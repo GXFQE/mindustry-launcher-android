@@ -32,7 +32,13 @@
 #         ./build.sh clean-trash    # 清空 .build-trash/（绕开批量删除闸，见下）
 # Env:    DEBUGGABLE=false|true (default false -- product ships NOT debuggable;
 #                                    all needed reflections pass without it)
-#         VER_CODE / VER_NAME / SUFFIX / KEYSTORE
+#         VER_CODE / VER_NAME / SUFFIX
+#         KEYSTORE / KS_ALIAS / KS_PASS / KEY_PASS
+#           ---- 签名。默认 = 本机 debug.keystore（自测够用）。
+#           ---- ★ 要**发出去**的包必须换成正式发布密钥，否则以后换密钥时
+#                已安装用户只能卸载重装，而卸载会删掉他们的存档槽：
+#                KEYSTORE=~/.android/mdt-launcher-release.jks KS_ALIAS=mdt \
+#                  KS_PASS=<口令> KEY_PASS=<口令> ./build.sh
 # =============================================================================
 set -euo pipefail
 
@@ -121,6 +127,11 @@ JAVAC_8="$JDK8/bin/javac"
 # ★ 2026-10-04：d8 的输入改成**一个 jar**（见 [3/4] 的注释），所以也要 JDK8 的 jar
 JAR_8="$JDK8/bin/jar"
 KEYSTORE="${KEYSTORE:-$HOME/.android/debug.keystore}"
+# 签名参数一律走环境变量（默认值 = Android 那套众所周知的 debug 凭据）。
+# ★ 发布包请换成自己的密钥，见文件头的 Env 说明。
+KS_ALIAS="${KS_ALIAS:-androiddebugkey}"
+KS_PASS="${KS_PASS:-android}"
+KEY_PASS="${KEY_PASS:-android}"
 
 PKG=io.mdt.launcher
 DEBUGGABLE="${DEBUGGABLE:-false}"
@@ -246,9 +257,9 @@ echo "== [4/4] zipalign + sign =="
 
 "$JAVA" -jar "$(jpath "$BT/lib/apksigner.jar")" sign \
   --ks "$(wpath "$KEYSTORE")" \
-  --ks-key-alias androiddebugkey \
-  --ks-pass pass:android \
-  --key-pass pass:android \
+  --ks-key-alias "$KS_ALIAS" \
+  --ks-pass "pass:$KS_PASS" \
+  --key-pass "pass:$KEY_PASS" \
   --out "$(wpath "$ROOT/$APP_NAME.apk")" \
   "$(wpath "$OUT/aligned.apk")"
 

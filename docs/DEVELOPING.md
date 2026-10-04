@@ -28,9 +28,23 @@ DEBUGGABLE=true ./build.sh   # 调试形态（反射已验证不需要它，只�
 JDK 8、`python`（打包 + clean-trash 用；PATH 里那个 WindowsApps 的 `python.exe` 是空壳，build.sh 会自己筛掉，也可用 `PYTHON=` 指定）。四个常见坑（MSYS 路径、cygpath 锁定、
 GBK 编码、批量删除）已固化在 build.sh 注释里。
 
-> ⚠️ **签名**：构建用的是调试签名密钥（`debug.keystore`）。自己侧载安装完全没问题；
-> 但如果要**正式分发**（尤其是以后做自更新），**必须先换成正式密钥** ——
-> 一旦发布过自更新就换不了了（换了老用户收不到升级）。
+> ⚠️ **签名**：默认用调试签名密钥（`$HOME/.android/debug.keystore`）—— 自己侧载自测够用，
+> **但要发出去的包必须换成正式发布密钥**。原因：Android 要求更新包的签名与已装版本一致，
+> 签名一换，已安装用户就只能**卸载重装**，而**卸载会连带删掉他们的存档槽**。
+>
+> ```bash
+> KEYSTORE=~/.android/mdt-launcher-release.jks KS_ALIAS=mdt \
+>   KS_PASS='<口令>' KEY_PASS='<口令>' ./build.sh
+> ```
+>
+> 四个变量都可覆盖（默认值就是 Android 那套众所周知的 debug 凭据）。
+> 核对产物：`apksigner verify --print-certs mdt-launcher.apk`，
+> 里面的 `certificate SHA-256 digest` 必须等于你密钥的指纹。
+> 正式密钥请**备份到两处以上**、口令存密码管理器 —— 丢了就再也发不了升级。
+>
+> ⚠️ 生成正式密钥请用**现代 JDK 的 keytool**。用 JDK 8 的 keytool 会写出旧算法 PKCS12，
+> 而签名用的 apksigner 跑在现代 JDK 上，会报
+> `UnrecoverableKeyException: failed to decrypt safe contents entry`（2026-10-04 实测踩过）。
 
 ## 资源
 
