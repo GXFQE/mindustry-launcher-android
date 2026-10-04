@@ -57,23 +57,52 @@ public final class Maps {
             return i >= 0 ? e.substring(i + 1) : e;
         }
 
-        /** 列表行第二行：区分度优先（地图口径：真名 · 尺寸 · 作者） */
-        public String line() {
+        /**
+         * 列表行第二行：区分度优先（地图口径：真名 · 尺寸 · 作者）。
+         *
+         * ★ 2026-10-04：改成**收 Context** —— 文案搬进资源了（P3 第一片，见 {@link MsavText}）。
+         *   原来是 Java 里拼中文，默认语言翻成英文之后这一行会中英混排。
+         */
+        public String line(Context c) {
             if (meta == null || !meta.ok) {
-                return "⚠ 读不出来" + (error == null || error.isEmpty() ? "" : "：" + error);
+                // ⚠️ 原因可能是"异常类名"，也可能是我们自己的中文（老 `error`）——
+                //    前者由 MsavText.userReason 翻成白话，后者原样透传（那批还没做错误码）。
+                return c.getString(R.string.msav_unreadable_fmt, MsavText.userReason(c, meta));
             }
-            return meta.shortLine(false);
+            return MsavText.shortLine(c, meta, false);
+        }
+
+        /**
+         * 来源标签（列表行用）：本槽 / 游戏自带 / 模组「x」。
+         *
+         * ★ 为什么**不接受** `source` 字段里的现成值：那是个**数据字段**（模组文件名是数据，
+         *   但"本槽""游戏自带"原来是写死的中文），而且它还要经 Intent 传出去 ⇒
+         *   拿它当界面文案会让"数据"和"文案"搅在一起（与 `MapStats.SRC_*` 是同一类问题）。
+         *   ⇒ 从 {@link #from} 这个**码**推文案，`source` 只留模组名。
+         */
+        public String sourceLabel(Context c) {
+            switch (from) {
+                case FROM_SLOT: return c.getString(R.string.map_from_slot);
+                case FROM_GAME: return c.getString(R.string.map_from_game);
+                default: return source == null || source.trim().isEmpty() ? ""
+                        : c.getString(R.string.map_from_mod_fmt, source);
+            }
+        }
+
+        /** 详情第一行用的来源（本槽那句多一个括号说明，所以与列表行不同） */
+        private String sourceLabelDetail(Context c) {
+            return from == FROM_SLOT ? c.getString(R.string.map_from_slot_detail) : sourceLabel(c);
         }
 
         /**
          * ★ 点开一项时摊开的详情（第 60 轮，用户：「我们可以加上点开地图查看详细信息」）。
          *
-         * 组成：**这是谁带来的 + 文件本身 + 元数据**（元数据交给 {@link MsavMeta#detail()}，
+         * 组成：**这是谁带来的 + 文件本身 + 元数据**（元数据交给 {@link MsavText#detail}，
          * 那是面向用户的版本；技术味的 `report()` 只用于落盘报告）。
          * ⚠️ 位置那行要**说人话**：模组/游戏自带的地图不在槽里，用户看不到那个文件，
          *    所以写「在 xxx 里」而不是 `zip!/maps/...` 这种路径。
          */
-        public String detail() {
+        public String detail(Context c) {
             StringBuilder sb = new StringBuilder();
             String n = meta != null && meta.ok ? Mods.stripColors(meta.displayName()) : "";
             String file = name();
@@ -82,15 +111,17 @@ public final class Maps {
             String stem = file.toLowerCase(Locale.ROOT).endsWith(".msav")
                     ? file.substring(0, file.length() - 5) : file;
             if (!n.isEmpty() && !n.equalsIgnoreCase(stem)) sb.append(n).append('\n');
-            sb.append("来自：").append(from == FROM_SLOT ? "本槽（你可以直接管理）"
-                    : from == FROM_GAME ? "游戏自带" : ("模组「" + source + "」")).append('\n');
-            sb.append("文件：").append(name()).append(" · ").append(Util.formatSize(bytes)).append('\n');
-            if (from != FROM_SLOT) sb.append("在：").append(container == null ? source : container.getName())
-                    .append(" 里\n");
+            sb.append(c.getString(R.string.map_detail_from_fmt, sourceLabelDetail(c))).append('\n');
+            sb.append(c.getString(R.string.map_detail_file_fmt, name(),
+                    Util.formatSize(bytes))).append('\n');
+            if (from != FROM_SLOT) {
+                sb.append(c.getString(R.string.map_detail_in_fmt,
+                        container == null ? sourceLabel(c) : container.getName())).append('\n');
+            }
             if (meta == null) {
-                sb.append("这个文件读不出来\n");
+                sb.append(c.getString(R.string.msav_unreadable)).append('\n');
             } else {
-                sb.append(meta.detail());
+                sb.append(MsavText.detail(c, meta));
             }
             return sb.toString();
         }
@@ -118,7 +149,7 @@ public final class Maps {
             scanModMaps(new File(dir, "mods"), out);
         }
         if (apkPath != null && !apkPath.trim().isEmpty()) {
-            scanContainer(new File(apkPath.trim()), "assets/maps/", FROM_GAME, "游戏自带", out);
+            scanContainer(new File(apkPath.trim()), "assets/maps/", FROM_GAME, "", out);
         }
         java.util.Collections.sort(out, new Comparator<Item>() {
             @Override public int compare(Item a, Item b) {
@@ -138,12 +169,15 @@ public final class Maps {
             if (!f.getName().toLowerCase(Locale.ROOT).endsWith(".msav")) continue;
             Item it = new Item();
             it.from = FROM_SLOT;
-            it.source = "本槽";
+            // ⚠️ `source` **不放中文标签**（"本槽"）—— 那是文案，由 {@link Item#sourceLabel} 从
+            //    `from` 推出来；这个字段只承载**数据**（模组文件名）。它还要经 Intent 传出去。
+            it.source = "";
             it.file = f;
             it.where = f.getAbsolutePath();
             it.bytes = f.length();
             it.meta = metaOf(it);
-            if (it.meta == null || !it.meta.ok) it.error = it.meta == null ? "读不出来" : it.meta.error;
+            // 只有"元数据读不出来"才有原因；**不要**塞一句自己的中文进去（那是文案，不是数据）
+            if (it.meta != null && !it.meta.ok) it.error = it.meta.error;
             out.add(it);
         }
     }
@@ -216,9 +250,7 @@ public final class Maps {
                 it.where = container.getName() + "!/" + n;
                 it.bytes = ze.getSize();
                 it.meta = metaOf(it);                     // ★ 只读第一块 ⇒ 不解压整份
-                if (it.meta == null || !it.meta.ok) {
-                    it.error = it.meta == null ? "读不出来" : it.meta.error;
-                }
+                if (it.meta != null && !it.meta.ok) it.error = it.meta.error;
                 out.add(it);
             }
         } catch (Throwable t) {

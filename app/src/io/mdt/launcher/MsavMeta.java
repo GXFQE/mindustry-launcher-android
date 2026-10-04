@@ -276,85 +276,24 @@ public final class MsavMeta {
         return (width > 0 && height > 0) ? (width + " × " + height) : "";
     }
 
-    /** 游玩时长文案（毫秒 ⇒ "3 小时 12 分"这种；<1 分钟就不显示） */
-    public String playtimeText() {
-        if (playtime <= 0) return "";
-        long sec = playtime / 1000L;
-        long h = sec / 3600L, min = (sec % 3600L) / 60L;
-        if (h > 0) return h + " 小时 " + min + " 分";
-        if (min > 0) return min + " 分钟";
-        return "不到 1 分钟";
-    }
-
-    /** 一行摘要（列表行副标题用；没有的项自动省掉） */
-    public String summary() {
-        List<String> parts = new ArrayList<>();
-        String n = displayName();
-        if (!n.isEmpty()) parts.add(n);
-        String sz = sizeText();
-        if (sz.isEmpty()) parts.add("尺寸读不出");
-        else parts.add(sz);
-        if (wave > 1) parts.add("第 " + wave + " 波");
-        String pt = playtimeText();
-        if (!pt.isEmpty()) parts.add("玩了 " + pt);
-        parts.add("格式 v" + version);
-        StringBuilder sb = new StringBuilder();
-        for (String s : parts) {
-            if (sb.length() > 0) sb.append(" · ");
-            sb.append(s);
-        }
-        if (truncated) sb.append(" · ⚠ 像是写了一半");
-        return sb.toString();
-    }
+    // ── 显示文案：**不在本类** ────────────────────────────────────────────
+    //
+    // 原来这里有 playtimeText / summary / shortLine 三个方法，它们**用 Java 拼中文**
+    // （`玩了 1 小时 2 分` / `存档于 …` / `作者：…`）。
+    // 2026-10-04（P3 第一片）搬到 {@link MsavText} 了，理由：
+    //   · 默认语言翻成英文之后，存档行成了「208.3 KB · 我的地图 · 玩了 1 小时 2 分」这种**中英混排**；
+    //   · 但本类**刻意不碰 Android**（要能在 PC 上单独编译、拿语料逐项对照）⇒ 不能 getString。
+    // ⇒ 分工：**本类只留数据 + 解析；一切给用户看的词都在 {@link MsavText}**。
+    //   以后往本类加东西时，别再把文案拼进来。
 
     /**
-     * ★ 列表行用的**短行**（区分度优先，用户 2026-10-03 要求）：
-     *  · 存档：`地图名 · 玩了 X · 存档于 10-03 13:22`  ← 时间与时长才是"哪一份"的判据
-     *  · 地图：`真名 · 586 × 586 · 作者：xxx`
-     *  ⚠️ **格式版本不进这一行** —— 那是给维护者看的（读不出来时才在别处说），
-     *    塞进来只会让长存档名溢出到第三行（真机截图里就溢出了）。
-     *  · 缺什么就省什么；都没有时退回尺寸/格式，**不返回空串**（空行会让列表看不出区别）。
-     *
-     * @param isSave 由调用方按**文件所在目录**决定（`saves/` vs `maps/`）——
-     *               ⚠️ 不要靠 tags 猜（老地图也带 `mapname`，见类注释）
-     */
-    public String shortLine(boolean isSave) {
-        List<String> parts = new ArrayList<>();
-        // ★ 地图真名里**带色码**（`[gold]Alloy-Sidestory [red]…`）—— 游戏会渲染成颜色，
-        //   我们这里是纯文本列表 ⇒ 必须去色，否则一行里全是 `[gold]` 这种噪声（真机截图里就是）。
-        //   判据复用 Mods 里那份 arc 等价实现（`Strings.stripColors`），不另写一份。
-        String n = Mods.stripColors(displayName());
-        if (!n.isEmpty()) parts.add(n);
-        if (isSave) {
-            String pt = playtimeText();
-            if (!pt.isEmpty()) parts.add("玩了 " + pt);
-            String t = savedText();
-            if (!t.isEmpty()) parts.add("存档于 " + t);
-        } else {
-            String sz = sizeText();
-            if (!sz.isEmpty()) parts.add(sz);
-            // ⚠️ 作者字段**同样可能带色码**（真机实测：`[#2E8E05]iq[lime]tik[green]123`）
-            //   ⇒ 与真名同一套判据，别只处理名字那一处
-            String au = Mods.stripColors(author == null ? "" : author).trim();
-            if (!au.isEmpty()) parts.add("作者：" + au);
-        }
-        if (parts.isEmpty()) {
-            String sz = sizeText();
-            if (!sz.isEmpty()) parts.add(sz);
-            parts.add("格式 v" + version);
-        }
-        StringBuilder sb = new StringBuilder();
-        for (String s : parts) {
-            if (sb.length() > 0) sb.append(" · ");
-            sb.append(s);
-        }
-        if (truncated) sb.append(" · ⚠ 像是写了一半");
-        return sb.toString();
-    }
-
-    /**
-     * 人读的保存时间：**今年内只写 `MM-DD HH:mm`**，跨年才带年份（本地时区）。
+     * 人读的保存时间：**今年内只写 `MM-dd HH:mm`**，跨年才带年份（本地时区）。
      * ★ 存档列表里"哪一份更新"是最常用的判据 ⇒ 短且能直接比较比"完整但很长"更有用。
+     *
+     * ⚠️ 用 `Locale.US`（2026-10-04 收口）：本工程其它 8 处日期/数字格式化一律 `Locale.US`/`Locale.ROOT`，
+     *   只有这里原来用的是 `Locale.getDefault()` —— 在阿拉伯语等使用本地数字的设备上，
+     *   它会输出本地数字而界面其它数字是西文数字，同一个界面上两套数字格式。
+     *   （格式串是纯数字 ⇒ 换 Locale 不改输出，见 docs/i18n-feasibility.md §7.9。）
      */
     public String savedText() {
         if (saved <= 0) return "";
@@ -364,14 +303,14 @@ public final class MsavMeta {
             int y = c.get(java.util.Calendar.YEAR);
             int nowYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR);
             java.text.SimpleDateFormat f = new java.text.SimpleDateFormat(
-                    y == nowYear ? "MM-dd HH:mm" : "yyyy-MM-dd HH:mm", java.util.Locale.getDefault());
+                    y == nowYear ? "MM-dd HH:mm" : "yyyy-MM-dd HH:mm", java.util.Locale.US);
             return f.format(new java.util.Date(saved));
         } catch (Throwable t) {
             return "";
         }
     }
 
-    /** 多行报告（详情弹窗 / 落盘报告用） */
+    /** 多行报告（**给维护者**：落盘报告 + 自检看它；给用户的那份是 {@link MsavText#detail}） */
     public String report() {
         StringBuilder sb = new StringBuilder();
         if (!ok) {
@@ -387,7 +326,7 @@ public final class MsavMeta {
         if (!sz.isEmpty()) sb.append("尺寸：").append(sz).append('\n');
         if (author != null && !author.trim().isEmpty()) sb.append("作者：").append(author).append('\n');
         if (wave > 0) sb.append("波次：").append(wave).append('\n');
-        String pt = playtimeText();
+        String pt = reportPlaytime();
         if (!pt.isEmpty()) sb.append("游玩：").append(pt).append('\n');
         if (build > 0) sb.append("游戏构建：").append(build).append('\n');
         if (saved > 0) sb.append("保存时间：").append(saved).append("（毫秒时间戳）\n");
@@ -399,62 +338,30 @@ public final class MsavMeta {
         return sb.toString();
     }
 
-    /**
-     * ★ **面向用户**的详情（第 60 轮：点开地图看详细信息）。
-     *
-     * 与 {@link #report()} 的分工要分清：
-     *  · `report()` —— 给维护者的（写着「毫秒时间戳」「元数据项 N 条」这类话），
-     *    用在落盘报告与自检里；
-     *  · `detail()` —— 给用户看的：**白话、短、没有术语**（用户 2026-10-02 定的文案三条），
-     *    色码去掉、时间写成人读的、只列"能用来判断这是哪张图"的字段。
-     */
-    public String detail() {
-        StringBuilder sb = new StringBuilder();
-        if (!ok) {
-            sb.append("这个文件读不出来");
-            if (error != null && !error.isEmpty()) sb.append("：").append(userReason());
-            sb.append('\n');
-            if (truncated) sb.append("（像是写了一半就中断了）\n");
-            return sb.toString();
-        }
-        if (truncated) sb.append("⚠ 这个文件像是写了一半\n");
-        String sz = sizeText();
-        if (!sz.isEmpty()) sb.append("尺寸：").append(sz).append('\n');
-        String au = Mods.stripColors(author == null ? "" : author).trim();
-        if (!au.isEmpty()) sb.append("作者：").append(au).append('\n');
-        if (wave > 0) sb.append("波次：").append(wave).append('\n');
-        String pt = playtimeText();
-        if (!pt.isEmpty()) sb.append("玩了：").append(pt).append('\n');
-        String t = savedText();
-        if (!t.isEmpty()) sb.append("保存于：").append(t).append('\n');
-        sb.append("格式版本：v").append(version).append('\n');
-        String d = Mods.stripColors(description == null ? "" : description).trim();
-        if (!d.isEmpty()) {
-            sb.append("简介：").append(d.length() > 160 ? d.substring(0, 160) + "…" : d).append('\n');
-        }
-        return sb.toString();
-    }
+    // 原来这里还有 detail() 与 userReason()，**同样搬到 {@link MsavText} 了**（P3 第一片）：
+    //   · detail()     —— 给用户的详情（"尺寸：… / 作者：… / 格式版本：v…"那一串）
+    //   · userReason() —— 给用户的失败原因
+    // 两者都是**给用户看的词**，所以按同一个理由离开本类：
+    //   **本类只留数据 + 解析；一切给用户看的词都在 MsavText。**
+    // ⚠️ report() 与 error 原文**留在本类**：那是给维护者的（落盘报告 + 自检看它），
+    //    不跟着界面语言变，别顺手也搬走。
 
     /**
-     * **给用户看**的失败原因（列表行 / 详情页用）。
+     * 报告里的时长文案（**只给 {@link #report} 用**，所以仍然是中文硬编码）。
      *
-     * ★ 为什么要有它：{@link #error} 里混着两类东西 ——
-     *   ① 我们自己写的中文判断（`这不是 .msav：开头不是 MSAV`）—— 直接能用；
-     *   ② Java 异常的 `类名: 消息`（`ZipException: incorrect header check`）—— 对用户是天书，
-     *      而它在真实场景里**最常见**（随便找个文件把后缀改成 `.msav`）。
-     *   ⇒ 只**翻译**第 ② 类，其余原样返回。
-     * ⚠️ 不改判据、不改 {@link #error} 原文：排查时看的仍然是那个字段（`report()` 用的就是它）。
+     * ★ 为什么不复用 {@link MsavText#playtimeText}：那个要 Context，而本类刻意不碰 Android
+     *   （要能在 PC 上单独编译、拿语料逐项对照）。
+     * ★ 为什么它可以留中文：`report()` 是**给维护者**的（落盘报告 + 自检看它），
+     *   正是 `res/values/strings.xml` 头注释里那条"写进 report-*.txt 的取证文本不进资源"。
+     *   **给用户看的那份在 {@link MsavText}**，跟着界面语言走 —— 两者别混。
      */
-    public String userReason() {
-        String e = error == null ? "" : error.trim();
-        if (e.isEmpty()) return "原因不明";
-        if (e.matches("^[A-Za-z_$][A-Za-z0-9_$]*(Exception|Error)\\b.*")) {
-            if (e.startsWith("ZipException") || e.startsWith("EOFException")) {
-                return "这个文件不像存档，或者写到一半就断了";
-            }
-            return "读这个文件的时候出错了";
-        }
-        return e;
+    private String reportPlaytime() {
+        if (playtime <= 0) return "";
+        long sec = playtime / 1000L;
+        long h = sec / 3600L, min = (sec % 3600L) / 60L;
+        if (h > 0) return h + " 小时 " + min + " 分";
+        if (min > 0) return min + " 分钟";
+        return "不到 1 分钟";
     }
 
     /** 全部 tags（诊断/落盘报告用；保序） */

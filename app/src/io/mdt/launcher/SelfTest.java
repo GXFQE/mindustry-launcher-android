@@ -198,7 +198,7 @@ public final class SelfTest {
             // ★ ㉙ 清单注册检查（新增页面必须注册，否则 BUILD OK 但真机崩）
             activityRegistration(ctx, L, stat);
             // ★ ㊱ 基类检查：每个页面都必须继承 BaseActivity（否则深浅色设置对它无效）
-            activityThemeBase(L, stat);
+            activityThemeBase(ctx, L, stat);
             // ★ ㊲ 主进程崩溃落盘（真写一份探针报告再删掉）
             crashDump(ctx, L, stat);
             // ★ ㉘ F10 地图增删：导入（先 part+验）与删除（挪不删）
@@ -3111,8 +3111,11 @@ public final class SelfTest {
                             && m.playtime == 3720000L && m.build == 153 && !m.truncated,
                     "★解析：格式版本/尺寸/波次/真名(中文)/游玩时长/构建号全部读出来");
             // ★ 列表行两个口径（用户要求"区分度大点"）：存档看**时长+时间**，地图看**尺寸+作者**
-            String saveLine = m.shortLine(true);
-            String mapLine = m.shortLine(false);
+            // ★ P3 第一片：行文案搬到 MsavText（收 Context）了 ⇒ 这里显式传 ctx。
+            //   自检的 ctx 一进来就被 force 成 SELFTEST（zh），所以下面那些中文期望值**照旧成立**，
+            //   而且从此**不受用户的界面语言设置影响**（这比原来更稳）。
+            String saveLine = MsavText.shortLine(ctx, m, true);
+            String mapLine = MsavText.shortLine(ctx, m, false);
             ok(stat, L, saveLine.contains("玩了 1 小时 2 分") && saveLine.contains("存档于 ")
                             && saveLine.contains("我的地图"),
                     "★存档行：地图名 + 玩了多久 + 人读的存档时间 —— " + saveLine);
@@ -3124,13 +3127,13 @@ public final class SelfTest {
             // ★ 去色：真名里带色码时必须去掉（真机截图里满行 `[gold]`/`[red]` 噪声）
             File colored = tinyMsav(new File(dir, "colored.msav"), "[gold]金色[red]地图[]", 32, 32, 2, false);
             MsavMeta cm = MsavMeta.read(colored);
-            String cl = cm.shortLine(false);
+            String cl = MsavText.shortLine(ctx, cm, false);
             ok(stat, L, "金色地图".equals(Mods.stripColors(cm.name)) && !cl.contains("[gold]")
                             && !cl.contains("[red]") && cl.contains("金色地图"),
                     "★去色：真名 `[gold]金色[red]地图[]` ⇒ 列表行显示「" + cl + "」（无方括号色码）");
             ok(stat, L, "我的地图".equals(m.displayName()) && "640 × 480".equals(m.sizeText())
-                            && !m.playtimeText().isEmpty(),
-                    "★展示：显示名 / 尺寸 / 时长文案（" + m.summary() + "）");
+                            && !MsavText.playtimeText(ctx, m).isEmpty(),
+                    "★展示：显示名 / 尺寸 / 时长文案（" + MsavText.summary(ctx, m) + "）");
 
             // 把最后一块（假的 map 区）砍掉 ⇒ meta 完好、文件其实不完整
             File cut = tinyMsav(new File(dir, "cut.msav"), "半份", 64, 64, 3, true);
@@ -3229,8 +3232,9 @@ public final class SelfTest {
             // ── 失败原因的"人话版"：异常类名不许直接甩给用户 ──
             MsavMeta tech = MsavMeta.read(junk);
             ok(stat, L, tech.error != null && tech.error.contains("ZipException")
-                            && "这个文件不像存档，或者写到一半就断了".equals(tech.userReason()),
-                    "★原因翻译：`" + tech.error + "` ⇒ 「" + tech.userReason() + "」");
+                            && "这个文件不像存档，或者写到一半就断了"
+                                    .equals(MsavText.userReason(ctx, tech)),
+                    "★原因翻译：`" + tech.error + "` ⇒ 「" + MsavText.userReason(ctx, tech) + "」");
             // ② 中文判断（我们自己写的）必须**原样返回** —— 判据不是"什么错都翻成同一句"
             java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
             java.util.zip.DeflaterOutputStream dos = new java.util.zip.DeflaterOutputStream(bo);
@@ -3240,11 +3244,11 @@ public final class SelfTest {
             write(noMagic, bo.toByteArray());
             MsavMeta nm = MsavMeta.read(noMagic);
             ok(stat, L, nm.error != null && nm.error.contains("MSAV")
-                            && nm.error.equals(nm.userReason())
-                            && !nm.userReason().equals(tech.userReason()),
+                            && nm.error.equals(MsavText.userReason(ctx, nm))
+                            && !MsavText.userReason(ctx, nm).equals(MsavText.userReason(ctx, tech)),
                     "★元断言：中文判断原样返回、且与上面那句**不是同一句**（翻译不是一把梭）⇒ 「"
-                            + nm.userReason() + "」");
-            ok(stat, L, "原因不明".equals(MsavMeta.read(good).userReason()),
+                            + MsavText.userReason(ctx, nm) + "」");
+            ok(stat, L, "原因不明".equals(MsavText.userReason(ctx, MsavMeta.read(good))),
                     "★反向：没出错（error=null）⇒ 兜底「原因不明」，不抛 NPE");
 
             // ── 文案实拼（★ 顺带钉住 aapt2 剥前导空白那个老坑：分隔符" · "必须还在）──
@@ -3262,6 +3266,18 @@ public final class SelfTest {
             ok(stat, L, ctx.getString(R.string.msav_bad_list_title_fmt, 3).contains("3"),
                     "★落点弹窗的标题带上份数："
                             + ctx.getString(R.string.msav_bad_list_title_fmt, 3));
+            // ★★ aapt2 会把值里的**裸双引号静默删掉**（2026-10-04 实测：`mod "%1$s"` 装到机器上
+            //    显示成 `mod X`）⇒ 要显示引号必须写 `\"`。这条拿**真参数实拼**钉住这个转义
+            //    （否则"翻译里写的引号全没了"这件事没有任何环节能发现）。
+            //    ⚠️ 必须显式取**英文**资源：自检的 ctx 被钉在 zh，而中文用的是「」、
+            //       本来就没有 ASCII 引号 —— 拿它断言等于什么都没验（我第一版就是这么错的）。
+            Context enCtx = LocaleMode.force(ctx, "en");
+            String quoted = enCtx.getString(R.string.map_from_mod_fmt, "X.zip");
+            String dlgTitle = enCtx.getString(R.string.delete_slot_confirm_title_fmt, "test");
+            ok(stat, L, quoted.contains("\"X.zip\"") && !quoted.contains("\\")
+                            && dlgTitle.contains("\"test\"") && !dlgTitle.contains("\\"),
+                    "★转义：英文资源里写 \\\" 才会真的显示双引号（裸引号会被 aapt2 删掉）：「"
+                            + quoted + "」/「" + dlgTitle + "」");
         } catch (Throwable t) {
             ok(stat, L, false, "存档体检用例自身异常：" + t);
         } finally {
@@ -3525,8 +3541,9 @@ public final class SelfTest {
             Maps.scanContainer(apk, "assets/maps/", Maps.FROM_GAME, "游戏自带", fromApk);
             ok(stat, L, fromApk.size() == 1 && fromApk.get(0).meta != null && fromApk.get(0).meta.ok
                             && "群岛".equals(fromApk.get(0).meta.name)
-                            && fromApk.get(0).line().contains("96 × 96"),
-                    "★游戏自带：从 APK 的 assets/maps 条目流式读出「真名 · 尺寸」：" + fromApk.get(0).line());
+                            && fromApk.get(0).line(ctx).contains("96 × 96"),
+                    "★游戏自带：从 APK 的 assets/maps 条目流式读出「真名 · 尺寸」："
+                            + fromApk.get(0).line(ctx));
 
             // ③ 模组包：maps/ 下的图，且要标出来自哪个包
             File mz = new File(root, "real-mod.zip");
@@ -3635,13 +3652,14 @@ public final class SelfTest {
                 if (i.meta != null && i.meta.ok) good = i;
                 else bad = i;
             }
-            String gd = good == null ? "" : good.detail();
+            String gd = good == null ? "" : good.detail(ctx);
             ok(stat, L, good != null && gd.contains("金色地图") && gd.contains("320 × 240")
                             && gd.contains("来自：本槽") && gd.contains("文件：colored.msav")
                             && !gd.contains("[gold]") && !gd.contains("毫秒") && !gd.contains("元数据项"),
                     "★详情：真名/尺寸/来源/文件都在，且**没有色码、没有维护者视角的话**（"
                             + gd.replace(String.valueOf((char) 10), String.valueOf((char) 32)) + "）");
-            ok(stat, L, bad != null && bad.detail().contains("读不出来") && !bad.detail().contains("尺寸："),
+            ok(stat, L, bad != null && bad.detail(ctx).contains("读不出来")
+                            && !bad.detail(ctx).contains("尺寸："),
                     "★反向：读不出来的那一项，详情里**不许**出现正常地图才有的字段（不伪装成功）");
         } catch (Throwable t) {
             ok(stat, L, false, "地图详情用例自身异常：" + t);
@@ -3834,7 +3852,7 @@ public final class SelfTest {
      * ★ 元断言：拿 `android.app.Activity` 这个**不是** BaseActivity 的类喂同一个判据，
      *   必须判否，否则这条可能只是在恒真地打勾。
      */
-    private static void activityThemeBase(List<String> L, int[] stat) {
+    private static void activityThemeBase(Context ctx, List<String> L, int[] stat) {
         L.add("── ㊱ 每个页面都必须继承 BaseActivity（否则深浅色设置对它无效）──");
         int n = 0;
         for (Class<?> c : PAGES) {
@@ -3848,6 +3866,24 @@ public final class SelfTest {
         // ★ 元断言：判据必须有分辨力（`android.app.Activity` 本身不是 BaseActivity 的子类）
         ok(stat, L, !BaseActivity.class.isAssignableFrom(android.app.Activity.class),
                 "★元断言：android.app.Activity 本身判否（说明这条不是在恒真地打勾）");
+
+        // ★ 顶栏标题：`Activity.mTitle` 是**框架**在 attach() 里用 PackageManager 按**系统语言**
+        //   解析 android:label 得到的 —— 我们在 attachBaseContext 里包的 Configuration **管不到它**
+        //   ⇒ 必须由 BaseActivity.onCreate 按应用内语言重设一次（2026-10-04 用户报的
+        //   "最上面的大标题没改"）。这条钉住"那次重设还在"：删了它，界面只会**静默**退回系统语言。
+        boolean hasOnCreate = false;
+        try {
+            BaseActivity.class.getDeclaredMethod("onCreate", android.os.Bundle.class);
+            hasOnCreate = true;
+        } catch (NoSuchMethodException ignored) {
+        }
+        ok(stat, L, hasOnCreate,
+                "★顶栏标题：BaseActivity 必须重写 onCreate（框架那份 label 是按系统语言取的）");
+        // ★ 元断言：标题文案两套语言确实是两份 —— 否则"改了也看不出来"，上面那条就没有意义
+        Context titleEn = LocaleMode.force(ctx, "en");
+        ok(stat, L, !titleEn.getString(R.string.app_name).equals(ctx.getString(R.string.app_name)),
+                "★元断言：app_name 两套语言是两份（en=「" + titleEn.getString(R.string.app_name)
+                        + "」/ zh=「" + ctx.getString(R.string.app_name) + "」）");
         L.add("");
     }
 
@@ -4146,6 +4182,12 @@ public final class SelfTest {
                             + "item.copper.name=模组铜\n"
                             + "item.titanium.name=模组钛\n"
                             + "item.ve-copper.name=模组铜2\n").getBytes("UTF-8"));
+            // ★ 同一个 `bundles/` 目录里**再放一份繁体**：这是真机实测的情况
+            //   （模组同时带 bundle_zh_CN 与 bundle_zh_TW）⇒ 两份都读会互相覆盖，
+            //   中文界面显示成「釷/鈹/鎢」那种繁体。每个目录只能取**一份**。
+            write(new File(bundles, "bundle_zh_TW.properties"),
+                    ("item.copper.name=模組銅\n"
+                            + "item.titanium.name=模組鈦\n").getBytes("UTF-8"));
             // 模组的**基础层**（层序判据要用：语言层压得住模组的基础层；基础层里模组压得住版本）
             write(new File(bundles, "bundle.properties"),
                     "item.lead.name=模组铅\nitem.silicon.name=模组硅\n".getBytes("UTF-8"));
@@ -4153,7 +4195,7 @@ public final class SelfTest {
             mp.dir = modDir;
             mp.label = "测试模组";
             MapStats.Bundles modBundle = MapStats.readBundles(
-                    java.util.Collections.singletonList(mp));
+                    java.util.Collections.singletonList(mp), MapStats.bundleLang("zh_CN"));
             File fakeApk = new File(tmp, "fake.apk");
             zipMany(fakeApk,
                     new String[]{"assets/bundles/bundle_zh_CN.properties",
@@ -4161,7 +4203,8 @@ public final class SelfTest {
                     new String[]{"item.copper.name=铜\nitem.silicon.name=硅\n",
                             "item.copper.name=Copper\nitem.lead.name=Lead\n"
                                     + "item.silicon.name=Silicon\nitem.titanium.name=Titanium\n"});
-            BundleNames bn = new BundleNames(fakeApk, modBundle, null);
+            BundleNames bn = new BundleNames(fakeApk, modBundle, null,
+                    MapStats.bundleLang("zh_CN"), "%1$s（墙）");
             ok(stat, L, "铝土".equals(bn.item("ve-aluminium")) && "甜瓜土".equals(bn.block("ve-melondirt")),
                     "★模组物品/方块的译名从**模组自己的 bundle** 里捞（版本 APK 里没有这些名字）");
             ok(stat, L, "模组铜".equals(bn.item("copper")),
@@ -4170,11 +4213,72 @@ public final class SelfTest {
                     "★层序：版本 APK 的**语言包**压得住模组的**基础包**");
             ok(stat, L, "模组铅".equals(bn.item("lead")),
                     "★基础层里同样是模组覆盖版本 APK（铅只在两边的 base 里）");
-            ok(stat, L, "".equals(bn.item("no-such-item")) && "（墙）".equals(bn.wallSuffix()),
-                    "★反向：两层都查不到 ⇒ 返回空串（调用方退回内部名的可读化形式）");
+            ok(stat, L, "".equals(bn.item("no-such-item")) && "钍（墙）".equals(bn.wallName("钍")),
+                    "★反向：两层都查不到 ⇒ 返回空串（调用方退回内部名的可读化形式）；"
+                            + "矿墙名是**整名**（`钍（墙）` 而不是拼一个后缀 —— 英文那句要 `Thorium (wall)`，"
+                            + "前导空格写进资源会被 aapt2 剥掉）");
             ok(stat, L, mp.bundleKeys == 7 && modBundle.keys() == 7,
                     "模组 bundle 读到 7 条（语言包 5 + 基础包 2；技术细节层要能报出这个数）："
                             + modBundle.keys());
+            // ★★ 同目录里 CN/TW 都在 ⇒ **只能取一份**（取错/取两份会显示成繁体，且条数会变多）
+            ok(stat, L, "模组铜".equals(bn.item("copper")) && !"模組銅".equals(bn.item("copper")),
+                    "★★同目录 `bundle_zh_CN` + `bundle_zh_TW` ⇒ 只取**分数最高的那一份**："
+                            + "want=zh_CN 时显示简体「" + bn.item("copper") + "」（不是繁体「模組銅」）");
+            BundleNames tw = new BundleNames(fakeApk,
+                    MapStats.readBundles(java.util.Collections.singletonList(mp),
+                            MapStats.bundleLang("zh_TW")),
+                    null, MapStats.bundleLang("zh_TW"), "%1$s（牆）");
+            ok(stat, L, "模組銅".equals(tw.item("copper")) && "模組鈦".equals(tw.item("titanium")),
+                    "★反向：want=zh_TW 时取的是**繁体**那份「" + tw.item("copper")
+                            + "」—— 证明上面那条不是「恒取 CN」（判据有分辨力）");
+            // ★★ P4 的**分辨力**判据：同一份假 APK，只把"界面语言"从 zh_CN 换成 en，
+            //    读到的名字必须**真的不一样** —— 否则"矿名跟着界面语言走"就只是句话。
+            //    ⚠️ 模组那份 bundle 也要**按同一门语言重读**（`BundleNames` 会无条件合并传进来的
+            //       那两层 —— 产品侧靠"缓存键含语言"保证两者同源，见 MapStatsMods.key）。
+            MapStats.Bundles modBundleEn = MapStats.readBundles(
+                    java.util.Collections.singletonList(mp), MapStats.bundleLang("en"));
+            BundleNames en = new BundleNames(fakeApk, modBundleEn, null,
+                    MapStats.bundleLang("en"), "%1$s (wall)");
+            ok(stat, L, "Copper".equals(en.item("copper")) && "Titanium".equals(en.item("titanium"))
+                            && "".equals(en.item("ve-aluminium"))
+                            && "模组铅".equals(en.item("lead"))
+                            && "Thorium (wall)".equals(en.wallName("Thorium")),
+                    "★★界面语言换 en ⇒ 读**基础包**（`bundle.properties` = 官方那份英文）：铜/钛变 Copper/Titanium、"
+                            + "只存在于 zh 语言包里的名字查不到、矿墙名用整句模板。"
+                            + "铜（zh）=「" + bn.item("copper") + "」/ 铜（en）=「" + en.item("copper") + "」");
+            ok(stat, L, !en.item("copper").equals(bn.item("copper"))
+                            && !en.wallName("Thorium").equals(bn.wallName("钍")),
+                    "★元断言：语言后缀真的改变了读哪一层（否则上面那条会在两种语言下同时成立 = 没有分辨力）");
+
+            // ★★ 回归（用户 2026-10-04 报的第二条："换中文不管用"）：
+            //    应用内语言是 **`zh`（没有地区）**，而包里的文件叫 `bundle_zh_CN.properties`
+            //    ⇒ 精确匹配会全落空、整层掉回英文（矿名变 Thorium）。必须**按语言前缀兜底**。
+            BundleNames bare = new BundleNames(fakeApk,
+                    MapStats.readBundles(java.util.Collections.singletonList(mp),
+                            MapStats.bundleLang("zh")),
+                    null, MapStats.bundleLang("zh"), "%1$s（墙）");
+            ok(stat, L, "模组铜".equals(bare.item("copper")) && "铝土".equals(bare.item("ve-aluminium"))
+                            && "模组钛".equals(bare.item("titanium")),
+                    "★★回归：want=`zh`（**没有地区**）也要认 `bundle_zh_CN.properties` —— 否则中文界面的"
+                            + "矿名会掉回英文（铜 =「" + bare.item("copper") + "」）");
+            ok(stat, L, bare.item("copper").equals(bn.item("copper"))
+                            && !bare.item("copper").equals(en.item("copper")),
+                    "★元断言：`zh` 与 `zh_CN` 结果**相同**（前缀兜底生效），且**都不是** en 的结果");
+            // 反过来：want 带了地区时，**别的地区**那份要排在后面（同语言多份不能都读、互相覆盖）
+            ok(stat, L, MapStats.bundleRank("a/bundles/bundle_zh_CN.properties",
+                            MapStats.bundleLang("zh_CN"))
+                            > MapStats.bundleRank("a/bundles/bundle_zh_TW.properties",
+                            MapStats.bundleLang("zh_CN")),
+                    "★元断言：want=`zh_CN` 时 CN 那份的分数**高于** TW 那份（同语言多地区只取最匹配的一份）");
+            ok(stat, L, MapStats.bundleRank("a/bundles/bundle.properties",
+                            MapStats.bundleLang("zh")) == 2
+                            && MapStats.bundleRank("a/bundles/bundle_zh_CN.properties",
+                            MapStats.bundleLang("zh")) >= 10
+                            && MapStats.bundleRank("a/other/bundle_zh_CN.properties",
+                            MapStats.bundleLang("zh")) >= 10
+                            && MapStats.bundleRank("a/bundles/bundle_en.properties",
+                            MapStats.bundleLang("zh")) == 0,
+                    "★判层：基础包=2、同语言语言包≥10、**别的语言=0**（认错语言比认不出更糟）");
 
             // ★★ 内容引用按**游戏那条顺序**解析：`<模组前缀>-短名` → 短名
             //    （ContentParser$2 字节码：先 getByName(type, mod.name + "-" + name)，再 getByName(type, name)）
@@ -4305,8 +4409,8 @@ public final class SelfTest {
                 return i;
             }
 
-            @Override public String wallSuffix() {
-                return "（墙）";
+            @Override public String wallName(String base) {
+                return base + "（墙）";
             }
 
             @Override public String attr(String key) {

@@ -67,6 +67,34 @@ public abstract class BaseActivity extends Activity {
     }
 
     @Override
+    protected void onCreate(android.os.Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        applyLocalizedTitle();
+    }
+
+    /**
+     * 把顶栏标题按**应用内语言**重新解析一次。
+     *
+     * 🔴 为什么必须我们自己动手：`Activity.mTitle` 是**框架**在 `attach()` 里用
+     *   `PackageManager.getActivityInfo(...).loadLabel(pm)` 取的 —— 那次解析用的是**系统**语言，
+     *   我们在 {@link #attachBaseContext} 里包的那份 Configuration **根本管不到它**
+     *   ⇒ 用户把界面切成英文之后，主页顶栏还是「MDT 启动器」（2026-10-04 用户报的
+     *   "最上面的大标题没改"）。
+     * ★ 其余页面（地图 / 槽 / 设置…）在**子类 `onCreate` 里**显式 `setTitle(getString(...))`，
+     *   那是用我们包过的 Context 取的 ⇒ 本来就是对的。这里只补上"清单里那份 label"的兜底，
+     *   而且它跑在子类 `onCreate` 之前 ⇒ **子类照样覆盖得了**，不会把已有的标题改坏。
+     */
+    private void applyLocalizedTitle() {
+        try {
+            android.content.pm.ActivityInfo ai =
+                    getPackageManager().getActivityInfo(getComponentName(), 0);
+            if (ai != null && ai.labelRes != 0) setTitle(getString(ai.labelRes));
+        } catch (Throwable ignored) {
+            // 拿不到就维持框架给的那个（宁可语言不对，也不能因为标题把页面搞崩）
+        }
+    }
+
+    @Override
     protected void onResume() {
         super.onResume();
         if (!syncUiOnResume() || isFinishing()) return;

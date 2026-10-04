@@ -123,12 +123,32 @@ public final class LocaleMode {
         return base.createConfigurationContext(cfg);
     }
 
-    /** BCP47 标签 → Locale（`zh-TW` 这种写法也认）。认不出来返回 null */
+    /**
+     * BCP47 标签 → Locale（`zh-TW` 这种写法也认）。认不出来返回 null。
+     *
+     * ★ 2026-10-04：**给名单里的语言补上默认地区**（`zh` ⇒ `zh_CN`）。
+     *   原来 `Locale.forLanguageTag("zh")` 得到的是"只有语言、没有地区"的 Locale，
+     *   后果是地图统计去游戏/模组的语言包里找译名时匹配不上
+     *   （包里叫 `bundle_zh_CN.properties`，我们却在找 `bundle_zh.properties`）⇒
+     *   中文界面的矿物名**掉回英文**（用户报的"换中文不管用"）。
+     *   ⚠️ 这里只加**地区**，不改语言；`values-zh/` 照样命中（资源按语言匹配）。
+     *   新增语言时**要么**在名单里直接写全 `zh-Hans-CN`，**要么**在这里补一行。
+     */
+    private static final java.util.Map<String, String> LIKELY_TAG = new java.util.HashMap<>();
+
+    static {
+        LIKELY_TAG.put("zh", "zh-CN");        // 名单里的「简体中文」= 简体 + 中国
+        // en 不需要（英语没有地区兜底这回事）
+    }
+
     public static Locale toLocale(String tag) {
         if (tag == null || tag.trim().isEmpty()) return null;
+        String t = tag.trim();
+        String full = LIKELY_TAG.get(t);
+        if (full != null) t = full;
         try {
-            return Locale.forLanguageTag(tag.trim());
-        } catch (Throwable t) {
+            return Locale.forLanguageTag(t);
+        } catch (Throwable ex) {
             return null;
         }
     }

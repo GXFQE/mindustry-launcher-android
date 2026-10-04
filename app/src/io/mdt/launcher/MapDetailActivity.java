@@ -62,7 +62,7 @@ public class MapDetailActivity extends BaseActivity {
         Util.applySystemInsets(root);
         setContentView(root);
 
-        ((TextView) root.findViewById(R.id.detail_text)).setText(mItem.detail());
+        ((TextView) root.findViewById(R.id.detail_text)).setText(mItem.detail(this));
         mState = (TextView) root.findViewById(R.id.stats_state);
         mBox = (LinearLayout) root.findViewById(R.id.stats_box);
 
@@ -263,6 +263,27 @@ public class MapDetailActivity extends BaseActivity {
         return v;
     }
 
+    /**
+     * 「依据」条目 → **当前界面语言**的整句（核心只给码与数字，见 {@link MapStats.Note}）。
+     *
+     * ★ 每一条都是**整句 + `%n$d`**，不拼前缀/尾巴（工程硬规矩）。
+     */
+    private String noteText(MapStats.Note nt) {
+        if (nt == null) return "";
+        switch (nt.code) {
+            case MapStats.Note.VANILLA_TABLE:
+                return getString(R.string.stats_note_vanilla_table_fmt, nt.n);
+            case MapStats.Note.PATCH_CHANGED:
+                return getString(R.string.stats_note_patch_changed_fmt, nt.n2, nt.n);
+            case MapStats.Note.JSON_NAMES:
+                return getString(R.string.stats_note_json_names_fmt, nt.n);
+            case MapStats.Note.UNKNOWN_TYPE:
+                return getString(R.string.stats_note_unknown_type_fmt, nt.n);
+            default:
+                return "";
+        }
+    }
+
     /** 依据：用了哪张内容表、译文从哪来、谁挡住的、认不出什么、耗时 —— **判据要能看见依据** */
     private void addTech(MapStatsMods.Built b) {
         MapStats.Result r = b.result;
@@ -273,10 +294,20 @@ public class MapDetailActivity extends BaseActivity {
                         MapStatsMods.num(r.cells)));
         LinearLayout body = (LinearLayout) card.findViewById(R.id.stat_card_body);
 
-        List<String> notes = new ArrayList<>(r.notes);
+        List<String> notes = new ArrayList<>();
+        // ★ 定义表那几句「依据」：核心只给**码 + 数字**（见 MapStats.Note），句子在这里按界面语言取 ——
+        //   原来是核心直接拼中文，英文界面下会露出中文（2026-10-04 用户报的"还有没翻译的"）。
+        for (MapStats.Note nt : r.notes) {
+            String s = noteText(nt);
+            if (!s.isEmpty()) notes.add(s);
+        }
         if (b.modNote != null && !b.modNote.isEmpty()) notes.add(b.modNote);
+        // ★ P4：译文那一层**单独一行**（不往上一句尾巴上拼）
+        if (b.bundleNote != null && !b.bundleNote.isEmpty()) notes.add(b.bundleNote);
         line(body, getString(R.string.stats_tech_table_fmt, join(notes)));
-        line(body, getString(R.string.stats_tech_names_fmt, b.namesNote == null ? "" : b.namesNote));
+        line(body, getString(R.string.stats_tech_names_fmt, join(b.namesNotes)));
+        // ⚠️ 地图自带补丁那一条**已经在 `r.notes` 里了**（PATCH_CHANGED）——
+        //    这里原来又单独加了一行，等于同一件事在界面上出现**两遍**（我 2026-10-04 引入的重复）。
         if (!r.blockers.isEmpty()) {
             StringBuilder sb = new StringBuilder();
             for (MapStats.Row row : r.blockers) {

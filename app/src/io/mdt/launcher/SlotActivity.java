@@ -326,7 +326,8 @@ public class SlotActivity extends BaseActivity {
      * ★ 有读不出来的就直接把它说在脸上 —— 这是这一行的**主要用途**（"哪天存的"反而是次要的）。
      */
     private String savesSubtitle(MsavMeta.Saves sm) {
-        String line = (sm.newestMeta != null && sm.newestMeta.ok) ? sm.newestMeta.shortLine(true) : "";
+        String line = (sm.newestMeta != null && sm.newestMeta.ok)
+                ? MsavText.shortLine(this, sm.newestMeta, true) : "";
         int bad = sm.unreadableCount();
         if (bad > 0) {
             return line.isEmpty()

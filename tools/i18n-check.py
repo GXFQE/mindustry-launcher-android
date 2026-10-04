@@ -338,6 +338,11 @@ def load_dir(root, dirname):
 # %[arg$][flags][width][.precision]conv
 SPEC_RE = re.compile(r"%(\d+\$)?([-+ 0,(#]*)(\d+)?(?:\.(\d+))?([a-zA-Z%])")
 
+# 裸双引号（前面没有反斜杠的那个）—— aapt2 会把成对引号当「引起来的一段」，**只取内容、不留引号**。
+# 实测（2026-10-04）：`mod "%1$s"` 装到机器上显示成 `mod X`；要真的显示引号必须写 `\"`。
+# ⚠️ 这条**没有任何其它环节能发现**：门禁之外的构建步骤全绿，只有人眼看界面才会发现。
+BARE_QUOTE = re.compile(r'(?<!\\)"')
+
 
 def spec_info(value):
     """-> (index_set, bare_list, conv_multiset)"""
@@ -513,6 +518,14 @@ def check_res(root, verbose=False):
                     "RES-05", "ERROR", rel, line, name,
                     "key '%s' 用了 \\u0020 但不在白名单里 —— 首选改成整句资源 + %%1$s；"
                     "确有必要再把它加进 tools/i18n-check.py 的 U0020_WHITELIST" % name))
+            for t in pieces:
+                if BARE_QUOTE.search(t):
+                    findings.append(Finding(
+                        "RES-12", "ERROR", rel, line, name,
+                        "key '%s' 的值里有**裸双引号** —— aapt2 会把它**静默删掉**"
+                        "（它把成对引号当成「引起来的一段」，只取内容、不留引号）⇒ 界面上根本看不到。"
+                        " 要显示双引号请写成 \\\" " % name))
+                    break
             for t in pieces:
                 if "·" in t and dot_sep_bad(t):
                     findings.append(Finding(
@@ -995,6 +1008,24 @@ def selftest(root, verbose=False):
             "app/AndroidManifest.xml": _MIN_MANIFEST,
         }, scratch),
         "RES-09", None))
+    cases.append((
+        "RES-12 值里有裸双引号（aapt2 会静默删掉）",
+        _mk_tree({
+            "app/res/values/strings.xml":
+                '<resources><string name="q">slot "%1$s" here</string></resources>',
+            "app/src/io/mdt/launcher/A.java": _MIN_JAVA,
+            "app/AndroidManifest.xml": _MIN_MANIFEST,
+        }, scratch),
+        "RES-12", None))
+    cases.append((
+        "RES-12 转义过的引号不许响",
+        _mk_tree({
+            "app/res/values/strings.xml":
+                '<resources><string name="q">slot \\"%1$s\\" here</string></resources>',
+            "app/src/io/mdt/launcher/A.java": _MIN_JAVA,
+            "app/AndroidManifest.xml": _MIN_MANIFEST,
+        }, scratch),
+        None, {"RES-12"}))
     cases.append((
         "RES-11 注释里出现「星号+斜杠」（会把 R.java 的 Javadoc 提前结束）",
         _mk_tree({

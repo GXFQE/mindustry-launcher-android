@@ -48,8 +48,10 @@ public final class MapStatsMods {
         public String error = "";
         /** 模组/补丁那一层的一句话依据（技术细节层显示） */
         public String modNote = "";
-        /** 译名那一路的来源（技术细节层显示） */
-        public String namesNote = "";
+        /** 译名来源那几层（技术细节层显示）—— **多条整句**，由显示侧连起来 */
+        public final List<String> namesNotes = new ArrayList<>();
+        /** 模组译文那一层（技术细节层显示）—— 单独一行，**不往别的句子尾巴上拼** */
+        public String bundleNote = "";
         /** 读表 + 统计的总耗时（毫秒） */
         public long millis;
     }
@@ -64,20 +66,52 @@ public final class MapStatsMods {
         public MapStats.Table table;
         /** 模组译文（**两层**：语言包 / 基础包）—— 版本 APK 里查不到的名字靠它翻 */
         public MapStats.Bundles bundle = new MapStats.Bundles();
-        /** 这一层的一句话依据（技术细节层显示） */
+        /** 这一层的一句话依据（技术细节层显示）—— ⚠️ 中文，只给**维护者**看；
+         *  给用户的那份在 {@link Built#modNote} 等字段里、按界面语言拼 */
         public String note = "";
         /** 带译文的模组包数 */
         public int bundlesWithText;
+        /** ★ 依据用**数字**（文案在 UI 侧拼 ⇒ 技术细节也跟着界面语言走） */
+        public int packs, added, overridden;
+        /** 游戏这次不加载模组（上次崩过） */
+        public boolean skipMods;
+        /** 模组那一层读不动 */
+        public boolean failed;
     }
 
     private static final Map<String, Cached> CACHE = new HashMap<>();
 
     private MapStatsMods() {}
 
-    /** 缓存键：槽名 + 槽目录（换槽不能拿错模组表） */
+    /**
+     * 当前**界面语言**对应的 bundle 后缀（`zh_CN` / `en` / `pt_BR`）。
+     *
+     * ★ 2026-10-04（P4）：矿物/物品/方块名来自游戏的 `bundle_<后缀>.properties`，
+     *   原来那个后缀**写死**成 `zh_CN` ⇒ 界面切成英文之后"地图矿物统计还是中文"（用户报的）。
+     * ★ 取的是**启动器界面的语言**（而不是游戏里选的语言）：这一页是启动器自己的界面，
+     *   同一屏里不该出现两种语言。启动器选"跟随系统"时，它自然等于系统语言，
+     *   也就等于游戏在 `locale=default` 时用的那个（游戏读的是**进程**默认 locale）。
+     */
+    public static String bundleLocaleSuffix(Context ctx) {
+        try {
+            android.content.res.Configuration cfg = ctx.getResources().getConfiguration();
+            Locale l = cfg.getLocales().isEmpty() ? Locale.getDefault() : cfg.getLocales().get(0);
+            if (l == null) return "";
+            String lang = l.getLanguage();
+            if (lang == null || lang.isEmpty()) return "";
+            String c = l.getCountry();
+            return (c == null || c.isEmpty()) ? lang : (lang + "_" + c);
+        } catch (Throwable t) {
+            return "";
+        }
+    }
+
+    /** 缓存键：槽名 + 槽目录（换槽不能拿错模组表）＋ **界面语言**
+     *  （★ 语言变了必须重读：译文就是按语言选的，拿旧缓存会继续显示上一门语言的名字） */
     private static String key(Context ctx, String slot) {
         File dir = Data.dirOf(ctx, slot);
-        return slot + "@" + (dir == null ? "?" : dir.getAbsolutePath());
+        return slot + "@" + (dir == null ? "?" : dir.getAbsolutePath())
+                + "@" + bundleLocaleSuffix(ctx);
     }
 
     /** `mods/` 目录的"戳"：条目数 + 各自的修改时间（增删/导入都会变） */
@@ -99,9 +133,10 @@ public final class MapStatsMods {
     /**
      * 「原版 ⨁ 本槽已启用模组」那张表 + 模组的译文（带缓存）。
      *
-     * @param note 出参：这一层的一句话依据（"3 个模组（新增 12 条，覆盖 44 条）"之类）
+     * ★ 返回的 {@link SlotContent} 里同时有**数字**（{@code packs/added/overridden/…}）与
+     *   一句中文 {@code note}：数字是给 UI 按界面语言拼依据用的，`note` 只给维护者。
      */
-    public static synchronized SlotContent contentFor(Context ctx, String slot, StringBuilder note) {
+    public static synchronized SlotContent contentFor(Context ctx, String slot) {
         File modsDir = null;
         try {
             modsDir = Mods.scan(ctx, slot).modsDir;
@@ -111,7 +146,6 @@ public final class MapStatsMods {
         String stamp = stampOf(modsDir);
         Cached c = CACHE.get(k);
         if (c != null && c.stamp.equals(stamp)) {
-            if (note != null) note.append(c.content.note);
             return c.content;
         }
         SlotContent out = new SlotContent();
@@ -121,6 +155,7 @@ public final class MapStatsMods {
         try {
             Mods.Scan scan = Mods.scan(ctx, slot);
             if (scan.skipModLoading) {
+                out.skipMods = true;
                 line = "游戏这次不加载模组（上次崩过），按原版算";
             } else {
                 List<MapStats.Pack> packs = new ArrayList<>();
@@ -141,8 +176,13 @@ public final class MapStatsMods {
                     packs.add(p);
                 }
                 MapStats.ModResult mr = MapStats.overlayMods(t, packs);
+                out.packs = mr.packs;
+                out.added = mr.added;
+                out.overridden = mr.overridden;
                 // ★ 译文：版本 APK 只认识原版内容，模组加的物品/方块得从**模组自己的 bundle** 里捞
-                out.bundle = MapStats.readBundles(packs);
+                //   ★ 读哪一层语言包由**界面语言**决定（P4）
+                out.bundle = MapStats.readBundles(packs,
+                        MapStats.bundleLang(bundleLocaleSuffix(ctx)));
                 for (MapStats.Pack p : packs) {
                     if (p.bundleKeys > 0) out.bundlesWithText++;
                 }
@@ -152,6 +192,7 @@ public final class MapStatsMods {
                         + "）";
             }
         } catch (Throwable ex) {
+            out.failed = true;
             line = "模组读不动，只按原版算";
         }
         out.note = line;
@@ -159,7 +200,6 @@ public final class MapStatsMods {
         c.stamp = stamp;
         c.content = out;
         CACHE.put(k, c);
-        if (note != null) note.append(line);
         return out;
     }
 
@@ -182,19 +222,46 @@ public final class MapStatsMods {
             b.error = "这张地图读不出来";
             return b;
         }
-        StringBuilder note = new StringBuilder();
         // ★ 缓存里那份表**不能**被改（补丁会改行）⇒ 用前先深拷贝；译文与它同源，一起拿
-        SlotContent sc = contentFor(ctx, slot, note);
+        SlotContent sc = contentFor(ctx, slot);
         b.table = MapStats.copyOf(sc.table);
-        b.modNote = note.toString();
+        // ★ 依据文案在**这里**按界面语言拼（`SlotContent` 只给数字）——
+        //   原来是在 `contentFor` 里拼中文 ⇒ 英文界面下"技术细节"那几行也是中文
+        if (sc.skipMods) b.modNote = ctx.getString(R.string.stats_note_skip_mods);
+        else if (sc.failed) b.modNote = ctx.getString(R.string.stats_note_mods_failed);
+        else b.modNote = ctx.getString(R.string.stats_note_mods_fmt,
+                sc.packs, sc.added, sc.overridden);
+        if (sc.bundlesWithText > 0) {
+            b.bundleNote = ctx.getString(R.string.stats_note_bundles_fmt,
+                    sc.bundlesWithText, sc.bundle.keys());
+        }
         if (!b.tiles.patchEntries.isEmpty()) {
             List<String> logs = new ArrayList<>();
-            int n = MapStats.applyPatches(b.table, b.tiles.patchEntries, logs);
-            b.modNote = b.modNote + "；地图自带补丁 " + b.tiles.patchEntries.size() + " 条"
-                    + (n > 0 ? "（改了 " + n + " 处）" : "");
+            MapStats.applyPatches(b.table, b.tiles.patchEntries, logs);
+            // ⚠️ 这里**不再**单独拼一句补丁依据：`applyPatches` 自己会把
+            //    `Note.PATCH_CHANGED` 记进 `Table.notes`，两处都写会在界面上出现**同一条两遍**
+            //    （我 2026-10-04 引入过这个重复，真机截图能看出来）。
         }
-        b.names = new BundleNames(apkPath == null ? null : new File(apkPath), sc.bundle, attrLabels);
-        b.namesNote = ((BundleNames) b.names).note;
+        BundleNames bn = new BundleNames(apkPath == null ? null : new File(apkPath), sc.bundle,
+                attrLabels, MapStats.bundleLang(bundleLocaleSuffix(ctx)),
+                ctx.getString(R.string.stats_wall_name_fmt));
+        b.names = bn;
+        // ★ 名字来源（依据）：数字在 BundleNames 里，**句子在这里按界面语言拼**
+        if (bn.nApkLocale > 0) {
+            b.namesNotes.add(ctx.getString(R.string.stats_note_names_apk_fmt,
+                    bn.apkName, bn.nApkLocale));
+        } else {
+            b.namesNotes.add(ctx.getString(R.string.stats_note_names_no_apk));
+        }
+        if (bn.nModLocale > 0) {
+            b.namesNotes.add(ctx.getString(R.string.stats_note_names_mod_fmt, bn.nModLocale));
+        }
+        if (bn.nApkBase > 0) {
+            b.namesNotes.add(ctx.getString(R.string.stats_note_names_apk_base_fmt, bn.nApkBase));
+        }
+        if (bn.nModBase > 0) {
+            b.namesNotes.add(ctx.getString(R.string.stats_note_names_mod_base_fmt, bn.nModBase));
+        }
         b.result = MapStats.analyze(b.tiles, b.table, b.names);
         if (!b.result.ok) b.error = b.result.error;
         b.millis = System.currentTimeMillis() - t0;

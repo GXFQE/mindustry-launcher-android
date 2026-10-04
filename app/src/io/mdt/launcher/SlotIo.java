@@ -259,13 +259,13 @@ final class SlotIo {
         }, "msav-unreadable").start();
     }
 
-    /** 存档行第二行（只此一处）：口径在 {@link MsavMeta#shortLine(boolean)} */
+    /** 存档行第二行（只此一处）：口径在 {@link MsavText#shortLine} */
     private static String msavLine(Activity a, MsavMeta m) {
         if (m == null || !m.ok) {
-            // ★ 原因走 `userReason()`（异常类名要翻成白话），不是原始的 `error`（那是给排查看的）
-            return m == null ? "" : a.getString(R.string.msav_unreadable_fmt, m.userReason());
+            // ★ 原因走 `MsavText.userReason()`（异常类名要翻成白话），不是原始的 `error`（那是给排查看的）
+            return m == null ? "" : a.getString(R.string.msav_unreadable_fmt, MsavText.userReason(a, m));
         }
-        return m.shortLine(true);
+        return MsavText.shortLine(a, m, true);
     }
 
     /**

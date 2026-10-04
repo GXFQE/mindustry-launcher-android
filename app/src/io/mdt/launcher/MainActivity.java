@@ -489,8 +489,9 @@ public class MainActivity extends BaseActivity {
                           .append(" · 模组自带 ").append(Maps.count(items, Maps.FROM_MOD))
                           .append("（共 ").append(items.size()).append("）\n\n");
                         for (Maps.Item it : items) {
-                            sb.append("· [").append(it.source).append("] ").append(it.name())
-                              .append("  |  ").append(it.line())
+                            sb.append("· [").append(it.sourceLabel(MainActivity.this)).append("] ")
+                              .append(it.name())
+                              .append("  |  ").append(it.line(MainActivity.this))
                               .append("  |  ").append(it.where).append('\n');
                         }
                         rep = sb.toString();

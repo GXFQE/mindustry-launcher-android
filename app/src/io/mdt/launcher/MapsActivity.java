@@ -155,7 +155,7 @@ public class MapsActivity extends BaseActivity {
                 for (int i = 0; i < items.size(); i++) {
                     Maps.Item it = items.get(i);
                     titles[i] = it.name();
-                    subs[i] = it.source + " · " + it.line();
+                    subs[i] = it.sourceLabel(MapsActivity.this) + " · " + it.line(MapsActivity.this);
                 }
                 runOnUiThread(new Runnable() {
                     @Override public void run() {

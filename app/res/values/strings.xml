@@ -26,7 +26,7 @@
     <string name="act_import_sub">Pick a file on this device (system file picker)</string>
     <string name="act_saves_title">Saves &amp; Backups</string>
     <string name="act_saves_sub">Slots · backups · import saves</string>
-    <string name="empty_versions">No versions yet.\nUse "Add package name" above to scan installed ones, or "Import APK" to pick a file.</string>
+    <string name="empty_versions">No versions yet.\nUse \"Add package name\" above to scan installed ones, or \"Import APK\" to pick a file.</string>
 
     <!-- F2：版本列表行（槽徽标 / 可见槽按钮 / 同槽冲突 / 继续上次） -->
     <string name="row_slot_btn">Slot</string>
@@ -45,12 +45,12 @@
 
     <!-- F4①：启动前的同槽冲突预检（0 IO，纯用列表里已算好的结论） -->
     <string name="launch_conflict_title">These two versions share one slot</string>
-    <string name="launch_conflict_msg_fmt">"%1$s" and %2$s both use slot "%3$s".\n\nTheir saves overwrite each other; the one you open last is the one that stays.\n\nLaunch "%1$s" now?</string>
+    <string name="launch_conflict_msg_fmt">\"%1$s\" and %2$s both use slot \"%3$s\".\n\nTheir saves overwrite each other; the one you open last is the one that stays.\n\nLaunch \"%1$s\" now?</string>
     <string name="launch_conflict_go">Launch anyway</string>
-    <string name="dev_new_slot_ok_fmt">Created slot "%1$s"</string>
+    <string name="dev_new_slot_ok_fmt">Created slot \"%1$s\"</string>
     <string name="dev_new_slot_fail">Could not create slot</string>
     <string name="dev_assign_title">dev_assign_key</string>
-    <string name="dev_assign_fmt">Pointed %1$s at slot "%2$s" (empty slot = default slot)</string>
+    <string name="dev_assign_fmt">Pointed %1$s at slot \"%2$s\" (empty slot = default slot)</string>
 
     <!-- 导入 APK -->
     <string name="chooser_pick_apk">Pick a game APK</string>
@@ -70,7 +70,7 @@
     <string name="compat_reject_align">The package libraries do not fit this device and the system will refuse to load them.\n\nUse v158 or newer.</string>
 
     <!-- 槽选择 / 添加包名 / 详情 / 删除 -->
-    <string name="slot_pick_title_fmt">Which slot for "%1$s"?</string>
+    <string name="slot_pick_title_fmt">Which slot for \"%1$s\"?</string>
     <!--
       ⚠️⚠️ 前导空格必须写成转义 \u0020，**不能写字面空格**（2026-10-02 真机实测）。
       aapt2 编译 string 资源时会把【前导空白剥掉】—— 这里原文写的是 2 个空格，
@@ -82,7 +82,7 @@
       ★ 用量：选槽对话框（MainActivity.pickSlot）+ 设置页「默认槽」（SettingsActivity）。
     -->
     <string name="slot_current_suffix">\u0020\u0020[current]</string>
-    <string name="slot_set_fmt">Set to slot "%1$s"</string>
+    <string name="slot_set_fmt">Set to slot \"%1$s\"</string>
     <string name="slot_manage">Manage slots…</string>
     <string name="slot_label">Save slot</string>
     <string name="add_package_title">Add package name</string>
@@ -131,7 +131,7 @@
     <string name="dev_launch_miss_title">dev_launch_key did not match</string>
     <string name="dev_launch_miss_fmt">No installed version has key = %1$s\nAvailable:\n%2$s</string>
     <string name="dev_msav_title">dev .msav</string>
-    <string name="dev_msav_running_fmt">%1$s → slot "%2$s"</string>
+    <string name="dev_msav_running_fmt">%1$s → slot \"%2$s\"</string>
     <string name="dev_msav_done">dev .msav done</string>
     <string name="dev_msav_failed">dev .msav failed</string>
     <string name="dev_msav_done_fmt">Target: %1$s\nSize: %2$s\ngzip check: %3$s</string>
@@ -169,7 +169,7 @@
          改成说清**因果**：游戏首次启动会把整个 files/ 抄进数据根，于是我们的私有数据
          被顺手抄了一份进去。同样的解释在 health_ok_msg 里已有，这里只是提前到列表上。 -->
 
-    <string name="saves_empty">No slots yet. Tap "New slot" above to start.</string>
+    <string name="saves_empty">No slots yet. Tap \"New slot\" above to start.</string>
     <string name="saves_summary_fmt">%1$d slots · current slot %2$s · game %3$s</string>
     <string name="saves_detail_fmt">Current slot data\n%1$s\n\nBackup location\n%2$s</string>
     <string name="game_running">Running ⚠</string>
@@ -201,8 +201,8 @@
     <string name="renamed_slots_fmt">Slot assignment follows the rename for %1$d versions</string>
 
     <string name="delete_current_slot_title">Cannot delete the current slot</string>
-    <string name="delete_current_slot_msg_fmt">"%1$s" is the current slot and the game is using it.\nLaunch once with another slot, then come back and delete this one.</string>
-    <string name="delete_slot_confirm_title_fmt">Delete slot "%1$s"?</string>
+    <string name="delete_current_slot_msg_fmt">\"%1$s\" is the current slot and the game is using it.\nLaunch once with another slot, then come back and delete this one.</string>
+    <string name="delete_slot_confirm_title_fmt">Delete slot \"%1$s\"?</string>
     <!-- ⚠️ 这里**不能**用 `**` 表示强调：弹窗是纯文本（AlertDialog.setMessage），
          `**` 会原样显示成星号。要加重语气只能靠措辞。全工程同此纪律。 -->
     <string name="delete_slot_warn">This permanently deletes all data in this slot (Android has no recycle bin):\n\n</string>
@@ -211,37 +211,37 @@
     <string name="delete_slot_no_backups">\n(this slot has no backups)</string>
     <string name="delete_forever">Delete permanently</string>
     <string name="delete_failed">Delete failed</string>
-    <string name="slot_deleted_fmt">Deleted slot "%1$s"</string>
+    <string name="slot_deleted_fmt">Deleted slot \"%1$s\"</string>
     <string name="slot_deleted_fallback_fmt">(%1$d versions fell back to the default slot)</string>
 
-    <string name="backup_title_fmt">Back up slot "%1$s"</string>
+    <string name="backup_title_fmt">Back up slot \"%1$s\"</string>
     <string name="backup_label_hint">Note, may be left empty</string>
     <string name="backup_msg_fmt">Backs up everything in the slot (including config files that mods put there).\nOnly excluded: %1$s</string>
     <string name="backup">Back up</string>
     <string name="backup_progress_title">Backing up</string>
-    <string name="backup_progress_msg_fmt">Slot "%1$s"\nreading · checking…</string>
+    <string name="backup_progress_msg_fmt">Slot \"%1$s\"\nreading · checking…</string>
     <string name="backup_done">Backup complete</string>
     <string name="backup_done_msg_fmt">Backup: %1$s\n%2$d files · %3$s\nNew space used: %4$s\n\nLocation: %5$s</string>
     <string name="backup_failed">Backup failed</string>
 
     <!-- F4②：克隆此槽（= 备份源槽 + 恢复进一个全新槽；零新原语） -->
-    <string name="clone_title_fmt">Clone slot "%1$s"</string>
-    <string name="clone_msg_fmt">Copies everything in "%1$s" (%2$d files · %3$s) into a new slot; afterwards the two are independent.\n\nOnly %4$s is excluded.\nThe source slot also gets a backup.</string>
-    <string name="clone_source_empty_fmt">Slot "%1$s" has no data, so there is nothing to clone.</string>
+    <string name="clone_title_fmt">Clone slot \"%1$s\"</string>
+    <string name="clone_msg_fmt">Copies everything in \"%1$s\" (%2$d files · %3$s) into a new slot; afterwards the two are independent.\n\nOnly %4$s is excluded.\nThe source slot also gets a backup.</string>
+    <string name="clone_source_empty_fmt">Slot \"%1$s\" has no data, so there is nothing to clone.</string>
     <string name="clone_name_hint">New slot name, e.g. mindustryX-copy</string>
     <string name="clone">Clone</string>
     <string name="clone_progress_title">Cloning</string>
-    <string name="clone_progress_msg_fmt">Slot "%1$s" → "%2$s"\nbacking up source · restoring into the new slot…</string>
+    <string name="clone_progress_msg_fmt">Slot \"%1$s\" → \"%2$s\"\nbacking up source · restoring into the new slot…</string>
     <string name="clone_done">Clone complete</string>
-    <string name="clone_done_msg_fmt">New slot "%1$s": %2$d files · %3$s\n\nThe source slot was not touched. Point a version at this slot from the main screen to use it.</string>
+    <string name="clone_done_msg_fmt">New slot \"%1$s\": %2$d files · %3$s\n\nThe source slot was not touched. Point a version at this slot from the main screen to use it.</string>
     <string name="clone_failed">Clone failed</string>
     <string name="clone_source_live">The source slot is in use by the game</string>
-    <string name="clone_source_live_msg_fmt">"%1$s" is the current slot and the game is still running.\nFiles being written may read back corrupted, so exit the game first.</string>
+    <string name="clone_source_live_msg_fmt">\"%1$s\" is the current slot and the game is still running.\nFiles being written may read back corrupted, so exit the game first.</string>
 
     <string name="no_backup_title">No backups available</string>
-    <string name="no_backup_msg_fmt">Slot "%1$s" has no backups yet.</string>
+    <string name="no_backup_msg_fmt">Slot \"%1$s\" has no backups yet.</string>
     <string name="restore_head_fmt">%1$d backups · pick one to restore</string>
-    <string name="restore_to_slot_title_fmt">Restore into slot "%1$s"</string>
+    <string name="restore_to_slot_title_fmt">Restore into slot \"%1$s\"</string>
     <string name="snapshot_entry_fmt">%1$d files · %2$s</string>
     <string name="restore_confirm_title">Restore?</string>
     <string name="restore_confirm_msg_fmt">Backup: %1$s\n%2$d files · %3$s\n\nThese files will be written back:\n%4$s\n\n· only overwrites files that are in the backup, everything else is left alone\n· checks the content for damage before writing</string>
@@ -252,15 +252,15 @@
     <string name="restore_not_run">Restore not performed</string>
 
     <string name="game_busy_title">Exit the game first</string>
-    <string name="game_busy_msg_fmt">Slot "%1$s" is in use by the game and would be overwritten. Exit the game first.</string>
+    <string name="game_busy_msg_fmt">Slot \"%1$s\" is in use by the game and would be overwritten. Exit the game first.</string>
     <string name="chooser_pick_msav">Pick a .msav save</string>
     <string name="msav_import_progress_title">Import save</string>
-    <string name="msav_import_progress_msg_fmt">%1$s\nwriting into slot "%2$s"…</string>
+    <string name="msav_import_progress_msg_fmt">%1$s\nwriting into slot \"%2$s\"…</string>
     <string name="not_msav_title">This file does not look like .msav</string>
     <string name="not_msav_msg">This file does not look like a save and the game may not read it.\n\nImport anyway?</string>
     <string name="import_anyway">Import anyway</string>
     <string name="discard">Discard</string>
-    <string name="msav_imported_fmt">Imported into slot "%1$s": %2$s</string>
+    <string name="msav_imported_fmt">Imported into slot \"%1$s\": %2$s</string>
 
     <!-- ══ F6 导出到共享存储（SAF 出口，不需要任何存储权限） ══════════════ -->
     <!--
@@ -279,10 +279,10 @@
     <string name="slot_op_maps">Maps (this slot / game / mods)…</string>
     <!-- 地图增删（F10）-->
     <string name="maps_import">Import map…</string>
-    <string name="map_import_ok_fmt">Imported "%1$s"</string>
+    <string name="map_import_ok_fmt">Imported \"%1$s\"</string>
     <string name="map_import_fail_fmt">Import failed: %1$s</string>
     <string name="map_overwrite_title">A map with this name already exists</string>
-    <string name="map_overwrite_msg_fmt">This slot already has "%1$s".\nReplacing moves the old one to the transfer station instead of deleting it.</string>
+    <string name="map_overwrite_msg_fmt">This slot already has \"%1$s\".\nReplacing moves the old one to the transfer station instead of deleting it.</string>
     <string name="map_overwrite_ok">Replace</string>
     <string name="map_delete">Delete (move to transfer station)</string>
     <string name="map_delete_sub">Moves it to the transfer station instead of deleting it</string>
@@ -294,8 +294,8 @@
       ② 中转站有份数上限（`MapFiles.KEEP_TRASH = 20`，模组中转站同款）。原来一个字都没提，
          删到第 21 张时第一张已被**静默硬删** —— 现在明说。
     -->
-    <string name="map_delete_confirm_fmt">Move "%1$s" to the transfer station?\n\nIt does not really disappear (it stays on the phone), but the game will not see it.\nThe station keeps at most 20 maps; deleting more pushes out the oldest.</string>
-    <string name="map_deleted_ok_fmt">Moved "%1$s" to the transfer station</string>
+    <string name="map_delete_confirm_fmt">Move \"%1$s\" to the transfer station?\n\nIt does not really disappear (it stays on the phone), but the game will not see it.\nThe station keeps at most 20 maps; deleting more pushes out the oldest.</string>
+    <string name="map_deleted_ok_fmt">Moved \"%1$s\" to the transfer station</string>
     <!-- ★ 游戏在跑这条路已由 UI 提前拦下（见 MapDetailActivity.confirmDelete）⇒ 这句只说剩下的原因 -->
     <string name="map_delete_fail">Cannot delete: another app may be holding this map open.</string>
     <string name="map_delete_busy_msg">The game is running and would fight over this file. Exit the game first.</string>
@@ -323,7 +323,7 @@
       ⇒ 「带占位符的资源不许被 android:label 引用」这条现在由构建期门禁钉着。
     -->
     <string name="slot_page_title">Slot</string>
-    <string name="slot_page_title_fmt">Slot "%1$s"</string>
+    <string name="slot_page_title_fmt">Slot \"%1$s\"</string>
     <string name="slot_page_mods_count_fmt">%1$d mods installed</string>
     <string name="slot_page_mods">Mods</string>
     <string name="slot_page_mods_sub">Toggle / filter / batch / check conflicts</string>
@@ -354,7 +354,7 @@
          （与下面 slot_page_saves_* 的写法一致：不许在调用点拼前后缀）。
       ⚠️ 五个 `·` 两侧都留了空格（aapt2 会剥首尾空白，靠拼串留不出空白）。
     -->
-    <string name="slot_page_info_missing_fmt">Cannot read data for slot "%1$s"</string>
+    <string name="slot_page_info_missing_fmt">Cannot read data for slot \"%1$s\"</string>
     <string name="slot_page_info_cur_fmt">This is the current slot (the game starts into it) · target game %1$s</string>
     <string name="slot_page_info_cur_nogame">This is the current slot (the game starts into it) · no version assigned yet</string>
     <string name="slot_page_info_other_fmt">Not the current slot · target game %1$s</string>
@@ -368,19 +368,19 @@
          用户看到的是 `java.lang.NullPointerException: …`（见 MapsActivity.scan 的 catch）。 -->
     <string name="maps_scan_failed">Could not list the maps. Go back and enter again.</string>
     <string name="maps_scanning">Listing maps…</string>
-    <string name="maps_title_fmt">Maps in slot "%1$s"</string>
+    <string name="maps_title_fmt">Maps in slot \"%1$s\"</string>
     <string name="maps_counts_fmt">this slot %1$d · built into game %2$d · from mods %3$d</string>
     <!-- ★ 2026-10-04：这句原来"全工程零引用"（地图页没有空态），现在真的用上了。
          ⚠️ 同时**收短**：原来挤在一行里三句（"本槽没有，模组没自带，游戏自带的要等…"），
             空态只需要"为什么没有 + 下一步"两件事（对齐 empty_versions 的写法）。 -->
-    <string name="maps_empty_fmt">Slot "%1$s" has no maps yet.\nOnce a version is assigned to this slot, the maps built into the game show up here.</string>
+    <string name="maps_empty_fmt">Slot \"%1$s\" has no maps yet.\nOnce a version is assigned to this slot, the maps built into the game show up here.</string>
     <string name="slot_op_import_save">Import a save (.msav)…</string>
     <string name="slot_op_import_slot">Import a whole slot (zip)…</string>
     <string name="slot_op_export_save">Export a save (.msav)…</string>
     <string name="slot_op_export_slot">Export the whole slot (zip)…</string>
-    <string name="export_no_save_fmt">Slot "%1$s" has no saves yet.</string>
+    <string name="export_no_save_fmt">Slot \"%1$s\" has no saves yet.</string>
     <string name="export_pick_title_fmt">Export save</string>
-    <string name="export_pick_head_fmt">Slot "%1$s" · %2$d saves</string>
+    <string name="export_pick_head_fmt">Slot \"%1$s\" · %2$d saves</string>
     <string name="export_item_fmt">%1$s  ·  %2$s</string>
     <!-- F10：.msav 元数据那一行（白话、短、无 markdown） -->
 
@@ -389,13 +389,78 @@
 
     <string name="msav_unreadable_fmt">⚠ Unreadable: %1$s</string>
     <string name="msav_unknown_reason">Reason unknown</string>
-    <string name="export_slot_title_fmt">Export whole slot "%1$s"</string>
+
+    <!--
+      ══ .msav 元数据的显示文案（P3 第一片，2026-10-04）════════════════════════
+      ★ 这些原来是 MsavMeta 里**用 Java 拼出来的中文**（"玩了 1 小时 2 分" / "存档于 …" /
+        "作者：…" / "格式 v4" / 详情弹窗的各个标签）。默认语言翻成英文之后，存档行就成了
+        「208.3 KB · 我的地图 · 玩了 1 小时 2 分 · 存档于 10-03 13:22」这种**中英混排** ——
+        用户报的就是这个（"存档显示部分翻译不全"）。
+      ★ 为什么搬到资源：MsavMeta 刻意不碰 Android（好在 PC 上单独编译验收），
+        所以显示文案收口到 MsavText（Android 侧），MsavMeta 只留**数据**。
+      ★ 写法纪律：**整句 + %1$s**，不要"前缀/尾巴拼空白" ——
+        `msav_half_fmt` 就是为此而生的（原来是 Java 里拼一个【带前导空格】的碎片，
+        而 aapt2 会把资源的前导空格剥掉，那样必然粘连）。
+    -->
+    <string name="msav_playtime_hm_fmt">%1$dh %2$dm</string>
+    <string name="msav_playtime_min_fmt">%1$d min</string>
+    <string name="msav_playtime_sec">under a minute</string>
+    <string name="msav_played_fmt">played %1$s</string>
+    <string name="msav_saved_at_fmt">saved %1$s</string>
+    <string name="msav_author_fmt">by %1$s</string>
+    <string name="msav_format_fmt">format v%1$d</string>
+    <string name="msav_size_unknown">size unknown</string>
+    <string name="msav_wave_fmt">wave %1$d</string>
+    <string name="msav_half_fmt">%1$s · ⚠ looks half-written</string>
+    <string name="msav_unreadable">This file cannot be read</string>
+    <string name="msav_half_broken">(it looks like it stopped half-way)</string>
+    <string name="msav_half_banner">⚠ this file looks half-written</string>
+    <string name="msav_lbl_size_fmt">Size: %1$s</string>
+    <string name="msav_lbl_author_fmt">Author: %1$s</string>
+    <string name="msav_lbl_wave_fmt">Wave: %1$d</string>
+    <string name="msav_lbl_played_fmt">Played: %1$s</string>
+    <string name="msav_lbl_saved_fmt">Saved: %1$s</string>
+    <string name="msav_lbl_format_fmt">Format: v%1$d</string>
+    <string name="msav_lbl_desc_fmt">About: %1$s</string>
+    <string name="msav_reason_not_save">This file does not look like a save, or it stopped half-way</string>
+    <string name="msav_reason_read_error">Something went wrong while reading this file</string>
+    <!-- 地图来源与详情（同一族：Maps.Item 原来也是 Java 里拼的中文）-->
+    <string name="map_from_slot">this slot</string>
+    <string name="map_from_slot_detail">this slot (you can manage it here)</string>
+    <string name="map_from_game">built into the game</string>
+    <string name="map_from_mod_fmt">mod \"%1$s\"</string>
+    <string name="map_detail_from_fmt">From: %1$s</string>
+    <string name="map_detail_file_fmt">File: %1$s · %2$s</string>
+    <string name="map_detail_in_fmt">Inside %1$s</string>
+    <!--
+      地图统计「技术细节」里那几行依据（P4，2026-10-04）。
+      ★ 原来是 `MapStatsMods.contentFor` / `BundleNames` 里拼的中文 ⇒ 英文界面下这几行还是中文。
+      ★ 现在：**核心只给数字，句子在这里按界面语言拼**（`MapStats` / `BundleNames` 刻意不碰 Android）。
+      ★ 每一条都是**整句**；几句话之间由显示侧用 ` · ` 连起来 ——
+        **不要**为"分号 + 空格"再做一个分隔符资源（尾随空格会被 aapt2 剥掉，
+        写成 `"; "` 更会把引号变成字面内容 —— 我第一版就是这么错的）。
+    -->
+    <string name="stats_note_skip_mods">The game is not loading mods this run (it crashed last time), so this counts vanilla only</string>
+    <string name="stats_note_mods_failed">Mods could not be read, so this counts vanilla only</string>
+    <string name="stats_note_mods_fmt">%1$d mods (%2$d entries added, %3$d overridden)</string>
+    <string name="stats_note_bundles_fmt">%1$d of the packs ship translations, %2$d entries in all</string>
+    <string name="stats_note_patch_changed_fmt">This map carries its own patch: %1$d entries, %2$d of them applied</string>
+    <string name="stats_note_vanilla_table_fmt">Vanilla blocks: %1$d entries</string>
+    <string name="stats_note_json_names_fmt">%1$d names are written inside the content files (those mods ship no translation file)</string>
+    <string name="stats_note_unknown_type_fmt">%1$d pieces of content in the mods use a type we do not recognise (counted only under unrecognised)</string>
+    <string name="stats_note_names_apk_fmt">%1$s: %2$d entries</string>
+    <string name="stats_note_names_no_apk">The version APK has no translation for this language</string>
+    <string name="stats_note_names_mod_fmt">mods add %1$d entries</string>
+    <string name="stats_note_names_apk_base_fmt">base bundle: %1$d entries</string>
+    <string name="stats_note_names_mod_base_fmt">mod base bundle: %1$d entries</string>
+    <string name="stats_wall_name_fmt">%1$s (wall)</string>
+    <string name="export_slot_title_fmt">Export whole slot \"%1$s\"</string>
     <string name="export_slot_msg_fmt">Packs the whole slot into one zip: saves · maps · schematics · mods · settings.%1$s\n\nThe game can import this package too (Settings → Data → Import data).</string>
     <string name="export_slot_playing">\n\n⚠️ The game is running; the export may capture a half-written save.</string>
     <string name="export_ok">Choose where to save</string>
     <string name="chooser_export">Export to…</string>
     <string name="export_progress_title">Exporting</string>
-    <string name="export_progress_msg_fmt">Packing slot "%1$s"\ncompressing · writing…</string>
+    <string name="export_progress_msg_fmt">Packing slot \"%1$s\"\ncompressing · writing…</string>
     <string name="export_done_fmt">Exported %1$s (%2$s)</string>
     <string name="export_slot_done_fmt">Exported the whole slot: %1$d files, %2$s</string>
     <string name="export_slot_empty_fmt">This slot has nothing to export.</string>
@@ -412,11 +477,11 @@
     <string name="zip_read_progress_title">Reading data package</string>
     <string name="zip_read_progress_msg_fmt">%1$s\nreading the manifest…</string>
     <string name="zip_read_failed">Cannot open this zip</string>
-    <string name="zip_confirm_title_fmt">Import into slot "%1$s"</string>
+    <string name="zip_confirm_title_fmt">Import into slot \"%1$s\"</string>
     <string name="zip_confirm_head_fmt">%1$d files · %2$s</string>
     <string name="zip_confirm_tops_fmt">\nContains: %1$s</string>
-    <string name="zip_confirm_strip_fmt">\n\n(The package has an extra "%1$s" wrapper, which is stripped when extracting)</string>
-    <string name="zip_tag_native">\n\nIt contains the game settings file — this is the format the game itself writes with "Export data".</string>
+    <string name="zip_confirm_strip_fmt">\n\n(The package has an extra \"%1$s\" wrapper, which is stripped when extracting)</string>
+    <string name="zip_tag_native">\n\nIt contains the game settings file — this is the format the game itself writes with \"Export data\".</string>
     <string name="zip_tag_custom">\n\nNo game settings file — this looks like a package exported by this launcher.</string>
     <string name="zip_warn_unknown">This does not look like a Mindustry data package. Import anyway?</string>
     <string name="zip_warn_skipped_fmt">%1$d entries have unsafe paths and will be skipped.</string>
@@ -426,14 +491,14 @@
     <string name="import_btn">Import</string>
     <string name="zip_import_done">Import complete</string>
     <string name="zip_extract_progress_title">Importing</string>
-    <string name="zip_extract_progress_msg_fmt">Extracting into slot "%1$s"\nwriting…</string>
-    <string name="zip_import_ok_fmt">Imported into slot "%1$s": %2$d files, %3$s%4$s</string>
+    <string name="zip_extract_progress_msg_fmt">Extracting into slot \"%1$s\"\nwriting…</string>
+    <string name="zip_import_ok_fmt">Imported into slot \"%1$s\": %2$d files, %3$s%4$s</string>
     <string name="zip_import_wiped_fmt">\nCleared first: %1$s</string>
     <string name="zip_import_skipped_fmt">\n⚠️ Skipped %1$d unsafe entries</string>
     <string name="zip_import_failed">Import failed</string>
     <string name="zip_nothing">This zip has no files to extract.</string>
 
-    <string name="msav_name_title_fmt">Import into slot "%1$s"</string>
+    <string name="msav_name_title_fmt">Import into slot \"%1$s\"</string>
     <string name="msav_name_hint">This name shows up in the game save list.\nYou can change it; the extension is added automatically.</string>
     <string name="msav_not_zlib_warn">⚠ This file does not look like a save and the game may not read it.\nYou can still put it in and try.</string>
     <string name="msav_name_empty">Name cannot be empty</string>
@@ -446,7 +511,7 @@
          「永久删除…安卓没有回收站」同一口径。
     -->
     <string name="msav_overwrite_title">A save with this name is already in the slot</string>
-    <string name="msav_overwrite_msg_fmt">Slot "%1$s" already has a "%2$s".\n\nReplacing deletes the old one outright; it cannot be recovered.</string>
+    <string name="msav_overwrite_msg_fmt">Slot \"%1$s\" already has a \"%2$s\".\n\nReplacing deletes the old one outright; it cannot be recovered.</string>
     <string name="msav_overwrite_ok">Replace</string>
     <string name="msav_overwrite_rename">Use another name</string>
 
@@ -547,7 +612,7 @@
     </string-array>
 
     <string name="set_slot_title">Default slot</string>
-    <string name="set_slot_sub_fmt">Newly found versions use "%1$s" by default</string>
+    <string name="set_slot_sub_fmt">Newly found versions use \"%1$s\" by default</string>
     <string name="set_slot_pick_title">Which slot should new versions use by default?</string>
 
     <string name="set_logs_title">Log files kept</string>
@@ -560,7 +625,7 @@
 
     <!-- ══ F5 自动备份（每槽一套策略，对齐桌面版的「存档分类设置」） ══════ -->
     <string name="slot_op_policy">Automatic backup settings…</string>
-    <string name="policy_title_fmt">Automatic backup for "%1$s"</string>
+    <string name="policy_title_fmt">Automatic backup for \"%1$s\"</string>
     <string name="policy_enabled">Enable automatic backup</string>
     <string name="policy_enabled_hint">When off, this slot is only backed up manually</string>
     <string name="policy_min">Minimum play time (minutes)</string>
@@ -578,7 +643,7 @@
     <string name="policy_summary_fmt">\nAuto backup: after %1$d minutes of play · keeps at most %2$d</string>
     <string name="policy_off_suffix">\nAuto backup: off</string>
     <string name="auto_backup_label">Automatic backup</string>
-    <string name="auto_backup_done_fmt">Automatically backed up slot "%1$s"</string>
+    <string name="auto_backup_done_fmt">Automatically backed up slot \"%1$s\"</string>
 
     <!-- ══ F7 运行日志页 ══════════════════════════════════════════════════ -->
     <string name="act_logs_title">Runtime log</string>
@@ -600,7 +665,7 @@
     <string name="log_slot_fmt">current slot %1$s</string>
     <string name="log_no_storage">External storage is unavailable; the data directory cannot be read.</string>
     <string name="log_crash_none">No crash reports yet — the game has not crashed so far.</string>
-    <string name="log_crash_meta_fmt">%1$d files (limit %2$d, change it under "Settings · Log files kept")\nnewest %3$s</string>
+    <string name="log_crash_meta_fmt">%1$d files (limit %2$d, change it under \"Settings · Log files kept\")\nnewest %3$s</string>
     <string name="log_crash_clean_fmt">Delete the oldest %1$d</string>
     <string name="log_crash_clean_title">Delete crash reports</string>
     <string name="log_crash_clean_msg_fmt">Deletes the oldest %1$d crash reports and keeps the most recent %2$d.\n\nDeleted files cannot be recovered.</string>
@@ -651,7 +716,7 @@
     <string name="mods_crash_no">The last launch finished normally</string>
 
     <string name="mods_row_slot_title">Slot being viewed</string>
-    <string name="mods_row_slot_sub_fmt">Viewing mods of "%1$s"</string>
+    <string name="mods_row_slot_sub_fmt">Viewing mods of \"%1$s\"</string>
     <string name="mods_slot_pick_title">Which slot mods do you want to see?</string>
 
     <string name="mods_empty_fmt">This slot has no mods yet.\nPut .jar / .zip into:\n%1$s</string>
@@ -761,13 +826,13 @@
     <string name="mods_detail_meta_head">Description file as written (first %1$d characters)</string>
     <string name="mods_detail_size_fmt">Size: %1$s · %2$s</string>
     <string name="mods_detail_allok">✅ This version can load it</string>
-    <string name="mods_detail_somefail_fmt">⚠ %1$d gates fail; tap "Technical details" to see which</string>
+    <string name="mods_detail_somefail_fmt">⚠ %1$d gates fail; tap \"Technical details\" to see which</string>
     <string name="mods_detail_tech">Technical details</string>
     <string name="mods_detail_path_fmt">Location: %1$s</string>
         <string name="mods_toggle_btn_on">Enable it</string>
     <string name="mods_toggle_btn_off">Disable it</string>
-    <string name="mods_toggle_ask_on_fmt">Enable "%1$s"?</string>
-    <string name="mods_toggle_ask_off_fmt">Disable "%1$s"?</string>
+    <string name="mods_toggle_ask_on_fmt">Enable \"%1$s\"?</string>
+    <string name="mods_toggle_ask_off_fmt">Disable \"%1$s\"?</string>
     <string name="mods_detail_gate_ok_note_fmt">✅ %1$s\n   %2$s</string>
     <string name="mods_detail_setting2_fmt">%1$s: %2$s</string>
     <string name="mods_setting_enabled">Enabled</string>
@@ -807,11 +872,11 @@
     -->
     <string name="mods_word_on">on</string>
     <string name="mods_word_off">off</string>
-    <string name="mods_toggle_ok_fmt">Turned "%1$s" %2$s.</string>
+    <string name="mods_toggle_ok_fmt">Turned \"%1$s\" %2$s.</string>
     <string name="mods_batch_ok_fmt">Toggled %1$d mods.</string>
     <string name="mods_toggle_backup_note">\n\nThe settings were backed up and verified afterwards.</string>
     <string name="mods_toggle_verified_note">\n\nRead back and verified afterwards.</string>
-    <string name="mods_toggle_noop_msg_fmt">"%1$s" was already %2$s; not a single byte of the file changed.</string>
+    <string name="mods_toggle_noop_msg_fmt">\"%1$s\" was already %2$s; not a single byte of the file changed.</string>
     <string name="mods_batch_noop_msg">The mod toggles in this slot were already in the target state; not a single byte of the file changed.</string>
     <string name="mods_toggle_fail_msg_fmt">Not changed: %1$s\n\nThe settings file was not touched at all.</string>
     <string name="mods_toggle_detail">Technical details</string>
@@ -821,23 +886,23 @@
     <string name="mods_act_import_title">Import mod package</string>
     <string name="mods_act_import_sub">Pick a .zip / .jar on this device</string>
     <string name="mods_act_copy_title">Copy this slot mods to…</string>
-    <string name="mods_act_copy_sub_fmt">Copies the whole mod set of "%1$s" into another slot</string>
+    <string name="mods_act_copy_sub_fmt">Copies the whole mod set of \"%1$s\" into another slot</string>
     <string name="chooser_pick_mod">Pick a mod package</string>
     <string name="mods_import_progress_title">Import mod package</string>
-    <string name="mods_import_progress_fmt">Putting "%1$s" into slot "%2$s"…</string>
+    <string name="mods_import_progress_fmt">Putting \"%1$s\" into slot \"%2$s\"…</string>
     <string name="mods_import_failed">Import failed</string>
     <string name="mods_import_ok">Import complete</string>
     <string name="mods_import_exists_title">A mod with this name already exists</string>
-    <string name="mods_import_exists_msg_fmt">This slot already has "%1$s".\n\nReplacing moves the old one to the transfer station instead of deleting it. Replace?</string>
+    <string name="mods_import_exists_msg_fmt">This slot already has \"%1$s\".\n\nReplacing moves the old one to the transfer station instead of deleting it. Replace?</string>
     <string name="mods_import_replace">Replace</string>
     <string name="mods_import_compat_ok_fmt">Target game %1$s ≥ its requirement %2$s — it will load</string>
     <string name="mods_import_compat_bad_fmt">⚠ Game version %1$s is below its requirement %2$s — it will not load even if installed</string>
     <string name="mods_import_nogame">No version points at this slot yet. Assign one first, or it will not load even if installed</string>
     <string name="mods_copy_pick_title">Copy to which slot?</string>
     <string name="mods_copy_no_target">There is only this one slot, so there is nowhere to copy to</string>
-    <string name="mods_copy_confirm_title_fmt">Copy into "%1$s"?</string>
-    <string name="mods_copy_confirm_msg_fmt">Copies the whole mod set of "%1$s" into "%2$s":\n%3$d items · %4$s\n\n%5$d of them already exist there and will be skipped.\nToggle states are not copied.</string>
-    <string name="mods_copy_progress_fmt">Copying %1$d items into "%2$s"…</string>
+    <string name="mods_copy_confirm_title_fmt">Copy into \"%1$s\"?</string>
+    <string name="mods_copy_confirm_msg_fmt">Copies the whole mod set of \"%1$s\" into \"%2$s\":\n%3$d items · %4$s\n\n%5$d of them already exist there and will be skipped.\nToggle states are not copied.</string>
+    <string name="mods_copy_progress_fmt">Copying %1$d items into \"%2$s\"…</string>
     <string name="mods_copy_done">Copy complete</string>
     <string name="mods_copy_title_ok">Start copying</string>
     <string name="mods_copy_blocked">The game is running and would interfere with the copy. Exit the game first.</string>

@@ -214,8 +214,12 @@ public final class MapStats {
         public final Map<String, String> itemNames = new LinkedHashMap<>();
         /** 从内容 JSON 里读到几个"自带名字"（块 + 物品）—— 技术细节层用 */
         public int jsonNames;
-        /** 这张表是怎么拼出来的（技术细节层显示给用户看"依据"） */
-        public final List<String> notes = new ArrayList<>();
+        /**
+         * 这张表是怎么拼出来的（**技术细节层显示给用户看的「依据」**）。
+         *
+         * ⚠️ 存的是 {@link Note}（**码 + 数字**），不是拼好的句子 —— 理由见 {@link Note}。
+         */
+        public final List<Note> notes = new ArrayList<>();
 
         public int size() {
             return byName.size();
@@ -252,7 +256,7 @@ public final class MapStats {
         if (VANILLA == null) {
             Table t = new Table();
             loadRows(t, MapStatsTable.VANILLA_B64, SRC_VANILLA);
-            t.notes.add(SRC_VANILLA + "方块表 " + t.size() + " 条");
+            t.notes.add(new Note(Note.VANILLA_TABLE, t.size()));
             VANILLA = t;
         }
         return VANILLA;
@@ -307,17 +311,64 @@ public final class MapStats {
     // ══ 二、译名（名字从哪来） ═══════════════════════════════════════════════
 
     /**
-     * 名字来源。做成接口是为了：**核心保持纯 Java**（PC 可编、可单独喂断言），
-     * 而"从哪个 APK 读 bundle、属性词用哪几个中文字"留在外面
-     * （{@link MapStatsMods.ApkNames} 是产品侧实现；PC 验收台有自己的实现）。
+     * 「技术细节」里那几句**依据**（{@link Table#notes} 的元素）。
+     *
+     * <h3>为什么只存「码 + 数字」，不存拼好的句子</h3>
+     * <pre>
+     *   ① 这些句子会**原样出现在给用户看的「技术细节」里**，必须跟着界面语言走
+     *      （2026-10-04 用户报的"还有没翻译的"就是它们）；
+     *   ② 而本类**刻意不碰 Android**（PC 可编、可喂断言）⇒ 不能 getString；
+     *   ③ 🔴 更不能在**构建表的时候**就把句子拼好存进去：原版表是 {@link #VANILLA}
+     *      **静态缓存**的 ⇒ 句子会被"第一次用到的那门语言"钉死，用户切语言后还是旧语言。
+     * </pre>
+     * ⇒ 分工：**本类只回答"哪一句 + 数字"，句子在 `MapDetailActivity` 里按界面语言取。**
+     */
+    public static final class Note {
+        /** 原版方块表 N 条 */
+        public static final int VANILLA_TABLE = 1;
+        /** 地图自带补丁：M 条、改了 N 处（`n` = 应用数，`n2` = 条目数） */
+        public static final int PATCH_CHANGED = 2;
+        /** 名字写在内容文件里的有 N 条（这些模组不带译文文件） */
+        public static final int JSON_NAMES = 3;
+        /** 模组里有 N 处内容用了我们认不出的类型（只算进「认不出」那一桶） */
+        public static final int UNKNOWN_TYPE = 4;
+
+        public final int code;
+        /** 主数字 */
+        public final int n;
+        /** 第二个数字（目前只有 {@link #PATCH_CHANGED} 用；不用时为 0） */
+        public final int n2;
+
+        public Note(int code, int n) {
+            this(code, n, 0);
+        }
+
+        public Note(int code, int n, int n2) {
+            this.code = code;
+            this.n = n;
+            this.n2 = n2;
+        }
+    }
+
+    /** 名字来源。做成接口是为了：**核心保持纯 Java**（PC 可编、可单独喂断言），
+     * 而"从哪个 APK 读 bundle、读哪一门语言的 bundle、属性词用哪几个字"留在外面
+     * （{@link BundleNames} 是产品侧实现；PC 验收台与自检有自己的精简实现）。
      */
     public interface Names {
         String block(String internal);
 
         String item(String internal);
 
-        /** 矿墙后缀（游戏 bundle 的 `wallore`，中文是「（墙）」） */
-        String wallSuffix();
+        /**
+         * 矿墙的**整名**（`base` = 已经解析好的矿名）。
+         *
+         * ★ 为什么要收 `base` 而不是只给一个"后缀"（2026-10-04 改）：
+         *   原来是 `label = base + wallSuffix()`，而中文的 `wallore` 是「（墙）」——
+         *   中文能直接拼，**英文不行**（英文要 `Thorium (wall)`，那个前导空格
+         *   一旦写进资源就会被 aapt2 剥掉 ⇒ 变成 `Thorium(wall)`）。
+         *   ⇒ 与工程里那条硬规矩一致：**整句 + `%1$s`，不拼前缀/尾巴**。
+         */
+        String wallName(String base);
 
         /** 属性词（`water` → 「含水」）；认不出就返回原键 */
         String attr(String key);
@@ -361,8 +412,68 @@ public final class MapStats {
      * ⚠️ 允许带一层包裹前缀（`蓝钢-欢迎您/bundles/…`、`TnmSpiroct-…/bundles/…` 都实测见过）。
      * 🔴 必须按 **UTF-8** 读（`Properties.load(InputStream)` 是 ISO-8859-1 ⇒ 全篇乱码）。
      */
-    private static final String BUNDLE_LOCALE_FILE = "bundle_zh_CN.properties";
     private static final String BUNDLE_BASE_FILE = "bundle.properties";
+
+    /**
+     * "想要哪门语言的译文"（游戏约定 = `"bundle" + Locale.toString()`，见 {@link Bundles}）。
+     *
+     * ★ 2026-10-04（P4）：原来是**写死的** `bundle_zh_CN.properties`
+     *   ⇒ 界面切成英文之后矿物/物品/方块名**还是中文**（用户报的第一条）。
+     *   改成跟著界面语言之后又出了第二条（用户报的"换中文不管用"）：
+     *   启动器的应用内语言是 `zh`，而 `Locale.forLanguageTag("zh")` **没有地区** ⇒
+     *   精确匹配 `bundle_zh.properties` **一个都不中**（游戏与模组发的是 `bundle_zh_CN.properties`）
+     *   ⇒ 整层落空、掉回基础包（英文）。系统语言是 `zh_SG` 之类的同理。
+     *   ⇒ 所以必须**按语言前缀兜底**，见 {@link #bundleRank}。
+     */
+    public static final class BundleLang {
+        /** 精确标签（`zh_CN`；应用内语言往往只有 `zh` ⇒ 空地区） */
+        public final String tag;
+        /** 语言（`zh`）—— 精确匹配不中时按它兜底 */
+        public final String lang;
+
+        public BundleLang(String tag, String lang) {
+            this.tag = tag == null ? "" : tag;
+            this.lang = lang == null ? "" : lang;
+        }
+    }
+
+    /**
+     * `zh_CN` / `en` / `pt_BR` 这种后缀 ⇒ {@link BundleLang}。空串 = 不要语言包（只用基础层）。
+     */
+    public static BundleLang bundleLang(String suffix) {
+        if (suffix == null || suffix.isEmpty()) return new BundleLang("", "");
+        int u = suffix.indexOf('_');
+        return new BundleLang(suffix, u > 0 ? suffix.substring(0, u) : suffix);
+    }
+
+    /**
+     * 这个 zip 条目/文件名属于哪一层、匹配得多好（**分数越高越该用**）：
+     * <pre>
+     *   0  = 不是 bundle 文件
+     *   2  = 基础包（bundle.properties）
+     *   10 = 同语言的**某个地区**版本（bundle_zh_CN 之于 want=zh）← 兜底，避免掉回英文
+     *   20 = 语言精确、地区没写（bundle_zh 之于 want=zh）或 want 本来就没地区
+     *   30 = 语言 + 地区**都精确**（bundle_zh_CN 之于 want=zh_CN）
+     * </pre>
+     * ⚠️ 打分而不是"能匹配就用"：同一门语言可能同时存在 `bundle_zh_CN` 与 `bundle_zh_TW`，
+     *   两份都读会**互相覆盖**（后读的赢）⇒ 必须只取分数最高的那一份。
+     */
+    static int bundleRank(String path, BundleLang want) {
+        if (path == null || want == null || want.lang.isEmpty()) return 0;
+        int slash = path.lastIndexOf('/');
+        String file = (slash >= 0 ? path.substring(slash + 1) : path).toLowerCase(Locale.ROOT);
+        if (file.equals(BUNDLE_BASE_FILE)) return 2;
+        String head = "bundle_" + want.lang.toLowerCase(Locale.ROOT);
+        if (!file.startsWith(head) || !file.endsWith(".properties")) return 0;
+        String mid = file.substring(head.length(), file.length() - ".properties".length());
+        if (mid.isEmpty()) return 20;                        // bundle_zh.properties
+        if (!mid.startsWith("_")) return 0;                  // bundle_zho… 这种不算
+        // want.tag 里"地区"那一段（`zh_CN` ⇒ `_CN`）；want 只有语言时它是空的
+        int t = want.tag.indexOf('_');
+        String wantRegion = t > 0 ? want.tag.substring(t) : "";
+        if (!wantRegion.isEmpty() && mid.equalsIgnoreCase(wantRegion)) return 30;
+        return 10;                                           // 同语言、别的地区 ⇒ 兜底用它
+    }
 
     /**
      * 模组译文的两层（{@link #readBundles} 的产物）。
@@ -401,38 +512,92 @@ public final class MapStats {
      *   ⇒ 游戏运行时那些名字是有的，我们只读标准目录就会显示成 `Ore Tungsten`。
      *   ⚠️ 这条是"用户说游戏里有翻译、我们这里没有"的直接原因。
      */
-    private static void readZipBundles(ZipFile zf, MapStats.Pack p, MapStats.Bundles out) {
-        List<String> hits = new ArrayList<>();
+    private static void readZipBundles(ZipFile zf, MapStats.Pack p, MapStats.Bundles out,
+                                       BundleLang want) {
+        List<String> base = new ArrayList<>();
+        // 目录 → 该目录里分数最高的那份语言包
+        // ★ 为什么**按目录**取最好的一份，而不是"整个包取最高分"：
+        //   · 同一个目录里可能同时有 `bundle_zh_CN` 与 `bundle_zh_TW`——两份都读会**互相覆盖**
+        //     （2026-10-04 实测踩到：中文界面显示成繁体「釷/鈹/鎢」）；
+        //   · 而**不同目录**的两份都必须读 —— `Neon-vN14.zip` 就是 `bundles/` 与 `fst-bundles/`
+        //     各一份、后者有 2754 条原版内容名（见本方法上面的长注释）。
+        Map<String, String> bestInDir = new java.util.LinkedHashMap<>();
+        Map<String, Integer> rankInDir = new java.util.HashMap<>();
         Enumeration<? extends ZipEntry> en = zf.entries();
         while (en.hasMoreElements()) {
             String n = en.nextElement().getName();
-            if (bundleLayer(n) != 0) hits.add(n);
+            if (!inBundleDir(n)) continue;           // 父目录必须是 bundles / *-bundles
+            int r = bundleRank(n, want);
+            if (r == 2) {
+                base.add(n);
+                continue;
+            }
+            if (r < 10) continue;
+            String dir = bundleDirOf(n);
+            Integer cur = rankInDir.get(dir);
+            String curName = bestInDir.get(dir);
+            // 同分时按文件名定序取一个（`bundle_zh_CN` < `bundle_zh_TW` ⇒ 简体优先）——
+            //   必须是**确定**的，不能靠遍历顺序（zip 条目顺序不保证）
+            if (cur == null || r > cur || (r == cur && curName != null && n.compareTo(curName) < 0)) {
+                rankInDir.put(dir, r);
+                bestInDir.put(dir, n);
+            }
         }
-        Collections.sort(hits);            // 顺序固定（后读的覆盖先读的）
-        for (String n : hits) {
+        Collections.sort(base);
+        List<String> loc = new ArrayList<>(bestInDir.values());
+        Collections.sort(loc);             // 顺序固定（后读的覆盖先读的）
+        loadAll(zf, base, out.base, p);
+        loadAll(zf, loc, out.locale, p);
+    }
+
+    /** 目录形态：在包根下找一层 `*bundles/` 目录 */
+    private static void readDirBundles(File root, MapStats.Pack p, MapStats.Bundles out,
+                                       BundleLang want) {
+        File[] fs = root.listFiles();
+        if (fs == null) return;
+        for (File d : fs) {
+            if (d == null || !d.isDirectory() || !isBundleDir(d.getName().toLowerCase(Locale.ROOT))) continue;
+            File[] inner = d.listFiles();
+            if (inner == null) continue;
+            // 目录形态走**真实文件名**（大小写必须保持）⇒ 这里不能小写化
+            String best = null;
+            int bestRank = 0;
+            for (File f : inner) {
+                if (f == null || !f.isFile()) continue;
+                int r = bundleRank(f.getName(), want);
+                if (r < 10) continue;
+                String n = f.getName();
+                if (r > bestRank || (r == bestRank && best != null && n.compareTo(best) < 0)) {
+                    bestRank = r;
+                    best = n;
+                }
+            }
+            loadFile(d, BUNDLE_BASE_FILE, out.base, p);
+            if (best != null) loadFile(d, best, out.locale, p);
+        }
+    }
+
+    /** zip 条目所在的那层 bundle 目录（`a/fst-bundles/bundle_zh_CN.properties` ⇒ `a/fst-bundles`） */
+    private static String bundleDirOf(String path) {
+        int slash = path.lastIndexOf('/');
+        return slash <= 0 ? "" : path.substring(0, slash);
+    }
+
+    private static void loadAll(ZipFile zf, List<String> names, Map<String, String> into, Pack p) {
+        for (String n : names) {
             try {
-                p.bundleKeys += loadBundle(bundleLayer(n) == 1 ? out.locale : out.base,
-                        zf.getInputStream(zf.getEntry(n)), 1);
+                p.bundleKeys += loadBundle(into, zf.getInputStream(zf.getEntry(n)), 1);
             } catch (Throwable ignored) {
             }
         }
     }
 
-    /** 目录形态：在包根下找一层 `*bundles/` 目录 */
-    private static void readDirBundles(File root, MapStats.Pack p, MapStats.Bundles out) {
-        File[] fs = root.listFiles();
-        if (fs == null) return;
-        for (File d : fs) {
-            if (d == null || !d.isDirectory() || !isBundleDir(d.getName().toLowerCase(Locale.ROOT))) continue;
-            for (String file : new String[]{BUNDLE_BASE_FILE, BUNDLE_LOCALE_FILE}) {
-                File f = new File(d, file);
-                if (!f.isFile()) continue;
-                try {
-                    Map<String, String> into = file.equals(BUNDLE_LOCALE_FILE) ? out.locale : out.base;
-                    p.bundleKeys += loadBundle(into, new java.io.FileInputStream(f), 0);
-                } catch (Throwable ignored) {
-                }
-            }
+    private static void loadFile(File dir, String file, Map<String, String> into, Pack p) {
+        File f = new File(dir, file);
+        if (!f.isFile()) return;
+        try {
+            p.bundleKeys += loadBundle(into, new java.io.FileInputStream(f), 0);
+        } catch (Throwable ignored) {
         }
     }
 
@@ -441,23 +606,20 @@ public final class MapStats {
         return dirLower.equals("bundles") || dirLower.endsWith("-bundles");
     }
 
-    /** 这个 zip 条目属于哪一层：1 = 语言包，2 = 基础包，0 = 不是 bundle */
-    private static int bundleLayer(String path) {
-        String s = path.toLowerCase(Locale.ROOT);
-        if (!s.endsWith(".properties")) return 0;
-        int slash = s.lastIndexOf('/');
-        if (slash <= 0) return 0;
-        String file = s.substring(slash + 1);
-        String dir = s.substring(0, slash);
+    /**
+     * 这个 zip 条目的**父目录**是不是 `bundles` / `*-bundles`。
+     *
+     * ⚠️ 允许带一层包裹前缀（`蓝钢-欢迎您/bundles/…`、`TnmSpiroct-…/bundles/…` 都实测见过）
+     * ⇒ 取**最后一层**目录名来判，不要求路径以 `bundles/` 开头。
+     * 🔴 这条不能省：`bundleRank` 只看**文件名** ⇒ 少了它就等于"任何目录下的
+     *   `bundle_zh_CN.properties` 都算语言包"（模组把译文放别处、或玩家自己塞的文件都会混进来）。
+     */
+    private static boolean inBundleDir(String path) {
+        int slash = path.lastIndexOf('/');
+        if (slash <= 0) return false;
+        String dir = path.substring(0, slash);
         int d2 = dir.lastIndexOf('/');
-        String dirName = d2 >= 0 ? dir.substring(d2 + 1) : dir;
-        if (!isBundleDir(dirName)) return 0;
-        // ⚠️ 这里比的是**小写化后**的条目名（`s` 已经 toLowerCase），所以右侧也要小写；
-        //    目录形态走的是真实文件名，**必须保持 `bundle_zh_CN` 的大小写**
-        //    （Android/Linux 文件系统区分大小写 —— 我第一版这里写成小写，结果语言包一个都没读到）
-        if (file.equals(BUNDLE_LOCALE_FILE.toLowerCase(Locale.ROOT))) return 1;
-        if (file.equals(BUNDLE_BASE_FILE)) return 2;
-        return 0;
+        return isBundleDir((d2 >= 0 ? dir.substring(d2 + 1) : dir).toLowerCase(Locale.ROOT));
     }
 
     /**
@@ -468,20 +630,22 @@ public final class MapStats {
      * 在那里查不到 ⇒ 只能显示内部名的可读化形式（「Ve Aluminium」），而模组自己几乎都带译文
      * （实测 18 个真模组里 15 个带 bundle）。
      *
+     * @param want {@link #bundleLang}（按**界面语言**算出来的；`lang` 为空 = 只用基础层）
      * @return 两层（**包之间后读的覆盖先读的**，与游戏按 mod 顺序加载一致）
      */
-    public static Bundles readBundles(List<Pack> packs) {
+    public static Bundles readBundles(List<Pack> packs, BundleLang want) {
         Bundles out = new Bundles();
         if (packs == null) return out;
+        BundleLang w = want == null ? new BundleLang("", "") : want;
         for (Pack p : packs) {
             if (p == null) continue;
             try {
                 if (p.dir != null && p.dir.isDirectory()) {
-                    readDirBundles(p.dir, p, out);
+                    readDirBundles(p.dir, p, out, w);
                 } else if (p.pkg != null && p.pkg.isFile()) {
                     ZipFile zf = new ZipFile(p.pkg);
                     try {
-                        readZipBundles(zf, p, out);
+                        readZipBundles(zf, p, out, w);
                     } finally {
                         try {
                             zf.close();
@@ -570,10 +734,10 @@ public final class MapStats {
         //    调用方（MapStatsMods）已经把它写进依据里了；两处都写会在界面上出现**同一条两遍**
         //    （真机截图上就是这么暴露的）。
         if (r.jsonNames > 0) {
-            t.notes.add("名字写在内容文件里的有 " + r.jsonNames + " 条（这些模组不带译文文件）");
+            t.notes.add(new Note(Note.JSON_NAMES, r.jsonNames));
         }
         if (r.unknownType > 0) {
-            t.notes.add("模组里有 " + r.unknownType + " 处内容用了我们认不出的类型（只算进「认不出」那一桶）");
+            t.notes.add(new Note(Note.UNKNOWN_TYPE, r.unknownType));
         }
         return r;
     }
@@ -928,7 +1092,9 @@ public final class MapStats {
                 if (logs != null && logs.size() < 8) logs.add(nd.name);
             }
         }
-        if (n > 0) t.notes.add(SRC_PATCH + "：改了 " + n + " 条内容定义");
+        // ★ 两个数字都给出去（补丁条目数 / 真正改到几处）—— 调用方按界面语言拼整句
+        if (n > 0) t.notes.add(new Note(Note.PATCH_CHANGED,
+                entries == null ? 0 : entries.size(), n));
         return n;
     }
 
@@ -976,8 +1142,8 @@ public final class MapStats {
         /** 认不出的内容（按格数降序） */
         public final List<Unk> unknowns = new ArrayList<>();
         public int unkOre, unkFloor, unkBonus;
-        /** 定义表的来源（技术细节层） */
-        public List<String> notes = new ArrayList<>();
+        /** 定义表的来源（技术细节层；**码 + 数字**，见 {@link Note}） */
+        public List<Note> notes = new ArrayList<>();
         public long millis;
         /** 计数那一段的微秒数（毫秒粒度在 PC 上量不出来：一张图只要几百微秒） */
         public long micros;
@@ -1183,7 +1349,7 @@ public final class MapStats {
                 }
                 if (base == null || base.isEmpty()) base = pretty(internal);
                 label = base;
-                if (d != null && d.wallOre && nm != null) label = base + nm.wallSuffix();
+                if (d != null && d.wallOre && nm != null) label = nm.wallName(base);
             }
             Row row = byLabel.get(label);
             if (row == null) {

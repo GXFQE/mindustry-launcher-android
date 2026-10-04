@@ -389,6 +389,64 @@
 
     <string name="msav_unreadable_fmt">⚠ 读不出来：%1$s</string>
     <string name="msav_unknown_reason">原因不明</string>
+
+    <!--
+      ══ .msav 元数据的显示文案（P3 第一片，2026-10-04）════════════════════════
+      ★ 这些原来是 MsavMeta 里用 Java 拼出来的中文，默认语言翻成英文之后存档行会中英混排。
+      ★ 全部是**整句 + %1$s**（`msav_half_fmt` 就是为此而生的：原来是拼一个带前导空格的碎片，
+        而 aapt2 会把资源的前导空格剥掉 ⇒ 必然粘连）。
+      ⚠️ 这一片的 key 与默认目录**必须逐条对齐**（参数索引也要一致），由门禁 RES-01/RES-02 钉着。
+    -->
+    <string name="msav_playtime_hm_fmt">%1$d 小时 %2$d 分</string>
+    <string name="msav_playtime_min_fmt">%1$d 分钟</string>
+    <string name="msav_playtime_sec">不到 1 分钟</string>
+    <string name="msav_played_fmt">玩了 %1$s</string>
+    <string name="msav_saved_at_fmt">存档于 %1$s</string>
+    <string name="msav_author_fmt">作者：%1$s</string>
+    <string name="msav_format_fmt">格式 v%1$d</string>
+    <string name="msav_size_unknown">尺寸读不出</string>
+    <string name="msav_wave_fmt">第 %1$d 波</string>
+    <string name="msav_half_fmt">%1$s · ⚠ 像是写了一半</string>
+    <string name="msav_unreadable">这个文件读不出来</string>
+    <string name="msav_half_broken">（像是写了一半就中断了）</string>
+    <string name="msav_half_banner">⚠ 这个文件像是写了一半</string>
+    <string name="msav_lbl_size_fmt">尺寸：%1$s</string>
+    <string name="msav_lbl_author_fmt">作者：%1$s</string>
+    <string name="msav_lbl_wave_fmt">波次：%1$d</string>
+    <string name="msav_lbl_played_fmt">玩了：%1$s</string>
+    <string name="msav_lbl_saved_fmt">保存于：%1$s</string>
+    <string name="msav_lbl_format_fmt">格式版本：v%1$d</string>
+    <string name="msav_lbl_desc_fmt">简介：%1$s</string>
+    <string name="msav_reason_not_save">这个文件不像存档，或者写到一半就断了</string>
+    <string name="msav_reason_read_error">读这个文件的时候出错了</string>
+    <!-- 地图来源与详情（同一族：Maps.Item 原来也是 Java 里拼的中文）-->
+    <string name="map_from_slot">本槽</string>
+    <string name="map_from_slot_detail">本槽（你可以直接管理）</string>
+    <string name="map_from_game">游戏自带</string>
+    <string name="map_from_mod_fmt">模组「%1$s」</string>
+    <string name="map_detail_from_fmt">来自：%1$s</string>
+    <string name="map_detail_file_fmt">文件：%1$s · %2$s</string>
+    <string name="map_detail_in_fmt">在 %1$s 里</string>
+    <!--
+      地图统计「技术细节」里那几行依据（P4，2026-10-04）。
+      ★ 原来是 MapStatsMods / BundleNames 里拼的中文；现在核心只给数字，句子在这里拼。
+      ★ 每条都是**整句**；几句话之间由显示侧用 ` · ` 连起来（不为"分号+空格"再做一个分隔符资源 ——
+        尾随空格会被 aapt2 剥掉）。
+    -->
+    <string name="stats_note_skip_mods">游戏这次不加载模组（上次崩过），按原版算</string>
+    <string name="stats_note_mods_failed">模组读不动，只按原版算</string>
+    <string name="stats_note_mods_fmt">%1$d 个模组（新增 %2$d 条，覆盖 %3$d 条）</string>
+    <string name="stats_note_bundles_fmt">%1$d 个带译文，共 %2$d 条</string>
+    <string name="stats_note_patch_changed_fmt">地图自带补丁 %1$d 条（改了 %2$d 处）</string>
+    <string name="stats_note_vanilla_table_fmt">原版方块表 %1$d 条</string>
+    <string name="stats_note_json_names_fmt">名字写在内容文件里的有 %1$d 条（这些模组不带译文文件）</string>
+    <string name="stats_note_unknown_type_fmt">模组里有 %1$d 处内容用了我们认不出的类型（只算进「认不出」那一桶）</string>
+    <string name="stats_note_names_apk_fmt">%1$s 语言包 %2$d 条</string>
+    <string name="stats_note_names_no_apk">版本里没有这门语言的译文</string>
+    <string name="stats_note_names_mod_fmt">模组语言包 %1$d 条</string>
+    <string name="stats_note_names_apk_base_fmt">版本基础包 %1$d 条</string>
+    <string name="stats_note_names_mod_base_fmt">模组基础包 %1$d 条</string>
+    <string name="stats_wall_name_fmt">%1$s（墙）</string>
     <string name="export_slot_title_fmt">导出整槽「%1$s」</string>
     <string name="export_slot_msg_fmt">把整个槽打包成一个 zip：存档 · 地图 · 蓝图 · 模组 · 设置。%1$s\n\n游戏自己也能导入这个包（设置 → 数据 → 导入数据）。</string>
     <string name="export_slot_playing">\n\n⚠️ 游戏正在运行，此刻导出可能拿到写了一半的存档。</string>

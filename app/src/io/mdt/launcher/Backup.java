@@ -657,7 +657,7 @@ public final class Backup {
                 }
                 if (pick == null) return "";
                 MsavMeta m = MsavMeta.read(pick);
-                return m.ok ? m.shortLine(true) : "";       // 快照里的都是存档
+                return m.ok ? MsavText.shortLine(ctx, m, true) : "";   // 快照里的都是存档
             }
             List<Entry> es = readEntries(new File(ss.dir, MANIFEST));
             Entry best = null;
@@ -672,7 +672,7 @@ public final class Backup {
             InputStream in = new java.io.BufferedInputStream(new FileInputStream(obj), 8192);
             try {
                 MsavMeta m = MsavMeta.read(in);
-                return m.ok ? m.shortLine(true) : "";       // 快照里的都是存档
+                return m.ok ? MsavText.shortLine(ctx, m, true) : "";   // 快照里的都是存档
             } finally {
                 in.close();
             }
