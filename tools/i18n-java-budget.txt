@@ -1,0 +1,46 @@
+# SRC-02 台账：Java 源里「含中文的字符串字面量」的**每个文件上限**（注释不算）。
+#
+# 判据（tools/i18n-check.py 的 SRC-02）：
+#   · 实测 > 台账  ⇒ ERROR：新加了中文 ⇒ 搬进 res/values(-zh)/strings.xml；
+#                     确实该留中文（维护者视角，如落盘报告 / 自检断言 / dev_* 口）就把这行改成实测值。
+#   · 实测 < 台账  ⇒ ERROR：你已经搬走了几条 ⇒ **把这行改小**。
+#   · 文件有中文却不在本表里 ⇒ ERROR：新文件出现了中文。
+# ★ 这一列数字就是 **P3（把中文搬进资源）的进度**：它只许降。
+#   合计 1671 条 —— 其中大头是**有意保留**的：
+#     · SelfTest.java  —— 断言消息（自检语言钉死在 zh，**不进资源**，见 REF §67）
+#     · MainActivity.java —— 全在 dev_* 直通口（仅 debuggable 构建可达）
+#     · Compat / AutoBackup / Crash —— 只进 report-*.txt（取证文本不进资源）
+#   真正要迁的是**用户可见**的那些（Mods / Data / Backup / SettingsBin / MsavMeta / SlotZip …）。
+#
+# ⚠️ 改这个文件 = 一次**有意识的决定**，不是消音器。
+#
+# 文件 = 上限（含中文的字符串字面量条数）
+
+SelfTest.java = 967
+Mods.java = 140
+MainActivity.java = 126
+Data.java = 81
+Backup.java = 53
+SettingsBin.java = 52
+Injector.java = 33
+ModsActivity.java = 33
+MsavMeta.java = 32
+Compat.java = 26
+MapStats.java = 22
+SlotZip.java = 20
+MapFiles.java = 14
+AutoBackup.java = 11
+BundleNames.java = 10
+Cas.java = 8
+Importer.java = 8
+MapStatsMods.java = 8
+Crash.java = 6
+Exporter.java = 6
+Msav.java = 5
+Versions.java = 3
+GameSlot.java = 2
+LauncherApp.java = 1
+Maps.java = 1
+MsavPatches.java = 1
+SlotIo.java = 1
+Util.java = 1

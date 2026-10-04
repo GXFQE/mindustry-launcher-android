@@ -22,10 +22,21 @@ i18n-check.py -- MDT 启动器「国际化构建期门禁」（研究文档 docs
              命中条件 = 判据的实参是 ① 含中文 ② 纯状态符号（✅/❌/⚠ 这类 Unicode 分类 So）
              ③ 一个「值本身是文案」的常量（如 MapStats.SRC_MOD = "模组"）。
              ⚠️ 一翻译就**静默改行为**，不报错不崩溃 —— 这是本门禁最重要的一条。
+     SRC-02  Java 里「含中文的字符串字面量」**只许降**（每个文件的上限记在台账里）。
+             实测 > 台账 ⇒ 新加了中文，搬进资源；实测 < 台账 ⇒ 把台账改小（那一列就是 P3 的进度）；
+             有中文却不在台账里 ⇒ 也报。
+             ⚠️ 它数的是**全部**含中文字面量，不区分给谁看 —— `SelfTest` 的断言消息、
+             `dev_*` 直通口、`report-*.txt` 那几类**本来就该留中文**，台账里那些大数字是
+             "已知且有意保留"，判据只保证**不再增加**。
 
-已知缺陷台账：tools/i18n-known.txt
-     里面记的条目**必须还在复现**；已经修好的条目会让本脚本报 STALE 并失败
-     （判据对 ≠ 清单全，两个方向都要跑）。
+ 已知缺陷台账：tools/i18n-known.txt
+      里面记的条目**必须还在复现**；已经修好的条目会让本脚本报 STALE 并失败
+      （判据对 ≠ 清单全，两个方向都要跑）。
+
+ Java 中文字面量台账：tools/i18n-java-budget.txt
+      **每个文件一行「文件名 = 上限」**，由本脚本的同一把尺子生成
+      （`tools/../.tmp-i18n/gen-java-budget.py` 那种脚本 import 本模块来写，
+       **别手写数字** —— 手写迟早与判据口径漂移）。改它 = 一次有意识的决定。
 
 用法:
     python tools/i18n-check.py                  # 检查（构建期调用；根目录由脚本位置推断）
@@ -61,6 +72,16 @@ RES_DIR = os.path.join("app", "res")
 SRC_DIR = os.path.join("app", "src")
 MANIFEST = os.path.join("app", "AndroidManifest.xml")
 KNOWN_FILE = os.path.join("tools", "i18n-known.txt")
+# SRC-02 的台账：**每个 Java 文件里"含中文的字符串字面量"条数的上限**。
+#   ★ 它的作用是把 P3（把中文搬进资源）变成一个**只许降不许升**的数字：
+#     · 某文件**超出**台账 ⇒ 你新加了用户可能看到的中文，搬进资源去；
+#     · 某文件**低于**台账 ⇒ 你已经搬走了几条，**把台账那一行改小**（这一行就是 P3 的进度）。
+#   ⚠️ 它数的是"含 CJK 的字符串字面量"，**不区分**给用户看的还是给维护者看的
+#     （`SelfTest` 的断言消息、`dev_*` 口、落盘报告那几类**本来就该留中文**）。
+#     所以台账里那些大数字不是"欠债"，是"已知且有意保留"；判据只保证**不再增加**。
+BUDGET_FILE = os.path.join("tools", "i18n-java-budget.txt")
+# 一个字符串字面量的内容（不跨行；Java 里跨行是相邻字面量相加 ⇒ 每个片段各算一条）
+LITERAL_RE = re.compile(r'"((?:[^"\\]|\\.)*)"')
 
 # RES-05：「允许用 \u0020 留白」的 key 白名单。
 #   这几条都是**贴在别的串前后的碎片**，必须有前导空格，而 aapt2 会把字面空格剥掉。
@@ -785,6 +806,80 @@ def check_src(root, include_selftest=False, verbose=False):
     return findings, notes
 
 
+def count_cjk_literals(root):
+    """每个 Java 文件里「含中文的字符串字面量」条数（注释已经剥掉）。
+
+    ★ 为什么用这个当 P3 的尺子：它**完全机械**（不猜"这句是给谁看的"），
+      所以能被别人独立复算；而"到底该不该搬"由**台账**那一行（人的决定）来记。
+    """
+    out = {}
+    for rel, full in java_files(root, include_selftest=True):
+        name = os.path.basename(rel)
+        for line in java_code_lines(read_text(full)):
+            for m in LITERAL_RE.finditer(line):
+                if has_cjk(m.group(1)):
+                    out[name] = out.get(name, 0) + 1
+    return out
+
+
+def parse_budget(text):
+    """台账格式：每行 `文件名.java = 数字`；`#` 之后是注释。"""
+    out = {}
+    for line in text.splitlines():
+        s = line.split("#", 1)[0].strip()
+        if not s or "=" not in s:
+            continue
+        k, v = s.split("=", 1)
+        try:
+            out[k.strip()] = int(v.strip())
+        except ValueError:
+            continue
+    return out
+
+
+def check_src02(root, verbose=False):
+    """SRC-02：Java 里的中文字面量**只许降**（台账 = 每个文件的上限）。"""
+    findings = []
+    notes = []
+    path = os.path.join(root, BUDGET_FILE)
+    if not os.path.isfile(path):
+        notes.append(("src", "SRC-02 跳过：没有 " + BUDGET_FILE.replace("\\", "/")))
+        return findings, notes
+    budget = parse_budget(read_text(path))
+    actual = count_cjk_literals(root)
+
+    for name in sorted(set(list(actual.keys()) + list(budget.keys()))):
+        a = actual.get(name, 0)
+        b = budget.get(name)
+        if b is None:
+            findings.append(Finding(
+                "SRC-02", "ERROR", BUDGET_FILE, 0, name,
+                "%s 里有 %d 条含中文的字符串字面量，台账里**没有这一行** —— 新出现的中文要么搬进"
+                " res/values(-zh)/strings.xml，要么在 %s 里记一行「%s = %d」"
+                "（记了就等于声明「这条我确认该留中文」）"
+                % (name, a, BUDGET_FILE.replace("\\", "/"), name, a)))
+        elif a > b:
+            findings.append(Finding(
+                "SRC-02", "ERROR", BUDGET_FILE, 0, name,
+                "%s 的中文字面量 **%d 条 > 台账的 %d 条** —— 新加的中文请搬进 "
+                "res/values(-zh)/strings.xml；确实该留中文（维护者视角）才把台账改成 %d"
+                % (name, a, b, a)))
+        elif a < b:
+            findings.append(Finding(
+                "SRC-02", "ERROR", BUDGET_FILE, 0, name,
+                "%s 的中文字面量已经降到 **%d 条**（台账还写着 %d）—— 把台账那一行改成 %d。"
+                "★ 这一行就是 P3 的进度：它只许降"
+                % (name, a, b, a)))
+
+    notes.append(("src", "SRC-02 中文字面量预算: 台账 %d 个文件 / 实测 %d 个文件；"
+                  "合计 %d（台账）vs %d（实测）"
+                  % (len(budget), len(actual), sum(budget.values()), sum(actual.values()))))
+    changed = [n for n in sorted(actual) if budget.get(n) != actual[n]]
+    if changed and verbose:
+        notes.append(("src", "SRC-02 与台账不一致的文件: " + ", ".join(changed)))
+    return findings, notes
+
+
 # ---------------------------------------------------------------------------
 # 已知缺陷台账
 # ---------------------------------------------------------------------------
@@ -923,9 +1018,12 @@ def _base(scratch, locale_file=None, locale_name="values-en", java=None, manifes
 
 
 def _run(root, include_selftest=False):
+    """★ 这里必须与 `main` 的检查清单**逐条对应** —— 漏一条的后果是：
+    那条规则的元断言会全红（响亮地失败），而不是"悄悄没人测它"。加规则时两边一起加。"""
     f1, _n1, _d = check_res(root)
     f2, _n2 = check_src(root, include_selftest=include_selftest)
-    return f1 + f2
+    f3, _n3 = check_src02(root)
+    return f1 + f2 + f3
 
 
 def selftest(root, verbose=False):
@@ -1026,6 +1124,50 @@ def selftest(root, verbose=False):
             "app/AndroidManifest.xml": _MIN_MANIFEST,
         }, scratch),
         None, {"RES-12"}))
+    # ── SRC-02：Java 里的中文字面量只许降（台账 = 每个文件的上限）──
+    _CJKJAVA = ('package io.mdt.launcher;\nclass A {\n'
+                '  String f() { return "\u4e2d\u6587\u4e00"; }\n'
+                '  String g() { return "\u4e2d\u6587\u4e8c"; }\n}\n')
+    cases.append((
+        "SRC-02 中文字面量超出台账（新加了中文）",
+        _mk_tree({
+            "app/res/values/strings.xml":
+                '<resources><string name="a">A</string></resources>',
+            "app/src/io/mdt/launcher/A.java": _CJKJAVA,
+            "app/AndroidManifest.xml": _MIN_MANIFEST,
+            "tools/i18n-java-budget.txt": "A.java = 1\n",
+        }, scratch),
+        "SRC-02", None))
+    cases.append((
+        "SRC-02 台账偏大（已经搬走了却没更新台账）也要报",
+        _mk_tree({
+            "app/res/values/strings.xml":
+                '<resources><string name="a">A</string></resources>',
+            "app/src/io/mdt/launcher/A.java": _CJKJAVA,
+            "app/AndroidManifest.xml": _MIN_MANIFEST,
+            "tools/i18n-java-budget.txt": "A.java = 5\n",
+        }, scratch),
+        "SRC-02", None))
+    cases.append((
+        "SRC-02 有中文但台账里没有这一行",
+        _mk_tree({
+            "app/res/values/strings.xml":
+                '<resources><string name="a">A</string></resources>',
+            "app/src/io/mdt/launcher/A.java": _CJKJAVA,
+            "app/AndroidManifest.xml": _MIN_MANIFEST,
+            "tools/i18n-java-budget.txt": "# \u7a7a\u53f0\u8d26\n",
+        }, scratch),
+        "SRC-02", None))
+    cases.append((
+        "SRC-02 与台账完全一致时不许响（也不许被别的规则误伤）",
+        _mk_tree({
+            "app/res/values/strings.xml":
+                '<resources><string name="a">A</string></resources>',
+            "app/src/io/mdt/launcher/A.java": _CJKJAVA,
+            "app/AndroidManifest.xml": _MIN_MANIFEST,
+            "tools/i18n-java-budget.txt": "A.java = 2\n",
+        }, scratch),
+        None, {"SRC-02"}))
     cases.append((
         "RES-11 注释里出现「星号+斜杠」（会把 R.java 的 Javadoc 提前结束）",
         _mk_tree({
@@ -1245,9 +1387,10 @@ def main(argv):
 
     res_findings, res_notes, default_name = check_res(root, verbose=verbose)
     src_findings, src_notes = check_src(root, include_selftest=include_selftest, verbose=verbose)
-    findings = res_findings + src_findings
+    src02_findings, src02_notes = check_src02(root, verbose=verbose)
+    findings = res_findings + src_findings + src02_findings
 
-    for tag, msg in res_notes + src_notes:
+    for tag, msg in res_notes + src_notes + src02_notes:
         emit("   [%s] %s" % (tag, msg))
 
     # 台账
