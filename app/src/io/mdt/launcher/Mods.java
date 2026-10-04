@@ -627,7 +627,49 @@ public final class Mods {
      * 导入 / 复制的结果（人读报告 + 机器可判字段，界面与 dev 口共用一处）。
      */
     public static final class PackResult {
+        // ── ★ 错误码（P3，2026-10-05）：`importPackage` / `copyMods` **没有 Context**（12 处调用）
+        //   而 `report()` 就是弹窗正文 ⇒ 走「码 + 参数」，文案在 `ModsText.packReason` 里取。
+        //   ⚠️ `error` **一个字都不动**（dev 报告 / 自检看它）。
+        //   ⚠️ **第一层不许夹带"原因"**（异常原文 / `metaReason` 诊断）；中性参数（路径/文件名）可以。
+        public static final int P_NONE = 0;
+        public static final int P_SRC_MISSING = 1;        // s1 = 源路径
+        public static final int P_SRC_OPEN = 2;
+        public static final int P_NO_MODS_DIR = 3;
+        public static final int P_NAME_EMPTY = 4;
+        public static final int P_NAME_COLON = 5;
+        public static final int P_NAME_DOT = 6;
+        public static final int P_NAME_EXT = 7;
+        public static final int P_MKDIR = 8;              // s1 = 目录
+        public static final int P_NAME_TAKEN = 9;         // s1 = 文件名
+        public static final int P_NOT_A_MOD = 10;
+        public static final int P_IMPORT_FAILED = 11;
+        public static final int P_COPY_NO_SRC = 12;
+        public static final int P_COPY_NO_DST = 13;
+        public static final int P_COPY_SAME = 14;
+        public static final int P_COPY_UNREADABLE = 15;
+        public static final int P_COPY_NOTHING = 16;
+
+        /** **所有**错误码（给自检**遍历**用：漏映射 = 弹窗里静默空白） */
+        public static final int[] ALL_CODES = {
+                P_SRC_MISSING, P_SRC_OPEN, P_NO_MODS_DIR, P_NAME_EMPTY, P_NAME_COLON,
+                P_NAME_DOT, P_NAME_EXT, P_MKDIR, P_NAME_TAKEN, P_NOT_A_MOD,
+                P_IMPORT_FAILED, P_COPY_NO_SRC, P_COPY_NO_DST, P_COPY_SAME,
+                P_COPY_UNREADABLE, P_COPY_NOTHING,
+        };
+
+        public int errCode = P_NONE;
+        public String errS1;
+
+        /** 记下"错在哪"：**码 + 参数给界面**，中文句子留给报告与自检 */
+        PackResult fail(int code, String zh, String s1) {
+            errCode = code;
+            errS1 = s1;
+            error = zh;
+            return this;
+        }
+
         public boolean ok;
+        /** 失败原因（ok=false 时不为 null）—— ⚠️ 给报告/自检看的原文，别直接显示给用户 */
         public String error;
         /** 单包导入：最终落点与文件名 */
         public File dest;
@@ -643,33 +685,41 @@ public final class Mods {
         /** 批量复制：真正复制过去的字节数 */
         public long copiedBytes;
 
-        public String report() {
+        /**
+         * 人读正文。★ P3：**收 `Context`** —— 这是弹窗正文（`ModsActivity` 三处直接塞进 `alert`），
+         * 文案全走资源；码为 0 时才退回 {@link #error} 原文（那是异常/诊断，给维护者看的）。
+         */
+        public String report(Context ctx) {
             StringBuilder sb = new StringBuilder();
             if (!ok && error != null) {
-                sb.append("❌ 没做：").append(error).append('\n');
+                sb.append(ctx.getString(R.string.pack_report_failed_fmt,
+                        ModsText.packReason(ctx, this))).append('\n');
                 return sb.toString();
             }
             if (finalName != null) {
-                sb.append(overwrote ? "✅ 已替换：" : "✅ 已导入：").append(finalName).append('\n');
-                sb.append("位置：").append(dest == null ? "?" : dest.getAbsolutePath()).append('\n');
-                sb.append("大小：").append(Util.formatSize(bytes)).append('\n');
+                sb.append(ctx.getString(overwrote ? R.string.pack_report_replaced_fmt
+                        : R.string.pack_report_imported_fmt, finalName)).append('\n');
+                sb.append(ctx.getString(R.string.pack_report_where_fmt,
+                        dest == null ? "?" : dest.getAbsolutePath())).append('\n');
+                sb.append(ctx.getString(R.string.pack_report_size_fmt,
+                        Util.formatSize(bytes))).append('\n');
                 if (meta != null) {
-                    sb.append("模组：").append(meta.title()).append("  ")
-                      .append(meta.version == null ? "0" : meta.version).append('\n');
-                    sb.append("游戏里的名字：").append(meta.internalName)
-                      .append("   它要求游戏 ").append(meta.minGameVersion).append('\n');
+                    sb.append(ctx.getString(R.string.pack_report_mod_fmt, meta.title(),
+                            meta.version == null ? "0" : meta.version)).append('\n');
+                    sb.append(ctx.getString(R.string.pack_report_names_fmt, meta.internalName,
+                            meta.minGameVersion)).append('\n');
                 }
                 return sb.toString();
             }
-            sb.append("✅ 复制完成：").append(copied.size()).append(" 项，")
-              .append(Util.formatSize(copiedBytes)).append('\n');
+            sb.append(ctx.getString(R.string.pack_report_copied_fmt, copied.size(),
+                    Util.formatSize(copiedBytes))).append('\n');
             if (!skipped.isEmpty()) {
-                sb.append("跳过 ").append(skipped.size()).append(" 项（目标槽已有同名）：")
-                  .append(join(skipped)).append('\n');
+                sb.append(ctx.getString(R.string.pack_report_skipped_fmt, skipped.size(),
+                        join(skipped))).append('\n');
             }
             if (!failedList.isEmpty()) {
-                sb.append("❌ 失败 ").append(failedList.size()).append(" 项：")
-                  .append(join(failedList)).append('\n');
+                sb.append(ctx.getString(R.string.pack_report_failed_list_fmt, failedList.size(),
+                        join(failedList))).append('\n');
             }
             return sb.toString();
         }
@@ -681,16 +731,29 @@ public final class Mods {
      *  · 🔴 **名字里绝不能有冒号**：上游注释 `Mods.java:113` 明说安卓会给文件名加冒号
      *    （`primary:X.jar`）**从而破坏 dexing**。
      */
-    public static String checkPackName(String name) {
-        if (name == null || name.trim().isEmpty()) return "文件名为空";
+    /** 文件名检查的结果：**码 + 中文同行**（码给界面、中文给报告）—— 分两处判迟早会漂移 */
+    public static final class NameErr {
+        public final int code;
+        public final String zh;
+        NameErr(int code, String zh) { this.code = code; this.zh = zh; }
+    }
+
+    public static NameErr checkPackName(String name) {
+        if (name == null || name.trim().isEmpty()) {
+            return new NameErr(PackResult.P_NAME_EMPTY, "文件名为空");
+        }
         String n = name.trim();
         if (n.indexOf(':') >= 0) {
-            return "文件名里有冒号，游戏加载不了";
+            return new NameErr(PackResult.P_NAME_COLON, "文件名里有冒号，游戏加载不了");
         }
-        if (n.startsWith(".")) return "文件名以点开头，游戏不会把它当模组";
+        if (n.startsWith(".")) {
+            return new NameErr(PackResult.P_NAME_DOT,
+                    "文件名以点开头，游戏不会把它当模组");
+        }
         String lower = n.toLowerCase(Locale.ROOT);
         if (!lower.endsWith(".jar") && !lower.endsWith(".zip")) {
-            return "游戏只加载 .jar / .zip 形态的模组包，这个文件名两个都不是";
+            return new NameErr(PackResult.P_NAME_EXT,
+                    "游戏只加载 .jar / .zip 形态的模组包，这个文件名两个都不是");
         }
         return null;
     }
@@ -726,7 +789,7 @@ public final class Mods {
     public static PackResult importPackage(File modsDir, File src, boolean overwrite, File trashDir) {
         if (src == null || !src.isFile()) {
             PackResult r = new PackResult();
-            r.error = "源文件不存在：" + src;
+            r.fail(PackResult.P_SRC_MISSING, "源文件不存在：" + src, String.valueOf(src));
             return r;
         }
         java.io.FileInputStream in;
@@ -734,7 +797,7 @@ public final class Mods {
             in = new java.io.FileInputStream(src);
         } catch (Throwable t) {
             PackResult r = new PackResult();
-            r.error = "打不开源文件：" + t.getMessage();
+            r.fail(PackResult.P_SRC_OPEN, "打不开源文件：" + t.getMessage(), null);
             return r;
         }
         try {
@@ -763,22 +826,24 @@ public final class Mods {
                                            File trashDir) {
         PackResult r = new PackResult();
         if (modsDir == null) {
-            r.error = "拿不到这个槽的 mods/ 目录";
+            r.fail(PackResult.P_NO_MODS_DIR, "拿不到这个槽的 mods/ 目录", null);
             return r;
         }
-        String nameErr = checkPackName(displayName);
+        NameErr nameErr = checkPackName(displayName);
         if (nameErr != null) {
-            r.error = nameErr;
+            r.fail(nameErr.code, nameErr.zh, null);
             return r;
         }
         final String name = displayName.trim();
         if (!modsDir.exists() && !modsDir.mkdirs()) {
-            r.error = "建目录失败：" + modsDir.getAbsolutePath();
+            r.fail(PackResult.P_MKDIR, "建目录失败：" + modsDir.getAbsolutePath(),
+                    modsDir.getAbsolutePath());
             return r;
         }
         File dest = new File(modsDir, name);
         if (dest.exists() && !overwrite) {
-            r.error = "这个槽的 mods/ 里已经有「" + name + "」了 —— 替换会覆盖原文件，需要先确认";
+            r.fail(PackResult.P_NAME_TAKEN,
+                    "这个槽的 mods/ 里已经有「" + name + "」了 —— 替换会覆盖原文件，需要先确认", name);
             return r;
         }
         File part = new File(modsDir, name + ".part");
@@ -789,7 +854,7 @@ public final class Mods {
             if (m.metaError != null) {
                 Data.deleteTree(part);
                 // ★ 2026-10-04：走 metaReason()（白话），别把 `类名: 消息` 拼进用户可见的失败原因
-                r.error = "这个包不是游戏能加载的模组：" + m.metaReason();
+                r.fail(PackResult.P_NOT_A_MOD, "这个包不是游戏能加载的模组", null);
                 return r;
             }
             m.fileName = name;                  // 报告里说最终名字，而不是 .part
@@ -802,7 +867,8 @@ public final class Mods {
             return r;
         } catch (Throwable t) {
             Data.deleteTree(part);
-            r.error = t.getClass().getSimpleName() + ": " + t.getMessage();
+            r.fail(PackResult.P_IMPORT_FAILED,
+                    t.getClass().getSimpleName() + ": " + t.getMessage(), null);
             return r;
         }
     }
@@ -822,24 +888,25 @@ public final class Mods {
     public static PackResult copyMods(File fromDir, File toDir, boolean overwrite, File trashDir) {
         PackResult r = new PackResult();
         if (fromDir == null || !fromDir.isDirectory()) {
-            r.error = "源槽没有 mods/ 目录";
+            r.fail(PackResult.P_COPY_NO_SRC, "源槽没有 mods/ 目录", null);
             return r;
         }
         if (toDir == null) {
-            r.error = "拿不到目标槽的 mods/ 目录";
+            r.fail(PackResult.P_COPY_NO_DST, "拿不到目标槽的 mods/ 目录", null);
             return r;
         }
         if (fromDir.getAbsolutePath().equals(toDir.getAbsolutePath())) {
-            r.error = "源槽与目标槽是同一个";
+            r.fail(PackResult.P_COPY_SAME, "源槽与目标槽是同一个", null);
             return r;
         }
         File[] kids = fromDir.listFiles();
         if (kids == null) {
-            r.error = "读不到源槽 mods/ 的内容";
+            r.fail(PackResult.P_COPY_UNREADABLE, "读不到源槽 mods/ 的内容", null);
             return r;
         }
         if (!toDir.exists() && !toDir.mkdirs()) {
-            r.error = "建目录失败：" + toDir.getAbsolutePath();
+            r.fail(PackResult.P_MKDIR, "建目录失败：" + toDir.getAbsolutePath(),
+                    toDir.getAbsolutePath());
             return r;
         }
         List<File> sorted = new ArrayList<>();
@@ -880,7 +947,9 @@ public final class Mods {
             }
         }
         r.ok = r.failedList.isEmpty();
-        if (!r.ok && r.copied.isEmpty() && r.skipped.isEmpty()) r.error = "一项都没复制成功";
+        if (!r.ok && r.copied.isEmpty() && r.skipped.isEmpty()) {
+            r.fail(PackResult.P_COPY_NOTHING, "一项都没复制成功", null);
+        }
         return r;
     }
 

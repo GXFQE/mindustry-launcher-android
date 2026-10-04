@@ -418,7 +418,7 @@ public class MainActivity extends BaseActivity {
                         Mods.PackResult r = Mods.importPackage(dir, src, ow,
                                 Mods.trashDirOf(MainActivity.this));
                         rep = "槽 = " + useSlot + "  源 = " + src.getAbsolutePath()
-                                + "  覆盖 = " + ow + "\n\n" + r.report();
+                                + "  覆盖 = " + ow + "\n\n" + r.report(MainActivity.this);
                         if (r.ok && r.meta != null) {
                             Mods.Target t = Mods.targetsFor(MainActivity.this, useSlot);
                             rep += "指向本槽的版本 = " + (t.any() ? t.label : "（无）")
@@ -455,7 +455,7 @@ public class MainActivity extends BaseActivity {
                                 Mods.trashDirOf(MainActivity.this));
                         rep = "从 " + fromSlot + " 复制到 " + toSlot + "（覆盖 = " + ow2 + "）\n"
                                 + from.getAbsolutePath() + "\n" + to.getAbsolutePath() + "\n\n"
-                                + r.report();
+                                + r.report(MainActivity.this);
                     } catch (Throwable t) {
                         rep = "dev_mods_copy 失败：" + t;
                     }

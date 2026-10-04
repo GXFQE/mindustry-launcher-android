@@ -323,7 +323,7 @@ public class ModsActivity extends BaseActivity {
                                         .show();
                                 return;
                             }
-                            alert(getString(R.string.mods_import_failed), fpr.report());
+                            alert(getString(R.string.mods_import_failed), fpr.report(ModsActivity.this));
                             return;
                         }
                         showImportResult(fpr);
@@ -336,7 +336,7 @@ public class ModsActivity extends BaseActivity {
 
     /** 导入结果 + **版本兼容性提示**（F13 的头号卖点，在"刚装进去"这一刻就该说） */
     private void showImportResult(Mods.PackResult pr) {
-        StringBuilder sb = new StringBuilder(pr.report());
+        StringBuilder sb = new StringBuilder(pr.report(this));
         Mods.Target t = Mods.targetsFor(this, mSlot);
         if (pr.meta != null) {
             sb.append(getString(R.string.mods_detail_kind_fmt, kindOf(pr.meta))).append('\n');
@@ -451,7 +451,7 @@ public class ModsActivity extends BaseActivity {
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
                         pd.dismiss();
-                        alert(getString(R.string.mods_copy_done), fe != null ? fe : fpr.report());
+                        alert(getString(R.string.mods_copy_done), fe != null ? fe : fpr.report(ModsActivity.this));
                         rescan();
                     }
                 });

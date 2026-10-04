@@ -539,6 +539,42 @@
     <string name="mods_detail_depchain">dependency chain verdict:</string>
     <string name="mods_detail_repo_override_fmt">%1$s (overridden by settings)</string>
     <string name="mods_detail_settings_unreadable">⚠ the settings file cannot be read: the values above are defaults, not what is on disk\n</string>
+    <!--
+      ══ 模组包导入 / 跨槽复制的**结果与失败原因**（P3）══════════════════════
+      ★ `Mods.PackResult.report()` **就是弹窗正文**（`ModsActivity` 三处直接把它塞进 `alert`）
+        ⇒ 属于给用户看的；`importPackage` / `copyMods` 又**没有 Context**（12 处调用）
+        ⇒ 走**码 + 参数**：核心只给 `errCode`，文案在 `ModsText.packReason(ctx, r)` 里按码取。
+      ★ `report(ctx)` 里的**行首标签**（位置 / 大小 / 模组 …）也一起进资源 —— 它们是整句。
+      🔴 **第一层不许夹带"原因"**：异常原文（`FileNotFoundException: …`）与 `metaReason` 那种
+        诊断一律**不进**；**中性参数**（路径 / 文件名 / 体积）可以进。
+      ⚠️ 英文别写撇号（RES-13）、要显示引号写 `\"`（RES-12）。
+    -->
+    <string name="pack_err_src_missing_fmt">the source file does not exist: %1$s</string>
+    <string name="pack_err_src_open">could not open the source file</string>
+    <string name="pack_err_no_mods_dir">cannot reach the mods/ folder of this slot</string>
+    <string name="pack_err_name_empty">the file name is empty</string>
+    <string name="pack_err_name_colon">the file name contains a colon, so the game cannot load it</string>
+    <string name="pack_err_name_dot">the file name starts with a dot, so the game will not treat it as a mod</string>
+    <string name="pack_err_name_ext">the game only loads mod packs ending in .jar or .zip; this name ends in neither</string>
+    <string name="pack_err_mkdir_fmt">could not create the directory: %1$s</string>
+    <string name="pack_err_name_taken_fmt">this slot already has a mod called \"%1$s\" — replacing it would overwrite the original file, so ask first</string>
+    <string name="pack_err_not_a_mod">this package is not a mod the game can load</string>
+    <string name="pack_err_import_failed">something went wrong during the import</string>
+    <string name="pack_err_copy_no_src">the source slot has no mods/ folder</string>
+    <string name="pack_err_copy_no_dst">cannot reach the mods/ folder of the target slot</string>
+    <string name="pack_err_copy_same">the source slot and the target slot are the same</string>
+    <string name="pack_err_copy_unreadable">could not read the contents of the source slot mods/</string>
+    <string name="pack_err_copy_nothing">nothing was copied</string>
+    <string name="pack_report_failed_fmt">❌ nothing was done: %1$s</string>
+    <string name="pack_report_replaced_fmt">✅ replaced: %1$s</string>
+    <string name="pack_report_imported_fmt">✅ imported: %1$s</string>
+    <string name="pack_report_where_fmt">Where: %1$s</string>
+    <string name="pack_report_size_fmt">Size: %1$s</string>
+    <string name="pack_report_mod_fmt">Mod: %1$s  %2$s</string>
+    <string name="pack_report_names_fmt">Name in the game: %1$s   it needs game %2$s</string>
+    <string name="pack_report_copied_fmt">✅ copy done: %1$d items, %2$s</string>
+    <string name="pack_report_skipped_fmt">skipped %1$d items (the target slot already has the same name): %2$s</string>
+    <string name="pack_report_failed_list_fmt">❌ %1$d items failed: %2$s</string>
     <!-- 地图来源与详情（同一族：Maps.Item 原来也是 Java 里拼的中文）-->
     <string name="map_from_slot">this slot</string>
     <string name="map_from_slot_detail">this slot (you can manage it here)</string>

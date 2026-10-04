@@ -3492,6 +3492,32 @@ public final class SelfTest {
                             && !ctx.getString(R.string.mods_detail_no_target).isEmpty(),
                     "★P3：模组页那两条带占位符的按真参数实拼；详情里**不再出现源码出处**（文案纪律 ⑤）");
 
+            // ★★ P3 第十批：模组包**导入 / 跨槽复制**的失败原因（`Mods.PackResult`）。
+            //    它和 `SettingsBin` 一样是"纯 Java 核心 + 码"，所以判据也照抄那一条：
+            //    ① 遍历 `ALL_CODES`，每个都必须映射到真文案（漏映射 = 弹窗里**静默空白**）；
+            //    ② 两套语言不同；
+            //    ③ **原始原因**（异常原文/诊断）不许进，**中性参数**（路径/文件名）必须进。
+            StringBuilder missPk = new StringBuilder();
+            boolean pkNeutral = true, pkLocale = true, pkLeak = false;
+            for (int code : Mods.PackResult.ALL_CODES) {
+                Mods.PackResult pr = new Mods.PackResult();
+                pr.errCode = code;
+                pr.errS1 = "NEUTRAL";
+                pr.error = "BOOM: raw";
+                String pz = ModsText.packReason(ctx, pr);
+                String pe = ModsText.packReason(enCtx, pr);
+                if (pz == null || pz.isEmpty() || pz.contains("BOOM")) missPk.append(code).append(' ');
+                if (pz.equals(pe)) pkLocale = false;
+                boolean neutral = code == Mods.PackResult.P_SRC_MISSING
+                        || code == Mods.PackResult.P_MKDIR
+                        || code == Mods.PackResult.P_NAME_TAKEN;
+                if (neutral && !pz.contains("NEUTRAL")) pkNeutral = false;
+                if (!neutral && pz.contains("NEUTRAL")) pkLeak = true;
+            }
+            ok(stat, L, missPk.length() == 0 && pkNeutral && pkLocale && !pkLeak,
+                    "★P3：模组包那 16 个码**每个**都有文案、两套语言不同、"
+                            + "中性参数（路径/文件名）进了而原始原因没进；可疑的是［" + missPk + "］");
+
             // ★★ P3 第六批：启动管线各步 + 失败原因（`Injector.LaunchError` → 启动失败弹窗）。
             //    ★ 这里只需验两件事：① 两条带占位符的按真参数实拼；② 6 个步骤名**两套语言都有字**
             //      （报告的键是 ASCII 的 `prewarm`/`dexInject`/…，与界面语言无关，**不是**这些资源）。
