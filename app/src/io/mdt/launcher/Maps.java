@@ -145,11 +145,11 @@ public final class Maps {
         List<Item> out = new ArrayList<>();
         File dir = Data.dirOf(ctx, slot);
         if (dir != null) {
-            scanSlotMaps(new File(dir, "maps"), out);
-            scanModMaps(new File(dir, "mods"), out);
+            scanSlotMaps(ctx, new File(dir, "maps"), out);
+            scanModMaps(ctx, new File(dir, "mods"), out);
         }
         if (apkPath != null && !apkPath.trim().isEmpty()) {
-            scanContainer(new File(apkPath.trim()), "assets/maps/", FROM_GAME, "", out);
+            scanContainer(ctx, new File(apkPath.trim()), "assets/maps/", FROM_GAME, "", out);
         }
         java.util.Collections.sort(out, new Comparator<Item>() {
             @Override public int compare(Item a, Item b) {
@@ -161,7 +161,7 @@ public final class Maps {
     }
 
     /** ① 本槽 `maps/`（只列 `.msav`；`.part` 是"写了一半"，不算）—— 包内可见，供自检直接调 */
-    static void scanSlotMaps(File mapsDir, List<Item> out) {
+    static void scanSlotMaps(Context ctx, File mapsDir, List<Item> out) {
         File[] fs = mapsDir == null ? null : mapsDir.listFiles();
         if (fs == null) return;
         for (File f : fs) {
@@ -183,27 +183,27 @@ public final class Maps {
     }
 
     /** ③ 槽内模组包里的 `maps/**`（zip/jar + 目录形态的模组） */
-    private static void scanModMaps(File modsDir, List<Item> out) {
+    private static void scanModMaps(Context ctx, File modsDir, List<Item> out) {
         File[] fs = modsDir == null ? null : modsDir.listFiles();
         if (fs == null) return;
         for (File m : fs) {
             if (m == null) continue;
             String lower = m.getName().toLowerCase(Locale.ROOT);
             if (m.isFile() && (lower.endsWith(".zip") || lower.endsWith(".jar"))) {
-                scanContainer(m, "maps/", FROM_MOD, m.getName(), out);
+                scanContainer(ctx, m, "maps/", FROM_MOD, m.getName(), out);
             } else if (m.isDirectory()) {
                 // 目录形态的模组：走文件系统（下潜几层就够，模组不会把地图埋太深）
-                scanDirMaps(m, 0, m.getName(), out);
+                scanDirMaps(ctx, m, 0, m.getName(), out);
             }
         }
     }
 
-    private static void scanDirMaps(File dir, int depth, String modName, List<Item> out) {
+    private static void scanDirMaps(Context ctx, File dir, int depth, String modName, List<Item> out) {
         File[] fs = dir.listFiles();
         if (fs == null || depth > 3) return;
         for (File f : fs) {
             if (f.isDirectory()) {
-                scanDirMaps(f, depth + 1, modName, out);
+                scanDirMaps(ctx, f, depth + 1, modName, out);
             } else if (f.getName().toLowerCase(Locale.ROOT).endsWith(".msav")
                     && f.getParentFile() != null && "maps".equals(f.getParentFile().getName())) {
                 Item it = new Item();
@@ -213,7 +213,7 @@ public final class Maps {
                 it.where = f.getAbsolutePath();
                 it.bytes = f.length();
                 it.meta = metaOf(it);
-                if (it.meta == null || !it.meta.ok) it.error = it.meta == null ? "读不出来" : it.meta.error;
+                if (it.meta == null || !it.meta.ok) it.error = it.meta == null ? ctx.getString(R.string.maps_err_unreadable) : it.meta.error;
                 out.add(it);
             }
         }
@@ -226,7 +226,7 @@ public final class Maps {
      * @param from         {@link #FROM_GAME} / {@link #FROM_MOD}
      * @param sourceLabel  人读来源（`游戏自带` / 模组文件名）
      */
-    static void scanContainer(File container, String prefix, int from, String sourceLabel,
+    static void scanContainer(Context ctx, File container, String prefix, int from, String sourceLabel,
                               List<Item> out) {
         if (container == null || !container.isFile()) return;
         ZipFile zf = null;

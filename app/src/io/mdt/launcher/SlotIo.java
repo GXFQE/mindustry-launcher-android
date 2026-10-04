@@ -680,7 +680,7 @@ final class SlotIo {
 
         StringBuilder sb = new StringBuilder();
         sb.append(a.getString(R.string.zip_confirm_head_fmt, inf.files,
-                inf.sizeKnown ? Util.formatSize(inf.bytes) : "大小未知"));
+                inf.sizeKnown ? Util.formatSize(inf.bytes) : a.getString(R.string.zip_size_unknown)));
         if (!inf.tops.isEmpty()) {
             sb.append(a.getString(R.string.zip_confirm_tops_fmt, joinList(inf.tops)));
         }

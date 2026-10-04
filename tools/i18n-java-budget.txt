@@ -6,7 +6,7 @@
 #   · 实测 < 台账  ⇒ ERROR：你已经搬走了几条 ⇒ **把这行改小**。
 #   · 文件有中文却不在本表里 ⇒ ERROR：新文件出现了中文。
 # ★ 这一列数字就是 **P3（把中文搬进资源）的进度**：它只许降。
-#   合计 526 条 —— 其中大头是**有意保留**的：
+#   合计 524 条 —— 其中大头是**有意保留**的：
 #     · MainActivity.java —— 全在 dev_* 直通口（仅 debuggable 构建可达）
 #     · Compat / AutoBackup / Crash —— 只进 report-*.txt（取证文本不进资源）
 #     · Data / MapStats 等文件里的**落盘报告与体检明细**（同上）
@@ -29,13 +29,11 @@ MapStats.java = 22   # 已搬完；剩的是 SRC_VANILLA/MOD/PATCH 文案常量�
 Injector.java = 21   # 用户可见的已搬完；剩的是启动管线报告（log.append）
 Backup.java = 17   # 用户可见的已搬完；剩的是 CAS 迁移报告与 Log 诊断
 AutoBackup.java = 11   # 只进 report-autobackup.txt
-BundleNames.java = 10
-Cas.java = 8
-MapStatsMods.java = 8
+BundleNames.java = 10   # ★ 代码注释原文：「`note` 只留给**维护者**（PC 验收台）」⇒ 技术细节层依据
+Cas.java = 8   # 🔴 **已知残留**：纯 Java 对象池，8 条消息经 `Backup` 恢复报告的**每文件行**（`backup_restore_err_line_fmt` 的 `%2$s`）可能露给用户。要彻底解决得给 Cas 上「码 + 参数」（它没有 Context）—— 自检里有一条断言**点名要它**（「报告点名对象内容与地址 sha256 不符」）⇒ 那条信息有用，不许简单删掉。
+MapStatsMods.java = 8   # 地图详情「技术细节」的依据行（模组叠加 / 语料诊断）——依据，有意保留
 Crash.java = 6   # 只进 crashes/*.txt（崩溃转储）
-GameSlot.java = 2
-LauncherApp.java = 1
-Maps.java = 1
-MsavPatches.java = 1
-SlotIo.java = 1
-Util.java = 1
+GameSlot.java = 2   # 启动时 `Data.prepareSlot` 的落盘/日志报告（`rep`）
+LauncherApp.java = 1   # `Log.i` 里的 F0 迁移报告 —— 只进日志
+MsavPatches.java = 1   # ★ 纯 Java 解析器守卫（`IllegalArgumentException`），只经异常链向上
+Util.java = 1   # ★ 通用 IO 原语诊断；调用方（`MapFiles`）自己先建目录 ⇒ 此路径实际不可达

@@ -3822,7 +3822,7 @@ public final class SelfTest {
             fo.write(new byte[]{9, 9, 9, 9});
             fo.close();
             List<Maps.Item> slotItems = new ArrayList<>();
-            Maps.scanSlotMaps(maps, slotItems);
+            Maps.scanSlotMaps(ctx, maps, slotItems);
             ok(stat, L, slotItems.size() == 2 && slotItems.get(0).from == Maps.FROM_SLOT,
                     "★本槽来源：两张 .msav 都列出来（" + slotItems.get(0).name() + " / "
                             + slotItems.get(1).name() + "）");
@@ -3837,7 +3837,7 @@ public final class SelfTest {
             pf.write(new byte[]{1});
             pf.close();
             List<Maps.Item> slotItems2 = new ArrayList<>();
-            Maps.scanSlotMaps(maps, slotItems2);
+            Maps.scanSlotMaps(ctx, maps, slotItems2);
             ok(stat, L, slotItems2.size() == 2, "★反向：.msav.part（写了一半）不算地图，不进列表");
 
             // ② 游戏 APK：assets/maps/ 下的图（用假 APK = 普通 zip）
@@ -3845,7 +3845,7 @@ public final class SelfTest {
             zipMsav(apk, "AndroidManifest.xml", "x",
                     "assets/maps/default/archipelago.msav", "群岛", 96, 96);
             List<Maps.Item> fromApk = new ArrayList<>();
-            Maps.scanContainer(apk, "assets/maps/", Maps.FROM_GAME, "游戏自带", fromApk);
+            Maps.scanContainer(ctx, apk, "assets/maps/", Maps.FROM_GAME, "游戏自带", fromApk);
             ok(stat, L, fromApk.size() == 1 && fromApk.get(0).meta != null && fromApk.get(0).meta.ok
                             && "群岛".equals(fromApk.get(0).meta.name)
                             && fromApk.get(0).line(ctx).contains("96 × 96"),
@@ -3856,7 +3856,7 @@ public final class SelfTest {
             File mz = new File(root, "real-mod.zip");
             zipMsav(mz, "mod.json", "name: Real Mod\n", "maps/real.msav", "模组地图", 64, 64);
             List<Maps.Item> fromMod = new ArrayList<>();
-            Maps.scanContainer(mz, "maps/", Maps.FROM_MOD, mz.getName(), fromMod);
+            Maps.scanContainer(ctx, mz, "maps/", Maps.FROM_MOD, mz.getName(), fromMod);
             ok(stat, L, fromMod.size() == 1 && fromMod.get(0).meta != null && fromMod.get(0).meta.ok
                             && "模组地图".equals(fromMod.get(0).meta.name)
                             && "real-mod.zip".equals(fromMod.get(0).source),
@@ -3864,7 +3864,7 @@ public final class SelfTest {
 
             // 反向：来源前缀不对 ⇒ 一条都不出（不是"有 zip 就算有地图"）
             List<Maps.Item> none = new ArrayList<>();
-            Maps.scanContainer(mz, "assets/maps/", Maps.FROM_GAME, "游戏自带", none);
+            Maps.scanContainer(ctx, mz, "assets/maps/", Maps.FROM_GAME, "游戏自带", none);
             ok(stat, L, none.isEmpty(), "★反向：用错来源前缀 ⇒ 一条都不出");
             // 反向：容器打不开 ⇒ 空列表且不抛
             File notZip = new File(root, "not-a-zip.apk");
@@ -3872,7 +3872,7 @@ public final class SelfTest {
             nf.write(new byte[]{1, 2, 3});
             nf.close();
             List<Maps.Item> brokenC = new ArrayList<>();
-            Maps.scanContainer(notZip, "assets/maps/", Maps.FROM_GAME, "x", brokenC);
+            Maps.scanContainer(ctx, notZip, "assets/maps/", Maps.FROM_GAME, "x", brokenC);
             ok(stat, L, brokenC.isEmpty(), "★反向：容器打不开 ⇒ 空列表且**不抛异常**");
         } catch (Throwable t) {
             ok(stat, L, false, "地图清点用例自身异常：" + t);
@@ -3953,7 +3953,7 @@ public final class SelfTest {
             jo.write(new byte[]{7, 7, 7});
             jo.close();
             List<Maps.Item> items = new ArrayList<>();
-            Maps.scanSlotMaps(maps, items);
+            Maps.scanSlotMaps(ctx, maps, items);
             Maps.Item good = null, bad = null;
             for (Maps.Item i : items) {
                 if (i.meta != null && i.meta.ok) good = i;

@@ -678,6 +678,8 @@
     <string name="backup_restore_more_fmt">… 共 %1$d 项\n</string>
     <string name="backup_restore_bullet_fmt">· %1$s\n</string>
     <string name="backup_restore_err_line_fmt">· %1$s：%2$s\n</string>
+    <string name="maps_err_unreadable">读不出来</string>
+    <string name="zip_size_unknown">大小未知</string>
     <string name="backup_restore_ok_head_fmt">✅ 已从快照恢复到槽「%1$s」\n</string>
     <string name="backup_restore_ok_snapshot_fmt">快照：%1$s\n</string>
     <string name="backup_restore_ok_files_fmt">文件：%1$d / %2$d （%3$s）\n</string>

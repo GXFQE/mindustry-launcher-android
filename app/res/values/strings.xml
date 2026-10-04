@@ -710,6 +710,8 @@
     <string name="backup_restore_more_fmt">…%1$d in all\n</string>
     <string name="backup_restore_bullet_fmt">· %1$s\n</string>
     <string name="backup_restore_err_line_fmt">· %1$s: %2$s\n</string>
+    <string name="maps_err_unreadable">unreadable</string>
+    <string name="zip_size_unknown">size unknown</string>
     <string name="backup_restore_ok_head_fmt">✅ Restored from the snapshot into slot \"%1$s\"\n</string>
     <string name="backup_restore_ok_snapshot_fmt">Snapshot: %1$s\n</string>
     <string name="backup_restore_ok_files_fmt">Files: %1$d / %2$d (%3$s)\n</string>
