@@ -804,7 +804,7 @@ public class MainActivity extends BaseActivity {
                 try {
                     File tmp = SlotZip.stage(MainActivity.this, Uri.fromFile(src));
                     try {
-                        SlotZip.Info inf = SlotZip.inspect(tmp);
+                        SlotZip.Info inf = SlotZip.inspect(MainActivity.this, tmp);
                         sb.append("files=").append(inf.files)
                           .append(" dirs=").append(inf.dirs)
                           .append(" bytes=").append(inf.bytes)
@@ -842,7 +842,7 @@ public class MainActivity extends BaseActivity {
                 try {
                     File tmp = SlotZip.stage(MainActivity.this, Uri.fromFile(src));
                     try {
-                        SlotZip.Info inf = SlotZip.inspect(tmp);
+                        SlotZip.Info inf = SlotZip.inspect(MainActivity.this, tmp);
                         sb.append("inspect: files=").append(inf.files)
                           .append(" native=").append(inf.nativeFormat)
                           .append(" strip=\"").append(inf.strip).append("\"\n");

@@ -3315,6 +3315,31 @@ public final class SelfTest {
                             && ctx.getString(R.string.mapfile_err_rename_fmt, "/x").contains("/x")
                             && mNameTaken.contains("\"a.msav\"") && !mNameTaken.contains("\\"),
                     "★P3：地图那边 5 条带占位符的报错按真参数实拼（英文那句的双引号也在）");
+
+            // ★★ P3 第三批：整槽 zip 导入的报错（`SlotZip.stage/inspect/extract/open/badZip/mkdirs`）——
+            //    12 条带占位符的按真参数实拼（其中 3 条是**两个**参数）。`%n$` 与实参不匹配会崩，
+            //    而那些句子只在"导入出岔子"时才会走到 ⇒ 不实拼就等于没测。
+            String zClean = ctx.getString(R.string.slotzip_err_clean_tmp_fmt, "/t");
+            String zMany = ctx.getString(R.string.slotzip_err_too_many_fmt, 5000);
+            String zMore = ctx.getString(R.string.slotzip_more_fmt, 9);
+            String zNoDir = ctx.getString(R.string.slotzip_err_no_slot_dir_fmt, "s");
+            String zWipe = ctx.getString(R.string.slotzip_err_wipe_failed_fmt, "/w");
+            String zMkdir = ctx.getString(R.string.slotzip_err_mkdir_slot_fmt, "/m");
+            String zWrite = ctx.getString(R.string.slotzip_err_write_failed_fmt, "/x", "why");
+            String zDel = ctx.getString(R.string.slotzip_err_delete_failed_fmt, "/d");
+            String zRen = ctx.getString(R.string.slotzip_err_rename_fmt, "a", "b");
+            String zTemp = ctx.getString(R.string.slotzip_err_temp_gone_fmt, "/z");
+            String zDir = ctx.getString(R.string.slotzip_err_dir_failed_fmt, "/e");
+            String zEsc = ctx.getString(R.string.slotzip_err_escape_fmt, "boom");
+            ok(stat, L, zClean.contains("/t") && zMany.contains("5000") && zMore.contains("9")
+                            && zNoDir.contains("s") && zWipe.contains("/w") && zMkdir.contains("/m")
+                            && zWrite.contains("/x") && zWrite.contains("why") && zDel.contains("/d")
+                            && zRen.contains("a") && zRen.contains("b") && zTemp.contains("/z")
+                            && zDir.contains("/e") && zEsc.contains("boom"),
+                    "★P3：整槽 zip 那 12 条带占位符的报错按真参数实拼（含 3 条两个参数）");
+            String zNoDirEn = enCtx.getString(R.string.slotzip_err_no_slot_dir_fmt, "s");
+            ok(stat, L, zNoDirEn.contains("\"s\"") && !zNoDirEn.contains("\\"),
+                    "★P3（英文）：zip 那句槽名带引号且不留反斜杠：「" + zNoDirEn + "」");
         } catch (Throwable t) {
             ok(stat, L, false, "存档体检用例自身异常：" + t);
         } finally {

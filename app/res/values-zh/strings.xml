@@ -485,6 +485,29 @@
     <string name="mapfile_err_trash_mkdir_fmt">建中转站失败：%1$s</string>
     <string name="mapfile_err_trash_move">旧文件挪去中转站失败</string>
     <string name="mapfile_err_rename_fmt">改名失败：%1$s</string>
+
+    <!--
+      ══ 整槽 zip 导入的失败原因（P3）══════════════════════════════════════
+      ★ `SlotZip.stage / inspect / extract` 抛出的 `IOException` 消息**就是弹窗正文**
+        （调用方取 `getMessage()`）⇒ 给用户看的。原来是 Java 里拼中文 + **碎片拼接**
+        （`"拿不到槽「" + slot + "」的目录"`）⇒ 一律**整句 + %n$**。
+      ⚠️ 两套语言的 %n$ 集合必须一致（门禁 RES-02）。
+    -->
+    <string name="slotzip_err_no_uri">没有拿到 zip 的位置</string>
+    <string name="slotzip_err_open_failed">打不开所选文件</string>
+    <string name="slotzip_err_clean_tmp_fmt">清理上次的临时文件失败：%1$s</string>
+    <string name="slotzip_err_empty">所选文件是空的</string>
+    <string name="slotzip_err_too_many_fmt">这个 zip 的条目超过 %1$d 个，已中止</string>
+    <string name="slotzip_more_fmt">…共 %1$d 项</string>
+    <string name="slotzip_err_no_slot_dir_fmt">拿不到槽「%1$s」的目录</string>
+    <string name="slotzip_err_wipe_failed_fmt">清空失败：%1$s\n（可能有文件被占用，先退出游戏再试）</string>
+    <string name="slotzip_err_mkdir_slot_fmt">创建槽目录失败：%1$s</string>
+    <string name="slotzip_err_write_failed_fmt">写出失败：%1$s\n%2$s</string>
+    <string name="slotzip_err_delete_failed_fmt">同名文件删不掉：%1$s</string>
+    <string name="slotzip_err_rename_fmt">改名失败：%1$s → %2$s</string>
+    <string name="slotzip_err_temp_gone_fmt">临时包不见了：%1$s</string>
+    <string name="slotzip_err_dir_failed_fmt">建目录失败：%1$s</string>
+    <string name="slotzip_err_escape_fmt">这个 zip 里有【越出目录】的条目名，已整体拒绝导入：\n%1$s\n\n（正常的 zip 不会有这种条目；它多半是被改过的恶意包）</string>
     <string name="export_slot_title_fmt">导出整槽「%1$s」</string>
     <string name="export_slot_msg_fmt">把整个槽打包成一个 zip：存档 · 地图 · 蓝图 · 模组 · 设置。%1$s\n\n游戏自己也能导入这个包（设置 → 数据 → 导入数据）。</string>
     <string name="export_slot_playing">\n\n⚠️ 游戏正在运行，此刻导出可能拿到写了一半的存档。</string>

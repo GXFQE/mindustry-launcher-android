@@ -499,6 +499,30 @@
     <string name="mapfile_err_trash_mkdir_fmt">Could not create the transfer station: %1$s</string>
     <string name="mapfile_err_trash_move">Could not move the old file to the transfer station</string>
     <string name="mapfile_err_rename_fmt">Rename failed: %1$s</string>
+
+    <!--
+      ══ 整槽 zip 导入的失败原因（P3）══════════════════════════════════════
+      ★ `SlotZip.stage / inspect / extract` 抛出的 `IOException` 消息**就是弹窗正文**
+        （调用方 `msgOf(e)` 直接取 `getMessage()`）⇒ 属于给用户看的。
+      ★ 原来在 Java 里拼中文，含**碎片拼接**（`"拿不到槽「" + slot + "」的目录"`）
+        ⇒ 一律改成**整句资源 + %n$**。
+      ⚠️ 两个语言的 %n$ 集合必须一致（门禁 RES-02）；英文里的双引号写 `\"`（RES-12）。
+    -->
+    <string name="slotzip_err_no_uri">Could not get the location of the zip</string>
+    <string name="slotzip_err_open_failed">Could not open the selected file</string>
+    <string name="slotzip_err_clean_tmp_fmt">Could not clean up the previous temporary file: %1$s</string>
+    <string name="slotzip_err_empty">The selected file is empty</string>
+    <string name="slotzip_err_too_many_fmt">This zip has more than %1$d entries, so it was stopped</string>
+    <string name="slotzip_more_fmt">…%1$d in all</string>
+    <string name="slotzip_err_no_slot_dir_fmt">Cannot reach the directory of slot \"%1$s\"</string>
+    <string name="slotzip_err_wipe_failed_fmt">Clearing failed: %1$s\n(some files may be in use — exit the game and try again)</string>
+    <string name="slotzip_err_mkdir_slot_fmt">Could not create the slot directory: %1$s</string>
+    <string name="slotzip_err_write_failed_fmt">Writing failed: %1$s\n%2$s</string>
+    <string name="slotzip_err_delete_failed_fmt">Could not delete the file with that name: %1$s</string>
+    <string name="slotzip_err_rename_fmt">Rename failed: %1$s → %2$s</string>
+    <string name="slotzip_err_temp_gone_fmt">The temporary package is gone: %1$s</string>
+    <string name="slotzip_err_dir_failed_fmt">Could not create the directory: %1$s</string>
+    <string name="slotzip_err_escape_fmt">This zip contains an entry name that escapes the directory, so the whole import was refused:\n%1$s\n\n(a normal zip would not have such an entry; it is most likely a modified, malicious package)</string>
     <string name="export_slot_title_fmt">Export whole slot \"%1$s\"</string>
     <string name="export_slot_msg_fmt">Packs the whole slot into one zip: saves · maps · schematics · mods · settings.%1$s\n\nThe game can import this package too (Settings → Data → Import data).</string>
     <string name="export_slot_playing">\n\n⚠️ The game is running; the export may capture a half-written save.</string>

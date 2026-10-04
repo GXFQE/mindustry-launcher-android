@@ -633,7 +633,7 @@ final class SlotIo {
                 SlotZip.Info inf = null;
                 try {
                     tmp = SlotZip.stage(a, uri);
-                    inf = SlotZip.inspect(tmp);
+                    inf = SlotZip.inspect(a, tmp);
                     if (inf.empty()) throw new IOException(a.getString(R.string.zip_nothing));
                 } catch (Exception e) {
                     err = msgOf(e);
