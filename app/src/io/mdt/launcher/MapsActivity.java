@@ -349,8 +349,8 @@ public class MapsActivity extends BaseActivity {
                 try {
                     in = getContentResolver().openInputStream(uri);
                     File dir = new File(Data.dirOf(MapsActivity.this, slot), "maps");
-                    r = MapFiles.importMap(dir, MapFiles.safeName(displayName), in, overwrite,
-                            MapFiles.trashDirOf(MapsActivity.this));
+                    r = MapFiles.importMap(MapsActivity.this, dir, MapFiles.safeName(displayName), in,
+                            overwrite, MapFiles.trashDirOf(MapsActivity.this));
                 } catch (Throwable t) {
                     runOnUiThread(new Runnable() {
                         @Override public void run() {

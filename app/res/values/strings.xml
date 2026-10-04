@@ -475,6 +475,30 @@
     <string name="stats_note_names_apk_base_fmt">base bundle: %1$d entries</string>
     <string name="stats_note_names_mod_base_fmt">mod base bundle: %1$d entries</string>
     <string name="stats_wall_name_fmt">%1$s (wall)</string>
+
+    <!--
+      ══ 地图增删的失败原因（P3）════════════════════════════════════════════
+      ★ `MapFiles.checkName / importMap / place` 的返回值**就是弹窗正文** ⇒ 属于给用户看的。
+      ★ 原来在 Java 里拼中文、还带**碎片拼接**（`"这个槽的 maps/ 里已经有「" + name + "」了…"`）
+        ⇒ 一律改成**整句资源 + %1$s**。
+      ⚠️ `place()` 抛的 `IllegalStateException` 也会走到用户面前（`importMap` 的 catch 会拼成
+        「类名: 消息」）⇒ 那几句同样必须进资源。
+      ⚠️ 英文里那句双引号写 `\"`（裸引号会被 aapt2 静默删掉，门禁 RES-12 钉着）。
+    -->
+    <string name="mapfile_err_name_empty">The name is empty</string>
+    <string name="mapfile_err_no_dir">No maps/ folder for this slot</string>
+    <string name="mapfile_err_name_dot">The name cannot start with a dot</string>
+    <string name="mapfile_err_name_ext">Map files must end with .msav</string>
+    <string name="mapfile_err_name_path">The name cannot contain path characters</string>
+    <string name="mapfile_err_name_long">The name is too long</string>
+    <string name="mapfile_err_mkdir_fmt">Could not create the directory: %1$s</string>
+    <string name="mapfile_err_name_taken_fmt">This slot already has a map called \"%1$s\" — replacing it would overwrite the original file, so ask first</string>
+    <string name="mapfile_err_not_map">This file is not a map the game can read</string>
+    <string name="mapfile_err_not_map_why_fmt">This file is not a map the game can read: %1$s</string>
+    <string name="mapfile_err_no_trash">A file with that name already exists, and no transfer station is available</string>
+    <string name="mapfile_err_trash_mkdir_fmt">Could not create the transfer station: %1$s</string>
+    <string name="mapfile_err_trash_move">Could not move the old file to the transfer station</string>
+    <string name="mapfile_err_rename_fmt">Rename failed: %1$s</string>
     <string name="export_slot_title_fmt">Export whole slot \"%1$s\"</string>
     <string name="export_slot_msg_fmt">Packs the whole slot into one zip: saves · maps · schematics · mods · settings.%1$s\n\nThe game can import this package too (Settings → Data → Import data).</string>
     <string name="export_slot_playing">\n\n⚠️ The game is running; the export may capture a half-written save.</string>

@@ -464,6 +464,27 @@
     <string name="stats_note_names_apk_base_fmt">版本基础包 %1$d 条</string>
     <string name="stats_note_names_mod_base_fmt">模组基础包 %1$d 条</string>
     <string name="stats_wall_name_fmt">%1$s（墙）</string>
+
+    <!--
+      ══ 地图增删的失败原因（P3）════════════════════════════════════════════
+      ★ `MapFiles.checkName / importMap / place` 的返回值**就是弹窗正文**（给用户看的）。
+      ★ 原来在 Java 里拼中文且是**碎片拼接**（`"…已经有「" + name + "」了…"`）⇒ 一律**整句 + %1$s**。
+      ⚠️ `place()` 抛的 `IllegalStateException` 也会走到用户面前（catch 会拼成「类名: 消息」）。
+    -->
+    <string name="mapfile_err_name_empty">名字是空的</string>
+    <string name="mapfile_err_no_dir">拿不到这个槽的 maps/ 目录</string>
+    <string name="mapfile_err_name_dot">名字不能以点开头</string>
+    <string name="mapfile_err_name_ext">地图文件必须以 .msav 结尾</string>
+    <string name="mapfile_err_name_path">名字里不能有路径符号</string>
+    <string name="mapfile_err_name_long">名字太长了</string>
+    <string name="mapfile_err_mkdir_fmt">建目录失败：%1$s</string>
+    <string name="mapfile_err_name_taken_fmt">这个槽的 maps/ 里已经有「%1$s」了 —— 替换会盖掉原文件，需要先确认</string>
+    <string name="mapfile_err_not_map">这个文件不是游戏能读的地图</string>
+    <string name="mapfile_err_not_map_why_fmt">这个文件不是游戏能读的地图：%1$s</string>
+    <string name="mapfile_err_no_trash">同名文件已存在，且没有中转站可用</string>
+    <string name="mapfile_err_trash_mkdir_fmt">建中转站失败：%1$s</string>
+    <string name="mapfile_err_trash_move">旧文件挪去中转站失败</string>
+    <string name="mapfile_err_rename_fmt">改名失败：%1$s</string>
     <string name="export_slot_title_fmt">导出整槽「%1$s」</string>
     <string name="export_slot_msg_fmt">把整个槽打包成一个 zip：存档 · 地图 · 蓝图 · 模组 · 设置。%1$s\n\n游戏自己也能导入这个包（设置 → 数据 → 导入数据）。</string>
     <string name="export_slot_playing">\n\n⚠️ 游戏正在运行，此刻导出可能拿到写了一半的存档。</string>

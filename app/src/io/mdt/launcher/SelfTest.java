@@ -3305,6 +3305,16 @@ public final class SelfTest {
             String sExistsEn = enCtx.getString(R.string.slot_err_exists_fmt, "x");
             ok(stat, L, sExistsEn.contains("\"x\"") && !sExistsEn.contains("\\"),
                     "★P3（英文）：槽已存在那句的双引号真的显示了：「" + sExistsEn + "」");
+
+            // ★★ P3 第二批：地图增删的报错（`MapFiles.checkName/importMap/place`）——
+            //    5 条带占位符的按真参数实拼；顺带验英文那句的 `\"` 转义。
+            String mNameTaken = enCtx.getString(R.string.mapfile_err_name_taken_fmt, "a.msav");
+            ok(stat, L, ctx.getString(R.string.mapfile_err_mkdir_fmt, "/p").contains("/p")
+                            && ctx.getString(R.string.mapfile_err_not_map_why_fmt, "why").contains("why")
+                            && ctx.getString(R.string.mapfile_err_trash_mkdir_fmt, "/t").contains("/t")
+                            && ctx.getString(R.string.mapfile_err_rename_fmt, "/x").contains("/x")
+                            && mNameTaken.contains("\"a.msav\"") && !mNameTaken.contains("\\"),
+                    "★P3：地图那边 5 条带占位符的报错按真参数实拼（英文那句的双引号也在）");
         } catch (Throwable t) {
             ok(stat, L, false, "存档体检用例自身异常：" + t);
         } finally {
@@ -3787,7 +3797,7 @@ public final class SelfTest {
             byte[] bytes = java.nio.file.Files.readAllBytes(src.toPath());
 
             // ① 好图：导入成功，且 .part 不残留、内容与源一致
-            MapFiles.Result r1 = MapFiles.importMap(maps, "导入测试图.msav",
+            MapFiles.Result r1 = MapFiles.importMap(ctx, maps, "导入测试图.msav",
                     new java.io.ByteArrayInputStream(bytes), false, trash);
             File dest = new File(maps, "导入测试图.msav");
             ok(stat, L, r1.ok && dest.isFile() && dest.length() == bytes.length
@@ -3796,14 +3806,14 @@ public final class SelfTest {
                     "★导入：落盘成功、内容一致、**没有 .part 残留**，且读出真名「导入测试图」");
 
             // ② 坏文件：被拒，且**什么都不留**（这是"不塞垃圾进槽"的关键）
-            MapFiles.Result r2 = MapFiles.importMap(maps, "垃圾.msav",
+            MapFiles.Result r2 = MapFiles.importMap(ctx, maps, "垃圾.msav",
                     new java.io.ByteArrayInputStream("not-a-map".getBytes("UTF-8")), false, trash);
             ok(stat, L, !r2.ok && r2.error != null && !new File(maps, "垃圾.msav").exists()
                             && !new File(maps, "垃圾.msav.part").exists(),
                     "★坏文件：拒收（" + r2.error + "）且**一个字节都没留下**");
 
             // ③ 同名不覆盖：拒绝（宁可不做，也不硬盖）
-            MapFiles.Result r3 = MapFiles.importMap(maps, "导入测试图.msav",
+            MapFiles.Result r3 = MapFiles.importMap(ctx, maps, "导入测试图.msav",
                     new java.io.ByteArrayInputStream(bytes), false, trash);
             ok(stat, L, !r3.ok, "★同名且未确认覆盖 ⇒ 拒绝：" + r3.error);
 
@@ -3814,7 +3824,7 @@ public final class SelfTest {
                 tinyMsav(src2, "第二版", 80, 80, 2, false);
                 bytes2 = java.nio.file.Files.readAllBytes(src2.toPath());
             }
-            MapFiles.Result r4 = MapFiles.importMap(maps, "导入测试图.msav",
+            MapFiles.Result r4 = MapFiles.importMap(ctx, maps, "导入测试图.msav",
                     new java.io.ByteArrayInputStream(bytes2), true, trash);
             File[] trashed = trash.listFiles();
             ok(stat, L, r4.ok && r4.overwrote && trashed != null && trashed.length == 1

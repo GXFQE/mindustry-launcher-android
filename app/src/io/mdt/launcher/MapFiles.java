@@ -78,15 +78,21 @@ public final class MapFiles {
     /**
      * 文件名检查：必须是 `.msav`，且不含路径分隔符/冒号等。
      *
-     * @return 错误文案（null = 通过）
+     * @return 错误文案（null = 通过）；文案走资源（见 `mapfile_err_name_*`）
      */
-    public static String checkName(String displayName) {
-        if (displayName == null || displayName.trim().isEmpty()) return "名字是空的";
+    public static String checkName(Context ctx, String displayName) {
+        if (displayName == null || displayName.trim().isEmpty()) {
+            return ctx.getString(R.string.mapfile_err_name_empty);
+        }
         String n = displayName.trim();
-        if (n.startsWith(".")) return "名字不能以点开头";
-        if (!n.toLowerCase(java.util.Locale.ROOT).endsWith(".msav")) return "地图文件必须以 .msav 结尾";
-        if (n.contains("/") || n.contains("\\") || n.contains(":")) return "名字里不能有路径符号";
-        if (n.length() > 120) return "名字太长了";
+        if (n.startsWith(".")) return ctx.getString(R.string.mapfile_err_name_dot);
+        if (!n.toLowerCase(java.util.Locale.ROOT).endsWith(".msav")) {
+            return ctx.getString(R.string.mapfile_err_name_ext);
+        }
+        if (n.contains("/") || n.contains("\\") || n.contains(":")) {
+            return ctx.getString(R.string.mapfile_err_name_path);
+        }
+        if (n.length() > 120) return ctx.getString(R.string.mapfile_err_name_long);
         return null;
     }
 
@@ -117,28 +123,28 @@ public final class MapFiles {
      * @param overwrite true ⇒ 同名时把旧的挪去中转站再覆盖
      * @param trashDir  中转站（null ⇒ 那就**不允许覆盖**，宁可不做也不硬删）
      */
-    public static Result importMap(File mapsDir, String displayName, InputStream in,
+    public static Result importMap(Context ctx, File mapsDir, String displayName, InputStream in,
                                    boolean overwrite, File trashDir) {
         Result r = new Result();
         if (mapsDir == null) {
-            r.error = "拿不到这个槽的 maps/ 目录";
+            r.error = ctx.getString(R.string.mapfile_err_no_dir);
             return r;
         }
-        String nameErr = checkName(displayName);
+        String nameErr = checkName(ctx, displayName);
         if (nameErr != null) {
             r.error = nameErr;
             return r;
         }
         final String name = safeName(displayName);
         if (!mapsDir.exists() && !mapsDir.mkdirs()) {
-            r.error = "建目录失败：" + mapsDir.getAbsolutePath();
+            r.error = ctx.getString(R.string.mapfile_err_mkdir_fmt, mapsDir.getAbsolutePath());
             return r;
         }
         File dest = new File(mapsDir, name);
         if (dest.exists() && !(overwrite && trashDir != null)) {
             // ★ 判据字段（界面据此决定要不要弹"同名替换"框）；error 只是给人看的话
             r.nameTaken = true;
-            r.error = "这个槽的 maps/ 里已经有「" + name + "」了 —— 替换会盖掉原文件，需要先确认";
+            r.error = ctx.getString(R.string.mapfile_err_name_taken_fmt, name);
             return r;
         }
         File part = new File(mapsDir, name + ".part");
@@ -149,13 +155,14 @@ public final class MapFiles {
             MsavMeta meta = MsavMeta.read(part, true);
             if (!meta.ok) {
                 Data.deleteTree(part);
-                r.error = "这个文件不是游戏能读的地图"
-                        + (meta.error == null || meta.error.isEmpty() ? "" : "：" + meta.error);
+                r.error = (meta.error == null || meta.error.isEmpty())
+                        ? ctx.getString(R.string.mapfile_err_not_map)
+                        : ctx.getString(R.string.mapfile_err_not_map_why_fmt, meta.error);
                 return r;
             }
             r.meta = meta;
             r.overwrote = dest.exists();
-            place(part, dest, trashDir);
+            place(ctx, part, dest, trashDir);
             r.dest = dest;
             r.finalName = name;
             r.ok = true;
@@ -170,23 +177,32 @@ public final class MapFiles {
     /**
      * 就位：**先把旧的挪去中转站**，再把 `.part` 改名成目标名。
      * 改名失败 ⇒ 把旧的从中转站搬回来（宁可回到原状，也不留一个空位）。
+     *
+     * ⚠️ 异常消息**也走资源**：`importMap` 的 catch 会把它拼成「类名: 消息」直接给用户看
+     *   （见 {@link Result#error}），所以它同样是**用户可见文案**。
      */
-    static void place(File part, File dest, File trashDir) throws Exception {
+    static void place(Context ctx, File part, File dest, File trashDir) throws Exception {
         File backup = null;
         if (dest.exists()) {
-            if (trashDir == null) throw new IllegalStateException("同名文件已存在，且没有中转站可用");
+            if (trashDir == null) {
+                throw new IllegalStateException(ctx.getString(R.string.mapfile_err_no_trash));
+            }
             if (!trashDir.isDirectory() && !trashDir.mkdirs() && !trashDir.isDirectory()) {
-                throw new IllegalStateException("建中转站失败：" + trashDir.getAbsolutePath());
+                throw new IllegalStateException(
+                        ctx.getString(R.string.mapfile_err_trash_mkdir_fmt, trashDir.getAbsolutePath()));
             }
             backup = new File(trashDir, stamp() + "-" + dest.getName());
-            if (!dest.renameTo(backup)) throw new IllegalStateException("旧文件挪去中转站失败");
+            if (!dest.renameTo(backup)) {
+                throw new IllegalStateException(ctx.getString(R.string.mapfile_err_trash_move));
+            }
         }
         if (!part.renameTo(dest)) {
             if (backup != null) {
                 // 回滚：把旧的搬回来
                 backup.renameTo(dest);
             }
-            throw new IllegalStateException("改名失败：" + dest.getAbsolutePath());
+            throw new IllegalStateException(
+                    ctx.getString(R.string.mapfile_err_rename_fmt, dest.getAbsolutePath()));
         }
         if (backup != null) pruneTrash(trashDir, KEEP_TRASH);
     }

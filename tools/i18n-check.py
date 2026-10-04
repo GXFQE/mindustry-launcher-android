@@ -15,6 +15,11 @@ i18n-check.py -- MDT 启动器「国际化构建期门禁」（研究文档 docs
      RES-07  Java 里引用的 R.string.* 必须在默认目录里存在
      RES-08  android:label 引用的串不许含占位符（系统不会去 format 它）
      RES-09  每个 `·` 的两侧都必须是空格（与 SelfTest.sepsOk 同一条规则，但作用于全部语言）
+     RES-10  语言名单（R.array/app_languages）必须与 values-xx/ 目录**双向**一一对应
+     RES-11  values*/ 的 XML 注释里不许出现「星号+斜杠」（会被搬进 R.java 当 Javadoc ⇒ 打炸 javac）
+     RES-12  值里不许有**裸双引号**（aapt2 会静默删掉；要显示引号写 \\"）
+     RES-13  值里不许有**没转义的撇号**（奇数次 ⇒ aapt2 报 `file failed to compile.` **不给行号**；
+             偶数次 ⇒ 被当成「引起来的一段」**悄无声息**；要写 \\' 或改写措辞绕开）
      RES-00  （INFO）默认目录里定义了却没有任何 Java 引用的 key
 
   B) 源码层  app/src/
@@ -369,6 +374,13 @@ SPEC_RE = re.compile(r"%(\d+\$)?([-+ 0,(#]*)(\d+)?(?:\.(\d+))?([a-zA-Z%])")
 # ⚠️ 这条**没有任何其它环节能发现**：门禁之外的构建步骤全绿，只有人眼看界面才会发现。
 BARE_QUOTE = re.compile(r'(?<!\\)"')
 
+# 没转义的撇号（`'`，前面没有反斜杠）。Android 资源里它有两种下场，**都不好**：
+#   · 出现**奇数次** ⇒ aapt2 直接报 `strings.xml: error: file failed to compile.`
+#     —— **不给行号**（2026-10-05 实测：两个 `This slot's` 让我多跑了一轮构建才定位到）；
+#   · 出现**偶数次** ⇒ aapt2 把它们当"引起来的一段"，**引号连同内容照收、悄无声息**。
+# ⇒ 判据：值里只要出现没转义的 `'` 就报。要么写 `\'`，要么改写措辞绕开（首选后者，英文更干净）。
+BARE_APOSTROPHE = re.compile(r"(?<!\\)'")
+
 
 def spec_info(value):
     """-> (index_set, bare_list, conv_multiset)"""
@@ -551,6 +563,15 @@ def check_res(root, verbose=False):
                         "key '%s' 的值里有**裸双引号** —— aapt2 会把它**静默删掉**"
                         "（它把成对引号当成「引起来的一段」，只取内容、不留引号）⇒ 界面上根本看不到。"
                         " 要显示双引号请写成 \\\" " % name))
+                    break
+            for t in pieces:
+                if BARE_APOSTROPHE.search(t):
+                    findings.append(Finding(
+                        "RES-13", "ERROR", rel, line, name,
+                        "key '%s' 的值里有**没转义的撇号** —— 出现奇数次会让 aapt2 直接报"
+                        " `file failed to compile.`（**不给行号**，极难定位）；偶数次更糟："
+                        " 那对撇号会被当成「引起来的一段」**悄无声息**。写成 \\' 或改写措辞绕开"
+                        % name))
                     break
             for t in pieces:
                 if "·" in t and dot_sep_bad(t):
@@ -1137,6 +1158,24 @@ def selftest(root, verbose=False):
     _CJKJAVA = ('package io.mdt.launcher;\nclass A {\n'
                 '  String f() { return "\u4e2d\u6587\u4e00"; }\n'
                 '  String g() { return "\u4e2d\u6587\u4e8c"; }\n}\n')
+    cases.append((
+        "RES-13 值里有没转义的撇号（aapt2 报错不给行号）",
+        _mk_tree({
+            "app/res/values/strings.xml":
+                '<resources><string name="a">cannot reach this slot\'s folder</string></resources>',
+            "app/src/io/mdt/launcher/A.java": _MIN_JAVA,
+            "app/AndroidManifest.xml": _MIN_MANIFEST,
+        }, scratch),
+        "RES-13", None))
+    cases.append((
+        "RES-13 转义过的撇号不许响",
+        _mk_tree({
+            "app/res/values/strings.xml":
+                '<resources><string name="a">cannot reach this slot\\\'s folder</string></resources>',
+            "app/src/io/mdt/launcher/A.java": _MIN_JAVA,
+            "app/AndroidManifest.xml": _MIN_MANIFEST,
+        }, scratch),
+        None, {"RES-13"}))
     cases.append((
         "SRC-02 中文字面量超出台账（新加了中文）",
         _mk_tree({
