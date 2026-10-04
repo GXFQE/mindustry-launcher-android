@@ -32,12 +32,11 @@ final class SettingsText {
             case SettingsBin.Result.E_BACKUP_MKDIR:
                 return c.getString(R.string.settings_err_backup_mkdir_fmt, r.errS1);
             case SettingsBin.Result.E_BACKUP_VERIFY:
-                return c.getString(R.string.settings_err_backup_verify_fmt, r.errS1);
+                return c.getString(R.string.settings_err_backup_verify);
             case SettingsBin.Result.E_VERIFY_ROLLBACK:
                 return c.getString(R.string.settings_err_verify_rollback_fmt, detail(c, r));
             case SettingsBin.Result.E_VERIFY_ROLLBACK_FAIL:
-                return c.getString(R.string.settings_err_verify_rollback_fail_fmt,
-                        detail(c, r), r.errS2);
+                return c.getString(R.string.settings_err_verify_rollback_fail_fmt, detail(c, r));
             case SettingsBin.Result.E_VERIFY_DELETED:
                 return c.getString(R.string.settings_err_verify_deleted_fmt, detail(c, r));
             default:
@@ -55,7 +54,7 @@ final class SettingsText {
     /** 写后自检不过的**具体原因**（嵌在上面三条的 `%1$s` 里，所以它也得是整句资源） */
     private static String detail(Context c, SettingsBin.Result r) {
         if (r.subCode == SettingsBin.Result.SUB_UNREADABLE) {
-            return c.getString(R.string.settings_selfcheck_unreadable_fmt, r.errS1);
+            return c.getString(R.string.settings_selfcheck_unreadable);
         }
         return c.getString(R.string.settings_selfcheck_mismatch);
     }

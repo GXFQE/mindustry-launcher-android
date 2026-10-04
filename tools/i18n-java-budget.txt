@@ -21,7 +21,7 @@
 Mods.java = 140
 MainActivity.java = 126   # 全部在 dev_* 直通口（仅 debuggable 构建可达）
 Data.java = 61   # 用户可见的已搬完；剩的是数据根体检明细与隔离报告（落盘）
-SettingsBin.java = 50
+SettingsBin.java = 50   # ★ 已码化：失败文案走 errCode+参数（SettingsText 映射）；剩的是 read/write 的 IOException 原文、report()/changeDesc(技术细节第二层) —— 依据，有意保留
 ModsActivity.java = 33
 MsavMeta.java = 32   # ★ 已码化：8 条 error 走 errCode+参数（MsavText 映射）；这些句子只给报告/自检看
 Compat.java = 26   # 只进 report-devtool.txt / 崩溃报告（取证文本）

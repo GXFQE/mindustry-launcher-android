@@ -463,11 +463,11 @@
     <string name="settings_err_null_file">目标文件为 null</string>
     <string name="settings_err_no_keys">没有要改的键</string>
     <string name="settings_err_backup_mkdir_fmt">建备份目录失败：%1$s</string>
-    <string name="settings_err_backup_verify_fmt">备份校验失败（写出的备份读不回或与原文件不一致）：%1$s</string>
+    <string name="settings_err_backup_verify">备份校验失败（写出的备份读不回或与原文件不一致）</string>
     <string name="settings_selfcheck_mismatch">写回后读出的键表与预期不一致</string>
-    <string name="settings_selfcheck_unreadable_fmt">写回后读不出来：%1$s</string>
+    <string name="settings_selfcheck_unreadable">写回后读不出来</string>
     <string name="settings_err_verify_rollback_fmt">自检失败（%1$s）⇒ 已用备份还原原文件</string>
-    <string name="settings_err_verify_rollback_fail_fmt">自检失败（%1$s）且还原失败：%2$s</string>
+    <string name="settings_err_verify_rollback_fail_fmt">自检失败（%1$s）且还原失败</string>
     <string name="settings_err_verify_deleted_fmt">自检失败（%1$s）⇒ 已删除刚新建的文件</string>
     <string name="msav_reason_meta_tail_fmt">元数据块读完后还剩 %1$d 字节（与游戏的口径不一致）</string>
     <!-- 地图来源与详情（同一族：Maps.Item 原来也是 Java 里拼的中文）-->

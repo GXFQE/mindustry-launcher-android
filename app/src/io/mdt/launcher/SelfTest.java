@@ -2685,7 +2685,7 @@ public final class SelfTest {
         // ★★ P3：**遍历 `ALL_CODES`** —— 每个码都必须映射到一条真文案（不是"原因不明"那个兜底）。
         //    漏一条映射**不崩不报错**、界面只是**静默空白**，只有遍历才抓得住。
         StringBuilder missSt = new StringBuilder();
-        boolean stParamOk = true, stLocaleDiff = true;
+        boolean stRawLeak = false, stLocaleDiff = true;
         String stFallback = ctx.getString(R.string.settings_reason_unknown);
         for (int code : SettingsBin.Result.ALL_CODES) {
             SettingsBin.Result rr = SettingsBin.Result.withCode(code, "WHY", "BOOM");
@@ -2693,18 +2693,20 @@ public final class SelfTest {
             String re = SettingsText.userReason(enSt, rr);
             if (rz == null || rz.isEmpty() || stFallback.equals(rz)) missSt.append(code).append(' ');
             if (rz.equals(re)) stLocaleDiff = false;
-            if (code == SettingsBin.Result.E_VERIFY_ROLLBACK_FAIL
-                    && !(rz.contains("WHY") && rz.contains("BOOM")
-                         && re.contains("WHY") && re.contains("BOOM"))) {
-                stParamOk = false;
-            }
+            // ★ **原始原因**（异常原文 / 我们 `read()` 里的中文）一个字都不许进第一层 ——
+            //   那是"依据"，按硬规矩走 `report()`（「技术细节」第二层）。备份目录那条除外：
+            //   它的参数是个**路径**（中性，不是原因）。
+            if (rz.contains("BOOM")) stRawLeak = true;
+            if (code != SettingsBin.Result.E_BACKUP_MKDIR && rz.contains("WHY")) stRawLeak = true;
         }
         ok(stat, L, missSt.length() == 0,
                 "★P3：settings 那 7 个错误码**每一个**都有文案映射（漏映射=界面静默空白），漏的是［"
                         + missSt + "］");
-        ok(stat, L, stParamOk && stLocaleDiff,
-                "★P3：错误码的参数真的进了句子（含自检失败那条的**两个**参数 WHY/BOOM），"
-                        + "且两套语言文案不同");
+        ok(stat, L, !stRawLeak && stLocaleDiff
+                        && SettingsText.userReason(ctx, SettingsBin.Result.withCode(
+                                SettingsBin.Result.E_BACKUP_MKDIR, "WHY", null)).contains("WHY"),
+                "★P3：第一层只带**中性参数**（备份目录那条的路径进去了），"
+                        + "**原始原因一个字都没进**（依据在 report() 里），且两套语言文案不同");
         // ★ 自检失败那条是**嵌套**的（外面一句 + 里面一句"具体原因"）⇒ 两个分支都要过一遍，
         //   否则"另一个分支永远显示同一句"这种错看不出来。
         SettingsBin.Result mSub = SettingsBin.Result.withCode(
