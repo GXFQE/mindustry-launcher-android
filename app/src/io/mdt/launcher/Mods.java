@@ -522,7 +522,7 @@ public final class Mods {
             return r;
         }
         if (Data.gameAlive(ctx)) {
-            // ★ 2026-10-04：这句现在会**原样出现在用户弹窗的第一层**（`Result.userReason()`），
+            // ★ 2026-10-04：这句现在会**原样出现在用户弹窗的第一层**（`SettingsText.userReason()`），
             //   所以去掉 `:game` / `settings.bin` 这类术语（文案纪律 ③）。
             r.error = "游戏正在运行，现在改会被它覆盖 —— 请先退出游戏再改。";
             return r;

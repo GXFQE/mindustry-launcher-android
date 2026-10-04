@@ -2665,18 +2665,56 @@ public final class SelfTest {
         } finally {
             deleteTree(dir);        // 这个目录在 app_hub 下，不经 TEST_SLOTS，自己清
         }
-        // ★ 2026-10-04（第 86 轮）：失败原因的**白话翻译** —— 启停结果弹窗的第一层直接用它，
-        //   所以它必须有判据（含元断言：不能"把什么都翻译掉"，我们自己写的中文要原样透传）。
+        // ★ 2026-10-04（第 86 轮）失败原因的白话翻译；★ 2026-10-05（P3）**改走「码 + 参数」**：
+        //   核心（`SettingsBin`，纯 Java）只说"错在哪"，文案在 `SettingsText` 里按码取资源。
+        //   🔴 这条断言原来要求"我们自己写的中文**原样透传**" —— 那正是被替换掉的旧设计。
         SettingsBin.Result tech = new SettingsBin.Result();
         tech.error = "IOException: boom";
         SettingsBin.Result plain = new SettingsBin.Result();
         plain.error = "游戏正在运行，现在改会被它覆盖 —— 请先退出游戏再改。";
-        ok(stat, L, !tech.userReason().contains("Exception") && !tech.userReason().equals(tech.error)
-                        && plain.userReason().equals(plain.error),
-                "★原因翻译（Result.userReason）：异常形态 ⇒ 「" + tech.userReason()
-                        + "」，自己写的中文原样透传（元断言：不是恒改）");
-        ok(stat, L, "原因不明".equals(new SettingsBin.Result().userReason()),
-                "★没有原因时给「原因不明」");
+        Context enSt = LocaleMode.force(ctx, "en");
+        ok(stat, L, !SettingsText.userReason(ctx, tech).contains("Exception")
+                        && !SettingsText.userReason(ctx, tech).equals(tech.error)
+                        && !SettingsText.userReason(enSt, tech).equals(tech.error)
+                        && SettingsText.userReason(ctx, plain).equals(plain.error),
+                "★原因翻译（SettingsText.userReason）：异常形态 ⇒ 「"
+                        + SettingsText.userReason(ctx, tech) + "」（中英都不是核心原文）");
+        ok(stat, L, ctx.getString(R.string.settings_reason_unknown)
+                        .equals(SettingsText.userReason(ctx, new SettingsBin.Result())),
+                "★没有原因（码为 0 且 error 为空）时给「原因不明」");
+        // ★★ P3：**遍历 `ALL_CODES`** —— 每个码都必须映射到一条真文案（不是"原因不明"那个兜底）。
+        //    漏一条映射**不崩不报错**、界面只是**静默空白**，只有遍历才抓得住。
+        StringBuilder missSt = new StringBuilder();
+        boolean stParamOk = true, stLocaleDiff = true;
+        String stFallback = ctx.getString(R.string.settings_reason_unknown);
+        for (int code : SettingsBin.Result.ALL_CODES) {
+            SettingsBin.Result rr = SettingsBin.Result.withCode(code, "WHY", "BOOM");
+            String rz = SettingsText.userReason(ctx, rr);
+            String re = SettingsText.userReason(enSt, rr);
+            if (rz == null || rz.isEmpty() || stFallback.equals(rz)) missSt.append(code).append(' ');
+            if (rz.equals(re)) stLocaleDiff = false;
+            if (code == SettingsBin.Result.E_VERIFY_ROLLBACK_FAIL
+                    && !(rz.contains("WHY") && rz.contains("BOOM")
+                         && re.contains("WHY") && re.contains("BOOM"))) {
+                stParamOk = false;
+            }
+        }
+        ok(stat, L, missSt.length() == 0,
+                "★P3：settings 那 7 个错误码**每一个**都有文案映射（漏映射=界面静默空白），漏的是［"
+                        + missSt + "］");
+        ok(stat, L, stParamOk && stLocaleDiff,
+                "★P3：错误码的参数真的进了句子（含自检失败那条的**两个**参数 WHY/BOOM），"
+                        + "且两套语言文案不同");
+        // ★ 自检失败那条是**嵌套**的（外面一句 + 里面一句"具体原因"）⇒ 两个分支都要过一遍，
+        //   否则"另一个分支永远显示同一句"这种错看不出来。
+        SettingsBin.Result mSub = SettingsBin.Result.withCode(
+                SettingsBin.Result.E_VERIFY_ROLLBACK, "WHY", null);
+        mSub.subCode = SettingsBin.Result.SUB_MISMATCH;
+        ok(stat, L, SettingsText.userReason(ctx, mSub)
+                        .contains(ctx.getString(R.string.settings_selfcheck_mismatch))
+                        && !SettingsText.userReason(ctx, mSub).contains("WHY"),
+                "★P3：自检失败的**另一个分支**（键表不符）走另一句资源，且不夹带参数："
+                        + "「" + SettingsText.userReason(ctx, mSub) + "」");
         L.add("");
     }
 

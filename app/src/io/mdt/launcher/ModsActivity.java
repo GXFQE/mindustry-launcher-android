@@ -1146,7 +1146,7 @@ public class ModsActivity extends BaseActivity {
         if (!r.ok) {
             title = getString(R.string.mods_toggle_failed);
             // ★ 原因走 userReason()（异常类名要翻成白话），不是原始的 error（那是给排查看的）
-            msg = getString(R.string.mods_toggle_fail_msg_fmt, r.userReason());
+            msg = getString(R.string.mods_toggle_fail_msg_fmt, SettingsText.userReason(this, r));
         } else if (r.noop) {
             title = getString(R.string.mods_toggle_noop);
             msg = count > 0

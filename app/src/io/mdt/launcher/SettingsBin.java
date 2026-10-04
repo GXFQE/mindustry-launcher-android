@@ -383,10 +383,74 @@ public final class SettingsBin {
 
     // ══ 安全改写（F13 第二阶段：模组启停的唯一入口） ═══════════════════════
 
+    /** 记下"错在哪"：**码 + 参数给界面**（`SettingsText` 映射），中文句子留给 `report()` / 自检 */
+    private static Result err(Result r, int code, String zh, String s1, String s2) {
+        r.errCode = code;
+        r.errS1 = s1;
+        r.errS2 = s2;
+        r.error = zh;
+        return r;
+    }
+
     /** 一次安全改写的结果（人读报告 + 机器可判的字段） */
     public static final class Result {
+        // ── ★ 错误码（P3，2026-10-05）：给界面用的「码 + 参数」─────────────────────
+        // 为什么要有它：本类是**刻意纯 Java** 的（见类注释"能在 PC 上单独编译验证"）⇒ 不能 `getString`。
+        // 可 {@link #error} 里**我们自己写的那几句中文**会经 `userReason()` **原样到用户眼前**
+        // （模组启停失败的第一层弹窗）⇒ 加这一层：核心只说"错在哪、带哪些参数"，
+        // 文案由 Android 侧的 `SettingsText` 映射成资源。
+        // ⚠️ {@link #error} **一个字都不动** —— `report()`（「技术细节」第二层）、dev 落盘报告与
+        //    自检看的仍是它（工程纪律，见 `MsavText` 那条同款注释）。
+        // ⚠️ 新增错误时**必须**同时：加一个码 + 在 `SettingsText` 里加一条映射 + 自检里过一遍
+        //    （自检**遍历 `ALL_CODES`**，漏映射会被抓住；否则界面上是**静默空白**）。
+        /** 没有码 */
+        public static final int E_NONE = 0;
+        /** 目标文件为 null */
+        public static final int E_NULL_FILE = 1;
+        /** 没有要改的键 */
+        public static final int E_NO_KEYS = 2;
+        /** 建备份目录失败；s1 = 目录 */
+        public static final int E_BACKUP_MKDIR = 3;
+        /** 备份校验失败；s1 = 读不回的原因 */
+        public static final int E_BACKUP_VERIFY = 4;
+        /** 写后自检不过 ⇒ 已还原；s1 = 具体原因（见下面的 SUB_*） */
+        public static final int E_VERIFY_ROLLBACK = 5;
+        /** 写后自检不过**且还原也失败**；s1 = 具体原因，s2 = 还原时的异常 */
+        public static final int E_VERIFY_ROLLBACK_FAIL = 6;
+        /** 写后自检不过 ⇒ 删掉了刚新建的文件；s1 = 具体原因 */
+        public static final int E_VERIFY_DELETED = 7;
+
+        /** 自检失败的"具体原因"：嵌在上面三条的 `%1$s` 里 */
+        public static final int SUB_NONE = 0;
+        /** 写回后读出的键表与预期不一致 */
+        public static final int SUB_MISMATCH = 1;
+        /** 写回后读不出来；s1 = 读失败的原因 */
+        public static final int SUB_UNREADABLE = 2;
+
+        /** **所有**错误码（给自检**遍历**用：漏一条映射在界面上是静默空白，只有遍历抓得住） */
+        public static final int[] ALL_CODES = {
+                E_NULL_FILE, E_NO_KEYS, E_BACKUP_MKDIR, E_BACKUP_VERIFY,
+                E_VERIFY_ROLLBACK, E_VERIFY_ROLLBACK_FAIL, E_VERIFY_DELETED,
+        };
+
+        /** 码 + 参数（界面用）；`errS1` 也给 `SUB_*` 当参数 */
+        public int errCode = E_NONE;
+        public int subCode = SUB_NONE;
+        public String errS1;
+        public String errS2;
+
+        /** 造一个"只带错误码"的实例：**给自检遍历所有码用**（自带 SUB_UNREADABLE，参数会流进句子） */
+        static Result withCode(int code, String s1, String s2) {
+            Result r = new Result();
+            r.errCode = code;
+            r.subCode = SUB_UNREADABLE;
+            r.errS1 = s1;
+            r.errS2 = s2;
+            return r;
+        }
+
         public boolean ok;
-        /** 失败原因（ok=false 时不为 null） */
+        /** 失败原因（ok=false 时不为 null）—— ⚠️ **给报告/自检看的原文**，别拿它直接显示给用户 */
         public String error;
         /** 什么都没改（例如"键不存在 + 目标就是默认值"） */
         public boolean noop;
@@ -425,22 +489,11 @@ public final class SettingsBin {
         }
 
         /**
-         * ★★ **给用户看**的失败原因（2026-10-04，第 86 轮）。
-         *
-         * ★ 与 {@link MsavMeta#userReason()} 同一套路 —— {@link #error} 里混着两类东西：
-         *   ① 我们自己写的中文判断（"游戏正在运行，现在改会被它覆盖…"）—— 直接能用；
-         *   ② 异常（`applyBools` 的 catch 写成 `类名: 消息`，如 `IOException: …`）—— 对用户是天书。
-         *   ⇒ 只**翻译**第 ② 类，其余原样返回。
-         * ⚠️ **不改 {@link #error} 原文**：`report()`、dev 报告与自检看的仍是那个字段（排查要它）。
+         * ★★ **给用户看**的失败原因 —— ⚠️ **2026-10-05（P3）搬走了**：原来这个方法里透传我们自己的
+         * 中文（"游戏正在运行…"）⇒ 现在核心只出 {@link #errCode} + 参数，文案在 Android 侧的
+         * {@link SettingsText#userReason} 里映射成资源（本类要保持**纯 Java**、能在 PC 上单独编译）。
+         * 自检会**遍历 {@link #ALL_CODES}** 确认每条都有映射。
          */
-        public String userReason() {
-            String e = error == null ? "" : error.trim();
-            if (e.isEmpty()) return "原因不明";
-            if (e.matches("^[A-Za-z_$][A-Za-z0-9_$]*(Exception|Error)\\b.*")) {
-                return "读写这个槽的设置时出错了";
-            }
-            return e;
-        }
     }
 
     /**
@@ -482,12 +535,10 @@ public final class SettingsBin {
         Result r = new Result();
         r.file = file;
         if (file == null) {
-            r.error = "目标文件为 null";
-            return r;
+            return err(r, Result.E_NULL_FILE, "目标文件为 null", null, null);
         }
         if (values == null || values.isEmpty()) {
-            r.error = "没有要改的键";
-            return r;
+            return err(r, Result.E_NO_KEYS, "没有要改的键", null, null);
         }
         try {
             // ① 读原件（坏文件 ⇒ read() 直接抛，绝不往下走）
@@ -546,8 +597,8 @@ public final class SettingsBin {
         // ② 备份
         if (backupDir != null && beforeBytes.length > 0) {
             if (!backupDir.exists() && !backupDir.mkdirs()) {
-                r.error = "建备份目录失败：" + backupDir.getAbsolutePath();
-                return r;
+                return err(r, Result.E_BACKUP_MKDIR, "建备份目录失败："
+                        + backupDir.getAbsolutePath(), backupDir.getAbsolutePath(), null);
             }
             File bk = new File(backupDir, stamp() + ".bin");
             FileOutputStream fo = new FileOutputStream(bk);
@@ -563,8 +614,9 @@ public final class SettingsBin {
             Values bkRead = readSafe(bk, why);
             if (bkRead == null || !sameValues(before, bkRead)) {
                 bk.delete();
-                r.error = "备份校验失败（写出的备份读不回或与原文件不一致）：" + why[0];
-                return r;
+                return err(r, Result.E_BACKUP_VERIFY,
+                        "备份校验失败（写出的备份读不回或与原文件不一致）：" + why[0],
+                        why[0], null);
             }
             r.backup = bk;
             pruneBackups(backupDir, KEEP_BACKUPS);
@@ -584,18 +636,23 @@ public final class SettingsBin {
         if (!r.verified) {
             // ⑤ 还原（自检不过 = 我写出去的东西不是我要写的 ⇒ 回到原状最安全）
             String detail = okRead ? "写回后读出的键表与预期不一致" : ("写回后读不出来：" + why[0]);
+            int sub = okRead ? Result.SUB_MISMATCH : Result.SUB_UNREADABLE;
             if (beforeBytes.length > 0) {
                 try {
                     Values orig = new Values(readMapOf(before), before.compressed, before.fileBytes);
                     writeAtomic(file, orig);
-                    r.error = "自检失败（" + detail + "）⇒ 已用备份还原原文件";
+                    err(r, Result.E_VERIFY_ROLLBACK, "自检失败（" + detail + "）⇒ 已用备份还原原文件",
+                            why[0], null).subCode = sub;
                 } catch (Throwable t2) {
-                    r.error = "自检失败（" + detail + "）且还原失败：" + t2
-                            + "；备份在 " + (r.backup == null ? "（无）" : r.backup.getAbsolutePath());
+                    err(r, Result.E_VERIFY_ROLLBACK_FAIL,
+                            "自检失败（" + detail + "）且还原失败：" + t2
+                                    + "；备份在 " + (r.backup == null ? "（无）" : r.backup.getAbsolutePath()),
+                            why[0], String.valueOf(t2)).subCode = sub;
                 }
             } else {
                 file.delete();
-                r.error = "自检失败（" + detail + "）⇒ 已删除刚新建的文件";
+                err(r, Result.E_VERIFY_DELETED, "自检失败（" + detail + "）⇒ 已删除刚新建的文件",
+                        why[0], null).subCode = sub;
             }
             return r;
         }
