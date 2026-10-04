@@ -749,9 +749,12 @@ public final class MapStats {
             r.skipped++;                           // 模组代码/JS 定义的内容我们认不出来 ⇒ 跳过
             return "目标不认识，跳过";
         }
-        if (!SRC_VANILLA.equals(old.source) && old.source.startsWith(SRC_MOD)) {
-            // 已经被别的包改过：照样在**当前行**上继续改（与游戏的叠加顺序一致）
-        }
+        // ★ 这里原来有一个**空体 if**：`if (!SRC_VANILLA.equals(old.source) && old.source.startsWith(SRC_MOD)) { }`
+        //   —— 判据建在 SRC_VANILLA / SRC_MOD 这两个**中文常量**上，而体内只有一句注释、
+        //   **什么都没做**（走到这里本来就是"在当前行上继续改"）。
+        //   2026-10-04（i18n P0.1）把它删了：留着一条不生效、又拿文案当判据的条件，
+        //   只会让下一个人以为它在起作用。它想表达的意思保留在下面这句注释里：
+        //   ⇒ 已经被别的包改过的行，**照样在当前行上继续改**（与游戏的叠加顺序一致）。
         String loc = str(json.get("localizedName"), "");
         if (!loc.isEmpty()) {
             old.localizedName = loc;

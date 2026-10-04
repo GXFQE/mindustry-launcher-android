@@ -153,6 +153,50 @@ echo "ROOT = $ROOT"
 echo "SDK  = $SDK"
 echo
 
+# ---- [0/4] i18n gate --------------------------------------------------------
+# 国际化门禁（研究文档 docs/i18n-feasibility.md 的 P0）。检查器是纯 Python、
+# 不碰工具链，所以放在最前面 —— 资源树坏了就早失败，别等 aapt2 跑完。
+#
+# ★ 两道，顺序不能换：
+#   ① --selftest：**先证明这把尺子有牙**（每一条规则都拿一个"已知坏的输入"喂它，
+#      要求判死；再拿"已知好的输入"喂它，要求别乱叫）。元断言不过就直接停 ——
+#      尺子本身坏了，它说"通过"也没有意义。
+#   ② 真检查：资源层（多语言目录一致性 / 参数 / 空白）+ 源码层（不许用文案串当判据）。
+#
+# ★ tools/i18n-known.txt 是"已知缺陷台账"：里面记的必须**还在复现**，
+#   修好了却忘了删，脚本会报 STALE 并失败（判据对 != 清单全，两个方向都要跑）。
+# ★ 输出默认是 ASCII 的（非 ASCII 转成 \uXXXX）—— 见本文件头："Echo messages are
+#   deliberately ASCII: shell output is decoded as GBK"。想看人话的完整报告：
+#       python tools/i18n-check.py --utf8
+# ★ 应急开关：SKIP_I18N_CHECK=1 ./build.sh（会打一行很响的 WARNING）。
+I18N_CHECK="$(jpath "$ROOT/tools/i18n-check.py")"
+if [ "${SKIP_I18N_CHECK:-}" = "1" ]; then
+  echo "== [0/4] i18n check: SKIPPED (SKIP_I18N_CHECK=1) =="
+  echo "   WARNING: the i18n gate is OFF -- a broken resource tree can ship."
+  echo
+elif [ ! -f "$I18N_CHECK" ]; then
+  echo "== [0/4] i18n check: NOT INSTALLED (tools/i18n-check.py missing) =="
+  echo
+else
+  echo "== [0/4] i18n check =="
+  if ! "$PYTHON" "$I18N_CHECK" --root "$(jpath "$ROOT")" --selftest; then
+    echo "FAIL: the i18n checker failed its own meta-assertions." >&2
+    echo "      The ruler is broken -- fix tools/i18n-check.py first." >&2
+    exit 1
+  fi
+  if ! "$PYTHON" "$I18N_CHECK" --root "$(jpath "$ROOT")"; then
+    echo >&2
+    echo "FAIL: i18n check did not pass." >&2
+    echo "  readable report : $PYTHON tools/i18n-check.py --utf8" >&2
+    echo "  prove the ruler : $PYTHON tools/i18n-check.py --selftest" >&2
+    echo "  known-defect log: tools/i18n-known.txt" >&2
+    echo "  why / phasing   : docs/i18n-feasibility.md" >&2
+    exit 1
+  fi
+  echo
+fi
+
+
 # ⚠️ 归档改名而不是 rm -rf（一次删太多会被环境拦掉）。
 #    .build-trash/ 攒着不大，但记得偶尔整个删掉。
 if [ -d "$OUT" ]; then

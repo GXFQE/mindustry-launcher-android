@@ -50,6 +50,8 @@ public final class Config {
     private static final String K_LOGS = "max_log_files";
     /** F15：界面深浅色（0=跟随系统 1=浅色 2=深色） */
     private static final String K_THEME = "theme_mode";
+    /** 界面语言（空串=跟随系统；否则 BCP47 标签，如 en / zh / zh-TW）—— 见 {@link LocaleMode} */
+    private static final String K_LANG = "app_language";
     /** F5：每槽的自动备份策略 { "&lt;槽名&gt;": {enabled, min_minutes, max_backups} } */
     private static final String K_BACKUP = "backup_policy";
     /** F5：一次启动的记账 {key, slot, at} —— 游戏退出后回来结算自动备份用 */
@@ -385,6 +387,30 @@ public final class Config {
 
     public synchronized void setThemeMode(int v) {
         put(K_THEME, Math.max(ThemeMode.SYSTEM, Math.min(ThemeMode.DARK, v)));
+        save();
+    }
+
+    // ── 界面语言 ──────────────────────────────────────────────────────────
+
+    /**
+     * 界面语言：{@link LocaleMode#SYSTEM}（空串）= 跟随系统；否则是 BCP47 标签。
+     *
+     * ★ **只做"类型"容错**（不是字符串就退默认 + WARNING 点名键名，与 maxLogFiles / themeMode 同纪律）。
+     * ★ **"认不认识这个标签"由 {@link LocaleMode#of} 判** —— 名单住在资源里
+     *   （`R.array.app_languages`，由构建期门禁 `RES-10` 保证与 `values-*` 目录一一对应），
+     *   而 `Config` 刻意不依赖资源系统，所以不在这一层判。
+     */
+    public synchronized String appLanguage() {
+        if (!mRoot.has(K_LANG)) return LocaleMode.SYSTEM;
+        Object v = mRoot.opt(K_LANG);
+        if (v instanceof String) return ((String) v).trim();
+        Log.w(TAG, "config key '" + K_LANG + "' is not a string (" + v
+                + "), falling back to default (follow system)");
+        return LocaleMode.SYSTEM;
+    }
+
+    public synchronized void setAppLanguage(String tag) {
+        put(K_LANG, tag == null ? LocaleMode.SYSTEM : tag.trim());
         save();
     }
 

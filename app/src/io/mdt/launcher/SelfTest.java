@@ -117,7 +117,14 @@ public final class SelfTest {
 
     // ── 主入口 ────────────────────────────────────────────────────────────
 
-    public static String runM3(Context ctx) {
+    public static String runM3(Context passed) {
+        // ★★ 自检的语言**必须与用户的界面语言设置解耦**（P2 之后用户能自己切语言）。
+        //    本套断言的期望值是照**中文资源**写死的（"· 两侧要有空格"、"中文与插入值之间无多余空格"…），
+        //    一旦用户的设置是英文、自检却跟着走，就会红一片 —— 那不是回归，是它本来就这么写的。
+        //    ⇒ 一进来就 force() 到 LocaleMode.SELFTEST，让结论**确定性、可复现**。
+        //    ⚠️ 这是过渡：真正的做法是让那些断言与语言无关 / zh-en 双跑，见 docs/i18n-feasibility.md §7.3。
+        //    ⚠️ 只改 Configuration，不碰 Locale.setDefault（红线，见 LocaleMode 类注释）。
+        final Context ctx = LocaleMode.force(passed, LocaleMode.SELFTEST);
         List<String> L = new ArrayList<>();
         int[] stat = {0, 0};   // {pass, fail}
         long t0 = System.currentTimeMillis();
@@ -125,6 +132,9 @@ public final class SelfTest {
         L.add("数据根 = " + path(Data.dataRoot(ctx)));
         L.add("HUB 外部 = " + path(Data.hubDir(ctx)));
         L.add("当前槽 = " + Data.currentSlot(ctx));
+        // ★ 把"自检跑在哪个语言下"写进报告：它是复现结论的必要信息
+        //   （同一份代码在 zh / en 下跑出来**不是**同一个数字，见 §7.3 的实测）。
+        L.add("自检语言 = " + LocaleMode.SELFTEST + "（锁定，与界面语言设置无关）");
         L.add("");
 
         // 先清场：上一轮跑挂了也不能污染这一轮
@@ -475,8 +485,8 @@ public final class SelfTest {
         ok(stat, L, corrupted,
                 "破坏已生效（a.msav 变了、settings.bin 与 logic-tool 的 JSON 都没了）");
 
-        String report = Backup.restore(ctx, SLOT, ss);
-        ok(stat, L, report.startsWith("✅"), "恢复返回成功");
+        Backup.RestoreResult rr = Backup.restore(ctx, SLOT, ss);
+        ok(stat, L, rr.ok, "恢复返回成功");
         ok(stat, L, Util.md5(new File(slot, "saves/a.msav")).equals(md5a),
                 "★ 恢复后 a.msav md5 与破坏前相同");
         ok(stat, L, Util.md5(new File(slot, "saves/b.msav")).equals(md5b), "b.msav md5 未变");
@@ -611,15 +621,16 @@ public final class SelfTest {
         }
         ok(stat, L, String.valueOf(victim.length()).equals(sizeBefore), "篡改后长度未变（只翻了一个字节）");
 
-        String r = Backup.restore(ctx, SLOT, ss);
-        // ★ 把被断言的原文打出来：这几条断言全是"报告里必须出现某句话"，
+        Backup.RestoreResult rr = Backup.restore(ctx, SLOT, ss);
+        // ★ 把被断言的原文打出来：下面还有"报告里必须出现某句话"的断言，
         //   若不显示原文，一旦断言失败就只能靠猜（踩过一次）。
-        L.add("      恢复报告：" + oneLine(r));
+        L.add("      恢复报告：" + oneLine(rr.report));
         // ★ F16 语义（与旧版不同，是有意改的）：对象池是不可变的，**坏一项不影响别的项**
         //   ⇒ 不再"整份拒绝"（那会让用户一个文件都拿不回来），而是**这一项不写出去**、
         //     其余照常恢复，并在报告里点名。
-        ok(stat, L, r.startsWith("✅"), "其余项照常恢复（返回 ✅，只有坏的那一项失败）");
-        ok(stat, L, r.contains("sha256"), "报告点明对象内容与地址（sha256）不符");
+        // ★ P0.1：成败改读 rr.ok（原来读报告开头的 ✅ —— 那是文案，本地化后会把成功显示成"未执行"）
+        ok(stat, L, rr.ok, "其余项照常恢复（rr.ok = true，只有坏的那一项失败）");
+        ok(stat, L, rr.report.contains("sha256"), "报告点明对象内容与地址（sha256）不符");
         ok(stat, L, Util.md5(target).equals(md5Before),
                 "★ 坏对象**没有被写出去**（b.msav 一个字节都没动，没有半截恢复）");
         L.add("");
@@ -1577,8 +1588,8 @@ public final class SelfTest {
             write(live, gzip("trashed".getBytes("UTF-8")));
         } catch (Exception ignored) {
         }
-        String r = Backup.restore(ctx, SLOT, migrated);
-        ok(stat, L, r.startsWith("✅"), "从迁移后的快照恢复成功");
+        Backup.RestoreResult rr = Backup.restore(ctx, SLOT, migrated);
+        ok(stat, L, rr.ok, "从迁移后的快照恢复成功");
         ok(stat, L, live.isFile() && Util.md5(live).equals(wantMd5),
                 "★ 迁移后恢复出来的内容与迁移前逐字节一致（md5 相同）");
         L.add("");

@@ -163,12 +163,13 @@ final class SlotOps {
                 a.getString(R.string.restore_progress_msg), true, false);
         new Thread(new Runnable() {
             @Override public void run() {
-                final String report = Backup.restore(a, s.name, ss);
+                // ★ 成败读 rr.ok，**不许读报告开头**（那是文案，一本地化就判错；门禁规则 SRC-01）
+                final Backup.RestoreResult rr = Backup.restore(a, s.name, ss);
                 a.runOnUiThread(new Runnable() {
                     @Override public void run() {
                         pd.dismiss();
-                        alert(a, a.getString(report.startsWith("✅") ? R.string.restore_done
-                                : R.string.restore_not_run), report);
+                        alert(a, a.getString(rr.ok ? R.string.restore_done
+                                : R.string.restore_not_run), rr.report);
                         h.onSlotChanged();
                     }
                 });

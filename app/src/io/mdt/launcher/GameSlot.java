@@ -44,13 +44,13 @@ public class GameSlot extends BaseActivity {
     private TextView mStatus;
 
     /**
-     * F15：**不要**在回到前台时自查主题。
+     * F15：**不要**在回到前台时自查界面配置（深浅色 + 语言）。
      * 本 Activity 的 onCreate 里跑的是六步加载管线（dexdump 注入 / load native / 挂资产链），
      * 中途被 `recreate()` 会把整条启动流程打断。它显示的"正在启动"只闪一下就被游戏盖住，
-     * 不值得为它冒险 —— 代价是它固定用"建实例那一刻"的主题。
+     * 不值得为它冒险 —— 代价是它固定用"建实例那一刻"的深浅色与语言。
      */
     @Override
-    protected boolean syncThemeOnResume() {
+    protected boolean syncUiOnResume() {
         return false;
     }
 

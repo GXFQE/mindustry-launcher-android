@@ -381,7 +381,10 @@ public class MapsActivity extends BaseActivity {
                             recreate();
                             return;
                         }
-                        if (!overwrite && r.error != null && r.error.contains("已经有")) {
+                        // ★ 判"要不要弹同名替换框"**只认 r.nameTaken**（MapFiles 给的权威标志），
+                        //   不许去看 r.error 的字面内容 —— 那是给人看的话，一改措辞/一翻译就判错
+                        //   （2026-10-04 i18n P0.1；门禁规则 SRC-01）。
+                        if (!overwrite && r.nameTaken) {
                             new AlertDialog.Builder(MapsActivity.this)
                                     .setTitle(R.string.map_overwrite_title)
                                     .setMessage(getString(R.string.map_overwrite_msg_fmt,

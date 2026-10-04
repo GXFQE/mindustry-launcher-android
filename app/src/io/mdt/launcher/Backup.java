@@ -310,25 +310,25 @@ public final class Backup {
      *   不符就报错，宁可不写也不写出坏存档。任何一项失败只记该项，其余继续
      *   （池是不可变的，坏一项不影响别的项）。
      *
-     * 返回人读报告（以 "✅" / "⚠" 开头区分成败）。
+     * **返回 {@link RestoreResult}**：成败是一个**布尔值**，不是从报告文案里读出来的。
      */
-    public static String restore(Context ctx, String slot, Snapshot ss) {
-        if (ss == null || ss.dir == null || !ss.dir.exists()) return "⚠ 快照不存在";
+    public static RestoreResult restore(Context ctx, String slot, Snapshot ss) {
+        if (ss == null || ss.dir == null || !ss.dir.exists()) return fail("⚠ 快照不存在");
         if (gameAliveOn(ctx, slot)) {
-            return "⚠ 游戏进程还在运行（当前槽正被游戏占用）——\n请先退出游戏再恢复。未做任何改动。";
+            return fail("⚠ 游戏进程还在运行（当前槽正被游戏占用）——\n请先退出游戏再恢复。未做任何改动。");
         }
         List<Entry> entries;
         try {
             entries = readEntries(new File(ss.dir, MANIFEST));
         } catch (IOException e) {
-            return "⚠ 读不了快照清单：" + e.getMessage();
+            return fail("⚠ 读不了快照清单：" + e.getMessage());
         }
-        if (entries.isEmpty()) return "⚠ 快照清单是空的";
+        if (entries.isEmpty()) return fail("⚠ 快照清单是空的");
 
         File dstRoot = Data.dirOf(ctx, slot);
-        if (dstRoot == null) return "⚠ 拿不到目标槽目录";
+        if (dstRoot == null) return fail("⚠ 拿不到目标槽目录");
         if (!dstRoot.exists() && !dstRoot.mkdirs()) {
-            return "⚠ 创建目标目录失败：" + dstRoot.getAbsolutePath();
+            return fail("⚠ 创建目标目录失败：" + dstRoot.getAbsolutePath());
         }
 
         int ok = 0;
@@ -362,7 +362,7 @@ public final class Backup {
                 StringBuilder sb = new StringBuilder("⚠ 这份备份自身校验没过，已拒绝恢复（没有动你的数据）：\n");
                 for (int i = 0; i < bad.size() && i < 8; i++) sb.append("  · ").append(bad.get(i)).append('\n');
                 if (bad.size() > 8) sb.append("  … 共 ").append(bad.size()).append(" 项\n");
-                return sb.toString();
+                return fail(sb.toString());
             }
             for (Entry e : entries) {
                 File from = new File(srcRoot, e.rel);
@@ -385,7 +385,33 @@ public final class Backup {
         if (ok < entries.size()) sb.append("\n⚠ 有文件没写成功：\n").append(errs);
         Log.i(TAG, "restore slot=" + slot + " ok=" + ok + "/" + entries.size()
                 + " v=" + ss.version);
-        return sb.toString();
+        return new RestoreResult(true, sb.toString());
+    }
+
+    /**
+     * {@link #restore} 的结果。
+     *
+     * 🔴 **成败必须读 {@link #ok}，不许去读 {@link #report} 的开头**（2026-10-04，i18n P0.1）。
+     *   原来两处调用方判 `report.startsWith("✅")` —— 而那个 ✅ 是 {@code restore} 自己拼进报告里的
+     *   一句中文/符号。它一被本地化，"恢复成功"就会被显示成"未执行"，而且**不报错、不崩溃、没有任何
+     *   自检会红**。构建期门禁规则 `SRC-01` 就是钉这一类的（见 docs/i18n-feasibility.md §5.2）。
+     *   {@code report} 里仍然带 ✅ / ⚠ 前缀，但那**只是给人看的**，不再承担判据职责。
+     */
+    public static final class RestoreResult {
+        /** 真的执行了恢复（⚠ 开头的几种早退都是 false） */
+        public final boolean ok;
+        /** 给用户看的报告正文 */
+        public final String report;
+
+        RestoreResult(boolean ok, String report) {
+            this.ok = ok;
+            this.report = report;
+        }
+    }
+
+    /** `restore` 的失败出口（早退的几种原因） */
+    private static RestoreResult fail(String report) {
+        return new RestoreResult(false, report);
     }
 
     // ── 克隆槽（F4②） ─────────────────────────────────────────────────────
@@ -428,13 +454,10 @@ public final class Backup {
         }
         try {
             Snapshot ss = create(ctx, src, label);
-            String report = restore(ctx, dst, ss);
-            // restore 的契约：以 "✅" / "⚠" 开头区分成败。走 ⚠ 的几种：
-            // 快照不存在 / 清单为空 / 游戏在跑 / 拿不到目标目录。
-            // ⚠️ "源槽是空的"**不会**走到这里 —— `create` 自己就会拒（实测它的原话是
-            //    「槽「x」里没有可备份的内容」，见自检 ⑭ 的负例③）。
-            if (report == null) return "恢复没有返回结果";
-            if (!report.startsWith("✅")) return report;
+            RestoreResult rr = restore(ctx, dst, ss);
+            // ★ 成败读 rr.ok，**不许读报告开头**（见 RestoreResult 的注释）。
+            //   restore 不返回 null，所以这里没有"拿不到结果"那条分支了。
+            if (!rr.ok) return rr.report;
             return null;
         } catch (Exception e) {
             return e.getMessage() == null ? String.valueOf(e) : e.getMessage();

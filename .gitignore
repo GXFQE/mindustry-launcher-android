@@ -53,7 +53,8 @@ __pycache__/
 
 # 保留：app/（源码 + 资源 + AndroidManifest）、build.sh、README.md /
 #       FLOWS.md / BACKLOG.md（三份文档）、spike/（实验记录）、
-#       evidence/（真机取证，README 引用 25 处）
+#       evidence/（真机取证，README 引用 25 处）、
+#       tools/（i18n 构建期门禁：i18n-check.py + i18n-known.txt）
 
 # ── 改源码时留的工序备份（*.bak / *.bak2 / *.emptied.bak …）——不提交 ────────
 *.bak*

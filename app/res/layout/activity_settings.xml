@@ -58,6 +58,24 @@
                     android:layout_marginStart="62dp"
                     android:background="@color/divider" />
 
+                <!--
+                  P2：界面语言。紧挨着深浅色 —— 这两项是 BaseActivity **在同一个
+                  Configuration 上一起写**的（uiMode 的 night 位 + locale 位），
+                  也都是"改完立刻重建本页"的项，放一起用户找得到。
+                  副标题显示当前值（与深浅色 / 默认槽同款：内容即当前状态）。
+                -->
+                <include
+                    android:id="@+id/row_language"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="62dp"
+                    android:background="@color/divider" />
+
                 <include
                     android:id="@+id/row_def_slot"
                     layout="@layout/row_action"

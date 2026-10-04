@@ -50,19 +50,28 @@ public final class ThemeMode {
     }
 
     /**
-     * 把上下文包成"强制浅/深"的版本。
-     * SYSTEM 原样返回；LIGHT / DARK 返回一个 `uiMode` 被改过的新 Context。
+     * 把「强制浅/深」写进 `cfg` 的 `uiMode`；**返回是否真的改了**。
      *
-     * ⚠️ 必须在 `Activity.attachBaseContext` 里调用（那时 Activity 的 Resources 还没建），
-     *   在 onCreate 之后再换就晚了 —— Resources 已经按旧 uiMode 解析过一遍。
+     * ★ `SYSTEM` 时**一个字节都不动并返回 false** —— 调用方据此决定"要不要包 Context"。
+     *   跟随系统时如果我们也包一层，"系统切深浅 → Activity 重建"这条系统自带的派发
+     *   就看不出来了（因为我们把它盖住了）。
+     *
+     * ⚠️ 必须在 `Activity.attachBaseContext` 里用（那时 Activity 的 Resources 还没建），
+     *   在 onCreate 之后再换就晚了 —— Resources 已经按旧配置解析过一遍。
+     *
+     * ⚠️ 只改 `uiMode` 的 night 位，**其余位原样保留** —— 直接 `new Configuration()` 从头造
+     *   会把横竖屏 / **语言**信息丢掉，那会让布局选错限定符、把语言设置冲掉。
+     *   （2026-10-04：这个方法从"自己包一层"改成"只改自己那几位"，
+     *     就是为了让 {@link LocaleMode} 能在**同一个** Configuration 上一起改，
+     *     而不是套两层 Context。）
      */
-    public static Context wrap(Context base, int mode) {
-        if (mode == SYSTEM) return base;
-        Configuration cfg = new Configuration(base.getResources().getConfiguration());
+    public static boolean apply(Configuration cfg, int mode) {
+        if (mode == SYSTEM) return false;
         int night = (mode == DARK) ? Configuration.UI_MODE_NIGHT_YES
                                    : Configuration.UI_MODE_NIGHT_NO;
+        int before = cfg.uiMode;
         cfg.uiMode = (cfg.uiMode & ~Configuration.UI_MODE_NIGHT_MASK) | night;
-        return base.createConfigurationContext(cfg);
+        return cfg.uiMode != before;
     }
 
     /** 模式对应的显示名资源（设置页单选列表与副标题共用，避免两处措辞分叉） */

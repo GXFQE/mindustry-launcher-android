@@ -122,7 +122,7 @@
             android:name=".SlotActivity"
             android:exported="false"
             android:theme="@style/AppTheme"
-            android:label="@string/slot_page_title_fmt" />
+            android:label="@string/slot_page_title" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

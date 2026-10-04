@@ -95,6 +95,99 @@ F2 与 F2b 已按这条路加过 `layout/` + `drawable/` + `values/dimens.xml`�
   会继承 application 的（官方那是 `@style/ArcTheme`，在官方包内、我们引用不到）。
 - 完整证据与配方：`docs/flows/03-阶段-0.md`（F1 节）+ `evidence/`（真机取证）。
 
+### 语言资源（2026-10-04 起：**默认是英文**）
+
+| 目录 | 语言 | 说明 |
+|---|---|---|
+| `app/res/values/strings.xml` | **英文** | ★ **默认语言 / 唯一真源**。新文案先写这里 |
+| `app/res/values-zh/strings.xml` | 简体中文 | 译文 |
+
+⚠️ **默认目录必须有全部 key** —— 只在 `values-zh/` 里加的 key，aapt2 会**静默移除**
+（只打一行 warn、退出码仍是 0），Java 里引用它就变成"编译不过"。
+这条由门禁 `RES-01` / `RES-07` 钉着。
+
+⚠️ aapt2 会**剥掉字符串的前导/尾随空白** ⇒ 要留白必须写 `\u0020`，
+而且**只在 `tools/i18n-check.py` 的 `U0020_WHITELIST` 里那几条能用**（不在里面就报 `RES-05`）。
+首选的正确做法是**改成整句资源 + `%1$s`**，而不是拿前缀/尾巴去拼。
+
+🔴 **`values*/` 的 XML 注释里不许出现「星号+斜杠」**（`RES-11`）。
+aapt2 会把这里的注释**原样搬进生成的 `R.java` 当 Javadoc** ⇒ 注释被提前结束，
+后面整段变成 Java 代码，javac 报**几十上百个 cascading error 且行号指向 `R.java`**，极难定位。
+（2026-10-04 踩过：注释里写 `values-*` 后面紧跟一个斜杠，报了 96 个错。
+ drawable/layout 的注释**不会**被搬，所以只扫 `values*/`。）
+
+### 语言选择器（P2，2026-10-04）
+
+设置页第二行「语言 / Language」。三项：跟随系统 / English / 简体中文。
+
+| 在哪 | 是什么 |
+|---|---|
+| `LocaleMode.java` | 机制。**只改 `Configuration` 的 locale 位**（与 `ThemeMode` 一起在 `BaseActivity` 里合成**一次**包装） |
+| `Config.appLanguage()` | 存 `config.json` 的 `app_language`（空串 = 跟随系统） |
+| `R.array/app_languages` | **语言名单**（`translatable="false"`） |
+| `R.array/app_language_names` | 语言**用自己语言写的名字**（`translatable="false"`，所以别翻译它） |
+| `R.string.app_default_language` | 默认目录 `values/` 是哪门语言（门禁 `RES-10` 靠它对齐名单与目录） |
+
+🔴 **绝对不许调用 `Locale.setDefault()`**（`LocaleMode` 类注释里有完整理由）：
+`GameSlot` 跑在 `:game` 进程、**与游戏 Activity 同进程**，而游戏选语言时读的正是进程默认 locale
+（`Vars.java:536-554`，`settings.getString("locale")` 为 `"default"` 时走 `Locale.getDefault()`）。
+一旦设了它，**没在游戏里显式选过语言的玩家会跟着启动器走**。
+（判据：`grep -n 'Locale.setDefault' app/src/**/*.java` 应当**只命中注释**。）
+
+★ **新增一门语言要动三处**（`RES-10` 会拦住漏掉的那种）：
+① 建 `app/res/values-<tag>/strings.xml` ② 把 tag 加进 `R.array/app_languages`
+③ 在 `R.array/app_language_names` 的**同一序号**上写它自己的语言名。
+
+★ **自检的语言被钉死在 `LocaleMode.SELFTEST`（zh）**，**不跟用户的设置走** ——
+否则用户把界面切成英文之后，那 15 条"照中文写的"断言会红一片（那不是回归）。
+真正的做法是让断言与语言无关 / 中英双跑，见 `docs/i18n-feasibility.md` §7.3（P1-B）。
+
+### 国际化门禁（P0，2026-10-04）
+
+`build.sh` 的 **`[0/4]`** 是国际化门禁，跑 `tools/i18n-check.py`。纯 Python、不碰工具链，
+所以放在最前面 —— 资源树坏了就早失败。
+
+**两道，顺序不能换**：先 `--selftest`（**证明这把尺子有牙**：每条规则都拿一个"已知坏的输入"
+喂它要求判死，再拿"已知好的输入"喂它要求别乱叫），再跑真检查。元断言不过就直接停 ——
+尺子本身坏了，它说"通过"也没有意义。
+
+| 规则 | 查什么 |
+|---|---|
+| `RES-01` | 语言目录独有的 key —— **aapt2 会静默移除它**（只打一行 warn、退出码仍是 0） |
+| `RES-02` | 每条 key 的 `%n$` **参数索引集合**必须与默认目录一致（换序/重复是合法的） |
+| `RES-03` / `RES-04` | 不许裸 `%s` / `%d`；值不许有**真的**前导尾随空白（aapt2 会剥，要留白用 `\u0020`） |
+| `RES-05` | `\u0020` 白名单（留白是"碎片式文案"的补丁，必须有意识） |
+| `RES-06` | 同一语言目录里同名资源重复 |
+| `RES-07` | Java 引用的 `R.string.*` 必须在默认目录里存在 |
+| `RES-08` | `android:label` 引用的串**不许含占位符**（系统不会去 format 它） |
+| `RES-09` | `·` 当**分隔符**用时两侧必须是空格（行首项目符号除外） |
+| `RES-10` | **语言名单**（`R.array/app_languages`）必须与 `values-xx/` 目录**一一对应**（漏一边用户就选不了 / 选了没效果） |
+| `RES-11` | `values*/` 的 XML 注释里不许出现「星号+斜杠」或连续两个减号（会被搬进 R.java 当 Javadoc，报一大片 cascading error） |
+| `SRC-01` | **不许用「文案串」当判据**（中文 / 状态符号 ✅❌⚠ / 值为文案的常量） |
+
+> ★ `SRC-01` 是这套门禁里最重要的一条：中文当判据的地方**一翻译就静默改行为**，
+> 不报错、不崩溃、没有任何自检会红。判据要改成枚举 / 布尔标志 / 错误码。
+> 单行可加 `// i18n-ok: <理由>` 显式豁免。
+
+**输出默认是 ASCII 的**（非 ASCII 转成 `\uXXXX`）—— 因为 shell 输出会被按 GBK 解码（见本文件头）。
+想看人话的完整报告：
+
+```bash
+python tools/i18n-check.py --utf8        # 人看的报告
+python tools/i18n-check.py --selftest    # 只跑元断言
+python tools/i18n-check.py --verbose     # 连 INFO 明细（孤儿 key 等）一起打
+SKIP_I18N_CHECK=1 ./build.sh             # 应急关掉（会打一行很响的 WARNING）
+```
+
+**`tools/i18n-known.txt` = 已知缺陷台账**（只放"已经存在、明知故犯留到某一期再修"的）。
+它**不是消音器**：每次构建都会把它打出来；而且里面记的**必须还在复现** ——
+修好了却忘了删，脚本会报 `STALE` 并失败（判据对 ≠ 清单全，两个方向都要跑）。
+匹配**不看行号**（只认 `规则id + 文件 + 指纹`），所以改代码挪行不会让台账失效。
+
+**改动 `app/res/` 或加语言目录前，先跑一遍 `--selftest`** —— 它是唯一能证明
+"门禁真的会拦住东西"的手段。完整的国际化研究（现状、路线、分期、判据）见
+**`docs/i18n-feasibility.md`**。
+
 ## 开发直通口（仅 debuggable 构建生效）
 
 adb 无法驱动弹窗与系统文件选择器，所以留了一组 `dev_*` extras 走**与界面完全相同的代码路径**：

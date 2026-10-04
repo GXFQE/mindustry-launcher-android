@@ -39,6 +39,7 @@ public class SettingsActivity extends BaseActivity {
     private static final int LOG_MAX = 999;
 
     private TextView mThemeSub;
+    private TextView mLangSub;
     private TextView mSlotSub;
     private TextView mLogsSub;
     /** F20：自动清理残留那一行的副标题（已开 / 已关） */
@@ -68,6 +69,13 @@ public class SettingsActivity extends BaseActivity {
                     @Override public void run() { pickTheme(); }
                 });
         mThemeSub = (TextView) rowTheme.findViewById(R.id.act_sub);
+
+        // P2：界面语言。与深浅色相邻 —— 两者都在 BaseActivity 的同一个 Configuration 上生效。
+        View rowLang = Util.bindActionValue(root, R.id.row_language, R.drawable.ic_language,
+                R.string.set_lang_title, new Runnable() {
+                    @Override public void run() { pickLanguage(); }
+                });
+        mLangSub = (TextView) rowLang.findViewById(R.id.act_sub);
 
         View rowSlot = Util.bindActionValue(root, R.id.row_def_slot, R.drawable.ic_folder,
                 R.string.set_slot_title, new Runnable() {
@@ -128,6 +136,12 @@ public class SettingsActivity extends BaseActivity {
         if (mThemeSub != null) {
             mThemeSub.setText(getString(R.string.set_theme_sub_fmt,
                     getString(ThemeMode.labelRes(Config.get().themeMode()))));
+        }
+        if (mLangSub != null) {
+            // ★ 语言名用它自己的语言写（English / 简体中文）—— 所以这里传的是**当前上下文的
+            //   Resources**，但取的数组是 translatable="false" 的，任何语言下都是同一份。
+            CharSequence cur = LocaleMode.label(this, LocaleMode.of(this));
+            mLangSub.setText(getString(R.string.set_lang_sub_fmt, cur));
         }
         if (mSlotSub != null) {
             String s = Config.get().defaultSlot();
@@ -237,6 +251,49 @@ public class SettingsActivity extends BaseActivity {
                     @Override public void onClick(DialogInterface d, int w) {
                         d.dismiss();
                         Config.get().setThemeMode(modes[w]);
+                        recreate();
+                    }
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    /**
+     * P2：界面语言。列表第一项是「跟随系统」，其余是**应用真正带了的那些语言**
+     * （名单 = `R.array.app_languages`，由构建期门禁 `RES-10` 保证与 `values-*` 一一对应）。
+     *
+     * ★ 语言名用**它自己的语言**写（English / 简体中文）—— 语言选择器的通行做法：
+     *   用户在一个看不懂的界面里，唯一能认出来的就是母语自己的写法。
+     *
+     * ★ 与 {@link #pickTheme()} 同一套：
+     *   · 改完必须**自己 `recreate()`** —— 改动就发生在当前页，`onResume` 不会重跑，
+     *     不重建的话界面上什么都不变（用户会以为没生效，然后再点一次）；
+     *   · 单选列表只能配 `setTitle`、**不能**配 `setMessage`（两者并存列表项不渲染）；
+     *   · 先 `dismiss()` 再重建，免得对话框的窗口在 Activity 被销毁后还挂着。
+     *
+     * ⚠️ 这里**只写 config.json**，绝不调 `Locale.setDefault()` —— 理由见 {@link LocaleMode}
+     *   类注释里那条红线（`:game` 进程与游戏同进程，动了它会把游戏的语言也带偏）。
+     */
+    private void pickLanguage() {
+        final String[] tags = LocaleMode.tags(this);
+        String[] names = new String[tags.length];
+        final String cur = LocaleMode.of(this);
+        int checked = -1;
+        for (int i = 0; i < tags.length; i++) {
+            names[i] = ("system".equals(tags[i]) ? getString(R.string.lang_system)
+                                                 : String.valueOf(LocaleMode.label(this, tags[i])));
+            // 「跟随系统」在资源里存的是字面量 "system"，与 LocaleMode.SYSTEM（空串）是两回事
+            boolean isCur = "system".equals(tags[i]) ? LocaleMode.SYSTEM.equals(cur)
+                                                     : tags[i].equals(cur);
+            if (isCur) checked = i;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.set_lang_pick_title)
+                .setSingleChoiceItems(names, checked, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int w) {
+                        d.dismiss();
+                        Config.get().setAppLanguage("system".equals(tags[w])
+                                ? LocaleMode.SYSTEM : tags[w]);
                         recreate();
                     }
                 })

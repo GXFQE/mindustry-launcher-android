@@ -685,7 +685,10 @@ public class MainActivity extends BaseActivity {
                         sb.append("选中 v").append(ss.version).append(" 快照：")
                           .append(ss.title()).append("  ").append(ss.count)
                           .append(" 个文件 ").append(Util.formatSize(ss.bytes)).append('\n');
-                        sb.append(Backup.restore(MainActivity.this, slot, ss)).append('\n');
+                        Backup.RestoreResult rr =
+                                Backup.restore(MainActivity.this, slot, ss);
+                        sb.append(rr.ok ? "OK" : "FAILED").append('\n')
+                          .append(rr.report).append('\n');
                     }
                 } catch (Throwable t) {
                     sb.append("FAILED: ").append(t).append('\n');

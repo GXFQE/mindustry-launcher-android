@@ -35,6 +35,16 @@ public final class MapFiles {
         public String finalName = "";
         public boolean overwrote;
         public long bytes;
+        /**
+         * 目标名在槽里**已经被占了**、而调用方没给 overwrite ⇒ 这一趟什么都没写，只是回来问一声。
+         *
+         * 🔴 为什么要这个字段（2026-10-04，i18n P0.1）：界面原来判的是
+         *   `r.error.contains("已经有")` —— 拿 {@link #error} 里**文案**的一个子串当控制流判据。
+         *   那句话一改措辞（更别说一翻译成英文），"同名替换"确认框就**再也不会弹**，
+         *   而且不报错、不崩溃、没有任何自检会红。构建期门禁规则 `SRC-01` 就是钉这一类的。
+         *   ⇒ **判"要不要弹替换框"只认这个字段**，不许再去看 {@link #error} 的字面内容。
+         */
+        public boolean nameTaken;
         /** 验过之后读出来的元数据（界面可以直接拿来显示"导入的是哪张图"） */
         public MsavMeta meta;
     }
@@ -126,6 +136,8 @@ public final class MapFiles {
         }
         File dest = new File(mapsDir, name);
         if (dest.exists() && !(overwrite && trashDir != null)) {
+            // ★ 判据字段（界面据此决定要不要弹"同名替换"框）；error 只是给人看的话
+            r.nameTaken = true;
             r.error = "这个槽的 maps/ 里已经有「" + name + "」了 —— 替换会盖掉原文件，需要先确认";
             return r;
         }
