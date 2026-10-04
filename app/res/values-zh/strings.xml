@@ -469,6 +469,40 @@
     <string name="settings_err_verify_rollback_fmt">自检失败（%1$s）⇒ 已用备份还原原文件</string>
     <string name="settings_err_verify_rollback_fail_fmt">自检失败（%1$s）且还原失败</string>
     <string name="settings_err_verify_deleted_fmt">自检失败（%1$s）⇒ 已删除刚新建的文件</string>
+    <!--
+      ══ 模组状态（P3：`Mods.State` 枚举原来**自己带显示文案**，现在只留枚举常量当码）════
+      ★ `label` = 句子形式（详情弹窗 / 报告）；`badge` = 徽标短形式（列表行放不下长的）。
+      🔴 映射在 `ModsText.stateLabel/stateBadge`：加一个状态就必须两边都加（自检会遍历枚举）。
+    -->
+    <string name="mods_state_enabled">启用</string>
+    <string name="mods_state_content_errors">内容有错</string>
+    <string name="mods_state_missing_deps">缺少必需依赖</string>
+    <string name="mods_state_incomplete_deps">依赖被禁用/失效</string>
+    <string name="mods_state_circular_deps">循环依赖</string>
+    <string name="mods_state_unsupported">与当前游戏版本不兼容</string>
+    <string name="mods_state_disabled">被用户关闭</string>
+    <string name="mods_badge_missing_deps">缺依赖</string>
+    <string name="mods_badge_incomplete_deps">依赖失效</string>
+    <string name="mods_badge_unsupported">版本不符</string>
+    <string name="mods_badge_disabled">已关闭</string>
+    <!--
+      ══ 六道加载门（P3）：`Mods.gates` 原来在 Java 里拼中文 ════════════════
+      ★ `note` 只在**失败**时给；`label` 里不塞数据，数据一律进 note。
+    -->
+    <string name="mods_gate_android_load">安卓能加载它</string>
+    <string name="mods_gate_android_load_note">它写明要 Java，但包里没有安卓能跑的代码 ⇒ 游戏会试着加载、然后跳过</string>
+    <string name="mods_gate_enabled">游戏里是启用状态</string>
+    <string name="mods_gate_enabled_note">还没读到游戏的设置文件 ⇒ 这里显示的是默认值（没写过 = 启用）</string>
+    <string name="mods_gate_version">游戏版本够新</string>
+    <string name="mods_gate_version_note_fmt">它要求 %1$s 以上，当前是 %2$s</string>
+    <string name="mods_gate_minver">满足最低版本要求</string>
+    <string name="mods_gate_minver_none">它没写要求哪个游戏版本，游戏会当成太老的模组跳过</string>
+    <string name="mods_gate_minver_old_fmt">它写的最低版本是 %1$d，太老了（要 %2$d 以上）—— 游戏会跳过它</string>
+    <string name="mods_gate_blacklist">不在游戏的禁用名单里</string>
+    <string name="mods_gate_blacklist_note_fmt">在名单里：%1$s</string>
+    <string name="mods_gate_last_crash">上次启动没崩到「跳过全部模组」</string>
+    <string name="mods_gate_last_crash_note">只有游戏跑起来才知道</string>
+    <string name="mods_gate_no_version">还没指定版本</string>
     <string name="msav_reason_meta_tail_fmt">元数据块读完后还剩 %1$d 字节（与游戏的口径不一致）</string>
     <!-- 地图来源与详情（同一族：Maps.Item 原来也是 Java 里拼的中文）-->
     <string name="map_from_slot">本槽</string>

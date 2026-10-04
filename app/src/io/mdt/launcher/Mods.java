@@ -1822,7 +1822,7 @@ public final class Mods {
      * @param gameBuild    目标游戏 build（如 159）；`<=0` ⇒ 按游戏的边界一律放行
      * @param gameRevision 目标游戏 revision（如 7）
      */
-    public static List<Gate> gates(Info m, int gameBuild, int gameRevision) {
+    public static List<Gate> gates(Context ctx, Info m, int gameBuild, int gameRevision) {
         List<Gate> out = new ArrayList<>();
         if (m == null) return out;
 
@@ -1835,19 +1835,18 @@ public final class Mods {
         //   多半是在**复述标题**（`不在游戏的黑名单里` / `不在`）⇒ 六关白占十二行。
         //   label 也不再把数据塞进去（原来是「游戏版本够（它要 160.1，当前 0）」，
         //   没指定版本时那个「当前 0」很怪）—— 数据一律进 note，且只在**失败**时给。
-        out.add(new Gate("安卓能加载它", canLoad,
-                canLoad ? null
-                        : "它写明要 Java，但包里没有安卓能跑的代码 ⇒ 游戏会试着加载、然后跳过"));
+        out.add(new Gate(ctx.getString(R.string.mods_gate_android_load), canLoad,
+                canLoad ? null : ctx.getString(R.string.mods_gate_android_load_note)));
 
-        out.add(new Gate("游戏里是启用状态", m.enabled,
-                m.settingsKnown ? null
-                        : "还没读到游戏的设置文件 ⇒ 这里显示的是默认值（没写过 = 启用）"));
+        out.add(new Gate(ctx.getString(R.string.mods_gate_enabled), m.enabled,
+                m.settingsKnown ? null : ctx.getString(R.string.mods_gate_enabled_note)));
 
         boolean verOk = isAtLeast(gameBuild, gameRevision, m.minGameVersion);
-        final String curVer = gameBuild == 0 ? "还没指定版本"
+        final String curVer = gameBuild == 0 ? ctx.getString(R.string.mods_gate_no_version)
                 : (gameBuild + (gameRevision == 0 ? "" : "." + gameRevision));
-        out.add(new Gate("游戏版本够新", verOk,
-                verOk ? null : "它要求 " + m.minGameVersion + " 以上，当前是 " + curVer));
+        out.add(new Gate(ctx.getString(R.string.mods_gate_version), verOk,
+                verOk ? null : ctx.getString(R.string.mods_gate_version_note_fmt,
+                        m.minGameVersion, curVer)));
 
         // ★ 两个门槛是**两个数**（`Vars.java:53/55`）：Java 模组 154、**脚本 / 数据模组 136**。
         //   都拿"它自己写的 `minGameVersion` 主版本"去比 —— **没写 = 0 = 太老** ⇒ 游戏判 unsupported
@@ -1860,17 +1859,19 @@ public final class Mods {
         int minMajor = m.minMajor();
         int need = m.isJava() ? MIN_JAVA_MOD_GAME_VERSION : MIN_MOD_GAME_VERSION;
         boolean majorOk = minMajor >= need || m.legacyCompatible;
-        out.add(new Gate("满足最低版本要求", majorOk,
+        out.add(new Gate(ctx.getString(R.string.mods_gate_minver), majorOk,
                 majorOk ? null
                         : (minMajor <= 0
-                            ? "它没写要求哪个游戏版本，游戏会当成太老的模组跳过"
-                            : "它写的最低版本是 " + minMajor + "，太老了（要 " + need + " 以上）—— 游戏会跳过它")));
+                            ? ctx.getString(R.string.mods_gate_minver_none)
+                            : ctx.getString(R.string.mods_gate_minver_old_fmt, minMajor, need))));
 
         boolean blOk = !isBlacklisted(m.name, m.version);
-        out.add(new Gate("不在游戏的禁用名单里", blOk,
-                blOk ? null : "在名单里：" + m.name + ":" + m.version));
+        out.add(new Gate(ctx.getString(R.string.mods_gate_blacklist), blOk,
+                blOk ? null : ctx.getString(R.string.mods_gate_blacklist_note_fmt,
+                        m.name + ":" + m.version)));
 
-        out.add(new Gate("上次启动没崩到「跳过全部模组」", true, "只有游戏跑起来才知道"));
+        out.add(new Gate(ctx.getString(R.string.mods_gate_last_crash), true,
+                ctx.getString(R.string.mods_gate_last_crash_note)));
         return out;
     }
 
@@ -1878,25 +1879,15 @@ public final class Mods {
 
     /** 与游戏 `Mods.ModState` 同名同序（`Mods.java:1472`） */
     public enum State {
-        ENABLED("启用", "启用"), CONTENT_ERRORS("内容有错", "内容有错"),
-        MISSING_DEPENDENCIES("缺少必需依赖", "缺依赖"),
-        INCOMPLETE_DEPENDENCIES("依赖被禁用/失效", "依赖失效"),
-        CIRCULAR_DEPENDENCIES("循环依赖", "循环依赖"),
-        UNSUPPORTED("与当前游戏版本不兼容", "版本不符"), DISABLED("被用户关闭", "已关闭");
+        ENABLED, CONTENT_ERRORS, MISSING_DEPENDENCIES, INCOMPLETE_DEPENDENCIES,
+        CIRCULAR_DEPENDENCIES, UNSUPPORTED, DISABLED;
 
-        /** 句子形式：详情弹窗 / dev 报告 / 依赖链清单用（**别用在徽标上**） */
-        public final String label;
-        /**
-         * 徽标形式（短）—— 与 {@link #label} **不是同一个东西**：徽标挤在标题右边，
-         * 太长会把标题挤到折行（真机实测：`与当前游戏版本不兼容` 让
-         * `MI2-Utilities Java  1.16.2` 断成两行）。两者用途不同，各自只此一份。
-         */
-        public final String badge;
-
-        State(String label, String badge) {
-            this.label = label;
-            this.badge = badge;
-        }
+        // ★ 2026-10-05（P3）：这里原来**枚举自己带显示文案**（`ENABLED("启用","启用")` …）——
+        //   枚举是"码"，文案属于界面 ⇒ 全搬到 `ModsText.stateLabel / stateBadge`（按枚举取资源）。
+        //   ⚠️ **常量名与顺序不许改**：它跟游戏 `ModState` 同名同序，而且映射以它为码。
+        //   ⚠️ 原来 `label`（句子）/ `badge`（徽标短形式）之分仍然成立：两者**不是同一个东西**
+        //      —— 徽标挤在标题右边，太长会把标题挤到折行（真机实测：`与当前游戏版本不兼容` 让
+        //      `MI2-Utilities Java  1.16.2` 断成两行）⇒ 只有本来就一样短的那三个才共用一条资源。
     }
 
     /** 解析结果 */

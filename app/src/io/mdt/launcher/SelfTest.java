@@ -2463,16 +2463,16 @@ public final class SelfTest {
             ok(stat, L, Mods.stateOf(scriptMod, none, 159, 7) == Mods.State.ENABLED,
                     "★legacyCompatible ⇒ 豁免这一条（照游戏那个 `&& !meta.legacyCompatible`）");
             scriptMod.legacyCompatible = false;
-            ok(stat, L, !allGatesPass(scriptMod, 159, 7),
+            ok(stat, L, !allGatesPass(ctx, scriptMod, 159, 7),
                     "★门禁那一关必须跟着判死 —— 否则徽标写「不支持」而正文一行依据都没有");
             scriptMod.minGameVersion = "136";
-            ok(stat, L, allGatesPass(scriptMod, 159, 7),
+            ok(stat, L, allGatesPass(ctx, scriptMod, 159, 7),
                     "★元断言：写上 136 之后门禁**全过**（判据有分辨力，不是恒判死）");
 
             // 依赖：steel 被关闭 ⇒ 依赖它的 dirmod 连坐（游戏 Mods.java:1064 的 && !getBool）
             ok(stat, L, r.stateOf("dir-mod") == Mods.State.INCOMPLETE_DEPENDENCIES,
                     "必需依赖被关闭 ⇒ 连坐成 incompleteDependencies（实得 "
-                            + r.stateOf("dir-mod").label + "）");
+                            + ModsText.stateLabel(ctx, r.stateOf("dir-mod")) + "）");
 
             // 依赖解析的另外几条（纯函数，不落盘）
             List<Mods.Info> g = new ArrayList<>();
@@ -2493,11 +2493,12 @@ public final class SelfTest {
             ok(stat, L, gr.stateOf("b") == Mods.State.INCOMPLETE_DEPENDENCIES
                             && gr.stateOf("c") == Mods.State.INCOMPLETE_DEPENDENCIES,
                     "★必需依赖互相成环 ⇒ 双方都是 incomplete（CIRCULAR 被 incomplete 覆盖，"
-                            + "实得 " + gr.stateOf("b").label + " / " + gr.stateOf("c").label + "）");
+                            + "实得 " + ModsText.stateLabel(ctx, gr.stateOf("b")) + " / "
+                        + ModsText.stateLabel(ctx, gr.stateOf("c")) + "）");
             // ★ 只有**软**依赖那条路上，环才会留在 CIRCULAR（上一句不是「永远 incomplete」）
             ok(stat, L, gr.stateOf("p") == Mods.State.CIRCULAR_DEPENDENCIES,
                     "★元断言：软依赖成环（p -软-> q -必-> p）⇒ p 留在 CIRCULAR"
-                            + "（实得 " + gr.stateOf("p").label + "；证明上一条不是恒真）");
+                            + "（实得 " + ModsText.stateLabel(ctx, gr.stateOf("p")) + "；证明上一条不是恒真）");
             List<Mods.Info> g2 = new ArrayList<>();
             g2.add(mkMod("x", new String[]{"y"}, new String[0], true));
             g2.add(mkMod("y", new String[0], new String[0], true));
@@ -3444,6 +3445,38 @@ public final class SelfTest {
             }
             ok(stat, L, noLead,
                     "★P3：报告行资源里**没有前导空格**（缩进是 Java 侧排版 —— aapt2 剥不动它）");
+
+            // ★★ P3 第八批：`Mods.State` 的显示文案（原来**枚举自己带文案**）+ 六道加载门。
+            //    ① **遍历所有状态**：label 与 badge 都必须非空 —— `switch` 有 `default` 兜底，
+            //       漏映射**不崩不报错**、界面只是**静默空白**，只有遍历抓得住；顺带验两套语言不同；
+            //    ② 徽标必须**不比句子长**（真机实测过：太长会把列表标题挤到折行）——
+            //       这条把"别顺手把 label 当 badge 用"钉住，而且与语言无关。
+            StringBuilder missMd = new StringBuilder();
+            boolean mdDiff = true, badgeShorter = true;
+            for (Mods.State one : Mods.State.values()) {
+                String lb = ModsText.stateLabel(ctx, one);
+                String bd = ModsText.stateBadge(ctx, one);
+                if (lb.isEmpty() || bd.isEmpty()) missMd.append(one).append(' ');
+                if (lb.equals(ModsText.stateLabel(enCtx, one))) mdDiff = false;
+                if (bd.length() > lb.length()) badgeShorter = false;
+            }
+            ok(stat, L, missMd.length() == 0,
+                    "★P3：7 个模组状态**每一个**都有 label + badge 文案（漏映射=界面静默空白），漏的是［"
+                            + missMd + "］");
+            ok(stat, L, mdDiff && badgeShorter,
+                    "★P3：状态文案两套语言不同；且**徽标不比句子长**（长了会把列表标题挤到折行）");
+            // ② 六道加载门：标签六条都要有；**没通过的**那几关必须给原因（通过的可以只画一行 ✅）
+            Mods.Info gm = mkMod("gate-probe", null, null, true);
+            StringBuilder gateMiss = new StringBuilder();
+            int gateCount = 0;
+            for (Mods.Gate g : Mods.gates(ctx, gm, 0, 0)) {
+                gateCount++;
+                if (g.label == null || g.label.isEmpty()) gateMiss.append("标签 ");
+                if (!g.pass && (g.note == null || g.note.isEmpty())) gateMiss.append("原因 ");
+            }
+            ok(stat, L, gateCount == 6 && gateMiss.length() == 0,
+                    "★P3：六道加载门的标签齐全；**没通过的**那几关必须给原因（通过了可只画一行）；"
+                            + "门数=" + gateCount + "，缺=" + gateMiss);
 
             // ★★ P3 第六批：启动管线各步 + 失败原因（`Injector.LaunchError` → 启动失败弹窗）。
             //    ★ 这里只需验两件事：① 两条带占位符的按真参数实拼；② 6 个步骤名**两套语言都有字**
@@ -4663,8 +4696,8 @@ public final class SelfTest {
      * ★ 存在的意义：`stateOf` 与 `gates` 是**两处入口**，徽标写"不支持"而门禁里没有一关判死，
      *   用户就看不到依据（F4①d 那条纪律：判据要能看见依据）。
      */
-    private static boolean allGatesPass(Mods.Info m, int build, int rev) {
-        for (Mods.Gate g : Mods.gates(m, build, rev)) {
+    private static boolean allGatesPass(Context ctx, Mods.Info m, int build, int rev) {
+        for (Mods.Gate g : Mods.gates(ctx, m, build, rev)) {
             if (!g.pass) return false;
         }
         return true;

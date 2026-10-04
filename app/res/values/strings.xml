@@ -486,6 +486,44 @@
     <string name="settings_err_verify_rollback_fmt">the after-write check failed (%1$s), so the original file was restored from the backup</string>
     <string name="settings_err_verify_rollback_fail_fmt">the after-write check failed (%1$s) and restoring also failed</string>
     <string name="settings_err_verify_deleted_fmt">the after-write check failed (%1$s), so the file that was just created was deleted</string>
+    <!--
+      ══ 模组状态（P3：`Mods.State` 枚举原来**自己带显示文案**，现在只留枚举常量当码）════
+      ★ `label` = 句子形式（详情弹窗 / 报告）；`badge` = 徽标短形式（列表行一行放不下长的，
+        真机实测过：**太长的徽标会把标题挤到折行**）⇒ 两者**不是同一个东西**。
+        只有"本来就一样短"的三个状态（启用 / 内容有错 / 循环依赖）才共用一条。
+      🔴 映射在 `ModsText.stateLabel/stateBadge`：加一个状态就必须在这里加两条 + 那里加两条
+        （自检会**遍历所有枚举值**，漏了会被抓住）。
+    -->
+    <string name="mods_state_enabled">enabled</string>
+    <string name="mods_state_content_errors">content errors</string>
+    <string name="mods_state_missing_deps">required dependencies are missing</string>
+    <string name="mods_state_incomplete_deps">a dependency is disabled or broken</string>
+    <string name="mods_state_circular_deps">circular dependency</string>
+    <string name="mods_state_unsupported">not compatible with this game version</string>
+    <string name="mods_state_disabled">turned off by the user</string>
+    <string name="mods_badge_missing_deps">missing deps</string>
+    <string name="mods_badge_incomplete_deps">dep broken</string>
+    <string name="mods_badge_unsupported">version</string>
+    <string name="mods_badge_disabled">off</string>
+    <!--
+      ══ 六道加载门（P3）：`Mods.gates` 原来在 Java 里拼中文 ════════════════
+      ★ `note` 只在**失败**时给（通过了就只画一行 ✅）；`label` 里**不塞数据**，数据一律进 note。
+      ⚠️ 那句"太老了（要 N 以上）"里有两个数字 ⇒ 按 `%n$` 写（门禁 RES-02 比对两套语言的参数集合）。
+    -->
+    <string name="mods_gate_android_load">Android can load it</string>
+    <string name="mods_gate_android_load_note">it says it needs Java, but the package has no code Android can run, so the game will try to load it and then skip it</string>
+    <string name="mods_gate_enabled">enabled in the game</string>
+    <string name="mods_gate_enabled_note">the game settings file has not been read yet, so this shows the default (never written means enabled)</string>
+    <string name="mods_gate_version">the game version is new enough</string>
+    <string name="mods_gate_version_note_fmt">it needs %1$s or newer; this one is %2$s</string>
+    <string name="mods_gate_minver">meets the minimum version</string>
+    <string name="mods_gate_minver_none">it does not say which game version it needs, so the game treats it as too old and skips it</string>
+    <string name="mods_gate_minver_old_fmt">its minimum version is %1$d, which is too old (it needs %2$d or newer) — the game will skip it</string>
+    <string name="mods_gate_blacklist">not on the game blacklist</string>
+    <string name="mods_gate_blacklist_note_fmt">it is on the list: %1$s</string>
+    <string name="mods_gate_last_crash">the last launch did not crash into skipping all mods</string>
+    <string name="mods_gate_last_crash_note">only the game can tell once it runs</string>
+    <string name="mods_gate_no_version">no version set yet</string>
     <!-- 地图来源与详情（同一族：Maps.Item 原来也是 Java 里拼的中文）-->
     <string name="map_from_slot">this slot</string>
     <string name="map_from_slot_detail">this slot (you can manage it here)</string>

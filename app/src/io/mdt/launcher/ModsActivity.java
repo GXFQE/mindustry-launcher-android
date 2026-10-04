@@ -591,7 +591,7 @@ public class ModsActivity extends BaseActivity {
             List<String> bad = new ArrayList<>();
             for (java.util.Map.Entry<String, Mods.State> en : mResolved.states.entrySet()) {
                 if (en.getValue() != Mods.State.ENABLED) {
-                    bad.add(en.getKey() + " → " + en.getValue().label);
+                    bad.add(en.getKey() + " → " + ModsText.stateLabel(this, en.getValue()));
                 }
             }
             if (!bad.isEmpty()) {
@@ -704,7 +704,8 @@ public class ModsActivity extends BaseActivity {
         // ★ 徽标优先级：游戏自己的状态 > "安卓上会加载失败"（我们推出来的）> 启用。
         //   `willFailJavaLoad` 是**真会咬人**的一条（声明了 java、包里没有 classes.dex ⇒
         //   游戏抛异常后**整个模组被跳过**）—— 那时还显示绿色「启用」就是在骗人。
-        String badgeText = broken ? getString(R.string.mods_badge_broken) : st.badge;
+        String badgeText = broken ? getString(R.string.mods_badge_broken)
+                    : ModsText.stateBadge(this, st);
         boolean warnBadge = broken || st != Mods.State.ENABLED;
         if (!broken && st == Mods.State.ENABLED && m.willFailJavaLoad()) {
             badgeText = getString(R.string.mods_badge_willfail);
@@ -712,8 +713,8 @@ public class ModsActivity extends BaseActivity {
         }
 
         title.setText(broken ? m.fileName : m.titleWithVersion());
-        // 徽标用**短**形式（st.badge），句子形式（st.label）留给详情弹窗与报告 ——
-        // 真机实测：`与当前游戏版本不兼容` 会把标题挤到折行。
+        // 徽标用**短**形式（`ModsText.stateBadge`），句子形式（`ModsText.stateLabel`）留给详情弹窗与报告
+        // —— 真机实测：`与当前游戏版本不兼容` 会把标题挤到折行。
         badge.setText(badgeText);
         if (!broken && m.duplicated) {
             badge.setText(getString(R.string.mods_dup_fmt, badgeText));
@@ -764,7 +765,7 @@ public class ModsActivity extends BaseActivity {
                 //    徽标已经写着状态，正文再复述一遍就是纯噪声（同一件事两处喊）。
             } else if (st != Mods.State.ENABLED) {
                 // 依赖类的状态没有别的行会说，必须在正文里点名
-                warns.add(getString(R.string.mods_warn_state_fmt, st.label));
+                warns.add(getString(R.string.mods_warn_state_fmt, ModsText.stateLabel(this, st)));
             }
         }
         if (warns.isEmpty()) {
@@ -912,9 +913,10 @@ public class ModsActivity extends BaseActivity {
         sb.append(getString(R.string.mods_detail_size_fmt,
                 Util.formatSize(m.bytes), formOf(m))).append('\n');
         sb.append('\n').append(getString(R.string.mods_detail_state_fmt,
-                Mods.stateOf(m, mResolved, mTarget.build, mTarget.revision).label));
+                ModsText.stateLabel(this,
+                        Mods.stateOf(m, mResolved, mTarget.build, mTarget.revision))));
         int fail = 0;
-        for (Mods.Gate g : Mods.gates(m, mTarget.build, mTarget.revision)) {
+        for (Mods.Gate g : Mods.gates(this, m, mTarget.build, mTarget.revision)) {
             if (!g.pass) fail++;
         }
         sb.append('\n').append(fail == 0 ? getString(R.string.mods_detail_allok)
@@ -973,7 +975,8 @@ public class ModsActivity extends BaseActivity {
         }
         if (m.metaError == null) {
             sb.append(getString(R.string.mods_detail_state_fmt,
-                    Mods.stateOf(m, mResolved, mTarget.build, mTarget.revision).label)).append('\n');
+                    ModsText.stateLabel(this,
+                            Mods.stateOf(m, mResolved, mTarget.build, mTarget.revision)))).append('\n');
         }
         // ★ 只给**相对位置**：整条 `/storage/emulated/0/Android/data/io.mdt.launcher/slot-xxx/mods/...`
         //   要占四行，用户既看不懂也不需要（用户 2026-10-03：「这个页面也改下」）。
@@ -990,7 +993,7 @@ public class ModsActivity extends BaseActivity {
             sb.append(getString(R.string.mods_detail_gate_note_fmt,
                     mTarget.label.isEmpty() ? getString(R.string.mods_detail_gate_nogame)
                             : mTarget.label)).append('\n');
-            for (Mods.Gate g : Mods.gates(m, mTarget.build, mTarget.revision)) {
+            for (Mods.Gate g : Mods.gates(this, m, mTarget.build, mTarget.revision)) {
                 // ★ 通过 + 无补充说明 ⇒ **只画一行**（note == null 就是"没什么好说的"，
                 //   约定见 Mods.gates 的注释）；失败才把原因摊在第二行。
                 if (g.pass) {
@@ -1213,7 +1216,8 @@ public class ModsActivity extends BaseActivity {
         sb.append('\n');
         for (Mods.Info m : scan.mods) {
             sb.append("· ").append(m.titleWithVersion())
-              .append("  [").append(Mods.stateOf(m, resolved, build, rev).label).append("]\n");
+              .append("  [").append(ModsText.stateLabel(ctx,
+                    Mods.stateOf(m, resolved, build, rev))).append("]\n");
             sb.append("    文件 = ").append(m.fileName)
               .append("  ").append(Util.formatSize(m.bytes))
               .append("  ").append(m.directory ? "目录" : "包").append('\n');
@@ -1231,7 +1235,7 @@ public class ModsActivity extends BaseActivity {
             if (!m.softDependencies.isEmpty()) {
                 sb.append("    软依赖 = ").append(m.softDependencies).append('\n');
             }
-            for (Mods.Gate g : Mods.gates(m, build, rev)) {
+            for (Mods.Gate g : Mods.gates(ctx, m, build, rev)) {
                 sb.append("      ").append(g.pass ? "[OK] " : "[NG] ").append(g.label)
                   .append("  —— ").append(g.note).append('\n');
             }
@@ -1246,7 +1250,7 @@ public class ModsActivity extends BaseActivity {
         for (java.util.Map.Entry<String, Mods.State> en : resolved.states.entrySet()) {
             if (en.getValue() != Mods.State.ENABLED) {
                 sb.append("依赖链：").append(en.getKey()).append(" → ")
-                  .append(en.getValue().label).append('\n');
+                  .append(ModsText.stateLabel(ctx, en.getValue())).append('\n');
             }
         }
         sb.append("\n（本报告是只读扫描：没有创建、修改、删除任何文件）\n");
