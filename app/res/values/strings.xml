@@ -200,6 +200,27 @@
     <string name="rename_failed">Could not rename</string>
     <string name="renamed_slots_fmt">Slot assignment follows the rename for %1$d versions</string>
 
+    <!--
+      ══ 槽的增 / 改 / 删**失败原因**（P3）════════════════════════════════════
+      ★ 这些是 `Data.createSlot / renameSlot / deleteSlot` 的**返回值**，调用方直接当弹窗正文
+        （标题是上面那几条 `*_failed`）⇒ 属于**给用户看的**，必须进资源。
+      ★ 原来在 Java 里拼中文，而且 `槽「` + 名字 + `」已存在` 是**碎片拼接**：
+        碎片在别的语言里语序会错，前后空白还会被 aapt2 剥掉（工程踩过）
+        ⇒ 一律改成**整句资源 + %1$s**。
+      ⚠️ 英文里的双引号必须写 `\"` —— 裸引号会被 aapt2 **静默删掉**（门禁 RES-12 钉着）。
+      ⚠️ 中文里的反斜杠写 `\\`（渲染成一个 `\`）；两个语言的 %n$ 集合必须一致（门禁 RES-02）。
+    -->
+    <string name="slot_err_name_invalid">Slot name not allowed.\nUse 1 to 40 characters; no / or \\; the name shared is reserved; and it cannot start with slot-.</string>
+    <string name="slot_err_no_external">Cannot reach the external data directory (it may not be mounted)</string>
+    <string name="slot_err_exists_fmt">Slot \"%1$s\" already exists</string>
+    <string name="slot_err_mkdir_fmt">Could not create the directory: %1$s</string>
+    <string name="slot_err_rename_current_fmt">\"%1$s\" is the current slot and is in use, so it cannot be renamed.\nPoint another version at a different slot first.</string>
+    <string name="slot_err_missing_fmt">Slot \"%1$s\" does not exist</string>
+    <string name="slot_err_target_current_fmt">The target name \"%1$s\" is the current slot and cannot be taken over</string>
+    <string name="slot_err_rename_failed_fmt">Rename failed (%1$s → %2$s)</string>
+    <string name="slot_err_delete_current_fmt">\"%1$s\" is the current slot and the game is using it, so it cannot be deleted.</string>
+    <string name="slot_err_delete_partial_fmt">Deletion did not fully succeed (some files may be in use): %1$s\n%2$d of %3$d files left</string>
+
     <string name="delete_current_slot_title">Cannot delete the current slot</string>
     <string name="delete_current_slot_msg_fmt">\"%1$s\" is the current slot and the game is using it.\nLaunch once with another slot, then come back and delete this one.</string>
     <string name="delete_slot_confirm_title_fmt">Delete slot \"%1$s\"?</string>

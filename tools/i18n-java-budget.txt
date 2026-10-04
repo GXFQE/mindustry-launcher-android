@@ -6,20 +6,21 @@
 #   · 实测 < 台账  ⇒ ERROR：你已经搬走了几条 ⇒ **把这行改小**。
 #   · 文件有中文却不在本表里 ⇒ ERROR：新文件出现了中文。
 # ★ 这一列数字就是 **P3（把中文搬进资源）的进度**：它只许降。
-#   合计 1671 条 —— 其中大头是**有意保留**的：
-#     · SelfTest.java  —— 断言消息（自检语言钉死在 zh，**不进资源**，见 REF §67）
+#   合计 684 条 —— 其中大头是**有意保留**的：
 #     · MainActivity.java —— 全在 dev_* 直通口（仅 debuggable 构建可达）
 #     · Compat / AutoBackup / Crash —— 只进 report-*.txt（取证文本不进资源）
-#   真正要迁的是**用户可见**的那些（Mods / Data / Backup / SettingsBin / MsavMeta / SlotZip …）。
+#     · Data / MapStats 等文件里的**落盘报告与体检明细**（同上）
+#   真正要迁的是**用户可见**的那些（Mods / Data 的弹窗文案 / Backup / SettingsBin / MsavMeta / SlotZip …）。
+# ⚠️ **SelfTest.java 不纳入**（见 tools/i18n-check.py 的 BUDGET_SKIP）：它的中文是断言期望值，
+#    必须留中文，而且每加一条断言都会变 —— 计入只会让台账变成消音器。
 #
 # ⚠️ 改这个文件 = 一次**有意识的决定**，不是消音器。
 #
 # 文件 = 上限（含中文的字符串字面量条数）
 
-SelfTest.java = 967
 Mods.java = 140
 MainActivity.java = 126
-Data.java = 81
+Data.java = 61
 Backup.java = 53
 SettingsBin.java = 52
 Injector.java = 33

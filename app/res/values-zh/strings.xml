@@ -200,6 +200,23 @@
     <string name="rename_failed">改名失败</string>
     <string name="renamed_slots_fmt">%1$d 个版本的槽分配已跟着改名</string>
 
+    <!--
+      ══ 槽的增 / 改 / 删**失败原因**（P3）════════════════════════════════════
+      ★ 这些是 `Data.createSlot / renameSlot / deleteSlot` 的**返回值**（弹窗正文）——
+        原来在 Java 里拼中文且是**碎片拼接**，现在一律**整句 + %1$s**。
+      ⚠️ 反斜杠写 `\\`（渲染成一个 `\`）；两套语言的 %n$ 集合必须一致（门禁 RES-02）。
+    -->
+    <string name="slot_err_name_invalid">槽名不合法。\n要求 1~40 字符，不能含 / 或 \\，不能是 shared，不能以 slot- 开头。</string>
+    <string name="slot_err_no_external">拿不到外部数据目录（可能没挂载）</string>
+    <string name="slot_err_exists_fmt">槽「%1$s」已存在</string>
+    <string name="slot_err_mkdir_fmt">创建目录失败：%1$s</string>
+    <string name="slot_err_rename_current_fmt">「%1$s」是当前槽（正在使用中），不能改名。\n请先用别的版本切到其它槽。</string>
+    <string name="slot_err_missing_fmt">槽「%1$s」不存在</string>
+    <string name="slot_err_target_current_fmt">目标名「%1$s」是当前槽，不能占用</string>
+    <string name="slot_err_rename_failed_fmt">改名失败（%1$s → %2$s）</string>
+    <string name="slot_err_delete_current_fmt">「%1$s」是当前槽，正被游戏使用，不能删除。</string>
+    <string name="slot_err_delete_partial_fmt">删除未完全成功（可能有文件被占用）：%1$s\n剩余 %2$d/%3$d 个文件</string>
+
     <string name="delete_current_slot_title">不能删除当前槽</string>
     <string name="delete_current_slot_msg_fmt">「%1$s」是当前槽，游戏正在用它。\n请先用别的槽启动一次，再回来删它。</string>
     <string name="delete_slot_confirm_title_fmt">删除槽「%1$s」？</string>

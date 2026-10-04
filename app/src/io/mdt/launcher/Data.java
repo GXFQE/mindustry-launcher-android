@@ -346,19 +346,19 @@ public final class Data {
 
     // ── 槽的增 / 改 / 删 ──────────────────────────────────────────────────
 
-    /** 失败返回错误文本，成功返回 null */
+    /** 失败返回错误文本，成功返回 null（文本走资源 —— 见 `slot_err_*`） */
     public static String createSlot(Context ctx, String rawName) {
         String n = sanitizeSlot(rawName);
         if (n == null) {
-            return "槽名不合法。\n要求 1~40 字符，不能含 / 或 \\，不能是 shared，不能以 slot- 开头。";
+            return ctx.getString(R.string.slot_err_name_invalid);
         }
         File d = slotDir(ctx, n);
-        if (d == null) return "拿不到外部数据目录（可能没挂载）";
+        if (d == null) return ctx.getString(R.string.slot_err_no_external);
         // 当前槽不算"新建"：它的本体就是 slot-<当前名>，由启动时按需 mkdirs。
         // ⚠️ 这里**故意不 mkdirs** —— F6 的教训：只读探测造出的空目录会被下一轮当成"有内容"。
         if (n.equals(currentSlot(ctx))) return null;
-        if (d.exists()) return "槽「" + n + "」已存在";
-        if (!d.mkdirs()) return "创建目录失败：" + d.getAbsolutePath();
+        if (d.exists()) return ctx.getString(R.string.slot_err_exists_fmt, n);
+        if (!d.mkdirs()) return ctx.getString(R.string.slot_err_mkdir_fmt, d.getAbsolutePath());
         Log.i(TAG, "slot created: " + d);
         return null;
     }
@@ -367,18 +367,20 @@ public final class Data {
     public static String renameSlot(Context ctx, String name, String rawNewName) {
         String n = sanitizeSlot(rawNewName);
         if (n == null) {
-            return "槽名不合法。\n要求 1~40 字符，不能含 / 或 \\，不能是 shared，不能以 slot- 开头。";
+            return ctx.getString(R.string.slot_err_name_invalid);
         }
         if (n.equals(name)) return null;
         if (name.equals(currentSlot(ctx))) {
-            return "「" + name + "」是当前槽（正在使用中），不能改名。\n请先用别的版本切到其它槽。";
+            return ctx.getString(R.string.slot_err_rename_current_fmt, name);
         }
         File from = slotDir(ctx, name);
-        if (from == null || !from.exists()) return "槽「" + name + "」不存在";
-        if (n.equals(currentSlot(ctx))) return "目标名「" + n + "」是当前槽，不能占用";
+        if (from == null || !from.exists()) return ctx.getString(R.string.slot_err_missing_fmt, name);
+        if (n.equals(currentSlot(ctx))) return ctx.getString(R.string.slot_err_target_current_fmt, n);
         File to = slotDir(ctx, n);
-        if (to.exists()) return "槽「" + n + "」已存在";
-        if (!from.renameTo(to)) return "改名失败（" + from.getName() + " → " + to.getName() + "）";
+        if (to.exists()) return ctx.getString(R.string.slot_err_exists_fmt, n);
+        if (!from.renameTo(to)) {
+            return ctx.getString(R.string.slot_err_rename_failed_fmt, from.getName(), to.getName());
+        }
         Log.i(TAG, "slot renamed: " + name + " -> " + n);
         return null;
     }
@@ -389,14 +391,14 @@ public final class Data {
      */
     public static String deleteSlot(Context ctx, String name) {
         if (name.equals(currentSlot(ctx))) {
-            return "「" + name + "」是当前槽，正被游戏使用，不能删除。";
+            return ctx.getString(R.string.slot_err_delete_current_fmt, name);
         }
         File d = slotDir(ctx, name);
-        if (d == null || !d.exists()) return "槽「" + name + "」不存在";
+        if (d == null || !d.exists()) return ctx.getString(R.string.slot_err_missing_fmt, name);
         int files = countTree(d);
         if (!deleteTree(d)) {
-            return "删除未完全成功（可能有文件被占用）：" + d.getAbsolutePath() + "\n剩余 "
-                    + countTree(d) + "/" + files + " 个文件";
+            return ctx.getString(R.string.slot_err_delete_partial_fmt,
+                    d.getAbsolutePath(), countTree(d), files);
         }
         Log.i(TAG, "slot deleted: " + name + " (" + files + " files)");
         return null;

@@ -3278,6 +3278,33 @@ public final class SelfTest {
                             && dlgTitle.contains("\"test\"") && !dlgTitle.contains("\\"),
                     "★转义：英文资源里写 \\\" 才会真的显示双引号（裸引号会被 aapt2 删掉）：「"
                             + quoted + "」/「" + dlgTitle + "」");
+
+            // ★★ P3 第一批：槽的增 / 改 / 删**报错文案**（`Data.createSlot/renameSlot/deleteSlot`
+            //    的返回值 ⇒ 弹窗正文）。8 条都带占位符 ⇒ **按真参数实拼**一遍
+            //    （工程铁律：`%n$` 与实参个数不匹配会抛 MissingFormatArgumentException **直接崩**，
+            //     而它只在走到那一句时才现形）。
+            String sExists = ctx.getString(R.string.slot_err_exists_fmt, "x");
+            String sMissing = ctx.getString(R.string.slot_err_missing_fmt, "x");
+            String sTarget = ctx.getString(R.string.slot_err_target_current_fmt, "x");
+            String sRenameCur = ctx.getString(R.string.slot_err_rename_current_fmt, "x");
+            String sDelCur = ctx.getString(R.string.slot_err_delete_current_fmt, "x");
+            String sMkdir = ctx.getString(R.string.slot_err_mkdir_fmt, "/p");
+            String sRenameFail = ctx.getString(R.string.slot_err_rename_failed_fmt, "a", "b");
+            String sPartial = ctx.getString(R.string.slot_err_delete_partial_fmt, "/p", 2, 7);
+            ok(stat, L, sExists.contains("x") && sMissing.contains("x") && sTarget.contains("x")
+                            && sRenameCur.contains("x") && sDelCur.contains("x")
+                            && sMkdir.contains("/p") && sRenameFail.contains("a")
+                            && sRenameFail.contains("b") && sPartial.contains("/p")
+                            && sPartial.contains("2") && sPartial.contains("7"),
+                    "★P3：槽操作那 8 条带占位符的报错文案按真参数实拼（不崩、参数都在）");
+            // ★ 反斜杠：中文那句里写的是 `\\`，必须**渲染成一个** `\`（写多写少都算错）
+            String sInvalid = ctx.getString(R.string.slot_err_name_invalid);
+            ok(stat, L, sInvalid.contains("\\") && !sInvalid.contains("\\\\"),
+                    "★P3：槽名不合法那句的反斜杠渲染成**一个** `\\`（资源里写的是两个）");
+            // ★ 英文侧：双引号必须真的显示（`slot_err_exists_fmt` 写的是 \" —— RES-12 的反面）
+            String sExistsEn = enCtx.getString(R.string.slot_err_exists_fmt, "x");
+            ok(stat, L, sExistsEn.contains("\"x\"") && !sExistsEn.contains("\\"),
+                    "★P3（英文）：槽已存在那句的双引号真的显示了：「" + sExistsEn + "」");
         } catch (Throwable t) {
             ok(stat, L, false, "存档体检用例自身异常：" + t);
         } finally {

@@ -80,6 +80,11 @@ KNOWN_FILE = os.path.join("tools", "i18n-known.txt")
 #     （`SelfTest` 的断言消息、`dev_*` 口、落盘报告那几类**本来就该留中文**）。
 #     所以台账里那些大数字不是"欠债"，是"已知且有意保留"；判据只保证**不再增加**。
 BUDGET_FILE = os.path.join("tools", "i18n-java-budget.txt")
+# 不纳入 SRC-02 预算的文件。
+#   `SelfTest.java` = **自检**：它的中文是**断言期望值**（自检语言钉死在 zh、那些中文本来就不该搬），
+#   而且每加一条断言就会变 ⇒ 计入预算只会"天天红"，最后大家闭着眼把数字改大 ——
+#   那正是台账变消音器的路。**排除它比"每次加断言都改数字"诚实**。
+BUDGET_SKIP = {"SelfTest.java"}
 # 一个字符串字面量的内容（不跨行；Java 里跨行是相邻字面量相加 ⇒ 每个片段各算一条）
 LITERAL_RE = re.compile(r'"((?:[^"\\]|\\.)*)"')
 
@@ -811,10 +816,14 @@ def count_cjk_literals(root):
 
     ★ 为什么用这个当 P3 的尺子：它**完全机械**（不猜"这句是给谁看的"），
       所以能被别人独立复算；而"到底该不该搬"由**台账**那一行（人的决定）来记。
+    ⚠️ **不纳入预算的文件见 BUDGET_SKIP** —— 自检的中文是**断言期望值**（它必须留中文，
+      而且每加一条断言都会变）⇒ 计入只会天天红，把台账变成消音器。
     """
     out = {}
     for rel, full in java_files(root, include_selftest=True):
         name = os.path.basename(rel)
+        if name in BUDGET_SKIP:
+            continue
         for line in java_code_lines(read_text(full)):
             for m in LITERAL_RE.finditer(line):
                 if has_cjk(m.group(1)):
