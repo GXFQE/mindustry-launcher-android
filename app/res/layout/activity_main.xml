@@ -1,0 +1,257 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  F1b：主界面骨架（卡片风）。F3a：整页可滚（修横屏裁切）。F3b：列表容器去掉 ListView。
+
+  结构：
+    外层 ScrollView（整页滚，横竖屏通用）
+      └ 内层 LinearLayout（vertical）
+          ├ 顶部区（原"固定"，现随整页一起滚）
+          │   ├ 状态摘要卡 —— 默认一行，点一下展开完整路径（F1b 的「弱化信息块」决策）
+          │   ├ 主按钮「继续上次」—— 仅当 lastVersion 能在已发现版本里命中时可见
+          │   └ 操作分组卡 —— 添加包名 / 导入 APK / 存档与备份 / 设置（四行 + 细分割线）
+          ├ 版本列表容器（LinearLayout，条目由代码 addView 全展开）
+          └ 空态 TextView（可见性由代码控制，不再依赖 setEmptyView）
+
+  ★★ 为什么必须是 ScrollView（2026-10-01 真机实测的根因，别改回去）：
+     旧结构是「根 LinearLayout + 顶部区 wrap_content + ListView 0dp/weight=1」，
+     思路是"顶部固定、列表自己滚"。竖屏够高时没问题，**横屏一定崩**：
+     横屏可用高只有 376dp（1224px @520dpi），顶部区内容需要约 334dp，
+     而 ListView 的 weight 在"剩余空间为负"时只能拿到 0；
+     多余的压缩**逐层向下传递**，最后一行（存档与备份）被 AT_MOST 压到 26dp
+     ——文字被裁成一条线，点不到；版本列表整块高度归零直接消失。
+     取证：横屏 uiautomator dump 里 ver_list 完全不在树上，
+     row_saves 85px（正常 204px），其 act_title 只剩 7px。
+     ⇒ 尺寸不足时唯一能保证"所有内容可滚达"的结构就是整页 ScrollView。
+
+  ★★ 为什么列表容器**不能**再用 ListView（2026-10-01 第二轮实测，别改回去）：
+     ScrollView 给子级的高度约束是 UNSPECIFIED。ListView 在
+     heightMode == UNSPECIFIED 分支下，AOSP onMeasure 只用
+     「padding + 单个 item 高」当作整体高度，**不会展开全部条目**。
+     实测：3 个版本只量到 342px（= 39px paddingBottom + 303px 一行），
+     于是外层 ScrollView 的滚动范围少算了三分之二，
+     列表后面的条目永远滚不出来（需求原文："拖不到最底下"）。
+     竖屏内容不满一屏时看不出来，横屏必现。
+     ⇒ 条目本来就少、且要求全展开，AbsListView 的回收机制毫无用武之地，
+       改用 LinearLayout 手工挂载：高度天然 wrap_content，也不再掺和嵌套滚动。
+
+  ★ 内层 LinearLayout 必须 wrap_content + 外层 fillViewport="true"：
+    内容不满一屏时由 fillViewport 撑满（背景色不断），内容超屏时正常滚。
+
+  ★ 根节点不设 padding：Util.applySystemInsets() 会写 root 的 padding
+    （四边叠加，见 Util）。页面内边距一律交给 header 与列表容器自己。
+-->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg"
+    android:fillViewport="true"
+    android:scrollbars="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <!-- ── 顶部区 ─────────────────────────────────────────────── -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="@dimen/page_pad"
+            android:paddingEnd="@dimen/page_pad"
+            android:paddingTop="12dp"
+            android:paddingBottom="14dp">
+
+            <!-- 状态摘要卡：整卡可点，展开/收起详情 -->
+            <LinearLayout
+                android:id="@+id/status_box"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/card_bg_press"
+                android:clickable="true"
+                android:focusable="false"
+                android:paddingStart="14dp"
+                android:paddingEnd="12dp"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:id="@+id/status_summary"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:singleLine="true"
+                        android:ellipsize="end"
+                        android:textSize="13sp"
+                        android:textColor="@color/fg_muted" />
+
+                    <ImageView
+                        android:id="@+id/status_chevron"
+                        android:layout_width="@dimen/row_chevron"
+                        android:layout_height="@dimen/row_chevron"
+                        android:layout_marginStart="8dp"
+                        android:src="@drawable/ic_chevron"
+                        android:tint="@color/fg_muted" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/status_detail"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingTop="8dp"
+                    android:textSize="11sp"
+                    android:lineSpacingExtra="4dp"
+                    android:textColor="@color/fg_muted"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <!-- 主按钮：继续上次（全页唯一实底 accent，作视觉焦点） -->
+            <LinearLayout
+                android:id="@+id/btn_continue"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/card_gap"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:background="@drawable/btn_primary"
+                android:clickable="true"
+                android:focusable="false"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:paddingTop="14dp"
+                android:paddingBottom="14dp"
+                android:visibility="gone">
+
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_play"
+                    android:tint="@color/on_accent" />
+
+                <!--
+                  「继续上次」文字（F2 引入，F17 改）。
+                  ★ 文字现在是 `继续上次 · <名称>  <版本号>`（与列表行同一套 displayName 规则）。
+                    版本号在**末尾** ⇒ 单行 + ellipsize 时**最先被切掉的正是版本号**
+                    （F7 在列表行踩过同一个坑："切掉的恰好是版本号本身"，等于白显示）。
+                  ⇒ 放开到 maxLines=2 让它折行，而不是被裁掉。
+                    ⚠️ 这也是本项目的一条纪律：行内文字别用 singleLine（见 REF ⑥e）。
+                -->
+                <TextView
+                    android:id="@+id/continue_text"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="10dp"
+                    android:maxLines="2"
+                    android:ellipsize="end"
+                    android:textSize="15sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:textColor="@color/on_accent" />
+
+            </LinearLayout>
+
+            <!-- 操作分组卡（五行共用 row_action，行间细分割线） -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/card_gap"
+                android:orientation="vertical"
+                android:background="@drawable/card_bg">
+
+                <include
+                    android:id="@+id/row_add"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="62dp"
+                    android:background="@color/divider" />
+
+                <include
+                    android:id="@+id/row_import"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="62dp"
+                    android:background="@color/divider" />
+
+                <include
+                    android:id="@+id/row_saves"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="62dp"
+                    android:background="@color/divider" />
+
+                
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="62dp"
+                    android:background="@color/divider" />
+
+                <include
+                    android:id="@+id/row_settings"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- ── 版本列表容器（条目由 MainActivity.rebuildList() 全展开挂载） ── -->
+        <LinearLayout
+            android:id="@+id/ver_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="@dimen/page_pad"
+            android:paddingEnd="@dimen/page_pad"
+            android:paddingBottom="12dp" />
+
+        <!-- 空态（可见性由 rebuildList() 控制） -->
+        <TextView
+            android:id="@+id/ver_empty"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="28dp"
+            android:gravity="center"
+            android:textAlignment="center"
+            android:textSize="13sp"
+            android:lineSpacingExtra="4dp"
+            android:textColor="@color/fg_muted" />
+
+        <!--
+          F5b：底部留白。
+          ★ 为什么需要：外层 ScrollView 的 paddingBottom 就是导航栏 inset，
+            滚到底时最后一张卡**正好贴住导航栏** —— 竖屏观感仍是"被切掉的"，
+            而且竖屏滚动范围只剩 119px（≈36dp），几乎感觉不到能滚。
+            加这 24dp 之后：① 滚到底末项与导航栏之间有明显间隙；
+                           ② 竖屏滚动范围 ≈ 197px，滚动是"看得见"的。
+          ⚠️ 它必须是**根内容的最后一个子节点**（列表容器与空态之外），
+            否则空态下会少一截。
+        -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/page_bottom_space" />
+    </LinearLayout>
+</ScrollView>

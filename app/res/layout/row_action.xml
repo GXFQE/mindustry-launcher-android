@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  F1b：操作行（主界面与存档页共用）。
+  结构：[ 圆形图标底 + 线性图标 ]  主标题 / 副标题  [ 右箭头 ]
+
+  用法：由父布局 <include> 引入，并在 include 上覆盖 android:id。
+  代码侧请**从 include 的根开始** findViewById（例如 rowAdd.findViewById(R.id.act_title)）——
+  本文件被引入多次时，id 在整棵树里是重复的，直接从 Activity 找只会命中第一个。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:background="?android:attr/selectableItemBackground"
+    android:clickable="true"
+    android:focusable="false"
+    android:paddingStart="14dp"
+    android:paddingEnd="12dp"
+    android:paddingTop="12dp"
+    android:paddingBottom="12dp">
+
+    <FrameLayout
+        android:layout_width="@dimen/row_icon_box"
+        android:layout_height="@dimen/row_icon_box"
+        android:background="@drawable/icon_circle">
+
+        <ImageView
+            android:id="@+id/act_icon"
+            android:layout_width="@dimen/row_icon"
+            android:layout_height="@dimen/row_icon"
+            android:layout_gravity="center"
+            android:tint="@color/accent" />
+    </FrameLayout>
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:layout_marginStart="14dp"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/act_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:textSize="15sp"
+            android:textColor="@color/fg" />
+
+        <TextView
+            android:id="@+id/act_sub"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="2dp"
+            android:textSize="12sp"
+            android:textColor="@color/fg_muted" />
+    </LinearLayout>
+
+    <ImageView
+        android:layout_width="@dimen/row_chevron"
+        android:layout_height="@dimen/row_chevron"
+        android:layout_marginStart="8dp"
+        android:src="@drawable/ic_chevron"
+        android:tint="@color/fg_muted" />
+</LinearLayout>

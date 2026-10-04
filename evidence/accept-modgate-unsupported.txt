@@ -1,0 +1,19 @@
+槽 = test
+mods 目录 = /storage/emulated/0/Android/data/io.mdt.launcher/slot-test/mods
+设置 = 已读 settings.bin（19 个键）
+launchid.dat = false  skipModLoading = false
+指向本槽的版本 = 159.7  比对基准 = 159.7（build=159, revision=7）
+模组 1 个；读不出元数据 0 个；游戏不看的条目 0 个；孤儿设置键 0 个
+
+· MDT Crash Probe  1.0  [与当前游戏版本不兼容]
+    文件 = mdt-crash-probe  1.2 KB  目录
+    内部名 = mdt-crash-probe  minGameVersion = 0  enabled = true  failed = false
+    classes.dex = false  scripts = true(1 js, main.js=true)  meta = mod.hjson
+      [OK] 安卓能加载它  —— null
+      [OK] 游戏里是启用状态  —— null
+      [OK] 游戏版本够新  —— null
+      [NG] 满足最低版本要求  —— 它没写要求哪个游戏版本，游戏会当成太老的模组跳过
+      [OK] 不在游戏的禁用名单里  —— null
+      [OK] 上次启动没崩到「跳过全部模组」  —— 只有游戏跑起来才知道
+
+（本报告是只读扫描：没有创建、修改、删除任何文件）

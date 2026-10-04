@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  F1b：视觉尺寸表。集中在这里，改版式时只动一处。
+  注：卡片圆角刻意**不**进本表 —— `<shape>` 的 corners 引用 @dimen 在部分工具链上
+  解析不稳，四个 drawable 里写死同一个字面量更保险（改的时候四处一起改）。
+-->
+<resources>
+    <!-- 页面 -->
+    <dimen name="page_pad">16dp</dimen>
+    <!--
+      页面底部留白（F5b）。
+      ★ 为什么需要它：ScrollView 的 paddingBottom 只等于导航栏 inset，
+        内容滚到底时最后一张卡**正好贴住导航栏**，观感仍像"被切掉"，
+        而且竖屏下滚动范围只剩 119px（≈36dp），几乎看不出能滚。
+        再加这 24dp ⇒ ① 滚到底后末项与导航栏之间有明确间隙；
+        ② 竖屏滚动范围 ≈ 197px，滚动是"看得见"的。
+    -->
+    <dimen name="page_bottom_space">24dp</dimen>
+
+    <!-- 卡片 -->
+    <dimen name="card_gap">10dp</dimen>
+    <dimen name="card_elev">2dp</dimen>
+
+    <!-- 操作行 -->
+    <dimen name="row_pad_v">13dp</dimen>
+    <dimen name="row_icon">22dp</dimen>
+    <dimen name="row_icon_box">34dp</dimen>
+    <dimen name="row_chevron">18dp</dimen>
+</resources>

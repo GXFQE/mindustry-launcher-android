@@ -1,0 +1,35 @@
+=== F10 `.msav` 解析器（MsavMeta）—— 语料对照与负例（2026-10-03 第 50 轮）===
+
+── 对照组（上帝视角）──
+做法：`_lab/msav/MsavOracle.java` + `Compare.java` 用**游戏自己的类**
+（`SaveIO.readHeader` → `SaveVersion.readRegion("meta", readStringMap)`，jar = Mindustry.jar 89 MB）
+读同一份文件，然后逐项比对：
+  · **全部 tags**（键集合 + 每个值，含中文真名/色码）
+  · 我们对外承诺的字段：version / width / height / wave / build / saved / playtime /
+    name / author / description / mapname
+⚠️ 报告写 **UTF-8 文件**再读（不靠 stdout：Java 在 Windows 默认按 GBK 写 stdout，中文真名会变 ���）。
+
+── 正例：真实语料 479 个文件 ──
+语料 = 桌面存档 313（%APPDATA%\Mindustry\saves）+ 桌面地图 75（maps）+ 用户地图 15
+     + 官方默认图（Mindustry-160.4 assets/maps/default）
+结果：**共 479 个文件：完全一致 479；不一致 0；两边都读不了 0**
+格式版本实测跨 2/4/5/7/8/9/11 ⇒ 解析器按"缺键用默认值"读，与游戏一致。
+（report.txt 原文见 evidence/f10-msav-corpus-report.txt）
+
+── 负例 8/8 全过（f10-msav-negative-report.txt）──
+  ① 空文件                          ⇒ 读不出来 ✓
+  ② 非 .msav（PNG 头冒充）           ⇒ 读不出来（"开头不是 MSAV"）✓
+  ③ 截断到 60%（只读 meta）          ⇒ ok=true 且**不**谎报 truncated（meta 确实完整）✓
+  ④ 同一份截断（查完整性 verifyWhole）⇒ 报 truncated + 给出原因 ✓
+  ⑤ 只留前 40 字节                    ⇒ 报截断/读不出 ✓
+  ⑥ gzip 压缩（.msav 是 zlib）        ⇒ 读不出来 ✓
+  ⑦ 版本号改成 1000                   ⇒ 读不出来（我们的上限 64）✓
+  ⑧ 真实文件对照                      ⇒ ok 且尺寸正确 ✓
+
+── 本轮修正的一处**语义**问题（负例逼出来的）──
+我原来把 `ok` 当成"这文件没问题"用 —— 但解析器**只读 meta**，砍到 60% 的文件 meta 仍完整，
+于是"ok=true"被自检当场判为可疑。⇒ 改成：
+  · `ok` = **元数据读出来了**（注释里写死：不保证整份文件完整）；
+  · `read(File, true)` 才**把剩下的流读干净**查完整性（zlib 截断会在末尾抛 EOFException）——
+    代价是整份解压，所以只在用户明确"查完整性"时用。
+★ 教训：**接口名要能承载它的承诺** —— 一个叫 ok 的布尔值会被到处当成"文件没问题"。

@@ -1,0 +1,34 @@
+=== F13 第二阶段：settings.bin 写侧的**本地**验收（PC，真实 502 KB 桌面文件） ===
+真实文件 = %APPDATA%\Mindustry\settings.bin
+
+真实文件 = %APPDATA%\Mindustry\settings.bin
+体积 = 502397 B   键数 = 5905
+  [OK] ① 读 → 编码逐字节一致   orig=502397 enc=502397
+选中的键 = [mod-logicchineselocalization-enabled]  现值 = false
+  [OK] ② applyBool 成功且自检通过   error=null
+  [OK] ② 长度不变（旧值→新值，布尔占 1 字节）   before=502397 after=502397
+  [OK] ② 只差 1 个字节   diffBytes=1
+  [OK] ② 读回是新值   now=true
+  [OK] ② 键数不变   5905 vs 5905
+  [OK] ② 其余键逐条一致
+  [OK] ② 备份与改前逐字节一致   20261002-211622.bin
+  [OK] ③ 新键追加在末尾   最后一个键 = mod-本地验收-全新的-enabled
+  [OK] ③ 原键全部保留且顺序未变
+  [OK] ④ 坏文件被拒绝   error=IOException: 多出尾部数据（Trailing settings data; expected EOF），首个多余字节 = 0x7f
+  [OK] ④ 拒绝时文件未被动过
+喂给神谕的文件 = <工程根>/.tmp-f13-lab/work/modified-settings.bin
+里面 mod-logicchineselocalization-enabled = true
+
+===== 本地验收：通过 12 项，失败 0 项 =====
+
+=== 神谕闭环：arc 自己的 Settings 读我们写出的文件 ===
+命令: SettingsOracle <modified-settings.bin> <keys...>   （out159 / out160 各一次）
+
+arc 159.7: KEY	mod-logicchineselocalization-enabled	bool=true	str=<ClassCastException>	int=<ClassCastException> | KEY	mod-��������-ȫ�µ�-enabled	bool=false	str=<absent>	int=-1
+arc 160.4: KEY	mod-logicchineselocalization-enabled	bool=true	str=<ClassCastException>	int=<ClassCastException> | KEY	mod-��������-ȫ�µ�-enabled	bool=false	str=<absent>	int=-1
+
+对照（原件，未改过）: KEY	mod-logicchineselocalization-enabled	bool=false	str=<ClassCastException>	int=<ClassCastException>
+
+结论：读→编码逐字节一致；改一个真实 mod-*-enabled 键 = 长度不变 / 只差 1 字节 /
+      其余 5904 个键逐条一致；新键追加在末尾；坏文件被拒且文件未被触碰；
+      **arc 159.7 与 160.4 自己都读回了新值 true**（原件是 false）⇒ 写侧与游戏一致。

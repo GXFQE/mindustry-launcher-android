@@ -1,0 +1,17 @@
+=== dev_compat Fri Oct 02 11:10:59 GMT+08:00 2026 ===
+APK  = /storage/emulated/0/Android/data/io.mdt.launcher/hub/compat-samples/classic.apk
+存在 = true   大小 = 20331908 B
+
+  1 入口类 mindustry/android/AndroidLauncher : 无
+  2 native 库  : 无（缺 libarc.so, libarc-freetype.so）
+  3 匹配 ABI   : arm64-v8a
+    设备 ABI   : arm64-v8a
+    包内 ABI   : arm64-v8a, armeabi, armeabi-v7a
+    包内 so    : libX86Bridge.so, libgdx.so
+  4 页对齐     : ?  /  设备页 4 KB  →  合格
+  5 属性注入   : 不支持 ⇒ 回退改名交换
+    dex 数     : 1
+  结论         : 拒绝进加载管线
+  一行摘要     : entry=N lib=- abi=arm64-v8a align=?/page=4K prop=N → 拒绝（回退改名交换）
+
+拒绝文案 = 包里找不到游戏入口类 mindustry.android.AndroidLauncher。  Mindustry v104 及更早的版本用的是另一套类名（io.anuke.mindustry.AndroidLauncher），MDT 加载不了；加固过的包也会因为 dex 被加密而搜不到。  请换用 v105 或更新的原版 APK。

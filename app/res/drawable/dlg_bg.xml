@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  F5b：AlertDialog 的窗口背景（替代框架默认的 dialog_material_background_*）。
+
+  ★ inset 必须写 16dp —— 这不是拍脑袋：实测框架自己的对话框背景就是 16dp。
+    证据（骨架 dump）：窗口根 FrameLayout [30,772][1193,1921]，
+    内层可见卡片 [82,824][1141,1869]，左边差 82-30=52px、上边差 824-772=52px，
+    520dpi 机型 ⇒ 52px = 16dp。
+    ⚠️ 改这个值会**同时改变对话框的可视宽度**（窗口 = 内容 + inset），别乱动。
+
+  ★ 圆角/描边与 card_bg 对齐（14dp / card_stroke）：应用的分层手段是
+    「淡描边 + 页底色差」，不是阴影 —— 换掉框架背景会丢掉阴影，正好与全站一致。
+-->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:inset="16dp">
+    <shape android:shape="rectangle">
+        <solid android:color="@color/card" />
+        <corners android:radius="14dp" />
+        <stroke android:width="1dp" android:color="@color/card_stroke" />
+    </shape>
+</inset>

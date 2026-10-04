@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  启动器图标 —— **背景层**（自适应图标 / adaptive-icon）。
+
+  ── 为什么是自适应图标 ────────────────────────────────────────────────────
+  本工程 `minSdk = 26`，而自适应图标正是 API 26 引入的 ⇒ **所有目标设备都支持**，
+  不需要再准备一套 PNG 兜底（那套 mipmap-*/ic_launcher.png 是为 API 25 及以下准备的）。
+  自适应 = 我们只给「背景层 + 前景层」两张 108×108 的图，**遮罩形状交给系统**
+  （圆形 / 圆角方 / squircle 各 ROM 不同），所以两层都必须**满画布**、且前景只画在安全区内。
+
+  ── 尺寸约定（别改，改了就是"图标被切"）──────────────────────────────────
+  108dp 画布；系统只会显示中间 **72dp**，而真正保证不被任何遮罩切到的**安全区是中心
+  直径 66dp 的圆**（半径 33）。⇒ 前景层的所有笔画必须落在半径 33 以内（本文件的前景用半径 31）。
+
+  🔴 **本文件的颜色是字面量，不是语义色 —— 这是有意为之，别"顺手改成" `@color/accent`**：
+     accent 在 `values-night/colors.xml` 里是 `#FF8C9EFF`（夜间更亮），拿它当图标底色会让
+     **同一个 app 在浅色/深色桌面上显示成两种颜色的图标**。品牌色不该跟着系统主题走；
+     而工程里"UI 一律走语义色"那条纪律（见 colors.xml 头注释）说的是**界面**，不是品牌资产。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 满画布矩形：背景必须铺满 108×108，否则遮罩放大后会露白边 -->
+    <path
+        android:fillColor="#FF3F51B5"
+        android:pathData="M0,0h108v108H0z" />
+</vector>

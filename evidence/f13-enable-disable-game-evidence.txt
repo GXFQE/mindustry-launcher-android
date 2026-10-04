@@ -1,0 +1,55 @@
+=== F13 第二阶段：启停（写 settings.bin）真机端到端证据 ===
+设备 <测试机型> / Android 16（API 36）· 2026-10-02 21:19~21:25
+
+测试槽 = f13-write（新建，**不是**用户的槽）
+  · settings.bin 从 slot-default **复制**一份真实文件（482 B / 23 键；md5 c68a8696512cecb74284a30f20471187）
+  · mods/demo-mod.zip（最小 JS 模组：mod.json + scripts/main.js，name = "Demo Mod"）
+  · 临时把 io.anuke.mindustry（官方 159.7）分配到本槽；跑完已还原为 default
+
+判据 = 游戏自己写的 <数据根>/last_log.txt 里有没有这一行：
+        [I] Loading mod: Demo Mod
+   （`Mods.java:1210` 的 `Log.info("Loading mod: @", meta.name)` —— 它只取决于
+     `skipModLoading()` 与 `mod-<内部名>-enabled` 这个键，**不取决于版本门/类加载**，
+     所以它是"游戏读到的开关值"的**直接读出**。每次启动前都删掉 launchid.dat，
+     否则 `skipModLoading()` 会把所有模组一起跳掉、把这条判据毁掉。）
+
+── 三步对照 ────────────────────────────────────────────────────────────
+① 基线（键不存在 ⇒ 默认 true）
+   grep 'Loading mod' last_log.txt  →  命中：`[I] Loading mod: Demo Mod`
+② App 写入 `mod-demo-mod-enabled = false`
+   dev 口：--es dev_mods_toggle f13-write --es dev_mods_name demo-mod -e dev_mods_on false
+   报告：✅ 已关闭模组「demo-mod」 —— mod-demo-mod-enabled: （未设置⇒默认 true） → false
+         体积：482 → 506 B（差 25 字节 = 追加键 23 B + count 字段变 1 B + 长度差）
+         键数：24（未知键原样保留）· 写后自检：通过（恰好 EOF + 所有键逐条比对一致）
+         改前备份：hub/settings-backups/slot-f13-write/20261002-212219.bin（482 B）
+   grep 'Loading mod' last_log.txt  →  **0 命中**（游戏确实把它关掉了）
+③ 再写回 true
+   报告：✅ 已启用模组「demo-mod」 —— mod-demo-mod-enabled: false → true
+         体积：506 → 506 B（**差 1 字节**）· 自检通过
+   grep 'Loading mod' last_log.txt  →  命中：`[I] Loading mod: Demo Mod`（又回来了）
+
+── 神谕闭环（arc 自己的 Settings 读**设备上**那份文件）────────────────────
+把设备上的 slot-f13-write/settings.bin（506 B，md5 acf75f2429bd2b79bbbb0007399af53e）
+拉到 PC，用 `_lab/hjson/out159` 的 `SettingsOracle` 读：
+
+  KEY  mod-demo-mod-enabled   bool=false        ← 我们写的值（游戏自己的读取器认了）
+  KEY  lastBuild              int=159           ← 游戏在 finishLaunch 里加的键
+  KEY  modcrashdisable        str=<absent>
+
+★ `lastBuild` 的出现说明这份文件**已经被游戏自己整份重写过**（`finishLaunch` 会写它），
+  而我们的键**存活了下来、值也没变** ⇒ 「我们写 → 游戏读 → 游戏整份重写 → 我们/神谕再读」
+  这条完整环路是通的。
+
+── UI 路径（同一条 Mods.setEnabled）──────────────────────────────────────
+evidence/f13-toggle-confirm.png  确认弹窗：键名 / true → false / 目标文件 / 备份目录 /
+                                 「游戏没在运行（可以安全改写）」
+evidence/f13-toggle-result.png   结果弹窗：✅ 已关闭 · 506 → 506 B（差 1 字节）· 24 键 ·
+                                 写后自检通过 · 改前备份路径
+
+── 现场留下的痕迹（已清理）──────────────────────────────────────────────
+hub/settings-backups/slot-f13-write/ 下有 3 份备份（482 B / 506 B / 506 B）——
+每次改写前都备了一份；测试槽删除后这些备份也一并清掉了。
+
+── 与用户数据的隔离（安全证据）──────────────────────────────────────────
+全程只碰测试槽 f13-write。用户的 slot-default/settings.bin 前后 md5
+均为 c68a8696512cecb74284a30f20471187（未改动）。

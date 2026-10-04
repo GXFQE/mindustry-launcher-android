@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- F2：槽名徽标（同槽冲突态）。语义同 badge_slot，只换配色。 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="9dp" />
+    <solid android:color="@color/chip_bg_warn" />
+</shape>

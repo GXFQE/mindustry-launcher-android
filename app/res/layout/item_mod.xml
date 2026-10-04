@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  F13：模组列表行。结构：
+    ┌──────────────────────────────────────────────┐
+    │ [图标]  名称  版本 ................. [状态徽标] │
+    │         文件名 · 大小 · 形态                   │
+    │         ⚠ 警告（版本过低 / 解析失败 / 依赖缺失）│
+    └──────────────────────────────────────────────┘
+
+  ★ 外层 padding 提供行距、内层才是卡片 —— 与 item_version / item_slot 同一形态
+    （F1b 为绕开 AbsListView 忽略 item 根 margin 而定；F3b 后 margin 其实可用，
+     但保持一致，少改一处是一处）。横向间距由列表容器的 paddingStart/End 统一给。
+  ★ 整行可点 = 详情弹窗（**不再单放一个"详情"按钮** —— 同一件事只留一个入口，F15b 纪律）。
+  ★ 标题/副标题都不设 singleLine：窄屏要能折行，否则版本号正好落在被裁掉的那截（F7 的坑）。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingBottom="@dimen/card_gap">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@drawable/card_bg_press"
+        android:paddingStart="14dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="12dp">
+
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_zip"
+            android:tint="@color/accent" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="12dp"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:id="@+id/mod_title"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:maxLines="2"
+                    android:ellipsize="end"
+                    android:lineSpacingExtra="1dp"
+                    android:textSize="15sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:textColor="@color/fg" />
+
+                <TextView
+                    android:id="@+id/mod_badge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:background="@drawable/badge_slot"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
+                    android:paddingTop="2dp"
+                    android:paddingBottom="2dp"
+                    android:textSize="11sp"
+                    android:textColor="@color/chip_fg" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/mod_sub"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="3dp"
+                android:maxLines="2"
+                android:ellipsize="end"
+                android:textSize="12sp"
+                android:textColor="@color/fg_muted" />
+
+            <TextView
+                android:id="@+id/mod_warn"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="4dp"
+                android:textSize="11sp"
+                android:lineSpacingExtra="2dp"
+                android:textColor="@color/chip_fg_warn"
+                android:visibility="gone" />
+        </LinearLayout>
+    </LinearLayout>
+</LinearLayout>

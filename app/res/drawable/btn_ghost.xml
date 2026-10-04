@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  F1b：小号描边按钮（列表行右侧的「槽」入口）。
+  实心 accent 留给页面级主操作，行内次要操作一律用"描边幽灵按钮"，避免视觉打架。
+-->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/accent_soft" />
+            <corners android:radius="8dp" />
+            <stroke android:width="1dp" android:color="@color/accent" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@android:color/transparent" />
+            <corners android:radius="8dp" />
+            <stroke android:width="1dp" android:color="@color/accent" />
+        </shape>
+    </item>
+</selector>

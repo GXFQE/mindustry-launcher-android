@@ -1,0 +1,704 @@
+#name	isFloor	isOverlay	isOre	isStatic	synthetic	solid	wallOre	itemDrop	playerUnmineable	speed	damage	liquidDrop	attributes	breakable	destructible	alwaysReplace	unitMoveBreakable	source
+air	1	0	0	1	0	0	0		0	1.0	0.0			0	0	1	0	vanilla
+spawn	1	1	0	1	0	0	0		0	1.0	0.0			0	0	0	0	vanilla
+remove-wall	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	vanilla
+remove-ore	1	1	0	1	0	0	0		0	1.0	0.0			0	0	0	0	vanilla
+cliff	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	vanilla
+build1	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	vanilla
+build2	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	vanilla
+build3	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	vanilla
+build4	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	vanilla
+build5	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	vanilla
+build6	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	vanilla
+build7	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	vanilla
+build8	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	vanilla
+build9	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	vanilla
+build10	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	vanilla
+build11	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	vanilla
+build12	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	vanilla
+build13	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	vanilla
+build14	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	vanilla
+build15	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	vanilla
+build16	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	vanilla
+deep-water	1	0	0	1	0	0	0		0	0.2	0.0	water		0	0	0	0	vanilla
+shallow-water	1	0	0	1	0	0	0		0	0.5	0.0	water		0	0	0	0	vanilla
+tainted-water	1	0	0	1	0	0	0		0	0.5	0.0	water	spores=0.15;	0	0	0	0	vanilla
+deep-tainted-water	1	0	0	1	0	0	0		0	0.18	0.0	water	spores=0.15;	0	0	0	0	vanilla
+darksand-tainted-water	1	0	0	1	0	0	0		0	0.75	0.0	water	spores=0.1;	0	0	0	0	vanilla
+sand-water	1	0	0	1	0	0	0	sand	0	0.8	0.0	water	json:{oil}	0	0	0	0	mod-override
+darksand-water	1	0	0	1	0	0	0		0	0.8	0.0	water		0	0	0	0	vanilla
+tar	1	0	0	1	0	0	0		0	0.19	0.0	oil		0	0	0	0	vanilla
+pooled-cryofluid	1	0	0	1	0	0	0		0	0.5	0.0	cryofluid		0	0	0	0	vanilla
+molten-slag	1	0	0	1	0	0	0		0	0.19	0.0	slag	heat=0.85;	0	0	0	0	vanilla
+space	1	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	vanilla
+empty	1	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	vanilla
+stone	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	vanilla
+crater-stone	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	vanilla
+char	1	0	0	1	0	0	0		0	1.0	0.0		water=-0.25;	0	0	0	0	vanilla
+basalt	1	0	0	1	0	0	0		0	1.0	0.0		json:{watersand}	0	0	0	0	mod-override
+hotrock	1	0	0	1	0	0	0		0	1.0	0.0		json:{waterheatsand}	0	0	0	0	mod-override
+magmarock	1	0	0	1	0	0	0		0	1.0	0.0		json:{waterheatsand}	0	0	0	0	mod-override
+sand-floor	1	0	0	1	0	0	0	sand	1	1.0	0.0		oil=0.7;	0	0	0	0	vanilla
+darksand	1	0	0	1	0	0	0	sand	1	1.0	0.0		oil=1.5;	0	0	0	0	vanilla
+dirt	1	0	0	1	0	0	0		0	1.0	0.0		json:{plant}	0	0	0	0	mod-override
+mud	1	0	0	1	0	0	0		0	0.6	0.0		json:{plantwater}	0	0	0	0	mod-override
+dacite	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	vanilla
+rhyolite	1	0	0	1	0	0	0		0	1.0	0.0		water=-1.0;	0	0	0	0	vanilla
+rhyolite-crater	1	0	0	1	0	0	0		0	1.0	0.0		water=-1.0;	0	0	0	0	vanilla
+rough-rhyolite	1	0	0	1	0	0	0		0	1.0	0.0		water=-1.0;	0	0	0	0	vanilla
+regolith	1	0	0	1	0	0	0		0	1.0	0.0		water=-1.0;	0	0	0	0	vanilla
+yellow-stone	1	0	0	1	0	0	0		0	1.0	0.0		water=-1.0;	0	0	0	0	vanilla
+carbon-stone	1	0	0	1	0	0	0		0	1.0	0.0		water=-1.0;	0	0	0	0	vanilla
+ferric-stone	1	0	0	1	0	0	0		0	1.0	0.0		water=-1.0;	0	0	0	0	vanilla
+ferric-craters	1	0	0	1	0	0	0		0	1.0	0.0		water=-1.0;	0	0	0	0	vanilla
+beryllic-stone	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	vanilla
+crystalline-stone	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	vanilla
+crystal-floor	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	vanilla
+yellow-stone-plates	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	vanilla
+red-stone	1	0	0	1	0	0	0		0	1.0	0.0		water=-1.0;	0	0	0	0	vanilla
+dense-red-stone	1	0	0	1	0	0	0		0	1.0	0.0		water=-1.0;	0	0	0	0	vanilla
+red-ice	1	0	0	1	0	0	0		0	0.9	0.0		water=0.4;	0	0	0	0	vanilla
+arkycite-floor	1	0	0	1	0	0	0		0	0.3	0.0	arkycite		0	0	0	0	vanilla
+arkyic-stone	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	vanilla
+rhyolite-vent	1	0	0	1	0	0	0		0	1.0	0.0		steam=1.0;	0	0	0	0	vanilla
+carbon-vent	1	0	0	1	0	0	0		0	1.0	0.0		steam=1.0;	0	0	0	0	vanilla
+arkyic-vent	1	0	0	1	0	0	0		0	1.0	0.0		steam=1.0;	0	0	0	0	vanilla
+yellow-stone-vent	1	0	0	1	0	0	0		0	1.0	0.0		steam=1.0;	0	0	0	0	vanilla
+red-stone-vent	1	0	0	1	0	0	0		0	1.0	0.0		steam=1.0;	0	0	0	0	vanilla
+crystalline-vent	1	0	0	1	0	0	0		0	1.0	0.0		steam=1.0;	0	0	0	0	vanilla
+stone-vent	1	0	0	1	0	0	0		0	1.0	0.0		steam=1.0;	0	0	0	0	vanilla
+basalt-vent	1	0	0	1	0	0	0		0	1.0	0.0		steam=1.0;	0	0	0	0	vanilla
+redmat	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	vanilla
+bluemat	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	vanilla
+grass	1	0	0	1	0	0	0		0	1.0	0.0		json:{waterplant}	0	0	0	0	mod-override
+salt	1	0	0	1	0	0	0	salt	1	1.0	0.0		water=-0.3;oil=0.3;	0	0	0	0	mod-override
+snow	1	0	0	1	0	0	0		0	1.0	0.0		water=0.2;	0	0	0	0	vanilla
+ice	1	0	0	1	0	0	0		0	0.9	0.0		water=0.4;	0	0	0	0	vanilla
+ice-snow	1	0	0	1	0	0	0		0	1.0	0.0		water=0.3;	0	0	0	0	vanilla
+shale	1	0	0	1	0	0	0	shale-cobble	1	1.0	0.0		oil=2.0;	0	0	0	0	mod-override
+moss	1	0	0	1	0	0	0		0	1.0	0.0		spores=0.15;	0	0	0	0	vanilla
+core-zone	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-override
+spore-moss	1	0	0	1	0	0	0		0	1.0	0.0		spores=0.3;	0	0	0	0	vanilla
+stone-wall	0	0	0	1	0	1	0		0	1.0	0.0		sand=1.0;	0	0	0	0	vanilla
+spore-wall	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	vanilla
+dirt-wall	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	vanilla
+dacite-wall	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	vanilla
+ice-wall	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	vanilla
+snow-wall	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	vanilla
+dune-wall	0	0	0	1	0	1	0		0	1.0	0.0		sand=2.0;	0	0	0	0	vanilla
+regolith-wall	0	0	0	1	0	1	0		0	1.0	0.0		sand=1.0;	0	0	0	0	vanilla
+yellow-stone-wall	0	0	0	1	0	1	0		0	1.0	0.0		sand=1.5;	0	0	0	0	vanilla
+rhyolite-wall	0	0	0	1	0	1	0		0	1.0	0.0		sand=1.0;	0	0	0	0	vanilla
+carbon-wall	0	0	0	1	0	1	0		0	1.0	0.0		sand=0.7;	0	0	0	0	vanilla
+ferric-stone-wall	0	0	0	1	0	1	0		0	1.0	0.0		sand=0.5;	0	0	0	0	vanilla
+beryllic-stone-wall	0	0	0	1	0	1	0		0	1.0	0.0		sand=1.2;	0	0	0	0	vanilla
+arkyic-wall	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	vanilla
+crystalline-stone-wall	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	vanilla
+red-ice-wall	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	vanilla
+red-stone-wall	0	0	0	1	0	1	0		0	1.0	0.0		sand=1.5;	0	0	0	0	vanilla
+red-diamond-wall	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	vanilla
+sand-wall	0	0	0	1	0	1	0		0	1.0	0.0		sand=2.0;	0	0	0	0	vanilla
+salt-wall	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	vanilla
+shrubs	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	vanilla
+shale-wall	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	vanilla
+spore-pine	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	vanilla
+snow-pine	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	vanilla
+pine	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	vanilla
+white-tree-dead	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	vanilla
+white-tree	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	vanilla
+spore-cluster	0	0	0	1	0	0	0		0	1.0	0.0			1	0	1	1	mod-override
+redweed	0	0	0	1	0	0	0		0	1.0	0.0			1	0	1	1	vanilla
+pur-bush	0	0	0	1	0	0	0		0	1.0	0.0			1	0	1	1	vanilla
+yellowcoral	0	0	0	1	0	0	0		0	1.0	0.0			1	0	1	1	vanilla
+boulder	0	0	0	1	0	0	0		0	1.0	0.0			1	0	1	1	vanilla
+snow-boulder	0	0	0	1	0	0	0		0	1.0	0.0			1	0	1	1	vanilla
+shale-boulder	0	0	0	1	0	0	0		0	1.0	0.0			1	0	1	1	vanilla
+sand-boulder	0	0	0	1	0	0	0		0	1.0	0.0			1	0	1	1	vanilla
+dacite-boulder	0	0	0	1	0	0	0		0	1.0	0.0			1	0	1	1	vanilla
+basalt-boulder	0	0	0	1	0	0	0		0	1.0	0.0			1	0	1	1	vanilla
+carbon-boulder	0	0	0	1	0	0	0		0	1.0	0.0			1	0	1	1	vanilla
+ferric-boulder	0	0	0	1	0	0	0		0	1.0	0.0			1	0	1	1	vanilla
+beryllic-boulder	0	0	0	1	0	0	0		0	1.0	0.0			1	0	1	1	vanilla
+yellow-stone-boulder	0	0	0	1	0	0	0		0	1.0	0.0			1	0	1	1	vanilla
+arkyic-boulder	0	0	0	1	0	0	0		0	1.0	0.0			1	0	1	1	vanilla
+crystal-cluster	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	vanilla
+vibrant-crystal-cluster	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	vanilla
+crystal-blocks	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	vanilla
+crystal-orbs	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	vanilla
+crystalline-boulder	0	0	0	1	0	0	0		0	1.0	0.0			1	0	1	1	vanilla
+red-ice-boulder	0	0	0	1	0	0	0		0	1.0	0.0			1	0	1	1	vanilla
+rhyolite-boulder	0	0	0	1	0	0	0		0	1.0	0.0			1	0	1	1	vanilla
+red-stone-boulder	0	0	0	1	0	0	0		0	1.0	0.0			1	0	1	1	vanilla
+metal-floor	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-override
+metal-floor-damaged	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-override
+metal-floor-2	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-override
+metal-floor-3	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-override
+metal-floor-4	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-override
+metal-floor-5	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-override
+dark-panel-1	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-override
+dark-panel-2	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-override
+dark-panel-3	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-override
+dark-panel-4	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-override
+dark-panel-5	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-override
+dark-panel-6	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-override
+dark-metal	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	vanilla
+metal-tiles-1	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-override
+metal-tiles-2	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-override
+metal-tiles-3	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-override
+metal-tiles-4	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-override
+metal-tiles-5	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-override
+metal-tiles-6	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-override
+metal-tiles-7	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-override
+metal-tiles-8	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-override
+metal-tiles-9	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-override
+metal-tiles-10	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-override
+metal-tiles-11	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-override
+metal-tiles-12	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-override
+metal-tiles-13	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	vanilla
+metal-wall-1	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	vanilla
+metal-wall-2	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	vanilla
+metal-wall-3	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	vanilla
+colored-floor	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	vanilla
+colored-wall	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	vanilla
+character-overlay	1	1	0	1	0	0	0		0	1.0	0.0			0	0	0	0	vanilla
+character-overlay-white	1	1	0	1	0	0	0		0	1.0	0.0			0	0	0	0	vanilla
+rune-overlay	1	1	0	1	0	0	0		0	1.0	0.0			0	0	0	0	vanilla
+rune-overlay-crux	1	1	0	1	0	0	0		0	1.0	0.0			0	0	0	0	vanilla
+pebbles	1	1	0	1	0	0	0		0	1.0	0.0			0	0	0	0	vanilla
+tendrils	1	1	0	1	0	0	0		0	1.0	0.0			0	0	0	0	vanilla
+ore-copper	1	1	1	1	0	0	0	copper	0	1.0	0.0			0	0	0	0	vanilla
+ore-lead	1	1	1	1	0	0	0	lead	0	1.0	0.0			0	0	0	0	vanilla
+ore-scrap	1	1	1	1	0	0	0	scrap	0	1.0	0.0			0	0	0	0	vanilla
+ore-coal	1	1	1	1	0	0	0	coal	0	1.0	0.0			0	0	0	0	vanilla
+ore-titanium	1	1	1	1	0	0	0	titanium	0	1.0	0.0			0	0	0	0	vanilla
+ore-thorium	1	1	1	1	0	0	0	thorium	0	1.0	0.0			0	0	0	0	vanilla
+ore-beryllium	1	1	1	1	0	0	0	beryllium	0	1.0	0.0			0	0	0	0	vanilla
+ore-tungsten	1	1	1	1	0	0	0	tungsten	0	1.0	0.0			0	0	0	0	vanilla
+ore-crystal-thorium	1	1	1	1	0	0	0	thorium	0	1.0	0.0			0	0	0	0	vanilla
+ore-wall-thorium	1	1	1	1	0	0	0	thorium	0	1.0	0.0			0	0	0	0	vanilla
+ore-wall-beryllium	1	1	1	1	0	0	0	beryllium	0	1.0	0.0			0	0	0	0	vanilla
+graphitic-wall	0	0	0	1	0	1	0	graphite	0	1.0	0.0			0	0	0	0	vanilla
+ore-wall-graphite	1	1	1	1	0	0	0	graphite	0	1.0	0.0			0	0	0	0	vanilla
+ore-wall-tungsten	1	1	1	1	0	0	0	tungsten	0	1.0	0.0			0	0	0	0	vanilla
+graphite-press	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+multi-press	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+silicon-smelter	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+silicon-crucible	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+kiln	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+plastanium-compressor	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+phase-weaver	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+surge-smelter	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+cryofluid-mixer	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+pyratite-mixer	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+blast-mixer	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+melter	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+separator	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+disassembler	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+spore-press	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+pulverizer	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+coal-centrifuge	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+incinerator	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+silicon-arc-furnace	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+electrolyzer	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+atmospheric-concentrator	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+oxidation-chamber	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+electric-heater	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+slag-heater	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+phase-heater	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+heat-redirector	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+small-heat-redirector	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+heat-router	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+slag-incinerator	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+carbide-crucible	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+slag-centrifuge	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+surge-crucible	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+cyanogen-synthesizer	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+phase-synthesizer	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+heat-reactor	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+copper-wall	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	mod-override
+copper-wall-large	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	mod-override
+titanium-wall	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	mod-override
+titanium-wall-large	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	mod-override
+plastanium-wall	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	mod-override
+plastanium-wall-large	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	mod-override
+thorium-wall	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	mod-override
+thorium-wall-large	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	mod-override
+phase-wall	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	mod-override
+phase-wall-large	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	mod-override
+surge-wall	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	mod-override
+surge-wall-large	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	mod-override
+door	0	0	0	1	1	0	0		0	1.0	0.0			0	1	0	0	mod-override
+door-large	0	0	0	1	1	0	0		0	1.0	0.0			0	1	0	0	mod-override
+scrap-wall	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	mod-override
+scrap-wall-large	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	mod-override
+scrap-wall-huge	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	mod-override
+scrap-wall-gigantic	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	mod-override
+thruster	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	mod-override
+beryllium-wall	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	vanilla
+beryllium-wall-large	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	vanilla
+tungsten-wall	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	vanilla
+tungsten-wall-large	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	vanilla
+blast-door	0	0	0	1	1	0	0		0	1.0	0.0			0	1	0	0	vanilla
+reinforced-surge-wall	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	vanilla
+reinforced-surge-wall-large	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	vanilla
+carbide-wall	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	vanilla
+carbide-wall-large	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	vanilla
+shielded-wall	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	vanilla
+mender	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+mend-projector	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+overdrive-projector	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+overdrive-dome	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+force-projector	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+shock-mine	0	0	0	1	1	0	0		0	1.0	0.0			0	1	0	0	mod-override
+radar	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+build-tower	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+regen-projector	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+shockwave-tower	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+shield-projector	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+large-shield-projector	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+conveyor	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	mod-override
+titanium-conveyor	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	mod-override
+plastanium-conveyor	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	mod-override
+armored-conveyor	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	mod-override
+junction	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	mod-override
+bridge-conveyor	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+phase-conveyor	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+sorter	0	0	0	1	1	0	0		0	1.0	0.0			0	1	0	0	mod-override
+inverted-sorter	0	0	0	1	1	0	0		0	1.0	0.0			0	1	0	0	mod-override
+router	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	mod-override
+distributor	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	mod-override
+overflow-gate	0	0	0	1	1	0	0		0	1.0	0.0			0	1	0	0	mod-override
+underflow-gate	0	0	0	1	1	0	0		0	1.0	0.0			0	1	0	0	mod-override
+unloader	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+mass-driver	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+duct	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	mod-override
+armored-duct	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	vanilla
+duct-router	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	vanilla
+overflow-duct	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	vanilla
+underflow-duct	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	vanilla
+duct-bridge	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+duct-unloader	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	vanilla
+surge-conveyor	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	vanilla
+surge-router	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	vanilla
+unit-cargo-loader	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+unit-cargo-unload-point	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+mechanical-pump	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+rotary-pump	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+impulse-pump	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+conduit	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	mod-override
+pulse-conduit	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	mod-override
+plated-conduit	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	mod-override
+liquid-router	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	mod-override
+liquid-container	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+liquid-tank	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+liquid-junction	0	0	0	1	1	0	0		0	1.0	0.0			0	1	0	0	mod-override
+bridge-conduit	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+phase-conduit	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+reinforced-pump	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+reinforced-conduit	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	vanilla
+reinforced-liquid-junction	0	0	0	1	1	0	0		0	1.0	0.0			0	1	0	0	vanilla
+reinforced-bridge-conduit	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+reinforced-liquid-router	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	vanilla
+reinforced-liquid-container	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+reinforced-liquid-tank	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+power-node	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	mod-override
+power-node-large	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	mod-override
+surge-tower	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	mod-override
+diode	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+battery	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	mod-override
+battery-large	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	mod-override
+combustion-generator	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+thermal-generator	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+steam-generator	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+differential-generator	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+rtg-generator	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+solar-panel	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+solar-panel-large	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+thorium-reactor	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+impact-reactor	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+beam-node	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+beam-tower	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+beam-link	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	vanilla
+turbine-condenser	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+chemical-combustion-chamber	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+pyrolysis-generator	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+flux-reactor	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+neoplasia-reactor	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+mechanical-drill	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+pneumatic-drill	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+laser-drill	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+blast-drill	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+water-extractor	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+cultivator	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+oil-extractor	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+vent-condenser	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+cliff-crusher	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+large-cliff-crusher	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+plasma-bore	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+large-plasma-bore	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+impact-drill	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+eruption-drill	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+core-shard	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	mod-override
+core-foundation	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	mod-override
+core-nucleus	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	mod-override
+core-bastion	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	vanilla
+core-citadel	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	vanilla
+core-acropolis	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	vanilla
+container	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	mod-override
+vault	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	vanilla
+reinforced-container	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	vanilla
+reinforced-vault	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	vanilla
+duo	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+scatter	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+scorch	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+hail	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+wave	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+lancer	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+arc	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+parallax	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+swarmer	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+salvo	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+segment	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+tsunami	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+fuse	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+ripple	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+cyclone	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+foreshadow	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+spectre	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+meltdown	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+breach	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+diffuse	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+sublimate	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+titan	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+disperse	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+afflict	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+lustre	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+scathe	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+smite	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+malign	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+ground-factory	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+air-factory	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+naval-factory	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+additive-reconstructor	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+multiplicative-reconstructor	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+exponential-reconstructor	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+tetrative-reconstructor	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+repair-point	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+repair-turret	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+tank-fabricator	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+ship-fabricator	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+mech-fabricator	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+tank-refabricator	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+ship-refabricator	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+mech-refabricator	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+prime-refabricator	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+tank-assembler	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+ship-assembler	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+mech-assembler	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+basic-assembler-module	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	vanilla
+unit-repair-tower	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+payload-conveyor	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	mod-override
+payload-router	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	mod-override
+reinforced-payload-conveyor	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	vanilla
+reinforced-payload-router	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	vanilla
+payload-mass-driver	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+large-payload-mass-driver	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+small-deconstructor	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+deconstructor	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+constructor	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+large-constructor	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+payload-loader	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	vanilla
+payload-unloader	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	vanilla
+power-source	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	vanilla
+power-void	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+item-source	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+item-void	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+liquid-source	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+liquid-void	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+payload-source	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	vanilla
+payload-void	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	vanilla
+heat-source	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+target-dummy	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	vanilla
+illuminator	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	mod-override
+legacy-mech-pad	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	vanilla
+legacy-unit-factory	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	vanilla
+legacy-unit-factory-air	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	vanilla
+legacy-unit-factory-ground	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	vanilla
+command-center	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	vanilla
+launch-pad	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+advanced-launch-pad	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+landing-pad	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+interplanetary-accelerator	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+message	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	mod-override
+switch	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	mod-override
+micro-processor	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+logic-processor	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+hyper-processor	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+memory-cell	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	mod-override
+memory-bank	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	mod-override
+logic-display	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+large-logic-display	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+tile-logic-display	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	mod-override
+canvas	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	vanilla
+large-canvas	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	mod-override
+reinforced-message	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	vanilla
+world-processor	0	0	0	1	1	1	0		0	1.0	0.0			0	0	0	0	vanilla
+world-cell	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	vanilla
+world-message	0	0	0	1	1	1	0		0	1.0	0.0			0	1	0	0	mod-override
+world-switch	0	0	0	1	1	0	0		0	1.0	0.0			0	0	0	0	mod-override
+probe-Prop	0	0	0	1	0	0	0		0	1.0	0.0			1	0	1	1	vanilla
+probe-WobbleProp	0	0	0	1	0	0	0		0	1.0	0.0			1	0	1	1	vanilla
+probe-StaticProp	0	0	0	1	0	0	0		0	1.0	0.0			1	0	1	1	vanilla
+probe-StaticTree	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	vanilla
+probe-TreeBlock	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	vanilla
+probe-StaticWall	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	vanilla
+probe-TiledWall	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	vanilla
+probe-ColoredWall	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	vanilla
+probe-Cliff	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	vanilla
+probe-TallBlock	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	vanilla
+probe-Seaweed	0	0	0	1	0	0	0		0	1.0	0.0			1	0	1	1	vanilla
+probe-SeaBush	0	0	0	1	0	0	0		0	1.0	0.0			1	0	1	1	vanilla
+probe-Floor	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	vanilla
+probe-OreBlock	1	1	1	1	0	0	0		0	1.0	0.0			0	0	0	0	vanilla
+probe-OverlayFloor	1	1	0	1	0	0	0		0	1.0	0.0			0	0	0	0	vanilla
+probe-ShallowLiquid	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	vanilla
+probe-TiledFloor	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	vanilla
+probe-EmptyFloor	1	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	vanilla
+probe-AirBlock	1	0	0	1	0	0	0		0	1.0	0.0			0	0	1	0	vanilla
+probe-SpawnBlock	1	1	0	1	0	0	0		0	1.0	0.0			0	0	0	0	vanilla
+probe-RemoveWall	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	vanilla
+probe-RemoveOre	1	1	0	1	0	0	0		0	1.0	0.0			0	0	0	0	vanilla
+probe-ColoredFloor	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	vanilla
+probe-CharacterOverlay	1	1	0	1	0	0	0		0	1.0	0.0			0	0	0	0	vanilla
+probe-RuneOverlay	1	1	0	1	0	0	0		0	1.0	0.0			0	0	0	0	vanilla
+frost-industry-ammonia-lake	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-armored-conduit	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-basic-conduit	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-blast-furnace	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-bow-turret	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-burner-generator	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-catapult	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-combustion-chamber	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-cracker	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-electric-pump	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-env-extractor	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-flame-tower	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-furnace	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-geothermal-plant	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-glass-chamber	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-ground-crusher	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-hand-pump	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-heat-vent	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-hydraulic-pump	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-hydrogen-generator	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-ice-melter	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-ice-ore	0	1	1	1	0	0	0	ice	0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-ice-thrower	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-iron-conveyor	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-iron-ore-deposit	0	1	1	1	0	0	0	iron-ore	0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-iron-wall	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-laser-turret	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-marble-deposit	0	1	1	1	0	0	0	marble	0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-marble-floor	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-molten-rock	0	0	0	1	0	0	0		0	1.0	0.0		{heat}	0	0	0	0	mod-new
+frost-industry-ore-extractor	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-pneumatic-gun	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-quartz-deposit	0	1	1	1	0	0	0	quartz	0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-reactor	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-reinforced-conveyor	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-reinforced-wall	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-silicon-chamber	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-sniper-tower	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-solar-cell	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-stack-conveyor	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-steel-mill	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-steel-wall	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-stone-barrier	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-stone-cliff	0	0	0	1	0	0	0	stone	0	1.0	0.0		{stone}	0	0	0	0	mod-new
+frost-industry-stone-conveyor	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-stone-floor	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-stone-miner	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-stone-ore	0	1	1	1	0	0	0	stone	0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-stone-reinforcer	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-tesla-tower	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-thermal-diff	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-wood-cliff	0	0	0	1	0	0	0	wood	0	1.0	0.0		{wood}	0	0	0	0	mod-new
+frost-industry-wood-miner	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+frost-industry-wood-ore	0	1	1	1	0	0	0	wood	0	1.0	0.0			0	0	0	0	mod-new
+ve-cargo-anchor	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-trade-portal	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-blue-ground	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-bush	0	0	0	1	0	0	0		0	1.0	0.0			1	0	1	1	mod-new
+ve-core-zone-cyclant	0	0	0	1	0	0	0		0	1.0	0.0		{water}	0	0	0	0	mod-new
+ve-accessible-deep-water	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-antigrass-dry	0	0	0	1	0	0	0		0	1.0	0.0		{water}	0	0	0	0	mod-new
+ve-antigrass-wall	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-antigrass	0	0	0	1	0	0	0		0	1.0	0.0		{water}	0	0	0	0	mod-new
+ve-carbon-shale-boulder	0	0	0	1	0	0	0		0	1.0	0.0			1	0	1	1	mod-new
+ve-carbon-shale-wall	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-carbon-shale	0	0	0	1	0	0	0	carbon-shale-cobble	0	1.0	0.0		{oilplant}	0	0	0	0	mod-new
+ve-deep-water-oil	0	0	0	1	0	0	0		0	1.0	0.0		{oil}	0	0	0	0	mod-new
+ve-flowing-lava	0	0	0	1	0	0	0		0	1.0	0.0		{heat}	0	0	0	0	mod-new
+ve-gravel	0	0	0	1	0	0	0	sand	0	1.0	0.0		{water}	0	0	0	0	mod-new
+ve-hill-stone-boulder	0	0	0	1	0	0	0		0	1.0	0.0			1	0	1	1	mod-new
+ve-hill-stone-wall	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-hill-stone	0	0	0	1	0	0	0		0	1.0	0.0		{water}	0	0	0	0	mod-new
+ve-salty-ice	0	0	0	1	0	0	0	salt	0	1.0	0.0		{water}	0	0	0	0	mod-new
+ve-semigrass-bush	0	0	0	1	0	0	0		0	1.0	0.0			1	0	1	1	mod-new
+ve-semigrass-wall	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-semigrass	0	0	0	1	0	0	0		0	1.0	0.0		{plant}	0	0	0	0	mod-new
+ve-tree	0	0	0	1	0	1	0		0	1.0	0.0			1	0	0	0	mod-new
+ve-dark-ground	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-dark-metal-repaired	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-green-ground	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-lava-rock	0	0	0	1	0	0	0		0	1.0	0.0		{heatwater}	0	0	0	0	mod-new
+ve-deepslate-brick-wall	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-deepslate-brick	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-deepslate-wall	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-deepslate	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-ferric-rock	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-ferric-shale-boulder	0	0	0	1	0	0	0		0	1.0	0.0			1	0	1	1	mod-new
+ve-ferric-shale-wall	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-ferric-shale	0	0	0	1	0	0	0	ferric-shale-cobble	0	1.0	0.0		{water}	0	0	0	0	mod-new
+ve-fiber-snow	0	0	0	1	0	0	0		0	1.0	0.0		{waterheat}	0	0	0	0	mod-new
+ve-frostone-boulder	0	0	0	1	0	0	0		0	1.0	0.0			1	0	1	1	mod-new
+ve-frostone-radioactive	0	0	0	1	0	0	0		0	1.0	0.0		{waterheat}	0	0	0	0	mod-new
+ve-frostone-wall	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-frostone	0	0	0	1	0	0	0		0	1.0	0.0		{waterheat}	0	0	0	0	mod-new
+ve-glasspam-root	0	1	0	1	0	0	0		0	1.0	0.0			1	0	0	0	mod-new
+ve-glasspam	0	0	0	1	0	0	0		0	1.0	0.0			1	0	1	1	mod-new
+ve-hard-ice-cracked	0	0	0	1	0	0	0		0	1.0	0.0		{waterheat}	0	0	0	0	mod-new
+ve-hard-ice	0	0	0	1	0	0	0		0	1.0	0.0		{waterheat}	0	0	0	0	mod-new
+ve-hard-snow-molten	0	0	0	1	0	0	0		0	1.0	0.0		{waterheat}	0	0	0	0	mod-new
+ve-hard-snow	0	0	0	1	0	0	0		0	1.0	0.0		{waterheat}	0	0	0	0	mod-new
+ve-mirmat	0	0	0	1	0	0	0		0	1.0	0.0			1	0	1	1	mod-new
+ve-multi-silvelade	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-nitroalkoss-plant	0	0	0	1	1	0	0		0	1.0	0.0			1	1	1	1	mod-new
+ve-outrayer	0	0	0	1	0	0	0		0	1.0	0.0			1	0	1	0	mod-new
+ve-red-soil-finely	0	0	0	1	0	0	0	red-soil	0	1.0	0.0		{water}	0	0	0	0	mod-new
+ve-red-soil-floor	0	0	0	1	0	0	0	red-soil	0	1.0	0.0		{water}	0	0	0	0	mod-new
+ve-red-soil-frozen-wall	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-red-soil-frozen	0	0	0	1	0	0	0	red-soil	0	1.0	0.0		{waterheat}	0	0	0	0	mod-new
+ve-red-soil-muddy-heavy	0	0	0	1	0	0	0		0	1.0	0.0		{water}	0	0	0	0	mod-new
+ve-red-soil-muddy	0	0	0	1	0	0	0		0	1.0	0.0		{water}	0	0	0	0	mod-new
+ve-red-soil-pebble	0	0	0	1	0	0	0		0	1.0	0.0		{water}	0	0	0	0	mod-new
+ve-red-soil-wall	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-red-soil-wet-wall	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-red-soil-wet	0	0	0	1	0	0	0	red-soil	0	1.0	0.0		{water}	0	0	0	0	mod-new
+ve-silvelade-large	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-silvelade	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-swamp-water-muddy	0	0	0	1	0	0	0		0	1.0	0.0		{water}	0	0	0	0	mod-new
+ve-swamp-water-shallow	0	0	0	1	0	0	0		0	1.0	0.0		{water}	0	0	0	0	mod-new
+ve-swamp-water	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-withered-reflector	0	1	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-metal-tiles-13ve	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-metal-tiles-14ve	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-metal-tiles-15ve	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-metal-tiles-16ve	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-ore-aluminium	0	1	1	1	0	0	0	aluminium	0	1.0	0.0			0	0	0	0	mod-new
+ve-ore-catalyzon	0	1	1	1	0	0	0	catalyzon	0	1.0	0.0			0	0	0	0	mod-new
+ve-ore-chromium-maress	0	1	1	1	0	0	0	chromium	0	1.0	0.0			0	0	0	0	mod-new
+ve-ore-chromium	0	1	1	1	0	0	0	chromium	0	1.0	0.0			0	0	0	0	mod-new
+ve-ore-cobalt	0	1	1	1	0	0	0	cobalt	0	1.0	0.0			0	0	0	0	mod-new
+ve-ore-ferrum	0	1	1	1	0	0	0	ferrum	0	1.0	0.0			0	0	0	0	mod-new
+ve-ore-pyratite	0	1	1	1	0	0	0	pyratite	0	1.0	0.0			0	0	0	0	mod-new
+ve-ore-salt	0	1	1	1	0	0	0	salt	0	1.0	0.0			0	0	0	0	mod-new
+ve-ore-silver-pure	0	1	1	1	0	0	0	silver	0	1.0	0.0			0	0	0	0	mod-new
+ve-ore-silver	0	1	1	1	0	0	0	silver	0	1.0	0.0			0	0	0	0	mod-new
+ve-ore-tantalum	0	1	1	1	0	0	0	tantalum	0	1.0	0.0			0	0	0	0	mod-new
+ve-ore-thorium-maress	0	1	1	1	0	0	0	thorium	0	1.0	0.0			0	0	0	0	mod-new
+ve-ore-wall-aluminium	0	1	1	1	0	0	1	aluminium	0	1.0	0.0			0	0	0	0	mod-new
+ve-ore-wall-quartz	0	1	1	1	0	0	1	quartz	0	1.0	0.0			0	0	0	0	mod-new
+ve-pure-dark	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-red-ground	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-melon-shell-dark	0	0	0	1	0	0	0		0	1.0	0.0		{watersporesteam}	0	0	0	0	mod-new
+ve-melon-shell-wall	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-melon-shell	0	0	0	1	0	0	0		0	1.0	0.0		{watersporesteam}	0	0	0	0	mod-new
+ve-melon-vascular	0	0	0	1	0	0	0		0	1.0	0.0		{watersporesteam}	0	0	0	0	mod-new
+ve-melondirt-wall	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-melondirt-water	0	0	0	1	0	0	0	melon-dirt	0	1.0	0.0		{spore}	0	0	0	0	mod-new
+ve-melondirt-white	0	0	0	1	0	0	0		0	1.0	0.0		{watersporesteam}	0	0	0	0	mod-new
+ve-melondirt	0	0	0	1	0	0	0	melon-dirt	0	1.0	0.0		{watersporesteam}	0	0	0	0	mod-new
+ve-melonwater-deep	0	0	0	1	0	0	0		0	1.0	0.0		{spore}	0	0	0	0	mod-new
+ve-melonwater	0	0	0	1	0	0	0		0	1.0	0.0		{spore}	0	0	0	0	mod-new
+ve-spore-melondirt-moss	0	0	0	1	0	0	0	spore-pod	0	1.0	0.0		{sporesteam}	0	0	0	0	mod-new
+ve-spore-melondirt-wall	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-spore-melondirt	0	0	0	1	0	0	0		0	1.0	0.0		{sporesteam}	0	0	0	0	mod-new
+ve-spore-melonwater-deep	0	0	0	1	0	0	0		0	1.0	0.0		{spore}	0	0	0	0	mod-new
+ve-spore-melonwater	0	0	0	1	0	0	0		0	1.0	0.0		{sporesteam}	0	0	0	0	mod-new
+ve-watermelon	0	0	0	1	1	1	0		0	1.0	0.0			1	1	1	1	mod-new
+ve-zenith-base-lamp-green	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-zenith-base-lamp-purple	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-zenith-base-lamp-red	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-zenith-base-lamp-unlit	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-zenith-base-lamp	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-dysharmony-fluid-floor	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-volcanic-rock	0	0	0	1	0	0	0		0	1.0	0.0		{heatwater}	0	0	0	0	mod-new
+ve-white-ground	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-fluid-sorter	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-m-fluid-sorter	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-isomorphic-memory	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-heat-turbine-generator	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-m-boiler	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-config-melter	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-isomorphic-cultivator	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-m-reduction-chamber	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-m-upgraded-reaction-pool	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-core-boss	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-map-power-source	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-sandbox-cover	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-advanced-launch-pad	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-core-general-final	0	0	0	1	1	0	0		0	1.0	0.0			0	1	0	0	mod-new
+ve-core-general-fungikiller	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-core-general-stg	0	0	0	1	1	0	0		0	1.0	0.0			0	1	0	0	mod-new
+ve-core-holder	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-core-singularity-crux	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-gamma-block	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-isomorphic-accelerator-crux	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-any-projector	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-bridge3	0	0	0	1	0	0	0	lead	0	1.0	0.0		{sandsporesheatsteamwateroil}	0	0	0	0	mod-new
+ve-core-thorium	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-spepipe	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-test-accelerator	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-test-beam	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-test-boulder	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-test-chain-burst	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-test-chain-drill	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-test-chain-pump	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-test-display-storage	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-test-gunmu-driver	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-test-instant-convey	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-test-nooverheat	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-test-omega-spawn	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-test-require-change	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-test-sectordestroyer	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-test-selfdigger	0	0	0	1	0	0	0		0	1.0	0.0		{heat}	0	0	0	0	mod-new
+ve-test-shield-wall	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-test-stack-rail	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-test-superlargecanvas	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-test-turret	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-test-turret2	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-test-turret3	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-test-unloader	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-test-wall	0	0	0	1	0	0	0		0	1.0	0.0		{sand}	0	0	0	0	mod-new
+ve-test4spawn	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-testrec	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-titanic-plastanium-wall	0	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-boosted-electrolyzer	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-compounder	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-core-zone-cyclant-center-huge	0	0	0	1	0	0	0		0	1.0	0.0		{water}	0	0	0	0	mod-new
+ve-core-zone-cyclant-center-large	0	0	0	1	0	0	0		0	1.0	0.0		{water}	0	0	0	0	mod-new
+ve-core-zone-cyclant-center	0	0	0	1	0	0	0		0	1.0	0.0		{water}	0	0	0	0	mod-new
+ve-core-zone-cyclant-dot	0	0	0	1	0	0	0		0	1.0	0.0		{water}	0	0	0	0	mod-new
+ve-hydrogen-can	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-super-unit-module	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+ve-ultra-unit-module	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+蓝钢拓展-发射台	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+蓝钢拓展-小型发射台	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+蓝钢拓展-蓝钢发射台	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+蓝钢拓展-轻质蓝钢发射台	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+蓝钢拓展-重型发射台	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+蓝钢拓展-亚光速质驱	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+蓝钢拓展-蓝钢质量驱动器	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+蓝钢拓展-钢桶子驱动器	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new
+蓝钢拓展-钢桶子驱动器—改	0	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0	mod-new

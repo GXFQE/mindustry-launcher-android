@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  启动器图标（自适应）。
+  ⚠️ 目录名必须是 `mipmap-anydpi-v26`：`anydpi` 表示"与密度无关"（矢量，任何 dpi 都用它），
+     `-v26` 是自适应图标的起始 API。本工程 minSdk = 26 ⇒ 不需要 PNG 兜底。
+  ⚠️ `<monochrome>` 是 API 33+ 的"主题图标"层（Android 13 起用户可让图标跟主题取色）。
+     旧系统（26~32）**认不出这个标签会直接跳过** —— 这正是它被设计成独立子标签的原因，
+     所以放在 v26 里是安全的（Android Studio 的图标向导也是这么生成的）。
+     这里**直接复用前景层**：它本来就是"透明底 + 纯白剪影"，正好是主题图标要的形状
+     （少一份文件 = 少一处会跟前景层走样的地方）。
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/ic_launcher_background" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+    <monochrome android:drawable="@drawable/ic_launcher_foreground" />
+</adaptive-icon>

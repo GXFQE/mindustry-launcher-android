@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  F1b：静态卡片底（不可交互的容器用，如操作分组卡、状态卡）。
+  圆角刻意写字面量而不用 @dimen：<shape> 的 corners 引用 dimen 在部分工具链上解析不稳。
+  改圆角时请与 card_bg_press / btn_primary / item_* 里的值一起改。
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/card" />
+    <corners android:radius="14dp" />
+    <stroke android:width="1dp" android:color="@color/card_stroke" />
+</shape>

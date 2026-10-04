@@ -1,0 +1,7 @@
+dev_backup_restore 槽="f19-real" 快照数=1
+选中 v2 快照：20261002-113420   自动备份  39 个文件 1.0 KB
+✅ 已从快照恢复到槽「f19-real」
+    快照：20261002-113420   自动备份
+    文件：39 / 39  （1.0 KB）
+    位置：/storage/emulated/0/Android/data/io.mdt.launcher/slot-f19-real
+

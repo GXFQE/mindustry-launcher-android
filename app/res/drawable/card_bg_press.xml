@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  F1b：可按压的卡片底（列表行、卡片式按钮）。
+
+  ★ 按下状态是"父级替子级按下"：行根（谁接了点击谁就是根）被按下时，
+    ViewGroup.dispatchSetPressed() 会把 pressed 转派给**所有不可点击的子视图**，
+    所以本背景虽挂在里层卡片上，照样能收到 state_pressed。
+    （这也意味着：行内那个自己 clickable 的按钮不会被转派，这正是我们要的。）
+    旧注释写的"ListView 会派发"只是当时那一种场景，机制其实是 ViewGroup 通用的。
+
+  ⚠️ 两态的 corners / stroke 必须完全一致，否则按下瞬间圆角会"跳"一下。
+-->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_pressed="true">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/card_press" />
+            <corners android:radius="14dp" />
+            <stroke android:width="1dp" android:color="@color/card_stroke" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/card" />
+            <corners android:radius="14dp" />
+            <stroke android:width="1dp" android:color="@color/card_stroke" />
+        </shape>
+    </item>
+</selector>

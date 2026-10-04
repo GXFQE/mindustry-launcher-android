@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  F1b：主界面「版本」列表行（卡片风重做）。
+  结构：┌──────────────────────────────────────────┐
+        │ [图标]  标题 ................ [槽徽标]  │
+        │         副标题                          │  [ 槽 ]
+        │         ⚠ 同槽冲突警告                  │
+        └──────────────────────────────────────────┘
+
+  ★ 两层结构（外层 padding 提供行距 + 内层卡片）是 F1b 为了绕开
+    "AbsListView 的 item 根 layout_margin 被忽略"而定的；F3b 换成 LinearLayout
+    之后 margin 其实可用了，但结构保持不变（少改一处是一处），
+    含义只是"行距由外层 padding 给，卡片本体在里层"。
+    横向间距不在这里做 —— 由列表容器的 paddingStart/End 统一给。
+
+  ★ F3b：原先这里挂的 descendantFocusability="blocksDescendants" 已移除。
+    它当年的唯一用途是阻止行内「槽」按钮抢焦点、以保住 ListView 的
+    onItemClick（点击整行启动）。现在整行的点击由 MainActivity 直接
+    setOnClickListener 到本布局的根上，不再经过 AdapterView 的 item 机制，
+    该属性纯属冗余。真机已复测「点整行启动」「点槽按钮弹窗」两条路径。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingBottom="@dimen/card_gap">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@drawable/card_bg_press"
+        android:paddingStart="14dp"
+        android:paddingEnd="8dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="12dp">
+
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_app"
+            android:tint="@color/accent" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="12dp"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <!--
+                  ★ F7 修正：这里**不能**用 singleLine。
+                  实测（竖屏 1224px @520dpi）：右边「槽徽标 + 槽按钮」吃掉约 460px，
+                  留给标题的只有 569px，而 `MindustryX  8-official-2026.09.X37` 约需 700px
+                  ⇒ 被 ellipsize 成 `MindustryX  8-official-…`，**版本号正好是被切掉的那截**。
+                  需求原文：「游戏的版本号被折叠了」。
+                  改成最多两行：有空间就是一行（观感不变），放不下就从空格处折行，
+                  保证 label 与版本号**都能看全**。ellipsize 保留，防极端长 label。
+                -->
+                <TextView
+                    android:id="@+id/ver_title"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:maxLines="2"
+                    android:ellipsize="end"
+                    android:lineSpacingExtra="1dp"
+                    android:textSize="15sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:textColor="@color/fg" />
+
+                <TextView
+                    android:id="@+id/ver_slot_badge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:background="@drawable/badge_slot"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
+                    android:paddingTop="2dp"
+                    android:paddingBottom="2dp"
+                    android:textSize="11sp"
+                    android:textColor="@color/chip_fg" />
+            </LinearLayout>
+
+            <!--
+              ★ F7：副标题同样从 singleLine 放开到两行。
+                同因（横向只有 764px，被「槽徽标 + 槽按钮」挤掉一截）：
+                `com.github.tinylake.mindustryX · 75.7 MB` 原来会显示成 `... 75.7 …`。
+                标题与副标题用同一条规则，卡片高度才可预测（最多 2+2+2 行）。
+            -->
+            <TextView
+                android:id="@+id/ver_sub"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="3dp"
+                android:maxLines="2"
+                android:ellipsize="end"
+                android:textSize="12sp"
+                android:textColor="@color/fg_muted" />
+
+            <TextView
+                android:id="@+id/ver_conflict"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="4dp"
+                android:textSize="11sp"
+                android:lineSpacingExtra="2dp"
+                android:textColor="@color/chip_fg_warn"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/ver_slot_btn"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:background="@drawable/btn_ghost"
+            android:clickable="true"
+            android:focusable="false"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            android:text="@string/row_slot_btn"
+            android:textSize="13sp"
+            android:fontFamily="sans-serif-medium"
+            android:textColor="@color/accent" />
+    </LinearLayout>
+</LinearLayout>

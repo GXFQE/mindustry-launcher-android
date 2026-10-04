@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  地图页（槽的子页面，REF §56）：**不再用弹窗** —— 弹窗属于发起它的那个页面，
+  关掉之后用户会落在"上一级"（用户 2026-10-03 反馈："查看地图后点关闭会返回到上一级页面"）。
+  做成独立页面后：返回键/返回箭头就回到槽二级页面。
+
+  ★ 这里是**页面自己的 ListView**（不在 ScrollView 里 ⇒ 没有 F2b 那条"高度塌掉"的问题）。
+  ★★ 顶部区 = 表头 + **「导入地图…」/「导出地图…」两行**（用户 2026-10-03 定案：
+     "导入和导出都放页面顶上吧"）。动作行放底部会盖住列表末行、手指按在它上面时列表滑不动。
+
+  🔴 根节点必须有 `@+id/root`，且 Activity 必须调 `Util.applySystemInsets(root)`：
+     targetSdk ≥ 35 强制 edge-to-edge ⇒ 没有这一步，**整页内容从屏幕 y=0 开始画**，
+     被状态栏（0~112px）+ 顶栏（112~305px）整块盖住。真机实测（第 81 轮，`uiautomator dump`）：
+     maps_head = [0,0][1224,112]、导入行 = [46,112][1178,316] —— view 在树里、
+     有文字，但**一个像素都看不见**，列表顶上还像"被切掉一行"。
+     ⚠️ 别改成 `android:fitsSystemWindows="true"`：Util.java 里写过它在 edge-to-edge 下不可靠，
+        而且另外 5 个页面走的都是 applySystemInsets（两套写法并存 = 迟早只修一边）。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bg">
+
+    <TextView
+        android:id="@+id/maps_head"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="6dp"
+        android:lineSpacingExtra="2dp"
+        android:textColor="@color/fg_muted"
+        android:textSize="12sp" />
+
+    <LinearLayout
+        android:id="@+id/maps_actions"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@drawable/card_bg"
+        android:layout_marginStart="14dp"
+        android:layout_marginEnd="14dp"
+        android:layout_marginBottom="8dp">
+
+        <include
+            android:id="@+id/row_maps_import"
+            layout="@layout/row_action"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginStart="62dp"
+            android:background="@color/divider" />
+
+        <include
+            android:id="@+id/row_maps_export"
+            layout="@layout/row_action"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+    </LinearLayout>
+
+    <!--
+      ★ 空态（2026-10-04 补）。可见性由 MapsActivity 的清点结果控制。
+      ⚠️ 为什么必须有：这句 `maps_empty_fmt` 早就写好了，但**全工程零引用**（孤儿串）——
+         一张图都没有时，用户只看到表头「本槽 0 · 游戏自带 0 · 模组自带 0」+ 一整片空白，
+         既不知道"为什么没有"，也不知道"下一步该干什么"。而"槽还没指到版本"时必然出现。
+      🔴 位置必须在 ListView **之前**：下面那个 ListView 是 `weight=1`（吃掉剩余高度），
+         空态若排在它后面，就会被顶到屏幕最底部（其它页面的空态都紧跟卡片）。
+      ⚠️ 样式与别的页面空态一致（见 activity_main.xml 的 ver_empty）。
+    -->
+    <TextView
+        android:id="@+id/maps_empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="28dp"
+        android:gravity="center"
+        android:textAlignment="center"
+        android:textSize="13sp"
+        android:lineSpacingExtra="4dp"
+        android:textColor="@color/fg_muted"
+        android:visibility="gone" />
+
+    <ListView
+        android:id="@+id/maps_list"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:divider="@null"
+        android:dividerHeight="0dp"
+        android:paddingBottom="8dp"
+        android:clipToPadding="false" />
+</LinearLayout>

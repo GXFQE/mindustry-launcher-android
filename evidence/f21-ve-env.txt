@@ -1,0 +1,158 @@
+== ① 每个 type 的默认标志（JSON 里没写时取这些）==
+type               isFloor  solid    breakable   destructible alwaysReplace  unitMoveBreakable update  
+Prop               false    false    true        false        true           true              false   
+WobbleProp         <构造不了：java.lang.reflect.InvocationTargetException>
+StaticProp         <构造不了：java.lang.reflect.InvocationTargetException>
+StaticTree         <构造不了：java.lang.reflect.InvocationTargetException>
+TreeBlock          <构造不了：java.lang.reflect.InvocationTargetException>
+StaticWall         <构造不了：java.lang.reflect.InvocationTargetException>
+TiledWall          <构造不了：java.lang.reflect.InvocationTargetException>
+ColoredWall        <构造不了：java.lang.reflect.InvocationTargetException>
+Cliff              <构造不了：java.lang.reflect.InvocationTargetException>
+TallBlock          <构造不了：java.lang.reflect.InvocationTargetException>
+Seaweed            <构造不了：java.lang.reflect.InvocationTargetException>
+SeaBush            <构造不了：java.lang.reflect.InvocationTargetException>
+Floor              <构造不了：java.lang.reflect.InvocationTargetException>
+OreBlock           <构造不了：java.lang.reflect.InvocationTargetException>
+OverlayFloor       <构造不了：java.lang.reflect.InvocationTargetException>
+ShallowLiquid      <构造不了：java.lang.reflect.InvocationTargetException>
+TiledFloor         <构造不了：java.lang.reflect.InvocationTargetException>
+EmptyFloor         <构造不了：java.lang.reflect.InvocationTargetException>
+AirBlock           <构造不了：java.lang.reflect.InvocationTargetException>
+SpawnBlock         <构造不了：java.lang.reflect.InvocationTargetException>
+RemoveWall         <构造不了：java.lang.reflect.InvocationTargetException>
+RemoveOre          <构造不了：java.lang.reflect.InvocationTargetException>
+ColoredFloor       <构造不了：java.lang.reflect.InvocationTargetException>
+CharacterOverlay   <构造不了：java.lang.reflect.InvocationTargetException>
+RuneOverlay        <构造不了：java.lang.reflect.InvocationTargetException>
+WallCrafter        <构造不了：类不存在>
+SolidPump          <构造不了：类不存在>
+
+小计：永久遮挡 86 ；可拆遮挡 10 ；资源 28 ；覆盖原版 16
+
+== ② vanilla-expansion 的 content/blocks/environment（松树在第 1 行）==
+文件                                 type           可拆?    资源?    breakable alwaysR  unitMoveBrk 判定
+basalt.json                        (无 type)       不能     -      false     false    false      永久遮挡（覆盖原版）
+blue-ground.json                   Floor          不能     -      false     false    false      永久遮挡
+bush.json                          Prop           能      -      true      true     true       可拆遮挡
+core-zone-cyclant.json             Floor          不能     -      false     false    false      永久遮挡
+core-zone.json                     (无 type)       不能     -      false     false    false      永久遮挡（覆盖原版）
+cyclant/accessible-deep-water.json Floor          不能     -      false     false    false      永久遮挡
+cyclant/antigrass-dry.json         Floor          不能     -      false     false    false      永久遮挡
+cyclant/antigrass-wall.json        StaticWall     不能     -      false     false    false      永久遮挡
+cyclant/antigrass.json             Floor          不能     -      false     false    false      永久遮挡
+cyclant/carbon-shale-boulder.json  Prop           能      -      true      true     true       可拆遮挡
+cyclant/carbon-shale-wall.json     StaticWall     不能     -      false     false    false      永久遮挡
+cyclant/carbon-shale.json          Floor          不能     有      false     false    false      可挖方块(资源)
+cyclant/deep-water-oil.json        Floor          不能     -      false     false    false      永久遮挡
+cyclant/flowing-lava.json          Floor          不能     -      false     false    false      永久遮挡
+cyclant/gravel.json                Floor          不能     有      false     false    false      可挖方块(资源)
+cyclant/hill-stone-boulder.json    Prop           能      -      true      true     true       可拆遮挡
+cyclant/hill-stone-wall.json       StaticWall     不能     -      false     false    false      永久遮挡
+cyclant/hill-stone.json            Floor          不能     -      false     false    false      永久遮挡
+cyclant/salty-ice.json             Floor          不能     有      false     false    false      可挖方块(资源)
+cyclant/semigrass-bush.json        WobbleProp     不能     -      false     false    false      永久遮挡
+cyclant/semigrass-wall.json        StaticWall     不能     -      false     false    false      永久遮挡
+cyclant/semigrass.json             Floor          不能     -      false     false    false      永久遮挡
+cyclant/tree.json                  StaticTree     能      -      true      false    false      可拆遮挡
+dark-ground.json                   Floor          不能     -      false     false    false      永久遮挡
+dark-metal-repaired.json           StaticWall     不能     -      false     false    false      永久遮挡
+dirt.json                          (无 type)       不能     -      false     false    false      永久遮挡（覆盖原版）
+grass.json                         (无 type)       不能     -      false     false    false      永久遮挡（覆盖原版）
+green-ground.json                  Floor          不能     -      false     false    false      永久遮挡
+hotrock.json                       (无 type)       不能     -      false     false    false      永久遮挡（覆盖原版）
+lava-rock.json                     Floor          不能     -      false     false    false      永久遮挡
+magmarock.json                     (无 type)       不能     -      false     false    false      永久遮挡（覆盖原版）
+maress/deepslate-brick-wall.json   StaticWall     不能     -      false     false    false      永久遮挡
+maress/deepslate-brick.json        Floor          不能     -      false     false    false      永久遮挡
+maress/deepslate-wall.json         StaticWall     不能     -      false     false    false      永久遮挡
+maress/deepslate.json              Floor          不能     -      false     false    false      永久遮挡
+maress/ferric-rock.json            TallBlock      不能     -      false     false    false      永久遮挡
+maress/ferric-shale-boulder.json   Prop           能      -      true      true     true       可拆遮挡
+maress/ferric-shale-wall.json      StaticWall     不能     -      false     false    false      永久遮挡
+maress/ferric-shale.json           Floor          不能     有      false     false    false      可挖方块(资源)
+maress/fiber-snow.json             Floor          不能     -      false     false    false      永久遮挡
+maress/frostone-boulder.json       Prop           能      -      true      true     true       可拆遮挡
+maress/frostone-radioactive.json   Floor          不能     -      false     false    false      永久遮挡
+maress/frostone-wall.json          StaticWall     不能     -      false     false    false      永久遮挡
+maress/frostone.json               Floor          不能     -      false     false    false      永久遮挡
+maress/glasspam-root.json          OverlayFloor   能      -      true      false    false      可拆遮挡
+maress/glasspam.json               WobbleProp     能      -      false     false    true       可拆遮挡
+maress/hard-ice-cracked.json       Floor          不能     -      false     false    false      永久遮挡
+maress/hard-ice.json               Floor          不能     -      false     false    false      永久遮挡
+maress/hard-snow-molten.json       Floor          不能     -      false     false    false      永久遮挡
+maress/hard-snow.json              Floor          不能     -      false     false    false      永久遮挡
+maress/mirmat.json                 WobbleProp     不能     -      false     false    false      永久遮挡
+maress/multi-silvelade.json        TreeBlock      不能     -      false     false    false      永久遮挡
+maress/nitroalkoss-plant.json      WobbleProp     能      -      false     false    false      可拆遮挡
+maress/outrayer.json               WobbleProp     不能     -      false     false    false      永久遮挡
+maress/red-soil-finely.json        Floor          不能     有      false     false    false      可挖方块(资源)
+maress/red-soil-floor.json         Floor          不能     有      false     false    false      可挖方块(资源)
+maress/red-soil-frozen-wall.json   StaticWall     不能     -      false     false    false      永久遮挡
+maress/red-soil-frozen.json        Floor          不能     有      false     false    false      可挖方块(资源)
+maress/red-soil-muddy-heavy.json   Floor          不能     -      false     false    false      永久遮挡
+maress/red-soil-muddy.json         Floor          不能     -      false     false    false      永久遮挡
+maress/red-soil-pebble.json        Floor          不能     -      false     false    false      永久遮挡
+maress/red-soil-wall.json          StaticWall     不能     -      false     false    false      永久遮挡
+maress/red-soil-wet-wall.json      StaticWall     不能     -      false     false    false      永久遮挡
+maress/red-soil-wet.json           Floor          不能     有      false     false    false      可挖方块(资源)
+maress/silvelade-large.json        TreeBlock      不能     -      false     false    false      永久遮挡
+maress/silvelade.json              TreeBlock      不能     -      false     false    false      永久遮挡
+maress/swamp-water-muddy.json      Floor          不能     -      false     false    false      永久遮挡
+maress/swamp-water-shallow.json    Floor          不能     -      false     false    false      永久遮挡
+maress/swamp-water.json            Floor          不能     -      false     false    false      永久遮挡
+maress/withered-reflector.json     OverlayFloor   不能     -      false     false    false      永久遮挡
+metal-floor-2.json                 (无 type)       不能     -      false     false    false      永久遮挡（覆盖原版）
+metal-floor-3.json                 (无 type)       不能     -      false     false    false      永久遮挡（覆盖原版）
+metal-floor-4.json                 (无 type)       不能     -      false     false    false      永久遮挡（覆盖原版）
+metal-floor-5.json                 (无 type)       不能     -      false     false    false      永久遮挡（覆盖原版）
+metal-floor-damaged.json           (无 type)       不能     -      false     false    false      永久遮挡（覆盖原版）
+metal-floor.json                   (无 type)       不能     -      false     false    false      永久遮挡（覆盖原版）
+metal-tiles-13ve.json              Floor          不能     -      false     false    false      永久遮挡
+metal-tiles-14ve.json              Floor          不能     -      false     false    false      永久遮挡
+metal-tiles-15ve.json              Floor          不能     -      false     false    false      永久遮挡
+metal-tiles-16ve.json              Floor          不能     -      false     false    false      永久遮挡
+mud.json                           (无 type)       不能     -      false     false    false      永久遮挡（覆盖原版）
+ore-aluminium.json                 OreBlock       不能     有      false     false    false      可挖方块(资源)
+ore-catalyzon.json                 OreBlock       不能     有      false     false    false      可挖方块(资源)
+ore-chromium-maress.json           OreBlock       不能     有      false     false    false      可挖方块(资源)
+ore-chromium.json                  OreBlock       不能     有      false     false    false      可挖方块(资源)
+ore-cobalt.json                    OreBlock       不能     有      false     false    false      可挖方块(资源)
+ore-ferrum.json                    OreBlock       不能     有      false     false    false      可挖方块(资源)
+ore-pyratite.json                  OreBlock       不能     有      false     false    false      可挖方块(资源)
+ore-salt.json                      OreBlock       不能     有      false     false    false      可挖方块(资源)
+ore-silver-pure.json               OreBlock       不能     有      false     false    false      可挖方块(资源)
+ore-silver.json                    OreBlock       不能     有      false     false    false      可挖方块(资源)
+ore-tantalum.json                  OreBlock       不能     有      false     false    false      可挖方块(资源)
+ore-thorium-maress.json            OreBlock       不能     有      false     false    false      可挖方块(资源)
+ore-wall-aluminium.json            OreBlock       不能     有      false     false    false      可挖方块(资源)
+ore-wall-quartz.json               OreBlock       不能     有      false     false    false      可挖方块(资源)
+pure-dark.json                     StaticWall     不能     -      false     false    false      永久遮挡
+red-ground.json                    Floor          不能     -      false     false    false      永久遮挡
+salt.json                          (无 type)       不能     有      false     false    false      可挖方块(资源)（覆盖原版）
+sand-water.json                    (无 type)       不能     有      false     false    false      可挖方块(资源)（覆盖原版）
+shale.json                         (无 type)       不能     有      false     false    false      可挖方块(资源)（覆盖原版）
+sitrullus/melon-shell-dark.json    Floor          不能     -      false     false    false      永久遮挡
+sitrullus/melon-shell-wall.json    StaticWall     不能     -      false     false    false      永久遮挡
+sitrullus/melon-shell.json         Floor          不能     -      false     false    false      永久遮挡
+sitrullus/melon-vascular.json      Floor          不能     -      false     false    false      永久遮挡
+sitrullus/melondirt-wall.json      StaticWall     不能     -      false     false    false      永久遮挡
+sitrullus/melondirt-water.json     Floor          不能     有      false     false    false      可挖方块(资源)
+sitrullus/melondirt-white.json     Floor          不能     -      false     false    false      永久遮挡
+sitrullus/melondirt.json           Floor          不能     有      false     false    false      可挖方块(资源)
+sitrullus/melonwater-deep.json     Floor          不能     -      false     false    false      永久遮挡
+sitrullus/melonwater.json          Floor          不能     -      false     false    false      永久遮挡
+sitrullus/spore-melondirt-moss.json Floor          不能     有      false     false    false      可挖方块(资源)
+sitrullus/spore-melondirt-wall.json StaticWall     不能     -      false     false    false      永久遮挡
+sitrullus/spore-melondirt.json     Floor          不能     -      false     false    false      永久遮挡
+sitrullus/spore-melonwater-deep.json Floor          不能     -      false     false    false      永久遮挡
+sitrullus/spore-melonwater.json    Floor          不能     -      false     false    false      永久遮挡
+sitrullus/watermelon.json          Prop           能      -      true      true     true       可拆遮挡
+sitrullus/zenith-base-lamp-green.json Floor          不能     -      false     false    false      永久遮挡
+sitrullus/zenith-base-lamp-purple.json Floor          不能     -      false     false    false      永久遮挡
+sitrullus/zenith-base-lamp-red.json Floor          不能     -      false     false    false      永久遮挡
+sitrullus/zenith-base-lamp-unlit.json Floor          不能     -      false     false    false      永久遮挡
+sitrullus/zenith-base-lamp.json    Floor          不能     -      false     false    false      永久遮挡
+thavina/dysharmony-fluid-floor.json Floor          不能     -      false     false    false      永久遮挡
+volcanic-rock.json                 Floor          不能     -      false     false    false      永久遮挡
+white-ground.json                  Floor          不能     -      false     false    false      永久遮挡

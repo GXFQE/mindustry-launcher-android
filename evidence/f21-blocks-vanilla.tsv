@@ -1,0 +1,448 @@
+#name	isFloor	isOverlay	isOre	isStatic	synthetic	solid	wallOre	itemDrop	playerUnmineable	speed	damage	liquidDrop	attributes	breakable	destructible	alwaysReplace	unitMoveBreakable
+air	1	0	0	1	0	0	0		0	1.0	0.0			0	0	1	0
+spawn	1	1	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+remove-wall	0	0	0	1	0	0	0		0	null	null			0	0	0	0
+remove-ore	1	1	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+cliff	0	0	0	1	0	1	0		0	null	null			0	0	0	0
+build1	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+build2	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+build3	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+build4	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+build5	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+build6	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+build7	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+build8	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+build9	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+build10	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+build11	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+build12	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+build13	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+build14	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+build15	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+build16	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+deep-water	1	0	0	1	0	0	0		0	0.2	0.0	water		0	0	0	0
+shallow-water	1	0	0	1	0	0	0		0	0.5	0.0	water		0	0	0	0
+tainted-water	1	0	0	1	0	0	0		0	0.5	0.0	water	spores=0.15;	0	0	0	0
+deep-tainted-water	1	0	0	1	0	0	0		0	0.18	0.0	water	spores=0.15;	0	0	0	0
+darksand-tainted-water	1	0	0	1	0	0	0		0	0.75	0.0	water	spores=0.1;	0	0	0	0
+sand-water	1	0	0	1	0	0	0		0	0.8	0.0	water		0	0	0	0
+darksand-water	1	0	0	1	0	0	0		0	0.8	0.0	water		0	0	0	0
+tar	1	0	0	1	0	0	0		0	0.19	0.0	oil		0	0	0	0
+pooled-cryofluid	1	0	0	1	0	0	0		0	0.5	0.0	cryofluid		0	0	0	0
+molten-slag	1	0	0	1	0	0	0		0	0.19	0.0	slag	heat=0.85;	0	0	0	0
+space	1	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0
+empty	1	0	0	1	0	1	0		0	1.0	0.0			0	0	0	0
+stone	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+crater-stone	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+char	1	0	0	1	0	0	0		0	1.0	0.0		water=-0.25;	0	0	0	0
+basalt	1	0	0	1	0	0	0		0	1.0	0.0		water=-0.25;	0	0	0	0
+hotrock	1	0	0	1	0	0	0		0	1.0	0.0		heat=0.5;water=-0.5;	0	0	0	0
+magmarock	1	0	0	1	0	0	0		0	1.0	0.0		heat=0.75;water=-0.75;	0	0	0	0
+sand-floor	1	0	0	1	0	0	0	sand	1	1.0	0.0		oil=0.7;	0	0	0	0
+darksand	1	0	0	1	0	0	0	sand	1	1.0	0.0		oil=1.5;	0	0	0	0
+dirt	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+mud	1	0	0	1	0	0	0		0	0.6	0.0		water=1.0;	0	0	0	0
+dacite	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+rhyolite	1	0	0	1	0	0	0		0	1.0	0.0		water=-1.0;	0	0	0	0
+rhyolite-crater	1	0	0	1	0	0	0		0	1.0	0.0		water=-1.0;	0	0	0	0
+rough-rhyolite	1	0	0	1	0	0	0		0	1.0	0.0		water=-1.0;	0	0	0	0
+regolith	1	0	0	1	0	0	0		0	1.0	0.0		water=-1.0;	0	0	0	0
+yellow-stone	1	0	0	1	0	0	0		0	1.0	0.0		water=-1.0;	0	0	0	0
+carbon-stone	1	0	0	1	0	0	0		0	1.0	0.0		water=-1.0;	0	0	0	0
+ferric-stone	1	0	0	1	0	0	0		0	1.0	0.0		water=-1.0;	0	0	0	0
+ferric-craters	1	0	0	1	0	0	0		0	1.0	0.0		water=-1.0;	0	0	0	0
+beryllic-stone	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+crystalline-stone	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+crystal-floor	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+yellow-stone-plates	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+red-stone	1	0	0	1	0	0	0		0	1.0	0.0		water=-1.0;	0	0	0	0
+dense-red-stone	1	0	0	1	0	0	0		0	1.0	0.0		water=-1.0;	0	0	0	0
+red-ice	1	0	0	1	0	0	0		0	0.9	0.0		water=0.4;	0	0	0	0
+arkycite-floor	1	0	0	1	0	0	0		0	0.3	0.0	arkycite		0	0	0	0
+arkyic-stone	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+rhyolite-vent	1	0	0	1	0	0	0		0	1.0	0.0		steam=1.0;	0	0	0	0
+carbon-vent	1	0	0	1	0	0	0		0	1.0	0.0		steam=1.0;	0	0	0	0
+arkyic-vent	1	0	0	1	0	0	0		0	1.0	0.0		steam=1.0;	0	0	0	0
+yellow-stone-vent	1	0	0	1	0	0	0		0	1.0	0.0		steam=1.0;	0	0	0	0
+red-stone-vent	1	0	0	1	0	0	0		0	1.0	0.0		steam=1.0;	0	0	0	0
+crystalline-vent	1	0	0	1	0	0	0		0	1.0	0.0		steam=1.0;	0	0	0	0
+stone-vent	1	0	0	1	0	0	0		0	1.0	0.0		steam=1.0;	0	0	0	0
+basalt-vent	1	0	0	1	0	0	0		0	1.0	0.0		steam=1.0;	0	0	0	0
+redmat	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+bluemat	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+grass	1	0	0	1	0	0	0		0	1.0	0.0		water=0.1;	0	0	0	0
+salt	1	0	0	1	0	0	0		0	1.0	0.0		water=-0.3;oil=0.3;	0	0	0	0
+snow	1	0	0	1	0	0	0		0	1.0	0.0		water=0.2;	0	0	0	0
+ice	1	0	0	1	0	0	0		0	0.9	0.0		water=0.4;	0	0	0	0
+ice-snow	1	0	0	1	0	0	0		0	1.0	0.0		water=0.3;	0	0	0	0
+shale	1	0	0	1	0	0	0		0	1.0	0.0		oil=2.0;	0	0	0	0
+moss	1	0	0	1	0	0	0		0	1.0	0.0		spores=0.15;	0	0	0	0
+core-zone	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+spore-moss	1	0	0	1	0	0	0		0	1.0	0.0		spores=0.3;	0	0	0	0
+stone-wall	0	0	0	1	0	1	0		0	null	null		sand=1.0;	0	0	0	0
+spore-wall	0	0	0	1	0	1	0		0	null	null			0	0	0	0
+dirt-wall	0	0	0	1	0	1	0		0	null	null			0	0	0	0
+dacite-wall	0	0	0	1	0	1	0		0	null	null			0	0	0	0
+ice-wall	0	0	0	1	0	1	0		0	null	null			0	0	0	0
+snow-wall	0	0	0	1	0	1	0		0	null	null			0	0	0	0
+dune-wall	0	0	0	1	0	1	0		0	null	null		sand=2.0;	0	0	0	0
+regolith-wall	0	0	0	1	0	1	0		0	null	null		sand=1.0;	0	0	0	0
+yellow-stone-wall	0	0	0	1	0	1	0		0	null	null		sand=1.5;	0	0	0	0
+rhyolite-wall	0	0	0	1	0	1	0		0	null	null		sand=1.0;	0	0	0	0
+carbon-wall	0	0	0	1	0	1	0		0	null	null		sand=0.7;	0	0	0	0
+ferric-stone-wall	0	0	0	1	0	1	0		0	null	null		sand=0.5;	0	0	0	0
+beryllic-stone-wall	0	0	0	1	0	1	0		0	null	null		sand=1.2;	0	0	0	0
+arkyic-wall	0	0	0	1	0	1	0		0	null	null			0	0	0	0
+crystalline-stone-wall	0	0	0	1	0	1	0		0	null	null			0	0	0	0
+red-ice-wall	0	0	0	1	0	1	0		0	null	null			0	0	0	0
+red-stone-wall	0	0	0	1	0	1	0		0	null	null		sand=1.5;	0	0	0	0
+red-diamond-wall	0	0	0	1	0	1	0		0	null	null			0	0	0	0
+sand-wall	0	0	0	1	0	1	0		0	null	null		sand=2.0;	0	0	0	0
+salt-wall	0	0	0	1	0	1	0		0	null	null			0	0	0	0
+shrubs	0	0	0	1	0	1	0		0	null	null			0	0	0	0
+shale-wall	0	0	0	1	0	1	0		0	null	null			0	0	0	0
+spore-pine	0	0	0	1	0	1	0		0	null	null			0	0	0	0
+snow-pine	0	0	0	1	0	1	0		0	null	null			0	0	0	0
+pine	0	0	0	1	0	1	0		0	null	null			0	0	0	0
+white-tree-dead	0	0	0	1	0	1	0		0	null	null			0	0	0	0
+white-tree	0	0	0	1	0	1	0		0	null	null			0	0	0	0
+spore-cluster	0	0	0	1	0	0	0		0	null	null			1	0	1	1
+redweed	0	0	0	1	0	0	0		0	null	null			1	0	1	1
+pur-bush	0	0	0	1	0	0	0		0	null	null			1	0	1	1
+yellowcoral	0	0	0	1	0	0	0		0	null	null			1	0	1	1
+boulder	0	0	0	1	0	0	0		0	null	null			1	0	1	1
+snow-boulder	0	0	0	1	0	0	0		0	null	null			1	0	1	1
+shale-boulder	0	0	0	1	0	0	0		0	null	null			1	0	1	1
+sand-boulder	0	0	0	1	0	0	0		0	null	null			1	0	1	1
+dacite-boulder	0	0	0	1	0	0	0		0	null	null			1	0	1	1
+basalt-boulder	0	0	0	1	0	0	0		0	null	null			1	0	1	1
+carbon-boulder	0	0	0	1	0	0	0		0	null	null			1	0	1	1
+ferric-boulder	0	0	0	1	0	0	0		0	null	null			1	0	1	1
+beryllic-boulder	0	0	0	1	0	0	0		0	null	null			1	0	1	1
+yellow-stone-boulder	0	0	0	1	0	0	0		0	null	null			1	0	1	1
+arkyic-boulder	0	0	0	1	0	0	0		0	null	null			1	0	1	1
+crystal-cluster	0	0	0	1	0	1	0		0	null	null			0	0	0	0
+vibrant-crystal-cluster	0	0	0	1	0	1	0		0	null	null			0	0	0	0
+crystal-blocks	0	0	0	1	0	1	0		0	null	null			0	0	0	0
+crystal-orbs	0	0	0	1	0	1	0		0	null	null			0	0	0	0
+crystalline-boulder	0	0	0	1	0	0	0		0	null	null			1	0	1	1
+red-ice-boulder	0	0	0	1	0	0	0		0	null	null			1	0	1	1
+rhyolite-boulder	0	0	0	1	0	0	0		0	null	null			1	0	1	1
+red-stone-boulder	0	0	0	1	0	0	0		0	null	null			1	0	1	1
+metal-floor	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+metal-floor-damaged	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+metal-floor-2	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+metal-floor-3	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+metal-floor-4	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+metal-floor-5	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+dark-panel-1	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+dark-panel-2	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+dark-panel-3	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+dark-panel-4	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+dark-panel-5	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+dark-panel-6	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+dark-metal	0	0	0	1	0	1	0		0	null	null			0	0	0	0
+metal-tiles-1	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+metal-tiles-2	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+metal-tiles-3	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+metal-tiles-4	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+metal-tiles-5	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+metal-tiles-6	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+metal-tiles-7	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+metal-tiles-8	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+metal-tiles-9	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+metal-tiles-10	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+metal-tiles-11	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+metal-tiles-12	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+metal-tiles-13	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+metal-wall-1	0	0	0	1	0	1	0		0	null	null			0	0	0	0
+metal-wall-2	0	0	0	1	0	1	0		0	null	null			0	0	0	0
+metal-wall-3	0	0	0	1	0	1	0		0	null	null			0	0	0	0
+colored-floor	1	0	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+colored-wall	0	0	0	1	0	1	0		0	null	null			0	0	0	0
+character-overlay	1	1	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+character-overlay-white	1	1	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+rune-overlay	1	1	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+rune-overlay-crux	1	1	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+pebbles	1	1	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+tendrils	1	1	0	1	0	0	0		0	1.0	0.0			0	0	0	0
+ore-copper	1	1	1	1	0	0	0	copper	0	1.0	0.0			0	0	0	0
+ore-lead	1	1	1	1	0	0	0	lead	0	1.0	0.0			0	0	0	0
+ore-scrap	1	1	1	1	0	0	0	scrap	0	1.0	0.0			0	0	0	0
+ore-coal	1	1	1	1	0	0	0	coal	0	1.0	0.0			0	0	0	0
+ore-titanium	1	1	1	1	0	0	0	titanium	0	1.0	0.0			0	0	0	0
+ore-thorium	1	1	1	1	0	0	0	thorium	0	1.0	0.0			0	0	0	0
+ore-beryllium	1	1	1	1	0	0	0	beryllium	0	1.0	0.0			0	0	0	0
+ore-tungsten	1	1	1	1	0	0	0	tungsten	0	1.0	0.0			0	0	0	0
+ore-crystal-thorium	1	1	1	1	0	0	0	thorium	0	1.0	0.0			0	0	0	0
+ore-wall-thorium	1	1	1	1	0	0	1	thorium	0	1.0	0.0			0	0	0	0
+ore-wall-beryllium	1	1	1	1	0	0	1	beryllium	0	1.0	0.0			0	0	0	0
+graphitic-wall	0	0	0	1	0	1	0	graphite	0	null	null			0	0	0	0
+ore-wall-graphite	1	1	1	1	0	0	1	graphite	0	1.0	0.0			0	0	0	0
+ore-wall-tungsten	1	1	1	1	0	0	1	tungsten	0	1.0	0.0			0	0	0	0
+graphite-press	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+multi-press	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+silicon-smelter	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+silicon-crucible	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+kiln	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+plastanium-compressor	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+phase-weaver	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+surge-smelter	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+cryofluid-mixer	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+pyratite-mixer	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+blast-mixer	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+melter	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+separator	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+disassembler	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+spore-press	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+pulverizer	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+coal-centrifuge	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+incinerator	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+silicon-arc-furnace	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+electrolyzer	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+atmospheric-concentrator	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+oxidation-chamber	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+electric-heater	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+slag-heater	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+phase-heater	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+heat-redirector	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+small-heat-redirector	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+heat-router	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+slag-incinerator	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+carbide-crucible	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+slag-centrifuge	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+surge-crucible	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+cyanogen-synthesizer	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+phase-synthesizer	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+heat-reactor	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+copper-wall	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+copper-wall-large	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+titanium-wall	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+titanium-wall-large	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+plastanium-wall	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+plastanium-wall-large	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+thorium-wall	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+thorium-wall-large	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+phase-wall	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+phase-wall-large	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+surge-wall	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+surge-wall-large	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+door	0	0	0	1	1	0	0		0	null	null			0	1	0	0
+door-large	0	0	0	1	1	0	0		0	null	null			0	1	0	0
+scrap-wall	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+scrap-wall-large	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+scrap-wall-huge	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+scrap-wall-gigantic	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+thruster	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+beryllium-wall	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+beryllium-wall-large	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+tungsten-wall	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+tungsten-wall-large	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+blast-door	0	0	0	1	1	0	0		0	null	null			0	1	0	0
+reinforced-surge-wall	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+reinforced-surge-wall-large	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+carbide-wall	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+carbide-wall-large	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+shielded-wall	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+mender	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+mend-projector	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+overdrive-projector	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+overdrive-dome	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+force-projector	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+shock-mine	0	0	0	1	1	0	0		0	null	null			0	1	0	0
+radar	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+build-tower	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+regen-projector	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+shockwave-tower	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+shield-projector	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+large-shield-projector	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+conveyor	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+titanium-conveyor	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+plastanium-conveyor	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+armored-conveyor	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+junction	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+bridge-conveyor	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+phase-conveyor	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+sorter	0	0	0	1	1	0	0		0	null	null			0	1	0	0
+inverted-sorter	0	0	0	1	1	0	0		0	null	null			0	1	0	0
+router	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+distributor	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+overflow-gate	0	0	0	1	1	0	0		0	null	null			0	1	0	0
+underflow-gate	0	0	0	1	1	0	0		0	null	null			0	1	0	0
+unloader	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+mass-driver	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+duct	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+armored-duct	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+duct-router	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+overflow-duct	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+underflow-duct	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+duct-bridge	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+duct-unloader	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+surge-conveyor	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+surge-router	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+unit-cargo-loader	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+unit-cargo-unload-point	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+mechanical-pump	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+rotary-pump	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+impulse-pump	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+conduit	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+pulse-conduit	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+plated-conduit	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+liquid-router	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+liquid-container	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+liquid-tank	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+liquid-junction	0	0	0	1	1	0	0		0	null	null			0	1	0	0
+bridge-conduit	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+phase-conduit	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+reinforced-pump	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+reinforced-conduit	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+reinforced-liquid-junction	0	0	0	1	1	0	0		0	null	null			0	1	0	0
+reinforced-bridge-conduit	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+reinforced-liquid-router	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+reinforced-liquid-container	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+reinforced-liquid-tank	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+power-node	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+power-node-large	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+surge-tower	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+diode	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+battery	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+battery-large	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+combustion-generator	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+thermal-generator	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+steam-generator	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+differential-generator	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+rtg-generator	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+solar-panel	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+solar-panel-large	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+thorium-reactor	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+impact-reactor	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+beam-node	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+beam-tower	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+beam-link	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+turbine-condenser	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+chemical-combustion-chamber	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+pyrolysis-generator	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+flux-reactor	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+neoplasia-reactor	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+mechanical-drill	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+pneumatic-drill	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+laser-drill	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+blast-drill	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+water-extractor	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+cultivator	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+oil-extractor	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+vent-condenser	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+cliff-crusher	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+large-cliff-crusher	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+plasma-bore	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+large-plasma-bore	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+impact-drill	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+eruption-drill	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+core-shard	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+core-foundation	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+core-nucleus	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+core-bastion	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+core-citadel	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+core-acropolis	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+container	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+vault	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+reinforced-container	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+reinforced-vault	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+duo	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+scatter	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+scorch	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+hail	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+wave	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+lancer	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+arc	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+parallax	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+swarmer	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+salvo	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+segment	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+tsunami	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+fuse	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+ripple	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+cyclone	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+foreshadow	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+spectre	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+meltdown	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+breach	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+diffuse	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+sublimate	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+titan	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+disperse	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+afflict	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+lustre	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+scathe	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+smite	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+malign	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+ground-factory	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+air-factory	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+naval-factory	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+additive-reconstructor	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+multiplicative-reconstructor	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+exponential-reconstructor	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+tetrative-reconstructor	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+repair-point	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+repair-turret	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+tank-fabricator	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+ship-fabricator	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+mech-fabricator	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+tank-refabricator	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+ship-refabricator	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+mech-refabricator	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+prime-refabricator	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+tank-assembler	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+ship-assembler	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+mech-assembler	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+basic-assembler-module	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+unit-repair-tower	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+payload-conveyor	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+payload-router	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+reinforced-payload-conveyor	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+reinforced-payload-router	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+payload-mass-driver	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+large-payload-mass-driver	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+small-deconstructor	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+deconstructor	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+constructor	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+large-constructor	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+payload-loader	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+payload-unloader	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+power-source	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+power-void	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+item-source	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+item-void	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+liquid-source	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+liquid-void	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+payload-source	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+payload-void	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+heat-source	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+target-dummy	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+illuminator	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+legacy-mech-pad	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+legacy-unit-factory	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+legacy-unit-factory-air	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+legacy-unit-factory-ground	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+command-center	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+launch-pad	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+advanced-launch-pad	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+landing-pad	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+interplanetary-accelerator	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+message	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+switch	0	0	0	1	1	0	0		0	null	null			0	0	0	0
+micro-processor	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+logic-processor	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+hyper-processor	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+memory-cell	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+memory-bank	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+logic-display	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+large-logic-display	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+tile-logic-display	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+canvas	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+large-canvas	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+reinforced-message	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+world-processor	0	0	0	1	1	1	0		0	null	null			0	0	0	0
+world-cell	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+world-message	0	0	0	1	1	1	0		0	null	null			0	1	0	0
+world-switch	0	0	0	1	1	0	0		0	null	null			0	0	0	0

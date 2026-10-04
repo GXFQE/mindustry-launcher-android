@@ -1,0 +1,232 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  F13：模组管理页骨架（与 activity_saves / activity_settings 同款卡片风）。
+
+  结构：
+    外层 ScrollView（整页滚，横竖屏通用）
+      └ 内层 LinearLayout（vertical）
+          ├ 顶部区（随整页滚）
+          │   ├ 状态摘要卡 —— 「N 个模组 · 槽 X · 目标游戏 Y」，点开是完整路径与设置侧说明
+          │   └ 操作卡    —— 「查看的槽」（只读切换，用来做跨槽模组视图）
+          ├ 模组列表容器（LinearLayout，条目由代码 addView 全展开）
+          └ 空态 TextView
+
+  ★★ 为什么必须是 ScrollView / 为什么列表容器不能用 ListView：
+     与 activity_main / activity_saves 同因（横屏可用高 376dp；ScrollView 给子级的高度约束
+     是 UNSPECIFIED，ListView 在那个分支只按「padding + 单行」估高、条目不展开
+     ⇒ 外层滚动范围少算、底部条目永远滚不出来）。详见 activity_main.xml 顶部注释。
+  ★ 根节点不设 padding：Util.applySystemInsets() 会写 root 的 padding（四边叠加）。
+-->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg"
+    android:fillViewport="true"
+    android:scrollbars="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="@dimen/page_pad"
+            android:paddingEnd="@dimen/page_pad"
+            android:paddingTop="12dp"
+            android:paddingBottom="14dp">
+
+            <!-- 状态摘要卡：整卡可点，展开成完整路径 / 设置侧说明 -->
+            <LinearLayout
+                android:id="@+id/mods_status_box"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/card_bg_press"
+                android:clickable="true"
+                android:focusable="false"
+                android:paddingStart="14dp"
+                android:paddingEnd="12dp"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:id="@+id/mods_summary"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:singleLine="true"
+                        android:ellipsize="end"
+                        android:textSize="13sp"
+                        android:textColor="@color/fg_muted" />
+
+                    <ImageView
+                        android:id="@+id/mods_chevron"
+                        android:layout_width="@dimen/row_chevron"
+                        android:layout_height="@dimen/row_chevron"
+                        android:layout_marginStart="8dp"
+                        android:src="@drawable/ic_chevron"
+                        android:tint="@color/fg_muted" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/mods_detail"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingTop="8dp"
+                    android:textSize="11sp"
+                    android:lineSpacingExtra="4dp"
+                    android:textColor="@color/fg_muted"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <!-- 操作卡：只读的槽切换（模组住在槽里 ⇒ 跨槽视图就是"换个槽看"） -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/card_gap"
+                android:orientation="vertical"
+                android:background="@drawable/card_bg">
+
+                <include
+                    android:id="@+id/row_mod_slot"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="62dp"
+                    android:background="@color/divider" />
+
+                <!--
+                  F13 第三阶段：进口（导入模组包）与跨槽复制。
+                  ★ 与「查看的槽」同卡 —— 三件事都作用于**当前正在看的那个槽**，
+                    这是 F15b 那条纪律的落点："导入的落点必然是某个东西"，所以
+                    "从那个东西进去"最省事，也不需要在别处再开第二个入口。
+                -->
+                <include
+                    android:id="@+id/row_mod_import"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="62dp"
+                    android:background="@color/divider" />
+
+                <include
+                    android:id="@+id/row_mod_copy"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="62dp"
+                    android:background="@color/divider" />
+
+                <!--
+                  模组间冲突体检（用户问：「能检查到 logicsugar 和 neon 同时加载吗」）。
+                  ★ 放在**按需**一行里：它要读每个 Java 模组的 classes.dex（可能十几 MB），
+                    不适合每次进页面都跑。
+                -->
+                <include
+                    android:id="@+id/row_mod_conflict"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="62dp"
+                    android:background="@color/divider" />
+
+                <include
+                    android:id="@+id/row_mod_filter"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="62dp"
+                    android:background="@color/divider" />
+
+                <include
+                    android:id="@+id/row_mod_batch"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- 搜索框（第②项：排序/筛选/搜索）—— 纯前端过滤，**不改任何文件** -->
+        <EditText
+            android:id="@+id/mod_search"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="@dimen/page_pad"
+            android:layout_marginEnd="@dimen/page_pad"
+            android:layout_marginTop="2dp"
+            android:hint="@string/mods_search_hint"
+            android:inputType="text"
+            android:maxLength="60"
+            android:singleLine="true"
+            android:textColor="@color/fg"
+            android:textColorHint="@color/fg_muted"
+            android:textSize="15sp" />
+
+        <!-- 筛选状态（只有真的在筛选时才显示） -->
+        <TextView
+            android:id="@+id/mod_filtered"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingStart="@dimen/page_pad"
+            android:paddingEnd="@dimen/page_pad"
+            android:paddingTop="6dp"
+            android:textColor="@color/fg_muted"
+            android:textSize="12sp"
+            android:visibility="gone" />
+        <!-- 模组列表容器（条目由 ModsActivity.rebuildList() 全展开挂载） -->
+        <LinearLayout
+            android:id="@+id/mod_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="@dimen/page_pad"
+            android:paddingEnd="@dimen/page_pad"
+            android:paddingBottom="12dp" />
+
+        <TextView
+            android:id="@+id/mod_empty"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="28dp"
+            android:gravity="center"
+            android:textAlignment="center"
+            android:textSize="13sp"
+            android:lineSpacingExtra="4dp"
+            android:textColor="@color/fg_muted" />
+
+        <!-- F5b：底部留白（滚到底时末项与导航栏留出间隙）。见 activity_main.xml -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/page_bottom_space" />
+    </LinearLayout>
+</ScrollView>

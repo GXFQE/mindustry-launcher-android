@@ -1,0 +1,36 @@
+=== 第③④项真机证据（2026-10-03 第 48 轮）===
+
+── ③ 批量启停（SettingsBin.applyBools：一次读 + 批量改 + 一次原子写 + 一次读回自检）──
+槽 = 冲突演示（9 个模组，本来没有 settings.bin）
+
+批量关闭：结果弹窗原文
+  ✅ 已全部关闭：9 个模组 —— （新建 settings.bin）mod-betterminimap-enabled:（未设置⇒默认 true）→ false；
+     mod-ice-enabled: … → false；mod-tmi-enabled: … → false；mod-logicsugar-enabled: … → false；
+     mod-neon-enabled: … → false；mod-patch-editor-enabled: … → false；mod-patchviewer-enabled: … → false；
+     mod-stealth-path-enabled: … → false；mod-tripwire-dev-enabled: … → false
+  文件：…/slot-冲突演示/settings.bin
+  体积：0 → 228 B（差 228 字节）
+  键数：9（未知键原样保留）
+  写后自检：通过（恰好 EOF + 所有键逐条比对一致）
+dev 扫描复核：设置 = 已读 settings.bin（9 个键）；9 个模组 enabled = false ✓
+截图：evidence/f13-mods-batch-dialog.png（对话框）、f13-mods-batch-enable.png
+
+批量启用（第二次）：结果弹窗
+  （没动文件）这一槽的模组开关本来就是目标值，文件一个字节都没动
+★ noop 分支真机验过：不改就不写（不是"写一遍恰好一样"）。
+截图：evidence/f13-mods-batch-noop.png
+
+── ④ 禁用前的反向依赖提醒 ──
+夹具：dep-base（依赖基座）+ dep-user（依赖使用者，dependencies=[dep-base]），推进 冲突演示 槽
+路径：模组页 → 冲突演示 → 点「依赖基座」→ 详情里点「关闭此模组」
+确认框原文（末尾多出来的一段）：
+  关掉它会连累这些还开着的模组：
+  · 必需：依赖使用者
+  它们下次启动时会缺依赖（游戏里会显示缺依赖，或干脆不生效）。
+截图：evidence/f13-mods-dep-warning.png
+
+── 自检 ──
+⑳ 批量启停 6 条（含"noop 时文件逐字节没动"元断言、坏文件拒绝写、空 map 明确拒绝，
+   以及★分层反向断言：通用层对「不存在 + true」的新键必须真的写进去）
+㉑ 反向依赖 4 条（软依赖也算 / 大小写无关 / 仍关闭的不算 / 没人依赖 ⇒ 空）
+合计 **381 通过 / 0 失败**（evidence/f13-selftest-report.txt）

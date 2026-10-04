@@ -1,0 +1,104 @@
+package io.mdt.launcher;
+
+import android.content.Context;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.BaseAdapter;
+import android.widget.TextView;
+
+/**
+ * 「标题 + 副标题」两行的卡片列表适配器（F10 的存档/地图选择列表用）。
+ *
+ * ★ 为什么要它（用户 2026-10-03：「区分度依旧很低，要不你加个框吧」）：
+ *   `AlertDialog.setItems` 那种纯文本行里，"一条的第二行"和"下一条的第一行"贴着，
+ *   几百条读起来是一整片；换成**每条一个卡片**（{@link R.layout#item_msav}）之后，
+ *   边界来自视觉而不是靠读。
+ *
+ * ★ 为什么两个数组而不是一个对象列表：副标题是**异步**补上来的（先"文件名 + 大小"，
+ *   后台读完 meta 再补第二行）⇒ 就地改数组 + {@link #notifyDataSetChanged()} 最省事。
+ */
+final class MsavListAdapter extends BaseAdapter {
+    private final LayoutInflater inf;
+    private final String[] titles;
+    private final String[] subs;
+    /** 缩略图（F10 地图预览用；存档列表整列都是 null） */
+    private final android.graphics.Bitmap[] thumbs;
+
+    MsavListAdapter(Context ctx, String[] titles, String[] subs) {
+        this(ctx, titles, subs, null);
+    }
+
+    MsavListAdapter(Context ctx, String[] titles, String[] subs, android.graphics.Bitmap[] thumbs) {
+        this.inf = LayoutInflater.from(ctx);
+        this.titles = titles;
+        this.subs = subs;
+        this.thumbs = thumbs;
+    }
+
+    @Override public int getCount() {
+        return titles.length;
+    }
+
+    @Override public Object getItem(int i) {
+        return titles[i];
+    }
+
+    @Override public long getItemId(int i) {
+        return i;
+    }
+
+    /** 异步补副标题（要在 UI 线程；刷界面走 {@link #refreshSub}，**别用 notifyDataSetChanged**） */
+    void setSub(int i, String sub) {
+        if (i >= 0 && i < subs.length) subs[i] = sub;
+    }
+
+    /** 异步补缩略图（同上，刷界面走 {@link #refreshThumb}） */
+    void setThumb(int i, android.graphics.Bitmap b) {
+        if (thumbs != null && i >= 0 && i < thumbs.length) thumbs[i] = b;
+    }
+
+    /**
+     * ★★ **只刷新某一行**（2026-10-04 第 86 轮）。副标题异步补上来时用它，**不要** `notifyDataSetChanged()`。
+     *
+     * 为什么：`notifyDataSetChanged()` 会让整张列表重排 —— 用户在填充过程中滚动时，
+     * 手感就是"滑不上去 / 一滑就跳"（`MapsActivity` 的缩略图那条注释里记着 114 张时的实测反馈）。
+     * 而存档列表**没有份数上限**（`SlotIo.exportSave` 明确去掉了 60 份上限）⇒ 几百份存档就是几百次整片重排。
+     *
+     * ⚠️ 不在可见区就**什么都不做**：滚回来时 {@link #getView} 自然会用新值渲染。
+     */
+    void refreshSub(android.widget.ListView lv, int i) {
+        if (lv == null || i < 0 || i >= subs.length) return;
+        View row = lv.getChildAt(i - lv.getFirstVisiblePosition());
+        if (row == null) return;
+        TextView s = (TextView) row.findViewById(R.id.msav_sub);
+        if (s != null) bindSub(s, i);
+    }
+
+    /** 副标题的**唯一渲染实现**（`getView` 与 `refreshSub` 共用，免得两处各判一次可见性而分叉） */
+    private void bindSub(TextView s, int i) {
+        String sub = subs[i];
+        s.setText(sub == null ? "" : sub);
+        s.setVisibility(sub == null || sub.isEmpty() ? View.GONE : View.VISIBLE);
+    }
+
+    @Override public View getView(int i, View convert, ViewGroup parent) {
+        View v = convert != null ? convert : inf.inflate(R.layout.item_msav, parent, false);
+        TextView t = (TextView) v.findViewById(R.id.msav_title);
+        TextView s = (TextView) v.findViewById(R.id.msav_sub);
+        android.widget.ImageView iv = (android.widget.ImageView) v.findViewById(R.id.msav_thumb);
+        String title = titles[i];
+        t.setText(title == null ? "" : title);
+        bindSub(s, i);
+        if (iv != null) {
+            android.graphics.Bitmap b = thumbs == null ? null : thumbs[i];
+            if (b == null || b.isRecycled()) {
+                iv.setVisibility(View.GONE);
+            } else {
+                iv.setImageBitmap(b);
+                iv.setVisibility(View.VISIBLE);
+            }
+        }
+        return v;
+    }
+}

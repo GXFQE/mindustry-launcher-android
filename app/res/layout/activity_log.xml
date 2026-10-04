@@ -1,0 +1,325 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  F7：运行日志页（只读）。
+
+  三张卡对应三个数据源，缺一不可：
+    ① 游戏日志   <数据根>/last_log.txt         游戏自己写的（每行 flush，崩了也在盘上）
+    ② 启动器日志 hub/report-*.txt              我们的六步管线 / 自动备份 / 自检 / 体检取证
+    ③ 崩溃报告   <数据根>/crashes/*.txt        游戏崩溃时的堆栈
+
+  ★ 为什么是「一页三卡」而不是「列表 -> 详情」：
+    这些文件都很小（几百 B 到几 KB），跳详情反而多一次点击；
+    而日志的用法本来就是"扫一眼找异常"，全部摊开最合手。
+  ★ 为什么正文用 monospace：`[I]` / `[E]` 前缀行首对齐后，异常行一眼能跳出来。
+  ★ 为什么 chip 外面套 HorizontalScrollView：报告有 6 份，竖屏一行放不下，
+    横滑比"折成两行"更好读，也不会与外层的竖向滚动打架（方向不同）。
+
+  结构：外层 ScrollView（整页滚，横竖屏通用）
+        └ 内层 LinearLayout
+            ├ 导出行       （F20：一键把三张卡合成一个文件，走 SAF 存出去）
+            ├ 游戏日志卡   （标题行 + meta + 正文）
+            ├ 启动器日志卡 （+ 报告 chip 横滑切换）
+            └ 崩溃报告卡   （+ 崩溃 chip 横滑切换 + 清理）
+
+  ★ 根节点不设 padding：Util.applySystemInsets() 会写 root 的 padding（四边叠加）。
+-->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg"
+    android:fillViewport="true"
+    android:scrollbars="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="@dimen/page_pad"
+            android:paddingEnd="@dimen/page_pad"
+            android:paddingTop="12dp"
+            android:paddingBottom="14dp">
+
+            <!-- ══ F20：导出入口（放在**最上面**） ═══════════════════════════
+                 ★ 为什么是"一行导全部"而不是每张卡各加一个导出按钮：
+                   三张卡是**同一次排障要一起看**的东西（见 LogActivity 的类注释），
+                   分开导出等于让用户自己拼三份文件 —— 那正是他不想做的事。
+                 ★ 为什么放在页**首**：日志页是"先扫一眼、有异常才细看"的页面，
+                   导出是**第一个**会想做（或别人让你做）的动作；放到页末要滚过
+                   三张大卡才够得着（F17c 那条"结论必须前置"的同一个道理）。
+                 ★ 为什么套一层带 card_bg 的容器：row_action 自带的是
+                   selectableItemBackground（点按反馈），不是卡片底 —— 直接放会在
+                   页底色上"浮着"，与下面三张卡的层次不一致。 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/card_bg"
+                android:paddingTop="2dp"
+                android:paddingBottom="2dp">
+
+                <include
+                    android:id="@+id/log_row_export"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
+            <!-- ══ 卡 1：游戏日志（当前槽） ══════════════════════════════════ -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/card_gap"
+                android:orientation="vertical"
+                android:background="@drawable/card_bg"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:paddingTop="12dp"
+                android:paddingBottom="14dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:singleLine="true"
+                        android:ellipsize="end"
+                        android:text="@string/log_game_title"
+                        android:textSize="15sp"
+                        android:fontFamily="sans-serif-medium"
+                        android:textColor="@color/fg" />
+
+                    <TextView
+                        android:id="@+id/log_game_copy"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:background="@drawable/btn_ghost"
+                        android:clickable="true"
+                        android:focusable="false"
+                        android:paddingStart="14dp"
+                        android:paddingEnd="14dp"
+                        android:paddingTop="6dp"
+                        android:paddingBottom="6dp"
+                        android:text="@string/log_copy"
+                        android:textSize="13sp"
+                        android:fontFamily="sans-serif-medium"
+                        android:textColor="@color/accent" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/log_game_meta"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingTop="4dp"
+                    android:textSize="12sp"
+                    android:textColor="@color/fg_muted" />
+
+                <TextView
+                    android:id="@+id/log_game_body"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingTop="10dp"
+                    android:textSize="11sp"
+                    android:lineSpacingExtra="3dp"
+                    android:fontFamily="monospace"
+                    android:textIsSelectable="true"
+                    android:textColor="@color/fg" />
+            </LinearLayout>
+
+            <!-- ══ 卡 2：启动器日志（hub/report-*.txt） ═════════════════════ -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/card_gap"
+                android:orientation="vertical"
+                android:background="@drawable/card_bg"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:paddingTop="12dp"
+                android:paddingBottom="14dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:singleLine="true"
+                        android:ellipsize="end"
+                        android:text="@string/log_hub_title"
+                        android:textSize="15sp"
+                        android:fontFamily="sans-serif-medium"
+                        android:textColor="@color/fg" />
+
+                    <TextView
+                        android:id="@+id/log_hub_copy"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:background="@drawable/btn_ghost"
+                        android:clickable="true"
+                        android:focusable="false"
+                        android:paddingStart="14dp"
+                        android:paddingEnd="14dp"
+                        android:paddingTop="6dp"
+                        android:paddingBottom="6dp"
+                        android:text="@string/log_copy"
+                        android:textSize="13sp"
+                        android:fontFamily="sans-serif-medium"
+                        android:textColor="@color/accent" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/log_hub_meta"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingTop="4dp"
+                    android:textSize="12sp"
+                    android:textColor="@color/fg_muted" />
+
+                <HorizontalScrollView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingTop="10dp"
+                    android:scrollbars="none">
+
+                    <LinearLayout
+                        android:id="@+id/log_hub_chips"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal" />
+                </HorizontalScrollView>
+
+                <TextView
+                    android:id="@+id/log_hub_body"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingTop="10dp"
+                    android:textSize="11sp"
+                    android:lineSpacingExtra="3dp"
+                    android:fontFamily="monospace"
+                    android:textIsSelectable="true"
+                    android:textColor="@color/fg" />
+            </LinearLayout>
+
+            <!-- ══ 卡 3：崩溃报告（crashes/） ═══════════════════════════════ -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/card_gap"
+                android:orientation="vertical"
+                android:background="@drawable/card_bg"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:paddingTop="12dp"
+                android:paddingBottom="14dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:singleLine="true"
+                        android:ellipsize="end"
+                        android:text="@string/log_crash_title"
+                        android:textSize="15sp"
+                        android:fontFamily="sans-serif-medium"
+                        android:textColor="@color/fg" />
+
+                    <TextView
+                        android:id="@+id/log_crash_copy"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:background="@drawable/btn_ghost"
+                        android:clickable="true"
+                        android:focusable="false"
+                        android:paddingStart="14dp"
+                        android:paddingEnd="14dp"
+                        android:paddingTop="6dp"
+                        android:paddingBottom="6dp"
+                        android:text="@string/log_copy"
+                        android:textSize="13sp"
+                        android:fontFamily="sans-serif-medium"
+                        android:textColor="@color/accent" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/log_crash_meta"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingTop="4dp"
+                    android:textSize="12sp"
+                    android:textColor="@color/fg_muted" />
+
+                <HorizontalScrollView
+                    android:id="@+id/log_crash_chip_scroll"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingTop="10dp"
+                    android:scrollbars="none">
+
+                    <LinearLayout
+                        android:id="@+id/log_crash_chips"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal" />
+                </HorizontalScrollView>
+
+                <TextView
+                    android:id="@+id/log_crash_body"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingTop="10dp"
+                    android:textSize="11sp"
+                    android:lineSpacingExtra="3dp"
+                    android:fontFamily="monospace"
+                    android:textIsSelectable="true"
+                    android:textColor="@color/fg" />
+
+                <!-- 仅当崩溃份数超出「日志保留份数」时才可见 —— 见 LogActivity.refreshCleanButton() -->
+                <TextView
+                    android:id="@+id/log_crash_clean"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/btn_ghost"
+                    android:clickable="true"
+                    android:focusable="false"
+                    android:paddingStart="14dp"
+                    android:paddingEnd="14dp"
+                    android:paddingTop="7dp"
+                    android:paddingBottom="7dp"
+                    android:textSize="13sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:textColor="@color/accent"
+                    android:visibility="gone" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- F5b：底部留白（滚到底时末卡与导航栏留出间隙）。见 activity_main.xml -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/page_bottom_space" />
+    </LinearLayout>
+</ScrollView>

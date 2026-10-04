@@ -1,0 +1,9 @@
+[I] [GL] Version: <GPU 与驱动版本已隐去>
+[I] [GL] Max texture size: 16384
+[I] [GL] Using OpenGL 3 API.
+[I] [JAVA] Version: 0
+[I] [ANDROID] API level: 36
+[I] [RAM] Available: 512.0 MB
+[I] [Mindustry] Version: 159.7
+[I] Total time to load: 1782ms
+[I] Fetched 259 community servers.

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  颜色语义表（浅色）。
+  纪律：所有控件只引用语义名；深色模式由 values-night/colors.xml 整份覆盖，
+  主题文件与布局文件都不需要为深色写第二份。
+
+  F1b（视觉打磨）新增：card / card_stroke / card_press / divider / appbar / on_appbar /
+  statusbar / icon_tint / accent_soft。卡片风靠「浅灰页底 + 白卡面 + 淡描边」拉开层次，
+  而不是靠重阴影（阴影在深色下几乎不可见，描边才是跨主题稳定的分隔手段）。
+-->
+<resources>
+    <!-- 基底 -->
+    <color name="bg">#FFF3F4F6</color>
+    <color name="fg">#FF1A1C1E</color>
+    <color name="fg_muted">#FF6B7280</color>
+    <color name="accent">#FF3F51B5</color>
+    <color name="accent_press">#FF303F9F</color>
+    <color name="on_accent">#FFFFFFFF</color>
+    <color name="accent_soft">#FFE8EAF6</color>
+
+    <!-- 卡片 -->
+    <color name="card">#FFFFFFFF</color>
+    <color name="card_press">#FFEFF1F5</color>
+    <color name="card_stroke">#FFE3E5EA</color>
+
+    <!-- 顶栏（ActionBar + 状态栏） -->
+    <color name="appbar">#FF3F51B5</color>
+    <color name="on_appbar">#FFFFFFFF</color>
+    <color name="statusbar">#FF303F9F</color>
+
+    <!-- 其它 -->
+    <color name="divider">#FFE8EAEE</color>
+    <color name="icon_tint">#FF5F6368</color>
+
+    <!-- F2：列表行槽徽标（chip 风格：浅底 + 深字；深色值见 values-night/colors.xml） -->
+    <color name="chip_bg">#FFE8EAF6</color>
+    <color name="chip_fg">#FF303F9F</color>
+    <color name="chip_bg_warn">#FFFFEBEE</color>
+    <color name="chip_fg_warn">#FFC62828</color>
+</resources>

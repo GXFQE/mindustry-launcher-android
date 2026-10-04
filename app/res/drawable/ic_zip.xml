@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  F6c：整槽 zip（箱子 + 拉链）。见 ic_add.xml 头注释的图标集约定。
+  画法：上盖一条横杠 + 下面一个"空心的箱体框" + 中间两节拉链齿。
+  箱体刻意画成四条边而不是实心块 —— 实心块里再画同色的拉链看不见。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@color/icon_tint"
+        android:pathData="M3,3h18v4h-18z" />
+    <path
+        android:fillColor="@color/icon_tint"
+        android:pathData="M5,9h2v12h-2z M17,9h2v12h-2z M5,19h14v2h-14z M5,9h6v2h-6z M13,9h6v2h-6z" />
+    <path
+        android:fillColor="@color/icon_tint"
+        android:pathData="M11,11h2v2.5h-2z M11,14.5h2v2.5h-2z" />
+</vector>

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  颜色语义表（深色）。系统 uimode=night 时整份覆盖 values/colors.xml。
+  同名同语义，只换值 —— 主题与控件代码都不需要为深色写第二份。
+
+  F1b 注：深色下**不靠阴影**分层（阴影在近黑底上不可见），改用
+  「比页底略亮的卡面 + 一道淡描边」；顶栏（appbar）取与卡面同色，与页底留微差。
+-->
+<resources>
+    <!-- 基底 -->
+    <color name="bg">#FF101114</color>
+    <color name="fg">#FFE6E7E9</color>
+    <color name="fg_muted">#FF9AA0A6</color>
+    <color name="accent">#FF8C9EFF</color>
+    <color name="accent_press">#FF7A8CF0</color>
+    <color name="on_accent">#FF101114</color>
+    <color name="accent_soft">#FF2A2E45</color>
+
+    <!-- 卡片 -->
+    <color name="card">#FF1B1D22</color>
+    <color name="card_press">#FF262931</color>
+    <color name="card_stroke">#FF2A2D34</color>
+
+    <!-- 顶栏：深色下顶栏用卡面色，标题用亮字 -->
+    <color name="appbar">#FF1B1D22</color>
+    <color name="on_appbar">#FFE6E7E9</color>
+    <color name="statusbar">#FF101114</color>
+
+    <!-- 其它 -->
+    <color name="divider">#FF2A2D34</color>
+    <color name="icon_tint">#FFAEB3BB</color>
+
+    <!-- F2：列表行槽徽标（深色态 = 深底 + 亮字，与浅色保持同一语义） -->
+    <color name="chip_bg">#FF2A2E45</color>
+    <color name="chip_fg">#FFAFB8FF</color>
+    <color name="chip_bg_warn">#FF3A2426</color>
+    <color name="chip_fg_warn">#FFFFB4AB</color>
+</resources>

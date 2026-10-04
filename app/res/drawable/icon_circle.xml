@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- F1b：操作行图标底（圆形浅色块，让线性图标有"支点"，比裸图标整齐） -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="oval">
+    <solid android:color="@color/accent_soft" />
+</shape>

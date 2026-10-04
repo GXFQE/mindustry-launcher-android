@@ -1,0 +1,34 @@
+== 铜矿格（floor=stone, overlay=ore-copper），block 层换各种东西 ==
+block层              tile.solid tile.drop()     canMine(机械/气动/激光/爆能)
+air                 false      copper          不能/不能/不能/不能
+stone-wall          true       copper          不能/不能/不能/不能
+dark-metal          true       copper          不能/不能/不能/不能
+graphitic-wall      true       copper          不能/不能/不能/不能
+cliff               true       copper          不能/不能/不能/不能
+empty               true       copper          不能/不能/不能/不能
+space               true       copper          不能/不能/不能/不能
+conveyor            false      copper          不能/不能/不能/不能
+boulder             false      copper          不能/不能/不能/不能
+ore-wall-thorium    false      copper          不能/不能/不能/不能
+dune-wall           true       copper          不能/不能/不能/不能
+world-processor     true       copper          不能/不能/不能/不能
+
+== 同一格，overlay 换成别的（block=air）==
+overlay             tile.solid tile.drop()     canMine(机械)
+air                 false      null            不能
+ore-copper          false      copper          不能
+sand-floor          false      sand            不能
+darksand            false      sand            不能
+character-overlay   false      null            不能
+spawn               false      null            不能
+
+== 可挖掘地板被墙压住时 ==
+floor         block         机械钻头
+sand-floor    air           不能
+sand-floor    stone-wall    不能
+sand-floor    dark-metal    不能
+sand-floor    conveyor      不能
+darksand      air           不能
+darksand      stone-wall    不能
+darksand      dark-metal    不能
+darksand      conveyor      不能

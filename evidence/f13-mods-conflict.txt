@@ -1,0 +1,27 @@
+=== F13 第五阶段：模组间冲突体检（用户问「能检查到 logicsugar 和 neon 同时加载吗」）===
+设备 <测试机型> / Android 16；槽「模组演示」；2026-10-02 第四十七轮续。
+
+── 判据与实测分辨力（在 8 个真实包上跑）──
+① 内置检测（判决性）：把每个模组的主类名当字节串，在别的模组的 classes.dex 里找。
+   · Neon-vN14.zip       的 dex 里含 logicsugar/LogicSugarMod  ⇒ 命中（Neon 内置了 LogicSugar）
+   · LogicSugar-v5.2.0.jar 的 dex 里含 bektools/BekToolsMod   ⇒ 未命中（单向内置）
+② 共同全局钩子（提示性）：mindustry/logic/LCanvas
+   · LogicSugar ✅  Neon ✅  blackdeluxecatschematicparse ❌  DeepSpace ❌
+     饱和火力 ❌  PatchEditor ❌   ⇒ 零假阳性
+   · 逻辑工具v1.1.135.jar 无 classes.dex（安卓本来就加载不了，见「加载会失败」那条）
+③ 简介提及（线索）：Neon 的描述里把 logic sugar 列为自己的一项功能 ⇒ 命中
+④ 游戏日志归因（决定性）：读当前槽 last_log.txt 里提到各模组的行（本槽还没跑过游戏 ⇒ 目前为空，如实显示）
+
+── 真机输出（纯白话版，2026-10-02 定稿；UI 里不再出现 markdown 与类名）──
+检查了 6 个带代码的模组（7.5 MB）
+
+【重复实现】
+· 「Neon / 氖」里已经带了「Logic Sugar」⇒ 两个一起开 = 同一套功能装两遍，会互相抢；建议只留一个
+
+【可能互相抢】
+· 「Logic Sugar」 与 「Neon / 氖」 都想接管游戏里的逻辑编辑器 —— 只能有一个生效（是谁，看下面的游戏记录）
+
+【简介里提到对方】
+· 「Neon / 氖」的简介里提到了「Logic Sugar」
+
+注：「Logic Sugar」单独装没问题；它的功能可能已经在「Neon / 氖」里了。

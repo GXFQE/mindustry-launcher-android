@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  F1b：存档页的槽列表行（卡片风）。
+  结构：┌──────────────────────────────────────┐
+        │ [图标]  槽名 ........... [当前]   ›  │
+        │         N 个文件 · 大小              │
+        └──────────────────────────────────────┘
+
+  ★ 与 item_version.xml 同样用「外层 padding 提供行距 + 内层卡片」两层结构
+    （来历见 item_version.xml 顶部注释；F3b 起列表容器是 LinearLayout）。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingBottom="@dimen/card_gap">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:background="@drawable/card_bg_press"
+        android:paddingStart="14dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="12dp">
+
+        <ImageView
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_folder"
+            android:tint="@color/accent" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:layout_marginStart="12dp"
+            android:orientation="vertical">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
+
+                <TextView
+                    android:id="@+id/slot_name"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:singleLine="true"
+                    android:ellipsize="end"
+                    android:textSize="15sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:textColor="@color/fg" />
+
+                <TextView
+                    android:id="@+id/slot_badge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:background="@drawable/badge_slot"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
+                    android:paddingTop="2dp"
+                    android:paddingBottom="2dp"
+                    android:text="@string/slot_current_badge"
+                    android:textSize="11sp"
+                    android:textColor="@color/chip_fg"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <!-- F5：第二行改成可折 2 行 —— 第一行是"文件数 · 大小"，第二行是自动备份策略摘要 -->
+            <TextView
+                android:id="@+id/slot_meta"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="3dp"
+                android:maxLines="3"
+                android:ellipsize="end"
+                android:textSize="12sp"
+                android:lineSpacingExtra="2dp"
+                android:textColor="@color/fg_muted" />
+        </LinearLayout>
+
+        <ImageView
+            android:layout_width="@dimen/row_chevron"
+            android:layout_height="@dimen/row_chevron"
+            android:layout_marginStart="6dp"
+            android:src="@drawable/ic_chevron"
+            android:tint="@color/fg_muted" />
+    </LinearLayout>
+</LinearLayout>

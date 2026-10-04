@@ -1,0 +1,209 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  MDT Android 启动器 —— 正式产品工程。
+
+  架构判定与全部机制证据在探针工程 MDT-Android-Dev（README §一~§三），本工程
+  只做产品化，不复现实验。清单形态直接沿用探针已验证的「known good」形状：
+
+    - :game 子进程承载 GameSlot（坑位）+ 官方 AndroidLauncher
+      （每版本一个独立进程，ClassLoader / native / AssetManager 天然隔离；
+       游戏 onDestroy 必 System.exit(0)，UI 必须留在主进程）
+    - AndroidLauncher 的属性逐条照抄官方 APK（探针 aapt2 dump 读出），
+      唯一不抄 appComponentFactory（无 androidx，抄了直接启动失败）
+    - targetSdk 36 = 拿最严的隐藏 API / 动态代码策略（探针已在 API 28~36 验证全通，
+      且 debuggable=false 下同样通过）
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="io.mdt.launcher"
+    android:versionCode="1"
+    android:versionName="0.1">
+
+    <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="36"/>
+
+    <!-- 官方 APK 声明 glEsVersion 0x20000(required)，我们是游戏宿主，照抄 -->
+    <uses-feature android:glEsVersion="0x00020000" android:required="true"/>
+
+    <!--
+      按精确包名查询任意已装游戏（getApplicationInfo）需要包可见性。
+      本应用不会上架 Play（插件式加载其他 APK 本身就不符合其政策），走侧载分发，
+      QUERY_ALL_PACKAGES 是最简单也最可靠的选择（用户可手填任意包名）。
+    -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"/>
+
+    <!--
+      ★★ P0：必须原样复刻游戏声明的权限（官方 v159.7 与本地 160.4 源码一致，就只有这三条）。
+      依据：权限按 **UID** 授予，而游戏代码跑在我们进程、我们 UID 里
+      ⇒ 我们没声明的权限，游戏调 API 时就是 SecurityException。
+
+      INTERNET —— 联机 / 服务器列表 / 游戏内置 mod·地图下载。
+        2026-10-01 实测缺失后果（游戏自己写的 last_log.txt 原文）：
+          [E] Failed to fetch community servers: java.lang.SecurityException:
+              Permission denied (missing INTERNET permission?)
+          Caused by: android.system.ErrnoException: android_getaddrinfo failed: EPERM
+        ⇒ DNS 第一步就被挡掉。补上即可，无运行时申请、无副作用。
+
+      READ/WRITE_EXTERNAL_STORAGE —— 只为游戏的「备用文件选择器」。
+        AndroidLauncher.showFileChooser 的分支是：SDK_INT >= Q(29) 走 SAF，**否则**走
+        FileChooser fallback，而 fallback 要求这两个权限**都**为 GRANTED，否则
+        requestPermissions 拿不到就永远不弹选择器（游戏内部导入 mod/地图的路径直接失效）。
+        本工程 minSdk=26 ⇒ API 26~28 设备会真的走到那条分支，所以必须声明。
+        在 API 33+ 这两个权限已是 no-op（被 READ_MEDIA_* 取代），声明无害、也不会被授予，
+        此时游戏走 SAF 分支，不受影响。
+        （不加 maxSdkVersion：与官方清单逐字一致，便于用 aapt2 对比回归。）
+    -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+
+    <!-- M4 自更新：提交 PackageInstaller 会话需要它（安装确认仍由用户点） -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
+
+    <!--
+      ★ F1 实测修正：theme **只挂在我们自己的 Activity 上，不挂 application**。
+      原因（aapt2 dump 官方 APK 得出）：官方的 theme 是声明在 application 节点上的
+      `@style/ArcTheme`（parent 指向 framework 的全屏无标题主题），游戏 Activity
+      `mindustry.android.AndroidLauncher` 自己没有 theme ⇒ 它**继承 application 的**。
+      ArcTheme 定义在官方包内（0x7f040000），我们的 APK 引用不到，照抄会直接编不过；
+      而若把 AppTheme 挂到 application，游戏 Activity 就会跟着变成 Material.Light
+      （多出 ActionBar / 背景色改变）—— 那是拿游戏观感去换启动器观感，不划算。
+      ⇒ 结论：游戏侧保持"无 theme = 系统默认"（与加主题之前完全一致），
+         启动器侧三个 Activity 各自声明 AppTheme（深色跟随系统就落在它们身上）。
+    -->
+    <!--
+      ★ 桌面图标（2026-10-04 第 86 轮补）：修之前**一个 android:icon 都没有**
+      ⇒ `aapt2 dump badging` 报 `icon=''`，桌面显示的是系统默认的机器人。
+      用**自适应图标**（`@mipmap/ic_launcher`，两条图层见 drawable/ic_launcher_*.xml）：
+      minSdk = 26 正好是自适应图标的起始 API ⇒ 全设备通吃、不需要 PNG 兜底；
+      `roundIcon` 给个别按圆形取图的桌面用（内容与主图标逐字相同）。
+
+      ⚠️ 注意与**上面那段 theme 的注释相反**：图标**应该**挂在 application 上 ——
+         它会被子 Activity 继承（包括跑在 `:game` 进程里的游戏 Activity），
+         而我们希望最近任务/设置里的图标都是**启动器自己的图标**（游戏是我们加载进来的，
+         不是一个独立应用）。主题则是另一回事：挂上来游戏就会被套上 Material 外观。
+    -->
+    <application
+        android:name=".LauncherApp"
+        android:label="@string/app_name"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:allowBackup="false"
+        android:debuggable="false"
+        android:extractNativeLibs="true"
+        android:hasCode="true"
+        android:largeHeap="true"
+        android:isGame="true"
+        android:resizeableActivity="true"
+        android:enableOnBackInvokedCallback="false">
+
+        <!-- 复刻官方 APK 的 android.max_aspect，宽高比上限 -->
+        <meta-data
+            android:name="android.max_aspect"
+            android:value="2.1"/>
+
+        <!-- 主进程（UI）：版本列表 / 导入 / 设置。
+             singleTop：已在前台时再被拉起（如 dev_import_path 热路径）走 onNewIntent，
+             而不是叠加一个新实例。 -->
+        <activity
+            android:name=".MapsActivity"
+            android:exported="false"
+            android:theme="@style/AppTheme"
+            android:label="@string/maps_title" />
+        <!--
+          F21 地图详情：大图 + 元数据 + 四段可折叠的资源统计（地矿/墙矿/可采地板/加成地板）。
+          ⚠️ **必须注册**：aapt2 不检查引用，漏了照样 BUILD OK，真机一点就崩
+             （自检 ㉙ 专门盯这条）。
+        -->
+        <activity
+            android:name=".MapDetailActivity"
+            android:exported="false"
+            android:theme="@style/AppTheme"
+            android:label="@string/map_detail_title" />
+        <activity
+            android:name=".SlotActivity"
+            android:exported="false"
+            android:theme="@style/AppTheme"
+            android:label="@string/slot_page_title_fmt" />
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:theme="@style/AppTheme"
+            android:label="@string/app_name">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+
+        <!--
+          存档与备份（M3）：槽管理 / 备份恢复 / .msav 导入 / 数据根体检。
+          跑在主进程 —— 它对数据根只做文件级操作，不需要游戏进程的 ClassLoader。
+        -->
+        <activity
+            android:name=".SavesActivity"
+            android:exported="false"
+            android:theme="@style/AppTheme"
+            android:label="@string/saves_title"
+            android:parentActivityName=".MainActivity"/>
+
+        <!--
+          F13 模组管理（第一阶段：**只读扫描**）：已装模组 / 元数据 / 版本要求 / 依赖 /
+          游戏自己那个启停开关。主进程即可 —— 纯文件读（zip 中央目录 + settings.bin），
+          不碰游戏 ClassLoader，也不写任何东西。
+        -->
+        <activity
+            android:name=".ModsActivity"
+            android:exported="false"
+            android:theme="@style/AppTheme"
+            android:label="@string/mods_title"
+            android:parentActivityName=".MainActivity"/>
+
+        <!--
+          F3 全局设置：默认槽 / 日志保留份数 / 运行日志 / 关于。
+          同样跑在主进程 —— 它只读写 app_hub/config.json 与只读几条路径，不需要游戏进程。
+        -->
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="false"
+            android:theme="@style/AppTheme"
+            android:label="@string/settings_title"
+            android:parentActivityName=".MainActivity"/>
+
+        <!--
+          F7 运行日志：只读展示 <数据根>/last_log.txt、hub/report-*.txt、<数据根>/crashes/*.txt。
+          主进程即可 —— 纯文件读，不碰游戏 ClassLoader。
+          ⚠️ 本 ROM 滤掉应用自己的 logcat，这些文件就是唯一的运行期证据出口（REFERENCE §14）。
+        -->
+        <activity
+            android:name=".LogActivity"
+            android:exported="false"
+            android:theme="@style/AppTheme"
+            android:label="@string/log_title"
+            android:parentActivityName=".SettingsActivity"/>
+
+        <!--
+          游戏坑位：加载流程（存档槽交换 / 预热 / dex 注入 / load native / 挂资产链）
+          必须跑在游戏所在的 :game 进程里，否则系统在干净进程里找不到游戏类。
+          exported=true 便于 adb 驱动验证 —— M5 发布前评估是否收回。
+        -->
+        <activity
+            android:name=".GameSlot"
+            android:exported="true"
+            android:process=":game"
+            android:theme="@style/AppTheme"
+            android:label="@string/gameslot_title"/>
+
+        <!--
+          游戏主 Activity：类体来自被注入的官方 APK dex（系统按本进程 base CL 实例化）。
+          属性照抄官方 APK：largeHeap 在 application 级已声明。
+        -->
+        <activity
+            android:name="mindustry.android.AndroidLauncher"
+            android:exported="false"
+            android:process=":game"
+            android:launchMode="singleTask"
+            android:screenOrientation="user"
+            android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|uiMode|screenSize"
+            android:resizeableActivity="true"/>
+    </application>
+</manifest>

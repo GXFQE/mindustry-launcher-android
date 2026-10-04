@@ -1,0 +1,66 @@
+MDT Android —— 第 85 轮 ⑥ F21 尾巴 1「数据补丁区 vs 模组表的叠加顺序」
+=============================================================================
+
+问题（§61.7 第 5 条 / BACKLOG 01 的尾巴 1）：我们的 `MapStatsMods` 是"**先模组、后地图补丁**"，
+  要确认游戏也是这个顺序 —— 否则同名的方块会被两边按不同优先级覆盖，统计数字就会与游戏口径分叉。
+
+■ 一、顺序：由**游戏源码**定案（不用真机，因为这是"什么时候发生"的问题）
+-----------------------------------------------------------------------------
+① mod 内容在**启动**时就加载完：
+   `core/src/mindustry/ClientLauncher.java:167~173`
+     assets.loadRun("contentcreate", Content.class,
+         () -> { content.createBaseContent(); content.loadColors(); },
+         () -> { mods.loadScripts(); content.createModContent(); });
+② 地图的补丁区是**读地图文件**时读进来的：
+   `core/src/mindustry/io/SaveVersion.java:63~65`
+     public void read(DataInputStream stream, ...){
+         readRegion("meta", ...);
+         if(version >= 12) readRegion("patches", stream, counter, in -> readDataPatches(in, saveState));
+③ 读完就**立刻应用**到当前内容表：
+   `core/src/mindustry/io/SaveVersion.java:577~582`
+     Events.fire(new DataPatchLoadEvent(assets));
+     state.data.load(assets);
+     //now that patches are loaded, the rules can actually be read
+     readRules(saveState);
+   `core/src/mindustry/mod/DataManager.java:198~216`（`load`）→ `patcher.apply(getPatches(), getContent());`
+   `core/src/mindustry/mod/DataManager.java:169~176`（`reloadPatches`）同一条路
+④ `state.data` 是**每张地图自己的** DataManager：`core/src/mindustry/core/GameState.java:47`
+     public DataManager data = new DataManager();
+   ⇒ 地图数据补丁的作用时机 = **载入地图时**（远晚于启动时的 mod 内容加载）。
+
+★ 结论：**mod 先、地图补丁后 ⇒ 补丁赢**。我们的 `MapStatsMods`（先叠模组、再叠补丁）与游戏一致 ✅。
+（v11 / v12 走的是 `versions/Save11.java:42~55`、`Save12.java:22~48`，同样是读完就 `state.data.load(assets)`。）
+
+■ 二、影响面：这份 460 语料里**能不能观察到顺序差异**（PC 分析，证据文件里现成的两张表）
+-----------------------------------------------------------------------------
+做法：把 14 张带非空补丁的图（`f21-patches.txt`）里补丁点到的**内容名**，与两张表交叉：
+`f21-blocks-vanilla.tsv`（原版 447 行）与 `f21-blocks-modmerged.tsv`（本槽已启用模组叠加后的 703 行，
+每行带 `source` 列）。
+
+```
+原版表 447 行；合并表 703 行（其中模组**重定义**原版方块 171 个、模组新增 231 个）
+
+· 炉火纪元.msav     beam-link / core-acropolis / reinforced-vault  … 全部【原版】
+· 2.msav            cliff-crusher【原版】、dark-metal【原版，改的是 attributes ← ★影响统计口径】
+· 75/74/75/76/生化…  tank-assembler / mech-assembler / ship-assembler【全部原版，改的是 plans（与统计无关）】
+· 77.msav           11 项全是 content（新增内容，游戏会加 dp- 前缀）⇒ 不可能与模组同名冲突
+
+★ 汇总：补丁点到的内容名里 —— 原版被模组重定义 0 处 / 模组新增 0 处 / 两表都没有 5 处
+        （那 5 处是我这份粗解析把**字段名**误当内容名了，见下"口径"）；改了统计相关字段的 1 处
+```
+
+⇒ **在"这 13 个模组 × 这 14 张图"这个组合里，两种顺序给出的表完全一样**：
+   8 个被补丁点到、且真实存在的内容名**全是原版**，而且**没有一个**落在"被模组重定义的原版方块"
+   （171 个）里。⇒ 顺序在这份语料上**不可观测**，真机跑也分辨不出来（两种顺序输出同一个数字）。
+
+■ 三、口径与残余风险（如实说）
+-----------------------------------------------------------------------------
+· "模组重定义原版方块 171 个" 说明**这件事本身很常见**（模组确实会覆盖原版方块）⇒ 风险是真的，
+  只是本次语料恰好没有"补丁与模组点同一个名字"的样本。
+· 本轮解析是**文本级**（`f21-patches.txt` 的打印稿 + 两张 TSV），对多行 HJSON 的缩进启发式会把
+  `localizedName` / `mineFloor` / `requirements` 这类**字段名**误当内容名 ⇒ 上表"两表都没有 5 处"是解析噪声，
+  **不是**发现。要精确判定得直接解 `.msav` 的补丁区（`MsavPatches`），留到真出现这种图时再做。
+· 出现"补丁与模组点同名"的地图时的**真·判据**（已想好，不用猜）：用一个 JS 探针在**游戏进程里**
+  打印 `content.block("<名字>")` 的
+  `attributes` / `solid` / `wallOre` / `itemDrop` / 类名（`getClass().getSimpleName()`），
+  那就是补丁应用**之后**的游戏真相 —— 与我们的表逐项比即可（第 84 轮的 JS 探针链路已经跑通过）。

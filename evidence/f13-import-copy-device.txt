@@ -1,0 +1,68 @@
+=== F13 第三阶段：模组包导入 / 跨槽复制 真机证据（2026-10-02 第四十七轮）===
+设备 <测试机型> / Android 16（API 36）；槽「模组演示」为新建的演示槽。
+
+── 导入（dev 口 = 与界面同一条 Mods.importPackage 核心）──
+① 合法包（真实 LogicSugar 元数据）
+   ✅ 已导入：07-LogicSugar-v5.2.0.jar.zip（429 B）· 模组 Logic Sugar 5.2.0 · 内部名 logicsugar · 要求 160.1
+   落点 md5 与源一致；目录里**没有 .part 残留**
+② 坏包（zip 里没有 mod.json）
+   ❌ 拒绝：这个包不是游戏能加载的模组：包里（含下潜一层）没有 mod.json/mod.hjson/plugin.json/plugin.hjson
+   目标目录无残留
+③ 重复导入（不覆盖）
+   ❌ 拒绝：这个槽的 mods/ 里已经有「…」了 —— 替换会覆盖原文件，需要先确认
+④ 覆盖导入（--ez dev_mods_overwrite true）
+   ✅ 已替换；内容 md5 变成源的 md5；**旧的那份留在 hub/mods-trash/20261002-215021-07-LogicSugar-v5.2.0.jar.zip（429 B）**
+
+── 跨槽复制（模组演示 → f13-copy-dst，20 个顶层条目）──
+   ✅ 复制完成：20 项（含 1 个目录模组 dirmod-demo 及其 scripts/）
+   逐文件核对：cd 源 && md5sum * | sort  vs  cd 目标 && md5sum * | sort  ⇒  diff **为空**（所有条目 md5 完全一致）
+   再复制一次 ⇒ 复制完成 0 项；跳过 20 项（目标槽已有同名，不覆盖）
+
+── 没能验完的一段（已如实记录，见 REF §52.5）──
+   SAF 选择器：本 ROM 的「下载内容」只列 **应用下载过**（MediaStore 里有 owner 的）文件；
+   adb push 的 .zip 用 scan_file 调用 / MEDIA_SCANNER_SCAN_FILE 广播 / content insert 造行
+
+── ✅ 补验（同日稍后；用户点破「是中文输入法吧」）──
+真实条件有两个，缺一不可：
+  ① 文件要在 MediaStore 的 downloads 集合里（adb push 不在；content insert 造行后才是）；
+     真实「下载」来的文件天然满足 ⇒ 用户侧本来就没事。
+  ② 搜索框里的字符串必须是对的 —— 第三方中文输入法会把 input text F13B 变成 1F3B（我上一轮拿错串搜的）。
+做法：先把还原配方落盘 → 只禁用该输入法（另一个中文输入法保持启用作回落）→ 搜索立即列出文件 → 点选 →
+     Import 完成（结果弹窗：✅ 已导入 F13SAF-Demo.zip · 321 B · 内部名 ui-import-demo ·
+     要求 140 · 类型：数据模组 · 这个槽还没有版本指向它）→ 立刻拨回输入法。
+还原验收（按「用户感知的值」）：default_input_method / enabled_input_methods 与动手前**逐字一致**；
+     mCurId = com.tencent.wetype/.plugin.hld.WxHldService、mInputShown=true，
+     截图里就是该输入法的键盘（evidence 未存图，现场截屏已核）。
+
+── 类型提示 + 反斜杠诊断（用户要求）──
+  Mods.Info.parts() 位掩码（判据照抄游戏 LoadedMod.isJava() 与 loadScripts 的触发条件）：
+  Java 模组 / Java 模组（仅声明）/ JS 脚本模组（N 个 .js）/ Java+JS 混合 / 数据模组；
+  行内用短标签、弹窗用长句；导入结果弹窗也带类型。
+  实测 F13SAF-Demo.zip（.NET 打的包，条目名是 scripts\main.js 反斜杠）⇒ 行内显示：
+  「数据模组 · F13SAF-Demo.zip · 321 B · zip 包」
+  ＋「⚠ 包内有 1 个条目名带反斜杠（Windows 打包工具常见）：游戏会把它们当成目录，
+     scripts/main.js 之类会找不到 —— 重新用 zip 工具打包（条目名用 /）即可」
+自检：339 通过 / 0 失败。
+
+── ✅ 第三批（用户三点）：类型组合 / 多人游戏 /「加载会失败」──
+① 「怎么都是仅声明」的两个原因：
+   (a) 我的锅：演示槽原来塞的是 17 个「只有 mod.json」的元数据副本 ⇒ 每个都"声明 java 无 dex"；
+   (b) 判据错：把「meta 声明 java」当成了类型。真相 = 它是一条警告（见下）。
+   已把演示槽换成 PC 上的**真实模组包**。
+② 类型改成位掩码组合式（JAVA_DEX / JAVA_CLASS / JS / DATA）：4 位 = 16 种组合，
+   枚举字符串必然漏 —— 用户说的 "json 混合 js" 正是我漏掉的那类。实测：
+   · 原版瘤液拓展.zip   ⇒ JS 脚本（28 个 .js）＋Java（classes.dex）＋资源
+   · 饱和火力3.3.0.zip  ⇒ JS 脚本（17 个 .js）＋Java（classes.dex）＋资源
+   · 蓝钢工业拓展包(1).zip ⇒ 数据模组（JSON + 资源）
+   · blackdeluxecatschematicparse.zip ⇒ Java（classes.dex）＋资源
+③ ★★「加载会失败」：meta 声明 java 但没有 classes.dex ⇒ 安卓 DexClassLoader 找不到类 ⇒
+   游戏 Failed to load mod file … Skipping.、整个模组被跳过。实测反例：
+   · 逻辑工具v1.1.135.jar（java=true + 150 个 .class、无 dex）⇒ 徽标「加载会失败」+ 详细说明。
+④ ★ 多人游戏（用游戏自己的判据与标签）：
+   · Mods.java:950 getModStrings() 只收 !hidden && enabled（发给服务器比对「名字:版本」）；
+   · ModsDialog.java:369 对 hidden 显示 @mod.multiplayer.compatible＝「支持多人游戏」；
+   · Mods.java:1190-1192 插件（Plugin）会被游戏自动当作 hidden。
+   实测：blackdeluxecatschematicparse / 逻辑工具（都 hidden=true）⇒「支持多人」；
+         蓝钢工业拓展包 / 原版瘤液拓展 / 饱和火力（hidden 未写）⇒「联机需同款同版本」。
+⑤ 自检 342 通过 / 0 失败。★ 其中「反斜杠条目必须与游戏同判」那条**当场抓住我重构时的手滑**
+   （把 scripts/ 的前缀判断也归一化了 —— 那正是 §52.1 明说不许做的）。

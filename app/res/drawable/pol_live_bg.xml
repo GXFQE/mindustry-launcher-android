@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  F5b：策略对话框里那行「实时摘要」的底（浅色 accent_soft + 圆角）。
+  用语义色 ⇒ 深浅两套主题自动跟随，不需要 values-night 再来一份。
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/accent_soft" />
+    <corners android:radius="10dp" />
+</shape>

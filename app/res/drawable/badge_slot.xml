@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- F2：槽名徽标（正常态）。chip 风格 —— 浅底 + 深字，深浅主题各由 @color 语义名切换。 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <corners android:radius="9dp" />
+    <solid android:color="@color/chip_bg" />
+</shape>

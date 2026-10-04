@@ -1,0 +1,83 @@
+MDT Android —— 第 85 轮（2026-10-04）④「游戏侧崩溃转储」真机取证的逐字抄录
+=============================================================================
+
+为什么是"抄录"而不是原始文件：
+  真机确实产出了 <数据根>/crashes/crash_1791090009861483.txt 与对应的 last_log.txt，
+  但取证之后我把整个临时槽（slot-test）连同这些文件一起删掉了（收尾纪律：临时槽 + 夹具
+  不留）；当时只把内容读进了终端，没有先 exec-out 落盘 —— 这是我的流程错，如实记在这里。
+  ★ 对照用的**阴性样本**是真文件（见同目录 accept-crashprobe-control.txt）。
+  ★ 规则本身的真机判据另有硬证据：同目录 accept-modgate-unsupported.txt（产品扫描报告）
+    与自检断言（对/反向/元断言各一条）。
+
+
+■ 生产条件（真机 <测试机型> / Android 16）：
+  探针 = 一个 JS 模组（mod.json 写 "minGameVersion": "140" + scripts/main.js），
+  脚本自己起一个 Java 线程、在线程里抛未捕获异常（脚本自身的异常会被 Scripts.run 吞掉，
+  所以必须换个线程抛）。启动方式：`--es dev_launch_key "import:official-159.apk"`
+  （该导入版本分配在 test 槽；槽在动手前是空的，验完已还原为空）。
+
+■ 崩溃转储 crash_1791090009861483.txt（逐字，堆栈中段略）：
+-----------------------------------------------------------------------------
+The mod 'MDT Crash Probe' (mdt-crash-probe) has caused Mindustry to crash.
+Version: release build 159.7 (Built July 19, 2026 17:39 PM)
+Date: 十月 4, 2026 12:57:41 下午
+OS: Linux x (aarch64)
+GL Version: <GPU 与驱动版本已隐去>
+Android API level: 36
+Java Version: 0
+Runtime Available Memory: 512mb
+Cores: <已隐去>
+Likely Cause: MDT Crash Probe (mdt-crash-probe v1.0)
+Mods: mdt-crash-probe:1.0
+
+
+rhino.JavaScriptException: java.lang.RuntimeException: MDT crash-dump probe (this crash is expected) (mdt-crash-probe/main.js#19)
+	at rhino.gen.mdt_crash_probe_main_js_3._c_anonymous_2(mdt-crash-probe/main.js:18)
+	at rhino.gen.mdt_crash_probe_main_js_3.call(Unknown Source:47)
+	at rhino.ContextFactory.doTopCall(ContextFactory.java:1)
+	at rhino.ScriptRuntime.doTopCall(ScriptRuntime.java:34)
+	at rhino.gen.mdt_crash_probe_main_js_3.call(Unknown Source:18)
+	at rhino.InterfaceAdapter.invokeImpl(InterfaceAdapter.java:92)
+	at rhino.InterfaceAdapter.lambda$invoke$0(InterfaceAdapter.java:8)
+	at rhino.InterfaceAdapter.$r8$lambda$eCbvUJKud9uRuKkOr-KOpaMfYY8(InterfaceAdapter.java:1)
+	at rhino.InterfaceAdapter$$ExternalSyntheticLambda0.run(R8$$SyntheticClass:14)
+	at rhino.Context.call(Context.java:4)
+	at rhino.ContextFactory.call(ContextFactory.java:1)
+	（堆栈下略）
+-----------------------------------------------------------------------------
+
+★ 结论：**游戏自己**会把未捕获异常写成 `<数据根>/crashes/crash_<毫秒时间戳>.txt`，
+  内容含版本 / 系统 / API level / GL / 内存 / 核数 / **模组归因**（Likely Cause）与完整堆栈。
+  落地位置由 `mindustry.data.dir` 注入决定 ⇒ 它就是**当前槽**的数据根（我们的槽隔离成立）。
+  机制（源码 `Mindustry-159.7`，逐行核对过）：
+    android/src/mindustry/android/AndroidLauncher.java:39~51
+      Thread.setDefaultUncaughtExceptionHandler((t, e) -> CrashHandler.log(e))
+    core/src/mindustry/net/CrashHandler.java:48~54
+      Core.settings.getDataDirectory().child("crashes").child("crash_" + System.currentTimeMillis() + ".txt")
+        .writeString(createReport(e))
+
+■ 同一次启动的 last_log.txt（逐字）：
+-----------------------------------------------------------------------------
+[I] [GL] Version: <GPU 与驱动版本已隐去>
+[I] [GL] Max texture size: 16384
+[I] [GL] Using OpenGL 3 API.
+[I] [JAVA] Version: 0
+[I] [ANDROID] API level: 36
+[I] [RAM] Available: 512.0 MB
+[I] [Mindustry] Version: 159.7
+[I] Loading mod: MDT Crash Probe
+[I] [mdt-crash-probe/mdt-crash-probe/main.js]: MDTCP-T1 alive, build=159
+[I] [mdt-crash-probe/mdt-crash-probe/main.js]: MDTCP-T2 thread started
+-----------------------------------------------------------------------------
+
+■ ★★ 顺带挖出的产品缺陷（本轮已修，见 REF §65.7）：
+  同一份探针**只改 `minGameVersion` 一个字段**，结果完全不同 ——
+    · 缺省（= "0"）⇒ 日志只有 `Loading mod: MDT Crash Probe`，**脚本一行没跑**、也没有崩溃文件
+      （真机阴性样本见 accept-crashprobe-control.txt）
+    · "140"      ⇒ 脚本跑起来（MDTCP-T1/T2）并产出崩溃文件
+  根因：游戏 `LoadedMod.isOutdated()` 对**非 Java（脚本/数据）模组**用的是另一个门槛
+  `Vars.minModGameVersion = 136`（Java 模组才是 154）⇒ 没写 `minGameVersion` = 主版本 0 < 136
+  ⇒ 状态 unsupported ⇒ `enabled()` 为 false ⇒ `loadScripts` / `loadContent` 都不进它，
+  **而日志照样打 `Loading mod:`**（极具误导性）。
+  我们这边原来只写了 `m.isJava() && …` ⇒ 脚本模组整类漏判（显示"启用"）——已修，并把
+  门禁那一关也补上（否则徽标写"不支持"、正文一行依据都没有）。

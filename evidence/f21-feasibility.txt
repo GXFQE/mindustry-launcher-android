@@ -1,0 +1,177 @@
+=== F21 可行性：地图「矿物 / 可采地板 / 加成地板」占格数（PC 全套实测）===
+
+> 2026-10-03 第 82 轮。**只读分析，未改任何产品代码**。
+> 语料：460 个 .msav（用户图 74 + 官方图 74 + 存档 312），合计 **88,039,002 格**、55.3 MB 压缩数据。
+> 结论：**可行**。主要风险已用数据钉死，剩下的是工程量而不是不确定性。
+
+--------------------------------------------------------------------------------
+一、一句话结论
+--------------------------------------------------------------------------------
+现有 `MsavTiles` 解出的三趟数据（floors / ores / blocks）+ 地图自带 id→名字表，
+配上「有效内容定义表」（原版 18 列 ⨁ 模组 content JSON ⨁ 地图自带 patches）就能算出每种资源占多少格；
+不可再生的地形墙挡住的格子**必须排除**（游戏自己的 `Drill.canMine` 就拒绝这种格）。
+
+--------------------------------------------------------------------------------
+二、数据链（每一步都有实测判据）
+--------------------------------------------------------------------------------
+① 解码        MsavTiles（已有，F10）             460/460 成功；386 语料逐格与游戏一致（已证）
+② 分类        有效内容定义表（本次新增，见四/五） 原版 447 行 + 模组 703 行
+③ 计数        按 content id 预计算标志 + int[] 计数（本次新增）1.64 ms/张
+④ 遮挡剔除    露天+可拆 计入，永久遮挡 排除     见三
+⑤ 译文        版本 APK 的 bundle（UTF-8）       412 block + 22 item 键；官方 74 图 missing=0
+
+版本分布（460 个）：v4=1 · v7=5 · v8=10 · v9=53 · v10=29 · v11=274 · v13=88
+
+--------------------------------------------------------------------------------
+三、判据：什么叫「永久遮挡」
+--------------------------------------------------------------------------------
+从游戏自己的字段来（不是靠名字或类型名推）：
+  永久遮挡 = block 层不是 air，且 synthetic/destructible/breakable/alwaysReplace/unitMoveBreakable **全 0**
+  可拆遮挡 = 建筑（synthetic）/ 玩家墙（destructible）/ 可拆道具（boulder 类）
+  露天     = block 层是 air
+原版 447 个方块里 **204 个**是永久墙；叠加模组后 **232 个**。
+
+旁证（读游戏字节码）：
+  · `Drill.canMine(Tile)` 第一句就是 `if(tile.block().isStatic()) return false` —— 压在墙下的矿，钻头不采
+  · `Tile.drop()` 在墙下**仍然返回矿的物品**（物品还在，但拿不到）
+  · `Tile.solid()` 对墙格为 true ⇒ 连建筑也放不下
+  · 编辑器里能删墙，但那是改地图，不算"游戏内可得资源"
+
+⚠️ 例外已核：v160 只有 3 个单位能挖"非地板方块"（`evoke` / `incite` / `emanate`，`mineWalls=true`），
+   判据是挖**墙自己的 `itemDrop`** ⇒ 对没有掉落的 stone-wall / dune-wall 不成立，结论不变。
+
+实测遮挡占比（460 语料，用合并表）：
+  矿物格 1,573,328      露天 79.9% · 永久 13.6% · 可拆 6.2% · 未知 0.3%
+  可采地板 10,583,467   露天 66.3% · 永久 30.2% · 可拆 3.2% · 未知 0.3%
+  加成地板 59,942,904   露天 40.8% · 永久 52.9% · 可拆 6.2% · 未知 0.1%
+挡可采地板的 top：sand-wall 1,011,327 · shale-wall 793,255 · dune-wall 662,841 · salt-wall 287,819
+可拆那侧 top：reinforced-conduit / duct / reinforced-surge-wall / titanium-conveyor / carbide-wall（全是玩家的）
+
+--------------------------------------------------------------------------------
+四、基础表（18 列，从游戏 jar 导出）
+--------------------------------------------------------------------------------
+#name isFloor isOverlay isOre isStatic synthetic solid wallOre itemDrop playerUnmineable speed damage
+      liquidDrop attributes breakable destructible alwaysReplace unitMoveBreakable [source]
+
+导出脚本 ContentTable2.java（只需 Mindustry.jar，不启动游戏、不需要 native）：
+  java -cp "<Mindustry.jar>;<out>" ContentTable2 blocks.tsv
+
+--------------------------------------------------------------------------------
+五、模组链（本次跑通，VE 的松树是判据试金石）
+--------------------------------------------------------------------------------
+规则（实测与语料对得上）：
+  · 模组前缀 = mod.hjson / mod.json 里第一个 "name"（VE = "ve"）
+  · content/**.json|hjson|json5 **有 "type:"**  ⇒ 新内容，名字 = <前缀>-<文件名>（ve-tree / ve-ore-aluminium）
+  · **无 "type:"**                            ⇒ 覆盖同名**已有**内容（salt.json 改的就是原版 salt）
+  · JSON 里**没写的字段取"类的默认值"** ⇒ 必须先把每个 type 的默认值导出来
+
+class 默认值导出（25/25 个环境类）：
+  🔴 裸 new 必须用**唯一名字**（第一次全用 "probe" ⇒ content 注册表报
+     "Two content objects defined with the same name" ⇒ 13/25 失败；改成 "probe-<类名>" 后 25/25 成功）
+  ⇒ 这张表只能 PC 侧导，端上现推不现实。
+
+VE 实测（vanilla-expansion2119.zip，129 个环境 JSON）：
+  永久 86 · 可拆 10 · 资源 28 · 覆盖原版 16
+  · ve-tree      = {"type":"StaticTree","breakable":true,...}  ⇒ **能拆**（原版 pine 同类不能）
+  · ve-bush      = {"type":"Prop"}（一个标志都没写）           ⇒ 靠类默认值判定"能拆"
+  · ve-glasspam  = WobbleProp + unitMoveBreakable              ⇒ 单位踩过就碎
+  · ve-nitroalkoss-plant = WobbleProp + update/destructible + destroyBullet ⇒ 可拆，拆了会炸
+  · ve-ore-aluminium / ve-ore-wall-quartz = OreBlock + itemDrop(+wallOre) ⇒ 模组新矿/新矿墙
+  · salt / sand-water / shale / hotrock …（16 个无 type）      ⇒ 覆盖原版 ⇒ 原版地板变成可采
+
+17 个模组实测：235 个新内容 + 584 处覆盖；表 703 行（301 原版未被覆盖 + 171 处覆盖 + 231 新内容）。
+
+口径修正带来的量级变化（同一语料，原版表 → 合并表）：
+  可采地板  7,780,538 → 10,583,467   **+36%（+280 万格）**（VE 把原版地板变成资源，原来整段漏掉）
+  加成地板「未知」143,712 → 51,992   **−64%**
+  矿物「未知」     6,540 → 4,208     −36%
+  可采地板「未知」41,982 → 34,034    −19%
+
+--------------------------------------------------------------------------------
+六、数据补丁（v12+ 的 patches 区）
+--------------------------------------------------------------------------------
+格式（SaveVersion.readDataPatches + PatchAsset/ContentAsset.read）：
+  int 格式版本(=2) | int 条数 | 条 × { byte 类型 | UTF 路径 | boolean 是否内嵌 | 内嵌?数据:32字节hash }
+类型 0=patch 1=content 2=bundle 3=image 4=sound 5=music；**patch/content 永远内嵌**（hash 只用于图/音）。
+区顺序：meta → patches → content → map → entities → markers → custom
+实测 460 个：**14 个带非空补丁**、74 个空补丁表、其余（v11 及更早）没有这个区。
+样例：`block.dark-metal.attributes = {scrapmetal: 2}`、`core-acropolis.itemCapacity = 30000`、
+      `content wall-scrap.json = type: StaticWall, attributes: {scrapmetal: 2}`、`dp-crusher-scrap = WallCrafter`。
+
+--------------------------------------------------------------------------------
+七、译文
+--------------------------------------------------------------------------------
+· 来源：**该槽指向的版本 APK** 的 assets/bundles/bundle_zh_CN.properties（回退 bundle.properties）
+  ★ 必须按 UTF-8 读；`Properties.load(InputStream)` 按 ISO-8859-1 解 ⇒ 乱码
+· v160 APK：412 条 block.*.name + 22 条 item.*.name（共 3496 键 / 190 KB）
+· **矿没有自己的键**（447 个方块里没译文的 35 个 = air + build1..16 + legacy-* + command-center + 全部 13 个矿）
+  ⇒ 照游戏口径：矿名 = `item.<掉落物>.name`；矿墙再加 bundle["wallore"]（zh = 「（墙）」）
+  ⇒ 副作用：ore-thorium 与 ore-crystal-thorium 都显示「钍」，要区分得靠内部名（放技术细节层）
+· 属性**没有任何官方译文**（中英 bundle 都没有 attribute.* 键，Attribute 类也没有 localized()）
+  ⇒ 属性标签只能写在启动器自己的 strings.xml
+· 模组：16 个里 13 个带 bundles/bundle_zh_CN.properties（合计 1135 条）；语料里 487 个未知名翻出 301 个
+· 官方 74 张图：missing = 0
+
+--------------------------------------------------------------------------------
+八、性能（PC，JDK 25；同一套代码两种写法）
+--------------------------------------------------------------------------------
+                     朴素版（HashMap+字符串）   优化版（按 id 预计算标志 + int[] 计数）
+  读入 + 解压          3.52 ms                  2.31 ms
+  解 content 区        0.09 ms                  含在上面
+  解瓦片               4.38 ms                  3.69 ms
+  统计 + 遮挡分类      **15.31 ms**             **1.64 ms**
+  全流程               **23.31 ms/张**           **7.63 ms/张**
+  最贵单张             101 ms（冷启动）          43 ms（冷）
+  全语料 460 个        10.72 s                   3.51 s
+内存峰值 ≈ 2.7 MB（600×600；三个 short[] = 2B×3×W×H）。
+★ 结论：**循环里绝不能出现字符串与 HashMap** —— 统计那一步会变成比解码还贵的瓶颈。
+设备未实测：估计 20~40 ms/张（600×600）、最坏 ~150 ms；需要 dev 口 + 真机计时。
+
+--------------------------------------------------------------------------------
+九、还没验 / 仍不确定（就这些）
+--------------------------------------------------------------------------------
+1. **代码/JS 定义的内容读不到** ⇒ 残留未知：exoprosopa（整个模组）、frost-industry 的一部分、
+   VE 的脚本内容（ve-rail / ve-isomorphic-conduit …）。残留量：矿物 4,208 格、可采 34,034 格、加成 51,992 格。
+2. 本次 JSON 解析是**探针级**（顶层键值扫描 + 109 个 type 没解析到类）⇒ 真实现要换真 JSON5/HJSON 解析器
+   与更全的类查找；覆盖率已证明路线成立。
+3. `requirements 非空 ⇒ 可建 ⇒ 可拆` 这条**还没从游戏数据逐条核**。
+4. 设备性能未实测。
+5. 补丁区与模组表的**叠加顺序**（游戏里 patches 相对 content 的先后）需要真机对照一次。
+
+--------------------------------------------------------------------------------
+十、怎么复现（全部在 MDT-Android-Dev/_lab/msav/）
+--------------------------------------------------------------------------------
+# 1) 导出基础表（18 列）
+javac -encoding UTF-8 -cp "<Mindustry.jar>" -d out ContentTable2.java
+java -cp "<Mindustry.jar>;out" ContentTable2 blocks-vanilla.tsv
+
+# 2) 导出"有效定义表"（原版 ⨁ 模组 content JSON）—— 需要先解出 APK 里的 bundle_zh_CN.properties
+java -cp "<Mindustry.jar>;out" Feas1 blocks-modmerged.tsv <bundle_zh_CN.properties> "%APPDATA%\Mindustry\mods"
+
+# 3) 语料统计（把产品版 app/src/io/mdt/launcher/MsavTiles.java 一起编；它用的是内嵌类 Tiles）
+javac -encoding UTF-8 -d out io/mdt/launcher/MsavTiles.java io/mdt/launcher/Occ3.java
+java -cp out io.mdt.launcher.Occ3 occ-mod.txt blocks-modmerged.tsv <语料目录...>
+
+# 4) 其他探针
+PatchProbe  <out.txt> <语料...>            # 数据补丁区
+PerfFast    <out.txt> <blocks.tsv> <语料...> # 分阶段计时（优化版统计）
+VeEnv       <mod.zip> <out.txt>            # 某模组的环境 JSON 逐条判定
+Zh2         <out.txt> <blocks.tsv> <apk> <语料...>  # 按中文渲染样例
+Occl2       <out.txt>                      # 用游戏自己的 Drill.canMine 验"墙下能不能采"
+Sem2        <out.txt>                      # 导出 breakable/destructible/alwaysReplace/unitMoveBreakable
+Units       <out.txt>                      # 哪些单位能挖墙
+
+--------------------------------------------------------------------------------
+十一、产物清单（本目录）
+--------------------------------------------------------------------------------
+f21-feasibility.txt            本文件
+f21-blocks-vanilla.tsv         原版 447 行 × 18 列（ContentTable2 导出）
+f21-blocks-modmerged.tsv       原版 ⨁ 模组 703 行 × 19 列（末列 source = vanilla / mod-new / mod-override）
+f21-occlusion-vanilla.txt      只用原版表时的遮挡统计
+f21-occlusion-modmerged.txt    合并表时的遮挡统计（含遮挡者 top8 + 残留未知 top15）
+f21-perf-naive.txt             朴素版（HashMap+字符串）分阶段计时，460 个语料逐条
+f21-perf-optimized.txt         优化版（按 id 计数）分阶段计时
+f21-patches.txt                460 个语料的数据补丁区扫描结果
+f21-ve-env.txt                 VE 129 个环境 JSON 逐条判定 + 25 个 type 的默认标志
+f21-stats-zh.txt               按中文渲染的样例（官方 74 图，用版本 APK 的 bundle）
+f21-drill-canmine-matrix.txt   用游戏自己的 Drill.canMine 验「墙下的矿能不能采」

@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  应用主题（浅色）。纯 framework —— 零 AndroidX / 零 Material Components，
+  直接继承系统内置的 android:Theme.Material.Light。
+
+  深色：values-night/themes.xml 同名覆盖（系统 uimode=night 自动选中），parent 换成
+  android:Theme.Material。因为颜色全部走 @color 语义名，两份主题的 item 列表是同一份。
+
+  ★ F1b（视觉打磨）变更：显式定制顶栏，取 accent 实色底 + on_appbar 文字。
+
+  ⚠️ 两条踩过的坑（都别改回去）：
+    a) 顶栏标题色必须写 @color/on_appbar，**不能**写 @color/fg。
+       `titleTextStyle` 在部分 ROM 上会被 ActionBar 的默认样式盖掉，此时标题取的是
+       「彩色顶栏 → 白色标题」的默认值；若把它配成深色的 @color/fg，换一台机器
+       就会变成"深靛蓝底 + 深色字"，直接看不清。用 on_appbar 则**两条路都对**：
+       生效时是白字，不生效时默认也是白字。
+    b) 顶栏底色是深色 ⇒ 状态栏图标必须用浅色，即 windowLightStatusBar=false。
+       写成 true 会得到"深蓝状态栏 + 深色时间/信号图标"，在会读这个属性的 ROM 上等于瞎。
+
+  ⚠️ 主题只能挂在**我们自己的 Activity** 上（见 AndroidManifest.xml）。
+    绝不设到 <application>：游戏 Activity 未声明 theme 会继承它，被套上 Material 外观
+    （官方包是在 application 上挂 @style/ArcTheme，我们引不到那个资源）。
+-->
+<resources>
+    <style name="AppTheme" parent="android:Theme.Material.Light">
+        <item name="android:windowBackground">@color/bg</item>
+        <item name="android:textColorPrimary">@color/fg</item>
+        <item name="android:textColorSecondary">@color/fg_muted</item>
+        <item name="android:colorAccent">@color/accent</item>
+
+        <!-- F1b：顶栏 -->
+        <item name="android:colorPrimary">@color/appbar</item>
+        <item name="android:colorPrimaryDark">@color/statusbar</item>
+        <item name="android:statusBarColor">@color/statusbar</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:actionBarStyle">@style/AppBarStyle</item>
+
+        <!-- F5b：所有 AlertDialog 走自己的样式（否则是系统默认灰底，与卡片风格脱节） -->
+        <item name="android:alertDialogTheme">@style/AppDialogTheme</item>
+    </style>
+
+    <!--
+      F5b：对话框样式。默认的 android:Theme.Material.Dialog.Alert 用框架色
+      （深色下背景是 material_grey_850 #303030），和应用的 card 色对不上。
+      这里换掉三样东西：
+        ① windowBackground —— 换成自己的 inset + 圆角卡片（★ inset 必须是 16dp，
+           骨架实测框架自己就是 16dp：窗口 [30,772] → 卡片 [82,824]，差 52px = 16dp。
+           inset 变了对话框的可视宽度会跟着变）；
+        ② colorAccent —— 按钮文字 / CheckBox / 单选圆点 / 输入框光标；
+        ③ colorControlNormal —— 未选中态描边与输入框下划线。
+      ⚠️ values-night 里有同名 style（parent 换成深色对话框、windowBackground 同一份资源色）；
+         「整份替换」语义 ⇒ 那边必须写全，不能只写差异项。
+    -->
+    <style name="AppDialogTheme" parent="android:Theme.Material.Light.Dialog.Alert">
+        <item name="android:windowBackground">@drawable/dlg_bg</item>
+        <item name="android:colorAccent">@color/accent</item>
+        <item name="android:textColorPrimary">@color/fg</item>
+        <item name="android:textColorSecondary">@color/fg_muted</item>
+        <item name="android:colorControlNormal">@color/fg_muted</item>
+    </style>
+
+    <!--
+      顶栏本体。刻意只定义**一份**，放在 values/：背景色与标题色全部走语义资源，
+      会自动跟随 values-night/colors.xml ⇒ 深色主题不需要第二份。
+      （注：values-night 里的同名 style 是整份替换而非 item 合并，所以共用部分必须放这边。）
+    -->
+    <style name="AppBarStyle" parent="android:Widget.Material.ActionBar.Solid">
+        <item name="android:background">@color/appbar</item>
+        <!-- 去阴影：顶栏与页底靠颜色差分层，不靠投影（深色下投影本来就看不见） -->
+        <item name="android:elevation">0dp</item>
+        <!-- 与页面 16dp 左边距对齐 -->
+        <item name="android:contentInsetStart">16dp</item>
+        <item name="android:titleTextStyle">@style/AppBarTitle</item>
+    </style>
+
+    <style name="AppBarTitle" parent="android:TextAppearance.Material.Widget.ActionBar.Title">
+        <item name="android:textColor">@color/on_appbar</item>
+        <item name="android:textSize">20sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+    </style>
+</resources>

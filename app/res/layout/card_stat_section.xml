@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  F21：一段可折叠的资源统计卡（点标题行展开/收起，箭头转 90°）。
+
+  ★ 用 `Util.bindExpandableCard(card, R.id.stat_card, R.id.stat_card_body, R.id.stat_card_chevron)`
+    绑定 —— **不要**用 ExpandableListView：这一页是 ScrollView，往里塞 ListView 高度会塌
+    （F3b 已经否掉过这条路，见 REF §55）。
+  ★ 摘要（stat_card_summary）**常驻**显示：收起状态下也要能一眼看到"多少种、能采到多少格"。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/stat_card"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:layout_marginTop="8dp"
+    android:background="@drawable/card_bg">
+
+    <!--
+      ⚠️ 标题行**不要**写 `android:clickable="true"`：点击监听是绑在**卡片根**
+        （`stat_card`，见 Util.bindExpandableCard）上的，而一个 clickable 的子 View
+        会**吃掉**这次触摸、父 View 永远收不到 ⇒ 点标题不展开（真机实测过：
+        uiautomator 里 view 都在、点了没反应，也不报错）。
+    -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:focusable="false"
+        android:paddingStart="14dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="2dp">
+
+        <TextView
+            android:id="@+id/stat_card_title"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:textSize="15sp"
+            android:fontFamily="sans-serif-medium"
+            android:textColor="@color/fg" />
+
+        <ImageView
+            android:id="@+id/stat_card_chevron"
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:layout_marginStart="8dp"
+            android:src="@drawable/ic_chevron"
+            android:tint="@color/fg_muted" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/stat_card_summary"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:paddingBottom="12dp"
+        android:lineSpacingExtra="2dp"
+        android:textSize="12sp"
+        android:textColor="@color/fg_muted" />
+
+    <LinearLayout
+        android:id="@+id/stat_card_body"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingBottom="6dp"
+        android:visibility="gone" />
+</LinearLayout>

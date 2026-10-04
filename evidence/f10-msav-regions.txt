@@ -1,0 +1,3392 @@
+=== .msav 区清单 / preview_map 覆盖率（PC 实验室）===
+
+语料 386 个
+带 preview_map 217 ；不带 169 ；读取失败 0
+版本分布：{4=1, 7=3, 8=10, 9=51, 10=26, 11=217, 13=78}
+
+preview 尺寸样本（前 12 条）：
+  512x155 len=80276
+  256x41 len=10695
+  256x44 len=11425
+  256x56 len=14489
+  256x150 len=38424
+  256x26 len=6678
+
+· 0.msav：v11，区 7 个（基准 6）
+    #0 meta len=11004  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=1
+    #3 map len=2194929  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=3986
+    #5 markers len=12831
+    #6 custom len=5356
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 1.msav：v11，区 7 个（基准 6）
+    #0 meta len=11694  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=1
+    #3 map len=2248835  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=4103
+    #5 markers len=12823
+    #6 custom len=5553
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 10.msav：v11，区 7 个（基准 6）
+    #0 meta len=12462  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=1
+    #3 map len=2220367  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=61451
+    #5 markers len=12161
+    #6 custom len=7793
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 11.msav：v11，区 7 个（基准 6）
+    #0 meta len=12579  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=1
+    #3 map len=2219189  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=69719
+    #5 markers len=12787
+    #6 custom len=7932
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 11.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=12580  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=1
+    #3 map len=2218994  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=70132
+    #5 markers len=12787
+    #6 custom len=7932
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 12.msav：v11，区 7 个（基准 6）
+    #0 meta len=12572  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=1
+    #3 map len=1835781  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=72389
+    #5 markers len=10922
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 12.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=12576  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=1
+    #3 map len=2206805  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=72077
+    #5 markers len=10922
+    #6 custom len=7932
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 13.msav：v11，区 7 个（基准 6）
+    #0 meta len=11906  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=1
+    #3 map len=2259541  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=6024
+    #5 markers len=12823
+    #6 custom len=5567
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 14.msav：v11，区 7 个（基准 6）
+    #0 meta len=11960  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=1
+    #3 map len=2247789  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=12200
+    #5 markers len=13958
+    #6 custom len=5688
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 15.msav：v11，区 7 个（基准 6）
+    #0 meta len=12007  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=1
+    #3 map len=2233877  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=19943
+    #5 markers len=12943
+    #6 custom len=5648
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 16.msav：v11，区 7 个（基准 6）
+    #0 meta len=12008  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=1
+    #3 map len=2217042  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=25247
+    #5 markers len=12943
+    #6 custom len=5607
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 17.msav：v11，区 7 个（基准 6）
+    #0 meta len=12009  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=1
+    #3 map len=2213120  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=24742
+    #5 markers len=12943
+    #6 custom len=5626
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 18.msav：v11，区 7 个（基准 6）
+    #0 meta len=12010  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=1
+    #3 map len=2172301  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=51812
+    #5 markers len=12943
+    #6 custom len=5613
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 19.msav：v11，区 7 个（基准 6）
+    #0 meta len=12015  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=1
+    #3 map len=1743657  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=51851
+    #5 markers len=12161
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 2.msav：v11，区 7 个（基准 6）
+    #0 meta len=11890  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=1
+    #3 map len=2244546  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=11430
+    #5 markers len=13195
+    #6 custom len=5688
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 20.msav：v11，区 7 个（基准 6）
+    #0 meta len=12304  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=1
+    #3 map len=1824981  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=60232
+    #5 markers len=12161
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 20.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=12304  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=1
+    #3 map len=1824981  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=60172
+    #5 markers len=12161
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 21.msav：v11，区 7 个（基准 6）
+    #0 meta len=12376  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=1
+    #3 map len=1828380  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=61214
+    #5 markers len=12161
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 21.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=12323  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=1
+    #3 map len=1828148  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=60983
+    #5 markers len=12161
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 22.msav：v11，区 7 个（基准 6）
+    #0 meta len=12025  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=1
+    #3 map len=2098242  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=51815
+    #5 markers len=12161
+    #6 custom len=7898
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 23.msav：v11，区 7 个（基准 6）
+    #0 meta len=12283  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=1
+    #3 map len=2163312  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=54572
+    #5 markers len=12161
+    #6 custom len=7842
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 24.msav：v11，区 7 个（基准 6）
+    #0 meta len=12316  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=1
+    #3 map len=2167630  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=55386
+    #5 markers len=12161
+    #6 custom len=7839
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 25.msav：v11，区 7 个（基准 6）
+    #0 meta len=12445  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=1
+    #3 map len=2192982  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=56055
+    #5 markers len=12161
+    #6 custom len=7831
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 26.msav：v11，区 7 个（基准 6）
+    #0 meta len=12575  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=1
+    #3 map len=2216857  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=57863
+    #5 markers len=12161
+    #6 custom len=7798
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 27.msav：v11，区 7 个（基准 6）
+    #0 meta len=12647  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9609
+    #2 ?preview_map len=1
+    #3 map len=1852561  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=68171
+    #5 markers len=10922
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 28.msav：v11，区 7 个（基准 6）
+    #0 meta len=12647  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9609
+    #2 ?preview_map len=1
+    #3 map len=1789116  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=85448
+    #5 markers len=10933
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 29.msav：v11，区 7 个（基准 6）
+    #0 meta len=12673  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9609
+    #2 ?preview_map len=1
+    #3 map len=1715632  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=104937
+    #5 markers len=12064
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 3.msav：v11，区 7 个（基准 6）
+    #0 meta len=11985  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=1
+    #3 map len=2244988  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=14575
+    #5 markers len=12943
+    #6 custom len=5654
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 30.msav：v11，区 7 个（基准 6）
+    #0 meta len=12646  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9609
+    #2 ?preview_map len=1
+    #3 map len=1852376  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=67903
+    #5 markers len=10922
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 30.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=12645  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9609
+    #2 ?preview_map len=1
+    #3 map len=1852331  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=67850
+    #5 markers len=10922
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 31.msav：v11，区 7 个（基准 6）
+    #0 meta len=12754  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9609
+    #2 ?preview_map len=1
+    #3 map len=1477075  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=183784
+    #5 markers len=11048
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 31.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=12727  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9609
+    #2 ?preview_map len=1
+    #3 map len=1589697  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=199985
+    #5 markers len=11833
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 32.msav：v11，区 7 个（基准 6）
+    #0 meta len=12753  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9609
+    #2 ?preview_map len=1
+    #3 map len=1460039  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=180853
+    #5 markers len=11048
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 32.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=12753  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9609
+    #2 ?preview_map len=1
+    #3 map len=1460039  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=180853
+    #5 markers len=11048
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 33.msav：v11，区 7 个（基准 6）
+    #0 meta len=5460  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9689
+    #2 ?preview_map len=1
+    #3 map len=1194574  **像地图** 586x586（宽高比载荷小？）
+    #4 entities len=15623
+    #5 markers len=2
+    #6 custom len=10076
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 34.msav：v11，区 7 个（基准 6）
+    #0 meta len=5692  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9689
+    #2 ?preview_map len=1
+    #3 map len=1275292  **像地图** 586x586（宽高比载荷小？）
+    #4 entities len=24032
+    #5 markers len=2
+    #6 custom len=10310
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 35.msav：v11，区 7 个（基准 6）
+    #0 meta len=5994  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9689
+    #2 ?preview_map len=1
+    #3 map len=1360138  **像地图** 586x586（宽高比载荷小？）
+    #4 entities len=38147
+    #5 markers len=2
+    #6 custom len=10254
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 36.msav：v11，区 7 个（基准 6）
+    #0 meta len=6989  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9689
+    #2 ?preview_map len=1
+    #3 map len=1196162  **像地图** 586x586（宽高比载荷小？）
+    #4 entities len=132819
+    #5 markers len=2
+    #6 custom len=10394
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 37.msav：v11，区 7 个（基准 6）
+    #0 meta len=7073  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9689
+    #2 ?preview_map len=1
+    #3 map len=1120481  **像地图** 586x586（宽高比载荷小？）
+    #4 entities len=139554
+    #5 markers len=2
+    #6 custom len=10459
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 38.msav：v11，区 7 个（基准 6）
+    #0 meta len=7150  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9689
+    #2 ?preview_map len=1
+    #3 map len=1059523  **像地图** 586x586（宽高比载荷小？）
+    #4 entities len=174787
+    #5 markers len=2
+    #6 custom len=10497
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 39.msav：v11，区 7 个（基准 6）
+    #0 meta len=18325  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9848
+    #2 ?preview_map len=1
+    #3 map len=2601758  **像地图** 600x600（宽高比载荷小？）
+    #4 entities len=15727
+    #5 markers len=57104
+    #6 custom len=7964
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 4.msav：v11，区 7 个（基准 6）
+    #0 meta len=12020  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=1
+    #3 map len=2224024  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=25166
+    #5 markers len=12943
+    #6 custom len=5575
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 4.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=12020  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=1
+    #3 map len=2224024  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=24716
+    #5 markers len=12943
+    #6 custom len=5575
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 40.msav：v11，区 7 个（基准 6）
+    #0 meta len=18512  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9848
+    #2 ?preview_map len=1
+    #3 map len=2634787  **像地图** 600x600（宽高比载荷小？）
+    #4 entities len=21939
+    #5 markers len=57104
+    #6 custom len=7961
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 40.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=18499  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9848
+    #2 ?preview_map len=1
+    #3 map len=2635810  **像地图** 600x600（宽高比载荷小？）
+    #4 entities len=22499
+    #5 markers len=57104
+    #6 custom len=7961
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 41.msav：v11，区 7 个（基准 6）
+    #0 meta len=19146  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9848
+    #2 ?preview_map len=1
+    #3 map len=2604335  **像地图** 600x600（宽高比载荷小？）
+    #4 entities len=28409
+    #5 markers len=57104
+    #6 custom len=7996
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 42.msav：v11，区 7 个（基准 6）
+    #0 meta len=19444  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9848
+    #2 ?preview_map len=1
+    #3 map len=2496329  **像地图** 600x600（宽高比载荷小？）
+    #4 entities len=54675
+    #5 markers len=57104
+    #6 custom len=8061
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 43.msav：v11，区 7 个（基准 6）
+    #0 meta len=19545  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9848
+    #2 ?preview_map len=1
+    #3 map len=2545750  **像地图** 600x600（宽高比载荷小？）
+    #4 entities len=61043
+    #5 markers len=57104
+    #6 custom len=8091
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 44.msav：v11，区 7 个（基准 6）
+    #0 meta len=19563  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9848
+    #2 ?preview_map len=1
+    #3 map len=2570269  **像地图** 600x600（宽高比载荷小？）
+    #4 entities len=67604
+    #5 markers len=57104
+    #6 custom len=8036
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 45.msav：v11，区 7 个（基准 6）
+    #0 meta len=19633  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9848
+    #2 ?preview_map len=1
+    #3 map len=2593583  **像地图** 600x600（宽高比载荷小？）
+    #4 entities len=79559
+    #5 markers len=57104
+    #6 custom len=8066
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 45.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=19576  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9848
+    #2 ?preview_map len=1
+    #3 map len=2573671  **像地图** 600x600（宽高比载荷小？）
+    #4 entities len=71033
+    #5 markers len=57104
+    #6 custom len=8055
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 46.msav：v11，区 7 个（基准 6）
+    #0 meta len=19634  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9848
+    #2 ?preview_map len=1
+    #3 map len=2606955  **像地图** 600x600（宽高比载荷小？）
+    #4 entities len=87458
+    #5 markers len=57104
+    #6 custom len=8064
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 46.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=19841  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9848
+    #2 ?preview_map len=1
+    #3 map len=2209665  **像地图** 600x600（宽高比载荷小？）
+    #4 entities len=87958
+    #5 markers len=57104
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 47.msav：v11，区 7 个（基准 6）
+    #0 meta len=19782  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9848
+    #2 ?preview_map len=1
+    #3 map len=2504466  **像地图** 600x600（宽高比载荷小？）
+    #4 entities len=95298
+    #5 markers len=57104
+    #6 custom len=8282
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 48.msav：v11，区 7 个（基准 6）
+    #0 meta len=19857  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9848
+    #2 ?preview_map len=1
+    #3 map len=2521192  **像地图** 600x600（宽高比载荷小？）
+    #4 entities len=104336
+    #5 markers len=57104
+    #6 custom len=8338
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 49.msav：v11，区 7 个（基准 6）
+    #0 meta len=6406  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=237429  **像地图** 450x100（宽高比载荷小？）
+    #4 entities len=22094
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 49.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=6311  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=237712  **像地图** 450x100（宽高比载荷小？）
+    #4 entities len=20110
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 5.msav：v11，区 7 个（基准 6）
+    #0 meta len=12039  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=1
+    #3 map len=2217207  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=26909
+    #5 markers len=12943
+    #6 custom len=5594
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 50.msav：v7，区 5 个（基准 5）
+    #0 meta len=2435  **像地图** 16x8（宽高比载荷小？）
+    #1 content len=7603
+    #2 map len=45855  **像地图** 256x256
+    #3 entities len=128
+    #4 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· 50.msav-backup.msav：v7，区 5 个（基准 5）
+    #0 meta len=2436  **像地图** 16x8（宽高比载荷小？）
+    #1 content len=7603
+    #2 map len=45855  **像地图** 256x256
+    #3 entities len=128
+    #4 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· 51.msav：v11，区 7 个（基准 6）
+    #0 meta len=4499  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=74332  **像地图** 300x179（宽高比载荷小？）
+    #4 entities len=3294
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 51.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=4500  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=74332  **像地图** 300x179（宽高比载荷小？）
+    #4 entities len=3294
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 52.msav：v11，区 7 个（基准 6）
+    #0 meta len=4838  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=101967  **像地图** 600x600
+    #4 entities len=130
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 52.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=4838  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=101967  **像地图** 600x600
+    #4 entities len=234
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 53.msav：v11，区 7 个（基准 6）
+    #0 meta len=4373  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=2209
+    #4 entities len=130
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 1 个）
+· 53.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=4373  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=2209
+    #4 entities len=130
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 1 个）
+· 54.msav：v11，区 7 个（基准 6）
+    #0 meta len=4376  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=2209
+    #4 entities len=130
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 1 个）
+· 54.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=4376  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=2209
+    #4 entities len=130
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 1 个）
+· 55.msav：v11，区 7 个（基准 6）
+    #0 meta len=4462  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=2317
+    #4 entities len=155
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 1 个）
+· 55.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=4380  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=2209
+    #4 entities len=130
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 1 个）
+· 56.msav：v11，区 7 个（基准 6）
+    #0 meta len=4687  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=2209
+    #4 entities len=130
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 1 个）
+· 56.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=4668  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=2209
+    #4 entities len=130
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 1 个）
+· 57.msav：v11，区 7 个（基准 6）
+    #0 meta len=4795  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=39773  **像地图** 200x200
+    #4 entities len=130
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 57.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=4794  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=39803  **像地图** 200x200
+    #4 entities len=130
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 58.msav：v11，区 7 个（基准 6）
+    #0 meta len=10081  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=1442012  **像地图** 600x600（宽高比载荷小？）
+    #4 entities len=3892
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 58.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=10081  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=1442012  **像地图** 600x600（宽高比载荷小？）
+    #4 entities len=3892
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 59.msav：v11，区 7 个（基准 6）
+    #0 meta len=13241  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=1471828  **像地图** 600x600（宽高比载荷小？）
+    #4 entities len=40940
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 59.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=13249  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=1766320  **像地图** 600x600（宽高比载荷小？）
+    #4 entities len=39062
+    #5 markers len=2
+    #6 custom len=10213
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 6.msav：v11，区 7 个（基准 6）
+    #0 meta len=12038  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=1
+    #3 map len=2197477  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=50665
+    #5 markers len=12943
+    #6 custom len=5595
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 60.msav：v11，区 7 个（基准 6）
+    #0 meta len=13577  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=1727093  **像地图** 600x600（宽高比载荷小？）
+    #4 entities len=65740
+    #5 markers len=2
+    #6 custom len=10426
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 60.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=13577  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=1727093  **像地图** 600x600（宽高比载荷小？）
+    #4 entities len=65400
+    #5 markers len=2
+    #6 custom len=10426
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 61.msav：v11，区 7 个（基准 6）
+    #0 meta len=14970  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=1115429  **像地图** 600x600（宽高比载荷小？）
+    #4 entities len=190197
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 61.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=14970  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=1115429  **像地图** 600x600（宽高比载荷小？）
+    #4 entities len=190471
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 62.msav：v11，区 7 个（基准 6）
+    #0 meta len=13750  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=1422784  **像地图** 600x600（宽高比载荷小？）
+    #4 entities len=73870
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 63.msav：v11，区 7 个（基准 6）
+    #0 meta len=14100  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=1644315  **像地图** 600x600（宽高比载荷小？）
+    #4 entities len=97820
+    #5 markers len=2
+    #6 custom len=10503
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 63.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=14091  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=1374963  **像地图** 600x600（宽高比载荷小？）
+    #4 entities len=97820
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 64.msav：v11，区 7 个（基准 6）
+    #0 meta len=14561  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=1556870  **像地图** 600x600（宽高比载荷小？）
+    #4 entities len=124981
+    #5 markers len=2
+    #6 custom len=10708
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 65.msav：v11，区 7 个（基准 6）
+    #0 meta len=14970  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=1115182  **像地图** 600x600（宽高比载荷小？）
+    #4 entities len=188264
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 66.msav：v13，区 7 个（基准 7）
+    #0 meta len=4497
+    #1 patches len=8
+    #2 content len=9867
+    #3 map len=2209
+    #4 entities len=234
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 0 个）
+· 66.msav-backup.msav：v13，区 7 个（基准 7）
+    #0 meta len=4497
+    #1 patches len=8
+    #2 content len=9867
+    #3 map len=2209
+    #4 entities len=234
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 0 个）
+· 67.msav：v13，区 7 个（基准 7）
+    #0 meta len=8379
+    #1 patches len=8
+    #2 content len=9867
+    #3 map len=1482229  **像地图** 710x710（宽高比载荷小？）
+    #4 entities len=126489
+    #5 markers len=554
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· 67.msav-backup.msav：v13，区 7 个（基准 7）
+    #0 meta len=8361
+    #1 patches len=8
+    #2 content len=9867
+    #3 map len=1485377  **像地图** 710x710（宽高比载荷小？）
+    #4 entities len=126512
+    #5 markers len=600
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· 68.msav：v13，区 7 个（基准 7）
+    #0 meta len=4445
+    #1 patches len=8
+    #2 content len=9867
+    #3 map len=2209
+    #4 entities len=234
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 0 个）
+· 68.msav-backup.msav：v13，区 7 个（基准 7）
+    #0 meta len=4446
+    #1 patches len=8
+    #2 content len=9867
+    #3 map len=2209
+    #4 entities len=234
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 0 个）
+· 69.msav：v13，区 7 个（基准 7）
+    #0 meta len=4524
+    #1 patches len=8
+    #2 content len=9867
+    #3 map len=2209
+    #4 entities len=130
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 0 个）
+· 69.msav-backup.msav：v13，区 7 个（基准 7）
+    #0 meta len=4445
+    #1 patches len=8
+    #2 content len=9867
+    #3 map len=2209
+    #4 entities len=244
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 0 个）
+· 7.msav：v11，区 7 个（基准 6）
+    #0 meta len=12219  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=1
+    #3 map len=2186611  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=55275
+    #5 markers len=12161
+    #6 custom len=7889
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 70.msav：v13，区 7 个（基准 7）
+    #0 meta len=13478
+    #1 patches len=8
+    #2 content len=9867
+    #3 map len=575478  **像地图** 525x525（宽高比载荷小？）
+    #4 entities len=17427
+    #5 markers len=1686
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· 70.msav-backup.msav：v13，区 7 个（基准 7）
+    #0 meta len=13478
+    #1 patches len=8
+    #2 content len=9867
+    #3 map len=575478  **像地图** 525x525（宽高比载荷小？）
+    #4 entities len=17427
+    #5 markers len=1686
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· 71.msav：v13，区 7 个（基准 7）
+    #0 meta len=15012
+    #1 patches len=8
+    #2 content len=9867
+    #3 map len=630217  **像地图** 525x525（宽高比载荷小？）
+    #4 entities len=92778
+    #5 markers len=2040
+    #6 custom len=8526
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· 71.msav-backup.msav：v13，区 7 个（基准 7）
+    #0 meta len=14994
+    #1 patches len=8
+    #2 content len=9867
+    #3 map len=537919  **像地图** 525x525（宽高比载荷小？）
+    #4 entities len=84659
+    #5 markers len=2648
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· 72.msav：v13，区 7 个（基准 7）
+    #0 meta len=6020
+    #1 patches len=8
+    #2 content len=9867
+    #3 map len=34787  **像地图** 200x200
+    #4 entities len=1174
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· 72.msav-backup.msav：v13，区 7 个（基准 7）
+    #0 meta len=6020
+    #1 patches len=8
+    #2 content len=9867
+    #3 map len=34834  **像地图** 200x200
+    #4 entities len=1303
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· 73.msav：v13，区 7 个（基准 7）
+    #0 meta len=7922
+    #1 patches len=80
+    #2 content len=9867
+    #3 map len=211975  **像地图** 300x300（宽高比载荷小？）
+    #4 entities len=1248
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· 73.msav-backup.msav：v13，区 7 个（基准 7）
+    #0 meta len=7922
+    #1 patches len=80
+    #2 content len=9867
+    #3 map len=212051  **像地图** 300x300（宽高比载荷小？）
+    #4 entities len=1352
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· 74.msav：v13，区 7 个（基准 7）
+    #0 meta len=8123
+    #1 patches len=310
+    #2 content len=9867
+    #3 map len=228781  **像地图** 300x300（宽高比载荷小？）
+    #4 entities len=147
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· 74.msav-backup.msav：v13，区 7 个（基准 7）
+    #0 meta len=8123
+    #1 patches len=310
+    #2 content len=9867
+    #3 map len=228781  **像地图** 300x300（宽高比载荷小？）
+    #4 entities len=147
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· 75.msav：v13，区 7 个（基准 7）
+    #0 meta len=7628
+    #1 patches len=310
+    #2 content len=9867
+    #3 map len=259865  **像地图** 300x300（宽高比载荷小？）
+    #4 entities len=138
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· 75.msav-backup.msav：v13，区 7 个（基准 7）
+    #0 meta len=7628
+    #1 patches len=310
+    #2 content len=9867
+    #3 map len=259878  **像地图** 300x300（宽高比载荷小？）
+    #4 entities len=138
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· 76.msav：v13，区 7 个（基准 7）
+    #0 meta len=7582
+    #1 patches len=310
+    #2 content len=9867
+    #3 map len=259578  **像地图** 300x300（宽高比载荷小？）
+    #4 entities len=138
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· 76.msav-backup.msav：v13，区 7 个（基准 7）
+    #0 meta len=7299
+    #1 patches len=310
+    #2 content len=9867
+    #3 map len=253680  **像地图** 300x300（宽高比载荷小？）
+    #4 entities len=138
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· 77.msav：v13，区 7 个（基准 7）
+    #0 meta len=4623
+    #1 patches len=1043
+    #2 content len=9900
+    #3 map len=16016  **像地图** 200x200
+    #4 entities len=130
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· 77.msav-backup.msav：v13，区 7 个（基准 7）
+    #0 meta len=4647
+    #1 patches len=998
+    #2 content len=9900
+    #3 map len=2859
+    #4 entities len=130
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 0 个）
+· 8.msav：v11，区 7 个（基准 6）
+    #0 meta len=12315  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=1
+    #3 map len=2207461  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=56353
+    #5 markers len=12161
+    #6 custom len=7856
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 9.msav：v11，区 7 个（基准 6）
+    #0 meta len=12436  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=1
+    #3 map len=2220652  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=60364
+    #5 markers len=12161
+    #6 custom len=7793
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 9.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=12426  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=1
+    #3 map len=2215913  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=59767
+    #5 markers len=12161
+    #6 custom len=7802
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-erekir-10.msav：v9，区 6 个（基准 6）
+    #0 meta len=5208  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=175995  **像地图** 512x512
+    #3 entities len=2465
+    #4 markers len=2
+    #5 custom len=4673
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-erekir-10.msav-backup.msav：v9，区 6 个（基准 6）
+    #0 meta len=5208  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=176001  **像地图** 512x512
+    #3 entities len=2465
+    #4 markers len=2
+    #5 custom len=4673
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-erekir-12.msav：v13，区 7 个（基准 7）
+    #0 meta len=11257
+    #1 patches len=8
+    #2 content len=9867
+    #3 map len=674297  **像地图** 600x600（宽高比载荷小？）
+    #4 entities len=19372
+    #5 markers len=2
+    #6 custom len=11874
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-erekir-12.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=11235  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=673823  **像地图** 600x600（宽高比载荷小？）
+    #4 entities len=19500
+    #5 markers len=2
+    #6 custom len=8078
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-erekir-14.msav：v9，区 6 个（基准 6）
+    #0 meta len=5257  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=272398  **像地图** 586x586
+    #3 entities len=16515
+    #4 markers len=2
+    #5 custom len=6304
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-erekir-14.msav-backup.msav：v9，区 6 个（基准 6）
+    #0 meta len=5257  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=272404  **像地图** 586x586
+    #3 entities len=16515
+    #4 markers len=2
+    #5 custom len=6304
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-erekir-18.msav：v11，区 7 个（基准 6）
+    #0 meta len=6295  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=382092  **像地图** 586x586（宽高比载荷小？）
+    #4 entities len=58336
+    #5 markers len=2
+    #6 custom len=10906
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-erekir-18.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=6295  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=382116  **像地图** 586x586（宽高比载荷小？）
+    #4 entities len=58352
+    #5 markers len=2
+    #6 custom len=10906
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-erekir-19.msav：v9，区 6 个（基准 6）
+    #0 meta len=3058  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=229183  **像地图** 600x600
+    #3 entities len=2935
+    #4 markers len=2
+    #5 custom len=6017
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-erekir-19.msav-backup.msav：v9，区 6 个（基准 6）
+    #0 meta len=3061  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=228679  **像地图** 600x600
+    #3 entities len=2935
+    #4 markers len=2
+    #5 custom len=6017
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-erekir-25.msav：v9，区 6 个（基准 6）
+    #0 meta len=5431  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=265733  **像地图** 586x586
+    #3 entities len=1995
+    #4 markers len=2
+    #5 custom len=5979
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-erekir-25.msav-backup.msav：v9，区 6 个（基准 6）
+    #0 meta len=5431  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=265595  **像地图** 586x586
+    #3 entities len=1995
+    #4 markers len=2
+    #5 custom len=5979
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-erekir-29.msav：v9，区 6 个（基准 6）
+    #0 meta len=5389  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=301279  **像地图** 586x586
+    #3 entities len=14685
+    #4 markers len=2
+    #5 custom len=10596
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-erekir-29.msav-backup.msav：v9，区 6 个（基准 6）
+    #0 meta len=5390  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=301273  **像地图** 586x586
+    #3 entities len=14685
+    #4 markers len=2
+    #5 custom len=10596
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-erekir-3.msav：v9，区 6 个（基准 6）
+    #0 meta len=4887  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=227562  **像地图** 494x494
+    #3 entities len=1720
+    #4 markers len=2
+    #5 custom len=2494
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-erekir-3.msav-backup.msav：v9，区 6 个（基准 6）
+    #0 meta len=4888  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=227412  **像地图** 494x494
+    #3 entities len=1720
+    #4 markers len=2
+    #5 custom len=2494
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-erekir-30.msav：v9，区 6 个（基准 6）
+    #0 meta len=5640  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=93563  **像地图** 310x390
+    #3 entities len=3405
+    #4 markers len=2
+    #5 custom len=2434
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-erekir-30.msav-backup.msav：v9，区 6 个（基准 6）
+    #0 meta len=5640  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=93638  **像地图** 310x390
+    #3 entities len=3405
+    #4 markers len=2
+    #5 custom len=2434
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-erekir-36.msav：v9，区 6 个（基准 6）
+    #0 meta len=3620  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=170158  **像地图** 484x484
+    #3 entities len=2483
+    #4 markers len=2
+    #5 custom len=4262
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-erekir-36.msav-backup.msav：v9，区 6 个（基准 6）
+    #0 meta len=3621  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=170182  **像地图** 484x484
+    #3 entities len=2483
+    #4 markers len=2
+    #5 custom len=4262
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-erekir-37.msav：v11，区 7 个（基准 6）
+    #0 meta len=11002  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9848
+    #2 ?preview_map len=1
+    #3 map len=280935  **像地图** 600x420（宽高比载荷小？）
+    #4 entities len=13075
+    #5 markers len=2
+    #6 custom len=5512
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-erekir-37.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=11002  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9848
+    #2 ?preview_map len=1
+    #3 map len=280947  **像地图** 600x420（宽高比载荷小？）
+    #4 entities len=13075
+    #5 markers len=2
+    #6 custom len=5512
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-erekir-39.msav：v9，区 6 个（基准 6）
+    #0 meta len=4343  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=208004  **像地图** 494x494
+    #3 entities len=3535
+    #4 markers len=2
+    #5 custom len=2525
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-erekir-39.msav-backup.msav：v9，区 6 个（基准 6）
+    #0 meta len=4343  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=208028  **像地图** 494x494
+    #3 entities len=3535
+    #4 markers len=2
+    #5 custom len=2525
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-erekir-41.msav：v9，区 6 个（基准 6）
+    #0 meta len=5021  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=38313  **像地图** 320x320
+    #3 entities len=2790
+    #4 markers len=2
+    #5 custom len=2119
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-erekir-41.msav-backup.msav：v9，区 6 个（基准 6）
+    #0 meta len=5021  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=38307  **像地图** 320x320
+    #3 entities len=2790
+    #4 markers len=2
+    #5 custom len=2119
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-erekir-43.msav：v9，区 6 个（基准 6）
+    #0 meta len=5647  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=149482  **像地图** 450x450
+    #3 entities len=8550
+    #4 markers len=2
+    #5 custom len=3995
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-erekir-43.msav-backup.msav：v9，区 6 个（基准 6）
+    #0 meta len=5646  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=149434  **像地图** 450x450
+    #3 entities len=8550
+    #4 markers len=2
+    #5 custom len=3995
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-erekir-5.msav：v11，区 7 个（基准 6）
+    #0 meta len=9956  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=272887  **像地图** 600x600
+    #4 entities len=2911
+    #5 markers len=2
+    #6 custom len=3494
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-erekir-5.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=9957  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=272777  **像地图** 600x600
+    #4 entities len=2911
+    #5 markers len=2
+    #6 custom len=3494
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-erekir-58.msav：v9，区 6 个（基准 6）
+    #0 meta len=6268  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=279366  **像地图** 400x600（宽高比载荷小？）
+    #3 entities len=19099
+    #4 markers len=2
+    #5 custom len=7554
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-erekir-58.msav-backup.msav：v9，区 6 个（基准 6）
+    #0 meta len=6267  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=279310  **像地图** 400x600（宽高比载荷小？）
+    #3 entities len=19099
+    #4 markers len=2
+    #5 custom len=7554
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-erekir-88.msav：v9，区 6 个（基准 6）
+    #0 meta len=5369  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=174617  **像地图** 400x400（宽高比载荷小？）
+    #3 entities len=2935
+    #4 markers len=2
+    #5 custom len=2887
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-erekir-88.msav-backup.msav：v9，区 6 个（基准 6）
+    #0 meta len=5369  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=174497  **像地图** 400x400（宽高比载荷小？）
+    #3 entities len=2935
+    #4 markers len=2
+    #5 custom len=2887
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-exoprosopa-frostnova-1.msav：v13，区 7 个（基准 7）
+    #0 meta len=10447
+    #1 patches len=8
+    #2 content len=23572
+    #3 map len=29783  **像地图** 200x200
+    #4 entities len=1309
+    #5 markers len=2
+    #6 custom len=904
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-exoprosopa-frostnova-1.msav-backup.msav：v13，区 7 个（基准 7）
+    #0 meta len=10446
+    #1 patches len=8
+    #2 content len=23572
+    #3 map len=29855  **像地图** 200x200
+    #4 entities len=1309
+    #5 markers len=2
+    #6 custom len=904
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-exoprosopa-frostnova-101.msav：v13，区 7 个（基准 7）
+    #0 meta len=11762
+    #1 patches len=8
+    #2 content len=23572
+    #3 map len=85533  **像地图** 300x300
+    #4 entities len=253
+    #5 markers len=2
+    #6 custom len=1795
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-exoprosopa-frostnova-101.msav-backup.msav：v13，区 7 个（基准 7）
+    #0 meta len=11762
+    #1 patches len=8
+    #2 content len=23572
+    #3 map len=85629  **像地图** 300x300
+    #4 entities len=253
+    #5 markers len=2
+    #6 custom len=1795
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-exoprosopa-frostnova-125.msav：v13，区 7 个（基准 7）
+    #0 meta len=16728
+    #1 patches len=8
+    #2 content len=23572
+    #3 map len=118789  **像地图** 400x275（宽高比载荷小？）
+    #4 entities len=1353
+    #5 markers len=2
+    #6 custom len=3220
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-exoprosopa-frostnova-125.msav-backup.msav：v13，区 7 个（基准 7）
+    #0 meta len=16728
+    #1 patches len=8
+    #2 content len=23572
+    #3 map len=118825  **像地图** 400x275（宽高比载荷小？）
+    #4 entities len=1353
+    #5 markers len=2
+    #6 custom len=3220
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-exoprosopa-frostnova-146.msav：v13，区 7 个（基准 7）
+    #0 meta len=16758
+    #1 patches len=8
+    #2 content len=23572
+    #3 map len=225160  **像地图** 500x500
+    #4 entities len=378
+    #5 markers len=2
+    #6 custom len=2543
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-exoprosopa-frostnova-146.msav-backup.msav：v13，区 7 个（基准 7）
+    #0 meta len=16758
+    #1 patches len=8
+    #2 content len=23572
+    #3 map len=225160  **像地图** 500x500
+    #4 entities len=378
+    #5 markers len=2
+    #6 custom len=2543
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-exoprosopa-frostnova-170.msav：v13，区 7 个（基准 7）
+    #0 meta len=16958
+    #1 patches len=8
+    #2 content len=23572
+    #3 map len=74220  **像地图** 300x200（宽高比载荷小？）
+    #4 entities len=4630
+    #5 markers len=2
+    #6 custom len=1516
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-exoprosopa-frostnova-170.msav-backup.msav：v13，区 7 个（基准 7）
+    #0 meta len=16958
+    #1 patches len=8
+    #2 content len=23572
+    #3 map len=74196  **像地图** 300x200（宽高比载荷小？）
+    #4 entities len=4646
+    #5 markers len=2
+    #6 custom len=1516
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-exoprosopa-frostnova-174.msav：v13，区 7 个（基准 7）
+    #0 meta len=16314
+    #1 patches len=8
+    #2 content len=23572
+    #3 map len=82286  **像地图** 270x400
+    #4 entities len=15941
+    #5 markers len=2
+    #6 custom len=3235
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-exoprosopa-frostnova-174.msav-backup.msav：v13，区 7 个（基准 7）
+    #0 meta len=16313
+    #1 patches len=8
+    #2 content len=23572
+    #3 map len=82268  **像地图** 270x400
+    #4 entities len=15941
+    #5 markers len=2
+    #6 custom len=3235
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-exoprosopa-frostnova-214.msav：v13，区 7 个（基准 7）
+    #0 meta len=18952
+    #1 patches len=8
+    #2 content len=23572
+    #3 map len=186593  **像地图** 400x400（宽高比载荷小？）
+    #4 entities len=970
+    #5 markers len=2
+    #6 custom len=2878
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-exoprosopa-frostnova-214.msav-backup.msav：v13，区 7 个（基准 7）
+    #0 meta len=18952
+    #1 patches len=8
+    #2 content len=23572
+    #3 map len=186557  **像地图** 400x400（宽高比载荷小？）
+    #4 entities len=825
+    #5 markers len=2
+    #6 custom len=2878
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-exoprosopa-frostnova-219.msav：v13，区 7 个（基准 7）
+    #0 meta len=14051
+    #1 patches len=8
+    #2 content len=23572
+    #3 map len=99156  **像地图** 250x270（宽高比载荷小？）
+    #4 entities len=158
+    #5 markers len=2
+    #6 custom len=1363
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-exoprosopa-frostnova-219.msav-backup.msav：v13，区 7 个（基准 7）
+    #0 meta len=14051
+    #1 patches len=8
+    #2 content len=23572
+    #3 map len=99126  **像地图** 250x270（宽高比载荷小？）
+    #4 entities len=158
+    #5 markers len=2
+    #6 custom len=1363
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-exoprosopa-frostnova-22.msav：v13，区 7 个（基准 7）
+    #0 meta len=20942
+    #1 patches len=8
+    #2 content len=23572
+    #3 map len=151356  **像地图** 400x360（宽高比载荷小？）
+    #4 entities len=27232
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-exoprosopa-frostnova-22.msav-backup.msav：v13，区 7 个（基准 7）
+    #0 meta len=20942
+    #1 patches len=8
+    #2 content len=23572
+    #3 map len=151283  **像地图** 400x360（宽高比载荷小？）
+    #4 entities len=27000
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-exoprosopa-frostnova-223.msav：v13，区 7 个（基准 7）
+    #0 meta len=17918
+    #1 patches len=8
+    #2 content len=23572
+    #3 map len=95991  **像地图** 350x300
+    #4 entities len=4268
+    #5 markers len=2
+    #6 custom len=3285
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-exoprosopa-frostnova-223.msav-backup.msav：v13，区 7 个（基准 7）
+    #0 meta len=17918
+    #1 patches len=8
+    #2 content len=23572
+    #3 map len=95991  **像地图** 350x300
+    #4 entities len=4268
+    #5 markers len=2
+    #6 custom len=3285
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-exoprosopa-frostnova-40.msav：v13，区 7 个（基准 7）
+    #0 meta len=12098
+    #1 patches len=8
+    #2 content len=23572
+    #3 map len=85408  **像地图** 330x300
+    #4 entities len=1861
+    #5 markers len=2
+    #6 custom len=1904
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-exoprosopa-frostnova-40.msav-backup.msav：v13，区 7 个（基准 7）
+    #0 meta len=12097
+    #1 patches len=8
+    #2 content len=23572
+    #3 map len=85384  **像地图** 330x300
+    #4 entities len=1861
+    #5 markers len=2
+    #6 custom len=1904
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-exoprosopa-frostnova-41.msav：v13，区 7 个（基准 7）
+    #0 meta len=13046
+    #1 patches len=8
+    #2 content len=23572
+    #3 map len=66584  **像地图** 300x300
+    #4 entities len=2977
+    #5 markers len=2
+    #6 custom len=2702
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-exoprosopa-frostnova-41.msav-backup.msav：v13，区 7 个（基准 7）
+    #0 meta len=13045
+    #1 patches len=8
+    #2 content len=23572
+    #3 map len=66524  **像地图** 300x300
+    #4 entities len=2985
+    #5 markers len=2
+    #6 custom len=2702
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-exoprosopa-frostnova-64.msav：v13，区 7 个（基准 7）
+    #0 meta len=15627
+    #1 patches len=8
+    #2 content len=23572
+    #3 map len=47415  **像地图** 160x220（宽高比载荷小？）
+    #4 entities len=2553
+    #5 markers len=2
+    #6 custom len=848
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-exoprosopa-frostnova-64.msav-backup.msav：v13，区 7 个（基准 7）
+    #0 meta len=15627
+    #1 patches len=8
+    #2 content len=23572
+    #3 map len=47421  **像地图** 160x220（宽高比载荷小？）
+    #4 entities len=2553
+    #5 markers len=2
+    #6 custom len=848
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-exoprosopa-frostnova-65.msav：v13，区 7 个（基准 7）
+    #0 meta len=14539
+    #1 patches len=8
+    #2 content len=23572
+    #3 map len=154569  **像地图** 400x300（宽高比载荷小？）
+    #4 entities len=194
+    #5 markers len=2
+    #6 custom len=2275
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-exoprosopa-frostnova-65.msav-backup.msav：v13，区 7 个（基准 7）
+    #0 meta len=14539
+    #1 patches len=8
+    #2 content len=23572
+    #3 map len=154581  **像地图** 400x300（宽高比载荷小？）
+    #4 entities len=194
+    #5 markers len=2
+    #6 custom len=2275
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-exoprosopa-frostnova-85.msav：v13，区 7 个（基准 7）
+    #0 meta len=19103
+    #1 patches len=8
+    #2 content len=23572
+    #3 map len=124462  **像地图** 300x300（宽高比载荷小？）
+    #4 entities len=14461
+    #5 markers len=2
+    #6 custom len=2142
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-exoprosopa-frostnova-85.msav-backup.msav：v13，区 7 个（基准 7）
+    #0 meta len=19103
+    #1 patches len=8
+    #2 content len=23572
+    #3 map len=124342  **像地图** 300x300（宽高比载荷小？）
+    #4 entities len=14461
+    #5 markers len=2
+    #6 custom len=2142
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-exoprosopa-frostnova-86.msav：v13，区 7 个（基准 7）
+    #0 meta len=17008
+    #1 patches len=8
+    #2 content len=23572
+    #3 map len=131630  **像地图** 200x400（宽高比载荷小？）
+    #4 entities len=290
+    #5 markers len=2
+    #6 custom len=1593
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-exoprosopa-frostnova-86.msav-backup.msav：v13，区 7 个（基准 7）
+    #0 meta len=17008
+    #1 patches len=8
+    #2 content len=23572
+    #3 map len=131624  **像地图** 200x400（宽高比载荷小？）
+    #4 entities len=290
+    #5 markers len=2
+    #6 custom len=1593
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-ice-ardery-9.msav：v13，区 7 个（基准 7）
+    #0 meta len=4368
+    #1 patches len=8
+    #2 content len=24994
+    #3 map len=47092  **像地图** 215x322
+    #4 entities len=1142  **像地图** 21x34（宽高比载荷小？）
+    #5 markers len=2
+    #6 custom len=23
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-ice-ardery-9.msav-backup.msav：v13，区 7 个（基准 7）
+    #0 meta len=4364
+    #1 patches len=8
+    #2 content len=24994
+    #3 map len=46586  **像地图** 215x322
+    #4 entities len=1142  **像地图** 21x34（宽高比载荷小？）
+    #5 markers len=2
+    #6 custom len=23
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-proxima-170.msav：v13，区 7 个（基准 7）
+    #0 meta len=4471
+    #1 patches len=8
+    #2 content len=32955
+    #3 map len=7767
+    #4 entities len=18
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 0 个）
+· sector-proxima-170.msav-backup.msav：v13，区 7 个（基准 7）
+    #0 meta len=4470
+    #1 patches len=8
+    #2 content len=32955
+    #3 map len=7767
+    #4 entities len=18
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 0 个）
+· sector-serpulo-142.msav：v9，区 6 个（基准 6）
+    #0 meta len=5109  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=391018  **像地图** 344x344（宽高比载荷小？）
+    #3 entities len=7856
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-142.msav-backup.msav：v9，区 6 个（基准 6）
+    #0 meta len=5109  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=391172  **像地图** 344x344（宽高比载荷小？）
+    #3 entities len=7856
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-143.msav：v9，区 6 个（基准 6）
+    #0 meta len=5581  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=374887  **像地图** 300x300（宽高比载荷小？）
+    #3 entities len=7996
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-143.msav-backup.msav：v9，区 6 个（基准 6）
+    #0 meta len=5583  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=374833  **像地图** 300x300（宽高比载荷小？）
+    #3 entities len=7996
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-145.msav：v11，区 7 个（基准 6）
+    #0 meta len=5504  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=1
+    #3 map len=231981  **像地图** 280x280（宽高比载荷小？）
+    #4 entities len=3002
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-serpulo-145.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=5503  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=1
+    #3 map len=231979  **像地图** 280x280（宽高比载荷小？）
+    #4 entities len=3002
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-serpulo-164.msav：v9，区 6 个（基准 6）
+    #0 meta len=4565  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=359029  **像地图** 400x400（宽高比载荷小？）
+    #3 entities len=3187
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-164.msav-backup.msav：v9，区 6 个（基准 6）
+    #0 meta len=4565  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=359179  **像地图** 400x400（宽高比载荷小？）
+    #3 entities len=3187
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-165.msav：v10，区 6 个（基准 6）
+    #0 meta len=5385  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9511
+    #2 map len=255773  **像地图** 400x400（宽高比载荷小？）
+    #3 entities len=3710
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-165.msav-backup.msav：v10，区 6 个（基准 6）
+    #0 meta len=5383  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9511
+    #2 map len=255767  **像地图** 400x400（宽高比载荷小？）
+    #3 entities len=3710
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-166.msav：v11，区 7 个（基准 6）
+    #0 meta len=16767  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32652
+    #2 ?preview_map len=1
+    #3 map len=470603  **像地图** 500x500（宽高比载荷小？）
+    #4 entities len=8528
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-serpulo-166.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=16767  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32652
+    #2 ?preview_map len=1
+    #3 map len=470679  **像地图** 500x500（宽高比载荷小？）
+    #4 entities len=8528
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-serpulo-169.msav：v10，区 6 个（基准 6）
+    #0 meta len=6933  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9511
+    #2 map len=147406  **像地图** 275x275（宽高比载荷小？）
+    #3 entities len=2762
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-169.msav-backup.msav：v10，区 6 个（基准 6）
+    #0 meta len=6934  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9511
+    #2 map len=147418  **像地图** 275x275（宽高比载荷小？）
+    #3 entities len=2762
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-170.msav：v11，区 7 个（基准 6）
+    #0 meta len=3110  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9828
+    #2 ?preview_map len=1
+    #3 map len=73271  **像地图** 256x256（宽高比载荷小？）
+    #4 entities len=122
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-serpulo-170.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=3099  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=1
+    #3 map len=73281  **像地图** 256x256（宽高比载荷小？）
+    #4 entities len=122
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-serpulo-173.msav：v10，区 6 个（基准 6）
+    #0 meta len=12363  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9511
+    #2 map len=62978  **像地图** 450x450
+    #3 entities len=5789
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-173.msav-backup.msav：v10，区 6 个（基准 6）
+    #0 meta len=12362  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9511
+    #2 map len=62978  **像地图** 450x450
+    #3 entities len=5789
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-204.msav：v11，区 7 个（基准 6）
+    #0 meta len=19705  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=357500  **像地图** 600x600
+    #4 entities len=12577
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-serpulo-204.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=19702  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=357516  **像地图** 600x600
+    #4 entities len=12577
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-serpulo-213.msav：v9，区 6 个（基准 6）
+    #0 meta len=4584  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=144767  **像地图** 300x300（宽高比载荷小？）
+    #3 entities len=7723
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-213.msav-backup.msav：v9，区 6 个（基准 6）
+    #0 meta len=4584  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=144799  **像地图** 300x300（宽高比载荷小？）
+    #3 entities len=7723
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-214.msav：v10，区 6 个（基准 6）
+    #0 meta len=6386  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9511
+    #2 map len=275671  **像地图** 380x380（宽高比载荷小？）
+    #3 entities len=10898
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-214.msav-backup.msav：v10，区 6 个（基准 6）
+    #0 meta len=6386  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9511
+    #2 map len=275671  **像地图** 380x380（宽高比载荷小？）
+    #3 entities len=10898
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-217.msav：v13，区 7 个（基准 7）
+    #0 meta len=9717
+    #1 patches len=8
+    #2 content len=9888
+    #3 map len=316518  **像地图** 512x512（宽高比载荷小？）
+    #4 entities len=115559
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-serpulo-217.msav-backup.msav：v13，区 7 个（基准 7）
+    #0 meta len=9718
+    #1 patches len=8
+    #2 content len=9867
+    #3 map len=316582  **像地图** 512x512（宽高比载荷小？）
+    #4 entities len=115559
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-serpulo-219.msav：v10，区 6 个（基准 6）
+    #0 meta len=3766  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9511
+    #2 map len=120852  **像地图** 256x256（宽高比载荷小？）
+    #3 entities len=1639
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-219.msav-backup.msav：v10，区 6 个（基准 6）
+    #0 meta len=3766  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9511
+    #2 map len=120794  **像地图** 256x256（宽高比载荷小？）
+    #3 entities len=1639
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-221.msav：v10，区 6 个（基准 6）
+    #0 meta len=3903  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9511
+    #2 map len=70123  **像地图** 150x250（宽高比载荷小？）
+    #3 entities len=3562
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-221.msav-backup.msav：v10，区 6 个（基准 6）
+    #0 meta len=3903  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9511
+    #2 map len=70061  **像地图** 150x250（宽高比载荷小？）
+    #3 entities len=3562
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-223.msav：v9，区 6 个（基准 6）
+    #0 meta len=4647  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=269314  **像地图** 300x300（宽高比载荷小？）
+    #3 entities len=3267
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-223.msav-backup.msav：v9，区 6 个（基准 6）
+    #0 meta len=4647  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=269286  **像地图** 300x300（宽高比载荷小？）
+    #3 entities len=3267
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-228.msav：v9，区 6 个（基准 6）
+    #0 meta len=5417  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=357265  **像地图** 250x250（宽高比载荷小？）
+    #3 entities len=10320
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-228.msav-backup.msav：v9，区 6 个（基准 6）
+    #0 meta len=5416  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=357269  **像地图** 250x250（宽高比载荷小？）
+    #3 entities len=10320
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-23.msav：v10，区 6 个（基准 6）
+    #0 meta len=3794  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9511
+    #2 map len=116017  **像地图** 250x250（宽高比载荷小？）
+    #3 entities len=167
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-23.msav-backup.msav：v10，区 6 个（基准 6）
+    #0 meta len=3794  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9511
+    #2 map len=116131  **像地图** 250x250（宽高比载荷小？）
+    #3 entities len=167
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-266.msav：v13，区 7 个（基准 7）
+    #0 meta len=4757
+    #1 patches len=8
+    #2 content len=9867
+    #3 map len=384102  **像地图** 300x300（宽高比载荷小？）
+    #4 entities len=3322
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-serpulo-266.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=4737  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9848
+    #2 ?preview_map len=1
+    #3 map len=383940  **像地图** 300x300（宽高比载荷小？）
+    #4 entities len=3386
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-serpulo-271.msav：v11，区 7 个（基准 6）
+    #0 meta len=4172  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=189742  **像地图** 110x400（宽高比载荷小？）
+    #4 entities len=2990
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-serpulo-271.msav-backup.msav：v9，区 6 个（基准 6）
+    #0 meta len=4177  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=183488  **像地图** 110x400（宽高比载荷小？）
+    #3 entities len=2712
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-41.msav：v10，区 6 个（基准 6）
+    #0 meta len=4692  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9511
+    #2 map len=271430  **像地图** 300x300（宽高比载荷小？）
+    #3 entities len=5330
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-41.msav-backup.msav：v10，区 6 个（基准 6）
+    #0 meta len=4692  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9511
+    #2 map len=271508  **像地图** 300x300（宽高比载荷小？）
+    #3 entities len=5330
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-64.msav：v9，区 6 个（基准 6）
+    #0 meta len=3514  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=64945  **像地图** 200x200（宽高比载荷小？）
+    #3 entities len=120
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-64.msav-backup.msav：v9，区 6 个（基准 6）
+    #0 meta len=3513  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=64907  **像地图** 200x200（宽高比载荷小？）
+    #3 entities len=120
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-65.msav：v10，区 6 个（基准 6）
+    #0 meta len=4849  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9511
+    #2 map len=173713  **像地图** 220x280（宽高比载荷小？）
+    #3 entities len=1677
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-65.msav-backup.msav：v10，区 6 个（基准 6）
+    #0 meta len=4849  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9511
+    #2 map len=173533  **像地图** 220x280（宽高比载荷小？）
+    #3 entities len=1677
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-75.msav：v11，区 7 个（基准 6）
+    #0 meta len=6210  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=13373
+    #2 ?preview_map len=1
+    #3 map len=256578  **像地图** 432x432（宽高比载荷小？）
+    #4 entities len=12404
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-serpulo-75.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=6208  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=13373
+    #2 ?preview_map len=1
+    #3 map len=256750  **像地图** 432x432（宽高比载荷小？）
+    #4 entities len=12404
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-serpulo-85.msav：v9，区 6 个（基准 6）
+    #0 meta len=6369  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=165373  **像地图** 200x265（宽高比载荷小？）
+    #3 entities len=8360
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-85.msav-backup.msav：v9，区 6 个（基准 6）
+    #0 meta len=6369  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=165539  **像地图** 200x265（宽高比载荷小？）
+    #3 entities len=8360
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-86.msav：v9，区 6 个（基准 6）
+    #0 meta len=4433  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=230474  **像地图** 320x320（宽高比载荷小？）
+    #3 entities len=6488
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-86.msav-backup.msav：v9，区 6 个（基准 6）
+    #0 meta len=4433  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=230466  **像地图** 320x320（宽高比载荷小？）
+    #3 entities len=6488
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-95.msav：v11，区 7 个（基准 6）
+    #0 meta len=14497  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9689
+    #2 ?preview_map len=1
+    #3 map len=301572  **像地图** 597x597
+    #4 entities len=139
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-serpulo-95.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=14464  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9689
+    #2 ?preview_map len=1
+    #3 map len=301774  **像地图** 597x597
+    #4 entities len=130
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-serpulo-97.msav：v10，区 6 个（基准 6）
+    #0 meta len=4462  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9511
+    #2 map len=262569  **像地图** 400x400（宽高比载荷小？）
+    #3 entities len=7826
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-97.msav-backup.msav：v10，区 6 个（基准 6）
+    #0 meta len=4462  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9511
+    #2 map len=262555  **像地图** 400x400（宽高比载荷小？）
+    #3 entities len=7826
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-98.msav：v10，区 6 个（基准 6）
+    #0 meta len=5085  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9511
+    #2 map len=455004  **像地图** 300x300（宽高比载荷小？）
+    #3 entities len=7490
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-98.msav-backup.msav：v10，区 6 个（基准 6）
+    #0 meta len=5085  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9511
+    #2 map len=455108  **像地图** 300x300（宽高比载荷小？）
+    #3 entities len=7490
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-99.msav：v9，区 6 个（基准 6）
+    #0 meta len=4481  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=254782  **像地图** 260x260（宽高比载荷小？）
+    #3 entities len=5832
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-serpulo-99.msav-backup.msav：v9，区 6 个（基准 6）
+    #0 meta len=4480  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=254732  **像地图** 260x260（宽高比载荷小？）
+    #3 entities len=5832
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· sector-template-mod-template-planet-0.msav：v13，区 7 个（基准 7）
+    #0 meta len=4387
+    #1 patches len=8
+    #2 content len=10197
+    #3 map len=28030  **像地图** 256x256
+    #4 entities len=126
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-template-mod-template-planet-0.msav-backup.msav：v13，区 7 个（基准 7）
+    #0 meta len=4387
+    #1 patches len=8
+    #2 content len=10197
+    #3 map len=28030  **像地图** 256x256
+    #4 entities len=126
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-ve-cyclant-137.msav：v11，区 7 个（基准 6）
+    #0 meta len=16014  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32652
+    #2 ?preview_map len=1
+    #3 map len=240199  **像地图** 600x600
+    #4 entities len=3714
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-cyclant-137.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=16013  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32652
+    #2 ?preview_map len=1
+    #3 map len=240319  **像地图** 600x600
+    #4 entities len=3714
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-cyclant-143.msav：v11，区 7 个（基准 6）
+    #0 meta len=24787  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32874
+    #2 ?preview_map len=1
+    #3 map len=710435  **像地图** 700x400（宽高比载荷小？）
+    #4 entities len=68287
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-cyclant-143.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=24787  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32874
+    #2 ?preview_map len=1
+    #3 map len=710213  **像地图** 700x400（宽高比载荷小？）
+    #4 entities len=68249
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-cyclant-144.msav：v11，区 7 个（基准 6）
+    #0 meta len=27433  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32874
+    #2 ?preview_map len=1
+    #3 map len=178254  **像地图** 300x400（宽高比载荷小？）
+    #4 entities len=30317
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-cyclant-144.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=27433  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32874
+    #2 ?preview_map len=1
+    #3 map len=178296  **像地图** 300x400（宽高比载荷小？）
+    #4 entities len=30317
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-cyclant-170.msav：v11，区 7 个（基准 6）
+    #0 meta len=9585  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32652
+    #2 ?preview_map len=1
+    #3 map len=60297  **像地图** 180x240（宽高比载荷小？）
+    #4 entities len=126
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-cyclant-170.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=9585  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32652
+    #2 ?preview_map len=1
+    #3 map len=60339  **像地图** 180x240（宽高比载荷小？）
+    #4 entities len=126
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-cyclant-19.msav：v11，区 7 个（基准 6）
+    #0 meta len=14516  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32652
+    #2 ?preview_map len=1
+    #3 map len=174011  **像地图** 300x300（宽高比载荷小？）
+    #4 entities len=7500
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-cyclant-19.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=14518  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32652
+    #2 ?preview_map len=1
+    #3 map len=174041  **像地图** 300x300（宽高比载荷小？）
+    #4 entities len=7500
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-cyclant-20.msav：v11，区 7 个（基准 6）
+    #0 meta len=11067  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32652
+    #2 ?preview_map len=1
+    #3 map len=74901  **像地图** 400x400
+    #4 entities len=18857
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-cyclant-20.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=11067  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32652
+    #2 ?preview_map len=1
+    #3 map len=74933  **像地图** 400x400
+    #4 entities len=18857
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-cyclant-222.msav：v11，区 7 个（基准 6）
+    #0 meta len=15975  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32652
+    #2 ?preview_map len=1
+    #3 map len=187714  **像地图** 320x320（宽高比载荷小？）
+    #4 entities len=15404
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-cyclant-222.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=15975  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32652
+    #2 ?preview_map len=1
+    #3 map len=187606  **像地图** 320x320（宽高比载荷小？）
+    #4 entities len=15404
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-cyclant-224.msav：v13，区 7 个（基准 7）
+    #0 meta len=22285
+    #1 patches len=8
+    #2 content len=32955
+    #3 map len=329296  **像地图** 400x800（宽高比载荷小？）
+    #4 entities len=24048
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-ve-cyclant-224.msav-backup.msav：v13，区 7 个（基准 7）
+    #0 meta len=22285
+    #1 patches len=8
+    #2 content len=32955
+    #3 map len=329127  **像地图** 400x800（宽高比载荷小？）
+    #4 entities len=23800
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-ve-cyclant-227.msav：v11，区 7 个（基准 6）
+    #0 meta len=26625  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32874
+    #2 ?preview_map len=1
+    #3 map len=385652  **像地图** 400x500（宽高比载荷小？）
+    #4 entities len=17498
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-cyclant-227.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=26625  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32874
+    #2 ?preview_map len=1
+    #3 map len=385578  **像地图** 400x500（宽高比载荷小？）
+    #4 entities len=17498
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-cyclant-228.msav：v11，区 7 个（基准 6）
+    #0 meta len=21548  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32874
+    #2 ?preview_map len=1
+    #3 map len=253580  **像地图** 800x400
+    #4 entities len=41378
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-cyclant-228.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=21548  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32874
+    #2 ?preview_map len=1
+    #3 map len=253580  **像地图** 800x400
+    #4 entities len=41378
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-cyclant-229.msav：v11，区 7 个（基准 6）
+    #0 meta len=20169  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32874
+    #2 ?preview_map len=1
+    #3 map len=189727  **像地图** 400x400（宽高比载荷小？）
+    #4 entities len=29630
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-cyclant-229.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=20168  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32874
+    #2 ?preview_map len=1
+    #3 map len=189757  **像地图** 400x400（宽高比载荷小？）
+    #4 entities len=29630
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-cyclant-230.msav：v11，区 7 个（基准 6）
+    #0 meta len=16223  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32652
+    #2 ?preview_map len=1
+    #3 map len=121627  **像地图** 400x400
+    #4 entities len=76522
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-cyclant-230.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=16223  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32652
+    #2 ?preview_map len=1
+    #3 map len=121609  **像地图** 400x400
+    #4 entities len=76522
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-cyclant-24.msav：v11，区 7 个（基准 6）
+    #0 meta len=22057  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32874
+    #2 ?preview_map len=1
+    #3 map len=312936  **像地图** 300x500（宽高比载荷小？）
+    #4 entities len=56158
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-cyclant-24.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=22057  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32874
+    #2 ?preview_map len=1
+    #3 map len=312986  **像地图** 300x500（宽高比载荷小？）
+    #4 entities len=56158
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-cyclant-245.msav：v11，区 7 个（基准 6）
+    #0 meta len=23673  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32874
+    #2 ?preview_map len=1
+    #3 map len=324268  **像地图** 600x700
+    #4 entities len=54195
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-cyclant-245.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=23673  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32874
+    #2 ?preview_map len=1
+    #3 map len=324234  **像地图** 600x700
+    #4 entities len=54040
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-cyclant-261.msav：v11，区 7 个（基准 6）
+    #0 meta len=19595  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32874
+    #2 ?preview_map len=1
+    #3 map len=346040  **像地图** 500x500（宽高比载荷小？）
+    #4 entities len=13555
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-cyclant-261.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=19595  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32874
+    #2 ?preview_map len=1
+    #3 map len=347016  **像地图** 500x500（宽高比载荷小？）
+    #4 entities len=13593
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-cyclant-35.msav：v11，区 7 个（基准 6）
+    #0 meta len=11884  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32652
+    #2 ?preview_map len=1
+    #3 map len=216624  **像地图** 400x300（宽高比载荷小？）
+    #4 entities len=2003
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-cyclant-35.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=11886  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32652
+    #2 ?preview_map len=1
+    #3 map len=216656  **像地图** 400x300（宽高比载荷小？）
+    #4 entities len=2003
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-cyclant-39.msav：v13，区 7 个（基准 7）
+    #0 meta len=22000
+    #1 patches len=8
+    #2 content len=33633
+    #3 map len=68553  **像地图** 300x300
+    #4 entities len=6749
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-ve-cyclant-39.msav-backup.msav：v13，区 7 个（基准 7）
+    #0 meta len=22002
+    #1 patches len=8
+    #2 content len=33633
+    #3 map len=68523  **像地图** 300x300
+    #4 entities len=6749
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-ve-cyclant-53.msav：v11，区 7 个（基准 6）
+    #0 meta len=16530  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32874
+    #2 ?preview_map len=1
+    #3 map len=60213  **像地图** 300x300
+    #4 entities len=16351
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-cyclant-53.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=16528  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32874
+    #2 ?preview_map len=1
+    #3 map len=60259  **像地图** 300x300
+    #4 entities len=16491
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-cyclant-91.msav：v11，区 7 个（基准 6）
+    #0 meta len=18615  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32874
+    #2 ?preview_map len=1
+    #3 map len=174141  **像地图** 400x400（宽高比载荷小？）
+    #4 entities len=30419
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-cyclant-91.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=18615  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32874
+    #2 ?preview_map len=1
+    #3 map len=174211  **像地图** 400x400（宽高比载荷小？）
+    #4 entities len=30419
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-cyclant-95.msav：v11，区 7 个（基准 6）
+    #0 meta len=14619  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32652
+    #2 ?preview_map len=1
+    #3 map len=86102  **像地图** 400x400
+    #4 entities len=12017
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-cyclant-95.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=14619  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32652
+    #2 ?preview_map len=1
+    #3 map len=86046  **像地图** 400x400
+    #4 entities len=12017
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-cyclant-98.msav：v11，区 7 个（基准 6）
+    #0 meta len=19014  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32874
+    #2 ?preview_map len=1
+    #3 map len=120608  **像地图** 400x250（宽高比载荷小？）
+    #4 entities len=18736
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-cyclant-98.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=19013  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32874
+    #2 ?preview_map len=1
+    #3 map len=120690  **像地图** 400x250（宽高比载荷小？）
+    #4 entities len=18736
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-maress-43.msav：v11，区 7 个（基准 6）
+    #0 meta len=5817  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32874
+    #2 ?preview_map len=1
+    #3 map len=125488  **像地图** 400x400
+    #4 entities len=179
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-maress-43.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=5817  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32874
+    #2 ?preview_map len=1
+    #3 map len=125488  **像地图** 400x400
+    #4 entities len=179
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-phoon-0.msav：v11，区 7 个（基准 6）
+    #0 meta len=4756  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32874
+    #2 ?preview_map len=1
+    #3 map len=11509  **像地图** 200x200
+    #4 entities len=715
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-phoon-0.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=4756  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32874
+    #2 ?preview_map len=1
+    #3 map len=11509  **像地图** 200x200
+    #4 entities len=715
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-phoon-19.msav：v11，区 7 个（基准 6）
+    #0 meta len=3535  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32874
+    #2 ?preview_map len=1
+    #3 map len=23984  **像地图** 150x150（宽高比载荷小？）
+    #4 entities len=166
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-phoon-19.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=3535  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32874
+    #2 ?preview_map len=1
+    #3 map len=23984  **像地图** 150x150（宽高比载荷小？）
+    #4 entities len=166
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-phoon-20.msav：v11，区 7 个（基准 6）
+    #0 meta len=6338  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32874
+    #2 ?preview_map len=1
+    #3 map len=8373  **像地图** 100x100
+    #4 entities len=755
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-phoon-20.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=6338  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32874
+    #2 ?preview_map len=1
+    #3 map len=8373  **像地图** 100x100
+    #4 entities len=755
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-phoon-3.msav：v11，区 7 个（基准 6）
+    #0 meta len=5773  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32874
+    #2 ?preview_map len=1
+    #3 map len=8556  **像地图** 200x100
+    #4 entities len=127
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-phoon-3.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=5772  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32874
+    #2 ?preview_map len=1
+    #3 map len=8556  **像地图** 200x100
+    #4 entities len=127
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-sitrullus-15.msav：v11，区 7 个（基准 6）
+    #0 meta len=16665  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32874
+    #2 ?preview_map len=1
+    #3 map len=64749  **像地图** 200x300（宽高比载荷小？）
+    #4 entities len=286
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-sitrullus-15.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=16665  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32874
+    #2 ?preview_map len=1
+    #3 map len=64431  **像地图** 200x300（宽高比载荷小？）
+    #4 entities len=286
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-sitrullus-2.msav：v13，区 7 个（基准 7）
+    #0 meta len=5181
+    #1 patches len=8
+    #2 content len=32955
+    #3 map len=369491  **像地图** 240x420（宽高比载荷小？）
+    #4 entities len=1728
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-ve-sitrullus-2.msav-backup.msav：v13，区 7 个（基准 7）
+    #0 meta len=5181
+    #1 patches len=8
+    #2 content len=32955
+    #3 map len=369491  **像地图** 240x420（宽高比载荷小？）
+    #4 entities len=1728
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-ve-sitrullus-28.msav：v11，区 7 个（基准 6）
+    #0 meta len=4996  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32874
+    #2 ?preview_map len=1
+    #3 map len=110986  **像地图** 200x200（宽高比载荷小？）
+    #4 entities len=294
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-sitrullus-28.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=4996  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32874
+    #2 ?preview_map len=1
+    #3 map len=110986  **像地图** 200x200（宽高比载荷小？）
+    #4 entities len=294
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-sitrullus-32.msav：v11，区 7 个（基准 6）
+    #0 meta len=6170  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32874
+    #2 ?preview_map len=1
+    #3 map len=155277  **像地图** 300x300（宽高比载荷小？）
+    #4 entities len=4238
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-sitrullus-32.msav-backup.msav：v11，区 7 个（基准 6）
+    #0 meta len=6170  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=32874
+    #2 ?preview_map len=1
+    #3 map len=155277  **像地图** 300x300（宽高比载荷小？）
+    #4 entities len=4238
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· sector-ve-sitrullus-71.msav：v13，区 7 个（基准 7）
+    #0 meta len=4996
+    #1 patches len=8
+    #2 content len=32955
+    #3 map len=33295  **像地图** 400x200
+    #4 entities len=126
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-ve-sitrullus-71.msav-backup.msav：v13，区 7 个（基准 7）
+    #0 meta len=4995
+    #1 patches len=8
+    #2 content len=32955
+    #3 map len=33295  **像地图** 400x200
+    #4 entities len=126
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-ve-thavina-0.msav：v13，区 7 个（基准 7）
+    #0 meta len=11268
+    #1 patches len=8
+    #2 content len=32955
+    #3 map len=73841  **像地图** 500x500
+    #4 entities len=135
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· sector-ve-thavina-0.msav-backup.msav：v13，区 7 个（基准 7）
+    #0 meta len=11268
+    #1 patches len=8
+    #2 content len=32955
+    #3 map len=73841  **像地图** 500x500
+    #4 entities len=135
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· Alloy Front.msav：v9，区 6 个（基准 6）
+    #0 meta len=4592  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=8764
+    #2 map len=1090945  **像地图** 586x586（宽高比载荷小？）
+    #3 entities len=26
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· CUDA CORE.msav：v7，区 5 个（基准 5）
+    #0 meta len=4033  **像地图** 22x8（宽高比载荷小？）
+    #1 content len=7603
+    #2 map len=101653  **像地图** 350x350
+    #3 entities len=50
+    #4 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· CUDA-SIEGE-V4.msav：v8，区 6 个（基准 6）
+    #0 meta len=4085  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=8515
+    #2 map len=641232  **像地图** 350x350（宽高比载荷小？）
+    #3 entities len=26
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· EditorPlaytesting_20251024.msav：v10，区 6 个（基准 6）
+    #0 meta len=5753  **像地图** 24x8（宽高比载荷小？）
+    #1 content len=9511
+    #2 map len=811880  **像地图** 600x600（宽高比载荷小？）
+    #3 entities len=26
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· EditorPlaytesting_20251111.msav：v10，区 6 个（基准 6）
+    #0 meta len=5837  **像地图** 24x8（宽高比载荷小？）
+    #1 content len=9511
+    #2 map len=812300  **像地图** 600x600（宽高比载荷小？）
+    #3 entities len=26
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· EditorPlaytesting_20260804.msav：v11，区 7 个（基准 6）
+    #0 meta len=11592  **像地图** 24x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=1934396  **像地图** 600x500（宽高比载荷小？）
+    #4 entities len=42
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· e星pvp1v1岩浆两岸.msav：v11，区 7 个（基准 6）
+    #0 meta len=6733  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=123095  **像地图** 400x400
+    #4 entities len=34
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· Origin.msav：v11，区 7 个（基准 6）
+    #0 meta len=5700  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=9689
+    #2 ?preview_map len=1
+    #3 map len=806456  **像地图** 600x600（宽高比载荷小？）
+    #4 entities len=26
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· pvp.msav：v11，区 7 个（基准 6）
+    #0 meta len=4834  **像地图** 24x8（宽高比载荷小？）
+    #1 content len=13648
+    #2 ?preview_map len=1
+    #3 map len=113411  **像地图** 300x300（宽高比载荷小？）
+    #4 entities len=186
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· PVP-ordinbird-erekir-V1_200x200.msav：v11，区 7 个（基准 6）
+    #0 meta len=4725  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=9689
+    #2 ?preview_map len=1
+    #3 map len=24171  **像地图** 200x200
+    #4 entities len=42
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· PVP-ordinbird-erekir-V1_400x400.msav：v11，区 7 个（基准 6）
+    #0 meta len=4800  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=9689
+    #2 ?preview_map len=1
+    #3 map len=85905  **像地图** 400x400
+    #4 entities len=42
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· PVP-ordinbird-V1.msav：v11，区 7 个（基准 6）
+    #0 meta len=4879  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=1
+    #3 map len=231627  **像地图** 400x400（宽高比载荷小？）
+    #4 entities len=50
+    #5 markers len=2
+    #6 custom len=6778
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· PVP-ordinbird-V2.msav：v11，区 7 个（基准 6）
+    #0 meta len=4875  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=1
+    #3 map len=244857  **像地图** 400x400（宽高比载荷小？）
+    #4 entities len=50
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· PVP-ordinbird-V4.msav：v11，区 7 个（基准 6）
+    #0 meta len=5209  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=1
+    #3 map len=476653  **像地图** 400x400（宽高比载荷小？）
+    #4 entities len=50
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· test00.msav：v11，区 7 个（基准 6）
+    #0 meta len=4321  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=91862  **像地图** 360x240（宽高比载荷小？）
+    #4 entities len=34
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· V9-战役预备稿 翠墨支流.msav：v11，区 7 个（基准 6）
+    #0 meta len=5791  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=9689
+    #2 ?preview_map len=1
+    #3 map len=1135370  **像地图** 525x525（宽高比载荷小？）
+    #4 entities len=1537
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 异虫横行：蠕动之境（155修复）.msav：v11，区 7 个（基准 6）
+    #0 meta len=3861  **像地图** 24x8（宽高比载荷小？）
+    #1 content len=9689
+    #2 ?preview_map len=1
+    #3 map len=536816  **像地图** 494x494（宽高比载荷小？）
+    #4 entities len=34
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 异虫横行：蠕动之境.msav：v11，区 7 个（基准 6）
+    #0 meta len=3781  **像地图** 24x8（宽高比载荷小？）
+    #1 content len=9689
+    #2 ?preview_map len=1
+    #3 map len=536874  **像地图** 494x494（宽高比载荷小？）
+    #4 entities len=34
+    #5 markers len=2
+    #6 custom len=8958
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 冰原推进.msav：v8，区 6 个（基准 6）
+    #0 meta len=2550  **像地图** 22x8（宽高比载荷小？）
+    #1 content len=8515
+    #2 map len=161713  **像地图** 850x62（宽高比载荷小？）
+    #3 entities len=26
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· 传奇逆天猎奇阴间何意味pvp.msav：v11，区 7 个（基准 6）
+    #0 meta len=4812  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=9670
+    #2 ?preview_map len=1
+    #3 map len=31399  **像地图** 200x200
+    #4 entities len=42
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 登仙路.msav：v11，区 7 个（基准 6）
+    #0 meta len=8932  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=9689
+    #2 ?preview_map len=80276  **像地图** 512x155（宽高比载荷小？）
+    #3 map len=106127  **像地图** 414x414
+    #4 entities len=1398
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 3 个）
+· 恶劣地形.msav：v11，区 7 个（基准 6）
+    #0 meta len=4784  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=344144  **像地图** 350x350（宽高比载荷小？）
+    #4 entities len=346
+    #5 markers len=2
+    #6 custom len=3709
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 恶劣地形困难版.msav：v11，区 7 个（基准 6）
+    #0 meta len=4963  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=328145  **像地图** 350x350（宽高比载荷小？）
+    #4 entities len=346
+    #5 markers len=2
+    #6 custom len=3709
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 芳石裂隙.msav：v11，区 7 个（基准 6）
+    #0 meta len=6060  **像地图** 24x8（宽高比载荷小？）
+    #1 content len=9689
+    #2 ?preview_map len=1
+    #3 map len=1543719  **像地图** 600x600（宽高比载荷小？）
+    #4 entities len=26
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 斐波那契推论.msav：v13，区 7 个（基准 7）
+    #0 meta len=6231
+    #1 patches len=8
+    #2 content len=9867
+    #3 map len=405625  **像地图** 134x216（宽高比载荷小？）
+    #4 entities len=129
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 1 个）
+· 风化平原.msav：v11，区 7 个（基准 6）
+    #0 meta len=4931  **像地图** 24x8（宽高比载荷小？）
+    #1 content len=9689
+    #2 ?preview_map len=1
+    #3 map len=2881206  **像地图** 600x600（宽高比载荷小？）
+    #4 entities len=134
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 光辉长路1-子夜峡谷.msav：v11，区 7 个（基准 6）
+    #0 meta len=7297  **像地图** 24x8（宽高比载荷小？）
+    #1 content len=9689
+    #2 ?preview_map len=1
+    #3 map len=427849  **像地图** 400x400（宽高比载荷小？）
+    #4 entities len=26
+    #5 markers len=1244
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 光辉长路2-流星栈道.msav：v11，区 7 个（基准 6）
+    #0 meta len=12752  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=740469  **像地图** 525x525（宽高比载荷小？）
+    #4 entities len=284
+    #5 markers len=2
+    #6 custom len=7736
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 后勤王v7 单科.msav：v11，区 7 个（基准 6）
+    #0 meta len=5621  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=299
+    #3 map len=715740  **像地图** 780x321（宽高比载荷小？）
+    #4 entities len=50
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 后勤王v8.msav：v11，区 7 个（基准 6）
+    #0 meta len=7620  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=246
+    #3 map len=965915  **像地图** 511x583（宽高比载荷小？）
+    #4 entities len=66
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 荒火起源.msav：v11，区 7 个（基准 6）
+    #0 meta len=6471  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=1772186  **像地图** 600x600（宽高比载荷小？）
+    #4 entities len=7046
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 荒漠推进.msav：v8，区 6 个（基准 6）
+    #0 meta len=1002  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=8515
+    #2 map len=287173  **像地图** 1000x62（宽高比载荷小？）
+    #3 entities len=26
+    #4 markers len=2
+    #5 custom len=1220
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· 黄石高原.msav：v11，区 7 个（基准 6）
+    #0 meta len=3866  **像地图** 24x8（宽高比载荷小？）
+    #1 content len=9689
+    #2 ?preview_map len=1
+    #3 map len=2049957  **像地图** 600x600（宽高比载荷小？）
+    #4 entities len=26
+    #5 markers len=2
+    #6 custom len=8481
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 黄石山脉.msav：v11，区 7 个（基准 6）
+    #0 meta len=7600  **像地图** 24x8（宽高比载荷小？）
+    #1 content len=9689
+    #2 ?preview_map len=1
+    #3 map len=4065107  **像地图** 800x800（宽高比载荷小？）
+    #4 entities len=3975
+    #5 markers len=2
+    #6 custom len=11962
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 火山口.msav：v11，区 7 个（基准 6）
+    #0 meta len=5448  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=40510  **像地图** 200x200（宽高比载荷小？）
+    #4 entities len=130
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 机械推进.msav：v8，区 6 个（基准 6）
+    #0 meta len=844  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=8515
+    #2 map len=513742  **像地图** 970x67（宽高比载荷小？）
+    #3 entities len=26
+    #4 markers len=2
+    #5 custom len=1229
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· 决心-生存比赛.msav：v9，区 6 个（基准 6）
+    #0 meta len=7284  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=8855
+    #2 map len=117466  **像地图** 200x400（宽高比载荷小？）
+    #3 entities len=26
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· 军事要塞.msav：v11，区 7 个（基准 6）
+    #0 meta len=9767  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=262044  **像地图** 400x310（宽高比载荷小？）
+    #4 entities len=4160
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 空岛生存_v0.4.msav：v11，区 7 个（基准 6）
+    #0 meta len=7103  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=9848
+    #2 ?preview_map len=10695  **像地图** 256x41（宽高比载荷小？）
+    #3 map len=79942  **像地图** 416x416
+    #4 entities len=26
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 3 个）
+· 空岛生存_v0.5.msav：v11，区 7 个（基准 6）
+    #0 meta len=7217  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=9848
+    #2 ?preview_map len=11425  **像地图** 256x44（宽高比载荷小？）
+    #3 map len=78746  **像地图** 416x416
+    #4 entities len=26
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 3 个）
+· 空岛生存_v0.7.msav：v11，区 7 个（基准 6）
+    #0 meta len=6958  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=9848
+    #2 ?preview_map len=14489  **像地图** 256x56（宽高比载荷小？）
+    #3 map len=86191  **像地图** 416x416
+    #4 entities len=26
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 3 个）
+· 两岸.msav：v11，区 7 个（基准 6）
+    #0 meta len=3114  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=32281  **像地图** 200x200
+    #4 entities len=26
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 裂变山峰.msav：v11，区 7 个（基准 6）
+    #0 meta len=6559  **像地图** 24x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=1150982  **像地图** 480x480（宽高比载荷小？）
+    #4 entities len=26
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 流火高原.msav：v11，区 7 个（基准 6）
+    #0 meta len=5744  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=9609
+    #2 ?preview_map len=1
+    #3 map len=942285  **像地图** 480x480（宽高比载荷小？）
+    #4 entities len=26
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 硫磺酸沼.msav：v11，区 7 个（基准 6）
+    #0 meta len=20874  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=9848
+    #2 ?preview_map len=38424  **像地图** 256x150（宽高比载荷小？）
+    #3 map len=247942  **像地图** 500x500
+    #4 entities len=26
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 3 个）
+· 炉火纪元.msav：v13，区 7 个（基准 7）
+    #0 meta len=7267
+    #1 patches len=342
+    #2 content len=9867
+    #3 map len=83443
+    #4 entities len=26
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ 不带 preview_map（像地图的区 0 个）
+· 弥火渊谷.msav：v11，区 7 个（基准 6）
+    #0 meta len=6101  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=9609
+    #2 ?preview_map len=1
+    #3 map len=1050930  **像地图** 520x520（宽高比载荷小？）
+    #4 entities len=386
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 能源争夺战-据点4Pv1.2 未来科技.msav：v11，区 7 个（基准 6）
+    #0 meta len=3400  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=189
+    #3 map len=128616  **像地图** 300x300（宽高比载荷小？）
+    #4 entities len=58
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 平原推进.msav：v8，区 6 个（基准 6）
+    #0 meta len=2513  **像地图** 22x8（宽高比载荷小？）
+    #1 content len=8515
+    #2 map len=173739  **像地图** 800x62（宽高比载荷小？）
+    #3 entities len=26
+    #4 markers len=2
+    #5 custom len=980
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· 七日生存-电线间谍.msav：v11，区 7 个（基准 6）
+    #0 meta len=11549  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=51445  **像地图** 300x200
+    #4 entities len=18
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 起源（升天版）.msav：v11，区 7 个（基准 6）
+    #0 meta len=4053  **像地图** 25x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=1
+    #3 map len=1055537  **像地图** 650x650（宽高比载荷小？）
+    #4 entities len=5144
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 群岛推进.msav：v8，区 6 个（基准 6）
+    #0 meta len=953  **像地图** 22x8（宽高比载荷小？）
+    #1 content len=8515
+    #2 map len=135654  **像地图** 900x67（宽高比载荷小？）
+    #3 entities len=26
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· 熔岩信使.msav：v11，区 7 个（基准 6）
+    #0 meta len=13868  **像地图** 24x8（宽高比载荷小？）
+    #1 content len=9550
+    #2 ?preview_map len=1
+    #3 map len=2192821  **像地图** 450x600（宽高比载荷小？）
+    #4 entities len=3986
+    #5 markers len=12831
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 熔岩要塞-火山基地.msav：v8，区 6 个（基准 6）
+    #0 meta len=2476  **像地图** 22x8（宽高比载荷小？）
+    #1 content len=8515
+    #2 map len=580374  **像地图** 350x300（宽高比载荷小？）
+    #3 entities len=26
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· 沙盒图-cp修改测试-155.msav：v11，区 7 个（基准 6）
+    #0 meta len=30487  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=233018
+    #3 map len=103486
+    #4 entities len=26
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 1 个）
+· 沙漠荒地-4P-2.1.msav：v4，区 4 个（基准 5）
+    #0 meta len=2749  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=4062
+    #2 map len=90663  **像地图** 300x300（宽高比载荷小？）
+    #3 entities len=129
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· 双线作战2P.msav：v11，区 7 个（基准 6）
+    #0 meta len=4521  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=72053  **像地图** 300x179（宽高比载荷小？）
+    #4 entities len=34
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 碎火山岭.msav：v11，区 7 个（基准 6）
+    #0 meta len=5508  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=9609
+    #2 ?preview_map len=1
+    #3 map len=563419  **像地图** 450x450（宽高比载荷小？）
+    #4 entities len=26
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 天火裂隙.msav：v11，区 7 个（基准 6）
+    #0 meta len=5322  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=9609
+    #2 ?preview_map len=1
+    #3 map len=1076812  **像地图** 560x560（宽高比载荷小？）
+    #4 entities len=121
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 天坠攻势.msav：v9，区 6 个（基准 6）
+    #0 meta len=8849  **像地图** 24x8（宽高比载荷小？）
+    #1 content len=8855
+    #2 map len=1784949  **像地图** 600x600（宽高比载荷小？）
+    #3 entities len=26
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· 峡谷.msav：v11，区 7 个（基准 6）
+    #0 meta len=5407  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=151618  **像地图** 450x100（宽高比载荷小？）
+    #4 entities len=26
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 像素战争：赤潮2.0 乱改版V2.2.4.msav：v11，区 7 个（基准 6）
+    #0 meta len=8900  **像地图** 24x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=6678  **像地图** 256x26（宽高比载荷小？）
+    #3 map len=501681  **像地图** 240x130（宽高比载荷小？）
+    #4 entities len=50
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 3 个）
+· 械族-生存比赛.msav：v10，区 6 个（基准 6）
+    #0 meta len=8056  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=9511
+    #2 map len=522903  **像地图** 600x600（宽高比载荷小？）
+    #3 entities len=26
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· 星火地区.msav：v11，区 7 个（基准 6）
+    #0 meta len=5066  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=9609
+    #2 ?preview_map len=1
+    #3 map len=360293  **像地图** 420x420（宽高比载荷小？）
+    #4 entities len=26
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 循序渐进.msav：v8，区 6 个（基准 6）
+    #0 meta len=4060  **像地图** 22x8（宽高比载荷小？）
+    #1 content len=8515
+    #2 map len=639838  **像地图** 1000x82（宽高比载荷小？）
+    #3 entities len=26
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· 银石海岸.msav：v9，区 6 个（基准 6）
+    #0 meta len=11181  **像地图** 24x8（宽高比载荷小？）
+    #1 content len=8855
+    #2 map len=521599  **像地图** 512x512（宽高比载荷小？）
+    #3 entities len=26
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· 永夜城.msav：v10，区 6 个（基准 6）
+    #0 meta len=5803  **像地图** 24x8（宽高比载荷小？）
+    #1 content len=9511
+    #2 map len=812287  **像地图** 600x600（宽高比载荷小？）
+    #3 entities len=26
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· 占山为王4p混战小图（1）.msav：v11，区 7 个（基准 6）
+    #0 meta len=4923  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=18885  **像地图** 150x150
+    #4 entities len=50
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 占山为王4p混战小图（1）_early20260517.msav：v11，区 7 个（基准 6）
+    #0 meta len=4914  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=9867
+    #2 ?preview_map len=1
+    #3 map len=18885  **像地图** 150x150
+    #4 entities len=50
+    #5 markers len=2
+    #6 custom len=4
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 真菌推进.msav：v8，区 6 个（基准 6）
+    #0 meta len=1032  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=8515
+    #2 map len=353732  **像地图** 750x82（宽高比载荷小？）
+    #3 entities len=26
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· 终末V5.msav：v8，区 6 个（基准 6）
+    #0 meta len=5933  **像地图** 22x8（宽高比载荷小？）
+    #1 content len=8515
+    #2 map len=455548  **像地图** 300x300（宽高比载荷小？）
+    #3 entities len=26
+    #4 markers len=2
+    #5 custom len=4
+    ⇒ 不带 preview_map（像地图的区 2 个）
+· 铸熔矩阵 服务器简单版.msav：v11，区 7 个（基准 6）
+    #0 meta len=20092  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=9609
+    #2 ?preview_map len=1
+    #3 map len=2269690  **像地图** 600x600（宽高比载荷小？）
+    #4 entities len=2366
+    #5 markers len=51980
+    #6 custom len=7506
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 铸熔矩阵_20260118.msav：v11，区 7 个（基准 6）
+    #0 meta len=20044  **像地图** 23x8（宽高比载荷小？）
+    #1 content len=9609
+    #2 ?preview_map len=1
+    #3 map len=2269690  **像地图** 600x600（宽高比载荷小？）
+    #4 entities len=2366
+    #5 markers len=51980
+    #6 custom len=7506
+    ⇒ **带 preview_map**（像地图的区 2 个）
+· 铸熔矩阵_20260408.msav：v11，区 7 个（基准 6）
+    #0 meta len=19633  **像地图** 19x8（宽高比载荷小？）
+    #1 content len=9848
+    #2 ?preview_map len=1
+    #3 map len=2593583  **像地图** 600x600（宽高比载荷小？）
+    #4 entities len=79559
+    #5 markers len=57104
+    #6 custom len=8066
+    ⇒ **带 preview_map**（像地图的区 2 个）

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  F7：日志页「来源切换」chip 的选中态。
+  实心 accent_soft + accent 描边 —— 与 badge_slot 同族，但描边更实，
+  以便在同一个横向滚动条里与未选态一眼区分。
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/accent_soft" />
+    <corners android:radius="8dp" />
+    <stroke android:width="1dp" android:color="@color/accent" />
+</shape>

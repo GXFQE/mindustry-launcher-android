@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  槽的二级页面（F 导航重构，REF §56）：**点一个槽进这里，而不是弹 11 项菜单**。
+
+  ★ 骨架照抄 activity_saves（ScrollView + 卡片 + 代码 addView）：
+    · **不要在 ScrollView 里塞 ListView**（高度会塌，见 FLOWS F2b）——长列表"再点进一层"；
+    · `<include>` 的 row_action 每个都要**不同的 id**（F2b 第二条坑）。
+  ⚠️ 图标暂借 ic_health（先保证功能与结构对，图标下一轮换成专用图）。
+
+  🔴 根节点必须有 `@+id/root`，且 Activity 必须调 `Util.applySystemInsets(root)`：
+     targetSdk ≥ 35 强制 edge-to-edge ⇒ 缺这一步整页内容从 y=0 开始画，
+     被状态栏 + 顶栏盖住。真机实测（第 81 轮）：本页「槽「xxx」」大标题**完全看不见**、
+     信息卡第一行只剩下半截（证据 evidence/f-nav-slot-page.png）。
+     写法与 activity_mods.xml 一致；别用 `android:fitsSystemWindows`（见 Util.java 的注释）。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bg">
+
+    <!--
+      ★ 这里原来有一行自绘大标题「槽「xxx」」，与顶栏（ActionBar）写的是同一句话
+        ⇒ 用户 2026-10-03 报「UI 一堆问题」之一。现在**只留顶栏那一处**（setTitle 用同一条文案），
+        内容区直接从信息卡开始；顶到顶栏的间距改由下面的 paddingTop 给。
+    -->
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingTop="12dp"
+            android:paddingBottom="16dp">
+
+            <!-- 槽信息卡 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="14dp"
+                android:layout_marginEnd="14dp"
+                android:layout_marginTop="12dp"
+                android:orientation="vertical"
+                android:background="@drawable/card_bg"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp">
+
+                <TextView
+                    android:id="@+id/slot_info"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:lineSpacingExtra="3dp"
+                    android:textColor="@color/fg"
+                    android:textSize="13sp" />
+
+                <TextView
+                    android:id="@+id/slot_paths"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:lineSpacingExtra="3dp"
+                    android:textColor="@color/fg_muted"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <!-- 四段入口 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="14dp"
+                android:layout_marginEnd="14dp"
+                android:layout_marginTop="12dp"
+                android:orientation="vertical"
+                android:background="@drawable/card_bg">
+
+                <include
+                    android:id="@+id/row_slot_mods"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <include
+                    android:id="@+id/row_slot_saves"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <include
+                    android:id="@+id/row_slot_maps"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <include
+                    android:id="@+id/row_slot_ops"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <include
+                    android:id="@+id/row_slot_export"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

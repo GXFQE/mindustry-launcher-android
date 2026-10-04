@@ -1,0 +1,34 @@
+=== 用【单独发布的子模组真实文件】验收冲突检测（2026-10-02 第四十七轮续）===
+背景：子模组确实有单独发布，只不过在另一个仓库 —— 找到了：
+Neon 的简介自称 "Bundled Mindustry client toolkit (29-in-1)"，它的每个子包在作者
+DeterMination-Wind 名下**都有独立仓库**（共 66 个仓库里能对上 ~29 个）：
+LogicSugar / Tripwire / PatchViewer / betterMiniMap / StealthPath / betterHotKey /
+customMarker / AdvancedReplace / BetterRTSFormation / PinyinSearchSupport / Random ...
+
+本次从 GitHub 下了 4 个真实发布文件（字节数与 API 报的 size 完全一致）：
+  Tripwire-1.1.1.zip            63 112 B   main=tripwire.TripwireMod
+  PatchViewer-v2.4.1.jar       131 894 B   main=patchviewer.PatchViewerMod
+  betterMiniMap.jar             44 629 B   main=betterminimap.BetterMiniMapMod
+  stealth-path.jar             247 075 B   main=stealthpath.StealthPathMod
+★ 四个主类**全都在** Neon N14 的 classes.dex 里 ⇒ 判据对上（不是只有 LogicSugar 那一对）。
+
+── 真机扫描（槽 冲突演示，9 个模组）──
+槽 = 冲突演示
+
+检查了 9 个带代码的模组（22.2 MB）
+
+【重复实现】
+· 「DeepSpace」里已经带了「Too Many Items」⇒ 两个一起开 = 同一套功能装两遍，会互相抢；建议只留一个
+· 「Neon / 氖」里已经带了「betterMiniMap」⇒ 两个一起开 = 同一套功能装两遍，会互相抢；建议只留一个
+· 「Neon / 氖」里已经带了「Logic Sugar」⇒ 两个一起开 = 同一套功能装两遍，会互相抢；建议只留一个
+· 「Neon / 氖」里已经带了「PatchViewer / 补丁查看器」⇒ 两个一起开 = 同一套功能装两遍，会互相抢；建议只留一个
+· 「Neon / 氖」里已经带了「Stealth Path / 偷袭小道」⇒ 两个一起开 = 同一套功能装两遍，会互相抢；建议只留一个
+· 「Neon / 氖」里已经带了「Tripwire」⇒ 两个一起开 = 同一套功能装两遍，会互相抢；建议只留一个
+
+【可能互相抢】
+· 「Logic Sugar」 与 「Neon / 氖」 都想接管游戏里的逻辑编辑器 —— 只能有一个生效（是谁，看下面的游戏记录）
+
+【简介里提到对方】
+· 「Neon / 氖」的简介里提到了「Logic Sugar」
+· 「Neon / 氖」的简介里提到了「Tripwire」
+

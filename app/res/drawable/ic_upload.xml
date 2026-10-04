@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- F10：导出地图（把一张图存到手机共享存储里）。
+     与 ic_download 同一套图标集（Material file_upload 的标准 path，箭头朝上 = 出去）。
+     见 ic_add.xml 头注释的图标集约定。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@color/icon_tint"
+        android:pathData="M9,16h6v-6h4l-7,-7 -7,7h4zM5,18h14v2H5z" />
+</vector>

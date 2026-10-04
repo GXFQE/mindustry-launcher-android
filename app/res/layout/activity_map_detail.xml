@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  F21：地图详情页（从地图列表点进来）。
+
+  为什么是**独立页面**而不是弹窗：这一页要放一张大图 + 元数据 + 四段可折叠的资源统计，
+  弹窗（AlertDialog）装不下，而且弹窗属于发起它的那个页面 —— 关掉会落在"上一级"
+  （用户 2026-10-03 反馈过地图列表那一版，见 REF §56）。
+
+  🔴 根节点必须有 `@+id/root`，且 Activity 必须调 `Util.applySystemInsets(root)`：
+     targetSdk ≥ 35 强制 edge-to-edge ⇒ 漏了这一步整页从 y=0 开始画、被状态栏 + 顶栏整块盖住
+     （第 81 轮踩过，且**全程不报错**，自检 ㉛ 会拦）。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bg">
+
+    <ScrollView
+        android:id="@+id/detail_scroll"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:clipToPadding="false">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingBottom="12dp">
+
+            <!--
+              大图预览。★ 默认 **GONE**：渲染不出来时（最常见 = 这个槽**还没指定版本**
+              ⇒ 没有配色表；或格式 v2 的老图）**不许留一个空框**（用户 2026-10-04 明确要求），
+              后台拿到位图才 setVisibility(VISIBLE)。列表行里的缩略图同理（见 MsavListAdapter）。
+            -->
+            <ImageView
+                android:id="@+id/detail_image"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:adjustViewBounds="true"
+                android:scaleType="fitCenter"
+                android:visibility="gone"
+                android:background="@drawable/card_bg" />
+
+            <TextView
+                android:id="@+id/detail_text"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="10dp"
+                android:lineSpacingExtra="3dp"
+                android:textSize="13sp"
+                android:textColor="@color/fg" />
+
+            <!-- 只有**本槽**的图才给删除入口（游戏自带 / 模组自带的那两张在包里，删不了） -->
+            <LinearLayout
+                android:id="@+id/detail_actions"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/card_bg"
+                android:visibility="gone">
+
+                <include
+                    android:id="@+id/row_detail_delete"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/stats_state"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="14dp"
+                android:paddingBottom="4dp"
+                android:lineSpacingExtra="2dp"
+                android:textSize="13sp"
+                android:textColor="@color/fg_muted" />
+
+            <!-- 四段资源统计 + 技术细节，运行时按需 inflate card_stat_section 填进来 -->
+            <LinearLayout
+                android:id="@+id/stats_box"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

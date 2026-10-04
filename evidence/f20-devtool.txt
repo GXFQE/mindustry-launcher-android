@@ -1,0 +1,4 @@
+dev_logs_export ok
+目标 = /storage/emulated/0/Android/data/io.mdt.launcher/hub/trunc-test.txt
+正文 = 9446 字符 / 15621 B
+落盘 = 15621 B

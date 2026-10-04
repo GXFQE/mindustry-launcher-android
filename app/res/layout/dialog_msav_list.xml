@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  存档 / 地图的选择列表（对话框里的**卡片列表**）。
+
+  ★ 用 ListView 而不是"把行全展开进 ScrollView"：这份列表可能有几百条（存档页那份就是），
+    全展开会一次性 inflate 几百个视图。★ 这里是**对话框自己的窗口**，
+    不存在 FLOWS F2b 那条"ScrollView 里套 ListView 高度塌掉"的问题（那条说的是页面里的嵌套）。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <!--
+      ★ 表头（第 58 轮）：**条数/分组这类信息要放这里，不能塞标题**。
+        AlertDialog 的标题是**单行**的（超了直接省略号），真机实测
+        「槽「default」的地图\n本槽 0 · 游戏自带 114 · 模组自带 0」被截成
+        「…模组自…」——标题里放多行内容必然出事。
+    -->
+    <TextView
+        android:id="@+id/msav_head"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="4dp"
+        android:lineSpacingExtra="2dp"
+        android:textColor="@color/fg_muted"
+        android:textSize="12sp"
+        android:visibility="gone" />
+
+    <ListView
+        android:id="@+id/msav_list"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxHeight="420dp"
+        android:divider="@null"
+        android:dividerHeight="0dp"
+        android:paddingTop="4dp"
+        android:paddingBottom="4dp"
+        android:clipToPadding="false" />
+</LinearLayout>

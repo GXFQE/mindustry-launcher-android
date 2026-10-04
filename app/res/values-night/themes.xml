@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  应用主题（深色）。系统 uimode=night 时整份覆盖 values/themes.xml 的同名 style。
+  ⚠️ 覆盖是「整份替换」而不是 item 合并 ⇒ 这里的 AppTheme 必须写全，不能只写差异项。
+
+  唯一与浅色的结构差异：parent（Theme.Material）与 windowLightStatusBar。
+  其余 item 引用的是同一批语义色，深浅由 values-night/colors.xml 决定。
+  AppBarStyle / AppBarTitle 只在 values/themes.xml 定义一份即可（颜色自动跟随）。
+-->
+<resources>
+    <style name="AppTheme" parent="android:Theme.Material">
+        <item name="android:windowBackground">@color/bg</item>
+        <item name="android:textColorPrimary">@color/fg</item>
+        <item name="android:textColorSecondary">@color/fg_muted</item>
+        <item name="android:colorAccent">@color/accent</item>
+
+        <!-- F1b：顶栏（深色下顶栏取卡面色，与页底留微差） -->
+        <item name="android:colorPrimary">@color/appbar</item>
+        <item name="android:colorPrimaryDark">@color/statusbar</item>
+        <item name="android:statusBarColor">@color/statusbar</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:actionBarStyle">@style/AppBarStyle</item>
+
+        <!-- F5b：对话框样式（深色版；与 values 同一份，只换 parent） -->
+        <item name="android:alertDialogTheme">@style/AppDialogTheme</item>
+    </style>
+
+    <!-- F5b：深色对话框 —— parent 换成深色对话框主题，windowBackground 复用同一份 dlg_bg
+         （颜色走 @color/card，由 values-night/colors.xml 决定）。详见 values/themes.xml 的注释。 -->
+    <style name="AppDialogTheme" parent="android:Theme.Material.Dialog.Alert">
+        <item name="android:windowBackground">@drawable/dlg_bg</item>
+        <item name="android:colorAccent">@color/accent</item>
+        <item name="android:textColorPrimary">@color/fg</item>
+        <item name="android:textColorSecondary">@color/fg_muted</item>
+        <item name="android:colorControlNormal">@color/fg_muted</item>
+    </style>
+</resources>

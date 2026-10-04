@@ -1,0 +1,24 @@
+=== F10 地图入口（本槽 / 游戏自带 / 模组自带）—— 数据 + 界面双证据（2026-10-03 第 55 轮）===
+
+── 数据链：dev 口 `--es dev_maps_slot <槽>`（落 hub/report-devtool.txt，不依赖点菜单）──
+槽 default（指到官方 159.7）:
+  游戏 APK = /data/app/…io.anuke.mindustry…/base.apk
+  本槽 0 · 游戏自带 114 · 模组自带 0（共 114）
+  · [游戏自带] 0.msav | 0 · 350 × 350 · 作者：iqtik123 | base.apk!/assets/maps/serpulo/hidden/0.msav
+  · [游戏自带] 111.msav | 111 · 600 × 600 · 作者：enwyz | …/serpulo/hidden/111.msav
+  ⇒ **从官方 APK 的 assets/maps 里流式读出 114 张**（官方图 + 战役区块图）
+槽 模组演示:
+  本槽 0 · 游戏自带 0 · 模组自带 22（共 22）
+  · [原版瘤液拓展.zip] [Neop1]fumarole.msav | [Neop1]fumarole · 320 × 320 · 作者：-YOXILIS-
+  · [原版瘤液拓展.zip] [Neop2]faultline.msav | [Neop2]faultline · 450 × 450 · 作者：-Y0XI1IS
+  ⇒ **从真实模组包里的 maps/** 读出 22 张**，每张都标着来自哪个包
+
+── 界面链（真机）：存档页 → 槽行 → 菜单第一项「地图（本槽 / 游戏 / 模组）…」──
+槽 冲突演示（我推了 2 张进它的 maps/）：
+  标题: 槽「冲突演示」的地图 · 本槽 2 · 游戏自带 0 · 模组自带 2
+  行: 文件名 + 「来源 · 真名 · 尺寸 · 作者」两行
+截图: evidence/f10-maps-list.png
+
+★ 本轮修掉一处：**作者字段也会带色码**（真机实测 `[#2E8E05]iq[lime]tik[green]123`）——
+  我第一版只对"真名"去了色，作者漏了；现已用同一判据（Mods.stripColors）处理。
+★ 菜单项从 10 条变 11 条（0=地图 … 10=删除），switch 已整体后移并核对过对齐。

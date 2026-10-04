@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  圆形图标变体：内容与 `ic_launcher.xml` **完全相同**（自适应图标本来就是"由系统套遮罩"，
+  圆形/方圆/圆角方都是同一份资源换遮罩）。
+  ⚠️ 存在的唯一理由：`android:roundIcon` 这个清单属性要一个**独立的资源名**（API 25 引入，
+  个别桌面/系统界面会按它取图）。⇒ 两份必须**逐字一致**，改一份就要改另一份；
+  真正的两条图层定义在 ic_launcher_background/foreground.xml 里，不在这里。
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/ic_launcher_background" />
+    <foreground android:drawable="@drawable/ic_launcher_foreground" />
+    <monochrome android:drawable="@drawable/ic_launcher_foreground" />
+</adaptive-icon>

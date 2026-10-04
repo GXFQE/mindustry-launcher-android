@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  F6c：导入 .msav 时的**存档名**确认步骤（AlertDialog.setView 的载体）。
+
+  ★ 为什么值得单独一屏：Mindustry 的存档名**就是文件名**（`saves/&lt;名&gt;.msav`，
+    列表里去掉扩展名显示，见 Msav.safeName 的注释）。导入一份别人给的存档时，
+    名字往往是 `save1.msav` / `困难模式 (1).msav` 这种，直接落盘就等于把这个名字
+    永久写进玩家的存档列表 —— 让他在这里改一次，比事后在文件管理器里找要省事得多。
+
+  ★ 顺带把"这个文件不像 .msav"的警告并进同一屏（原来是单独一个确认框）：两步合一，
+    少一次弹窗，且用户在看到警告时手边就是改名框和「取消」。
+
+  ⚠️ 只用 setTitle，不用 setMessage（同 dialog_policy.xml 的注释）。
+-->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:scrollbars="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/msav_name_hint"
+            android:textColor="@color/fg_muted"
+            android:textSize="12sp"
+            android:lineSpacingExtra="2dp" />
+
+        <EditText
+            android:id="@+id/msav_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:inputType="text"
+            android:maxLength="100"
+            android:singleLine="true"
+            android:textColor="@color/fg"
+            android:textSize="16sp" />
+
+        <TextView
+            android:id="@+id/msav_warn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/pol_live_bg"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="10dp"
+            android:paddingBottom="10dp"
+            android:text="@string/msav_not_zlib_warn"
+            android:textColor="@color/fg"
+            android:textSize="12sp"
+            android:lineSpacingExtra="2dp"
+            android:visibility="gone" />
+    </LinearLayout>
+</ScrollView>
