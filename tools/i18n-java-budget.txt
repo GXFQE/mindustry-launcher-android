@@ -6,7 +6,7 @@
 #   · 实测 < 台账  ⇒ ERROR：你已经搬走了几条 ⇒ **把这行改小**。
 #   · 文件有中文却不在本表里 ⇒ ERROR：新文件出现了中文。
 # ★ 这一列数字就是 **P3（把中文搬进资源）的进度**：它只许降。
-#   合计 611 条 —— 其中大头是**有意保留**的：
+#   合计 599 条 —— 其中大头是**有意保留**的：
 #     · MainActivity.java —— 全在 dev_* 直通口（仅 debuggable 构建可达）
 #     · Compat / AutoBackup / Crash —— 只进 report-*.txt（取证文本不进资源）
 #     · Data / MapStats 等文件里的**落盘报告与体检明细**（同上）
@@ -22,11 +22,11 @@ Mods.java = 140
 MainActivity.java = 126
 Data.java = 61
 SettingsBin.java = 52
-Injector.java = 33
 ModsActivity.java = 33
 MsavMeta.java = 32
 Compat.java = 26
 MapStats.java = 22
+Injector.java = 21
 Backup.java = 17
 AutoBackup.java = 11
 BundleNames.java = 10

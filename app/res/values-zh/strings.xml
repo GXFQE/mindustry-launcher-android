@@ -644,6 +644,21 @@
     <string name="game_pkg_missing_fmt">找不到要启动的游戏包\n（%1$s）</string>
     <string name="step_prepare">准备</string>
     <string name="step_unknown">未知</string>
+    <!--
+      ══ 启动管线各步 + 失败原因（P3）══════════════════════════════════════
+      ★ `Injector.LaunchError.step` / 它带的 msg **就是启动失败弹窗正文** ⇒ 给用户看的。
+      ⚠️ **报告里的键不是这些**（那些是 ASCII：`prewarm` / `dexInject` / …，与语言无关）。
+    -->
+    <string name="step_prewarm">预热</string>
+    <string name="step_dex">dex 注入</string>
+    <string name="step_native">native 库</string>
+    <string name="step_native_flag">native 标志</string>
+    <string name="step_assets">资产挂载</string>
+    <string name="step_start">启动游戏</string>
+    <string name="launch_err_bad_package">游戏包不存在或不可读</string>
+    <string name="launch_err_no_activity_fmt">无法从游戏包中解析出 %1$s\n该文件可能不是 Mindustry 系 APK，或已损坏。</string>
+    <string name="launch_err_no_abi_fmt">APK 里没有适配本机的 native 库（设备 %1$s）</string>
+    <string name="launch_err_no_native_loaded">没有任何 native 库被加载</string>
 
     <!-- ══ F3 全局设置页（按 Android 语义：这里只放"所有槽共用"的项） ══════ -->
     <string name="act_settings_title">设置</string>

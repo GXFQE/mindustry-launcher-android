@@ -3396,6 +3396,24 @@ public final class SelfTest {
             }
             ok(stat, L, noLead,
                     "★P3：报告行资源里**没有前导空格**（缩进是 Java 侧排版 —— aapt2 剥不动它）");
+
+            // ★★ P3 第六批：启动管线各步 + 失败原因（`Injector.LaunchError` → 启动失败弹窗）。
+            //    ★ 这里只需验两件事：① 两条带占位符的按真参数实拼；② 6 个步骤名**两套语言都有字**
+            //      （报告的键是 ASCII 的 `prewarm`/`dexInject`/…，与界面语言无关，**不是**这些资源）。
+            String iNoAct = ctx.getString(R.string.launch_err_no_activity_fmt, "a.b.C");
+            String iNoAbi = enCtx.getString(R.string.launch_err_no_abi_fmt, "[arm64-v8a]");
+            boolean stepsBothLocales = true;
+            for (int id : new int[]{R.string.step_prewarm, R.string.step_dex, R.string.step_native,
+                    R.string.step_native_flag, R.string.step_assets, R.string.step_start}) {
+                if (ctx.getString(id).isEmpty() || enCtx.getString(id).isEmpty()) {
+                    stepsBothLocales = false;
+                }
+            }
+            ok(stat, L, iNoAct.contains("a.b.C") && iNoAbi.contains("[arm64-v8a]")
+                            && !ctx.getString(R.string.launch_err_bad_package).isEmpty()
+                            && !ctx.getString(R.string.launch_err_no_native_loaded).isEmpty()
+                            && stepsBothLocales,
+                    "★P3：启动管线 6 个步骤名两套语言都有字，两条带占位符的原因按真参数实拼");
         } catch (Throwable t) {
             ok(stat, L, false, "存档体检用例自身异常：" + t);
         } finally {

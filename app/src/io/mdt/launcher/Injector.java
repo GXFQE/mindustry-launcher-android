@@ -100,7 +100,8 @@ public final class Injector {
      */
     public static Timing launch(Activity activity, Plan plan) throws LaunchError {
         if (plan == null || plan.apk == null || !plan.apk.exists()) {
-            throw new LaunchError("准备", "游戏包不存在或不可读", null);
+            throw new LaunchError(activity.getString(R.string.step_prepare),
+                    activity.getString(R.string.launch_err_bad_package), null);
         }
         Context app = activity.getApplicationContext();
         ClassLoader baseCl = activity.getClassLoader();
@@ -115,8 +116,8 @@ public final class Injector {
         if (!prewarm(app, plan.apk, log)) {
             t.mark("prewarm");
             report(app, log);
-            throw new LaunchError("预热", "无法从游戏包中解析出 " + GAME_ACTIVITY
-                    + "\n该文件可能不是 Mindustry 系 APK，或已损坏。", null);
+            throw new LaunchError(activity.getString(R.string.step_prewarm),
+                    activity.getString(R.string.launch_err_no_activity_fmt, GAME_ACTIVITY), null);
         }
         t.mark("prewarm");
 
@@ -126,7 +127,8 @@ public final class Injector {
         } catch (Throwable e) {
             t.mark("dexInject");
             report(app, log);
-            throw new LaunchError("dex 注入", String.valueOf(e), e);
+            throw new LaunchError(activity.getString(R.string.step_dex),
+                    String.valueOf(e), e);
         }
         t.mark("dexInject");
 
@@ -136,7 +138,8 @@ public final class Injector {
         } catch (Throwable e) {
             t.mark("nativeLoad");
             report(app, log);
-            throw new LaunchError("native 库", String.valueOf(e), e);
+            throw new LaunchError(activity.getString(R.string.step_native),
+                    String.valueOf(e), e);
         }
         t.mark("nativeLoad");
 
@@ -146,7 +149,8 @@ public final class Injector {
         } catch (Throwable e) {
             t.mark("nativeFlag");
             report(app, log);
-            throw new LaunchError("native 标志", String.valueOf(e), e);
+            throw new LaunchError(activity.getString(R.string.step_native_flag),
+                    String.valueOf(e), e);
         }
         t.mark("nativeFlag");
 
@@ -156,7 +160,8 @@ public final class Injector {
         } catch (Throwable e) {
             t.mark("assetMount");
             report(app, log);
-            throw new LaunchError("资产挂载", String.valueOf(e), e);
+            throw new LaunchError(activity.getString(R.string.step_assets),
+                    String.valueOf(e), e);
         }
         t.mark("assetMount");
 
@@ -166,7 +171,8 @@ public final class Injector {
         } catch (Throwable e) {
             t.mark("startActivity");
             report(app, log);
-            throw new LaunchError("启动游戏", String.valueOf(e), e);
+            throw new LaunchError(activity.getString(R.string.step_start),
+                    String.valueOf(e), e);
         }
         t.mark("startActivity");
 
@@ -238,8 +244,8 @@ public final class Injector {
             String abi = Compat.pickAbi(zf);
             if (abi == null) {
                 log.append("APK 里没有任何匹配本机 ABI 的 native 目录\n");
-                throw new IllegalStateException("APK 里没有适配本机的 native 库（设备 "
-                        + joinAbis() + "）");
+                throw new IllegalStateException(ctx.getString(R.string.launch_err_no_abi_fmt,
+                        joinAbis()));
             }
             log.append("选用 ABI = ").append(abi).append('\n');
             File dir = new File(new File(Paths.privateDir(ctx), "natives"), abi);
@@ -280,7 +286,7 @@ public final class Injector {
         //   进程仍在）⇒ 第二次启动一个 native 缺失的包时这个判断**不会抛**，
         //   于是一路走到 startActivity，最后崩在游戏内部（等价的库从未加载），
         //   用户完全无从判断原因 —— 这是"静默出错"的最坏形态。
-        if (loaded == 0) throw new IllegalStateException("没有任何 native 库被加载");
+        if (loaded == 0) throw new IllegalStateException(ctx.getString(R.string.launch_err_no_native_loaded));
     }
 
     /** 设备 ABI 列表，仅供错误文案（`[arm64-v8a, armeabi-v7a]`） */
