@@ -552,6 +552,27 @@
     <string name="pack_report_copied_fmt">✅ 复制完成：%1$d 项，%2$s</string>
     <string name="pack_report_skipped_fmt">跳过 %1$d 项（目标槽已有同名）：%2$s</string>
     <string name="pack_report_failed_list_fmt">❌ 失败 %1$d 项：%2$s</string>
+    <!--
+      ══ APK 导入 / 导出 / 存档落盘的失败原因（P3）══════════════════════════
+      ★ 这三处的 `IOException` 消息经 `msgOf(e)`（= `getMessage()` 原文）**直接进弹窗** ⇒ 给用户看的。
+      🔴 **原始原因不进第一层**：`不是有效的 zip/APK：<异常>` 的尾巴去掉。
+    -->
+    <string name="imp_err_open_failed">无法读取所选文件</string>
+    <string name="imp_err_too_small_fmt">文件过小（%1$d B），不是游戏 APK</string>
+    <string name="imp_err_no_dex">不是有效的 APK（缺 classes.dex）</string>
+    <string name="imp_err_bad_zip">不是有效的 zip/APK</string>
+    <string name="imp_err_no_entry_fmt">解析不出游戏入口类 %1$s\n（可能不是 Mindustry 系 APK）</string>
+    <string name="imp_err_rename_fmt">落盘改名失败：%1$s</string>
+    <string name="exp_err_src_missing_fmt">源文件不存在：%1$s</string>
+    <string name="exp_err_pkg_missing_fmt">源包不存在：%1$s</string>
+    <string name="exp_err_no_entry">没有指名要导出哪一条</string>
+    <string name="exp_err_entry_missing_fmt">这个包里没有这条：%1$s</string>
+    <string name="exp_err_no_dest">没有拿到目标位置</string>
+    <string name="exp_err_dest_readonly">目标位置不可写（系统没给出可写句柄）</string>
+    <string name="msav_err_open_failed">无法读取所选文件</string>
+    <string name="msav_err_no_saves_fmt">拿不到槽「%1$s」的 saves/ 目录</string>
+    <string name="msav_err_same_name_fmt">同名存档已存在且删不掉：%1$s</string>
+    <string name="msav_err_rename_fmt">改名失败：%1$s → %2$s</string>
     <string name="msav_reason_meta_tail_fmt">元数据块读完后还剩 %1$d 字节（与游戏的口径不一致）</string>
     <!-- 地图来源与详情（同一族：Maps.Item 原来也是 Java 里拼的中文）-->
     <string name="map_from_slot">本槽</string>

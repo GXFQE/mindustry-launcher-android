@@ -59,7 +59,7 @@ public final class Importer {
         if (tmp.exists()) { tmp.setWritable(true); tmp.delete(); }
 
         InputStream in = ctx.getContentResolver().openInputStream(uri);
-        if (in == null) throw new IOException("无法读取所选文件");
+        if (in == null) throw new IOException(ctx.getString(R.string.imp_err_open_failed));
         long bytes = 0;
         OutputStream out = new FileOutputStream(tmp);
         try {
@@ -72,7 +72,7 @@ public final class Importer {
         }
         if (bytes < 1024) {
             cleanup(tmp);
-            throw new IOException("文件过小（" + bytes + " B），不是游戏 APK");
+            throw new IOException(ctx.getString(R.string.imp_err_too_small_fmt, bytes));
         }
 
         String version;
@@ -80,7 +80,7 @@ public final class Importer {
             ZipFile zip = new ZipFile(tmp);
             try {
                 if (zip.getEntry("classes.dex") == null)
-                    throw new IOException("不是有效的 APK（缺 classes.dex）");
+                    throw new IOException(ctx.getString(R.string.imp_err_no_dex));
                 version = readVersion(zip);
 
                 // ★ F18 兼容性探测（复用同一个 ZipFile，成本 ~10 ms 级）——
@@ -100,7 +100,7 @@ public final class Importer {
             throw e;
         } catch (Exception e) {
             cleanup(tmp);
-            throw new IOException("不是有效的 zip/APK：" + e);
+            throw new IOException(ctx.getString(R.string.imp_err_bad_zip));
         }
 
         // ★ dex 载体必须只读
@@ -111,7 +111,7 @@ public final class Importer {
         if (c == null) c = tryLoadClass(ctx, tmp);
         if (c == null) {
             cleanup(tmp);
-            throw new IOException("解析不出游戏入口类 " + SENTINEL + "\n（可能不是 Mindustry 系 APK）");
+            throw new IOException(ctx.getString(R.string.imp_err_no_entry_fmt, SENTINEL));
         }
         Log.i(TAG, "import prewarm ok: " + c.getName() + " from " + tmp.getName());
 
@@ -121,7 +121,7 @@ public final class Importer {
             tmp.setWritable(true);
             if (!tmp.renameTo(file)) {
                 cleanup(tmp);
-                throw new IOException("落盘改名失败: " + tmp.getName());
+                throw new IOException(ctx.getString(R.string.imp_err_rename_fmt, tmp.getName()));
             }
             file.setReadOnly();
         }

@@ -44,10 +44,10 @@ public final class Msav {
     /** 流式拷到目标槽的 saves/ 下（先 .part）。失败时 .part 已清理。 */
     public static Stage stage(Context ctx, InputStream in, String displayName, String slot)
             throws IOException {
-        if (in == null) throw new IOException("无法读取所选文件");
+        if (in == null) throw new IOException(ctx.getString(R.string.msav_err_open_failed));
         File savesDir = Data.savesDirOf(ctx, slot);
         if (savesDir == null || !savesDir.isDirectory()) {
-            throw new IOException("拿不到槽「" + slot + "」的 saves/ 目录");
+            throw new IOException(ctx.getString(R.string.msav_err_no_saves_fmt, slot));
         }
         String base = safeName(displayName);
         sweepParts(savesDir);       // 清掉上一轮的孤儿 .part（见 sweepParts 注释）
@@ -79,14 +79,14 @@ public final class Msav {
     }
 
     /** 落定：`<名>.msav.part` → `<名>.msav`。同名已存在则替换（用户选的这份为准）。 */
-    public static File commit(Stage s) throws IOException {
+    public static File commit(Context ctx, Stage s) throws IOException {
         File dest = new File(s.savesDir, s.base);
         if (dest.exists() && !dest.delete()) {
-            throw new IOException("同名存档已存在且删不掉：" + s.base);
+            throw new IOException(ctx.getString(R.string.msav_err_same_name_fmt, s.base));
         }
         s.part.setWritable(true);
         if (!s.part.renameTo(dest)) {
-            throw new IOException("改名失败：" + s.part.getName() + " → " + s.base);
+            throw new IOException(ctx.getString(R.string.msav_err_rename_fmt, s.part.getName(), s.base));
         }
         return dest;
     }

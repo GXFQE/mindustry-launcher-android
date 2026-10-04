@@ -1104,7 +1104,7 @@ public class MainActivity extends BaseActivity {
                 try {
                     InputStream in = new FileInputStream(src);
                     st = Msav.stage(MainActivity.this, in, src.getName(), slot);
-                    dest = Msav.commit(st).getAbsolutePath();
+                    dest = Msav.commit(MainActivity.this, st).getAbsolutePath();
                 } catch (Exception e) {
                     err = e.getMessage() == null ? String.valueOf(e) : e.getMessage();
                     android.util.Log.w("MDTLauncher", "dev msav failed: " + err, e);

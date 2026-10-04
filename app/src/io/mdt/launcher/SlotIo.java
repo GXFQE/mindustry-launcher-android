@@ -584,7 +584,7 @@ final class SlotIo {
 
     private static void commitMsav(final Activity a, Msav.Stage st, String slot, final SlotOps.Host h) {
         try {
-            File dest = Msav.commit(st);
+            File dest = Msav.commit(a, st);
             Toast.makeText(a, a.getString(R.string.msav_imported_fmt, slot, dest.getName()),
                     Toast.LENGTH_LONG).show();
         } catch (IOException e) {

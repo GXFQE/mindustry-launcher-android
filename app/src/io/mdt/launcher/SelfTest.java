@@ -1604,7 +1604,7 @@ public final class SelfTest {
             Msav.Stage s1 = Msav.stage(ctx, new ByteArrayInputStream(gz), "我的存档 1.msav", SLOT);
             ok(stat, L, s1.zlib, "★zlib 流（78 9C 头）被认出来（原来这里断言的是 gzip 1f8b —— 判据是错的）");
             ok(stat, L, "saves".equals(s1.savesDir.getName()), "落点是 saves/");
-            File f1 = Msav.commit(s1);
+            File f1 = Msav.commit(ctx, s1);
             ok(stat, L, "我的存档 1.msav".equals(f1.getName()),
                     "★ 中文存档名被原样保留（游戏列表显示的就是文件名）：" + f1.getName());
             ok(stat, L, Util.md5(f1).length() == 32, "落盘可读且 md5 可算");
@@ -1623,7 +1623,7 @@ public final class SelfTest {
 
             // 同名重导 = 替换
             Msav.Stage s3 = Msav.stage(ctx, new ByteArrayInputStream(gz), "我的存档 1.msav", SLOT);
-            File f3 = Msav.commit(s3);
+            File f3 = Msav.commit(ctx, s3);
             ok(stat, L, f3.getName().equals(f1.getName()), "同名重导替换而不新增");
         } catch (Exception e) {
             stat[1]++;
@@ -3518,6 +3518,27 @@ public final class SelfTest {
                     "★P3：模组包那 16 个码**每个**都有文案、两套语言不同、"
                             + "中性参数（路径/文件名）进了而原始原因没进；可疑的是［" + missPk + "］");
 
+            // ★★ P3 第十一批：APK 导入 / 导出 / 存档落盘那几条带占位符的按**真参数实拼**
+            //    （工程铁律：`%n$` 与实参个数不匹配会抛 `MissingFormatArgumentException` **直接崩**，
+            //      而那些句子只在"真出错"时才走到 ⇒ 不实拼就等于没测）。
+            String iSmall = ctx.getString(R.string.imp_err_too_small_fmt, 42);
+            String iEntry = ctx.getString(R.string.imp_err_no_entry_fmt, "a.b.C");
+            String iRen = ctx.getString(R.string.imp_err_rename_fmt, "x.apk");
+            String eSrc = enCtx.getString(R.string.exp_err_src_missing_fmt, "/p");
+            String ePkg = ctx.getString(R.string.exp_err_pkg_missing_fmt, "/q");
+            String eEnt = ctx.getString(R.string.exp_err_entry_missing_fmt, "maps/a.msav");
+            String mNo = enCtx.getString(R.string.msav_err_no_saves_fmt, "s");
+            String mSame = ctx.getString(R.string.msav_err_same_name_fmt, "a.msav");
+            String mRen = ctx.getString(R.string.msav_err_rename_fmt, "a.part", "a.msav");
+            ok(stat, L, iSmall.contains("42") && iEntry.contains("a.b.C") && iRen.contains("x.apk")
+                            && eSrc.contains("/p") && ePkg.contains("/q")
+                            && eEnt.contains("maps/a.msav") && mNo.contains("s")
+                            && mSame.contains("a.msav") && mRen.contains("a.part")
+                            && mRen.contains("a.msav")
+                            && !ctx.getString(R.string.imp_err_bad_zip).isEmpty()
+                            && !ctx.getString(R.string.exp_err_dest_readonly).isEmpty(),
+                    "★P3：导入/导出/存档落盘那 9 条带占位符的按真参数实拼（含 1 条两个参数）");
+
             // ★★ P3 第六批：启动管线各步 + 失败原因（`Injector.LaunchError` → 启动失败弹窗）。
             //    ★ 这里只需验两件事：① 两条带占位符的按真参数实拼；② 6 个步骤名**两套语言都有字**
             //      （报告的键是 ASCII 的 `prewarm`/`dexInject`/…，与界面语言无关，**不是**这些资源）。
@@ -4206,19 +4227,19 @@ public final class SelfTest {
 
             // ① 正例：逐字节一致
             ByteArrayOutputStream out = new ByteArrayOutputStream();
-            long n = Exporter.copyEntry(zip, "maps/导出测试图.msav", out);
+            long n = Exporter.copyEntry(ctx, zip, "maps/导出测试图.msav", out);
             final byte[] got = out.toByteArray();
             ok(stat, L, n == want.length && java.util.Arrays.equals(got, want),
                     "★包里条目拷出来：" + n + " B，与源**逐字节一致**（源 " + want.length + " B）");
 
             // ② 反向：条目不存在
-            String e1 = failOfCopy(zip, "maps/没有这一条.msav");
+            String e1 = failOfCopy(ctx, zip, "maps/没有这一条.msav");
             ok(stat, L, e1 != null, "★反向：条目不存在 ⇒ 拒绝（" + e1 + "）");
 
             // ③ 反向：容器不是 zip
             File notZip = new File(root, "不是zip.bin");
             java.nio.file.Files.write(notZip.toPath(), "这不是一个 zip".getBytes("UTF-8"));
-            String e2 = failOfCopy(notZip, "maps/随便.msav");
+            String e2 = failOfCopy(ctx, notZip, "maps/随便.msav");
             ok(stat, L, e2 != null, "★反向：容器不是 zip ⇒ 拒绝（" + e2 + "）");
 
             // ④ 元断言：源改 1 个字节，同一套比较必须判不等
@@ -4234,9 +4255,9 @@ public final class SelfTest {
     }
 
     /** 拷贝**必须**失败时返回异常消息；成功返回 null（调用方据此判死） */
-    private static String failOfCopy(File container, String entry) {
+    private static String failOfCopy(Context ctx, File container, String entry) {
         try {
-            Exporter.copyEntry(container, entry, new ByteArrayOutputStream());
+            Exporter.copyEntry(ctx, container, entry, new ByteArrayOutputStream());
             return null;
         } catch (Throwable t) {
             return String.valueOf(t.getMessage());

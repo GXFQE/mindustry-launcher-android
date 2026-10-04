@@ -67,7 +67,7 @@ public final class Exporter {
 
     /** 把一个文件流式写进 SAF 目标。返回写入字节数。 */
     public static long writeFile(Context ctx, Uri uri, File src) throws IOException {
-        if (src == null || !src.isFile()) throw new IOException("源文件不存在：" + src);
+        if (src == null || !src.isFile()) throw new IOException(ctx.getString(R.string.exp_err_src_missing_fmt, String.valueOf(src)));
         InputStream in = new FileInputStream(src);
         OutputStream out = null;
         long n = 0;
@@ -106,7 +106,7 @@ public final class Exporter {
         long n;
         try {
             out = openOut(ctx, uri);
-            n = copyEntry(container, entry, out);
+            n = copyEntry(ctx, container, entry, out);
             out.flush();
         } finally {
             closeQuietly(out);
@@ -121,12 +121,13 @@ public final class Exporter {
      * ★ 刻意与 SAF 解耦（只吃一个 {@link OutputStream}）⇒ 自检能直接喂一个
      *   `ByteArrayOutputStream` 把"字节真的一样"钉死，不必依赖真机上的文件选择器。
      */
-    static long copyEntry(File container, String entry, OutputStream out) throws IOException {
+    static long copyEntry(Context ctx, File container, String entry, OutputStream out)
+            throws IOException {
         if (container == null || !container.isFile()) {
-            throw new IOException("源包不存在：" + container);
+            throw new IOException(ctx.getString(R.string.exp_err_pkg_missing_fmt, String.valueOf(container)));
         }
         if (entry == null || entry.trim().isEmpty()) {
-            throw new IOException("没有指名要导出哪一条");
+            throw new IOException(ctx.getString(R.string.exp_err_no_entry));
         }
         java.util.zip.ZipFile zf = null;
         InputStream in = null;
@@ -134,7 +135,7 @@ public final class Exporter {
         try {
             zf = new java.util.zip.ZipFile(container);
             java.util.zip.ZipEntry ze = zf.getEntry(entry);
-            if (ze == null) throw new IOException("这个包里没有这条：" + entry);
+            if (ze == null) throw new IOException(ctx.getString(R.string.exp_err_entry_missing_fmt, entry));
             in = zf.getInputStream(ze);
             byte[] buf = new byte[BUF];
             int r;
@@ -280,7 +281,7 @@ public final class Exporter {
      *    个别老 provider 不认 `"wt"` 会抛，这时回落默认模式（总比直接失败强）。
      */
     private static OutputStream openOut(Context ctx, Uri uri) throws IOException {
-        if (uri == null) throw new IOException("没有拿到目标位置");
+        if (uri == null) throw new IOException(ctx.getString(R.string.exp_err_no_dest));
         try {
             OutputStream o = ctx.getContentResolver().openOutputStream(uri, "wt");
             if (o != null) return o;
@@ -288,7 +289,7 @@ public final class Exporter {
             Log.w(TAG, "openOutputStream(wt) refused, falling back: " + t);
         }
         OutputStream o = ctx.getContentResolver().openOutputStream(uri);
-        if (o == null) throw new IOException("目标位置不可写（系统没给出可写句柄）");
+        if (o == null) throw new IOException(ctx.getString(R.string.exp_err_dest_readonly));
         return o;
     }
 

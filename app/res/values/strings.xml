@@ -575,6 +575,29 @@
     <string name="pack_report_copied_fmt">✅ copy done: %1$d items, %2$s</string>
     <string name="pack_report_skipped_fmt">skipped %1$d items (the target slot already has the same name): %2$s</string>
     <string name="pack_report_failed_list_fmt">❌ %1$d items failed: %2$s</string>
+    <!--
+      ══ APK 导入 / 导出 / 存档落盘的失败原因（P3）══════════════════════════
+      ★ 这三处的 `IOException` 消息经 `msgOf(e)`（= `getMessage()` 原文）**直接进弹窗**
+        ⇒ 给用户看的。三个类都已经是 Android 侧（有 `Context`）⇒ 直接 `getString`。
+      🔴 **原始原因不进第一层**：`不是有效的 zip/APK：<异常>` 的那种尾巴一律去掉
+        （诊断仍在异常链里，由 `msgOf` 之外的调试路径看）。
+    -->
+    <string name="imp_err_open_failed">could not read the selected file</string>
+    <string name="imp_err_too_small_fmt">the file is too small (%1$d B) to be a game APK</string>
+    <string name="imp_err_no_dex">not a valid APK (classes.dex is missing)</string>
+    <string name="imp_err_bad_zip">not a valid zip/APK</string>
+    <string name="imp_err_no_entry_fmt">could not resolve the game entry class %1$s\n(this may not be a Mindustry-family APK)</string>
+    <string name="imp_err_rename_fmt">could not rename the file into place: %1$s</string>
+    <string name="exp_err_src_missing_fmt">the source file does not exist: %1$s</string>
+    <string name="exp_err_pkg_missing_fmt">the source package does not exist: %1$s</string>
+    <string name="exp_err_no_entry">no entry was named for export</string>
+    <string name="exp_err_entry_missing_fmt">this package has no such entry: %1$s</string>
+    <string name="exp_err_no_dest">the destination was not available</string>
+    <string name="exp_err_dest_readonly">the destination is not writable (the system did not hand back a writable handle)</string>
+    <string name="msav_err_open_failed">could not read the selected file</string>
+    <string name="msav_err_no_saves_fmt">cannot reach the saves/ folder of slot \"%1$s\"</string>
+    <string name="msav_err_same_name_fmt">a save with the same name already exists and cannot be deleted: %1$s</string>
+    <string name="msav_err_rename_fmt">rename failed: %1$s → %2$s</string>
     <!-- 地图来源与详情（同一族：Maps.Item 原来也是 Java 里拼的中文）-->
     <string name="map_from_slot">this slot</string>
     <string name="map_from_slot_detail">this slot (you can manage it here)</string>
