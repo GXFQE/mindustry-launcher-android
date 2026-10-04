@@ -2695,18 +2695,23 @@ public final class SelfTest {
             if (rz == null || rz.isEmpty() || stFallback.equals(rz)) missSt.append(code).append(' ');
             if (rz.equals(re)) stLocaleDiff = false;
             // ★ **原始原因**（异常原文 / 我们 `read()` 里的中文）一个字都不许进第一层 ——
-            //   那是"依据"，按硬规矩走 `report()`（「技术细节」第二层）。备份目录那条除外：
-            //   它的参数是个**路径**（中性，不是原因）。
+            //   那是"依据"，按硬规矩走 `report()`（「技术细节」第二层）。
+            //   但**中性参数**（路径 / 槽名）可以进：`E_BACKUP_MKDIR` 的备份目录、
+            //   `E_NO_SLOT_DIR` 的槽名 —— 它们不是"原因"，是"说的是哪个"。加码时照这条判。
             if (rz.contains("BOOM")) stRawLeak = true;
-            if (code != SettingsBin.Result.E_BACKUP_MKDIR && rz.contains("WHY")) stRawLeak = true;
+            boolean neutralParam = code == SettingsBin.Result.E_BACKUP_MKDIR
+                    || code == SettingsBin.Result.E_NO_SLOT_DIR;
+            if (!neutralParam && rz.contains("WHY")) stRawLeak = true;
         }
         ok(stat, L, missSt.length() == 0,
-                "★P3：settings 那 7 个错误码**每一个**都有文案映射（漏映射=界面静默空白），漏的是［"
+                "★P3：settings 那 12 个错误码**每一个**都有文案映射（漏映射=界面静默空白），漏的是［"
                         + missSt + "］");
         ok(stat, L, !stRawLeak && stLocaleDiff
                         && SettingsText.userReason(ctx, SettingsBin.Result.withCode(
-                                SettingsBin.Result.E_BACKUP_MKDIR, "WHY", null)).contains("WHY"),
-                "★P3：第一层只带**中性参数**（备份目录那条的路径进去了），"
+                                SettingsBin.Result.E_BACKUP_MKDIR, "WHY", null)).contains("WHY")
+                        && SettingsText.userReason(ctx, SettingsBin.Result.withCode(
+                                SettingsBin.Result.E_NO_SLOT_DIR, "SLOT", null)).contains("SLOT"),
+                "★P3：第一层只带**中性参数**（备份目录/槽名那两条进去了），"
                         + "**原始原因一个字都没进**（依据在 report() 里），且两套语言文案不同");
         // ★ 自检失败那条是**嵌套**的（外面一句 + 里面一句"具体原因"）⇒ 两个分支都要过一遍，
         //   否则"另一个分支永远显示同一句"这种错看不出来。
@@ -3477,6 +3482,15 @@ public final class SelfTest {
             ok(stat, L, gateCount == 6 && gateMiss.length() == 0,
                     "★P3：六道加载门的标签齐全；**没通过的**那几关必须给原因（通过了可只画一行）；"
                             + "门数=" + gateCount + "，缺=" + gateMiss);
+            // ★★ P3 第九批：模组页那几条（导入失败 + 详情弹窗补充说明）按真参数实拼。
+            //    ★ 其中两条的占位符是"整句 + %1$s/%2$s"（原来是 Java 里拼的**碎片**）。
+            String mdTarget = ctx.getString(R.string.mods_detail_target_fmt, "A / B", "1.2");
+            String mdRepo = ctx.getString(R.string.mods_detail_repo_override_fmt, "https://x");
+            ok(stat, L, mdTarget.contains("A / B") && mdTarget.contains("1.2")
+                            && mdRepo.contains("https://x")
+                            && !ctx.getString(R.string.mods_detail_depchain).contains("Mods.")
+                            && !ctx.getString(R.string.mods_detail_no_target).isEmpty(),
+                    "★P3：模组页那两条带占位符的按真参数实拼；详情里**不再出现源码出处**（文案纪律 ⑤）");
 
             // ★★ P3 第六批：启动管线各步 + 失败原因（`Injector.LaunchError` → 启动失败弹窗）。
             //    ★ 这里只需验两件事：① 两条带占位符的按真参数实拼；② 6 个步骤名**两套语言都有字**

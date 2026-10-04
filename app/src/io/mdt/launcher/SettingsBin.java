@@ -385,11 +385,7 @@ public final class SettingsBin {
 
     /** 记下"错在哪"：**码 + 参数给界面**（`SettingsText` 映射），中文句子留给 `report()` / 自检 */
     private static Result err(Result r, int code, String zh, String s1, String s2) {
-        r.errCode = code;
-        r.errS1 = s1;
-        r.errS2 = s2;
-        r.error = zh;
-        return r;
+        return r.fail(code, zh, s1, s2);
     }
 
     /** 一次安全改写的结果（人读报告 + 机器可判的字段） */
@@ -419,6 +415,17 @@ public final class SettingsBin {
         public static final int E_VERIFY_ROLLBACK_FAIL = 6;
         /** 写后自检不过 ⇒ 删掉了刚新建的文件；s1 = 具体原因 */
         public static final int E_VERIFY_DELETED = 7;
+        // ── 下面几条由 `Mods` 的启停路径给（同一个 Result 类型 ⇒ 码集也同一处维护）──
+        /** 拿不到这个槽的目录（外部存储可能没挂载）；s1 = 槽名 */
+        public static final int E_NO_SLOT_DIR = 8;
+        /** 游戏正在运行，现在改会被它覆盖 */
+        public static final int E_GAME_RUNNING = 9;
+        /** 这个槽的设置读不出来 ⇒ 拒绝改写（**故意不带原始原因**：那是依据，走 `report()`） */
+        public static final int E_SETTINGS_UNREADABLE = 10;
+        /** 没有可改的模组 */
+        public static final int E_NO_MODS = 11;
+        /** 内部名为空（先扫出这个模组再改） */
+        public static final int E_NO_INTERNAL_NAME = 12;
 
         /** 自检失败的"具体原因"：嵌在上面三条的 `%1$s` 里 */
         public static final int SUB_NONE = 0;
@@ -431,6 +438,8 @@ public final class SettingsBin {
         public static final int[] ALL_CODES = {
                 E_NULL_FILE, E_NO_KEYS, E_BACKUP_MKDIR, E_BACKUP_VERIFY,
                 E_VERIFY_ROLLBACK, E_VERIFY_ROLLBACK_FAIL, E_VERIFY_DELETED,
+                E_NO_SLOT_DIR, E_GAME_RUNNING, E_SETTINGS_UNREADABLE, E_NO_MODS,
+                E_NO_INTERNAL_NAME,
         };
 
         /** 码 + 参数（界面用）；`errS1` 也给 `SUB_*` 当参数 */
@@ -447,6 +456,18 @@ public final class SettingsBin {
             r.errS1 = s1;
             r.errS2 = s2;
             return r;
+        }
+
+        /**
+         * 记下"错在哪"：**码 + 参数给界面**（`SettingsText` 映射），中文句子留给报告与自检。
+         * ★ 给 `Mods` 的启停路径用（它和本类共用同一个 `Result` ⇒ 码集也只在这一处维护）。
+         */
+        public Result fail(int code, String zh, String s1, String s2) {
+            errCode = code;
+            errS1 = s1;
+            errS2 = s2;
+            error = zh;
+            return this;
         }
 
         public boolean ok;

@@ -486,6 +486,12 @@
     <string name="settings_err_verify_rollback_fmt">the after-write check failed (%1$s), so the original file was restored from the backup</string>
     <string name="settings_err_verify_rollback_fail_fmt">the after-write check failed (%1$s) and restoring also failed</string>
     <string name="settings_err_verify_deleted_fmt">the after-write check failed (%1$s), so the file that was just created was deleted</string>
+    <!-- 这几条由 `Mods` 的启停路径给（同一个 Result 类型 ⇒ 码集与文案都同一处维护） -->
+    <string name="settings_err_no_slot_dir_fmt">cannot reach the directory of slot \"%1$s\" (external storage may not be mounted)</string>
+    <string name="settings_err_game_running">the game is running, so this change would be overwritten — exit the game first</string>
+    <string name="settings_err_settings_unreadable">the settings of this slot cannot be read, so the change was refused.\nLet the game run once (it rebuilds them), or restore from a backup and try again</string>
+    <string name="settings_err_no_mods">there are no mods to change</string>
+    <string name="settings_err_no_internal_name">the internal name is empty — scan this mod first, then change it</string>
     <!--
       ══ 模组状态（P3：`Mods.State` 枚举原来**自己带显示文案**，现在只留枚举常量当码）════
       ★ `label` = 句子形式（详情弹窗 / 报告）；`badge` = 徽标短形式（列表行一行放不下长的，
@@ -524,6 +530,15 @@
     <string name="mods_gate_last_crash">the last launch did not crash into skipping all mods</string>
     <string name="mods_gate_last_crash_note">only the game can tell once it runs</string>
     <string name="mods_gate_no_version">no version set yet</string>
+    <!-- ══ 模组页的几条（P3）：导入失败 + 详情弹窗的补充说明 ══════════════════
+         ⚠️ 原文里「（照抄 Mods.resolveDependencies）」是**维护者自我说明 / 源码出处**，
+            按文案纪律 ⑤ 不该出现在界面上 ⇒ 已去掉（依据仍在代码注释里）。 -->
+    <string name="mods_import_open_failed">could not open the selected file (it may not be readable)</string>
+    <string name="mods_detail_no_target">no version points at this slot, so these mods are never loaded by any launch.</string>
+    <string name="mods_detail_target_fmt">versions pointing at this slot: %1$s (the lowest, %2$s, is used for comparison)</string>
+    <string name="mods_detail_depchain">dependency chain verdict:</string>
+    <string name="mods_detail_repo_override_fmt">%1$s (overridden by settings)</string>
+    <string name="mods_detail_settings_unreadable">⚠ the settings file cannot be read: the values above are defaults, not what is on disk\n</string>
     <!-- 地图来源与详情（同一族：Maps.Item 原来也是 Java 里拼的中文）-->
     <string name="map_from_slot">this slot</string>
     <string name="map_from_slot_detail">this slot (you can manage it here)</string>

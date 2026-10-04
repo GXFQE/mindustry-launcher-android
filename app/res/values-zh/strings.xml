@@ -469,6 +469,12 @@
     <string name="settings_err_verify_rollback_fmt">自检失败（%1$s）⇒ 已用备份还原原文件</string>
     <string name="settings_err_verify_rollback_fail_fmt">自检失败（%1$s）且还原失败</string>
     <string name="settings_err_verify_deleted_fmt">自检失败（%1$s）⇒ 已删除刚新建的文件</string>
+    <!-- 这几条由 `Mods` 的启停路径给（同一个 Result 类型 ⇒ 码集与文案都同一处维护） -->
+    <string name="settings_err_no_slot_dir_fmt">拿不到槽「%1$s」的目录（外部存储可能没挂载）</string>
+    <string name="settings_err_game_running">游戏正在运行，现在改会被它覆盖 —— 请先退出游戏再改。</string>
+    <string name="settings_err_settings_unreadable">这个槽的设置读不出来 ⇒ 拒绝改写。\n请先让游戏跑一次（它会重建设置），或从备份恢复后再试。</string>
+    <string name="settings_err_no_mods">没有可改的模组</string>
+    <string name="settings_err_no_internal_name">内部名为空 —— 先扫出这个模组再改</string>
     <!--
       ══ 模组状态（P3：`Mods.State` 枚举原来**自己带显示文案**，现在只留枚举常量当码）════
       ★ `label` = 句子形式（详情弹窗 / 报告）；`badge` = 徽标短形式（列表行放不下长的）。
@@ -503,6 +509,15 @@
     <string name="mods_gate_last_crash">上次启动没崩到「跳过全部模组」</string>
     <string name="mods_gate_last_crash_note">只有游戏跑起来才知道</string>
     <string name="mods_gate_no_version">还没指定版本</string>
+    <!-- ══ 模组页的几条（P3）：导入失败 + 详情弹窗的补充说明 ══════════════════
+         ⚠️ 原文里「（照抄 Mods.resolveDependencies）」是**维护者自我说明 / 源码出处**，
+            按文案纪律 ⑤ 不该出现在界面上 ⇒ 已去掉（依据仍在代码注释里）。 -->
+    <string name="mods_import_open_failed">打不开所选文件（可能没有读取权限）</string>
+    <string name="mods_detail_no_target">没有版本指向这个槽 ⇒ 这里的模组不会在任何一次启动里被加载。</string>
+    <string name="mods_detail_target_fmt">指向这个槽的版本：%1$s（比对取其中最低的 %2$s）</string>
+    <string name="mods_detail_depchain">依赖链判定：</string>
+    <string name="mods_detail_repo_override_fmt">%1$s（settings 覆盖）</string>
+    <string name="mods_detail_settings_unreadable">⚠ 设置文件读不到：上面是默认值，不是磁盘状态\n</string>
     <string name="msav_reason_meta_tail_fmt">元数据块读完后还剩 %1$d 字节（与游戏的口径不一致）</string>
     <!-- 地图来源与详情（同一族：Maps.Item 原来也是 Java 里拼的中文）-->
     <string name="map_from_slot">本槽</string>

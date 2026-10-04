@@ -518,20 +518,24 @@ public final class Mods {
         File file = settingsFileOf(ctx, slot);
         r.file = file;
         if (file == null) {
-            r.error = "拿不到槽「" + slot + "」的目录（外部存储可能没挂载）";
+            r.fail(SettingsBin.Result.E_NO_SLOT_DIR,
+                    "拿不到槽「" + slot + "」的目录（外部存储可能没挂载）", slot, null);
             return r;
         }
         if (Data.gameAlive(ctx)) {
             // ★ 2026-10-04：这句现在会**原样出现在用户弹窗的第一层**（`SettingsText.userReason()`），
             //   所以去掉 `:game` / `settings.bin` 这类术语（文案纪律 ③）。
-            r.error = "游戏正在运行，现在改会被它覆盖 —— 请先退出游戏再改。";
+            r.fail(SettingsBin.Result.E_GAME_RUNNING,
+                    "游戏正在运行，现在改会被它覆盖 —— 请先退出游戏再改。", null, null);
             return r;
         }
         String[] why = new String[1];
         SettingsBin.Values cur = file.isFile() ? SettingsBin.readSafe(file, why) : null;
         if (file.isFile() && cur == null) {
-            r.error = "这个槽的设置读不出来（" + why[0] + "）⇒ 拒绝改写。\n"
-                    + "请先让游戏跑一次（它会重建设置），或从备份恢复后再试。";
+            r.fail(SettingsBin.Result.E_SETTINGS_UNREADABLE,
+                    "这个槽的设置读不出来（" + why[0] + "）⇒ 拒绝改写。\n"
+                            + "请先让游戏跑一次（它会重建设置），或从备份恢复后再试。",
+                    null, null);
             return r;
         }
         java.util.LinkedHashMap<String, Boolean> map = new java.util.LinkedHashMap<>();
@@ -543,7 +547,7 @@ public final class Mods {
             }
         }
         if (map.isEmpty()) {
-            r.error = "没有可改的模组";
+            r.fail(SettingsBin.Result.E_NO_MODS, "没有可改的模组", null, null);
             return r;
         }
         // ★ 「键不存在 = 默认启用」是**模组开关专属**语义 ⇒ 在**这一层**把"本来就对"的键裁掉，
@@ -575,26 +579,31 @@ public final class Mods {
                                                boolean on) {
         SettingsBin.Result r = new SettingsBin.Result();
         if (internalName == null || internalName.isEmpty()) {
-            r.error = "内部名为空 —— 先扫出这个模组再改";
+            r.fail(SettingsBin.Result.E_NO_INTERNAL_NAME,
+                    "内部名为空 —— 先扫出这个模组再改", null, null);
             return r;
         }
         File file = settingsFileOf(ctx, slot);
         r.file = file;
         if (file == null) {
-            r.error = "拿不到槽「" + slot + "」的目录（外部存储可能没挂载）";
+            r.fail(SettingsBin.Result.E_NO_SLOT_DIR,
+                    "拿不到槽「" + slot + "」的目录（外部存储可能没挂载）", slot, null);
             return r;
         }
         if (Data.gameAlive(ctx)) {
             // ★ 同 setEnabledAll：这句会原样进用户弹窗第一层 ⇒ 去术语（2026-10-04）
-            r.error = "游戏正在运行，现在改会被它覆盖 —— 请先退出游戏再改。";
+            r.fail(SettingsBin.Result.E_GAME_RUNNING,
+                    "游戏正在运行，现在改会被它覆盖 —— 请先退出游戏再改。", null, null);
             return r;
         }
         String key = enabledKey(internalName);
         String[] why = new String[1];
         SettingsBin.Values cur = file.isFile() ? SettingsBin.readSafe(file, why) : null;
         if (file.isFile() && cur == null) {
-            r.error = "这个槽的设置读不出来（" + why[0] + "）⇒ 拒绝改写。\n"
-                    + "请先让游戏跑一次（它会重建设置），或从备份恢复后再试。";
+            r.fail(SettingsBin.Result.E_SETTINGS_UNREADABLE,
+                    "这个槽的设置读不出来（" + why[0] + "）⇒ 拒绝改写。\n"
+                            + "请先让游戏跑一次（它会重建设置），或从备份恢复后再试。",
+                    null, null);
             return r;
         }
         if (cur != null && !cur.has(key) && on) {

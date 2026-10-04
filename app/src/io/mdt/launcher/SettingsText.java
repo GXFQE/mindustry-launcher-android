@@ -39,6 +39,16 @@ final class SettingsText {
                 return c.getString(R.string.settings_err_verify_rollback_fail_fmt, detail(c, r));
             case SettingsBin.Result.E_VERIFY_DELETED:
                 return c.getString(R.string.settings_err_verify_deleted_fmt, detail(c, r));
+            case SettingsBin.Result.E_NO_SLOT_DIR:
+                return c.getString(R.string.settings_err_no_slot_dir_fmt, r.errS1);
+            case SettingsBin.Result.E_GAME_RUNNING:
+                return c.getString(R.string.settings_err_game_running);
+            case SettingsBin.Result.E_SETTINGS_UNREADABLE:
+                return c.getString(R.string.settings_err_settings_unreadable);
+            case SettingsBin.Result.E_NO_MODS:
+                return c.getString(R.string.settings_err_no_mods);
+            case SettingsBin.Result.E_NO_INTERNAL_NAME:
+                return c.getString(R.string.settings_err_no_internal_name);
             default:
                 break;
         }

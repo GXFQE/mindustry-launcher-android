@@ -278,7 +278,7 @@ public class ModsActivity extends BaseActivity {
                 try {
                     destDir = new File(Data.dirOf(ModsActivity.this, slot), "mods");
                     java.io.InputStream in = getContentResolver().openInputStream(uri);
-                    if (in == null) throw new java.io.IOException("打不开所选文件（可能没有读取权限）");
+                    if (in == null) throw new java.io.IOException(getString(R.string.mods_import_open_failed));
                     try {
                         pr = Mods.importPackage(destDir, displayName, in, overwrite,
                                 Mods.trashDirOf(ModsActivity.this));
@@ -570,10 +570,11 @@ public class ModsActivity extends BaseActivity {
                     mScan.settingsNote,
                     getString(mScan.launchIdExists ? R.string.mods_crash_yes : R.string.mods_crash_no)));
             if (!mTarget.any()) {
-                sb.append("\n\n没有版本指向这个槽 ⇒ 这里的模组不会在任何一次启动里被加载。");
+                sb.append("\n\n").append(getString(R.string.mods_detail_no_target));
             } else {
-                sb.append("\n\n指向这个槽的版本：").append(join(mTarget.versions))
-                  .append("（比对取其中最低的 ").append(mTarget.label).append("）");
+                sb.append("\n\n").append(getString(R.string.mods_detail_target_fmt,
+                        join(mTarget.versions), mTarget.label));
+
             }
             if (!mScan.ignored.isEmpty()) {
                 sb.append("\n\n").append(getString(R.string.mods_ignored_fmt, mScan.ignored.size()));
@@ -595,7 +596,9 @@ public class ModsActivity extends BaseActivity {
                 }
             }
             if (!bad.isEmpty()) {
-                sb.append("\n\n依赖链判定（照抄 Mods.resolveDependencies）：");
+                // ★ 原文案里有「（照抄 Mods.resolveDependencies）」—— 那是
+                //   **维护者自我说明 / 源码出处**，按文案纪律 ⑤ 不该出现在界面上 ⇒ 去掉。
+                sb.append("\n\n").append(getString(R.string.mods_detail_depchain));
                 for (String b : bad) sb.append("\n· ").append(b);
             }
             mDetail.setText(sb.toString());
@@ -962,7 +965,7 @@ public class ModsActivity extends BaseActivity {
         if (m.settingsRepo != null && !m.settingsRepo.isEmpty()
                 && !m.settingsRepo.equals(m.repo)) {
             sb.append(getString(R.string.mods_detail_repo_fmt,
-                    m.settingsRepo + "（settings 覆盖）")).append('\n');
+                    getString(R.string.mods_detail_repo_override_fmt, m.settingsRepo))).append('\n');
         }
         // ★ 不再显示「代码入口：logicsugar.LogicSugarMod」那种**类名** ——
         //   用户看不懂，而下面「说明文件原文」里的 main 字段就是它。
@@ -1022,7 +1025,7 @@ public class ModsActivity extends BaseActivity {
                         m.settingsRepo == null ? getString(R.string.mods_setting_repo_default)
                                 : m.settingsRepo)).append('\n');
             }
-            sb.append(m.settingsKnown ? "" : "⚠ 设置文件读不到：上面是默认值，不是磁盘状态\n");
+            sb.append(m.settingsKnown ? "" : getString(R.string.mods_detail_settings_unreadable));
         }
 
         if (m.rawMeta != null && !m.rawMeta.isEmpty()) {
