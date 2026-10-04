@@ -528,6 +528,31 @@
     <string name="backup_err_snapshot_mkdir_fmt">创建快照目录失败：%1$s</string>
     <string name="backup_err_snapshot_missing">快照不存在</string>
     <string name="backup_err_delete_partial_fmt">删除未完全成功：%1$s</string>
+    <!-- 恢复（restore）那一段：失败原因 + 自检报告 + 成功报告 —— 都是弹窗正文 -->
+    <string name="backup_restore_err_no_snapshot">⚠ 快照不存在</string>
+    <string name="backup_restore_err_game_running">⚠ 游戏进程还在运行（当前槽正被游戏占用）——\n请先退出游戏再恢复。未做任何改动。</string>
+    <string name="backup_restore_err_manifest_fmt">⚠ 读不了快照清单：%1$s</string>
+    <string name="backup_restore_err_manifest_empty">⚠ 快照清单是空的</string>
+    <string name="backup_restore_err_no_dst">⚠ 拿不到目标槽目录</string>
+    <string name="backup_restore_err_mkdir_fmt">⚠ 创建目标目录失败：%1$s</string>
+    <string name="backup_restore_bad_missing_fmt">%1$s（缺失）</string>
+    <string name="backup_restore_bad_size_fmt">%1$s（大小 %2$d≠%3$d）</string>
+    <string name="backup_restore_bad_md5_fmt">%1$s（md5 不符）</string>
+    <string name="backup_restore_err_selfcheck_fmt">⚠ 这份备份自身校验没过，已拒绝恢复（没有动你的数据）：\n%1$s</string>
+    <!--⚠ 缩进一律**不写进资源**（aapt2 会把前导/尾随空白剥掉，判据 RES-04）——
+        报告各行的缩进由 Java 侧加（那是排版，不是文案）。-->
+    <string name="backup_restore_more_fmt">… 共 %1$d 项\n</string>
+    <string name="backup_restore_bullet_fmt">· %1$s\n</string>
+    <string name="backup_restore_err_line_fmt">· %1$s：%2$s\n</string>
+    <string name="backup_restore_ok_head_fmt">✅ 已从快照恢复到槽「%1$s」\n</string>
+    <string name="backup_restore_ok_snapshot_fmt">快照：%1$s\n</string>
+    <string name="backup_restore_ok_files_fmt">文件：%1$d / %2$d （%3$s）\n</string>
+    <string name="backup_restore_ok_where_fmt">位置：%1$s\n</string>
+    <string name="backup_restore_partial_fmt">\n⚠ 有文件没写成功：\n%1$s</string>
+    <string name="backup_err_not_manifest">不是 MDT 备份清单</string>
+    <string name="backup_err_slot_name_invalid">槽名不合法</string>
+    <string name="backup_err_clone_target_current_fmt">「%1$s」是当前槽，不能作为克隆的目标。\n（源槽的内容会与它混在一起，之后就分不开了）</string>
+    <string name="backup_err_slot_backups_delete_fmt">备份目录删除未完全成功：%1$s</string>
     <string name="export_slot_title_fmt">导出整槽「%1$s」</string>
     <string name="export_slot_msg_fmt">把整个槽打包成一个 zip：存档 · 地图 · 蓝图 · 模组 · 设置。%1$s\n\n游戏自己也能导入这个包（设置 → 数据 → 导入数据）。</string>
     <string name="export_slot_playing">\n\n⚠️ 游戏正在运行，此刻导出可能拿到写了一半的存档。</string>

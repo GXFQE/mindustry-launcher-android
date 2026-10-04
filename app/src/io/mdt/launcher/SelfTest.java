@@ -3361,6 +3361,41 @@ public final class SelfTest {
                                     "cfg" + sepEn + "natives").contains("cfg, natives"),
                     "★P3：列表分隔符两套语言各一份（中「" + sepZh + "」/ 英「" + sepEn
                             + "」），英文那个**带空格**且真的进了句子");
+
+            // ★★ P3 第五批：备份**恢复**路径（`Backup.restore` 的失败原因 / 自检报告 / 成功报告）。
+            //    16 条带占位符的按真参数实拼（含 1 条**三个**参数、2 条两个参数）。
+            String rMan = ctx.getString(R.string.backup_restore_err_manifest_fmt, "e");
+            String rMk = ctx.getString(R.string.backup_restore_err_mkdir_fmt, "/m");
+            String rMissing = ctx.getString(R.string.backup_restore_bad_missing_fmt, "a");
+            String rSize = ctx.getString(R.string.backup_restore_bad_size_fmt, "a", 1, 2);
+            String rMd5 = ctx.getString(R.string.backup_restore_bad_md5_fmt, "a");
+            String rSelf = ctx.getString(R.string.backup_restore_err_selfcheck_fmt, "x");
+            String rMore = ctx.getString(R.string.backup_restore_more_fmt, 9);
+            String rBullet = ctx.getString(R.string.backup_restore_bullet_fmt, "b");
+            String rLine = ctx.getString(R.string.backup_restore_err_line_fmt, "r", "m");
+            String rHead = ctx.getString(R.string.backup_restore_ok_head_fmt, "s");
+            String rSnap = ctx.getString(R.string.backup_restore_ok_snapshot_fmt, "t");
+            String rFiles = ctx.getString(R.string.backup_restore_ok_files_fmt, 1, 2, "1 KB");
+            String rWhere = ctx.getString(R.string.backup_restore_ok_where_fmt, "/w");
+            String rPart = ctx.getString(R.string.backup_restore_partial_fmt, "z");
+            String rClone = ctx.getString(R.string.backup_err_clone_target_current_fmt, "d");
+            String rDel = ctx.getString(R.string.backup_err_slot_backups_delete_fmt, "/b");
+            ok(stat, L, rMan.contains("e") && rMk.contains("/m") && rMissing.contains("a")
+                            && rSize.contains("a") && rSize.contains("1") && rSize.contains("2")
+                            && rMd5.contains("a") && rSelf.contains("x") && rMore.contains("9")
+                            && rBullet.contains("b") && rLine.contains("r") && rLine.contains("m")
+                            && rHead.contains("s") && rSnap.contains("t") && rFiles.contains("1 KB")
+                            && rWhere.contains("/w") && rPart.contains("z") && rClone.contains("d")
+                            && rDel.contains("/b"),
+                    "★P3：备份恢复那 16 条带占位符的文案按真参数实拼（含 1 条三个参数、2 条两个）");
+            // ★ `RES-04` 的反面：报告行的**缩进由 Java 侧加**，资源本身**不许**以空格开头
+            //   （aapt2 会把前导空白剥掉 —— 这一批我第一版就是把缩进写进了资源，被门禁当场抓住）。
+            boolean noLead = true;
+            for (String one : new String[]{rSnap, rFiles, rWhere, rBullet, rLine, rMore}) {
+                if (one.startsWith(" ")) noLead = false;
+            }
+            ok(stat, L, noLead,
+                    "★P3：报告行资源里**没有前导空格**（缩进是 Java 侧排版 —— aapt2 剥不动它）");
         } catch (Throwable t) {
             ok(stat, L, false, "存档体检用例自身异常：" + t);
         } finally {

@@ -545,6 +545,31 @@
     <string name="backup_err_snapshot_mkdir_fmt">Could not create the snapshot directory: %1$s</string>
     <string name="backup_err_snapshot_missing">The snapshot does not exist</string>
     <string name="backup_err_delete_partial_fmt">Deletion did not fully succeed: %1$s</string>
+    <!-- 恢复（restore）那一段：失败原因 + 自检报告 + 成功报告 —— 都是弹窗正文 -->
+    <string name="backup_restore_err_no_snapshot">⚠ The snapshot does not exist</string>
+    <string name="backup_restore_err_game_running">⚠ The game process is still running (this slot is in use by the game) —\nExit the game before restoring. Nothing was changed.</string>
+    <string name="backup_restore_err_manifest_fmt">⚠ Cannot read the snapshot manifest: %1$s</string>
+    <string name="backup_restore_err_manifest_empty">⚠ The snapshot manifest is empty</string>
+    <string name="backup_restore_err_no_dst">⚠ Cannot reach the target slot directory</string>
+    <string name="backup_restore_err_mkdir_fmt">⚠ Could not create the target directory: %1$s</string>
+    <string name="backup_restore_bad_missing_fmt">%1$s (missing)</string>
+    <string name="backup_restore_bad_size_fmt">%1$s (size %2$d≠%3$d)</string>
+    <string name="backup_restore_bad_md5_fmt">%1$s (md5 mismatch)</string>
+    <string name="backup_restore_err_selfcheck_fmt">⚠ This backup failed its own check, so the restore was refused (your data was not touched):\n%1$s</string>
+    <!--␣缩进一律**不写进资源**（aapt2 会把前导/尾随空白剥掉，判据 RES-04）——
+        报告各行的缩进由 Java 侧加（那是排版，不是文案）。-->
+    <string name="backup_restore_more_fmt">…%1$d in all\n</string>
+    <string name="backup_restore_bullet_fmt">· %1$s\n</string>
+    <string name="backup_restore_err_line_fmt">· %1$s: %2$s\n</string>
+    <string name="backup_restore_ok_head_fmt">✅ Restored from the snapshot into slot \"%1$s\"\n</string>
+    <string name="backup_restore_ok_snapshot_fmt">Snapshot: %1$s\n</string>
+    <string name="backup_restore_ok_files_fmt">Files: %1$d / %2$d (%3$s)\n</string>
+    <string name="backup_restore_ok_where_fmt">Where: %1$s\n</string>
+    <string name="backup_restore_partial_fmt">\n⚠ Some files were not written:\n%1$s</string>
+    <string name="backup_err_not_manifest">Not an MDT backup manifest</string>
+    <string name="backup_err_slot_name_invalid">Slot name not allowed</string>
+    <string name="backup_err_clone_target_current_fmt">\"%1$s\" is the current slot, so it cannot be the clone target.\n(the source slot content would mix with it and could never be separated again)</string>
+    <string name="backup_err_slot_backups_delete_fmt">Could not fully delete the backup directory: %1$s</string>
     <string name="export_slot_title_fmt">Export whole slot \"%1$s\"</string>
     <string name="export_slot_msg_fmt">Packs the whole slot into one zip: saves · maps · schematics · mods · settings.%1$s\n\nThe game can import this package too (Settings → Data → Import data).</string>
     <string name="export_slot_playing">\n\n⚠️ The game is running; the export may capture a half-written save.</string>

@@ -316,22 +316,27 @@ public final class Backup {
      * **返回 {@link RestoreResult}**：成败是一个**布尔值**，不是从报告文案里读出来的。
      */
     public static RestoreResult restore(Context ctx, String slot, Snapshot ss) {
-        if (ss == null || ss.dir == null || !ss.dir.exists()) return fail("⚠ 快照不存在");
+        if (ss == null || ss.dir == null || !ss.dir.exists()) {
+            return fail(ctx.getString(R.string.backup_restore_err_no_snapshot));
+        }
         if (gameAliveOn(ctx, slot)) {
-            return fail("⚠ 游戏进程还在运行（当前槽正被游戏占用）——\n请先退出游戏再恢复。未做任何改动。");
+            return fail(ctx.getString(R.string.backup_restore_err_game_running));
         }
         List<Entry> entries;
         try {
-            entries = readEntries(new File(ss.dir, MANIFEST));
+            entries = readEntries(ctx, new File(ss.dir, MANIFEST));
         } catch (IOException e) {
-            return fail("⚠ 读不了快照清单：" + e.getMessage());
+            return fail(ctx.getString(R.string.backup_restore_err_manifest_fmt, e.getMessage()));
         }
-        if (entries.isEmpty()) return fail("⚠ 快照清单是空的");
+        if (entries.isEmpty()) {
+            return fail(ctx.getString(R.string.backup_restore_err_manifest_empty));
+        }
 
         File dstRoot = Data.dirOf(ctx, slot);
-        if (dstRoot == null) return fail("⚠ 拿不到目标槽目录");
+        if (dstRoot == null) return fail(ctx.getString(R.string.backup_restore_err_no_dst));
         if (!dstRoot.exists() && !dstRoot.mkdirs()) {
-            return fail("⚠ 创建目标目录失败：" + dstRoot.getAbsolutePath());
+            return fail(ctx.getString(R.string.backup_restore_err_mkdir_fmt,
+                    dstRoot.getAbsolutePath()));
         }
 
         int ok = 0;
@@ -345,7 +350,8 @@ public final class Backup {
                     pool.getTo(e.hash, to, true);
                     ok++;
                 } catch (IOException ex) {
-                    errs.append("  · ").append(e.rel).append("：").append(ex.getMessage()).append('\n');
+                    errs.append("  ").append(ctx.getString(R.string.backup_restore_err_line_fmt,
+                            e.rel, ex.getMessage()));
                 }
             }
         } else {
@@ -354,17 +360,30 @@ public final class Backup {
             List<String> bad = new ArrayList<>();
             for (Entry e : entries) {
                 File f = new File(srcRoot, e.rel);
-                if (!f.isFile()) { bad.add(e.rel + "（缺失）"); continue; }
-                if (f.length() != e.size) {
-                    bad.add(e.rel + "（大小 " + f.length() + "≠" + e.size + "）");
+                if (!f.isFile()) {
+                    bad.add(ctx.getString(R.string.backup_restore_bad_missing_fmt, e.rel));
                     continue;
                 }
-                if (!Util.md5(f).equals(e.hash)) bad.add(e.rel + "（md5 不符）");
+                if (f.length() != e.size) {
+                    bad.add(ctx.getString(R.string.backup_restore_bad_size_fmt,
+                            e.rel, f.length(), e.size));
+                    continue;
+                }
+                if (!Util.md5(f).equals(e.hash)) {
+                    bad.add(ctx.getString(R.string.backup_restore_bad_md5_fmt, e.rel));
+                }
             }
             if (!bad.isEmpty()) {
-                StringBuilder sb = new StringBuilder("⚠ 这份备份自身校验没过，已拒绝恢复（没有动你的数据）：\n");
-                for (int i = 0; i < bad.size() && i < 8; i++) sb.append("  · ").append(bad.get(i)).append('\n');
-                if (bad.size() > 8) sb.append("  … 共 ").append(bad.size()).append(" 项\n");
+                StringBuilder sb = new StringBuilder(
+                        ctx.getString(R.string.backup_restore_err_selfcheck_fmt, ""));
+                for (int i = 0; i < bad.size() && i < 8; i++) {
+                    sb.append("  ").append(ctx.getString(R.string.backup_restore_bullet_fmt,
+                            bad.get(i)));
+                }
+                if (bad.size() > 8) {
+                    sb.append("  ").append(ctx.getString(R.string.backup_restore_more_fmt,
+                            bad.size()));
+                }
                 return fail(sb.toString());
             }
             for (Entry e : entries) {
@@ -374,18 +393,22 @@ public final class Backup {
                     copyRecursive(from, to);
                     ok++;
                 } catch (IOException ex) {
-                    errs.append("  · ").append(e.rel).append("：").append(ex.getMessage()).append('\n');
+                    errs.append("  ").append(ctx.getString(R.string.backup_restore_err_line_fmt,
+                            e.rel, ex.getMessage()));
                 }
             }
         }
 
         StringBuilder sb = new StringBuilder();
-        sb.append("✅ 已从快照恢复到槽「").append(slot).append("」\n");
-        sb.append("    快照：").append(ss.title()).append('\n');
-        sb.append("    文件：").append(ok).append(" / ").append(entries.size())
-                .append("  （").append(Util.formatSize(ss.bytes)).append("）\n");
-        sb.append("    位置：").append(dstRoot.getAbsolutePath()).append('\n');
-        if (ok < entries.size()) sb.append("\n⚠ 有文件没写成功：\n").append(errs);
+        sb.append(ctx.getString(R.string.backup_restore_ok_head_fmt, slot));
+        sb.append("    ").append(ctx.getString(R.string.backup_restore_ok_snapshot_fmt, ss.title()));
+        sb.append("    ").append(ctx.getString(R.string.backup_restore_ok_files_fmt, ok,
+                entries.size(), Util.formatSize(ss.bytes)));
+        sb.append("    ").append(ctx.getString(R.string.backup_restore_ok_where_fmt,
+                dstRoot.getAbsolutePath()));
+        if (ok < entries.size()) {
+            sb.append(ctx.getString(R.string.backup_restore_partial_fmt, errs.toString()));
+        }
         Log.i(TAG, "restore slot=" + slot + " ok=" + ok + "/" + entries.size()
                 + " v=" + ss.version);
         return new RestoreResult(true, sb.toString());
@@ -446,14 +469,13 @@ public final class Backup {
         String err = Data.createSlot(ctx, rawDst);
         if (err != null) return err;
         String dst = Data.sanitizeSlot(rawDst);
-        if (dst == null) return "槽名不合法";
+        if (dst == null) return ctx.getString(R.string.backup_err_slot_name_invalid);
         // ⚠️⚠️ 必须自己再判一次"目标 = 当前槽"：`Data.createSlot` 对当前槽是**返回成功**的，
         //   因为它的语义是"当前槽不算新建，本体由启动时按需 mkdirs"。
         //   若放过这一步，`restore` 会把源槽内容**合并写进当前槽**（restore 只增不删）
         //   —— 两份数据混在一起、再也分不开，是本功能能造成的最坏破坏。
         if (dst.equals(Data.currentSlot(ctx))) {
-            return "「" + dst + "」是当前槽，不能作为克隆的目标。\n"
-                    + "（源槽的内容会与它混在一起，之后就分不开了）";
+            return ctx.getString(R.string.backup_err_clone_target_current_fmt, dst);
         }
         try {
             Snapshot ss = create(ctx, src, label);
@@ -481,7 +503,9 @@ public final class Backup {
     public static String deleteSlotBackups(Context ctx, String slot) {
         File d = slotDir(ctx, slot);
         if (!d.exists()) return null;
-        if (!Data.deleteTree(d)) return "备份目录删除未完全成功：" + d.getAbsolutePath();
+        if (!Data.deleteTree(d)) {
+            return ctx.getString(R.string.backup_err_slot_backups_delete_fmt, d.getAbsolutePath());
+        }
         scheduleGc(ctx);
         return null;
     }
@@ -662,7 +686,7 @@ public final class Backup {
                 MsavMeta m = MsavMeta.read(pick);
                 return m.ok ? MsavText.shortLine(ctx, m, true) : "";   // 快照里的都是存档
             }
-            List<Entry> es = readEntries(new File(ss.dir, MANIFEST));
+            List<Entry> es = readEntries(ctx, new File(ss.dir, MANIFEST));
             Entry best = null;
             for (Entry e : es) {
                 if (e.rel == null || !e.rel.startsWith("saves/")) continue;
@@ -753,7 +777,7 @@ public final class Backup {
                 }
                 List<Entry> entries;
                 try {
-                    entries = readEntries(mf);
+                    entries = readEntries(ctx, mf);
                 } catch (IOException e) {
                     failed++;
                     notes.append("  · ").append(snap.getName())
@@ -937,11 +961,11 @@ public final class Backup {
     }
 
     /** 读文件表（v1 的 hash 列是 md5，v2 是 sha256 —— 由清单头区分，这里只搬字节） */
-    private static List<Entry> readEntries(File manifest) throws IOException {
+    private static List<Entry> readEntries(Context ctx, File manifest) throws IOException {
         List<Entry> out = new ArrayList<>();
         String text = Util.readText(manifest);
         if (text == null || !(text.startsWith(MARK2) || text.startsWith(MARK1))) {
-            throw new IOException("不是 MDT 备份清单");
+            throw new IOException(ctx.getString(R.string.backup_err_not_manifest));
         }
         boolean inTable = false;
         for (String line : text.split("\n")) {
