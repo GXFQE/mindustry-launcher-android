@@ -319,14 +319,9 @@ public final class Mods {
          *   ⇒ 只翻译第 ② 类（与 {@link MsavMeta#userReason()} / {@link SettingsBin.Result#userReason()} 同一套路）。
          * ⚠️ **不改 {@link #metaError} 原文**：落盘报告与自检看的仍是那个字段。
          */
-        public String metaReason() {
-            String e = metaError == null ? "" : metaError.trim();
-            if (e.isEmpty()) return "说明文件读不出来";
-            if (e.matches("^[A-Za-z_$][A-Za-z0-9_$]*(Exception|Error)\\b.*")) {
-                return "说明文件的格式看不懂，游戏会跳过它";
-            }
-            return e;
-        }
+        // ★ 2026-10-05（P3）：这里的 `metaReason()` **已搬走** —— `Mods.Info` 是纯数据类、
+        //   拿不到 `Context`，而这两句会**直接显示在模组详情里**（`mods_warn_meta_fmt`）
+        //   ⇒ 现在走 `ModsText.infoMetaReason(ctx, m)`（按"异常形态"翻译，我们自己的中文原样透传）。
 
         /**
          * 是否"支持多人游戏" —— **用游戏自己的判据与自己的标签**：

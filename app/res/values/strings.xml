@@ -511,6 +511,9 @@
     <string name="mods_badge_incomplete_deps">dep broken</string>
     <string name="mods_badge_unsupported">version</string>
     <string name="mods_badge_disabled">off</string>
+    <!-- 模组说明文件读不出来时的"人话版"原因（P3：原 `Mods.Info.metaReason()`） -->
+    <string name="mods_meta_no_file">the description file could not be read</string>
+    <string name="mods_meta_bad_format">the description file has a format the game cannot understand, so it will skip this mod</string>
     <!--
       ══ 六道加载门（P3）：`Mods.gates` 原来在 Java 里拼中文 ════════════════
       ★ `note` 只在**失败**时给（通过了就只画一行 ✅）；`label` 里**不塞数据**，数据一律进 note。

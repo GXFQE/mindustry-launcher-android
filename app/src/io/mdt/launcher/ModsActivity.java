@@ -734,7 +734,7 @@ public class ModsActivity extends BaseActivity {
         List<String> warns = new ArrayList<>();
         if (broken || m.metaError != null) {
             // ★ 走 metaReason()（异常类名/全限定名要翻成白话），不是原始 metaError（那是给排查看的）
-            warns.add(getString(R.string.mods_warn_meta_fmt, m.metaReason()));
+            warns.add(getString(R.string.mods_warn_meta_fmt, ModsText.infoMetaReason(this, m)));
         } else {
             if (!Mods.isAtLeast(mTarget.build, mTarget.revision, m.minGameVersion)) {
                 warns.add(getString(R.string.mods_warn_version_fmt,
@@ -896,7 +896,8 @@ public class ModsActivity extends BaseActivity {
             // 读不出说明文件：能说的只有"读不出来 + 为什么"；门禁那几关**根本没有依据**，别摆
             sb.append(getString(R.string.mods_detail_size_fmt,
                     Util.formatSize(m.bytes), formOf(m))).append('\n');
-            sb.append('\n').append(getString(R.string.mods_warn_meta_fmt, m.metaReason()));
+            sb.append('\n').append(getString(R.string.mods_warn_meta_fmt,
+                    ModsText.infoMetaReason(this, m)));
             return sb.toString();
         }
         // ★ 第 85 轮：模组**自己写的"这是什么"**原来从没上过界面 ——

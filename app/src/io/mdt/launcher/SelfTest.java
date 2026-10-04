@@ -2301,10 +2301,10 @@ public final class SelfTest {
             techInfo.metaError = "ParseException: io.mdt.launcher.Hjson$ParseException: boom";
             Mods.Info plainInfo = new Mods.Info();
             plainInfo.metaError = "包里没有说明文件（mod.json 之类）";
-            ok(stat, L, !techInfo.metaReason().contains("Exception")
-                            && !techInfo.metaReason().equals(techInfo.metaError)
-                            && plainInfo.metaReason().equals(plainInfo.metaError),
-                    "★原因翻译（Info.metaReason）：异常形态 ⇒ 「" + techInfo.metaReason()
+            ok(stat, L, !ModsText.infoMetaReason(ctx, techInfo).contains("Exception")
+                            && !ModsText.infoMetaReason(ctx, techInfo).equals(techInfo.metaError)
+                            && ModsText.infoMetaReason(ctx, plainInfo).equals(plainInfo.metaError),
+                    "★原因翻译（Info.metaReason）：异常形态 ⇒ 「" + ModsText.infoMetaReason(ctx, techInfo)
                             + "」，中文判断原样透传（元断言：不是恒改）");
             ok(stat, L, s.ignored.contains("junkdir"),
                     "没有 meta 的目录进「游戏不加载」清单（与「加载失败」分开）");

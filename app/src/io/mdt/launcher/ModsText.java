@@ -50,6 +50,23 @@ final class ModsText {
     }
 
     /**
+     * 模组**说明文件**读不出来时的"人话版"原因（原来在 `Mods.Info.metaReason()` 里）。
+     *
+     * ★ 为什么搬出来：`Mods.Info` 是纯数据类、拿不到 `Context`，而这两句会经
+     *   `mods_warn_meta_fmt` **直接显示在模组详情里** ⇒ 英文界面下会冒中文。
+     * ⚠️ 与 `SettingsText.userReason` 同一条纪律：**只翻译"异常形态"**，
+     *   我们自己写的中文（`metaError` 原文）**原样透传**（那是给排查看的）。
+     */
+    static String infoMetaReason(Context c, Mods.Info m) {
+        String e = m == null || m.metaError == null ? "" : m.metaError.trim();
+        if (e.isEmpty()) return c.getString(R.string.mods_meta_no_file);
+        if (e.matches("^[A-Za-z_$][A-Za-z0-9_$]*(Exception|Error)\\b.*")) {
+            return c.getString(R.string.mods_meta_bad_format);
+        }
+        return e;
+    }
+
+    /**
      * 模组包**导入 / 跨槽复制**的失败原因（`Mods.PackResult`）。
      *
      * 🔴 与 `SettingsText.userReason` 同一条纪律：**第一层不许夹带"原因"**
