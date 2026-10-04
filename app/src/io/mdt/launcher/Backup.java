@@ -148,10 +148,9 @@ public final class Backup {
             return stamp(created) + (label.isEmpty() ? "" : "   " + label);
         }
 
-        public String subtitle() {
-            return count + " 个文件 · " + Util.formatSize(bytes)
-                    + (label.isEmpty() ? "" : "\n" + label);
-        }
+        // ⚠️ 这里原来还有一个 `subtitle()`（`N 个文件 · 体积`）—— 2026-10-05 核实**全库无调用**
+        //    （快照行的统计段早已统一走资源，见 SavesActivity 里那条注释）⇒ 当死代码删掉。
+        //    留着它只会让 SRC-02 的台账里多一条"其实没人看的中文"。
 
         /** 还是旧格式（内容自成一份），会被自动迁移 */
         public boolean legacy() {
@@ -186,24 +185,24 @@ public final class Backup {
     public static Snapshot create(Context ctx, String slot, String label) throws IOException {
         boolean live = slot.equals(Data.currentSlot(ctx));
         if (live && Data.gameAlive(ctx)) {
-            throw new IOException("游戏进程还在运行（当前槽正被游戏占用）。\n"
-                    + "请先退出游戏再备份，否则备份内容可能不一致。");
+            throw new IOException(ctx.getString(R.string.backup_err_game_running));
         }
         File src = Data.dirOf(ctx, slot);
         if (src == null || !src.exists()) {
-            throw new IOException("槽「" + slot + "」还没有数据目录，没有可备份的内容。");
+            throw new IOException(ctx.getString(R.string.backup_err_no_data_fmt, slot));
         }
 
         File parent = slotDir(ctx, slot);
         if (!parent.exists() && !parent.mkdirs()) {
-            throw new IOException("创建备份目录失败：" + parent.getAbsolutePath());
+            throw new IOException(ctx.getString(R.string.backup_err_mkdir_fmt,
+                    parent.getAbsolutePath()));
         }
         long now = System.currentTimeMillis();
         File dest = new File(parent, stamp(now));
         for (int i = 1; dest.exists() && i < 100; i++) {
             dest = new File(parent, stamp(now) + "-" + i);
         }
-        if (dest.exists()) throw new IOException("同一秒内已有同名快照，请稍后重试");
+        if (dest.exists()) throw new IOException(ctx.getString(R.string.backup_err_same_second));
 
         Snapshot ss = new Snapshot();
         ss.dir = dest;
@@ -242,13 +241,13 @@ public final class Backup {
                     ss.bytes += e.size;
                 }
                 if (ss.count == 0) {
-                    throw new IOException("槽「" + slot + "」里没有可备份的内容。\n"
-                            + src.getAbsolutePath() + "\n"
-                            + "是空的，或只剩 " + join(Data.SLOT_EXCLUDE, "、")
-                            + " 这类游戏自己会重建的东西。");
+                    throw new IOException(ctx.getString(R.string.backup_err_nothing_fmt,
+                            slot, src.getAbsolutePath(),
+                            join(Data.SLOT_EXCLUDE, ctx.getString(R.string.list_join_sep))));
                 }
                 if (!dest.mkdirs() && !dest.isDirectory()) {
-                    throw new IOException("创建快照目录失败：" + dest.getAbsolutePath());
+                    throw new IOException(ctx.getString(R.string.backup_err_snapshot_mkdir_fmt,
+                            dest.getAbsolutePath()));
                 }
                 writeManifest(dest, ss, entries);
             }
@@ -288,8 +287,12 @@ public final class Backup {
      * ★ 删完**立刻调度一次 GC** —— 对象池是全局的，不回收的话快照删了空间还在。
      */
     public static String delete(Context ctx, Snapshot ss) {
-        if (ss == null || ss.dir == null || !ss.dir.exists()) return "快照不存在";
-        if (!Data.deleteTree(ss.dir)) return "删除未完全成功：" + ss.dir.getAbsolutePath();
+        if (ss == null || ss.dir == null || !ss.dir.exists()) {
+            return ctx.getString(R.string.backup_err_snapshot_missing);
+        }
+        if (!Data.deleteTree(ss.dir)) {
+            return ctx.getString(R.string.backup_err_delete_partial_fmt, ss.dir.getAbsolutePath());
+        }
         File p = ss.dir.getParentFile();
         if (p != null && p.listFiles() != null && p.listFiles().length == 0) p.delete();
         scheduleGc(ctx);

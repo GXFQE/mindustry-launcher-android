@@ -31,6 +31,10 @@
     <!-- F2：版本列表行（槽徽标 / 可见槽按钮 / 同槽冲突 / 继续上次） -->
     <string name="row_slot_btn">槽</string>
     <string name="row_conflict_fmt">⚠ 与%1$s共用此槽，存档会互相覆盖</string>
+    <!-- 同槽组里"对手"的说法（P3）：2 个版本只点一个对手，3 个及以上把数量说出来 -->
+    <string name="versions_peer_one_fmt">「%1$s」</string>
+    <string name="versions_peer_more_fmt">「%1$s」等 %2$d 个版本</string>
+    <string name="versions_imported_copy">导入副本</string>
     <!--
       F4①c：fork 行的**基座版本尾注**，接在主标题的版本号后面（如
       `MindustryX  2026.09.X37（基于 160.1）`）。
@@ -508,6 +512,22 @@
     <string name="slotzip_err_temp_gone_fmt">临时包不见了：%1$s</string>
     <string name="slotzip_err_dir_failed_fmt">建目录失败：%1$s</string>
     <string name="slotzip_err_escape_fmt">这个 zip 里有【越出目录】的条目名，已整体拒绝导入：\n%1$s\n\n（正常的 zip 不会有这种条目；它多半是被改过的恶意包）</string>
+
+    <!--
+      ══ 备份/恢复的失败原因与结果（P3，先做创建/删除那一段）════════════════
+      ★ `Backup.create` 抛的 `IOException`、`Backup.delete` 的返回值**就是弹窗正文**。
+      ★ 原来在 Java 里拼中文 + **碎片拼接** ⇒ 一律**整句 + %n$**。
+      ⚠️ `list_join_sep` 是**列表分隔符**（中文用顿号；英文那份在默认目录里写成 `,\u0020`）。
+    -->
+    <string name="list_join_sep">、</string>
+    <string name="backup_err_game_running">游戏进程还在运行（当前槽正被游戏占用）。\n请先退出游戏再备份，否则备份内容可能不一致。</string>
+    <string name="backup_err_no_data_fmt">槽「%1$s」还没有数据目录，没有可备份的内容。</string>
+    <string name="backup_err_mkdir_fmt">创建备份目录失败：%1$s</string>
+    <string name="backup_err_same_second">同一秒内已有同名快照，请稍后重试</string>
+    <string name="backup_err_nothing_fmt">槽「%1$s」里没有可备份的内容。\n%2$s\n是空的，或只剩 %3$s 这类游戏自己会重建的东西。</string>
+    <string name="backup_err_snapshot_mkdir_fmt">创建快照目录失败：%1$s</string>
+    <string name="backup_err_snapshot_missing">快照不存在</string>
+    <string name="backup_err_delete_partial_fmt">删除未完全成功：%1$s</string>
     <string name="export_slot_title_fmt">导出整槽「%1$s」</string>
     <string name="export_slot_msg_fmt">把整个槽打包成一个 zip：存档 · 地图 · 蓝图 · 模组 · 设置。%1$s\n\n游戏自己也能导入这个包（设置 → 数据 → 导入数据）。</string>
     <string name="export_slot_playing">\n\n⚠️ 游戏正在运行，此刻导出可能拿到写了一半的存档。</string>

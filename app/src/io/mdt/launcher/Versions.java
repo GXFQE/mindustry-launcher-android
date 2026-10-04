@@ -109,16 +109,19 @@ public final class Versions {
      *   ⚠️ 所以这里的判据是 **`total - 1`**，而不是 `total`。改这个数的时候，
      *      先想清楚"谁在说这句话" —— 这是本条注释存在的全部理由。
      *
-     * ⚠️ 书名号**含在返回值里**（不在 `row_conflict_fmt` 里）—— 否则"等 N 个版本"会跑到
-     *   书名号**外面**去，变成 `与「A」等 3 个版本」共用此槽`。这个错位很容易写出来，
-     *   所以抽成纯函数并配自检（见 SelfTest ⑥c）。
+     * ⚠️ **引号（中文书名号 / 英文双引号）含在返回值里**（不在 `row_conflict_fmt` 里）—— 否则
+     *   "等 N 个版本"会跑到书名号**外面**去，变成 `与「A」等 3 个版本」共用此槽`。
+     *   ★ P3 之后这两句是**各自的整句资源**（`versions_peer_one_fmt` / `versions_peer_more_fmt`），
+     *     所以"引号跑到外面"这件事在结构上不可能再发生；判据仍在（见 SelfTest ⑥c）。
      *
      * @param firstName 对手的 {@link Entry#displayName()}（组内第一个不是自己的）
      * @param total     该槽里**不同的版本数**（含自己，≥2）；单看"条目数"会把同一版本的
      *                  多个副本算成好几个版本 —— 见 {@link #conflictPeers} 的口径说明
      */
-    public static String conflictPeerDesc(String firstName, int total) {
-        return "「" + firstName + "」" + (total > 2 ? "等 " + (total - 1) + " 个版本" : "");
+    public static String conflictPeerDesc(Context ctx, String firstName, int total) {
+        return total > 2
+                ? ctx.getString(R.string.versions_peer_more_fmt, firstName, total - 1)
+                : ctx.getString(R.string.versions_peer_one_fmt, firstName);
     }
 
     /**
@@ -473,8 +476,8 @@ public final class Versions {
          * 「（导入）」之后**弹窗侧唯一还能说明"这是导入的私有副本"的地方
          * （配合 `detail_imported_note`），别把这两行改掉。
          */
-        public String subtitle() {
-            return (imported ? "导入副本" : pkg) + "\n" + apkPath
+        public String subtitle(Context ctx) {
+            return (imported ? ctx.getString(R.string.versions_imported_copy) : pkg) + "\n" + apkPath
                     + " (" + Util.formatSize(apkSize) + ")";
         }
 

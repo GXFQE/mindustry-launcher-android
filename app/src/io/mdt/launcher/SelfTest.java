@@ -898,19 +898,19 @@ public final class SelfTest {
         L.add("── ⑥c 同槽冲突提示（对手描述） ──");
 
         // ① 纯函数本身：2 个点一个对手；3 个及以上把**数量**说出来
-        ok(stat, L, "「A」".equals(Versions.conflictPeerDesc("A", 2)),
-                "2 个版本 ⇒ 只点一个对手：" + Versions.conflictPeerDesc("A", 2));
-        ok(stat, L, "「A」等 2 个版本".equals(Versions.conflictPeerDesc("A", 3)),
-                "3 个版本 ⇒ 说「等 2 个」（除自己之外）：" + Versions.conflictPeerDesc("A", 3));
-        ok(stat, L, "「A」等 3 个版本".equals(Versions.conflictPeerDesc("A", 4)),
-                "4 个版本 ⇒ 数量跟着走：" + Versions.conflictPeerDesc("A", 4));
+        ok(stat, L, "「A」".equals(Versions.conflictPeerDesc(ctx, "A", 2)),
+                "2 个版本 ⇒ 只点一个对手：" + Versions.conflictPeerDesc(ctx, "A", 2));
+        ok(stat, L, "「A」等 2 个版本".equals(Versions.conflictPeerDesc(ctx, "A", 3)),
+                "3 个版本 ⇒ 说「等 2 个」（除自己之外）：" + Versions.conflictPeerDesc(ctx, "A", 3));
+        ok(stat, L, "「A」等 3 个版本".equals(Versions.conflictPeerDesc(ctx, "A", 4)),
+                "4 个版本 ⇒ 数量跟着走：" + Versions.conflictPeerDesc(ctx, "A", 4));
 
         // ② ★★ 硬断言：**说出来的数 == total - 1**，且 total 本身绝不出现。
         //    只验形态（"有没有等 N 个"）测不出"N 到底是几" —— 这正是本轮改的那个错。
         boolean peerOk = true;
         StringBuilder peerSeen = new StringBuilder();
         for (int total = 3; total <= 6; total++) {
-            String d = Versions.conflictPeerDesc("A", total);
+            String d = Versions.conflictPeerDesc(ctx, "A", total);
             int got = shownPeerCount(d);
             if (got != total - 1) peerOk = false;
             if (d.contains(String.valueOf(total))) peerOk = false;   // 总数（含自己）不许露面
@@ -925,8 +925,8 @@ public final class SelfTest {
                 "元断言：旧写法（3 个版本写「等 3 个」）会被判死 —— 判据不是恒真");
 
         // ③ 与 fmt 实拼后的形态
-        String c2 = ctx.getString(R.string.row_conflict_fmt, Versions.conflictPeerDesc("A", 2));
-        String c3 = ctx.getString(R.string.row_conflict_fmt, Versions.conflictPeerDesc("A", 3));
+        String c2 = ctx.getString(R.string.row_conflict_fmt, Versions.conflictPeerDesc(ctx, "A", 2));
+        String c3 = ctx.getString(R.string.row_conflict_fmt, Versions.conflictPeerDesc(ctx, "A", 3));
         L.add("    2 个版本 ⇒ " + c2);
         L.add("    3 个版本 ⇒ " + c3);
         ok(stat, L, c2.contains("「A」") && !c2.contains("等 "),
@@ -998,7 +998,7 @@ public final class SelfTest {
         ok(stat, L, p2.size() == 1,
                 "对 146 而言两个 159.7 副本折成 1 个对手");
         String c = ctx.getString(R.string.row_conflict_fmt,
-                Versions.conflictPeerDesc(p2.get(0).displayName(), p2.size() + 1));
+                Versions.conflictPeerDesc(ctx, p2.get(0).displayName(), p2.size() + 1));
         L.add("    实拼 ⇒ " + c);
         ok(stat, L, !c.contains("等 "),
                 "★ 副本不虚报：146 那行不写「等 2 个版本」（那是条目数，不是版本数）");
@@ -3340,6 +3340,27 @@ public final class SelfTest {
             String zNoDirEn = enCtx.getString(R.string.slotzip_err_no_slot_dir_fmt, "s");
             ok(stat, L, zNoDirEn.contains("\"s\"") && !zNoDirEn.contains("\\"),
                     "★P3（英文）：zip 那句槽名带引号且不留反斜杠：「" + zNoDirEn + "」");
+
+            // ★★ P3 第四批：备份创建/删除的报错（`Backup.create` 抛的 IOException / `delete` 的返回值）。
+            String bNoData = ctx.getString(R.string.backup_err_no_data_fmt, "s");
+            String bMkdir = ctx.getString(R.string.backup_err_mkdir_fmt, "/b");
+            String bNothing = ctx.getString(R.string.backup_err_nothing_fmt, "s", "/src", "cfg");
+            String bSnapMk = ctx.getString(R.string.backup_err_snapshot_mkdir_fmt, "/sm");
+            String bDel = ctx.getString(R.string.backup_err_delete_partial_fmt, "/d");
+            ok(stat, L, bNoData.contains("s") && bMkdir.contains("/b")
+                            && bNothing.contains("s") && bNothing.contains("/src")
+                            && bNothing.contains("cfg") && bSnapMk.contains("/sm")
+                            && bDel.contains("/d"),
+                    "★P3：备份创建/删除那 5 条带占位符的报错按真参数实拼（含 1 条**三个**参数）");
+            // ★ **列表分隔符**：中文顿号 / 英文「逗号 + 空格」—— 英文那份写的是 `\u0020`
+            //   （白名单 U0020_WHITELIST 里"确有必要"的那一类），这里验它**真的进了句子**。
+            String sepZh = ctx.getString(R.string.list_join_sep);
+            String sepEn = enCtx.getString(R.string.list_join_sep);
+            ok(stat, L, !sepZh.equals(sepEn) && sepEn.endsWith(" ")
+                            && enCtx.getString(R.string.backup_err_nothing_fmt, "s", "/src",
+                                    "cfg" + sepEn + "natives").contains("cfg, natives"),
+                    "★P3：列表分隔符两套语言各一份（中「" + sepZh + "」/ 英「" + sepEn
+                            + "」），英文那个**带空格**且真的进了句子");
         } catch (Throwable t) {
             ok(stat, L, false, "存档体检用例自身异常：" + t);
         } finally {

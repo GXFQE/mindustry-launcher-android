@@ -1497,7 +1497,8 @@ public class MainActivity extends BaseActivity {
                 List<Versions.Entry> peers = Versions.conflictPeers(e, l);
                 if (peers.isEmpty()) continue;
                 mConflict.put(e.key(), new Share(
-                        Versions.conflictPeerDesc(peers.get(0).displayName(), peers.size() + 1),
+                        Versions.conflictPeerDesc(MainActivity.this, peers.get(0).displayName(),
+                                peers.size() + 1),
                         anyExplicit));
             }
         }
@@ -1856,7 +1857,7 @@ public class MainActivity extends BaseActivity {
         String upLine = (up != null) ? getString(R.string.detail_upstream_fmt, up) : "";
         // ★ F8：已装版本也给"只读事实"（构建号 / 架构 / 位置 / 大小），并**说明为什么不给删**。
         //   已装 = 系统里那一份，删它会连累别的用同一份安装的应用 ⇒ 只读是**设计**，不是漏做。
-        final String head = e.subtitle() + rawLine + upLine + slotLine
+        final String head = e.subtitle(this) + rawLine + upLine + slotLine
                 + getString(e.imported ? R.string.detail_imported_note : R.string.detail_installed_note);
         AlertDialog.Builder b = new AlertDialog.Builder(this)
                 .setTitle(e.displayName())

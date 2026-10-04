@@ -31,6 +31,10 @@
     <!-- F2：版本列表行（槽徽标 / 可见槽按钮 / 同槽冲突 / 继续上次） -->
     <string name="row_slot_btn">Slot</string>
     <string name="row_conflict_fmt">⚠ Shares this slot with %1$s; saves overwrite each other</string>
+    <!-- 同槽组里"对手"的说法（P3）：2 个版本只点一个对手，3 个及以上把数量说出来 -->
+    <string name="versions_peer_one_fmt">\"%1$s\"</string>
+    <string name="versions_peer_more_fmt">\"%1$s\" and %2$d more versions</string>
+    <string name="versions_imported_copy">Imported copy</string>
     <!--
       F4①c：fork 行的**基座版本尾注**，接在主标题的版本号后面（如
       `MindustryX  2026.09.X37（基于 160.1）`）。
@@ -523,6 +527,24 @@
     <string name="slotzip_err_temp_gone_fmt">The temporary package is gone: %1$s</string>
     <string name="slotzip_err_dir_failed_fmt">Could not create the directory: %1$s</string>
     <string name="slotzip_err_escape_fmt">This zip contains an entry name that escapes the directory, so the whole import was refused:\n%1$s\n\n(a normal zip would not have such an entry; it is most likely a modified, malicious package)</string>
+
+    <!--
+      ══ 备份/恢复的失败原因与结果（P3，先做创建/删除那一段）════════════════
+      ★ `Backup.create` 抛的 `IOException`、`Backup.delete` 的返回值**就是弹窗正文**。
+      ★ 原来在 Java 里拼中文，含**碎片拼接**（`"槽「" + slot + "」还没有数据目录…"`）
+        ⇒ 一律**整句资源 + %n$**。
+      ⚠️ 英文里的双引号写 `\"`（RES-12）；`list_join_sep` 是**列表分隔符**（英文要带一个空格，
+        所以写 `,\u0020` 并进了 U0020 白名单 —— 这是"确有必要"的那一类）。
+    -->
+    <string name="list_join_sep">,\u0020</string>
+    <string name="backup_err_game_running">The game process is still running (this slot is in use by the game).\nExit the game before backing up, or the backup may not match what you see.</string>
+    <string name="backup_err_no_data_fmt">Slot \"%1$s\" has no data directory yet, so there is nothing to back up.</string>
+    <string name="backup_err_mkdir_fmt">Could not create the backup directory: %1$s</string>
+    <string name="backup_err_same_second">A snapshot with that name already exists in this second — try again in a moment</string>
+    <string name="backup_err_nothing_fmt">Slot \"%1$s\" has nothing to back up.\n%2$s\nIt is empty, or only has %3$s, which the game recreates by itself.</string>
+    <string name="backup_err_snapshot_mkdir_fmt">Could not create the snapshot directory: %1$s</string>
+    <string name="backup_err_snapshot_missing">The snapshot does not exist</string>
+    <string name="backup_err_delete_partial_fmt">Deletion did not fully succeed: %1$s</string>
     <string name="export_slot_title_fmt">Export whole slot \"%1$s\"</string>
     <string name="export_slot_msg_fmt">Packs the whole slot into one zip: saves · maps · schematics · mods · settings.%1$s\n\nThe game can import this package too (Settings → Data → Import data).</string>
     <string name="export_slot_playing">\n\n⚠️ The game is running; the export may capture a half-written save.</string>
