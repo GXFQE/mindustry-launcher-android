@@ -1,93 +1,122 @@
-# MDT 启动器 —— Mindustry（像素工厂）安卓多版本启动器
+English · [简体中文](README.zh.md)
 
-官方的 Mindustry 安卓版**一次只能装一个版本**，装第二个就把第一个覆盖掉；存档也只有一份，
-换版本玩就等于把旧存档顶掉。这个启动器给每个版本一个**独立的「存档槽」** ——
-多个版本同时装着，各自的**存档 / 地图 / 模组**互不干扰。
+# MDT Launcher — a multi-version launcher for Mindustry on Android
 
-> ⚠️ **目前只有预览版（Pre-release），功能还没做完** —— APK 挂在
-> [Releases](https://github.com/GXFQE/mindustry-launcher-android/releases)
-> （标着 Pre-release 的那个），也可以自己构建，见 [构建](docs/DEVELOPING.md#构建)。
-> 预览版意味着：界面、数据格式、功能都还可能变，**别拿它当稳定版用**。
+The official Android build of Mindustry **only lets you keep one version installed** — install a
+second one and it overwrites the first. There is a single set of saves too, so switching versions
+pushes the old progress aside. This launcher gives every version its own **save slot**: several
+versions installed side by side, each with separate **saves / maps / mods**.
 
-## 它解决什么
+> ⚠️ **Pre-release only — the feature set is not finished.** The APK is on
+> [Releases](https://github.com/GXFQE/mindustry-launcher-android/releases) (the one marked
+> Pre-release); you can also build it yourself — see [Building](docs/DEVELOPING.md#构建)
+> *(in Chinese for now)*. Pre-release means the interface, the data format and
+> the features can all still change — **do not treat it as a stable release.**
 
-| 直接用官方安卓版 | 用这个启动器 |
+## What it solves
+
+| Official Android build | With this launcher |
 |---|---|
-| 一次只能装一个版本，装第二个 = 覆盖第一个 | 多个版本同时装（159.7 / 160.4 / MindustryX X37 …），互不覆盖 |
-| 所有版本共用一份存档，切版本 = 存档被顶掉 | 每个版本分配到一个**槽**，存档 / 地图 / 模组全独立 |
-| 想回老版本玩老存档，得手动来回倒文件 | 点一下切版本；「继续上次」直接接上上次那个版本 |
-| 存档只能靠 adb 才拿得出来 | 应用内导出 / 导入存档，整槽打包导出 |
-| 「这个模组为什么没生效」查不出来 | 逐个模组说明会不会加载、为什么；模组间冲突会点出来 |
-| 备份攒多了很占地方 | 备份之间按内容去重（真机实测省 74.4%）|
+| One version at a time — a second install overwrites the first | Several versions installed at once (159.7 / 160.4 / MindustryX X37 …), none overwriting the others |
+| Every version shares one set of saves, so switching versions replaces them | Each version is assigned to a **slot**; saves / maps / mods are fully independent |
+| Going back to an old version for an old save means shuffling files by hand | Switch versions with one tap; **Continue** picks up the version you played last |
+| Saves can only be pulled off the phone with adb | Export / import saves in the app; pack a whole slot as a zip |
+| "Why is this mod not taking effect?" — no way to find out | Every mod states whether it will load and why; conflicts between mods are pointed out |
+| Backups pile up and eat space | Backups are deduplicated by content (measured on a real device: 74.4% saved) |
 
-**它是怎么做到的**：把官方 APK **原样当插件加载** —— 不重打包、不重签名、不改游戏包名。
-游戏自身的校验、存档格式、模组生态都不受影响；启动器这边只负责给每个版本安排一个
-独立的数据根，并在启动时把游戏引到那个目录去。
+**How it works**: the official APK is loaded **as-is, as a plug-in** — no repacking, no
+re-signing, no change to the game's package name. The game's own signature checks, save format and
+mod ecosystem are untouched; the launcher's only job is to give each version its own data root and
+point the game at that directory when it starts.
 
-## 怎么用
+## Getting started
 
-1. **自己准备游戏 APK** —— 本仓库**不包含**游戏本体，请从官方渠道获取官方 Mindustry，
-   或 MindustryX 等构建的 APK。（魔改过的包不一定能加载。）
-2. **装上启动器** —— 目前要自己构建（见 [构建](docs/DEVELOPING.md#构建)）。要求
-   **Android 8.0（API 26）** 及以上；开发期间在 **Android 16（API 36）** 真机上验证过。
-3. **导入并开玩**：
-   - 打开启动器 → 「导入 APK」选你那份 APK（会复制一份到应用私有目录），
-     或用「添加包名」扫描已经装在手机上的游戏；
-   - 给它分配一个**槽**（不同版本用不同的槽，存档就不会互相覆盖）；
-   - 点那个版本启动。「继续上次」直接回到上次玩的版本。
+1. **Get a game APK yourself** — this repository **does not include** the game. Use the official
+   Mindustry from the official channel, or a build such as MindustryX. (Heavily modified packages
+   may not load.)
+2. **Install the launcher** — for now you have to build it yourself (see
+   [Building](docs/DEVELOPING.md#构建)). It requires **Android 8.0 (API 26)** or newer; during
+   development it was verified on a real device running **Android 16 (API 36)**.
+3. **Import and play**:
+   - Open the launcher → **Import APK** and pick your APK (a copy is made into the app's private
+     directory), or use **Add package name** to scan games already installed on the phone;
+   - assign it a **slot** (use a different slot per version and the saves will not overwrite each
+     other);
+   - tap that version to launch. **Continue** goes straight back to the version you played last.
 
-## 能做什么
+## What it can do
 
-### 版本
-- 扫描**已装**的 Mindustry / MindustryX，或**导入** APK 副本（流式拷贝，落地前先预检）
-- 一个版本一行；点开有详情（来源路径、大小、MD5、原始版本名、架构 / 构建号）
-- 每个版本分配一个槽；**版本号相同**才算「同一个槽的同一批」，版本号不同会提醒冲突
-- **拒跑不了的包**：导入时 + 启动前两道检查（ABI / dex / 版本门槛），不让你进去了才发现
-- 「继续上次」：记住上次玩的版本，下次直接接上
+### Versions
+- Scan Mindustry / MindustryX builds that are **already installed**, or **import** a copy of an APK
+  (streamed copy, with a pre-check before it lands)
+- One row per version; tap for details (source path, size, MD5, original version name,
+  architecture / build number)
+- Assign a slot per version; several versions may share a slot **only when their version numbers
+  match** — otherwise the launcher warns about a conflict
+- **Refuse packages that will not run**: two checks (ABI / dex / version thresholds), at import
+  time and again before launch, so you do not find out only after getting in
+- **Continue**: remembers the version you played last and goes straight back to it
 
-### 存档与数据
-- **存档槽**：新建 / 改名 / 克隆 / 删除；每槽有独立的存档、地图、模组
-- **自动备份**：按「这一局玩了多久」的门槛决定要不要备份，超出上限自动删最旧的；可逐槽开关
-- **CAS 存档对象池**：多份备份按内容去重 —— 真机实测 4 份 99.5 MB → 25.5 MB（省 74.4%）
-- **导出 / 导入**：单个 `.msav` 存档，或把**整个槽打成一个 zip**（含地图 / 模组 / 设置），
-  换手机 / 换槽都能整包搬
-- **数据根体检**：自动扫出冗余目录并清理
+### Saves and data
+- **Save slots**: create / rename / clone / delete; each slot has its own saves, maps and mods
+- **Automatic backup**: whether to back up is decided by how long the session ran; past the limit
+  the oldest is dropped; can be switched on or off per slot
+- **Content-addressed store for saves**: backups are deduplicated by content — measured on a real
+  device, 4 backups of 99.5 MB → 25.5 MB (74.4% saved)
+- **Export / import**: a single `.msav` save, or **a whole slot as one zip** (including maps, mods
+  and settings) — move everything to a new phone or another slot
+- **Data directory check**: redundant directories are found and cleaned up automatically
 
-### 地图
-- 地图列表（卡片 + **预览图**）与独立详情页
-- **地图资源统计**：地矿 / 墙矿 / 可采地板 / 加成地板 —— 首屏只报「能采到」的数字，
-  依据（哪些方块、多少格）可以展开看
-- **导入 `.msav`**；**导出不限来源** —— 游戏自带 / 模组自带的图在 APK 里面，也能直接导出来
-  （导出的文件与源逐字节一致）
-- 增删：导入先解析校验；删除走中转站（挪走而不是硬删）
+### Maps
+- Map list (cards with a **preview image**) plus a separate detail page
+- **Map resource statistics**: ore / ore in walls / mineable floor / bonus floor — the top level
+  reports only the "reachable" numbers, and the evidence (which blocks, how many tiles) can be
+  expanded
+- **Import `.msav`**; **export from any source** — maps built into the game or into a mod live
+  inside the APK, and can still be exported directly (the exported file is byte-for-byte identical
+  to the source)
+- Add and remove: imports are parsed and verified first; deletion goes through the transfer station
+  (moved aside, not hard-deleted)
 
-### 模组
-- 扫描槽里的模组，逐个或**批量启停**（改的是游戏自己的开关：改前备份 + 原子写 + 写后自检）
-- **冲突体检**：两个模组重复实现同一个东西时点出来
-- 导入模组包；把本槽的模组**复制到别的槽**
-- 每个模组说明**能不能加载、为什么**：类型（Java / JS / 数据模组）、依赖、版本门槛、能否联机
+### Mods
+- Scan the mods in a slot and enable or disable them one by one or **in bulk** (this writes the
+  game's own switches: back up first, atomic write, verify after writing)
+- **Conflict check**: points out when two mods implement the same thing
+- Import mod packages; **copy this slot's mods to another slot**
+- Every mod states **whether it can load and why**: type (Java / JS / data mod), dependencies,
+  version thresholds, multiplayer support
 
-### 其它
-- **运行日志页**：启动器日志 + 游戏日志 + 崩溃堆栈；崩溃会自己落盘，可一键导出成一个文件
-- **深浅色**：跟随系统 / 浅色 / 深色（应用内切换，不动系统设置）
-- **设置页**：默认槽、日志保留份数
+### Other
+- **Runtime log page**: launcher log + game log + crash stack; crashes are written to disk
+  automatically and can be exported as a single file
+- **Theme**: follow system / light / dark (switched inside the app, without touching system
+  settings)
+- **Language**: follow system / English / 简体中文 (switched inside the app, without touching system
+  settings)
+- **Settings**: default slot, how many log files to keep
 
-## 现在还没有的
+## What is not there yet
 
-- **只有一个预览版（Pre-release），事情还没做完** —— 界面、数据格式、功能都可能变；
-  稳定版还没出。要稳定就等，或者自己构建
-- **没有任何联网功能**：地图下载、论坛嵌入、检查更新、启动器自更新**都还没做**
-  （v1 的定位就是「只在本地：扫描已装的 + 自己导入」）
-- **不上架 Google Play**：把别的 APK 当插件加载本身不符合它的政策，只能侧载分发
-- **本仓库不含游戏本体**：Mindustry 与 MindustryX 等第三方构建的版权归各自作者所有，
-  遵循各自的许可协议
+- **Only a pre-release, and the work is not finished** — the interface, the data format and the
+  features can all change; there is no stable release yet. If you need stability, wait, or build it
+  yourself
+- **No networking at all**: map downloads, a forum panel, update checks and launcher self-updates
+  **are not implemented** (v1 is deliberately "local only: scan what is installed + import your
+  own")
+- **Not on Google Play**: loading another APK as a plug-in does not fit its policies, so it can
+  only be distributed by sideloading
+- **This repository does not contain the game**: Mindustry and third-party builds such as
+  MindustryX are copyright their respective authors, under their own licences
 
 ---
 
-要**构建 / 改代码**请看 **[docs/DEVELOPING.md](docs/DEVELOPING.md)**（构建链、`dev_*` 直通口、
-模块边界、文档地图）。逐轮的实现与真机验证记录在 [`docs/history/`](docs/history/README.md)。
+To **build or change the code**, see **[docs/DEVELOPING.md](docs/DEVELOPING.md)** (that document is
+currently in Chinese: the build chain, the `dev_*` direct entries, module boundaries and a map of
+the documentation). The per-round implementation and on-device verification records live in
+[`docs/history/`](docs/history/README.md).
 
-## 许可证
+## Licence
 
-本项目以 **GNU General Public License v3.0** 发布，全文见 [LICENSE](LICENSE)。
-Copyright (C) 2026 GXFQE。
+This project is released under the **GNU General Public License v3.0**; the full text is in
+[LICENSE](LICENSE).
+Copyright (C) 2026 GXFQE.
