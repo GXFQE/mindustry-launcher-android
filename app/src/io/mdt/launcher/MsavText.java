@@ -175,10 +175,35 @@ public final class MsavText {
      *   ⇒ 只**翻译**第 ② 类，其余原样返回。
      * ⚠️ 不改判据、不改 {@link MsavMeta#error} 原文：排查时看的仍然是那个字段（`report()` 用的就是它）。
      *
-     * ⚠️ 已知缺口（下一步）：第 ① 类那 20 多条**我们自己写的中文**仍是硬编码在 `MsavMeta` 里的，
-     *   英文界面下读不出来的存档会显示它们。彻底的做法是把那些 `m.error = "…"` 改成**错误码 + 参数**。
+     * ★ **2026-10-05（P3）补齐了原来那个"已知缺口"**：第 ① 类不再透传中文，而是先看
+     *   {@link MsavMeta#errCode}（核心是纯 Java ⇒ 不能 `getString`，只给「码 + 参数」）。
+     *   ⚠️ **加一个码就要在这里加一条**：`switch` 有 `default` 兜底（返回"原因不明"），
+     *   所以漏掉映射**不崩**——正因为不崩，自检里才要**遍历所有码**过一遍（漏映射 = 界面静默空白）。
      */
     public static String userReason(Context c, MsavMeta m) {
+        if (m != null && m.errCode != MsavMeta.E_NONE) {
+            switch (m.errCode) {
+                case MsavMeta.E_NULL_FILE:
+                    return c.getString(R.string.msav_reason_null_file);
+                case MsavMeta.E_MAGIC:
+                    return c.getString(R.string.msav_reason_magic);
+                case MsavMeta.E_VERSION:
+                    return c.getString(R.string.msav_reason_version_fmt, m.errN1);
+                case MsavMeta.E_META_LEN:
+                    return c.getString(R.string.msav_reason_meta_len_fmt, m.errN1);
+                case MsavMeta.E_TRUNC_HEAD:
+                    return c.getString(R.string.msav_reason_trunc_head);
+                case MsavMeta.E_TRUNC_AFTER:
+                    return c.getString(R.string.msav_reason_trunc_after);
+                case MsavMeta.E_META_SHORT:
+                    return c.getString(R.string.msav_reason_meta_short_fmt, m.errN1, m.errN2);
+                case MsavMeta.E_META_TAIL:
+                    return c.getString(R.string.msav_reason_meta_tail_fmt, m.errN1);
+                default:
+                    // 新加了码却忘了在这里加映射 ⇒ 不崩，但界面会静默退化
+                    return c.getString(R.string.msav_unknown_reason);
+            }
+        }
         String e = m == null || m.error == null ? "" : m.error.trim();
         if (e.isEmpty()) return c.getString(R.string.msav_unknown_reason);
         if (e.matches("^[A-Za-z_$][A-Za-z0-9_$]*(Exception|Error)\\b.*")) {

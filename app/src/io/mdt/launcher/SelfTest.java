@@ -3235,7 +3235,10 @@ public final class SelfTest {
                             && "这个文件不像存档，或者写到一半就断了"
                                     .equals(MsavText.userReason(ctx, tech)),
                     "★原因翻译：`" + tech.error + "` ⇒ 「" + MsavText.userReason(ctx, tech) + "」");
-            // ② 中文判断（我们自己写的）必须**原样返回** —— 判据不是"什么错都翻成同一句"
+            // ② 我们自己写的中文判断 ⇒ **P3 第七批起不再原样透传**，改走「错误码 → 资源」
+            //    （核心是纯 Java，只给 `errCode` + 参数；文案在 `MsavText` 里按码取资源）
+            //    🔴 这条断言**原来要求的是"原样返回"** —— 那正是被替换掉的旧设计。
+            //       它当时红了一下，正好说明"行为改了，判据会喊"（这正是要的）。
             java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
             java.util.zip.DeflaterOutputStream dos = new java.util.zip.DeflaterOutputStream(bo);
             dos.write("NOPE-not-msav".getBytes("UTF-8"));
@@ -3243,10 +3246,15 @@ public final class SelfTest {
             File noMagic = new File(dir, "nomagic.msav");
             write(noMagic, bo.toByteArray());
             MsavMeta nm = MsavMeta.read(noMagic);
+            // ⚠️ 这段没有 `enCtx`（那个在 ㉞ 段的另一个方法里）⇒ 本地取一个英文 ctx
+            Context enCtxNm = LocaleMode.force(ctx, "en");
             ok(stat, L, nm.error != null && nm.error.contains("MSAV")
-                            && nm.error.equals(MsavText.userReason(ctx, nm))
+                            && nm.errCode == MsavMeta.E_MAGIC
+                            && !MsavText.userReason(ctx, nm).equals(nm.error)
+                            && !MsavText.userReason(enCtxNm, nm).equals(nm.error)
                             && !MsavText.userReason(ctx, nm).equals(MsavText.userReason(ctx, tech)),
-                    "★元断言：中文判断原样返回、且与上面那句**不是同一句**（翻译不是一把梭）⇒ 「"
+                    "★元断言：我们的中文判断走**错误码 → 资源**（核心那句只给报告看；"
+                            + "中英两套都**不是**核心原文）⇒ 「"
                             + MsavText.userReason(ctx, nm) + "」");
             ok(stat, L, "原因不明".equals(MsavText.userReason(ctx, MsavMeta.read(good))),
                     "★反向：没出错（error=null）⇒ 兜底「原因不明」，不抛 NPE");
@@ -3414,6 +3422,35 @@ public final class SelfTest {
                             && !ctx.getString(R.string.launch_err_no_native_loaded).isEmpty()
                             && stepsBothLocales,
                     "★P3：启动管线 6 个步骤名两套语言都有字，两条带占位符的原因按真参数实拼");
+
+            // ★★ P3 第七批：**第一块「码 + 参数」** —— 存档读不出来的原因（`MsavMeta.errCode` →
+            //    `MsavText.userReason` → 资源）。核心是纯 Java ⇒ 它只说"错在哪、带哪几个数"。
+            //    ① **遍历所有码**：每个都必须映射到一条真文案（不是"原因不明"那个兜底）——
+            //       漏一条映射**不崩不报错**、界面只是**静默空白**，只有遍历才抓得住；
+            //    ② 参数真的进了句子（meta 声明 5 项、只读到 2 项 ⇒ 文案里得有 5 和 2）；
+            //    ③ 两套语言给出**不同**文案（证明走的是资源，而不是把核心那句中文透传出去）。
+            StringBuilder missCode = new StringBuilder();
+            boolean paramOk = true, localeDiff = true;
+            String reasonFallback = ctx.getString(R.string.msav_unknown_reason);
+            for (int code : MsavMeta.ALL_CODES) {
+                MsavMeta mm = MsavMeta.withCode(code, 5, 2);
+                String rz = MsavText.userReason(ctx, mm);
+                String re = MsavText.userReason(enCtx, mm);
+                if (rz == null || rz.isEmpty() || reasonFallback.equals(rz)) {
+                    missCode.append(code).append(' ');
+                }
+                if (rz.equals(re)) localeDiff = false;
+                if (code == MsavMeta.E_META_SHORT
+                        && !(rz.contains("5") && rz.contains("2")
+                             && re.contains("5") && re.contains("2"))) {
+                    paramOk = false;
+                }
+            }
+            ok(stat, L, missCode.length() == 0,
+                    "★P3：8 个错误码**每一个**都有文案映射（漏映射=界面静默空白），漏的是［"
+                            + missCode + "］");
+            ok(stat, L, paramOk && localeDiff,
+                    "★P3：错误码的参数真的进了句子（声明 5 项/读到 2 项），且两套语言文案不同");
         } catch (Throwable t) {
             ok(stat, L, false, "存档体检用例自身异常：" + t);
         } finally {

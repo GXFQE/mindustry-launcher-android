@@ -88,6 +88,65 @@ public final class MsavMeta {
      *  ⚠️ 默认只读 meta ⇒ **meta 之后**的截断看不到，必须用 {@link #read(File, boolean)} 才会查 */
     public boolean truncated;
 
+    // ── ★ 错误码（P3，2026-10-05）：给界面用的「码 + 参数」─────────────────────
+    // 为什么要有它：本类是**刻意纯 Java** 的（好在 PC 上单独编译验收，见类头）⇒ 不能 `getString`。
+    // 可它的 {@link #error} 句子会经 `MsavText.userReason` **直接落到用户眼前**
+    // （「⚠ N 份读不出来」弹窗）⇒ 加这一层：核心只说"错在哪、带哪几个数"，
+    // 文案由 Android 侧的 `MsavText` 映射成资源。
+    // ⚠️ {@link #error} 里那句中**一个字都不动** —— 落盘报告、`report()` 与自检看的是它（维护者视角）。
+    // ⚠️ 新增错误时**必须**同时做三件事：加一个码 + 在 `MsavText.userReason` 里加一条映射
+    //    + 自检里遍历所有码过一遍（自检会**遍历**，漏映射会被抓住；否则界面上是**静默空白**）。
+    /** 没有码（或不是我们写的错：`error` 里是异常原文） */
+    public static final int E_NONE = 0;
+    /** `read(File)` 传进来的是 null */
+    public static final int E_NULL_FILE = 1;
+    /** 开头不是 `MSAV` */
+    public static final int E_MAGIC = 2;
+    /** 格式版本不合理；参数 n1 = 读到的版本号 */
+    public static final int E_VERSION = 3;
+    /** meta 块长度不合理；参数 n1 = 声明长度 */
+    public static final int E_META_LEN = 4;
+    /** 被截断，且连元数据都没读全 */
+    public static final int E_TRUNC_HEAD = 5;
+    /** 元数据之后被截断（已读出的部分仍可用） */
+    public static final int E_TRUNC_AFTER = 6;
+    /** meta 声明 n1 项、只读到 n2 项 */
+    public static final int E_META_SHORT = 7;
+    /** meta 读完后还剩 n1 字节（与游戏口径不一致） */
+    public static final int E_META_TAIL = 8;
+
+    /** 上面那些码之一（{@link #E_NONE} = 没有） */
+    public int errCode = E_NONE;
+    /** 码带的两个整数参数（没用到的是 0） */
+    public long errN1;
+    public long errN2;
+
+    /**
+     * **所有**错误码（给自检**遍历**用）。
+     *
+     * 🔴 为什么要有它：`MsavText.userReason` 的 `switch` 带 `default` 兜底（返回"原因不明"），
+     *   所以"新加了码却忘了加映射"**不崩、不报错**，界面上只是**静默退化**。
+     *   只有把所有码逐条过一遍才抓得住 ⇒ **加码时这里也要加**（枚举写在一处，漏了看得见）。
+     */
+    public static final int[] ALL_CODES = {
+            E_NULL_FILE, E_MAGIC, E_VERSION, E_META_LEN,
+            E_TRUNC_HEAD, E_TRUNC_AFTER, E_META_SHORT, E_META_TAIL,
+    };
+
+    /** 造一个"只带错误码"的实例：**给自检遍历所有码用**（正常路径只有 {@link #read} 会造它） */
+    static MsavMeta withCode(int code, long n1, long n2) {
+        return new MsavMeta().fail(code, "", n1, n2);
+    }
+
+    /** 记下"错在哪"：**码 + 参数给界面**，中文句子留给报告与自检 */
+    private MsavMeta fail(int code, String zh, long n1, long n2) {
+        errCode = code;
+        errN1 = n1;
+        errN2 = n2;
+        error = zh;
+        return this;
+    }
+
     private MsavMeta() {}
 
     /** 读一个文件，**只读 meta**（最快；meta 之后的截断看不到） */
@@ -106,8 +165,7 @@ public final class MsavMeta {
     public static MsavMeta read(File f, boolean verifyWhole) {
         MsavMeta m = new MsavMeta();
         if (f == null) {
-            m.error = "文件为 null";
-            return m;
+            return m.fail(E_NULL_FILE, "文件为 null", 0, 0);
         }
         m.fileBytes = f.length();
         InputStream in = null;
@@ -140,20 +198,21 @@ public final class MsavMeta {
             in.readFully(magic);
             for (int i = 0; i < MAGIC.length; i++) {
                 if (magic[i] != MAGIC[i]) {
-                    m.error = "这不是 .msav：开头不是 MSAV";
-                    return m;
+                    return m.fail(E_MAGIC, "这不是 .msav：开头不是 MSAV", 0, 0);
                 }
             }
             m.version = in.readInt();
             if (m.version < MIN_VERSION || m.version > MAX_VERSION) {
-                m.error = "格式版本不合理（" + m.version + "）—— 可能不是 .msav，或是我们没见过的版本";
-                return m;
+                return m.fail(E_VERSION,
+                        "格式版本不合理（" + m.version + "）—— 可能不是 .msav，或是我们没见过的版本",
+                        m.version, 0);
             }
             // region 串的第一块永远是 meta（SaveVersion.write 的顺序写死的）
             int len = in.readInt();
             if (len < 0 || len > MAX_REGION) {
-                m.error = "meta 块长度不合理（" + len + "）—— 文件可能坏了";
-                return m;
+                return m.fail(E_META_LEN,
+                        "meta 块长度不合理（" + len + "）—— 文件可能坏了",
+                        len, 0);
             }
             byte[] payload = new byte[len];
             in.readFully(payload);                    // 截断 ⇒ 这里抛 EOFException
@@ -171,9 +230,10 @@ public final class MsavMeta {
             // ★ 写了一半的文件（`.msav.part`）：**已经解析出来的 tags 照样有用**
             //   （游戏侧遇到截断就是读失败；我们比它多给一步"能读多少读多少"）
             m.truncated = true;
-            m.error = m.tags.isEmpty()
+            m.fail(m.tags.isEmpty() ? E_TRUNC_HEAD : E_TRUNC_AFTER, m.tags.isEmpty()
                     ? "文件被截断（像是写了一半）—— 连元数据都没读全"
-                    : "文件在元数据之后被截断（像是写了一半）；下面这些是已经读出来的部分";
+                    : "文件在元数据之后被截断（像是写了一半）；下面这些是已经读出来的部分",
+                    0, 0);
             m.ok = !m.tags.isEmpty() || m.version > 0;
             return m;
         } catch (Throwable t) {
@@ -204,12 +264,16 @@ public final class MsavMeta {
         } catch (EOFException e) {
             // 块长度对不上：保留已读到的，并说明（游戏侧这里是 "read length mismatch" 硬报错）
             m.truncated = true;
-            m.error = "meta 块声明了 " + size + " 项，只读到 " + read + " 项（块被截断或损坏）";
+            m.fail(E_META_SHORT,
+                    "meta 块声明了 " + size + " 项，只读到 " + read + " 项（块被截断或损坏）",
+                    size, read);
         }
         // 与游戏同款的"用干净没"检查：readRegion 会核对 length 是否恰好等于读掉的字节数
         int leftover = ds.available();
         if (leftover > 0 && m.error == null) {
-            m.error = "meta 块读完后还剩 " + leftover + " 字节（与游戏的口径不一致）";
+            m.fail(E_META_TAIL,
+                    "meta 块读完后还剩 " + leftover + " 字节（与游戏的口径不一致）",
+                    leftover, 0);
         }
         m.applyTags();
     }

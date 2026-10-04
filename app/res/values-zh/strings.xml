@@ -440,6 +440,19 @@
     <string name="msav_lbl_desc_fmt">简介：%1$s</string>
     <string name="msav_reason_not_save">这个文件不像存档，或者写到一半就断了</string>
     <string name="msav_reason_read_error">读这个文件的时候出错了</string>
+    <!--
+      ══ 读不出来时的具体原因（P3：核心的「码 + 参数」在这里映射成文案）══════
+      ★ `MsavMeta` 是**刻意纯 Java** ⇒ 只给 `errCode` + `errN1/errN2`；文案在 `MsavText.userReason`。
+      🔴 **加一个码就必须在这里加一条 + 在 `MsavText` 里加一条映射**（自检会遍历所有码）。
+    -->
+    <string name="msav_reason_null_file">没有拿到文件</string>
+    <string name="msav_reason_magic">这不是 .msav 文件 —— 开头不是 MSAV</string>
+    <string name="msav_reason_version_fmt">格式版本不合理（%1$d）—— 可能不是 .msav，或是我们没见过的版本</string>
+    <string name="msav_reason_meta_len_fmt">元数据块长度不合理（%1$d）—— 文件可能坏了</string>
+    <string name="msav_reason_trunc_head">文件被截断（像是写了一半）—— 连元数据都没读全</string>
+    <string name="msav_reason_trunc_after">文件在元数据之后被截断（像是写了一半）；下面这些是已经读出来的部分</string>
+    <string name="msav_reason_meta_short_fmt">元数据块声明了 %1$d 项，只读到 %2$d 项（块被截断或损坏）</string>
+    <string name="msav_reason_meta_tail_fmt">元数据块读完后还剩 %1$d 字节（与游戏的口径不一致）</string>
     <!-- 地图来源与详情（同一族：Maps.Item 原来也是 Java 里拼的中文）-->
     <string name="map_from_slot">本槽</string>
     <string name="map_from_slot_detail">本槽（你可以直接管理）</string>
