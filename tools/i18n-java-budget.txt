@@ -6,7 +6,7 @@
 #   · 实测 < 台账  ⇒ ERROR：你已经搬走了几条 ⇒ **把这行改小**。
 #   · 文件有中文却不在本表里 ⇒ ERROR：新文件出现了中文。
 # ★ 这一列数字就是 **P3（把中文搬进资源）的进度**：它只许降。
-#   合计 487 条 —— 其中大头是**有意保留**的：
+#   合计 489 条 —— 其中大头是**有意保留**的：
 #     · MainActivity.java —— 全在 dev_* 直通口（仅 debuggable 构建可达）
 #     · Compat / AutoBackup / Crash —— 只进 report-*.txt（取证文本不进资源）
 #     · Data / MapStats 等文件里的**落盘报告与体检明细**（同上）
@@ -25,8 +25,8 @@ SettingsBin.java = 50   # ★ 已码化：失败文案走 errCode+参数（Setti
 MsavMeta.java = 32   # ★ 已码化：8 条 error 走 errCode+参数（MsavText 映射）；这些句子只给报告/自检看
 Compat.java = 26   # 只进 report-devtool.txt / 崩溃报告（取证文本）
 ModsActivity.java = 26   # 全部在 `report()` 里（dev 落盘转储，只有 `MainActivity` 的 `dev_*` 口调它） —— 与 `MainActivity` 的 126 条同类；**它没有自己的用户可见文案**
+Injector.java = 23   # 用户可见的已搬完；剩的是启动管线报告（log.append）
 MapStats.java = 22   # 已搬完；剩的是 SRC_VANILLA/MOD/PATCH 文案常量与语料诊断（内部，不上界面）
-Injector.java = 21   # 用户可见的已搬完；剩的是启动管线报告（log.append）
 Backup.java = 17   # 用户可见的已搬完；剩的是 CAS 迁移报告与 Log 诊断
 AutoBackup.java = 11   # 只进 report-autobackup.txt
 BundleNames.java = 10   # ★ 代码注释原文：「`note` 只留给**维护者**（PC 验收台）」⇒ 技术细节层依据

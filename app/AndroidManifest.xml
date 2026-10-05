@@ -182,6 +182,21 @@
             android:parentActivityName=".SettingsActivity"/>
 
         <!--
+          中转站（2026-10-05，第 102 轮）：地图被删 / 被同名覆盖、模组被同名覆盖时，
+          旧件都挪进了 <hub>/maps-trash/ 与 <hub>/mods-trash/，但此前**没有任何界面读过它们**
+          （用户 2026-10-05：「这个中转站像是个半成品啊」）⇒ 本页是那批东西的出口：
+          列表 / 放回去 / 彻底删除 / 清空 / 占用。入口在设置页一行（中转站是全局的，不属于任何槽）。
+          主进程即可 —— 纯文件操作，不碰游戏 ClassLoader。
+          ⚠️ **必须注册**：aapt2 不检查引用，漏了照样 BUILD OK，真机一点就崩（自检 ㉙ 盯着）。
+        -->
+        <activity
+            android:name=".TrashActivity"
+            android:exported="false"
+            android:theme="@style/AppTheme"
+            android:label="@string/trash_title"
+            android:parentActivityName=".SettingsActivity"/>
+
+        <!--
           游戏坑位：加载流程（存档槽交换 / 预热 / dex 注入 / load native / 挂资产链）
           必须跑在游戏所在的 :game 进程里，否则系统在干净进程里找不到游戏类。
           exported=true 便于 adb 驱动验证 —— M5 发布前评估是否收回。

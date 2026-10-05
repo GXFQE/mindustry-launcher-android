@@ -780,31 +780,10 @@ public final class Mods {
         return null;
     }
 
-    /** 我们挪走旧条目时的**中转站**（`<hub>/mods-trash/`）——「挪不删」是本工程的老规矩 */
+    /** 我们挪走旧条目时的**中转站**（`<hub>/mods-trash/`）——「挪不删」是本工程的老规矩。
+     *  实现（名字编码 / 修剪 / 列表 / 恢复）统一在 {@link Trash}，这里只是给老调用点留的别名。 */
     public static File trashDirOf(Context ctx) {
-        return new File(Data.hubDir(ctx), "mods-trash");
-    }
-
-    /** 中转站保留份数（超出按名字里的时间戳删最旧）：它是"可手工取回"的兜底，不是第二份存档 */
-    public static final int KEEP_TRASH = 20;
-
-    /** 只保留最近 `keep` 份（文件名前缀是 `yyyyMMdd-HHmmss` ⇒ 字典序 = 时间序） */
-    public static int pruneTrash(File dir, int keep) {
-        if (dir == null) return 0;
-        File[] fs = dir.listFiles();
-        if (fs == null || fs.length <= keep) return 0;
-        List<File> all = new ArrayList<>();
-        Collections.addAll(all, fs);
-        Collections.sort(all, new java.util.Comparator<File>() {
-            @Override public int compare(File a, File b) {
-                return a.getName().compareTo(b.getName());
-            }
-        });
-        int removed = 0;
-        for (int i = 0; i < all.size() - keep; i++) {
-            if (Data.deleteTree(all.get(i))) removed++;
-        }
-        return removed;
+        return Trash.modsDir(ctx);
     }
 
     /** 文件版导入（dev 口 / 自检用） */
@@ -1018,7 +997,9 @@ public final class Mods {
 
         File stash = null;
         if (trashDir != null && (trashDir.exists() || trashDir.mkdirs())) {
-            stash = new File(trashDir, SettingsBin.stamp() + "-" + dst.getName());
+            // ★ 中转站里的名字带**来源槽**（v2，见 Trash.nameFor）—— 恢复时才能默认放回原槽
+            stash = new File(trashDir,
+                    Trash.nameFor(Trash.slotLabel(dst.getParentFile()), dst.getName()));
             if (!dst.renameTo(stash)) {
                 // 跨文件系统：rename 不动 ⇒ 复制过去（复制不完整就作废这次中转）
                 try {
@@ -1056,9 +1037,9 @@ public final class Mods {
                 throw new java.io.IOException(back ? "改名失败（原条目已放回）"
                         : "改名失败；原条目留在 " + stash.getAbsolutePath());
             }
-            // ★ 成功之后**不删**那份旧条目：它留在 `hub/mods-trash/` 供手工取回
-            //   （与替换确认框里那句"可手工取回"对齐；只按份数修剪，别让它无限长）
-            pruneTrash(trashDir, KEEP_TRASH);
+            // ★ 成功之后**不删**那份旧条目：它留在 `hub/mods-trash/` 等用户来取
+            //   （中转站页面能列出来、能恢复 —— 见 {@link TrashActivity}；只按份数修剪，别让它无限长）
+            Trash.prune(trashDir, Trash.KEEP);
             return;
         }
         // 中转站不可用（或中转失败）⇒ 退化成"先删再改名"：源件仍在别处，最坏是用户重来一次

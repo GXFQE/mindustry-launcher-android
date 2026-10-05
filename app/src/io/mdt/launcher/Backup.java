@@ -300,14 +300,20 @@ public final class Backup {
     }
 
     /**
-     * 恢复：把快照里的条目**覆盖**回目标槽（口径 = 备份时的口径，见类头 ①）。
+     * 恢复：把快照里的条目写回目标槽。**三种模式**（2026-10-05 第 104 轮，用户要的）：
+     * <pre>
+     *   {@link SlotWrite#UPDATE}    —— 两边都有的用快照里的覆盖（＝老行为，默认）
+     *   {@link SlotWrite#KEEP_OLD}  —— 两边都有的保留槽里的，只把缺的补上
+     *   {@link SlotWrite#REPLACE}   —— 先按 {@link Data#contentRootsOf} 清空槽内容，再整份写回
+     * </pre>
      *
-     * ★ **只覆盖、不删除**（有意）：快照里没有的文件原样留着 —— 包括"备份之后
-     *   新产生的"和"本来就在排除名单里的"。所以恢复**不是**"把槽还原成快照那一刻"，
-     *   而是"把快照里记着的东西按原内容放回去"。
-     *   ⚠️ 别改成"先清空再解包"：清空是**不可逆**的，而"哪些文件是备份之后加的"
-     *      我们**无法判定**（mtime 会被 FUSE / 导入动作改掉，见 REF §33）。
-     *      真要整槽替换，用户该走的是"整槽导出 + 导入"那条路（{@link Data#WIPE_DIRS}）。
+     * ★ **默认（{@link SlotWrite#UPDATE}）与老行为逐字相同**：只覆盖快照里有的文件，
+     *   其余原样留着 —— 包括"备份之后新产生的"和"本来就在排除名单里的"。
+     *   所以恢复**不是**"把槽还原成快照那一刻"，而是"把快照里记着的东西按原内容放回去"。
+     *   ⚠️ 别把默认改成"先清空"：清空是**不可逆**的，而"哪些文件是备份之后加的"我们
+     *      **无法判定**（mtime 会被 FUSE / 导入动作改掉，见 REF §33）⇒ 想要完全替换的用户
+     *      必须**自己选**「覆盖」，而且那条路动手前一定先自动备份
+     *      （见 {@link AutoBackup#beforeSlotOp}）。
      *
      * ★ CAS 版是**边写边校验 sha256**（一遍 I/O）：对象池里的内容与清单里记的地址
      *   不符就报错，宁可不写也不写出坏存档。任何一项失败只记该项，其余继续
@@ -315,7 +321,8 @@ public final class Backup {
      *
      * **返回 {@link RestoreResult}**：成败是一个**布尔值**，不是从报告文案里读出来的。
      */
-    public static RestoreResult restore(Context ctx, String slot, Snapshot ss) {
+    public static RestoreResult restore(Context ctx, String slot, Snapshot ss, int mode) {
+        mode = SlotWrite.sane(mode);
         if (ss == null || ss.dir == null || !ss.dir.exists()) {
             return fail(ctx.getString(R.string.backup_restore_err_no_snapshot));
         }
@@ -338,14 +345,30 @@ public final class Backup {
             return fail(ctx.getString(R.string.backup_restore_err_mkdir_fmt,
                     dstRoot.getAbsolutePath()));
         }
+        StringBuilder wiped = new StringBuilder();
+        if (SlotWrite.wipeFirst(mode)) {
+            try {
+                for (String n : SlotWrite.wipeSlot(ctx, dstRoot)) {
+                    if (wiped.length() > 0) wiped.append("、");
+                    wiped.append(n);
+                }
+            } catch (IOException e) {
+                // 清了一半就停：宁可什么都不写（快照还在，用户可以再来一次）
+                return fail(e.getMessage() == null ? String.valueOf(e) : e.getMessage());
+            }
+        }
 
-        int ok = 0;
+        int ok = 0, kept = 0;
         StringBuilder errs = new StringBuilder();
         if (ss.version >= 2) {
             // ── CAS：从对象池流式还原，边写边验 ──────────────────────────
             Cas pool = cas(ctx);
             for (Entry e : entries) {
                 File to = new File(dstRoot, e.rel);
+                if (!SlotWrite.sourceWins(mode) && to.exists()) {
+                    kept++;
+                    continue;
+                }
                 try {
                     pool.getTo(e.hash, to, true);
                     ok++;
@@ -391,6 +414,10 @@ public final class Backup {
             for (Entry e : entries) {
                 File from = new File(srcRoot, e.rel);
                 File to = new File(dstRoot, e.rel);
+                if (!SlotWrite.sourceWins(mode) && to.exists()) {
+                    kept++;
+                    continue;
+                }
                 try {
                     copyRecursive(from, to);
                     ok++;
@@ -408,14 +435,30 @@ public final class Backup {
         sb.append("    ").append(ctx.getString(R.string.backup_restore_ok_snapshot_fmt, ss.title()));
         sb.append("    ").append(ctx.getString(R.string.backup_restore_ok_files_fmt, ok,
                 entries.size(), Util.formatSize(ss.bytes)));
+        if (kept > 0) {
+            sb.append("    ").append(ctx.getString(R.string.backup_restore_ok_kept_fmt, kept));
+        }
+        if (wiped.length() > 0) {
+            sb.append("    ").append(ctx.getString(R.string.backup_restore_ok_wiped_fmt,
+                    wiped.toString()));
+        }
         sb.append("    ").append(ctx.getString(R.string.backup_restore_ok_where_fmt,
                 dstRoot.getAbsolutePath()));
         if (ok < entries.size()) {
             sb.append(ctx.getString(R.string.backup_restore_partial_fmt, errs.toString()));
         }
         Log.i(TAG, "restore slot=" + slot + " ok=" + ok + "/" + entries.size()
-                + " v=" + ss.version);
+                + " kept=" + kept + " mode=" + mode + " v=" + ss.version);
         return new RestoreResult(true, sb.toString());
+    }
+
+    /**
+     * 老的入口：**模式 = 更新**（只覆盖同名，其余原样留着）。
+     * ★ 留着它是为了让"克隆槽 / 自检"这些**本来就不该换模式**的调用点读起来干净，
+     *   同时也把"默认是哪一个"写进签名里。
+     */
+    public static RestoreResult restore(Context ctx, String slot, Snapshot ss) {
+        return restore(ctx, slot, ss, SlotWrite.UPDATE);
     }
 
     /**
@@ -526,8 +569,26 @@ public final class Backup {
      */
     public static Set<String> allReferencedShas(Context ctx) {
         Set<String> refs = new HashSet<>();
-        File[] slots = rootDir(ctx).listFiles();
-        if (slots == null) return refs;
+        scanRefs(rootDir(ctx), refs);
+        // ★ 中转站里的**整槽**（2026-10-05 第二批）：容器里的 `backups/` 同样是**活引用**。
+        //   不扫这一处，下一次 GC 就会把那些快照引用的对象当孤儿删掉 —— 而用户此刻正看着
+        //   "删掉的槽还能放回来"，恢复回来却是一份坏快照（静默丢数据，且没有任何症状）。
+        //   ⚠️ 与 `Trash.trashSlot` 是**一对**：那边负责"别把备份落下"，这里负责"别把对象回收掉"。
+        File containers = Trash.slotsDir(ctx);
+        File[] cs = containers.isDirectory() ? containers.listFiles() : null;
+        if (cs != null) {
+            for (File c : cs) {
+                if (!c.isDirectory()) continue;
+                scanRefs(new File(c, Trash.INNER_BACKUPS), refs);
+            }
+        }
+        return refs;
+    }
+
+    /** 扫一个"备份根"下的 `&lt;槽&gt;/&lt;快照&gt;/manifest`（`hub/backups` 与中转站容器里的 `backups/` 共用） */
+    private static void scanRefs(File root, Set<String> refs) {
+        File[] slots = root == null ? null : root.listFiles();
+        if (slots == null) return;
         for (File sd : slots) {
             if (!sd.isDirectory()) continue;
             File[] snaps = sd.listFiles();
@@ -537,7 +598,6 @@ public final class Backup {
                 collectShas(new File(snap, MANIFEST), refs);
             }
         }
-        return refs;
     }
 
     /** 某个槽的快照清单里引用到的地址（迁移/自查用） */

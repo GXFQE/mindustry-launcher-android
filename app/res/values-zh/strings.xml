@@ -226,13 +226,15 @@
     <string name="delete_slot_confirm_title_fmt">删除槽「%1$s」？</string>
     <!-- ⚠️ 这里**不能**用 `**` 表示强调：弹窗是纯文本（AlertDialog.setMessage），
          `**` 会原样显示成星号。要加重语气只能靠措辞。全工程同此纪律。 -->
-    <string name="delete_slot_warn">将会永久删除这个槽的全部数据（安卓没有回收站）：\n\n</string>
+    <string name="delete_slot_warn">这个槽的全部数据会挪进中转站（连同它的备份），之后可以在设置里放回来：\n\n</string>
     <string name="delete_slot_files_fmt">%1$d 个文件 · %2$s\n</string>
-    <string name="delete_slot_with_backups_fmt">\n连带删除 %1$d 份备份。</string>
+    <string name="delete_slot_with_backups_fmt">\n它的 %1$d 份备份一起挪走。</string>
     <string name="delete_slot_no_backups">\n（这个槽没有备份）</string>
+    <string name="delete_slot_cap_fmt">\n中转站最多留 %1$d 个槽，再删会顶掉最早的那个。</string>
+    <string name="delete_slot_confirm_btn">挪进中转站</string>
     <string name="delete_forever">永久删除</string>
     <string name="delete_failed">删除失败</string>
-    <string name="slot_deleted_fmt">已删除槽「%1$s」</string>
+    <string name="slot_deleted_fmt">已把槽「%1$s」挪进中转站</string>
     <string name="slot_deleted_fallback_fmt">（%1$d 个版本回落到默认槽）</string>
 
     <string name="backup_title_fmt">备份槽「%1$s」</string>
@@ -265,7 +267,7 @@
     <string name="restore_to_slot_title_fmt">恢复到槽「%1$s」</string>
     <string name="snapshot_entry_fmt">%1$d 个文件 · %2$s</string>
     <string name="restore_confirm_title">确认恢复？</string>
-    <string name="restore_confirm_msg_fmt">备份：%1$s\n%2$d 个文件 · %3$s\n\n会把备份里的文件写回去：\n%4$s\n\n· 只覆盖备份里有的文件，其它原样留着\n· 写之前先检查内容有没有坏</string>
+    <string name="restore_confirm_msg_fmt">备份：%1$s\n%2$d 个文件 · %3$s\n\n会把备份里的文件写回去：\n%4$s\n\n· 写之前先检查内容有没有坏</string>
     <string name="restore">恢复</string>
     <string name="restore_progress_title">恢复中</string>
     <string name="restore_progress_msg">检查内容 · 写回…</string>
@@ -312,10 +314,12 @@
       ① 原来写「它不会真的消失，**之后可以手工取回**」—— 而 Android 11+ 起
          `Android/data/<包名>/` 对文件管理器**不可见**（这正是本工程要做 SAF 导入导出的原因），
          所以"手工取回"对普通用户是**做不到**的承诺。改成如实说"还在手机里、但游戏里看不到它了"。
-      ② 中转站有份数上限（`MapFiles.KEEP_TRASH = 20`，模组中转站同款）。原来一个字都没提，
+      ② 中转站有份数上限（`Trash.KEEP = 20`，地图与模组同一个口径）。原来一个字都没提，
          删到第 21 张时第一张已被**静默硬删** —— 现在明说。
+      ③ ★ 2026-10-05（中转站页面落地）：那句「可以手工取回」的**替代说法**现在真的成立了 ——
+         删除确认里直接点明"去设置里的中转站放回来"。页面见 TrashActivity。
     -->
-    <string name="map_delete_confirm_fmt">把「%1$s」挪进中转站？\n\n它不会真的消失（还在手机里），但游戏里就看不到它了。\n中转站最多留 20 份，再删会顶掉最早的那份。</string>
+    <string name="map_delete_confirm_fmt">把「%1$s」挪进中转站？\n\n它不会真的消失（还在手机里），但游戏里就看不到它了。\n之后可以在设置的「中转站」里放回来；那里最多留 20 份，再删会顶掉最早的那份。</string>
     <string name="map_deleted_ok_fmt">已把「%1$s」挪进中转站</string>
     <!-- ★ 游戏在跑这条路已由 UI 提前拦下（见 MapDetailActivity.confirmDelete）⇒ 这句只说剩下的原因 -->
     <string name="map_delete_fail">删不掉：这张图可能正被别的程序占用着。</string>
@@ -610,7 +614,7 @@
     <string name="exp_err_dest_readonly">目标位置不可写（系统没给出可写句柄）</string>
     <string name="msav_err_open_failed">无法读取所选文件</string>
     <string name="msav_err_no_saves_fmt">拿不到槽「%1$s」的 saves/ 目录</string>
-    <string name="msav_err_same_name_fmt">同名存档已存在且删不掉：%1$s</string>
+    <string name="msav_err_trash_failed">挪不开旧存档，这次没有导入。腾点空间再试一次</string>
     <string name="msav_err_rename_fmt">改名失败：%1$s → %2$s</string>
     <string name="msav_reason_meta_tail_fmt">元数据块读完后还剩 %1$d 字节（与游戏的口径不一致）</string>
     <!-- 地图来源与详情（同一族：Maps.Item 原来也是 Java 里拼的中文）-->
@@ -677,7 +681,7 @@
     <string name="slotzip_err_too_many_fmt">这个 zip 的条目超过 %1$d 个，已中止</string>
     <string name="slotzip_more_fmt">…共 %1$d 项</string>
     <string name="slotzip_err_no_slot_dir_fmt">拿不到槽「%1$s」的目录</string>
-    <string name="slotzip_err_wipe_failed_fmt">清空失败：%1$s\n（可能有文件被占用，先退出游戏再试）</string>
+    <string name="slotwrite_err_wipe_failed_fmt">清空失败：%1$s\n（可能有文件被占用，先退出游戏再试）</string>
     <string name="slotzip_err_mkdir_slot_fmt">创建槽目录失败：%1$s</string>
     <string name="slotzip_err_write_failed_fmt">写出失败：%1$s\n%2$s</string>
     <string name="slotzip_err_delete_failed_fmt">同名文件删不掉：%1$s</string>
@@ -733,6 +737,8 @@
     <string name="backup_restore_ok_snapshot_fmt">快照：%1$s\n</string>
     <string name="backup_restore_ok_files_fmt">文件：%1$d / %2$d （%3$s）\n</string>
     <string name="backup_restore_ok_where_fmt">位置：%1$s\n</string>
+    <string name="backup_restore_ok_kept_fmt">保留了 %1$d 个文件现在的版本\n</string>
+    <string name="backup_restore_ok_wiped_fmt">已先清空：%1$s\n</string>
     <string name="backup_restore_partial_fmt">\n⚠ 有文件没写成功：\n%1$s</string>
     <string name="backup_err_not_manifest">不是 MDT 备份清单</string>
     <string name="backup_err_slot_name_invalid">槽名不合法</string>
@@ -769,8 +775,6 @@
     <string name="zip_tag_custom">\n\n没有游戏的设置文件 —— 像是本启动器导出的包。</string>
     <string name="zip_warn_unknown">看不出这是 Mindustry 的数据包。仍然要导入吗？</string>
     <string name="zip_warn_skipped_fmt">有 %1$d 个条目的路径不安全，会被跳过。</string>
-    <string name="zip_wipe_label">先清空目标槽的存档内容</string>
-    <string name="zip_wipe_hint">先删掉旧的存档 · 地图 · 蓝图 · 缓存，完全还原成导出时的样子。\n不勾选则只覆盖同名文件（更安全）。\n\n⚠️ 删掉就找不回来了；模组不受影响。</string>
     <!-- 通用：导入动作的确认按钮（zip 与 .msav 共用；非 gzip 的 .msav 用 import_anyway） -->
     <string name="import_btn">导入</string>
     <string name="zip_import_done">导入完成</string>
@@ -778,6 +782,24 @@
     <string name="zip_extract_progress_msg_fmt">解包到槽「%1$s」\n写入…</string>
     <string name="zip_import_ok_fmt">已导入到槽「%1$s」：%2$d 个文件，%3$s%4$s</string>
     <string name="zip_import_wiped_fmt">\n已先清空：%1$s</string>
+
+    <!--
+      ══ 整槽写入的三个模式（2026-10-05 第 104 轮）════════════════════════
+      用户要的：更新（相同的用新的盖）/ 反向更新（相同的保留旧的）/ 覆盖（完全替换）。
+      标签只给名字（文案三条：短），解释放在随选择变化的那行摘要里。
+    -->
+    <string name="slot_mode_title">这个槽怎么变？</string>
+    <string name="slot_mode_update">更新</string>
+    <string name="slot_mode_keep">反向更新</string>
+    <string name="slot_mode_replace">覆盖</string>
+    <string name="slot_mode_update_hint">两边都有的用新的盖掉；只在这个槽里的留着。</string>
+    <string name="slot_mode_keep_hint">两边都有的保留这个槽现在的；只把缺的补上。</string>
+    <string name="slot_mode_replace_hint">先把这个槽清空，再整份换成包里的。</string>
+    <string name="slot_mode_autobak_note">动手之前会自动备份一份，改坏了能退回来。</string>
+    <string name="backup_auto_zip">自动 · 整槽导入前</string>
+    <string name="backup_auto_restore">自动 · 恢复前</string>
+    <string name="slot_autobak_done_fmt">\n改前已自动备份：%1$s</string>
+    <string name="zip_import_kept_fmt">\n保留了 %1$d 个文件现在的版本。</string>
     <string name="zip_import_skipped_fmt">\n⚠️ 跳过 %1$d 个不安全条目</string>
     <string name="zip_import_failed">导入失败</string>
     <string name="zip_nothing">这个 zip 里没有可解包的文件。</string>
@@ -795,7 +817,7 @@
          「永久删除…安卓没有回收站」同一口径。
     -->
     <string name="msav_overwrite_title">槽里已经有同名存档</string>
-    <string name="msav_overwrite_msg_fmt">槽「%1$s」里已经有一份「%2$s」了。\n\n替换的话，那份旧的会被直接删掉，找不回来。</string>
+    <string name="msav_overwrite_msg_fmt">槽「%1$s」里已经有一份「%2$s」了。\n\n替换的话旧的会挪进中转站，不会直接删掉。</string>
     <string name="msav_overwrite_ok">替换</string>
     <string name="msav_overwrite_rename">换个名字</string>
 
@@ -858,6 +880,77 @@
     <string name="set_autoclean_done_fmt">清掉了 %1$d 项</string>
     <string name="set_autoclean_none">没有需要清理的</string>
     <string name="set_autoclean_fail">清理没成功，稍后再试</string>
+    <!--
+      ══ 中转站（TrashActivity，2026-10-05 第 102 轮）══════════════════════
+      起因（用户 2026-10-05）：「这个中转站像是个半成品啊」。此前"中转站"只是数据层的一个
+      目录（地图/模组被覆盖或删除时旧件挪进去），界面上**一处入口都没有** ——
+      文案却一直对用户说"挪进中转站，不会直接删掉"，等于承诺了一个进不去的地方。
+      这里补齐：入口在设置页一行，页面能看列表 / 放回去 / 彻底删除 / 清空 / 占用。
+
+      ★ 术语与老文案保持一致（`map_delete` 那几条说的是"中转站"）——
+        同一个东西在界面上有两种叫法，用户会以为是两件事。
+      ★ 时间、份数、体积**都由 Java 侧拼**（Trash.timeText / Util.formatSize），
+        资源里只写整句 + 占位符（aapt2 会剥掉值里的首尾空白，碎片式拼串必然粘连）。
+    -->
+    <string name="trash_title">中转站</string>
+    <string name="trash_sub">删掉的地图和槽、被替换的模组和存档先挪到这里，可以再放回去</string>
+    <string name="trash_head_fmt">共 %1$d 份 · %2$s</string>
+    <string name="trash_empty">还没有东西挪进来。\n删地图、删槽，或者替换模组和存档时，旧的那份会挪到这里。</string>
+    <string name="trash_scanning">正在清点…</string>
+    <string name="trash_scan_failed">中转站没清点出来。返回上一页再进一次试试。</string>
+    <string name="trash_empty_all">清空中转站</string>
+    <string name="trash_empty_all_sub">把这里的东西全部彻底删掉</string>
+    <string name="trash_empty_confirm_title">全部彻底删掉？</string>
+    <string name="trash_empty_confirm_fmt">把里面 %1$d 份（%2$s）全部彻底删掉？\n\n删掉就找不回来了。</string>
+    <string name="trash_emptied_fmt">已清空，释放了 %1$s</string>
+    <string name="trash_empty_fail">有东西没删掉，稍后再试</string>
+
+    <string name="trash_kind_map">地图</string>
+    <string name="trash_kind_mod">模组</string>
+    <string name="trash_kind_save">存档</string>
+    <string name="trash_kind_slot">整个槽</string>
+    <string name="trash_kind_other">其他文件</string>
+    <string name="trash_from_slot_fmt">来自槽「%1$s」</string>
+    <string name="trash_source_unknown">来源不清楚</string>
+    <string name="trash_files_fmt">%1$d 个文件</string>
+
+    <string name="trash_actions_msg_fmt">%1$s\n\n放回去游戏里就又能看到它；彻底删除就找不回来了。</string>
+    <string name="trash_restore">放回去…</string>
+    <string name="trash_restore_pick_title">放回哪个槽？</string>
+    <string name="trash_restore_confirm_title">放回去</string>
+    <string name="trash_restore_confirm_fmt">把「%1$s」放回槽「%2$s」？</string>
+    <string name="trash_restore_ok_fmt">已把「%1$s」放回槽「%2$s」</string>
+    <string name="trash_restore_overwrite_title">同名文件已存在</string>
+    <string name="trash_restore_overwrite_fmt">槽「%2$s」里已经有「%1$s」了。\n\n替换的话旧的会挪进中转站，不会直接删掉。</string>
+
+    <string name="trash_slot_restore_confirm_fmt">把整个槽「%1$s」放回去？\n\n它的存档、地图、模组连同备份一起回来。</string>
+    <string name="trash_slot_restored_fmt">已把槽「%1$s」放回来</string>
+    <string name="trash_slot_rename_title">换个名字放回去</string>
+    <string name="trash_slot_rename_hint">新的槽名</string>
+    <string name="trash_slot_rename_prefill_fmt">%1$s-恢复</string>
+    <string name="trash_slot_taken_fmt">已经有一个叫「%1$s」的槽了。\n\n给这个换个名字，两个都能留着。</string>
+    <string name="trash_slot_bad_name">这个名字不能用</string>
+
+    <string name="trash_delete_one">彻底删除</string>
+    <string name="trash_delete_one_confirm_fmt">把「%1$s」彻底删掉？\n\n删掉就找不回来了。</string>
+    <string name="trash_deleted_fmt">已彻底删掉「%1$s」</string>
+    <string name="trash_delete_fail">删不掉，稍后再试</string>
+
+    <string name="trash_busy_msg">游戏正在运行，现在动这些文件会跟它抢。请先退出游戏。</string>
+
+    <!-- 失败原因：纯 Java 的 Trash 只出「码 + 中性参数」，这里是码到话的映射（漏一条 = 界面静默空白） -->
+    <string name="trash_reason_not_in_trash">那一份已经不在中转站里了</string>
+    <string name="trash_reason_no_target">那个槽已经不在了</string>
+    <string name="trash_reason_name_taken">那个槽里已经有同名的文件了</string>
+    <string name="trash_reason_not_map">这个地图或存档游戏已经读不出来了</string>
+    <string name="trash_reason_stash_failed">挪不开原有的那份，什么都没改</string>
+    <string name="trash_reason_move_failed">放不回去，它还在中转站里</string>
+    <string name="trash_reason_no_kind">这既不是地图、模组、存档，也不是整个槽，没有地方放回去</string>
+    <string name="trash_reason_mkdir">建不了那个槽里的目录</string>
+    <string name="trash_reason_delete_failed">删不掉，它还在中转站里</string>
+    <string name="trash_reason_current_slot">那个槽正在用着，先换到别的槽再试</string>
+    <string name="trash_reason_bad_name">那个槽名不能用</string>
+    <string name="trash_reason_unknown">原因不明</string>
 <string name="about_card_title">关于</string>
 
     <!--

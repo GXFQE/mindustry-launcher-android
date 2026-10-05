@@ -108,6 +108,17 @@ public class SettingsActivity extends BaseActivity {
                 });
         mAutoCleanSub = (TextView) rowClean.findViewById(R.id.act_sub);
 
+        // 中转站（2026-10-05，第 102 轮）：地图/模组被覆盖或删除时挪进去的旧件在这里。
+        // ★ 入口放全局设置页 —— 中转站不属于任何一个槽（见 activity_settings.xml 里那段注释）。
+        // ★ 副标题是**固定的一句**，不显示份数/体积：那要扫盘（目录形态的模组可能不小），
+        //   而本页每次 onResume 都会重填一遍 —— 为了一个副标题去递归算体积不值得。
+        Util.bindAction(root, R.id.row_trash, R.drawable.ic_trash,
+                R.string.trash_title, R.string.trash_sub, new Runnable() {
+                    @Override public void run() {
+                        startActivity(new Intent(SettingsActivity.this, TrashActivity.class));
+                    }
+                });
+
         // 「关于」全部取运行期事实，不写死版本 —— 免得出现"日志说 0.2、界面写 0.1"
         String verName = "?";
         int verCode = 0;

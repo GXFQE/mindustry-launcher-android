@@ -1,0 +1,83 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  整槽写入的**模式选择器**（2026-10-05 第 104 轮）。被两处 include 共用：
+    · dialog_zip_import.xml —— 整槽 zip 导入
+    · SlotOps.restore 的确认框 —— 快照恢复
+
+  ★ 为什么共用一份布局：这两个入口问的是**同一个问题**（"新的和旧的重名时谁说了算、
+    要不要先清空"），分成两份布局迟早只改一边 —— 那是"同一件事两套口径"的老病。
+
+  ★ 为什么用单选组 + 一行实时摘要，而不是三个长的单选标签：
+    用户 2026-10-02 定的文案三条（短 / 少术语 / 无 markdown）⇒ 标签只给**名字**，
+    解释放在下面那行随选择变化的摘要里（`SlotModes.bind` 负责刷）。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="14dp"
+        android:text="@string/slot_mode_title"
+        android:textColor="@color/fg"
+        android:textSize="14sp"
+        android:fontFamily="sans-serif-medium" />
+
+    <RadioGroup
+        android:id="@+id/slot_mode_group"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:orientation="vertical">
+
+        <RadioButton
+            android:id="@+id/slot_mode_update"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/slot_mode_update"
+            android:textColor="@color/fg"
+            android:textSize="15sp" />
+
+        <RadioButton
+            android:id="@+id/slot_mode_keep"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/slot_mode_keep"
+            android:textColor="@color/fg"
+            android:textSize="15sp" />
+
+        <RadioButton
+            android:id="@+id/slot_mode_replace"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/slot_mode_replace"
+            android:textColor="@color/fg"
+            android:textSize="15sp" />
+    </RadioGroup>
+
+    <TextView
+        android:id="@+id/slot_mode_hint"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:lineSpacingExtra="2dp"
+        android:textColor="@color/fg_muted"
+        android:textSize="12sp" />
+
+    <!-- 自动备份那句话：三个模式都成立，所以放固定行里，不进随选择变化的摘要 -->
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:background="@drawable/pol_live_bg"
+        android:paddingStart="12dp"
+        android:paddingEnd="12dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:lineSpacingExtra="2dp"
+        android:text="@string/slot_mode_autobak_note"
+        android:textColor="@color/fg"
+        android:textSize="12sp" />
+</LinearLayout>

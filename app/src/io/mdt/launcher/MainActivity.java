@@ -136,6 +136,7 @@ public class MainActivity extends BaseActivity {
                 || intent.hasExtra("dev_autobackup_test")
                 || intent.hasExtra("dev_zip_list")
                 || intent.hasExtra("dev_zip_import")
+                || intent.hasExtra("dev_zip_confirm")
                 || intent.hasExtra("dev_zip_export")
                 || intent.hasExtra("dev_cas_stats")
                 || intent.hasExtra("dev_cas_gc")
@@ -311,8 +312,28 @@ public class MainActivity extends BaseActivity {
         }
         String zipImp = intent.getStringExtra("dev_zip_import");
         if (zipImp != null && !zipImp.isEmpty()) {
-            devZipImport(new File(zipImp), intent.getStringExtra("dev_zip_slot"),
-                    "1".equals(intent.getStringExtra("dev_zip_wipe")));
+            // 模式：`dev_zip_mode` 优先；老的 `dev_zip_wipe 1` 等价于"覆盖"（见 devZipImport 注释）
+            String modeStr = intent.getStringExtra("dev_zip_mode");
+            int mode = SlotWrite.UPDATE;
+            if (modeStr != null && !modeStr.trim().isEmpty()) {
+                try {
+                    mode = Integer.parseInt(modeStr.trim());
+                } catch (NumberFormatException ignored) {
+                    mode = SlotWrite.UPDATE;
+                }
+            } else if ("1".equals(intent.getStringExtra("dev_zip_wipe"))) {
+                mode = SlotWrite.REPLACE;
+            }
+            devZipImport(new File(zipImp), intent.getStringExtra("dev_zip_slot"), mode);
+            return;
+        }
+        String zipConfirm = intent.getStringExtra("dev_zip_confirm");
+        if (zipConfirm != null && !zipConfirm.isEmpty()) {
+            // 整槽导入的**确认框**（带三个模式选择器）——SAF 选包那一步换成路径，其余与界面同路。
+            SlotIo.devReadZip(this, new File(zipConfirm), intent.getStringExtra("dev_zip_slot"),
+                    new SlotOps.Host() {
+                        @Override public void onSlotChanged() { rescan(); }
+                    });
             return;
         }
         String zipExp = intent.getStringExtra("dev_zip_export");
@@ -829,16 +850,21 @@ public class MainActivity extends BaseActivity {
     /**
      * F6c：直接解包（跳过 SAF 选包），走与界面**完全相同**的
      * {@link SlotZip#stage} → {@link SlotZip#inspect} → {@link SlotZip#extract} 三步。
-     * 用法：`--es dev_zip_import /sdcard/xxx.zip [--es dev_zip_slot <槽>] [--es dev_zip_wipe 1]`
+     *
+     * 用法：`--es dev_zip_import /sdcard/xxx.zip [--es dev_zip_slot <槽>] [--es dev_zip_mode <0|1|2>]`
+     *   mode：0 = 更新（默认，只覆盖同名）/ 1 = 反向更新（同名保留槽里的）/ 2 = 覆盖（先清空）。
+     *   ⚠️ 旧的 `--es dev_zip_wipe 1` 仍认，等价于 mode=2（2026-10-05 第 104 轮把
+     *      "要不要清空"扩成了三个模式，老脚本不该因此失效）。
      */
-    private void devZipImport(final File src, final String slotArg, final boolean wipe) {
+    private void devZipImport(final File src, final String slotArg, final int modeArg) {
         final String slot = (slotArg == null || slotArg.isEmpty())
                 ? Data.currentSlot(this) : slotArg;
+        final int mode = SlotWrite.sane(modeArg);
         new Thread(new Runnable() {
             @Override public void run() {
                 final StringBuilder sb = new StringBuilder();
                 sb.append("dev_zip_import ").append(src.getAbsolutePath())
-                  .append(" -> 槽 \"").append(slot).append("\"  wipe=").append(wipe).append('\n');
+                  .append(" -> 槽 \"").append(slot).append("\"  mode=").append(mode).append('\n');
                 try {
                     File tmp = SlotZip.stage(MainActivity.this, Uri.fromFile(src));
                     try {
@@ -846,10 +872,11 @@ public class MainActivity extends BaseActivity {
                         sb.append("inspect: files=").append(inf.files)
                           .append(" native=").append(inf.nativeFormat)
                           .append(" strip=\"").append(inf.strip).append("\"\n");
-                        SlotZip.Result r = SlotZip.extract(MainActivity.this, tmp, inf, slot, wipe);
+                        SlotZip.Result r = SlotZip.extract(MainActivity.this, tmp, inf, slot, mode);
                         sb.append("extract: files=").append(r.files)
                           .append(" bytes=").append(r.bytes)
                           .append(" skipped=").append(r.skipped)
+                          .append(" kept=").append(r.kept)
                           .append(" wiped=").append(r.wiped).append('\n');
                         sb.append("槽目录=").append(Data.dirOf(MainActivity.this, slot)).append('\n');
                     } finally {

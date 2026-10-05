@@ -78,16 +78,40 @@ public final class Msav {
         return s;
     }
 
-    /** 落定：`<名>.msav.part` → `<名>.msav`。同名已存在则替换（用户选的这份为准）。 */
+    /**
+     * 落定：`<名>.msav.part` → `<名>.msav`。同名已存在则替换（用户选的这份为准）。
+     *
+     * ★★ 2026-10-05（第二批）：同名那份**先进中转站**，不再硬删。
+     *   在此之前这里是 `dest.delete()` —— 界面上那句「替换会删掉旧的」是**如实**的，
+     *   也就是"用户几百小时的存档，替换一次就没了"（第 86 轮只补了"先问一声"）。
+     *   现在与地图那条线同一个口径：`&lt;hub&gt;/saves-trash/&lt;戳&gt;__&lt;槽&gt;__&lt;原名&gt;`，
+     *   中转站页面能看到、能放回来。
+     *
+     * 🔴 **挪不动就拒绝这次导入**（不是退化成硬删）：旧存档**只存在这一份**，
+     *   "删了再改名"就是静默丢数据。宁可报错让用户腾点空间重试 —— 旧的还在，
+     *   而 `.part` 由调用方 {@link #discard} 收掉。
+     * ★ 挪动成功后改名失败 ⇒ 把旧的那份**搬回来**（宁可回到原状，也不留一个空位）。
+     */
     public static File commit(Context ctx, Stage s) throws IOException {
         File dest = new File(s.savesDir, s.base);
-        if (dest.exists() && !dest.delete()) {
-            throw new IOException(ctx.getString(R.string.msav_err_same_name_fmt, s.base));
+        File stash = null;
+        if (dest.exists()) {
+            File dir = Trash.savesDir(ctx);
+            if (!dir.isDirectory() && !dir.mkdirs() && !dir.isDirectory()) {
+                throw new IOException(ctx.getString(R.string.msav_err_trash_failed));
+            }
+            stash = new File(dir, Trash.nameFor(Trash.slotLabel(s.savesDir), dest.getName()));
+            dest.setWritable(true);
+            if (!Trash.move(dest, stash)) {
+                throw new IOException(ctx.getString(R.string.msav_err_trash_failed));
+            }
         }
         s.part.setWritable(true);
         if (!s.part.renameTo(dest)) {
+            if (stash != null) Trash.move(stash, dest);        // 回滚：旧的放回去
             throw new IOException(ctx.getString(R.string.msav_err_rename_fmt, s.part.getName(), s.base));
         }
+        if (stash != null) Trash.pruneIn(stash.getParentFile());
         return dest;
     }
 

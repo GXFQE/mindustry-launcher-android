@@ -91,6 +91,14 @@ public final class SelfTest {
     /** ⑰ F13 第三阶段：模组包导入 / 跨槽复制 —— 源槽与目标槽 */
     public static final String SLOT_PACK = "m3-modpack";
     public static final String SLOT_PACK_DST = "m3-modpack-dst";
+    /** ㊴ 中转站第二批：存档同名覆盖用的槽 */
+    public static final String SLOT_SAVE = "m3-saves";
+    /** ㊴ 中转站第二批：整槽进站/放回用的槽，以及"换个名字放回去"那个目标 */
+    public static final String SLOT_GONE = "m3-gone";
+    public static final String SLOT_GONE2 = "m3-gone2";
+    /** ㊵ 整槽写入模式：一个用来被"改写"的槽，一个**故意留空**（验自动备份在空槽上安静跳过） */
+    public static final String SLOT_MODE = "m3-mode";
+    public static final String SLOT_MODE2 = "m3-mode-empty";
 
     /**
      * 自检会创建并最终删除的**全部**测试槽。
@@ -99,7 +107,8 @@ public final class SelfTest {
      */
     private static final String[] TEST_SLOTS = {
             SLOT, SLOT_RENAMED, CLONE_SRC, CLONE_DST, CLONE_EMPTY, CLONE_EMPTY_DST, SLOT_MODS,
-            SLOT_SET, SLOT_PACK, SLOT_PACK_DST};
+            SLOT_SET, SLOT_PACK, SLOT_PACK_DST, SLOT_SAVE, SLOT_GONE, SLOT_GONE2,
+            SLOT_MODE, SLOT_MODE2};
 
     /**
      * 本工程**自己的全部页面**（㊱ 基类检查用）。
@@ -111,7 +120,7 @@ public final class SelfTest {
     private static final Class<?>[] PAGES = {
             MainActivity.class, SavesActivity.class, SlotActivity.class, ModsActivity.class,
             MapsActivity.class, MapDetailActivity.class, SettingsActivity.class,
-            LogActivity.class, GameSlot.class};
+            LogActivity.class, TrashActivity.class, GameSlot.class};
 
     private SelfTest() {}
 
@@ -141,7 +150,7 @@ public final class SelfTest {
         try {
             for (String s : TEST_SLOTS) {
                 Backup.deleteSlotBackups(ctx, s);
-                Data.deleteSlot(ctx, s);
+                Data.deleteSlotForever(ctx, s);
             }
         } catch (Throwable ignored) {
         }
@@ -215,6 +224,13 @@ public final class SelfTest {
             textEdgeWhitespace(ctx, L, stat);
             // ★ ㉟ 模组详情首层那句「简介」（纯函数：subtitle 优先 / description 第一行 / 截断 / 空）
             modTagline(L, stat);
+            // ★ ㊳ 中转站：列表 / 放回去（验过才放回）/ 同名先问 / 彻底删除 / 清空 / 修剪 / 码映射
+            //   （顺手把 ⑰ 为了复现跨文件系统 rename 而写进**真目录**的那几份自检残留清掉）
+            trashStation(ctx, L, stat);
+            // ★ ㊴ 中转站第二批：存档同名覆盖 / 整个槽（含"进站不许让快照对象变孤儿"那条元断言）
+            trashMore(ctx, L, stat);
+            // ★ ㊵ 整槽写入的三个模式（更新 / 反向更新 / 覆盖）+ 槽操作前的自动备份
+            slotModes(ctx, L, stat);
             // ★ 篡改对象池的用例放**最后**：它会在池里留下一个内容坏掉的对象，
             //   之后任何"再备份一次"都会因为 `has()` 命中而复用坏对象（CAS 的固有
             //   假设是"池内不可变"）。放在最后就不影响别的用例。
@@ -230,7 +246,7 @@ public final class SelfTest {
         int cleaned = 0;
         for (String s : leftover) {
             Backup.deleteSlotBackups(ctx, s);
-            if (Data.deleteSlot(ctx, s) == null) cleaned++;
+            if (Data.deleteSlotForever(ctx, s) == null) cleaned++;
         }
         L.add("");
         L.add(cleaned + " 个测试槽已清理（含其备份）");
@@ -349,7 +365,7 @@ public final class SelfTest {
         String cur = Data.currentSlot(ctx);
         String curName = Data.sanitizeSlot(cur);
         if (curName != null) {
-            ok(stat, L, Data.deleteSlot(ctx, cur) != null, "拒绝删除当前槽「" + cur + "」");
+            ok(stat, L, Data.deleteSlotForever(ctx, cur) != null, "拒绝删除当前槽「" + cur + "」");
         }
 
         // 改名
@@ -3377,7 +3393,7 @@ public final class SelfTest {
             String zMany = ctx.getString(R.string.slotzip_err_too_many_fmt, 5000);
             String zMore = ctx.getString(R.string.slotzip_more_fmt, 9);
             String zNoDir = ctx.getString(R.string.slotzip_err_no_slot_dir_fmt, "s");
-            String zWipe = ctx.getString(R.string.slotzip_err_wipe_failed_fmt, "/w");
+            String zWipe = ctx.getString(R.string.slotwrite_err_wipe_failed_fmt, "/w");
             String zMkdir = ctx.getString(R.string.slotzip_err_mkdir_slot_fmt, "/m");
             String zWrite = ctx.getString(R.string.slotzip_err_write_failed_fmt, "/x", "why");
             String zDel = ctx.getString(R.string.slotzip_err_delete_failed_fmt, "/d");
@@ -3528,16 +3544,17 @@ public final class SelfTest {
             String ePkg = ctx.getString(R.string.exp_err_pkg_missing_fmt, "/q");
             String eEnt = ctx.getString(R.string.exp_err_entry_missing_fmt, "maps/a.msav");
             String mNo = enCtx.getString(R.string.msav_err_no_saves_fmt, "s");
-            String mSame = ctx.getString(R.string.msav_err_same_name_fmt, "a.msav");
+            // `msav_err_same_name_fmt` 已随第二批删掉（同名那份现在**进中转站**，不再"删不掉就报错"）
+            String mTrash = ctx.getString(R.string.msav_err_trash_failed);
             String mRen = ctx.getString(R.string.msav_err_rename_fmt, "a.part", "a.msav");
             ok(stat, L, iSmall.contains("42") && iEntry.contains("a.b.C") && iRen.contains("x.apk")
                             && eSrc.contains("/p") && ePkg.contains("/q")
                             && eEnt.contains("maps/a.msav") && mNo.contains("s")
-                            && mSame.contains("a.msav") && mRen.contains("a.part")
+                            && !mTrash.isEmpty() && mRen.contains("a.part")
                             && mRen.contains("a.msav")
                             && !ctx.getString(R.string.imp_err_bad_zip).isEmpty()
                             && !ctx.getString(R.string.exp_err_dest_readonly).isEmpty(),
-                    "★P3：导入/导出/存档落盘那 9 条带占位符的按真参数实拼（含 1 条两个参数）");
+                    "★P3：导入/导出/存档落盘那几条带占位符的按真参数实拼（含 1 条两个参数）");
 
             // ★★ P3 第十六批：CAS 对象池的失败原因（纯 Java ⇒ 码 + 参数）。
             //    它堵的是 `Backup` 恢复报告「每文件一行」那条泄漏（原来直接吃 `getMessage()`）。
@@ -3733,15 +3750,133 @@ public final class SelfTest {
                         && noopMsg.equals("「蓝钢拓展」本来就是启用的，文件一个字节都没动。"),
                 "★启停结果弹窗三条整句实拼：" + okMsg + " ｜ " + noopMsg);
         String ow = ctx.getString(R.string.msav_overwrite_msg_fmt, "default", "困难模式.msav");
+        // ★ 2026-10-05（第二批）：这句的措辞变了 —— 同名那份现在**进中转站**（以前是"直接删掉"）。
+        //   判据随之改成"说了中转站、而且不再承诺删掉"（旧措辞里的「找不回来」必须消失）。
         ok(stat, L, ow.contains("default") && ow.contains("困难模式.msav")
-                        && ow.contains("找不回来"),
-                "★同名存档覆盖确认两句实拼：" + ow.replace('\n', ' '));
+                        && ow.contains("中转站") && !ow.contains("找不回来"),
+                "★同名存档覆盖确认两句实拼（旧的那份进中转站，不再说\"直接删掉\"）："
+                        + ow.replace('\n', ' '));
         String lp = ctx.getString(R.string.launch_progress_msg_fmt, "MindustryX  2026.09.X37");
         ok(stat, L, lp.contains("正在准备存档槽") && lp.contains("2026.09.X37"),
                 "★启动进度提示实拼：" + lp.replace('\n', ' '));
         String ep = ctx.getString(R.string.maps_empty_fmt, "default");
         ok(stat, L, ep.contains("default") && ep.contains("给某个版本分配这个槽"),
                 "★地图页空态实拼：" + ep.replace('\n', ' '));
+        L.add("");
+    }
+
+    /**
+     * ㊵ **整槽写入的三个模式 + 槽操作前的自动备份**（2026-10-05 第 104 轮）。
+     *
+     * 用户原话：「**这个整槽变更，我觉得可以有几个模式的**：更新（混合，相同新覆盖旧）/
+     * 反向更新（混合，相同旧覆盖新）/ 覆盖（完全替换）。**以及在槽操作前都自动备份吧
+     * （反正 CAS 不占空间）**」。
+     *
+     * 🔴 判据纪律：
+     * <pre>
+     *   ① 三种模式必须**互相可分辨**：同一对手文件（`both`）在更新下变成新内容、
+     *      在反向更新下**一个字节都不动**、在覆盖下变成新内容且**只在这里的**被删掉；
+     *   ② ★ 覆盖**不许**动 {@link Data#SLOT_EXCLUDE} 里的东西（缓存 / 导入副本 / config.json）——
+     *      少了这条，"完全替换"会顺手把游戏的临时目录也删了；
+     *   ③ ★ 元断言：越界的模式值（99）必须退化成"更新"而**不是**"清空"
+     *      （清空是不可逆的，拿它当兜底等于埋一颗雷）；
+     *   ④ 自动备份真的落了一份快照、且**空槽时安静地跳过**（不能因为"没内容可备"就报错）。
+     * </pre>
+     */
+    private static void slotModes(Context ctx, List<String> L, int[] stat) {
+        L.add("── ㊵ 整槽写入的三个模式（更新 / 反向更新 / 覆盖）+ 操作前自动备份 ──");
+        try {
+            String e1 = Data.createSlot(ctx, SLOT_MODE);
+            String e2 = Data.createSlot(ctx, SLOT_MODE2);
+            ok(stat, L, e1 == null && e2 == null,
+                    "建测试槽 " + SLOT_MODE + " / " + SLOT_MODE2
+                            + (e1 == null && e2 == null ? "" : "：" + e1 + e2));
+            if (e1 != null || e2 != null) return;
+
+            File slot = Data.slotDir(ctx, SLOT_MODE);
+            File saves = new File(slot, "saves");
+            File both = new File(saves, "both.msav");
+            File onlyTarget = new File(saves, "only-target.msav");
+            File modInSlot = new File(new File(slot, "mods"), "keepmod.zip");
+            File cache = new File(new File(slot, "cache"), "junk.bin");
+            write(both, "OLD".getBytes("UTF-8"));
+            write(onlyTarget, "T".getBytes("UTF-8"));
+            write(modInSlot, "M".getBytes("UTF-8"));
+            write(cache, "C".getBytes("UTF-8"));
+            write(new File(slot, "config.json"), "{}".getBytes("UTF-8"));
+
+            // 包：只含 saves/（**故意不含 mods/**）——就是"完全替换会不会把模组清掉"那个问题
+            File zip1 = new File(Paths.privateDir(ctx), "selftest-mode1.zip");
+            zipMany(zip1, new String[]{"saves/both.msav", "saves/only-zip.msav"},
+                    new String[]{"NEW", "Z"});
+            File zip2 = new File(Paths.privateDir(ctx), "selftest-mode2.zip");
+            zipMany(zip2, new String[]{"saves/both.msav", "saves/only-zip2.msav"},
+                    new String[]{"NEW2", "Z2"});
+
+            // ── ① 更新：同名用包里的，只在这里的留着 ──────────────────────
+            SlotZip.Info i1 = SlotZip.inspect(ctx, zip1);
+            SlotZip.Result r1 = SlotZip.extract(ctx, zip1, i1, SLOT_MODE, SlotWrite.UPDATE);
+            ok(stat, L, "NEW".equals(read(both)) && onlyTarget.isFile()
+                            && new File(saves, "only-zip.msav").isFile()
+                            && modInSlot.isFile() && r1.kept == 0,
+                    "① 更新：同名换成包里的（both=「" + read(both) + "」），只在这里的与模组都留着");
+
+            // ── ② 反向更新：同名保留槽里的，只补缺的 ──────────────────────
+            write(both, "OLD".getBytes("UTF-8"));
+            SlotZip.Info i2 = SlotZip.inspect(ctx, zip2);
+            SlotZip.Result r2 = SlotZip.extract(ctx, zip2, i2, SLOT_MODE, SlotWrite.KEEP_OLD);
+            ok(stat, L, "OLD".equals(read(both)) && new File(saves, "only-zip2.msav").isFile()
+                            && r2.kept >= 1,
+                    "② ★反向更新：同名**一个字节没动**（both 仍是「" + read(both) + "」），"
+                            + "缺的补上（kept=" + r2.kept + "）");
+
+            // ── ③ 覆盖：完全替换（只在这里的没了；模组也按包里的来） ──────
+            SlotZip.Result r3 = SlotZip.extract(ctx, zip2, i2, SLOT_MODE, SlotWrite.REPLACE);
+            ok(stat, L, "NEW2".equals(read(both)) && !onlyTarget.exists()
+                            && !modInSlot.exists() && new File(saves, "only-zip2.msav").isFile()
+                            && !r3.wiped.isEmpty(),
+                    "③ ★覆盖：槽里只剩包里的（只在这里的与模组都清掉了，wiped=" + r3.wiped + "）");
+            ok(stat, L, cache.isFile() && new File(slot, "config.json").isFile(),
+                    "③ ★覆盖**不许**动排除名单里的东西（缓存 / 导入副本 / 游戏配置还在）——"
+                            + "少了这条，\"完全替换\"会顺手删掉游戏的临时目录");
+
+            // ── ④ 越界模式值 ⇒ 退化成"更新"（元断言） ─────────────────────
+            ok(stat, L, SlotWrite.sane(99) == SlotWrite.UPDATE
+                            && !SlotWrite.wipeFirst(99) && SlotWrite.sourceWins(99),
+                    "④ ★元断言：越界的模式值（99）退化成\"更新\"，**绝不**变成\"清空\""
+                            + "（清空不可逆，拿它当兜底等于埋雷）");
+
+            // ── ⑤ 快照恢复那三条路（与 zip 共用 SlotWrite，但计数/清空是另一段代码） ──
+            Backup.Snapshot snap = Backup.create(ctx, SLOT_MODE, "㊵ 基准");
+            write(both, "LATER".getBytes("UTF-8"));
+            write(new File(saves, "added-later.msav"), "L".getBytes("UTF-8"));
+            Backup.RestoreResult kk = Backup.restore(ctx, SLOT_MODE, snap, SlotWrite.KEEP_OLD);
+            ok(stat, L, kk.ok && "LATER".equals(read(both)),
+                    "⑤ ★恢复·反向更新：槽里改过的那份**保留**（both=「" + read(both) + "」）");
+            Backup.RestoreResult rr = Backup.restore(ctx, SLOT_MODE, snap, SlotWrite.REPLACE);
+            ok(stat, L, rr.ok && "NEW2".equals(read(both))
+                            && !new File(saves, "added-later.msav").exists(),
+                    "⑤ ★恢复·覆盖：回到快照那一刻（both=「" + read(both) + "」，"
+                            + "快照之后新增的那份没了）");
+
+            // ── ⑥ 槽操作前的自动备份 ──────────────────────────────────────
+            int before = Backup.list(ctx, SLOT_MODE).size();
+            Backup.Snapshot auto = AutoBackup.beforeSlotOp(ctx, SLOT_MODE, "㊵ 自动");
+            int after = Backup.list(ctx, SLOT_MODE).size();
+            ok(stat, L, auto != null && after == before + 1 && "㊵ 自动".equals(auto.label),
+                    "⑥ 槽操作前自动备份：真落了一份快照（" + before + " → " + after + "，备注「"
+                            + (auto == null ? "?" : auto.label) + "」）");
+            int emptyBefore = Backup.list(ctx, SLOT_MODE2).size();
+            Backup.Snapshot none = AutoBackup.beforeSlotOp(ctx, SLOT_MODE2, "㊵ 空槽");
+            ok(stat, L, none == null && Backup.list(ctx, SLOT_MODE2).size() == emptyBefore,
+                    "⑥ ★空槽 ⇒ 安静跳过（返回 null、不抛错、不建空快照）——"
+                            + "自动备份是安全网，不是门禁");
+        } catch (Throwable t) {
+            ok(stat, L, false, "㊵ 自身异常：" + t);
+        } finally {
+            new File(Paths.privateDir(ctx), "selftest-mode1.zip").delete();
+            new File(Paths.privateDir(ctx), "selftest-mode2.zip").delete();
+        }
         L.add("");
     }
 
@@ -3760,6 +3895,360 @@ public final class SelfTest {
             if (!left || !right) return false;
         }
         return any;
+    }
+
+    /**
+     * ㊳ **中转站**（2026-10-05，第 102 轮）。
+     *
+     * 背景（用户 2026-10-05）：「这个中转站像是个半成品啊」—— 查下来是**只有数据层、没有界面层**：
+     * 地图/模组被覆盖或删除时旧件被挪进 `&lt;hub&gt;/maps-trash/`、`&lt;hub&gt;/mods-trash/`，
+     * 而全工程**没有一处界面读过它们**（见 {@link Trash} 类注释）。本轮的页面 + 数据层要一起验。
+     *
+     * 🔴 判据纪律（每条都拿"已知是坏的输入"喂过）：
+     * <pre>
+     *   ① 名字编解码：v2 往返 / **v1（老用户的中转站里就是它）读得懂** / 认不出也要保留原名；
+     *      ★ 元断言：v1 里"原名以三位数字开头"不许被当成毫秒（那会让恢复落到错的文件名上）；
+     *   ② 放回去：地图**过解析器**才算数，就位后与原件**逐字节一致**，中转站里那份已离开；
+     *      ★ 元断言：把那份写成垃圾字节 ⇒ **必须判死**（否则"验过才放回"是句空话）；
+     *   ③ 同名：没确认 ⇒ 只回来问一声、**两边都没动**；确认替换 ⇒ 旧的**再进一次中转站**；
+     *   ④ 认不出类型（.txt）与"不在中转站里的文件"都必须**动不了**（两条安全判据）；
+     *   ⑤ 修剪按**真实时间**（认不出戳的用文件时间），不是文件名字典序 —— 见下面那条构造；
+     *   ⑥ 所有错误码都要映射到真文案（漏映射 = 界面静默"原因不明"）+ 带占位符的文案实拼一遍。
+     * </pre>
+     *
+     * ⚠️ 全部在 `app_hub/selftest-trash/` 里自建夹具、跑完删掉 —— **绝不碰用户真正的中转站**
+     *   （唯一一处例外是结尾那次"打扫 ⑰ 留下的残留"，它按"来源槽以 m3- 开头"这个判据删，
+     *   且那个判据本身先在临时目录里验过分辨力）。
+     */
+    private static void trashStation(Context ctx, List<String> L, int[] stat) {
+        L.add("── ㊳ 中转站（列表 / 放回去 / 彻底删除 / 清空 / 修剪）──");
+        File root = new File(Paths.privateDir(ctx), "selftest-trash");
+        deleteTree(root);
+        File trash = new File(root, "trash");
+        File slotMaps = new File(root, "slot-test/maps");
+        File slotMods = new File(root, "slot-test/mods");
+        trash.mkdirs();
+        slotMaps.mkdirs();
+        slotMods.mkdirs();
+        try {
+            // ── ① 名字编解码 ──────────────────────────────────────────────
+            File v2f = new File(trash, Trash.nameFor("default", "我的图.msav"));
+            write(v2f, "x".getBytes("UTF-8"));
+            Trash.Item a = Trash.parse(v2f);
+            ok(stat, L, a.parsed && "default".equals(a.slot) && "我的图.msav".equals(a.name)
+                            && a.kind == Trash.Kind.MAP && a.stamp > 0,
+                    "① v2 名字往返：来源槽「" + a.slot + "」· 原名「" + a.name + "」· 类型 " + a.kind);
+
+            File v1f = new File(trash, "20261004-153000-旧图.msav");
+            write(v1f, "x".getBytes("UTF-8"));
+            Trash.Item b = Trash.parse(v1f);
+            ok(stat, L, b.parsed && b.slot.isEmpty() && "旧图.msav".equals(b.name),
+                    "① 旧格式（v1）读得懂：来源槽为空（界面据此说\"来源不清楚\"）· 原名「" + b.name + "」");
+
+            File v1d = new File(trash, "20261004-153000-123-图.msav");
+            Trash.Item c = Trash.parse(v1d);
+            ok(stat, L, "123-图.msav".equals(c.name),
+                    "① ★元断言：v1 里以三位数字开头的原名**不被当成毫秒吃掉**（得到「" + c.name + "」）");
+
+            File odd = new File(trash, "不是时间戳的图.msav");
+            write(odd, "x".getBytes("UTF-8"));
+            Trash.Item d = Trash.parse(odd);
+            ok(stat, L, !d.parsed && "不是时间戳的图.msav".equals(d.name),
+                    "① ★元断言：认不出的名字 parsed=false，但**原名原样保留**（得到「" + d.name + "」）");
+
+            // ── ② 放回去：过解析器 + 逐字节一致 ───────────────────────────
+            File srcMap = tinyMsav(new File(root, "夹具.msav"), "夹具图", 32, 32, 1, false);
+            final byte[] mapBytes = java.nio.file.Files.readAllBytes(srcMap.toPath());
+            File tMap = new File(trash, Trash.nameFor("srcslot", "夹具图.msav"));
+            write(tMap, mapBytes);
+            Trash.Result r1 = Trash.restore(tMap, slotMaps, false, trash);
+            File back = new File(slotMaps, "夹具图.msav");
+            ok(stat, L, r1.ok && back.isFile() && !tMap.exists()
+                            && java.util.Arrays.equals(mapBytes,
+                                    java.nio.file.Files.readAllBytes(back.toPath())),
+                    "② 放回地图：就位那份与原件**逐字节一致**，且中转站里那份已离开（是挪不是拷）");
+
+            File tBad = new File(trash, Trash.nameFor("srcslot", "坏图.msav"));
+            write(tBad, "not a map".getBytes("UTF-8"));
+            Trash.Result r2 = Trash.restore(tBad, slotMaps, false, trash);
+            ok(stat, L, !r2.ok && r2.errCode == Trash.Result.T_NOT_MAP && tBad.isFile()
+                            && !new File(slotMaps, "坏图.msav").exists(),
+                    "② ★元断言：坏地图**放不回去**（过不了解析器），原件仍留在中转站");
+
+            // ── ③ 同名：先问一声 / 明确替换 ───────────────────────────────
+            File tMap2 = new File(trash, Trash.nameFor("srcslot", "夹具图.msav"));
+            write(tMap2, mapBytes);
+            Trash.Result r3 = Trash.restore(tMap2, slotMaps, false, trash);
+            ok(stat, L, !r3.ok && r3.nameTaken && r3.errCode == Trash.Result.T_NAME_TAKEN
+                            && back.isFile() && tMap2.isFile(),
+                    "③ 同名 + 没确认 ⇒ 只回来问一声（nameTaken 字段，不是看文案）：**两边都没动**");
+            int before = Trash.list(trash).size();
+            Trash.Result r4 = Trash.restore(tMap2, slotMaps, true, trash);
+            ok(stat, L, r4.ok && back.isFile() && !tMap2.exists()
+                            && Trash.list(trash).size() == before,
+                    "③ 同名 + 明确替换 ⇒ 新的就位，**旧的再进一次中转站**（份数不变："
+                            + before + " 份进、出各一）");
+
+            // ── ④ 两条安全判据：认不出类型的 / 不在中转站里的 ──────────────
+            File tOther = new File(trash, Trash.nameFor("srcslot", "笔记.txt"));
+            write(tOther, "hello".getBytes("UTF-8"));
+            Trash.Result r5 = Trash.restore(tOther, slotMods, false, trash);
+            ok(stat, L, !r5.ok && r5.errCode == Trash.Result.T_NO_KIND && tOther.isFile(),
+                    "④ 认不出类型（.txt）⇒ **没有地方放回去**，判死（界面也不给那个按钮）");
+
+            File outside = new File(root, "外面的图.msav");
+            write(outside, mapBytes);
+            Trash.Result r6 = Trash.restore(outside, slotMaps, true, trash);
+            Trash.Result r7 = Trash.remove(outside, trash);
+            ok(stat, L, !r6.ok && r6.errCode == Trash.Result.T_NOT_IN_TRASH
+                            && !r7.ok && outside.isFile(),
+                    "④ ★安全判据：不在中转站里的文件**放不动也删不动**（只认直接子项），文件没被碰");
+
+            // 目标槽不存在（界面那条路：restoreInSlot 先解析槽目录）
+            Trash.Result r8 = Trash.restoreFrom(ctx, Trash.parse(tOther), "m3-no-such-slot-9f", false);
+            ok(stat, L, !r8.ok && r8.errCode == Trash.Result.T_NO_TARGET,
+                    "④ 目标槽不存在 ⇒ 判死（不会顺手建一个槽出来）");
+
+            // ── ⑤ 修剪按真实时间，不按文件名字典序 ────────────────────────
+            File pr = new File(root, "prune");
+            pr.mkdirs();
+            File older = new File(pr, "20260101-000000-000__s__old.msav");
+            write(older, "old".getBytes("UTF-8"));
+            File unparsed = new File(pr, "a.zip");
+            write(unparsed, "zip".getBytes("UTF-8"));
+            // 名字时间戳 2026-01-01 vs 认不出戳的 a.zip（按文件时间 2020）——
+            // 字典序会把 a.zip 当"最新"（`a` > `2`），真实时间说它最旧 ⇒ 两种排序结论相反
+            boolean lm = unparsed.setLastModified(1577836800000L);   // 2020-01-01
+            int removed = Trash.prune(pr, 1);
+            ok(stat, L, lm && removed == 1 && !unparsed.exists() && older.isFile(),
+                    "⑤ ★修剪按**真实时间**：2020 那份（名字以 a 开头、字典序最大）先被删，2026 那份留下");
+
+            // ── ⑥ 清空 / 码映射 / 文案实拼 ────────────────────────────────
+            final int n0 = Trash.list(trash).size();
+            Trash.Result r9 = Trash.empty(trash);
+            ok(stat, L, r9.ok && r9.count == n0 && Trash.list(trash).isEmpty(),
+                    "⑥ 清空：一次删掉 " + r9.count + " 份（" + Util.formatSize(r9.bytes) + "），目录空了");
+
+            int mapped = 0;
+            for (int code : Trash.Result.ALL_CODES) {
+                String s = TrashText.reason(ctx, Trash.withCode(code, "x"));
+                if (s != null && !s.isEmpty()
+                        && !s.equals(ctx.getString(R.string.trash_reason_unknown))) mapped++;
+            }
+            ok(stat, L, mapped == Trash.Result.ALL_CODES.length,
+                    "⑥ ★遍历所有错误码都有真文案（漏映射 = 界面静默\"原因不明\"）："
+                            + mapped + "/" + Trash.Result.ALL_CODES.length);
+            ok(stat, L, ctx.getString(R.string.trash_reason_unknown)
+                            .equals(TrashText.reason(ctx, Trash.withCode(Trash.Result.T_NONE, null))),
+                    "⑥ ★元断言：没有码时**就是**兜底那句（说明上面那条不是在恒真地打勾）");
+
+            try {
+                String head = TrashText.head(ctx, 3, 1024);
+                String line = TrashText.line(ctx, Trash.parse(older));
+                String s3 = ctx.getString(R.string.trash_actions_msg_fmt, line);
+                String s4 = ctx.getString(R.string.trash_restore_confirm_fmt, "图.msav", "default");
+                String s5 = ctx.getString(R.string.trash_restore_ok_fmt, "图.msav", "default");
+                String s6 = ctx.getString(R.string.trash_restore_overwrite_fmt, "图.msav", "default");
+                String s7 = ctx.getString(R.string.trash_empty_confirm_fmt, 2, "1.2 MB");
+                String s8 = ctx.getString(R.string.trash_delete_one_confirm_fmt, "图.msav");
+                String s9 = ctx.getString(R.string.trash_deleted_fmt, "图.msav");
+                String s10 = ctx.getString(R.string.trash_emptied_fmt, "1.2 MB");
+                String s11 = ctx.getString(R.string.trash_from_slot_fmt, "default");
+                ok(stat, L, sepsOk(head) && sepsOk(line) && s3.contains(line)
+                                && s4.contains("default") && s5.contains("default")
+                                && s6.contains("default") && s7.contains("1.2 MB")
+                                && s8.contains("图.msav") && s9.contains("图.msav")
+                                && s10.contains("1.2 MB") && s11.contains("default"),
+                        "⑥ ★带占位符的文案按**真参数**实拼一遍（个数不对会当场 MissingFormatArgumentException 崩）"
+                                + "，且 `·` 两侧都有空格：" + head + " ｜ " + line);
+            } catch (Throwable t) {
+                ok(stat, L, false, "⑥ 文案实拼抛异常：" + t);
+            }
+        } catch (Throwable t) {
+            ok(stat, L, false, "㊳ 自身异常：" + t);
+        } finally {
+            deleteTree(root);
+        }
+
+        // ── ⑦ 自检不许把东西留在**用户的中转站**里 ────────────────────────
+        // ⑰（模组包导入）为了复现"跨文件系统 rename 失败"用的是**真目录** Mods.trashDirOf(ctx)，
+        // 于是它替换掉的那份模组会留在用户的中转站里 —— 以前没人看得见，现在有页面了，
+        // 用户会看到一条"来自槽 m3-modpack"的莫名其妙的东西。
+        // ★ 判据先在**临时目录**里验分辨力，再拿去扫真目录（不许在真目录里试）。
+        boolean predOk = isSelfTestTrash(new File(trash, Trash.nameFor("m3-modpack", "a.zip")))
+                && !isSelfTestTrash(new File(trash, Trash.nameFor("我的槽", "b.zip")));
+        ok(stat, L, predOk,
+                "⑦ ★元断言：打扫判据（来源槽以 m3- 开头）只认自检留下的，**不认用户自己的**");
+        int swept = sweepSelfTestTrash(ctx);
+        int left = 0;
+        for (File d : Trash.allDirs(ctx)) {
+            for (Trash.Item it : Trash.list(d)) if (isSelfTestTrash(it.path)) left++;
+        }
+        ok(stat, L, left == 0,
+                "⑦ 用户的中转站里没有自检残留（本次扫掉 " + swept + " 份，剩 " + left + "）");
+        L.add("");
+    }
+
+    /** ⑦ 用：这一份是不是**自检自己**留在真中转站里的（判据 = 来源槽以 `m3-` 开头，见 TEST_SLOTS） */
+    private static boolean isSelfTestTrash(File f) {
+        if (f == null) return false;
+        Trash.Item it = Trash.parse(f);
+        return it.parsed && it.slot != null && it.slot.startsWith("m3-");
+    }
+
+    /**
+     * 把自检留在**用户真正的中转站**里的东西扫掉，返回扫掉几份。
+     *
+     * ★ 为什么得有它：有几条用例（⑰ 模组包覆盖、㊴ 存档覆盖/整槽）必须走**真目录**
+     *   （它们验的正是"产品代码往哪儿写"），于是会在用户的中转站里留下"来自槽 m3-xxx"的东西 ——
+     *   以前没人看得见，现在有页面了就会明晃晃地出现在用户眼前。
+     * ★ 判据是"来源槽以 `m3-` 开头"（自检槽名的前缀），**不认用户自己的** ——
+     *   分辨力在 ㊳⑦ 里先用临时目录验过（`isSelfTestTrash` 的两向断言）。
+     */
+    private static int sweepSelfTestTrash(Context ctx) {
+        int n = 0;
+        for (File d : Trash.allDirs(ctx)) {
+            for (Trash.Item it : Trash.list(d)) {
+                if (!isSelfTestTrash(it.path)) continue;
+                if (Trash.remove(it.path, d).ok) n++;
+            }
+        }
+        return n;
+    }
+
+    /**
+     * ㊴ 中转站**第二批**（2026-10-05）：存档同名覆盖、整个槽，也接上了中转站。
+     *
+     * 为什么这两条值得单独钉：
+     * <pre>
+     *   · 存档那条原来是 `Msav.commit` 里的 `dest.delete()` —— 界面写着"替换会删掉旧的"，
+     *     也就是**真的**删（用户几百小时的存档，替换一次就没了）；
+     *   · 删槽那条原来是"删备份 + 硬删槽"，而它牵着一处**看不见的耦合**：
+     *     快照引用的对象住在 CAS 池里，`Backup.allReferencedShas` 只扫 `hub/backups/` ——
+     *     槽一进站，那些对象就成了"孤儿"，下一次 GC 会把它们删掉，**恢复回来就是坏快照**。
+     *     ⇒ ③ 那条"进站前后引用集不变"才是这一节最要紧的断言。
+     * </pre>
+     * ⚠️ ①③ 走的是**真目录**（验的正是产品代码往哪儿写）⇒ 会在用户的中转站里留下"来自槽 m3-…"
+     *   的东西，结尾用 {@link #sweepSelfTestTrash} 扫掉并断言扫干净了。
+     */
+    private static void trashMore(Context ctx, List<String> L, int[] stat) {
+        L.add("── ㊴ 中转站（第二批：存档覆盖 / 整个槽）──");
+        try {
+            // ── ① 存档：同名覆盖时旧的那份进站，而不是删掉 ────────────────
+            String e1 = Data.createSlot(ctx, SLOT_SAVE);
+            ok(stat, L, e1 == null, "建测试槽 " + SLOT_SAVE + (e1 == null ? "" : "：" + e1));
+            if (e1 != null) return;
+            final String saveName = "覆盖测试.msav";
+            Msav.Stage s1 = Msav.stage(ctx, new ByteArrayInputStream(
+                    zlib("first".getBytes("UTF-8"))), saveName, SLOT_SAVE);
+            String md5First = Util.md5(Msav.commit(ctx, s1));
+            Msav.Stage s2 = Msav.stage(ctx, new ByteArrayInputStream(
+                    zlib("second".getBytes("UTF-8"))), saveName, SLOT_SAVE);
+            File now = Msav.commit(ctx, s2);
+            ok(stat, L, now.isFile() && !md5First.equals(Util.md5(now)),
+                    "① 同名覆盖：新的那份就位（内容确实换了）");
+
+            Trash.Item stashed = null;
+            for (Trash.Item it : Trash.list(Trash.savesDir(ctx))) {
+                if (saveName.equals(it.name) && SLOT_SAVE.equals(it.slot)) { stashed = it; break; }
+            }
+            ok(stat, L, stashed != null && md5First.equals(Util.md5(stashed.path)),
+                    "① ★旧的那份**在中转站里**（saves-trash · 来自槽 " + SLOT_SAVE + " · md5 与覆盖前一致）");
+            if (stashed == null) return;
+
+            Trash.Result rA = Trash.restoreFrom(ctx, stashed, SLOT_SAVE, false);
+            ok(stat, L, !rA.ok && rA.nameTaken && stashed.path.isFile(),
+                    "① 放回去 + 同名没确认 ⇒ 只回来问一声（nameTaken），两边都没动");
+            Trash.Result rB = Trash.restoreFrom(ctx, stashed, SLOT_SAVE, true);
+            File back = new File(Data.savesDirOf(ctx, SLOT_SAVE), saveName);
+            ok(stat, L, rB.ok && md5First.equals(Util.md5(back)),
+                    "① ★放回去（确认替换）⇒ 槽里那份的内容回到了覆盖前");
+
+            File badSave = new File(Trash.savesDir(ctx), Trash.nameFor(SLOT_SAVE, "坏的.msav"));
+            write(badSave, "not-zlib".getBytes("UTF-8"));
+            Trash.Result rC = Trash.restoreFrom(ctx, Trash.parse(badSave), SLOT_SAVE, false);
+            ok(stat, L, !rC.ok && rC.errCode == Trash.Result.T_NOT_MAP && badSave.isFile(),
+                    "① ★元断言：不是 zlib 的假存档**放不回去**（存档按导入时的尺子判），原件仍在站里");
+
+            // ── ② 整槽：槽本体 + 它的备份一起进站，能整槽放回来 ────────────
+            String e2 = Data.createSlot(ctx, SLOT_GONE);
+            ok(stat, L, e2 == null, "建测试槽 " + SLOT_GONE + (e2 == null ? "" : "：" + e2));
+            if (e2 != null) return;
+            File slotDir = Data.slotDir(ctx, SLOT_GONE);
+            write(new File(new File(slotDir, "saves"), "a.msav"),
+                    zlib("slot-content".getBytes("UTF-8")));
+            Backup.create(ctx, SLOT_GONE, "㊴ 用");
+            int refsBefore = Backup.allReferencedShas(ctx).size();
+
+            Trash.Result r1 = Trash.trashSlot(ctx, SLOT_GONE, Backup.rootDir(ctx));
+            ok(stat, L, r1.ok && !slotDir.exists()
+                            && new File(r1.dest, Trash.INNER_SLOT).isDirectory()
+                            && new File(new File(r1.dest, Trash.INNER_BACKUPS), SLOT_GONE).isDirectory(),
+                    "② 删槽 ⇒ 槽本体与它的备份都在**同一个容器**里，且 `backups/＜槽名＞/＜快照＞`"
+                            + " 层级与 `allReferencedShas` 的扫描口径逐层对齐"
+                            + (r1.dest == null ? "" : "（" + r1.dest.getName() + "）"));
+            ok(stat, L, Backup.list(ctx, SLOT_GONE).isEmpty(),
+                    "② 槽没了 ⇒ 它的快照也不再列出来（不给用户一个「看得见却打不开」的备份列表）");
+            int refsAfter = Backup.allReferencedShas(ctx).size();
+            ok(stat, L, refsAfter == refsBefore,
+                    "② ★元断言：整槽进站前后**引用集不变**（" + refsBefore + " → " + refsAfter
+                            + "）⇒ 那些对象不会被 GC 当孤儿删掉（否则恢复回来是坏快照）");
+            if (!r1.ok) return;
+
+            Trash.Result r7 = Trash.restoreFrom(ctx, Trash.parse(r1.dest),
+                    Data.currentSlot(ctx), false);
+            ok(stat, L, !r7.ok && r7.errCode == Trash.Result.T_CURRENT_SLOT,
+                    "③ ★不许把整槽放到**正在用的**那个槽（那等于砸掉当前存档）");
+
+            File decoy = Data.slotDir(ctx, SLOT_GONE);
+            decoy.mkdirs();
+            write(new File(decoy, "占名的.txt"), "x".getBytes("UTF-8"));
+            Trash.Result r4 = Trash.restoreFrom(ctx, Trash.parse(r1.dest), SLOT_GONE, false);
+            ok(stat, L, !r4.ok && r4.nameTaken && new File(decoy, "占名的.txt").isFile(),
+                    "③ ★重名 ⇒ 只回来问一声，**那个占名的槽一个字节没动**（界面据此弹「换个名字」）");
+            Trash.Result r5 = Trash.restoreFrom(ctx, Trash.parse(r1.dest), SLOT_GONE + "2", false);
+            ok(stat, L, r5.ok && Data.slotDir(ctx, SLOT_GONE + "2").isDirectory()
+                            && new File(decoy, "占名的.txt").isFile()
+                            && !Backup.list(ctx, SLOT_GONE + "2").isEmpty(),
+                    "③ ★换个名字放回去 ⇒ 两个槽都在，而且**快照跟着回来了**"
+                            + "（" + Backup.list(ctx, SLOT_GONE + "2").size() + " 份）");
+
+            // ── ④ 份数上限：整个槽是 3、其余是 20（口径在 keepFor / pruneIn） ──
+            ok(stat, L, Trash.keepFor(Trash.Kind.SLOT) == Trash.KEEP_SLOTS
+                            && Trash.keepFor(Trash.Kind.MAP) == Trash.KEEP,
+                    "④ 份数上限按类型分开：整槽 " + Trash.KEEP_SLOTS + " / 其余 " + Trash.KEEP);
+            File fake = new File(root4(ctx), Trash.DIR_SLOTS);
+            deleteTree(fake.getParentFile());
+            fake.mkdirs();
+            String[] stamps = {"20260101-000000-001", "20260102-000000-002",
+                    "20260103-000000-003", "20260104-000000-004", "20260105-000000-005"};
+            for (String st : stamps) new File(fake, st + Trash.SEP + "x" + Trash.SEP + "x").mkdirs();
+            int pruned = Trash.pruneIn(fake);
+            ok(stat, L, pruned == 2 && Trash.list(fake).size() == Trash.KEEP_SLOTS
+                            && !new File(fake, stamps[0] + Trash.SEP + "x" + Trash.SEP + "x").exists(),
+                    "④ ★按目录类型修剪：铺 5 个假容器 ⇒ 删最旧的 2 个、留 " + Trash.list(fake).size()
+                            + " 个（用地图那套 20 就会一个都不删）");
+            deleteTree(fake.getParentFile());
+
+            // ── ⑤ 收尾：自检不许在用户的中转站里留东西 ────────────────────
+            int swept = sweepSelfTestTrash(ctx);
+            int left = 0;
+            for (File d : Trash.allDirs(ctx)) {
+                for (Trash.Item it : Trash.list(d)) if (isSelfTestTrash(it.path)) left++;
+            }
+            ok(stat, L, left == 0,
+                    "⑤ 用户的中转站里没有第二批的残留（扫掉 " + swept + " 份，剩 " + left + "）");
+        } catch (Throwable t) {
+            ok(stat, L, false, "㊴ 自身异常：" + t);
+        }
+        L.add("");
+    }
+
+    /** ㊴④ 用的临时根（在 app_hub 下，收尾自己删） */
+    private static File root4(Context ctx) {
+        File d = new File(Paths.privateDir(ctx), "selftest-trash2");
+        if (!d.exists()) d.mkdirs();
+        return d;
     }
 
     /**
@@ -4216,7 +4705,8 @@ public final class SelfTest {
         L.add("── ㉙ 清单注册检查（漏注册 = BUILD OK 但真机崩）──");
         String[] want = {"io.mdt.launcher.MainActivity", "io.mdt.launcher.SavesActivity",
                 "io.mdt.launcher.ModsActivity", "io.mdt.launcher.SlotActivity",
-                "io.mdt.launcher.MapsActivity", "io.mdt.launcher.MapDetailActivity"};
+                "io.mdt.launcher.MapsActivity", "io.mdt.launcher.MapDetailActivity",
+                "io.mdt.launcher.TrashActivity"};
         int found = 0;
         for (String n : want) {
             if (canResolve(ctx, n)) found++;
@@ -4365,7 +4855,8 @@ public final class SelfTest {
         L.add("── ㉛ 页面骨架（根节点 @id/root + 地图页两行动作在顶上）──");
         final int[] layouts = {R.layout.activity_main, R.layout.activity_saves,
                 R.layout.activity_mods, R.layout.activity_slot, R.layout.activity_maps,
-                R.layout.activity_settings, R.layout.activity_log, R.layout.activity_map_detail};
+                R.layout.activity_settings, R.layout.activity_log, R.layout.activity_map_detail,
+                R.layout.activity_trash};
         android.view.LayoutInflater inf = android.view.LayoutInflater.from(ctx);
         int good = 0;
         StringBuilder bad = new StringBuilder();

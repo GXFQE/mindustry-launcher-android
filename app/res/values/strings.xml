@@ -230,13 +230,15 @@
     <string name="delete_slot_confirm_title_fmt">Delete slot \"%1$s\"?</string>
     <!-- ⚠️ 这里**不能**用 `**` 表示强调：弹窗是纯文本（AlertDialog.setMessage），
          `**` 会原样显示成星号。要加重语气只能靠措辞。全工程同此纪律。 -->
-    <string name="delete_slot_warn">This permanently deletes all data in this slot (Android has no recycle bin):\n\n</string>
+    <string name="delete_slot_warn">Everything in this slot moves to the transfer station, its backups included. You can put it back from Settings:\n\n</string>
     <string name="delete_slot_files_fmt">%1$d files · %2$s\n</string>
-    <string name="delete_slot_with_backups_fmt">\nAlso deletes %1$d backups.</string>
+    <string name="delete_slot_with_backups_fmt">\nIts %1$d backups move along with it.</string>
     <string name="delete_slot_no_backups">\n(this slot has no backups)</string>
+    <string name="delete_slot_cap_fmt">\nThe station keeps at most %1$d slots; deleting more pushes out the oldest.</string>
+    <string name="delete_slot_confirm_btn">Move it to the transfer station</string>
     <string name="delete_forever">Delete permanently</string>
     <string name="delete_failed">Delete failed</string>
-    <string name="slot_deleted_fmt">Deleted slot \"%1$s\"</string>
+    <string name="slot_deleted_fmt">Moved slot \"%1$s\" to the transfer station</string>
     <string name="slot_deleted_fallback_fmt">(%1$d versions fell back to the default slot)</string>
 
     <string name="backup_title_fmt">Back up slot \"%1$s\"</string>
@@ -269,7 +271,7 @@
     <string name="restore_to_slot_title_fmt">Restore into slot \"%1$s\"</string>
     <string name="snapshot_entry_fmt">%1$d files · %2$s</string>
     <string name="restore_confirm_title">Restore?</string>
-    <string name="restore_confirm_msg_fmt">Backup: %1$s\n%2$d files · %3$s\n\nThese files will be written back:\n%4$s\n\n· only overwrites files that are in the backup, everything else is left alone\n· checks the content for damage before writing</string>
+    <string name="restore_confirm_msg_fmt">Backup: %1$s\n%2$d files · %3$s\n\nThese files will be written back:\n%4$s\n\n· the content is checked for damage before writing</string>
     <string name="restore">Restore</string>
     <string name="restore_progress_title">Restoring</string>
     <string name="restore_progress_msg">checking · writing back…</string>
@@ -316,10 +318,12 @@
       ① 原来写「它不会真的消失，**之后可以手工取回**」—— 而 Android 11+ 起
          `Android/data/<包名>/` 对文件管理器**不可见**（这正是本工程要做 SAF 导入导出的原因），
          所以"手工取回"对普通用户是**做不到**的承诺。改成如实说"还在手机里、但游戏里看不到它了"。
-      ② 中转站有份数上限（`MapFiles.KEEP_TRASH = 20`，模组中转站同款）。原来一个字都没提，
+      ② 中转站有份数上限（`Trash.KEEP = 20`，地图与模组同一个口径）。原来一个字都没提，
          删到第 21 张时第一张已被**静默硬删** —— 现在明说。
+      ③ ★ 2026-10-05（中转站页面落地）：那句「可以手工取回」的**替代说法**现在真的成立了 ——
+         删除确认里直接点明"去设置里的中转站放回来"。页面见 TrashActivity。
     -->
-    <string name="map_delete_confirm_fmt">Move \"%1$s\" to the transfer station?\n\nIt does not really disappear (it stays on the phone), but the game will not see it.\nThe station keeps at most 20 maps; deleting more pushes out the oldest.</string>
+    <string name="map_delete_confirm_fmt">Move \"%1$s\" to the transfer station?\n\nIt does not really disappear (it stays on the phone), but the game will not see it.\nYou can put it back later from Transfer station in Settings. The station keeps at most 20 maps; deleting more pushes out the oldest.</string>
     <string name="map_deleted_ok_fmt">Moved \"%1$s\" to the transfer station</string>
     <!-- ★ 游戏在跑这条路已由 UI 提前拦下（见 MapDetailActivity.confirmDelete）⇒ 这句只说剩下的原因 -->
     <string name="map_delete_fail">Cannot delete: another app may be holding this map open.</string>
@@ -635,7 +639,7 @@
     <string name="exp_err_dest_readonly">the destination is not writable (the system did not hand back a writable handle)</string>
     <string name="msav_err_open_failed">could not read the selected file</string>
     <string name="msav_err_no_saves_fmt">cannot reach the saves/ folder of slot \"%1$s\"</string>
-    <string name="msav_err_same_name_fmt">a save with the same name already exists and cannot be deleted: %1$s</string>
+    <string name="msav_err_trash_failed">could not move the existing save aside, so nothing was imported. Free some space and try again</string>
     <string name="msav_err_rename_fmt">rename failed: %1$s → %2$s</string>
     <!-- 地图来源与详情（同一族：Maps.Item 原来也是 Java 里拼的中文）-->
     <string name="map_from_slot">this slot</string>
@@ -707,7 +711,7 @@
     <string name="slotzip_err_too_many_fmt">This zip has more than %1$d entries, so it was stopped</string>
     <string name="slotzip_more_fmt">…%1$d in all</string>
     <string name="slotzip_err_no_slot_dir_fmt">Cannot reach the directory of slot \"%1$s\"</string>
-    <string name="slotzip_err_wipe_failed_fmt">Clearing failed: %1$s\n(some files may be in use — exit the game and try again)</string>
+    <string name="slotwrite_err_wipe_failed_fmt">Clearing failed: %1$s\n(some files may be in use — exit the game and try again)</string>
     <string name="slotzip_err_mkdir_slot_fmt">Could not create the slot directory: %1$s</string>
     <string name="slotzip_err_write_failed_fmt">Writing failed: %1$s\n%2$s</string>
     <string name="slotzip_err_delete_failed_fmt">Could not delete the file with that name: %1$s</string>
@@ -766,6 +770,8 @@
     <string name="backup_restore_ok_snapshot_fmt">Snapshot: %1$s\n</string>
     <string name="backup_restore_ok_files_fmt">Files: %1$d / %2$d (%3$s)\n</string>
     <string name="backup_restore_ok_where_fmt">Where: %1$s\n</string>
+    <string name="backup_restore_ok_kept_fmt">Kept %1$d files as they are now\n</string>
+    <string name="backup_restore_ok_wiped_fmt">Cleared first: %1$s\n</string>
     <string name="backup_restore_partial_fmt">\n⚠ Some files were not written:\n%1$s</string>
     <string name="backup_err_not_manifest">Not an MDT backup manifest</string>
     <string name="backup_err_slot_name_invalid">Slot name not allowed</string>
@@ -802,13 +808,31 @@
     <string name="zip_tag_custom">\n\nNo game settings file — this looks like a package exported by this launcher.</string>
     <string name="zip_warn_unknown">This does not look like a Mindustry data package. Import anyway?</string>
     <string name="zip_warn_skipped_fmt">%1$d entries have unsafe paths and will be skipped.</string>
-    <string name="zip_wipe_label">Clear the target slot saves first</string>
-    <string name="zip_wipe_hint">Deletes the old saves · maps · schematics · cache first, restoring exactly the exported state.\nUnchecked, it only overwrites files with the same name (safer).\n\n⚠️ Deleted data cannot be recovered; mods are not affected.</string>
     <!-- 通用：导入动作的确认按钮（zip 与 .msav 共用；非 gzip 的 .msav 用 import_anyway） -->
     <string name="import_btn">Import</string>
     <string name="zip_import_done">Import complete</string>
     <string name="zip_extract_progress_title">Importing</string>
     <string name="zip_extract_progress_msg_fmt">Extracting into slot \"%1$s\"\nwriting…</string>
+    <!--
+      ══ 整槽写入的三个模式（2026-10-05 第 104 轮）════════════════════════
+      用户要的：更新（相同的用新的盖）/ 反向更新（相同的保留旧的）/ 覆盖（完全替换）。
+      标签只给名字（文案三条：短），解释放在随选择变化的那行摘要里。
+      ★ 「反向更新」在英文里没有对应说法，直译会让英语用户看不懂 ⇒ 用一句自解释的
+        "Keep current"，摘要里说清"只补缺的"。
+    -->
+    <string name="slot_mode_title">What should this do to the slot?</string>
+    <string name="slot_mode_update">Update</string>
+    <string name="slot_mode_keep">Keep current</string>
+    <string name="slot_mode_replace">Replace</string>
+    <string name="slot_mode_update_hint">Files that exist on both sides get the new version. Files that are only in this slot stay.</string>
+    <string name="slot_mode_keep_hint">Files that exist on both sides keep what the slot has now. Only missing files are added.</string>
+    <string name="slot_mode_replace_hint">Everything in this slot is removed first, then everything in the package is written in full.</string>
+    <string name="slot_mode_autobak_note">A backup is taken before anything changes, so this can be undone.</string>
+    <string name="backup_auto_zip">automatic, before a slot import</string>
+    <string name="backup_auto_restore">automatic, before a restore</string>
+    <string name="slot_autobak_done_fmt">\nBacked up first: %1$s</string>
+    <string name="zip_import_kept_fmt">\nKept the current version of %1$d files.</string>
+
     <string name="zip_import_ok_fmt">Imported into slot \"%1$s\": %2$d files, %3$s%4$s</string>
     <string name="zip_import_wiped_fmt">\nCleared first: %1$s</string>
     <string name="zip_import_skipped_fmt">\n⚠️ Skipped %1$d unsafe entries</string>
@@ -828,7 +852,7 @@
          「永久删除…安卓没有回收站」同一口径。
     -->
     <string name="msav_overwrite_title">A save with this name is already in the slot</string>
-    <string name="msav_overwrite_msg_fmt">Slot \"%1$s\" already has a \"%2$s\".\n\nReplacing deletes the old one outright; it cannot be recovered.</string>
+    <string name="msav_overwrite_msg_fmt">Slot \"%1$s\" already has a \"%2$s\".\n\nReplacing moves the old one to the transfer station instead of deleting it.</string>
     <string name="msav_overwrite_ok">Replace</string>
     <string name="msav_overwrite_rename">Use another name</string>
 
@@ -894,6 +918,77 @@
     <string name="set_autoclean_done_fmt">Cleaned %1$d items</string>
     <string name="set_autoclean_none">Nothing to clean</string>
     <string name="set_autoclean_fail">Cleanup did not succeed, try again later</string>
+    <!--
+      ══ 中转站（TrashActivity，2026-10-05 第 102 轮）══════════════════════
+      起因（用户 2026-10-05）：「这个中转站像是个半成品啊」。此前"中转站"只是数据层的一个
+      目录（地图/模组被覆盖或删除时旧件挪进去），界面上**一处入口都没有** ——
+      文案却一直对用户说"挪进中转站，不会直接删掉"，等于承诺了一个进不去的地方。
+      这里补齐：入口在设置页一行，页面能看列表 / 放回去 / 彻底删除 / 清空 / 占用。
+
+      ★ 术语与老文案保持一致（`map_delete` 那几条说的是 transfer station）——
+        同一个东西在界面上有两种叫法，用户会以为是两件事。
+      ★ 时间、份数、体积**都由 Java 侧拼**（Trash.timeText / Util.formatSize），
+        资源里只写整句 + 占位符（aapt2 会剥掉值里的首尾空白，碎片式拼串必然粘连）。
+    -->
+    <string name="trash_title">Transfer station</string>
+    <string name="trash_sub">Deleted maps and slots, replaced mods and saves wait here. You can put them back.</string>
+    <string name="trash_head_fmt">%1$d items · %2$s</string>
+    <string name="trash_empty">Nothing here yet.\nDeleting a map or a slot, or replacing a mod or a save, moves the old one here.</string>
+    <string name="trash_scanning">Listing…</string>
+    <string name="trash_scan_failed">Could not list the transfer station. Go back and enter again.</string>
+    <string name="trash_empty_all">Empty the transfer station</string>
+    <string name="trash_empty_all_sub">Deletes everything here for good</string>
+    <string name="trash_empty_confirm_title">Delete everything?</string>
+    <string name="trash_empty_confirm_fmt">Delete all %1$d items (%2$s) for good?\n\nThis cannot be undone.</string>
+    <string name="trash_emptied_fmt">Emptied, freed %1$s</string>
+    <string name="trash_empty_fail">Some items could not be deleted, try again</string>
+
+    <string name="trash_kind_map">Map</string>
+    <string name="trash_kind_mod">Mod</string>
+    <string name="trash_kind_save">Save</string>
+    <string name="trash_kind_slot">Whole slot</string>
+    <string name="trash_kind_other">Other file</string>
+    <string name="trash_from_slot_fmt">from slot \"%1$s\"</string>
+    <string name="trash_source_unknown">source unknown</string>
+    <string name="trash_files_fmt">%1$d files</string>
+
+    <string name="trash_actions_msg_fmt">%1$s\n\nPutting it back makes the game see it again. Deleting for good cannot be undone.</string>
+    <string name="trash_restore">Put back…</string>
+    <string name="trash_restore_pick_title">Put it back into which slot?</string>
+    <string name="trash_restore_confirm_title">Put it back</string>
+    <string name="trash_restore_confirm_fmt">Put \"%1$s\" back into slot \"%2$s\"?</string>
+    <string name="trash_restore_ok_fmt">Put \"%1$s\" back into slot \"%2$s\"</string>
+    <string name="trash_restore_overwrite_title">A file with this name is already there</string>
+    <string name="trash_restore_overwrite_fmt">Slot \"%2$s\" already has \"%1$s\".\n\nReplacing moves the old one into the transfer station instead of deleting it.</string>
+
+    <string name="trash_slot_restore_confirm_fmt">Put the whole slot \"%1$s\" back?\n\nIts saves, maps, mods and backups come back with it.</string>
+    <string name="trash_slot_restored_fmt">Put slot \"%1$s\" back</string>
+    <string name="trash_slot_rename_title">Put it back under another name</string>
+    <string name="trash_slot_rename_hint">new slot name</string>
+    <string name="trash_slot_rename_prefill_fmt">%1$s-restored</string>
+    <string name="trash_slot_taken_fmt">There is already a slot named \"%1$s\".\n\nGive this one another name and both stay.</string>
+    <string name="trash_slot_bad_name">That name cannot be used</string>
+
+    <string name="trash_delete_one">Delete for good</string>
+    <string name="trash_delete_one_confirm_fmt">Delete \"%1$s\" for good?\n\nThis cannot be undone.</string>
+    <string name="trash_deleted_fmt">Deleted \"%1$s\"</string>
+    <string name="trash_delete_fail">Could not delete it, try again</string>
+
+    <string name="trash_busy_msg">The game is running and would fight over these files. Exit the game first.</string>
+
+    <!-- 失败原因：纯 Java 的 Trash 只出「码 + 中性参数」，这里是码到话的映射（漏一条 = 界面静默空白） -->
+    <string name="trash_reason_not_in_trash">That item is no longer in the transfer station</string>
+    <string name="trash_reason_no_target">That slot does not exist any more</string>
+    <string name="trash_reason_name_taken">That slot already has a file with the same name</string>
+    <string name="trash_reason_not_map">The game cannot read this map or save any more</string>
+    <string name="trash_reason_stash_failed">Could not move the existing item aside, nothing was changed</string>
+    <string name="trash_reason_move_failed">Could not put it back; it is still in the transfer station</string>
+    <string name="trash_reason_no_kind">This is not a map, mod, save or slot, so there is nowhere to put it back</string>
+    <string name="trash_reason_mkdir">Could not create the folder inside that slot</string>
+    <string name="trash_reason_delete_failed">Could not delete it; it is still in the transfer station</string>
+    <string name="trash_reason_current_slot">That slot is in use right now. Switch to another slot first.</string>
+    <string name="trash_reason_bad_name">That slot name cannot be used</string>
+    <string name="trash_reason_unknown">Unknown reason</string>
 <string name="about_card_title">About</string>
 
     <!--

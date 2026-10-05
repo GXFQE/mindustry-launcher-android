@@ -101,16 +101,11 @@ public final class Data {
      */
     public static final String[] SLOT_EXCLUDE = {"config.json", "import", "natives", "tmp", "cache"};
 
-    /**
-     * F6c：导入 zip 时「先清空」会删掉的目录。
-     *
-     * 口径对齐游戏原生 `importData`（它删 `saves` / `assetCache` / `tmp`），
-     * 再补上同族的 `maps` / `schematics` —— 这五个就是"被导出内容所描述的那部分"。
-     *
-     * ⚠️ **`mods` 刻意不在名单里**：mod 是跨存档共享的，游戏原生导入也不动它；
-     *    把它算进来会在"导入一个不含 mods 的包"时把用户攒的模组删光，那是纯破坏。
-     */
-    public static final String[] WIPE_DIRS = {"saves", "maps", "schematics", "assetCache"};
+    // ⚠️ 这里原来还有一个 `WIPE_DIRS = {saves, maps, schematics, assetCache}`
+    //    （F6c 的「先清空」名单）。2026-10-05（第 104 轮）**删掉了**：
+    //    "清空"现在只有一处实现 `SlotWrite.wipeSlot`，口径 = `contentRootsOf`（槽的全部内容 − 排除），
+    //    而 `WIPE_DIRS` 那份**刻意不删 mods** 的老名单与用户要的「覆盖 = 完全替换」相冲。
+    //    ⇒ 留着它就是第二个口径（迟早有人照着它再写一份清空）。
 
     private Data() {}
 
@@ -386,10 +381,16 @@ public final class Data {
     }
 
     /**
-     * 删除槽（**硬删**，Android 无系统回收站）。当前槽拒绝。
+     * **硬删**一个槽（真正的不可逆删除）。当前槽拒绝。
+     *
+     * 🔴 2026-10-05（第二批）改名 + 收窄：界面上的"删槽"现在走 {@link Trash#trashSlot}
+     *   （整槽进中转站、能放回来），这里只剩**自检的清理**与"确实要永久删"的调用点。
+     *   名字带 `Forever` 是刻意的 —— 两个入口长得一样才是这类事故的温床（谁都不想哪天
+     *   为了图省事在 UI 里调了这一个）。要新增调用点前先问一句：**这个槽真的不该能恢复吗？**
+     *
      * ⚠️ 调用方必须先让用户确认，并把受影响文件数/体积摊开。
      */
-    public static String deleteSlot(Context ctx, String name) {
+    public static String deleteSlotForever(Context ctx, String name) {
         if (name.equals(currentSlot(ctx))) {
             return ctx.getString(R.string.slot_err_delete_current_fmt, name);
         }
@@ -400,7 +401,7 @@ public final class Data {
             return ctx.getString(R.string.slot_err_delete_partial_fmt,
                     d.getAbsolutePath(), countTree(d), files);
         }
-        Log.i(TAG, "slot deleted: " + name + " (" + files + " files)");
+        Log.i(TAG, "slot deleted forever: " + name + " (" + files + " files)");
         return null;
     }
 

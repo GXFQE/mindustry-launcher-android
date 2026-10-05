@@ -4,9 +4,6 @@ import android.content.Context;
 
 import java.io.File;
 import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 
 /**
  * 地图的**增删**（F10 预览目标的最后一块）。
@@ -16,17 +13,14 @@ import java.util.List;
  *   ① 落盘先写 `.part`，**用我们自己的解析器验一遍**（不是"扩展名对就算"），
  *      验不过 ⇒ 删掉 `.part`，一个字节都不留；
  *   ② 就位时**先把旧的挪去中转站**（`&lt;hub&gt;/maps-trash/`），改名成功之后旧的那份还在中转站里
- *      ⇒ **挪不删**，用户能手工取回；
- *   ③ 中转站只留最近 {@link #KEEP_TRASH} 份（按名字前缀的时间戳排序删最旧）。
+ *      ⇒ **挪不删**（中转站本身现在有页面了，见 {@link Trash} / {@link TrashActivity}）；
+ *   ③ 中转站只留最近 {@link Trash#KEEP} 份（按名字里的时间戳排序删最旧）。
  * </pre>
  *
  * ⚠️ 只允许删 **槽的 `maps/` 目录下的直接子项**（{@link #deleteToTrash} 会验）——
  *    游戏自带/模组自带的地图**不在槽里**，不允许被"删"（它们属于那个包）。
  */
 public final class MapFiles {
-    /** 中转站保留份数（"可手工取回"的兜底，不是第二份存档） */
-    public static final int KEEP_TRASH = 20;
-
     /** 导入结果 */
     public static final class Result {
         public boolean ok;
@@ -51,28 +45,9 @@ public final class MapFiles {
 
     private MapFiles() {}
 
-    /** 中转站：`<hub>/maps-trash/` */
+    /** 中转站：`<hub>/maps-trash/`（实现与"模组那条线"统一在 {@link Trash}） */
     public static File trashDirOf(Context ctx) {
-        return new File(Data.hubDir(ctx), "maps-trash");
-    }
-
-    /** 只保留最近 `keep` 份（文件名前缀是 `yyyyMMdd-HHmmss` ⇒ 字典序 = 时间序） */
-    public static int pruneTrash(File dir, int keep) {
-        if (dir == null) return 0;
-        File[] fs = dir.listFiles();
-        if (fs == null || fs.length <= keep) return 0;
-        List<File> all = new ArrayList<>();
-        Collections.addAll(all, fs);
-        Collections.sort(all, new java.util.Comparator<File>() {
-            @Override public int compare(File a, File b) {
-                return a.getName().compareTo(b.getName());
-            }
-        });
-        int removed = 0;
-        for (int i = 0; i < all.size() - keep; i++) {
-            if (Data.deleteTree(all.get(i))) removed++;
-        }
-        return removed;
+        return Trash.mapsDir(ctx);
     }
 
     /**
@@ -191,7 +166,9 @@ public final class MapFiles {
                 throw new IllegalStateException(
                         ctx.getString(R.string.mapfile_err_trash_mkdir_fmt, trashDir.getAbsolutePath()));
             }
-            backup = new File(trashDir, stamp() + "-" + dest.getName());
+            // ★ 中转站里的名字带**来源槽**（v2，见 Trash.nameFor）—— 恢复时才能默认放回原槽
+            backup = new File(trashDir,
+                    Trash.nameFor(Trash.slotLabel(dest.getParentFile()), dest.getName()));
             if (!dest.renameTo(backup)) {
                 throw new IllegalStateException(ctx.getString(R.string.mapfile_err_trash_move));
             }
@@ -204,7 +181,7 @@ public final class MapFiles {
             throw new IllegalStateException(
                     ctx.getString(R.string.mapfile_err_rename_fmt, dest.getAbsolutePath()));
         }
-        if (backup != null) pruneTrash(trashDir, KEEP_TRASH);
+        if (backup != null) Trash.prune(trashDir, Trash.KEEP);
     }
 
     /**
@@ -228,14 +205,10 @@ public final class MapFiles {
         }
         if (!mapFile.isFile()) return null;
         if (!trashDir.isDirectory() && !trashDir.mkdirs() && !trashDir.isDirectory()) return null;
-        File moved = new File(trashDir, stamp() + "-" + mapFile.getName());
+        File moved = new File(trashDir,
+                Trash.nameFor(Trash.slotLabel(mapsDir), mapFile.getName()));
         if (!mapFile.renameTo(moved)) return null;
-        pruneTrash(trashDir, KEEP_TRASH);
+        Trash.prune(trashDir, Trash.KEEP);
         return moved;
-    }
-
-    static String stamp() {
-        return new java.text.SimpleDateFormat("yyyyMMdd-HHmmss", java.util.Locale.US)
-                .format(new java.util.Date());
     }
 }

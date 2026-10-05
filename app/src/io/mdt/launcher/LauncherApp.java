@@ -17,6 +17,15 @@ public class LauncherApp extends Application {
         //   下面那几件事（迁移/回收）本身也可能抛，装晚了就白装。内部自己判"是不是主进程"，
         //   所以在 :game 进程里是空操作（那边是游戏的进程，有自己的崩溃转储）。
         Crash.installIfMainProcess(this);
+        // ★★ 2026-10-05：**游戏 activity 一创建就把资产链补挂上**。
+        //   起因：`arc` 用的是游戏自己那个 activity 的 AssetManager，而它由 `startActivity`
+        //   之后系统创建 —— 坑位挂链时它还不存在。这台 ROM 上 `app.getAssets() != activity.getAssets()`，
+        //   新 activity 会拿到第三份没挂链的实例 ⇒ 游戏起来就 `FileNotFoundException: cursors/cursor.png`。
+        //   详见 GameActivityWatcher 的类注释（含两个包各自的崩溃现场）。
+        //   ⚠️ **无条件注册**：主进程里 `Injector.sChain` 永远是 null ⇒ 回调自己 no-op。
+        //      反过来（只在 :game 注册）要靠 `Util.isMainProcess` 判，而它"拿不准就当主进程"
+        //      ⇒ 判不准时正好**漏装**，那是这个修复最不该有的失败方式。
+        GameActivityWatcher.install(this);
         // 历史版本把私有数据误放 getFilesDir()（会被游戏在首次启动时复制进数据根），
         // 这里幂等地搬到 app_hub。必须在 Config.load 之前做。
         Paths.migrateFromLegacy(this);

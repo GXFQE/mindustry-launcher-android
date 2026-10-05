@@ -58,13 +58,18 @@ point the game at that directory when it starts.
 - **Continue**: remembers the version you played last and goes straight back to it
 
 ### Saves and data
-- **Save slots**: create / rename / clone / delete; each slot has its own saves, maps and mods
+- **Save slots**: create / rename / clone / delete (a deleted slot goes to the **transfer station**
+  along with its backups, and can be put back); each slot has its own saves, maps and mods
 - **Automatic backup**: whether to back up is decided by how long the session ran; past the limit
   the oldest is dropped; can be switched on or off per slot
 - **Content-addressed store for saves**: backups are deduplicated by content — measured on a real
   device, 4 backups of 99.5 MB → 25.5 MB (74.4% saved)
 - **Export / import**: a single `.msav` save, or **a whole slot as one zip** (including maps, mods
-  and settings) — move everything to a new phone or another slot
+  and settings) — move everything to a new phone or another slot. Both a slot import and a
+  "restore backup" let you pick **how the two sides merge**: **Update** (the new version wins),
+  **Keep current** (what the slot has now wins, only missing files are added) or **Replace**
+  (clear the slot first, then write the package in full) — and **a backup is taken first**,
+  so a wrong choice can be undone
 - **Data directory check**: redundant directories are found and cleaned up automatically
 
 ### Maps
@@ -86,6 +91,16 @@ point the game at that directory when it starts.
 - Every mod states **whether it can load and why**: type (Java / JS / data mod), dependencies,
   version thresholds, multiplayer support
 
+### Transfer station
+- Deleted maps, **deleted whole slots**, and replaced mods or saves are **moved here first**
+  instead of disappearing
+- The list shows what it is, which slot it came from, its size, and when it arrived; you can **put
+  it back** (the slot it came from is preselected)
+- A deleted slot brings **its backups** along and they come back with it; if the name is taken you
+  can **put it back under another name**
+- You can also **delete for good** or **empty** it (both ask again and state the count and size);
+  the station keeps at most 20 items (3 whole slots) and pushes out the oldest beyond that
+
 ### Other
 - **Runtime log page**: launcher log + game log + crash stack; crashes are written to disk
   automatically and can be exported as a single file
@@ -93,7 +108,7 @@ point the game at that directory when it starts.
   settings)
 - **Language**: follow system / English / 简体中文 (switched inside the app, without touching system
   settings)
-- **Settings**: default slot, how many log files to keep
+- **Settings**: default slot, how many log files to keep, the transfer station
 
 ## What is not there yet
 

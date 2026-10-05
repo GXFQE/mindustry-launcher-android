@@ -125,6 +125,25 @@
                     layout="@layout/row_action"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="62dp"
+                    android:background="@color/divider" />
+
+                <!--
+                  中转站（2026-10-05，第 102 轮）。★ 放在这张卡的**末位**：
+                    前几项用户天天改，这一项只在"东西被删了想找回来"时才来。
+                  ★ 为什么入口在**全局设置页**而不是某个槽里：中转站是 per-hub 的、不属于任何槽
+                    （地图与模组的中转站是同一个地方），塞进槽页会让用户以为里面只有这个槽的东西。
+                    放回去时**再选目标槽**，那一问在页面里。
+                -->
+                <include
+                    android:id="@+id/row_trash"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
             </LinearLayout>
 
             <!-- 关于：只读，不参与交互 -->

@@ -48,6 +48,104 @@ public final class Injector {
 
     private Injector() {}
 
+    /**
+     * 已经挂好的**资产链**（`:game` 进程里由 {@link #mountAssets} 写；新 activity 一创建就照它再挂一遍）。
+     *
+     * 🔴 为什么需要它（2026-10-05 现场查出来的真问题）：`arc` 的 `AndroidFi` 用的是**游戏自己那个
+     * activity**（`mindustry.android.AndroidLauncher`）的 `getAssets()`，而那个 activity 是
+     * `startActivity` 之后才由系统创建的 —— 我们挂链时它**还不存在**。M2 的结论只说"要挂两份
+     * （Application + 坑位 activity）"，可这台 ROM 上 `app.getAssets() != activity.getAssets()`，
+     * 新 activity 完全可能拿到**第三份**未挂链的 AssetManager ⇒ 游戏读任何资产都
+     * `FileNotFoundException`（症状：崩在 `Fonts.loadSystemCursors → cursors/cursor.png`，
+     * 或 MindustryX 的 `mod.hjson`），而我们自己的启动报告里**两份 cookie 都是正常的** ——
+     * 这正是"会往错误方向排查"的那一类。
+     * ⇒ 用 {@link LauncherApp} 的 lifecycle 回调在**每个 activity 创建之前**再挂一遍。
+     */
+    private static volatile List<File> sChain;
+
+    /**
+     * 已经补挂过的 AssetManager（**按实例身份**去重）。
+     * ★ 为什么要去重：`preCreated`/`created` 两个回调都会走到这里（API 29+），
+     *   而 `addAssetPath` 是**追加**语义 —— 不记一下，同一个实例会被反复追加同一条路径，
+     *   游戏进程在整个生命周期里创建多少 activity 就追加多少次。
+     * ⚠️ 用 `IdentityHashMap`（比对象身份，不比 equals）且持有强引用：AssetManager 数量
+     *   等于进程里 activity 的数量级，不会长到需要清理。
+     */
+    private static final java.util.IdentityHashMap<android.content.res.AssetManager, Boolean> sPatched =
+            new java.util.IdentityHashMap<>();
+
+    /** 给**任何一个**后建的 activity 的 AssetManager 补挂资产链（LauncherApp 在 preCreated 里调） */
+    static void applyChainTo(Activity a) {
+        List<File> chain = sChain;
+        if (chain == null || chain.isEmpty() || a == null) return;
+        StringBuilder sb = new StringBuilder();
+        sb.append("资产链补挂 ").append(a.getClass().getName()).append('\n');
+        try {
+            android.content.res.AssetManager am = a.getAssets();
+            boolean known;
+            synchronized (sPatched) {
+                known = sPatched.containsKey(am);
+            }
+            sb.append("  probe-before = ").append(probeAsset(am)).append('\n');
+            if (known) {
+                sb.append("  （这份实例已经补挂过，跳过）\n");
+            } else {
+                for (File f : chain) {
+                    int c = Reflect.addAssetPath(am, f);
+                    sb.append("  addAssetPath(").append(f.getName()).append(") cookie=")
+                            .append(c).append('\n');
+                }
+                synchronized (sPatched) {
+                    sPatched.put(am, Boolean.TRUE);
+                }
+            }
+            sb.append("  probe-after  = ").append(probeAsset(am)).append('\n');
+        } catch (Throwable t) {
+            sb.append("  FAILED: ").append(t).append('\n');
+        }
+        Log.i(TAG, sb.toString());
+        appendToReport(a, sb.toString());
+    }
+
+    /**
+     * 直接复现游戏那次崩溃的判据：读一个**只存在于游戏 APK 里**的资产。
+     * ⚠️ 别用 `list("")` 当判据 —— 它在链没挂上时**照样能看到 `cursors` 目录**（M2 踩过），
+     *   会让你往"文件是不是没打进包"的方向排查半天。
+     */
+    static String probeAsset(android.content.res.AssetManager am) {
+        if (am == null) return "no-am";
+        InputStream in = null;
+        try {
+            in = am.open("cursors/cursor.png");
+            return "ok(" + in.available() + "B)";
+        } catch (Throwable t) {
+            return "FAIL:" + t.getClass().getSimpleName();
+        } finally {
+            try {
+                if (in != null) in.close();
+            } catch (Throwable ignored) {
+            }
+        }
+    }
+
+    /** 把补挂结果**追加**到 `hub/report-assets.txt`（启动报告那时已经写完了，不能覆盖它） */
+    private static void appendToReport(Context ctx, String text) {
+        try {
+            File hub = Paths.externalHub(ctx);
+            if (hub == null) return;
+            File f = new File(hub, "report-assets.txt");
+            FileOutputStream out = new FileOutputStream(f, true);
+            try {
+                out.write(text.getBytes("UTF-8"));
+                out.flush();
+            } finally {
+                out.close();
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "append report-assets failed: " + t);
+        }
+    }
+
     /** 一次启动的输入。v1（整包）只用 apk；assetBase/deltas 留给 M4 的 CAS 装配。 */
     public static class Plan {
         /** 代码流 + native 来源（整包 APK，或"基线+裸dex"装配后的容器） */
@@ -345,6 +443,7 @@ public final class Injector {
         android.content.res.AssetManager amApp = app.getAssets();
         android.content.res.AssetManager amAct = activity.getAssets();
         boolean same = amApp == amAct;
+        sChain = chain;                       // ★ 留给后建的 activity 补挂（见 sChain 的注释）
         log.append("资产链 = ");
         for (File f : chain) log.append(f.getName()).append(' ');
         log.append("\n两份 AssetManager 同源 = ").append(same).append('\n');
@@ -360,6 +459,10 @@ public final class Injector {
             }
             if (c1 == 0) throw new IllegalStateException("addAssetPath 未接受 " + f.getName());
         }
+        // ★ 这两份挂完之后**各自探一次**：探针能直接回答"这个实例到底读不读得到游戏资产"，
+        //   而不是等游戏崩了再猜（M2 那条 `list("")` 误判就是缺这么一个探针）。
+        log.append("  probe(app) = ").append(probeAsset(amApp)).append('\n');
+        if (!same) log.append("  probe(act) = ").append(probeAsset(amAct)).append('\n');
     }
 
     // ── ⑤ 启动游戏 ────────────────────────────────────────────────────────

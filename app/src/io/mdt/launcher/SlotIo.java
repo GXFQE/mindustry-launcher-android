@@ -9,7 +9,6 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.provider.OpenableColumns;
 import android.view.View;
-import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -616,6 +615,28 @@ final class SlotIo {
     }
 
     /**
+     * **dev 口专用**：跳过 SAF 选包，直接从设备上的一个 zip 走到"读包 → 确认框"。
+     *
+     * ★ 为什么需要它：整槽导入的确认框是**弹窗流程**，而它前面那道 SAF 选择器
+     *   **自动化点不了**（本 ROM 的「下载内容」只列应用下载过的文件，见 REF §52.5.1 那一串坑）。
+     *   老 dev 口 `dev_zip_import` 只驱动数据层（`stage→inspect→extract`），**验不到弹窗**；
+     *   而 2026-10-05（第 104 轮）给那个弹窗加了**三个模式**，模式选择器必须人眼过一遍。
+     *   ⇒ 这一口把"选包"换成文件路径，后面的路与界面**逐字相同**
+     *   （`readZipThenConfirm` → `confirmZipImport` → `doZipExtract`）。
+     *
+     * 用法：`--es dev_zip_confirm /path/to/x.zip [--es dev_zip_slot <槽>]`
+     */
+    static void devReadZip(final Activity a, final File zip, final String slotArg, final SlotOps.Host h) {
+        if (zip == null || !zip.isFile()) {
+            toast(a, a.getString(R.string.zip_import_failed) + "：" + zip);
+            return;
+        }
+        final String slot = (slotArg == null || slotArg.trim().isEmpty())
+                ? Data.currentSlot(a) : slotArg.trim();
+        readZipThenConfirm(a, Uri.fromFile(zip), zip.getName(), slot, h);
+    }
+
+    /**
      * 读包 → 弹确认框。**这一步只能读**，任何写操作都要等用户在确认框里点下去。
      *
      * ★ 为什么先把包拷到内部临时文件（{@link SlotZip#stage}）：
@@ -659,7 +680,7 @@ final class SlotIo {
                         }
                         sZipTmp = ftmp;
                         sZipInfo = finf;
-                        confirmZipImport(a, slot, finf, zipName, h);
+                        confirmZipImport(a, slot, finf, h);
                     }
                 });
             }
@@ -667,16 +688,18 @@ final class SlotIo {
     }
 
     /**
-     * 解包前的确认框：**把包里有什么摊开给用户看**，再让他决定。
+     * 解包前的确认框：**把包里有什么摊开给用户看**，再让他选"怎么放进去"。
      *
-     * ⚠️ 「先清空」默认**不勾**。它是不可逆的删除（{@link Data#WIPE_DIRS}），
-     *   而"只覆盖同名"已经能满足绝大多数场景；真需要完全还原的人会自己去勾。
+     * ★ 2026-10-05（第 104 轮）：原来的「先清空」复选框换成了**三个模式**
+     *   （更新 / 反向更新 / 覆盖）—— 用户要的不只是"要不要清空"，
+     *   还有"两边的同名文件谁说了算"（反向更新就是为此存在的）。
+     *   判据与清空实现都在 {@link SlotWrite}，与快照恢复**共用一份**。
      */
-    private static void confirmZipImport(final Activity a, final String slot, final SlotZip.Info inf, String zipName, final SlotOps.Host h) {
+    private static void confirmZipImport(final Activity a, final String slot, final SlotZip.Info inf, final SlotOps.Host h) {
         View form = a.getLayoutInflater().inflate(R.layout.dialog_zip_import, null);
-        final CheckBox wipe = (CheckBox) form.findViewById(R.id.zip_wipe);
         TextView list = (TextView) form.findViewById(R.id.zip_list);
         TextView warn = (TextView) form.findViewById(R.id.zip_warn);
+        final SlotModes modes = SlotModes.bind(a, form);      // 默认「更新」（= 老行为）
 
         StringBuilder sb = new StringBuilder();
         sb.append(a.getString(R.string.zip_confirm_head_fmt, inf.files,
@@ -708,7 +731,7 @@ final class SlotIo {
                 .setView(form)
                 .setPositiveButton(R.string.import_btn, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int w) {
-                        doZipExtract(a, slot, wipe.isChecked(), h);
+                        doZipExtract(a, slot, modes == null ? SlotWrite.UPDATE : modes.mode(), h);
                     }
                 })
                 .setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
@@ -720,7 +743,7 @@ final class SlotIo {
                 .show();
     }
 
-    private static void doZipExtract(final Activity a, final String slot, final boolean wipe, final SlotOps.Host h) {
+    private static void doZipExtract(final Activity a, final String slot, final int mode, final SlotOps.Host h) {
         final File zip = sZipTmp;
         final SlotZip.Info inf = sZipInfo;
         if (zip == null) {
@@ -734,8 +757,12 @@ final class SlotIo {
             @Override public void run() {
                 String err = null;
                 SlotZip.Result r = null;
+                Backup.Snapshot auto = null;
                 try {
-                    r = SlotZip.extract(a, zip, inf, slot, wipe);
+                    // ★★ 槽操作前的自动备份（用户 2026-10-05：「在槽操作前都自动备份吧」）。
+                    //    放在**解包之前**、同一个后台线程里 —— 它就是给"这一下改坏了"兜底的。
+                    auto = AutoBackup.beforeSlotOp(a, slot, a.getString(R.string.backup_auto_zip));
+                    r = SlotZip.extract(a, zip, inf, slot, mode);
                 } catch (Exception e) {
                     err = msgOf(e);
                     android.util.Log.w("MDTLauncher", "zip extract failed: " + err, e);
@@ -743,6 +770,7 @@ final class SlotIo {
                 SlotZip.unstage(zip);
                 final String fe = err;
                 final SlotZip.Result fr = r;
+                final Backup.Snapshot fauto = auto;
                 a.runOnUiThread(new Runnable() {
                     @Override public void run() {
                         pd.dismiss();
@@ -754,11 +782,17 @@ final class SlotIo {
                             return;
                         }
                         StringBuilder ex = new StringBuilder();
+                        if (fr.kept > 0) {
+                            ex.append(a.getString(R.string.zip_import_kept_fmt, fr.kept));
+                        }
                         if (!fr.wiped.isEmpty()) {
                             ex.append(a.getString(R.string.zip_import_wiped_fmt, joinList(fr.wiped)));
                         }
                         if (fr.skipped > 0) {
                             ex.append(a.getString(R.string.zip_import_skipped_fmt, fr.skipped));
+                        }
+                        if (fauto != null) {
+                            ex.append(a.getString(R.string.slot_autobak_done_fmt, fauto.title()));
                         }
                         alert(a, a.getString(R.string.zip_import_done),
                                 a.getString(R.string.zip_import_ok_fmt, slot, fr.files,

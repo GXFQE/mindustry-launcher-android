@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  中转站页（TrashActivity，2026-10-05 第 102 轮）：删掉/被替换的地图与模组都在这儿，
+  能看列表、能放回去、能彻底删除、能清空。
+
+  ★ 骨架照抄 activity_maps.xml（表头 + 动作卡 + 空态 + ListView），理由是同一批老坑：
+    · 根节点必须有 `@+id/root`，且 Activity 必须 `Util.applySystemInsets(root)` ——
+      targetSdk ≥ 35 强制 edge-to-edge，漏了这一步整页从 y=0 开始画、被状态栏和顶栏盖住，
+      而 view 在 uiautomator dump 里**还在**（自检 ㉛ 会拦住它）。
+    · 空态必须排在 ListView **之前**：下面那个 ListView 是 `weight=1`，空态排在它后面
+      会被顶到屏幕最底部。
+    · 页面自己的 ListView（不在 ScrollView 里）⇒ 没有 FLOWS F2b 那条"高度塌掉"的问题。
+
+  ★ 为什么"清空"要做成一个动作行而不是列表末尾一项：它是**不可逆**的动作，混在可点开的
+    条目里手指一滑就点上了。放顶上、单独一张卡，和地图页"导入 / 导出在顶上"同一套排布。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bg">
+
+    <TextView
+        android:id="@+id/trash_head"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="6dp"
+        android:lineSpacingExtra="2dp"
+        android:textColor="@color/fg_muted"
+        android:textSize="12sp" />
+
+    <LinearLayout
+        android:id="@+id/trash_actions"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@drawable/card_bg"
+        android:layout_marginStart="14dp"
+        android:layout_marginEnd="14dp"
+        android:layout_marginBottom="8dp">
+
+        <include
+            android:id="@+id/row_trash_empty_all"
+            layout="@layout/row_action"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/trash_empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="28dp"
+        android:gravity="center"
+        android:textAlignment="center"
+        android:textSize="13sp"
+        android:lineSpacingExtra="4dp"
+        android:textColor="@color/fg_muted"
+        android:visibility="gone" />
+
+    <ListView
+        android:id="@+id/trash_list"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:divider="@null"
+        android:dividerHeight="0dp"
+        android:paddingBottom="8dp"
+        android:clipToPadding="false" />
+</LinearLayout>

@@ -135,6 +135,48 @@ final class AutoBackup {
      *   那不是故障，报出来只会吓人。证据写 hub/report-autobackup.txt。
      */
     static String runNow(Context ctx, String slot, String label) {
+        try {
+            createAndTrim(ctx, slot, label);
+            return null;
+        } catch (Throwable t) {
+            android.util.Log.i("MDTLauncher", "auto backup aborted: " + t);
+            String m = t.getMessage();
+            return (m == null || m.isEmpty()) ? String.valueOf(t) : m;
+        }
+    }
+
+    /**
+     * **槽操作前的自动备份**（2026-10-05 第 104 轮）。
+     *
+     * 用户原话：「**以及在槽操作前都自动备份吧（反正 CAS 不占空间）**」——
+     * 于是"恢复 / 整槽导入"这类**会改写整个槽**的动作，动手前一律先留一份快照：
+     * CAS 按内容寻址 ⇒ 没变的部分不占新空间，用户随时能退回上一步。
+     *
+     * ★ 与"玩够门槛"那条走**同一处实现**（{@link #createAndTrim}）：busy 标志
+     *   （启动路径要等它收尾）、超上限修剪、计数记录 —— 三件都要，抄一份迟早漏一件。
+     * ★ **不受 {@link Config.BackupPolicy#enabled} 约束**：那个开关管的是"每局结束要不要
+     *   自动备份"；这里是"即将动这个槽"的安全网。关掉自动备份的人，也不该在点了
+     *   「覆盖」之后没有退路。
+     * ★ 返回 null = 没做成（新槽还没内容 / 游戏在跑 / 出错）—— 调用方**照常继续**：
+     *   备份是安全网，不是门禁（把它做成门禁会让"空槽导入"直接不可用）。
+     *
+     * @return 快照（成功）；失败或没内容 ⇒ null，原因只进日志
+     */
+    static Backup.Snapshot beforeSlotOp(Context ctx, String slot, String label) {
+        try {
+            Backup.Snapshot ss = createAndTrim(ctx, slot, label);
+            android.util.Log.i("MDTLauncher", "pre-op backup ok: slot=" + slot
+                    + " files=" + ss.count + " new=" + ss.storedNew + " -> " + ss.dir);
+            return ss;
+        } catch (Throwable t) {
+            android.util.Log.i("MDTLauncher", "pre-op backup skipped: " + t);
+            return null;
+        }
+    }
+
+    /** 快照 + 计数 + 修剪（**唯一实现**，上面两个入口共用）；失败抛给调用方 */
+    private static Backup.Snapshot createAndTrim(Context ctx, String slot, String label)
+            throws Exception {
         beginWork();
         try {
             Backup.Snapshot ss = Backup.create(ctx, slot, label);
@@ -143,11 +185,7 @@ final class AutoBackup {
             sLastStoredNew = ss.storedNew;
             sLastLogical = ss.bytes;
             trim(ctx, slot);
-            return null;
-        } catch (Throwable t) {
-            android.util.Log.i("MDTLauncher", "auto backup aborted: " + t);
-            String m = t.getMessage();
-            return (m == null || m.isEmpty()) ? String.valueOf(t) : m;
+            return ss;
         } finally {
             endWork();
         }

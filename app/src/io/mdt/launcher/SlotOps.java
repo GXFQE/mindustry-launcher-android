@@ -141,16 +141,29 @@ final class SlotOps {
         rdlg.show();
     }
 
+    /**
+     * 恢复确认框（2026-10-05 第 104 轮加了**模式选择**）。
+     *
+     * ★ 为什么必须让用户选：恢复可能是**破坏性**的（「覆盖」会先清空这个槽），
+     *   而"这份快照里的东西跟现在的怎么合"，只有用户知道他要的是哪一种。
+     *   默认 = {@link SlotWrite#UPDATE}（只覆盖快照里有的，其余原样留着）——
+     *   与老行为逐字相同，也是三种里最小的那一个。
+     * ★ 布局与判据都与**整槽 zip 导入**共用（`dialog_slot_mode` + {@link SlotModes}）：
+     *   同一个问题在两个入口下必须只有一种问法与一种答法。
+     */
     private static void confirmRestore(final Activity a, final Data.Slot s,
                                        final Backup.Snapshot ss, final Host h) {
+        View form = a.getLayoutInflater().inflate(R.layout.dialog_slot_mode, null);
+        final SlotModes modes = SlotModes.bind(a, form);
         new AlertDialog.Builder(a)
                 .setTitle(R.string.restore_confirm_title)
                 .setMessage(a.getString(R.string.restore_confirm_msg_fmt, ss.title(), ss.count,
                         Util.formatSize(ss.bytes),
                         s.dir == null ? "?" : s.dir.getAbsolutePath()))
+                .setView(form)
                 .setPositiveButton(R.string.restore, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int w) {
-                        doRestore(a, s, ss, h);
+                        doRestore(a, s, ss, modes == null ? SlotWrite.UPDATE : modes.mode(), h);
                     }
                 })
                 .setNegativeButton(R.string.cancel, null)
@@ -158,18 +171,24 @@ final class SlotOps {
     }
 
     private static void doRestore(final Activity a, final Data.Slot s,
-                                  final Backup.Snapshot ss, final Host h) {
+                                  final Backup.Snapshot ss, final int mode, final Host h) {
         final ProgressDialog pd = ProgressDialog.show(a, a.getString(R.string.restore_progress_title),
                 a.getString(R.string.restore_progress_msg), true, false);
         new Thread(new Runnable() {
             @Override public void run() {
+                // ★★ 槽操作前的自动备份（用户 2026-10-05：「在槽操作前都自动备份吧」）：
+                //    在**恢复之前**先留一份"现在的样子" —— 恢复选错模式也退得回来。
+                final Backup.Snapshot auto =
+                        AutoBackup.beforeSlotOp(a, s.name, a.getString(R.string.backup_auto_restore));
                 // ★ 成败读 rr.ok，**不许读报告开头**（那是文案，一本地化就判错；门禁规则 SRC-01）
-                final Backup.RestoreResult rr = Backup.restore(a, s.name, ss);
+                Backup.RestoreResult rr = Backup.restore(a, s.name, ss, mode);
+                final String report = rr.report + (auto == null ? ""
+                        : a.getString(R.string.slot_autobak_done_fmt, auto.title()));
                 a.runOnUiThread(new Runnable() {
                     @Override public void run() {
                         pd.dismiss();
                         alert(a, a.getString(rr.ok ? R.string.restore_done
-                                : R.string.restore_not_run), rr.report);
+                                : R.string.restore_not_run), report);
                         h.onSlotChanged();
                     }
                 });
@@ -379,6 +398,17 @@ final class SlotOps {
                 .show();
     }
 
+    /**
+     * 删槽 —— **整槽挪进中转站**（2026-10-05 第二批）。
+     *
+     * ★ 为什么改：以前这里是"先删备份、再 `Data.deleteSlot` 硬删"（注释还写着"Android 没有回收站"）。
+     *   中转站那套原语有了之后，一个几十 MB 的槽被误删仍然是**不可逆**的 —— 而用户对
+     *   「挪进中转站」的预期已经建立起来了（地图/模组/存档都这样）。所以整槽（连它的备份）
+     *   一起进站，能放回来；只有在中转站里再点一次「彻底删除」才真的没了。
+     * ★ 顺带：不再调 `Backup.deleteSlotBackups`（备份跟着槽进容器）；也不在这里 `scheduleGc`
+     *   —— 那些快照引用的对象**仍然被引用**（`Backup.allReferencedShas` 会扫中转站的容器），
+     *   到用户真的彻底删掉那个容器时，{@link TrashActivity} 才会叫 GC 去收。
+     */
     static void deleteSlot(final Activity a, final Data.Slot s, final Host h) {
         if (s.active) {
             alert(a, a.getString(R.string.delete_current_slot_title),
@@ -395,15 +425,19 @@ final class SlotOps {
         } else {
             sb.append(a.getString(R.string.delete_slot_no_backups));
         }
+        sb.append(a.getString(R.string.delete_slot_cap_fmt, Trash.KEEP_SLOTS));
         new AlertDialog.Builder(a)
                 .setTitle(a.getString(R.string.delete_slot_confirm_title_fmt, s.name))
                 .setMessage(sb.toString())
-                .setPositiveButton(R.string.delete_forever, new DialogInterface.OnClickListener() {
+                // ★ 按钮文案**必须与动作一致**：这里已经**不是**永久删除（整槽进中转站了）。
+                //   原先复用 `delete_forever`（「永久删除」）—— 正文说"会挪进中转站"、按钮说"永久删除"，
+                //   真机验收时一眼就看出来了（这种自相矛盾比措辞难看严重得多）。
+                .setPositiveButton(R.string.delete_slot_confirm_btn, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int w) {
-                        String e1 = Backup.deleteSlotBackups(a, s.name);
-                        String e2 = Data.deleteSlot(a, s.name);
-                        if (e2 != null) {
-                            alert(a, a.getString(R.string.delete_failed), e2);
+                        Trash.Result r = Trash.trashSlot(a, s.name, Backup.rootDir(a));
+                        if (!r.ok) {
+                            alert(a, a.getString(R.string.delete_failed),
+                                    TrashText.reason(a, r));
                         } else {
                             int n = Config.get().retargetSlots(s.name, "");
                             Toast.makeText(a,
@@ -411,8 +445,48 @@ final class SlotOps {
                                             + (n > 0 ? a.getString(R.string.slot_deleted_fallback_fmt, n) : ""),
                                     Toast.LENGTH_LONG).show();
                         }
-                        if (e1 != null) android.util.Log.w("MDTLauncher", e1);
                         h.onSlotChanged();
+                    }
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    // ── 选槽（放东西进哪个槽） ────────────────────────────────────────────
+
+    /** 选完槽的回调 */
+    interface SlotPick {
+        void onPicked(String slot);
+    }
+
+    /**
+     * 弹一个"用哪个槽"的单选列表（当前槽带「[当前]」后缀，与设置页「默认槽」同一套文案）。
+     *
+     * ★ 为什么收在这里（2026-10-05，中转站页面要选目标槽时）：`MainActivity.pickSlot` 与
+     *   `ModsActivity.pickSlot` 各有一份私有实现 —— 那边多带了一行"这个槽当前指到哪个版本"的
+     *   信息，与这里**不是**同一种列表，所以没有合并；但"选一个槽"这件事在本类里只留这一份，
+     *   新页面（中转站）不许再抄第三份。
+     *
+     * @param titleRes 列表标题（调用方给 —— "放回哪个槽"和"复制到哪个槽"不是同一句话）
+     * @param prefer   默认勾选哪个槽（传空 = 不勾）
+     */
+    static void pickSlot(final Activity a, int titleRes, final String prefer, final SlotPick cb) {
+        final List<Data.Slot> slots = Data.allSlots(a);
+        if (slots.isEmpty()) return;
+        final String[] names = new String[slots.size()];
+        int checked = -1;
+        for (int i = 0; i < slots.size(); i++) {
+            Data.Slot s = slots.get(i);
+            names[i] = s.name + (s.active ? a.getString(R.string.slot_current_suffix) : "");
+            if (s.name.equals(prefer)) checked = i;
+        }
+        new AlertDialog.Builder(a)
+                .setTitle(titleRes)
+                .setSingleChoiceItems(names, checked, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int w) {
+                        if (w < 0 || w >= slots.size()) return;
+                        d.dismiss();
+                        cb.onPicked(slots.get(w).name);
                     }
                 })
                 .setNegativeButton(R.string.cancel, null)

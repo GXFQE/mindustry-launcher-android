@@ -95,7 +95,9 @@ public final class SlotZip {
         public int files;
         public long bytes;
         public int skipped;
-        /** 实际被清空的目录名（wipe 模式下） */
+        /** 「反向更新」下**保留下来的**同名文件数（它们没有被写） */
+        public int kept;
+        /** 实际被清空的顶级条目名（只有「覆盖」模式非空） */
         public final List<String> wiped = new ArrayList<>();
     }
 
@@ -229,25 +231,21 @@ public final class SlotZip {
     /**
      * 把 zip 解包进槽目录（zip 根 = 槽目录，与 {@link Exporter} 完全对称）。
      *
-     * @param wipe true = 先删 {@link Data#WIPE_DIRS} 里的目录再解包（完全还原）；
-     *             false = 只覆盖同名，其余原样保留
+     * @param mode {@link SlotWrite#UPDATE}（同名用包里的，其余原样留着）
+     *             · {@link SlotWrite#KEEP_OLD}（同名保留槽里的，只补缺的）
+     *             · {@link SlotWrite#REPLACE}（先按 {@link Data#contentRootsOf} 清空槽内容，再整份写入）
      */
-    public static Result extract(Context ctx, File zip, Info info, String slot, boolean wipe)
+    public static Result extract(Context ctx, File zip, Info info, String slot, int mode)
             throws IOException {
+        mode = SlotWrite.sane(mode);
         File root = Data.dirOf(ctx, slot);
         if (root == null) throw new IOException(ctx.getString(R.string.slotzip_err_no_slot_dir_fmt, slot));
         Result r = new Result();
 
-        if (wipe) {
-            for (String d : Data.WIPE_DIRS) {
-                File t = new File(root, d);
-                if (!t.exists()) continue;
-                if (!Data.deleteTree(t)) {
-                    throw new IOException(ctx.getString(R.string.slotzip_err_wipe_failed_fmt,
-                            t.getAbsolutePath()));
-                }
-                r.wiped.add(d);
-            }
+        // ★ 清空走共享原语（口径 = 槽内容，见 SlotWrite 类注释）——
+        //   它**抛异常就不继续**：清了一半再写会得到一个"既不是旧槽也不是新包"的东西。
+        if (SlotWrite.wipeFirst(mode) && root.isDirectory()) {
+            r.wiped.addAll(SlotWrite.wipeSlot(ctx, root));
         }
         if (!root.exists() && !root.mkdirs()) {
             throw new IOException(ctx.getString(R.string.slotzip_err_mkdir_slot_fmt,
@@ -278,6 +276,12 @@ public final class SlotZip {
                 File to = new File(root, n.replace('/', File.separatorChar));
                 if (e.isDirectory()) {
                     mkdirs(ctx, to);
+                    continue;
+                }
+                // ★ 「反向更新」：槽里已经有的**一个字节都不动**（只把缺的补上）。
+                //   判据在 SlotWrite，不是就地写一个 `if` —— 快照恢复那条路用的是同一份。
+                if (!SlotWrite.sourceWins(mode) && to.exists()) {
+                    r.kept++;
                     continue;
                 }
                 File parent = to.getParentFile();
@@ -325,7 +329,8 @@ public final class SlotZip {
             closeQuietly(zin);
         }
         Log.i(TAG, "zip extract ok: slot=" + slot + " files=" + r.files
-                + " bytes=" + r.bytes + " wipe=" + wipe + " wiped=" + r.wiped);
+                + " bytes=" + r.bytes + " kept=" + r.kept + " mode=" + mode
+                + " wiped=" + r.wiped);
         return r;
     }
 

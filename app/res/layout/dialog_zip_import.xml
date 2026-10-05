@@ -54,21 +54,16 @@
             android:layout_marginTop="16dp"
             android:background="@color/divider" />
 
-        <CheckBox
-            android:id="@+id/zip_wipe"
+        <!--
+          写入模式（更新 / 反向更新 / 覆盖）。★ 2026-10-05 第 104 轮把原来的「先清空」复选框
+          换成了这一组单选：用户要的是**三个模式**，而不是"要不要清空"这一个开关 ——
+          "两边的同名文件谁说了算"同样重要（反向更新就是为此存在的）。
+          判据与实现都在 SlotWrite，两处共用（另一处是快照恢复）。
+        -->
+        <include
+            android:id="@+id/zip_mode"
+            layout="@layout/dialog_slot_mode"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:text="@string/zip_wipe_label"
-            android:textColor="@color/fg"
-            android:textSize="15sp" />
-
-        <TextView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/zip_wipe_hint"
-            android:textColor="@color/fg_muted"
-            android:textSize="12sp"
-            android:lineSpacingExtra="2dp" />
+            android:layout_height="wrap_content" />
     </LinearLayout>
 </ScrollView>
