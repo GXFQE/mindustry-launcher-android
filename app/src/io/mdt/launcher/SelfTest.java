@@ -6561,6 +6561,14 @@ public final class SelfTest {
             ok(stat, L, soft1.missingKinds == 1 && soft1.softMissing && !soft2.softMissing,
                     "⑨ 缺件的那份被标记为「可能认错」，全认得出的那份不标 —— 且文案真的换了说法："
                             + oneLine(soft1.line(ctx)));
+            // ★ 两种说法真的不同（那份"同样缺件、但不打标记"的做对照）—— ⚠️ 必须夹在
+            //   `markSoft(…, 0)` 那条**之前**：那条会把标记清掉（我第一版把顺序写反，
+            //   自检当场判死 —— 这条断言本身也是"顺序敏感"的判据）
+            Blueprints.Item soft3 = new Blueprints.Item();
+            soft3.msch = soft1.msch;
+            Blueprints.summarize(soft3, Blueprints.rows(soft3.msch, softTab, null));
+            ok(stat, L, !soft1.line(ctx).equals(soft3.line(ctx)),
+                    "⑨ ★两种说法真的不同（可能认错 / 断定没有各一份）：" + oneLine(soft3.line(ctx)));
             Blueprints.markSoft(softItems, 0);
             ok(stat, L, !soft1.softMissing,
                     "⑨ ★元断言：本槽**没有**这种模组时不许打这个标记（否则它会变成一条恒真的免责声明）");
@@ -6574,13 +6582,31 @@ public final class SelfTest {
             int opHidden = MapStatsMods.contentFor(ctx, SLOT_BP).opaque;
             ok(stat, L, opHidden == 0,
                     "⑨ ★hidden 的模组不算误报来源（游戏不加载它的 Java 内容）—— 实得 " + opHidden);
-            // 文案实拼（带参资源按真参数调一次，防 `%n$` 与参数个数不匹配当场崩）
-            ok(stat, L, !ctx.getString(R.string.bp_line_missing_soft_fmt, 2, 3).isEmpty()
+            // 文案实拼：★ **必须走界面真正走的那两个函数**（第 113 轮真机崩溃的教训）——
+            //   第 112 轮这条断言是自己挑参数（两个 int），而真实调用点传的是
+            //   `MapStatsMods.num(tiles)`（**字符串**），于是资源里的 `%2$d` 在真机上抛
+            //   `IllegalFormatConversionException`、主进程崩，而自检**全绿**。
+            String ms1 = Blueprints.missingSummary(ctx, 2, 3456, true);
+            String ms0 = Blueprints.missingSummary(ctx, 2, 3456, false);
+            String mt1 = Blueprints.missingTitle(ctx, true);
+            String mt0 = Blueprints.missingTitle(ctx, false);
+            ok(stat, L, !ms1.isEmpty() && !ms0.isEmpty() && !mt1.isEmpty() && !mt0.isEmpty()
+                            && !ms1.equals(ms0) && !mt1.equals(mt0)
                             && !ctx.getString(R.string.bp_tech_opaque_fmt, 1).isEmpty()
-                            && !ctx.getString(R.string.bp_blocks_missing_soft_sum_fmt, 2, 3).isEmpty()
-                            && !ctx.getString(R.string.bp_blocks_missing_soft_note).isEmpty()
-                            && !ctx.getString(R.string.bp_section_missing_soft).isEmpty(),
-                    "⑨ ★新增的 5 条文案按真参数实拼不炸");
+                            && !ctx.getString(R.string.bp_blocks_missing_soft_note).isEmpty(),
+                    "⑨ ★文案实拼走**真实调用点**（含 `num()` 那个字符串参数）："
+                            + oneLine(ms1) + " / " + oneLine(mt1));
+            // ★ 列表行的两种说法也必须真的不同 —— 已经在上面夹在正确的位置断言过了
+            // ⑨c ★元断言：这条尺子得**有牙** —— 同一批资源里拿"字符串喂 %d"必须抛，
+            //     否则上面那条只是"没报错"，抓不住真正的错配
+            boolean thr = false;
+            try {
+                ctx.getString(R.string.bp_tech_time_fmt, "x");   // `%1$d 毫秒` 收 int
+            } catch (Throwable t) {
+                thr = true;
+            }
+            ok(stat, L, thr,
+                    "⑨ ★元断言：字符串喂 `%d` 真的会抛（说明上面那条不抛是有分辨力的）");
         } catch (Throwable t) {
             ok(stat, L, false, "㊹ 自己抛了异常：" + t);
         } finally {

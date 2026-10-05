@@ -184,14 +184,14 @@ public class BlueprintDetailActivity extends BaseActivity {
         }
         // ★ 本槽有"看不见方块"的模组时，这一段**特别标记 + 说清为什么可能认错**
         //   （判据 = `MapStatsMods.SlotContent.opaque`，见 MapStats.Pack#hasCode）
+        //   ⚠️ 标题与摘要都走 `Blueprints` 里那两个函数（界面与自检**同一份格式化**，
+        //   就地写 getString 会让"参数类型"漂移 —— 第 112 轮就是这么崩的，见 §77.6）
         boolean soft = !missing.isEmpty() && opaque > 0;
         if (!missing.isEmpty()) {
             int tiles = 0;
             for (Blueprints.Row r : missing) tiles += r.tiles;
-            addSection(getString(soft ? R.string.bp_section_missing_soft : R.string.bp_section_missing),
-                    getString(soft ? R.string.bp_blocks_missing_soft_sum_fmt
-                                    : R.string.bp_blocks_missing_sum_fmt,
-                            missing.size(), MapStatsMods.num(tiles)),
+            addSection(Blueprints.missingTitle(this, soft),
+                    Blueprints.missingSummary(this, missing.size(), tiles, soft),
                     missing, true, soft);
         }
         addTech(ms, opaque);

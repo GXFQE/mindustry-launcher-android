@@ -188,6 +188,29 @@ public final class Blueprints {
         for (Item it : items) it.softMissing = it.missingKinds > 0 && opaquePacks > 0;
     }
 
+    /**
+     * 「缺哪些方块」那一段的标题（`soft` ⇒ 带"可能认错"标记）。
+     *
+     * 🔴 **为什么把它挪到这里**（第 113 轮，真机崩溃之后）：界面与自检必须走**同一份格式化**。
+     *   第 112 轮我在详情页里就地写 `getString(...)`，而自检那条"实拼"断言用的是自己挑的参数
+     *   （两个 `int`）—— 真实调用点传的却是 `MapStatsMods.num(tiles)`（**字符串**），
+     *   于是资源里的 `%2$d` 在**真机**上抛 `IllegalFormatConversionException`、主进程崩，
+     *   而自检**全绿**（判据测的不是真实参数）。⇒ 收口成这两个函数，
+     *   自检直接调它们（= 真实调用点的类型），这类漂移就再也藏不住。
+     */
+    public static String missingTitle(Context c, boolean soft) {
+        return c.getString(soft ? R.string.bp_section_missing_soft : R.string.bp_section_missing);
+    }
+
+    /**
+     * 那一段的摘要（⚠️ 格子数走 {@link MapStatsMods#num(int)}，资源里必须写 `%s` —— **这里踩过崩溃**）。
+     */
+    public static String missingSummary(Context c, int kinds, int tiles, boolean soft) {
+        return c.getString(soft ? R.string.bp_blocks_missing_soft_sum_fmt
+                        : R.string.bp_blocks_missing_sum_fmt,
+                kinds, MapStatsMods.num(tiles));
+    }
+
     /** 分类连成一行（**分类本身是数据**：作者写的标签，不翻译） */
     static String join(List<String> xs) {
         StringBuilder sb = new StringBuilder();

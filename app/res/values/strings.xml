@@ -586,7 +586,7 @@
     -->
     <string name="bp_line_missing_soft_fmt">⚠ %1$d kinds of blocks were not recognized (%2$d tiles); some mods add blocks in code or scripts, so this may be wrong</string>
     <string name="bp_section_missing_soft">Missing blocks (may be wrong)</string>
-    <string name="bp_blocks_missing_soft_sum_fmt">%1$d kinds not recognized, %2$d tiles</string>
+    <string name="bp_blocks_missing_soft_sum_fmt">%1$d kinds not recognized, %2$s tiles</string>
     <string name="bp_blocks_missing_soft_note">When the game meets a block it does not know, it drops that tile. Some mods add their blocks in code or scripts, though, and we cannot see those — so this list may well include blocks that do exist. Trust what the game shows when you paste it.</string>
     <string name="bp_tech_opaque_fmt">%1$d enabled mod(s) add their blocks in code or scripts, and those blocks are invisible to us</string>
     <!-- Blueprints in the trash: a sentence of its own (saying map would be misleading) -->
