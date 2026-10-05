@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  F22：蓝图（.msch）行/页面。见 ic_add.xml 头注释的图标集约定（24dp 线性、`@color/icon_tint`）。
+
+  画法 = **一张网格里的几块积木**（蓝图的本质就是"一格一格的建筑"）：
+  外框四边 + 中间两块实心格 + 一块 L 形。
+  ⚠️ 别画成"一张纸"（那与「存档/文件」的图标撞车），也别用实心底再加同色格（看不见，见 ic_zip 的注释）。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@color/icon_tint"
+        android:pathData="M4,4h16v2h-16z M4,18h16v2h-16z M4,4h2v16h-2z M18,4h2v16h-2z" />
+    <path
+        android:fillColor="@color/icon_tint"
+        android:pathData="M8,8h3v3h-3z M14,8h2v2h-2z" />
+    <path
+        android:fillColor="@color/icon_tint"
+        android:pathData="M8,14h2v2h-2z M11,14h2v2h-2z M14,12h2v4h-2z" />
+</vector>

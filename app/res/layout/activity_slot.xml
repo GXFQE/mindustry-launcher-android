@@ -97,6 +97,16 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
 
+                <!--
+                  ★ F22（2026-10-05 第 109 轮）：蓝图。放在「地图」之后、「槽操作」之前 ——
+                    模组 / 存档 / 地图 / 蓝图 都是"这个槽里有什么"，四个入口挨在一起。
+                -->
+                <include
+                    android:id="@+id/row_slot_blueprints"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
                 <include
                     android:id="@+id/row_slot_ops"
                     layout="@layout/row_action"

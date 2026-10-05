@@ -103,6 +103,17 @@ public class SlotActivity extends BaseActivity {
                 });
         mMapsSub = (TextView) mapsRow.findViewById(R.id.act_sub);
         mMapsSub.setText(R.string.slot_page_maps_sub);
+        // ★ F22（第 109 轮）：蓝图 —— 与地图同一条路子（开子页面，不弹窗）。
+        //   副标题后台填"本槽 N · 模组自带 M"，与地图行同一口径。
+        View bpRow = Util.bindActionValue(root, R.id.row_slot_blueprints, R.drawable.ic_schematic,
+                R.string.slot_page_blueprints, new Runnable() {
+                    @Override public void run() {
+                        startActivity(new Intent(SlotActivity.this, BlueprintsActivity.class)
+                                .putExtra(BlueprintsActivity.EXTRA_SLOT, mSlot));
+                    }
+                });
+        mBpSub = (TextView) bpRow.findViewById(R.id.act_sub);
+        mBpSub.setText(R.string.slot_page_blueprints_sub);
         // ★★ 「备份与恢复」**就地弹窗**（不再跳存档页）—— 实现搬到 SlotOps，两个页面共用一份。
         //   原来靠"派发 + REORDER_TO_FRONT"复用存档页的实现 ⇒ 点了会先**跳到存档页**再弹窗、
         //   关掉后还停在那一页（用户 2026-10-03 报的 UI 问题之一）。
@@ -217,8 +228,8 @@ public class SlotActivity extends BaseActivity {
     private TextView mInfo, mPaths;
     /** 模组行的副标题（后台扫完把条数写上去） */
     private TextView mModsSub;
-    /** 存档 / 地图两行的副标题（同样后台填） */
-    private TextView mSavesSub, mMapsSub;
+    /** 存档 / 地图 / 蓝图三行的副标题（同样后台填） */
+    private TextView mSavesSub, mMapsSub, mBpSub;
     /**
      * 上一轮扫出来的「读不出来的存档」份数 —— 副标题与存档行的菜单项**共用这一个数**。
      * ★ 存在的意义是**别在点击时重新扫盘**：槽里几百份存档，扫一遍要百来毫秒，
@@ -310,6 +321,20 @@ public class SlotActivity extends BaseActivity {
                                     Maps.count(items, Maps.FROM_SLOT),
                                     Maps.count(items, Maps.FROM_GAME),
                                     Maps.count(items, Maps.FROM_MOD)));
+                        }
+                    });
+                } catch (Throwable ignored) {
+                }
+                // ④ 蓝图：两个来源各多少（与蓝图页同一口径 Blueprints.scan / count）
+                try {
+                    final java.util.List<Blueprints.Item> bps =
+                            Blueprints.scan(SlotActivity.this, mSlot);
+                    runOnUiThread(new Runnable() {
+                        @Override public void run() {
+                            if (mBpSub == null || isFinishing()) return;
+                            mBpSub.setText(getString(R.string.bp_head_fmt,
+                                    Blueprints.count(bps, Blueprints.FROM_SLOT),
+                                    Blueprints.count(bps, Blueprints.FROM_MOD)));
                         }
                     });
                 } catch (Throwable ignored) {

@@ -152,6 +152,7 @@ public class MainActivity extends BaseActivity {
                 || intent.hasExtra("dev_maps_slot")
                 || intent.hasExtra("dev_map_import")
                 || intent.hasExtra("dev_maps_page")
+                || intent.hasExtra("dev_bp_page")
                 || intent.hasExtra("dev_mapstats")
                 || intent.hasExtra("dev_msch");
         if (!isDev) return;
@@ -498,6 +499,19 @@ public class MainActivity extends BaseActivity {
             Intent mi = new Intent(this, MapsActivity.class);
             mi.putExtra(MapsActivity.EXTRA_SLOT, dmp.trim());
             startActivity(mi);
+            finish();
+            return;
+        }
+
+        // ── 蓝图（F22）：直接打开某个槽的蓝图页 ──────────────────────────────
+        // 用法：`--es dev_bp_page <槽>`
+        // ★ 理由与 dev_maps_page 一样：蓝图页是槽页的子页面（点槽 → 蓝图），
+        //   自动化点进去要穿两层；而真机验收（列表 / 缺件段 / 技术细节）都发生在那两页上。
+        String dbp = intent.getStringExtra("dev_bp_page");
+        if (dbp != null && !dbp.trim().isEmpty()) {
+            Intent bi = new Intent(this, BlueprintsActivity.class);
+            bi.putExtra(BlueprintsActivity.EXTRA_SLOT, dbp.trim());
+            startActivity(bi);
             finish();
             return;
         }

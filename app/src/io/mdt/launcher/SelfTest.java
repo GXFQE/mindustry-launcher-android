@@ -103,6 +103,8 @@ public final class SelfTest {
     public static final String SLOT_S2M = "m3-save2map";
     /** ㊷ 蓝图（`.msch`）解析用的槽 —— 现场造几份 .msch 落盘再读回来 */
     public static final String SLOT_MSCH = "m3-msch";
+    /** ㊸ 蓝图**清点**用的槽（本槽 schematics/ + 两个模组包，其中一个被 settings.bin 关掉） */
+    public static final String SLOT_BP = "m3-blueprints";
 
     /**
      * 自检会创建并最终删除的**全部**测试槽。
@@ -112,7 +114,7 @@ public final class SelfTest {
     private static final String[] TEST_SLOTS = {
             SLOT, SLOT_RENAMED, CLONE_SRC, CLONE_DST, CLONE_EMPTY, CLONE_EMPTY_DST, SLOT_MODS,
             SLOT_SET, SLOT_PACK, SLOT_PACK_DST, SLOT_SAVE, SLOT_GONE, SLOT_GONE2,
-            SLOT_MODE, SLOT_MODE2, SLOT_S2M, SLOT_MSCH};
+            SLOT_MODE, SLOT_MODE2, SLOT_S2M, SLOT_MSCH, SLOT_BP};
 
     /**
      * 本工程**自己的全部页面**（㊱ 基类检查用）。
@@ -124,7 +126,8 @@ public final class SelfTest {
     private static final Class<?>[] PAGES = {
             MainActivity.class, SavesActivity.class, SlotActivity.class, ModsActivity.class,
             MapsActivity.class, MapDetailActivity.class, SettingsActivity.class,
-            LogActivity.class, TrashActivity.class, GameSlot.class};
+            LogActivity.class, TrashActivity.class, BlueprintsActivity.class,
+            BlueprintDetailActivity.class, GameSlot.class};
 
     private SelfTest() {}
 
@@ -241,6 +244,8 @@ public final class SelfTest {
             //   旧名映射 + 宽松 labels + modified UTF-8 + 包围盒口径 + 8 份负样本 + 码映射
             //   （纯函数为主，只有几份样本落盘在自己的一次性槽里）
             mschParse(ctx, L, stat);
+            // ★ ㊸ 蓝图清点（F22 列表页的数据层）：两个来源 + 三条模组过滤 + 缺件判据
+            blueprintScan(ctx, L, stat);
             // ★ 篡改对象池的用例放**最后**：它会在池里留下一个内容坏掉的对象，
             //   之后任何"再备份一次"都会因为 `has()` 命中而复用坏对象（CAS 的固有
             //   假设是"池内不可变"）。放在最后就不影响别的用例。
@@ -5226,13 +5231,14 @@ public final class SelfTest {
         String[] want = {"io.mdt.launcher.MainActivity", "io.mdt.launcher.SavesActivity",
                 "io.mdt.launcher.ModsActivity", "io.mdt.launcher.SlotActivity",
                 "io.mdt.launcher.MapsActivity", "io.mdt.launcher.MapDetailActivity",
+                "io.mdt.launcher.BlueprintsActivity", "io.mdt.launcher.BlueprintDetailActivity",
                 "io.mdt.launcher.TrashActivity"};
         int found = 0;
         for (String n : want) {
             if (canResolve(ctx, n)) found++;
         }
         ok(stat, L, found == want.length,
-                "★" + want.length + " 个页面都能被解析到（含新加的 MapDetailActivity）：" + found + "/" + want.length);
+                "★" + want.length + " 个页面都能被解析到（含新加的蓝图两页）：" + found + "/" + want.length);
         // ★ 元断言：这条判据**必须有分辨力** —— 编一个不存在的页面名，必须解析不到
         ok(stat, L, !canResolve(ctx, "io.mdt.launcher.NoSuchActivityForSelfTest"),
                 "★元断言：不存在的页面名必须解析不到（否则上面那条等于在测空气）");
@@ -6248,6 +6254,147 @@ public final class SelfTest {
         ok(stat, L, broken != null && !broken.ok && r1 != null && !r1.isEmpty(),
                 "⑧ 失败实例走 MschText.reason 也有话说：" + r1);
         L.add("");
+    }
+
+    /**
+     * ㊸ 蓝图**清点**（F22 列表页的数据层，第 109 轮）。
+     *
+     * 判据分四块，每条都对着游戏源码的一个具体行为：
+     *   ① **本槽来源** = `<槽>/schematics/**` **递归**（游戏 `schematicDirectory.walk`），
+     *      非 `.msch` 一律不算；
+     *   ② **模组来源的三条过滤**：只认**已启用**的模组（`Mods.listFiles` 走 `eachEnabled`）、
+     *      只认 `schematics/` 的**直接子文件**（游戏是 `file.list()`，不下潜）、
+     *      被游戏整个跳过的包不算 ⇒ ＋ **元断言**：用 `settings.bin` 把那个模组关掉，
+     *      同一份包必须**少一份蓝图**（否则"启用过滤"这条等于没测）；
+     *   ③ **缺件判据**（{@link Blueprints#rows}）：内容表里没有的方块 ⇒ `missing` 且排到最后；
+     *   ④ Intent 往返（详情页靠它重建记录）。
+     */
+    private static void blueprintScan(Context ctx, List<String> L, int[] stat) {
+        L.add("── ㊸ 蓝图清点：两个来源 + 模组的启用过滤 + 缺件判据 ──");
+        File root = Data.dirOf(ctx, SLOT_BP);
+        if (root == null) {
+            ok(stat, L, false, "拿不到测试槽目录：" + SLOT_BP);
+            return;
+        }
+        try {
+            Data.deleteTree(root);
+            File sch = new File(root, "schematics");
+            File mods = new File(root, "mods");
+            sch.mkdirs();
+            mods.mkdirs();
+
+            byte[] a = new Sch(1, 4, 4).tag("name", "bp-a")
+                    .tile("conveyor", 0, 0, 0, new byte[]{0}).bytes();
+            byte[] b = new Sch(1, 4, 4).tag("name", "bp-b")
+                    .tile("conveyor", 1, 1, 0, new byte[]{0}).bytes();
+            byte[] c = new Sch(1, 4, 4).tag("name", "bp-c")
+                    .tile("conveyor", 2, 2, 0, new byte[]{0}).bytes();
+            byte[] d = new Sch(1, 4, 4).tag("name", "bp-d")
+                    .tile("conveyor", 3, 3, 0, new byte[]{0}).bytes();
+            write(new File(sch, "a.msch"), a);
+            write(new File(sch, "b.msch"), b);
+            write(new File(new File(sch, "sub"), "c.msch"), c);        // 子目录：walk 会走到
+            write(new File(sch, "notes.txt"), "x".getBytes("UTF-8"));  // 非 .msch：不算
+
+            // 模组 A：schematics/ 下 1 个直接子文件 + 1 个嵌套（不算）+ 别的目录 1 个（不算）
+            zipEntries(new File(mods, "mod-a.zip"),
+                    new String[]{"mod.json", "schematics/a.msch", "schematics/nested/b.msch",
+                            "other/c.msch"},
+                    new byte[][]{"name: BP Mod A\nversion: 1\n".getBytes("UTF-8"), a, b, c});
+            // 模组 B：待会儿用 settings.bin 关掉它
+            zipEntries(new File(mods, "mod-b.zip"),
+                    new String[]{"mod.json", "schematics/d.msch"},
+                    new byte[][]{"name: BP Mod B\nversion: 1\n".getBytes("UTF-8"), d});
+
+            List<Blueprints.Item> items = Blueprints.scan(ctx, SLOT_BP);
+            int fromSlot = Blueprints.count(items, Blueprints.FROM_SLOT);
+            int fromMod = Blueprints.count(items, Blueprints.FROM_MOD);
+            ok(stat, L, fromSlot == 3,
+                    "① 本槽递归找到 3 份（含 sub/ 那份），notes.txt 不算 —— 实得 " + fromSlot);
+            ok(stat, L, fromMod == 2,
+                    "② 模组只算 `schematics/` 的**直接子文件**（嵌套 / 别的目录都不算）—— 实得 " + fromMod);
+
+            // ② ★元断言：关掉模组 B ⇒ 必须少一份
+            String key = null;
+            for (Mods.Info mi : Mods.scan(ctx, SLOT_BP).mods) {
+                if ("BP Mod B".equals(mi.title())) key = mi.internalName;
+            }
+            if (key == null || key.isEmpty()) {
+                ok(stat, L, false, "② ★元断言：夹具里没扫到「BP Mod B」（internalName 拿不到）");
+            } else {
+                writeSettings(Mods.settingsFileOf(ctx, SLOT_BP),
+                        new Object[][]{{"mod-" + key + "-enabled", SettingsBin.TYPE_BOOL,
+                                Boolean.FALSE}}, true);
+                int off = Blueprints.count(Blueprints.scan(ctx, SLOT_BP), Blueprints.FROM_MOD);
+                ok(stat, L, off == fromMod - 1,
+                        "② ★元断言：把该模组关掉 ⇒ 模组自带少一份（" + fromMod + " → " + off
+                                + "，键 `mod-" + key + "-enabled`）");
+                // 恢复启用：别把"某模组被关掉"这个状态留给别的用例（槽收尾还会整棵删掉）
+                writeSettings(Mods.settingsFileOf(ctx, SLOT_BP),
+                        new Object[][]{{"mod-" + key + "-enabled", SettingsBin.TYPE_BOOL,
+                                Boolean.TRUE}}, true);
+            }
+
+            // ③ 缺件判据：conveyor 认识、`ve-nope` 不认识 ⇒ 后者 missing 且排最后
+            Msch m = Msch.read(new Sch(1, 4, 4).tag("name", "bp-mix")
+                    .tile("conveyor", 0, 0, 0, new byte[]{0})
+                    .tile("ve-nope", 1, 1, 0, new byte[]{0}).bytes());
+            List<Blueprints.Row> rows = Blueprints.rows(m, MapStats.vanilla(), null);
+            Blueprints.Item probe = new Blueprints.Item();
+            Blueprints.summarize(probe, rows);
+            boolean last = rows.size() == 2 && rows.get(1).missing && "ve-nope".equals(rows.get(1).internal);
+            ok(stat, L, rows.size() == 2 && probe.blockKinds == 2 && probe.missingKinds == 1
+                            && probe.missingTiles == 1 && last,
+                    "③ 缺件判据：2 种方块 / 缺 1 种（1 格），缺的那行排最后");
+            // ★ 元断言：**没有内容表**时不敢说"缺件"（表都没读到就报缺 = 诬告）
+            Blueprints.Item probe2 = new Blueprints.Item();
+            List<Blueprints.Row> noTab = Blueprints.rows(m, null, null);
+            Blueprints.summarize(probe2, noTab);
+            ok(stat, L, noTab.size() == 2 && probe2.missingKinds == 0,
+                    "③ ★元断言：内容表为 null 时**不报缺件**（宁可不说，也不诬告）");
+
+            // ④ Intent 往返（详情页重建记录那条路）
+            Blueprints.Item one = null;
+            for (Blueprints.Item it : items) {
+                if (Blueprints.FROM_SLOT == it.from) { one = it; break; }
+            }
+            android.content.Intent i = new android.content.Intent();
+            Blueprints.putExtra(i, one);
+            Blueprints.Item back = Blueprints.fromExtra(ctx, i);
+            ok(stat, L, one != null && back != null && back.from == one.from
+                            && one.where.equals(back.where) && back.ok()
+                            && one.displayName().equals(back.displayName()),
+                    "④ Intent 往返：详情页重建出来的记录与原记录同源同解析结果");
+
+            // ⑤ 没有 schematics/ 目录的槽 ⇒ 0 份、不抛（真实的空槽就是这样）
+            File empty = new File(Paths.privateDir(ctx), "selftest-bp-empty");
+            Data.deleteTree(empty);
+            empty.mkdirs();
+            List<Blueprints.Item> none = new ArrayList<>();
+            Blueprints.scanSlot(new File(empty, "schematics"), none);
+            ok(stat, L, none.isEmpty(), "⑤ 空槽（没有 schematics/）⇒ 0 份，不抛异常");
+            Data.deleteTree(empty);
+        } catch (Throwable t) {
+            ok(stat, L, false, "㊸ 自己抛了异常：" + t);
+        }
+        L.add("");
+    }
+
+    /** 把若干**二进制**条目打进一个 zip（模组夹具用；`zipMany` 只收文本） */
+    private static void zipEntries(File f, String[] names, byte[][] data) throws IOException {
+        File p = f.getParentFile();
+        if (p != null && !p.exists() && !p.mkdirs()) throw new IOException("mkdir 失败：" + p);
+        java.util.zip.ZipOutputStream z =
+                new java.util.zip.ZipOutputStream(new FileOutputStream(f));
+        try {
+            for (int i = 0; i < names.length; i++) {
+                z.putNextEntry(new java.util.zip.ZipEntry(names[i]));
+                z.write(data[i]);
+                z.closeEntry();
+            }
+        } finally {
+            z.close();
+        }
     }
 
     /** 声明 20000 格瓦片的 body（读到 int 总数就判死，后面没有数据也没关系） */

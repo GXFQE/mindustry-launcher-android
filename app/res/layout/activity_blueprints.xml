@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  蓝图列表页（F22，2026-10-05 第 109 轮）：从槽二级页面点「蓝图」进来。
+
+  ★ 结构照抄 activity_maps（页面自己的 ListView，**不在 ScrollView 里** ⇒ 没有 F2b 那条"高度塌掉"）。
+  ★ 这一轮**只读**：还没有导入/导出（那是 F22 的下一步），所以没有动作行，
+    只有一行表头 + 列表 + 空态。
+
+  🔴 根节点必须有 `@+id/root`，且 Activity 必须调 `Util.applySystemInsets(root)`：
+     targetSdk ≥ 35 强制 edge-to-edge ⇒ 漏了这一步整页从 y=0 开始画、被状态栏 + 顶栏整块盖住，
+     而且**全程不报错**（第 81 轮踩过，自检 ㉛ 会拦）。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bg">
+
+    <TextView
+        android:id="@+id/bp_head"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:paddingTop="12dp"
+        android:paddingBottom="6dp"
+        android:lineSpacingExtra="2dp"
+        android:textColor="@color/fg_muted"
+        android:textSize="12sp" />
+
+    <!--
+      ★ 空态。位置必须在 ListView **之前**：下面那个 ListView 是 `weight=1`（吃掉剩余高度），
+        空态若排在它后面就会被顶到屏幕最底部（见 activity_maps.xml 的同一条注释）。
+    -->
+    <TextView
+        android:id="@+id/bp_empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="28dp"
+        android:gravity="center"
+        android:textAlignment="center"
+        android:textSize="13sp"
+        android:lineSpacingExtra="4dp"
+        android:textColor="@color/fg_muted"
+        android:visibility="gone" />
+
+    <ListView
+        android:id="@+id/bp_list"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:divider="@null"
+        android:dividerHeight="0dp"
+        android:paddingBottom="8dp"
+        android:clipToPadding="false" />
+</LinearLayout>

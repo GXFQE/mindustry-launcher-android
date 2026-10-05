@@ -1,0 +1,235 @@
+package io.mdt.launcher;
+
+import android.os.Bundle;
+import android.view.View;
+import android.widget.LinearLayout;
+import android.widget.TextView;
+
+import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * 蓝图详情页（F22）：从蓝图列表点进来。
+ *
+ * <h3>两段 + 技术细节（§59 的两层纪律）</h3>
+ * <ol>
+ *   <li><b>用到的方块</b>：按用量降序，一行一种（名字用内容表的译名 → 模组 bundle → 可读化）。</li>
+ *   <li><b>缺哪些方块</b>：**这一页的价值所在** —— 游戏遇到认不出的方块是**静默**换成空气，
+ *       只有在启动器里才看得见。判据 = 本槽已启用模组的内容表里没有这一行。</li>
+ *   <li><b>技术细节</b>（依据，默认收起）：解析版本 / 声明尺寸 / 瓦片范围 / 越界 / 字典 /
+ *       标签 / 自带名字表 / 末尾多余字节 / 用时 —— **依据不能删**（F4①d），只是收起来。</li>
+ * </ol>
+ *
+ * ⚠️ 这一轮**没有预览图**（像素级预览要自研图集解析，REF §73 判为"大"；色块预览是下一步）
+ *   ⇒ 界面上**不摆空框**（用户 2026-10-04 明确要求）。
+ *
+ * 🔴 必须继承 {@link BaseActivity}（深浅色唯一生效点）+ 根节点 `@+id/root` + insets
+ *   （见 {@link BlueprintsActivity} 的类注释；自检 ㊱ / ㉛ 分别盯着这两条）。
+ */
+public class BlueprintDetailActivity extends BaseActivity {
+    /** 目标槽（译文与内容表都按它取） */
+    public static final String EXTRA_SLOT = "slot";
+    /** 一段里最多列几行（超出的只报"还有 N 种"） */
+    private static final int ROW_CAP = 15;
+
+    private String mSlot;
+    private Blueprints.Item mItem;
+    private TextView mText, mState;
+    private LinearLayout mBox;
+
+    @Override protected void onCreate(Bundle b) {
+        super.onCreate(b);
+        mSlot = getIntent() == null ? null : getIntent().getStringExtra(EXTRA_SLOT);
+        mItem = Blueprints.fromExtra(this, getIntent());
+        if (mSlot == null || mSlot.trim().isEmpty() || mItem == null) {
+            finish();                       // 没槽名 / 没定位信息就退出，**不猜**
+            return;
+        }
+        mSlot = mSlot.trim();
+        setTitle(mItem.displayName());
+
+        View root = getLayoutInflater().inflate(R.layout.activity_blueprint_detail, null);
+        Util.applySystemInsets(root);
+        setContentView(root);
+
+        mText = (TextView) root.findViewById(R.id.bp_detail_text);
+        mText.setText(mItem.detail(this));
+        mState = (TextView) root.findViewById(R.id.bp_detail_state);
+        mBox = (LinearLayout) root.findViewById(R.id.bp_detail_box);
+        startStats();
+    }
+
+    /**
+     * 方块清点（**整段在后台**）：内容表 + 译文都要读 APK / 模组包，不能放 UI 线程。
+     * 界面先给一行「正在数方块…」，完成后换成两段卡片。
+     */
+    private void startStats() {
+        if (!mItem.ok()) {
+            // 蓝图本身就读不出来 ⇒ 详情顶部已经说了原因，这里不再摆一段空的
+            mState.setText(R.string.bp_stats_failed);
+            return;
+        }
+        mState.setText(R.string.bp_stats_working);
+        new Thread(new Runnable() {
+            @Override public void run() {
+                final List<Blueprints.Row> rows;
+                final long ms;
+                try {
+                    long t0 = System.currentTimeMillis();
+                    MapStatsMods.SlotContent sc = MapStatsMods.contentFor(
+                            BlueprintDetailActivity.this, mSlot);
+                    String apk = null;
+                    try {
+                        apk = Mods.targetsFor(BlueprintDetailActivity.this, mSlot).apkPath;
+                    } catch (Throwable ignored) {
+                    }
+                    // 译名的两层来源与地图统计完全同源（APK 的语言包 + 模组的 *bundles/）
+                    BundleNames bn = new BundleNames(
+                            apk == null || apk.trim().isEmpty() ? null : new File(apk.trim()),
+                            sc.bundle, MapStatsMods.attrLabels(BlueprintDetailActivity.this),
+                            MapStats.bundleLang(MapStatsMods.bundleLocaleSuffix(BlueprintDetailActivity.this)),
+                            getString(R.string.stats_wall_name_fmt));
+                    rows = Blueprints.rows(mItem.msch, sc.table, bn);
+                    ms = System.currentTimeMillis() - t0;
+                } catch (Throwable t) {
+                    android.util.Log.w("MDTLauncher", "blueprint stats failed", t);
+                    runOnUiThread(new Runnable() {
+                        @Override public void run() {
+                            if (Util.dead(BlueprintDetailActivity.this)) return;
+                            mState.setText(R.string.bp_stats_failed);
+                        }
+                    });
+                    return;
+                }
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        if (Util.dead(BlueprintDetailActivity.this)) return;
+                        render(rows, ms);
+                    }
+                });
+            }
+        }, "bp-stats").start();
+    }
+
+    private void render(List<Blueprints.Row> rows, long ms) {
+        mState.setVisibility(View.GONE);
+        List<Blueprints.Row> used = new ArrayList<>(), missing = new ArrayList<>();
+        int usedTiles = 0;
+        for (Blueprints.Row r : rows) {
+            if (r.missing) missing.add(r);
+            else {
+                used.add(r);
+                usedTiles += r.tiles;
+            }
+        }
+        // ⚠️ 内容表**不会是空的**（`MapStatsMods.contentFor` 至少给原版 447 行）⇒
+        //    "全都是缺件"是真信号（典型：这份蓝图来自一个**当前没启用**的模组）——
+        //    那种情况下更要说清楚，**不许**把它当成"我们表读不出来"而藏起来。
+        if (!used.isEmpty()) {
+            addSection(getString(R.string.bp_section_blocks),
+                    getString(R.string.bp_blocks_sum_fmt, used.size(), MapStatsMods.num(usedTiles)),
+                    used, false);
+        }
+        if (!missing.isEmpty()) {
+            int tiles = 0;
+            for (Blueprints.Row r : missing) tiles += r.tiles;
+            addSection(getString(R.string.bp_section_missing),
+                    getString(R.string.bp_blocks_missing_sum_fmt, missing.size(), MapStatsMods.num(tiles)),
+                    missing, true);
+        }
+        addTech(ms);
+    }
+
+    /** 一段：摘要常驻，明细点开才出来（`card_stat_section` + `Util.bindExpandableCard`） */
+    private void addSection(String title, String summary, List<Blueprints.Row> rows, boolean missingKind) {
+        View card = getLayoutInflater().inflate(R.layout.card_stat_section, mBox, false);
+        ((TextView) card.findViewById(R.id.stat_card_title)).setText(title);
+        ((TextView) card.findViewById(R.id.stat_card_summary)).setText(summary);
+        LinearLayout body = (LinearLayout) card.findViewById(R.id.stat_card_body);
+        if (missingKind) {
+            TextView note = new TextView(this);
+            note.setText(R.string.bp_blocks_missing_note);
+            note.setTextSize(12f);
+            note.setLineSpacing(dp(2), 1f);
+            note.setPadding(dp(14), dp(4), dp(14), dp(6));
+            note.setTextColor(getResources().getColor(R.color.fg_muted));
+            body.addView(note);
+        }
+        int n = Math.min(rows.size(), ROW_CAP);
+        for (int i = 0; i < n; i++) body.addView(rowView(body, rows.get(i)));
+        if (rows.size() > n) {
+            TextView more = new TextView(this);
+            more.setText(getString(R.string.bp_more_fmt, rows.size() - n));
+            more.setTextSize(11f);
+            more.setPadding(dp(14), dp(4), dp(14), dp(8));
+            more.setTextColor(getResources().getColor(R.color.fg_muted));
+            body.addView(more);
+        }
+        Util.bindExpandableCard(card, R.id.stat_card, R.id.stat_card_body, R.id.stat_card_chevron);
+        mBox.addView(card);
+    }
+
+    /** 一行方块：显示名 + 「N 格」 */
+    private View rowView(LinearLayout parent, Blueprints.Row row) {
+        View v = getLayoutInflater().inflate(R.layout.item_stat, parent, false);
+        ((TextView) v.findViewById(R.id.stat_row_title)).setText(row.label);
+        ((TextView) v.findViewById(R.id.stat_row_count))
+                .setText(getString(R.string.bp_row_tiles_fmt, MapStatsMods.num(row.tiles)));
+        return v;
+    }
+
+    /** 依据（**判据要能看见依据**）：解析出来的原始事实，全部来自内核，一个字都不加工 */
+    private void addTech(long ms) {
+        View card = getLayoutInflater().inflate(R.layout.card_stat_section, mBox, false);
+        ((TextView) card.findViewById(R.id.stat_card_title)).setText(R.string.bp_section_tech);
+        Msch m = mItem.msch;
+        // ⚠️ 摘要**不能**用 `mItem.blockKinds` —— 那是**列表页**扫的时候填进 Item 的派生字段，
+        //   而详情页是**另一个进程内实例**（记录经 Intent 重建）⇒ 那边永远是 0
+        //   （真机第一版就是"技术细节 · 0 种，共 79 格"，当场看出来）。这里用解析版本，短且确定。
+        ((TextView) card.findViewById(R.id.stat_card_summary))
+                .setText(getString(R.string.bp_tech_summary_fmt, m == null ? 0 : m.version));
+        LinearLayout body = (LinearLayout) card.findViewById(R.id.stat_card_body);
+        if (m != null && m.ok) {
+            line(body, getString(R.string.bp_tech_version_fmt, m.version));
+            line(body, getString(R.string.bp_tech_declared_fmt, m.declaredWidth, m.declaredHeight));
+            line(body, getString(R.string.bp_tech_box_fmt, m.minX, m.minY, m.maxX, m.maxY));
+            if (m.outOfBounds > 0) {
+                line(body, getString(R.string.bp_tech_oob_fmt, m.outOfBounds));
+            }
+            line(body, getString(R.string.bp_tech_dict_fmt, m.dict.size()));
+            StringBuilder keys = new StringBuilder();
+            for (String k : m.tags.keySet()) {
+                if (keys.length() > 0) keys.append(", ");
+                keys.append(k);
+            }
+            line(body, getString(R.string.bp_tech_tags_fmt,
+                    keys.length() == 0 ? getString(R.string.stats_tech_none) : keys.toString()));
+            line(body, getString(R.string.bp_tech_contentmap_fmt,
+                    getString(m.hasContentMap ? R.string.bp_tech_yes : R.string.bp_tech_no)));
+            if (m.leftover > 0) {
+                line(body, getString(R.string.bp_tech_leftover_fmt, m.leftover));
+            }
+        } else if (m != null) {
+            // 读不出来时：把**内核给的码 + 参数**翻成人话（`error` 原文只留给报告与自检）
+            line(body, MschText.reason(this, m));
+        }
+        line(body, getString(R.string.bp_tech_time_fmt, ms));
+        Util.bindExpandableCard(card, R.id.stat_card, R.id.stat_card_body, R.id.stat_card_chevron);
+        mBox.addView(card);
+    }
+
+    private void line(LinearLayout body, String text) {
+        TextView tv = new TextView(this);
+        tv.setText(text);
+        tv.setTextSize(12f);
+        tv.setLineSpacing(dp(2), 1f);
+        tv.setPadding(dp(14), dp(3), dp(14), dp(3));
+        tv.setTextColor(getResources().getColor(R.color.fg_muted));
+        body.addView(tv);
+    }
+
+    private int dp(int v) {
+        return Math.round(v * getResources().getDisplayMetrics().density);
+    }
+}

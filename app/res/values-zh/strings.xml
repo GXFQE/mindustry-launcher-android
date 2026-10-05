@@ -676,6 +676,51 @@
     <string name="msch_reason_nested">建筑设置嵌套太深</string>
     <string name="msch_reason_unknown_tag">蓝图里有我们不认识的数据</string>
     <string name="msch_reason_unreadable">读这个文件的时候出错了</string>
+    <!--
+      ══ 蓝图（.msch）页面（F22：列表 / 详情，2026-10-05 第 109 轮）════
+      ★ 文案三条：短、白话、无术语（不写 zip / TypeIO / 内容表 / 内部名）。
+      ★ ` · ` 用来把**完整句子**连起来（拼接在 Java 侧，资源里不留首尾空白 —— aapt2 会剥）。
+    -->
+    <string name="bp_title">蓝图</string>
+    <string name="bp_detail_title">蓝图详情</string>
+    <string name="slot_page_blueprints">蓝图</string>
+    <string name="slot_page_blueprints_sub">本槽与模组自带的蓝图</string>
+    <string name="bp_head_fmt">本槽 %1$d · 模组自带 %2$d</string>
+    <string name="bp_empty">本槽还没有蓝图，模组也没带。\n在游戏里存下来的蓝图会出现在这里。</string>
+    <string name="bp_from_slot">本槽</string>
+    <string name="bp_from_mod_unknown">模组</string>
+    <string name="bp_line_size_fmt">%1$d × %2$d · %3$d 格</string>
+    <string name="bp_line_missing_fmt">⚠ 有 %1$d 种方块本槽没有（共 %2$d 格），游戏里会当空气丢掉</string>
+    <string name="bp_labels_bad">它的分类读不出来</string>
+    <string name="bp_reading">正在读…</string>
+    <string name="bp_detail_from_fmt">来自：%1$s</string>
+    <string name="bp_detail_file_fmt">文件：%1$s（%2$s）</string>
+    <string name="bp_detail_in_fmt">在 %1$s 里面</string>
+    <string name="bp_detail_size_fmt">尺寸：%1$d × %2$d，共 %3$d 格</string>
+    <string name="bp_detail_labels_fmt">分类：%1$s</string>
+    <string name="bp_detail_desc_fmt">说明：%1$s</string>
+    <string name="bp_section_blocks">用到的方块</string>
+    <string name="bp_section_missing">缺哪些方块</string>
+    <string name="bp_section_tech">技术细节</string>
+    <string name="bp_blocks_sum_fmt">%1$d 种，共 %2$s 格</string>
+    <string name="bp_blocks_missing_sum_fmt">%1$d 种本槽没有，共 %2$s 格</string>
+    <string name="bp_blocks_missing_note">游戏遇到认不出的方块会直接丢掉那一格，所以这份蓝图贴出来会缺件。</string>
+    <string name="bp_row_tiles_fmt">%1$s 格</string>
+    <string name="bp_more_fmt">还有 %1$d 种</string>
+    <string name="bp_stats_working">正在数方块…</string>
+    <string name="bp_stats_failed">这份蓝图读不出来</string>
+    <string name="bp_tech_version_fmt">格式版本：v%1$d</string>
+    <string name="bp_tech_dict_fmt">文件里的方块名：%1$d 个</string>
+    <string name="bp_tech_tags_fmt">标签：%1$s</string>
+    <string name="bp_tech_contentmap_fmt">自带名字对照表：%1$s</string>
+    <string name="bp_tech_yes">有</string>
+    <string name="bp_tech_no">没有</string>
+    <string name="bp_tech_box_fmt">瓦片范围：%1$d, %2$d 到 %3$d, %4$d</string>
+    <string name="bp_tech_declared_fmt">文件里写的尺寸：%1$d × %2$d</string>
+    <string name="bp_tech_oob_fmt">超出这个尺寸的瓦片：%1$d 格</string>
+    <string name="bp_tech_leftover_fmt">末尾多余的字节：%1$d</string>
+    <string name="bp_tech_time_fmt">本页用时 %1$d 毫秒</string>
+    <string name="bp_tech_summary_fmt">按格式 v%1$d 读出来</string>
     <!-- 地图来源与详情（同一族：Maps.Item 原来也是 Java 里拼的中文）-->
     <string name="map_from_slot">本槽</string>
     <string name="map_from_slot_detail">本槽（你可以直接管理）</string>

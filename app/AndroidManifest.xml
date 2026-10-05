@@ -123,6 +123,21 @@
             android:exported="false"
             android:theme="@style/AppTheme"
             android:label="@string/slot_page_title" />
+        <!--
+          F22 蓝图（.msch）：列表页 + 详情页（2026-10-05 第 109 轮）。
+          解析内核见 Msch.java（判据在 PC：_lab/msch，拿游戏自己的读取器当神谕）。
+          ⚠️ **必须注册**：aapt2 不检查引用，漏了照样 BUILD OK，真机一点就崩（自检 ㉙ 盯着）。
+        -->
+        <activity
+            android:name=".BlueprintsActivity"
+            android:exported="false"
+            android:theme="@style/AppTheme"
+            android:label="@string/bp_title" />
+        <activity
+            android:name=".BlueprintDetailActivity"
+            android:exported="false"
+            android:theme="@style/AppTheme"
+            android:label="@string/bp_detail_title" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

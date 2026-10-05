@@ -533,6 +533,51 @@
     <string name="msch_reason_unknown_tag">This blueprint contains a kind of data we do not know</string>
     <string name="msch_reason_unreadable">Something went wrong while reading this file</string>
     <!--
+      ══ 蓝图（.msch）页面（F22：列表 / 详情，2026-10-05 第 109 轮）════
+      ★ 文案三条：短、白话、无术语（不写 zip / TypeIO / contentMap / 内部名）。
+      ★ ` · ` 用来把**完整句子**连起来（拼接在 Java 侧，资源里不留首尾空白 —— aapt2 会剥）。
+    -->
+    <string name="bp_title">Blueprints</string>
+    <string name="bp_detail_title">Blueprint</string>
+    <string name="slot_page_blueprints">Blueprints</string>
+    <string name="slot_page_blueprints_sub">Blueprints in this slot and in its mods</string>
+    <string name="bp_head_fmt">In this slot %1$d · From mods %2$d</string>
+    <string name="bp_empty">This slot has no blueprints yet, and none of its mods bring any.\nBlueprints saved in the game show up here.</string>
+    <string name="bp_from_slot">This slot</string>
+    <string name="bp_from_mod_unknown">A mod</string>
+    <string name="bp_line_size_fmt">%1$d × %2$d · %3$d tiles</string>
+    <string name="bp_line_missing_fmt">⚠ %1$d block types are missing here (%2$d tiles) — the game will leave them out</string>
+    <string name="bp_labels_bad">Its categories cannot be read</string>
+    <string name="bp_reading">Reading…</string>
+    <string name="bp_detail_from_fmt">From: %1$s</string>
+    <string name="bp_detail_file_fmt">File: %1$s (%2$s)</string>
+    <string name="bp_detail_in_fmt">Inside %1$s</string>
+    <string name="bp_detail_size_fmt">Size: %1$d × %2$d, %3$d tiles</string>
+    <string name="bp_detail_labels_fmt">Categories: %1$s</string>
+    <string name="bp_detail_desc_fmt">Notes: %1$s</string>
+    <string name="bp_section_blocks">Blocks used</string>
+    <string name="bp_section_missing">Missing blocks</string>
+    <string name="bp_section_tech">Technical details</string>
+    <string name="bp_blocks_sum_fmt">%1$d kinds, %2$s tiles</string>
+    <string name="bp_blocks_missing_sum_fmt">%1$d kinds are missing here, %2$s tiles</string>
+    <string name="bp_blocks_missing_note">Blocks the game cannot find are silently left out, so this blueprint will be incomplete.</string>
+    <string name="bp_row_tiles_fmt">%1$s tiles</string>
+    <string name="bp_more_fmt">and %1$d more kinds</string>
+    <string name="bp_stats_working">Counting blocks…</string>
+    <string name="bp_stats_failed">This blueprint cannot be read</string>
+    <string name="bp_tech_version_fmt">Format version: v%1$d</string>
+    <string name="bp_tech_dict_fmt">Block names in file: %1$d</string>
+    <string name="bp_tech_tags_fmt">Tags: %1$s</string>
+    <string name="bp_tech_contentmap_fmt">Carries its own name table: %1$s</string>
+    <string name="bp_tech_yes">yes</string>
+    <string name="bp_tech_no">no</string>
+    <string name="bp_tech_box_fmt">Tiles span: %1$d, %2$d to %3$d, %4$d</string>
+    <string name="bp_tech_declared_fmt">Declared size: %1$d × %2$d</string>
+    <string name="bp_tech_oob_fmt">Tiles outside the declared size: %1$d</string>
+    <string name="bp_tech_leftover_fmt">Extra bytes at the end: %1$d</string>
+    <string name="bp_tech_time_fmt">This page took %1$d ms</string>
+    <string name="bp_tech_summary_fmt">Read as format v%1$d</string>
+    <!--
       ══ settings.bin 安全改写的失败原因（P3：核心的「码 + 参数」在这里映射成文案）════
       ★ `SettingsBin` 是**刻意纯 Java** ⇒ 只给 `errCode`/`subCode` + `errS1`/`errS2`；
         文案在 `SettingsText.userReason` 里按码取这几条。

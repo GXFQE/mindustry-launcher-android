@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  蓝图详情页（F22）：从蓝图列表点进来。
+
+  ★ 结构照抄 activity_map_detail：顶部几行文字 + 若干**可折叠**卡片（`card_stat_section`）。
+    · 这里**没有预览图** —— 像素级预览要自研图集解析（REF §73 判为"大"，单独立项）；
+      色块预览留给下一步，所以本页不摆空框（用户 2026-10-04：「不要放个空框啊」）。
+  🔴 根节点必须有 `@+id/root` + `Util.applySystemInsets(root)`（见 activity_maps.xml 的注释）。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bg">
+
+    <ScrollView
+        android:id="@+id/bp_detail_scroll"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:clipToPadding="false">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingBottom="12dp">
+
+            <TextView
+                android:id="@+id/bp_detail_text"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="12dp"
+                android:lineSpacingExtra="3dp"
+                android:textSize="13sp"
+                android:textColor="@color/fg" />
+
+            <TextView
+                android:id="@+id/bp_detail_state"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingTop="14dp"
+                android:paddingBottom="4dp"
+                android:lineSpacingExtra="2dp"
+                android:textSize="13sp"
+                android:textColor="@color/fg_muted" />
+
+            <!-- 各段（方块构成 / 缺件 / 技术细节）运行时 inflate card_stat_section 填进来 -->
+            <LinearLayout
+                android:id="@+id/bp_detail_box"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>
