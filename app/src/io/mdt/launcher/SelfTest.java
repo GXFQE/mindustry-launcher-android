@@ -182,7 +182,7 @@ public final class SelfTest {
             // ★ ⑳ F13 第二批：批量启停的写侧（一次读写 / noop 不动文件 / 坏文件拒绝写）
             modsBatchWrite(ctx, L, stat);
             // ★ ㉑ F13 第二批：反向依赖（禁用前的提醒）
-            modsDependents(L, stat);
+            modsDependents(ctx, L, stat);
             // ★ ㉒ F10：.msav 元数据解析（现场造文件 + 两个口径的反向断言）
             msavParse(ctx, L, stat);
             // ★ ㉓ F10：快照列表里的「这是什么存档」（v1 真文件 + 反向）
@@ -2942,7 +2942,7 @@ public final class SelfTest {
             // 简介提及：让 A 的简介里出现 B 的名字
             ia.description = "内置了 Small Mod 的功能";
 
-            Mods.Conflict cf = Mods.findConflicts(mods, null);
+            Mods.Conflict cf = Mods.findConflicts(ctx, mods, null);
             boolean containsAB = false;
             for (String s : cf.contained) {
                 if (s.contains("Big Mod") && s.contains("Small Mod")) containsAB = true;
@@ -2976,7 +2976,7 @@ public final class SelfTest {
             List<Mods.Info> mods2 = new ArrayList<>();
             mods2.add(Mods.readOne(a2));
             mods2.add(ib);
-            Mods.Conflict cf2 = Mods.findConflicts(mods2, null);
+            Mods.Conflict cf2 = Mods.findConflicts(ctx, mods2, null);
             ok(stat, L, cf2.contained.isEmpty(),
                     "★元断言：把 B 的主类从 A 的 dex 里拿掉 ⇒ **不再**报「内置」"
                             + "（证明上一条不是恒真）");
@@ -3110,7 +3110,7 @@ public final class SelfTest {
      * ㉑ 反向依赖（第④项）：关掉一个模组前，先算出"会连累谁"。
      * ★ 三条最容易写错的都在这里钉住：**软依赖也算** / **大小写无关** / **已关闭的不算**。
      */
-    private static void modsDependents(List<String> L, int[] stat) {
+    private static void modsDependents(Context ctx, List<String> L, int[] stat) {
         L.add("── ㉑ 反向依赖（禁用前的提醒）──");
         Mods.Info base = new Mods.Info();
         base.internalName = "dep-base"; base.enabled = true; base.name = "Dep Base";
@@ -3126,15 +3126,15 @@ public final class SelfTest {
         List<Mods.Info> ms = new ArrayList<>();
         ms.add(base); ms.add(hard); ms.add(soft); ms.add(off);
 
-        List<String> who = Mods.dependents(ms, "dep-base");
+        List<String> who = Mods.dependents(ctx, ms, "dep-base");
         ok(stat, L, who.size() == 2,
                 "★反向：**已关闭**的依赖者不算（它自己都没在跑）—— 只数出 2 个：" + who);
         ok(stat, L, who.get(0).startsWith("必需") && who.get(0).contains("Dep User")
                         && who.get(1).startsWith("软依赖") && who.get(1).contains("Dep Soft"),
                 "必需与软依赖都算、且必需排前面：" + who);
-        ok(stat, L, Mods.dependents(ms, "dep-user").isEmpty(),
+        ok(stat, L, Mods.dependents(ctx, ms, "dep-user").isEmpty(),
                 "★反向：没人依赖 dep-user ⇒ 返回空（不是「随便返回点什么」）");
-        ok(stat, L, Mods.dependents(ms, "dep-off").isEmpty(),
+        ok(stat, L, Mods.dependents(ctx, ms, "dep-off").isEmpty(),
                 "被关闭的模组自己也不该因为「依赖者都关着」而报（它不在启用集合里）");
         L.add("");
     }
@@ -3603,6 +3603,27 @@ public final class SelfTest {
                             && !ctx.getString(R.string.mods_scan_settings_none).isEmpty()
                             && !ctx.getString(R.string.mods_scan_no_mods_dir).isEmpty(),
                     "★P3：冲突体检/模组页那三条带占位符的按真参数实拼，小标题与两句结论都在");
+
+            // ★★ P3 第二十批：冲突体检的**逐条明细** + 依赖行 + 重复包（都是弹窗/详情里的整句）。
+            String cName = ctx.getString(R.string.conflict_name_fmt, "A");
+            String cCont = enCtx.getString(R.string.conflict_contained_fmt, "A", "B");
+            String cShared = ctx.getString(R.string.conflict_shared_fmt, "A 与 B", "设置界面");
+            String cMent = ctx.getString(R.string.conflict_mentioned_fmt, "A", "B");
+            String cDex = ctx.getString(R.string.conflict_note_dex_fmt, "x.jar");
+            String dReq = ctx.getString(R.string.mods_dep_required_fmt, "M");
+            String dSoft = enCtx.getString(R.string.mods_dep_soft_fmt, "M");
+            String dup = ctx.getString(R.string.mods_scan_dup_fmt, "a.jar", "b.jar");
+            ok(stat, L, cName.contains("A") && cCont.contains("A") && cCont.contains("B")
+                            && cShared.contains("A 与 B") && cShared.contains("设置界面")
+                            && cMent.contains("A") && cMent.contains("B") && cDex.contains("x.jar")
+                            && dReq.contains("M") && dSoft.contains("M")
+                            && dup.contains("a.jar") && dup.contains("b.jar")
+                            && !ctx.getString(R.string.conflict_note_log).isEmpty(),
+                    "★P3：冲突明细/依赖行/重复包那 9 条按真参数实拼（含 3 条两个参数）");
+            // ★ **列表连接词两侧都要有空格**（`\u0020`，白名单里那一类 —— 与 list_join_sep 同族）
+            String cJoin = ctx.getString(R.string.conflict_join_and);
+            ok(stat, L, cJoin.startsWith(" ") && cJoin.endsWith(" "),
+                    "★P3：冲突明细的连接词两侧都有空格（写的是 \\u0020）：「" + cJoin + "」");
 
             // ★★ P3 第六批：启动管线各步 + 失败原因（`Injector.LaunchError` → 启动失败弹窗）。
             //    ★ 这里只需验两件事：① 两条带占位符的按真参数实拼；② 6 个步骤名**两套语言都有字**

@@ -486,7 +486,7 @@ public class ModsActivity extends BaseActivity {
             @Override public void run() {
                 String text;
                 try {
-                    Mods.Conflict c = Mods.findConflicts(mScan.mods,
+                    Mods.Conflict c = Mods.findConflicts(ModsActivity.this, mScan.mods,
                             new File(Data.dirOf(ModsActivity.this, mSlot), "last_log.txt"));
                     text = c.report(ModsActivity.this);
                     try {
@@ -1065,7 +1065,7 @@ public class ModsActivity extends BaseActivity {
         // ★ 第④项：关之前先算「会连累谁」—— 现在游戏要到下次启动才显示缺依赖，
         //   那时用户早忘了自己关过什么（判据在 Mods.dependents 里，一处实现）。
         if (!on) {
-            List<String> who = Mods.dependents(mScan.mods, m.internalName);
+            List<String> who = Mods.dependents(this, mScan.mods, m.internalName);
             if (!who.isEmpty()) {
                 StringBuilder w = new StringBuilder(msg);
                 w.append("\n\n").append(getString(R.string.mods_dep_warn_head)).append('\n');

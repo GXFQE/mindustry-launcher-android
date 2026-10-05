@@ -1167,7 +1167,7 @@ public final class Mods {
      * ⚠️ 这是**按需**动作（要读几 MB 的 dex）：界面上挂在「查模组间冲突」一行，不是每次刷新都跑。
      * @param logFile 当前槽的 `last_log.txt`（可为 null；读了就把相关行摘出来）
      */
-    public static Conflict findConflicts(List<Info> mods, File logFile) {
+    public static Conflict findConflicts(Context ctx, List<Info> mods, File logFile) {
         Conflict c = new Conflict();
         // ① 主类模式：meta.main → dex 里的描述符形态（pkg/Main）
         List<Info> javaMods = new ArrayList<>();
@@ -1200,7 +1200,7 @@ public final class Mods {
             try {
                 found = scanDex(m, pats);
             } catch (Throwable t) {
-                c.notes.add("读不了「" + m.fileName + "」的 classes.dex：" + t.getMessage());
+                c.notes.add(ctx.getString(R.string.conflict_note_dex_fmt, m.fileName));
                 continue;
             }
             c.scannedDex++;
@@ -1220,9 +1220,8 @@ public final class Mods {
         for (int i = 0; i < javaMods.size(); i++) {
             for (Integer jObj : hits.get(i)) {
                 int j = jObj.intValue();
-                c.contained.add("「" + javaMods.get(i).title() + "」里已经带了「"
-                        + javaMods.get(j).title() + "」⇒ 两个一起开 = 同一套功能装两遍，"
-                        + "会互相抢；建议只留一个");
+                c.contained.add(ctx.getString(R.string.conflict_contained_fmt,
+                        javaMods.get(i).title(), javaMods.get(j).title()));
             }
         }
         // 汇总 ②
@@ -1232,8 +1231,8 @@ public final class Mods {
                 if (hookHits.get(i).contains(Integer.valueOf(h))) who.add(javaMods.get(i).title());
             }
             if (who.size() >= 2) {
-                c.sharedHooks.add(hookList(who) + " 都想接管游戏里的"
-                        + GLOBAL_HOOKS[h][0] + " —— 只能有一个生效（是谁，看下面的游戏记录）");
+                c.sharedHooks.add(ctx.getString(R.string.conflict_shared_fmt,
+                        hookList(ctx, who), GLOBAL_HOOKS[h][0]));
             }
         }
         // 汇总 ③：简介提及
@@ -1244,7 +1243,8 @@ public final class Mods {
                 if (containsIgnoreCase(a.description, b.name)
                         || (b.displayName != null && b.displayName.length() >= 3
                             && containsIgnoreCase(a.description, b.displayName))) {
-                    c.mentioned.add("「" + a.title() + "」的简介里提到了「" + b.title() + "」");
+                    c.mentioned.add(ctx.getString(R.string.conflict_mentioned_fmt,
+                            a.title(), b.title()));
                 }            }
         }
         // ⊙ 游戏日志
@@ -1268,7 +1268,7 @@ public final class Mods {
                     if (c.logLines.size() >= 40) break;
                 }
             } catch (Throwable t) {
-                c.notes.add("读不了游戏日志：" + t.getMessage());
+                c.notes.add(ctx.getString(R.string.conflict_note_log));
             }
         }
         // ⚠️ 这里**不再**为每个被内置者加一条"注：" —— 实测 Neon 一个包里有 3 个受害者，
@@ -1282,11 +1282,11 @@ public final class Mods {
         return patIndex >= self ? patIndex + 1 : patIndex;
     }
 
-    private static String hookList(List<String> who) {
+    private static String hookList(Context ctx, List<String> who) {
         StringBuilder sb = new StringBuilder();
         for (String s : who) {
-            if (sb.length() > 0) sb.append(" 与 ");
-            sb.append("「").append(s).append("」");
+            if (sb.length() > 0) sb.append(ctx.getString(R.string.conflict_join_and));
+            sb.append(ctx.getString(R.string.conflict_name_fmt, s));
         }
         return sb.toString();
     }
@@ -1373,7 +1373,7 @@ public final class Mods {
      *
      * @return 形如 {"必需：Macro Pro", "软依赖：Logic Helper"} 的清单
      */
-    public static List<String> dependents(List<Info> mods, String internalName) {
+    public static List<String> dependents(Context ctx, List<Info> mods, String internalName) {
         List<String> out = new ArrayList<>();
         if (mods == null || internalName == null || internalName.isEmpty()) return out;
         String want = internalName.toLowerCase(Locale.ROOT);
@@ -1381,9 +1381,9 @@ public final class Mods {
             if (m == null || !m.enabled) continue;
             if (m.internalName != null && m.internalName.equalsIgnoreCase(internalName)) continue;
             if (hasDep(m.dependencies, want)) {
-                out.add("必需：" + m.title());
+                out.add(ctx.getString(R.string.mods_dep_required_fmt, m.title()));
             } else if (hasDep(m.softDependencies, want)) {
-                out.add("软依赖：" + m.title());
+                out.add(ctx.getString(R.string.mods_dep_soft_fmt, m.title()));
             }
         }
         return out;
@@ -1546,8 +1546,7 @@ public final class Mods {
                 //   `两个包解出同一个 internalName「x」：a.zip 与 b.zip ⇒ 游戏里 `mapping.put()`
                 //   后写者覆盖前者（Mods.java:538），只有一个会生效` —— 一句里同时含 camelCase
                 //   术语、反引号 markdown、源码文件名+行号（违反文案纪律 ①③⑤）。
-                s.problems.add(prev.fileName + " 和 " + m.fileName
-                        + " 是同一个模组的两份 ⇒ 游戏里只认一个（后放进去的那个）。");
+                s.problems.add(ctx.getString(R.string.mods_scan_dup_fmt, prev.fileName, m.fileName));
             } else {
                 byInternal.put(key, m);
             }

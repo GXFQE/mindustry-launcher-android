@@ -541,6 +541,20 @@
     <string name="conflict_none">没发现明显冲突。</string>
     <string name="conflict_none_hint">⚠ 有些冲突要游戏跑起来才知道 —— 跑一次游戏，再回这里看看。</string>
     <string name="conflict_note_fmt">注：%1$s</string>
+    <!-- ══ 冲突体检的**逐条明细** + 依赖行 + 重复包（P3）════
+         ⚠ 这些是弹窗正文里的**整句**（原来在 Java 里拼）；
+         `conflict_join_and` 是**列表连接词**（中文「与」/英文 and，
+         两侧都要空格 ⇒ 写 `\u0020` 并进白名单）。 -->
+    <string name="conflict_name_fmt">「%1$s」</string>
+    <string name="conflict_join_and">\u0020与\u0020</string>
+    <string name="conflict_note_dex_fmt">读不了「%1$s」的 classes.dex</string>
+    <string name="conflict_note_log">读不了游戏日志</string>
+    <string name="conflict_contained_fmt">「%1$s」里已经带了「%2$s」⇒ 两个一起开 = 同一套功能装两遍，会互相抢；建议只留一个</string>
+    <string name="conflict_shared_fmt">%1$s 都想接管游戏里的%2$s —— 只能有一个生效（是谁，看下面的游戏记录）</string>
+    <string name="conflict_mentioned_fmt">「%1$s」的简介里提到了「%2$s」</string>
+    <string name="mods_dep_required_fmt">必需：%1$s</string>
+    <string name="mods_dep_soft_fmt">软依赖：%1$s</string>
+    <string name="mods_scan_dup_fmt">%1$s 和 %2$s 是同一个模组的两份 ⇒ 游戏里只认一个（后放进去的那个）。</string>
     <!--
       ══ 模组包导入 / 跨槽复制的**结果与失败原因**（P3）══════════════════════
       ★ `Mods.PackResult.report()` **就是弹窗正文** ⇒ 给用户看的；而 `importPackage` / `copyMods`
