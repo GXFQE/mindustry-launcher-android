@@ -14,10 +14,12 @@ import java.util.List;
  *   ② {@link Backup#restore}   快照恢复
  * </pre>
  *
- * ── 用户要的三个模式（原话）──────────────────────────────────────────────
+ * ── 用户要的三个模式（原话 + 最终叫法）──────────────────────────────────
  * <pre>
  *   更新      —— 混合，相同（同名）的用**新**的覆盖旧的
- *   反向更新  —— 混合，相同的用**旧**的覆盖新的（只把缺的补上）
+ *   补齐      —— 混合，相同的用**旧**的覆盖新的（只把缺的补上）
+ *                ⚠️ 用户原话叫「**补齐**」，界面上线后他说"这个名字有点奇怪"
+ *                   ⇒ 中文改「补齐」、英文 "Add missing"（**语义一个字没变**，常量仍是 {@link #KEEP_OLD}）
  *   覆盖      —— 完全替换
  * </pre>
  *
@@ -39,7 +41,7 @@ public final class SlotWrite {
 
     /** 更新：两边都有的用**源**覆盖（＝本工程原来的"只覆盖同名"行为） */
     public static final int UPDATE = 0;
-    /** 反向更新：两边都有的**保留目标里的**，只把目标缺的补上 */
+    /** 补齐：两边都有的**保留目标里的**，只把目标缺的补上 */
     public static final int KEEP_OLD = 1;
     /** 覆盖：先把槽内容清空，再整份写入（完全替换） */
     public static final int REPLACE = 2;
@@ -57,7 +59,7 @@ public final class SlotWrite {
         return (mode == UPDATE || mode == KEEP_OLD || mode == REPLACE) ? mode : UPDATE;
     }
 
-    /** 两边同名时，源要不要盖掉目标（更新 / 覆盖 = 要；反向更新 = 不要） */
+    /** 两边同名时，源要不要盖掉目标（更新 / 覆盖 = 要；补齐 = 不要） */
     public static boolean sourceWins(int mode) {
         return sane(mode) != KEEP_OLD;
     }

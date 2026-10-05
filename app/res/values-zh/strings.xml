@@ -785,12 +785,15 @@
 
     <!--
       ══ 整槽写入的三个模式（2026-10-05 第 104 轮）════════════════════════
-      用户要的：更新（相同的用新的盖）/ 反向更新（相同的保留旧的）/ 覆盖（完全替换）。
+      用户要的：更新（相同的用新的盖）/ 补齐（相同的保留旧的，只补缺的）/ 覆盖（完全替换）。
+      ★ 中间那个原来照用户原话叫「反向更新」—— 用户看过界面后说「**这个名字有点奇怪**」
+        ⇒ 改成「补齐」（与「更新」「覆盖」一样两个字，而且是动作词）。
+        语义没变：两边都有的保留这个槽现在的，只把缺的补上（代码里的常量仍是 `SlotWrite.KEEP_OLD`）。
       标签只给名字（文案三条：短），解释放在随选择变化的那行摘要里。
     -->
     <string name="slot_mode_title">这个槽怎么变？</string>
     <string name="slot_mode_update">更新</string>
-    <string name="slot_mode_keep">反向更新</string>
+    <string name="slot_mode_keep">补齐</string>
     <string name="slot_mode_replace">覆盖</string>
     <string name="slot_mode_update_hint">两边都有的用新的盖掉；只在这个槽里的留着。</string>
     <string name="slot_mode_keep_hint">两边都有的保留这个槽现在的；只把缺的补上。</string>

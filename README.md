@@ -67,7 +67,7 @@ point the game at that directory when it starts.
 - **Export / import**: a single `.msav` save, or **a whole slot as one zip** (including maps, mods
   and settings) — move everything to a new phone or another slot. Both a slot import and a
   "restore backup" let you pick **how the two sides merge**: **Update** (the new version wins),
-  **Keep current** (what the slot has now wins, only missing files are added) or **Replace**
+  **Add missing** (what the slot has now wins, only missing files are added) or **Replace**
   (clear the slot first, then write the package in full) — and **a backup is taken first**,
   so a wrong choice can be undone
 - **Data directory check**: redundant directories are found and cleaned up automatically

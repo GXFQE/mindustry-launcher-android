@@ -229,7 +229,7 @@ public final class SelfTest {
             trashStation(ctx, L, stat);
             // ★ ㊴ 中转站第二批：存档同名覆盖 / 整个槽（含"进站不许让快照对象变孤儿"那条元断言）
             trashMore(ctx, L, stat);
-            // ★ ㊵ 整槽写入的三个模式（更新 / 反向更新 / 覆盖）+ 槽操作前的自动备份
+            // ★ ㊵ 整槽写入的三个模式（更新 / 补齐 / 覆盖）+ 槽操作前的自动备份
             slotModes(ctx, L, stat);
             // ★ 篡改对象池的用例放**最后**：它会在池里留下一个内容坏掉的对象，
             //   之后任何"再备份一次"都会因为 `has()` 命中而复用坏对象（CAS 的固有
@@ -3769,13 +3769,13 @@ public final class SelfTest {
      * ㊵ **整槽写入的三个模式 + 槽操作前的自动备份**（2026-10-05 第 104 轮）。
      *
      * 用户原话：「**这个整槽变更，我觉得可以有几个模式的**：更新（混合，相同新覆盖旧）/
-     * 反向更新（混合，相同旧覆盖新）/ 覆盖（完全替换）。**以及在槽操作前都自动备份吧
+     * 补齐（混合，相同旧覆盖新）/ 覆盖（完全替换）。**以及在槽操作前都自动备份吧
      * （反正 CAS 不占空间）**」。
      *
      * 🔴 判据纪律：
      * <pre>
      *   ① 三种模式必须**互相可分辨**：同一对手文件（`both`）在更新下变成新内容、
-     *      在反向更新下**一个字节都不动**、在覆盖下变成新内容且**只在这里的**被删掉；
+     *      在补齐下**一个字节都不动**、在覆盖下变成新内容且**只在这里的**被删掉；
      *   ② ★ 覆盖**不许**动 {@link Data#SLOT_EXCLUDE} 里的东西（缓存 / 导入副本 / config.json）——
      *      少了这条，"完全替换"会顺手把游戏的临时目录也删了；
      *   ③ ★ 元断言：越界的模式值（99）必须退化成"更新"而**不是**"清空"
@@ -3784,7 +3784,7 @@ public final class SelfTest {
      * </pre>
      */
     private static void slotModes(Context ctx, List<String> L, int[] stat) {
-        L.add("── ㊵ 整槽写入的三个模式（更新 / 反向更新 / 覆盖）+ 操作前自动备份 ──");
+        L.add("── ㊵ 整槽写入的三个模式（更新 / 补齐 / 覆盖）+ 操作前自动备份 ──");
         try {
             String e1 = Data.createSlot(ctx, SLOT_MODE);
             String e2 = Data.createSlot(ctx, SLOT_MODE2);
@@ -3821,13 +3821,13 @@ public final class SelfTest {
                             && modInSlot.isFile() && r1.kept == 0,
                     "① 更新：同名换成包里的（both=「" + read(both) + "」），只在这里的与模组都留着");
 
-            // ── ② 反向更新：同名保留槽里的，只补缺的 ──────────────────────
+            // ── ② 补齐：同名保留槽里的，只补缺的 ──────────────────────
             write(both, "OLD".getBytes("UTF-8"));
             SlotZip.Info i2 = SlotZip.inspect(ctx, zip2);
             SlotZip.Result r2 = SlotZip.extract(ctx, zip2, i2, SLOT_MODE, SlotWrite.KEEP_OLD);
             ok(stat, L, "OLD".equals(read(both)) && new File(saves, "only-zip2.msav").isFile()
                             && r2.kept >= 1,
-                    "② ★反向更新：同名**一个字节没动**（both 仍是「" + read(both) + "」），"
+                    "② ★补齐：同名**一个字节没动**（both 仍是「" + read(both) + "」），"
                             + "缺的补上（kept=" + r2.kept + "）");
 
             // ── ③ 覆盖：完全替换（只在这里的没了；模组也按包里的来） ──────
@@ -3852,7 +3852,7 @@ public final class SelfTest {
             write(new File(saves, "added-later.msav"), "L".getBytes("UTF-8"));
             Backup.RestoreResult kk = Backup.restore(ctx, SLOT_MODE, snap, SlotWrite.KEEP_OLD);
             ok(stat, L, kk.ok && "LATER".equals(read(both)),
-                    "⑤ ★恢复·反向更新：槽里改过的那份**保留**（both=「" + read(both) + "」）");
+                    "⑤ ★恢复·补齐：槽里改过的那份**保留**（both=「" + read(both) + "」）");
             Backup.RestoreResult rr = Backup.restore(ctx, SLOT_MODE, snap, SlotWrite.REPLACE);
             ok(stat, L, rr.ok && "NEW2".equals(read(both))
                             && !new File(saves, "added-later.msav").exists(),

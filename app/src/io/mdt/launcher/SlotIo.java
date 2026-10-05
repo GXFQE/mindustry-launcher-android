@@ -691,8 +691,8 @@ final class SlotIo {
      * 解包前的确认框：**把包里有什么摊开给用户看**，再让他选"怎么放进去"。
      *
      * ★ 2026-10-05（第 104 轮）：原来的「先清空」复选框换成了**三个模式**
-     *   （更新 / 反向更新 / 覆盖）—— 用户要的不只是"要不要清空"，
-     *   还有"两边的同名文件谁说了算"（反向更新就是为此存在的）。
+     *   （更新 / 补齐 / 覆盖）—— 用户要的不只是"要不要清空"，
+     *   还有"两边的同名文件谁说了算"（补齐就是为此存在的）。
      *   判据与清空实现都在 {@link SlotWrite}，与快照恢复**共用一份**。
      */
     private static void confirmZipImport(final Activity a, final String slot, final SlotZip.Info inf, final SlotOps.Host h) {

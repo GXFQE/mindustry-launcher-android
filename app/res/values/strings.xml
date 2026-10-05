@@ -815,14 +815,15 @@
     <string name="zip_extract_progress_msg_fmt">Extracting into slot \"%1$s\"\nwriting…</string>
     <!--
       ══ 整槽写入的三个模式（2026-10-05 第 104 轮）════════════════════════
-      用户要的：更新（相同的用新的盖）/ 反向更新（相同的保留旧的）/ 覆盖（完全替换）。
+      用户要的：更新（相同的用新的盖）/ 补齐（相同的保留旧的，只补缺的）/ 覆盖（完全替换）。
+      ★ 中间那个原来叫「反向更新」/ "Keep current"，用户说中文名"有点奇怪" ⇒ 中文改「补齐」，
+        英文跟着改成动作短语 "Add missing"（比 "Keep current" 更像标签，也与 Update/Replace 并列）。
+        语义没变（代码里的常量仍是 `SlotWrite.KEEP_OLD`）。
       标签只给名字（文案三条：短），解释放在随选择变化的那行摘要里。
-      ★ 「反向更新」在英文里没有对应说法，直译会让英语用户看不懂 ⇒ 用一句自解释的
-        "Keep current"，摘要里说清"只补缺的"。
     -->
     <string name="slot_mode_title">What should this do to the slot?</string>
     <string name="slot_mode_update">Update</string>
-    <string name="slot_mode_keep">Keep current</string>
+    <string name="slot_mode_keep">Add missing</string>
     <string name="slot_mode_replace">Replace</string>
     <string name="slot_mode_update_hint">Files that exist on both sides get the new version. Files that are only in this slot stay.</string>
     <string name="slot_mode_keep_hint">Files that exist on both sides keep what the slot has now. Only missing files are added.</string>

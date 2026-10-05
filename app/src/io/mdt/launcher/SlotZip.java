@@ -95,7 +95,7 @@ public final class SlotZip {
         public int files;
         public long bytes;
         public int skipped;
-        /** 「反向更新」下**保留下来的**同名文件数（它们没有被写） */
+        /** 「补齐」下**保留下来的**同名文件数（它们没有被写） */
         public int kept;
         /** 实际被清空的顶级条目名（只有「覆盖」模式非空） */
         public final List<String> wiped = new ArrayList<>();
@@ -278,7 +278,7 @@ public final class SlotZip {
                     mkdirs(ctx, to);
                     continue;
                 }
-                // ★ 「反向更新」：槽里已经有的**一个字节都不动**（只把缺的补上）。
+                // ★ 「补齐」：槽里已经有的**一个字节都不动**（只把缺的补上）。
                 //   判据在 SlotWrite，不是就地写一个 `if` —— 快照恢复那条路用的是同一份。
                 if (!SlotWrite.sourceWins(mode) && to.exists()) {
                     r.kept++;

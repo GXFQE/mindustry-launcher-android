@@ -852,7 +852,7 @@ public class MainActivity extends BaseActivity {
      * {@link SlotZip#stage} → {@link SlotZip#inspect} → {@link SlotZip#extract} 三步。
      *
      * 用法：`--es dev_zip_import /sdcard/xxx.zip [--es dev_zip_slot <槽>] [--es dev_zip_mode <0|1|2>]`
-     *   mode：0 = 更新（默认，只覆盖同名）/ 1 = 反向更新（同名保留槽里的）/ 2 = 覆盖（先清空）。
+     *   mode：0 = 更新（默认，只覆盖同名）/ 1 = 补齐（同名保留槽里的）/ 2 = 覆盖（先清空）。
      *   ⚠️ 旧的 `--es dev_zip_wipe 1` 仍认，等价于 mode=2（2026-10-05 第 104 轮把
      *      "要不要清空"扩成了三个模式，老脚本不该因此失效）。
      */
