@@ -164,7 +164,18 @@ public final class MapStatsMods {
                     if (m.willFailJavaLoad()) continue;      // 游戏整个跳过它 ⇒ 内容也不该算
                     MapStats.Pack p = new MapStats.Pack();
                     p.label = m.title();
-                    p.prefix = m.name != null && !m.name.isEmpty() ? m.name : m.internalName;
+                    // ★ 前缀 = **游戏注册用的那个名字**（`Mods.java:1253` 的
+                    //   `meta.name.toLowerCase().replace(" ", "-")`，也就是我们的 `internalName`）。
+                    //   🔴 第 111 轮前这里取的是 `m.name`（meta 原样，可能带大写）——
+                    //   于是 `name: BpCase` 的模组被我们叫 `BpCase-x`，而游戏叫 `bpcase-x`
+                    //   ⇒ 查表落空 ⇒ **含该模组方块的蓝图/地图被误报"本槽没有"**。
+                    //   判据 = 真机对照实验 + `Mods.java:1253` 源码。
+                    p.prefix = m.internalName != null && !m.internalName.isEmpty()
+                            ? m.internalName
+                            : (m.name != null ? Mods.internalNameOf(m.name) : "");
+                    // meta 原样那一种只当**别名**（有作者按它引用，见 MapStats.Pack#alt）
+                    p.alt = (m.name != null && !m.name.isEmpty()
+                            && !m.name.equals(p.prefix)) ? m.name : "";
                     p.internal = m.internalName == null ? "" : m.internalName;
                     if (p.prefix == null || p.prefix.isEmpty()) p.prefix = m.fileName;
                     if (m.directory) {

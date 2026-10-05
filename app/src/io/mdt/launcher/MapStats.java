@@ -395,10 +395,28 @@ public final class MapStats {
         public File dir;
         /** zip 形态的根前缀（已下潜一层，`""` 或 `"X/"`） */
         public String rootPrefix = "";
-        /** 内容前缀 = 模组名（**照游戏口径用原样的 name**，不是小写化的内部名） */
+        /**
+         * 内容前缀 = **游戏注册用的那个名字**（`mindustry/mod/Mods.java:1253`：
+         * `meta.name.toLowerCase(Locale.ROOT).replace(" ", "-")`，再经
+         * `ContentLoader.transformName()` 拼成 `&lt;前缀&gt;-&lt;文件名&gt;`）。
+         *
+         * 🔴 **这里踩过一次**（第 111 轮）：原来照"原样的 name"当前缀，
+         *   于是 meta 里 `name: BpCase` 的模组被我们叫 `BpCase-wall2`，而游戏注册的是
+         *   `bpcase-wall2` ⇒ 查表（**大小写敏感的精确匹配**）落空 ⇒ 含该模组方块的蓝图
+         *   被**误报"本槽没有"**（地图那条路则误报"认不出的格子"）。
+         *   判据 = 真机对照实验：两个只差大小写的模组，全小写那个当时就是对的。
+         */
         public String prefix = "";
-        /** 小写化的内部名（覆盖查找的第二个候选，见 {@link #applyModContent}） */
+        /** 小写化的内部名（与 {@link #prefix} 同值；保留是为了兼容覆盖查找那条老路） */
         public String internal = "";
+        /**
+         * meta 里**原样**的 name（可能带大写/空格）—— 只当**别名**用。
+         *
+         * ★ 为什么还要留它：确实有模组在**自己的 JSON 里**引用"显示名-文件名"那种写法
+         *   （见 {@link #applyModContent} 里 frost-industry 那条注释）⇒ 两种写法都认，
+         *   但**主名只认游戏那一个**，否则统计与去重都会跟游戏对不上。
+         */
+        public String alt = "";
         /** 显示名（技术细节层） */
         public String label = "";
         /** 这个包的 bundle 里读到几条（0 = 它没带译文）—— 技术细节层用 */
@@ -871,6 +889,7 @@ public final class MapStats {
                 String reg = jsonName(json, base, p.prefix);
                 t.putItem(reg, loc);
                 t.putItem(p.prefix + "-" + base, loc);      // 两种写法都认（见 Table#itemNames）
+                if (!p.alt.isEmpty()) t.putItem(p.alt + "-" + base, loc);
                 t.jsonNames++;
             }
             return "物品名字";
@@ -903,12 +922,16 @@ public final class MapStats {
             //   （作者原话"文件名=内部名，所有引用写这个名字"）⇒ 地图里的内容名两种写法都可能出现，
             //   两个都登记，统计时不会两边都认不出。
             t.alias(p.prefix + "-" + base, nd);
+            // ★ 第三种写法：模组 meta 里 name 的大小写/空格与游戏注册名不一致时（`BpCase` vs `bpcase`），
+            //   有些作者会按"meta 原样"来引用 ⇒ 原样那一种也登记成别名（第 111 轮，真机对照实验抓到的）。
+            if (!p.alt.isEmpty()) t.alias(p.alt + "-" + base, nd);
             return "新内容";
         }
-        // 无 type：覆盖已有内容（先原版名，再 <前缀>-名字；两个前缀写法都试）
+        // 无 type：覆盖已有内容（先原版名，再 <前缀>-名字；三种前缀写法都试）
         Def old = t.row(base);
         if (old == null) old = t.row(p.prefix + "-" + base);
         if (old == null && !p.internal.isEmpty()) old = t.row(p.internal + "-" + base);
+        if (old == null && !p.alt.isEmpty()) old = t.row(p.alt + "-" + base);
         if (old == null) {
             r.skipped++;                           // 模组代码/JS 定义的内容我们认不出来 ⇒ 跳过
             return "目标不认识，跳过";

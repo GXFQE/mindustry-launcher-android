@@ -6499,6 +6499,33 @@ public final class SelfTest {
             // ── ⑦ 收尾：自建的中转站与测试槽整棵删掉（**不碰用户的真中转站**）──
             ok(stat, L, Data.deleteTree(work) && !work.exists(),
                     "⑦ 自建的中转站已整棵删除（用户的 `<hub>/schematics-trash` 一个字节没碰）");
+
+            // ── ⑧ ★模组前缀必须是**游戏注册用的那个名字**（第 111 轮真机对照实验抓到的真 bug）──
+            //   判据 = `mindustry/mod/Mods.java:1253`：
+            //       this.name = meta.name.toLowerCase(Locale.ROOT).replace(" ", "-")
+            //   ⇒ meta 里写 `BpCase` 的模组，方块注册成 `bpcase-wall2`；而"原样当前缀"会得到
+            //     `BpCase-wall2` ⇒ 查表（大小写敏感的精确匹配）落空
+            //     ⇒ **含该模组方块的蓝图被误报"本槽没有"**（地图那条路误报"认不出的格子"）。
+            //   ★ 这两个夹具只差**大小写**，就是真机上那组对照实验。
+            File modsDir = new File(slotDir, "mods");
+            write(new File(new File(modsDir, "bpmod"), "mod.json"),
+                    "{\"name\":\"bpmod\",\"version\":\"1.0\",\"minGameVersion\":\"140\"}"
+                            .getBytes("UTF-8"));
+            write(new File(new File(modsDir, "bpmod"), "content/blocks/testwall.json"),
+                    "{\"type\":\"Wall\",\"size\":1,\"health\":100}".getBytes("UTF-8"));
+            write(new File(new File(modsDir, "bpcase"), "mod.json"),
+                    "{\"name\":\"BpCase\",\"version\":\"1.0\",\"minGameVersion\":\"140\"}"
+                            .getBytes("UTF-8"));
+            write(new File(new File(modsDir, "bpcase"), "content/blocks/wall2.json"),
+                    "{\"type\":\"Wall\",\"size\":1,\"health\":100}".getBytes("UTF-8"));
+            MapStats.Table mt = MapStatsMods.contentFor(ctx, SLOT_BP).table;
+            ok(stat, L, mt.row("bpmod-testwall") != null && mt.row("bpcase-wall2") != null,
+                    "⑧ ★模组前缀照游戏小写化：两个数据模组的方块都进了内容表"
+                            + "（`bpmod-testwall` / `bpcase-wall2`，后者的 meta 里写的是 `BpCase`）");
+            ok(stat, L, mt.row("BpCase-wall2") != null,
+                    "⑧ ★meta 原样那一种写法留作别名（有作者按它引用，别把人家的图判成缺件）");
+            ok(stat, L, mt.row("bpcase-nope") == null,
+                    "⑧ ★元断言：不存在的名字查不到 —— 说明上面两条不是在恒真地打勾");
         } catch (Throwable t) {
             ok(stat, L, false, "㊹ 自己抛了异常：" + t);
         } finally {
