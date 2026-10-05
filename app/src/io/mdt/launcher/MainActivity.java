@@ -415,7 +415,7 @@ public class MainActivity extends BaseActivity {
                     String rep;
                     try {
                         File dir = new File(Data.dirOf(MainActivity.this, useSlot), "mods");
-                        Mods.PackResult r = Mods.importPackage(dir, src, ow,
+                        Mods.PackResult r = Mods.importPackage(MainActivity.this, dir, src, ow,
                                 Mods.trashDirOf(MainActivity.this));
                         rep = "槽 = " + useSlot + "  源 = " + src.getAbsolutePath()
                                 + "  覆盖 = " + ow + "\n\n" + r.report(MainActivity.this);
@@ -451,7 +451,7 @@ public class MainActivity extends BaseActivity {
                     try {
                         File from = new File(Data.dirOf(MainActivity.this, fromSlot), "mods");
                         File to = new File(Data.dirOf(MainActivity.this, toSlot), "mods");
-                        Mods.PackResult r = Mods.copyMods(from, to, ow2,
+                        Mods.PackResult r = Mods.copyMods(MainActivity.this, from, to, ow2,
                                 Mods.trashDirOf(MainActivity.this));
                         rep = "从 " + fromSlot + " 复制到 " + toSlot + "（覆盖 = " + ow2 + "）\n"
                                 + from.getAbsolutePath() + "\n" + to.getAbsolutePath() + "\n\n"

@@ -54,10 +54,24 @@ final class ModsText {
      *
      * ★ 为什么搬出来：`Mods.Info` 是纯数据类、拿不到 `Context`，而这两句会经
      *   `mods_warn_meta_fmt` **直接显示在模组详情里** ⇒ 英文界面下会冒中文。
-     * ⚠️ 与 `SettingsText.userReason` 同一条纪律：**只翻译"异常形态"**，
-     *   我们自己写的中文（`metaError` 原文）**原样透传**（那是给排查看的）。
+     * ⚠️ 与 `SettingsText.userReason` 同一条纪律：**先看码**（`metaErrCode`，我们自己写的那 8 句
+     *   在 `Mods` 里都配了码）；码为 0 时才退回"异常形态"判断；最后才原样透传
+     *   （那时 `metaError` 是我们自己的中文诊断，给排查看的）。
      */
     static String infoMetaReason(Context c, Mods.Info m) {
+        if (m != null && m.metaErrCode != Mods.Info.M_NONE) {
+            switch (m.metaErrCode) {
+                case Mods.Info.M_COLON: return c.getString(R.string.mods_meta_colon);
+                case Mods.Info.M_NO_META_HERE: return c.getString(R.string.mods_meta_no_meta_here);
+                case Mods.Info.M_NO_META_IN_PACK: return c.getString(R.string.mods_meta_no_meta_in_pack);
+                case Mods.Info.M_META_TOO_BIG: return c.getString(R.string.mods_meta_too_big);
+                case Mods.Info.M_META_UNREADABLE: return c.getString(R.string.mods_meta_unreadable);
+                case Mods.Info.M_META_BAD_FORMAT: return c.getString(R.string.mods_meta_bad_format);
+                case Mods.Info.M_META_NO_NAME: return c.getString(R.string.mods_meta_no_name);
+                case Mods.Info.M_META_BAD_JSON: return c.getString(R.string.mods_meta_bad_json);
+                default: break;
+            }
+        }
         String e = m == null || m.metaError == null ? "" : m.metaError.trim();
         if (e.isEmpty()) return c.getString(R.string.mods_meta_no_file);
         if (e.matches("^[A-Za-z_$][A-Za-z0-9_$]*(Exception|Error)\\b.*")) {

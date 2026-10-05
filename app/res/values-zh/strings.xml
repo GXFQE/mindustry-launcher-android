@@ -494,6 +494,13 @@
     <!-- 模组说明文件读不出来时的"人话版"原因（P3：原 `Mods.Info.metaReason()`） -->
     <string name="mods_meta_no_file">说明文件读不出来</string>
     <string name="mods_meta_bad_format">说明文件的格式看不懂，游戏会跳过它</string>
+    <string name="mods_meta_colon">文件名里有冒号，游戏加载不了</string>
+    <string name="mods_meta_no_meta_here">这里没有说明文件（mod.json 之类）</string>
+    <string name="mods_meta_no_meta_in_pack">包里没有说明文件（mod.json 之类）</string>
+    <string name="mods_meta_too_big">说明文件太大，读不了</string>
+    <string name="mods_meta_unreadable">说明文件读不出来</string>
+    <string name="mods_meta_no_name">说明文件里没写模组名</string>
+    <string name="mods_meta_bad_json">说明文件不是有效的 JSON</string>
     <!--
       ══ 六道加载门（P3）：`Mods.gates` 原来在 Java 里拼中文 ════════════════
       ★ `note` 只在**失败**时给；`label` 里不塞数据，数据一律进 note。
@@ -545,6 +552,8 @@
     <string name="pack_err_copy_same">源槽与目标槽是同一个</string>
     <string name="pack_err_copy_unreadable">读不到源槽 mods/ 的内容</string>
     <string name="pack_err_copy_nothing">一项都没复制成功</string>
+    <string name="mods_err_tmp_mkdir">建临时目录失败</string>
+    <string name="mods_err_copy_bytes_fmt">复制出的字节数不符：%1$s</string>
     <string name="pack_report_failed_fmt">❌ 没做：%1$s</string>
     <string name="pack_report_replaced_fmt">✅ 已替换：%1$s</string>
     <string name="pack_report_imported_fmt">✅ 已导入：%1$s</string>
@@ -683,6 +692,16 @@
     <string name="backup_restore_err_line_fmt">· %1$s：%2$s\n</string>
     <string name="maps_err_unreadable">读不出来</string>
     <string name="zip_size_unknown">大小未知</string>
+    <!-- ══ CAS 对象池的失败原因（P3）：纯 Java 核心出码，这里映射成文案 ══════
+         🔴 它堵的是 `Backup` 恢复报告「每文件一行」那条泄漏。参数都是**中性**的（路径/地址）。 -->
+    <string name="cas_err_obj_busy_fmt">对象位置被占且清不掉：%1$s</string>
+    <string name="cas_err_obj_place_fmt">对象落盘失败（rename）：%1$s</string>
+    <string name="cas_err_obj_missing_fmt">对象丢失：%1$s</string>
+    <string name="cas_err_obj_corrupt_fmt">对象内容损坏（sha256 与地址不符）：%1$s</string>
+    <string name="cas_err_dst_busy_fmt">目标文件清不掉：%1$s</string>
+    <string name="cas_err_restore_write_fmt">恢复写出失败（rename）：%1$s</string>
+    <string name="cas_err_no_sha256">本机没有 SHA-256 实现</string>
+    <string name="cas_err_mkdir_fmt">建目录失败：%1$s</string>
     <string name="backup_restore_ok_head_fmt">✅ 已从快照恢复到槽「%1$s」\n</string>
     <string name="backup_restore_ok_snapshot_fmt">快照：%1$s\n</string>
     <string name="backup_restore_ok_files_fmt">文件：%1$d / %2$d （%3$s）\n</string>

@@ -53,6 +53,39 @@ import java.util.Set;
  *    {@link Backup#renameSlotBackups} 天然碰不到池，**零回归风险**。
  */
 final class Cas {
+
+    // ── ★ 错误码（P3，2026-10-05）：本类是**纯 Java**（不许 import android）⇒ 只说"错在哪、带哪个参数"，
+    //   文案由 Android 侧的 `CasText` 映射。堵的是 `Backup` 恢复报告「每文件一行」那条泄漏
+    //   （`backup_restore_err_line_fmt` 的 `%2$s` 原来直接吃 `getMessage()` ⇒ 英文界面下冒中文）。
+    //   ⚠️ `getMessage()` 里的中文**一个字不动**（落盘报告 / 自检看它）。
+    static final int C_OBJ_BUSY = 1;        // s1 = 对象路径
+    static final int C_OBJ_PLACE = 2;       // s1 = 对象路径
+    static final int C_OBJ_MISSING = 3;     // s1 = 对象地址
+    static final int C_OBJ_CORRUPT = 4;     // s1 = 对象地址
+    static final int C_DST_BUSY = 5;        // s1 = 目标路径
+    static final int C_RESTORE_WRITE = 6;   // s1 = 目标路径
+    static final int C_NO_SHA256 = 7;
+    static final int C_MKDIR = 8;           // s1 = 目录
+
+    /** **所有**错误码（给自检**遍历**用：漏映射 = 静默退回异常原文，那正是要避免的） */
+    static final int[] ALL_CODES = {C_OBJ_BUSY, C_OBJ_PLACE, C_OBJ_MISSING, C_OBJ_CORRUPT,
+            C_DST_BUSY, C_RESTORE_WRITE, C_NO_SHA256, C_MKDIR};
+
+    /** 带码的异常：`code` + 一个**中性**参数（路径/对象地址），文案交给 `CasText` */
+    static final class CasException extends IOException {
+        final int code;
+        final String s1;
+        CasException(int code, String zh, String s1) {
+            super(zh);
+            this.code = code;
+            this.s1 = s1;
+        }
+        CasException(int code, String zh, String s1, Throwable cause) {
+            super(zh, cause);
+            this.code = code;
+            this.s1 = s1;
+        }
+    }
     private static final String TAG = "MDTLauncher";
 
     /** 对象池子目录名（相对 CAS 基目录） */
@@ -169,11 +202,13 @@ final class Cas {
         }
         if (obj.exists() && !obj.delete()) {  // 极罕见：同名但类型不是文件
             tmp.delete();
-            throw new IOException("对象位置被占且清不掉：" + obj.getAbsolutePath());
+            throw new CasException(C_OBJ_BUSY, "对象位置被占且清不掉：" + obj.getAbsolutePath(),
+                    obj.getAbsolutePath());
         }
         if (!tmp.renameTo(obj)) {
             tmp.delete();
-            throw new IOException("对象落盘失败（rename）：" + obj.getAbsolutePath());
+            throw new CasException(C_OBJ_PLACE, "对象落盘失败（rename）：" + obj.getAbsolutePath(),
+                    obj.getAbsolutePath());
         }
         return new Stored(id, true, n);
     }
@@ -212,7 +247,7 @@ final class Cas {
      */
     void getTo(String id, File dst, boolean verify) throws IOException {
         File obj = objectPath(id);
-        if (!obj.isFile()) throw new IOException("对象丢失：" + id);
+        if (!obj.isFile()) throw new CasException(C_OBJ_MISSING, "对象丢失：" + id, id);
 
         File par = dst.getParentFile();
         if (par != null) ensureDir(par);
@@ -245,15 +280,18 @@ final class Cas {
 
         if (md != null && !hex(md.digest()).equals(id)) {
             tmp.delete();
-            throw new IOException("对象内容损坏（sha256 与地址不符）：" + id);
+            throw new CasException(C_OBJ_CORRUPT,
+                    "对象内容损坏（sha256 与地址不符）：" + id, id);
         }
         if (dst.exists() && !dst.delete()) {
             tmp.delete();
-            throw new IOException("目标文件清不掉：" + dst.getAbsolutePath());
+            throw new CasException(C_DST_BUSY, "目标文件清不掉：" + dst.getAbsolutePath(),
+                    dst.getAbsolutePath());
         }
         if (!tmp.renameTo(dst)) {
             tmp.delete();
-            throw new IOException("恢复写出失败（rename）：" + dst.getAbsolutePath());
+            throw new CasException(C_RESTORE_WRITE,
+                    "恢复写出失败（rename）：" + dst.getAbsolutePath(), dst.getAbsolutePath());
         }
     }
 
@@ -375,14 +413,14 @@ final class Cas {
         try {
             return MessageDigest.getInstance("SHA-256");
         } catch (NoSuchAlgorithmException e) {
-            throw new IOException("本机没有 SHA-256 实现", e);
+            throw new CasException(C_NO_SHA256, "本机没有 SHA-256 实现", null, e);
         }
     }
 
     private static void ensureDir(File d) throws IOException {
         if (d == null || d.isDirectory()) return;
         if (!d.mkdirs() && !d.isDirectory()) {
-            throw new IOException("建目录失败：" + d.getAbsolutePath());
+            throw new CasException(C_MKDIR, "建目录失败：" + d.getAbsolutePath(), d.getAbsolutePath());
         }
     }
 

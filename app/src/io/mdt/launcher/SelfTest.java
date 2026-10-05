@@ -2821,7 +2821,7 @@ public final class SelfTest {
             zipMany(badMeta, new String[]{"mod.json"}, new String[]{"description: '''\n'''"});
 
             // ① 合法包：导入成功、落点与源逐字节一致、不留 .part
-            Mods.PackResult r1 = Mods.importPackage(srcMods, good, false, trash);
+            Mods.PackResult r1 = Mods.importPackage(ctx, srcMods, good, false, trash);
             File placed = new File(srcMods, "good-mod.zip");
             ok(stat, L, r1.ok && placed.isFile()
                             && Util.md5(good).equals(Util.md5(placed))
@@ -2832,27 +2832,27 @@ public final class SelfTest {
                     "① 没有 `.part` 残留（导入是「先落半成品再就位」的）");
 
             // ②③④⑤ 五个负例
-            Mods.PackResult r2 = Mods.importPackage(srcMods, noMeta, false, trash);
+            Mods.PackResult r2 = Mods.importPackage(ctx, srcMods, noMeta, false, trash);
             ok(stat, L, !r2.ok && r2.error != null && !new File(srcMods, "no-meta.zip").exists()
                             && !new File(srcMods, "no-meta.zip.part").exists(),
                     "② 包里没有 meta ⇒ **拒绝**且不留残骸：" + oneLine(r2.error));
-            Mods.PackResult r3 = Mods.importPackage(srcMods, badMeta, false, trash);
+            Mods.PackResult r3 = Mods.importPackage(ctx, srcMods, badMeta, false, trash);
             ok(stat, L, !r3.ok && !new File(srcMods, "bad-meta.zip").exists(),
                     "③ 坏 meta（空多行）⇒ 拒绝：" + oneLine(r3.error));
-            Mods.PackResult r4 = Mods.importPackage(srcMods, new File(work, "x.txt"), false, trash);
+            Mods.PackResult r4 = Mods.importPackage(ctx, srcMods, new File(work, "x.txt"), false, trash);
             ok(stat, L, !r4.ok, "④ 扩展名不是 .zip/.jar ⇒ 拒绝：" + oneLine(r4.error));
-            Mods.PackResult r5 = Mods.importPackage(srcMods, new File(work, "a:b.zip"), false, trash);
+            Mods.PackResult r5 = Mods.importPackage(ctx, srcMods, new File(work, "a:b.zip"), false, trash);
             ok(stat, L, !r5.ok, "⑤ 文件名含冒号 ⇒ 拒绝（安卓会因此 dex 失败）：" + oneLine(r5.error));
 
             // ⑥ 同名：不覆盖 ⇒ 拒；明确覆盖 ⇒ 成功，且旧的那份被**挪**去 trash
             String oldMd5 = Util.md5(placed);
-            Mods.PackResult r6 = Mods.importPackage(srcMods, good, false, trash);
+            Mods.PackResult r6 = Mods.importPackage(ctx, srcMods, good, false, trash);
             ok(stat, L, !r6.ok && oldMd5.equals(Util.md5(placed)),
                     "⑥ 同名 + 不允许覆盖 ⇒ 拒绝，且原文件一个字节没动");
             File good2 = new File(work, "good-mod.zip");
             zipMany(good2, new String[]{"mod.json"},
                     new String[]{"name: Pack Test\nversion: 3.0\nminGameVersion: 140\n"});
-            Mods.PackResult r7 = Mods.importPackage(srcMods, good2, true, trash);
+            Mods.PackResult r7 = Mods.importPackage(ctx, srcMods, good2, true, trash);
             int stashed = countFiles(trash);
             ok(stat, L, r7.ok && r7.overwrote
                             && !oldMd5.equals(Util.md5(placed)),
@@ -2867,7 +2867,7 @@ public final class SelfTest {
             write(new File(new File(srcMods, "pack-test"), "config.json"),
                     "{\"settings\":1}".getBytes("UTF-8"));     // 游戏的模组配置目录（无 meta）
             write(new File(srcMods, "half.zip.part"), "HALF".getBytes("UTF-8"));
-            Mods.PackResult r8 = Mods.copyMods(srcMods, dstMods, false, trash);
+            Mods.PackResult r8 = Mods.copyMods(ctx, srcMods, dstMods, false, trash);
             // 源槽此刻有 4 个顶层条目：good-mod.zip / dirmod / pack-test / half.zip.part
             // ⇒ 该复制的是**前 3 个**（`.part` 是"写一半"的东西，必须被跳过）
             ok(stat, L, r8.ok && r8.copied.size() == 3,
@@ -2879,14 +2879,14 @@ public final class SelfTest {
                             && new File(dstMods, "dirmod/mod.json").isFile()
                             && new File(dstMods, "pack-test/config.json").isFile(),
                     "⑦ ★逐字节一致：zip 包 md5 相同，目录模组与**模组配置目录**都跟过去了");
-            Mods.PackResult r9 = Mods.copyMods(srcMods, dstMods, false, trash);
+            Mods.PackResult r9 = Mods.copyMods(ctx, srcMods, dstMods, false, trash);
             ok(stat, L, r9.copied.isEmpty() && r9.skipped.size() == 3,
                     "⑦ 再复制一次 ⇒ 全部跳过（不覆盖）：skipped=" + r9.skipped.size());
 
             // ⑧ 元断言：把"合法包"的 meta 拿掉 ⇒ 必须判非法（证明第 ① 条不是恒真）
             File noMeta2 = new File(work, "good-mod-no-meta.zip");
             zipMany(noMeta2, new String[]{"scripts/main.js"}, new String[]{"print('x')"});
-            Mods.PackResult r10 = Mods.importPackage(srcMods, noMeta2, false, trash);
+            Mods.PackResult r10 = Mods.importPackage(ctx, srcMods, noMeta2, false, trash);
             ok(stat, L, !r10.ok,
                     "⑧ ★元断言：同一个包把 meta 拿掉 ⇒ 必须判非法（否则 ① 的 ok 只是恒真）");
         } catch (Throwable t) {
@@ -3538,6 +3538,53 @@ public final class SelfTest {
                             && !ctx.getString(R.string.imp_err_bad_zip).isEmpty()
                             && !ctx.getString(R.string.exp_err_dest_readonly).isEmpty(),
                     "★P3：导入/导出/存档落盘那 9 条带占位符的按真参数实拼（含 1 条两个参数）");
+
+            // ★★ P3 第十六批：CAS 对象池的失败原因（纯 Java ⇒ 码 + 参数）。
+            //    它堵的是 `Backup` 恢复报告「每文件一行」那条泄漏（原来直接吃 `getMessage()`）。
+            //    ① 遍历 `ALL_CODES`：每个码都必须**映射到资源**（不是退回异常原文）；
+            //    ② 两套语言不同；③ **中性参数**（路径/对象地址）真的进句子（无参那条不带）。
+            StringBuilder missCas = new StringBuilder();
+            boolean casParam = true, casLocale = true, casLeak = false;
+            for (int code : Cas.ALL_CODES) {
+                Cas.CasException ce = new Cas.CasException(code, "RAW 中文原文", "NEUTRAL");
+                String cz = CasText.reason(ctx, ce);
+                String cEn = CasText.reason(enCtx, ce);
+                if (cz == null || cz.isEmpty() || cz.contains("RAW")) missCas.append(code).append(' ');
+                if (cz.equals(cEn)) casLocale = false;
+                if (code != Cas.C_NO_SHA256 && !cz.contains("NEUTRAL")) casParam = false;
+                if (code == Cas.C_NO_SHA256 && cz.contains("NEUTRAL")) casLeak = true;
+            }
+            ok(stat, L, missCas.length() == 0 && casLocale,
+                    "★P3：CAS 那 8 个码**每个**都映射到资源（不是退回异常原文）、两套语言不同；可疑的是［"
+                            + missCas + "］");
+            ok(stat, L, casParam && !casLeak,
+                    "★P3：CAS 的**中性参数**（路径/对象地址）真的进了句子（无参那条不带）");
+
+            // ★★ P3 第十七批：模组**说明文件**读不出来的原因（`Mods.Info.metaErrCode`）。
+            //    堵的是：我们自己写的那 8 句中文原来会经 `infoMetaReason` **原样透传**给用户
+            //    （英文界面下冒中文），而"模组缺 mod.json"是**很常见**的情况。
+            StringBuilder missMeta = new StringBuilder();
+            boolean metaLocale = true;
+            for (int code : Mods.Info.ALL_CODES) {
+                Mods.Info mi = new Mods.Info();
+                mi.metaErrCode = code;
+                mi.metaError = "RAW 中文诊断";
+                String mz = ModsText.infoMetaReason(ctx, mi);
+                String mEn = ModsText.infoMetaReason(enCtx, mi);
+                if (mz == null || mz.isEmpty() || mz.contains("RAW")) missMeta.append(code).append(' ');
+                if (mz.equals(mEn)) metaLocale = false;
+            }
+            ok(stat, L, missMeta.length() == 0 && metaLocale,
+                    "★P3：模组说明文件那 8 个码**每个**都映射到资源（不再透传中文诊断）、两套语言不同；"
+                            + "可疑的是［" + missMeta + "］");
+            // ★ **反向**：没有码时仍走老逻辑（异常形态 ⇒ 翻白话；我们自己的中文 ⇒ 原样透传）
+            Mods.Info miPlain = new Mods.Info();
+            miPlain.metaError = "包里没有说明文件（mod.json 之类）";
+            Mods.Info miTech = new Mods.Info();
+            miTech.metaError = "ParseException: io.mdt.launcher.Hjson$ParseException: boom";
+            ok(stat, L, ModsText.infoMetaReason(ctx, miPlain).equals(miPlain.metaError)
+                            && !ModsText.infoMetaReason(ctx, miTech).contains("Exception"),
+                    "★P3 反向：**没有码**时仍走老逻辑（异常形态⇒白话 / 自身中文⇒原样透传）");
 
             // ★★ P3 第六批：启动管线各步 + 失败原因（`Injector.LaunchError` → 启动失败弹窗）。
             //    ★ 这里只需验两件事：① 两条带占位符的按真参数实拼；② 6 个步骤名**两套语言都有字**

@@ -514,6 +514,13 @@
     <!-- 模组说明文件读不出来时的"人话版"原因（P3：原 `Mods.Info.metaReason()`） -->
     <string name="mods_meta_no_file">the description file could not be read</string>
     <string name="mods_meta_bad_format">the description file has a format the game cannot understand, so it will skip this mod</string>
+    <string name="mods_meta_colon">the file name contains a colon, so the game cannot load it</string>
+    <string name="mods_meta_no_meta_here">there is no description file here (mod.json or similar)</string>
+    <string name="mods_meta_no_meta_in_pack">the package has no description file (mod.json or similar)</string>
+    <string name="mods_meta_too_big">the description file is too big to read</string>
+    <string name="mods_meta_unreadable">the description file could not be read</string>
+    <string name="mods_meta_no_name">the description file does not give a mod name</string>
+    <string name="mods_meta_bad_json">the description file is not valid JSON</string>
     <!--
       ══ 六道加载门（P3）：`Mods.gates` 原来在 Java 里拼中文 ════════════════
       ★ `note` 只在**失败**时给（通过了就只画一行 ✅）；`label` 里**不塞数据**，数据一律进 note。
@@ -568,6 +575,8 @@
     <string name="pack_err_copy_same">the source slot and the target slot are the same</string>
     <string name="pack_err_copy_unreadable">could not read the contents of the source slot mods/</string>
     <string name="pack_err_copy_nothing">nothing was copied</string>
+    <string name="mods_err_tmp_mkdir">could not create the temporary directory</string>
+    <string name="mods_err_copy_bytes_fmt">the copied size does not match: %1$s</string>
     <string name="pack_report_failed_fmt">❌ nothing was done: %1$s</string>
     <string name="pack_report_replaced_fmt">✅ replaced: %1$s</string>
     <string name="pack_report_imported_fmt">✅ imported: %1$s</string>
@@ -715,6 +724,17 @@
     <string name="backup_restore_err_line_fmt">· %1$s: %2$s\n</string>
     <string name="maps_err_unreadable">unreadable</string>
     <string name="zip_size_unknown">size unknown</string>
+    <!-- ══ CAS 对象池的失败原因（P3）：纯 Java 核心出码，这里映射成文案 ══════
+         🔴 它堵的是 `Backup` 恢复报告「每文件一行」那条泄漏（原来直接吃 `getMessage()`）。
+         ⚠️ 参数都是**中性**的（路径 / 对象地址）⇒ 可以进第一层。 -->
+    <string name="cas_err_obj_busy_fmt">the object slot is taken and cannot be cleared: %1$s</string>
+    <string name="cas_err_obj_place_fmt">could not place the object (rename): %1$s</string>
+    <string name="cas_err_obj_missing_fmt">the object is missing: %1$s</string>
+    <string name="cas_err_obj_corrupt_fmt">the object content is damaged (sha256 does not match its address): %1$s</string>
+    <string name="cas_err_dst_busy_fmt">the target file cannot be cleared: %1$s</string>
+    <string name="cas_err_restore_write_fmt">restore write failed (rename): %1$s</string>
+    <string name="cas_err_no_sha256">this device has no SHA-256 implementation</string>
+    <string name="cas_err_mkdir_fmt">could not create the directory: %1$s</string>
     <string name="backup_restore_ok_head_fmt">✅ Restored from the snapshot into slot \"%1$s\"\n</string>
     <string name="backup_restore_ok_snapshot_fmt">Snapshot: %1$s\n</string>
     <string name="backup_restore_ok_files_fmt">Files: %1$d / %2$d (%3$s)\n</string>

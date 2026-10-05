@@ -280,7 +280,7 @@ public class ModsActivity extends BaseActivity {
                     java.io.InputStream in = getContentResolver().openInputStream(uri);
                     if (in == null) throw new java.io.IOException(getString(R.string.mods_import_open_failed));
                     try {
-                        pr = Mods.importPackage(destDir, displayName, in, overwrite,
+                        pr = Mods.importPackage(ModsActivity.this, destDir, displayName, in, overwrite,
                                 Mods.trashDirOf(ModsActivity.this));
                     } finally {
                         try {
@@ -442,7 +442,7 @@ public class ModsActivity extends BaseActivity {
                 Mods.PackResult pr = null;
                 String err = null;
                 try {
-                    pr = Mods.copyMods(from, to, false, Mods.trashDirOf(ModsActivity.this));
+                    pr = Mods.copyMods(ModsActivity.this, from, to, false, Mods.trashDirOf(ModsActivity.this));
                 } catch (Throwable t) {
                     err = String.valueOf(t.getMessage());
                 }

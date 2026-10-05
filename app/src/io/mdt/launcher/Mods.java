@@ -189,6 +189,33 @@ public final class Mods {
         /** 解析失败原因（`null` = 成功） */
         public String metaError;
 
+        // ── ★ 说明文件为什么读不出来的**码**（P3，2026-10-05）────────────────────
+        //   `MetaInfo.metaReason()` 原来把**我们自己写的中文**原样透传给界面 ⇒ 英文界面下会冒中文，
+        //   而"模组缺 mod.json / 格式看不懂"是**很常见**的情况。
+        //   ⚠️ `metaError` 里的中文**一个字不动**（它同时是"有没有错"的判据 + 诊断原文）。
+        public static final int M_NONE = 0;
+        public static final int M_COLON = 1;
+        public static final int M_NO_META_HERE = 2;
+        public static final int M_NO_META_IN_PACK = 3;
+        public static final int M_META_TOO_BIG = 4;
+        public static final int M_META_UNREADABLE = 5;
+        public static final int M_META_BAD_FORMAT = 6;
+        public static final int M_META_NO_NAME = 7;
+        public static final int M_META_BAD_JSON = 8;
+
+        /** **所有**码（给自检**遍历**用） */
+        public static final int[] ALL_CODES = {M_COLON, M_NO_META_HERE, M_NO_META_IN_PACK,
+                M_META_TOO_BIG, M_META_UNREADABLE, M_META_BAD_FORMAT, M_META_NO_NAME,
+                M_META_BAD_JSON};
+
+        public int metaErrCode = M_NONE;
+
+        /** 记下"说明文件错在哪"：**码给界面**，中文留给诊断 */
+        void metaFail(int code, String zh) {
+            metaErrCode = code;
+            metaError = zh;
+        }
+
         // —— meta 字段（全部按游戏的 cleanup 规则处理过）——
         public String name;
         public String displayName;
@@ -781,7 +808,8 @@ public final class Mods {
     }
 
     /** 文件版导入（dev 口 / 自检用） */
-    public static PackResult importPackage(File modsDir, File src, boolean overwrite, File trashDir) {
+    public static PackResult importPackage(Context ctx, File modsDir, File src, boolean overwrite,
+                                           File trashDir) {
         if (src == null || !src.isFile()) {
             PackResult r = new PackResult();
             r.fail(PackResult.P_SRC_MISSING, "源文件不存在：" + src, String.valueOf(src));
@@ -796,7 +824,7 @@ public final class Mods {
             return r;
         }
         try {
-            return importPackage(modsDir, src.getName(), in, overwrite, trashDir);
+            return importPackage(ctx, modsDir, src.getName(), in, overwrite, trashDir);
         } finally {
             try {
                 in.close();
@@ -816,7 +844,7 @@ public final class Mods {
      *     否则会把一个游戏根本不认的包塞进槽里，用户进游戏才发现"没反应"；
      *  ⑤ 就位（原条目先挪去 `hub/mods-trash/`，改名成功后才删）。
      */
-    public static PackResult importPackage(File modsDir, String displayName,
+    public static PackResult importPackage(Context ctx, File modsDir, String displayName,
                                            java.io.InputStream in, boolean overwrite,
                                            File trashDir) {
         PackResult r = new PackResult();
@@ -855,7 +883,7 @@ public final class Mods {
             m.fileName = name;                  // 报告里说最终名字，而不是 .part
             r.meta = m;
             r.overwrote = dest.exists();
-            place(part, dest, overwrite, trashDir);
+            place(ctx, part, dest, overwrite, trashDir);
             r.dest = dest;
             r.finalName = name;
             r.ok = true;
@@ -880,7 +908,8 @@ public final class Mods {
      *  ② **不复制启停状态**：那是目标槽 `settings.bin` 里的键（本次一个字都不写）⇒
      *     复制过去的模组在目标槽按"键不存在 = 默认启用"生效。要在界面上说清楚。
      */
-    public static PackResult copyMods(File fromDir, File toDir, boolean overwrite, File trashDir) {
+    public static PackResult copyMods(Context ctx, File fromDir, File toDir, boolean overwrite,
+                                      File trashDir) {
         PackResult r = new PackResult();
         if (fromDir == null || !fromDir.isDirectory()) {
             r.fail(PackResult.P_COPY_NO_SRC, "源槽没有 mods/ 目录", null);
@@ -922,16 +951,16 @@ public final class Mods {
             try {
                 Data.deleteTree(part);
                 if (f.isDirectory()) {
-                    if (!part.mkdirs()) throw new java.io.IOException("建临时目录失败");
-                    copyTree(f, part);
+                    if (!part.mkdirs()) throw new java.io.IOException(ctx.getString(R.string.mods_err_tmp_mkdir));
+                    copyTree(ctx, f, part);
                 } else {
                     Util.copyFile(f, part);
                     if (part.length() != f.length()) {
-                        throw new java.io.IOException("复制出的字节数不符（"
-                                + part.length() + " ≠ " + f.length() + "）");
+                        throw new java.io.IOException(ctx.getString(R.string.mods_err_copy_bytes_fmt,
+                                f.getName() + ": " + part.length() + " ≠ " + f.length()));
                     }
                 }
-                place(part, dst, overwrite, trashDir);
+                place(ctx, part, dst, overwrite, trashDir);
                 r.copied.add(f.getName());
                 // ⚠️ 别对**文件**用 `Data.sizeTree` —— 它内部 `listFiles()` 对文件返回 null ⇒ 恒 0
                 //   （自检没抓到，是设备上那行"复制完成：20 项，61 B"露的马脚：61 B 只可能是那个目录模组）
@@ -949,18 +978,19 @@ public final class Mods {
     }
 
     /** 递归复制一棵树（只用于跨槽复制；不做 `.part` 命名 —— 那是外层的事） */
-    private static void copyTree(File src, File dst) throws java.io.IOException {
+    private static void copyTree(Context ctx, File src, File dst) throws java.io.IOException {
         File[] kids = src.listFiles();
         if (kids == null) return;
         for (File f : kids) {
             File to = new File(dst, f.getName());
             if (f.isDirectory()) {
-                if (!to.exists() && !to.mkdirs()) throw new java.io.IOException("建目录失败：" + to);
-                copyTree(f, to);
+                if (!to.exists() && !to.mkdirs()) throw new java.io.IOException(ctx.getString(R.string.pack_err_mkdir_fmt, to.getAbsolutePath()));
+                copyTree(ctx, f, to);
             } else {
                 Util.copyFile(f, to);
                 if (to.length() != f.length()) {
-                    throw new java.io.IOException("复制出的字节数不符：" + f.getName());
+                    throw new java.io.IOException(ctx.getString(R.string.mods_err_copy_bytes_fmt,
+                            f.getName()));
                 }
             }
         }
@@ -976,7 +1006,8 @@ public final class Mods {
      *   绝不能让"挪不删"这句承诺**悄悄降级成"删"**（那正是本项目最忌讳的静默行为）。
      *   复制也失败才允许原地删（并且此时源件通常还在别处）。
      */
-    private static void place(File tmp, File dst, boolean overwrite, File trashDir) throws java.io.IOException {
+    private static void place(Context ctx, File tmp, File dst, boolean overwrite, File trashDir)
+            throws java.io.IOException {
         if (!dst.exists()) {
             if (!tmp.renameTo(dst)) {
                 throw new java.io.IOException("改名失败：" + tmp.getName() + " → " + dst.getName());
@@ -993,7 +1024,7 @@ public final class Mods {
                 try {
                     if (dst.isDirectory()) {
                         if (!stash.mkdirs()) throw new java.io.IOException("建中转目录失败");
-                        copyTree(dst, stash);
+                        copyTree(ctx, dst, stash);
                     } else {
                         Util.copyFile(dst, stash);
                         if (stash.length() != dst.length()) {
@@ -1013,7 +1044,7 @@ public final class Mods {
                     // 连"放回去"都失败（又是跨文件系统）⇒ 再复制一次
                     try {
                         if (stash.isDirectory()) {
-                            if (dst.mkdirs()) copyTree(stash, dst);
+                            if (dst.mkdirs()) copyTree(ctx, stash, dst);
                             back = dst.exists();
                         } else {
                             Util.copyFile(stash, dst);
@@ -1589,7 +1620,7 @@ public final class Mods {
         m.bytes = m.directory ? Data.sizeTree(f) : f.length();
         if (m.fileName.indexOf(':') >= 0) {
             // Mods.java:113 上游注释：安卓会给文件名加冒号（primary:X.jar）从而**破坏 dexing**
-            m.metaError = "文件名里有冒号，游戏加载不了";
+            m.metaFail(Info.M_COLON, "文件名里有冒号，游戏加载不了");
             return m;
         }
         try {
@@ -1598,7 +1629,7 @@ public final class Mods {
                 m.rootDir = root;
                 File meta = findMetaInDir(root);
                 if (meta == null) {
-                    m.metaError = "这里没有说明文件（mod.json 之类）";
+                    m.metaFail(Info.M_NO_META_HERE, "这里没有说明文件（mod.json 之类）");
                     return m;
                 }
                 m.metaName = meta.getName();
@@ -1639,13 +1670,13 @@ public final class Mods {
                 }
             }
             if (metaEntry == null) {
-                m.metaError = "包里没有说明文件（mod.json 之类）";
+                m.metaFail(Info.M_NO_META_IN_PACK, "包里没有说明文件（mod.json 之类）");
                 return;
             }
             m.metaName = metaEntry.substring(metaEntry.lastIndexOf('/') + 1);
             ZipEntry ze = zf.getEntry(metaEntry);
             if (ze.getSize() > MAX_META_BYTES) {
-                m.metaError = "说明文件太大，读不了";
+                m.metaFail(Info.M_META_TOO_BIG, "说明文件太大，读不了");
                 return;
             }
             m.rawMeta = readEntry(zf, ze);
@@ -1734,7 +1765,7 @@ public final class Mods {
     /** 把 meta 文本解析成字段（链路照抄 `Mods.java:1019`：HJSON → 标准 JSON 文本 → 反序列化） */
     static void parseMeta(Info m) {
         if (m.rawMeta == null) {
-            m.metaError = "说明文件读不出来";
+            m.metaFail(Info.M_META_UNREADABLE, "说明文件读不出来");
             return;
         }
         String json;
@@ -1748,7 +1779,7 @@ public final class Mods {
                 json = Hjson.toJsonText(m.rawMeta, Hjson.ARC_159);
                 m.metaError = null;
             } catch (Throwable t159) {
-                m.metaError = "说明文件的格式看不懂";
+                m.metaFail(Info.M_META_BAD_FORMAT, "说明文件的格式看不懂");
                 return;
             }
         }
@@ -1772,10 +1803,10 @@ public final class Mods {
             readStringArray(o, "softDependencies", m.softDependencies);
             m.internalName = internalNameOf(m.name);
             if (m.name == null) {
-                m.metaError = "说明文件里没写模组名";
+                m.metaFail(Info.M_META_NO_NAME, "说明文件里没写模组名");
             }
         } catch (Throwable t) {
-            m.metaError = "说明文件不是有效的 JSON：" + oneLine(t);
+            m.metaFail(Info.M_META_BAD_JSON, "说明文件不是有效的 JSON：" + oneLine(t));
         }
     }
 

@@ -350,8 +350,10 @@ public final class Backup {
                     pool.getTo(e.hash, to, true);
                     ok++;
                 } catch (IOException ex) {
+                    // ★ 走 CasText：Cas 的对象池异常带码 ⇒ 映射成资源（原来直接把 getMessage() 端给用户）；
+                    //   v1 那条路上的异常不是 CasException ⇒ 它原样返回消息（行为不变）。
                     errs.append("  ").append(ctx.getString(R.string.backup_restore_err_line_fmt,
-                            e.rel, ex.getMessage()));
+                            e.rel, CasText.reason(ctx, ex)));
                 }
             }
         } else {
@@ -393,8 +395,10 @@ public final class Backup {
                     copyRecursive(from, to);
                     ok++;
                 } catch (IOException ex) {
+                    // ★ 走 CasText：Cas 的对象池异常带码 ⇒ 映射成资源（原来直接把 getMessage() 端给用户）；
+                    //   v1 那条路上的异常不是 CasException ⇒ 它原样返回消息（行为不变）。
                     errs.append("  ").append(ctx.getString(R.string.backup_restore_err_line_fmt,
-                            e.rel, ex.getMessage()));
+                            e.rel, CasText.reason(ctx, ex)));
                 }
             }
         }
