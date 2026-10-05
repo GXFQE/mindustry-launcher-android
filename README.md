@@ -87,8 +87,12 @@ point the game at that directory when it starts.
 - Blueprint list (this slot + **shipped inside mods**) with a separate detail page: which blocks are
   used and how many tiles each takes
 - **Missing-block warning**: when the game meets a block it does not know, it silently drops that
-  tile — the list row says "N kinds of blocks are missing from this slot", and the detail page lists
-  them one by one (usually because the mod that brings them is not enabled)
+  tile — the list row names how many kinds are missing, and the detail page lists them one by one
+  (usually because the mod that brings them is not enabled)
+- **The warning says so when it may be wrong**: mods that add their blocks in code or scripts are
+  invisible to the launcher (it reads the block data shipped inside the mod package), so in a slot
+  with such an enabled mod the wording becomes "N kinds were **not recognized** … this may be
+  wrong", the detail page carries a visible *may be wrong* marker, and the reason sits one tap away
 - **Import `.msch`** (verified before it is put in place; on a name clash you are asked first, and
   the old one moves to the transfer station); **export from any source**
 - Deletion goes through the transfer station (moved aside, not hard-deleted) and can be put back

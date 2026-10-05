@@ -217,6 +217,9 @@ $ADB shell am start -n io.mdt.launcher/.MainActivity --es dev_autobackup_test <�
 $ADB shell am start -n io.mdt.launcher/.MainActivity --es dev_zip_list <zip绝对路径>
 $ADB shell am start -n io.mdt.launcher/.MainActivity --es dev_zip_import <zip绝对路径> \
     --es dev_zip_slot <槽> [--es dev_zip_wipe 1]
+$ADB shell am start -n io.mdt.launcher/.MainActivity --es dev_zip_confirm <zip绝对路径> \
+    [--es dev_zip_slot <槽>]                            # 第 104 轮：**走弹窗那条路**（选包换成路径，
+                                                        #   后面的路与界面逐字相同 ⇒ 能验到"选哪种合并方式"）
 $ADB shell am start -n io.mdt.launcher/.MainActivity --es dev_zip_export <目标.zip绝对路径> \
     [--es dev_zip_slot <槽>]
 #   结果落在 <外部 hub>/report-devtool.txt（本 ROM 滤 logcat ⇒ 只能靠文件）
@@ -236,8 +239,35 @@ $ADB shell am start -n io.mdt.launcher/.MainActivity \
 $ADB shell am start -n io.mdt.launcher/.MainActivity --es dev_mapstats <槽> \
     [--es dev_mapstats_file <某个 .msav 绝对路径>]     # 逐图数字 + 真机耗时
 #   不带 dev_mapstats_file ⇒ 把该槽能扫到的图（最多 60 张）全跑一遍
-#   结果同样落在 <外部 hub>/report-devtool.txt（★ 所有 dev_* 口共用这一个文件；不存在 report-cas.txt）
+#   ↓ F13 模组 / F10+F21 地图 / F20 日志 / F22 蓝图（2026-10-03 起；都用 `<槽>`，空/true = 当前槽）
+$ADB shell am start -n io.mdt.launcher/.MainActivity --es dev_mods_scan <槽>
+$ADB shell am start -n io.mdt.launcher/.MainActivity --es dev_mods_toggle <槽> \
+    --es dev_mods_name <内部名> [--ez dev_mods_on true|false]      # 不带 on = 取反
+$ADB shell am start -n io.mdt.launcher/.MainActivity --es dev_mods_conflict <槽>
+$ADB shell am start -n io.mdt.launcher/.MainActivity --es dev_mods_import <模组包路径> \
+    [--es dev_mods_slot <槽>] [--ez dev_mods_overwrite true]
+$ADB shell am start -n io.mdt.launcher/.MainActivity --es dev_mods_copy <源槽> \
+    --es dev_mods_copy_to <目标槽> [--ez dev_mods_overwrite true]
+$ADB shell am start -n io.mdt.launcher/.MainActivity --es dev_maps_slot <槽>          # 三来源清单
+$ADB shell am start -n io.mdt.launcher/.MainActivity --es dev_maps_page <槽>          # 直接开地图页
+$ADB shell am start -n io.mdt.launcher/.MainActivity --es dev_map_import <某个 .msav> \
+    [--es dev_map_slot <槽>]                           # 「存档视为地图」：选文件换成路径
+$ADB shell am start -n io.mdt.launcher/.MainActivity --es dev_bp_page <槽>            # 直接开蓝图页
+$ADB shell am start -n io.mdt.launcher/.MainActivity --es dev_bp_page <槽> \
+    --es dev_bp_import <某个 .msch>                    # 蓝图导入：选文件换成路径
+$ADB shell am start -n io.mdt.launcher/.MainActivity --es dev_msch <某个 .msch> \
+    [--es dev_msch_slot <槽>]                          # 解析 + 缺方块体检
+$ADB shell am start -n io.mdt.launcher/.MainActivity --es dev_logs_export <目标.txt>  # F20 日志导出
+$ADB shell am start -n io.mdt.launcher/.MainActivity --es dev_compat <APK绝对路径>     # F18 兼容预检
+#   ⚠️ 上面这些**报告型**的口落 `<外部 hub>/report-devtool.txt`（★ 共用这一个文件；不存在 report-cas.txt）；
+#     而 `dev_bp_page` / `dev_bp_import` / `dev_maps_page` / `dev_map_import` / `dev_zip_confirm` 是
+#     **驱动界面**的口（结果在弹窗/列表上），别去报告文件里找它们的判据。
 ```
+
+⚠️ **子页面（`exported=false`）`am start` 直接拉不起来**（`Permission Denial`）——
+要直达某一页就**加一个 dev 口**（先例：`dev_maps_page` / `dev_bp_page <槽>`），
+**别**把 activity 改成 exported（那是发布形态的可见面）。
+⚠️ **SAF 选择器自动化不了** ⇒ 那几条路一律"把选文件换成路径"，后面的路与界面逐字相同。
 
 ⚠️ **深色/浅色切换**
 - **启动器自己的深浅色**：用设置页第一行「深浅色」，或 `--es dev_theme light|dark|system`。
@@ -275,9 +305,57 @@ SettingsActivity 全局设置页（默认槽 / 日志保留份数 + 只读「关
 GameSlot        :game 坑位（解析目标 → 换槽 → 跑管线；失败按步骤报）
 ```
 
+★ 上面那份是 **M/F 时代（到 2026-10-02）** 的名单，**没再重排**；03 之后长出来的子系统在下面，
+按**区域**分组（同一行里是"数据层 + 页面 + 文案"这种配套关系）：
+
+```
+BaseActivity    ★ 主题 / 语言 / 顶栏标题 / insets 的**唯一生效点**（新页面必须继承它）
+ThemeMode       应用内深浅色（只依赖 Config）
+LocaleMode      应用内语言（只改 Configuration 的 locale 位，**绝不 Locale.setDefault**）
+Crash           主进程未捕获异常落盘（crashes/crash_<毫秒>_launcher.txt）
+Compat          版本兼容预检（这个包能不能进 MDT 的加载管线）
+Importer        见上（另有 F17 命名统一 / F18 门槛）
+Exporter        导出到共享存储（单文件 / zip / **包内条目流式拷**）
+SlotIo          槽的导入 / 导出（走 SAF；SAF 的"待办目标"必须 static）
+SlotOps         槽操作的**就地实现**（导航重构后从 SavesActivity 搬出来的那一块）
+SlotWrite       ★ 整槽写入的**唯一一份模式判据**（更新 / 补齐 / 覆盖 + sane + 清空口径）
+SlotModes       上面那套模式在界面上的标签与摘要
+SlotZip         整槽 zip 的读 / 写
+Cas / CasText   存档对象池（CAS 去重）+「码 → 文案」
+Trash / TrashText / TrashActivity
+                中转站（"挪不删"的唯一实现与唯一出口；Kind = 地图 / 模组 / 存档 / 整槽 / 蓝图）
+Backup / AutoBackup
+                见上（第 104 轮起：整槽操作前**自动备份**，与"玩够门槛"共用 createAndTrim）
+Msav / MsavMeta / MsavTiles / MsavPatches / MsavText / MsavListAdapter
+                .msav 的导入导出 / 元数据 / 瓦片解码 / 数据补丁 / 文案 / 卡片列表适配器
+MapLoad / MapPreview
+                地图预览的绘制侧（Android）与纯逻辑侧（PC 可验）
+Maps / MapsActivity / MapFiles
+                地图页：三来源清点 / 页面 / 增删（导入先验、删除走中转站）
+MapStats / MapStatsMods / MapStatsTable
+                内容表与地图资源统计（**纯 Java 内核**；Mods 那侧负责"取数"）
+SaveAsMap       「存档视为地图」的改写器（纯逻辑，REF §72）
+Mods / ModsActivity / ModsText
+                模组扫描 / 启停（写 settings.bin）/ 导入复制 / 冲突体检 +「码 → 文案」
+SettingsBin / SettingsText
+                settings.bin 的读 / 写（**改前备份 + 原子写 + 写后自检**）+ 文案
+BundleNames     内容译名（两层 bundle：语言层 / 基础层，**层内模组优先**）
+Hjson / Colors  自带 HJSON → 标准 JSON 文本；去色（settings 键名与显示名都靠它）
+LogActivity     运行日志页（启动器日志 + 游戏日志 + 崩溃堆栈，可导出）
+GameActivityWatcher
+                ★ 游戏 activity 一创建就把**第三个** AssetManager 补挂上（第 105 轮的启动崩溃）
+Msch / MschConfigTable / MschText
+                蓝图 `.msch` 解析内核 / `ver 0` 的 `mapConfig` 分支表（生成物，勿手改）/ 文案
+Blueprints / BlueprintFiles / BlueprintsActivity / BlueprintDetailActivity
+                蓝图清点 / 写侧（导入·删除）/ 列表页 / 详情页
+SelfTest        见上（现在含 ㉑~㊹ 等成组断言；`dev_m3_selftest` 触发）
+```
+
 依赖方向单向：`Paths/Util/Reflect → Config → Data/Versions → Importer/Backup/Msav/Injector → UI/GameSlot`，不许反向。
 （备份要读数据根、要找槽目录，所以 `Backup` 依赖 `Data` 而不是被它依赖；`Data` 里只有文件级操作，不认识备份。）
 `AutoBackup` 是 `Backup` 之上的一层策略（记账 + 判定 + 裁剪），只被 `MainActivity` 调，不反向依赖 UI。
+★ 后长出来的那些也守同一条：**纯 Java 内核不碰 Android 类**（`MapStats` / `Msch` / `SlotWrite` /
+`SettingsBin` / `SaveAsMap` …），这样它们才能在 PC 上单独编译验证；文案一律"内核出码 + Android 侧映射"。
 
 ## 文档地图
 
@@ -287,8 +365,9 @@ GameSlot        :game 坑位（解析目标 → 换槽 → 跑管线；失败按
 | [README.zh.md](../README.zh.md) | 上面那份的**简体中文版**（两份结构一一对应，改一份记得改另一份） |
 | `DEVELOPING.md`（本文） | 构建、`dev_*` 直通口、模块边界、文档地图 |
 | `BACKLOG.md`（**索引**） | 功能池：**是什么 / 为什么 / 已核实了什么**（正文在 `docs/backlog/`，8 片） |
-| **`FLOWS.md`**（**索引**） | ★ **怎么动手**：逐个功能的「改动面 → 步骤 → 验收 → 坑」（正文在 `docs/flows/`，14 片） |
-| `docs/history/README.md`（**索引**） | 逐轮的**实现与真机验证记录**（2026-10-04 从 README 整节搬出，内容一字未改；正文 23 片） |
+| **`FLOWS.md`**（**索引**） | ★ **怎么动手**：逐个功能的「改动面 → 步骤 → 验收 → 坑」（正文在 `docs/flows/`，**15 片**；第 15 片是 F22 蓝图） |
+| `docs/history/README.md`（**索引**） | 逐轮的**实现与真机验证记录**（2026-10-04 从 README 整节搬出，内容一字未改；正文 23 片）—— ⚠️ **它停在搬出那一刻（F21 / 第 43 轮）**，此后轮次看下一条 |
+| 2026-10-04 之后的新轮次 | 实现与验证记录写在 **`docs/flows/` 对应的 F 分片**里（如 F22 = 第 108~113 轮），本机开发笔记（`.dsh/memory/NEXT.md` + `ref/`）另有一份带判据的流水 —— **两者都不随本仓发布的部分只作来源标注** |
 | `spike/spike-datadir/RESULT.md` | `mindustry.data.dir` 注入 spike 的完整实验证据（✅ 成立）与实施清单 |
 | **`REF §n`**（散见各文档） | 「为什么这么改」的**开发笔记编号** —— 该笔记**不随本仓发布**，出现处只作来源标注 |
 | 当前进度 / 下一步 | 不维护**全局里程碑表**（半更新的表比没有更误导）—— 各批次完成状态见 `docs/flows/02-一-总顺序.md` 与 `docs/backlog/07-五-建议的动手顺序.md` |
