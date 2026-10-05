@@ -102,8 +102,8 @@ point the game at that directory when it starts.
   version thresholds, multiplayer support
 
 ### Transfer station
-- Deleted maps, **deleted whole slots**, and replaced mods or saves are **moved here first**
-  instead of disappearing
+- Deleted maps, **deleted whole slots**, replaced mods or saves, and deleted **blueprints** are
+  **moved here first** instead of disappearing
 - The list shows what it is, which slot it came from, its size, and when it arrived; you can **put
   it back** (the slot it came from is preselected)
 - A deleted slot brings **its backups** along and they come back with it; if the name is taken you
