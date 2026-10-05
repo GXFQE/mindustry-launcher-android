@@ -488,7 +488,7 @@ public class ModsActivity extends BaseActivity {
                 try {
                     Mods.Conflict c = Mods.findConflicts(mScan.mods,
                             new File(Data.dirOf(ModsActivity.this, mSlot), "last_log.txt"));
-                    text = c.report();
+                    text = c.report(ModsActivity.this);
                     try {
                         Util.atomicWriteText(new File(Data.hubDir(ModsActivity.this),
                                 "report-mods-conflict.txt"), text);

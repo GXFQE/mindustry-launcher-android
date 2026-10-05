@@ -1115,35 +1115,40 @@ public final class Mods {
             return !contained.isEmpty() || !sharedHooks.isEmpty() || !mentioned.isEmpty();
         }
 
-        public String report() {
+        /**
+         * 人读报告。★ P3：**收 `Context`** —— 它同时喂**冲突体检弹窗**（用户可见）与
+         * `<hub>/report-mods-conflict.txt`（落盘）；后者会跟着界面语言走（与 `PackResult.report`
+         * 同一处置）。行首的 `· ` 项目符号与缩进留在 Java（那是**排版**，写进资源会被 aapt2 剥掉）。
+         */
+        public String report(Context ctx) {
             StringBuilder sb = new StringBuilder();
-            sb.append("检查了 ").append(javaMods).append(" 个带代码的模组（")
-              .append(Util.formatSize(scannedBytes)).append("）\n\n");
+            sb.append(ctx.getString(R.string.conflict_scanned_fmt, javaMods,
+                    Util.formatSize(scannedBytes))).append('\n');
             if (!contained.isEmpty()) {
-                sb.append("【重复实现】\n");
+                sb.append(ctx.getString(R.string.conflict_head_contained)).append('\n');
                 for (String s : contained) sb.append("· ").append(s).append('\n');
                 sb.append('\n');
             }
             if (!sharedHooks.isEmpty()) {
-                sb.append("【可能互相抢】\n");
+                sb.append(ctx.getString(R.string.conflict_head_shared)).append('\n');
                 for (String s : sharedHooks) sb.append("· ").append(s).append('\n');
                 sb.append('\n');
             }
             if (!mentioned.isEmpty()) {
-                sb.append("【简介里提到对方】\n");
+                sb.append(ctx.getString(R.string.conflict_head_mentioned)).append('\n');
                 for (String s : mentioned) sb.append("· ").append(s).append('\n');
                 sb.append('\n');
             }
             if (!logLines.isEmpty()) {
-                sb.append("【游戏上次启动时的记录】\n");
+                sb.append(ctx.getString(R.string.conflict_head_log)).append('\n');
                 for (String s : logLines) sb.append("  ").append(s).append('\n');
                 sb.append('\n');
             }
             if (!any() && logLines.isEmpty()) {
-                sb.append("没发现明显冲突。\n")
-                  .append("⚠ 有些冲突要游戏跑起来才知道 —— 跑一次游戏，再回这里看看。\n");
+                sb.append(ctx.getString(R.string.conflict_none)).append('\n')
+                  .append(ctx.getString(R.string.conflict_none_hint)).append('\n');
             }
-            for (String n : notes) sb.append("注：").append(n).append('\n');
+            for (String n : notes) sb.append(ctx.getString(R.string.conflict_note_fmt, n)).append('\n');
             return sb.toString();
         }
     }
@@ -1487,14 +1492,14 @@ public final class Mods {
                 // ★ 2026-10-04：这三句会原样出现在模组页的展开卡里（`mods_detail_fmt`），
                 //   原来写着 `settings.bin` / `zlib 压缩` / `键不存在 = 默认启用`
                 //   —— 违反文案纪律 ③（`settings.bin` 是被点名的禁词）。
-                s.settingsNote = "已读到游戏的设置（" + s.settings.size() + " 项）";
+                s.settingsNote = ctx.getString(R.string.mods_scan_settings_fmt, s.settings.size());
             } else {
-                s.settingsNote = "⚠ 游戏的设置读不出来（" + why[0] + "） —— 下面所有模组都按"
-                        + "「没关过」显示，不代表磁盘上就是这样";
+                // ★ 不带 why[0]：那是 readSafe 塞的**裸消息**（异常原文或我们 read() 里的中文）
+                //   —— 按「依据不进第一层」的规矩去掉。
+                s.settingsNote = ctx.getString(R.string.mods_scan_settings_unreadable);
             }
         } else {
-            s.settingsNote = "这个槽还没跑过游戏，没有设置文件"
-                    + " —— 下面所有模组都按「没关过」显示";
+            s.settingsNote = ctx.getString(R.string.mods_scan_settings_none);
         }
 
         // ② 上次是否崩在启动里（Vars.checkLaunch）
@@ -1505,7 +1510,7 @@ public final class Mods {
 
         if (dir == null || !dir.isDirectory()) {
             // ⚠️ 只读：**不 mkdirs**（F6 的教训：只看一眼造出的空目录会被下一轮当成"有内容"）
-            s.ignored.add("（没有 mods/ 目录）");
+            s.ignored.add(ctx.getString(R.string.mods_scan_no_mods_dir));
             return s;
         }
 

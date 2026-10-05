@@ -549,6 +549,19 @@
     <string name="mods_detail_depchain">dependency chain verdict:</string>
     <string name="mods_detail_repo_override_fmt">%1$s (overridden by settings)</string>
     <string name="mods_detail_settings_unreadable">⚠ the settings file cannot be read: the values above are defaults, not what is on disk\n</string>
+    <!-- ══ 模组页的说明行 + 冲突体检报告（P3）══════════ -->
+    <string name="mods_scan_settings_fmt">read the game settings (%1$d entries)</string>
+    <string name="mods_scan_settings_unreadable">⚠ the game settings cannot be read — every mod below is shown as if it had never been turned off, which may not match the disk</string>
+    <string name="mods_scan_settings_none">this slot has never run the game, so there is no settings file — every mod below is shown as if it had never been turned off</string>
+    <string name="mods_scan_no_mods_dir">(there is no mods/ folder)</string>
+    <string name="conflict_scanned_fmt">checked %1$d mods that carry code (%2$s)\n</string>
+    <string name="conflict_head_contained">[duplicate implementation]</string>
+    <string name="conflict_head_shared">[may fight over the same hook]</string>
+    <string name="conflict_head_mentioned">[the description mentions the other one]</string>
+    <string name="conflict_head_log">[what the game logged on its last launch]</string>
+    <string name="conflict_none">no obvious conflicts found.</string>
+    <string name="conflict_none_hint">⚠ some conflicts only show up once the game runs — play once, then come back here.</string>
+    <string name="conflict_note_fmt">note: %1$s</string>
     <!--
       ══ 模组包导入 / 跨槽复制的**结果与失败原因**（P3）══════════════════════
       ★ `Mods.PackResult.report()` **就是弹窗正文**（`ModsActivity` 三处直接把它塞进 `alert`）

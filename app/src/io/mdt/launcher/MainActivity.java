@@ -517,7 +517,7 @@ public class MainActivity extends BaseActivity {
                         Mods.Scan s = Mods.scan(MainActivity.this, useSlot);
                         Mods.Conflict c = Mods.findConflicts(s.mods,
                                 new File(Data.dirOf(MainActivity.this, useSlot), "last_log.txt"));
-                        rep = "槽 = " + useSlot + "\n\n" + c.report();
+                        rep = "槽 = " + useSlot + "\n\n" + c.report(MainActivity.this);
                     } catch (Throwable t) {
                         rep = "dev_mods_conflict 失败：" + t;
                     }

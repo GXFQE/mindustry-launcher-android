@@ -3586,6 +3586,24 @@ public final class SelfTest {
                             && !ModsText.infoMetaReason(ctx, miTech).contains("Exception"),
                     "★P3 反向：**没有码**时仍走老逻辑（异常形态⇒白话 / 自身中文⇒原样透传）");
 
+            // ★★ P3 第十九批：**冲突体检报告 + 模组页说明行**（都被用户直接看到）。
+            //    三条带占位符的按真参数实拼；另验四个小标题与两句结论都在（漏一条资源就是空白）。
+            String cfScan = ctx.getString(R.string.conflict_scanned_fmt, 7, "1.2 MB");
+            String cfNote = enCtx.getString(R.string.conflict_note_fmt, "x");
+            String scSet = ctx.getString(R.string.mods_scan_settings_fmt, 12);
+            ok(stat, L, cfScan.contains("7") && cfScan.contains("1.2 MB") && cfNote.contains("x")
+                            && scSet.contains("12")
+                            && !ctx.getString(R.string.conflict_head_contained).isEmpty()
+                            && !ctx.getString(R.string.conflict_head_shared).isEmpty()
+                            && !ctx.getString(R.string.conflict_head_mentioned).isEmpty()
+                            && !ctx.getString(R.string.conflict_head_log).isEmpty()
+                            && !ctx.getString(R.string.conflict_none).isEmpty()
+                            && !ctx.getString(R.string.conflict_none_hint).isEmpty()
+                            && !ctx.getString(R.string.mods_scan_settings_unreadable).isEmpty()
+                            && !ctx.getString(R.string.mods_scan_settings_none).isEmpty()
+                            && !ctx.getString(R.string.mods_scan_no_mods_dir).isEmpty(),
+                    "★P3：冲突体检/模组页那三条带占位符的按真参数实拼，小标题与两句结论都在");
+
             // ★★ P3 第六批：启动管线各步 + 失败原因（`Injector.LaunchError` → 启动失败弹窗）。
             //    ★ 这里只需验两件事：① 两条带占位符的按真参数实拼；② 6 个步骤名**两套语言都有字**
             //      （报告的键是 ASCII 的 `prewarm`/`dexInject`/…，与界面语言无关，**不是**这些资源）。
