@@ -101,6 +101,8 @@ public final class SelfTest {
     public static final String SLOT_MODE2 = "m3-mode-empty";
     /** ㊶ 「存档视为地图」用的槽（现场造一份"没有 name 的存档"再把它变成图） */
     public static final String SLOT_S2M = "m3-save2map";
+    /** ㊷ 蓝图（`.msch`）解析用的槽 —— 现场造几份 .msch 落盘再读回来 */
+    public static final String SLOT_MSCH = "m3-msch";
 
     /**
      * 自检会创建并最终删除的**全部**测试槽。
@@ -110,7 +112,7 @@ public final class SelfTest {
     private static final String[] TEST_SLOTS = {
             SLOT, SLOT_RENAMED, CLONE_SRC, CLONE_DST, CLONE_EMPTY, CLONE_EMPTY_DST, SLOT_MODS,
             SLOT_SET, SLOT_PACK, SLOT_PACK_DST, SLOT_SAVE, SLOT_GONE, SLOT_GONE2,
-            SLOT_MODE, SLOT_MODE2, SLOT_S2M};
+            SLOT_MODE, SLOT_MODE2, SLOT_S2M, SLOT_MSCH};
 
     /**
      * 本工程**自己的全部页面**（㊱ 基类检查用）。
@@ -235,6 +237,10 @@ public final class SelfTest {
             slotModes(ctx, L, stat);
             // ★ ㊶ 「存档视为地图」：区间改写（两面判据）+ 落位 + 区 1..n 不变 + 码映射
             saveAsMap(ctx, L, stat);
+            // ★ ㊷ 蓝图（`.msch`）解析：24 种配置 tag 的**字节级**期望 + 两版格式 +
+            //   旧名映射 + 宽松 labels + modified UTF-8 + 包围盒口径 + 8 份负样本 + 码映射
+            //   （纯函数为主，只有几份样本落盘在自己的一次性槽里）
+            mschParse(ctx, L, stat);
             // ★ 篡改对象池的用例放**最后**：它会在池里留下一个内容坏掉的对象，
             //   之后任何"再备份一次"都会因为 `has()` 命中而复用坏对象（CAS 的固有
             //   假设是"池内不可变"）。放在最后就不影响别的用例。
@@ -6006,6 +6012,422 @@ public final class SelfTest {
         } finally {
             z.close();
         }
+    }
+
+    /**
+     * ㊷ 蓝图（`.msch`）解析（纯 Java 内核 {@link Msch}）。
+     *
+     * ★ **期望值全部来自 PC 上的"游戏自己的读取器"**（`_lab/msch/` 的测试台：合成样本 36/36、
+     *   24 种配置 tag 字节级 25/25、4821 份真语料逐字段互校）。设备这边只负责**把这些钉住** ——
+     *   自检跑不了 4821 份语料（那在 PC 上），所以这里全是内存里现造的小样本。
+     *
+     * 判据分七块：
+     *   ① 24 种配置 tag 的**消费字节数 + 规范化值**（长度字段错一位这条就红）＋**元断言**；
+     *   ② 旧格式（ver 0）裸 int 的四种转换 + 旧名映射表（**与游戏源码逐条对比过**）；
+     *   ③ 宽松 `labels`（语料里 4516/4821 份是**裸词** `[T5]`）＋ 8 种必须判死的写法；
+     *   ④ **modified UTF-8**（emoji 名字）＋ 元断言（普通 UTF-8 编的同一串必须读不出原文）；
+     *   ⑤ 落盘读回来：名/描述/分类/字典/瓦片/旧名映射/contentMap 反查；
+     *   ⑥ 🔴 **包围盒按瓦片算、不信声明尺寸**（语料里真出现过越界）+ 尾随垃圾（游戏容忍）；
+     *   ⑦ 8 份负样本**判死且错误码对得上** ＋ 元断言（补回砍掉的字节又能读 ⇒ 判据不是恒真）
+     *      ＋ 所有错误码都有文案（**带参实拼**，漏映射 = 界面静默变"原因不明"）。
+     */
+    private static void mschParse(Context ctx, List<String> L, int[] stat) {
+        L.add("── ㊷ 蓝图（.msch）解析：两版格式 + 24 种配置 + 宽松 labels + 负样本 ──");
+
+        // ── ① 24 种配置 tag：字节级（消费字节数 + 规范化值）────────────────────
+        // 期望值 = 神谕（游戏 `TypeIO.readObject`）在 PC 上打出来的，逐字符照抄。
+        String[][] tags = {
+                {"00", "null"},
+                {"0100000005", "i:5"},
+                {"020000000000000005", "l:5"},
+                {"033FC00000", "f:1.5"},
+                {"04010003616263", "s:abc"},
+                {"05000007", "c:0:7"},
+                {"060003000000010000000200000003", "is:3:1:2:3"},
+                {"070000000300000004", "p2:3,4"},
+                {"08020001000200030004", "p2a:2:65538:196612"},
+                {"09000007", "tn:0:7"},
+                {"0A01", "b:true"},
+                {"0B400C000000000000", "d:3.5"},
+                {"0C000004D2", "bd:1234"},
+                {"0D0003", "la:3"},
+                {"0E0000000401020304", "by:4"},
+                {"0F00", "null"},
+                {"1000000003010001", "ba:3:[true, false, true]"},
+                {"110000002A", "u:42"},
+                {"1200023FC00000402000004060000040900000", "v2a:2:1.5,2.5:3.5,4.5"},
+                {"133FC0000040200000", "v2:1.5,2.5"},
+                {"1401", "t:1"},
+                {"150003000000070000000800000009", "ia:3:[7, 8, 9]"},
+                {"16000000030100000005040100017800", "oa:3:[i:5]:[s:x]:[null]"},
+                {"170000", "c:16:0"},
+        };
+        String tBad = "";
+        int tOk = 0;
+        for (String[] c : tags) {
+            byte[] raw = hex(c[0]);
+            Msch.Payload p = Msch.readPayload(raw);
+            if (!p.ok) {
+                tBad += "[" + c[0] + " 判死：" + p.error + "] ";
+                continue;
+            }
+            if (p.used != raw.length) tBad += "[" + c[0] + " 消费 " + p.used + "≠" + raw.length + "] ";
+            String got = Msch.norm(p.cfg);
+            if (!got.equals(c[1])) tBad += "[" + c[0] + " " + got + "≠" + c[1] + "] ";
+            tOk++;
+        }
+        ok(stat, L, tBad.isEmpty() && tOk == tags.length,
+                "① " + tags.length + " 种配置：字节消费 + 规范化值全对（通过 " + tOk + "）" + tBad);
+
+        // ★ 元断言：把 tag 21（int[]）的长度字段**按一个字节**写（参考实现当年就是这么错的，
+        //   语料里从没出现过这种 tag ⇒ 潜伏了很久）⇒ 解出来必须是"数组长度不合法"。
+        Msch.Payload wl = Msch.readPayload(hex("1503000000070000000800000009"));
+        ok(stat, L, !wl.ok || !"ia:3:[7, 8, 9]".equals(Msch.norm(wl.cfg)),
+                "① ★元断言：int[] 的长度字段少一字节 ⇒ 判死（否则上面那条没有分辨力）");
+
+        // ── ② 旧格式（ver 0）与旧名映射 ────────────────────────────────────────
+        Msch.Cfg cItem = Msch.mapConfig("sorter", 7, 0, 0);
+        Msch.Cfg cLiq = Msch.mapConfig("liquid-source", 3, 0, 0);
+        Msch.Cfg cPt = Msch.mapConfig("bridge-conveyor",
+                ((8 & 0xFFFF) << 16) | (9 & 0xFFFF), 5, 6);
+        Msch.Cfg cInt = Msch.mapConfig("illuminator", 42, 0, 0);
+        Msch.Cfg cNull = Msch.mapConfig("conveyor", 42, 0, 0);
+        ok(stat, L, cItem.tag == 5 && cItem.ctype == 0 && cItem.cid == 7
+                        && cLiq.tag == 5 && cLiq.ctype == 4 && cLiq.cid == 3
+                        && cPt.tag == 7 && cPt.px == 3 && cPt.py == 3
+                        && cInt.tag == 1 && cInt.i == 42
+                        && cNull.tag == 0,
+                "② 旧格式裸 int：物品 / 液体 / 坐标（**减掉瓦片坐标**）/ 整数 / 不认识给 null");
+        ok(stat, L, MschConfigTable.size() == 11
+                        && MschConfigTable.kindOf("duct-router") == MschConfigTable.NONE,
+                "② ★元断言：分支表 11 条；duct-router 之类**不是**那四类（在 master 里它们的父类是 Block）");
+        ok(stat, L, Msch.fallbackSize() == 51
+                        && "surge-smelter".equals(Msch.mapFallback("alloy-smelter"))
+                        && "conveyor".equals(Msch.mapFallback("conveyor")),
+                "② 旧名映射 " + Msch.fallbackSize() + " 条（与游戏 SaveFileReader 逐条对比过），不认识的原样返回");
+
+        // ── ③ labels：宽松口径（口径是**拿游戏试出来的**，见 core/gen_labels_probe.py）──
+        // ⚠️ 换行用 `(char) 10` 拼，**不写转义**：这里的字符串会被 aapt/javac 之外的
+        //    环节反复搬运，转义写错一次就变成"裸词里带着反斜杠 n"（本用例第一版就是这么错的）。
+        String nl = String.valueOf((char) 10);
+        String[][] labs = {
+                {"[T5]", "1:T5"},
+                {"[VE蓝图集-杂项]", "1:VE蓝图集-杂项"},
+                {"[ a ]", "1:a"},
+                {"[a b]", "1:a b"},
+                {"['a']", "1:'a'"},
+                {"[a,]", "1:a"},
+                {"[\"a\",b]", "2:a|b"},
+                {"[]", "0:"},
+                {"[\"\"]", "1:"},
+                {"[1,2]", "2:1|2"},
+                {"[" + nl + " a" + nl + " ," + nl + " b" + nl + "]", "2:a|b"},
+        };
+        String lBad = "";
+        for (String[] c : labs) {
+            List<String> got = Msch.parseLabels(c[0]);
+            String enc = got == null ? "null" : (got.size() + ":" + joinBar(got));
+            if (!enc.equals(c[1])) lBad += "[" + c[0] + " → " + enc + "≠" + c[1] + "] ";
+        }
+        ok(stat, L, lBad.isEmpty(),
+                "③ 宽松 labels：" + labs.length + " 种写法（裸词 / 两边空白 trim / 单引号是普通字符 / 尾随逗号）" + lBad);
+        String[] badLabs = {"[a]junk", "[a][b]", "[a,,b]", "[,]", "[[\"a\"]]", "{\"a\":1}", "[a}b]", "[a"};
+        int survived = 0;
+        String sBad = "";
+        for (String s : badLabs) {
+            if (Msch.parseLabels(s) != null) {
+                survived++;
+                sBad += "[" + s + "] ";
+            }
+        }
+        ok(stat, L, survived == 0,
+                "③ ★" + badLabs.length + " 种坏写法**全部判死**（游戏那边同样解不开）" + sBad);
+
+        // ── ④ modified UTF-8（`Reads.str()` = `DataInputStream.readUTF`，不是普通 UTF-8）──
+        String emoji = "名字 😀 🇨🇳";
+        Msch.Payload me = Msch.readPayload(concat(hex("0401"), utfBytes(emoji)));
+        ok(stat, L, me.ok && emoji.equals(me.cfg.s),
+                "④ modified UTF-8：星平面名字逐字符相同（普通 UTF-8 解会变成替换字符）");
+        Msch.Payload mp = Msch.readPayload(concat(hex("0401"), plainUtf(emoji)));
+        ok(stat, L, !mp.ok || !emoji.equals(mp.cfg.s),
+                "④ ★元断言：同一个串按**普通 UTF-8** 编 ⇒ 读不出原文（证明上面那条不是恒真）");
+
+        // ── ⑤ 落盘 → 读回来（含 contentMap 反查与旧名映射）────────────────────
+        try {
+            File dir = Data.dirOf(ctx, SLOT_MSCH);
+            if (dir != null && !dir.isDirectory()) dir.mkdirs();
+            File f = new File(dir, "ok.msch");
+            Sch sch = new Sch(1, 2, 2)
+                    .tag("name", "样本😀")
+                    .tag("description", "描述")
+                    .tag("labels", "[甲, \"乙\"]")
+                    .tag("contentMap", "{0:{thorium:7},4:{water:3}}")
+                    .tile("alloy-smelter", 5, 7, 1, new Pay(5).u8(0).s16(7).out())
+                    .tile("conveyor", -3, -4, 3, new byte[]{0});
+            write(f, sch.bytes());
+            Msch m = Msch.read(f);
+            ok(stat, L, m.ok, "⑤ 完整文件读得出来：" + m.report() + (m.ok ? "" : " / " + m.error));
+            ok(stat, L, "样本😀".equals(m.displayName()) && "描述".equals(m.description())
+                            && m.labels.size() == 2 && "甲".equals(m.labels.get(0))
+                            && "乙".equals(m.labels.get(1))
+                            && m.dict.size() == 2 && m.tileCount() == 2
+                            && "surge-smelter".equals(m.tiles.get(0).block)
+                            && "alloy-smelter".equals(m.tiles.get(0).rawName)
+                            && m.tiles.get(0).rotation == 1,
+                    "⑤ 名（含 emoji）/描述/分类/字典/两格瓦片/旋转 都对");
+            ok(stat, L, "surge-smelter".equals(m.tiles.get(0).block),
+                    "⑤ 旧名映射生效：文件里的 alloy-smelter ⇒ 游戏认识的名字 surge-smelter");
+            ok(stat, L, "thorium".equals(m.contentName(0, 7)) && "water".equals(m.contentName(4, 3))
+                            && m.contentName(0, 99) == null && m.hasContentMap,
+                    "⑤ contentMap 反查：物品 7 → thorium、液体 3 → water、查不到给 null");
+            ok(stat, L, m.declaredWidth == 2 && m.declaredHeight == 2
+                            && m.minX == -3 && m.minY == -4 && m.maxX == 5 && m.maxY == 7
+                            && m.boxWidth() == 9 && m.boxHeight() == 12 && m.outOfBounds == 2,
+                    "⑤ ★包围盒**按瓦片算**（-3,-4 .. 5,7，负坐标要还原成有符号）"
+                            + "；声明尺寸仍是 2×2、两格越界");
+
+            // ── ⑥ 尾随垃圾（游戏容忍；我们只是标出来）──────────────────────
+            File ft = new File(dir, "tail.msch");
+            write(ft, new Sch(1, 2, 2).tag("name", "tail")
+                    .tile("conveyor", 0, 0, 0, new byte[]{0}).trail(16).bytes());
+            Msch mt = Msch.read(ft);
+            ok(stat, L, mt.ok && mt.leftover == 16,
+                    "⑥ 瓦片后多 16 字节：照样读得出来，并把 leftover 标成 " + mt.leftover);
+
+            // ── ⑦ 负样本：判死 + 码对得上（+ 一条元断言）───────────────────
+            byte[] good = new Sch(1, 2, 2).tag("name", "x")
+                    .tile("conveyor", 0, 0, 0, new byte[]{0}).bytes();
+            byte[] badHead = good.clone();
+            badHead[0] = 'x';
+            byte[] ver2 = good.clone();
+            ver2[4] = 2;
+            byte[] badZ = good.clone();
+            badZ[5] = 0;                                    // zlib 头坏掉
+            byte[] trunc = java.util.Arrays.copyOf(good, good.length - 4);
+            byte[] nested = new Sch(1, 2, 2).tag("name", "n")
+                    .tile("conveyor", 0, 0, 0, hex("160000000106000100000005")).bytes();
+            Object[][] negs = {
+                    {"坏头", badHead, Msch.E_HEADER},
+                    {"空文件", new byte[0], Msch.E_HEADER},
+                    {"版本 v2", ver2, Msch.E_VERSION},
+                    {"坏 zlib", badZ, Msch.E_ZLIB},
+                    {"截断", trunc, Msch.E_TRUNC},
+                    {"声明 129 宽", new Sch(1, 129, 2).tag("name", "b").bytes(), Msch.E_TOO_LARGE},
+                    {"声明 20000 格", bigTileCount(), Msch.E_TOO_MANY},
+                    {"嵌套数组", nested, Msch.E_NESTED},
+            };
+            String nBad = "";
+            for (Object[] n : negs) {
+                Msch mm = Msch.read((byte[]) n[1]);
+                if (mm.ok) nBad += "[" + n[0] + " 竟然读出来了] ";
+                else if (mm.errCode != (Integer) n[2]) {
+                    nBad += "[" + n[0] + " 码 " + mm.errCode + "≠" + n[2] + "：" + mm.error + "] ";
+                }
+            }
+            ok(stat, L, nBad.isEmpty(),
+                    "⑦ " + negs.length + " 份负样本：全部判死且**错误码逐条对得上**" + nBad);
+            ok(stat, L, Msch.read(good).ok,
+                    "⑦ ★元断言：把「截断」那份补回来又能读（证明上面这条不是恒真）");
+        } catch (Throwable t) {
+            ok(stat, L, false, "⑤⑥⑦ 落盘用例自己抛了异常：" + t);
+        }
+
+        // ── ⑧ 错误码 → 文案（遍历 + 带参实拼；漏映射 = 界面静默变"原因不明"）──
+        String cBad = "";
+        for (int code : Msch.ALL_CODES) {
+            String s = MschText.reason(ctx, code, 12, 34);
+            if (s == null || s.isEmpty()
+                    || s.equals(ctx.getString(R.string.msav_unknown_reason))) {
+                cBad += "[码 " + code + "] ";
+            }
+        }
+        ok(stat, L, cBad.isEmpty(),
+                "⑧ " + Msch.ALL_CODES.length + " 个错误码都有文案（**按真参数实拼**）" + cBad);
+        Msch broken = Msch.read(new byte[0]);
+        String r1 = MschText.reason(ctx, broken);
+        ok(stat, L, broken != null && !broken.ok && r1 != null && !r1.isEmpty(),
+                "⑧ 失败实例走 MschText.reason 也有话说：" + r1);
+        L.add("");
+    }
+
+    /** 声明 20000 格瓦片的 body（读到 int 总数就判死，后面没有数据也没关系） */
+    private static byte[] bigTileCount() {
+        try {
+            ByteArrayOutputStream body = new ByteArrayOutputStream();
+            java.io.DataOutputStream d = new java.io.DataOutputStream(body);
+            d.writeShort(1);
+            d.writeShort(1);
+            d.writeByte(0);
+            d.writeByte(0);
+            d.writeInt(20000);
+            d.flush();
+            return pack(body.toByteArray(), 1);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /** `msch` + 版本字节 + zlib（照 `Schematics.write`；自检造样本用） */
+    private static byte[] pack(byte[] body, int ver) throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        out.write(new byte[]{'m', 's', 'c', 'h'});
+        out.write(ver);
+        java.util.zip.DeflaterOutputStream z = new java.util.zip.DeflaterOutputStream(out);
+        try {
+            z.write(body);
+        } finally {
+            z.close();
+        }
+        return out.toByteArray();
+    }
+
+    /** 自检用的 `.msch` 生成器（照 `Schematics.write` 的字节布局；只给自检用，不进产品） */
+    private static final class Sch {
+        private final int ver, w, h;
+        private final java.util.LinkedHashMap<String, String> tags = new java.util.LinkedHashMap<>();
+        private final List<String> dict = new ArrayList<>();
+        private final ByteArrayOutputStream tiles = new ByteArrayOutputStream();
+        private int tileN, trail;
+
+        Sch(int ver, int w, int h) {
+            this.ver = ver;
+            this.w = w;
+            this.h = h;
+        }
+
+        Sch tag(String k, String v) {
+            tags.put(k, v);
+            return this;
+        }
+
+        /** 瓦片数据之后再加 n 个字节（测 `leftover`；游戏容忍尾随垃圾） */
+        Sch trail(int n) {
+            this.trail = n;
+            return this;
+        }
+
+        Sch tile(String block, int x, int y, int rot, byte[] cfg) {
+            int idx = dict.indexOf(block);
+            if (idx < 0) {
+                dict.add(block);
+                idx = dict.size() - 1;
+            }
+            int packed = ((x & 0xFFFF) << 16) | (y & 0xFFFF);
+            byte[] pos = {(byte) (packed >>> 24), (byte) (packed >>> 16),
+                    (byte) (packed >>> 8), (byte) packed};
+            tiles.write(idx);
+            tiles.write(pos, 0, pos.length);
+            tiles.write(cfg, 0, cfg.length);
+            tiles.write(rot);
+            tileN++;
+            return this;
+        }
+
+        byte[] bytes() {
+            try {
+                ByteArrayOutputStream body = new ByteArrayOutputStream();
+                java.io.DataOutputStream d = new java.io.DataOutputStream(body);
+                d.writeShort(w);
+                d.writeShort(h);
+                d.writeByte(tags.size());
+                for (java.util.Map.Entry<String, String> e : tags.entrySet()) {
+                    d.writeUTF(e.getKey());
+                    d.writeUTF(e.getValue());
+                }
+                d.writeByte(dict.size());
+                for (String n : dict) d.writeUTF(n);
+                d.writeInt(tileN);
+                d.write(tiles.toByteArray());
+                for (int i = 0; i < trail; i++) d.writeByte(0);
+                d.flush();
+                return pack(body.toByteArray(), ver);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }
+    }
+
+    /** 自检用的单条配置载荷生成器（按 TypeIO 的写侧摆字节） */
+    private static final class Pay {
+        private final ByteArrayOutputStream b = new ByteArrayOutputStream();
+        private final java.io.DataOutputStream d = new java.io.DataOutputStream(b);
+
+        Pay(int tag) {
+            u8(tag);
+        }
+
+        Pay u8(int v) {
+            try {
+                d.writeByte(v);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            return this;
+        }
+
+        Pay s16(int v) {
+            try {
+                d.writeShort(v);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+            return this;
+        }
+
+        byte[] out() {
+            try {
+                d.flush();
+            } catch (IOException ignored) {
+            }
+            return b.toByteArray();
+        }
+    }
+
+    /** `DataOutputStream.writeUTF` 等价（**modified UTF-8**，长度是 unsigned short） */
+    private static byte[] utfBytes(String s) {
+        try {
+            ByteArrayOutputStream b = new ByteArrayOutputStream();
+            java.io.DataOutputStream d = new java.io.DataOutputStream(b);
+            d.writeUTF(s);
+            d.flush();
+            return b.toByteArray();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /** **普通** UTF-8 + 两字节长度（元断言里的"错误编法"） */
+    private static byte[] plainUtf(String s) {
+        byte[] x = s.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        byte[] out = new byte[x.length + 2];
+        out[0] = (byte) (x.length >>> 8);
+        out[1] = (byte) x.length;
+        System.arraycopy(x, 0, out, 2, x.length);
+        return out;
+    }
+
+    private static byte[] concat(byte[] a, byte[] b) {
+        byte[] out = new byte[a.length + b.length];
+        System.arraycopy(a, 0, out, 0, a.length);
+        System.arraycopy(b, 0, out, a.length, b.length);
+        return out;
+    }
+
+    private static byte[] hex(String s) {
+        byte[] out = new byte[s.length() / 2];
+        for (int i = 0; i < out.length; i++) {
+            out[i] = (byte) Integer.parseInt(s.substring(i * 2, i * 2 + 2), 16);
+        }
+        return out;
+    }
+
+    private static String joinBar(List<String> xs) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < xs.size(); i++) {
+            if (i > 0) sb.append('|');
+            sb.append(xs.get(i));
+        }
+        return sb.toString();
     }
 
     // ── 小工具 ────────────────────────────────────────────────────────────

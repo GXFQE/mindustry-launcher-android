@@ -657,6 +657,25 @@
     <string name="msav_err_trash_failed">挪不开旧存档，这次没有导入。腾点空间再试一次</string>
     <string name="msav_err_rename_fmt">改名失败：%1$s → %2$s</string>
     <string name="msav_reason_meta_tail_fmt">元数据块读完后还剩 %1$d 字节（与游戏的口径不一致）</string>
+    <!--
+      ══ 蓝图（.msch）读不出来的原因（P3：`Msch` 只给「码 + 参数」，文案在这里）════
+      ★ 文案三条：短、白话、无术语 —— 不写 zlib / TypeIO / inflate。
+      ⚠️ 加一个码就要在这里加一条（+ values/ 那一份），漏了不崩、界面静默变"原因不明"。
+    -->
+    <string name="msch_reason_no_file">没有拿到文件</string>
+    <string name="msch_reason_file_too_big_fmt">这个文件太大，不像是蓝图（超过 %1$d 字节）</string>
+    <string name="msch_reason_not_blueprint">这不是蓝图文件</string>
+    <string name="msch_reason_newer_fmt">这份蓝图是更新版本的游戏存的（v%1$d）</string>
+    <string name="msch_reason_broken">文件内容坏了</string>
+    <string name="msch_reason_huge">这个文件解开后太大，没有读它</string>
+    <string name="msch_reason_too_large_fmt">蓝图尺寸超出游戏上限（%1$d × %2$d）</string>
+    <string name="msch_reason_too_many_fmt">蓝图里的建筑太多了（%1$d 个）</string>
+    <string name="msch_reason_half">这个文件像是写到一半</string>
+    <string name="msch_reason_config">蓝图里有读不懂的建筑设置</string>
+    <string name="msch_reason_array_fmt">建筑设置的长度不对（%1$d）</string>
+    <string name="msch_reason_nested">建筑设置嵌套太深</string>
+    <string name="msch_reason_unknown_tag">蓝图里有我们不认识的数据</string>
+    <string name="msch_reason_unreadable">读这个文件的时候出错了</string>
     <!-- 地图来源与详情（同一族：Maps.Item 原来也是 Java 里拼的中文）-->
     <string name="map_from_slot">本槽</string>
     <string name="map_from_slot_detail">本槽（你可以直接管理）</string>

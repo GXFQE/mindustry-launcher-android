@@ -152,7 +152,8 @@ public class MainActivity extends BaseActivity {
                 || intent.hasExtra("dev_maps_slot")
                 || intent.hasExtra("dev_map_import")
                 || intent.hasExtra("dev_maps_page")
-                || intent.hasExtra("dev_mapstats");
+                || intent.hasExtra("dev_mapstats")
+                || intent.hasExtra("dev_msch");
         if (!isDev) return;
         if ((getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) == 0) {
             Toast.makeText(this, R.string.dev_blocked_toast, Toast.LENGTH_SHORT).show();
@@ -588,6 +589,111 @@ public class MainActivity extends BaseActivity {
             devMapStats(dstat, intent.getStringExtra("dev_mapstats_file"));
             return;
         }
+        // ── 蓝图（.msch）解析：拿真文件跑一遍，把**逐格配置 + 缺哪些方块**落到报告 ────
+        // 用法：`--es dev_msch /sdcard/xxx.msch [--es dev_msch_slot <槽>]`
+        // ★ 为什么要这个口：① 判据在 PC 上（`_lab/msch/` 拿游戏自己的读取器当神谕），
+        //   设备这边要看的是**同一份内核在真机上跑真文件**；② 界面入口还没有，
+        //   而"缺哪些方块"正是蓝图体检的价值所在（认不出的方块游戏**静默当空气**）。
+        String mschPath = intent.getStringExtra("dev_msch");
+        if (mschPath != null && !mschPath.isEmpty()) {
+            devMsch(mschPath, intent.getStringExtra("dev_msch_slot"));
+            return;
+        }
+    }
+
+    /** 蓝图解析的 dev 口：解析报告 + 缺方块体检（判据 = 本槽已启用模组的**内容表**） */
+    private void devMsch(final String path, final String slotArg) {
+        final String useSlot = (slotArg == null || slotArg.trim().isEmpty() || "true".equals(slotArg.trim()))
+                ? Data.currentSlot(this) : slotArg.trim();
+        new Thread(new Runnable() {
+            @Override public void run() {
+                StringBuilder sb = new StringBuilder();
+                long t0 = System.currentTimeMillis();
+                try {
+                    File f = new File(path);
+                    sb.append("文件 = ").append(f.getAbsolutePath()).append("  ")
+                      .append(f.length()).append(" 字节\n");
+                    sb.append("槽 = ").append(useSlot).append("\n\n");
+                    Msch m = Msch.read(f);
+                    if (!m.ok) {
+                        sb.append("❌ 读不出来（码 ").append(m.errCode).append("）：")
+                          .append(m.error).append('\n');
+                        sb.append("界面文案 = ").append(MschText.reason(MainActivity.this, m)).append('\n');
+                    } else {
+                        sb.append(m.report()).append('\n');
+                        sb.append("名 = ").append(m.displayName()).append('\n');
+                        sb.append("标签 = ").append(m.tags.keySet()).append('\n');
+                        sb.append("分类 = ").append(m.labels)
+                          .append(m.labelsBad ? "（解析失败，游戏同样忽略）" : "").append('\n');
+                        sb.append("字典 = ").append(m.dict).append('\n');
+
+                        // 缺方块体检：判据 = **本槽已启用模组**（+原版）的内容表
+                        MapStats.Table tab = MapStatsMods.contentFor(MainActivity.this, useSlot).table;
+                        java.util.LinkedHashMap<String, Integer> miss = new java.util.LinkedHashMap<>();
+                        java.util.LinkedHashMap<String, Integer> used = new java.util.LinkedHashMap<>();
+                        for (Msch.Tile t : m.tiles) {
+                            String n = t.block == null ? "(空)" : t.block;
+                            used.put(n, (used.containsKey(n) ? used.get(n) : 0) + 1);
+                            if (tab == null || tab.row(n) == null) {
+                                miss.put(n, (miss.containsKey(n) ? miss.get(n) : 0) + 1);
+                            }
+                        }
+                        sb.append("方块种类 = ").append(used.size()).append("（内容表 ")
+                          .append(tab == null ? "读不出来" : tab.size() + " 条").append("）\n");
+                        sb.append("用到 = ").append(brief(used)).append('\n');
+                        sb.append(miss.isEmpty() ? "缺方块 = 没有（这份蓝图在本槽能完整还原）\n"
+                                                 : "缺方块 = " + brief(miss) + "   ← 游戏会**静默当空气**\n");
+
+                        // 逐格配置（最多 60 行，够看出形状）
+                        int n = 0;
+                        for (Msch.Tile t : m.tiles) {
+                            if (n++ >= 60) {
+                                sb.append("… 还有 ").append(m.tiles.size() - 60).append(" 格\n");
+                                break;
+                            }
+                            sb.append("  ").append(t.block).append(" @").append(t.x).append(',')
+                              .append(t.y).append(" rot=").append(t.rotation).append("  ")
+                              .append(cfgText(m, t.config)).append('\n');
+                        }
+                    }
+                    sb.append("\n用时 ").append(System.currentTimeMillis() - t0).append(" ms\n");
+                } catch (Throwable t) {
+                    sb.append("dev_msch 失败：").append(t).append('\n');
+                }
+                reportDev(sb.toString(), "dev_msch · " + new File(path).getName());
+            }
+        }, "dev-msch").start();
+    }
+
+    /** `名字×N · 名字×N`（dev 报告里压成一行） */
+    private static String brief(java.util.Map<String, Integer> counts) {
+        StringBuilder sb = new StringBuilder();
+        for (java.util.Map.Entry<String, Integer> e : counts.entrySet()) {
+            if (sb.length() > 0) sb.append(" · ");
+            sb.append(e.getKey()).append('×').append(e.getValue());
+        }
+        return sb.length() == 0 ? "（无）" : sb.toString();
+    }
+
+    /**
+     * 一格配置的人话（dev 报告用）。
+     * ★ `byte[]`（tag 14）**既可能是逻辑代码、也可能是 MindustryX `canvas` 的原始像素** ⇒
+     *   这里只报"多少字节" + 可打印比例，**不猜**（按方块类型分派那条纪律）。
+     */
+    private static String cfgText(Msch m, Msch.Cfg g) {
+        if (g == null) return "null";
+        String n = Msch.norm(g);
+        if (g.tag == 5) {
+            String nm = m.contentName(g.ctype, g.cid);
+            n += nm == null ? "（认不出名字）" : "(" + nm + ")";
+        } else if (g.tag == 14) {
+            int printable = 0;
+            for (byte b : g.bytes) {
+                if (b == '\n' || b == '\r' || b == '\t' || (b >= 32 && b < 127)) printable++;
+            }
+            n += "  可打印 " + (g.bytes.length == 0 ? 0 : printable * 100 / g.bytes.length) + "%";
+        }
+        return n;
     }
 
     /** F21 的 dev 口：跑一遍统计并把**逐项数字 + 真机耗时**落到 `hub/report-devtool.txt` */

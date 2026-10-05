@@ -18,7 +18,9 @@
 #
 # 文件 = 上限（含中文的字符串字面量条数）
 
-MainActivity.java = 126   # 全部在 dev_* 直通口（仅 debuggable 构建可达）
+MainActivity.java = 152   # 全部在 dev_* 直通口（仅 debuggable 构建可达）；2026-10-05 由 126 升到 152：
+                         #   新增的是蓝图解析口 `dev_msch`（`--es dev_msch <路径>`）的落盘报告行 ——
+                         #   与既有 dev 口同类（dev_mapstats / dev_mods_conflict…），**没有自己的界面文案**。
 Data.java = 61   # 用户可见的已搬完；剩的是数据根体检明细与隔离报告（落盘）
 Mods.java = 58   # ★ **用户可见路径已全部本地化/码化**：`State`（枚举码）/ `gates`（六道门）/ 启停原因（5 码）/ `PackResult`（16 码）/ `metaErrCode`（8 码）/ 冲突明细 + 依赖行 + 重复包（整句资源）/ `metaReason`。剩下的是：各码的**报告原文**（`error`/`metaError` 里的中文，给维护者与落盘报告）+ `changeDesc` 系列（技术细节第二层）+ `place()` 的内部诊断（经 `P_IMPORT_FAILED` 兜底后才给用户看）。
 SettingsBin.java = 50   # ★ 已码化：失败文案走 errCode+参数（SettingsText 映射）；剩的是 read/write 的 IOException 原文、report()/changeDesc(技术细节第二层) —— 依据，有意保留
@@ -37,3 +39,6 @@ GameSlot.java = 2   # 启动时 `Data.prepareSlot` 的落盘/日志报告（`rep
 LauncherApp.java = 1   # `Log.i` 里的 F0 迁移报告 —— 只进日志
 MsavPatches.java = 1   # ★ 纯 Java 解析器守卫（`IllegalArgumentException`），只经异常链向上
 Util.java = 1   # ★ 通用 IO 原语诊断；调用方（`MapFiles`）自己先建目录 ⇒ 此路径实际不可达
+Msch.java = 46   # ★ 2026-10-05 新增（蓝图解析）：**全部是 `error`/`Bad` 的中文诊断**（给落盘报告与自检看）；
+                 #   界面一律走 `errCode` + `MschText`（那个文件 **0 条**中文，已核）。
+                 #   🔴 核心刻意不碰 Android（要在 PC 上拿游戏自己的读取器当判据）⇒ 只能这样分 —— 与 `MsavMeta` 同族。
