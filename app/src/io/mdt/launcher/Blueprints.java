@@ -72,6 +72,15 @@ public final class Blueprints {
         public int missingKinds;
         /** 认不出的**格子**数 */
         public int missingTiles;
+        /**
+         * ★ **这份的"缺件"名单可能认错**（第 112 轮，用户：「这种情况特别标记一下（告诉用户很有可能识别错误）」）。
+         *
+         * 判据**不是**猜的：{@link MapStats.Pack#hasCode} —— 本槽存在"把方块写在代码或脚本里、
+         * 包里又没有方块 JSON"的**已启用非 hidden** 模组时，我们那张表里就缺它的方块
+         * ⇒ 名单里的名字可能其实存在（真机实例：`原版瘤液拓展` 自带的 8 份蓝图里有 4 份被误标）。
+         * 由 {@link #markSoft} 统一置位；**只影响文案与标记，不改判据本身**。
+         */
+        public boolean softMissing;
 
         public boolean ok() {
             return msch != null && msch.ok;
@@ -122,8 +131,11 @@ public final class Blueprints {
             if (!labels.isEmpty()) parts.add(labels);
             StringBuilder sb = new StringBuilder(joinParts(parts));
             if (missingKinds > 0) {
-                sb.append('\n').append(c.getString(R.string.bp_line_missing_fmt,
-                        missingKinds, missingTiles));
+                // ★ 两种说法**刻意不同**：拿不准的时候**不许**断言"本槽没有 / 会被当空气丢掉"
+                //   （那是给用户一个可能错的结论）—— 改成"我们没认出来" + 说清为什么可能认错。
+                sb.append('\n').append(c.getString(softMissing
+                        ? R.string.bp_line_missing_soft_fmt
+                        : R.string.bp_line_missing_fmt, missingKinds, missingTiles));
             } else if (msch.labelsBad && labels.isEmpty()) {
                 sb.append('\n').append(c.getString(R.string.bp_labels_bad));
             }
@@ -162,6 +174,19 @@ public final class Blueprints {
     }
 
     private Blueprints() {}
+
+    /**
+     * 给清点结果打上"**缺件名单可能认错**"的标记（第 112 轮）。
+     *
+     * @param opaquePacks 「有代码/脚本、又没带方块 JSON」的已启用模组数（{@link MapStatsMods.SlotContent#opaque}）
+     *
+     * ★ 为什么单独一个函数：它是一条**判据**（列表行与详情页都读同一个标记），
+     *   自检要能直接喂它两个方向（有这种模组 / 没有）—— 见自检㊹⑨。
+     */
+    public static void markSoft(List<Item> items, int opaquePacks) {
+        if (items == null) return;
+        for (Item it : items) it.softMissing = it.missingKinds > 0 && opaquePacks > 0;
+    }
 
     /** 分类连成一行（**分类本身是数据**：作者写的标签，不翻译） */
     static String join(List<String> xs) {

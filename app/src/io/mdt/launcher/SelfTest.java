@@ -6526,6 +6526,61 @@ public final class SelfTest {
                     "⑧ ★meta 原样那一种写法留作别名（有作者按它引用，别把人家的图判成缺件）");
             ok(stat, L, mt.row("bpcase-nope") == null,
                     "⑧ ★元断言：不存在的名字查不到 —— 说明上面两条不是在恒真地打勾");
+
+            // ── ⑨ ★"缺件名单可能认错"这条判据（第 112 轮，用户：「这种情况特别标记一下」）──
+            //   背景：内容表**只读 `content/blocks/**` 的 JSON** ⇒ 把方块写在代码/脚本里、又不带方块 JSON
+            //   的模组，它的方块我们**根本看不见**（真机实例：`原版瘤液拓展` 自带的 8 份蓝图里
+            //   有 4 份被误标成"本槽没有"）。⇒ 出现这种模组时，"缺件"必须**自己声明不确定**。
+            //   判据 = `MapStats.Pack#hasCode`（有代码/脚本）＋没有方块 JSON ＋**非 hidden**
+            //   （游戏 `Mods.java:838`「hidden mods can't load content」⇒ hidden 的"看不见的方块"
+            //   在游戏里本来就不存在，不能当误报来源，否则会把对的报法说成可能错）。
+            File opq = new File(modsDir, "opq");
+            write(new File(opq, "scripts/main.js"),
+                    "// 只是个夹具：有脚本、没有方块 JSON\n".getBytes("UTF-8"));
+            write(new File(opq, "mod.json"),
+                    "{\"name\":\"opq\",\"version\":\"1.0\",\"minGameVersion\":\"140\"}".getBytes("UTF-8"));
+            MapStatsMods.invalidate();                    // 模组增删后缓存要作废（真机也是靠戳，这里显式）
+            int op = MapStatsMods.contentFor(ctx, SLOT_BP).opaque;
+            ok(stat, L, op == 1,
+                    "⑨ 「有代码/脚本 + 没有方块 JSON」的模组被数出来了（实得 " + op
+                            + "；同一槽里的 `bpmod` 带了方块 JSON、不该算进来）");
+
+            MapStats.Table softTab = MapStatsMods.contentFor(ctx, SLOT_BP).table;
+            List<Blueprints.Item> softItems = new ArrayList<>();
+            Blueprints.Item soft1 = new Blueprints.Item();
+            soft1.msch = Msch.read(new Sch(1, 4, 4).tag("name", "soft")
+                    .tile("opq-made-up", 0, 0, 0, new byte[]{0}).bytes());
+            Blueprints.summarize(soft1, Blueprints.rows(soft1.msch, softTab, null));
+            Blueprints.Item soft2 = new Blueprints.Item();
+            soft2.msch = Msch.read(new Sch(1, 4, 4).tag("name", "soft2")
+                    .tile("conveyor", 0, 0, 0, new byte[]{0}).bytes());
+            Blueprints.summarize(soft2, Blueprints.rows(soft2.msch, softTab, null));
+            softItems.add(soft1);
+            softItems.add(soft2);
+            Blueprints.markSoft(softItems, op);
+            ok(stat, L, soft1.missingKinds == 1 && soft1.softMissing && !soft2.softMissing,
+                    "⑨ 缺件的那份被标记为「可能认错」，全认得出的那份不标 —— 且文案真的换了说法："
+                            + oneLine(soft1.line(ctx)));
+            Blueprints.markSoft(softItems, 0);
+            ok(stat, L, !soft1.softMissing,
+                    "⑨ ★元断言：本槽**没有**这种模组时不许打这个标记（否则它会变成一条恒真的免责声明）");
+
+            // ⑨b ★再把那个模组标成 hidden：游戏不加载它的 Java 内容 ⇒ 它的"看不见的方块"不存在
+            //     ⇒ 我们不能拿它当误报来源（这条就是钉 `Mods.java:838` 那句的）
+            write(new File(opq, "mod.json"),
+                    "{\"name\":\"opq\",\"hidden\":true,\"version\":\"1.0\",\"minGameVersion\":\"140\"}"
+                            .getBytes("UTF-8"));
+            MapStatsMods.invalidate();
+            int opHidden = MapStatsMods.contentFor(ctx, SLOT_BP).opaque;
+            ok(stat, L, opHidden == 0,
+                    "⑨ ★hidden 的模组不算误报来源（游戏不加载它的 Java 内容）—— 实得 " + opHidden);
+            // 文案实拼（带参资源按真参数调一次，防 `%n$` 与参数个数不匹配当场崩）
+            ok(stat, L, !ctx.getString(R.string.bp_line_missing_soft_fmt, 2, 3).isEmpty()
+                            && !ctx.getString(R.string.bp_tech_opaque_fmt, 1).isEmpty()
+                            && !ctx.getString(R.string.bp_blocks_missing_soft_sum_fmt, 2, 3).isEmpty()
+                            && !ctx.getString(R.string.bp_blocks_missing_soft_note).isEmpty()
+                            && !ctx.getString(R.string.bp_section_missing_soft).isEmpty(),
+                    "⑨ ★新增的 5 条文案按真参数实拼不炸");
         } catch (Throwable t) {
             ok(stat, L, false, "㊹ 自己抛了异常：" + t);
         } finally {

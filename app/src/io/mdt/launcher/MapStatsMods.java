@@ -73,6 +73,13 @@ public final class MapStatsMods {
         public int bundlesWithText;
         /** ★ 依据用**数字**（文案在 UI 侧拼 ⇒ 技术细节也跟着界面语言走） */
         public int packs, added, overridden;
+        /**
+         * 「有代码/脚本、又没带方块 JSON」的已启用模组数（hidden 不算）。
+         *
+         * 蓝图页拿它做两件事：**给"缺件"打上"可能认错"的标记** + 在技术细节里给出依据。
+         * 详见 {@link MapStats.Pack#hasCode}。
+         */
+        public int opaque;
         /** 游戏这次不加载模组（上次崩过） */
         public boolean skipMods;
         /** 模组那一层读不动 */
@@ -184,12 +191,16 @@ public final class MapStatsMods {
                         p.pkg = m.file;
                         p.rootPrefix = m.rootPrefix == null ? "" : m.rootPrefix;
                     }
+                    // ★ "这个包的方块我们看不看得见"（蓝图那侧要拿它声明不确定性，见 MapStats.Pack#hasCode）
+                    p.hasCode = m.hasScripts || m.hasClassesDex || m.java;
+                    p.hidden = m.hidden;
                     packs.add(p);
                 }
                 MapStats.ModResult mr = MapStats.overlayMods(t, packs);
                 out.packs = mr.packs;
                 out.added = mr.added;
                 out.overridden = mr.overridden;
+                out.opaque = mr.opaque;
                 // ★ 译文：版本 APK 只认识原版内容，模组加的物品/方块得从**模组自己的 bundle** 里捞
                 //   ★ 读哪一层语言包由**界面语言**决定（P4）
                 out.bundle = MapStats.readBundles(packs,

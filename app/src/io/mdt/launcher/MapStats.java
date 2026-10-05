@@ -419,6 +419,23 @@ public final class MapStats {
         public String alt = "";
         /** 显示名（技术细节层） */
         public String label = "";
+        /**
+         * 这个包带了**代码或脚本**（`classes.dex` / `java: true` / `scripts/`）。
+         *
+         * 🔴 为什么要记它：内容表**只读 `content/blocks/**` 的 JSON** ⇒ 一个把方块写在代码/脚本里、
+         *   又没带方块 JSON 的模组，它的方块**我们根本看不见**。含这种方块的蓝图会被我们误报"缺件"
+         *   （真机实例：`原版瘤液拓展` —— 0 个方块 JSON、方块全在 `scripts/**` + dex 里，
+         *   它自带的 8 份蓝图里有 4 份被我们标成"本槽没有"，见 REF §77.5）。
+         */
+        public boolean hasCode;
+        /** 这个包里出现过 `content/blocks/**` 的 JSON（方块至少有一部分我们看得见） */
+        public boolean hasBlockJson;
+        /**
+         * 游戏说 `hidden` 的模组**不加载 Java 内容**（`mindustry/mod/Mods.java:838`
+         * 「hidden mods can't load content」，那一遍直接 `continue`）⇒
+         * 它的"看不见的方块"在游戏里**本来就不存在**，不能当误报来源（否则会把对的报法说成可能错）。
+         */
+        public boolean hidden;
         /** 这个包的 bundle 里读到几条（0 = 它没带译文）—— 技术细节层用 */
         public int bundleKeys;
     }
@@ -712,6 +729,13 @@ public final class MapStats {
     /** 应用模组内容的结果（给技术细节层看"依据"） */
     public static final class ModResult {
         public int packs, entries, added, overridden, skipped, unknownType;
+        /**
+         * 「**有代码/脚本、又没带方块 JSON**」的已启用模组数（hidden 的不算）。
+         *
+         * 用途只有一个：让"缺件"这种判断**自己声明不确定性** —— 这些模组可能正是那些名字的来源，
+         * 而我们看不见它们注册了什么（REF §77.5）。⚠️ 它**不进任何统计数字**，只影响文案与标记。
+         */
+        public int opaque;
         /** 从内容 JSON 里读到的"自带名字"条数（块 + 物品） */
         public int jsonNames;
         public final List<String> unknownTypes = new ArrayList<>();
@@ -746,6 +770,9 @@ public final class MapStats {
             } catch (Throwable ignored) {
                 // 一个包读不动不影响别的包（也与游戏一致：坏包被跳过）
             }
+            // ★ 收口在**这里**（而不是让调用方自己遍历模组列表再判）：判据要求"这个包到底有没有
+            //   方块 JSON"，而那件事只有走完它的条目才知道（见 Pack#hasBlockJson）。
+            if (p.hasCode && !p.hasBlockJson && !p.hidden) r.opaque++;
         }
         r.jsonNames = t.jsonNames;
         // ⚠️ 这里**不要**再报"N 个包、新增/覆盖多少条" —— 那是 {@link ModResult} 的事，
@@ -879,6 +906,9 @@ public final class MapStats {
         if (slash >= 0) base = base.substring(slash + 1);
         int dot = base.lastIndexOf('.');
         if (dot >= 0) base = base.substring(0, dot);
+        // ★ 记下"这个包确实带了方块 JSON"（{@link Pack#hasBlockJson}）—— 走条目时顺手记，
+        //   比事后再去列一遍包便宜，而且天然覆盖目录形态/zip 形态两条路。
+        if (isContentPath(entryName)) p.hasBlockJson = true;
         Map<String, Object> json = jsonOf(text);
         if (json == null) return "看不懂";
         r.entries++;

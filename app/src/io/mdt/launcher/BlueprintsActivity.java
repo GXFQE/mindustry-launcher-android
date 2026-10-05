@@ -133,10 +133,13 @@ public class BlueprintsActivity extends BaseActivity {
             @Override public void run() {
                 final List<Blueprints.Item> items;
                 MapStats.Table tab;
+                int opaque;
                 try {
                     items = Blueprints.scan(BlueprintsActivity.this, mSlot);
                     // 缺件判据 = **本槽已启用模组**的那张内容表（与地图统计同源，含缓存）
-                    tab = MapStatsMods.contentFor(BlueprintsActivity.this, mSlot).table;
+                    MapStatsMods.SlotContent sc = MapStatsMods.contentFor(BlueprintsActivity.this, mSlot);
+                    tab = sc.table;
+                    opaque = sc.opaque;
                 } catch (Throwable ex) {
                     android.util.Log.w("MDTLauncher", "blueprint scan failed", ex);
                     runOnUiThread(new Runnable() {
@@ -151,6 +154,8 @@ public class BlueprintsActivity extends BaseActivity {
                 for (Blueprints.Item it : items) {
                     Blueprints.summarize(it, Blueprints.rows(it.msch, tab, null));
                 }
+                // ★ 再打一道"可能认错"的标记（判据在 MapStats.Pack#hasCode；只影响文案，不改判据）
+                Blueprints.markSoft(items, opaque);
                 final String[] titles = new String[items.size()];
                 final String[] subs = new String[items.size()];
                 for (int i = 0; i < items.size(); i++) {

@@ -124,10 +124,12 @@ public class BlueprintDetailActivity extends BaseActivity {
             @Override public void run() {
                 final List<Blueprints.Row> rows;
                 final long ms;
+                final int opaque;
                 try {
                     long t0 = System.currentTimeMillis();
                     MapStatsMods.SlotContent sc = MapStatsMods.contentFor(
                             BlueprintDetailActivity.this, mSlot);
+                    opaque = sc.opaque;
                     String apk = null;
                     try {
                         apk = Mods.targetsFor(BlueprintDetailActivity.this, mSlot).apkPath;
@@ -154,14 +156,14 @@ public class BlueprintDetailActivity extends BaseActivity {
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
                         if (Util.dead(BlueprintDetailActivity.this)) return;
-                        render(rows, ms);
+                        render(rows, ms, opaque);
                     }
                 });
             }
         }, "bp-stats").start();
     }
 
-    private void render(List<Blueprints.Row> rows, long ms) {
+    private void render(List<Blueprints.Row> rows, long ms, int opaque) {
         mState.setVisibility(View.GONE);
         List<Blueprints.Row> used = new ArrayList<>(), missing = new ArrayList<>();
         int usedTiles = 0;
@@ -178,27 +180,33 @@ public class BlueprintDetailActivity extends BaseActivity {
         if (!used.isEmpty()) {
             addSection(getString(R.string.bp_section_blocks),
                     getString(R.string.bp_blocks_sum_fmt, used.size(), MapStatsMods.num(usedTiles)),
-                    used, false);
+                    used, false, false);
         }
+        // ★ 本槽有"看不见方块"的模组时，这一段**特别标记 + 说清为什么可能认错**
+        //   （判据 = `MapStatsMods.SlotContent.opaque`，见 MapStats.Pack#hasCode）
+        boolean soft = !missing.isEmpty() && opaque > 0;
         if (!missing.isEmpty()) {
             int tiles = 0;
             for (Blueprints.Row r : missing) tiles += r.tiles;
-            addSection(getString(R.string.bp_section_missing),
-                    getString(R.string.bp_blocks_missing_sum_fmt, missing.size(), MapStatsMods.num(tiles)),
-                    missing, true);
+            addSection(getString(soft ? R.string.bp_section_missing_soft : R.string.bp_section_missing),
+                    getString(soft ? R.string.bp_blocks_missing_soft_sum_fmt
+                                    : R.string.bp_blocks_missing_sum_fmt,
+                            missing.size(), MapStatsMods.num(tiles)),
+                    missing, true, soft);
         }
-        addTech(ms);
+        addTech(ms, opaque);
     }
 
     /** 一段：摘要常驻，明细点开才出来（`card_stat_section` + `Util.bindExpandableCard`） */
-    private void addSection(String title, String summary, List<Blueprints.Row> rows, boolean missingKind) {
+    private void addSection(String title, String summary, List<Blueprints.Row> rows,
+                            boolean missingKind, boolean soft) {
         View card = getLayoutInflater().inflate(R.layout.card_stat_section, mBox, false);
         ((TextView) card.findViewById(R.id.stat_card_title)).setText(title);
         ((TextView) card.findViewById(R.id.stat_card_summary)).setText(summary);
         LinearLayout body = (LinearLayout) card.findViewById(R.id.stat_card_body);
         if (missingKind) {
             TextView note = new TextView(this);
-            note.setText(R.string.bp_blocks_missing_note);
+            note.setText(soft ? R.string.bp_blocks_missing_soft_note : R.string.bp_blocks_missing_note);
             note.setTextSize(12f);
             note.setLineSpacing(dp(2), 1f);
             note.setPadding(dp(14), dp(4), dp(14), dp(6));
@@ -229,7 +237,7 @@ public class BlueprintDetailActivity extends BaseActivity {
     }
 
     /** 依据（**判据要能看见依据**）：解析出来的原始事实，全部来自内核，一个字都不加工 */
-    private void addTech(long ms) {
+    private void addTech(long ms, int opaque) {
         View card = getLayoutInflater().inflate(R.layout.card_stat_section, mBox, false);
         ((TextView) card.findViewById(R.id.stat_card_title)).setText(R.string.bp_section_tech);
         Msch m = mItem.msch;
@@ -239,6 +247,11 @@ public class BlueprintDetailActivity extends BaseActivity {
         ((TextView) card.findViewById(R.id.stat_card_summary))
                 .setText(getString(R.string.bp_tech_summary_fmt, m == null ? 0 : m.version));
         LinearLayout body = (LinearLayout) card.findViewById(R.id.stat_card_body);
+        // ★ **依据**：本槽有几个"看不到方块"的模组（"可能认错"那个标记就是它撑起来的，
+        //   依据不能删、但也不进第一层 —— 这里正是技术细节层该待的地方）
+        if (opaque > 0) {
+            line(body, getString(R.string.bp_tech_opaque_fmt, opaque));
+        }
         if (m != null && m.ok) {
             line(body, getString(R.string.bp_tech_version_fmt, m.version));
             line(body, getString(R.string.bp_tech_declared_fmt, m.declaredWidth, m.declaredHeight));
