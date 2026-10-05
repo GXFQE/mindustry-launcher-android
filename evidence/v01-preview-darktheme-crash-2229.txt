@@ -1,0 +1,32 @@
+Mindustry has crashed. How unfortunate.
+Report this at https://github.com/Anuken/Mindustry/issues/new?labels=bug&template=bug_report.md
+
+Version: unknown build 0
+Date: 十月 5, 2026 22:29:00 下午
+OS: Linux x (aarch64)
+GL Version: GLES 3.2.0 / Qualcomm / Adreno (TM) 735 / OpenGL ES 3.2 V@0762.46 (GIT@6275e17561, If3c5f88bad, 1769153819) (Date:01/23/26)
+Android API level: 36
+Java Version: 0
+Runtime Available Memory: 512mb
+Cores: 8
+Mods: none (vanilla)
+
+
+arc.util.ArcRuntimeException: Error reading file: cursors/cursor.png (internal)
+	at arc.backend.android.AndroidFi.read(AndroidFi.java:54)
+	at arc.files.Fi.readBytes(Fi.java:1)
+	at arc.graphics.Pixmap.<init>(Pixmap.java:8)
+	at arc.Graphics.newCursor(Graphics.java:17)
+	at arc.Graphics.newCursor(Graphics.java:16)
+	at mindustry.ui.Fonts.loadSystemCursors(Fonts.java:11)
+	at mindustry.ClientLauncher.setup(ClientLauncher.java:407)
+	at mindustry.ClientLauncher.init(ClientLauncher.java:7)
+	at arc.backend.android.AndroidGraphics.onSurfaceChanged(AndroidGraphics.java:53)
+	at android.opengl.GLSurfaceView$GLThread.guardedRun(GLSurfaceView.java:1570)
+	at android.opengl.GLSurfaceView$GLThread.run(GLSurfaceView.java:1283)
+Caused by: java.io.FileNotFoundException: cursors/cursor.png
+	at android.content.res.AssetManager.nativeOpenAsset(Native Method)
+	at android.content.res.AssetManager.open(AssetManager.java:1190)
+	at android.content.res.AssetManager.open(AssetManager.java:1167)
+	at arc.backend.android.AndroidFi.read(AndroidFi.java:15)
+	... 10 more
