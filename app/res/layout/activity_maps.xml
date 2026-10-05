@@ -57,6 +57,25 @@
             android:layout_marginStart="62dp"
             android:background="@color/divider" />
 
+        <!--
+          ★ 2026-10-05「本槽存档 → 地图」（REF §72.10）：**不过系统文件选择器**。
+          为什么必须有：手机上的存档就在本槽 `saves/` 里，而 SAF 够不到 `Android/data/…`
+          ⇒ 走「导入地图…」那条路，用户得先把存档导出到 Download 再选回来（用户原话：
+          「我就是不希望手动导入啊，要不然我为什么不用原版」）。
+          放**导入与导出之间**：三者都读作"进/出这份地图列表"，顺序 = 从文件来 / 从存档来 / 导出去。
+        -->
+        <include
+            android:id="@+id/row_maps_from_save"
+            layout="@layout/row_action"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginStart="62dp"
+            android:background="@color/divider" />
+
         <include
             android:id="@+id/row_maps_export"
             layout="@layout/row_action"

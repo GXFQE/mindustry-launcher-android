@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  「存档视为地图」的**命名框**（2026-10-05，REF §72）。
+
+  ★ 什么时候弹：用户在地图页点「导入地图」选到的 `.msav` **meta 里没有 `name`**
+    ⇒ 它其实是一份存档（判据 = 游戏自己的 `SaveMeta.isMap()`），要先问名字才能当图用。
+    预填 = 存档里的 `mapname`（语料 312/312 都非空），用户可改。
+  ★ 与 `dialog_msav_name.xml` **刻意不共用**：那句提示讲的是"这个名字会出现在游戏**存档**列表里"，
+    在这里会误导 —— 这里问的是**地图显示名**（写进文件里，游戏的地图列表与编辑器显示的就是它）。
+  ★ 可选警告行（`map_save_nocores_warn`）：这张图没有玩家核心时显示（编辑器能开，直接开可能立刻结束）。
+    ⚠️ 默认 `gone` ——「拿不到就不显示空框」是老规矩。
+  ★★ 「源图」那一行（`map_save_source`，2026-10-05 用户提的）：**让用户自己挑**用哪张图补齐
+    生成器设置 / 作者 / 简介。为什么要它：自动匹配靠存档的 `mapname`，**图被改过名或撞名时会失手**
+    （用户原话：「有可能会被改过名或不小心撞名，给个接口允许用户打开自行选择」）。
+    点一下弹出本槽地图列表（第一项 = 不使用源图）。
+  ⚠️ 只用 setTitle，不用 setMessage（同 dialog_policy.xml 的注释）。
+-->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:scrollbars="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp">
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/map_save_name_hint"
+            android:textColor="@color/fg_muted"
+            android:textSize="12sp"
+            android:lineSpacingExtra="2dp" />
+
+        <EditText
+            android:id="@+id/map_save_name"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:inputType="text"
+            android:maxLength="100"
+            android:singleLine="true"
+            android:textColor="@color/fg"
+            android:textSize="16sp" />
+
+        <TextView
+            android:id="@+id/map_save_source"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp"
+            android:background="?android:attr/selectableItemBackground"
+            android:paddingStart="4dp"
+            android:paddingEnd="4dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp"
+            android:textColor="@color/fg"
+            android:textSize="13sp"
+            android:lineSpacingExtra="2dp" />
+
+        <TextView
+            android:id="@+id/map_save_warn"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/pol_live_bg"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp"
+            android:paddingTop="10dp"
+            android:paddingBottom="10dp"
+            android:text="@string/map_save_nocores_warn"
+            android:textColor="@color/fg"
+            android:textSize="12sp"
+            android:lineSpacingExtra="2dp"
+            android:visibility="gone" />
+    </LinearLayout>
+</ScrollView>

@@ -214,4 +214,39 @@ public final class MsavText {
         }
         return e;
     }
+
+    // ── 「存档视为地图」的失败原因（2026-10-05，REF §72） ─────────────────
+
+    /**
+     * {@link SaveAsMap} 的失败原因（**给用户看**）。
+     *
+     * ★ 分工与 {@link #userReason} 完全一样：内核（纯 Java）只给「码 + 参数」，
+     *   这里翻成白话；`SaveAsMap.Result#report()` 那份是给维护者的（技术细节第二层 / dev 落盘）。
+     * ⚠️ **加一个码就要在这里加一条**：`switch` 有 `default` 兜底（返回"原因不明"）⇒
+     *   漏映射**不崩**，所以自检要**遍历 `ALL_CODES`** 过一遍（漏映射 = 界面静默退化成"原因不明"）。
+     */
+    public static String convertReason(Context c, SaveAsMap.Result r) {
+        if (r == null) return c.getString(R.string.msav_unknown_reason);
+        switch (r.errCode) {
+            case SaveAsMap.E_MAGIC:
+                return c.getString(R.string.mapsave_reason_magic);
+            case SaveAsMap.E_VERSION:
+                return c.getString(R.string.mapsave_reason_version_fmt, r.errS1);
+            case SaveAsMap.E_META_LEN:
+            case SaveAsMap.E_META_SHORT:
+                return c.getString(R.string.mapsave_reason_meta);
+            case SaveAsMap.E_RULES_SHAPE:
+                return c.getString(R.string.mapsave_reason_rules);
+            case SaveAsMap.E_CHUNK_LEN:
+                return c.getString(R.string.mapsave_reason_broken);
+            case SaveAsMap.E_TRUNCATED:
+                return c.getString(R.string.mapsave_reason_truncated);
+            case SaveAsMap.E_UTF_TOO_LONG:
+                return c.getString(R.string.mapsave_reason_toolong_fmt, r.errS1);
+            case SaveAsMap.E_IO:
+                return c.getString(R.string.msav_reason_read_error);
+            default:
+                return c.getString(R.string.msav_unknown_reason);
+        }
+    }
 }

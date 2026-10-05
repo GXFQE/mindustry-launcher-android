@@ -99,6 +99,8 @@ public final class SelfTest {
     /** ㊵ 整槽写入模式：一个用来被"改写"的槽，一个**故意留空**（验自动备份在空槽上安静跳过） */
     public static final String SLOT_MODE = "m3-mode";
     public static final String SLOT_MODE2 = "m3-mode-empty";
+    /** ㊶ 「存档视为地图」用的槽（现场造一份"没有 name 的存档"再把它变成图） */
+    public static final String SLOT_S2M = "m3-save2map";
 
     /**
      * 自检会创建并最终删除的**全部**测试槽。
@@ -108,7 +110,7 @@ public final class SelfTest {
     private static final String[] TEST_SLOTS = {
             SLOT, SLOT_RENAMED, CLONE_SRC, CLONE_DST, CLONE_EMPTY, CLONE_EMPTY_DST, SLOT_MODS,
             SLOT_SET, SLOT_PACK, SLOT_PACK_DST, SLOT_SAVE, SLOT_GONE, SLOT_GONE2,
-            SLOT_MODE, SLOT_MODE2};
+            SLOT_MODE, SLOT_MODE2, SLOT_S2M};
 
     /**
      * 本工程**自己的全部页面**（㊱ 基类检查用）。
@@ -231,6 +233,8 @@ public final class SelfTest {
             trashMore(ctx, L, stat);
             // ★ ㊵ 整槽写入的三个模式（更新 / 补齐 / 覆盖）+ 槽操作前的自动备份
             slotModes(ctx, L, stat);
+            // ★ ㊶ 「存档视为地图」：区间改写（两面判据）+ 落位 + 区 1..n 不变 + 码映射
+            saveAsMap(ctx, L, stat);
             // ★ 篡改对象池的用例放**最后**：它会在池里留下一个内容坏掉的对象，
             //   之后任何"再备份一次"都会因为 `has()` 命中而复用坏对象（CAS 的固有
             //   假设是"池内不可变"）。放在最后就不影响别的用例。
@@ -3878,6 +3882,516 @@ public final class SelfTest {
             new File(Paths.privateDir(ctx), "selftest-mode2.zip").delete();
         }
         L.add("");
+    }
+
+    /**
+     * ㊶ **「存档视为地图」**（2026-10-05，REF §72）。
+     *
+     * 要验的是"**只改第 0 区（meta）、其余区逐字节搬**"这条纪律，以及它接进地图导入路的那三个判据：
+     * <pre>
+     *   ① 区间扫描器的**两面**判据（合成串）：该删的删净、不该删的**逐字节不动**、坏串判死
+     *   ② 端到端：`MapFiles.importMap` **认出这是存档**（`saveNoName`）⇒ `commitSaveAsMap` 落位
+     *   ③ ★ **区 1..n 逐字节相同** + 元断言"第 0 区确实变了"（否则上面那条没分辨力）
+     *   ④ 源存档一个字节没动；`.part` 用完清掉；同名先问；覆盖时旧图进中转站
+     *   ⑤ 码映射：遍历 `SaveAsMap.ALL_CODES`（漏映射 = 界面静默退化成"原因不明"）
+     * </pre>
+     * ⚠️ 与 ㊴/㊵ 一样，会被覆盖掉的东西走**真中转站**（`Trash.mapsDir`）⇒ 收尾要扫掉自检残留。
+     */
+    private static void saveAsMap(Context ctx, List<String> L, int[] stat) {
+        L.add("── ㊶ 「存档视为地图」：只改 meta + 区 1..n 逐字节搬 ──");
+        File slotDir = Data.dirOf(ctx, SLOT_S2M);
+        File mapsDir = new File(slotDir, "maps");
+        File save = new File(new File(slotDir, "saves"), "s2m.msav");
+        File out = new File(mapsDir, "我的图.msav");
+        try {
+            Data.deleteTree(slotDir);
+            mapsDir.mkdirs();
+            save.getParentFile().mkdirs();
+
+            // ── ① 区间扫描器：两面判据（合成串，先自证尺子有牙）────────────────
+            String[][] good = {
+                    {"{}", "{}"},
+                    // 原版星球（含**冷门**的 verilus/gier/tantros）一个都不许删
+                    {"{planet:\"erekir\",teams:{}}", "{planet:\"erekir\",teams:{}}"},
+                    {"{planet:\"verilus\",teams:{}}", "{planet:\"verilus\",teams:{}}"},
+                    // 模组星球 ⇒ 删
+                    {"{planet:\"ve-cyclant\",teams:{}}", "{teams:{}}"},
+                    // ★ 数组里的裸值以 `]` 结束（真语料 `objectiveFlags:{values:[一次对话]}` 的形状）
+                    {"{objectiveFlags:{values:[一次对话]}}", "{}"},
+                    {"{flags:{values:[一次对话]}}", "{flags:{values:[一次对话]}}"},
+                    // limitMapArea 置 false；本来就是 false 的一个字都不动
+                    {"{limitMapArea:true,x:1}", "{limitMapArea:false,x:1}"},
+                    {"{limitMapArea:false,x:1}", "{limitMapArea:false,x:1}"},
+                    // 六件套一起：删净 + 非目标键（planet/teams）逐字节保留
+                    {"{sector:\"erekir-10\",researched:{a:1},allowEditRules:true,limitX:1,limitY:2,"
+                            + "limitWidth:3,limitHeight:4,planet:\"erekir\",teams:{}}",
+                            "{planet:\"erekir\",teams:{}}"},
+            };
+            String badWhy = "";
+            for (String[] c : good) {
+                SaveAsMap.RulesEdit e = SaveAsMap.editRules(c[0]);
+                if (!e.ok) badWhy += "应通过却判死[" + c[0] + "] ";
+                else if (!e.text.equals(c[1])) badWhy += "输出不符[" + e.text + "≠" + c[1] + "] ";
+            }
+            ok(stat, L, badWhy.isEmpty(), "① 规则区区间改写：" + good.length + " 条两面判据全过" + badWhy);
+
+            String[] bad = {"not-an-object", "{a:1", "{}trailing", "{a:,b:1}", "{a:x] ,b:1}", "{a:x//c,b:1}"};
+            int survived = 0;
+            for (String s : bad) {
+                SaveAsMap.RulesEdit e = SaveAsMap.editRules(s);
+                if (e.ok) survived++;
+            }
+            ok(stat, L, survived == 0,
+                    "① ★元断言：" + bad.length + " 条坏串**全部判死**（宁可拒绝，不猜）");
+
+            // ── ② 现场造一份"存档"（**没有 name** + 带 rules + 三块区）──────────
+            tinySave(save);
+            String md5Before = Util.md5(save);
+
+            MapFiles.Result r1 = importMapFile(ctx, mapsDir, "s2m.msav", save, false);
+            ok(stat, L, r1.saveNoName && r1.part != null && r1.part.isFile() && !out.exists(),
+                    "② 缺 name ⇒ **判为存档**（判据字段 saveNoName）：.part 留着、什么都没落位");
+
+            // ── ③ 落位：只改 meta ──────────────────────────────────────────
+            MapFiles.Result r2 = MapFiles.commitSaveAsMap(ctx, mapsDir, r1.part, "我的图", false,
+                    MapFiles.trashDirOf(ctx));
+            ok(stat, L, r2.ok && out.isFile() && r2.conv != null && r2.conv.ok,
+                    "③ 落位成功：变成一张地图「我的图.msav」");
+            MsavMeta m2 = MsavMeta.read(out, true);
+            ok(stat, L, m2.ok && "我的图".equals(m2.get("name", null)) && m2.wave == 1
+                            && m2.playtime == 0 && "{}".equals(m2.get("stats", "")),
+                    "③ meta：补了 name、wave=1、playtime=0、stats={}（读回来自检）");
+            String nr = m2.get("rules", "");
+            ok(stat, L, !nr.contains("sector:") && !nr.contains("researched:")
+                            && !nr.contains("allowEditRules:") && !nr.contains("objectiveFlags:")
+                            && !nr.contains("limitX:") && !nr.contains("limitY:")
+                            && !nr.contains("limitWidth:") && !nr.contains("limitHeight:")
+                            && nr.contains("limitMapArea:false") && nr.contains("planet:\"erekir\"")
+                            && nr.contains("spawns:[{type:dagger,begin:1}]"),
+                    "③ rules：该删的 8 个键删净、limitMapArea→false、planet（原版）与非目标键原样");
+
+            List<byte[]> c1 = msavChunks(save), c2 = msavChunks(out);
+            boolean chunksSame = c1.size() == c2.size() && c1.size() >= 3;
+            for (int i = 1; chunksSame && i < c1.size(); i++) {
+                chunksSame = java.util.Arrays.equals(c1.get(i), c2.get(i));
+            }
+            ok(stat, L, chunksSame, "③ ★**区 1..n 逐字节相同**（" + c1.size() + " 块里第 1..n 块全等）");
+            ok(stat, L, !java.util.Arrays.equals(c1.get(0), c2.get(0)),
+                    "③ ★元断言：第 0 区**确实变了**（否则上面那条判据没有分辨力）");
+            ok(stat, L, md5Before.equals(Util.md5(save)), "③ ★源存档一个字节没动（md5 前后一致）");
+            ok(stat, L, !r1.part.exists(), "③ 成功之后源 .part 清掉了（不留垃圾）");
+
+            // ── ④ 同名先问 / 覆盖 ⇒ 旧的进中转站 ─────────────────────────────
+            MapFiles.Result r3 = importMapFile(ctx, mapsDir, "s2m.msav", save, false);
+            MapFiles.Result r4 = MapFiles.commitSaveAsMap(ctx, mapsDir, r3.part, "我的图", false,
+                    MapFiles.trashDirOf(ctx));
+            ok(stat, L, !r4.ok && r4.nameTaken && out.isFile(),
+                    "④ 同名 ⇒ 只回来问一声（判据字段 nameTaken，不看文案）");
+            MapFiles.Result r5 = MapFiles.commitSaveAsMap(ctx, mapsDir, r3.part, "我的图", true,
+                    MapFiles.trashDirOf(ctx));
+            Trash.Item stashed = null;
+            for (Trash.Item it : Trash.list(Trash.mapsDir(ctx))) {
+                if ("我的图.msav".equals(it.name) && SLOT_S2M.equals(it.slot)) {
+                    stashed = it;
+                    break;
+                }
+            }
+            ok(stat, L, r5.ok && stashed != null,
+                    "④ 确认覆盖 ⇒ 落位成功，且**旧图进了中转站**（挪不删）");
+
+            // ── ⑥ 🔴 红线：源文件是**用户的存档原件**时，谁都不许删它 ──────────────
+            //   「本槽存档 → 地图」那条路会把 `<槽>/saves/x.msav` 直接传进来
+            //   （REF §72.10）—— 两条删除路径（discard / commit 收尾）都只许删 `.part`。
+            File realSave = new File(new File(slotDir, "saves"), "原件.msav");
+            tinySave(realSave);
+            String md5Real = Util.md5(realSave);
+            MapFiles.discard(realSave);
+            ok(stat, L, realSave.isFile() && md5Real.equals(Util.md5(realSave)),
+                    "⑥ ★元断言：discard 对**用户的存档原件**是空操作（判据 = 只删 `.part`）");
+            MapFiles.Result r6 = MapFiles.commitSaveAsMap(ctx, mapsDir, realSave, "原件转图", false,
+                    MapFiles.trashDirOf(ctx));
+            ok(stat, L, r6.ok && realSave.isFile() && md5Real.equals(Util.md5(realSave))
+                            && new File(mapsDir, "原件转图.msav").isFile(),
+                    "⑥ ★红线：从**存档原件**转图成功之后，源存档一个字节没动（只删我们自己的 .part）");
+
+            // ★ 真机当场抓到的回归（2026-10-05）：「本槽存档 → 地图」进来的槽可能**一张图都没有**，
+            //   连 `maps/` 目录都不存在 ⇒ 第一版直接去写文件，抛 FileNotFoundException、
+            //   界面还显示成"读取失败"。判据：自己建目录并把图写出来。
+            File noDirMaps = new File(new File(slotDir, "no-maps-dir"), "maps");
+            File saveNew = new File(new File(slotDir, "saves"), "空槽源.msav");
+            tinySave(saveNew);
+            MapFiles.Result r7 = MapFiles.commitSaveAsMap(ctx, noDirMaps, saveNew, "空槽转图", false,
+                    MapFiles.trashDirOf(ctx));
+            ok(stat, L, r7.ok && noDirMaps.isDirectory() && new File(noDirMaps, "空槽转图.msav").isFile(),
+                    "⑥ ★回归：槽里**没有 maps/ 目录**时自己建（真机上第一版就炸在这里）");
+
+            // ── ⑦ 按"源图"补齐 + `genfilters` 兜底（2026-10-05 用户提的第二、三条机制）──────
+            //   ① 存档的 `mapname` 能在本槽 `maps/` 里找到同名图 ⇒ 缺的元数据按它补
+            //      （判据与游戏 `SaveMeta` 同源：`maps.all().find(m -> m.name().equals(mapname))`）
+            //   ② 找不到 ⇒ 写**显式空列表** "[]"（缺键/空串时游戏每次都会现造一份默认、删不掉）
+            //   ③ 元断言：存档**自己带的** `genfilters` 一个字都不许被源图盖掉
+            final String srcGen = "[{class:scatter,block:boulder,chance:0.015,flooronto:stone}]";
+            tinyMap(new File(mapsDir, "源图.msav"), "源图", srcGen, "[gold]原作者");
+            File sFromMap = new File(new File(slotDir, "saves"), "源图存档.msav");
+            tinySave(sFromMap, "源图");
+            String md5From = Util.md5(sFromMap);
+            MapFiles.Result r8 = MapFiles.commitSaveAsMap(ctx, mapsDir, sFromMap, "按源图补的图", false,
+                    MapFiles.trashDirOf(ctx));
+            MsavMeta m8 = MsavMeta.read(new File(mapsDir, "按源图补的图.msav"), true);
+            ok(stat, L, r8.ok && m8.ok && srcGen.equals(m8.get("genfilters", ""))
+                            && "[gold]原作者".equals(m8.get("author", ""))
+                            && "源图的简介".equals(m8.get("description", ""))
+                            && r8.conv != null && r8.conv.inherited >= 3
+                            && "源图.msav".equals(r8.conv.inheritFrom)
+                            && md5From.equals(Util.md5(sFromMap)),
+                    "⑦ ★按同名源图补齐：genfilters / 作者 / 简介**逐字节照搬**（补了 "
+                            + (r8.conv == null ? "?" : r8.conv.inherited) + " 个键），源存档没动");
+            // ★ 通用规则（用户：「不止 genfilters，其他缺失的也可以补的」）：
+            //   源图有、存档没有的键 ⇒ 补（`locales`）；`NO_INHERIT` 里的 ⇒ **不许**补（`tick`/`viewpos`）
+            ok(stat, L, "{\"zh_CN\":{\"name\":\"源图\"}}".equals(m8.get("locales", ""))
+                            && !m8.has("tick") && !m8.has("viewpos")
+                            && r8.conv != null && r8.conv.inheritKeys != null
+                            && r8.conv.inheritKeys.contains("locales"),
+                    "⑦ ★通用补齐：**任何**源图有而存档没有的键都补（实测补上了 `locales`）；"
+                            + "`NO_INHERIT` 里的运行态键（`tick`/`viewpos`）**一个都不许带过来**");
+
+            File sNoMap = new File(new File(slotDir, "saves"), "无源图.msav");
+            tinySave(sNoMap, "这张图不存在");
+            MapFiles.Result r9 = MapFiles.commitSaveAsMap(ctx, mapsDir, sNoMap, "没源图的图", false,
+                    MapFiles.trashDirOf(ctx));
+            MsavMeta m9 = MsavMeta.read(new File(mapsDir, "没源图的图.msav"), true);
+            ok(stat, L, r9.ok && m9.ok && SaveAsMap.EMPTY_FILTERS.equals(m9.get("genfilters", ""))
+                            && r9.conv != null && r9.conv.genEmpty && r9.conv.inherited == 0,
+                    "⑦ ★找不到源图 ⇒ 写显式空列表 " + SaveAsMap.EMPTY_FILTERS
+                            + "（编辑器「生成」区删了才不会又冒出来）");
+
+            File sOwn = new File(new File(slotDir, "saves"), "自带生成器.msav");
+            tinySave(sOwn, "源图", "[{class:scatter,block:x}]");
+            MapFiles.Result r10 = MapFiles.commitSaveAsMap(ctx, mapsDir, sOwn, "自带的图", false,
+                    MapFiles.trashDirOf(ctx));
+            MsavMeta m10 = MsavMeta.read(new File(mapsDir, "自带的图.msav"), true);
+            ok(stat, L, r10.ok && "[{class:scatter,block:x}]".equals(m10.get("genfilters", "")),
+                    "⑦ ★元断言：存档**自己带的** genfilters 一个字都不许被源图盖掉（只补缺的键）");
+
+            // ── ⑧ 「源图」可以自己挑（2026-10-05 用户要求：「改名或撞名时让我自己选」）──────────
+            //   ① 自动匹配：`mapname` == 图的 `name`（游戏 SaveMeta 同源）⇒ 命中 1 张
+            //   ② 撞名：两张同名图 ⇒ 命中 2 张（界面据此显示"有 N 张同名，点这里选一张"）
+            //   ③ 改名之后自动匹配**找不到**，但**显式指定源图**照样能补齐 ⇒ 这就是那个接口的意义
+            File renamed = new File(mapsDir, "改过名的图.msav");
+            tinyMap(renamed, "早就改了名", "[{class:scatter,block:renamed}]", "改名作者");
+            File sRenamed = new File(new File(slotDir, "saves"), "改名存档.msav");
+            tinySave(sRenamed, "源图");                      // 存档里还记着老名字（"源图"）
+            ok(stat, L, MapFiles.findSources(mapsDir, "源图").size() >= 1
+                            && MapFiles.findSources(mapsDir, "早就改了名").size() == 1
+                            && MapFiles.findSources(mapsDir, "根本没有").isEmpty(),
+                    "⑧ 自动匹配（findSources）：同名命中 / 改名后按老名字找不到 / 不存在的名字返回空");
+            tinyMap(new File(mapsDir, "同名甲.msav"), "撞名图", "[{a:1}]", "甲");
+            tinyMap(new File(mapsDir, "同名乙.msav"), "撞名图", "[{b:2}]", "乙");
+            ok(stat, L, MapFiles.findSources(mapsDir, "撞名图").size() == 2,
+                    "⑧ ★撞名：两张同名图 ⇒ 命中 2 张（界面据此提示并让用户自己选，而不是替用户猜）");
+            MapFiles.Result r11 = MapFiles.commitSaveAsMap(ctx, mapsDir, sRenamed, "改名后补的图", false,
+                    MapFiles.trashDirOf(ctx), renamed);
+            MsavMeta m11 = MsavMeta.read(new File(mapsDir, "改名后补的图.msav"), true);
+            ok(stat, L, r11.ok && "[{class:scatter,block:renamed}]".equals(m11.get("genfilters", ""))
+                            && "改名作者".equals(m11.get("author", "")),
+                    "⑧ ★改名之后也能补齐：**用户指定**了源图（`早就改了名.msav`）⇒ 设置照样搬过来");
+            MapFiles.Result r12 = MapFiles.commitSaveAsMap(ctx, mapsDir, sRenamed, "不用源图的图", false,
+                    MapFiles.trashDirOf(ctx), null);
+            MsavMeta m12 = MsavMeta.read(new File(mapsDir, "不用源图的图.msav"), true);
+            ok(stat, L, r12.ok && SaveAsMap.EMPTY_FILTERS.equals(m12.get("genfilters", "")),
+                    "⑧ ★用户明确选「不使用源图」⇒ 生成器设置留空（" + SaveAsMap.EMPTY_FILTERS
+                            + "），不去猜、也不去捡同名图");
+
+            // ── ⑨ 源图可以是**游戏自带 / 模组自带**（在 APK / 模组包里面，不是槽里的文件）──────
+            //   用户 2026-10-05：「**选择应该允许系统自带以及模组自带**」＋「**原版战役地图为什么识别不到啊**」
+            //   ⇒ ① 找源图要在**三来源清单**里找
+            //      ② 战役图那条判据是**存档的 `sectorPreset` == 图条目的文件名主干**
+            //         （战役存档的 `mapname` 是当时语言的显示名，跟图里的基础名对不上）
+            //      ③ 选中之后是拿**已经读好的 tags** 去补（不再打开容器）
+            Maps.Item slotItem = new Maps.Item();
+            slotItem.from = Maps.FROM_SLOT;
+            slotItem.file = new File(mapsDir, "源图.msav");
+            slotItem.meta = MsavMeta.read(slotItem.file, false);
+            Maps.Item gameItem = new Maps.Item();
+            gameItem.from = Maps.FROM_GAME;
+            gameItem.entry = "assets/maps/serpulo/fallenVessel.msav";
+            gameItem.container = new File("/tmp/fake-game.apk");
+            // ⚠️ `MsavMeta` 的构造器是 private（只能由解析器造）⇒ 先落一份真夹具再读它的 meta，
+            //    这样"容器来源"这条用例走的仍是真解析器，而不是手搓一个对象
+            File campaignSrc = new File(new File(slotDir, "no-maps-dir"), "战役源.msav");
+            campaignSrc.getParentFile().mkdirs();
+            // ★ 图里的 `name` 是**基础名**（`fallenVessel`），存档里是**显示名**（「坠落飞船」）
+            //   ＋ `sectorPreset=fallenVessel` —— 正是真机上"识别不到"的那个形态
+            tinyMap(campaignSrc, "fallenVessel", "[{class:scatter,block:game}]", "官方");
+            gameItem.meta = MsavMeta.read(campaignSrc, false);
+            gameItem.bytes = campaignSrc.length();
+            Maps.Item modItem = new Maps.Item();
+            modItem.from = Maps.FROM_MOD;
+            modItem.source = "测试模组.zip";
+            modItem.entry = "maps/custom-mod-map.msav";
+            modItem.container = new File("/tmp/fake-mod.zip");
+            File modSrc = new File(new File(slotDir, "no-maps-dir"), "模组源.msav");
+            tinyMap(modSrc, "[gold]模组图", "[{class:scatter,block:mod}]", "模组作者");
+            modItem.meta = MsavMeta.read(modSrc, false);
+            java.util.List<Maps.Item> pool = new java.util.ArrayList<>();
+            pool.add(slotItem);
+            pool.add(gameItem);
+            pool.add(modItem);
+            ok(stat, L, Maps.byName(pool, "源图").size() == 1
+                            && Maps.byName(pool, "源图").get(0).from == Maps.FROM_SLOT
+                            && Maps.byName(pool, "[gold]模组图").size() == 1
+                            && Maps.byName(pool, "[gold]模组图").get(0).from == Maps.FROM_MOD
+                            && Maps.byName(pool, "没有这张图").isEmpty()
+                            && Maps.byName(pool, null).isEmpty(),
+                    "⑨ ★按名字找源图要**跨三个来源**（本槽文件 / 游戏自带 APK 条目 / 模组自带）；"
+                            + "找不到与名字为空都返回空");
+            ok(stat, L, Maps.bySave(pool, "坠落飞船", "fallenVessel").size() == 1
+                            && Maps.bySave(pool, "坠落飞船", "fallenVessel").get(0).from == Maps.FROM_GAME
+                            && Maps.bySave(pool, null, "FALLENVESSEL").size() == 1
+                            && Maps.bySave(pool, "坠落飞船", null).isEmpty(),
+                    "⑨ ★**战役图那条判据**：存档 `mapname`=显示名（「坠落飞船」）对不上图里的基础名，"
+                            + "靠 `sectorPreset`（== 条目文件名主干 `fallenVessel`，大小写不敏感）命中");
+            File sCampaign = new File(new File(slotDir, "saves"), "战役存档.msav");
+            tinySave(sCampaign, "坠落飞船");
+            MapFiles.Result r13 = MapFiles.commitSaveAsMap(ctx, mapsDir, sCampaign, "战役图补出来的", false,
+                    MapFiles.trashDirOf(ctx), gameItem.meta.tags, "fallenVessel.msav(游戏自带)");
+            MsavMeta m13 = MsavMeta.read(new File(mapsDir, "战役图补出来的.msav"), true);
+            ok(stat, L, r13.ok && m13.ok
+                            && "[{class:scatter,block:game}]".equals(m13.get("genfilters", ""))
+                            && "官方".equals(m13.get("author", ""))
+                            && r13.conv != null && "fallenVessel.msav(游戏自带)".equals(r13.conv.inheritFrom)
+                            && r13.conv.inherited >= 3,
+                    "⑨ ★源图在**容器里**（APK/模组包）也能补：直接递扫描时读好的 tags，"
+                            + "报告里写明来源（`fallenVessel.msav(游戏自带)`）");
+
+            // ── ⑤ 失败不留东西 + 码映射 ─────────────────────────────────────
+            File notMsav = new File(mapsDir, "假的.msav");
+            write(notMsav, "definitely-not-a-msav".getBytes("UTF-8"));
+            File convOut = new File(mapsDir, "假的-conv.msav");
+            SaveAsMap.Result cbad = SaveAsMap.convert(notMsav, convOut, "X");
+            // ⚠️ 非 zlib 的文件在**解压那一步**就抛 ZipException ⇒ 内核报 E_IO，不是 E_MAGIC
+            //   （第一版断言写成 E_MAGIC，真机自检当场判死 —— 这条注释就是那次失败的记录）
+            ok(stat, L, !cbad.ok && cbad.errCode == SaveAsMap.E_IO && !convOut.exists(),
+                    "⑤ 不是 zlib ⇒ 判死（E_IO）且**一个字节都不留**");
+            // 真·E_MAGIC：zlib 明文开头不是 MSAV
+            File wrongMagic = new File(mapsDir, "魔数不对.msav");
+            zlibTo(wrongMagic, "NOPE-not-msav-at-all".getBytes("UTF-8"));
+            File convOut2 = new File(mapsDir, "魔数不对-conv.msav");
+            SaveAsMap.Result cmag = SaveAsMap.convert(wrongMagic, convOut2, "X");
+            ok(stat, L, !cmag.ok && cmag.errCode == SaveAsMap.E_MAGIC && !convOut2.exists(),
+                    "⑤ zlib 但开头不是 MSAV ⇒ E_MAGIC，且一个字节都不留");
+
+            File brokenRules = new File(mapsDir, "规则坏.msav");
+            tinySaveBrokenRules(brokenRules);
+            SaveAsMap.Result cbr = SaveAsMap.convert(brokenRules, new File(mapsDir, "规则坏-conv.msav"), "X");
+            ok(stat, L, !cbr.ok && cbr.errCode == SaveAsMap.E_RULES_SHAPE,
+                    "⑤ 规则区结构看不懂 ⇒ 拒绝（E_RULES_SHAPE），不猜也不改");
+
+            File orphan = new File(mapsDir, "待办.msav.part");
+            tinySave(orphan);
+            MapFiles.discard(orphan);
+            ok(stat, L, !orphan.exists(), "⑤ discard 清掉待办 .part（用户在命名框里取消时用）");
+            ok(stat, L, MapFiles.checkMapName(ctx, "  ") != null
+                            && MapFiles.checkMapName(ctx, "正常名字") == null,
+                    "⑤ 显示名检查：空/全空白判死，正常名字放行（文件名另一个函数管）");
+
+            Context enCtx = LocaleMode.force(ctx, "en");
+            String fallback = ctx.getString(R.string.msav_unknown_reason);
+            StringBuilder miss = new StringBuilder();
+            boolean localeDiff = true;
+            for (int code : SaveAsMap.ALL_CODES) {
+                SaveAsMap.Result rr = new SaveAsMap.Result();
+                rr.errCode = code;
+                rr.errS1 = "x";
+                String rz = MsavText.convertReason(ctx, rr);
+                String re = MsavText.convertReason(enCtx, rr);
+                if (rz == null || rz.isEmpty() || fallback.equals(rz)) miss.append(code).append(' ');
+                if (rz != null && rz.equals(re)) localeDiff = false;
+            }
+            ok(stat, L, miss.length() == 0 && localeDiff,
+                    "⑤ ★" + SaveAsMap.ALL_CODES.length + " 个错误码**每一个**都有文案映射，"
+                            + "且中英不同（漏映射 = 界面静默退化成「原因不明」）" + miss);
+        } catch (Throwable t) {
+            ok(stat, L, false, "㊶ 自身异常：" + t);
+        } finally {
+            // ★ 自检不许把东西留在**用户的中转站**里（㊳⑦ 那条判据的同一件事；这里自己收）
+            sweepSelfTestTrash(ctx);
+            int left = 0;
+            for (Trash.Item it : Trash.list(Trash.mapsDir(ctx))) {
+                if (SLOT_S2M.equals(it.slot)) left++;
+            }
+            ok(stat, L, left == 0, "㊶ 收尾：地图中转站里没有本用例的残留（剩 " + left + "）");
+        }
+        L.add("");
+    }
+
+    /** ㊶ 用：把文件当输入流喂给 `MapFiles.importMap`（流由调用方负责关） */
+    private static MapFiles.Result importMapFile(Context ctx, File mapsDir, String name, File src,
+                                                 boolean overwrite) throws Exception {
+        java.io.InputStream in = new java.io.FileInputStream(src);
+        try {
+            return MapFiles.importMap(ctx, mapsDir, name, in, overwrite, MapFiles.trashDirOf(ctx));
+        } finally {
+            in.close();
+        }
+    }
+
+    /**
+     * ㊶ 用：造一份**最小合法"存档"**。
+     *
+     * ⚠️ 与 {@link #tinyMsav} **刻意不同**：那个一定写 `name`（造的是**图**），
+     *   这个**不写 `name`**（造的是**存档**），而且带一段 rules + **三块区** ——
+     *   好让"区 1..n 逐字节不变"这条判据真的有东西可比。
+     */
+    private static File tinySave(File f) throws Exception {
+        return tinySave(f, "始发地区", null);
+    }
+
+    /** ㊶ 用：同上，指定 `mapname`（验"按同名源图补齐"那条要用它去匹配） */
+    private static File tinySave(File f, String mapname) throws Exception {
+        return tinySave(f, mapname, null);
+    }
+
+    /**
+     * ㊶ 用：同上，外加可选的 `genfilters`。
+     *
+     * @param genfilters 非 null ⇒ 也写进 meta —— 专供**元断言**用：存档自己带的值
+     *                   **一个字都不许**被源图覆盖（只许补缺的键）。
+     */
+    private static File tinySave(File f, String mapname, String genfilters) throws Exception {
+        java.io.ByteArrayOutputStream metaBuf = new java.io.ByteArrayOutputStream();
+        java.io.DataOutputStream md = new java.io.DataOutputStream(metaBuf);
+        java.util.LinkedHashMap<String, String> tags = new java.util.LinkedHashMap<>();
+        tags.put("width", "32");
+        tags.put("height", "32");
+        tags.put("mapname", mapname);
+        tags.put("wave", "45");
+        tags.put("playtime", "3720000");
+        tags.put("saved", "1700000000000");
+        tags.put("stats", "{\"wavesSurvived\":9}");
+        tags.put("nocores", "false");
+        tags.put("mods", "[]");
+        if (genfilters != null) tags.put("genfilters", genfilters);
+        // ★ 一段**真形状**的 rules：arc 紧凑输出（键不带引号）、含要删的 6 类键 + 要保留的键
+        tags.put("rules", "{sector:\"erekir-10\",planet:\"erekir\",researched:{a:1},allowEditRules:true,"
+                + "objectiveFlags:{values:[一次对话]},limitMapArea:true,limitX:1,limitY:2,"
+                + "limitWidth:3,limitHeight:4,teams:{0:{}},spawns:[{type:dagger,begin:1}]}");
+        md.writeShort(tags.size());
+        for (java.util.Map.Entry<String, String> e : tags.entrySet()) {
+            md.writeUTF(e.getKey());
+            md.writeUTF(e.getValue());
+        }
+        md.flush();
+        byte[] meta = metaBuf.toByteArray();
+
+        java.io.ByteArrayOutputStream plain = new java.io.ByteArrayOutputStream();
+        java.io.DataOutputStream d = new java.io.DataOutputStream(plain);
+        d.write(MsavMeta.MAGIC);
+        d.writeInt(11);
+        d.writeInt(meta.length);
+        d.write(meta);
+        d.writeInt(6);
+        d.write(new byte[]{1, 2, 3, 4, 5, 6});                 // 第 1 区（假数据，可辨认）
+        d.writeInt(4);
+        d.write(new byte[]{9, 8, 7, 6});                       // 第 2 区
+        d.flush();
+        return zlibTo(f, plain.toByteArray());
+    }
+
+    /**
+     * ㊶ 用：造一份**最小合法"地图"**（与 {@link #tinySave} 相对：**有 `name`** +
+     * `genfilters`/`author`/`description`）—— 专供"按同名源图补齐缺失的键"那条用例。
+     */
+    private static File tinyMap(File f, String name, String genfilters, String author) throws Exception {
+        java.io.ByteArrayOutputStream metaBuf = new java.io.ByteArrayOutputStream();
+        java.io.DataOutputStream md = new java.io.DataOutputStream(metaBuf);
+        java.util.LinkedHashMap<String, String> tags = new java.util.LinkedHashMap<>();
+        tags.put("name", name);
+        tags.put("width", "32");
+        tags.put("height", "32");
+        tags.put("wave", "1");
+        tags.put("playtime", "0");
+        tags.put("stats", "{}");
+        tags.put("genfilters", genfilters);
+        tags.put("author", author);
+        tags.put("description", "源图的简介");
+        // ★ 供"通用补齐"两条判据：
+        //   `locales` = 地图侧的多语言名字（**该补**）；`tick` = 运行态（在 NO_INHERIT 里，**不许补**）
+        tags.put("locales", "{\"zh_CN\":{\"name\":\"源图\"}}");
+        tags.put("tick", "12345");
+        tags.put("viewpos", "1,2");
+        tags.put("rules", "{planet:\"erekir\",teams:{0:{}},spawns:[]}");
+        md.writeShort(tags.size());
+        for (java.util.Map.Entry<String, String> e : tags.entrySet()) {
+            md.writeUTF(e.getKey());
+            md.writeUTF(e.getValue());
+        }
+        md.flush();
+        byte[] meta = metaBuf.toByteArray();
+
+        java.io.ByteArrayOutputStream plain = new java.io.ByteArrayOutputStream();
+        java.io.DataOutputStream d = new java.io.DataOutputStream(plain);
+        d.write(MsavMeta.MAGIC);
+        d.writeInt(11);
+        d.writeInt(meta.length);
+        d.write(meta);
+        d.writeInt(2);
+        d.write(new byte[]{5, 5});
+        d.flush();
+        return zlibTo(f, plain.toByteArray());
+    }
+
+    /** ㊶ 用：把 `.msav` 全解压后按 `int 长度 + 载荷` 切块（纯 Java，比对"区 1..n 没动"） */
+    private static List<byte[]> msavChunks(File f) throws Exception {
+        java.util.zip.InflaterInputStream in =
+                new java.util.zip.InflaterInputStream(new java.io.FileInputStream(f));
+        java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+        byte[] buf = new byte[8192];
+        int n;
+        while ((n = in.read(buf)) > 0) bos.write(buf, 0, n);
+        in.close();
+        byte[] body = bos.toByteArray();
+        List<byte[]> out = new ArrayList<>();
+        int i = 8;                                             // 跳过 MSAV + 版本
+        while (i + 4 <= body.length) {
+            int len = ((body[i] & 0xFF) << 24) | ((body[i + 1] & 0xFF) << 16)
+                    | ((body[i + 2] & 0xFF) << 8) | (body[i + 3] & 0xFF);
+            i += 4;
+            if (len < 0 || i + len > body.length) break;
+            out.add(java.util.Arrays.copyOfRange(body, i, i + len));
+            i += len;
+        }
+        return out;
+    }
+
+    /** ㊶ 用：把明文 zlib 压进文件（与 tinyMsav 同一套写法） */
+    private static File zlibTo(File f, byte[] plain) throws Exception {
+        java.io.FileOutputStream fo = new java.io.FileOutputStream(f);
+        java.util.zip.DeflaterOutputStream zo = new java.util.zip.DeflaterOutputStream(fo);
+        zo.write(plain);
+        zo.close();
+        return f;
+    }
+
+    /** ㊶ 用：结构坏掉的 rules（`)` 少了、值里有 `//`）—— 必须被**拒绝**而不是猜着改 */
+    private static File tinySaveBrokenRules(File f) throws Exception {
+        java.io.ByteArrayOutputStream metaBuf = new java.io.ByteArrayOutputStream();
+        java.io.DataOutputStream md = new java.io.DataOutputStream(metaBuf);
+        md.writeShort(1);
+        md.writeUTF("rules");
+        md.writeUTF("{sector:x//boom,teams:{0:{}}");
+        md.flush();
+        byte[] meta = metaBuf.toByteArray();
+        java.io.ByteArrayOutputStream plain = new java.io.ByteArrayOutputStream();
+        java.io.DataOutputStream d = new java.io.DataOutputStream(plain);
+        d.write(MsavMeta.MAGIC);
+        d.writeInt(11);
+        d.writeInt(meta.length);
+        d.write(meta);
+        d.writeInt(2);
+        d.write(new byte[]{7, 7});
+        d.flush();
+        return zlibTo(f, plain.toByteArray());
     }
 
     /**

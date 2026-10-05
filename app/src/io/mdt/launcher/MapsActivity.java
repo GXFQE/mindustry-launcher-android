@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
+import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
@@ -37,11 +38,27 @@ public class MapsActivity extends BaseActivity {
     private static final int REQ_MAP_EXPORT = 62;
     /** 地图详情页（F21）：回来时若它是"删掉了"就重新清点 */
     private static final int REQ_MAP_DETAIL = 63;
+    /**
+     * dev 口：`--es dev_map_import &lt;路径&gt;` —— 把"用 SAF 选文件"换成路径。
+     *
+     * ★ 为什么要它：系统文件选择器（SAF）**自动化不了**（第 104 轮 `dev_zip_confirm` 就是
+     *   同一个理由），而"选到一份存档之后要走的那条路"必须能被真机验一遍。
+     *   后面的路与界面**逐字相同**（`importFile(...)` 原路进）。
+     * ⚠️ 本页 `android:exported="false"` ⇒ 只有我们自己的进程能发这个 Intent。
+     */
+    public static final String EXTRA_DEV_IMPORT = "dev_map_path";
 
     private String mSlot;
     private TextView mHead;
     /** 空态（2026-10-04 补）：一张图都没有时把「为什么没有 / 下一步」说出来，见布局注释 */
     private TextView mEmpty;
+    /**
+     * 列表本身（2026-10-05 补）：**转图/导入成功之后要能自己重扫一遍**。
+     * ★ 为什么必须有：`scan(lv)` 原来只接 onCreate 里那个局部变量 ⇒ 做完一次导入除了
+     *   `recreate()` 没有别的刷新手段，而转图那条路走的是"结果弹窗"（用户不点关闭就一直是旧列表，
+     *   真机上就出现过"已经转好了、表头还写着本槽 0"——用户当场提的："导入之后要自动刷新页面啊"）。
+     */
+    private ListView mList;
     private MsavListAdapter mAdapter;
     private List<Maps.Item> mItems;
     private String mApkPath;
@@ -107,6 +124,22 @@ public class MapsActivity extends BaseActivity {
                     }
                 });
 
+        // ★ 2026-10-05「本槽存档 → 地图」（REF §72.10）：**不过系统文件选择器**。
+        //   手机上的存档就在本槽 `saves/` 里，而 SAF 够不到 `Android/data/…`
+        //   ⇒ 走「导入地图…」得先导出到 Download 再选回来（用户："我就是不希望手动导入"）。
+        //   与导入同一条门禁：这是往槽的 `maps/` 里写（旧图会进中转站）。
+        Util.bindAction(root, R.id.row_maps_from_save, R.drawable.ic_save,
+                R.string.maps_from_save, R.string.maps_from_save_sub, new Runnable() {
+                    @Override public void run() {
+                        if (Data.gameAlive(MapsActivity.this)) {
+                            alert(getString(R.string.game_busy_title),
+                                    getString(R.string.maps_import_busy_msg));
+                            return;
+                        }
+                        pickSlotSave();
+                    }
+                });
+
         // ★ 导出与导入成对放在**页面顶上**（用户 2026-10-03 定案）
         Util.bindAction(root, R.id.row_maps_export, R.drawable.ic_upload,
                 R.string.maps_export, R.string.maps_export_sub, new Runnable() {
@@ -116,12 +149,34 @@ public class MapsActivity extends BaseActivity {
                 });
 
         final ListView lv = (ListView) root.findViewById(R.id.maps_list);
+        mList = lv;
         lv.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener() {
             @Override public void onItemClick(android.widget.AdapterView<?> p, View v, int pos, long id) {
                 if (mItems != null && pos >= 0 && pos < mItems.size()) showDetail(mItems.get(pos));
             }
         });
         scan(lv);
+
+        // dev 口：把"选文件"换成路径（SAF 自动化不了）。⚠️ 必须放在 scan() 之后，
+        //   因为 importFile 成功后会 recreate() 再看一次列表。
+        final String devPath = getIntent() == null ? null : getIntent().getStringExtra(EXTRA_DEV_IMPORT);
+        if (devPath != null && !devPath.trim().isEmpty()) {
+            File df = new File(devPath.trim());
+            importFile(Uri.fromFile(df), df.getName(), mSlot, false);
+        }
+    }
+
+    /**
+     * 重新清点并刷新列表（**导入/转图成功之后立刻用**）。
+     *
+     * ★ 用户 2026-10-05：「**导入之后要自动刷新页面啊**」—— 原来只有 `recreate()` 一条刷新路，
+     *   而"存档 → 地图"走的是结果弹窗（不点「关闭」就一直是旧列表，表头还写着"本槽 0"）。
+     * ★ 与 `recreate()` 的分工：这个只重扫列表（不重建 Activity）⇒ 弹窗还开着也不会闪。
+     */
+    private void refreshList() {
+        if (Util.dead(this) || mList == null) return;
+        mHead.setText(R.string.maps_scanning);
+        scan(mList);
     }
 
     /** 三来源清点 + 缩略图**后台逐张渲染**（出来一张刷一张） */
@@ -374,11 +429,20 @@ public class MapsActivity extends BaseActivity {
                         //   必须停在这里（否则 BadTokenException 闪退，见 {@link Util#dead}）。
                         //   ⚠️ 成功/失败那两条出口走 alert()/Toast，已由它们各自挡住。
                         if (Util.dead(MapsActivity.this)) return;
+                        // ★★ 「这份其实是存档」⇒ 先问名字（2026-10-05，REF §72）。
+                        //   判据字段 = r.saveNoName（meta 里没有 `name`，与游戏自己的
+                        //   `SaveMeta.isMap()` 同源）；此时 `.part` 已经留在槽里，
+                        //   问完名字再 commitSaveAsMap，**不必重下那份文件**。
+                        if (r.saveNoName) {
+                            // ⚠️ 最后那个 true = "这是我们自己的待办 `.part`"（取消时可以删它）
+                            showSaveAsMapNameDialog(r.part, r.meta, Msav.baseName(r.base), true);
+                            return;
+                        }
                         if (r.ok) {
                             Toast.makeText(MapsActivity.this,
                                     getString(R.string.map_import_ok_fmt, r.finalName),
                                     Toast.LENGTH_SHORT).show();
-                            recreate();
+                            refreshList();          // ★ 与转图那条路统一：只重扫列表，不重建页面
                             return;
                         }
                         // ★ 判"要不要弹同名替换框"**只认 r.nameTaken**（MapFiles 给的权威标志），
@@ -405,6 +469,427 @@ public class MapsActivity extends BaseActivity {
                 });
             }
         }, "map-import").start();
+    }
+
+    // ── 「存档视为地图」（2026-10-05，REF §72） ─────────────────────────────
+
+    /**
+     * 「**本槽存档 → 地图**」：列本槽 `saves/` 里的存档，挑一份转成地图（REF §72.10）。
+     *
+     * ★ 与「导入地图…」那条路的差别**只有"从哪儿拿文件"**：不问系统文件选择器
+     *   （SAF 够不到 `Android/data/…`，而存档就在那儿）⇒ 用户不必先导出到 Download 再选回来。
+     *   后面走的是**同一个** {@link MapFiles#commitSaveAsMap} 与同一个命名框。
+     * ★ 列表写法照抄 {@link SlotIo} 导出存档那个弹窗：标题 = 文件名、副标题先给体积，
+     *   元数据**后台渐进填**（几十份存档不许在 UI 线程读完才弹窗）。
+     */
+    private void pickSlotSave() {
+        final File dir = new File(Data.dirOf(this, mSlot), "saves");
+        File[] all = dir.listFiles();
+        final java.util.List<File> keep = new java.util.ArrayList<>();
+        if (all != null) {
+            for (File f : all) {
+                // 判据：是文件、`.msav`、**不是写了一半的 `.part`**（与 SlotIo 的存档列表同口径）
+                if (f.isFile() && f.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".msav")
+                        && !f.getName().endsWith(".part")) {
+                    keep.add(f);
+                }
+            }
+        }
+        if (keep.isEmpty()) {
+            Toast.makeText(this, R.string.maps_from_save_none, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        java.util.Collections.sort(keep, new java.util.Comparator<File>() {
+            @Override public int compare(File a, File b) {
+                return a.getName().compareToIgnoreCase(b.getName());
+            }
+        });
+        final File[] fs = keep.toArray(new File[0]);
+        final String[] titles = new String[fs.length];
+        final String[] subs = new String[fs.length];
+        for (int i = 0; i < fs.length; i++) {
+            titles[i] = fs[i].getName();
+            subs[i] = Util.formatSize(fs[i].length());
+        }
+        View box = getLayoutInflater().inflate(R.layout.dialog_msav_list, null);
+        TextView head = (TextView) box.findViewById(R.id.msav_head);
+        head.setVisibility(View.VISIBLE);
+        head.setText(getString(R.string.maps_from_save_head_fmt, fs.length));
+        android.widget.ListView lv = (android.widget.ListView) box.findViewById(R.id.msav_list);
+        final MsavListAdapter adapter = new MsavListAdapter(this, titles, subs);
+        lv.setAdapter(adapter);
+        final AlertDialog dlg = new AlertDialog.Builder(this)
+                .setTitle(R.string.maps_from_save_pick_title)
+                .setView(box)
+                .setNegativeButton(R.string.cancel, null)
+                .create();
+        lv.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener() {
+            @Override public void onItemClick(android.widget.AdapterView<?> p, View v, int pos, long id) {
+                if (pos < 0 || pos >= fs.length) return;
+                dlg.dismiss();
+                MsavMeta m = MsavMeta.read(fs[pos], false);
+                String base = Msav.baseName(fs[pos].getName());
+                // ⚠️ 最后那个 false = "这不是我们的待办 .part，是用户的存档原件" ⇒ 谁都不许删它
+                showSaveAsMapNameDialog(fs[pos], m, base, false);
+            }
+        });
+        dlg.show();
+        final boolean[] alive = {true};
+        dlg.setOnDismissListener(new DialogInterface.OnDismissListener() {
+            @Override public void onDismiss(DialogInterface d) {
+                alive[0] = false;
+            }
+        });
+        new Thread(new Runnable() {
+            @Override public void run() {
+                for (int i = 0; i < fs.length && alive[0]; i++) {
+                    final int idx = i;
+                    final MsavMeta m = MsavMeta.read(fs[idx], false);
+                    final String line = MsavText.shortLine(MapsActivity.this, m, true);
+                    runOnUiThread(new Runnable() {
+                        @Override public void run() {
+                            if (!alive[0]) return;
+                            String size = Util.formatSize(fs[idx].length());
+                            adapter.setSub(idx, line.isEmpty() ? size : (size + " · " + line));
+                            adapter.refreshSub(lv, idx);
+                        }
+                    });
+                }
+            }
+        }, "s2m-meta").start();
+    }
+
+    /**
+     * 选到的 `.msav` 里**没有 `name`** ⇒ 它其实是一份**存档**（判据与游戏同源：
+     * `SaveMeta.isMap()` = `tags.containsKey("name")`）：先问名字，再只改元数据区变成地图。
+     *
+     * ★ 预填 = 存档里的 `mapname`（语料 312/312 都非空），用户可改。
+     * ★ 这个名字会**写进文件**（游戏的地图列表与编辑器显示的就是它），
+     *   文件名另外消毒 —— 所以提示语与"存档命名框"**不是同一句**（那个讲的是存档列表）。
+     * ★ `nocores=true` 时多显示一行警告：编辑器能开，直接当普通图开可能立刻结束（REF §72.9）。
+     *
+     * @param src         源文件：**待办 `.part`**（SAF 那条）或**用户的存档原件**（本槽那条）
+     * @param fallbackBase 名字兜底（`mapname` 为空时用），已经去掉 `.msav`
+     * @param pendingPart `src` 是不是我们自己的待办 `.part` —— 决定"取消时能不能删它"
+     *                    （见 {@link MapFiles#isPendingPart}；用户的存档**一个字都不能删**）
+     */
+    private void showSaveAsMapNameDialog(final File src, final MsavMeta meta,
+                                         final String fallbackBase, final boolean pendingPart) {
+        if (Util.dead(this)) return;
+        if (src == null || !src.isFile()) {
+            alert(getString(R.string.map_save_name_title), getString(R.string.mapfile_err_part_gone));
+            return;
+        }
+        View form = getLayoutInflater().inflate(R.layout.dialog_map_name, null);
+        final EditText name = (EditText) form.findViewById(R.id.map_save_name);
+        String def = meta == null ? null : meta.get("mapname", null);
+        if (def == null || def.trim().isEmpty()) def = fallbackBase;
+        name.setText(def);
+        name.setSelection(name.getText().length());
+        if (meta != null && "true".equalsIgnoreCase(String.valueOf(meta.get("nocores", "")))) {
+            form.findViewById(R.id.map_save_warn).setVisibility(View.VISIBLE);
+        }
+        // ★★ 「源图」那一行（2026-10-05 用户要求：「有可能会被改过名或不小心撞名，
+        //   给个接口允许用户打开自行选择」）：默认按 `mapname` 自动匹配（判据与游戏 SaveMeta 同源），
+        //   但**用户可以点开自己换** —— 图改过名 / 撞名时自动匹配会失手。
+        final TextView srcRow = (TextView) form.findViewById(R.id.map_save_source);
+        srcRow.setText(R.string.map_save_source_finding);
+        final Maps.Item[] chosen = {null};            // null = 不用源图
+        final boolean[] resolved = {false};           // 还没解析完就点「导入」⇒ 退回"自动"
+        final File mapsDir = new File(Data.dirOf(this, mSlot), "maps");
+        srcRow.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                showSourcePicker(srcRow, mapsDir, chosen, resolved);
+            }
+        });
+        // ★ 自动匹配：**在已经扫描出来的三来源清单里找**（本槽 / 游戏自带 / 模组自带）。
+        //   ⚠️ 只扫 `<槽>/maps/` 是不够的 —— **原版战役地图在 APK 里**
+        //   （`assets/maps/<星球>/<区块键>.msav`）；而且战役存档的 `mapname` 是**当时语言的显示名**，
+        //   得靠 `sectorPreset` 才对得上（用户 2026-10-05：「原版战役地图为什么识别不到啊」）。
+        final String wantName = meta == null ? null : meta.get("mapname", null);
+        final String wantSector = meta == null ? null : meta.get("sectorPreset", null);
+        final List<Maps.Item> scanned = mItems;
+        if (scanned != null) {
+            applySourceChoice(srcRow, chosen, resolved, Maps.bySave(scanned, wantName, wantSector));
+        } else {
+            // 页面还没扫完（罕见）：退回"只找槽内文件"，且放后台，别卡住弹窗
+            new Thread(new Runnable() {
+                @Override public void run() {
+                    final java.util.List<MapFiles.Candidate> hits = MapFiles.findSources(mapsDir, wantName);
+                    runOnUiThread(new Runnable() {
+                        @Override public void run() {
+                            if (Util.dead(MapsActivity.this)) return;
+                            java.util.List<Maps.Item> asItems = new java.util.ArrayList<>();
+                            for (MapFiles.Candidate c : hits) {
+                                Maps.Item it = new Maps.Item();
+                                it.from = Maps.FROM_SLOT;
+                                it.file = c.file;
+                                it.meta = c.meta;
+                                it.where = c.file.getAbsolutePath();
+                                asItems.add(it);
+                            }
+                            applySourceChoice(srcRow, chosen, resolved, asItems);
+                        }
+                    });
+                }
+            }, "s2m-source").start();
+        }
+        final AlertDialog dlg = new AlertDialog.Builder(this)
+                .setTitle(R.string.map_save_name_title)
+                .setView(form)
+                // ★ 接管确定键：名字为空时**不关窗**（否则等于静默丢弃，用户只觉得"点了没反应"）
+                .setPositiveButton(R.string.import_btn, null)
+                .setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int w) {
+                        if (pendingPart) MapFiles.discard(src);
+                    }
+                })
+                .create();
+        dlg.setOnCancelListener(new DialogInterface.OnCancelListener() {
+            @Override public void onCancel(DialogInterface d) {
+                if (pendingPart) MapFiles.discard(src);
+            }
+        });
+        dlg.setOnShowListener(new DialogInterface.OnShowListener() {
+            @Override public void onShow(DialogInterface d) {
+                dlg.getButton(DialogInterface.BUTTON_POSITIVE)
+                        .setOnClickListener(new View.OnClickListener() {
+                            @Override public void onClick(View v) {
+                                String raw = name.getText().toString().trim();
+                                String err = MapFiles.checkMapName(MapsActivity.this, raw);
+                                if (err != null) {
+                                    Toast.makeText(MapsActivity.this, err, Toast.LENGTH_SHORT).show();
+                                    return;
+                                }
+                                dlg.dismiss();      // dismiss 不触发 onCancel ⇒ 不会误 discard
+                                // resolved=false（还在查找）⇒ 交给 MapFiles 自动匹配；否则用用户选的
+                                commitSaveAsMap(src, raw, mSlot, false, chosen[0], !resolved[0]);
+                            }
+                        });
+            }
+        });
+        dlg.show();
+    }
+
+    /**
+     * 把"自动匹配/用户选择"的结果落到那一行文字上（**一处判据**：自动匹配与手工选择共用）。
+     *
+     * @param hits 命中的源图（空 = 没找到；>1 = 撞名，明说有几张让用户自己选）
+     */
+    private void applySourceChoice(final TextView row, final Maps.Item[] chosen,
+                                   final boolean[] resolved, List<Maps.Item> hits) {
+        if (Util.dead(this)) return;
+        resolved[0] = true;
+        if (hits == null || hits.isEmpty()) {
+            chosen[0] = null;
+            row.setText(R.string.map_save_source_missing);
+            return;
+        }
+        chosen[0] = hits.get(0);
+        row.setText(sourceRowText(hits.get(0), hits.size()));
+    }
+
+    /** 那一行「源图：…」的文字（选中一张之后也用它） */
+    private CharSequence sourceRowText(Maps.Item it, int hits) {
+        String nm = it == null ? "" : it.displayName();
+        // 候选多张 ⇒ 明说有几张（**不写"同名"** —— 战役那条判据是"区块键 == 文件名"，
+        // 命中多张时不一定同名）；游戏自带/模组自带的还要点明来源，否则用户不知道它在哪
+        if (hits > 1) return getString(R.string.map_save_source_amb_fmt, nm, hits);
+        if (it != null && it.from != Maps.FROM_SLOT) {
+            return getString(R.string.map_save_source_pick_src_fmt, nm, it.sourceLabel(this));
+        }
+        return getString(R.string.map_save_source_pick_fmt, nm);
+    }
+
+    /**
+     * 「源图」那一行点开后的选择框：**第一项 = 不使用源图**，其余 = **三个来源**的每一张
+     * （本槽 `maps/` / 游戏自带（APK 的 `assets/maps/**`，含**战役区块图**）/ 模组自带）。
+     *
+     * ★ 为什么要有它（用户 2026-10-05）：「有可能会被改过名或不小心撞名，给个接口允许用户打开自行选择」
+     *   ＋「**选择应该允许系统自带以及模组自带**」—— 自动匹配靠存档的 `mapname`，改名/撞名都会失手，
+     *   而**战役地图压根不在槽里**，所以最终决定权给用户、范围给全。
+     * ⚠️ 直接复用页面**已经扫描出来的清单**（`mItems`）—— 里面每张图的 meta 都读好了，
+     *   选中之后就不用再打开一次 APK/模组包。
+     */
+    private void showSourcePicker(final TextView row, final File mapsDir,
+                                  final Maps.Item[] chosen, final boolean[] resolved) {
+        if (Util.dead(this)) return;
+        final List<Maps.Item> all = new java.util.ArrayList<>();
+        if (mItems != null) {
+            all.addAll(mItems);
+        } else {
+            // 退化路径：还没扫完 ⇒ 至少给槽内文件（少见）
+            for (MapFiles.Candidate c : MapFiles.listMaps(mapsDir)) {
+                Maps.Item it = new Maps.Item();
+                it.from = Maps.FROM_SLOT;
+                it.file = c.file;
+                it.meta = c.meta;
+                it.bytes = c.file.length();
+                it.where = c.file.getAbsolutePath();
+                all.add(it);
+            }
+        }
+        int nSlot = 0, nGame = 0, nMod = 0;
+        for (Maps.Item it : all) {
+            if (it.from == Maps.FROM_GAME) nGame++;
+            else if (it.from == Maps.FROM_MOD) nMod++;
+            else nSlot++;
+        }
+        String[] titles = new String[all.size() + 1];
+        String[] subs = new String[all.size() + 1];
+        titles[0] = getString(R.string.map_save_source_off_item);
+        subs[0] = "";
+        for (int i = 0; i < all.size(); i++) {
+            Maps.Item it = all.get(i);
+            titles[i + 1] = it.displayName();
+            // 副标题：来源 + 文件名/条目名（撞名时靠它区分）
+            subs[i + 1] = it.sourceLabel(this) + " · " + it.name();
+        }
+        View box = getLayoutInflater().inflate(R.layout.dialog_msav_list, null);
+        TextView head = (TextView) box.findViewById(R.id.msav_head);
+        head.setVisibility(View.VISIBLE);
+        head.setText(getString(R.string.map_save_source_head3_fmt, nSlot, nGame, nMod));
+        android.widget.ListView lv = (android.widget.ListView) box.findViewById(R.id.msav_list);
+        lv.setAdapter(new MsavListAdapter(this, titles, subs));
+        final AlertDialog dlg = new AlertDialog.Builder(this)
+                .setTitle(R.string.map_save_source_title)
+                .setView(box)
+                .setNegativeButton(R.string.cancel, null)
+                .create();
+        lv.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener() {
+            @Override public void onItemClick(android.widget.AdapterView<?> p, View v, int pos, long id) {
+                dlg.dismiss();
+                if (Util.dead(MapsActivity.this)) return;
+                resolved[0] = true;
+                if (pos == 0) {
+                    chosen[0] = null;
+                    row.setText(R.string.map_save_source_off);
+                    return;
+                }
+                Maps.Item it = all.get(pos - 1);
+                chosen[0] = it;
+                row.setText(sourceRowText(it, 1));
+            }
+        });
+        dlg.show();
+    }
+
+    /**
+     * 第二步：后台改写 + 落位（{@link MapFiles#commitSaveAsMap}）。
+     *
+     * ★ 同名**先问**（判据是 `Result.nameTaken` 字段，不是文案子串 —— 门禁 `SRC-01`）。
+     * ★ 任何一步失败都让源文件留着（`MapFiles` 那边不硬删），用户重试还有据可依。
+     * ★ `src` 可能是**用户的存档原件**（本槽那条路）⇒ 取消时的 `discard` 只删 `.part`
+     *   （判据收在 {@link MapFiles#isPendingPart} 一处）。
+     * ★ `sourceItem` = 用哪张图补齐缺的元数据（**用户可以在「源图」那一行自己挑**，可以是
+     *   **本槽文件 / 游戏自带（APK）/ 模组自带**里的任意一张；null = 不用源图）；
+     *   `autoSource` = 用户还没挑过（还在自动查找 / 直接点了导入）⇒ 交给 `MapFiles` 自己按 `mapname` 匹配。
+     */
+    private void commitSaveAsMap(final File src, final String metaName, final String slot,
+                                 final boolean overwrite, final Maps.Item sourceItem,
+                                 final boolean autoSource) {
+        final ProgressDialog pd = ProgressDialog.show(this, getString(R.string.map_save_name_title),
+                getString(R.string.maps_scanning), true, false);
+        new Thread(new Runnable() {
+            @Override public void run() {
+                final MapFiles.Result r;
+                try {
+                    File dir = new File(Data.dirOf(MapsActivity.this, slot), "maps");
+                    File trash = MapFiles.trashDirOf(MapsActivity.this);
+                    if (autoSource) {
+                        r = MapFiles.commitSaveAsMap(MapsActivity.this, dir, src, metaName, overwrite, trash);
+                    } else {
+                        // ★ 源图的 meta **已经在扫描时读好了**（APK/模组包里的条目也一样）⇒ 直接递 tags，
+                        //   不再打开一次容器（见 Maps.Item.meta / MapFiles 那个收 tags 的重载）
+                        java.util.Map<String, String> tags = null;
+                        String label = null;
+                        if (sourceItem != null && sourceItem.meta != null && sourceItem.meta.ok) {
+                            tags = sourceItem.meta.tags;
+                            label = sourceItem.name();
+                            if (sourceItem.from != Maps.FROM_SLOT) {
+                                label = label + "(" + sourceItem.sourceLabel(MapsActivity.this) + ")";
+                            }
+                        }
+                        r = MapFiles.commitSaveAsMap(MapsActivity.this, dir, src, metaName, overwrite, trash,
+                                tags, label);
+                    }
+                } catch (Throwable t) {
+                    runOnUiThread(new Runnable() {
+                        @Override public void run() {
+                            pd.dismiss();
+                            alert(getString(R.string.map_save_name_title), t.toString());
+                        }
+                    });
+                    return;
+                }
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        pd.dismiss();
+                        // ★ 这些框都是 inline 的，可能属于已被转屏销毁的实例 ⇒ 先判死
+                        if (Util.dead(MapsActivity.this)) return;
+                        if (r.ok) {
+                            showSaveAsMapResult(r, metaName);
+                            return;
+                        }
+                        if (!overwrite && r.nameTaken) {
+                            new AlertDialog.Builder(MapsActivity.this)
+                                    .setTitle(R.string.map_overwrite_title)
+                                    .setMessage(getString(R.string.map_overwrite_msg_fmt,
+                                            MapFiles.safeName(metaName)))
+                                    .setPositiveButton(R.string.map_overwrite_ok,
+                                            new DialogInterface.OnClickListener() {
+                                                @Override public void onClick(DialogInterface d, int w) {
+                                                    commitSaveAsMap(src, metaName, slot, true, sourceItem, autoSource);
+                                                }
+                                            })
+                                    .setNegativeButton(R.string.cancel,
+                                            new DialogInterface.OnClickListener() {
+                                                @Override public void onClick(DialogInterface d, int w) {
+                                                    MapFiles.discard(src);
+                                                }
+                                            })
+                                    .setOnCancelListener(new DialogInterface.OnCancelListener() {
+                                        @Override public void onCancel(DialogInterface d) {
+                                            MapFiles.discard(src);
+                                        }
+                                    })
+                                    .show();
+                            return;
+                        }
+                        // 失败：用户文案走 MsavText（内核只给「码 + 参数」）
+                        String why = r.conv != null
+                                ? MsavText.convertReason(MapsActivity.this, r.conv)
+                                : String.valueOf(r.error);
+                        alert(getString(R.string.map_save_name_title),
+                                getString(R.string.map_import_fail_fmt, why));
+                    }
+                });
+            }
+        }, "map-save2map").start();
+    }
+
+    /** 成功：第一层只说"转好了"，依据（删了哪些键 / 体积 / 源存档没动）走「技术细节」第二层 */
+    private void showSaveAsMapResult(final MapFiles.Result r, String metaName) {
+        if (Util.dead(this)) return;
+        // ★ **先刷新列表、再弹结果**（用户要求"导入之后要自动刷新页面"）——
+        //   弹窗还开着的时候，后面的表头/列表就已经是新数据了；「关闭」只负责收掉弹窗。
+        refreshList();
+        String inName = r.meta == null ? null : r.meta.get("name", null);
+        String shown = inName == null ? metaName : Mods.stripColors(inName);
+        AlertDialog.Builder b = new AlertDialog.Builder(this)
+                .setTitle(R.string.map_save_name_title)
+                .setMessage(getString(R.string.map_save_ok_fmt, shown)
+                        + getString(R.string.map_save_ok_note))
+                .setPositiveButton(R.string.close, null);
+        if (r.conv != null) {
+            // ★ 依据不能删（F4①d）：原始报告留在第二层
+            b.setNeutralButton(R.string.map_save_detail, new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface d, int w) {
+                    alert(getString(R.string.map_save_detail_title), r.conv.report());
+                }
+            });
+        }
+        b.show();
     }
 
     /** 从 SAF 的 Uri 问出显示名（与存档页同一套做法，失败退回 `map.msav`） */

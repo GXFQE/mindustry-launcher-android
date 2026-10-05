@@ -128,13 +128,75 @@ public final class Maps {
 
         /** 排序用的显示名（优先真名） */
         public String sortKey() {
+            return displayName().toLowerCase(Locale.ROOT);
+        }
+
+        /**
+         * ★ 给人看的名字（**去色码、优先真名**，没有就退回文件名/条目名）。
+         *   界面（"源图"那一行 / 选源图列表）都用它 —— 别拿 {@link #sortKey}（那是小写、给排序的）。
+         */
+        public String displayName() {
             String n = meta != null && meta.ok ? Mods.stripColors(meta.displayName()) : "";
             if (n == null || n.trim().isEmpty()) n = name();
-            return n.toLowerCase(Locale.ROOT);
+            return n == null ? "" : n;
         }
     }
 
     private Maps() {}
+
+    /**
+     * 给**一份存档**找它的"源图"（**三个来源都算**：本槽 / 游戏自带 / 模组自带）。
+     *
+     * <p>两条判据，都是游戏自己的口径：
+     * <ol>
+     *   <li><b>自定义图</b>：存档的 {@code mapname} == 图的 {@code name}
+     *       —— `SaveMeta` 显示"地图：X"用的就是 {@code maps.all().find(m -> m.name().equals(mapname))}。</li>
+     *   <li><b>原版战役（区块）图</b>：存档的 {@code sectorPreset} == 图条目的<b>文件名主干</b><br>
+     *       出处：{@code SectorPreset.java:84 → new FileMapGenerator(fileName == null ? this.name : fileName, this)}
+     *       ＋ `FileMapGenerator` 的候选路径 {@code <planet>/<mapName>.msav}
+     *       ⇒ 图就躺在 APK 的 {@code assets/maps/<星球>/<区块键>.msav}。</li>
+     * </ol>
+     *
+     * 🔴 **为什么不能只靠 `mapname`**（2026-10-05 用户：「**原版战役地图为什么识别不到啊**」）：
+     *    战役存档里的 `mapname` 是**存档当时语言的显示名**（「始发地区」/「Fallen Vessel」），
+     *    而图文件里的 `name` 是**基础名**（`onset` / `fallenVessel`）⇒ 中文环境下**永远匹配不上**。
+     *    语料实测：按 `mapname` 只命中 **6/312**，按 `sectorPreset` 命中 **90/312**。
+     * ⚠️ 两条判据都命中时**全都返回**（界面据此提示"候选 N 张、点这里选一张"，
+     *    默认取第一条 = `mapname` 那条），不替用户猜。
+     */
+    public static List<Item> bySave(List<Item> items, String mapname, String sectorPreset) {
+        List<Item> out = new ArrayList<>();
+        if (items == null) return out;
+        if (mapname != null && !mapname.trim().isEmpty()) {
+            for (Item it : items) {
+                if (it == null || it.meta == null || !it.meta.ok) continue;
+                if (mapname.equals(it.meta.get("name", null))) out.add(it);
+            }
+        }
+        if (sectorPreset != null && !sectorPreset.trim().isEmpty()) {
+            for (Item it : items) {
+                if (it == null || out.contains(it)) continue;
+                if (sectorPreset.equalsIgnoreCase(stem(it.name()))) out.add(it);
+            }
+        }
+        return out;
+    }
+
+    /** 去掉 `.msav` 后缀（战役图的文件名主干 == 区块键） */
+    private static String stem(String name) {
+        if (name == null) return "";
+        String lower = name.toLowerCase(Locale.ROOT);
+        return lower.endsWith(".msav") ? name.substring(0, name.length() - 5) : name;
+    }
+
+    /**
+     * 按 `mapname` 在**已经扫描出来的**清单里找"源图"（只按名字那条判据）。
+     * ⚠️ 界面走 {@link #bySave}（它多一条 `sectorPreset`，战役图靠那条）；
+     *    这个只留给"只要名字"的调用方与自检。
+     */
+    public static List<Item> byName(List<Item> items, String mapname) {
+        return bySave(items, mapname, null);
+    }
 
     /**
      * 只读清点三个来源。

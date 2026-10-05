@@ -150,6 +150,8 @@ public class MainActivity extends BaseActivity {
                 || intent.hasExtra("dev_mods_copy")
                 || intent.hasExtra("dev_mods_conflict")
                 || intent.hasExtra("dev_maps_slot")
+                || intent.hasExtra("dev_map_import")
+                || intent.hasExtra("dev_maps_page")
                 || intent.hasExtra("dev_mapstats");
         if (!isDev) return;
         if ((getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) == 0) {
@@ -483,6 +485,36 @@ public class MainActivity extends BaseActivity {
                     reportDev(rep, "dev_mods_copy");
                 }
             }, "dev-mods-copy").start();
+            return;
+        }
+
+        // ── 「存档视为地图」：直接打开某个槽的地图页 ──────────────────────────
+        // 用法：`--es dev_maps_page <槽>`
+        // ★ 为什么要它：地图页是槽页的子页面（点槽 → 地图），自动化点进去要穿两三层；
+        //   而"本槽存档 → 地图"这条路的验收全靠那一页上的行（SAF 那条另有 dev_map_import）。
+        String dmp = intent.getStringExtra("dev_maps_page");
+        if (dmp != null && !dmp.trim().isEmpty()) {
+            Intent mi = new Intent(this, MapsActivity.class);
+            mi.putExtra(MapsActivity.EXTRA_SLOT, dmp.trim());
+            startActivity(mi);
+            finish();
+            return;
+        }
+
+        // ── 「存档视为地图」：把"选文件"换成路径，直接进地图页那条导入路 ────────────
+        // 用法：`--es dev_map_import /sdcard/xxx.msav [--es dev_map_slot <槽>]`
+        // ★ 为什么要它：SAF 选择器**自动化不了**（第 104 轮 dev_zip_confirm 同一条理由），
+        //   而"选到一份存档之后"的那条路（命名框 → 改写 → 落位 → 结果框）必须能真机验。
+        //   ⇒ 后面的路与界面**逐字相同**，只是把"选包"换成了路径。
+        String dmImp = intent.getStringExtra("dev_map_import");
+        if (dmImp != null && !dmImp.isEmpty()) {
+            String useSlot = intent.getStringExtra("dev_map_slot");
+            if (useSlot == null || useSlot.trim().isEmpty()) useSlot = Data.currentSlot(this);
+            Intent mi = new Intent(this, MapsActivity.class);
+            mi.putExtra(MapsActivity.EXTRA_SLOT, useSlot.trim());
+            mi.putExtra(MapsActivity.EXTRA_DEV_IMPORT, dmImp.trim());
+            startActivity(mi);
+            finish();
             return;
         }
 

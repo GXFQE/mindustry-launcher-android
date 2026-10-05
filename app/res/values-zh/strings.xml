@@ -302,6 +302,46 @@
     <string name="slot_op_maps">地图（本槽 / 游戏 / 模组）…</string>
     <!-- 地图增删（F10）-->
     <string name="maps_import">导入地图…</string>
+    <!-- ★★ 2026-10-05「本槽存档 → 地图」（REF §72.10）：不过系统文件选择器，直接从本槽的存档里挑 -->
+    <string name="maps_from_save">本槽存档 → 地图…</string>
+    <string name="maps_from_save_sub">从本槽的存档里挑一份（不用文件选择器）</string>
+    <string name="maps_from_save_pick_title">把哪一份存档转成地图？</string>
+    <string name="maps_from_save_head_fmt">本槽有 %1$d 份存档 · 点一份</string>
+    <string name="maps_from_save_none">这个槽里还没有存档</string>
+    <!--
+      ★★ 2026-10-05「存档视为地图」（REF §72）：选到的 `.msav` 里没有 `name` ⇒ 它其实是**存档**，
+        先问名字，再只改元数据区把它变成地图。
+      ★ 判据是游戏自己的（有 `name` 才是图），不是后缀 —— 两边都叫 `.msav`。
+      ★ 文案口径：终点是**游戏里的编辑器**（编辑器 → 导入 → 导入地图 → 试玩），
+        别写成"直接当普通图开"（那会让人以为点开就能玩）。
+    -->
+    <string name="map_save_name_title">把这份存档转成地图</string>
+    <string name="map_save_name_hint">这是存档，还不是地图（文件里没有名字）。\n下面这个名字会写进文件里 —— 游戏和编辑器显示的就是它。</string>
+    <string name="map_save_nocores_warn">⚠ 这张图里没有玩家核心：编辑器里能打开，但直接当普通图开可能立刻结束。</string>
+    <!--
+      ★★ 「源图」那一行（2026-10-05）：自动匹配靠存档里的 `mapname`，**图被改过名或撞名时会失手**
+        ⇒ 让用户**自己挑**用哪张图补齐生成器设置 / 作者 / 简介（用户要求「打开自行选择」）。
+    -->
+    <string name="map_save_source_finding">源图：正在查找…</string>
+    <string name="map_save_source_pick_fmt">源图：%1$s（点这里换）</string>
+    <string name="map_save_source_pick_src_fmt">源图：%1$s · %2$s（点这里换）</string>
+    <string name="map_save_source_missing">源图：没找到同名图（点这里选一张）</string>
+    <string name="map_save_source_amb_fmt">源图：%1$s · 候选 %2$d 张（点这里选一张）</string>
+    <string name="map_save_source_off">源图：不使用（生成器设置留空）</string>
+    <string name="map_save_source_title">用哪张图补齐设置？</string>
+    <string name="map_save_source_head3_fmt">本槽 %1$d · 游戏自带 %2$d · 模组自带 %3$d · 点一张</string>
+    <string name="map_save_source_off_item">不使用源图（生成器设置留空）</string>
+    <string name="map_save_ok_fmt">已转为地图「%1$s」</string>
+    <string name="map_save_ok_note">\n\n源存档没动。只改了名字、波次和几处战役残留；地形与建筑一个字节都没变。</string>
+    <string name="map_save_detail">技术细节</string>
+    <string name="map_save_detail_title">技术细节</string>
+    <string name="mapsave_reason_magic">这份文件不是存档（开头不对）</string>
+    <string name="mapsave_reason_version_fmt">存档的格式版本不认识（%1$s）</string>
+    <string name="mapsave_reason_meta">存档的元数据区是坏的</string>
+    <string name="mapsave_reason_rules">存档里的规则区读不出来，一个字都没改</string>
+    <string name="mapsave_reason_truncated">文件像是写了一半，不完整</string>
+    <string name="mapsave_reason_toolong_fmt">有一项内容太长，装不下（%1$s）</string>
+    <string name="mapsave_reason_broken">文件里的数据块坏了</string>
     <string name="map_import_ok_fmt">已导入「%1$s」</string>
     <string name="map_import_fail_fmt">导入失败：%1$s</string>
     <string name="map_overwrite_title">同名地图已存在</string>
@@ -660,6 +700,7 @@
     <string name="mapfile_err_name_long">名字太长了</string>
     <string name="mapfile_err_mkdir_fmt">建目录失败：%1$s</string>
     <string name="mapfile_err_name_taken_fmt">这个槽的 maps/ 里已经有「%1$s」了 —— 替换会盖掉原文件，需要先确认</string>
+    <string name="mapfile_err_part_gone">那份待处理的文件已经不在了（可能被清理掉了），请重新导入</string>
     <string name="mapfile_err_not_map">这个文件不是游戏能读的地图</string>
     <string name="mapfile_err_not_map_why_fmt">这个文件不是游戏能读的地图：%1$s</string>
     <string name="mapfile_err_no_trash">同名文件已存在，且没有中转站可用</string>

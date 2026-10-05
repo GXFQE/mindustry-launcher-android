@@ -1,0 +1,10 @@
+（真机 uiautomator 转储：test 槽，存档 sector-erekir-10.msav，sectorPreset=onset / mapname=始发地区）
+--- 命名框 ---
+这是存档，还不是地图（文件里没有名字）。
+下面这个名字会写进文件里 —— 游戏和编辑器显示的就是它。
+始发地区
+源图：The Onset · 游戏自带（点这里换）
+取消
+导入
+--- 技术细节（转换报告）---
+ok=true err=0 errN1=5 name=始发地区 dropped=6 limitFalse=true planet=erekir rulesChanged=true inherited=2(onset.msav(游戏自带))[author,genfilters] genfiltersEmpty=false bytes=50553->50477

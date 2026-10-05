@@ -306,6 +306,49 @@
     <string name="slot_op_maps">Maps (this slot / game / mods)…</string>
     <!-- 地图增删（F10）-->
     <string name="maps_import">Import map…</string>
+    <!--
+      ★★ 2026-10-05「本槽存档 → 地图」（REF §72.10）：**不过系统文件选择器**。
+      ★ 为什么：手机上的存档就在本槽 `saves/` 里，而系统文件选择器够不到 `Android/data/…`
+        ⇒ 走「导入地图…」那条路，得先把存档导出到 Download 再选回来。
+    -->
+    <string name="maps_from_save">Save → map…</string>
+    <string name="maps_from_save_sub">Pick one from this slot (no file picker)</string>
+    <string name="maps_from_save_pick_title">Turn which save into a map?</string>
+    <string name="maps_from_save_head_fmt">This slot has %1$d saves · tap one</string>
+    <string name="maps_from_save_none">No saves in this slot yet</string>
+    <!--
+      ★★ 2026-10-05「存档视为地图」（REF §72）：选到的 `.msav` 若 meta 里没有 `name`，
+        它其实是**存档** ⇒ 先问名字，再只改 meta 区把它变成地图。
+      ★ 判据是游戏自己的（`SaveMeta.isMap()` = 有 `name` 才是图），不是后缀 —— 两边都叫 `.msav`。
+      ★ 文案口径：终点是**游戏里的编辑器**（导入 → 导入地图 → 试玩），别写成"直接当普通图开"。
+    -->
+    <string name="map_save_name_title">Turn this save into a map</string>
+    <string name="map_save_name_hint">This is a save file, not a map yet (it has no name inside).\nThe name below is written into the file — the game and the editor show exactly it.</string>
+    <string name="map_save_nocores_warn">⚠ This world has no player core: the editor can open it, but starting it as a normal map may end immediately.</string>
+    <!--
+      ★★ 「源图」那一行（2026-10-05）：自动匹配靠存档里的 `mapname`，**图被改过名或撞名时会失手**
+        ⇒ 让用户**自己挑**用哪张图补齐生成器设置 / 作者 / 简介（用户要求「打开自行选择」）。
+    -->
+    <string name="map_save_source_finding">Source map: looking…</string>
+    <string name="map_save_source_pick_fmt">Source map: %1$s — tap to change</string>
+    <string name="map_save_source_pick_src_fmt">Source map: %1$s · %2$s — tap to change</string>
+    <string name="map_save_source_missing">Source map: no map with this name — tap to pick one</string>
+    <string name="map_save_source_amb_fmt">Source map: %1$s — %2$d candidates, tap to pick one</string>
+    <string name="map_save_source_off">Source map: none (generator settings stay empty)</string>
+    <string name="map_save_source_title">Which map should fill in the settings?</string>
+    <string name="map_save_source_head3_fmt">%1$d in this slot · %2$d built-in · %3$d from mods · tap one</string>
+    <string name="map_save_source_off_item">Do not use a source map (generator settings stay empty)</string>
+    <string name="map_save_ok_fmt">Turned into map \"%1$s\"</string>
+    <string name="map_save_ok_note">\n\nThe save file itself was not touched. Only the name, the wave counter and a few campaign leftovers were cleaned up; terrain and buildings are byte-for-byte the same.</string>
+    <string name="map_save_detail">Details</string>
+    <string name="map_save_detail_title">Details</string>
+    <string name="mapsave_reason_magic">This file is not a save (wrong header)</string>
+    <string name="mapsave_reason_version_fmt">Unknown save format version (%1$s)</string>
+    <string name="mapsave_reason_meta">The metadata block of this save is damaged</string>
+    <string name="mapsave_reason_rules">The rules section of this save cannot be read, so nothing was changed</string>
+    <string name="mapsave_reason_truncated">The file looks half-written (incomplete)</string>
+    <string name="mapsave_reason_toolong_fmt">One entry is too long to fit (%1$s)</string>
+    <string name="mapsave_reason_broken">A data block inside the file is damaged</string>
     <string name="map_import_ok_fmt">Imported \"%1$s\"</string>
     <string name="map_import_fail_fmt">Import failed: %1$s</string>
     <string name="map_overwrite_title">A map with this name already exists</string>
@@ -689,6 +732,8 @@
     <string name="mapfile_err_name_long">The name is too long</string>
     <string name="mapfile_err_mkdir_fmt">Could not create the directory: %1$s</string>
     <string name="mapfile_err_name_taken_fmt">This slot already has a map called \"%1$s\" — replacing it would overwrite the original file, so ask first</string>
+    <!-- ★ 2026-10-05「存档视为地图」：命名框那一步留下的待办文件没了（用户取消/被清理）-->
+    <string name="mapfile_err_part_gone">The pending file is gone (it may have been cleaned up) — import it again</string>
     <string name="mapfile_err_not_map">This file is not a map the game can read</string>
     <string name="mapfile_err_not_map_why_fmt">This file is not a map the game can read: %1$s</string>
     <string name="mapfile_err_no_trash">A file with that name already exists, and no transfer station is available</string>
