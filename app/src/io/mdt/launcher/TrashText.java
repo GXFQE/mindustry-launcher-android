@@ -20,7 +20,7 @@ public final class TrashText {
 
     private TrashText() {}
 
-    /** 这是什么：地图 / 模组 / 存档 / 整个槽 / 其他文件 */
+    /** 这是什么：地图 / 模组 / 存档 / 整个槽 / 蓝图 / 其他文件 */
     static String kindLabel(Context c, Trash.Item it) {
         if (it == null) return "";
         switch (it.kind) {
@@ -28,6 +28,7 @@ public final class TrashText {
             case MOD: return c.getString(R.string.trash_kind_mod);
             case SAVE: return c.getString(R.string.trash_kind_save);
             case SLOT: return c.getString(R.string.trash_kind_slot);
+            case SCHEM: return c.getString(R.string.trash_kind_schem);
             default: return c.getString(R.string.trash_kind_other);
         }
     }
@@ -116,6 +117,8 @@ public final class TrashText {
                 return c.getString(R.string.trash_reason_current_slot);
             case Trash.Result.T_BAD_NAME:
                 return c.getString(R.string.trash_reason_bad_name);
+            case Trash.Result.T_NOT_SCHEM:
+                return c.getString(R.string.trash_reason_not_schem);
             default:
                 return c.getString(R.string.trash_reason_unknown);
         }

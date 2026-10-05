@@ -246,6 +246,8 @@ public final class SelfTest {
             mschParse(ctx, L, stat);
             // ★ ㊸ 蓝图清点（F22 列表页的数据层）：两个来源 + 三条模组过滤 + 缺件判据
             blueprintScan(ctx, L, stat);
+            // ★ ㊹ 蓝图的「写」侧（F22 第二步）：先 part + 解析器验 + 同名先问 + 删=挪进中转站
+            blueprintWrite(ctx, L, stat);
             // ★ 篡改对象池的用例放**最后**：它会在池里留下一个内容坏掉的对象，
             //   之后任何"再备份一次"都会因为 `has()` 命中而复用坏对象（CAS 的固有
             //   假设是"池内不可变"）。放在最后就不影响别的用例。
@@ -6376,6 +6378,131 @@ public final class SelfTest {
             Data.deleteTree(empty);
         } catch (Throwable t) {
             ok(stat, L, false, "㊸ 自己抛了异常：" + t);
+        }
+        L.add("");
+    }
+
+    /**
+     * ㊹ 蓝图的**写**侧（F22 第二步，第 110 轮）：导入 / 同名先问 / 覆盖进中转站 / 删除 / 放回去。
+     *
+     * ★ 与地图那条线**同一把尺子**（{@link MapFiles}）：
+     *   先 `.part` + {@link Msch} 验过才就位、同名**不硬删**（旧的进中转站）、删除=**挪**。
+     * ★ **全程不碰用户的真中转站**：所有进站操作都指向自建的
+     *   `&lt;私有目录&gt;/selftest-bp/schematics-trash`（名字必须逐字是它 —— {@link Trash#kindIn}
+     *   按**目录名**判类型）⇒ 收尾整棵删掉，用户站里一份不多、一份不少。
+     *   （㊳ 的教训：自检往用户站里留东西 = 用户看到一个他不认识的文件。）
+     */
+    private static void blueprintWrite(Context ctx, List<String> L, int[] stat) {
+        L.add("── ㊹ 蓝图写侧：导入（先验后位）/ 同名先问 / 覆盖进站 / 删除 / 放回去 ──");
+        File slotDir = Data.dirOf(ctx, SLOT_BP);
+        if (slotDir == null) {
+            ok(stat, L, false, "拿不到测试槽目录：" + SLOT_BP);
+            return;
+        }
+        File work = new File(Paths.privateDir(ctx), "selftest-bp");
+        try {
+            Data.deleteTree(slotDir);
+            Data.deleteTree(work);
+            File schems = new File(slotDir, "schematics");
+            // ⚠️ 这一层名字必须逐字是 `schematics-trash`（`Trash.kindIn` 按目录名判类型）
+            File trash = new File(work, "schematics-trash");
+            schems.mkdirs();
+            trash.mkdirs();
+
+            byte[] good = new Sch(1, 4, 4).tag("name", "bp-ok")
+                    .tile("conveyor", 0, 0, 0, new byte[]{0}).bytes();
+            File src = new File(work, "源.msch");
+            write(src, good);
+
+            // ── ① 导入合法蓝图：落点逐字节相同、`.part` 无残留 ──────────────
+            BlueprintFiles.Result r1 = BlueprintFiles.importSchem(ctx, schems, "我的蓝图.msch",
+                    new java.io.FileInputStream(src), false, trash);
+            File dest = new File(schems, "我的蓝图.msch");
+            ok(stat, L, r1.ok && dest.isFile() && Util.md5(src).equals(Util.md5(dest))
+                            && !new File(schems, "我的蓝图.msch.part").exists()
+                            && r1.msch != null && r1.msch.ok,
+                    "① 导入合法蓝图：落点与源**逐字节一致**，无 `.part` 残留，解析通过");
+
+            // ── ② 负例：不是蓝图 ⇒ 判死、不留残骸 ─────────────────────────
+            File junk = new File(work, "junk.msch");
+            write(junk, "这不是蓝图，只是一段文字".getBytes("UTF-8"));
+            BlueprintFiles.Result r2 = BlueprintFiles.importSchem(ctx, schems, "假的.msch",
+                    new java.io.FileInputStream(junk), false, trash);
+            ok(stat, L, !r2.ok && r2.broken != null && !new File(schems, "假的.msch").exists()
+                            && !new File(schems, "假的.msch.part").exists(),
+                    "② 不是蓝图 ⇒ 判死（码 " + (r2.broken == null ? "?" : r2.broken.errCode)
+                            + "）、**不留 `.part`**、目标不存在");
+
+            // ── ③ 同名 + 不覆盖 ⇒ 只回来问一声，一个字节都没动 ──────────────
+            String md5Before = Util.md5(dest);
+            BlueprintFiles.Result r3 = BlueprintFiles.importSchem(ctx, schems, "我的蓝图.msch",
+                    new java.io.FileInputStream(src), false, trash);
+            ok(stat, L, !r3.ok && r3.nameTaken && md5Before.equals(Util.md5(dest)),
+                    "③ 同名 + 不覆盖 ⇒ 判据字段 nameTaken 为真，且**原文件一个字节没动**");
+
+            // ── ④ 同名 + 覆盖 ⇒ 替换，旧的**进中转站**（挪不删）────────────
+            byte[] other = new Sch(1, 4, 4).tag("name", "bp-new")
+                    .tile("conveyor", 1, 1, 0, new byte[]{0}).bytes();
+            File src2 = new File(work, "新的.msch");
+            write(src2, other);
+            BlueprintFiles.Result r4 = BlueprintFiles.importSchem(ctx, schems, "我的蓝图.msch",
+                    new java.io.FileInputStream(src2), true, trash);
+            int stashed = 0;
+            Trash.Item stashedItem = null;
+            for (Trash.Item it : Trash.list(trash)) {
+                stashed++;
+                stashedItem = it;
+            }
+            ok(stat, L, r4.ok && r4.overwrote && !md5Before.equals(Util.md5(dest))
+                            && stashed == 1 && stashedItem != null
+                            && "我的蓝图.msch".equals(stashedItem.name)
+                            && SLOT_BP.equals(stashedItem.slot)
+                            && stashedItem.kind == Trash.Kind.SCHEM,
+                    "④ 同名 + 覆盖 ⇒ 换成功，**旧的那份在中转站里**（名字 =" + (stashedItem == null
+                            ? "?" : stashedItem.name) + "，来源槽 " + (stashedItem == null
+                            ? "?" : stashedItem.slot) + "，类型 " + (stashedItem == null
+                            ? "?" : stashedItem.kind) + "）");
+
+            // ── ⑤ 删除 = 挪进中转站；元断言：不是直接子项就删不动 ────────────
+            File sub = new File(new File(schems, "子目录"), "深.msch");
+            write(sub, good);
+            File moveIt = new File(schems, "要删的.msch");
+            write(moveIt, good);
+            boolean gameAlive = Data.gameAlive(ctx);
+            File moved = BlueprintFiles.deleteToTrash(ctx, schems, moveIt, trash);
+            if (gameAlive) {
+                // 门禁生效的那一支：**什么都没动**（这才是这段代码在游戏跑着时该有的样子）
+                ok(stat, L, moved == null && moveIt.isFile(),
+                        "⑤ 游戏在跑 ⇒ 删除被门禁拦住、文件原样不动");
+            } else {
+                ok(stat, L, moved != null && moved.isFile() && !moveIt.exists(),
+                        "⑤ 删除 = **挪进中转站**（槽里那份没了、站里那份在）");
+            }
+            File nested = BlueprintFiles.deleteToTrash(ctx, schems, sub, trash);
+            ok(stat, L, nested == null && sub.isFile(),
+                    "⑤ ★元断言：**不是直接子项**的那份（子目录里的）删不动，原件还在");
+
+            // ── ⑥ 放回去：合法 ⇒ 成功；坏文件 ⇒ 判死且原件留在站里 ───────────
+            File back = new File(trash, Trash.nameFor(SLOT_BP, "放回去的.msch"));
+            write(back, good);
+            Trash.Result tr1 = Trash.restore(back, schems, false, trash);
+            ok(stat, L, tr1.ok && new File(schems, "放回去的.msch").isFile() && !back.exists(),
+                    "⑥ 蓝图放回去：回到槽里（走的是 `Msch` 那把尺子，与导入同一把）");
+
+            File bad = new File(trash, Trash.nameFor(SLOT_BP, "坏的.msch"));
+            write(bad, "坏内容".getBytes("UTF-8"));
+            Trash.Result tr2 = Trash.restore(bad, schems, false, trash);
+            ok(stat, L, !tr2.ok && tr2.errCode == Trash.Result.T_NOT_SCHEM && bad.isFile(),
+                    "⑥ ★元断言：坏蓝图放不回去（码 " + tr2.errCode + "），**原件仍留在站里**"
+                            + "（说明上面那条不是恒真）");
+
+            // ── ⑦ 收尾：自建的中转站与测试槽整棵删掉（**不碰用户的真中转站**）──
+            ok(stat, L, Data.deleteTree(work) && !work.exists(),
+                    "⑦ 自建的中转站已整棵删除（用户的 `<hub>/schematics-trash` 一个字节没碰）");
+        } catch (Throwable t) {
+            ok(stat, L, false, "㊹ 自己抛了异常：" + t);
+        } finally {
+            Data.deleteTree(work);
         }
         L.add("");
     }

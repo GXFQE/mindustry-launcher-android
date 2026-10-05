@@ -72,11 +72,13 @@ public final class Trash {
      */
     public static final int KEEP_SLOTS = 3;
 
-    /** 四个中转站目录名（`&lt;hub&gt;/` 下）—— 前两个字面量与旧代码逐字相同，改名会让老用户的东西失联 */
+    /** 五个中转站目录名（`&lt;hub&gt;/` 下）—— 前四个字面量与旧代码逐字相同，改名会让老用户的东西失联 */
     static final String DIR_MAPS = "maps-trash";
     static final String DIR_MODS = "mods-trash";
     static final String DIR_SAVES = "saves-trash";
     static final String DIR_SLOTS = "slots-trash";
+    /** 蓝图（`.msch`，2026-10-05 第 110 轮）—— 新目录，没有历史包袱 */
+    static final String DIR_SCHEMS = "schematics-trash";
 
     /** 槽容器里的两半（整槽进站时把"槽本体"与"它的备份"装在一起，恢复时一起回去） */
     static final String INNER_SLOT = "slot";
@@ -117,9 +119,14 @@ public final class Trash {
         return new File(Data.hubDir(ctx), DIR_SLOTS);
     }
 
-    /** 四个目录（清空 / 统计 / 列表要一起看 —— 用户眼里中转站只有一个） */
+    /** 蓝图的中转站：`&lt;hub&gt;/schematics-trash/`（删蓝图 = 挪进来，同名导入时旧的也来这里） */
+    public static File schemsDir(Context ctx) {
+        return new File(Data.hubDir(ctx), DIR_SCHEMS);
+    }
+
+    /** 五个目录（清空 / 统计 / 列表要一起看 —— 用户眼里中转站只有一个） */
     public static File[] allDirs(Context ctx) {
-        return new File[]{mapsDir(ctx), modsDir(ctx), savesDir(ctx), slotsDir(ctx)};
+        return new File[]{mapsDir(ctx), modsDir(ctx), savesDir(ctx), slotsDir(ctx), schemsDir(ctx)};
     }
 
     // ── 名字：编码 / 解码 ─────────────────────────────────────────────────
@@ -200,8 +207,8 @@ public final class Trash {
 
     // ── 条目 ──────────────────────────────────────────────────────────────
 
-    /** 认得出是什么：地图 / 模组 / 存档 / 整个槽 / 其它（其它**不能恢复** —— 没有地方放回去） */
-    public enum Kind { MAP, MOD, SAVE, SLOT, OTHER }
+    /** 认得出是什么：地图 / 模组 / 存档 / 整个槽 / 蓝图 / 其它（其它**不能恢复** —— 没有地方放回去） */
+    public enum Kind { MAP, MOD, SAVE, SLOT, SCHEM, OTHER }
 
     /** 中转站里的一项 */
     public static final class Item {
@@ -241,9 +248,11 @@ public final class Trash {
         if (DIR_MODS.equals(p)) return Kind.MOD;
         if (DIR_SAVES.equals(p)) return Kind.SAVE;
         if (DIR_SLOTS.equals(p)) return Kind.SLOT;
+        if (DIR_SCHEMS.equals(p)) return Kind.SCHEM;
         if (dirForm) return Kind.MOD;                     // 手工丢进来的目录：多半是目录形态的模组
         String n = name == null ? "" : name.toLowerCase(java.util.Locale.ROOT);
         if (n.endsWith(".msav")) return Kind.MAP;
+        if (n.endsWith(".msch")) return Kind.SCHEM;        // ★ 蓝图：与地图/存档不是同一种（别猜成 MAP）
         if (n.endsWith(".jar") || n.endsWith(".zip")) return Kind.MOD;
         return Kind.OTHER;
     }
@@ -380,13 +389,20 @@ public final class Trash {
         public static final int T_CURRENT_SLOT = 11;
         /** 槽名不合法（空、保留名、带路径符号…）；s1 = 用户填的原文 */
         public static final int T_BAD_NAME = 12;
+        /**
+         * 蓝图放不回去（`Msch` 读不出来）。s1 = 文件名。
+         *
+         * ★ 与地图那条（T_NOT_MAP）**分开**：文案不一样（"这份蓝图读不出来" vs "地图或存档读不出来"），
+         *   混用会让用户以为中转站里躺着一张地图。
+         */
+        public static final int T_NOT_SCHEM = 13;
 
         /** **所有**错误码（自检**遍历**它：`TrashText.reason` 的 switch 有 default 兜底，
          *  漏映射**不崩**、界面上只是静默退化成"原因不明" ⇒ 只有遍历才抓得住） */
         public static final int[] ALL_CODES = {
                 T_NOT_IN_TRASH, T_NO_TARGET, T_NAME_TAKEN, T_NOT_MAP, T_STASH_FAILED,
                 T_MOVE_FAILED, T_GAME_RUNNING, T_NO_KIND, T_MKDIR, T_DELETE_FAILED,
-                T_CURRENT_SLOT, T_BAD_NAME,
+                T_CURRENT_SLOT, T_BAD_NAME, T_NOT_SCHEM,
         };
 
         public boolean ok;
@@ -506,6 +522,11 @@ public final class Trash {
         //   （`Msav.stage` 判的就是它）—— 几十 MB 的存档没必要为了"放回去"整份解压一遍。
         if (it.kind == Kind.SAVE && !Util.isZlib(itemPath)) {
             return r.fail(Result.T_NOT_MAP, "save not zlib: " + itemPath, it.name);
+        }
+        // ★ 蓝图的尺子 = **我们自己的解析器**（`Msch`）—— 与导入那条路**同一把**
+        //   （存档那条刻意宽松到只判 zlib，是因为几十 MB；蓝图是 KB 级，没必要省这一步）。
+        if (it.kind == Kind.SCHEM && !Msch.read(itemPath).ok) {
+            return r.fail(Result.T_NOT_SCHEM, "blueprint unreadable: " + itemPath, it.name);
         }
         if (!targetDir.isDirectory() && !targetDir.mkdirs() && !targetDir.isDirectory()) {
             return r.fail(Result.T_MKDIR, "mkdir failed: " + targetDir, targetDir.getAbsolutePath());
@@ -699,7 +720,8 @@ public final class Trash {
         if (slotDir == null || !slotDir.isDirectory()) {
             return r.fail(Result.T_NO_TARGET, "no slot dir: " + slotDir, slot);
         }
-        String sub = it.kind == Kind.MAP ? "maps" : (it.kind == Kind.SAVE ? "saves" : "mods");
+        String sub = it.kind == Kind.MAP ? "maps"
+                : (it.kind == Kind.SAVE ? "saves" : (it.kind == Kind.SCHEM ? "schematics" : "mods"));
         return restore(it.path, new File(slotDir, sub), overwrite, it.path.getParentFile());
     }
 

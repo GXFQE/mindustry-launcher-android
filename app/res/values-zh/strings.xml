@@ -721,6 +721,47 @@
     <string name="bp_tech_leftover_fmt">末尾多余的字节：%1$d</string>
     <string name="bp_tech_time_fmt">本页用时 %1$d 毫秒</string>
     <string name="bp_tech_summary_fmt">按格式 v%1$d 读出来</string>
+    <!-- 蓝图的中转站：与地图/存档分开一句（说"地图"会让用户以为中转站里躺着一张图） -->
+    <string name="trash_reason_not_schem">这份蓝图读不出来了（文件坏了）</string>
+    <!--
+      ══ 蓝图的「写」侧（F22 第二步，2026-10-05 第 110 轮）：导入 / 导出 / 删除 ════
+      ★ 尺子与地图那条线一致：导入 = **先 .part + 我们的解析器验 + 再就位**；删除 = **挪进中转站**。
+    -->
+    <string name="bp_import">导入蓝图…</string>
+    <string name="bp_import_sub">从文件管理器选一个 .msch 文件</string>
+    <string name="bp_export">导出蓝图…</string>
+    <string name="bp_export_sub">导出成文件（存到 Download 等）</string>
+    <string name="bp_export_none">这个槽还没有蓝图</string>
+    <string name="bp_export_head_fmt">共 %1$d 份，点一份导出</string>
+    <string name="bp_export_working">正在写文件…</string>
+    <string name="bp_export_ok_fmt">已导出 %1$s（%2$s）</string>
+    <string name="bp_export_nosrc">找不到这份蓝图的来源</string>
+    <string name="bp_import_ok_fmt">已导入 %1$s</string>
+    <string name="bp_import_fail_fmt">%1$s</string>
+    <string name="bp_import_busy_msg">游戏正在跑。先进游戏退出，再来导入 —— 这一局里存下来的蓝图会被覆盖。</string>
+    <string name="bp_overwrite_title">已经有同名的蓝图</string>
+    <string name="bp_overwrite_msg_fmt">槽里已经有一份叫 %1$s 的蓝图。替换会把旧的那份挪进中转站。</string>
+    <string name="bp_overwrite_ok">替换</string>
+    <string name="bp_delete">删除这份蓝图</string>
+    <string name="bp_delete_sub">挪进中转站，可以再放回来</string>
+    <string name="bp_delete_confirm_title">删除蓝图「%1$s」？</string>
+    <string name="bp_delete_confirm_msg">会挪进中转站，之后可以从那里放回来。</string>
+    <string name="bp_delete_ok_fmt">已挪进中转站：%1$s</string>
+    <string name="bp_delete_fail">删不掉（游戏可能在跑，或者这份蓝图不在本槽里）</string>
+    <string name="bpfile_err_name_empty">名字是空的</string>
+    <string name="bpfile_err_name_dot">名字不能以点开头</string>
+    <string name="bpfile_err_name_ext">蓝图文件要以 .msch 结尾</string>
+    <string name="bpfile_err_name_path">名字里不能有路径符号</string>
+    <string name="bpfile_err_name_long">名字太长了</string>
+    <string name="bpfile_err_no_dir">拿不到这个槽的蓝图目录</string>
+    <string name="bpfile_err_mkdir_fmt">建不了目录：%1$s</string>
+    <string name="bpfile_err_name_taken_fmt">已经有一份叫 %1$s 的蓝图</string>
+    <string name="bpfile_err_not_schem">这不是蓝图文件</string>
+    <string name="bpfile_err_not_schem_fmt">这不是蓝图文件（%1$s）</string>
+    <string name="bpfile_err_no_trash">找不到中转站，这次没有替换</string>
+    <string name="bpfile_err_trash_mkdir_fmt">建不了中转站目录：%1$s</string>
+    <string name="bpfile_err_trash_move">挪不动旧的那份，这次没有导入。腾点空间再试</string>
+    <string name="bpfile_err_rename_fmt">改名失败：%1$s</string>
     <!-- 地图来源与详情（同一族：Maps.Item 原来也是 Java 里拼的中文）-->
     <string name="map_from_slot">本槽</string>
     <string name="map_from_slot_detail">本槽（你可以直接管理）</string>
@@ -1018,6 +1059,7 @@
     <string name="trash_kind_save">存档</string>
     <string name="trash_kind_slot">整个槽</string>
     <string name="trash_kind_other">其他文件</string>
+    <string name="trash_kind_schem">蓝图</string>
     <string name="trash_from_slot_fmt">来自槽「%1$s」</string>
     <string name="trash_source_unknown">来源不清楚</string>
     <string name="trash_files_fmt">%1$d 个文件</string>

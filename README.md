@@ -83,6 +83,16 @@ point the game at that directory when it starts.
 - Add and remove: imports are parsed and verified first; deletion goes through the transfer station
   (moved aside, not hard-deleted)
 
+### Blueprints
+- Blueprint list (this slot + **shipped inside mods**) with a separate detail page: which blocks are
+  used and how many tiles each takes
+- **Missing-block warning**: when the game meets a block it does not know, it silently drops that
+  tile — the list row says "N kinds of blocks are missing from this slot", and the detail page lists
+  them one by one (usually because the mod that brings them is not enabled)
+- **Import `.msch`** (verified before it is put in place; on a name clash you are asked first, and
+  the old one moves to the transfer station); **export from any source**
+- Deletion goes through the transfer station (moved aside, not hard-deleted) and can be put back
+
 ### Mods
 - Scan the mods in a slot and enable or disable them one by one or **in bulk** (this writes the
   game's own switches: back up first, atomic write, verify after writing)

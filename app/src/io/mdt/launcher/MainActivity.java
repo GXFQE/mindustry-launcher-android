@@ -153,6 +153,7 @@ public class MainActivity extends BaseActivity {
                 || intent.hasExtra("dev_map_import")
                 || intent.hasExtra("dev_maps_page")
                 || intent.hasExtra("dev_bp_page")
+                || intent.hasExtra(BlueprintsActivity.EXTRA_DEV_IMPORT)
                 || intent.hasExtra("dev_mapstats")
                 || intent.hasExtra("dev_msch");
         if (!isDev) return;
@@ -511,6 +512,13 @@ public class MainActivity extends BaseActivity {
         if (dbp != null && !dbp.trim().isEmpty()) {
             Intent bi = new Intent(this, BlueprintsActivity.class);
             bi.putExtra(BlueprintsActivity.EXTRA_SLOT, dbp.trim());
+            // ★ 顺带把"选文件换成路径"那条也转过去（与 dev_map_import 同一个用法）：
+            //   SAF 选择器自动化不了，而"选到一份 .msch 之后"的路（验 → 同名先问 → 落位 → 刷新）
+            //   必须能真机验。⇒ 后面的路与界面**逐字相同**，只是把"选文件"换成了路径。
+            String bpImp = intent.getStringExtra(BlueprintsActivity.EXTRA_DEV_IMPORT);
+            if (bpImp != null && !bpImp.trim().isEmpty()) {
+                bi.putExtra(BlueprintsActivity.EXTRA_DEV_IMPORT, bpImp.trim());
+            }
             startActivity(bi);
             finish();
             return;

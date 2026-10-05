@@ -38,6 +38,23 @@
                 android:textSize="13sp"
                 android:textColor="@color/fg" />
 
+            <!-- 只有**本槽**的蓝图才给删除入口（模组自带 / APK 里的那份在包里，删不了） -->
+            <LinearLayout
+                android:id="@+id/bp_detail_actions"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginTop="10dp"
+                android:background="@drawable/card_bg"
+                android:visibility="gone">
+
+                <include
+                    android:id="@+id/row_bp_detail_delete"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
             <TextView
                 android:id="@+id/bp_detail_state"
                 android:layout_width="match_parent"

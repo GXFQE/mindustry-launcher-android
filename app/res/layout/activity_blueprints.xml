@@ -30,6 +30,41 @@
         android:textSize="12sp" />
 
     <!--
+      ★★ 导入 / 导出**放页面顶上**（与地图页同一条定案，用户 2026-10-03：「导入和导出都放页面顶上吧」）：
+        动作行放底部会盖住列表末行、手指按在它上面时列表滑不动。
+      ⚠️ 两行都 `<include>` 同一个 `row_action` ⇒ id 会重复，代码里必须**从行根** findViewById
+         （`Util.bindAction` 已经这么做了；见 FLOWS F2b 第二条坑）。
+    -->
+    <LinearLayout
+        android:id="@+id/bp_actions"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@drawable/card_bg"
+        android:layout_marginStart="14dp"
+        android:layout_marginEnd="14dp"
+        android:layout_marginBottom="8dp">
+
+        <include
+            android:id="@+id/row_bp_import"
+            layout="@layout/row_action"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginStart="62dp"
+            android:background="@color/divider" />
+
+        <include
+            android:id="@+id/row_bp_export"
+            layout="@layout/row_action"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+    </LinearLayout>
+
+    <!--
       ★ 空态。位置必须在 ListView **之前**：下面那个 ListView 是 `weight=1`（吃掉剩余高度），
         空态若排在它后面就会被顶到屏幕最底部（见 activity_maps.xml 的同一条注释）。
     -->

@@ -577,6 +577,48 @@
     <string name="bp_tech_leftover_fmt">Extra bytes at the end: %1$d</string>
     <string name="bp_tech_time_fmt">This page took %1$d ms</string>
     <string name="bp_tech_summary_fmt">Read as format v%1$d</string>
+    <!-- Blueprints in the trash: a sentence of its own (saying map would be misleading) -->
+    <string name="trash_reason_not_schem">This blueprint cannot be read any more (the file is damaged)</string>
+    <!--
+      ══ Blueprints: the write side (F22 part two, 2026-10-05 round 110): import / export / delete ══
+      ★ Same ruler as the maps path: import = **.part first, our parser checks it, then place**;
+        delete = **move into the trash**, never delete outright.
+    -->
+    <string name="bp_import">Import blueprint…</string>
+    <string name="bp_import_sub">Pick a .msch file from a file manager</string>
+    <string name="bp_export">Export blueprint…</string>
+    <string name="bp_export_sub">Write one out to a file (Download and so on)</string>
+    <string name="bp_export_none">This slot has no blueprints yet</string>
+    <string name="bp_export_head_fmt">%1$d in total, tap one to export it</string>
+    <string name="bp_export_working">Writing the file…</string>
+    <string name="bp_export_ok_fmt">Exported %1$s (%2$s)</string>
+    <string name="bp_export_nosrc">The source of this blueprint cannot be found</string>
+    <string name="bp_import_ok_fmt">Imported %1$s</string>
+    <string name="bp_import_fail_fmt">%1$s</string>
+    <string name="bp_import_busy_msg">The game is running. Quit the game first, then import — blueprints saved in the current session would be overwritten.</string>
+    <string name="bp_overwrite_title">A blueprint with that name is already here</string>
+    <string name="bp_overwrite_msg_fmt">This slot already has a blueprint called %1$s. Replacing moves the old one into the trash.</string>
+    <string name="bp_overwrite_ok">Replace</string>
+    <string name="bp_delete">Delete this blueprint</string>
+    <string name="bp_delete_sub">Moves it into the trash, where it can be put back</string>
+    <string name="bp_delete_confirm_title">Delete blueprint %1$s?</string>
+    <string name="bp_delete_confirm_msg">It moves into the trash, and can be put back from there.</string>
+    <string name="bp_delete_ok_fmt">Moved into the trash: %1$s</string>
+    <string name="bp_delete_fail">Cannot delete it (the game may be running, or this blueprint is not in this slot)</string>
+    <string name="bpfile_err_name_empty">The name is empty</string>
+    <string name="bpfile_err_name_dot">A name cannot start with a dot</string>
+    <string name="bpfile_err_name_ext">A blueprint file must end with .msch</string>
+    <string name="bpfile_err_name_path">A name cannot contain path characters</string>
+    <string name="bpfile_err_name_long">The name is too long</string>
+    <string name="bpfile_err_no_dir">The blueprint folder of this slot is not available</string>
+    <string name="bpfile_err_mkdir_fmt">Cannot create the folder: %1$s</string>
+    <string name="bpfile_err_name_taken_fmt">A blueprint called %1$s is already here</string>
+    <string name="bpfile_err_not_schem">This is not a blueprint file</string>
+    <string name="bpfile_err_not_schem_fmt">This is not a blueprint file (%1$s)</string>
+    <string name="bpfile_err_no_trash">The trash is not available, so nothing was replaced</string>
+    <string name="bpfile_err_trash_mkdir_fmt">Cannot create the trash folder: %1$s</string>
+    <string name="bpfile_err_trash_move">The old one could not be moved, so nothing was imported. Try again after freeing some space</string>
+    <string name="bpfile_err_rename_fmt">Renaming failed: %1$s</string>
     <!--
       ══ settings.bin 安全改写的失败原因（P3：核心的「码 + 参数」在这里映射成文案）════
       ★ `SettingsBin` 是**刻意纯 Java** ⇒ 只给 `errCode`/`subCode` + `errS1`/`errS2`；
@@ -1059,6 +1101,7 @@
     <string name="trash_kind_save">Save</string>
     <string name="trash_kind_slot">Whole slot</string>
     <string name="trash_kind_other">Other file</string>
+    <string name="trash_kind_schem">Blueprint</string>
     <string name="trash_from_slot_fmt">from slot \"%1$s\"</string>
     <string name="trash_source_unknown">source unknown</string>
     <string name="trash_files_fmt">%1$d files</string>

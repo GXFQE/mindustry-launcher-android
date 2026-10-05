@@ -4,6 +4,7 @@ import android.os.Bundle;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -57,7 +58,55 @@ public class BlueprintDetailActivity extends BaseActivity {
         mText.setText(mItem.detail(this));
         mState = (TextView) root.findViewById(R.id.bp_detail_state);
         mBox = (LinearLayout) root.findViewById(R.id.bp_detail_box);
+
+        // 只有**本槽**的蓝图能删（模组自带 / APK 里的那两份在包里，它们属于那个包）
+        if (mItem.from == Blueprints.FROM_SLOT && mItem.file != null) {
+            View actions = root.findViewById(R.id.bp_detail_actions);
+            actions.setVisibility(View.VISIBLE);
+            Util.bindAction(actions, R.id.row_bp_detail_delete, R.drawable.ic_trash,
+                    R.string.bp_delete, R.string.bp_delete_sub, new Runnable() {
+                        @Override public void run() {
+                            confirmDelete();
+                        }
+                    });
+        }
         startStats();
+    }
+
+    /**
+     * 删除：**挪进中转站，不硬删**（口径与地图那条一字不差）。
+     *
+     * ★ 先判游戏在不在跑（与 {@link BlueprintFiles#deleteToTrash} 里那道是同一个判据，
+     *   这里只是把它提前到"问用户之前"）—— 免得用户点了确认才被告知不行。
+     */
+    private void confirmDelete() {
+        if (Data.gameAlive(this)) {
+            alert(getString(R.string.game_busy_title), getString(R.string.bp_import_busy_msg));
+            return;
+        }
+        new android.app.AlertDialog.Builder(this)
+                .setTitle(getString(R.string.bp_delete_confirm_title, mItem.displayName()))
+                .setMessage(R.string.bp_delete_confirm_msg)
+                .setPositiveButton(R.string.bp_delete,
+                        new android.content.DialogInterface.OnClickListener() {
+                            @Override public void onClick(android.content.DialogInterface d, int w) {
+                                File moved = BlueprintFiles.deleteToTrash(BlueprintDetailActivity.this,
+                                        mItem.file.getParentFile(), mItem.file,
+                                        BlueprintFiles.trashDirOf(BlueprintDetailActivity.this));
+                                if (moved == null) {
+                                    alert(getString(R.string.bp_delete),
+                                            getString(R.string.bp_delete_fail));
+                                    return;
+                                }
+                                Toast.makeText(BlueprintDetailActivity.this,
+                                        getString(R.string.bp_delete_ok_fmt, mItem.name()),
+                                        Toast.LENGTH_SHORT).show();
+                                setResult(RESULT_OK);      // 告诉列表：少了一份，回去重新清点
+                                finish();
+                            }
+                        })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
     }
 
     /**
@@ -231,5 +280,18 @@ public class BlueprintDetailActivity extends BaseActivity {
 
     private int dp(int v) {
         return Math.round(v * getResources().getDisplayMetrics().density);
+    }
+
+    /**
+     * 弹窗入口（**唯一**一处）—— ★ 在这里挡"已销毁的 Activity"（理由见 {@link Util#dead}）：
+     * 本页的弹窗既可能来自用户点击，也可能来自后台清点任务收尾（统计失败那条）。
+     */
+    private void alert(String title, String msg) {
+        if (Util.dead(this)) return;
+        new android.app.AlertDialog.Builder(this)
+                .setTitle(title)
+                .setMessage(msg)
+                .setPositiveButton(R.string.close, null)
+                .show();
     }
 }
