@@ -8,6 +8,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.zip.GZIPOutputStream;
 
 /**
@@ -257,6 +258,8 @@ public final class SelfTest {
             tier3(ctx, L, stat);
             // ★ ㊽ 预览图（第 116 轮）：方块名 → 配色/尺寸表 + 蓝图色块渲染 + 存档预览的接口
             previews(ctx, L, stat);
+            // ★ ㊾ 像素级预览（第 117 轮）：图集解析（神谕同构）+ 贴图拼接 + 旋转 + 回落
+            spritePreview(ctx, L, stat);
             // ★ 篡改对象池的用例放**最后**：它会在池里留下一个内容坏掉的对象，
             //   之后任何"再备份一次"都会因为 `has()` 命中而复用坏对象（CAS 的固有
             //   假设是"池内不可变"）。放在最后就不影响别的用例。
@@ -3500,8 +3503,8 @@ public final class SelfTest {
         Blueprints.Item z = new Blueprints.Item();
         z.container = new File(Paths.privateDir(ctx), "m.zip");
         z.entry = "schematics/a.msch";
-        ok(stat, L, !MschLoad.key(f1).equals(MschLoad.key(f2))
-                        && !MschLoad.key(f1).equals(MschLoad.key(z)),
+        ok(stat, L, !MschLoad.key(f1, null).equals(MschLoad.key(f2, null))
+                        && !MschLoad.key(f1, null).equals(MschLoad.key(z, null)),
                 "⑥ 缓存键：两份不同文件 / 包内条目各自不同（撞了会显示错图）");
 
         // ⑦ 存档预览：文件形态的入口在（`.msav` 与地图同源，渲染逻辑 ㉗ 已钉）
@@ -3529,6 +3532,12 @@ public final class SelfTest {
                 .tile(block, x, y, 0, new byte[]{0}).bytes());
     }
 
+    /** 造一份"同一个方块、指定朝向"的 `.msch`（自检夹具） */
+    private static Msch schRot(String block, int rot) {
+        return Msch.read(new Sch(1, 16, 16).tag("name", "probe")
+                .tile(block, 5, 5, rot, new byte[]{0}).bytes());
+    }
+
     /**
      * 算出来的包围盒是不是恰好 `x[x0..x1] y[y0..y1]`（几何口径的判据）。
      *
@@ -3549,6 +3558,192 @@ public final class SelfTest {
     private static String box(Msch m) {
         int[] b = MschPreview.bounds(m, MschPreview.table());
         return b == null ? "null" : ("x[" + b[0] + ".." + b[2] + "] y[" + b[1] + ".." + b[3] + "]");
+    }
+
+    /**
+     * ㊾ **像素级预览**（2026-10-06，第 117 轮）：用户「**那个蓝图显示真的抽象**」⇒ 改成贴真图集。
+     *
+     * <pre>
+     *   ① 图集解析器（{@link MschAtlas}）：**自己造一份小图集**逐字段验（页头 + 区域 + 三个可选块），
+     *      并配元断言（magic 不对必须返回 null）—— 真文件那条更硬的判据在 PC：
+     *      与**游戏自己的读取器**（`_lab/msch/AtlasProbe.java`）对同一个 v160 APK
+     *      **5161 个区域名 / 矩形逐条相同**、解析结束**刚好 EOF**。
+     *   ② 5 级回落（{@link MschSprite#resolve}）：`block-x-full` → `x-full` → `x` → `block-x` → `x1`，
+     *      逐级各钉一条（拿假表喂进去，验的就是"顺序"本身）。
+     *   ③ 贴图拼接：1 格 / 5 格方块的中心与占地、**旋转只在 rotate&&rotateDraw 时发生**
+     *      （★元断言：`copper-wall` 转 0° 与 90° 必须**逐像素相同**，`conveyor` 必须不同）。
+     *   ④ 回落：查不到区域的方块 ⇒ 画成色块（不是空气）；没有版本 APK ⇒ 整张走色块档。
+     *   ⑤ 端到端（真机）：拿**这个槽的版本 APK** 开表 ⇒ 解析出区域、裁出 `copper-wall` 32×32、
+     *      页图真的抽到了磁盘上。
+     * </pre>
+     */
+    private static void spritePreview(Context ctx, List<String> L, int[] stat) {
+        L.add("── ㊾ 像素级预览：图集解析 / 贴图拼接 / 旋转 / 回落 ──");
+
+        // ① 造一份最小图集（2 个区域，其中一个带 hasOffsets 块）
+        byte[] atlas = tinyAtlas();
+        Map<String, MschAtlas.Region> tab;
+        MschAtlas.Region a = null, b = null;
+        try {
+            tab = MschAtlas.read(new ByteArrayInputStream(atlas));
+            a = tab == null ? null : tab.get("copper-wall");
+            b = tab == null ? null : tab.get("trimmed");
+        } catch (Throwable t) {
+            tab = null;
+        }
+        ok(stat, L, tab != null && tab.size() == 2 && a != null && "sprites.png".equals(a.page)
+                        && a.x == 8 && a.y == 16 && a.w == 32 && a.h == 32,
+                "① 图集解析：自家造的 2 条区域都读对（页名 / 矩形）—— 实得 " + (a == null ? "null" : a));
+        ok(stat, L, b != null && b.w == 26 && b.h == 28,
+                "① 图集解析：带 `hasOffsets` 那条（trim 过的贴图）矩形也对 —— 实得 "
+                        + (b == null ? "null" : b));
+        ok(stat, L, MschAtlas.read(new ByteArrayInputStream(new byte[]{'X', 'X', 'X', 'X', 'X'})) == null
+                        && MschAtlas.read(null) == null,
+                "① ★元断言：magic 不对 / 空输入 ⇒ null（不假装解开了，界面回落色块）");
+
+        // ② 5 级回落：造一张只有指定名字的假表，验**查找顺序本身**（= 决策点）
+        ok(stat, L, "block-x-full".equals(askedName("block-x-full", "x-full", "x")),
+                "② 回落①：`block-<名字>-full` 在就用它（与游戏 `loadIcon()` 同一级）");
+        ok(stat, L, "x-full".equals(askedName("x-full", "x")),
+                "② 回落②：没有 `block-x-full` ⇒ 用 `<名字>-full`");
+        ok(stat, L, "x".equals(askedName("x")),
+                "② 回落③：都没有 ⇒ 用 `<名字>` 本身（最常见的一条）");
+        ok(stat, L, "block-x".equals(askedName("block-x")), "② 回落④：再退到 `block-<名字>`");
+        ok(stat, L, "x1".equals(askedName("x1")), "② 回落⑤：最后退到 `<名字>1`（垃圾墙那种变体）");
+        ok(stat, L, askedName() == null && MschSprite.resolve(fakeSheet(), "根本没有这个方块") == null,
+                "② 回落：一级都没中 ⇒ null（调用方退化成色块，不崩）");
+
+        // ③ 贴图拼接 + 旋转
+        MschSprite.Sheet sheet = fakeSheet();
+        MapPreview.Img one = MschSprite.render(schWith("copper-wall", 5, 5), sheet, 256);
+        ok(stat, L, one != null && one.width == 32 && one.height == 32
+                        && one.pixels[0] == 0xFF000000,
+                "③ 拼接：1 格方块画一张 32×32 的贴图（实得 "
+                        + (one == null ? "null" : one.width + "×" + one.height) + "）");
+        MapPreview.Img big = MschSprite.render(schWith("core-nucleus", 5, 5), sheet, 256);
+        ok(stat, L, big != null && big.width == 160 && big.height == 160,
+                "③ 拼接：5 格方块画 160×160（= 5 × 32，多格方块是整张贴图）—— 实得 "
+                        + (big == null ? "null" : big.width + "×" + big.height));
+        // ★ 元断言：**不转的方块**转多少度都必须一模一样（表里 rotate/rotateDraw 那两列的判据）
+        MapPreview.Img w0 = MschSprite.render(schRot("copper-wall", 0), sheet, 256);
+        MapPreview.Img w2 = MschSprite.render(schRot("copper-wall", 2), sheet, 256);
+        ok(stat, L, w0 != null && w2 != null && java.util.Arrays.equals(w0.pixels, w2.pixels),
+                "③ ★元断言：`copper-wall`（rotate=0）转 0° 与 180° **逐像素相同** ——"
+                        + " 说明「转不转」真的按表里那两列走，不是一律都转");
+        // ★ 反向：会转的方块（传送带 rotate=1）转与不转必须**不同**
+        MapPreview.Img c0 = MschSprite.render(schRot("armored-conveyor", 0), sheet, 256);
+        MapPreview.Img c1 = MschSprite.render(schRot("armored-conveyor", 1), sheet, 256);
+        ok(stat, L, c0 != null && c1 != null && !java.util.Arrays.equals(c0.pixels, c1.pixels),
+                "③ ★元断言：`armored-conveyor`（rotate=1）转 90° 之后**必须不一样**"
+                        + "（否则「旋转」就是恒真的装饰）");
+
+        // ④ 回落：查不到区域 ⇒ 那一格画成色块（而不是留空气）
+        MschSprite.Sheet empty = MschSprite.sheet(new java.util.HashMap<String, MschAtlas.Region>(),
+                new MschSprite.PixelSource() {
+                    @Override public int[] pixels(MschAtlas.Region r) { return null; }
+                });
+        MapPreview.Img fb = MschSprite.render(schWith("copper-wall", 5, 5), empty, 256);
+        int want = MschPreview.table().color("copper-wall");
+        ok(stat, L, fb != null && fb.pixels[0] == want,
+                "④ 回落：图集里没有这个方块 ⇒ 那一格画成**色块**（不是空气、不是空白）");
+
+        // ⑤ 端到端：真机上的版本 APK
+        try {
+            String apk = Mods.targetsFor(ctx, Data.currentSlot(ctx)).apkPath;
+            MschSheet sh = MschSheet.open(ctx, apk);
+            MschAtlas.Region cw = sh == null ? null : sh.find("copper-wall");
+            int[] px = cw == null ? null : sh.pixels(cw);
+            ok(stat, L, cw != null && px != null && cw.w == 32 && cw.h == 32 && px.length == 1024,
+                    "⑤ 端到端：从版本 APK 的图集里查到 `copper-wall` 并裁出 32×32 像素（实得 "
+                            + (cw == null ? "没查到" : cw + " / " + (px == null ? 0 : px.length) + " 像素") + "）");
+            // 字节不该全一样（真贴图有明暗、有透明边；全 0 或全同色说明裁错了位置）
+            java.util.HashSet<Integer> distinct = new java.util.HashSet<>();
+            if (px != null) for (int c : px) distinct.add(c);
+            ok(stat, L, distinct.size() > 3,
+                    "⑤ ★元断言：裁出来的是**真图**（" + distinct.size() + " 种颜色 > 3）——"
+                            + " 位置错的话会是一块纯色或全透明");
+            File pdir = sh == null ? null : MschSheet.pageDirOf(sh);
+            ok(stat, L, MschSheet.isOpen(apk) && pdir != null && pdir.isDirectory(),
+                    "⑤ 端到端：表开着，页图也真的抽到了磁盘上（BitmapRegionDecoder 要能随机访问）");
+        } catch (Throwable t) {
+            ok(stat, L, false, "⑤ 端到端用例自己抛了：" + t);
+        }
+        L.add("");
+    }
+
+    /**
+     * 自检用：假表里**第一个被问到的、且存在的**名字 —— 直接验 {@link MschSprite#resolve} 的
+     * **查找顺序**（判据钉在决策点上：只验"最后查到了"会漏掉顺序错）。
+     */
+    private static String askedName(final String... names) {
+        final java.util.HashSet<String> have = new java.util.HashSet<>(java.util.Arrays.asList(names));
+        final String[] asked = {null};
+        MschSprite.Sheet s = new MschSprite.Sheet() {
+            @Override public MschAtlas.Region find(String r) {
+                if (have.contains(r)) {
+                    if (asked[0] == null) asked[0] = r;
+                    return new MschAtlas.Region("p.png", 0, 0, 32, 32);
+                }
+                return null;
+            }
+
+            @Override public int[] pixels(MschAtlas.Region r) {
+                return null;
+            }
+        };
+        MschSprite.resolve(s, "x");
+        return asked[0];
+    }
+
+    /** 自检用：一张"每个区域都是同一张**非纯色**小图"的假图集（纯色的话旋转验不出来） */
+    private static MschSprite.Sheet fakeSheet() {
+        final java.util.HashMap<String, MschAtlas.Region> map = new java.util.HashMap<>();
+        for (String n : new String[]{"copper-wall", "core-nucleus", "armored-conveyor",
+                "copper-wall-full", "block-copper-wall-full"}) {
+            map.put(n, new MschAtlas.Region("fake.png", 0, 0, 32, 32));
+        }
+        return MschSprite.sheet(map, new MschSprite.PixelSource() {
+            @Override public int[] pixels(MschAtlas.Region r) {
+                int[] out = new int[r.w * r.h];
+                for (int y = 0; y < r.h; y++) {
+                    for (int x = 0; x < r.w; x++) {
+                        // 左上角 = 0xFF000000（断言要用），整张图随坐标变（旋转才验得出来）
+                        out[y * r.w + x] = 0xFF000000 | ((x * 8 & 0xff) << 8) | (y * 8 & 0xff);
+                    }
+                }
+                return out;
+            }
+        });
+    }
+
+    /**
+     * 自检用：手写一份最小 `sprites.aatls`（1 页 + 2 区域，第二条带 `hasOffsets`）。
+     * ★ 格式与实测文件一致（见 {@link MschAtlas} 类注释）。
+     */
+    private static byte[] tinyAtlas() {
+        try {
+            java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
+            java.io.DataOutputStream d = new java.io.DataOutputStream(bo);
+            d.writeBytes("AATLS");
+            d.writeByte(0);                       // 版本
+            d.writeByte(1);                       // 每页开头那个字节
+            d.writeUTF("sprites.png");
+            d.writeShort(64); d.writeShort(64);   // 页尺寸
+            d.writeByte(0); d.writeByte(0); d.writeByte(0); d.writeByte(0);
+            d.writeInt(2);                        // 区域数
+            d.writeUTF("copper-wall");
+            d.writeShort(8); d.writeShort(16); d.writeShort(32); d.writeShort(32);
+            d.writeByte(0); d.writeByte(0); d.writeByte(0);          // 三个可选块都没有
+            d.writeUTF("trimmed");
+            d.writeShort(0); d.writeShort(0); d.writeShort(26); d.writeShort(28);
+            d.writeByte(1);                                          // hasOffsets
+            d.writeShort(3); d.writeShort(2); d.writeShort(32); d.writeShort(32);
+            d.writeByte(0); d.writeByte(0);
+            d.flush();
+            return bo.toByteArray();
+        } catch (Throwable t) {
+            return new byte[0];
+        }
     }
 
     /**

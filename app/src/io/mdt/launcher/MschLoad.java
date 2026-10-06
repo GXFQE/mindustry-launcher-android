@@ -4,19 +4,24 @@ import android.content.Context;
 import android.graphics.Bitmap;
 
 /**
- * 蓝图预览图的**加载侧**（Android 那一半）：渲染、整数倍放大、缓存。
- * 纯逻辑在 {@link MschPreview}（不碰 Android，能在 PC 上单独验）。
+ * 蓝图预览图的**加载侧**（Android 那一半）：取图 → 整数倍放大 → 缓存。
+ * 纯逻辑在两处（都不碰 Android，能在 PC 上单独验）：
+ * <ul>
+ *   <li>{@link MschSprite} —— **像素级**：拿版本 APK 里的**真贴图**按游戏口径拼（首选）；</li>
+ *   <li>{@link MschPreview} —— **色块档**：拿烘在启动器里的配色画（回落，见下）。</li>
+ * </ul>
  *
- * <h3>和地图 / 存档那条的关系</h3>
+ * <h3>两条路怎么选（第 117 轮）</h3>
  * <pre>
- *   「内存 → 磁盘 → 现渲染」这套流程**只有一份实现**（{@link MapLoad#cached}）
- *   ⇒ 三条预览线的缓存键、落盘位置（`hub/previews/`）、内存上限**不会分叉**；
- *   本类只负责"怎么把一份 .msch 变成一张图"。
+ *   有版本 APK 且图集解得开 → **像素级**（和游戏里那张缩略图同构）
+ *   没有版本 APK / 图集读不了 / 某个方块查不到区域 → **逐格退化成色块**（整张图仍然是拼出来的）
+ *   ⇒ "没分配版本的槽也有预览"这条**保住了**（那正是第 116 轮用户问过的那件事）
  * </pre>
+ * 🔴 **像素级必须读版本 APK**：图集页的排版逐版本会变 ⇒ 区域矩形不能烘进启动器。
+ *   ⚠️ 因此缓存键里**必须带上 APK 身份**（换版本 ⇒ 换 key，否则会显示上一个版本的图）。
  *
- * 🔴 与地图预览的**一处刻意不同**：蓝图**不依赖版本 APK**
- *   （配色烘在 {@link BlockTable} 里，见那个文件的头注释）⇒
- *   **槽还没指定版本时，蓝图照旧有预览图**；而地图那边没版本就没有配色表、只能不出图。
+ * 「内存 → 磁盘 → 现渲染」那套流程仍然只有一份实现（{@link MapLoad#cached}），
+ * 落点同样是 `hub/previews/`。
  */
 public final class MschLoad {
     /** 缩略图边长（列表用，与 {@link MapLoad#THUMB} 同值） */
@@ -26,9 +31,8 @@ public final class MschLoad {
     /**
      * 太小的图**整数倍放大**到这个边长再交给 ImageView（按用途取：列表 256 / 详情 512）。
      *
-     * ★ 为什么要它：一份 15×15 的蓝图渲染出来就是 15×15 像素，而列表里的缩略图框是 56dp
-     *   （本机 1224px 宽 ≈ 3.1x ⇒ ≈175px）⇒ 由 ImageView 拉伸出来是一片糊（2026-10-06
-     *   真机第一版实测：`MIN_SIDE=96` 出来的图在列表里明显发虚）。
+     * ★ 为什么要它：一份 15×15 的蓝图按原始密度渲染是 480×480，但一份 5×5 的只有 160×160，
+     *   而列表里的框是 56dp（本机 1224px 宽 ≈ 3.1x ⇒ ≈175px）⇒ 不放大就发虚。
      *   整数倍 + **最近邻**（相邻像素直接复制，不是插值）能保住"一格一个方块"的锐利边界。
      * ⚠️ 放大发生在**落盘之前**（`MapLoad.cached` 拿到的就是放大后的像素）⇒ 缓存里存的就是清晰版。
      */
@@ -40,13 +44,27 @@ public final class MschLoad {
     /**
      * 取蓝图预览（内存 → 磁盘 → 现渲染）。
      *
+     * @param apkPath 这个槽指向的版本 APK（**可以为 null** ⇒ 回落到色块档）
      * @param maxSide {@link #THUMB} / {@link #BIG}
      * @return 失败返回 null（界面**保持 GONE**，不留空框）
      */
-    public static Bitmap image(final Context ctx, final Blueprints.Item it, final int maxSide) {
+    public static Bitmap image(final Context ctx, final Blueprints.Item it, final String apkPath,
+                               final int maxSide) {
         if (it == null || it.msch == null) return null;
-        return MapLoad.cached(ctx, key(it), maxSide, new MapLoad.Renderer() {
+        return MapLoad.cached(ctx, key(it, apkPath), maxSide, new MapLoad.Renderer() {
             @Override public MapPreview.Img render() {
+                int target = maxSide >= BIG ? MIN_SIDE_BIG : MIN_SIDE_THUMB;
+                // ① 首选：像素级（真贴图）
+                try {
+                    MschSheet sheet = MschSheet.open(ctx, apkPath);
+                    if (sheet != null) {
+                        MapPreview.Img img = MschSprite.render(it.msch, sheet, target);
+                        if (img != null) return upscale(img, target);
+                    }
+                } catch (Throwable t) {
+                    android.util.Log.w("MDTLauncher", "sprite preview failed", t);
+                }
+                // ② 回落：色块档（没版本 APK / 图集读不了）
                 MapPreview.Img img = MschPreview.render(it.msch, MschPreview.table(), maxSide);
                 return img == null ? null : upscale(img, maxSide >= BIG ? MIN_SIDE_BIG : MIN_SIDE_THUMB);
             }
@@ -54,14 +72,24 @@ public final class MschLoad {
     }
 
     /**
-     * 缓存身份：**槽内文件用路径+大小+时间**，zip/APK 条目用容器+条目名+大小。
+     * 缓存身份：**槽内文件用路径+大小+时间**，zip/APK 条目用容器+条目名+大小，
+     * **再加版本 APK 的指纹**（像素级图依赖它；不带就会在换版本后显示上一版的图）。
      * ⚠️ 与 {@link MapLoad#cacheKey} 同一套口径（同一个理由：内容变了就必须换 key）。
-     * ⚠️ 这里**不带** maxSide —— 那个由 {@link MapLoad#cached} 自己拼进 key。
      */
-    static String key(Blueprints.Item it) {
-        if (it.file != null) return MapLoad.fileKey(it.file);
-        return (it.container == null ? "?" : it.container.getAbsolutePath()) + "|" + it.bytes + "|"
-                + it.entry;
+    static String key(Blueprints.Item it, String apkPath) {
+        String base;
+        if (it.file != null) {
+            base = MapLoad.fileKey(it.file);
+        } else {
+            base = (it.container == null ? "?" : it.container.getAbsolutePath()) + "|" + it.bytes + "|"
+                    + it.entry;
+        }
+        String apkId = "none";
+        if (apkPath != null && !apkPath.trim().isEmpty()) {
+            java.io.File f = new java.io.File(apkPath.trim());
+            apkId = MapLoad.md5(f.getAbsolutePath() + "|" + f.length() + "|" + f.lastModified());
+        }
+        return base + "|" + apkId;
     }
 
     /** 整数倍最近邻放大（见 {@link #MIN_SIDE_THUMB}）；已经够大就原样返回 */

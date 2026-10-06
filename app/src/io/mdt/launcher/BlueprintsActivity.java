@@ -183,12 +183,19 @@ public class BlueprintsActivity extends BaseActivity {
                     }
                 });
                 // ★ 后台逐张渲染（出来一张刷**那一行**）—— 与地图页同一套做法与同一条理由：
-                //   几十份蓝图里 `msch` 已经在上面解析过，这里只是把瓦片画成位图 + 落缓存
+                //   几十份蓝图里 `msch` 已经在上面解析过，这里只是把瓦片画成位图 + 落缓存。
+                //   ⚠️ 像素级预览要**这个槽指向的版本 APK**（图集在里面）；拿不到就回落色块档。
+                String apk = null;
+                try {
+                    apk = Mods.targetsFor(BlueprintsActivity.this, mSlot).apkPath;
+                } catch (Throwable ignored) {
+                }
+                final String apkPath = apk;
                 final ListView lv = mList;
                 for (int i = 0; i < items.size(); i++) {
                     final int idx = i;
-                    final android.graphics.Bitmap bm =
-                            MschLoad.image(BlueprintsActivity.this, items.get(idx), MschLoad.THUMB);
+                    final android.graphics.Bitmap bm = MschLoad.image(
+                            BlueprintsActivity.this, items.get(idx), apkPath, MschLoad.THUMB);
                     if (bm == null) continue;
                     runOnUiThread(new Runnable() {
                         @Override public void run() {

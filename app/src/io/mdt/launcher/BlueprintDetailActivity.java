@@ -85,8 +85,14 @@ public class BlueprintDetailActivity extends BaseActivity {
         if (!mItem.ok()) return;                 // 读不出来的蓝图没有预览可言（顶部已经说了原因）
         new Thread(new Runnable() {
             @Override public void run() {
-                final android.graphics.Bitmap bm =
-                        MschLoad.image(BlueprintDetailActivity.this, mItem, MschLoad.BIG);
+                // 像素级预览要**这个槽指向的版本 APK**（图集在里面）；拿不到就回落色块档
+                String apk = null;
+                try {
+                    apk = Mods.targetsFor(BlueprintDetailActivity.this, mSlot).apkPath;
+                } catch (Throwable ignored) {
+                }
+                final android.graphics.Bitmap bm = MschLoad.image(
+                        BlueprintDetailActivity.this, mItem, apk, MschLoad.BIG);
                 if (bm == null) return;
                 runOnUiThread(new Runnable() {
                     @Override public void run() {

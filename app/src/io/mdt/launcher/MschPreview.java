@@ -74,6 +74,18 @@ public final class MschPreview {
         return TABLE;
     }
 
+    /**
+     * 这个方块**会不会按朝向转**（表里的 `rotate && rotateDraw`）。
+     *
+     * ★ 判据来自游戏 `Block.drawDefaultPlanRegion`：
+     * `Draw.rect(fullIcon, drawx, drawy, (!rotate || !rotateDraw) ? 0 : plan.rotation * 90)`
+     * ⇒ 墙 / 地板 / 核心这类转不得（转了就是错的）。像素级预览靠它（{@link MschSprite}）。
+     */
+    public static boolean rotates(String internal) {
+        int[] r = rows().get(internal);
+        return r != null && r[2] != 0 && r[3] != 0;
+    }
+
     /** 解析 {@link BlockTable#DATA_B64}（**唯一**的解码实现；编解码两端同源见生成器） */
     static synchronized Map<String, int[]> rows() {
         if (ROWS == null) {
@@ -94,7 +106,10 @@ public final class MschPreview {
                     size = Integer.parseInt(c[2].trim());
                 } catch (Throwable ignored) {
                 }
-                m.put(c[0], new int[]{argb, size});
+                // 第 4/5 列是 rotate / rotateDraw（第 117 轮加的；老表没有这两列时按"不转"处理）
+                int rot = c.length > 3 ? ("1".equals(c[3].trim()) ? 1 : 0) : 0;
+                int rotDraw = c.length > 4 ? ("1".equals(c[4].trim()) ? 1 : 0) : 0;
+                m.put(c[0], new int[]{argb, size, rot, rotDraw});
             }
             ROWS = m;
         }
