@@ -21,7 +21,7 @@ import android.content.Context;
 public final class Util {
 
     /**
-     * ★★ 2026-10-06（第 115 轮第四批）：把**系统异常**翻成用户看得懂的一句话（**弹窗正文**专用）。
+     * ★★ 2026-10-06（第 115 轮第五批）：把**系统异常**翻成用户看得懂的一句话（**弹窗正文**专用）。
      *
      * <p>为什么需要它：磁盘满 / 没权限 / 文件被占用时，Java 抛出来的是
      * `java.io.IOException: write failed: ENOSPC (No space left on device)` 这种句子 ——

@@ -239,7 +239,7 @@ public final class SelfTest {
             // ★ ㊵ 整槽写入的三个模式（更新 / 补齐 / 覆盖）+ 槽操作前的自动备份
             slotModes(ctx, L, stat);
             // ★ ㊶ 「存档视为地图」：区间改写（两面判据）+ 落位 + 区 1..n 不变 + 码映射
-            // ★ 2026-10-06（第 115 轮第四批）：把"系统异常 ⇒ 白话"的翻译钉死
+            // ★ 2026-10-06（第 115 轮第五批）：把"系统异常 ⇒ 白话"的翻译钉死
             ioReason(ctx, L, stat);
             saveAsMap(ctx, L, stat);
             // ★ ㊷ 蓝图（`.msch`）解析：24 种配置 tag 的**字节级**期望 + 两版格式 +
@@ -4204,7 +4204,7 @@ public final class SelfTest {
      * ⚠️ 与 ㊴/㊵ 一样，会被覆盖掉的东西走**真中转站**（`Trash.mapsDir`）⇒ 收尾要扫掉自检残留。
      */
     /**
-     * ㊼ **系统异常 ⇒ 用户看得懂的一句话**（`Util.ioReason`，2026-10-06 第 115 轮第四批）。
+     * ㊼ **系统异常 ⇒ 用户看得懂的一句话**（`Util.ioReason`，2026-10-06 第 115 轮第五批）。
      *
      * <p>背景：磁盘满 / 没权限 / 文件被占用时，弹窗原来直接把 `java.io.IOException: write failed:
      * ENOSPC (No space left on device)` 当正文（`SlotIo` / `ModsActivity` / `SlotOps` /
