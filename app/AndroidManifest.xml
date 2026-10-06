@@ -153,13 +153,27 @@
         <!--
           存档与备份（M3）：槽管理 / 备份恢复 / .msav 导入 / 数据根体检。
           跑在主进程 —— 它对数据根只做文件级操作，不需要游戏进程的 ClassLoader。
+          ★ 2026-10-06：本类改名为 `SlotsActivity`（它列的是**槽**，不是存档）。
+        -->
+        <activity
+            android:name=".SlotsActivity"
+            android:exported="false"
+            android:theme="@style/AppTheme"
+            android:label="@string/saves_title"
+            android:parentActivityName=".MainActivity"/>
+
+        <!--
+          某个槽的**存档列表**（二级页面，从槽页的「存档」行进）——
+          与模组页 / 地图页 / 蓝图页同一个形状：页面自己的列表 + 顶上动作行。
+          ★ 2026-10-06（第 115 轮第六批）：原来这里是**弹窗菜单**（看每份存档 / 导出 / 导入），
+            现在收成一个页面（用户：「存档页面也变成和模组/地图/蓝图这样的二级页面吧」）。
         -->
         <activity
             android:name=".SavesActivity"
             android:exported="false"
             android:theme="@style/AppTheme"
-            android:label="@string/saves_title"
-            android:parentActivityName=".MainActivity"/>
+            android:label="@string/slot_page_saves"
+            android:parentActivityName=".SlotActivity"/>
 
         <!--
           F13 模组管理（第一阶段：**只读扫描**）：已装模组 / 元数据 / 版本要求 / 依赖 /

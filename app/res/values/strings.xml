@@ -190,7 +190,7 @@
     <string name="keys_empty">(none)</string>
 
     <!--
-      存档与备份页（SavesActivity）。
+      存档与备份页（SlotsActivity）。
       ★ 槽在界面上的显示已**全部收口到资源**（2026-10-02）：
         · 存档页的槽行拆成三个控件 —— 槽名 / `[当前]` 徽标（slot_current_badge）/
           统计（slot_entry_fmt），见 item_slot.xml；
@@ -221,7 +221,7 @@
          ⚠️ 选槽对话框原先另有一条 `slot_entry_suffix_fmt`，两份内容只差一个前导空格。
          那正是本工程反复栽的形态（同一显示规则两处实现 ⇒ 改一边另一边静默不跟），已合并。 -->
     <string name="slot_entry_fmt">%1$d files · %2$s</string>
-    <!-- 槽操作菜单的标题：槽名 + 元信息。元信息本来走 setMessage，但那个坑见 SavesActivity.slotOps() -->
+    <!-- 槽操作菜单的标题：槽名 + 元信息。元信息本来走 setMessage，但那个坑见 SlotsActivity.slotOps() -->
     <string name="slot_ops_title_fmt">%1$s (%2$s)</string>
 
     <string name="slot_op_backup">Back up this slot…</string>
@@ -461,6 +461,13 @@
     <string name="slot_page_saves_bad_fmt">%1$d saves · ⚠ %2$d unreadable</string>
     <string name="slot_page_saves_bad_recent_fmt">%1$d saves · latest: %2$s · ⚠ %3$d unreadable</string>
     <string name="slot_op_show_bad_saves">See which ones are unreadable</string>
+    <!--
+      ★ 2026-10-06 (round 115, batch 6): subtitles of the three rows on the **saves page**
+        (second-level page), same shape as the mods / maps / blueprints pages.
+    -->
+    <string name="save_page_import_sub">Pick a .msav from this device and put it in this slot</string>
+    <string name="save_page_export_sub">Export the saves of this slot to this device</string>
+    <string name="save_page_bad_sub">See why those few cannot be read</string>
     <string name="msav_bad_list_title_fmt">Unreadable saves (%1$d)</string>
     <string name="msav_all_ok">All saves in this slot are readable right now</string>
     <!-- 冲突体检没做成时的白话提示（2026-10-04 补）：原来是把异常对象直接拼进正文。 -->
@@ -502,7 +509,6 @@
             空态只需要"为什么没有 + 下一步"两件事（对齐 empty_versions 的写法）。 -->
     <string name="maps_empty_fmt">Slot \"%1$s\" has no maps yet.\nOnce a version is assigned to this slot, the maps built into the game show up here.</string>
     <string name="slot_op_import_save">Import a save (.msav)…</string>
-    <string name="slot_op_show_saves">See each save…</string>
     <string name="slot_op_import_slot">Import a whole slot (zip)…</string>
     <string name="slot_op_export_save">Export a save (.msav)…</string>
     <!--

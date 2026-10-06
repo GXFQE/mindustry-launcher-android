@@ -24,7 +24,7 @@ import java.util.List;
  *   一个"当前分类"。而 Android 这边槽是**按版本分配**的（同一时刻可以有多个槽在用），
  *   根本没有强"当前存档"概念 —— 把「自动备份」这类按槽生效的项塞进全局页，
  *   用户改完不知道改的是哪个槽。所以按 Android 语义拆开：
- *     · 按槽生效（自动备份三件套）→ 存档页的槽菜单，就近改（见 SavesActivity）
+ *     · 按槽生效（自动备份三件套）→ 存档页的槽菜单，就近改（见 SlotsActivity）
  *     · 所有槽共用（默认槽 / 日志保留份数）→ 本页
  *
  * 交互与桌面版设置页刻意不同：桌面版是"改一堆、最后一个出口保存"（tkinter 没有即时绑定），
@@ -295,7 +295,7 @@ public class SettingsActivity extends BaseActivity {
      *   {@link BaseActivity#onResume} 的自查，不需要在这里通知它们。
      *
      * ⚠️ 单选列表只能配 `setTitle`，**不能**配 `setMessage`（两者并存列表项不渲染，
-     *    见 {@link SavesActivity#slotOps} 的注释）；先 `dismiss()` 再重建，
+     *    见 {@link SlotsActivity#slotOps} 的注释）；先 `dismiss()` 再重建，
      *    免得对话框的窗口在 Activity 被销毁后还挂着。
      */
     private void pickTheme() {
@@ -366,7 +366,7 @@ public class SettingsActivity extends BaseActivity {
     /**
      * 默认槽 = 新发现的版本自动落到哪个槽（此前是硬编码 default）。
      * ⚠️ 单选列表必须用 setSingleChoiceItems 配 setTitle —— 不能配 setMessage，
-     *    否则列表项一个都不渲染（F3b 实测，见 SavesActivity.slotOps 的注释）。
+     *    否则列表项一个都不渲染（F3b 实测，见 SlotsActivity.slotOps 的注释）。
      */
     private void pickDefaultSlot() {
         final List<Data.Slot> slots = Data.allSlots(this);

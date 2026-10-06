@@ -36,7 +36,7 @@ import java.util.Map;
  * M0：已装版本扫描 + 手填包名。
  * M1：SAF 导入 APK（ACTION_OPEN_DOCUMENT → Importer 流式拷贝 + 预热预检）+ 导入项删除。
  * M2：点击版本 → GameSlot 六步加载配方。
- * M3：存档槽分配（长按详情 → 存档槽）+ 入口进 SavesActivity（备份/恢复/.msav/体检）。
+ * M3：存档槽分配（长按详情 → 存档槽）+ 入口进 SlotsActivity（备份/恢复/.msav/体检）。
  */
 public class MainActivity extends BaseActivity {
 
@@ -185,7 +185,7 @@ public class MainActivity extends BaseActivity {
         }
 
         if (intent.hasExtra("dev_saves")) {
-            startActivity(new Intent(this, SavesActivity.class));
+            startActivity(new Intent(this, SlotsActivity.class));
             return;
         }
 
@@ -1425,7 +1425,7 @@ public class MainActivity extends BaseActivity {
         Util.bindAction(root, R.id.row_saves, R.drawable.ic_folder, R.string.act_saves_title,
                 R.string.act_saves_sub, new Runnable() {
                     @Override public void run() {
-                        startActivity(new Intent(MainActivity.this, SavesActivity.class));
+                        startActivity(new Intent(MainActivity.this, SlotsActivity.class));
                     }
                 });
         // ★ 导航重构（REF §56，用户 2026-10-03 定案）：主界面**不再有「模组」这一行** ——

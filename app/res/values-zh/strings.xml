@@ -191,7 +191,7 @@
     <string name="keys_empty">（空）</string>
 
     <!--
-      存档与备份页（SavesActivity）。
+      存档与备份页（SlotsActivity）。
       ★ 槽在界面上的显示已**全部收口到资源**（2026-10-02）：
         · 存档页的槽行拆成三个控件 —— 槽名 / `[当前]` 徽标（slot_current_badge）/
           统计（slot_entry_fmt），见 item_slot.xml；
@@ -222,7 +222,7 @@
          ⚠️ 选槽对话框原先另有一条 `slot_entry_suffix_fmt`，两份内容只差一个前导空格。
          那正是本工程反复栽的形态（同一显示规则两处实现 ⇒ 改一边另一边静默不跟），已合并。 -->
     <string name="slot_entry_fmt">%1$d 个文件 · %2$s</string>
-    <!-- 槽操作菜单的标题：槽名 + 元信息。元信息本来走 setMessage，但那个坑见 SavesActivity.slotOps() -->
+    <!-- 槽操作菜单的标题：槽名 + 元信息。元信息本来走 setMessage，但那个坑见 SlotsActivity.slotOps() -->
     <string name="slot_ops_title_fmt">%1$s（%2$s）</string>
 
     <string name="slot_op_backup">备份此槽…</string>
@@ -456,6 +456,13 @@
     <string name="slot_page_saves_bad_fmt">%1$d 份存档 · ⚠ %2$d 份读不出来</string>
     <string name="slot_page_saves_bad_recent_fmt">%1$d 份存档 · 最近：%2$s · ⚠ %3$d 份读不出来</string>
     <string name="slot_op_show_bad_saves">看看哪几份读不出来</string>
+    <!--
+      ★ 2026-10-06（第 115 轮第六批）：存档**页面**（二级页）顶上那三行的副标题 ——
+        与模组页 / 地图页 / 蓝图页同一形状（用户：「存档页面也变成…二级页面吧」）。
+    -->
+    <string name="save_page_import_sub">从本机选一份 .msav 放进这个槽</string>
+    <string name="save_page_export_sub">把这个槽的存档导到本机</string>
+    <string name="save_page_bad_sub">读不出来的那几份，看看为什么</string>
     <string name="msav_bad_list_title_fmt">读不出来的存档（%1$d 份）</string>
     <string name="msav_all_ok">这个槽的存档现在都读得出来</string>
     <!-- 冲突体检没做成时的白话提示（2026-10-04 补）：原来是把异常对象直接拼进正文。 -->
@@ -497,7 +504,6 @@
             空态只需要"为什么没有 + 下一步"两件事（对齐 empty_versions 的写法）。 -->
     <string name="maps_empty_fmt">槽「%1$s」里还没有地图。\n给某个版本分配这个槽之后，游戏自带的地图就会出现。</string>
     <string name="slot_op_import_save">导入存档（.msav）…</string>
-    <string name="slot_op_show_saves">看每份存档…</string>
     <string name="slot_op_import_slot">导入整槽（zip）…</string>
     <string name="slot_op_export_save">导出存档（.msav）…</string>
     <!--

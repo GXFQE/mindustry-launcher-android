@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  F1b：存档与备份页骨架（与 activity_main 同款卡片风）。F3a：整页可滚。F3b：列表容器去 ListView。
+
+  结构：
+    外层 ScrollView（整页滚，横竖屏通用）
+      └ 内层 LinearLayout（vertical）
+          ├ 顶部区（原"固定"，现随整页一起滚）
+          │   ├ 状态摘要卡 —— 摘要一行（N 个槽 / 当前槽 / 游戏进程），点开是完整的数据根与备份路径
+          │   └ 操作分组卡 —— 新建槽 / 数据根体检（★ F15b 后只剩这两项"无槽语境"的动作；
+          │       导入类入口统一收进槽菜单 —— 见下方槽操作菜单的说明）
+          ├ 槽列表容器（LinearLayout，条目由代码 addView 全展开）
+          └ 空态 TextView（可见性由代码控制，不再依赖 setEmptyView）
+
+  ★★ 为什么必须是 ScrollView：与 activity_main 同因（横屏可用高 376dp，
+     装不下顶部区 + 列表，旧结构下 ListView 被挤成 0 高、末行被 AT_MOST 压扁到点不到）。
+     完整根因与取证见 activity_main.xml 顶部注释。
+
+  ★★ 为什么列表容器**不能**用 ListView：ScrollView 给出的高度约束是 UNSPECIFIED，
+     ListView 在该分支只按「padding + 单个 item 高」估高、不展开全部条目，
+     导致外层滚动范围少算、底部条目永远滚不出来。详见 activity_main.xml 顶部注释。
+
+  ★ 根节点不设 padding：Util.applySystemInsets() 会写 root 的 padding（四边叠加）。
+-->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg"
+    android:fillViewport="true"
+    android:scrollbars="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="@dimen/page_pad"
+            android:paddingEnd="@dimen/page_pad"
+            android:paddingTop="12dp"
+            android:paddingBottom="14dp">
+
+            <LinearLayout
+                android:id="@+id/saves_status_box"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@drawable/card_bg_press"
+                android:clickable="true"
+                android:focusable="false"
+                android:paddingStart="14dp"
+                android:paddingEnd="12dp"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:id="@+id/saves_summary"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:singleLine="true"
+                        android:ellipsize="end"
+                        android:textSize="13sp"
+                        android:textColor="@color/fg_muted" />
+
+                    <ImageView
+                        android:id="@+id/saves_chevron"
+                        android:layout_width="@dimen/row_chevron"
+                        android:layout_height="@dimen/row_chevron"
+                        android:layout_marginStart="8dp"
+                        android:src="@drawable/ic_chevron"
+                        android:tint="@color/fg_muted" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/saves_detail"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingTop="8dp"
+                    android:textSize="11sp"
+                    android:lineSpacingExtra="4dp"
+                    android:textColor="@color/fg_muted"
+                    android:visibility="gone" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/card_gap"
+                android:orientation="vertical"
+                android:background="@drawable/card_bg">
+
+                <include
+                    android:id="@+id/row_new_slot"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="62dp"
+                    android:background="@color/divider" />
+
+                <!--
+                  F15b：这里原本还有「导入 .msav」与「导入整槽（zip）」两行，**已移除**。
+                  ★ 原因（需求原文）：「这里UI重复，解决一下」——
+                    这两条与槽菜单里的「导入存档（.msav）」「导入整槽（zip）」是同一件事，
+                    同一个界面上出现两次入口。而 F15 已把两者做成"按介质成对"放进槽菜单
+                    （见 SlotsActivity.slotOps），且**从槽进去时目标槽已知、跳过选槽页**，
+                    比这里的"先选槽 → 再挑文件"少一步 ⇒ 保留槽菜单那条，删掉这两行。
+                  ⇒ 存档页顶部的操作卡现在只剩「无槽语境」的两项：
+                    新建槽（造槽本身）与数据根体检（全局维护），语义不再与槽菜单交叉。
+                -->
+                
+            </LinearLayout>
+        </LinearLayout>
+
+        <!-- 槽列表容器（条目由 SlotsActivity.rebuildList() 全展开挂载） -->
+        <LinearLayout
+            android:id="@+id/slot_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="@dimen/page_pad"
+            android:paddingEnd="@dimen/page_pad"
+            android:paddingBottom="12dp" />
+
+        <TextView
+            android:id="@+id/slot_empty"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:padding="28dp"
+            android:gravity="center"
+            android:textAlignment="center"
+            android:textSize="13sp"
+            android:lineSpacingExtra="4dp"
+            android:textColor="@color/fg_muted" />
+
+        <!-- F5b：底部留白（滚到底时末项与导航栏留出间隙、竖屏滚动范围更明显）。见 activity_main.xml -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/page_bottom_space" />
+    </LinearLayout>
+</ScrollView>

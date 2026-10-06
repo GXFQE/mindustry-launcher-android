@@ -1,275 +1,166 @@
 package io.mdt.launcher;
 
-import android.app.Activity;
-import android.app.AlertDialog;
-import android.app.ProgressDialog;
-import android.content.DialogInterface;
 import android.content.Intent;
-import android.database.Cursor;
-import android.net.Uri;
 import android.os.Bundle;
-import android.provider.OpenableColumns;
-import android.text.Editable;
-import android.text.InputType;
-import android.text.TextWatcher;
-import android.view.LayoutInflater;
 import android.view.View;
-import android.view.ViewGroup;
-import android.widget.CheckBox;
-import android.widget.CompoundButton;
-import android.widget.EditText;
-import android.widget.LinearLayout;
+import android.widget.AdapterView;
+import android.widget.ListView;
 import android.widget.TextView;
-import android.widget.Toast;
+
 import java.io.File;
-import java.io.FileFilter;
-import java.io.IOException;
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Comparator;
-import java.util.Date;
-import java.util.List;
-import java.util.Locale;
 
 /**
- * 存档与备份（M3）。
+ * 某个槽的**存档列表页**（二级页面，2026-10-06 第 115 轮第六批）。
  *
- * 心智模型（和桌面版 MDT 的「分类」对齐）：
- *   「槽」= 一套互相隔离的游戏数据（存档 / 设置 / mods）。一个槽 = 一个数据目录。
- *   多版本共享同一个数据根时**互相破坏**（探针实证），所以给版本分配不同的槽是唯一的隔离手段。
- *   ★ F0（2026-10-02）之后：**每个槽（含当前槽）恒定住在平级的 `slot-&lt;名&gt;`**，
- *     当前槽只是"被记下来、下次游戏启动会读它"的那一个（见 {@link Data#dirOf}）。
- *     改造前当前槽是「数据根本体 `files/`」，靠启动前改名交换换进换出；
- *     唯一的例外是 `build ≤ 146` 的远古包，它只认 `files/`，那一刻本体被临时改名过去。
+ * <p>★ 起因（用户）：「**存档页面也变成和模组 / 地图 / 蓝图这样的二级页面吧**」——
+ * 原来槽页的「存档」只是一层**弹窗菜单**（看每份存档… / 导出存档… / 导入存档…），
+ * 而模组 / 地图 / 蓝图那三条早就是**页面**了 ⇒ 存档补齐同一形状：
+ * 表头 + 顶上动作行 + 页面自己的列表，返回键直接回槽页。
  *
- * 本界面提供八件事：
- *   ① 槽的增 / 改名 / 删（改名与删除会同步修正「版本 → 槽」的分配）；
- *   ② 备份 / 恢复（口径 =「槽内容 − 排除名单」，与整槽导出共用；CAS 清单记 sha256，
- *      恢复前先边写边验 —— F19 前是白名单，见 {@link Data#SLOT_EXCLUDE}）；
- *   ③ 桌面版 `.msav` 迁移（gzip 流，直接放进目标槽的 `saves/`）；
- *   ④ **数据根体检** —— 找出游戏 copy 机制留下的 HUB 冗余副本并清理（见 Paths 头注释）；
- *   ⑤ **导出到共享存储（F6）** —— 单个 `.msav` 或整槽打包 zip，走 SAF，
- *      不需要任何存储权限（Android 11+ 下 `Android/data/` 对文件管理器不可见，
- *      这是用户唯一能自己把存档拿出来的途径，见 {@link Exporter}）；
- *   ⑥ **整槽 zip 导入（F6c）** —— ⑤ 的反向：把 zip 解包进指定槽，兼容游戏自己那份
- *      「设置 → 数据 → 导出数据」的格式（见 {@link SlotZip}）。
- *   ⑦ **F15：进 / 出入口对称** —— ③⑥ 原先只在存档页、⑤ 只在槽菜单，于是"在这个槽上
- *      导一份存档进来"要退回存档页重选一遍槽。现在**槽菜单里按介质成对**排：
- *      导入存档 / 导出存档 / 导入整槽 / 导出整槽（{@link #pickMsavForSlot} 等），
- *      从槽进来时目标已知、跳过选槽页。
- *   ⑧ **F15b：存档页不再有导入入口** —— ⑦ 之后 ③⑥ 与槽菜单重复，同一界面上两个入口
- *      （需求原文「这里UI重复，解决一下」）⇒ 存档页顶部只留「无槽语境」的两项
- *      （新建槽 / 数据根体检），**导入统一从槽菜单进**（目标已知，还少一次选槽）。
- *   ⑨ **F4②：克隆此槽** —— 把某个槽整份复制成一个新槽。本类只负责**界面**
- *      （{@link #promptClone} 问名字 / 前置挡住"源槽在跑""源槽是空的"；
- *      {@link #doClone} 进度框 + 报数），真正的实现是
- *      {@link Backup#cloneSlot} = 「备份源槽 + 恢复进新槽」，**零新原语**。
- *      刻意不另写一份目录树复制：否则"克隆"与"备份"会各有一套口径，
- *      不一致时不会有任何症状（症状只会是"克隆出来的槽少几个文件"这种半年后才发现的东西）。
- *      ★ 放在 `Backup` 而不是本类，是为了让**自检**与界面走同一份实现（可断言）。
+ * <p>🔴 **两条纪律**（与那三个页面一字不差）：
+ * <ul>
+ *   <li>**只读**：本页不提供删除 —— 存档是用户的东西，删只走游戏自己的界面
+ *       （口径见 {@link SlotIo#showUnreadable} 的注释）；</li>
+ *   <li>SAF 的「导入」走 `startActivityForResult` ⇒ **本页必须转发 `onActivityResult`**
+ *       （少了它就是"选完文件什么都没发生"）。</li>
+ * </ul>
  *
- * ⚠️ 对**当前槽**的写操作要求 `:game` 已退出（Data.gameAlive）。界面上会先提示并给出「结束游戏」。
+ * <p>⚠️ 名字来历：本类原来指的是**槽列表页**（主页「存档与备份」那一行）；
+ *   第六批把它改名成 {@link SlotsActivity}（它列的是**槽**），把这个名字让给了这里。
  */
 public class SavesActivity extends BaseActivity {
 
+    /** 进来的槽名。没有 ⇒ 直接退出，**不猜**（与模组页 / 地图页 / 蓝图页同一条） */
+    public static final String EXTRA_SLOT = "slot";
 
-
-
-    private List<Data.Slot> mSlots;
-
-    // F3b：槽列表容器（LinearLayout，条目代码挂载）+ 空态
-    private ViewGroup mListContainer;
+    private String mSlot;
+    private ListView mList;
+    private TextView mHead;
     private TextView mEmpty;
+    private View mBadRow;
+    private View mBadDiv;
+    /** 当前这份列表对应的文件（点行时按位置取；与列表**同一次扫描**，不重扫） */
+    private File[] mFiles = new File[0];
 
-    // F1b：顶部状态卡（摘要行 + 可展开的完整路径）
-    private TextView mSummary;
-    private TextView mDetail;
+    /** SAF 回调后要刷新本页（`SlotOps.Host` 是 `SlotIo` 那套 SAF 流程的回调口） */
+    private final SlotOps.Host mHost = new SlotOps.Host() {
+        @Override public void onSlotChanged() {
+            if (!Util.dead(SavesActivity.this)) refresh();
+        }
+    };
 
-
-    @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    @Override protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        android.util.Log.i("MDTLauncher", "SavesActivity onCreate");
-        buildUi();
-    }
-    /**
-     * 进页面时清一遍数据根残留。
-     *
-     * ★ F20（2026-10-03 用户：「我们是不是应该给一些功能加上开关」）：本方法会**删文件**，
-     *   而它原本既没有开关、也不说一声（第 57 轮把体检的可见入口删掉了）⇒ 给它加了开关。
-     *   关掉后直接返回；想清的时候去设置页「自动清理残留 → 立即清理一次」。
-     *   ⚠️ 它只清 {@link Data#REDUNDANT_NAMES} 那三项**自己的残留副本**（自检 ㉕ 守着这条边界）。
-     */
-    private void autoHealth() {
-        if (!Config.get().autoCleanRedundant()) return;
-        new Thread(new Runnable() {
-            @Override public void run() {
-                final Data.AutoClean a = Data.autoCleanRedundant(SavesActivity.this);
-                if (a.cleaned > 0 && !isFinishing()) {
-                    runOnUiThread(new Runnable() {
-                        @Override public void run() {
-                            if (!isFinishing()) refresh();
-                        }
-                    });
-                }
-            }
-        }, "auto-health").start();
-    }
+        mSlot = getIntent() == null ? null : getIntent().getStringExtra(EXTRA_SLOT);
+        if (mSlot == null || mSlot.trim().isEmpty()) {
+            finish();                       // 没槽名就退出，**不猜**
+            return;
+        }
+        mSlot = mSlot.trim();
 
-
-    @Override
-    protected void onResume() {
-        super.onResume();
-        // F0：`:game` 进程可能刚写过 `mdt-legacy-owner.txt`（远古包借住 files/ 或刚收回），
-        //   本页 `dirOf` 依赖它 ⇒ 每次回前台先刷一次这个跨进程键，再重建列表。
-        Data.reloadLegacyOwner();
-        refresh();
-            autoHealth();              // 静默清一遍数据根残留（无可见入口）
-}
-
-    // ── UI ────────────────────────────────────────────────────────────────
-
-    /**
-     * F1b：界面由"代码手搓"改为 inflate 布局（卡片风），与主界面同款骨架。
-     * 逻辑（备份 / 恢复 / .msav / 体检）一行未动。
-     */
-    private void buildUi() {
         View root = getLayoutInflater().inflate(R.layout.activity_saves, null);
-
-        // 顶部状态卡：整卡可点，展开完整路径
-        mSummary = (TextView) root.findViewById(R.id.saves_summary);
-        mDetail = (TextView) root.findViewById(R.id.saves_detail);
-        Util.bindExpandableCard(root, R.id.saves_status_box,
-                R.id.saves_detail, R.id.saves_chevron);
-
-        Util.bindAction(root, R.id.row_new_slot, R.drawable.ic_add,
-                R.string.saves_act_new_title, R.string.saves_act_new_sub, new Runnable() {
-                    @Override public void run() { promptNewSlot(); }
-                });
-        // F15b：原先这里还有 row_msav / row_zip 两行（导入 .msav / 导入整槽 zip），**已移除** ——
-        //   它们与槽菜单里的同两项重复。导入的落点必然是某个槽，从槽进去目标已知、
-        //   还能跳过选槽页 ⇒ 统一收进槽菜单（见 slotOps）。原因与影响见 activity_saves.xml。
-
-        // 槽列表：容器是 LinearLayout，条目在 rebuildList() 里全展开挂载
-        // ★ 为什么不用 ListView —— 见 MainActivity.rebuildList() 的注释（F3b 根因）。
-        mListContainer = (ViewGroup) root.findViewById(R.id.slot_container);
-        mEmpty = (TextView) root.findViewById(R.id.slot_empty);
-        mEmpty.setText(R.string.saves_empty);
-
         Util.applySystemInsets(root);
         setContentView(root);
+        setTitle(getString(R.string.saves_list_title_fmt, mSlot));
+
+        mHead = (TextView) root.findViewById(R.id.save_head);
+        mEmpty = (TextView) root.findViewById(R.id.save_empty);
+        // ⚠️ 空态那句话**复用**导入那条资源（「槽「X」里还没有存档。」）—— 同一件事只留一句文案
+        mEmpty.setText(getString(R.string.export_no_save_fmt, mSlot));
+        mList = (ListView) root.findViewById(R.id.save_list);
+        mList.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override public void onItemClick(AdapterView<?> p, View v, int pos, long id) {
+                if (pos < 0 || pos >= mFiles.length) return;
+                SlotIo.showSaveDetail(SavesActivity.this, mFiles[pos]);
+            }
+        });
+        mBadRow = root.findViewById(R.id.row_save_bad);
+        mBadDiv = root.findViewById(R.id.div_save_bad);
+
+        // ── 三条动作（顶上）────────────────────────────────────────────────
+        Util.bindAction(root, R.id.row_save_import, R.drawable.ic_download,
+                R.string.slot_op_import_save, R.string.save_page_import_sub, new Runnable() {
+                    @Override public void run() {
+                        Data.Slot s = findSlot();
+                        if (s == null) { gone(); return; }
+                        SlotIo.importSave(SavesActivity.this, s);
+                    }
+                });
+        Util.bindAction(root, R.id.row_save_export, R.drawable.ic_upload,
+                R.string.slot_op_export_save, R.string.save_page_export_sub, new Runnable() {
+                    @Override public void run() {
+                        Data.Slot s = findSlot();
+                        if (s == null) { gone(); return; }
+                        SlotIo.exportSave(SavesActivity.this, s);
+                    }
+                });
+        Util.bindAction(root, R.id.row_save_bad, R.drawable.ic_health,
+                R.string.slot_op_show_bad_saves, R.string.save_page_bad_sub, new Runnable() {
+                    @Override public void run() {
+                        SlotIo.showUnreadable(SavesActivity.this, mSlot);
+                    }
+                });
     }
 
-    private void refresh() {
-        mSlots = Data.allSlots(this);
-        rebuildList();
-        if (mSummary != null) {
-            File root = Data.dataRoot(this);
-            mSummary.setText(getString(R.string.saves_summary_fmt,
-                    mSlots.size(),
-                    Data.currentSlot(this),
-                    getString(Data.gameAlive(this) ? R.string.game_running
-                                                   : R.string.game_not_running)));
-            mDetail.setText(getString(R.string.saves_detail_fmt,
-                    root == null ? "?" : root.getAbsolutePath(),
-                    Backup.rootDir(this).getAbsolutePath()));
-        }
+    @Override protected void onResume() {
+        super.onResume();
+        refresh();                          // 用户可能刚在游戏里存过 / 在别处导入过
     }
 
     /**
-     * 重建槽列表（F3b）。
-     * ★ 不用 ListView 的原因见 MainActivity.rebuildList()：ScrollView 内的 ListView
-     *   拿到 UNSPECIFIED 高度约束，只按「padding + 单行高」估整体高度，
-     *   列表后面条目的滚不出来。
+     * ★ SAF 的结果**必然回到发起它的那个 Activity** ⇒ 本页必须转发给 {@link SlotIo}
+     *   （少了它就是"选完文件什么都没发生"；先例见 {@link SlotActivity} 的同一条注释）。
      */
-    private void rebuildList() {
-        if (mListContainer == null) return;
-        mListContainer.removeAllViews();
-        int n = (mSlots == null) ? 0 : mSlots.size();
-        if (mEmpty != null) mEmpty.setVisibility(n == 0 ? View.VISIBLE : View.GONE);
-        if (n == 0) return;
-
-        LayoutInflater inf = getLayoutInflater();
-        for (int i = 0; i < n; i++) {
-            final Data.Slot s = mSlots.get(i);
-            View v = inf.inflate(R.layout.item_slot, mListContainer, false);
-            ((TextView) v.findViewById(R.id.slot_name)).setText(s.name);
-            // 槽行的统计段统一走资源（原 Data.Slot.subtitle() 的硬编码串已删，2026-10-02）。
-            // F5：再追加一行自动备份策略摘要 —— 否则用户没法一眼看出"这个槽到底会不会自动备份"。
-            String meta = getString(R.string.slot_entry_fmt, s.files, Util.formatSize(s.bytes));
-            Config.BackupPolicy bp = Config.get().backupPolicy(s.name);
-            meta += bp.enabled
-                    ? getString(R.string.policy_summary_fmt, bp.minMinutes, bp.maxBackups)
-                    : getString(R.string.policy_off_suffix);
-            ((TextView) v.findViewById(R.id.slot_meta)).setText(meta);
-            v.findViewById(R.id.slot_badge).setVisibility(s.active ? View.VISIBLE : View.GONE);
-            // 整行点击 = 槽操作菜单（原先是 ListView 的 onItemClick）
-            v.setOnClickListener(new View.OnClickListener() {
-                @Override public void onClick(View x) { Intent _it = new Intent(SavesActivity.this, SlotActivity.class);
-                            _it.putExtra(SlotActivity.EXTRA_SLOT, s.name);
-                            startActivity(_it); }
-            });
-            mListContainer.addView(v);
-        }
+    @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        SlotIo.onActivityResult(this, requestCode, resultCode, data, mHost);
     }
 
-    // ── 槽操作 ────────────────────────────────────────────────────────────
+    /** 重新扫盘 + 重建列表 + 决定空态 / 「读不出来」那一行的显隐 */
+    private void refresh() {
+        mFiles = SlotIo.fillSaves(this, mSlot, mList, null);
+        boolean empty = mFiles.length == 0;
+        // 表头那句同时承担"有几份"（标题里放不下多行，见 dialog_msav_list.xml 的实测）
+        mHead.setText(getString(R.string.saves_list_head_fmt, mFiles.length));
+        mEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
+        mList.setVisibility(empty ? View.GONE : View.VISIBLE);
 
-
-
-    private void promptNewSlot() {
-        final EditText input = new EditText(this);
-        input.setInputType(InputType.TYPE_CLASS_TEXT);
-        input.setHint(R.string.new_slot_hint);
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(20), 0, dp(20), 0);
-        box.addView(input, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.new_slot_title)
-                .setMessage(R.string.new_slot_msg)
-                .setView(box)
-                .setPositiveButton(R.string.create, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) {
-                        String err = Data.createSlot(SavesActivity.this, input.getText().toString());
-                        if (err != null) alert(getString(R.string.create_failed), err);
-                        refresh();
+        // 「看看哪几份读不出来」**只在真有**的时候出现 —— 口径 = `MsavMeta.summarize`
+        // （与槽页副标题、那个弹窗**同一处**实现；读 meta 要开流 ⇒ 走后台）
+        new Thread(new Runnable() {
+            @Override public void run() {
+                final MsavMeta.Saves sm;
+                try {
+                    File dir = new File(Data.dirOf(SavesActivity.this, mSlot), "saves");
+                    sm = MsavMeta.summarize(dir.listFiles());
+                } catch (Throwable t) {
+                    return;
+                }
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        if (Util.dead(SavesActivity.this)) return;
+                        int vis = sm.unreadableCount() > 0 ? View.VISIBLE : View.GONE;
+                        if (mBadRow != null) mBadRow.setVisibility(vis);
+                        // ⚠️ 线要跟着行一起显隐（只处理行 ⇒ 卡片底下留一条悬空横线，第 115 轮第二批踩过）
+                        if (mBadDiv != null) mBadDiv.setVisibility(vis);
                     }
-                })
-                .setNegativeButton(R.string.cancel, null)
-                .show();
+                });
+            }
+        }, "save-bad-count").start();
     }
 
-
-
-
-
-
-
-    // ── 数据根体检 ────────────────────────────────────────────────────────
-
-    // ── 小工具 ────────────────────────────────────────────────────────────
-
-
-
-
-    /** 全类弹窗的唯一入口 —— ★ 2026-10-04 起在这里挡"已销毁的 Activity"（见 {@link Util#dead}）。 */
-    private void alert(String title, String msg) {
-        if (Util.dead(this)) return;
-        new AlertDialog.Builder(this)
-                .setTitle(title)
-                .setMessage(msg)
-                .setPositiveButton(R.string.close, null)
-                .show();
+    /** 这个槽已经不在了（被删 / 改名）：提示一句就退出去（文案与槽页那句同一条） */
+    private void gone() {
+        android.widget.Toast.makeText(this, getString(R.string.slot_page_gone_fmt, mSlot),
+                android.widget.Toast.LENGTH_SHORT).show();
+        finish();
     }
 
-    private void toast(String s) {
-        Toast.makeText(this, s, Toast.LENGTH_SHORT).show();
-    }
-
-    private int dp(int v) {
-        return Math.round(v * getResources().getDisplayMetrics().density);
+    /** 找本页认的那个槽对象（**每次都现扫** —— 槽会被重命名 / 删除，别缓存） */
+    private Data.Slot findSlot() {
+        for (Data.Slot x : Data.allSlots(this)) {
+            if (mSlot.equals(x.name)) return x;
+        }
+        return null;
     }
 }

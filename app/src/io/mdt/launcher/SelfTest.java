@@ -124,10 +124,10 @@ public final class SelfTest {
      *   那边管"清单里注册了没有"，这边管"类继承对了没有"，判据不同，不能合并。
      */
     private static final Class<?>[] PAGES = {
-            MainActivity.class, SavesActivity.class, SlotActivity.class, ModsActivity.class,
+            MainActivity.class, SlotsActivity.class, SlotActivity.class, ModsActivity.class,
             MapsActivity.class, MapDetailActivity.class, SettingsActivity.class,
             LogActivity.class, TrashActivity.class, BlueprintsActivity.class,
-            BlueprintDetailActivity.class, GameSlot.class};
+            BlueprintDetailActivity.class, GameSlot.class, SavesActivity.class};
 
     private SelfTest() {}
 
@@ -1900,7 +1900,7 @@ public final class SelfTest {
 
     /**
      * ★ ⑭ F4② 克隆槽（2026-10-02）。被试用真原语 {@link Backup#cloneSlot} ——
-     * 界面（SavesActivity.doClone）调的就是它，所以这里过 = 用户按下去就过。
+     * 界面（SlotsActivity.doClone）调的就是它，所以这里过 = 用户按下去就过。
      *
      * ★★ 为什么必须**逐字节**比对，而不是"文件数对得上"：
      *   克隆走的是 `Backup.create` + `restore`，它的口径（排除名单 / 空壳判定 / `.part` /
@@ -5639,11 +5639,11 @@ public final class SelfTest {
      */
     private static void activityRegistration(Context ctx, List<String> L, int[] stat) {
         L.add("── ㉙ 清单注册检查（漏注册 = BUILD OK 但真机崩）──");
-        String[] want = {"io.mdt.launcher.MainActivity", "io.mdt.launcher.SavesActivity",
+        String[] want = {"io.mdt.launcher.MainActivity", "io.mdt.launcher.SlotsActivity",
                 "io.mdt.launcher.ModsActivity", "io.mdt.launcher.SlotActivity",
                 "io.mdt.launcher.MapsActivity", "io.mdt.launcher.MapDetailActivity",
                 "io.mdt.launcher.BlueprintsActivity", "io.mdt.launcher.BlueprintDetailActivity",
-                "io.mdt.launcher.TrashActivity"};
+                "io.mdt.launcher.TrashActivity", "io.mdt.launcher.SavesActivity"};
         int found = 0;
         for (String n : want) {
             if (canResolve(ctx, n)) found++;
@@ -5790,10 +5790,10 @@ public final class SelfTest {
      */
     private static void pageSkeleton(Context ctx, List<String> L, int[] stat) {
         L.add("── ㉛ 页面骨架（根节点 @id/root + 地图页两行动作在顶上）──");
-        final int[] layouts = {R.layout.activity_main, R.layout.activity_saves,
+        final int[] layouts = {R.layout.activity_main, R.layout.activity_slots,
                 R.layout.activity_mods, R.layout.activity_slot, R.layout.activity_maps,
                 R.layout.activity_settings, R.layout.activity_log, R.layout.activity_map_detail,
-                R.layout.activity_trash};
+                R.layout.activity_trash, R.layout.activity_saves};
         android.view.LayoutInflater inf = android.view.LayoutInflater.from(ctx);
         int good = 0;
         StringBuilder bad = new StringBuilder();

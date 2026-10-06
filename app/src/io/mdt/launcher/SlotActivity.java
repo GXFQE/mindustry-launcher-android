@@ -62,40 +62,15 @@ public class SlotActivity extends BaseActivity {
         mModsSub = (TextView) modsRow.findViewById(R.id.act_sub);
         mModsSub.setText(R.string.slot_page_mods_sub);
         mSavesSub = (TextView) root.findViewById(R.id.row_slot_saves).findViewById(R.id.act_sub);
-        // ★ 存档段：导入/导出**就地做**（{@link SlotIo}）—— 不再派发回存档页。
-        //   这两条走 SAF，本页自己发起、自己收结果（见本类 onActivityResult 的转发）。
+        // ★ 2026-10-06（第 115 轮第六批）：本行改成**开子页面**（与模组 / 地图 / 蓝图同一条）。
+        //   原来是**弹窗菜单**（看每份存档… / 导出存档… / 导入存档…），用户：
+        //   「存档页面也变成和模组/地图/蓝图这样的二级页面吧」⇒ 菜单整个搬进新页面，
+        //   本行只负责"进那一页"（导入/导出/读不出来的那几份都在页面上）。
         Util.bindActionValue(root, R.id.row_slot_saves, R.drawable.ic_save,
                 R.string.slot_page_saves, new Runnable() {
                     @Override public void run() {
-                        // ★ 第三项只在**真有读不出来的存档**时出现 —— 它由副标题上那句 ⚠ 引出来
-                        //   （上一轮 `refresh()` 已经数好了，这里只读那个数，**不在点击时重新扫盘**）。
-                        // ★ 2026-10-06（一档①）：第一项 = **只读**的「看每份存档…」——
-                        //   "这份存档是什么图、玩了多久"原来只能靠点「导出存档」顺带看到
-                        //   （用导出查档案，路子不对）。列表与详情的实现都在 {@link SlotIo}。
-                        final boolean hasBad = mSavesBad > 0;
-                        String[] items = hasBad
-                                ? new String[]{getString(R.string.slot_op_show_saves),
-                                        getString(R.string.slot_op_export_save),
-                                        getString(R.string.slot_op_import_save),
-                                        getString(R.string.slot_op_show_bad_saves)}
-                                : new String[]{getString(R.string.slot_op_show_saves),
-                                        getString(R.string.slot_op_export_save),
-                                        getString(R.string.slot_op_import_save)};
-                        new android.app.AlertDialog.Builder(SlotActivity.this)
-                                .setTitle(R.string.slot_page_saves)
-                                .setItems(items,
-                                        new android.content.DialogInterface.OnClickListener() {
-                                            @Override public void onClick(android.content.DialogInterface d, int w) {
-                                                if (w == 0) { SlotIo.showSaves(SlotActivity.this, mSlot); return; }
-                                                Data.Slot s = findSlot();
-                                                if (s == null) { gone(); return; }
-                                                if (w == 1) SlotIo.exportSave(SlotActivity.this, s);
-                                                else if (w == 2) SlotIo.importSave(SlotActivity.this, s);
-                                                else SlotIo.showUnreadable(SlotActivity.this, mSlot);
-                                            }
-                                        })
-                                .setNegativeButton(R.string.cancel, null)
-                                .show();
+                        startActivity(new Intent(SlotActivity.this, SavesActivity.class)
+                                .putExtra(SavesActivity.EXTRA_SLOT, mSlot));
                     }
                 });
         View mapsRow = Util.bindActionValue(root, R.id.row_slot_maps, R.drawable.ic_map,
@@ -157,7 +132,7 @@ public class SlotActivity extends BaseActivity {
      *
      * 原因：`startActivityForResult` 的结果**必然回到发起它的那个 Activity**；
      *   既然发起方已经从存档页改成槽页面，回调也就只能在这里收。
-     *   ⚠️ 症状与 SavesActivity 少 `onNewIntent` 那次一模一样（用户：「点了没反应」）。
+     *   ⚠️ 症状与 SlotsActivity 少 `onNewIntent` 那次一模一样（用户：「点了没反应」）。
      */
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);

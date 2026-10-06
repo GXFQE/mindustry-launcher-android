@@ -44,7 +44,7 @@ import java.util.zip.ZipInputStream;
  *    （那种文件在游戏里会显示成一个打不开的存档）。
  *
  * ⚠️ 解包是**写操作**：目标槽是当前槽时必须先确认 `:game` 已退出，
- *    这条由调用方（{@link SavesActivity}）负责，本类不查（同 {@link Backup}）。
+ *    这条由调用方（{@link SlotsActivity}）负责，本类不查（同 {@link Backup}）。
  */
 public final class SlotZip {
 

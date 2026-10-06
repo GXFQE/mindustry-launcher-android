@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Locale;
 
 /**
- * 槽的**导入 / 导出**（走 SAF）—— 从 {@link SavesActivity} 搬出来的第二块
+ * 槽的**导入 / 导出**（走 SAF）—— 从 {@link SlotsActivity} 搬出来的第二块
  * （第一块是对话框类的 {@link SlotOps}）。
  *
  * 🔴 为什么搬（2026-10-03 用户：「也搬过去」）：这些操作原来只实现在存档页，
@@ -42,7 +42,7 @@ import java.util.Locale;
  *    `onActivityResult` 做成静态方法而不是自带 Activity 的原因。
  *
  * ★ 跨 `onActivityResult` 的"待办目标"（选完文件才知道要落到哪）存在**静态字段**里：
- *   与原来 SavesActivity 的实例字段是同一套语义（都只在内存里、进程被杀就丢），
+ *   与原来 SlotsActivity 的实例字段是同一套语义（都只在内存里、进程被杀就丢），
  *   ⚠️ 但**每次发起前必须重设**、**回调进来先清空**（`REQ_*` 三条分支都这么做）——
  *   否则用户取消后残留的目标会被下一次选择"接上"，文件落进上一个槽。
  */
@@ -135,6 +135,57 @@ final class SlotIo {
     // ── 导出到共享存储（F6） ──────────────────────────────────────────────
 
     /**
+     * ★★ 2026-10-06（第 115 轮第六批）：把一个槽的存档列表**填进一个 ListView**。
+     *
+     * <p>为什么要抽出来：这份列表原来只填进**对话框**（`exportSave` / `showSaves`），
+     * 而第六批把「看每份存档」做成了**页面**（{@link SlotsActivity}）⇒ 两边要的完全是同一套：
+     * 扫描 → 排序 → "文件名 + 大小" → **meta 后台渐进补** → **只刷那一行**。
+     *
+     * <p>⚠️ 三条老是踩的：① 列表**没有份数上限**（几百份存档），所以只能后台补；
+     * ② 补的时候**绝不能用 `notifyDataSetChanged()`**（整片重排 ⇒ 用户一边滚一边跳）；
+     * ③ 后台线程要能**停**：对话框那条路靠 `aliveOrNull[0]`（关掉即停），
+     * 页面那条路传 null ⇒ 用 {@link Util#dead(Activity)} 判（转屏 / 退出都会停）。
+     *
+     * @param aliveOrNull 对话框的"还开着吗"标志；页面传 **null**
+     * @return **排好序**的文件数组（调用方按位置取，**不要重扫** —— 重扫会与列表对不上）
+     */
+    static File[] fillSaves(final Activity a, final String slotName, final android.widget.ListView lv,
+                            final boolean[] aliveOrNull) {
+        File dir = new File(Data.dirOf(a, slotName), "saves");   // 手拼：**别**用会 mkdirs 的那个
+        File[] fs = dir.listFiles(ONLY_FILES);
+        if (fs == null) fs = new File[0];
+        Arrays.sort(fs, NAME_ORDER);
+        final File[] files = fs;
+        final String[] titles = new String[files.length];
+        final String[] subs = new String[files.length];
+        for (int i = 0; i < files.length; i++) {
+            titles[i] = files[i].getName();
+            subs[i] = Util.formatSize(files[i].length());
+        }
+        final MsavListAdapter adapter = new MsavListAdapter(a, titles, subs);
+        lv.setAdapter(adapter);
+        new Thread(new Runnable() {
+            @Override public void run() {
+                for (int i = 0; i < files.length; i++) {
+                    if (aliveOrNull != null ? !aliveOrNull[0] : Util.dead(a)) return;
+                    final int idx = i;
+                    final String line = msavLine(a, MsavMeta.read(files[idx]));
+                    a.runOnUiThread(new Runnable() {
+                        @Override public void run() {
+                            if (aliveOrNull != null ? !aliveOrNull[0] : Util.dead(a)) return;
+                            String size = Util.formatSize(files[idx].length());
+                            adapter.setSub(idx, line.isEmpty() ? size : (size + " · " + line));
+                            // ★ 只刷新**这一行**（见 {@link MsavListAdapter#refreshSub} 的长注释）
+                            adapter.refreshSub(lv, idx);
+                        }
+                    });
+                }
+            }
+        }, "msav-list").start();
+        return files;
+    }
+
+    /**
      * F6 ①：单文件导出（把这个槽 `saves/` 里的某个存档拿出来）。
      *
      * ★ 文件名**用原始名**（`f.getName()`）—— 存档名就是玩家在游戏里看到的那个名字
@@ -148,64 +199,35 @@ final class SlotIo {
         //   于是"只是打开看看有没有存档"这个只读动作会把空目录造出来，
         //   进而把空槽的导出判定污染成"有内容"（本轮真机实测踩到）。
         File dir = new File(Data.dirOf(a, s.name), "saves");
-        final File[] fs = dir.listFiles(ONLY_FILES);
+        File[] fs = dir.listFiles(ONLY_FILES);
         if (fs == null || fs.length == 0) {
             toast(a, a.getString(R.string.export_no_save_fmt, s.name));
             return;
         }
-        Arrays.sort(fs, NAME_ORDER);
-        // ★ 每条一个**卡片**：第一行 = 文件名，第二行 = 大小 ·「这是什么存档」
-        final String[] titles = new String[fs.length];
-        final String[] subs = new String[fs.length];
-        for (int i = 0; i < fs.length; i++) {
-            titles[i] = fs[i].getName();
-            subs[i] = Util.formatSize(fs[i].length());
-        }
-        // ★★ 元数据**后台渐进填充**、**不设上限**（用户问过「存档太多会不会出问题」——
-        //   会：原来全在 UI 线程读完才弹窗、且留了 60 份上限）
+        // ★★ 列表本体走 {@link #fillSaves}（与存档页**同一套实现**：后台渐进补 + 只刷那一行）
         View listView = a.getLayoutInflater().inflate(R.layout.dialog_msav_list, null);
         final android.widget.ListView lv =
                 (android.widget.ListView) listView.findViewById(R.id.msav_list);
-        final MsavListAdapter adapter = new MsavListAdapter(a, titles, subs);
-        lv.setAdapter(adapter);
         final AlertDialog dlg = new AlertDialog.Builder(a)
                 .setTitle(R.string.export_pick_title_fmt)
                 .setView(listView)
                 .setNegativeButton(R.string.cancel, null)
                 .create();
+        final boolean[] alive = {true};
+        final File[] ordered = fillSaves(a, s.name, lv, alive);
         lv.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener() {
             @Override public void onItemClick(android.widget.AdapterView<?> p, View v, int pos, long id) {
-                if (pos < 0 || pos >= fs.length) return;
-                startExportSave(a, fs[pos]);
+                if (pos < 0 || pos >= ordered.length) return;
+                startExportSave(a, ordered[pos]);
                 dlg.dismiss();
             }
         });
-        dlg.show();
-        final boolean[] alive = {true};
         dlg.setOnDismissListener(new DialogInterface.OnDismissListener() {
             @Override public void onDismiss(DialogInterface d) {
-                alive[0] = false;
+                alive[0] = false;          // 关了 ⇒ 后台补副标题的线程自己停
             }
         });
-        new Thread(new Runnable() {
-            @Override public void run() {
-                for (int i = 0; i < fs.length && alive[0]; i++) {
-                    final int idx = i;
-                    final String line = msavLine(a, MsavMeta.read(fs[idx]));
-                    a.runOnUiThread(new Runnable() {
-                        @Override public void run() {
-                            if (!alive[0]) return;
-                            String size = Util.formatSize(fs[idx].length());
-                            adapter.setSub(idx, line.isEmpty() ? size : (size + " · " + line));
-                            // ★ 2026-10-04：只刷新**这一行**（原来调 notifyDataSetChanged()，
-                            //   整片列表每补一份就重排一次 —— 存档多的槽一边滚一边跳）。
-                            //   口径与 MapsActivity 的缩略图那条一致，实现收口在适配器里。
-                            adapter.refreshSub(lv, idx);
-                        }
-                    });
-                }
-            }
-        }, "msav-meta").start();
+        dlg.show();
     }
 
     /**
@@ -256,78 +278,6 @@ final class SlotIo {
         }, "msav-unreadable").start();
     }
 
-    /**
-     * ★ 2026-10-05：**只读的存档列表** —— 点一份看它是什么图、玩了多久。
-     *
-     * 起因：这两件事原来只有两条路能看见 ——
-     *   ① 点「导出存档」列表的第二行（**用"导出"去查档案，路子不对**）；
-     *   ② 地图详情页（那是**地图**，不是存档）。
-     * ⇒ 补一个只读入口，点一份弹详情（{@link MsavText#detail} 那一份口径），
-     *   详情里带「导出这一份…」出口 —— 出口是便利，不是这个列表的主题。
-     *
-     * ⚠️ 与 {@link #showUnreadable} 同一条纪律：**只读，不提供删除**
-     *   （存档是用户的东西，删只走游戏自己的界面）。
-     * ⚠️ 这份列表没有份数上限，副标题照样**后台渐进填充 + 只刷那一行**（见 exportSave 的注释）。
-     */
-    static void showSaves(final Activity a, final String slotName) {
-        final File dir = new File(Data.dirOf(a, slotName), "saves");
-        final File[] fs = dir.listFiles(ONLY_FILES);
-        if (fs == null || fs.length == 0) {
-            toast(a, a.getString(R.string.export_no_save_fmt, slotName));
-            return;
-        }
-        Arrays.sort(fs, NAME_ORDER);
-        final String[] titles = new String[fs.length];
-        final String[] subs = new String[fs.length];
-        for (int i = 0; i < fs.length; i++) {
-            titles[i] = fs[i].getName();
-            subs[i] = Util.formatSize(fs[i].length());
-        }
-        View listView = a.getLayoutInflater().inflate(R.layout.dialog_msav_list, null);
-        TextView head = (TextView) listView.findViewById(R.id.msav_head);
-        if (head != null) {
-            head.setVisibility(View.VISIBLE);
-            head.setText(a.getString(R.string.saves_list_head_fmt, fs.length));
-        }
-        final android.widget.ListView lv =
-                (android.widget.ListView) listView.findViewById(R.id.msav_list);
-        final MsavListAdapter adapter = new MsavListAdapter(a, titles, subs);
-        lv.setAdapter(adapter);
-        final AlertDialog dlg = new AlertDialog.Builder(a)
-                .setTitle(a.getString(R.string.saves_list_title_fmt, slotName))
-                .setView(listView)
-                .setNegativeButton(R.string.close, null)
-                .create();
-        lv.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener() {
-            @Override public void onItemClick(android.widget.AdapterView<?> p, View v, int pos, long id) {
-                if (pos < 0 || pos >= fs.length) return;
-                showSaveDetail(a, fs[pos]);
-            }
-        });
-        dlg.show();
-        final boolean[] alive = {true};
-        dlg.setOnDismissListener(new DialogInterface.OnDismissListener() {
-            @Override public void onDismiss(DialogInterface d) {
-                alive[0] = false;
-            }
-        });
-        new Thread(new Runnable() {
-            @Override public void run() {
-                for (int i = 0; i < fs.length && alive[0]; i++) {
-                    final int idx = i;
-                    final String line = msavLine(a, MsavMeta.read(fs[idx]));
-                    a.runOnUiThread(new Runnable() {
-                        @Override public void run() {
-                            if (!alive[0]) return;
-                            String size = Util.formatSize(fs[idx].length());
-                            adapter.setSub(idx, line.isEmpty() ? size : (size + " · " + line));
-                            adapter.refreshSub(lv, idx);
-                        }
-                    });
-                }
-            }
-        }, "msav-list").start();
-    }
 
     /**
      * 一份存档的详情（**只读**）：文件名当标题，正文是「地图名 + 那几行」，
@@ -338,7 +288,8 @@ final class SlotIo {
      *   那一段（地图页的标题里已经有真名，所以那边不能重复加）。⇒ 这里加、那边不加。
      * ⚠️ 读 meta 走后台线程（大的存档要开流），与列表那条同一个理由。
      */
-    private static void showSaveDetail(final Activity a, final File f) {
+    // ★ 2026-10-06（第六批）：包级可见（原来是 private）—— 存档**页面**（SlotsActivity）点一行要调它。
+    static void showSaveDetail(final Activity a, final File f) {
         new Thread(new Runnable() {
             @Override public void run() {
                 final MsavMeta m = MsavMeta.read(f);

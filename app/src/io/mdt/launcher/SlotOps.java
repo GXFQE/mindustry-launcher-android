@@ -22,13 +22,13 @@ import java.util.List;
  * 槽操作的**就地实现**（导航重构 REF §56 第 4 步的落地）。
  *
  * 🔴 为什么要有它（2026-10-03 用户报「**一堆 UI 问题**」，其中一条就是这个）：
- *   这些操作原先**只**实现在 {@link SavesActivity} 里，槽二级页面靠"带 extra 派发 +
+ *   这些操作原先**只**实现在 {@link SlotsActivity} 里，槽二级页面靠"带 extra 派发 +
  *   `FLAG_ACTIVITY_REORDER_TO_FRONT`"去复用 —— 于是用户点「备份此槽…」会
  *   **先跳到存档页、再弹窗**，关掉之后还停在存档页（观感像"被踢回上一级"）。
  *   抽到这里之后，槽页面**就地弹窗**，实现仍然只有一份（不是复制两份）。
  *
  * ⚠️ 只放**纯对话框类**操作（备份 / 恢复 / 克隆 / 备份策略 / 重命名 / 删除）。
- *   走 SAF 的导入导出仍在 {@link SavesActivity}：文件选择器的回调
+ *   走 SAF 的导入导出仍在 {@link SlotsActivity}：文件选择器的回调
  *   （`onActivityResult`）天然属于发起它的那个 Activity，搬过来只会多一层跳板。
  *
  * ★ 调用方通过 {@link Host#onSlotChanged()} 收到"槽内容可能变了"的通知

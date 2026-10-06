@@ -474,7 +474,7 @@ public class ModsActivity extends BaseActivity {
         }, "mod-copy").start();
     }
 
-    /** 弹窗三件套里的 alert（与 SavesActivity / MainActivity 同名同形，别各写一份）。
+    /** 弹窗三件套里的 alert（与 SlotsActivity / MainActivity 同名同形，别各写一份）。
      *  ★ 2026-10-04 起在这里挡"已销毁的 Activity"：导入模组是几十秒的后台任务，
      *    失败弹窗落在转屏销毁的实例上会 BadTokenException 闪退（见 {@link Util#dead}）。 */
     private void alert(String title, String msg) {
