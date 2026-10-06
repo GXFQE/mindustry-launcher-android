@@ -1608,22 +1608,15 @@ public class MainActivity extends BaseActivity {
             conflict.setVisibility(View.GONE);
         }
 
-        // 可见的改槽入口。长按详情里那条仍保留 —— 两条路都走 pickSlot，结果一致。
+        // 可见的入口。长按详情里那条仍保留 —— 两条路都走 pickSlot，结果一致。
         // ★ 槽按钮自己消费点击（它是 clickable），不会冒到整行 —— 所以两个动作不冲突。
+        // 🔴 2026-10-06（同日回退）：这里曾经**在行内**直接挂"换槽"，另加一个箭头开详情 ——
+        //   结果那一行的宽度不够，`MindustryX` 的第二行被挤成 `2026.09.X37（基于 16…`
+        //   （版本号又被切了，正是 F7 修掉的毛病；`uiautomator dump` 里 text 是全文、看不出来）。
+        //   ⇒ 改成**动作表**：行内只留一个按钮，详情与换槽都从它进（零宽度成本）。
         slotBtn.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View x) { pickSlot(e); }
+            @Override public void onClick(View x) { promptVersionActions(e); }
         });
-
-        // ★ 2026-10-06（三档）：**看得见的详情入口**（右侧箭头）——与长按整行走同一个动作。
-        //   为什么必须有它：长按是**看不见的手势**，而详情里装着来源路径 / 校验码 / 架构 /
-        //   槽内存档数 / 上次启动 —— 用户不知道有它就等于没有（`row_detail_btn` 是它的无障碍描述，
-        //   读屏与 `uiautomator dump` 都靠它认出这个入口）。
-        View more = v.findViewById(R.id.ver_more);
-        if (more != null) {
-            more.setOnClickListener(new View.OnClickListener() {
-                @Override public void onClick(View x) { showDetail(e); }
-            });
-        }
 
         // 整行：单击启动 / 长按详情。原先是 ListView 的 onItemClick / onItemLongClick，
         // 现在直接挂在行根上（行根变 clickable 后，按下状态会自动播给内部不可点击的子视图，
@@ -2036,6 +2029,33 @@ public class MainActivity extends BaseActivity {
      *   "主界面说用 A 槽、模组页按 B 槽算版本要求"这种**没有任何症状**的分叉。
      *   实现只有一处：{@link Versions#slotFor}（口径与注释也搬过去了）。
      */
+
+    /**
+     * ★ 2026-10-06（三档，同日回退后定的形状）：版本行「槽」按钮 = **这一行的动作表** ——
+     * 「换到别的槽…」/「看详情…」。
+     *
+     * 🔴 为什么详情不放在行内：那一行右侧的宽度**已经用满**（徽标 + 槽按钮 ≈ 460px / 1224px）。
+     *   先前的做法是**再加一个 22dp 箭头** ⇒ `MindustryX` 那行的第二行立刻被挤成
+     *   `2026.09.X37（基于 16…`（就是 F7 当年修掉的"版本号被折叠"）。
+     *   ⚠️ 而自检当时**没抓到**：`uiautomator dump` 的 `text=` 是**全文**，省略号只在渲染里 ——
+     *   这类判据**只能看截图**（教训已写进 `item_version.xml` 的注释与 AGENTS §五）。
+     * ★ 两个动作都是"这一行"的动作，所以共用同一个可见控件；长按整行那条路仍在（同一个 `showDetail`）。
+     */
+    private void promptVersionActions(final Versions.Entry e) {
+        new AlertDialog.Builder(this)
+                .setTitle(e.displayName())
+                .setItems(new String[]{
+                        getString(R.string.row_slot_change),
+                        getString(R.string.row_detail_btn)},
+                        new DialogInterface.OnClickListener() {
+                            @Override public void onClick(DialogInterface d, int w) {
+                                if (w == 0) pickSlot(e);
+                                else showDetail(e);
+                            }
+                        })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
 
     /** 给某个版本指定存档槽 */
     private void pickSlot(final Versions.Entry e) {

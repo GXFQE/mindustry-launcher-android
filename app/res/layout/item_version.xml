@@ -18,6 +18,14 @@
     onItemClick（点击整行启动）。现在整行的点击由 MainActivity 直接
     setOnClickListener 到本布局的根上，不再经过 AdapterView 的 item 机制，
     该属性纯属冗余。真机已复测「点整行启动」「点槽按钮弹窗」两条路径。
+
+  🔴 **宽度预算（2026-10-06 踩过一次，别再犯）**：行右侧**只能有**「槽徽标 + 「槽」按钮」
+    这两样（合计约 460px / 1224px）。那天为了让"详情"看得见，在这里插了一个 22dp 箭头
+    （+68px）⇒ `MindustryX` 那一行的**第二行**立刻被挤成 `2026.09.X37（基于 16…`
+    —— **版本号又被切掉了**（正是 F7 修掉的那个毛病）。
+    ⚠️ 所以：**"详情"改从「槽」按钮的动作表进**（零宽度成本），不要再往行里加控件。
+    ⚠️ 而且那次自检**没抓到**：`uiautomator dump` 的 `text=` 是**全文**，
+    省略号只存在于渲染里 ⇒ **这类判据只能看截图**（见 AGENTS §五）。
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -116,25 +124,6 @@
                 android:textColor="@color/chip_fg_warn"
                 android:visibility="gone" />
         </LinearLayout>
-
-        <!--
-          ★ 2026-10-06（三档）：**看得见的详情入口**。
-          以前"看详情"只有长按整行这一条路（没有任何视觉提示），而详情里装着来源路径 /
-          校验码 / 架构 / 槽内存档数 / 上次启动 —— 用户不知道有它就等于没有。
-          这里放一个箭头（与「槽」按钮并排），点击与长按**走同一个 `showDetail(e)`**。
-          ⚠️ 宽度账要算清：徽标 + 箭头 + 「槽」按钮合计约 520px，标题区仍有约 500px（maxLines=2）。
-          ⚠️ `contentDescription` 不是装饰：读屏与 `uiautomator dump` 靠它认出这个入口。
-        -->
-        <ImageView
-            android:id="@+id/ver_more"
-            android:layout_width="22dp"
-            android:layout_height="22dp"
-            android:layout_marginStart="6dp"
-            android:src="@drawable/ic_chevron"
-            android:tint="@color/fg_muted"
-            android:clickable="true"
-            android:focusable="false"
-            android:contentDescription="@string/row_detail_btn" />
 
         <TextView
             android:id="@+id/ver_slot_btn"

@@ -3334,14 +3334,26 @@ public final class SelfTest {
         ok(stat, L, !"测试口".equals("调试记录") && !"自检".equals("自检报告"),
                 "★元断言：新旧值确实不同（否则上一条在**没改**的时候也会绿）");
 
-        // ④ 版本行的可见详情入口（真 inflate 一次 item_version）
+        // ④ 版本行的宽度预算（2026-10-06 当天回退过一版；教训写在 item_version.xml 的注释里）
         android.view.View row = android.view.LayoutInflater.from(ctx)
                 .inflate(R.layout.item_version, null, false);
-        android.view.View more = row == null ? null : row.findViewById(R.id.ver_more);
-        ok(stat, L, more != null,
-                "版本行：有看得见的「详情」入口（`ver_more` —— 长按那个手势不是唯一的路了）");
-        ok(stat, L, more != null && more.isClickable(),
-                "版本行：那个入口**自己消费点击**（不然点它会冒到整行去启动游戏）");
+        ok(stat, L, row != null && row.findViewById(R.id.ver_slot_btn) != null,
+                "版本行：可见的动作入口在（「槽」按钮 —— 换槽与看详情都从它进）");
+        // ★ 元断言：那一行**右侧的宽度已经用满**（徽标 + 槽按钮 ≈ 460px / 1224px）。
+        //   2026-10-06 我在卡片里插过一个 22dp 箭头 ⇒ `MindustryX` 的第二行当场被挤成
+        //   `2026.09.X37（基于 16…`（版本号又被切掉 = F7 修掉的老毛病）。
+        //   ⚠️ 当时自检**没抓到**：`uiautomator dump` 的 `text=` 是全文，省略只在渲染里。
+        //   ⇒ 这条断言改成钉**结构**（横向卡片里只许 3 个元素），并配真机截图判据。
+        int cardKids = -1;
+        if (row instanceof android.view.ViewGroup) {
+            android.view.ViewGroup outer = (android.view.ViewGroup) row;
+            if (outer.getChildCount() > 0 && outer.getChildAt(0) instanceof android.view.ViewGroup) {
+                cardKids = ((android.view.ViewGroup) outer.getChildAt(0)).getChildCount();
+            }
+        }
+        ok(stat, L, cardKids == 3,
+                "★元断言：版本行卡片里**只有 3 个**横向元素（图标 / 文字列 / 动作按钮）——"
+                        + " 再加一个右侧控件就会把版本号挤成省略号，实际 " + cardKids);
         L.add("");
     }
 

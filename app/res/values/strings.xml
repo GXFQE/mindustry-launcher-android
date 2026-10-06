@@ -31,12 +31,13 @@
     <!-- F2：版本列表行（槽徽标 / 可见槽按钮 / 同槽冲突 / 继续上次） -->
     <string name="row_slot_btn">Slot</string>
     <!--
-      ★ 2026-10-06: the "see details" chevron on the version row.
-      Long-press was an invisible gesture, while the detail dialog holds the source path,
-      checksum, ABI, saves in the slot and the last launch. This string is the a11y
-      description of that icon (screen readers and `uiautomator dump` both see it).
+      ★ 2026-10-06: the version row's "Slot" button now opens a small action sheet
+      (change slot / see details). Details moved **into the sheet** on purpose: the row's
+      right side has no width left (badge + slot button ≈ 460px of 1224px) — a 22dp chevron
+      pushed the MindustryX row's second line into an ellipsis (`2026.09.X37（基于 16…`).
     -->
-    <string name="row_detail_btn">Details</string>
+    <string name="row_slot_change">Change slot…</string>
+    <string name="row_detail_btn">See details…</string>
     <string name="row_conflict_fmt">⚠ Shares this slot with %1$s; saves overwrite each other</string>
     <!-- 同槽组里"对手"的说法（P3）：2 个版本只点一个对手，3 个及以上把数量说出来 -->
     <string name="versions_peer_one_fmt">\"%1$s\"</string>
