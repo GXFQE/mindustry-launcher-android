@@ -260,6 +260,15 @@ public class BlueprintDetailActivity extends BaseActivity {
                 line(body, getString(R.string.bp_tech_oob_fmt, m.outOfBounds));
             }
             line(body, getString(R.string.bp_tech_dict_fmt, m.dict.size()));
+            // ★ 一档⑥（2026-10-06）：把解析出来、界面上一直没显示的字段放出来。
+            //   三行都是加分项 ⇒ 内容是空串就整行不出现（不摆空行）。
+            //   ⚠️ 格式化在 `MschText` 里（界面与自检同一份），这里只负责"要不要摆这一行"。
+            String dictNames = MschText.techDictNames(this, m.dictView());
+            if (!dictNames.isEmpty()) line(body, dictNames);
+            String renamed = MschText.techRemapped(this, m.remappedPairs());
+            if (!renamed.isEmpty()) line(body, renamed);
+            String rotated = MschText.techRotated(this, m.rotatedCount());
+            if (!rotated.isEmpty()) line(body, rotated);
             StringBuilder keys = new StringBuilder();
             for (String k : m.tags.keySet()) {
                 if (keys.length() > 0) keys.append(", ");

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 设置页「存储占用」行。Material "storage"（三层抽屉）的标准 path。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@color/icon_tint"
+        android:pathData="M2,20h20v-4H2v4zM4,17h2v2H4v-2zM2,4v4h20V4H2zM4,7h2v2H4V7zM2,12h20v-4H2v4zM4,11h2v2H4v-2z" />
+</vector>

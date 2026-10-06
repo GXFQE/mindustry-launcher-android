@@ -65,6 +65,13 @@ final class SlotIo {
         }
     };
 
+    /** 存档列表的排序（名字升序、忽略大小写）—— 导出列表与「看每份存档」**共用一份** */
+    private static final Comparator<File> NAME_ORDER = new Comparator<File>() {
+        @Override public int compare(File x, File y) {
+            return x.getName().compareToIgnoreCase(y.getName());
+        }
+    };
+
     // 待办目标（跨 onActivityResult 存活；每次发起前重设、回调进来先清）
     private static String sMsavTarget;
     private static String sZipSlot;
@@ -146,11 +153,7 @@ final class SlotIo {
             toast(a, a.getString(R.string.export_no_save_fmt, s.name));
             return;
         }
-        Arrays.sort(fs, new Comparator<File>() {
-            @Override public int compare(File a, File b) {
-                return a.getName().compareToIgnoreCase(b.getName());
-            }
-        });
+        Arrays.sort(fs, NAME_ORDER);
         // ★ 每条一个**卡片**：第一行 = 文件名，第二行 = 大小 ·「这是什么存档」
         final String[] titles = new String[fs.length];
         final String[] subs = new String[fs.length];
@@ -173,12 +176,7 @@ final class SlotIo {
         lv.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener() {
             @Override public void onItemClick(android.widget.AdapterView<?> p, View v, int pos, long id) {
                 if (pos < 0 || pos >= fs.length) return;
-                sExportKind = EXPORT_FILE;
-                sExportSrc = fs[pos];
-                sExportSlot = null;
-                a.startActivityForResult(Intent.createChooser(
-                        Exporter.createDoc(fs[pos].getName(), "application/octet-stream"),
-                        a.getString(R.string.chooser_export)), REQ_EXPORT);
+                startExportSave(a, fs[pos]);
                 dlg.dismiss();
             }
         });
@@ -256,6 +254,143 @@ final class SlotIo {
                 });
             }
         }, "msav-unreadable").start();
+    }
+
+    /**
+     * ★ 2026-10-05：**只读的存档列表** —— 点一份看它是什么图、玩了多久。
+     *
+     * 起因：这两件事原来只有两条路能看见 ——
+     *   ① 点「导出存档」列表的第二行（**用"导出"去查档案，路子不对**）；
+     *   ② 地图详情页（那是**地图**，不是存档）。
+     * ⇒ 补一个只读入口，点一份弹详情（{@link MsavText#detail} 那一份口径），
+     *   详情里带「导出这一份…」出口 —— 出口是便利，不是这个列表的主题。
+     *
+     * ⚠️ 与 {@link #showUnreadable} 同一条纪律：**只读，不提供删除**
+     *   （存档是用户的东西，删只走游戏自己的界面）。
+     * ⚠️ 这份列表没有份数上限，副标题照样**后台渐进填充 + 只刷那一行**（见 exportSave 的注释）。
+     */
+    static void showSaves(final Activity a, final String slotName) {
+        final File dir = new File(Data.dirOf(a, slotName), "saves");
+        final File[] fs = dir.listFiles(ONLY_FILES);
+        if (fs == null || fs.length == 0) {
+            toast(a, a.getString(R.string.export_no_save_fmt, slotName));
+            return;
+        }
+        Arrays.sort(fs, NAME_ORDER);
+        final String[] titles = new String[fs.length];
+        final String[] subs = new String[fs.length];
+        for (int i = 0; i < fs.length; i++) {
+            titles[i] = fs[i].getName();
+            subs[i] = Util.formatSize(fs[i].length());
+        }
+        View listView = a.getLayoutInflater().inflate(R.layout.dialog_msav_list, null);
+        TextView head = (TextView) listView.findViewById(R.id.msav_head);
+        if (head != null) {
+            head.setVisibility(View.VISIBLE);
+            head.setText(a.getString(R.string.saves_list_head_fmt, fs.length));
+        }
+        final android.widget.ListView lv =
+                (android.widget.ListView) listView.findViewById(R.id.msav_list);
+        final MsavListAdapter adapter = new MsavListAdapter(a, titles, subs);
+        lv.setAdapter(adapter);
+        final AlertDialog dlg = new AlertDialog.Builder(a)
+                .setTitle(a.getString(R.string.saves_list_title_fmt, slotName))
+                .setView(listView)
+                .setNegativeButton(R.string.close, null)
+                .create();
+        lv.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener() {
+            @Override public void onItemClick(android.widget.AdapterView<?> p, View v, int pos, long id) {
+                if (pos < 0 || pos >= fs.length) return;
+                showSaveDetail(a, fs[pos]);
+            }
+        });
+        dlg.show();
+        final boolean[] alive = {true};
+        dlg.setOnDismissListener(new DialogInterface.OnDismissListener() {
+            @Override public void onDismiss(DialogInterface d) {
+                alive[0] = false;
+            }
+        });
+        new Thread(new Runnable() {
+            @Override public void run() {
+                for (int i = 0; i < fs.length && alive[0]; i++) {
+                    final int idx = i;
+                    final String line = msavLine(a, MsavMeta.read(fs[idx]));
+                    a.runOnUiThread(new Runnable() {
+                        @Override public void run() {
+                            if (!alive[0]) return;
+                            String size = Util.formatSize(fs[idx].length());
+                            adapter.setSub(idx, line.isEmpty() ? size : (size + " · " + line));
+                            adapter.refreshSub(lv, idx);
+                        }
+                    });
+                }
+            }
+        }, "msav-list").start();
+    }
+
+    /**
+     * 一份存档的详情（**只读**）：文件名当标题，正文是「地图名 + 那几行」，
+     * 正按钮给「导出这一份…」的直接出口。
+     *
+     * ★ 为什么正文自己拼一句"地图："：存档的 `displayName()` 是**它是从哪张图上存下来的**
+     *   （战役存档就是当时的地区名），而 {@link MsavText#detail} 是地图页与存档页**共用**的
+     *   那一段（地图页的标题里已经有真名，所以那边不能重复加）。⇒ 这里加、那边不加。
+     * ⚠️ 读 meta 走后台线程（大的存档要开流），与列表那条同一个理由。
+     */
+    private static void showSaveDetail(final Activity a, final File f) {
+        new Thread(new Runnable() {
+            @Override public void run() {
+                final MsavMeta m = MsavMeta.read(f);
+                final String body = saveDetailText(a, m);
+                a.runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        if (Util.dead(a)) return;
+                        new AlertDialog.Builder(a)
+                                .setTitle(a.getString(R.string.save_detail_title_fmt, f.getName()))
+                                .setMessage(body)
+                                .setPositiveButton(R.string.save_detail_export,
+                                        new DialogInterface.OnClickListener() {
+                                            @Override public void onClick(DialogInterface d, int w) {
+                                                startExportSave(a, f);
+                                            }
+                                        })
+                                .setNegativeButton(R.string.close, null)
+                                .show();
+                    }
+                });
+            }
+        }, "msav-detail").start();
+    }
+
+    /**
+     * 存档详情的正文（**唯一实现**，自检直接喂它 ⇒ 与界面走同一份格式化）。
+     * ⚠️ 色码要去掉（`[gold]foo` 在纯文本里是噪声）—— 判据复用 {@link Mods#stripColors}。
+     * ⚠️ 参数是 {@link android.content.Context} 而不是 Activity：本方法只用 `getString`
+     *   （自检手里只有 Context —— 它要是 Activity 就只能靠真机看，那样等于没有判据）。
+     */
+    static String saveDetailText(android.content.Context a, MsavMeta m) {
+        StringBuilder sb = new StringBuilder();
+        if (m != null && m.ok) {
+            String n = Mods.stripColors(m.displayName()).trim();
+            if (!n.isEmpty()) sb.append(a.getString(R.string.msav_lbl_map_fmt, n)).append('\n');
+        }
+        sb.append(MsavText.detail(a, m));
+        return sb.toString();
+    }
+
+    /**
+     * 单份存档的导出（**唯一实现**）：导出列表与存档详情两处共用。
+     * ★ 待办目标（{@link #sExportSrc}）在这里写、在 `onActivityResult` 的 REQ_EXPORT 分支里清 ——
+     *   "每次发起前重设、回调进来先清空"那条纪律只有这一处落点。
+     */
+    private static void startExportSave(Activity a, File f) {
+        sExportKind = EXPORT_FILE;
+        sExportSrc = f;
+        sExportSlot = null;
+        a.startActivityForResult(Intent.createChooser(
+                Exporter.createDoc(f.getName(), "application/octet-stream"),
+                a.getString(R.string.chooser_export)), REQ_EXPORT);
     }
 
     /** 存档行第二行（只此一处）：口径在 {@link MsavText#shortLine} */

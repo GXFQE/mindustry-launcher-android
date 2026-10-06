@@ -108,6 +108,15 @@ public class SettingsActivity extends BaseActivity {
                 });
         mAutoCleanSub = (TextView) rowClean.findViewById(R.id.act_sub);
 
+        // ★ 2026-10-06（一档③+⑦）：存储占用 —— 备份省了多少 + 各类数据各占多少。
+        //   只读：一个字节都不写。数字在后台算完再填进弹窗（见 showStorage）。
+        Util.bindAction(root, R.id.row_storage, R.drawable.ic_storage,
+                R.string.set_storage_title, R.string.set_storage_sub, new Runnable() {
+                    @Override public void run() {
+                        showStorage();
+                    }
+                });
+
         // 中转站（2026-10-05，第 102 轮）：地图/模组被覆盖或删除时挪进去的旧件在这里。
         // ★ 入口放全局设置页 —— 中转站不属于任何一个槽（见 activity_settings.xml 里那段注释）。
         // ★ 副标题是**固定的一句**，不显示份数/体积：那要扫盘（目录形态的模组可能不小），
@@ -194,6 +203,48 @@ public class SettingsActivity extends BaseActivity {
                         })
                 .setNegativeButton(R.string.cancel, null)
                 .show();
+    }
+
+    /**
+     * ★ 2026-10-06（一档③+⑦）：「存储占用」——**只读**的一份账。
+     *
+     * 结构：先把弹窗摆出来（正文写"正在统计…"），后台算完再 `setMessage` ——
+     * 与 {@link MainActivity} 详情弹窗里那条"先弹窗、算完补上"是同一套：
+     * 遍历各槽 + 整个对象池 + 中转站要几百毫秒，放主线程就是 ANR。
+     *
+     * ⚠️ 收尾必须判 {@link Util#dead}（转屏时 `isFinishing()` 是 false ⇒ 弹窗会炸）。
+     * ⚠️ 本方法**只读**：不回收、不迁移、不清理（那些各有各的安排与门禁）。
+     */
+    private void showStorage() {
+        final AlertDialog dlg = new AlertDialog.Builder(this)
+                .setTitle(R.string.set_storage_title)
+                .setMessage(R.string.storage_loading)
+                .setPositiveButton(R.string.close, null)
+                .create();
+        dlg.show();
+        final android.content.Context app = getApplicationContext();
+        new Thread(new Runnable() {
+            @Override public void run() {
+                String body;
+                String err = null;
+                try {
+                    body = Storage.text(app, Storage.collect(app));
+                } catch (Throwable t) {
+                    body = null;
+                    err = String.valueOf(t);
+                    android.util.Log.w("MDTLauncher", "storage stats failed: " + t);
+                }
+                final String fBody = body;
+                final String fErr = err;
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        if (Util.dead(SettingsActivity.this) || !dlg.isShowing()) return;
+                        dlg.setMessage(fErr == null ? fBody
+                                : getString(R.string.storage_failed, fErr));
+                    }
+                });
+            }
+        }, "storage-stats").start();
     }
 
     /** 立即清理一次（后台线程 —— 要扫数据根；清完回主线程报数量） */

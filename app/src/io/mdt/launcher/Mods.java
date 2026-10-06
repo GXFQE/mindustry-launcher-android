@@ -1384,6 +1384,30 @@ public final class Mods {
     public static final int SORT_NAME = 0, SORT_STATE = 1, SORT_SIZE = 2;
 
     /**
+     * 类型筛选（一档⑤，2026-10-06）：{@link #TYPE_ANY} = 不筛；其余三个是
+     * {@link Info#parts()} 那个位掩码的**组合**（见 {@link #TYPE_JAVA}）。
+     *
+     * ★ 判据只有一句：**"包含"这一类**（`(parts() & want) != 0`）——
+     *   混合模组（Java+JS）在"有 Java"与"有脚本"两处都会出现，那是**事实**不是重复。
+     * ⚠️ 读不出说明文件的坏包 `parts()` 是 0 ⇒ 选了任一类它都**不出现**
+     *   （我们确实不知道它是什么类型，不能替它猜）。
+     */
+    public static final int TYPE_ANY = 0;
+    /** 有 Java 代码：安卓能跑的 `classes.dex`，或只有桌面包那批 `.class` 的（游戏都当"Java 模组"看） */
+    public static final int TYPE_JAVA = JAVA_DEX | JAVA_CLASS;
+    /** 有脚本（`scripts/`） */
+    public static final int TYPE_JS = JS;
+    /** 有游戏认的资源目录（bundles / sprites / sprites-override） */
+    public static final int TYPE_DATA = DATA;
+
+    /** 这个模组算不算"某一类"（`TYPE_ANY` ⇒ 一律算）。判据的唯一实现。 */
+    public static boolean matchesType(Info m, int want) {
+        if (want == TYPE_ANY) return true;
+        if (m == null) return false;
+        return (m.parts() & want) != 0;
+    }
+
+    /**
      * ★ "这个模组值不值得看一眼" —— **「只看有问题的」的判据只此一处**。
      *
      *  · 固有毛病（扫描就能看出来，不需要目标版本）：读不出信息 / 安卓会加载失败 /
@@ -1418,10 +1442,12 @@ public final class Mods {
      * @param query        关键词（空 = 不筛）；比 显示名 / 文件名 / 游戏里的名字，忽略大小写
      * @param sort         {@link #SORT_NAME} / {@link #SORT_STATE} / {@link #SORT_SIZE}
      * @param onlyProblems 只看有问题的（见 {@link #isProblem}）
+     * @param type         {@link #TYPE_ANY} / {@link #TYPE_JAVA} / {@link #TYPE_JS} / {@link #TYPE_DATA}
+     *                     （见 {@link #matchesType}；"包含"语义，不是"只有"）
      * @param states       与 mods 一一对应的状态；可为 null（那就只按固有毛病判）
      */
     public static List<Info> filterAndSort(List<Info> mods, String query, int sort,
-                                           boolean onlyProblems, State[] states) {
+                                           boolean onlyProblems, int type, State[] states) {
         List<SortRow> rows = new ArrayList<>();
         if (mods != null) {
             String q = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
@@ -1430,6 +1456,7 @@ public final class Mods {
                 if (m == null) continue;
                 State st = (states != null && i < states.length) ? states[i] : null;
                 if (onlyProblems && !isProblem(m, st)) continue;
+                if (!matchesType(m, type)) continue;
                 if (!q.isEmpty() && !matchesQuery(m, q)) continue;
                 rows.add(new SortRow(m, st));
             }

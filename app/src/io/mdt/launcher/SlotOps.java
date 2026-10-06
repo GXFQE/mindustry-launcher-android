@@ -102,9 +102,20 @@ final class SlotOps {
         }).start();
     }
 
-    // ── 恢复 ──────────────────────────────────────────────────────────────
+    // ── 备份列表（看 / 恢复 / 删掉） ───────────────────────────────────────
 
-    static void restore(final Activity a, final Data.Slot s, final Host h) {
+    /**
+     * ★ 2026-10-06（一档②）：这个槽的全部备份 —— 点一份再问"恢复还是删掉"。
+     *
+     * ★ 为什么把原来的「恢复备份…」改成这一个入口：**恢复本来就得先选一份** ⇒
+     *   列表是必经之路；而"只想看一眼有哪些备份、里面是什么"用的是同一个列表。
+     *   ⇒ 一个列表服务两种意图，**不做两个入口** —— 两条路各管一种直觉不是保留重复的
+     *   理由（F15b 的教训，REF §34）。
+     *
+     * ★ 每一行仍然是**卡片**（时间戳标题 + 份数/体积 +「这是什么存档」），口径与原来一字不差：
+     *   同一件事只留一份显示实现（`Backup.msavLine` + `snapshot_entry_fmt`）。
+     */
+    static void backups(final Activity a, final Data.Slot s, final Host h) {
         final List<Backup.Snapshot> snaps = Backup.list(a, s.name);
         if (snaps.isEmpty()) {
             alert(a, a.getString(R.string.no_backup_title),
@@ -123,22 +134,93 @@ final class SlotOps {
             subs[i] = msav.isEmpty() ? base : (base + " · " + msav);
         }
         View listView = a.getLayoutInflater().inflate(R.layout.dialog_msav_list, null);
+        TextView head = (TextView) listView.findViewById(R.id.msav_head);
+        if (head != null) {
+            // ★ 表头说清"点一份能干什么" —— 标题是单行的，放不下第二句（见该布局的注释）
+            head.setVisibility(View.VISIBLE);
+            head.setText(a.getString(R.string.backup_list_head_fmt, snaps.size()));
+        }
         final android.widget.ListView lv =
                 (android.widget.ListView) listView.findViewById(R.id.msav_list);
         lv.setAdapter(new MsavListAdapter(a, titles, subs));
         final AlertDialog rdlg = new AlertDialog.Builder(a)
-                .setTitle(a.getString(R.string.restore_to_slot_title_fmt, s.name))
+                .setTitle(a.getString(R.string.backup_list_title_fmt, s.name))
                 .setView(listView)
-                .setNegativeButton(R.string.cancel, null)
+                .setNegativeButton(R.string.close, null)
                 .create();
         lv.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener() {
             @Override public void onItemClick(android.widget.AdapterView<?> p, View v, int pos, long id) {
                 if (pos < 0 || pos >= snaps.size()) return;
                 rdlg.dismiss();
-                confirmRestore(a, s, snaps.get(pos), h);
+                promptBackupActions(a, s, snaps.get(pos), h);
             }
         });
         rdlg.show();
+    }
+
+    /**
+     * 选中一份备份之后的动作表（**只有这一处问这个问题**）。
+     * ⚠️ 标题用那份备份自己的 `title()`（时间戳 + 备注）—— 用户刚点的是哪一行，
+     *   这里就得是哪一行，别换成另一句话。
+     */
+    private static void promptBackupActions(final Activity a, final Data.Slot s,
+                                            final Backup.Snapshot ss, final Host h) {
+        new AlertDialog.Builder(a)
+                .setTitle(ss.title())
+                .setItems(new String[]{
+                        a.getString(R.string.slot_op_restore),
+                        a.getString(R.string.slot_op_backup_delete)},
+                        new DialogInterface.OnClickListener() {
+                            @Override public void onClick(DialogInterface d, int w) {
+                                if (w == 0) confirmRestore(a, s, ss, h);
+                                else confirmDelete(a, s, ss, h);
+                            }
+                        })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    /**
+     * 删掉一份备份。
+     *
+     * ★ 与自动修剪（超过上限丢最旧）走的是**同一个** {@link Backup#delete} —— 它自己会
+     *   调度一次内容回收（不回收的话备份删了、空间还在）。
+     * ★ 与恢复**刻意不同**：删备份不加"游戏没在跑"那道门禁（它不碰游戏的数据根），
+     *   问一次就动手；而恢复要先留一份自动备份（见 {@link #doRestore}）。
+     */
+    private static void confirmDelete(final Activity a, final Data.Slot s,
+                                      final Backup.Snapshot ss, final Host h) {
+        new AlertDialog.Builder(a)
+                .setTitle(R.string.backup_delete_title)
+                .setMessage(a.getString(R.string.backup_delete_msg_fmt, ss.title(), ss.count,
+                        Util.formatSize(ss.bytes)))
+                .setPositiveButton(R.string.delete, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int w) {
+                        doDelete(a, ss, h);
+                    }
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    private static void doDelete(final Activity a, final Backup.Snapshot ss, final Host h) {
+        new Thread(new Runnable() {
+            @Override public void run() {
+                final String err = Backup.delete(a, ss);
+                a.runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        // ⚠️ 转屏 / 页面已经没了 ⇒ 什么都不做（`isFinishing()` 挡不住转屏）
+                        if (Util.dead(a)) return;
+                        if (err == null) {
+                            toast(a, a.getString(R.string.backup_deleted_fmt, ss.title()));
+                        } else {
+                            alert(a, a.getString(R.string.backup_delete_failed), err);
+                        }
+                        h.onSlotChanged();
+                    }
+                });
+            }
+        }, "backup-delete").start();
     }
 
     /**

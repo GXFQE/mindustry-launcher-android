@@ -58,6 +58,18 @@ public final class Config {
     private static final String K_SESSION = "session";
     /** F20：进存档页时自动清理数据根残留（默认开；关掉后只能手动清） */
     private static final String K_AUTO_CLEAN = "auto_clean_redundant";
+    /**
+     * 一档④（2026-10-06）：每个版本**上次启动的时刻** { "&lt;版本key&gt;": 毫秒 }。
+     *
+     * ★ 为什么需要它：{@link #sessionStartedAt()} 记的是"**正在进行**的那一次"，
+     *   结算完就 {@link #sessionClear() 清掉} ⇒ 界面问不出"我上次什么时候玩的这个版本"。
+     * ★ 与 session **同一次写入**（都在 {@link #sessionStart}）：不额外多一次落盘，
+     *   也不会出现"记了 session 却没记历史"的半截状态。
+     * ⚠️ 有上限（{@link #PLAYED_KEEP}）：版本列表可能长期累积，别让它无限长大。
+     */
+    private static final String K_PLAYED = "last_played";
+    /** `last_played` 最多留几条（旧的先丢）—— 只是给界面看的一行字，不值得无限保存 */
+    private static final int PLAYED_KEEP = 64;
 
     /**
      * 自动备份的出厂默认，逐条对齐桌面版 config.py 的 PROFILE_DEFAULTS
@@ -510,7 +522,50 @@ public final class Config {
             return;
         }
         put(K_SESSION, o);
+        rememberPlayed(key);
         save();
+    }
+
+    /**
+     * 记一笔"这个版本被启动过"（一档④）。与 {@link #sessionStart} 同一次写盘。
+     * ⚠️ 超过 {@link #PLAYED_KEEP} 条时**丢最旧的那几条**（按时刻），不是拒绝新值。
+     */
+    private void rememberPlayed(String key) {
+        if (key == null || key.trim().isEmpty()) return;
+        JSONObject all = mRoot.optJSONObject(K_PLAYED);
+        if (all == null) all = new JSONObject();
+        try {
+            all.put(key, System.currentTimeMillis());
+        } catch (Exception e) {
+            Log.w(TAG, "rememberPlayed failed: " + e);
+            return;
+        }
+        if (all.length() > PLAYED_KEEP) {
+            // 找最旧的一条删掉（JSONObject 没有有序删除 ⇒ 扫一遍取最小）
+            String oldest = null;
+            long min = Long.MAX_VALUE;
+            java.util.Iterator<String> it = all.keys();
+            while (it.hasNext()) {
+                String k = it.next();
+                long v = all.optLong(k, 0L);
+                if (v < min) {
+                    min = v;
+                    oldest = k;
+                }
+            }
+            if (oldest != null && !oldest.equals(key)) all.remove(oldest);
+        }
+        put(K_PLAYED, all);
+    }
+
+    /**
+     * 这个版本上次启动的时刻（毫秒）；从没启动过 = 0。
+     * ★ 只读、不进 {@link #sessionStartedAt} 那条链路（那条是"正在进行的这一局"）。
+     */
+    public synchronized long lastPlayed(String key) {
+        if (key == null) return 0L;
+        JSONObject all = mRoot.optJSONObject(K_PLAYED);
+        return all == null ? 0L : all.optLong(key, 0L);
     }
 
     /** 上次记账的槽名（无记账 = 空串）。 */

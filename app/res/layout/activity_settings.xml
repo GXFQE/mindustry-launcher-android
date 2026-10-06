@@ -133,6 +133,26 @@
                     android:background="@color/divider" />
 
                 <!--
+                  存储占用（一档③+⑦，2026-10-06）。★ 放在「自动清理」与「中转站」之间：
+                    它统计的正是"各槽 / 备份 / 中转站"各占多少，而下一行就是中转站本体 ——
+                    用户看完"中转站占了 120 MB"接着就想进去处理它。
+                  ★ 只读弹窗：数字在后台算（要遍历对象池与所有槽），所以点开先显示"正在统计…"。
+                  ★ 为什么不单开一页：这一页只有数字、没有交互 ⇒ 弹窗足够，
+                    也省掉"新页面必须补 insets / 继承 BaseActivity / 注册清单"这三件都踩过的事。
+                -->
+                <include
+                    android:id="@+id/row_storage"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="62dp"
+                    android:background="@color/divider" />
+
+                <!--
                   中转站（2026-10-05，第 102 轮）。★ 放在这张卡的**末位**：
                     前几项用户天天改，这一项只在"东西被删了想找回来"时才来。
                   ★ 为什么入口在**全局设置页**而不是某个槽里：中转站是 per-hub 的、不属于任何槽

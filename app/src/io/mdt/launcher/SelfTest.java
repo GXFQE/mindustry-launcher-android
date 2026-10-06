@@ -248,6 +248,9 @@ public final class SelfTest {
             blueprintScan(ctx, L, stat);
             // ★ ㊹ 蓝图的「写」侧（F22 第二步）：先 part + 解析器验 + 同名先问 + 删=挪进中转站
             blueprintWrite(ctx, L, stat);
+            // ★ ㊺ 一档六项（第 115 轮）：存档详情 / 备份列表 / 存储占用 / 版本行 / 模组类型 /
+            //   蓝图技术细节 —— 全是纯函数 + 资源实拼（不建 UI、不写用户数据）
+            tier1(ctx, L, stat);
             // ★ 篡改对象池的用例放**最后**：它会在池里留下一个内容坏掉的对象，
             //   之后任何"再备份一次"都会因为 `has()` 命中而复用坏对象（CAS 的固有
             //   假设是"池内不可变"）。放在最后就不影响别的用例。
@@ -3037,32 +3040,244 @@ public final class SelfTest {
         List<Mods.Info> ms = new ArrayList<>();
         ms.add(a); ms.add(b); ms.add(c);
 
-        ok(stat, L, Mods.filterAndSort(ms, "", Mods.SORT_NAME, false, null).size() == 3,
+        ok(stat, L, Mods.filterAndSort(ms, "", Mods.SORT_NAME, false, Mods.TYPE_ANY, null).size() == 3,
                 "空关键词 = 不筛（三个都在）");
-        List<Mods.Info> q = Mods.filterAndSort(ms, "BET", Mods.SORT_NAME, false, null);
+        List<Mods.Info> q = Mods.filterAndSort(ms, "BET", Mods.SORT_NAME, false, Mods.TYPE_ANY, null);
         ok(stat, L, q.size() == 1 && q.get(0) == b, "搜索：忽略大小写按名字命中（BET → Beta）");
-        ok(stat, L, Mods.filterAndSort(ms, "gamma", Mods.SORT_NAME, false, null).size() == 1,
+        ok(stat, L, Mods.filterAndSort(ms, "gamma", Mods.SORT_NAME, false, Mods.TYPE_ANY, null).size() == 1,
                 "搜索：换成文件名也能命中");
-        ok(stat, L, Mods.filterAndSort(ms, "zzz", Mods.SORT_NAME, false, null).isEmpty(),
+        ok(stat, L, Mods.filterAndSort(ms, "zzz", Mods.SORT_NAME, false, Mods.TYPE_ANY, null).isEmpty(),
                 "★元断言：搜不到必须返回**空列表**，不能「筛不动就返回全部」");
 
-        List<Mods.Info> pb = Mods.filterAndSort(ms, "", Mods.SORT_NAME, true, null);
+        List<Mods.Info> pb = Mods.filterAndSort(ms, "", Mods.SORT_NAME, true, Mods.TYPE_ANY, null);
         ok(stat, L, pb.size() == 1 && pb.get(0) == b,
                 "只看有问题的：固有毛病（上次出错被标记）会被留下");
         Mods.State[] st = {Mods.State.UNSUPPORTED, Mods.State.DISABLED, Mods.State.ENABLED};
-        List<Mods.Info> ps = Mods.filterAndSort(ms, "", Mods.SORT_NAME, true, st);
+        List<Mods.Info> ps = Mods.filterAndSort(ms, "", Mods.SORT_NAME, true, Mods.TYPE_ANY, st);
         ok(stat, L, ps.size() == 2 && ps.contains(a) && !ps.contains(c),
                 "★反向：只有「版本不符」算问题，「被用户关闭」**不算**（否则用户自己关掉的模组会一直赖在有问题的里）");
 
-        ok(stat, L, Mods.filterAndSort(ms, "", Mods.SORT_NAME, false, null).get(0) == a,
+        ok(stat, L, Mods.filterAndSort(ms, "", Mods.SORT_NAME, false, Mods.TYPE_ANY, null).get(0) == a,
                 "按名称排序：Alpha 在 Beta/Gamma 前");
-        ok(stat, L, Mods.filterAndSort(ms, "", Mods.SORT_SIZE, false, null).get(0) == a
-                        && Mods.filterAndSort(ms, "", Mods.SORT_SIZE, false, null).get(2) == b,
+        ok(stat, L, Mods.filterAndSort(ms, "", Mods.SORT_SIZE, false, Mods.TYPE_ANY, null).get(0) == a
+                        && Mods.filterAndSort(ms, "", Mods.SORT_SIZE, false, Mods.TYPE_ANY, null).get(2) == b,
                 "按大小排序：大的在前（300 / 200 / 100）");
-        ok(stat, L, Mods.filterAndSort(ms, "", Mods.SORT_STATE, false, null).get(0) == b,
+        ok(stat, L, Mods.filterAndSort(ms, "", Mods.SORT_STATE, false, Mods.TYPE_ANY, null).get(0) == b,
                 "有问题的在前：failed 的那个排第一");
         ok(stat, L, ms.size() == 3 && ms.get(0) == a && ms.get(2) == c,
                 "★纯函数：入参列表没被改动（长度与顺序都不变）");
+
+        // ── ⑤ 按类型筛（一档⑤，2026-10-06）─────────────────────────────────
+        // 夹具：三个包各带一种"东西"（判据 = Info.parts() 的位掩码，与行内标签同一份）
+        a.hasClassesDex = true;                 // Java（有 classes.dex）
+        b.hasScripts = true;                    // 脚本（有 scripts/）
+        c.hasResources = true;                  // 带资源（bundles / sprites …）
+        ok(stat, L, Mods.filterAndSort(ms, "", Mods.SORT_NAME, false, Mods.TYPE_ANY, null).size() == 3,
+                "类型：TYPE_ANY 不筛（三个都在）");
+        List<Mods.Info> tj = Mods.filterAndSort(ms, "", Mods.SORT_NAME, false, Mods.TYPE_JAVA, null);
+        ok(stat, L, tj.size() == 1 && tj.get(0) == a, "类型：只看有 Java 代码 ⇒ 只剩 Alpha");
+        List<Mods.Info> tjs = Mods.filterAndSort(ms, "", Mods.SORT_NAME, false, Mods.TYPE_JS, null);
+        ok(stat, L, tjs.size() == 1 && tjs.get(0) == b, "类型：只看有脚本 ⇒ 只剩 Beta");
+        List<Mods.Info> td = Mods.filterAndSort(ms, "", Mods.SORT_NAME, false, Mods.TYPE_DATA, null);
+        ok(stat, L, td.size() == 1 && td.get(0) == c, "类型：只看带资源 ⇒ 只剩 Gamma");
+        // ★ 「包含」语义，不是「只有」：混合模组（Java+JS）在两类里都要出现
+        a.hasScripts = true;
+        ok(stat, L, Mods.filterAndSort(ms, "", Mods.SORT_NAME, false, Mods.TYPE_JS, null).contains(a),
+                "★混合模组（Java+JS）在两类里都出现（判据是「包含」不是「只有」）");
+        a.hasScripts = false;
+        // ★ 元断言：这条判据必须真的在减东西（防止"筛了等于没筛"那种恒真装饰）
+        ok(stat, L, Mods.filterAndSort(ms, "", Mods.SORT_NAME, false, Mods.TYPE_DATA, null).size() < 3,
+                "★元断言：类型筛选必须真的筛掉东西（不是恒真）");
+        // ★ 反向：读不出说明文件的坏包**没有类型** ⇒ 选了任一类都不出现（不许替它猜）
+        Mods.Info bad = new Mods.Info();
+        bad.fileName = "broken.zip";
+        bad.metaError = "unreadable";
+        List<Mods.Info> withBad = new ArrayList<>(ms);
+        withBad.add(bad);
+        ok(stat, L, Mods.filterAndSort(withBad, "", Mods.SORT_NAME, false, Mods.TYPE_JAVA, null).size() == 1,
+                "★反向：坏包没有类型 ⇒ 选了类型就不出现（我们不替它猜类型）");
+        ok(stat, L, Mods.filterAndSort(withBad, "", Mods.SORT_NAME, false, Mods.TYPE_ANY, null).size() == 4,
+                "★反向对照：同一个坏包在 TYPE_ANY 下照常出现（它只是没类型，不是被藏起来）");
+        // ★ 类型与"只看有问题的"是**两个独立维度**，叠加时必须同时满足
+        ok(stat, L, Mods.filterAndSort(ms, "", Mods.SORT_NAME, true, Mods.TYPE_JS, null).size() == 1,
+                "类型 + 只看有问题的：两个条件同时生效（Beta 是脚本且标了出错）");
+        // ★ 判据本体就是一个纯函数：直接喂它"位掩码"两个方向都验
+        ok(stat, L, Mods.matchesType(a, Mods.TYPE_JAVA) && !Mods.matchesType(a, Mods.TYPE_DATA),
+                "matchesType：有 dex 的算 Java、不算带资源");
+        ok(stat, L, Mods.matchesType(null, Mods.TYPE_ANY) && !Mods.matchesType(null, Mods.TYPE_JAVA),
+                "matchesType：null 在 TYPE_ANY 下算通过、在具体类型下不算（不崩）");
+        L.add("");
+    }
+
+    /**
+     * ㊺ 一档六项（2026-10-06 第 115 轮）。
+     *
+     * <pre>
+     *   ① 存档详情    —— 地图名加不加、色码去没去
+     *   ② 备份列表    —— 删一份的动作与"这份备份已经不在了"那句文案（走 Backup.delete 的空对象分支：不碰磁盘）
+     *   ③+⑦ 存储占用 —— 合成一份 Report，验实拼出来的每一行 + 三条"该省的行必须省掉"
+     *   ④ 版本行      —— 带存档条数的那两句与不带的那两句**必须不同**（否则等于没加）
+     *   ⑤ 模组类型    —— 四个标签必须两两不同（判据在 ⑲，这里钉"界面上的四个词"）
+     *   ⑥ 蓝图细节    —— 名字表内容 / 截断 / 换算过的名字 / 带朝向格数 + 两条反向
+     * </pre>
+     *
+     * ★ 为什么全是纯函数 + 资源实拼：这一批功能**没有一个新页面**，判据都在能单独喂输入的地方
+     *   （{@link Storage#text} / {@link SlotIo#saveDetailText} / {@link MschText#techDictNames}）——
+     *   塞进 Activity 就只能靠真机肉眼看，而真机看不出"这两句其实是同一句"。
+     * ★ 每条都配反向或元断言：{@code "看着有判据" ≠ "判据对"}（§35.13 / §45.9）。
+     */
+    private static void tier1(Context ctx, List<String> L, int[] stat) {
+        L.add("── ㊺ 一档六项：存档详情 / 备份列表 / 存储占用 / 版本行 / 模组类型 / 蓝图细节 ──");
+
+        // ① 存档详情（SlotIo.saveDetailText）—— 用**真造一份 .msav**（与 ㉒ 同一个夹具生成器）
+        File dir = new File(Paths.privateDir(ctx), "selftest-tier1");
+        deleteTree(dir);
+        dir.mkdirs();
+        try {
+            File good = tinyMsav(new File(dir, "tier1.msav"), "[gold]我的地图", 100, 50, 12, false);
+            MsavMeta m = MsavMeta.read(good);
+            String body = SlotIo.saveDetailText(ctx, m);
+            ok(stat, L, body.contains("我的地图"),
+                    "存档详情：地图真名出现在正文里");
+            ok(stat, L, !body.contains("[gold]"),
+                    "★存档详情：色码被去掉（纯文本列表里 `[gold]` 是噪声）");
+            ok(stat, L, body.contains(ctx.getString(R.string.msav_lbl_played_fmt,
+                            MsavText.playtimeText(ctx, m))),
+                    "存档详情：时长那行走的是与地图页**同一句**（MsavText.detail）");
+            MsavMeta bad = MsavMeta.read(new File(dir, "no-such-file.msav"));
+            ok(stat, L, SlotIo.saveDetailText(ctx, bad).equals(MsavText.detail(ctx, bad)),
+                    "★反向：读不出来的存档正文里**不许**多出'地图：'那一行（没有名字可写）");
+            ok(stat, L, SlotIo.saveDetailText(ctx, bad).length() > 0,
+                    "★反向对照：读不出来的存档也要有话说（不能是空正文）");
+
+            // ② 备份列表：删一份的失败分支（空对象 ⇒ 不碰磁盘）
+            Backup.Snapshot ghost = new Backup.Snapshot();
+            ok(stat, L, ctx.getString(R.string.backup_err_snapshot_missing)
+                            .equals(Backup.delete(ctx, ghost)),
+                    "备份列表：删一份不存在的备份 ⇒ 报的是那句「这份备份已经不在了」");
+            ok(stat, L, !ctx.getString(R.string.slot_op_restore)
+                            .equals(ctx.getString(R.string.slot_op_backup_delete)),
+                    "★备份列表：『恢复这一份』与『删掉这一份』必须是两句不同的话（否则用户分不清点的是哪个）");
+            ok(stat, L, ctx.getString(R.string.backup_list_head_fmt, 3).contains("3"),
+                    "备份列表：表头带份数（%1$d 真的被填进去了）");
+
+            // ⑥ 蓝图技术细节：造一份**真 .msch**（两个方块名都在旧名表里 ⇒ 一定会有"换算过"的那行）
+            byte[] raw = new Sch(1, 4, 4)
+                    .tag("name", "tier1-bp")
+                    .tile("alloy-smelter", 1, 1, 0, new byte[]{0})   // 旧名 ⇒ 换算成 surge-smelter
+                    .tile("sand", 2, 2, 2, new byte[]{0})            // 旧名 + 带朝向
+                    .bytes();
+            Msch bp = Msch.read(raw);
+            ok(stat, L, bp.ok && bp.dict.size() == 2,
+                    "蓝图细节：夹具本身解析成功、字典 2 个名字");
+            ok(stat, L, bp.rotatedCount() == 1,
+                    "蓝图细节：带朝向的格数只数 rotation != 0 的（这里 1 格）");
+            List<String> pairs = bp.remappedPairs();
+            ok(stat, L, pairs.size() == 2
+                            && pairs.get(0).startsWith("alloy-smelter"),
+                    "蓝图细节：换算过的名字只列真的换过的（旧的 → 新的）：" + pairs);
+            ok(stat, L, pairs.get(0).contains("surge-smelter"),
+                    "蓝图细节：换算那一行同时给出**换算后**的名字（否则读者不知道被换算成了什么）");
+            String dictNames = MschText.techDictNames(ctx, bp.dictView());
+            ok(stat, L, dictNames.contains("alloy-smelter") && dictNames.contains("sand"),
+                    "蓝图细节：名字表内容真的列出来了（原来只报个数）");
+            ok(stat, L, MschText.techDictNames(ctx, new ArrayList<String>()).isEmpty(),
+                    "★反向：名字表为空 ⇒ 整行不出现（返回空串，不摆空行）");
+            ok(stat, L, MschText.techRotated(ctx, 0).isEmpty()
+                            && !MschText.techRotated(ctx, 3).isEmpty(),
+                    "★反向：0 格不出现、3 格出现（这一行不是恒真的）");
+            List<String> many = new ArrayList<>();
+            for (int i = 0; i < 12; i++) many.add("blk" + i);
+            String capped = MschText.techDictNames(ctx, many);
+            ok(stat, L, !capped.contains("blk11")
+                            && !capped.equals(MschText.techDictNames(ctx, many.subList(0, 8))),
+                    "蓝图细节：超过 8 个名字 ⇒ 截断并换成「还有 N 个」那句");
+        } catch (Throwable t) {
+            stat[1]++;
+            L.add("❌ ㊺ 的磁盘夹具那段自己抛了异常：" + t);
+        } finally {
+            deleteTree(dir);
+        }
+
+        // ③+⑦ 存储占用（Storage.text —— 合成一份 Report，不碰真实数据）
+        Storage.Report r = new Storage.Report();
+        r.hubBytes = 300L * 1024 * 1024;
+        r.slots.add(new Data.Slot("default", null, true, 51, 209L * 1024 * 1024));
+        r.pool = new Backup.PoolStats();
+        r.pool.snapshots = 20;
+        r.pool.logical = 3L * 1024 * 1024 * 1024;
+        r.pool.actual = 240L * 1024 * 1024;
+        r.pool.objects = 1200;
+        r.trashCounts[Trash.Kind.MAP.ordinal()] = 2;
+        r.trashBytes[Trash.Kind.MAP.ordinal()] = 1024L * 1024;
+        r.trashItems = 2;
+        r.trashTotalBytes = 1024L * 1024;
+        r.redundantPlaces = 3;
+        r.redundantBytes = 2048L;
+        String txt = Storage.text(ctx, r);
+        ok(stat, L, txt.contains(ctx.getString(R.string.storage_total_fmt,
+                        Util.formatSize(r.hubBytes))),
+                "存储占用：第一行是总占用（与 hubBytes 同一个格式化）");
+        ok(stat, L, txt.contains(ctx.getString(R.string.storage_slot_line_fmt,
+                        "default", 51, Util.formatSize(209L * 1024 * 1024))),
+                "存储占用：各槽一行（槽名 / 文件数 / 体积）");
+        ok(stat, L, txt.contains(ctx.getString(R.string.storage_pct_fmt, 92))
+                        || txt.contains(ctx.getString(R.string.storage_pct_fmt, 93)),
+                "存储占用：备份那一行给出节省率（3 GB → 240 MB 约 92%）");
+        ok(stat, L, txt.contains(Storage.trashKindLabel(ctx, Trash.Kind.MAP)),
+                "存储占用：中转站按类型分行（地图 2 项）");
+        ok(stat, L, txt.contains(ctx.getString(R.string.storage_clean_fmt, 3,
+                        Util.formatSize(2048L))),
+                "存储占用：可清理残留那行带处数与体积（原来只在别处显示'已开/已关'）");
+        // ★ 三条"该省的行必须省掉"（反向判据 —— 防止每行都恒真地出现）
+        Storage.Report empty = new Storage.Report();
+        empty.pool = new Backup.PoolStats();
+        String t2 = Storage.text(ctx, empty);
+        ok(stat, L, t2.contains(ctx.getString(R.string.storage_backup_none))
+                        && !t2.contains(ctx.getString(R.string.storage_pct_fmt, 0)),
+                "★反向：一份备份都没有 ⇒ 说「还没有备份」，且**不出现**节省率那一行");
+        ok(stat, L, t2.contains(ctx.getString(R.string.storage_no_slots))
+                        && t2.contains(ctx.getString(R.string.storage_trash_none)),
+                "★反向：没有槽 / 中转站是空的 ⇒ 各说一句话（不摆空段）");
+        ok(stat, L, !t2.contains(ctx.getString(R.string.storage_backup_orphan_fmt,
+                        Util.formatSize(0))),
+                "★反向：孤儿为 0 ⇒ 不许出现「另有 … 收回」那一行（元断言：这行不是恒真的）");
+        r.pool.orphanBytes = 5L * 1024 * 1024;
+        ok(stat, L, Storage.text(ctx, r).contains(Util.formatSize(r.pool.orphanBytes)),
+                "★对照：孤儿不为 0 ⇒ 那一行必须出现（证明上一条不是因为整段没实现）");
+        ok(stat, L, Storage.text(ctx, null).isEmpty(),
+                "★反向：Report 为 null ⇒ 返回空串（不崩、不返回半句话）");
+
+        // ④ 版本行 / 详情：带条数与不带条数**必须真的是两句话**
+        String withSaves = ctx.getString(R.string.row_sub_saves_fmt, "com.x", "74.7 MB", 7);
+        String plain = ctx.getString(R.string.row_sub_fmt, "com.x", "74.7 MB");
+        ok(stat, L, withSaves.contains("7") && !withSaves.equals(plain),
+                "版本行：带存档条数的那句与不带的那句不同（且填进了 7）");
+        String impSaves = ctx.getString(R.string.row_imported_sub_saves_fmt, "a.apk", "74.7 MB", 7);
+        ok(stat, L, impSaves.contains("a.apk") && impSaves.contains("7"),
+                "版本行：导入项那条同样带文件名与条数");
+        ok(stat, L, !ctx.getString(R.string.detail_saves_fmt, 7)
+                        .equals(ctx.getString(R.string.detail_saves_none)),
+                "版本详情：有存档 / 没存档是两句不同的话");
+        ok(stat, L, Trash.timeText(0).isEmpty(),
+                "★元断言：timeText(0) 必须是空串（否则「上次玩：」后面会跟一片空白）");
+        ok(stat, L, !Trash.timeText(System.currentTimeMillis()).isEmpty(),
+                "★元断言对照：给了真实时刻就必须有内容（防止上一条是因为它恒空）");
+
+        // ⑤ 模组类型：界面上的四个词必须两两不同（判据本身在 ⑲）
+        String[] typeLabels = {
+                ctx.getString(R.string.mods_filter_type_all),
+                ctx.getString(R.string.mods_filter_type_java),
+                ctx.getString(R.string.mods_filter_type_js),
+                ctx.getString(R.string.mods_filter_type_data)};
+        boolean distinct = true;
+        for (int i = 0; i < typeLabels.length; i++) {
+            if (typeLabels[i].trim().isEmpty()) distinct = false;
+            for (int j = i + 1; j < typeLabels.length; j++) {
+                if (typeLabels[i].equals(typeLabels[j])) distinct = false;
+            }
+        }
+        ok(stat, L, distinct, "★模组类型：四个标签互不相同、且都不是空串（否则用户选不出来）");
         L.add("");
     }
 

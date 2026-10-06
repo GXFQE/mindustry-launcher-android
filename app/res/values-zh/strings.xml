@@ -93,6 +93,16 @@
     <string name="add_package_msg">按精确包名查已装的游戏版本</string>
     <string name="add_package_hint">如 io.anuke.mindustry</string>
     <string name="detail_slot_line_fmt">\n\n存档槽: %1$s</string>
+    <!-- ★ 2026-10-06（一档④）：这个版本指向的槽里有多少份存档 / 上次什么时候启动的（只在详情弹窗里）
+         🔴 措辞两处都刻意保守：
+            ① 说「上次**启动**」不说「上次玩」—— 记账写在**点启动的那一刻**（`Config.sessionStart`），
+               启动失败也会留下这条记录；
+            ② 没记录时写「还没有记录」而不是「还没玩过」—— 这个字段**从本版才开始记**，
+               老用户的游戏历史我们根本不知道（拿不准的判断不许说成结论，见 REF §77.5）。 -->
+    <string name="detail_saves_fmt">\n这个槽里有 %1$d 份存档</string>
+    <string name="detail_saves_none">\n这个槽里还没有存档</string>
+    <string name="detail_played_fmt">\n上次启动：%1$s</string>
+    <string name="detail_played_none">\n上次启动：还没有记录</string>
     <string name="detail_slot_hint">\n（不同版本用不同的槽，存档就不会互相覆盖）</string>
     <!--
       界面把 APK 里的构建前缀剥掉再显示（`8-official-159.7` → `159.7`，见 Versions.Entry.displayVersion）。
@@ -129,6 +139,15 @@
     -->
     <string name="row_sub_fmt">%1$s · %2$s</string>
     <string name="row_imported_sub_fmt">已导入 · %1$s · %2$s</string>
+    <!--
+      ★ 2026-10-06（一档④）：版本行补"这个槽里有几份存档"那一段。
+      ⚠️ **这两条曾经只加在默认目录（英文）里** —— 于是中文界面下这一行渲染成
+        `io.anuke.mindustry · 74.7 MB · 8 save(s)`（中英混排，真机 dump 抓到的）。
+        门禁 RES-02 只比"两边都有的 key 的参数集合"，**抓不到只在一边存在的 key**
+        （回落到默认语言是合法行为）⇒ 这类漏加只能靠"改完文案 dump 回读"。
+    -->
+    <string name="row_sub_saves_fmt">%1$s · %2$s · 存档 %3$d 份</string>
+    <string name="row_imported_sub_saves_fmt">已导入 · %1$s · %2$s · 存档 %3$d 份</string>
 
     <!-- dev 直通口（仅 debuggable 构建可见） -->
     <string name="dev_blocked_toast">发布构建不接受 dev_* 直通口</string>
@@ -189,7 +208,16 @@
 
     <string name="slot_op_backup">备份此槽…</string>
     <string name="slot_op_clone">克隆此槽…</string>
-    <string name="slot_op_restore">恢复备份…</string>
+    <!--
+      ★ 2026-10-06（一档②）：这一项的入口从「恢复备份…」改成「看看有哪些备份…」。
+      理由：**恢复本来就得先选一份** ⇒ 列表是必经之路；而"只想看一眼有哪些备份、
+      里面是什么"用的是同一个列表。⇒ 一个列表服务两种意图，**不做两个入口**
+      （F15b 的教训：两条路各管一种直觉，不是保留重复的理由）。
+      选中一份之后的动作（恢复 / 删掉）在那一行上问 —— 见 SLOT_OP 的动作表。
+    -->
+    <string name="slot_op_backups">看看有哪些备份…</string>
+    <string name="slot_op_restore">恢复这一份…</string>
+    <string name="slot_op_backup_delete">删掉这一份…</string>
     <string name="slot_op_rename">重命名此槽…</string>
     <string name="slot_op_delete">删除此槽…</string>
 
@@ -264,8 +292,18 @@
     <string name="no_backup_title">没有可用备份</string>
     <string name="no_backup_msg_fmt">槽「%1$s」还没有备份。</string>
     <string name="restore_head_fmt">共 %1$d 份备份，选一份恢复</string>
-    <string name="restore_to_slot_title_fmt">恢复到槽「%1$s」</string>
     <string name="snapshot_entry_fmt">%1$d 个文件 · %2$s</string>
+    <!--
+      ══ 备份列表（一档②）：列表本身 + 选中一份之后的动作 ══════════════════════
+      ★ 术语统一成「备份」：原来菜单叫「备份」、列表与失败提示叫「快照」——
+        同一件事两个叫法（用户看到会以为这是两种东西）。本组起一律说「备份」。
+    -->
+    <string name="backup_list_title_fmt">槽「%1$s」的备份</string>
+    <string name="backup_list_head_fmt">共 %1$d 份 · 点一份可以选择恢复或删掉</string>
+    <string name="backup_delete_title">删掉这一份备份？</string>
+    <string name="backup_delete_msg_fmt">备份：%1$s\n%2$d 个文件 · %3$s\n\n删掉就找不回来了。</string>
+    <string name="backup_delete_failed">删不掉</string>
+    <string name="backup_deleted_fmt">已删掉备份 %1$s</string>
     <string name="restore_confirm_title">确认恢复？</string>
     <string name="restore_confirm_msg_fmt">备份：%1$s\n%2$d 个文件 · %3$s\n\n会把备份里的文件写回去：\n%4$s\n\n· 写之前先检查内容有没有坏</string>
     <string name="restore">恢复</string>
@@ -404,7 +442,7 @@
     <!-- 冲突体检没做成时的白话提示（2026-10-04 补）：原来是把异常对象直接拼进正文。 -->
     <string name="mods_conflict_failed">冲突体检没做成。返回上一页再进一次试试。</string>
     <string name="slot_page_saves">存档</string>
-    <string name="slot_page_saves_sub">导入 / 导出 / 看每份存档是什么图</string>
+    <string name="slot_page_saves_sub">看每份是什么图 / 导入 / 导出</string>
     <string name="slot_page_maps">地图</string>
     <string name="slot_page_maps_sub">本槽 / 游戏 / 模组自带</string>
     <string name="slot_page_gone_fmt">这个槽已经不在了：%1$s</string>
@@ -425,7 +463,7 @@
     <string name="slot_page_info_other_fmt">不是当前槽 · 目标游戏 %1$s</string>
     <string name="slot_page_info_other_nogame">不是当前槽 · 还没指定版本</string>
     <string name="slot_page_ops">备份与恢复</string>
-    <string name="slot_page_ops_sub">备份 / 恢复 / 克隆 / 备份策略</string>
+    <string name="slot_page_ops_sub">备份 / 看有哪些 / 克隆 / 备份策略</string>
     <string name="slot_page_export">整槽导入导出</string>
     <string name="slot_page_export_sub">换机迁移用（zip）</string>
     <string name="maps_title">地图</string>
@@ -440,8 +478,22 @@
             空态只需要"为什么没有 + 下一步"两件事（对齐 empty_versions 的写法）。 -->
     <string name="maps_empty_fmt">槽「%1$s」里还没有地图。\n给某个版本分配这个槽之后，游戏自带的地图就会出现。</string>
     <string name="slot_op_import_save">导入存档（.msav）…</string>
+    <string name="slot_op_show_saves">看每份存档…</string>
     <string name="slot_op_import_slot">导入整槽（zip）…</string>
     <string name="slot_op_export_save">导出存档（.msav）…</string>
+    <!--
+      ══ 存档列表 / 存档详情（一档①，2026-10-06）═════════════════════════════
+      ★ 起因：原来"这份存档是什么图、玩了多久"只有两条路能看见 ——
+        ① 点「导出存档」列表的第二行（用"导出"去查档案，路子不对）；② 地图详情页（那是**地图**）。
+      ⇒ 新增只读入口「看每份存档…」：点一份看详情，详情里带「导出这一份…」出口。
+      ⚠️ 只读列表**不做删除** —— 存档是用户的东西，删只走游戏自己的界面
+        （与「看看哪几份读不出来」那条同一个口径）。
+    -->
+    <string name="saves_list_title_fmt">槽「%1$s」的存档</string>
+    <string name="saves_list_head_fmt">共 %1$d 份 · 点一份看它是什么图</string>
+    <string name="save_detail_title_fmt">存档：%1$s</string>
+    <string name="save_detail_export">导出这一份…</string>
+    <string name="msav_lbl_map_fmt">地图：%1$s</string>
     <string name="slot_op_export_slot">导出整槽（zip）…</string>
     <string name="export_no_save_fmt">槽「%1$s」里还没有存档。</string>
     <string name="export_pick_title_fmt">导出存档</string>
@@ -711,6 +763,17 @@
     <string name="bp_stats_failed">这份蓝图读不出来</string>
     <string name="bp_tech_version_fmt">格式版本：v%1$d</string>
     <string name="bp_tech_dict_fmt">文件里的方块名：%1$d 个</string>
+    <!--
+      ★ 2026-10-06（一档⑥）：把**已经解析出来、界面上一直没显示**的字段放出来。
+      判据都在内核里（`Msch.dictView` / `Tile.rawName` / `Tile.rotation`），这里只是显示：
+      · 名字表内容（原来只报个数）—— 缺件名单对不对，看这里最直接；
+      · "换算过名字的方块" —— 文件里写的是**旧名**、我们按游戏的映射换成了注册名的那些；
+      · 带朝向的方块 —— 传送带/炮塔那类 rotation 有意义的格子数（解析保真度的证据）。
+    -->
+    <string name="bp_tech_dict_names_fmt">名字表里写着：%1$s</string>
+    <string name="bp_tech_dict_names_more_fmt">名字表里写着：%1$s（还有 %2$d 个）</string>
+    <string name="bp_tech_renamed_fmt">换算过名字的方块：%1$s</string>
+    <string name="bp_tech_rot_fmt">带朝向的方块：%1$s 格</string>
     <string name="bp_tech_tags_fmt">标签：%1$s</string>
     <string name="bp_tech_contentmap_fmt">自带名字对照表：%1$s</string>
     <string name="bp_tech_yes">有</string>
@@ -857,16 +920,16 @@
     <string name="backup_err_game_running">游戏进程还在运行（当前槽正被游戏占用）。\n请先退出游戏再备份，否则备份内容可能不一致。</string>
     <string name="backup_err_no_data_fmt">槽「%1$s」还没有数据目录，没有可备份的内容。</string>
     <string name="backup_err_mkdir_fmt">创建备份目录失败：%1$s</string>
-    <string name="backup_err_same_second">同一秒内已有同名快照，请稍后重试</string>
+    <string name="backup_err_same_second">同一秒内已经有一份同名的备份了，稍等一下再试</string>
     <string name="backup_err_nothing_fmt">槽「%1$s」里没有可备份的内容。\n%2$s\n是空的，或只剩 %3$s 这类游戏自己会重建的东西。</string>
-    <string name="backup_err_snapshot_mkdir_fmt">创建快照目录失败：%1$s</string>
-    <string name="backup_err_snapshot_missing">快照不存在</string>
+    <string name="backup_err_snapshot_mkdir_fmt">创建备份目录失败：%1$s</string>
+    <string name="backup_err_snapshot_missing">这份备份已经不在了</string>
     <string name="backup_err_delete_partial_fmt">删除未完全成功：%1$s</string>
     <!-- 恢复（restore）那一段：失败原因 + 自检报告 + 成功报告 —— 都是弹窗正文 -->
-    <string name="backup_restore_err_no_snapshot">⚠ 快照不存在</string>
+    <string name="backup_restore_err_no_snapshot">⚠ 这份备份已经不在了</string>
     <string name="backup_restore_err_game_running">⚠ 游戏进程还在运行（当前槽正被游戏占用）——\n请先退出游戏再恢复。未做任何改动。</string>
-    <string name="backup_restore_err_manifest_fmt">⚠ 读不了快照清单：%1$s</string>
-    <string name="backup_restore_err_manifest_empty">⚠ 快照清单是空的</string>
+    <string name="backup_restore_err_manifest_fmt">⚠ 读不了这份备份的清单：%1$s</string>
+    <string name="backup_restore_err_manifest_empty">⚠ 这份备份的清单是空的</string>
     <string name="backup_restore_err_no_dst">⚠ 拿不到目标槽目录</string>
     <string name="backup_restore_err_mkdir_fmt">⚠ 创建目标目录失败：%1$s</string>
     <string name="backup_restore_bad_missing_fmt">%1$s（缺失）</string>
@@ -890,8 +953,8 @@
     <string name="cas_err_restore_write_fmt">恢复写出失败（rename）：%1$s</string>
     <string name="cas_err_no_sha256">本机没有 SHA-256 实现</string>
     <string name="cas_err_mkdir_fmt">建目录失败：%1$s</string>
-    <string name="backup_restore_ok_head_fmt">✅ 已从快照恢复到槽「%1$s」\n</string>
-    <string name="backup_restore_ok_snapshot_fmt">快照：%1$s\n</string>
+    <string name="backup_restore_ok_head_fmt">✅ 已从备份恢复到槽「%1$s」\n</string>
+    <string name="backup_restore_ok_snapshot_fmt">备份：%1$s\n</string>
     <string name="backup_restore_ok_files_fmt">文件：%1$d / %2$d （%3$s）\n</string>
     <string name="backup_restore_ok_where_fmt">位置：%1$s\n</string>
     <string name="backup_restore_ok_kept_fmt">保留了 %1$d 个文件现在的版本\n</string>
@@ -1052,6 +1115,37 @@
       ★ 时间、份数、体积**都由 Java 侧拼**（Trash.timeText / Util.formatSize），
         资源里只写整句 + 占位符（aapt2 会剥掉值里的首尾空白，碎片式拼串必然粘连）。
     -->
+    <!--
+      ══ 存储占用（一档③+⑦，2026-10-06）══════════════════════════════════════
+      ★ 这一页回答两件事：① 备份到底省了多少（内容去重的价值，原来只有 dev 口看得见）；
+        ② 各类数据各占多少 —— 各槽 / 备份 / 中转站 / 可以清理的残留。
+      ★ 为什么要有第②件：中转站那句注释自己写着"**此前不参与任何体检数字**"，
+        而 hub 下的 backups 与几个 trash 目录原来是**统计盲区**（体检查的是数据根残留，
+        不是"谁占了多少"）。
+      ★ 口径：**只读**，一个字节都不写；数字全在后台线程算完再弹窗。
+      ⚠️ 术语纪律：第一层不出现"对象池 / 去重"这类词 —— 说"备份之间共用内容，所以占得少"。
+        依据（对象数 / 暂时没用的部分）在同一条里用白话带过。
+    -->
+    <string name="set_storage_title">存储占用</string>
+    <string name="set_storage_sub">备份省了多少、各类数据各占多少</string>
+    <string name="storage_loading">正在统计…</string>
+    <string name="storage_failed">统计失败：%1$s</string>
+    <string name="storage_total_fmt">启动器数据共占 %1$s</string>
+    <string name="storage_sec_slots">各槽内容</string>
+    <string name="storage_no_slots">还没有槽。</string>
+    <string name="storage_slot_line_fmt">槽「%1$s」：%2$d 个文件 · %3$s</string>
+    <string name="storage_sec_backup">备份</string>
+    <string name="storage_backup_none">还没有备份。</string>
+    <string name="storage_backup_fmt">%1$d 份备份 · 占 %2$s · 不共用内容的话要 %3$s（省了 %4$s）</string>
+    <string name="storage_pct_fmt">%1$d%%</string>
+    <string name="storage_backup_legacy_fmt">其中 %1$d 份还是旧格式 · %2$s</string>
+    <string name="storage_backup_orphan_fmt">另有 %1$s 现在没有备份在用，下次自动清理时收回</string>
+    <string name="storage_sec_trash">中转站</string>
+    <string name="storage_trash_line_fmt">%1$s：%2$d 项 · %3$s</string>
+    <string name="storage_trash_none">（空的）</string>
+    <string name="storage_sec_clean">可以清理的残留</string>
+    <string name="storage_clean_fmt">%1$d 处 · %2$s（在设置里「立即清理一次」可清）</string>
+
     <string name="trash_title">中转站</string>
     <string name="trash_sub">删掉的地图和槽、被替换的模组和存档先挪到这里，可以再放回去</string>
     <string name="trash_head_fmt">共 %1$d 份 · %2$s</string>
@@ -1292,7 +1386,7 @@
     <!-- 列表的搜索/筛选/排序（用户点单第②项） -->
     <string name="mods_search_hint">搜索模组名或文件名</string>
     <string name="mods_act_filter_title">筛选与排序</string>
-    <string name="mods_act_filter_sub">搜名字 · 只看有问题的</string>
+    <string name="mods_act_filter_sub">搜名字 · 只看有问题的 · 按类型</string>
     <string name="mods_filter_title">筛选与排序</string>
     <!-- 批量启停（第③项）：一次读写改完整槽的开关 -->
     <string name="mods_act_batch_title">批量启停</string>
@@ -1311,6 +1405,16 @@
     <string name="mods_filter_sort_state">有问题的在前</string>
     <string name="mods_filter_sort_size">按大小（大的在前）</string>
     <string name="mods_filter_only">只看有问题的</string>
+    <!--
+      ★ 2026-10-06（一档⑤）：按类型筛（判据 = `Mods.Info.parts()` 的位掩码，
+        与行内那个"Java / 脚本 / 资源"标签**同一份判据**）。
+      ★ 语义是「**包含**这一类」而不是"只有这一类"：混合模组（Java+JS）两边都会出现 ——
+        那是事实，不是重复。读不出说明文件的坏包**没有类型** ⇒ 选了任一类它都不出现。
+    -->
+    <string name="mods_filter_type_all">全部类型</string>
+    <string name="mods_filter_type_java">有 Java 代码</string>
+    <string name="mods_filter_type_js">有脚本</string>
+    <string name="mods_filter_type_data">带资源</string>
     <string name="mods_filter_reset">清空筛选</string>
     <string name="mods_filtered_fmt">显示 %1$d / %2$d 个模组（已筛选）</string>
     <string name="mods_empty_filtered">没有符合条件的模组</string>

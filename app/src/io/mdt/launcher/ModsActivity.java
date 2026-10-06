@@ -48,6 +48,8 @@ public class ModsActivity extends BaseActivity {
     private static final String STATE_QUERY = "mdt-mods-query";
     private static final String STATE_SORT = "mdt-mods-sort";
     private static final String STATE_ONLY = "mdt-mods-only";
+    /** 一档⑤：类型筛选也要活过转屏（同 STATE_ONLY 那条教训） */
+    private static final String STATE_TYPE = "mdt-mods-type";
     /** SAF 请求码（导入模组包） */
     private static final int REQ_MOD_IMPORT = 61;
 
@@ -63,10 +65,12 @@ public class ModsActivity extends BaseActivity {
      *   否则"页面上说版本不符、报告里说没问题"这种分叉不会有任何报错。
      */
     private Mods.Target mTarget = new Mods.Target();
-    /** 第②项：搜索词 / 排序方式 / 只看有问题的（**纯前端**，不写任何文件） */
+    /** 搜索词 / 排序方式 / 只看有问题的 / 类型（**纯前端**，不写任何文件） */
     private String mQuery = "";
     private int mSort = Mods.SORT_NAME;
     private boolean mOnlyProblems;
+    /** 一档⑤：类型筛选（{@link Mods#TYPE_ANY} = 不筛）。判据 = `Mods.matchesType` */
+    private int mType = Mods.TYPE_ANY;
     private EditText mSearch;
     private TextView mFiltered;
 
@@ -108,6 +112,7 @@ public class ModsActivity extends BaseActivity {
             if (q != null) mQuery = q;
             mSort = savedInstanceState.getInt(STATE_SORT, Mods.SORT_NAME);
             mOnlyProblems = savedInstanceState.getBoolean(STATE_ONLY, false);
+            mType = savedInstanceState.getInt(STATE_TYPE, Mods.TYPE_ANY);
         }
         buildUi();
         rescan();
@@ -120,6 +125,7 @@ public class ModsActivity extends BaseActivity {
         outState.putString(STATE_QUERY, mQuery);
         outState.putInt(STATE_SORT, mSort);
         outState.putBoolean(STATE_ONLY, mOnlyProblems);
+        outState.putInt(STATE_TYPE, mType);
     }
 
     @Override
@@ -634,9 +640,10 @@ public class ModsActivity extends BaseActivity {
             all.add(m);
             sts.add(null);                                // 读不出元数据 ⇒ 没有「游戏里的状态」
         }
-        List<Mods.Info> shown = Mods.filterAndSort(all, mQuery, mSort, mOnlyProblems,
+        List<Mods.Info> shown = Mods.filterAndSort(all, mQuery, mSort, mOnlyProblems, mType,
                 sts.toArray(new Mods.State[0]));
-        boolean filtering = mOnlyProblems || !mQuery.trim().isEmpty() || mSort != Mods.SORT_NAME;
+        boolean filtering = mOnlyProblems || mType != Mods.TYPE_ANY || !mQuery.trim().isEmpty()
+                || mSort != Mods.SORT_NAME;
         if (mFiltered != null) {
             mFiltered.setVisibility(filtering ? View.VISIBLE : View.GONE);
             mFiltered.setText(getString(R.string.mods_filtered_fmt, shown.size(), all.size()));
@@ -660,8 +667,10 @@ public class ModsActivity extends BaseActivity {
 
     /**
      * 「筛选与排序」对话框。
-     * ★ 不为它新建 layout：排序（单选）+ 只看有问题的（开关）+ 清空，用一个列表表达
-     *   （当前项打勾）—— 少一个 layout 文件就少一处跟主题有关的坑（见 FLOWS F2b）。
+     * ★ 不为它新建 layout：排序（单选）+ 只看有问题的（开关）+ 类型（四选一）+ 清空，
+     *   用一个列表表达（当前项打勾）—— 少一个 layout 文件就少一处跟主题有关的坑（见 FLOWS F2b）。
+     * ★ 一档⑤（2026-10-06）：加了"类型"四行。判据是 `Mods.matchesType`（"包含"语义）——
+     *   混合模组会在两类里都出现，那是事实；这一行**只是纯前端过滤**，一个文件都不碰。
      */
     private void pickFilter() {
         final String tick = "✓ ";
@@ -670,6 +679,10 @@ public class ModsActivity extends BaseActivity {
                 (mSort == Mods.SORT_STATE ? tick : "") + getString(R.string.mods_filter_sort_state),
                 (mSort == Mods.SORT_SIZE ? tick : "") + getString(R.string.mods_filter_sort_size),
                 (mOnlyProblems ? tick : "") + getString(R.string.mods_filter_only),
+                (mType == Mods.TYPE_ANY ? tick : "") + getString(R.string.mods_filter_type_all),
+                (mType == Mods.TYPE_JAVA ? tick : "") + getString(R.string.mods_filter_type_java),
+                (mType == Mods.TYPE_JS ? tick : "") + getString(R.string.mods_filter_type_js),
+                (mType == Mods.TYPE_DATA ? tick : "") + getString(R.string.mods_filter_type_data),
                 getString(R.string.mods_filter_reset)};
         new AlertDialog.Builder(this)
                 .setTitle(R.string.mods_filter_title)
@@ -683,9 +696,18 @@ public class ModsActivity extends BaseActivity {
                             mSort = Mods.SORT_SIZE;
                         } else if (which == 3) {
                             mOnlyProblems = !mOnlyProblems;
+                        } else if (which == 4) {
+                            mType = Mods.TYPE_ANY;
+                        } else if (which == 5) {
+                            mType = Mods.TYPE_JAVA;
+                        } else if (which == 6) {
+                            mType = Mods.TYPE_JS;
+                        } else if (which == 7) {
+                            mType = Mods.TYPE_DATA;
                         } else {
                             mSort = Mods.SORT_NAME;
                             mOnlyProblems = false;
+                            mType = Mods.TYPE_ANY;
                             mQuery = "";
                             if (mSearch != null) mSearch.setText("");
                         }

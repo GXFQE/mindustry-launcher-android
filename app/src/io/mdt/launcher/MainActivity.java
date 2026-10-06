@@ -1492,6 +1492,84 @@ public class MainActivity extends BaseActivity {
             bindVersionRow(v, e);
             mListContainer.addView(v);
         }
+        // ★ 一档④：副标题里"这个槽有几份存档"那一段**后台补**（见 fillSlotSaveCounts）
+        fillSlotSaveCounts(mEntries);
+    }
+
+    /**
+     * ★ 2026-10-06（一档④）：把"这个版本的槽里有几份存档"补到行上。
+     *
+     * ★ 为什么后台 + 按槽去重：`bindVersionRow` 跑在 UI 线程上，而这里要**列目录**；
+     *   版本一多就是 N 次遍历。同槽的版本共用一次结果（`map` 去重），整段在后台线程。
+     * ★ 为什么只刷那一行：与存档列表那条同一个教训 —— 整片重排会让正在滚动的手感变差。
+     * ⚠️ 收尾要比 `mEntries` 的**对象身份**：用户可能已经 re-scan 过（列表换了一批对象），
+     *   拿旧的下标去写新列表就是"张冠李戴"。
+     */
+    private void fillSlotSaveCounts(final List<Versions.Entry> entries) {
+        if (entries == null || entries.isEmpty() || mListContainer == null) return;
+        new Thread(new Runnable() {
+            @Override public void run() {
+                final java.util.Map<String, Integer> counts = new java.util.HashMap<>();
+                for (Versions.Entry e : entries) {
+                    String s = Versions.slotFor(e);
+                    if (s == null || s.isEmpty() || counts.containsKey(s)) continue;
+                    counts.put(s, saveCountIn(s));
+                }
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        if (Util.dead(MainActivity.this) || mEntries != entries) return;
+                        int rows = Math.min(mListContainer.getChildCount(), entries.size());
+                        for (int i = 0; i < rows; i++) {
+                            View v = mListContainer.getChildAt(i);
+                            if (v == null) continue;
+                            TextView sub = (TextView) v.findViewById(R.id.ver_sub);
+                            if (sub == null) continue;
+                            Integer c = counts.get(Versions.slotFor(entries.get(i)));
+                            sub.setText(rowSubtitle(entries.get(i), c == null ? 0 : c));
+                        }
+                    }
+                });
+            }
+        }, "slot-save-count").start();
+    }
+
+    /**
+     * 一个槽里有几份存档 —— **只数文件**（不读 meta）。
+     * ★ 与槽页那条"读每一份存档的元数据"刻意不同：槽页只需算一次、可以慢；
+     *   这里要按版本行算，只数文件名就够了（".msav" 且不是隐藏文件）。
+     */
+    private int saveCountIn(String slot) {
+        File dir = new File(Data.dirOf(this, slot), "saves");
+        File[] fs = dir.listFiles();
+        if (fs == null) return 0;
+        int n = 0;
+        for (File f : fs) {
+            if (f == null || !f.isFile()) continue;
+            String name = f.getName();
+            if (name.startsWith(".")) continue;
+            if (!name.toLowerCase(java.util.Locale.ROOT).endsWith(".msav")) continue;
+            n++;
+        }
+        return n;
+    }
+
+    /**
+     * 版本行副标题（**唯一实现**：绑定那一行与后台补"存档 N 份"都走它）。
+     * ★ 零份时**不加那一段**（"存档 0 份"没有信息量，还会把行撑到两行）。
+     */
+    private String rowSubtitle(Versions.Entry e, int saves) {
+        if (saves > 0) {
+            return e.imported
+                    ? getString(R.string.row_imported_sub_saves_fmt,
+                            e.importFile == null ? "" : e.importFile,
+                            Util.formatSize(e.apkSize), saves)
+                    : getString(R.string.row_sub_saves_fmt, e.pkg,
+                            Util.formatSize(e.apkSize), saves);
+        }
+        return e.imported
+                ? getString(R.string.row_imported_sub_fmt,
+                        e.importFile == null ? "" : e.importFile, Util.formatSize(e.apkSize))
+                : getString(R.string.row_sub_fmt, e.pkg, Util.formatSize(e.apkSize));
     }
 
     /** 把一行「版本」填上数据并接上交互（原 Adapter.getView 的逻辑，一字未改）。 */
@@ -1508,10 +1586,9 @@ public class MainActivity extends BaseActivity {
         //   ⇒ 真机上渲染成 `已导入 ·imported · 74.7 MB`（2026-10-04 真机 dump 抓到）。
         // ⚠️ 导入项的 `pkg` 是个**内部占位串**（`Versions` 里写死 "imported"），本来就不该给用户看；
         //   现在导入项显示的是**你导入时的那个文件名**（`importFile`）。
-        sub.setText(e.imported
-                ? getString(R.string.row_imported_sub_fmt,
-                        e.importFile == null ? "" : e.importFile, Util.formatSize(e.apkSize))
-                : getString(R.string.row_sub_fmt, e.pkg, Util.formatSize(e.apkSize)));
+        // ★ 一档④：这里先按"0 份存档"绑一次（进页面立刻有内容），条数由后台补齐 ——
+        //   口径**只有一处实现**（{@link #rowSubtitle}）。
+        sub.setText(rowSubtitle(e, 0));
 
         // 槽徽标：一眼看出这个版本落在哪个槽（未分配也显式显示默认槽名，不留空白）
         badge.setText(Versions.slotFor(e));
@@ -2070,13 +2147,35 @@ public class MainActivity extends BaseActivity {
         new Thread(new Runnable() {
             @Override public void run() {
                 final String detail = probeDetail(e);
+                // ★ 一档④：槽里几份存档 + 上次启动的时间 —— 都要碰磁盘/config，与"读包"同一趟后台
+                final String facts = slotFacts(e);
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
-                        if (!isFinishing() && dlg.isShowing()) dlg.setMessage(head + detail);
+                        if (!isFinishing() && dlg.isShowing()) dlg.setMessage(head + facts + detail);
                     }
                 });
             }
         }, "version-detail").start();
+    }
+
+    /**
+     * 详情弹窗里"这个槽"那两行（**后台线程**调用；一档④，2026-10-06）：
+     * <pre>
+     *   这个槽里有 N 份存档        —— 只数文件（{@link #saveCountIn}），与列表行同一口径
+     *   上次玩：10-05 21:30        —— 读 config 里那笔记账（{@link Config#lastPlayed}）
+     * </pre>
+     * ★ 时间文案复用 {@link Trash#timeText}（"MM-dd HH:mm"，跨年带年份）——
+     *   那是全工程唯一的时间格式化实现（中转站列表在用），不再写第二份。
+     */
+    private String slotFacts(Versions.Entry e) {
+        int n = saveCountIn(Versions.slotFor(e));
+        StringBuilder sb = new StringBuilder();
+        sb.append(n > 0 ? getString(R.string.detail_saves_fmt, n)
+                        : getString(R.string.detail_saves_none));
+        long at = Config.get().lastPlayed(e.key());
+        sb.append(at > 0 ? getString(R.string.detail_played_fmt, Trash.timeText(at))
+                         : getString(R.string.detail_played_none));
+        return sb.toString();
     }
 
     /**

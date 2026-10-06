@@ -70,4 +70,41 @@ public final class MschText {
                 return c.getString(R.string.msav_unknown_reason);
         }
     }
+
+    // ── 技术细节里那几行"解析出来但一直没显示"的事实（一档⑥，2026-10-06）──────────
+    //
+    // ★ 为什么放在这里而不是详情页里就地 getString：界面与自检必须走**同一份格式化**
+    //   （第 112 轮那次真机崩溃就是因为自检自己挑参数、而调用点传的是另一种类型 —— 见 §77.6）。
+    // ★ 三行都是"加分项"：内容为空就**返回空串**，调用方据此**整行不出现**（不摆空行）。
+
+    /** 名字表里写着的方块名（最多列 8 个，其余报个数）。表是空的 ⇒ 空串 */
+    public static String techDictNames(Context c, java.util.List<String> dict) {
+        if (dict == null || dict.isEmpty()) return "";
+        final int cap = 8;
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < Math.min(cap, dict.size()); i++) {
+            if (sb.length() > 0) sb.append(", ");
+            sb.append(dict.get(i));
+        }
+        return dict.size() > cap
+                ? c.getString(R.string.bp_tech_dict_names_more_fmt, sb.toString(), dict.size() - cap)
+                : c.getString(R.string.bp_tech_dict_names_fmt, sb.toString());
+    }
+
+    /** 文件里写旧名、被我们换算过的方块（最多 6 条）。没有 ⇒ 空串 */
+    public static String techRemapped(Context c, java.util.List<String> pairs) {
+        if (pairs == null || pairs.isEmpty()) return "";
+        final int cap = 6;
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < Math.min(cap, pairs.size()); i++) {
+            if (sb.length() > 0) sb.append(", ");
+            sb.append(pairs.get(i));
+        }
+        return c.getString(R.string.bp_tech_renamed_fmt, sb.toString());
+    }
+
+    /** 带朝向的方块格数（0 ⇒ 空串：一行"0 格"没有信息量） */
+    public static String techRotated(Context c, int rotated) {
+        return rotated <= 0 ? "" : c.getString(R.string.bp_tech_rot_fmt, MapStatsMods.num(rotated));
+    }
 }

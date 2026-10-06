@@ -1288,6 +1288,39 @@ public final class Msch {
         return Collections.unmodifiableList(dict);
     }
 
+    /**
+     * 带朝向的方块格数（`rotation != 0`）。
+     *
+     * ★ 2026-10-06（一档⑥）：这个量一直在内核里（{@link Tile#rotation} 每格都解析了），
+     *   但界面上从来没显示过 —— 它是"解析保真度"的一个可读证据（传送带/炮塔那类格子有朝向）。
+     * ⚠️ 只读派生量，不改任何状态；自检可直接喂一份合成蓝图验它。
+     */
+    public int rotatedCount() {
+        int n = 0;
+        for (Tile t : tiles) {
+            if (t != null && t.rotation != 0) n++;
+        }
+        return n;
+    }
+
+    /**
+     * 文件里写了**旧名**、被 {@link #mapFallback} 换算成游戏注册名的那些（按出现顺序去重，
+     * 元素形如 `oldName -> newName`）。
+     *
+     * ★ 为什么值得显示：缺件名单里的名字是**换算后**的（与 `content.getByName` 同口径），
+     *   而文件里写的可能是旧名 —— 两边对不上时，这一行就是解释。
+     */
+    public List<String> remappedPairs() {
+        List<String> out = new ArrayList<>();
+        for (Tile t : tiles) {
+            if (t == null || t.rawName == null || t.block == null) continue;
+            if (t.rawName.equals(t.block)) continue;
+            String pair = t.rawName + " -> " + t.block;
+            if (!out.contains(pair)) out.add(pair);
+        }
+        return out;
+    }
+
     /** 只读视图：瓦片（不可改） */
     public List<Tile> tileView() {
         return Collections.unmodifiableList(tiles);

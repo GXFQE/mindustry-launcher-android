@@ -56,10 +56,16 @@ point the game at that directory when it starts.
 - **Refuse packages that will not run**: two checks (ABI / dex / version thresholds), at import
   time and again before launch, so you do not find out only after getting in
 - **Continue**: remembers the version you played last and goes straight back to it
+- Each row also says **how many saves that version's slot holds**; long-press for the details and
+  you also get "this slot has N saves" and "last played"
 
 ### Saves and data
 - **Save slots**: create / rename / clone / delete (a deleted slot goes to the **transfer station**
   along with its backups, and can be put back); each slot has its own saves, maps and mods
+- **See each save**: tap one to see which map it is, its size, wave, playtime and when it was saved
+  (read-only, with an "export this save" button right there)
+- **Backup list**: every backup listed on its own (time / how many files / size / what the main save
+  inside is), and one tap to **restore** or **delete that one**
 - **Automatic backup**: whether to back up is decided by how long the session ran; past the limit
   the oldest is dropped; can be switched on or off per slot
 - **Content-addressed store for saves**: backups are deduplicated by content — measured on a real
@@ -96,6 +102,8 @@ point the game at that directory when it starts.
 - **Import `.msch`** (verified before it is put in place; on a name clash you are asked first, and
   the old one moves to the transfer station); **export from any source**
 - Deletion goes through the transfer station (moved aside, not hard-deleted) and can be put back
+- The **technical details** section shows the evidence: the name table the file carries, how many
+  tiles have a direction, and any block names that had to be remapped
 
 ### Mods
 - Scan the mods in a slot and enable or disable them one by one or **in bulk** (this writes the
@@ -104,6 +112,8 @@ point the game at that directory when it starts.
 - Import mod packages; **copy this slot's mods to another slot**
 - Every mod states **whether it can load and why**: type (Java / JS / data mod), dependencies,
   version thresholds, multiplayer support
+- The list can **filter by type** (has Java code / has scripts / has resources); a mixed mod shows
+  up under both — that is a fact, not a duplicate
 
 ### Transfer station
 - Deleted maps, **deleted whole slots**, replaced mods or saves, and deleted **blueprints** are
@@ -122,7 +132,8 @@ point the game at that directory when it starts.
   settings)
 - **Language**: follow system / English / 简体中文 (switched inside the app, without touching system
   settings)
-- **Settings**: default slot, how many log files to keep, the transfer station
+- **Settings**: default slot, how many log files to keep, **storage used** (how much each slot,
+  the backups and the transfer station take, and how much the backups save), the transfer station
 
 ## What is not there yet
 

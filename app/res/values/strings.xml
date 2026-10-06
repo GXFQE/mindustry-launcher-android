@@ -93,6 +93,14 @@
     <string name="add_package_msg">Look up an installed game version by exact package name</string>
     <string name="add_package_hint">e.g. io.anuke.mindustry</string>
     <string name="detail_slot_line_fmt">\n\nSave slot: %1$s</string>
+    <!-- ★ 2026-10-06: two facts about the slot this version points at (detail dialog only).
+         The wording is deliberately conservative: "last launch" (the record is written when the
+         launch starts, so a failed launch still leaves one) and "no record yet" (the field only
+         starts recording with this build — we do not know the player's older history). -->
+    <string name="detail_saves_fmt">\nThis slot has %1$d save(s)</string>
+    <string name="detail_saves_none">\nThis slot has no saves yet</string>
+    <string name="detail_played_fmt">\nLast launch: %1$s</string>
+    <string name="detail_played_none">\nLast launch: no record yet</string>
     <string name="detail_slot_hint">\n(different versions in different slots never overwrite each other)</string>
     <!--
       界面把 APK 里的构建前缀剥掉再显示（`8-official-159.7` → `159.7`，见 Versions.Entry.displayVersion）。
@@ -129,6 +137,14 @@
     -->
     <string name="row_sub_fmt">%1$s · %2$s</string>
     <string name="row_imported_sub_fmt">Imported · %1$s · %2$s</string>
+    <!--
+      ★ 2026-10-06: the version row also says how many saves its slot holds.
+      Same shape as the two above (whole sentence + positional args), just one more
+      trailing segment — it must stay short, the row is capped at two lines.
+      Filled in **later**, from a background count (0 = the segment is not added at all).
+    -->
+    <string name="row_sub_saves_fmt">%1$s · %2$s · %3$d save(s)</string>
+    <string name="row_imported_sub_saves_fmt">Imported · %1$s · %2$s · %3$d save(s)</string>
 
     <!-- dev 直通口（仅 debuggable 构建可见） -->
     <string name="dev_blocked_toast">Release builds do not accept dev_* entry points</string>
@@ -189,7 +205,15 @@
 
     <string name="slot_op_backup">Back up this slot…</string>
     <string name="slot_op_clone">Clone this slot…</string>
-    <string name="slot_op_restore">Restore a backup…</string>
+    <!--
+      ★ 2026-10-06: this entry changed from "Restore a backup…" to "See the backups…".
+      Restoring always needs a list first, and "just take a look" uses the very same list
+      ⇒ one list serves both intents; no second entry (see the F15b lesson in FLOWS).
+      What to do with the chosen one (restore / delete) is asked on that row.
+    -->
+    <string name="slot_op_backups">See the backups…</string>
+    <string name="slot_op_restore">Restore this one…</string>
+    <string name="slot_op_backup_delete">Delete this one…</string>
     <string name="slot_op_rename">Rename this slot…</string>
     <string name="slot_op_delete">Delete this slot…</string>
 
@@ -268,8 +292,18 @@
     <string name="no_backup_title">No backups available</string>
     <string name="no_backup_msg_fmt">Slot \"%1$s\" has no backups yet.</string>
     <string name="restore_head_fmt">%1$d backups · pick one to restore</string>
-    <string name="restore_to_slot_title_fmt">Restore into slot \"%1$s\"</string>
     <string name="snapshot_entry_fmt">%1$d files · %2$s</string>
+    <!--
+      ══ Backup list: the list itself + the actions for one chosen backup ══════
+      ★ One word only: "backup". The menu used to say "backup" while the list and the
+        failure messages said "snapshot" — two names for one thing.
+    -->
+    <string name="backup_list_title_fmt">Backups of slot \"%1$s\"</string>
+    <string name="backup_list_head_fmt">%1$d backups · tap one to restore or delete it</string>
+    <string name="backup_delete_title">Delete this backup?</string>
+    <string name="backup_delete_msg_fmt">Backup: %1$s\n%2$d files · %3$s\n\nThis cannot be undone.</string>
+    <string name="backup_delete_failed">Could not delete</string>
+    <string name="backup_deleted_fmt">Deleted backup %1$s</string>
     <string name="restore_confirm_title">Restore?</string>
     <string name="restore_confirm_msg_fmt">Backup: %1$s\n%2$d files · %3$s\n\nThese files will be written back:\n%4$s\n\n· the content is checked for damage before writing</string>
     <string name="restore">Restore</string>
@@ -411,7 +445,7 @@
     <!-- 冲突体检没做成时的白话提示（2026-10-04 补）：原来是把异常对象直接拼进正文。 -->
     <string name="mods_conflict_failed">The conflict check did not finish. Go back and enter again.</string>
     <string name="slot_page_saves">Saves</string>
-    <string name="slot_page_saves_sub">Import / export / see which map each save is</string>
+    <string name="slot_page_saves_sub">See each save / import / export</string>
     <string name="slot_page_maps">Maps</string>
     <string name="slot_page_maps_sub">this slot / game / mods</string>
     <string name="slot_page_gone_fmt">This slot is gone: %1$s</string>
@@ -432,7 +466,7 @@
     <string name="slot_page_info_other_fmt">Not the current slot · target game %1$s</string>
     <string name="slot_page_info_other_nogame">Not the current slot · no version assigned yet</string>
     <string name="slot_page_ops">Backup &amp; restore</string>
-    <string name="slot_page_ops_sub">Backup / restore / clone / backup policy</string>
+    <string name="slot_page_ops_sub">Backup / see backups / clone / backup policy</string>
     <string name="slot_page_export">Whole-slot import &amp; export</string>
     <string name="slot_page_export_sub">For moving to a new phone (zip)</string>
     <string name="maps_title">Maps</string>
@@ -447,8 +481,23 @@
             空态只需要"为什么没有 + 下一步"两件事（对齐 empty_versions 的写法）。 -->
     <string name="maps_empty_fmt">Slot \"%1$s\" has no maps yet.\nOnce a version is assigned to this slot, the maps built into the game show up here.</string>
     <string name="slot_op_import_save">Import a save (.msav)…</string>
+    <string name="slot_op_show_saves">See each save…</string>
     <string name="slot_op_import_slot">Import a whole slot (zip)…</string>
     <string name="slot_op_export_save">Export a save (.msav)…</string>
+    <!--
+      ══ Save list / save detail (2026-10-06) ══════════════════════════════════
+      "What map is this save, how long did I play" used to be visible in only two places:
+      the second line of the *export* list (looking up a file through the export flow),
+      and the map detail page (that is a *map*). Hence a read-only "See each save…"
+      entry: tap one for its detail, which carries an "Export this save…" exit.
+      ⚠️ The read-only list never deletes: saves belong to the user and are deleted in
+      the game's own UI (same rule as the "which saves are unreadable" list).
+    -->
+    <string name="saves_list_title_fmt">Saves in slot \"%1$s\"</string>
+    <string name="saves_list_head_fmt">%1$d saves · tap one to see what map it is</string>
+    <string name="save_detail_title_fmt">Save: %1$s</string>
+    <string name="save_detail_export">Export this save…</string>
+    <string name="msav_lbl_map_fmt">Map: %1$s</string>
     <string name="slot_op_export_slot">Export the whole slot (zip)…</string>
     <string name="export_no_save_fmt">Slot \"%1$s\" has no saves yet.</string>
     <string name="export_pick_title_fmt">Export save</string>
@@ -567,6 +616,16 @@
     <string name="bp_stats_failed">This blueprint cannot be read</string>
     <string name="bp_tech_version_fmt">Format version: v%1$d</string>
     <string name="bp_tech_dict_fmt">Block names in file: %1$d</string>
+    <!--
+      ★ 2026-10-06: show fields the parser has always produced but the UI never showed.
+      The evidence lives in the kernel (`Msch.dictView` / `Tile.rawName` / `Tile.rotation`);
+      this is display only: the name table itself, the names we had to remap (the file wrote
+      an old name), and how many tiles carry a direction.
+    -->
+    <string name="bp_tech_dict_names_fmt">Names in the table: %1$s</string>
+    <string name="bp_tech_dict_names_more_fmt">Names in the table: %1$s (%2$d more)</string>
+    <string name="bp_tech_renamed_fmt">Block names we remapped: %1$s</string>
+    <string name="bp_tech_rot_fmt">Tiles with a direction: %1$s</string>
     <string name="bp_tech_tags_fmt">Tags: %1$s</string>
     <string name="bp_tech_contentmap_fmt">Carries its own name table: %1$s</string>
     <string name="bp_tech_yes">yes</string>
@@ -896,16 +955,16 @@
     <string name="backup_err_game_running">The game process is still running (this slot is in use by the game).\nExit the game before backing up, or the backup may not match what you see.</string>
     <string name="backup_err_no_data_fmt">Slot \"%1$s\" has no data directory yet, so there is nothing to back up.</string>
     <string name="backup_err_mkdir_fmt">Could not create the backup directory: %1$s</string>
-    <string name="backup_err_same_second">A snapshot with that name already exists in this second — try again in a moment</string>
+    <string name="backup_err_same_second">A backup with that name already exists in this second — try again in a moment</string>
     <string name="backup_err_nothing_fmt">Slot \"%1$s\" has nothing to back up.\n%2$s\nIt is empty, or only has %3$s, which the game recreates by itself.</string>
-    <string name="backup_err_snapshot_mkdir_fmt">Could not create the snapshot directory: %1$s</string>
-    <string name="backup_err_snapshot_missing">The snapshot does not exist</string>
+    <string name="backup_err_snapshot_mkdir_fmt">Could not create the backup directory: %1$s</string>
+    <string name="backup_err_snapshot_missing">That backup is gone</string>
     <string name="backup_err_delete_partial_fmt">Deletion did not fully succeed: %1$s</string>
     <!-- 恢复（restore）那一段：失败原因 + 自检报告 + 成功报告 —— 都是弹窗正文 -->
-    <string name="backup_restore_err_no_snapshot">⚠ The snapshot does not exist</string>
+    <string name="backup_restore_err_no_snapshot">⚠ That backup is gone</string>
     <string name="backup_restore_err_game_running">⚠ The game process is still running (this slot is in use by the game) —\nExit the game before restoring. Nothing was changed.</string>
-    <string name="backup_restore_err_manifest_fmt">⚠ Cannot read the snapshot manifest: %1$s</string>
-    <string name="backup_restore_err_manifest_empty">⚠ The snapshot manifest is empty</string>
+    <string name="backup_restore_err_manifest_fmt">⚠ Cannot read the manifest of this backup: %1$s</string>
+    <string name="backup_restore_err_manifest_empty">⚠ The manifest of this backup is empty</string>
     <string name="backup_restore_err_no_dst">⚠ Cannot reach the target slot directory</string>
     <string name="backup_restore_err_mkdir_fmt">⚠ Could not create the target directory: %1$s</string>
     <string name="backup_restore_bad_missing_fmt">%1$s (missing)</string>
@@ -930,8 +989,8 @@
     <string name="cas_err_restore_write_fmt">restore write failed (rename): %1$s</string>
     <string name="cas_err_no_sha256">this device has no SHA-256 implementation</string>
     <string name="cas_err_mkdir_fmt">could not create the directory: %1$s</string>
-    <string name="backup_restore_ok_head_fmt">✅ Restored from the snapshot into slot \"%1$s\"\n</string>
-    <string name="backup_restore_ok_snapshot_fmt">Snapshot: %1$s\n</string>
+    <string name="backup_restore_ok_head_fmt">✅ Restored from the backup into slot \"%1$s\"\n</string>
+    <string name="backup_restore_ok_snapshot_fmt">Backup: %1$s\n</string>
     <string name="backup_restore_ok_files_fmt">Files: %1$d / %2$d (%3$s)\n</string>
     <string name="backup_restore_ok_where_fmt">Where: %1$s\n</string>
     <string name="backup_restore_ok_kept_fmt">Kept %1$d files as they are now\n</string>
@@ -1095,6 +1154,34 @@
       ★ 时间、份数、体积**都由 Java 侧拼**（Trash.timeText / Util.formatSize），
         资源里只写整句 + 占位符（aapt2 会剥掉值里的首尾空白，碎片式拼串必然粘连）。
     -->
+    <!--
+      ══ Storage used (2026-10-06) ═════════════════════════════════════════════
+      Answers two things: (1) how much the backups actually save — the value of
+      content sharing, which only a dev entry used to show; (2) where the space
+      goes: slots / backups / transfer station / leftovers that can be cleaned.
+      ★ Read-only: not a single byte is written; all numbers are counted off the
+        UI thread first.
+    -->
+    <string name="set_storage_title">Storage used</string>
+    <string name="set_storage_sub">What backups save, and where the space goes</string>
+    <string name="storage_loading">Counting…</string>
+    <string name="storage_failed">Could not count: %1$s</string>
+    <string name="storage_total_fmt">Launcher data: %1$s in total</string>
+    <string name="storage_sec_slots">Slot contents</string>
+    <string name="storage_no_slots">No slots yet.</string>
+    <string name="storage_slot_line_fmt">Slot \"%1$s\": %2$d files · %3$s</string>
+    <string name="storage_sec_backup">Backups</string>
+    <string name="storage_backup_none">No backups yet.</string>
+    <string name="storage_backup_fmt">%1$d backups · %2$s on disk · %3$s if nothing were shared (%4$s saved)</string>
+    <string name="storage_pct_fmt">%1$d%%</string>
+    <string name="storage_backup_legacy_fmt">%1$d of them are still the old format · %2$s</string>
+    <string name="storage_backup_orphan_fmt">%1$s more is not used by any backup and is reclaimed by the next cleanup</string>
+    <string name="storage_sec_trash">Transfer station</string>
+    <string name="storage_trash_line_fmt">%1$s: %2$d · %3$s</string>
+    <string name="storage_trash_none">(empty)</string>
+    <string name="storage_sec_clean">Leftovers you can clean</string>
+    <string name="storage_clean_fmt">%1$d place(s) · %2$s (\"Clean now\" in settings)</string>
+
     <string name="trash_title">Transfer station</string>
     <string name="trash_sub">Deleted maps and slots, replaced mods and saves wait here. You can put them back.</string>
     <string name="trash_head_fmt">%1$d items · %2$s</string>
@@ -1361,7 +1448,7 @@
     <!-- 列表的搜索/筛选/排序（用户点单第②项） -->
     <string name="mods_search_hint">Search mod name or file name</string>
     <string name="mods_act_filter_title">Filter and sort</string>
-    <string name="mods_act_filter_sub">Search by name · problems only</string>
+    <string name="mods_act_filter_sub">Search by name · problems only · by type</string>
     <string name="mods_filter_title">Filter and sort</string>
     <!-- 批量启停（第③项）：一次读写改完整槽的开关 -->
     <string name="mods_act_batch_title">Batch toggle</string>
@@ -1380,6 +1467,17 @@
     <string name="mods_filter_sort_state">Problems first</string>
     <string name="mods_filter_sort_size">Size (largest first)</string>
     <string name="mods_filter_only">Problems only</string>
+    <!--
+      ★ 2026-10-06: filter by type (the bitmask from `Mods.Info.parts()`, i.e. the very
+        same ruler as the inline Java / scripts / resources label).
+      ★ "contains this kind", not "only this kind": a mixed mod (Java+JS) shows up under
+        both — that is a fact, not a duplicate. Packages whose metadata is unreadable have
+        no type at all, so they are hidden whenever a type is selected.
+    -->
+    <string name="mods_filter_type_all">All types</string>
+    <string name="mods_filter_type_java">Has Java code</string>
+    <string name="mods_filter_type_js">Has scripts</string>
+    <string name="mods_filter_type_data">Has resources</string>
     <string name="mods_filter_reset">Clear filters</string>
     <string name="mods_filtered_fmt">Showing %1$d / %2$d mods (filtered)</string>
     <string name="mods_empty_filtered">No mods match the filter</string>

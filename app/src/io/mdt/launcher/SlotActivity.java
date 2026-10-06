@@ -69,22 +69,28 @@ public class SlotActivity extends BaseActivity {
                     @Override public void run() {
                         // ★ 第三项只在**真有读不出来的存档**时出现 —— 它由副标题上那句 ⚠ 引出来
                         //   （上一轮 `refresh()` 已经数好了，这里只读那个数，**不在点击时重新扫盘**）。
+                        // ★ 2026-10-06（一档①）：第一项 = **只读**的「看每份存档…」——
+                        //   "这份存档是什么图、玩了多久"原来只能靠点「导出存档」顺带看到
+                        //   （用导出查档案，路子不对）。列表与详情的实现都在 {@link SlotIo}。
                         final boolean hasBad = mSavesBad > 0;
                         String[] items = hasBad
-                                ? new String[]{getString(R.string.slot_op_export_save),
+                                ? new String[]{getString(R.string.slot_op_show_saves),
+                                        getString(R.string.slot_op_export_save),
                                         getString(R.string.slot_op_import_save),
                                         getString(R.string.slot_op_show_bad_saves)}
-                                : new String[]{getString(R.string.slot_op_export_save),
+                                : new String[]{getString(R.string.slot_op_show_saves),
+                                        getString(R.string.slot_op_export_save),
                                         getString(R.string.slot_op_import_save)};
                         new android.app.AlertDialog.Builder(SlotActivity.this)
                                 .setTitle(R.string.slot_page_saves)
                                 .setItems(items,
                                         new android.content.DialogInterface.OnClickListener() {
                                             @Override public void onClick(android.content.DialogInterface d, int w) {
+                                                if (w == 0) { SlotIo.showSaves(SlotActivity.this, mSlot); return; }
                                                 Data.Slot s = findSlot();
                                                 if (s == null) { gone(); return; }
-                                                if (w == 0) SlotIo.exportSave(SlotActivity.this, s);
-                                                else if (w == 1) SlotIo.importSave(SlotActivity.this, s);
+                                                if (w == 1) SlotIo.exportSave(SlotActivity.this, s);
+                                                else if (w == 2) SlotIo.importSave(SlotActivity.this, s);
                                                 else SlotIo.showUnreadable(SlotActivity.this, mSlot);
                                             }
                                         })
@@ -198,7 +204,7 @@ public class SlotActivity extends BaseActivity {
                 .setTitle(R.string.slot_page_ops)
                 .setItems(new String[]{
                         getString(R.string.slot_op_backup),
-                        getString(R.string.slot_op_restore),
+                        getString(R.string.slot_op_backups),
                         getString(R.string.slot_op_clone),
                         getString(R.string.slot_op_policy),
                         getString(R.string.slot_op_rename),
@@ -207,7 +213,7 @@ public class SlotActivity extends BaseActivity {
                             @Override public void onClick(android.content.DialogInterface d, int w) {
                                 switch (w) {
                                     case 0: SlotOps.backup(SlotActivity.this, s, mHost); break;
-                                    case 1: SlotOps.restore(SlotActivity.this, s, mHost); break;
+                                    case 1: SlotOps.backups(SlotActivity.this, s, mHost); break;
                                     case 2: SlotOps.cloneSlot(SlotActivity.this, s, mHost); break;
                                     case 3: SlotOps.backupPolicy(SlotActivity.this, s, mHost); break;
                                     case 4: SlotOps.renameSlot(SlotActivity.this, s, mHost); break;
