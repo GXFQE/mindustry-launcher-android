@@ -58,3 +58,10 @@ __pycache__/
 
 # ── 改源码时留的工序备份（*.bak / *.bak2 / *.emptied.bak …）——不提交 ────────
 *.bak*
+
+# ── 桌面版（Steam）Mindustry 以本目录为工作目录跑过时留下的产物 ──────────────
+# 2026-10-06 实测：仓库根下凭空多出 cache/（16 首音乐，27.2 MB，`名字__字节数.ogg`）
+# 和 saves/last_log.txt（内容是 `[E] Steam client not running.`）——
+# 那是**游戏自己的运行产物**，不是本工程的东西 ⇒ 忽略，别提交（也别删，那是用户的运行痕迹）。
+/cache/
+/saves/
