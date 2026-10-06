@@ -300,7 +300,9 @@ public class ModsActivity extends BaseActivity {
                         }
                     }
                 } catch (Throwable t) {
-                    err = String.valueOf(t.getMessage());
+                    // ★ 2026-10-06（第 115 轮第四批）：弹窗正文翻白话（系统 errno 才翻），原文进日志
+                    android.util.Log.w("MDTLauncher", "mods op failed", t);
+                    err = Util.ioReason(ModsActivity.this, t);
                 }
                 final Mods.PackResult fpr = pr;
                 final String fe = err;
@@ -455,7 +457,9 @@ public class ModsActivity extends BaseActivity {
                 try {
                     pr = Mods.copyMods(ModsActivity.this, from, to, false, Mods.trashDirOf(ModsActivity.this));
                 } catch (Throwable t) {
-                    err = String.valueOf(t.getMessage());
+                    // ★ 2026-10-06（第 115 轮第四批）：弹窗正文翻白话（系统 errno 才翻），原文进日志
+                    android.util.Log.w("MDTLauncher", "mods op failed", t);
+                    err = Util.ioReason(ModsActivity.this, t);
                 }
                 final Mods.PackResult fpr = pr;
                 final String fe = err;

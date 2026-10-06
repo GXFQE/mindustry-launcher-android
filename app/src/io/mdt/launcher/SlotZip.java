@@ -306,9 +306,11 @@ public final class SlotZip {
                     }
                 } catch (IOException ex) {
                     part.delete();
+                    // ★ 2026-10-06：原因走 `Util.ioReason`（认识的 errno 翻白话）——
+                    //   这句会经 `zip_import_failed` 弹窗显示给用户。原文在异常链里（cause）不丢。
                     throw new IOException(ctx.getString(R.string.slotzip_err_write_failed_fmt,
                             to.getAbsolutePath(),
-                            ex.getMessage() == null ? String.valueOf(ex) : ex.getMessage()));
+                            Util.ioReason(ctx, ex)), ex);
                 }
                 if (to.exists() && !to.delete()) {
                     part.delete();

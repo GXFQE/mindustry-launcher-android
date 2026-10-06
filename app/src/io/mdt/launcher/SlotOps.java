@@ -78,7 +78,8 @@ final class SlotOps {
                 try {
                     ss = Backup.create(a, s.name, label);
                 } catch (Exception e) {
-                    err = e.getMessage() == null ? String.valueOf(e) : e.getMessage();
+                    // ★ 2026-10-06：弹窗正文翻白话（系统 errno 才翻）；原文留在日志里
+                    err = Util.ioReason(a, e);
                     android.util.Log.w("MDTLauncher", "backup failed: " + err, e);
                 }
                 final String fe = err;

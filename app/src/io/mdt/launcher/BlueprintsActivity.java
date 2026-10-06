@@ -349,9 +349,11 @@ public class BlueprintsActivity extends BaseActivity {
                     runOnUiThread(new Runnable() {
                         @Override public void run() {
                             pd.dismiss();
+                            // 同 `MapsActivity` 的导出失败：`ioReason` 只翻认识的系统 errno，
+                            // 我们自己的文案原样透传（没 message 时用资源兜底，不甩类名）
                             alert(getString(R.string.export_failed),
-                                    t.getMessage() == null
-                                            ? getString(R.string.bp_export_nosrc) : t.getMessage());
+                                    Util.ioReason(BlueprintsActivity.this, t,
+                                            getString(R.string.bp_export_nosrc)));
                         }
                     });
                     return;

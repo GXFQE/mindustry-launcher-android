@@ -372,11 +372,11 @@ public class MapsActivity extends BaseActivity {
                     runOnUiThread(new Runnable() {
                         @Override public void run() {
                             pd.dismiss();
-                            // 异常消息就是我们自己抛的那几句人话（见 Exporter）；
-                            // 万一没有 message，也**不把类名甩给用户**（文案纪律第三条）
+                            // 异常消息多半就是我们自己抛的那几句人话（见 Exporter）⇒ `ioReason`
+                            // **认识的系统 errno 才翻**、我们的文案原样透传；没有 message 时也不把类名甩给用户
                             alert(getString(R.string.export_failed),
-                                    t.getMessage() == null
-                                            ? getString(R.string.maps_export_nosrc) : t.getMessage());
+                                    Util.ioReason(MapsActivity.this, t,
+                                            getString(R.string.maps_export_nosrc)));
                         }
                     });
                     return;

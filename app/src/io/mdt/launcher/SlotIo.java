@@ -471,7 +471,7 @@ final class SlotIo {
                 try {
                     n = Exporter.writeFile(a, uri, src);
                 } catch (Exception e) {
-                    err = msgOf(e);
+                    err = Util.ioReason(a, e);
                     android.util.Log.w("MDTLauncher", "export file failed", e);
                 }
                 final String fe = err;
@@ -507,7 +507,7 @@ final class SlotIo {
                     r = Exporter.zipTo(a, uri,
                             Data.dirOf(a, slot), roots);
                 } catch (Exception e) {
-                    err = msgOf(e);
+                    err = Util.ioReason(a, e);
                     android.util.Log.w("MDTLauncher", "export slot failed", e);
                 }
                 final String fe = err;
@@ -527,10 +527,12 @@ final class SlotIo {
         }, "export-slot").start();
     }
 
-    private static String msgOf(Exception e) {
-        String m = e.getMessage();
-        return (m == null || m.isEmpty()) ? String.valueOf(e) : m;
-    }
+    /*
+     * ★ 2026-10-06（第 115 轮第四批）：这里原来有个 `msgOf(Exception)`（`getMessage()`，
+     *   空则 `String.valueOf(e)`），五个调用点全都把它当**弹窗正文** ⇒ 用户会看到
+     *   `java.io.IOException: write failed: ENOSPC (No space left on device)` 这种句子。
+     *   ⇒ 已删掉，统一走 {@link Util#ioReason}（认识的 errno 翻白话、我们自己的文案原样透传）。
+     */
 
     /** 目标槽是否正被游戏占用（占用了就不许往里写，除非是纯读的导出） */
     private static boolean blockedByGame(Activity a, Data.Slot s) {
@@ -591,7 +593,7 @@ final class SlotIo {
                     st = Msav.stage(a,
                             a.getContentResolver().openInputStream(uri), displayName, slot);
                 } catch (Exception e) {
-                    err = msgOf(e);
+                    err = Util.ioReason(a, e);
                     android.util.Log.w("MDTLauncher", "msav stage failed: " + err, e);
                 }
                 final String fe = err;
@@ -723,7 +725,9 @@ final class SlotIo {
                     Toast.LENGTH_LONG).show();
         } catch (IOException e) {
             Msav.discard(st);
-            alert(a, a.getString(R.string.import_failed), String.valueOf(e.getMessage()));
+            // ★ 2026-10-06：弹窗正文走 `Util.ioReason`（系统 errno 翻白话），原文进日志
+            android.util.Log.w("MDTLauncher", "msav commit failed", e);
+            alert(a, a.getString(R.string.import_failed), Util.ioReason(a, e));
         }
         h.onSlotChanged();
     }
@@ -792,7 +796,7 @@ final class SlotIo {
                     inf = SlotZip.inspect(a, tmp);
                     if (inf.empty()) throw new IOException(a.getString(R.string.zip_nothing));
                 } catch (Exception e) {
-                    err = msgOf(e);
+                    err = Util.ioReason(a, e);
                     SlotZip.unstage(tmp);
                     tmp = null;
                     android.util.Log.w("MDTLauncher", "zip inspect failed: " + err, e);
@@ -899,7 +903,7 @@ final class SlotIo {
                     auto = AutoBackup.beforeSlotOp(a, slot, a.getString(R.string.backup_auto_zip));
                     r = SlotZip.extract(a, zip, inf, slot, mode);
                 } catch (Exception e) {
-                    err = msgOf(e);
+                    err = Util.ioReason(a, e);
                     android.util.Log.w("MDTLauncher", "zip extract failed: " + err, e);
                 }
                 SlotZip.unstage(zip);

@@ -99,6 +99,17 @@
     <string name="slot_current_suffix">\u0020\u0020[current]</string>
     <string name="slot_set_fmt">Set to slot \"%1$s\"</string>
     <string name="slot_label">Save slot</string>
+    <!--
+      ★ 2026-10-06 (round 115, batch 4): plain-language versions of **system** failures,
+      used by `Util.ioReason`. Only known errnos are translated; our own resource
+      messages pass through untouched, and the raw text still goes to the log/report.
+    -->
+    <string name="io_reason_no_space">Not enough space left — free some space and try again</string>
+    <string name="io_reason_denied">No permission to write here</string>
+    <string name="io_reason_busy">Another app is holding this file open</string>
+    <string name="io_reason_readonly">This location is read-only</string>
+    <string name="io_reason_missing">The file or folder is gone</string>
+    <string name="io_reason_failed">Read or write failed</string>
     <string name="add_package_title">Add package name</string>
     <string name="add_package_msg">Look up an installed game version by exact package name</string>
     <string name="add_package_hint">e.g. io.anuke.mindustry</string>

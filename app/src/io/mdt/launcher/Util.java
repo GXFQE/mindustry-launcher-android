@@ -10,10 +10,60 @@ import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.security.MessageDigest;
 
+import android.content.Context;
+
 /**
  * 基础工具（模块边界：最底层，不依赖任何其他模块 —— 对齐桌面版 utils 的位置）。
+ *
+ * ⚠️ 唯一的例外是 {@link #ioReason}：它要 `Context` 才能查资源（这是我们自己的双语资源），
+ *   但它**不依赖任何业务类**，仍然算"最底层"。
  */
 public final class Util {
+
+    /**
+     * ★★ 2026-10-06（第 115 轮第四批）：把**系统异常**翻成用户看得懂的一句话（**弹窗正文**专用）。
+     *
+     * <p>为什么需要它：磁盘满 / 没权限 / 文件被占用时，Java 抛出来的是
+     * `java.io.IOException: write failed: ENOSPC (No space left on device)` 这种句子 ——
+     * 直接当弹窗正文等于把维护者视角甩给用户（本工程 §五 三大纪律之一）。
+     *
+     * <p>🔴 判据只有一条 —— **认识的 errno 才翻译，其余原样透传**：
+     * <ul>
+     *   <li>认识的系统错误（`ENOSPC` / `EACCES` / `EBUSY` / `EROFS` / `ENOENT` …）⇒ 对应那一句白话；</li>
+     *   <li>**我们自己抛的资源文案**（如 `bp_export_nosrc`）⇒ 原样返回 ——
+     *       它们**本来就是要给用户看的**，翻译反而会把"没有可导出的文件"变成"读写失败"；</li>
+     *   <li>消息为空 ⇒ `fallback`（没有就退回一句泛化的「读写失败」）。</li>
+     * </ul>
+     *
+     * <p>⚠️ 原文**不许丢**：调用方照旧 `Log.w(...)`（报告 / 自检 / 排查看原文）——
+     * 这个函数只管**第一层**那一句。
+     */
+    public static String ioReason(Context c, Throwable t) {
+        return ioReason(c, t, null);
+    }
+
+    /** 见 {@link #ioReason(Context, Throwable)}；`fallback` = 消息为空时用的那句（可为 null） */
+    public static String ioReason(Context c, Throwable t, String fallback) {
+        String m = t == null ? null : t.getMessage();
+        if (m == null || m.trim().isEmpty()) {
+            if (fallback != null) return fallback;
+            return c.getString(R.string.io_reason_failed);
+        }
+        String s = m;
+        if (has(s, "ENOSPC") || has(s, "No space left")) return c.getString(R.string.io_reason_no_space);
+        if (has(s, "EACCES") || has(s, "Permission denied") || has(s, "EPERM")
+                || has(s, "Operation not permitted")) return c.getString(R.string.io_reason_denied);
+        if (has(s, "EBUSY") || has(s, "Device or resource busy") || has(s, "Text file busy")
+                || has(s, "EAGAIN")) return c.getString(R.string.io_reason_busy);
+        if (has(s, "EROFS") || has(s, "Read-only file system")) return c.getString(R.string.io_reason_readonly);
+        if (has(s, "ENOENT") || has(s, "No such file")) return c.getString(R.string.io_reason_missing);
+        return s;      // 我们自己写的文案 / 不认识的错误：原样（信息不丢）
+    }
+
+    /** 大小写无关的子串判断（errno 在消息里可能大小写不一） */
+    private static boolean has(String s, String needle) {
+        return s.toLowerCase(java.util.Locale.ROOT).contains(needle.toLowerCase(java.util.Locale.ROOT));
+    }
 
     /**
      * ★ **zlib 头判据（唯一实现）**：`78 01/5E/9C/DA` —— 与 arc 的 `writeCompressed` 同一条件。

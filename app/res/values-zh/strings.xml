@@ -97,6 +97,17 @@
     <string name="slot_current_suffix">\u0020\u0020[当前]</string>
     <string name="slot_set_fmt">已设为槽「%1$s」</string>
     <string name="slot_label">存档槽</string>
+    <!--
+      ★ 2026-10-06（第 115 轮第四批）：**系统异常**翻成白话的那几句（`Util.ioReason` 用）。
+      ⚠️ 只翻**认识的 errno**；我们自己抛的资源文案**原样透传**（见 Util.ioReason 的注释）。
+      原文不丢：调用方照旧写日志 / 落盘报告。
+    -->
+    <string name="io_reason_no_space">空间不够了 —— 腾点地方再试</string>
+    <string name="io_reason_denied">没有权限写这里</string>
+    <string name="io_reason_busy">这个文件正被别的程序占用着</string>
+    <string name="io_reason_readonly">这里是只读的，写不进去</string>
+    <string name="io_reason_missing">文件或目录不在了</string>
+    <string name="io_reason_failed">读写失败</string>
     <string name="add_package_title">添加包名</string>
     <string name="add_package_msg">按精确包名查已装的游戏版本</string>
     <string name="add_package_hint">如 io.anuke.mindustry</string>

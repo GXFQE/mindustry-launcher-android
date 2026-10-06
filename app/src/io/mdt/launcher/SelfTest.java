@@ -239,6 +239,8 @@ public final class SelfTest {
             // ★ ㊵ 整槽写入的三个模式（更新 / 补齐 / 覆盖）+ 槽操作前的自动备份
             slotModes(ctx, L, stat);
             // ★ ㊶ 「存档视为地图」：区间改写（两面判据）+ 落位 + 区 1..n 不变 + 码映射
+            // ★ 2026-10-06（第 115 轮第四批）：把"系统异常 ⇒ 白话"的翻译钉死
+            ioReason(ctx, L, stat);
             saveAsMap(ctx, L, stat);
             // ★ ㊷ 蓝图（`.msch`）解析：24 种配置 tag 的**字节级**期望 + 两版格式 +
             //   旧名映射 + 宽松 labels + modified UTF-8 + 包围盒口径 + 8 份负样本 + 码映射
@@ -4201,6 +4203,58 @@ public final class SelfTest {
      * </pre>
      * ⚠️ 与 ㊴/㊵ 一样，会被覆盖掉的东西走**真中转站**（`Trash.mapsDir`）⇒ 收尾要扫掉自检残留。
      */
+    /**
+     * ㊼ **系统异常 ⇒ 用户看得懂的一句话**（`Util.ioReason`，2026-10-06 第 115 轮第四批）。
+     *
+     * <p>背景：磁盘满 / 没权限 / 文件被占用时，弹窗原来直接把 `java.io.IOException: write failed:
+     * ENOSPC (No space left on device)` 当正文（`SlotIo` / `ModsActivity` / `SlotOps` /
+     * 两个导出页 / `SlotZip` / `Backup` 共 7 处）。
+     *
+     * <p>判据两条（都要）：
+     * <ol>
+     *   <li>**认识的 errno** 翻成对应白话，且结果里**不许再出现那个 errno 串**（证明真翻了）；</li>
+     *   <li>★ **我们自己抛的资源文案必须原样透传** —— 翻了反而会把"没有可导出的文件"
+     *       说成"读写失败"（这条是**元断言**：拿真资源喂它，要求一字不改）。</li>
+     * </ol>
+     */
+    private static void ioReason(Context ctx, List<String> L, int[] stat) {
+        L.add("── ㊼ 系统异常 ⇒ 白话（`Util.ioReason`）──");
+        String noSpace = ctx.getString(R.string.io_reason_no_space);
+        String denied = ctx.getString(R.string.io_reason_denied);
+        String busy = ctx.getString(R.string.io_reason_busy);
+        String ro = ctx.getString(R.string.io_reason_readonly);
+        String gone = ctx.getString(R.string.io_reason_missing);
+        String failed = ctx.getString(R.string.io_reason_failed);
+
+        java.io.IOException enospc = new java.io.IOException(
+                "write failed: ENOSPC (No space left on device)");
+        ok(stat, L, noSpace.equals(Util.ioReason(ctx, enospc)) && !Util.ioReason(ctx, enospc).contains("ENOSPC"),
+                "★磁盘满 ⇒ 「" + oneLine(Util.ioReason(ctx, enospc)) + "」（且**不再出现 ENOSPC**）");
+        ok(stat, L, denied.equals(Util.ioReason(ctx, new java.io.IOException(
+                        "open failed: EACCES (Permission denied)")))
+                        && ro.equals(Util.ioReason(ctx, new java.io.IOException("Read-only file system")))
+                        && busy.equals(Util.ioReason(ctx, new java.io.IOException(
+                                "open failed: EBUSY (Device or resource busy)")))
+                        && gone.equals(Util.ioReason(ctx, new java.io.IOException(
+                                "java.io.FileNotFoundException: x (No such file or directory)"))),
+                "★没权限 / 只读 / 被占用 / 文件不在了 各自翻对（4 条）");
+
+        // ★ 元断言：**我们自己写的资源文案**（导出页那条兜底）必须**一字不改**透传 ——
+        //   否则"没有可导出的文件"会被说成"读写失败"（翻译器越权）
+        String ours = ctx.getString(R.string.bp_export_nosrc);
+        ok(stat, L, ours.equals(Util.ioReason(ctx, new java.io.IOException(ours))),
+                "★元断言：我们自己的文案原样透传（「" + oneLine(ours) + "」没被翻译）");
+
+        // 消息为空：给了 fallback 就用它；没给就一句泛化的（**不许**冒出类名 / "null"）
+        java.io.IOException empty = new java.io.IOException((String) null);
+        String withFb = Util.ioReason(ctx, empty, "FALLBACK");
+        String noFb = Util.ioReason(ctx, empty);
+        ok(stat, L, "FALLBACK".equals(withFb) && failed.equals(noFb)
+                        && !noFb.contains("Exception") && !noFb.contains("null"),
+                "★没有消息 ⇒ 有 fallback 用它、没有就「" + oneLine(noFb) + "」（不冒类名 / null）");
+        L.add("");
+    }
+
     private static void saveAsMap(Context ctx, List<String> L, int[] stat) {
         L.add("── ㊶ 「存档视为地图」：只改 meta + 区 1..n 逐字节搬 ──");
         File slotDir = Data.dirOf(ctx, SLOT_S2M);

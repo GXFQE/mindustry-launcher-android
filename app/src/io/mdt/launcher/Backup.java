@@ -333,7 +333,9 @@ public final class Backup {
         try {
             entries = readEntries(ctx, new File(ss.dir, MANIFEST));
         } catch (IOException e) {
-            return fail(ctx.getString(R.string.backup_restore_err_manifest_fmt, e.getMessage()));
+            // ★ 2026-10-06：这句会进恢复结果弹窗 ⇒ 原因翻白话（认识的 errno 才翻），原文进日志
+            android.util.Log.w("MDTLauncher", "manifest read failed", e);
+            return fail(ctx.getString(R.string.backup_restore_err_manifest_fmt, Util.ioReason(ctx, e)));
         }
         if (entries.isEmpty()) {
             return fail(ctx.getString(R.string.backup_restore_err_manifest_empty));
