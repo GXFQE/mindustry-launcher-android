@@ -70,7 +70,36 @@ public class BlueprintDetailActivity extends BaseActivity {
                         }
                     });
         }
+        startPreview();
         startStats();
+    }
+
+    /**
+     * 预览大图（**色块档**，2026-10-06 第 116 轮）：解码瓦片 → 按 `BlockTable` 上色 → 落缓存。
+     *
+     * ★ 与「方块清点」**分两趟**：那一段要读 APK / 模组包（慢），而预览只读这一份文件
+     *   ⇒ 分开发布，用户先看到图再看到统计（而不是等两件事都做完才出现）。
+     * 🔴 出不了图**保持 GONE**（不留空框）；连不上槽 / 蓝图本身读不出来时也**不去猜**。
+     */
+    private void startPreview() {
+        if (!mItem.ok()) return;                 // 读不出来的蓝图没有预览可言（顶部已经说了原因）
+        new Thread(new Runnable() {
+            @Override public void run() {
+                final android.graphics.Bitmap bm =
+                        MschLoad.image(BlueprintDetailActivity.this, mItem, MschLoad.BIG);
+                if (bm == null) return;
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        if (Util.dead(BlueprintDetailActivity.this)) return;
+                        android.widget.ImageView iv = (android.widget.ImageView)
+                                findViewById(R.id.bp_detail_image);
+                        if (iv == null) return;
+                        iv.setImageBitmap(bm);
+                        iv.setVisibility(View.VISIBLE);
+                    }
+                });
+            }
+        }, "bp-preview").start();
     }
 
     /**

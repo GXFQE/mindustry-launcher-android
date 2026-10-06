@@ -250,16 +250,10 @@ public class MapsActivity extends BaseActivity {
                             // ★ 只更新**这一行**，绝不 `notifyDataSetChanged()` ——
                             //   后者会让整张列表在用户滚动时不断重排，手感就是"滑不上去 / 一滑就跳"
                             //   （114 张缩略图 = 114 次重排，用户 2026-10-03 实测反馈）。
-                            int first = lv.getFirstVisiblePosition();
-                            View row = lv.getChildAt(idx - first);
-                            if (row != null) {
-                                android.widget.ImageView iv =
-                                        (android.widget.ImageView) row.findViewById(R.id.msav_thumb);
-                                if (iv != null) {
-                                    iv.setImageBitmap(bm);
-                                    iv.setVisibility(View.VISIBLE);
-                                }
-                            }
+                            //   ★ 2026-10-06（第 116 轮）：这段"换第 i 行的图"收进了
+                            //   `MsavListAdapter#refreshThumb` —— 存档 / 蓝图两条线也要它，
+                            //   三份内联实现迟早会有一份改了另两份不改（且**不报错**）。
+                            mAdapter.refreshThumb(lv, idx);
                         }
                     });
                 }

@@ -82,6 +82,29 @@ final class MsavListAdapter extends BaseAdapter {
         s.setVisibility(sub == null || sub.isEmpty() ? View.GONE : View.VISIBLE);
     }
 
+    /**
+     * ★★ **只刷新某一行的缩略图**（与 {@link #refreshSub} 同一套理由与做法）。
+     *
+     * 为什么要有它（2026-10-06）：地图 / 存档 / 蓝图三条列表**都要**后台逐张出图，
+     * 而 `MapsActivity` 里那段「取第 i 行的 `msav_thumb` 换图」原来是**内联**的 ——
+     * 再抄两遍就是三份同样的实现（其中一份改了、另两份不改的时候**不报错**，
+     * 症状是"有的页面滑一下缩略图就没了"）⇒ 收在这里做**唯一实现**。
+     */
+    void refreshThumb(android.widget.ListView lv, int i) {
+        if (lv == null || thumbs == null || i < 0 || i >= thumbs.length) return;
+        View row = lv.getChildAt(i - lv.getFirstVisiblePosition());
+        if (row == null) return;                 // 不在可见区：滚回来时 getView 自然用新值渲染
+        android.widget.ImageView iv = (android.widget.ImageView) row.findViewById(R.id.msav_thumb);
+        if (iv == null) return;
+        android.graphics.Bitmap b = thumbs[i];
+        if (b == null || b.isRecycled()) {
+            iv.setVisibility(View.GONE);
+        } else {
+            iv.setImageBitmap(b);
+            iv.setVisibility(View.VISIBLE);
+        }
+    }
+
     @Override public View getView(int i, View convert, ViewGroup parent) {
         View v = convert != null ? convert : inf.inflate(R.layout.item_msav, parent, false);
         TextView t = (TextView) v.findViewById(R.id.msav_title);

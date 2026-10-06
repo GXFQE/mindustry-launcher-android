@@ -146,6 +146,13 @@ final class SlotIo {
      * ③ 后台线程要能**停**：对话框那条路靠 `aliveOrNull[0]`（关掉即停），
      * 页面那条路传 null ⇒ 用 {@link Util#dead(Activity)} 判（转屏 / 退出都会停）。
      *
+     * <p>★ 2026-10-06（第 116 轮）：**顺带把预览缩略图也补上**（用户：「让存档和蓝图页面也能像
+     * 地图一样有预览图片」）。存档本来就是 `.msav`（REF §72）⇒ 解码/上色/缓存全部照用地图那条
+     * （{@link MapLoad#image(Context, File, String, int)}），这里只是多一个"补图"的动作：
+     * 同一个后台线程、同一个"只刷这一行"、**出不了图就保持 GONE**（不留空框）。
+     * ⚠️ 配色表来自**本槽指向的版本 APK**：槽没指定版本 ⇒ 没配色表 ⇒ 这一列全是空的
+     * （与地图页同一条，不是新引入的退化）。
+     *
      * @param aliveOrNull 对话框的"还开着吗"标志；页面传 **null**
      * @return **排好序**的文件数组（调用方按位置取，**不要重扫** —— 重扫会与列表对不上）
      */
@@ -158,14 +165,22 @@ final class SlotIo {
         final File[] files = fs;
         final String[] titles = new String[files.length];
         final String[] subs = new String[files.length];
+        final android.graphics.Bitmap[] thumbs = new android.graphics.Bitmap[files.length];
         for (int i = 0; i < files.length; i++) {
             titles[i] = files[i].getName();
             subs[i] = Util.formatSize(files[i].length());
         }
-        final MsavListAdapter adapter = new MsavListAdapter(a, titles, subs);
+        final MsavListAdapter adapter = new MsavListAdapter(a, titles, subs, thumbs);
         lv.setAdapter(adapter);
         new Thread(new Runnable() {
             @Override public void run() {
+                // 配色表：**本槽指向的版本 APK**（读不到就是 null ⇒ 一条缩略图都不出，界面留白）
+                String apk = null;
+                try {
+                    apk = Mods.targetsFor(a, slotName).apkPath;
+                } catch (Throwable ignored) {
+                }
+                final String apkPath = apk;
                 for (int i = 0; i < files.length; i++) {
                     if (aliveOrNull != null ? !aliveOrNull[0] : Util.dead(a)) return;
                     final int idx = i;
@@ -177,6 +192,17 @@ final class SlotIo {
                             adapter.setSub(idx, line.isEmpty() ? size : (size + " · " + line));
                             // ★ 只刷新**这一行**（见 {@link MsavListAdapter#refreshSub} 的长注释）
                             adapter.refreshSub(lv, idx);
+                        }
+                    });
+                    // ★ 预览图（上面是文字、下面是图，**同一趟后台**里顺序做完）
+                    final android.graphics.Bitmap bm =
+                            MapLoad.image(a, files[idx], apkPath, MapLoad.THUMB);
+                    if (bm == null) continue;
+                    a.runOnUiThread(new Runnable() {
+                        @Override public void run() {
+                            if (aliveOrNull != null ? !aliveOrNull[0] : Util.dead(a)) return;
+                            adapter.setThumb(idx, bm);
+                            adapter.refreshThumb(lv, idx);
                         }
                     });
                 }
@@ -280,26 +306,44 @@ final class SlotIo {
 
 
     /**
-     * 一份存档的详情（**只读**）：文件名当标题，正文是「地图名 + 那几行」，
+     * 一份存档的详情（**只读**）：文件名当标题，上面一张**预览大图**，正文是「地图名 + 那几行」，
      * 正按钮给「导出这一份…」的直接出口。
      *
      * ★ 为什么正文自己拼一句"地图："：存档的 `displayName()` 是**它是从哪张图上存下来的**
      *   （战役存档就是当时的地区名），而 {@link MsavText#detail} 是地图页与存档页**共用**的
      *   那一段（地图页的标题里已经有真名，所以那边不能重复加）。⇒ 这里加、那边不加。
      * ⚠️ 读 meta 走后台线程（大的存档要开流），与列表那条同一个理由。
+     * ★ 2026-10-06（第 116 轮）：加预览大图 —— **和 meta 同一趟后台**做完再弹窗
+     *   （弹窗一出来就是完整的，不用"先弹出来再刷图"）；出不了图就保持 GONE，不留空框。
+     * ⚠️ 弹窗正文从 `setMessage` 换成**自定义 view**：两者在 AlertDialog 里互斥。
      */
     // ★ 2026-10-06（第六批）：包级可见（原来是 private）—— 存档**页面**（SlotsActivity）点一行要调它。
-    static void showSaveDetail(final Activity a, final File f) {
+    static void showSaveDetail(final Activity a, final String slotName, final File f) {
         new Thread(new Runnable() {
             @Override public void run() {
                 final MsavMeta m = MsavMeta.read(f);
                 final String body = saveDetailText(a, m);
+                // 预览大图：配色表取**本槽指向的版本 APK**（与列表那条同一处口径）
+                String apk = null;
+                try {
+                    apk = Mods.targetsFor(a, slotName).apkPath;
+                } catch (Throwable ignored) {
+                }
+                final android.graphics.Bitmap bm = MapLoad.image(a, f, apk, MapLoad.BIG);
                 a.runOnUiThread(new Runnable() {
                     @Override public void run() {
                         if (Util.dead(a)) return;
+                        View box = a.getLayoutInflater().inflate(R.layout.dialog_msav_detail, null);
+                        ((TextView) box.findViewById(R.id.msav_detail_text)).setText(body);
+                        android.widget.ImageView iv =
+                                (android.widget.ImageView) box.findViewById(R.id.msav_detail_image);
+                        if (bm != null && iv != null) {
+                            iv.setImageBitmap(bm);
+                            iv.setVisibility(View.VISIBLE);
+                        }
                         new AlertDialog.Builder(a)
                                 .setTitle(a.getString(R.string.save_detail_title_fmt, f.getName()))
-                                .setMessage(body)
+                                .setView(box)
                                 .setPositiveButton(R.string.save_detail_export,
                                         new DialogInterface.OnClickListener() {
                                             @Override public void onClick(DialogInterface d, int w) {

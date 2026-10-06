@@ -153,6 +153,7 @@ public class MainActivity extends BaseActivity {
                 || intent.hasExtra("dev_map_import")
                 || intent.hasExtra("dev_maps_page")
                 || intent.hasExtra("dev_bp_page")
+                || intent.hasExtra("dev_saves_page")
                 || intent.hasExtra(BlueprintsActivity.EXTRA_DEV_IMPORT)
                 || intent.hasExtra("dev_mapstats")
                 || intent.hasExtra("dev_msch");
@@ -524,8 +525,20 @@ public class MainActivity extends BaseActivity {
             return;
         }
 
-        // ── 「存档视为地图」：把"选文件"换成路径，直接进地图页那条导入路 ────────────
-        // 用法：`--es dev_map_import /sdcard/xxx.msav [--es dev_map_slot <槽>]`
+        // ── 存档列表页（第 116 轮加）：直接打开某个槽的存档页 ────────────────────
+        // 用法：`--es dev_saves_page <槽>`
+        // ★ 理由与 dev_maps_page / dev_bp_page 一样：存档页也是槽页的子页面，
+        //   而"缩略图有没有出来 / 点一行的大图对不对"只能在这一页上验收。
+        String dsp = intent.getStringExtra("dev_saves_page");
+        if (dsp != null && !dsp.trim().isEmpty()) {
+            Intent si = new Intent(this, SavesActivity.class);
+            si.putExtra(SavesActivity.EXTRA_SLOT, dsp.trim());
+            startActivity(si);
+            finish();
+            return;
+        }
+
+        // ── 「存档视为地图」：把"选文件"换成路径，直接进地图页那条导入路 ────────────        // 用法：`--es dev_map_import /sdcard/xxx.msav [--es dev_map_slot <槽>]`
         // ★ 为什么要它：SAF 选择器**自动化不了**（第 104 轮 dev_zip_confirm 同一条理由），
         //   而"选到一份存档之后"的那条路（命名框 → 改写 → 落位 → 结果框）必须能真机验。
         //   ⇒ 后面的路与界面**逐字相同**，只是把"选包"换成了路径。

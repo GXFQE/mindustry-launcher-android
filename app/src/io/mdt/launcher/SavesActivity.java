@@ -71,7 +71,7 @@ public class SavesActivity extends BaseActivity {
         mList.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override public void onItemClick(AdapterView<?> p, View v, int pos, long id) {
                 if (pos < 0 || pos >= mFiles.length) return;
-                SlotIo.showSaveDetail(SavesActivity.this, mFiles[pos]);
+                SlotIo.showSaveDetail(SavesActivity.this, mSlot, mFiles[pos]);
             }
         });
         mBadRow = root.findViewById(R.id.row_save_bad);

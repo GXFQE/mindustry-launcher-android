@@ -158,6 +158,8 @@ public class BlueprintsActivity extends BaseActivity {
                 Blueprints.markSoft(items, opaque);
                 final String[] titles = new String[items.size()];
                 final String[] subs = new String[items.size()];
+                // ★ 缩略图（第 116 轮）：与地图 / 存档页同一个形状 —— 先摆空数组，后台出来一张刷一张
+                final android.graphics.Bitmap[] thumbs = new android.graphics.Bitmap[items.size()];
                 for (int i = 0; i < items.size(); i++) {
                     Blueprints.Item it = items.get(i);
                     titles[i] = it.displayName();
@@ -171,7 +173,7 @@ public class BlueprintsActivity extends BaseActivity {
                         mHead.setText(getString(R.string.bp_head_fmt,
                                 Blueprints.count(items, Blueprints.FROM_SLOT),
                                 Blueprints.count(items, Blueprints.FROM_MOD)));
-                        mAdapter = new MsavListAdapter(BlueprintsActivity.this, titles, subs);
+                        mAdapter = new MsavListAdapter(BlueprintsActivity.this, titles, subs, thumbs);
                         mList.setAdapter(mAdapter);
                         if (mEmpty != null) {
                             mEmpty.setVisibility(items.isEmpty() ? View.VISIBLE : View.GONE);
@@ -180,6 +182,23 @@ public class BlueprintsActivity extends BaseActivity {
                         mScanned = true;
                     }
                 });
+                // ★ 后台逐张渲染（出来一张刷**那一行**）—— 与地图页同一套做法与同一条理由：
+                //   几十份蓝图里 `msch` 已经在上面解析过，这里只是把瓦片画成位图 + 落缓存
+                final ListView lv = mList;
+                for (int i = 0; i < items.size(); i++) {
+                    final int idx = i;
+                    final android.graphics.Bitmap bm =
+                            MschLoad.image(BlueprintsActivity.this, items.get(idx), MschLoad.THUMB);
+                    if (bm == null) continue;
+                    runOnUiThread(new Runnable() {
+                        @Override public void run() {
+                            if (Util.dead(BlueprintsActivity.this) || mAdapter == null) return;
+                            mAdapter.setThumb(idx, bm);
+                            // ★ 只更新**这一行**（`notifyDataSetChanged()` 会让整张列表在滚动时重排）
+                            mAdapter.refreshThumb(lv, idx);
+                        }
+                    });
+                }
             }
         }, "bp-scan").start();
     }

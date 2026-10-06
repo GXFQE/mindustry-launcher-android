@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  一份存档的**详情弹窗**（点存档列表里的一行）—— 第 116 轮加的预览大图。
+
+  ★ 为什么从 `setMessage` 改成自定义 view：`setMessage` 与 `setView` 在 AlertDialog 里
+    **互斥**（同时用只会渲染其中一个），而这一版要在大图之外**照旧**显示原来那段文字。
+  ★ 外层**不套 ScrollView**：平台 AlertDialog 已经把 customPanel 放在它自己的 ScrollView 里
+    （套两层会出现"滚动打架"）。
+  ⚠️ 根节点**不要** `@+id/root`：它不是页面布局，不该进 `Util.applySystemInsets` 那条路
+    （自检 ㉛ 正是拿"根节点没有 id 的布局"当元断言夹具的）。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingStart="20dp"
+    android:paddingEnd="20dp"
+    android:paddingTop="4dp"
+    android:paddingBottom="4dp">
+
+    <!--
+      ★ 默认 **GONE**：出不了图时（这个槽没指定版本 ⇒ 没配色表；或格式 v2 的老存档）
+        **不许留一个空框**（用户 2026-10-04 明确要求）—— 后台拿到位图才 VISIBLE。
+    -->
+    <ImageView
+        android:id="@+id/msav_detail_image"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:maxHeight="240dp"
+        android:adjustViewBounds="true"
+        android:scaleType="fitCenter"
+        android:visibility="gone"
+        android:background="@drawable/card_bg" />
+
+    <TextView
+        android:id="@+id/msav_detail_text"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingTop="10dp"
+        android:lineSpacingExtra="3dp"
+        android:textSize="13sp"
+        android:textColor="@color/fg" />
+</LinearLayout>

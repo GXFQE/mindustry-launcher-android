@@ -92,14 +92,27 @@ public final class MapLoad {
 
     /** 缓存文件名：**槽内文件用路径+大小+时间**，zip 条目用容器+条目名（避免同名互相覆盖） */
     static String cacheKey(Maps.Item it) {
-        String base;
-        if (it.file != null) {
-            base = it.file.getAbsolutePath() + "|" + it.file.length() + "|" + it.file.lastModified();
-        } else {
-            base = (it.container == null ? "?" : it.container.getAbsolutePath()) + "|" + it.bytes + "|"
-                    + it.entry;
-        }
-        return md5(base) + ".png";
+        if (it.file != null) return md5(fileKey(it.file)) + ".png";
+        return md5((it.container == null ? "?" : it.container.getAbsolutePath()) + "|" + it.bytes + "|"
+                + it.entry) + ".png";
+    }
+
+    /**
+     * 磁盘上那份 `.msav` 的定位串（路径 + 大小 + 修改时间）。
+     * ★ 存档与地图**同一套口径** ⇒ 同一份文件不会出现两张不同的图（改过的图也不会显示旧预览）。
+     */
+    static String fileKey(File f) {
+        return f.getAbsolutePath() + "|" + f.length() + "|" + f.lastModified();
+    }
+
+    /**
+     * 「现渲染」那一半（谁都能实现）。
+     * ★ 抽出来是为了让**地图 / 存档 / 蓝图**共用同一套「内存 → 磁盘 → 现渲染」的取图流程
+     *   （{@link #cached}）—— 三条路各写一份的话，缓存键、落盘、内存上限迟早会分叉。
+     */
+    interface Renderer {
+        /** @return 出不了图返回 null（**不许**抛） */
+        MapPreview.Img render();
     }
 
     /**
@@ -110,7 +123,53 @@ public final class MapLoad {
      */
     public static Bitmap image(Context ctx, Maps.Item it, String apkPath, int maxSide) {
         if (it == null) return null;
-        String key = cacheKey(it) + "@" + maxSide;
+        return image(ctx, it, it.file, apkPath, maxSide);
+    }
+
+    /**
+     * 一份**存档**（或任何 `.msav` 文件）的预览图。
+     *
+     * ★ 存档和地图**是同一种文件**（`.msav`；REF §72）⇒ 解码、上色、缩略、缓存全部照用，
+     *   唯一的差别是"定位信息"只有那个文件（没有 {@link Maps.Item} 那份来源/容器）。
+     * ⚠️ 缓存键与地图那条**同源**（{@link #fileKey}：路径+大小+修改时间）
+     *   ⇒ 同一份文件不会出现两张不同的图；游戏里覆盖保存过之后 key 会变，也不会显示旧预览。
+     */
+    public static Bitmap image(Context ctx, File f, String apkPath, int maxSide) {
+        if (f == null) return null;
+        return image(ctx, null, f, apkPath, maxSide);
+    }
+
+    /**
+     * 地图 / 存档的**唯一**取图路径（内存 → 磁盘 → 现渲染）。
+     *
+     * @param it    zip/APK 条目来源（槽内文件时为 null）
+     * @param file  磁盘上的那份（zip/APK 条目来源时为 null）
+     */
+    private static Bitmap image(final Context ctx, final Maps.Item it, final File file,
+                                final String apkPath, final int maxSide) {
+        final String keyBase = file != null ? fileKey(file) : cacheKey(it);
+        return cached(ctx, keyBase, maxSide, new Renderer() {
+            @Override public MapPreview.Img render() {
+                int[] palette = palette(ctx, apkPath);
+                if (palette == null) return null;
+                MsavTiles.Tiles tiles = file != null ? MsavTiles.read(file, true) : decode(it);
+                if (tiles == null) return null;
+                return MapPreview.render(tiles, palette, maxSide);
+            }
+        });
+    }
+
+    /**
+     * 「内存 → 磁盘 → 现渲染」的**唯一实现**（地图 / 存档 / 蓝图三条预览线共用）。
+     *
+     * @param keyBase  缓存身份（改了内容就得换 key；地图/存档那条 = 路径+大小+时间，
+     *                 蓝图那条见 {@link MschLoad}）
+     * @param maxSide  输出边长上限（**进 key**：同一份东西的缩略图与大图是两个缓存）
+     * @param renderer 现渲染；返回 null = 出不了图，此时**不落盘**（下次还会再试一次，
+     *                 但"没版本 / 老格式"这种原因不会自己变好，代价只是重算一遍）
+     */
+    static Bitmap cached(Context ctx, String keyBase, int maxSide, Renderer renderer) {
+        String key = keyBase + "@" + maxSide;
         synchronized (MEM) {
             Bitmap b = MEM.get(key);
             if (b != null && !b.isRecycled()) return b;
@@ -128,11 +187,7 @@ public final class MapLoad {
             }
         }
         // 现渲染
-        int[] palette = palette(ctx, apkPath);
-        if (palette == null) return null;
-        MsavTiles.Tiles tiles = decode(it);
-        if (tiles == null) return null;
-        MapPreview.Img img = MapPreview.render(tiles, palette, maxSide);
+        MapPreview.Img img = renderer.render();
         if (img == null) return null;
         Bitmap bmp = Bitmap.createBitmap(img.pixels, img.width, img.height, Bitmap.Config.ARGB_8888);
         if (disk != null) {

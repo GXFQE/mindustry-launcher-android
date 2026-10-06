@@ -255,6 +255,8 @@ public final class SelfTest {
             tier1(ctx, L, stat);
             // ★ ㊻ 三档（同一轮第二批）：文案去术语 + 版本行那个看得见的详情入口
             tier3(ctx, L, stat);
+            // ★ ㊽ 预览图（第 116 轮）：方块名 → 配色/尺寸表 + 蓝图色块渲染 + 存档预览的接口
+            previews(ctx, L, stat);
             // ★ 篡改对象池的用例放**最后**：它会在池里留下一个内容坏掉的对象，
             //   之后任何"再备份一次"都会因为 `has()` 命中而复用坏对象（CAS 的固有
             //   假设是"池内不可变"）。放在最后就不影响别的用例。
@@ -3360,6 +3362,196 @@ public final class SelfTest {
     }
 
     /**
+     * ㊽ **预览图**（2026-10-06，第 116 轮）：用户「让存档和蓝图页面也能像地图一样有预览图片」。
+     *
+     * <pre>
+     *   存档那边：`.msav` 与地图**同一种文件**（REF §72）⇒ 复用 {@link MapLoad} 那条路，
+     *             自检只需要钉住"文件形态的入口在"（渲染逻辑 ㉗ 已经钉过）。
+     *   蓝图那边：`.msch` 里存的是**方块名**，而调色板按 **content id** 索引
+     *             ⇒ 需要 {@link BlockTable}（名字 → 颜色 / 占地格数）——
+     *             这张表的**来源、对齐证据、为什么不烘 id** 全写在那个文件的头注释里。
+     * </pre>
+     *
+     * <p>这一节钉四类东西（全部纯 Java，不需要真机）：
+     * <ol>
+     *   <li><b>表本身</b>：447 行、颜色不是一片纯色、关键条目对得上（含"矿色来自物品"）；</li>
+     *   <li>★ <b>几何口径</b>：瓦片坐标 = 方块**中心**、多格方块往外扩 `(size-1)/2`
+     *       （与游戏 `Schematics#getBuffer` 一字不差）—— 用 2/3/4 格方块各钉一遍；</li>
+     *   <li><b>认不出 ⇒ 中性色**不是**空格</b>（拿假表喂进去，要求颜色是 {@link MschPreview#UNKNOWN}）；</li>
+     *   <li><b>负例</b>：null / 解不出来 / 没瓦片 / maxSide≤0 / 坐标炸出上限 ⇒ 一律 null，不崩、不留空框。</li>
+     * </ol>
+     * ⚠️ 真语料那条**更硬的证据在 PC 侧**（`.tmp-prev-lab/CheckGeom.java`，2026-10-06 实跑）：
+     *   5369 份 `.msch` 里解得出来 5321 份；**「方块全认识」的 5009 份中 4911 份的包围盒
+     *   与文件声明的宽高逐格相同**（对不上的 98 份全是自检/实验室造的夹具，或含**尺寸未知的
+     *   模组方块**——后者本来就会算小，属预期）。自检这边不复现那个规模，只钉口径。
+     */
+    private static void previews(Context ctx, List<String> L, int[] stat) {
+        L.add("── ㊽ 预览图：方块表 / 蓝图色块渲染 / 存档预览入口 ──");
+
+        // ① 表本身：行数、关键条目、颜色不许是一片纯色
+        java.util.Map<String, int[]> rows = MschPreview.rows();
+        ok(stat, L, rows.size() == BlockTable.COUNT && BlockTable.COUNT > 400,
+                "① 方块表：解码出 " + rows.size() + " 行（表常数 " + BlockTable.COUNT + "）");
+        ok(stat, L, MschPreview.table().color("copper-wall") != 0
+                        && MschPreview.table().size("copper-wall-large") == 2
+                        && MschPreview.table().size("core-nucleus") == 5
+                        && MschPreview.table().color("ore-copper") != 0
+                        && MschPreview.table().color("air") == 0,
+                "① 关键条目：`copper-wall` 有颜色 · `copper-wall-large` 占 2 格 · `core-nucleus` 占 5 格 ·"
+                        + " `ore-copper` 有颜色（矿色来自物品）· `air` 没有颜色");
+        java.util.HashSet<Integer> cols = new java.util.HashSet<>();
+        int multi = 0;
+        for (java.util.Map.Entry<String, int[]> e : rows.entrySet()) {
+            if (e.getValue()[0] != 0) cols.add(e.getValue()[0]);
+            if (e.getValue()[1] >= 2) multi++;
+        }
+        ok(stat, L, cols.size() > 100 && multi > 100,
+                "① 表有分辨力：不同颜色 " + cols.size() + " 种、多格方块 " + multi + " 个"
+                        + "（不是「一片纯色」的假货）");
+        // ★ 元断言：模组方块**不在表里** ⇒ 认不出（这正是"不许把不确定说成确定"的落点）
+        ok(stat, L, MschPreview.table().color("ve-bank-silicide") == 0
+                        && MschPreview.table().size("ve-bank-silicide") <= 0,
+                "① ★元断言：模组方块（`ve-bank-silicide`）**不在表里** ⇒ 查不到颜色与尺寸");
+
+        // ② 几何口径：瓦片坐标是**中心**，多格方块往外扩 (size-1)/2
+        //    （游戏 `Schematics#getBuffer`：`int offsetx = -(size - 1) / 2;` 整数除法）
+        //    预期值来自游戏自己的规则：2 格 ⇒ 往右上长（off=0）；3 格 ⇒ ±1；4 格 ⇒ -1..+2；5 格 ⇒ ±2
+        Msch m2 = schWith("copper-wall-large", 5, 5);
+        ok(stat, L, boxIs(m2, "copper-wall-large (2 格)", 5, 5, 6, 6),
+                "② 2×2 方块在 (5,5)：占 x[5..6] y[5..6]（偶数尺寸往**右上**长，与游戏同口径）—— 实得 "
+                        + box(m2));
+        Msch m5 = schWith("core-nucleus", 5, 5);
+        ok(stat, L, boxIs(m5, "core-nucleus (5 格)", 3, 3, 7, 7),
+                "② 5×5 方块在 (5,5)：占 x[3..7] y[3..7]（`(5-1)/2 = 2`）—— 实得 " + box(m5));
+        Msch m4 = schWith("scrap-wall-gigantic", 5, 5);
+        ok(stat, L, boxIs(m4, "scrap-wall-gigantic (4 格)", 4, 4, 7, 7),
+                "② 4×4 方块在 (5,5)：占 x[4..7] y[4..7]（`(4-1)/2 = 1`）—— 实得 " + box(m4));
+        // ★ 元断言：把尺寸当成 1 格的实现会算出 1×1 ⇒ 上面三条必须判死它。
+        //   这里直接喂假表（size 恒为 1），要求包围盒退化 ⇒ 证明上面那三条**真的在测尺寸**。
+        MschPreview.Lookup flat = new MschPreview.Lookup() {
+            @Override public int color(String n) { return 0xFF112233; }
+            @Override public int size(String n) { return 1; }
+        };
+        int[] fb = MschPreview.bounds(Msch.read(new Sch(1, 16, 16)
+                .tile("core-nucleus", 5, 5, 0, new byte[]{0}).bytes()), flat);
+        ok(stat, L, fb != null && fb[0] == 5 && fb[2] == 5,
+                "② ★元断言：同一份蓝图喂「尺寸恒为 1」的假表 ⇒ 包围盒退化成 1×1"
+                        + "（证明前三条测的是**尺寸**，不是恒真的装饰）");
+
+        // ③ 渲染：像素级 —— 一格的方块一个色块、多格的铺满它的面积、空格用 EMPTY、认不出用 UNKNOWN
+        Msch mixed = Msch.read(new Sch(1, 16, 16)
+                .tile("conveyor", 0, 0, 0, new byte[]{0})            // 1×1
+                .tile("core-nucleus", 5, 5, 0, new byte[]{0})        // 5×5
+                .tile("ve-bank-silicide", 10, 10, 0, new byte[]{0})  // 表外 ⇒ 认不出
+                .bytes());
+        MapPreview.Img img = MschPreview.render(mixed, MschPreview.table(), 128);
+        // 包围盒 = x[0..10] y[0..10]（conveyor 在 (0,0)，ve 方块在 (10,10)）⇒ 11×11
+        ok(stat, L, img != null && img.width == 11 && img.height == 11,
+                "③ 渲染：1 格 + 5 格 + 认不出的方块 ⇒ 画布 11×11（"
+                        + (img == null ? "null" : img.width + "×" + img.height) + "）");
+        int core = MschPreview.table().color("core-nucleus");
+        int conv = MschPreview.table().color("conveyor");
+        int corePx = 0, convPx = 0, unkPx = 0, emptyPx = 0;
+        if (img != null) {
+            for (int c : img.pixels) {
+                if (c == core) corePx++;
+                else if (c == conv) convPx++;
+                else if (c == MschPreview.UNKNOWN) unkPx++;
+                else if (c == MschPreview.EMPTY) emptyPx++;
+            }
+        }
+        ok(stat, L, corePx == 25 && convPx == 1 && unkPx == 1,
+                "③ 像素：5×5 方块铺满 **25** 格、1×1 方块 **1** 格、认不出的 **1** 格（实得 "
+                        + corePx + " / " + convPx + " / " + unkPx + "）");
+        ok(stat, L, emptyPx == 121 - 25 - 1 - 1,
+                "③ ★元断言：认不出的那格**不是**空格（UNKNOWN ≠ EMPTY）—— 数出来 "
+                        + unkPx + " 格认不出、" + emptyPx + " 格空（共 121 格）");
+
+        // ④ 负例：一律 null（界面保持 GONE，不留空框）
+        ok(stat, L, MschPreview.render(null, null, 128) == null
+                        && MschPreview.render(Msch.read(new byte[0]), null, 128) == null
+                        && MschPreview.render(mixed, null, 0) == null,
+                "④ 负例：没有蓝图 / 解不出来 / maxSide≤0 ⇒ 出不了图（返回 null，界面保持 GONE）");
+        ok(stat, L, MschPreview.render(Msch.read(new Sch(1, 16, 16).bytes()), null, 128) == null,
+                "④ 负例：一份**没有瓦片**的蓝图 ⇒ null（不画一张空图）");
+        // ★ 坐标炸出上限（语料里真有 `outOfBounds` 的文件）⇒ 直接放弃，不去分配几万格。
+        //   ⚠️ 判据是**包围盒的跨度**（不是绝对坐标）：包围盒按瓦片自己算，单放一格在
+        //      (9000,9000) 也只是一个 1×1 的图（正确）；要**两份离得极远**才越过 128 的上限。
+        Msch far = Msch.read(new Sch(1, 16, 16)
+                .tile("conveyor", 0, 0, 0, new byte[]{0})
+                .tile("conveyor", 9000, 9000, 0, new byte[]{0}).bytes());
+        ok(stat, L, MschPreview.render(far, MschPreview.table(), 128) == null,
+                "④ 上限：两份瓦片相隔 9000 格（包围盒 9001×9001 > 128）⇒ 不出图（不去分配那块内存）");
+
+        // ⑤ 缩略：maxSide 小于包围盒 ⇒ 输出最长边 ≤ maxSide
+        Msch big = Msch.read(new Sch(1, 128, 128).tag("name", "big")
+                .tile("conveyor", 0, 0, 0, new byte[]{0})
+                .tile("conveyor", 100, 100, 0, new byte[]{0}).bytes());
+        MapPreview.Img small = MschPreview.render(big, MschPreview.table(), 32);
+        ok(stat, L, small != null && Math.max(small.width, small.height) <= 32
+                        && Math.max(small.width, small.height) >= 16,
+                "⑤ 缩略：101×101 的蓝图按 maxSide=32 缩成 "
+                        + (small == null ? "null" : small.width + "×" + small.height));
+
+        // ⑥ 缓存键：文件形态与包内条目**不许撞**（撞了就会显示别人的预览图）
+        Blueprints.Item f1 = new Blueprints.Item(), f2 = new Blueprints.Item();
+        f1.file = new File(Paths.privateDir(ctx), "a.msch");
+        f2.file = new File(Paths.privateDir(ctx), "b.msch");
+        Blueprints.Item z = new Blueprints.Item();
+        z.container = new File(Paths.privateDir(ctx), "m.zip");
+        z.entry = "schematics/a.msch";
+        ok(stat, L, !MschLoad.key(f1).equals(MschLoad.key(f2))
+                        && !MschLoad.key(f1).equals(MschLoad.key(z)),
+                "⑥ 缓存键：两份不同文件 / 包内条目各自不同（撞了会显示错图）");
+
+        // ⑦ 存档预览：文件形态的入口在（`.msav` 与地图同源，渲染逻辑 ㉗ 已钉）
+        File saves = new File(Paths.privateDir(ctx), "selftest-preview-save");
+        Data.deleteTree(saves);
+        try {
+            saves.mkdirs();
+            File fake = new File(saves, "s.msav");
+            write(fake, "not-a-msav".getBytes("UTF-8"));
+            ok(stat, L, MapLoad.image(ctx, fake, null, MapLoad.THUMB) == null,
+                    "⑦ 存档预览：坏文件 / 没有配色表 ⇒ null（不崩、界面保持 GONE）");
+            ok(stat, L, MapLoad.fileKey(fake).contains("selftest-preview-save"),
+                    "⑦ 缓存键：文件名进 key（改了内容 key 就变，不会显示旧预览）");
+        } catch (Throwable t) {
+            ok(stat, L, false, "⑦ 存档预览用例自己抛了：" + t);
+        } finally {
+            Data.deleteTree(saves);
+        }
+        L.add("");
+    }
+
+    /** 造一份只放一个方块的 `.msch`（自检夹具） */
+    private static Msch schWith(String block, int x, int y) {
+        return Msch.read(new Sch(1, 16, 16).tag("name", "probe")
+                .tile(block, x, y, 0, new byte[]{0}).bytes());
+    }
+
+    /**
+     * 算出来的包围盒是不是恰好 `x[x0..x1] y[y0..y1]`（几何口径的判据）。
+     *
+     * @param what 只用来打日志（判死时能在 logcat 里看出是哪一条）
+     */
+    private static boolean boxIs(Msch m, String what, int x0, int y0, int x1, int y1) {
+        int[] b = MschPreview.bounds(m, MschPreview.table());
+        if (b == null) return false;
+        boolean same = b[0] == x0 && b[1] == y0 && b[2] == x1 && b[3] == y1;
+        if (!same) {
+            android.util.Log.w(TAG, "box mismatch for " + what + ": got " + b[0] + "," + b[1] + ".."
+                    + b[2] + "," + b[3] + " want " + x0 + "," + y0 + ".." + x1 + "," + y1);
+        }
+        return same;
+    }
+
+    /** 包围盒的可读形式（进报告 —— 判死时不用去翻 logcat） */
+    private static String box(Msch m) {
+        int[] b = MschPreview.bounds(m, MschPreview.table());
+        return b == null ? "null" : ("x[" + b[0] + ".." + b[2] + "] y[" + b[1] + ".." + b[3] + "]");
+    }
+
+    /**
      * ⑳ 批量启停的写侧（第③项）。★ 这条路径**会写游戏设置** ⇒ 除了正面用例，必须钉住：
      *   ① 一次读写把多个键改完；② 不需要改时**一个字节都不动**（不是"写了一遍恰好一样"）；
      *   ③ 文件是坏的 ⇒ 拒绝写且原文件不被动；④ 一个键都没给 ⇒ 明确拒绝（不静默成功）。
@@ -5793,7 +5985,10 @@ public final class SelfTest {
         final int[] layouts = {R.layout.activity_main, R.layout.activity_slots,
                 R.layout.activity_mods, R.layout.activity_slot, R.layout.activity_maps,
                 R.layout.activity_settings, R.layout.activity_log, R.layout.activity_map_detail,
-                R.layout.activity_trash, R.layout.activity_saves};
+                R.layout.activity_trash, R.layout.activity_saves,
+                // ★ 2026-10-06（第 116 轮）：蓝图两页原来**漏在这份名单外**——
+                //   它们有 `@+id/root`（所以补上不会红），但"名单漏了不会有症状"正是 ㉛ 想防的漏。
+                R.layout.activity_blueprints, R.layout.activity_blueprint_detail};
         android.view.LayoutInflater inf = android.view.LayoutInflater.from(ctx);
         int good = 0;
         StringBuilder bad = new StringBuilder();
