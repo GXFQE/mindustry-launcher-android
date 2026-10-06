@@ -5487,6 +5487,10 @@ public final class SelfTest {
             ok(stat, L, !r2.ok && r2.error != null && !new File(maps, "垃圾.msav").exists()
                             && !new File(maps, "垃圾.msav.part").exists(),
                     "★坏文件：拒收（" + r2.error + "）且**一个字节都没留下**");
+            // ★ 元断言（2026-10-06）：给用户看的那句里**不许出现类名/原始异常**
+            //   （地图这条链没有别的显示映射器，`MapsActivity` 直接把 `r.error` 显示出来）
+            ok(stat, L, r2.error != null && !r2.error.contains("Exception"),
+                    "★元断言：拒收原因**不带类名**（原来是 `…：ZipException: incorrect header check`）");
 
             // ③ 同名不覆盖：拒绝（宁可不做，也不硬盖）
             MapFiles.Result r3 = MapFiles.importMap(ctx, maps, "导入测试图.msav",
@@ -6813,6 +6817,21 @@ public final class SelfTest {
                             ? "?" : stashedItem.name) + "，来源槽 " + (stashedItem == null
                             ? "?" : stashedItem.slot) + "，类型 " + (stashedItem == null
                             ? "?" : stashedItem.kind) + "）");
+
+            // ── ④b ★ 失败原因**不许带类名**（2026-10-06）：把"中转站"做成一个**文件** ⇒
+            //   `place()` 建站失败 ⇒ 它抛的是**给用户看的资源文案**。这条 catch 会被用户**原样看到**：
+            //   `BlueprintsActivity` 只在 `broken != null` 时走 `MschText.reason`（码→白话），
+            //   而这里 `broken` 是 null（失败来自 `place`、不是解析）⇒ 界面直接显示 `r.error`。
+            //   ⚠️ 原写法 `类名 + ": " + 消息` ⇒ 用户看到 `IllegalStateException: …`。
+            File badTrash = new File(work, "不是目录.txt");
+            write(badTrash, "x".getBytes("UTF-8"));
+            String md5Keep = Util.md5(dest);
+            BlueprintFiles.Result rBad = BlueprintFiles.importSchem(ctx, schems, "我的蓝图.msch",
+                    new java.io.FileInputStream(src2), true, badTrash);
+            ok(stat, L, !rBad.ok && rBad.broken == null && rBad.error != null
+                            && !rBad.error.contains("Exception") && md5Keep.equals(Util.md5(dest)),
+                    "④b ★失败原因不带类名、旧蓝图原地不动（用户看到的是「"
+                            + oneLine(rBad.error == null ? "?" : rBad.error) + "」）");
 
             // ── ⑤ 删除 = 挪进中转站；元断言：不是直接子项就删不动 ────────────
             File sub = new File(new File(schems, "子目录"), "深.msch");

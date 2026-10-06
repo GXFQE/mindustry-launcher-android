@@ -147,7 +147,13 @@ public final class BlueprintFiles {
             return r;
         } catch (Throwable t) {
             Data.deleteTree(part);
-            r.error = t.getClass().getSimpleName() + ": " + t.getMessage();
+            // ★ 同 `MapFiles` 的两条 catch（2026-10-06）：`place()` 抛的是**给用户看的资源文案**
+            //   ⇒ 别把 `IllegalStateException:` 类名拼进去。
+            //   ⚠️ 这条**会直接显示给用户**：`BlueprintsActivity` 只在 `broken != null` 时走
+            //   `MschText.reason`（码→白话），而这条路 `broken` 是 null（失败来自 `place`，不是解析）
+            //   ⇒ 界面原样显示 `r.error`。
+            String m = t.getMessage();
+            r.error = (m == null || m.isEmpty()) ? t.getClass().getSimpleName() : m;
             return r;
         }
     }

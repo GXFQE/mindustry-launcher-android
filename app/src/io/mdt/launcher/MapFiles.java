@@ -150,7 +150,12 @@ public final class MapFiles {
                 Data.deleteTree(part);
                 r.error = (meta.error == null || meta.error.isEmpty())
                         ? ctx.getString(R.string.mapfile_err_not_map)
-                        : ctx.getString(R.string.mapfile_err_not_map_why_fmt, meta.error);
+                        // ★ 2026-10-06（两处：`importMap` / `commitSaveAsMap`）：`meta.error` 是**原始诊断**
+                        //   （可能是 `ZipException: incorrect header check`）⇒ 第一层必须过
+                        //   `MsavText.userReason` 翻成白话 —— 地图这条链**没有**别的显示映射器
+                        //   （`MapsActivity` 直接显示 `r.error`）。我们自己写的诊断会被**原样透传**，不丢信息。
+                        : ctx.getString(R.string.mapfile_err_not_map_why_fmt,
+                                MsavText.userReason(ctx, meta));
                 return r;
             }
             r.meta = meta;
@@ -370,7 +375,12 @@ public final class MapFiles {
                 Data.deleteTree(part2);
                 r.error = (meta.error == null || meta.error.isEmpty())
                         ? ctx.getString(R.string.mapfile_err_not_map)
-                        : ctx.getString(R.string.mapfile_err_not_map_why_fmt, meta.error);
+                        // ★ 2026-10-06（两处：`importMap` / `commitSaveAsMap`）：`meta.error` 是**原始诊断**
+                        //   （可能是 `ZipException: incorrect header check`）⇒ 第一层必须过
+                        //   `MsavText.userReason` 翻成白话 —— 地图这条链**没有**别的显示映射器
+                        //   （`MapsActivity` 直接显示 `r.error`）。我们自己写的诊断会被**原样透传**，不丢信息。
+                        : ctx.getString(R.string.mapfile_err_not_map_why_fmt,
+                                MsavText.userReason(ctx, meta));
                 return r;
             }
             r.meta = meta;
