@@ -1608,14 +1608,18 @@ public class MainActivity extends BaseActivity {
             conflict.setVisibility(View.GONE);
         }
 
-        // 可见的入口。长按详情里那条仍保留 —— 两条路都走 pickSlot，结果一致。
+        // 可见的改槽入口（**直接**弹槽列表，不套第二层）。
         // ★ 槽按钮自己消费点击（它是 clickable），不会冒到整行 —— 所以两个动作不冲突。
-        // 🔴 2026-10-06（同日回退）：这里曾经**在行内**直接挂"换槽"，另加一个箭头开详情 ——
-        //   结果那一行的宽度不够，`MindustryX` 的第二行被挤成 `2026.09.X37（基于 16…`
-        //   （版本号又被切了，正是 F7 修掉的毛病；`uiautomator dump` 里 text 是全文、看不出来）。
-        //   ⇒ 改成**动作表**：行内只留一个按钮，详情与换槽都从它进（零宽度成本）。
+        // 🔴 2026-10-06：这里反复试过两版，形状是**用户定的** ——
+        //   ① 行内加箭头开详情 ⇒ 宽度不够，版本号被挤成省略号（当场被用户抓到）；
+        //   ② 按钮改成"动作表"（换槽 / 看详情）⇒ 用户：「**换槽要二级页面是不是有点不太方便**」
+        //      —— 换槽是常用动作，不该多一层。
+        //   ⇒ 最终：**按钮 = 直接换槽**；详情仍走长按整行（`showDetail`）。
+        //   ⚠️ 想给详情加"看得见的入口"时注意：这一行的横向宽度**一点余量都没有**了
+        //      （徽标 + 按钮 ≈ 460px/1224px，最长的标题第二行正好放满），
+        //      可行方向只有"多一行"或"并进别的弹窗"，别再往行里塞控件。
         slotBtn.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View x) { promptVersionActions(e); }
+            @Override public void onClick(View x) { pickSlot(e); }
         });
 
         // 整行：单击启动 / 长按详情。原先是 ListView 的 onItemClick / onItemLongClick，
@@ -2029,33 +2033,6 @@ public class MainActivity extends BaseActivity {
      *   "主界面说用 A 槽、模组页按 B 槽算版本要求"这种**没有任何症状**的分叉。
      *   实现只有一处：{@link Versions#slotFor}（口径与注释也搬过去了）。
      */
-
-    /**
-     * ★ 2026-10-06（三档，同日回退后定的形状）：版本行「槽」按钮 = **这一行的动作表** ——
-     * 「换到别的槽…」/「看详情…」。
-     *
-     * 🔴 为什么详情不放在行内：那一行右侧的宽度**已经用满**（徽标 + 槽按钮 ≈ 460px / 1224px）。
-     *   先前的做法是**再加一个 22dp 箭头** ⇒ `MindustryX` 那行的第二行立刻被挤成
-     *   `2026.09.X37（基于 16…`（就是 F7 当年修掉的"版本号被折叠"）。
-     *   ⚠️ 而自检当时**没抓到**：`uiautomator dump` 的 `text=` 是**全文**，省略号只在渲染里 ——
-     *   这类判据**只能看截图**（教训已写进 `item_version.xml` 的注释与 AGENTS §五）。
-     * ★ 两个动作都是"这一行"的动作，所以共用同一个可见控件；长按整行那条路仍在（同一个 `showDetail`）。
-     */
-    private void promptVersionActions(final Versions.Entry e) {
-        new AlertDialog.Builder(this)
-                .setTitle(e.displayName())
-                .setItems(new String[]{
-                        getString(R.string.row_slot_change),
-                        getString(R.string.row_detail_btn)},
-                        new DialogInterface.OnClickListener() {
-                            @Override public void onClick(DialogInterface d, int w) {
-                                if (w == 0) pickSlot(e);
-                                else showDetail(e);
-                            }
-                        })
-                .setNegativeButton(R.string.cancel, null)
-                .show();
-    }
 
     /** 给某个版本指定存档槽 */
     private void pickSlot(final Versions.Entry e) {
