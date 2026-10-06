@@ -49,14 +49,15 @@ public final class MschLoad {
      * @return 出不了图返回 null（界面**保持 GONE**，不留空框）
      */
     public static Bitmap image(final Context ctx, final Blueprints.Item it, final String apkPath,
-                               final int maxSide) {
+                               final String slot, final int maxSide) {
         if (it == null || it.msch == null) return null;
         // ★ 没有版本就没有图：**不回落**（用户 2026-10-06：「那东西太抽象了毫无意义啊」）
         if (apkPath == null || apkPath.trim().isEmpty()) return null;
         return MapLoad.cached(ctx, key(it, apkPath), maxSide, new MapLoad.Renderer() {
             @Override public MapPreview.Img render() {
                 int target = maxSide >= BIG ? MIN_SIDE_BIG : MIN_SIDE_THUMB;
-                MschSheet sheet = MschSheet.open(ctx, apkPath);
+                // 图集（版本 APK）+ 模组贴图（这个槽的 mods/，第 119 轮）
+                MschSheet sheet = MschSheet.open(ctx, apkPath, slot);
                 if (sheet == null) return null;              // 图集读不了 ⇒ 没有图（不回落）
                 MapPreview.Img img = MschSprite.render(it.msch, sheet, target);
                 return img == null ? null : upscale(img, target);

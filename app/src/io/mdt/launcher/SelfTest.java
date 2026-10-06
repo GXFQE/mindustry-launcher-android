@@ -260,6 +260,8 @@ public final class SelfTest {
             previews(ctx, L, stat);
             // ★ ㊾ 像素级预览（第 117 轮）：图集解析（神谕同构）+ 贴图拼接 + 旋转 + 回落
             spritePreview(ctx, L, stat);
+            // ★ ㊿ 模组方块的贴图（第 119 轮）：从本槽 `mods/` 里按游戏自己的规则找 PNG
+            modSprites(ctx, L, stat);
             // ★ 篡改对象池的用例放**最后**：它会在池里留下一个内容坏掉的对象，
             //   之后任何"再备份一次"都会因为 `has()` 命中而复用坏对象（CAS 的固有
             //   假设是"池内不可变"）。放在最后就不影响别的用例。
@@ -3473,11 +3475,12 @@ public final class SelfTest {
                 "④ 上限：两份瓦片相隔 9000 格（包围盒 9001×9001 > 128）⇒ 不出图（不去分配那块内存）");
 
         // ⑤ 🔴 第 118 轮的新规矩：**没有版本就没有图**（不回落色块档）
+        final String slot0 = Data.currentSlot(ctx);
         Blueprints.Item noVer = new Blueprints.Item();
         noVer.msch = schWith("copper-wall", 5, 5);
         noVer.file = new File(Paths.privateDir(ctx), "selftest-msch-nover.msch");
-        ok(stat, L, MschLoad.image(ctx, noVer, null, MschLoad.THUMB) == null
-                        && MschLoad.image(ctx, noVer, "", MschLoad.THUMB) == null,
+        ok(stat, L, MschLoad.image(ctx, noVer, null, slot0, MschLoad.THUMB) == null
+                        && MschLoad.image(ctx, noVer, "", slot0, MschLoad.THUMB) == null,
                 "⑤ 没版本 ⇒ **不画**（null；用户明确否掉了色块档：「那东西太抽象了毫无意义啊」）");
         // ★ 元断言：同一个 Item 带上版本 APK 就**出得来图** ⇒ 证明上一条的 null 不是"Item 本身坏了"
         String apkForProbe = null;
@@ -3486,7 +3489,7 @@ public final class SelfTest {
         } catch (Throwable ignored) {
         }
         ok(stat, L, apkForProbe != null
-                        && MschLoad.image(ctx, noVer, apkForProbe, MschLoad.THUMB) != null,
+                        && MschLoad.image(ctx, noVer, apkForProbe, slot0, MschLoad.THUMB) != null,
                 "⑤ ★元断言：**同一个 Item** 带上版本 APK ⇒ 有图 —— 证明上一条测的是"
                         + "「没版本」这条规矩，不是 Item 坏了（拿不到 APK 时这条会判死，见报告）");
         // 收尾：上面这条**真的落了一次盘**（其余用例都走"出不了图 ⇒ 不落盘"）⇒ 把那份缓存删掉，
@@ -3524,6 +3527,83 @@ public final class SelfTest {
             ok(stat, L, false, "⑦ 存档预览用例自己抛了：" + t);
         } finally {
             Data.deleteTree(saves);
+        }
+        L.add("");
+    }
+
+    /**
+     * ㊿ **模组方块的贴图**（2026-10-06，第 119 轮）：让含模组的蓝图里那几格也画真贴图。
+     *
+     * <pre>
+     *   ① 注册名规则（照抄游戏 `Mods.java:386~410`）：`sprites/` 底下**递归**所有 PNG，
+     *      注册名 = `<模组名>-<文件名主干>`；**唯一例外** = 文件名已被类别前缀
+     *      （`block-<模组名>-…`）⇒ 不加前缀；`sprites-override/**` 也不加。
+     *      ★ 判据用的是**真实的模组包**（设备上那个装满模组的槽），不是我自己编的名字。
+     *   ② 尺寸：**问贴图自己**（32 px = 1 格）⇒ 模组的多格建筑不再被当成 1 格
+     *      （第 116 轮起那条"包围盒会算小"的边界，本轮修掉）。
+     *   ③ 端到端：拿真模组包里的方块名查到条目 + 取到 PNG 字节 + 头部宽高读得出来。
+     * </pre>
+     */
+    private static void modSprites(Context ctx, List<String> L, int[] stat) {
+        L.add("── ㊿ 模组方块的贴图：注册名规则 / 尺寸 / 真包端到端 ──");
+
+        // ① 注册名规则（纯函数，最容易写错的就是那条例外）
+        ok(stat, L, "vne-bank".equals(ModSprites.regionOf("sprites/blocks/defense/bank.png", "vne")),
+                "① 注册名：`sprites/**` 递归找，名字 = <模组名>-<文件主干>（**不含目录**、不含 .png）");
+        ok(stat, L, "vne-bank".equals(ModSprites.regionOf("sprites/bank.png", "vne"))
+                        && "bank".equals(ModSprites.regionOf("sprites-override/bank.png", "vne")),
+                "① 注册名：`sprites-override/**` **不加**模组前缀（那是用来覆盖原版贴图的）");
+        ok(stat, L, "block-vne-thing-full".equals(
+                        ModSprites.regionOf("sprites/block-vne-thing-full.png", "vne")),
+                "① ★元断言：文件名**已被类别前缀**（`block-vne-…`）⇒ 不再加模组前缀"
+                        + "（游戏注释里那个例子，加错了就永远查不到）");
+        // ⚠️ 游戏用的是 `fullName` = 前缀 + **原始**主干（`Mods.java:412`）——那个"取第一个点之前"的
+        //    `regionName` 只用来做 override 的存在性检查（`Mods.java:389/393`）⇒ 这里**不**去点。
+        ok(stat, L, "vne-a.b".equals(ModSprites.regionOf("sprites/a.b.png", "vne"))
+                        && ModSprites.regionOf("icon.png", "vne") == null,
+                "① 注册名：`a.b.png` 保留完整主干（**游戏同款**）；模组 `icon.png` **不是**内容贴图");
+
+        // ② 尺寸：32 px = 1 格
+        ok(stat, L, ModSprites.tilesOf(32, 32) == 1 && ModSprites.tilesOf(64, 64) == 2
+                        && ModSprites.tilesOf(160, 160) == 5 && ModSprites.tilesOf(26, 28) == 1,
+                "② 尺寸：32→1 格 / 64→2 格 / 160→5 格 / 26×28（trim 过的）→1 格");
+
+        // ③ 端到端：真模组包（**只读**扫描设备上的槽，不动用户数据）
+        //   ⚠️ 判据不能写死某个方块名（别的机器上未必装同一个模组）⇒ 先挑一个**真的索引出贴图**的槽，
+        //      再拿**索引里第一个名字**回查。写死名字的那版第一跑就判死了（挑中了自检自己造的假模组槽）。
+        String slot = null;
+        ModSprites ms = null;
+        for (Data.Slot s : Data.allSlots(ctx)) {
+            try {
+                ModSprites one = ModSprites.of(Mods.scan(ctx, s.name).mods);
+                if (!one.isEmpty()) {
+                    slot = s.name;
+                    ms = one;
+                    break;
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+        if (ms == null) {
+            ok(stat, L, false, "③ 端到端：**设备上没有任何真模组包** ⇒ 这条用例无从验证"
+                    + "（不是通过；见报告里的槽列表）");
+        } else {
+            ok(stat, L, !ms.isEmpty(),
+                    "③ 端到端：槽「" + slot + "」的模组包索引出 " + ms.describe());
+            String name = ms.keys().iterator().next();
+            ModSprites.Hit hit = ms.find(name);
+            ok(stat, L, hit != null && hit.entry.toLowerCase().endsWith(".png"),
+                    "③ 端到端：拿索引里第一个名字回查得到条目 —— " + name + " → " + hit);
+            byte[] png = hit == null ? null : ms.bytes(hit);
+            ok(stat, L, png != null && png.length > 100 && png[0] == (byte) 0x89 && png[1] == 'P',
+                    "③ 端到端：取到真 PNG 字节（" + (png == null ? 0 : png.length) + " 字节）");
+            ok(stat, L, hit != null && ms.sizeOf(hit) >= 1,
+                    "③ 端到端：从 PNG 头读出它占 " + (hit == null ? "?" : ms.sizeOf(hit))
+                            + " 格（≥1；32 px 的给 1 格）");
+            // ★ 元断言：**编一个不存在的方块名** ⇒ 必须查不到（否则索引就是"来者不拒"的假货）
+            ok(stat, L, ms.find(name + "-根本没有这个后缀") == null
+                            && ms.find(null) == null,
+                    "③ ★元断言：不存在的名字 / null ⇒ 查不到（证明上面那条不是恒真的）");
         }
         L.add("");
     }
@@ -3652,7 +3732,7 @@ public final class SelfTest {
         // ⑤ 端到端：真机上的版本 APK
         try {
             String apk = Mods.targetsFor(ctx, Data.currentSlot(ctx)).apkPath;
-            MschSheet sh = MschSheet.open(ctx, apk);
+            MschSheet sh = MschSheet.open(ctx, apk, Data.currentSlot(ctx));
             MschAtlas.Region cw = sh == null ? null : sh.find("copper-wall");
             int[] px = cw == null ? null : sh.pixels(cw);
             ok(stat, L, cw != null && px != null && cw.w == 32 && cw.h == 32 && px.length == 1024,
@@ -3665,7 +3745,7 @@ public final class SelfTest {
                     "⑤ ★元断言：裁出来的是**真图**（" + distinct.size() + " 种颜色 > 3）——"
                             + " 位置错的话会是一块纯色或全透明");
             File pdir = sh == null ? null : MschSheet.pageDirOf(sh);
-            ok(stat, L, MschSheet.isOpen(apk) && pdir != null && pdir.isDirectory(),
+            ok(stat, L, MschSheet.isOpen(apk, Data.currentSlot(ctx)) && pdir != null && pdir.isDirectory(),
                     "⑤ 端到端：表开着，页图也真的抽到了磁盘上（BitmapRegionDecoder 要能随机访问）");
         } catch (Throwable t) {
             ok(stat, L, false, "⑤ 端到端用例自己抛了：" + t);
@@ -3691,6 +3771,10 @@ public final class SelfTest {
 
             @Override public int[] pixels(MschAtlas.Region r) {
                 return null;
+            }
+
+            @Override public int size(String block) {
+                return 0;                       // 这一节只验"查找顺序"，尺寸不参与
             }
         };
         MschSprite.resolve(s, "x");

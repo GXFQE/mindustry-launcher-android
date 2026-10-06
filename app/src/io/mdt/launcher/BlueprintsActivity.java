@@ -195,7 +195,7 @@ public class BlueprintsActivity extends BaseActivity {
                 for (int i = 0; i < items.size(); i++) {
                     final int idx = i;
                     final android.graphics.Bitmap bm = MschLoad.image(
-                            BlueprintsActivity.this, items.get(idx), apkPath, MschLoad.THUMB);
+                            BlueprintsActivity.this, items.get(idx), apkPath, mSlot, MschLoad.THUMB);
                     if (bm == null) continue;
                     runOnUiThread(new Runnable() {
                         @Override public void run() {

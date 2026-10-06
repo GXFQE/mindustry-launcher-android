@@ -48,6 +48,13 @@ public final class MschSprite {
          * @return 取不到返回 null（那一格会退化成色块）
          */
         int[] pixels(MschAtlas.Region region);
+
+        /**
+         * 这个方块**占几格**（第 119 轮加的：模组方块的多格尺寸只能从贴图自己问出来）。
+         *
+         * @return 不知道返回 0（渲染时回落到烘在启动器里的原版表、再回落到 1 格）
+         */
+        int size(String block);
     }
 
     private MschSprite() {}
@@ -81,7 +88,9 @@ public final class MschSprite {
      */
     public static MapPreview.Img render(Msch m, Sheet s, int targetSide) {
         if (m == null || !m.ok || m.tiles.isEmpty() || s == null || targetSide <= 0) return null;
-        int[] b = MschPreview.bounds(m, MschPreview.table());
+        // ★ 尺寸优先问供图方（模组方块的多格尺寸写在自己的贴图里），问不到才回落到原版表
+        MschPreview.Lookup lk = lookupFor(s);
+        int[] b = MschPreview.bounds(m, lk);
         if (b == null) return null;
         int tilesW = b[2] - b[0] + 1, tilesH = b[3] - b[1] + 1;
         if (tilesW <= 0 || tilesH <= 0 || tilesW > Msch.MAX_DIM || tilesH > Msch.MAX_DIM) return null;
@@ -93,7 +102,7 @@ public final class MschSprite {
         Arrays.fill(out, MschPreview.EMPTY);
 
         for (Msch.Tile t : m.tiles) {
-            int size = MschPreview.table().size(t.block);
+            int size = lk.size(t.block);
             if (size <= 0) size = 1;
             int off = -(size - 1) / 2;
             // 方块中心（格坐标 → 输出像素）：见类注释 ②
@@ -104,7 +113,7 @@ public final class MschSprite {
             int[] src = reg == null ? null : s.pixels(reg);
             if (src == null || reg.w <= 0 || reg.h <= 0 || src.length < reg.w * reg.h) {
                 // 退化：这一格画成色块（占地 = size × size 格）
-                int color = MschPreview.table().color(t.block);
+                int color = lk.color(t.block);
                 fill(out, w, h, cx - size * px / 2, cy - size * px / 2, size * px, size * px,
                         color == 0 ? MschPreview.UNKNOWN : color);
                 continue;
@@ -224,7 +233,7 @@ public final class MschSprite {
         }
     }
 
-    /** 给 PC 验收台/自检用：把图集目录包一个 {@link Sheet}（像素来源由调用方给） */
+    /** 给 PC 验收台/自检用：把图集目录包一个 {@link Sheet}（像素来源由调用方给，尺寸问表） */
     public static Sheet sheet(final Map<String, MschAtlas.Region> regions, final PixelSource src) {
         return new Sheet() {
             @Override public MschAtlas.Region find(String region) {
@@ -233,6 +242,27 @@ public final class MschSprite {
 
             @Override public int[] pixels(MschAtlas.Region region) {
                 return src == null ? null : src.pixels(region);
+            }
+
+            @Override public int size(String block) {
+                return 0;                     // 问表（原版）；假表/PC 台不需要模组尺寸
+            }
+        };
+    }
+
+    /**
+     * 把 {@link Sheet} 折成渲染器要的"颜色 + 尺寸"查表：**尺寸优先问供图方**，颜色一律问原版表。
+     * （模组方块的颜色表里没有 ⇒ 那一格本来就该是中性紫，见 {@link MschSprite} 类注释）
+     */
+    static MschPreview.Lookup lookupFor(final Sheet s) {
+        return new MschPreview.Lookup() {
+            @Override public int color(String internal) {
+                return MschPreview.table().color(internal);
+            }
+
+            @Override public int size(String internal) {
+                int n = s.size(internal);
+                return n > 0 ? n : MschPreview.table().size(internal);
             }
         };
     }

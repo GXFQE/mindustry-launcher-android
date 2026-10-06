@@ -92,7 +92,7 @@ public class BlueprintDetailActivity extends BaseActivity {
                 } catch (Throwable ignored) {
                 }
                 final android.graphics.Bitmap bm = MschLoad.image(
-                        BlueprintDetailActivity.this, mItem, apk, MschLoad.BIG);
+                        BlueprintDetailActivity.this, mItem, apk, mSlot, MschLoad.BIG);
                 if (bm == null) return;
                 runOnUiThread(new Runnable() {
                     @Override public void run() {

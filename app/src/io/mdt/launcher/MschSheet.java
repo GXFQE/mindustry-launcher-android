@@ -41,28 +41,34 @@ public final class MschSheet implements MschSprite.Sheet {
     private final File apk;
     private final File pageDir;
     private final Map<String, MschAtlas.Region> regions;
+    /** 本槽模组的贴图索引（第 119 轮）；图集里查不到时才问它 */
+    private final ModSprites mods;
+    /** 模组命中的区域 → 条目（`Region.page` 用 `@mod:` 前缀编码，见 {@link #find}） */
+    private final Map<String, ModSprites.Hit> modHits = new HashMap<>();
     private final Map<String, BitmapRegionDecoder> decoders = new HashMap<>();
     /** 区域像素缓存（名字 → ARGB；一张 32×32 只有 4 KB，几百个也无所谓） */
     private final Map<String, int[]> pixels = new HashMap<>();
     private int pxBytes;
 
-    private MschSheet(File apk, File pageDir, Map<String, MschAtlas.Region> regions) {
+    private MschSheet(File apk, File pageDir, Map<String, MschAtlas.Region> regions, ModSprites mods) {
         this.apk = apk;
         this.pageDir = pageDir;
         this.regions = regions;
+        this.mods = mods;
     }
 
     /**
-     * 打开（带缓存）某个版本 APK 的图集。
+     * 打开（带缓存）某个版本 APK 的图集 + **这个槽的模组贴图**。
      *
-     * @return 拿不到（没给路径 / APK 读不了 / 图集格式不对）返回 null —— **不抛**
+     * @param slot 槽名（模组从它的 `mods/` 里找；**null / 空 = 没有模组侧**）
+     * @return 图集拿不到（没给路径 / APK 读不了 / 格式不对）返回 null —— **不抛**
      */
-    public static synchronized MschSheet open(Context ctx, String apkPath) {
+    public static synchronized MschSheet open(Context ctx, String apkPath, String slot) {
         if (apkPath == null || apkPath.trim().isEmpty()) return null;
-        String key = apkPath.trim();
+        String key = apkPath.trim() + "@" + (slot == null ? "" : slot);
         if (CURRENT != null && key.equals(CURRENT_KEY)) return CURRENT;
         closeCurrent();
-        MschSheet s = build(ctx, new File(key));
+        MschSheet s = build(ctx, new File(apkPath.trim()), slot);
         CURRENT = s;
         CURRENT_KEY = s == null ? null : key;
         return s;
@@ -74,7 +80,7 @@ public final class MschSheet implements MschSprite.Sheet {
         CURRENT_KEY = null;
     }
 
-    private static MschSheet build(Context ctx, File apk) {
+    private static MschSheet build(Context ctx, File apk, String slot) {
         ZipFile zf = null;
         InputStream in = null;
         try {
@@ -86,9 +92,16 @@ public final class MschSheet implements MschSprite.Sheet {
             in = zf.getInputStream(e);
             Map<String, MschAtlas.Region> regions = MschAtlas.read(in);
             if (regions == null || regions.isEmpty()) return null;
+            // 模组侧：扫本槽 `mods/`（读不出来就是空的，不影响原版贴图）
+            ModSprites mods;
+            try {
+                mods = ModSprites.of(Mods.scan(ctx, slot).mods);
+            } catch (Throwable t) {
+                mods = ModSprites.of(null);
+            }
             File dir = new File(MapLoad.cacheDir(ctx), "atlas/"
                     + MapLoad.md5(apk.getAbsolutePath() + "|" + apk.length() + "|" + apk.lastModified()));
-            return new MschSheet(apk, dir, regions);
+            return new MschSheet(apk, dir, regions, mods);
         } catch (Throwable t) {
             return null;
         } finally {
@@ -108,7 +121,31 @@ public final class MschSheet implements MschSprite.Sheet {
     }
 
     @Override public MschAtlas.Region find(String region) {
-        return region == null ? null : regions.get(region);
+        if (region == null) return null;
+        MschAtlas.Region r = regions.get(region);
+        if (r != null) return r;
+        // 图集里没有 ⇒ 问模组（第 119 轮）。★ 用 `@mod:` 前缀把"来源"编进 page：
+        //   模组贴图不是在页图里的一个矩形，而是**一个 PNG 条目整张**（矩形 = 0,0,w,h）
+        ModSprites.Hit h = mods.find(region);
+        if (h == null) return null;
+        int[] wh = mods.dims(h);
+        if (wh == null) return null;
+        String page = "@mod:" + h.pack.getAbsolutePath() + "!" + h.entry;
+        modHits.put(page, h);
+        return new MschAtlas.Region(page, 0, 0, wh[0], wh[1]);
+    }
+
+    /**
+     * 这个方块占几格：**模组方块问它自己的贴图**（32 px = 1 格），原版方块交给烘好的表。
+     */
+    @Override public int size(String block) {
+        ModSprites.Hit h = mods.find(block);
+        return h == null ? 0 : mods.sizeOf(h);
+    }
+
+    /** 诊断串（进自检报告）：模组侧索引到多少张 */
+    String modsNote() {
+        return mods.describe();
     }
 
     @Override public int[] pixels(MschAtlas.Region r) {
@@ -130,8 +167,9 @@ public final class MschSheet implements MschSprite.Sheet {
         return px;
     }
 
-    /** 裁一块贴图（顺带把页图抽到磁盘上） */
+    /** 裁一块贴图（顺带把页图抽到磁盘上）；`page` 是 `@mod:` 开头时走模组包（第 119 轮） */
     private int[] decode(MschAtlas.Region r) {
+        if (r.page != null && r.page.startsWith("@mod:")) return decodeMod(r);
         BitmapRegionDecoder dec;
         synchronized (this) {
             dec = decoders.get(r.page);
@@ -162,6 +200,32 @@ public final class MschSheet implements MschSprite.Sheet {
             bmp.getPixels(out, 0, w, 0, 0, w, h);
             // ⚠️ trim 过的区域（如 `duo` 26×28）要**补回原尺寸**再交给渲染器吗？
             //   不用 —— 游戏 `Draw.rect` 就是拿打包后的尺寸居中画的（见 MschSprite 类注释 ③）
+            return out;
+        } catch (Throwable t) {
+            return null;
+        } finally {
+            if (bmp != null) bmp.recycle();
+        }
+    }
+
+    /** 模组贴图：从包里取 PNG 字节 → `BitmapFactory` 解（同样要 `inPremultiplied=false`） */
+    private int[] decodeMod(MschAtlas.Region r) {
+        ModSprites.Hit h;
+        synchronized (this) {
+            h = modHits.get(r.page);
+        }
+        if (h == null) return null;
+        byte[] png = mods.bytes(h);
+        if (png == null || png.length == 0) return null;
+        Bitmap bmp = null;
+        try {
+            BitmapFactory.Options opt = new BitmapFactory.Options();
+            opt.inPremultiplied = false;
+            bmp = BitmapFactory.decodeByteArray(png, 0, png.length, opt);
+            if (bmp == null) return null;
+            int w = bmp.getWidth(), hh = bmp.getHeight();
+            int[] out = new int[w * hh];
+            bmp.getPixels(out, 0, w, 0, 0, w, hh);
             return out;
         } catch (Throwable t) {
             return null;
@@ -233,9 +297,10 @@ public final class MschSheet implements MschSprite.Sheet {
         }
     }
 
-    /** 自检用：现在手上有没有打开的表（判据要看得见状态） */
-    static synchronized boolean isOpen(String apkPath) {
-        return CURRENT != null && apkPath != null && apkPath.equals(CURRENT_KEY);
+    /** 自检用：现在手上有没有打开的表（判据要看得见状态）；slot 要对上（模组也参与缓存键） */
+    static synchronized boolean isOpen(String apkPath, String slot) {
+        return CURRENT != null && apkPath != null
+                && (apkPath + "@" + (slot == null ? "" : slot)).equals(CURRENT_KEY);
     }
 
     /** 自检用：这个 APK 的页图缓存目录（抽出来的 PNG 在哪） */
