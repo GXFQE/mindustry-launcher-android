@@ -3568,6 +3568,19 @@ public final class SelfTest {
                         && ModSprites.tilesOf(160, 160) == 5 && ModSprites.tilesOf(26, 28) == 1,
                 "② 尺寸：32→1 格 / 64→2 格 / 160→5 格 / 26×28（trim 过的）→1 格");
 
+        // ②b **朝向**（第 120 轮）：类名表 —— 数据模组 JSON 的 `type` 就是 jar 里的类名，
+        //     而 rotate/rotateDraw 写在**类自己的构造函数**里（Turret.java:163 / Conveyor.java:40）
+        ok(stat, L, ModSprites.classCount() >= 100,
+                "②b 类名表：解出 " + ModSprites.classCount() + " 个原版方块类（对账常数 "
+                        + ClassRotateTable.COUNT + "）");
+        ok(stat, L, ModSprites.classRotates("Conveyor") && ModSprites.classRotates("ItemTurret")
+                        && ModSprites.classRotates("Duct") && !ModSprites.classRotates("GenericCrafter")
+                        && !ModSprites.classRotates("Block"),
+                "②b 类名表：`Conveyor`/`ItemTurret`/`Duct` 转，`GenericCrafter`/`Block` 不转"
+                        + "（`GenericCrafter` 原版那个 true 是匿名块里设的 ⇒ 按**不转**记）");
+        ok(stat, L, !ModSprites.classRotates("根本没有这个类") && !ModSprites.classRotates(null),
+                "②b ★元断言：查不到的类名 / null ⇒ **不转**（不猜；猜错会把方块画歪）");
+
         // ③ 端到端：真模组包（**只读**扫描设备上的槽，不动用户数据）
         //   ⚠️ 判据不能写死某个方块名（别的机器上未必装同一个模组）⇒ 先挑一个**真的索引出贴图**的槽，
         //      再拿**索引里第一个名字**回查。写死名字的那版第一跑就判死了（挑中了自检自己造的假模组槽）。
@@ -3775,6 +3788,10 @@ public final class SelfTest {
 
             @Override public int size(String block) {
                 return 0;                       // 这一节只验"查找顺序"，尺寸不参与
+            }
+
+            @Override public boolean rotates(String block) {
+                return false;                   // 同上，朝向不参与
             }
         };
         MschSprite.resolve(s, "x");

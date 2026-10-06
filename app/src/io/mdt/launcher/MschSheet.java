@@ -143,6 +143,14 @@ public final class MschSheet implements MschSprite.Sheet {
         return h == null ? 0 : mods.sizeOf(h);
     }
 
+    /**
+     * 这个方块转不转：**模组方块问它 JSON 里的 `type` → 类名表**（第 120 轮）；
+     * 原版交给烘好的表（{@link MschSprite#render} 里两者取或）。
+     */
+    @Override public boolean rotates(String block) {
+        return mods.rotates(block);
+    }
+
     /** 诊断串（进自检报告）：模组侧索引到多少张 */
     String modsNote() {
         return mods.describe();

@@ -55,6 +55,13 @@ public final class MschSprite {
          * @return 不知道返回 0（渲染时回落到烘在启动器里的原版表、再回落到 1 格）
          */
         int size(String block);
+
+        /**
+         * 这个方块**会不会按朝向转**（第 120 轮加的：模组方块走它 JSON 里的 `type` → 类名表）。
+         *
+         * @return 不知道返回 false（渲染时再问烘好的原版表）
+         */
+        boolean rotates(String block);
     }
 
     private MschSprite() {}
@@ -118,7 +125,7 @@ public final class MschSprite {
                         color == 0 ? MschPreview.UNKNOWN : color);
                 continue;
             }
-            boolean rot = MschPreview.rotates(t.block);
+            boolean rot = s.rotates(t.block) || MschPreview.rotates(t.block);
             int[] spr = src;
             int sw = reg.w, sh = reg.h;
             if (rot && t.rotation != 0) {
@@ -246,6 +253,10 @@ public final class MschSprite {
 
             @Override public int size(String block) {
                 return 0;                     // 问表（原版）；假表/PC 台不需要模组尺寸
+            }
+
+            @Override public boolean rotates(String block) {
+                return false;                 // 问表（原版）
             }
         };
     }

@@ -65,9 +65,57 @@ public final class ModSprites {
 
     /** 注册名 → 命中 */
     private final Map<String, Hit> index = new HashMap<>();
+    /** 注册名 → 方块 JSON 里的 `type`（= 游戏 jar 里的类名；第 120 轮，用来判朝向） */
+    private final Map<String, String> types = new HashMap<>();
     /** 参与索引的模组（名字进诊断） */
     private final List<String> packs = new ArrayList<>();
     private final List<String> notes = new ArrayList<>();
+
+    /** `ClassRotateTable` 解出来的「类名 → 会不会转」（懒解析一次，与 {@link MschPreview#rows} 同一套） */
+    private static Map<String, String> CLS;
+
+    private static synchronized Map<String, String> classes() {
+        if (CLS == null) {
+            Map<String, String> m = new HashMap<>(256);
+            for (String line : MapStats.inflate(ClassRotateTable.DATA_B64).split("\n")) {
+                if (line.isEmpty() || line.charAt(0) == '#') continue;
+                String[] c = line.split("\t", -1);
+                if (c.length >= 2) m.put(c[0].trim(), c[1].trim());
+            }
+            CLS = m;
+        }
+        return CLS;
+    }
+
+    /**
+     * 这个**模组方块**会不会按朝向转（第 120 轮）。
+     *
+     * <p>原理：数据模组的方块 JSON 用 `type` 指定**游戏 jar 里的类名**（实测蓝钢拓展写着
+     * `"type": "MassDriver"`），而 `rotate/rotateDraw` 是那些类**构造函数**里设的
+     * （`Turret.java:163` / `Conveyor.java:40` 都在类自己里设 true）⇒ 类名查表即可。
+     *
+     * @return 没这个方块 / 没读它的 JSON / 类名查不到 ⇒ **false**（不猜）
+     */
+    public boolean rotates(String block) {
+        String cls = types.get(block);
+        if (cls == null) return false;
+        return "1".equals(classes().get(cls));
+    }
+
+    /** 这个方块 JSON 里写的 `type`（诊断/自检用；没有返回 null） */
+    public String typeOf(String block) {
+        return types.get(block);
+    }
+
+    /** 表里有多少个类（自检对账） */
+    public static int classCount() {
+        return classes().size();
+    }
+
+    /** 某个**游戏 jar 里的类名**转不转（自检/渲染用；查不到 = false，不猜） */
+    public static boolean classRotates(String cls) {
+        return cls != null && "1".equals(classes().get(cls));
+    }
 
     private ModSprites() {}
 
@@ -103,11 +151,20 @@ public final class ModSprites {
                 ZipEntry e = es.nextElement();
                 if (e.isDirectory()) continue;
                 String name = e.getName();
-                if (!name.toLowerCase(Locale.ROOT).endsWith(".png")) continue;
-                String region = regionOf(name, prefix);
-                if (region != null && !index.containsKey(region)) {
-                    index.put(region, new Hit(zip, name, false));
-                    n++;
+                String low = name.toLowerCase(Locale.ROOT);
+                if (low.endsWith(".png")) {
+                    String region = regionOf(name, prefix);
+                    if (region != null && !index.containsKey(region)) {
+                        index.put(region, new Hit(zip, name, false));
+                        n++;
+                    }
+                } else if (isBlockJson(name)) {
+                    // 方块 JSON：顺手把 `type`（= jar 里的类名）记下来 —— 判朝向要用（第 120 轮）
+                    String base = baseOf(name);
+                    if (base != null) {
+                        String cls = typeIn(readAll(zf.getInputStream(e)));
+                        if (cls != null) types.put(prefix + "-" + base, cls);
+                    }
                 }
             }
         } finally {
@@ -116,7 +173,55 @@ public final class ModSprites {
         return n;
     }
 
-    private int indexDir(File dir, String prefix) {
+    /** `content/blocks/**` 下的 `.json`（数据模组的方块定义） */
+    static boolean isBlockJson(String path) {
+        String p = path.replace('\\', '/');
+        return p.startsWith("content/blocks/") && p.toLowerCase(Locale.ROOT).endsWith(".json");
+    }
+
+    /** 文件名主干（去目录、去 `.json`）—— 与注册名同一套（`content/blocks/a/b.json` ⇒ `b`） */
+    static String baseOf(String path) {
+        String p = path.replace('\\', '/');
+        int slash = p.lastIndexOf('/');
+        String file = slash < 0 ? p : p.substring(slash + 1);
+        int dot = file.lastIndexOf('.');
+        return dot > 0 ? file.substring(0, dot) : file;
+    }
+
+    /**
+     * 从方块 JSON 里取 `type`（= 游戏 jar 里的类名）。
+     *
+     * ⚠️ 用**正则**而不是完整 JSON 解析，是因为模组 JSON 允许 HJSON 方言（不带引号的键、
+     *   尾随逗号、注释），拿严格 JSON 解会有一批模组解不开；这里只要一个类名，容错写法更稳。
+     *   判据见自检 ㊿：拿**真的模组包**（蓝钢拓展 `"type": "MassDriver"`）验。
+     */
+    static String typeIn(byte[] json) {
+        if (json == null || json.length == 0) return null;
+        String s = new String(json, java.nio.charset.StandardCharsets.UTF_8);
+        java.util.regex.Matcher m = java.util.regex.Pattern
+                .compile("[\"']?type[\"']?\\s*[:=]\\s*[\"']?([A-Za-z_$][A-Za-z0-9_$]*)").matcher(s);
+        return m.find() ? m.group(1) : null;
+    }
+
+    private static byte[] readAll(InputStream in) {
+        if (in == null) return null;
+        try {
+            java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream(1 << 12);
+            byte[] buf = new byte[1 << 12];
+            int n;
+            while ((n = in.read(buf)) > 0) bo.write(buf, 0, n);
+            return bo.toByteArray();
+        } catch (Throwable t) {
+            return null;
+        } finally {
+            try {
+                in.close();
+            } catch (Throwable ignored) {
+            }
+        }
+    }
+
+    private int indexDir(File dir, String prefix) throws Exception {
         int n = 0;
         List<File> stack = new ArrayList<>();
         stack.add(dir);
@@ -129,12 +234,20 @@ public final class ModSprites {
                     stack.add(f);
                     continue;
                 }
-                if (!f.getName().toLowerCase(Locale.ROOT).endsWith(".png")) continue;
+                String low = f.getName().toLowerCase(Locale.ROOT);
                 String rel = dir.toURI().relativize(f.toURI()).getPath();
-                String region = regionOf(rel, prefix);
-                if (region != null && !index.containsKey(region)) {
-                    index.put(region, new Hit(dir, rel, true));
-                    n++;
+                if (low.endsWith(".png")) {
+                    String region = regionOf(rel, prefix);
+                    if (region != null && !index.containsKey(region)) {
+                        index.put(region, new Hit(dir, rel, true));
+                        n++;
+                    }
+                } else if (isBlockJson(rel)) {
+                    String base = baseOf(rel);
+                    if (base != null) {
+                        String cls = typeIn(readAll(new FileInputStream(f)));
+                        if (cls != null) types.put(prefix + "-" + base, cls);
+                    }
                 }
             }
         }
