@@ -30,6 +30,8 @@
 
     <!-- F2：版本列表行（槽徽标 / 可见槽按钮 / 同槽冲突 / 继续上次） -->
     <string name="row_slot_btn">槽</string>
+    <!-- 版本行「槽」列表弹窗里的动作：打开这个版本的详情（路径 / 校验码 / 架构 / 存档数 / 删除导入项） -->
+    <string name="row_detail_btn">看详情…</string>
     <!--
       ★ 2026-10-06：这一行**没有**"详情"按钮 —— 详情走**长按整行**（`MainActivity.showDetail`）。
       ★ 原因是宽度：徽标 + 「槽」按钮 ≈ 460px / 1224px，最长的标题（`MindustryX  2026.09.X37
@@ -94,7 +96,6 @@
     -->
     <string name="slot_current_suffix">\u0020\u0020[当前]</string>
     <string name="slot_set_fmt">已设为槽「%1$s」</string>
-    <string name="slot_manage">管理槽…</string>
     <string name="slot_label">存档槽</string>
     <string name="add_package_title">添加包名</string>
     <string name="add_package_msg">按精确包名查已装的游戏版本</string>

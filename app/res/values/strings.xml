@@ -30,6 +30,9 @@
 
     <!-- F2：版本列表行（槽徽标 / 可见槽按钮 / 同槽冲突 / 继续上次） -->
     <string name="row_slot_btn">Slot</string>
+    <!-- Action inside the version row's slot picker: open this version's details
+         (path / checksum / ABI / saves in the slot / delete an imported copy) -->
+    <string name="row_detail_btn">See details…</string>
     <!--
       ★ 2026-10-06: this row has **no** "details" button — details are on **long-press**
       (`MainActivity.showDetail`). Reason = width: badge + "Slot" button ≈ 460px of 1224px,
@@ -95,7 +98,6 @@
     -->
     <string name="slot_current_suffix">\u0020\u0020[current]</string>
     <string name="slot_set_fmt">Set to slot \"%1$s\"</string>
-    <string name="slot_manage">Manage slots…</string>
     <string name="slot_label">Save slot</string>
     <string name="add_package_title">Add package name</string>
     <string name="add_package_msg">Look up an installed game version by exact package name</string>

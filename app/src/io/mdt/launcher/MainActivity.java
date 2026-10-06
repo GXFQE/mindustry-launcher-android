@@ -2066,9 +2066,12 @@ public class MainActivity extends BaseActivity {
                     }
                 })
                 .setNegativeButton(R.string.cancel, null)
-                .setNeutralButton(R.string.slot_manage, new DialogInterface.OnClickListener() {
+                // ★ 2026-10-06（用户定案）：**详情并进这个弹窗** ——
+                //   行内宽度已用尽（加 22dp 箭头会把版本号挤成省略号），而这里是"点一下就看见"的地方。
+                //   原来这个位置的「管理槽…」让位（主页「存档与备份」里仍有管理槽的入口）。
+                .setNeutralButton(R.string.row_detail_btn, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int w) {
-                        startActivity(new Intent(MainActivity.this, SavesActivity.class));
+                        showDetail(e);
                     }
                 })
                 .show();
