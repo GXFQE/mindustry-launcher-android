@@ -4303,6 +4303,19 @@ public final class SelfTest {
             ok(stat, L, r5.ok && stashed != null,
                     "④ 确认覆盖 ⇒ 落位成功，且**旧图进了中转站**（挪不删）");
 
+            // ── ⑤ ★ 失败原因**不许带类名**（2026-10-06）：把"中转站"做成一个**文件** ⇒
+            //   `place()` 建站失败 ⇒ 它抛的是**给用户看的资源文案**。这条 catch 正是
+            //   「本槽存档 → 地图 / 选源图」那条**用户最常走的路**（`MapsActivity` 直接把 r.error 显示出来）。
+            //   ⚠️ 原写法 `t.getClass().getSimpleName() + ": " + t.getMessage()` ⇒ 对话框里出现
+            //      `IllegalStateException: 建中转站失败：…`（类名泄漏给用户）。
+            File badTrash = new File(slotDir, "不是目录.txt");
+            write(badTrash, "x".getBytes("UTF-8"));
+            MapFiles.Result rBad = MapFiles.commitSaveAsMap(ctx, mapsDir, save, "我的图", true, badTrash);
+            ok(stat, L, !rBad.ok && rBad.error != null && !rBad.error.contains("Exception")
+                            && out.isFile(),
+                    "⑤ ★失败原因不带类名、旧图原地不动（用户看到的是「"
+                            + oneLine(rBad.error == null ? "?" : rBad.error) + "」）");
+
             // ── ⑥ 🔴 红线：源文件是**用户的存档原件**时，谁都不许删它 ──────────────
             //   「本槽存档 → 地图」那条路会把 `<槽>/saves/x.msav` 直接传进来
             //   （REF §72.10）—— 两条删除路径（discard / commit 收尾）都只许删 `.part`。

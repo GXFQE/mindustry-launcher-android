@@ -384,7 +384,11 @@ public final class MapFiles {
         } catch (Throwable t) {
             Data.deleteTree(conv);
             Data.deleteTree(part2);
-            r.error = t.getClass().getSimpleName() + ": " + t.getMessage();
+            // ★ 同 `importMap` 的 catch（2026-10-06）：`place()` 抛的是**给用户看的资源文案**
+            //   ⇒ 别把 `IllegalStateException:` 类名拼进去。⚠️ 这条才是用户最常看见的那条路
+            //   （「本槽存档 → 地图」/ 选源图都走它）。
+            String m = t.getMessage();
+            r.error = (m == null || m.isEmpty()) ? t.getClass().getSimpleName() : m;
             return r;
         }
     }
