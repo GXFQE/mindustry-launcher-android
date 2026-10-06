@@ -49,16 +49,16 @@ point the game at that directory when it starts.
 ### Versions
 - Scan Mindustry / MindustryX builds that are **already installed**, or **import** a copy of an APK
   (streamed copy, with a pre-check before it lands)
-- One row per version; tap the row to launch, tap **Slot** on the right to pick its slot, and
-  **long-press** the row for details (source path, size, MD5, original version name, architecture /
-  build number — this is also where an imported copy can be deleted)
+- One row per version; tap the row to launch, tap **Slot** on the right to pick its slot (that dialog
+  also offers **See details**), and **long-press** the row for details (source path, size, MD5,
+  original version name, architecture / build number — this is also where an imported copy is deleted)
 - Assign a slot per version; several versions may share a slot **only when their version numbers
   match** — otherwise the launcher warns about a conflict
 - **Refuse packages that will not run**: two checks (ABI / dex / version thresholds), at import
   time and again before launch, so you do not find out only after getting in
 - **Continue**: remembers the version you played last and goes straight back to it
 - Each row also says **how many saves that version's slot holds**; long-press for the details and
-  you also get "this slot has N saves" and "last played"
+  you also get "this slot has N saves" and "last launch"
 
 ### Saves and data
 - **Save slots**: create / rename / clone / delete (a deleted slot goes to the **transfer station**
