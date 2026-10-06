@@ -528,7 +528,7 @@ final class SlotIo {
     }
 
     /*
-     * ★ 2026-10-06（第 115 轮第四批）：这里原来有个 `msgOf(Exception)`（`getMessage()`，
+     * ★ 2026-10-06（第 115 轮第五批）：这里原来有个 `msgOf(Exception)`（`getMessage()`，
      *   空则 `String.valueOf(e)`），五个调用点全都把它当**弹窗正文** ⇒ 用户会看到
      *   `java.io.IOException: write failed: ENOSPC (No space left on device)` 这种句子。
      *   ⇒ 已删掉，统一走 {@link Util#ioReason}（认识的 errno 翻白话、我们自己的文案原样透传）。
