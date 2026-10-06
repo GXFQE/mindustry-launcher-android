@@ -5506,10 +5506,57 @@ public final class SelfTest {
                             && moved.length() == bytes2.length
                             && notMoved == null && outside.isFile(),
                     "★删除：槽内的挪进中转站（原位置消失、内容还在）；**槽外的动不了**（安全判据）");
+
+            // ── ⑥ ★ 跨卷（2026-10-06 对齐纪律）：地图在**外部**（真槽目录）、中转站在**内部** ──
+            //    ⇒ `renameTo` 在不同文件系统上必失败 ⇒ 只能靠 `Trash.move` 的
+            //      "复制 + 校验长度 + **才**删源"。原来这三处是裸 `renameTo`（蓝图/模组两条线都有兜底）。
+            //    ⚠️ 夹具**刻意**造成跨卷：照抄生产布局（两边都在外部存储）永远测不出这一条 ——
+            //      蓝图那条线就是靠这种夹具把裸 `renameTo` 当场抓出来的。
+            File extSlot = Data.dirOf(ctx, SLOT_S2M);                                   // 外部
+            File extMaps = new File(extSlot, "maps");
+            File intTrash = new File(Paths.privateDir(ctx), "selftest-mapcrud-trash");  // 内部
+            deleteTree(extSlot);
+            deleteTree(intTrash);
+            extMaps.mkdirs();
+            intTrash.mkdirs();
+            // ★元断言：先证明这个夹具**真的跨卷** —— 拿一个探针试 `renameTo`，必须失败。
+            //   （否则这条用例会在"两边同卷"的机器上静默退化成"又测了一遍 renameTo 成功"）
+            File probe = new File(extMaps, "probe.txt");
+            write(probe, "x".getBytes("UTF-8"));
+            boolean crossed = probe.renameTo(new File(intTrash, "probe.txt"));
+            deleteTree(new File(intTrash, "probe.txt"));
+            deleteTree(probe);
+            ok(stat, L, !crossed,
+                    "⑥ ★元断言：夹具真的跨卷（外部 → 内部 `renameTo` 必须失败）");
+
+            File oldMap = new File(extMaps, "跨卷旧图.msav");
+            tinyMsav(oldMap, "跨卷旧图", 64, 64, 1, false);
+            long oldLen = oldMap.length();
+            File src3 = new File(root, "input3.msav");
+            tinyMsav(src3, "跨卷新图", 64, 64, 2, false);
+            long newLen = src3.length();
+            MapFiles.Result r6 = MapFiles.importMap(ctx, extMaps, "跨卷旧图.msav",
+                    new java.io.FileInputStream(src3), true, intTrash);
+            File[] trashed2 = intTrash.listFiles();
+            ok(stat, L, r6.ok && r6.overwrote && trashed2 != null && trashed2.length == 1
+                            && trashed2[0].isFile() && trashed2[0].length() == oldLen
+                            && new File(extMaps, "跨卷旧图.msav").length() == newLen
+                            && !new File(extMaps, "跨卷旧图.msav.part").exists(),
+                    "⑥ 跨卷覆盖：旧图**完整**进中转站（" + oldLen + " B，靠复制兜底）、新图就位、无 `.part`");
+
+            // 删除同一套：外部那份 → 内部中转站（也必须是复制兜底）
+            File delX = new File(extMaps, "跨卷要删.msav");
+            java.nio.file.Files.copy(new File(extMaps, "跨卷旧图.msav").toPath(), delX.toPath());
+            File movedX = MapFiles.deleteToTrash(ctx, extMaps, delX, intTrash);
+            ok(stat, L, movedX != null && movedX.isFile() && !delX.exists()
+                            && movedX.length() == newLen,
+                    "⑥ 跨卷删除：同样挪得动（原位置消失、站里那份 `" + newLen + "` B 没坏）");
         } catch (Throwable t) {
             ok(stat, L, false, "地图增删用例自身异常：" + t);
         } finally {
             deleteTree(root);
+            deleteTree(new File(Paths.privateDir(ctx), "selftest-mapcrud-trash"));
+            deleteTree(Data.dirOf(ctx, SLOT_S2M));   // ⑥ 用的外部槽目录（㊶ 会自己重建）
         }
         L.add("");
     }

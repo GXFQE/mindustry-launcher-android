@@ -172,7 +172,11 @@ public final class MapFiles {
             return r;
         } catch (Throwable t) {
             Data.deleteTree(part);
-            r.error = t.getClass().getSimpleName() + ": " + t.getMessage();
+            // ★ 2026-10-06：`place()` 抛出来的消息**本身就是给用户看的资源文案**
+            //   ⇒ 不要把 `IllegalStateException:` 这种类名拼在前面（那是维护者视角）。
+            //   ⚠️ 只有拿不到消息时才退回类名（那时的异常多半是 IO 层的，至少给个类别线索）。
+            String m = t.getMessage();
+            r.error = (m == null || m.isEmpty()) ? t.getClass().getSimpleName() : m;
             return r;
         }
     }
@@ -443,14 +447,22 @@ public final class MapFiles {
             // ★ 中转站里的名字带**来源槽**（v2，见 Trash.nameFor）—— 恢复时才能默认放回原槽
             backup = new File(trashDir,
                     Trash.nameFor(Trash.slotLabel(dest.getParentFile()), dest.getName()));
-            if (!dest.renameTo(backup)) {
+            // 🔴 用 `Trash.move`，**不要**裸 `renameTo`（2026-10-06 对齐纪律）：
+            //   中转站与槽**可能不在一个卷上**（`renameTo` 在不同文件系统上必失败），
+            //   而它失败得很安静 —— 用户看到的就是"覆盖不了 / 删不掉"。
+            //   `Trash.move` = renameTo 失败即退化成"复制 + 校验长度 + **才**删源"。
+            //   ★ 蓝图那条线一直这么做、模组那条线内联了同一套；只有地图这条线原来是裸的。
+            if (!Trash.move(dest, backup)) {
                 throw new IllegalStateException(ctx.getString(R.string.mapfile_err_trash_move));
             }
         }
-        if (!part.renameTo(dest)) {
-            if (backup != null) {
-                // 回滚：把旧的搬回来
-                backup.renameTo(dest);
+        if (!Trash.move(part, dest)) {
+            // 🔴 回滚**必须判结果**（原来那句 `backup.renameTo(dest)` 是裸的、返回值没人看）：
+            //   回滚失败 ⇒ 旧图此刻躺在中转站里、目标位置是空的 ⇒ 必须**如实告诉用户旧的在哪**，
+            //   否则用户以为图丢了（其实在「存档与备份 → 中转站」里能捞回来）。
+            if (backup != null && !Trash.move(backup, dest)) {
+                throw new IllegalStateException(ctx.getString(R.string.mapfile_err_rename_stash_fmt,
+                        dest.getAbsolutePath(), trashDir == null ? "" : trashDir.getAbsolutePath()));
             }
             throw new IllegalStateException(
                     ctx.getString(R.string.mapfile_err_rename_fmt, dest.getAbsolutePath()));
@@ -481,7 +493,8 @@ public final class MapFiles {
         if (!trashDir.isDirectory() && !trashDir.mkdirs() && !trashDir.isDirectory()) return null;
         File moved = new File(trashDir,
                 Trash.nameFor(Trash.slotLabel(mapsDir), mapFile.getName()));
-        if (!mapFile.renameTo(moved)) return null;
+        // 🔴 同样用 `Trash.move`（跨卷兜底）——见 {@link #place} 里的长注释
+        if (!Trash.move(mapFile, moved)) return null;
         Trash.prune(trashDir, Trash.KEEP);
         return moved;
     }
