@@ -196,14 +196,12 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
 
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="62dp"
-                    android:background="@color/divider" />
-
-                
-
+                <!--
+                  ★ 2026-10-06（三档）：这里原来是**两条分割线中间夹一个空行** ——
+                    导航重构把「模组」行收进槽二级页面时，只删了那一行、没删它下面那条线
+                    ⇒ 真机上「存档与备份」与「设置」之间是一条**双线空档**（看着像少了一行）。
+                  ⚠️ 判据只能靠**看**：aapt2 / 编译器对"多一条 1dp 的线"完全无感。
+                -->
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"

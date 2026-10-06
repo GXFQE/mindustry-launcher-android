@@ -251,6 +251,8 @@ public final class SelfTest {
             // ★ ㊺ 一档六项（第 115 轮）：存档详情 / 备份列表 / 存储占用 / 版本行 / 模组类型 /
             //   蓝图技术细节 —— 全是纯函数 + 资源实拼（不建 UI、不写用户数据）
             tier1(ctx, L, stat);
+            // ★ ㊻ 三档（同一轮第二批）：文案去术语 + 版本行那个看得见的详情入口
+            tier3(ctx, L, stat);
             // ★ 篡改对象池的用例放**最后**：它会在池里留下一个内容坏掉的对象，
             //   之后任何"再备份一次"都会因为 `has()` 命中而复用坏对象（CAS 的固有
             //   假设是"池内不可变"）。放在最后就不影响别的用例。
@@ -666,7 +668,14 @@ public final class SelfTest {
         //     其余照常恢复，并在报告里点名。
         // ★ P0.1：成败改读 rr.ok（原来读报告开头的 ✅ —— 那是文案，本地化后会把成功显示成"未执行"）
         ok(stat, L, rr.ok, "其余项照常恢复（rr.ok = true，只有坏的那一项失败）");
-        ok(stat, L, rr.report.contains("sha256"), "报告点明对象内容与地址（sha256）不符");
+        // ★ 2026-10-06（三档）：判据从"报告里出现 `sha256`"改成"报告里出现**这条原因本身**"——
+        //   旧写法把断言的命脉挂在**算法名**上，而三档正好把算法名从用户文案里拿掉了
+        //   （它当场判死，这是它该做的）。现在按**资源**取前缀来比：文案怎么改都跟得上。
+        String corruptLine = ctx.getString(R.string.cas_err_obj_corrupt_fmt, "");
+        ok(stat, L, !corruptLine.trim().isEmpty() && rr.report.contains(corruptLine),
+                "报告点名「这个对象的内容对不上」（按资源本身比，不再挂算法名）");
+        ok(stat, L, !rr.report.contains("sha256"),
+                "★元断言：报告里**不再**出现 sha256（否则上一条对旧文案也会通过 = 没分辨力）");
         ok(stat, L, Util.md5(target).equals(md5Before),
                 "★ 坏对象**没有被写出去**（b.msav 一个字节都没动，没有半截恢复）");
         L.add("");
@@ -3278,6 +3287,61 @@ public final class SelfTest {
             }
         }
         ok(stat, L, distinct, "★模组类型：四个标签互不相同、且都不是空串（否则用户选不出来）");
+        L.add("");
+    }
+
+    /**
+     * ㊻ 三档：**文案与布局的小东西**（2026-10-06，第 115 轮第二批）。
+     *
+     * <pre>
+     *   ① 蓝图删除失败：不再提"游戏可能在跑 / 不在本槽"（那两条路在问用户之前就排除了）
+     *   ② 恢复报告：不再把 sha256 / rename 甩到用户面前（机制留着，换成白话）
+     *   ③ 日志页 chip：不再是「测试口 / 自检」这种开发者词
+     *   ④ 版本行：**看得见的详情入口**真的在布局里、而且自己消费点击
+     * </pre>
+     *
+     * ★ 每条都配**元断言**：先证明"旧的那串确实会长这样"，再要求新串判死它 ——
+     *   否则"新串里没有某个词"这条断言在**根本没实现**时也照样绿（恒真装饰）。
+     */
+    private static void tier3(Context ctx, List<String> L, int[] stat) {
+        L.add("── ㊻ 三档：文案与可见入口的小修 ──");
+
+        // ① 蓝图删除失败的原因
+        String oldBp = "删不掉（游戏可能在跑，或者这份蓝图不在本槽里）";
+        String newBp = ctx.getString(R.string.bp_delete_fail);
+        ok(stat, L, !newBp.contains("游戏可能") && !newBp.contains("不在本槽"),
+                "蓝图删除失败：不再指两条**不可能**的路（游戏在跑 / 不在本槽都被提前排除了）");
+        ok(stat, L, oldBp.contains("游戏可能") && oldBp.contains("不在本槽"),
+                "★元断言：旧串确实带那两个词（证明上一条不是恒真）");
+
+        // ② 恢复报告里的术语
+        String corrupt = ctx.getString(R.string.cas_err_obj_corrupt_fmt, "x");
+        ok(stat, L, !corrupt.toLowerCase(java.util.Locale.ROOT).contains("sha256")
+                        && !corrupt.contains("对象"),
+                "恢复报告：内容对不上那条不再出现 sha256 / 「对象」这类词");
+        ok(stat, L, "对象内容损坏（sha256 与地址不符）：%1$s".toLowerCase(java.util.Locale.ROOT)
+                        .contains("sha256"),
+                "★元断言：旧串确实带 sha256（证明上一条不是恒真）");
+        ok(stat, L, ctx.getString(R.string.cas_err_obj_place_fmt, "x").contains("改名")
+                        && ctx.getString(R.string.cas_err_restore_write_fmt, "x").contains("改名"),
+                "恢复报告：机制（改名失败）**留着** —— 只是从 rename 换成白话（依据不能删）");
+
+        // ③ 日志页的 chip 用词
+        String chipM3 = ctx.getString(R.string.log_hub_m3);
+        String chipDev = ctx.getString(R.string.log_hub_devtool);
+        ok(stat, L, !chipM3.equals("自检") && !chipDev.equals("测试口"),
+                "日志页 chip：不再是「自检 / 测试口」这种只对维护者有意义的词");
+        ok(stat, L, !"测试口".equals("调试记录") && !"自检".equals("自检报告"),
+                "★元断言：新旧值确实不同（否则上一条在**没改**的时候也会绿）");
+
+        // ④ 版本行的可见详情入口（真 inflate 一次 item_version）
+        android.view.View row = android.view.LayoutInflater.from(ctx)
+                .inflate(R.layout.item_version, null, false);
+        android.view.View more = row == null ? null : row.findViewById(R.id.ver_more);
+        ok(stat, L, more != null,
+                "版本行：有看得见的「详情」入口（`ver_more` —— 长按那个手势不是唯一的路了）");
+        ok(stat, L, more != null && more.isClickable(),
+                "版本行：那个入口**自己消费点击**（不然点它会冒到整行去启动游戏）");
         L.add("");
     }
 

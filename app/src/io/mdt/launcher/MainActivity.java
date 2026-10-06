@@ -1614,6 +1614,17 @@ public class MainActivity extends BaseActivity {
             @Override public void onClick(View x) { pickSlot(e); }
         });
 
+        // ★ 2026-10-06（三档）：**看得见的详情入口**（右侧箭头）——与长按整行走同一个动作。
+        //   为什么必须有它：长按是**看不见的手势**，而详情里装着来源路径 / 校验码 / 架构 /
+        //   槽内存档数 / 上次启动 —— 用户不知道有它就等于没有（`row_detail_btn` 是它的无障碍描述，
+        //   读屏与 `uiautomator dump` 都靠它认出这个入口）。
+        View more = v.findViewById(R.id.ver_more);
+        if (more != null) {
+            more.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View x) { showDetail(e); }
+            });
+        }
+
         // 整行：单击启动 / 长按详情。原先是 ListView 的 onItemClick / onItemLongClick，
         // 现在直接挂在行根上（行根变 clickable 后，按下状态会自动播给内部不可点击的子视图，
         // 卡片背景 card_bg_press 的按下高亮照旧生效）。

@@ -152,8 +152,13 @@ public class ModsActivity extends BaseActivity {
         mSlotSub = (TextView) row.findViewById(R.id.act_sub);
         // ★ 导航重构（REF §56）：从**槽二级页面**进来时槽已经定死 ⇒ 不再给"选槽"这个入口
         //   （用户 2026-10-03：「反正都要选槽」）。没有槽参数时保留旧行为（兼容老入口）。
+        // ★ 2026-10-06（三档）：**连同它下面那条分割线一起收掉** —— 只 GONE 行本身的话，
+        //   卡片顶上会留下一条**悬空横线**（用户视角就是"这里少了一行"，而编译器无感）。
+        //   分割线现在有 id（`div_mod_slot`），两件事必须一起做。
         if (mSlotFixed) {
             row.setVisibility(View.GONE);
+            View div = root.findViewById(R.id.div_mod_slot);
+            if (div != null) div.setVisibility(View.GONE);
         }
 
         Util.bindAction(root, R.id.row_mod_import, R.drawable.ic_download,

@@ -30,6 +30,13 @@
 
     <!-- F2：版本列表行（槽徽标 / 可见槽按钮 / 同槽冲突 / 继续上次） -->
     <string name="row_slot_btn">Slot</string>
+    <!--
+      ★ 2026-10-06: the "see details" chevron on the version row.
+      Long-press was an invisible gesture, while the detail dialog holds the source path,
+      checksum, ABI, saves in the slot and the last launch. This string is the a11y
+      description of that icon (screen readers and `uiautomator dump` both see it).
+    -->
+    <string name="row_detail_btn">Details</string>
     <string name="row_conflict_fmt">⚠ Shares this slot with %1$s; saves overwrite each other</string>
     <!-- 同槽组里"对手"的说法（P3）：2 个版本只点一个对手，3 个及以上把数量说出来 -->
     <string name="versions_peer_one_fmt">\"%1$s\"</string>
@@ -675,7 +682,7 @@
     <string name="bp_delete_confirm_title">Delete blueprint %1$s?</string>
     <string name="bp_delete_confirm_msg">It moves into the trash, and can be put back from there.</string>
     <string name="bp_delete_ok_fmt">Moved into the trash: %1$s</string>
-    <string name="bp_delete_fail">Cannot delete it (the game may be running, or this blueprint is not in this slot)</string>
+    <string name="bp_delete_fail">Cannot delete it: another app may be holding the file open.</string>
     <string name="bpfile_err_name_empty">The name is empty</string>
     <string name="bpfile_err_name_dot">A name cannot start with a dot</string>
     <string name="bpfile_err_name_ext">A blueprint file must end with .msch</string>
@@ -982,11 +989,11 @@
          🔴 它堵的是 `Backup` 恢复报告「每文件一行」那条泄漏（原来直接吃 `getMessage()`）。
          ⚠️ 参数都是**中性**的（路径 / 对象地址）⇒ 可以进第一层。 -->
     <string name="cas_err_obj_busy_fmt">the object slot is taken and cannot be cleared: %1$s</string>
-    <string name="cas_err_obj_place_fmt">could not place the object (rename): %1$s</string>
+    <string name="cas_err_obj_place_fmt">could not write into the backup directory (rename failed): %1$s</string>
     <string name="cas_err_obj_missing_fmt">the object is missing: %1$s</string>
-    <string name="cas_err_obj_corrupt_fmt">the object content is damaged (sha256 does not match its address): %1$s</string>
+    <string name="cas_err_obj_corrupt_fmt">the content does not match (the address check failed; the file may have been changed or damaged): %1$s</string>
     <string name="cas_err_dst_busy_fmt">the target file cannot be cleared: %1$s</string>
-    <string name="cas_err_restore_write_fmt">restore write failed (rename): %1$s</string>
+    <string name="cas_err_restore_write_fmt">could not write the file back (rename failed): %1$s</string>
     <string name="cas_err_no_sha256">this device has no SHA-256 implementation</string>
     <string name="cas_err_mkdir_fmt">could not create the directory: %1$s</string>
     <string name="backup_restore_ok_head_fmt">✅ Restored from the backup into slot \"%1$s\"\n</string>
@@ -1360,8 +1367,8 @@
     <string name="log_hub_autobackup">Auto backup</string>
     <string name="log_hub_settings">Settings</string>
     <string name="log_hub_health">Data check</string>
-    <string name="log_hub_m3">Self-test</string>
-    <string name="log_hub_devtool">Dev ports</string>
+    <string name="log_hub_m3">Self-test report</string>
+    <string name="log_hub_devtool">Debug log</string>
 
     <!-- F20：一键导出「全部日志」成一个文件（需求原文：「加一个一键导出所以日志的功能」） -->
     <string name="log_export">Export all logs</string>

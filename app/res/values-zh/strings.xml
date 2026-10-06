@@ -30,6 +30,14 @@
 
     <!-- F2：版本列表行（槽徽标 / 可见槽按钮 / 同槽冲突 / 继续上次） -->
     <string name="row_slot_btn">槽</string>
+    <!--
+      ★ 2026-10-06（三档）：版本行右侧那个「看详情」箭头。
+      ★ 为什么加它：这一行的**长按＝详情**是个**看不见的手势**（用户不知道有它），
+        而详情里装着来源路径 / 校验码 / 架构 / 槽内存档数 / 上次启动 —— 那些字用户永远看不到。
+      ⚠️ 这条资源是**无障碍描述**（`contentDescription`）：界面上显示的是箭头图标，
+        但它让"读屏"与自动化 `uiautomator dump` 都能认出这个入口（判据也就挂得住）。
+    -->
+    <string name="row_detail_btn">详情</string>
     <string name="row_conflict_fmt">⚠ 与%1$s共用此槽，存档会互相覆盖</string>
     <!-- 同槽组里"对手"的说法（P3）：2 个版本只点一个对手，3 个及以上把数量说出来 -->
     <string name="versions_peer_one_fmt">「%1$s」</string>
@@ -821,7 +829,10 @@
     <string name="bp_delete_confirm_title">删除蓝图「%1$s」？</string>
     <string name="bp_delete_confirm_msg">会挪进中转站，之后可以从那里放回来。</string>
     <string name="bp_delete_ok_fmt">已挪进中转站：%1$s</string>
-    <string name="bp_delete_fail">删不掉（游戏可能在跑，或者这份蓝图不在本槽里）</string>
+    <!-- ★ 2026-10-06（三档）：旧串是「删不掉（游戏可能在跑，或者这份蓝图不在本槽里）」——
+         后半句**永远不会成立**：入口只对本槽的蓝图出现，而"游戏在跑"在问用户之前就已经拦掉了
+         ⇒ 与地图那条（`map_delete_fail`）统一成"可能是占用"，不再给用户指一条不存在的路。 -->
+    <string name="bp_delete_fail">删不掉：文件可能正被别的程序占用着。</string>
     <string name="bpfile_err_name_empty">名字是空的</string>
     <string name="bpfile_err_name_dot">名字不能以点开头</string>
     <string name="bpfile_err_name_ext">蓝图文件要以 .msch 结尾</string>
@@ -946,11 +957,16 @@
     <!-- ══ CAS 对象池的失败原因（P3）：纯 Java 核心出码，这里映射成文案 ══════
          🔴 它堵的是 `Backup` 恢复报告「每文件一行」那条泄漏。参数都是**中性**的（路径/地址）。 -->
     <string name="cas_err_obj_busy_fmt">对象位置被占且清不掉：%1$s</string>
-    <string name="cas_err_obj_place_fmt">对象落盘失败（rename）：%1$s</string>
     <string name="cas_err_obj_missing_fmt">对象丢失：%1$s</string>
-    <string name="cas_err_obj_corrupt_fmt">对象内容损坏（sha256 与地址不符）：%1$s</string>
+    <!--
+      ★ 2026-10-06（三档）：这一族会**出现在恢复报告里**（用户面前）⇒ 去掉算法名与 API 名，
+        但**机制不删**（"按地址校验"/"改名失败"就是依据本身，只是换成白话）。
+        原来：`对象内容损坏（sha256 与地址不符）` / `对象落盘失败（rename）` / `恢复写出失败（rename）`。
+    -->
+    <string name="cas_err_obj_corrupt_fmt">内容对不上（按地址校验没过，文件可能被改过或坏了）：%1$s</string>
+    <string name="cas_err_obj_place_fmt">写不进备份目录（改名失败）：%1$s</string>
+    <string name="cas_err_restore_write_fmt">写回文件失败（改名失败）：%1$s</string>
     <string name="cas_err_dst_busy_fmt">目标文件清不掉：%1$s</string>
-    <string name="cas_err_restore_write_fmt">恢复写出失败（rename）：%1$s</string>
     <string name="cas_err_no_sha256">本机没有 SHA-256 实现</string>
     <string name="cas_err_mkdir_fmt">建目录失败：%1$s</string>
     <string name="backup_restore_ok_head_fmt">✅ 已从备份恢复到槽「%1$s」\n</string>
@@ -1298,8 +1314,8 @@
     <string name="log_hub_autobackup">自动备份</string>
     <string name="log_hub_settings">设置</string>
     <string name="log_hub_health">体检</string>
-    <string name="log_hub_m3">自检</string>
-    <string name="log_hub_devtool">测试口</string>
+    <string name="log_hub_m3">自检报告</string>
+    <string name="log_hub_devtool">调试记录</string>
 
     <!-- F20：一键导出「全部日志」成一个文件（需求原文：「加一个一键导出所以日志的功能」） -->
     <string name="log_export">导出全部日志</string>
