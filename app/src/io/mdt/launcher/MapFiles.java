@@ -459,7 +459,7 @@ public final class MapFiles {
         if (!Trash.move(part, dest)) {
             // 🔴 回滚**必须判结果**（原来那句 `backup.renameTo(dest)` 是裸的、返回值没人看）：
             //   回滚失败 ⇒ 旧图此刻躺在中转站里、目标位置是空的 ⇒ 必须**如实告诉用户旧的在哪**，
-            //   否则用户以为图丢了（其实在「存档与备份 → 中转站」里能捞回来）。
+            //   否则用户以为图丢了（其实在「设置 → 中转站」里能捞回来）。
             if (backup != null && !Trash.move(backup, dest)) {
                 throw new IllegalStateException(ctx.getString(R.string.mapfile_err_rename_stash_fmt,
                         dest.getAbsolutePath(), trashDir == null ? "" : trashDir.getAbsolutePath()));
