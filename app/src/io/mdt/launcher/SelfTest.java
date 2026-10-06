@@ -3441,41 +3441,27 @@ public final class SelfTest {
                 "② ★元断言：同一份蓝图喂「尺寸恒为 1」的假表 ⇒ 包围盒退化成 1×1"
                         + "（证明前三条测的是**尺寸**，不是恒真的装饰）");
 
-        // ③ 渲染：像素级 —— 一格的方块一个色块、多格的铺满它的面积、空格用 EMPTY、认不出用 UNKNOWN
+        // ③ 渲染：像素级 —— 一格的方块一张贴图、多格的铺满它的面积
+        //   ⚠️ 第 118 轮起**没有色块档**了（用户：「没版本时不用回退（那东西太抽象了毫无意义啊）」）
+        //      ⇒ 这里只剩"像素级"这一条路，色块只作为**单个方块查不到贴图时**的逐格兜底（㊾③/④ 钉着）。
         Msch mixed = Msch.read(new Sch(1, 16, 16)
                 .tile("conveyor", 0, 0, 0, new byte[]{0})            // 1×1
                 .tile("core-nucleus", 5, 5, 0, new byte[]{0})        // 5×5
-                .tile("ve-bank-silicide", 10, 10, 0, new byte[]{0})  // 表外 ⇒ 认不出
+                .tile("ve-bank-silicide", 10, 10, 0, new byte[]{0})  // 表外
                 .bytes());
-        MapPreview.Img img = MschPreview.render(mixed, MschPreview.table(), 128);
-        // 包围盒 = x[0..10] y[0..10]（conveyor 在 (0,0)，ve 方块在 (10,10)）⇒ 11×11
-        ok(stat, L, img != null && img.width == 11 && img.height == 11,
-                "③ 渲染：1 格 + 5 格 + 认不出的方块 ⇒ 画布 11×11（"
+        MapPreview.Img img = MschSprite.render(mixed, fakeSheet(), 512);
+        // 包围盒 = x[0..10] y[0..10]（conveyor 在 (0,0)，ve 方块在 (10,10)）⇒ 11 格 × 32px
+        ok(stat, L, img != null && img.width == 352 && img.height == 352,
+                "③ 渲染：1 格 + 5 格 + 表外方块 ⇒ 画布 11 格 = 352px（"
                         + (img == null ? "null" : img.width + "×" + img.height) + "）");
-        int core = MschPreview.table().color("core-nucleus");
-        int conv = MschPreview.table().color("conveyor");
-        int corePx = 0, convPx = 0, unkPx = 0, emptyPx = 0;
-        if (img != null) {
-            for (int c : img.pixels) {
-                if (c == core) corePx++;
-                else if (c == conv) convPx++;
-                else if (c == MschPreview.UNKNOWN) unkPx++;
-                else if (c == MschPreview.EMPTY) emptyPx++;
-            }
-        }
-        ok(stat, L, corePx == 25 && convPx == 1 && unkPx == 1,
-                "③ 像素：5×5 方块铺满 **25** 格、1×1 方块 **1** 格、认不出的 **1** 格（实得 "
-                        + corePx + " / " + convPx + " / " + unkPx + "）");
-        ok(stat, L, emptyPx == 121 - 25 - 1 - 1,
-                "③ ★元断言：认不出的那格**不是**空格（UNKNOWN ≠ EMPTY）—— 数出来 "
-                        + unkPx + " 格认不出、" + emptyPx + " 格空（共 121 格）");
 
         // ④ 负例：一律 null（界面保持 GONE，不留空框）
-        ok(stat, L, MschPreview.render(null, null, 128) == null
-                        && MschPreview.render(Msch.read(new byte[0]), null, 128) == null
-                        && MschPreview.render(mixed, null, 0) == null,
-                "④ 负例：没有蓝图 / 解不出来 / maxSide≤0 ⇒ 出不了图（返回 null，界面保持 GONE）");
-        ok(stat, L, MschPreview.render(Msch.read(new Sch(1, 16, 16).bytes()), null, 128) == null,
+        ok(stat, L, MschSprite.render(null, fakeSheet(), 256) == null
+                        && MschSprite.render(Msch.read(new byte[0]), fakeSheet(), 256) == null
+                        && MschSprite.render(mixed, null, 256) == null
+                        && MschSprite.render(mixed, fakeSheet(), 0) == null,
+                "④ 负例：没有蓝图 / 解不出来 / 没有图集 / 边长≤0 ⇒ 出不了图（返回 null，界面保持 GONE）");
+        ok(stat, L, MschSprite.render(Msch.read(new Sch(1, 16, 16).bytes()), fakeSheet(), 256) == null,
                 "④ 负例：一份**没有瓦片**的蓝图 ⇒ null（不画一张空图）");
         // ★ 坐标炸出上限（语料里真有 `outOfBounds` 的文件）⇒ 直接放弃，不去分配几万格。
         //   ⚠️ 判据是**包围盒的跨度**（不是绝对坐标）：包围盒按瓦片自己算，单放一格在
@@ -3483,18 +3469,34 @@ public final class SelfTest {
         Msch far = Msch.read(new Sch(1, 16, 16)
                 .tile("conveyor", 0, 0, 0, new byte[]{0})
                 .tile("conveyor", 9000, 9000, 0, new byte[]{0}).bytes());
-        ok(stat, L, MschPreview.render(far, MschPreview.table(), 128) == null,
+        ok(stat, L, MschSprite.render(far, fakeSheet(), 256) == null,
                 "④ 上限：两份瓦片相隔 9000 格（包围盒 9001×9001 > 128）⇒ 不出图（不去分配那块内存）");
 
-        // ⑤ 缩略：maxSide 小于包围盒 ⇒ 输出最长边 ≤ maxSide
-        Msch big = Msch.read(new Sch(1, 128, 128).tag("name", "big")
-                .tile("conveyor", 0, 0, 0, new byte[]{0})
-                .tile("conveyor", 100, 100, 0, new byte[]{0}).bytes());
-        MapPreview.Img small = MschPreview.render(big, MschPreview.table(), 32);
-        ok(stat, L, small != null && Math.max(small.width, small.height) <= 32
-                        && Math.max(small.width, small.height) >= 16,
-                "⑤ 缩略：101×101 的蓝图按 maxSide=32 缩成 "
-                        + (small == null ? "null" : small.width + "×" + small.height));
+        // ⑤ 🔴 第 118 轮的新规矩：**没有版本就没有图**（不回落色块档）
+        Blueprints.Item noVer = new Blueprints.Item();
+        noVer.msch = schWith("copper-wall", 5, 5);
+        noVer.file = new File(Paths.privateDir(ctx), "selftest-msch-nover.msch");
+        ok(stat, L, MschLoad.image(ctx, noVer, null, MschLoad.THUMB) == null
+                        && MschLoad.image(ctx, noVer, "", MschLoad.THUMB) == null,
+                "⑤ 没版本 ⇒ **不画**（null；用户明确否掉了色块档：「那东西太抽象了毫无意义啊」）");
+        // ★ 元断言：同一个 Item 带上版本 APK 就**出得来图** ⇒ 证明上一条的 null 不是"Item 本身坏了"
+        String apkForProbe = null;
+        try {
+            apkForProbe = Mods.targetsFor(ctx, Data.currentSlot(ctx)).apkPath;
+        } catch (Throwable ignored) {
+        }
+        ok(stat, L, apkForProbe != null
+                        && MschLoad.image(ctx, noVer, apkForProbe, MschLoad.THUMB) != null,
+                "⑤ ★元断言：**同一个 Item** 带上版本 APK ⇒ 有图 —— 证明上一条测的是"
+                        + "「没版本」这条规矩，不是 Item 坏了（拿不到 APK 时这条会判死，见报告）");
+        // 收尾：上面这条**真的落了一次盘**（其余用例都走"出不了图 ⇒ 不落盘"）⇒ 把那份缓存删掉，
+        //   免得自检夹具的缩略图永远留在 hub/previews 里
+        try {
+            File junk = new File(MapLoad.cacheDir(ctx),
+                    MapLoad.md5(MschLoad.key(noVer, apkForProbe) + "@" + MschLoad.THUMB) + ".png");
+            if (junk.isFile()) junk.delete();
+        } catch (Throwable ignored) {
+        }
 
         // ⑥ 缓存键：文件形态与包内条目**不许撞**（撞了就会显示别人的预览图）
         Blueprints.Item f1 = new Blueprints.Item(), f2 = new Blueprints.Item();

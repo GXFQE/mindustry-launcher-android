@@ -1,21 +1,23 @@
 package io.mdt.launcher;
 
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
 /**
- * 把 {@link Msch} 解出来的瓦片画成**色块预览图**（蓝图列表缩略图 / 详情大图）。
+ * 蓝图预览的**共用底座**：那张生成表「方块名 → 配色 / 占地格数 / 会不会转」+ 包围盒几何。
  *
- * <h3>和地图预览什么关系</h3>
+ * <h3>🔄 第 118 轮的转向（用户原话：「没版本时不用回退（那东西太抽象了毫无意义啊）」）</h3>
+ * 第 116 轮这里曾经还有一个**色块渲染器**（`render()`：一格里画一个方块的颜色），
+ * 它的唯一用处是给"没分配版本的槽"兜底。用户看过之后明确否掉了 —— 那张马赛克既不像游戏、
+ * 也读不出布局 ⇒ **整条色块渲染路径已删除**（连同自检里那几条断言）。
+ * 现在的规矩很简单：
  * <pre>
- *   地图预览（{@link MapPreview}）能成立，是因为 `.msav` 里存的是 **content id**，
- *   而 APK 里那张 `sprites/block_colors.png` 就是**按 id 索引**的；
- *   而 `.msch` 里存的是**方块名字** ⇒ 需要一张「名字 → 颜色 / 占地格数」的表
- *   （{@link BlockTable}，生成配方见那个文件的头注释）。
- *   两张图的口径刻意保持一致（同一套取色、同一套缩略平均），所以蓝图页看起来
- *   和地图页是**同一个东西的两种**（用户 2026-10-06：「让存档和蓝图页面也能像地图一样有预览图片」）。
+ *   有版本 APK ⇒ {@link MschSprite}（真贴图）
+ *   没有 / 图集读不了 ⇒ **没有图**（返回 null，界面保持 GONE —— 与地图页 / 存档页同一条口径）
  * </pre>
+ * ⚠️ 但**表本身还得留着**：像素级渲染要靠它拿**占地格数**（{@link #bounds}）与
+ *   `rotate/rotateDraw`（{@link #rotates}），而某个方块在图集里查不到时还要用**它的地图配色**
+ *   补一个色块（那是**逐格**的兜底，不是整张图的兜底 —— 见 {@link MschSprite#render}）。
  *
  * <h3>几何：照抄游戏自己的预览渲染器</h3>
  * 依据 = `mindustry.game.Schematics#getBuffer`（v160）：
@@ -141,73 +143,8 @@ public final class MschPreview {
     }
 
     /**
-     * 渲染（并**顺带缩略**：每 scale×scale 格取平均色，与 {@link MapPreview#render} 同一套）。
-     *
-     * @param maxSide 输出最长边上限
-     * @return 出不了图返回 null（界面**保持 GONE**，不留空框 —— 用户 2026-10-04 的明确要求）
+     * 尺寸：认不出当 1 格（与游戏 `content.getByName() == null` 时的后果一致：那一格按 1 格画）
      */
-    public static MapPreview.Img render(Msch m, Lookup lk, int maxSide) {
-        if (m == null || !m.ok || m.tiles.isEmpty() || maxSide <= 0) return null;
-        if (lk == null) lk = TABLE;
-        int[] b = bounds(m, lk);
-        if (b == null) return null;
-        int w = b[2] - b[0] + 1, h = b[3] - b[1] + 1;
-        // 🔴 上限用**游戏自己的**：`Msch.MAX_DIM` = 128（游戏 maxSchematicSize）。
-        //   语料里真有"瓦片原点落在声明尺寸之外"的文件（Msch.outOfBounds），
-        //   极端的坐标会让包围盒炸成几万格 ⇒ 这里直接放弃出图，**不去分配**那块内存。
-        if (w <= 0 || h <= 0 || w > Msch.MAX_DIM || h > Msch.MAX_DIM) return null;
-
-        int[] full = new int[w * h];
-        Arrays.fill(full, EMPTY);
-        for (Msch.Tile t : m.tiles) {
-            int s = size(lk, t.block);
-            int off = -(s - 1) / 2;
-            int c = lk.color(t.block);
-            if (c == 0) c = UNKNOWN;                      // 认不出 ⇒ 中性紫，不当空格
-            int y0 = t.y + off - b[1], x0 = t.x + off - b[0];
-            for (int dy = 0; dy < s; dy++) {
-                int y = y0 + dy;
-                if (y < 0 || y >= h) continue;
-                for (int dx = 0; dx < s; dx++) {
-                    int x = x0 + dx;
-                    if (x < 0 || x >= w) continue;
-                    full[y * w + x] = c;
-                }
-            }
-        }
-        return shrink(full, w, h, maxSide);
-    }
-
-    /** 按平均色缩到 maxSide 之内（`scale == 1` 时原样返回） */
-    static MapPreview.Img shrink(int[] full, int w, int h, int maxSide) {
-        int scale = Math.max(1, (int) Math.ceil(Math.max(w, h) / (double) maxSide));
-        int ow = Math.max(1, w / scale), oh = Math.max(1, h / scale);
-        if (scale == 1) return new MapPreview.Img(w, h, full);
-        int[] out = new int[ow * oh];
-        for (int oy = 0; oy < oh; oy++) {
-            for (int ox = 0; ox < ow; ox++) {
-                int r = 0, g = 0, bl = 0, cnt = 0;
-                for (int dy = 0; dy < scale; dy++) {
-                    int y = oy * scale + dy;
-                    if (y >= h) break;
-                    for (int dx = 0; dx < scale; dx++) {
-                        int x = ox * scale + dx;
-                        if (x >= w) break;
-                        int c = full[y * w + x];
-                        r += (c >> 16) & 0xff;
-                        g += (c >> 8) & 0xff;
-                        bl += c & 0xff;
-                        cnt++;
-                    }
-                }
-                out[oy * ow + ox] = cnt == 0 ? EMPTY
-                        : 0xFF000000 | ((r / cnt) << 16) | ((g / cnt) << 8) | (bl / cnt);
-            }
-        }
-        return new MapPreview.Img(ow, oh, out);
-    }
-
-    /** 尺寸：认不出当 1 格（与游戏 `content.getByName() == null` 时的后果一致：那一格按 1 格画） */
     private static int size(Lookup lk, String internal) {
         int s = lk.size(internal);
         return s <= 0 ? 1 : s;

@@ -5,18 +5,18 @@ import android.graphics.Bitmap;
 
 /**
  * 蓝图预览图的**加载侧**（Android 那一半）：取图 → 整数倍放大 → 缓存。
- * 纯逻辑在两处（都不碰 Android，能在 PC 上单独验）：
- * <ul>
- *   <li>{@link MschSprite} —— **像素级**：拿版本 APK 里的**真贴图**按游戏口径拼（首选）；</li>
- *   <li>{@link MschPreview} —— **色块档**：拿烘在启动器里的配色画（回落，见下）。</li>
- * </ul>
+ * 纯逻辑在 {@link MschSprite}（**像素级**：拿版本 APK 里的**真贴图**按游戏口径拼），
+ * 它只吃像素数组 ⇒ 不碰 Android、能在 PC 上单独验。
  *
- * <h3>两条路怎么选（第 117 轮）</h3>
+ * <h3>两条路（第 118 轮起只剩一条 —— 用户否掉了色块档）</h3>
  * <pre>
- *   有版本 APK 且图集解得开 → **像素级**（和游戏里那张缩略图同构）
- *   没有版本 APK / 图集读不了 / 某个方块查不到区域 → **逐格退化成色块**（整张图仍然是拼出来的）
- *   ⇒ "没分配版本的槽也有预览"这条**保住了**（那正是第 116 轮用户问过的那件事）
+ *   有版本 APK 且图集解得开 ⇒ **像素级**（和游戏里那张缩略图同构）
+ *   没有版本 APK / 图集读不了 ⇒ **没有图**（返回 null ⇒ 界面保持 GONE）
  * </pre>
+ * 🔴 用户 2026-10-06（第 118 轮）原话：「**没版本时不用回退（那东西太抽象了毫无意义啊）**」
+ *   —— 第 116 轮那个"色块档"（一格画一个方块的颜色）**已被整条删除**，不是禁用：
+ *   与其给一张读不出布局的马赛克，不如**什么都不显示**（与地图页 / 存档页同一条口径，
+ *   也是用户 2026-10-04 那句「拿不到内容就把那块收掉，不要留空框」）。
  * 🔴 **像素级必须读版本 APK**：图集页的排版逐版本会变 ⇒ 区域矩形不能烘进启动器。
  *   ⚠️ 因此缓存键里**必须带上 APK 身份**（换版本 ⇒ 换 key，否则会显示上一个版本的图）。
  *
@@ -44,29 +44,22 @@ public final class MschLoad {
     /**
      * 取蓝图预览（内存 → 磁盘 → 现渲染）。
      *
-     * @param apkPath 这个槽指向的版本 APK（**可以为 null** ⇒ 回落到色块档）
+     * @param apkPath 这个槽指向的版本 APK；**没有（null）⇒ 直接返回 null**（不画任何图 —— 见类注释）
      * @param maxSide {@link #THUMB} / {@link #BIG}
-     * @return 失败返回 null（界面**保持 GONE**，不留空框）
+     * @return 出不了图返回 null（界面**保持 GONE**，不留空框）
      */
     public static Bitmap image(final Context ctx, final Blueprints.Item it, final String apkPath,
                                final int maxSide) {
         if (it == null || it.msch == null) return null;
+        // ★ 没有版本就没有图：**不回落**（用户 2026-10-06：「那东西太抽象了毫无意义啊」）
+        if (apkPath == null || apkPath.trim().isEmpty()) return null;
         return MapLoad.cached(ctx, key(it, apkPath), maxSide, new MapLoad.Renderer() {
             @Override public MapPreview.Img render() {
                 int target = maxSide >= BIG ? MIN_SIDE_BIG : MIN_SIDE_THUMB;
-                // ① 首选：像素级（真贴图）
-                try {
-                    MschSheet sheet = MschSheet.open(ctx, apkPath);
-                    if (sheet != null) {
-                        MapPreview.Img img = MschSprite.render(it.msch, sheet, target);
-                        if (img != null) return upscale(img, target);
-                    }
-                } catch (Throwable t) {
-                    android.util.Log.w("MDTLauncher", "sprite preview failed", t);
-                }
-                // ② 回落：色块档（没版本 APK / 图集读不了）
-                MapPreview.Img img = MschPreview.render(it.msch, MschPreview.table(), maxSide);
-                return img == null ? null : upscale(img, maxSide >= BIG ? MIN_SIDE_BIG : MIN_SIDE_THUMB);
+                MschSheet sheet = MschSheet.open(ctx, apkPath);
+                if (sheet == null) return null;              // 图集读不了 ⇒ 没有图（不回落）
+                MapPreview.Img img = MschSprite.render(it.msch, sheet, target);
+                return img == null ? null : upscale(img, target);
             }
         });
     }
