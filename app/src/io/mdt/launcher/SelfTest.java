@@ -3760,6 +3760,22 @@ public final class SelfTest {
             File pdir = sh == null ? null : MschSheet.pageDirOf(sh);
             ok(stat, L, MschSheet.isOpen(apk, Data.currentSlot(ctx)) && pdir != null && pdir.isDirectory(),
                     "⑤ 端到端：表开着，页图也真的抽到了磁盘上（BitmapRegionDecoder 要能随机访问）");
+            // ⑤b **autotiler 的形状 0**（第 121 轮）：预览里**恒为形状 0**（`QueryEachable(null,·).each()`
+            //    是空实现 ⇒ 找不到邻居；14 份真蓝图实测全 0）⇒ 名字是 `<名字>-0-0` / duct·conduit 两层
+            ok(stat, L, MschTiling.family("conveyor") == 1 && MschTiling.family("duct") == 3
+                            && MschTiling.family("conduit") == 5
+                            && "conveyor-0-0".equals(MschTiling.shape0Regions("conveyor")[0]),
+                    "⑤b 形状 0：`conveyor` 家族 1 → `conveyor-0-0`；`duct` 3 / `conduit` 5（读生成表）");
+            ok(stat, L, MschTiling.shape0Regions("duct").length == 2
+                            && "duct-bottom-0".equals(MschTiling.shape0Fallbacks("duct")[0])
+                            && "conduit-bottom-0".equals(MschTiling.shape0Fallbacks("conduit")[0]),
+                    "⑤b 两层：duct / conduit 都是**先 bottom 后 top**，底层有共享兜底图");
+            ok(stat, L, MschTiling.shape0Regions("copper-wall") == null
+                            && MschTiling.family("copper-wall") == 0,
+                    "⑤b ★元断言：普通方块（`copper-wall`）**不走** autotiler ⇒ null（别拿形状 0 去套）");
+            ok(stat, L, sh != null && sh.find("conveyor-0-0") != null && sh.find("duct-bottom-0") != null
+                            && sh.find("conduit-top-0") != null,
+                    "⑤b 端到端：真 APK 图集里 `conveyor-0-0` / `duct-bottom-0` / `conduit-top-0` 都查得到");
         } catch (Throwable t) {
             ok(stat, L, false, "⑤ 端到端用例自己抛了：" + t);
         }

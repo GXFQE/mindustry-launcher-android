@@ -116,30 +116,54 @@ public final class MschSprite {
             int cx = (int) Math.round(((t.x + off + size / 2.0) - b[0]) * px);
             int cy = (int) Math.round(((t.y + off + size / 2.0) - b[1]) * px);
 
-            MschAtlas.Region reg = resolve(s, t.block);
-            int[] src = reg == null ? null : s.pixels(reg);
-            if (src == null || reg.w <= 0 || reg.h <= 0 || src.length < reg.w * reg.h) {
-                // 退化：这一格画成色块（占地 = size × size 格）
+            // ★ 传送带 / 导管这类"按邻居算形状"的方块（autotiler 家族）：**游戏自己的预览只画形状 0**
+            //   （`QueryEachable(null, plans).each()` 是空实现 ⇒ 找不到邻居 ⇒ `bits[0] = 0`，
+            //    实测 14 份蓝图全部如此，见 {@link MschTiling} 类注释）。所以这里按形状 0 的名字取图，
+            //    duct/conduit 还是**两层**（先 bottom 后 top）。
+            String[] names = MschTiling.shape0Regions(t.block);
+            String[] fbs = MschTiling.shape0Fallbacks(t.block);
+            int layers = names == null ? 1 : names.length;
+            int[] drawn = new int[layers];                 // 每层是否真画上了
+            for (int li = 0; li < layers; li++) {
+                MschAtlas.Region reg = names == null ? resolve(s, t.block)
+                        : byNameOr(s, names[li], fbs == null ? null : fbs[li], t.block);
+                int[] src = reg == null ? null : s.pixels(reg);
+                if (src == null || reg.w <= 0 || reg.h <= 0 || src.length < reg.w * reg.h) continue;
+                boolean rot = s.rotates(t.block) || MschPreview.rotates(t.block);
+                int[] spr = src;
+                int sw = reg.w, sh = reg.h;
+                if (rot && t.rotation != 0) {
+                    spr = rotate90(spr, sw, sh, t.rotation & 3);
+                    if ((t.rotation & 1) != 0) { int tmp = sw; sw = sh; sh = tmp; }   // 转 90/270 后宽高互换
+                }
+                if (px != TILE_PX) {
+                    spr = scale(spr, sw, sh, Math.max(1, sw * px / TILE_PX), Math.max(1, sh * px / TILE_PX));
+                    sw = Math.max(1, sw * px / TILE_PX);
+                    sh = Math.max(1, sh * px / TILE_PX);
+                }
+                // ⚠️ 游戏里 duct 的**底层**是半透明的（`Draw.alpha(0.5f)`）；conduit 的底层还带流体颜色
+                //    （我们拿不到流体 ⇒ 不透明、不着色，如实记在 REF §82.3）
+                int alphaMul = (li == 0 && fbs != null) ? 128 : 255;
+                paste(out, w, h, spr, sw, sh, cx - sw / 2, cy - sh / 2, alphaMul);
+                drawn[li] = 1;
+            }
+            boolean any = false;
+            for (int d : drawn) if (d != 0) any = true;
+            if (!any) {
+                // 一层都没画上 ⇒ 退化：这一格画成色块（占地 = size × size 格）
                 int color = lk.color(t.block);
                 fill(out, w, h, cx - size * px / 2, cy - size * px / 2, size * px, size * px,
                         color == 0 ? MschPreview.UNKNOWN : color);
-                continue;
             }
-            boolean rot = s.rotates(t.block) || MschPreview.rotates(t.block);
-            int[] spr = src;
-            int sw = reg.w, sh = reg.h;
-            if (rot && t.rotation != 0) {
-                spr = rotate90(spr, sw, sh, t.rotation & 3);
-                if ((t.rotation & 1) != 0) { int tmp = sw; sw = sh; sh = tmp; }   // 转 90/270 后宽高互换
-            }
-            if (px != TILE_PX) {
-                spr = scale(spr, sw, sh, Math.max(1, sw * px / TILE_PX), Math.max(1, sh * px / TILE_PX));
-                sw = Math.max(1, sw * px / TILE_PX);
-                sh = Math.max(1, sh * px / TILE_PX);
-            }
-            paste(out, w, h, spr, sw, sh, cx - sw / 2, cy - sh / 2);
         }
         return new MapPreview.Img(w, h, out);
+    }
+
+    /** 先按形状 0 的名字找，没有再退到 fallback（`duct-bottom-0` 那种共享底图），最后退到 5 级回落链 */
+    private static MschAtlas.Region byNameOr(Sheet s, String primary, String fallback, String block) {
+        MschAtlas.Region r = s.find(primary);
+        if (r == null && fallback != null) r = s.find(fallback);
+        return r == null ? resolve(s, block) : r;
     }
 
     /** 顺时针 90°×k（图像空间；见类注释 ④） */
@@ -195,6 +219,31 @@ public final class MschSprite {
 
     /** 把一张小图**按 alpha 混合**贴到画布上（贴图有透明边 ⇒ 不能直接覆盖） */
     static void paste(int[] dst, int dw, int dh, int[] src, int sw, int sh, int ox, int oy) {
+        paste(dst, dw, dh, src, sw, sh, ox, oy, 255);
+    }
+
+    /**
+     * 同 {@link #paste}，但**整层 alpha 再乘一个系数**（`alphaMul`/255）。
+     * ★ 用在 duct 的底层：游戏里那是 `Draw.alpha(0.5f)`（见 REF §82）。
+     */
+    static void paste(int[] dst, int dw, int dh, int[] src, int sw, int sh, int ox, int oy, int alphaMul) {
+        if (alphaMul >= 255) {
+            pasteRaw(dst, dw, dh, src, sw, sh, ox, oy);
+            return;
+        }
+        int[] tmp = src;
+        if (alphaMul < 255) {
+            tmp = new int[src.length];
+            for (int i = 0; i < src.length; i++) {
+                int c = src[i];
+                int a = (c >>> 24) & 0xff;
+                tmp[i] = ((a * alphaMul / 255) << 24) | (c & 0x00FFFFFF);
+            }
+        }
+        pasteRaw(dst, dw, dh, tmp, sw, sh, ox, oy);
+    }
+
+    private static void pasteRaw(int[] dst, int dw, int dh, int[] src, int sw, int sh, int ox, int oy) {
         for (int y = 0; y < sh; y++) {
             int dy = oy + y;
             if (dy < 0 || dy >= dh) continue;
