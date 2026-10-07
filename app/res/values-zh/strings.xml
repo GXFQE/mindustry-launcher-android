@@ -1644,6 +1644,12 @@
     <string name="lang_chooser_title">选择 .properties 文件</string>
     <string name="lang_pack_ok">装上</string>
     <string name="lang_pack_none_used">没有一条对得上当前版本的 key —— 请核对键名与 strings.xml 里的一致。</string>
+    <string name="lang_tpl_how">把每行等号后面的文字改成你的语言，存成 UTF-8（不要 BOM）的 .properties，再到「设置 → 翻译文件」里导入。没改的行会回落成界面语言。</string>
+    <string name="lang_tpl_ph_warn">%1$s / %2$d 这类占位符必须原样保留（个数、序号、类型都要一致）—— 装包时会逐条校验，不符合的那一条会被拒绝并回落（不会崩）。</string>
+    <string name="lang_tpl_export">导出一份模板</string>
+    <string name="lang_tpl_save_title">把模板存成 .properties</string>
+    <string name="lang_tpl_done_fmt">模板已写出：%1$d 条</string>
+    <string name="lang_tpl_fail_fmt">模板写不出来：%1$s</string>
     <string name="lang_pack_remove">移除翻译文件</string>
     <string name="lang_dialog_msg_fmt">%1$s\n\n用了 %2$d 条 · 缺 %3$d 条 · 认不出 %4$d 条 · 拒绝 %5$d 条</string>
     <string name="lang_stat_used_fmt">正在用 %1$d 条译文</string>

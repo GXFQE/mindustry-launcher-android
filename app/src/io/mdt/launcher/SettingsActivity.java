@@ -43,6 +43,11 @@ public class SettingsActivity extends BaseActivity {
     private static final int LOG_MAX = 999;
     /** 用户语言包的文件选择请求码（本页唯一一个 `startActivityForResult`） */
     private static final int REQ_LANG_PACK = 62;
+    /** 导出翻译模板的"存到哪"请求码 */
+    private static final int REQ_LANG_TPL = 63;
+    /** 模板先落这里，用户选完落点再整份写过去（取消就删掉） */
+    private File sTemplateTmp;
+    private int sTemplateCount;
 
     private TextView mThemeSub;
     private TextView mLangSub;
@@ -369,7 +374,24 @@ public class SettingsActivity extends BaseActivity {
     private void pickLangPack() {
         final Trans.Pack cur = Trans.installed(this) ? Trans.pack(this) : null;
         if (cur == null) {
-            openLangPackPicker();
+            // 没装包：也要能导出模板（译者第一步就是拿模板），所以给一个二选一
+            new AlertDialog.Builder(this)
+                    .setTitle(Trans.get(SettingsActivity.this, R.string.lang_dialog_title))
+                    .setMessage(Trans.get(SettingsActivity.this, R.string.lang_row_none))
+                    .setPositiveButton(Trans.get(SettingsActivity.this, R.string.lang_chooser_title),
+                            new DialogInterface.OnClickListener() {
+                                @Override public void onClick(DialogInterface d, int w) {
+                                    openLangPackPicker();
+                                }
+                            })
+                    .setNeutralButton(Trans.get(SettingsActivity.this, R.string.lang_tpl_export),
+                            new DialogInterface.OnClickListener() {
+                                @Override public void onClick(DialogInterface d, int w) {
+                                    exportLangTemplate();
+                                }
+                            })
+                    .setNegativeButton(Trans.get(SettingsActivity.this, R.string.cancel), null)
+                    .show();
             return;
         }
         new AlertDialog.Builder(this)
@@ -381,14 +403,96 @@ public class SettingsActivity extends BaseActivity {
                         new DialogInterface.OnClickListener() {
                             @Override public void onClick(DialogInterface d, int w) { removeLangPack(); }
                         })
-                .setNeutralButton(Trans.get(SettingsActivity.this, R.string.lang_chooser_title),
+                .setNeutralButton(Trans.get(SettingsActivity.this, R.string.lang_tpl_export),
+                        new DialogInterface.OnClickListener() {
+                            @Override public void onClick(DialogInterface d, int w) {
+                                exportLangTemplate();
+                            }
+                        })
+                .setNegativeButton(Trans.get(SettingsActivity.this, R.string.lang_chooser_title),
                         new DialogInterface.OnClickListener() {
                             @Override public void onClick(DialogInterface d, int w) {
                                 openLangPackPicker();
                             }
                         })
-                .setNegativeButton(Trans.get(SettingsActivity.this, R.string.cancel), null)
                 .show();
+    }
+
+    // ── 导出翻译模板（给译者一份带全部键名 + 英文原文的底稿）──────────────────
+
+    private void exportLangTemplate() {
+        new Thread(new Runnable() {
+            @Override public void run() {
+                String err = null;
+                int n = 0;
+                final File tmp = new File(Trans.file(SettingsActivity.this).getParentFile(),
+                        "lang-template.properties");
+                try {
+                    n = Trans.writeTemplate(SettingsActivity.this, tmp, null);
+                } catch (Throwable t) {
+                    err = t.toString();
+                    android.util.Log.w("MDTLauncher", "template write failed: " + t);
+                }
+                final String ferr = err;
+                final int fn = n;
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        if (ferr != null) {
+                            Toast.makeText(SettingsActivity.this,
+                                    Trans.get(SettingsActivity.this, R.string.lang_tpl_fail_fmt, ferr),
+                                    Toast.LENGTH_LONG).show();
+                            tmp.delete();
+                            return;
+                        }
+                        sTemplateTmp = tmp;
+                        sTemplateCount = fn;
+                        // ★ 走 SAF 的"存到哪"（与导出一份存档同一条路：不需要任何存储权限）
+                        startActivityForResult(
+                                Intent.createChooser(
+                                        Exporter.createDoc("lang.properties", "text/plain"),
+                                        Trans.get(SettingsActivity.this, R.string.lang_tpl_save_title)),
+                                REQ_LANG_TPL);
+                    }
+                });
+            }
+        }).start();
+    }
+
+    /** 把模板整份写进用户选的落点（流式，与 Exporter 同一条纪律：绝不全量进内存）。 */
+    private void saveTemplateTo(final Uri uri) {
+        new Thread(new Runnable() {
+            @Override public void run() {
+                String err = null;
+                try {
+                    InputStream in = new java.io.FileInputStream(sTemplateTmp);
+                    java.io.OutputStream out = getContentResolver().openOutputStream(uri);
+                    if (out == null) throw new IOException("cannot write " + uri);
+                    try {
+                        byte[] buf = new byte[64 * 1024];
+                        int k;
+                        while ((k = in.read(buf)) > 0) out.write(buf, 0, k);
+                    } finally {
+                        out.close();
+                        in.close();
+                    }
+                } catch (Throwable t) {
+                    err = t.toString();
+                    android.util.Log.w("MDTLauncher", "template save failed: " + t);
+                }
+                if (sTemplateTmp != null) sTemplateTmp.delete();
+                sTemplateTmp = null;
+                final String ferr = err;
+                final int n = sTemplateCount;
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        String msg = ferr != null
+                                ? Trans.get(SettingsActivity.this, R.string.lang_tpl_fail_fmt, ferr)
+                                : Trans.get(SettingsActivity.this, R.string.lang_tpl_done_fmt, n);
+                        Toast.makeText(SettingsActivity.this, msg, Toast.LENGTH_LONG).show();
+                    }
+                });
+            }
+        }).start();
     }
 
     private void openLangPackPicker() {
@@ -403,6 +507,15 @@ public class SettingsActivity extends BaseActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == REQ_LANG_TPL) {
+            if (resultCode == RESULT_OK && data != null && data.getData() != null) {
+                saveTemplateTo(data.getData());
+            } else if (sTemplateTmp != null) {
+                sTemplateTmp.delete();      // 用户在系统选择器里取消了
+                sTemplateTmp = null;
+            }
+            return;
+        }
         if (requestCode != REQ_LANG_PACK) return;
         if (resultCode != RESULT_OK || data == null || data.getData() == null) return;
         final Uri uri = data.getData();

@@ -262,6 +262,9 @@ public final class SelfTest {
             spritePreview(ctx, L, stat);
             // ★ ㊿ 模组方块的贴图（第 119 轮）：从本槽 `mods/` 里按游戏自己的规则找 PNG
             modSprites(ctx, L, stat);
+            // ★ 用户语言包（2026-10-07）：单键包只改那一条 + 占位符门禁 + 模板能装回自己
+            //   ⚠️ 断言用的是**同一次调用里的对照**（装前 /= 装后逐键比对），与自检语言无关。
+            langPack(ctx, L, stat);
             // ★ 篡改对象池的用例放**最后**：它会在池里留下一个内容坏掉的对象，
             //   之后任何"再备份一次"都会因为 `has()` 命中而复用坏对象（CAS 的固有
             //   假设是"池内不可变"）。放在最后就不影响别的用例。
@@ -7743,6 +7746,181 @@ public final class SelfTest {
             sb.append(xs.get(i));
         }
         return sb.toString();
+    }
+
+    // ── 用户语言包（2026-10-07）────────────────────────────────────────────
+
+    /**
+     * 用户语言包（`lang.properties`）的四条断言。
+     *
+     * ★ 为什么这条**必须**有：装配语言包那套代码本身"错了也不会崩" ——
+     *   键名查错一个字母，症状只是"某一条文案没跟着变"，编译器和界面都看不出来。
+     *   所以这里用**同一次调用内的对照**（装前逐键读一遍、装后逐键再读一遍）来钉死它。
+     *
+     * ★ 与自检语言解耦：断言不写死任何一条具体译文，只比对"变了 / 没变"。
+     *
+     * ⚠️ 会**短暂**改动全局语言包状态（装自己的测试包），收尾一定还原；
+     *   本用例只在 debuggable 构建的自检里跑（产品版进不来）。
+     */
+    private static void langPack(Context ctx, List<String> L, int[] stat) throws Exception {        L.add("");
+        L.add("── 用户语言包（lang.properties）──");
+
+        final int[] ids = stringIds(ctx);
+        ok(stat, L, ids.length > 500,
+                "枚举到 " + ids.length + " 个 R.string 字段（反射；用于逐键比对）");
+
+        // ① 装之前先把全部键读一遍（含已装用户包的影响 ⇒ 后面装完要还原成同一状态）
+        File installed = Trans.file(ctx);
+        final byte[] saved = installed.exists() ? readBytes(installed) : null;
+        final boolean hadPack = saved != null;
+
+        String[] before = new String[ids.length];
+        for (int i = 0; i < ids.length; i++) before[i] = Trans.get(ctx, ids[i]);
+
+        File tmpDir = new File(Data.dataRoot(ctx), "selftest-lang");
+        tmpDir.mkdirs();
+        File one = new File(tmpDir, "one.properties");
+        write(one, ("act_saves_title=SELFTEST-ONE" + Long.toHexString(System.nanoTime()) + "\n")
+                .getBytes("UTF-8"));
+
+        try {
+            // ★ 写之前先确认落脚点（"装不上"最常见的原因就是父目录不对）
+            File dstDir = Trans.file(ctx).getParentFile();
+            ok(stat, L, dstDir != null && dstDir.isDirectory(),
+                    "私有目录可用：" + (dstDir == null ? "null" : dstDir.getAbsolutePath())
+                            + "（是目录=" + (dstDir != null && dstDir.isDirectory())
+                            + "，可写=" + (dstDir != null && dstDir.canWrite()) + "）"
+                            + "，ctx=" + ctx.getPackageName());
+
+            // ② ★★ 核心：装上一个键的包 ⇒ **恰好一个键**变，其余逐字不变
+            // ⚠️ `Trans.install(ctx, src)` 按设计**只解析 + 设状态、不复制文件**（复制是界面那一步的事，
+            //    见 SettingsActivity.installLangPack）⇒ 这里必须自己先拷到 Trans.file() 那个位置，
+            //    否则"装上了但文件不在"（第一次写这条断言就栽在这里，症状是 used=1 而值一个都没变）。
+            copyFile(one, Trans.file(ctx));
+            Trans.Pack p = Trans.installFromFile(ctx);
+            ok(stat, L, p.rejected.isEmpty() && p.unknown.isEmpty(),
+                    "单键包：rejected=" + p.rejected.size() + " unknown=" + p.unknown.size() + "（都该是 0）");
+            ok(stat, L, p.used() == 1, "单键包 used=" + p.used() + "（应为 1）");
+
+            int changed = 0, firstOther = -1;
+            String got = null;
+            for (int i = 0; i < ids.length; i++) {
+                String now = Trans.get(ctx, ids[i]);
+                if (!now.equals(before[i])) {
+                    changed++;
+                    if (ids[i] == R.string.act_saves_title) got = now;
+                    else if (firstOther < 0) firstOther = ids[i];
+                }
+            }
+            ok(stat, L, changed == 1,
+                    "装上单键包后**只有 1 个**键的值变了（实得 " + changed
+                            + (firstOther > 0 ? "，多出来的那个 id=" + firstOther : "") + "）");
+            ok(stat, L, got != null && got.startsWith("SELFTEST-ONE"),
+                    "变的那个正是 act_saves_title，且值来自用户包（实得「" + got + "」）");
+        } finally {
+            // 还原：有原包就装回去，没有就删掉
+            if (hadPack) write(installed, saved);
+            else installed.delete();
+            if (installed.exists()) Trans.installFromFile(ctx);
+            else Trans.uninstall(ctx);
+        }
+
+        // ③ 占位符门禁：故意漏掉 %1$s ⇒ 那一条被拒、其余照常
+        File bad = new File(tmpDir, "bad.properties");
+        write(bad, ("main_continue_fmt=continue-without-placeholder\n"
+                + "act_saves_title=SELFTEST-TWO\n").getBytes("UTF-8"));
+        Trans.Pack pb = Trans.parse(ctx, bad);
+        ok(stat, L, pb.rejected.containsKey("main_continue_fmt"),
+                "占位符不符的条目被拒（rejected 含 main_continue_fmt）"
+                        + (pb.rejected.isEmpty() ? "" : " 原因=" + pb.rejected.values().iterator().next()));
+        ok(stat, L, pb.entries.containsKey("act_saves_title"),
+                "同一份包里的另一条**照常生效**（部分可用，不是整包拒绝）");
+        ok(stat, L, pb.unknown.isEmpty(), "包里的键都认得出（unknown=0）");
+
+        // ④ 导出模板：必须"能被自己装回去"（unknown / rejected 都为 0），且键数 == 资源键数
+        File tpl = new File(tmpDir, "template.properties");
+        int n = Trans.writeTemplate(ctx, tpl, "selftest");
+        Trans.Pack pt = Trans.parse(ctx, tpl);
+        ok(stat, L, pt.unknown.isEmpty() && pt.rejected.isEmpty(),
+                "导出模板 round-trip：unknown=" + pt.unknown.size() + " rejected=" + pt.rejected.size()
+                        + "（都该是 0）"
+                        + (pt.unknown.isEmpty() ? "" : " 认不出的前 3 个="
+                        + pt.unknown.subList(0, Math.min(3, pt.unknown.size()))));
+        ok(stat, L, n >= ids.length,
+                "模板写出 " + n + " 条 ≥ R.string 字段数 " + ids.length
+                        + "（多出来的是同一字段被 aapt2 收进多个资源表的重复项）");
+        ok(stat, L, tpl.length() > 10000, "模板不是空壳（" + tpl.length() + " B）");
+
+        // ★ 形状断言：正文里每一行要么是注释/空行，要么是 `键=值`。
+        //   这条专门钉住"中文原文带换行 ⇒ 第二行变成裸键值对"那个坑（真踩过：多出 122 个假键）。
+        int badLines = 0;
+        String firstBad = null;
+        for (String line : Trans.buildTemplate(ctx, null).toString().split("\n", -1)) {
+            String s = line.trim();
+            if (s.isEmpty() || s.startsWith("#")) continue;
+            int eq = s.indexOf('=');
+            // 键名只许是 [A-Za-z_][A-Za-z0-9_]*，且等号前不能有空格
+            if (eq <= 0 || !s.substring(0, eq).matches("[A-Za-z_][A-Za-z0-9_]*")) {
+                badLines++;
+                if (firstBad == null) firstBad = s.length() > 60 ? s.substring(0, 60) : s;
+            }
+        }
+        ok(stat, L, badLines == 0,
+                "模板正文的每一行都是「注释」或「键=值」（实得 " + badLines + " 行不合规"
+                        + (firstBad == null ? "" : "，首个：" + firstBad) + "）");
+
+        tmpDir.delete();
+    }
+
+    /** 反射枚举 `R.string` 的全部字段值（去重后排序）—— 用来"逐键"读文案 */
+    private static int[] stringIds(Context ctx) {
+        java.util.TreeSet<Integer> set = new java.util.TreeSet<>();
+        try {
+            for (java.lang.reflect.Field f : R.string.class.getFields()) {
+                try {
+                    set.add(f.getInt(null));
+                } catch (Throwable ignored) {
+                }
+            }
+        } catch (Throwable t) {
+            return new int[0];
+        }
+        int[] out = new int[set.size()];
+        int i = 0;
+        for (int v : set) out[i++] = v;
+        return out;
+    }
+
+    /** 整份复制一个文件（自检里给语言包"先落位再装"用） */
+    private static void copyFile(File src, File dst) throws IOException {
+        java.io.InputStream in = new java.io.FileInputStream(src);
+        try {
+            write(dst, readAll(in));
+        } finally {
+            in.close();
+        }
+    }
+
+    private static byte[] readAll(java.io.InputStream in) throws IOException {
+        ByteArrayOutputStream b = new ByteArrayOutputStream();
+        byte[] buf = new byte[8192];
+        int n;
+        while ((n = in.read(buf)) > 0) b.write(buf, 0, n);
+        return b.toByteArray();
+    }
+
+    private static byte[] readBytes(File f) throws IOException {
+        java.io.FileInputStream in = new java.io.FileInputStream(f);
+        try {
+            byte[] buf = new byte[(int) Math.max(16, f.length())];
+            int n = in.read(buf);
+            if (n <= 0) return new byte[0];
+            byte[] out = new byte[n];
+            System.arraycopy(buf, 0, out, 0, n);
+            return out;
+        } finally {
+            in.close();
+        }
     }
 
     // ── 小工具 ────────────────────────────────────────────────────────────

@@ -1701,6 +1701,12 @@
     <string name="lang_chooser_title">Pick a .properties file</string>
     <string name="lang_pack_ok">Install</string>
     <string name="lang_pack_none_used">No entry matched this version of the app — check that the keys are the same ones used in strings.xml.</string>
+    <string name="lang_tpl_how">Edit the text after each = sign into your language, save as UTF-8 .properties (no BOM), then import it in Settings - Translation file. Lines you leave alone fall back to the app language.</string>
+    <string name="lang_tpl_ph_warn">Keep placeholders like %1$s / %2$d exactly as they are (same count, same index, same type) - each entry is checked when the file is installed, and a mismatching entry is rejected (it will not crash the app).</string>
+    <string name="lang_tpl_export">Export a template</string>
+    <string name="lang_tpl_save_title">Save template as .properties</string>
+    <string name="lang_tpl_done_fmt">Template written: %1$d entries</string>
+    <string name="lang_tpl_fail_fmt">Could not write the template: %1$s</string>
     <string name="lang_pack_remove">Remove the translation file</string>
     <string name="lang_dialog_msg_fmt">%1$s\n\nUsed %2$d · missing %3$d · unknown %4$d · rejected %5$d</string>
     <string name="lang_stat_used_fmt">Using %1$d translated strings</string>

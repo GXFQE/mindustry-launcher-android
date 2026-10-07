@@ -7,6 +7,7 @@ import android.widget.TextView;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -79,6 +80,7 @@ public final class Trans {
 
     private static volatile Pack sPack;              // 已装上的用户包（null = 没装）
     private static Context sTemplate;                // 英文模板 Context（兜底 + 校验）
+    private static Context sChinese;                 // 中文 Context（只给导出模板的注释用）
     private static Map<String, Integer> sKnown;      // 键名 -> resId（反射 Lazy 建，一次）
     private static final Map<Integer, String> sKeyOf = new HashMap<>();   // resId -> 键名（热路径缓存）
     private static volatile long sLoadedLen = -2;    // 上次读盘时的文件长度（-2 = 还没读过）
@@ -277,6 +279,132 @@ public final class Trans {
         return install(ctx, file(ctx));
     }
 
+    /** 全部键名（已排序）。给"导出模板"与报告用。 */
+    public static java.util.List<String> keys(Context ctx) {
+        java.util.List<String> out = new ArrayList<>(known(ctx.getApplicationContext()).keySet());
+        java.util.Collections.sort(out);
+        return out;
+    }
+
+    /**
+     * 导出**翻译模板**：一份含全部键名 + 英文原文的 `key=value` 文本，译者拿它当底稿。
+     *
+     * ★ 为什么必须带英文原文（而不是空值）：译者要的是"这个名字在界面上是什么意思"，
+     *   只给键名等于让他去读 `strings.xml`（那正是这个功能要省掉的事）。
+     *   注释块里也附上中文原文，方便对照 —— 但**注释行不属于键值对**，装包时被 `Properties` 忽略。
+     *
+     * 🔴 自证：写完立刻用 {@link #parse} 读一遍，断言 `unknown` 与 `rejected` **都是 0**
+     *   —— 否则我们导出的是"一份装不上/会被拒的模板"，比不导出更坏。
+     *   （被 `<xliff:g>` 之类吃掉、或键名在资源表里查不到的条目会被跳过，不会进文件。）
+     *
+     * @return 写出的键数（不含注释行）
+     */
+    public static int writeTemplate(Context ctx, File dst, String note) throws IOException {
+        StringBuilder sb = buildTemplate(ctx, note);
+        Context app = ctx.getApplicationContext();
+        FileOutputStream out = new FileOutputStream(dst);
+        try {
+            out.write(sb.toString().getBytes("UTF-8"));
+        } finally {
+            out.close();
+        }
+
+        // 🔴 自证：导出的模板必须能被自己装上（unknown / rejected 都为 0）
+        Pack back = parse(app, dst);
+        if (!back.unknown.isEmpty() || !back.rejected.isEmpty()) {
+            throw new IOException("template self-check failed: unknown=" + back.unknown.size()
+                    + " rejected=" + back.rejected.size() + " first=" + back.rejected.keySet()
+                    + " unknownFirst=" + back.unknown.subList(0, Math.min(8, back.unknown.size())));
+        }
+        return countEntries(sb);
+    }
+
+    /** 拼模板正文（拆出来是为了**能被断言**：自检直接逐行检查它的形状，不必先落盘） */
+    static StringBuilder buildTemplate(Context ctx, String note) {
+        Context app = ctx.getApplicationContext();
+        Context en = template(app);
+        Context zh = chinese(app);
+        Map<String, Integer> k = known(app);
+
+        java.util.List<String> keys = new ArrayList<>(k.keySet());
+        java.util.Collections.sort(keys);
+
+        StringBuilder sb = new StringBuilder();
+        sb.append("# MDT launcher — translation template\n");
+        sb.append("#\n");
+        sb.append("# ").append(oneLine(tplHint(app, R.string.lang_tpl_how))).append('\n');
+        sb.append("# ").append(oneLine(tplHint(app, R.string.lang_tpl_ph_warn))).append('\n');
+        sb.append("#\n");
+        if (note != null && !note.isEmpty()) {
+            sb.append("# ").append(oneLine(note)).append('\n');
+            sb.append("#\n");
+        }
+
+        String lastPrefix = "";
+        for (String key : keys) {
+            Integer id = k.get(key);
+            if (id == null) continue;                     // 理论上不会
+            String value;
+            try {
+                value = en.getString(id);
+            } catch (Throwable t) {
+                continue;                                 // 英文资源里取不到 ⇒ 跳过（别导出装不上的行）
+            }
+            // 键名前缀分组（一屏一片，译者好找）
+            int dot = key.indexOf('_');
+            String prefix = dot > 0 ? key.substring(0, dot) : key;
+            if (!prefix.equals(lastPrefix)) {
+                sb.append('\n').append("# ── ").append(prefix).append(" ──\n");
+                lastPrefix = prefix;
+            }
+            // 🔴 注释行**必须单行**：中文原文里有换行，第二行起没有 `#`
+            //    ⇒ `Properties.load` 会把它当成键值对（真踩过：模板装回来多出 122 个"认不出的键"）。
+            sb.append("# ").append(oneLine(zhOf(zh, id))).append('\n');
+            sb.append(key).append('=').append(escape(value)).append('\n');
+        }
+        return sb;
+    }
+
+    /** 数一数正文里有几个"真·键值对"（非注释、非空、含 `=`） */
+    static int countEntries(CharSequence body) {
+        int n = 0;
+        for (String line : body.toString().split("\n", -1)) {
+            String s = line.trim();
+            if (s.isEmpty() || s.startsWith("#")) continue;
+            if (s.indexOf('=') > 0) n++;
+        }
+        return n;
+    }
+
+    /** 压成单行（注释用）：换行 → 空格，制表符 → 空格 */
+    private static String oneLine(String s) {
+        if (s == null) return "";
+        return s.replace("\r\n", " ").replace('\n', ' ').replace('\r', ' ').replace('\t', ' ');
+    }
+
+    /** 中文模板（拿不到就返回空串，不抛） */
+    private static String zhOf(Context zh, int resId) {
+        if (zh == null) return "-";
+        try {
+            return zh.getString(resId);
+        } catch (Throwable t) {
+            return "-";
+        }
+    }
+
+    /**
+     * 导出模板里用的提示行（走资源，所以它们能跟随界面语言）。
+     * 单独一个方法是为了让 {@link #writeTemplate} 读起来还是"拼文本"的形状。
+     */
+    private static String tplHint(Context ctx, int resId) {
+        return Trans.get(ctx, resId);
+    }
+
+    /** properties 值里的换行要转义 —— 否则装回来会被截断（模板自证会当场发现）。 */
+    private static String escape(String s) {
+        return s.replace("\\", "\\\\").replace("\n", "\\n").replace("\r", "");
+    }
+
     // ── 内部 ────────────────────────────────────────────────────────────────
 
     /**
@@ -331,6 +459,23 @@ public final class Trans {
         t = app.createConfigurationContext(cfg);
         sTemplate = t;
         return t;
+    }
+
+    /**
+     * 中文 Context（只给"导出模板"的注释做对照用）。
+     * 同样是**一次性** `createConfigurationContext`，不碰 `Locale.setDefault`。
+     * ⚠️ 拿不到简体中文资源（例如将来只带别的语言）时返回 null，调用方要给兜底。
+     */
+    private static Context chinese(Context app) {
+        if (sChinese != null) return sChinese;
+        try {
+            Configuration cfg = new Configuration(app.getResources().getConfiguration());
+            cfg.setLocale(Locale.SIMPLIFIED_CHINESE);
+            sChinese = app.createConfigurationContext(cfg);
+        } catch (Throwable t) {
+            return null;
+        }
+        return sChinese;
     }
 
     /**
