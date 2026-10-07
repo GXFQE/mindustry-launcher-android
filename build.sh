@@ -48,16 +48,16 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # 🔴 **不要直接用裸 `python`**：Windows 的 WindowsApps 里有个同名**空壳 stub**，
 #   它不打印任何东西、也不报错，直接以 exit 49 静默退出 —— 症状是构建卡在
 #   [3/4] 之后**一行输出都没有**，看着像 d8 挂了（实测踩过）。
-#   ⇒ 显式挑一个**真能跑**的解释器：优先 $PYTHON，其次 python3 / python，
+#   ⇒ 显式挑一个**真能跑**的解释器：优先 $PYTHON，其次**用户 Anaconda**（本机默认，
+#     库最全、探针与生成表脚本都靠它），最后才 python3 / python，
 #     并且每个候选都真的试跑一次（只查 `command -v` 挡不住 stub）。
-PYTHON="${PYTHON:-}"
-if [ -z "$PYTHON" ]; then
-  for c in python3 python; do
-    if command -v "$c" >/dev/null 2>&1 && "$c" -c 'pass' >/dev/null 2>&1; then
-      PYTHON="$c"; break
-    fi
-  done
-fi
+for c in "${PYTHON:-}" "/c/ProgramData/anaconda3/python.exe" python3 python; do
+  [ -n "$c" ] || continue
+  if "$c" -c 'pass' >/dev/null 2>&1; then
+    PYTHON="$c"; break
+  fi
+done
+unset c
 if [ -z "$PYTHON" ]; then
   echo "错误：找不到可用的 Python —— 请 export PYTHON=/path/to/python.exe" >&2
   echo "     （PATH 里那个 WindowsApps\\python.exe 是空壳，不算可用）" >&2
