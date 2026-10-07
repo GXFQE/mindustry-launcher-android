@@ -128,7 +128,7 @@ final class Storage {
             int pct = (int) Math.round(p.saved() * 100d);
             sb.append(Trans.get(c, R.string.storage_backup_fmt, snaps,
                     Util.formatSize(p.actual), Util.formatSize(p.logical),
-                    c.getString(R.string.storage_pct_fmt, pct))).append('\n');
+                    Trans.get(c, R.string.storage_pct_fmt, pct))).append('\n');
             if (legacy > 0) {
                 sb.append(Trans.get(c, R.string.storage_backup_legacy_fmt, legacy,
                         Util.formatSize(p.legacyBytes))).append('\n');

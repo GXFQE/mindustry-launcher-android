@@ -55,8 +55,8 @@ final class SlotOps {
         box.addView(input, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         new AlertDialog.Builder(a)
-                .setTitle(a.getString(R.string.backup_title_fmt, s.name))
-                .setMessage(a.getString(R.string.backup_msg_fmt, excludedNames()))
+                .setTitle(Trans.get(a, R.string.backup_title_fmt, s.name))
+                .setMessage(Trans.get(a, R.string.backup_msg_fmt, excludedNames()))
                 .setView(box)
                 .setPositiveButton(R.string.backup, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int w) {
@@ -69,8 +69,8 @@ final class SlotOps {
 
     private static void doBackup(final Activity a, final Data.Slot s, final Host h,
                                  final String label) {
-        final ProgressDialog pd = ProgressDialog.show(a, a.getString(R.string.backup_progress_title),
-                a.getString(R.string.backup_progress_msg_fmt, s.name), true, false);
+        final ProgressDialog pd = ProgressDialog.show(a, Trans.get(a, R.string.backup_progress_title),
+                Trans.get(a, R.string.backup_progress_msg_fmt, s.name), true, false);
         new Thread(new Runnable() {
             @Override public void run() {
                 String err = null;
@@ -88,13 +88,13 @@ final class SlotOps {
                     @Override public void run() {
                         pd.dismiss();
                         if (fe == null) {
-                            alert(a, a.getString(R.string.backup_done),
-                                    a.getString(R.string.backup_done_msg_fmt, fss.title(),
+                            alert(a, Trans.get(a, R.string.backup_done),
+                                    Trans.get(a, R.string.backup_done_msg_fmt, fss.title(),
                                             fss.count, Util.formatSize(fss.bytes),
                                             Util.formatSize(fss.storedNew),
                                             fss.dir.getAbsolutePath()));
                         } else {
-                            alert(a, a.getString(R.string.backup_failed), fe);
+                            alert(a, Trans.get(a, R.string.backup_failed), fe);
                         }
                         h.onSlotChanged();
                     }
@@ -119,8 +119,8 @@ final class SlotOps {
     static void backups(final Activity a, final Data.Slot s, final Host h) {
         final List<Backup.Snapshot> snaps = Backup.list(a, s.name);
         if (snaps.isEmpty()) {
-            alert(a, a.getString(R.string.no_backup_title),
-                    a.getString(R.string.no_backup_msg_fmt, s.name));
+            alert(a, Trans.get(a, R.string.no_backup_title),
+                    Trans.get(a, R.string.no_backup_msg_fmt, s.name));
             return;
         }
         // ★ 每条一个**卡片**（用户 2026-10-03：「区分度依旧很低，要不你加个框吧」）：
@@ -130,7 +130,7 @@ final class SlotOps {
         for (int i = 0; i < snaps.size(); i++) {
             Backup.Snapshot ss = snaps.get(i);
             titles[i] = ss.title();
-            String base = a.getString(R.string.snapshot_entry_fmt, ss.count, Util.formatSize(ss.bytes));
+            String base = Trans.get(a, R.string.snapshot_entry_fmt, ss.count, Util.formatSize(ss.bytes));
             String msav = Backup.msavLine(a, ss);
             subs[i] = msav.isEmpty() ? base : (base + " · " + msav);
         }
@@ -139,13 +139,13 @@ final class SlotOps {
         if (head != null) {
             // ★ 表头说清"点一份能干什么" —— 标题是单行的，放不下第二句（见该布局的注释）
             head.setVisibility(View.VISIBLE);
-            head.setText(a.getString(R.string.backup_list_head_fmt, snaps.size()));
+            head.setText(Trans.get(a, R.string.backup_list_head_fmt, snaps.size()));
         }
         final android.widget.ListView lv =
                 (android.widget.ListView) listView.findViewById(R.id.msav_list);
         lv.setAdapter(new MsavListAdapter(a, titles, subs));
         final AlertDialog rdlg = new AlertDialog.Builder(a)
-                .setTitle(a.getString(R.string.backup_list_title_fmt, s.name))
+                .setTitle(Trans.get(a, R.string.backup_list_title_fmt, s.name))
                 .setView(listView)
                 .setNegativeButton(R.string.close, null)
                 .create();
@@ -169,8 +169,8 @@ final class SlotOps {
         new AlertDialog.Builder(a)
                 .setTitle(ss.title())
                 .setItems(new String[]{
-                        a.getString(R.string.slot_op_restore),
-                        a.getString(R.string.slot_op_backup_delete)},
+                        Trans.get(a, R.string.slot_op_restore),
+                        Trans.get(a, R.string.slot_op_backup_delete)},
                         new DialogInterface.OnClickListener() {
                             @Override public void onClick(DialogInterface d, int w) {
                                 if (w == 0) confirmRestore(a, s, ss, h);
@@ -193,7 +193,7 @@ final class SlotOps {
                                       final Backup.Snapshot ss, final Host h) {
         new AlertDialog.Builder(a)
                 .setTitle(R.string.backup_delete_title)
-                .setMessage(a.getString(R.string.backup_delete_msg_fmt, ss.title(), ss.count,
+                .setMessage(Trans.get(a, R.string.backup_delete_msg_fmt, ss.title(), ss.count,
                         Util.formatSize(ss.bytes)))
                 .setPositiveButton(R.string.delete, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int w) {
@@ -213,9 +213,9 @@ final class SlotOps {
                         // ⚠️ 转屏 / 页面已经没了 ⇒ 什么都不做（`isFinishing()` 挡不住转屏）
                         if (Util.dead(a)) return;
                         if (err == null) {
-                            toast(a, a.getString(R.string.backup_deleted_fmt, ss.title()));
+                            toast(a, Trans.get(a, R.string.backup_deleted_fmt, ss.title()));
                         } else {
-                            alert(a, a.getString(R.string.backup_delete_failed), err);
+                            alert(a, Trans.get(a, R.string.backup_delete_failed), err);
                         }
                         h.onSlotChanged();
                     }
@@ -246,7 +246,7 @@ final class SlotOps {
         final SlotModes modes = SlotModes.bind(a, form);
         new AlertDialog.Builder(a)
                 .setTitle(R.string.restore_confirm_title)
-                .setMessage(a.getString(R.string.restore_confirm_msg_fmt, ss.title(), ss.count,
+                .setMessage(Trans.get(a, R.string.restore_confirm_msg_fmt, ss.title(), ss.count,
                         Util.formatSize(ss.bytes),
                         s.dir == null ? "?" : s.dir.getAbsolutePath()))
                 .setView(form)
@@ -261,18 +261,18 @@ final class SlotOps {
 
     private static void doRestore(final Activity a, final Data.Slot s,
                                   final Backup.Snapshot ss, final int mode, final Host h) {
-        final ProgressDialog pd = ProgressDialog.show(a, a.getString(R.string.restore_progress_title),
-                a.getString(R.string.restore_progress_msg), true, false);
+        final ProgressDialog pd = ProgressDialog.show(a, Trans.get(a, R.string.restore_progress_title),
+                Trans.get(a, R.string.restore_progress_msg), true, false);
         new Thread(new Runnable() {
             @Override public void run() {
                 // ★★ 槽操作前的自动备份（用户 2026-10-05：「在槽操作前都自动备份吧」）：
                 //    在**恢复之前**先留一份"现在的样子" —— 恢复选错模式也退得回来。
                 final Backup.Snapshot auto =
-                        AutoBackup.beforeSlotOp(a, s.name, a.getString(R.string.backup_auto_restore));
+                        AutoBackup.beforeSlotOp(a, s.name, Trans.get(a, R.string.backup_auto_restore));
                 // ★ 成败读 rr.ok，**不许读报告开头**（那是文案，一本地化就判错；门禁规则 SRC-01）
                 Backup.RestoreResult rr = Backup.restore(a, s.name, ss, mode);
                 final String report = rr.report + (auto == null ? ""
-                        : a.getString(R.string.slot_autobak_done_fmt, auto.title()));
+                        : Trans.get(a, R.string.slot_autobak_done_fmt, auto.title()));
                 a.runOnUiThread(new Runnable() {
                     @Override public void run() {
                         pd.dismiss();
@@ -303,12 +303,12 @@ final class SlotOps {
      */
     static void cloneSlot(final Activity a, final Data.Slot s, final Host h) {
         if (s.name.equals(Data.currentSlot(a)) && Data.gameAlive(a)) {
-            alert(a, a.getString(R.string.clone_source_live),
-                    a.getString(R.string.clone_source_live_msg_fmt, s.name));
+            alert(a, Trans.get(a, R.string.clone_source_live),
+                    Trans.get(a, R.string.clone_source_live_msg_fmt, s.name));
             return;
         }
         if (s.files == 0) {
-            toast(a, a.getString(R.string.clone_source_empty_fmt, s.name));
+            toast(a, Trans.get(a, R.string.clone_source_empty_fmt, s.name));
             return;
         }
 
@@ -321,8 +321,8 @@ final class SlotOps {
         box.addView(input, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         new AlertDialog.Builder(a)
-                .setTitle(a.getString(R.string.clone_title_fmt, s.name))
-                .setMessage(a.getString(R.string.clone_msg_fmt, s.name, s.files,
+                .setTitle(Trans.get(a, R.string.clone_title_fmt, s.name))
+                .setMessage(Trans.get(a, R.string.clone_msg_fmt, s.name, s.files,
                         Util.formatSize(s.bytes), excludedNames()))
                 .setView(box)
                 .setPositiveButton(R.string.clone, new DialogInterface.OnClickListener() {
@@ -347,11 +347,11 @@ final class SlotOps {
         // 仅用于**进度框文案与快照标题**；合法性判定不在这里（见上面第 3 条）。
         final String to = Data.sanitizeSlot(rawName);
         final String shown = (to == null) ? rawName : to;
-        final String title = a.getString(R.string.clone_title_fmt, shown);
+        final String title = Trans.get(a, R.string.clone_title_fmt, shown);
 
         final ProgressDialog pd = ProgressDialog.show(a,
-                a.getString(R.string.clone_progress_title),
-                a.getString(R.string.clone_progress_msg_fmt, s.name, shown), true, false);
+                Trans.get(a, R.string.clone_progress_title),
+                Trans.get(a, R.string.clone_progress_msg_fmt, s.name, shown), true, false);
         new Thread(new Runnable() {
             @Override public void run() {
                 final String fail = Backup.cloneSlot(a, s.name, rawName, title);
@@ -359,13 +359,13 @@ final class SlotOps {
                     @Override public void run() {
                         pd.dismiss();
                         if (fail != null) {
-                            alert(a, a.getString(R.string.clone_failed), fail);
+                            alert(a, Trans.get(a, R.string.clone_failed), fail);
                         } else {
                             // ⚠️ 直接问盘（`Data.slotInfo`），**不要**从列表快照里找 ——
                             //   它此刻还是克隆前的，新槽压根不在里面（会报 0 个文件）。
                             Data.Slot now = Data.slotInfo(a, to);
-                            alert(a, a.getString(R.string.clone_done),
-                                    a.getString(R.string.clone_done_msg_fmt, to,
+                            alert(a, Trans.get(a, R.string.clone_done),
+                                    Trans.get(a, R.string.clone_done_msg_fmt, to,
                                             now.files, Util.formatSize(now.bytes)));
                         }
                         h.onSlotChanged();
@@ -409,9 +409,9 @@ final class SlotOps {
                 min.setEnabled(e);
                 max.setEnabled(e);
                 live.setText(e
-                        ? a.getString(R.string.policy_live_fmt,
+                        ? Trans.get(a, R.string.policy_live_fmt,
                                 parseIntOr(min, cur.minMinutes), parseIntOr(max, cur.maxBackups))
-                        : a.getString(R.string.policy_live_off));
+                        : Trans.get(a, R.string.policy_live_off));
             }
         };
         on.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
@@ -427,7 +427,7 @@ final class SlotOps {
         sync.run();
 
         final AlertDialog dlg = new AlertDialog.Builder(a)
-                .setTitle(a.getString(R.string.policy_title_fmt, s.name))
+                .setTitle(Trans.get(a, R.string.policy_title_fmt, s.name))
                 .setView(form)
                 .setPositiveButton(R.string.policy_save, null)
                 .setNegativeButton(R.string.cancel, null)
@@ -441,10 +441,10 @@ final class SlotOps {
                     @Override public void onClick(View v) {
                         int mn = parseIntOr(min, -1);
                         int mx = parseIntOr(max, -1);
-                        if (mn < 0 || mn > 100000) { toast(a, a.getString(R.string.policy_bad_min)); return; }
-                        if (mx < 1 || mx > 1000) { toast(a, a.getString(R.string.policy_bad_max)); return; }
+                        if (mn < 0 || mn > 100000) { toast(a, Trans.get(a, R.string.policy_bad_min)); return; }
+                        if (mx < 1 || mx > 1000) { toast(a, Trans.get(a, R.string.policy_bad_max)); return; }
                         Config.get().setBackupPolicy(s.name, on.isChecked(), mn, mx);
-                        toast(a, a.getString(R.string.policy_saved));
+                        toast(a, Trans.get(a, R.string.policy_saved));
                         dlg.dismiss();
                         h.onSlotChanged();
                     }
@@ -480,12 +480,12 @@ final class SlotOps {
                     @Override public void onClick(DialogInterface d, int w) {
                         String nv = input.getText().toString();
                         String err = Data.renameSlot(a, s.name, nv);
-                        if (err != null) { alert(a, a.getString(R.string.rename_failed), err); return; }
+                        if (err != null) { alert(a, Trans.get(a, R.string.rename_failed), err); return; }
                         String clean = Data.sanitizeSlot(nv);
                         if (clean != null) {
                             Backup.renameSlotBackups(a, s.name, clean);
                             int n = Config.get().retargetSlots(s.name, clean);
-                            if (n > 0) toast(a, a.getString(R.string.renamed_slots_fmt, n));
+                            if (n > 0) toast(a, Trans.get(a, R.string.renamed_slots_fmt, n));
                         }
                         h.onSlotChanged();
                     }
@@ -507,23 +507,23 @@ final class SlotOps {
      */
     static void deleteSlot(final Activity a, final Data.Slot s, final Host h) {
         if (s.active) {
-            alert(a, a.getString(R.string.delete_current_slot_title),
-                    a.getString(R.string.delete_current_slot_msg_fmt, s.name));
+            alert(a, Trans.get(a, R.string.delete_current_slot_title),
+                    Trans.get(a, R.string.delete_current_slot_msg_fmt, s.name));
             return;
         }
         final List<Backup.Snapshot> snaps = Backup.list(a, s.name);
         StringBuilder sb = new StringBuilder();
-        sb.append(a.getString(R.string.delete_slot_warn));
+        sb.append(Trans.get(a, R.string.delete_slot_warn));
         sb.append(s.dir == null ? "?" : s.dir.getAbsolutePath()).append('\n');
-        sb.append(a.getString(R.string.delete_slot_files_fmt, s.files, Util.formatSize(s.bytes)));
+        sb.append(Trans.get(a, R.string.delete_slot_files_fmt, s.files, Util.formatSize(s.bytes)));
         if (!snaps.isEmpty()) {
-            sb.append(a.getString(R.string.delete_slot_with_backups_fmt, snaps.size()));
+            sb.append(Trans.get(a, R.string.delete_slot_with_backups_fmt, snaps.size()));
         } else {
-            sb.append(a.getString(R.string.delete_slot_no_backups));
+            sb.append(Trans.get(a, R.string.delete_slot_no_backups));
         }
-        sb.append(a.getString(R.string.delete_slot_cap_fmt, Trash.KEEP_SLOTS));
+        sb.append(Trans.get(a, R.string.delete_slot_cap_fmt, Trash.KEEP_SLOTS));
         new AlertDialog.Builder(a)
-                .setTitle(a.getString(R.string.delete_slot_confirm_title_fmt, s.name))
+                .setTitle(Trans.get(a, R.string.delete_slot_confirm_title_fmt, s.name))
                 .setMessage(sb.toString())
                 // ★ 按钮文案**必须与动作一致**：这里已经**不是**永久删除（整槽进中转站了）。
                 //   原先复用 `delete_forever`（「永久删除」）—— 正文说"会挪进中转站"、按钮说"永久删除"，
@@ -532,13 +532,13 @@ final class SlotOps {
                     @Override public void onClick(DialogInterface d, int w) {
                         Trash.Result r = Trash.trashSlot(a, s.name, Backup.rootDir(a));
                         if (!r.ok) {
-                            alert(a, a.getString(R.string.delete_failed),
+                            alert(a, Trans.get(a, R.string.delete_failed),
                                     TrashText.reason(a, r));
                         } else {
                             int n = Config.get().retargetSlots(s.name, "");
                             Toast.makeText(a,
-                                    a.getString(R.string.slot_deleted_fmt, s.name)
-                                            + (n > 0 ? a.getString(R.string.slot_deleted_fallback_fmt, n) : ""),
+                                    Trans.get(a, R.string.slot_deleted_fmt, s.name)
+                                            + (n > 0 ? Trans.get(a, R.string.slot_deleted_fallback_fmt, n) : ""),
                                     Toast.LENGTH_LONG).show();
                         }
                         h.onSlotChanged();
@@ -573,7 +573,7 @@ final class SlotOps {
         int checked = -1;
         for (int i = 0; i < slots.size(); i++) {
             Data.Slot s = slots.get(i);
-            names[i] = s.name + (s.active ? a.getString(R.string.slot_current_suffix) : "");
+            names[i] = s.name + (s.active ? Trans.get(a, R.string.slot_current_suffix) : "");
             if (s.name.equals(prefer)) checked = i;
         }
         new AlertDialog.Builder(a)

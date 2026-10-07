@@ -243,7 +243,7 @@ public final class Backup {
                 if (ss.count == 0) {
                     throw new IOException(Trans.get(ctx, R.string.backup_err_nothing_fmt,
                             slot, src.getAbsolutePath(),
-                            join(Data.SLOT_EXCLUDE, ctx.getString(R.string.list_join_sep))));
+                            join(Data.SLOT_EXCLUDE, Trans.get(ctx, R.string.list_join_sep))));
                 }
                 if (!dest.mkdirs() && !dest.isDirectory()) {
                     throw new IOException(Trans.get(ctx, R.string.backup_err_snapshot_mkdir_fmt,

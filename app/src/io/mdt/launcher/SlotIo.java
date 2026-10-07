@@ -227,7 +227,7 @@ final class SlotIo {
         File dir = new File(Data.dirOf(a, s.name), "saves");
         File[] fs = dir.listFiles(ONLY_FILES);
         if (fs == null || fs.length == 0) {
-            toast(a, a.getString(R.string.export_no_save_fmt, s.name));
+            toast(a, Trans.get(a, R.string.export_no_save_fmt, s.name));
             return;
         }
         // ★★ 列表本体走 {@link #fillSaves}（与存档页**同一套实现**：后台渐进补 + 只刷那一行）
@@ -286,7 +286,7 @@ final class SlotIo {
                         if (Util.dead(a)) return;
                         if (titles.length == 0) {
                             // 扫盘之后发现其实都读得出来（用户刚在游戏里覆盖保存过）
-                            toast(a, a.getString(R.string.msav_all_ok));
+                            toast(a, Trans.get(a, R.string.msav_all_ok));
                             return;
                         }
                         View listView = a.getLayoutInflater().inflate(R.layout.dialog_msav_list, null);
@@ -294,7 +294,7 @@ final class SlotIo {
                                 (android.widget.ListView) listView.findViewById(R.id.msav_list);
                         lv.setAdapter(new MsavListAdapter(a, titles, subs));
                         new AlertDialog.Builder(a)
-                                .setTitle(a.getString(R.string.msav_bad_list_title_fmt, titles.length))
+                                .setTitle(Trans.get(a, R.string.msav_bad_list_title_fmt, titles.length))
                                 .setView(listView)
                                 .setPositiveButton(R.string.close, null)
                                 .show();
@@ -342,7 +342,7 @@ final class SlotIo {
                             iv.setVisibility(View.VISIBLE);
                         }
                         new AlertDialog.Builder(a)
-                                .setTitle(a.getString(R.string.save_detail_title_fmt, f.getName()))
+                                .setTitle(Trans.get(a, R.string.save_detail_title_fmt, f.getName()))
                                 .setView(box)
                                 .setPositiveButton(R.string.save_detail_export,
                                         new DialogInterface.OnClickListener() {
@@ -368,7 +368,7 @@ final class SlotIo {
         StringBuilder sb = new StringBuilder();
         if (m != null && m.ok) {
             String n = Mods.stripColors(m.displayName()).trim();
-            if (!n.isEmpty()) sb.append(a.getString(R.string.msav_lbl_map_fmt, n)).append('\n');
+            if (!n.isEmpty()) sb.append(Trans.get(a, R.string.msav_lbl_map_fmt, n)).append('\n');
         }
         sb.append(MsavText.detail(a, m));
         return sb.toString();
@@ -385,14 +385,14 @@ final class SlotIo {
         sExportSlot = null;
         a.startActivityForResult(Intent.createChooser(
                 Exporter.createDoc(f.getName(), "application/octet-stream"),
-                a.getString(R.string.chooser_export)), REQ_EXPORT);
+                Trans.get(a, R.string.chooser_export)), REQ_EXPORT);
     }
 
     /** 存档行第二行（只此一处）：口径在 {@link MsavText#shortLine} */
     private static String msavLine(Activity a, MsavMeta m) {
         if (m == null || !m.ok) {
             // ★ 原因走 `MsavText.userReason()`（异常类名要翻成白话），不是原始的 `error`（那是给排查看的）
-            return m == null ? "" : a.getString(R.string.msav_unreadable_fmt, MsavText.userReason(a, m));
+            return m == null ? "" : Trans.get(a, R.string.msav_unreadable_fmt, MsavText.userReason(a, m));
         }
         return MsavText.shortLine(a, m, true);
     }
@@ -416,12 +416,12 @@ final class SlotIo {
             // ★ 拦在 SAF **之前**。放到后面的话用户已经点了"保存"，
             //   系统会先建出一个 0 字节的 zip 我们才报错 —— 白留垃圾还让人以为导出过。
             //   文案刻意简短：Toast 只有两行，塞清单会被截断（实测）。
-            toast(a, a.getString(R.string.export_slot_empty_fmt));
+            toast(a, Trans.get(a, R.string.export_slot_empty_fmt));
             return;
         }
         new AlertDialog.Builder(a)
-                .setTitle(a.getString(R.string.export_slot_title_fmt, s.name))
-                .setMessage(a.getString(R.string.export_slot_msg_fmt,
+                .setTitle(Trans.get(a, R.string.export_slot_title_fmt, s.name))
+                .setMessage(Trans.get(a, R.string.export_slot_msg_fmt,
                         Data.gameAlive(a) ? a.getString(R.string.export_slot_playing) : ""))
                 .setPositiveButton(R.string.export_ok, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int w) {
@@ -431,7 +431,7 @@ final class SlotIo {
                         sExportSrc = null;
                         a.startActivityForResult(Intent.createChooser(
                                 Exporter.createDoc(suggestZipName(s.name), "application/zip"),
-                                a.getString(R.string.chooser_export)), REQ_EXPORT);
+                                Trans.get(a, R.string.chooser_export)), REQ_EXPORT);
                     }
                 })
                 .setNegativeButton(R.string.cancel, null)
@@ -474,10 +474,10 @@ final class SlotIo {
                 a.runOnUiThread(new Runnable() {
                     @Override public void run() {
                         if (fe != null) {
-                            alert(a, a.getString(R.string.export_failed), fe);
+                            alert(a, Trans.get(a, R.string.export_failed), fe);
                             return;
                         }
-                        toast(a, a.getString(R.string.export_done_fmt,
+                        toast(a, Trans.get(a, R.string.export_done_fmt,
                                 src.getName(), Util.formatSize(fn)));
                     }
                 });
@@ -487,13 +487,13 @@ final class SlotIo {
 
     private static void doExportSlot(final Activity a, final Uri uri, final String slot, final List<File> roots) {
         if (roots == null || roots.isEmpty()) {
-            alert(a, a.getString(R.string.export_failed),
-                    a.getString(R.string.export_slot_empty_fmt));
+            alert(a, Trans.get(a, R.string.export_failed),
+                    Trans.get(a, R.string.export_slot_empty_fmt));
             return;
         }
         final ProgressDialog pd = ProgressDialog.show(a,
-                a.getString(R.string.export_progress_title),
-                a.getString(R.string.export_progress_msg_fmt, slot), true, false);
+                Trans.get(a, R.string.export_progress_title),
+                Trans.get(a, R.string.export_progress_msg_fmt, slot), true, false);
         new Thread(new Runnable() {
             @Override public void run() {
                 String err = null;
@@ -511,10 +511,10 @@ final class SlotIo {
                     @Override public void run() {
                         pd.dismiss();
                         if (fe != null) {
-                            alert(a, a.getString(R.string.export_failed), fe);
+                            alert(a, Trans.get(a, R.string.export_failed), fe);
                             return;
                         }
-                        toast(a, a.getString(R.string.export_slot_done_fmt,
+                        toast(a, Trans.get(a, R.string.export_slot_done_fmt,
                                 fr.files, Util.formatSize(fr.outBytes)));
                     }
                 });
@@ -532,8 +532,8 @@ final class SlotIo {
     /** 目标槽是否正被游戏占用（占用了就不许往里写，除非是纯读的导出） */
     private static boolean blockedByGame(Activity a, Data.Slot s) {
         if (s.active && Data.gameAlive(a)) {
-            alert(a, a.getString(R.string.game_busy_title),
-                    a.getString(R.string.game_busy_msg_fmt, s.name));
+            alert(a, Trans.get(a, R.string.game_busy_title),
+                    Trans.get(a, R.string.game_busy_msg_fmt, s.name));
             return true;
         }
         return false;
@@ -561,7 +561,7 @@ final class SlotIo {
         // */*：各家文件管理器对 .msav 的 MIME 报得五花八门，限死会让用户选不中自己的存档
         i.setType("*/*");
         a.startActivityForResult(
-                Intent.createChooser(i, a.getString(R.string.chooser_pick_msav)), REQ_MSAV);
+                Intent.createChooser(i, Trans.get(a, R.string.chooser_pick_msav)), REQ_MSAV);
     }
 
     /**
@@ -578,8 +578,8 @@ final class SlotIo {
      */
     private static void importMsav(final Activity a, final Uri uri, final String displayName, final String slot, final SlotOps.Host h) {
         final ProgressDialog pd = ProgressDialog.show(a,
-                a.getString(R.string.msav_import_progress_title),
-                a.getString(R.string.msav_import_progress_msg_fmt, displayName, slot), true, false);
+                Trans.get(a, R.string.msav_import_progress_title),
+                Trans.get(a, R.string.msav_import_progress_msg_fmt, displayName, slot), true, false);
         new Thread(new Runnable() {
             @Override public void run() {
                 String err = null;
@@ -597,7 +597,7 @@ final class SlotIo {
                     @Override public void run() {
                         pd.dismiss();
                         if (fe != null) {
-                            alert(a, a.getString(R.string.import_failed), fe);
+                            alert(a, Trans.get(a, R.string.import_failed), fe);
                             return;
                         }
                         // ★ 接下来弹的是**改名框**（inline AlertDialog）⇒ 实例死了就必须停在这里，
@@ -632,7 +632,7 @@ final class SlotIo {
         if (!st.zlib) form.findViewById(R.id.msav_warn).setVisibility(View.VISIBLE);
 
         final AlertDialog dlg = new AlertDialog.Builder(a)
-                .setTitle(a.getString(R.string.msav_name_title_fmt, slot))
+                .setTitle(Trans.get(a, R.string.msav_name_title_fmt, slot))
                 .setView(form)
                 .setPositiveButton(st.zlib ? R.string.import_btn : R.string.import_anyway, null)
                 .setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
@@ -649,7 +649,7 @@ final class SlotIo {
                     @Override public void onClick(View v) {
                         String raw = name.getText().toString().trim();
                         if (raw.isEmpty()) {
-                            toast(a, a.getString(R.string.msav_name_empty));
+                            toast(a, Trans.get(a, R.string.msav_name_empty));
                             return;
                         }
                         st.base = Msav.safeName(raw);
@@ -693,8 +693,8 @@ final class SlotIo {
                                              final String slot, final SlotOps.Host h,
                                              final String fileName) {
         new AlertDialog.Builder(a)
-                .setTitle(a.getString(R.string.msav_overwrite_title))
-                .setMessage(a.getString(R.string.msav_overwrite_msg_fmt, slot, fileName))
+                .setTitle(Trans.get(a, R.string.msav_overwrite_title))
+                .setMessage(Trans.get(a, R.string.msav_overwrite_msg_fmt, slot, fileName))
                 .setPositiveButton(R.string.msav_overwrite_ok,
                         new DialogInterface.OnClickListener() {
                             @Override public void onClick(DialogInterface d, int w) {
@@ -719,13 +719,13 @@ final class SlotIo {
     private static void commitMsav(final Activity a, Msav.Stage st, String slot, final SlotOps.Host h) {
         try {
             File dest = Msav.commit(a, st);
-            Toast.makeText(a, a.getString(R.string.msav_imported_fmt, slot, dest.getName()),
+            Toast.makeText(a, Trans.get(a, R.string.msav_imported_fmt, slot, dest.getName()),
                     Toast.LENGTH_LONG).show();
         } catch (IOException e) {
             Msav.discard(st);
             // ★ 2026-10-06：弹窗正文走 `Util.ioReason`（系统 errno 翻白话），原文进日志
             android.util.Log.w("MDTLauncher", "msav commit failed", e);
-            alert(a, a.getString(R.string.import_failed), Util.ioReason(a, e));
+            alert(a, Trans.get(a, R.string.import_failed), Util.ioReason(a, e));
         }
         h.onSlotChanged();
     }
@@ -748,7 +748,7 @@ final class SlotIo {
         // 报得五花八门（octet-stream、x-zip-compressed…），限死会让用户选不中自己的包。
         i.setType("*/*");
         a.startActivityForResult(
-                Intent.createChooser(i, a.getString(R.string.chooser_pick_zip)), REQ_ZIP);
+                Intent.createChooser(i, Trans.get(a, R.string.chooser_pick_zip)), REQ_ZIP);
     }
 
     /**
@@ -765,7 +765,7 @@ final class SlotIo {
      */
     static void devReadZip(final Activity a, final File zip, final String slotArg, final SlotOps.Host h) {
         if (zip == null || !zip.isFile()) {
-            toast(a, a.getString(R.string.zip_import_failed) + "：" + zip);
+            toast(a, Trans.get(a, R.string.zip_import_failed) + "：" + zip);
             return;
         }
         final String slot = (slotArg == null || slotArg.trim().isEmpty())
@@ -782,8 +782,8 @@ final class SlotIo {
      */
     private static void readZipThenConfirm(final Activity a, final Uri uri, final String zipName, final String slot, final SlotOps.Host h) {
         final ProgressDialog pd = ProgressDialog.show(a,
-                a.getString(R.string.zip_read_progress_title),
-                a.getString(R.string.zip_read_progress_msg_fmt, zipName), true, false);
+                Trans.get(a, R.string.zip_read_progress_title),
+                Trans.get(a, R.string.zip_read_progress_msg_fmt, zipName), true, false);
         new Thread(new Runnable() {
             @Override public void run() {
                 String err = null;
@@ -792,7 +792,7 @@ final class SlotIo {
                 try {
                     tmp = SlotZip.stage(a, uri);
                     inf = SlotZip.inspect(a, tmp);
-                    if (inf.empty()) throw new IOException(a.getString(R.string.zip_nothing));
+                    if (inf.empty()) throw new IOException(Trans.get(a, R.string.zip_nothing));
                 } catch (Exception e) {
                     err = Util.ioReason(a, e);
                     SlotZip.unstage(tmp);
@@ -806,7 +806,7 @@ final class SlotIo {
                     @Override public void run() {
                         pd.dismiss();
                         if (fe != null) {
-                            alert(a, a.getString(R.string.zip_read_failed), fe);
+                            alert(a, Trans.get(a, R.string.zip_read_failed), fe);
                             return;
                         }
                         // ★ 下面弹的是 inline 确认框 ⇒ 实例死了必须停，并**把临时包清掉**
@@ -839,24 +839,24 @@ final class SlotIo {
         final SlotModes modes = SlotModes.bind(a, form);      // 默认「更新」（= 老行为）
 
         StringBuilder sb = new StringBuilder();
-        sb.append(a.getString(R.string.zip_confirm_head_fmt, inf.files,
+        sb.append(Trans.get(a, R.string.zip_confirm_head_fmt, inf.files,
                 inf.sizeKnown ? Util.formatSize(inf.bytes) : a.getString(R.string.zip_size_unknown)));
         if (!inf.tops.isEmpty()) {
-            sb.append(a.getString(R.string.zip_confirm_tops_fmt, joinList(inf.tops)));
+            sb.append(Trans.get(a, R.string.zip_confirm_tops_fmt, joinList(inf.tops)));
         }
         if (!inf.strip.isEmpty()) {
-            sb.append(a.getString(R.string.zip_confirm_strip_fmt,
+            sb.append(Trans.get(a, R.string.zip_confirm_strip_fmt,
                     inf.strip.substring(0, inf.strip.length() - 1)));
         }
-        sb.append(inf.nativeFormat ? a.getString(R.string.zip_tag_native)
-                                   : a.getString(R.string.zip_tag_custom));
+        sb.append(inf.nativeFormat ? Trans.get(a, R.string.zip_tag_native)
+                                   : Trans.get(a, R.string.zip_tag_custom));
         list.setText(sb.toString());
 
         StringBuilder wn = new StringBuilder();
-        if (!inf.known) wn.append(a.getString(R.string.zip_warn_unknown));
+        if (!inf.known) wn.append(Trans.get(a, R.string.zip_warn_unknown));
         if (inf.skipped > 0) {
             if (wn.length() > 0) wn.append("\n\n");
-            wn.append(a.getString(R.string.zip_warn_skipped_fmt, inf.skipped));
+            wn.append(Trans.get(a, R.string.zip_warn_skipped_fmt, inf.skipped));
         }
         if (wn.length() > 0) {
             warn.setText(wn.toString());
@@ -864,7 +864,7 @@ final class SlotIo {
         }
 
         new AlertDialog.Builder(a)
-                .setTitle(a.getString(R.string.zip_confirm_title_fmt, slot))
+                .setTitle(Trans.get(a, R.string.zip_confirm_title_fmt, slot))
                 .setView(form)
                 .setPositiveButton(R.string.import_btn, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int w) {
@@ -884,12 +884,12 @@ final class SlotIo {
         final File zip = sZipTmp;
         final SlotZip.Info inf = sZipInfo;
         if (zip == null) {
-            toast(a, a.getString(R.string.zip_import_failed));
+            toast(a, Trans.get(a, R.string.zip_import_failed));
             return;
         }
         final ProgressDialog pd = ProgressDialog.show(a,
-                a.getString(R.string.zip_extract_progress_title),
-                a.getString(R.string.zip_extract_progress_msg_fmt, slot), true, false);
+                Trans.get(a, R.string.zip_extract_progress_title),
+                Trans.get(a, R.string.zip_extract_progress_msg_fmt, slot), true, false);
         new Thread(new Runnable() {
             @Override public void run() {
                 String err = null;
@@ -898,7 +898,7 @@ final class SlotIo {
                 try {
                     // ★★ 槽操作前的自动备份（用户 2026-10-05：「在槽操作前都自动备份吧」）。
                     //    放在**解包之前**、同一个后台线程里 —— 它就是给"这一下改坏了"兜底的。
-                    auto = AutoBackup.beforeSlotOp(a, slot, a.getString(R.string.backup_auto_zip));
+                    auto = AutoBackup.beforeSlotOp(a, slot, Trans.get(a, R.string.backup_auto_zip));
                     r = SlotZip.extract(a, zip, inf, slot, mode);
                 } catch (Exception e) {
                     err = Util.ioReason(a, e);
@@ -914,25 +914,25 @@ final class SlotIo {
                         sZipTmp = null;
                         sZipInfo = null;
                         if (fe != null) {
-                            alert(a, a.getString(R.string.zip_import_failed), fe);
+                            alert(a, Trans.get(a, R.string.zip_import_failed), fe);
                             h.onSlotChanged();
                             return;
                         }
                         StringBuilder ex = new StringBuilder();
                         if (fr.kept > 0) {
-                            ex.append(a.getString(R.string.zip_import_kept_fmt, fr.kept));
+                            ex.append(Trans.get(a, R.string.zip_import_kept_fmt, fr.kept));
                         }
                         if (!fr.wiped.isEmpty()) {
-                            ex.append(a.getString(R.string.zip_import_wiped_fmt, joinList(fr.wiped)));
+                            ex.append(Trans.get(a, R.string.zip_import_wiped_fmt, joinList(fr.wiped)));
                         }
                         if (fr.skipped > 0) {
-                            ex.append(a.getString(R.string.zip_import_skipped_fmt, fr.skipped));
+                            ex.append(Trans.get(a, R.string.zip_import_skipped_fmt, fr.skipped));
                         }
                         if (fauto != null) {
-                            ex.append(a.getString(R.string.slot_autobak_done_fmt, fauto.title()));
+                            ex.append(Trans.get(a, R.string.slot_autobak_done_fmt, fauto.title()));
                         }
-                        alert(a, a.getString(R.string.zip_import_done),
-                                a.getString(R.string.zip_import_ok_fmt, slot, fr.files,
+                        alert(a, Trans.get(a, R.string.zip_import_done),
+                                Trans.get(a, R.string.zip_import_ok_fmt, slot, fr.files,
                                         Util.formatSize(fr.bytes), ex.toString()));
                         h.onSlotChanged();
                     }
