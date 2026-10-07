@@ -23,7 +23,7 @@ versions installed side by side, each with separate **saves / maps / mods**.
 | One version at a time — a second install overwrites the first | Several versions installed at once (159.7 / 160.4 / MindustryX X37 …), none overwriting the others |
 | Every version shares one set of saves, so switching versions replaces them | Each version is assigned to a **slot**; saves / maps / mods are fully independent |
 | Going back to an old version for an old save means shuffling files by hand | Switch versions with one tap; **Continue** picks up the version you played last |
-| Saves can only be pulled off the phone with adb | Export / import saves in the app; pack a whole slot as a zip |
+| Exporting or importing a save means opening the game and going through its own save menu, one save at a time | Export / import saves right in the launcher (the game does not have to be started); pack a whole slot as a zip |
 | "Why is this mod not taking effect?" — no way to find out | Every mod states whether it will load and why; conflicts between mods are pointed out |
 | Backups pile up and eat space | Backups are deduplicated by content (measured on a real device: 74.4% saved) |
 

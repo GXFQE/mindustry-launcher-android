@@ -20,7 +20,11 @@ import java.util.zip.ZipOutputStream;
  *
  * 存在理由（对称性缺口）：{@link Importer} / {@link Msav} 只解决了"进"，
  * 而 Android 11+ 起 `Android/data/&lt;包名&gt;/` 对文件管理器和 MTP 都**不可见**
- * （实测：只有 adb 进得去）⇒ 用户没有任何官方途径把存档拿出来。
+ * （实测：只有 adb 进得去）⇒ **在启动器里**没有任何出口。
+ * ⚠️ **2026-10-06 订正**：这句话原来写的是"用户没有任何官方途径把存档拿出来"，**是错的** ——
+ * 游戏**自己**的存档菜单里就有导出 / 导入（bundle 键 `save.export` / `save.import.fail` /
+ * `save.import.invalid`），只是要**先进游戏**、**一次一份**、没有"整个槽"的概念。
+ * F6 补的是**启动器这一侧的对称出口** + 整槽打包，不是"从无到有"。
  * SAF 的 `ACTION_CREATE_DOCUMENT` 是这条路上唯一不需要任何存储权限的出口：
  * 用户自己选落点，我们只拿到一个 `content://` 写句柄，全程不碰路径、不碰 SELinux 标签
  * （与 {@link Importer} 的输入侧完全对称）。
