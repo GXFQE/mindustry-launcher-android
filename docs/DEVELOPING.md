@@ -160,26 +160,59 @@ Trans.bind(root, R.id.tx_xxx, R.string.xxx)  // 按 id 取控件再设（布局�
 
 | 事实 | 数值 / 说明 |
 |---|---|
-| `Trans` 当前行为 | **完全等价于 `ctx.getString(…)`**（薄壳，零行为变化） |
-| 收口用了 6 个阶段 | 布局 25（`Trans.bind`）· Activity 353 · 非 Activity 398 · `Activity a` 形参 111 · 收尾 13 |
+| `Trans` 当前行为 | 用户语言包（若有）→ 系统资源兜底（2026-10-07 接上，见下） |
+| 收口用了 6 个阶段 | 布局 25（`Trans.bind`）· Activity 353 · 非 Activity 398 · `Activity a` 形参 111 · 收尾 13 · **`setText(resId)` 33** |
 | 为什么 `bind` 收 `View` 不收 `TextView` | 布局里带文案的还有 `CheckBox`/`RadioButton`/`EditText`(hint)，它们**没有共同父类**能 setText |
 | 布局里的静态文案 | **一律搬进 Java**（布局的 `android:text="@string/x"` 由 Android 自己解析，`Trans` 够不到）。9 个布局、25 处，硬约束见 `ref/29-五-动手前的硬约束.md`（「判据类」那条） |
 
 ⚠️ **`SelfTest.java` 的 188 处不动**：它钉死 `LocaleMode.SELFTEST`（zh），
 且它自己就是"中文当判据"那门课的重灾区（改文案会打断老断言 —— 那是它该做的）。
 
-🔴 **接"用户语言包"时必须守的三条**（写在 `Trans` 的 Javadoc 里，动手前读它）：
-① 顺序 = **用户包优先、系统资源兜底**；② **占位符的序号与类型必须逐条比对**，不匹配就拒绝装
-（`%2$d` 收到字符串会**直接崩主进程** —— 第 112 轮真踩过）；③ `resId → 键名`的反查要**缓存**
-（932 处是热路径，且对非 string 资源会抛）。
+#### 用户语言包（2026-10-07 已实现）
 
-★ **批量替换这类改动（本仓库做过 6 次）的四条教训**（都导致过构建失败，但**都靠编译器抓到了**）：
+用户在 **`<私有目录>/lang.properties`**（`app_hub/lang.properties`，UTF-8、**无 BOM**）放一份
+`键名=译文` 就能改界面文案，不用重新发版：
+
+```properties
+act_saves_title=存档与备份
+main_continue_fmt=继续上次 · %1$s
+```
+
+| 行为 | 说明 |
+|---|---|
+| 顺序 | **用户包优先 → 系统资源兜底**（没翻的键跟随界面语言，不是回落英文） |
+| **占位符门禁** | 个数 / 位置序号（`%1$s` 的 1）/ 类型字符 / 裸 `%` **逐条比对**；不符的**那一条**拒用（回落），其余照常。原因进 `Pack.rejected`，提示文案本身走资源（8 条 `lang_err_*` / `lang_*`） |
+| 认不出的键 | 进 `Pack.unknown`（版本对不上 / 打错字），不报错、不生效 |
+| 变更检测 | 只看文件**长度与存在性**（换包 / 删包会被发现；不比 mtime） |
+| 性能 | 键名表反射 `R.string` 字段建一次 + `resId → 键名` 缓存；命中用户包才 `String.format` |
+| 英文模板 | 一次性 `createConfigurationContext(Locale.ENGLISH)`，**绝不碰 `Locale.setDefault()`** |
+
+★ **真机验过的判据**（塞一份 3 键的包：1 正常 / 1 占位符故意写错 / 1 个不存在的键）：
+`used=1 missing=1083 unknown=1 rejected=1`，界面显示包里的文案，被拒那条正确回落系统资源，
+`adb logcat -s MDTLauncher` 里**恰好一条** `lang pack loaded`。
+
+🔴 **两个坑（都进 `ref/29` 了）**：① `parse()` 里取提示文案会调 `Trans.get` ⇒ 重入
+`maybeReload`（此时 `sLoadedLen` 还没更新）⇒ **无限递归**，用 `sLoading` 挡；
+② `.properties` 带 **BOM** 时第一个键名变 `\ufeff<key>` ⇒ `used=0`（PowerShell 的
+`Set-Content -Encoding utf8` 就会写 BOM）。
+
+🔴 **接"用户语言包"必须守的三条**（写在 `Trans` 的 Javadoc 里，动手前读它）：
+① 顺序 = **用户包优先、系统资源兜底**；② **占位符的序号与类型必须逐条比对**，不匹配就拒绝
+（`%2$d` 收到字符串会**直接崩主进程** —— 第 112 轮真踩过）；③ `resId → 键名`的反查要**缓存**
+（932 处是热路径）。
+
+★ **批量替换这类改动（本仓库做过 7 次）的五条教训**（都导致过构建失败，但**都靠编译器抓到了**）：
 ① 模式**必须包含 `R.string.`** —— 只找 `getString(` 会把 `Cursor.getString(列索引)` 也吃掉
-（误伤两次）；② `this` 在匿名 `Runnable`/lambda 里**不是** Activity ⇒ 用 `XxxActivity.this`；
-③ 括号配对**要跳过字符串字面量**（实参里的引号会把配对算错）；
-④ 单行正则漏跨行调用 ⇒ 用括号配对扫全文。
+（误伤两次）；② **`setText(resId)` 也是取值路径**（框架自己按 resId 取系统资源）——
+只收 `getString` 会漏掉 33 处；③ `this` 在匿名 `Runnable`/lambda 里**不是** Activity ⇒
+用 `XxxActivity.this`；④ 括号配对**要跳过字符串字面量**；⑤ 单行正则漏跨行调用 ⇒ 用括号配对扫全文。
 ⚠️ 真正危险的是**编译器抓不住**的那类（把 `R.string.a` 换成 `R.string.b`）——
-那只能靠"只提供一个键的用户包 ⇒ 只改那一句、其余 900+ 处逐字不变"这条**元断言**兜底（待接用户包时实现）。
+那只能靠"只提供一个键的用户包 ⇒ 只改那一句、其余 900+ 处逐字不变"这条**元断言**兜底
+（**待实现**，见下）。
+
+⚠️ **还没做的**：① 设置页的导入 / 卸载界面（现在只有 `Trans.parse` / `install` / `uninstall`
+三个 API + 报告对象，**没有界面**）；② 把 `install` 接进 `SelfTest` 的元断言；
+③ 上面那条"单键包只改一句"的验收断言。
 
 > 设计与成本定案（含"方案 A 编进 APK vs 方案 B 用户自带"的对照，以及游戏侧外部语言包的实测）见
 > [`i18n-user-bundles.md`](i18n-user-bundles.md)。
