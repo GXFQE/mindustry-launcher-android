@@ -141,7 +141,6 @@
             android:paddingEnd="14dp"
             android:paddingTop="6dp"
             android:paddingBottom="6dp"
-            android:text="@string/row_slot_btn"
             android:textSize="13sp"
             android:fontFamily="sans-serif-medium"
             android:textColor="@color/accent" />

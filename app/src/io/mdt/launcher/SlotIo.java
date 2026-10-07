@@ -626,6 +626,9 @@ final class SlotIo {
         final EditText name = (EditText) form.findViewById(R.id.msav_name);
         name.setText(Msav.baseName(st.base));
         name.setSelection(name.getText().length());
+        // 布局里那些静态文案已搬到 Java（见 Trans）：布局够不到用户语言包
+        Trans.bind(form, R.id.tx_msav_name_hint, R.string.msav_name_hint);
+        Trans.bind(form, R.id.msav_warn, R.string.msav_not_zlib_warn);
         if (!st.zlib) form.findViewById(R.id.msav_warn).setVisibility(View.VISIBLE);
 
         final AlertDialog dlg = new AlertDialog.Builder(a)

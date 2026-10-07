@@ -237,6 +237,12 @@ final class SlotOps {
     private static void confirmRestore(final Activity a, final Data.Slot s,
                                        final Backup.Snapshot ss, final Host h) {
         View form = a.getLayoutInflater().inflate(R.layout.dialog_slot_mode, null);
+        // 布局里那些静态文案已搬到 Java（见 Trans）：布局够不到用户语言包
+        Trans.bind(form, R.id.tx_slot_mode_title, R.string.slot_mode_title);
+        Trans.bind(form, R.id.slot_mode_update, R.string.slot_mode_update);
+        Trans.bind(form, R.id.slot_mode_keep, R.string.slot_mode_keep);
+        Trans.bind(form, R.id.slot_mode_replace, R.string.slot_mode_replace);
+        Trans.bind(form, R.id.tx_slot_mode_autobak_note, R.string.slot_mode_autobak_note);
         final SlotModes modes = SlotModes.bind(a, form);
         new AlertDialog.Builder(a)
                 .setTitle(R.string.restore_confirm_title)
@@ -376,6 +382,13 @@ final class SlotOps {
 
         // F5b：表单走 XML（res/layout/dialog_policy.xml），不再是"代码拼一堆裸控件"。
         View form = a.getLayoutInflater().inflate(R.layout.dialog_policy, null);
+        // 布局里那些静态文案已搬到 Java（见 Trans）：布局够不到用户语言包
+        Trans.bind(form, R.id.pol_enabled, R.string.policy_enabled);
+        Trans.bind(form, R.id.tx_policy_enabled_hint, R.string.policy_enabled_hint);
+        Trans.bind(form, R.id.tx_policy_min, R.string.policy_min);
+        Trans.bind(form, R.id.tx_policy_min_hint, R.string.policy_min_hint);
+        Trans.bind(form, R.id.tx_policy_max, R.string.policy_max);
+        Trans.bind(form, R.id.tx_policy_max_hint, R.string.policy_max_hint);
         final CheckBox on = (CheckBox) form.findViewById(R.id.pol_enabled);
         final View minBox = form.findViewById(R.id.pol_min_box);
         final View maxBox = form.findViewById(R.id.pol_max_box);

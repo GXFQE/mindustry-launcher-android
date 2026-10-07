@@ -200,6 +200,15 @@ public class LogActivity extends BaseActivity {
 
         Util.applySystemInsets(root);
         setContentView(root);
+
+        // 布局里那些静态文案已搬到 Java（见 Trans）：布局够不到用户语言包
+        Trans.bind(root, R.id.tx_log_game_title, R.string.log_game_title);
+        Trans.bind(root, R.id.log_game_copy, R.string.log_copy);
+        Trans.bind(root, R.id.tx_log_hub_title, R.string.log_hub_title);
+        Trans.bind(root, R.id.log_hub_copy, R.string.log_copy);
+        Trans.bind(root, R.id.tx_log_crash_title, R.string.log_crash_title);
+        Trans.bind(root, R.id.log_crash_copy, R.string.log_copy);
+
     }
 
     // ── 读取（全部在后台线程） ────────────────────────────────────────────

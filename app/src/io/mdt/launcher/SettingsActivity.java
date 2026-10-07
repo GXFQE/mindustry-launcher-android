@@ -146,6 +146,10 @@ public class SettingsActivity extends BaseActivity {
 
         Util.applySystemInsets(root);
         setContentView(root);
+
+        // 布局里那些静态文案已搬到 Java（见 Trans）：布局够不到用户语言包
+        Trans.bind(root, R.id.tx_about_card_title, R.string.about_card_title);
+
     }
 
     /**

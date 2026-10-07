@@ -17,10 +17,10 @@
     android:orientation="vertical">
 
     <TextView
+                        android:id="@+id/tx_slot_mode_title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="14dp"
-        android:text="@string/slot_mode_title"
         android:textColor="@color/fg"
         android:textSize="14sp"
         android:fontFamily="sans-serif-medium" />
@@ -36,7 +36,6 @@
             android:id="@+id/slot_mode_update"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/slot_mode_update"
             android:textColor="@color/fg"
             android:textSize="15sp" />
 
@@ -44,7 +43,6 @@
             android:id="@+id/slot_mode_keep"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/slot_mode_keep"
             android:textColor="@color/fg"
             android:textSize="15sp" />
 
@@ -52,7 +50,6 @@
             android:id="@+id/slot_mode_replace"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/slot_mode_replace"
             android:textColor="@color/fg"
             android:textSize="15sp" />
     </RadioGroup>
@@ -68,6 +65,7 @@
 
     <!-- 自动备份那句话：三个模式都成立，所以放固定行里，不进随选择变化的摘要 -->
     <TextView
+                        android:id="@+id/tx_slot_mode_autobak_note"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginTop="10dp"
@@ -77,7 +75,6 @@
         android:paddingTop="8dp"
         android:paddingBottom="8dp"
         android:lineSpacingExtra="2dp"
-        android:text="@string/slot_mode_autobak_note"
         android:textColor="@color/fg"
         android:textSize="12sp" />
 </LinearLayout>

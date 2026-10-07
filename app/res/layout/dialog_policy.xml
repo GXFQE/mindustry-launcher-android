@@ -33,14 +33,13 @@
             android:id="@+id/pol_enabled"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/policy_enabled"
             android:textColor="@color/fg"
             android:textSize="15sp" />
 
         <TextView
+                        android:id="@+id/tx_policy_enabled_hint"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/policy_enabled_hint"
             android:textColor="@color/fg_muted"
             android:textSize="12sp"
             android:lineSpacingExtra="2dp" />
@@ -54,18 +53,18 @@
             android:orientation="vertical">
 
             <TextView
+                        android:id="@+id/tx_policy_min"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/policy_min"
                 android:textColor="@color/fg"
                 android:textSize="14sp"
                 android:fontFamily="sans-serif-medium" />
 
             <TextView
+                        android:id="@+id/tx_policy_min_hint"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:paddingTop="2dp"
-                android:text="@string/policy_min_hint"
                 android:textColor="@color/fg_muted"
                 android:textSize="12sp" />
 
@@ -90,18 +89,18 @@
             android:orientation="vertical">
 
             <TextView
+                        android:id="@+id/tx_policy_max"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/policy_max"
                 android:textColor="@color/fg"
                 android:textSize="14sp"
                 android:fontFamily="sans-serif-medium" />
 
             <TextView
+                        android:id="@+id/tx_policy_max_hint"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:paddingTop="2dp"
-                android:text="@string/policy_max_hint"
                 android:textColor="@color/fg_muted"
                 android:textSize="12sp" />
 

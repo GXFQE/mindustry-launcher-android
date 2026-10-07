@@ -185,7 +185,6 @@
             android:layout_marginStart="@dimen/page_pad"
             android:layout_marginEnd="@dimen/page_pad"
             android:layout_marginTop="2dp"
-            android:hint="@string/mods_search_hint"
             android:inputType="text"
             android:maxLength="60"
             android:singleLine="true"

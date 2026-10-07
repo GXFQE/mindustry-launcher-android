@@ -1502,6 +1502,8 @@ public class MainActivity extends BaseActivity {
         for (int i = 0; i < n; i++) {
             final Versions.Entry e = mEntries.get(i);
             View v = inf.inflate(R.layout.item_version, mListContainer, false);
+            // 布局里那些静态文案已搬到 Java（见 Trans）：布局够不到用户语言包
+            Trans.bind(v, R.id.ver_slot_btn, R.string.row_slot_btn);
             bindVersionRow(v, e);
             mListContainer.addView(v);
         }

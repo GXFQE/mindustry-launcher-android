@@ -99,6 +99,11 @@ public class MapsActivity extends BaseActivity {
         //   （用户 2026-10-03 报的"顶部就有问题"就是这个）。
         Util.applySystemInsets(root);
         setContentView(root);
+
+        // 布局里那些静态文案已搬到 Java（见 Trans）：布局够不到用户语言包
+        Trans.bind(root, R.id.tx_map_save_name_hint, R.string.map_save_name_hint);
+        Trans.bind(root, R.id.map_save_warn, R.string.map_save_nocores_warn);
+
         mHead = (TextView) root.findViewById(R.id.maps_head);
         mHead.setText(R.string.maps_scanning);
         mEmpty = (TextView) root.findViewById(R.id.maps_empty);

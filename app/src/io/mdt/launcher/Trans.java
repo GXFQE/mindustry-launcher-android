@@ -74,10 +74,14 @@ public final class Trans {
     /**
      * 从布局里取控件**并**给它绑文案（省掉"先 findViewById 再 setText"两行）。
      * 用于"文案本来就写在 XML 里、控件也没有 id"的那些位置 —— 顺手把 id 加上即可。
+     *
+     * ⚠️ 参数收 {@link android.view.View} 而不是 TextView：布局里带文案的还有
+     *   `CheckBox` / `RadioButton` / `EditText`（hint），它们在 Java 里**没有共同父类**能 setText
+     *   ⇒ 这里按"是不是 TextView"统一处理（CheckBox/RadioButton 都是 TextView 子类，EditText 也是）。
      */
     public static void bind(android.view.View root, int viewId, int resId) {
         if (root == null) return;
-        TextView v = root.findViewById(viewId);
-        bind(v, resId);
+        android.view.View v = root.findViewById(viewId);
+        if (v instanceof TextView) bind((TextView) v, resId);
     }
 }

@@ -179,9 +179,9 @@
                 android:paddingBottom="14dp">
 
                 <TextView
+                        android:id="@+id/tx_about_card_title"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="@string/about_card_title"
                     android:textSize="15sp"
                     android:fontFamily="sans-serif-medium"
                     android:textColor="@color/fg" />

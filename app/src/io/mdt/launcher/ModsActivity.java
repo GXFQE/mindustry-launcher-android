@@ -207,6 +207,10 @@ public class ModsActivity extends BaseActivity {
 
         Util.applySystemInsets(root);
         setContentView(root);
+
+        // 布局里那些静态文案已搬到 Java（见 Trans）：布局够不到用户语言包
+        Trans.bind(root, R.id.mod_search, R.string.mods_search_hint);
+
     }
 
     // ── F13 第三阶段：导入模组包 / 跨槽复制 ────────────────────────────────

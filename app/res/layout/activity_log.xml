@@ -89,12 +89,12 @@
                     android:gravity="center_vertical">
 
                     <TextView
+                        android:id="@+id/tx_log_game_title"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:singleLine="true"
                         android:ellipsize="end"
-                        android:text="@string/log_game_title"
                         android:textSize="15sp"
                         android:fontFamily="sans-serif-medium"
                         android:textColor="@color/fg" />
@@ -111,7 +111,6 @@
                         android:paddingEnd="14dp"
                         android:paddingTop="6dp"
                         android:paddingBottom="6dp"
-                        android:text="@string/log_copy"
                         android:textSize="13sp"
                         android:fontFamily="sans-serif-medium"
                         android:textColor="@color/accent" />
@@ -156,12 +155,12 @@
                     android:gravity="center_vertical">
 
                     <TextView
+                        android:id="@+id/tx_log_hub_title"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:singleLine="true"
                         android:ellipsize="end"
-                        android:text="@string/log_hub_title"
                         android:textSize="15sp"
                         android:fontFamily="sans-serif-medium"
                         android:textColor="@color/fg" />
@@ -178,7 +177,6 @@
                         android:paddingEnd="14dp"
                         android:paddingTop="6dp"
                         android:paddingBottom="6dp"
-                        android:text="@string/log_copy"
                         android:textSize="13sp"
                         android:fontFamily="sans-serif-medium"
                         android:textColor="@color/accent" />
@@ -236,12 +234,12 @@
                     android:gravity="center_vertical">
 
                     <TextView
+                        android:id="@+id/tx_log_crash_title"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:singleLine="true"
                         android:ellipsize="end"
-                        android:text="@string/log_crash_title"
                         android:textSize="15sp"
                         android:fontFamily="sans-serif-medium"
                         android:textColor="@color/fg" />
@@ -258,7 +256,6 @@
                         android:paddingEnd="14dp"
                         android:paddingTop="6dp"
                         android:paddingBottom="6dp"
-                        android:text="@string/log_copy"
                         android:textSize="13sp"
                         android:fontFamily="sans-serif-medium"
                         android:textColor="@color/accent" />

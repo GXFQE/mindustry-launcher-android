@@ -199,6 +199,8 @@ public class SlotsActivity extends BaseActivity {
         for (int i = 0; i < n; i++) {
             final Data.Slot s = mSlots.get(i);
             View v = inf.inflate(R.layout.item_slot, mListContainer, false);
+            // 布局里那些静态文案已搬到 Java（见 Trans）：布局够不到用户语言包
+            Trans.bind(v, R.id.slot_badge, R.string.slot_current_badge);
             ((TextView) v.findViewById(R.id.slot_name)).setText(s.name);
             // 槽行的统计段统一走资源（原 Data.Slot.subtitle() 的硬编码串已删，2026-10-02）。
             // F5：再追加一行自动备份策略摘要 —— 否则用户没法一眼看出"这个槽到底会不会自动备份"。

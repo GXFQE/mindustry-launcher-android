@@ -30,9 +30,9 @@
         android:paddingBottom="8dp">
 
         <TextView
+                        android:id="@+id/tx_map_save_name_hint"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="@string/map_save_name_hint"
             android:textColor="@color/fg_muted"
             android:textSize="12sp"
             android:lineSpacingExtra="2dp" />
@@ -72,7 +72,6 @@
             android:paddingEnd="12dp"
             android:paddingTop="10dp"
             android:paddingBottom="10dp"
-            android:text="@string/map_save_nocores_warn"
             android:textColor="@color/fg"
             android:textSize="12sp"
             android:lineSpacingExtra="2dp"
