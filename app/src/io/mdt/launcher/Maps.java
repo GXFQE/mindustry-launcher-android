@@ -336,6 +336,50 @@ public final class Maps {
         return n;
     }
 
+    // ── 列表的搜索 / 排序 / 只看有问题的（判据在 ListQuery，这里只回答"一条地图怎么答"）──
+
+    /**
+     * 「有问题的」= **元数据读不出来**（唯一判据）。
+     *
+     * ★ 这就是列表行第二行那句「读不出来」的同一个判据（见 {@link Item#line}）——
+     *   一份认不出的图在游戏里也开不了，是这一页唯一"用户应该去看一眼"的东西。
+     * ⚠️ 判据只此一处：`Item#line`、{@link #KEY}、界面上的筛选都从这里取。
+     */
+    public static boolean isProblem(Item it) {
+        return it == null || it.meta == null || !it.meta.ok;
+    }
+
+    /**
+     * 搜索 / 排序用的钥匙：搜「真名 + 文件名」（两个都要，用户手里可能是哪个都不一定），
+     * 按真名排序、按大小排序（住的容器里那个条目大小 = `Item.bytes`，与界面上显示的一致）。
+     */
+    public static final ListQuery.Key<Item> KEY = new ListQuery.Key<Item>() {
+        @Override public String title(Item it) {
+            return it.displayName();
+        }
+
+        @Override public String text(Item it) {
+            return ListQuery.haystack(it.displayName(), it.name());
+        }
+
+        @Override public long bytes(Item it) {
+            return it.bytes;
+        }
+
+        @Override public boolean problem(Item it) {
+            return isProblem(it);
+        }
+    };
+
+    /**
+     * 地图列表的搜索 / 筛选 / 排序（**纯函数**，判据在 {@link ListQuery#apply}）。
+     * 默认排序 = 名称；「有问题的在前」= 读不出来的在前。
+     */
+    public static List<Item> filterAndSort(List<Item> items, String query, int sort,
+                                           boolean onlyProblems) {
+        return ListQuery.apply(items, query, sort, onlyProblems, KEY);
+    }
+
     // ── 记录 → Intent → 记录（地图详情页要用；**只传定位信息**，不传对象） ──────
 
     /**

@@ -18,7 +18,6 @@ import java.io.FileFilter;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -65,12 +64,9 @@ final class SlotIo {
         }
     };
 
-    /** 存档列表的排序（名字升序、忽略大小写）—— 导出列表与「看每份存档」**共用一份** */
-    private static final Comparator<File> NAME_ORDER = new Comparator<File>() {
-        @Override public int compare(File x, File y) {
-            return x.getName().compareToIgnoreCase(y.getName());
-        }
-    };
+    // ★ 存档列表的排序（名字升序、忽略大小写）原来在这是一份 `NAME_ORDER` 比较器；
+    //   2026-10-07（第 122 轮）搬进了 `ListQuery`（见 listSaves）—— 存档页那一档"按名称"
+    //   用的是同一个判据，两份比较器迟早会分叉。
 
     // 待办目标（跨 onActivityResult 存活；每次发起前重设、回调进来先清）
     private static String sMsavTarget;
@@ -135,6 +131,22 @@ final class SlotIo {
     // ── 导出到共享存储（F6） ──────────────────────────────────────────────
 
     /**
+     * 扫一个槽的 `saves/`（只文件、跳过点开头的）并**按名称升序**排好。
+     *
+     * ★ 2026-10-07（第 122 轮）从 {@link #fillSaves} 里拆出来：存档**页面**现在要自己
+     *   先筛（搜索词）再排（名称 / 大小 / 最新在前）⇒ "扫描"与"填列表"必须能分开。
+     *   排序走 {@link ListQuery}（与页面上"按名称"那一档**同一个实现**，不另写一份比较器）。
+     */
+    static File[] listSaves(Activity a, String slotName) {
+        File dir = new File(Data.dirOf(a, slotName), "saves");   // 手拼：**别**用会 mkdirs 的那个
+        File[] fs = dir.listFiles(ONLY_FILES);
+        if (fs == null) fs = new File[0];
+        List<File> sorted = ListQuery.apply(Arrays.asList(fs), "", ListQuery.SORT_NAME, false,
+                ListQuery.FILE_KEY);
+        return sorted.toArray(new File[0]);
+    }
+
+    /**
      * ★★ 2026-10-06（第 115 轮第六批）：把一个槽的存档列表**填进一个 ListView**。
      *
      * <p>为什么要抽出来：这份列表原来只填进**对话框**（`exportSave` / `showSaves`），
@@ -158,11 +170,16 @@ final class SlotIo {
      */
     static File[] fillSaves(final Activity a, final String slotName, final android.widget.ListView lv,
                             final boolean[] aliveOrNull) {
-        File dir = new File(Data.dirOf(a, slotName), "saves");   // 手拼：**别**用会 mkdirs 的那个
-        File[] fs = dir.listFiles(ONLY_FILES);
-        if (fs == null) fs = new File[0];
-        Arrays.sort(fs, NAME_ORDER);
-        final File[] files = fs;
+        return fillSaves(a, slotName, lv, aliveOrNull, listSaves(a, slotName));
+    }
+
+    /**
+     * 把**已经定好顺序**的那几份填进列表（存档页那条路：它先按搜索词与排序方式筛过）。
+     *
+     * @param files 要显示的（顺序就是列表顺序）；调用方拿它按下标取文件，**不要重扫**
+     */
+    static File[] fillSaves(final Activity a, final String slotName, final android.widget.ListView lv,
+                            final boolean[] aliveOrNull, final File[] files) {
         final String[] titles = new String[files.length];
         final String[] subs = new String[files.length];
         final android.graphics.Bitmap[] thumbs = new android.graphics.Bitmap[files.length];
@@ -182,12 +199,12 @@ final class SlotIo {
                 }
                 final String apkPath = apk;
                 for (int i = 0; i < files.length; i++) {
-                    if (aliveOrNull != null ? !aliveOrNull[0] : Util.dead(a)) return;
+                    if (!stillAlive(a, aliveOrNull)) return;
                     final int idx = i;
                     final String line = msavLine(a, MsavMeta.read(files[idx]));
                     a.runOnUiThread(new Runnable() {
                         @Override public void run() {
-                            if (aliveOrNull != null ? !aliveOrNull[0] : Util.dead(a)) return;
+                            if (!stillAlive(a, aliveOrNull)) return;
                             String size = Util.formatSize(files[idx].length());
                             adapter.setSub(idx, line.isEmpty() ? size : (size + " · " + line));
                             // ★ 只刷新**这一行**（见 {@link MsavListAdapter#refreshSub} 的长注释）
@@ -200,7 +217,7 @@ final class SlotIo {
                     if (bm == null) continue;
                     a.runOnUiThread(new Runnable() {
                         @Override public void run() {
-                            if (aliveOrNull != null ? !aliveOrNull[0] : Util.dead(a)) return;
+                            if (!stillAlive(a, aliveOrNull)) return;
                             adapter.setThumb(idx, bm);
                             adapter.refreshThumb(lv, idx);
                         }
@@ -209,6 +226,21 @@ final class SlotIo {
             }
         }, "msav-list").start();
         return files;
+    }
+
+    /**
+     * 后台补列表时"还该继续吗" —— **两个条件都要判**（2026-10-07 第 122 轮）。
+     *
+     * <p>原来只有一条：对话框传自己的标志、页面传 null 走 {@link Util#dead(Activity)}。
+     * 存档页加搜索框之后**每次输入都会重填一遍列表**，于是多出一条更隐蔽的路：
+     * 上一趟后台线程还在跑，而它手里的 `adapter` 已经是**上一代**的了 ——
+     * 它按旧下标调 {@link MsavListAdapter#refreshSub} 会写到**新**适配器的同一行上
+     * （症状是"筛出来的那行文字跟行对不上"，滚一下又好了）。
+     * ⇒ 页面每次都换一个新的标志数组、把旧的按掉（见 `SavesActivity.rebuildList`），
+     * 这里再补上"Activity 已经死了也别写了"。
+     */
+    private static boolean stillAlive(Activity a, boolean[] flag) {
+        return (flag == null || flag[0]) && !Util.dead(a);
     }
 
     /**

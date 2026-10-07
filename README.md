@@ -84,6 +84,8 @@ that, including switching back to following the system.
 - **See each save**: which map it is, its size, wave, playtime, author and when it was saved;
   unreadable files are listed separately with the reason instead of silently disappearing
   (the save page is read-only — deleting a save is left to the game's own screen)
+- **The save list can be searched and sorted**: search by save name; sort by name / **newest first** /
+  size (this page has no "problems only" — the unreadable ones already have a row of their own)
 - **Import / export `.msav`** saves, one file at a time
 - **Backup list**: every backup on its own row (time / how many files / size / what the main save
   inside is), and one tap to **restore** or **delete that one**
@@ -114,6 +116,8 @@ that, including switching back to following the system.
   settings
 - Deletion goes through the transfer station (moved aside, not hard-deleted); a name clash asks first
   and moves the old map there too
+- **Search and sort**: by map name or file name; sort by name / **problems first** / size;
+  "problems only" means the maps whose metadata cannot be read
 
 ### Blueprints
 - **Thumbnails and a whole-blueprint preview**: the list draws the real sprites, and the detail page
@@ -135,6 +139,9 @@ that, including switching back to following the system.
 - The **technical details** section shows the evidence: the name table the file carries, how many
   tiles have a direction, any block names that had to be remapped, and the declared size against the
   tiles actually found
+- **Search and sort**: by blueprint name or file name; sort by name / **problems first** / size;
+  "problems only" means **missing blocks or an unreadable file** (the uncertain "may be wrong" ones
+  count too)
 
 ### Mods
 - Mods live inside a slot's page (main screen → **Saves & Backups** → a slot → **Mods**), and the page

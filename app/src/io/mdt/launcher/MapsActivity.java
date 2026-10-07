@@ -83,6 +83,23 @@ public class MapsActivity extends BaseActivity {
     private String[] mSubs;
     private android.graphics.Bitmap[] mThumbs;
 
+    // ── 搜索 / 排序 / 只看有问题的（2026-10-07 第 122 轮；**纯前端**，一个文件都不碰）──
+    /** 转屏要恢复的三个状态 —— 同模组页那条教训：不存就会"一转屏用户打的字没了"，且日志里什么都没有 */
+    private static final String STATE_QUERY = "mdt-maps-query";
+    private static final String STATE_SORT = "mdt-maps-sort";
+    private static final String STATE_ONLY = "mdt-maps-only";
+    private String mQuery = "";
+    private int mSort = ListQuery.SORT_NAME;
+    private boolean mOnlyProblems;
+    private EditText mSearch;
+    private TextView mFiltered;
+    /**
+     * 当前**显示**的那一批（筛过 / 排过）。
+     * ⚠️ 与 {@link #mItems}（全部）是两回事：点行、补缩略图都按它取；
+     *   而导出对话框、源图匹配走的是**全部**（那是"挑一份"的入口，不该被列表上的搜索框缩窄）。
+     */
+    private List<Maps.Item> mShown;
+
     @Override protected void onCreate(Bundle b) {
         super.onCreate(b);
         mSlot = getIntent() == null ? null : getIntent().getStringExtra(EXTRA_SLOT);
@@ -91,6 +108,13 @@ public class MapsActivity extends BaseActivity {
             return;
         }
         mSlot = mSlot.trim();
+        // ★ 转屏恢复搜索 / 排序 / 筛选（见 STATE_* 的注释）
+        if (b != null) {
+            String q = b.getString(STATE_QUERY);
+            if (q != null) mQuery = q;
+            mSort = b.getInt(STATE_SORT, ListQuery.SORT_NAME);
+            mOnlyProblems = b.getBoolean(STATE_ONLY, false);
+        }
         setTitle(Trans.get(MapsActivity.this, R.string.maps_title_fmt, mSlot));
 
         View root = getLayoutInflater().inflate(R.layout.activity_maps, null);
@@ -153,13 +177,36 @@ public class MapsActivity extends BaseActivity {
                     }
                 });
 
+        // ★ 2026-10-07（第 122 轮）：「筛选与排序」——与模组页同一行、同一个对话框形状
+        //   （用户：「把搜索 / 排序推广到地图 / 蓝图 / 存档列表」）。
+        //   ⚠️ 对话框里那几条词（按名称 / 有问题的在前 / 按大小 / 只看有问题的 / 清空筛选）
+        //   **复用模组页的资源**：四个列表页说的是同一件事，各写一份只会让用户语言包里
+        //   多出四条一模一样的翻译 —— 而"模组"两个字并不在那几条词里，不会串味。
+        Util.bindAction(root, R.id.row_maps_filter, R.drawable.ic_settings,
+                R.string.mods_filter_title, R.string.maps_act_filter_sub, new Runnable() {
+                    @Override public void run() { pickFilter(); }
+                });
+
         final ListView lv = (ListView) root.findViewById(R.id.maps_list);
         mList = lv;
         lv.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener() {
             @Override public void onItemClick(android.widget.AdapterView<?> p, View v, int pos, long id) {
-                if (mItems != null && pos >= 0 && pos < mItems.size()) showDetail(mItems.get(pos));
+                if (mShown != null && pos >= 0 && pos < mShown.size()) showDetail(mShown.get(pos));
             }
         });
+
+        // 搜索框（纯前端过滤，只在这里的内存里筛）+ 「显示 N / 共 M」那一行
+        mSearch = (EditText) root.findViewById(R.id.maps_search);
+        mFiltered = (TextView) root.findViewById(R.id.maps_filtered);
+        Util.bindSearch(mSearch, mQuery, new Runnable() {
+            @Override public void run() {
+                mQuery = mSearch == null ? "" : mSearch.getText().toString();
+                rebuildList();
+            }
+        });
+        // 布局里那些静态文案已搬到 Java（见 Trans）：布局够不到用户语言包
+        Trans.bind(root, R.id.maps_search, R.string.maps_search_hint);
+
         scan(lv);
 
         // dev 口：把"选文件"换成路径（SAF 自动化不了）。⚠️ 必须放在 scan() 之后，
@@ -222,7 +269,8 @@ public class MapsActivity extends BaseActivity {
                         mItems = items;
                         mApkPath = apk;
                         // ★ 三件套存成字段：导出对话框直接复用（缩略图已经在后台渲染过一遍，
-                        //   再渲染一次既慢又白费电）
+                        //   再渲染一次既慢又白费电）；它们**与 mItems 同下标**，
+                        //   列表显示的是筛过的那一份（见 rebuildList）
                         mTitles = titles;
                         mSubs = subs;
                         mThumbs = thumbs;
@@ -230,17 +278,8 @@ public class MapsActivity extends BaseActivity {
                                 Maps.count(items, Maps.FROM_SLOT),
                                 Maps.count(items, Maps.FROM_GAME),
                                 Maps.count(items, Maps.FROM_MOD)));
-                        mAdapter = new MsavListAdapter(MapsActivity.this, titles, subs, thumbs);
-                        lv.setAdapter(mAdapter);
-                        // ★ 空态（2026-10-04 补）：一张图都没有时必须说清"为什么没有 + 下一步"。
-                        //   文案 `maps_empty_fmt` 早就写好了，此前**全工程零引用**（孤儿串）
-                        //   ⇒ 用户只看到一排 0 和一片空白。见布局里那段注释。
-                        if (mEmpty != null) {
-                            mEmpty.setVisibility(items.isEmpty() ? View.VISIBLE : View.GONE);
-                            if (items.isEmpty()) {
-                                mEmpty.setText(Trans.get(MapsActivity.this, R.string.maps_empty_fmt, mSlot));
-                            }
-                        }
+                        // ★ 列表本体（含搜索 / 排序 / 只看有问题的 / 空态）只有一处实现
+                        rebuildList();
                     }
                 });
                 for (int i = 0; i < items.size(); i++) {
@@ -250,20 +289,153 @@ public class MapsActivity extends BaseActivity {
                     if (bm == null) continue;
                     runOnUiThread(new Runnable() {
                         @Override public void run() {
-                            if (Util.dead(MapsActivity.this) || mAdapter == null) return;
-                            mAdapter.setThumb(idx, bm);
+                            if (Util.dead(MapsActivity.this)) return;
                             // ★ 只更新**这一行**，绝不 `notifyDataSetChanged()` ——
                             //   后者会让整张列表在用户滚动时不断重排，手感就是"滑不上去 / 一滑就跳"
                             //   （114 张缩略图 = 114 次重排，用户 2026-10-03 实测反馈）。
                             //   ★ 2026-10-06（第 116 轮）：这段"换第 i 行的图"收进了
                             //   `MsavListAdapter#refreshThumb` —— 存档 / 蓝图两条线也要它，
                             //   三份内联实现迟早会有一份改了另两份不改（且**不报错**）。
-                            mAdapter.refreshThumb(lv, idx);
+                            //   ★ 2026-10-07（第 122 轮）：下标要多绕一步 —— 后台这张图是按
+                            //   **全部清单**的下标算的，而列表里显示的可能只是筛过的一部分
+                            //   ⇒ 收进 thumbReady（那里同时负责写主数组）。
+                            thumbReady(idx, bm);
                         }
                     });
                 }
             }
         }, "maps-page").start();
+    }
+
+    // ── 搜索 / 排序 / 只看有问题的（第 122 轮）───────────────────────────────
+
+    @Override protected void onSaveInstanceState(Bundle out) {
+        super.onSaveInstanceState(out);
+        out.putString(STATE_QUERY, mQuery);
+        out.putInt(STATE_SORT, mSort);
+        out.putBoolean(STATE_ONLY, mOnlyProblems);
+    }
+
+    /**
+     * 重建列表 = 搜索 / 筛选 / 排序（判据在 {@link Maps#filterAndSort}）+ 挂行 + 下面那两行提示。
+     *
+     * <p>★ 为什么"空态"也在这里：空态现在有**两种**（一张图都没有 / 筛完一条不剩），
+     * 而只有这里同时知道"总共几张"与"筛完几张" —— 留在扫描回调里就会退化成前一种
+     * （症状：搜了个不存在的词，界面说"槽里还没有地图"，用户以为图丢了）。
+     *
+     * <p>★ 适配器每次重建都新建一个：`MsavListAdapter` 拿的是三个**数组**（标题/副标题/缩略图），
+     * 筛完的下标与主清单不同 ⇒ 直接切一份新的最省事，而几百个引用在 UI 线程上可以忽略。
+     * 缩略图从**主数组** `mThumbs` 里搬（已经渲染好的不会因为筛一下就要重渲染）。
+     */
+    private void rebuildList() {
+        if (mList == null || mItems == null) return;
+        mShown = Maps.filterAndSort(mItems, mQuery, mSort, mOnlyProblems);
+        boolean filtering = ListQuery.filtering(mQuery, mSort, mOnlyProblems, ListQuery.SORT_NAME);
+        String[] titles = new String[mShown.size()];
+        String[] subs = new String[mShown.size()];
+        android.graphics.Bitmap[] thumbs = new android.graphics.Bitmap[mShown.size()];
+        for (int i = 0; i < mShown.size(); i++) {
+            int k = allIndexOf(mShown.get(i));
+            titles[i] = mShown.get(i).name();
+            subs[i] = k < 0 ? "" : mSubs[k];
+            thumbs[i] = (k < 0 || mThumbs == null) ? null : mThumbs[k];
+        }
+        mAdapter = new MsavListAdapter(this, titles, subs, thumbs);
+        mList.setAdapter(mAdapter);
+
+        if (mFiltered != null) {
+            mFiltered.setVisibility(filtering ? View.VISIBLE : View.GONE);
+            if (filtering) {
+                mFiltered.setText(Trans.get(MapsActivity.this, R.string.maps_filtered_fmt,
+                        mShown.size(), mItems.size()));
+            }
+        }
+        if (mEmpty != null) {
+            boolean none = mShown.isEmpty();
+            mEmpty.setVisibility(none ? View.VISIBLE : View.GONE);
+            if (none) {
+                // ★ 两种空态必须分开说：一张都没有 ≠ 筛掉了（后者用户自己能救回来 —— 清空筛选）
+                mEmpty.setText(filtering
+                        ? Trans.get(MapsActivity.this, R.string.maps_empty_filtered)
+                        : Trans.get(MapsActivity.this, R.string.maps_empty_fmt, mSlot));
+            }
+        }
+    }
+
+    /** 一条地图在**全部清单**里的下标（`Item` 没有 equals ⇒ 比的是同一个对象） */
+    private int allIndexOf(Maps.Item it) {
+        if (mItems == null || it == null) return -1;
+        for (int i = 0; i < mItems.size(); i++) {
+            if (mItems.get(i) == it) return i;
+        }
+        return -1;
+    }
+
+    /** 一条地图在**当前显示的那一份**里的下标（-1 = 现在被筛掉了） */
+    private int shownIndexOf(Maps.Item it) {
+        if (mShown == null || it == null) return -1;
+        for (int i = 0; i < mShown.size(); i++) {
+            if (mShown.get(i) == it) return i;
+        }
+        return -1;
+    }
+
+    /**
+     * 后台渲染好一张缩略图（**按全部清单的下标**）：写主数组 + 若它此刻在列表里就只刷那一行。
+     * ★ 被筛掉的那些照样写主数组 —— 用户清掉搜索词时 `rebuildList` 会把它从主数组里搬出来，
+     *   不必再渲染一次。
+     */
+    private void thumbReady(int allIdx, android.graphics.Bitmap bm) {
+        if (mThumbs != null && allIdx >= 0 && allIdx < mThumbs.length) mThumbs[allIdx] = bm;
+        if (mAdapter == null || mList == null || mItems == null) return;
+        if (allIdx < 0 || allIdx >= mItems.size()) return;
+        int k = shownIndexOf(mItems.get(allIdx));
+        if (k < 0) return;
+        mAdapter.setThumb(k, bm);
+        mAdapter.refreshThumb(mList, k);
+    }
+
+    /**
+     * 「筛选与排序」对话框。
+     * ★ 与模组页同一个形状（排序单选 + 「只看有问题的」开关 + 清空），也**共用它那几条词** ——
+     *   四个列表页说的是同一件事。地图这一页没有"类型"那一维（那是模组独有的）。
+     */
+    private void pickFilter() {
+        final String tick = "✓ ";
+        final String[] items = {
+                (mSort == ListQuery.SORT_NAME ? tick : "")
+                        + Trans.get(MapsActivity.this, R.string.mods_filter_sort_name),
+                (mSort == ListQuery.SORT_PROBLEM ? tick : "")
+                        + Trans.get(MapsActivity.this, R.string.mods_filter_sort_state),
+                (mSort == ListQuery.SORT_SIZE ? tick : "")
+                        + Trans.get(MapsActivity.this, R.string.mods_filter_sort_size),
+                (mOnlyProblems ? tick : "")
+                        + Trans.get(MapsActivity.this, R.string.mods_filter_only),
+                Trans.get(MapsActivity.this, R.string.mods_filter_reset)};
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.mods_filter_title)
+                .setItems(items, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int which) {
+                        if (which == 0) {
+                            mSort = ListQuery.SORT_NAME;
+                        } else if (which == 1) {
+                            mSort = ListQuery.SORT_PROBLEM;
+                        } else if (which == 2) {
+                            mSort = ListQuery.SORT_SIZE;
+                        } else if (which == 3) {
+                            mOnlyProblems = !mOnlyProblems;
+                        } else {
+                            mSort = ListQuery.SORT_NAME;
+                            mOnlyProblems = false;
+                            mQuery = "";
+                            // 清框会经 TextWatcher 走一趟 rebuildList，这里再走一趟也无害（同模组页）
+                            if (mSearch != null) mSearch.setText("");
+                        }
+                        rebuildList();
+                    }
+                })
+                .setNegativeButton(R.string.close, null)
+                .show();
     }
 
     /**

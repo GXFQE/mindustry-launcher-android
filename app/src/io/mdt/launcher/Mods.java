@@ -1380,8 +1380,17 @@ public final class Mods {
 
     // ══ 列表的搜索 / 筛选 / 排序（**纯函数**，界面只管显示） ═══════════════════
 
-    /** 排序方式：名称 / 有问题的在前 / 大小 */
-    public static final int SORT_NAME = 0, SORT_STATE = 1, SORT_SIZE = 2;
+    /**
+     * 排序方式：名称 / 有问题的在前 / 大小。
+     *
+     * ★ 2026-10-07（第 122 轮）：三个常量改成 {@link ListQuery} 的**别名** ——
+     *   "搜索 / 排序"的判据收进了 {@link ListQuery#apply}（地图 / 蓝图 / 存档三页也用同一份），
+     *   取值刻意相同 ⇒ 不需要一张映射表（映射表本身就是第二个会写错的地方）。
+     *   名字（`SORT_STATE`）留着不动：模组页那句话是"游戏里的状态"，与别页的"有问题的"是同一个轴。
+     */
+    public static final int SORT_NAME = ListQuery.SORT_NAME;
+    public static final int SORT_STATE = ListQuery.SORT_PROBLEM;
+    public static final int SORT_SIZE = ListQuery.SORT_SIZE;
 
     /**
      * 类型筛选（一档⑤，2026-10-06）：{@link #TYPE_ANY} = 不筛；其余三个是
@@ -1425,19 +1434,13 @@ public final class Mods {
         return st != null && st != State.ENABLED && st != State.DISABLED;
     }
 
-    /** 排序用的小配对 —— 过滤后下标就对不上状态数组了，所以绑在一起走（防"状态串行"这类错） */
-    private static final class SortRow {
-        final Info m;
-        final State st;
-
-        SortRow(Info m, State st) {
-            this.m = m;
-            this.st = st;
-        }
-    }
-
     /**
      * ★ 搜索 + 筛选 + 排序（**纯函数**：不改入参、不碰文件 ⇒ 能单独喂给自检）。
+     *
+     * ★ 2026-10-07（第 122 轮）：本方法**不再自己实现过滤与排序** ——
+     *   过滤 / 命中 / 三种排序的比较规则全部走 {@link ListQuery#apply}（地图 / 蓝图 / 存档
+     *   三页共用那一份），这里只提供"模组这条记录怎么答那几个问题"（{@link #KEY} 的在位版本，
+     *   因为它比别页多两个维度：**类型**（`keep`）与**与下标对齐的状态数组**）。
      *
      * @param query        关键词（空 = 不筛）；比 显示名 / 文件名 / 游戏里的名字，忽略大小写
      * @param sort         {@link #SORT_NAME} / {@link #SORT_STATE} / {@link #SORT_SIZE}
@@ -1448,42 +1451,38 @@ public final class Mods {
      */
     public static List<Info> filterAndSort(List<Info> mods, String query, int sort,
                                            boolean onlyProblems, int type, State[] states) {
-        List<SortRow> rows = new ArrayList<>();
-        if (mods != null) {
-            String q = query == null ? "" : query.trim().toLowerCase(Locale.ROOT);
-            for (int i = 0; i < mods.size(); i++) {
-                Info m = mods.get(i);
-                if (m == null) continue;
-                State st = (states != null && i < states.length) ? states[i] : null;
-                if (onlyProblems && !isProblem(m, st)) continue;
-                if (!matchesType(m, type)) continue;
-                if (!q.isEmpty() && !matchesQuery(m, q)) continue;
-                rows.add(new SortRow(m, st));
+        // ★ 状态与记录**按下标对齐**（过滤之后下标就对不上了）⇒ 这里先配成一张按**对象身份**查的表。
+        //   原来是在过滤循环里用同一个下标同时取两样东西；现在过滤在 ListQuery 里 ⇒ 只能这么绑。
+        //   ⚠️ 同一个 Info 出现两次时以**最后一次**为准 —— 扫描结果里不会有重复对象（自检也不造）。
+        final java.util.IdentityHashMap<Info, State> byId = new java.util.IdentityHashMap<>();
+        if (mods != null && states != null) {
+            for (int i = 0; i < mods.size() && i < states.length; i++) {
+                if (mods.get(i) != null) byId.put(mods.get(i), states[i]);
             }
         }
-        java.util.Collections.sort(rows, new java.util.Comparator<SortRow>() {
-            @Override public int compare(SortRow a, SortRow b) {
-                if (sort == SORT_SIZE) {
-                    return Long.compare(b.m.bytes, a.m.bytes);            // 大的在前
-                }
-                if (sort == SORT_STATE) {
-                    boolean pa = isProblem(a.m, a.st), pb = isProblem(b.m, b.st);
-                    if (pa != pb) return pa ? -1 : 1;                     // 有问题的在前
-                }
-                return a.m.title().compareToIgnoreCase(b.m.title());
+        final int wantType = type;
+        ListQuery.Key<Info> key = new ListQuery.Key<Info>() {
+            @Override public String title(Info m) {
+                return m.title();
             }
-        });
-        List<Info> out = new ArrayList<>(rows.size());
-        for (SortRow r : rows) out.add(r.m);
-        return out;
-    }
 
-    private static boolean matchesQuery(Info m, String q) {
-        String[] fields = {m.title(), m.fileName, m.internalName, m.displayName, m.name};
-        for (String s : fields) {
-            if (s != null && s.toLowerCase(Locale.ROOT).contains(q)) return true;
-        }
-        return false;
+            @Override public String text(Info m) {
+                return ListQuery.haystack(m.title(), m.fileName, m.internalName, m.displayName, m.name);
+            }
+
+            @Override public long bytes(Info m) {
+                return m.bytes;
+            }
+
+            @Override public boolean problem(Info m) {
+                return isProblem(m, byId.get(m));
+            }
+
+            @Override public boolean keep(Info m) {
+                return matchesType(m, wantType);
+            }
+        };
+        return ListQuery.apply(mods, query, sort, onlyProblems, key);
     }
 
     public static Scan scan(Context ctx, String slot) {

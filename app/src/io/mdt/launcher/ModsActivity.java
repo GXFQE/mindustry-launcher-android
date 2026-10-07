@@ -188,22 +188,14 @@ public class ModsActivity extends BaseActivity {
         // 第②项：搜索框（纯前端过滤，只在内存里筛，一个文件都不碰）
         mSearch = (EditText) root.findViewById(R.id.mod_search);
         mFiltered = (TextView) root.findViewById(R.id.mod_filtered);
-        if (mSearch != null) {
-            mSearch.setText(mQuery);                      // 转屏恢复：框里也要有那几个字
-            mSearch.setSelection(mSearch.getText().length());
-            mSearch.addTextChangedListener(new android.text.TextWatcher() {
-                @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {
-                }
-
-                @Override public void onTextChanged(CharSequence s, int a, int b, int c) {
-                }
-
-                @Override public void afterTextChanged(android.text.Editable e) {
-                    mQuery = e == null ? "" : e.toString();
-                    rebuildList();
-                }
-            });
-        }
+        // ★ 2026-10-07（第 122 轮）：接搜索框那段收进了 `Util.bindSearch` —— 地图 / 蓝图 / 存档
+        //   三页也要它（"恢复文字 + 光标到末尾 + 输入即刷新"三步的顺序是有讲究的，见那里的注释）。
+        Util.bindSearch(mSearch, mQuery, new Runnable() {
+            @Override public void run() {
+                mQuery = mSearch == null ? "" : mSearch.getText().toString();
+                rebuildList();
+            }
+        });
 
         Util.applySystemInsets(root);
         setContentView(root);

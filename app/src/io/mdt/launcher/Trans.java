@@ -183,12 +183,22 @@ public final class Trans {
      *
      * ⚠️ 参数收 {@link android.view.View} 而不是 TextView：布局里带文案的还有
      *   `CheckBox` / `RadioButton` / `EditText`（hint），它们在 Java 里**没有共同父类**能 setText
-     *   ⇒ 这里按"是不是 TextView"统一处理（CheckBox/RadioButton 都是 TextView 子类，EditText 也是）。
+     *   ⇒ 这里按"是什么控件"分别处理。
+     *
+     * 🔴 **`EditText` 必须落到 `setHint`，绝不能 `setText`**（2026-10-07 第 122 轮踩的，
+     *   当天引入、当天发现）：搜索框上挂着 `TextWatcher`，把提示语 `setText` 进去等于
+     *   **立刻拿提示语当关键词搜了一遍** ⇒ 列表被筛空（模组 / 地图 / 蓝图 / 存档四页全中），
+     *   而界面**不报错**：看着就是"搜索框里已经有一行字、结果一条都没有"。
+     *   ⇒ 判据由自检 ㉛ 钉着（`Trans.bind` 之后 `getText()` 必须为空、`getHint()` 必须非空）。
      */
     public static void bind(android.view.View root, int viewId, int resId) {
         if (root == null) return;
         android.view.View v = root.findViewById(viewId);
-        if (v instanceof TextView) bind((TextView) v, resId);
+        if (v instanceof android.widget.EditText) {
+            ((android.widget.EditText) v).setHint(get(v.getContext(), resId));
+        } else if (v instanceof TextView) {
+            bind((TextView) v, resId);
+        }
     }
 
     // ── 装包 / 卸包 / 查询 ──────────────────────────────────────────────────

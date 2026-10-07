@@ -220,6 +220,40 @@ public final class Util {
     }
 
     /**
+     * ★★ 把一个搜索框接上（**四个列表页共用**：模组 / 地图 / 蓝图 / 存档，2026-10-07 第 122 轮）。
+     *
+     * <p>它做三件事，顺序**不能换**：
+     * <ol>
+     *   <li>`setText(初始词)` —— 转屏恢复时框里也要有那几个字（否则用户看到的是"我打的字没了"，
+     *       而日志里什么都不会有；模组页当初就是这么修的）；</li>
+     *   <li>光标移到末尾（否则恢复后光标停在开头，接着打字是**从中间插**）；</li>
+     *   <li>**最后**才挂 `TextWatcher` —— 反过来的话第 ① 步会立刻触发一次回调，
+     *       而那时页面往往还没扫完（`mItems == null`），属于白跑一次（不崩，但没必要）。</li>
+     * </ol>
+     *
+     * @param onChange 每一次输入之后要做的事（各页面自己去读框里的文字再重建列表）
+     */
+    public static void bindSearch(final android.widget.EditText e, String initial,
+                                  final Runnable onChange) {
+        if (e == null) return;
+        if (initial != null && !initial.isEmpty()) {
+            e.setText(initial);
+            e.setSelection(e.getText().length());
+        }
+        e.addTextChangedListener(new android.text.TextWatcher() {
+            @Override public void beforeTextChanged(CharSequence s, int a, int b, int c) {
+            }
+
+            @Override public void onTextChanged(CharSequence s, int a, int b, int c) {
+            }
+
+            @Override public void afterTextChanged(android.text.Editable s) {
+                if (onChange != null) onChange.run();
+            }
+        });
+    }
+
+    /**
      * ★ 当前进程是不是**主进程**（不是 `:game` 子进程）。
      *
      * 为什么需要它：`LauncherApp.onCreate` 在**两个进程各跑一次**（工程头注释就写着这条），

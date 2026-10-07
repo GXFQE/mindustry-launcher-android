@@ -55,6 +55,21 @@ public class BlueprintsActivity extends BaseActivity {
     /** 已经扫过一轮（第一次 `onResume` 紧跟 `onCreate`，靠它避免开局扫两遍） */
     private boolean mScanned;
 
+    // ── 搜索 / 排序 / 只看有问题的（2026-10-07 第 122 轮；**纯前端**，一个文件都不碰）──
+    /** 转屏要恢复的三个状态（同模组页 / 地图页那条教训：不存就是"一转屏我打的字没了"） */
+    private static final String STATE_QUERY = "mdt-bp-query";
+    private static final String STATE_SORT = "mdt-bp-sort";
+    private static final String STATE_ONLY = "mdt-bp-only";
+    private String mQuery = "";
+    private int mSort = ListQuery.SORT_NAME;
+    private boolean mOnlyProblems;
+    private android.widget.EditText mSearch;
+    private TextView mFiltered;
+    /** 当前**显示**的那一批（筛过 / 排过）；`mItems` 仍是全部（导出对话框按它列） */
+    private List<Blueprints.Item> mShown;
+    /** 全部清单的缩略图（与 `mItems` 同下标；列表只显示其中一部分，见 `thumbReady`） */
+    private android.graphics.Bitmap[] mThumbs;
+
     @Override protected void onCreate(Bundle b) {
         super.onCreate(b);
         mSlot = getIntent() == null ? null : getIntent().getStringExtra(EXTRA_SLOT);
@@ -63,6 +78,13 @@ public class BlueprintsActivity extends BaseActivity {
             return;
         }
         mSlot = mSlot.trim();
+        // ★ 转屏恢复搜索 / 排序 / 筛选（见 STATE_* 的注释）
+        if (b != null) {
+            String q = b.getString(STATE_QUERY);
+            if (q != null) mQuery = q;
+            mSort = b.getInt(STATE_SORT, ListQuery.SORT_NAME);
+            mOnlyProblems = b.getBoolean(STATE_ONLY, false);
+        }
 
         View root = getLayoutInflater().inflate(R.layout.activity_blueprints, null);
         Util.applySystemInsets(root);
@@ -76,9 +98,21 @@ public class BlueprintsActivity extends BaseActivity {
         mList = (ListView) root.findViewById(R.id.bp_list);
         mList.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override public void onItemClick(AdapterView<?> p, View v, int pos, long id) {
-                if (mItems != null && pos >= 0 && pos < mItems.size()) showDetail(mItems.get(pos));
+                if (mShown != null && pos >= 0 && pos < mShown.size()) showDetail(mShown.get(pos));
             }
         });
+
+        // 搜索框 + 「显示 N / 共 M」那一行（纯前端过滤，一个文件都不碰）
+        mSearch = (android.widget.EditText) root.findViewById(R.id.bp_search);
+        mFiltered = (TextView) root.findViewById(R.id.bp_filtered);
+        Util.bindSearch(mSearch, mQuery, new Runnable() {
+            @Override public void run() {
+                mQuery = mSearch == null ? "" : mSearch.getText().toString();
+                rebuildList();
+            }
+        });
+        // 布局里那些静态文案已搬到 Java（见 Trans）：布局够不到用户语言包
+        Trans.bind(root, R.id.bp_search, R.string.bp_search_hint);
 
         // ── 导入 / 导出（页面顶上两行，与地图页同一条定案）──────────────────────
         Util.bindAction(root, R.id.row_bp_import, R.drawable.ic_download,
@@ -105,6 +139,15 @@ public class BlueprintsActivity extends BaseActivity {
                     @Override public void run() {
                         promptExport();
                     }
+                });
+        // ★ 2026-10-07（第 122 轮）：「筛选与排序」——与模组 / 地图页同一行、同一个对话框形状。
+        //   ⚠️ 对话框里那几条词复用模组页的资源（名称 / 有问题的在前 / 大小 / 只看有问题的 /
+        //   清空筛选）：四个列表页说的是同一件事，各写一份只会让用户语言包多四条重复翻译。
+        //   这一页的「有问题的」= **缺件或解析不了**（判据见 Blueprints#isProblem）——
+        //   那正是这一页存在的理由：开游戏之前先看一眼这蓝图缺不缺件。
+        Util.bindAction(root, R.id.row_bp_filter, R.drawable.ic_settings,
+                R.string.mods_filter_title, R.string.bp_act_filter_sub, new Runnable() {
+                    @Override public void run() { pickFilter(); }
                 });
 
         scan();
@@ -170,15 +213,14 @@ public class BlueprintsActivity extends BaseActivity {
                     @Override public void run() {
                         if (Util.dead(BlueprintsActivity.this)) return;
                         mItems = items;
+                        // ★ 缩略图主数组（与 mItems 同下标）：列表显示的是筛过的那一份，
+                        //   所以后台补图要先落到这里（见 thumbReady）
+                        mThumbs = thumbs;
                         mHead.setText(Trans.get(BlueprintsActivity.this, R.string.bp_head_fmt,
                                 Blueprints.count(items, Blueprints.FROM_SLOT),
                                 Blueprints.count(items, Blueprints.FROM_MOD)));
-                        mAdapter = new MsavListAdapter(BlueprintsActivity.this, titles, subs, thumbs);
-                        mList.setAdapter(mAdapter);
-                        if (mEmpty != null) {
-                            mEmpty.setVisibility(items.isEmpty() ? View.VISIBLE : View.GONE);
-                            if (items.isEmpty()) mEmpty.setText(Trans.get(BlueprintsActivity.this, R.string.bp_empty));
-                        }
+                        // ★ 列表本体（含搜索 / 排序 / 只看有问题的 / 空态）只有一处实现
+                        rebuildList();
                         mScanned = true;
                     }
                 });
@@ -191,7 +233,6 @@ public class BlueprintsActivity extends BaseActivity {
                 } catch (Throwable ignored) {
                 }
                 final String apkPath = apk;
-                final ListView lv = mList;
                 for (int i = 0; i < items.size(); i++) {
                     final int idx = i;
                     final android.graphics.Bitmap bm = MschLoad.image(
@@ -199,15 +240,138 @@ public class BlueprintsActivity extends BaseActivity {
                     if (bm == null) continue;
                     runOnUiThread(new Runnable() {
                         @Override public void run() {
-                            if (Util.dead(BlueprintsActivity.this) || mAdapter == null) return;
-                            mAdapter.setThumb(idx, bm);
-                            // ★ 只更新**这一行**（`notifyDataSetChanged()` 会让整张列表在滚动时重排）
-                            mAdapter.refreshThumb(lv, idx);
+                            if (Util.dead(BlueprintsActivity.this)) return;
+                            // ★ 只更新**这一行**（`notifyDataSetChanged()` 会让整张列表在滚动时重排）；
+                            //   下标要绕一步 —— 图是按**全部清单**算的，列表里可能只是筛过的一部分
+                            thumbReady(idx, bm);
                         }
                     });
                 }
             }
         }, "bp-scan").start();
+    }
+
+    // ── 搜索 / 排序 / 只看有问题的（第 122 轮）───────────────────────────────
+
+    @Override protected void onSaveInstanceState(Bundle out) {
+        super.onSaveInstanceState(out);
+        out.putString(STATE_QUERY, mQuery);
+        out.putInt(STATE_SORT, mSort);
+        out.putBoolean(STATE_ONLY, mOnlyProblems);
+    }
+
+    /**
+     * 重建列表 = 搜索 / 筛选 / 排序（判据在 {@link Blueprints#filterAndSort}）+ 挂行 + 那两行提示。
+     *
+     * <p>★ 与地图页同一份形状（那里注释写得更细）：空态分**两种**（一份蓝图都没有 / 筛完一条不剩），
+     * 缩略图从主数组 `mThumbs` 里搬、不重渲染。
+     * ⚠️ "只看缺件的"依赖**后台已经算好的** `missingKinds`（`Blueprints.summarize`）——
+     * 本方法在扫描回调里、也就是 summarize **之后**才被调（顺序反了会把所有条目都筛掉）。
+     */
+    private void rebuildList() {
+        if (mList == null || mItems == null) return;
+        mShown = Blueprints.filterAndSort(mItems, mQuery, mSort, mOnlyProblems);
+        boolean filtering = ListQuery.filtering(mQuery, mSort, mOnlyProblems, ListQuery.SORT_NAME);
+        String[] titles = new String[mShown.size()];
+        String[] subs = new String[mShown.size()];
+        android.graphics.Bitmap[] thumbs = new android.graphics.Bitmap[mShown.size()];
+        for (int i = 0; i < mShown.size(); i++) {
+            Blueprints.Item it = mShown.get(i);
+            int k = allIndexOf(it);
+            titles[i] = it.displayName();
+            subs[i] = it.sourceLabel(this) + " · " + it.line(this);
+            thumbs[i] = (k < 0 || mThumbs == null) ? null : mThumbs[k];
+        }
+        mAdapter = new MsavListAdapter(this, titles, subs, thumbs);
+        mList.setAdapter(mAdapter);
+
+        if (mFiltered != null) {
+            mFiltered.setVisibility(filtering ? View.VISIBLE : View.GONE);
+            if (filtering) {
+                mFiltered.setText(Trans.get(BlueprintsActivity.this, R.string.bp_filtered_fmt,
+                        mShown.size(), mItems.size()));
+            }
+        }
+        if (mEmpty != null) {
+            boolean none = mShown.isEmpty();
+            mEmpty.setVisibility(none ? View.VISIBLE : View.GONE);
+            if (none) {
+                mEmpty.setText(filtering
+                        ? Trans.get(BlueprintsActivity.this, R.string.bp_empty_filtered)
+                        : Trans.get(BlueprintsActivity.this, R.string.bp_empty));
+            }
+        }
+    }
+
+    /** 一份蓝图在**全部清单**里的下标（`Item` 没有 equals ⇒ 比的是同一个对象） */
+    private int allIndexOf(Blueprints.Item it) {
+        if (mItems == null || it == null) return -1;
+        for (int i = 0; i < mItems.size(); i++) {
+            if (mItems.get(i) == it) return i;
+        }
+        return -1;
+    }
+
+    /** 一份蓝图在**当前显示的那一份**里的下标（-1 = 现在被筛掉了） */
+    private int shownIndexOf(Blueprints.Item it) {
+        if (mShown == null || it == null) return -1;
+        for (int i = 0; i < mShown.size(); i++) {
+            if (mShown.get(i) == it) return i;
+        }
+        return -1;
+    }
+
+    /** 后台渲染好一张缩略图（按**全部清单**的下标）：写主数组 + 若它此刻在列表里就只刷那一行 */
+    private void thumbReady(int allIdx, android.graphics.Bitmap bm) {
+        if (mThumbs != null && allIdx >= 0 && allIdx < mThumbs.length) mThumbs[allIdx] = bm;
+        if (mAdapter == null || mList == null || mItems == null) return;
+        if (allIdx < 0 || allIdx >= mItems.size()) return;
+        int k = shownIndexOf(mItems.get(allIdx));
+        if (k < 0) return;
+        mAdapter.setThumb(k, bm);
+        mAdapter.refreshThumb(mList, k);
+    }
+
+    /**
+     * 「筛选与排序」对话框（与模组 / 地图页同一个形状，也共用它那几条词）。
+     * ★ 蓝图的「有问题的」= 缺件或解析不了 —— 这一页最该被筛出来的就是缺件那些。
+     */
+    private void pickFilter() {
+        final String tick = "✓ ";
+        final String[] items = {
+                (mSort == ListQuery.SORT_NAME ? tick : "")
+                        + Trans.get(BlueprintsActivity.this, R.string.mods_filter_sort_name),
+                (mSort == ListQuery.SORT_PROBLEM ? tick : "")
+                        + Trans.get(BlueprintsActivity.this, R.string.mods_filter_sort_state),
+                (mSort == ListQuery.SORT_SIZE ? tick : "")
+                        + Trans.get(BlueprintsActivity.this, R.string.mods_filter_sort_size),
+                (mOnlyProblems ? tick : "")
+                        + Trans.get(BlueprintsActivity.this, R.string.mods_filter_only),
+                Trans.get(BlueprintsActivity.this, R.string.mods_filter_reset)};
+        new android.app.AlertDialog.Builder(this)
+                .setTitle(R.string.mods_filter_title)
+                .setItems(items, new android.content.DialogInterface.OnClickListener() {
+                    @Override public void onClick(android.content.DialogInterface d, int which) {
+                        if (which == 0) {
+                            mSort = ListQuery.SORT_NAME;
+                        } else if (which == 1) {
+                            mSort = ListQuery.SORT_PROBLEM;
+                        } else if (which == 2) {
+                            mSort = ListQuery.SORT_SIZE;
+                        } else if (which == 3) {
+                            mOnlyProblems = !mOnlyProblems;
+                        } else {
+                            mSort = ListQuery.SORT_NAME;
+                            mOnlyProblems = false;
+                            mQuery = "";
+                            // 清框会经 TextWatcher 走一趟 rebuildList，这里再走一趟也无害（同模组页）
+                            if (mSearch != null) mSearch.setText("");
+                        }
+                        rebuildList();
+                    }
+                })
+                .setNegativeButton(R.string.close, null)
+                .show();
     }
 
     private void showDetail(Blueprints.Item it) {

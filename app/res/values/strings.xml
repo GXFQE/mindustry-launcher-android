@@ -508,6 +508,18 @@
          ⚠️ 同时**收短**：原来挤在一行里三句（"本槽没有，模组没自带，游戏自带的要等…"），
             空态只需要"为什么没有 + 下一步"两件事（对齐 empty_versions 的写法）。 -->
     <string name="maps_empty_fmt">Slot \"%1$s\" has no maps yet.\nOnce a version is assigned to this slot, the maps built into the game show up here.</string>
+    <!--
+      ★ 2026-10-07（第 122 轮）：地图列表的搜索 / 排序。
+      用户：「把搜索 / 排序推广到地图 / 蓝图 / 存档列表」—— 模组页（F13 第二批）已有这一套。
+      · 排序那几条词**复用模组页的资源**（mods_filter_sort_name / _state / _size / only / reset）：
+        四个列表页说的是同一件事，各写一份只会让用户语言包多出重复的翻译
+        （"模组"两个字并不在那几条词里，不会串味）。
+      · 这里只放**这一页独有**的：搜索框提示、那一行的副标题、"显示 N / 共 M"、筛空的空态。
+    -->
+    <string name="maps_search_hint">Search map name or file name</string>
+    <string name="maps_act_filter_sub">Search by name · problems only</string>
+    <string name="maps_filtered_fmt">Showing %1$d / %2$d maps (filtered)</string>
+    <string name="maps_empty_filtered">No maps match the filter</string>
     <string name="slot_op_import_save">Import a save (.msav)…</string>
     <string name="slot_op_import_slot">Import a whole slot (zip)…</string>
     <string name="slot_op_export_save">Export a save (.msav)…</string>
@@ -522,6 +534,17 @@
     -->
     <string name="saves_list_title_fmt">Saves in slot \"%1$s\"</string>
     <string name="saves_list_head_fmt">%1$d saves · tap one to see what map it is</string>
+    <!--
+      ★ 2026-10-07（第 122 轮）：存档列表的搜索 / 排序（判据与文案口径见 activity_maps 那一节）。
+      ⚠️ 这一页**没有**"只看有问题的"：存档的"读不出来"已经有专用入口（上面那一行），
+        再来一个开关就是同一件事两个入口。取而代之的是**按时间**那一档 ——
+        存档是真文件、有修改时间，"最新保存的在前"最常用。
+    -->
+    <string name="save_search_hint">Search save name</string>
+    <string name="save_act_filter_sub">Search by name · newest first</string>
+    <string name="save_filter_sort_time">Newest first</string>
+    <string name="save_filtered_fmt">Showing %1$d / %2$d saves (filtered)</string>
+    <string name="save_empty_filtered">No saves match the filter</string>
     <string name="save_detail_title_fmt">Save: %1$s</string>
     <string name="save_detail_export">Export this save…</string>
     <string name="msav_lbl_map_fmt">Map: %1$s</string>
@@ -619,6 +642,15 @@
     <string name="slot_page_blueprints_sub">Blueprints in this slot and in its mods</string>
     <string name="bp_head_fmt">In this slot %1$d · From mods %2$d</string>
     <string name="bp_empty">This slot has no blueprints yet, and none of its mods bring any.\nBlueprints saved in the game show up here.</string>
+    <!--
+      ★ 2026-10-07（第 122 轮）：蓝图列表的搜索 / 排序。
+      ★ 这一页的"有问题的" = **缺件或解析不了**（判据见 Blueprints.isProblem）——
+        那正是这一页存在的理由（游戏那边缺件是静默的，只能在这里提前看见）。
+    -->
+    <string name="bp_search_hint">Search blueprint name or file name</string>
+    <string name="bp_act_filter_sub">Search by name · missing blocks only</string>
+    <string name="bp_filtered_fmt">Showing %1$d / %2$d blueprints (filtered)</string>
+    <string name="bp_empty_filtered">No blueprints match the filter</string>
     <string name="bp_from_slot">This slot</string>
     <string name="bp_from_mod_unknown">A mod</string>
     <string name="bp_line_size_fmt">%1$d × %2$d · %3$d tiles</string>

@@ -81,7 +81,56 @@
             layout="@layout/row_action"
             android:layout_width="match_parent"
             android:layout_height="wrap_content" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginStart="62dp"
+            android:background="@color/divider" />
+
+        <!--
+          ★ 2026-10-07（第 122 轮）：「筛选与排序」（搜索词 + 排序 + 只看有问题的）。
+          ★ 为什么放在**这一张卡里**而不是另起一卡：它与上面三行的作用域一样 ——
+            都是"这一页的这份列表"；另起一卡会在页顶多出一块没有必要的区域。
+          ★ 它是**纯前端**的：只筛内存里已经清点好的那份清单，一个文件都不碰
+            （判据在 `Maps.filterAndSort`，与列表行显示的是同一份数据）。
+        -->
+        <include
+            android:id="@+id/row_maps_filter"
+            layout="@layout/row_action"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
     </LinearLayout>
+
+    <!--
+      搜索框（第 122 轮）：与模组页同一个形状 —— 就在列表正上方。
+      ⚠️ 提示语在 Java 里绑（`Trans.bind`）：布局够不到用户语言包。
+    -->
+    <EditText
+        android:id="@+id/maps_search"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/page_pad"
+        android:layout_marginEnd="@dimen/page_pad"
+        android:layout_marginTop="2dp"
+        android:inputType="text"
+        android:maxLength="60"
+        android:singleLine="true"
+        android:textColor="@color/fg"
+        android:textColorHint="@color/fg_muted"
+        android:textSize="15sp" />
+
+    <!-- 筛选状态（只有真的在筛选时才显示；见 MapsActivity.rebuildList） -->
+    <TextView
+        android:id="@+id/maps_filtered"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="@dimen/page_pad"
+        android:paddingEnd="@dimen/page_pad"
+        android:paddingTop="6dp"
+        android:textColor="@color/fg_muted"
+        android:textSize="12sp"
+        android:visibility="gone" />
 
     <!--
       ★ 空态（2026-10-04 补）。可见性由 MapsActivity 的清点结果控制。

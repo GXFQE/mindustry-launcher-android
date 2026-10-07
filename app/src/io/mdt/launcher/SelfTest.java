@@ -195,7 +195,8 @@ public final class SelfTest {
             modsConflict(ctx, L, stat);
             // ★ ⑲ F13 第二批：搜索/筛选/排序（纯函数，可单独喂断言）
             modsFilter(L, stat);
-            modsFilter(L, stat);
+            // ★ 第 122 轮：「搜索 / 排序」推广到地图 / 蓝图 / 存档三个列表（判据收进 ListQuery）
+            listQuery(ctx, L, stat);
             // ★ ⑳ F13 第二批：批量启停的写侧（一次读写 / noop 不动文件 / 坏文件拒绝写）
             modsBatchWrite(ctx, L, stat);
             // ★ ㉑ F13 第二批：反向依赖（禁用前的提醒）
@@ -3130,6 +3131,195 @@ public final class SelfTest {
         L.add("");
     }
 
+    /**
+     * 第 122 轮（2026-10-07）：**搜索 / 排序推广到地图 / 蓝图 / 存档三个列表页**。
+     *
+     * <p>起因（用户）：「把搜索 / 排序推广到地图 / 蓝图 / 存档列表」——模组页（⑲）已有这一套。
+     * 判据全部收进了 {@link ListQuery}（过滤 / 命中 / 三种排序**只有一份实现**），
+     * 三页各自只提供"一条记录怎么答那几个问题"（{@link Maps#KEY} / {@link Blueprints#KEY} /
+     * {@link ListQuery#FILE_KEY}）⇒ 这一节能完全用纯函数喂死，不用建 UI。
+     *
+     * <p>🔴 每条都配反向或元断言（「看着有判据」≠「判据对」）：
+     * <ul>
+     *   <li>搜不到必须返回**空**（不能「筛不动就返回全部」）；</li>
+     *   <li>{@link ListQuery#haystack} 的分隔符必须真的挡住**跨字段命中**；</li>
+     *   <li>三页的「有问题的」判据各自钉一条真/假两个方向；</li>
+     *   <li>入参列表**不许被改动**（纯函数）。</li>
+     * </ul>
+     *
+     * <p>★ 夹具走**真解析**（`tinyMsav` / `Sch`）而不是手搓对象：`MsavMeta` 与 `Msch` 的构造函数
+     * 是 private（它们是"只能由解析器造出来"的数据），而自检要的恰恰是"和用户手里那份
+     * 走同一条解析路"的夹具。
+     */
+    private static void listQuery(Context ctx, List<String> L, int[] stat) throws Exception {
+        L.add("── 第 122 轮：地图 / 蓝图 / 存档列表的搜索 / 排序 / 只看有问题的 ──");
+
+        File dir = new File(Data.dataRoot(ctx), "selftest-listquery");
+        try {
+            dir.mkdirs();
+
+            // ── ① 地图：真名（meta 里的 name）与文件名都要能搜到 ─────────────────
+            File fa = tinyMsav(new File(dir, "a.msav"), "Alpha", 10, 10, 1, false);
+            File fb = tinyMsav(new File(dir, "b.msav"), "Beta", 10, 10, 1, false);
+            Maps.Item m1 = new Maps.Item();
+            m1.from = Maps.FROM_SLOT;
+            m1.file = fa;
+            m1.bytes = 300;          // 大小**写死**：排序读的是这个字段，别让它跟文件长度绑死
+            m1.meta = MsavMeta.read(fa);
+            Maps.Item m2 = new Maps.Item();
+            m2.from = Maps.FROM_SLOT;
+            m2.file = fb;
+            m2.bytes = 100;
+            m2.meta = MsavMeta.read(fb);
+            Maps.Item m3 = new Maps.Item();          // 读不出来的那张（meta.ok=false）
+            m3.from = Maps.FROM_GAME;
+            m3.entry = "assets/maps/sun/zeta.msav";
+            m3.bytes = 200;
+            m3.meta = MsavMeta.read(new File(dir, "no-such.msav"));
+            List<Maps.Item> maps = new ArrayList<>();
+            maps.add(m1); maps.add(m2); maps.add(m3);
+
+            ok(stat, L, Maps.filterAndSort(maps, "", ListQuery.SORT_NAME, false).size() == 3,
+                    "地图：空关键词 = 不筛（三张都在）");
+            List<Maps.Item> mq = Maps.filterAndSort(maps, "ALPH", ListQuery.SORT_NAME, false);
+            ok(stat, L, mq.size() == 1 && mq.get(0) == m1,
+                    "地图：按**真名**搜（忽略大小写，ALPH → Alpha）");
+            List<Maps.Item> mq2 = Maps.filterAndSort(maps, "b.msav", ListQuery.SORT_NAME, false);
+            ok(stat, L, mq2.size() == 1 && mq2.get(0) == m2,
+                    "★地图：按**文件名**也要搜得到（真名是 Beta、文件名是 b.msav —— 两个都得算）");
+            List<Maps.Item> mq3 = Maps.filterAndSort(maps, "zeta", ListQuery.SORT_NAME, false);
+            ok(stat, L, mq3.size() == 1 && mq3.get(0) == m3,
+                    "地图：游戏自带那种（只有条目名的）也能按条目名搜到");
+            ok(stat, L, Maps.filterAndSort(maps, "zzz", ListQuery.SORT_NAME, false).isEmpty(),
+                    "★元断言：搜不到必须返回**空**，不能「筛不动就返回全部」");
+            List<Maps.Item> mp = Maps.filterAndSort(maps, "", ListQuery.SORT_NAME, true);
+            ok(stat, L, mp.size() == 1 && mp.get(0) == m3,
+                    "地图：「只看有问题的」只留 meta 读不出来的那张（真名那两张不算）");
+            ok(stat, L, !Maps.isProblem(m1) && Maps.isProblem(m3),
+                    "地图：isProblem 的真假两个方向（有 meta 的不算问题）");
+            ok(stat, L, Maps.filterAndSort(maps, "", ListQuery.SORT_NAME, false).get(0) == m1,
+                    "地图：按名称排序（Alpha → Beta → zeta.msav）");
+            ok(stat, L, Maps.filterAndSort(maps, "", ListQuery.SORT_SIZE, false).get(0) == m1
+                            && Maps.filterAndSort(maps, "", ListQuery.SORT_SIZE, false).get(2) == m2,
+                    "地图：按大小排序（大的在前 300 / 200 / 100）");
+            ok(stat, L, Maps.filterAndSort(maps, "", ListQuery.SORT_PROBLEM, false).get(0) == m3,
+                    "地图：「有问题的在前」（读不出来的那张排第一）");
+            ok(stat, L, maps.size() == 3 && maps.get(0) == m1 && maps.get(2) == m3,
+                    "★纯函数：入参列表没被改动（长度与顺序都不变）");
+            //  ★ 元断言：把「有问题的在前」换成默认排序，顺序必须真的变（防恒真）
+            List<Maps.Item> mark = new ArrayList<>();
+            mark.add(m1);                   // 健康的（真名 Alpha）
+            mark.add(m3);                   // 读不出来的（zeta.msav）
+            ok(stat, L, Maps.filterAndSort(mark, "", ListQuery.SORT_PROBLEM, false).get(0) == m3
+                            && Maps.filterAndSort(mark, "", ListQuery.SORT_NAME, false).get(0) == m1,
+                    "★元断言：「有问题的在前」与「按名称」的**结果必须不同**（否则这一档等于没做）");
+
+            // ── ② 蓝图：「有问题的」= 缺件或解析不了 ──────────────────────────
+            Blueprints.Item b1 = new Blueprints.Item();
+            b1.file = new File(dir, "x.msch");
+            b1.bytes = 300;
+            b1.msch = Msch.read(new Sch(1, 16, 16).tag("name", "Alpha").bytes());
+            Blueprints.Item b2 = new Blueprints.Item();     // 缺件
+            b2.file = new File(dir, "y.msch");
+            b2.bytes = 100;
+            b2.msch = Msch.read(new Sch(1, 16, 16).tag("name", "Zulu").bytes());
+            b2.missingKinds = 2;
+            b2.missingTiles = 5;
+            Blueprints.Item b3 = new Blueprints.Item();     // 解析不了
+            b3.file = new File(dir, "z.msch");
+            b3.bytes = 200;
+            b3.msch = Msch.read(new byte[0]);
+            List<Blueprints.Item> bps = new ArrayList<>();
+            bps.add(b1); bps.add(b2); bps.add(b3);
+
+            ok(stat, L, Blueprints.filterAndSort(bps, "zulu", ListQuery.SORT_NAME, false).size() == 1,
+                    "蓝图：按蓝图名搜（zulu → Zulu）");
+            List<Blueprints.Item> bq = Blueprints.filterAndSort(bps, "y.msch",
+                    ListQuery.SORT_NAME, false);
+            ok(stat, L, bq.size() == 1 && bq.get(0) == b2, "蓝图：按文件名也能搜到");
+            List<Blueprints.Item> bpr = Blueprints.filterAndSort(bps, "", ListQuery.SORT_NAME, true);
+            ok(stat, L, bpr.size() == 2 && bpr.contains(b2) && bpr.contains(b3),
+                    "★蓝图：「只看有问题的」= 缺件 + 解析不了（健康的 Alpha 不在里面）");
+            ok(stat, L, Blueprints.isProblem(b2) && Blueprints.isProblem(b3)
+                            && !Blueprints.isProblem(b1),
+                    "蓝图：isProblem 三个方向（缺件 / 解析不了 / 健康）");
+            // ★ 元断言：软缺件（可能认错）**照样算有问题** —— 判据不改，变的只是行里那句话
+            b2.softMissing = true;
+            ok(stat, L, Blueprints.isProblem(b2),
+                    "★元断言：软缺件（可能认错）也照样算「有问题的」"
+                            + "（否则「可能缺件」的蓝图会被筛没）");
+            b2.softMissing = false;
+            ok(stat, L, Blueprints.filterAndSort(bps, "", ListQuery.SORT_SIZE, false).get(0) == b1,
+                    "蓝图：按大小排序（300 / 200 / 100）");
+            ok(stat, L, Blueprints.filterAndSort(bps, "", ListQuery.SORT_PROBLEM, false).get(2) == b1,
+                    "蓝图：「有问题的在前」⇒ 健康的那个排最后");
+            ok(stat, L, bps.size() == 3 && bps.get(0) == b1 && bps.get(2) == b3,
+                    "★纯函数：蓝图那份入参也没被改动");
+
+            // ── ③ 存档：直接拿 File 当一条记录（搜文件名 / 按大小 / 按时间）──────────
+            //  ⚠️ 这一页**没有**「只看有问题的」（读不出来已有专用入口，见 ListQuery.FILE_KEY）
+            File s1 = new File(dir, "alpha.msav");
+            File s2 = new File(dir, "beta.msav");
+            File s3 = new File(dir, "gamma.msav");
+            write(s1, new byte[300]);
+            write(s2, new byte[100]);
+            write(s3, new byte[200]);
+            // 修改时间是「最新在前」那一档的判据（给三个**确定**的值，别依赖写文件的先后）
+            s1.setLastModified(1000L);
+            s2.setLastModified(3000L);
+            s3.setLastModified(2000L);
+            List<File> saves = new ArrayList<>();
+            saves.add(s1); saves.add(s2); saves.add(s3);
+
+            List<File> byName = ListQuery.apply(saves, "", ListQuery.SORT_NAME, false,
+                    ListQuery.FILE_KEY);
+            ok(stat, L, byName.size() == 3 && byName.get(0) == s1 && byName.get(2) == s3,
+                    "存档：按名称排序（alpha → beta → gamma）");
+            List<File> bySize = ListQuery.apply(saves, "", ListQuery.SORT_SIZE, false,
+                    ListQuery.FILE_KEY);
+            ok(stat, L, bySize.get(0) == s1 && bySize.get(2) == s2,
+                    "存档：按大小排序（300 / 200 / 100）");
+            List<File> byTime = ListQuery.apply(saves, "", ListQuery.SORT_TIME, false,
+                    ListQuery.FILE_KEY);
+            ok(stat, L, byTime.get(0) == s2 && byTime.get(2) == s1,
+                    "存档：「最新在前」（3000 / 2000 / 1000）");
+            List<File> sq = ListQuery.apply(saves, "BET", ListQuery.SORT_NAME, false,
+                    ListQuery.FILE_KEY);
+            ok(stat, L, sq.size() == 1 && sq.get(0) == s2,
+                    "存档：按文件名搜（忽略大小写，BET → beta.msav）");
+            ok(stat, L, ListQuery.apply(saves, "zzz", ListQuery.SORT_NAME, false,
+                    ListQuery.FILE_KEY).isEmpty(),
+                    "★元断言：存档搜不到也必须是空列表");
+            ok(stat, L, !ListQuery.FILE_KEY.problem(s1),
+                    "★元断言：存档那条钥匙的 problem 恒为 false（这一页没有「只看有问题的」）"
+                            + " —— 真要筛「读不出来」得走 row_save_bad 那个专用入口");
+            ok(stat, L, java.util.Arrays.asList(
+                            ListQuery.apply(saves, "A", ListQuery.SORT_SIZE, false,
+                                    ListQuery.FILE_KEY).toArray(new File[0])).size() == 3,
+                    "存档：搜索与排序可以叠加（名字都含 a 的三个文件，按大小排）");
+        } catch (Throwable t) {
+            ok(stat, L, false, "本用例的磁盘夹具自己抛了异常：" + t);
+        } finally {
+            deleteTree(dir);
+        }
+
+        // ── ④ 横跨四个页面的几条规矩（判据本体）──────────────────────────────
+        //  ★ haystack 的分隔符：不许「前一个字段的尾巴 + 后一个字段的头」凑出一个假命中
+        ok(stat, L, !ListQuery.matches(ListQuery.haystack("ab", "cd"), "bc"),
+                "★元断言：多字段拼接**不许跨字段命中**（ab + cd 搜 bc 必须搜不到）");
+        ok(stat, L, ListQuery.matches(ListQuery.haystack("ab", "cd"), "cd"),
+                "★反向对照：同一份拼接里，字段**内部**照样命中（cd 搜得到）");
+        ok(stat, L, ListQuery.matches("Alpha", "") && ListQuery.matches(null, ""),
+                "空关键词一律命中（调用方不必「先判空再判命中」，少一处能写反的地方）");
+        //  ★ filtering()：界面那一行「显示 N / 共 M」的显隐判据必须与过滤条件同步
+        ok(stat, L, !ListQuery.filtering("", ListQuery.SORT_NAME, false, ListQuery.SORT_NAME)
+                        && ListQuery.filtering("a", ListQuery.SORT_NAME, false, ListQuery.SORT_NAME)
+                        && ListQuery.filtering("  ", ListQuery.SORT_SIZE, false, ListQuery.SORT_NAME)
+                        && ListQuery.filtering("", ListQuery.SORT_NAME, true, ListQuery.SORT_NAME),
+                "filtering()：空词 + 默认排序 + 不筛 ⇒ 不显示；三个维度任一动过 ⇒ 显示"
+                        + "（★只打空格的搜索词不算「筛过」，与 apply 的 trim 口径一致）");
+        L.add("");
+    }
     /**
      * ㊺ 一档六项（2026-10-06 第 115 轮）。
      *
@@ -6354,6 +6544,75 @@ public final class SelfTest {
                             + il + " 个) **之前** ⇒ 两行就在页面顶上");
         } catch (Throwable t) {
             ok(stat, L, false, "地图页布局检查自身异常：" + t);
+        }
+
+        // ★ 2026-10-07（第 122 轮）：三个列表页（地图 / 蓝图 / 存档）的**搜索 / 筛选控件**
+        //   必须都在。为什么值得单独钉一条：少一个 id 的症状是"这一页没有搜索框"而**不报错** ——
+        //   `findViewById` 返回 null 时 `Util.bindSearch` / `bindAction` 都是静默跳过，
+        //   编译、构建、其余自检全绿（这正是 ㉛ 想防的那类漏）。
+        final int[] pages = {R.layout.activity_maps, R.layout.activity_blueprints,
+                R.layout.activity_saves};
+        final int[] searchIds = {R.id.maps_search, R.id.bp_search, R.id.save_search};
+        final int[] filterIds = {R.id.row_maps_filter, R.id.row_bp_filter, R.id.row_save_filter};
+        final int[] filteredIds = {R.id.maps_filtered, R.id.bp_filtered, R.id.save_filtered};
+        for (int i = 0; i < pages.length; i++) {
+            String nm;
+            try {
+                nm = ctx.getResources().getResourceEntryName(pages[i]);
+            } catch (Throwable t) {
+                nm = String.valueOf(pages[i]);
+            }
+            boolean all;
+            try {
+                android.view.View v = inf.inflate(pages[i], null);
+                all = v.findViewById(searchIds[i]) != null
+                        && v.findViewById(filterIds[i]) != null
+                        && v.findViewById(filteredIds[i]) != null;
+            } catch (Throwable t) {
+                all = false;
+            }
+            ok(stat, L, all, "★" + nm + "：搜索框 / 筛选行 / 「已筛选」那一行三个控件都在");
+        }
+
+        // 🔴 搜索框的提示语必须落在 **hint** 上（2026-10-07 第 122 轮踩的）：四个搜索框都挂着
+        //   `TextWatcher`，提示语要是被 `setText` 塞进去，等于**立刻拿提示语当关键词搜了一遍**
+        //   ⇒ 列表被筛空，而界面不报错（看着就是"框里已经有一行字、结果一条都没有"）。
+        //   ⚠️ 这条断言直接喂 `Trans.bind`（就是那个唯一入口）—— 断言的是"入口的行为"，不是某一页。
+        final int[] searchLayouts = {R.layout.activity_mods, R.layout.activity_maps,
+                R.layout.activity_blueprints, R.layout.activity_saves};
+        final int[] searchBoxes = {R.id.mod_search, R.id.maps_search, R.id.bp_search, R.id.save_search};
+        final int[] searchHints = {R.string.mods_search_hint, R.string.maps_search_hint,
+                R.string.bp_search_hint, R.string.save_search_hint};
+        for (int i = 0; i < searchLayouts.length; i++) {
+            String nm;
+            try {
+                nm = ctx.getResources().getResourceEntryName(searchLayouts[i]);
+            } catch (Throwable t) {
+                nm = String.valueOf(searchLayouts[i]);
+            }
+            boolean hintOk;
+            try {
+                android.view.View v = inf.inflate(searchLayouts[i], null);
+                Trans.bind(v, searchBoxes[i], searchHints[i]);
+                android.widget.EditText e =
+                        (android.widget.EditText) v.findViewById(searchBoxes[i]);
+                hintOk = e != null && e.getText().length() == 0 && e.getHint() != null
+                        && e.getHint().length() > 0;
+            } catch (Throwable t) {
+                hintOk = false;
+            }
+            ok(stat, L, hintOk, "★" + nm + "：搜索框的提示语落在 **hint** 上"
+                    + "（不是塞进输入框当正文 —— 那会立刻把列表筛成空的）");
+        }
+        // ★ 元断言：同一份控制权交给 TextView 时**仍然**是 setText（别把标题也改成 hint 了）
+        try {
+            android.view.View v = inf.inflate(R.layout.activity_maps, null);
+            Trans.bind(v, R.id.maps_head, R.string.maps_scanning);
+            android.widget.TextView t = (android.widget.TextView) v.findViewById(R.id.maps_head);
+            ok(stat, L, t != null && t.getText().length() > 0,
+                    "★元断言：同一条 `Trans.bind` 对 TextView 仍然是 setText（表头不能变成 hint）");
+        } catch (Throwable t) {
+            ok(stat, L, false, "TableView 那条元断言自身异常：" + t);
         }
         L.add("");
     }

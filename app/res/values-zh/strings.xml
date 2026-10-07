@@ -503,6 +503,17 @@
          ⚠️ 同时**收短**：原来挤在一行里三句（"本槽没有，模组没自带，游戏自带的要等…"），
             空态只需要"为什么没有 + 下一步"两件事（对齐 empty_versions 的写法）。 -->
     <string name="maps_empty_fmt">槽「%1$s」里还没有地图。\n给某个版本分配这个槽之后，游戏自带的地图就会出现。</string>
+    <!--
+      ★ 2026-10-07（第 122 轮）：地图列表的搜索 / 排序。
+      用户：「把搜索 / 排序推广到地图 / 蓝图 / 存档列表」—— 模组页（F13 第二批）已有这一套。
+      · 排序那几条词**复用模组页的资源**（mods_filter_sort_name / _state / _size / only / reset）：
+        四个列表页说的是同一件事，各写一份只会让用户语言包多出重复的翻译。
+      · 这里只放**这一页独有**的：搜索框提示、那一行的副标题、"显示 N / 共 M"、筛空的空态。
+    -->
+    <string name="maps_search_hint">搜索地图名或文件名</string>
+    <string name="maps_act_filter_sub">按名称搜索 · 只看有问题的</string>
+    <string name="maps_filtered_fmt">显示 %1$d / %2$d 张地图（已筛选）</string>
+    <string name="maps_empty_filtered">没有符合条件的地图</string>
     <string name="slot_op_import_save">导入存档（.msav）…</string>
     <string name="slot_op_import_slot">导入整槽（zip）…</string>
     <string name="slot_op_export_save">导出存档（.msav）…</string>
@@ -516,6 +527,17 @@
     -->
     <string name="saves_list_title_fmt">槽「%1$s」的存档</string>
     <string name="saves_list_head_fmt">共 %1$d 份 · 点一份看它是什么图</string>
+    <!--
+      ★ 2026-10-07（第 122 轮）：存档列表的搜索 / 排序（口径见地图那一节）。
+      ⚠️ 这一页**没有**"只看有问题的"：存档的"读不出来"已经有专用入口（上面那一行），
+        再来一个开关就是同一件事两个入口。取而代之的是**按时间**那一档 ——
+        存档是真文件、有修改时间，"最新保存的在前"最常用。
+    -->
+    <string name="save_search_hint">搜索存档名</string>
+    <string name="save_act_filter_sub">按名称搜索 · 最新在前</string>
+    <string name="save_filter_sort_time">最新在前</string>
+    <string name="save_filtered_fmt">显示 %1$d / %2$d 份存档（已筛选）</string>
+    <string name="save_empty_filtered">没有符合条件的存档</string>
     <string name="save_detail_title_fmt">存档：%1$s</string>
     <string name="save_detail_export">导出这一份…</string>
     <string name="msav_lbl_map_fmt">地图：%1$s</string>
@@ -764,6 +786,15 @@
     <string name="slot_page_blueprints_sub">本槽与模组自带的蓝图</string>
     <string name="bp_head_fmt">本槽 %1$d · 模组自带 %2$d</string>
     <string name="bp_empty">本槽还没有蓝图，模组也没带。\n在游戏里存下来的蓝图会出现在这里。</string>
+    <!--
+      ★ 2026-10-07（第 122 轮）：蓝图列表的搜索 / 排序。
+      ★ 这一页的"有问题的" = **缺件或解析不了**（判据见 Blueprints.isProblem）——
+        那正是这一页存在的理由（游戏那边缺件是静默的，只能在这里提前看见）。
+    -->
+    <string name="bp_search_hint">搜索蓝图名或文件名</string>
+    <string name="bp_act_filter_sub">按名称搜索 · 只看缺件的</string>
+    <string name="bp_filtered_fmt">显示 %1$d / %2$d 份蓝图（已筛选）</string>
+    <string name="bp_empty_filtered">没有符合条件的蓝图</string>
     <string name="bp_from_slot">本槽</string>
     <string name="bp_from_mod_unknown">模组</string>
     <string name="bp_line_size_fmt">%1$d × %2$d · %3$d 格</string>

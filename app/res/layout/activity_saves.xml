@@ -83,7 +83,55 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:visibility="gone" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginStart="62dp"
+            android:background="@color/divider" />
+
+        <!--
+          ★ 2026-10-07（第 122 轮）：「筛选与排序」（搜索词 + 排序：名称 / 最新在前 / 大小）。
+          这一页**没有**"只看有问题的"：存档的"读不出来"已经有专用入口（上面那一行
+          →「哪几份读不出来」），再来一个开关就是同一件事两个入口（F15b 的教训）。
+          纯前端：只筛内存里的那份清单，一个文件都不动。
+        -->
+        <include
+            android:id="@+id/row_save_filter"
+            layout="@layout/row_action"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
     </LinearLayout>
+
+    <!--
+      搜索框（第 122 轮）：与模组 / 地图 / 蓝图页同一个形状 —— 就在列表正上方。
+      ⚠️ 提示语在 Java 里绑（`Trans.bind`）：布局够不到用户语言包。
+    -->
+    <EditText
+        android:id="@+id/save_search"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/page_pad"
+        android:layout_marginEnd="@dimen/page_pad"
+        android:layout_marginTop="2dp"
+        android:inputType="text"
+        android:maxLength="60"
+        android:singleLine="true"
+        android:textColor="@color/fg"
+        android:textColorHint="@color/fg_muted"
+        android:textSize="15sp" />
+
+    <!-- 筛选状态（只有真的在筛选时才显示；见 SavesActivity.rebuildList） -->
+    <TextView
+        android:id="@+id/save_filtered"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="@dimen/page_pad"
+        android:paddingEnd="@dimen/page_pad"
+        android:paddingTop="6dp"
+        android:textColor="@color/fg_muted"
+        android:textSize="12sp"
+        android:visibility="gone" />
 
     <!--
       ★ 空态位置必须在 ListView **之前**：下面那个 ListView 是 `weight=1`（吃掉剩余高度），

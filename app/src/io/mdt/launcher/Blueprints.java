@@ -265,6 +265,52 @@ public final class Blueprints {
         return n;
     }
 
+    // ── 列表的搜索 / 排序 / 只看有问题的（判据在 ListQuery，这里只回答"一条蓝图怎么答"）──
+
+    /**
+     * 「有问题的」= **解析不了**或**有本槽认不出的方块**（唯一判据）。
+     *
+     * ★ 为什么把"缺件"也算进去：这一页存在的意义就是"开游戏之前先看一眼缺不缺件"
+     *   （游戏那边是**静默**丢方块）⇒ 缺件必须能被一眼筛出来。
+     * ⚠️ 拿不准的那些（{@link Item#softMissing}，见 {@link #markSoft}）**照样算**
+     *   —— 判据不改，变的只是行里那句话（"我们没认出来" vs "本槽没有"）。
+     */
+    public static boolean isProblem(Item it) {
+        return it == null || !it.ok() || it.missingKinds > 0;
+    }
+
+    /**
+     * 搜索 / 排序用的钥匙：搜「蓝图名 + 文件名」（蓝图内名可以重复，文件名才唯一），
+     * 按蓝图名排序、按大小排序。
+     */
+    public static final ListQuery.Key<Item> KEY = new ListQuery.Key<Item>() {
+        @Override public String title(Item it) {
+            return it.displayName();
+        }
+
+        @Override public String text(Item it) {
+            return ListQuery.haystack(it.displayName(), it.name());
+        }
+
+        @Override public long bytes(Item it) {
+            return it.bytes;
+        }
+
+        @Override public boolean problem(Item it) {
+            return isProblem(it);
+        }
+    };
+
+    /**
+     * 蓝图列表的搜索 / 筛选 / 排序（**纯函数**，判据在 {@link ListQuery#apply}）。
+     * ⚠️ 缺件的判据（`missingKinds`）是**后台算好**的（{@link #summarize}）⇒ 调用方要先把
+     *   `summarize` 跑完再调这里，否则"只看缺件的"会把所有条目都漏掉。
+     */
+    public static List<Item> filterAndSort(List<Item> items, String query, int sort,
+                                           boolean onlyProblems) {
+        return ListQuery.apply(items, query, sort, onlyProblems, KEY);
+    }
+
     /**
      * ① 本槽 {@code <槽>/schematics/**} —— **递归**（照游戏 `walk`，不是只扫顶层）。
      * ⚠️ 只认 `.msch`：游戏靠 `file.extEquals("msch")` 过滤，别的文件即使躺在那里也不算蓝图。
