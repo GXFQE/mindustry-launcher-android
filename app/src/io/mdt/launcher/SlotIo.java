@@ -422,7 +422,7 @@ final class SlotIo {
         new AlertDialog.Builder(a)
                 .setTitle(Trans.get(a, R.string.export_slot_title_fmt, s.name))
                 .setMessage(Trans.get(a, R.string.export_slot_msg_fmt,
-                        Data.gameAlive(a) ? a.getString(R.string.export_slot_playing) : ""))
+                        Data.gameAlive(a) ? Trans.get(a, R.string.export_slot_playing) : ""))
                 .setPositiveButton(R.string.export_ok, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int w) {
                         sExportKind = EXPORT_SLOT;
@@ -840,7 +840,7 @@ final class SlotIo {
 
         StringBuilder sb = new StringBuilder();
         sb.append(Trans.get(a, R.string.zip_confirm_head_fmt, inf.files,
-                inf.sizeKnown ? Util.formatSize(inf.bytes) : a.getString(R.string.zip_size_unknown)));
+                inf.sizeKnown ? Util.formatSize(inf.bytes) : Trans.get(a, R.string.zip_size_unknown)));
         if (!inf.tops.isEmpty()) {
             sb.append(Trans.get(a, R.string.zip_confirm_tops_fmt, joinList(inf.tops)));
         }

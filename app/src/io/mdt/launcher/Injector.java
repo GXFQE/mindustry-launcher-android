@@ -198,8 +198,8 @@ public final class Injector {
      */
     public static Timing launch(Activity activity, Plan plan) throws LaunchError {
         if (plan == null || plan.apk == null || !plan.apk.exists()) {
-            throw new LaunchError(activity.getString(R.string.step_prepare),
-                    activity.getString(R.string.launch_err_bad_package), null);
+            throw new LaunchError(Trans.get(activity, R.string.step_prepare),
+                    Trans.get(activity, R.string.launch_err_bad_package), null);
         }
         Context app = activity.getApplicationContext();
         ClassLoader baseCl = activity.getClassLoader();
@@ -214,8 +214,8 @@ public final class Injector {
         if (!prewarm(app, plan.apk, log)) {
             t.mark("prewarm");
             report(app, log);
-            throw new LaunchError(activity.getString(R.string.step_prewarm),
-                    activity.getString(R.string.launch_err_no_activity_fmt, GAME_ACTIVITY), null);
+            throw new LaunchError(Trans.get(activity, R.string.step_prewarm),
+                    Trans.get(activity, R.string.launch_err_no_activity_fmt, GAME_ACTIVITY), null);
         }
         t.mark("prewarm");
 
@@ -225,7 +225,7 @@ public final class Injector {
         } catch (Throwable e) {
             t.mark("dexInject");
             report(app, log);
-            throw new LaunchError(activity.getString(R.string.step_dex),
+            throw new LaunchError(Trans.get(activity, R.string.step_dex),
                     String.valueOf(e), e);
         }
         t.mark("dexInject");
@@ -236,7 +236,7 @@ public final class Injector {
         } catch (Throwable e) {
             t.mark("nativeLoad");
             report(app, log);
-            throw new LaunchError(activity.getString(R.string.step_native),
+            throw new LaunchError(Trans.get(activity, R.string.step_native),
                     String.valueOf(e), e);
         }
         t.mark("nativeLoad");
@@ -247,7 +247,7 @@ public final class Injector {
         } catch (Throwable e) {
             t.mark("nativeFlag");
             report(app, log);
-            throw new LaunchError(activity.getString(R.string.step_native_flag),
+            throw new LaunchError(Trans.get(activity, R.string.step_native_flag),
                     String.valueOf(e), e);
         }
         t.mark("nativeFlag");
@@ -258,7 +258,7 @@ public final class Injector {
         } catch (Throwable e) {
             t.mark("assetMount");
             report(app, log);
-            throw new LaunchError(activity.getString(R.string.step_assets),
+            throw new LaunchError(Trans.get(activity, R.string.step_assets),
                     String.valueOf(e), e);
         }
         t.mark("assetMount");
@@ -269,7 +269,7 @@ public final class Injector {
         } catch (Throwable e) {
             t.mark("startActivity");
             report(app, log);
-            throw new LaunchError(activity.getString(R.string.step_start),
+            throw new LaunchError(Trans.get(activity, R.string.step_start),
                     String.valueOf(e), e);
         }
         t.mark("startActivity");

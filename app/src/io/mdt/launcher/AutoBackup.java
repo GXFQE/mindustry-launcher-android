@@ -112,13 +112,13 @@ final class AutoBackup {
 
         new Thread(new Runnable() {
             @Override public void run() {
-                String err = runNow(act, slot, act.getString(R.string.auto_backup_label));
+                String err = runNow(act, slot, Trans.get(act, R.string.auto_backup_label));
                 writeReport(act, slot, minutes,
                         err == null ? "完成" : "跳过/失败：" + err);
                 if (err != null) return;
                 act.runOnUiThread(new Runnable() {
                     @Override public void run() {
-                        Toast.makeText(act, act.getString(R.string.auto_backup_done_fmt, slot),
+                        Toast.makeText(act, Trans.get(act, R.string.auto_backup_done_fmt, slot),
                                 Toast.LENGTH_SHORT).show();
                     }
                 });
