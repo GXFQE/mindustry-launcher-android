@@ -142,6 +142,48 @@ aapt2 会把这里的注释**原样搬进生成的 `R.java` 当 Javadoc** ⇒ �
 否则用户把界面切成英文之后，那 15 条"照中文写的"断言会红一片（那不是回归）。
 真正的做法是让断言与语言无关 / 中英双跑，见 `docs/i18n-feasibility.md` §7.3（P1-B）。
 
+### 文案取值：一律走 `Trans`（2026-10-07 起）
+
+```java
+Trans.get(ctx, R.string.xxx)              // 任何文案
+Trans.get(ctx, R.string.xxx, arg1, arg2)  // 带占位符的那 435 条
+Trans.bind(view, R.string.xxx)            // 给控件设文案（参数收 View，见下）
+Trans.bind(root, R.id.tx_xxx, R.string.xxx)  // 按 id 取控件再设（布局里搬出来的那批）
+```
+
+🔴 **新代码不许再直调 `getString(R.string.…)`**（`getString` 只允许出现在 `Trans` 内部与
+`SelfTest` 里 —— 后者按纪律保留，理由见下）。
+
+**为什么要有这一层**：把 1452 处 `R.string.*` 引用收敛到**一个**函数上，将来接"用户自带的翻译文件"
+时只要改 `Trans` 里面那两个方法，而不是再动一遍全仓库。现状（2026-10-07 收口完成）：
+**932 处调用点全部走 `Trans`**；仍直调 `getString` 的 **188 处全在 `SelfTest.java`**。
+
+| 事实 | 数值 / 说明 |
+|---|---|
+| `Trans` 当前行为 | **完全等价于 `ctx.getString(…)`**（薄壳，零行为变化） |
+| 收口用了 6 个阶段 | 布局 25（`Trans.bind`）· Activity 353 · 非 Activity 398 · `Activity a` 形参 111 · 收尾 13 |
+| 为什么 `bind` 收 `View` 不收 `TextView` | 布局里带文案的还有 `CheckBox`/`RadioButton`/`EditText`(hint)，它们**没有共同父类**能 setText |
+| 布局里的静态文案 | **一律搬进 Java**（布局的 `android:text="@string/x"` 由 Android 自己解析，`Trans` 够不到）。9 个布局、25 处，硬约束见 `ref/29-五-动手前的硬约束.md`（「判据类」那条） |
+
+⚠️ **`SelfTest.java` 的 188 处不动**：它钉死 `LocaleMode.SELFTEST`（zh），
+且它自己就是"中文当判据"那门课的重灾区（改文案会打断老断言 —— 那是它该做的）。
+
+🔴 **接"用户语言包"时必须守的三条**（写在 `Trans` 的 Javadoc 里，动手前读它）：
+① 顺序 = **用户包优先、系统资源兜底**；② **占位符的序号与类型必须逐条比对**，不匹配就拒绝装
+（`%2$d` 收到字符串会**直接崩主进程** —— 第 112 轮真踩过）；③ `resId → 键名`的反查要**缓存**
+（932 处是热路径，且对非 string 资源会抛）。
+
+★ **批量替换这类改动（本仓库做过 6 次）的四条教训**（都导致过构建失败，但**都靠编译器抓到了**）：
+① 模式**必须包含 `R.string.`** —— 只找 `getString(` 会把 `Cursor.getString(列索引)` 也吃掉
+（误伤两次）；② `this` 在匿名 `Runnable`/lambda 里**不是** Activity ⇒ 用 `XxxActivity.this`；
+③ 括号配对**要跳过字符串字面量**（实参里的引号会把配对算错）；
+④ 单行正则漏跨行调用 ⇒ 用括号配对扫全文。
+⚠️ 真正危险的是**编译器抓不住**的那类（把 `R.string.a` 换成 `R.string.b`）——
+那只能靠"只提供一个键的用户包 ⇒ 只改那一句、其余 900+ 处逐字不变"这条**元断言**兜底（待接用户包时实现）。
+
+> 设计与成本定案（含"方案 A 编进 APK vs 方案 B 用户自带"的对照，以及游戏侧外部语言包的实测）见
+> [`i18n-user-bundles.md`](i18n-user-bundles.md)。
+
 ### 国际化门禁（P0，2026-10-04）
 
 `build.sh` 的 **`[0/4]`** 是国际化门禁，跑 `tools/i18n-check.py`。纯 Python、不碰工具链，
@@ -365,6 +407,8 @@ SelfTest        见上（现在含 ㉑~㊹ 等成组断言；`dev_m3_selftest` �
 | [README.zh.md](../README.zh.md) | 上面那份的**简体中文版**（两份结构一一对应，改一份记得改另一份） |
 | `DEVELOPING.md`（本文） | 构建、`dev_*` 直通口、模块边界、文档地图 |
 | `BACKLOG.md`（**索引**） | 功能池：**是什么 / 为什么 / 已核实了什么**（正文在 `docs/backlog/`，8 片） |
+| [`i18n-feasibility.md`](i18n-feasibility.md) | 2026-10-04 那次国际化的**可行性研究**（默认语言翻英 / 应用内切语言 / 门禁 15 规则）；已落地 |
+| [`i18n-user-bundles.md`](i18n-user-bundles.md) | ★ **用户自带翻译文件**的设计稿与成本定案：为什么没有捷径（`resources.arsc` vs properties）、1452 处改动面的实测、方案 A/B 对照、游戏侧外部语言包实测（`<槽根>/bundle`）、4 条待复核 |
 | **`FLOWS.md`**（**索引**） | ★ **怎么动手**：逐个功能的「改动面 → 步骤 → 验收 → 坑」（正文在 `docs/flows/`，**15 片**；第 15 片是 F22 蓝图） |
 | `docs/history/README.md`（**索引**） | 逐轮的**实现与真机验证记录**（2026-10-04 从 README 整节搬出，内容一字未改；正文 23 片）—— ⚠️ **它停在搬出那一刻（F21 / 第 43 轮）**，此后轮次看下一条 |
 | 2026-10-04 之后的新轮次 | 实现与验证记录写在 **`docs/flows/` 对应的 F 分片**里（如 F22 = 第 108~113 轮），本机开发笔记（`.dsh/memory/NEXT.md` + `ref/`）另有一份带判据的流水 —— **两者都不随本仓发布的部分只作来源标注** |
