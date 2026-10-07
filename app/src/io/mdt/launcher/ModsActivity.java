@@ -225,7 +225,7 @@ public class ModsActivity extends BaseActivity {
         //   （目录形态模组还会把旧件挪去中转站），而工程里凡"写槽"的路径都有这道门禁
         //   （导入存档/整槽、备份、恢复、改设置、跨槽复制）；模组导入原来漏了。
         if (Data.gameAlive(this)) {
-            alert(getString(R.string.game_busy_title), getString(R.string.mods_import_busy_msg));
+            alert(Trans.get(ModsActivity.this, R.string.game_busy_title), Trans.get(ModsActivity.this, R.string.mods_import_busy_msg));
             return;
         }
         sImportSlot = mSlot;
@@ -233,7 +233,7 @@ public class ModsActivity extends BaseActivity {
         i.addCategory(Intent.CATEGORY_OPENABLE);
         i.setType("*/*");
         startActivityForResult(
-                Intent.createChooser(i, getString(R.string.chooser_pick_mod)), REQ_MOD_IMPORT);
+                Intent.createChooser(i, Trans.get(ModsActivity.this, R.string.chooser_pick_mod)), REQ_MOD_IMPORT);
     }
 
     @Override
@@ -283,8 +283,8 @@ public class ModsActivity extends BaseActivity {
     private void doImport(final String slot, final Uri uri, final String displayName,
                           final boolean overwrite) {
         final ProgressDialog pd = ProgressDialog.show(this,
-                getString(R.string.mods_import_progress_title),
-                getString(R.string.mods_import_progress_fmt, displayName, slot), true, false);
+                Trans.get(ModsActivity.this, R.string.mods_import_progress_title),
+                Trans.get(ModsActivity.this, R.string.mods_import_progress_fmt, displayName, slot), true, false);
         new Thread(new Runnable() {
             @Override public void run() {
                 Mods.PackResult pr = null;
@@ -293,7 +293,7 @@ public class ModsActivity extends BaseActivity {
                 try {
                     destDir = new File(Data.dirOf(ModsActivity.this, slot), "mods");
                     java.io.InputStream in = getContentResolver().openInputStream(uri);
-                    if (in == null) throw new java.io.IOException(getString(R.string.mods_import_open_failed));
+                    if (in == null) throw new java.io.IOException(Trans.get(ModsActivity.this, R.string.mods_import_open_failed));
                     try {
                         pr = Mods.importPackage(ModsActivity.this, destDir, displayName, in, overwrite,
                                 Mods.trashDirOf(ModsActivity.this));
@@ -315,7 +315,7 @@ public class ModsActivity extends BaseActivity {
                     @Override public void run() {
                         pd.dismiss();
                         if (fe != null) {
-                            alert(getString(R.string.mods_import_failed), fe);
+                            alert(Trans.get(ModsActivity.this, R.string.mods_import_failed), fe);
                             return;
                         }
                         // ★ 下面两条出口弹的都是 inline 窗口（同名替换框 / 导入结果框）⇒
@@ -328,7 +328,7 @@ public class ModsActivity extends BaseActivity {
                             if (dest != null && dest.exists()) {
                                 new AlertDialog.Builder(ModsActivity.this)
                                         .setTitle(R.string.mods_import_exists_title)
-                                        .setMessage(getString(R.string.mods_import_exists_msg_fmt,
+                                        .setMessage(Trans.get(ModsActivity.this, R.string.mods_import_exists_msg_fmt,
                                                 displayName))
                                         .setPositiveButton(R.string.mods_import_replace,
                                                 new DialogInterface.OnClickListener() {
@@ -340,7 +340,7 @@ public class ModsActivity extends BaseActivity {
                                         .show();
                                 return;
                             }
-                            alert(getString(R.string.mods_import_failed), fpr.report(ModsActivity.this));
+                            alert(Trans.get(ModsActivity.this, R.string.mods_import_failed), fpr.report(ModsActivity.this));
                             return;
                         }
                         showImportResult(fpr);
@@ -356,15 +356,15 @@ public class ModsActivity extends BaseActivity {
         StringBuilder sb = new StringBuilder(pr.report(this));
         Mods.Target t = Mods.targetsFor(this, mSlot);
         if (pr.meta != null) {
-            sb.append(getString(R.string.mods_detail_kind_fmt, kindOf(pr.meta))).append('\n');
+            sb.append(Trans.get(ModsActivity.this, R.string.mods_detail_kind_fmt, kindOf(pr.meta))).append('\n');
             sb.append('\n');
             if (!t.any()) {
-                sb.append(getString(R.string.mods_import_nogame)).append('\n');
+                sb.append(Trans.get(ModsActivity.this, R.string.mods_import_nogame)).append('\n');
             } else if (Mods.isAtLeast(t.build, t.revision, pr.meta.minGameVersion)) {
-                sb.append(getString(R.string.mods_import_compat_ok_fmt,
+                sb.append(Trans.get(ModsActivity.this, R.string.mods_import_compat_ok_fmt,
                         t.label, pr.meta.minGameVersion)).append('\n');
             } else {
-                sb.append(getString(R.string.mods_import_compat_bad_fmt,
+                sb.append(Trans.get(ModsActivity.this, R.string.mods_import_compat_bad_fmt,
                         t.label, pr.meta.minGameVersion)).append('\n');
             }
         }
@@ -388,8 +388,8 @@ public class ModsActivity extends BaseActivity {
         String[] names = new String[targets.size()];
         for (int i = 0; i < targets.size(); i++) {
             Data.Slot s = targets.get(i);
-            names[i] = s.name + (s.active ? getString(R.string.slot_current_suffix) : "")
-                    + "  " + getString(R.string.slot_entry_fmt, s.files, Util.formatSize(s.bytes));
+            names[i] = s.name + (s.active ? Trans.get(ModsActivity.this, R.string.slot_current_suffix) : "")
+                    + "  " + Trans.get(ModsActivity.this, R.string.slot_entry_fmt, s.files, Util.formatSize(s.bytes));
         }
         new AlertDialog.Builder(this)
                 .setTitle(R.string.mods_copy_pick_title)
@@ -426,8 +426,8 @@ public class ModsActivity extends BaseActivity {
             }
         }
         new AlertDialog.Builder(this)
-                .setTitle(getString(R.string.mods_copy_confirm_title_fmt, toSlot))
-                .setMessage(getString(R.string.mods_copy_confirm_msg_fmt,
+                .setTitle(Trans.get(ModsActivity.this, R.string.mods_copy_confirm_title_fmt, toSlot))
+                .setMessage(Trans.get(ModsActivity.this, R.string.mods_copy_confirm_msg_fmt,
                         mSlot, toSlot, count, Util.formatSize(bytes), clash))
                 .setPositiveButton(R.string.mods_copy_title_ok, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int w) {
@@ -443,7 +443,7 @@ public class ModsActivity extends BaseActivity {
         // 两个非当前槽之间互拷与它无关（别用一条过宽的规矩挡掉无害的操作）。
         final String cur = Data.currentSlot(this);
         if (Data.gameAlive(this) && (mSlot.equals(cur) || toSlot.equals(cur))) {
-            alert(getString(R.string.mods_copy_done), getString(R.string.mods_copy_blocked));
+            alert(Trans.get(ModsActivity.this, R.string.mods_copy_done), Trans.get(ModsActivity.this, R.string.mods_copy_blocked));
             return;
         }
         int count = 0;
@@ -452,8 +452,8 @@ public class ModsActivity extends BaseActivity {
             for (File f : kids) if (!Data.contentSkipped(f)) count++;
         }
         final ProgressDialog pd = ProgressDialog.show(this,
-                getString(R.string.mods_copy_done),
-                getString(R.string.mods_copy_progress_fmt, count, toSlot), true, false);
+                Trans.get(ModsActivity.this, R.string.mods_copy_done),
+                Trans.get(ModsActivity.this, R.string.mods_copy_progress_fmt, count, toSlot), true, false);
         new Thread(new Runnable() {
             @Override public void run() {
                 Mods.PackResult pr = null;
@@ -470,7 +470,7 @@ public class ModsActivity extends BaseActivity {
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
                         pd.dismiss();
-                        alert(getString(R.string.mods_copy_done), fe != null ? fe : fpr.report(ModsActivity.this));
+                        alert(Trans.get(ModsActivity.this, R.string.mods_copy_done), fe != null ? fe : fpr.report(ModsActivity.this));
                         rescan();
                     }
                 });
@@ -499,8 +499,8 @@ public class ModsActivity extends BaseActivity {
      */
     private void runConflictScan() {
         final ProgressDialog pd = ProgressDialog.show(this,
-                getString(R.string.mods_act_conflict_title),
-                getString(R.string.mods_conflict_progress), true, false);
+                Trans.get(ModsActivity.this, R.string.mods_act_conflict_title),
+                Trans.get(ModsActivity.this, R.string.mods_conflict_progress), true, false);
         new Thread(new Runnable() {
             @Override public void run() {
                 String text;
@@ -518,13 +518,13 @@ public class ModsActivity extends BaseActivity {
                     //   （`text = "冲突体检失败：" + t`）—— 异常原文归 logcat，
                     //   界面只给白话（文案纪律 ③：别把类名甩给用户）。
                     android.util.Log.w("MDTLauncher", "conflict scan failed", t);
-                    text = getString(R.string.mods_conflict_failed);
+                    text = Trans.get(ModsActivity.this, R.string.mods_conflict_failed);
                 }
                 final String ft = text;
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
                         pd.dismiss();
-                        alert(getString(R.string.mods_conflict_title), ft);
+                        alert(Trans.get(ModsActivity.this, R.string.mods_conflict_title), ft);
                     }
                 });
             }
@@ -539,8 +539,8 @@ public class ModsActivity extends BaseActivity {
         int checked = 0;
         for (int i = 0; i < slots.size(); i++) {
             Data.Slot s = slots.get(i);
-            names[i] = s.name + (s.active ? getString(R.string.slot_current_suffix) : "")
-                    + "  " + getString(R.string.slot_entry_fmt, s.files, Util.formatSize(s.bytes));
+            names[i] = s.name + (s.active ? Trans.get(ModsActivity.this, R.string.slot_current_suffix) : "")
+                    + "  " + Trans.get(ModsActivity.this, R.string.slot_entry_fmt, s.files, Util.formatSize(s.bytes));
             if (s.name.equals(mSlot)) checked = i;
         }
         new AlertDialog.Builder(this)
@@ -569,42 +569,42 @@ public class ModsActivity extends BaseActivity {
     private void fillHeader() {
         if (mSummary != null) {
             if (!mTarget.any()) {
-                mSummary.setText(getString(R.string.mods_summary_nogame_fmt,
+                mSummary.setText(Trans.get(ModsActivity.this, R.string.mods_summary_nogame_fmt,
                         mScan.mods.size(), mSlot));
             } else {
-                mSummary.setText(getString(R.string.mods_summary_fmt,
+                mSummary.setText(Trans.get(ModsActivity.this, R.string.mods_summary_fmt,
                         mScan.mods.size(), mSlot, join(mTarget.versions)));
             }
         }
         if (mSlotSub != null) {
-            mSlotSub.setText(getString(R.string.mods_row_slot_sub_fmt, mSlot));
+            mSlotSub.setText(Trans.get(ModsActivity.this, R.string.mods_row_slot_sub_fmt, mSlot));
         }
         if (mCopySub != null) {
-            mCopySub.setText(getString(R.string.mods_act_copy_sub_fmt, mSlot));
+            mCopySub.setText(Trans.get(ModsActivity.this, R.string.mods_act_copy_sub_fmt, mSlot));
         }
         if (mDetail != null) {
             StringBuilder sb = new StringBuilder();
-            sb.append(getString(R.string.mods_detail_fmt,
+            sb.append(Trans.get(ModsActivity.this, R.string.mods_detail_fmt,
                     mScan.modsDirPath(),
                     mScan.settingsNote,
                     getString(mScan.launchIdExists ? R.string.mods_crash_yes : R.string.mods_crash_no)));
             if (!mTarget.any()) {
-                sb.append("\n\n").append(getString(R.string.mods_detail_no_target));
+                sb.append("\n\n").append(Trans.get(ModsActivity.this, R.string.mods_detail_no_target));
             } else {
-                sb.append("\n\n").append(getString(R.string.mods_detail_target_fmt,
+                sb.append("\n\n").append(Trans.get(ModsActivity.this, R.string.mods_detail_target_fmt,
                         join(mTarget.versions), mTarget.label));
 
             }
             if (!mScan.ignored.isEmpty()) {
-                sb.append("\n\n").append(getString(R.string.mods_ignored_fmt, mScan.ignored.size()));
+                sb.append("\n\n").append(Trans.get(ModsActivity.this, R.string.mods_ignored_fmt, mScan.ignored.size()));
                 sb.append("：").append(join(mScan.ignored));
             }
             if (!mScan.orphanKeys.isEmpty()) {
-                sb.append("\n\n").append(getString(R.string.mods_orphan_fmt, mScan.orphanKeys.size()));
+                sb.append("\n\n").append(Trans.get(ModsActivity.this, R.string.mods_orphan_fmt, mScan.orphanKeys.size()));
                 sb.append("：").append(join(mScan.orphanKeys));
             }
             if (!mScan.problems.isEmpty()) {
-                sb.append("\n\n").append(getString(R.string.mods_problem_head));
+                sb.append("\n\n").append(Trans.get(ModsActivity.this, R.string.mods_problem_head));
                 for (String p : mScan.problems) sb.append("\n· ").append(p);
             }
             // 依赖链的失效项单独说（这是"为什么它没生效"的第二种静默原因）
@@ -617,7 +617,7 @@ public class ModsActivity extends BaseActivity {
             if (!bad.isEmpty()) {
                 // ★ 原文案里有「（照抄 Mods.resolveDependencies）」—— 那是
                 //   **维护者自我说明 / 源码出处**，按文案纪律 ⑤ 不该出现在界面上 ⇒ 去掉。
-                sb.append("\n\n").append(getString(R.string.mods_detail_depchain));
+                sb.append("\n\n").append(Trans.get(ModsActivity.this, R.string.mods_detail_depchain));
                 for (String b : bad) sb.append("\n· ").append(b);
             }
             mDetail.setText(sb.toString());
@@ -659,14 +659,14 @@ public class ModsActivity extends BaseActivity {
                 || mSort != Mods.SORT_NAME;
         if (mFiltered != null) {
             mFiltered.setVisibility(filtering ? View.VISIBLE : View.GONE);
-            mFiltered.setText(getString(R.string.mods_filtered_fmt, shown.size(), all.size()));
+            mFiltered.setText(Trans.get(ModsActivity.this, R.string.mods_filtered_fmt, shown.size(), all.size()));
         }
         if (mEmpty != null) {
             mEmpty.setVisibility(shown.isEmpty() ? View.VISIBLE : View.GONE);
             if (shown.isEmpty()) {
                 mEmpty.setText(!filtering && all.isEmpty()
-                        ? getString(R.string.mods_empty_fmt, mScan.modsDirPath())
-                        : getString(R.string.mods_empty_filtered));
+                        ? Trans.get(ModsActivity.this, R.string.mods_empty_fmt, mScan.modsDirPath())
+                        : Trans.get(ModsActivity.this, R.string.mods_empty_filtered));
             }
         }
         LayoutInflater inf = getLayoutInflater();
@@ -688,15 +688,15 @@ public class ModsActivity extends BaseActivity {
     private void pickFilter() {
         final String tick = "✓ ";
         final String[] items = {
-                (mSort == Mods.SORT_NAME ? tick : "") + getString(R.string.mods_filter_sort_name),
-                (mSort == Mods.SORT_STATE ? tick : "") + getString(R.string.mods_filter_sort_state),
-                (mSort == Mods.SORT_SIZE ? tick : "") + getString(R.string.mods_filter_sort_size),
-                (mOnlyProblems ? tick : "") + getString(R.string.mods_filter_only),
-                (mType == Mods.TYPE_ANY ? tick : "") + getString(R.string.mods_filter_type_all),
-                (mType == Mods.TYPE_JAVA ? tick : "") + getString(R.string.mods_filter_type_java),
-                (mType == Mods.TYPE_JS ? tick : "") + getString(R.string.mods_filter_type_js),
-                (mType == Mods.TYPE_DATA ? tick : "") + getString(R.string.mods_filter_type_data),
-                getString(R.string.mods_filter_reset)};
+                (mSort == Mods.SORT_NAME ? tick : "") + Trans.get(ModsActivity.this, R.string.mods_filter_sort_name),
+                (mSort == Mods.SORT_STATE ? tick : "") + Trans.get(ModsActivity.this, R.string.mods_filter_sort_state),
+                (mSort == Mods.SORT_SIZE ? tick : "") + Trans.get(ModsActivity.this, R.string.mods_filter_sort_size),
+                (mOnlyProblems ? tick : "") + Trans.get(ModsActivity.this, R.string.mods_filter_only),
+                (mType == Mods.TYPE_ANY ? tick : "") + Trans.get(ModsActivity.this, R.string.mods_filter_type_all),
+                (mType == Mods.TYPE_JAVA ? tick : "") + Trans.get(ModsActivity.this, R.string.mods_filter_type_java),
+                (mType == Mods.TYPE_JS ? tick : "") + Trans.get(ModsActivity.this, R.string.mods_filter_type_js),
+                (mType == Mods.TYPE_DATA ? tick : "") + Trans.get(ModsActivity.this, R.string.mods_filter_type_data),
+                Trans.get(ModsActivity.this, R.string.mods_filter_reset)};
         new AlertDialog.Builder(this)
                 .setTitle(R.string.mods_filter_title)
                 .setItems(items, new DialogInterface.OnClickListener() {
@@ -742,11 +742,11 @@ public class ModsActivity extends BaseActivity {
         // ★ 徽标优先级：游戏自己的状态 > "安卓上会加载失败"（我们推出来的）> 启用。
         //   `willFailJavaLoad` 是**真会咬人**的一条（声明了 java、包里没有 classes.dex ⇒
         //   游戏抛异常后**整个模组被跳过**）—— 那时还显示绿色「启用」就是在骗人。
-        String badgeText = broken ? getString(R.string.mods_badge_broken)
+        String badgeText = broken ? Trans.get(ModsActivity.this, R.string.mods_badge_broken)
                     : ModsText.stateBadge(this, st);
         boolean warnBadge = broken || st != Mods.State.ENABLED;
         if (!broken && st == Mods.State.ENABLED && m.willFailJavaLoad()) {
-            badgeText = getString(R.string.mods_badge_willfail);
+            badgeText = Trans.get(ModsActivity.this, R.string.mods_badge_willfail);
             warnBadge = true;
         }
 
@@ -755,7 +755,7 @@ public class ModsActivity extends BaseActivity {
         // —— 真机实测：`与当前游戏版本不兼容` 会把标题挤到折行。
         badge.setText(badgeText);
         if (!broken && m.duplicated) {
-            badge.setText(getString(R.string.mods_dup_fmt, badgeText));
+            badge.setText(Trans.get(ModsActivity.this, R.string.mods_dup_fmt, badgeText));
         }
         badge.setBackgroundResource(warnBadge ? R.drawable.badge_slot_warn : R.drawable.badge_slot);
 
@@ -764,15 +764,15 @@ public class ModsActivity extends BaseActivity {
         //   ② 「联机要服务器同款」几乎每个模组都一样，12 行重复同一句就是纯噪声
         //      ⇒ 挪进详情弹窗（那里才需要判断）。
         sub.setText(kindShortOf(m) + "  ·  "
-                + getString(R.string.mods_sub_fmt, Util.formatSize(m.bytes), formOf(m)));
+                + Trans.get(ModsActivity.this, R.string.mods_sub_fmt, Util.formatSize(m.bytes), formOf(m)));
 
         List<String> warns = new ArrayList<>();
         if (broken || m.metaError != null) {
             // ★ 走 metaReason()（异常类名/全限定名要翻成白话），不是原始 metaError（那是给排查看的）
-            warns.add(getString(R.string.mods_warn_meta_fmt, ModsText.infoMetaReason(this, m)));
+            warns.add(Trans.get(ModsActivity.this, R.string.mods_warn_meta_fmt, ModsText.infoMetaReason(this, m)));
         } else {
             if (!Mods.isAtLeast(mTarget.build, mTarget.revision, m.minGameVersion)) {
-                warns.add(getString(R.string.mods_warn_version_fmt,
+                warns.add(Trans.get(ModsActivity.this, R.string.mods_warn_version_fmt,
                         m.minGameVersion, mTarget.label));
             }
             // ★ 门槛分两档（`Vars.java:53/55`）：Java 模组 154、**脚本 / 数据模组 136** ——
@@ -782,28 +782,28 @@ public class ModsActivity extends BaseActivity {
             int needMajor = m.isJava() ? Mods.MIN_JAVA_MOD_GAME_VERSION : Mods.MIN_MOD_GAME_VERSION;
             if (minMajor < needMajor && !m.legacyCompatible) {
                 warns.add(minMajor <= 0
-                        ? getString(R.string.mods_warn_noversion_fmt)
-                        : getString(R.string.mods_warn_minmajor_fmt, minMajor, needMajor));
+                        ? Trans.get(ModsActivity.this, R.string.mods_warn_noversion_fmt)
+                        : Trans.get(ModsActivity.this, R.string.mods_warn_minmajor_fmt, minMajor, needMajor));
             }
             if (Mods.isBlacklisted(m.name, m.version)) {
-                warns.add(getString(R.string.mods_warn_blacklist_fmt, m.name + ":" + m.version));
+                warns.add(Trans.get(ModsActivity.this, R.string.mods_warn_blacklist_fmt, m.name + ":" + m.version));
             }
-            if (m.duplicated) warns.add(getString(R.string.mods_warn_dup));
-            if (m.failed) warns.add(getString(R.string.mods_warn_failed));
-            if (m.willFailJavaLoad()) warns.add(getString(R.string.mods_warn_willfail));
-            if (m.noMainScript()) warns.add(getString(R.string.mods_warn_no_mainjs_fmt, m.jsCount));
+            if (m.duplicated) warns.add(Trans.get(ModsActivity.this, R.string.mods_warn_dup));
+            if (m.failed) warns.add(Trans.get(ModsActivity.this, R.string.mods_warn_failed));
+            if (m.willFailJavaLoad()) warns.add(Trans.get(ModsActivity.this, R.string.mods_warn_willfail));
+            if (m.noMainScript()) warns.add(Trans.get(ModsActivity.this, R.string.mods_warn_no_mainjs_fmt, m.jsCount));
             if (m.backslashEntries > 0) {
-                warns.add(getString(R.string.mods_warn_backslash_fmt, m.backslashEntries));
+                warns.add(Trans.get(ModsActivity.this, R.string.mods_warn_backslash_fmt, m.backslashEntries));
             }
             if (st == Mods.State.DISABLED) {
-                warns.add(getString(R.string.mods_warn_disabled));
+                warns.add(Trans.get(ModsActivity.this, R.string.mods_warn_disabled));
             } else if (st == Mods.State.UNSUPPORTED) {
                 // ⚠️ 不写「状态：与当前游戏版本不兼容」—— 那个状态**只有三个成因**
                 //    （版本不够 / minMajor 太低 / 黑名单），上面三行各自都说过一次了。
                 //    徽标已经写着状态，正文再复述一遍就是纯噪声（同一件事两处喊）。
             } else if (st != Mods.State.ENABLED) {
                 // 依赖类的状态没有别的行会说，必须在正文里点名
-                warns.add(getString(R.string.mods_warn_state_fmt, ModsText.stateLabel(this, st)));
+                warns.add(Trans.get(ModsActivity.this, R.string.mods_warn_state_fmt, ModsText.stateLabel(this, st)));
             }
         }
         if (warns.isEmpty()) {
@@ -828,7 +828,7 @@ public class ModsActivity extends BaseActivity {
     }
 
     private String formOf(Mods.Info m) {
-        if (m.directory) return getString(R.string.mods_form_dir);
+        if (m.directory) return Trans.get(ModsActivity.this, R.string.mods_form_dir);
         String n = m.fileName.toLowerCase(java.util.Locale.ROOT);
         return getString(n.endsWith(".jar") ? R.string.mods_form_jar : R.string.mods_form_zip);
     }
@@ -851,14 +851,14 @@ public class ModsActivity extends BaseActivity {
         }
         StringBuilder sb = new StringBuilder();
         if (js) {
-            sb.append(getString(R.string.mods_kind_s_js_fmt, m.jsCount));
+            sb.append(Trans.get(ModsActivity.this, R.string.mods_kind_s_js_fmt, m.jsCount));
         }
         if (dex || cls) {
             if (sb.length() > 0) sb.append(" + ");
             sb.append(getString(dex ? R.string.mods_kind_s_java_dex
                     : R.string.mods_kind_s_java_nodex));
         }
-        if (data) sb.append(getString(R.string.mods_kind_s_plus_res));
+        if (data) sb.append(Trans.get(ModsActivity.this, R.string.mods_kind_s_plus_res));
         return sb.toString();
     }
 
@@ -870,21 +870,21 @@ public class ModsActivity extends BaseActivity {
     private String kindOf(Mods.Info m) {
         int p = m.parts();
         StringBuilder sb = new StringBuilder();
-        if ((p & Mods.JS) != 0) sb.append(getString(R.string.mods_kind_js_fmt, m.jsCount));
+        if ((p & Mods.JS) != 0) sb.append(Trans.get(ModsActivity.this, R.string.mods_kind_js_fmt, m.jsCount));
         if ((p & Mods.JAVA_DEX) != 0) {
             if (sb.length() > 0) sb.append(" ＋ ");
-            sb.append(getString(R.string.mods_kind_java_dex));
+            sb.append(Trans.get(ModsActivity.this, R.string.mods_kind_java_dex));
         }
         if ((p & Mods.JAVA_CLASS) != 0) {
             if (sb.length() > 0) sb.append(" ＋ ");
-            sb.append(getString(R.string.mods_kind_java_class_fmt, m.classFiles));
+            sb.append(Trans.get(ModsActivity.this, R.string.mods_kind_java_class_fmt, m.classFiles));
         }
         if ((p & Mods.DATA) != 0) {
             if (sb.length() > 0) sb.append(" ＋ ");
-            sb.append(getString(R.string.mods_kind_res));
+            sb.append(Trans.get(ModsActivity.this, R.string.mods_kind_res));
         }
         if (sb.length() == 0) {
-            sb.append(getString(R.string.mods_kind_data));
+            sb.append(Trans.get(ModsActivity.this, R.string.mods_kind_data));
         }
         return sb.toString();
     }
@@ -926,12 +926,12 @@ public class ModsActivity extends BaseActivity {
     /** 第一层：正常模组 7 行以内 —— 类型 / 简介 / 联机 / 作者 / 大小 · 开关状态 · 一句话结论 */
     private String userPart(final Mods.Info m) {
         StringBuilder sb = new StringBuilder();
-        sb.append(getString(R.string.mods_detail_kind_fmt, kindShortOf(m))).append('\n');
+        sb.append(Trans.get(ModsActivity.this, R.string.mods_detail_kind_fmt, kindShortOf(m))).append('\n');
         if (m.metaError != null) {
             // 读不出说明文件：能说的只有"读不出来 + 为什么"；门禁那几关**根本没有依据**，别摆
-            sb.append(getString(R.string.mods_detail_size_fmt,
+            sb.append(Trans.get(ModsActivity.this, R.string.mods_detail_size_fmt,
                     Util.formatSize(m.bytes), formOf(m))).append('\n');
-            sb.append('\n').append(getString(R.string.mods_warn_meta_fmt,
+            sb.append('\n').append(Trans.get(ModsActivity.this, R.string.mods_warn_meta_fmt,
                     ModsText.infoMetaReason(this, m)));
             return sb.toString();
         }
@@ -942,24 +942,24 @@ public class ModsActivity extends BaseActivity {
         //      全文仍在第二层「技术细节」的说明文件原文里（信息没删，只是分层）。
         String tag = tagline(m);
         if (!tag.isEmpty()) {
-            sb.append(getString(R.string.mods_detail_desc_fmt, tag)).append('\n');
+            sb.append(Trans.get(ModsActivity.this, R.string.mods_detail_desc_fmt, tag)).append('\n');
         }
-        sb.append(getString(R.string.mods_detail_mp_fmt, getString(m.multiSafe()
+        sb.append(Trans.get(ModsActivity.this, R.string.mods_detail_mp_fmt, getString(m.multiSafe()
                 ? R.string.mods_mp_ok_long : R.string.mods_mp_need_long))).append('\n');
         if (m.author != null && !m.author.isEmpty()) {
-            sb.append(getString(R.string.mods_detail_author_fmt, m.author)).append('\n');
+            sb.append(Trans.get(ModsActivity.this, R.string.mods_detail_author_fmt, m.author)).append('\n');
         }
-        sb.append(getString(R.string.mods_detail_size_fmt,
+        sb.append(Trans.get(ModsActivity.this, R.string.mods_detail_size_fmt,
                 Util.formatSize(m.bytes), formOf(m))).append('\n');
-        sb.append('\n').append(getString(R.string.mods_detail_state_fmt,
+        sb.append('\n').append(Trans.get(ModsActivity.this, R.string.mods_detail_state_fmt,
                 ModsText.stateLabel(this,
                         Mods.stateOf(m, mResolved, mTarget.build, mTarget.revision))));
         int fail = 0;
         for (Mods.Gate g : Mods.gates(this, m, mTarget.build, mTarget.revision)) {
             if (!g.pass) fail++;
         }
-        sb.append('\n').append(fail == 0 ? getString(R.string.mods_detail_allok)
-                : getString(R.string.mods_detail_somefail_fmt, fail));
+        sb.append('\n').append(fail == 0 ? Trans.get(ModsActivity.this, R.string.mods_detail_allok)
+                : Trans.get(ModsActivity.this, R.string.mods_detail_somefail_fmt, fail));
         return sb.toString();
     }
 
@@ -989,31 +989,31 @@ public class ModsActivity extends BaseActivity {
      */
     private void showTech(final Mods.Info m) {
         StringBuilder sb = new StringBuilder();
-        sb.append(getString(R.string.mods_detail_file_fmt, m.fileName,
+        sb.append(Trans.get(ModsActivity.this, R.string.mods_detail_file_fmt, m.fileName,
                 Util.formatSize(m.bytes), formOf(m))).append('\n');
         if (m.metaName != null) {
-            sb.append(getString(R.string.mods_detail_key_fmt, String.valueOf(m.internalName)))
+            sb.append(Trans.get(ModsActivity.this, R.string.mods_detail_key_fmt, String.valueOf(m.internalName)))
               .append('\n');
         }
         if (m.repo != null && !m.repo.isEmpty()) {
-            sb.append(getString(R.string.mods_detail_repo_fmt, m.repo)).append('\n');
+            sb.append(Trans.get(ModsActivity.this, R.string.mods_detail_repo_fmt, m.repo)).append('\n');
         }
         if (m.settingsRepo != null && !m.settingsRepo.isEmpty()
                 && !m.settingsRepo.equals(m.repo)) {
-            sb.append(getString(R.string.mods_detail_repo_fmt,
-                    getString(R.string.mods_detail_repo_override_fmt, m.settingsRepo))).append('\n');
+            sb.append(Trans.get(ModsActivity.this, R.string.mods_detail_repo_fmt,
+                    Trans.get(ModsActivity.this, R.string.mods_detail_repo_override_fmt, m.settingsRepo))).append('\n');
         }
         // ★ 不再显示「代码入口：logicsugar.LogicSugarMod」那种**类名** ——
         //   用户看不懂，而下面「说明文件原文」里的 main 字段就是它。
         if (!m.dependencies.isEmpty()) {
-            sb.append(getString(R.string.mods_detail_deps_fmt, join(m.dependencies))).append('\n');
+            sb.append(Trans.get(ModsActivity.this, R.string.mods_detail_deps_fmt, join(m.dependencies))).append('\n');
         }
         if (!m.softDependencies.isEmpty()) {
-            sb.append(getString(R.string.mods_detail_softdeps_fmt,
+            sb.append(Trans.get(ModsActivity.this, R.string.mods_detail_softdeps_fmt,
                     join(m.softDependencies))).append('\n');
         }
         if (m.metaError == null) {
-            sb.append(getString(R.string.mods_detail_state_fmt,
+            sb.append(Trans.get(ModsActivity.this, R.string.mods_detail_state_fmt,
                     ModsText.stateLabel(this,
                             Mods.stateOf(m, mResolved, mTarget.build, mTarget.revision)))).append('\n');
         }
@@ -1025,49 +1025,49 @@ public class ModsActivity extends BaseActivity {
             String p = m.file.getAbsolutePath(), d = slotDir.getAbsolutePath();
             if (p.startsWith(d + "/")) rel = p.substring(d.length() + 1);
         }
-        sb.append('\n').append(getString(R.string.mods_detail_path_fmt, rel)).append('\n');
+        sb.append('\n').append(Trans.get(ModsActivity.this, R.string.mods_detail_path_fmt, rel)).append('\n');
 
         if (m.metaError == null) {
-            sb.append('\n').append(getString(R.string.mods_detail_gate_head)).append('\n');
-            sb.append(getString(R.string.mods_detail_gate_note_fmt,
-                    mTarget.label.isEmpty() ? getString(R.string.mods_detail_gate_nogame)
+            sb.append('\n').append(Trans.get(ModsActivity.this, R.string.mods_detail_gate_head)).append('\n');
+            sb.append(Trans.get(ModsActivity.this, R.string.mods_detail_gate_note_fmt,
+                    mTarget.label.isEmpty() ? Trans.get(ModsActivity.this, R.string.mods_detail_gate_nogame)
                             : mTarget.label)).append('\n');
             for (Mods.Gate g : Mods.gates(this, m, mTarget.build, mTarget.revision)) {
                 // ★ 通过 + 无补充说明 ⇒ **只画一行**（note == null 就是"没什么好说的"，
                 //   约定见 Mods.gates 的注释）；失败才把原因摊在第二行。
                 if (g.pass) {
                     sb.append(g.note == null
-                            ? getString(R.string.mods_detail_gate_ok_fmt, g.label)
-                            : getString(R.string.mods_detail_gate_ok_note_fmt, g.label, g.note));
+                            ? Trans.get(ModsActivity.this, R.string.mods_detail_gate_ok_fmt, g.label)
+                            : Trans.get(ModsActivity.this, R.string.mods_detail_gate_ok_note_fmt, g.label, g.note));
                 } else {
-                    sb.append(getString(R.string.mods_detail_gate_fail_fmt, g.label, g.note));
+                    sb.append(Trans.get(ModsActivity.this, R.string.mods_detail_gate_fail_fmt, g.label, g.note));
                 }
                 sb.append('\n');
             }
-            sb.append('\n').append(getString(R.string.mods_detail_settings_head)).append('\n');
+            sb.append('\n').append(Trans.get(ModsActivity.this, R.string.mods_detail_settings_head)).append('\n');
             if (m.internalName != null) {
                 // ★ 大白话 + 是/否：原来显示 `mod-logicsugar-enabled = true` 这种**键名 + 机器值**，
                 //   用户看不懂（键名留在 Mods.enabledKey 那边的注释里，排查时再查）
-                sb.append(getString(R.string.mods_detail_setting2_fmt,
-                        getString(R.string.mods_setting_enabled),
+                sb.append(Trans.get(ModsActivity.this, R.string.mods_detail_setting2_fmt,
+                        Trans.get(ModsActivity.this, R.string.mods_setting_enabled),
                         getString(m.enabled ? R.string.mods_setting_yes
                                 : R.string.mods_setting_no))).append('\n');
-                sb.append(getString(R.string.mods_detail_setting2_fmt,
-                        getString(R.string.mods_setting_failed),
+                sb.append(Trans.get(ModsActivity.this, R.string.mods_detail_setting2_fmt,
+                        Trans.get(ModsActivity.this, R.string.mods_setting_failed),
                         getString(m.failed ? R.string.mods_setting_yes
                                 : R.string.mods_setting_no))).append('\n');
-                sb.append(getString(R.string.mods_detail_setting2_fmt,
-                        getString(R.string.mods_setting_repo),
-                        m.settingsRepo == null ? getString(R.string.mods_setting_repo_default)
+                sb.append(Trans.get(ModsActivity.this, R.string.mods_detail_setting2_fmt,
+                        Trans.get(ModsActivity.this, R.string.mods_setting_repo),
+                        m.settingsRepo == null ? Trans.get(ModsActivity.this, R.string.mods_setting_repo_default)
                                 : m.settingsRepo)).append('\n');
             }
-            sb.append(m.settingsKnown ? "" : getString(R.string.mods_detail_settings_unreadable));
+            sb.append(m.settingsKnown ? "" : Trans.get(ModsActivity.this, R.string.mods_detail_settings_unreadable));
         }
 
         if (m.rawMeta != null && !m.rawMeta.isEmpty()) {
             int cap = 1500;
             String body = m.rawMeta.length() > cap ? m.rawMeta.substring(0, cap) + "…" : m.rawMeta;
-            sb.append('\n').append(getString(R.string.mods_detail_meta_head,
+            sb.append('\n').append(Trans.get(ModsActivity.this, R.string.mods_detail_meta_head,
                     Integer.valueOf(cap))).append('\n').append(body);
         }
 
@@ -1094,7 +1094,7 @@ public class ModsActivity extends BaseActivity {
      */
     private void confirmToggle(final Mods.Info m) {
         final boolean on = !m.enabled;
-        String msg = getString(R.string.mods_toggle_msg_fmt,
+        String msg = Trans.get(ModsActivity.this, R.string.mods_toggle_msg_fmt,
                 getString(Data.gameAlive(this)
                         ? R.string.mods_toggle_game_alive : R.string.mods_toggle_game_off));
         // ★ 第④项：关之前先算「会连累谁」—— 现在游戏要到下次启动才显示缺依赖，
@@ -1103,9 +1103,9 @@ public class ModsActivity extends BaseActivity {
             List<String> who = Mods.dependents(this, mScan.mods, m.internalName);
             if (!who.isEmpty()) {
                 StringBuilder w = new StringBuilder(msg);
-                w.append("\n\n").append(getString(R.string.mods_dep_warn_head)).append('\n');
+                w.append("\n\n").append(Trans.get(ModsActivity.this, R.string.mods_dep_warn_head)).append('\n');
                 for (String s : who) w.append("· ").append(s).append('\n');
-                w.append(getString(R.string.mods_dep_warn_tail));
+                w.append(Trans.get(ModsActivity.this, R.string.mods_dep_warn_tail));
                 msg = w.toString();
             }
         }
@@ -1128,7 +1128,7 @@ public class ModsActivity extends BaseActivity {
      *   改多少个、改前会备份、游戏在跑就不许改（门禁在 {@link Mods#setEnabledAll} 里）。
      */
     private void pickBatch() {
-        final String[] items = {getString(R.string.mods_batch_on), getString(R.string.mods_batch_off)};
+        final String[] items = {Trans.get(ModsActivity.this, R.string.mods_batch_on), Trans.get(ModsActivity.this, R.string.mods_batch_off)};
         new AlertDialog.Builder(this)
                 .setTitle(R.string.mods_batch_title)
                 .setItems(items, new DialogInterface.OnClickListener() {
@@ -1186,14 +1186,14 @@ public class ModsActivity extends BaseActivity {
         final String title;
         final String msg;
         if (!r.ok) {
-            title = getString(R.string.mods_toggle_failed);
+            title = Trans.get(ModsActivity.this, R.string.mods_toggle_failed);
             // ★ 原因走 userReason()（异常类名要翻成白话），不是原始的 error（那是给排查看的）
-            msg = getString(R.string.mods_toggle_fail_msg_fmt, SettingsText.userReason(this, r));
+            msg = Trans.get(ModsActivity.this, R.string.mods_toggle_fail_msg_fmt, SettingsText.userReason(this, r));
         } else if (r.noop) {
-            title = getString(R.string.mods_toggle_noop);
+            title = Trans.get(ModsActivity.this, R.string.mods_toggle_noop);
             msg = count > 0
-                    ? getString(R.string.mods_batch_noop_msg)
-                    : getString(R.string.mods_toggle_noop_msg_fmt,
+                    ? Trans.get(ModsActivity.this, R.string.mods_batch_noop_msg)
+                    : Trans.get(ModsActivity.this, R.string.mods_toggle_noop_msg_fmt,
                             shownName == null ? "" : shownName, toggleWord(on));
         } else {
             // 批量与单个的标题分开（"批量启停完成"比"已改动"更说得清这次干了什么）
@@ -1201,8 +1201,8 @@ public class ModsActivity extends BaseActivity {
             // ★ 备份只在"原来就有设置文件"时才存在（新建那份没有原件可备份，见 SettingsBin.commit）
             String note = getString(r.backup != null ? R.string.mods_toggle_backup_note
                                                      : R.string.mods_toggle_verified_note);
-            msg = (count > 0 ? getString(R.string.mods_batch_ok_fmt, count)
-                             : getString(R.string.mods_toggle_ok_fmt, shownName, toggleWord(on)))
+            msg = (count > 0 ? Trans.get(ModsActivity.this, R.string.mods_batch_ok_fmt, count)
+                             : Trans.get(ModsActivity.this, R.string.mods_toggle_ok_fmt, shownName, toggleWord(on)))
                     + note;
         }
         AlertDialog.Builder b = new AlertDialog.Builder(this)
@@ -1213,7 +1213,7 @@ public class ModsActivity extends BaseActivity {
             // ★ 依据不能删：原始报告（体积 / 键数 / 写后自检 / 备份路径）留在第二层
             b.setNeutralButton(R.string.mods_toggle_detail, new DialogInterface.OnClickListener() {
                 @Override public void onClick(DialogInterface d, int w) {
-                    alert(getString(R.string.mods_toggle_detail_title), r.report());
+                    alert(Trans.get(ModsActivity.this, R.string.mods_toggle_detail_title), r.report());
                 }
             });
         }

@@ -91,7 +91,7 @@ public class MapsActivity extends BaseActivity {
             return;
         }
         mSlot = mSlot.trim();
-        setTitle(getString(R.string.maps_title_fmt, mSlot));
+        setTitle(Trans.get(MapsActivity.this, R.string.maps_title_fmt, mSlot));
 
         View root = getLayoutInflater().inflate(R.layout.activity_maps, null);
         // ★ 必须有（见 activity_maps.xml 的注释）：targetSdk ≥ 35 强制 edge-to-edge，
@@ -116,8 +116,8 @@ public class MapsActivity extends BaseActivity {
                         //   而工程里凡"写槽"的路径都有这道门禁（导入存档/整槽、备份、恢复、改设置）；
                         //   地图与模组导入原来漏了 —— 游戏本局写的图会被覆盖或被挪走。
                         if (Data.gameAlive(MapsActivity.this)) {
-                            alert(getString(R.string.game_busy_title),
-                                    getString(R.string.maps_import_busy_msg));
+                            alert(Trans.get(MapsActivity.this, R.string.game_busy_title),
+                                    Trans.get(MapsActivity.this, R.string.maps_import_busy_msg));
                             return;
                         }
                         sMapTarget = mSlot;
@@ -125,7 +125,7 @@ public class MapsActivity extends BaseActivity {
                         i.addCategory(Intent.CATEGORY_OPENABLE);
                         i.setType("*/*");       // 各家文件管理器对 .msav 的 MIME 报得五花八门
                         startActivityForResult(Intent.createChooser(i,
-                                getString(R.string.maps_import)), REQ_MAP);
+                                Trans.get(MapsActivity.this, R.string.maps_import)), REQ_MAP);
                     }
                 });
 
@@ -137,8 +137,8 @@ public class MapsActivity extends BaseActivity {
                 R.string.maps_from_save, R.string.maps_from_save_sub, new Runnable() {
                     @Override public void run() {
                         if (Data.gameAlive(MapsActivity.this)) {
-                            alert(getString(R.string.game_busy_title),
-                                    getString(R.string.maps_import_busy_msg));
+                            alert(Trans.get(MapsActivity.this, R.string.game_busy_title),
+                                    Trans.get(MapsActivity.this, R.string.maps_import_busy_msg));
                             return;
                         }
                         pickSlotSave();
@@ -226,7 +226,7 @@ public class MapsActivity extends BaseActivity {
                         mTitles = titles;
                         mSubs = subs;
                         mThumbs = thumbs;
-                        mHead.setText(getString(R.string.maps_counts_fmt,
+                        mHead.setText(Trans.get(MapsActivity.this, R.string.maps_counts_fmt,
                                 Maps.count(items, Maps.FROM_SLOT),
                                 Maps.count(items, Maps.FROM_GAME),
                                 Maps.count(items, Maps.FROM_MOD)));
@@ -238,7 +238,7 @@ public class MapsActivity extends BaseActivity {
                         if (mEmpty != null) {
                             mEmpty.setVisibility(items.isEmpty() ? View.VISIBLE : View.GONE);
                             if (items.isEmpty()) {
-                                mEmpty.setText(getString(R.string.maps_empty_fmt, mSlot));
+                                mEmpty.setText(Trans.get(MapsActivity.this, R.string.maps_empty_fmt, mSlot));
                             }
                         }
                     }
@@ -325,7 +325,7 @@ public class MapsActivity extends BaseActivity {
         head.setVisibility(View.VISIBLE);
         // ★ 条数这类信息只能放表头，**不能塞标题**：AlertDialog 的标题是单行的
         //   （第 58 轮实测被截成省略号）—— 见 dialog_msav_list.xml 的注释
-        head.setText(getString(R.string.maps_export_head_fmt, items.size()));
+        head.setText(Trans.get(MapsActivity.this, R.string.maps_export_head_fmt, items.size()));
         ListView lv = (ListView) box.findViewById(R.id.msav_list);
         lv.setAdapter(new MsavListAdapter(this, mTitles, mSubs, mThumbs));
         final AlertDialog dlg = new AlertDialog.Builder(this)
@@ -343,7 +343,7 @@ public class MapsActivity extends BaseActivity {
                         // ★ 文件名用**原始名**：`0.msav` 这种就是游戏里认的名字，
                         //   "安全化"成 ASCII 之后用户在文件管理器里认不出来（同存档导出那条纪律）
                         Exporter.createDoc(it.name(), "application/octet-stream"),
-                        getString(R.string.chooser_export)), REQ_MAP_EXPORT);
+                        Trans.get(MapsActivity.this, R.string.chooser_export)), REQ_MAP_EXPORT);
             }
         });
         dlg.show();
@@ -354,8 +354,8 @@ public class MapsActivity extends BaseActivity {
      * 两条路：本槽（以及目录形态模组）里的是**真文件**；游戏 APK / 模组包里的要**从 zip 条目流式拷**。
      */
     private void exportItem(final Maps.Item it, final Uri uri) {
-        final ProgressDialog pd = ProgressDialog.show(this, getString(R.string.maps_export),
-                getString(R.string.maps_export_working), true, false);
+        final ProgressDialog pd = ProgressDialog.show(this, Trans.get(MapsActivity.this, R.string.maps_export),
+                Trans.get(MapsActivity.this, R.string.maps_export_working), true, false);
         new Thread(new Runnable() {
             @Override public void run() {
                 final long n;
@@ -365,7 +365,7 @@ public class MapsActivity extends BaseActivity {
                     } else if (it.container != null && it.entry != null) {
                         n = Exporter.writeEntry(MapsActivity.this, uri, it.container, it.entry);
                     } else {
-                        throw new java.io.IOException(getString(R.string.maps_export_nosrc));
+                        throw new java.io.IOException(Trans.get(MapsActivity.this, R.string.maps_export_nosrc));
                     }
                 } catch (final Throwable t) {
                     runOnUiThread(new Runnable() {
@@ -373,9 +373,9 @@ public class MapsActivity extends BaseActivity {
                             pd.dismiss();
                             // 异常消息多半就是我们自己抛的那几句人话（见 Exporter）⇒ `ioReason`
                             // **认识的系统 errno 才翻**、我们的文案原样透传；没有 message 时也不把类名甩给用户
-                            alert(getString(R.string.export_failed),
+                            alert(Trans.get(MapsActivity.this, R.string.export_failed),
                                     Util.ioReason(MapsActivity.this, t,
-                                            getString(R.string.maps_export_nosrc)));
+                                            Trans.get(MapsActivity.this, R.string.maps_export_nosrc)));
                         }
                     });
                     return;
@@ -384,7 +384,7 @@ public class MapsActivity extends BaseActivity {
                     @Override public void run() {
                         pd.dismiss();
                         Toast.makeText(MapsActivity.this,
-                                getString(R.string.map_export_ok_fmt, it.name(),
+                                Trans.get(MapsActivity.this, R.string.map_export_ok_fmt, it.name(),
                                         Util.formatSize(n)), Toast.LENGTH_SHORT).show();
                     }
                 });
@@ -394,8 +394,8 @@ public class MapsActivity extends BaseActivity {
 
     private void importFile(final Uri uri, final String displayName, final String slot,
                             final boolean overwrite) {
-        final ProgressDialog pd = ProgressDialog.show(this, getString(R.string.maps_import),
-                getString(R.string.maps_scanning), true, false);
+        final ProgressDialog pd = ProgressDialog.show(this, Trans.get(MapsActivity.this, R.string.maps_import),
+                Trans.get(MapsActivity.this, R.string.maps_scanning), true, false);
         new Thread(new Runnable() {
             @Override public void run() {
                 final MapFiles.Result r;
@@ -409,7 +409,7 @@ public class MapsActivity extends BaseActivity {
                     runOnUiThread(new Runnable() {
                         @Override public void run() {
                             pd.dismiss();
-                            alert(getString(R.string.maps_import), t.toString());
+                            alert(Trans.get(MapsActivity.this, R.string.maps_import), t.toString());
                         }
                     });
                     return;
@@ -439,7 +439,7 @@ public class MapsActivity extends BaseActivity {
                         }
                         if (r.ok) {
                             Toast.makeText(MapsActivity.this,
-                                    getString(R.string.map_import_ok_fmt, r.finalName),
+                                    Trans.get(MapsActivity.this, R.string.map_import_ok_fmt, r.finalName),
                                     Toast.LENGTH_SHORT).show();
                             refreshList();          // ★ 与转图那条路统一：只重扫列表，不重建页面
                             return;
@@ -450,7 +450,7 @@ public class MapsActivity extends BaseActivity {
                         if (!overwrite && r.nameTaken) {
                             new AlertDialog.Builder(MapsActivity.this)
                                     .setTitle(R.string.map_overwrite_title)
-                                    .setMessage(getString(R.string.map_overwrite_msg_fmt,
+                                    .setMessage(Trans.get(MapsActivity.this, R.string.map_overwrite_msg_fmt,
                                             MapFiles.safeName(displayName)))
                                     .setPositiveButton(R.string.map_overwrite_ok,
                                             new DialogInterface.OnClickListener() {
@@ -462,8 +462,8 @@ public class MapsActivity extends BaseActivity {
                                     .show();
                             return;
                         }
-                        alert(getString(R.string.maps_import),
-                                getString(R.string.map_import_fail_fmt, r.error));
+                        alert(Trans.get(MapsActivity.this, R.string.maps_import),
+                                Trans.get(MapsActivity.this, R.string.map_import_fail_fmt, r.error));
                     }
                 });
             }
@@ -513,7 +513,7 @@ public class MapsActivity extends BaseActivity {
         View box = getLayoutInflater().inflate(R.layout.dialog_msav_list, null);
         TextView head = (TextView) box.findViewById(R.id.msav_head);
         head.setVisibility(View.VISIBLE);
-        head.setText(getString(R.string.maps_from_save_head_fmt, fs.length));
+        head.setText(Trans.get(MapsActivity.this, R.string.maps_from_save_head_fmt, fs.length));
         android.widget.ListView lv = (android.widget.ListView) box.findViewById(R.id.msav_list);
         final MsavListAdapter adapter = new MsavListAdapter(this, titles, subs);
         lv.setAdapter(adapter);
@@ -576,7 +576,7 @@ public class MapsActivity extends BaseActivity {
                                          final String fallbackBase, final boolean pendingPart) {
         if (Util.dead(this)) return;
         if (src == null || !src.isFile()) {
-            alert(getString(R.string.map_save_name_title), getString(R.string.mapfile_err_part_gone));
+            alert(Trans.get(MapsActivity.this, R.string.map_save_name_title), Trans.get(MapsActivity.this, R.string.mapfile_err_part_gone));
             return;
         }
         View form = getLayoutInflater().inflate(R.layout.dialog_map_name, null);
@@ -693,11 +693,11 @@ public class MapsActivity extends BaseActivity {
         String nm = it == null ? "" : it.displayName();
         // 候选多张 ⇒ 明说有几张（**不写"同名"** —— 战役那条判据是"区块键 == 文件名"，
         // 命中多张时不一定同名）；游戏自带/模组自带的还要点明来源，否则用户不知道它在哪
-        if (hits > 1) return getString(R.string.map_save_source_amb_fmt, nm, hits);
+        if (hits > 1) return Trans.get(MapsActivity.this, R.string.map_save_source_amb_fmt, nm, hits);
         if (it != null && it.from != Maps.FROM_SLOT) {
-            return getString(R.string.map_save_source_pick_src_fmt, nm, it.sourceLabel(this));
+            return Trans.get(MapsActivity.this, R.string.map_save_source_pick_src_fmt, nm, it.sourceLabel(this));
         }
-        return getString(R.string.map_save_source_pick_fmt, nm);
+        return Trans.get(MapsActivity.this, R.string.map_save_source_pick_fmt, nm);
     }
 
     /**
@@ -736,7 +736,7 @@ public class MapsActivity extends BaseActivity {
         }
         String[] titles = new String[all.size() + 1];
         String[] subs = new String[all.size() + 1];
-        titles[0] = getString(R.string.map_save_source_off_item);
+        titles[0] = Trans.get(MapsActivity.this, R.string.map_save_source_off_item);
         subs[0] = "";
         for (int i = 0; i < all.size(); i++) {
             Maps.Item it = all.get(i);
@@ -747,7 +747,7 @@ public class MapsActivity extends BaseActivity {
         View box = getLayoutInflater().inflate(R.layout.dialog_msav_list, null);
         TextView head = (TextView) box.findViewById(R.id.msav_head);
         head.setVisibility(View.VISIBLE);
-        head.setText(getString(R.string.map_save_source_head3_fmt, nSlot, nGame, nMod));
+        head.setText(Trans.get(MapsActivity.this, R.string.map_save_source_head3_fmt, nSlot, nGame, nMod));
         android.widget.ListView lv = (android.widget.ListView) box.findViewById(R.id.msav_list);
         lv.setAdapter(new MsavListAdapter(this, titles, subs));
         final AlertDialog dlg = new AlertDialog.Builder(this)
@@ -787,8 +787,8 @@ public class MapsActivity extends BaseActivity {
     private void commitSaveAsMap(final File src, final String metaName, final String slot,
                                  final boolean overwrite, final Maps.Item sourceItem,
                                  final boolean autoSource) {
-        final ProgressDialog pd = ProgressDialog.show(this, getString(R.string.map_save_name_title),
-                getString(R.string.maps_scanning), true, false);
+        final ProgressDialog pd = ProgressDialog.show(this, Trans.get(MapsActivity.this, R.string.map_save_name_title),
+                Trans.get(MapsActivity.this, R.string.maps_scanning), true, false);
         new Thread(new Runnable() {
             @Override public void run() {
                 final MapFiles.Result r;
@@ -816,7 +816,7 @@ public class MapsActivity extends BaseActivity {
                     runOnUiThread(new Runnable() {
                         @Override public void run() {
                             pd.dismiss();
-                            alert(getString(R.string.map_save_name_title), t.toString());
+                            alert(Trans.get(MapsActivity.this, R.string.map_save_name_title), t.toString());
                         }
                     });
                     return;
@@ -833,7 +833,7 @@ public class MapsActivity extends BaseActivity {
                         if (!overwrite && r.nameTaken) {
                             new AlertDialog.Builder(MapsActivity.this)
                                     .setTitle(R.string.map_overwrite_title)
-                                    .setMessage(getString(R.string.map_overwrite_msg_fmt,
+                                    .setMessage(Trans.get(MapsActivity.this, R.string.map_overwrite_msg_fmt,
                                             MapFiles.safeName(metaName)))
                                     .setPositiveButton(R.string.map_overwrite_ok,
                                             new DialogInterface.OnClickListener() {
@@ -859,8 +859,8 @@ public class MapsActivity extends BaseActivity {
                         String why = r.conv != null
                                 ? MsavText.convertReason(MapsActivity.this, r.conv)
                                 : String.valueOf(r.error);
-                        alert(getString(R.string.map_save_name_title),
-                                getString(R.string.map_import_fail_fmt, why));
+                        alert(Trans.get(MapsActivity.this, R.string.map_save_name_title),
+                                Trans.get(MapsActivity.this, R.string.map_import_fail_fmt, why));
                     }
                 });
             }
@@ -877,14 +877,14 @@ public class MapsActivity extends BaseActivity {
         String shown = inName == null ? metaName : Mods.stripColors(inName);
         AlertDialog.Builder b = new AlertDialog.Builder(this)
                 .setTitle(R.string.map_save_name_title)
-                .setMessage(getString(R.string.map_save_ok_fmt, shown)
-                        + getString(R.string.map_save_ok_note))
+                .setMessage(Trans.get(MapsActivity.this, R.string.map_save_ok_fmt, shown)
+                        + Trans.get(MapsActivity.this, R.string.map_save_ok_note))
                 .setPositiveButton(R.string.close, null);
         if (r.conv != null) {
             // ★ 依据不能删（F4①d）：原始报告留在第二层
             b.setNeutralButton(R.string.map_save_detail, new DialogInterface.OnClickListener() {
                 @Override public void onClick(DialogInterface d, int w) {
-                    alert(getString(R.string.map_save_detail_title), r.conv.report());
+                    alert(Trans.get(MapsActivity.this, R.string.map_save_detail_title), r.conv.report());
                 }
             });
         }

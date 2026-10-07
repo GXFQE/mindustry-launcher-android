@@ -84,8 +84,8 @@ public class GameSlot extends BaseActivity {
             label = pkg;
         }
         if (target == null || !target.exists()) {
-            fail(getString(R.string.step_prepare),
-                    getString(R.string.game_pkg_missing_fmt,
+            fail(Trans.get(GameSlot.this, R.string.step_prepare),
+                    Trans.get(GameSlot.this, R.string.game_pkg_missing_fmt,
                             pkg != null ? "pkg=" + pkg : "apk=" + apkPath), null);
             return;
         }
@@ -105,7 +105,7 @@ public class GameSlot extends BaseActivity {
             }
         }
         android.util.Log.i("MDTLauncher", "slot prepare:\n" + rep);
-        mStatus.setText(getString(R.string.game_starting_fmt, shown, Data.currentSlot(this)));
+        mStatus.setText(Trans.get(GameSlot.this, R.string.game_starting_fmt, shown, Data.currentSlot(this)));
 
         // ③ 六步管线（同步执行，与探针一致；前置段 ~200-500 ms，游戏自身加载另有 4~5 s）
         Injector.Plan plan = new Injector.Plan();
@@ -120,7 +120,7 @@ public class GameSlot extends BaseActivity {
         } catch (Injector.LaunchError e) {
             fail(e.step, e.getMessage(), e);
         } catch (Throwable e) {
-            fail(getString(R.string.step_unknown), String.valueOf(e), e);
+            fail(Trans.get(GameSlot.this, R.string.step_unknown), String.valueOf(e), e);
         }
     }
 
@@ -149,9 +149,9 @@ public class GameSlot extends BaseActivity {
     }
 
     private void fail(String step, String msg, Throwable cause) {
-        mStatus.setText(getString(R.string.game_start_failed_fmt, step));
+        mStatus.setText(Trans.get(GameSlot.this, R.string.game_start_failed_fmt, step));
         StringBuilder sb = new StringBuilder();
-        sb.append(getString(R.string.game_step_stuck_fmt, step, msg));
+        sb.append(Trans.get(GameSlot.this, R.string.game_step_stuck_fmt, step, msg));
         if (cause != null) {
             sb.append("\n\n").append(cause.getClass().getSimpleName());
             StackTraceElement[] st = cause.getStackTrace();
@@ -159,7 +159,7 @@ public class GameSlot extends BaseActivity {
                 sb.append("\n  at ").append(st[i]);
             }
         }
-        sb.append(getString(R.string.game_report_hint));
+        sb.append(Trans.get(GameSlot.this, R.string.game_report_hint));
         new AlertDialog.Builder(this)
                 .setTitle(R.string.game_cannot_start)
                 .setMessage(sb.toString())

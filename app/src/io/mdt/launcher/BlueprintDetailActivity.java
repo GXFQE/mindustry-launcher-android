@@ -116,11 +116,11 @@ public class BlueprintDetailActivity extends BaseActivity {
      */
     private void confirmDelete() {
         if (Data.gameAlive(this)) {
-            alert(getString(R.string.game_busy_title), getString(R.string.bp_import_busy_msg));
+            alert(Trans.get(BlueprintDetailActivity.this, R.string.game_busy_title), Trans.get(BlueprintDetailActivity.this, R.string.bp_import_busy_msg));
             return;
         }
         new android.app.AlertDialog.Builder(this)
-                .setTitle(getString(R.string.bp_delete_confirm_title, mItem.displayName()))
+                .setTitle(Trans.get(BlueprintDetailActivity.this, R.string.bp_delete_confirm_title, mItem.displayName()))
                 .setMessage(R.string.bp_delete_confirm_msg)
                 .setPositiveButton(R.string.bp_delete,
                         new android.content.DialogInterface.OnClickListener() {
@@ -129,12 +129,12 @@ public class BlueprintDetailActivity extends BaseActivity {
                                         mItem.file.getParentFile(), mItem.file,
                                         BlueprintFiles.trashDirOf(BlueprintDetailActivity.this));
                                 if (moved == null) {
-                                    alert(getString(R.string.bp_delete),
-                                            getString(R.string.bp_delete_fail));
+                                    alert(Trans.get(BlueprintDetailActivity.this, R.string.bp_delete),
+                                            Trans.get(BlueprintDetailActivity.this, R.string.bp_delete_fail));
                                     return;
                                 }
                                 Toast.makeText(BlueprintDetailActivity.this,
-                                        getString(R.string.bp_delete_ok_fmt, mItem.name()),
+                                        Trans.get(BlueprintDetailActivity.this, R.string.bp_delete_ok_fmt, mItem.name()),
                                         Toast.LENGTH_SHORT).show();
                                 setResult(RESULT_OK);      // 告诉列表：少了一份，回去重新清点
                                 finish();
@@ -175,7 +175,7 @@ public class BlueprintDetailActivity extends BaseActivity {
                             apk == null || apk.trim().isEmpty() ? null : new File(apk.trim()),
                             sc.bundle, MapStatsMods.attrLabels(BlueprintDetailActivity.this),
                             MapStats.bundleLang(MapStatsMods.bundleLocaleSuffix(BlueprintDetailActivity.this)),
-                            getString(R.string.stats_wall_name_fmt));
+                            Trans.get(BlueprintDetailActivity.this, R.string.stats_wall_name_fmt));
                     rows = Blueprints.rows(mItem.msch, sc.table, bn);
                     ms = System.currentTimeMillis() - t0;
                 } catch (Throwable t) {
@@ -213,8 +213,8 @@ public class BlueprintDetailActivity extends BaseActivity {
         //    "全都是缺件"是真信号（典型：这份蓝图来自一个**当前没启用**的模组）——
         //    那种情况下更要说清楚，**不许**把它当成"我们表读不出来"而藏起来。
         if (!used.isEmpty()) {
-            addSection(getString(R.string.bp_section_blocks),
-                    getString(R.string.bp_blocks_sum_fmt, used.size(), MapStatsMods.num(usedTiles)),
+            addSection(Trans.get(BlueprintDetailActivity.this, R.string.bp_section_blocks),
+                    Trans.get(BlueprintDetailActivity.this, R.string.bp_blocks_sum_fmt, used.size(), MapStatsMods.num(usedTiles)),
                     used, false, false);
         }
         // ★ 本槽有"看不见方块"的模组时，这一段**特别标记 + 说清为什么可能认错**
@@ -252,7 +252,7 @@ public class BlueprintDetailActivity extends BaseActivity {
         for (int i = 0; i < n; i++) body.addView(rowView(body, rows.get(i)));
         if (rows.size() > n) {
             TextView more = new TextView(this);
-            more.setText(getString(R.string.bp_more_fmt, rows.size() - n));
+            more.setText(Trans.get(BlueprintDetailActivity.this, R.string.bp_more_fmt, rows.size() - n));
             more.setTextSize(11f);
             more.setPadding(dp(14), dp(4), dp(14), dp(8));
             more.setTextColor(getResources().getColor(R.color.fg_muted));
@@ -267,7 +267,7 @@ public class BlueprintDetailActivity extends BaseActivity {
         View v = getLayoutInflater().inflate(R.layout.item_stat, parent, false);
         ((TextView) v.findViewById(R.id.stat_row_title)).setText(row.label);
         ((TextView) v.findViewById(R.id.stat_row_count))
-                .setText(getString(R.string.bp_row_tiles_fmt, MapStatsMods.num(row.tiles)));
+                .setText(Trans.get(BlueprintDetailActivity.this, R.string.bp_row_tiles_fmt, MapStatsMods.num(row.tiles)));
         return v;
     }
 
@@ -280,21 +280,21 @@ public class BlueprintDetailActivity extends BaseActivity {
         //   而详情页是**另一个进程内实例**（记录经 Intent 重建）⇒ 那边永远是 0
         //   （真机第一版就是"技术细节 · 0 种，共 79 格"，当场看出来）。这里用解析版本，短且确定。
         ((TextView) card.findViewById(R.id.stat_card_summary))
-                .setText(getString(R.string.bp_tech_summary_fmt, m == null ? 0 : m.version));
+                .setText(Trans.get(BlueprintDetailActivity.this, R.string.bp_tech_summary_fmt, m == null ? 0 : m.version));
         LinearLayout body = (LinearLayout) card.findViewById(R.id.stat_card_body);
         // ★ **依据**：本槽有几个"看不到方块"的模组（"可能认错"那个标记就是它撑起来的，
         //   依据不能删、但也不进第一层 —— 这里正是技术细节层该待的地方）
         if (opaque > 0) {
-            line(body, getString(R.string.bp_tech_opaque_fmt, opaque));
+            line(body, Trans.get(BlueprintDetailActivity.this, R.string.bp_tech_opaque_fmt, opaque));
         }
         if (m != null && m.ok) {
-            line(body, getString(R.string.bp_tech_version_fmt, m.version));
-            line(body, getString(R.string.bp_tech_declared_fmt, m.declaredWidth, m.declaredHeight));
-            line(body, getString(R.string.bp_tech_box_fmt, m.minX, m.minY, m.maxX, m.maxY));
+            line(body, Trans.get(BlueprintDetailActivity.this, R.string.bp_tech_version_fmt, m.version));
+            line(body, Trans.get(BlueprintDetailActivity.this, R.string.bp_tech_declared_fmt, m.declaredWidth, m.declaredHeight));
+            line(body, Trans.get(BlueprintDetailActivity.this, R.string.bp_tech_box_fmt, m.minX, m.minY, m.maxX, m.maxY));
             if (m.outOfBounds > 0) {
-                line(body, getString(R.string.bp_tech_oob_fmt, m.outOfBounds));
+                line(body, Trans.get(BlueprintDetailActivity.this, R.string.bp_tech_oob_fmt, m.outOfBounds));
             }
-            line(body, getString(R.string.bp_tech_dict_fmt, m.dict.size()));
+            line(body, Trans.get(BlueprintDetailActivity.this, R.string.bp_tech_dict_fmt, m.dict.size()));
             // ★ 一档⑥（2026-10-06）：把解析出来、界面上一直没显示的字段放出来。
             //   三行都是加分项 ⇒ 内容是空串就整行不出现（不摆空行）。
             //   ⚠️ 格式化在 `MschText` 里（界面与自检同一份），这里只负责"要不要摆这一行"。
@@ -309,18 +309,18 @@ public class BlueprintDetailActivity extends BaseActivity {
                 if (keys.length() > 0) keys.append(", ");
                 keys.append(k);
             }
-            line(body, getString(R.string.bp_tech_tags_fmt,
-                    keys.length() == 0 ? getString(R.string.stats_tech_none) : keys.toString()));
-            line(body, getString(R.string.bp_tech_contentmap_fmt,
+            line(body, Trans.get(BlueprintDetailActivity.this, R.string.bp_tech_tags_fmt,
+                    keys.length() == 0 ? Trans.get(BlueprintDetailActivity.this, R.string.stats_tech_none) : keys.toString()));
+            line(body, Trans.get(BlueprintDetailActivity.this, R.string.bp_tech_contentmap_fmt,
                     getString(m.hasContentMap ? R.string.bp_tech_yes : R.string.bp_tech_no)));
             if (m.leftover > 0) {
-                line(body, getString(R.string.bp_tech_leftover_fmt, m.leftover));
+                line(body, Trans.get(BlueprintDetailActivity.this, R.string.bp_tech_leftover_fmt, m.leftover));
             }
         } else if (m != null) {
             // 读不出来时：把**内核给的码 + 参数**翻成人话（`error` 原文只留给报告与自检）
             line(body, MschText.reason(this, m));
         }
-        line(body, getString(R.string.bp_tech_time_fmt, ms));
+        line(body, Trans.get(BlueprintDetailActivity.this, R.string.bp_tech_time_fmt, ms));
         Util.bindExpandableCard(card, R.id.stat_card, R.id.stat_card_body, R.id.stat_card_chevron);
         mBox.addView(card);
     }

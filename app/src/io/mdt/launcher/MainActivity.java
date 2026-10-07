@@ -194,8 +194,8 @@ public class MainActivity extends BaseActivity {
         String newSlot = intent.getStringExtra("dev_new_slot");
         if (newSlot != null && !newSlot.isEmpty()) {
             String err = Data.createSlot(this, newSlot);
-            alert(err == null ? getString(R.string.dev_new_slot_ok_fmt, newSlot)
-                              : getString(R.string.dev_new_slot_fail), err == null ? newSlot : err);
+            alert(err == null ? Trans.get(MainActivity.this, R.string.dev_new_slot_ok_fmt, newSlot)
+                              : Trans.get(MainActivity.this, R.string.dev_new_slot_fail), err == null ? newSlot : err);
             rescan();
             return;
         }
@@ -205,8 +205,8 @@ public class MainActivity extends BaseActivity {
             if (s == null) s = "";
             Config.get().setSlotOf(asKey, s);
             rescan();
-            alert(getString(R.string.dev_assign_title),
-                    getString(R.string.dev_assign_fmt, asKey, s.isEmpty() ? Data.SLOT_DEFAULT : s));
+            alert(Trans.get(MainActivity.this, R.string.dev_assign_title),
+                    Trans.get(MainActivity.this, R.string.dev_assign_fmt, asKey, s.isEmpty() ? Data.SLOT_DEFAULT : s));
             return;
         }
 
@@ -222,8 +222,8 @@ public class MainActivity extends BaseActivity {
                 }
             }
             if (hit == null) {
-                alert(getString(R.string.dev_launch_miss_title),
-                        getString(R.string.dev_launch_miss_fmt, launchKey, keysOf()));
+                alert(Trans.get(MainActivity.this, R.string.dev_launch_miss_title),
+                        Trans.get(MainActivity.this, R.string.dev_launch_miss_fmt, launchKey, keysOf()));
                 return;
             }
             startVersion(hit);
@@ -1294,8 +1294,8 @@ public class MainActivity extends BaseActivity {
 
     /** 开发路径：走与界面完全相同的 .msav 落盘逻辑（Msav.stage/commit） */
     private void runMsavPipeline(final File src, final String slot) {
-        final ProgressDialog pd = ProgressDialog.show(this, getString(R.string.dev_msav_title),
-                getString(R.string.dev_msav_running_fmt, src.getName(), slot), true, false);
+        final ProgressDialog pd = ProgressDialog.show(this, Trans.get(MainActivity.this, R.string.dev_msav_title),
+                Trans.get(MainActivity.this, R.string.dev_msav_running_fmt, src.getName(), slot), true, false);
         new Thread(new Runnable() {
             @Override public void run() {
                 String err = null;
@@ -1315,10 +1315,10 @@ public class MainActivity extends BaseActivity {
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
                         pd.dismiss();
-                        alert(fe == null ? getString(R.string.dev_msav_done)
-                                          : getString(R.string.dev_msav_failed),
+                        alert(fe == null ? Trans.get(MainActivity.this, R.string.dev_msav_done)
+                                          : Trans.get(MainActivity.this, R.string.dev_msav_failed),
                                 fe == null
-                                        ? getString(R.string.dev_msav_done_fmt, fd,
+                                        ? Trans.get(MainActivity.this, R.string.dev_msav_done_fmt, fd,
                                                 Util.formatSize(bytes), String.valueOf(gz))
                                         : fe);
                         rescan();
@@ -1329,8 +1329,8 @@ public class MainActivity extends BaseActivity {
     }
 
     private void runSelftest() {
-        final ProgressDialog pd = ProgressDialog.show(this, getString(R.string.selftest_title),
-                getString(R.string.selftest_running), true, false);
+        final ProgressDialog pd = ProgressDialog.show(this, Trans.get(MainActivity.this, R.string.selftest_title),
+                Trans.get(MainActivity.this, R.string.selftest_running), true, false);
         new Thread(new Runnable() {
             @Override public void run() {
                 final String r = SelfTest.runM3(MainActivity.this);
@@ -1339,7 +1339,7 @@ public class MainActivity extends BaseActivity {
                         pd.dismiss();
                         // ★ F17c：结论同时放进**标题** —— AlertDialog 的标题不随正文滚动，
                         //   于是"过没过"在任何滚动位置都可见（一张截图即可判读）。
-                        alert(getString(R.string.selftest_result) + " · " + SelfTest.summaryOf(r), r);
+                        alert(Trans.get(MainActivity.this, R.string.selftest_result) + " · " + SelfTest.summaryOf(r), r);
                         rescan();
                     }
                 });
@@ -1348,7 +1348,7 @@ public class MainActivity extends BaseActivity {
     }
 
     private void runHealth(final boolean clean) {
-        final ProgressDialog pd = ProgressDialog.show(this, getString(R.string.health_title),
+        final ProgressDialog pd = ProgressDialog.show(this, Trans.get(MainActivity.this, R.string.health_title),
                 getString(clean ? R.string.health_cleaning : R.string.health_scanning), true, false);
         new Thread(new Runnable() {
             @Override public void run() {
@@ -1356,7 +1356,7 @@ public class MainActivity extends BaseActivity {
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
                         pd.dismiss();
-                        alert(getString(R.string.health_title), r);
+                        alert(Trans.get(MainActivity.this, R.string.health_title), r);
                         rescan();
                     }
                 });
@@ -1378,7 +1378,7 @@ public class MainActivity extends BaseActivity {
 
     /** 当前可用版本 key 列表（dev 直通口报错时给出） */
     private String keysOf() {
-        if (mEntries == null || mEntries.isEmpty()) return getString(R.string.keys_empty);
+        if (mEntries == null || mEntries.isEmpty()) return Trans.get(MainActivity.this, R.string.keys_empty);
         StringBuilder sb = new StringBuilder();
         for (Versions.Entry e : mEntries) {
             sb.append("  ").append(e.key()).append('\n');
@@ -1467,9 +1467,9 @@ public class MainActivity extends BaseActivity {
         rebuildList();
         if (mStatusSummary != null) {
             File dataRoot = Data.dataRoot(this);
-            mStatusSummary.setText(getString(R.string.main_summary_fmt,
+            mStatusSummary.setText(Trans.get(MainActivity.this, R.string.main_summary_fmt,
                     mEntries.size(), Data.currentSlot(this)));
-            mStatusDetail.setText(getString(R.string.main_detail_fmt,
+            mStatusDetail.setText(Trans.get(MainActivity.this, R.string.main_detail_fmt,
                     dataRoot == null ? "?" : dataRoot.getAbsolutePath(),
                     Data.hubDir(this).getAbsolutePath()));
         }
@@ -1575,16 +1575,16 @@ public class MainActivity extends BaseActivity {
     private String rowSubtitle(Versions.Entry e, int saves) {
         if (saves > 0) {
             return e.imported
-                    ? getString(R.string.row_imported_sub_saves_fmt,
+                    ? Trans.get(MainActivity.this, R.string.row_imported_sub_saves_fmt,
                             e.importFile == null ? "" : e.importFile,
                             Util.formatSize(e.apkSize), saves)
-                    : getString(R.string.row_sub_saves_fmt, e.pkg,
+                    : Trans.get(MainActivity.this, R.string.row_sub_saves_fmt, e.pkg,
                             Util.formatSize(e.apkSize), saves);
         }
         return e.imported
-                ? getString(R.string.row_imported_sub_fmt,
+                ? Trans.get(MainActivity.this, R.string.row_imported_sub_fmt,
                         e.importFile == null ? "" : e.importFile, Util.formatSize(e.apkSize))
-                : getString(R.string.row_sub_fmt, e.pkg, Util.formatSize(e.apkSize));
+                : Trans.get(MainActivity.this, R.string.row_sub_fmt, e.pkg, Util.formatSize(e.apkSize));
     }
 
     /** 把一行「版本」填上数据并接上交互（原 Adapter.getView 的逻辑，一字未改）。 */
@@ -1618,7 +1618,7 @@ public class MainActivity extends BaseActivity {
 
         if (clash) {
             conflict.setVisibility(View.VISIBLE);
-            conflict.setText(getString(R.string.row_conflict_fmt, share.peer));
+            conflict.setText(Trans.get(MainActivity.this, R.string.row_conflict_fmt, share.peer));
         } else {
             conflict.setVisibility(View.GONE);
         }
@@ -1686,7 +1686,7 @@ public class MainActivity extends BaseActivity {
         //   ⚠️ "要不要显示"的判断在 `Entry.upstreamNote()`，与详情弹窗**共用**同一份；
         //      这里只管排版。官方本体返回 null ⇒ 整串与从前逐字相同。
         String note = e.upstreamNote();
-        String full = (note == null) ? plain : plain + getString(R.string.row_upstream_fmt, note);
+        String full = (note == null) ? plain : plain + Trans.get(MainActivity.this, R.string.row_upstream_fmt, note);
         if (ver.isEmpty() || "?".equals(ver)) return full;
         // ⚠️ 在 `plain` 上定位、套用到 `full`（尾注只加在**后面** ⇒ 前缀位置不变）。
         //   反过来在 `full` 上 indexOf 也能跑，但一旦尾注里出现与版本号相同的子串
@@ -1827,7 +1827,7 @@ public class MainActivity extends BaseActivity {
             return;
         }
         mBtnContinue.setVisibility(View.VISIBLE);
-        mContinueText.setText(getString(R.string.main_continue_fmt, e.displayName()));
+        mContinueText.setText(Trans.get(MainActivity.this, R.string.main_continue_fmt, e.displayName()));
         mBtnContinue.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { startVersion(e); }
         });
@@ -1839,7 +1839,7 @@ public class MainActivity extends BaseActivity {
         Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
         i.addCategory(Intent.CATEGORY_OPENABLE);
         i.setType("application/vnd.android.package-archive");
-        startActivityForResult(Intent.createChooser(i, getString(R.string.chooser_pick_apk)), REQ_IMPORT);
+        startActivityForResult(Intent.createChooser(i, Trans.get(MainActivity.this, R.string.chooser_pick_apk)), REQ_IMPORT);
     }
 
     @Override
@@ -1873,8 +1873,8 @@ public class MainActivity extends BaseActivity {
 
     private void startImport(final Uri uri, final String name) {
         final android.app.ProgressDialog pd = android.app.ProgressDialog.show(
-                this, getString(R.string.import_progress_title),
-                name + getString(R.string.import_progress_suffix), true, false);
+                this, Trans.get(MainActivity.this, R.string.import_progress_title),
+                name + Trans.get(MainActivity.this, R.string.import_progress_suffix), true, false);
         new Thread() {
             @Override public void run() {
                 String err = null;
@@ -1899,7 +1899,7 @@ public class MainActivity extends BaseActivity {
                             //    Toast 报「8-official-159.7」、而同一秒列表行报「159.7」，
                             //    同一个版本两种叫法（用户：「导入的这个版本号也处理下」）。
                             Toast.makeText(MainActivity.this,
-                                    getString(R.string.import_done_fmt,
+                                    Trans.get(MainActivity.this, R.string.import_done_fmt,
                                             fentry.optString("label"),
                                             Versions.displayVersionOf(fentry.optString("version"))),
                                     Toast.LENGTH_LONG).show();
@@ -1953,7 +1953,7 @@ public class MainActivity extends BaseActivity {
         }
         new AlertDialog.Builder(this)
                 .setTitle(R.string.launch_conflict_title)
-                .setMessage(getString(R.string.launch_conflict_msg_fmt,
+                .setMessage(Trans.get(MainActivity.this, R.string.launch_conflict_msg_fmt,
                         e.displayName(), share.peer, Versions.slotFor(e)))
                 .setPositiveButton(R.string.launch_conflict_go,
                         new DialogInterface.OnClickListener() {
@@ -1981,8 +1981,8 @@ public class MainActivity extends BaseActivity {
         if (sLaunching) return;
         sLaunching = true;
         final ProgressDialog pd = ProgressDialog.show(this,
-                getString(R.string.launch_progress_title),
-                getString(R.string.launch_progress_msg_fmt, e.displayName()), true, false);
+                Trans.get(MainActivity.this, R.string.launch_progress_title),
+                Trans.get(MainActivity.this, R.string.launch_progress_msg_fmt, e.displayName()), true, false);
         new Thread(new Runnable() {
             @Override public void run() {
                 // F5：先等自动备份收尾 —— 否则"备份正在读槽"会和"游戏起来在写槽"打架。
@@ -2001,7 +2001,7 @@ public class MainActivity extends BaseActivity {
                             // 这条出口也要收掉进度框 + 清标志，否则用户被永久挡住（点不动了）
                             pd.dismiss();
                             sLaunching = false;
-                            alert(getString(R.string.compat_reject_title), msg);
+                            alert(Trans.get(MainActivity.this, R.string.compat_reject_title), msg);
                         }
                     });
                     return;
@@ -2064,18 +2064,18 @@ public class MainActivity extends BaseActivity {
             // ★ 统计段复用存档页那条 slot_entry_fmt（同一显示规则只留一处实现）：
             //   原先这里另有一条 slot_entry_suffix_fmt，两份内容只差空格 ⇒
             //   改了一边另一边静默不跟（本工程栽过多次的形态）。
-            names[i] = s.name + (s.active ? getString(R.string.slot_current_suffix) : "")
-                    + "  " + getString(R.string.slot_entry_fmt, s.files, Util.formatSize(s.bytes));
+            names[i] = s.name + (s.active ? Trans.get(MainActivity.this, R.string.slot_current_suffix) : "")
+                    + "  " + Trans.get(MainActivity.this, R.string.slot_entry_fmt, s.files, Util.formatSize(s.bytes));
             if (s.name.equals(cur)) checked = i;
         }
         new AlertDialog.Builder(this)
-                .setTitle(getString(R.string.slot_pick_title_fmt, e.label))
+                .setTitle(Trans.get(MainActivity.this, R.string.slot_pick_title_fmt, e.label))
                 .setSingleChoiceItems(names, checked, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int w) {
                         Config.get().setSlotOf(e.key(), slots.get(w).name);
                         d.dismiss();
                         Toast.makeText(MainActivity.this,
-                                getString(R.string.slot_set_fmt, slots.get(w).name),
+                                Trans.get(MainActivity.this, R.string.slot_set_fmt, slots.get(w).name),
                                 Toast.LENGTH_SHORT).show();
                         rescan();
                     }
@@ -2127,12 +2127,12 @@ public class MainActivity extends BaseActivity {
     }
 
     private void showDetail(final Versions.Entry e) {
-        String slotLine = getString(R.string.detail_slot_line_fmt, Versions.slotFor(e))
-                + getString(R.string.detail_slot_hint);
+        String slotLine = Trans.get(MainActivity.this, R.string.detail_slot_line_fmt, Versions.slotFor(e))
+                + Trans.get(MainActivity.this, R.string.detail_slot_hint);
         // ★ 标题/正文里显示的是**剥过构建前缀**的版本号 ⇒ 这里把原文还回来。
         //   剥前缀是有损显示，详情弹窗是唯一能对照"界面值从哪来"的地方。
         String rawLine = e.versionTrimmed()
-                ? getString(R.string.detail_raw_ver_fmt, e.rawVersion()) : "";
+                ? Trans.get(MainActivity.this, R.string.detail_raw_ver_fmt, e.rawVersion()) : "";
         // ★ 第 40 轮：fork 的"基座版本"必须**说出来**。
         //   它是"这个版本为什么和官方某一版不互相提示"的全部依据（判据用 formatVersion），
         //   不说的话用户只能看到"该提示的没提示"，却无从判断这到底对不对
@@ -2144,14 +2144,14 @@ public class MainActivity extends BaseActivity {
         one.add(e);
         Versions.resolveUpstreamVersions(one);
         String up = e.upstreamNote();
-        String upLine = (up != null) ? getString(R.string.detail_upstream_fmt, up) : "";
+        String upLine = (up != null) ? Trans.get(MainActivity.this, R.string.detail_upstream_fmt, up) : "";
         // ★ F8：已装版本也给"只读事实"（构建号 / 架构 / 位置 / 大小），并**说明为什么不给删**。
         //   已装 = 系统里那一份，删它会连累别的用同一份安装的应用 ⇒ 只读是**设计**，不是漏做。
         final String head = e.subtitle(this) + rawLine + upLine + slotLine
                 + getString(e.imported ? R.string.detail_imported_note : R.string.detail_installed_note);
         AlertDialog.Builder b = new AlertDialog.Builder(this)
                 .setTitle(e.displayName())
-                .setMessage(head + getString(R.string.detail_probing))
+                .setMessage(head + Trans.get(MainActivity.this, R.string.detail_probing))
                 .setPositiveButton(R.string.close, null)
                 .setNeutralButton(R.string.slot_label, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int w) {
@@ -2196,11 +2196,11 @@ public class MainActivity extends BaseActivity {
     private String slotFacts(Versions.Entry e) {
         int n = saveCountIn(Versions.slotFor(e));
         StringBuilder sb = new StringBuilder();
-        sb.append(n > 0 ? getString(R.string.detail_saves_fmt, n)
-                        : getString(R.string.detail_saves_none));
+        sb.append(n > 0 ? Trans.get(MainActivity.this, R.string.detail_saves_fmt, n)
+                        : Trans.get(MainActivity.this, R.string.detail_saves_none));
         long at = Config.get().lastPlayed(e.key());
-        sb.append(at > 0 ? getString(R.string.detail_played_fmt, Trash.timeText(at))
-                         : getString(R.string.detail_played_none));
+        sb.append(at > 0 ? Trans.get(MainActivity.this, R.string.detail_played_fmt, Trash.timeText(at))
+                         : Trans.get(MainActivity.this, R.string.detail_played_none));
         return sb.toString();
     }
 
@@ -2215,14 +2215,14 @@ public class MainActivity extends BaseActivity {
     private String probeDetail(Versions.Entry e) {
         StringBuilder sb = new StringBuilder();
         String md5 = (e.md5 != null && !e.md5.isEmpty()) ? e.md5 : Util.md5(new File(e.apkPath));
-        sb.append(getString(R.string.detail_md5_fmt, md5 == null || md5.isEmpty() ? "?" : md5));
+        sb.append(Trans.get(MainActivity.this, R.string.detail_md5_fmt, md5 == null || md5.isEmpty() ? "?" : md5));
         String abis = "";
         try {
             abis = TextUtils.join("、", Compat.probe(new File(e.apkPath)).apkAbis);
         } catch (Throwable ignored) {
         }
-        sb.append(getString(R.string.detail_abi_fmt,
-                abis.isEmpty() ? getString(R.string.detail_abi_unknown) : abis));
+        sb.append(Trans.get(MainActivity.this, R.string.detail_abi_fmt,
+                abis.isEmpty() ? Trans.get(MainActivity.this, R.string.detail_abi_unknown) : abis));
         int code = 0;
         try {
             if (e.imported) {
@@ -2234,14 +2234,14 @@ public class MainActivity extends BaseActivity {
             }
         } catch (Throwable ignored) {
         }
-        if (code > 0) sb.append(getString(R.string.detail_build_fmt, code));
+        if (code > 0) sb.append(Trans.get(MainActivity.this, R.string.detail_build_fmt, code));
         return sb.toString();
     }
 
     private void confirmDeleteImport(final Versions.Entry e) {
         new AlertDialog.Builder(this)
                 .setTitle(R.string.delete_import_title)
-                .setMessage(getString(R.string.delete_import_msg_fmt, e.displayName()))
+                .setMessage(Trans.get(MainActivity.this, R.string.delete_import_msg_fmt, e.displayName()))
                 .setPositiveButton(R.string.delete, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int w) {
                         Importer.removeImport(MainActivity.this, e.importFile);

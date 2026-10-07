@@ -46,7 +46,7 @@ public class SlotActivity extends BaseActivity {
         setContentView(root);
         // ★ 顶栏就写「槽「xxx」」——原来顶栏是裸槽名、内容区又写一遍「槽「xxx」」大标题，
         //   同一句话出现两次（用户 2026-10-03 报的"UI 一堆问题"之一）。现在只留顶栏这一处。
-        setTitle(getString(R.string.slot_page_title_fmt, mSlot));
+        setTitle(Trans.get(SlotActivity.this, R.string.slot_page_title_fmt, mSlot));
 
         mInfo = (TextView) root.findViewById(R.id.slot_info);
         mPaths = (TextView) root.findViewById(R.id.slot_paths);
@@ -111,8 +111,8 @@ public class SlotActivity extends BaseActivity {
                         new android.app.AlertDialog.Builder(SlotActivity.this)
                                 .setTitle(R.string.slot_page_export)
                                 .setItems(new String[]{
-                                        getString(R.string.slot_op_import_slot),
-                                        getString(R.string.slot_op_export_slot)},
+                                        Trans.get(SlotActivity.this, R.string.slot_op_import_slot),
+                                        Trans.get(SlotActivity.this, R.string.slot_op_export_slot)},
                                         new android.content.DialogInterface.OnClickListener() {
                                             @Override public void onClick(android.content.DialogInterface d, int w) {
                                                 Data.Slot s = findSlot();
@@ -141,7 +141,7 @@ public class SlotActivity extends BaseActivity {
 
     /** 这个槽已经不在了（被删 / 改名）：提示一句就退出去 */
     private void gone() {
-        android.widget.Toast.makeText(this, getString(R.string.slot_page_gone_fmt, mSlot),
+        android.widget.Toast.makeText(this, Trans.get(SlotActivity.this, R.string.slot_page_gone_fmt, mSlot),
                 android.widget.Toast.LENGTH_SHORT).show();
         finish();
     }
@@ -178,12 +178,12 @@ public class SlotActivity extends BaseActivity {
         new android.app.AlertDialog.Builder(this)
                 .setTitle(R.string.slot_page_ops)
                 .setItems(new String[]{
-                        getString(R.string.slot_op_backup),
-                        getString(R.string.slot_op_backups),
-                        getString(R.string.slot_op_clone),
-                        getString(R.string.slot_op_policy),
-                        getString(R.string.slot_op_rename),
-                        getString(R.string.slot_op_delete)},
+                        Trans.get(SlotActivity.this, R.string.slot_op_backup),
+                        Trans.get(SlotActivity.this, R.string.slot_op_backups),
+                        Trans.get(SlotActivity.this, R.string.slot_op_clone),
+                        Trans.get(SlotActivity.this, R.string.slot_op_policy),
+                        Trans.get(SlotActivity.this, R.string.slot_op_rename),
+                        Trans.get(SlotActivity.this, R.string.slot_op_delete)},
                         new android.content.DialogInterface.OnClickListener() {
                             @Override public void onClick(android.content.DialogInterface d, int w) {
                                 switch (w) {
@@ -242,16 +242,16 @@ public class SlotActivity extends BaseActivity {
         //    理由见 strings.xml 里那段注释：aapt2 会剥掉首尾空白）。
         StringBuilder sb = new StringBuilder();
         sb.append(s == null
-                ? getString(R.string.slot_page_info_missing_fmt, mSlot)
-                : getString(R.string.slot_entry_fmt, s.files, Util.formatSize(s.bytes)));
+                ? Trans.get(SlotActivity.this, R.string.slot_page_info_missing_fmt, mSlot)
+                : Trans.get(SlotActivity.this, R.string.slot_entry_fmt, s.files, Util.formatSize(s.bytes)));
         sb.append('\n');
         boolean hasGame = t != null && !t.label.isEmpty();
         if (current) {
-            sb.append(hasGame ? getString(R.string.slot_page_info_cur_fmt, t.label)
-                              : getString(R.string.slot_page_info_cur_nogame));
+            sb.append(hasGame ? Trans.get(SlotActivity.this, R.string.slot_page_info_cur_fmt, t.label)
+                              : Trans.get(SlotActivity.this, R.string.slot_page_info_cur_nogame));
         } else {
-            sb.append(hasGame ? getString(R.string.slot_page_info_other_fmt, t.label)
-                              : getString(R.string.slot_page_info_other_nogame));
+            sb.append(hasGame ? Trans.get(SlotActivity.this, R.string.slot_page_info_other_fmt, t.label)
+                              : Trans.get(SlotActivity.this, R.string.slot_page_info_other_nogame));
         }
         if (mInfo != null) mInfo.setText(sb.toString());
         if (mPaths != null) {
@@ -267,7 +267,7 @@ public class SlotActivity extends BaseActivity {
                     runOnUiThread(new Runnable() {
                         @Override public void run() {
                             if (mModsSub != null && !isFinishing()) {
-                                mModsSub.setText(getString(R.string.slot_page_mods_count_fmt, n));
+                                mModsSub.setText(Trans.get(SlotActivity.this, R.string.slot_page_mods_count_fmt, n));
                             }
                         }
                     });
@@ -298,7 +298,7 @@ public class SlotActivity extends BaseActivity {
                     runOnUiThread(new Runnable() {
                         @Override public void run() {
                             if (mMapsSub == null || isFinishing()) return;
-                            mMapsSub.setText(getString(R.string.maps_counts_fmt,
+                            mMapsSub.setText(Trans.get(SlotActivity.this, R.string.maps_counts_fmt,
                                     Maps.count(items, Maps.FROM_SLOT),
                                     Maps.count(items, Maps.FROM_GAME),
                                     Maps.count(items, Maps.FROM_MOD)));
@@ -313,7 +313,7 @@ public class SlotActivity extends BaseActivity {
                     runOnUiThread(new Runnable() {
                         @Override public void run() {
                             if (mBpSub == null || isFinishing()) return;
-                            mBpSub.setText(getString(R.string.bp_head_fmt,
+                            mBpSub.setText(Trans.get(SlotActivity.this, R.string.bp_head_fmt,
                                     Blueprints.count(bps, Blueprints.FROM_SLOT),
                                     Blueprints.count(bps, Blueprints.FROM_MOD)));
                         }
@@ -337,11 +337,11 @@ public class SlotActivity extends BaseActivity {
         int bad = sm.unreadableCount();
         if (bad > 0) {
             return line.isEmpty()
-                    ? getString(R.string.slot_page_saves_bad_fmt, sm.total, bad)
-                    : getString(R.string.slot_page_saves_bad_recent_fmt, sm.total, line, bad);
+                    ? Trans.get(SlotActivity.this, R.string.slot_page_saves_bad_fmt, sm.total, bad)
+                    : Trans.get(SlotActivity.this, R.string.slot_page_saves_bad_recent_fmt, sm.total, line, bad);
         }
         return line.isEmpty()
-                ? getString(R.string.slot_page_saves_count_only_fmt, sm.total)
-                : getString(R.string.slot_page_saves_count_fmt, sm.total, line);
+                ? Trans.get(SlotActivity.this, R.string.slot_page_saves_count_only_fmt, sm.total)
+                : Trans.get(SlotActivity.this, R.string.slot_page_saves_count_fmt, sm.total, line);
     }
 }

@@ -139,7 +139,7 @@ public class SettingsActivity extends BaseActivity {
             android.util.Log.w("MDTLauncher", "read PackageInfo failed: " + e);
         }
         File dataRoot = Data.dataRoot(this);
-        ((TextView) root.findViewById(R.id.about_text)).setText(getString(R.string.about_fmt,
+        ((TextView) root.findViewById(R.id.about_text)).setText(Trans.get(SettingsActivity.this, R.string.about_fmt,
                 verName, verCode, getPackageName(),
                 dataRoot == null ? "?" : dataRoot.getAbsolutePath(),
                 Data.hubDir(this).getAbsolutePath()));
@@ -158,22 +158,22 @@ public class SettingsActivity extends BaseActivity {
      */
     private void fillValues() {
         if (mThemeSub != null) {
-            mThemeSub.setText(getString(R.string.set_theme_sub_fmt,
+            mThemeSub.setText(Trans.get(SettingsActivity.this, R.string.set_theme_sub_fmt,
                     getString(ThemeMode.labelRes(Config.get().themeMode()))));
         }
         if (mLangSub != null) {
             // ★ 语言名用它自己的语言写（English / 简体中文）—— 所以这里传的是**当前上下文的
             //   Resources**，但取的数组是 translatable="false" 的，任何语言下都是同一份。
             CharSequence cur = LocaleMode.label(this, LocaleMode.of(this));
-            mLangSub.setText(getString(R.string.set_lang_sub_fmt, cur));
+            mLangSub.setText(Trans.get(SettingsActivity.this, R.string.set_lang_sub_fmt, cur));
         }
         if (mSlotSub != null) {
             String s = Config.get().defaultSlot();
-            mSlotSub.setText(getString(R.string.set_slot_sub_fmt,
+            mSlotSub.setText(Trans.get(SettingsActivity.this, R.string.set_slot_sub_fmt,
                     s.isEmpty() ? Data.SLOT_DEFAULT : s));
         }
         if (mLogsSub != null) {
-            mLogsSub.setText(getString(R.string.set_logs_sub_fmt, Config.get().maxLogFiles()));
+            mLogsSub.setText(Trans.get(SettingsActivity.this, R.string.set_logs_sub_fmt, Config.get().maxLogFiles()));
         }
         if (mAutoCleanSub != null) {
             mAutoCleanSub.setText(Config.get().autoCleanRedundant()
@@ -195,7 +195,7 @@ public class SettingsActivity extends BaseActivity {
         new AlertDialog.Builder(this)
                 .setTitle(R.string.set_autoclean_title)
                 .setItems(new String[]{
-                        getString(R.string.set_autoclean_do),
+                        Trans.get(SettingsActivity.this, R.string.set_autoclean_do),
                         getString(on ? R.string.set_autoclean_disable
                                      : R.string.set_autoclean_enable)},
                         new DialogInterface.OnClickListener() {
@@ -244,7 +244,7 @@ public class SettingsActivity extends BaseActivity {
                     @Override public void run() {
                         if (Util.dead(SettingsActivity.this) || !dlg.isShowing()) return;
                         dlg.setMessage(fErr == null ? fBody
-                                : getString(R.string.storage_failed, fErr));
+                                : Trans.get(SettingsActivity.this, R.string.storage_failed, fErr));
                     }
                 });
             }
@@ -275,8 +275,8 @@ public class SettingsActivity extends BaseActivity {
                             return;
                         }
                         Toast.makeText(SettingsActivity.this,
-                                count > 0 ? getString(R.string.set_autoclean_done_fmt, count)
-                                          : getString(R.string.set_autoclean_none),
+                                count > 0 ? Trans.get(SettingsActivity.this, R.string.set_autoclean_done_fmt, count)
+                                          : Trans.get(SettingsActivity.this, R.string.set_autoclean_none),
                                 Toast.LENGTH_SHORT).show();
                     }
                 });
@@ -346,7 +346,7 @@ public class SettingsActivity extends BaseActivity {
         final String cur = LocaleMode.of(this);
         int checked = -1;
         for (int i = 0; i < tags.length; i++) {
-            names[i] = ("system".equals(tags[i]) ? getString(R.string.lang_system)
+            names[i] = ("system".equals(tags[i]) ? Trans.get(SettingsActivity.this, R.string.lang_system)
                                                  : String.valueOf(LocaleMode.label(this, tags[i])));
             // 「跟随系统」在资源里存的是字面量 "system"，与 LocaleMode.SYSTEM（空串）是两回事
             boolean isCur = "system".equals(tags[i]) ? LocaleMode.SYSTEM.equals(cur)
@@ -380,7 +380,7 @@ public class SettingsActivity extends BaseActivity {
         int checked = -1;
         for (int i = 0; i < slots.size(); i++) {
             Data.Slot s = slots.get(i);
-            names[i] = s.name + (s.active ? getString(R.string.slot_current_suffix) : "");
+            names[i] = s.name + (s.active ? Trans.get(SettingsActivity.this, R.string.slot_current_suffix) : "");
             if (s.name.equals(cur)) checked = i;
         }
         new AlertDialog.Builder(this)

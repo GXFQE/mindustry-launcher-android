@@ -177,17 +177,17 @@ public class LogActivity extends BaseActivity {
 
         root.findViewById(R.id.log_game_copy).setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
-                copy(getString(R.string.log_game_title), mShownGame);
+                copy(Trans.get(LogActivity.this, R.string.log_game_title), mShownGame);
             }
         });
         root.findViewById(R.id.log_hub_copy).setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
-                copy(getString(R.string.log_hub_title), mShownHub);
+                copy(Trans.get(LogActivity.this, R.string.log_hub_title), mShownHub);
             }
         });
         root.findViewById(R.id.log_crash_copy).setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
-                copy(getString(R.string.log_crash_title), mShownCrash);
+                copy(Trans.get(LogActivity.this, R.string.log_crash_title), mShownCrash);
             }
         });
 
@@ -267,14 +267,14 @@ public class LogActivity extends BaseActivity {
             s.dataRootMissing = true;
             return s;
         }
-        s.game = new Doc("last_log.txt", ctx.getString(R.string.log_game_title),
+        s.game = new Doc("last_log.txt", Trans.get(ctx, R.string.log_game_title),
                 new File(dataRoot, "last_log.txt"));
         s.game.load();
 
         File hub = Data.hubDir(ctx);
         s.hub = new Doc[HUB_FILES.length];
         for (int i = 0; i < HUB_FILES.length; i++) {
-            s.hub[i] = new Doc(HUB_FILES[i], ctx.getString(HUB_LABELS[i]),
+            s.hub[i] = new Doc(HUB_FILES[i], Trans.get(ctx, HUB_LABELS[i]),
                     new File(hub, HUB_FILES[i]));
             s.hub[i].load();
         }
@@ -322,8 +322,8 @@ public class LogActivity extends BaseActivity {
 
         // ── 卡 1：游戏日志 ──
         mShownGame = s.game;
-        mGameMeta.setText(metaOf(s.game, getString(R.string.log_slot_fmt, Data.currentSlot(this))));
-        mGameBody.setText(highlight(s.game.text, getString(R.string.log_game_missing_hint)));
+        mGameMeta.setText(metaOf(s.game, Trans.get(LogActivity.this, R.string.log_slot_fmt, Data.currentSlot(this))));
+        mGameBody.setText(highlight(s.game.text, Trans.get(LogActivity.this, R.string.log_game_missing_hint)));
 
         // ── 卡 2：启动器日志 ──
         mHubDocs = s.hub;
@@ -350,8 +350,8 @@ public class LogActivity extends BaseActivity {
         for (int i = 0; i < mHubDocs.length; i++) {
             final int idx = i;
             boolean has = mHubDocs[i].file != null && mHubDocs[i].file.isFile();
-            String label = getString(HUB_LABELS[i]);
-            if (!has) label = getString(R.string.log_chip_absent_fmt, label);
+            String label = Trans.get(LogActivity.this, HUB_LABELS[i]);
+            if (!has) label = Trans.get(LogActivity.this, R.string.log_chip_absent_fmt, label);
             mHubChips.addView(makeChip(label, i == mHubIndex, new View.OnClickListener() {
                 @Override public void onClick(View v) {
                     mHubIndex = idx;
@@ -367,7 +367,7 @@ public class LogActivity extends BaseActivity {
         Doc d = mHubDocs[i];
         mShownHub = d;
         mHubMeta.setText(metaOf(d, null));
-        mHubBody.setText(highlight(d.text, getString(R.string.log_hub_missing_hint)));
+        mHubBody.setText(highlight(d.text, Trans.get(LogActivity.this, R.string.log_hub_missing_hint)));
     }
 
     private void mountCrashChips() {
@@ -402,7 +402,7 @@ public class LogActivity extends BaseActivity {
         Doc d = mCrashes.get(i);
         mShownCrash = d;
         int keep = Config.get().maxLogFiles();
-        mCrashMeta.setText(getString(R.string.log_crash_meta_fmt,
+        mCrashMeta.setText(Trans.get(LogActivity.this, R.string.log_crash_meta_fmt,
                 mCrashes.size(), keep, fmtTime(d.mtime)));
         mCrashBody.setText(highlight(d.text, ""));
     }
@@ -417,12 +417,12 @@ public class LogActivity extends BaseActivity {
             return;
         }
         mCrashClean.setVisibility(View.VISIBLE);
-        mCrashClean.setText(getString(R.string.log_crash_clean_fmt, over, keep));
+        mCrashClean.setText(Trans.get(LogActivity.this, R.string.log_crash_clean_fmt, over, keep));
         mCrashClean.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(final View v) {
                 new AlertDialog.Builder(LogActivity.this)
                         .setTitle(R.string.log_crash_clean_title)
-                        .setMessage(getString(R.string.log_crash_clean_msg_fmt, over, keep))
+                        .setMessage(Trans.get(LogActivity.this, R.string.log_crash_clean_msg_fmt, over, keep))
                         .setPositiveButton(R.string.delete, new DialogInterface.OnClickListener() {
                             @Override public void onClick(DialogInterface d, int w) {
                                 doClean(over);
@@ -448,8 +448,8 @@ public class LogActivity extends BaseActivity {
             if (f != null && f.isFile() && !f.delete()) failed++;
         }
         Toast.makeText(this, failed == 0
-                        ? getString(R.string.log_crash_clean_done_fmt, over)
-                        : getString(R.string.log_crash_clean_fail_fmt, failed),
+                        ? Trans.get(LogActivity.this, R.string.log_crash_clean_done_fmt, over)
+                        : Trans.get(LogActivity.this, R.string.log_crash_clean_fail_fmt, failed),
                 Toast.LENGTH_SHORT).show();
         reload();
     }
@@ -478,12 +478,12 @@ public class LogActivity extends BaseActivity {
         if (d == null || d.file == null) return "";
         StringBuilder sb = new StringBuilder();
         if (!d.file.isFile()) {
-            sb.append(getString(R.string.log_not_generated_fmt, d.label));
+            sb.append(Trans.get(LogActivity.this, R.string.log_not_generated_fmt, d.label));
         } else {
-            sb.append(getString(R.string.log_meta_fmt,
+            sb.append(Trans.get(LogActivity.this, R.string.log_meta_fmt,
                     d.label, Util.formatSize(d.size), fmtTime(d.mtime)));
             if (d.truncated) {
-                sb.append(getString(R.string.log_meta_truncated, d.lines));
+                sb.append(Trans.get(LogActivity.this, R.string.log_meta_truncated, d.lines));
             }
         }
         if (tail != null) sb.append('\n').append(tail);
@@ -531,7 +531,7 @@ public class LogActivity extends BaseActivity {
         ClipboardManager cm = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
         if (cm == null) return;
         cm.setPrimaryClip(ClipData.newPlainText(what, d.text));
-        Toast.makeText(this, getString(R.string.log_copied_fmt, what), Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, Trans.get(LogActivity.this, R.string.log_copied_fmt, what), Toast.LENGTH_SHORT).show();
     }
 
     // ── F20：一键导出全部日志 ──────────────────────────────────────────────
@@ -603,8 +603,8 @@ public class LogActivity extends BaseActivity {
                     @Override public void run() {
                         Toast.makeText(LogActivity.this,
                                 ferr == null
-                                        ? getString(R.string.log_export_ok_fmt, Util.formatSize(fn))
-                                        : getString(R.string.log_export_fail_fmt, ferr),
+                                        ? Trans.get(LogActivity.this, R.string.log_export_ok_fmt, Util.formatSize(fn))
+                                        : Trans.get(LogActivity.this, R.string.log_export_fail_fmt, ferr),
                                 Toast.LENGTH_LONG).show();
                     }
                 });
@@ -637,12 +637,12 @@ public class LogActivity extends BaseActivity {
             ver = "?";
         }
         long page = Compat.pageSize();
-        return ctx.getString(R.string.log_export_head_fmt,
+        return Trans.get(ctx, R.string.log_export_head_fmt,
                 new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date()),
                 ver,
                 Data.currentSlot(ctx),
-                root == null ? ctx.getString(R.string.log_export_absent) : root.getAbsolutePath(),
-                hub == null ? ctx.getString(R.string.log_export_absent) : hub.getAbsolutePath(),
+                root == null ? Trans.get(ctx, R.string.log_export_absent) : root.getAbsolutePath(),
+                hub == null ? Trans.get(ctx, R.string.log_export_absent) : hub.getAbsolutePath(),
                 android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL
                         + " · Android " + android.os.Build.VERSION.RELEASE
                         + " (API " + android.os.Build.VERSION.SDK_INT + ")",
@@ -663,14 +663,14 @@ public class LogActivity extends BaseActivity {
         sb.append(header).append("\n\n");
 
         // ① 游戏日志
-        sb.append(ctx.getString(R.string.log_export_s1)).append('\n');
+        sb.append(Trans.get(ctx, R.string.log_export_s1)).append('\n');
         appendDoc(sb, ctx, s == null ? null : s.game);
         sb.append('\n');
 
         // ② 启动器日志（六份，缺的也列出来 —— "哪份没有"本身是排障信息）
-        sb.append(ctx.getString(R.string.log_export_s2)).append('\n');
+        sb.append(Trans.get(ctx, R.string.log_export_s2)).append('\n');
         if (s == null || s.hub == null || s.hub.length == 0) {
-            sb.append(ctx.getString(R.string.log_export_absent)).append('\n');
+            sb.append(Trans.get(ctx, R.string.log_export_absent)).append('\n');
         } else {
             for (Doc d : s.hub) appendDoc(sb, ctx, d);
         }
@@ -678,9 +678,9 @@ public class LogActivity extends BaseActivity {
 
         // ③ 崩溃报告（已在 readAll 里按新 -> 旧排好，导出沿用同一顺序）
         int n = (s == null || s.crashes == null) ? 0 : s.crashes.size();
-        sb.append(ctx.getString(R.string.log_export_s3_fmt, n)).append('\n');
+        sb.append(Trans.get(ctx, R.string.log_export_s3_fmt, n)).append('\n');
         if (n == 0) {
-            sb.append(ctx.getString(R.string.log_export_absent)).append('\n');
+            sb.append(Trans.get(ctx, R.string.log_export_absent)).append('\n');
         } else {
             for (Doc d : s.crashes) appendDoc(sb, ctx, d);
         }
@@ -693,18 +693,18 @@ public class LogActivity extends BaseActivity {
         String name = (d == null) ? "?"
                 : (d.dispName != null ? d.dispName : (d.label != null ? d.label : "?"));
         String fn = (d == null || d.label == null) ? "?" : d.label;
-        sb.append(ctx.getString(R.string.log_export_sec_fmt, name, fn)).append('\n');
+        sb.append(Trans.get(ctx, R.string.log_export_sec_fmt, name, fn)).append('\n');
         if (d == null || d.file == null || !d.file.isFile()) {
-            sb.append(ctx.getString(R.string.log_export_absent)).append('\n');
+            sb.append(Trans.get(ctx, R.string.log_export_absent)).append('\n');
             return;
         }
         String t = d.fullText();
         if (t == null || t.length() == 0) {
-            sb.append(ctx.getString(R.string.log_export_blank)).append('\n');
+            sb.append(Trans.get(ctx, R.string.log_export_blank)).append('\n');
             return;
         }
         if (d.wholeTruncated) {
-            sb.append(ctx.getString(R.string.log_export_big_fmt,
+            sb.append(Trans.get(ctx, R.string.log_export_big_fmt,
                     Util.formatSize(d.file.length()), Util.formatSize(EXPORT_MAX_BYTES))).append('\n');
         }
         sb.append(t);

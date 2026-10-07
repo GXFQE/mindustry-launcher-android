@@ -88,8 +88,8 @@ public class BlueprintsActivity extends BaseActivity {
                         //   导入是往槽的 schematics/ 里写（同名旧件还会被挪去中转站），
                         //   而游戏本局存下来的蓝图就在那个目录里 —— 与地图导入同一条门禁。
                         if (Data.gameAlive(BlueprintsActivity.this)) {
-                            alert(getString(R.string.game_busy_title),
-                                    getString(R.string.bp_import_busy_msg));
+                            alert(Trans.get(BlueprintsActivity.this, R.string.game_busy_title),
+                                    Trans.get(BlueprintsActivity.this, R.string.bp_import_busy_msg));
                             return;
                         }
                         sImportSlot = mSlot;
@@ -97,7 +97,7 @@ public class BlueprintsActivity extends BaseActivity {
                         i.addCategory(Intent.CATEGORY_OPENABLE);
                         i.setType("*/*");     // 各家文件管理器对 .msch 的 MIME 报得五花八门
                         startActivityForResult(Intent.createChooser(i,
-                                getString(R.string.bp_import)), REQ_BP_IMPORT);
+                                Trans.get(BlueprintsActivity.this, R.string.bp_import)), REQ_BP_IMPORT);
                     }
                 });
         Util.bindAction(root, R.id.row_bp_export, R.drawable.ic_upload,
@@ -170,7 +170,7 @@ public class BlueprintsActivity extends BaseActivity {
                     @Override public void run() {
                         if (Util.dead(BlueprintsActivity.this)) return;
                         mItems = items;
-                        mHead.setText(getString(R.string.bp_head_fmt,
+                        mHead.setText(Trans.get(BlueprintsActivity.this, R.string.bp_head_fmt,
                                 Blueprints.count(items, Blueprints.FROM_SLOT),
                                 Blueprints.count(items, Blueprints.FROM_MOD)));
                         mAdapter = new MsavListAdapter(BlueprintsActivity.this, titles, subs, thumbs);
@@ -242,7 +242,7 @@ public class BlueprintsActivity extends BaseActivity {
     private void importFile(final android.net.Uri uri, final String displayName,
                             final String slot, final boolean overwrite) {
         final android.app.ProgressDialog pd = android.app.ProgressDialog.show(this,
-                getString(R.string.bp_import), getString(R.string.bp_reading), true, false);
+                Trans.get(BlueprintsActivity.this, R.string.bp_import), Trans.get(BlueprintsActivity.this, R.string.bp_reading), true, false);
         new Thread(new Runnable() {
             @Override public void run() {
                 final BlueprintFiles.Result r;
@@ -257,7 +257,7 @@ public class BlueprintsActivity extends BaseActivity {
                     runOnUiThread(new Runnable() {
                         @Override public void run() {
                             pd.dismiss();
-                            alert(getString(R.string.bp_import), String.valueOf(t));
+                            alert(Trans.get(BlueprintsActivity.this, R.string.bp_import), String.valueOf(t));
                         }
                     });
                     return;
@@ -276,7 +276,7 @@ public class BlueprintsActivity extends BaseActivity {
                         if (Util.dead(BlueprintsActivity.this)) return;
                         if (r.ok) {
                             Toast.makeText(BlueprintsActivity.this,
-                                    getString(R.string.bp_import_ok_fmt, r.finalName),
+                                    Trans.get(BlueprintsActivity.this, R.string.bp_import_ok_fmt, r.finalName),
                                     Toast.LENGTH_SHORT).show();
                             scan();                       // ★ 与地图页统一：只重扫列表，不重建页面
                             return;
@@ -286,7 +286,7 @@ public class BlueprintsActivity extends BaseActivity {
                         if (!overwrite && r.nameTaken) {
                             new android.app.AlertDialog.Builder(BlueprintsActivity.this)
                                     .setTitle(R.string.bp_overwrite_title)
-                                    .setMessage(getString(R.string.bp_overwrite_msg_fmt,
+                                    .setMessage(Trans.get(BlueprintsActivity.this, R.string.bp_overwrite_msg_fmt,
                                             BlueprintFiles.safeName(displayName)))
                                     .setPositiveButton(R.string.bp_overwrite_ok,
                                             new android.content.DialogInterface.OnClickListener() {
@@ -301,8 +301,8 @@ public class BlueprintsActivity extends BaseActivity {
                         // ⚠️ 失败原因走**码 → 文案**（`Msch` 只给码；`error` 原文是给报告与自检的）
                         String why = r.broken != null ? MschText.reason(BlueprintsActivity.this, r.broken)
                                 : r.error;
-                        alert(getString(R.string.bp_import),
-                                getString(R.string.bp_import_fail_fmt, why));
+                        alert(Trans.get(BlueprintsActivity.this, R.string.bp_import),
+                                Trans.get(BlueprintsActivity.this, R.string.bp_import_fail_fmt, why));
                     }
                 });
             }
@@ -333,7 +333,7 @@ public class BlueprintsActivity extends BaseActivity {
         TextView head = (TextView) box.findViewById(R.id.msav_head);
         head.setVisibility(View.VISIBLE);
         // ★ 条数这类信息只能放表头，**不能塞标题**（AlertDialog 的标题是单行的）
-        head.setText(getString(R.string.bp_export_head_fmt, items.size()));
+        head.setText(Trans.get(BlueprintsActivity.this, R.string.bp_export_head_fmt, items.size()));
         ListView lv = (ListView) box.findViewById(R.id.msav_list);
         lv.setAdapter(new MsavListAdapter(this, titles, subs));
         final android.app.AlertDialog dlg = new android.app.AlertDialog.Builder(this)
@@ -350,7 +350,7 @@ public class BlueprintsActivity extends BaseActivity {
                         // ★ 文件名用**原始名**：那才是游戏里认的名字，"安全化"成 ASCII 之后
                         //   用户在文件管理器里认不出来（同地图/存档导出那条纪律）
                         Exporter.createDoc(sExportItem.name(), "application/octet-stream"),
-                        getString(R.string.chooser_export)), REQ_BP_EXPORT);
+                        Trans.get(BlueprintsActivity.this, R.string.chooser_export)), REQ_BP_EXPORT);
             }
         });
         dlg.show();
@@ -359,7 +359,7 @@ public class BlueprintsActivity extends BaseActivity {
     /** 把选中的那份写进 SAF 目标：本槽是真文件、模组自带要从 zip 条目流式拷 */
     private void exportItem(final Blueprints.Item it, final android.net.Uri uri) {
         final android.app.ProgressDialog pd = android.app.ProgressDialog.show(this,
-                getString(R.string.bp_export), getString(R.string.bp_export_working), true, false);
+                Trans.get(BlueprintsActivity.this, R.string.bp_export), Trans.get(BlueprintsActivity.this, R.string.bp_export_working), true, false);
         new Thread(new Runnable() {
             @Override public void run() {
                 final long n;
@@ -369,7 +369,7 @@ public class BlueprintsActivity extends BaseActivity {
                     } else if (it.container != null && it.entry != null) {
                         n = Exporter.writeEntry(BlueprintsActivity.this, uri, it.container, it.entry);
                     } else {
-                        throw new java.io.IOException(getString(R.string.bp_export_nosrc));
+                        throw new java.io.IOException(Trans.get(BlueprintsActivity.this, R.string.bp_export_nosrc));
                     }
                 } catch (final Throwable t) {
                     runOnUiThread(new Runnable() {
@@ -377,9 +377,9 @@ public class BlueprintsActivity extends BaseActivity {
                             pd.dismiss();
                             // 同 `MapsActivity` 的导出失败：`ioReason` 只翻认识的系统 errno，
                             // 我们自己的文案原样透传（没 message 时用资源兜底，不甩类名）
-                            alert(getString(R.string.export_failed),
+                            alert(Trans.get(BlueprintsActivity.this, R.string.export_failed),
                                     Util.ioReason(BlueprintsActivity.this, t,
-                                            getString(R.string.bp_export_nosrc)));
+                                            Trans.get(BlueprintsActivity.this, R.string.bp_export_nosrc)));
                         }
                     });
                     return;
@@ -388,7 +388,7 @@ public class BlueprintsActivity extends BaseActivity {
                     @Override public void run() {
                         pd.dismiss();
                         Toast.makeText(BlueprintsActivity.this,
-                                getString(R.string.bp_export_ok_fmt, it.name(),
+                                Trans.get(BlueprintsActivity.this, R.string.bp_export_ok_fmt, it.name(),
                                         Util.formatSize(n)), Toast.LENGTH_SHORT).show();
                     }
                 });

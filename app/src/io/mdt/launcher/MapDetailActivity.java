@@ -153,7 +153,7 @@ public class MapDetailActivity extends BaseActivity {
 
     private void render(MapStatsMods.Built b) {
         if (b.error != null && !b.error.isEmpty()) {
-            mState.setText(getString(R.string.stats_failed_fmt, b.error));
+            mState.setText(Trans.get(MapDetailActivity.this, R.string.stats_failed_fmt, b.error));
             return;
         }
         MapStats.Result r = b.result;
@@ -166,12 +166,12 @@ public class MapDetailActivity extends BaseActivity {
         mState.setVisibility(View.GONE);
         // 两类矿的口径（用户 2026-10-04 定）：**地矿**（长在地板上，用**地钻**）用"能采到"口径；
         // **墙矿**（长在墙里，要用**墙钻**）只报总格数、不报遮挡（它本身就是墙；行名带「（墙）」不会同名）
-        if (!r.ores.isEmpty()) addSection(getString(R.string.stats_section_ore), r.ores, false);
-        if (!r.oreWalls.isEmpty()) addSection(getString(R.string.stats_section_orewall), r.oreWalls, true);
+        if (!r.ores.isEmpty()) addSection(Trans.get(MapDetailActivity.this, R.string.stats_section_ore), r.ores, false);
+        if (!r.oreWalls.isEmpty()) addSection(Trans.get(MapDetailActivity.this, R.string.stats_section_orewall), r.oreWalls, true);
         // ★ 可采地板 / 加成地板：**同一批格子可能两段都出现**（沙地既掉沙又含油）
         //   ⇒ 两段口径必须一致（都是「能采 X 格」+ 副行「共 Y 格」），否则用户会看到同名两个数
-        if (!r.floors.isEmpty()) addSection(getString(R.string.stats_section_floor), r.floors, false);
-        if (!r.bonuses.isEmpty()) addSection(getString(R.string.stats_section_bonus), r.bonuses, false);
+        if (!r.floors.isEmpty()) addSection(Trans.get(MapDetailActivity.this, R.string.stats_section_floor), r.floors, false);
+        if (!r.bonuses.isEmpty()) addSection(Trans.get(MapDetailActivity.this, R.string.stats_section_bonus), r.bonuses, false);
         addTech(b);
     }
 
@@ -194,11 +194,11 @@ public class MapDetailActivity extends BaseActivity {
         int reach = MapStats.sum(rows, MapStats.SUM_REACH);
         String sum;
         if (wallKind) {
-            sum = getString(R.string.stats_sum_wall_fmt, rows.size(), MapStatsMods.num(total));
+            sum = Trans.get(MapDetailActivity.this, R.string.stats_sum_wall_fmt, rows.size(), MapStatsMods.num(total));
         } else if (reach == total) {
-            sum = getString(R.string.stats_sum_same_fmt, rows.size(), MapStatsMods.num(total));
+            sum = Trans.get(MapDetailActivity.this, R.string.stats_sum_same_fmt, rows.size(), MapStatsMods.num(total));
         } else {
-            sum = getString(R.string.stats_sum_fmt, rows.size(),
+            sum = Trans.get(MapDetailActivity.this, R.string.stats_sum_fmt, rows.size(),
                     MapStatsMods.num(total), MapStatsMods.num(reach));
         }
         ((TextView) card.findViewById(R.id.stat_card_summary)).setText(sum);
@@ -208,7 +208,7 @@ public class MapDetailActivity extends BaseActivity {
         for (int i = 0; i < n; i++) body.addView(rowView(body, rows.get(i), wallKind));
         if (rows.size() > n) {
             TextView more = new TextView(this);
-            more.setText(getString(R.string.stats_more_fmt, rows.size() - n));
+            more.setText(Trans.get(MapDetailActivity.this, R.string.stats_more_fmt, rows.size() - n));
             more.setTextSize(11f);
             more.setPadding(dp(14), dp(4), dp(14), dp(8));
             more.setTextColor(getResources().getColor(R.color.fg_muted));
@@ -224,21 +224,21 @@ public class MapDetailActivity extends BaseActivity {
         View v = getLayoutInflater().inflate(R.layout.item_stat, parent, false);
         ((TextView) v.findViewById(R.id.stat_row_title)).setText(
                 row.attrs == null || row.attrs.isEmpty() ? row.label
-                        : getString(R.string.stats_row_attr_fmt, row.label, row.attrs));
+                        : Trans.get(MapDetailActivity.this, R.string.stats_row_attr_fmt, row.label, row.attrs));
         if (wallKind) {
             ((TextView) v.findViewById(R.id.stat_row_count))
-                    .setText(getString(R.string.stats_row_total_fmt, MapStatsMods.num(row.total)));
+                    .setText(Trans.get(MapDetailActivity.this, R.string.stats_row_total_fmt, MapStatsMods.num(row.total)));
         } else {
             ((TextView) v.findViewById(R.id.stat_row_count))
-                    .setText(getString(R.string.stats_row_reach_fmt, MapStatsMods.num(row.reachable())));
+                    .setText(Trans.get(MapDetailActivity.this, R.string.stats_row_reach_fmt, MapStatsMods.num(row.reachable())));
         }
         StringBuilder sb = new StringBuilder();
         // ★ 有"拿不到"的部分时才另起一行报总数 —— 数字只有一个来源，用户不会再看到两个值
         if (!wallKind && row.total != row.reachable()) {
-            sb.append(getString(R.string.stats_row_total_fmt, MapStatsMods.num(row.total)));
+            sb.append(Trans.get(MapDetailActivity.this, R.string.stats_row_total_fmt, MapStatsMods.num(row.total)));
         }
         if (row.drop != null && !row.drop.isEmpty()) {
-            cat(sb, getString(R.string.stats_row_drop_fmt, row.drop));
+            cat(sb, Trans.get(MapDetailActivity.this, R.string.stats_row_drop_fmt, row.drop));
         }
         // 🔴 「墙矿」段**不报遮挡**（用户 2026-10-04 问："什么叫做矿墙在墙下拿不到？"）：
         //   墙矿**本身就长在墙里**，说它"在墙下"是自相矛盾的措辞；而它的"能采"按地钻口径几乎恒为 0
@@ -246,13 +246,13 @@ public class MapDetailActivity extends BaseActivity {
         //   （用户的术语：地矿/墙矿 ↔ 地钻/墙钻；**不要**写"普通钻头采不了"）。
         if (!wallKind) {
             if (row.buried > 0) {
-                cat(sb, getString(R.string.stats_row_buried_fmt, MapStatsMods.num(row.buried)));
+                cat(sb, Trans.get(MapDetailActivity.this, R.string.stats_row_buried_fmt, MapStatsMods.num(row.buried)));
             }
             if (row.loose > 0) {
-                cat(sb, getString(R.string.stats_row_loose_fmt, MapStatsMods.num(row.loose)));
+                cat(sb, Trans.get(MapDetailActivity.this, R.string.stats_row_loose_fmt, MapStatsMods.num(row.loose)));
             }
             if (row.unknown > 0) {
-                cat(sb, getString(R.string.stats_row_unknown_fmt, MapStatsMods.num(row.unknown)));
+                cat(sb, Trans.get(MapDetailActivity.this, R.string.stats_row_unknown_fmt, MapStatsMods.num(row.unknown)));
             }
         }
         TextView sub = (TextView) v.findViewById(R.id.stat_row_sub);
@@ -272,13 +272,13 @@ public class MapDetailActivity extends BaseActivity {
         if (nt == null) return "";
         switch (nt.code) {
             case MapStats.Note.VANILLA_TABLE:
-                return getString(R.string.stats_note_vanilla_table_fmt, nt.n);
+                return Trans.get(MapDetailActivity.this, R.string.stats_note_vanilla_table_fmt, nt.n);
             case MapStats.Note.PATCH_CHANGED:
-                return getString(R.string.stats_note_patch_changed_fmt, nt.n2, nt.n);
+                return Trans.get(MapDetailActivity.this, R.string.stats_note_patch_changed_fmt, nt.n2, nt.n);
             case MapStats.Note.JSON_NAMES:
-                return getString(R.string.stats_note_json_names_fmt, nt.n);
+                return Trans.get(MapDetailActivity.this, R.string.stats_note_json_names_fmt, nt.n);
             case MapStats.Note.UNKNOWN_TYPE:
-                return getString(R.string.stats_note_unknown_type_fmt, nt.n);
+                return Trans.get(MapDetailActivity.this, R.string.stats_note_unknown_type_fmt, nt.n);
             default:
                 return "";
         }
@@ -290,7 +290,7 @@ public class MapDetailActivity extends BaseActivity {
         View card = getLayoutInflater().inflate(R.layout.card_stat_section, mBox, false);
         ((TextView) card.findViewById(R.id.stat_card_title)).setText(R.string.stats_section_tech);
         ((TextView) card.findViewById(R.id.stat_card_summary))
-                .setText(getString(R.string.stats_tech_size_fmt, r.width, r.height,
+                .setText(Trans.get(MapDetailActivity.this, R.string.stats_tech_size_fmt, r.width, r.height,
                         MapStatsMods.num(r.cells)));
         LinearLayout body = (LinearLayout) card.findViewById(R.id.stat_card_body);
 
@@ -304,29 +304,29 @@ public class MapDetailActivity extends BaseActivity {
         if (b.modNote != null && !b.modNote.isEmpty()) notes.add(b.modNote);
         // ★ P4：译文那一层**单独一行**（不往上一句尾巴上拼）
         if (b.bundleNote != null && !b.bundleNote.isEmpty()) notes.add(b.bundleNote);
-        line(body, getString(R.string.stats_tech_table_fmt, join(notes)));
-        line(body, getString(R.string.stats_tech_names_fmt, join(b.namesNotes)));
+        line(body, Trans.get(MapDetailActivity.this, R.string.stats_tech_table_fmt, join(notes)));
+        line(body, Trans.get(MapDetailActivity.this, R.string.stats_tech_names_fmt, join(b.namesNotes)));
         // ⚠️ 地图自带补丁那一条**已经在 `r.notes` 里了**（PATCH_CHANGED）——
         //    这里原来又单独加了一行，等于同一件事在界面上出现**两遍**（我 2026-10-04 引入的重复）。
         if (!r.blockers.isEmpty()) {
             StringBuilder sb = new StringBuilder();
             for (MapStats.Row row : r.blockers) {
                 if (sb.length() > 0) sb.append(" · ");
-                sb.append(getString(R.string.stats_tech_count_fmt, row.label, row.total));
+                sb.append(Trans.get(MapDetailActivity.this, R.string.stats_tech_count_fmt, row.label, row.total));
             }
-            line(body, getString(R.string.stats_tech_blockers_fmt, sb.toString()));
+            line(body, Trans.get(MapDetailActivity.this, R.string.stats_tech_blockers_fmt, sb.toString()));
         }
         if (!r.unknowns.isEmpty()) {
             StringBuilder sb = new StringBuilder();
             for (MapStats.Unk u : r.unknowns) {
                 if (sb.length() > 0) sb.append(" · ");
-                sb.append(getString(R.string.stats_tech_count_fmt, u.name, u.total()));
+                sb.append(Trans.get(MapDetailActivity.this, R.string.stats_tech_count_fmt, u.name, u.total()));
             }
-            line(body, getString(R.string.stats_tech_unknown_fmt, sb.toString()));
+            line(body, Trans.get(MapDetailActivity.this, R.string.stats_tech_unknown_fmt, sb.toString()));
         } else {
-            line(body, getString(R.string.stats_tech_unknown_fmt, getString(R.string.stats_tech_none)));
+            line(body, Trans.get(MapDetailActivity.this, R.string.stats_tech_unknown_fmt, Trans.get(MapDetailActivity.this, R.string.stats_tech_none)));
         }
-        line(body, getString(R.string.stats_tech_time_fmt, b.millis));
+        line(body, Trans.get(MapDetailActivity.this, R.string.stats_tech_time_fmt, b.millis));
         Util.bindExpandableCard(card, R.id.stat_card, R.id.stat_card_body, R.id.stat_card_chevron);
         mBox.addView(card);
     }
@@ -348,24 +348,24 @@ public class MapDetailActivity extends BaseActivity {
         //   本页的删除入口**只对本槽地图出现**（见 onCreate 里的 FROM_SLOT 判断），
         //   那个原因在任何情况下都不成立，等于把唯一可操作的那句稀释掉了。
         if (Data.gameAlive(this)) {
-            alert(getString(R.string.game_busy_title), getString(R.string.map_delete_busy_msg));
+            alert(Trans.get(MapDetailActivity.this, R.string.game_busy_title), Trans.get(MapDetailActivity.this, R.string.map_delete_busy_msg));
             return;
         }
         new AlertDialog.Builder(this)
                 .setTitle(R.string.map_delete)
-                .setMessage(getString(R.string.map_delete_confirm_fmt, mItem.name()))
+                .setMessage(Trans.get(MapDetailActivity.this, R.string.map_delete_confirm_fmt, mItem.name()))
                 .setPositiveButton(R.string.map_delete, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int w) {
                         File moved = MapFiles.deleteToTrash(MapDetailActivity.this,
                                 mItem.file.getParentFile(), mItem.file,
                                 MapFiles.trashDirOf(MapDetailActivity.this));
                         if (moved == null) {
-                            alert(getString(R.string.map_delete),
-                                    getString(R.string.map_delete_fail));
+                            alert(Trans.get(MapDetailActivity.this, R.string.map_delete),
+                                    Trans.get(MapDetailActivity.this, R.string.map_delete_fail));
                             return;
                         }
                         Toast.makeText(MapDetailActivity.this,
-                                getString(R.string.map_deleted_ok_fmt, mItem.name()),
+                                Trans.get(MapDetailActivity.this, R.string.map_deleted_ok_fmt, mItem.name()),
                                 Toast.LENGTH_SHORT).show();
                         setResult(RESULT_OK);   // 告诉列表：图没了，回去重新清点
                         finish();

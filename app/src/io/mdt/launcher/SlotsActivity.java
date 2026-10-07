@@ -171,12 +171,12 @@ public class SlotsActivity extends BaseActivity {
         rebuildList();
         if (mSummary != null) {
             File root = Data.dataRoot(this);
-            mSummary.setText(getString(R.string.saves_summary_fmt,
+            mSummary.setText(Trans.get(SlotsActivity.this, R.string.saves_summary_fmt,
                     mSlots.size(),
                     Data.currentSlot(this),
                     getString(Data.gameAlive(this) ? R.string.game_running
                                                    : R.string.game_not_running)));
-            mDetail.setText(getString(R.string.saves_detail_fmt,
+            mDetail.setText(Trans.get(SlotsActivity.this, R.string.saves_detail_fmt,
                     root == null ? "?" : root.getAbsolutePath(),
                     Backup.rootDir(this).getAbsolutePath()));
         }
@@ -204,11 +204,11 @@ public class SlotsActivity extends BaseActivity {
             ((TextView) v.findViewById(R.id.slot_name)).setText(s.name);
             // 槽行的统计段统一走资源（原 Data.Slot.subtitle() 的硬编码串已删，2026-10-02）。
             // F5：再追加一行自动备份策略摘要 —— 否则用户没法一眼看出"这个槽到底会不会自动备份"。
-            String meta = getString(R.string.slot_entry_fmt, s.files, Util.formatSize(s.bytes));
+            String meta = Trans.get(SlotsActivity.this, R.string.slot_entry_fmt, s.files, Util.formatSize(s.bytes));
             Config.BackupPolicy bp = Config.get().backupPolicy(s.name);
             meta += bp.enabled
-                    ? getString(R.string.policy_summary_fmt, bp.minMinutes, bp.maxBackups)
-                    : getString(R.string.policy_off_suffix);
+                    ? Trans.get(SlotsActivity.this, R.string.policy_summary_fmt, bp.minMinutes, bp.maxBackups)
+                    : Trans.get(SlotsActivity.this, R.string.policy_off_suffix);
             ((TextView) v.findViewById(R.id.slot_meta)).setText(meta);
             v.findViewById(R.id.slot_badge).setVisibility(s.active ? View.VISIBLE : View.GONE);
             // 整行点击 = 槽操作菜单（原先是 ListView 的 onItemClick）
@@ -241,7 +241,7 @@ public class SlotsActivity extends BaseActivity {
                 .setPositiveButton(R.string.create, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int w) {
                         String err = Data.createSlot(SlotsActivity.this, input.getText().toString());
-                        if (err != null) alert(getString(R.string.create_failed), err);
+                        if (err != null) alert(Trans.get(SlotsActivity.this, R.string.create_failed), err);
                         refresh();
                     }
                 })

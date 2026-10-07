@@ -144,9 +144,9 @@ public class TrashActivity extends BaseActivity {
     private void showActions(final Trash.Item it) {
         String body = TrashText.line(this, it);
         if (it.kind == Trash.Kind.OTHER) {
-            body = body + "\n\n" + getString(R.string.trash_reason_no_kind);
+            body = body + "\n\n" + Trans.get(TrashActivity.this, R.string.trash_reason_no_kind);
         } else {
-            body = getString(R.string.trash_actions_msg_fmt, body);
+            body = Trans.get(TrashActivity.this, R.string.trash_actions_msg_fmt, body);
         }
         AlertDialog.Builder d = new AlertDialog.Builder(this)
                 .setTitle(TrashText.title(it))
@@ -177,7 +177,7 @@ public class TrashActivity extends BaseActivity {
     private void confirmRestore(final Trash.Item it, final String slot) {
         new AlertDialog.Builder(this)
                 .setTitle(R.string.trash_restore_confirm_title)
-                .setMessage(getString(R.string.trash_restore_confirm_fmt,
+                .setMessage(Trans.get(TrashActivity.this, R.string.trash_restore_confirm_fmt,
                         TrashText.title(it), slot))
                 .setPositiveButton(R.string.trash_restore, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int w) {
@@ -193,7 +193,7 @@ public class TrashActivity extends BaseActivity {
         final String name = TrashText.title(it);
         new AlertDialog.Builder(this)
                 .setTitle(R.string.trash_restore_confirm_title)
-                .setMessage(getString(R.string.trash_slot_restore_confirm_fmt, name))
+                .setMessage(Trans.get(TrashActivity.this, R.string.trash_slot_restore_confirm_fmt, name))
                 .setPositiveButton(R.string.trash_restore, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int w) {
                         doRestore(it, name, false);
@@ -212,7 +212,7 @@ public class TrashActivity extends BaseActivity {
     private void askOverwrite(final Trash.Item it, final String slot) {
         new AlertDialog.Builder(this)
                 .setTitle(R.string.trash_restore_overwrite_title)
-                .setMessage(getString(R.string.trash_restore_overwrite_fmt,
+                .setMessage(Trans.get(TrashActivity.this, R.string.trash_restore_overwrite_fmt,
                         TrashText.title(it), slot))
                 .setPositiveButton(R.string.map_overwrite_ok, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int w) {
@@ -234,7 +234,7 @@ public class TrashActivity extends BaseActivity {
         final android.widget.EditText input = new android.widget.EditText(this);
         input.setInputType(android.text.InputType.TYPE_CLASS_TEXT);
         input.setHint(R.string.trash_slot_rename_hint);
-        input.setText(getString(R.string.trash_slot_rename_prefill_fmt, taken));
+        input.setText(Trans.get(TrashActivity.this, R.string.trash_slot_rename_prefill_fmt, taken));
         android.widget.LinearLayout box = new android.widget.LinearLayout(this);
         box.setOrientation(android.widget.LinearLayout.VERTICAL);
         int pad = dp(20);
@@ -244,7 +244,7 @@ public class TrashActivity extends BaseActivity {
                 android.view.ViewGroup.LayoutParams.WRAP_CONTENT));
         new AlertDialog.Builder(this)
                 .setTitle(R.string.trash_slot_rename_title)
-                .setMessage(getString(R.string.trash_slot_taken_fmt, taken))
+                .setMessage(Trans.get(TrashActivity.this, R.string.trash_slot_taken_fmt, taken))
                 .setView(box)
                 .setPositiveButton(R.string.trash_restore, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int w) {
@@ -273,8 +273,8 @@ public class TrashActivity extends BaseActivity {
                         if (r.ok) {
                             Toast.makeText(TrashActivity.this,
                                     it.kind == Trash.Kind.SLOT
-                                            ? getString(R.string.trash_slot_restored_fmt, slot)
-                                            : getString(R.string.trash_restore_ok_fmt,
+                                            ? Trans.get(TrashActivity.this, R.string.trash_slot_restored_fmt, slot)
+                                            : Trans.get(TrashActivity.this, R.string.trash_restore_ok_fmt,
                                                     TrashText.title(it), slot),
                                     Toast.LENGTH_LONG).show();
                             scan();
@@ -286,7 +286,7 @@ public class TrashActivity extends BaseActivity {
                             else askOverwrite(it, slot);
                             return;
                         }
-                        alert(getString(R.string.trash_restore_confirm_title),
+                        alert(Trans.get(TrashActivity.this, R.string.trash_restore_confirm_title),
                                 TrashText.reason(TrashActivity.this, r));
                     }
                 });
@@ -303,7 +303,7 @@ public class TrashActivity extends BaseActivity {
     private void confirmDeleteOne(final Trash.Item it) {
         new AlertDialog.Builder(this)
                 .setTitle(R.string.trash_delete_one)
-                .setMessage(getString(R.string.trash_delete_one_confirm_fmt,
+                .setMessage(Trans.get(TrashActivity.this, R.string.trash_delete_one_confirm_fmt,
                         TrashText.title(it)))
                 .setPositiveButton(R.string.delete_forever, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int w) { doDeleteOne(it); }
@@ -326,11 +326,11 @@ public class TrashActivity extends BaseActivity {
                         if (Util.dead(TrashActivity.this)) return;
                         if (r.ok) {
                             Toast.makeText(TrashActivity.this,
-                                    getString(R.string.trash_deleted_fmt,
+                                    Trans.get(TrashActivity.this, R.string.trash_deleted_fmt,
                                             TrashText.title(it)),
                                     Toast.LENGTH_SHORT).show();
                         } else {
-                            alert(getString(R.string.trash_delete_fail),
+                            alert(Trans.get(TrashActivity.this, R.string.trash_delete_fail),
                                     TrashText.reason(TrashActivity.this, r));
                         }
                         scan();
@@ -356,7 +356,7 @@ public class TrashActivity extends BaseActivity {
         }
         new AlertDialog.Builder(this)
                 .setTitle(R.string.trash_empty_confirm_title)
-                .setMessage(getString(R.string.trash_empty_confirm_fmt, n, Util.formatSize(bytes)))
+                .setMessage(Trans.get(TrashActivity.this, R.string.trash_empty_confirm_fmt, n, Util.formatSize(bytes)))
                 .setPositiveButton(R.string.delete_forever, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int w) { doEmptyAll(); }
                 })
@@ -377,10 +377,10 @@ public class TrashActivity extends BaseActivity {
                         if (Util.dead(TrashActivity.this)) return;
                         if (r.ok) {
                             Toast.makeText(TrashActivity.this,
-                                    getString(R.string.trash_emptied_fmt, Util.formatSize(r.bytes)),
+                                    Trans.get(TrashActivity.this, R.string.trash_emptied_fmt, Util.formatSize(r.bytes)),
                                     Toast.LENGTH_LONG).show();
                         } else {
-                            alert(getString(R.string.trash_empty_fail),
+                            alert(Trans.get(TrashActivity.this, R.string.trash_empty_fail),
                                     TrashText.reason(TrashActivity.this, r));
                         }
                         scan();

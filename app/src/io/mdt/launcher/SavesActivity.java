@@ -61,12 +61,12 @@ public class SavesActivity extends BaseActivity {
         View root = getLayoutInflater().inflate(R.layout.activity_saves, null);
         Util.applySystemInsets(root);
         setContentView(root);
-        setTitle(getString(R.string.saves_list_title_fmt, mSlot));
+        setTitle(Trans.get(SavesActivity.this, R.string.saves_list_title_fmt, mSlot));
 
         mHead = (TextView) root.findViewById(R.id.save_head);
         mEmpty = (TextView) root.findViewById(R.id.save_empty);
         // ⚠️ 空态那句话**复用**导入那条资源（「槽「X」里还没有存档。」）—— 同一件事只留一句文案
-        mEmpty.setText(getString(R.string.export_no_save_fmt, mSlot));
+        mEmpty.setText(Trans.get(SavesActivity.this, R.string.export_no_save_fmt, mSlot));
         mList = (ListView) root.findViewById(R.id.save_list);
         mList.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override public void onItemClick(AdapterView<?> p, View v, int pos, long id) {
@@ -121,7 +121,7 @@ public class SavesActivity extends BaseActivity {
         mFiles = SlotIo.fillSaves(this, mSlot, mList, null);
         boolean empty = mFiles.length == 0;
         // 表头那句同时承担"有几份"（标题里放不下多行，见 dialog_msav_list.xml 的实测）
-        mHead.setText(getString(R.string.saves_list_head_fmt, mFiles.length));
+        mHead.setText(Trans.get(SavesActivity.this, R.string.saves_list_head_fmt, mFiles.length));
         mEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
         mList.setVisibility(empty ? View.GONE : View.VISIBLE);
 
@@ -151,7 +151,7 @@ public class SavesActivity extends BaseActivity {
 
     /** 这个槽已经不在了（被删 / 改名）：提示一句就退出去（文案与槽页那句同一条） */
     private void gone() {
-        android.widget.Toast.makeText(this, getString(R.string.slot_page_gone_fmt, mSlot),
+        android.widget.Toast.makeText(this, Trans.get(SavesActivity.this, R.string.slot_page_gone_fmt, mSlot),
                 android.widget.Toast.LENGTH_SHORT).show();
         finish();
     }
