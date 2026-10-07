@@ -76,6 +76,23 @@
                     android:layout_marginStart="62dp"
                     android:background="@color/divider" />
 
+                <!--
+                  用户语言包（lang.properties）：紧挨着「语言」—— 两者都是"界面文字从哪来"，
+                  区别是这一项由用户丢文件，而上一项是内置翻译。
+                  副标题 = 当前状态（与深浅色 / 默认槽同款：内容即当前状态）。
+                -->
+                <include
+                    android:id="@+id/row_lang_pack"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="62dp"
+                    android:background="@color/divider" />
+
                 <include
                     android:id="@+id/row_def_slot"
                     layout="@layout/row_action"

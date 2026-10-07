@@ -1639,6 +1639,12 @@
     <string name="lang_err_ph_count">占位符个数不一样：原文 %1$d 个，你的 %2$d 个（原：%3$s，你的：%4$s）</string>
     <string name="lang_err_ph_index">第 %1$d 个占位符不一样：原文 %2$s，你的 %3$s</string>
     <string name="lang_dialog_title">翻译文件</string>
+    <string name="lang_row_title">翻译文件</string>
+    <string name="lang_row_none">用内置翻译（跟随系统语言）</string>
+    <string name="lang_chooser_title">选择 .properties 文件</string>
+    <string name="lang_pack_ok">装上</string>
+    <string name="lang_pack_none_used">没有一条对得上当前版本的 key —— 请核对键名与 strings.xml 里的一致。</string>
+    <string name="lang_pack_remove">移除翻译文件</string>
     <string name="lang_dialog_msg_fmt">%1$s\n\n用了 %2$d 条 · 缺 %3$d 条 · 认不出 %4$d 条 · 拒绝 %5$d 条</string>
     <string name="lang_stat_used_fmt">正在用 %1$d 条译文</string>
     <string name="lang_rejected_fmt">%1$d 条被拒绝（占位符对不上）—— 见设置 → 语言</string>

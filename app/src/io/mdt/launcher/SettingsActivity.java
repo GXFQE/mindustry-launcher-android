@@ -14,7 +14,11 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
 import java.util.List;
+import android.net.Uri;
 
 /**
  * 全局设置（F3）。
@@ -37,6 +41,8 @@ public class SettingsActivity extends BaseActivity {
 
     private static final int LOG_MIN = 1;
     private static final int LOG_MAX = 999;
+    /** 用户语言包的文件选择请求码（本页唯一一个 `startActivityForResult`） */
+    private static final int REQ_LANG_PACK = 62;
 
     private TextView mThemeSub;
     private TextView mLangSub;
@@ -44,6 +50,8 @@ public class SettingsActivity extends BaseActivity {
     private TextView mLogsSub;
     /** F20：自动清理残留那一行的副标题（已开 / 已关） */
     private TextView mAutoCleanSub;
+    /** 用户语言包那一行的副标题（当前状态） */
+    private TextView mLangPackSub;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -76,6 +84,13 @@ public class SettingsActivity extends BaseActivity {
                     @Override public void run() { pickLanguage(); }
                 });
         mLangSub = (TextView) rowLang.findViewById(R.id.act_sub);
+
+        // 用户语言包（lang.properties）：紧挨「语言」—— 两者都是"界面文字从哪来"。
+        View rowLangPack = Util.bindActionValue(root, R.id.row_lang_pack, R.drawable.ic_language,
+                R.string.lang_row_title, new Runnable() {
+                    @Override public void run() { pickLangPack(); }
+                });
+        mLangPackSub = (TextView) rowLangPack.findViewById(R.id.act_sub);
 
         View rowSlot = Util.bindActionValue(root, R.id.row_def_slot, R.drawable.ic_folder,
                 R.string.set_slot_title, new Runnable() {
@@ -178,6 +193,24 @@ public class SettingsActivity extends BaseActivity {
         if (mAutoCleanSub != null) {
             mAutoCleanSub.setText(Config.get().autoCleanRedundant()
                     ? R.string.set_autoclean_on : R.string.set_autoclean_off);
+        }
+        if (mLangPackSub != null) {
+            Trans.Pack p = Trans.installed(SettingsActivity.this)
+                    ? Trans.pack(SettingsActivity.this) : null;
+            if (p == null) {
+                mLangPackSub.setText(Trans.get(SettingsActivity.this, R.string.lang_row_none));
+            } else {
+                String s = Trans.get(SettingsActivity.this, R.string.lang_stat_used_fmt, p.used());
+                if (!p.ok()) {
+                    s += "　" + Trans.get(SettingsActivity.this, R.string.lang_rejected_fmt,
+                            p.rejected.size());
+                }
+                if (!p.unknown.isEmpty()) {
+                    s += "　" + Trans.get(SettingsActivity.this, R.string.lang_unknown_fmt,
+                            p.unknown.size());
+                }
+                mLangPackSub.setText(s);
+            }
         }
     }
 
@@ -322,6 +355,176 @@ public class SettingsActivity extends BaseActivity {
                 })
                 .setNegativeButton(R.string.cancel, null)
                 .show();
+    }
+
+    // ── 用户语言包（lang.properties）────────────────────────────────────────
+
+    /**
+     * 用户语言包那一行。已装 = 先弹"当前状态 + 移除 / 重选"，没装 = 直接开选择器。
+     *
+     * ★ 范式与别处一致：**先在临时文件上校验，用户看到报告再决定装不装** ——
+     *   一份占位符写错的包会让若干条文案静默回落（甚至崩主进程，见 {@link Trans}），
+     *   所以"装之前把 rejected 摆给用户看"是这条功能的必要部分，不是可选项。
+     */
+    private void pickLangPack() {
+        final Trans.Pack cur = Trans.installed(this) ? Trans.pack(this) : null;
+        if (cur == null) {
+            openLangPackPicker();
+            return;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(Trans.get(SettingsActivity.this, R.string.lang_dialog_title))
+                .setMessage(Trans.get(SettingsActivity.this, R.string.lang_dialog_msg_fmt,
+                        cur.file.getName(), cur.used(), cur.missing.size(),
+                        cur.unknown.size(), cur.rejected.size()))
+                .setPositiveButton(Trans.get(SettingsActivity.this, R.string.lang_pack_remove),
+                        new DialogInterface.OnClickListener() {
+                            @Override public void onClick(DialogInterface d, int w) { removeLangPack(); }
+                        })
+                .setNeutralButton(Trans.get(SettingsActivity.this, R.string.lang_chooser_title),
+                        new DialogInterface.OnClickListener() {
+                            @Override public void onClick(DialogInterface d, int w) {
+                                openLangPackPicker();
+                            }
+                        })
+                .setNegativeButton(Trans.get(SettingsActivity.this, R.string.cancel), null)
+                .show();
+    }
+
+    private void openLangPackPicker() {
+        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        i.addCategory(Intent.CATEGORY_OPENABLE);
+        i.setType("*/*");     // ⚠️ 通配：各家文件管理器对 .properties 报的 MIME 不一致（同模组导入那条）
+        startActivityForResult(
+                Intent.createChooser(i, Trans.get(SettingsActivity.this, R.string.lang_chooser_title)),
+                REQ_LANG_PACK);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != REQ_LANG_PACK) return;
+        if (resultCode != RESULT_OK || data == null || data.getData() == null) return;
+        final Uri uri = data.getData();
+        new Thread(new Runnable() {
+            @Override public void run() {
+                final File tmp = new File(getCacheDir(), "lang.properties.tmp");
+                try {
+                    InputStream in = getContentResolver().openInputStream(uri);
+                    if (in == null) throw new IOException("cannot open " + uri);
+                    try {
+                        copyToFile(in, tmp);
+                    } finally {
+                        in.close();
+                    }
+                    final Trans.Pack p = Trans.parse(SettingsActivity.this, tmp);
+                    runOnUiThread(new Runnable() {
+                        @Override public void run() { showLangPackReport(p, uri, tmp); }
+                    });
+                } catch (final Throwable e) {
+                    runOnUiThread(new Runnable() {
+                        @Override public void run() {
+                            // ★ 按纪律：第一层只说"这件事没成"，原始异常进日志（见 §五"系统异常不许当弹窗正文"）
+                            android.util.Log.w("MDTLauncher", "lang pack read failed: " + e);
+                            Toast.makeText(SettingsActivity.this, e.toString(),
+                                    Toast.LENGTH_LONG).show();
+                        }
+                    });
+                }
+            }
+        }).start();
+    }
+
+    /** 把用户选的文件整份读出来（临时文件用于校验；真正装的时候再拷到私有目录）。 */
+    private static void copyToFile(InputStream in, File dst) throws IOException {
+        FileOutputStream out = new FileOutputStream(dst);
+        try {
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+        } finally {
+            out.close();
+        }
+    }
+
+    /**
+     * 装之前的报告。★ 只有用户点了「装上」才写入私有目录 —— 取消的话那份临时文件直接删掉，
+     * 用户不会因为"点错一次"就把界面文案换掉。
+     */
+    private void showLangPackReport(final Trans.Pack p, final Uri uri, final File tmp) {
+        String msg = Trans.get(SettingsActivity.this, R.string.lang_dialog_msg_fmt,
+                uri.getLastPathSegment(), p.used(), p.missing.size(),
+                p.unknown.size(), p.rejected.size());
+        if (p.used() == 0) {
+            // 一条都用不上：说清"为什么白忙"（最常见就是键名对不上）
+            msg += "\n\n" + Trans.get(SettingsActivity.this, R.string.lang_pack_none_used);
+        } else if (!p.ok()) {
+            msg += "\n\n" + Trans.get(SettingsActivity.this, R.string.lang_rejected_fmt,
+                    p.rejected.size());
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(Trans.get(SettingsActivity.this, R.string.lang_dialog_title))
+                .setMessage(msg)
+                .setPositiveButton(Trans.get(SettingsActivity.this, R.string.lang_pack_ok),
+                        new DialogInterface.OnClickListener() {
+                            @Override public void onClick(DialogInterface d, int w) {
+                                installLangPack(tmp);
+                            }
+                        })
+                .setNegativeButton(Trans.get(SettingsActivity.this, R.string.cancel),
+                        new DialogInterface.OnClickListener() {
+                            @Override public void onClick(DialogInterface d, int w) {
+                                tmp.delete();
+                            }
+                        })
+                .show();
+    }
+
+    /**
+     * 装上：临时文件 → 私有目录 → {@link Trans#installFromFile}。
+     * ⚠️ 临时文件在 `getCacheDir()`，与私有目录**可能不同文件系统** ⇒ 必须字节流复制（不能 `renameTo`）。
+     */
+    private void installLangPack(final File tmp) {
+        new Thread(new Runnable() {
+            @Override public void run() {
+                String err = null;
+                try {
+                    File dst = Trans.file(SettingsActivity.this);
+                    InputStream in = new java.io.FileInputStream(tmp);
+                    try {
+                        copyToFile(in, dst);
+                    } finally {
+                        in.close();
+                    }
+                    Trans.installFromFile(SettingsActivity.this);
+                } catch (Throwable t) {
+                    err = t.toString();
+                    android.util.Log.w("MDTLauncher", "lang pack install failed: " + t);
+                }
+                tmp.delete();      // 成功失败都清掉（校验用的临时件没用了）
+                final String ferr = err;
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        if (ferr != null) {
+                            Toast.makeText(SettingsActivity.this, ferr, Toast.LENGTH_LONG).show();
+                        }
+                        // ★ 与深浅色 / 语言同一条：改的是"界面文字从哪来"，必须自己 recreate()
+                        //   —— 否则用户看到的是旧文字，会以为没生效（见 pickTheme 的注释）。
+                        recreate();
+                    }
+                });
+            }
+        }).start();
+    }
+
+    private void removeLangPack() {
+        try {
+            Trans.uninstall(SettingsActivity.this);
+        } catch (Throwable t) {
+            android.util.Log.w("MDTLauncher", "lang pack uninstall failed: " + t);
+            Toast.makeText(SettingsActivity.this, t.toString(), Toast.LENGTH_LONG).show();
+        }
+        recreate();
     }
 
     /**

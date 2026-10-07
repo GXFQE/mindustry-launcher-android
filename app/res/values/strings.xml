@@ -1696,6 +1696,12 @@
     <string name="lang_err_ph_count">Placeholder count differs: original has %1$d, yours has %2$d (original: %3$s, yours: %4$s)</string>
     <string name="lang_err_ph_index">Placeholder #%1$d differs: original %2$s, yours %3$s</string>
     <string name="lang_dialog_title">Translation file</string>
+    <string name="lang_row_title">Translation file</string>
+    <string name="lang_row_none">Use the built-in translation (system language)</string>
+    <string name="lang_chooser_title">Pick a .properties file</string>
+    <string name="lang_pack_ok">Install</string>
+    <string name="lang_pack_none_used">No entry matched this version of the app — check that the keys are the same ones used in strings.xml.</string>
+    <string name="lang_pack_remove">Remove the translation file</string>
     <string name="lang_dialog_msg_fmt">%1$s\n\nUsed %2$d · missing %3$d · unknown %4$d · rejected %5$d</string>
     <string name="lang_stat_used_fmt">Using %1$d translated strings</string>
     <string name="lang_rejected_fmt">%1$d entries were rejected (placeholder mismatch) — see Settings → Language</string>
