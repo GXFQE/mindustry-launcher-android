@@ -151,10 +151,10 @@ public class BlueprintDetailActivity extends BaseActivity {
     private void startStats() {
         if (!mItem.ok()) {
             // 蓝图本身就读不出来 ⇒ 详情顶部已经说了原因，这里不再摆一段空的
-            mState.setText(R.string.bp_stats_failed);
+            mState.setText(Trans.get(BlueprintDetailActivity.this, R.string.bp_stats_failed));
             return;
         }
-        mState.setText(R.string.bp_stats_working);
+        mState.setText(Trans.get(BlueprintDetailActivity.this, R.string.bp_stats_working));
         new Thread(new Runnable() {
             @Override public void run() {
                 final List<Blueprints.Row> rows;
@@ -183,7 +183,7 @@ public class BlueprintDetailActivity extends BaseActivity {
                     runOnUiThread(new Runnable() {
                         @Override public void run() {
                             if (Util.dead(BlueprintDetailActivity.this)) return;
-                            mState.setText(R.string.bp_stats_failed);
+                            mState.setText(Trans.get(BlueprintDetailActivity.this, R.string.bp_stats_failed));
                         }
                     });
                     return;
@@ -274,7 +274,7 @@ public class BlueprintDetailActivity extends BaseActivity {
     /** 依据（**判据要能看见依据**）：解析出来的原始事实，全部来自内核，一个字都不加工 */
     private void addTech(long ms, int opaque) {
         View card = getLayoutInflater().inflate(R.layout.card_stat_section, mBox, false);
-        ((TextView) card.findViewById(R.id.stat_card_title)).setText(R.string.bp_section_tech);
+        ((TextView) card.findViewById(R.id.stat_card_title)).setText(Trans.get(BlueprintDetailActivity.this, R.string.bp_section_tech));
         Msch m = mItem.msch;
         // ⚠️ 摘要**不能**用 `mItem.blockKinds` —— 那是**列表页**扫的时候填进 Item 的派生字段，
         //   而详情页是**另一个进程内实例**（记录经 Intent 重建）⇒ 那边永远是 0

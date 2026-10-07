@@ -105,7 +105,7 @@ public class MapsActivity extends BaseActivity {
         Trans.bind(root, R.id.map_save_warn, R.string.map_save_nocores_warn);
 
         mHead = (TextView) root.findViewById(R.id.maps_head);
-        mHead.setText(R.string.maps_scanning);
+        mHead.setText(Trans.get(MapsActivity.this, R.string.maps_scanning));
         mEmpty = (TextView) root.findViewById(R.id.maps_empty);
 
         Util.bindAction(root, R.id.row_maps_import, R.drawable.ic_download,
@@ -180,7 +180,7 @@ public class MapsActivity extends BaseActivity {
      */
     private void refreshList() {
         if (Util.dead(this) || mList == null) return;
-        mHead.setText(R.string.maps_scanning);
+        mHead.setText(Trans.get(MapsActivity.this, R.string.maps_scanning));
         scan(mList);
     }
 
@@ -204,7 +204,7 @@ public class MapsActivity extends BaseActivity {
                             // ★ 原来这里是 `mHead.setText(String.valueOf(ex))` —— 表头直接
                             //   变成 `java.lang.NullPointerException: …`（2026-10-04 修）。
                             //   异常原文归 logcat / 报告，界面只给白话 + 下一步。
-                            mHead.setText(R.string.maps_scan_failed);
+                            mHead.setText(Trans.get(MapsActivity.this, R.string.maps_scan_failed));
                         }
                     });
                     return;
@@ -592,7 +592,7 @@ public class MapsActivity extends BaseActivity {
         //   给个接口允许用户打开自行选择」）：默认按 `mapname` 自动匹配（判据与游戏 SaveMeta 同源），
         //   但**用户可以点开自己换** —— 图改过名 / 撞名时自动匹配会失手。
         final TextView srcRow = (TextView) form.findViewById(R.id.map_save_source);
-        srcRow.setText(R.string.map_save_source_finding);
+        srcRow.setText(Trans.get(MapsActivity.this, R.string.map_save_source_finding));
         final Maps.Item[] chosen = {null};            // null = 不用源图
         final boolean[] resolved = {false};           // 还没解析完就点「导入」⇒ 退回"自动"
         final File mapsDir = new File(Data.dirOf(this, mSlot), "maps");
@@ -681,7 +681,7 @@ public class MapsActivity extends BaseActivity {
         resolved[0] = true;
         if (hits == null || hits.isEmpty()) {
             chosen[0] = null;
-            row.setText(R.string.map_save_source_missing);
+            row.setText(Trans.get(MapsActivity.this, R.string.map_save_source_missing));
             return;
         }
         chosen[0] = hits.get(0);
@@ -762,7 +762,7 @@ public class MapsActivity extends BaseActivity {
                 resolved[0] = true;
                 if (pos == 0) {
                     chosen[0] = null;
-                    row.setText(R.string.map_save_source_off);
+                    row.setText(Trans.get(MapsActivity.this, R.string.map_save_source_off));
                     return;
                 }
                 Maps.Item it = all.get(pos - 1);

@@ -63,7 +63,7 @@ public class TrashActivity extends BaseActivity {
         mHead = (TextView) root.findViewById(R.id.trash_head);
         mEmpty = (TextView) root.findViewById(R.id.trash_empty);
         mList = (ListView) root.findViewById(R.id.trash_list);
-        mHead.setText(R.string.trash_scanning);
+        mHead.setText(Trans.get(TrashActivity.this, R.string.trash_scanning));
 
         Util.bindAction(root, R.id.row_trash_empty_all, R.drawable.ic_trash,
                 R.string.trash_empty_all, R.string.trash_empty_all_sub, new Runnable() {
@@ -99,7 +99,7 @@ public class TrashActivity extends BaseActivity {
                     runOnUiThread(new Runnable() {
                         @Override public void run() {
                             if (Util.dead(TrashActivity.this)) return;
-                            mHead.setText(R.string.trash_scan_failed);
+                            mHead.setText(Trans.get(TrashActivity.this, R.string.trash_scan_failed));
                         }
                     });
                     return;
@@ -122,7 +122,7 @@ public class TrashActivity extends BaseActivity {
                         //   而且这句要说清"为什么会空"与"什么动作会把东西挪进来"。
                         if (mEmpty != null) {
                             mEmpty.setVisibility(items.isEmpty() ? View.VISIBLE : View.GONE);
-                            if (items.isEmpty()) mEmpty.setText(R.string.trash_empty);
+                            if (items.isEmpty()) mEmpty.setText(Trans.get(TrashActivity.this, R.string.trash_empty));
                         }
                     }
                 });

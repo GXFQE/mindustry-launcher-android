@@ -1455,7 +1455,7 @@ public class MainActivity extends BaseActivity {
         // ★ 为什么不用 ListView —— 见 rebuildList() 的注释（F3b 根因）。
         mListContainer = (ViewGroup) root.findViewById(R.id.ver_container);
         mEmpty = (TextView) root.findViewById(R.id.ver_empty);
-        mEmpty.setText(R.string.empty_versions);
+        mEmpty.setText(Trans.get(MainActivity.this, R.string.empty_versions));
 
         Util.applySystemInsets(root);
         setContentView(root);

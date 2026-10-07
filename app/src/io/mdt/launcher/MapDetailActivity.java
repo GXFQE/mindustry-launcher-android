@@ -113,7 +113,7 @@ public class MapDetailActivity extends BaseActivity {
 
     /** 统计（读定义表 + 解整图 + 计数）——**整段都在后台**，界面先给一行"正在数…" */
     private void startStats() {
-        mState.setText(R.string.stats_working);
+        mState.setText(Trans.get(MapDetailActivity.this, R.string.stats_working));
         new Thread(new Runnable() {
             @Override public void run() {
                 final MapStatsMods.Built built;
@@ -136,7 +136,7 @@ public class MapDetailActivity extends BaseActivity {
                     runOnUiThread(new Runnable() {
                         @Override public void run() {
                             if (Util.dead(MapDetailActivity.this)) return;
-                            mState.setText(R.string.stats_failed_plain);
+                            mState.setText(Trans.get(MapDetailActivity.this, R.string.stats_failed_plain));
                         }
                     });
                     return;
@@ -160,7 +160,7 @@ public class MapDetailActivity extends BaseActivity {
         boolean any = !r.ores.isEmpty() || !r.oreWalls.isEmpty() || !r.floors.isEmpty()
                 || !r.bonuses.isEmpty();
         if (!any) {
-            mState.setText(R.string.stats_none);
+            mState.setText(Trans.get(MapDetailActivity.this, R.string.stats_none));
             return;
         }
         mState.setVisibility(View.GONE);
@@ -288,7 +288,7 @@ public class MapDetailActivity extends BaseActivity {
     private void addTech(MapStatsMods.Built b) {
         MapStats.Result r = b.result;
         View card = getLayoutInflater().inflate(R.layout.card_stat_section, mBox, false);
-        ((TextView) card.findViewById(R.id.stat_card_title)).setText(R.string.stats_section_tech);
+        ((TextView) card.findViewById(R.id.stat_card_title)).setText(Trans.get(MapDetailActivity.this, R.string.stats_section_tech));
         ((TextView) card.findViewById(R.id.stat_card_summary))
                 .setText(Trans.get(MapDetailActivity.this, R.string.stats_tech_size_fmt, r.width, r.height,
                         MapStatsMods.num(r.cells)));

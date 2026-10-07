@@ -214,12 +214,12 @@ public class LogActivity extends BaseActivity {
     // ── 读取（全部在后台线程） ────────────────────────────────────────────
 
     private void reload() {
-        mGameMeta.setText(R.string.log_loading);
+        mGameMeta.setText(Trans.get(LogActivity.this, R.string.log_loading));
         mGameBody.setText("");
-        mHubMeta.setText(R.string.log_loading);
+        mHubMeta.setText(Trans.get(LogActivity.this, R.string.log_loading));
         mHubBody.setText("");
         mHubChips.removeAllViews();
-        mCrashMeta.setText(R.string.log_loading);
+        mCrashMeta.setText(Trans.get(LogActivity.this, R.string.log_loading));
         mCrashBody.setText("");
         mCrashChips.removeAllViews();
         mCrashClean.setVisibility(View.GONE);
@@ -313,7 +313,7 @@ public class LogActivity extends BaseActivity {
     private void apply(Snap s) {
         mSnap = s;
         if (s.dataRootMissing) {
-            mGameMeta.setText(R.string.log_no_storage);
+            mGameMeta.setText(Trans.get(LogActivity.this, R.string.log_no_storage));
             mHubMeta.setText("");
             mCrashMeta.setText("");
             mCrashChipScroll.setVisibility(View.GONE);
@@ -395,7 +395,7 @@ public class LogActivity extends BaseActivity {
     private void showCrash(int i) {
         if (i < 0 || i >= mCrashes.size()) {
             mShownCrash = null;
-            mCrashMeta.setText(R.string.log_crash_none);
+            mCrashMeta.setText(Trans.get(LogActivity.this, R.string.log_crash_none));
             mCrashBody.setText("");
             return;
         }

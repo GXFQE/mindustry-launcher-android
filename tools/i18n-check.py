@@ -657,10 +657,16 @@ def check_res(root, verbose=False):
                     % (name, conv_d, conv_l)))
 
     # RES-07 / RES-00：Java 引用 vs 默认目录
+    #
+    # ⚠️ 别把 `R.string.class` 当成"引用了 key `class`"（2026-10-07 踩的）：
+    #   `Trans` 要用反射枚举 `R.string` 的全部字段 ⇒ 源码里**必然**出现 `R.string.class`，
+    #   而 R.string 里没有（也不可能有）叫 `class` 的字段 ⇒ RES-07 会报一条纯误报。
+    #   ⇒ 把 Java 关键字排除掉（本工程只用到 `class`，`new`/`int` 之类一并挡上，免得将来再踩）。
+    R_STRING_REF = r"R\.string\.(?!class\b|new\b|int\b|boolean\b|void\b)(\w+)"
     refs = {}
     for rel, full in java_files(root, include_selftest=True):
         for i, line in enumerate(java_code_lines(read_text(full)), 1):
-            for m in re.finditer(r"R\.string\.(\w+)", line):
+            for m in re.finditer(R_STRING_REF, line):
                 refs.setdefault(m.group(1), []).append((rel, i))
     # ★ 清单里引用的也算"有人用"：否则只给 android:label / activity 用的串会被误报成孤儿。
     #   （`RES-08` 只管"带不带占位符"，不管"有没有人用" —— 两件事。）
@@ -977,7 +983,6 @@ class A {
     int f() { return R.string.app_name + R.string.a_fmt + R.string.plain; }
 }
 """
-
 _BASE_MANIFEST = """<?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android" package="io.mdt.launcher">
     <application android:label="@string/app_name"/>
@@ -1181,6 +1186,20 @@ def selftest(root, verbose=False):
             "app/AndroidManifest.xml": _MIN_MANIFEST,
         }, scratch),
         None, {"RES-13"}))
+    # ── RES-07：反射枚举 R.string 时的 `R.string.class` 不许被当成"引用了 key class" ──
+    #    （2026-10-07 真踩过：`Trans` 用 `R.string.class.getFields()` 建键名表 ⇒ 纯误报）
+    cases.append((
+        "RES-07 R.string.class（反射取类）不许响",
+        _mk_tree({
+            "app/res/values/strings.xml":
+                '<resources><string name="app_name">App</string></resources>',
+            "app/src/io/mdt/launcher/A.java":
+                "package io.mdt.launcher;\nclass A {\n"
+                "  int n() { return R.string.class.getFields().length; }\n"
+                "  String s() { return R.string.app_name; }\n}\n",
+            "app/AndroidManifest.xml": _MIN_MANIFEST,
+        }, scratch),
+        None, {"RES-07"}))
     cases.append((
         "SRC-02 中文字面量超出台账（新加了中文）",
         _mk_tree({

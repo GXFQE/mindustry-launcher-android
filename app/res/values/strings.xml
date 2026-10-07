@@ -1691,4 +1691,13 @@
     <string name="stats_tech_none">none</string>
     <string name="stats_tech_count_fmt">%1$s %2$d tiles</string>
     <string name="stats_tech_item_fmt">%1$s (%2$s)</string>
+    <!-- ══ 用户语言包（lang.properties）的校验提示 ══ -->
+    <string name="lang_err_bare_percent">A percent sign near \u0022%1$s\u0022 is not paired (a literal percent must be doubled)</string>
+    <string name="lang_err_ph_count">Placeholder count differs: original has %1$d, yours has %2$d (original: %3$s, yours: %4$s)</string>
+    <string name="lang_err_ph_index">Placeholder #%1$d differs: original %2$s, yours %3$s</string>
+    <string name="lang_dialog_title">Translation file</string>
+    <string name="lang_dialog_msg_fmt">%1$s\n\nUsed %2$d · missing %3$d · unknown %4$d · rejected %5$d</string>
+    <string name="lang_stat_used_fmt">Using %1$d translated strings</string>
+    <string name="lang_rejected_fmt">%1$d entries were rejected (placeholder mismatch) — see Settings → Language</string>
+    <string name="lang_unknown_fmt">%1$d keys are unknown (file version may not match the app)</string>
 </resources>

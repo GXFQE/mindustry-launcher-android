@@ -160,7 +160,7 @@ public class SlotsActivity extends BaseActivity {
         // ★ 为什么不用 ListView —— 见 MainActivity.rebuildList() 的注释（F3b 根因）。
         mListContainer = (ViewGroup) root.findViewById(R.id.slot_container);
         mEmpty = (TextView) root.findViewById(R.id.slot_empty);
-        mEmpty.setText(R.string.saves_empty);
+        mEmpty.setText(Trans.get(SlotsActivity.this, R.string.saves_empty));
 
         Util.applySystemInsets(root);
         setContentView(root);

@@ -60,7 +60,7 @@ public class SlotActivity extends BaseActivity {
                     }
                 });
         mModsSub = (TextView) modsRow.findViewById(R.id.act_sub);
-        mModsSub.setText(R.string.slot_page_mods_sub);
+        mModsSub.setText(Trans.get(SlotActivity.this, R.string.slot_page_mods_sub));
         mSavesSub = (TextView) root.findViewById(R.id.row_slot_saves).findViewById(R.id.act_sub);
         // ★ 2026-10-06（第 115 轮第六批）：本行改成**开子页面**（与模组 / 地图 / 蓝图同一条）。
         //   原来是**弹窗菜单**（看每份存档… / 导出存档… / 导入存档…），用户：
@@ -83,7 +83,7 @@ public class SlotActivity extends BaseActivity {
                     }
                 });
         mMapsSub = (TextView) mapsRow.findViewById(R.id.act_sub);
-        mMapsSub.setText(R.string.slot_page_maps_sub);
+        mMapsSub.setText(Trans.get(SlotActivity.this, R.string.slot_page_maps_sub));
         // ★ F22（第 109 轮）：蓝图 —— 与地图同一条路子（开子页面，不弹窗）。
         //   副标题后台填"本槽 N · 模组自带 M"，与地图行同一口径。
         View bpRow = Util.bindActionValue(root, R.id.row_slot_blueprints, R.drawable.ic_schematic,
@@ -94,7 +94,7 @@ public class SlotActivity extends BaseActivity {
                     }
                 });
         mBpSub = (TextView) bpRow.findViewById(R.id.act_sub);
-        mBpSub.setText(R.string.slot_page_blueprints_sub);
+        mBpSub.setText(Trans.get(SlotActivity.this, R.string.slot_page_blueprints_sub));
         // ★★ 「备份与恢复」**就地弹窗**（不再跳存档页）—— 实现搬到 SlotOps，两个页面共用一份。
         //   原来靠"派发 + REORDER_TO_FRONT"复用存档页的实现 ⇒ 点了会先**跳到存档页**再弹窗、
         //   关掉后还停在那一页（用户 2026-10-03 报的 UI 问题之一）。

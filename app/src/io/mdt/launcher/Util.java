@@ -149,8 +149,11 @@ public final class Util {
                                   int titleRes, int subRes, final Runnable onClick) {
         android.view.View row = root.findViewById(rowId);
         ((android.widget.ImageView) row.findViewById(R.id.act_icon)).setImageResource(iconRes);
-        ((android.widget.TextView) row.findViewById(R.id.act_title)).setText(titleRes);
-        ((android.widget.TextView) row.findViewById(R.id.act_sub)).setText(subRes);
+        // ★ 走 Trans 而不是 setText(resId)：`TextView.setText(int)` 是**框架按 resId 自己取系统资源**，
+        //   会绕过用户语言包。context 从 root 拿，所以调用点不用改（2026-10-07）。
+        android.content.Context c = root.getContext();
+        ((android.widget.TextView) row.findViewById(R.id.act_title)).setText(Trans.get(c, titleRes));
+        ((android.widget.TextView) row.findViewById(R.id.act_sub)).setText(Trans.get(c, subRes));
         row.setOnClickListener(new android.view.View.OnClickListener() {
             @Override public void onClick(android.view.View v) { onClick.run(); }
         });
@@ -166,7 +169,9 @@ public final class Util {
                                                     final Runnable onClick) {
         android.view.View row = root.findViewById(rowId);
         ((android.widget.ImageView) row.findViewById(R.id.act_icon)).setImageResource(iconRes);
-        ((android.widget.TextView) row.findViewById(R.id.act_title)).setText(titleRes);
+        // ★ 同上：走 Trans，context 从 root 取（调用点不用改）。
+        ((android.widget.TextView) row.findViewById(R.id.act_title))
+                .setText(Trans.get(root.getContext(), titleRes));
         row.setOnClickListener(new android.view.View.OnClickListener() {
             @Override public void onClick(android.view.View v) { onClick.run(); }
         });

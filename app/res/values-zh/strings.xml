@@ -1634,4 +1634,13 @@
     <string name="stats_tech_none">没有</string>
     <string name="stats_tech_count_fmt">%1$s %2$d 格</string>
     <string name="stats_tech_item_fmt">%1$s（%2$s）</string>
+    <!-- ══ 用户语言包（lang.properties）的校验提示 ══ -->
+    <string name="lang_err_bare_percent">「%1$s」这里的百分号没配对（要显示百分号本身得写两个）</string>
+    <string name="lang_err_ph_count">占位符个数不一样：原文 %1$d 个，你的 %2$d 个（原：%3$s，你的：%4$s）</string>
+    <string name="lang_err_ph_index">第 %1$d 个占位符不一样：原文 %2$s，你的 %3$s</string>
+    <string name="lang_dialog_title">翻译文件</string>
+    <string name="lang_dialog_msg_fmt">%1$s\n\n用了 %2$d 条 · 缺 %3$d 条 · 认不出 %4$d 条 · 拒绝 %5$d 条</string>
+    <string name="lang_stat_used_fmt">正在用 %1$d 条译文</string>
+    <string name="lang_rejected_fmt">%1$d 条被拒绝（占位符对不上）—— 见设置 → 语言</string>
+    <string name="lang_unknown_fmt">%1$d 个 key 认不出来（文件版本可能和应用对不上）</string>
 </resources>

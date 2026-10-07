@@ -70,7 +70,7 @@ public class BlueprintsActivity extends BaseActivity {
         setTitle(R.string.bp_title);
 
         mHead = (TextView) root.findViewById(R.id.bp_head);
-        mHead.setText(R.string.bp_reading);
+        mHead.setText(Trans.get(BlueprintsActivity.this, R.string.bp_reading));
         mEmpty = (TextView) root.findViewById(R.id.bp_empty);
 
         mList = (ListView) root.findViewById(R.id.bp_list);
@@ -128,7 +128,7 @@ public class BlueprintsActivity extends BaseActivity {
     /** 重扫并刷新（**只重扫列表，不重建页面** —— 与地图页同一个理由：重建会闪） */
     private void scan() {
         if (Util.dead(this) || mList == null) return;
-        mHead.setText(R.string.bp_reading);
+        mHead.setText(Trans.get(BlueprintsActivity.this, R.string.bp_reading));
         new Thread(new Runnable() {
             @Override public void run() {
                 final List<Blueprints.Item> items;
@@ -145,7 +145,7 @@ public class BlueprintsActivity extends BaseActivity {
                     runOnUiThread(new Runnable() {
                         @Override public void run() {
                             if (Util.dead(BlueprintsActivity.this)) return;
-                            mHead.setText(R.string.bp_stats_failed);
+                            mHead.setText(Trans.get(BlueprintsActivity.this, R.string.bp_stats_failed));
                         }
                     });
                     return;
@@ -177,7 +177,7 @@ public class BlueprintsActivity extends BaseActivity {
                         mList.setAdapter(mAdapter);
                         if (mEmpty != null) {
                             mEmpty.setVisibility(items.isEmpty() ? View.VISIBLE : View.GONE);
-                            if (items.isEmpty()) mEmpty.setText(R.string.bp_empty);
+                            if (items.isEmpty()) mEmpty.setText(Trans.get(BlueprintsActivity.this, R.string.bp_empty));
                         }
                         mScanned = true;
                     }
