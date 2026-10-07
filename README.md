@@ -12,6 +12,9 @@ versions installed side by side, each with separate **saves / maps / mods**.
 > Pre-release); you can also build it yourself — see [Building](docs/DEVELOPING.md#构建)
 > *(in Chinese for now)*. Pre-release means the interface, the data format and
 > the features can all still change — **do not treat it as a stable release.**
+>
+> The feature list further down describes the **current source code**; the newest pre-release APK can
+> lag a little behind it.
 
 ## What it solves
 
@@ -63,6 +66,8 @@ point the game at that directory when it starts.
 ### Saves and data
 - **Save slots**: create / rename / clone / delete (a deleted slot goes to the **transfer station**
   along with its backups, and can be put back); each slot has its own saves, maps and mods
+- **Thumbnails in the list**: every save shows a small picture of its map, drawn the same way (that one
+  also needs a version assigned to the slot)
 - **See each save**: tap one to see which map it is, its size, wave, playtime and when it was saved
   (read-only, with an "export this save" button right there)
 - **Backup list**: every backup listed on its own (time / how many files / size / what the main save
@@ -91,6 +96,9 @@ point the game at that directory when it starts.
   (moved aside, not hard-deleted)
 
 ### Blueprints
+- **Thumbnails and a whole-blueprint preview**: the list draws the real sprites, and the detail page
+  draws the blueprint pixel by pixel with the same artwork the game uses. Both need a version assigned
+  to this slot, because the artwork is read out of that version APK
 - Blueprint list (this slot + **shipped inside mods**) with a separate detail page: which blocks are
   used and how many tiles each takes
 - **Missing-block warning**: when the game meets a block it does not know, it silently drops that
