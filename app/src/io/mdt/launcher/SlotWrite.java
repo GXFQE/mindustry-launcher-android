@@ -81,7 +81,7 @@ public final class SlotWrite {
         if (root == null || !root.isDirectory()) return gone;
         for (File f : Data.contentRootsOf(root)) {
             if (!Data.deleteTree(f)) {
-                throw new IOException(ctx.getString(R.string.slotwrite_err_wipe_failed_fmt,
+                throw new IOException(Trans.get(ctx, R.string.slotwrite_err_wipe_failed_fmt,
                         f.getAbsolutePath()));
             }
             gone.add(f.getName());

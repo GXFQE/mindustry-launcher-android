@@ -184,16 +184,16 @@ public final class Compat {
     /** 拒绝时给用户看的原因（不拦则返回 null）。文案在 strings.xml。 */
     public static String rejectReason(Context ctx, Probe p) {
         if (!p.hasEntry) {
-            return ctx.getString(R.string.compat_reject_entry);
+            return Trans.get(ctx, R.string.compat_reject_entry);
         }
         if (p.abi == null) {
-            return ctx.getString(R.string.compat_reject_abi,
+            return Trans.get(ctx, R.string.compat_reject_abi,
                     join(Build.SUPPORTED_ABIS), join(p.apkAbis));
         }
         if (p.coreLib == null) {
-            return ctx.getString(R.string.compat_reject_gdx);
+            return Trans.get(ctx, R.string.compat_reject_gdx);
         }
-        return ctx.getString(R.string.compat_reject_align,
+        return Trans.get(ctx, R.string.compat_reject_align,
                 p.maxAlign / 1024, p.pageSize / 1024);
     }
 

@@ -714,33 +714,33 @@ public final class Mods {
         public String report(Context ctx) {
             StringBuilder sb = new StringBuilder();
             if (!ok && error != null) {
-                sb.append(ctx.getString(R.string.pack_report_failed_fmt,
+                sb.append(Trans.get(ctx, R.string.pack_report_failed_fmt,
                         ModsText.packReason(ctx, this))).append('\n');
                 return sb.toString();
             }
             if (finalName != null) {
-                sb.append(ctx.getString(overwrote ? R.string.pack_report_replaced_fmt
+                sb.append(Trans.get(ctx, overwrote ? R.string.pack_report_replaced_fmt
                         : R.string.pack_report_imported_fmt, finalName)).append('\n');
-                sb.append(ctx.getString(R.string.pack_report_where_fmt,
+                sb.append(Trans.get(ctx, R.string.pack_report_where_fmt,
                         dest == null ? "?" : dest.getAbsolutePath())).append('\n');
-                sb.append(ctx.getString(R.string.pack_report_size_fmt,
+                sb.append(Trans.get(ctx, R.string.pack_report_size_fmt,
                         Util.formatSize(bytes))).append('\n');
                 if (meta != null) {
-                    sb.append(ctx.getString(R.string.pack_report_mod_fmt, meta.title(),
+                    sb.append(Trans.get(ctx, R.string.pack_report_mod_fmt, meta.title(),
                             meta.version == null ? "0" : meta.version)).append('\n');
-                    sb.append(ctx.getString(R.string.pack_report_names_fmt, meta.internalName,
+                    sb.append(Trans.get(ctx, R.string.pack_report_names_fmt, meta.internalName,
                             meta.minGameVersion)).append('\n');
                 }
                 return sb.toString();
             }
-            sb.append(ctx.getString(R.string.pack_report_copied_fmt, copied.size(),
+            sb.append(Trans.get(ctx, R.string.pack_report_copied_fmt, copied.size(),
                     Util.formatSize(copiedBytes))).append('\n');
             if (!skipped.isEmpty()) {
-                sb.append(ctx.getString(R.string.pack_report_skipped_fmt, skipped.size(),
+                sb.append(Trans.get(ctx, R.string.pack_report_skipped_fmt, skipped.size(),
                         join(skipped))).append('\n');
             }
             if (!failedList.isEmpty()) {
-                sb.append(ctx.getString(R.string.pack_report_failed_list_fmt, failedList.size(),
+                sb.append(Trans.get(ctx, R.string.pack_report_failed_list_fmt, failedList.size(),
                         join(failedList))).append('\n');
             }
             return sb.toString();
@@ -930,12 +930,12 @@ public final class Mods {
             try {
                 Data.deleteTree(part);
                 if (f.isDirectory()) {
-                    if (!part.mkdirs()) throw new java.io.IOException(ctx.getString(R.string.mods_err_tmp_mkdir));
+                    if (!part.mkdirs()) throw new java.io.IOException(Trans.get(ctx, R.string.mods_err_tmp_mkdir));
                     copyTree(ctx, f, part);
                 } else {
                     Util.copyFile(f, part);
                     if (part.length() != f.length()) {
-                        throw new java.io.IOException(ctx.getString(R.string.mods_err_copy_bytes_fmt,
+                        throw new java.io.IOException(Trans.get(ctx, R.string.mods_err_copy_bytes_fmt,
                                 f.getName() + ": " + part.length() + " ≠ " + f.length()));
                     }
                 }
@@ -963,12 +963,12 @@ public final class Mods {
         for (File f : kids) {
             File to = new File(dst, f.getName());
             if (f.isDirectory()) {
-                if (!to.exists() && !to.mkdirs()) throw new java.io.IOException(ctx.getString(R.string.pack_err_mkdir_fmt, to.getAbsolutePath()));
+                if (!to.exists() && !to.mkdirs()) throw new java.io.IOException(Trans.get(ctx, R.string.pack_err_mkdir_fmt, to.getAbsolutePath()));
                 copyTree(ctx, f, to);
             } else {
                 Util.copyFile(f, to);
                 if (to.length() != f.length()) {
-                    throw new java.io.IOException(ctx.getString(R.string.mods_err_copy_bytes_fmt,
+                    throw new java.io.IOException(Trans.get(ctx, R.string.mods_err_copy_bytes_fmt,
                             f.getName()));
                 }
             }
@@ -1103,33 +1103,33 @@ public final class Mods {
          */
         public String report(Context ctx) {
             StringBuilder sb = new StringBuilder();
-            sb.append(ctx.getString(R.string.conflict_scanned_fmt, javaMods,
+            sb.append(Trans.get(ctx, R.string.conflict_scanned_fmt, javaMods,
                     Util.formatSize(scannedBytes))).append('\n');
             if (!contained.isEmpty()) {
-                sb.append(ctx.getString(R.string.conflict_head_contained)).append('\n');
+                sb.append(Trans.get(ctx, R.string.conflict_head_contained)).append('\n');
                 for (String s : contained) sb.append("· ").append(s).append('\n');
                 sb.append('\n');
             }
             if (!sharedHooks.isEmpty()) {
-                sb.append(ctx.getString(R.string.conflict_head_shared)).append('\n');
+                sb.append(Trans.get(ctx, R.string.conflict_head_shared)).append('\n');
                 for (String s : sharedHooks) sb.append("· ").append(s).append('\n');
                 sb.append('\n');
             }
             if (!mentioned.isEmpty()) {
-                sb.append(ctx.getString(R.string.conflict_head_mentioned)).append('\n');
+                sb.append(Trans.get(ctx, R.string.conflict_head_mentioned)).append('\n');
                 for (String s : mentioned) sb.append("· ").append(s).append('\n');
                 sb.append('\n');
             }
             if (!logLines.isEmpty()) {
-                sb.append(ctx.getString(R.string.conflict_head_log)).append('\n');
+                sb.append(Trans.get(ctx, R.string.conflict_head_log)).append('\n');
                 for (String s : logLines) sb.append("  ").append(s).append('\n');
                 sb.append('\n');
             }
             if (!any() && logLines.isEmpty()) {
-                sb.append(ctx.getString(R.string.conflict_none)).append('\n')
-                  .append(ctx.getString(R.string.conflict_none_hint)).append('\n');
+                sb.append(Trans.get(ctx, R.string.conflict_none)).append('\n')
+                  .append(Trans.get(ctx, R.string.conflict_none_hint)).append('\n');
             }
-            for (String n : notes) sb.append(ctx.getString(R.string.conflict_note_fmt, n)).append('\n');
+            for (String n : notes) sb.append(Trans.get(ctx, R.string.conflict_note_fmt, n)).append('\n');
             return sb.toString();
         }
     }
@@ -1181,7 +1181,7 @@ public final class Mods {
             try {
                 found = scanDex(m, pats);
             } catch (Throwable t) {
-                c.notes.add(ctx.getString(R.string.conflict_note_dex_fmt, m.fileName));
+                c.notes.add(Trans.get(ctx, R.string.conflict_note_dex_fmt, m.fileName));
                 continue;
             }
             c.scannedDex++;
@@ -1201,7 +1201,7 @@ public final class Mods {
         for (int i = 0; i < javaMods.size(); i++) {
             for (Integer jObj : hits.get(i)) {
                 int j = jObj.intValue();
-                c.contained.add(ctx.getString(R.string.conflict_contained_fmt,
+                c.contained.add(Trans.get(ctx, R.string.conflict_contained_fmt,
                         javaMods.get(i).title(), javaMods.get(j).title()));
             }
         }
@@ -1212,7 +1212,7 @@ public final class Mods {
                 if (hookHits.get(i).contains(Integer.valueOf(h))) who.add(javaMods.get(i).title());
             }
             if (who.size() >= 2) {
-                c.sharedHooks.add(ctx.getString(R.string.conflict_shared_fmt,
+                c.sharedHooks.add(Trans.get(ctx, R.string.conflict_shared_fmt,
                         hookList(ctx, who), GLOBAL_HOOKS[h][0]));
             }
         }
@@ -1224,7 +1224,7 @@ public final class Mods {
                 if (containsIgnoreCase(a.description, b.name)
                         || (b.displayName != null && b.displayName.length() >= 3
                             && containsIgnoreCase(a.description, b.displayName))) {
-                    c.mentioned.add(ctx.getString(R.string.conflict_mentioned_fmt,
+                    c.mentioned.add(Trans.get(ctx, R.string.conflict_mentioned_fmt,
                             a.title(), b.title()));
                 }            }
         }
@@ -1249,7 +1249,7 @@ public final class Mods {
                     if (c.logLines.size() >= 40) break;
                 }
             } catch (Throwable t) {
-                c.notes.add(ctx.getString(R.string.conflict_note_log));
+                c.notes.add(Trans.get(ctx, R.string.conflict_note_log));
             }
         }
         // ⚠️ 这里**不再**为每个被内置者加一条"注：" —— 实测 Neon 一个包里有 3 个受害者，
@@ -1266,8 +1266,8 @@ public final class Mods {
     private static String hookList(Context ctx, List<String> who) {
         StringBuilder sb = new StringBuilder();
         for (String s : who) {
-            if (sb.length() > 0) sb.append(ctx.getString(R.string.conflict_join_and));
-            sb.append(ctx.getString(R.string.conflict_name_fmt, s));
+            if (sb.length() > 0) sb.append(Trans.get(ctx, R.string.conflict_join_and));
+            sb.append(Trans.get(ctx, R.string.conflict_name_fmt, s));
         }
         return sb.toString();
     }
@@ -1362,9 +1362,9 @@ public final class Mods {
             if (m == null || !m.enabled) continue;
             if (m.internalName != null && m.internalName.equalsIgnoreCase(internalName)) continue;
             if (hasDep(m.dependencies, want)) {
-                out.add(ctx.getString(R.string.mods_dep_required_fmt, m.title()));
+                out.add(Trans.get(ctx, R.string.mods_dep_required_fmt, m.title()));
             } else if (hasDep(m.softDependencies, want)) {
-                out.add(ctx.getString(R.string.mods_dep_soft_fmt, m.title()));
+                out.add(Trans.get(ctx, R.string.mods_dep_soft_fmt, m.title()));
             }
         }
         return out;
@@ -1500,14 +1500,14 @@ public final class Mods {
                 // ★ 2026-10-04：这三句会原样出现在模组页的展开卡里（`mods_detail_fmt`），
                 //   原来写着 `settings.bin` / `zlib 压缩` / `键不存在 = 默认启用`
                 //   —— 违反文案纪律 ③（`settings.bin` 是被点名的禁词）。
-                s.settingsNote = ctx.getString(R.string.mods_scan_settings_fmt, s.settings.size());
+                s.settingsNote = Trans.get(ctx, R.string.mods_scan_settings_fmt, s.settings.size());
             } else {
                 // ★ 不带 why[0]：那是 readSafe 塞的**裸消息**（异常原文或我们 read() 里的中文）
                 //   —— 按「依据不进第一层」的规矩去掉。
-                s.settingsNote = ctx.getString(R.string.mods_scan_settings_unreadable);
+                s.settingsNote = Trans.get(ctx, R.string.mods_scan_settings_unreadable);
             }
         } else {
-            s.settingsNote = ctx.getString(R.string.mods_scan_settings_none);
+            s.settingsNote = Trans.get(ctx, R.string.mods_scan_settings_none);
         }
 
         // ② 上次是否崩在启动里（Vars.checkLaunch）
@@ -1518,7 +1518,7 @@ public final class Mods {
 
         if (dir == null || !dir.isDirectory()) {
             // ⚠️ 只读：**不 mkdirs**（F6 的教训：只看一眼造出的空目录会被下一轮当成"有内容"）
-            s.ignored.add(ctx.getString(R.string.mods_scan_no_mods_dir));
+            s.ignored.add(Trans.get(ctx, R.string.mods_scan_no_mods_dir));
             return s;
         }
 
@@ -1554,7 +1554,7 @@ public final class Mods {
                 //   `两个包解出同一个 internalName「x」：a.zip 与 b.zip ⇒ 游戏里 `mapping.put()`
                 //   后写者覆盖前者（Mods.java:538），只有一个会生效` —— 一句里同时含 camelCase
                 //   术语、反引号 markdown、源码文件名+行号（违反文案纪律 ①③⑤）。
-                s.problems.add(ctx.getString(R.string.mods_scan_dup_fmt, prev.fileName, m.fileName));
+                s.problems.add(Trans.get(ctx, R.string.mods_scan_dup_fmt, prev.fileName, m.fileName));
             } else {
                 byInternal.put(key, m);
             }
@@ -1951,17 +1951,17 @@ public final class Mods {
         //   多半是在**复述标题**（`不在游戏的黑名单里` / `不在`）⇒ 六关白占十二行。
         //   label 也不再把数据塞进去（原来是「游戏版本够（它要 160.1，当前 0）」，
         //   没指定版本时那个「当前 0」很怪）—— 数据一律进 note，且只在**失败**时给。
-        out.add(new Gate(ctx.getString(R.string.mods_gate_android_load), canLoad,
-                canLoad ? null : ctx.getString(R.string.mods_gate_android_load_note)));
+        out.add(new Gate(Trans.get(ctx, R.string.mods_gate_android_load), canLoad,
+                canLoad ? null : Trans.get(ctx, R.string.mods_gate_android_load_note)));
 
-        out.add(new Gate(ctx.getString(R.string.mods_gate_enabled), m.enabled,
-                m.settingsKnown ? null : ctx.getString(R.string.mods_gate_enabled_note)));
+        out.add(new Gate(Trans.get(ctx, R.string.mods_gate_enabled), m.enabled,
+                m.settingsKnown ? null : Trans.get(ctx, R.string.mods_gate_enabled_note)));
 
         boolean verOk = isAtLeast(gameBuild, gameRevision, m.minGameVersion);
-        final String curVer = gameBuild == 0 ? ctx.getString(R.string.mods_gate_no_version)
+        final String curVer = gameBuild == 0 ? Trans.get(ctx, R.string.mods_gate_no_version)
                 : (gameBuild + (gameRevision == 0 ? "" : "." + gameRevision));
-        out.add(new Gate(ctx.getString(R.string.mods_gate_version), verOk,
-                verOk ? null : ctx.getString(R.string.mods_gate_version_note_fmt,
+        out.add(new Gate(Trans.get(ctx, R.string.mods_gate_version), verOk,
+                verOk ? null : Trans.get(ctx, R.string.mods_gate_version_note_fmt,
                         m.minGameVersion, curVer)));
 
         // ★ 两个门槛是**两个数**（`Vars.java:53/55`）：Java 模组 154、**脚本 / 数据模组 136**。
@@ -1975,19 +1975,19 @@ public final class Mods {
         int minMajor = m.minMajor();
         int need = m.isJava() ? MIN_JAVA_MOD_GAME_VERSION : MIN_MOD_GAME_VERSION;
         boolean majorOk = minMajor >= need || m.legacyCompatible;
-        out.add(new Gate(ctx.getString(R.string.mods_gate_minver), majorOk,
+        out.add(new Gate(Trans.get(ctx, R.string.mods_gate_minver), majorOk,
                 majorOk ? null
                         : (minMajor <= 0
-                            ? ctx.getString(R.string.mods_gate_minver_none)
-                            : ctx.getString(R.string.mods_gate_minver_old_fmt, minMajor, need))));
+                            ? Trans.get(ctx, R.string.mods_gate_minver_none)
+                            : Trans.get(ctx, R.string.mods_gate_minver_old_fmt, minMajor, need))));
 
         boolean blOk = !isBlacklisted(m.name, m.version);
-        out.add(new Gate(ctx.getString(R.string.mods_gate_blacklist), blOk,
-                blOk ? null : ctx.getString(R.string.mods_gate_blacklist_note_fmt,
+        out.add(new Gate(Trans.get(ctx, R.string.mods_gate_blacklist), blOk,
+                blOk ? null : Trans.get(ctx, R.string.mods_gate_blacklist_note_fmt,
                         m.name + ":" + m.version)));
 
-        out.add(new Gate(ctx.getString(R.string.mods_gate_last_crash), true,
-                ctx.getString(R.string.mods_gate_last_crash_note)));
+        out.add(new Gate(Trans.get(ctx, R.string.mods_gate_last_crash), true,
+                Trans.get(ctx, R.string.mods_gate_last_crash_note)));
         return out;
     }
 

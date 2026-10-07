@@ -59,17 +59,17 @@ public final class BlueprintFiles {
      */
     public static String checkName(Context ctx, String displayName) {
         if (displayName == null || displayName.trim().isEmpty()) {
-            return ctx.getString(R.string.bpfile_err_name_empty);
+            return Trans.get(ctx, R.string.bpfile_err_name_empty);
         }
         String n = displayName.trim();
-        if (n.startsWith(".")) return ctx.getString(R.string.bpfile_err_name_dot);
+        if (n.startsWith(".")) return Trans.get(ctx, R.string.bpfile_err_name_dot);
         if (!n.toLowerCase(java.util.Locale.ROOT).endsWith(".msch")) {
-            return ctx.getString(R.string.bpfile_err_name_ext);
+            return Trans.get(ctx, R.string.bpfile_err_name_ext);
         }
         if (n.contains("/") || n.contains("\\") || n.contains(":")) {
-            return ctx.getString(R.string.bpfile_err_name_path);
+            return Trans.get(ctx, R.string.bpfile_err_name_path);
         }
-        if (n.length() > 120) return ctx.getString(R.string.bpfile_err_name_long);
+        if (n.length() > 120) return Trans.get(ctx, R.string.bpfile_err_name_long);
         return null;
     }
 
@@ -102,7 +102,7 @@ public final class BlueprintFiles {
                                      boolean overwrite, File trashDir) {
         Result r = new Result();
         if (dir == null) {
-            r.error = ctx.getString(R.string.bpfile_err_no_dir);
+            r.error = Trans.get(ctx, R.string.bpfile_err_no_dir);
             return r;
         }
         String nameErr = checkName(ctx, displayName);
@@ -112,14 +112,14 @@ public final class BlueprintFiles {
         }
         final String name = safeName(displayName);
         if (!dir.exists() && !dir.mkdirs()) {
-            r.error = ctx.getString(R.string.bpfile_err_mkdir_fmt, dir.getAbsolutePath());
+            r.error = Trans.get(ctx, R.string.bpfile_err_mkdir_fmt, dir.getAbsolutePath());
             return r;
         }
         File dest = new File(dir, name);
         if (dest.exists() && !(overwrite && trashDir != null)) {
             // ★ 判据字段（界面据此决定要不要弹"同名替换"框）；error 只是给人看的话
             r.nameTaken = true;
-            r.error = ctx.getString(R.string.bpfile_err_name_taken_fmt, name);
+            r.error = Trans.get(ctx, R.string.bpfile_err_name_taken_fmt, name);
             return r;
         }
         File part = new File(dir, name + ".part");
@@ -134,8 +134,8 @@ public final class BlueprintFiles {
                 Data.deleteTree(part);
                 r.broken = m;
                 r.error = (m.error == null || m.error.isEmpty())
-                        ? ctx.getString(R.string.bpfile_err_not_schem)
-                        : ctx.getString(R.string.bpfile_err_not_schem_fmt, m.error);
+                        ? Trans.get(ctx, R.string.bpfile_err_not_schem)
+                        : Trans.get(ctx, R.string.bpfile_err_not_schem_fmt, m.error);
                 return r;
             }
             r.msch = m;
@@ -172,22 +172,22 @@ public final class BlueprintFiles {
         File backup = null;
         if (dest.exists()) {
             if (trashDir == null) {
-                throw new IllegalStateException(ctx.getString(R.string.bpfile_err_no_trash));
+                throw new IllegalStateException(Trans.get(ctx, R.string.bpfile_err_no_trash));
             }
             if (!trashDir.isDirectory() && !trashDir.mkdirs() && !trashDir.isDirectory()) {
                 throw new IllegalStateException(
-                        ctx.getString(R.string.bpfile_err_trash_mkdir_fmt, trashDir.getAbsolutePath()));
+                        Trans.get(ctx, R.string.bpfile_err_trash_mkdir_fmt, trashDir.getAbsolutePath()));
             }
             backup = new File(trashDir,
                     Trash.nameFor(Trash.slotLabel(dest.getParentFile()), dest.getName()));
             if (!Trash.move(dest, backup)) {
-                throw new IllegalStateException(ctx.getString(R.string.bpfile_err_trash_move));
+                throw new IllegalStateException(Trans.get(ctx, R.string.bpfile_err_trash_move));
             }
         }
         if (!Trash.move(part, dest)) {
             if (backup != null) Trash.move(backup, dest);   // 回滚
             throw new IllegalStateException(
-                    ctx.getString(R.string.bpfile_err_rename_fmt, dest.getAbsolutePath()));
+                    Trans.get(ctx, R.string.bpfile_err_rename_fmt, dest.getAbsolutePath()));
         }
         if (backup != null) Trash.prune(trashDir, Trash.KEEP);
     }

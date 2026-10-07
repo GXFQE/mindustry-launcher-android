@@ -45,16 +45,16 @@ public final class MsavText {
         if (m == null || m.playtime <= 0) return "";
         long sec = m.playtime / 1000L;
         long h = sec / 3600L, min = (sec % 3600L) / 60L;
-        if (h > 0) return c.getString(R.string.msav_playtime_hm_fmt, h, min);
-        if (min > 0) return c.getString(R.string.msav_playtime_min_fmt, min);
-        return c.getString(R.string.msav_playtime_sec);
+        if (h > 0) return Trans.get(c, R.string.msav_playtime_hm_fmt, h, min);
+        if (min > 0) return Trans.get(c, R.string.msav_playtime_min_fmt, min);
+        return Trans.get(c, R.string.msav_playtime_sec);
     }
 
     // ── 列表行 ────────────────────────────────────────────────────────────
 
     /** 总括一行（"写了一半"用整句包一层，不拼前导空格 —— 见类注释） */
     private static String withHalfWarning(Context c, String line, boolean truncated) {
-        return truncated ? c.getString(R.string.msav_half_fmt, line) : line;
+        return truncated ? Trans.get(c, R.string.msav_half_fmt, line) : line;
     }
 
     private static String join(Context c, List<String> parts) {
@@ -73,11 +73,11 @@ public final class MsavText {
         String n = m.displayName();
         if (!n.isEmpty()) parts.add(n);
         String sz = m.sizeText();
-        parts.add(sz.isEmpty() ? c.getString(R.string.msav_size_unknown) : sz);
-        if (m.wave > 1) parts.add(c.getString(R.string.msav_wave_fmt, m.wave));
+        parts.add(sz.isEmpty() ? Trans.get(c, R.string.msav_size_unknown) : sz);
+        if (m.wave > 1) parts.add(Trans.get(c, R.string.msav_wave_fmt, m.wave));
         String pt = playtimeText(c, m);
-        if (!pt.isEmpty()) parts.add(c.getString(R.string.msav_played_fmt, pt));
-        parts.add(c.getString(R.string.msav_format_fmt, m.version));
+        if (!pt.isEmpty()) parts.add(Trans.get(c, R.string.msav_played_fmt, pt));
+        parts.add(Trans.get(c, R.string.msav_format_fmt, m.version));
         return withHalfWarning(c, join(c, parts), m.truncated);
     }
 
@@ -102,21 +102,21 @@ public final class MsavText {
         if (!n.isEmpty()) parts.add(n);
         if (isSave) {
             String pt = playtimeText(c, m);
-            if (!pt.isEmpty()) parts.add(c.getString(R.string.msav_played_fmt, pt));
+            if (!pt.isEmpty()) parts.add(Trans.get(c, R.string.msav_played_fmt, pt));
             String t = m.savedText();
-            if (!t.isEmpty()) parts.add(c.getString(R.string.msav_saved_at_fmt, t));
+            if (!t.isEmpty()) parts.add(Trans.get(c, R.string.msav_saved_at_fmt, t));
         } else {
             String sz = m.sizeText();
             if (!sz.isEmpty()) parts.add(sz);
             // ⚠️ 作者字段**同样可能带色码**（真机实测：`[#2E8E05]iq[lime]tik[green]123`）
             //   ⇒ 与真名同一套判据，别只处理名字那一处
             String au = Mods.stripColors(m.author == null ? "" : m.author).trim();
-            if (!au.isEmpty()) parts.add(c.getString(R.string.msav_author_fmt, au));
+            if (!au.isEmpty()) parts.add(Trans.get(c, R.string.msav_author_fmt, au));
         }
         if (parts.isEmpty()) {
             String sz = m.sizeText();
             if (!sz.isEmpty()) parts.add(sz);
-            parts.add(c.getString(R.string.msav_format_fmt, m.version));
+            parts.add(Trans.get(c, R.string.msav_format_fmt, m.version));
         }
         return withHalfWarning(c, join(c, parts), m.truncated);
     }
@@ -133,31 +133,31 @@ public final class MsavText {
      *    色码去掉、时间写成人读的、只列"能用来判断这是哪张图"的字段。
      */
     public static String detail(Context c, MsavMeta m) {
-        if (m == null) return c.getString(R.string.msav_unreadable) + "\n";
+        if (m == null) return Trans.get(c, R.string.msav_unreadable) + "\n";
         StringBuilder sb = new StringBuilder();
         if (!m.ok) {
-            sb.append(c.getString(R.string.msav_unreadable));
+            sb.append(Trans.get(c, R.string.msav_unreadable));
             if (m.error != null && !m.error.isEmpty()) {
                 sb.append("：").append(userReason(c, m));
             }
             sb.append('\n');
-            if (m.truncated) sb.append(c.getString(R.string.msav_half_broken)).append('\n');
+            if (m.truncated) sb.append(Trans.get(c, R.string.msav_half_broken)).append('\n');
             return sb.toString();
         }
-        if (m.truncated) sb.append(c.getString(R.string.msav_half_banner)).append('\n');
+        if (m.truncated) sb.append(Trans.get(c, R.string.msav_half_banner)).append('\n');
         String sz = m.sizeText();
-        if (!sz.isEmpty()) sb.append(c.getString(R.string.msav_lbl_size_fmt, sz)).append('\n');
+        if (!sz.isEmpty()) sb.append(Trans.get(c, R.string.msav_lbl_size_fmt, sz)).append('\n');
         String au = Mods.stripColors(m.author == null ? "" : m.author).trim();
-        if (!au.isEmpty()) sb.append(c.getString(R.string.msav_lbl_author_fmt, au)).append('\n');
-        if (m.wave > 0) sb.append(c.getString(R.string.msav_lbl_wave_fmt, m.wave)).append('\n');
+        if (!au.isEmpty()) sb.append(Trans.get(c, R.string.msav_lbl_author_fmt, au)).append('\n');
+        if (m.wave > 0) sb.append(Trans.get(c, R.string.msav_lbl_wave_fmt, m.wave)).append('\n');
         String pt = playtimeText(c, m);
-        if (!pt.isEmpty()) sb.append(c.getString(R.string.msav_lbl_played_fmt, pt)).append('\n');
+        if (!pt.isEmpty()) sb.append(Trans.get(c, R.string.msav_lbl_played_fmt, pt)).append('\n');
         String t = m.savedText();
-        if (!t.isEmpty()) sb.append(c.getString(R.string.msav_lbl_saved_fmt, t)).append('\n');
-        sb.append(c.getString(R.string.msav_lbl_format_fmt, m.version)).append('\n');
+        if (!t.isEmpty()) sb.append(Trans.get(c, R.string.msav_lbl_saved_fmt, t)).append('\n');
+        sb.append(Trans.get(c, R.string.msav_lbl_format_fmt, m.version)).append('\n');
         String d = Mods.stripColors(m.description == null ? "" : m.description).trim();
         if (!d.isEmpty()) {
-            sb.append(c.getString(R.string.msav_lbl_desc_fmt,
+            sb.append(Trans.get(c, R.string.msav_lbl_desc_fmt,
                     d.length() > 160 ? d.substring(0, 160) + "…" : d)).append('\n');
         }
         return sb.toString();
@@ -184,33 +184,33 @@ public final class MsavText {
         if (m != null && m.errCode != MsavMeta.E_NONE) {
             switch (m.errCode) {
                 case MsavMeta.E_NULL_FILE:
-                    return c.getString(R.string.msav_reason_null_file);
+                    return Trans.get(c, R.string.msav_reason_null_file);
                 case MsavMeta.E_MAGIC:
-                    return c.getString(R.string.msav_reason_magic);
+                    return Trans.get(c, R.string.msav_reason_magic);
                 case MsavMeta.E_VERSION:
-                    return c.getString(R.string.msav_reason_version_fmt, m.errN1);
+                    return Trans.get(c, R.string.msav_reason_version_fmt, m.errN1);
                 case MsavMeta.E_META_LEN:
-                    return c.getString(R.string.msav_reason_meta_len_fmt, m.errN1);
+                    return Trans.get(c, R.string.msav_reason_meta_len_fmt, m.errN1);
                 case MsavMeta.E_TRUNC_HEAD:
-                    return c.getString(R.string.msav_reason_trunc_head);
+                    return Trans.get(c, R.string.msav_reason_trunc_head);
                 case MsavMeta.E_TRUNC_AFTER:
-                    return c.getString(R.string.msav_reason_trunc_after);
+                    return Trans.get(c, R.string.msav_reason_trunc_after);
                 case MsavMeta.E_META_SHORT:
-                    return c.getString(R.string.msav_reason_meta_short_fmt, m.errN1, m.errN2);
+                    return Trans.get(c, R.string.msav_reason_meta_short_fmt, m.errN1, m.errN2);
                 case MsavMeta.E_META_TAIL:
-                    return c.getString(R.string.msav_reason_meta_tail_fmt, m.errN1);
+                    return Trans.get(c, R.string.msav_reason_meta_tail_fmt, m.errN1);
                 default:
                     // 新加了码却忘了在这里加映射 ⇒ 不崩，但界面会静默退化
-                    return c.getString(R.string.msav_unknown_reason);
+                    return Trans.get(c, R.string.msav_unknown_reason);
             }
         }
         String e = m == null || m.error == null ? "" : m.error.trim();
-        if (e.isEmpty()) return c.getString(R.string.msav_unknown_reason);
+        if (e.isEmpty()) return Trans.get(c, R.string.msav_unknown_reason);
         if (e.matches("^[A-Za-z_$][A-Za-z0-9_$]*(Exception|Error)\\b.*")) {
             if (e.startsWith("ZipException") || e.startsWith("EOFException")) {
-                return c.getString(R.string.msav_reason_not_save);
+                return Trans.get(c, R.string.msav_reason_not_save);
             }
-            return c.getString(R.string.msav_reason_read_error);
+            return Trans.get(c, R.string.msav_reason_read_error);
         }
         return e;
     }
@@ -226,27 +226,27 @@ public final class MsavText {
      *   漏映射**不崩**，所以自检要**遍历 `ALL_CODES`** 过一遍（漏映射 = 界面静默退化成"原因不明"）。
      */
     public static String convertReason(Context c, SaveAsMap.Result r) {
-        if (r == null) return c.getString(R.string.msav_unknown_reason);
+        if (r == null) return Trans.get(c, R.string.msav_unknown_reason);
         switch (r.errCode) {
             case SaveAsMap.E_MAGIC:
-                return c.getString(R.string.mapsave_reason_magic);
+                return Trans.get(c, R.string.mapsave_reason_magic);
             case SaveAsMap.E_VERSION:
-                return c.getString(R.string.mapsave_reason_version_fmt, r.errS1);
+                return Trans.get(c, R.string.mapsave_reason_version_fmt, r.errS1);
             case SaveAsMap.E_META_LEN:
             case SaveAsMap.E_META_SHORT:
-                return c.getString(R.string.mapsave_reason_meta);
+                return Trans.get(c, R.string.mapsave_reason_meta);
             case SaveAsMap.E_RULES_SHAPE:
-                return c.getString(R.string.mapsave_reason_rules);
+                return Trans.get(c, R.string.mapsave_reason_rules);
             case SaveAsMap.E_CHUNK_LEN:
-                return c.getString(R.string.mapsave_reason_broken);
+                return Trans.get(c, R.string.mapsave_reason_broken);
             case SaveAsMap.E_TRUNCATED:
-                return c.getString(R.string.mapsave_reason_truncated);
+                return Trans.get(c, R.string.mapsave_reason_truncated);
             case SaveAsMap.E_UTF_TOO_LONG:
-                return c.getString(R.string.mapsave_reason_toolong_fmt, r.errS1);
+                return Trans.get(c, R.string.mapsave_reason_toolong_fmt, r.errS1);
             case SaveAsMap.E_IO:
-                return c.getString(R.string.msav_reason_read_error);
+                return Trans.get(c, R.string.msav_reason_read_error);
             default:
-                return c.getString(R.string.msav_unknown_reason);
+                return Trans.get(c, R.string.msav_unknown_reason);
         }
     }
 }

@@ -59,7 +59,7 @@ public final class Importer {
         if (tmp.exists()) { tmp.setWritable(true); tmp.delete(); }
 
         InputStream in = ctx.getContentResolver().openInputStream(uri);
-        if (in == null) throw new IOException(ctx.getString(R.string.imp_err_open_failed));
+        if (in == null) throw new IOException(Trans.get(ctx, R.string.imp_err_open_failed));
         long bytes = 0;
         OutputStream out = new FileOutputStream(tmp);
         try {
@@ -72,7 +72,7 @@ public final class Importer {
         }
         if (bytes < 1024) {
             cleanup(tmp);
-            throw new IOException(ctx.getString(R.string.imp_err_too_small_fmt, bytes));
+            throw new IOException(Trans.get(ctx, R.string.imp_err_too_small_fmt, bytes));
         }
 
         String version;
@@ -80,7 +80,7 @@ public final class Importer {
             ZipFile zip = new ZipFile(tmp);
             try {
                 if (zip.getEntry("classes.dex") == null)
-                    throw new IOException(ctx.getString(R.string.imp_err_no_dex));
+                    throw new IOException(Trans.get(ctx, R.string.imp_err_no_dex));
                 version = readVersion(zip);
 
                 // ★ F18 兼容性探测（复用同一个 ZipFile，成本 ~10 ms 级）——
@@ -100,7 +100,7 @@ public final class Importer {
             throw e;
         } catch (Exception e) {
             cleanup(tmp);
-            throw new IOException(ctx.getString(R.string.imp_err_bad_zip));
+            throw new IOException(Trans.get(ctx, R.string.imp_err_bad_zip));
         }
 
         // ★ dex 载体必须只读
@@ -111,7 +111,7 @@ public final class Importer {
         if (c == null) c = tryLoadClass(ctx, tmp);
         if (c == null) {
             cleanup(tmp);
-            throw new IOException(ctx.getString(R.string.imp_err_no_entry_fmt, SENTINEL));
+            throw new IOException(Trans.get(ctx, R.string.imp_err_no_entry_fmt, SENTINEL));
         }
         Log.i(TAG, "import prewarm ok: " + c.getName() + " from " + tmp.getName());
 
@@ -121,7 +121,7 @@ public final class Importer {
             tmp.setWritable(true);
             if (!tmp.renameTo(file)) {
                 cleanup(tmp);
-                throw new IOException(ctx.getString(R.string.imp_err_rename_fmt, tmp.getName()));
+                throw new IOException(Trans.get(ctx, R.string.imp_err_rename_fmt, tmp.getName()));
             }
             file.setReadOnly();
         }

@@ -44,10 +44,10 @@ public final class Msav {
     /** 流式拷到目标槽的 saves/ 下（先 .part）。失败时 .part 已清理。 */
     public static Stage stage(Context ctx, InputStream in, String displayName, String slot)
             throws IOException {
-        if (in == null) throw new IOException(ctx.getString(R.string.msav_err_open_failed));
+        if (in == null) throw new IOException(Trans.get(ctx, R.string.msav_err_open_failed));
         File savesDir = Data.savesDirOf(ctx, slot);
         if (savesDir == null || !savesDir.isDirectory()) {
-            throw new IOException(ctx.getString(R.string.msav_err_no_saves_fmt, slot));
+            throw new IOException(Trans.get(ctx, R.string.msav_err_no_saves_fmt, slot));
         }
         String base = safeName(displayName);
         sweepParts(savesDir);       // 清掉上一轮的孤儿 .part（见 sweepParts 注释）
@@ -98,18 +98,18 @@ public final class Msav {
         if (dest.exists()) {
             File dir = Trash.savesDir(ctx);
             if (!dir.isDirectory() && !dir.mkdirs() && !dir.isDirectory()) {
-                throw new IOException(ctx.getString(R.string.msav_err_trash_failed));
+                throw new IOException(Trans.get(ctx, R.string.msav_err_trash_failed));
             }
             stash = new File(dir, Trash.nameFor(Trash.slotLabel(s.savesDir), dest.getName()));
             dest.setWritable(true);
             if (!Trash.move(dest, stash)) {
-                throw new IOException(ctx.getString(R.string.msav_err_trash_failed));
+                throw new IOException(Trans.get(ctx, R.string.msav_err_trash_failed));
             }
         }
         s.part.setWritable(true);
         if (!s.part.renameTo(dest)) {
             if (stash != null) Trash.move(stash, dest);        // 回滚：旧的放回去
-            throw new IOException(ctx.getString(R.string.msav_err_rename_fmt, s.part.getName(), s.base));
+            throw new IOException(Trans.get(ctx, R.string.msav_err_rename_fmt, s.part.getName(), s.base));
         }
         if (stash != null) Trash.pruneIn(stash.getParentFile());
         return dest;

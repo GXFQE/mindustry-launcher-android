@@ -29,14 +29,14 @@ final class CasText {
 
     static String reason(Context c, Cas.CasException e) {
         switch (e.code) {
-            case Cas.C_OBJ_BUSY: return c.getString(R.string.cas_err_obj_busy_fmt, e.s1);
-            case Cas.C_OBJ_PLACE: return c.getString(R.string.cas_err_obj_place_fmt, e.s1);
-            case Cas.C_OBJ_MISSING: return c.getString(R.string.cas_err_obj_missing_fmt, e.s1);
-            case Cas.C_OBJ_CORRUPT: return c.getString(R.string.cas_err_obj_corrupt_fmt, e.s1);
-            case Cas.C_DST_BUSY: return c.getString(R.string.cas_err_dst_busy_fmt, e.s1);
-            case Cas.C_RESTORE_WRITE: return c.getString(R.string.cas_err_restore_write_fmt, e.s1);
-            case Cas.C_NO_SHA256: return c.getString(R.string.cas_err_no_sha256);
-            case Cas.C_MKDIR: return c.getString(R.string.cas_err_mkdir_fmt, e.s1);
+            case Cas.C_OBJ_BUSY: return Trans.get(c, R.string.cas_err_obj_busy_fmt, e.s1);
+            case Cas.C_OBJ_PLACE: return Trans.get(c, R.string.cas_err_obj_place_fmt, e.s1);
+            case Cas.C_OBJ_MISSING: return Trans.get(c, R.string.cas_err_obj_missing_fmt, e.s1);
+            case Cas.C_OBJ_CORRUPT: return Trans.get(c, R.string.cas_err_obj_corrupt_fmt, e.s1);
+            case Cas.C_DST_BUSY: return Trans.get(c, R.string.cas_err_dst_busy_fmt, e.s1);
+            case Cas.C_RESTORE_WRITE: return Trans.get(c, R.string.cas_err_restore_write_fmt, e.s1);
+            case Cas.C_NO_SHA256: return Trans.get(c, R.string.cas_err_no_sha256);
+            case Cas.C_MKDIR: return Trans.get(c, R.string.cas_err_mkdir_fmt, e.s1);
             default:
                 // 新加了码却忘了在这里加映射 ⇒ 不崩，但会退回异常原文（中文）
                 return e.getMessage() == null ? String.valueOf(e) : e.getMessage();

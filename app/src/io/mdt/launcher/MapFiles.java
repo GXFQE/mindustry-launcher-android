@@ -75,17 +75,17 @@ public final class MapFiles {
      */
     public static String checkName(Context ctx, String displayName) {
         if (displayName == null || displayName.trim().isEmpty()) {
-            return ctx.getString(R.string.mapfile_err_name_empty);
+            return Trans.get(ctx, R.string.mapfile_err_name_empty);
         }
         String n = displayName.trim();
-        if (n.startsWith(".")) return ctx.getString(R.string.mapfile_err_name_dot);
+        if (n.startsWith(".")) return Trans.get(ctx, R.string.mapfile_err_name_dot);
         if (!n.toLowerCase(java.util.Locale.ROOT).endsWith(".msav")) {
-            return ctx.getString(R.string.mapfile_err_name_ext);
+            return Trans.get(ctx, R.string.mapfile_err_name_ext);
         }
         if (n.contains("/") || n.contains("\\") || n.contains(":")) {
-            return ctx.getString(R.string.mapfile_err_name_path);
+            return Trans.get(ctx, R.string.mapfile_err_name_path);
         }
-        if (n.length() > 120) return ctx.getString(R.string.mapfile_err_name_long);
+        if (n.length() > 120) return Trans.get(ctx, R.string.mapfile_err_name_long);
         return null;
     }
 
@@ -120,7 +120,7 @@ public final class MapFiles {
                                    boolean overwrite, File trashDir) {
         Result r = new Result();
         if (mapsDir == null) {
-            r.error = ctx.getString(R.string.mapfile_err_no_dir);
+            r.error = Trans.get(ctx, R.string.mapfile_err_no_dir);
             return r;
         }
         String nameErr = checkName(ctx, displayName);
@@ -130,14 +130,14 @@ public final class MapFiles {
         }
         final String name = safeName(displayName);
         if (!mapsDir.exists() && !mapsDir.mkdirs()) {
-            r.error = ctx.getString(R.string.mapfile_err_mkdir_fmt, mapsDir.getAbsolutePath());
+            r.error = Trans.get(ctx, R.string.mapfile_err_mkdir_fmt, mapsDir.getAbsolutePath());
             return r;
         }
         File dest = new File(mapsDir, name);
         if (dest.exists() && !(overwrite && trashDir != null)) {
             // ★ 判据字段（界面据此决定要不要弹"同名替换"框）；error 只是给人看的话
             r.nameTaken = true;
-            r.error = ctx.getString(R.string.mapfile_err_name_taken_fmt, name);
+            r.error = Trans.get(ctx, R.string.mapfile_err_name_taken_fmt, name);
             return r;
         }
         File part = new File(mapsDir, name + ".part");
@@ -149,12 +149,12 @@ public final class MapFiles {
             if (!meta.ok) {
                 Data.deleteTree(part);
                 r.error = (meta.error == null || meta.error.isEmpty())
-                        ? ctx.getString(R.string.mapfile_err_not_map)
+                        ? Trans.get(ctx, R.string.mapfile_err_not_map)
                         // ★ 2026-10-06（两处：`importMap` / `commitSaveAsMap`）：`meta.error` 是**原始诊断**
                         //   （可能是 `ZipException: incorrect header check`）⇒ 第一层必须过
                         //   `MsavText.userReason` 翻成白话 —— 地图这条链**没有**别的显示映射器
                         //   （`MapsActivity` 直接显示 `r.error`）。我们自己写的诊断会被**原样透传**，不丢信息。
-                        : ctx.getString(R.string.mapfile_err_not_map_why_fmt,
+                        : Trans.get(ctx, R.string.mapfile_err_not_map_why_fmt,
                                 MsavText.userReason(ctx, meta));
                 return r;
             }
@@ -316,7 +316,7 @@ public final class MapFiles {
 
         Result r = new Result();
         if (mapsDir == null) {
-            r.error = ctx.getString(R.string.mapfile_err_no_dir);
+            r.error = Trans.get(ctx, R.string.mapfile_err_no_dir);
             return r;
         }
         String nameErr = checkMapName(ctx, metaName);
@@ -325,14 +325,14 @@ public final class MapFiles {
             return r;
         }
         if (part == null || !part.isFile()) {
-            r.error = ctx.getString(R.string.mapfile_err_part_gone);
+            r.error = Trans.get(ctx, R.string.mapfile_err_part_gone);
             return r;
         }
         // 🔴 `importMap` 那条路进到这里时 maps/ 一定已经建好了（`.part` 就写在里面），
         //   而「本槽存档 → 地图」那条路进来的槽**可能一张图都还没有、maps/ 根本不存在**
         //   ⇒ 不建目录的话 `SaveAsMap.convert` 写不出来，报的却是"读取失败"（真机实测，2026-10-05）。
         if (!mapsDir.exists() && !mapsDir.mkdirs()) {
-            r.error = ctx.getString(R.string.mapfile_err_mkdir_fmt, mapsDir.getAbsolutePath());
+            r.error = Trans.get(ctx, R.string.mapfile_err_mkdir_fmt, mapsDir.getAbsolutePath());
             return r;
         }
         final String file = safeName(metaName);
@@ -342,7 +342,7 @@ public final class MapFiles {
         if (dest.exists() && !(overwrite && trashDir != null)) {
             // ★ 判据字段（界面据此决定弹"同名"框）；error 只是给人看的话
             r.nameTaken = true;
-            r.error = ctx.getString(R.string.mapfile_err_name_taken_fmt, file);
+            r.error = Trans.get(ctx, R.string.mapfile_err_name_taken_fmt, file);
             return r;
         }
         File conv = new File(mapsDir, file + ".conv.part");   // `.part` 结尾 ⇒ 不算槽内容
@@ -367,19 +367,19 @@ public final class MapFiles {
             Data.deleteTree(part2);
             if (!conv.renameTo(part2)) {
                 Data.deleteTree(conv);
-                r.error = ctx.getString(R.string.mapfile_err_rename_fmt, part2.getAbsolutePath());
+                r.error = Trans.get(ctx, R.string.mapfile_err_rename_fmt, part2.getAbsolutePath());
                 return r;
             }
             MsavMeta meta = MsavMeta.read(part2, true);
             if (!meta.ok || !meta.has("name")) {
                 Data.deleteTree(part2);
                 r.error = (meta.error == null || meta.error.isEmpty())
-                        ? ctx.getString(R.string.mapfile_err_not_map)
+                        ? Trans.get(ctx, R.string.mapfile_err_not_map)
                         // ★ 2026-10-06（两处：`importMap` / `commitSaveAsMap`）：`meta.error` 是**原始诊断**
                         //   （可能是 `ZipException: incorrect header check`）⇒ 第一层必须过
                         //   `MsavText.userReason` 翻成白话 —— 地图这条链**没有**别的显示映射器
                         //   （`MapsActivity` 直接显示 `r.error`）。我们自己写的诊断会被**原样透传**，不丢信息。
-                        : ctx.getString(R.string.mapfile_err_not_map_why_fmt,
+                        : Trans.get(ctx, R.string.mapfile_err_not_map_why_fmt,
                                 MsavText.userReason(ctx, meta));
                 return r;
             }
@@ -411,9 +411,9 @@ public final class MapFiles {
      */
     public static String checkMapName(Context ctx, String display) {
         if (display == null || display.trim().isEmpty()) {
-            return ctx.getString(R.string.mapfile_err_name_empty);
+            return Trans.get(ctx, R.string.mapfile_err_name_empty);
         }
-        if (display.trim().length() > 120) return ctx.getString(R.string.mapfile_err_name_long);
+        if (display.trim().length() > 120) return Trans.get(ctx, R.string.mapfile_err_name_long);
         return null;
     }
 
@@ -452,11 +452,11 @@ public final class MapFiles {
         File backup = null;
         if (dest.exists()) {
             if (trashDir == null) {
-                throw new IllegalStateException(ctx.getString(R.string.mapfile_err_no_trash));
+                throw new IllegalStateException(Trans.get(ctx, R.string.mapfile_err_no_trash));
             }
             if (!trashDir.isDirectory() && !trashDir.mkdirs() && !trashDir.isDirectory()) {
                 throw new IllegalStateException(
-                        ctx.getString(R.string.mapfile_err_trash_mkdir_fmt, trashDir.getAbsolutePath()));
+                        Trans.get(ctx, R.string.mapfile_err_trash_mkdir_fmt, trashDir.getAbsolutePath()));
             }
             // ★ 中转站里的名字带**来源槽**（v2，见 Trash.nameFor）—— 恢复时才能默认放回原槽
             backup = new File(trashDir,
@@ -467,7 +467,7 @@ public final class MapFiles {
             //   `Trash.move` = renameTo 失败即退化成"复制 + 校验长度 + **才**删源"。
             //   ★ 蓝图那条线一直这么做、模组那条线内联了同一套；只有地图这条线原来是裸的。
             if (!Trash.move(dest, backup)) {
-                throw new IllegalStateException(ctx.getString(R.string.mapfile_err_trash_move));
+                throw new IllegalStateException(Trans.get(ctx, R.string.mapfile_err_trash_move));
             }
         }
         if (!Trash.move(part, dest)) {
@@ -475,11 +475,11 @@ public final class MapFiles {
             //   回滚失败 ⇒ 旧图此刻躺在中转站里、目标位置是空的 ⇒ 必须**如实告诉用户旧的在哪**，
             //   否则用户以为图丢了（其实在「设置 → 中转站」里能捞回来）。
             if (backup != null && !Trash.move(backup, dest)) {
-                throw new IllegalStateException(ctx.getString(R.string.mapfile_err_rename_stash_fmt,
+                throw new IllegalStateException(Trans.get(ctx, R.string.mapfile_err_rename_stash_fmt,
                         dest.getAbsolutePath(), trashDir == null ? "" : trashDir.getAbsolutePath()));
             }
             throw new IllegalStateException(
-                    ctx.getString(R.string.mapfile_err_rename_fmt, dest.getAbsolutePath()));
+                    Trans.get(ctx, R.string.mapfile_err_rename_fmt, dest.getAbsolutePath()));
         }
         if (backup != null) Trash.prune(trashDir, Trash.KEEP);
     }

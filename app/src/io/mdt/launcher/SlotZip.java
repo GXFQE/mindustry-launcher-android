@@ -109,12 +109,12 @@ public final class SlotZip {
 
     /** 拷到 `app_hub/zip-import.tmp`；用完必须 {@link #unstage}。 */
     public static File stage(Context ctx, Uri uri) throws IOException {
-        if (uri == null) throw new IOException(ctx.getString(R.string.slotzip_err_no_uri));
+        if (uri == null) throw new IOException(Trans.get(ctx, R.string.slotzip_err_no_uri));
         InputStream in = ctx.getContentResolver().openInputStream(uri);
-        if (in == null) throw new IOException(ctx.getString(R.string.slotzip_err_open_failed));
+        if (in == null) throw new IOException(Trans.get(ctx, R.string.slotzip_err_open_failed));
         File tmp = new File(Paths.privateDir(ctx), "zip-import.tmp");
         if (tmp.exists() && !tmp.delete()) {
-            throw new IOException(ctx.getString(R.string.slotzip_err_clean_tmp_fmt, tmp.toString()));
+            throw new IOException(Trans.get(ctx, R.string.slotzip_err_clean_tmp_fmt, tmp.toString()));
         }
         long n = 0;
         try {
@@ -138,7 +138,7 @@ public final class SlotZip {
         }
         if (n == 0) {
             tmp.delete();
-            throw new IOException(ctx.getString(R.string.slotzip_err_empty));
+            throw new IOException(Trans.get(ctx, R.string.slotzip_err_empty));
         }
         Log.i(TAG, "zip staged: " + n + " B -> " + tmp);
         return tmp;
@@ -169,7 +169,7 @@ public final class SlotZip {
             int guard = 0;
             while ((e = zin.getNextEntry()) != null) {
                 if (++guard > MAX_ENTRIES) {
-                    throw new IOException(ctx.getString(R.string.slotzip_err_too_many_fmt, MAX_ENTRIES));
+                    throw new IOException(Trans.get(ctx, R.string.slotzip_err_too_many_fmt, MAX_ENTRIES));
                 }
                 boolean dir = e.isDirectory();
                 if (dir) inf.dirs++;
@@ -214,7 +214,7 @@ public final class SlotZip {
         }
         Collections.sort(tops);
         for (int i = 0; i < tops.size() && i < 8; i++) inf.tops.add(tops.get(i));
-        if (tops.size() > 8) inf.tops.add(ctx.getString(R.string.slotzip_more_fmt, tops.size()));
+        if (tops.size() > 8) inf.tops.add(Trans.get(ctx, R.string.slotzip_more_fmt, tops.size()));
 
         for (int i = 0; i < tops.size() && i < 8; i++) {
             for (String k : KNOWN_TOPS) {
@@ -239,7 +239,7 @@ public final class SlotZip {
             throws IOException {
         mode = SlotWrite.sane(mode);
         File root = Data.dirOf(ctx, slot);
-        if (root == null) throw new IOException(ctx.getString(R.string.slotzip_err_no_slot_dir_fmt, slot));
+        if (root == null) throw new IOException(Trans.get(ctx, R.string.slotzip_err_no_slot_dir_fmt, slot));
         Result r = new Result();
 
         // ★ 清空走共享原语（口径 = 槽内容，见 SlotWrite 类注释）——
@@ -248,7 +248,7 @@ public final class SlotZip {
             r.wiped.addAll(SlotWrite.wipeSlot(ctx, root));
         }
         if (!root.exists() && !root.mkdirs()) {
-            throw new IOException(ctx.getString(R.string.slotzip_err_mkdir_slot_fmt,
+            throw new IOException(Trans.get(ctx, R.string.slotzip_err_mkdir_slot_fmt,
                     root.getAbsolutePath()));
         }
 
@@ -308,18 +308,18 @@ public final class SlotZip {
                     part.delete();
                     // ★ 2026-10-06：原因走 `Util.ioReason`（认识的 errno 翻白话）——
                     //   这句会经 `zip_import_failed` 弹窗显示给用户。原文在异常链里（cause）不丢。
-                    throw new IOException(ctx.getString(R.string.slotzip_err_write_failed_fmt,
+                    throw new IOException(Trans.get(ctx, R.string.slotzip_err_write_failed_fmt,
                             to.getAbsolutePath(),
                             Util.ioReason(ctx, ex)), ex);
                 }
                 if (to.exists() && !to.delete()) {
                     part.delete();
-                    throw new IOException(ctx.getString(R.string.slotzip_err_delete_failed_fmt,
+                    throw new IOException(Trans.get(ctx, R.string.slotzip_err_delete_failed_fmt,
                             to.getAbsolutePath()));
                 }
                 if (!part.renameTo(to)) {
                     part.delete();
-                    throw new IOException(ctx.getString(R.string.slotzip_err_rename_fmt,
+                    throw new IOException(Trans.get(ctx, R.string.slotzip_err_rename_fmt,
                             part.getName(), to.getName()));
                 }
                 r.files++;
@@ -406,7 +406,7 @@ public final class SlotZip {
 
     private static ZipInputStream open(Context ctx, File zip) throws IOException {
         if (zip == null || !zip.isFile()) {
-            throw new IOException(ctx.getString(R.string.slotzip_err_temp_gone_fmt,
+            throw new IOException(Trans.get(ctx, R.string.slotzip_err_temp_gone_fmt,
                     String.valueOf(zip)));
         }
         return new ZipInputStream(new BufferedInputStream(new FileInputStream(zip), BUF));
@@ -415,12 +415,12 @@ public final class SlotZip {
     /** 把 JDK 的 `Invalid zip entry path` 翻成人话（见 inspect/extract 里的 catch 注释） */
     private static IOException badZip(Context ctx, java.util.zip.ZipException ze) {
         String m = ze.getMessage() == null ? String.valueOf(ze) : ze.getMessage();
-        return new IOException(ctx.getString(R.string.slotzip_err_escape_fmt, m), ze);
+        return new IOException(Trans.get(ctx, R.string.slotzip_err_escape_fmt, m), ze);
     }
 
     private static void mkdirs(Context ctx, File d) throws IOException {
         if (d != null && !d.exists() && !d.mkdirs() && !d.isDirectory()) {
-            throw new IOException(ctx.getString(R.string.slotzip_err_dir_failed_fmt,
+            throw new IOException(Trans.get(ctx, R.string.slotzip_err_dir_failed_fmt,
                     d.getAbsolutePath()));
         }
     }

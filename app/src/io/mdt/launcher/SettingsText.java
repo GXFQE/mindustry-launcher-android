@@ -23,40 +23,40 @@ final class SettingsText {
 
     /** 失败原因（**第一层**给用户看的那句） */
     static String userReason(Context c, SettingsBin.Result r) {
-        if (r == null) return c.getString(R.string.settings_reason_unknown);
+        if (r == null) return Trans.get(c, R.string.settings_reason_unknown);
         switch (r.errCode) {
             case SettingsBin.Result.E_NULL_FILE:
-                return c.getString(R.string.settings_err_null_file);
+                return Trans.get(c, R.string.settings_err_null_file);
             case SettingsBin.Result.E_NO_KEYS:
-                return c.getString(R.string.settings_err_no_keys);
+                return Trans.get(c, R.string.settings_err_no_keys);
             case SettingsBin.Result.E_BACKUP_MKDIR:
-                return c.getString(R.string.settings_err_backup_mkdir_fmt, r.errS1);
+                return Trans.get(c, R.string.settings_err_backup_mkdir_fmt, r.errS1);
             case SettingsBin.Result.E_BACKUP_VERIFY:
-                return c.getString(R.string.settings_err_backup_verify);
+                return Trans.get(c, R.string.settings_err_backup_verify);
             case SettingsBin.Result.E_VERIFY_ROLLBACK:
-                return c.getString(R.string.settings_err_verify_rollback_fmt, detail(c, r));
+                return Trans.get(c, R.string.settings_err_verify_rollback_fmt, detail(c, r));
             case SettingsBin.Result.E_VERIFY_ROLLBACK_FAIL:
-                return c.getString(R.string.settings_err_verify_rollback_fail_fmt, detail(c, r));
+                return Trans.get(c, R.string.settings_err_verify_rollback_fail_fmt, detail(c, r));
             case SettingsBin.Result.E_VERIFY_DELETED:
-                return c.getString(R.string.settings_err_verify_deleted_fmt, detail(c, r));
+                return Trans.get(c, R.string.settings_err_verify_deleted_fmt, detail(c, r));
             case SettingsBin.Result.E_NO_SLOT_DIR:
-                return c.getString(R.string.settings_err_no_slot_dir_fmt, r.errS1);
+                return Trans.get(c, R.string.settings_err_no_slot_dir_fmt, r.errS1);
             case SettingsBin.Result.E_GAME_RUNNING:
-                return c.getString(R.string.settings_err_game_running);
+                return Trans.get(c, R.string.settings_err_game_running);
             case SettingsBin.Result.E_SETTINGS_UNREADABLE:
-                return c.getString(R.string.settings_err_settings_unreadable);
+                return Trans.get(c, R.string.settings_err_settings_unreadable);
             case SettingsBin.Result.E_NO_MODS:
-                return c.getString(R.string.settings_err_no_mods);
+                return Trans.get(c, R.string.settings_err_no_mods);
             case SettingsBin.Result.E_NO_INTERNAL_NAME:
-                return c.getString(R.string.settings_err_no_internal_name);
+                return Trans.get(c, R.string.settings_err_no_internal_name);
             default:
                 break;
         }
         // 不是我们写的码 ⇒ 退回"异常形态"判断：`类名: 消息` 对用户是天书
         String e = r.error == null ? "" : r.error.trim();
-        if (e.isEmpty()) return c.getString(R.string.settings_reason_unknown);
+        if (e.isEmpty()) return Trans.get(c, R.string.settings_reason_unknown);
         if (e.matches("^[A-Za-z_$][A-Za-z0-9_$]*(Exception|Error)\\b.*")) {
-            return c.getString(R.string.settings_reason_read_write_error);
+            return Trans.get(c, R.string.settings_reason_read_write_error);
         }
         return e;
     }
@@ -64,8 +64,8 @@ final class SettingsText {
     /** 写后自检不过的**具体原因**（嵌在上面三条的 `%1$s` 里，所以它也得是整句资源） */
     private static String detail(Context c, SettingsBin.Result r) {
         if (r.subCode == SettingsBin.Result.SUB_UNREADABLE) {
-            return c.getString(R.string.settings_selfcheck_unreadable);
+            return Trans.get(c, R.string.settings_selfcheck_unreadable);
         }
-        return c.getString(R.string.settings_selfcheck_mismatch);
+        return Trans.get(c, R.string.settings_selfcheck_mismatch);
     }
 }

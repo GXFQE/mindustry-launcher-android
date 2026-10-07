@@ -185,16 +185,16 @@ public final class Backup {
     public static Snapshot create(Context ctx, String slot, String label) throws IOException {
         boolean live = slot.equals(Data.currentSlot(ctx));
         if (live && Data.gameAlive(ctx)) {
-            throw new IOException(ctx.getString(R.string.backup_err_game_running));
+            throw new IOException(Trans.get(ctx, R.string.backup_err_game_running));
         }
         File src = Data.dirOf(ctx, slot);
         if (src == null || !src.exists()) {
-            throw new IOException(ctx.getString(R.string.backup_err_no_data_fmt, slot));
+            throw new IOException(Trans.get(ctx, R.string.backup_err_no_data_fmt, slot));
         }
 
         File parent = slotDir(ctx, slot);
         if (!parent.exists() && !parent.mkdirs()) {
-            throw new IOException(ctx.getString(R.string.backup_err_mkdir_fmt,
+            throw new IOException(Trans.get(ctx, R.string.backup_err_mkdir_fmt,
                     parent.getAbsolutePath()));
         }
         long now = System.currentTimeMillis();
@@ -202,7 +202,7 @@ public final class Backup {
         for (int i = 1; dest.exists() && i < 100; i++) {
             dest = new File(parent, stamp(now) + "-" + i);
         }
-        if (dest.exists()) throw new IOException(ctx.getString(R.string.backup_err_same_second));
+        if (dest.exists()) throw new IOException(Trans.get(ctx, R.string.backup_err_same_second));
 
         Snapshot ss = new Snapshot();
         ss.dir = dest;
@@ -241,12 +241,12 @@ public final class Backup {
                     ss.bytes += e.size;
                 }
                 if (ss.count == 0) {
-                    throw new IOException(ctx.getString(R.string.backup_err_nothing_fmt,
+                    throw new IOException(Trans.get(ctx, R.string.backup_err_nothing_fmt,
                             slot, src.getAbsolutePath(),
                             join(Data.SLOT_EXCLUDE, ctx.getString(R.string.list_join_sep))));
                 }
                 if (!dest.mkdirs() && !dest.isDirectory()) {
-                    throw new IOException(ctx.getString(R.string.backup_err_snapshot_mkdir_fmt,
+                    throw new IOException(Trans.get(ctx, R.string.backup_err_snapshot_mkdir_fmt,
                             dest.getAbsolutePath()));
                 }
                 writeManifest(dest, ss, entries);
@@ -288,10 +288,10 @@ public final class Backup {
      */
     public static String delete(Context ctx, Snapshot ss) {
         if (ss == null || ss.dir == null || !ss.dir.exists()) {
-            return ctx.getString(R.string.backup_err_snapshot_missing);
+            return Trans.get(ctx, R.string.backup_err_snapshot_missing);
         }
         if (!Data.deleteTree(ss.dir)) {
-            return ctx.getString(R.string.backup_err_delete_partial_fmt, ss.dir.getAbsolutePath());
+            return Trans.get(ctx, R.string.backup_err_delete_partial_fmt, ss.dir.getAbsolutePath());
         }
         File p = ss.dir.getParentFile();
         if (p != null && p.listFiles() != null && p.listFiles().length == 0) p.delete();
@@ -324,10 +324,10 @@ public final class Backup {
     public static RestoreResult restore(Context ctx, String slot, Snapshot ss, int mode) {
         mode = SlotWrite.sane(mode);
         if (ss == null || ss.dir == null || !ss.dir.exists()) {
-            return fail(ctx.getString(R.string.backup_restore_err_no_snapshot));
+            return fail(Trans.get(ctx, R.string.backup_restore_err_no_snapshot));
         }
         if (gameAliveOn(ctx, slot)) {
-            return fail(ctx.getString(R.string.backup_restore_err_game_running));
+            return fail(Trans.get(ctx, R.string.backup_restore_err_game_running));
         }
         List<Entry> entries;
         try {
@@ -335,16 +335,16 @@ public final class Backup {
         } catch (IOException e) {
             // ★ 2026-10-06：这句会进恢复结果弹窗 ⇒ 原因翻白话（认识的 errno 才翻），原文进日志
             android.util.Log.w("MDTLauncher", "manifest read failed", e);
-            return fail(ctx.getString(R.string.backup_restore_err_manifest_fmt, Util.ioReason(ctx, e)));
+            return fail(Trans.get(ctx, R.string.backup_restore_err_manifest_fmt, Util.ioReason(ctx, e)));
         }
         if (entries.isEmpty()) {
-            return fail(ctx.getString(R.string.backup_restore_err_manifest_empty));
+            return fail(Trans.get(ctx, R.string.backup_restore_err_manifest_empty));
         }
 
         File dstRoot = Data.dirOf(ctx, slot);
-        if (dstRoot == null) return fail(ctx.getString(R.string.backup_restore_err_no_dst));
+        if (dstRoot == null) return fail(Trans.get(ctx, R.string.backup_restore_err_no_dst));
         if (!dstRoot.exists() && !dstRoot.mkdirs()) {
-            return fail(ctx.getString(R.string.backup_restore_err_mkdir_fmt,
+            return fail(Trans.get(ctx, R.string.backup_restore_err_mkdir_fmt,
                     dstRoot.getAbsolutePath()));
         }
         StringBuilder wiped = new StringBuilder();
@@ -377,7 +377,7 @@ public final class Backup {
                 } catch (IOException ex) {
                     // ★ 走 CasText：Cas 的对象池异常带码 ⇒ 映射成资源（原来直接把 getMessage() 端给用户）；
                     //   v1 那条路上的异常不是 CasException ⇒ 它原样返回消息（行为不变）。
-                    errs.append("  ").append(ctx.getString(R.string.backup_restore_err_line_fmt,
+                    errs.append("  ").append(Trans.get(ctx, R.string.backup_restore_err_line_fmt,
                             e.rel, CasText.reason(ctx, ex)));
                 }
             }
@@ -388,27 +388,27 @@ public final class Backup {
             for (Entry e : entries) {
                 File f = new File(srcRoot, e.rel);
                 if (!f.isFile()) {
-                    bad.add(ctx.getString(R.string.backup_restore_bad_missing_fmt, e.rel));
+                    bad.add(Trans.get(ctx, R.string.backup_restore_bad_missing_fmt, e.rel));
                     continue;
                 }
                 if (f.length() != e.size) {
-                    bad.add(ctx.getString(R.string.backup_restore_bad_size_fmt,
+                    bad.add(Trans.get(ctx, R.string.backup_restore_bad_size_fmt,
                             e.rel, f.length(), e.size));
                     continue;
                 }
                 if (!Util.md5(f).equals(e.hash)) {
-                    bad.add(ctx.getString(R.string.backup_restore_bad_md5_fmt, e.rel));
+                    bad.add(Trans.get(ctx, R.string.backup_restore_bad_md5_fmt, e.rel));
                 }
             }
             if (!bad.isEmpty()) {
                 StringBuilder sb = new StringBuilder(
-                        ctx.getString(R.string.backup_restore_err_selfcheck_fmt, ""));
+                        Trans.get(ctx, R.string.backup_restore_err_selfcheck_fmt, ""));
                 for (int i = 0; i < bad.size() && i < 8; i++) {
-                    sb.append("  ").append(ctx.getString(R.string.backup_restore_bullet_fmt,
+                    sb.append("  ").append(Trans.get(ctx, R.string.backup_restore_bullet_fmt,
                             bad.get(i)));
                 }
                 if (bad.size() > 8) {
-                    sb.append("  ").append(ctx.getString(R.string.backup_restore_more_fmt,
+                    sb.append("  ").append(Trans.get(ctx, R.string.backup_restore_more_fmt,
                             bad.size()));
                 }
                 return fail(sb.toString());
@@ -426,28 +426,28 @@ public final class Backup {
                 } catch (IOException ex) {
                     // ★ 走 CasText：Cas 的对象池异常带码 ⇒ 映射成资源（原来直接把 getMessage() 端给用户）；
                     //   v1 那条路上的异常不是 CasException ⇒ 它原样返回消息（行为不变）。
-                    errs.append("  ").append(ctx.getString(R.string.backup_restore_err_line_fmt,
+                    errs.append("  ").append(Trans.get(ctx, R.string.backup_restore_err_line_fmt,
                             e.rel, CasText.reason(ctx, ex)));
                 }
             }
         }
 
         StringBuilder sb = new StringBuilder();
-        sb.append(ctx.getString(R.string.backup_restore_ok_head_fmt, slot));
-        sb.append("    ").append(ctx.getString(R.string.backup_restore_ok_snapshot_fmt, ss.title()));
-        sb.append("    ").append(ctx.getString(R.string.backup_restore_ok_files_fmt, ok,
+        sb.append(Trans.get(ctx, R.string.backup_restore_ok_head_fmt, slot));
+        sb.append("    ").append(Trans.get(ctx, R.string.backup_restore_ok_snapshot_fmt, ss.title()));
+        sb.append("    ").append(Trans.get(ctx, R.string.backup_restore_ok_files_fmt, ok,
                 entries.size(), Util.formatSize(ss.bytes)));
         if (kept > 0) {
-            sb.append("    ").append(ctx.getString(R.string.backup_restore_ok_kept_fmt, kept));
+            sb.append("    ").append(Trans.get(ctx, R.string.backup_restore_ok_kept_fmt, kept));
         }
         if (wiped.length() > 0) {
-            sb.append("    ").append(ctx.getString(R.string.backup_restore_ok_wiped_fmt,
+            sb.append("    ").append(Trans.get(ctx, R.string.backup_restore_ok_wiped_fmt,
                     wiped.toString()));
         }
-        sb.append("    ").append(ctx.getString(R.string.backup_restore_ok_where_fmt,
+        sb.append("    ").append(Trans.get(ctx, R.string.backup_restore_ok_where_fmt,
                 dstRoot.getAbsolutePath()));
         if (ok < entries.size()) {
-            sb.append(ctx.getString(R.string.backup_restore_partial_fmt, errs.toString()));
+            sb.append(Trans.get(ctx, R.string.backup_restore_partial_fmt, errs.toString()));
         }
         Log.i(TAG, "restore slot=" + slot + " ok=" + ok + "/" + entries.size()
                 + " kept=" + kept + " mode=" + mode + " v=" + ss.version);
@@ -518,13 +518,13 @@ public final class Backup {
         String err = Data.createSlot(ctx, rawDst);
         if (err != null) return err;
         String dst = Data.sanitizeSlot(rawDst);
-        if (dst == null) return ctx.getString(R.string.backup_err_slot_name_invalid);
+        if (dst == null) return Trans.get(ctx, R.string.backup_err_slot_name_invalid);
         // ⚠️⚠️ 必须自己再判一次"目标 = 当前槽"：`Data.createSlot` 对当前槽是**返回成功**的，
         //   因为它的语义是"当前槽不算新建，本体由启动时按需 mkdirs"。
         //   若放过这一步，`restore` 会把源槽内容**合并写进当前槽**（restore 只增不删）
         //   —— 两份数据混在一起、再也分不开，是本功能能造成的最坏破坏。
         if (dst.equals(Data.currentSlot(ctx))) {
-            return ctx.getString(R.string.backup_err_clone_target_current_fmt, dst);
+            return Trans.get(ctx, R.string.backup_err_clone_target_current_fmt, dst);
         }
         try {
             Snapshot ss = create(ctx, src, label);
@@ -553,7 +553,7 @@ public final class Backup {
         File d = slotDir(ctx, slot);
         if (!d.exists()) return null;
         if (!Data.deleteTree(d)) {
-            return ctx.getString(R.string.backup_err_slot_backups_delete_fmt, d.getAbsolutePath());
+            return Trans.get(ctx, R.string.backup_err_slot_backups_delete_fmt, d.getAbsolutePath());
         }
         scheduleGc(ctx);
         return null;
@@ -1031,7 +1031,7 @@ public final class Backup {
         List<Entry> out = new ArrayList<>();
         String text = Util.readText(manifest);
         if (text == null || !(text.startsWith(MARK2) || text.startsWith(MARK1))) {
-            throw new IOException(ctx.getString(R.string.backup_err_not_manifest));
+            throw new IOException(Trans.get(ctx, R.string.backup_err_not_manifest));
         }
         boolean inTable = false;
         for (String line : text.split("\n")) {

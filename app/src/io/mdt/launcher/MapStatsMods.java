@@ -249,12 +249,12 @@ public final class MapStatsMods {
         b.table = MapStats.copyOf(sc.table);
         // ★ 依据文案在**这里**按界面语言拼（`SlotContent` 只给数字）——
         //   原来是在 `contentFor` 里拼中文 ⇒ 英文界面下"技术细节"那几行也是中文
-        if (sc.skipMods) b.modNote = ctx.getString(R.string.stats_note_skip_mods);
-        else if (sc.failed) b.modNote = ctx.getString(R.string.stats_note_mods_failed);
-        else b.modNote = ctx.getString(R.string.stats_note_mods_fmt,
+        if (sc.skipMods) b.modNote = Trans.get(ctx, R.string.stats_note_skip_mods);
+        else if (sc.failed) b.modNote = Trans.get(ctx, R.string.stats_note_mods_failed);
+        else b.modNote = Trans.get(ctx, R.string.stats_note_mods_fmt,
                 sc.packs, sc.added, sc.overridden);
         if (sc.bundlesWithText > 0) {
-            b.bundleNote = ctx.getString(R.string.stats_note_bundles_fmt,
+            b.bundleNote = Trans.get(ctx, R.string.stats_note_bundles_fmt,
                     sc.bundlesWithText, sc.bundle.keys());
         }
         if (!b.tiles.patchEntries.isEmpty()) {
@@ -266,23 +266,23 @@ public final class MapStatsMods {
         }
         BundleNames bn = new BundleNames(apkPath == null ? null : new File(apkPath), sc.bundle,
                 attrLabels, MapStats.bundleLang(bundleLocaleSuffix(ctx)),
-                ctx.getString(R.string.stats_wall_name_fmt));
+                Trans.get(ctx, R.string.stats_wall_name_fmt));
         b.names = bn;
         // ★ 名字来源（依据）：数字在 BundleNames 里，**句子在这里按界面语言拼**
         if (bn.nApkLocale > 0) {
-            b.namesNotes.add(ctx.getString(R.string.stats_note_names_apk_fmt,
+            b.namesNotes.add(Trans.get(ctx, R.string.stats_note_names_apk_fmt,
                     bn.apkName, bn.nApkLocale));
         } else {
-            b.namesNotes.add(ctx.getString(R.string.stats_note_names_no_apk));
+            b.namesNotes.add(Trans.get(ctx, R.string.stats_note_names_no_apk));
         }
         if (bn.nModLocale > 0) {
-            b.namesNotes.add(ctx.getString(R.string.stats_note_names_mod_fmt, bn.nModLocale));
+            b.namesNotes.add(Trans.get(ctx, R.string.stats_note_names_mod_fmt, bn.nModLocale));
         }
         if (bn.nApkBase > 0) {
-            b.namesNotes.add(ctx.getString(R.string.stats_note_names_apk_base_fmt, bn.nApkBase));
+            b.namesNotes.add(Trans.get(ctx, R.string.stats_note_names_apk_base_fmt, bn.nApkBase));
         }
         if (bn.nModBase > 0) {
-            b.namesNotes.add(ctx.getString(R.string.stats_note_names_mod_base_fmt, bn.nModBase));
+            b.namesNotes.add(Trans.get(ctx, R.string.stats_note_names_mod_base_fmt, bn.nModBase));
         }
         b.result = MapStats.analyze(b.tiles, b.table, b.names);
         if (!b.result.ok) b.error = b.result.error;
@@ -293,13 +293,13 @@ public final class MapStatsMods {
     /** 属性词表：键 = 游戏 `Attribute` 的名字（`water`/`oil`/`heat`/`spores`/`steam`/`light`/`sand`） */
     public static Map<String, String> attrLabels(Context ctx) {
         Map<String, String> m = new HashMap<>();
-        m.put("water", ctx.getString(R.string.stats_attr_water));
-        m.put("oil", ctx.getString(R.string.stats_attr_oil));
-        m.put("heat", ctx.getString(R.string.stats_attr_heat));
-        m.put("spores", ctx.getString(R.string.stats_attr_spores));
-        m.put("steam", ctx.getString(R.string.stats_attr_steam));
-        m.put("light", ctx.getString(R.string.stats_attr_light));
-        m.put("sand", ctx.getString(R.string.stats_attr_sand));
+        m.put("water", Trans.get(ctx, R.string.stats_attr_water));
+        m.put("oil", Trans.get(ctx, R.string.stats_attr_oil));
+        m.put("heat", Trans.get(ctx, R.string.stats_attr_heat));
+        m.put("spores", Trans.get(ctx, R.string.stats_attr_spores));
+        m.put("steam", Trans.get(ctx, R.string.stats_attr_steam));
+        m.put("light", Trans.get(ctx, R.string.stats_attr_light));
+        m.put("sand", Trans.get(ctx, R.string.stats_attr_sand));
         return m;
     }
 

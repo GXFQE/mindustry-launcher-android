@@ -965,7 +965,7 @@ final class SlotIo {
                 try {
                     int i = c.getColumnIndex(OpenableColumns.DISPLAY_NAME);
                     if (i >= 0 && c.moveToFirst()) {
-                        String n = c.getString(i);
+                        String n = c.getString(i);   // ⚠️ 这里是 Cursor 的列索引，不是 R.string —— 不归 Trans 管
                         if (n != null && !n.isEmpty()) return n;
                     }
                 } finally {

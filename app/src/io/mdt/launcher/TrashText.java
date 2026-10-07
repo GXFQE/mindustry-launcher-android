@@ -24,12 +24,12 @@ public final class TrashText {
     static String kindLabel(Context c, Trash.Item it) {
         if (it == null) return "";
         switch (it.kind) {
-            case MAP: return c.getString(R.string.trash_kind_map);
-            case MOD: return c.getString(R.string.trash_kind_mod);
-            case SAVE: return c.getString(R.string.trash_kind_save);
-            case SLOT: return c.getString(R.string.trash_kind_slot);
-            case SCHEM: return c.getString(R.string.trash_kind_schem);
-            default: return c.getString(R.string.trash_kind_other);
+            case MAP: return Trans.get(c, R.string.trash_kind_map);
+            case MOD: return Trans.get(c, R.string.trash_kind_mod);
+            case SAVE: return Trans.get(c, R.string.trash_kind_save);
+            case SLOT: return Trans.get(c, R.string.trash_kind_slot);
+            case SCHEM: return Trans.get(c, R.string.trash_kind_schem);
+            default: return Trans.get(c, R.string.trash_kind_other);
         }
     }
 
@@ -50,8 +50,8 @@ public final class TrashText {
      */
     static String fromLabel(Context c, Trash.Item it) {
         String s = it == null || it.slot == null ? "" : it.slot.trim();
-        if (s.isEmpty()) return c.getString(R.string.trash_source_unknown);
-        return c.getString(R.string.trash_from_slot_fmt, s);
+        if (s.isEmpty()) return Trans.get(c, R.string.trash_source_unknown);
+        return Trans.get(c, R.string.trash_from_slot_fmt, s);
     }
 
     /**
@@ -69,7 +69,7 @@ public final class TrashText {
         if (it.kind != Trash.Kind.SLOT) sb.append(" · ").append(fromLabel(c, it));
         sb.append(" · ").append(Util.formatSize(it.bytes));
         if (it.kind == Trash.Kind.SLOT && it.files > 0) {
-            sb.append(" · ").append(c.getString(R.string.trash_files_fmt, it.files));
+            sb.append(" · ").append(Trans.get(c, R.string.trash_files_fmt, it.files));
         }
         String t = Trash.timeText(it.stamp);
         if (!t.isEmpty()) sb.append(" · ").append(t);
@@ -78,7 +78,7 @@ public final class TrashText {
 
     /** 表头：`共 3 份 · 1.2 MB` */
     public static String head(Context c, int count, long bytes) {
-        return c.getString(R.string.trash_head_fmt, count, Util.formatSize(bytes));
+        return Trans.get(c, R.string.trash_head_fmt, count, Util.formatSize(bytes));
     }
 
     /**
@@ -93,34 +93,34 @@ public final class TrashText {
         int code = r == null ? Trash.Result.T_NONE : r.errCode;
         switch (code) {
             case Trash.Result.T_NOT_IN_TRASH:
-                return c.getString(R.string.trash_reason_not_in_trash);
+                return Trans.get(c, R.string.trash_reason_not_in_trash);
             case Trash.Result.T_NO_TARGET:
-                return c.getString(R.string.trash_reason_no_target);
+                return Trans.get(c, R.string.trash_reason_no_target);
             case Trash.Result.T_NAME_TAKEN:
-                return c.getString(R.string.trash_reason_name_taken);
+                return Trans.get(c, R.string.trash_reason_name_taken);
             case Trash.Result.T_NOT_MAP:
-                return c.getString(R.string.trash_reason_not_map);
+                return Trans.get(c, R.string.trash_reason_not_map);
             case Trash.Result.T_STASH_FAILED:
-                return c.getString(R.string.trash_reason_stash_failed);
+                return Trans.get(c, R.string.trash_reason_stash_failed);
             case Trash.Result.T_MOVE_FAILED:
-                return c.getString(R.string.trash_reason_move_failed);
+                return Trans.get(c, R.string.trash_reason_move_failed);
             case Trash.Result.T_GAME_RUNNING:
                 // 游戏在跑这条有自己的一句（比"原因不明"具体得多）—— 复用同一句，别写两份
-                return c.getString(R.string.trash_busy_msg);
+                return Trans.get(c, R.string.trash_busy_msg);
             case Trash.Result.T_NO_KIND:
-                return c.getString(R.string.trash_reason_no_kind);
+                return Trans.get(c, R.string.trash_reason_no_kind);
             case Trash.Result.T_MKDIR:
-                return c.getString(R.string.trash_reason_mkdir);
+                return Trans.get(c, R.string.trash_reason_mkdir);
             case Trash.Result.T_DELETE_FAILED:
-                return c.getString(R.string.trash_reason_delete_failed);
+                return Trans.get(c, R.string.trash_reason_delete_failed);
             case Trash.Result.T_CURRENT_SLOT:
-                return c.getString(R.string.trash_reason_current_slot);
+                return Trans.get(c, R.string.trash_reason_current_slot);
             case Trash.Result.T_BAD_NAME:
-                return c.getString(R.string.trash_reason_bad_name);
+                return Trans.get(c, R.string.trash_reason_bad_name);
             case Trash.Result.T_NOT_SCHEM:
-                return c.getString(R.string.trash_reason_not_schem);
+                return Trans.get(c, R.string.trash_reason_not_schem);
             default:
-                return c.getString(R.string.trash_reason_unknown);
+                return Trans.get(c, R.string.trash_reason_unknown);
         }
     }
 }

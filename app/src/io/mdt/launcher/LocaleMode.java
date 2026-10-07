@@ -168,7 +168,7 @@ public final class LocaleMode {
         for (int i = 0; i < ts.length; i++) {
             if (ts[i].equals(tag)) { idx = i; break; }
         }
-        if (idx <= 0) return ctx.getString(R.string.lang_system);
+        if (idx <= 0) return Trans.get(ctx, R.string.lang_system);
         try {
             String[] names = ctx.getResources().getStringArray(R.array.app_language_names);
             if (idx < names.length && names[idx] != null && names[idx].trim().length() > 0) {

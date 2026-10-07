@@ -47,16 +47,16 @@ public final class Util {
         String m = t == null ? null : t.getMessage();
         if (m == null || m.trim().isEmpty()) {
             if (fallback != null) return fallback;
-            return c.getString(R.string.io_reason_failed);
+            return Trans.get(c, R.string.io_reason_failed);
         }
         String s = m;
-        if (has(s, "ENOSPC") || has(s, "No space left")) return c.getString(R.string.io_reason_no_space);
+        if (has(s, "ENOSPC") || has(s, "No space left")) return Trans.get(c, R.string.io_reason_no_space);
         if (has(s, "EACCES") || has(s, "Permission denied") || has(s, "EPERM")
-                || has(s, "Operation not permitted")) return c.getString(R.string.io_reason_denied);
+                || has(s, "Operation not permitted")) return Trans.get(c, R.string.io_reason_denied);
         if (has(s, "EBUSY") || has(s, "Device or resource busy") || has(s, "Text file busy")
-                || has(s, "EAGAIN")) return c.getString(R.string.io_reason_busy);
-        if (has(s, "EROFS") || has(s, "Read-only file system")) return c.getString(R.string.io_reason_readonly);
-        if (has(s, "ENOENT") || has(s, "No such file")) return c.getString(R.string.io_reason_missing);
+                || has(s, "EAGAIN")) return Trans.get(c, R.string.io_reason_busy);
+        if (has(s, "EROFS") || has(s, "Read-only file system")) return Trans.get(c, R.string.io_reason_readonly);
+        if (has(s, "ENOENT") || has(s, "No such file")) return Trans.get(c, R.string.io_reason_missing);
         return s;      // 我们自己写的文案 / 不认识的错误：原样（信息不丢）
     }
 

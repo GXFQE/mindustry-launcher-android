@@ -120,8 +120,8 @@ public final class Versions {
      */
     public static String conflictPeerDesc(Context ctx, String firstName, int total) {
         return total > 2
-                ? ctx.getString(R.string.versions_peer_more_fmt, firstName, total - 1)
-                : ctx.getString(R.string.versions_peer_one_fmt, firstName);
+                ? Trans.get(ctx, R.string.versions_peer_more_fmt, firstName, total - 1)
+                : Trans.get(ctx, R.string.versions_peer_one_fmt, firstName);
     }
 
     /**
@@ -477,7 +477,7 @@ public final class Versions {
          * （配合 `detail_imported_note`），别把这两行改掉。
          */
         public String subtitle(Context ctx) {
-            return (imported ? ctx.getString(R.string.versions_imported_copy) : pkg) + "\n" + apkPath
+            return (imported ? Trans.get(ctx, R.string.versions_imported_copy) : pkg) + "\n" + apkPath
                     + " (" + Util.formatSize(apkSize) + ")";
         }
 

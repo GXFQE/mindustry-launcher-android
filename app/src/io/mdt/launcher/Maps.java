@@ -67,7 +67,7 @@ public final class Maps {
             if (meta == null || !meta.ok) {
                 // ⚠️ 原因可能是"异常类名"，也可能是我们自己的中文（老 `error`）——
                 //    前者由 MsavText.userReason 翻成白话，后者原样透传（那批还没做错误码）。
-                return c.getString(R.string.msav_unreadable_fmt, MsavText.userReason(c, meta));
+                return Trans.get(c, R.string.msav_unreadable_fmt, MsavText.userReason(c, meta));
             }
             return MsavText.shortLine(c, meta, false);
         }
@@ -82,16 +82,16 @@ public final class Maps {
          */
         public String sourceLabel(Context c) {
             switch (from) {
-                case FROM_SLOT: return c.getString(R.string.map_from_slot);
-                case FROM_GAME: return c.getString(R.string.map_from_game);
+                case FROM_SLOT: return Trans.get(c, R.string.map_from_slot);
+                case FROM_GAME: return Trans.get(c, R.string.map_from_game);
                 default: return source == null || source.trim().isEmpty() ? ""
-                        : c.getString(R.string.map_from_mod_fmt, source);
+                        : Trans.get(c, R.string.map_from_mod_fmt, source);
             }
         }
 
         /** 详情第一行用的来源（本槽那句多一个括号说明，所以与列表行不同） */
         private String sourceLabelDetail(Context c) {
-            return from == FROM_SLOT ? c.getString(R.string.map_from_slot_detail) : sourceLabel(c);
+            return from == FROM_SLOT ? Trans.get(c, R.string.map_from_slot_detail) : sourceLabel(c);
         }
 
         /**
@@ -111,15 +111,15 @@ public final class Maps {
             String stem = file.toLowerCase(Locale.ROOT).endsWith(".msav")
                     ? file.substring(0, file.length() - 5) : file;
             if (!n.isEmpty() && !n.equalsIgnoreCase(stem)) sb.append(n).append('\n');
-            sb.append(c.getString(R.string.map_detail_from_fmt, sourceLabelDetail(c))).append('\n');
-            sb.append(c.getString(R.string.map_detail_file_fmt, name(),
+            sb.append(Trans.get(c, R.string.map_detail_from_fmt, sourceLabelDetail(c))).append('\n');
+            sb.append(Trans.get(c, R.string.map_detail_file_fmt, name(),
                     Util.formatSize(bytes))).append('\n');
             if (from != FROM_SLOT) {
-                sb.append(c.getString(R.string.map_detail_in_fmt,
+                sb.append(Trans.get(c, R.string.map_detail_in_fmt,
                         container == null ? sourceLabel(c) : container.getName())).append('\n');
             }
             if (meta == null) {
-                sb.append(c.getString(R.string.msav_unreadable)).append('\n');
+                sb.append(Trans.get(c, R.string.msav_unreadable)).append('\n');
             } else {
                 sb.append(MsavText.detail(c, meta));
             }
@@ -275,7 +275,7 @@ public final class Maps {
                 it.where = f.getAbsolutePath();
                 it.bytes = f.length();
                 it.meta = metaOf(it);
-                if (it.meta == null || !it.meta.ok) it.error = it.meta == null ? ctx.getString(R.string.maps_err_unreadable) : it.meta.error;
+                if (it.meta == null || !it.meta.ok) it.error = it.meta == null ? Trans.get(ctx, R.string.maps_err_unreadable) : it.meta.error;
                 out.add(it);
             }
         }

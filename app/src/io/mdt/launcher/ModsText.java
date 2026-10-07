@@ -23,13 +23,13 @@ final class ModsText {
     static String stateLabel(Context c, Mods.State st) {
         if (st == null) return "";
         switch (st) {
-            case ENABLED: return c.getString(R.string.mods_state_enabled);
-            case CONTENT_ERRORS: return c.getString(R.string.mods_state_content_errors);
-            case MISSING_DEPENDENCIES: return c.getString(R.string.mods_state_missing_deps);
-            case INCOMPLETE_DEPENDENCIES: return c.getString(R.string.mods_state_incomplete_deps);
-            case CIRCULAR_DEPENDENCIES: return c.getString(R.string.mods_state_circular_deps);
-            case UNSUPPORTED: return c.getString(R.string.mods_state_unsupported);
-            case DISABLED: return c.getString(R.string.mods_state_disabled);
+            case ENABLED: return Trans.get(c, R.string.mods_state_enabled);
+            case CONTENT_ERRORS: return Trans.get(c, R.string.mods_state_content_errors);
+            case MISSING_DEPENDENCIES: return Trans.get(c, R.string.mods_state_missing_deps);
+            case INCOMPLETE_DEPENDENCIES: return Trans.get(c, R.string.mods_state_incomplete_deps);
+            case CIRCULAR_DEPENDENCIES: return Trans.get(c, R.string.mods_state_circular_deps);
+            case UNSUPPORTED: return Trans.get(c, R.string.mods_state_unsupported);
+            case DISABLED: return Trans.get(c, R.string.mods_state_disabled);
             default: return "";
         }
     }
@@ -41,10 +41,10 @@ final class ModsText {
     static String stateBadge(Context c, Mods.State st) {
         if (st == null) return "";
         switch (st) {
-            case MISSING_DEPENDENCIES: return c.getString(R.string.mods_badge_missing_deps);
-            case INCOMPLETE_DEPENDENCIES: return c.getString(R.string.mods_badge_incomplete_deps);
-            case UNSUPPORTED: return c.getString(R.string.mods_badge_unsupported);
-            case DISABLED: return c.getString(R.string.mods_badge_disabled);
+            case MISSING_DEPENDENCIES: return Trans.get(c, R.string.mods_badge_missing_deps);
+            case INCOMPLETE_DEPENDENCIES: return Trans.get(c, R.string.mods_badge_incomplete_deps);
+            case UNSUPPORTED: return Trans.get(c, R.string.mods_badge_unsupported);
+            case DISABLED: return Trans.get(c, R.string.mods_badge_disabled);
             default: return stateLabel(c, st);
         }
     }
@@ -61,21 +61,21 @@ final class ModsText {
     static String infoMetaReason(Context c, Mods.Info m) {
         if (m != null && m.metaErrCode != Mods.Info.M_NONE) {
             switch (m.metaErrCode) {
-                case Mods.Info.M_COLON: return c.getString(R.string.mods_meta_colon);
-                case Mods.Info.M_NO_META_HERE: return c.getString(R.string.mods_meta_no_meta_here);
-                case Mods.Info.M_NO_META_IN_PACK: return c.getString(R.string.mods_meta_no_meta_in_pack);
-                case Mods.Info.M_META_TOO_BIG: return c.getString(R.string.mods_meta_too_big);
-                case Mods.Info.M_META_UNREADABLE: return c.getString(R.string.mods_meta_unreadable);
-                case Mods.Info.M_META_BAD_FORMAT: return c.getString(R.string.mods_meta_bad_format);
-                case Mods.Info.M_META_NO_NAME: return c.getString(R.string.mods_meta_no_name);
-                case Mods.Info.M_META_BAD_JSON: return c.getString(R.string.mods_meta_bad_json);
+                case Mods.Info.M_COLON: return Trans.get(c, R.string.mods_meta_colon);
+                case Mods.Info.M_NO_META_HERE: return Trans.get(c, R.string.mods_meta_no_meta_here);
+                case Mods.Info.M_NO_META_IN_PACK: return Trans.get(c, R.string.mods_meta_no_meta_in_pack);
+                case Mods.Info.M_META_TOO_BIG: return Trans.get(c, R.string.mods_meta_too_big);
+                case Mods.Info.M_META_UNREADABLE: return Trans.get(c, R.string.mods_meta_unreadable);
+                case Mods.Info.M_META_BAD_FORMAT: return Trans.get(c, R.string.mods_meta_bad_format);
+                case Mods.Info.M_META_NO_NAME: return Trans.get(c, R.string.mods_meta_no_name);
+                case Mods.Info.M_META_BAD_JSON: return Trans.get(c, R.string.mods_meta_bad_json);
                 default: break;
             }
         }
         String e = m == null || m.metaError == null ? "" : m.metaError.trim();
-        if (e.isEmpty()) return c.getString(R.string.mods_meta_no_file);
+        if (e.isEmpty()) return Trans.get(c, R.string.mods_meta_no_file);
         if (e.matches("^[A-Za-z_$][A-Za-z0-9_$]*(Exception|Error)\\b.*")) {
-            return c.getString(R.string.mods_meta_bad_format);
+            return Trans.get(c, R.string.mods_meta_bad_format);
         }
         return e;
     }
@@ -91,37 +91,37 @@ final class ModsText {
         if (r == null) return "";
         switch (r.errCode) {
             case Mods.PackResult.P_SRC_MISSING:
-                return c.getString(R.string.pack_err_src_missing_fmt, r.errS1);
+                return Trans.get(c, R.string.pack_err_src_missing_fmt, r.errS1);
             case Mods.PackResult.P_SRC_OPEN:
-                return c.getString(R.string.pack_err_src_open);
+                return Trans.get(c, R.string.pack_err_src_open);
             case Mods.PackResult.P_NO_MODS_DIR:
-                return c.getString(R.string.pack_err_no_mods_dir);
+                return Trans.get(c, R.string.pack_err_no_mods_dir);
             case Mods.PackResult.P_NAME_EMPTY:
-                return c.getString(R.string.pack_err_name_empty);
+                return Trans.get(c, R.string.pack_err_name_empty);
             case Mods.PackResult.P_NAME_COLON:
-                return c.getString(R.string.pack_err_name_colon);
+                return Trans.get(c, R.string.pack_err_name_colon);
             case Mods.PackResult.P_NAME_DOT:
-                return c.getString(R.string.pack_err_name_dot);
+                return Trans.get(c, R.string.pack_err_name_dot);
             case Mods.PackResult.P_NAME_EXT:
-                return c.getString(R.string.pack_err_name_ext);
+                return Trans.get(c, R.string.pack_err_name_ext);
             case Mods.PackResult.P_MKDIR:
-                return c.getString(R.string.pack_err_mkdir_fmt, r.errS1);
+                return Trans.get(c, R.string.pack_err_mkdir_fmt, r.errS1);
             case Mods.PackResult.P_NAME_TAKEN:
-                return c.getString(R.string.pack_err_name_taken_fmt, r.errS1);
+                return Trans.get(c, R.string.pack_err_name_taken_fmt, r.errS1);
             case Mods.PackResult.P_NOT_A_MOD:
-                return c.getString(R.string.pack_err_not_a_mod);
+                return Trans.get(c, R.string.pack_err_not_a_mod);
             case Mods.PackResult.P_IMPORT_FAILED:
-                return c.getString(R.string.pack_err_import_failed);
+                return Trans.get(c, R.string.pack_err_import_failed);
             case Mods.PackResult.P_COPY_NO_SRC:
-                return c.getString(R.string.pack_err_copy_no_src);
+                return Trans.get(c, R.string.pack_err_copy_no_src);
             case Mods.PackResult.P_COPY_NO_DST:
-                return c.getString(R.string.pack_err_copy_no_dst);
+                return Trans.get(c, R.string.pack_err_copy_no_dst);
             case Mods.PackResult.P_COPY_SAME:
-                return c.getString(R.string.pack_err_copy_same);
+                return Trans.get(c, R.string.pack_err_copy_same);
             case Mods.PackResult.P_COPY_UNREADABLE:
-                return c.getString(R.string.pack_err_copy_unreadable);
+                return Trans.get(c, R.string.pack_err_copy_unreadable);
             case Mods.PackResult.P_COPY_NOTHING:
-                return c.getString(R.string.pack_err_copy_nothing);
+                return Trans.get(c, R.string.pack_err_copy_nothing);
             default:
                 return r.error == null ? "" : r.error;
         }

@@ -107,9 +107,9 @@ public final class Blueprints {
 
         /** 来源标签：本槽 / 模组「x」 */
         public String sourceLabel(Context c) {
-            return from == FROM_SLOT ? c.getString(R.string.bp_from_slot)
-                    : (source == null || source.trim().isEmpty() ? c.getString(R.string.bp_from_mod_unknown)
-                    : c.getString(R.string.map_from_mod_fmt, source));
+            return from == FROM_SLOT ? Trans.get(c, R.string.bp_from_slot)
+                    : (source == null || source.trim().isEmpty() ? Trans.get(c, R.string.bp_from_mod_unknown)
+                    : Trans.get(c, R.string.map_from_mod_fmt, source));
         }
 
         /**
@@ -122,10 +122,10 @@ public final class Blueprints {
          */
         public String line(Context c) {
             if (!ok()) {
-                return c.getString(R.string.msav_unreadable_fmt, MschText.reason(c, msch));
+                return Trans.get(c, R.string.msav_unreadable_fmt, MschText.reason(c, msch));
             }
             List<String> parts = new ArrayList<>();
-            parts.add(c.getString(R.string.bp_line_size_fmt,
+            parts.add(Trans.get(c, R.string.bp_line_size_fmt,
                     msch.declaredWidth, msch.declaredHeight, msch.tileCount()));
             String labels = join(msch.labels);
             if (!labels.isEmpty()) parts.add(labels);
@@ -133,11 +133,11 @@ public final class Blueprints {
             if (missingKinds > 0) {
                 // ★ 两种说法**刻意不同**：拿不准的时候**不许**断言"本槽没有 / 会被当空气丢掉"
                 //   （那是给用户一个可能错的结论）—— 改成"我们没认出来" + 说清为什么可能认错。
-                sb.append('\n').append(c.getString(softMissing
+                sb.append('\n').append(Trans.get(c, softMissing
                         ? R.string.bp_line_missing_soft_fmt
                         : R.string.bp_line_missing_fmt, missingKinds, missingTiles));
             } else if (msch.labelsBad && labels.isEmpty()) {
-                sb.append('\n').append(c.getString(R.string.bp_labels_bad));
+                sb.append('\n').append(Trans.get(c, R.string.bp_labels_bad));
             }
             return sb.toString();
         }
@@ -148,25 +148,25 @@ public final class Blueprints {
          */
         public String detail(Context c) {
             StringBuilder sb = new StringBuilder();
-            sb.append(c.getString(R.string.bp_detail_from_fmt, sourceLabel(c))).append('\n');
-            sb.append(c.getString(R.string.bp_detail_file_fmt, name(), Util.formatSize(bytes)))
+            sb.append(Trans.get(c, R.string.bp_detail_from_fmt, sourceLabel(c))).append('\n');
+            sb.append(Trans.get(c, R.string.bp_detail_file_fmt, name(), Util.formatSize(bytes)))
               .append('\n');
             if (from == FROM_MOD) {
-                sb.append(c.getString(R.string.bp_detail_in_fmt,
+                sb.append(Trans.get(c, R.string.bp_detail_in_fmt,
                         container == null ? sourceLabel(c) : container.getName())).append('\n');
             }
             if (!ok()) {
                 sb.append(MschText.reason(c, msch)).append('\n');
                 return sb.toString();
             }
-            sb.append(c.getString(R.string.bp_detail_size_fmt,
+            sb.append(Trans.get(c, R.string.bp_detail_size_fmt,
                     msch.declaredWidth, msch.declaredHeight, msch.tileCount())).append('\n');
             if (!msch.labels.isEmpty()) {
-                sb.append(c.getString(R.string.bp_detail_labels_fmt, join(msch.labels))).append('\n');
+                sb.append(Trans.get(c, R.string.bp_detail_labels_fmt, join(msch.labels))).append('\n');
             }
             String d = Mods.stripColors(msch.description()).trim();
             if (!d.isEmpty()) {
-                sb.append(c.getString(R.string.bp_detail_desc_fmt,
+                sb.append(Trans.get(c, R.string.bp_detail_desc_fmt,
                         d.length() > 200 ? d.substring(0, 200) + "…" : d)).append('\n');
             }
             return sb.toString();
@@ -199,14 +199,14 @@ public final class Blueprints {
      *   自检直接调它们（= 真实调用点的类型），这类漂移就再也藏不住。
      */
     public static String missingTitle(Context c, boolean soft) {
-        return c.getString(soft ? R.string.bp_section_missing_soft : R.string.bp_section_missing);
+        return Trans.get(c, soft ? R.string.bp_section_missing_soft : R.string.bp_section_missing);
     }
 
     /**
      * 那一段的摘要（⚠️ 格子数走 {@link MapStatsMods#num(int)}，资源里必须写 `%s` —— **这里踩过崩溃**）。
      */
     public static String missingSummary(Context c, int kinds, int tiles, boolean soft) {
-        return c.getString(soft ? R.string.bp_blocks_missing_soft_sum_fmt
+        return Trans.get(c, soft ? R.string.bp_blocks_missing_soft_sum_fmt
                         : R.string.bp_blocks_missing_sum_fmt,
                 kinds, MapStatsMods.num(tiles));
     }

@@ -28,9 +28,9 @@ public final class MschText {
             return reason(c, m.errCode, m.errN1, m.errN2);
         }
         String e = m == null || m.error == null ? "" : m.error.trim();
-        if (e.isEmpty()) return c.getString(R.string.msav_unknown_reason);
+        if (e.isEmpty()) return Trans.get(c, R.string.msav_unknown_reason);
         if (e.matches("^[A-Za-z_$][A-Za-z0-9_$]*(Exception|Error)\\b.*")) {
-            return c.getString(R.string.msch_reason_unreadable);
+            return Trans.get(c, R.string.msch_reason_unreadable);
         }
         return e;
     }
@@ -39,35 +39,35 @@ public final class MschText {
     public static String reason(Context c, int code, long n1, long n2) {
         switch (code) {
             case Msch.E_NULL_FILE:
-                return c.getString(R.string.msch_reason_no_file);
+                return Trans.get(c, R.string.msch_reason_no_file);
             case Msch.E_FILE_TOO_BIG:
-                return c.getString(R.string.msch_reason_file_too_big_fmt, n1);
+                return Trans.get(c, R.string.msch_reason_file_too_big_fmt, n1);
             case Msch.E_HEADER:
-                return c.getString(R.string.msch_reason_not_blueprint);
+                return Trans.get(c, R.string.msch_reason_not_blueprint);
             case Msch.E_VERSION:
-                return c.getString(R.string.msch_reason_newer_fmt, n1);
+                return Trans.get(c, R.string.msch_reason_newer_fmt, n1);
             case Msch.E_ZLIB:
-                return c.getString(R.string.msch_reason_broken);
+                return Trans.get(c, R.string.msch_reason_broken);
             case Msch.E_INFLATE_LIMIT:
-                return c.getString(R.string.msch_reason_huge);
+                return Trans.get(c, R.string.msch_reason_huge);
             case Msch.E_TOO_LARGE:
-                return c.getString(R.string.msch_reason_too_large_fmt, n1, n2);
+                return Trans.get(c, R.string.msch_reason_too_large_fmt, n1, n2);
             case Msch.E_TOO_MANY:
-                return c.getString(R.string.msch_reason_too_many_fmt, n1);
+                return Trans.get(c, R.string.msch_reason_too_many_fmt, n1);
             case Msch.E_TRUNC:
-                return c.getString(R.string.msch_reason_half);
+                return Trans.get(c, R.string.msch_reason_half);
             case Msch.E_CONFIG:
-                return c.getString(R.string.msch_reason_config);
+                return Trans.get(c, R.string.msch_reason_config);
             case Msch.E_ARRAY:
-                return c.getString(R.string.msch_reason_array_fmt, n1);
+                return Trans.get(c, R.string.msch_reason_array_fmt, n1);
             case Msch.E_NESTED:
-                return c.getString(R.string.msch_reason_nested);
+                return Trans.get(c, R.string.msch_reason_nested);
             case Msch.E_TAG:
-                return c.getString(R.string.msch_reason_unknown_tag);
+                return Trans.get(c, R.string.msch_reason_unknown_tag);
             case Msch.E_BODY:
-                return c.getString(R.string.msch_reason_broken);
+                return Trans.get(c, R.string.msch_reason_broken);
             default:
-                return c.getString(R.string.msav_unknown_reason);
+                return Trans.get(c, R.string.msav_unknown_reason);
         }
     }
 
@@ -87,8 +87,8 @@ public final class MschText {
             sb.append(dict.get(i));
         }
         return dict.size() > cap
-                ? c.getString(R.string.bp_tech_dict_names_more_fmt, sb.toString(), dict.size() - cap)
-                : c.getString(R.string.bp_tech_dict_names_fmt, sb.toString());
+                ? Trans.get(c, R.string.bp_tech_dict_names_more_fmt, sb.toString(), dict.size() - cap)
+                : Trans.get(c, R.string.bp_tech_dict_names_fmt, sb.toString());
     }
 
     /** 文件里写旧名、被我们换算过的方块（最多 6 条）。没有 ⇒ 空串 */
@@ -100,11 +100,11 @@ public final class MschText {
             if (sb.length() > 0) sb.append(", ");
             sb.append(pairs.get(i));
         }
-        return c.getString(R.string.bp_tech_renamed_fmt, sb.toString());
+        return Trans.get(c, R.string.bp_tech_renamed_fmt, sb.toString());
     }
 
     /** 带朝向的方块格数（0 ⇒ 空串：一行"0 格"没有信息量） */
     public static String techRotated(Context c, int rotated) {
-        return rotated <= 0 ? "" : c.getString(R.string.bp_tech_rot_fmt, MapStatsMods.num(rotated));
+        return rotated <= 0 ? "" : Trans.get(c, R.string.bp_tech_rot_fmt, MapStatsMods.num(rotated));
     }
 }

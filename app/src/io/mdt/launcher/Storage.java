@@ -103,62 +103,62 @@ final class Storage {
     static String text(Context c, Report r) {
         StringBuilder sb = new StringBuilder();
         if (r == null) return "";
-        sb.append(c.getString(R.string.storage_total_fmt, Util.formatSize(r.hubBytes))).append('\n');
+        sb.append(Trans.get(c, R.string.storage_total_fmt, Util.formatSize(r.hubBytes))).append('\n');
 
         // ① 各槽内容
-        sb.append('\n').append(c.getString(R.string.storage_sec_slots)).append('\n');
+        sb.append('\n').append(Trans.get(c, R.string.storage_sec_slots)).append('\n');
         if (r.slots == null || r.slots.isEmpty()) {
-            sb.append(c.getString(R.string.storage_no_slots)).append('\n');
+            sb.append(Trans.get(c, R.string.storage_no_slots)).append('\n');
         } else {
             for (Data.Slot s : r.slots) {
                 if (s == null) continue;
-                sb.append(c.getString(R.string.storage_slot_line_fmt, s.name, s.files,
+                sb.append(Trans.get(c, R.string.storage_slot_line_fmt, s.name, s.files,
                         Util.formatSize(s.bytes))).append('\n');
             }
         }
 
         // ② 备份（去重效果就靠这一行说清）
-        sb.append('\n').append(c.getString(R.string.storage_sec_backup)).append('\n');
+        sb.append('\n').append(Trans.get(c, R.string.storage_sec_backup)).append('\n');
         Backup.PoolStats p = r.pool;
         int snaps = p == null ? 0 : p.snapshots;
         int legacy = p == null ? 0 : p.legacySnapshots;
         if (snaps <= 0 && legacy <= 0) {
-            sb.append(c.getString(R.string.storage_backup_none)).append('\n');
+            sb.append(Trans.get(c, R.string.storage_backup_none)).append('\n');
         } else if (p != null) {
             int pct = (int) Math.round(p.saved() * 100d);
-            sb.append(c.getString(R.string.storage_backup_fmt, snaps,
+            sb.append(Trans.get(c, R.string.storage_backup_fmt, snaps,
                     Util.formatSize(p.actual), Util.formatSize(p.logical),
                     c.getString(R.string.storage_pct_fmt, pct))).append('\n');
             if (legacy > 0) {
-                sb.append(c.getString(R.string.storage_backup_legacy_fmt, legacy,
+                sb.append(Trans.get(c, R.string.storage_backup_legacy_fmt, legacy,
                         Util.formatSize(p.legacyBytes))).append('\n');
             }
         }
         // 孤儿（暂时没人用的对象）单独一句：它不属于任何一份备份，但确实占着地方
         if (p != null && p.orphanBytes > 0) {
-            sb.append(c.getString(R.string.storage_backup_orphan_fmt,
+            sb.append(Trans.get(c, R.string.storage_backup_orphan_fmt,
                     Util.formatSize(p.orphanBytes))).append('\n');
         }
 
         // ③ 中转站（按类型分，为 0 的类型不出现 —— 空行比"没有"更省事）
-        sb.append('\n').append(c.getString(R.string.storage_sec_trash)).append('\n');
+        sb.append('\n').append(Trans.get(c, R.string.storage_sec_trash)).append('\n');
         if (r.trashItems <= 0) {
-            sb.append(c.getString(R.string.storage_trash_none)).append('\n');
+            sb.append(Trans.get(c, R.string.storage_trash_none)).append('\n');
         } else {
             Trash.Kind[] kinds = Trash.Kind.values();
             for (int i = 0; i < r.trashCounts.length && i < kinds.length; i++) {
                 if (r.trashCounts[i] <= 0) continue;
-                sb.append(c.getString(R.string.storage_trash_line_fmt, trashKindLabel(c, kinds[i]),
+                sb.append(Trans.get(c, R.string.storage_trash_line_fmt, trashKindLabel(c, kinds[i]),
                         r.trashCounts[i], Util.formatSize(r.trashBytes[i]))).append('\n');
             }
         }
 
         // ④ 可以清理的残留（体检数字，原来只在设置页那一行里体现"已开/已关"）
-        sb.append('\n').append(c.getString(R.string.storage_sec_clean)).append('\n');
+        sb.append('\n').append(Trans.get(c, R.string.storage_sec_clean)).append('\n');
         sb.append(r.redundantPlaces > 0
-                ? c.getString(R.string.storage_clean_fmt, r.redundantPlaces,
+                ? Trans.get(c, R.string.storage_clean_fmt, r.redundantPlaces,
                         Util.formatSize(r.redundantBytes))
-                : c.getString(R.string.set_autoclean_none)).append('\n');
+                : Trans.get(c, R.string.set_autoclean_none)).append('\n');
         return sb.toString();
     }
 
@@ -168,14 +168,14 @@ final class Storage {
      *   同一个东西在两个界面上必须一个叫法。
      */
     static String trashKindLabel(Context c, Trash.Kind k) {
-        if (k == null) return c.getString(R.string.trash_kind_other);
+        if (k == null) return Trans.get(c, R.string.trash_kind_other);
         switch (k) {
-            case MAP: return c.getString(R.string.trash_kind_map);
-            case MOD: return c.getString(R.string.trash_kind_mod);
-            case SAVE: return c.getString(R.string.trash_kind_save);
-            case SLOT: return c.getString(R.string.trash_kind_slot);
-            case SCHEM: return c.getString(R.string.trash_kind_schem);
-            default: return c.getString(R.string.trash_kind_other);
+            case MAP: return Trans.get(c, R.string.trash_kind_map);
+            case MOD: return Trans.get(c, R.string.trash_kind_mod);
+            case SAVE: return Trans.get(c, R.string.trash_kind_save);
+            case SLOT: return Trans.get(c, R.string.trash_kind_slot);
+            case SCHEM: return Trans.get(c, R.string.trash_kind_schem);
+            default: return Trans.get(c, R.string.trash_kind_other);
         }
     }
 }

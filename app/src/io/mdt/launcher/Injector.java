@@ -342,7 +342,7 @@ public final class Injector {
             String abi = Compat.pickAbi(zf);
             if (abi == null) {
                 log.append("APK 里没有任何匹配本机 ABI 的 native 目录\n");
-                throw new IllegalStateException(ctx.getString(R.string.launch_err_no_abi_fmt,
+                throw new IllegalStateException(Trans.get(ctx, R.string.launch_err_no_abi_fmt,
                         joinAbis()));
             }
             log.append("选用 ABI = ").append(abi).append('\n');
@@ -384,7 +384,7 @@ public final class Injector {
         //   进程仍在）⇒ 第二次启动一个 native 缺失的包时这个判断**不会抛**，
         //   于是一路走到 startActivity，最后崩在游戏内部（等价的库从未加载），
         //   用户完全无从判断原因 —— 这是"静默出错"的最坏形态。
-        if (loaded == 0) throw new IllegalStateException(ctx.getString(R.string.launch_err_no_native_loaded));
+        if (loaded == 0) throw new IllegalStateException(Trans.get(ctx, R.string.launch_err_no_native_loaded));
     }
 
     /** 设备 ABI 列表，仅供错误文案（`[arm64-v8a, armeabi-v7a]`） */

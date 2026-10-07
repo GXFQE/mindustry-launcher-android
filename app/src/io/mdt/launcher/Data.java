@@ -345,15 +345,15 @@ public final class Data {
     public static String createSlot(Context ctx, String rawName) {
         String n = sanitizeSlot(rawName);
         if (n == null) {
-            return ctx.getString(R.string.slot_err_name_invalid);
+            return Trans.get(ctx, R.string.slot_err_name_invalid);
         }
         File d = slotDir(ctx, n);
-        if (d == null) return ctx.getString(R.string.slot_err_no_external);
+        if (d == null) return Trans.get(ctx, R.string.slot_err_no_external);
         // 当前槽不算"新建"：它的本体就是 slot-<当前名>，由启动时按需 mkdirs。
         // ⚠️ 这里**故意不 mkdirs** —— F6 的教训：只读探测造出的空目录会被下一轮当成"有内容"。
         if (n.equals(currentSlot(ctx))) return null;
-        if (d.exists()) return ctx.getString(R.string.slot_err_exists_fmt, n);
-        if (!d.mkdirs()) return ctx.getString(R.string.slot_err_mkdir_fmt, d.getAbsolutePath());
+        if (d.exists()) return Trans.get(ctx, R.string.slot_err_exists_fmt, n);
+        if (!d.mkdirs()) return Trans.get(ctx, R.string.slot_err_mkdir_fmt, d.getAbsolutePath());
         Log.i(TAG, "slot created: " + d);
         return null;
     }
@@ -362,19 +362,19 @@ public final class Data {
     public static String renameSlot(Context ctx, String name, String rawNewName) {
         String n = sanitizeSlot(rawNewName);
         if (n == null) {
-            return ctx.getString(R.string.slot_err_name_invalid);
+            return Trans.get(ctx, R.string.slot_err_name_invalid);
         }
         if (n.equals(name)) return null;
         if (name.equals(currentSlot(ctx))) {
-            return ctx.getString(R.string.slot_err_rename_current_fmt, name);
+            return Trans.get(ctx, R.string.slot_err_rename_current_fmt, name);
         }
         File from = slotDir(ctx, name);
-        if (from == null || !from.exists()) return ctx.getString(R.string.slot_err_missing_fmt, name);
-        if (n.equals(currentSlot(ctx))) return ctx.getString(R.string.slot_err_target_current_fmt, n);
+        if (from == null || !from.exists()) return Trans.get(ctx, R.string.slot_err_missing_fmt, name);
+        if (n.equals(currentSlot(ctx))) return Trans.get(ctx, R.string.slot_err_target_current_fmt, n);
         File to = slotDir(ctx, n);
-        if (to.exists()) return ctx.getString(R.string.slot_err_exists_fmt, n);
+        if (to.exists()) return Trans.get(ctx, R.string.slot_err_exists_fmt, n);
         if (!from.renameTo(to)) {
-            return ctx.getString(R.string.slot_err_rename_failed_fmt, from.getName(), to.getName());
+            return Trans.get(ctx, R.string.slot_err_rename_failed_fmt, from.getName(), to.getName());
         }
         Log.i(TAG, "slot renamed: " + name + " -> " + n);
         return null;
@@ -392,13 +392,13 @@ public final class Data {
      */
     public static String deleteSlotForever(Context ctx, String name) {
         if (name.equals(currentSlot(ctx))) {
-            return ctx.getString(R.string.slot_err_delete_current_fmt, name);
+            return Trans.get(ctx, R.string.slot_err_delete_current_fmt, name);
         }
         File d = slotDir(ctx, name);
-        if (d == null || !d.exists()) return ctx.getString(R.string.slot_err_missing_fmt, name);
+        if (d == null || !d.exists()) return Trans.get(ctx, R.string.slot_err_missing_fmt, name);
         int files = countTree(d);
         if (!deleteTree(d)) {
-            return ctx.getString(R.string.slot_err_delete_partial_fmt,
+            return Trans.get(ctx, R.string.slot_err_delete_partial_fmt,
                     d.getAbsolutePath(), countTree(d), files);
         }
         Log.i(TAG, "slot deleted forever: " + name + " (" + files + " files)");
