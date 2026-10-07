@@ -47,8 +47,9 @@ point the game at that directory when it starts.
      other);
    - tap that version to launch. **Continue** goes straight back to the version you launched last.
 
-The interface starts in **English**; **Settings → Language** switches it to 简体中文 (or back to
-following the system language).
+The interface **follows your system language**: 简体中文 on a phone set to Chinese, English otherwise
+(English and Simplified Chinese are the only translations so far). **Settings → Language** overrides
+that, including switching back to following the system.
 
 ## What it can do
 
