@@ -122,17 +122,24 @@ public final class MschSheet implements MschSprite.Sheet {
 
     @Override public MschAtlas.Region find(String region) {
         if (region == null) return null;
-        MschAtlas.Region r = regions.get(region);
-        if (r != null) return r;
-        // 图集里没有 ⇒ 问模组（第 119 轮）。★ 用 `@mod:` 前缀把"来源"编进 page：
-        //   模组贴图不是在页图里的一个矩形，而是**一个 PNG 条目整张**（矩形 = 0,0,w,h）
+        // ★ 顺序是**刻意的**（第 121 轮）：**先问模组**，再问图集。
+        //   游戏打包时 `sprites-override/**` 是**最后**写入的 ⇒ 它**覆盖**原版贴图。
+        //   我们的模组索引里 `sprites/**` 的键**带模组前缀**（如 `vne-bank`）⇒ 撞不上原版名；
+        //   能撞上的只有 `sprites-override/**`（**不加**前缀，键就是 `copper-wall` 这种）⇒
+        //   "模组优先"精确实现了覆盖语义，**不会**误伤原版方块（索引键不加前缀由自检 ㊿① 钉着）。
+        //   ⚠️ 设备上没有"覆盖原版方块贴图"的真模组 ⇒ 这条**只有单元级证据**（㊿① 那条断言），
+        //      没有端到端截图（如实记，别写成"真机验过"）。
         ModSprites.Hit h = mods.find(region);
-        if (h == null) return null;
-        int[] wh = mods.dims(h);
-        if (wh == null) return null;
-        String page = "@mod:" + h.pack.getAbsolutePath() + "!" + h.entry;
-        modHits.put(page, h);
-        return new MschAtlas.Region(page, 0, 0, wh[0], wh[1]);
+        if (h != null) {
+            int[] wh = mods.dims(h);
+            if (wh != null) {
+                // 用 `@mod:` 前缀把"来源"编进 page：模组贴图不是页图里的矩形，而是**一个 PNG 条目整张**
+                String page = "@mod:" + h.pack.getAbsolutePath() + "!" + h.entry;
+                modHits.put(page, h);
+                return new MschAtlas.Region(page, 0, 0, wh[0], wh[1]);
+            }
+        }
+        return regions.get(region);
     }
 
     /**
