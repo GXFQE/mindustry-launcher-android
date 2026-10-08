@@ -203,6 +203,7 @@ public final class SelfTest {
             // ★ ⑳ F13 第二批：批量启停的写侧（一次读写 / noop 不动文件 / 坏文件拒绝写）
             modsBatchWrite(ctx, L, stat);
             modsTogglePair(ctx, L, stat);
+            ignoreAndRetryLab(ctx, L, stat);
             // ★ ㉑ F13 第二批：反向依赖（禁用前的提醒）
             modsDependents(ctx, L, stat);
             // ★ ㉒ F10：.msav 元数据解析（现场造文件 + 两个口径的反向断言）
@@ -5106,6 +5107,49 @@ public final class SelfTest {
         m.internalName = internal;
         m.name = internal;
         return m;
+    }
+
+    /**
+     * ★★ **「忽略它试试」**（2026-10-08 用户：「其实更应该是忽略这个试试，因为一般只是一个模组搞崩溃的」）。
+     *
+     * <p>判据：① 真的被关了；② 成对写（`-failed` 一并清）；
+     * ③ **`launchid.dat` 被删** —— 这才是“下次启动不会被整槽跳过（=试得出来）”的硬判据。
+     */
+    private static void ignoreAndRetryLab(Context ctx, List<String> L, int[] stat) {
+        L.add("── Ⓞ 「忽略它试试」（关掉它 + 清 launchid.dat）──");
+        final String slot = "m3-ignore";
+        File dir = Data.dirOf(ctx, slot);
+        deleteTree(dir);
+        dir.mkdirs();
+        try {
+            java.util.LinkedHashMap<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("mod-suspect-enabled", Boolean.TRUE);
+            // ★ 夹具要带上真机那个状态（记录在）—— 否则“成对写”根本没被考到：
+            //   键不存在时读出来是 null而不是 FALSE（这一条自己就踩过）。
+            m.put("mod-suspect-failed", Boolean.TRUE);
+            SettingsBin.writeAtomic(Mods.settingsFileOf(ctx, slot),
+                    new SettingsBin.Values(m, false, 0));
+            File lid = new File(dir, "launchid.dat");
+            if (!lid.createNewFile()) {
+                ok(stat, L, false, "Ⓞ 造不出 launchid.dat 夹具");
+                return;
+            }
+            SettingsBin.Result r = Mods.ignoreAndRetry(ctx, slot, "suspect");
+            SettingsBin.Values after = SettingsBin.readSafe(Mods.settingsFileOf(ctx, slot), new String[1]);
+            ok(stat, L, r.ok && !r.noop
+                            && Boolean.FALSE.equals(after.all().get("mod-suspect-enabled"))
+                            && Boolean.FALSE.equals(after.all().get("mod-suspect-failed")),
+                    "★★「忽略它试试」：把它关了且**成对写**（-failed 也清）");
+            ok(stat, L, !lid.exists(),
+                    "★★并**清掉了 launchid.dat**（否则下次启动还是整槽跳过，"
+                            + "关掉它等于白关）");
+            ok(stat, L, r.changeDesc != null && r.changeDesc.contains("launchid"),
+                    "★结果里说清了“连标记一起清了”（第二层依据）");
+        } catch (Throwable e) {
+            ok(stat, L, false, "Ⓞ 这一块自己抛了：" + e);
+        } finally {
+            deleteTree(dir);
+        }
     }
 
     private static void modsBatchWrite(Context ctx, List<String> L, int[] stat) {        L.add("── ⑳ 批量启停（写侧）──");

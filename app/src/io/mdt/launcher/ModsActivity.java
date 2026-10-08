@@ -1250,6 +1250,11 @@ public class ModsActivity extends BaseActivity {
                 msg = w.toString();
             }
         }
+        // ★ 在“下次启动会整槽跳过”的状态下关模组，顺带会清掉那个标记（否则白关）
+        //   —— 这件事必须在确认框里说出来，不能静默做。
+        if (!on && mScan != null && mScan.skipModLoading) {
+            msg = msg + "\n\n" + Trans.get(ModsActivity.this, R.string.mods_ignore_retry_note);
+        }
         new AlertDialog.Builder(this)
                 // 标题带上模组名：原来只有「关闭此模组」，看不出关的是哪一个
                 .setTitle(getString(on ? R.string.mods_toggle_ask_on_fmt
@@ -1305,7 +1310,11 @@ public class ModsActivity extends BaseActivity {
 
     /** 真正落盘：{@link Mods#setEnabled}（门禁 + 备份 + 原子写 + 读回自检），然后把结果摊开 */
     private void doToggle(String internalName, boolean on, String shownName) {
-        SettingsBin.Result r = Mods.setEnabled(this, mSlot, internalName, on);
+        // ★★ 「忽略它试试」（2026-10-08）：在“下次启动会整槽跳过”的状态下，
+        //    关掉这个模组**必须连 `launchid.dat` 一起清** —— 否则下次启动连它带别的一起被跳过。
+        SettingsBin.Result r = (!on && mScan != null && mScan.skipModLoading)
+                ? Mods.ignoreAndRetry(this, mSlot, internalName)
+                : Mods.setEnabled(this, mSlot, internalName, on);
         showToggleResult(r, shownName, on, 0);
         rescan();
     }

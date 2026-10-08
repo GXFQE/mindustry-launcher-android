@@ -661,6 +661,7 @@
     -->
     <string name="mods_gate_android_load">安卓能加载它</string>
     <string name="mods_gate_android_load_note">它写明要 Java，但包里没有安卓能跑的代码 ⇒ 游戏会试着加载、然后跳过</string>
+    <string name="mods_ignore_retry_note">顺带会清掉「上次没跑完」的标记 —— 否则下次启动还是整槽跳过，关掉它等于白关</string>
     <string name="mods_gate_enabled">游戏里启用着它</string>
     <string name="mods_gate_enabled_note">还没读到游戏的设置文件 ⇒ 这里显示的是默认值（没写过 = 启用）</string>
     <!-- ★ 2026-10-08：这一关**不通过**时原来没有原因（note 只跟着"设置读没读到"）⇒ 详情页直接印出 null。

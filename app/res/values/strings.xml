@@ -816,6 +816,7 @@
     -->
     <string name="mods_gate_android_load">Android can load it</string>
     <string name="mods_gate_android_load_note">it says it needs Java, but the package has no code Android can run, so the game will try to load it and then skip it</string>
+    <string name="mods_ignore_retry_note">this also clears the last-launch-did-not-finish mark - otherwise the next launch still skips the whole slot and switching it off would do nothing</string>
     <string name="mods_gate_enabled">the game has it switched on</string>
     <string name="mods_gate_enabled_note">the game settings file has not been read yet, so this shows the default (never written means enabled)</string>
     <string name="mods_gate_enabled_off">it is turned off — press Enable to turn it on</string>

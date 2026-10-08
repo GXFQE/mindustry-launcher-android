@@ -553,6 +553,35 @@ public final class Mods {
      *
      * @param only 只改这些模组（null = 传进来的整份列表）
      */
+    /**
+     * ★★ **「忽略它试试」**（2026-10-08 用户点单：「其实更应该是**忽略这个试试**，
+     * 因为一般只是一个模组搞崩溃的」）。
+     *
+     * <p>做的事 = **关掉这个模组**（走 {@link #setEnabled}，成对写 `-enabled` / `-failed`）
+     * ＋ **删掉 {@code launchid.dat}**。
+     *
+     * <p>⚠️ 为什么必须删那个文件：`launchid.dat` 在 ⇒ 游戏下次启动会**整槽跳过**
+     * （`failedToLaunch && modcrashdisable`，见 REF §86.1②）—— 那时“关掉一个模组再试”**等于白关**：
+     * 整槽都不会加载。删掉它 = 告诉游戏“上次那次算正常结束了”⇒
+     * 下次启动**真的会加载其余的模组** ⇒ 这才是一次有效的“排除法”尝试。
+     * 若还崩，游戏自己会重新写下它并把整槽关掉（**自修复**，不需要我们兜底）。
+     *
+     * <p>⚠️ 只在“启停本身成功”之后才动 `launchid.dat`（游戏在跑 / 设置读不出来时一律不碰）。
+     */
+    public static SettingsBin.Result ignoreAndRetry(Context ctx, String slot, String internalName) {
+        SettingsBin.Result r = setEnabled(ctx, slot, internalName, false);
+        if (!r.ok) return r;                     // 启停没成功 ⇒ 一个字都不多动
+        File root = Data.dirOf(ctx, slot);
+        File lid = root == null ? null : new File(root, "launchid.dat");
+        boolean cleared = lid != null && lid.isFile() && lid.delete();
+        r.changeDesc = (r.changeDesc == null ? "" : r.changeDesc + " ")
+                + (cleared
+                        ? "另外清掉了「上次没跑完」的标记（launchid.dat）"
+                          + "—— 下次启动不会再整槽跳过"
+                        : "（本来就没有「上次没跑完」的标记，无需清）");
+        return r;
+    }
+
     public static SettingsBin.Result setEnabledAll(Context ctx, String slot, boolean on,
                                                    List<Info> only) {
         SettingsBin.Result r = new SettingsBin.Result();
