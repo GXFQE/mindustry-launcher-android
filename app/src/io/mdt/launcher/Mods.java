@@ -2058,8 +2058,15 @@ public final class Mods {
         out.add(new Gate(Trans.get(ctx, R.string.mods_gate_android_load), canLoad,
                 canLoad ? null : Trans.get(ctx, R.string.mods_gate_android_load_note)));
 
+        // 🔴 2026-10-08 修：原来这句是 `m.settingsKnown ? null : …note` —— **说明只跟着"设置读没读到"**，
+        //   于是"模组被关掉"时这一关不通过、原因却是 null ⇒ 详情页那行（❌ 标签 + 换行 + 原因）
+        //   直接印出 **null**（用户截图抓到的）。现在按**通过与不通过**给原因，并且把「点启用」
+        //   这个动作**收在这一关**（它才是"这个模组开没开"的判据；下面"上次启动"那一关只讲机制）。
         out.add(new Gate(Trans.get(ctx, R.string.mods_gate_enabled), m.enabled,
-                m.settingsKnown ? null : Trans.get(ctx, R.string.mods_gate_enabled_note)));
+                m.enabled
+                        ? (m.settingsKnown ? null : Trans.get(ctx, R.string.mods_gate_enabled_note))
+                        : (!m.settingsKnown ? Trans.get(ctx, R.string.mods_gate_enabled_unknown)
+                                : Trans.get(ctx, R.string.mods_gate_enabled_off))));
 
         boolean verOk = isAtLeast(gameBuild, gameRevision, m.minGameVersion);
         final String curVer = gameBuild == 0 ? Trans.get(ctx, R.string.mods_gate_no_version)
@@ -2102,14 +2109,11 @@ public final class Mods {
                 lastCrashOk
                         // 通过但"上次没跑完"（用户关了 modcrashdisable）⇒ 值得说一句
                         ? (lid ? Trans.get(ctx, R.string.mods_gate_last_crash_note) : null)
-                        // 🔴 不通过时只说**这个模组该做什么**，而且**跟着它当前的状态走**：
-                        //   关着的 ⇒ 让它"点启用"；开着的 ⇒ 说重试 / 怎么别再被整槽跳过。
-                        //   用户原话：「想再试就点启用，但现在状态就是启用（这矛盾啊）」。
-                        //   ⚠️ 也不再写"游戏把它标成失败" —— 那是**全槽级**标记（一崩全槽都标上），
-                        //   搁在这道**按模组**的门里就是 §85.16 那类错（槽级事实说成项级判断）。
-                        : Trans.get(ctx, !m.enabled ? R.string.mods_gate_last_crash_off
-                                : (skipping ? R.string.mods_gate_last_crash_skip_again
-                                            : R.string.mods_gate_last_crash_retry))));
+                        // 🔴 不通过时只讲**机制与槽级动作**（"点启用"归上面那道"游戏里是启用状态"——
+                        //   两处都说就成了同一屏重复，用户说的"乱"有一部分就是它）：
+                        //   `-enabled` / `-failed` 的真义见 failedKey 的 Javadoc（字节码级定案）。
+                        : Trans.get(ctx, skipping ? R.string.mods_gate_last_crash_skip_again
+                                                  : R.string.mods_gate_last_crash_retry)));
         return out;
     }
 

@@ -5498,6 +5498,54 @@ public final class SelfTest {
             ok(stat, L, gateCount == 6 && gateMiss.length() == 0,
                     "★P3：六道加载门的标签齐全；**没通过的**那几关必须给原因（通过了可只画一行）；"
                             + "门数=" + gateCount + "，缺=" + gateMiss);
+            // 🔴 2026-10-08：上面那把尺子**只喂了"启用中"的夹具** ⇒ 漏掉一整类：
+            //   模组被关掉时那道「游戏里是启用状态」不通过，而它的原因只在"设置没读到"时才给
+            //   ⇒ 详情页那行（❌ 标签 + 换行 + 原因）**直接印出 null**（用户截图抓到的）。
+            //   ⇒ 夹具扩到六种状态，并且**明文禁止 note 里出现"null"**。
+            java.util.List<Object[]> gateCases = new java.util.ArrayList<>();
+            Mods.Info gcOn = mkMod("gate-on", null, null, true);
+            Mods.Info gcOff = mkMod("gate-off", null, null, false);
+            Mods.Info gcFailed = mkMod("gate-failed", null, null, true);
+            gcFailed.failed = true;
+            Mods.Info gcUnknown = mkMod("gate-unknown", null, null, true);
+            gcUnknown.settingsKnown = false;
+            Mods.Info gcWorst = mkMod("gate-worst", null, null, false);   // 用户那一屏：关闭 + 记录 + 还会再跳
+            gcWorst.failed = true;
+            Mods.Scan gcSkipScan = new Mods.Scan("m3-gate", null);
+            gcSkipScan.launchIdExists = true;
+            gcSkipScan.skipModLoading = true;
+            gateCases.add(new Object[]{"启用中", gcOn, null});
+            gateCases.add(new Object[]{"被关掉", gcOff, null});
+            gateCases.add(new Object[]{"有失败记录", gcFailed, null});
+            gateCases.add(new Object[]{"设置没读到", gcUnknown, null});
+            gateCases.add(new Object[]{"还会整槽跳过", gcOn, gcSkipScan});
+            gateCases.add(new Object[]{"关闭+记录+还会跳", gcWorst, gcSkipScan});
+            StringBuilder gateBad = new StringBuilder();
+            for (Object[] c : gateCases) {
+                String name = (String) c[0];
+                java.util.List<Mods.Gate> gs = Mods.gates(ctx, (Mods.Info) c[1], 0, 0, (Mods.Scan) c[2]);
+                if (gs.size() != 6) gateBad.append(name).append(":门数 ").append(gs.size()).append(" ");
+                for (Mods.Gate g : gs) {
+                    if (g.label == null || g.label.isEmpty()) gateBad.append(name).append(":缺标签 ");
+                    if (!g.pass && (g.note == null || g.note.isEmpty())) gateBad.append(name).append(":缺原因 ");
+                    if (g.note != null && (g.note.contains("null") || g.note.trim().isEmpty())) {
+                        gateBad.append(name).append(":注意有 null ");
+                    }
+                    // ★ 字数预算（2026-10-08 用户："还是乱的"）：门的说明会**折行**，
+                    //   40 字以内基本是两行；再长就把六道门挤成一整屏（真正的解释放弹窗/日志）。
+                    if (g.note != null && g.note.length() > 40) {
+                        gateBad.append(name).append(":说明太长(").append(g.note.length()).append(") ");
+                    }
+                }
+            }
+            ok(stat, L, gateBad.length() == 0,
+                    "★★元断言：**六种状态**下（启用/关掉/有记录/设置没读到/还会跳/最坏组合）"
+                            + "每道门都有标签、**不通过必有原因、且原因里不许出现 null** —— "
+                            + (gateBad.length() == 0 ? "全过" : "问题：" + gateBad));
+            ok(stat, L, !ctx.getString(R.string.mods_gate_enabled_off).isEmpty()
+                            && Mods.gates(ctx, gcOff, 0, 0, null).get(1).note != null
+                            && Mods.gates(ctx, gcOff, 0, 0, null).get(1).note.contains("「启用」"),
+                    "★「游戏里是启用状态」不通过时：原因在、并且给出「启用」这个动作（改前是 null）");
             // ── ★★ 2026-10-08 修（用户真机反馈：「上次启动没崩到跳过」这句有问题）──
             //    原来最后那道门的 `pass` **写死 true**，判据一行没算 ⇒ 详情页会同时写着
             //    「❌ 已被标记为失败：是」和「✅ 上次启动没崩到跳过全部模组」两句互相打脸。
@@ -5546,16 +5594,25 @@ public final class SelfTest {
                     "★元断言：两支不通过的**建议不同** ⇒ 文案真的分开了，不是一句万金油");
             // ★★ 2026-10-08：**建议必须跟着当前状态走** —— 用户原话
             //    「想再试就点启用，但现在状态就是启用（这矛盾啊）」。
-            //    判据：模组**开着**时，那道门的说明里**不许**出现"点「启用」"。
+            //    ★ 本批（第十五批）机制定案后口径**再收紧**：那个动作**只许出现在
+            //      「游戏里是启用状态」那道门**（它才是"这个模组开没开"的判据）；
+            //      「上次启动」那道门**任何状态下都不许**说"点启用" —— 两处都说就是同一屏重复
+            //      （用户说的"乱"有一部分就是它）。
             Mods.Info gOn = mkMod("gate-crash-probe", null, null, true);      // 启用中
             gOn.failed = true;
             Mods.Info gOff = mkMod("gate-crash-probe", null, null, false);    // 已关掉
             gOff.failed = true;
             String noteOn = String.valueOf(lastGateOf(ctx, gOn, gScan).note);
             String noteOff = String.valueOf(lastGateOf(ctx, gOff, gScan).note);
-            ok(stat, L, !noteOn.contains("「启用」") && noteOff.contains("「启用」"),
-                    "★★建议跟着状态走：**开着**的模组不说「点启用」（实得「" + noteOn
-                            + "」）；**关掉**的才说（实得「" + noteOff + "」）");
+            ok(stat, L, !noteOn.contains("「启用」") && !noteOff.contains("「启用」"),
+                    "★★「上次启动」那道门**任何状态下**都不说「点启用」（动作归"
+                            + "「游戏里是启用状态」那道门）—— 实得开着「" + noteOn
+                            + "」/ 关着「" + noteOff + "」");
+            ok(stat, L, Mods.gates(ctx, gOn, 0, 0, gScan).get(1).pass
+                            && Mods.gates(ctx, gOff, 0, 0, gScan).get(1).note != null
+                            && Mods.gates(ctx, gOff, 0, 0, gScan).get(1).note.contains("「启用」"),
+                    "★动作落在**对的门**上：关掉的模组在「游戏里是启用状态」那道门拿到「启用」；"
+                            + "开着的那道门通过（不再有第二条门重复给同一个动作）");
             ok(stat, L, !noteOn.contains("标成失败") && !noteFail.contains("标成失败"),
                     "★元断言：门的说明里不再写「把它标成失败」—— 那是**全槽级**标记"
                             + "（一崩 12 个模组全有），搁在按模组的门里就是 §85.16 那类错");

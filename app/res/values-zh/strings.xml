@@ -654,6 +654,10 @@
     <string name="mods_gate_android_load_note">它写明要 Java，但包里没有安卓能跑的代码 ⇒ 游戏会试着加载、然后跳过</string>
     <string name="mods_gate_enabled">游戏里是启用状态</string>
     <string name="mods_gate_enabled_note">还没读到游戏的设置文件 ⇒ 这里显示的是默认值（没写过 = 启用）</string>
+    <!-- ★ 2026-10-08：这一关**不通过**时原来没有原因（note 只跟着"设置读没读到"）⇒ 详情页直接印出 null。
+         现在原因与动作都收在这一关（"点启用"归它；下面"上次启动"那一关只讲机制，避免同屏重复）。 -->
+    <string name="mods_gate_enabled_off">它被关掉了 —— 点「启用」就能打开</string>
+    <string name="mods_gate_enabled_unknown">设置文件还没读出来，拿不到它的开关状态</string>
     <string name="mods_gate_version">游戏版本够新</string>
     <string name="mods_gate_version_note_fmt">它要求 %1$s 以上，当前是 %2$s</string>
     <string name="mods_gate_minver">满足最低版本要求</string>
@@ -671,9 +675,8 @@
          —— 关着的才说"点启用"；开着的说重试/怎么让它别再被跳过。
          ⚠️ 原来还写「游戏把它标成失败」：那是**全槽级**标记（一崩 12 个模组全有），
          搁在这儿等于把槽级事实说成这个模组的事（§85.16 同一类错的第三处）⇒ 删掉。 -->
-    <string name="mods_gate_last_crash_off">它现在是关着的 —— 想再试就点「启用」</string>
-    <string name="mods_gate_last_crash_skip_again">先关掉点名那个模组，或关掉「启动崩溃后禁用模组」</string>
-    <string name="mods_gate_last_crash_retry">下次启动会再试它；要是还崩，先把它关掉</string>
+    <string name="mods_gate_last_crash_skip_again">下次启动还会关掉整槽模组 —— 先关掉点名那个模组，或关掉「启动崩溃后禁用模组」</string>
+    <string name="mods_gate_last_crash_retry">那次游戏把整槽模组都关掉了（这条记录还在）</string>
     <string name="mods_gate_no_version">还没指定版本</string>
     <!-- ══ 模组页的几条（P3）：导入失败 + 详情弹窗的补充说明 ══════════════════
          ⚠️ 原文里「（照抄 Mods.resolveDependencies）」是**维护者自我说明 / 源码出处**，

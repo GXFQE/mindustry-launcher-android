@@ -816,6 +816,8 @@
     <string name="mods_gate_android_load_note">it says it needs Java, but the package has no code Android can run, so the game will try to load it and then skip it</string>
     <string name="mods_gate_enabled">enabled in the game</string>
     <string name="mods_gate_enabled_note">the game settings file has not been read yet, so this shows the default (never written means enabled)</string>
+    <string name="mods_gate_enabled_off">it is turned off — press Enable to turn it on</string>
+    <string name="mods_gate_enabled_unknown">the settings file could not be read, so its switch state is unknown</string>
     <string name="mods_gate_version">the game version is new enough</string>
     <string name="mods_gate_version_note_fmt">it needs %1$s or newer; this one is %2$s</string>
     <string name="mods_gate_minver">meets the minimum version</string>
@@ -828,9 +830,8 @@
     <string name="mods_gate_last_crash_bad">the last launch crashed into skipping the whole slot</string>
     <string name="mods_gate_last_crash_note">the last launch did not finish, but you turned off skip-mods-after-crash, so nothing gets skipped</string>
     <!-- Fail case: the advice follows THIS mod's current state (already enabled => do not say "press Enable"). -->
-    <string name="mods_gate_last_crash_off">it is currently off — press Enable to try again</string>
-    <string name="mods_gate_last_crash_skip_again">turn off the mod named above, or turn off skip-mods-after-crash</string>
-    <string name="mods_gate_last_crash_retry">the next launch retries it; if it crashes again, turn it off first</string>
+    <string name="mods_gate_last_crash_skip_again">the next launch turns off every mod in the slot again — turn off the mod named above, or turn off skip-mods-after-crash</string>
+    <string name="mods_gate_last_crash_retry">the game turned off every mod in the slot that time (the record is still here)</string>
     <string name="mods_gate_no_version">no version set yet</string>
     <!-- ══ 模组页的几条（P3）：导入失败 + 详情弹窗的补充说明 ══════════════════
          ⚠️ 原文里「（照抄 Mods.resolveDependencies）」是**维护者自我说明 / 源码出处**，
