@@ -277,7 +277,7 @@
     <string name="delete_slot_confirm_title_fmt">Delete slot \"%1$s\"?</string>
     <!-- ⚠️ 这里**不能**用 `**` 表示强调：弹窗是纯文本（AlertDialog.setMessage），
          `**` 会原样显示成星号。要加重语气只能靠措辞。全工程同此纪律。 -->
-    <string name="delete_slot_warn">Everything in this slot moves to the transfer station, its backups included. You can put it back from Settings:\n\n</string>
+    <string name="delete_slot_warn">Everything in this slot moves to the transfer station, its backups included. You can put it back from the transfer station on the home screen:\n\n</string>
     <string name="delete_slot_files_fmt">%1$d files · %2$s\n</string>
     <string name="delete_slot_with_backups_fmt">\nIts %1$d backups move along with it.</string>
     <string name="delete_slot_no_backups">\n(this slot has no backups)</string>
@@ -423,7 +423,7 @@
       ③ ★ 2026-10-05（中转站页面落地）：那句「可以手工取回」的**替代说法**现在真的成立了 ——
          删除确认里直接点明"去设置里的中转站放回来"。页面见 TrashActivity。
     -->
-    <string name="map_delete_confirm_fmt">Move \"%1$s\" to the transfer station?\n\nIt does not really disappear (it stays on the phone), but the game will not see it.\nYou can put it back later from Transfer station in Settings. The station keeps at most 20 maps; deleting more pushes out the oldest.</string>
+    <string name="map_delete_confirm_fmt">Move \"%1$s\" to the transfer station?\n\nIt does not really disappear (it stays on the phone), but the game will not see it.\nYou can put it back later from the transfer station on the home screen. The station keeps at most 20 maps; deleting more pushes out the oldest.</string>
     <string name="map_deleted_ok_fmt">Moved \"%1$s\" to the transfer station</string>
     <!-- ★ 游戏在跑这条路已由 UI 提前拦下（见 MapDetailActivity.confirmDelete）⇒ 这句只说剩下的原因 -->
     <string name="map_delete_fail">Cannot delete: another app may be holding this map open.</string>
@@ -984,7 +984,7 @@
       either, so the old map is sitting in the transfer station right now. Say so — otherwise the user
       thinks the map is gone. %1$s = target path, %2$s = transfer station directory.
     -->
-    <string name="mapfile_err_rename_stash_fmt">Rename failed: %1$s\nThe old copy is not lost — it is in Settings → Transfer station: %2$s</string>
+    <string name="mapfile_err_rename_stash_fmt">Rename failed: %1$s\nThe old copy is not lost — it is in Home → Transfer station: %2$s</string>
 
     <!--
       ══ 整槽 zip 导入的失败原因（P3）══════════════════════════════════════
@@ -1172,7 +1172,7 @@
     <string name="launch_progress_msg_fmt">%1$s\npreparing the save slot · checking this package…</string>
     <string name="game_start_failed_fmt">Launch failed (%1$s)</string>
     <string name="game_step_stuck_fmt">Stuck at step: %1$s\n\n%2$s</string>
-    <string name="game_report_hint">\n\nA detailed record was written to the runtime log (Settings → Runtime log).</string>
+    <string name="game_report_hint">\n\nA detailed record was written to the runtime log (Home → Runtime log).</string>
     <string name="game_cannot_start">Cannot start</string>
     <string name="game_pkg_missing_fmt">Cannot find the game package to start\n(%1$s)</string>
     <string name="step_prepare">prepare</string>

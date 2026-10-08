@@ -275,7 +275,7 @@
     <string name="delete_slot_confirm_title_fmt">删除槽「%1$s」？</string>
     <!-- ⚠️ 这里**不能**用 `**` 表示强调：弹窗是纯文本（AlertDialog.setMessage），
          `**` 会原样显示成星号。要加重语气只能靠措辞。全工程同此纪律。 -->
-    <string name="delete_slot_warn">这个槽的全部数据会挪进中转站（连同它的备份），之后可以在设置里放回来：\n\n</string>
+    <string name="delete_slot_warn">这个槽的全部数据会挪进中转站（连同它的备份），之后可以在主界面「中转站」里放回来：\n\n</string>
     <string name="delete_slot_files_fmt">%1$d 个文件 · %2$s\n</string>
     <string name="delete_slot_with_backups_fmt">\n它的 %1$d 份备份一起挪走。</string>
     <string name="delete_slot_no_backups">\n（这个槽没有备份）</string>
@@ -416,9 +416,9 @@
       ② 中转站有份数上限（`Trash.KEEP = 20`，地图与模组同一个口径）。原来一个字都没提，
          删到第 21 张时第一张已被**静默硬删** —— 现在明说。
       ③ ★ 2026-10-05（中转站页面落地）：那句「可以手工取回」的**替代说法**现在真的成立了 ——
-         删除确认里直接点明"去设置里的中转站放回来"。页面见 TrashActivity。
+         删除确认里直接点明"去主界面的中转站放回来"（2026-10-08 第 123 轮：中转站从设置页搬到主界面工具卡）。页面见 TrashActivity。
     -->
-    <string name="map_delete_confirm_fmt">把「%1$s」挪进中转站？\n\n它不会真的消失（还在手机里），但游戏里就看不到它了。\n之后可以在设置的「中转站」里放回来；那里最多留 20 份，再删会顶掉最早的那份。</string>
+    <string name="map_delete_confirm_fmt">把「%1$s」挪进中转站？\n\n它不会真的消失（还在手机里），但游戏里就看不到它了。\n之后可以在主界面的「中转站」里放回来；那里最多留 20 份，再删会顶掉最早的那份。</string>
     <string name="map_deleted_ok_fmt">已把「%1$s」挪进中转站</string>
     <!-- ★ 游戏在跑这条路已由 UI 提前拦下（见 MapDetailActivity.confirmDelete）⇒ 这句只说剩下的原因 -->
     <string name="map_delete_fail">删不掉：这张图可能正被别的程序占用着。</string>
@@ -949,10 +949,10 @@
     <string name="mapfile_err_rename_fmt">改名失败：%1$s</string>
     <!--
       ★ 2026-10-06：覆盖导入时，`.part` 就位失败**且旧的也没能搬回去** ⇒ 旧的此刻在中转站里。
-      必须把这件事说出来（否则用户以为那张图丢了，其实「存档与备份 → 中转站」里能捞回来）。
+      必须把这件事说出来（否则用户以为那张图丢了，其实主界面的「中转站」里能捞回来）。
       %1$s = 目标路径，%2$s = 中转站目录
     -->
-    <string name="mapfile_err_rename_stash_fmt">改名失败：%1$s\n旧的那份没有丢 —— 它现在在「设置 → 中转站」里：%2$s</string>
+    <string name="mapfile_err_rename_stash_fmt">改名失败：%1$s\n旧的那份没有丢 —— 它现在在「主界面 → 中转站」里：%2$s</string>
 
     <!--
       ══ 整槽 zip 导入的失败原因（P3）══════════════════════════════════════
@@ -1141,7 +1141,7 @@
     <string name="launch_progress_msg_fmt">%1$s\n正在准备存档槽 · 检查这个包…</string>
     <string name="game_start_failed_fmt">启动失败（%1$s）</string>
     <string name="game_step_stuck_fmt">卡在步骤：%1$s\n\n%2$s</string>
-    <string name="game_report_hint">\n\n详细记录已写进运行日志（设置 → 运行日志）。</string>
+    <string name="game_report_hint">\n\n详细记录已写进运行日志（主界面 → 运行日志）。</string>
     <string name="game_cannot_start">无法启动</string>
     <string name="game_pkg_missing_fmt">找不到要启动的游戏包\n（%1$s）</string>
     <string name="step_prepare">准备</string>
@@ -1179,7 +1179,7 @@
       起因（用户 2026-10-05）：「这个中转站像是个半成品啊」。此前"中转站"只是数据层的一个
       目录（地图/模组被覆盖或删除时旧件挪进去），界面上**一处入口都没有** ——
       文案却一直对用户说"挪进中转站，不会直接删掉"，等于承诺了一个进不去的地方。
-      这里补齐：入口在设置页一行，页面能看列表 / 放回去 / 彻底删除 / 清空 / 占用。
+      这里补齐：入口一行为主（2026-10-08 第 123 轮从设置页搬去主界面的工具卡），页面能看列表 / 放回去 / 彻底删除 / 清空 / 占用。
 
       ★ 术语与老文案保持一致（`map_delete` 那几条说的是"中转站"）——
         同一个东西在界面上有两种叫法，用户会以为是两件事。

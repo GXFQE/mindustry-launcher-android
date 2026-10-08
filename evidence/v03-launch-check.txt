@@ -1,0 +1,25 @@
+MDT 启动器 v0.3-preview —— 发版前「最基础功能」真机验证（2026-10-08）
+=====================================================================
+
+设备：HONOR ELP-AN00 / Android 16 (API 36)
+被测包：本地构建的**产品版**（DEBUGGABLE=false，debug.keystore 签名；
+        与发布包的差别只有签名密钥与清单里的版本号）
+路径：启动器主界面 → 点版本行「Mindustry 159.7」→ 游戏主菜单 → 载入游戏 → 退出
+
+判据与实测
+----------
+1. :game 进程起来了           pid 15328  (io.mdt.launcher:game)
+2. 坑位 Activity 到前台        mCurrentFocus = io.mdt.launcher/mindustry.android.AndroidLauncher
+3. 启动管线报告六步全绿        hub/report-launch.txt：
+                             预热成功(第1次) · dexElements=2 · 看到 mindustry.android.AndroidLauncher
+                             · ABI=arm64-v8a · libarc.so 802496 B + libarc-freetype.so 471592 B 加载 OK
+                             · AssetManager 两份都 addAssetPath(base.apk) 且 probe 都 ok(336B)
+                             · startActivity 已返回、坑位 finish
+4. 游戏进到主菜单            截图 v03-launch-menu.png（Mindustry release build 159.7，
+                             战役模式 / 载入游戏 / 自定义游戏 / 加入游戏 / 地图编辑器 / 设置 / 模组 / 退出）
+5. 游戏读到**本槽的存档**     截图 v03-launch-saves.png：载入游戏里列出 3 份（含缩略图）
+                             —— 这条同时证明槽数据目录挂对了
+6. 退出游戏回到启动器         mCurrentFocus = io.mdt.launcher/.MainActivity，:game 进程消失
+7. AndroidRuntime 无崩溃      logcat -s AndroidRuntime:E 全程为空
+
+说明：截图 PNG 被 .gitignore 的 evidence/*.png 挡住（只在本地留档），本文件进仓库。
