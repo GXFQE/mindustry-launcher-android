@@ -1,0 +1,69 @@
+F23 第五批 · 客户端真正开局/继续：数据损坏不产生崩溃报告（2026-10-08，真机）
+==============================================================================
+问题：F23 的归因器只吃"游戏崩了写下的报告"。那么"**玩家真的开局/继续时，地图或存档坏了**"
+      这条路上，客户端会不会写下报告？——这是它最后一类没被任何实验覆盖的输入。
+做法（真机 GUI）：实验槽 `maplab`（不碰用户槽）+ 真模组 `stealth-path.zip`（刻意装着，
+      好回答"会不会冤枉模组"）；地图 = 用户那张 49 KB 真地图派生的 4 种坏法 + 1 份对照；
+      存档 = 用户 `2.msav` 的**副本**派生的 2 种坏法 + 1 份对照。
+
+■ 结论：**一个崩溃报告都没产生**（`slot-maplab/crashes/` 始终为空）
+
+  ① 自定义游戏 → 选「内容截断」那张 → 开始游戏 ⇒ 游戏自己弹：
+         「发生错误 · 加载地图时出错。地图文件损坏或无效。」
+     日志逐字（`slot-maplab/last_log.txt`）：
+         [E] mindustry.io.SaveIO$SaveException: java.io.IOException: Error reading region "map".
+         	at mindustry.io.SaveIO.load(SaveIO.java:8)
+         	at mindustry.core.World.loadMap(World.java:4)
+         	at mindustry.core.Control.lambda$playMap$28(Control.java:8)
+         	at arc.util.Timer$1.run(Timer.java:3)
+         	at arc.backend.android.AndroidGraphics.onDrawFrame(AndroidGraphics.java:89)
+         Caused by: java.io.IOException: Error reading region "map".
+         	at mindustry.io.SaveFileReader.readRegion(SaveFileReader.java:69)
+         	at mindustry.io.SaveVersion.read(SaveVersion.java:49)
+         Caused by: java.lang.NullPointerException: Attempt to read from field 'short mindustry.world.Tile.x'
+                   on a null object reference in method 'void mindustry.maps.filters.GenerateFilter$GenerateInput.set(mindustry.world.Tile)'
+         	at mindustry.maps.filters.GenerateFilter$GenerateInput.set(GenerateFilter.java:2)
+      ★ 注意它是**渲染线程上**的失败，照样被 `UI.loadAnd` 接住了。
+
+  ② 载入游戏 → 点「截断的存档副本」 ⇒ 游戏自己弹：
+         「发生错误 · 存档文件损坏或无效！」
+     日志逐字：
+         Caused by: java.io.IOException: Error reading region "map".
+         	at mindustry.io.SaveFileReader.readRegion(SaveFileReader.java:69)
+         	at mindustry.io.SaveVersion.read(SaveVersion.java:49)
+         	at mindustry.io.SaveIO.load(SaveIO.java:14)
+
+  ③ 另外三种地图坏法**在列表阶段就被接住**（缩略图显示 `oh no`，或干脆不列出）：
+        1cut     : Caused by: java.io.EOFException: Unexpected end of ZLIB input stream
+        2bitflip : [E] Failed to generate preview!: java.io.IOException: Error reading region "preview_map".
+                   Caused by: java.lang.ClassCastException: mindustry.content.Blocks$86
+                             cannot be cast to mindustry.world.blocks.environment.Floor   (MapIO.colorFor)
+        3badver  : [E] Failed to load custom map file '.../3badver.msav'!
+                   java.io.IOException: Unknown save version: 9999. Are you trying to load a save from a newer version?
+                   (MapIO.createMap)
+
+■ 对 F23 的意义
+  · 归因器**没有输入** ⇒ 这条路上**不可能**把"数据坏了"冤枉成某个模组（假阳性不成立）；
+  · 与语料对得上：`11-安卓设备现成报告.md` 12 份安卓真机报告里，数据损坏类签名 **0 处**；
+    有这一族的是 `09b-桌面报告-数据损坏.md`（桌面客户端才崩到写报告）
+    ⇒ **别为了让桌面报告好看，给安卓这边加一条没有真实输入的判据**。
+  · 将来真冒出来时照指纹写判据：链里同时有 `SaveIO`/`SaveVersion`/`SaveFileReader` 与
+    `Error reading region "…"`，或 `ZipException`/`EOFException`，且没有任何模组针命中。
+
+■ 没做的（诚实清单）
+  · **没试会造成 OOM 的坏法**（把地图尺寸字段改成极大）—— 那类可能绕过 try/catch 变成真崩溃
+    ⇒"这条路上一定不产生报告"**没有被证明**，只证明了这 7 种坏法不产生；
+  · 没试启动器自己读坏文件的路（那是 F10/F21 的 .msav 解析器）；
+  · 没试"数值合法但语义荒谬"的坏法（例如方块 ID 换成另一个合法 ID）。
+
+■ 三个 GUI 自动化坑（都害过我一次）
+  1. 地图列表按**内部名**显示 ⇒ 5 份夹具都叫「始发地区」时界面分不清；修法 = 改 MSAV 头的名字，
+     **等长替换**（12 字节 UTF-8 → 12 字节 ASCII，保住 writeUTF 的长度前缀）；
+  2. 列表**缓存在内存**里 ⇒ 改完 maps/ 必须重启游戏（删了 4 份后列表still 显示 5 份）；
+  3. "我点到了"不能只看 `dumpsys window` 焦点（一直写着那个 Activity）⇒ 判据 = **截图哈希**
+     （同屏重复截 hash 相同 = 界面没动）+ **游戏自己写的 last_log.txt**。
+
+■ 截图（本地，未进仓库：`evidence/*.png` 被 gitignore）
+  · map-error-dialog.png   = 「加载地图时出错。地图文件损坏或无效。」
+  · map-list-renamed.png   = 改过内部名之后的列表（cut1-map-001 / cutinner-004 / flip-map-002 / good-map-005）
+  · save-error-dialog.png  = 「存档文件损坏或无效！」
