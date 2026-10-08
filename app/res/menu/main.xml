@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  主界面的顶栏菜单（第 123 轮，2026-10-08）。
+
+  ★ 为什么是菜单而不是页内一行：用户点单「这个设置功能能不能放右上角的那种？」——
+    设置是**全局的、低频的**，占主界面一行不划算；顶栏右上角是 Android 上"全局设置"的惯例位置
+    （而且本工程本来就有 ActionBar：AppTheme → android:actionBarStyle，见 values/themes.xml）。
+  ★ 只挂 MainActivity（菜单是 per-Activity 的）⇒ 别的页面顶栏不会多出这个齿轮。
+
+  ⚠️ 两条别改回去：
+    a) 图标必须用 `@drawable/ic_settings_bar`（fillColor = @color/on_appbar）。
+       行内那份 `ic_settings` 是给深色齿轮配 `android:tint="@color/accent"` 用的，
+       **ActionBar 不会替菜单图标上色** ⇒ 拿来用会看不见（见那份 drawable 的头注释）。
+    b) 用 `android:showAsAction`（framework 的 ActionBar 属性），**不是** AppCompat 的
+       `app:showAsAction` —— 本工程零 AndroidX，没有 app 命名空间。
+  ⚠️ `android:title` 只是**无障碍/溢出菜单**用的标签，ActionBar 上不显示文字；
+     真正的标题在 MainActivity.onCreateOptionsMenu 里用 `Trans` 覆盖一遍（文案唯一入口那条纪律）。
+-->
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item
+        android:id="@+id/action_settings"
+        android:icon="@drawable/ic_settings_bar"
+        android:showAsAction="always"
+        android:title="@string/act_settings_title" />
+</menu>

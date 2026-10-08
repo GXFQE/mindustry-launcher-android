@@ -6672,6 +6672,48 @@ public final class SelfTest {
         } catch (Throwable t) {
             ok(stat, L, false, "添加游戏弹窗检查自身异常：" + t);
         }
+        // ★ 2026-10-08（第 123 轮**第二批**）：「设置」也从操作卡搬走了 ⇒ 搬去**顶栏右上角**
+        //   （ActionBar 菜单）。判据同样只能靠断言：
+        //   ① 菜单资源里那一项**必须带图标** —— ActionBar 不替菜单图标上色，图标一旦忘了写，
+        //      顶栏上是个"看不见但能点"的空洞（画得出来、也点得着，就是不显示）；
+        //   ② MainActivity **必须真的覆写那两个回调** —— 只 inflate 菜单资源而不接回调的话，
+        //      齿轮画得出来、点下去没反应，同样不报错、不崩。
+        try {
+            android.widget.PopupMenu pm = new android.widget.PopupMenu(ctx, new android.view.View(ctx));
+            pm.getMenuInflater().inflate(R.menu.main, pm.getMenu());
+            android.view.MenuItem it = pm.getMenu().findItem(R.id.action_settings);
+            ok(stat, L, it != null && it.getIcon() != null,
+                    "★顶栏菜单：res/menu/main.xml 里有 action_settings **且带图标**"
+                            + "（图标必须是 ic_settings_bar —— 行内那份在顶栏上看不见）");
+            boolean titled = it != null && it.getTitle() != null && it.getTitle().length() > 0;
+            ok(stat, L, titled, "★顶栏菜单项有无障碍/溢出用的标题（Trans 会再覆盖一遍）");
+        } catch (Throwable t) {
+            ok(stat, L, false, "顶栏菜单检查自身异常：" + t);
+        }
+        try {
+            MainActivity.class.getDeclaredMethod("onCreateOptionsMenu", android.view.Menu.class);
+            MainActivity.class.getDeclaredMethod("onOptionsItemSelected", android.view.MenuItem.class);
+            ok(stat, L, true, "★MainActivity 真的覆写了 onCreateOptionsMenu / onOptionsItemSelected"
+                    + "（否则顶栏齿轮点下去没反应，且不报错）");
+        } catch (Throwable t) {
+            ok(stat, L, false, "MainActivity 没有接上菜单回调：" + t);
+        }
+        // ★ 操作卡此时只剩两行（添加游戏 / 存档与备份）—— 数"带 act_title 的子节点"，
+        //   1dp 分割线是没有这个 id 的 View ⇒ 天然不计数（这也是"多一条线"那类漏的形状判据）。
+        try {
+            android.view.View m = inf.inflate(R.layout.activity_main, null);
+            android.view.View addGame = m.findViewById(R.id.row_add_game);
+            android.view.ViewGroup card = addGame == null ? null
+                    : (android.view.ViewGroup) addGame.getParent();
+            int rows = 0;
+            for (int i = 0; card != null && i < card.getChildCount(); i++) {
+                if (card.getChildAt(i).findViewById(R.id.act_title) != null) rows++;
+            }
+            ok(stat, L, rows == 2,
+                    "★主界面操作卡只剩两行（添加游戏 / 存档与备份）——「设置」在顶栏；实得 " + rows + " 行");
+        } catch (Throwable t) {
+            ok(stat, L, false, "操作卡行数检查自身异常：" + t);
+        }
         L.add("");
     }
 

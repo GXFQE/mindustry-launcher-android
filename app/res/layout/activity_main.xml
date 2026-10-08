@@ -8,8 +8,10 @@
           ├ 顶部区（原"固定"，现随整页一起滚）
           │   ├ 状态摘要卡 —— 默认一行，点一下展开完整路径（F1b 的「弱化信息块」决策）
           │   ├ 主按钮「继续上次」—— 仅当 lastVersion 能在已发现版本里命中时可见
-          │   ├ 操作分组卡 —— 添加游戏 / 存档与备份 / 设置（三行 + 细分割线）
+          │   ├ 操作分组卡 —— 添加游戏 / 存档与备份（两行 + 细分割线）
           │   └ 工具卡 —— 中转站 / 运行日志（第 123 轮从设置页搬来，两行 + 细分割线）
+          │      ★ 「设置」第 123 轮第二批搬去了**顶栏右上角的齿轮**（res/menu/main.xml），
+          │        不再是页内一行 —— 它本来就不属于这条"把游戏跑起来"的主线。
           ├ 版本列表容器（LinearLayout，条目由代码 addView 全展开）
           └ 空态 TextView（可见性由代码控制，不再依赖 setEmptyView）
 
@@ -160,12 +162,16 @@
             </LinearLayout>
 
             <!--
-              操作分组卡（三行共用 row_action，行间细分割线）。行顺序 = 使用频率。
+              操作分组卡（两行共用 row_action，行间细分割线）。行顺序 = 使用频率。
 
               ★ 2026-10-08（第 123 轮，用户点单）：「添加包名」「导入 APK」原本各占一行 ——
                 它们是**同一件事的两条路**（把一个游戏版本交给启动器），并排两行会让人以为
                 要分两步走，主界面也白占一行。现在合成一行「添加游戏」，两条路进弹窗
                 （见 MainActivity.promptAddGame 与 layout/dialog_add_game.xml）。
+              ★ 同轮第二批（用户：「这个设置功能能不能放右上角的那种？」）：「设置」这一行
+                **搬到顶栏右上角的齿轮**（ActionBar 菜单，见 res/menu/main.xml）——
+                全局 / 低频的入口占页内一行不划算，而顶栏右上角正是 Android 的惯例位置。
+                ⇒ 本卡只剩两行；本页的入口总数从 5 变 4（两张卡各 2 行）+ 顶栏 1 个齿轮。
               ⚠️ 加/删一行时**分割线要跟着一起加/删**：2026-10-06 就是"删了行没删线"，
                 真机上「存档与备份」与「设置」之间留了一条**双线空档**（看着像少了一行）。
                 aapt2 / 编译器对"多一条 1dp 的线"完全无感，判据只能靠**看**。
@@ -191,18 +197,6 @@
 
                 <include
                     android:id="@+id/row_saves"
-                    layout="@layout/row_action"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content" />
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="62dp"
-                    android:background="@color/divider" />
-
-                <include
-                    android:id="@+id/row_settings"
                     layout="@layout/row_action"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />

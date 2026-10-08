@@ -49,8 +49,8 @@ point the game at that directory when it starts.
    - tap that version to launch. **Continue** goes straight back to the version you launched last.
 
 The interface **follows your system language**: 简体中文 on a phone set to Chinese, English otherwise
-(English and Simplified Chinese are the only translations so far). **Settings → Language** overrides
-that, including switching back to following the system.
+(English and Simplified Chinese are the only translations so far). **Settings → Language** (the gear at
+the top right) overrides that, including switching back to following the system.
 
 ## What it can do
 
@@ -178,9 +178,10 @@ that, including switching back to following the system.
   there and can be put back
 - **Theme**: follow system / light / dark, and **Language**: follow system / English / 简体中文 —
   both switched inside the app, without touching system settings
-- **Settings** (only things you can *change*): default slot for newly found versions, how many crash
-  reports to keep, automatic cleanup (with a manual "clean up once now"), and **storage used** (what
-  each slot, the backups and the transfer station take, and how much the content-addressed store saves)
+- **Settings** (**the gear at the top right**; only things you can *change*): default slot for newly
+  found versions, how many crash reports to keep, automatic cleanup (with a manual "clean up once now"),
+  and **storage used** (what each slot, the backups and the transfer station take, and how much the
+  content-addressed store saves)
 
 ## What is not there yet
 

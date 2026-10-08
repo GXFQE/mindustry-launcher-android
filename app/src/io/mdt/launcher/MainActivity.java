@@ -16,6 +16,8 @@ import android.text.TextUtils;
 import android.text.style.ForegroundColorSpan;
 import android.text.style.RelativeSizeSpan;
 import android.view.LayoutInflater;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
@@ -1442,12 +1444,9 @@ public class MainActivity extends BaseActivity {
         // ★ 导航重构（REF §56，用户 2026-10-03 定案）：主界面**不再有「模组」这一行** ——
         //   模组住在槽内部，入口统一收进「存档与备份 → 点一个槽 → 模组」那一页。
         //   （原来那行只是"拿当前槽进模组页"，而这正是槽二级页面要做的事。）
-        Util.bindAction(root, R.id.row_settings, R.drawable.ic_settings,
-                R.string.act_settings_title, R.string.act_settings_sub, new Runnable() {
-                    @Override public void run() {
-                        startActivity(new Intent(MainActivity.this, SettingsActivity.class));
-                    }
-                });
+        // ★ 2026-10-08（第 123 轮第二批，用户：「这个设置功能能不能放右上角的那种？」）：
+        //   「设置」那一行**也删了** —— 它现在是顶栏右上角的齿轮（见 onCreateOptionsMenu
+        //   与 res/menu/main.xml）。全局 / 低频的入口占页内一行不划算，顶栏右上角才是惯例位置。
 
         // ★ 工具卡（2026-10-08，第 123 轮，用户点单）：中转站 / 运行日志从设置页搬来。
         //   判据：这两项都不是"设置" —— 一个是 per-hub 的回收站，一个是诊断用的日志页；
@@ -1473,6 +1472,39 @@ public class MainActivity extends BaseActivity {
 
         Util.applySystemInsets(root);
         setContentView(root);
+    }
+
+    // ── 顶栏右上角：设置（第 123 轮第二批）───────────────────────────────────
+
+    /**
+     * 主界面顶栏右上角的齿轮 = 「设置」。
+     *
+     * ★ 为什么是菜单而不是页内一行（用户 2026-10-08：「这个设置功能能不能放右上角的那种？」）：
+     *   设置是**全局的、低频的**，而主界面那两张卡是"把一个游戏跑起来"这条主线
+     *   （添加游戏 / 存档与备份 / 中转站 / 运行日志）—— 它夹在里面本来就不合群。
+     *   顶栏右上角是 Android 上"全局设置"的惯例位置，而本工程本来就有 ActionBar
+     *   （AppTheme → android:actionBarStyle）。
+     * ★ 菜单是 **per-Activity** 的 ⇒ 别的页面顶栏不会多出这个齿轮。
+     * ⚠️ 图标用的是单独一份 `ic_settings_bar`（fillColor = @color/on_appbar）：
+     *   **ActionBar 不会替菜单图标上色**，行内那份 `ic_settings` 画上去会看不见。
+     */
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.main, menu);
+        // ★ 标题走 Trans（文案唯一入口那条纪律）：菜单项标题虽然不在顶栏显示，
+        //   但它是**无障碍标签**与溢出菜单的文字，用户语言包必须能改到它。
+        MenuItem it = menu.findItem(R.id.action_settings);
+        if (it != null) it.setTitle(Trans.get(MainActivity.this, R.string.act_settings_title));
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        if (item.getItemId() == R.id.action_settings) {
+            startActivity(new Intent(MainActivity.this, SettingsActivity.class));
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 
     private void rescan() {
