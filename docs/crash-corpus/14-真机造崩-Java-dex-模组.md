@@ -284,3 +284,42 @@ adb shell am start -n io.mdt.launcher/.MainActivity --es dev_launch_key "import:
 2. ⚠️ **dev 口的 key 是 `import:<文件名>.apk`**，不是界面上那个短名：传 `official-159` 会命中
    `dev_launch_key 未命中`（弹窗里会把可用 key 列出来）。另：`am start --es k ""` **不接受空值**
    （要传空串得整条丢给设备侧 shell，用 `''`）。
+
+## 7. 真实大模组：注入型归因 + L3 的成本（2026-10-08，同一台设备）
+
+前面六节用的都是 **1 KB 的探针包**。这一节换成真家伙：**Neon-vB16.5.jar**
+（22.7 MB 包 / `classes.dex` **4835540 B** / `main = bektools.BekToolsMod`）+ **stealth-path.zip**
+（0.25 MB 包 / 0.16 MB dex），放进实验槽 `dexlab`，喂三份报告：
+
+| 夹具 | 是什么 | L3 结论（逐字） | 耗时 |
+|---|---|---|---|
+| `neon-l3-1.txt` | 语料 `09a` 里那份 **Neon 真报告**，去掉**两处**便宜归因 | `Neon / 氖(L3/w2/mindustry.logic.SugarCanvas$SugarStatementElem)` | 75~94 ms |
+| `neon-l3-2.txt` | 同上，另一份（v120004） | `Neon / 氖(L3/w2/mindustry.logic.SugarStatements$IfBeginStatement)` | 112~123 ms |
+| `neon-worst.txt` | 人造最坏情况：唯一一根针 `bektools.profiler.NeonProfiler` 在 dex 的 **81.8%** 处 | `Neon / 氖(L3/w3/bektools.profiler.NeonProfiler)` | 550~1029 ms |
+
+★ **"注入型"在真机真报告上成立**：模组把类注进 `mindustry.logic.*`，报告里只剩那句
+`IllegalAccessError: class mindustry.logic.SugarCanvas$SugarStatementElem tried to access …`
+⇒ 命中权重 **w2**（注入进游戏命名空间、带 `$`）就能点名，显示名从 `mod.hjson` 解析出来。
+★ `dex=2` ⇒ 两个模组的 dex **都读过**（一个命中、一个不命中）—— 这就是耗时的来源。
+
+★ **成本 A/B（改前/改后各构建一次、各跑 3 遍，原始数据 `evidence/f23-l3-perf.txt`）**：
+`Mods.scanDex` 原来每读一块就 `new String(win, "ISO-8859-1")` + 每根针 `String.contains`，
+现改为"复用窗口 + **逐字节**比较"：
+
+| 报告 | 针数 | 旧 | 新 |
+|---|---|---|---|
+| `neon-l3-2` | 28 | 758 / 781 / 761 ms | **112 / 123 / 345 ms** |
+| `neon-l3-1` | 15 | 489 / 496 / 491 ms | **75 / 79 / 94 ms** |
+| `neon-worst` | 2 | 572 / 630 / 615 ms | 550 / 604 / 1029 ms（**没变**） |
+| 合计 | | 1832 / 1904 / 1865 ms | 738 / 807 / 1471 ms |
+
+🔴 **两条结论，只记前半条会得出错误结论**：① 逐字节省掉的是"每块一次 UTF-16 转换 + 每根针一趟
+扫描" ⇒ **针越多越省**（真报告 15~28 根针，快约 6×）；② **针很少时开销根本不在搜索**，而在
+"打开 22 MB 的包 + 解压出 4.6 MB dex"（首次冷读 0.5~1 s，同一份再来一次掉到几十~一百多 ms）
+⇒ 再优化搜索对"第一次看到那份报告"**没有帮助**。
+⚠️ 我最初凭单次、冷热混合的两次测量写成"638 ms → ~20 ms"，**受控 A/B 把它否掉了** ⇒ 按实测改口。
+
+★ 两个操作坑（都害过我一次）：① 便宜层的归因其实有**两处**（桌面 `Likely Cause:` 行 **与**
+游戏自己写的 `The mod '…' has caused Mindustry to crash.` 那句）—— 只去掉前者 ⇒ L1 直接命中、
+**根本没走 L3**，一度以为"真实大模组判不出来"；② `report-devtool.txt` 是**上一轮**的产物，
+轮询条件被旧文件满足 ⇒ 早退、拿旧数据当新数据（判据改成"**先删报告文件**再跑"）。

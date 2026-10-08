@@ -3443,6 +3443,27 @@ public final class SelfTest {
                     "★真路径（`Mods.scanDex`）：命中前两根针、第三根没命中：" + got);
             ok(stat, L, !got.contains(Integer.valueOf(2)),
                     "★元断言：dex 里没有的串**不许**命中（不是\"扫了就全命中\"）");
+            // ★★ 跨块边界（2026-10-08 加了这一条）：扫描是**流式**的（每块 64 KB + 尾巴），
+            //    改成逐字节搜索时最容易写坏的就是这里 —— 让针**骑在 65536 的边界上**，
+            //    再让一根针落在**文件最末尾**（没有后续块 ⇒ 只能靠最后那一块的窗口）。
+            File straddle = new File(work, "classes.dex");
+            byte[] big = new byte[(1 << 16) + 64];
+            java.util.Arrays.fill(big, (byte) 'p');
+            byte[] inMiddle = "straddleNeedle".getBytes("UTF-8");
+            System.arraycopy(inMiddle, 0, big, (1 << 16) - 5, inMiddle.length);   // 起点在块内、跨过边界
+            byte[] atEnd = "needleAtVeryEnd".getBytes("UTF-8");
+            System.arraycopy(atEnd, 0, big, big.length - atEnd.length, atEnd.length);
+            write(straddle, big);
+            List<String> p2 = new ArrayList<String>();
+            p2.add("straddleNeedle");
+            p2.add("needleAtVeryEnd");
+            p2.add("needleNotThere");
+            java.util.Set<Integer> g2 = CrashAnalysis.DEX.scan(dm, p2);
+            ok(stat, L, g2.size() == 2 && g2.contains(Integer.valueOf(0))
+                            && g2.contains(Integer.valueOf(1)),
+                    "★★真路径：**跨 64 KB 块边界**的针与**落在文件最末尾**的针都能命中：" + g2);
+            ok(stat, L, !g2.contains(Integer.valueOf(2)),
+                    "★元断言：同一份大文件里没有的针仍然不命中（不是\"块大了就一律命中\"）");
             File gone = new File(work, "classes.dex");
             ok(stat, L, gone.delete(), "（收尾：删掉假 dex）");
             ok(stat, L, CrashAnalysis.DEX.scan(dm, pats).isEmpty(),

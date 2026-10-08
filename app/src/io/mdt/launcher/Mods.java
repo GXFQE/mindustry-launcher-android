@@ -1278,6 +1278,26 @@ public final class Mods {
     }
 
     /**
+     * 在一个字节窗口的前 `len` 个字节里找一根针（**逐字节**，首次命中即返回）。
+     * ★ 与 {@code String.contains} 等价，但不用把窗口转成 UTF-16 字符串 —— 那是
+     *   {@link #scanDex} 在真实大 dex 上的主要开销（见那里的注释）。
+     */
+    private static int indexOf(byte[] hay, int len, byte[] pat) {
+        int last = len - pat.length;
+        if (last < 0 || pat.length == 0) return -1;
+        byte b0 = pat[0];
+        outer:
+        for (int i = 0; i <= last; i++) {
+            if (hay[i] != b0) continue;
+            for (int j = 1; j < pat.length; j++) {
+                if (hay[i + j] != pat[j]) continue outer;
+            }
+            return i;
+        }
+        return -1;
+    }
+
+    /**
      * 在一个模组的 `classes.dex` 里**流式**找若干 ASCII 模式（返回命中的模式下标）。
      * ⚠️ 流式 + 小块：dex 可能十几 MB（用户的 `DeepSpace` 就是 10 MB），
      * 一次性读进内存虽然也能跑，但这份代码要在 UI 线程的隔壁跑、且设备内存紧张，别赌。
@@ -1311,25 +1331,42 @@ public final class Mods {
                     }
                 };
             }
+            // ★★ **逐字节找**（2026-10-08 改）：原来每读一块都 `new String(win, "ISO-8859-1")`
+            //   再对每根针 `String.contains` —— 真机 A/B（Neon 的 4.61 MB dex + stealth-path 0.16 MB，
+            //   同一套夹具各跑 3 遍，见 evidence/f23-l3-perf.txt）：
+            //     · 28 根针的报告：758/781/761 ms → **112/123/345 ms**（≈6×）
+            //     · 15 根针的报告：489/496/491 ms → **75/79/94 ms**（≈5.6×）
+            //     · 只有 2 根针的报告：572~630 ms → **550~1029 ms**（**没变**）
+            //   ⇒ 结论两条，别只记前半条：
+            //     ① 逐字节省掉的是"每块一次 UTF-16 转换 + 每根针一趟扫描" ⇒ **针越多越省**；
+            //     ② **针很少时开销根本不在搜索**，而在"打开 22 MB 的包 + 解压出 4.6 MB dex"
+            //        （首次冷读 0.5~1 s，同一份再来一次掉到几十~一百多 ms）⇒ 再优化搜索**没用**。
+            //   ⚠️ 针按 **UTF-8** 编码：dex 里的字符串是 MUTF-8，ASCII 部分与 UTF-8 逐字节相同
+            //   （本判据的针一律是类名 / 成员名 ⇒ ASCII），将来真有非 ASCII 的针也不会找错。
+            byte[][] needle = new byte[pats.size()][];
             int maxLen = 0;
-            for (String p : pats) maxLen = Math.max(maxLen, p.length());
-            byte[] buf = new byte[1 << 16];
-            byte[] carry = new byte[Math.max(0, maxLen - 1)];
-            int carryLen = 0;
+            for (int i = 0; i < pats.size(); i++) {
+                needle[i] = pats.get(i).getBytes("UTF-8");
+                maxLen = Math.max(maxLen, needle[i].length);
+            }
             java.util.Set<Integer> hit = new java.util.HashSet<>();
+            if (maxLen == 0) return hit;
+            byte[] buf = new byte[1 << 16];
+            // 窗口 = 上一块的尾巴(carry) + 这一块；**复用同一个数组**（不再每块新分配）
+            byte[] win = new byte[(1 << 16) + maxLen - 1];
+            int carryLen = 0;
             int n;
             while ((n = in.read(buf)) > 0) {
-                byte[] win = new byte[carryLen + n];
-                System.arraycopy(carry, 0, win, 0, carryLen);
                 System.arraycopy(buf, 0, win, carryLen, n);
-                String w = new String(win, "ISO-8859-1");     // 逐字节保真
-                for (int i = 0; i < pats.size(); i++) {
+                int len = carryLen + n;
+                for (int i = 0; i < needle.length; i++) {
                     if (hit.contains(Integer.valueOf(i))) continue;
-                    if (w.contains(pats.get(i))) hit.add(Integer.valueOf(i));
+                    if (indexOf(win, len, needle[i]) >= 0) hit.add(Integer.valueOf(i));
                 }
-                if (hit.size() == pats.size()) break;
-                carryLen = Math.min(carry.length, win.length);
-                System.arraycopy(win, win.length - carryLen, carry, 0, carryLen);
+                if (hit.size() == needle.length) break;
+                // 跨块命中：把窗口尾巴留在数组开头（`arraycopy` 自己处理重叠）
+                carryLen = Math.min(maxLen - 1, len);
+                System.arraycopy(win, len - carryLen, win, 0, carryLen);
             }
             return hit;
         } finally {

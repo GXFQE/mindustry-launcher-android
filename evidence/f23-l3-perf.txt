@@ -1,0 +1,95 @@
+F23 第四批：真实大模组的 L3 成本 + 注入型归因端到端（2026-10-08，真机）
+=========================================================================
+这一批把"真实大模组"补上：前面只用过 1 KB 的探针包，真实槽里是 **Neon（22 MB 包 / 4.61 MB dex）
++ stealth-path（0.25 MB 包 / 0.16 MB dex）**。判据要回答两件事：
+  ① 换真实大模组后，L3（扫 dex 找人）**判得对**吗 —— 尤其"注入型"（模组把类注进 `mindustry.*`）；
+  ② 用户要等多久 —— 之前只有玩具模组的数字。
+
+■ 夹具（都是**真**报告 / **真**模组）
+  · neon-l3-1.txt / neon-l3-2.txt = `crash-corpus/09a` 里那两份 **Neon 崩溃报告**，
+    **两处便宜归因都去掉**（`Likely Cause:` 行 + 游戏自己写的
+    `The mod '…' has caused Mindustry to crash.` 那句）⇒ 只剩异常栈与 `Mods:` 行，逼出 L3。
+  · neon-worst.txt = 人造的**最坏情况**：唯一一根针是 `bektools.profiler.NeonProfiler`
+    （Neon 自己的包名，权重 3），它在 dex 里的位置是 **81.8%**（字符串表末尾）⇒ 必须几乎读完整份。
+  · 模组：`Neon-vB16.5.jar`（`classes.dex` 4835540 B，`main = bektools.BekToolsMod`）+ `stealth-path.zip`。
+
+■ ① 判得对（L3 层，真 dex）
+
+slot = dexlab
+dataRoot = /storage/emulated/0/Android/data/io.mdt.launcher/slot-dexlab
+crashes  = /storage/emulated/0/Android/data/io.mdt.launcher/slot-dexlab/crashes
+mods = 2 (2 with classes.dex)
+
+-- neon-worst.txt (381 B) --
+  kind=MOD version=release build 159.7 (Built July 19, 2026 17:39 PM) mods=[neon] chain=1 frames=1 needles=2 top=java.lang.NoClassDefFoundError: Failed resolution of: Lbektools/profiler/NeonProfiler; hits=Neon / 氖(L3/w3/bektools.profiler.NeonProfiler) dex=2
+  verdict: 很可能与「Neon / 氖」有关 —— 它的 classes.dex 里有 bektools.profiler.NeonProfiler
+  took 1000 ms
+
+-- neon-l3-2.txt (2502 B) --
+  kind=MOD version=release build 159.7 mods=[kotlin, logicchineselocalization, mi2-utilities-java, mindustryx, neon, patch-editor] chain=1 frames=26 needles=28 top=java.lang.IllegalAccessError: class mindustry.logic.SugarStatements tried to access protected method 'arc.scene.ui.layou… hits=Neon / 氖(L3/w2/mindustry.logic.SugarStatements$IfBeginStatement) dex=2
+  verdict: 很可能与「Neon / 氖」有关 —— 它的 classes.dex 里有 mindustry.logic.SugarStatements$IfBeginStatement
+  took 308 ms
+
+-- neon-l3-1.txt (1472 B) --
+  kind=MOD version=release build 159.7 mods=[kotlin, logicchineselocalization, mi2-utilities-java, mindustryx, neon, patch-editor] chain=1 frames=12 needles=15 top=java.lang.IllegalAccessError: class mindustry.logic.SugarCanvas$SugarStatementElem tried to access field mindustry.logic… hits=Neon / 氖(L3/w2/mindustry.logic.SugarCanvas$SugarStatementElem) dex=2
+  verdict: 很可能与「Neon / 氖」有关 —— 它的 classes.dex 里有 mindustry.logic.SugarCanvas$SugarStatementElem
+  took 94 ms
+
+total 1403 ms
+
+  ★ 三条都命中：两份**真报告**靠"注入型"那根针（`mindustry.logic.SugarCanvas$SugarStatementElem`
+    与 `…SugarStatements$IfBeginStatement`）点名 Neon —— 权重 **w2**（注入进游戏命名空间、带 `$`）；
+    人造最坏情况靠 Neon 自己的包 **w3**。显示名「Neon / 氖」是从 `mod.hjson` 解析出来的。
+  ★ `dex=2` ⇒ 两个模组的 dex **都扫了**（1 个命中 + 1 个不命中），"不命中"的那份也读过 —— 这正是耗时来源。
+
+■ ② 要等多久（受控 A/B：同一套夹具、同一台设备、各 3 遍、改前改后各一次构建）
+
+  旧算法（每读一块就 `new String(win, "ISO-8859-1")` + 每根针 `String.contains`）：
+old run1 neon-worst.txt        615 ms
+old run1 neon-l3-2.txt         758 ms
+old run1 neon-l3-1.txt         489 ms
+old run1 TOTAL 1865 ms
+old run2 neon-worst.txt        630 ms
+old run2 neon-l3-2.txt         781 ms
+old run2 neon-l3-1.txt         491 ms
+old run2 TOTAL 1904 ms
+old run3 neon-worst.txt        572 ms
+old run3 neon-l3-2.txt         761 ms
+old run3 neon-l3-1.txt         496 ms
+old run3 TOTAL 1832 ms
+
+  新算法（复用窗口 + **逐字节**比较，`Mods.indexOf`）：
+new run1 neon-worst.txt        604 ms
+new run1 neon-l3-2.txt         123 ms
+new run1 neon-l3-1.txt          79 ms
+new run1 TOTAL 807 ms
+new run2 neon-worst.txt       1029 ms
+new run2 neon-l3-2.txt         345 ms
+new run2 neon-l3-1.txt          94 ms
+new run2 TOTAL 1471 ms
+new run3 neon-worst.txt        550 ms
+new run3 neon-l3-2.txt         112 ms
+new run3 neon-l3-1.txt          75 ms
+new run3 TOTAL 738 ms
+
+  ★ 结论两条（**只记前半条会得出错误结论**）：
+    ① 针多的报告（真报告 15~28 根针）**快约 6×**：758~781 → 112~123 ms、489~496 → 75~94 ms；
+    ② 只有 2 根针时**没变**（572~630 → 550~1029 ms）—— 因为这份的开销根本不在搜索，而在
+       "打开 22 MB 的包 + 解压出 4.6 MB dex"（首次冷读 0.5~1 s；同一份再来一次掉到几十~一百多 ms）。
+       所以**再优化搜索对"第一次看到那份报告"没有帮助**。
+  ⚠️ 我第一次写的注释是"638 ms → ~20 ms"，**那是拿单次、冷热混合的两次测量对比出来的**，
+    受控 A/B 把它否掉了 ⇒ 已按实测改口（见 `Mods.scanDex` 里那段注释）。
+  ⚠️ 本次 A/B 的坑：`report-devtool.txt` 是**上一轮**的产物（轮询条件被旧文件满足 ⇒ 早退），
+    差点把旧数据当新数据用 ⇒ 判据改成"**先删报告文件**再跑"。同理，A/B 期间临时
+    `git checkout -- Mods.java` 回退算法时，先把新版另存到 `.tmp-artlab/Mods.new.java`。
+
+■ ③ 用户能感受到的最坏情况（按现在的实现）
+  · 日志页：点开一份"游戏崩了、且便宜判据都没命中"的报告 ⇒ 后台扫全部模组的 dex。
+    22 MB 包 + 4.6 MB dex 的首次约 **0.5~1 s**（页面有「正在核对模组包…」占位），
+    第二次及以后同进程内约 **80~120 ms**。
+  · 模组页那一行（F23 第三批）：同上，但**静默**在后台算，不挡操作。
+  · 结论：**可以接受，但"首次 1 s"是真实存在的**；要做更快就得缓存"（包, mtime）→ 扫描结果"，
+    本轮没做（判据不需要，收益只在反复打开时）。
+
+■ 原始报告（第三遍，含 verdict 逐字）
+
