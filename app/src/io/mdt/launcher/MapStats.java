@@ -537,6 +537,59 @@ public final class MapStats {
     }
 
     /**
+     * ★★ **真修（REF §77.5④）：从 bundle 里挑出"这个名字的方块确实存在"的证据。**
+     *
+     * <p>为什么需要它：有的模组把方块写在**代码 / 脚本**里（`new Block("ash")`，游戏再按
+     * `transformName` 加成 `vne-ash`）⇒ 我们那张内容表**看不见它**，于是含它方块的蓝图被
+     * **误报**「有 N 种方块本槽没有」（真机实测：`原版瘤液拓展` 自带 8 份蓝图，4 份被误报，
+     * 缺的那个就是 `vne-ash`）。而同一份包里就有 `block.vne-ash.name = 星尘` ——
+     * 它本来就是"这个模组注册了哪些方块"的**权威清单**。
+     *
+     * <p>⚠️ 用法有两条硬约束（见 §77.5④）：
+     * <ol>
+     *   <li>**只当"这个名字存在"的证据**，给蓝图那侧的一句话用；
+     *       **绝不**在内容表里造行 —— 地图统计那边必须保持"认不出的格子"
+     *       （我们不知道它的属性，拿零标志当方块会污染统计）；</li>
+     *   <li>调用方**只应把"我们看不见内容的那些包"**的 bundle 传进来
+     *       （判据与 {@code MapStats.overlayMods} 里那个 `opaque` 相同：
+     *       `hasCode && !hasBlockJson && !hidden`）—— 因为误报只可能由它们造成；
+     *       有方块 JSON 的包若留着一个**过期的键**，拿它当证据就会把真缺件说成不缺（漏报）。</li>
+     * </ol>
+     *
+     * <p>键形如 `block.<内部名>.name` / `.description` / `.alwaysUnlocked` …
+     * （`<内部名>` 里不出现点号）⇒ 取"存在"时看前缀、取显示名时用 `.name`。
+     * 语言层后写 ⇒ 返回值里同名以**语言层**为准（与 {@link Bundles} 的查找顺序一致）。
+     *
+     * @return 内部名 → 显示名（**没有 `.name` 键时值是空串**，调用方自己退回 `blockLabel`）
+     */
+    public static Map<String, String> bundleBlockNames(Bundles b) {
+        Map<String, String> out = new LinkedHashMap<>();
+        if (b == null) return out;
+        collectBlockKeys(b.base, out);
+        collectBlockKeys(b.locale, out);      // 语言层后写 ⇒ 显示名以它为准
+        return out;
+    }
+
+    private static void collectBlockKeys(Map<String, String> from, Map<String, String> out) {
+        if (from == null) return;
+        for (Map.Entry<String, String> e : from.entrySet()) {
+            String k = e.getKey();
+            if (k == null || !k.startsWith("block.")) continue;
+            int dot = k.indexOf('.', 6);
+            if (dot < 0) continue;
+            String name = k.substring(6, dot);
+            if (name.isEmpty()) continue;
+            if (!k.endsWith(".name")) {
+                // 只声明了别的字段（description / alwaysUnlocked …）⇒ 也算"这个名字存在"
+                if (!out.containsKey(name)) out.put(name, "");
+                continue;
+            }
+            String v = e.getValue();
+            out.put(name, v == null ? "" : v.trim());
+        }
+    }
+
+    /**
      * 从 zip 里读**所有** bundle 文件，按文件名分到两层。
      *
      * 🔴 为什么要"所有"而不是只找 `bundles/bundle_zh_CN.properties`（第 84 轮实测踩到）：

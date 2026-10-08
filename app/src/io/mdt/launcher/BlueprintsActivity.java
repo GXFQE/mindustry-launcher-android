@@ -176,6 +176,8 @@ public class BlueprintsActivity extends BaseActivity {
             @Override public void run() {
                 final List<Blueprints.Item> items;
                 MapStats.Table tab;
+                // ★ bundle 里声明过的方块名（真修 §77.5④）—— `sc` 只在 try 里可见，所以拷出来
+                java.util.Map<String, String> bundleBlocks;
                 int opaque;
                 try {
                     items = Blueprints.scan(BlueprintsActivity.this, mSlot);
@@ -183,6 +185,7 @@ public class BlueprintsActivity extends BaseActivity {
                     MapStatsMods.SlotContent sc = MapStatsMods.contentFor(BlueprintsActivity.this, mSlot);
                     tab = sc.table;
                     opaque = sc.opaque;
+                    bundleBlocks = sc.bundleBlocks;
                 } catch (Throwable ex) {
                     android.util.Log.w("MDTLauncher", "blueprint scan failed", ex);
                     runOnUiThread(new Runnable() {
@@ -194,8 +197,10 @@ public class BlueprintsActivity extends BaseActivity {
                     return;
                 }
                 // 每份的派生量（方块种类 / 缺件）在后台算好，界面只渲染 —— 列表行要显示缺件警告
+                // ★ 带上 `sc.bundleBlocks`（真修，REF §77.5④）：方块写在代码/脚本里的模组
+                //   会在 bundle 里声明 `block.<名字>.name` ⇒ 拿它当"存在"证据，消掉误报缺件
                 for (Blueprints.Item it : items) {
-                    Blueprints.summarize(it, Blueprints.rows(it.msch, tab, null));
+                    Blueprints.summarize(it, Blueprints.rows(it.msch, tab, null, bundleBlocks));
                 }
                 // ★ 再打一道"可能认错"的标记（判据在 MapStats.Pack#hasCode；只影响文案，不改判据）
                 Blueprints.markSoft(items, opaque);

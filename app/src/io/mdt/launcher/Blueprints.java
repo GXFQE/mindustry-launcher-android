@@ -489,6 +489,31 @@ public final class Blueprints {
      *   否则装了模组也会被误报成"缺方块"。
      */
     public static List<Row> rows(Msch m, MapStats.Table tab, MapStats.Names nm) {
+        return rows(m, tab, nm, null);
+    }
+
+    /**
+     * 同上，外加**"这个名字存在"的旁证**（{@link MapStats#bundleBlockNames}）。
+     *
+     * <p>★★ **真修（REF §77.5④）**：有的模组把方块写在**代码 / 脚本**里
+     * （`new Block("ash")` ⇒ 游戏注册成 `vne-ash`），我们那张内容表**看不见它**
+     * ⇒ 含它方块的蓝图被**误报**「有 N 种方块本槽没有」（真机实测：`原版瘤液拓展`
+     * 自带 8 份蓝图、4 份被误报，缺的那个就是 `vne-ash`）。
+     * 同一份包的 bundle 里就写着 `block.vne-ash.name = 星尘` ⇒ 拿它当**存在证据**，
+     * 这类假阳性就没了。
+     *
+     * <p>⚠️ 两条边界：
+     * <ol>
+     *   <li>只改**这一句判断**（和那一行的显示名），**不往内容表里加行** ——
+     *       地图统计那边必须保持"认不出的格子"；</li>
+     *   <li>旁证只来自"我们看不见内容的包"（见 {@link MapStatsMods.SlotContent#bundleBlocks}）——
+     *       有方块 JSON 的包留过期键时不许抑制，否则会把**真缺件**说成不缺。</li>
+     * </ol>
+     *
+     * @param bundleBlocks 内部名 → 显示名（可空 = 老口径，只信内容表）
+     */
+    public static List<Row> rows(Msch m, MapStats.Table tab, MapStats.Names nm,
+                                 java.util.Map<String, String> bundleBlocks) {
         List<Row> out = new ArrayList<>();
         if (m == null || !m.ok || m.tiles.isEmpty()) return out;
         Map<String, Row> byName = new LinkedHashMap<>();
@@ -500,8 +525,12 @@ public final class Blueprints {
                 r = new Row();
                 r.internal = name;
                 MapStats.Def d = tab == null ? null : tab.row(name);
+                String via = bundleBlocks == null ? null : bundleBlocks.get(name);
+                // 显示名照旧走 blockLabel（`nm` 本来就是 bundle 支撑的 ⇒ 第 113 轮真机看到的
+                // 「氮化炉」那种中文名就是这么来的）；这里**只改"缺不缺"这一句判断**
                 r.label = MapStats.blockLabel(nm, name, d, name);
-                r.missing = (tab != null && d == null);
+                // 表里没有、但 bundle 里声明过这个名字 ⇒ **它存在**（游戏里加载得出来）
+                r.missing = (tab != null && d == null && via == null);
                 byName.put(name, r);
                 out.add(r);
             }

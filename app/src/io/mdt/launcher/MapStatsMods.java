@@ -82,6 +82,16 @@ public final class MapStatsMods {
         public int opaque;
         /** 游戏这次不加载模组（上次崩过） */
         public boolean skipMods;
+        /**
+         * ★★ **真修（REF §77.5④）**：那些"我们看不见它内容"的包在 bundle 里声明过的方块名
+         * （内部名 → 显示名；显示名可能是空串）。
+         *
+         * <p>蓝图那侧拿它当「这个名字**存在**」的证据 —— 消掉"方块写在代码 / 脚本里
+         * ⇒ 被误报缺件"这一类**假阳性**（真机实测 `原版瘤液拓展` 的 `block.vne-ash.name = 星尘`）。
+         * ⚠️ **只给蓝图用**：内容表（地图统计）**不许**拿它造行 —— 我们没有它的属性，
+         * 拿零标志当方块会把统计污染（见 {@code MapStats} 里"不造幽灵行"那条）。
+         */
+        public java.util.Map<String, String> bundleBlocks = new java.util.LinkedHashMap<>();
         /** 模组那一层读不动 */
         public boolean failed;
     }
@@ -205,13 +215,25 @@ public final class MapStatsMods {
                 //   ★ 读哪一层语言包由**界面语言**决定（P4）
                 out.bundle = MapStats.readBundles(packs,
                         MapStats.bundleLang(bundleLocaleSuffix(ctx)));
+                // ★★ 真修（REF §77.5④）：bundle 里的 `block.<名字>.*` 当"这个名字**存在**"的证据，
+                //   但**只取"我们看不见它内容"的那些包**（判据与 MapStats.overlayMods 里那个
+                //   `opaque` 逐字相同：hasCode && !hasBlockJson && !hidden）—— 因为误报只可能由它们造成；
+                //   有方块 JSON 的包若留着一个**过期的键**，拿它当证据就会把真缺件说成不缺（漏报）。
+                java.util.List<MapStats.Pack> opaquePacks = new java.util.ArrayList<>();
+                for (MapStats.Pack p : packs) {
+                    if (p.hasCode && !p.hasBlockJson && !p.hidden) opaquePacks.add(p);
+                }
+                out.bundleBlocks = MapStats.bundleBlockNames(MapStats.readBundles(opaquePacks,
+                        MapStats.bundleLang(bundleLocaleSuffix(ctx))));
                 for (MapStats.Pack p : packs) {
                     if (p.bundleKeys > 0) out.bundlesWithText++;
                 }
                 line = mr.packs + " 个模组（新增 " + mr.added + " 条，覆盖 " + mr.overridden + " 条"
                         + (out.bundlesWithText > 0
                         ? "；" + out.bundlesWithText + " 个带译文，共 " + out.bundle.keys() + " 条" : "")
-                        + "）";
+                        + (out.bundleBlocks.isEmpty() ? ""
+                        : "；bundle 声明过的方块名 " + out.bundleBlocks.size() + " 条（只在蓝图那侧当"
+                        + "「存在」的证据）") + "）";
             }
         } catch (Throwable ex) {
             out.failed = true;

@@ -37,7 +37,10 @@ Backup.java = 17   # 用户可见的已搬完；剩的是 CAS 迁移报告与 Lo
 AutoBackup.java = 11   # 只进 report-autobackup.txt
 BundleNames.java = 10   # ★ 代码注释原文：「`note` 只留给**维护者**（PC 验收台）」⇒ 技术细节层依据
 Cas.java = 8   # 🔴 **已知残留**：纯 Java 对象池，8 条消息经 `Backup` 恢复报告的**每文件行**（`backup_restore_err_line_fmt` 的 `%2$s`）可能露给用户。要彻底解决得给 Cas 上「码 + 参数」（它没有 Context）—— 自检里有一条断言**点名要它**（「报告点名对象内容与地址 sha256 不符」）⇒ 那条信息有用，不许简单删掉。
-MapStatsMods.java = 8   # 地图详情「技术细节」的依据行（模组叠加 / 语料诊断）——依据，有意保留
+MapStatsMods.java = 11  # 地图详情「技术细节」的依据行（模组叠加 / 语料诊断 / bundle 旁证条数）
+                        # ——依据，有意保留；8 → 11 是 2026-10-08 加"bundle 声明过的方块名 N 条"
+                        # （蓝图缺件误报的**真修**旁证，见 REF §77.5④）：新加的这 2~3 条同样是
+                        # **维护者可见的依据行**，不是给用户的界面文案。
 Crash.java = 6   # 只进 crashes/*.txt（崩溃转储）
 GameSlot.java = 2   # 启动时 `Data.prepareSlot` 的落盘/日志报告（`rep`）
 LauncherApp.java = 1   # `Log.i` 里的 F0 迁移报告 —— 只进日志

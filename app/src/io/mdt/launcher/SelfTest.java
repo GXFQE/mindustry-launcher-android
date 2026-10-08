@@ -8664,6 +8664,59 @@ public final class SelfTest {
             int opHidden = MapStatsMods.contentFor(ctx, SLOT_BP).opaque;
             ok(stat, L, opHidden == 0,
                     "⑨ ★hidden 的模组不算误报来源（游戏不加载它的 Java 内容）—— 实得 " + opHidden);
+
+            // ── ⑩ ★★ 真修（REF §77.5④）：把 bundle 里的 `block.<名字>.name` 当"这个名字**存在**"的旁证 ──
+            //   背景见 ⑨：方块写在脚本里的模组，它的方块我们看不见。可**它自己的 bundle 里写着**
+            //   `block.<名字>.name`（真机实例：`原版瘤液拓展` 的 `block.vne-ash.name = 星尘`）
+            //   ⇒ 拿它当存在证据，那类"误报缺件"就消掉了。
+            //   ⚠️ 三条边界（都在下面各钉一条）：① 只改"缺不缺"这一句，**不往内容表加行**；
+            //   ② 不带旁证时照样报缺件（不是恒真）；③ **有方块 JSON 的包**留的过期键**不许**抑制。
+            // 先把 opq 从 hidden 改回来（⑨b 刚把它设成 hidden），再给它加两层 bundle
+            write(new File(opq, "mod.json"),
+                    "{\"name\":\"opq\",\"version\":\"1.0\",\"minGameVersion\":\"140\"}".getBytes("UTF-8"));
+            write(new File(opq, "bundles/bundle.properties"),
+                    "block.opq-ash.name = Star Dust\nblock.opq-ash.description = fixture\n"
+                            .getBytes("UTF-8"));
+            write(new File(opq, "bundles/bundle_zh_CN.properties"),
+                    "block.opq-ash.name = 星尘\n".getBytes("UTF-8"));
+            MapStatsMods.invalidate();
+            MapStatsMods.SlotContent sc10 = MapStatsMods.contentFor(ctx, SLOT_BP);
+            ok(stat, L, sc10.bundleBlocks.containsKey("opq-ash"),
+                    "⑩ ★bundle 里声明过的方块名被挑出来了（`block.opq-ash.name` ⇒ "
+                            + sc10.bundleBlocks.size() + " 条）");
+            MapStats.Table tab10 = sc10.table;
+            ok(stat, L, tab10.row("opq-ash") == null,
+                    "⑩ ★元断言：内容表里**没有**这一行 —— 旁证只改那一句判断，绝不造幽灵行"
+                            + "（地图统计那边必须保持「认不出的格子」）");
+            Blueprints.Item fix1 = new Blueprints.Item();
+            fix1.msch = Msch.read(new Sch(1, 4, 4).tag("name", "fix")
+                    .tile("opq-ash", 0, 0, 0, new byte[]{0}).bytes());
+            Blueprints.summarize(fix1, Blueprints.rows(fix1.msch, tab10, null, sc10.bundleBlocks));
+            ok(stat, L, fix1.missingKinds == 0,
+                    "⑩ ★★真修：脚本模组的方块（bundle 声明过）**不再被误报缺件**："
+                            + oneLine(fix1.line(ctx)));
+            Blueprints.Item fix2 = new Blueprints.Item();
+            fix2.msch = fix1.msch;
+            Blueprints.summarize(fix2, Blueprints.rows(fix2.msch, tab10, null));   // 老口径
+            ok(stat, L, fix2.missingKinds == 1,
+                    "⑩ ★元断言：**不带**旁证时它照样报缺件（" + fix2.missingKinds
+                            + " 种）—— 证明上一条是旁证带来的，不是别处改动");
+            Blueprints.Item fix3 = new Blueprints.Item();
+            fix3.msch = Msch.read(new Sch(1, 4, 4).tag("name", "fix3")
+                    .tile("opq-nope", 0, 0, 0, new byte[]{0}).bytes());
+            Blueprints.summarize(fix3, Blueprints.rows(fix3.msch, tab10, null, sc10.bundleBlocks));
+            ok(stat, L, fix3.missingKinds == 1,
+                    "⑩ ★元断言：bundle 里**没声明过**的名字照样报缺件（不是「有 bundle 就一律不敢报」）");
+            // ③ 闸门：有方块 JSON 的包（`bpmod`，非 opaque）留的过期键**不许**当证据
+            write(new File(new File(modsDir, "bpmod"), "bundles/bundle_zh_CN.properties"),
+                    "block.bpmod-ghost.name = 幽灵\n".getBytes("UTF-8"));
+            MapStatsMods.invalidate();
+            MapStatsMods.SlotContent sc11 = MapStatsMods.contentFor(ctx, SLOT_BP);
+            ok(stat, L, !sc11.bundleBlocks.containsKey("bpmod-ghost"),
+                    "⑩ ★元断言：**有方块 JSON** 的包（非 opaque）留的过期键不进旁证 —— "
+                            + "否则会把真缺件说成不缺（漏报）");
+            ok(stat, L, sc11.bundleBlocks.containsKey("opq-ash"),
+                    "⑩ ★同一次扫描里，脚本模组（opaque）的键照样进旁证（闸门是按包判的，不是全关）");
             // 文案实拼：★ **必须走界面真正走的那两个函数**（第 113 轮真机崩溃的教训）——
             //   第 112 轮这条断言是自己挑参数（两个 int），而真实调用点传的是
             //   `MapStatsMods.num(tiles)`（**字符串**），于是资源里的 `%2$d` 在真机上抛

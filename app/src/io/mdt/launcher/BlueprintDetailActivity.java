@@ -176,7 +176,8 @@ public class BlueprintDetailActivity extends BaseActivity {
                             sc.bundle, MapStatsMods.attrLabels(BlueprintDetailActivity.this),
                             MapStats.bundleLang(MapStatsMods.bundleLocaleSuffix(BlueprintDetailActivity.this)),
                             Trans.get(BlueprintDetailActivity.this, R.string.stats_wall_name_fmt));
-                    rows = Blueprints.rows(mItem.msch, sc.table, bn);
+                    // ★ 与列表页同一个口径：把"bundle 声明过的方块名"当存在证据（真修 §77.5④）
+                    rows = Blueprints.rows(mItem.msch, sc.table, bn, sc.bundleBlocks);
                     ms = System.currentTimeMillis() - t0;
                 } catch (Throwable t) {
                     android.util.Log.w("MDTLauncher", "blueprint stats failed", t);
