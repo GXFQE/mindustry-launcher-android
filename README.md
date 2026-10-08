@@ -50,7 +50,8 @@ point the game at that directory when it starts.
 
 The interface **follows your system language**: 简体中文 on a phone set to Chinese, English otherwise
 (English and Simplified Chinese are the only translations so far). **Settings → Language** (the gear at
-the top right) overrides that, including switching back to following the system.
+the top right) overrides that, including switching back to following the system; to translate it
+yourself — even just a few lines — see **Translation file** below.
 
 ## What it can do
 
@@ -178,6 +179,10 @@ the top right) overrides that, including switching back to following the system.
   there and can be put back
 - **Theme**: follow system / light / dark, and **Language**: follow system / English / 简体中文 —
   both switched inside the app, without touching system settings
+- **You can translate the interface text yourself**: Settings (the gear at the top right) →
+  **Translation file** — import a `lang.properties` and it overrides **any** string in the interface
+  (menus and dialogs included, because all interface text goes through one entry point); placeholder
+  mistakes are listed before you install it, and you can **export a template** to start from
 - **Settings** (**the gear at the top right**; only things you can *change*): default slot for newly
   found versions, how many crash reports to keep, automatic cleanup (with a manual "clean up once now"),
   and **storage used** (what each slot, the backups and the transfer station take, and how much the
