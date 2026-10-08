@@ -844,7 +844,7 @@ public class ModsActivity extends BaseActivity {
         //     ① 没读到设置文件时**不许说「启用」**（那只是默认值，用户分辨不出"真开着"与"我们不知道"）；
         //     ② `willFailJavaLoad` 优先（声明了 java 却没 classes.dex ⇒ 那时说「启用」是骗人）。
         String badgeText = broken ? Trans.get(ModsActivity.this, R.string.mods_badge_broken)
-                    : ModsText.badge(this, st, m.settingsKnown, m.willFailJavaLoad());
+                    : ModsText.badge(this, st, m.settingsKnown, m.willFailJavaLoad(), mScan.skipModLoading);
         boolean warnBadge = broken || ModsText.badgeWarns(st, m.settingsKnown, m.willFailJavaLoad());
 
         title.setText(broken ? m.fileName : m.titleWithVersion());
@@ -1069,7 +1069,7 @@ public class ModsActivity extends BaseActivity {
         sb.append('\n').append(Trans.get(ModsActivity.this, R.string.mods_detail_state_fmt,
                 ModsText.outcome(this,
                         Mods.stateOf(m, mResolved, mTarget.build, mTarget.revision),
-                        m.settingsKnown, m.willFailJavaLoad(), m.failed)));
+                        m.settingsKnown, m.willFailJavaLoad(), m.failed, mScan.skipModLoading)));
         int fail = 0;
         for (Mods.Gate g : Mods.gates(this, m, mTarget.build, mTarget.revision, mScan)) {
             if (!g.pass) fail++;
@@ -1132,7 +1132,7 @@ public class ModsActivity extends BaseActivity {
             sb.append(Trans.get(ModsActivity.this, R.string.mods_detail_state_fmt,
                     ModsText.outcome(this,
                             Mods.stateOf(m, mResolved, mTarget.build, mTarget.revision),
-                            m.settingsKnown, m.willFailJavaLoad(), m.failed))).append('\n');
+                            m.settingsKnown, m.willFailJavaLoad(), m.failed, mScan.skipModLoading))).append('\n');
         }
         // ★ 只给**相对位置**：整条 `/storage/emulated/0/Android/data/io.mdt.launcher/slot-xxx/mods/...`
         //   要占四行，用户既看不懂也不需要（用户 2026-10-03：「这个页面也改下」）。

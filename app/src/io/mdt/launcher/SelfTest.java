@@ -5562,21 +5562,38 @@ public final class SelfTest {
             //    徽标与详情页顶上那行都改成报**结果**（下次启动会不会加载），**不报**游戏内部那个开关位。
             String enBadge = ctx.getString(R.string.mods_badge_load);
             String noBadge = ctx.getString(R.string.mods_badge_noload);
-            ok(stat, L, enBadge.equals(ModsText.badge(ctx, Mods.State.ENABLED, true, false))
-                            && !enBadge.equals(ModsText.badge(ctx, Mods.State.ENABLED, false, false))
-                            && ModsText.badge(ctx, Mods.State.ENABLED, false, false)
+            ok(stat, L, enBadge.equals(ModsText.badge(ctx, Mods.State.ENABLED, true, false, false))
+                            && !enBadge.equals(ModsText.badge(ctx, Mods.State.ENABLED, false, false, false))
+                            && ModsText.badge(ctx, Mods.State.ENABLED, false, false, false)
                                     .equals(ctx.getString(R.string.mods_badge_unknown))
-                            && ModsText.badge(ctx, Mods.State.ENABLED, true, true)
+                            && ModsText.badge(ctx, Mods.State.ENABLED, true, true, false)
                                     .equals(ctx.getString(R.string.mods_badge_willfail))
-                            && noBadge.equals(ModsText.badge(ctx, Mods.State.DISABLED, true, false)),
+                            && noBadge.equals(ModsText.badge(ctx, Mods.State.DISABLED, true, false, false)),
                     "★★徽标报**结果**：读到设置+启用 ⇒「" + enBadge + "」；**没读到 ⇒「"
                             + ctx.getString(R.string.mods_badge_unknown) + "」（默认值不当事实说）**；"
                             + "会加载失败 ⇒「" + ctx.getString(R.string.mods_badge_willfail)
                             + "」压过它；被关掉 ⇒「" + noBadge + "」（**不说「已关闭」**）");
-            String outOn = ModsText.outcome(ctx, Mods.State.ENABLED, true, false, false);
-            String outOff = ModsText.outcome(ctx, Mods.State.DISABLED, true, false, false);
-            String outMark = ModsText.outcome(ctx, Mods.State.DISABLED, true, false, true);
-            String outDep = ModsText.outcome(ctx, Mods.State.MISSING_DEPENDENCIES, true, false, false);
+            String outOn = ModsText.outcome(ctx, Mods.State.ENABLED, true, false, false, false);
+            // ★★ 2026-10-08 用户：「**所以为啥还是会加载啊**」—— `launchid.dat` 在时，游戏会在**加载之前**
+            //    把整槽模组的 `-enabled` 写成 false（§86.1③）⇒ 结果是**不会加载**。
+            //    "现在是启用" ≠ "下次启动会加载" ⇒ 徽标与详情页那行都必须把这条算进去。
+            String badgeSkip = ModsText.badge(ctx, Mods.State.ENABLED, true, false, true);
+            String outSkip = ModsText.outcome(ctx, Mods.State.ENABLED, true, false, false, true);
+            ok(stat, L, noBadge.equals(badgeSkip)
+                            && outSkip.contains(noBadge)
+                            && outSkip.contains(ctx.getString(R.string.mods_reason_skip_next))
+                            // ⚠️ 这里**不能**用 contains("会加载")：那句是「**不**会加载」，子串天然包含
+                            //    ⇒ 判据要写成"整句不等于肯定那句"（自检自己踩过一次，记一笔）
+                            && !outSkip.equals(enBadge),
+                    "★★待整槽跳过时：**模组启用着也要说「" + noBadge + "」**（实得徽标「" + badgeSkip
+                            + "」、详情页「" + outSkip + "」）—— 与卡片那句警告同一判据，不再互相打脸");
+            ok(stat, L, !ModsText.badge(ctx, Mods.State.ENABLED, true, false, false).equals(badgeSkip)
+                            && ModsText.outcome(ctx, Mods.State.ENABLED, true, false, false, false)
+                                    .equals(enBadge),
+                    "★元断言：**同一状态、只改「待跳过」这一个变量** ⇒ 结论必须不同（否则这条判据没接上）");
+            String outOff = ModsText.outcome(ctx, Mods.State.DISABLED, true, false, false, false);
+            String outMark = ModsText.outcome(ctx, Mods.State.DISABLED, true, false, true, false);
+            String outDep = ModsText.outcome(ctx, Mods.State.MISSING_DEPENDENCIES, true, false, false, false);
             ok(stat, L, outOn.equals(enBadge) && outOff.contains(noBadge)
                             && outOff.contains(ctx.getString(R.string.mods_reason_off))
                             && outDep.contains(noBadge)

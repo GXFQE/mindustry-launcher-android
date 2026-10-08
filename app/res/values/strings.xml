@@ -1639,6 +1639,7 @@
     <string name="mods_badge_load">loads</string>
     <string name="mods_badge_noload">will not load</string>
     <string name="mods_outcome_noload_fmt">will not load (%1$s)</string>
+    <string name="mods_reason_skip_next">the next launch skips the whole slot</string>
     <string name="mods_reason_off">switched off</string>
     <string name="mods_reason_failed">the game shows this as failed to load</string>
     <string name="mods_detail_gate_head">It has to pass these gates</string>

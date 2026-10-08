@@ -1596,6 +1596,7 @@
     <string name="mods_badge_load">会加载</string>
     <string name="mods_badge_noload">不会加载</string>
     <string name="mods_outcome_noload_fmt">不会加载（%1$s）</string>
+    <string name="mods_reason_skip_next">下次启动会整槽跳过</string>
     <string name="mods_reason_off">被关掉了</string>
     <!-- ★★ 2026-10-08 用户：「**确实不会加载，但是游戏里面显示的是加载失败而不是禁用啊**」
          —— MindustryX（用户跑的 fork）的 dex 里**确实读** `-failed`（官方 160 只写不读），

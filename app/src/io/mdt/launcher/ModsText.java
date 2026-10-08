@@ -81,13 +81,20 @@ final class ModsText {
      *   <li>声明了 java 却打包里没有 `classes.dex` ⇒ 「加载会失败」（优先于「会加载」）；</li>
      *   <li>被关掉 ⇒ 「不会加载」。</li>
      * </ul>
-     * ⚠️ 依赖 / 版本 / 内容那几类**保留原来的短词**（缺依赖 / 不兼容 / 内容有错 / 循环依赖）——
+     * <p>🔴 **还要看"下次启动会不会整槽跳过"**（2026-10-08 用户：「**所以为啥还是会加载啊**」）：
+     * `launchid.dat` 在 + `modcrashdisable` 开 ⇒ 游戏会在**加载之前**把整槽模组的 `-enabled` 写成 false
+     * （§86.1③ 的字节码）⇒ 那时它**根本不会被加载**。所以"现在是启用"**不等于**"下次启动会加载"，
+     * 徽标必须把这条算进去，否则它和我们自己卡片那句警告互相打脸。
+     *
+     * <p>⚠️ 依赖 / 版本 / 内容那几类**保留原来的短词**（缺依赖 / 不兼容 / 内容有错 / 循环依赖）——
      * 它们本身就是**原因**，比笼统的「不会加载」信息量大。
      */
-    static String badge(Context c, Mods.State st, boolean settingsKnown, boolean willFailJava) {
+    static String badge(Context c, Mods.State st, boolean settingsKnown, boolean willFailJava,
+                        boolean skipPending) {
         if (st == Mods.State.ENABLED) {
             if (!settingsKnown) return Trans.get(c, R.string.mods_badge_unknown);
             if (willFailJava) return Trans.get(c, R.string.mods_badge_willfail);
+            if (skipPending) return Trans.get(c, R.string.mods_badge_noload);
             return Trans.get(c, R.string.mods_badge_load);
         }
         if (st == Mods.State.DISABLED) return Trans.get(c, R.string.mods_badge_noload);
@@ -104,12 +111,16 @@ final class ModsText {
      * ⇒ 才说「被关掉了」。
      */
     static String outcome(Context c, Mods.State st, boolean settingsKnown, boolean willFailJava,
-                          boolean failedMark) {
+                          boolean failedMark, boolean skipPending) {
         if (st == Mods.State.ENABLED) {
             if (!settingsKnown) return Trans.get(c, R.string.mods_badge_unknown);
             if (willFailJava) {
                 return Trans.get(c, R.string.mods_outcome_noload_fmt,
                         Trans.get(c, R.string.mods_badge_willfail));
+            }
+            if (skipPending) {
+                return Trans.get(c, R.string.mods_outcome_noload_fmt,
+                        Trans.get(c, R.string.mods_reason_skip_next));
             }
             return Trans.get(c, R.string.mods_badge_load);
         }
