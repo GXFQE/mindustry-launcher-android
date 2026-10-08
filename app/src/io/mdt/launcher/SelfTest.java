@@ -5551,6 +5551,19 @@ public final class SelfTest {
             ok(stat, L, gateCount == 6 && gateMiss.length() == 0,
                     "★P3：六道加载门的标签齐全；**没通过的**那几关必须给原因（通过了可只画一行）；"
                             + "门数=" + gateCount + "，缺=" + gateMiss);
+            // ★★ 2026-10-08 用户：「**怎么还有❌游戏里是启用状态这种说法**」——
+            //    门的标签必须是**谓词**（前面加 ❌ 才读得通：「❌ 游戏里启用着它」= 游戏里没启用它），
+            //    不能是**状态名词陈述**（「游戏里**是**启用**状态**」+ ❌ = "❌ 它是启用的" ⇒ 读不通，
+            //    与 §85.16.3「叉号配正面词」同源）。机械判据：**标签里不许出现「状态」**
+            //    （"状态"是名词，谓词不需要它）。
+            StringBuilder labelBad = new StringBuilder();
+            for (Mods.Gate g : Mods.gates(ctx, gm, 0, 0, null)) {
+                if (g.label != null && g.label.contains("状态")) labelBad.append(g.label).append(" ");
+            }
+            ok(stat, L, labelBad.length() == 0,
+                    "★★门标签不许用「状态」这种名词陈述（前面配 ❌ 读不通）—— 违规："
+                            + (labelBad.length() == 0 ? "无" : labelBad.toString())
+                            + "；那道门现在是「" + ctx.getString(R.string.mods_gate_enabled) + "」");
             // ★★ 2026-10-08（用户真机澄清：「是游戏崩溃自己关的啊」）：状态行**不许把它归到用户头上** ——
             //   整槽跳过时是**游戏**写 `-enabled=false`（见 Mods.failedKey 的 Javadoc），而我们
             //   **分不出**是谁关的（跳过 / 用户手动都可能）⇒ 只说状态。要归因的位置是下面那道门
@@ -5638,7 +5651,7 @@ public final class SelfTest {
                     "★★「游戏里的开关」表头交代来源与时刻：「" + head + "」；文件不在 ⇒ 退回不带时刻那句「"
                             + headNoFile + "」");
             // 🔴 2026-10-08：上面那把尺子**只喂了"启用中"的夹具** ⇒ 漏掉一整类：
-            //   模组被关掉时那道「游戏里是启用状态」不通过，而它的原因只在"设置没读到"时才给
+            //   模组被关掉时那道「游戏里启用着它」不通过，而它的原因只在"设置没读到"时才给
             //   ⇒ 详情页那行（❌ 标签 + 换行 + 原因）**直接印出 null**（用户截图抓到的）。
             //   ⇒ 夹具扩到六种状态，并且**明文禁止 note 里出现"null"**。
             java.util.List<Object[]> gateCases = new java.util.ArrayList<>();
@@ -5684,7 +5697,7 @@ public final class SelfTest {
             ok(stat, L, !ctx.getString(R.string.mods_gate_enabled_off).isEmpty()
                             && Mods.gates(ctx, gcOff, 0, 0, null).get(1).note != null
                             && Mods.gates(ctx, gcOff, 0, 0, null).get(1).note.contains("「启用」"),
-                    "★「游戏里是启用状态」不通过时：原因在、并且给出「启用」这个动作（改前是 null）");
+                    "★「游戏里启用着它」不通过时：原因在、并且给出「启用」这个动作（改前是 null）");
             // ── ★★ 2026-10-08 修（用户真机反馈：「上次启动没崩到跳过」这句有问题）──
             //    原来最后那道门的 `pass` **写死 true**，判据一行没算 ⇒ 详情页会同时写着
             //    「❌ 已被标记为失败：是」和「✅ 上次启动没崩到跳过全部模组」两句互相打脸。
@@ -5734,7 +5747,7 @@ public final class SelfTest {
             // ★★ 2026-10-08：**建议必须跟着当前状态走** —— 用户原话
             //    「想再试就点启用，但现在状态就是启用（这矛盾啊）」。
             //    ★ 本批（第十五批）机制定案后口径**再收紧**：那个动作**只许出现在
-            //      「游戏里是启用状态」那道门**（它才是"这个模组开没开"的判据）；
+            //      「游戏里启用着它」那道门**（它才是"这个模组开没开"的判据）；
             //      「上次启动」那道门**任何状态下都不许**说"点启用" —— 两处都说就是同一屏重复
             //      （用户说的"乱"有一部分就是它）。
             Mods.Info gOn = mkMod("gate-crash-probe", null, null, true);      // 启用中
@@ -5745,12 +5758,12 @@ public final class SelfTest {
             String noteOff = String.valueOf(lastGateOf(ctx, gOff, gScan).note);
             ok(stat, L, !noteOn.contains("「启用」") && !noteOff.contains("「启用」"),
                     "★★「上次启动」那道门**任何状态下**都不说「点启用」（动作归"
-                            + "「游戏里是启用状态」那道门）—— 实得开着「" + noteOn
+                            + "「游戏里启用着它」那道门）—— 实得开着「" + noteOn
                             + "」/ 关着「" + noteOff + "」");
             ok(stat, L, Mods.gates(ctx, gOn, 0, 0, gScan).get(1).pass
                             && Mods.gates(ctx, gOff, 0, 0, gScan).get(1).note != null
                             && Mods.gates(ctx, gOff, 0, 0, gScan).get(1).note.contains("「启用」"),
-                    "★动作落在**对的门**上：关掉的模组在「游戏里是启用状态」那道门拿到「启用」；"
+                    "★动作落在**对的门**上：关掉的模组在「游戏里启用着它」那道门拿到「启用」；"
                             + "开着的那道门通过（不再有第二条门重复给同一个动作）");
             ok(stat, L, !noteOn.contains("标成失败") && !noteFail.contains("标成失败"),
                     "★元断言：门的说明里不再写「把它标成失败」—— 那是**全槽级**标记"

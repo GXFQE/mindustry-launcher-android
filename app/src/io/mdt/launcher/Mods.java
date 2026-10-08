@@ -2109,7 +2109,7 @@ public final class Mods {
                 lastCrashOk
                         // 通过但"上次没跑完"（用户关了 modcrashdisable）⇒ 值得说一句
                         ? (lid ? Trans.get(ctx, R.string.mods_gate_last_crash_note) : null)
-                        // 🔴 不通过时只讲**机制与槽级动作**（"点启用"归上面那道"游戏里是启用状态"——
+                        // 🔴 不通过时只讲**机制与槽级动作**（"点启用"归上面那道"游戏里启用着它"——
                         //   两处都说就成了同一屏重复，用户说的"乱"有一部分就是它）：
                         //   `-enabled` / `-failed` 的真义见 failedKey 的 Javadoc（字节码级定案）。
                         : Trans.get(ctx, skipping ? R.string.mods_gate_last_crash_skip_again

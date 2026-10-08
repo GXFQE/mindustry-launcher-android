@@ -816,7 +816,7 @@
     -->
     <string name="mods_gate_android_load">Android can load it</string>
     <string name="mods_gate_android_load_note">it says it needs Java, but the package has no code Android can run, so the game will try to load it and then skip it</string>
-    <string name="mods_gate_enabled">enabled in the game</string>
+    <string name="mods_gate_enabled">the game has it switched on</string>
     <string name="mods_gate_enabled_note">the game settings file has not been read yet, so this shows the default (never written means enabled)</string>
     <string name="mods_gate_enabled_off">it is turned off — press Enable to turn it on</string>
     <string name="mods_gate_enabled_unknown">the settings file could not be read, so its switch state is unknown</string>
