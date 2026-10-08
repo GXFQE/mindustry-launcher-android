@@ -912,9 +912,11 @@ public class ModsActivity extends BaseActivity {
                 //    （版本不够 / minMajor 太低 / 黑名单），上面三行各自都说过一次了。
                 //    徽标已经写着状态，正文再复述一遍就是纯噪声（同一件事两处喊）。
             } else if (st == Mods.State.DISABLED) {
-                // ★ 2026-10-08：徽标现在报**结果**（「不会加载」），这里给**原因**，用口语那句 ——
-                //   不再写「游戏里的状态：已关闭」（用户：「不需要告诉用户在游戏关闭时模组到底启没启用」）。
-                warns.add(Trans.get(ModsActivity.this, R.string.mods_warn_disabled));
+                // ★ 2026-10-08：徽标报**结果**（「不会加载」），这里给**原因** —— 而且用**游戏里的说法**
+                //   （用户：「游戏里面显示的是加载失败而不是禁用啊」）：
+                //   带游戏的失败记录 ⇒ 「游戏里显示「加载失败」」；用户手动关的 ⇒ 「它现在是关着的」。
+                warns.add(Trans.get(ModsActivity.this, m.failed
+                        ? R.string.mods_warn_failed_mark : R.string.mods_warn_disabled));
             } else if (ModsText.needsReason(st)) {
                 // 依赖 / 版本那几类：徽标报结果，这里补"为什么"（`⚠ 缺少必需依赖`）
                 warns.add(Trans.get(ModsActivity.this, R.string.mods_warn_state_fmt, ModsText.stateLabel(this, st)));
@@ -1068,7 +1070,7 @@ public class ModsActivity extends BaseActivity {
         sb.append('\n').append(Trans.get(ModsActivity.this, R.string.mods_detail_state_fmt,
                 ModsText.outcome(this,
                         Mods.stateOf(m, mResolved, mTarget.build, mTarget.revision),
-                        m.settingsKnown, m.willFailJavaLoad())));
+                        m.settingsKnown, m.willFailJavaLoad(), m.failed)));
         int fail = 0;
         for (Mods.Gate g : Mods.gates(this, m, mTarget.build, mTarget.revision, mScan)) {
             if (!g.pass) fail++;
@@ -1131,7 +1133,7 @@ public class ModsActivity extends BaseActivity {
             sb.append(Trans.get(ModsActivity.this, R.string.mods_detail_state_fmt,
                     ModsText.outcome(this,
                             Mods.stateOf(m, mResolved, mTarget.build, mTarget.revision),
-                            m.settingsKnown, m.willFailJavaLoad()))).append('\n');
+                            m.settingsKnown, m.willFailJavaLoad(), m.failed))).append('\n');
         }
         // ★ 只给**相对位置**：整条 `/storage/emulated/0/Android/data/io.mdt.launcher/slot-xxx/mods/...`
         //   要占四行，用户既看不懂也不需要（用户 2026-10-03：「这个页面也改下」）。

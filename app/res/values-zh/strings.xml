@@ -685,7 +685,7 @@
          ⚠️ 原来还写「游戏把它标成失败」：那是**全槽级**标记（一崩 12 个模组全有），
          搁在这儿等于把槽级事实说成这个模组的事（§85.16 同一类错的第三处）⇒ 删掉。 -->
     <string name="mods_gate_last_crash_skip_again">下次启动还会关掉整槽模组 —— 先关掉点名那个模组，或关掉「启动崩溃后禁用模组」</string>
-    <string name="mods_gate_last_crash_retry">那次游戏把整槽模组都关掉了（这条记录还在）</string>
+    <string name="mods_gate_last_crash_retry">那次游戏把它们标成「加载失败」并关掉了（记录还在）</string>
     <string name="mods_gate_no_version">还没指定版本</string>
     <!-- ══ 模组页的几条（P3）：导入失败 + 详情弹窗的补充说明 ══════════════════
          ⚠️ 原文里「（照抄 Mods.resolveDependencies）」是**维护者自我说明 / 源码出处**，
@@ -1559,8 +1559,8 @@
     <!-- ★ 2026-10-08 用户：「现在这个状态下次启动所有模组都会禁用，但是还是显示启用」
          —— 两句都是真的（模组现在确实开着；下次启动游戏确实会把它们关掉），
          但一个在卡片、一个在列表里，读起来就像自相矛盾 ⇒ **同一句里把两个时刻都说了**。 -->
-    <string name="mods_warn_failed">⚠ 现在是开着的，但下次启动游戏会把整槽模组关掉</string>
-    <string name="mods_warn_failed_applied">⚠ 上次启动崩过：游戏把整槽模组关掉了 —— 点「启用」可以重新打开</string>
+    <string name="mods_warn_failed">⚠ 现在是开着的，但下次启动游戏会把它们标成「加载失败」</string>
+    <string name="mods_warn_failed_applied">⚠ 游戏把整槽模组标成「加载失败」并关掉了 —— 点「启用」可恢复</string>
     <string name="mods_warn_failed_noskip">⚠ 上次启动没跑完：整槽模组被记了一笔（你已关掉跳过，下次还会加载）</string>
     <string name="mods_warn_blamed">⚠ 上次崩溃很可能与它有关</string>
 
@@ -1575,6 +1575,7 @@
     <string name="mods_warn_backslash_fmt">⚠ 这个包压得不太对，游戏会找不到里面的脚本 —— 重新压一次就好</string>
     <string name="mods_warn_state_fmt">⚠ %1$s</string>
     <string name="mods_warn_disabled">⚠ 它现在是关着的</string>
+    <string name="mods_warn_failed_mark">⚠ 游戏里显示「加载失败」</string>
 
     <string name="mods_detail_file_fmt">文件：%1$s（%2$s · %3$s）</string>
     <string name="mods_detail_key_fmt">游戏里的名字：%1$s</string>
@@ -1596,6 +1597,11 @@
     <string name="mods_badge_noload">不会加载</string>
     <string name="mods_outcome_noload_fmt">不会加载（%1$s）</string>
     <string name="mods_reason_off">被关掉了</string>
+    <!-- ★★ 2026-10-08 用户：「**确实不会加载，但是游戏里面显示的是加载失败而不是禁用啊**」
+         —— MindustryX（用户跑的 fork）的 dex 里**确实读** `-failed`（官方 160 只写不读），
+         并且把它显示成「加载失败」⇒ 我们的措辞必须**跟游戏里看到的一致**，
+         否则同一件事在游戏里叫「加载失败」、在启动器里叫「被关掉了」，用户只会更糊涂。 -->
+    <string name="mods_reason_failed">游戏里显示「加载失败」</string>
     <string name="mods_detail_gate_head">它要过这几关</string>
     <string name="mods_detail_gate_note_fmt">游戏版本：%1$s</string>
     <string name="mods_detail_gate_nogame">还没有版本指向这个槽</string>

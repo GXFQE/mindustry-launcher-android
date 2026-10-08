@@ -833,7 +833,7 @@
     <string name="mods_gate_last_crash_note">the last launch did not finish, but you turned off skip-mods-after-crash, so nothing gets skipped</string>
     <!-- Fail case: the advice follows THIS mod's current state (already enabled => do not say "press Enable"). -->
     <string name="mods_gate_last_crash_skip_again">the next launch turns off every mod in the slot again — turn off the mod named above, or turn off skip-mods-after-crash</string>
-    <string name="mods_gate_last_crash_retry">the game turned off every mod in the slot that time (the record is still here)</string>
+    <string name="mods_gate_last_crash_retry">the game marked them as failed to load and switched them off (the record is still here)</string>
     <string name="mods_gate_no_version">no version set yet</string>
     <!-- ══ 模组页的几条（P3）：导入失败 + 详情弹窗的补充说明 ══════════════════
          ⚠️ 原文里「（照抄 Mods.resolveDependencies）」是**维护者自我说明 / 源码出处**，
@@ -1607,8 +1607,8 @@
     <string name="mods_warn_noversion_fmt">⚠ It does not declare which game version it needs — the game will treat it as too old and skip it</string>
     <string name="mods_warn_blacklist_fmt">⚠ It is on the game blacklist: %1$s</string>
     <string name="mods_warn_dup">⚠ Duplicate name with another package — only one of them takes effect in the game</string>
-    <string name="mods_warn_failed">⚠ they are on now, but the next launch turns off every mod in this slot</string>
-    <string name="mods_warn_failed_applied">⚠ The last launch crashed: the game turned off every mod in this slot — press Enable to turn them back on</string>
+    <string name="mods_warn_failed">⚠ they are on now, but the next launch marks them all as failed to load</string>
+    <string name="mods_warn_failed_applied">⚠ the game marked every mod in this slot as failed to load and switched it off — press Enable to restore</string>
     <string name="mods_warn_failed_noskip">⚠ The last launch did not finish: the mods were flagged (you turned skip off, so they still load)</string>
     <string name="mods_warn_blamed">⚠ It is the likely cause of the last crash</string>
 
@@ -1622,6 +1622,7 @@
     <string name="mods_warn_backslash_fmt">⚠ This package is packed incorrectly and the game cannot find its scripts — just repack it</string>
     <string name="mods_warn_state_fmt">⚠ %1$s</string>
     <string name="mods_warn_disabled">⚠ it is switched off right now</string>
+    <string name="mods_warn_failed_mark">⚠ the game shows this as failed to load</string>
 
     <string name="mods_detail_file_fmt">File: %1$s (%2$s · %3$s)</string>
     <string name="mods_detail_key_fmt">In-game name: %1$s</string>
@@ -1639,6 +1640,7 @@
     <string name="mods_badge_noload">will not load</string>
     <string name="mods_outcome_noload_fmt">will not load (%1$s)</string>
     <string name="mods_reason_off">switched off</string>
+    <string name="mods_reason_failed">the game shows this as failed to load</string>
     <string name="mods_detail_gate_head">It has to pass these gates</string>
     <string name="mods_detail_gate_note_fmt">Game version: %1$s</string>
     <string name="mods_detail_gate_nogame">No version points at this slot yet</string>

@@ -97,8 +97,14 @@ final class ModsText {
     /**
      * 详情页顶上那行的**句子形式**：`下次启动：会不会加载`（+ 一句原因）。
      * 与 {@link #badge} 同一套语义，只是能多带一句为什么。
+     *
+     * <p>★ 原因用**游戏里的说法**（2026-10-08 用户：「**游戏里面显示的是加载失败而不是禁用啊**」）：
+     * 那条 `-failed` 是游戏自己写的（MindustryX 会读它并显示成「加载失败」）⇒ 我们说「被关掉了」
+     * 就与用户屏幕上的字对不上。带记录 ⇒ 说「游戏里显示「加载失败」」；不带记录（用户手动关的）
+     * ⇒ 才说「被关掉了」。
      */
-    static String outcome(Context c, Mods.State st, boolean settingsKnown, boolean willFailJava) {
+    static String outcome(Context c, Mods.State st, boolean settingsKnown, boolean willFailJava,
+                          boolean failedMark) {
         if (st == Mods.State.ENABLED) {
             if (!settingsKnown) return Trans.get(c, R.string.mods_badge_unknown);
             if (willFailJava) {
@@ -107,9 +113,13 @@ final class ModsText {
             }
             return Trans.get(c, R.string.mods_badge_load);
         }
-        String why = st == Mods.State.DISABLED ? Trans.get(c, R.string.mods_reason_off)
-                : stateLabel(c, st);
+        String why = st != Mods.State.DISABLED ? stateLabel(c, st) : reasonOff(c, failedMark);
         return Trans.get(c, R.string.mods_outcome_noload_fmt, why);
+    }
+
+    /** 关闭态的**原因**：带游戏的失败记录 ⇒ 用游戏的说法；否则就是"被关掉了"。 */
+    static String reasonOff(Context c, boolean failedMark) {
+        return Trans.get(c, failedMark ? R.string.mods_reason_failed : R.string.mods_reason_off);
     }
 
     /** 徽标是不是"警告色"（与 {@link #badge} 同源判据，别再各写一套）。 */

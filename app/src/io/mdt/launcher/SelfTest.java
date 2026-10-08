@@ -3639,16 +3639,17 @@ public final class SelfTest {
                             + " / 已跳完 " + failNoteApplied.length()
                             + " / 点名那行 " + blameOne.replace("%1$s", "").length() + " 字"
                             + "（超了就又会挤成三行）");
-            ok(stat, L, failNote.contains("关掉") && failNoteApplied.contains("关掉")
+            ok(stat, L, failNote.contains("加载失败") && failNoteApplied.contains("加载失败")
                             && failNoteApplied.contains("「启用」"),
-                    "★机制口径（2026-10-08 字节码定案）：那句话必须说「游戏会把整槽模组**关掉**」"
-                            + "（`-failed` 的真义不是「它崩了」，是「整槽被跳过的副产品」）；"
-                            + "跳过已发生那支要给出「启用」这个动作");
-            ok(stat, L, failNote.contains("关掉") && failNoteNo.contains("还会加载")
-                            && ctx.getString(R.string.mods_gate_last_crash).contains("整槽跳过")
+                    "★机制口径（2026-10-08，用户点单后按**游戏的说法**收口）：那两句都要出现"
+                            + "「加载失败」（游戏里就是这么显示的）＋**跳过已发生那支要给出「启用」这个动作**"
+                            + "（`-failed` 的真义是「整槽被跳过的副产品」，见 REF §86.1③）");
+            ok(stat, L, failNote.contains("加载失败") && failNoteNo.contains("还会加载"),
+                    "★术语统一：摘要卡用**游戏里的说法**「加载失败」（用户：「游戏里面显示的是加载失败"
+                            + "而不是禁用啊」）/ 关了跳过那支说「还会加载」/ 门标签（两支）用「整槽跳过」");
+            ok(stat, L, ctx.getString(R.string.mods_gate_last_crash).contains("整槽跳过")
                             && ctx.getString(R.string.mods_gate_last_crash_bad).contains("整槽跳过"),
-                    "★术语统一：摘要卡（游戏把整槽模组**关掉**）/ 关了跳过那支 / 门标签（两支）"
-                            + "口径一致（机制定案后：真正的后果是「模组被关掉」，不是「被标成失败」）");
+                    "★门标签两支都用「整槽跳过」（这个是我们自己的机制术语，游戏里没有对应的词）");
             ok(stat, L, !ctx.getString(R.string.mods_gate_last_crash_bad).contains("跳过全部模组")
                             && !ctx.getString(R.string.mods_gate_last_crash_skip_again)
                                     .contains("跳过全部模组"),
@@ -5544,15 +5545,27 @@ public final class SelfTest {
                             + ctx.getString(R.string.mods_badge_unknown) + "」（默认值不当事实说）**；"
                             + "会加载失败 ⇒「" + ctx.getString(R.string.mods_badge_willfail)
                             + "」压过它；被关掉 ⇒「" + noBadge + "」（**不说「已关闭」**）");
-            String outOn = ModsText.outcome(ctx, Mods.State.ENABLED, true, false);
-            String outOff = ModsText.outcome(ctx, Mods.State.DISABLED, true, false);
-            String outDep = ModsText.outcome(ctx, Mods.State.MISSING_DEPENDENCIES, true, false);
+            String outOn = ModsText.outcome(ctx, Mods.State.ENABLED, true, false, false);
+            String outOff = ModsText.outcome(ctx, Mods.State.DISABLED, true, false, false);
+            String outMark = ModsText.outcome(ctx, Mods.State.DISABLED, true, false, true);
+            String outDep = ModsText.outcome(ctx, Mods.State.MISSING_DEPENDENCIES, true, false, false);
             ok(stat, L, outOn.equals(enBadge) && outOff.contains(noBadge)
                             && outOff.contains(ctx.getString(R.string.mods_reason_off))
                             && outDep.contains(noBadge)
                             && outDep.contains(ctx.getString(R.string.mods_state_missing_deps)),
                     "★★详情页顶上那行同理：「" + outOn + "」/「" + outOff + "」/「" + outDep
-                            + "」—— 结果 + 一句原因（关闭态给的是口语那句，不写「已关闭」）");
+                            + "」—— 结果 + 一句原因");
+            // ★★ 2026-10-08 用户：「**确实不会加载，但是游戏里面显示的是加载失败而不是禁用啊**」
+            //    ⇒ 原因必须用**游戏里的说法**（MindustryX 的 dex 里读 `-failed` 并显示成「加载失败」；
+            //    官方 160 只写不读 ⇒ 这是 fork 的用法）。带记录 / 不带记录要能分开，而且**反例要能算出 false**。
+            ok(stat, L, outMark.contains(noBadge)
+                            && outMark.contains(ctx.getString(R.string.mods_reason_failed))
+                            && !outMark.contains(ctx.getString(R.string.mods_reason_off))
+                            && !outOff.contains(ctx.getString(R.string.mods_reason_failed)),
+                    "★★带游戏的失败记录 ⇒ 原因说「" + ctx.getString(R.string.mods_reason_failed)
+                            + "」（与游戏屏幕上一致）；用户手动关的（没记录）⇒ 说「"
+                            + ctx.getString(R.string.mods_reason_off) + "」—— 两者互斥（实得「"
+                            + outMark + "」/「" + outOff + "」）");
             // ★★ 表头要交代"这是几点的值"（模组开关只有游戏会写，用户得知道它有多新）
             File stProbe = new File(ctx.getCacheDir(), "settings-probe.bin");
             try {
