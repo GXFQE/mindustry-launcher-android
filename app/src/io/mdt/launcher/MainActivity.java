@@ -159,6 +159,7 @@ public class MainActivity extends BaseActivity {
                 || intent.hasExtra(BlueprintsActivity.EXTRA_DEV_IMPORT)
                 || intent.hasExtra("dev_mapstats")
                 || intent.hasExtra("dev_crash_analyze")
+                || intent.hasExtra("dev_crash_corpus")
                 || intent.hasExtra("dev_msch");
         if (!isDev) return;
         if ((getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) == 0) {
@@ -637,6 +638,28 @@ public class MainActivity extends BaseActivity {
                     reportDev(rep, "dev_crash_analyze · 槽 " + useSlot);
                 }
             }, "dev-crash-analyze").start();
+            return;
+        }
+        // ── F23：崩溃分析 · 全量语料回归（把一整个目录的语料逐份跑一遍）───────────────
+        // 用法：`--es dev_crash_corpus /sdcard/mdt-corpus [--es dev_crash_corpus_slot <槽>]`
+        // ★ 为什么要这个口：语料库会长（40 条签名 + 六十多份报告），只靠自检里那几份夹具
+        //   覆盖不到全量；这一遍专门看"解析不抛 / 该点名的不许认不出 / 不该点名的不许点名"。
+        String corpus = intent.getStringExtra("dev_crash_corpus");
+        if (corpus != null && !corpus.isEmpty()) {
+            final String dir = corpus.trim();
+            String s0 = intent.getStringExtra("dev_crash_corpus_slot");
+            final String useSlot = (s0 == null || s0.trim().isEmpty()) ? Data.currentSlot(this) : s0.trim();
+            new Thread(new Runnable() {
+                @Override public void run() {
+                    String rep;
+                    try {
+                        rep = CrashAnalysis.corpusReport(MainActivity.this, dir, useSlot);
+                    } catch (Throwable t) {
+                        rep = "dev_crash_corpus 失败：" + t;
+                    }
+                    reportDev(rep, "dev_crash_corpus · " + dir + " · 槽 " + useSlot);
+                }
+            }, "dev-crash-corpus").start();
             return;
         }
         // ── F21：地图资源统计（真机计时 + 逐项数字）─────────────────────────────

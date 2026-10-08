@@ -3269,6 +3269,118 @@ public final class SelfTest {
                         == CrashAnalysis.KIND_NONE,
                 "★元断言：同一份报告、dex 里什么都没有 ⇒ 认不出（L3 那条不是恒真的）");
 
+        // ── 夹具 9：真机 **缺依赖**（三层 `Caused by` 链）──
+        //    出处：docs/crash-corpus/14-真机造崩-Java-dex-模组.md §1b（探针 `depuser`，逐字）
+        String fxDep = fx(new String[]{
+                "Mindustry has crashed. How unfortunate.",
+                "Version: release build 159.7 (Built July 19, 2026 17:39 PM)",
+                "Date: 十月 8, 2026 14:55:41 下午",
+                "OS: Linux x (aarch64)",
+                "Android API level: 36",
+                "Java Version: 0",
+                "Runtime Available Memory: 512mb",
+                "Cores: 8",
+                "Mods: depuser:1.0",
+                "",
+                "",
+                "java.lang.RuntimeException: Error loading mod depuser",
+                "\tat mindustry.mod.Mods.contextRun(Mods.java:18)",
+                "\tat mindustry.mod.Mods.lambda$eachClass$38(Mods.java:7)",
+                "\tat arc.struct.Seq.each(Seq.java:1)",
+                "\tat mindustry.ClientLauncher.update(ClientLauncher.java:127)",
+                "Caused by: java.lang.NoClassDefFoundError: Failed resolution of: Ldepmod/Dep;",
+                "\tat depuser.Dep.init(Dep.java:14)",
+                "\tat mindustry.mod.Mods.lambda$eachClass$37(Mods.java:3)",
+                "\t... 9 more",
+                "Caused by: java.lang.ClassNotFoundException: depmod.Dep",
+                "\tat mindustry.mod.ModClassLoader.findClass(ModClassLoader.java:81)",
+                "\tat java.lang.ClassLoader.loadClass(ClassLoader.java:637)",
+                "\t... 15 more",
+        });
+        CrashAnalysis.Report rDep = CrashAnalysis.parse(fxDep);
+        ok(stat, L, rDep.chain.size() == 3,
+                "★★真机报告（缺依赖）：**三层** `Caused by` 链都追出来了（" + rDep.chain.size() + " 节）");
+        ok(stat, L, "Error loading mod depuser".equals(rDep.topMessage()),
+                "★真机报告（缺依赖）：顶层消息逐字");
+        ok(stat, L, needleWeight(rDep, "depmod/Dep") == 3,
+                "★★缺依赖的两句话（`Failed resolution of: Ldepmod/Dep;` 与 `ClassNotFoundException: depmod.Dep`）"
+                        + "抽出来是**同一根针**、权重 3（模组命名空间）");
+        CrashAnalysis.Verdict vDep = CrashAnalysis.judge(rDep, null, null);
+        ok(stat, L, vDep.kind == CrashAnalysis.KIND_MOD
+                        && CrashAnalysis.LAYER_L1B.equals(vDep.hits.get(0).layer)
+                        && "depuser".equals(vDep.hits.get(0).name) && !vDep.hits.get(0).known,
+                "★模组**不在槽里**也照样点名（报告是历史事实，只是 known=false）："
+                        + CrashAnalysis.debugLine(rDep, vDep));
+        List<Mods.Info> modsDep = new ArrayList<Mods.Info>();
+        modsDep.add(info("depuser", "MDT Dep Probe", "depuser.Dep"));
+        ok(stat, L, "MDT Dep Probe".equals(CrashAnalysis.judge(rDep, modsDep, null).hits.get(0).name),
+                "★补上模组包之后，显示名从 mod.hjson 解析出来（MDT Dep Probe）");
+        String depNoL1b = fxDep.replace("java.lang.RuntimeException: Error loading mod depuser",
+                        "java.lang.RuntimeException: something else")
+                .replace("\tat depuser.Dep.init(Dep.java:14)\n", "");
+        CrashAnalysis.Report rDep2 = CrashAnalysis.parse(depNoL1b);
+        List<Mods.Info> modsDep2 = new ArrayList<Mods.Info>();
+        modsDep2.add(info("depuser", "MDT Dep Probe", "depuser.Main"));
+        CrashAnalysis.Verdict vDep2 = CrashAnalysis.judge(rDep2, modsDep2, fakeDex("depuser", "depmod/Dep"));
+        ok(stat, L, vDep2.kind == CrashAnalysis.KIND_MOD
+                        && CrashAnalysis.LAYER_DEX.equals(vDep2.hits.get(0).layer)
+                        && "depmod.Dep".equals(vDep2.hits.get(0).evidence),
+                "★★真机报告（缺依赖）· L3：只剩符号也能点名（缺的那个类在它包里）："
+                        + CrashAnalysis.debugLine(rDep2, vDep2));
+        ok(stat, L, CrashAnalysis.judge(rDep2, modsDep2, fakeDex("depuser")).kind
+                        == CrashAnalysis.KIND_NONE,
+                "★元断言：dex 里没有 `depmod/Dep` ⇒ 认不出（不能靠「它加载失败过」就点名）");
+
+        // ── 夹具 10：真机 **访问权限变了**（ART 那句 `Field '…' is inaccessible to class '…'`）──
+        //    出处：同上 §1c（探针 `accessboom`，逐字）
+        String fxAcc = fx(new String[]{
+                "Mindustry has crashed. How unfortunate.",
+                "Version: release build 159.7 (Built July 19, 2026 17:39 PM)",
+                "Date: 十月 8, 2026 14:55:57 下午",
+                "OS: Linux x (aarch64)",
+                "Android API level: 36",
+                "Java Version: 0",
+                "Runtime Available Memory: 512mb",
+                "Cores: 8",
+                "Mods: accessboom:1.0",
+                "",
+                "",
+                "java.lang.RuntimeException: Error loading mod accessboom",
+                "\tat mindustry.mod.Mods.contextRun(Mods.java:18)",
+                "\tat arc.struct.Seq.each(Seq.java:1)",
+                "Caused by: java.lang.IllegalAccessError: Field 'mindustry.core.GameState.state'"
+                        + " is inaccessible to class 'accessboom.Boom' (declaration of"
+                        + " 'accessboom.Boom' appears in /data/user/0/io.mdt.launcher/cache/mods/"
+                        + "accessboom/1a11a4a9d60.zip)",
+                "\tat accessboom.Boom.init(Boom.java:13)",
+                "\tat mindustry.mod.Mods.lambda$eachClass$37(Mods.java:3)",
+                "\t... 9 more",
+        });
+        CrashAnalysis.Report rAcc = CrashAnalysis.parse(fxAcc);
+        ok(stat, L, needleWeight(rAcc, "accessboom/Boom") == 3,
+                "★★ART 那句 `is inaccessible to class 'X'` 里的 **X = 访问方类**（模组自己的类）"
+                        + "抽成权重 3 的针 —— 这条消息在安卓上是**能点名**的");
+        ok(stat, L, needleWeight(rAcc, "mindustry/core/GameState") == 1
+                        && needleWeight(rAcc, "state") == 1,
+                "★同一条消息里的目标 owner（游戏类）与短成员名（`state`）都只有 1 分 ⇒ 不许靠它们点名");
+        String accNoL1b = fxAcc.replace("java.lang.RuntimeException: Error loading mod accessboom",
+                        "java.lang.RuntimeException: something else")
+                .replace("\tat accessboom.Boom.init(Boom.java:13)\n", "");
+        CrashAnalysis.Report rAcc2 = CrashAnalysis.parse(accNoL1b);
+        List<Mods.Info> modsAcc = new ArrayList<Mods.Info>();
+        modsAcc.add(info("accessboom", "MDT Access Probe", "accessboom.Main"));
+        CrashAnalysis.Verdict vAcc = CrashAnalysis.judge(rAcc2, modsAcc,
+                fakeDex("accessboom", "accessboom/Boom"));
+        ok(stat, L, vAcc.kind == CrashAnalysis.KIND_MOD
+                        && CrashAnalysis.LAYER_DEX.equals(vAcc.hits.get(0).layer)
+                        && "accessboom.Boom".equals(vAcc.hits.get(0).evidence),
+                "★★真机报告（访问权限）· L3：靠「访问方类」点名：" + CrashAnalysis.debugLine(rAcc2, vAcc));
+        CrashAnalysis.Verdict vAccWeak = CrashAnalysis.judge(rAcc2, modsAcc,
+                fakeDex("accessboom", "mindustry/core/GameState", "state"));
+        ok(stat, L, vAccWeak.kind == CrashAnalysis.KIND_NONE && vAccWeak.hits.size() == 1
+                        && vAccWeak.hits.get(0).weight == 1,
+                "★元断言：只命中 1 分的针（游戏类 / 短成员名）⇒ **不点名**，只留弱线索");
+
         // ── 渲染：并列 / 弱线索 / 依据与结论同一行 ──
         CrashAnalysis.Verdict vMulti = new CrashAnalysis.Verdict();
         vMulti.kind = CrashAnalysis.KIND_MOD;

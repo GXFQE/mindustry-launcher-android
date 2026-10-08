@@ -1,0 +1,447 @@
+F23 全量语料回归：120 份语料逐份跑一遍（2026-10-08，真机）
+================================================================
+dev 口：`--es dev_crash_corpus <目录> [--es dev_crash_corpus_slot <槽>]`
+夹具 = `docs/crash-corpus/*.md` 里**所有**围栏块（120 份 / 199 KB；含 13/14 片里的源码块，
+       "喂进去不许抛"本身就是一条判据）。
+槽 = crashlab（**0 个模组**）⇒ L2a/L3 这一遍不可能命中，看的正是 L1/L1b/vanilla/launcher 四类。
+
+■ 逐份输出 + 汇总（report-devtool.txt 原文）
+-----------------------------------------------------------------------------
+dir = /storage/emulated/0/Android/data/io.mdt.launcher/hub/mdt-corpus
+slot = crashlab
+mods = 0 (0 with classes.dex)  -- L2a/L3 can only fire when the slot really has that mod
+
+01-01.txt                  kind=NONE     chain=0 needles=0   kind=NONE hits=- dex=-1
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    可能是游戏本体、环境（内存 / 驱动 / 缺系统文件），也可能是已经被删掉的模组。
+01-02.txt                  kind=NONE     chain=1 needles=15  kind=NONE hits=- dex=0
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    这个槽里没有带代码（classes.dex）的模组，没有可归因的对象。
+01-03.txt                  kind=NONE     chain=1 needles=4   kind=NONE hits=- dex=0
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    这个槽里没有带代码（classes.dex）的模组，没有可归因的对象。
+01-04.txt                  kind=NONE     chain=0 needles=0   kind=NONE hits=- dex=-1
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    可能是游戏本体、环境（内存 / 驱动 / 缺系统文件），也可能是已经被删掉的模组。
+02-01.txt                  kind=NONE     chain=0 needles=0   kind=NONE hits=- dex=-1
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    可能是游戏本体、环境（内存 / 驱动 / 缺系统文件），也可能是已经被删掉的模组。
+02-02.txt                  kind=NONE     chain=2 needles=3   kind=NONE hits=- dex=0
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    这个槽里没有带代码（classes.dex）的模组，没有可归因的对象。
+02-03.txt                  kind=NONE     chain=0 needles=0   kind=NONE hits=- dex=-1
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    可能是游戏本体、环境（内存 / 驱动 / 缺系统文件），也可能是已经被删掉的模组。
+02-04.txt                  kind=NONE     chain=0 needles=0   kind=NONE hits=- dex=-1
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    可能是游戏本体、环境（内存 / 驱动 / 缺系统文件），也可能是已经被删掉的模组。
+03-01.txt                  kind=NONE     chain=1 needles=21  kind=NONE hits=- dex=0
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    这个槽里没有带代码（classes.dex）的模组，没有可归因的对象。
+03-02.txt                  kind=NONE     chain=0 needles=0   kind=NONE hits=- dex=-1
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    可能是游戏本体、环境（内存 / 驱动 / 缺系统文件），也可能是已经被删掉的模组。
+04-01.txt                  kind=NONE     chain=0 needles=0   kind=NONE hits=- dex=-1
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    可能是游戏本体、环境（内存 / 驱动 / 缺系统文件），也可能是已经被删掉的模组。
+04-02.txt                  kind=MOD      chain=1 needles=18  kind=MOD hits=MI2-Utilities Java(L1/w3/mi2-utilities-java) dex=-1
+    是「MI2-Utilities Java」引起的 —— 游戏自己在报告里写明了归因（Likely Cause）
+04-03.txt                  kind=NONE     chain=0 needles=0   kind=NONE hits=- dex=-1
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    可能是游戏本体、环境（内存 / 驱动 / 缺系统文件），也可能是已经被删掉的模组。
+04-04.txt                  kind=NONE     chain=2 needles=25  kind=NONE hits=- dex=0
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    这个槽里没有带代码（classes.dex）的模组，没有可归因的对象。
+05-01.txt                  kind=NONE     chain=0 needles=0   kind=NONE hits=- dex=-1
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    可能是游戏本体、环境（内存 / 驱动 / 缺系统文件），也可能是已经被删掉的模组。
+05-02.txt                  kind=NONE     chain=0 needles=0   kind=NONE hits=- dex=-1
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    可能是游戏本体、环境（内存 / 驱动 / 缺系统文件），也可能是已经被删掉的模组。
+05-03.txt                  kind=NONE     chain=2 needles=12  kind=NONE hits=- dex=0
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    这个槽里没有带代码（classes.dex）的模组，没有可归因的对象。
+06-01.txt                  kind=NONE     chain=1 needles=3   kind=NONE hits=- dex=0
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    这个槽里没有带代码（classes.dex）的模组，没有可归因的对象。
+06-02.txt                  kind=NONE     chain=0 needles=0   kind=NONE hits=- dex=-1
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    可能是游戏本体、环境（内存 / 驱动 / 缺系统文件），也可能是已经被删掉的模组。
+06-03.txt                  kind=NONE     chain=0 needles=0   kind=NONE hits=- dex=-1
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    可能是游戏本体、环境（内存 / 驱动 / 缺系统文件），也可能是已经被删掉的模组。
+06-04.txt                  kind=NONE     chain=4 needles=6   kind=NONE hits=- dex=0
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    这个槽里没有带代码（classes.dex）的模组，没有可归因的对象。
+06-05.txt                  kind=NONE     chain=0 needles=0   kind=NONE hits=- dex=-1
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    可能是游戏本体、环境（内存 / 驱动 / 缺系统文件），也可能是已经被删掉的模组。
+07-01.txt                  kind=NONE     chain=1 needles=0   kind=NONE hits=- dex=-1
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    可能是游戏本体、环境（内存 / 驱动 / 缺系统文件），也可能是已经被删掉的模组。
+07-02.txt                  kind=NONE     chain=1 needles=0   kind=NONE hits=- dex=-1
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    可能是游戏本体、环境（内存 / 驱动 / 缺系统文件），也可能是已经被删掉的模组。
+08-01.txt                  kind=NONE     chain=2 needles=20  kind=NONE hits=- dex=0
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    这个槽里没有带代码（classes.dex）的模组，没有可归因的对象。
+08-02.txt                  kind=NONE     chain=1 needles=2   kind=NONE hits=- dex=0
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    这个槽里没有带代码（classes.dex）的模组，没有可归因的对象。
+08-03.txt                  kind=NONE     chain=0 needles=0   kind=NONE hits=- dex=-1
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    可能是游戏本体、环境（内存 / 驱动 / 缺系统文件），也可能是已经被删掉的模组。
+08-04.txt                  kind=NONE     chain=0 needles=0   kind=NONE hits=- dex=-1
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    可能是游戏本体、环境（内存 / 驱动 / 缺系统文件），也可能是已经被删掉的模组。
+08-05.txt                  kind=NONE     chain=0 needles=0   kind=NONE hits=- dex=-1
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    可能是游戏本体、环境（内存 / 驱动 / 缺系统文件），也可能是已经被删掉的模组。
+08-06.txt                  kind=BROKEN   chain=0 needles=0   kind=BROKEN hits=- dex=-1
+    读不出这份报告（文件是空的）。
+08-07.txt                  kind=NONE     chain=3 needles=17  kind=NONE hits=- dex=0
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    这个槽里没有带代码（classes.dex）的模组，没有可归因的对象。
+08-08.txt                  kind=NONE     chain=1 needles=24  kind=NONE hits=- dex=0
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    这个槽里没有带代码（classes.dex）的模组，没有可归因的对象。
+08-09.txt                  kind=NONE     chain=0 needles=0   kind=NONE hits=- dex=-1
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    可能是游戏本体、环境（内存 / 驱动 / 缺系统文件），也可能是已经被删掉的模组。
+08-10.txt                  kind=NONE     chain=0 needles=0   kind=NONE hits=- dex=-1
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    可能是游戏本体、环境（内存 / 驱动 / 缺系统文件），也可能是已经被删掉的模组。
+08-11.txt                  kind=NONE     chain=1 needles=3   kind=NONE hits=- dex=0
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    这个槽里没有带代码（classes.dex）的模组，没有可归因的对象。
+08-12.txt                  kind=NONE     chain=0 needles=0   kind=NONE hits=- dex=-1
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    可能是游戏本体、环境（内存 / 驱动 / 缺系统文件），也可能是已经被删掉的模组。
+08-13.txt                  kind=NONE     chain=0 needles=0   kind=NONE hits=- dex=-1
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    可能是游戏本体、环境（内存 / 驱动 / 缺系统文件），也可能是已经被删掉的模组。
+08-14.txt                  kind=NONE     chain=0 needles=0   kind=NONE hits=- dex=-1
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    可能是游戏本体、环境（内存 / 驱动 / 缺系统文件），也可能是已经被删掉的模组。
+08-15.txt                  kind=BROKEN   chain=0 needles=0   kind=BROKEN hits=- dex=-1
+    读不出这份报告（文件是空的）。
+08-16.txt                  kind=NONE     chain=0 needles=0   kind=NONE hits=- dex=-1
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    可能是游戏本体、环境（内存 / 驱动 / 缺系统文件），也可能是已经被删掉的模组。
+08-17.txt                  kind=NONE     chain=1 needles=2   kind=NONE hits=- dex=0
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    这个槽里没有带代码（classes.dex）的模组，没有可归因的对象。
+08-18.txt                  kind=NONE     chain=1 needles=2   kind=NONE hits=- dex=0
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    这个槽里没有带代码（classes.dex）的模组，没有可归因的对象。
+09a-01.txt                 kind=MOD      chain=1 needles=15  kind=MOD hits=Neon / 氖(L1/w3/neon) dex=-1
+    是「Neon / 氖」引起的 —— 游戏自己在报告里写明了归因（Likely Cause）
+09a-02.txt                 kind=MOD      chain=2 needles=21  kind=MOD hits=Neon / 氖(L1/w3/neon) dex=-1
+    是「Neon / 氖」引起的 —— 游戏自己在报告里写明了归因（Likely Cause）
+09a-03.txt                 kind=MOD      chain=1 needles=17  kind=MOD hits=Neon / 氖(L1/w3/neon) dex=-1
+    是「Neon / 氖」引起的 —— 游戏自己在报告里写明了归因（Likely Cause）
+09a-04.txt                 kind=MOD      chain=1 needles=28  kind=MOD hits=Neon / 氖(L1/w3/neon) dex=-1
+    是「Neon / 氖」引起的 —— 游戏自己在报告里写明了归因（Likely Cause）
+09a-05.txt                 kind=MOD      chain=1 needles=19  kind=MOD hits=Neon / 氖(L1/w3/neon) dex=-1
+    是「Neon / 氖」引起的 —— 游戏自己在报告里写明了归因（Likely Cause）
+09a-06.txt                 kind=MOD      chain=1 needles=9   kind=MOD hits=Stealth Path / 偷袭小道(L1/w3/stealth-path) dex=-1
+    是「Stealth Path / 偷袭小道」引起的 —— 游戏自己在报告里写明了归因（Likely Cause）
+09a-07.txt                 kind=MOD      chain=1 needles=9   kind=MOD hits=Stealth Path / 偷袭小道(L1/w3/stealth-path) dex=-1
+    是「Stealth Path / 偷袭小道」引起的 —— 游戏自己在报告里写明了归因（Likely Cause）
+09a-08.txt                 kind=MOD      chain=1 needles=9   kind=MOD hits=Stealth Path / 偷袭小道(L1/w3/stealth-path) dex=-1
+    是「Stealth Path / 偷袭小道」引起的 —— 游戏自己在报告里写明了归因（Likely Cause）
+09a-09.txt                 kind=MOD      chain=1 needles=9   kind=MOD hits=Stealth Path / 偷袭小道(L1/w3/stealth-path) dex=-1
+    是「Stealth Path / 偷袭小道」引起的 —— 游戏自己在报告里写明了归因（Likely Cause）
+09a-10.txt                 kind=MOD      chain=0 needles=0   kind=MOD hits=Neon / 氖(L1/w3/neon) dex=-1
+    是「Neon / 氖」引起的 —— 游戏自己在报告里写明了归因（Likely Cause）
+09a-11.txt                 kind=MOD      chain=0 needles=0   kind=MOD hits=Neon / 氖(L1/w3/neon) dex=-1
+    是「Neon / 氖」引起的 —— 游戏自己在报告里写明了归因（Likely Cause）
+09a-12.txt                 kind=MOD      chain=0 needles=0   kind=MOD hits=Logic Sugar(L1/w3/logicsugar-dev) dex=-1
+    是「Logic Sugar」引起的 —— 游戏自己在报告里写明了归因（Likely Cause）
+09a-13.txt                 kind=MOD      chain=1 needles=13  kind=MOD hits=JS Crash Test(L1/w3/jstest) dex=-1
+    是「JS Crash Test」引起的 —— 游戏自己在报告里写明了归因（Likely Cause）
+09a-14.txt                 kind=MOD      chain=1 needles=13  kind=MOD hits=JS Crash Test(L1/w3/jstest) dex=-1
+    是「JS Crash Test」引起的 —— 游戏自己在报告里写明了归因（Likely Cause）
+09a-15.txt                 kind=MOD      chain=1 needles=13  kind=MOD hits=JS Crash Test(L1/w3/jstest) dex=-1
+    是「JS Crash Test」引起的 —— 游戏自己在报告里写明了归因（Likely Cause）
+09b-01.txt                 kind=MOD      chain=3 needles=11  kind=MOD hits=databoom(L1b/w3/databoom) dex=-1
+    是「databoom」引起的 —— 报告里写着「Error loading mod databoom」
+09b-02.txt                 kind=MOD      chain=3 needles=11  kind=MOD hits=databoom(L1b/w3/databoom) dex=-1
+    是「databoom」引起的 —— 报告里写着「Error loading mod databoom」
+09b-03.txt                 kind=MOD      chain=3 needles=9   kind=MOD hits=databoom(L1b/w3/databoom) dex=-1
+    是「databoom」引起的 —— 报告里写着「Error loading mod databoom」
+09b-04.txt                 kind=MOD      chain=3 needles=9   kind=MOD hits=databoom(L1b/w3/databoom) dex=-1
+    是「databoom」引起的 —— 报告里写着「Error loading mod databoom」
+09b-05.txt                 kind=MOD      chain=3 needles=9   kind=MOD hits=databoom(L1b/w3/databoom) dex=-1
+    是「databoom」引起的 —— 报告里写着「Error loading mod databoom」
+09b-06.txt                 kind=MOD      chain=3 needles=9   kind=MOD hits=databoom(L1b/w3/databoom) dex=-1
+    是「databoom」引起的 —— 报告里写着「Error loading mod databoom」
+09b-07.txt                 kind=MOD      chain=3 needles=8   kind=MOD hits=databoom(L1b/w3/databoom) dex=-1
+    是「databoom」引起的 —— 报告里写着「Error loading mod databoom」
+09b-08.txt                 kind=MOD      chain=3 needles=8   kind=MOD hits=databoom(L1b/w3/databoom) dex=-1
+    是「databoom」引起的 —— 报告里写着「Error loading mod databoom」
+09b-09.txt                 kind=MOD      chain=3 needles=11  kind=MOD hits=databoom(L1b/w3/databoom) dex=-1
+    是「databoom」引起的 —— 报告里写着「Error loading mod databoom」
+09b-10.txt                 kind=MOD      chain=3 needles=11  kind=MOD hits=databoom(L1b/w3/databoom) dex=-1
+    是「databoom」引起的 —— 报告里写着「Error loading mod databoom」
+09b-11.txt                 kind=MOD      chain=3 needles=9   kind=MOD hits=databoom(L1b/w3/databoom) dex=-1
+    是「databoom」引起的 —— 报告里写着「Error loading mod databoom」
+09b-12.txt                 kind=MOD      chain=3 needles=9   kind=MOD hits=databoom(L1b/w3/databoom) dex=-1
+    是「databoom」引起的 —— 报告里写着「Error loading mod databoom」
+09b-13.txt                 kind=MOD      chain=3 needles=11  kind=MOD hits=databoom(L1b/w3/databoom) dex=-1
+    是「databoom」引起的 —— 报告里写着「Error loading mod databoom」
+09b-14.txt                 kind=MOD      chain=3 needles=11  kind=MOD hits=databoom(L1b/w3/databoom) dex=-1
+    是「databoom」引起的 —— 报告里写着「Error loading mod databoom」
+09b-15.txt                 kind=MOD      chain=3 needles=11  kind=MOD hits=databoom(L1b/w3/databoom) dex=-1
+    是「databoom」引起的 —— 报告里写着「Error loading mod databoom」
+09b-16.txt                 kind=MOD      chain=3 needles=8   kind=MOD hits=databoom(L1b/w3/databoom) dex=-1
+    是「databoom」引起的 —— 报告里写着「Error loading mod databoom」
+09b-17.txt                 kind=MOD      chain=3 needles=8   kind=MOD hits=databoom(L1b/w3/databoom) dex=-1
+    是「databoom」引起的 —— 报告里写着「Error loading mod databoom」
+09b-18.txt                 kind=MOD      chain=3 needles=9   kind=MOD hits=databoom(L1b/w3/databoom) dex=-1
+    是「databoom」引起的 —— 报告里写着「Error loading mod databoom」
+09b-19.txt                 kind=MOD      chain=3 needles=9   kind=MOD hits=databoom(L1b/w3/databoom) dex=-1
+    是「databoom」引起的 —— 报告里写着「Error loading mod databoom」
+09b-20.txt                 kind=MOD      chain=3 needles=9   kind=MOD hits=databoom(L1b/w3/databoom) dex=-1
+    是「databoom」引起的 —— 报告里写着「Error loading mod databoom」
+09c-01.txt                 kind=NONE     chain=2 needles=9   kind=NONE hits=- dex=0
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    这个槽里没有带代码（classes.dex）的模组，没有可归因的对象。
+09c-02.txt                 kind=NONE     chain=2 needles=9   kind=NONE hits=- dex=0
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    这个槽里没有带代码（classes.dex）的模组，没有可归因的对象。
+09c-03.txt                 kind=MOD      chain=2 needles=9   kind=MOD hits=crashtest(L1b/w3/crashtest) dex=-1
+    是「crashtest」引起的 —— 报告里写着「Error loading mod crashtest」
+09c-04.txt                 kind=MOD      chain=2 needles=9   kind=MOD hits=crashtest(L1b/w3/crashtest) dex=-1
+    是「crashtest」引起的 —— 报告里写着「Error loading mod crashtest」
+09c-05.txt                 kind=MOD      chain=2 needles=9   kind=MOD hits=crashtest(L1b/w3/crashtest) dex=-1
+    是「crashtest」引起的 —— 报告里写着「Error loading mod crashtest」
+09c-06.txt                 kind=MOD      chain=2 needles=11  kind=MOD hits=crashtest(L1b/w3/crashtest) dex=-1
+    是「crashtest」引起的 —— 报告里写着「Error loading mod crashtest」
+09c-07.txt                 kind=MOD      chain=3 needles=11  kind=MOD hits=crashtest(L1b/w3/crashtest) dex=-1
+    是「crashtest」引起的 —— 报告里写着「Error loading mod crashtest」
+09c-08.txt                 kind=MOD      chain=3 needles=11  kind=MOD hits=depuser(L1b/w3/depuser) dex=-1
+    是「depuser」引起的 —— 报告里写着「Error loading mod depuser」
+09c-09.txt                 kind=MOD      chain=2 needles=9   kind=MOD hits=crashtest(L1b/w3/crashtest) dex=-1
+    是「crashtest」引起的 —— 报告里写着「Error loading mod crashtest」
+09c-10.txt                 kind=MOD      chain=2 needles=8   kind=MOD hits=crashtest(L1b/w3/crashtest) dex=-1
+    是「crashtest」引起的 —— 报告里写着「Error loading mod crashtest」
+09c-11.txt                 kind=MOD      chain=2 needles=11  kind=MOD hits=crashtest(L1b/w3/crashtest) dex=-1
+    是「crashtest」引起的 —— 报告里写着「Error loading mod crashtest」
+09c-12.txt                 kind=MOD      chain=2 needles=8   kind=MOD hits=crashtest(L1b/w3/crashtest) dex=-1
+    是「crashtest」引起的 —— 报告里写着「Error loading mod crashtest」
+09c-13.txt                 kind=MOD      chain=2 needles=8   kind=MOD hits=crashtest(L1b/w3/crashtest) dex=-1
+    是「crashtest」引起的 —— 报告里写着「Error loading mod crashtest」
+09c-14.txt                 kind=MOD      chain=3 needles=11  kind=MOD hits=crashtest(L1b/w3/crashtest) dex=-1
+    是「crashtest」引起的 —— 报告里写着「Error loading mod crashtest」
+09c-15.txt                 kind=MOD      chain=2 needles=8   kind=MOD hits=crashtest(L1b/w3/crashtest) dex=-1
+    是「crashtest」引起的 —— 报告里写着「Error loading mod crashtest」
+09c-16.txt                 kind=MOD      chain=4 needles=9   kind=MOD hits=crashtest(L1b/w3/crashtest) dex=-1
+    是「crashtest」引起的 —— 报告里写着「Error loading mod crashtest」
+09c-17.txt                 kind=MOD      chain=3 needles=11  kind=MOD hits=crashtest(L1b/w3/crashtest) dex=-1
+    是「crashtest」引起的 —— 报告里写着「Error loading mod crashtest」
+11-01.txt                  kind=VANILLA  chain=2 needles=12  kind=VANILLA hits=- dex=-1
+    不是模组的问题 —— 报告里写着这次没有加载任何模组（Mods: none (vanilla)）。
+11-02.txt                  kind=VANILLA  chain=2 needles=12  kind=VANILLA hits=- dex=-1
+    不是模组的问题 —— 报告里写着这次没有加载任何模组（Mods: none (vanilla)）。
+11-03.txt                  kind=VANILLA  chain=2 needles=12  kind=VANILLA hits=- dex=-1
+    不是模组的问题 —— 报告里写着这次没有加载任何模组（Mods: none (vanilla)）。
+11-04.txt                  kind=VANILLA  chain=2 needles=12  kind=VANILLA hits=- dex=-1
+    不是模组的问题 —— 报告里写着这次没有加载任何模组（Mods: none (vanilla)）。
+11-05.txt                  kind=VANILLA  chain=2 needles=12  kind=VANILLA hits=- dex=-1
+    不是模组的问题 —— 报告里写着这次没有加载任何模组（Mods: none (vanilla)）。
+11-06.txt                  kind=VANILLA  chain=2 needles=12  kind=VANILLA hits=- dex=-1
+    不是模组的问题 —— 报告里写着这次没有加载任何模组（Mods: none (vanilla)）。
+11-07.txt                  kind=VANILLA  chain=2 needles=12  kind=VANILLA hits=- dex=-1
+    不是模组的问题 —— 报告里写着这次没有加载任何模组（Mods: none (vanilla)）。
+11-08.txt                  kind=VANILLA  chain=2 needles=12  kind=VANILLA hits=- dex=-1
+    不是模组的问题 —— 报告里写着这次没有加载任何模组（Mods: none (vanilla)）。
+11-09.txt                  kind=VANILLA  chain=2 needles=12  kind=VANILLA hits=- dex=-1
+    不是模组的问题 —— 报告里写着这次没有加载任何模组（Mods: none (vanilla)）。
+11-10.txt                  kind=VANILLA  chain=2 needles=12  kind=VANILLA hits=- dex=-1
+    不是模组的问题 —— 报告里写着这次没有加载任何模组（Mods: none (vanilla)）。
+11-11.txt                  kind=VANILLA  chain=2 needles=12  kind=VANILLA hits=- dex=-1
+    不是模组的问题 —— 报告里写着这次没有加载任何模组（Mods: none (vanilla)）。
+11-12.txt                  kind=VANILLA  chain=2 needles=12  kind=VANILLA hits=- dex=-1
+    不是模组的问题 —— 报告里写着这次没有加载任何模组（Mods: none (vanilla)）。
+13-01.txt                  kind=NONE     chain=0 needles=0   kind=NONE hits=- dex=-1
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    可能是游戏本体、环境（内存 / 驱动 / 缺系统文件），也可能是已经被删掉的模组。
+13-02.txt                  kind=NONE     chain=0 needles=0   kind=NONE hits=- dex=-1
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    可能是游戏本体、环境（内存 / 驱动 / 缺系统文件），也可能是已经被删掉的模组。
+13-03.txt                  kind=NONE     chain=0 needles=0   kind=NONE hits=- dex=-1
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    可能是游戏本体、环境（内存 / 驱动 / 缺系统文件），也可能是已经被删掉的模组。
+13-04.txt                  kind=NONE     chain=0 needles=0   kind=NONE hits=- dex=-1
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    可能是游戏本体、环境（内存 / 驱动 / 缺系统文件），也可能是已经被删掉的模组。
+13-05.txt                  kind=NONE     chain=1 needles=2   kind=NONE hits=- dex=0
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    这个槽里没有带代码（classes.dex）的模组，没有可归因的对象。
+14-01.txt                  kind=NONE     chain=0 needles=0   kind=NONE hits=- dex=-1
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    可能是游戏本体、环境（内存 / 驱动 / 缺系统文件），也可能是已经被删掉的模组。
+14-02.txt                  kind=NONE     chain=0 needles=0   kind=NONE hits=- dex=-1
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    可能是游戏本体、环境（内存 / 驱动 / 缺系统文件），也可能是已经被删掉的模组。
+14-03.txt                  kind=MOD      chain=3 needles=15  kind=MOD hits=depuser(L1b/w3/depuser) dex=-1
+    是「depuser」引起的 —— 报告里写着「Error loading mod depuser」
+14-04.txt                  kind=NONE     chain=0 needles=0   kind=NONE hits=- dex=-1
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    可能是游戏本体、环境（内存 / 驱动 / 缺系统文件），也可能是已经被删掉的模组。
+14-05.txt                  kind=MOD      chain=2 needles=16  kind=MOD hits=accessboom(L1b/w3/accessboom) dex=-1
+    是「accessboom」引起的 —— 报告里写着「Error loading mod accessboom」
+14-06.txt                  kind=NONE     chain=0 needles=0   kind=NONE hits=- dex=-1
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    可能是游戏本体、环境（内存 / 驱动 / 缺系统文件），也可能是已经被删掉的模组。
+14-07.txt                  kind=NONE     chain=0 needles=0   kind=NONE hits=- dex=-1
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    可能是游戏本体、环境（内存 / 驱动 / 缺系统文件），也可能是已经被删掉的模组。
+14-08.txt                  kind=NONE     chain=0 needles=0   kind=NONE hits=- dex=-1
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    可能是游戏本体、环境（内存 / 驱动 / 缺系统文件），也可能是已经被删掉的模组。
+14-09.txt                  kind=NONE     chain=0 needles=0   kind=NONE hits=- dex=-1
+    认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+    可能是游戏本体、环境（内存 / 驱动 / 缺系统文件），也可能是已经被删掉的模组。
+
+total 488 ms for 120 fixtures
+by kind: NONE=53 MOD=53 VANILLA=12 LAUNCHER=0 BROKEN=2
+threw = 0
+missed (evidence in report but no hit) = 0
+false positive (named a mod it should not) = 0
+
+■ 人工对表（期望只从原文推，不看分析器）
+-----------------------------------------------------------------------------
+期望规则：有 `Likely Cause:` 或 `Error loading mod` ⇒ 必须 MOD；`Mods: none (vanilla)` ⇒ VANILLA；
+          首行是启动器报告头 ⇒ LAUNCHER；其余 ⇒ 不许是 MOD。
+结果：**120/120 分析出结论，0 处不符**；`threw=0`（解析一次都没抛）、`missed=0`、`false positive=0`。
+分类计数：NONE=53 · MOD=53 · VANILLA=12 · BROKEN=2 · LAUNCHER=0。
+★ MOD=53 与"原文里有归因证据的份数"（Likely Cause 16 + Error loading mod 37）**逐份对上**；
+★ VANILLA=12 与"原文写 none (vanilla) 的份数"**也逐份对上**；
+★ BROKEN=2 是两个**空围栏块**（1 B，08 片里的占位），判 BROKEN 是对的。
+
+■ 夹具清单（manifest.tsv）
+-----------------------------------------------------------------------------
+file	shard	heading	bytes	has_l1	has_l1b	vanilla	launcher
+01-01.txt	01-模组与加载期.md	1.1 `java.lang.RuntimeException: UI should be created in main Thread`	4001	False	False	False	False
+01-02.txt	01-模组与加载期.md	1.2 `java.lang.NoClassDefFoundError: Could not initialize class mindustryX.features.ui.OverlayUI`	3518	False	False	False	False
+01-03.txt	01-模组与加载期.md	1.3 `java.lang.NoClassDefFoundError: java/sql/SQLException`	2049	False	False	False	False
+01-04.txt	01-模组与加载期.md	1.4 `arc.util.ArcRuntimeException: File not found: mod.hjson (internal)`	1806	False	False	False	False
+02-01.txt	02-地图与存档.md	2.1 `java.lang.NullPointerException: Cannot invoke "mindustry.io.SaveVersion.region(String, java.io.DataInput, arc.`	2525	False	False	False	False
+02-02.txt	02-地图与存档.md	2.2 `mindustry.io.SaveIO$SaveException: java.io.IOException: Error reading region "content".`	157	False	False	False	False
+02-03.txt	02-地图与存档.md	2.3 `java.net.SocketTimeoutException: Connect timed out`	235	False	False	False	False
+02-04.txt	02-地图与存档.md	2.4 `java.io.IOException: Unknown save version: 13. Are you trying to load a save from a newer version?`	372	False	False	False	False
+03-01.txt	03-蓝图.md	3.1 `java.lang.OutOfMemoryError: Failed to allocate a 256 byte allocation with 2148112 free bytes and 2097KB until `	4023	False	False	False	False
+03-02.txt	03-蓝图.md	3.2 `java.io.IOException: Invalid schematic: Too many blocks.`	2542	False	False	False	False
+04-01.txt	04-UI-与线程.md	4.1 `java.lang.ClassCastException: class java.lang.String cannot be cast to class [B (java.lang.String and [B are i`	3427	False	False	False	False
+04-02.txt	04-UI-与线程.md	4.2 `java.lang.NoSuchMethodError: 'void mindustry.ui.dialogs.ModsDialog.githubImportMod(java.lang.String, boolean, `	4183	True	False	False	False
+04-03.txt	04-UI-与线程.md	4.3 `java.lang.NullPointerException: Cannot assign field "config" because "this.selected" is null`	1353	False	False	False	False
+04-04.txt	04-UI-与线程.md	4.4 `java.lang.ArrayIndexOutOfBoundsException: Index 22 out of bounds for length 22`	2995	False	False	False	False
+05-01.txt	05-环境与图形.md	5.1 `java.lang.NoClassDefFoundError: arc/files (wrong name: arc/Files)`	2325	False	False	False	False
+05-02.txt	05-环境与图形.md	5.2 `java.lang.IllegalStateException: Frame buffer couldn't be constructed: unknown error 1285`	1504	False	False	False	False
+05-03.txt	05-环境与图形.md	5.3 `java.lang.NoClassDefFoundError: Could not initialize class sun.security.jca.Providers`	4045	False	False	False	False
+06-01.txt	06-网络与镜像.md	6.1 `java.io.IOException: HTTP 403 from htt`	839	False	False	False	False
+06-02.txt	06-网络与镜像.md	6.2 `java.net.SocketTimeoutException: Read timed out`	2133	False	False	False	False
+06-03.txt	06-网络与镜像.md	6.3 `arc.util.Http$HttpStatusException: HTTP request failed with error: 403 (FORBIDDEN, URL = http`	727	False	False	False	False
+06-04.txt	06-网络与镜像.md	6.4 `java.net.ConnectException`	4001	False	False	False	False
+06-05.txt	06-网络与镜像.md	6.5 `java.lang.NullPointerException: Cannot invoke "arc.struct.Seq.sortComparing(arc.func.Func)" because "mods" is `	728	False	False	False	False
+07-01.txt	07-启动器自身.md	7.1 `AttributeError: 'MindustryLauncher' object has no attribute 'config'`	437	False	False	False	False
+07-02.txt	07-启动器自身.md	7.2 `TypeError: '<' not supported between instances of 'int' and 'tuple'`	485	False	False	False	False
+08-01.txt	08-其它游戏侧异常.md	8.1 `java.lang.reflect.InvocationTargetException`	2758	False	False	False	False
+08-02.txt	08-其它游戏侧异常.md	8.2 `java.lang.IllegalStateException: 本脚本依赖MindustryX v143.102 或更新版本`	170	False	False	False	False
+08-03.txt	08-其它游戏侧异常.md	8.3 `arc.util.ArcRuntimeException: File not found: recommendMods.json (internal)`	237	False	False	False	False
+08-04.txt	08-其它游戏侧异常.md	8.4 `arc.util.ArcRuntimeException: java.lang.NoClassDefFoundError: mindustry/type/AmmoType`	338	False	False	False	False
+08-05.txt	08-其它游戏侧异常.md	8.5 `java.lang.NoClassDefFoundError: mindustry/type/AmmoType`	308	False	False	False	False
+08-06.txt	08-其它游戏侧异常.md	8.5 `java.lang.NoClassDefFoundError: mindustry/type/AmmoType`	1	False	False	False	False
+08-07.txt	08-其它游戏侧异常.md	8.6 `arc.util.ArcRuntimeException: arc.util.ArcRuntimeException: Couldn't load dependencies of asset: contentcreate`	4049	False	False	False	False
+08-08.txt	08-其它游戏侧异常.md	8.7 `java.lang.ClassCastException: com.sun.tools.javac.code.Symtab$4 cannot be cast to javax.lang.model.element.Typ`	4001	False	False	False	False
+08-09.txt	08-其它游戏侧异常.md	8.8 `java.lang.ArrayIndexOutOfBoundsException: Index 0 out of bounds for length 0`	1228	False	False	False	False
+08-10.txt	08-其它游戏侧异常.md	8.9 `arc.util.ArcRuntimeException: File not found: saves\mods\config\PatchEditor\favorites.json (local)`	1532	False	False	False	False
+08-11.txt	08-其它游戏侧异常.md	8.10 `java.lang.ClassCastException: class java.lang.String cannot be cast to class [B`	154	False	False	False	False
+08-12.txt	08-其它游戏侧异常.md	8.11 `Error`	161	False	False	False	False
+08-13.txt	08-其它游戏侧异常.md	8.12 `java.lang.RuntimeException: java.lang.NoSuchFieldException: textureCache`	339	False	False	False	False
+08-14.txt	08-其它游戏侧异常.md	8.13 `java.lang.NoSuchFieldException: textureCache`	311	False	False	False	False
+08-15.txt	08-其它游戏侧异常.md	8.13 `java.lang.NoSuchFieldException: textureCache`	1	False	False	False	False
+08-16.txt	08-其它游戏侧异常.md	8.14 `（无异常签名）`	459	False	False	False	False
+08-17.txt	08-其它游戏侧异常.md	8.15 `java.lang.ClassNotFoundException: arc.math.geom.Mat3D`	402	False	False	False	False
+08-18.txt	08-其它游戏侧异常.md	8.16 `java.lang.NoSuchFieldError: Class mindustry.ai.UnitCommand does not have member field 'mindustry.ai.UnitComman`	126	False	False	False	False
+09a-01.txt	09a-桌面报告-有归因.md	`crash-report-08_16_2026_18_24_18.txt`	1571	True	False	False	False
+09a-02.txt	09a-桌面报告-有归因.md	`crash-report-08_16_2026_18_39_47.txt`	2620	True	False	False	False
+09a-03.txt	09a-桌面报告-有归因.md	`crash-report-08_19_2026_16_58_04.txt`	2126	True	False	False	False
+09a-04.txt	09a-桌面报告-有归因.md	`crash-report-08_20_2026_19_15_00.txt`	2601	True	False	False	False
+09a-05.txt	09a-桌面报告-有归因.md	`crash-report-08_20_2026_19_31_34.txt`	1674	True	False	False	False
+09a-06.txt	09a-桌面报告-有归因.md	`crash-report-08_21_2026_19_47_51.txt`	1399	True	False	False	False
+09a-07.txt	09a-桌面报告-有归因.md	`crash-report-08_21_2026_19_52_26.txt`	1488	True	False	False	False
+09a-08.txt	09a-桌面报告-有归因.md	`crash-report-08_21_2026_19_54_39.txt`	1485	True	False	False	False
+09a-09.txt	09a-桌面报告-有归因.md	`crash-report-08_21_2026_19_56_50.txt`	1485	True	False	False	False
+09a-10.txt	09a-桌面报告-有归因.md	`crash-report-09_03_2026_13_53_58.txt`	587	True	False	False	False
+09a-11.txt	09a-桌面报告-有归因.md	`crash-report-09_03_2026_16_24_10.txt`	587	True	False	False	False
+09a-12.txt	09a-桌面报告-有归因.md	`crash-report-09_04_2026_22_41_54.txt`	617	True	False	False	False
+09a-13.txt	09a-桌面报告-有归因.md	`crash-report-10_07_2026_21_51_37.txt`	1485	True	False	False	False
+09a-14.txt	09a-桌面报告-有归因.md	`crash-report-10_07_2026_21_57_01.txt`	1497	True	False	False	False
+09a-15.txt	09a-桌面报告-有归因.md	`crash-report-10_07_2026_23_41_23.txt`	1485	True	False	False	False
+09b-01.txt	09b-桌面报告-数据损坏.md	`crash-report-10_08_2026_00_18_27.txt`	1528	False	True	False	False
+09b-02.txt	09b-桌面报告-数据损坏.md	`crash-report-10_08_2026_00_20_39.txt`	1819	False	True	False	False
+09b-03.txt	09b-桌面报告-数据损坏.md	`crash-report-10_08_2026_00_20_42.txt`	1255	False	True	False	False
+09b-04.txt	09b-桌面报告-数据损坏.md	`crash-report-10_08_2026_00_20_44.txt`	1476	False	True	False	False
+09b-05.txt	09b-桌面报告-数据损坏.md	`crash-report-10_08_2026_00_20_46.txt`	1468	False	True	False	False
+09b-06.txt	09b-桌面报告-数据损坏.md	`crash-report-10_08_2026_00_20_48.txt`	1255	False	True	False	False
+09b-07.txt	09b-桌面报告-数据损坏.md	`crash-report-10_08_2026_00_21_21.txt`	1451	False	True	False	False
+09b-08.txt	09b-桌面报告-数据损坏.md	`crash-report-10_08_2026_00_21_23.txt`	1354	False	True	False	False
+09b-09.txt	09b-桌面报告-数据损坏.md	`crash-report-10_08_2026_00_21_44.txt`	1528	False	True	False	False
+09b-10.txt	09b-桌面报告-数据损坏.md	`crash-report-10_08_2026_00_21_46.txt`	1528	False	True	False	False
+09b-11.txt	09b-桌面报告-数据损坏.md	`crash-report-10_08_2026_00_21_48.txt`	1297	False	True	False	False
+09b-12.txt	09b-桌面报告-数据损坏.md	`crash-report-10_08_2026_00_21_50.txt`	1249	False	True	False	False
+09b-13.txt	09b-桌面报告-数据损坏.md	`crash-report-10_08_2026_00_22_08.txt`	1528	False	True	False	False
+09b-14.txt	09b-桌面报告-数据损坏.md	`crash-report-10_08_2026_00_22_10.txt`	1528	False	True	False	False
+09b-15.txt	09b-桌面报告-数据损坏.md	`crash-report-10_08_2026_00_22_43.txt`	1528	False	True	False	False
+09b-16.txt	09b-桌面报告-数据损坏.md	`crash-report-10_08_2026_00_22_45.txt`	1358	False	True	False	False
+09b-17.txt	09b-桌面报告-数据损坏.md	`crash-report-10_08_2026_00_23_18.txt`	1358	False	True	False	False
+09b-18.txt	09b-桌面报告-数据损坏.md	`crash-report-10_08_2026_00_23_32.txt`	1271	False	True	False	False
+09b-19.txt	09b-桌面报告-数据损坏.md	`crash-report-10_08_2026_00_23_35.txt`	1269	False	True	False	False
+09b-20.txt	09b-桌面报告-数据损坏.md	`crash-report-10_08_2026_00_23_37.txt`	1267	False	True	False	False
+09c-01.txt	09c-桌面报告-无归因其它.md	`crash-report-08_16_2026_18_48_30.txt`	1755	False	False	False	False
+09c-02.txt	09c-桌面报告-无归因其它.md	`crash-report-08_18_2026_23_33_31.txt`	1705	False	False	False	False
+09c-03.txt	09c-桌面报告-无归因其它.md	`crash-report-10_07_2026_21_49_21.txt`	1090	False	True	False	False
+09c-04.txt	09c-桌面报告-无归因其它.md	`crash-report-10_07_2026_21_49_44.txt`	1089	False	True	False	False
+09c-05.txt	09c-桌面报告-无归因其它.md	`crash-report-10_07_2026_21_49_46.txt`	1062	False	True	False	False
+09c-06.txt	09c-桌面报告-无归因其它.md	`crash-report-10_07_2026_21_49_47.txt`	1228	False	True	False	False
+09c-07.txt	09c-桌面报告-无归因其它.md	`crash-report-10_07_2026_21_49_49.txt`	1778	False	True	False	False
+09c-08.txt	09c-桌面报告-无归因其它.md	`crash-report-10_07_2026_21_57_03.txt`	1708	False	True	False	False
+09c-09.txt	09c-桌面报告-无归因其它.md	`crash-report-10_07_2026_23_47_07.txt`	1066	False	True	False	False
+09c-10.txt	09c-桌面报告-无归因其它.md	`crash-report-10_07_2026_23_47_10.txt`	1053	False	True	False	False
+09c-11.txt	09c-桌面报告-无归因其它.md	`crash-report-10_07_2026_23_47_12.txt`	1155	False	True	False	False
+09c-12.txt	09c-桌面报告-无归因其它.md	`crash-report-10_07_2026_23_47_15.txt`	1028	False	True	False	False
+09c-13.txt	09c-桌面报告-无归因其它.md	`crash-report-10_07_2026_23_47_18.txt`	33585	False	True	False	False
+09c-14.txt	09c-桌面报告-无归因其它.md	`crash-report-10_07_2026_23_47_21.txt`	1757	False	True	False	False
+09c-15.txt	09c-桌面报告-无归因其它.md	`crash-report-10_07_2026_23_47_23.txt`	1297	False	True	False	False
+09c-16.txt	09c-桌面报告-无归因其它.md	`crash-report-10_07_2026_23_47_39.txt`	1664	False	True	False	False
+09c-17.txt	09c-桌面报告-无归因其它.md	`crash-report-10_07_2026_23_47_42.txt`	1757	False	True	False	False
+11-01.txt	11-安卓设备现成报告.md	1. `crash_1791182470449.txt`（1 份同款）	1435	False	False	True	False
+11-02.txt	11-安卓设备现成报告.md	2. `crash_1791182472962.txt`（1 份同款）	1435	False	False	True	False
+11-03.txt	11-安卓设备现成报告.md	3. `crash_1791182474364.txt`（1 份同款）	1435	False	False	True	False
+11-04.txt	11-安卓设备现成报告.md	4. `crash_1791178571768.txt`（1 份同款）	1457	False	False	True	False
+11-05.txt	11-安卓设备现成报告.md	5. `crash_1791182541626.txt`（1 份同款）	1457	False	False	True	False
+11-06.txt	11-安卓设备现成报告.md	6. `crash_1791123668649.txt`（1 份同款）	1435	False	False	True	False
+11-07.txt	11-安卓设备现成报告.md	7. `crash_1791182537394.txt`（1 份同款）	1435	False	False	True	False
+11-08.txt	11-安卓设备现成报告.md	8. `crash_1791182538952.txt`（1 份同款）	1435	False	False	True	False
+11-09.txt	11-安卓设备现成报告.md	9. `crash_1791182568924.txt`（1 份同款）	1435	False	False	True	False
+11-10.txt	11-安卓设备现成报告.md	10. `crash_1791182570800.txt`（1 份同款）	1435	False	False	True	False
+11-11.txt	11-安卓设备现成报告.md	11. `crash_1791182572057.txt`（1 份同款）	1435	False	False	True	False
+11-12.txt	11-安卓设备现成报告.md	12. `crash_1791182658822.txt`（1 份同款）	1435	False	False	True	False
+13-01.txt	13-ART-措辞-安卓运行期.md	1. 探针源码（四分法）	845	False	False	False	False
+13-02.txt	13-ART-措辞-安卓运行期.md	2. 四次实测的逐字输出（stderr / stdout 原样）	262	False	False	False	False
+13-03.txt	13-ART-措辞-安卓运行期.md	2. 四次实测的逐字输出（stderr / stdout 原样）	267	False	False	False	False
+13-04.txt	13-ART-措辞-安卓运行期.md	2. 四次实测的逐字输出（stderr / stdout 原样）	244	False	False	False	False
+13-05.txt	13-ART-措辞-安卓运行期.md	2. 四次实测的逐字输出（stderr / stdout 原样）	223	False	False	False	False
+14-01.txt	14-真机造崩-Java-dex-模组.md	1. 主探针（`crashtest`）：**游戏类里没有那个成员**（1701 B）	9	False	False	False	False
+14-02.txt	14-真机造崩-Java-dex-模组.md	1a. 同一次启动的 `last_log.txt`（逐字）	6	False	False	False	False
+14-03.txt	14-真机造崩-Java-dex-模组.md	1b. 变体 A：**缺依赖**（`depuser`，2231 B）	2231	False	True	False	False
+14-04.txt	14-真机造崩-Java-dex-模组.md	1b. 变体 A：**缺依赖**（`depuser`，2231 B）	393	False	False	False	False
+14-05.txt	14-真机造崩-Java-dex-模组.md	1c. 变体 B：**访问权限变了**（`accessboom`，1695 B）	1695	False	True	False	False
+14-06.txt	14-真机造崩-Java-dex-模组.md	3. 探针模组（三份，源码逐字）	16	False	False	False	False
+14-07.txt	14-真机造崩-Java-dex-模组.md	3. 探针模组（三份，源码逐字）	263	False	False	False	False
+14-08.txt	14-真机造崩-Java-dex-模组.md	3. 探针模组（三份，源码逐字）	341	False	False	False	False
+14-09.txt	14-真机造崩-Java-dex-模组.md	4. 配方（命令级，PC 侧）	1290	False	False	False	False
+

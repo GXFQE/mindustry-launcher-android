@@ -923,4 +923,95 @@ final class CrashAnalysis {
         sb.append("\ntotal ").append(System.currentTimeMillis() - t0).append(" ms\n");
         return sb.toString();
     }
+
+    /**
+     * **dev 口**（`--es dev_crash_corpus <目录>`）：把一个目录里的语料**逐份跑一遍**。
+     *
+     * ★ 为什么值得有：语料库（40 条异常签名 + 六十多份报告）是**会长**的，而判据改动
+     *   （新措辞、新权重）只靠自检里那几份夹具**覆盖不到全量** —— 这一遍要看三件事：
+     *   ① **解析不抛**（任何一份喂进去都不许把分析器打崩）；
+     *   ② **该点名的不许认不出**（报告里明明有 `Likely Cause` / `Error loading mod`）；
+     *   ③ **不该点名的不许点名**（原版崩、启动器自己的报告、纯日志片段）。
+     *   逐份给 `kind / 链节数 / 针数 / 命中`，末尾给分类汇总与耗时 ⇒ 可以直接跟
+     *   "我按原文人工判断的期望"对表（那一列在语料片里写着）。
+     * ⚠️ 与 {@link #devReport} 一样，这是本类里**碰 IO/Context** 的方法之一。
+     */
+    static String corpusReport(Context ctx, String dirPath, String slot) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("dir = ").append(dirPath).append('\n');
+        sb.append("slot = ").append(slot == null ? "?" : slot).append('\n');
+        java.io.File dir = dirPath == null ? null : new java.io.File(dirPath);
+        java.io.File[] fs = (dir != null && dir.isDirectory()) ? dir.listFiles() : null;
+        if (fs == null || fs.length == 0) {
+            sb.append("\n(no fixture; put *.txt here)\n");
+            return sb.toString();
+        }
+        java.util.Arrays.sort(fs, new java.util.Comparator<java.io.File>() {
+            @Override public int compare(java.io.File a, java.io.File b) {
+                return a.getName().compareTo(b.getName());
+            }
+        });
+        List<Mods.Info> mods = null;
+        int dexMods = 0;
+        try {
+            mods = Mods.scan(ctx, slot == null ? Data.currentSlot(ctx) : slot).mods;
+            for (Mods.Info m : mods) if (m != null && m.hasClassesDex) dexMods++;
+        } catch (Throwable t) {
+            sb.append("mods scan failed: ").append(t).append('\n');
+        }
+        sb.append("mods = ").append(mods == null ? "?" : String.valueOf(mods.size()))
+          .append(" (").append(dexMods).append(" with classes.dex)")
+          .append("  -- L2a/L3 can only fire when the slot really has that mod\n\n");
+        int[] byKind = new int[5];
+        List<String> failures = new ArrayList<String>();
+        List<String> suspects = new ArrayList<String>();   // 该点名却认不出
+        List<String> falsePos = new ArrayList<String>();   // 不该点名却点名
+        long t0 = System.currentTimeMillis();
+        int n = 0;
+        for (java.io.File f : fs) {
+            if (!f.isFile() || !f.getName().endsWith(".txt")) continue;
+            n++;
+            String body = null;
+            Report parsed = null;
+            Verdict v = null;
+            try {
+                body = f.length() > 4L * 1024 * 1024 ? null : Util.readText(f);
+                parsed = parse(body);
+                v = judge(parsed, mods, DEX);
+            } catch (Throwable t) {
+                failures.add(f.getName() + " -> " + t);
+                sb.append("!! ").append(f.getName()).append(" THREW ").append(t).append('\n');
+                continue;
+            }
+            byKind[v.kind]++;
+            sb.append(String.format("%-26s kind=%-8s chain=%d needles=%-3d %s%n",
+                    f.getName(), kindName(v.kind), parsed.chain.size(), parsed.needles.size(),
+                    debugLine(null, v).replace(" dex=", " dex=")));
+            sb.append("    ").append(text(ctx, v).replace("\n", "\n    ")).append('\n');
+            // ② 该点名却认不出：报告头里有游戏自己的归因证据，但结论是 NONE
+            boolean hasEvidence = !parsed.likelyName.isEmpty() || !parsed.likelyInternal.isEmpty()
+                    || findErrorLoadingMod(parsed) != null;
+            if (hasEvidence && v.kind != KIND_MOD) {
+                suspects.add(f.getName() + " (report has Likely Cause / Error loading mod but no hit)");
+            }
+            // ③ 不该点名却点名：模组一行是 none (vanilla)，或本来就是启动器自己的报告
+            if (v.kind == KIND_MOD && (parsed.vanilla || parsed.launcherOwn)) {
+                falsePos.add(f.getName());
+            }
+        }
+        sb.append("\ntotal ").append(System.currentTimeMillis() - t0).append(" ms for ")
+          .append(n).append(" fixtures\n");
+        sb.append("by kind: NONE=").append(byKind[KIND_NONE])
+          .append(" MOD=").append(byKind[KIND_MOD])
+          .append(" VANILLA=").append(byKind[KIND_VANILLA])
+          .append(" LAUNCHER=").append(byKind[KIND_LAUNCHER])
+          .append(" BROKEN=").append(byKind[KIND_BROKEN]).append('\n');
+        sb.append("threw = ").append(failures.size()).append('\n');
+        for (String s : failures) sb.append("  !! ").append(s).append('\n');
+        sb.append("missed (evidence in report but no hit) = ").append(suspects.size()).append('\n');
+        for (String s : suspects) sb.append("  ?? ").append(s).append('\n');
+        sb.append("false positive (named a mod it should not) = ").append(falsePos.size()).append('\n');
+        for (String s : falsePos) sb.append("  !! ").append(s).append('\n');
+        return sb.toString();
+    }
 }

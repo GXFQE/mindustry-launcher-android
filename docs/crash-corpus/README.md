@@ -23,6 +23,7 @@
 | 写解析器 | 每条都给「日期 + 签名 + 原文」，可直接当输入断言 |
 | 判断覆盖面 | 看每条的「类别」与是否带 `Likely Cause:`，就知道哪类形态还没覆盖 |
 | 造新夹具 | 看 `.dsh/research/2026-10-07-crash-attribution-lab.md` 里的造法（stub 编译 + headless/客户端） |
+| **加样本后回归一遍** | dev 口 `dev_crash_corpus <目录>`（`--es dev_crash_corpus_slot <槽>` 可指定槽）：把围栏块抽成 `.txt` 放进去，它会逐份跑 `CrashAnalysis` 并给出 `threw / missed / false positive` 三个计数 —— 2026-10-08 实测 120 份 **0 抛 / 0 漏 / 0 误报**（`evidence/f23-corpus-sweep.txt`）。⚠️ 夹具要放在**我们自己的外部目录**（`hub/<子目录>`），app 读不了 `/sdcard` 下的普通目录 |
 
 ## 脱敏规则（进仓库前已逐条跑过）
 
