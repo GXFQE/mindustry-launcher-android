@@ -1559,7 +1559,7 @@
     <!-- ★ 2026-10-08 用户：「现在这个状态下次启动所有模组都会禁用，但是还是显示启用」
          —— 两句都是真的（模组现在确实开着；下次启动游戏确实会把它们关掉），
          但一个在卡片、一个在列表里，读起来就像自相矛盾 ⇒ **同一句里把两个时刻都说了**。 -->
-    <string name="mods_warn_failed">⚠ 现在是开着的，但下次启动游戏会把它们标成「加载失败」</string>
+    <string name="mods_warn_failed">⚠ 下次启动游戏会把整槽模组关掉（现在开着的也一样）</string>
     <string name="mods_warn_failed_applied">⚠ 游戏把整槽模组标成「加载失败」并关掉了 —— 点「启用」可恢复</string>
     <string name="mods_warn_failed_noskip">⚠ 上次启动没跑完：整槽模组被记了一笔（你已关掉跳过，下次还会加载）</string>
     <string name="mods_warn_blamed">⚠ 上次崩溃很可能与它有关</string>

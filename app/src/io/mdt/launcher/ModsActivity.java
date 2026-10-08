@@ -665,15 +665,14 @@ public class ModsActivity extends BaseActivity {
                     break;
                 }
             }
-            if (anyFailed) {
-                // ★ 三句话按**机制**分岔（2026-10-08 用字节码定案，见 Mods.failedKey 的 Javadoc）：
-                //   ① 还会再跳一次（`launchid.dat` 在 + `modcrashdisable` 开）⇒ 下次启动游戏会把整槽模组关掉；
-                //   ② 用户自己关了跳过开关 ⇒ 只会留个记录，模组照常加载；
-                //   ③ 跳过**已经发生过**（记录在、但没有待跳过的 launchid）⇒ 模组现在是被关掉的，
-                //      要点「启用」打开（我们的启停会顺带清掉那条记录）。
-                int noteRes = mScan.skipModLoading ? R.string.mods_warn_failed
-                        : (mScan.launchIdExists ? R.string.mods_warn_failed_noskip
-                                                : R.string.mods_warn_failed_applied);
+            // ★★ 2026-10-08 修（用户真机：「明明游戏禁用了所有模组但依旧显示会加载」/
+            //    「就是目前这个状态，但下次启动是不加载的」）：
+            //    **判据搬进 `ModsText.cardNote`**（纯函数、自检逐格钉住），而且
+            //    **"下次启动会整槽跳过"不再挂在 `anyFailed` 上** —— 那是两件独立的事：
+            //    用户在游戏里点过恢复（`-failed` 被清掉）之后 `launchid.dat` 还在，
+            //    下次启动游戏照样会把整槽模组关掉；原来那种写法这时**一句警告都不显示**。
+            int noteRes = ModsText.cardNote(mScan, anyFailed);
+            if (noteRes != 0) {
                 mFailNote.setText(Trans.get(ModsActivity.this, noteRes));
                 mFailNote.setVisibility(View.VISIBLE);
             } else {

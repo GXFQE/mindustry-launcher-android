@@ -3639,14 +3639,42 @@ public final class SelfTest {
                             + " / 已跳完 " + failNoteApplied.length()
                             + " / 点名那行 " + blameOne.replace("%1$s", "").length() + " 字"
                             + "（超了就又会挤成三行）");
-            ok(stat, L, failNote.contains("加载失败") && failNoteApplied.contains("加载失败")
+            ok(stat, L, failNote.contains("关掉") && failNoteApplied.contains("关掉")
                             && failNoteApplied.contains("「启用」"),
-                    "★机制口径（2026-10-08，用户点单后按**游戏的说法**收口）：那两句都要出现"
-                            + "「加载失败」（游戏里就是这么显示的）＋**跳过已发生那支要给出「启用」这个动作**"
-                            + "（`-failed` 的真义是「整槽被跳过的副产品」，见 REF §86.1③）");
-            ok(stat, L, failNote.contains("加载失败") && failNoteNo.contains("还会加载"),
-                    "★术语统一：摘要卡用**游戏里的说法**「加载失败」（用户：「游戏里面显示的是加载失败"
-                            + "而不是禁用啊」）/ 关了跳过那支说「还会加载」/ 门标签（两支）用「整槽跳过」");
+                    "★机制口径：那两句都要说「关掉」（`-failed` 的真义是「整槽被跳过的副产品」，"
+                            + "见 REF §86.1③）＋**跳过已发生那支要给出「启用」这个动作**");
+            // ★★ 2026-10-08 用户真机：「**明明游戏禁用了所有模组但依旧显示会加载**」/
+            //    「**就是目前这个状态，但下次启动是不加载的**」—— 真机实测的那个状态是：
+            //      `launchid.dat` 在（⇒ 下次启动会整槽跳过）、而 12 个 `-failed` **已被游戏清掉**
+            //      （用户在游戏里点过恢复）⇒ 原来"有标记才显示"的写法这时**一句警告都没有**。
+            //    ⇒ 判据搬进 `ModsText.cardNote`，这里把**整张真值表**逐格钉住。
+            Mods.Scan scSkip = new Mods.Scan("m3-card", null);
+            scSkip.launchIdExists = true;
+            scSkip.skipModLoading = true;
+            Mods.Scan scLid = new Mods.Scan("m3-card", null);
+            scLid.launchIdExists = true;
+            Mods.Scan scClean = new Mods.Scan("m3-card", null);
+            int nSkipNoMark = ModsText.cardNote(scSkip, false);      // ← 用户那个状态
+            int nSkipMark = ModsText.cardNote(scSkip, true);
+            int nLidMark = ModsText.cardNote(scLid, true);
+            int nApplied = ModsText.cardNote(scClean, true);
+            int nNone = ModsText.cardNote(scClean, false);
+            int nLidNoMark = ModsText.cardNote(scLid, false);
+            ok(stat, L, nSkipNoMark == R.string.mods_warn_failed
+                            && nSkipMark == R.string.mods_warn_failed,
+                    "★★修（用户真机那个状态）：`launchid.dat` 在 ⇒ **就算一个 `-failed` 标记都没有**"
+                            + "（用户点过恢复），卡片也必须警告「下次启动会把整槽模组关掉」——"
+                            + "实得 resId=" + nSkipNoMark + "（0 就是「一句话都不说」，那就是原来的 bug）");
+            ok(stat, L, nLidMark == R.string.mods_warn_failed_noskip
+                            && nApplied == R.string.mods_warn_failed_applied
+                            && nNone == 0 && nLidNoMark == 0,
+                    "★★真值表其余四格：launchid 在 + 关了跳过开关 + 有标记 ⇒「还会加载」那支；"
+                            + "跳过已发生（没 launchid）+ 有标记 ⇒「都被关了」那支；"
+                            + "没标记且不会跳 ⇒ **不显示**（干净槽不该有这句）—— 实得 " + nLidMark + "/"
+                            + nApplied + "/" + nNone + "/" + nLidNoMark);
+            ok(stat, L, failNote.contains("关掉") && failNoteNo.contains("还会加载"),
+                    "★术语统一：摘要卡（下次启动会把整槽模组关掉 / 都被关了）/ 关了跳过那支"
+                            + "（「还会加载」）/ 门标签（两支）都用「整槽跳过」");
             ok(stat, L, ctx.getString(R.string.mods_gate_last_crash).contains("整槽跳过")
                             && ctx.getString(R.string.mods_gate_last_crash_bad).contains("整槽跳过"),
                     "★门标签两支都用「整槽跳过」（这个是我们自己的机制术语，游戏里没有对应的词）");

@@ -144,6 +144,34 @@ final class ModsText {
     }
 
     /**
+     * ★★ 摘要卡那一句该显示**哪一句**（0 = 不显示）。判据全在**机制**上，与界面无关
+     * （2026-10-08 用户真机：「**明明游戏禁用了所有模组但依旧显示会加载**」/「**就是目前这个状态，
+     * 但下次启动是不加载的**」）。
+     *
+     * <p>🔴 这里修的是一个**真的漏报**：原来那句的显示条件是"有模组带 `-failed` 标记"
+     * （`anyFailed`），而"下次启动会整槽跳过"的判据是 **`launchid.dat` 在 + `modcrashdisable` 开**
+     * ——两件事**互相独立**。用户在游戏里点过恢复（`-failed` 被清掉）之后：
+     * 文件里 12 个模组都是"启用"，但 `launchid.dat` 还在 ⇒ 下次启动游戏照样会把它们全关掉，
+     * 而我们的卡片**一句话都不说**，只剩列表里的「会加载」⇒ 用户看到的就是"明明会被禁用却说会加载"。
+     *
+     * <p>判据表（先看"下次会不会跳"，它是最要紧的未来事实）：
+     * <ul>
+     *   <li>`skipModLoading` ⇒ {@link R.string#mods_warn_failed}（下次启动会关整槽，**与有没有标记无关**）</li>
+     *   <li>否则 `launchidExists && anyFailed` ⇒ `mods_warn_failed_noskip`（你关了跳过开关 ⇒ 下次还会加载）</li>
+     *   <li>否则 `anyFailed` ⇒ `mods_warn_failed_applied`（跳过已经发生过，模组现在是被关掉的）</li>
+     *   <li>都没有 ⇒ 0（不显示；干净槽不该有这句）</li>
+     * </ul>
+     */
+    static int cardNote(Mods.Scan scan, boolean anyFailed) {
+        if (scan != null && scan.skipModLoading) return R.string.mods_warn_failed;
+        if (anyFailed) {
+            return (scan != null && scan.launchIdExists)
+                    ? R.string.mods_warn_failed_noskip : R.string.mods_warn_failed_applied;
+        }
+        return 0;
+    }
+
+    /**
      * 模组**说明文件**读不出来时的"人话版"原因（原来在 `Mods.Info.metaReason()` 里）。
      *
      * ★ 为什么搬出来：`Mods.Info` 是纯数据类、拿不到 `Context`，而这两句会经
