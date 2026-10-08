@@ -3604,6 +3604,35 @@ public final class SelfTest {
                             + "」/ 全槽级那句「"
                             + oneLine(ctx.getString(R.string.mods_warn_failed)) + "」");
 
+            // ── ★★ 2026-10-08 第二遍收口（用户：「这个全部加载失败和跳过所以模组感觉好乱啊」）──
+            //    乱在两处：① 同一件事四种说法；② 摘要卡两行都是两三行的长句。
+            //    现在：**术语只有两个**（「整槽跳过」/「被标成失败」）+ 摘要卡两行各自有**字数预算**。
+            //    ⚠️ 预算不是洁癖：1080p 竖屏 12sp 下一行 ≈ 22 个汉字，超了就会挤成三行（用户看到的就是那个）。
+            ok(stat, L, CrashAnalysis.blamedNames(bOne).size() == 1
+                            && "Crash Test".equals(CrashAnalysis.blamedNames(bOne).get(0)),
+                    "★摘要卡要的是**显示名**（不是内部名）：" + CrashAnalysis.blamedNames(bOne));
+            ok(stat, L, CrashAnalysis.blamedNames(bNone).isEmpty()
+                            && CrashAnalysis.blamedNames(bTwo).size() == 2,
+                    "★元断言：认不出 ⇒ 空（卡片第二行不出现）；并列 ⇒ 两个名字（退回整句那条路）");
+            String failNote = ctx.getString(R.string.mods_warn_failed);
+            String failNoteNo = ctx.getString(R.string.mods_warn_failed_noskip);
+            String blameOne = ctx.getString(R.string.mods_blame_one_fmt);
+            ok(stat, L, failNote.length() <= 40 && failNoteNo.length() <= 40
+                            && blameOne.replace("%1$s", "").length() <= 24,
+                    "★元断言（**防再变乱**）：摘要卡那两行的字数预算 —— "
+                            + "全槽级 " + failNote.length() + " 字 / 关了跳过 " + failNoteNo.length()
+                            + " 字 / 点名那行 " + blameOne.replace("%1$s", "").length() + " 字"
+                            + "（超了就又会挤成三行）");
+            ok(stat, L, failNote.contains("整槽跳过") && failNoteNo.contains("还会加载")
+                            && ctx.getString(R.string.mods_gate_last_crash).contains("整槽跳过")
+                            && ctx.getString(R.string.mods_gate_last_crash_bad).contains("整槽跳过"),
+                    "★术语统一：摘要卡 / 关了跳过那支 / 门标签（两支）**都用「整槽跳过」**"
+                            + "（改前有「跳过全部模组」「整槽跳过」两种说法 ⇒ 读起来像两件事）");
+            ok(stat, L, !ctx.getString(R.string.mods_gate_last_crash_bad).contains("跳过全部模组")
+                            && !ctx.getString(R.string.mods_gate_last_crash_skip_again)
+                                    .contains("跳过全部模组"),
+                    "★元断言：门那两支里都不再出现第二种说法（「跳过全部模组」）");
+
             // 🔴 真机抓到的那条：便宜层（L1b）命中时**也要把名字跟模组表对上** ——
             //    报告里只有 internalName（`Error loading mod depuser`），界面该显示 displayName。
             File modsDir = new File(root, "mods");
@@ -5392,31 +5421,58 @@ public final class SelfTest {
             gFail.failed = true;                     // ← 判据就是它（忘了这一行 = 测试自己写错了）
             Mods.Scan gScan = new Mods.Scan("m3-gate", null);
             String gLabel = ctx.getString(R.string.mods_gate_last_crash);
-            ok(stat, L, !gateOf(ctx, gFail, gScan).pass && gateOf(ctx, gFail, gScan).note != null,
+            ok(stat, L, !lastGateOf(ctx, gFail, gScan).pass && lastGateOf(ctx, gFail, gScan).note != null,
                     "★★修：游戏把这个模组标成失败（`failed=true`）⇒ 那道门**必须不通过**且给原因"
                             + "（改前是写死通过的 —— 用户真机看出来的）");
             Mods.Info gOk = mkMod("gate-crash-probe", null, null, true);
-            ok(stat, L, gateOf(ctx, gOk, gScan).pass,
+            ok(stat, L, lastGateOf(ctx, gOk, gScan).pass,
                     "★元断言：没被标失败、也没崩过 ⇒ 通过（判据有分辨力，不是恒不通过）");
             Mods.Scan gLid = new Mods.Scan("m3-gate", null);
             gLid.launchIdExists = true;
             gLid.skipModLoading = false;                       // launchid 在，但用户关了 modcrashdisable
-            ok(stat, L, gateOf(ctx, gOk, gLid).pass && gateOf(ctx, gOk, gLid).note != null,
+            ok(stat, L, lastGateOf(ctx, gOk, gLid).pass && lastGateOf(ctx, gOk, gLid).note != null,
                     "★launchid.dat 在、但关掉了「启动崩溃后禁用模组」⇒ **通过**（附一句说明）—— "
                             + "不然会把「关了开关」的人吓一跳");
             Mods.Scan gSkip = new Mods.Scan("m3-gate", null);
             gSkip.launchIdExists = true;
             gSkip.skipModLoading = true;
-            ok(stat, L, !gateOf(ctx, gOk, gSkip).pass,
+            ok(stat, L, !lastGateOf(ctx, gOk, gSkip).pass,
                     "★launchid.dat 在 **且** modcrashdisable 开着 ⇒ 不通过（下次启动整槽跳过）");
-            // ⚠️ 两种"不通过"的原因必须不同 —— 比 note 时**先转字符串**（通过那支的 note 是 null，
+            // ★★ 2026-10-08：**叉号后面不许再说"正常…"** —— 用户原话
+            //    「前面打个叉号后面说正常结束谁知道到底是正不正常啊」。
+            //    ✓/❌ 那套（`❌ 满足最低版本要求`）只适用于**要求/状态**式判据；
+            //    "过去时的叙述"必须**跟着状态换措辞**（不通过时直接说发生了什么）。
+            String okLabel = ctx.getString(R.string.mods_gate_last_crash);
+            String badLabel = ctx.getString(R.string.mods_gate_last_crash_bad);
+            ok(stat, L, !badLabel.equals(okLabel)
+                            && !badLabel.contains("正常") && !badLabel.contains("没触发"),
+                    "★★不通过时那道门的标签是「" + badLabel + "」—— 与通过时的「" + okLabel
+                            + "」**不同**，且不含「正常 / 没触发」（叉号配正面词 = 自相矛盾）");
+            ok(stat, L, lastGateOf(ctx, gFail, gScan).label.equals(badLabel)
+                            && lastGateOf(ctx, gOk, gScan).label.equals(okLabel),
+                    "★元断言：界面真的按状态取了不同标签（不是只写了两条文案没人用）");
+            // ⚠️ 两支"不通过"的**建议**必须不同 —— 比 note 时**先转字符串**（通过那支的 note 是 null，
             //    直接 `.equals` 会 NPE：第一版就这么把自己绊倒了）
-            String noteFailed = String.valueOf(gateOf(ctx, gFail, gScan).note);
-            String noteSkipping = String.valueOf(gateOf(ctx, gOk, gSkip).note);
-            ok(stat, L, !gLabel.isEmpty() && !noteFailed.equals(noteSkipping)
-                            && !"null".equals(noteFailed) && !"null".equals(noteSkipping),
-                    "★元断言：两种不通过的**原因不同**（被标失败 / 会整槽跳过）"
-                            + "⇒ 文案真的分开了，不是一句万金油");
+            String noteFail = String.valueOf(lastGateOf(ctx, gFail, gScan).note);
+            String noteSkip = String.valueOf(lastGateOf(ctx, gOk, gSkip).note);
+            ok(stat, L, !gLabel.isEmpty() && !noteFail.equals(noteSkip)
+                            && !"null".equals(noteFail) && !"null".equals(noteSkip),
+                    "★元断言：两支不通过的**建议不同** ⇒ 文案真的分开了，不是一句万金油");
+            // ★★ 2026-10-08：**建议必须跟着当前状态走** —— 用户原话
+            //    「想再试就点启用，但现在状态就是启用（这矛盾啊）」。
+            //    判据：模组**开着**时，那道门的说明里**不许**出现"点「启用」"。
+            Mods.Info gOn = mkMod("gate-crash-probe", null, null, true);      // 启用中
+            gOn.failed = true;
+            Mods.Info gOff = mkMod("gate-crash-probe", null, null, false);    // 已关掉
+            gOff.failed = true;
+            String noteOn = String.valueOf(lastGateOf(ctx, gOn, gScan).note);
+            String noteOff = String.valueOf(lastGateOf(ctx, gOff, gScan).note);
+            ok(stat, L, !noteOn.contains("「启用」") && noteOff.contains("「启用」"),
+                    "★★建议跟着状态走：**开着**的模组不说「点启用」（实得「" + noteOn
+                            + "」）；**关掉**的才说（实得「" + noteOff + "」）");
+            ok(stat, L, !noteOn.contains("标成失败") && !noteFail.contains("标成失败"),
+                    "★元断言：门的说明里不再写「把它标成失败」—— 那是**全槽级**标记"
+                            + "（一崩 12 个模组全有），搁在按模组的门里就是 §85.16 那类错");
             // ★★ P3 第九批：模组页那几条（导入失败 + 详情弹窗补充说明）按真参数实拼。
             //    ★ 其中两条的占位符是"整句 + %1$s/%2$s"（原来是 Java 里拼的**碎片**）。
             String mdTarget = ctx.getString(R.string.mods_detail_target_fmt, "A / B", "1.2");
@@ -8053,15 +8109,13 @@ public final class SelfTest {
      *   用户就看不到依据（F4①d 那条纪律：判据要能看见依据）。
      */
     /**
-     * ⑮ 用：把某个模组那六道门里**「上次启动」那道**挑出来（按标签找 —— 标签是界面文案，
-     * ⚠️ 所以这里是"跟着文案走"的地方；改文案时这条会一起红，正是想要的效果）。
+     * ⑮ 用：六道门里的**最后一道**（"上次启动"那道）。
+     * ⚠️ 按**位置**取，不按文案找 —— 它的标签**跟着状态换措辞**（见 `Mods.gates` 的注释），
+     * 按文案找在不通过时会静默落空（然后断言就"恰好"通过了，等于把尺子弄丢）。
      */
-    private static Mods.Gate gateOf(Context ctx, Mods.Info m, Mods.Scan scan) {
-        String want = ctx.getString(R.string.mods_gate_last_crash);
-        for (Mods.Gate g : Mods.gates(ctx, m, 0, 0, scan)) {
-            if (want.equals(g.label)) return g;
-        }
-        return new Mods.Gate("(没找到)", false, "(没找到)");
+    private static Mods.Gate lastGateOf(Context ctx, Mods.Info m, Mods.Scan scan) {
+        java.util.List<Mods.Gate> gs = Mods.gates(ctx, m, 0, 0, scan);
+        return gs.isEmpty() ? new Mods.Gate("(空)", false, "(空)") : gs.get(gs.size() - 1);
     }
 
     private static boolean allGatesPass(Context ctx, Mods.Info m, int build, int rev) {        for (Mods.Gate g : Mods.gates(ctx, m, build, rev)) {

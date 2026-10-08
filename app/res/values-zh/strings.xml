@@ -662,9 +662,18 @@
     <string name="mods_gate_blacklist">不在游戏的禁用名单里</string>
     <string name="mods_gate_blacklist_note_fmt">在名单里：%1$s</string>
     <string name="mods_gate_last_crash">上次启动正常结束（没触发整槽跳过）</string>
+    <!-- ★ 2026-10-08：这道门的标签**跟着状态换措辞**（用户：「前面打个叉号后面说正常结束谁知道到底是正不正常啊」）
+         —— ✓/❌ 那套（"❌ 满足最低版本要求"）只适用于**要求/状态**式判据；
+         "过去时的叙述"配 ❌ 会自相矛盾，所以不通过时直接说**发生了什么**。 -->
+    <string name="mods_gate_last_crash_bad">上次启动崩到了整槽跳过</string>
     <string name="mods_gate_last_crash_note">上次启动没跑完，但你关掉了「启动崩溃后禁用模组」⇒ 不会整槽跳过</string>
-    <string name="mods_gate_last_crash_failed">游戏已把这个模组标成失败（上次没加载起来）—— 想再试一次就点「启用」</string>
-    <string name="mods_gate_last_crash_skipping">上次启动没跑完，而且开着「启动崩溃后禁用模组」⇒ 下次启动会跳过全部模组</string>
+    <!-- ★ 不通过时的"该做什么"：**跟着这个模组当前的状态走**（用户：「想再试就点启用，但现在状态就是启用（这矛盾啊）」）
+         —— 关着的才说"点启用"；开着的说重试/怎么让它别再被跳过。
+         ⚠️ 原来还写「游戏把它标成失败」：那是**全槽级**标记（一崩 12 个模组全有），
+         搁在这儿等于把槽级事实说成这个模组的事（§85.16 同一类错的第三处）⇒ 删掉。 -->
+    <string name="mods_gate_last_crash_off">它现在是关着的 —— 想再试就点「启用」</string>
+    <string name="mods_gate_last_crash_skip_again">先关掉点名那个模组，或关掉「启动崩溃后禁用模组」</string>
+    <string name="mods_gate_last_crash_retry">下次启动会再试它；要是还崩，先把它关掉</string>
     <string name="mods_gate_no_version">还没指定版本</string>
     <!-- ══ 模组页的几条（P3）：导入失败 + 详情弹窗的补充说明 ══════════════════
          ⚠️ 原文里「（照抄 Mods.resolveDependencies）」是**维护者自我说明 / 源码出处**，
@@ -1393,7 +1402,7 @@
 
     <!-- F23 第二批：把结论送到「导出文件」与「模组页」—— 结论不能只活在日志页上 -->
     <string name="log_export_verdict">启动器对这份报告的判断：</string>
-    <string name="mods_verdict_fmt">上次崩溃：%1$s</string>
+    <string name="mods_verdict_fmt">上次崩溃的判断：%1$s</string>
     <string name="log_copied_fmt">已复制%1$s</string>
     <string name="log_copy_empty">这里没有可复制的内容</string>
     <string name="log_hub_launch">启动</string>
@@ -1532,8 +1541,13 @@
     <string name="mods_warn_noversion_fmt">⚠ 它没写要求哪个游戏版本 —— 游戏会当成太老的模组跳过</string>
     <string name="mods_warn_blacklist_fmt">⚠ 它在游戏的黑名单里：%1$s</string>
     <string name="mods_warn_dup">⚠ 和另一个包重名 ⇒ 游戏里只有一个会生效</string>
-    <string name="mods_warn_failed">⚠ 上次启动没跑完：游戏把本槽的全部模组都标成了失败，下次启动可能整槽跳过（这不是某一个模组的问题）</string>
+    <string name="mods_warn_failed">⚠ 上次启动没跑完：整槽模组都被标成失败，下次启动会整槽跳过</string>
+    <string name="mods_warn_failed_noskip">⚠ 上次启动没跑完：整槽模组都被标成失败（你已关掉跳过，下次还会加载）</string>
     <string name="mods_warn_blamed">⚠ 上次崩溃很可能与它有关</string>
+
+    <!-- 摘要卡第二行：点名的**短**形式（长依据留给运行日志 —— 2026-10-08 用户说"感觉好乱"）
+         ⚠️ 只有"分得出是哪一个"时才用它；并列（报告指向多个）走 mods_verdict_fmt 的整句 -->
+    <string name="mods_blame_one_fmt">最可能的原因：「%1$s」（依据在运行日志）</string>
 
     <!-- F23「崩了马上说一声」（2026-10-08 用户点单：有没有办法让他崩溃以后立马弹窗提示啊） -->
     <string name="crash_alert_title">游戏崩了</string>
@@ -1575,6 +1589,9 @@
     <string name="mods_detail_gate_ok_note_fmt">✅ %1$s\n　　 %2$s</string>
     <string name="mods_detail_setting2_fmt">%1$s：%2$s</string>
     <string name="mods_setting_enabled">启用</string>
+    <!-- ⚠️ 2026-10-08 起**没有调用点**了：详情页那行原始值删了（它与六道门里那道「上次启动…」
+         说的是同一件事 —— 同一屏说两遍就是"乱"）。**键保留**：v0.3 已发出去过，
+         用户语言包里可能有它，删了会让那些包报"未知键"。 -->
     <string name="mods_setting_failed">加载失败过</string>
     <string name="mods_setting_repo">更新地址</string>
     <string name="mods_setting_repo_default">（用说明文件里的）</string>

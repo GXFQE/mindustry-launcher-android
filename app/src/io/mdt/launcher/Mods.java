@@ -2048,13 +2048,22 @@ public final class Mods {
         boolean lid = scan != null && scan.launchIdExists;
         boolean skipping = scan != null && scan.skipModLoading;
         boolean lastCrashOk = !m.failed && !skipping;
-        out.add(new Gate(Trans.get(ctx, R.string.mods_gate_last_crash), lastCrashOk,
+        // 🔴 标签**跟着状态换措辞**：另外五道门是"要求/状态"式（`❌ 满足最低版本要求` 读得通），
+        //   而这句是**过去时的叙述** —— 配 ❌ 会变成"❌ 上次启动正常结束"，用户原话
+        //   「前面打个叉号后面说正常结束谁知道到底是正不正常啊」。不通过时直接说发生了什么。
+        out.add(new Gate(Trans.get(ctx, lastCrashOk
+                ? R.string.mods_gate_last_crash : R.string.mods_gate_last_crash_bad), lastCrashOk,
                 lastCrashOk
                         // 通过但"上次没跑完"（用户关了 modcrashdisable）⇒ 值得说一句
                         ? (lid ? Trans.get(ctx, R.string.mods_gate_last_crash_note) : null)
-                        : Trans.get(ctx, m.failed
-                                ? R.string.mods_gate_last_crash_failed
-                                : R.string.mods_gate_last_crash_skipping)));
+                        // 🔴 不通过时只说**这个模组该做什么**，而且**跟着它当前的状态走**：
+                        //   关着的 ⇒ 让它"点启用"；开着的 ⇒ 说重试 / 怎么别再被整槽跳过。
+                        //   用户原话：「想再试就点启用，但现在状态就是启用（这矛盾啊）」。
+                        //   ⚠️ 也不再写"游戏把它标成失败" —— 那是**全槽级**标记（一崩全槽都标上），
+                        //   搁在这道**按模组**的门里就是 §85.16 那类错（槽级事实说成项级判断）。
+                        : Trans.get(ctx, !m.enabled ? R.string.mods_gate_last_crash_off
+                                : (skipping ? R.string.mods_gate_last_crash_skip_again
+                                            : R.string.mods_gate_last_crash_retry))));
         return out;
     }
 

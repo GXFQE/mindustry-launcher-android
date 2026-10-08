@@ -954,6 +954,26 @@ final class CrashAnalysis {
         return out;
     }
 
+    /**
+     * 摘要卡要的**短**形式：点名者的**显示名**（单条时就用它 ⇒ 一行说清"最可能是谁"）。
+     * 认不出 / 原版崩 / 启动器自己的报告 ⇒ 空表。
+     *
+     * <p>★ 为什么要另给一个（而不是直接用 {@link #text}）：`text()` 是**整句 + 依据**
+     * （真机实测两行以上），放进模组页摘要卡就把三行警告挤在一起 —— 2026-10-08 用户说
+     * 「这个全部加载失败和跳过所以模组感觉好乱啊」。依据仍然能给：卡片那行写着
+     * 「依据在运行日志」，日志页/导出文件用的还是 {@link #text}（**同一份判据，两种详略**）。
+     */
+    static List<String> blamedNames(Verdict v) {
+        List<String> out = new ArrayList<String>();
+        if (v == null || v.kind != KIND_MOD || v.hits == null) return out;
+        for (Hit h : v.hits) {
+            if (h == null) continue;
+            String s = h.name == null || h.name.isEmpty() ? h.internal : h.name;
+            if (s != null && !s.isEmpty() && !out.contains(s)) out.add(s);
+        }
+        return out;
+    }
+
     // ══ dev 口 ═════════════════════════════════════════════════════════════
 
     /**

@@ -604,10 +604,19 @@ public class ModsActivity extends BaseActivity {
                 } catch (Throwable ignored) {
                     v = null;
                 }
-                final String line = (v != null && v.kind == CrashAnalysis.KIND_MOD)
-                        ? Trans.get(ModsActivity.this, R.string.mods_verdict_fmt,
-                                CrashAnalysis.text(ModsActivity.this, v))
-                        : "";
+                // ★ 摘要卡这一行要**短**（2026-10-08 用户：「全部加载失败和跳过所以模组感觉好乱」）：
+                //   分得出是哪一个 ⇒ 只写名字一行；并列（报告指向多个）才退回整句（那种情况本来就
+                //   说不清，整句反而是诚实的最小表述）。**长依据一律留给运行日志/导出**。
+                java.util.List<String> names = CrashAnalysis.blamedNames(v);
+                final String line;
+                if (names.size() == 1) {
+                    line = Trans.get(ModsActivity.this, R.string.mods_blame_one_fmt, names.get(0));
+                } else if (v != null && v.kind == CrashAnalysis.KIND_MOD) {
+                    line = Trans.get(ModsActivity.this, R.string.mods_verdict_fmt,
+                            CrashAnalysis.text(ModsActivity.this, v));
+                } else {
+                    line = "";
+                }
                 // ★ 按行标记的那份名单：**只**来自归因器（见 isBlamed）
                 final java.util.Set<String> blamed = new java.util.HashSet<>();
                 for (String s : CrashAnalysis.blamedInternals(v)) {
@@ -657,7 +666,10 @@ public class ModsActivity extends BaseActivity {
                 }
             }
             if (anyFailed) {
-                mFailNote.setText(Trans.get(ModsActivity.this, R.string.mods_warn_failed));
+                // ★ 两句话按**同一件事**分岔（同一屏幕里不重复说）：开着跳过 ⇒ 会整槽跳过；
+                //   用户自己关了 ⇒ 明确告诉他"下次还会加载"（否则他会以为模组废了）
+                mFailNote.setText(Trans.get(ModsActivity.this, mScan.skipModLoading
+                        ? R.string.mods_warn_failed : R.string.mods_warn_failed_noskip));
                 mFailNote.setVisibility(View.VISIBLE);
             } else {
                 mFailNote.setVisibility(View.GONE);
@@ -1143,10 +1155,11 @@ public class ModsActivity extends BaseActivity {
                         Trans.get(ModsActivity.this, R.string.mods_setting_enabled),
                         getString(m.enabled ? R.string.mods_setting_yes
                                 : R.string.mods_setting_no))).append('\n');
-                sb.append(Trans.get(ModsActivity.this, R.string.mods_detail_setting2_fmt,
-                        Trans.get(ModsActivity.this, R.string.mods_setting_failed),
-                        getString(m.failed ? R.string.mods_setting_yes
-                                : R.string.mods_setting_no))).append('\n');
+                // ★ 2026-10-08 删掉一行「加载失败过：是」—— 它与上面那六道门里
+                //   「❌ 上次启动正常结束…」说的是**同一件事**（那道门的判据就是 `m.failed`），
+                //   同一屏里说两遍正是用户说的"感觉好乱"。信息没丢：那道门的说明里写着
+                //   "游戏把它标成失败"，还多一句能操作的「想再试就点「启用」」。
+                //   （开关区只留真正的**开关**：启用 / 更新地址。）
                 sb.append(Trans.get(ModsActivity.this, R.string.mods_detail_setting2_fmt,
                         Trans.get(ModsActivity.this, R.string.mods_setting_repo),
                         m.settingsRepo == null ? Trans.get(ModsActivity.this, R.string.mods_setting_repo_default)
