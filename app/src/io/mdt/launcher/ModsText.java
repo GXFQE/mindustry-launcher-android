@@ -183,6 +183,22 @@ final class ModsText {
     }
 
     /**
+     * ★★ **那次崩溃还算不算"活着"**（摘要卡该不该还挂着「最可能的原因：…」）。
+     *
+     * <p>用户原话：「**已经不崩溃了为什么还显示最可能的原因**」。判据两条（任一成立就算活着）：
+     * <ul>
+     *   <li>下次启动还会因它**整槽跳过**（`launchid.dat` 在 + `modcrashdisable` 开）——
+     *       这时那句话是**可行动**的（先关掉点名那个模组）；</li>
+     *   <li>它留下的**后果还在**（有模组带着那次写的记录 / 还关着）。</li>
+     * </ul>
+     * 游戏这次跑完了（`launchid.dat` 被 `finishLaunch` 删掉）且模组都开着 ⇒ 那是**历史**，
+     * 卡片不该再挂着它（要考古去运行日志 —— 导出里那份判断一个字都没少）。
+     */
+    static boolean crashStillLive(Mods.Scan scan, boolean anyFailed) {
+        return (scan != null && scan.skipModLoading) || anyFailed;
+    }
+
+    /**
      * 模组**说明文件**读不出来时的"人话版"原因（原来在 `Mods.Info.metaReason()` 里）。
      *
      * ★ 为什么搬出来：`Mods.Info` 是纯数据类、拿不到 `Context`，而这两句会经

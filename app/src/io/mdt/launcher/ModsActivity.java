@@ -622,10 +622,29 @@ public class ModsActivity extends BaseActivity {
                 for (String s : CrashAnalysis.blamedInternals(v)) {
                     blamed.add(s.toLowerCase(java.util.Locale.ROOT));
                 }
+                // ★ 那次崩溃的**后果还在不在**：有模组带着它留下的记录（= 还被关着）
+                final boolean anyFailedNow;
+                {
+                    boolean any = false;
+                    for (Mods.Info mm : mScan.mods) {
+                        if (mm != null && mm.failed) {
+                            any = true;
+                            break;
+                        }
+                    }
+                    anyFailedNow = any;
+                }
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
                         if (Util.dead(ModsActivity.this) || !slot.equals(mSlot)) return;
-                        if (line.isEmpty()) {
+                        // ★★ 2026-10-08 用户：「**已经不崩溃了为什么还显示最可能的原因**」——
+                        //    这句只有在**那次崩溃还"活着"**时才该出现：
+                        //      · 下次启动还会因它整槽跳过（`launchid.dat` 在 + 跳过开关开），或
+                        //      · 它的后果还在（有模组带着那次留下的记录 / 还关着）
+                        //    游戏这次跑完了（`launchid.dat` 被 `finishLaunch` 删掉）且模组都开着
+                        //    ⇒ 那就是**历史**了，卡片上不该再挂着"最可能的原因"（要考古去运行日志）。
+                        boolean live = ModsText.crashStillLive(mScan, anyFailedNow);
+                        if (line.isEmpty() || !live) {
                             mCrashLine.setVisibility(View.GONE);
                         } else {
                             mCrashLine.setText(line);

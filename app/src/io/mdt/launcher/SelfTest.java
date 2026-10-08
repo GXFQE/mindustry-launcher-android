@@ -3672,6 +3672,18 @@ public final class SelfTest {
                             + "跳过已发生（没 launchid）+ 有标记 ⇒「都被关了」那支；"
                             + "没标记且不会跳 ⇒ **不显示**（干净槽不该有这句）—— 实得 " + nLidMark + "/"
                             + nApplied + "/" + nNone + "/" + nLidNoMark);
+            // ★★ 2026-10-08 用户：「**已经不崩溃了为什么还显示最可能的原因**」——
+            //    「最可能的原因」只在**那次崩溃还活着**时出现：还会再跳，或它的后果（记录/关着的模组）还在。
+            //    真机那个状态：`launchid.dat` 已经被 `finishLaunch` 删掉、12 个模组都开着
+            //    ⇒ 崩溃是**历史**了，卡片不该再挂着它。
+            ok(stat, L, ModsText.crashStillLive(scSkip, false)
+                            && ModsText.crashStillLive(scClean, true)
+                            && !ModsText.crashStillLive(scClean, false),
+                    "★★「最可能的原因」的显示判据：还会再跳 ⇒ 显示（可行动）；后果还在（有模组还关着）⇒ 显示；"
+                            + "**都过去了（launchid 没了 + 没有标记）⇒ 不显示** —— 实得 "
+                            + ModsText.crashStillLive(scSkip, false) + "/"
+                            + ModsText.crashStillLive(scClean, true) + "/"
+                            + ModsText.crashStillLive(scClean, false) + "（最后一格必须是 false）");
             ok(stat, L, failNote.contains("关掉") && failNoteNo.contains("还会加载"),
                     "★术语统一：摘要卡（下次启动会把整槽模组关掉 / 都被关了）/ 关了跳过那支"
                             + "（「还会加载」）/ 门标签（两支）都用「整槽跳过」");
