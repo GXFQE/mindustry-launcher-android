@@ -841,15 +841,12 @@ public class ModsActivity extends BaseActivity {
         Mods.State st = broken ? Mods.State.UNSUPPORTED
                 : Mods.stateOf(m, mResolved, mTarget.build, mTarget.revision);
         // ★ 徽标优先级：游戏自己的状态 > "安卓上会加载失败"（我们推出来的）> 启用。
-        //   `willFailJavaLoad` 是**真会咬人**的一条（声明了 java、包里没有 classes.dex ⇒
-        //   游戏抛异常后**整个模组被跳过**）—— 那时还显示绿色「启用」就是在骗人。
+        //   ★★ 2026-10-08：判据整体搬进 `ModsText.badge`（**可被自检钉住**）—— 两条要点：
+        //     ① 没读到设置文件时**不许说「启用」**（那只是默认值，用户分辨不出"真开着"与"我们不知道"）；
+        //     ② `willFailJavaLoad` 优先（声明了 java 却没 classes.dex ⇒ 那时说「启用」是骗人）。
         String badgeText = broken ? Trans.get(ModsActivity.this, R.string.mods_badge_broken)
-                    : ModsText.stateBadge(this, st);
-        boolean warnBadge = broken || st != Mods.State.ENABLED;
-        if (!broken && st == Mods.State.ENABLED && m.willFailJavaLoad()) {
-            badgeText = Trans.get(ModsActivity.this, R.string.mods_badge_willfail);
-            warnBadge = true;
-        }
+                    : ModsText.badge(this, st, m.settingsKnown, m.willFailJavaLoad());
+        boolean warnBadge = broken || ModsText.badgeWarns(st, m.settingsKnown, m.willFailJavaLoad());
 
         title.setText(broken ? m.fileName : m.titleWithVersion());
         // 徽标用**短**形式（`ModsText.stateBadge`），句子形式（`ModsText.stateLabel`）留给详情弹窗与报告
@@ -914,10 +911,12 @@ public class ModsActivity extends BaseActivity {
                 // ⚠️ 不写「状态：与当前游戏版本不兼容」—— 那个状态**只有三个成因**
                 //    （版本不够 / minMajor 太低 / 黑名单），上面三行各自都说过一次了。
                 //    徽标已经写着状态，正文再复述一遍就是纯噪声（同一件事两处喊）。
-            } else if (st != Mods.State.ENABLED && !ModsText.badgeSaysIt(this, st)) {
-                // 依赖类的状态没有别的行会说，必须在正文里点名；
-                // 🔴 但**徽标已经把话说完了**的那些状态（短形式与句子形式逐字相同，如「已关闭」）
-                //    不许在正文里再喊一遍 —— 判据在 `ModsText.badgeSaysIt`（自检钉着它）。
+            } else if (st == Mods.State.DISABLED) {
+                // ★ 2026-10-08：徽标现在报**结果**（「不会加载」），这里给**原因**，用口语那句 ——
+                //   不再写「游戏里的状态：已关闭」（用户：「不需要告诉用户在游戏关闭时模组到底启没启用」）。
+                warns.add(Trans.get(ModsActivity.this, R.string.mods_warn_disabled));
+            } else if (ModsText.needsReason(st)) {
+                // 依赖 / 版本那几类：徽标报结果，这里补"为什么"（`⚠ 缺少必需依赖`）
                 warns.add(Trans.get(ModsActivity.this, R.string.mods_warn_state_fmt, ModsText.stateLabel(this, st)));
             }
         }
@@ -1067,8 +1066,9 @@ public class ModsActivity extends BaseActivity {
         sb.append(Trans.get(ModsActivity.this, R.string.mods_detail_size_fmt,
                 Util.formatSize(m.bytes), formOf(m))).append('\n');
         sb.append('\n').append(Trans.get(ModsActivity.this, R.string.mods_detail_state_fmt,
-                ModsText.stateLabel(this,
-                        Mods.stateOf(m, mResolved, mTarget.build, mTarget.revision))));
+                ModsText.outcome(this,
+                        Mods.stateOf(m, mResolved, mTarget.build, mTarget.revision),
+                        m.settingsKnown, m.willFailJavaLoad())));
         int fail = 0;
         for (Mods.Gate g : Mods.gates(this, m, mTarget.build, mTarget.revision, mScan)) {
             if (!g.pass) fail++;
@@ -1129,8 +1129,9 @@ public class ModsActivity extends BaseActivity {
         }
         if (m.metaError == null) {
             sb.append(Trans.get(ModsActivity.this, R.string.mods_detail_state_fmt,
-                    ModsText.stateLabel(this,
-                            Mods.stateOf(m, mResolved, mTarget.build, mTarget.revision)))).append('\n');
+                    ModsText.outcome(this,
+                            Mods.stateOf(m, mResolved, mTarget.build, mTarget.revision),
+                            m.settingsKnown, m.willFailJavaLoad()))).append('\n');
         }
         // ★ 只给**相对位置**：整条 `/storage/emulated/0/Android/data/io.mdt.launcher/slot-xxx/mods/...`
         //   要占四行，用户既看不懂也不需要（用户 2026-10-03：「这个页面也改下」）。
@@ -1159,7 +1160,11 @@ public class ModsActivity extends BaseActivity {
                 }
                 sb.append('\n');
             }
-            sb.append('\n').append(Trans.get(ModsActivity.this, R.string.mods_detail_settings_head)).append('\n');
+            // ★★ 2026-10-08：表头带上"读自哪个文件、几点的值" —— 模组的开关**只有游戏会写**，
+            //   不写清时间戳，用户没法判断它是不是刚才那次游戏跑完留下的（用户原话：
+            //   「游戏没开时用户也不知道模组到底启没启用啊」）。
+            sb.append('\n').append(ModsText.settingsHead(this, Mods.settingsFileOf(this, mSlot)))
+                    .append('\n');
             if (m.internalName != null) {
                 // ★ 大白话 + 是/否：原来显示 `mod-logicsugar-enabled = true` 这种**键名 + 机器值**，
                 //   用户看不懂（键名留在 Mods.enabledKey 那边的注释里，排查时再查）

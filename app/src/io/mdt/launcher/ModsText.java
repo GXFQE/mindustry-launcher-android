@@ -2,6 +2,8 @@ package io.mdt.launcher;
 
 import android.content.Context;
 
+import java.io.File;
+
 /**
  * {@link Mods} 里那些**"码"到文案**的映射（Android 侧）。
  *
@@ -50,18 +52,85 @@ final class ModsText {
     }
 
     /**
-     * ★ **这个状态下，徽标是不是已经把话说完了**（2026-10-08 用户真机：「还有现在还是乱的」）。
+     * ★ **这一行需不需要再补一句"为什么"**（2026-10-08 两次真机反馈的合并判据）。
      *
-     * <p>列表行的构成是「标题 + 徽标（短形式）+ 正文（可能含一句「游戏里的状态：…」）」。
-     * 当短形式与句子形式**逐字相同**时（如「已关闭」），正文那句就是**同一行里同一个词喊两遍**
-     * —— 判据是"徽标说完了没有"，而不是"这是哪个状态"：{@code stateBadge == stateLabel} ⇒ 说完了。
-     *
-     * <p>⚠️ 反例（必须**保留**正文那句）：`MISSING_DEPENDENCIES` 徽标只写「缺依赖」，
-     * 句子形式是「缺少依赖的模组」—— 正文那句才有信息量。
+     * <p>列表行的构成是「标题 + 徽标（{@link #badge}，报结果）+ 副标题（可含一句原因）」。
+     * 徽标现在报的是**结果**（会加载 / 不会加载 / 未读到设置 / 加载会失败），而"原因"来自
+     * {@link #stateLabel} —— 两者**永远不同**（结果 ≠ 原因），所以依赖 / 版本那几类照旧要补一句；
+     * 但「被关掉」这种原因由调用方换成更口语的那句（见 `ModsActivity` 里对 DISABLED 的分支），
+     * 免得又出现"同一个词喊两遍"。
      */
-    static boolean badgeSaysIt(Context c, Mods.State st) {
-        String b = stateBadge(c, st);
-        return !b.isEmpty() && b.equals(stateLabel(c, st));
+    static boolean needsReason(Mods.State st) {
+        return st != Mods.State.ENABLED && st != Mods.State.DISABLED
+                && st != Mods.State.UNSUPPORTED;      // UNSUPPORTED 的三个成因上面几行各自说过了
+    }
+
+    /**
+     * ★★ 列表行的**徽标** —— 报的是**结果**（下次启动会不会加载），**不是**游戏内部那个开关位
+     * （2026-10-08 用户：「**你不需要告诉用户在游戏关闭时模组到底启没启用啊**」）。
+     *
+     * <p>为什么改：`-enabled` 是**游戏自己的记账**（只有游戏会写，而且每次启动都可能被
+     * "整槽跳过"改写），把它当"状态"报给用户既没意义、又和"下次启动会被关掉"打架
+     * （见 REF §86.7 / §86.10）。用户关心的是**它下次会不会加载**。
+     *
+     * <p>四条判据：
+     * <ul>
+     *   <li>读到设置 + 启用 ⇒ 「会加载」；</li>
+     *   <li>**没读到设置文件** ⇒ 「未读到设置」（`-enabled` 不存在时 arc 给的是默认值 true，
+     *       那不是我们读到的状态）；</li>
+     *   <li>声明了 java 却打包里没有 `classes.dex` ⇒ 「加载会失败」（优先于「会加载」）；</li>
+     *   <li>被关掉 ⇒ 「不会加载」。</li>
+     * </ul>
+     * ⚠️ 依赖 / 版本 / 内容那几类**保留原来的短词**（缺依赖 / 不兼容 / 内容有错 / 循环依赖）——
+     * 它们本身就是**原因**，比笼统的「不会加载」信息量大。
+     */
+    static String badge(Context c, Mods.State st, boolean settingsKnown, boolean willFailJava) {
+        if (st == Mods.State.ENABLED) {
+            if (!settingsKnown) return Trans.get(c, R.string.mods_badge_unknown);
+            if (willFailJava) return Trans.get(c, R.string.mods_badge_willfail);
+            return Trans.get(c, R.string.mods_badge_load);
+        }
+        if (st == Mods.State.DISABLED) return Trans.get(c, R.string.mods_badge_noload);
+        return stateBadge(c, st);
+    }
+
+    /**
+     * 详情页顶上那行的**句子形式**：`下次启动：会不会加载`（+ 一句原因）。
+     * 与 {@link #badge} 同一套语义，只是能多带一句为什么。
+     */
+    static String outcome(Context c, Mods.State st, boolean settingsKnown, boolean willFailJava) {
+        if (st == Mods.State.ENABLED) {
+            if (!settingsKnown) return Trans.get(c, R.string.mods_badge_unknown);
+            if (willFailJava) {
+                return Trans.get(c, R.string.mods_outcome_noload_fmt,
+                        Trans.get(c, R.string.mods_badge_willfail));
+            }
+            return Trans.get(c, R.string.mods_badge_load);
+        }
+        String why = st == Mods.State.DISABLED ? Trans.get(c, R.string.mods_reason_off)
+                : stateLabel(c, st);
+        return Trans.get(c, R.string.mods_outcome_noload_fmt, why);
+    }
+
+    /** 徽标是不是"警告色"（与 {@link #badge} 同源判据，别再各写一套）。 */
+    static boolean badgeWarns(Mods.State st, boolean settingsKnown, boolean willFailJava) {
+        return st != Mods.State.ENABLED || !settingsKnown || willFailJava;
+    }
+
+    /**
+     * ★★ 「游戏里的开关」那一节的**表头** —— 带上**读自哪个文件、什么时候读的**
+     * （2026-10-08 用户：「游戏没开时用户也不知道模组到底启没启用啊」）。
+     *
+     * <p>模组的开关只有**游戏**会写（见 {@code Mods.failedKey} 的 Javadoc），我们只能读；
+     * 不写清"这是几点的值"，用户就无法判断它是不是刚才那次游戏跑完留下的。
+     */
+    static String settingsHead(Context c, File settingsFile) {
+        if (settingsFile == null || !settingsFile.isFile()) {
+            return Trans.get(c, R.string.mods_detail_settings_head);
+        }
+        String when = new java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.US)
+                .format(new java.util.Date(settingsFile.lastModified()));
+        return Trans.get(c, R.string.mods_detail_settings_head_fmt, when);
     }
 
     /**

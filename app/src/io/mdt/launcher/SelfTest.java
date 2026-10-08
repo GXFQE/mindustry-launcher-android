@@ -5523,15 +5523,50 @@ public final class SelfTest {
                             + "」—— 不提「用户」（那是**游戏自己**在整槽跳过时关的，我们分不出是谁关的）");
             // ★★ 2026-10-08：**徽标说完了的状态，正文不许再喊一遍**（用户真机："还是乱的" ——
             //   行里徽标「已关闭」+ 正文「游戏里的状态：已关闭」）。判据 = 短形式 == 句子形式。
-            ok(stat, L, ModsText.badgeSaysIt(ctx, Mods.State.DISABLED)
-                            && !ModsText.badgeSaysIt(ctx, Mods.State.MISSING_DEPENDENCIES)
-                            && !ModsText.badgeSaysIt(ctx, Mods.State.UNSUPPORTED),
-                    "★★「徽标说完了就不在正文重复」有分辨力：已关闭 ⇒ 说完了（"
-                            + ctx.getString(R.string.mods_badge_disabled) + " == "
-                            + ctx.getString(R.string.mods_state_disabled) + "）；"
-                            + "缺依赖 ⇒ 没说完（" + ctx.getString(R.string.mods_badge_missing_deps)
-                            + " ≠ " + ctx.getString(R.string.mods_state_missing_deps)
-                            + "，正文那句必须留着）");
+            ok(stat, L, ModsText.needsReason(Mods.State.MISSING_DEPENDENCIES)
+                            && ModsText.needsReason(Mods.State.UNSUPPORTED) == false
+                            && ModsText.needsReason(Mods.State.DISABLED) == false
+                            && ModsText.needsReason(Mods.State.ENABLED) == false,
+                    "★★「要不要再补一句为什么」的判据有分辨力：缺依赖 ⇒ 补；不兼容（三个成因上面各自说过）"
+                            + "与关闭（有自己那句口语）⇒ 不补；启用 ⇒ 不补");
+            // ★★ 2026-10-08（用户：「**你不需要告诉用户在游戏关闭时模组到底启没启用啊**」）：
+            //    徽标与详情页顶上那行都改成报**结果**（下次启动会不会加载），**不报**游戏内部那个开关位。
+            String enBadge = ctx.getString(R.string.mods_badge_load);
+            String noBadge = ctx.getString(R.string.mods_badge_noload);
+            ok(stat, L, enBadge.equals(ModsText.badge(ctx, Mods.State.ENABLED, true, false))
+                            && !enBadge.equals(ModsText.badge(ctx, Mods.State.ENABLED, false, false))
+                            && ModsText.badge(ctx, Mods.State.ENABLED, false, false)
+                                    .equals(ctx.getString(R.string.mods_badge_unknown))
+                            && ModsText.badge(ctx, Mods.State.ENABLED, true, true)
+                                    .equals(ctx.getString(R.string.mods_badge_willfail))
+                            && noBadge.equals(ModsText.badge(ctx, Mods.State.DISABLED, true, false)),
+                    "★★徽标报**结果**：读到设置+启用 ⇒「" + enBadge + "」；**没读到 ⇒「"
+                            + ctx.getString(R.string.mods_badge_unknown) + "」（默认值不当事实说）**；"
+                            + "会加载失败 ⇒「" + ctx.getString(R.string.mods_badge_willfail)
+                            + "」压过它；被关掉 ⇒「" + noBadge + "」（**不说「已关闭」**）");
+            String outOn = ModsText.outcome(ctx, Mods.State.ENABLED, true, false);
+            String outOff = ModsText.outcome(ctx, Mods.State.DISABLED, true, false);
+            String outDep = ModsText.outcome(ctx, Mods.State.MISSING_DEPENDENCIES, true, false);
+            ok(stat, L, outOn.equals(enBadge) && outOff.contains(noBadge)
+                            && outOff.contains(ctx.getString(R.string.mods_reason_off))
+                            && outDep.contains(noBadge)
+                            && outDep.contains(ctx.getString(R.string.mods_state_missing_deps)),
+                    "★★详情页顶上那行同理：「" + outOn + "」/「" + outOff + "」/「" + outDep
+                            + "」—— 结果 + 一句原因（关闭态给的是口语那句，不写「已关闭」）");
+            // ★★ 表头要交代"这是几点的值"（模组开关只有游戏会写，用户得知道它有多新）
+            File stProbe = new File(ctx.getCacheDir(), "settings-probe.bin");
+            try {
+                java.io.FileOutputStream fo = new java.io.FileOutputStream(stProbe);
+                fo.write(1); fo.close();
+                stProbe.setLastModified(1759900000000L);            // 固定一个时刻，别让它随时钟漂
+            } catch (Throwable ignored) {
+            }
+            String head = ModsText.settingsHead(ctx, stProbe);
+            String headNoFile = ModsText.settingsHead(ctx, new File(ctx.getCacheDir(), "没有这个文件.bin"));
+            ok(stat, L, head.contains("settings.bin") && head.contains("-")
+                            && !headNoFile.contains("settings.bin"),
+                    "★★「游戏里的开关」表头交代来源与时刻：「" + head + "」；文件不在 ⇒ 退回不带时刻那句「"
+                            + headNoFile + "」");
             // 🔴 2026-10-08：上面那把尺子**只喂了"启用中"的夹具** ⇒ 漏掉一整类：
             //   模组被关掉时那道「游戏里是启用状态」不通过，而它的原因只在"设置没读到"时才给
             //   ⇒ 详情页那行（❌ 标签 + 换行 + 原因）**直接印出 null**（用户截图抓到的）。

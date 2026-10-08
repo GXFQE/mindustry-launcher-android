@@ -626,6 +626,11 @@
       🔴 映射在 `ModsText.stateLabel/stateBadge`：加一个状态就必须两边都加（自检会遍历枚举）。
     -->
     <string name="mods_state_enabled">启用</string>
+    <!-- ★ 2026-10-08 用户：「游戏没开时用户也不知道模组到底启没启用啊」——
+         `-enabled` 键不存在时 arc 给的是**默认值 true**，那不是"我们读到的状态"
+         ⇒ 没读到设置文件时不许说「启用」，改说这句（详情页那道门还会解释原因）。 -->
+    <string name="mods_badge_unknown">未读到设置</string>
+    <string name="mods_detail_settings_head_fmt">游戏里的开关（读自 settings.bin · %1$s）</string>
     <string name="mods_state_content_errors">内容有错</string>
     <string name="mods_state_missing_deps">缺少必需依赖</string>
     <string name="mods_state_incomplete_deps">依赖被禁用/失效</string>
@@ -1568,8 +1573,8 @@
     <string name="crash_alert_toast_fmt">游戏崩了：%1$s</string>
     <string name="crash_alert_open">看运行日志</string>
     <string name="mods_warn_backslash_fmt">⚠ 这个包压得不太对，游戏会找不到里面的脚本 —— 重新压一次就好</string>
-    <string name="mods_warn_state_fmt">⚠ 游戏里的状态：%1$s</string>
-    <string name="mods_warn_disabled">已关闭（游戏里的开关是 false）</string>
+    <string name="mods_warn_state_fmt">⚠ %1$s</string>
+    <string name="mods_warn_disabled">⚠ 它现在是关着的</string>
 
     <string name="mods_detail_file_fmt">文件：%1$s（%2$s · %3$s）</string>
     <string name="mods_detail_key_fmt">游戏里的名字：%1$s</string>
@@ -1582,7 +1587,15 @@
     <string name="mods_detail_deps_fmt">必需依赖：%1$s</string>
     <string name="mods_detail_softdeps_fmt">软依赖：%1$s</string>
     <string name="mods_detail_none">无</string>
-    <string name="mods_detail_state_fmt">游戏里的状态：%1$s</string>
+    <!-- ★★ 2026-10-08 用户：「**你不需要告诉用户在游戏关闭时模组到底启没启用啊**」
+         —— `-enabled` 是**游戏自己的记账**（只有游戏会写，每次启动都可能被整槽跳过改写），
+         把它当"状态"报给用户既没意义、又和"下次启动会被关掉"打架。
+         现在这行报**结果**：下次启动会不会加载（+一句原因）。 -->
+    <string name="mods_detail_state_fmt">下次启动：%1$s</string>
+    <string name="mods_badge_load">会加载</string>
+    <string name="mods_badge_noload">不会加载</string>
+    <string name="mods_outcome_noload_fmt">不会加载（%1$s）</string>
+    <string name="mods_reason_off">被关掉了</string>
     <string name="mods_detail_gate_head">它要过这几关</string>
     <string name="mods_detail_gate_note_fmt">游戏版本：%1$s</string>
     <string name="mods_detail_gate_nogame">还没有版本指向这个槽</string>

@@ -787,6 +787,8 @@
         （自检会**遍历所有枚举值**，漏了会被抓住）。
     -->
     <string name="mods_state_enabled">enabled</string>
+    <string name="mods_badge_unknown">settings not read</string>
+    <string name="mods_detail_settings_head_fmt">switches in the game (read from settings.bin at %1$s)</string>
     <string name="mods_state_content_errors">content errors</string>
     <string name="mods_state_missing_deps">required dependencies are missing</string>
     <string name="mods_state_incomplete_deps">a dependency is disabled or broken</string>
@@ -1618,8 +1620,8 @@
     <string name="crash_alert_toast_fmt">The game crashed: %1$s</string>
     <string name="crash_alert_open">Open the log</string>
     <string name="mods_warn_backslash_fmt">⚠ This package is packed incorrectly and the game cannot find its scripts — just repack it</string>
-    <string name="mods_warn_state_fmt">⚠ State in the game: %1$s</string>
-    <string name="mods_warn_disabled">Disabled (the in-game toggle is false)</string>
+    <string name="mods_warn_state_fmt">⚠ %1$s</string>
+    <string name="mods_warn_disabled">⚠ it is switched off right now</string>
 
     <string name="mods_detail_file_fmt">File: %1$s (%2$s · %3$s)</string>
     <string name="mods_detail_key_fmt">In-game name: %1$s</string>
@@ -1632,7 +1634,11 @@
     <string name="mods_detail_deps_fmt">Required dependencies: %1$s</string>
     <string name="mods_detail_softdeps_fmt">Soft dependencies: %1$s</string>
     <string name="mods_detail_none">none</string>
-    <string name="mods_detail_state_fmt">State in the game: %1$s</string>
+    <string name="mods_detail_state_fmt">next launch: %1$s</string>
+    <string name="mods_badge_load">loads</string>
+    <string name="mods_badge_noload">will not load</string>
+    <string name="mods_outcome_noload_fmt">will not load (%1$s)</string>
+    <string name="mods_reason_off">switched off</string>
     <string name="mods_detail_gate_head">It has to pass these gates</string>
     <string name="mods_detail_gate_note_fmt">Game version: %1$s</string>
     <string name="mods_detail_gate_nogame">No version points at this slot yet</string>
