@@ -160,20 +160,42 @@ public final class CrashAlert {
         String name = newestName(dir);
         if (name.isEmpty()) return;
         String key = slot + "|" + name;
-        if (key.equals(Config.get().crashAlerted())) return;
         File f = new File(dir, name);
         final CrashAnalysis.Verdict v = CrashAnalysis.analyzeReport(a, f, slot);
         if (v == null) return;
-        Config.get().setCrashAlerted(key);
+        if (!claim(key)) return;                         // ★ 原子闸门（查+写同锁）
         sPending = null;
         showDialog(a, v);
+    }
+
+    // ── 「同一份只提示一次」的原子闸门 ─────────────────────────────────────
+
+    /**
+     * ★★ **查与写在同一把锁里**（2026-10-08 真机反馈：「游戏崩溃时怎么弹了两个一模一样的窗啊」）。
+     *
+     * <p>原来三个路径各自"先查 {@link Config#crashAlerted()}、再写"，而**监视**那条路的
+     * *检查在 daemon 线程、弹窗在 UI 线程*，中间隔着一次 {@code Handler.post} 投递 ⇒
+     * 回到界面的 {@link #catchUp}（或 {@link #flushPending}）会在这空档里也判定"还没提示过"
+     * ⇒ **同一份报告弹两个窗**。现在统一走这里，谁先抢到谁提示。
+     *
+     * <p>判据抽成纯函数 {@link #claims} 好让自检钉住（同一份 ⇒ false；换了份 ⇒ true）。
+     */
+    private static synchronized boolean claim(String key) {
+        if (!claims(Config.get().crashAlerted(), key)) return false;
+        Config.get().setCrashAlerted(key);
+        return true;
+    }
+
+    /** 纯判据：{@code key} 这一份还没提示过吗（{@code already} = 上次提示过的那份）。 */
+    static boolean claims(String already, String key) {
+        return key != null && !key.isEmpty() && !key.equals(already);
     }
 
     // ── 提示 ─────────────────────────────────────────────────────────────
 
     private static void announce(final Context app, final String slot, final File f) {
         final String key = slot + "|" + f.getName();
-        if (key.equals(Config.get().crashAlerted())) return;
+        if (!claims(Config.get().crashAlerted(), key)) return;   // 便宜的预检（省一次分析）
         final CrashAnalysis.Verdict v = CrashAnalysis.analyzeReport(app, f, slot);
         if (v == null) return;
         final String line = Trans.get(app, R.string.crash_alert_toast_fmt,
@@ -186,9 +208,11 @@ public final class CrashAlert {
                 } catch (Throwable ignored) {
                 }
                 // ② 若此刻有前台页面（崩溃后回到启动器那种），直接弹对话框；否则留着，回到界面时补
+                // 🔴 **弹之前必须再过一次原子闸门**：预检在 daemon 线程、这里在 UI 线程，
+                //    中间那一跳足够让 catchUp 也判定"还没提示过" ⇒ 两个窗（真机抓到的就是这个）。
                 Activity top = sTop == null ? null : sTop.get();
                 if (top != null && !Util.dead(top)) {
-                    Config.get().setCrashAlerted(key);
+                    if (!claim(key)) return;
                     showDialog(top, v);
                 } else {
                     sPending = f;
@@ -210,7 +234,8 @@ public final class CrashAlert {
             @Override public void run() {
                 final CrashAnalysis.Verdict v = CrashAnalysis.analyzeReport(app, f, slot);
                 if (v == null) return;
-                Config.get().setCrashAlerted(slot + "|" + f.getName());
+                // 🔴 弹之前过原子闸门（原来这里是**无条件**弹 —— 第三条会产生重复窗的路）
+                if (!claim(slot + "|" + f.getName())) return;
                 new Handler(Looper.getMainLooper()).post(new Runnable() {
                     @Override public void run() {
                         Activity a = sTop == null ? null : sTop.get();

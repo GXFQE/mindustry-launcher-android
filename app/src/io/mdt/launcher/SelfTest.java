@@ -3549,6 +3549,18 @@ public final class SelfTest {
             ok(stat, L, "m3|crash_400.txt".equals(Config.get().crashAlerted()),
                     "★「同一份只提示一次」的记帐能落盘再读回（Config.crash_alert_last）");
             Config.get().setCrashAlerted(oldAlert);
+            // 🔴 2026-10-08 真机：「游戏崩溃时怎么弹了两个一模一样的窗啊」
+            //   根因：三条路（监视 / 回界面补 / 补弹 pending）各自"先查再写"，
+            //   而监视那条**检查在 daemon 线程、弹窗在 UI 线程**，中间一跳就够让另一条也判定
+            //   "还没提示过" ⇒ 两个窗。现在统一走 `claim`（synchronized：查+写同锁）。
+            //   这里把判据本身（纯函数）钉住：**同一份 ⇒ 不许再认领；换了份 ⇒ 认领**。
+            ok(stat, L, CrashAlert.claims(null, "模组演示|crash_300.txt")
+                            && !CrashAlert.claims("模组演示|crash_300.txt", "模组演示|crash_300.txt")
+                            && CrashAlert.claims("模组演示|crash_300.txt", "模组演示|crash_400.txt")
+                            && !CrashAlert.claims("x|y", null) && !CrashAlert.claims("x|y", ""),
+                    "★★原子闸门的判据：**同一份报告只认领一次**（已提示过的那份再认领 ⇒ false）；"
+                            + "换了另一份 / 空手 ⇒ 认领；null 与空串不许认领");
+            Config.get().setCrashAlerted(oldAlert);
             ok(stat, L, ctx.getString(R.string.crash_alert_title).length() > 0
                             && ctx.getString(R.string.crash_alert_open).length() > 0,
                     "★提示用的两条文案在：「" + ctx.getString(R.string.crash_alert_title)
