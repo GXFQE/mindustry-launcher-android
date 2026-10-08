@@ -108,6 +108,25 @@ public final class Mods {
         return "mod-" + internalName + "-enabled";
     }
 
+    /**
+     * `mod-&lt;内部名&gt;-failed` —— 🔴 **它的真义不是"这个模组崩了"**（2026-10-08 用
+     * `Mindustry-160.jar` 的字节码定案，证据见 `docs/flows/10-阶段-6-模组.md`）：
+     *
+     * <pre>
+     * // mindustry/mod/Mods.resolve()（javap -c 6342~6362 逐字）
+     * if (skipModLoading()) {                                   // = failedToLaunch &amp;&amp; modcrashdisable
+     *     boolean wasEnabled = settings.getBool("mod-" + name + "-enabled", true);
+     *     settings.put("mod-" + name + "-enabled", false);      // ← 关掉
+     *     settings.put("mod-" + name + "-failed", wasEnabled);  // ← 记录"它本来是开着的"
+     * }
+     * </pre>
+     *
+     * ⇒ 它是「**整槽被跳过时，这个模组本来是开着的**」的记录，是**槽级事件的副产品**，
+     * 不是"这个模组有毛病"的判据（一崩 12 个模组全为 true 就是这么来的）。
+     * 另外两处会把它写成 false：游戏自己的 `Mods.setEnabled`（改开关时顺手清）、
+     * 以及重新导入模组（`listFiles`）。官方 160 里 `LoadedMod.failed()` **没有任何调用点**
+     * （只写不读）—— 所以别把它当"游戏认为它坏了"。
+     */
     public static String failedKey(String internalName) {
         return "mod-" + internalName + "-failed";
     }
@@ -574,6 +593,11 @@ public final class Mods {
         }
         // ★ 「键不存在 = 默认启用」是**模组开关专属**语义 ⇒ 在**这一层**把"本来就对"的键裁掉，
         //   不塞进通用设置层（那里对任意键都必须老实写进去 —— 见 SettingsBin.applyBools 的注释）。
+        // ★★ 2026-10-08：**成对写**「-enabled + -failed」——照游戏自己 `Mods.setEnabled` 的口径
+        //   （`Mindustry-160.jar` javap：`put(mod-<name>-enabled, on); put(mod-<name>-failed, false);`）。
+        //   `-failed` 的真义见 `failedKey` 的 Javadoc：**不是"这个模组崩了"**，而是
+        //   "整槽被跳过时它本来是开着的"。我们先前只写 `-enabled` ⇒ 那个记录永远留着，
+        //   界面就会一直显示"加载失败过：是"（用户真机上抓到的那一幕）。
         java.util.LinkedHashMap<String, Boolean> need = new java.util.LinkedHashMap<>();
         for (java.util.Map.Entry<String, Boolean> e : map.entrySet()) {
             boolean want = e.getValue() != null && e.getValue().booleanValue();
@@ -582,6 +606,16 @@ public final class Mods {
             if (!has && want) continue;                       // 没写过 + 要启用 = 本来就是启用
             if (old instanceof Boolean && ((Boolean) old).booleanValue() == want) continue;
             need.put(e.getKey(), e.getValue());
+        }
+        if (only != null) {
+            for (Info m : only) {
+                if (m == null || m.internalName == null || m.internalName.isEmpty()) continue;
+                String fk = failedKey(m.internalName);
+                boolean fHas = cur != null && cur.has(fk);
+                if (fHas && Boolean.TRUE.equals(cur.all().get(fk))) {
+                    need.put(fk, Boolean.FALSE);              // 清掉"上次被跳过"的记录
+                }
+            }
         }
         if (need.isEmpty()) {
             r.ok = true;
@@ -628,17 +662,29 @@ public final class Mods {
                     null, null);
             return r;
         }
-        if (cur != null && !cur.has(key) && on) {
+        // ★★ 2026-10-08：成对判定（`-enabled` + `-failed`）—— 见 `failedKey` 的 Javadoc。
+        //   ⚠️ 这里**故意比游戏多清一次**：游戏 `Mods.setEnabled` 只在"开关状态真的变了"时才动，
+        //   于是"已经启用 + 带着失败记录"这种状态在游戏里点启用是**空操作**（用户真机就是这个状态：
+        //   启用：是 / 加载失败过：是）。我们要的是"让它回到可加载状态" ⇒ 记录还在就清掉。
+        String fkey = failedKey(internalName);
+        boolean hasKey = cur != null && cur.has(key);
+        boolean curEnabled = hasKey ? Boolean.TRUE.equals(cur.all().get(key)) : true;   // 缺省 true
+        boolean failedMark = cur != null && Boolean.TRUE.equals(cur.all().get(fkey));
+        java.util.LinkedHashMap<String, Boolean> need = new java.util.LinkedHashMap<>();
+        if (curEnabled != on) need.put(key, Boolean.valueOf(on));
+        if (failedMark) need.put(fkey, Boolean.FALSE);
+        if (need.isEmpty()) {
             r.ok = true;
             r.noop = true;
-            r.changeDesc = "「" + internalName + "」本来就是启用状态（" + key
-                    + " 不存在 ⇒ 默认 true），没有动文件";
+            r.changeDesc = "「" + internalName + "」本来就是" + (on ? "启用" : "关闭")
+                    + "状态，也没有失败记录，没有动文件";
             return r;
         }
-        SettingsBin.Result out = SettingsBin.applyBool(file, settingsBackupDirOf(ctx, slot), key, on);
+        SettingsBin.Result out = SettingsBin.applyBools(file, settingsBackupDirOf(ctx, slot), need);
         if (out.ok && !out.noop) {
-            out.changeDesc = (on ? "已启用" : "已关闭") + "模组「" + internalName + "」 —— "
-                    + out.changeDesc;
+            out.changeDesc = (on ? "已启用" : "已关闭") + "模组「" + internalName + "」"
+                    + (failedMark ? "（顺带清掉了" + fkey + " = true —— 那条记录的含义见文档）" : "")
+                    + " —— " + out.changeDesc;
         }
         return out;
     }

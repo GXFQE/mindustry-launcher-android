@@ -202,6 +202,7 @@ public final class SelfTest {
             listQuery(ctx, L, stat);
             // ★ ⑳ F13 第二批：批量启停的写侧（一次读写 / noop 不动文件 / 坏文件拒绝写）
             modsBatchWrite(ctx, L, stat);
+            modsTogglePair(ctx, L, stat);
             // ★ ㉑ F13 第二批：反向依赖（禁用前的提醒）
             modsDependents(ctx, L, stat);
             // ★ ㉒ F10：.msav 元数据解析（现场造文件 + 两个口径的反向断言）
@@ -3616,18 +3617,26 @@ public final class SelfTest {
                     "★元断言：认不出 ⇒ 空（卡片第二行不出现）；并列 ⇒ 两个名字（退回整句那条路）");
             String failNote = ctx.getString(R.string.mods_warn_failed);
             String failNoteNo = ctx.getString(R.string.mods_warn_failed_noskip);
+            String failNoteApplied = ctx.getString(R.string.mods_warn_failed_applied);
             String blameOne = ctx.getString(R.string.mods_blame_one_fmt);
             ok(stat, L, failNote.length() <= 40 && failNoteNo.length() <= 40
+                            && failNoteApplied.length() <= 40
                             && blameOne.replace("%1$s", "").length() <= 24,
-                    "★元断言（**防再变乱**）：摘要卡那两行的字数预算 —— "
-                            + "全槽级 " + failNote.length() + " 字 / 关了跳过 " + failNoteNo.length()
-                            + " 字 / 点名那行 " + blameOne.replace("%1$s", "").length() + " 字"
+                    "★元断言（**防再变乱**）：摘要卡那几行的字数预算 —— "
+                            + "会再跳 " + failNote.length() + " / 关了跳过 " + failNoteNo.length()
+                            + " / 已跳完 " + failNoteApplied.length()
+                            + " / 点名那行 " + blameOne.replace("%1$s", "").length() + " 字"
                             + "（超了就又会挤成三行）");
-            ok(stat, L, failNote.contains("整槽跳过") && failNoteNo.contains("还会加载")
+            ok(stat, L, failNote.contains("关掉") && failNoteApplied.contains("关掉")
+                            && failNoteApplied.contains("「启用」"),
+                    "★机制口径（2026-10-08 字节码定案）：那句话必须说「游戏会把整槽模组**关掉**」"
+                            + "（`-failed` 的真义不是「它崩了」，是「整槽被跳过的副产品」）；"
+                            + "跳过已发生那支要给出「启用」这个动作");
+            ok(stat, L, failNote.contains("关掉") && failNoteNo.contains("还会加载")
                             && ctx.getString(R.string.mods_gate_last_crash).contains("整槽跳过")
                             && ctx.getString(R.string.mods_gate_last_crash_bad).contains("整槽跳过"),
-                    "★术语统一：摘要卡 / 关了跳过那支 / 门标签（两支）**都用「整槽跳过」**"
-                            + "（改前有「跳过全部模组」「整槽跳过」两种说法 ⇒ 读起来像两件事）");
+                    "★术语统一：摘要卡（游戏把整槽模组**关掉**）/ 关了跳过那支 / 门标签（两支）"
+                            + "口径一致（机制定案后：真正的后果是「模组被关掉」，不是「被标成失败」）");
             ok(stat, L, !ctx.getString(R.string.mods_gate_last_crash_bad).contains("跳过全部模组")
                             && !ctx.getString(R.string.mods_gate_last_crash_skip_again)
                                     .contains("跳过全部模组"),
@@ -4968,8 +4977,85 @@ public final class SelfTest {
      *   ① 一次读写把多个键改完；② 不需要改时**一个字节都不动**（不是"写了一遍恰好一样"）；
      *   ③ 文件是坏的 ⇒ 拒绝写且原文件不被动；④ 一个键都没给 ⇒ 明确拒绝（不静默成功）。
      */
-    private static void modsBatchWrite(Context ctx, List<String> L, int[] stat) {
-        L.add("── ⑳ 批量启停（写侧）──");
+    /**
+     * ㉑ **启停要成对写** `mod-&lt;名字&gt;-enabled` + `mod-&lt;名字&gt;-failed`（2026-10-08，机制定案后补）。
+     *
+     * <p>为什么必须有这一块：`-failed` 的**真义**是「整槽被跳过时它本来是开着的」
+     * （`Mindustry-160.jar` → `Mods.resolve()` 的字节码：`put(-enabled,false); put(-failed,wasEnabled);`），
+     * 而游戏自己的 `Mods.setEnabled` 改开关时会把它清成 false。
+     * 我们先前**只写 `-enabled`** ⇒ 那条记录永远留着 ⇒ 界面一直显示"加载失败过"，
+     * 于是出现用户抓到的那一幕（启用：是 / 加载失败过：是，而且点"启用"没用）。
+     *
+     * <p>判据三条：① 带着记录时改开关 ⇒ **必须顺带清记录**（且不算空操作）；
+     * ② 记录已经没了 ⇒ 判 noop（不白写一遍文件）；③ **没有这个键的模组不许凭空多出一个键**。
+     */
+    private static void modsTogglePair(Context ctx, List<String> L, int[] stat) {
+        L.add("── ㉑ 启停成对写（-enabled + -failed）──");
+        final String slot = "m3-toggle";
+        File dir;
+        try {
+            dir = Data.dirOf(ctx, slot);
+        } catch (Throwable t) {
+            dir = null;
+        }
+        if (dir == null) {
+            ok(stat, L, false, "㉑ 拿不到测试槽目录");
+            return;
+        }
+        deleteTree(dir);
+        if (!dir.mkdirs() && !dir.isDirectory()) {
+            ok(stat, L, false, "㉑ 测试槽建不出来：" + dir);
+            return;
+        }
+        try {
+            // 夹具 = 用户真机上那个状态：**开着 + 带着"上次被跳过"的记录**
+            java.util.LinkedHashMap<String, Object> m = new java.util.LinkedHashMap<>();
+            m.put("mod-pair-enabled", Boolean.TRUE);
+            m.put("mod-pair-failed", Boolean.TRUE);
+            m.put("mod-clean-enabled", Boolean.TRUE);         // 没有 -failed 键的对照组
+            SettingsBin.writeAtomic(Mods.settingsFileOf(ctx, slot),
+                    new SettingsBin.Values(m, false, 0));
+
+            SettingsBin.Result r1 = Mods.setEnabled(ctx, slot, "pair", true);
+            SettingsBin.Values a1 = SettingsBin.readSafe(Mods.settingsFileOf(ctx, slot), new String[1]);
+            ok(stat, L, r1.ok && !r1.noop && !a1.compressed
+                            && Boolean.TRUE.equals(a1.all().get("mod-pair-enabled"))
+                            && Boolean.FALSE.equals(a1.all().get("mod-pair-failed")),
+                    "★① 已启用但带着失败记录 ⇒ 点「启用」**不是空操作**，并且把 "
+                            + Mods.failedKey("pair") + " 清成 false（改前只写 -enabled ⇒ 记录永久留着）");
+            ok(stat, L, r1.changeDesc != null && r1.changeDesc.contains(Mods.failedKey("pair")),
+                    "★① 依据可见（结果说明里点名了被清掉的键）：「"
+                            + oneLine(r1.changeDesc) + "」");
+            SettingsBin.Result r2 = Mods.setEnabled(ctx, slot, "pair", true);
+            ok(stat, L, r2.ok && r2.noop,
+                    "★② 元断言：记录已经没了 ⇒ 判 noop（不为了写而写）");
+            SettingsBin.Result r3 = Mods.setEnabled(ctx, slot, "clean", true);
+            SettingsBin.Values a3 = SettingsBin.readSafe(Mods.settingsFileOf(ctx, slot), new String[1]);
+            ok(stat, L, r3.ok && r3.noop && !a3.has(Mods.failedKey("clean")),
+                    "★③ 元断言：**本来就没有** -failed 键的模组，不许凭空多出这个键（键数不涨）");
+            // 批量方向：关闭时也要清（游戏自己的 setEnabled 是**两个方向都清**）
+            SettingsBin.Result r4 = Mods.setEnabledAll(ctx, slot, false,
+                    java.util.Collections.singletonList(modInfo("pair")));
+            SettingsBin.Values a4 = SettingsBin.readSafe(Mods.settingsFileOf(ctx, slot), new String[1]);
+            ok(stat, L, r4.ok && !r4.noop
+                            && Boolean.FALSE.equals(a4.all().get("mod-pair-enabled")),
+                    "★④ 批量关闭写成 -enabled=false（r4.ok=" + r4.ok + " noop=" + r4.noop + "）");
+        } catch (Throwable t) {
+            ok(stat, L, false, "㉑ 这一块自己抛了：" + t);
+        } finally {
+            deleteTree(dir);
+        }
+    }
+
+    /** ㉑ 用：只填内部名的最小 Info（`setEnabledAll` 只读 internalName） */
+    private static Mods.Info modInfo(String internal) {
+        Mods.Info m = new Mods.Info();
+        m.internalName = internal;
+        m.name = internal;
+        return m;
+    }
+
+    private static void modsBatchWrite(Context ctx, List<String> L, int[] stat) {        L.add("── ⑳ 批量启停（写侧）──");
         File dir = new File(Paths.privateDir(ctx), "selftest-batch");
         deleteTree(dir);
         dir.mkdirs();

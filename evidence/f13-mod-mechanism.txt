@@ -1,0 +1,83 @@
+模组「上次启动没跑完 / 崩溃后跳过」机制 —— 字节码级定案（2026-10-08）
+================================================================================
+用户点单：「**还是把这块的游戏本身机制彻底研究下再修下文案**」
+（前情：连着四处文案矛盾，全是"拿以为的机制写判据"造成的）
+
+■ 结论（一句话）
+`mod-<名字>-failed` **不是"这个模组崩了"**，而是「**上次启动没跑完、游戏把整槽模组关掉时，
+它本来是开着的**」——槽级事件的副产品；真正发生的事是 `mod-<名字>-enabled` 被写成 **false**
+（模组被关掉），用户得重新启用。
+
+■ 证据 ①（源码）`素材\Mindustry本体\Mindustry-master.zip` → core/src/mindustry/Vars.java
+    public static void checkLaunch(){                        // 启动最早调用
+        launchIDFile = settings.getDataDirectory().child("launchid.dat");
+        if(launchIDFile.exists()) failedToLaunch = true;     // 上次没删掉 ⇒ 上次没跑完
+        else { failedToLaunch = false; launchIDFile.writeString("go away"); }
+    }
+    public static void finishLaunch(){                       // 只有这次真跑起来才删
+        ... if(launchIDFile != null) launchIDFile.delete();
+    }
+
+■ 证据 ②（源码）mindustry/mod/Mods.java
+    public boolean skipModLoading(){
+        return failedToLaunch && Core.settings.getBool("modcrashdisable", true);
+    }
+
+■ 证据 ③（字节码）`Mindustry-160.jar` → javap -v -p mindustry.mod.Mods
+   常量池：`#1884 = String // mod-\u0001-failed`、`#1886 = String // mod-\u0001-enabled`
+   BootstrapMethods 里 `#6 -> mod-\u0001-failed`、`#7 -> mod-\u0001-enabled`
+   bootstrap #6/#7 的引用点：`listFiles`（2491/2500）、`setEnabled`（5343/5336）、`resolve`（多处）
+   ↓ resolve() 偏移 725~780 逐条读出来：
+    if (skipModLoading()) {                                     // 725: invokevirtual skipModLoading
+        boolean wasEnabled = settings.getBool("mod-"+name+"-enabled", true);   // 737~746
+        settings.put("mod-"+name+"-enabled", Boolean.FALSE);                    // 753~762
+        settings.put("mod-"+name+"-failed",  Boolean.valueOf(wasEnabled));      // 770~780  ★
+    }
+   ↓ setEnabled(LoadedMod, boolean) 5324~5346：
+        if (mod.enabled() != on) {                              // 5330~5332  ← 外层这个 if 很关键
+            settings.put("mod-"+name+"-enabled", on);           // 5336
+            settings.put("mod-"+name+"-failed",  Boolean.FALSE);// 5343（两个方向都清）
+        }
+   ↓ listFiles（导入模组）2488~2503：
+        settings.put("mod-"+name+"-failed", Boolean.FALSE);      // 2491（iconst_0）
+        if (来自文件) settings.put("mod-"+name+"-enabled", true); // 2500（iconst_1）
+
+■ 证据 ④（同一 jar 全量扫描）
+   `LoadedMod.failed()` 的**调用点 = 0**（扫全 jar 的 `failed:()Z` / `LoadedMod.failed` 无一命中）
+   ⇒ 官方 160 里它是**只写不读**的记录。另外 `Mods$ModState` 里**没有 failed 这个状态**
+   （enabled/contentErrors/missingDependencies/incompleteDependencies/circularDependencies/unsupported/disabled）。
+
+■ 用户跑的那个 fork（MindustryX 基于 160.1）：其 loader dex 里
+   `modcrashdisable` / `launchid` / `-enabled` / `failedToLaunch` **都在**，`-failed` **不在**
+   ⇒ 这半边与官方一致（未检出 fork 私有的 failed 语义）。
+
+■ 由机制推出的四条（这次文案全按它们改）
+ 1. `-failed` 不是按模组归因 ⇒ 列表**不许**按行显示"它出过错"（§85.16 的根因）；门的说明也不许说
+    "游戏把它标成失败"。
+ 2. 真正的后果是「**整槽模组被关掉**」⇒ 摘要卡改成「下次启动游戏会把整槽模组都关掉」；
+    跳过已发生那支给出动作「点「启用」可以重新打开」。
+ 3. 游戏自己的开关**只在状态变化时**才清标记 ⇒「已启用 + 带标记」时点启用是**空操作**
+    （用户正是这个状态）⇒ 我们**成对写**（`-enabled` + `-failed=false`），且"已启用但带标记"
+    **不算空操作**。
+ 4. 跳过前提 = `launchid.dat` 在 **且** `modcrashdisable` 开（默认 true）⇒ 门的三支建议：
+    还会跳 ⇒ 关掉点名那个模组 / 关掉跳过开关；关着 ⇒ 点启用；开着且不会再跳 ⇒ 会再试它。
+
+■ 我们自己的两处偏差（已修）
+ A. **启停只写 `-enabled`、从不清 `-failed`**（`Mods.java:567` 旧代码）⇒ 记录永久留着 ⇒ 界面一直
+    显示"加载失败过：是"，点「启用」也清不掉。现在照游戏口径成对写（自检 ㉑ 5 条钉死）。
+ B. 门的 `pass` 写死 true（第十批已修）、按行显示 `-failed`（第八批已修）——那两处当时是凭直觉改的，
+    现在依据补齐。
+
+■ 复现命令
+    # 源码
+    python -c "import zipfile;z=zipfile.ZipFile(r'...\Mindustry-master.zip');print(z.read('Mindustry-master/core/src/mindustry/Vars.java').decode('utf-8'))"
+    # 字节码
+    javap -v -p -cp '...\Mindustry-160.jar' mindustry.mod.Mods > mods160v.txt
+    ⚠️ PowerShell 重定向的 javap 输出是 **UTF-16**（Python 读要指定编码）
+    ⚠️ 拼接串在常量池里写作 `mod-\u0001-failed`，用法要去 BootstrapMethods 表里对号
+
+■ 落地
+ - 细则 REF **§86**（新分片 `ref/33-86-模组加载与崩溃跳过机制.md`）
+ - `Mods.failedKey` 的 Javadoc = 证据③那段 + 真义；`Mods.setEnabled` = 成对写
+ - 界面：摘要卡三支（会再跳 / 已跳完 / 关了开关）、门的三支建议、术语统一到「整槽跳过 / 关掉」
+ - 自检 976 → **982 / 0 失败**（+㉑ 五条 + 机制口径一条）

@@ -666,10 +666,15 @@ public class ModsActivity extends BaseActivity {
                 }
             }
             if (anyFailed) {
-                // ★ 两句话按**同一件事**分岔（同一屏幕里不重复说）：开着跳过 ⇒ 会整槽跳过；
-                //   用户自己关了 ⇒ 明确告诉他"下次还会加载"（否则他会以为模组废了）
-                mFailNote.setText(Trans.get(ModsActivity.this, mScan.skipModLoading
-                        ? R.string.mods_warn_failed : R.string.mods_warn_failed_noskip));
+                // ★ 三句话按**机制**分岔（2026-10-08 用字节码定案，见 Mods.failedKey 的 Javadoc）：
+                //   ① 还会再跳一次（`launchid.dat` 在 + `modcrashdisable` 开）⇒ 下次启动游戏会把整槽模组关掉；
+                //   ② 用户自己关了跳过开关 ⇒ 只会留个记录，模组照常加载；
+                //   ③ 跳过**已经发生过**（记录在、但没有待跳过的 launchid）⇒ 模组现在是被关掉的，
+                //      要点「启用」打开（我们的启停会顺带清掉那条记录）。
+                int noteRes = mScan.skipModLoading ? R.string.mods_warn_failed
+                        : (mScan.launchIdExists ? R.string.mods_warn_failed_noskip
+                                                : R.string.mods_warn_failed_applied);
+                mFailNote.setText(Trans.get(ModsActivity.this, noteRes));
                 mFailNote.setVisibility(View.VISIBLE);
             } else {
                 mFailNote.setVisibility(View.GONE);

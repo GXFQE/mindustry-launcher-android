@@ -1541,8 +1541,12 @@
     <string name="mods_warn_noversion_fmt">⚠ 它没写要求哪个游戏版本 —— 游戏会当成太老的模组跳过</string>
     <string name="mods_warn_blacklist_fmt">⚠ 它在游戏的黑名单里：%1$s</string>
     <string name="mods_warn_dup">⚠ 和另一个包重名 ⇒ 游戏里只有一个会生效</string>
-    <string name="mods_warn_failed">⚠ 上次启动没跑完：整槽模组都被标成失败，下次启动会整槽跳过</string>
-    <string name="mods_warn_failed_noskip">⚠ 上次启动没跑完：整槽模组都被标成失败（你已关掉跳过，下次还会加载）</string>
+    <!-- ★ 2026-10-08 机制定案后精确化（`-failed` 的正主：游戏在"上次没跑完"的下一次启动里
+         把**整槽模组关掉**，并给当时开着的那些写下这条记录 —— 见 Mods.failedKey 的 Javadoc）：
+         ① 还会再跳一次（launchid 在 + modcrashdisable 开）② 用户关了跳过开关 ③ 跳过已经发生过 -->
+    <string name="mods_warn_failed">⚠ 上次启动没跑完：下次启动游戏会把整槽模组都关掉</string>
+    <string name="mods_warn_failed_applied">⚠ 上次启动崩过：游戏把整槽模组关掉了 —— 点「启用」可以重新打开</string>
+    <string name="mods_warn_failed_noskip">⚠ 上次启动没跑完：整槽模组被记了一笔（你已关掉跳过，下次还会加载）</string>
     <string name="mods_warn_blamed">⚠ 上次崩溃很可能与它有关</string>
 
     <!-- 摘要卡第二行：点名的**短**形式（长依据留给运行日志 —— 2026-10-08 用户说"感觉好乱"）
