@@ -1530,7 +1530,8 @@
     <string name="mods_warn_noversion_fmt">⚠ 它没写要求哪个游戏版本 —— 游戏会当成太老的模组跳过</string>
     <string name="mods_warn_blacklist_fmt">⚠ 它在游戏的黑名单里：%1$s</string>
     <string name="mods_warn_dup">⚠ 和另一个包重名 ⇒ 游戏里只有一个会生效</string>
-    <string name="mods_warn_failed">⚠ 上次启动时它出过错</string>
+    <string name="mods_warn_failed">⚠ 上次启动没跑完：游戏把本槽的全部模组都标成了失败，下次启动可能整槽跳过（这不是某一个模组的问题）</string>
+    <string name="mods_warn_blamed">⚠ 上次崩溃很可能与它有关</string>
     <string name="mods_warn_backslash_fmt">⚠ 这个包压得不太对，游戏会找不到里面的脚本 —— 重新压一次就好</string>
     <string name="mods_warn_state_fmt">⚠ 游戏里的状态：%1$s</string>
     <string name="mods_warn_disabled">已关闭（游戏里的开关是 false）</string>

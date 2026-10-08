@@ -78,6 +78,21 @@
                         android:tint="@color/fg_muted" />
                 </LinearLayout>
 
+                <!-- ══ 「上次启动没跑完」是**全槽级**的事实，只在这里说一次（2026-10-08） ══
+                     ★ 为什么从每一行搬到这里：游戏自己在 settings 里把**本槽全部**模组都标成
+                       failed（那是它"下次整槽跳过"的机制）⇒ 逐行显示会被读成"这个模组出过错"
+                       （用户真机反馈："为什么无关模组也被判定到了"）。
+                       按行只标**归因器真正点名**的那一个（`mods_warn_blamed`）。 -->
+                <TextView
+                    android:id="@+id/mods_fail_note"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingTop="6dp"
+                    android:textSize="13sp"
+                    android:lineSpacingExtra="2dp"
+                    android:textColor="@color/fg"
+                    android:visibility="gone" />
+
                 <!-- ══ F23：上次崩溃的归因结论（一行） ══════════════════════════════
                      ★ 为什么放这里（摘要卡里、**在可展开的详情之外**）：模组页是"为什么它没生效"
                        的入口页，而"上次崩了、很可能是谁干的"正是同一类问题的另一半答案；

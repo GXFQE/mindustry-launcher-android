@@ -80,6 +80,14 @@ public class ModsActivity extends BaseActivity {
     private TextView mDetail;
     /** F23：上次崩溃的归因那一行（默认 GONE；只在点名成功时显示） */
     private TextView mCrashLine;
+    /** 「上次启动没跑完」这句**全槽级**的话（默认 GONE） */
+    private TextView mFailNote;
+    /**
+     * 归因器点名的那几个模组（内部名，小写）。★ 按行标记**只许标这里面的** ——
+     * 游戏自己在 settings 里把所有模组都标成 failed，照那个逐行显示就会冤枉无关模组
+     * （2026-10-08 用户真机反馈："为什么无关模组也被判定到了"）。
+     */
+    private java.util.Set<String> mBlamed = new java.util.HashSet<>();
     private TextView mSlotSub;
     private TextView mCopySub;
 
@@ -146,6 +154,7 @@ public class ModsActivity extends BaseActivity {
         mSummary = (TextView) root.findViewById(R.id.mods_summary);
         mDetail = (TextView) root.findViewById(R.id.mods_detail);
         mCrashLine = (TextView) root.findViewById(R.id.mods_verdict);
+        mFailNote = (TextView) root.findViewById(R.id.mods_fail_note);
         Util.bindExpandableCard(root, R.id.mods_status_box, R.id.mods_detail, R.id.mods_chevron);
 
         View row = Util.bindActionValue(root, R.id.row_mod_slot, R.drawable.ic_folder,
@@ -563,6 +572,16 @@ public class ModsActivity extends BaseActivity {
     }
 
     /**
+     * 这个模组是不是**归因器点名**的那一个（`mBlamed` 里存的内部名，小写）。
+     * ⚠️ 判据是"归因器点了名"，**不是**"游戏把它标成 failed" —— 后者是全槽级的（见 mBlamed 的注释）。
+     */
+    private boolean isBlamed(Mods.Info m) {
+        if (m == null || mBlamed.isEmpty()) return false;
+        String k = m.internalName == null ? "" : m.internalName.toLowerCase(java.util.Locale.ROOT);
+        return !k.isEmpty() && mBlamed.contains(k);
+    }
+
+    /**
      * F23：把**上次崩溃很可能是谁干的**显示在摘要卡里（一行）。
      *
      * ★ 为什么模组页也要这一行：这一页是"为什么它没生效"的入口，而"上次崩了、可能是谁"是同一类
@@ -589,15 +608,25 @@ public class ModsActivity extends BaseActivity {
                         ? Trans.get(ModsActivity.this, R.string.mods_verdict_fmt,
                                 CrashAnalysis.text(ModsActivity.this, v))
                         : "";
+                // ★ 按行标记的那份名单：**只**来自归因器（见 isBlamed）
+                final java.util.Set<String> blamed = new java.util.HashSet<>();
+                for (String s : CrashAnalysis.blamedInternals(v)) {
+                    blamed.add(s.toLowerCase(java.util.Locale.ROOT));
+                }
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
                         if (Util.dead(ModsActivity.this) || !slot.equals(mSlot)) return;
                         if (line.isEmpty()) {
                             mCrashLine.setVisibility(View.GONE);
-                            return;
+                        } else {
+                            mCrashLine.setText(line);
+                            mCrashLine.setVisibility(View.VISIBLE);
                         }
-                        mCrashLine.setText(line);
-                        mCrashLine.setVisibility(View.VISIBLE);
+                        // 名单变了就把列表重画一次（多标/少标一个「很可能与它有关」）
+                        if (!blamed.equals(mBlamed)) {
+                            mBlamed = blamed;
+                            rebuildList();
+                        }
                     }
                 });
             }
@@ -616,6 +645,23 @@ public class ModsActivity extends BaseActivity {
         }
         if (mSlotSub != null) {
             mSlotSub.setText(Trans.get(ModsActivity.this, R.string.mods_row_slot_sub_fmt, mSlot));
+        }
+        // ★ 「上次启动没跑完 ⇒ 游戏把全部模组都标成失败」是**全槽级**的事实，只在这里说一次
+        //   （理由见 `mods_warn_failed` / isBlamed 的注释：逐行显示会冤枉无关模组）
+        if (mFailNote != null) {
+            boolean anyFailed = false;
+            for (Mods.Info m : mScan.mods) {
+                if (m != null && m.failed) {
+                    anyFailed = true;
+                    break;
+                }
+            }
+            if (anyFailed) {
+                mFailNote.setText(Trans.get(ModsActivity.this, R.string.mods_warn_failed));
+                mFailNote.setVisibility(View.VISIBLE);
+            } else {
+                mFailNote.setVisibility(View.GONE);
+            }
         }
         if (mCopySub != null) {
             mCopySub.setText(Trans.get(ModsActivity.this, R.string.mods_act_copy_sub_fmt, mSlot));
@@ -827,7 +873,14 @@ public class ModsActivity extends BaseActivity {
                 warns.add(Trans.get(ModsActivity.this, R.string.mods_warn_blacklist_fmt, m.name + ":" + m.version));
             }
             if (m.duplicated) warns.add(Trans.get(ModsActivity.this, R.string.mods_warn_dup));
-            if (m.failed) warns.add(Trans.get(ModsActivity.this, R.string.mods_warn_failed));
+            // ★ 2026-10-08 改：这里原来写的是 `if (m.failed) warns.add(mods_warn_failed)`
+            //   —— 但 `failed` 是**游戏自己**在 settings 里写的 `mod-<名字>-failed`，模组加载期
+            //   一崩，游戏会把**本槽全部**模组都标上（它下次"整槽跳过"的机制）⇒ 逐行显示会被读成
+            //   "这个模组出过错"（用户真机反馈：「为什么无关模组也被判定到了」）。
+            //   现在：全槽级那句话只在摘要卡里说一次（`mFailNote`），按行**只标归因器点名的那一个**。
+            if (m.failed && isBlamed(m)) {
+                warns.add(Trans.get(ModsActivity.this, R.string.mods_warn_blamed));
+            }
             if (m.willFailJavaLoad()) warns.add(Trans.get(ModsActivity.this, R.string.mods_warn_willfail));
             if (m.noMainScript()) warns.add(Trans.get(ModsActivity.this, R.string.mods_warn_no_mainjs_fmt, m.jsCount));
             if (m.backslashEntries > 0) {

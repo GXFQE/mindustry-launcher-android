@@ -3514,6 +3514,49 @@ public final class SelfTest {
             ok(stat, L, ctx.getResources().getIdentifier("mods_verdict", "id",
                             ctx.getPackageName()) != 0,
                     "★模组页布局里有 `mods_verdict`（少一个 `@+id` 时 findViewById 是**静默 null**）");
+            ok(stat, L, ctx.getResources().getIdentifier("mods_fail_note", "id",
+                            ctx.getPackageName()) != 0,
+                    "★模组页布局里有 `mods_fail_note`（全槽级那句话的落点）");
+
+            // ── ★★ 按行标记只许标「归因器点名的那几个」（2026-10-08 用户真机反馈：
+            //    「为什么无关模组也被判定到了」）──
+            //    背景：游戏自己写的 `mod-<名字>-failed` 是**全槽级**的（加载期一崩全标上，
+            //    那是它"下次整槽跳过"的机制）⇒ 逐行显示会冤枉无关模组。
+            //    判据 = `CrashAnalysis.blamedInternals(verdict)`：只有归因器点名的人才在里面。
+            //    ⚠️ 用**人造 verdict**（不借用别处的变量）—— 这段自己就能说清判据。
+            CrashAnalysis.Verdict bOne = new CrashAnalysis.Verdict();
+            bOne.kind = CrashAnalysis.KIND_MOD;
+            CrashAnalysis.Hit bh1 = new CrashAnalysis.Hit();
+            bh1.name = "Crash Test"; bh1.internal = "crashtest";
+            bh1.layer = CrashAnalysis.LAYER_L1; bh1.evidence = "crashtest"; bh1.known = true;
+            bOne.hits.add(bh1);
+            java.util.List<String> bL1 = CrashAnalysis.blamedInternals(bOne);
+            ok(stat, L, bL1.size() == 1 && "crashtest".equals(bL1.get(0)),
+                    "★★按行标记的名单 = 归因器点名的那个（L1 ⇒ crashtest）：" + bL1);
+            CrashAnalysis.Verdict bNone = new CrashAnalysis.Verdict();
+            bNone.kind = CrashAnalysis.KIND_NONE;
+            ok(stat, L, CrashAnalysis.blamedInternals(bNone).isEmpty(),
+                    "★元断言：`认不出` ⇒ 名单**空**（一个都不许标 —— 这正是用户看到的那类冤枉）");
+            CrashAnalysis.Verdict bLauncher = new CrashAnalysis.Verdict();
+            bLauncher.kind = CrashAnalysis.KIND_LAUNCHER;
+            ok(stat, L, CrashAnalysis.blamedInternals(bLauncher).isEmpty()
+                            && CrashAnalysis.blamedInternals(null).isEmpty(),
+                    "★元断言：启动器自己的报告 / null ⇒ 名单空（不标任何模组）");
+            CrashAnalysis.Verdict bTwo = new CrashAnalysis.Verdict();
+            bTwo.kind = CrashAnalysis.KIND_MOD;
+            CrashAnalysis.Hit bh2 = new CrashAnalysis.Hit();
+            bh2.name = "B"; bh2.internal = "bmod"; bh2.layer = CrashAnalysis.LAYER_DEX;
+            bh2.evidence = "x.Y"; bh2.known = true;
+            bTwo.hits.add(bh1);
+            bTwo.hits.add(bh2);
+            ok(stat, L, CrashAnalysis.blamedInternals(bTwo).size() == 2,
+                    "★并列（报告指向多个模组）⇒ 名单里**都在**（不随便挑一个）："
+                            + CrashAnalysis.blamedInternals(bTwo));
+            ok(stat, L, !ctx.getString(R.string.mods_warn_blamed).isEmpty()
+                            && !ctx.getString(R.string.mods_warn_failed).isEmpty(),
+                    "★两条文案都在：按行那句「" + ctx.getString(R.string.mods_warn_blamed)
+                            + "」/ 全槽级那句「"
+                            + oneLine(ctx.getString(R.string.mods_warn_failed)) + "」");
 
             // 🔴 真机抓到的那条：便宜层（L1b）命中时**也要把名字跟模组表对上** ——
             //    报告里只有 internalName（`Error loading mod depuser`），界面该显示 displayName。

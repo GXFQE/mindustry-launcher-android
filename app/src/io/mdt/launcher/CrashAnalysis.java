@@ -914,6 +914,28 @@ final class CrashAnalysis {
         return judgeFull(ctx, parse(body), slot);
     }
 
+    /**
+     * 归因器**点名**的那几个模组的**内部名**（小写）；认不出 / 原版崩 / 启动器自己的报告 ⇒ 空表。
+     *
+     * ★ 为什么要有它：游戏自己在 `settings` 里写的 `mod-&lt;名字&gt;-failed` 是**全槽级**的
+     *   （加载期一崩，它把本槽全部模组都标上，那是它"下次整槽跳过"的机制）⇒ 界面按行显示那句
+     *   会被读成"这个模组出过错"（2026-10-08 用户真机反馈：「为什么无关模组也被判定到了」）。
+     *   按行只许标**这里返回的人**；全槽级那句话单独说一次。
+     *
+     * ⚠️ 并列（报告指向多个模组）时**全部返回** —— 那正是"分不出是谁"的诚实表达，
+     *   界面上每个都标一句"很可能与它有关"，而不是随便挑一个。
+     */
+    static List<String> blamedInternals(Verdict v) {
+        List<String> out = new ArrayList<String>();
+        if (v == null || v.kind != KIND_MOD || v.hits == null) return out;
+        for (Hit h : v.hits) {
+            if (h == null) continue;
+            String s = h.internal == null || h.internal.isEmpty() ? h.name : h.internal;
+            if (s != null && !s.isEmpty() && !out.contains(s)) out.add(s);
+        }
+        return out;
+    }
+
     // ══ dev 口 ═════════════════════════════════════════════════════════════
 
     /**
