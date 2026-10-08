@@ -202,3 +202,51 @@ F23 收尾批（2026-10-08，第七批）—— 三条尾巴的定案证据
 2. 蓝图的"`Too many blocks` / `Too large`"这两种**校验型**失败没造（要摸块数/尺寸字段的偏移）。
    本轮用的是"改头"与"截断"，都落在 `Schematics.read` 的同一条 catch 上。
 3. 没有试"世界数据里数值合法但语义荒谬"的坏法（上一轮也列着，未做）。
+
+
+§7 第七批补记（2026-10-08 深夜）：**OOM 型数据损坏的真机实验**（推翻 §2 的一句外推）
+====================================================================================
+先说结论：**§2 那条"数据损坏族结构上不可能产生报告"只对抛 Exception 的坏法成立。**
+OOM 型（声明尺寸荒谬）**会产生报告** —— 机制有**两条链**，源码里只看得到第一条。
+
+怎么把上一轮卡住的 GUI 那一步做成（上一轮我先放弃了它、改用源码外推）：
+  · 地图列表的搜索框不吃 `adb shell input text`（libGDX 的文本输入要 IME 连接）；
+  · ★ 破法：**列表按内部名排序**（实测首屏是 `Ancient Caldera` / `Archipelago`）⇒ 把夹具
+    **等长改名**成 `AAAoomt`（OOM 型）与 `AAokmap`（对照）—— `AA…` 排在 `Ancient Caldera` **前面**，
+    **首屏第一张就是它**，不用搜索、不用滚动；
+  · 点击目标用**像素级检测**："这块缩略图是一整块白 `oh no`" ⇒ 找最大近白连通域的中心
+    （`.dsh/research/_oom-experiment.py`，可复跑）。★ 对照那张缩略图**正常** ⇒ 同时证明
+    "这个槽的 `maps/` 真被读到了"，满足"夹具要能分辨两种解释"。
+
+实验（实验槽 `datalab3`，不碰用户槽）与结果：
+  自定义游戏 → 首屏第一张（面板标题逐字确认 = **`AAAoomt`**）→ 开始游戏
+  ⇒ **游戏进程死亡**（`ps` 里 `:game` 消失），槽里出现
+  `crashes/crash_1791471721413.txt`（1388 B，Python 逐字见 `docs/crash-corpus/16` §7）。
+
+报告顶层异常（**不是 OOM**）：
+    java.lang.ArrayIndexOutOfBoundsException: length=0; index=0
+        at mindustry.graphics.FloorRenderer.drawFloor(FloorRenderer.java:6)
+        ... at mindustry.ClientLauncher.update(ClientLauncher.java:193)
+        at arc.backend.android.AndroidGraphics.onDrawFrame(AndroidGraphics.java:132)
+
+同槽 `last_log.txt` 尾部（**OOM 只在这里**）：
+    Caused by: java.lang.OutOfMemoryError: Failed to allocate a 4294705168 byte allocation
+        at mindustry.world.Tiles.<init>(Tiles.java:6)
+        at mindustry.core.World.resize(World.java:16)
+        at mindustry.core.World$FilterContext.resize(World.java:1)
+        at mindustry.io.versions.ShortChunkSaveVersion.readMap(ShortChunkSaveVersion.java:20)
+        ... at mindustry.io.SaveIO.load(SaveIO.java:3)
+
+两条因果链：
+  ① **被接住**：OOM 在 `World.loadMap` 的 try 里 ⇒ `SaveIO.load` 包成 `SaveException` ⇒
+     `catch(Throwable)` 收掉 ⇒ `Log.err`（只进 last_log）+ 弹「地图文件损坏或无效」+ 回菜单；
+  ② **逃逸**：`World.resize` 已把 `Tiles` 开了一半（length=0），catch **没复原 world** ⇒
+     下一帧渲染器索引它 ⇒ **渲染线程上未捕获**（arc 的 `onDrawFrame` 没有 try/catch）⇒ 报告 + 进程死。
+
+产品代码在这份真报告上（`dev_crash_analyze true`，2 ms）：
+    kind=VANILLA  chain=1 frames=13 cause=none needles=10 hits=- dex=-1
+    verdict: 不是模组的问题 —— 报告里写着这次没有加载任何模组（Mods: none (vanilla)）。
+  ★ `cause=none` 是**刻意**的（报告正文没有 OOM 字样，不许从 length=0 反推）。
+★ 「崩了主动说一声」也顺带端到端验过：进程一死、启动器回前台立刻弹同一句结论。
+
+清场：见本文件末尾的"清场补记"。

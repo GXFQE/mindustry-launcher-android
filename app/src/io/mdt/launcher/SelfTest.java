@@ -3481,8 +3481,10 @@ public final class SelfTest {
         // ── F23 第七批（2026-10-08）：**"认不出"也要说准** —— 判得出原因的那一族 ──
         //    出处：docs/crash-corpus/03-蓝图.md §3.1（**安卓真机**的 Java 堆 OOM，逐字；帧截断）
         //    ★ 为什么只做"内存不足"这一条：安卓侧**有真实输入**的只有这一族 ——
-        //      图形/显存只有桌面语料（且用户 2026-10-07 已定为环境问题）、行星渲染一份都没有、
-        //      数据文件损坏在安卓上根本不产生报告（语料 15）。细则 REF §85.18。
+        //      图形/显存只有桌面语料（且用户 2026-10-07 已定为环境问题）、行星渲染一份都没有。
+        //      ⚠️ 2026-10-08 更正：原先这里写着"数据文件损坏在安卓上根本不产生报告" ——
+        //      那句只对**抛 Exception 的坏法**成立；**OOM 型坏法会产生报告**（真机实测，见本文件
+        //      下面「F23 第八批」那一段与 `crash-corpus/16` §7）。细则 REF §85.18 / §85.18.6。
         String fxOom = fx(new String[]{
                 "Mindustry has crashed. How unfortunate.",
                 "Version: release build 158.1",
@@ -3588,8 +3590,8 @@ public final class SelfTest {
         // ── ★ 数据损坏族**刻意不做原因**（用真报告钉住）──
         //    出处：docs/crash-corpus/09b-桌面报告-数据损坏.md（`Invalid schematic: Too many blocks.`，逐字）
         //    ★ 两份断言合起来说明这条边界：① 有模组证据 ⇒ 照旧点名模组（原因层一个字都不出现）；
-        //      ② 把模组证据拿掉 ⇒ 变成"认不出"，但**仍然不给原因** —— 因为安卓侧这一族
-        //      根本不产生崩溃报告（语料 15 实测），没有真实输入就不加判据。
+        //      ② 把模组证据拿掉 ⇒ 变成"认不出"，但**仍然不给原因** —— 抛 Exception 的坏法在安卓侧
+        //      不产生报告（语料 15 实测）；OOM 型那一支见下面"第八批"。
         String fxData = fx(new String[]{
                 "Mindustry has crashed. How unfortunate.",
                 "Version: release build 160.5 (Built September 20, 2026 13:57 PM) (Server)",
@@ -3627,7 +3629,62 @@ public final class SelfTest {
         ok(stat, L, vDataNo.kind == CrashAnalysis.KIND_NONE
                         && vDataNo.cause == CrashAnalysis.CAUSE_NONE,
                 "★★边界（刻意不做）：把模组证据拿掉 ⇒ 认不出，但**仍然不给原因** —— "
-                        + "安卓侧这一族不产生报告（语料 15），没有真实输入就不加判据（REF §85.18）");
+                        + "抛 Exception 的坏法在安卓侧不产生报告（语料 15），没有真实输入就不加判据（REF §85.18）");
+
+        // ── F23 第八批（2026-10-08 真机，**推翻了一条外推**）：OOM 型数据损坏**真的会崩** ──
+        //    出处：docs/crash-corpus/16-三族边界与Patches裁决.md §7（真机逐字，帧截断；
+        //    日期那行改成 ASCII 以免多一条中文字面量）。★ 机制两条链：
+        //      ① 地图区 w,h 改成 32767 ⇒ `Tiles.<init>` 申请 4.29 GB 失败 ⇒ OOM 被
+        //         `World.loadMap` 的 `catch(Throwable)` 收掉（**只进 last_log**，弹框回菜单）；
+        //      ② 但 `World.resize` 已把那张表**开了一半**（length=0），catch 没复原 world ⇒
+        //         下一帧 `FloorRenderer.drawFloor` 索引它 ⇒ **渲染线程上未捕获** ⇒ 报告 + 进程死。
+        //    ★ 所以"数据损坏族结构上不可能有报告"**只对抛 Exception 的坏法成立**。
+        String fxOomMap = fx(new String[]{
+                "Mindustry has crashed. How unfortunate.",
+                "Report this at https://github.com/Anuken/Mindustry/issues/new?labels=bug&template=bug_report.md",
+                "",
+                "Version: release build 159.7 (Built July 19, 2026 17:39 PM)",
+                "Date: Oct 8, 2026 23:02:01 PM",
+                "OS: Linux x (aarch64)",
+                "Android API level: 36",
+                "Java Version: 0",
+                "Runtime Available Memory: 512mb",
+                "Cores: 8",
+                "Mods: none (vanilla)",
+                "",
+                "",
+                "java.lang.ArrayIndexOutOfBoundsException: length=0; index=0",
+                "\tat mindustry.graphics.FloorRenderer.drawFloor(FloorRenderer.java:6)",
+                "\tat mindustry.core.Renderer.draw(Renderer.java:588)",
+                "\tat mindustry.ClientLauncher.update(ClientLauncher.java:193)",
+                "\tat arc.backend.android.AndroidGraphics.onDrawFrame(AndroidGraphics.java:132)",
+        });
+        CrashAnalysis.Report rOomMap = CrashAnalysis.parse(fxOomMap);
+        CrashAnalysis.Verdict vOomMap = CrashAnalysis.judge(rOomMap, null, null);
+        ok(stat, L, rOomMap.vanilla && vOomMap.kind == CrashAnalysis.KIND_VANILLA
+                        && vOomMap.hits.isEmpty(),
+                "★真机报告（OOM 型坏地图）：判「原版崩」、**一根针都不点**（栈里全是游戏/arc 类）："
+                        + CrashAnalysis.debugLine(rOomMap, vOomMap));
+        ok(stat, L, CrashAnalysis.text(ctx, vOomMap).contains(ctx.getString(R.string.crash_verdict_vanilla))
+                        && !CrashAnalysis.text(ctx, vOomMap).contains(ctx.getString(R.string.crash_verdict_none_oom)),
+                "★原版崩的结论里**不许**冒出「内存不足」那句（同一屏同一件事只说一次）");
+        ok(stat, L, rOomMap.cause == CrashAnalysis.CAUSE_NONE,
+                "★★刻意不猜：这份报告正文里**没有** OOM 字样（OOM 只在 `last_log.txt`）⇒ cause 必须是 none"
+                        + " —— 不许从 `length=0` 反推「是分配失败」（那要跨文件证据，本轮不做）");
+        CrashAnalysis.Report rOomMap2 = CrashAnalysis.parse(fxOomMap.replace(
+                "java.lang.ArrayIndexOutOfBoundsException: length=0; index=0",
+                "Caused by: java.lang.OutOfMemoryError: Failed to allocate a 4294705168 byte allocation"));
+        ok(stat, L, rOomMap2.cause == CrashAnalysis.CAUSE_OOM
+                        && CrashAnalysis.judge(rOomMap2, null, null).kind == CrashAnalysis.KIND_VANILLA,
+                "★★元断言：同一份报告里**加上** OOM 那一行 ⇒ cause 才变成 OOM（判据有分辨力，"
+                        + "不是「凡是 length=0 就叫内存不足」）；而 kind 仍是原版崩");
+        CrashAnalysis.Verdict vOomMapMods = CrashAnalysis.judge(
+                CrashAnalysis.parse(fxOomMap.replace("Mods: none (vanilla)", "Mods: databoom:1.0")),
+                null, null);
+        ok(stat, L, vOomMapMods.kind != CrashAnalysis.KIND_VANILLA,
+                "★反向：把 `Mods: none (vanilla)` 换成有模组 ⇒ **不再**判「原版崩」"
+                        + "（证明那个结论真的长在报告头那一行上，不是恒真）："
+                        + CrashAnalysis.debugLine(null, vOomMapMods));
 
         // ── F23 第二批：**结论要出院**（进导出文件 / 进模组页那一行）──
         //    判据：结论不能只活在日志页上 —— 用户报 bug 时发出来的就是导出文件。

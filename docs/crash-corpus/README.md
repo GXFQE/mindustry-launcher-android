@@ -26,7 +26,7 @@
 | 写解析器 | 每条都给「日期 + 签名 + 原文」，可直接当输入断言 |
 | 判断覆盖面 | 看每条的「类别」与是否带 `Likely Cause:`，就知道哪类形态还没覆盖 |
 | 造新夹具 | 看 `.dsh/research/2026-10-07-crash-attribution-lab.md` 里的造法（stub 编译 + headless/客户端） |
-| **加样本后回归一遍** | dev 口 `dev_crash_corpus <目录>`（`--es dev_crash_corpus_slot <槽>` 可指定槽）：把围栏块抽成 `.txt` 放进去，它会逐份跑 `CrashAnalysis` 并给出 `threw / missed / false positive` 与 `by kind / by cause` 计数。★ **夹具怎么抽是脚本化的**：`.dsh/research/extract-corpus-fixtures.py`（把各片的 ``` 围栏块逐个落成 `<片号>-NNN.txt`）⇒ 2026-10-08 重抽得 **119 份**、实测 **0 抛 / 0 漏 / 0 误报**（`evidence/f23-corpus-sweep.txt`；更早那一轮是 120 份，多出来的那份是当时手工加的变体）。⚠️ 夹具要放在**我们自己的外部目录**（`hub/<子目录>`），app 读不了 `/sdcard` 下的普通目录；`adb push <目录>` 会**套一层**，推完先 `ls` 一眼 |
+| **加样本后回归一遍** | dev 口 `dev_crash_corpus <目录>`（`--es dev_crash_corpus_slot <槽>` 可指定槽）：把围栏块抽成 `.txt` 放进去，它会逐份跑 `CrashAnalysis` 并给出 `threw / missed / false positive` 与 `by kind / by cause` 计数。★ **夹具怎么抽是脚本化的**：`.dsh/research/extract-corpus-fixtures.py`（把各片的**无标记**围栏块逐个落成 `<片号>-NNN.txt`）。⚠️ **只有无标记围栏块算夹具**（` ```java `/` ```powershell ` 那种源码/命令摘录**不当输入** —— 2026-10-08 收紧的口径，否则源码会变成回归噪声）⇒ 收紧+新增 16 片之后共 **116 份**，实测 **0 抛 / 0 漏 / 0 误报**。⚠️ 夹具要放在**我们自己的外部目录**（`hub/<子目录>`），app 读不了 `/sdcard` 下的普通目录；`adb push <目录>` 会**套一层**，推完先 `ls` 一眼 |
 
 ## 脱敏规则（进仓库前已逐条跑过）
 
