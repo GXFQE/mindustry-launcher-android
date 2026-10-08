@@ -15,7 +15,7 @@
 | # | 正文 | 里面有什么 |
 |---|---|---|
 | 01 | [`docs/backlog/01-MDT-Android-待办清单.md`](docs/backlog/01-MDT-Android-待办清单.md) | 文件头 + **当前待办**（F21 留下的两条尾巴、格式 v2 老地图解不出…） |
-| 02 | [`docs/backlog/02-零-P0-先修一个阻塞项.md`](docs/backlog/02-零-P0-先修一个阻塞项.md) | 零、P0：`INTERNET` 权限（游戏内联网全失败）及其取证 |
+| 02 | [`docs/backlog/02-零-P0-先修一个阻塞项.md`](docs/backlog/02-零-P0-先修一个阻塞项.md) | 零、P0：`INTERNET` 权限（游戏内联网全失败）及其取证 —— ✅ **已修（2026-10-01）**，本节只剩取证价值 |
 | 03 | [`docs/backlog/03-一-P1-功能同步.md`](docs/backlog/03-一-P1-功能同步.md) | 一、P1：桌面版功能对照表（自动备份 / 导出 / 日志页 / 设置页 / 深浅色 / 进出一致） |
 | 04 | [`docs/backlog/04-二-P2-新增功能.md`](docs/backlog/04-二-P2-新增功能.md) | 二、P2：新增功能（`.msav` 解析器 / 智能模组管理 / HJSON 选型与实测 / 模组开发器 / 论坛 / 地图下载 / 深链 / 另一个窗口） |
 | 05 | [`docs/backlog/05-三-P2-M4-拆分建议.md`](docs/backlog/05-三-P2-M4-拆分建议.md) | 三、P2：M4 拆分建议 |

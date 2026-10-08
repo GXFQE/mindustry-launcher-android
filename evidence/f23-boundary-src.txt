@@ -1,0 +1,204 @@
+F23 收尾批（2026-10-08，第七批）—— 三条尾巴的定案证据
+=====================================================
+
+设备：HONOR ELP-AN00 / Android 16 (API 36)
+产物：本地构建的 **dev 变体**（`DEBUGGABLE=true SUFFIX=-dev`），自检 1022 通过 / 0 失败
+实验槽：新建的 `datalab2`（**不碰用户槽**；收尾已删、配置与槽指针已还原 —— 见 §4）
+源码：`Mindustry-master.zip`（`素材/Mindustry本体/`）、`Arc-159.7.zip`（`素材/Arc/`）
+
+本文件回答三件事：
+  ① 行星 / 渲染 / 环境类崩溃 —— 要不要做归因？
+  ② 蓝图 / 地图 / 存档"数据损坏"族 —— 要不要做"非模组原因"？
+  ③ `Patches:` 段能不能当"谁打了数据补丁"的旁证？
+
+
+§1 结论先行（每一条都有下面的逐字证据）
+----------------------------------------
+1. **地图 / 存档 / 蓝图损坏：结构上不可能产生崩溃报告** ⇒ 不需要 CAUSE_DATA。
+   游戏自己用 `catch(Throwable)` 把整条读档链路包住了（连 `OutOfMemoryError` 一起收），
+   然后弹一句人话、回主菜单。⇒ 归因器在这条路上**永远没有输入**。
+   ★ 所以"把地图尺寸字段改成极大"这种 OOM 型坏法**也不必再试** —— 它抛出的 OOM 同样在
+   `SaveIO.load` 里被包成 `SaveException`、再被 `World.loadMap` 的 `catch(Throwable)` 收掉。
+2. **图形 / 显存类（`Frame buffer couldn't be constructed` / GL 1285）：不做。**
+   语料里只有**桌面**样本；用户 2026-10-07 已把它定为**本机显卡驱动/环境问题**、
+   明确"不建议为此设计归因"；安卓 12 份真机报告里图形类签名 0 处。
+3. **行星渲染类：不做。** 语料里 `Planet` 一份都没有（连桌面样本都没有）。
+4. **`Patches:` 段：不做归因**（结构上不能点名）、**也不加展示**（安卓侧 0 真实输入）。
+   理由见 §3 —— 报告里打印的是**补丁正文**，`PatchAsset` 没有任何 mod 归属字段。
+5. **内存不足（`OutOfMemoryError`）例外，要做** —— 它有安卓真机输入
+   （`docs/crash-corpus/03-蓝图.md` §3.1，`Android API level: 31`），而且**逃逸路径清楚**：
+   它崩在界面构建（`SchematicsDialog.setup`）而不是读档链路里 ⇒ 没人接 ⇒ 走到默认
+   未捕获处理器 ⇒ 真的写了报告。⇒ 已实现为 `CrashAnalysis.CAUSE_OOM`（只给"认不出"补一句原因，
+   **不参与点名**）。
+
+
+§2 源码级证据（逐字，行号可复查）
+---------------------------------
+
+2.1 安卓上"谁写报告"：只有**默认未捕获异常处理器**
+    `Mindustry-master/android/src/mindustry/android/AndroidLauncher.java:39~49`
+        39:         UncaughtExceptionHandler handler = Thread.getDefaultUncaughtExceptionHandler();
+        41:         Thread.setDefaultUncaughtExceptionHandler((thread, error) -> {
+        42:             CrashHandler.log(error);
+        ...
+        （全仓库 `CrashHandler.log(` 的调用点只有：AndroidLauncher:42、IOSLauncher:235；
+          桌面是 DesktopLauncher:322 的 `CrashHandler.handle(...)`。）
+    ⇒ **报告 = "异常一路逃到线程外"的产物**；被 catch 住的异常永远不会变成报告。
+
+2.2 GL 线程**不吞异常**（所以"渲染线程上崩"本身并不构成豁免）
+    `Arc-159.7/backends/backend-android/src/arc/backend/android/AndroidGraphics.java:351~387`
+       351:     public void onDrawFrame(GL10 gl){
+       ...
+       377:             app.defaultUpdate();
+       381:                 listeners.get(i).update();
+       （**整个方法没有 try/catch**）
+    ⇒ 渲染线程上抛出的异常会一路逃到 `GLThread.guardedRun` ⇒ 未捕获 ⇒ 写报告。
+    ⚠️ 这与语料 §2（4cutinner"发生在渲染线程上、照样被接住"）**并不矛盾**：
+       接住它的不是 arc，而是游戏自己的 `World.loadMap`（见 2.3）。
+
+2.3 读地图：`catch(Throwable)` —— **连 OOM 一起收**
+    `Mindustry-master/core/src/mindustry/core/World.java:344~362`
+       344:     public void loadMap(Map map, Rules checkRules){
+       351:         try{
+       352:             SaveIO.load(map.file, new FilterContext(map));
+       353:         }catch(Throwable e){
+       354:             Log.err(e);
+       355:             if(!headless){
+       356:                 ui.showErrorMessage("@map.invalid");
+       357:                 Core.app.post(() -> state.set(State.menu));
+       358:                 invalidMap = true;
+       359:             }
+       360:             generating = false;
+       361:             return;
+       362:         }
+    且 `Mindustry-master/core/src/mindustry/io/SaveIO.java:163~180`
+       163:     public static void load(InputStream is, WorldContext context) throws SaveException{
+       164:         try(CounterInputStream counter = ...){
+       ...
+       172:             ver.read(stream, counter, new SaveReadState(context));
+       174:         }catch(Throwable e){
+       175:             throw new SaveException(e);
+       ⇒ 瓦片分配（32767×32767 那种）发生在 172 行之内 ⇒ 抛出的 `OutOfMemoryError`
+         **先被包成 SaveException**，再被 353 行的 `catch(Throwable)` 收掉。
+
+2.4 读存档：`catch(SaveException)` → 弹「存档文件损坏或无效！」
+    `Mindustry-master/core/src/mindustry/ui/dialogs/LoadDialog.java:256~260`
+       256:                 }catch(SaveException e){
+       257:                     Log.err(e);
+       258:                     logic.reset();
+       259:                     ui.showErrorMessage("@save.corrupted");
+
+2.5 `ui.loadAnd` 自己**没有** catch（别把它当"安全网"）
+    `Mindustry-master/core/src/mindustry/core/UI.java:292~302`
+       292:     public void loadAnd(Runnable call){
+       293:         loadAnd("@loading", call);
+       296:     public void loadAnd(String text, Runnable call){
+       297:         loadfrag.show(text);
+       298:         Time.runTask(7f, () -> {
+       299:             call.run();
+       300:             loadfrag.hide();
+       301:         });
+    ⇒ {控制流里没有 try}；"被 loadAnd 接住"这个说法**是错的**，真正接住的是调用方自己的 catch。
+
+2.6 地图导入/编辑器那条路：`catch(Throwable)` 也一样
+    `Mindustry-master/core/src/mindustry/maps/Maps.java:297~306`
+       297:     public void tryCatchMapError(UnsafeRunnable run){
+       298:         try{
+       299:             run.run();
+       300:         }catch(Throwable e){
+       301:             Log.err(e);
+       ...
+       306:                 ui.showErrorMessage("@editor.errorheader");
+
+
+§3 `Patches:` 段为什么不能当旁证（源码级）
+-----------------------------------------
+3.1 它打印的是**补丁正文**，不是来源
+    `Mindustry-master/core/src/mindustry/net/CrashHandler.java:45`
+        + (state != null && state.data != null && state.data.getPatches().size > 0
+             ? "\n\nPatches: \n" + state.data.getPatches().toString("\n---\n", p -> p.patch) + "\n" : "");
+    ⇒ 逐份打印 `PatchAsset.patch`（**原始文本**），`\n---\n` 分隔。
+
+3.2 `PatchAsset` **没有**任何 mod 归属字段
+    `Mindustry-master/core/src/mindustry/mod/data/PatchAsset.java`
+        public String patch = "";        // 原始文本
+        public JsonValue json;           // 解析后的值
+        public boolean error;
+        public Seq<String> warnings;
+        （加上基类 `DataAsset` 的 `path` / `name` —— **但报告里不打印它们**）
+    ⚠️ 连 `path` 都不可靠：`PatchAsset(String patch)` 的构造注释写着
+       "patches don't have a path by default, so make it something random when reading."
+
+3.3 正文里那个 `name:"…"` **不是模组名**
+    `Mindustry-master/core/src/mindustry/mod/DataPatcher.java:251~252`
+        set.name = value.getString("name", "");
+        value.remove("name"); //patchsets can have a name, ignore it if present
+    ⇒ 它是**补丁集自己起的名字**（作者随手写的），不参与打补丁逻辑、也不含 internalName。
+    语料里的实例（`docs/crash-corpus/08-其它游戏侧异常.md` §8.14）：
+        Patches:
+        name:"世处ipt提高上限"block.world-processor.maxInstructionsPerTick:100000
+        ---
+3.4 真实输入有多薄：120 份语料里 **4 份**带 `Patches:` 行，其中 **3 份是空段**，
+    唯一非空的那份是**桌面 Windows + MindustryX** ⇒ **安卓侧 0 份**。
+    ⇒ 按本项目的老规矩（别给没有真实输入的地方加判据）**不加展示**。
+
+
+§4 真机实测（实验槽 datalab2，逐字）
+------------------------------------
+夹具（脚本 `.dsh/research/_craft-oom-map.py`，可复跑）：
+  · 底座 = `[Android][v158]Mindustry.apk` 里的 `assets/maps/default/glacier.msav`（v7 / 5 个区）
+  · `ok.msav`   = 对照（只把 meta 的 `name` 等长改成 `okmap17`）
+  · `oom.msav`  = 把**地图区**的 w/h 改成 32767（short 上限，≈10.7 亿格）
+  · `s-ok.msch` / `s-badhead.msch`（头 4 字节 `msch`→`xxxx`）/ `s-cut.msch`（截断到 60%）
+
+`slot-datalab2/last_log.txt` 里的逐字结论（`crashes/` **始终为空**）：
+
+  [E] Failed to read schematic from file '.../schematics/s-badhead.msch'
+  [E] java.io.IOException: Not a schematic file (missing header).
+      at mindustry.game.Schematics.read(Schematics.java:7)
+      at mindustry.game.Schematics.loadFile(Schematics.java:16)
+      at mindustry.game.Schematics.load(Schematics.java:17)
+      at mindustry.game.Schematics.loadSync(Schematics.java:1)
+      at arc.assets.AssetManager$2.loadSync(AssetManager.java:3)
+      at arc.assets.AssetLoader... → mindustry.ClientLauncher.update(ClientLauncher.java:87)
+      at arc.backend.android.AndroidGraphics.onDrawFrame(AndroidGraphics.java:132)   ← **渲染线程上**
+  [E] Failed to read schematic from file '.../schematics/s-cut.msch'
+  [E] java.lang.RuntimeException: java.io.EOFException: Unexpected end of ZLIB input stream
+      ...同一条链（Schematics.loadFile → … → onDrawFrame）
+  [E] Failed to generate preview!: java.io.IOException: Error reading region "preview_map".
+      at mindustry.io.SaveFileReader.readRegion(SaveFileReader.java:69)
+      at mindustry.io.MapIO.generatePreview(MapIO.java:18)
+      Caused by: java.lang.ClassCastException: mindustry.content.Blocks$55 cannot be cast to
+                 mindustry.world.blocks.environment.Floor
+      at mindustry.io.MapIO.colorFor(MapIO.java:15)
+      at mindustry.io.versions.ShortChunkSaveVersion.readMap(ShortChunkSaveVersion.java:71)
+  [I] Total time to load: 5813ms
+
+读法：
+  · 坏蓝图两种坏法 ⇒ **只进日志**（`Schematics.loadFile` 自己 catch），一个报告都没有；
+    而且它发生在**渲染线程**上 ⇒ 说明"接住它的"确实是游戏代码，不是 arc。
+  · `oom.msav` ⇒ 走的是 **preview 生成**那条路，抛出的异常同样被接住（`Failed to generate preview!`）。
+    真正"开局"那条路见 §2.3 的 `catch(Throwable)` —— 两条路都收，所以**没有**再手工点进游戏
+    去复现一次（GUI 那一步的实验设计见 §5）。
+
+收尾（**这一步踩了 AGENTS §85.11 记的那个坑**）：
+  · `dev_launch_key` 会把"当前槽"切到被启动版本所在的槽 ⇒ 删掉 `slot-datalab2` 之后
+    `app_hub/mdt-slot.txt` 里**仍然是 `datalab2`**（按一个不存在的槽跑）。
+  · 已还原：`mdt-slot.txt` = `模组演示`（12 B，无换行）、`config.json` 删掉新增的
+    `"import:official-159.apk": "datalab2"`（**定向文本删除 + 悬空逗号机修**，写回后按真 JSON 校验）。
+  · 写回方式（原来 `run-as ... sh -c "cat > 相对路径"` 会报 `No such file or directory`）：
+      adb shell "run-as io.mdt.launcher sh -c 'cd /data/data/io.mdt.launcher && cat > app_hub/<文件>'"
+    配 stdin 喂字节 —— 已在夹具上验证过逐字节往返。
+
+
+§5 这一轮**没做**的（诚实清单）
+-------------------------------
+1. **没有真的在 GUI 里点进「自定义游戏 → 选 oomtest → 开始游戏」那一步**。
+   原因是搜索框没吃进 `adb shell input text`（libGDX 的文本输入要 IME 连接），而地图列表
+   有 114 张内置图 + 2 张夹具，滚动定位代价高。
+   ⇒ 但"开局那条路不会产生报告"这一点由 §2.3 的 `catch(Throwable)` **源码级**定案，
+     并且**上一轮**已经在真机上点过一条同族的路（`crash-corpus/15` §2 的 `4cutinner`：
+     开局 ⇒ 弹「加载地图时出错。地图文件损坏或无效。」⇒ 无报告）。
+2. 蓝图的"`Too many blocks` / `Too large`"这两种**校验型**失败没造（要摸块数/尺寸字段的偏移）。
+   本轮用的是"改头"与"截断"，都落在 `Schematics.read` 的同一条 catch 上。
+3. 没有试"世界数据里数值合法但语义荒谬"的坏法（上一轮也列着，未做）。

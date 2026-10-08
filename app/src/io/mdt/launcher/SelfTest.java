@@ -3478,6 +3478,157 @@ public final class SelfTest {
         ok(stat, L, !work.exists() || countFiles(work) == 0,
                 "★自检不把自己的夹具留在用户的私有目录里");
 
+        // ── F23 第七批（2026-10-08）：**"认不出"也要说准** —— 判得出原因的那一族 ──
+        //    出处：docs/crash-corpus/03-蓝图.md §3.1（**安卓真机**的 Java 堆 OOM，逐字；帧截断）
+        //    ★ 为什么只做"内存不足"这一条：安卓侧**有真实输入**的只有这一族 ——
+        //      图形/显存只有桌面语料（且用户 2026-10-07 已定为环境问题）、行星渲染一份都没有、
+        //      数据文件损坏在安卓上根本不产生报告（语料 15）。细则 REF §85.18。
+        String fxOom = fx(new String[]{
+                "Mindustry has crashed. How unfortunate.",
+                "Version: release build 158.1",
+                "MindustryX 2026.05.27.B458",
+                "Date: 六月 6, 2026 09:15:51 上午",
+                "OS: Linux x (aarch64)",
+                "Android API level: 31",
+                "Java Version: 0",
+                "Runtime Available Memory: 512mb",
+                "Cores: 8",
+                "Mods: kotlin:2.3.20, mindustryx:2026.05.27.B458, 彩色末影进攻图合集:1.22",
+                "",
+                "",
+                "java.lang.OutOfMemoryError: Failed to allocate a 256 byte allocation with 2148112"
+                        + " free bytes and 2097KB until OOM, target footprint 536870912,"
+                        + " growth limit 536870912; giving up on allocation because <1% of heap free after GC.",
+                "\tat arc.scene.ui.layout.Table.button(Table.java:24)",
+                "\tat mindustry.ui.dialogs.SchematicsDialog.lambda$setup$28(SchematicsDialog.java:23)",
+                "\tat mindustry.ui.dialogs.SchematicsDialog.setup(SchematicsDialog.java:108)",
+                "\tat arc.scene.ui.Dialog.show(Dialog.java:4)",
+        });
+        CrashAnalysis.Report rOom = CrashAnalysis.parse(fxOom);
+        ok(stat, L, rOom.cause == CrashAnalysis.CAUSE_OOM
+                        && "java.lang.OutOfMemoryError".equals(rOom.causeEvidence),
+                "★非模组原因：这份报告判成「内存不足」（机器可读依据 = 异常类型逐字）："
+                        + rOom.causeEvidence);
+        ok(stat, L, "31".equals(rOom.apiLevel) && rOom.mods.size() == 3,
+                "★夹具确实是安卓那一份（API level 31、Mods 三行解析出来）");
+        CrashAnalysis.Verdict vOom = CrashAnalysis.judge(rOom, null, null);
+        ok(stat, L, vOom.kind == CrashAnalysis.KIND_NONE && vOom.cause == CrashAnalysis.CAUSE_OOM,
+                "★结论仍是「认不出」（没有模组证据），外加一条原因：" + CrashAnalysis.debugLine(rOom, vOom));
+        String textOom = CrashAnalysis.text(ctx, vOom);
+        // ⚠️ 判据一律**按资源**比（不写死译文）—— 既躲开门禁 SRC-01「中文当判据」，
+        //    也躲开 REF §85.16.3 那条"文案一改、按文案找的断言就静默落空"。
+        String noneLine = ctx.getString(R.string.crash_verdict_none);
+        String oomLine = ctx.getString(R.string.crash_verdict_none_oom);
+        String hintLine = ctx.getString(R.string.crash_verdict_none_hint);
+        ok(stat, L, textOom.contains(oomLine),
+                "★文案实拼：「认不出」那行后面接上原因（`crash_verdict_none_oom`）：" + oneLine(textOom));
+        ok(stat, L, !textOom.contains(hintLine),
+                "★判得出原因时**不再念**通用的三选一（同一屏同一件事只说一次 —— 那句里也列着「内存」）");
+        ok(stat, L, textOom.indexOf(noneLine) < textOom.indexOf(oomLine),
+                "★顺序：先「认不出」、再给原因（结论在前）");
+
+        // ★★ 元断言：把那一整行异常换掉 ⇒ 原因必须回到"判不出"（证明判据有分辨力、不是恒真）
+        String noOom = fxOom.replace(
+                "java.lang.OutOfMemoryError: Failed to allocate a 256 byte allocation with 2148112"
+                        + " free bytes and 2097KB until OOM, target footprint 536870912,"
+                        + " growth limit 536870912; giving up on allocation because <1% of heap free after GC.",
+                "java.lang.NullPointerException: boom");
+        CrashAnalysis.Report rNoOom = CrashAnalysis.parse(noOom);
+        ok(stat, L, rNoOom.cause == CrashAnalysis.CAUSE_NONE
+                        && CrashAnalysis.judge(rNoOom, null, null).cause == CrashAnalysis.CAUSE_NONE,
+                "★★元断言：那把 OOM 拿掉 ⇒ 认不出原因（也不会退回“通用三选一”变成乱猜）");
+        ok(stat, L, CrashAnalysis.text(ctx, CrashAnalysis.judge(rNoOom, null, null)).contains(hintLine)
+                        && !CrashAnalysis.text(ctx, CrashAnalysis.judge(rNoOom, null, null)).contains(oomLine),
+                "★反向：判不出原因时**仍然**给通用方向，而且不许冒出原因那句（替代关系是双向的）");
+
+        // ★ 包装型：OOM 被别的异常包着（节类型不是 OOM，只能从消息里认）
+        String wrapped = fxOom.replace("java.lang.OutOfMemoryError: Failed",
+                "java.lang.RuntimeException: java.lang.OutOfMemoryError: Failed");
+        ok(stat, L, CrashAnalysis.parse(wrapped).cause == CrashAnalysis.CAUSE_OOM,
+                "★包装型：`RuntimeException: java.lang.OutOfMemoryError: …` 也判得出来（从消息认）");
+
+        // ★★ 组合 1：**有模组证据时以模组为准**（原因那条一个字都不许出现）
+        String oomLoading = fxOom.replace("java.lang.OutOfMemoryError: Failed",
+                "java.lang.RuntimeException: Error loading mod oommod\njava.lang.OutOfMemoryError: Failed");
+        CrashAnalysis.Report rOomMod = CrashAnalysis.parse(oomLoading);
+        CrashAnalysis.Verdict vOomMod = CrashAnalysis.judge(rOomMod, null, null);
+        ok(stat, L, vOomMod.kind == CrashAnalysis.KIND_MOD
+                        && CrashAnalysis.LAYER_L1B.equals(vOomMod.hits.get(0).layer)
+                        && !CrashAnalysis.text(ctx, vOomMod).contains(oomLine),
+                "★★组合：OOM **加上** `Error loading mod oommod` ⇒ 只报模组、不提内存（模组证据优先）："
+                        + CrashAnalysis.debugLine(rOomMod, vOomMod));
+        // ★★ 组合 2：原版崩优先（`Mods: none (vanilla)`）
+        CrashAnalysis.Verdict vOomVanilla = CrashAnalysis.judge(
+                CrashAnalysis.parse(fxOom.replace(
+                        "Mods: kotlin:2.3.20, mindustryx:2026.05.27.B458, 彩色末影进攻图合集:1.22",
+                        "Mods: none (vanilla)")), null, null);
+        ok(stat, L, vOomVanilla.kind == CrashAnalysis.KIND_VANILLA
+                        && !CrashAnalysis.text(ctx, vOomVanilla).contains(oomLine),
+                "★★组合：OOM + `Mods: none (vanilla)` ⇒ 报原版崩（同样不提内存）");
+        // ★ 弱线索与原因**并存**（一个说"有个不够分的线索"，一个说"看着是内存不足"）
+        List<Mods.Info> modsOom = new ArrayList<Mods.Info>();
+        modsOom.add(info("oommod", "OOM Mod", "oommod.Main"));
+        CrashAnalysis.Verdict vOomWeak = CrashAnalysis.judge(rOom, modsOom,
+                fakeDex("oommod", "arc/scene/ui/layout/Table"));
+        ok(stat, L, vOomWeak.kind == CrashAnalysis.KIND_NONE && vOomWeak.hits.size() == 1
+                        && CrashAnalysis.text(ctx, vOomWeak).contains(oomLine)
+                        && CrashAnalysis.text(ctx, vOomWeak).length() > textOom.length(),
+                "★并存：权重 1 的弱线索 + 原因各说一句（互不覆盖，所以比只有原因那串更长）："
+                        + oneLine(CrashAnalysis.text(ctx, vOomWeak)));
+        ok(stat, L, CrashAnalysis.debugLine(rOom, vOom).contains("cause=OOM"),
+                "★机器可读摘要带 cause（语料回归靠它计数）：" + CrashAnalysis.debugLine(rOom, vOom));
+        boolean causeAscii = true;
+        for (int ci = 0; ci < rOom.causeEvidence.length(); ci++) {
+            if (rOom.causeEvidence.charAt(ci) > 127) { causeAscii = false; break; }
+        }
+        ok(stat, L, causeAscii,
+                "★依据里没有任何非 ASCII 字符（判据不许拿文案当钥匙，门禁 SRC-01 那条）："
+                        + rOom.causeEvidence);
+
+        // ── ★ 数据损坏族**刻意不做原因**（用真报告钉住）──
+        //    出处：docs/crash-corpus/09b-桌面报告-数据损坏.md（`Invalid schematic: Too many blocks.`，逐字）
+        //    ★ 两份断言合起来说明这条边界：① 有模组证据 ⇒ 照旧点名模组（原因层一个字都不出现）；
+        //      ② 把模组证据拿掉 ⇒ 变成"认不出"，但**仍然不给原因** —— 因为安卓侧这一族
+        //      根本不产生崩溃报告（语料 15 实测），没有真实输入就不加判据。
+        String fxData = fx(new String[]{
+                "Mindustry has crashed. How unfortunate.",
+                "Version: release build 160.5 (Built September 20, 2026 13:57 PM) (Server)",
+                "Date: 十月 8, 2026 00:21:50 上午",
+                "OS: Windows 11 x64 (amd64)",
+                "GL Version: NONE -1.-1.-1 /  /  / ",
+                "Java Version: 25.0.2",
+                "Runtime Available Memory: 3998mb",
+                "Cores: 18",
+                "Mods: databoom:1.0",
+                "",
+                "",
+                "java.lang.RuntimeException: Error loading mod databoom",
+                "\tat mindustry.mod.Mods.contextRun(Mods.java:1002)",
+                "\tat mindustry.mod.Mods.lambda$eachClass$38(Mods.java:990)",
+                "\tat mindustry.server.ServerLauncher.init(ServerLauncher.java:80)",
+                "Caused by: java.lang.RuntimeException: java.io.IOException: Invalid schematic: Too many blocks.",
+                "\tat databoom.Db.init(Db.java:30)",
+                "Caused by: java.io.IOException: Invalid schematic: Too many blocks.",
+                "\tat mindustry.game.Schematics.read(Schematics.java:625)",
+                "\tat mindustry.game.Schematics.read(Schematics.java:562)",
+                "\tat databoom.Db.init(Db.java:20)",
+        });
+        CrashAnalysis.Report rData = CrashAnalysis.parse(fxData);
+        CrashAnalysis.Verdict vData = CrashAnalysis.judge(rData, null, null);
+        ok(stat, L, rData.cause == CrashAnalysis.CAUSE_NONE
+                        && vData.kind == CrashAnalysis.KIND_MOD
+                        && CrashAnalysis.LAYER_L1B.equals(vData.hits.get(0).layer),
+                "★数据损坏（真报告）：有 `Error loading mod` ⇒ 照旧点名模组，**不**给「非模组原因」："
+                        + CrashAnalysis.debugLine(rData, vData));
+        CrashAnalysis.Verdict vDataNo = CrashAnalysis.judge(
+                CrashAnalysis.parse(fxData.replace(
+                        "java.lang.RuntimeException: Error loading mod databoom",
+                        "java.lang.RuntimeException: something else")), null, null);
+        ok(stat, L, vDataNo.kind == CrashAnalysis.KIND_NONE
+                        && vDataNo.cause == CrashAnalysis.CAUSE_NONE,
+                "★★边界（刻意不做）：把模组证据拿掉 ⇒ 认不出，但**仍然不给原因** —— "
+                        + "安卓侧这一族不产生报告（语料 15），没有真实输入就不加判据（REF §85.18）");
+
         // ── F23 第二批：**结论要出院**（进导出文件 / 进模组页那一行）──
         //    判据：结论不能只活在日志页上 —— 用户报 bug 时发出来的就是导出文件。
         File f23Dir = null;

@@ -1454,6 +1454,9 @@
     <string name="crash_verdict_vanilla">Not a mod problem — the report says no mods were loaded (Mods: none (vanilla)).</string>
     <string name="crash_verdict_none">Could not tell which mod did it — nothing in this report points at a mod.</string>
     <string name="crash_verdict_none_hint">It may be the game itself, the environment (memory, driver, missing system files), or a mod that is no longer installed.</string>
+    <!-- ★ 只在**判得出原因**时用它替代上面那条通用三选一（同一屏同一件事只说一次）。
+         判据见 CrashAnalysis#detectCause：安卓侧有真实输入的那一族只有内存不足。 -->
+    <string name="crash_verdict_none_oom">This looks like running out of memory (it crashed while allocating) — usually too much content loaded, not a missing class or a changed interface.</string>
     <string name="crash_verdict_none_nomods">There is no mod with code (classes.dex) in this slot, so there is nothing to blame.</string>
     <string name="crash_verdict_weak_fmt">Weak lead: \"%1$s\" — %2$s</string>
     <string name="crash_verdict_launcher">This report was written by the launcher itself, not by the game — no mod attribution.</string>

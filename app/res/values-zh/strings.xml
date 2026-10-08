@@ -1401,6 +1401,8 @@
     <string name="crash_verdict_vanilla">不是模组的问题 —— 报告里写着这次没有加载任何模组（Mods: none (vanilla)）。</string>
     <string name="crash_verdict_none">认不出是哪个模组 —— 这份报告里没有指向模组的证据。</string>
     <string name="crash_verdict_none_hint">可能是游戏本体、环境（内存 / 驱动 / 缺系统文件），也可能是已经被删掉的模组。</string>
+    <!-- ★ 只在**判得出原因**时用它替代上面那条通用三选一（同一屏同一件事只说一次）。 -->
+    <string name="crash_verdict_none_oom">看起来是内存不足（崩在申请内存那一步）—— 常见于内容 / 存档太多，而不是某个类找不到。</string>
     <string name="crash_verdict_none_nomods">这个槽里没有带代码（classes.dex）的模组，没有可归因的对象。</string>
     <string name="crash_verdict_weak_fmt">弱线索：「%1$s」—— %2$s</string>
     <string name="crash_verdict_launcher">这是启动器自己的崩溃报告（不是游戏），不做模组归因。</string>

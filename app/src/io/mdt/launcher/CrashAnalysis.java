@@ -67,6 +67,25 @@ final class CrashAnalysis {
     /** 读不出（空文件 / 根本不是报告） */
     static final int KIND_BROKEN = 4;
 
+    // ── 「不是模组」的可判原因（只用于 KIND_NONE：给"认不出"补一句方向）─────────
+    //
+    // ★ 为什么只有这一个值（2026-10-08 第七批定案，细则 REF §85.18）：
+    //   判据只能建在**有真实输入**的地方（本项目的老规矩："别给没有真实输入的地方加判据"）。
+    //   120 份语料里，安卓侧（含真机 12 份）**只有内存不足这一族**有真实报告
+    //   （`crash-corpus/03-蓝图.md` §3.1，`Android API level: 31`）；而
+    //   ① **图形/显存**（`Frame buffer couldn't be constructed: unknown error 1285`）只在桌面 SDL 语料里，
+    //      且用户 2026-10-07 已把它定为**本机显卡驱动/环境问题**、明确"不建议为此设计归因"；
+    //   ② **行星渲染类**：语料里 `Planet` **一份都没有**；
+    //   ③ **数据文件损坏**（蓝图/地图/存档）：安卓真机 6 种坏法实测**一个崩溃报告都不产生**
+    //      （`crash-corpus/15`）—— 只在桌面 `09b` 里有。
+    //   ⇒ 这三族**刻意不做**，并由自检钉住（`SelfTest` F23 节有一条"图形报告必须仍然是
+    //     `CAUSE_NONE`"的反方向断言）：以后要加，先拿出真实输入来。
+
+    /** 判不出"非模组"的原因（默认） */
+    static final int CAUSE_NONE = 0;
+    /** 内存不足（`OutOfMemoryError`）—— ★ **有安卓真机输入**（语料 03 §3.1） */
+    static final int CAUSE_OOM = 1;
+
     // ── 依据层 ────────────────────────────────────────────────────────────
 
     static final String LAYER_L1 = "L1";
@@ -147,6 +166,14 @@ final class CrashAnalysis {
         final List<Needle> needles = new ArrayList<Needle>();
         /** 栈帧总数（报告/自检用） */
         int frameCount;
+        /** 「不是模组」的可判原因（{@link #CAUSE_NONE} / {@link #CAUSE_OOM}） */
+        int cause = CAUSE_NONE;
+        /**
+         * 那条原因的**机器可读依据**（命中的异常类型全名，如 `java.lang.OutOfMemoryError`）。
+         * ⚠️ 它只进 {@link #debugLine}（给维护者看的证据），**不许进第一层文案** ——
+         *    REF §78.9：类名 / 原始异常只许出现在"原始诊断"那一层。
+         */
+        String causeEvidence = "";
 
         String topType() {
             return chain.isEmpty() ? "" : chain.get(0).type;
@@ -181,6 +208,12 @@ final class CrashAnalysis {
         final List<Hit> hits = new ArrayList<Hit>();
         /** 扫了几个模组的 dex；-1 = 便宜层就出结论了，没扫 */
         int dexScanned = -1;
+        /**
+         * 报告里可判的「非模组」原因（{@link #CAUSE_NONE} / {@link #CAUSE_OOM}）。
+         * ★ 只在 {@code kind == KIND_NONE} 时进文案 —— **有模组证据的一律以模组为准**
+         *   （自检有两条组合夹具钉着：OOM + `Error loading mod` ⇒ 只报模组）。
+         */
+        int cause = CAUSE_NONE;
     }
 
     /**
@@ -349,8 +382,41 @@ final class CrashAnalysis {
             }
         }
 
+        detectCause(r);
         collectNeedles(r);
         return r;
+    }
+
+    /**
+     * 判「不是模组」的**可判原因** —— 完全从异常文本本身判，不做任何猜测。
+     * ★ 它与归因是**并行**的一格信息（"这一份看着是什么"）：不参与点名，也**不会**抑制点名
+     *   （有模组证据时 {@link #judge} 照样走 L1~L3；见 {@link Verdict#cause} 的注释）。
+     * ⚠️ 这里**刻意只认内存不足**，其余三族为什么不做，见 {@link #CAUSE_NONE} 那段。
+     */
+    private static void detectCause(Report r) {
+        for (Sec s : r.chain) {
+            String t = s.type == null ? "" : s.type;
+            if (t.endsWith("OutOfMemoryError")) {
+                r.cause = CAUSE_OOM;
+                r.causeEvidence = t;
+                return;
+            }
+        }
+        // 包装型（`ExecutionException: java.lang.OutOfMemoryError: …`）：节类型不是 OOM，
+        // 只能从消息里认；依据退回用顶层类型。
+        for (Sec s : r.chain) {
+            String m = s.message == null ? "" : s.message;
+            if (m.contains("OutOfMemoryError") || m.contains("until OOM") || m.contains("Failed to allocate")) {
+                r.cause = CAUSE_OOM;
+                r.causeEvidence = r.topType().isEmpty() ? "OutOfMemoryError" : r.topType();
+                return;
+            }
+        }
+    }
+
+    /** 原因码 → 机器可读名（只进 {@link #debugLine}，**不本地化**） */
+    private static String causeName(int cause) {
+        return cause == CAUSE_OOM ? "OOM" : "none";
     }
 
     /** `Mods: none (vanilla)` / `Mods: kotlin:2.3.20, neon:120006` ⇒ internalName 列表 */
@@ -598,6 +664,7 @@ final class CrashAnalysis {
             v.reason = r == null ? "null" : r.emptyReason;
             return v;
         }
+        v.cause = r.cause;      // 「非模组」的可判原因：所有分支都带上（只有 KIND_NONE 会用它）
         if (r.launcherOwn) {
             v.kind = KIND_LAUNCHER;
             return v;
@@ -797,8 +864,13 @@ final class CrashAnalysis {
                       .append('\n');
                 }
                 sb.append(Trans.get(ctx, R.string.crash_verdict_none));
+                // ★ 判得出原因就**只说那一条**，不再念通用的三选一 ——
+                //   "同一屏同一件事只说一次"（REF §85.16.2）：通用那句里也列着"内存"，
+                //   两句并排等于把同一件事说两遍。
+                if (v.cause == CAUSE_OOM)
+                    sb.append('\n').append(Trans.get(ctx, R.string.crash_verdict_none_oom));
                 if (v.dexScanned == 0) sb.append('\n').append(Trans.get(ctx, R.string.crash_verdict_none_nomods));
-                else sb.append('\n').append(Trans.get(ctx, R.string.crash_verdict_none_hint));
+                else if (v.cause == CAUSE_NONE) sb.append('\n').append(Trans.get(ctx, R.string.crash_verdict_none_hint));
                 return sb.toString();
             }
         }
@@ -827,6 +899,8 @@ final class CrashAnalysis {
             sb.append(" version=").append(r.version.isEmpty() ? "?" : r.version);
             sb.append(" mods=").append(r.mods.isEmpty() ? (r.vanilla ? "vanilla" : "-") : r.mods.toString());
             sb.append(" chain=").append(r.chain.size()).append(" frames=").append(r.frameCount);
+            sb.append(" cause=").append(causeName(r.cause));
+            if (!r.causeEvidence.isEmpty()) sb.append('/').append(r.causeEvidence);
             sb.append(" needles=").append(r.needles.size());
             if (!r.topType().isEmpty()) {
                 sb.append(" top=").append(r.topType());
@@ -1076,6 +1150,7 @@ final class CrashAnalysis {
           .append(" (").append(dexMods).append(" with classes.dex)")
           .append("  -- L2a/L3 can only fire when the slot really has that mod\n\n");
         int[] byKind = new int[5];
+        int[] byCause = new int[2];
         List<String> failures = new ArrayList<String>();
         List<String> suspects = new ArrayList<String>();   // 该点名却认不出
         List<String> falsePos = new ArrayList<String>();   // 不该点名却点名
@@ -1097,9 +1172,12 @@ final class CrashAnalysis {
                 continue;
             }
             byKind[v.kind]++;
-            sb.append(String.format("%-26s kind=%-8s chain=%d needles=%-3d %s%n",
+            byCause[parsed.cause]++;
+            // ⚠️ 逐份行要**自己**带上 cause：`debugLine(null, v)` 拿不到 Report（那一列本来就是
+            //    "文件已经写了名字，别再重复一遍"）⇒ 漏了 cause 就只能看末尾汇总，查不出是哪几份。
+            sb.append(String.format("%-26s kind=%-8s chain=%d needles=%-3d cause=%-5s %s%n",
                     f.getName(), kindName(v.kind), parsed.chain.size(), parsed.needles.size(),
-                    debugLine(null, v).replace(" dex=", " dex=")));
+                    causeName(parsed.cause), debugLine(null, v)));
             sb.append("    ").append(text(ctx, v).replace("\n", "\n    ")).append('\n');
             // ② 该点名却认不出：报告头里有游戏自己的归因证据，但结论是 NONE
             boolean hasEvidence = !parsed.likelyName.isEmpty() || !parsed.likelyInternal.isEmpty()
@@ -1119,6 +1197,8 @@ final class CrashAnalysis {
           .append(" VANILLA=").append(byKind[KIND_VANILLA])
           .append(" LAUNCHER=").append(byKind[KIND_LAUNCHER])
           .append(" BROKEN=").append(byKind[KIND_BROKEN]).append('\n');
+        sb.append("by cause: none=").append(byCause[CAUSE_NONE])
+          .append(" OOM=").append(byCause[CAUSE_OOM]).append('\n');
         sb.append("threw = ").append(failures.size()).append('\n');
         for (String s : failures) sb.append("  !! ").append(s).append('\n');
         sb.append("missed (evidence in report but no hit) = ").append(suspects.size()).append('\n');
