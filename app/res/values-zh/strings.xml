@@ -661,8 +661,10 @@
     <string name="mods_gate_minver_old_fmt">它写的最低版本是 %1$d，太老了（要 %2$d 以上）—— 游戏会跳过它</string>
     <string name="mods_gate_blacklist">不在游戏的禁用名单里</string>
     <string name="mods_gate_blacklist_note_fmt">在名单里：%1$s</string>
-    <string name="mods_gate_last_crash">上次启动没崩到「跳过全部模组」</string>
-    <string name="mods_gate_last_crash_note">只有游戏跑起来才知道</string>
+    <string name="mods_gate_last_crash">上次启动正常结束（没触发整槽跳过）</string>
+    <string name="mods_gate_last_crash_note">上次启动没跑完，但你关掉了「启动崩溃后禁用模组」⇒ 不会整槽跳过</string>
+    <string name="mods_gate_last_crash_failed">游戏已把这个模组标成失败（上次没加载起来）—— 想再试一次就点「启用」</string>
+    <string name="mods_gate_last_crash_skipping">上次启动没跑完，而且开着「启动崩溃后禁用模组」⇒ 下次启动会跳过全部模组</string>
     <string name="mods_gate_no_version">还没指定版本</string>
     <!-- ══ 模组页的几条（P3）：导入失败 + 详情弹窗的补充说明 ══════════════════
          ⚠️ 原文里「（照抄 Mods.resolveDependencies）」是**维护者自我说明 / 源码出处**，

@@ -1977,6 +1977,26 @@ public final class Mods {
      * @param gameRevision 目标游戏 revision（如 7）
      */
     public static List<Gate> gates(Context ctx, Info m, int gameBuild, int gameRevision) {
+        return gates(ctx, m, gameBuild, gameRevision, null);
+    }
+
+    /**
+     * 六道加载门。{@code scan} = 这个槽的扫描结果（可以为 null = "没扫过"）。
+     *
+     * <p>🔴 **2026-10-08 修（用户真机反馈）**：最后那道门原来写的是
+     * {@code new Gate(..., true, ...)} —— `pass` **写死 true**，判据一行没算 ⇒
+     * 详情页会同时出现「❌ 已被标记为失败：是」和「✅ 上次启动没崩到「跳过全部模组」」**两句互相打脸**。
+     * 现在按**真证据**判：
+     * <ul>
+     *   <li>{@code m.failed}（游戏自己写的 `mod-&lt;名字&gt;-failed`）⇒ 上次它就没加载起来；</li>
+     *   <li>{@code scan.launchIdExists} + {@code scan.skipModLoading}
+     *       （= `launchid.dat` 在 **且** `modcrashdisable` 开着）⇒ **下次**启动会整槽跳过；</li>
+     *   <li>`launchid.dat` 在、但用户关掉了 `modcrashdisable` ⇒ **通过**（附一句说明：
+     *       上次没跑完但不会被跳过）。</li>
+     * </ul>
+     * ⚠️ 这三条都是**全槽级**事实，不是"这个模组的错"（按行标记的规矩见 §85.16）。
+     */
+    public static List<Gate> gates(Context ctx, Info m, int gameBuild, int gameRevision, Scan scan) {
         List<Gate> out = new ArrayList<>();
         if (m == null) return out;
 
@@ -2024,8 +2044,17 @@ public final class Mods {
                 blOk ? null : Trans.get(ctx, R.string.mods_gate_blacklist_note_fmt,
                         m.name + ":" + m.version)));
 
-        out.add(new Gate(Trans.get(ctx, R.string.mods_gate_last_crash), true,
-                Trans.get(ctx, R.string.mods_gate_last_crash_note)));
+        // ★ 六道门的最后一道：**上次启动到底崩到没崩到"整槽跳过"**（判据见本方法的 Javadoc）
+        boolean lid = scan != null && scan.launchIdExists;
+        boolean skipping = scan != null && scan.skipModLoading;
+        boolean lastCrashOk = !m.failed && !skipping;
+        out.add(new Gate(Trans.get(ctx, R.string.mods_gate_last_crash), lastCrashOk,
+                lastCrashOk
+                        // 通过但"上次没跑完"（用户关了 modcrashdisable）⇒ 值得说一句
+                        ? (lid ? Trans.get(ctx, R.string.mods_gate_last_crash_note) : null)
+                        : Trans.get(ctx, m.failed
+                                ? R.string.mods_gate_last_crash_failed
+                                : R.string.mods_gate_last_crash_skipping)));
         return out;
     }
 

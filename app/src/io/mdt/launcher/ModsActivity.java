@@ -1046,7 +1046,7 @@ public class ModsActivity extends BaseActivity {
                 ModsText.stateLabel(this,
                         Mods.stateOf(m, mResolved, mTarget.build, mTarget.revision))));
         int fail = 0;
-        for (Mods.Gate g : Mods.gates(this, m, mTarget.build, mTarget.revision)) {
+        for (Mods.Gate g : Mods.gates(this, m, mTarget.build, mTarget.revision, mScan)) {
             if (!g.pass) fail++;
         }
         sb.append('\n').append(fail == 0 ? Trans.get(ModsActivity.this, R.string.mods_detail_allok)
@@ -1123,7 +1123,7 @@ public class ModsActivity extends BaseActivity {
             sb.append(Trans.get(ModsActivity.this, R.string.mods_detail_gate_note_fmt,
                     mTarget.label.isEmpty() ? Trans.get(ModsActivity.this, R.string.mods_detail_gate_nogame)
                             : mTarget.label)).append('\n');
-            for (Mods.Gate g : Mods.gates(this, m, mTarget.build, mTarget.revision)) {
+            for (Mods.Gate g : Mods.gates(this, m, mTarget.build, mTarget.revision, mScan)) {
                 // ★ 通过 + 无补充说明 ⇒ **只画一行**（note == null 就是"没什么好说的"，
                 //   约定见 Mods.gates 的注释）；失败才把原因摊在第二行。
                 if (g.pass) {

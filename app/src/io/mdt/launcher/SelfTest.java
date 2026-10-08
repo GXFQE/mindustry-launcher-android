@@ -5383,6 +5383,40 @@ public final class SelfTest {
             ok(stat, L, gateCount == 6 && gateMiss.length() == 0,
                     "★P3：六道加载门的标签齐全；**没通过的**那几关必须给原因（通过了可只画一行）；"
                             + "门数=" + gateCount + "，缺=" + gateMiss);
+            // ── ★★ 2026-10-08 修（用户真机反馈：「上次启动没崩到跳过」这句有问题）──
+            //    原来最后那道门的 `pass` **写死 true**，判据一行没算 ⇒ 详情页会同时写着
+            //    「❌ 已被标记为失败：是」和「✅ 上次启动没崩到跳过全部模组」两句互相打脸。
+            //    现在按真证据判（`m.failed` / `scan.skipModLoading` / `scan.launchIdExists`），
+            //    这里把**四种组合**逐一点出来当判据。
+            Mods.Info gFail = mkMod("gate-crash-probe", null, null, true);
+            gFail.failed = true;                     // ← 判据就是它（忘了这一行 = 测试自己写错了）
+            Mods.Scan gScan = new Mods.Scan("m3-gate", null);
+            String gLabel = ctx.getString(R.string.mods_gate_last_crash);
+            ok(stat, L, !gateOf(ctx, gFail, gScan).pass && gateOf(ctx, gFail, gScan).note != null,
+                    "★★修：游戏把这个模组标成失败（`failed=true`）⇒ 那道门**必须不通过**且给原因"
+                            + "（改前是写死通过的 —— 用户真机看出来的）");
+            Mods.Info gOk = mkMod("gate-crash-probe", null, null, true);
+            ok(stat, L, gateOf(ctx, gOk, gScan).pass,
+                    "★元断言：没被标失败、也没崩过 ⇒ 通过（判据有分辨力，不是恒不通过）");
+            Mods.Scan gLid = new Mods.Scan("m3-gate", null);
+            gLid.launchIdExists = true;
+            gLid.skipModLoading = false;                       // launchid 在，但用户关了 modcrashdisable
+            ok(stat, L, gateOf(ctx, gOk, gLid).pass && gateOf(ctx, gOk, gLid).note != null,
+                    "★launchid.dat 在、但关掉了「启动崩溃后禁用模组」⇒ **通过**（附一句说明）—— "
+                            + "不然会把「关了开关」的人吓一跳");
+            Mods.Scan gSkip = new Mods.Scan("m3-gate", null);
+            gSkip.launchIdExists = true;
+            gSkip.skipModLoading = true;
+            ok(stat, L, !gateOf(ctx, gOk, gSkip).pass,
+                    "★launchid.dat 在 **且** modcrashdisable 开着 ⇒ 不通过（下次启动整槽跳过）");
+            // ⚠️ 两种"不通过"的原因必须不同 —— 比 note 时**先转字符串**（通过那支的 note 是 null，
+            //    直接 `.equals` 会 NPE：第一版就这么把自己绊倒了）
+            String noteFailed = String.valueOf(gateOf(ctx, gFail, gScan).note);
+            String noteSkipping = String.valueOf(gateOf(ctx, gOk, gSkip).note);
+            ok(stat, L, !gLabel.isEmpty() && !noteFailed.equals(noteSkipping)
+                            && !"null".equals(noteFailed) && !"null".equals(noteSkipping),
+                    "★元断言：两种不通过的**原因不同**（被标失败 / 会整槽跳过）"
+                            + "⇒ 文案真的分开了，不是一句万金油");
             // ★★ P3 第九批：模组页那几条（导入失败 + 详情弹窗补充说明）按真参数实拼。
             //    ★ 其中两条的占位符是"整句 + %1$s/%2$s"（原来是 Java 里拼的**碎片**）。
             String mdTarget = ctx.getString(R.string.mods_detail_target_fmt, "A / B", "1.2");
@@ -8018,8 +8052,19 @@ public final class SelfTest {
      * ★ 存在的意义：`stateOf` 与 `gates` 是**两处入口**，徽标写"不支持"而门禁里没有一关判死，
      *   用户就看不到依据（F4①d 那条纪律：判据要能看见依据）。
      */
-    private static boolean allGatesPass(Context ctx, Mods.Info m, int build, int rev) {
-        for (Mods.Gate g : Mods.gates(ctx, m, build, rev)) {
+    /**
+     * ⑮ 用：把某个模组那六道门里**「上次启动」那道**挑出来（按标签找 —— 标签是界面文案，
+     * ⚠️ 所以这里是"跟着文案走"的地方；改文案时这条会一起红，正是想要的效果）。
+     */
+    private static Mods.Gate gateOf(Context ctx, Mods.Info m, Mods.Scan scan) {
+        String want = ctx.getString(R.string.mods_gate_last_crash);
+        for (Mods.Gate g : Mods.gates(ctx, m, 0, 0, scan)) {
+            if (want.equals(g.label)) return g;
+        }
+        return new Mods.Gate("(没找到)", false, "(没找到)");
+    }
+
+    private static boolean allGatesPass(Context ctx, Mods.Info m, int build, int rev) {        for (Mods.Gate g : Mods.gates(ctx, m, build, rev)) {
             if (!g.pass) return false;
         }
         return true;

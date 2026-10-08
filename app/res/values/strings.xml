@@ -823,8 +823,10 @@
     <string name="mods_gate_minver_old_fmt">its minimum version is %1$d, which is too old (it needs %2$d or newer) — the game will skip it</string>
     <string name="mods_gate_blacklist">not on the game blacklist</string>
     <string name="mods_gate_blacklist_note_fmt">it is on the list: %1$s</string>
-    <string name="mods_gate_last_crash">the last launch did not crash into skipping all mods</string>
-    <string name="mods_gate_last_crash_note">only the game can tell once it runs</string>
+    <string name="mods_gate_last_crash">the last launch finished normally (no slot-wide skip)</string>
+    <string name="mods_gate_last_crash_note">the last launch did not finish, but you turned off skip-mods-after-crash, so nothing gets skipped</string>
+    <string name="mods_gate_last_crash_failed">the game marked this mod as failed (it did not load last time) — press Enable to try again</string>
+    <string name="mods_gate_last_crash_skipping">the last launch did not finish and skip-mods-after-crash is on, so the next launch will skip every mod</string>
     <string name="mods_gate_no_version">no version set yet</string>
     <!-- ══ 模组页的几条（P3）：导入失败 + 详情弹窗的补充说明 ══════════════════
          ⚠️ 原文里「（照抄 Mods.resolveDependencies）」是**维护者自我说明 / 源码出处**，
