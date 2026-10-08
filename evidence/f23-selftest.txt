@@ -1,0 +1,66 @@
+﻿MDT M3 自检   Thu Oct 08 12:21:17 GMT+08:00 2026
+
+===== 通过 902 项，失败 0 项 =====
+无失败项。下方依次是环境信息、逐项明细、清理与用时。
+
+── F23 崩溃分析（四层判据 + 认不出就说不认识）──
+  ✅ 解析：这份报告被认出来了（非空、也不是启动器自己的）
+  ✅ 解析：Version 行逐字（含游戏自己那串 build 尾注）：release build 160.5 (Built September 20, 2026 13:57 PM) (Server)
+  ✅ 解析：`Mods:` 行 → [crashtest]
+  ✅ ★L4：**追出了 `Caused by` 链**（2 节，顶层 java.lang.RuntimeException）—— 游戏自己的算法不追链，所以它在这类报告上给不出答案
+  ✅ 解析：顶层消息逐字：Error loading mod crashtest
+  ✅ ★抽针：缺失符号那一句的两个 token（成员名 + owner 类）都进了针袋
+  ✅ ★针的权重：`definitelyNotAField`（长成员名）= 3，`mindustry/core/GameState`（游戏类）= 1
+  ✅ ★L1b：只读报告就点名了（`Error loading mod crashtest`）—— 不用扫 dex：kind=MOD version=release build 160.5 (Built September 20, 2026 13:57 PM) (Server) mods=[crashtest] chain=2 frames=8 needles=7 top=java.lang.RuntimeException: Error loading mod crashtest hits=crashtest(L1b/w3/crashtest) dex=-1
+  ✅ ★名字对回了模组表（显示名 Crash Test、且它确实在这份报告的 Mods 行里）
+  ✅ ★文案实拼（界面与自检同一份）：是「Crash Test」引起的 —— 报告里写着「Error loading mod crashtest」
+  ✅ ★元断言：`Error loading mod` 那句拿掉 ⇒ 便宜层认不出（判据有分辨力）
+  ✅ ★L2a：帧 `boom.Boom.badField` 落在 main 的包前缀下 ⇒ 点名（追的是**整条链**里的帧）：kind=MOD version=release build 160.5 (Built September 20, 2026 13:57 PM) (Server) mods=[crashtest] chain=2 frames=8 needles=7 top=java.lang.RuntimeException: something else hits=Crash Test(L2/w3/boom.Boom) dex=-1
+  ✅ ★L3：`definitelyNotAField` 出现在它的 classes.dex 里 ⇒ 点名（权重 3）：kind=MOD version=release build 160.5 (Built September 20, 2026 13:57 PM) (Server) mods=[crashtest] chain=2 frames=8 needles=7 top=java.lang.RuntimeException: something else hits=Crash Test(L3/w3/definitelyNotAField) dex=1
+  ✅ ★成本记账：只扫了 1 个模组的 dex（报告里在场那个）
+  ✅ ★元断言：dex 里什么都没有 ⇒ 认不出，且**一条弱线索都不留**（不是"扫了就说嫌疑"）
+  ✅ ★L1：`Likely Cause` 拆成三段（显示名 / internalName / 版本）：Stealth Path / 偷袭小道 ｜ stealth-path ｜ 5.3.2
+  ✅ ★`Mods:` 里的**伪条目**（kotlin / mindustryx）照样进表 —— 不能假设都能对上我们的模组表：[kotlin, logicchineselocalization, mi2-utilities-java, mindustryx, stealth-path]
+  ✅ ★L1：命中且对回模组表（在场）—— 而且**没扫 dex**：kind=MOD version=release build 159.7 mods=[kotlin, logicchineselocalization, mi2-utilities-java, mindustryx, stealth-path] chain=1 frames=5 needles=5 top=java.lang.NoSuchFieldError: Class mindustry.ai.UnitCommand does not have member field 'mindustry.ai.UnitCommand boostC… hits=Stealth Path / 偷袭小道(L1/w3/stealth-path) dex=-1
+  ✅ ★文案实拼：确定口气 + 依据（游戏自己写的）：是「Stealth Path / 偷袭小道」引起的 —— 游戏自己在报告里写明了归因（Likely Cause）
+  ✅ ★渲染后没有残留占位符（`%`）：是「Stealth Path / 偷袭小道」引起的 —— 游戏自己在报告里写明了归因（Likely Cause）
+  ✅ ★元断言：拿掉 L1 之后确实没有首句/Likely Cause 了
+  ✅ ★L2a：只剩栈帧也能点名（帧在 `stealthpath.` 包下）：kind=MOD version=release build 159.7 mods=[kotlin, logicchineselocalization, mi2-utilities-java, mindustryx, stealth-path] chain=1 frames=5 needles=5 top=java.lang.NoSuchFieldError: Class mindustry.ai.UnitCommand does not have member field 'mindustry.ai.UnitCommand boostC… hits=Stealth Path / 偷袭小道(L2/w3/stealthpath.StealthPathMod) dex=-1
+  ✅ ★元断言：main 换成对不上的包（foo.Bar）⇒ L2a 必须给不出结论
+  ✅ 解析：internalName = neon；`Version:` 后面那行（MindustryX 尾注）也读到了
+  ✅ ★权重规则：注入进游戏命名空间的类（带 `$`）= 2，纯游戏类 = 1 —— 前者能点名、后者不能
+  ✅ ★★注入型（游戏的算法在这类上完全瞎）：靠"这个类在它包里"点名：kind=MOD version=release build 159.7 mods=[kotlin, mindustryx, neon, patch-editor] chain=1 frames=2 needles=6 top=java.lang.IllegalAccessError: class mindustry.logic.SugarCanvas$SugarStatementElem tried to access field mindustry.logic… hits=Neon / 氖(L3/w2/mindustry.logic.SugarCanvas$SugarStatementElem) dex=1
+  ✅ ★元断言：只有"纯游戏类"（权重 1）⇒ **不点名**，只留一条弱线索（否则每个模组都会被点名）
+  ✅ ★文案实拼（弱线索 + 认不出两层都在）：弱线索：「Neon / 氖」—— 它的 classes.dex 里有 mindustry.logic.LCanvas 认不出是哪个模组 —— 这份报告里没有指向模组的证据。 可能是游戏本体、环境（内存 / 驱动 / 缺系统文件），也可能是已经被删掉的模组。
+  ✅ 解析（安卓形态）：`Android API level` = 36，Version = unknown build 0
+  ✅ 解析：`Mods: none (vanilla)` 被认出来（不是空 Mods 行）
+  ✅ ★原版崩 ⇒ 明说"不是模组的问题"，**不去猜**：不是模组的问题 —— 报告里写着这次没有加载任何模组（Mods: none (vanilla)）。
+  ✅ ★元断言：把 `none (vanilla)` 换成 `neon:110008` ⇒ 必须不再判成 vanilla
+  ✅ ★启动器自己的报告：认出来 + **不做模组归因**：这是启动器自己的崩溃报告（不是游戏），不做模组归因。
+  ✅ ★元断言：哪怕给一把"什么都能命中"的探针，启动器的报告也不许被点名
+  ✅ ★元断言：首行不是我们的报告头 ⇒ 不再判成启动器报告
+  ✅ 空文件 ⇒ 标成 empty（页面上给"读不出这份报告"，不是硬凑一个结论）
+  ✅ ★空报告文案实拼：读不出这份报告（文件是空的）。
+  ✅ 不是报告的一段文字 ⇒ 认不出（不抛、不瞎点名）
+  ✅ ★ART 措辞（`No field x of type I in class La/b/C;`）也抽出了成员名针（权重 3）
+  ✅ ★ART 措辞里的 owner 类（描述符形态 `L…;`）也进了针袋
+  ✅ ★元断言：`of type I` 里的 `I`（类型描述符）与 `Failed resolution` 里的 `Failed`**都不是类名**，不许当针（否则每个模组都"命中"）
+  ✅ ★同一根针在两种运行时的措辞里抽出来**必须一样**（ART vs HotSpot）
+  ✅ ★ART 的合成类帧（`at boom.Boom.main(Unknown Source:8)`）也能解析 —— 真机那条 Rhino 崩溃就是这种形态
+  ✅ ★★安卓上靠 ART 措辞也能点名（这正是"照抄游戏算法"做不到的那一类）：kind=MOD version=release build 160.5 mods=[crashtest] chain=1 frames=1 needles=3 top=java.lang.NoSuchFieldError: No field definitelyNotAField of type I in class Lmindustry/core/GameState; or its supercla… hits=Crash Test(L3/w3/definitelyNotAField) dex=1
+  ✅ ★ART 的 `Failed resolution of: L…;` 抽出的是**描述符里的类**，不是 `Failed` 这个词
+  ✅ ★同一个 `Failed resolution of:` 形态：模组命名空间的类（`depmod/Dep`）= 3（能点名）
+  ✅ ★并列：两个模组都点出来、并报数：报告指向 2 个模组：「AAA」, 「BBB」 「AAA」—— 它的 classes.dex 里有 x.Y（这次启动没加载它） 「BBB」—— 它的 classes.dex 里有 x.Y（这次启动没加载它） 它们命中的是同一条依据，这份报告分不出是谁（把别的模组打包进自己包里的也…
+  ✅ ★并列比单条长（多了一段"分不出是谁"的说明），不是把两个名字挤成一行
+  ✅ ★元断言：换一个命中 ⇒ 实拼的整句跟着换（文案不是恒真的）
+  ✅ ★所有实拼路径都没有残留占位符
+  ✅ ★"正在核对模组包…"与"认不出"两条资源都在（页面上那两态）
+  ✅ ★布局里有 `log_crash_verdict`（少一个 `@+id` 时 findViewById 是**静默 null**，编译与门禁全绿 —— 所以这条必须钉）
+  ✅ ★依据与结论**同一行**（`它的 classes.dex 里有 …`）：报告指向 2 个模组：「AAA」, 「BBB」 「AAA」—— 它的 classes.dex 里有 x.Y（这次启动没加载它） 「BBB」—— 它的 classes.dex 里有 x.Y（这次启动没加载它） 它们命中的是同一条依据，这份报告分不出是谁（把别的模组打包进自己包里的也…
+  ✅ ★真路径（`Mods.scanDex`）：命中前两根针、第三根没命中：[0, 1]
+  ✅ ★元断言：dex 里没有的串**不许**命中（不是"扫了就全命中"）
+  ✅ （收尾：删掉假 dex）
+  ✅ ★没有 `classes.dex` ⇒ 空集且**不抛**（调用方按"没证据"处理）
+  ✅ ★自检不把自己的夹具留在用户的私有目录里
+
+── ㉘ F10 地图增删（导入 / 删除）──

@@ -1281,8 +1281,10 @@ public final class Mods {
      * 在一个模组的 `classes.dex` 里**流式**找若干 ASCII 模式（返回命中的模式下标）。
      * ⚠️ 流式 + 小块：dex 可能十几 MB（用户的 `DeepSpace` 就是 10 MB），
      * 一次性读进内存虽然也能跑，但这份代码要在 UI 线程的隔壁跑、且设备内存紧张，别赌。
+     * ★ 包级可见（不是 private）：{@link CrashAnalysis} 的 L2b/L3 判据（"这个缺失符号
+     * 在谁的包里"）走的就是它 —— 一次把所有针一起传进来，n 个模组 = n 次读，不是 n×k 次。
      */
-    private static java.util.Set<Integer> scanDex(Info m, List<String> pats) throws java.io.IOException {
+    static java.util.Set<Integer> scanDex(Info m, List<String> pats) throws java.io.IOException {
         java.io.InputStream in = null;
         try {
             if (m.directory) {

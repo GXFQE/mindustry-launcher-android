@@ -117,6 +117,8 @@ public class LogActivity extends BaseActivity {
     private LinearLayout mHubChips;
     private TextView mCrashMeta;
     private TextView mCrashBody;
+    /** F23：崩溃分析结论（正文之前的一行；没有结论时 GONE） */
+    private TextView mCrashVerdict;
     private TextView mCrashClean;
     private LinearLayout mCrashChips;
     private View mCrashChipScroll;
@@ -129,6 +131,14 @@ public class LogActivity extends BaseActivity {
     private Doc mShownCrash;
     private int mHubIndex = 0;
     private int mCrashIndex = 0;
+    /**
+     * F23：已经算过的结论（键 = 路径|大小|mtime）。
+     * ★ 有它才能在 chip 之间来回点时**不重扫 dex**（一次扫描是秒级的，见 analyzeCrash）。
+     */
+    private final java.util.HashMap<String, CrashAnalysis.Verdict> mVerdicts =
+            new java.util.HashMap<String, CrashAnalysis.Verdict>();
+    /** F23：分析任务的代次（换 chip / 换页 / 重读都自增 ⇒ 在途结果直接作废） */
+    private int mAnalyzeStamp = 0;
     /** 每次 reload 自增；后台线程回来时对不上就丢弃（防旋转 / 连点造成乱序回填） */
     private int mLoadStamp = 0;
     /** 最近一次读到的快照 —— 导出就是它（点"导出"时不再重新读盘，免得与屏幕上看到的不一致） */
@@ -171,6 +181,7 @@ public class LogActivity extends BaseActivity {
         mHubChips = (LinearLayout) root.findViewById(R.id.log_hub_chips);
         mCrashMeta = (TextView) root.findViewById(R.id.log_crash_meta);
         mCrashBody = (TextView) root.findViewById(R.id.log_crash_body);
+        mCrashVerdict = (TextView) root.findViewById(R.id.log_crash_verdict);
         mCrashClean = (TextView) root.findViewById(R.id.log_crash_clean);
         mCrashChips = (LinearLayout) root.findViewById(R.id.log_crash_chips);
         mCrashChipScroll = root.findViewById(R.id.log_crash_chip_scroll);
@@ -223,6 +234,7 @@ public class LogActivity extends BaseActivity {
         mCrashBody.setText("");
         mCrashChips.removeAllViews();
         mCrashClean.setVisibility(View.GONE);
+        hideVerdict();
 
         final int stamp = ++mLoadStamp;
         new Thread(new Runnable() {
@@ -397,6 +409,7 @@ public class LogActivity extends BaseActivity {
             mShownCrash = null;
             mCrashMeta.setText(Trans.get(LogActivity.this, R.string.log_crash_none));
             mCrashBody.setText("");
+            hideVerdict();
             return;
         }
         Doc d = mCrashes.get(i);
@@ -405,6 +418,83 @@ public class LogActivity extends BaseActivity {
         mCrashMeta.setText(Trans.get(LogActivity.this, R.string.log_crash_meta_fmt,
                 mCrashes.size(), keep, fmtTime(d.mtime)));
         mCrashBody.setText(highlight(d.text, ""));
+        analyzeCrash(d);
+    }
+
+    // ── F23：崩溃分析（结论写在正文之前）────────────────────────────────────
+
+    private void hideVerdict() {
+        mAnalyzeStamp++;          // 让在途的分析结果作废
+        mCrashVerdict.setText("");
+        mCrashVerdict.setVisibility(View.GONE);
+    }
+
+    private void showVerdict(String text) {
+        if (text == null || text.isEmpty()) {
+            hideVerdict();
+            return;
+        }
+        mCrashVerdict.setText(text);
+        mCrashVerdict.setVisibility(View.VISIBLE);
+    }
+
+    /**
+     * 分析**当前显示的那一份**崩溃报告。
+     *
+     * ★ 两段式（便宜层先出结论、贵的那层再补）：
+     *   ① 解析 + L1/L1b（只读报告，微秒级）⇒ 有结论就**立刻**显示；
+     *   ② 没有结论才去扫模组表与 dex（一个 `DeepSpace` 就 10 MB）⇒ 期间显示"正在核对模组包…"。
+     *   这样"游戏自己写明了归因"这种最常见、最便宜的情况**感觉不到等待**。
+     *
+     * ★ 为什么要缓存：来回点 chip 会把同一份报告分析很多遍，而 dex 扫描是秒级的。
+     *   键 = 路径 + 大小 + mtime（改了/换了就是另一份）。
+     * ★ 结果回来时要两道校验（stamp 且 mShownCrash 仍是它）—— 与 F7 那套"过期结果丢弃"同源。
+     */
+    private void analyzeCrash(final Doc d) {
+        if (d == null || d.file == null) {
+            hideVerdict();
+            return;
+        }
+        final String key = d.file.getAbsolutePath() + "|" + d.size + "|" + d.mtime;
+        CrashAnalysis.Verdict cached = mVerdicts.get(key);
+        if (cached != null) {
+            showVerdict(CrashAnalysis.text(this, cached));
+            return;
+        }
+        final int stamp = ++mAnalyzeStamp;
+        showVerdict(Trans.get(this, R.string.crash_verdict_pending));
+        new Thread(new Runnable() {
+            @Override public void run() {
+                // ⚠️ 必须用 fullText()：页面那份 text 只有**尾部 400 行**，
+                //    而报告头（Version / Mods / Likely Cause）在**最前面**（语料里最长一份 1044 行）
+                final CrashAnalysis.Report parsed = CrashAnalysis.parse(d.fullText());
+                final CrashAnalysis.Verdict cheap =
+                        CrashAnalysis.judge(parsed, null, null);
+                final List<Mods.Info> mods;
+                final CrashAnalysis.Verdict full;
+                if (cheap.kind == CrashAnalysis.KIND_NONE
+                        && !parsed.empty && !parsed.launcherOwn) {
+                    List<Mods.Info> scanned = null;
+                    try {
+                        scanned = Mods.scan(LogActivity.this, Data.currentSlot(LogActivity.this)).mods;
+                    } catch (Throwable t) {
+                        scanned = null;
+                    }
+                    mods = scanned;
+                    full = CrashAnalysis.judge(parsed, mods, CrashAnalysis.DEX);
+                } else {
+                    mods = null;
+                    full = cheap;
+                }
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        if (stamp != mAnalyzeStamp || mShownCrash != d) return;
+                        mVerdicts.put(key, full);
+                        showVerdict(CrashAnalysis.text(LogActivity.this, full));
+                    }
+                });
+            }
+        }, "crash-analyze").start();
     }
 
     /** 超出「日志保留份数」时才出现清理入口 —— 让 F3 那个配置项在这里真正生效。 */

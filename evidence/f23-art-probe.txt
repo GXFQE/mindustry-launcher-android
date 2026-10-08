@@ -1,0 +1,21 @@
+﻿F23 ART wording probe (2026-10-08) - raw stderr from the device runtime (dalvikvm), 4 linkage errors.
+Recipe + full source: docs/crash-corpus/13-ART-措辞-安卓运行期.md
+Probe jar: .tmp-artlab (javac --release 8 + d8, no game, no user data).
+
+===== field =====
+Exception in thread "main" java.lang.NoSuchFieldError: No field definitelyNotAField of type I in class Lmindustry/core/GameState; or its superclasses (declaration of 'mindustry.core.GameState' appears in /data/local/tmp/boom.jar)
+	at boom.Boom.main(Boom.java:8)
+
+===== method =====
+Exception in thread "main" java.lang.NoSuchMethodError: No static method definitelyNotAMethod()V in class Lmindustry/core/GameState; or its super classes (declaration of 'mindustry.core.GameState' appears in /data/local/tmp/boom.jar)
+	at boom.Boom.main(Boom.java:10)
+
+===== access =====
+Exception in thread "main" java.lang.IllegalAccessError: Field 'mindustry.core.GameState.privateAccessField' is inaccessible to class 'boom.Boom' (declaration of 'boom.Boom' appears in /data/local/tmp/boom.jar)
+	at boom.Boom.main(Boom.java:12)
+
+===== noclass =====
+Exception in thread "main" java.lang.NoClassDefFoundError: Failed resolution of: Lmindustry/logic/NotThere;
+	at boom.Boom.main(Boom.java:14)
+Caused by: java.lang.ClassNotFoundException: mindustry.logic.NotThere
+	... 1 more

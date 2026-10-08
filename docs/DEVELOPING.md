@@ -426,6 +426,8 @@ BaseActivity    ★ 主题 / 语言 / 顶栏标题 / insets 的**唯一生效点
 ThemeMode       应用内深浅色（只依赖 Config）
 LocaleMode      应用内语言（只改 Configuration 的 locale 位，**绝不 Locale.setDefault**）
 Crash           主进程未捕获异常落盘（crashes/crash_<毫秒>_launcher.txt）
+CrashAnalysis   ★ 崩溃分析 F23（游戏崩了是哪个模组干的）：四层判据 + **两种运行时的措辞**；
+                parse/judge 是纯函数（自检直接喂真语料），dex 那层走 Mods.scanDex
 Compat          版本兼容预检（这个包能不能进 MDT 的加载管线）
 Importer        见上（另有 F17 命名统一 / F18 门槛）
 Exporter        导出到共享存储（单文件 / zip / **包内条目流式拷**）
@@ -484,7 +486,7 @@ SelfTest        见上（现在含 ㉑~㊹ 等成组断言；`dev_m3_selftest` �
 | `docs/history/README.md`（**索引**） | 逐轮的**实现与真机验证记录**（2026-10-04 从 README 整节搬出，内容一字未改；正文 23 片）—— ⚠️ **它停在搬出那一刻（F21 / 第 43 轮）**，此后轮次看下一条 |
 | 2026-10-04 之后的新轮次 | 实现与验证记录写在 **`docs/flows/` 对应的 F 分片**里（如 F22 = 第 108~113 轮），本机开发笔记（`.dsh/memory/NEXT.md` + `ref/`）另有一份带判据的流水 —— **两者都不随本仓发布的部分只作来源标注** |
 | `spike/spike-datadir/RESULT.md` | `mindustry.data.dir` 注入 spike 的完整实验证据（✅ 成立）与实施清单 |
-| [`crash-corpus/README.md`](crash-corpus/README.md)（**索引**） | ★ **崩溃日志语料库**（**12 片**）：真实崩溃日志的**已脱敏**原文，按类别分片 —— 「**40 条异常签名** + **52 份桌面现成报告**（按 **有 `Likely Cause` / 数据损坏类 / 其它无归因** 分 09a·09b·09c）+ **12 份安卓设备报告**」。用途是给**崩溃归因 / 日志解析**当回归语料与夹具（含 `Likely Cause` 有无、`Patches` 有无、Java 堆 OOM 与显存 OOM 的区分）；另见 [`crash-corpus/TAXONOMY.md`](crash-corpus/TAXONOMY.md) —— **异常分类总表**（按族归类 + 标"能不能归因到模组"；★ 口径：真实日志 / 会话提及**分两列**，只有前者能当"崩过几次"；甲层真实日志 **19 种 / 174 次**） |
+| [`crash-corpus/README.md`](crash-corpus/README.md)（**索引**） | ★ **崩溃日志语料库**（**13 片**）：真实崩溃日志的**已脱敏**原文，按类别分片 —— 「**40 条异常签名** + **52 份桌面现成报告**（按 **有 `Likely Cause` / 数据损坏类 / 其它无归因** 分 09a·09b·09c）+ **12 份安卓设备报告** + **13 片 = ART 措辞**（安卓运行期实测的四句话，与桌面 HotSpot 完全不同款 —— F23 的抽针判据靠它）」。用途是给**崩溃归因 / 日志解析**当回归语料与夹具（含 `Likely Cause` 有无、`Patches` 有无、Java 堆 OOM 与显存 OOM 的区分）；另见 [`crash-corpus/TAXONOMY.md`](crash-corpus/TAXONOMY.md) —— **异常分类总表**（按族归类 + 标"能不能归因到模组"；★ 口径：真实日志 / 会话提及**分两列**，只有前者能当"崩过几次"；甲层真实日志 **19 种 / 174 次**） |
 | **`REF §n`**（散见各文档） | 「为什么这么改」的**开发笔记编号** —— 该笔记**不随本仓发布**，出现处只作来源标注 |
 | 当前进度 / 下一步 | 不维护**全局里程碑表**（半更新的表比没有更误导）—— 各批次完成状态见 `docs/flows/02-一-总顺序.md` 与 `docs/backlog/07-五-建议的动手顺序.md` |
 

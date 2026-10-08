@@ -1363,6 +1363,31 @@
     <string name="log_crash_clean_msg_fmt">将删除最旧的 %1$d 份崩溃报告，保留最近 %2$d 份。\n\n删除后无法恢复。</string>
     <string name="log_crash_clean_done_fmt">已清理 %1$d 份</string>
     <string name="log_crash_clean_fail_fmt">有 %1$d 份没能删掉</string>
+
+    <!-- ══ F23 崩溃分析（游戏崩了，是哪个模组干的）═══════════════════════════
+         ★ 口径与英文侧一一对应（① 可能错 ⇒ "很可能…依据是…"；② 认不出就说不认识；
+           ③ 依据与结论同一行）。细则见 docs/flows/16-阶段-10-崩溃分析.md。 -->
+    <string name="crash_verdict_pending">正在核对模组包…</string>
+    <string name="crash_verdict_certain_fmt">是「%1$s」引起的 —— %2$s</string>
+    <string name="crash_verdict_one_fmt">很可能与「%1$s」有关 —— %2$s</string>
+    <string name="crash_verdict_multi_fmt">报告指向 %1$d 个模组：%2$s</string>
+    <string name="crash_verdict_name_fmt">「%1$s」</string>
+    <string name="crash_verdict_hit_line_fmt">「%1$s」—— %2$s</string>
+    <string name="crash_verdict_multi_note">它们命中的是同一条依据，这份报告分不出是谁（把别的模组打包进自己包里的也会长这样）。</string>
+    <string name="crash_verdict_vanilla">不是模组的问题 —— 报告里写着这次没有加载任何模组（Mods: none (vanilla)）。</string>
+    <string name="crash_verdict_none">认不出是哪个模组 —— 这份报告里没有指向模组的证据。</string>
+    <string name="crash_verdict_none_hint">可能是游戏本体、环境（内存 / 驱动 / 缺系统文件），也可能是已经被删掉的模组。</string>
+    <string name="crash_verdict_none_nomods">这个槽里没有带代码（classes.dex）的模组，没有可归因的对象。</string>
+    <string name="crash_verdict_weak_fmt">弱线索：「%1$s」—— %2$s</string>
+    <string name="crash_verdict_launcher">这是启动器自己的崩溃报告（不是游戏），不做模组归因。</string>
+    <string name="crash_verdict_broken_fmt">读不出这份报告（%1$s）。</string>
+    <string name="crash_reason_empty">文件是空的</string>
+    <string name="crash_reason_null">文件读不出来</string>
+    <string name="crash_ev_l1">游戏自己在报告里写明了归因（Likely Cause）</string>
+    <string name="crash_ev_l1b_fmt">报告里写着「Error loading mod %1$s」</string>
+    <string name="crash_ev_frame_fmt">异常栈里有它的类 %1$s</string>
+    <string name="crash_ev_dex_fmt">它的 classes.dex 里有 %1$s</string>
+    <string name="crash_ev_not_loaded_fmt">%1$s（这次启动没加载它）</string>
     <string name="log_copied_fmt">已复制%1$s</string>
     <string name="log_copy_empty">这里没有可复制的内容</string>
     <string name="log_hub_launch">启动</string>

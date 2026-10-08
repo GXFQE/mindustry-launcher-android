@@ -269,6 +269,23 @@
                     android:textSize="12sp"
                     android:textColor="@color/fg_muted" />
 
+                <!-- ══ F23：崩溃分析结论（**在正文之前** —— 结论必须前置） ══════════
+                     ★ 为什么要单独一行、而不是塞进 meta：meta 是"有多少份 / 保留几份"
+                       （文件层面的事实），这一行是"是谁干的"（归因结论）。两件事混一行，
+                       用户扫一眼分不出哪个是哪个。
+                     ★ 为什么正文照旧全摊：结论可能错（这是推断，不是判决），原文必须还在
+                       —— 用户/我们复核时看的就是它（`Patches:` 那类只有原文才有的信息）。
+                     ★ 空态：没有崩溃报告、或这份报告读不出结论时 `GONE`（见 LogActivity.showCrash）。 -->
+                <TextView
+                    android:id="@+id/log_crash_verdict"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingTop="8dp"
+                    android:textSize="13sp"
+                    android:lineSpacingExtra="2dp"
+                    android:textColor="@color/fg"
+                    android:visibility="gone" />
+
                 <HorizontalScrollView
                     android:id="@+id/log_crash_chip_scroll"
                     android:layout_width="match_parent"

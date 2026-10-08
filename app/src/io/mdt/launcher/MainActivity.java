@@ -158,6 +158,7 @@ public class MainActivity extends BaseActivity {
                 || intent.hasExtra("dev_saves_page")
                 || intent.hasExtra(BlueprintsActivity.EXTRA_DEV_IMPORT)
                 || intent.hasExtra("dev_mapstats")
+                || intent.hasExtra("dev_crash_analyze")
                 || intent.hasExtra("dev_msch");
         if (!isDev) return;
         if ((getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) == 0) {
@@ -615,6 +616,27 @@ public class MainActivity extends BaseActivity {
                     reportDev(rep, "dev_mods_conflict · 槽 " + useSlot);
                 }
             }, "dev-mods-conflict").start();
+            return;
+        }
+        // ── F23：崩溃分析（把当前槽每一份崩溃报告的结论 + 证据 + 耗时落到报告）──────
+        // 用法：`--es dev_crash_analyze 1`（或槽名）→ `hub/report-devtool.txt`
+        // ★ 为什么要这个口：归因的判据要在**真机上的真报告**上过一遍（ART 的异常措辞
+        //   与桌面 HotSpot 未必同款），而结论文案的排版与 dex 扫描的耗时也只有真机量得准。
+        String can = intent.getStringExtra("dev_crash_analyze");
+        if (can != null && !can.isEmpty()) {
+            final String useSlot = ("true".equals(can.trim()) || can.trim().isEmpty())
+                    ? Data.currentSlot(this) : can.trim();
+            new Thread(new Runnable() {
+                @Override public void run() {
+                    String rep;
+                    try {
+                        rep = CrashAnalysis.devReport(MainActivity.this, useSlot);
+                    } catch (Throwable t) {
+                        rep = "dev_crash_analyze 失败：" + t;
+                    }
+                    reportDev(rep, "dev_crash_analyze · 槽 " + useSlot);
+                }
+            }, "dev-crash-analyze").start();
             return;
         }
         // ── F21：地图资源统计（真机计时 + 逐项数字）─────────────────────────────

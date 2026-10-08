@@ -1426,6 +1426,35 @@
     <string name="log_crash_clean_msg_fmt">Deletes the oldest %1$d crash reports and keeps the most recent %2$d.\n\nDeleted files cannot be recovered.</string>
     <string name="log_crash_clean_done_fmt">Deleted %1$d</string>
     <string name="log_crash_clean_fail_fmt">%1$d could not be deleted</string>
+
+    <!-- ══ F23 崩溃分析（游戏崩了，是哪个模组干的）═══════════════════════════
+         ★ 文案口径（三条，都是刻意的）：
+           ① 结论**可能错**（它是推断）⇒ 不写"就是它"，写"很可能…—— 依据是…"；
+              只有游戏自己写明的两层（Likely Cause / Error loading mod）才用确定的口气。
+           ② **认不出就说不认识**，并给出"可能是谁"的方向（环境 / 本体 / 已删掉的模组）。
+           ③ 依据必须与结论**同一行**：用户看到的是"谁 + 凭什么"，不是一个黑箱判决。
+         ⚠️ 英文值里不许出现撇号（见 REF §五），所以 "launcher's own" 那种写法一律绕开。 -->
+    <string name="crash_verdict_pending">Checking mod packages…</string>
+    <string name="crash_verdict_certain_fmt">Caused by \"%1$s\" — %2$s</string>
+    <string name="crash_verdict_one_fmt">Probably caused by \"%1$s\" — %2$s</string>
+    <string name="crash_verdict_multi_fmt">%1$d mods are implicated: %2$s</string>
+    <string name="crash_verdict_name_fmt">\"%1$s\"</string>
+    <string name="crash_verdict_hit_line_fmt">\"%1$s\" — %2$s</string>
+    <string name="crash_verdict_multi_note">They hit the same piece of evidence, so this report cannot tell them apart (a mod that bundles another one looks like this).</string>
+    <string name="crash_verdict_vanilla">Not a mod problem — the report says no mods were loaded (Mods: none (vanilla)).</string>
+    <string name="crash_verdict_none">Could not tell which mod did it — nothing in this report points at a mod.</string>
+    <string name="crash_verdict_none_hint">It may be the game itself, the environment (memory, driver, missing system files), or a mod that is no longer installed.</string>
+    <string name="crash_verdict_none_nomods">There is no mod with code (classes.dex) in this slot, so there is nothing to blame.</string>
+    <string name="crash_verdict_weak_fmt">Weak lead: \"%1$s\" — %2$s</string>
+    <string name="crash_verdict_launcher">This report was written by the launcher itself, not by the game — no mod attribution.</string>
+    <string name="crash_verdict_broken_fmt">Could not read this report (%1$s).</string>
+    <string name="crash_reason_empty">the file is empty</string>
+    <string name="crash_reason_null">the file could not be read</string>
+    <string name="crash_ev_l1">the game itself wrote this in the report (Likely Cause)</string>
+    <string name="crash_ev_l1b_fmt">the report says \"Error loading mod %1$s\"</string>
+    <string name="crash_ev_frame_fmt">its class %1$s is in the stack trace</string>
+    <string name="crash_ev_dex_fmt">its classes.dex contains %1$s</string>
+    <string name="crash_ev_not_loaded_fmt">%1$s (it was not loaded in that launch)</string>
     <string name="log_copied_fmt">Copied %1$s</string>
     <string name="log_copy_empty">Nothing to copy here</string>
     <string name="log_hub_launch">Launch</string>

@@ -219,6 +219,9 @@ public final class SelfTest {
             activityThemeBase(ctx, L, stat);
             // ★ ㊲ 主进程崩溃落盘（真写一份探针报告再删掉）
             crashDump(ctx, L, stat);
+            // ★ F23 崩溃分析：四层判据（真语料夹具 + 每层的反方向/元断言）—— 紧挨着 ㊲：
+            //   一个写报告、一个读报告，放一起读起来是一件事
+            crashAnalysis(ctx, L, stat);
             // ★ ㉘ F10 地图增删：导入（先 part+验）与删除（挪不删）
             mapCrud(ctx, L, stat);
             // ★ ㉚ F10 地图导出：包内条目流式拷出（字节一致 + 两向反向 + 元断言）
@@ -2833,6 +2836,486 @@ public final class SelfTest {
         ok(stat, L, probe == null || !probe.exists(),
                 "★探针文件已清理（别把它留在用户的崩溃列表里）");
         L.add("");
+    }
+
+    // ══ F23 崩溃分析（归因）════════════════════════════════════════════════
+
+    /**
+     * F23 **崩溃分析：游戏崩了，是哪个模组干的**（`docs/flows/16-阶段-10-崩溃分析.md`）。
+     *
+     * ★★ 夹具全部是**真报告逐字**（出处写在每份夹具头上，来自 `docs/crash-corpus/`）——
+     *   不是"照着我的解析器编一个格式"：那样断言的只是"解析器能解析它自己写的东西"。
+     * ★★ 每条判据都配**反方向 / 元断言**（把输入拿掉、或换一把"什么都不命中"的探针，
+     *   结论必须**变**）—— 证明那条断言不是在恒真地打勾（本项目的老毛病，REF §77.6）。
+     */
+    private static void crashAnalysis(Context ctx, List<String> L, int[] stat) {
+        L.add("── F23 崩溃分析（四层判据 + 认不出就说不认识）──");
+
+        // ── 夹具 1：**载入期崩**（`Error loading mod`）—— 游戏自己给不出 Likely Cause 的那一类 ──
+        //    出处：docs/crash-corpus/09c-桌面报告-无归因其它.md（2026-10-07 实验台造，逐字）
+        String fxL1b = fx(new String[]{
+                "Mindustry has crashed. How unfortunate.",
+                "Version: release build 160.5 (Built September 20, 2026 13:57 PM) (Server)",
+                "Date: 十月 7, 2026 21:49:21 下午",
+                "OS: Windows 11 x64 (amd64)",
+                "Java Version: 25.0.2",
+                "Runtime Available Memory: 3998mb",
+                "Cores: 18",
+                "Mods: crashtest:1.0",
+                "",
+                "",
+                "java.lang.RuntimeException: Error loading mod crashtest",
+                "\tat mindustry.mod.Mods.contextRun(Mods.java:1002)",
+                "\tat mindustry.mod.Mods.lambda$eachClass$38(Mods.java:990)",
+                "\tat arc.struct.Seq.each(Seq.java:207)",
+                "\tat mindustry.mod.Mods.eachClass(Mods.java:990)",
+                "\tat mindustry.server.ServerLauncher.init(ServerLauncher.java:80)",
+                "Caused by: java.lang.NoSuchFieldError: Class mindustry.core.GameState"
+                        + " does not have member field 'int definitelyNotAField'",
+                "\tat boom.Boom.badField(Boom.java:10)",
+                "\tat boom.Boom.init(Boom.java:27)",
+                "\tat mindustry.mod.Mods.lambda$eachClass$37(Mods.java:990)",
+                "\t... 6 more",
+        });
+        CrashAnalysis.Report r = CrashAnalysis.parse(fxL1b);
+        ok(stat, L, !r.empty && !r.launcherOwn, "解析：这份报告被认出来了（非空、也不是启动器自己的）");
+        ok(stat, L, "release build 160.5 (Built September 20, 2026 13:57 PM) (Server)".equals(r.version),
+                "解析：Version 行逐字（含游戏自己那串 build 尾注）：" + r.version);
+        ok(stat, L, r.mods.size() == 1 && "crashtest".equals(r.mods.get(0)) && !r.vanilla,
+                "解析：`Mods:` 行 → " + r.mods);
+        ok(stat, L, r.chain.size() == 2 && "java.lang.RuntimeException".equals(r.topType()),
+                "★L4：**追出了 `Caused by` 链**（" + r.chain.size() + " 节，顶层 " + r.topType()
+                        + "）—— 游戏自己的算法不追链，所以它在这类报告上给不出答案");
+        ok(stat, L, "Error loading mod crashtest".equals(r.topMessage()),
+                "解析：顶层消息逐字：" + r.topMessage());
+        ok(stat, L, hasNeedle(r, "definitelyNotAField") && hasNeedle(r, "mindustry/core/GameState"),
+                "★抽针：缺失符号那一句的两个 token（成员名 + owner 类）都进了针袋");
+        ok(stat, L, needleWeight(r, "definitelyNotAField") == 3
+                        && needleWeight(r, "mindustry/core/GameState") == 1,
+                "★针的权重：`definitelyNotAField`（长成员名）= 3，`mindustry/core/GameState`（游戏类）= 1");
+
+        CrashAnalysis.Verdict v = CrashAnalysis.judge(r, null, null);
+        ok(stat, L, v.kind == CrashAnalysis.KIND_MOD && v.hits.size() == 1
+                        && CrashAnalysis.LAYER_L1B.equals(v.hits.get(0).layer)
+                        && "crashtest".equals(v.hits.get(0).evidence),
+                "★L1b：只读报告就点名了（`Error loading mod crashtest`）—— 不用扫 dex："
+                        + CrashAnalysis.debugLine(r, v));
+
+        List<Mods.Info> mods1 = new ArrayList<Mods.Info>();
+        Mods.Info crashMod = info("crashtest", "Crash Test", "crashtest.Main");
+        mods1.add(crashMod);
+        CrashAnalysis.Verdict v2 = CrashAnalysis.judge(r, mods1, null);
+        ok(stat, L, v2.kind == CrashAnalysis.KIND_MOD && v2.hits.get(0).known
+                        && "Crash Test".equals(v2.hits.get(0).name) && v2.hits.get(0).inReport,
+                "★名字对回了模组表（显示名 Crash Test、且它确实在这份报告的 Mods 行里）");
+        ok(stat, L, CrashAnalysis.text(ctx, v2).contains("Crash Test")
+                        && CrashAnalysis.text(ctx, v2).contains("Error loading mod crashtest"),
+                "★文案实拼（界面与自检同一份）：" + oneLine(CrashAnalysis.text(ctx, v2)));
+
+        // ★★ 元断言：把那一句拿掉 ⇒ 便宜层必须**给不出结论**（证明上面那条不是恒真）
+        String noL1b = fxL1b.replace("java.lang.RuntimeException: Error loading mod crashtest",
+                "java.lang.RuntimeException: something else");
+        CrashAnalysis.Report rNo = CrashAnalysis.parse(noL1b);
+        ok(stat, L, CrashAnalysis.judge(rNo, null, null).kind == CrashAnalysis.KIND_NONE,
+                "★元断言：`Error loading mod` 那句拿掉 ⇒ 便宜层认不出（判据有分辨力）");
+        // ★ L2a：帧落在 `meta.main` 的包前缀下（这次给它一个**对得上**的 main）
+        List<Mods.Info> modsFrame = new ArrayList<Mods.Info>();
+        modsFrame.add(info("crashtest", "Crash Test", "boom.Boom"));
+        CrashAnalysis.Verdict vf = CrashAnalysis.judge(rNo, modsFrame, null);
+        ok(stat, L, vf.kind == CrashAnalysis.KIND_MOD
+                        && CrashAnalysis.LAYER_FRAME.equals(vf.hits.get(0).layer)
+                        && vf.hits.get(0).evidence.startsWith("boom."),
+                "★L2a：帧 `boom.Boom.badField` 落在 main 的包前缀下 ⇒ 点名（追的是**整条链**里的帧）："
+                        + CrashAnalysis.debugLine(rNo, vf));
+        // ★ L2b/L3：针在 dex 里（假探针；不造真 dex —— 扫描器只做字节搜索，见本段末尾那条真路径）
+        CrashAnalysis.Verdict v3 = CrashAnalysis.judge(rNo, mods1, fakeDex("crashtest",
+                "definitelyNotAField"));
+        ok(stat, L, v3.kind == CrashAnalysis.KIND_MOD
+                        && CrashAnalysis.LAYER_DEX.equals(v3.hits.get(0).layer)
+                        && "definitelyNotAField".equals(v3.hits.get(0).evidence)
+                        && v3.hits.get(0).weight == 3,
+                "★L3：`definitelyNotAField` 出现在它的 classes.dex 里 ⇒ 点名（权重 3）："
+                        + CrashAnalysis.debugLine(rNo, v3));
+        ok(stat, L, v3.dexScanned == 1, "★成本记账：只扫了 1 个模组的 dex（报告里在场那个）");
+        CrashAnalysis.Verdict v4 = CrashAnalysis.judge(rNo, mods1, fakeDex("crashtest"));
+        ok(stat, L, v4.kind == CrashAnalysis.KIND_NONE && v4.hits.isEmpty(),
+                "★元断言：dex 里什么都没有 ⇒ 认不出，且**一条弱线索都不留**（不是\"扫了就说嫌疑\"）");
+
+        // ── 夹具 2：**游戏自己归因成功**（首句 + Likely Cause + 模组自己的包在栈里）──
+        //    出处：docs/crash-corpus/09a-桌面报告-有归因.md（Stealth Path，逐字）
+        String fxL1 = fx(new String[]{
+                "The mod 'Stealth Path / 偷袭小道' (stealth-path) has caused Mindustry to crash.",
+                "Version: release build 159.7",
+                "Date: Aug 21, 2026 19:47:51 PM",
+                "OS: Windows 11 x64 (amd64)",
+                "Java Version: 25.0.1",
+                "Runtime Available Memory: 3998mb",
+                "Cores: 18",
+                "Likely Cause: Stealth Path / 偷袭小道 (stealth-path v5.3.2)",
+                "Mods: kotlin:2.3.20, logicchineselocalization:157.4.1, mi2-utilities-java:1.15.2,"
+                        + " mindustryx:2026.07.X36, stealth-path:5.3.2",
+                "",
+                "",
+                "java.lang.NoSuchFieldError: Class mindustry.ai.UnitCommand does not have member"
+                        + " field 'mindustry.ai.UnitCommand boostCommand'",
+                "\tat stealthpath.StealthPathMod.issueDirectRtsFallback(StealthPathMod.java:1132)",
+                "\tat stealthpath.StealthPathMod.autoHandleAutoMoveKey(StealthPathMod.java:1079)",
+                "\tat stealthpath.StealthPathMod.update(StealthPathMod.java:995)",
+                "\tat arc.Events.lambda$run$2(Events.java:20)",
+                "\tat mindustry.core.Logic.update(Logic.java:503)",
+        });
+        CrashAnalysis.Report r2 = CrashAnalysis.parse(fxL1);
+        ok(stat, L, "Stealth Path / 偷袭小道".equals(r2.likelyName)
+                        && "stealth-path".equals(r2.likelyInternal)
+                        && "5.3.2".equals(r2.likelyVersion),
+                "★L1：`Likely Cause` 拆成三段（显示名 / internalName / 版本）："
+                        + r2.likelyName + " ｜ " + r2.likelyInternal + " ｜ " + r2.likelyVersion);
+        ok(stat, L, r2.mods.size() == 5 && r2.mods.contains("kotlin") && r2.mods.contains("mindustryx"),
+                "★`Mods:` 里的**伪条目**（kotlin / mindustryx）照样进表 —— 不能假设都能对上我们的模组表："
+                        + r2.mods);
+        List<Mods.Info> mods2 = new ArrayList<Mods.Info>();
+        mods2.add(info("stealth-path", "Stealth Path / 偷袭小道", "stealthpath.StealthPathMod"));
+        CrashAnalysis.Verdict v5 = CrashAnalysis.judge(r2, mods2, null);
+        ok(stat, L, v5.kind == CrashAnalysis.KIND_MOD
+                        && CrashAnalysis.LAYER_L1.equals(v5.hits.get(0).layer)
+                        && v5.hits.get(0).inReport && v5.hits.get(0).known,
+                "★L1：命中且对回模组表（在场）—— 而且**没扫 dex**：" + CrashAnalysis.debugLine(r2, v5));
+        String text5 = CrashAnalysis.text(ctx, v5);
+        ok(stat, L, text5.contains("Stealth Path / 偷袭小道") && text5.contains("Likely Cause"),
+                "★文案实拼：确定口气 + 依据（游戏自己写的）：" + oneLine(text5));
+        ok(stat, L, text5.indexOf('%') < 0, "★渲染后没有残留占位符（`%`）：" + oneLine(text5));
+
+        // ★★ 反方向：把 L1 的两处都拿掉 ⇒ 只剩栈帧，必须靠 L2a 才点得出来
+        String noL1 = fxL1.replace("The mod 'Stealth Path / 偷袭小道' (stealth-path) has caused"
+                        + " Mindustry to crash.", "Mindustry has crashed. How unfortunate.")
+                .replace("Likely Cause: Stealth Path / 偷袭小道 (stealth-path v5.3.2)", "");
+        CrashAnalysis.Report r2b = CrashAnalysis.parse(noL1);
+        ok(stat, L, r2b.likelyName.isEmpty(), "★元断言：拿掉 L1 之后确实没有首句/Likely Cause 了");
+        CrashAnalysis.Verdict v6 = CrashAnalysis.judge(r2b, mods2, null);
+        ok(stat, L, v6.kind == CrashAnalysis.KIND_MOD
+                        && CrashAnalysis.LAYER_FRAME.equals(v6.hits.get(0).layer),
+                "★L2a：只剩栈帧也能点名（帧在 `stealthpath.` 包下）：" + CrashAnalysis.debugLine(r2b, v6));
+        List<Mods.Info> modsOther = new ArrayList<Mods.Info>();
+        modsOther.add(info("stealth-path", "Stealth Path / 偷袭小道", "foo.Bar"));
+        ok(stat, L, CrashAnalysis.judge(r2b, modsOther, null).kind == CrashAnalysis.KIND_NONE,
+                "★元断言：main 换成对不上的包（foo.Bar）⇒ L2a 必须给不出结论");
+
+        // ── 夹具 3：**类被注入游戏命名空间**（Neon）—— 权重规则里那条 `$` 就是为它写的 ──
+        //    出处：docs/crash-corpus/09a-桌面报告-有归因.md（IllegalAccessError，逐字，栈截断）
+        String fxInj = fx(new String[]{
+                "The mod 'Neon / 氖' (neon) has caused Mindustry to crash.",
+                "Version: release build 159.7",
+                "MindustryX 2026.07.X36",
+                "Date: Aug 16, 2026 18:24:18 PM",
+                "OS: Windows 11 x64 (amd64)",
+                "Java Version: 25.0.1",
+                "Cores: 18",
+                "Likely Cause: Neon / 氖 (neon v110008)",
+                "Mods: kotlin:2.3.20, mindustryx:2026.07.X36, neon:110008, patch-editor:1.13.1",
+                "",
+                "",
+                "java.lang.IllegalAccessError: class mindustry.logic.SugarCanvas$SugarStatementElem"
+                        + " tried to access field mindustry.logic.LCanvas.privileged"
+                        + " (mindustry.logic.SugarCanvas$SugarStatementElem is in unnamed module of"
+                        + " loader mindustry.core.Platform$1 @365220ad; mindustry.logic.LCanvas is in"
+                        + " unnamed module of loader 'app')",
+                "\tat mindustry.logic.SugarCanvas$SugarStatementElem.toggleComment(SugarCanvas.java:397)",
+                "\tat arc.scene.Element.lambda$clicked$2(Element.java:919)",
+        });
+        CrashAnalysis.Report r3 = CrashAnalysis.parse(fxInj);
+        ok(stat, L, "neon".equals(r3.likelyInternal) && "MindustryX 2026.07.X36".equals(r3.extraVersion),
+                "解析：internalName = neon；`Version:` 后面那行（MindustryX 尾注）也读到了");
+        ok(stat, L, needleWeight(r3, "mindustry/logic/SugarCanvas$SugarStatementElem") == 2
+                        && needleWeight(r3, "mindustry/logic/LCanvas") == 1,
+                "★权重规则：注入进游戏命名空间的类（带 `$`）= 2，纯游戏类 = 1 —— 前者能点名、后者不能");
+        String noL1Inj = fxInj.replace("Likely Cause: Neon / 氖 (neon v110008)", "")
+                .replace("The mod 'Neon / 氖' (neon) has caused Mindustry to crash.",
+                        "Mindustry has crashed. How unfortunate.");
+        CrashAnalysis.Report r3b = CrashAnalysis.parse(noL1Inj);
+        List<Mods.Info> mods3 = new ArrayList<Mods.Info>();
+        mods3.add(info("neon", "Neon / 氖", "neon.Neon"));
+        CrashAnalysis.Verdict v7 = CrashAnalysis.judge(r3b, mods3,
+                fakeDex("neon", "mindustry/logic/SugarCanvas$SugarStatementElem"));
+        ok(stat, L, v7.kind == CrashAnalysis.KIND_MOD
+                        && CrashAnalysis.LAYER_DEX.equals(v7.hits.get(0).layer)
+                        && v7.hits.get(0).weight == 2,
+                "★★注入型（游戏的算法在这类上完全瞎）：靠\"这个类在它包里\"点名："
+                        + CrashAnalysis.debugLine(r3b, v7));
+        CrashAnalysis.Verdict v8 = CrashAnalysis.judge(r3b, mods3, fakeDex("neon", "mindustry/logic/LCanvas"));
+        ok(stat, L, v8.kind == CrashAnalysis.KIND_NONE && v8.hits.size() == 1
+                        && v8.hits.get(0).weight == 1,
+                "★元断言：只有\"纯游戏类\"（权重 1）⇒ **不点名**，只留一条弱线索（否则每个模组都会被点名）");
+        String text8 = CrashAnalysis.text(ctx, v8);
+        ok(stat, L, text8.contains("弱线索") && text8.contains("认不出"),
+                "★文案实拼（弱线索 + 认不出两层都在）：" + oneLine(text8));
+
+        // ── 夹具 4：**安卓设备**的真实报告（原版崩，`Mods: none (vanilla)`）──
+        //    出处：docs/crash-corpus/11-安卓设备现成报告.md（cursors/cursor.png）
+        String fxVanilla = fx(new String[]{
+                "Mindustry has crashed. How unfortunate.",
+                "Report this at https://github.com/Anuken/Mindustry/issues/new",
+                "Version: unknown build 0",
+                "Date: 十月 5, 2026 14:41:10 下午",
+                "OS: Linux x (aarch64)",
+                "GL Version: GLES 3.2.0 / Qualcomm / Adreno (TM) 735",
+                "Android API level: 36",
+                "Java Version: 0",
+                "Runtime Available Memory: 512mb",
+                "Cores: 8",
+                "Mods: none (vanilla)",
+                "",
+                "",
+                "arc.util.ArcRuntimeException: Error reading file: cursors/cursor.png (internal)",
+                "\tat arc.backend.android.AndroidFi.read(AndroidFi.java:54)",
+                "\tat arc.backend.file.Fi.readBytes(Fi.java:1)",
+                "Caused by: java.io.FileNotFoundException: cursors/cursor.png",
+                "\tat android.content.res.AssetManager.nativeOpenAsset(Native Method)",
+                "\t... 10 more",
+        });
+        CrashAnalysis.Report r4 = CrashAnalysis.parse(fxVanilla);
+        ok(stat, L, "36".equals(r4.apiLevel) && "unknown build 0".equals(r4.version),
+                "解析（安卓形态）：`Android API level` = " + r4.apiLevel + "，Version = " + r4.version);
+        ok(stat, L, r4.vanilla && r4.mods.isEmpty(), "解析：`Mods: none (vanilla)` 被认出来（不是空 Mods 行）");
+        CrashAnalysis.Verdict v9 = CrashAnalysis.judge(r4, mods3, CrashAnalysis.DEX);
+        ok(stat, L, v9.kind == CrashAnalysis.KIND_VANILLA,
+                "★原版崩 ⇒ 明说\"不是模组的问题\"，**不去猜**：" + oneLine(CrashAnalysis.text(ctx, v9)));
+        CrashAnalysis.Report r4b = CrashAnalysis.parse(
+                fxVanilla.replace("Mods: none (vanilla)", "Mods: neon:110008"));
+        ok(stat, L, !r4b.vanilla && r4b.mods.contains("neon"),
+                "★元断言：把 `none (vanilla)` 换成 `neon:110008` ⇒ 必须不再判成 vanilla");
+
+        // ── 夹具 5：**启动器自己**的崩溃报告（同一套 `crashes/` 目录里的另一种形态）──
+        String fxOwn = fx(new String[]{
+                "MDT 安卓启动器 —— 崩溃报告",
+                "时刻：Mon Oct 05 22:28:11 GMT+08:00 2026（1759674491000）",
+                "线程：main（id=1）",
+                "版本：0.3（vc 3，debuggable=false）",
+                "当前槽：default",
+                "数据根：/storage/emulated/0/Android/data/io.mdt.launcher/files/slot-default",
+                "",
+                "java.lang.IllegalFormatConversionException: %2$d != java.lang.String",
+                "\tat io.mdt.launcher.Blueprints.missingSummary(Blueprints.java:194)",
+        });
+        CrashAnalysis.Report r5 = CrashAnalysis.parse(fxOwn);
+        ok(stat, L, r5.launcherOwn && CrashAnalysis.judge(r5, mods3, CrashAnalysis.DEX).kind
+                        == CrashAnalysis.KIND_LAUNCHER,
+                "★启动器自己的报告：认出来 + **不做模组归因**：" + oneLine(CrashAnalysis.text(ctx,
+                        CrashAnalysis.judge(r5, mods3, CrashAnalysis.DEX))));
+        ok(stat, L, CrashAnalysis.judge(r5, mods3, fakeDexAll()).kind == CrashAnalysis.KIND_LAUNCHER,
+                "★元断言：哪怕给一把\"什么都能命中\"的探针，启动器的报告也不许被点名");
+        CrashAnalysis.Report r5b = CrashAnalysis.parse(fxOwn.replace("MDT 安卓启动器 —— 崩溃报告",
+                "Mindustry has crashed. How unfortunate."));
+        ok(stat, L, !r5b.launcherOwn, "★元断言：首行不是我们的报告头 ⇒ 不再判成启动器报告");
+
+        // ── 夹具 6：读不出 / 没有异常内容 ──
+        CrashAnalysis.Report rEmpty = CrashAnalysis.parse("");
+        ok(stat, L, rEmpty.empty, "空文件 ⇒ 标成 empty（页面上给\"读不出这份报告\"，不是硬凑一个结论）");
+        CrashAnalysis.Verdict vb = CrashAnalysis.judge(CrashAnalysis.parse(""), null, null);
+        ok(stat, L, vb.kind == CrashAnalysis.KIND_BROKEN
+                        && CrashAnalysis.text(ctx, vb).contains("空"),
+                "★空报告文案实拼：" + oneLine(CrashAnalysis.text(ctx, vb)));
+        ok(stat, L, CrashAnalysis.judge(CrashAnalysis.parse("hello\n1234"), mods3,
+                        CrashAnalysis.DEX).kind == CrashAnalysis.KIND_NONE,
+                "不是报告的一段文字 ⇒ 认不出（不抛、不瞎点名）");
+
+        // ── 夹具 7：**ART（安卓运行期）的措辞** —— 与桌面 HotSpot **完全不同款** ──
+        //    出处：docs/crash-corpus/13-ART-措辞-安卓运行期.md §2.1 / §2.4（2026-10-08
+        //    用设备自带 `dalvikvm` 实测的逐字原文）。
+        //    🔴 这条夹具存在的理由：只照桌面语料写正则 ⇒ 手机上 L3 **一根针都抽不出来**。
+        String fxArt = fx(new String[]{
+                "Mindustry has crashed. How unfortunate.",
+                "Version: release build 160.5",
+                "Date: 十月 8, 2026 12:40:00 下午",
+                "OS: Linux x (aarch64)",
+                "Android API level: 36",
+                "Mods: crashtest:1.0",
+                "",
+                "",
+                "java.lang.NoSuchFieldError: No field definitelyNotAField of type I in class"
+                        + " Lmindustry/core/GameState; or its superclasses (declaration of"
+                        + " 'mindustry.core.GameState' appears in /data/local/tmp/boom.jar)",
+                "\tat boom.Boom.main(Unknown Source:8)",
+        });
+        CrashAnalysis.Report rArt = CrashAnalysis.parse(fxArt);
+        ok(stat, L, needleWeight(rArt, "definitelyNotAField") == 3,
+                "★ART 措辞（`No field x of type I in class La/b/C;`）也抽出了成员名针（权重 3）");
+        ok(stat, L, hasNeedle(rArt, "mindustry/core/GameState"),
+                "★ART 措辞里的 owner 类（描述符形态 `L…;`）也进了针袋");
+        ok(stat, L, !hasNeedle(rArt, "I") && !hasNeedle(rArt, "Failed"),
+                "★元断言：`of type I` 里的 `I`（类型描述符）与 `Failed resolution` 里的 `Failed`"
+                        + "**都不是类名**，不许当针（否则每个模组都\"命中\"）");
+        ok(stat, L, needleWeight(rArt, "definitelyNotAField")
+                        == needleWeight(r, "definitelyNotAField"),
+                "★同一根针在两种运行时的措辞里抽出来**必须一样**（ART vs HotSpot）");
+        ok(stat, L, rArt.frameCount == 1,
+                "★ART 的合成类帧（`at boom.Boom.main(Unknown Source:8)`）也能解析 —— "
+                        + "真机那条 Rhino 崩溃就是这种形态");
+        CrashAnalysis.Verdict vArt = CrashAnalysis.judge(rArt, mods1,
+                fakeDex("crashtest", "definitelyNotAField"));
+        ok(stat, L, vArt.kind == CrashAnalysis.KIND_MOD
+                        && CrashAnalysis.LAYER_DEX.equals(vArt.hits.get(0).layer),
+                "★★安卓上靠 ART 措辞也能点名（这正是\"照抄游戏算法\"做不到的那一类）："
+                        + CrashAnalysis.debugLine(rArt, vArt));
+        // ART 的 NoClassDefFoundError：`Failed resolution of: L…;`（HotSpot 是裸的 `a/b/C`）
+        String fxArt2 = fx(new String[]{
+                "Mindustry has crashed. How unfortunate.",
+                "Version: release build 160.5",
+                "Mods: crashtest:1.0",
+                "",
+                "",
+                "java.lang.NoClassDefFoundError: Failed resolution of: Lmindustry/logic/NotThere;",
+                "\tat boom.Boom.main(Unknown Source:14)",
+        });
+        CrashAnalysis.Report rArt2 = CrashAnalysis.parse(fxArt2);
+        ok(stat, L, hasNeedle(rArt2, "mindustry/logic/NotThere") && !hasNeedle(rArt2, "Failed"),
+                "★ART 的 `Failed resolution of: L…;` 抽出的是**描述符里的类**，不是 `Failed` 这个词");
+        // ★ 纯游戏命名空间的类是权重 1（不能点名）；换成"模组自己的包"才是 3 —— 同一条规则
+        String fxArt3 = fx(new String[]{
+                "Mindustry has crashed. How unfortunate.",
+                "Version: release build 160.5",
+                "Mods: depuser:1.0",
+                "",
+                "",
+                "java.lang.NoClassDefFoundError: Failed resolution of: Ldepmod/Dep;",
+                "\tat mindustry.mod.Mods.loadMod(Mods.java:1137)",
+        });
+        CrashAnalysis.Report rArt3 = CrashAnalysis.parse(fxArt3);
+        ok(stat, L, needleWeight(rArt3, "depmod/Dep") == 3,
+                "★同一个 `Failed resolution of:` 形态：模组命名空间的类（`depmod/Dep`）= 3（能点名）");
+
+        // ── 渲染：并列 / 弱线索 / 依据与结论同一行 ──
+        CrashAnalysis.Verdict vMulti = new CrashAnalysis.Verdict();
+        vMulti.kind = CrashAnalysis.KIND_MOD;
+        CrashAnalysis.Hit ha = new CrashAnalysis.Hit();
+        ha.name = "AAA"; ha.layer = CrashAnalysis.LAYER_DEX; ha.evidence = "x.Y"; ha.known = true;
+        CrashAnalysis.Hit hb = new CrashAnalysis.Hit();
+        hb.name = "BBB"; hb.layer = CrashAnalysis.LAYER_DEX; hb.evidence = "x.Y"; hb.known = true;
+        vMulti.hits.add(ha);
+        vMulti.hits.add(hb);
+        String textMulti = CrashAnalysis.text(ctx, vMulti);
+        ok(stat, L, textMulti.contains("AAA") && textMulti.contains("BBB") && textMulti.contains("2"),
+                "★并列：两个模组都点出来、并报数：" + oneLine(textMulti));
+        ok(stat, L, textMulti.length() > CrashAnalysis.text(ctx, v5).length(),
+                "★并列比单条长（多了一段\"分不出是谁\"的说明），不是把两个名字挤成一行");
+        // ★★ 元断言：结论真的**逐字来自命中**（换个名字必须换一句话）—— 防"文案恒真"
+        CrashAnalysis.Verdict vOther = new CrashAnalysis.Verdict();
+        vOther.kind = CrashAnalysis.KIND_MOD;
+        CrashAnalysis.Hit hc = new CrashAnalysis.Hit();
+        hc.name = "ZZZ"; hc.layer = CrashAnalysis.LAYER_L1; hc.evidence = "zzz";
+        vOther.hits.add(hc);
+        ok(stat, L, !CrashAnalysis.text(ctx, vOther).contains("Stealth Path")
+                        && CrashAnalysis.text(ctx, vOther).contains("ZZZ"),
+                "★元断言：换一个命中 ⇒ 实拼的整句跟着换（文案不是恒真的）");
+        ok(stat, L, !CrashAnalysis.text(ctx, v2).contains("%") && !textMulti.contains("%")
+                        && !text8.contains("%"),
+                "★所有实拼路径都没有残留占位符");
+        ok(stat, L, ctx.getString(R.string.crash_verdict_pending).length() > 0
+                        && ctx.getString(R.string.crash_verdict_none).length() > 0,
+                "★\"正在核对模组包…\"与\"认不出\"两条资源都在（页面上那两态）");
+        ok(stat, L, ctx.getResources().getIdentifier("log_crash_verdict", "id",
+                        ctx.getPackageName()) != 0,
+                "★布局里有 `log_crash_verdict`（少一个 `@+id` 时 findViewById 是**静默 null**，"
+                        + "编译与门禁全绿 —— 所以这条必须钉）");
+        ok(stat, L, CrashAnalysis.text(ctx, vMulti).indexOf("classes.dex") > 0,
+                "★依据与结论**同一行**（`它的 classes.dex 里有 …`）：" + oneLine(textMulti));
+
+        // ── 真路径：`Mods.scanDex`（流式字节搜索）—— 判据是"字节搜索"，所以夹具不必是真 dex ──
+        File work = new File(Paths.privateDir(ctx), "selftest-crash-dex");
+        deleteTree(work);
+        try {
+            work.mkdirs();
+            Mods.Info dm = new Mods.Info();
+            dm.directory = true;
+            dm.rootDir = work;
+            dm.hasClassesDex = true;
+            dm.internalName = "dexdemo";
+            dm.fileName = "dexdemo";
+            write(new File(work, "classes.dex"),
+                    ("padpad\u0000\u0001definitelyNotAField-and-mindustry/core/GameState").getBytes("UTF-8"));
+            List<String> pats = new ArrayList<String>();
+            pats.add("definitelyNotAField");
+            pats.add("mindustry/core/GameState");
+            pats.add("notThere");
+            java.util.Set<Integer> got = CrashAnalysis.DEX.scan(dm, pats);
+            ok(stat, L, got.size() == 2 && got.contains(Integer.valueOf(0))
+                            && got.contains(Integer.valueOf(1)),
+                    "★真路径（`Mods.scanDex`）：命中前两根针、第三根没命中：" + got);
+            ok(stat, L, !got.contains(Integer.valueOf(2)),
+                    "★元断言：dex 里没有的串**不许**命中（不是\"扫了就全命中\"）");
+            File gone = new File(work, "classes.dex");
+            ok(stat, L, gone.delete(), "（收尾：删掉假 dex）");
+            ok(stat, L, CrashAnalysis.DEX.scan(dm, pats).isEmpty(),
+                    "★没有 `classes.dex` ⇒ 空集且**不抛**（调用方按\"没证据\"处理）");
+        } catch (Throwable t) {
+            ok(stat, L, false, "F23 的 dex 真路径用例自身异常：" + t);
+        } finally {
+            deleteTree(work);
+        }
+        ok(stat, L, !work.exists() || countFiles(work) == 0,
+                "★自检不把自己的夹具留在用户的私有目录里");
+        L.add("");
+    }
+
+    /** F23 用：把若干行拼成一份报告（`\n` 分隔；**不**在末尾加空行） */
+    private static String fx(String[] lines) {
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < lines.length; i++) {
+            if (i > 0) sb.append('\n');
+            sb.append(lines[i]);
+        }
+        return sb.toString();
+    }
+
+    private static boolean hasNeedle(CrashAnalysis.Report r, String text) {
+        return needleWeight(r, text) >= 0;
+    }
+
+    /** 针的权重；没有这根针返回 -1 */
+    private static int needleWeight(CrashAnalysis.Report r, String text) {
+        if (r == null) return -1;
+        for (CrashAnalysis.Needle n : r.needles) {
+            if (n.text.equals(text)) return n.weight;
+        }
+        return -1;
+    }
+
+    /** F23 用：造一个模组条目（`main` 决定 L2a 能不能命中） */
+    private static Mods.Info info(String internal, String display, String main) {
+        Mods.Info m = new Mods.Info();
+        m.internalName = internal;
+        m.name = internal;
+        m.displayName = display;
+        m.main = main;
+        m.hasClassesDex = true;
+        m.fileName = internal + ".zip";
+        return m;
+    }
+
+    /** F23 用：按"这个模组的 dex 里有这些串"回答的**假探针**（不碰真 dex） */
+    private static CrashAnalysis.DexProbe fakeDex(final String mod, final String... needles) {
+        return new CrashAnalysis.DexProbe() {
+            @Override public java.util.Set<Integer> scan(Mods.Info m, List<String> pats) {
+                java.util.Set<Integer> hit = new java.util.HashSet<Integer>();
+                if (m == null || m.internalName == null || !m.internalName.equals(mod)) return hit;
+                for (int i = 0; i < pats.size(); i++) {
+                    for (String n : needles) {
+                        if (pats.get(i).equals(n)) hit.add(Integer.valueOf(i));
+                    }
+                }
+                return hit;
+            }
+        };
+    }
+
+    /** F23 用：对**任何**针都回答"有"的探针（只用来验"启动器报告不许被点名"那条元断言） */
+    private static CrashAnalysis.DexProbe fakeDexAll() {
+        return new CrashAnalysis.DexProbe() {
+            @Override public java.util.Set<Integer> scan(Mods.Info m, List<String> pats) {
+                java.util.Set<Integer> hit = new java.util.HashSet<Integer>();
+                for (int i = 0; i < pats.size(); i++) hit.add(Integer.valueOf(i));
+                return hit;
+            }
+        };
     }
 
     private static String lastKeyOf(SettingsBin.Values v) {
