@@ -1164,7 +1164,6 @@
 
     <!-- ══ F3 全局设置页（按 Android 语义：这里只放"所有槽共用"的项） ══════ -->
     <string name="act_settings_title">设置</string>
-    <string name="act_settings_sub">深浅色 · 语言 · 默认槽 · 存储 · 关于</string>
     <string name="settings_title">设置</string>
         <string name="set_autoclean_title">自动清理残留</string>
     <string name="set_autoclean_on">已开</string>

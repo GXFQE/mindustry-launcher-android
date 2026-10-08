@@ -1199,13 +1199,11 @@
     <!-- ══ F3 全局设置页（按 Android 语义：这里只放"所有槽共用"的项） ══════ -->
     <string name="act_settings_title">Settings</string>
     <!--
-      ⚠️ `act_settings_sub` 现在**没有任何调用点**（2026-10-08 第 123 轮第二批：「设置」从主界面
-      操作卡搬去顶栏右上角的齿轮 ⇒ 菜单项只有标题、没有副标题）。**刻意保留**：
-      删掉它会让我们自己的 key 消失，而用户语言包里那条翻译就会变成「本版里不存在」的
-      未知键（设置页的「翻译文件」那一行会多报一个数）—— 留着不占地方、也不会有任何症状。
-      ★ 门禁 RES-00 会把它列进"定义了但没人引用"（INFO，不失败），这条注释就是给那行 INFO 的解释。
+      ★ `act_settings_sub` 已删（2026-10-08 第 123 轮第二批）：「设置」从主界面操作卡搬去顶栏
+      右上角的齿轮之后，菜单项只有标题、没有副标题 ⇒ 它没有任何调用点。
+      用户定案：「删了吧，毕竟没发正式版」—— 判据是**这个 key 有没有随正式版发出去过**：
+      发过才需要为用户语言包的兼容留一条死键，没发过就直接删干净。
     -->
-    <string name="act_settings_sub">Theme · language · default slot · storage · about</string>
     <string name="settings_title">Settings</string>
         <string name="set_autoclean_title">Automatic cleanup</string>
     <string name="set_autoclean_on">On</string>
