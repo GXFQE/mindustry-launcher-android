@@ -1600,6 +1600,11 @@
     <string name="mods_warn_dup">⚠ Duplicate name with another package — only one of them takes effect in the game</string>
     <string name="mods_warn_failed">⚠ The last launch did not finish: the game marked every mod in this slot as failed, so it may skip the whole slot next time (this is not about one mod)</string>
     <string name="mods_warn_blamed">⚠ It is the likely cause of the last crash</string>
+
+    <!-- F23 "tell me right away" (2026-10-08, user request) -->
+    <string name="crash_alert_title">The game crashed</string>
+    <string name="crash_alert_toast_fmt">The game crashed: %1$s</string>
+    <string name="crash_alert_open">Open the log</string>
     <string name="mods_warn_backslash_fmt">⚠ This package is packed incorrectly and the game cannot find its scripts — just repack it</string>
     <string name="mods_warn_state_fmt">⚠ State in the game: %1$s</string>
     <string name="mods_warn_disabled">Disabled (the in-game toggle is false)</string>

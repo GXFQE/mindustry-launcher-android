@@ -1,0 +1,56 @@
+F23「崩了马上说一声」—— 真机验证（2026-10-08，用户点单：有没有办法让他崩溃以后立马弹窗提示啊）
+============================================================================================
+■ 做了什么（两条路都要，缺一条就有"事后才知道"的漏网）
+  ① **常驻监视**（本进程活着时）：每 700 ms 看一眼**当前槽**的 `crashes/`，出现新报告 ⇒ 立刻
+     `Toast`（系统浮层，游戏还在前台也看得见）+ 若此刻有前台页面就直接弹对话框；
+  ② **回到界面时补一次**（进程被系统杀过 / 用户自己切回来）：`MainActivity.onResume` →
+     `CrashAlert.catchUp`，判据 = 槽里有游戏写的 `launchid.dat`（"上次启动没跑完"）
+     **且** 最新报告不是已提示过的那份 ⇒ 弹对话框。
+  三条纪律：**只报新的**（监视启动时先快照当时最新的一份）· **同一份只提示一次**
+  （`Config.crash_alert_last` = `<槽>|<文件名>`）· 提示里的结论**只有一份来源**
+  （`CrashAnalysis.text`，不许在弹窗里另写一套话术）。
+  新文件：`CrashAlert.java`；改动：`CrashAnalysis`（抽出 `analyzeReport` + `brief`）、
+  `Config`（`crashAlerted/setCrashAlerted`）、`BaseActivity`（前台挂钩 resume/pause）、
+  `MainActivity.onResume`（start + catchUp）、3 条文案。
+
+■ 真机实验（实验槽 `alertlab` + 造崩探针 `depuser.zip`；**不碰用户槽**）
+  · 分配版本：`dev_assign_key import:official-159.apk --es dev_assign_slot alertlab`
+    → 启动：`dev_launch_key import:official-159.apk`
+  · **第 7 秒**崩（游戏自崩，与之前那批同一个探针）⇒ 报告落盘
+    `slot-alertlab/crashes/crash_1791452303321.txt`（1 份）
+
+  ★ 路径②（回到界面补弹）——**实测就是它先命中**：游戏进程死掉那一刻启动器就回到前台，
+    所以报告一出现就已经弹出对话框（`catchUp` 比 700 ms 轮询更快）：
+      游戏崩了
+      是「MDT Dep Probe」引起的 —— 报告里写着「Error loading mod depuser」
+      [关闭] [看运行日志]
+    截图 `evidence/f23-alert-dialog.png`（本地；png 被 gitignore）
+  ★ 路径①（监视线程 + Toast）——单独逼出来：把一份报告 `cp` 成一个**更新的名字**
+    （`crash_1791453111111.txt`）⇒ 只有监视线程能看到它 ⇒ 同一屏里**Toast 与对话框同时出现**：
+      Toast：游戏崩了：是「MDT Dep Probe」引起的 —— 报告里写着「Error loading mod…」
+      对话框：与上面逐字相同
+    截图 `evidence/f23-alert-toast.png`
+  ⚠️ **验 Toast 的教训**：第一张"对准崩溃瞬间"的截图里**没有** Toast，我差点据此判定
+    "Toast 被系统压掉了"。去 logcat 才拿到铁证 —— **Toast 真的上屏了**：
+      BufferQueueConsumer: [VRI[Toast]#2966(BLAST Consumer)…] disconnect
+      SurfaceControl: nativeRelease … name: Toast#114106 / 8e88b11 Toast#114104
+      NotificationService: Toast already killed. pkg=io.mdt.launcher token=…
+    ⇒ 瞬时 UI（Toast）**不能只看截图的时机**：要么用 logcat 的 surface 证据，要么把截图时机
+      对准（本次最终那张 = 造文件后 `sleep 1` 再 `screencap`）。
+
+  ★ "同一份只提示一次"真的落盘了：`app_hub/config.json` 里
+      `"crash_alert_last": "alertlab|crash_1791453111111.txt"`
+    ⇒ 之后再回到启动器**不会**重复弹（`catchUp` 第一步就命中这条）。
+
+■ 自检 **953 → 962 通过 / 0 失败**（+9 条，判据都是纯函数）
+  ★最新报告 = 名字最大的那份（与 analyzeNewest 同口径）· ★只报比快照新的（快照=200 ⇒ 挑出 300）·
+  ★元断言：快照已是最新 ⇒ 什么都不报（「不烦人」的牙齿）· ★元断言：`sinceMs` 在未来 ⇒ 一个都不报 ·
+  ★新报告一落盘就被挑出来 · ★目录不存在 / null ⇒ 不炸也不报（监视循环每 700 ms 跑一次，容错是硬要求）·
+  ★「同一份只提示一次」的记帐能落盘再读回 · ★两条文案都在 · ★Toast 那句是实拼的、`brief` 只有一行。
+
+■ 清场（都核对过）
+  · 删实验槽 `alertlab`、删 `/data/local/tmp/catch.sh`
+  · 修回 **我自己造的** 两处引用：`version_slots` 里 `import:official-159.apk -> alertlab`
+    （否则是悬空引用）+ `crash_alert_last`（清空；原文件另存 `app_hub/config.json.bak-alertlab`）
+  · 当前槽指针拨回用户原来的 `模组演示`；用户数据未动（**5 个槽 / 8 个存档 / 1 张地图**）
+  · 产品版装回并冒烟（无 FATAL）

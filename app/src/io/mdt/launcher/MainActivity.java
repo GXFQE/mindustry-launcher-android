@@ -1472,6 +1472,13 @@ public class MainActivity extends BaseActivity {
         // 「游戏退出→回启动器」与「划掉游戏→以后再开启动器」两条路径。
         // ⚠️ 必须在 reload 之后 —— 结算要读 session / backup_policy，拿旧值会误判。
         AutoBackup.settle(this);
+        // ★ F23「崩了马上说一声」（2026-10-08 用户点单）：游戏崩了要**当场**知道，
+        //   而不是等用户自己想到去翻「运行日志」。
+        //   ① start = 常驻监视（游戏还在前台时靠 Toast，系统浮层看得见）；
+        //   ② catchUp = 回到界面这一刻补一次（进程被系统杀过也能补上；判据 = 游戏的 launchid.dat）。
+        //   ⚠️ 都放在 rescan/AutoBackup 之后：提示是"锦上添花"，不许挡住主界面自己的刷新。
+        CrashAlert.start(this);
+        CrashAlert.catchUp(this);
     }
 
     /**

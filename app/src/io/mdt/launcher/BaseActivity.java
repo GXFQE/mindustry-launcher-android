@@ -97,6 +97,9 @@ public abstract class BaseActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        // ★ F23「崩了马上说一声」：记下"谁是当前前台页面"——崩溃提示要按这个决定
+        //   "现在弹对话框"还是"只 Toast"（游戏还在前台时弹窗没人看得见）。见 CrashAlert。
+        CrashAlert.activityResumed(this);
         if (!syncUiOnResume() || isFinishing()) return;
         // ★ 必须先把盘上的配置读回来：这两项都是在**另一个 Activity**（设置页）里改的，
         //   而 Config 是进程内单例、只在启动时 load 一次 —— 不 reload 就还是旧值。
@@ -104,5 +107,11 @@ public abstract class BaseActivity extends Activity {
         Config.get().reload(this);
         if (ThemeMode.of(this) != mAppliedTheme
                 || !LocaleMode.of(this).equals(mAppliedLang)) recreate();
+    }
+
+    @Override
+    protected void onPause() {
+        CrashAlert.activityPaused(this);
+        super.onPause();
     }
 }

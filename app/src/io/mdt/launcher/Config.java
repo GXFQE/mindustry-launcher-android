@@ -59,6 +59,12 @@ public final class Config {
     /** F20：进存档页时自动清理数据根残留（默认开；关掉后只能手动清） */
     private static final String K_AUTO_CLEAN = "auto_clean_redundant";
     /**
+     * F23 之后：**已经提示过**的那一份崩溃报告（`&lt;槽&gt;|&lt;文件名&gt;`）—— 同一份只提示一次。
+     *
+     * <p>★ 为什么要有它："崩了马上弹窗"有两条路（进程活着时立刻 Toast / 回到界面时补弹），
+     * 没有这个记帐就会**同一份崩两次提示两次**；反过来，不记又能重开应用再烦一次。
+     */
+    private static final String K_ALERT = "crash_alert_last";    /**
      * 一档④（2026-10-06）：每个版本**上次启动的时刻** { "&lt;版本key&gt;": 毫秒 }。
      *
      * ★ 为什么需要它：{@link #sessionStartedAt()} 记的是"**正在进行**的那一次"，
@@ -208,6 +214,16 @@ public final class Config {
 
     public synchronized void setLastVersion(String v) {
         put(K_LAST, v == null ? "" : v);
+        save();
+    }
+
+    /** F23 之后：已经提示过的那一份崩溃报告（`<槽>|<文件名>`；空串 = 还没提示过任何一份） */
+    public synchronized String crashAlerted() {
+        return mRoot.optString(K_ALERT, "");
+    }
+
+    public synchronized void setCrashAlerted(String v) {
+        put(K_ALERT, v == null ? "" : v);
         save();
     }
 

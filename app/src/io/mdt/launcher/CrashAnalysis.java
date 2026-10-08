@@ -904,14 +904,32 @@ final class CrashAnalysis {
             if (f == null || !f.isFile()) continue;
             if (newest == null || f.getName().compareTo(newest.getName()) > 0) newest = f;
         }
-        if (newest == null || newest.length() > 4L * 1024 * 1024) return null;
+        return analyzeReport(ctx, newest, slot);
+    }
+
+    /**
+     * 分析**指定那一份**报告（{@link #analyzeNewest} 与"崩了马上提示"共用这一条路）。
+     * ⚠️ 必须在**后台线程**调用；读不出来返回 null。
+     */
+    static Verdict analyzeReport(Context ctx, java.io.File f, String slot) {
+        if (f == null || !f.isFile() || f.length() > 4L * 1024 * 1024) return null;
         String body;
         try {
-            body = Util.readText(newest);
+            body = Util.readText(f);
         } catch (Throwable t) {
             return null;
         }
         return judgeFull(ctx, parse(body), slot);
+    }
+
+    /**
+     * 结论的**一行版**（Toast / 标题这类"只给一句"的地方用）：取 {@link #text} 的第一行。
+     * ★ 与 {@link #text} 同一个来源 ⇒ 不会出现"弹窗说 A、日志页说 B"。
+     */
+    static String brief(Context ctx, Verdict v) {
+        String t = text(ctx, v);
+        int nl = t.indexOf('\n');
+        return (nl < 0 ? t : t.substring(0, nl)).trim();
     }
 
     /**

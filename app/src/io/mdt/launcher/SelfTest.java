@@ -3518,6 +3518,52 @@ public final class SelfTest {
                             ctx.getPackageName()) != 0,
                     "★模组页布局里有 `mods_fail_note`（全槽级那句话的落点）");
 
+            // ── ★★ F23「崩了马上说一声」（2026-10-08 用户点单：有没有办法让崩溃以后立马弹窗提示）──
+            //    判据都是纯函数（`CrashAlert.newestName` / `pick`），这里直接喂一个真目录。
+            File ad = new File(new File(ctx.getCacheDir(), "selftest-alert"), "crashes");
+            deleteTree(ad);
+            if (!ad.mkdirs()) { /* 已存在也没关系 */ }
+            write(new File(ad, "crash_100.txt"), "a".getBytes("UTF-8"));
+            write(new File(ad, "crash_300.txt"), "c".getBytes("UTF-8"));
+            write(new File(ad, "crash_200.txt"), "b".getBytes("UTF-8"));
+            ok(stat, L, "crash_300.txt".equals(CrashAlert.newestName(ad)),
+                    "★最新报告 = 名字最大的那份（与 analyzeNewest 同口径）："
+                            + CrashAlert.newestName(ad));
+            ok(stat, L, CrashAlert.pick(ad, "crash_200.txt", 0) != null
+                            && "crash_300.txt".equals(CrashAlert.pick(ad, "crash_200.txt", 0).getName()),
+                    "★只报**比快照新**的（快照=200 ⇒ 挑出 300）—— 否则每次开应用都把历史崩溃报一遍");
+            ok(stat, L, CrashAlert.pick(ad, "crash_300.txt", 0) == null,
+                    "★元断言：快照已是最新 ⇒ **什么都不报**（这条是「不烦人」的牙齿）");
+            ok(stat, L, CrashAlert.pick(ad, "", System.currentTimeMillis() + 60000L) == null,
+                    "★元断言：`sinceMs` 在未来 ⇒ 一个都不报（mtime 那道闸真的在起作用）");
+            write(new File(ad, "crash_400.txt"), "d".getBytes("UTF-8"));
+            ok(stat, L, CrashAlert.pick(ad, "crash_300.txt", 0) != null
+                            && "crash_400.txt".equals(CrashAlert.pick(ad, "crash_300.txt", 0).getName()),
+                    "★新报告一落盘就被挑出来（「立马」那一步的判据）");
+            ok(stat, L, CrashAlert.newestName(new File(ctx.getCacheDir(), "没有这个目录")) .isEmpty()
+                            && CrashAlert.pick(null, "", 0) == null,
+                    "★目录不存在 / null ⇒ 不炸也不报（监视循环每 700 ms 跑一次，容错是硬要求）");
+            String oldAlert = Config.get().crashAlerted();
+            Config.get().setCrashAlerted("m3|crash_400.txt");
+            ok(stat, L, "m3|crash_400.txt".equals(Config.get().crashAlerted()),
+                    "★「同一份只提示一次」的记帐能落盘再读回（Config.crash_alert_last）");
+            Config.get().setCrashAlerted(oldAlert);
+            ok(stat, L, ctx.getString(R.string.crash_alert_title).length() > 0
+                            && ctx.getString(R.string.crash_alert_open).length() > 0,
+                    "★提示用的两条文案在：「" + ctx.getString(R.string.crash_alert_title)
+                            + "」/「" + ctx.getString(R.string.crash_alert_open) + "」");
+            CrashAnalysis.Verdict vAlert = new CrashAnalysis.Verdict();
+            vAlert.kind = CrashAnalysis.KIND_MOD;
+            CrashAnalysis.Hit hAlert = new CrashAnalysis.Hit();
+            hAlert.name = "AAA"; hAlert.layer = CrashAnalysis.LAYER_L1; hAlert.evidence = "x";
+            vAlert.hits.add(hAlert);
+            String toast = Trans.get(ctx, R.string.crash_alert_toast_fmt,
+                    CrashAnalysis.brief(ctx, vAlert));
+            ok(stat, L, toast.contains("AAA") && !toast.contains("%")
+                            && !CrashAnalysis.brief(ctx, vAlert).contains("\n"),
+                    "★Toast 那句是**实拼**的、且 brief 只有一行（多行塞进 Toast 会被截）："
+                            + oneLine(toast));
+
             // ── ★★ 按行标记只许标「归因器点名的那几个」（2026-10-08 用户真机反馈：
             //    「为什么无关模组也被判定到了」）──
             //    背景：游戏自己写的 `mod-<名字>-failed` 是**全槽级**的（加载期一崩全标上，
