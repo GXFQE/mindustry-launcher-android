@@ -36,6 +36,12 @@ import android.net.Uri;
  *
  * 对齐桌面版的项见 BACKLOG「桌面版功能对照表」；Android 无对应物的项（Java 路径 /
  * JVM 参数 / GitHub 镜像 / 隐藏窗口 / 永久删除）一律不做。
+ *
+ * ★ 2026-10-08（第 123 轮，用户点单）补的第二条判据：本页只放**能被改的项**
+ *   （深浅色 / 语言 / 用户语言包 / 默认槽 / 日志保留份数 / 自动清理 / 存储占用）。
+ *   「中转站」「运行日志」是**页面入口**，已搬去主界面的工具卡 ——
+ *   "去设置里找一个页面"本来就不该是用户的心智模型。
+ *   ⚠️ 以后别再往这里加"点开是另一个页面"的行（判据见 SelfTest.pageSkeleton）。
  */
 public class SettingsActivity extends BaseActivity {
 
@@ -109,14 +115,9 @@ public class SettingsActivity extends BaseActivity {
                 });
         mLogsSub = (TextView) rowLogs.findViewById(R.id.act_sub);
 
-        // F7：运行日志入口。与「日志保留份数」相邻 —— 那项是"留多少份"，
-        // 这项是"到哪看"，两者合起来才让日志真的可用。
-        Util.bindAction(root, R.id.row_open_logs, R.drawable.ic_terminal,
-                R.string.act_logs_title, R.string.act_logs_sub, new Runnable() {
-                    @Override public void run() {
-                        startActivity(new Intent(SettingsActivity.this, LogActivity.class));
-                    }
-                });
+        // F7：运行日志入口 —— ★ 2026-10-08（第 123 轮）**搬去主界面的工具卡**了
+        //   （用户点单：「中转站和运行日志不应该放在设置里」）。本页从此只放"能被改的项"，
+        //   不再放"点开是另一个页面"的行。日志份数（下面那行）留在这里 —— 那是一个**设置值**。
 
         // F20（2026-10-03 用户：「我们是不是应该给一些功能加上开关」）：
         // ★ 全工程**唯一一个"静默删文件"**的动作就是它（进存档页时清数据根残留），
@@ -137,16 +138,9 @@ public class SettingsActivity extends BaseActivity {
                     }
                 });
 
-        // 中转站（2026-10-05，第 102 轮）：地图/模组被覆盖或删除时挪进去的旧件在这里。
-        // ★ 入口放全局设置页 —— 中转站不属于任何一个槽（见 activity_settings.xml 里那段注释）。
-        // ★ 副标题是**固定的一句**，不显示份数/体积：那要扫盘（目录形态的模组可能不小），
-        //   而本页每次 onResume 都会重填一遍 —— 为了一个副标题去递归算体积不值得。
-        Util.bindAction(root, R.id.row_trash, R.drawable.ic_trash,
-                R.string.trash_title, R.string.trash_sub, new Runnable() {
-                    @Override public void run() {
-                        startActivity(new Intent(SettingsActivity.this, TrashActivity.class));
-                    }
-                });
+        // 中转站（2026-10-05 第 102 轮）—— ★ 2026-10-08（第 123 轮）**搬去主界面的工具卡**了
+        //   （用户点单）。它仍然不属于任何一个槽（所以没进槽页），只是不再住"设置"里。
+        //   副标题历史上是固定一句、不显示份数/体积（那要递归扫盘），这一点没变。
 
         // 「关于」全部取运行期事实，不写死版本 —— 免得出现"日志说 0.2、界面写 0.1"
         String verName = "?";

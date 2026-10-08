@@ -20,13 +20,15 @@
     <!-- 主界面（F1b 卡片化：操作行拆「主标题 + 副标题」；顶部信息改「摘要 + 可展开详情」） -->
     <string name="main_summary_fmt">%1$d versions · current slot %2$s</string>
     <string name="main_detail_fmt">Save data\n%1$s\n\nLauncher data\n%2$s</string>
+    <string name="act_add_game_title">Add game</string>
+    <string name="act_add_game_sub">Import an APK file · Scan installed games</string>
     <string name="act_add_title">Add package name</string>
     <string name="act_add_sub">Scan other installed game versions</string>
     <string name="act_import_title">Import APK</string>
     <string name="act_import_sub">Pick a file on this device (system file picker)</string>
     <string name="act_saves_title">Saves &amp; Backups</string>
     <string name="act_saves_sub">Slots · backups · import saves</string>
-    <string name="empty_versions">No versions yet.\nUse \"Add package name\" above to scan installed ones, or \"Import APK\" to pick a file.</string>
+    <string name="empty_versions">No versions yet.\nUse \"Add game\" above to import an APK file, or to scan the ones already installed.</string>
 
     <!-- F2：版本列表行（槽徽标 / 可见槽按钮 / 同槽冲突 / 继续上次） -->
     <string name="row_slot_btn">Slot</string>
@@ -1196,7 +1198,7 @@
 
     <!-- ══ F3 全局设置页（按 Android 语义：这里只放"所有槽共用"的项） ══════ -->
     <string name="act_settings_title">Settings</string>
-    <string name="act_settings_sub">Theme · default slot · logs · about</string>
+    <string name="act_settings_sub">Theme · language · default slot · storage · about</string>
     <string name="settings_title">Settings</string>
         <string name="set_autoclean_title">Automatic cleanup</string>
     <string name="set_autoclean_on">On</string>

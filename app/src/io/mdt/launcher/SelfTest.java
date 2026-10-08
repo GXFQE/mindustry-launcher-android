@@ -6614,6 +6614,64 @@ public final class SelfTest {
         } catch (Throwable t) {
             ok(stat, L, false, "TableView 那条元断言自身异常：" + t);
         }
+
+        // ★ 2026-10-08（第 123 轮，用户点单）：主界面的**入口分组**。
+        //   为什么这三条值得单钉：这一轮的改动全是"删一行 / 合一行 / 换个父容器 / 把入口从
+        //   设置页搬到主界面"，而这四件事**都不会让编译或别的自检变红** ——
+        //   少一个 id 的症状只是"这个入口不见了"（findViewById 返回 null 时 Util.bindAction 静默跳过）。
+        //   判据分三处，缺一不可：① 主界面有合并后的那一行 ② 中转站 / 运行日志在**另一张卡**里
+        //   ③ 设置页的**末行**不许再多出东西来（= 那两个入口没有偷偷回到设置里）。
+        try {
+            android.view.View m = inf.inflate(R.layout.activity_main, null);
+            android.view.View addGame = m.findViewById(R.id.row_add_game);
+            android.view.View trash = m.findViewById(R.id.row_trash);
+            android.view.View logs = m.findViewById(R.id.row_open_logs);
+            android.view.ViewGroup opsCard = addGame == null ? null
+                    : (android.view.ViewGroup) addGame.getParent();
+            android.view.ViewGroup toolCard = trash == null ? null
+                    : (android.view.ViewGroup) trash.getParent();
+            boolean grouped = addGame != null && trash != null && logs != null
+                    && toolCard != null && logs.getParent() == toolCard
+                    && opsCard != null && opsCard != toolCard;
+            ok(stat, L, grouped,
+                    "★主界面入口：添加游戏一行 + 工具卡（中转站 / 运行日志）都在，"
+                            + "后两者同卡、且与操作卡是**两张不同的卡**");
+        } catch (Throwable t) {
+            ok(stat, L, false, "主界面入口分组检查自身异常：" + t);
+        }
+        //    元断言：同一套"末行"判据喂**改之前**的形状（在设置卡的末尾塞一行）⇒ 必须判不合格。
+        //    （否则上面那条可能只是因为"末行"这个判据恒真。）
+        try {
+            android.view.View v = inf.inflate(R.layout.activity_settings, null);
+            android.view.View storage = v.findViewById(R.id.row_storage);
+            android.view.ViewGroup card = storage == null ? null
+                    : (android.view.ViewGroup) storage.getParent();
+            boolean isLast = card != null
+                    && card.getChildAt(card.getChildCount() - 1) == storage;
+            ok(stat, L, isLast,
+                    "★设置页：存储占用是设置卡的**最后一行** —— 中转站 / 运行日志不许再回到设置里");
+            if (card != null) {
+                android.view.View extra = new android.view.View(ctx);
+                card.addView(extra);                       // 临时塞一行，模拟"入口又搬回来了"
+                boolean stillLast = card.getChildAt(card.getChildCount() - 1) == storage;
+                card.removeView(extra);
+                ok(stat, L, !stillLast,
+                        "★元断言：往设置卡末尾塞一行之后，上面那条判据必须变红（判据不是恒真的）");
+            } else {
+                ok(stat, L, false, "★元断言：设置卡找不到（row_storage 不在树里）");
+            }
+        } catch (Throwable t) {
+            ok(stat, L, false, "设置页末行检查自身异常：" + t);
+        }
+        // ★「添加游戏」的二选一弹窗：两条路都在（少一条 = 少一个入口，且不报错）
+        try {
+            android.view.View v = inf.inflate(R.layout.dialog_add_game, null);
+            ok(stat, L, v.findViewById(R.id.row_pick_apk) != null
+                            && v.findViewById(R.id.row_add_pkg) != null,
+                    "★「添加游戏」弹窗：导入 APK / 添加包名两条路都在");
+        } catch (Throwable t) {
+            ok(stat, L, false, "添加游戏弹窗检查自身异常：" + t);
+        }
         L.add("");
     }
 

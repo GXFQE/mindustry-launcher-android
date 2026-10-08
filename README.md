@@ -41,8 +41,9 @@ point the game at that directory when it starts.
    [Building](docs/DEVELOPING.md#构建)). It requires **Android 8.0 (API 26)** or newer; during
    development it was verified on a real device running **Android 16 (API 36)**.
 3. **Import and play**:
-   - Open the launcher → **Import APK** and pick your APK (a copy is made into the app's private
-     directory), or use **Add package name** to scan game versions already installed on the phone;
+   - Open the launcher → **Add game** and pick one of the two: **Import APK** to choose your APK
+     (a copy is made into the app's private directory), or **Add package name** to scan game
+     versions already installed on the phone;
    - assign it a **slot** (use a different slot per version and the saves will not overwrite each
      other);
    - tap that version to launch. **Continue** goes straight back to the version you launched last.
@@ -170,15 +171,16 @@ that, including switching back to following the system.
   station keeps at most 20 items (3 whole slots) and pushes out the oldest beyond that
 
 ### Logs and settings
-- **Runtime log page** (Settings → Runtime log): the launcher's own log, the game log, and crash
+- **Runtime log page** (home → Runtime log): the launcher's own log, the game log, and crash
   reports as separate sections, each with its age and size; the oldest crash reports can be deleted
   from there, and **Export all logs** writes everything into one file
+- **Transfer station** (home → Transfer station): deleted maps, mods, slots and blueprints wait
+  there and can be put back
 - **Theme**: follow system / light / dark, and **Language**: follow system / English / 简体中文 —
   both switched inside the app, without touching system settings
-- **Settings**: default slot for newly found versions, how many crash reports to keep,
-  automatic cleanup (with a manual "clean up once now"), **storage used** (what each slot, the
-  backups and the transfer station take, and how much the content-addressed store saves), and the
-  transfer station
+- **Settings** (only things you can *change*): default slot for newly found versions, how many crash
+  reports to keep, automatic cleanup (with a manual "clean up once now"), and **storage used** (what
+  each slot, the backups and the transfer station take, and how much the content-addressed store saves)
 
 ## What is not there yet
 

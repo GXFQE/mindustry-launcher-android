@@ -20,13 +20,15 @@
     <!-- 主界面（F1b 卡片化：操作行拆「主标题 + 副标题」；顶部信息改「摘要 + 可展开详情」） -->
     <string name="main_summary_fmt">%1$d 个版本 · 当前槽 %2$s</string>
     <string name="main_detail_fmt">存档数据\n%1$s\n\n启动器数据\n%2$s</string>
+    <string name="act_add_game_title">添加游戏</string>
+    <string name="act_add_game_sub">导入 APK 文件 · 扫描已安装的游戏</string>
     <string name="act_add_title">添加包名</string>
     <string name="act_add_sub">扫描其他已安装的游戏版本</string>
     <string name="act_import_title">导入 APK</string>
     <string name="act_import_sub">从本机文件选择（经系统文件选择器）</string>
     <string name="act_saves_title">存档与备份</string>
     <string name="act_saves_sub">槽 · 备份恢复 · 导入存档</string>
-    <string name="empty_versions">还没有任何版本。\n用上面的「添加包名」扫描已装的，或「导入 APK」选本机文件。</string>
+    <string name="empty_versions">还没有任何版本。\n用上面的「添加游戏」导入 APK，或扫描已经装好的游戏。</string>
 
     <!-- F2：版本列表行（槽徽标 / 可见槽按钮 / 同槽冲突 / 继续上次） -->
     <string name="row_slot_btn">槽</string>
@@ -1162,7 +1164,7 @@
 
     <!-- ══ F3 全局设置页（按 Android 语义：这里只放"所有槽共用"的项） ══════ -->
     <string name="act_settings_title">设置</string>
-    <string name="act_settings_sub">深浅色 · 默认槽 · 日志 · 关于</string>
+    <string name="act_settings_sub">深浅色 · 语言 · 默认槽 · 存储 · 关于</string>
     <string name="settings_title">设置</string>
         <string name="set_autoclean_title">自动清理残留</string>
     <string name="set_autoclean_on">已开</string>

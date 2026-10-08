@@ -1427,13 +1427,11 @@ public class MainActivity extends BaseActivity {
         mBtnContinue = root.findViewById(R.id.btn_continue);
         mContinueText = (TextView) root.findViewById(R.id.continue_text);
 
-        Util.bindAction(root, R.id.row_add, R.drawable.ic_add, R.string.act_add_title,
-                R.string.act_add_sub, new Runnable() {
-                    @Override public void run() { promptAddPackage(); }
-                });
-        Util.bindAction(root, R.id.row_import, R.drawable.ic_download, R.string.act_import_title,
-                R.string.act_import_sub, new Runnable() {
-                    @Override public void run() { pickApkViaSaf(); }
+        // ★ 2026-10-08（第 123 轮，用户点单）：原来这里是**两行**（添加包名 / 导入 APK）。
+        //   它们是同一件事的两条路 ⇒ 合成一行「添加游戏」，点开二选一（见 promptAddGame）。
+        Util.bindAction(root, R.id.row_add_game, R.drawable.ic_add, R.string.act_add_game_title,
+                R.string.act_add_game_sub, new Runnable() {
+                    @Override public void run() { promptAddGame(); }
                 });
         Util.bindAction(root, R.id.row_saves, R.drawable.ic_folder, R.string.act_saves_title,
                 R.string.act_saves_sub, new Runnable() {
@@ -1448,6 +1446,22 @@ public class MainActivity extends BaseActivity {
                 R.string.act_settings_title, R.string.act_settings_sub, new Runnable() {
                     @Override public void run() {
                         startActivity(new Intent(MainActivity.this, SettingsActivity.class));
+                    }
+                });
+
+        // ★ 工具卡（2026-10-08，第 123 轮，用户点单）：中转站 / 运行日志从设置页搬来。
+        //   判据：这两项都不是"设置" —— 一个是 per-hub 的回收站，一个是诊断用的日志页；
+        //   设置页只留"能被改的项"（见 activity_main.xml / activity_settings.xml 里的注释）。
+        Util.bindAction(root, R.id.row_trash, R.drawable.ic_trash,
+                R.string.trash_title, R.string.trash_sub, new Runnable() {
+                    @Override public void run() {
+                        startActivity(new Intent(MainActivity.this, TrashActivity.class));
+                    }
+                });
+        Util.bindAction(root, R.id.row_open_logs, R.drawable.ic_terminal,
+                R.string.act_logs_title, R.string.act_logs_sub, new Runnable() {
+                    @Override public void run() {
+                        startActivity(new Intent(MainActivity.this, LogActivity.class));
                     }
                 });
 
@@ -2100,6 +2114,40 @@ public class MainActivity extends BaseActivity {
             try { Thread.sleep(50); } catch (InterruptedException ignored) { }
         }
         return true;
+    }
+
+    /**
+     * 第 123 轮（2026-10-08，用户点单）：主界面「添加游戏」那一行的二选一。
+     *
+     * ★ 为什么合成一行：{@link #promptAddPackage()} 与 {@link #pickApkViaSaf()}
+     *   是**同一件事的两条路**（把一个游戏版本交给启动器）—— 一条是"手机上已经装了，去扫出来"，
+     *   一条是"手上有个 APK 文件，导进来"。并排占两行会被读成"要分两步走"，
+     *   而主界面每一行都该是一件独立的事。
+     *
+     * ★ 为什么弹窗用两行 `row_action`（而不是 `setItems` 的一行一条纯文字）：
+     *   两条路的区别恰恰在**副标题**里（走系统文件选择器 / 扫描已装应用），
+     *   纯文字列表说不清；而这两行的排版与主界面完全同款 ⇒ 从"两行"变成"弹窗里两行"，
+     *   用户看到的东西是连续的，只是不再占主界面的位置。
+     *
+     * ⚠️ 顺序 = 常用度：导入 APK 在前。⚠️ 与 `dialog_add_game.xml` 里的顺序必须一致。
+     * ⚠️ 两个回调都要先 `dismiss()` 再干活：弹窗自己不会因为启动了下一个界面就关掉。
+     */
+    private void promptAddGame() {
+        View box = getLayoutInflater().inflate(R.layout.dialog_add_game, null);
+        final AlertDialog dlg = new AlertDialog.Builder(this)
+                .setTitle(R.string.act_add_game_title)
+                .setView(box)
+                .setNegativeButton(R.string.cancel, null)
+                .create();
+        Util.bindAction(box, R.id.row_pick_apk, R.drawable.ic_download,
+                R.string.act_import_title, R.string.act_import_sub, new Runnable() {
+                    @Override public void run() { dlg.dismiss(); pickApkViaSaf(); }
+                });
+        Util.bindAction(box, R.id.row_add_pkg, R.drawable.ic_add,
+                R.string.act_add_title, R.string.act_add_sub, new Runnable() {
+                    @Override public void run() { dlg.dismiss(); promptAddPackage(); }
+                });
+        dlg.show();
     }
 
     private void promptAddPackage() {

@@ -34,7 +34,14 @@
             android:paddingTop="12dp"
             android:paddingBottom="14dp">
 
-            <!-- 设置项：只有"所有槽共用"的项才放这里；按槽生效的项在存档页的槽菜单里 -->
+            <!--
+              设置项：只有"所有槽共用"的项才放这里；按槽生效的项在存档页的槽菜单里。
+              ★ 2026-10-08（第 123 轮，用户点单）：本卡**只放"能被改的项"** ——
+                「中转站」「运行日志」这两个**页面入口**搬去了主界面的工具卡
+                （它们不是设置：一个是回收站、一个是诊断日志页）。
+                ⚠️ 以后别再往这里加"点开是另一个页面"的行 —— 判据见
+                SelfTest.pageSkeleton 里"row_storage 必须是本卡最后一行"那条断言。
+            -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -117,20 +124,6 @@
                     android:layout_marginStart="62dp"
                     android:background="@color/divider" />
 
-                <!-- F7：运行日志入口。放在「日志保留份数」下方 —— 一个是"留多少份"，
-                     一个是"到哪看"，本来就是同一件事的两半，挨着才对。 -->
-                <include
-                    android:id="@+id/row_open_logs"
-                    layout="@layout/row_action"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content" />
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="62dp"
-                    android:background="@color/divider" />
-
                 <!--
                   F20：自动清理数据根残留（开关）。
                   ★ 放在这张卡的末位：前四项用户天天改，这一项一年碰不了一次。
@@ -150,34 +143,18 @@
                     android:background="@color/divider" />
 
                 <!--
-                  存储占用（一档③+⑦，2026-10-06）。★ 放在「自动清理」与「中转站」之间：
-                    它统计的正是"各槽 / 备份 / 中转站"各占多少，而下一行就是中转站本体 ——
-                    用户看完"中转站占了 120 MB"接着就想进去处理它。
+                  存储占用（一档③+⑦，2026-10-06）。
+                  ★ **这一行现在是本卡的末位**（2026-10-08，第 123 轮）：它下面原来的
+                    「中转站」搬去主界面的工具卡了（用户点单：中转站 / 运行日志不是"设置"）。
+                    ⚠️ 连带后果：2026-10-06 那句"下一行就是中转站本体，用户看完占了 120 MB
+                    接着就想进去处理"的**就近原则已经不成立** —— 想保留那点顺手，
+                    得把这一行也搬去工具卡（本轮没搬，见 REF §84）。
                   ★ 只读弹窗：数字在后台算（要遍历对象池与所有槽），所以点开先显示"正在统计…"。
                   ★ 为什么不单开一页：这一页只有数字、没有交互 ⇒ 弹窗足够，
                     也省掉"新页面必须补 insets / 继承 BaseActivity / 注册清单"这三件都踩过的事。
                 -->
                 <include
                     android:id="@+id/row_storage"
-                    layout="@layout/row_action"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content" />
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="62dp"
-                    android:background="@color/divider" />
-
-                <!--
-                  中转站（2026-10-05，第 102 轮）。★ 放在这张卡的**末位**：
-                    前几项用户天天改，这一项只在"东西被删了想找回来"时才来。
-                  ★ 为什么入口在**全局设置页**而不是某个槽里：中转站是 per-hub 的、不属于任何槽
-                    （地图与模组的中转站是同一个地方），塞进槽页会让用户以为里面只有这个槽的东西。
-                    放回去时**再选目标槽**，那一问在页面里。
-                -->
-                <include
-                    android:id="@+id/row_trash"
                     layout="@layout/row_action"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />

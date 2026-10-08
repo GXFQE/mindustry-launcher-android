@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  「添加游戏」的二选一弹窗（第 123 轮，2026-10-08）。
+
+  ★ 为什么主界面只留一行、两条路进弹窗：见 activity_main.xml 里那段注释 ——
+    「添加包名」与「导入 APK」是同一件事的两条路，并排两行会被读成"两步"。
+  ★ 为什么不用 `AlertDialog.setItems`（一行一条纯文字）而用两行 row_action：
+    两条路的区别在**副标题**里（一条走系统文件选择器；一条是扫描已经装在手机上的游戏版本），
+    纯文字列表说不清"这两条到底差在哪"，而这两行的排版与主界面完全同款 ⇒ 视觉上也连贯。
+  ★ 顺序 = 常用度：导入 APK（手上有安装包时走这条）在前，添加包名在后。
+  ★ 本布局**不带卡片背景**：宿主是对话框自己的 surface，再套一层 card_bg 会出双层描边。
+  ★ `<include>` 上覆盖 android:id 之后，`findViewById(include 的 id)` 命中的是**行根**
+    ⇒ 代码侧必须从行根开始找 act_icon / act_title / act_sub（见 Util.bindAction 的注释）。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingTop="4dp"
+    android:paddingBottom="4dp">
+
+    <include
+        android:id="@+id/row_pick_apk"
+        layout="@layout/row_action"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginStart="62dp"
+        android:background="@color/divider" />
+
+    <include
+        android:id="@+id/row_add_pkg"
+        layout="@layout/row_action"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+</LinearLayout>

@@ -8,7 +8,8 @@
           ├ 顶部区（原"固定"，现随整页一起滚）
           │   ├ 状态摘要卡 —— 默认一行，点一下展开完整路径（F1b 的「弱化信息块」决策）
           │   ├ 主按钮「继续上次」—— 仅当 lastVersion 能在已发现版本里命中时可见
-          │   └ 操作分组卡 —— 添加包名 / 导入 APK / 存档与备份 / 设置（四行 + 细分割线）
+          │   ├ 操作分组卡 —— 添加游戏 / 存档与备份 / 设置（三行 + 细分割线）
+          │   └ 工具卡 —— 中转站 / 运行日志（第 123 轮从设置页搬来，两行 + 细分割线）
           ├ 版本列表容器（LinearLayout，条目由代码 addView 全展开）
           └ 空态 TextView（可见性由代码控制，不再依赖 setEmptyView）
 
@@ -158,7 +159,17 @@
 
             </LinearLayout>
 
-            <!-- 操作分组卡（五行共用 row_action，行间细分割线） -->
+            <!--
+              操作分组卡（三行共用 row_action，行间细分割线）。行顺序 = 使用频率。
+
+              ★ 2026-10-08（第 123 轮，用户点单）：「添加包名」「导入 APK」原本各占一行 ——
+                它们是**同一件事的两条路**（把一个游戏版本交给启动器），并排两行会让人以为
+                要分两步走，主界面也白占一行。现在合成一行「添加游戏」，两条路进弹窗
+                （见 MainActivity.promptAddGame 与 layout/dialog_add_game.xml）。
+              ⚠️ 加/删一行时**分割线要跟着一起加/删**：2026-10-06 就是"删了行没删线"，
+                真机上「存档与备份」与「设置」之间留了一条**双线空档**（看着像少了一行）。
+                aapt2 / 编译器对"多一条 1dp 的线"完全无感，判据只能靠**看**。
+            -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
@@ -167,19 +178,7 @@
                 android:background="@drawable/card_bg">
 
                 <include
-                    android:id="@+id/row_add"
-                    layout="@layout/row_action"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content" />
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="62dp"
-                    android:background="@color/divider" />
-
-                <include
-                    android:id="@+id/row_import"
+                    android:id="@+id/row_add_game"
                     layout="@layout/row_action"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
@@ -196,12 +195,6 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
 
-                <!--
-                  ★ 2026-10-06（三档）：这里原来是**两条分割线中间夹一个空行** ——
-                    导航重构把「模组」行收进槽二级页面时，只删了那一行、没删它下面那条线
-                    ⇒ 真机上「存档与备份」与「设置」之间是一条**双线空档**（看着像少了一行）。
-                  ⚠️ 判据只能靠**看**：aapt2 / 编译器对"多一条 1dp 的线"完全无感。
-                -->
                 <View
                     android:layout_width="match_parent"
                     android:layout_height="1dp"
@@ -210,6 +203,43 @@
 
                 <include
                     android:id="@+id/row_settings"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
+            <!--
+              工具卡（2026-10-08，第 123 轮，用户点单）：中转站 + 运行日志。
+
+              ★ 为什么从**设置页**搬到这里：这两项都不是"设置" —— 一个是 per-hub 的回收站
+                （数据恢复），一个是诊断用的日志页（排查用）。它们原来住在设置页，
+                而设置页该只放"能被改的项"（深浅色 / 语言 / 默认槽 / 日志份数 / 自动清理…）。
+              ★ 为什么单独一张卡、而不是并进上面那张：上面那张是"把一个游戏跑起来"这条主线
+                （添加 / 存档 / 设置），这两项是"事后处理与排查"；分组靠卡片分开，
+                不靠加文字标题（本工程所有卡片都没有标题，只有设置页的「关于」例外）。
+              ★ 顺序：中转站在前 —— 它和「存档与备份」是同一族（东西没了去哪找回来）。
+            -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/card_gap"
+                android:orientation="vertical"
+                android:background="@drawable/card_bg">
+
+                <include
+                    android:id="@+id/row_trash"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="62dp"
+                    android:background="@color/divider" />
+
+                <include
+                    android:id="@+id/row_open_logs"
                     layout="@layout/row_action"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
