@@ -5498,6 +5498,28 @@ public final class SelfTest {
             ok(stat, L, gateCount == 6 && gateMiss.length() == 0,
                     "★P3：六道加载门的标签齐全；**没通过的**那几关必须给原因（通过了可只画一行）；"
                             + "门数=" + gateCount + "，缺=" + gateMiss);
+            // ★★ 2026-10-08（用户真机澄清：「是游戏崩溃自己关的啊」）：状态行**不许把它归到用户头上** ——
+            //   整槽跳过时是**游戏**写 `-enabled=false`（见 Mods.failedKey 的 Javadoc），而我们
+            //   **分不出**是谁关的（跳过 / 用户手动都可能）⇒ 只说状态。要归因的位置是下面那道门
+            //   （那里有 `-failed` 这个真证据）。原来写的是「被用户关闭」= 甩锅给用户。
+            String stOff = ctx.getString(R.string.mods_state_disabled);
+            String stOffEn = enCtx.getString(R.string.mods_state_disabled);
+            ok(stat, L, !stOff.contains("用户") && !stOff.contains("你")
+                            && !stOffEn.toLowerCase(java.util.Locale.ROOT).contains("user")
+                            && !stOffEn.toLowerCase(java.util.Locale.ROOT).contains("you"),
+                    "★★状态行不甩锅：关闭态只说「" + stOff + "」/「" + stOffEn
+                            + "」—— 不提「用户」（那是**游戏自己**在整槽跳过时关的，我们分不出是谁关的）");
+            // ★★ 2026-10-08：**徽标说完了的状态，正文不许再喊一遍**（用户真机："还是乱的" ——
+            //   行里徽标「已关闭」+ 正文「游戏里的状态：已关闭」）。判据 = 短形式 == 句子形式。
+            ok(stat, L, ModsText.badgeSaysIt(ctx, Mods.State.DISABLED)
+                            && !ModsText.badgeSaysIt(ctx, Mods.State.MISSING_DEPENDENCIES)
+                            && !ModsText.badgeSaysIt(ctx, Mods.State.UNSUPPORTED),
+                    "★★「徽标说完了就不在正文重复」有分辨力：已关闭 ⇒ 说完了（"
+                            + ctx.getString(R.string.mods_badge_disabled) + " == "
+                            + ctx.getString(R.string.mods_state_disabled) + "）；"
+                            + "缺依赖 ⇒ 没说完（" + ctx.getString(R.string.mods_badge_missing_deps)
+                            + " ≠ " + ctx.getString(R.string.mods_state_missing_deps)
+                            + "，正文那句必须留着）");
             // 🔴 2026-10-08：上面那把尺子**只喂了"启用中"的夹具** ⇒ 漏掉一整类：
             //   模组被关掉时那道「游戏里是启用状态」不通过，而它的原因只在"设置没读到"时才给
             //   ⇒ 详情页那行（❌ 标签 + 换行 + 原因）**直接印出 null**（用户截图抓到的）。

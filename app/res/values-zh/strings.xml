@@ -631,7 +631,11 @@
     <string name="mods_state_incomplete_deps">依赖被禁用/失效</string>
     <string name="mods_state_circular_deps">循环依赖</string>
     <string name="mods_state_unsupported">与当前游戏版本不兼容</string>
-    <string name="mods_state_disabled">被用户关闭</string>
+    <!-- ★ 2026-10-08 用户真机澄清：「是游戏崩溃自己关的啊」—— 原来写「被用户关闭」是**把游戏干的事
+         记到用户头上**：整槽跳过时游戏会写 `-enabled=false`（见 Mods.failedKey 的 Javadoc），
+         我们**分不出**是谁关的（有可能是跳过、也有可能是用户手动）⇒ 只说状态，别归因。
+         真要归因的位置是下面那道门（那里有 `-failed` 这个真证据）。 -->
+    <string name="mods_state_disabled">已关闭</string>
     <string name="mods_badge_missing_deps">缺依赖</string>
     <string name="mods_badge_incomplete_deps">依赖失效</string>
     <string name="mods_badge_unsupported">版本不符</string>

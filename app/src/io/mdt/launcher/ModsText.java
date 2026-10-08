@@ -50,6 +50,21 @@ final class ModsText {
     }
 
     /**
+     * ★ **这个状态下，徽标是不是已经把话说完了**（2026-10-08 用户真机：「还有现在还是乱的」）。
+     *
+     * <p>列表行的构成是「标题 + 徽标（短形式）+ 正文（可能含一句「游戏里的状态：…」）」。
+     * 当短形式与句子形式**逐字相同**时（如「已关闭」），正文那句就是**同一行里同一个词喊两遍**
+     * —— 判据是"徽标说完了没有"，而不是"这是哪个状态"：{@code stateBadge == stateLabel} ⇒ 说完了。
+     *
+     * <p>⚠️ 反例（必须**保留**正文那句）：`MISSING_DEPENDENCIES` 徽标只写「缺依赖」，
+     * 句子形式是「缺少依赖的模组」—— 正文那句才有信息量。
+     */
+    static boolean badgeSaysIt(Context c, Mods.State st) {
+        String b = stateBadge(c, st);
+        return !b.isEmpty() && b.equals(stateLabel(c, st));
+    }
+
+    /**
      * 模组**说明文件**读不出来时的"人话版"原因（原来在 `Mods.Info.metaReason()` 里）。
      *
      * ★ 为什么搬出来：`Mods.Info` 是纯数据类、拿不到 `Context`，而这两句会经

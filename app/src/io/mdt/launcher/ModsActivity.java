@@ -903,14 +903,21 @@ public class ModsActivity extends BaseActivity {
             if (m.backslashEntries > 0) {
                 warns.add(Trans.get(ModsActivity.this, R.string.mods_warn_backslash_fmt, m.backslashEntries));
             }
-            if (st == Mods.State.DISABLED) {
-                warns.add(Trans.get(ModsActivity.this, R.string.mods_warn_disabled));
-            } else if (st == Mods.State.UNSUPPORTED) {
+            // 🔴 2026-10-08（用户真机：「还有现在还是乱的」）：这里原来加一句
+            //   `mods_warn_disabled` =「已关闭（游戏里的开关是 false）」—— 而**徽标已经写着「已关闭」**
+            //   ⇒ 同一行里同一个词出现两次。**删掉**：徽标说状态就够了。
+            //   ⚠️ 而且"是谁关的"这事我们**分不出**（整槽跳过时是游戏关的，也可能是用户手动关的），
+            //   真要归因的位置是**摘要卡**（槽级、说一次）与详情页那道门（有 `-failed` 这个真证据），
+            //   搁在按行的副标题里就是 §85.16 那类错。
+            //   `mods_warn_disabled` 键**保留不再引用**（v0.3 已发出去过 ⇒ 用户语言包可能装着它）。
+            if (st == Mods.State.UNSUPPORTED) {
                 // ⚠️ 不写「状态：与当前游戏版本不兼容」—— 那个状态**只有三个成因**
                 //    （版本不够 / minMajor 太低 / 黑名单），上面三行各自都说过一次了。
                 //    徽标已经写着状态，正文再复述一遍就是纯噪声（同一件事两处喊）。
-            } else if (st != Mods.State.ENABLED) {
-                // 依赖类的状态没有别的行会说，必须在正文里点名
+            } else if (st != Mods.State.ENABLED && !ModsText.badgeSaysIt(this, st)) {
+                // 依赖类的状态没有别的行会说，必须在正文里点名；
+                // 🔴 但**徽标已经把话说完了**的那些状态（短形式与句子形式逐字相同，如「已关闭」）
+                //    不许在正文里再喊一遍 —— 判据在 `ModsText.badgeSaysIt`（自检钉着它）。
                 warns.add(Trans.get(ModsActivity.this, R.string.mods_warn_state_fmt, ModsText.stateLabel(this, st)));
             }
         }

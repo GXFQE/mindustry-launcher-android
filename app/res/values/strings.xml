@@ -792,7 +792,7 @@
     <string name="mods_state_incomplete_deps">a dependency is disabled or broken</string>
     <string name="mods_state_circular_deps">circular dependency</string>
     <string name="mods_state_unsupported">not compatible with this game version</string>
-    <string name="mods_state_disabled">turned off by the user</string>
+    <string name="mods_state_disabled">off</string>
     <string name="mods_badge_missing_deps">missing deps</string>
     <string name="mods_badge_incomplete_deps">dep broken</string>
     <string name="mods_badge_unsupported">version</string>
