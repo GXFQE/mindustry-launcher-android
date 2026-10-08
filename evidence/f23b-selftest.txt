@@ -1,6 +1,6 @@
-MDT M3 自检   Thu Oct 08 12:21:17 GMT+08:00 2026
+MDT M3 自检   Thu Oct 08 12:51:06 GMT+08:00 2026
 
-===== 通过 902 项，失败 0 项 =====
+===== 通过 911 项，失败 0 项 =====
 无失败项。下方依次是环境信息、逐项明细、清理与用时。
 
 ── F23 崩溃分析（四层判据 + 认不出就说不认识）──
@@ -50,6 +50,15 @@ MDT M3 自检   Thu Oct 08 12:21:17 GMT+08:00 2026
   ✅ ★★安卓上靠 ART 措辞也能点名（这正是"照抄游戏算法"做不到的那一类）：kind=MOD version=release build 160.5 mods=[crashtest] chain=1 frames=1 needles=3 top=java.lang.NoSuchFieldError: No field definitelyNotAField of type I in class Lmindustry/core/GameState; or its supercla… hits=Crash Test(L3/w3/definitelyNotAField) dex=1
   ✅ ★ART 的 `Failed resolution of: L…;` 抽出的是**描述符里的类**，不是 `Failed` 这个词
   ✅ ★同一个 `Failed resolution of:` 形态：模组命名空间的类（`depmod/Dep`）= 3（能点名）
+  ✅ ★真机报告（14 片）：Version / Mods 逐字解析出来了
+  ✅ ★真机报告：追出了 Caused by 链（2 节）
+  ✅ ★★真机报告里**没有** Likely Cause —— 载入期崩游戏自己归因不了（桌面结论在安卓复现）
+  ✅ ★真机报告的 ART 措辞抽出了成员名针（w3）与 owner 类
+  ✅ ★★真机报告 · L1b：直接点名（显示名从槽里的 mod.hjson 查出来）：kind=MOD version=release build 159.7 (Built July 19, 2026 17:39 PM) mods=[crashtest] chain=2 frames=11 needles=10 top=java.lang.RuntimeException: Error loading mod crashtest hits=MDT Crash Probe(L1b/w3/crashtest) dex=-1
+  ✅ ★真机报告文案实拼：是「MDT Crash Probe」引起的 —— 报告里写着「Error loading mod crashtest」
+  ✅ ★★真机报告 · L2a：帧 `boom.Boom.init(Boom.java:21)` 落在 main 的包下 ⇒ 点名：kind=MOD version=release build 159.7 (Built July 19, 2026 17:39 PM) mods=[crashtest] chain=2 frames=11 needles=10 top=java.lang.RuntimeException: something else hits=MDT Crash Probe(L2/w3/boom.Boom) dex=-1
+  ✅ ★★真机报告 · L3：只剩符号也要点名（扫 1 个 dex）：kind=MOD version=release build 159.7 (Built July 19, 2026 17:39 PM) mods=[crashtest] chain=2 frames=10 needles=9 top=java.lang.RuntimeException: something else hits=MDT Crash Probe(L3/w3/definitelyNotAField) dex=1
+  ✅ ★元断言：同一份报告、dex 里什么都没有 ⇒ 认不出（L3 那条不是恒真的）
   ✅ ★并列：两个模组都点出来、并报数：报告指向 2 个模组：「AAA」, 「BBB」 「AAA」—— 它的 classes.dex 里有 x.Y（这次启动没加载它） 「BBB」—— 它的 classes.dex 里有 x.Y（这次启动没加载它） 它们命中的是同一条依据，这份报告分不出是谁（把别的模组打包进自己包里的也…
   ✅ ★并列比单条长（多了一段"分不出是谁"的说明），不是把两个名字挤成一行
   ✅ ★元断言：换一个命中 ⇒ 实拼的整句跟着换（文案不是恒真的）
@@ -64,3 +73,4 @@ MDT M3 自检   Thu Oct 08 12:21:17 GMT+08:00 2026
   ✅ ★自检不把自己的夹具留在用户的私有目录里
 
 ── ㉘ F10 地图增删（导入 / 删除）──
+  ✅ ★导入：落盘成功、内容一致、**没有 .part 残留**，且读出真名「导入测试图」

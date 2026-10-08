@@ -1,4 +1,4 @@
-﻿F23 ART wording probe (2026-10-08) - raw stderr from the device runtime (dalvikvm), 4 linkage errors.
+F23 ART wording probe (2026-10-08) - raw stderr from the device runtime (dalvikvm), 4 linkage errors.
 Recipe + full source: docs/crash-corpus/13-ART-措辞-安卓运行期.md
 Probe jar: .tmp-artlab (javac --release 8 + d8, no game, no user data).
 

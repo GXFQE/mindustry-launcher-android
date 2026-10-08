@@ -3183,6 +3183,92 @@ public final class SelfTest {
         ok(stat, L, needleWeight(rArt3, "depmod/Dep") == 3,
                 "★同一个 `Failed resolution of:` 形态：模组命名空间的类（`depmod/Dep`）= 3（能点名）");
 
+        // ── 夹具 8：**真机上造出来的整份报告**（安卓 + 自造 Java dex 模组）──
+        //    出处：docs/crash-corpus/14-真机造崩-Java-dex-模组.md（2026-10-08，逐字；
+        //    设备 = HONOR ELP-AN00 / Android 16，游戏 = 导入的 official-159.apk = 159.7）。
+        //    ★ 它一条夹具同时钉三件事：① 载入期崩**没有** Likely Cause；
+        //      ② ART 措辞真的出现在游戏报告里；③ 三层判据逐层都点得出名（L1b → L2a → L3）。
+        String fxDevice = fx(new String[]{
+                "Mindustry has crashed. How unfortunate.",
+                "Version: release build 159.7 (Built July 19, 2026 17:39 PM)",
+                "Date: 十月 8, 2026 12:45:41 下午",
+                "OS: Linux x (aarch64)",
+                "GL Version: GLES 3.2.0 / Qualcomm / Adreno (TM) 735 / OpenGL ES 3.2 V@0762.46",
+                "Android API level: 36",
+                "Java Version: 0",
+                "Runtime Available Memory: 512mb",
+                "Cores: 8",
+                "Mods: crashtest:1.0",
+                "",
+                "",
+                "java.lang.RuntimeException: Error loading mod crashtest",
+                "\tat mindustry.mod.Mods.contextRun(Mods.java:18)",
+                "\tat mindustry.mod.Mods.lambda$eachClass$38(Mods.java:7)",
+                "\tat mindustry.mod.Mods.$r8$lambda$HyIUhXyWSolB9jGn61XETjxz3gQ(Mods.java:1)",
+                "\tat mindustry.mod.Mods$$ExternalSyntheticLambda0.get(R8$$SyntheticClass:16)",
+                "\tat arc.struct.Seq.each(Seq.java:1)",
+                "\tat mindustry.mod.Mods.eachClass(Mods.java:18)",
+                "\tat mindustry.ClientLauncher.update(ClientLauncher.java:127)",
+                "\tat arc.backend.android.AndroidGraphics.onDrawFrame(AndroidGraphics.java:132)",
+                "Caused by: java.lang.NoSuchFieldError: No field definitelyNotAField of type I in"
+                        + " class Lmindustry/core/GameState; or its superclasses (declaration of"
+                        + " 'mindustry.core.GameState' appears in /data/user/0/io.mdt.launcher/"
+                        + "app_hub/import/official-159.apk)",
+                "\tat boom.Boom.init(Boom.java:21)",
+                "\tat arc.net.ArcNet$$ExternalSyntheticLambda0.get(R8$$SyntheticClass:134)",
+                "\tat mindustry.mod.Mods.lambda$eachClass$37(Mods.java:3)",
+                "\t... 9 more",
+        });
+        CrashAnalysis.Report rDev = CrashAnalysis.parse(fxDevice);
+        ok(stat, L, "release build 159.7 (Built July 19, 2026 17:39 PM)".equals(rDev.version)
+                        && rDev.mods.size() == 1 && "crashtest".equals(rDev.mods.get(0)),
+                "★真机报告（14 片）：Version / Mods 逐字解析出来了");
+        ok(stat, L, rDev.chain.size() == 2 && rDev.topType().equals("java.lang.RuntimeException")
+                        && "Error loading mod crashtest".equals(rDev.topMessage()),
+                "★真机报告：追出了 Caused by 链（" + rDev.chain.size() + " 节）");
+        ok(stat, L, rDev.likelyName.isEmpty() && rDev.likelyRaw.isEmpty(),
+                "★★真机报告里**没有** Likely Cause —— 载入期崩游戏自己归因不了（桌面结论在安卓复现）");
+        ok(stat, L, needleWeight(rDev, "definitelyNotAField") == 3
+                        && hasNeedle(rDev, "mindustry/core/GameState"),
+                "★真机报告的 ART 措辞抽出了成员名针（w3）与 owner 类");
+        List<Mods.Info> modsDev = new ArrayList<Mods.Info>();
+        modsDev.add(info("crashtest", "MDT Crash Probe", "boom.Boom"));
+        CrashAnalysis.Verdict vDev = CrashAnalysis.judge(rDev, modsDev, null);
+        ok(stat, L, vDev.kind == CrashAnalysis.KIND_MOD
+                        && CrashAnalysis.LAYER_L1B.equals(vDev.hits.get(0).layer)
+                        && "MDT Crash Probe".equals(vDev.hits.get(0).name),
+                "★★真机报告 · L1b：直接点名（显示名从槽里的 mod.hjson 查出来）："
+                        + CrashAnalysis.debugLine(rDev, vDev));
+        ok(stat, L, CrashAnalysis.text(ctx, vDev).contains("MDT Crash Probe")
+                        && CrashAnalysis.text(ctx, vDev).contains("Error loading mod crashtest"),
+                "★真机报告文案实拼：" + oneLine(CrashAnalysis.text(ctx, vDev)));
+        // ★ 把 L1b 那句拿掉 ⇒ 交给 L2a（模组自己的帧）
+        String devNoL1b = fxDevice.replace(
+                "java.lang.RuntimeException: Error loading mod crashtest",
+                "java.lang.RuntimeException: something else");
+        CrashAnalysis.Report rDev2 = CrashAnalysis.parse(devNoL1b);
+        CrashAnalysis.Verdict vDev2 = CrashAnalysis.judge(rDev2, modsDev, null);
+        ok(stat, L, vDev2.kind == CrashAnalysis.KIND_MOD
+                        && CrashAnalysis.LAYER_FRAME.equals(vDev2.hits.get(0).layer)
+                        && "boom.Boom".equals(vDev2.hits.get(0).evidence),
+                "★★真机报告 · L2a：帧 `boom.Boom.init(Boom.java:21)` 落在 main 的包下 ⇒ 点名："
+                        + CrashAnalysis.debugLine(rDev2, vDev2));
+        // ★ 再把模组自己的帧也删掉 ⇒ 只剩"缺失符号"这条路，必须靠 L3 扫 dex
+        String devNoFrame = devNoL1b.replace("\tat boom.Boom.init(Boom.java:21)\n", "");
+        CrashAnalysis.Report rDev3 = CrashAnalysis.parse(devNoFrame);
+        List<Mods.Info> modsDev3 = new ArrayList<Mods.Info>();
+        modsDev3.add(info("crashtest", "MDT Crash Probe", "crashtest.Main"));
+        CrashAnalysis.Verdict vDev3 = CrashAnalysis.judge(rDev3, modsDev3,
+                fakeDex("crashtest", "definitelyNotAField"));
+        ok(stat, L, vDev3.kind == CrashAnalysis.KIND_MOD
+                        && CrashAnalysis.LAYER_DEX.equals(vDev3.hits.get(0).layer)
+                        && vDev3.hits.get(0).weight == 3 && vDev3.dexScanned == 1,
+                "★★真机报告 · L3：只剩符号也要点名（扫 1 个 dex）："
+                        + CrashAnalysis.debugLine(rDev3, vDev3));
+        ok(stat, L, CrashAnalysis.judge(rDev3, modsDev3, fakeDex("crashtest")).kind
+                        == CrashAnalysis.KIND_NONE,
+                "★元断言：同一份报告、dex 里什么都没有 ⇒ 认不出（L3 那条不是恒真的）");
+
         // ── 渲染：并列 / 弱线索 / 依据与结论同一行 ──
         CrashAnalysis.Verdict vMulti = new CrashAnalysis.Verdict();
         vMulti.kind = CrashAnalysis.KIND_MOD;
