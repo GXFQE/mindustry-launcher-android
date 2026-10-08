@@ -134,9 +134,10 @@ public class LogActivity extends BaseActivity {
     /**
      * F23：已经算过的结论（键 = 路径|大小|mtime）。
      * ★ 有它才能在 chip 之间来回点时**不重扫 dex**（一次扫描是秒级的，见 analyzeCrash）。
+     * ⚠️ 必须**并发安全**：导出在后台线程里也会往里写（见 compose 的 cache 参数）。
      */
-    private final java.util.HashMap<String, CrashAnalysis.Verdict> mVerdicts =
-            new java.util.HashMap<String, CrashAnalysis.Verdict>();
+    private final java.util.Map<String, CrashAnalysis.Verdict> mVerdicts =
+            new java.util.concurrent.ConcurrentHashMap<String, CrashAnalysis.Verdict>();
     /** F23：分析任务的代次（换 chip / 换页 / 重读都自增 ⇒ 在途结果直接作废） */
     private int mAnalyzeStamp = 0;
     /** 每次 reload 自增；后台线程回来时对不上就丢弃（防旋转 / 连点造成乱序回填） */
@@ -455,7 +456,7 @@ public class LogActivity extends BaseActivity {
             hideVerdict();
             return;
         }
-        final String key = d.file.getAbsolutePath() + "|" + d.size + "|" + d.mtime;
+        final String key = verdictKey(d);
         CrashAnalysis.Verdict cached = mVerdicts.get(key);
         if (cached != null) {
             showVerdict(CrashAnalysis.text(this, cached));
@@ -468,24 +469,9 @@ public class LogActivity extends BaseActivity {
                 // ⚠️ 必须用 fullText()：页面那份 text 只有**尾部 400 行**，
                 //    而报告头（Version / Mods / Likely Cause）在**最前面**（语料里最长一份 1044 行）
                 final CrashAnalysis.Report parsed = CrashAnalysis.parse(d.fullText());
-                final CrashAnalysis.Verdict cheap =
-                        CrashAnalysis.judge(parsed, null, null);
-                final List<Mods.Info> mods;
-                final CrashAnalysis.Verdict full;
-                if (cheap.kind == CrashAnalysis.KIND_NONE
-                        && !parsed.empty && !parsed.launcherOwn) {
-                    List<Mods.Info> scanned = null;
-                    try {
-                        scanned = Mods.scan(LogActivity.this, Data.currentSlot(LogActivity.this)).mods;
-                    } catch (Throwable t) {
-                        scanned = null;
-                    }
-                    mods = scanned;
-                    full = CrashAnalysis.judge(parsed, mods, CrashAnalysis.DEX);
-                } else {
-                    mods = null;
-                    full = cheap;
-                }
+                // judgeFull = 便宜层（L1/L1b/L2a，微秒级）+ 只在没结论时才扫 dex
+                final CrashAnalysis.Verdict full =
+                        CrashAnalysis.judgeFull(LogActivity.this, parsed, Data.currentSlot(LogActivity.this));
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
                         if (stamp != mAnalyzeStamp || mShownCrash != d) return;
@@ -643,7 +629,7 @@ public class LogActivity extends BaseActivity {
         final Snap s = mSnap;
         new Thread(new Runnable() {
             @Override public void run() {
-                final String text = compose(LogActivity.this, s, exportHeader(LogActivity.this));
+                final String text = compose(LogActivity.this, s, exportHeader(LogActivity.this), mVerdicts);
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
                         mExportText = text;
@@ -673,12 +659,14 @@ public class LogActivity extends BaseActivity {
         }
         final android.net.Uri uri = data.getData();
         // 兼容被系统回收后重建的情况：正文丢了就重拼一份（读盘很便宜，比重导一次强）
-        final String text = (mExportText != null)
-                ? mExportText
-                : compose(this, mSnap, exportHeader(this));
+        // ⚠️ 重拼挪进下面那个**后台线程**：F23 的结论在"认不出"时会扫 dex，
+        //    在 UI 线程里做就是一次可感知的卡顿（原来这里只拼文本，所以放在外面没问题）。
+        final String pre = mExportText;
         mExportText = null;
         new Thread(new Runnable() {
             @Override public void run() {
+                final String text = (pre != null) ? pre
+                        : compose(LogActivity.this, mSnap, exportHeader(LogActivity.this), mVerdicts);
                 long n = 0;
                 String err = null;
                 try {
@@ -749,6 +737,17 @@ public class LogActivity extends BaseActivity {
      * ⚠️ 用 {@link Doc#fullText()}（全文）而**不是** {@code d.text}（尾部 400 行）。
      */
     static String compose(Context ctx, Snap s, String header) {
+        return compose(ctx, s, header, null);
+    }
+
+    /**
+     * 同上，但可以带一份**已算好的结论缓存**（页面实例有；dev 口/自检没有 ⇒ 现算）。
+     * ★ 为什么导出要带结论（2026-10-08 补）：导出的文件是**交付物** —— 用户报 bug 时发出来的
+     *   就是它；结论只活在页面上等于让收件人自己重新分析一遍。而且这一步本来就在**后台线程**里跑
+     *   （见 {@link #onClickExport}），多算一次归因不影响交互。
+     */
+    static String compose(Context ctx, Snap s, String header,
+                          java.util.Map<String, CrashAnalysis.Verdict> cache) {
         StringBuilder sb = new StringBuilder();
         sb.append(header).append("\n\n");
 
@@ -772,9 +771,40 @@ public class LogActivity extends BaseActivity {
         if (n == 0) {
             sb.append(Trans.get(ctx, R.string.log_export_absent)).append('\n');
         } else {
-            for (Doc d : s.crashes) appendDoc(sb, ctx, d);
+            for (Doc d : s.crashes) appendCrashDoc(sb, ctx, d, cache);
         }
         return sb.toString();
+    }
+
+    /** F23：崩溃报告那一段 = **结论行**（有结论时）+ 原文 */
+    private static void appendCrashDoc(StringBuilder sb, Context ctx, Doc d,
+                                       java.util.Map<String, CrashAnalysis.Verdict> cache) {
+        CrashAnalysis.Verdict v = cachedVerdict(cache, d);
+        if (v == null && d != null && d.file != null && d.file.isFile()) {
+            // ⚠️ 现算时**没有**缓存的上下文也不怕：judgeFull 自己会扫 dex，而调用点都在后台线程
+            v = CrashAnalysis.judgeFull(ctx, CrashAnalysis.parse(d.fullText()),
+                    Data.currentSlot(ctx));
+            if (cache != null) cache.put(verdictKey(d), v);
+        }
+        if (v != null) {
+            String t = CrashAnalysis.text(ctx, v);
+            if (!t.isEmpty()) {
+                sb.append(Trans.get(ctx, R.string.log_export_verdict)).append('\n');
+                sb.append(t.replace("\n", "\n    ")).append('\n');
+            }
+        }
+        appendDoc(sb, ctx, d);
+    }
+
+    /** 结论缓存的键（页面与导出共用一份口径：**换了文件就不复用**） */
+    static String verdictKey(Doc d) {
+        return d == null || d.file == null ? ""
+                : d.file.getAbsolutePath() + "|" + d.size + "|" + d.mtime;
+    }
+
+    private static CrashAnalysis.Verdict cachedVerdict(
+            java.util.Map<String, CrashAnalysis.Verdict> cache, Doc d) {
+        return cache == null ? null : cache.get(verdictKey(d));
     }
 
     /** 一段：`──────── 展示名（文件名）────────` + 全文（或"缺失"/"空文件"/"过大"说明） */

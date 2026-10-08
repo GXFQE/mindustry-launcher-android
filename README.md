@@ -175,6 +175,14 @@ yourself — even just a few lines — see **Translation file** below.
 - **Runtime log page** (home → Runtime log): the launcher's own log, the game log, and crash
   reports as separate sections, each with its age and size; the oldest crash reports can be deleted
   from there, and **Export all logs** writes everything into one file
+- **Crash analysis**: after a crash, **which mod did it** — the crash card on the log page states a
+  one-line verdict, plus the evidence behind it (the game's own `Likely Cause`, an
+  `Error loading mod` line in the report, a class from the stack trace, or a missing symbol found in
+  that mod's `classes.dex`). The mods page summary also shows "Last crash: …".
+  It **says "cannot tell" when it cannot tell** — verdicts are stated as "probably", the evidence is
+  always shown, and vanilla crashes (`Mods: none`) or the launcher's own crash dumps are never
+  blamed on a mod. **Export all logs now carries these verdicts** (the receiver does not have to
+  redo the analysis)
 - **Transfer station** (home → Transfer station): deleted maps, mods, slots and blueprints wait
   there and can be put back
 - **Theme**: follow system / light / dark, and **Language**: follow system / English / 简体中文 —

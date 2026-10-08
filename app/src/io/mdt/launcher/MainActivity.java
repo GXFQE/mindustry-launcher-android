@@ -154,6 +154,7 @@ public class MainActivity extends BaseActivity {
                 || intent.hasExtra("dev_maps_slot")
                 || intent.hasExtra("dev_map_import")
                 || intent.hasExtra("dev_maps_page")
+                || intent.hasExtra("dev_mods_page")
                 || intent.hasExtra("dev_bp_page")
                 || intent.hasExtra("dev_saves_page")
                 || intent.hasExtra(BlueprintsActivity.EXTRA_DEV_IMPORT)
@@ -505,6 +506,20 @@ public class MainActivity extends BaseActivity {
             Intent mi = new Intent(this, MapsActivity.class);
             mi.putExtra(MapsActivity.EXTRA_SLOT, dmp.trim());
             startActivity(mi);
+            finish();
+            return;
+        }
+
+        // ── F13/F23：直接打开某个槽的模组页 ────────────────────────────────────
+        // 用法：`--es dev_mods_page <槽>`（空 = 当前槽）
+        // ★ 为什么要它：模组页那张摘要卡上有 F23 的「上次崩溃：……」一行，而"进这个槽的模组页"
+        //   在界面上要三步导航（主界面 → 槽 → 模组）；自动化验收需要一条直路
+        //   （与 dev_maps_page / dev_bp_page / dev_saves_page 同一族）。
+        String dmpg = intent.getStringExtra("dev_mods_page");
+        if (dmpg != null && !dmpg.trim().isEmpty()) {
+            Intent mmi = new Intent(this, ModsActivity.class);
+            mmi.putExtra(ModsActivity.EXTRA_SLOT, dmpg.trim());
+            startActivity(mmi);
             finish();
             return;
         }

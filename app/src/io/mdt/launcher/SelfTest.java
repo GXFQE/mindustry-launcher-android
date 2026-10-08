@@ -112,10 +112,13 @@ public final class SelfTest {
      * ★ 收在两处（跑前清场 / 跑后收尾）**共用这一份** —— 加一个新测试槽时只改这里，
      *   不会再出现"新加的槽忘了清"这种只在真机上慢慢攒垃圾的漏（原来两处各写一份字面量）。
      */
+    /** F23 第二批：把结论送到「导出文件」与「模组页」用的槽（里面只放一份人造崩溃报告） */
+    public static final String SLOT_F23 = "m3-f23";
+
     private static final String[] TEST_SLOTS = {
             SLOT, SLOT_RENAMED, CLONE_SRC, CLONE_DST, CLONE_EMPTY, CLONE_EMPTY_DST, SLOT_MODS,
             SLOT_SET, SLOT_PACK, SLOT_PACK_DST, SLOT_SAVE, SLOT_GONE, SLOT_GONE2,
-            SLOT_MODE, SLOT_MODE2, SLOT_S2M, SLOT_MSCH, SLOT_BP};
+            SLOT_MODE, SLOT_MODE2, SLOT_S2M, SLOT_MSCH, SLOT_BP, SLOT_F23};
 
     /**
      * 本工程**自己的全部页面**（㊱ 基类检查用）。
@@ -3451,6 +3454,88 @@ public final class SelfTest {
         }
         ok(stat, L, !work.exists() || countFiles(work) == 0,
                 "★自检不把自己的夹具留在用户的私有目录里");
+
+        // ── F23 第二批：**结论要出院**（进导出文件 / 进模组页那一行）──
+        //    判据：结论不能只活在日志页上 —— 用户报 bug 时发出来的就是导出文件。
+        File f23Dir = null;
+        try {
+            ok(stat, L, Data.createSlot(ctx, SLOT_F23) == null, "建 F23 用的测试槽 " + SLOT_F23);
+            File root = Data.dirOf(ctx, SLOT_F23);
+            f23Dir = new File(root, "crashes");
+            ok(stat, L, f23Dir.mkdirs() || f23Dir.isDirectory(), "造 crashes/ 目录：" + path(f23Dir));
+            File rep = new File(f23Dir, "crash_1791999999999.txt");
+            write(rep, fxDevice.getBytes("UTF-8"));
+            CrashAnalysis.Verdict v23 = CrashAnalysis.analyzeNewest(ctx, SLOT_F23);
+            ok(stat, L, v23 != null && v23.kind == CrashAnalysis.KIND_MOD
+                            && CrashAnalysis.LAYER_L1B.equals(v23.hits.get(0).layer),
+                    "★analyzeNewest（模组页那一行的数据源）：最新一份 ⇒ 点名（L1b）："
+                            + CrashAnalysis.debugLine(null, v23));
+
+            LogActivity.Doc doc = new LogActivity.Doc(rep.getName(), rep);
+            doc.load();
+            LogActivity.Snap snap = new LogActivity.Snap();
+            snap.crashes.add(doc);
+            String exported = LogActivity.compose(ctx, snap, "HEADER-F23");
+            String want = CrashAnalysis.text(ctx, v23);
+            ok(stat, L, exported.contains(ctx.getString(R.string.log_export_verdict)),
+                    "★★导出文件里有「结论」这一段（不是只有原文）");
+            ok(stat, L, exported.contains(want.replace("\n", "\n    ")),
+                    "★★导出文件里的结论逐字等于页面/自检用的那一份（界面与导出同一份格式化）");
+            ok(stat, L, exported.contains("Error loading mod crashtest"),
+                    "★导出文件里原文照旧保留（结论是推断，复核要看原文）");
+            LogActivity.Snap empty = new LogActivity.Snap();
+            String exportedEmpty = LogActivity.compose(ctx, empty, "HEADER-F23");
+            ok(stat, L, !exportedEmpty.contains(ctx.getString(R.string.log_export_verdict)),
+                    "★元断言：没有崩溃报告时**不许**出现「结论」那一段（判据不是恒真的）");
+            String modsLine = Trans.get(ctx, R.string.mods_verdict_fmt, want.replace("\n", " "));
+            ok(stat, L, modsLine.contains("crashtest") && modsLine.length() > want.length(),
+                    "★模组页那一行实拼（结论塞进「上次崩溃：%1$s」）：" + oneLine(modsLine));
+            ok(stat, L, ctx.getResources().getIdentifier("mods_verdict", "id",
+                            ctx.getPackageName()) != 0,
+                    "★模组页布局里有 `mods_verdict`（少一个 `@+id` 时 findViewById 是**静默 null**）");
+
+            // 🔴 真机抓到的那条：便宜层（L1b）命中时**也要把名字跟模组表对上** ——
+            //    报告里只有 internalName（`Error loading mod depuser`），界面该显示 displayName。
+            File modsDir = new File(root, "mods");
+            ok(stat, L, modsDir.mkdirs() || modsDir.isDirectory(), "造 mods/ 目录：" + path(modsDir));
+            write(rep, fxDep.getBytes("UTF-8"));   // ⚠️ 这份夹具才是"缺依赖"（L1b 报的是 internalName）
+            zipOne(new File(modsDir, "depuser.zip"), "mod.hjson",
+                    "{\n  name: \"depuser\"\n  displayName: \"MDT Dep Probe\"\n"
+                            + "  version: \"1.0\"\n  minGameVersion: \"157\"\n}\n");
+            CrashAnalysis.Verdict named = CrashAnalysis.analyzeNewest(ctx, SLOT_F23);
+            ok(stat, L, named != null && named.hits.get(0).known
+                            && "MDT Dep Probe".equals(named.hits.get(0).name)
+                            && named.hits.get(0).inReport,
+                    "★★模组表在场时，L1b 的结论显示**显示名**（MDT Dep Probe）而不是内部名："
+                            + CrashAnalysis.debugLine(null, named));
+            ok(stat, L, new File(modsDir, "depuser.zip").delete(),
+                    "（收尾：删掉人造模组包）");
+            CrashAnalysis.Verdict unnamed = CrashAnalysis.analyzeNewest(ctx, SLOT_F23);
+            ok(stat, L, unnamed != null && !unnamed.hits.get(0).known
+                            && "depuser".equals(unnamed.hits.get(0).name),
+                    "★元断言：模组包不在槽里时退回**报告里写的内部名**（depuser）—— "
+                            + "证明上一条的名字确实来自模组表，不是恒真");
+
+            // ★★ 缓存键：同一份稳定、内容一变就换（否则会拿旧结论糊在新报告上）
+            String k1 = LogActivity.verdictKey(doc);
+            String k2 = LogActivity.verdictKey(doc);
+            write(rep, fxDevice.getBytes("UTF-8"));
+            LogActivity.Doc doc2 = new LogActivity.Doc(rep.getName(), rep);
+            doc2.load();
+            long grew = rep.length();
+            write(rep, (fxDevice + "\n# pad\n").getBytes("UTF-8"));
+            LogActivity.Doc doc3 = new LogActivity.Doc(rep.getName(), rep);
+            doc3.load();
+            ok(stat, L, k1.equals(k2) && !k1.equals(LogActivity.verdictKey(doc3)),
+                    "★★元断言：结论缓存的键**同文件稳定、内容一变就换**（大小 "
+                            + grew + " → " + rep.length() + "）");
+
+            ok(stat, L, rep.delete(), "（收尾：删掉人造报告）");
+            ok(stat, L, CrashAnalysis.analyzeNewest(ctx, SLOT_F23) == null,
+                    "★元断言：报告删掉之后 analyzeNewest 返回 null（模组页那一行会自己藏起来）");
+        } catch (Throwable t) {
+            ok(stat, L, false, "F23 第二批用例自身异常：" + t);
+        }
         L.add("");
     }
 

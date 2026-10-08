@@ -1455,6 +1455,10 @@
     <string name="crash_ev_frame_fmt">its class %1$s is in the stack trace</string>
     <string name="crash_ev_dex_fmt">its classes.dex contains %1$s</string>
     <string name="crash_ev_not_loaded_fmt">%1$s (it was not loaded in that launch)</string>
+
+    <!-- F23 第二批：把结论送到"导出文件"与"模组页" —— 结论不能只活在日志页上 -->
+    <string name="log_export_verdict">What the launcher made of this report:</string>
+    <string name="mods_verdict_fmt">Last crash: %1$s</string>
     <string name="log_copied_fmt">Copied %1$s</string>
     <string name="log_copy_empty">Nothing to copy here</string>
     <string name="log_hub_launch">Launch</string>

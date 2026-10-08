@@ -861,6 +861,59 @@ final class CrashAnalysis {
         return s.length() <= n ? s : s.substring(0, n) + "…";
     }
 
+    /**
+     * **完整判据**：先跑便宜层（L1/L1b/L2a），没结论才去扫 dex。
+     * ⚠️ **必须在后台线程调用**（认不出时会读每个模组的 `classes.dex`）。
+     * @param slot 用哪个槽的模组表来对名字（L2a/L3 全靠它）；null ⇒ 当前槽
+     */
+    static Verdict judgeFull(Context ctx, Report r, String slot) {
+        Verdict v = judge(r, null, null);
+        if (r == null || r.empty || r.launcherOwn) return v;
+        List<Mods.Info> mods = null;
+        try {
+            mods = Mods.scan(ctx, slot == null ? Data.currentSlot(ctx) : slot).mods;
+        } catch (Throwable t) {
+            mods = null;
+        }
+        if (mods == null) return v;
+        if (v.kind == KIND_MOD) {
+            // 🔴 便宜层（L1/L1b）已经点名了，但**名字还没跟模组表对上**：
+            //   报告里 `Error loading mod <internalName>` 只有内部名，而界面该显示 `displayName`
+            //   （真机实测：不补这一步，模组页那行会写「depuser」而不是「MDT Dep Probe」）。
+            //   ⚠️ 这一步**只读模组表**（各自的 mod.hjson），**不扫 dex** —— 贵的那层留给下面那条路。
+            for (Hit h : v.hits) resolve(h, mods, r);
+            return v;
+        }
+        return judge(r, mods, DEX);
+    }
+
+    /**
+     * 分析某个槽里**最新一份**崩溃报告（给"模组页那一行结论"这类**只显示一句**的调用点）。
+     *
+     * ★ 为什么按**文件名**排序：崩溃报告的名字就是写入时的毫秒时间戳 ⇒ 字典序 = 时间序
+     *   （与 {@link LogActivity} 的 chips 同一口径）。
+     * ⚠️ 必须在**后台线程**调用；没有报告 / 读不出来一律返回 null（调用方把那一行藏起来）。
+     */
+    static Verdict analyzeNewest(Context ctx, String slot) {
+        java.io.File root = Data.dirOf(ctx, slot);
+        java.io.File dir = root == null ? null : new java.io.File(root, "crashes");
+        java.io.File[] fs = (dir != null && dir.isDirectory()) ? dir.listFiles() : null;
+        if (fs == null || fs.length == 0) return null;
+        java.io.File newest = null;
+        for (java.io.File f : fs) {
+            if (f == null || !f.isFile()) continue;
+            if (newest == null || f.getName().compareTo(newest.getName()) > 0) newest = f;
+        }
+        if (newest == null || newest.length() > 4L * 1024 * 1024) return null;
+        String body;
+        try {
+            body = Util.readText(newest);
+        } catch (Throwable t) {
+            return null;
+        }
+        return judgeFull(ctx, parse(body), slot);
+    }
+
     // ══ dev 口 ═════════════════════════════════════════════════════════════
 
     /**

@@ -1,0 +1,156 @@
+MDT M3 自检   Thu Oct 08 15:50:07 GMT+08:00 2026
+
+===== 通过 938 项，失败 0 项 =====
+无失败项。下方依次是环境信息、逐项明细、清理与用时。
+
+── F23 崩溃分析（四层判据 + 认不出就说不认识）──
+  ✅ 解析：这份报告被认出来了（非空、也不是启动器自己的）
+  ✅ 解析：Version 行逐字（含游戏自己那串 build 尾注）：release build 160.5 (Built September 20, 2026 13:57 PM) (Server)
+  ✅ 解析：`Mods:` 行 → [crashtest]
+  ✅ ★L4：**追出了 `Caused by` 链**（2 节，顶层 java.lang.RuntimeException）—— 游戏自己的算法不追链，所以它在这类报告上给不出答案
+  ✅ 解析：顶层消息逐字：Error loading mod crashtest
+  ✅ ★抽针：缺失符号那一句的两个 token（成员名 + owner 类）都进了针袋
+  ✅ ★针的权重：`definitelyNotAField`（长成员名）= 3，`mindustry/core/GameState`（游戏类）= 1
+  ✅ ★L1b：只读报告就点名了（`Error loading mod crashtest`）—— 不用扫 dex：kind=MOD version=release build 160.5 (Built September 20, 2026 13:57 PM) (Server) mods=[crashtest] chain=2 frames=8 needles=7 top=java.lang.RuntimeException: Error loading mod crashtest hits=crashtest(L1b/w3/crashtest) dex=-1
+  ✅ ★名字对回了模组表（显示名 Crash Test、且它确实在这份报告的 Mods 行里）
+  ✅ ★文案实拼（界面与自检同一份）：是「Crash Test」引起的 —— 报告里写着「Error loading mod crashtest」
+  ✅ ★元断言：`Error loading mod` 那句拿掉 ⇒ 便宜层认不出（判据有分辨力）
+  ✅ ★L2a：帧 `boom.Boom.badField` 落在 main 的包前缀下 ⇒ 点名（追的是**整条链**里的帧）：kind=MOD version=release build 160.5 (Built September 20, 2026 13:57 PM) (Server) mods=[crashtest] chain=2 frames=8 needles=7 top=java.lang.RuntimeException: something else hits=Crash Test(L2/w3/boom.Boom) dex=-1
+  ✅ ★L3：`definitelyNotAField` 出现在它的 classes.dex 里 ⇒ 点名（权重 3）：kind=MOD version=release build 160.5 (Built September 20, 2026 13:57 PM) (Server) mods=[crashtest] chain=2 frames=8 needles=7 top=java.lang.RuntimeException: something else hits=Crash Test(L3/w3/definitelyNotAField) dex=1
+  ✅ ★成本记账：只扫了 1 个模组的 dex（报告里在场那个）
+  ✅ ★元断言：dex 里什么都没有 ⇒ 认不出，且**一条弱线索都不留**（不是"扫了就说嫌疑"）
+  ✅ ★L1：`Likely Cause` 拆成三段（显示名 / internalName / 版本）：Stealth Path / 偷袭小道 ｜ stealth-path ｜ 5.3.2
+  ✅ ★`Mods:` 里的**伪条目**（kotlin / mindustryx）照样进表 —— 不能假设都能对上我们的模组表：[kotlin, logicchineselocalization, mi2-utilities-java, mindustryx, stealth-path]
+  ✅ ★L1：命中且对回模组表（在场）—— 而且**没扫 dex**：kind=MOD version=release build 159.7 mods=[kotlin, logicchineselocalization, mi2-utilities-java, mindustryx, stealth-path] chain=1 frames=5 needles=5 top=java.lang.NoSuchFieldError: Class mindustry.ai.UnitCommand does not have member field 'mindustry.ai.UnitCommand boostC… hits=Stealth Path / 偷袭小道(L1/w3/stealth-path) dex=-1
+  ✅ ★文案实拼：确定口气 + 依据（游戏自己写的）：是「Stealth Path / 偷袭小道」引起的 —— 游戏自己在报告里写明了归因（Likely Cause）
+  ✅ ★渲染后没有残留占位符（`%`）：是「Stealth Path / 偷袭小道」引起的 —— 游戏自己在报告里写明了归因（Likely Cause）
+  ✅ ★元断言：拿掉 L1 之后确实没有首句/Likely Cause 了
+  ✅ ★L2a：只剩栈帧也能点名（帧在 `stealthpath.` 包下）：kind=MOD version=release build 159.7 mods=[kotlin, logicchineselocalization, mi2-utilities-java, mindustryx, stealth-path] chain=1 frames=5 needles=5 top=java.lang.NoSuchFieldError: Class mindustry.ai.UnitCommand does not have member field 'mindustry.ai.UnitCommand boostC… hits=Stealth Path / 偷袭小道(L2/w3/stealthpath.StealthPathMod) dex=-1
+  ✅ ★元断言：main 换成对不上的包（foo.Bar）⇒ L2a 必须给不出结论
+  ✅ 解析：internalName = neon；`Version:` 后面那行（MindustryX 尾注）也读到了
+  ✅ ★权重规则：注入进游戏命名空间的类（带 `$`）= 2，纯游戏类 = 1 —— 前者能点名、后者不能
+  ✅ ★★注入型（游戏的算法在这类上完全瞎）：靠"这个类在它包里"点名：kind=MOD version=release build 159.7 mods=[kotlin, mindustryx, neon, patch-editor] chain=1 frames=2 needles=6 top=java.lang.IllegalAccessError: class mindustry.logic.SugarCanvas$SugarStatementElem tried to access field mindustry.logic… hits=Neon / 氖(L3/w2/mindustry.logic.SugarCanvas$SugarStatementElem) dex=1
+  ✅ ★元断言：只有"纯游戏类"（权重 1）⇒ **不点名**，只留一条弱线索（否则每个模组都会被点名）
+  ✅ ★文案实拼（弱线索 + 认不出两层都在）：弱线索：「Neon / 氖」—— 它的 classes.dex 里有 mindustry.logic.LCanvas 认不出是哪个模组 —— 这份报告里没有指向模组的证据。 可能是游戏本体、环境（内存 / 驱动 / 缺系统文件），也可能是已经被删掉的模组。
+  ✅ 解析（安卓形态）：`Android API level` = 36，Version = unknown build 0
+  ✅ 解析：`Mods: none (vanilla)` 被认出来（不是空 Mods 行）
+  ✅ ★原版崩 ⇒ 明说"不是模组的问题"，**不去猜**：不是模组的问题 —— 报告里写着这次没有加载任何模组（Mods: none (vanilla)）。
+  ✅ ★元断言：把 `none (vanilla)` 换成 `neon:110008` ⇒ 必须不再判成 vanilla
+  ✅ ★启动器自己的报告：认出来 + **不做模组归因**：这是启动器自己的崩溃报告（不是游戏），不做模组归因。
+  ✅ ★元断言：哪怕给一把"什么都能命中"的探针，启动器的报告也不许被点名
+  ✅ ★元断言：首行不是我们的报告头 ⇒ 不再判成启动器报告
+  ✅ 空文件 ⇒ 标成 empty（页面上给"读不出这份报告"，不是硬凑一个结论）
+  ✅ ★空报告文案实拼：读不出这份报告（文件是空的）。
+  ✅ 不是报告的一段文字 ⇒ 认不出（不抛、不瞎点名）
+  ✅ ★ART 措辞（`No field x of type I in class La/b/C;`）也抽出了成员名针（权重 3）
+  ✅ ★ART 措辞里的 owner 类（描述符形态 `L…;`）也进了针袋
+  ✅ ★元断言：`of type I` 里的 `I`（类型描述符）与 `Failed resolution` 里的 `Failed`**都不是类名**，不许当针（否则每个模组都"命中"）
+  ✅ ★同一根针在两种运行时的措辞里抽出来**必须一样**（ART vs HotSpot）
+  ✅ ★ART 的合成类帧（`at boom.Boom.main(Unknown Source:8)`）也能解析 —— 真机那条 Rhino 崩溃就是这种形态
+  ✅ ★★安卓上靠 ART 措辞也能点名（这正是"照抄游戏算法"做不到的那一类）：kind=MOD version=release build 160.5 mods=[crashtest] chain=1 frames=1 needles=3 top=java.lang.NoSuchFieldError: No field definitelyNotAField of type I in class Lmindustry/core/GameState; or its supercla… hits=Crash Test(L3/w3/definitelyNotAField) dex=1
+  ✅ ★ART 的 `Failed resolution of: L…;` 抽出的是**描述符里的类**，不是 `Failed` 这个词
+  ✅ ★同一个 `Failed resolution of:` 形态：模组命名空间的类（`depmod/Dep`）= 3（能点名）
+  ✅ ★真机报告（14 片）：Version / Mods 逐字解析出来了
+  ✅ ★真机报告：追出了 Caused by 链（2 节）
+  ✅ ★★真机报告里**没有** Likely Cause —— 载入期崩游戏自己归因不了（桌面结论在安卓复现）
+  ✅ ★真机报告的 ART 措辞抽出了成员名针（w3）与 owner 类
+  ✅ ★★真机报告 · L1b：直接点名（显示名从槽里的 mod.hjson 查出来）：kind=MOD version=release build 159.7 (Built July 19, 2026 17:39 PM) mods=[crashtest] chain=2 frames=11 needles=10 top=java.lang.RuntimeException: Error loading mod crashtest hits=MDT Crash Probe(L1b/w3/crashtest) dex=-1
+  ✅ ★真机报告文案实拼：是「MDT Crash Probe」引起的 —— 报告里写着「Error loading mod crashtest」
+  ✅ ★★真机报告 · L2a：帧 `boom.Boom.init(Boom.java:21)` 落在 main 的包下 ⇒ 点名：kind=MOD version=release build 159.7 (Built July 19, 2026 17:39 PM) mods=[crashtest] chain=2 frames=11 needles=10 top=java.lang.RuntimeException: something else hits=MDT Crash Probe(L2/w3/boom.Boom) dex=-1
+  ✅ ★★真机报告 · L3：只剩符号也要点名（扫 1 个 dex）：kind=MOD version=release build 159.7 (Built July 19, 2026 17:39 PM) mods=[crashtest] chain=2 frames=10 needles=9 top=java.lang.RuntimeException: something else hits=MDT Crash Probe(L3/w3/definitelyNotAField) dex=1
+  ✅ ★元断言：同一份报告、dex 里什么都没有 ⇒ 认不出（L3 那条不是恒真的）
+  ✅ ★★真机报告（缺依赖）：**三层** `Caused by` 链都追出来了（3 节）
+  ✅ ★真机报告（缺依赖）：顶层消息逐字
+  ✅ ★★缺依赖的两句话（`Failed resolution of: Ldepmod/Dep;` 与 `ClassNotFoundException: depmod.Dep`）抽出来是**同一根针**、权重 3（模组命名空间）
+  ✅ ★模组**不在槽里**也照样点名（报告是历史事实，只是 known=false）：kind=MOD version=release build 159.7 (Built July 19, 2026 17:39 PM) mods=[depuser] chain=3 frames=8 needles=9 top=java.lang.RuntimeException: Error loading mod depuser hits=depuser(L1b/w3/depuser) dex=-1
+  ✅ ★补上模组包之后，显示名从 mod.hjson 解析出来（MDT Dep Probe）
+  ✅ ★★真机报告（缺依赖）· L3：只剩符号也能点名（缺的那个类在它包里）：kind=MOD version=release build 159.7 (Built July 19, 2026 17:39 PM) mods=[depuser] chain=3 frames=7 needles=8 top=java.lang.RuntimeException: something else hits=MDT Dep Probe(L3/w3/depmod.Dep) dex=1
+  ✅ ★元断言：dex 里没有 `depmod/Dep` ⇒ 认不出（不能靠「它加载失败过」就点名）
+  ✅ ★★ART 那句 `is inaccessible to class 'X'` 里的 **X = 访问方类**（模组自己的类）抽成权重 3 的针 —— 这条消息在安卓上是**能点名**的
+  ✅ ★同一条消息里的目标 owner（游戏类）与短成员名（`state`）都只有 1 分 ⇒ 不许靠它们点名
+  ✅ ★★真机报告（访问权限）· L3：靠「访问方类」点名：kind=MOD version=release build 159.7 (Built July 19, 2026 17:39 PM) mods=[accessboom] chain=2 frames=3 needles=10 top=java.lang.RuntimeException: something else hits=MDT Access Probe(L3/w3/accessboom.Boom) dex=1
+  ✅ ★元断言：只命中 1 分的针（游戏类 / 短成员名）⇒ **不点名**，只留弱线索
+  ✅ ★并列：两个模组都点出来、并报数：报告指向 2 个模组：「AAA」, 「BBB」 「AAA」—— 它的 classes.dex 里有 x.Y（这次启动没加载它） 「BBB」—— 它的 classes.dex 里有 x.Y（这次启动没加载它） 它们命中的是同一条依据，这份报告分不出是谁（把别的模组打包进自己包里的也…
+  ✅ ★并列比单条长（多了一段"分不出是谁"的说明），不是把两个名字挤成一行
+  ✅ ★元断言：换一个命中 ⇒ 实拼的整句跟着换（文案不是恒真的）
+  ✅ ★所有实拼路径都没有残留占位符
+  ✅ ★"正在核对模组包…"与"认不出"两条资源都在（页面上那两态）
+  ✅ ★布局里有 `log_crash_verdict`（少一个 `@+id` 时 findViewById 是**静默 null**，编译与门禁全绿 —— 所以这条必须钉）
+  ✅ ★依据与结论**同一行**（`它的 classes.dex 里有 …`）：报告指向 2 个模组：「AAA」, 「BBB」 「AAA」—— 它的 classes.dex 里有 x.Y（这次启动没加载它） 「BBB」—— 它的 classes.dex 里有 x.Y（这次启动没加载它） 它们命中的是同一条依据，这份报告分不出是谁（把别的模组打包进自己包里的也…
+  ✅ ★真路径（`Mods.scanDex`）：命中前两根针、第三根没命中：[0, 1]
+  ✅ ★元断言：dex 里没有的串**不许**命中（不是"扫了就全命中"）
+  ✅ （收尾：删掉假 dex）
+  ✅ ★没有 `classes.dex` ⇒ 空集且**不抛**（调用方按"没证据"处理）
+  ✅ ★自检不把自己的夹具留在用户的私有目录里
+  ✅ 建 F23 用的测试槽 m3-f23
+  ✅ 造 crashes/ 目录：/storage/emulated/0/Android/data/io.mdt.launcher/slot-m3-f23/crashes
+  ✅ ★analyzeNewest（模组页那一行的数据源）：最新一份 ⇒ 点名（L1b）：kind=MOD hits=crashtest(L1b/w3/crashtest) dex=-1
+  ✅ ★★导出文件里有「结论」这一段（不是只有原文）
+  ✅ ★★导出文件里的结论逐字等于页面/自检用的那一份（界面与导出同一份格式化）
+  ✅ ★导出文件里原文照旧保留（结论是推断，复核要看原文）
+  ✅ ★元断言：没有崩溃报告时**不许**出现「结论」那一段（判据不是恒真的）
+  ✅ ★模组页那一行实拼（结论塞进「上次崩溃：%1$s」）：上次崩溃：是「crashtest」引起的 —— 报告里写着「Error loading mod crashtest」
+  ✅ ★模组页布局里有 `mods_verdict`（少一个 `@+id` 时 findViewById 是**静默 null**）
+  ✅ 造 mods/ 目录：/storage/emulated/0/Android/data/io.mdt.launcher/slot-m3-f23/mods
+  ✅ ★★模组表在场时，L1b 的结论显示**显示名**（MDT Dep Probe）而不是内部名：kind=MOD hits=MDT Dep Probe(L1b/w3/depuser) dex=-1
+  ✅ （收尾：删掉人造模组包）
+  ✅ ★元断言：模组包不在槽里时退回**报告里写的内部名**（depuser）—— 证明上一条的名字确实来自模组表，不是恒真
+  ✅ ★★元断言：结论缓存的键**同文件稳定、内容一变就换**（大小 1294 → 1301）
+  ✅ （收尾：删掉人造报告）
+  ✅ ★元断言：报告删掉之后 analyzeNewest 返回 null（模组页那一行会自己藏起来）
+
+── ㉘ F10 地图增删（导入 / 删除）──
+  ✅ ★导入：落盘成功、内容一致、**没有 .part 残留**，且读出真名「导入测试图」
+  ✅ ★坏文件：拒收（这个文件不是游戏能读的地图：这个文件不像存档，或者写到一半就断了）且**一个字节都没留下**
+  ✅ ★元断言：拒收原因**不带类名**（原来是 `…：ZipException: incorrect header check`）
+  ✅ ★同名且未确认覆盖 ⇒ 拒绝：这个槽的 maps/ 里已经有「导入测试图.msav」了 —— 替换会盖掉原文件，需要先确认
+  ✅ ★确认覆盖：新图就位、**旧的那份在中转站里**（大小还是 122 B）
+  ✅ ★删除：槽内的挪进中转站（原位置消失、内容还在）；**槽外的动不了**（安全判据）
+  ✅ ⑥ ★元断言：夹具真的跨卷（外部 → 内部 `renameTo` 必须失败）
+  ✅ ⑥ 跨卷覆盖：旧图**完整**进中转站（118 B，靠复制兜底）、新图就位、无 `.part`
+  ✅ ⑥ 跨卷删除：同样挪得动（原位置消失、站里那份 `118` B 没坏）
+
+── ㉚ F10 地图导出（包内条目 → 出去；拷贝必须逐字节一致）──
+  ✅ ★包里条目拷出来：122 B，与源**逐字节一致**（源 122 B）
+  ✅ ★反向：条目不存在 ⇒ 拒绝（这个包里没有这条：maps/没有这一条.msav）
+  ✅ ★反向：容器不是 zip ⇒ 拒绝（zip END header not found）
+  ✅ ★元断言：源改 1 个字节 ⇒ 同一套比较判**不等**（证明①有分辨力）
+
+── ㉛ 页面骨架（根节点 @id/root + 地图页两行动作在顶上）──
+  ✅ ★12 个页面布局的根节点都是 @id/root：12/12
+  ✅ ★元断言：根节点没有 id 的布局（dialog_msav_list）必须判不合格
+  ✅ ★地图页：导入行 + 导出行都在动作卡里，且动作卡(第 1 个) 排在列表(第 5 个) **之前** ⇒ 两行就在页面顶上
+  ✅ ★activity_maps：搜索框 / 筛选行 / 「已筛选」那一行三个控件都在
+  ✅ ★activity_blueprints：搜索框 / 筛选行 / 「已筛选」那一行三个控件都在
+  ✅ ★activity_saves：搜索框 / 筛选行 / 「已筛选」那一行三个控件都在
+  ✅ ★activity_mods：搜索框的提示语落在 **hint** 上（不是塞进输入框当正文 —— 那会立刻把列表筛成空的）
+  ✅ ★activity_maps：搜索框的提示语落在 **hint** 上（不是塞进输入框当正文 —— 那会立刻把列表筛成空的）
+  ✅ ★activity_blueprints：搜索框的提示语落在 **hint** 上（不是塞进输入框当正文 —— 那会立刻把列表筛成空的）
+  ✅ ★activity_saves：搜索框的提示语落在 **hint** 上（不是塞进输入框当正文 —— 那会立刻把列表筛成空的）
+  ✅ ★元断言：同一条 `Trans.bind` 对 TextView 仍然是 setText（表头不能变成 hint）
+  ✅ ★主界面入口：添加游戏一行 + 工具卡（中转站 / 运行日志）都在，后两者同卡、且与操作卡是**两张不同的卡**
+  ✅ ★设置页：存储占用是设置卡的**最后一行** —— 中转站 / 运行日志不许再回到设置里
+  ✅ ★元断言：往设置卡末尾塞一行之后，上面那条判据必须变红（判据不是恒真的）
+  ✅ ★「添加游戏」弹窗：导入 APK / 添加包名两条路都在
+  ✅ ★顶栏菜单：res/menu/main.xml 里有 action_settings **且带图标**（图标必须是 ic_settings_bar —— 行内那份在顶栏上看不见）
+  ✅ ★顶栏菜单项有无障碍/溢出用的标题（Trans 会再覆盖一遍）
+  ✅ ★MainActivity 真的覆写了 onCreateOptionsMenu / onOptionsItemSelected（否则顶栏齿轮点下去没反应，且不报错）
+  ✅ ★主界面操作卡只剩两行（添加游戏 / 存档与备份）——「设置」在顶栏；实得 2 行
+
+── ㉜ F21 地图资源统计（定义表 / JSON / 模组叠加 / 模组译文 / 补丁 / 遮挡 / 译名）──
+  ✅ 原版内容表 447 条：447
+  ✅ ★遮挡口径（照游戏字段）：石头墙拆不掉 / 石头能搬走 / 玩家墙能拆
+  ✅ 沙地（内部名 sand-floor）：掉落 sand ⇒ 可采地板；同时带含油的属性 ⇒ 也算加成地板（一格两用）
+  ✅ ★元断言：5 种天然地形墙都判成「拆不掉」：5/5
+  ✅ 自带 JSON 读取器：嵌套对象 / 数组 / 小数 / 转义 / 负数都对
+  ✅ ★元断言：半截 JSON 与空串都必须读失败（true/true）
+  ✅ ★模组新内容取类默认值：ve 的松树（breakable:true）能拆，原版 pine 不能 —— 同一个类，相反行为
+  ✅ ★覆盖是「在旧行上改字段」：salt 改出掉落物后，含水的属性仍在
+  ✅ ★无 type + 目标不认识 ⇒ 跳过且不建行（目标不认识，跳过）
+  ✅ ★元断言：认不出的类必须被计数且不建行（否则它会带着全 0 标志混进统计）
+  ✅ 数据补丁把 dark-metal 改成有属性（掉废料），改动数 1
+  ✅ 补丁区解析：1 条 patch 条目
+  ✅ ★元断言：补丁区尾部多 1 个字节就必须判死（「刚好读完」这条判据有分辨力）
+  ✅ 矿物：铜 3 格 = 能采 2（露天 1 + 石头下 1） + 墙下 1（实际 2/1）
+  ✅ 同名合并：ore-thorium 与 ore-crystal-thorium 都叫「钍」⇒ 合成 1 行 2 格（实际 2 格 / 2 个内部名）
+  ✅ 可采地板：沙子 1 格、掉落物是「沙」

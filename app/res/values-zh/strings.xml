@@ -1388,6 +1388,10 @@
     <string name="crash_ev_frame_fmt">异常栈里有它的类 %1$s</string>
     <string name="crash_ev_dex_fmt">它的 classes.dex 里有 %1$s</string>
     <string name="crash_ev_not_loaded_fmt">%1$s（这次启动没加载它）</string>
+
+    <!-- F23 第二批：把结论送到「导出文件」与「模组页」—— 结论不能只活在日志页上 -->
+    <string name="log_export_verdict">启动器对这份报告的判断：</string>
+    <string name="mods_verdict_fmt">上次崩溃：%1$s</string>
     <string name="log_copied_fmt">已复制%1$s</string>
     <string name="log_copy_empty">这里没有可复制的内容</string>
     <string name="log_hub_launch">启动</string>

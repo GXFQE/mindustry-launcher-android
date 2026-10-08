@@ -78,6 +78,8 @@ public class ModsActivity extends BaseActivity {
     private TextView mEmpty;
     private TextView mSummary;
     private TextView mDetail;
+    /** F23：上次崩溃的归因那一行（默认 GONE；只在点名成功时显示） */
+    private TextView mCrashLine;
     private TextView mSlotSub;
     private TextView mCopySub;
 
@@ -143,6 +145,7 @@ public class ModsActivity extends BaseActivity {
         View root = getLayoutInflater().inflate(R.layout.activity_mods, null);
         mSummary = (TextView) root.findViewById(R.id.mods_summary);
         mDetail = (TextView) root.findViewById(R.id.mods_detail);
+        mCrashLine = (TextView) root.findViewById(R.id.mods_verdict);
         Util.bindExpandableCard(root, R.id.mods_status_box, R.id.mods_detail, R.id.mods_chevron);
 
         View row = Util.bindActionValue(root, R.id.row_mod_slot, R.drawable.ic_folder,
@@ -556,6 +559,49 @@ public class ModsActivity extends BaseActivity {
         mTarget = Mods.targetsFor(this, mSlot);
         rebuildList();
         fillHeader();
+        refreshCrashVerdict();
+    }
+
+    /**
+     * F23：把**上次崩溃很可能是谁干的**显示在摘要卡里（一行）。
+     *
+     * ★ 为什么模组页也要这一行：这一页是"为什么它没生效"的入口，而"上次崩了、可能是谁"是同一类
+     *   问题的另一半答案 —— 只在日志页可见等于要用户先想到去那里翻。
+     * ★ 为什么只在**点名成功**时显示：`认不出`/原版崩/启动器自己的报告都**不占位、不说废话**
+     *   （与日志页那行的口径一致，只是这里更克制）。
+     * ⚠️ **必须在后台线程**：认不出时 `judgeFull` 要扫每个模组的 dex（真实槽里几十 MB）。
+     *   回来时两道校验（还停在这个槽 **且** 页面没销毁）—— 与 F7 的"过期结果丢弃"同源。
+     */
+    private void refreshCrashVerdict() {
+        if (mCrashLine == null) return;
+        mCrashLine.setVisibility(View.GONE);
+        mCrashLine.setText("");
+        final String slot = mSlot;
+        new Thread(new Runnable() {
+            @Override public void run() {
+                CrashAnalysis.Verdict v = null;
+                try {
+                    v = CrashAnalysis.analyzeNewest(ModsActivity.this, slot);
+                } catch (Throwable ignored) {
+                    v = null;
+                }
+                final String line = (v != null && v.kind == CrashAnalysis.KIND_MOD)
+                        ? Trans.get(ModsActivity.this, R.string.mods_verdict_fmt,
+                                CrashAnalysis.text(ModsActivity.this, v))
+                        : "";
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        if (Util.dead(ModsActivity.this) || !slot.equals(mSlot)) return;
+                        if (line.isEmpty()) {
+                            mCrashLine.setVisibility(View.GONE);
+                            return;
+                        }
+                        mCrashLine.setText(line);
+                        mCrashLine.setVisibility(View.VISIBLE);
+                    }
+                });
+            }
+        }, "mods-crash-verdict").start();
     }
 
     private void fillHeader() {

@@ -20,7 +20,8 @@
 
 > ⚠️ **本表停在 F13 / F0**（后来没再逐行补）。**F21 之后的 dev 口请看各自分片**：
 > F21 = `dev_mapstats`（[08 片](08-阶段-4-.msav-解析器.md)）· F22 = `dev_msch`（[15 片](15-阶段-9-蓝图.md)）·
-> **F23 = `dev_crash_analyze <槽>` 与 `dev_crash_corpus <目录>`**（[16 片](16-阶段-10-崩溃分析.md)）。
+> **F23 = `dev_crash_analyze <槽>` 与 `dev_crash_corpus <目录>`**（[16 片](16-阶段-10-崩溃分析.md)）；
+> 另有 `dev_mods_page <槽>`（直开某个槽的模组页，与 `dev_maps_page` / `dev_bp_page` 同族）。
 > 🔴 新增 dev 口时**别忘了** `checkDevIntent` 开头那个 `isDev` **白名单**（漏了 ⇒ 命令静默无反应，2026-10-08 真踩过）。
 
 **统一纪律**：`dev_*` 只在 debuggable 构建生效（`checkDevIntent` 已经在做），

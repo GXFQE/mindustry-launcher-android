@@ -78,6 +78,22 @@
                         android:tint="@color/fg_muted" />
                 </LinearLayout>
 
+                <!-- ══ F23：上次崩溃的归因结论（一行） ══════════════════════════════
+                     ★ 为什么放这里（摘要卡里、**在可展开的详情之外**）：模组页是"为什么它没生效"
+                       的入口页，而"上次崩了、很可能是谁干的"正是同一类问题的另一半答案；
+                       放在详情里就等于默认藏着（用户得先想到点开）。
+                     ★ 为什么默认 GONE：没有崩溃报告 / 结论是"认不出"时**不占位、不说废话**
+                       （这行的值由 ModsActivity.refreshCrashVerdict 在后台算，见那里的注释）。 -->
+                <TextView
+                    android:id="@+id/mods_verdict"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingTop="6dp"
+                    android:textSize="13sp"
+                    android:lineSpacingExtra="2dp"
+                    android:textColor="@color/fg"
+                    android:visibility="gone" />
+
                 <TextView
                     android:id="@+id/mods_detail"
                     android:layout_width="match_parent"
