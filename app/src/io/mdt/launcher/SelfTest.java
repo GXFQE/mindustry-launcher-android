@@ -3625,6 +3625,24 @@ public final class SelfTest {
             ok(stat, L, CrashAnalysis.blamedNames(bOne).size() == 1
                             && "Crash Test".equals(CrashAnalysis.blamedNames(bOne).get(0)),
                     "★摘要卡要的是**显示名**（不是内部名）：" + CrashAnalysis.blamedNames(bOne));
+            // ★★ 2026-10-08 用户：「其实崩溃那个弹窗也可能加上的」—— 弹窗与摘要卡共用同一个“单一嫌疑人”判据。
+            {
+                java.util.List<Mods.Info> one = new java.util.ArrayList<>();
+                Mods.Info fake = mkMod("modsolo", null, null, true);
+                java.util.List<String> ins = CrashAnalysis.blamedInternals(bOne);
+                if (!ins.isEmpty()) {
+                    fake.internalName = ins.get(0);
+                    one.add(fake);
+                }
+                ok(stat, L, !ins.isEmpty() && ModsText.soleSuspect(one, bOne) == fake
+                                && ModsText.soleSuspect(one, bTwo) == null
+                                && ModsText.soleSuspect(one, bNone) == null,
+                        "★★弹窗那个“忽略它并再试”只在**单一嫌疑人**且还能找到它时出现（并列 / 认不出 ⇒ 不给）");
+                ok(stat, L, ctx.getString(R.string.crash_alert_ignore).length() > 0
+                                && ctx.getString(R.string.crash_alert_ignore).length() <= 12,
+                        "★按钮字样要短（三个按钮一行）：「"
+                                + ctx.getString(R.string.crash_alert_ignore) + "」");
+            }
             ok(stat, L, CrashAnalysis.blamedNames(bNone).isEmpty()
                             && CrashAnalysis.blamedNames(bTwo).size() == 2,
                     "★元断言：认不出 ⇒ 空（卡片第二行不出现）；并列 ⇒ 两个名字（退回整句那条路）");

@@ -1620,6 +1620,9 @@
     <!-- F23 "tell me right away" (2026-10-08, user request) -->
     <string name="crash_alert_title">The game crashed</string>
     <string name="crash_alert_toast_fmt">The game crashed: %1$s</string>
+    <string name="crash_alert_ignore">Ignore it and retry</string>
+    <string name="crash_alert_ignored_fmt">ignored %1$s - just launch again (the rest of the mods will load this time)</string>
+    <string name="crash_alert_ignore_missing">it is not in the mod list anymore (maybe deleted)</string>
     <string name="crash_alert_open">Open the log</string>
     <string name="mods_warn_backslash_fmt">⚠ This package is packed incorrectly and the game cannot find its scripts — just repack it</string>
     <string name="mods_warn_state_fmt">⚠ %1$s</string>

@@ -1573,6 +1573,9 @@
     <!-- F23「崩了马上说一声」（2026-10-08 用户点单：有没有办法让他崩溃以后立马弹窗提示啊） -->
     <string name="crash_alert_title">游戏崩了</string>
     <string name="crash_alert_toast_fmt">游戏崩了：%1$s</string>
+    <string name="crash_alert_ignore">忽略它并再试</string>
+    <string name="crash_alert_ignored_fmt">已忽略「%1$s」—— 直接启动试试（这次会加载其余的模组）</string>
+    <string name="crash_alert_ignore_missing">没在模组列表里找到它（可能已经删了）</string>
     <string name="crash_alert_open">看运行日志</string>
     <string name="mods_warn_backslash_fmt">⚠ 这个包压得不太对，游戏会找不到里面的脚本 —— 重新压一次就好</string>
     <string name="mods_warn_state_fmt">⚠ %1$s</string>

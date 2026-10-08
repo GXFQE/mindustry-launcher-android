@@ -165,7 +165,7 @@ public final class CrashAlert {
         if (v == null) return;
         if (!claim(key)) return;                         // ★ 原子闸门（查+写同锁）
         sPending = null;
-        showDialog(a, v);
+        showDialog(a, v, slot);
     }
 
     // ── 「同一份只提示一次」的原子闸门 ─────────────────────────────────────
@@ -213,7 +213,7 @@ public final class CrashAlert {
                 Activity top = sTop == null ? null : sTop.get();
                 if (top != null && !Util.dead(top)) {
                     if (!claim(key)) return;
-                    showDialog(top, v);
+                    showDialog(top, v, slot);
                 } else {
                     sPending = f;
                     sPendingSlot = slot;
@@ -240,7 +240,7 @@ public final class CrashAlert {
                     @Override public void run() {
                         Activity a = sTop == null ? null : sTop.get();
                         if (a == null || Util.dead(a)) return;
-                        showDialog(a, v);
+                        showDialog(a, v, slot);
                     }
                 });
             }
@@ -248,9 +248,14 @@ public final class CrashAlert {
     }
 
     /** 结论对话框：正文 = {@link CrashAnalysis#text}（**唯一来源**），按钮 =「看运行日志」/「知道了」 */
-    private static void showDialog(final Activity a, CrashAnalysis.Verdict v) {
+    private static void showDialog(final Activity a, CrashAnalysis.Verdict v, final String slot) {
         if (a == null || Util.dead(a)) return;
-        new android.app.AlertDialog.Builder(a)
+        // ★★ 2026-10-08 用户：「其实崩溃那个弹窗也可能加上的」—— 崩的那一下正好知道是谁干的，
+        //   那一下就该能顺手忽略它（走 {@link Mods#ignoreAndRetry}：关掉它 + 清 launchid.dat）。
+        //   只在**单一嫌疑人**时才给这个按钮（并列时点哪一个都不对）。
+        final java.util.List<String> internals = CrashAnalysis.blamedInternals(v);
+        final boolean soleSuspect = internals != null && internals.size() == 1;
+        android.app.AlertDialog.Builder b = new android.app.AlertDialog.Builder(a)
                 .setTitle(R.string.crash_alert_title)
                 .setMessage(CrashAnalysis.text(a, v))
                 .setPositiveButton(R.string.crash_alert_open, new android.content.DialogInterface.OnClickListener() {
@@ -261,7 +266,41 @@ public final class CrashAlert {
                         }
                     }
                 })
-                .setNegativeButton(R.string.close, null)
-                .show();
+                .setNegativeButton(R.string.close, null);
+        if (soleSuspect) {
+            b.setNeutralButton(R.string.crash_alert_ignore,
+                    new android.content.DialogInterface.OnClickListener() {
+                        @Override public void onClick(android.content.DialogInterface d, int w) {
+                            ignoreAndRetry(a, slot, internals.get(0));
+                        }
+                    });
+        }
+        b.show();
+    }
+
+    /** 按下后：**关掉它 + 清掉“上次没跑完”那个标记**，然后告诉用户下一步。 */
+    private static void ignoreAndRetry(Activity a, String slot, String internalName) {
+        try {
+            Mods.Scan sc = Mods.scan(a, slot);
+            Mods.Info m = null;
+            for (Mods.Info x : sc.mods) {
+                if (x != null && x.internalName != null
+                        && x.internalName.equalsIgnoreCase(internalName)) {
+                    m = x;
+                    break;
+                }
+            }
+            if (m == null) {
+                Toast.makeText(a, Trans.get(a, R.string.crash_alert_ignore_missing),
+                        Toast.LENGTH_LONG).show();
+                return;
+            }
+            SettingsBin.Result r = Mods.ignoreAndRetry(a, slot, m.internalName);
+            Toast.makeText(a, r.ok
+                    ? Trans.get(a, R.string.crash_alert_ignored_fmt, m.title())
+                    : SettingsText.userReason(a, r), Toast.LENGTH_LONG).show();
+        } catch (Throwable e) {
+            Toast.makeText(a, String.valueOf(e), Toast.LENGTH_LONG).show();
+        }
     }
 }

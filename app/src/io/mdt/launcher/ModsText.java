@@ -199,6 +199,26 @@ final class ModsText {
     }
 
     /**
+     * ★★ **单一嫌疑人**（2026-10-08，用户：「其实崩溃那个弹窗也可能加上的」）。
+     *
+     * <p>归因器只点了**一个**模组、而且它还在我们的扫描结果里 ⇒ 返回它；
+     * 否则 null（**并列时点哪一个都不对** ⇒ 宁可不给这个动作）。
+     * 两处共用：摘要卡那行可点（{@code ModsActivity}）与崩溃弹窗（{@code CrashAlert}）。
+     */
+    static Mods.Info soleSuspect(java.util.List<Mods.Info> mods, CrashAnalysis.Verdict v) {
+        java.util.List<String> internals = CrashAnalysis.blamedInternals(v);
+        if (mods == null || internals == null || internals.size() != 1) return null;
+        String want = internals.get(0);
+        for (Mods.Info m : mods) {
+            if (m != null && m.internalName != null
+                    && want.equals(m.internalName.toLowerCase(java.util.Locale.ROOT))) {
+                return m;
+            }
+        }
+        return null;
+    }
+
+    /**
      * 模组**说明文件**读不出来时的"人话版"原因（原来在 `Mods.Info.metaReason()` 里）。
      *
      * ★ 为什么搬出来：`Mods.Info` 是纯数据类、拿不到 `Context`，而这两句会经
