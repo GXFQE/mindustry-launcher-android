@@ -1614,6 +1614,7 @@
     <string name="mods_warn_blamed">⚠ It is the likely cause of the last crash</string>
 
     <!-- Summary card, second line: short form (the long evidence lives in the log page) -->
+    <string name="mods_blame_one_tap_fmt">most likely cause: %1$s (tap to ignore it and retry)</string>
     <string name="mods_blame_one_fmt">Most likely cause: %1$s (evidence is in the log)</string>
 
     <!-- F23 "tell me right away" (2026-10-08, user request) -->

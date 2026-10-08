@@ -610,7 +610,10 @@ public class ModsActivity extends BaseActivity {
                 java.util.List<String> names = CrashAnalysis.blamedNames(v);
                 final String line;
                 if (names.size() == 1) {
-                    line = Trans.get(ModsActivity.this, R.string.mods_blame_one_fmt, names.get(0));
+                    // ★ 2026-10-08 用户点单（「可以加个快捷停用」）：单一嫌疑人时这行
+                    //   **直接可点** = 忽略它并再试（走同一个确认框与 {@link Mods#ignoreAndRetry}，
+                    //   不另造一套）—— 崩溃场景下不用先去列表里找那个模组。
+                    line = Trans.get(ModsActivity.this, R.string.mods_blame_one_tap_fmt, names.get(0));
                 } else if (v != null && v.kind == CrashAnalysis.KIND_MOD) {
                     line = Trans.get(ModsActivity.this, R.string.mods_verdict_fmt,
                             CrashAnalysis.text(ModsActivity.this, v));
@@ -646,9 +649,25 @@ public class ModsActivity extends BaseActivity {
                         boolean live = ModsText.crashStillLive(mScan, anyFailedNow);
                         if (line.isEmpty() || !live) {
                             mCrashLine.setVisibility(View.GONE);
+                            mCrashLine.setOnClickListener(null);
+                            mCrashLine.setClickable(false);
                         } else {
                             mCrashLine.setText(line);
                             mCrashLine.setVisibility(View.VISIBLE);
+                            // 只有“单一嫌疑人”时才可点（并列时点哪一个都不对）
+                            final Mods.Info suspect = names.size() == 1
+                                    ? findByName(mScan.mods, names.get(0)) : null;
+                            if (suspect != null) {
+                                mCrashLine.setOnClickListener(new View.OnClickListener() {
+                                    @Override public void onClick(View v) {
+                                        confirmToggle(suspect);
+                                    }
+                                });
+                                mCrashLine.setClickable(true);
+                            } else {
+                                mCrashLine.setOnClickListener(null);
+                                mCrashLine.setClickable(false);
+                            }
                         }
                         // 名单变了就把列表重画一次（多标/少标一个「很可能与它有关」）
                         if (!blamed.equals(mBlamed)) {
@@ -1217,6 +1236,15 @@ public class ModsActivity extends BaseActivity {
                 .setMessage(sb.toString())
                 .setPositiveButton(R.string.mods_close, null)
                 .show();
+    }
+
+    /** 按**显示名**在扫描结果里找那个模组（归因器给的就是显示名）。 */
+    private static Mods.Info findByName(java.util.List<Mods.Info> mods, String name) {
+        if (mods == null || name == null) return null;
+        for (Mods.Info m : mods) {
+            if (m != null && name.equals(m.title())) return m;
+        }
+        return null;
     }
 
     /**

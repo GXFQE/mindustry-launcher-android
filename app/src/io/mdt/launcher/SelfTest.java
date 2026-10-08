@@ -3632,6 +3632,17 @@ public final class SelfTest {
             String failNoteNo = ctx.getString(R.string.mods_warn_failed_noskip);
             String failNoteApplied = ctx.getString(R.string.mods_warn_failed_applied);
             String blameOne = ctx.getString(R.string.mods_blame_one_fmt);
+            // ★ 2026-10-08 用户点单：单一嫌疑人那行**可点** = 忽略它并再试
+            String blameTap = ctx.getString(R.string.mods_blame_one_tap_fmt);
+            ok(stat, L, blameTap.contains("点") && blameTap.contains("忽略")
+                            && blameTap.contains("%1$s")
+                            && blameTap.replace("%1$s", "").length() <= 24,
+                    "★★卡片上点名那行直接可点（忽略它并再试），且固定部分仍在字数预算内："
+                            + "「" + blameTap + "」（" + blameTap.replace("%1$s", "").length() + " 字）");
+            ok(stat, L, !ctx.getString(R.string.mods_blame_one_fmt).contains("点")
+                            && !ctx.getString(R.string.mods_blame_one_fmt).contains("忽略"),
+                    "★元断言：**不可点**那一份（并列时用的）不能带“点/忽略”字样，"
+                            + "否则用户会去点一个点不动的地方");
             ok(stat, L, failNote.length() <= 40 && failNoteNo.length() <= 40
                             && failNoteApplied.length() <= 40
                             && blameOne.replace("%1$s", "").length() <= 24,
