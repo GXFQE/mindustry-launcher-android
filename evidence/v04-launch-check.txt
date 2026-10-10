@@ -1,0 +1,43 @@
+MDT 启动器 v0.4-preview —— 发版前「最基础功能」真机验证（2026-10-10）
+=====================================================================
+
+设备：HONOR ELP-AN00 / Android 16 (API 36)
+被测包：本地构建的**产品版**（DEBUGGABLE=false，debug.keystore 签名；
+        与发布包的差别只有签名密钥与清单里的版本号）
+路径：启动器主界面 → 点版本行「Mindustry  159.7」→（两版本共用此槽，弹窗里点「仍然启动」）
+      → 游戏主菜单 → 退出
+
+判据与实测
+----------
+1. :game 进程起来了           pid 28284（io.mdt.launcher:game）
+2. 坑位 Activity 到前台        mCurrentFocus = io.mdt.launcher/mindustry.android.AndroidLauncher
+3. 启动管线报告全绿            hub/report-launch.txt：预热成功(第1次) · dexElements=2 ·
+                             看到 mindustry.android.AndroidLauncher · ABI=arm64-v8a ·
+                             libarc.so 802496 B + libarc-freetype.so 471592 B 加载 OK ·
+                             两份 AssetManager 都 addAssetPath(base.apk) 且 probe 都 ok(336B) ·
+                             startActivity 已返回、坑位 finish（前置段合计 41 ms）
+4. 游戏进到主菜单             截图 v04-launch-menu.png（这一刻还叠着下面那个模组错误弹窗）/
+                             点掉之后的全屏菜单 v04-launch-menu-clean.png
+                             （Mindustry release build 159.7：战役模式 / 载入游戏 / 自定义游戏 /
+                             加入游戏 / 地图编辑器 / 设置 / 模组 / 退出）
+5. ⚠️ 没有做到：游戏内「载入游戏」的存档列表这次没截到 —— 原因见下
+6. 退出游戏回到启动器          mCurrentFocus = io.mdt.launcher/.MainActivity，:game 进程消失
+7. AndroidRuntime 无崩溃       logcat -d -s AndroidRuntime:E 全程为空
+
+为什么第 5 条没做到（如实记）
+---------------------------
+当前槽「模组演示」里装着我前几轮崩溃分析（F23）实验用的模组，其中 dep-base.zip / dep-user.zip
+是**故意缺依赖**的探针包 ⇒ 游戏自己弹「你的模组发生了错误。请禁用受影响的模组或修复错误后再进行游戏。」
+并拒绝进入「载入游戏」（v04-launch-menu.png 就是那一刻；游戏自己的 last_log.txt 里也有
+`[E] No main.js found for mod UI Import Demo.`、`Content '蓝钢工业-蓝钢发射台' isn't in the tech tree…` 等行）。
+⇒ 这是**那个槽的内容**问题，不是启动器 / 安装包的问题：进程起得来、内容加载跑完
+（`[I] Total time to load: 7270ms`，之后还 `Fetched 270 community servers.`）、菜单画得出来、退出干净。
+
+替代证据（同样证明"槽挂对了"）：
+  · 游戏那条错误弹窗里列出的内容名（蓝钢拓展 / 亚光速质驱 / 小型发射台 / 重型发射台 …）
+    **正是本槽那 14 个模组里的内容** ⇒ 游戏读到的就是本槽
+  · 启动器侧：槽「冲突演示」的存档页列出 4 份（1.msav 364.6 KB、10.msav 383.3 KB …，
+    截图 v04-launch-slot-saves.png）—— 槽 → 存档 的映射在启动器侧一直是好的
+  · 上一版发版前的同一条检查是在一个干净槽上做的（见 v03-launch-check.txt 第 5 条）
+
+说明：截图 PNG 被 .gitignore 的 evidence/*.png 挡住（只在本地留档），本文件进仓库。
