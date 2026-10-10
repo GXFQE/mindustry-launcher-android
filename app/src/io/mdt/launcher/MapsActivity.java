@@ -145,11 +145,10 @@ public class MapsActivity extends BaseActivity {
                             return;
                         }
                         sMapTarget = mSlot;
-                        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-                        i.addCategory(Intent.CATEGORY_OPENABLE);
-                        i.setType("*/*");       // 各家文件管理器对 .msav 的 MIME 报得五花八门
-                        startActivityForResult(Intent.createChooser(i,
-                                Trans.get(MapsActivity.this, R.string.maps_import)), REQ_MAP);
+                        // ★ 第 127 轮：**可多选**（`EXTRA_ALLOW_MULTIPLE`）——
+                        //   选 1 份 = 老样子（含"这其实是存档"的命名框），选 ≥2 份或选了一个
+                        //   zip = 批量（见 onActivityResult / BatchIo.runImport）。
+                        BatchIo.pickFiles(MapsActivity.this, REQ_MAP, R.string.maps_import);
                     }
                 });
 
@@ -455,6 +454,8 @@ public class MapsActivity extends BaseActivity {
 
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        // ★ 第 127 轮：批量导出的落点（勾了多份时走它；一份仍走下面 REQ_MAP_EXPORT 那条老路）
+        if (BatchIo.handleExportResult(this, requestCode, resultCode, data)) return;
         if (requestCode == REQ_MAP_DETAIL) {
             // 详情页里把这张图删了 ⇒ 回来重新清点（与导入/删除原本的做法一致）
             if (resultCode == RESULT_OK) recreate();
@@ -472,19 +473,34 @@ public class MapsActivity extends BaseActivity {
         // ★ 与存档那条同一纪律：无论成败**先清目标槽**
         final String slot = sMapTarget;
         sMapTarget = null;
-        if (resultCode != RESULT_OK || data == null || data.getData() == null || slot == null) return;
-        importFile(data.getData(), queryName(data.getData()), slot, false);
+        if (resultCode != RESULT_OK || data == null || slot == null) return;
+        // ★ 第 127 轮：一批（多选 / 一个 zip）走批量；**一份普通文件**仍旧走单份那条路
+        //   （那条路有「这其实是一份存档 ⇒ 问名字」和逐个同名确认，逐份弹框在批量里是折磨）
+        List<BatchIo.Doc> docs = BatchIo.docsOf(this, data);
+        if (docs.isEmpty()) return;
+        if (docs.size() > 1 || BatchIo.isArchiveName(docs.get(0).name)) {
+            BatchIo.runImport(this, slot, docs, BatchIo.KIND_MAPS, new Runnable() {
+                @Override public void run() { refreshList(); }
+            });
+            return;
+        }
+        Uri uri = docs.get(0).uri;
+        importFile(uri, docs.get(0).name, slot, false);
     }
 
     // ── 导出地图（用户 2026-10-03：「导入和导出都放页面顶上吧」） ──────────────
 
     /**
-     * 先挑"导出哪一张"，再让用户选存到哪。
+     * 先挑"导出哪几张"，再让用户选存到哪。
      *
      * ★ 为什么不是"导出本槽全部"：地图有三个来源（本槽 / 游戏自带 / 模组自带，见 {@link Maps}），
      *   后两者**在 APK 和模组包里面**，用户在文件管理器里根本看不见它们 ——
      *   只导本槽的话，"把游戏自带那张图拿出来"这件事永远做不到。
-     *   所以这里列**全部**地图，点哪张导哪张。
+     *   所以这里列**全部**地图，勾哪张导哪张。
+     *
+     * ★ 第 127 轮：这张列表**改成多选**（勾选 + 「导出（N 份）」）——
+     *   勾 1 份仍走**单份那条路**（原文件名 + `REQ_MAP_EXPORT`），勾 ≥2 份打成**一个 zip**。
+     *   同一条判据贯穿四个内容页，见 {@link BatchIo} 的类注释。
      */
     private void promptExportMap() {
         if (mItems == null || mItems.isEmpty()) {
@@ -492,33 +508,35 @@ public class MapsActivity extends BaseActivity {
             return;
         }
         final List<Maps.Item> items = mItems;
-        View box = getLayoutInflater().inflate(R.layout.dialog_msav_list, null);
-        TextView head = (TextView) box.findViewById(R.id.msav_head);
-        head.setVisibility(View.VISIBLE);
-        // ★ 条数这类信息只能放表头，**不能塞标题**：AlertDialog 的标题是单行的
-        //   （第 58 轮实测被截成省略号）—— 见 dialog_msav_list.xml 的注释
-        head.setText(Trans.get(MapsActivity.this, R.string.maps_export_head_fmt, items.size()));
-        ListView lv = (ListView) box.findViewById(R.id.msav_list);
-        lv.setAdapter(new MsavListAdapter(this, mTitles, mSubs, mThumbs));
-        final AlertDialog dlg = new AlertDialog.Builder(this)
-                .setTitle(R.string.maps_export)
-                .setView(box)
-                .setNegativeButton(R.string.cancel, null)
-                .create();
-        lv.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener() {
-            @Override public void onItemClick(android.widget.AdapterView<?> p, View v, int pos, long id) {
-                if (pos < 0 || pos >= items.size()) return;
-                Maps.Item it = items.get(pos);
-                sExportItem = it;
-                dlg.dismiss();
-                startActivityForResult(Intent.createChooser(
-                        // ★ 文件名用**原始名**：`0.msav` 这种就是游戏里认的名字，
-                        //   "安全化"成 ASCII 之后用户在文件管理器里认不出来（同存档导出那条纪律）
-                        Exporter.createDoc(it.name(), "application/octet-stream"),
-                        Trans.get(MapsActivity.this, R.string.chooser_export)), REQ_MAP_EXPORT);
-            }
-        });
-        dlg.show();
+        BatchIo.pickMulti(this, R.string.maps_export,
+                Trans.get(MapsActivity.this, R.string.batch_export_head_fmt, items.size()),
+                mTitles, mSubs, mThumbs, new BatchIo.OnPick() {
+                    @Override public void onPick(List<Integer> idx) {
+                        if (idx.size() == 1) {
+                            // ★ 文件名用**原始名**：`0.msav` 这种就是游戏里认的名字，
+                            //   "安全化"成 ASCII 之后用户在文件管理器里认不出来（同存档导出那条纪律）
+                            Maps.Item it = items.get(idx.get(0).intValue());
+                            sExportItem = it;
+                            startActivityForResult(Intent.createChooser(
+                                    Exporter.createDoc(it.name(), "application/octet-stream"),
+                                    Trans.get(MapsActivity.this, R.string.chooser_export)),
+                                    REQ_MAP_EXPORT);
+                            return;
+                        }
+                        // ★ 多份 = 一个 zip（外层 zip 里每一条 = 单份导出时用户会拿到的那个文件）
+                        List<Exporter.Src> srcs = new java.util.ArrayList<>();
+                        for (Integer i : idx) {
+                            Maps.Item it = items.get(i.intValue());
+                            if (it.file != null) {
+                                srcs.add(Exporter.Src.ofFile(it.file, it.name()));
+                            } else if (it.container != null && it.entry != null) {
+                                srcs.add(Exporter.Src.ofEntry(it.container, it.entry, it.name()));
+                            }
+                        }
+                        BatchIo.startExport(MapsActivity.this, srcs,
+                                BatchIo.suggestZipName("maps"));
+                    }
+                });
     }
 
     /**
@@ -1063,26 +1081,11 @@ public class MapsActivity extends BaseActivity {
         b.show();
     }
 
-    /** 从 SAF 的 Uri 问出显示名（与存档页同一套做法，失败退回 `map.msav`） */
-    private String queryName(Uri uri) {
-        try {
-            android.database.Cursor c = getContentResolver().query(uri, null, null, null, null);
-            if (c != null) {
-                try {
-                    int i = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME);
-                    if (c.moveToFirst() && i >= 0) {
-                        String n = c.getString(i);
-                        if (n != null && !n.trim().isEmpty()) return n;
-                    }
-                } finally {
-                    c.close();
-                }
-            }
-        } catch (Throwable ignored) {
-        }
-        String s = uri.getLastPathSegment();
-        return s == null || s.trim().isEmpty() ? "map.msav" : s;
-    }
+    /**
+     * 从 SAF 的 Uri 问出显示名 —— 第 127 轮起**搬进了 {@link BatchIo#displayNameOf}**：
+     * 多选批量走的是同一件事（多选时 `data.getClipData()` 的每一条都要问一次名字），
+     * 留两份实现迟早会在"某一家文件管理器只给一部分 URI 名字"时表现不一致。
+     */
 
     /** 全类弹窗的唯一入口 —— ★ 2026-10-04 起在这里挡"已销毁的 Activity"：
      *  地图导入/导出是后台任务收尾时弹的（见 {@link Util#dead}）。 */

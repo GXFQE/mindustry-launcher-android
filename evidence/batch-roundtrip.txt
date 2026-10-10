@@ -1,0 +1,73 @@
+批量导入 / 导出 —— 真机端到端取证（第 127 轮，2026-10-10）
+设备：HONOR ELP-AN00 / Android 16（API 36），序列号 AJYMUT4522007370
+构建：DEBUGGABLE=true SUFFIX=-dev ./build.sh install（dev 变体）
+
+为什么用 dev 口：系统的"多选文件 / 保存到哪"两个选择器 adb 驱动不了，
+而这一轮的两个承诺（多份 → 一个 zip、整包 zip 能解开逐份导回来）必须靠**往返**取证。
+两个 dev 口走的是**与界面同一份实现**：
+  导出 = Exporter.zipSources（界面 BatchIo.startExport → handleExportResult 调的就是它）
+  导入 = BatchIo.importSync（与界面那条 runImport 共用 plan + applyAll）
+  --es dev_batch_export <槽> --es dev_batch_kind <maps|saves|blueprints|mods> --es dev_batch_path <目标.zip>
+  --es dev_batch_import <槽> --es dev_batch_kind <...>   --es dev_batch_path <一个文件 或 一个目录>
+
+① 地图：游戏自带 136 张 → 一个 zip → 导回新槽（往返逐字节）
+  dev_batch_export 模组演示 maps /hub/batch-fixtures/maps.zip
+      扫到条目 136 个
+      zip: files=136 raw=9417447 out=9427309     （地图本身已是 zlib ⇒ 再压略涨）
+      落盘大小=9427309
+  PC 侧 zipfile 检查：
+      entries = 136 / 全部 .msav / 无目录条目 / 无重名 / 首条头 = 78 9c（zlib）
+  dev_new_slot batchlab
+  dev_batch_import batchlab maps <maps.zip>
+      待导入 1 个
+      共处理 136 份 / 导入成功：136
+      从 maps.zip 里解出 136 份
+  md5 逐份比对（PC 侧 zip 条目 vs 设备 slot-batchlab/maps/）：
+      checked=136  mismatched/missing=0  device files=136
+  ⇒ 往返**逐字节一致**（同时验了"容器条目流式拷出" + "整包解开逐份导回"）
+
+② 模组：13 个包（含 1 个目录形态）→ 一个 zip → 导回
+  dev_batch_export 模组演示 mods
+      扫到条目 13 个
+      zip: files=13 raw=38856536 out=37495583
+  PC 侧：13 条；**目录形态那条是嵌套 zip** —— dirmod-demo.zip 里 root = scripts/main.js + mod.json ✓
+  dev_batch_import batchlab mods <mods.zip>
+      共处理 13 份 / 导入成功：12 / 失败：1
+        bad-package.zip — 这个包不是游戏能加载的模组
+      （反向：坏包必须**点名**，不许静默成功）
+  设备 slot-batchlab/mods/ 落 12 个文件（含 dirmod-demo.zip）⇒ 嵌套 zip 能被 importPackage 再吃回去
+
+③ 蓝图：4 份 → 一个 zip → 导回 4 份
+  dev_batch_export 预览验收 blueprints → files=4 raw=12202 out=12723
+  dev_batch_import batchlab blueprints → 共处理 4 份 / 导入成功：4 / 从 bp.zip 里解出 4 份
+
+④ 存档：两份 .msav（zlib）→ 批量导入
+  dev_batch_import batchlab saves <目录> → 待导入 2 个 / 共处理 2 份 / 导入成功：2
+  slot-batchlab/saves/ 里两份都落位、**没有 .part 残留**（stage → commit 两步都走到）
+
+⑤ 界面那条路（不是 dev 口）：蓝图页勾 2 份 → 「导出（2 份）」→ SAF 存盘
+  证据截图：
+    evidence/batch-pick-1.png        —— 多选对话框（4 行 + 复选框，按钮「导出（0 份）」/「全选」）
+    evidence/batch-pick-2.png        —— 勾 2 份：行勾上、按钮变「导出（2 份）」
+    evidence/batch-pick-3-saf.png    —— 系统"保存到"里建议名就是 mdt-blueprints-20261010-1739.zip
+    evidence/batch-export-toast.png  —— Toast「已导出 2 份 · 9.4 KB」
+  PC 侧校验那个 zip：entries=[px-board.msch, px-bigcore.msch]
+      px-board.msch   9e04d5162809846741f5ee4bd048e740
+      px-bigcore.msch d8298ed2d9c69a079e10d69daecf0d75
+  与设备 slot-预览验收/schematics/ 里那两份的 md5 **逐字相同**
+
+⑥ 自检：evidence/batch-selftest.txt
+  通过 1052 项，失败 0 项（本轮新增一节 25 条，其中 12 条是元断言/反方向断言）
+
+⚠️ 没验到的（如实记）：
+  · 系统多选**文件选择器**里"一次勾多个文件"这一步自动化不了 ⇒ 界面那条导入路只验到
+    "选完之后"（与 dev 口逐字相同的那一段）；"多选本身"（EXTRA_ALLOW_MULTIPLE + getClipData）
+    在代码上与 dev 口无关，**没有真机证据**（自检里用的是 Intent + ClipData 的纯函数那一段）。
+  · 批量导入的**一次性同名确认框**在真机上没点到（要走到它得先经 SAF 多选）——
+    判据在自检里（skipped=2 / replaced=1 两条）。
+
+清场（都做过，逐条复核）：
+  · 实验槽 slot-batchlab 删除；hub/batch-fixtures/（maps.zip / mods.zip / saves/）删除
+  · /sdcard/Download/mdt-blueprints-*.zip 删除；/sdcard/shot*.png、/sdcard/ui*.xml 删除
+  · 当前槽指针仍是「模组演示」（`app_hub/mdt-slot.txt` 复核）—— 本轮 dev 口**不会**改它
+  · 用户的槽（模组演示 / 预览验收 / default / test）只读，一个字节没改

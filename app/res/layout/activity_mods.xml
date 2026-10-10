@@ -172,6 +172,23 @@
                     android:background="@color/divider" />
 
                 <!--
+                  第 127 轮（批量导入导出）：模组这条线原来**只有进口没有出口**
+                  （整槽 zip 那条出口把模组混在里面，拿不出"单独某几个模组"）。
+                  ★ 放在「导入模组包」的下面一格：进和出挨着，与地图页 / 蓝图页同一个形状。
+                -->
+                <include
+                    android:id="@+id/row_mod_export"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="62dp"
+                    android:background="@color/divider" />
+
+                <!--
                   模组间冲突体检（用户问：「能检查到 logicsugar 和 neon 同时加载吗」）。
                   ★ 放在**按需**一行里：它要读每个 Java 模组的 classes.dex（可能十几 MB），
                     不适合每次进页面都跑。

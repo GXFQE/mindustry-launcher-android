@@ -462,7 +462,7 @@
       ★ 2026-10-06（第 115 轮第六批）：存档**页面**（二级页）顶上那三行的副标题 ——
         与模组页 / 地图页 / 蓝图页同一形状（用户：「存档页面也变成…二级页面吧」）。
     -->
-    <string name="save_page_import_sub">从本机选一份 .msav 放进这个槽</string>
+    <string name="save_page_import_sub">从本机选一份或多份 .msav 放进这个槽</string>
     <string name="save_page_export_sub">把这个槽的存档导到本机</string>
     <string name="save_page_bad_sub">读不出来的那几份，看看为什么</string>
     <string name="msav_bad_list_title_fmt">读不出来的存档（%1$d 份）</string>
@@ -884,7 +884,7 @@
       ★ 尺子与地图那条线一致：导入 = **先 .part + 我们的解析器验 + 再就位**；删除 = **挪进中转站**。
     -->
     <string name="bp_import">导入蓝图…</string>
-    <string name="bp_import_sub">从文件管理器选一个 .msch 文件</string>
+    <string name="bp_import_sub">从文件管理器选一个或多个 .msch 文件</string>
     <string name="bp_export">导出蓝图…</string>
     <string name="bp_export_sub">导出成文件（存到 Download 等）</string>
     <string name="bp_export_none">这个槽还没有蓝图</string>
@@ -1681,7 +1681,7 @@
 
     <!-- ══ F13 第三阶段：模组包导入 / 跨槽复制 ══════════════════════════════ -->
     <string name="mods_act_import_title">导入模组包</string>
-    <string name="mods_act_import_sub">从本机选 .zip / .jar</string>
+    <string name="mods_act_import_sub">从本机选 .zip / .jar（可多选）</string>
     <string name="mods_act_copy_title">复制本槽模组到…</string>
     <string name="mods_act_copy_sub_fmt">把「%1$s」里的模组整套复制到另一个槽</string>
     <string name="chooser_pick_mod">选择模组包</string>
@@ -1782,4 +1782,40 @@
     <string name="lang_stat_used_fmt">正在用 %1$d 条译文</string>
     <string name="lang_rejected_fmt">%1$d 条被拒绝（占位符对不上）—— 见设置 → 语言</string>
     <string name="lang_unknown_fmt">%1$d 个 key 认不出来（文件版本可能和应用对不上）</string>
+    <!-- ══ 批量导入 / 导出（第 127 轮：模组 / 地图 / 存档 / 蓝图 四类共用同一套界面） ══ -->
+    <string name="exp_err_no_src">没有可导出的东西</string>
+    <string name="batch_export_btn_fmt">导出（%1$d 份）</string>
+    <string name="batch_export_all">全选</string>
+    <string name="batch_export_none">清空勾选</string>
+    <string name="batch_export_nothing">还没有勾选任何一份</string>
+    <string name="batch_export_head_fmt">共 %1$d 份 · 勾选要导出的，再点「导出」</string>
+    <string name="batch_export_progress_title">正在导出</string>
+    <string name="batch_export_progress_fmt">正在把 %1$d 份打包成一个 zip</string>
+    <string name="batch_export_zip_done_fmt">已导出 %1$d 份 · %2$s</string>
+    <string name="batch_import_progress_title">正在导入</string>
+    <string name="batch_import_progress_fmt">正在把 %1$d 份导入 %2$s</string>
+    <string name="batch_import_running_fmt">正在导入 %1$d 份</string>
+    <string name="batch_import_nothing">没有选中任何文件</string>
+    <string name="batch_report_title">批量导入结果</string>
+    <string name="batch_report_head_fmt">共处理 %1$d 份</string>
+    <string name="batch_report_ok_fmt">导入成功：%1$d</string>
+    <string name="batch_report_replaced_fmt">替换（旧的已挪进中转站）：%1$d</string>
+    <string name="batch_report_skipped_fmt">跳过：%1$d</string>
+    <string name="batch_report_failed_fmt">失败：%1$d</string>
+    <string name="batch_report_line_fmt">%1$s — %2$s</string>
+    <string name="batch_overwrite_title">有同名的了</string>
+    <string name="batch_overwrite_msg_fmt">%2$d 份里有 %1$d 份与槽里同名。要替换吗？（旧的会挪进中转站）</string>
+    <string name="batch_overwrite_ok">替换</string>
+    <string name="batch_skip_exists">槽里已有同名的一份，没有替换</string>
+    <string name="batch_skip_dup">这一批里有两份重名</string>
+    <string name="batch_skip_too_many">一次导入的份数太多，跳过</string>
+    <string name="batch_note_unpacked_fmt">从 %2$s 里解出 %1$d 份</string>
+    <string name="batch_fail_unknown">未知失败</string>
+    <string name="batch_err_open_fmt">打不开「%1$s」</string>
+    <string name="batch_import_map_issave">这其实是一份存档，不是地图</string>
+    <string name="batch_import_save_nonstandard">不是标准存档，游戏可能读不出来</string>
+    <string name="mods_export">导出模组…</string>
+    <string name="mods_export_sub">可多选；多份会打包成一个 zip</string>
+    <string name="mods_export_none_fmt">槽「%1$s」里没有可导出的模组</string>
+    <string name="mods_export_dir_hint">目录形态，导出成 zip</string>
 </resources>

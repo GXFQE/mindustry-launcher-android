@@ -115,10 +115,13 @@ public final class SelfTest {
     /** F23 第二批：把结论送到「导出文件」与「模组页」用的槽（里面只放一份人造崩溃报告） */
     public static final String SLOT_F23 = "m3-f23";
 
+    /** 第 127 轮：批量导入（模组 / 地图 / 存档 / 蓝图）用的槽 */
+    public static final String SLOT_BATCH = "m3-batch";
+
     private static final String[] TEST_SLOTS = {
             SLOT, SLOT_RENAMED, CLONE_SRC, CLONE_DST, CLONE_EMPTY, CLONE_EMPTY_DST, SLOT_MODS,
             SLOT_SET, SLOT_PACK, SLOT_PACK_DST, SLOT_SAVE, SLOT_GONE, SLOT_GONE2,
-            SLOT_MODE, SLOT_MODE2, SLOT_S2M, SLOT_MSCH, SLOT_BP, SLOT_F23};
+            SLOT_MODE, SLOT_MODE2, SLOT_S2M, SLOT_MSCH, SLOT_BP, SLOT_F23, SLOT_BATCH};
 
     /**
      * 本工程**自己的全部页面**（㊱ 基类检查用）。
@@ -274,6 +277,8 @@ public final class SelfTest {
             // ★ 用户语言包（2026-10-07）：单键包只改那一条 + 占位符门禁 + 模板能装回自己
             //   ⚠️ 断言用的是**同一次调用里的对照**（装前 /= 装后逐键比对），与自检语言无关。
             langPack(ctx, L, stat);
+            // ★ 第 127 轮：批量导入 / 导出（四种来源打一个 zip + 整包判据 + 端到端往返）
+            batchIo(ctx, L, stat);
             // ★ 篡改对象池的用例放**最后**：它会在池里留下一个内容坏掉的对象，
             //   之后任何"再备份一次"都会因为 `has()` 命中而复用坏对象（CAS 的固有
             //   假设是"池内不可变"）。放在最后就不影响别的用例。
@@ -9833,6 +9838,324 @@ public final class SelfTest {
                         + (firstBad == null ? "" : "，首个：" + firstBad) + "）");
 
         tmpDir.delete();
+    }
+
+    /**
+     * 第 127 轮：**批量导入 / 导出**（模组 / 地图 / 存档 / 蓝图四类共用一套）。
+     *
+     * <p>这一节钉四件事，每件都配一条反方向或元断言：
+     * <ol>
+     *   <li><b>多份 → 一个 zip</b>：三种来源（真文件 / 容器条目 / **目录形态的模组**）
+     *       各写一条，且目录那条在外层里必须是**一个能打开的嵌套 zip**、
+     *       内容按目录**根**写（游戏认这个形状）；</li>
+     *   <li><b>重名去重</b>：两份同名 → 两个条目（`x.msav` / `x (2).msav`）——
+     *       zip 里同名条目解出来只剩一条而且**不报错**，是"导出了 20 份、解出 18 份"的根因；</li>
+     *   <li><b>整包判据</b>：我们导出的一整包 ⇒ 认得出来；**模组包本身**（根上有 `mod.hjson`）
+     *       ⇒ 必须判成"这不是一整包"（否则用户导一个模组会被拆成碎片）；不是 zip ⇒ 也不认。
+     *       解包只取**文件名最后一段**（zip 的 `../` 是经典路径穿越）；</li>
+     *   <li><b>端到端</b>：`BatchIo.importSync` 真的把一批导进测试槽（四类各一次），
+     *       同名**不替换 ⇒ 跳过**、**替换 ⇒ 旧的进中转站**；外加"导出→导入"的**往返**。</li>
+     * </ol>
+     */
+    private static void batchIo(Context ctx, List<String> L, int[] stat) {
+        L.add("── 第 127 轮：批量导入 / 导出（多份 = 一个 zip；整包解开逐份导回来）──");
+        File root = new File(Paths.privateDir(ctx), "selftest-batch");
+        deleteTree(root);
+        root.mkdirs();
+        try {
+            // ── ① 三种来源打成一个 zip ────────────────────────────────────────
+            File a = new File(root, "甲图.msav");
+            write(a, "AAA-甲图的内容".getBytes("UTF-8"));
+            File dirMod = new File(root, "目录模组");
+            new File(dirMod, "scripts").mkdirs();
+            write(new File(dirMod, "mod.hjson"), "name: dir-mod\n".getBytes("UTF-8"));
+            write(new File(dirMod, "scripts/main.js"), "// hi\n".getBytes("UTF-8"));
+            File container = new File(root, "容器.apk");
+            zipMany(container, new String[]{"assets/maps/乙图.msav", "assets/其他.txt"},
+                    new String[]{"BBB-乙图的内容", "x"});
+
+            List<Exporter.Src> srcs = new ArrayList<>();
+            srcs.add(Exporter.Src.ofFile(a, "甲图.msav"));
+            srcs.add(Exporter.Src.ofEntry(container, "assets/maps/乙图.msav", "乙图.msav"));
+            srcs.add(Exporter.Src.ofDir(dirMod, "目录模组.zip"));
+            ByteArrayOutputStream bo = new ByteArrayOutputStream();
+            Exporter.Result r = Exporter.zipSourcesTo(ctx, bo, srcs);
+            File zip = new File(root, "一整包.zip");
+            write(zip, bo.toByteArray());
+
+            java.util.zip.ZipFile zf = new java.util.zip.ZipFile(zip);
+            try {
+                ok(stat, L, zf.size() == 3 && zf.getEntry("甲图.msav") != null
+                                && zf.getEntry("乙图.msav") != null
+                                && zf.getEntry("目录模组.zip") != null,
+                        "★ 三种来源（真文件 / 容器条目 / 目录）打成一个 zip：3 条，名字保留非 ASCII");
+                ok(stat, L, r.files == 3, "★ 计数：写进去 3 条（r.files=" + r.files + "）");
+                ok(stat, L, "AAA-甲图的内容".equals(
+                                new String(readZipEntry(zf, "甲图.msav"), "UTF-8")),
+                        "★ 真文件那条：内容逐字节一致");
+                ok(stat, L, "BBB-乙图的内容".equals(
+                                new String(readZipEntry(zf, "乙图.msav"), "UTF-8")),
+                        "★ 容器条目那条：拷出来的是**那一条**（不是空字节、不是别的条目）");
+                File nz = new File(root, "nested.zip");
+                write(nz, readZipEntry(zf, "目录模组.zip"));
+                java.util.zip.ZipFile nzf = new java.util.zip.ZipFile(nz);
+                try {
+                    ok(stat, L, nzf.getEntry("mod.hjson") != null
+                                    && nzf.getEntry("scripts/main.js") != null,
+                            "★ 目录形态模组 ⇒ 外层里是一条**嵌套 zip**，内容按目录根写"
+                                    + "（mod.hjson / scripts/main.js）—— 这样它才能再被导入");
+                } finally {
+                    nzf.close();
+                }
+                // ★ 元断言：把源内容改一个字节，同一个比较必须判不等（证明上面三条有分辨力）
+                byte[] want = "AAA-甲图的内容".getBytes("UTF-8");
+                want[0] ^= 0x01;
+                ok(stat, L, !java.util.Arrays.equals(want,
+                                readZipEntry(zf, "甲图.msav")),
+                        "★ 元断言：源改 1 个字节 ⇒ 同一套比较判**不等**");
+            } finally {
+                zf.close();
+            }
+
+            // ── ② 重名去重 ───────────────────────────────────────────────────
+            List<Exporter.Src> dup = new ArrayList<>();
+            dup.add(Exporter.Src.ofFile(a, "同名.msav"));
+            dup.add(Exporter.Src.ofFile(a, "同名.msav"));
+            ByteArrayOutputStream bo2 = new ByteArrayOutputStream();
+            Exporter.zipSourcesTo(ctx, bo2, dup);
+            File zip2 = new File(root, "重名.zip");
+            write(zip2, bo2.toByteArray());
+            java.util.zip.ZipFile zf2 = new java.util.zip.ZipFile(zip2);
+            try {
+                ok(stat, L, zf2.size() == 2 && zf2.getEntry("同名.msav") != null
+                                && zf2.getEntry("同名 (2).msav") != null,
+                        "★ 两份重名 ⇒ 两个条目（`同名.msav` / `同名 (2).msav`），没有静默少一份");
+            } finally {
+                zf2.close();
+            }
+
+            // ── ③ 反向：空清单必须抛，不许写出一个 0 条目的 zip ────────────────
+            String err = null;
+            try {
+                Exporter.zipSourcesTo(ctx, new ByteArrayOutputStream(), new ArrayList<Exporter.Src>());
+            } catch (Throwable t) {
+                err = String.valueOf(t.getMessage());
+            }
+            ok(stat, L, err != null, "★ 反向：一条都没有 ⇒ 拒绝（" + err + "），不留一个空 zip");
+            // 反向：源文件已经不在 ⇒ 那一条被跳过；**全都不可用**时同样拒绝
+            String err2 = null;
+            try {
+                List<Exporter.Src> gone = new ArrayList<>();
+                gone.add(Exporter.Src.ofFile(new File(root, "不存在.msav"), "不存在.msav"));
+                Exporter.zipSourcesTo(ctx, new ByteArrayOutputStream(), gone);
+            } catch (Throwable t) {
+                err2 = String.valueOf(t.getMessage());
+            }
+            ok(stat, L, err2 != null, "★ 反向：源文件不存在 ⇒ 跳过它，全空时同样拒绝");
+
+            // ── ④ 整包判据（这是"别把模组包拆碎"的那一条）──────────────────────
+            String[] exts = {".msav"};
+            java.io.InputStream in1 = new java.io.FileInputStream(zip);
+            List<String> names = BatchIo.bundleNames(in1, exts, null);
+            in1.close();
+            ok(stat, L, names != null && names.size() == 2,
+                    "★ 我们导出的一整包 ⇒ 认出来（命中 " + (names == null ? "null" : names.size())
+                            + " 条 .msav）");
+
+            File modPack = new File(root, "一个模组.zip");
+            zipMany(modPack, new String[]{"mod.hjson", "maps/图.msav"},
+                    new String[]{"name: some-mod\n", "inside"});
+            java.io.InputStream in2 = new java.io.FileInputStream(modPack);
+            List<String> m2 = BatchIo.bundleNames(in2, exts, Mods.META_FILES);
+            in2.close();
+            ok(stat, L, m2 == null,
+                    "★ 元断言：**模组包本身**（根上有 mod.hjson，哪怕里面还带地图）⇒ 判成"
+                            + "「这不是一整包」—— 否则用户导一个模组会被拆成碎片");
+
+            File notZip = new File(root, "不是zip.msav");
+            write(notZip, zlib("这不是 zip，是 zlib".getBytes("UTF-8")));
+            java.io.InputStream in3 = new java.io.FileInputStream(notZip);
+            List<String> m3 = BatchIo.bundleNames(in3, exts, null);
+            in3.close();
+            ok(stat, L, m3 == null, "★ 反向：根本不是 zip（真存档就是 zlib 流）⇒ 不认，交给单份导入");
+
+            // ── ⑤ 解包：只取文件名最后一段（这是路径穿越那条防线的**同一行代码**）
+            //   ⚠️ 没法在这里造一条 `../../evil.msav` 的条目：Java / 安卓的 `ZipOutputStream`
+            //   自己就拒绝这种名字（`Invalid zip entry path`）⇒ 夹具只能是"带子目录"的正常条目，
+            //   而"只取 basename"这一条对两者是同一条实现（见 BatchIo.extractBundle 的注释）。
+            File nested = new File(root, "带子目录.zip");
+            zipMany(nested, new String[]{"sub/深.msav", "sub2/深.msav", "deep/a.msav"},
+                    new String[]{"DEEP", "DEEP2", "AAA"});
+            File work = new File(root, "work");
+            work.mkdirs();
+            java.io.InputStream in4 = new java.io.FileInputStream(nested);
+            List<File> got;
+            try {
+                got = BatchIo.extractBundle(in4, exts, work);
+            } finally {
+                in4.close();
+            }
+            boolean allInside = true;
+            boolean flat = true;
+            for (File f : got) {
+                if (!work.getAbsolutePath().equals(f.getParentFile().getAbsolutePath())) allInside = false;
+                if (f.getName().contains("/") || f.getName().contains("sub")) flat = false;
+            }
+            ok(stat, L, got.size() == 3 && allInside && flat,
+                    "★ 解包只落**文件名最后一段**：`sub/深.msav` ⇒ 工作目录里的 `深.msav`，"
+                            + "目录外面一个字节都没写（" + got.size() + " 份）");
+            boolean dupOk = false;
+            for (File f : got) if (f.getName().startsWith("深") && f.getName().contains("(2)")) dupOk = true;
+            ok(stat, L, dupOk,
+                    "★ 包里两条**不同路径同名**（sub/深.msav 与 sub2/深.msav）⇒ 解出来两份"
+                            + "（后一条改名，不覆盖前一条）");
+
+            // ── ⑥ plan：批内重名 + 与槽里同名（纯函数）────────────────────────
+            File planDir = new File(root, "plandir");
+            planDir.mkdirs();
+            write(new File(planDir, "已有.msav"), "old".getBytes("UTF-8"));
+            List<BatchIo.Item> items = new ArrayList<>();
+            items.add(BatchIo.Item.ofFile(a));                                   // 甲图.msav
+            items.add(BatchIo.Item.ofFile(a));                                   // 甲图.msav（批内重名）
+            items.add(BatchIo.Item.ofFile(new File(planDir, "已有.msav")));       // 与槽里同名
+            BatchIo.Plan plan = BatchIo.plan(planDir, items,
+                    new BatchIo.Namer() {
+                        @Override public String nameFor(String d) {
+                            return MapFiles.safeName(d);
+                        }
+                    });
+            ok(stat, L, plan.entries.size() == 2 && plan.dup.size() == 1 && plan.conflicts() == 1,
+                    "★ plan：3 份 ⇒ 条目 2（批内重名撤掉 1）+ 与槽里同名 1（entries="
+                            + plan.entries.size() + " dup=" + plan.dup.size()
+                            + " conflicts=" + plan.conflicts() + "）");
+            BatchIo.Plan empty = BatchIo.plan(new File(root, "空目录"), items,
+                    new BatchIo.Namer() {
+                        @Override public String nameFor(String d) {
+                            return MapFiles.safeName(d);
+                        }
+                    });
+            ok(stat, L, empty.conflicts() == 0,
+                    "★ 元断言：拿一个空目录 ⇒ 同名 0 份（证明上面那个 1 是「比出来的」，不是恒真）");
+
+            // ── ⑦ 端到端：四类各导一批进测试槽 ───────────────────────────────
+            File slotRoot = Data.dirOf(ctx, SLOT_BATCH);
+            Data.deleteTree(slotRoot);
+
+            // 地图：两份 → 都在；再来一次不替换 ⇒ 跳过；替换 ⇒ 进站
+            List<File> twoMaps = new ArrayList<>();
+            twoMaps.add(tinyMsav(new File(root, "甲.msav"), "甲图", 32, 32, 1, false));
+            twoMaps.add(tinyMsav(new File(root, "乙.msav"), "乙图", 32, 32, 2, false));
+            List<BatchIo.Doc> mapDocs = BatchIo.docsFromFiles(twoMaps);
+            BatchIo.Report rm = BatchIo.importSync(ctx, SLOT_BATCH, mapDocs,
+                    BatchIo.KIND_MAPS, true);
+            File mapsDir = new File(slotRoot, "maps");
+            ok(stat, L, rm.ok == 2 && rm.failed.isEmpty()
+                            && new File(mapsDir, "甲.msav").isFile()
+                            && new File(mapsDir, "乙.msav").isFile(),
+                    "★ 批量导入地图 2 份：都落位（ok=" + rm.ok + " failed=" + rm.failed.size() + "）");
+            BatchIo.Report rm2 = BatchIo.importSync(ctx, SLOT_BATCH, mapDocs,
+                    BatchIo.KIND_MAPS, false);
+            ok(stat, L, rm2.ok == 0 && rm2.replaced == 0 && rm2.skipped.size() == 2,
+                    "★ 同名 + **不替换** ⇒ 两份都跳过（skipped=" + rm2.skipped.size()
+                            + "），一份都没动");
+            String md5Before = Util.md5(new File(mapsDir, "甲.msav"));
+            tinyMsav(new File(root, "甲.msav"), "甲图改过", 48, 48, 3, false);
+            BatchIo.Report rm3 = BatchIo.importSync(ctx, SLOT_BATCH,
+                    BatchIo.docsFromFiles(java.util.Arrays.asList(new File(root, "甲.msav"))),
+                    BatchIo.KIND_MAPS, true);
+            ok(stat, L, rm3.replaced == 1
+                            && !md5Before.equals(Util.md5(new File(mapsDir, "甲.msav"))),
+                    "★ 同名 + **替换** ⇒ replaced=1，槽里那份真的是新的（md5 变了）");
+
+            // 蓝图：两份 .msch
+            List<File> twoBp = new ArrayList<>();
+            File bp1 = new File(root, "蓝一.msch");
+            File bp2 = new File(root, "蓝二.msch");
+            write(bp1, new Sch(1, 4, 4).tag("name", "bp-one")
+                    .tile("conveyor", 0, 0, 0, new byte[]{0}).bytes());
+            write(bp2, new Sch(1, 4, 4).tag("name", "bp-two")
+                    .tile("conveyor", 1, 0, 0, new byte[]{0}).bytes());
+            twoBp.add(bp1);
+            twoBp.add(bp2);
+            BatchIo.Report rb = BatchIo.importSync(ctx, SLOT_BATCH, BatchIo.docsFromFiles(twoBp),
+                    BatchIo.KIND_BLUEPRINTS, true);
+            File schDir = new File(slotRoot, "schematics");
+            ok(stat, L, rb.ok == 2 && new File(schDir, "蓝一.msch").isFile()
+                            && new File(schDir, "蓝二.msch").isFile(),
+                    "★ 批量导入蓝图 2 份：都落位，且都过了 Msch 校验");
+
+            // 存档：两份 .msav（zlib）
+            List<File> twoSaves = new ArrayList<>();
+            twoSaves.add(tinyMsav(new File(root, "档一.msav"), "档一", 16, 16, 1, false));
+            twoSaves.add(tinyMsav(new File(root, "档二.msav"), "档二", 16, 16, 2, false));
+            BatchIo.Report rs = BatchIo.importSync(ctx, SLOT_BATCH, BatchIo.docsFromFiles(twoSaves),
+                    BatchIo.KIND_SAVES, true);
+            File savesDir = new File(slotRoot, "saves");
+            ok(stat, L, rs.ok == 2 && new File(savesDir, "档一.msav").isFile()
+                            && new File(savesDir, "档二.msav").isFile()
+                            && Msav.isZlib(new File(savesDir, "档一.msav")),
+                    "★ 批量导入存档 2 份：都落位（含 stage→commit 两步）");
+
+            // 模组：两份小包
+            List<File> twoMods = new ArrayList<>();
+            File modFile1 = new File(root, "模一.zip");
+            File modFile2 = new File(root, "模二.zip");
+            zipMany(modFile1, new String[]{"mod.hjson"}, new String[]{"name: batch-one\n"});
+            zipMany(modFile2, new String[]{"mod.hjson"}, new String[]{"name: batch-two\n"});
+            twoMods.add(modFile1);
+            twoMods.add(modFile2);
+            BatchIo.Report rmod = BatchIo.importSync(ctx, SLOT_BATCH,
+                    BatchIo.docsFromFiles(twoMods), BatchIo.KIND_MODS, true);
+            File modsDir = new File(slotRoot, "mods");
+            ok(stat, L, rmod.ok == 2 && new File(modsDir, "模一.zip").isFile()
+                            && new File(modsDir, "模二.zip").isFile(),
+                    "★ 批量导入模组 2 份：都落位（含「用游戏自己的判据验一遍」那道门）");
+            // 反向：拿一个不是模组的 txt 充当模组 ⇒ 必须**报失败**，不许静默成功
+            File notMod = new File(root, "不是模组.zip");
+            zipMany(notMod, new String[]{"readme.txt"}, new String[]{"hello"});
+            BatchIo.Report rbad = BatchIo.importSync(ctx, SLOT_BATCH,
+                    BatchIo.docsFromFiles(java.util.Arrays.asList(notMod)),
+                    BatchIo.KIND_MODS, true);
+            ok(stat, L, rbad.ok == 0 && rbad.failed.size() == 1,
+                    "★ 反向：不是模组的包 ⇒ 计入**失败**并在报告里点名，不许静默成功");
+
+            // ── ⑧ 往返：导出成一整包 ⇒ 再导回来（一个 .zip 文件当整批）───────────
+            List<Exporter.Src> round = new ArrayList<>();
+            for (File f : twoMaps) round.add(Exporter.Src.ofFile(new File(mapsDir, f.getName()),
+                    f.getName()));
+            ByteArrayOutputStream bo3 = new ByteArrayOutputStream();
+            Exporter.zipSourcesTo(ctx, bo3, round);
+            File bundle = new File(root, "地图一整包.zip");
+            write(bundle, bo3.toByteArray());
+            // 先把槽里的地图删掉（模拟"换机之后导回来"），再用**一个 zip** 导
+            Data.deleteTree(mapsDir);
+            BatchIo.Report rr = BatchIo.importSync(ctx, SLOT_BATCH,
+                    BatchIo.docsFromFiles(java.util.Arrays.asList(bundle)),
+                    BatchIo.KIND_MAPS, true);
+            ok(stat, L, rr.ok == 2 && new File(mapsDir, "甲.msav").isFile()
+                            && new File(mapsDir, "乙.msav").isFile(),
+                    "★ 往返：2 份地图 ⇒ 导出一个 zip ⇒ **只选这个 zip** 也能导回来"
+                            + "（ok=" + rr.ok + "，报告里记了「从 zip 里解出 2 份」）");
+            ok(stat, L, !rr.notes.isEmpty(),
+                    "★ 报告里说明了「这一批是从 zip 里解出来的」（notes=" + rr.notes.size() + "）");
+        } catch (Throwable t) {
+            ok(stat, L, false, "批量导入导出用例自身异常：" + t);
+        } finally {
+            deleteTree(root);
+            Data.deleteTree(Data.dirOf(ctx, SLOT_BATCH));
+        }
+        L.add("");
+    }
+
+    /** 从 ZipFile 里读一条的字节（拿不到就返回空数组，让断言自己判死） */
+    private static byte[] readZipEntry(java.util.zip.ZipFile zf, String name) {
+        try {
+            java.util.zip.ZipEntry e = zf.getEntry(name);
+            if (e == null) return new byte[0];
+            return readAll(zf.getInputStream(e));
+        } catch (Throwable t) {
+            return new byte[0];
+        }
     }
 
     /** 反射枚举 `R.string` 的全部字段值（去重后排序）—— 用来"逐键"读文案 */

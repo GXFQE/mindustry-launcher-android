@@ -84,17 +84,32 @@ final class SlotIo {
      * 转发 `onActivityResult`。返回 true = 这个请求码是我们的、已经处理（调用方直接 return）。
      */
     static boolean onActivityResult(Activity a, int req, int res, Intent data, SlotOps.Host h) {
+        // ★ 第 127 轮：批量导出的落点（勾了多份时走 BatchIo；一份仍走下面 REQ_EXPORT 那条老路）。
+        //   存档页与槽页**都**从这里转发 ⇒ 这一条必须放在最前面。
+        if (BatchIo.handleExportResult(a, req, res, data)) return true;
         if (req == REQ_MSAV) {
             // ★ 与 REQ_ZIP / REQ_EXPORT 同一条纪律：无论成败**先清目标槽**。
             //   否则用户取消后残留的槽会被下一次选择"接上"，文件落进上一个槽里。
             final String slot = sMsavTarget;
             sMsavTarget = null;
-            if (res != Activity.RESULT_OK || data == null || data.getData() == null
-                    || slot == null) {
+            if (res != Activity.RESULT_OK || data == null || slot == null) {
                 return true;
             }
-            Uri uri = data.getData();
-            importMsav(a, uri, queryDisplayName(a, uri), slot, h);
+            // ★ 第 127 轮：**可多选**。选 1 份 = 老样子（含改名框与逐个同名确认）；
+            //   选 ≥2 份或选了一个 zip = 批量（按原文件名落位，同名**只问一次**），
+            //   见 {@link BatchIo#runImport}。
+            List<BatchIo.Doc> docs = BatchIo.docsOf(a, data);
+            if (docs.isEmpty()) return true;
+            if (docs.size() > 1 || BatchIo.isArchiveName(docs.get(0).name)) {
+                BatchIo.runImport(a, slot, docs, BatchIo.KIND_SAVES,
+                        h == null ? null : new Runnable() {
+                            @Override public void run() {
+                                h.onSlotChanged();      // 页面/槽页重扫自己（导入完列表要跟上）
+                            }
+                        });
+                return true;
+            }
+            importMsav(a, docs.get(0).uri, docs.get(0).name, slot, h);
             return true;
         }
         if (req == REQ_ZIP) {
@@ -166,17 +181,11 @@ final class SlotIo {
      * （与地图页同一条，不是新引入的退化）。
      *
      * @param aliveOrNull 对话框的"还开着吗"标志；页面传 **null**
-     * @return **排好序**的文件数组（调用方按位置取，**不要重扫** —— 重扫会与列表对不上）
-     */
-    static File[] fillSaves(final Activity a, final String slotName, final android.widget.ListView lv,
-                            final boolean[] aliveOrNull) {
-        return fillSaves(a, slotName, lv, aliveOrNull, listSaves(a, slotName));
-    }
-
-    /**
-     * 把**已经定好顺序**的那几份填进列表（存档页那条路：它先按搜索词与排序方式筛过）。
-     *
      * @param files 要显示的（顺序就是列表顺序）；调用方拿它按下标取文件，**不要重扫**
+     *
+     * <p>⚠️ 第 127 轮起**只剩这一个重载**：原来那个"自己扫一遍再填"的 3 参版本只有
+     *   导出对话框在用，而它改走 {@link BatchIo#pickMulti}（适配器由那边造）⇒ 已删；
+     *   "异步补内容"那一半拆到 {@link #fillSavesInto}（勾选对话框也要同一份实现）。
      */
     static File[] fillSaves(final Activity a, final String slotName, final android.widget.ListView lv,
                             final boolean[] aliveOrNull, final File[] files) {
@@ -189,6 +198,19 @@ final class SlotIo {
         }
         final MsavListAdapter adapter = new MsavListAdapter(a, titles, subs, thumbs);
         lv.setAdapter(adapter);
+        fillSavesInto(a, slotName, lv, adapter, aliveOrNull, files);
+        return files;
+    }
+
+    /**
+     * ★ 第 127 轮：**异步补内容那一半**单独拆出来 —— 批量导出的勾选对话框
+     *   （{@link BatchIo#pickMulti}）自己造适配器（它要多一个勾选列），
+     *   但"名字 + 大小先出，meta 行与缩略图后台再补"这件事必须**只有一份实现**
+     *   （两份的话，哪天改了"只刷那一行"的做法就会有一边反弹回整片重排）。
+     */
+    static void fillSavesInto(final Activity a, final String slotName, final android.widget.ListView lv,
+                              final MsavListAdapter adapter, final boolean[] aliveOrNull,
+                              final File[] files) {
         new Thread(new Runnable() {
             @Override public void run() {
                 // 配色表：**本槽指向的版本 APK**（读不到就是 null ⇒ 一条缩略图都不出，界面留白）
@@ -225,7 +247,6 @@ final class SlotIo {
                 }
             }
         }, "msav-list").start();
-        return files;
     }
 
     /**
@@ -244,13 +265,15 @@ final class SlotIo {
     }
 
     /**
-     * F6 ①：单文件导出（把这个槽 `saves/` 里的某个存档拿出来）。
+     * F6 ①：导出存档（把这个槽 `saves/` 里的存档拿出来）—— **可以一次导多份**。
      *
      * ★ 文件名**用原始名**（`f.getName()`）—— 存档名就是玩家在游戏里看到的那个名字
      *   （见 {@link Msav#safeName} 的注释）；导出时绝不能"安全化"成 ASCII，
      *   否则用户在文件管理器里看到一堆拼音/下划线，根本认不出哪份是哪份。
      *
-     * ⚠️ 选择列表用 setItems ⇒ **不能再 setMessage**（两者并存会让列表整体不渲染，见 slotOps 注释）。
+     * ★ 第 127 轮：勾 1 份 = **老样子**（直接给那份 `.msav`）；勾 ≥2 份 = **一个 zip**
+     *   （同一条判据贯穿四个内容页，见 {@link BatchIo} 的类注释）。
+     *   列表本体仍是"名字 + 大小先出，meta 行与预览图后台再补"那一套（{@link #fillSavesInto}）。
      */
     static void exportSave(Activity a, final Data.Slot s) {
         // ★ 用 dirOf 手拼 saves/，**不要用 Data.savesDirOf** —— 后者会 mkdirs，
@@ -262,30 +285,36 @@ final class SlotIo {
             toast(a, Trans.get(a, R.string.export_no_save_fmt, s.name));
             return;
         }
-        // ★★ 列表本体走 {@link #fillSaves}（与存档页**同一套实现**：后台渐进补 + 只刷那一行）
-        View listView = a.getLayoutInflater().inflate(R.layout.dialog_msav_list, null);
-        final android.widget.ListView lv =
-                (android.widget.ListView) listView.findViewById(R.id.msav_list);
-        final AlertDialog dlg = new AlertDialog.Builder(a)
-                .setTitle(R.string.export_pick_title_fmt)
-                .setView(listView)
-                .setNegativeButton(R.string.cancel, null)
-                .create();
-        final boolean[] alive = {true};
-        final File[] ordered = fillSaves(a, s.name, lv, alive);
-        lv.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener() {
-            @Override public void onItemClick(android.widget.AdapterView<?> p, View v, int pos, long id) {
-                if (pos < 0 || pos >= ordered.length) return;
-                startExportSave(a, ordered[pos]);
-                dlg.dismiss();
-            }
-        });
-        dlg.setOnDismissListener(new DialogInterface.OnDismissListener() {
-            @Override public void onDismiss(DialogInterface d) {
-                alive[0] = false;          // 关了 ⇒ 后台补副标题的线程自己停
-            }
-        });
-        dlg.show();
+        // ★ 顺序与存档页"按名称"那一档**同一个实现**（ListQuery），别另写一份比较器
+        final File[] ordered = listSaves(a, s.name);
+        String[] titles = new String[ordered.length];
+        String[] subs = new String[ordered.length];
+        for (int i = 0; i < ordered.length; i++) {
+            titles[i] = ordered[i].getName();
+            subs[i] = Util.formatSize(ordered[i].length());
+        }
+        BatchIo.pickMulti(a, R.string.export_pick_title_fmt,
+                Trans.get(a, R.string.batch_export_head_fmt, ordered.length),
+                titles, subs, null, new BatchIo.Filler() {
+                    @Override public void fill(MsavListAdapter ad, android.widget.ListView lv,
+                                               boolean[] alive) {
+                        // ★ 与存档页**同一套**补内容实现（后台渐进补 + 只刷那一行）
+                        fillSavesInto(a, s.name, lv, ad, alive, ordered);
+                    }
+                }, new BatchIo.OnPick() {
+                    @Override public void onPick(List<Integer> idx) {
+                        if (idx.size() == 1) {
+                            startExportSave(a, ordered[idx.get(0).intValue()]);
+                            return;
+                        }
+                        List<Exporter.Src> srcs = new java.util.ArrayList<>();
+                        for (Integer i : idx) {
+                            File f = ordered[i.intValue()];
+                            srcs.add(Exporter.Src.ofFile(f, f.getName()));
+                        }
+                        BatchIo.startExport(a, srcs, BatchIo.suggestZipName("saves"));
+                    }
+                });
     }
 
     /**
@@ -586,14 +615,13 @@ final class SlotIo {
         pickMsavFile(a);
     }
 
-    /** 挑 .msav（两条入口共用；目标槽必须已经写进 sMsavTarget） */
+    /**
+     * 挑 .msav（两条入口共用；目标槽必须已经写进 sMsavTarget）。
+     * ★ 第 127 轮：**可多选**（选 1 份仍走老路，见 {@link #onActivityResult}）。
+     */
     private static void pickMsavFile(Activity a) {
-        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-        i.addCategory(Intent.CATEGORY_OPENABLE);
         // */*：各家文件管理器对 .msav 的 MIME 报得五花八门，限死会让用户选不中自己的存档
-        i.setType("*/*");
-        a.startActivityForResult(
-                Intent.createChooser(i, Trans.get(a, R.string.chooser_pick_msav)), REQ_MSAV);
+        BatchIo.pickFiles(a, REQ_MSAV, R.string.chooser_pick_msav);
     }
 
     /**

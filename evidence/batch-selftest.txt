@@ -1,0 +1,1204 @@
+MDT M3 自检   Sat Oct 10 17:41:43 GMT+08:00 2026
+
+===== 通过 1052 项，失败 0 项 =====
+无失败项。下方依次是环境信息、逐项明细、清理与用时。
+
+数据根 = /storage/emulated/0/Android/data/io.mdt.launcher/slot-模组演示
+HUB 外部 = /storage/emulated/0/Android/data/io.mdt.launcher/hub
+当前槽 = 模组演示
+自检语言 = zh（锁定，与界面语言设置无关）
+
+── ① 数据根体检（只读） ──
+  冗余副本 0 项 / 证据不足 1 项（合计可释放 0 B）
+  ✅ 体检可跑通且判据自洽（只读，未删任何东西）
+
+── ② 槽的建 / 改名 / 删 ──
+  ✅ 新建槽「m3-selftest」
+  ✅ 槽目录已落盘：/storage/emulated/0/Android/data/io.mdt.launcher/slot-m3-selftest
+  ✅ 拒绝保留名 shared
+  ✅ 拒绝 slot- 前缀
+  ✅ 拒绝空名
+  ✅ 拒绝删除当前槽「模组演示」
+  ✅ 改名 m3-selftest → m3-renamed
+  ✅ 改名后旧目录消失、新目录存在
+  ✅ 改回原名
+
+── ③④ 槽内容口径（F19：全部 − 排除）+ 破坏→恢复（M3 的核心承诺） ──
+  假数据已铺（带本轮 nonce 1a1253094a9）：
+    【该进】saves/a.msav, saves/b.msav, settings.bin, mods/test.jar, logic-tool/history/project-1.json, previews/p.png
+    【不该进】cache/junk.bin, config.json（顶层排除名单） ; saves/half.msav.part, .hidden/secret.bin（通用跳过）
+  ✅ 快照收了 6 个文件，实为 6
+  ✅ 清单是 CAS 格式（mdt-backup 2）
+  ✅ 快照里没有 files/（内容已进对象池）
+  ✅ 首次入库写出 179 B = 逻辑量 179 B（6 个文件内容互不相同 ⇒ 全部是新增）
+      清单 rel(6) = [logic-tool/history/project-1.json, mods/test.jar, previews/p.png, saves/a.msav, saves/b.msav, settings.bin]
+  ✅ 清单条目集合 = 预期（多/少都算失败）；缺=无 多=无
+  ✅ ★ 顶层文件 settings.bin 的 rel 就是 "settings.bin"（不是空串、不带尾斜杠）
+  ✅ 每个 rel 都是「非空 · 相对 · / 分隔 · 无尾斜杠」（守卫 rel() 顶层兜底）
+  ✅ saves/a.msav 的对象已在池里（sha256 即地址）
+  ✅ ★★ 模组乱放在数据根顶层的 logic-tool/history/project-1.json 进池了（F19 之前会漏）
+  ✅ previews/ 也进了池（口径 = 全部 − 排除，不再是白名单）
+  ✅ 顶层排除名单里的 cache/ 与 config.json 都没进池
+  ✅ 写一半的 .part 与 .hidden/ 下的东西都没进池（通用跳过生效）
+  ✅ 破坏已生效（a.msav 变了、settings.bin 与 logic-tool 的 JSON 都没了）
+  ✅ 恢复返回成功
+  ✅ ★ 恢复后 a.msav md5 与破坏前相同
+  ✅ b.msav md5 未变
+  ✅ ★ 被删的 settings.bin 回来了且 md5 相同（顶层文件的 rel 拼得对）
+  ✅ 被删的 mods/test.jar 回来了
+  ✅ ★★ 模组乱放的那个 JSON 回来了且 md5 相同（两层目录也被自动建出来）
+  ✅ 被排除的 cache/junk.bin 没被动过（仍在且内容未变）
+  ✅ 槽改名后备份目录跟着搬了（1 份快照）
+
+── ⑤ CAS 对象池：去重 / 回收 ──
+  ✅ 第二份快照同样没有 files/
+  ✅ ★★ 内容没变 ⇒ 第二份**一个新对象都没写**（storedNew=0） ⇒ 增量成本 ≈ 0（这份快照逻辑上有 179 B）
+  ✅ ★★ 对象池占用**一个字节都没涨**（2.2 MB → 2.2 MB）—— 这是去重的硬证据
+  ✅ 池里 129 个对象 / 2.2 MB
+  ✅ 此刻没有旧格式快照（都在 CAS 里）
+    （信息）全局体检：逻辑 8.2 MB / 池实占 2.2 MB ⇒ 节省 73.0%（含池里未回收的历史遗留对象）
+  ✅ ★ 宽限期（600 s）内的对象一个都没被删：16 / 16（本次共删 24 个，只该是过期孤儿）
+  ✅ GC 跑完槽里的存档仍在（没被误伤）
+
+── ⑥ 节省率公式（合成数字，钉死那个写反过的 bug） ──
+  ✅ 逻辑 100 / 实占 25 ⇒ 75%（曾写反成 25%）实为 75%
+  ✅ 孤儿不计入实占：逻辑 100 / 实占 25-20=5 ⇒ 95%
+  ✅ 实占超过逻辑量时夹到 0（不出现负数）
+  ✅ 逻辑量为 0 时不除零
+
+── ⑥b 版本号显示（剥构建前缀，且不许误剥） ──
+  ✅ 8-official-159.7 → 159.7（官方 Mindustry（真机实测原文））
+  ✅ 8-official-2026.09.X37 → 2026.09.X37（MindustryX fork（真机实测原文））
+  ✅ 9-beta-160.1 → 160.1（★ 换渠道/序号也成立（不许硬编码 8-official））
+  ✅ 159.7 → 159.7（本来就没前缀 ⇒ 原样）
+  ✅ 2026.09.X37 → 2026.09.X37（带点号的版本号不许被当成前缀）
+  ✅ 1-2-3 → 1-2-3（★ 负例：第二段不以字母开头 ⇒ 不许剥）
+  ✅ 2.1.0-rc-3 → 2.1.0-rc-3（负例：第一段必须纯数字，`2.1.0` 不是）
+  ✅ versionName 为 null ⇒ 退回 ?（不崩）
+  ✅ displayName = `名称  版本号`：MindustryX  2026.09.X37
+  ✅ 剥过前缀 ⇒ 详情弹窗要露出原文
+  ✅ 导入项显示名 = `名称  版本号`，**不带**（导入）：official-159  159.7
+  ✅ imported 位**不影响**显示名（身份只在副标题）：official-159  159.7
+  ✅ 主标题不含「（导入）」后缀
+  ✅ 没剥过 ⇒ 详情弹窗不出现多余的「原始版本名」行
+  裸串入口 Versions.displayVersionOf（无 Entry 时用）：
+  ✅ displayVersionOf("8-official-159.7") = 159.7
+  ✅ displayVersionOf(导入项真机原文) = 2026.09.X37
+  ✅ null ⇒ ?（不崩）
+  ✅ 空串 ⇒ ?
+  ✅ `?` ⇒ `?`（原样，不变成空）
+  ✅ 负例仍不剥
+  ✅ 两条入口同源：Entry.displayVersion() == displayVersionOf(versionName)
+    登记项 official-159：version=8-official-159.7 → 界面 159.7
+  ✅ 真实登记项的显示值已剥干净：8-official-159.7 → 159.7
+    已核对 1 条真实登记项
+  ✅ 导入完成 Toast 文案（真机数据实拼，且不含被剥掉的原文）：已导入 official-159 159.7
+
+── ⑥c 同槽冲突提示（对手描述） ──
+  ✅ 2 个版本 ⇒ 只点一个对手：「A」
+  ✅ 3 个版本 ⇒ 说「等 2 个」（除自己之外）：「A」等 2 个版本
+  ✅ 4 个版本 ⇒ 数量跟着走：「A」等 3 个版本
+  ✅ 显示的版本数 = 总数 − 1（不含自己）  total=3 ⇒ 显示 2  total=4 ⇒ 显示 3  total=5 ⇒ 显示 4  total=6 ⇒ 显示 5
+  ✅ 元断言：旧写法（3 个版本写「等 3 个」）会被判死 —— 判据不是恒真
+    2 个版本 ⇒ ⚠ 与「A」共用此槽，存档会互相覆盖
+    3 个版本 ⇒ ⚠ 与「A」等 2 个版本共用此槽，存档会互相覆盖
+  ✅ 2 个版本的提示里不出现「等 N 个」
+  ✅ 3 个版本的提示形如「「A」等 2 个版本」（除自己之外）
+  ✅ 2 个版本：右书名号恰好 1 个
+  ✅ 3 个版本：右书名号恰好 1 个
+  ✅ 左书名号也是恰好 1 个（fmt 与 desc 不许各带一对）
+  ✅ 2 个版本：中文与插入值之间无多余空格
+  ✅ 3 个版本：「等 N 个版本」两侧紧贴中文
+  ✅ 元断言：带空格的错误文案会被判死（证明该判据有分辨力）
+  ✅ 元断言：正确文案不被误杀（判据不是恒真）
+
+── ⑥d 同槽冲突：谁才算对手（版本号不同才算） ──
+  ✅ 同版本号的副本共用 ⇒ 无对手（装了又导入同一个 APK，不该提示）
+  ✅ 两个方向都为空（判据与「谁是组内第几个」无关）
+  ✅ ★元断言：159.7 vs 159.8（只差一位）⇒ 必须算冲突（证明 ① 不是恒空）
+  ✅ 159.7×2 + 146 ⇒ 对 159.7 而言对手只有 146 一个
+  ✅ 对 146 而言两个 159.7 副本折成 1 个对手
+    实拼 ⇒ ⚠ 与「M  159.7」共用此槽，存档会互相覆盖
+  ✅ ★ 副本不虚报：146 那行不写「等 2 个版本」（那是条目数，不是版本数）
+
+── ⑥e fork 基座版本（MDTX 对应版本的 MDT 不提示） ──
+  ✅ 真样本 mod.hjson ⇒ 160.1（实得 160.1）
+  ✅ 不带引号也认（HJSON 允许）
+  ✅ 值后面的注释被剥掉（实得 160.4）
+  ✅ ★ gradle 默认值 custom ⇒ 当作「没声明」（不是「基座叫 custom」）
+  ✅ 没有这个键 ⇒ null（官方本体的 APK 里连这个文件都没有）
+  ✅ ★元断言：整行被注释掉的键不算
+  ✅ ★元断言：近似键名不许命中（证明 ① 不是靠前缀匹配过的）
+  ✅ ★元断言：非版本号值不许透过（首字符非数字即拒）
+  ✅ 从 zip 里真读出基座版本（实得 160.1）
+  ✅ 包里没有 assets/mod.hjson ⇒ null（官方 / Xenon / MDTHub 都是这种）
+  ✅ 端到端：custom 一路传到调用方仍是 null
+  ✅ 文件不存在 ⇒ null（不抛）
+  ✅ ★ 显示 = 2026.09.X37、判据 = 160.1（两个属性分工，不许混用）
+  ✅ ★ 官方 160.1 + MindustryX X37（基座 160.1）⇒ 无对手（用户要的就是这条）
+  ✅ ★元断言：官方 159.7 + MindustryX X37（基座 160.1）⇒ 仍算冲突（证明上面那条不是恒空）
+  ✅ 没声明基座 ⇒ formatVersion 回落到 displayVersion（行为不变）
+  ✅ 能拿到本应用的安装包路径：/data/app/~~kWpp_J2K_5rb8kPspAL2Ng==/io.mdt.launcher-84du4YmSaHadbHj9dtYnyg==/base.apk
+  ✅ ★ 真机样本：已安装的 /data/app/... APK 能被打开并列出 classes.dex（这是「读出已装 fork 的基座版本」的前提；打不开就会静默不生效）
+  ✅ ★ 真机样本：本应用没有 mod.hjson ⇒ null（「能打开」与「没这个文件」是两件事）
+  ✅ ★ 真样本 prerelease B502（build.yml 的 B 系列）⇒ 基座 160.5，正常识别
+  ✅ ★ 真样本 prerelease B497 ⇒ 基座 160.4
+  ✅ ★ 真样本 X36 ⇒ 基座 159.7（= 用户找的那个「159.7 对应的 MDTX」）
+  ✅ ★ 官方 tag 的三种真实形态（无补丁号 / 一位补丁 / 两位补丁）全部识别
+  ✅ ★元断言：万一带后缀也**原样保留、不归一化**（实得 160.5-beta）—— 若有人加了「剥后缀」逻辑，这条先红
+  ✅ ★元断言：`160.5-beta` 与官方 `160.5` **仍算冲突** ⇒ 精确相等口径真的在生效（改成长度/前缀/数值比较都会让这条变绿 —— 那是本项目的静默放宽老坑）
+  ✅ ★ 已装 fork：显示版本 2026.09.X37 ≠ 基座 160.1 ⇒ 要备注（实得 160.1）
+  ✅ 官方本体没声明 ⇒ 不备注（整串与从前逐字相同）
+  ✅ ★ 导入的 fork：显示版本恰等于基座 ⇒ **不备注**（否则是「160.1（基于 160.1）」）
+  ✅ ★元断言：upstreamNote 对「已装 fork / 导入 fork」给出不同答案（判据有分辨力）
+  ✅ ★ 列表行实拼 ⇒ `MindustryX  2026.09.X37（基于 160.1）`
+  ✅ ★ 官方行实拼 ⇒ 无尾注（与加尾注之前逐字相同）
+
+── ⑥f 槽选项串：资源前导空格不许被 aapt2 吃掉 ──
+  ✅ ★ 资源 slot_current_suffix 首字符是空格（U+0020 转义真的生效了；实得「  [当前]」）
+  ✅ ★ 去掉空白后恰好是 [当前]（转义没多也没少字符，实得「[当前]」）
+  ✅ ★ 实拼（当前槽）三段边界都有空白 ⇒ `default  [当前]  52 个文件 · 208.3 KB`
+  ✅ ★ 实拼（非当前槽）⇒ `test  0 个文件 · 0 B`
+  ✅ ★元断言：就是用户截图里那个粘连形态，必须判死（判据不是恒真）
+  ✅ ★元断言：只补前半段也不放过 —— [当前] 后面缺空白同样判死
+
+── ⑫ 日志导出（内容完整性） ──
+  ✅ 表头原样带出
+  ✅ ① 游戏日志的正文在导出里
+  ✅ ② 第 1 份启动器日志的正文在
+  ✅ ② 第 2 份启动器日志的正文在
+  ✅ ③ 崩溃报告正文在（含堆栈行）
+  ✅ 三段的小标题都在（缺一段即可看出）
+  ✅ 每段自报家门（展示名 + 文件名）—— 离线看的人才知道这是哪份
+  ✅ 前置：600 行样本在**页面视图**里确实是截断的（truncated=true）
+  ✅ ★ 导出走全文：第 0 行与第 599 行都在（页面只显示尾部 400 行）
+  ✅ 源不存在时写出「缺失」而不是静默跳过
+  ✅ 元断言：游戏日志缺失时该判据判死（证明上面几条有分辨力）
+  ✅ readAll 能独立跑通（hub 六份都在册，dataRoot 可用）
+
+── ⑦ CAS 回收：过期孤儿真的会被删 ──
+  ✅ 两个孤儿对象已入库（都不被任何清单引用）
+  ✅ ★ 进程内把老孤儿的 mtime 拨到 20 分钟前（adb shell 的 touch 做不到这件事）
+  ✅ 老孤儿确实已过宽限期
+  ✅ 新孤儿仍在宽限期内
+  ✅ 此刻池里有 85 个被清单引用的对象
+  ✅ ★ GC 删掉了过期孤儿（本次删 1 个）
+  ✅ ★★ 过期孤儿对象文件真的不在了：be2b355b82b5…
+  ✅ ★ 宽限期内的孤儿被保住（防误删的那道保险）
+  ✅ ★★ 全部 85 个被引用对象完好（GC 没误删）
+  ✅ 空分片目录被顺手收掉
+  ✅ 清干净后池里孤儿 = 0（应为 0）
+
+── ⑧ 旧格式（v1）自动迁移 ──
+  ✅ 认出旧格式快照（mdt-backup 1）
+  ✅ 迁移报告：CAS 迁移：成功 1 份 逻辑内容：34 B（原样拷贝占 34 B，现在进共享对象池）
+  ✅ 迁移后 files/ 已删除（原件没白占空间）
+  ✅ 已无旧格式快照
+  ✅ 迁移后的快照是 v2 格式
+  ✅ 从迁移后的快照恢复成功
+  ✅ ★ 迁移后恢复出来的内容与迁移前逐字节一致（md5 相同）
+
+── ⑨ .msav 落盘管线 ──
+  ✅ ★zlib 流（78 9C 头）被认出来（原来这里断言的是 gzip 1f8b —— 判据是错的）
+  ✅ 落点是 saves/
+  ✅ ★ 中文存档名被原样保留（游戏列表显示的就是文件名）：我的存档 1.msav
+  ✅ 落盘可读且 md5 可算
+  ✅ 无 .part 残留
+  ✅ 非 .msav（不是 zlib 流）未被误判，交用户确认
+  ✅ discard 后 .part 已清理
+  ✅ 路径注入被挡住（evil.msav）
+  ✅ 同名重导替换而不新增
+
+── ⑦ 兼容性探测（F18：按能力拒绝） ──
+  ✅ ENTRY_DESC 由 Injector.GAME_ACTIVITY 推导（不是第二份字面量）：mindustry/android/AndroidLauncher
+  ✅ ENTRY_DESC 是 dex 类描述符形式（点号全部换成斜杠）
+  ✅ ELF64：p_align=16384（实读 16384）
+  ✅ ELF64：p_align=4096（实读 4096）
+  ✅ ELF32：偏移口径也对（实读 16384）
+  ✅ 非 ELF ⇒ 0（不拦）
+  ✅ 太短 ⇒ 0（不拦）
+  ✅ null ⇒ 0（不抛异常）
+  ✅ 元断言：非 PT_LOAD 的 p_align 不被采信（证明②不是恒真）
+  ✅ 4 KB 库 / 4 KB 页 ⇒ 合格
+  ✅ 4 KB 库 / 16 KB 页 ⇒ 不合格（Android 15+ 会拒载）
+  ✅ 16 KB 库 / 16 KB 页 ⇒ 合格
+  ✅ 读不到对齐（0）⇒ 合格（保守：不拦）
+  ✅ 四项硬判据齐 ⇒ runnable
+  ✅ 无属性注入 ⇒ needsRename（该回退改名交换）
+  ✅ 有属性注入 ⇒ 不需要回退
+  ✅ 缺入口类 ⇒ 不可进管线（哪怕库和页对齐都合格）
+  ✅ 字节搜索：命中
+  ✅ 字节搜索：不命中
+  ✅ 字节搜索：针比干草长 ⇒ false（不越界）
+  ✅ 设备页大小 = 4096 B（2 的幂）
+    真机样本（本应用 APK）= entry=N lib=- abi=- align=?/page=4K prop=Y → 拒绝
+  ✅ 读到 dex（1 个）
+  ✅ 本应用 APK 里没有 mindustry/android/AndroidLauncher
+  ✅ 本应用 APK 里没有 lib/ ⇒ ABI 与 native 库都取不到（abi=null lib=null）
+  ✅ 本应用 APK 判为不可进管线（它确实不是游戏包）
+
+── ⑬ F0 数据隔离模型（真隔离 vs 改名交换） ──
+  ✅ slotParent = externalRoot 的父目录（/storage/emulated/0/Android/data/io.mdt.launcher）
+  ✅ slotDir 住在 slotParent 下（/storage/emulated/0/Android/data/io.mdt.launcher/slot-f0-probe）
+  ✅ slotDir 名 = 「slot-」+ 槽名
+  ✅ 槽目录**不在** externalRoot(files/) 内 —— 这正是 F0 与「改名交换」的分界
+  ✅ 元断言：insideOf 有分辨力（files/saves 判为「在里面」）
+  ✅ Data 的槽常量是 Paths 的**别名**（同一份字面量）
+  ✅ 槽名唯一来源：Paths.readSlotName == Data.currentSlot（模组演示）
+  ✅ dirOf(shared) = externalRoot
+  ✅ dirOf(普通槽) = slotDir(该槽)
+  ✅ 元断言：shared 与普通槽解析到**不同**路径（分支真有分辨力）
+  ✅ dirOf(null) = dirOf(当前槽)
+  ✅ 统一布局（无标记 + files/ 无内容）⇒ 没有要收回的本体
+  ✅ 老布局（无标记 + files/ 有内容）⇒ 本体归**当前槽** a
+  ✅ 远古包标记 b ⇒ 即使 files/ 空，本体也算 b（**标记说了算**）
+  ✅ shared：files/ 本来就是它的根 ⇒ 绝不搬动
+  ✅ 元断言：「shared」是**精确**保留值（shared2 不受影响 ⇒ 实现不是 startsWith）
+  ✅ 元断言：legacyClaim 对「files/ 有没有内容」敏感（不是恒返回同一个）
+    当前布局：marker=test  files/有内容=true  认定本体=test（在 files/）
+  ✅ 不变式：槽「f0-probe」→ files/ ？ 实得 false，应为 false
+  ✅ 不变式：槽「模组演示」→ files/ ？ 实得 false，应为 false
+  ✅ 不变式：槽「shared」→ files/ ？ 实得 true，应为 true
+  ✅ 不变式：槽「default」→ files/ ？ 实得 false，应为 false
+  ✅ 只有该拦的（cache/ *.part 点文件 零字节 空目录）⇒ 零内容（实得 0 项 []）
+  ✅ 同一目录里加入 keep/ 后：只留下它，前面那些仍被拦（实得 1 项 [keep]）
+
+── ⑭ F4② 克隆槽（逐字节一致 + 三条负例） ──
+  ✅ 建源槽「m3-clone-src」
+  ✅ 元断言：treeMd5 对内容改动敏感（改一个字节就判不等）
+  ✅ 元断言后源槽已复原（尺子复位）
+  ✅ 克隆 m3-clone-src → m3-clone-dst
+  ✅ ★ 新槽内容与期望**逐字节一致**（4 / 应为 4 个文件；实得 [[mods/x.jar, nested/deep/y.json, saves/a.msav, settings.bin]]）
+  ✅   · mods/x.jar 内容相同（md5 一致）
+  ✅   · nested/deep/y.json 内容相同（md5 一致）
+  ✅   · saves/a.msav 内容相同（md5 一致）
+  ✅   · settings.bin 内容相同（md5 一致）
+  ✅ 被排除的四项一项都没跟过来（cache/ · config.json · *.part · 点文件）
+  ✅ 新槽是**另一个**目录，不与源槽嵌套
+  ✅ ★ 源槽整棵树未被改动（8 个文件，md5 全同）
+  ✅ 源槽备份数 +1（中间快照，有意保留：可再恢复一次）
+  ✅ 负例：目标已存在 ⇒ 报错（槽「m3-clone-dst」已存在）
+  ✅ 负例：目标槽内容未被覆盖/合并
+  ✅ 负例：目标是当前槽 ⇒ 报错（「模组演示」是当前槽，不能作为克隆的目标。 （源槽的内容会与它混在一起，之后就分不开了））
+  ✅ 负例：当前槽文件数未变（82）—— 没有被混入源槽内容
+  ✅ 负例：在**建快照之前**就返回了（源槽备份数未变 ⇒ 真的什么都没写）
+  ✅ 建空源槽「m3-clone-empty」
+  ✅ 负例：源槽为空 ⇒ 报错，而不是「静默认成功」（槽「m3-clone-empty」里没有可备份的内容。 /storage/emulated/0/Android/data/io.mdt.launcher/slot-m3-clone-empty 是空的，或只剩 config.json、import、natives、tmp、cach…）
+
+── ⑮ F13 模组扫描（HJSON 两档 / settings.bin / 扫描与判定；全部只读）──
+  · 键名判据（去色 → internalName）：模组开关的键就是这两步算出来的
+  ✅ 去色：[red]Terraform → Terraform
+  ✅ 去色：[#ff0000]X → X（十六进制标记）
+  ✅ 去色：[]x → x（弹栈标记）
+  ✅ 去色：[accent]A → A（Mindustry 自己注册的颜色名也要认，否则键名算错）
+  ✅ ★元断言：b 不是颜色名 ⇒ 原样保留（证明不是「见括号就删」）
+  ✅ ★元断言：[[ 不被吃掉（arc 的 -2 分支在这条路上等价于「不是标记」）
+  ✅ internalName：小写 + 每个空格换 -（两个空格 ⇒ 两个 -，与游戏的 replace 一致）
+  ✅ internalName：中文原样保留（键名走 modified-UTF-8）
+  ✅ ★元断言：internalNameOf 自己**不去色** —— 去色是上一步的事，两步混起来就看不出「该去色的地方没去」
+  · 版本门（照抄 Version.java:64 的 isAtLeast）
+  ✅ 160.4 ≥ 160.1
+  ✅ ★160.0 < 160.1（补丁号真的参与比较）
+  ✅ 160.0 ≥ 160
+  ✅ 159.7 < 160
+  ✅ ★边界：build ≤ 0（自定义构建）一律放行（Version.java:65）
+  ✅ ★边界：解析不出的值当 0 ⇒ 放行（Strings.parseInt(x,0) 的语义）
+  ✅ parseBuild("159.7") = {159,7}
+  ✅ minMajorOf：154.1→154；null→0
+  ✅ 黑名单：schema / scheme-size:1.0.5 命中
+  ✅ ★元断言：黑名单是精确匹配且区分大小写（不是「像就拦」）
+  · HJSON 解析器：**替哪个版本解析**是两回事（arc 159 与 160 语义不同）
+  ✅ ARC_159：注释**并进**无引号值（HJSON 规范行为，实得 QX4   // ZZC）
+  ✅ ARC_160：注释终止无引号值（实得 QX4）
+  ✅ ★两档必须**分家** —— 相同就说明 profile 开关没生效（等于只有一档）
+  ✅ ★引号内裸换行：接受（官方 hjson-java 在这里拒绝 ⇒ 17 个真实模组会误判 1 个）
+  ✅ ARC_159：单行对象解析失败（照抄 arc 159.7）
+  ✅ ARC_160：单行对象能解析（arc 160 把 } 并进了终止集）
+  ✅ ★空多行：两档都**判失败**（收敛成 ParseException，不逃逸 StringIndexOutOfBounds）
+  ✅ ★BOM：解析**成功**、BOM 留在键名里（{"\ufeffname":"X"}）⇒ 取不到 name（游戏会静默跳过它）
+  ✅ ★`=` 分隔符：解析**成功**但结果是裸字符串（不是对象）⇒ 同样取不到 name
+  ✅ ★无引号的值以 [ 开头 ⇒ 当**数组**解析、随即报错（真实模组的颜色码必须加引号，这条是踩过的坑）
+  ✅ 严格 JSON 也吃（游戏侧本来就是同一段代码）
+  ✅ ★深嵌套不逃逸：只许成功或 ParseException，不许 StackOverflowError 之类跑出来
+  · settings.bin 读取（格式照抄 arc Settings.java；「恰好 EOF」就是「没坏」的判据）
+  ✅ 读回 7/7 个键
+  ✅ 非 ASCII 键名 + bool 读回 false（键名走 modified-UTF-8）
+  ✅ int / string 值逐条一致
+  ✅ string 键读回
+  ✅ binary 长度正确（binary(5)）
+  ✅ ★键不存在 ⇒ 回落缺省 true（游戏语义：**键不存在 ≠ 禁用**）
+  ✅ zlib 压缩变体也能读（compressed=true）
+  ✅ ★元断言：尾部多一个字节 ⇒ 判失败（否则「恰好 EOF」只是装饰）
+  ✅ ★元断言：count=0 ⇒ 判失败（游戏自己就把它当损坏文件）
+  ✅ ★元断言：未知类型 ⇒ 判失败
+  · 扫描端到端（自建测试槽 m3-mods：6 种形态 + settings.bin + launchid.dat）
+  ✅ 建测试槽
+    扫到的内部名 = [dir-mod, twin, twin, steel, 蓝钢拓展]；读不出元数据的 = [bad.zip]
+  ✅ 扫到 5 个可加载模组（实得 5）
+  ✅ ★坏 meta 被**报出来**（游戏侧是 catch 后静默跳过）：说明文件的格式看不懂
+  ✅ ★原因翻译（Info.metaReason）：异常形态 ⇒ 「说明文件的格式看不懂，游戏会跳过它」，中文判断原样透传（元断言：不是恒改）
+  ✅ 没有 meta 的目录进「游戏不加载」清单（与「加载失败」分开）
+  ✅ 三个模组的 internalName 都按游戏规则算出来了（steel / 蓝钢拓展 / dir-mod）
+  ✅ zip 里的 classes.dex 与 scripts/main.js 都认出来了（**按前缀扫条目**，不能要求包里带 `scripts/` 目录条目）
+  ✅ 作者名里的颜色码被去掉（[red]Me → Me）
+  ✅ ★套一层目录的 zip：下潜一层后命中 mod.hjson
+  ✅ minGameVersion 读出来了（160.1 / 159.7）
+  ✅ ★类型：根上既有 classes.dex 又有 scripts/ ⇒ JSON + JS + Java（dex）
+  ✅ ★类型：只有 classes.dex ⇒ JSON + Java（dex）
+  ✅ ★类型：两样都没有 ⇒ **只有元数据（JSON）**（不是坏模组）
+  ✅ ★类型：只声明 java=true、包里没有 classes.dex ⇒ 类型里**不再冒充** Java，而是打「加载会失败」（安卓 DexClassLoader 找不到类 ⇒ 整个被跳过）
+  ✅ ★类型：桌面版 .class + 资源都要认出来，且**仍算会加载失败**（classFiles=1）
+  ✅ ★反向：同样的声明 + 包里有 classes.dex ⇒ **不**会失败（证明上一条不是恒真）
+  ✅ ★脚本入口：只有一个 js（哪怕不叫 main.js）⇒ **不算问题**（游戏向后兼容，就用那一个）
+  ✅ ★脚本入口：两个 js 却没有 main.js ⇒ 判「不会生效」（游戏只找 main.js）
+  ✅ ★反向：两个 js 且有 main.js ⇒ 不报（证明上一条不是恒真）
+  ✅ ★多人：hidden=true ⇒ 支持多人（不参与联机校验）；没写 ⇒ 联机需服务器同款同版本（`Mods.java:950` 只收 !hidden；`ModsDialog.java:369` 把 hidden 标成 `mod.multiplayer.compatible`＝支持多人游戏）
+  ✅ ★反斜杠条目：与游戏同判（当成目录 ⇒ 没有 scripts/、类型=数据模组），并记下 backslashEntries=1 供界面解释原因
+  ✅ ★元断言：同样两个条目、只把反斜杠换成斜杠 ⇒ 立刻认成 JS 脚本（证明上一条不是「永远认不出脚本」）
+  ✅ settings.bin 的三个键族都生效（steel.enabled=false、dir.failed=true）
+  ✅ mod-<名>-repo 覆盖元数据里的 repo（检查更新的数据源）
+  ✅ 孤儿设置键被检出（设置里有、包已不在）：[mod-ghost-enabled]
+  ✅ 同名冲突被检出一次（实得 1）
+  ✅ 冲突双方都被标上 duplicated（游戏里只有一个会生效）
+  ✅ ★元断言：launchid.dat 在、但 modcrashdisable=false ⇒ **不**跳过全部模组（证明它真的读了那个键，而不是只看文件在不在）
+  ✅ ★同一个 launchid.dat、modcrashdisable 改成 true ⇒ 跳过全部模组（判据有分辨力）
+  ✅ ★要求 160.1 的模组 + 目标 159.7 ⇒ UNSUPPORTED（这一条就是 F13 的头号卖点）
+  ✅ 版本够了但开关是 false ⇒ DISABLED
+  ✅ ★脚本模组没写 minGameVersion（0 < 136）⇒ 游戏口径 UNSUPPORTED（脚本永远不会跑）
+  ✅ ★元断言：同一个模组写上 136（刚好够）⇒ ENABLED（判据不是「脚本模组一律判死」）
+  ✅ ★legacyCompatible ⇒ 豁免这一条（照游戏那个 `&& !meta.legacyCompatible`）
+  ✅ ★门禁那一关必须跟着判死 —— 否则徽标写「不支持」而正文一行依据都没有
+  ✅ ★元断言：写上 136 之后门禁**全过**（判据有分辨力，不是恒判死）
+  ✅ 必需依赖被关闭 ⇒ 连坐成 incompleteDependencies（实得 依赖被禁用/失效）
+  ✅ 必需依赖不存在 ⇒ missingDependencies
+  ✅ ★软依赖不存在**不**算失效（依赖链里最容易写反的一条）
+  ✅ ★必需依赖互相成环 ⇒ 双方都是 incomplete（CIRCULAR 被 incomplete 覆盖，实得 依赖被禁用/失效 / 依赖被禁用/失效）
+  ✅ ★元断言：软依赖成环（p -软-> q -必-> p）⇒ p 留在 CIRCULAR（实得 循环依赖；证明上一条不是恒真）
+  ✅ 依赖排在依赖者之前（加载顺序）：[y, x]
+  ✅ ★元断言：把 y 关掉 ⇒ x 必须连坐（证明上面那条不是恒真）
+
+── ⑯ F13 启停：settings.bin 安全改写（备份 / 原子写 / 写后自检 / 还原）──
+  ✅ ① 读 → 编码**逐字节一致**（165 B / 7 键，含 binary 与非 ASCII 键名）
+  ✅ ① zlib 变体也能逐字节往返（写回时沿用原件的压缩形态）
+  ✅ ② ★真实文件逐字节往返：slot-模组演示/settings.bin 3695 B / 76 键（只读，未改动）
+  ✅ ② ★元断言：真实文件**尾部追加 1 字节** ⇒ 读取必须判失败（「恰好 EOF」判据在工作）
+  ✅ ② ★元断言：真实文件**截断 1 字节** ⇒ 读取必须判失败
+  ✅ ③ 建测试槽「m3-settings」
+  ✅ ③ 改一个已存在的键：写成功 + 自检通过 + 读回是新值
+  ✅ ③ ★文件长度不变、**只差 1 个字节**（实得差 1 字节）
+  ✅ ③ ★改前备份存在，且与改前文件 **md5 相同**
+  ✅ ③ ★除了那一个键，**其余键逐条一致**（未知键原样保留、顺序不变）
+  ✅ ③ ★新键**追加在末尾**（已存在的键原位换值、新键不插队）
+  ✅ ④ ★坏文件 ⇒ **拒绝改写**（不猜、不覆盖）：IOException: 多出尾部数据（Trailing settings data; expected EOF），首个多余字节 = 0x7f
+  ✅ ④ ★拒绝时目标文件**一个字节都没动**
+  ✅ ④ ★拒绝时**不产生备份**（没写就没得备，别在用户盘上留垃圾）
+  ✅ ⑤ ★元断言：改一个值 ⇒ sameValues 必须判**不一致**
+  ✅ ⑤ ★元断言：少一个键 ⇒ 必须判**不一致**
+  ✅ ⑤ ★元断言：同一个键换了类型 ⇒ 必须判**不一致**
+  ✅ ⑤ ★反向：完全相同的两份必须判**一致**（否则判据写成恒 false 也能过）
+  ✅ ★原因翻译（SettingsText.userReason）：异常形态 ⇒ 「读写这个槽的设置时出错了」（中英都不是核心原文）
+  ✅ ★没有原因（码为 0 且 error 为空）时给「原因不明」
+  ✅ ★P3：settings 那 12 个错误码**每一个**都有文案映射（漏映射=界面静默空白），漏的是［］
+  ✅ ★P3：第一层只带**中性参数**（备份目录/槽名那两条进去了），**原始原因一个字都没进**（依据在 report() 里），且两套语言文案不同
+  ✅ ★P3：自检失败的**另一个分支**（键表不符）走另一句资源，且不夹带参数：「自检失败（写回后读出的键表与预期不一致）⇒ 已用备份还原原文件」
+
+── ⑰ F13 模组包导入 / 跨槽复制 ──
+  ✅ 建测试槽 m3-modpack / m3-modpack-dst
+  ✅ ① 合法包导入成功且**逐字节一致**（内部名 pack-test）
+  ✅ ① 没有 `.part` 残留（导入是「先落半成品再就位」的）
+  ✅ ② 包里没有 meta ⇒ **拒绝**且不留残骸：这个包不是游戏能加载的模组
+  ✅ ③ 坏 meta（空多行）⇒ 拒绝：这个包不是游戏能加载的模组
+  ✅ ④ 扩展名不是 .zip/.jar ⇒ 拒绝：源文件不存在：/data/user/0/io.mdt.launcher/app_hub/selftest-modpack/x.txt
+  ✅ ⑤ 文件名含冒号 ⇒ 拒绝（安卓会因此 dex 失败）：源文件不存在：/data/user/0/io.mdt.launcher/app_hub/selftest-modpack/a:b.zip
+  ✅ ⑥ 同名 + 不允许覆盖 ⇒ 拒绝，且原文件一个字节没动
+  ✅ ⑥ 同名 + 明确覆盖 ⇒ 替换成功（内容确实换了）
+  ✅ ⑥ ★旧的那份**没被删**，挪去了 hub/mods-trash/（挪不删，共 1 份）
+  ✅ ⑦ 复制了 3 项（good-mod.zip / dirmod / pack-test；实得 3：[dirmod, good-mod.zip, pack-test]）
+  ✅ ⑦ ★`.part` 半成品**没有**被复制过去（它是「写一半」的东西）
+  ✅ ⑦ ★逐字节一致：zip 包 md5 相同，目录模组与**模组配置目录**都跟过去了
+  ✅ ⑦ 再复制一次 ⇒ 全部跳过（不覆盖）：skipped=3
+  ✅ ⑧ ★元断言：同一个包把 meta 拿掉 ⇒ 必须判非法（否则 ① 的 ok 只是恒真）
+
+── ⑱ F13 模组间冲突体检 ──
+  ✅ ★内置检测：A 的 classes.dex 里含 B 的主类 ⇒ 判为「A 内置了 B」（扫了 3 个 Java 模组 / 3 个 dex）
+  ✅ ★反向：B 的 dex 里没有 A 的主类 ⇒ **不许**反过来说「B 内置了 A」（⚠️ 判**方向**要看「谁在说」那一句，不能只看两个名字都出现过 —— 第一版就是这么写错的，两个名字在同一句里当然都出现）
+  ✅ ★共同全局钩子：两个模组的 dex 都引用 mindustry/logic/LCanvas ⇒ 报「可能抢逻辑编辑器」
+  ✅ ★反向：无关模组不引用该钩子 ⇒ **不许**把它算进来
+  ✅ ★简介提及只作线索（A 的简介里写了 Small Mod ⇒ 出现在线索里）
+  ✅ ★元断言：把 B 的主类从 A 的 dex 里拿掉 ⇒ **不再**报「内置」（证明上一条不是恒真）
+
+── ⑲ 模组列表的搜索 / 筛选 / 排序 ──
+  ✅ 空关键词 = 不筛（三个都在）
+  ✅ 搜索：忽略大小写按名字命中（BET → Beta）
+  ✅ 搜索：换成文件名也能命中
+  ✅ ★元断言：搜不到必须返回**空列表**，不能「筛不动就返回全部」
+  ✅ 只看有问题的：固有毛病（上次出错被标记）会被留下
+  ✅ ★反向：只有「版本不符」算问题，「被用户关闭」**不算**（否则用户自己关掉的模组会一直赖在有问题的里）
+  ✅ 按名称排序：Alpha 在 Beta/Gamma 前
+  ✅ 按大小排序：大的在前（300 / 200 / 100）
+  ✅ 有问题的在前：failed 的那个排第一
+  ✅ ★纯函数：入参列表没被改动（长度与顺序都不变）
+  ✅ 类型：TYPE_ANY 不筛（三个都在）
+  ✅ 类型：只看有 Java 代码 ⇒ 只剩 Alpha
+  ✅ 类型：只看有脚本 ⇒ 只剩 Beta
+  ✅ 类型：只看带资源 ⇒ 只剩 Gamma
+  ✅ ★混合模组（Java+JS）在两类里都出现（判据是「包含」不是「只有」）
+  ✅ ★元断言：类型筛选必须真的筛掉东西（不是恒真）
+  ✅ ★反向：坏包没有类型 ⇒ 选了类型就不出现（我们不替它猜类型）
+  ✅ ★反向对照：同一个坏包在 TYPE_ANY 下照常出现（它只是没类型，不是被藏起来）
+  ✅ 类型 + 只看有问题的：两个条件同时生效（Beta 是脚本且标了出错）
+  ✅ matchesType：有 dex 的算 Java、不算带资源
+  ✅ matchesType：null 在 TYPE_ANY 下算通过、在具体类型下不算（不崩）
+
+── 第 122 轮：地图 / 蓝图 / 存档列表的搜索 / 排序 / 只看有问题的 ──
+  ✅ 地图：空关键词 = 不筛（三张都在）
+  ✅ 地图：按**真名**搜（忽略大小写，ALPH → Alpha）
+  ✅ ★地图：按**文件名**也要搜得到（真名是 Beta、文件名是 b.msav —— 两个都得算）
+  ✅ 地图：游戏自带那种（只有条目名的）也能按条目名搜到
+  ✅ ★元断言：搜不到必须返回**空**，不能「筛不动就返回全部」
+  ✅ 地图：「只看有问题的」只留 meta 读不出来的那张（真名那两张不算）
+  ✅ 地图：isProblem 的真假两个方向（有 meta 的不算问题）
+  ✅ 地图：按名称排序（Alpha → Beta → zeta.msav）
+  ✅ 地图：按大小排序（大的在前 300 / 200 / 100）
+  ✅ 地图：「有问题的在前」（读不出来的那张排第一）
+  ✅ ★纯函数：入参列表没被改动（长度与顺序都不变）
+  ✅ ★元断言：「有问题的在前」与「按名称」的**结果必须不同**（否则这一档等于没做）
+  ✅ 蓝图：按蓝图名搜（zulu → Zulu）
+  ✅ 蓝图：按文件名也能搜到
+  ✅ ★蓝图：「只看有问题的」= 缺件 + 解析不了（健康的 Alpha 不在里面）
+  ✅ 蓝图：isProblem 三个方向（缺件 / 解析不了 / 健康）
+  ✅ ★元断言：软缺件（可能认错）也照样算「有问题的」（否则「可能缺件」的蓝图会被筛没）
+  ✅ 蓝图：按大小排序（300 / 200 / 100）
+  ✅ 蓝图：「有问题的在前」⇒ 健康的那个排最后
+  ✅ ★纯函数：蓝图那份入参也没被改动
+  ✅ 存档：按名称排序（alpha → beta → gamma）
+  ✅ 存档：按大小排序（300 / 200 / 100）
+  ✅ 存档：「最新在前」（3000 / 2000 / 1000）
+  ✅ 存档：按文件名搜（忽略大小写，BET → beta.msav）
+  ✅ ★元断言：存档搜不到也必须是空列表
+  ✅ ★元断言：存档那条钥匙的 problem 恒为 false（这一页没有「只看有问题的」） —— 真要筛「读不出来」得走 row_save_bad 那个专用入口
+  ✅ 存档：搜索与排序可以叠加（名字都含 a 的三个文件，按大小排）
+  ✅ ★元断言：多字段拼接**不许跨字段命中**（ab + cd 搜 bc 必须搜不到）
+  ✅ ★反向对照：同一份拼接里，字段**内部**照样命中（cd 搜得到）
+  ✅ 空关键词一律命中（调用方不必「先判空再判命中」，少一处能写反的地方）
+  ✅ filtering()：空词 + 默认排序 + 不筛 ⇒ 不显示；三个维度任一动过 ⇒ 显示（★只打空格的搜索词不算「筛过」，与 apply 的 trim 口径一致）
+
+── ⑳ 批量启停（写侧）──
+  ✅ ★一次读写把两个键都关了，无关键原样保留
+  ✅ 改前备份落盘、键数不变（3 个：批量改不该增删键）
+  ✅ ★元断言：没有键需要改 ⇒ 判 noop 且**文件逐字节没动**（不是「写一遍恰好一样」）
+  ✅ ★分层：通用层对「不存在 + true」的新键要**真的写进去**（不是当成默认值跳过）
+  ✅ ★负例：设置文件是坏的 ⇒ 拒绝写，且原文件一个字节没动
+  ✅ ★负例：一个键都没给 ⇒ 明确拒绝（不静默成功）
+
+── ㉑ 启停成对写（-enabled + -failed）──
+  ✅ ★① 已启用但带着失败记录 ⇒ 点「启用」**不是空操作**，并且把 mod-pair-failed 清成 false（改前只写 -enabled ⇒ 记录永久留着）
+  ✅ ★① 依据可见（结果说明里点名了被清掉的键）：「已启用模组「pair」（顺带清掉了mod-pair-failed = true —— 那条记录的含义见文档） —— mod-pair-failed: true → false」
+  ✅ ★② 元断言：记录已经没了 ⇒ 判 noop（不为了写而写）
+  ✅ ★③ 元断言：**本来就没有** -failed 键的模组，不许凭空多出这个键（键数不涨）
+  ✅ ★④ 批量关闭写成 -enabled=false（r4.ok=true noop=false）
+── Ⓞ 「忽略它试试」（关掉它 + 清 launchid.dat）──
+  ✅ ★★「忽略它试试」：把它关了且**成对写**（-failed 也清）
+  ✅ ★★并**清掉了 launchid.dat**（否则下次启动还是整槽跳过，关掉它等于白关）
+  ✅ ★结果里说清了“连标记一起清了”（第二层依据）
+── ㉑ 反向依赖（禁用前的提醒）──
+  ✅ ★反向：**已关闭**的依赖者不算（它自己都没在跑）—— 只数出 2 个：[必需：Dep User, 软依赖：Dep Soft]
+  ✅ 必需与软依赖都算、且必需排前面：[必需：Dep User, 软依赖：Dep Soft]
+  ✅ ★反向：没人依赖 dep-user ⇒ 返回空（不是「随便返回点什么」）
+  ✅ 被关闭的模组自己也不该因为「依赖者都关着」而报（它不在启用集合里）
+
+── ㉒ F10 .msav 元数据 ──
+  ✅ ★解析：格式版本/尺寸/波次/真名(中文)/游玩时长/构建号全部读出来
+  ✅ ★存档行：地图名 + 玩了多久 + 人读的存档时间 —— 我的地图 · 玩了 1 小时 2 分 · 存档于 2023-11-15 06:13
+  ✅ ★地图行：尺寸/作者口径，且**不带**存档那套 —— 我的地图 · 640 × 480
+  ✅ ★元断言：格式版本**已移出列表行**（它会把长名字挤到第三行），且两个口径确实不同
+  ✅ ★去色：真名 `[gold]金色[red]地图[]` ⇒ 列表行显示「金色地图 · 32 × 32」（无方括号色码）
+  ✅ ★展示：显示名 / 尺寸 / 时长文案（我的地图 · 640 × 480 · 第 12 波 · 玩了 1 小时 2 分 · 格式 v11）
+  ✅ ★只读 meta：meta 之后被截断**看不到**，仍然报 ok（它只承诺「元数据读出来了」）
+  ✅ ★元断言：同一份文件用查完整性口径**必须**报截断 ⇒ 两个口径的差别钉死在这里
+  ✅ ★负例：垃圾文件 ⇒ 读不出来、且**不留半截 tags**
+  ✅ ★负例：gzip 压缩 ⇒ 读不出来（.msav 是 zlib，这条防「随便什么压缩都当 msav」）
+  ✅ ★zlib 判据：真实 .msav（78 9C 头）必须判**活** —— 旧代码按 gzip（1f 8b）判，结果是每份正常存档都被警告、真正读不了的 gzip 反被放行
+  ✅ ★反向：gzip 文件 / 垃圾文件 / 不存在的文件都必须判**死**（且不抛）
+
+── ㉓ F10 快照列表的「这是什么存档」──
+  ✅ ★v1 快照（目录里是真文件）⇒ 读出「地图名 · 玩了多久 · 存档时间」：快照地图 · 玩了 1 小时 2 分 · 存档于 2023-11-15 06:13
+  ✅ ★反向：快照里没有存档 ⇒ 返回空串（不是编一行出来）
+  ✅ ★负例：CAS 池里对象缺失 ⇒ 返回空串且**不抛异常**（加分项不该拖垮界面）
+
+── ㉔ F10 地图清点（本槽 / 游戏 APK / 模组包）──
+  ✅ ★本槽来源：两张 .msav 都列出来（myslot.msav / junk.msav）
+  ✅ ★好的带元数据、坏的带原因（**不静默丢**）
+  ✅ ★反向：.msav.part（写了一半）不算地图，不进列表
+  ✅ ★游戏自带：从 APK 的 assets/maps 条目流式读出「真名 · 尺寸」：群岛 · 96 × 96
+  ✅ ★模组自带：读出真名，并标出来自「real-mod.zip」
+  ✅ ★反向：用错来源前缀 ⇒ 一条都不出
+  ✅ ★反向：容器打不开 ⇒ 空列表且**不抛异常**
+
+── ㉕ 数据根残留：自动清理的策略边界 ──
+  ✅ ★只删 redundant：证据不足的那项**原样还在**（这是「自动清」敢不问用户的前提）
+  ✅ 报告里说清了几项：已删 单测 / config.json（2 B）  1 项已清理，释放约 2 B
+  ✅ ★反向：再清一遍是 0 项（不虚报）
+
+── ㉖ 点开一项看到的详细信息 ──
+  ✅ ★详情：真名/尺寸/来源/文件都在，且**没有色码、没有维护者视角的话**（金色地图 来自：本槽（你可以直接管理） 文件：colored.msav · 137 B 尺寸：320 × 240 波次：5 玩了：1 小时 2 分 保存于：2023-11-15 06:13 格式版本：v11 ）
+  ✅ ★反向：读不出来的那一项，详情里**不许**出现正常地图才有的字段（不伪装成功）
+
+── ㉗ F10 预览：配色表 / 渲染 / 负例 ──
+  ✅ ★配色表：从版本 APK 的 sprites/block_colors.png 读出 446 格（其中 410 格有颜色）
+  ✅ ★负例：垃圾文件 / 不存在的文件 ⇒ 解不出来返回 null（不抛、不崩界面）
+  ✅ ★负例：没有瓦片 ⇒ 渲染返回 null（界面显示占位，不画一张假图）
+  ✅ ★元断言：人造瓦片渲染出 5 种颜色（≥4）⇒ 渲染器不是「画一片纯色」的假货
+  ✅ ★缓存键：不同来源给出不同短哈希（撞了会显示错图），长度固定 16
+
+── ㉙ 清单注册检查（漏注册 = BUILD OK 但真机崩）──
+  ✅ ★10 个页面都能被解析到（含新加的蓝图两页）：10/10
+  ✅ ★元断言：不存在的页面名必须解析不到（否则上面那条等于在测空气）
+
+── ㊱ 每个页面都必须继承 BaseActivity（否则深浅色设置对它无效）──
+  ✅ ★ MainActivity 继承 BaseActivity（深浅色靠它的 attachBaseContext）
+  ✅ ★ SlotsActivity 继承 BaseActivity（深浅色靠它的 attachBaseContext）
+  ✅ ★ SlotActivity 继承 BaseActivity（深浅色靠它的 attachBaseContext）
+  ✅ ★ ModsActivity 继承 BaseActivity（深浅色靠它的 attachBaseContext）
+  ✅ ★ MapsActivity 继承 BaseActivity（深浅色靠它的 attachBaseContext）
+  ✅ ★ MapDetailActivity 继承 BaseActivity（深浅色靠它的 attachBaseContext）
+  ✅ ★ SettingsActivity 继承 BaseActivity（深浅色靠它的 attachBaseContext）
+  ✅ ★ LogActivity 继承 BaseActivity（深浅色靠它的 attachBaseContext）
+  ✅ ★ TrashActivity 继承 BaseActivity（深浅色靠它的 attachBaseContext）
+  ✅ ★ BlueprintsActivity 继承 BaseActivity（深浅色靠它的 attachBaseContext）
+  ✅ ★ BlueprintDetailActivity 继承 BaseActivity（深浅色靠它的 attachBaseContext）
+  ✅ ★ GameSlot 继承 BaseActivity（深浅色靠它的 attachBaseContext）
+  ✅ ★ SavesActivity 继承 BaseActivity（深浅色靠它的 attachBaseContext）
+  ✅ ★ 13 个页面全部继承：13/13
+  ✅ ★元断言：android.app.Activity 本身判否（说明这条不是在恒真地打勾）
+  ✅ ★顶栏标题：BaseActivity 必须重写 onCreate（框架那份 label 是按系统语言取的）
+  ✅ ★元断言：app_name 两套语言是两份（en=「MDT Launcher」/ zh=「MDT 启动器」）
+
+── ㊲ 主进程崩溃落盘（写 <数据根>/crashes/crash_<毫秒>_launcher.txt）──
+  ✅ ★自检自己跑在主进程里（isMainProcess 判据；:game 侧只能在真机另验）
+  ✅ ★探针异常真的落了盘：/storage/emulated/0/Android/data/io.mdt.launcher/slot-模组演示/crashes/crash_1791625304746_launcher.txt
+  ✅ ★落点在 <数据根>/crashes/（日志页「崩溃堆栈」读的就是它）
+  ✅ ★文件名与游戏那份同构（不影响「按名倒序 = 时间序」）：crash_1791625304746_launcher.txt
+  ✅ ★内容里有异常原文 + 完整栈 + 现场（版本 / 当前槽 / 数据根）
+  ✅ ★探针文件已清理（别把它留在用户的崩溃列表里）
+
+── F23 崩溃分析（四层判据 + 认不出就说不认识）──
+  ✅ 解析：这份报告被认出来了（非空、也不是启动器自己的）
+  ✅ 解析：Version 行逐字（含游戏自己那串 build 尾注）：release build 160.5 (Built September 20, 2026 13:57 PM) (Server)
+  ✅ 解析：`Mods:` 行 → [crashtest]
+  ✅ ★L4：**追出了 `Caused by` 链**（2 节，顶层 java.lang.RuntimeException）—— 游戏自己的算法不追链，所以它在这类报告上给不出答案
+  ✅ 解析：顶层消息逐字：Error loading mod crashtest
+  ✅ ★抽针：缺失符号那一句的两个 token（成员名 + owner 类）都进了针袋
+  ✅ ★针的权重：`definitelyNotAField`（长成员名）= 3，`mindustry/core/GameState`（游戏类）= 1
+  ✅ ★L1b：只读报告就点名了（`Error loading mod crashtest`）—— 不用扫 dex：kind=MOD version=release build 160.5 (Built September 20, 2026 13:57 PM) (Server) mods=[crashtest] chain=2 frames=8 cause=none needles=7 top=java.lang.RuntimeException: Error loading mod crashtest hits=crashtest(L1b/w3/crashtest) dex=-1
+  ✅ ★名字对回了模组表（显示名 Crash Test、且它确实在这份报告的 Mods 行里）
+  ✅ ★文案实拼（界面与自检同一份）：是「Crash Test」引起的 —— 报告里写着「Error loading mod crashtest」
+  ✅ ★元断言：`Error loading mod` 那句拿掉 ⇒ 便宜层认不出（判据有分辨力）
+  ✅ ★L2a：帧 `boom.Boom.badField` 落在 main 的包前缀下 ⇒ 点名（追的是**整条链**里的帧）：kind=MOD version=release build 160.5 (Built September 20, 2026 13:57 PM) (Server) mods=[crashtest] chain=2 frames=8 cause=none needles=7 top=java.lang.RuntimeException: something else hits=Crash Test(L2/w3/boom.Boom) dex=-1
+  ✅ ★L3：`definitelyNotAField` 出现在它的 classes.dex 里 ⇒ 点名（权重 3）：kind=MOD version=release build 160.5 (Built September 20, 2026 13:57 PM) (Server) mods=[crashtest] chain=2 frames=8 cause=none needles=7 top=java.lang.RuntimeException: something else hits=Crash Test(L3/w3/definitelyNotAField) dex=1
+  ✅ ★成本记账：只扫了 1 个模组的 dex（报告里在场那个）
+  ✅ ★元断言：dex 里什么都没有 ⇒ 认不出，且**一条弱线索都不留**（不是"扫了就说嫌疑"）
+  ✅ ★L1：`Likely Cause` 拆成三段（显示名 / internalName / 版本）：Stealth Path / 偷袭小道 ｜ stealth-path ｜ 5.3.2
+  ✅ ★`Mods:` 里的**伪条目**（kotlin / mindustryx）照样进表 —— 不能假设都能对上我们的模组表：[kotlin, logicchineselocalization, mi2-utilities-java, mindustryx, stealth-path]
+  ✅ ★L1：命中且对回模组表（在场）—— 而且**没扫 dex**：kind=MOD version=release build 159.7 mods=[kotlin, logicchineselocalization, mi2-utilities-java, mindustryx, stealth-path] chain=1 frames=5 cause=none needles=5 top=java.lang.NoSuchFieldError: Class mindustry.ai.UnitCommand does not have member field 'mindustry.ai.UnitCommand boostC… hits=Stealth Path / 偷袭小道(L1/w3/stealth-path) dex=-1
+  ✅ ★文案实拼：确定口气 + 依据（游戏自己写的）：是「Stealth Path / 偷袭小道」引起的 —— 游戏自己在报告里写明了归因（Likely Cause）
+  ✅ ★渲染后没有残留占位符（`%`）：是「Stealth Path / 偷袭小道」引起的 —— 游戏自己在报告里写明了归因（Likely Cause）
+  ✅ ★元断言：拿掉 L1 之后确实没有首句/Likely Cause 了
+  ✅ ★L2a：只剩栈帧也能点名（帧在 `stealthpath.` 包下）：kind=MOD version=release build 159.7 mods=[kotlin, logicchineselocalization, mi2-utilities-java, mindustryx, stealth-path] chain=1 frames=5 cause=none needles=5 top=java.lang.NoSuchFieldError: Class mindustry.ai.UnitCommand does not have member field 'mindustry.ai.UnitCommand boostC… hits=Stealth Path / 偷袭小道(L2/w3/stealthpath.StealthPathMod) dex=-1
+  ✅ ★元断言：main 换成对不上的包（foo.Bar）⇒ L2a 必须给不出结论
+  ✅ 解析：internalName = neon；`Version:` 后面那行（MindustryX 尾注）也读到了
+  ✅ ★权重规则：注入进游戏命名空间的类（带 `$`）= 2，纯游戏类 = 1 —— 前者能点名、后者不能
+  ✅ ★★注入型（游戏的算法在这类上完全瞎）：靠"这个类在它包里"点名：kind=MOD version=release build 159.7 mods=[kotlin, mindustryx, neon, patch-editor] chain=1 frames=2 cause=none needles=6 top=java.lang.IllegalAccessError: class mindustry.logic.SugarCanvas$SugarStatementElem tried to access field mindustry.logic… hits=Neon / 氖(L3/w2/mindustry.logic.SugarCanvas$SugarStatementElem) dex=1
+  ✅ ★元断言：只有"纯游戏类"（权重 1）⇒ **不点名**，只留一条弱线索（否则每个模组都会被点名）
+  ✅ ★文案实拼（弱线索 + 认不出两层都在）：弱线索：「Neon / 氖」—— 它的 classes.dex 里有 mindustry.logic.LCanvas 认不出是哪个模组 —— 这份报告里没有指向模组的证据。 可能是游戏本体、环境（内存 / 驱动 / 缺系统文件），也可能是已经被删掉的模组。
+  ✅ 解析（安卓形态）：`Android API level` = 36，Version = unknown build 0
+  ✅ 解析：`Mods: none (vanilla)` 被认出来（不是空 Mods 行）
+  ✅ ★原版崩 ⇒ 明说"不是模组的问题"，**不去猜**：不是模组的问题 —— 报告里写着这次没有加载任何模组（Mods: none (vanilla)）。
+  ✅ ★元断言：把 `none (vanilla)` 换成 `neon:110008` ⇒ 必须不再判成 vanilla
+  ✅ ★启动器自己的报告：认出来 + **不做模组归因**：这是启动器自己的崩溃报告（不是游戏），不做模组归因。
+  ✅ ★元断言：哪怕给一把"什么都能命中"的探针，启动器的报告也不许被点名
+  ✅ ★元断言：首行不是我们的报告头 ⇒ 不再判成启动器报告
+  ✅ 空文件 ⇒ 标成 empty（页面上给"读不出这份报告"，不是硬凑一个结论）
+  ✅ ★空报告文案实拼：读不出这份报告（文件是空的）。
+  ✅ 不是报告的一段文字 ⇒ 认不出（不抛、不瞎点名）
+  ✅ ★ART 措辞（`No field x of type I in class La/b/C;`）也抽出了成员名针（权重 3）
+  ✅ ★ART 措辞里的 owner 类（描述符形态 `L…;`）也进了针袋
+  ✅ ★元断言：`of type I` 里的 `I`（类型描述符）与 `Failed resolution` 里的 `Failed`**都不是类名**，不许当针（否则每个模组都"命中"）
+  ✅ ★同一根针在两种运行时的措辞里抽出来**必须一样**（ART vs HotSpot）
+  ✅ ★ART 的合成类帧（`at boom.Boom.main(Unknown Source:8)`）也能解析 —— 真机那条 Rhino 崩溃就是这种形态
+  ✅ ★★安卓上靠 ART 措辞也能点名（这正是"照抄游戏算法"做不到的那一类）：kind=MOD version=release build 160.5 mods=[crashtest] chain=1 frames=1 cause=none needles=3 top=java.lang.NoSuchFieldError: No field definitelyNotAField of type I in class Lmindustry/core/GameState; or its supercla… hits=Crash Test(L3/w3/definitelyNotAField) dex=1
+  ✅ ★ART 的 `Failed resolution of: L…;` 抽出的是**描述符里的类**，不是 `Failed` 这个词
+  ✅ ★同一个 `Failed resolution of:` 形态：模组命名空间的类（`depmod/Dep`）= 3（能点名）
+  ✅ ★真机报告（14 片）：Version / Mods 逐字解析出来了
+  ✅ ★真机报告：追出了 Caused by 链（2 节）
+  ✅ ★★真机报告里**没有** Likely Cause —— 载入期崩游戏自己归因不了（桌面结论在安卓复现）
+  ✅ ★真机报告的 ART 措辞抽出了成员名针（w3）与 owner 类
+  ✅ ★★真机报告 · L1b：直接点名（显示名从槽里的 mod.hjson 查出来）：kind=MOD version=release build 159.7 (Built July 19, 2026 17:39 PM) mods=[crashtest] chain=2 frames=11 cause=none needles=10 top=java.lang.RuntimeException: Error loading mod crashtest hits=MDT Crash Probe(L1b/w3/crashtest) dex=-1
+  ✅ ★真机报告文案实拼：是「MDT Crash Probe」引起的 —— 报告里写着「Error loading mod crashtest」
+  ✅ ★★真机报告 · L2a：帧 `boom.Boom.init(Boom.java:21)` 落在 main 的包下 ⇒ 点名：kind=MOD version=release build 159.7 (Built July 19, 2026 17:39 PM) mods=[crashtest] chain=2 frames=11 cause=none needles=10 top=java.lang.RuntimeException: something else hits=MDT Crash Probe(L2/w3/boom.Boom) dex=-1
+  ✅ ★★真机报告 · L3：只剩符号也要点名（扫 1 个 dex）：kind=MOD version=release build 159.7 (Built July 19, 2026 17:39 PM) mods=[crashtest] chain=2 frames=10 cause=none needles=9 top=java.lang.RuntimeException: something else hits=MDT Crash Probe(L3/w3/definitelyNotAField) dex=1
+  ✅ ★元断言：同一份报告、dex 里什么都没有 ⇒ 认不出（L3 那条不是恒真的）
+  ✅ ★★真机报告（缺依赖）：**三层** `Caused by` 链都追出来了（3 节）
+  ✅ ★真机报告（缺依赖）：顶层消息逐字
+  ✅ ★★缺依赖的两句话（`Failed resolution of: Ldepmod/Dep;` 与 `ClassNotFoundException: depmod.Dep`）抽出来是**同一根针**、权重 3（模组命名空间）
+  ✅ ★模组**不在槽里**也照样点名（报告是历史事实，只是 known=false）：kind=MOD version=release build 159.7 (Built July 19, 2026 17:39 PM) mods=[depuser] chain=3 frames=8 cause=none needles=9 top=java.lang.RuntimeException: Error loading mod depuser hits=depuser(L1b/w3/depuser) dex=-1
+  ✅ ★补上模组包之后，显示名从 mod.hjson 解析出来（MDT Dep Probe）
+  ✅ ★★真机报告（缺依赖）· L3：只剩符号也能点名（缺的那个类在它包里）：kind=MOD version=release build 159.7 (Built July 19, 2026 17:39 PM) mods=[depuser] chain=3 frames=7 cause=none needles=8 top=java.lang.RuntimeException: something else hits=MDT Dep Probe(L3/w3/depmod.Dep) dex=1
+  ✅ ★元断言：dex 里没有 `depmod/Dep` ⇒ 认不出（不能靠「它加载失败过」就点名）
+  ✅ ★★ART 那句 `is inaccessible to class 'X'` 里的 **X = 访问方类**（模组自己的类）抽成权重 3 的针 —— 这条消息在安卓上是**能点名**的
+  ✅ ★同一条消息里的目标 owner（游戏类）与短成员名（`state`）都只有 1 分 ⇒ 不许靠它们点名
+  ✅ ★★真机报告（访问权限）· L3：靠「访问方类」点名：kind=MOD version=release build 159.7 (Built July 19, 2026 17:39 PM) mods=[accessboom] chain=2 frames=3 cause=none needles=10 top=java.lang.RuntimeException: something else hits=MDT Access Probe(L3/w3/accessboom.Boom) dex=1
+  ✅ ★元断言：只命中 1 分的针（游戏类 / 短成员名）⇒ **不点名**，只留弱线索
+  ✅ ★并列：两个模组都点出来、并报数：报告指向 2 个模组：「AAA」, 「BBB」 「AAA」—— 它的 classes.dex 里有 x.Y（这次启动没加载它） 「BBB」—— 它的 classes.dex 里有 x.Y（这次启动没加载它） 它们命中的是同一条依据，这份报告分不出是谁（把别的模组打包进自己包里的也…
+  ✅ ★并列比单条长（多了一段"分不出是谁"的说明），不是把两个名字挤成一行
+  ✅ ★元断言：换一个命中 ⇒ 实拼的整句跟着换（文案不是恒真的）
+  ✅ ★所有实拼路径都没有残留占位符
+  ✅ ★"正在核对模组包…"与"认不出"两条资源都在（页面上那两态）
+  ✅ ★布局里有 `log_crash_verdict`（少一个 `@+id` 时 findViewById 是**静默 null**，编译与门禁全绿 —— 所以这条必须钉）
+  ✅ ★依据与结论**同一行**（`它的 classes.dex 里有 …`）：报告指向 2 个模组：「AAA」, 「BBB」 「AAA」—— 它的 classes.dex 里有 x.Y（这次启动没加载它） 「BBB」—— 它的 classes.dex 里有 x.Y（这次启动没加载它） 它们命中的是同一条依据，这份报告分不出是谁（把别的模组打包进自己包里的也…
+  ✅ ★真路径（`Mods.scanDex`）：命中前两根针、第三根没命中：[0, 1]
+  ✅ ★元断言：dex 里没有的串**不许**命中（不是"扫了就全命中"）
+  ✅ ★★真路径：**跨 64 KB 块边界**的针与**落在文件最末尾**的针都能命中：[0, 1]
+  ✅ ★元断言：同一份大文件里没有的针仍然不命中（不是"块大了就一律命中"）
+  ✅ （收尾：删掉假 dex）
+  ✅ ★没有 `classes.dex` ⇒ 空集且**不抛**（调用方按"没证据"处理）
+  ✅ ★自检不把自己的夹具留在用户的私有目录里
+  ✅ ★非模组原因：这份报告判成「内存不足」（机器可读依据 = 异常类型逐字）：java.lang.OutOfMemoryError
+  ✅ ★夹具确实是安卓那一份（API level 31、Mods 三行解析出来）
+  ✅ ★结论仍是「认不出」（没有模组证据），外加一条原因：kind=NONE version=release build 158.1 mods=[kotlin, mindustryx, 彩色末影进攻图合集] chain=1 frames=4 cause=OOM/java.lang.OutOfMemoryError needles=4 top=java.lang.OutOfMemoryError: Failed to allocate a 256 byte allocation with 2148112 free bytes and 2097KB until OOM, tar… hits=- dex=-1
+  ✅ ★文案实拼：「认不出」那行后面接上原因（`crash_verdict_none_oom`）：认不出是哪个模组 —— 这份报告里没有指向模组的证据。 看起来是内存不足（崩在申请内存那一步）—— 常见于内容 / 存档太多，而不是某个类找不到。
+  ✅ ★判得出原因时**不再念**通用的三选一（同一屏同一件事只说一次 —— 那句里也列着「内存」）
+  ✅ ★顺序：先「认不出」、再给原因（结论在前）
+  ✅ ★★元断言：那把 OOM 拿掉 ⇒ 认不出原因（也不会退回“通用三选一”变成乱猜）
+  ✅ ★反向：判不出原因时**仍然**给通用方向，而且不许冒出原因那句（替代关系是双向的）
+  ✅ ★包装型：`RuntimeException: java.lang.OutOfMemoryError: …` 也判得出来（从消息认）
+  ✅ ★★组合：OOM **加上** `Error loading mod oommod` ⇒ 只报模组、不提内存（模组证据优先）：kind=MOD version=release build 158.1 mods=[kotlin, mindustryx, 彩色末影进攻图合集] chain=2 frames=4 cause=OOM/java.lang.OutOfMemoryError needles=5 top=java.lang.RuntimeException: Error loading mod oommod hits=oommod(L1b/w3/oommod) dex=-1
+  ✅ ★★组合：OOM + `Mods: none (vanilla)` ⇒ 报原版崩（同样不提内存）
+  ✅ ★并存：权重 1 的弱线索 + 原因各说一句（互不覆盖，所以比只有原因那串更长）：弱线索：「OOM Mod」—— 它的 classes.dex 里有 arc.scene.ui.layout.Table（这次启动没加载它） 认不出是哪个模组 —— 这份报告里没有指向模组的证据。 看起来是内存不足（崩在申请内存那一步）—— 常见于内容 / 存档太多，而不是某个类找…
+  ✅ ★机器可读摘要带 cause（语料回归靠它计数）：kind=NONE version=release build 158.1 mods=[kotlin, mindustryx, 彩色末影进攻图合集] chain=1 frames=4 cause=OOM/java.lang.OutOfMemoryError needles=4 top=java.lang.OutOfMemoryError: Failed to allocate a 256 byte allocation with 2148112 free bytes and 2097KB until OOM, tar… hits=- dex=-1
+  ✅ ★依据里没有任何非 ASCII 字符（判据不许拿文案当钥匙，门禁 SRC-01 那条）：java.lang.OutOfMemoryError
+  ✅ ★数据损坏（真报告）：有 `Error loading mod` ⇒ 照旧点名模组，**不**给「非模组原因」：kind=MOD version=release build 160.5 (Built September 20, 2026 13:57 PM) (Server) mods=[databoom] chain=3 frames=7 cause=none needles=6 top=java.lang.RuntimeException: Error loading mod databoom hits=databoom(L1b/w3/databoom) dex=-1
+  ✅ ★★边界（刻意不做）：把模组证据拿掉 ⇒ 认不出，但**仍然不给原因** —— 抛 Exception 的坏法在安卓侧不产生报告（语料 15），没有真实输入就不加判据（REF §85.18）
+  ✅ ★真机报告（OOM 型坏地图）：判「原版崩」、**一根针都不点**（栈里全是游戏/arc 类）：kind=VANILLA version=release build 159.7 (Built July 19, 2026 17:39 PM) mods=vanilla chain=1 frames=4 cause=none needles=5 top=java.lang.ArrayIndexOutOfBoundsException: length=0; index=0 hits=- dex=-1
+  ✅ ★原版崩的结论里**不许**冒出「内存不足」那句（同一屏同一件事只说一次）
+  ✅ ★★刻意不猜：这份报告正文里**没有** OOM 字样（OOM 只在 `last_log.txt`）⇒ cause 必须是 none —— 不许从 `length=0` 反推「是分配失败」（那要跨文件证据，本轮不做）
+  ✅ ★★元断言：同一份报告里**加上** OOM 那一行 ⇒ cause 才变成 OOM（判据有分辨力，不是「凡是 length=0 就叫内存不足」）；而 kind 仍是原版崩
+  ✅ ★反向：把 `Mods: none (vanilla)` 换成有模组 ⇒ **不再**判「原版崩」（证明那个结论真的长在报告头那一行上，不是恒真）：kind=NONE hits=- dex=-1
+  ✅ 建 F23 用的测试槽 m3-f23
+  ✅ 造 crashes/ 目录：/storage/emulated/0/Android/data/io.mdt.launcher/slot-m3-f23/crashes
+  ✅ ★analyzeNewest（模组页那一行的数据源）：最新一份 ⇒ 点名（L1b）：kind=MOD hits=crashtest(L1b/w3/crashtest) dex=-1
+  ✅ ★★导出文件里有「结论」这一段（不是只有原文）
+  ✅ ★★导出文件里的结论逐字等于页面/自检用的那一份（界面与导出同一份格式化）
+  ✅ ★导出文件里原文照旧保留（结论是推断，复核要看原文）
+  ✅ ★元断言：没有崩溃报告时**不许**出现「结论」那一段（判据不是恒真的）
+  ✅ ★模组页那一行实拼（结论塞进「上次崩溃：%1$s」）：上次崩溃的判断：是「crashtest」引起的 —— 报告里写着「Error loading mod crashtest」
+  ✅ ★模组页布局里有 `mods_verdict`（少一个 `@+id` 时 findViewById 是**静默 null**）
+  ✅ ★模组页布局里有 `mods_fail_note`（全槽级那句话的落点）
+  ✅ ★最新报告 = 名字最大的那份（与 analyzeNewest 同口径）：crash_300.txt
+  ✅ ★只报**比快照新**的（快照=200 ⇒ 挑出 300）—— 否则每次开应用都把历史崩溃报一遍
+  ✅ ★元断言：快照已是最新 ⇒ **什么都不报**（这条是「不烦人」的牙齿）
+  ✅ ★元断言：`sinceMs` 在未来 ⇒ 一个都不报（mtime 那道闸真的在起作用）
+  ✅ ★新报告一落盘就被挑出来（「立马」那一步的判据）
+  ✅ ★目录不存在 / null ⇒ 不炸也不报（监视循环每 700 ms 跑一次，容错是硬要求）
+  ✅ ★「同一份只提示一次」的记帐能落盘再读回（Config.crash_alert_last）
+  ✅ ★★原子闸门的判据：**同一份报告只认领一次**（已提示过的那份再认领 ⇒ false）；换了另一份 / 空手 ⇒ 认领；null 与空串不许认领
+  ✅ ★提示用的两条文案在：「游戏崩了」/「看运行日志」
+  ✅ ★Toast 那句是**实拼**的、且 brief 只有一行（多行塞进 Toast 会被截）：游戏崩了：是「AAA」引起的 —— 游戏自己在报告里写明了归因（Likely Cause）
+  ✅ ★★按行标记的名单 = 归因器点名的那个（L1 ⇒ crashtest）：[crashtest]
+  ✅ ★元断言：`认不出` ⇒ 名单**空**（一个都不许标 —— 这正是用户看到的那类冤枉）
+  ✅ ★元断言：启动器自己的报告 / null ⇒ 名单空（不标任何模组）
+  ✅ ★并列（报告指向多个模组）⇒ 名单里**都在**（不随便挑一个）：[crashtest, bmod]
+  ✅ ★两条文案都在：按行那句「⚠ 上次崩溃很可能与它有关」/ 全槽级那句「⚠ 下次启动游戏会把整槽模组关掉（现在开着的也一样）」
+  ✅ ★摘要卡要的是**显示名**（不是内部名）：[Crash Test]
+  ✅ ★★弹窗那个“忽略它并再试”只在**单一嫌疑人**且还能找到它时出现（并列 / 认不出 ⇒ 不给）
+  ✅ ★按钮字样要短（三个按钮一行）：「忽略它并再试」
+  ✅ ★元断言：认不出 ⇒ 空（卡片第二行不出现）；并列 ⇒ 两个名字（退回整句那条路）
+  ✅ ★★卡片上点名那行直接可点（忽略它并再试），且固定部分仍在字数预算内：「最可能的原因：%1$s（可点它忽略并再试）」（17 字）
+  ✅ ★元断言：**不可点**那一份（并列时用的）不能带“点/忽略”字样，否则用户会去点一个点不动的地方
+  ✅ ★元断言（**防再变乱**）：摘要卡那几行的字数预算 —— 会再跳 26 / 关了跳过 34 / 已跳完 33 / 点名那行 18 字（超了就又会挤成三行）
+  ✅ ★机制口径：那两句都要说「关掉」（`-failed` 的真义是「整槽被跳过的副产品」，见 REF §86.1③）＋**跳过已发生那支要给出「启用」这个动作**
+  ✅ ★★修（用户真机那个状态）：`launchid.dat` 在 ⇒ **就算一个 `-failed` 标记都没有**（用户点过恢复），卡片也必须警告「下次启动会把整槽模组关掉」——实得 resId=2131297004（0 就是「一句话都不说」，那就是原来的 bug）
+  ✅ ★★真值表其余四格：launchid 在 + 关了跳过开关 + 有标记 ⇒「还会加载」那支；跳过已发生（没 launchid）+ 有标记 ⇒「都被关了」那支；没标记且不会跳 ⇒ **不显示**（干净槽不该有这句）—— 实得 2131297007/2131297005/0/0
+  ✅ ★★「最可能的原因」的显示判据：还会再跳 ⇒ 显示（可行动）；后果还在（有模组还关着）⇒ 显示；**都过去了（launchid 没了 + 没有标记）⇒ 不显示** —— 实得 true/true/false（最后一格必须是 false）
+  ✅ ★术语统一：摘要卡（下次启动会把整槽模组关掉 / 都被关了）/ 关了跳过那支（「还会加载」）/ 门标签（两支）都用「整槽跳过」
+  ✅ ★门标签两支都用「整槽跳过」（这个是我们自己的机制术语，游戏里没有对应的词）
+  ✅ ★元断言：门那两支里都不再出现第二种说法（「跳过全部模组」）
+  ✅ 造 mods/ 目录：/storage/emulated/0/Android/data/io.mdt.launcher/slot-m3-f23/mods
+  ✅ ★★模组表在场时，L1b 的结论显示**显示名**（MDT Dep Probe）而不是内部名：kind=MOD hits=MDT Dep Probe(L1b/w3/depuser) dex=-1
+  ✅ （收尾：删掉人造模组包）
+  ✅ ★元断言：模组包不在槽里时退回**报告里写的内部名**（depuser）—— 证明上一条的名字确实来自模组表，不是恒真
+  ✅ ★★元断言：结论缓存的键**同文件稳定、内容一变就换**（大小 1294 → 1301）
+  ✅ （收尾：删掉人造报告）
+  ✅ ★元断言：报告删掉之后 analyzeNewest 返回 null（模组页那一行会自己藏起来）
+
+── ㉘ F10 地图增删（导入 / 删除）──
+  ✅ ★导入：落盘成功、内容一致、**没有 .part 残留**，且读出真名「导入测试图」
+  ✅ ★坏文件：拒收（这个文件不是游戏能读的地图：这个文件不像存档，或者写到一半就断了）且**一个字节都没留下**
+  ✅ ★元断言：拒收原因**不带类名**（原来是 `…：ZipException: incorrect header check`）
+  ✅ ★同名且未确认覆盖 ⇒ 拒绝：这个槽的 maps/ 里已经有「导入测试图.msav」了 —— 替换会盖掉原文件，需要先确认
+  ✅ ★确认覆盖：新图就位、**旧的那份在中转站里**（大小还是 122 B）
+  ✅ ★删除：槽内的挪进中转站（原位置消失、内容还在）；**槽外的动不了**（安全判据）
+  ✅ ⑥ ★元断言：夹具真的跨卷（外部 → 内部 `renameTo` 必须失败）
+  ✅ ⑥ 跨卷覆盖：旧图**完整**进中转站（118 B，靠复制兜底）、新图就位、无 `.part`
+  ✅ ⑥ 跨卷删除：同样挪得动（原位置消失、站里那份 `118` B 没坏）
+
+── ㉚ F10 地图导出（包内条目 → 出去；拷贝必须逐字节一致）──
+  ✅ ★包里条目拷出来：122 B，与源**逐字节一致**（源 122 B）
+  ✅ ★反向：条目不存在 ⇒ 拒绝（这个包里没有这条：maps/没有这一条.msav）
+  ✅ ★反向：容器不是 zip ⇒ 拒绝（zip END header not found）
+  ✅ ★元断言：源改 1 个字节 ⇒ 同一套比较判**不等**（证明①有分辨力）
+
+── ㉛ 页面骨架（根节点 @id/root + 地图页两行动作在顶上）──
+  ✅ ★12 个页面布局的根节点都是 @id/root：12/12
+  ✅ ★元断言：根节点没有 id 的布局（dialog_msav_list）必须判不合格
+  ✅ ★地图页：导入行 + 导出行都在动作卡里，且动作卡(第 1 个) 排在列表(第 5 个) **之前** ⇒ 两行就在页面顶上
+  ✅ ★activity_maps：搜索框 / 筛选行 / 「已筛选」那一行三个控件都在
+  ✅ ★activity_blueprints：搜索框 / 筛选行 / 「已筛选」那一行三个控件都在
+  ✅ ★activity_saves：搜索框 / 筛选行 / 「已筛选」那一行三个控件都在
+  ✅ ★activity_mods：搜索框的提示语落在 **hint** 上（不是塞进输入框当正文 —— 那会立刻把列表筛成空的）
+  ✅ ★activity_maps：搜索框的提示语落在 **hint** 上（不是塞进输入框当正文 —— 那会立刻把列表筛成空的）
+  ✅ ★activity_blueprints：搜索框的提示语落在 **hint** 上（不是塞进输入框当正文 —— 那会立刻把列表筛成空的）
+  ✅ ★activity_saves：搜索框的提示语落在 **hint** 上（不是塞进输入框当正文 —— 那会立刻把列表筛成空的）
+  ✅ ★元断言：同一条 `Trans.bind` 对 TextView 仍然是 setText（表头不能变成 hint）
+  ✅ ★主界面入口：添加游戏一行 + 工具卡（中转站 / 运行日志）都在，后两者同卡、且与操作卡是**两张不同的卡**
+  ✅ ★设置页：存储占用是设置卡的**最后一行** —— 中转站 / 运行日志不许再回到设置里
+  ✅ ★元断言：往设置卡末尾塞一行之后，上面那条判据必须变红（判据不是恒真的）
+  ✅ ★「添加游戏」弹窗：导入 APK / 添加包名两条路都在
+  ✅ ★顶栏菜单：res/menu/main.xml 里有 action_settings **且带图标**（图标必须是 ic_settings_bar —— 行内那份在顶栏上看不见）
+  ✅ ★顶栏菜单项有无障碍/溢出用的标题（Trans 会再覆盖一遍）
+  ✅ ★MainActivity 真的覆写了 onCreateOptionsMenu / onOptionsItemSelected（否则顶栏齿轮点下去没反应，且不报错）
+  ✅ ★主界面操作卡只剩两行（添加游戏 / 存档与备份）——「设置」在顶栏；实得 2 行
+
+── ㉜ F21 地图资源统计（定义表 / JSON / 模组叠加 / 模组译文 / 补丁 / 遮挡 / 译名）──
+  ✅ 原版内容表 447 条：447
+  ✅ ★遮挡口径（照游戏字段）：石头墙拆不掉 / 石头能搬走 / 玩家墙能拆
+  ✅ 沙地（内部名 sand-floor）：掉落 sand ⇒ 可采地板；同时带含油的属性 ⇒ 也算加成地板（一格两用）
+  ✅ ★元断言：5 种天然地形墙都判成「拆不掉」：5/5
+  ✅ 自带 JSON 读取器：嵌套对象 / 数组 / 小数 / 转义 / 负数都对
+  ✅ ★元断言：半截 JSON 与空串都必须读失败（true/true）
+  ✅ ★模组新内容取类默认值：ve 的松树（breakable:true）能拆，原版 pine 不能 —— 同一个类，相反行为
+  ✅ ★覆盖是「在旧行上改字段」：salt 改出掉落物后，含水的属性仍在
+  ✅ ★无 type + 目标不认识 ⇒ 跳过且不建行（目标不认识，跳过）
+  ✅ ★元断言：认不出的类必须被计数且不建行（否则它会带着全 0 标志混进统计）
+  ✅ 数据补丁把 dark-metal 改成有属性（掉废料），改动数 1
+  ✅ 补丁区解析：1 条 patch 条目
+  ✅ ★元断言：补丁区尾部多 1 个字节就必须判死（「刚好读完」这条判据有分辨力）
+  ✅ 矿物：铜 3 格 = 能采 2（露天 1 + 石头下 1） + 墙下 1（实际 2/1）
+  ✅ 同名合并：ore-thorium 与 ore-crystal-thorium 都叫「钍」⇒ 合成 1 行 2 格（实际 2 格 / 2 个内部名）
+  ✅ 可采地板：沙子 1 格、掉落物是「沙」
+  ✅ 加成地板：盐地带的属性词是「水 油」
+  ✅ 永久遮挡者名单里只有石头墙（实际 stone-wall）
+  ✅ ★元断言：永久墙换成玩家墙后，铜的「能采」从 2 变 3、「墙下」归 0（实际 3/0）
+  ✅ ★反向：认不出的遮挡者记成「未知」，绝不算进「能采」（实际 未知 1 / 能采 2）
+  ✅ ★模组物品/方块的译名从**模组自己的 bundle** 里捞（版本 APK 里没有这些名字）
+  ✅ ★同一层里**模组覆盖版本 APK**（游戏把两者写进同一个 map，模组后加载）
+  ✅ ★层序：版本 APK 的**语言包**压得住模组的**基础包**
+  ✅ ★基础层里同样是模组覆盖版本 APK（铅只在两边的 base 里）
+  ✅ ★反向：两层都查不到 ⇒ 返回空串（调用方退回内部名的可读化形式）；矿墙名是**整名**（`钍（墙）` 而不是拼一个后缀 —— 英文那句要 `Thorium (wall)`，前导空格写进资源会被 aapt2 剥掉）
+  ✅ 模组 bundle 读到 7 条（语言包 5 + 基础包 2；技术细节层要能报出这个数）：7
+  ✅ ★★同目录 `bundle_zh_CN` + `bundle_zh_TW` ⇒ 只取**分数最高的那一份**：want=zh_CN 时显示简体「模组铜」（不是繁体「模組銅」）
+  ✅ ★反向：want=zh_TW 时取的是**繁体**那份「模組銅」—— 证明上面那条不是「恒取 CN」（判据有分辨力）
+  ✅ ★★界面语言换 en ⇒ 读**基础包**（`bundle.properties` = 官方那份英文）：铜/钛变 Copper/Titanium、只存在于 zh 语言包里的名字查不到、矿墙名用整句模板。铜（zh）=「模组铜」/ 铜（en）=「Copper」
+  ✅ ★元断言：语言后缀真的改变了读哪一层（否则上面那条会在两种语言下同时成立 = 没有分辨力）
+  ✅ ★★回归：want=`zh`（**没有地区**）也要认 `bundle_zh_CN.properties` —— 否则中文界面的矿名会掉回英文（铜 =「模组铜」）
+  ✅ ★元断言：`zh` 与 `zh_CN` 结果**相同**（前缀兜底生效），且**都不是** en 的结果
+  ✅ ★元断言：want=`zh_CN` 时 CN 那份的分数**高于** TW 那份（同语言多地区只取最匹配的一份）
+  ✅ ★判层：基础包=2、同语言语言包≥10、**别的语言=0**（认错语言比认不出更糟）
+  ✅ ★模组矿写 itemDrop: aluminium ⇒ 按 ve-aluminium 查到「铝土」（VE 真实情形）
+  ✅ ★顺序照游戏：**先**试 <模组前缀>-短名（哪怕原版也有同名物品）
+  ✅ 原版行（无前缀）走语言层 ⇒ 硅（模组基础层的「模组硅」盖不动它）
+  ✅ ★反向：两边都查不到的掉落物 ⇒ 返回空（调用方退回可读化形式）
+  ✅ ★JSON 里写了 name 的模组：注册名与 <前缀>-文件名 **两个名字都登记**（地图里哪种都可能出现）
+  ✅ ★方块名取自内容 JSON 的 localizedName
+  ✅ ★物品名取自物品 JSON 的 localizedName（模组不带 bundles/ 时唯一的译名来源）
+  ✅ ★元断言：物品 JSON 不写 localizedName ⇒ 必须查不到（这条判据有分辨力）
+
+── ㉝ 槽内存档体检（哪几份读不出来） ──
+  ✅ ★认档判据：只数 .msav 普通文件（目录 somedir.msav / note.txt / half.msav.part 都不算） ⇒ total=2
+  ✅ ★读不出来要点名到**具体文件**并带上原因：junk.msav —— ZipException: incorrect header check
+  ✅ ★`newest` 按改动时间取，**不因为读不出来就跳过**（否则「最近那份坏了」会被静默藏起来）
+  ✅ ★`isSaveFile`：.msav 普通文件算；别的后缀 / .msav.part / 同名目录 / null 都不算
+  ✅ ★元断言：全是好档 ⇒ total=2 且一份都不报（判据不是恒真）
+  ✅ ★反向：没有文件（null）⇒ 干净的空结果、不抛
+  ✅ ★原因翻译：`ZipException: incorrect header check` ⇒ 「这个文件不像存档，或者写到一半就断了」
+  ✅ ★元断言：我们的中文判断走**错误码 → 资源**（核心那句只给报告看；中英两套都**不是**核心原文）⇒ 「这不是 .msav 文件 —— 开头不是 MSAV」
+  ✅ ★反向：没出错（error=null）⇒ 兜底「原因不明」，不抛 NPE
+  ✅ ★坏档文案：7 份存档 · ⚠ 2 份读不出来（分隔符没被 aapt2 吃掉）
+  ✅ ★坏档文案（带最近那份）：7 份存档 · 最近：好档 · ⚠ 2 份读不出来
+  ✅ ★元断言：没有坏档时**不许**出现那句警告 ⇒ 7 份存档 · 最近：好档 / 7 份存档
+  ✅ ★落点弹窗的标题带上份数：读不出来的存档（3 份）
+  ✅ ★转义：英文资源里写 \" 才会真的显示双引号（裸引号会被 aapt2 删掉）：「mod "X.zip"」/「Delete slot "test"?」
+  ✅ ★P3：槽操作那 8 条带占位符的报错文案按真参数实拼（不崩、参数都在）
+  ✅ ★P3：槽名不合法那句的反斜杠渲染成**一个** `\`（资源里写的是两个）
+  ✅ ★P3（英文）：槽已存在那句的双引号真的显示了：「Slot "x" already exists」
+  ✅ ★P3：地图那边 5 条带占位符的报错按真参数实拼（英文那句的双引号也在）
+  ✅ ★P3：整槽 zip 那 12 条带占位符的报错按真参数实拼（含 3 条两个参数）
+  ✅ ★P3（英文）：zip 那句槽名带引号且不留反斜杠：「Cannot reach the directory of slot "s"」
+  ✅ ★P3：备份创建/删除那 5 条带占位符的报错按真参数实拼（含 1 条**三个**参数）
+  ✅ ★P3：列表分隔符两套语言各一份（中「、」/ 英「, 」），英文那个**带空格**且真的进了句子
+  ✅ ★P3：备份恢复那 16 条带占位符的文案按真参数实拼（含 1 条三个参数、2 条两个）
+  ✅ ★P3：报告行资源里**没有前导空格**（缩进是 Java 侧排版 —— aapt2 剥不动它）
+  ✅ ★P3：7 个模组状态**每一个**都有 label + badge 文案（漏映射=界面静默空白），漏的是［］
+  ✅ ★P3：状态文案两套语言不同；且**徽标不比句子长**（长了会把列表标题挤到折行）
+  ✅ ★P3：六道加载门的标签齐全；**没通过的**那几关必须给原因（通过了可只画一行）；门数=6，缺=
+  ✅ ★★门标签不许用「状态」这种名词陈述（前面配 ❌ 读不通）—— 违规：无；那道门现在是「游戏里启用着它」
+  ✅ ★★状态行不甩锅：关闭态只说「已关闭」/「off」—— 不提「用户」（那是**游戏自己**在整槽跳过时关的，我们分不出是谁关的）
+  ✅ ★★「要不要再补一句为什么」的判据有分辨力：缺依赖 ⇒ 补；不兼容（三个成因上面各自说过）与关闭（有自己那句口语）⇒ 不补；启用 ⇒ 不补
+  ✅ ★★徽标报**结果**：读到设置+启用 ⇒「会加载」；**没读到 ⇒「未读到设置」（默认值不当事实说）**；会加载失败 ⇒「加载会失败」压过它；被关掉 ⇒「不会加载」（**不说「已关闭」**）
+  ✅ ★★待整槽跳过时：**模组启用着也要说「不会加载」**（实得徽标「不会加载」、详情页「不会加载（下次启动会整槽跳过）」）—— 与卡片那句警告同一判据，不再互相打脸
+  ✅ ★元断言：**同一状态、只改「待跳过」这一个变量** ⇒ 结论必须不同（否则这条判据没接上）
+  ✅ ★★详情页顶上那行同理：「会加载」/「不会加载（被关掉了）」/「不会加载（缺少必需依赖）」—— 结果 + 一句原因
+  ✅ ★★带游戏的失败记录 ⇒ 原因说「游戏里显示「加载失败」」（与游戏屏幕上一致）；用户手动关的（没记录）⇒ 说「被关掉了」—— 两者互斥（实得「不会加载（游戏里显示「加载失败」）」/「不会加载（被关掉了）」）
+  ✅ ★★「游戏里的开关」表头交代来源与时刻：「游戏里的开关（读自 settings.bin · 10-08 13:06）」；文件不在 ⇒ 退回不带时刻那句「游戏里的开关」
+  ✅ ★★元断言：**六种状态**下（启用/关掉/有记录/设置没读到/还会跳/最坏组合）每道门都有标签、**不通过必有原因、且原因里不许出现 null** —— 全过
+  ✅ ★「游戏里启用着它」不通过时：原因在、并且给出「启用」这个动作（改前是 null）
+  ✅ ★★修：游戏把这个模组标成失败（`failed=true`）⇒ 那道门**必须不通过**且给原因（改前是写死通过的 —— 用户真机看出来的）
+  ✅ ★元断言：没被标失败、也没崩过 ⇒ 通过（判据有分辨力，不是恒不通过）
+  ✅ ★launchid.dat 在、但关掉了「启动崩溃后禁用模组」⇒ **通过**（附一句说明）—— 不然会把「关了开关」的人吓一跳
+  ✅ ★launchid.dat 在 **且** modcrashdisable 开着 ⇒ 不通过（下次启动整槽跳过）
+  ✅ ★★不通过时那道门的标签是「上次启动崩到了整槽跳过」—— 与通过时的「上次启动正常结束（没触发整槽跳过）」**不同**，且不含「正常 / 没触发」（叉号配正面词 = 自相矛盾）
+  ✅ ★元断言：界面真的按状态取了不同标签（不是只写了两条文案没人用）
+  ✅ ★元断言：两支不通过的**建议不同** ⇒ 文案真的分开了，不是一句万金油
+  ✅ ★★「上次启动」那道门**任何状态下**都不说「点启用」（动作归「游戏里启用着它」那道门）—— 实得开着「那次游戏把它们标成「加载失败」并关掉了（记录还在）」/ 关着「那次游戏把它们标成「加载失败」并关掉了（记录还在）」
+  ✅ ★动作落在**对的门**上：关掉的模组在「游戏里启用着它」那道门拿到「启用」；开着的那道门通过（不再有第二条门重复给同一个动作）
+  ✅ ★元断言：门的说明里不再写「把它标成失败」—— 那是**全槽级**标记（一崩 12 个模组全有），搁在按模组的门里就是 §85.16 那类错
+  ✅ ★P3：模组页那两条带占位符的按真参数实拼；详情里**不再出现源码出处**（文案纪律 ⑤）
+  ✅ ★P3：模组包那 16 个码**每个**都有文案、两套语言不同、中性参数（路径/文件名）进了而原始原因没进；可疑的是［］
+  ✅ ★P3：导入/导出/存档落盘那几条带占位符的按真参数实拼（含 1 条两个参数）
+  ✅ ★P3：CAS 那 8 个码**每个**都映射到资源（不是退回异常原文）、两套语言不同；可疑的是［］
+  ✅ ★P3：CAS 的**中性参数**（路径/对象地址）真的进了句子（无参那条不带）
+  ✅ ★P3：模组说明文件那 8 个码**每个**都映射到资源（不再透传中文诊断）、两套语言不同；可疑的是［］
+  ✅ ★P3 反向：**没有码**时仍走老逻辑（异常形态⇒白话 / 自身中文⇒原样透传）
+  ✅ ★P3：冲突体检/模组页那三条带占位符的按真参数实拼，小标题与两句结论都在
+  ✅ ★P3：冲突明细/依赖行/重复包那 9 条按真参数实拼（含 3 条两个参数）
+  ✅ ★P3：冲突明细的连接词两侧都有空格（写的是 \u0020）：「 与 」
+  ✅ ★P3：启动管线 6 个步骤名两套语言都有字，两条带占位符的原因按真参数实拼
+  ✅ ★P3：8 个错误码**每一个**都有文案映射（漏映射=界面静默空白），漏的是［］
+  ✅ ★P3：错误码的参数真的进了句子（声明 5 项/读到 2 项），且两套语言文案不同
+
+── ㉞ 用户可见文案：首尾空白不许靠拼串留 ──
+  ✅ ★导入项副标题逐字：已导入 · official-159.apk · 74.7 MB
+  ✅ ★已装版本副标题逐字：io.anuke.mindustry · 74.7 MB
+  ✅ ★日志/模组三条整句：游戏日志 还没生成 ｜ 游戏日志 · 无 ｜ tmi · 重名
+  ✅ ★带 `·` 的四条：分隔符两侧都是空格
+  ✅ ★没有 `·` 的那条仍留着空格：游戏日志 还没生成
+  ✅ ★元断言：真机坏串（`已导入 ·imported`、`游戏日志· 无`）会被判死，而修好的串通过 ⇒ 判据有分辨力
+  ✅ ★启停确认框按**一个**参数实拼（资源原写 %6$s）：改前会自动备份设置，改完会读回来核对，不对就自动还原。游戏没在运行（可以安全改写）
+  ✅ ★启停结果弹窗三条整句实拼：已把「蓝钢拓展」关闭。 ｜ 「蓝钢拓展」本来就是启用的，文件一个字节都没动。
+  ✅ ★同名存档覆盖确认两句实拼（旧的那份进中转站，不再说"直接删掉"）：槽「default」里已经有一份「困难模式.msav」了。  替换的话旧的会挪进中转站，不会直接删掉。
+  ✅ ★启动进度提示实拼：MindustryX  2026.09.X37 正在准备存档槽 · 检查这个包…
+  ✅ ★地图页空态实拼：槽「default」里还没有地图。 给某个版本分配这个槽之后，游戏自带的地图就会出现。
+
+── ㉟ 模组详情首层的「简介」──
+  ✅ ★有 subtitle ⇒ 就用它（description 不参与）
+  ✅ ★没有 subtitle ⇒ 退回 description 的**第一行**：「第一行说明」
+  ✅ ★超长截到 60 字 + 省略号（实际长度 61）
+  ✅ ★元断言：两头都空 ⇒ **空串**（不是「暂无简介」那种占位），调用方据此整行不收
+
+── ㊳ 中转站（列表 / 放回去 / 彻底删除 / 清空 / 修剪）──
+  ✅ ① v2 名字往返：来源槽「default」· 原名「我的图.msav」· 类型 MAP
+  ✅ ① 旧格式（v1）读得懂：来源槽为空（界面据此说"来源不清楚"）· 原名「旧图.msav」
+  ✅ ① ★元断言：v1 里以三位数字开头的原名**不被当成毫秒吃掉**（得到「123-图.msav」）
+  ✅ ① ★元断言：认不出的名字 parsed=false，但**原名原样保留**（得到「不是时间戳的图.msav」）
+  ✅ ② 放回地图：就位那份与原件**逐字节一致**，且中转站里那份已离开（是挪不是拷）
+  ✅ ② ★元断言：坏地图**放不回去**（过不了解析器），原件仍留在中转站
+  ✅ ③ 同名 + 没确认 ⇒ 只回来问一声（nameTaken 字段，不是看文案）：**两边都没动**
+  ✅ ③ 同名 + 明确替换 ⇒ 新的就位，**旧的再进一次中转站**（份数不变：5 份进、出各一）
+  ✅ ④ 认不出类型（.txt）⇒ **没有地方放回去**，判死（界面也不给那个按钮）
+  ✅ ④ ★安全判据：不在中转站里的文件**放不动也删不动**（只认直接子项），文件没被碰
+  ✅ ④ 目标槽不存在 ⇒ 判死（不会顺手建一个槽出来）
+  ✅ ⑤ ★修剪按**真实时间**：2020 那份（名字以 a 开头、字典序最大）先被删，2026 那份留下
+  ✅ ⑥ 清空：一次删掉 6 份（132 B），目录空了
+  ✅ ⑥ ★遍历所有错误码都有真文案（漏映射 = 界面静默"原因不明"）：13/13
+  ✅ ⑥ ★元断言：没有码时**就是**兜底那句（说明上面那条不是在恒真地打勾）
+  ✅ ⑥ ★带占位符的文案按**真参数**实拼一遍（个数不对会当场 MissingFormatArgumentException 崩），且 `·` 两侧都有空格：共 3 份 · 1.0 KB ｜ 地图 · 来自槽「s」 · 3 B · 01-01 00:00
+  ✅ ⑦ ★元断言：打扫判据（来源槽以 m3- 开头）只认自检留下的，**不认用户自己的**
+  ✅ ⑦ 用户的中转站里没有自检残留（本次扫掉 3 份，剩 0）
+
+── ㊴ 中转站（第二批：存档覆盖 / 整个槽）──
+  ✅ 建测试槽 m3-saves
+  ✅ ① 同名覆盖：新的那份就位（内容确实换了）
+  ✅ ① ★旧的那份**在中转站里**（saves-trash · 来自槽 m3-saves · md5 与覆盖前一致）
+  ✅ ① 放回去 + 同名没确认 ⇒ 只回来问一声（nameTaken），两边都没动
+  ✅ ① ★放回去（确认替换）⇒ 槽里那份的内容回到了覆盖前
+  ✅ ① ★元断言：不是 zlib 的假存档**放不回去**（存档按导入时的尺子判），原件仍在站里
+  ✅ 建测试槽 m3-gone
+  ✅ ② 删槽 ⇒ 槽本体与它的备份都在**同一个容器**里，且 `backups/＜槽名＞/＜快照＞` 层级与 `allReferencedShas` 的扫描口径逐层对齐（20261010-174145-118__m3-gone__m3-gone）
+  ✅ ② 槽没了 ⇒ 它的快照也不再列出来（不给用户一个「看得见却打不开」的备份列表）
+  ✅ ② ★元断言：整槽进站前后**引用集不变**（91 → 91）⇒ 那些对象不会被 GC 当孤儿删掉（否则恢复回来是坏快照）
+  ✅ ③ ★不许把整槽放到**正在用的**那个槽（那等于砸掉当前存档）
+  ✅ ③ ★重名 ⇒ 只回来问一声，**那个占名的槽一个字节没动**（界面据此弹「换个名字」）
+  ✅ ③ ★换个名字放回去 ⇒ 两个槽都在，而且**快照跟着回来了**（1 份）
+  ✅ ④ 份数上限按类型分开：整槽 3 / 其余 20
+  ✅ ④ ★按目录类型修剪：铺 5 个假容器 ⇒ 删最旧的 2 个、留 3 个（用地图那套 20 就会一个都不删）
+  ✅ ⑤ 用户的中转站里没有第二批的残留（扫掉 2 份，剩 0）
+
+── ㊵ 整槽写入的三个模式（更新 / 补齐 / 覆盖）+ 操作前自动备份 ──
+  ✅ 建测试槽 m3-mode / m3-mode-empty
+  ✅ ① 更新：同名换成包里的（both=「NEW」），只在这里的与模组都留着
+  ✅ ② ★补齐：同名**一个字节没动**（both 仍是「OLD」），缺的补上（kept=1）
+  ✅ ③ ★覆盖：槽里只剩包里的（只在这里的与模组都清掉了，wiped=[mods, saves]）
+  ✅ ③ ★覆盖**不许**动排除名单里的东西（缓存 / 导入副本 / 游戏配置还在）——少了这条，"完全替换"会顺手删掉游戏的临时目录
+  ✅ ④ ★元断言：越界的模式值（99）退化成"更新"，**绝不**变成"清空"（清空不可逆，拿它当兜底等于埋雷）
+  ✅ ⑤ ★恢复·补齐：槽里改过的那份**保留**（both=「LATER」）
+  ✅ ⑤ ★恢复·覆盖：回到快照那一刻（both=「NEW2」，快照之后新增的那份没了）
+  ✅ ⑥ 槽操作前自动备份：真落了一份快照（1 → 2，备注「㊵ 自动」）
+  ✅ ⑥ ★空槽 ⇒ 安静跳过（返回 null、不抛错、不建空快照）——自动备份是安全网，不是门禁
+
+── ㊼ 系统异常 ⇒ 白话（`Util.ioReason`）──
+  ✅ ★磁盘满 ⇒ 「空间不够了 —— 腾点地方再试」（且**不再出现 ENOSPC**）
+  ✅ ★没权限 / 只读 / 被占用 / 文件不在了 各自翻对（4 条）
+  ✅ ★元断言：我们自己的文案原样透传（「找不到这份蓝图的来源」没被翻译）
+  ✅ ★没有消息 ⇒ 有 fallback 用它、没有就「读写失败」（不冒类名 / null）
+
+── ㊶ 「存档视为地图」：只改 meta + 区 1..n 逐字节搬 ──
+  ✅ ① 规则区区间改写：9 条两面判据全过
+  ✅ ① ★元断言：6 条坏串**全部判死**（宁可拒绝，不猜）
+  ✅ ② 缺 name ⇒ **判为存档**（判据字段 saveNoName）：.part 留着、什么都没落位
+  ✅ ③ 落位成功：变成一张地图「我的图.msav」
+  ✅ ③ meta：补了 name、wave=1、playtime=0、stats={}（读回来自检）
+  ✅ ③ rules：该删的 8 个键删净、limitMapArea→false、planet（原版）与非目标键原样
+  ✅ ③ ★**区 1..n 逐字节相同**（3 块里第 1..n 块全等）
+  ✅ ③ ★元断言：第 0 区**确实变了**（否则上面那条判据没有分辨力）
+  ✅ ③ ★源存档一个字节没动（md5 前后一致）
+  ✅ ③ 成功之后源 .part 清掉了（不留垃圾）
+  ✅ ④ 同名 ⇒ 只回来问一声（判据字段 nameTaken，不看文案）
+  ✅ ④ 确认覆盖 ⇒ 落位成功，且**旧图进了中转站**（挪不删）
+  ✅ ⑤ ★失败原因不带类名、旧图原地不动（用户看到的是「建中转站失败：/storage/emulated/0/Android/data/io.mdt.launcher/slot-m3-save2map/不是目录.txt」）
+  ✅ ⑥ ★元断言：discard 对**用户的存档原件**是空操作（判据 = 只删 `.part`）
+  ✅ ⑥ ★红线：从**存档原件**转图成功之后，源存档一个字节没动（只删我们自己的 .part）
+  ✅ ⑥ ★回归：槽里**没有 maps/ 目录**时自己建（真机上第一版就炸在这里）
+  ✅ ⑦ ★按同名源图补齐：genfilters / 作者 / 简介**逐字节照搬**（补了 4 个键），源存档没动
+  ✅ ⑦ ★通用补齐：**任何**源图有而存档没有的键都补（实测补上了 `locales`）；`NO_INHERIT` 里的运行态键（`tick`/`viewpos`）**一个都不许带过来**
+  ✅ ⑦ ★找不到源图 ⇒ 写显式空列表 []（编辑器「生成」区删了才不会又冒出来）
+  ✅ ⑦ ★元断言：存档**自己带的** genfilters 一个字都不许被源图盖掉（只补缺的键）
+  ✅ ⑧ 自动匹配（findSources）：同名命中 / 改名后按老名字找不到 / 不存在的名字返回空
+  ✅ ⑧ ★撞名：两张同名图 ⇒ 命中 2 张（界面据此提示并让用户自己选，而不是替用户猜）
+  ✅ ⑧ ★改名之后也能补齐：**用户指定**了源图（`早就改了名.msav`）⇒ 设置照样搬过来
+  ✅ ⑧ ★用户明确选「不使用源图」⇒ 生成器设置留空（[]），不去猜、也不去捡同名图
+  ✅ ⑨ ★按名字找源图要**跨三个来源**（本槽文件 / 游戏自带 APK 条目 / 模组自带）；找不到与名字为空都返回空
+  ✅ ⑨ ★**战役图那条判据**：存档 `mapname`=显示名（「坠落飞船」）对不上图里的基础名，靠 `sectorPreset`（== 条目文件名主干 `fallenVessel`，大小写不敏感）命中
+  ✅ ⑨ ★源图在**容器里**（APK/模组包）也能补：直接递扫描时读好的 tags，报告里写明来源（`fallenVessel.msav(游戏自带)`）
+  ✅ ⑤ 不是 zlib ⇒ 判死（E_IO）且**一个字节都不留**
+  ✅ ⑤ zlib 但开头不是 MSAV ⇒ E_MAGIC，且一个字节都不留
+  ✅ ⑤ 规则区结构看不懂 ⇒ 拒绝（E_RULES_SHAPE），不猜也不改
+  ✅ ⑤ discard 清掉待办 .part（用户在命名框里取消时用）
+  ✅ ⑤ 显示名检查：空/全空白判死，正常名字放行（文件名另一个函数管）
+  ✅ ⑤ ★9 个错误码**每一个**都有文案映射，且中英不同（漏映射 = 界面静默退化成「原因不明」）
+  ✅ ㊶ 收尾：地图中转站里没有本用例的残留（剩 0）
+
+── ㊷ 蓝图（.msch）解析：两版格式 + 24 种配置 + 宽松 labels + 负样本 ──
+  ✅ ① 24 种配置：字节消费 + 规范化值全对（通过 24）
+  ✅ ① ★元断言：int[] 的长度字段少一字节 ⇒ 判死（否则上面那条没有分辨力）
+  ✅ ② 旧格式裸 int：物品 / 液体 / 坐标（**减掉瓦片坐标**）/ 整数 / 不认识给 null
+  ✅ ② ★元断言：分支表 11 条；duct-router 之类**不是**那四类（在 master 里它们的父类是 Block）
+  ✅ ② 旧名映射 51 条（与游戏 SaveFileReader 逐条对比过），不认识的原样返回
+  ✅ ③ 宽松 labels：11 种写法（裸词 / 两边空白 trim / 单引号是普通字符 / 尾随逗号）
+  ✅ ③ ★8 种坏写法**全部判死**（游戏那边同样解不开）
+  ✅ ④ modified UTF-8：星平面名字逐字符相同（普通 UTF-8 解会变成替换字符）
+  ✅ ④ ★元断言：同一个串按**普通 UTF-8** 编 ⇒ 读不出原文（证明上面那条不是恒真）
+  ✅ ⑤ 完整文件读得出来：v1 声明 2×2 瓦片 2 框 9×12 字典 2 标签 4 分类 2 越界 2
+  ✅ ⑤ 名（含 emoji）/描述/分类/字典/两格瓦片/旋转 都对
+  ✅ ⑤ 旧名映射生效：文件里的 alloy-smelter ⇒ 游戏认识的名字 surge-smelter
+  ✅ ⑤ contentMap 反查：物品 7 → thorium、液体 3 → water、查不到给 null
+  ✅ ⑤ ★包围盒**按瓦片算**（-3,-4 .. 5,7，负坐标要还原成有符号）；声明尺寸仍是 2×2、两格越界
+  ✅ ⑥ 瓦片后多 16 字节：照样读得出来，并把 leftover 标成 16
+  ✅ ⑦ 8 份负样本：全部判死且**错误码逐条对得上**
+  ✅ ⑦ ★元断言：把「截断」那份补回来又能读（证明上面这条不是恒真）
+  ✅ ⑧ 14 个错误码都有文案（**按真参数实拼**）
+  ✅ ⑧ 失败实例走 MschText.reason 也有话说：这不是蓝图文件
+
+── ㊸ 蓝图清点：两个来源 + 模组的启用过滤 + 缺件判据 ──
+  ✅ ① 本槽递归找到 3 份（含 sub/ 那份），notes.txt 不算 —— 实得 3
+  ✅ ② 模组只算 `schematics/` 的**直接子文件**（嵌套 / 别的目录都不算）—— 实得 2
+  ✅ ② ★元断言：把该模组关掉 ⇒ 模组自带少一份（2 → 1，键 `mod-bp-mod-b-enabled`）
+  ✅ ③ 缺件判据：2 种方块 / 缺 1 种（1 格），缺的那行排最后
+  ✅ ③ ★元断言：内容表为 null 时**不报缺件**（宁可不说，也不诬告）
+  ✅ ④ Intent 往返：详情页重建出来的记录与原记录同源同解析结果
+  ✅ ⑤ 空槽（没有 schematics/）⇒ 0 份，不抛异常
+
+── ㊹ 蓝图写侧：导入（先验后位）/ 同名先问 / 覆盖进站 / 删除 / 放回去 ──
+  ✅ ① 导入合法蓝图：落点与源**逐字节一致**，无 `.part` 残留，解析通过
+  ✅ ② 不是蓝图 ⇒ 判死（码 3）、**不留 `.part`**、目标不存在
+  ✅ ③ 同名 + 不覆盖 ⇒ 判据字段 nameTaken 为真，且**原文件一个字节没动**
+  ✅ ④ 同名 + 覆盖 ⇒ 换成功，**旧的那份在中转站里**（名字 =我的蓝图.msch，来源槽 m3-blueprints，类型 SCHEM）
+  ✅ ④b ★失败原因不带类名、旧蓝图原地不动（用户看到的是「建不了中转站目录：/data/user/0/io.mdt.launcher/app_hub/selftest-bp/不是目录.txt」）
+  ✅ ⑤ 删除 = **挪进中转站**（槽里那份没了、站里那份在）
+  ✅ ⑤ ★元断言：**不是直接子项**的那份（子目录里的）删不动，原件还在
+  ✅ ⑥ 蓝图放回去：回到槽里（走的是 `Msch` 那把尺子，与导入同一把）
+  ✅ ⑥ ★元断言：坏蓝图放不回去（码 13），**原件仍留在站里**（说明上面那条不是恒真）
+  ✅ ⑦ 自建的中转站已整棵删除（用户的 `<hub>/schematics-trash` 一个字节没碰）
+  ✅ ⑧ ★模组前缀照游戏小写化：两个数据模组的方块都进了内容表（`bpmod-testwall` / `bpcase-wall2`，后者的 meta 里写的是 `BpCase`）
+  ✅ ⑧ ★meta 原样那一种写法留作别名（有作者按它引用，别把人家的图判成缺件）
+  ✅ ⑧ ★元断言：不存在的名字查不到 —— 说明上面两条不是在恒真地打勾
+  ✅ ⑨ 「有代码/脚本 + 没有方块 JSON」的模组被数出来了（实得 1；同一槽里的 `bpmod` 带了方块 JSON、不该算进来）
+  ✅ ⑨ 缺件的那份被标记为「可能认错」，全认得出的那份不标 —— 且文案真的换了说法：4 × 4 · 1 格 ⚠ 有 1 种方块我们没认出来（共 1 格）；有模组用代码或脚本加方块，这里可能认错
+  ✅ ⑨ ★两种说法真的不同（可能认错 / 断定没有各一份）：4 × 4 · 1 格 ⚠ 有 1 种方块本槽没有（共 1 格），游戏里会当空气丢掉
+  ✅ ⑨ ★元断言：本槽**没有**这种模组时不许打这个标记（否则它会变成一条恒真的免责声明）
+  ✅ ⑨ ★hidden 的模组不算误报来源（游戏不加载它的 Java 内容）—— 实得 0
+  ✅ ⑩ ★bundle 里声明过的方块名被挑出来了（`block.opq-ash.name` ⇒ 1 条）
+  ✅ ⑩ ★元断言：内容表里**没有**这一行 —— 旁证只改那一句判断，绝不造幽灵行（地图统计那边必须保持「认不出的格子」）
+  ✅ ⑩ ★★真修：脚本模组的方块（bundle 声明过）**不再被误报缺件**：4 × 4 · 1 格
+  ✅ ⑩ ★元断言：**不带**旁证时它照样报缺件（1 种）—— 证明上一条是旁证带来的，不是别处改动
+  ✅ ⑩ ★元断言：bundle 里**没声明过**的名字照样报缺件（不是「有 bundle 就一律不敢报」）
+  ✅ ⑩ ★元断言：**有方块 JSON** 的包（非 opaque）留的过期键不进旁证 —— 否则会把真缺件说成不缺（漏报）
+  ✅ ⑩ ★同一次扫描里，脚本模组（opaque）的键照样进旁证（闸门是按包判的，不是全关）
+  ✅ ⑨ ★文案实拼走**真实调用点**（含 `num()` 那个字符串参数）：2 种没认出来，共 3,456 格 / 缺哪些方块（可能认错）
+  ✅ ⑨ ★元断言：字符串喂 `%d` 真的会抛（说明上面那条不抛是有分辨力的）
+
+── ㊺ 一档六项：存档详情 / 备份列表 / 存储占用 / 版本行 / 模组类型 / 蓝图细节 ──
+  ✅ 存档详情：地图真名出现在正文里
+  ✅ ★存档详情：色码被去掉（纯文本列表里 `[gold]` 是噪声）
+  ✅ 存档详情：时长那行走的是与地图页**同一句**（MsavText.detail）
+  ✅ ★反向：读不出来的存档正文里**不许**多出'地图：'那一行（没有名字可写）
+  ✅ ★反向对照：读不出来的存档也要有话说（不能是空正文）
+  ✅ 备份列表：删一份不存在的备份 ⇒ 报的是那句「这份备份已经不在了」
+  ✅ ★备份列表：『恢复这一份』与『删掉这一份』必须是两句不同的话（否则用户分不清点的是哪个）
+  ✅ 备份列表：表头带份数（%1$d 真的被填进去了）
+  ✅ 蓝图细节：夹具本身解析成功、字典 2 个名字
+  ✅ 蓝图细节：带朝向的格数只数 rotation != 0 的（这里 1 格）
+  ✅ 蓝图细节：换算过的名字只列真的换过的（旧的 → 新的）：[alloy-smelter -> surge-smelter, sand -> sand-floor]
+  ✅ 蓝图细节：换算那一行同时给出**换算后**的名字（否则读者不知道被换算成了什么）
+  ✅ 蓝图细节：名字表内容真的列出来了（原来只报个数）
+  ✅ ★反向：名字表为空 ⇒ 整行不出现（返回空串，不摆空行）
+  ✅ ★反向：0 格不出现、3 格出现（这一行不是恒真的）
+  ✅ 蓝图细节：超过 8 个名字 ⇒ 截断并换成「还有 N 个」那句
+  ✅ 存储占用：第一行是总占用（与 hubBytes 同一个格式化）
+  ✅ 存储占用：各槽一行（槽名 / 文件数 / 体积）
+  ✅ 存储占用：备份那一行给出节省率（3 GB → 240 MB 约 92%）
+  ✅ 存储占用：中转站按类型分行（地图 2 项）
+  ✅ 存储占用：可清理残留那行带处数与体积（原来只在别处显示'已开/已关'）
+  ✅ ★反向：一份备份都没有 ⇒ 说「还没有备份」，且**不出现**节省率那一行
+  ✅ ★反向：没有槽 / 中转站是空的 ⇒ 各说一句话（不摆空段）
+  ✅ ★反向：孤儿为 0 ⇒ 不许出现「另有 … 收回」那一行（元断言：这行不是恒真的）
+  ✅ ★对照：孤儿不为 0 ⇒ 那一行必须出现（证明上一条不是因为整段没实现）
+  ✅ ★反向：Report 为 null ⇒ 返回空串（不崩、不返回半句话）
+  ✅ 版本行：带存档条数的那句与不带的那句不同（且填进了 7）
+  ✅ 版本行：导入项那条同样带文件名与条数
+  ✅ 版本详情：有存档 / 没存档是两句不同的话
+  ✅ ★元断言：timeText(0) 必须是空串（否则「上次玩：」后面会跟一片空白）
+  ✅ ★元断言对照：给了真实时刻就必须有内容（防止上一条是因为它恒空）
+  ✅ ★模组类型：四个标签互不相同、且都不是空串（否则用户选不出来）
+
+── ㊻ 三档：文案与可见入口的小修 ──
+  ✅ 蓝图删除失败：不再指两条**不可能**的路（游戏在跑 / 不在本槽都被提前排除了）
+  ✅ ★元断言：旧串确实带那两个词（证明上一条不是恒真）
+  ✅ 恢复报告：内容对不上那条不再出现 sha256 / 「对象」这类词
+  ✅ ★元断言：旧串确实带 sha256（证明上一条不是恒真）
+  ✅ 恢复报告：机制（改名失败）**留着** —— 只是从 rename 换成白话（依据不能删）
+  ✅ 日志页 chip：不再是「自检 / 测试口」这种只对维护者有意义的词
+  ✅ ★元断言：新旧值确实不同（否则上一条在**没改**的时候也会绿）
+  ✅ 版本行：可见的动作入口在（「槽」按钮 —— 换槽与看详情都从它进）
+  ✅ ★元断言：版本行卡片里**只有 3 个**横向元素（图标 / 文字列 / 动作按钮）—— 再加一个右侧控件就会把版本号挤成省略号，实际 3
+
+── ㊽ 预览图：方块表 / 蓝图色块渲染 / 存档预览入口 ──
+  ✅ ① 方块表：解码出 447 行（表常数 447）
+  ✅ ① 关键条目：`copper-wall` 有颜色 · `copper-wall-large` 占 2 格 · `core-nucleus` 占 5 格 · `ore-copper` 有颜色（矿色来自物品）· `air` 没有颜色
+  ✅ ① 表有分辨力：不同颜色 412 种、多格方块 195 个（不是「一片纯色」的假货）
+  ✅ ① ★元断言：模组方块（`ve-bank-silicide`）**不在表里** ⇒ 查不到颜色与尺寸
+  ✅ ② 2×2 方块在 (5,5)：占 x[5..6] y[5..6]（偶数尺寸往**右上**长，与游戏同口径）—— 实得 x[5..6] y[5..6]
+  ✅ ② 5×5 方块在 (5,5)：占 x[3..7] y[3..7]（`(5-1)/2 = 2`）—— 实得 x[3..7] y[3..7]
+  ✅ ② 4×4 方块在 (5,5)：占 x[4..7] y[4..7]（`(4-1)/2 = 1`）—— 实得 x[4..7] y[4..7]
+  ✅ ② ★元断言：同一份蓝图喂「尺寸恒为 1」的假表 ⇒ 包围盒退化成 1×1（证明前三条测的是**尺寸**，不是恒真的装饰）
+  ✅ ③ 渲染：1 格 + 5 格 + 表外方块 ⇒ 画布 11 格 = 352px（352×352）
+  ✅ ④ 负例：没有蓝图 / 解不出来 / 没有图集 / 边长≤0 ⇒ 出不了图（返回 null，界面保持 GONE）
+  ✅ ④ 负例：一份**没有瓦片**的蓝图 ⇒ null（不画一张空图）
+  ✅ ④ 上限：两份瓦片相隔 9000 格（包围盒 9001×9001 > 128）⇒ 不出图（不去分配那块内存）
+  ✅ ⑤ 没版本 ⇒ **不画**（null；用户明确否掉了色块档：「那东西太抽象了毫无意义啊」）
+  ✅ ⑤ ★元断言：**同一个 Item** 带上版本 APK ⇒ 有图 —— 证明上一条测的是「没版本」这条规矩，不是 Item 坏了（拿不到 APK 时这条会判死，见报告）
+  ✅ ⑥ 缓存键：两份不同文件 / 包内条目各自不同（撞了会显示错图）
+  ✅ ⑦ 存档预览：坏文件 / 没有配色表 ⇒ null（不崩、界面保持 GONE）
+  ✅ ⑦ 缓存键：文件名进 key（改了内容 key 就变，不会显示旧预览）
+
+── ㊾ 像素级预览：图集解析 / 贴图拼接 / 旋转 / 回落 ──
+  ✅ ① 图集解析：自家造的 2 条区域都读对（页名 / 矩形）—— 实得 sprites.png@8,16 32x32
+  ✅ ① 图集解析：带 `hasOffsets` 那条（trim 过的贴图）矩形也对 —— 实得 sprites.png@0,0 26x28
+  ✅ ① ★元断言：magic 不对 / 空输入 ⇒ null（不假装解开了，界面回落色块）
+  ✅ ② 回落①：`block-<名字>-full` 在就用它（与游戏 `loadIcon()` 同一级）
+  ✅ ② 回落②：没有 `block-x-full` ⇒ 用 `<名字>-full`
+  ✅ ② 回落③：都没有 ⇒ 用 `<名字>` 本身（最常见的一条）
+  ✅ ② 回落④：再退到 `block-<名字>`
+  ✅ ② 回落⑤：最后退到 `<名字>1`（垃圾墙那种变体）
+  ✅ ② 回落：一级都没中 ⇒ null（调用方退化成色块，不崩）
+  ✅ ③ 拼接：1 格方块画一张 32×32 的贴图（实得 32×32）
+  ✅ ③ 拼接：5 格方块画 160×160（= 5 × 32，多格方块是整张贴图）—— 实得 160×160
+  ✅ ③ ★元断言：`copper-wall`（rotate=0）转 0° 与 180° **逐像素相同** —— 说明「转不转」真的按表里那两列走，不是一律都转
+  ✅ ③ ★元断言：`armored-conveyor`（rotate=1）转 90° 之后**必须不一样**（否则「旋转」就是恒真的装饰）
+  ✅ ④ 回落：图集里没有这个方块 ⇒ 那一格画成**色块**（不是空气、不是空白）
+  ✅ ⑤ 端到端：从版本 APK 的图集里查到 `copper-wall` 并裁出 32×32 像素（实得 sprites.png@3513,668 32x32 / 1024 像素）
+  ✅ ⑤ ★元断言：裁出来的是**真图**（11 种颜色 > 3）—— 位置错的话会是一块纯色或全透明
+  ✅ ⑤ 端到端：表开着，页图也真的抽到了磁盘上（BitmapRegionDecoder 要能随机访问）
+  ✅ ⑤b 形状 0：`conveyor` 家族 1 → `conveyor-0-0`；`duct` 3 / `conduit` 5（读生成表）
+  ✅ ⑤b 两层：duct / conduit 都是**先 bottom 后 top**，底层有共享兜底图
+  ✅ ⑤b ★元断言：普通方块（`copper-wall`）**不走** autotiler ⇒ null（别拿形状 0 去套）
+  ✅ ⑤b 端到端：真 APK 图集里 `conveyor-0-0` / `duct-bottom-0` / `conduit-top-0` 都查得到
+
+── ㊿ 模组方块的贴图：注册名规则 / 尺寸 / 真包端到端 ──
+  ✅ ① 注册名：`sprites/**` 递归找，名字 = <模组名>-<文件主干>（**不含目录**、不含 .png）
+  ✅ ① 注册名：`sprites-override/**` **不加**模组前缀（那是用来覆盖原版贴图的）
+  ✅ ① ★元断言：文件名**已被类别前缀**（`block-vne-…`）⇒ 不再加模组前缀（游戏注释里那个例子，加错了就永远查不到）
+  ✅ ① 注册名：`a.b.png` 保留完整主干（**游戏同款**）；模组 `icon.png` **不是**内容贴图
+  ✅ ② 尺寸：32→1 格 / 64→2 格 / 160→5 格 / 26×28（trim 过的）→1 格
+  ✅ ②b 类名表：解出 136 个原版方块类（对账常数 136）
+  ✅ ②b 类名表：`Conveyor`/`ItemTurret`/`Duct` 转，`GenericCrafter`/`Block` 不转（`GenericCrafter` 原版那个 true 是匿名块里设的 ⇒ 按**不转**记）
+  ✅ ②b ★元断言：查不到的类名 / null ⇒ **不转**（不猜；猜错会把方块画歪）
+  ✅ ③ 端到端：槽「模组演示」的模组包索引出 2521 张 / 包 [SchematicParse(1), frost-industry(266), vne(501), 蓝钢拓展(18), 饱和火力(1735)]
+  ✅ ③ 端到端：拿索引里第一个名字回查得到条目 —— 饱和火力-裂位收容块 → 饱和火力3.3.0.zip!sprites/blocks/城墙/裂位收容块.png
+  ✅ ③ 端到端：取到真 PNG 字节（2527 字节）
+  ✅ ③ 端到端：从 PNG 头读出它占 4 格（≥1；32 px 的给 1 格）
+  ✅ ③ ★元断言：不存在的名字 / null ⇒ 查不到（证明上面那条不是恒真的）
+
+
+── 用户语言包（lang.properties）──
+  ✅ 枚举到 1196 个 R.string 字段（反射；用于逐键比对）
+  ✅ 私有目录可用：/data/user/0/io.mdt.launcher/app_hub（是目录=true，可写=true），ctx=io.mdt.launcher
+  ✅ 单键包：rejected=0 unknown=0（都该是 0）
+  ✅ 单键包 used=1（应为 1）
+  ✅ 装上单键包后**只有 1 个**键的值变了（实得 1）
+  ✅ 变的那个正是 act_saves_title，且值来自用户包（实得「SELFTEST-ONE35aef5e494c9f」）
+  ✅ 占位符不符的条目被拒（rejected 含 main_continue_fmt） 原因=Placeholder count differs: original has 1, yours has 0 (original: [1s], yours: [])
+  ✅ 同一份包里的另一条**照常生效**（部分可用，不是整包拒绝）
+  ✅ 包里的键都认得出（unknown=0）
+  ✅ 导出模板 round-trip：unknown=0 rejected=0（都该是 0）
+  ✅ 模板写出 1196 条 ≥ R.string 字段数 1196（多出来的是同一字段被 aapt2 收进多个资源表的重复项）
+  ✅ 模板不是空壳（115318 B）
+  ✅ 模板正文的每一行都是「注释」或「键=值」（实得 0 行不合规）
+── 第 127 轮：批量导入 / 导出（多份 = 一个 zip；整包解开逐份导回来）──
+  ✅ ★ 三种来源（真文件 / 容器条目 / 目录）打成一个 zip：3 条，名字保留非 ASCII
+  ✅ ★ 计数：写进去 3 条（r.files=3）
+  ✅ ★ 真文件那条：内容逐字节一致
+  ✅ ★ 容器条目那条：拷出来的是**那一条**（不是空字节、不是别的条目）
+  ✅ ★ 目录形态模组 ⇒ 外层里是一条**嵌套 zip**，内容按目录根写（mod.hjson / scripts/main.js）—— 这样它才能再被导入
+  ✅ ★ 元断言：源改 1 个字节 ⇒ 同一套比较判**不等**
+  ✅ ★ 两份重名 ⇒ 两个条目（`同名.msav` / `同名 (2).msav`），没有静默少一份
+  ✅ ★ 反向：一条都没有 ⇒ 拒绝（没有可导出的东西），不留一个空 zip
+  ✅ ★ 反向：源文件不存在 ⇒ 跳过它，全空时同样拒绝
+  ✅ ★ 我们导出的一整包 ⇒ 认出来（命中 2 条 .msav）
+  ✅ ★ 元断言：**模组包本身**（根上有 mod.hjson，哪怕里面还带地图）⇒ 判成「这不是一整包」—— 否则用户导一个模组会被拆成碎片
+  ✅ ★ 反向：根本不是 zip（真存档就是 zlib 流）⇒ 不认，交给单份导入
+  ✅ ★ 解包只落**文件名最后一段**：`sub/深.msav` ⇒ 工作目录里的 `深.msav`，目录外面一个字节都没写（3 份）
+  ✅ ★ 包里两条**不同路径同名**（sub/深.msav 与 sub2/深.msav）⇒ 解出来两份（后一条改名，不覆盖前一条）
+  ✅ ★ plan：3 份 ⇒ 条目 2（批内重名撤掉 1）+ 与槽里同名 1（entries=2 dup=1 conflicts=1）
+  ✅ ★ 元断言：拿一个空目录 ⇒ 同名 0 份（证明上面那个 1 是「比出来的」，不是恒真）
+  ✅ ★ 批量导入地图 2 份：都落位（ok=2 failed=0）
+  ✅ ★ 同名 + **不替换** ⇒ 两份都跳过（skipped=2），一份都没动
+  ✅ ★ 同名 + **替换** ⇒ replaced=1，槽里那份真的是新的（md5 变了）
+  ✅ ★ 批量导入蓝图 2 份：都落位，且都过了 Msch 校验
+  ✅ ★ 批量导入存档 2 份：都落位（含 stage→commit 两步）
+  ✅ ★ 批量导入模组 2 份：都落位（含「用游戏自己的判据验一遍」那道门）
+  ✅ ★ 反向：不是模组的包 ⇒ 计入**失败**并在报告里点名，不许静默成功
+  ✅ ★ 往返：2 份地图 ⇒ 导出一个 zip ⇒ **只选这个 zip** 也能导回来（ok=2，报告里记了「从 zip 里解出 2 份」）
+  ✅ ★ 报告里说明了「这一批是从 zip 里解出来的」（notes=1）
+
+── ⑩ 负例：对象池里的内容被破坏 ⇒ 这一项必须拒绝写 ──
+  ✅ 篡改前对象内容与地址一致（对象此刻有效）
+  ✅ 篡改后长度未变（只翻了一个字节）
+      恢复报告：✅ 已从备份恢复到槽「m3-selftest」     备份：20261010-174143   cas-dedup     文件：5 / 6 （179 B）     位置：/storage/emulated/0/Android/data/io.mdt.launcher/slot…
+  ✅ 其余项照常恢复（rr.ok = true，只有坏的那一项失败）
+  ✅ 报告点名「这个对象的内容对不上」（按资源本身比，不再挂算法名）
+  ✅ ★元断言：报告里**不再**出现 sha256（否则上一条对旧文案也会通过 = 没分辨力）
+  ✅ ★ 坏对象**没有被写出去**（b.msav 一个字节都没动，没有半截恢复）
+
+
+18 个测试槽已清理（含其备份）
+用时 2842 ms

@@ -467,7 +467,7 @@
       ★ 2026-10-06 (round 115, batch 6): subtitles of the three rows on the **saves page**
         (second-level page), same shape as the mods / maps / blueprints pages.
     -->
-    <string name="save_page_import_sub">Pick a .msav from this device and put it in this slot</string>
+    <string name="save_page_import_sub">Pick one or more .msav from this device and put them in this slot</string>
     <string name="save_page_export_sub">Export the saves of this slot to this device</string>
     <string name="save_page_bad_sub">See why those few cannot be read</string>
     <string name="msav_bad_list_title_fmt">Unreadable saves (%1$d)</string>
@@ -717,7 +717,7 @@
         delete = **move into the trash**, never delete outright.
     -->
     <string name="bp_import">Import blueprint…</string>
-    <string name="bp_import_sub">Pick a .msch file from a file manager</string>
+    <string name="bp_import_sub">Pick one or more .msch files from a file manager</string>
     <string name="bp_export">Export blueprint…</string>
     <string name="bp_export_sub">Write one out to a file (Download and so on)</string>
     <string name="bp_export_none">This slot has no blueprints yet</string>
@@ -1718,7 +1718,7 @@
 
     <!-- ══ F13 第三阶段：模组包导入 / 跨槽复制 ══════════════════════════════ -->
     <string name="mods_act_import_title">Import mod package</string>
-    <string name="mods_act_import_sub">Pick a .zip / .jar on this device</string>
+    <string name="mods_act_import_sub">Pick one or more .zip / .jar on this device</string>
     <string name="mods_act_copy_title">Copy this slot mods to…</string>
     <string name="mods_act_copy_sub_fmt">Copies the whole mod set of \"%1$s\" into another slot</string>
     <string name="chooser_pick_mod">Pick a mod package</string>
@@ -1819,4 +1819,40 @@
     <string name="lang_stat_used_fmt">Using %1$d translated strings</string>
     <string name="lang_rejected_fmt">%1$d entries were rejected (placeholder mismatch) — see Settings → Language</string>
     <string name="lang_unknown_fmt">%1$d keys are unknown (file version may not match the app)</string>
+    <!-- ══ 批量导入 / 导出（第 127 轮：模组 / 地图 / 存档 / 蓝图 四类共用同一套界面） ══ -->
+    <string name="exp_err_no_src">Nothing to export</string>
+    <string name="batch_export_btn_fmt">Export (%1$d)</string>
+    <string name="batch_export_all">Select all</string>
+    <string name="batch_export_none">Clear</string>
+    <string name="batch_export_nothing">Nothing is ticked yet</string>
+    <string name="batch_export_head_fmt">%1$d in total · tick what to export, then tap Export</string>
+    <string name="batch_export_progress_title">Exporting</string>
+    <string name="batch_export_progress_fmt">Packing %1$d items into one zip</string>
+    <string name="batch_export_zip_done_fmt">Exported %1$d items · %2$s</string>
+    <string name="batch_import_progress_title">Importing</string>
+    <string name="batch_import_progress_fmt">Importing %1$d items into %2$s</string>
+    <string name="batch_import_running_fmt">Importing %1$d items</string>
+    <string name="batch_import_nothing">No file was picked</string>
+    <string name="batch_report_title">Batch import</string>
+    <string name="batch_report_head_fmt">%1$d items processed</string>
+    <string name="batch_report_ok_fmt">Imported: %1$d</string>
+    <string name="batch_report_replaced_fmt">Replaced, old ones moved to Trash: %1$d</string>
+    <string name="batch_report_skipped_fmt">Skipped: %1$d</string>
+    <string name="batch_report_failed_fmt">Failed: %1$d</string>
+    <string name="batch_report_line_fmt">%1$s — %2$s</string>
+    <string name="batch_overwrite_title">Some names already exist</string>
+    <string name="batch_overwrite_msg_fmt">%1$d of %2$d already exist in this slot. Replace them? The old ones are moved to Trash.</string>
+    <string name="batch_overwrite_ok">Replace</string>
+    <string name="batch_skip_exists">same name is already there, not replaced</string>
+    <string name="batch_skip_dup">same name appears twice in this batch</string>
+    <string name="batch_skip_too_many">too many items in one batch, skipped</string>
+    <string name="batch_note_unpacked_fmt">Unpacked %1$d files from %2$s</string>
+    <string name="batch_fail_unknown">unknown failure</string>
+    <string name="batch_err_open_fmt">Cannot open %1$s</string>
+    <string name="batch_import_map_issave">this is a save, not a map</string>
+    <string name="batch_import_save_nonstandard">not a standard save, the game may not read it</string>
+    <string name="mods_export">Export mods…</string>
+    <string name="mods_export_sub">Pick one or more; more than one is packed into a zip</string>
+    <string name="mods_export_none_fmt">No mods to export in slot %1$s</string>
+    <string name="mods_export_dir_hint">folder form, exported as a zip</string>
 </resources>

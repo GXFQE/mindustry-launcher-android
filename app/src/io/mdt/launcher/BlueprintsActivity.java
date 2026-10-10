@@ -127,11 +127,9 @@ public class BlueprintsActivity extends BaseActivity {
                             return;
                         }
                         sImportSlot = mSlot;
-                        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-                        i.addCategory(Intent.CATEGORY_OPENABLE);
-                        i.setType("*/*");     // 各家文件管理器对 .msch 的 MIME 报得五花八门
-                        startActivityForResult(Intent.createChooser(i,
-                                Trans.get(BlueprintsActivity.this, R.string.bp_import)), REQ_BP_IMPORT);
+                        // ★ 第 127 轮：**可多选**（选 1 份 = 老样子；≥2 份或一个 zip = 批量，
+                        //   见 onActivityResult / BatchIo.runImport）
+                        BatchIo.pickFiles(BlueprintsActivity.this, REQ_BP_IMPORT, R.string.bp_import);
                     }
                 });
         Util.bindAction(root, R.id.row_bp_export, R.drawable.ic_upload,
@@ -390,6 +388,8 @@ public class BlueprintsActivity extends BaseActivity {
 
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        // ★ 第 127 轮：批量导出的落点（勾了多份时走它；一份仍走下面 REQ_BP_EXPORT 那条老路）
+        if (BatchIo.handleExportResult(this, requestCode, resultCode, data)) return;
         if (requestCode == REQ_BP_EXPORT) {
             // ★ 与导入同一条纪律：无论成败**先清掉待写的那一条**（否则下一次导出会认错蓝图）
             final Blueprints.Item it = sExportItem;
@@ -402,8 +402,18 @@ public class BlueprintsActivity extends BaseActivity {
         // ★ 与地图那条同一纪律：无论成败**先清目标槽**
         final String slot = sImportSlot;
         sImportSlot = null;
-        if (resultCode != RESULT_OK || data == null || data.getData() == null || slot == null) return;
-        importFile(data.getData(), queryName(data.getData()), slot, false);
+        if (resultCode != RESULT_OK || data == null || slot == null) return;
+        // ★ 第 127 轮：一批（多选 / 一个 zip）走批量；**一份普通文件**仍走单份那条路
+        //   （那条路有逐个同名确认，逐份弹框在批量里是折磨）
+        List<BatchIo.Doc> docs = BatchIo.docsOf(this, data);
+        if (docs.isEmpty()) return;
+        if (docs.size() > 1 || BatchIo.isArchiveName(docs.get(0).name)) {
+            BatchIo.runImport(this, slot, docs, BatchIo.KIND_BLUEPRINTS, new Runnable() {
+                @Override public void run() { scan(); }
+            });
+            return;
+        }
+        importFile(docs.get(0).uri, docs.get(0).name, slot, false);
     }
 
     // ── 导入 ──────────────────────────────────────────────────────────────
@@ -481,10 +491,12 @@ public class BlueprintsActivity extends BaseActivity {
     // ── 导出 ──────────────────────────────────────────────────────────────
 
     /**
-     * 先挑"导出哪一份"，再让用户选存到哪。
+     * 先挑"导出哪几份"，再让用户选存到哪。
      *
      * ★ 与地图页同一条理由：**导出不限来源** —— 模组自带的蓝图在模组包（zip）里面，
      *   用户在文件管理器里根本看不见它们；只导本槽的话，"把模组带的那份拿出来"永远做不到。
+     * ★ 第 127 轮：这张列表**改成多选** —— 勾 1 份仍走单份那条路（原文件名），
+     *   勾 ≥2 份打成**一个 zip**（同一条判据见 {@link BatchIo}）。
      */
     private void promptExport() {
         if (mItems == null || mItems.isEmpty()) {
@@ -498,31 +510,32 @@ public class BlueprintsActivity extends BaseActivity {
             titles[i] = items.get(i).displayName();
             subs[i] = items.get(i).sourceLabel(this) + " · " + items.get(i).line(this);
         }
-        View box = getLayoutInflater().inflate(R.layout.dialog_msav_list, null);
-        TextView head = (TextView) box.findViewById(R.id.msav_head);
-        head.setVisibility(View.VISIBLE);
-        // ★ 条数这类信息只能放表头，**不能塞标题**（AlertDialog 的标题是单行的）
-        head.setText(Trans.get(BlueprintsActivity.this, R.string.bp_export_head_fmt, items.size()));
-        ListView lv = (ListView) box.findViewById(R.id.msav_list);
-        lv.setAdapter(new MsavListAdapter(this, titles, subs));
-        final android.app.AlertDialog dlg = new android.app.AlertDialog.Builder(this)
-                .setTitle(R.string.bp_export)
-                .setView(box)
-                .setNegativeButton(R.string.cancel, null)
-                .create();
-        lv.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-            @Override public void onItemClick(AdapterView<?> p, View v, int pos, long id) {
-                if (pos < 0 || pos >= items.size()) return;
-                sExportItem = items.get(pos);
-                dlg.dismiss();
-                startActivityForResult(Intent.createChooser(
-                        // ★ 文件名用**原始名**：那才是游戏里认的名字，"安全化"成 ASCII 之后
-                        //   用户在文件管理器里认不出来（同地图/存档导出那条纪律）
-                        Exporter.createDoc(sExportItem.name(), "application/octet-stream"),
-                        Trans.get(BlueprintsActivity.this, R.string.chooser_export)), REQ_BP_EXPORT);
-            }
-        });
-        dlg.show();
+        BatchIo.pickMulti(this, R.string.bp_export,
+                Trans.get(BlueprintsActivity.this, R.string.batch_export_head_fmt, items.size()),
+                titles, subs, null, new BatchIo.OnPick() {
+                    @Override public void onPick(List<Integer> idx) {
+                        if (idx.size() == 1) {
+                            // ★ 文件名用**原始名**：那才是游戏里认的名字（同地图/存档导出那条纪律）
+                            sExportItem = items.get(idx.get(0).intValue());
+                            startActivityForResult(Intent.createChooser(
+                                    Exporter.createDoc(sExportItem.name(), "application/octet-stream"),
+                                    Trans.get(BlueprintsActivity.this, R.string.chooser_export)),
+                                    REQ_BP_EXPORT);
+                            return;
+                        }
+                        List<Exporter.Src> srcs = new java.util.ArrayList<>();
+                        for (Integer i : idx) {
+                            Blueprints.Item it = items.get(i.intValue());
+                            if (it.file != null) {
+                                srcs.add(Exporter.Src.ofFile(it.file, it.name()));
+                            } else if (it.container != null && it.entry != null) {
+                                srcs.add(Exporter.Src.ofEntry(it.container, it.entry, it.name()));
+                            }
+                        }
+                        BatchIo.startExport(BlueprintsActivity.this, srcs,
+                                BatchIo.suggestZipName("blueprints"));
+                    }
+                });
     }
 
     /** 把选中的那份写进 SAF 目标：本槽是真文件、模组自带要从 zip 条目流式拷 */
@@ -565,26 +578,11 @@ public class BlueprintsActivity extends BaseActivity {
         }, "bp-export").start();
     }
 
-    /** 从 SAF 的 Uri 问出显示名（与地图/存档页同一套做法，失败退回 `blueprint.msch`） */
-    private String queryName(android.net.Uri uri) {
-        try {
-            android.database.Cursor c = getContentResolver().query(uri, null, null, null, null);
-            if (c != null) {
-                try {
-                    int i = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME);
-                    if (c.moveToFirst() && i >= 0) {
-                        String n = c.getString(i);
-                        if (n != null && !n.trim().isEmpty()) return n;
-                    }
-                } finally {
-                    c.close();
-                }
-            }
-        } catch (Throwable ignored) {
-        }
-        String s = uri.getLastPathSegment();
-        return s == null || s.trim().isEmpty() ? "blueprint.msch" : s;
-    }
+    /**
+     * 从 SAF 的 Uri 问出显示名 —— 第 127 轮起**搬进了 {@link BatchIo#displayNameOf}**：
+     * 多选批量走的是同一件事（`data.getClipData()` 里每条都要问一次名字），
+     * 留两份实现迟早会在"某一家文件管理器只给一部分 URI 名字"时表现不一致。
+     */
 
     /** 全类弹窗的唯一入口（挡"已销毁的 Activity"：导入/导出是后台任务收尾时弹的） */
     private void alert(String title, String msg) {

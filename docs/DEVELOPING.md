@@ -372,6 +372,13 @@ $ADB shell am start -n io.mdt.launcher/.MainActivity --es dev_msch <某个 .msch
     [--es dev_msch_slot <槽>]                          # 解析 + 缺方块体检
 $ADB shell am start -n io.mdt.launcher/.MainActivity --es dev_logs_export <目标.txt>  # F20 日志导出
 $ADB shell am start -n io.mdt.launcher/.MainActivity --es dev_compat <APK绝对路径>     # F18 兼容预检
+#   ↓ F24 批量导入 / 导出（第 127 轮；SAF 的"多选文件 / 保存到哪"两个选择器 adb 驱动不了）
+$ADB shell am start -n io.mdt.launcher/.MainActivity --es dev_batch_export <槽> \
+    --es dev_batch_kind <maps|saves|blueprints|mods> --es dev_batch_path <目标.zip绝对路径>
+$ADB shell am start -n io.mdt.launcher/.MainActivity --es dev_batch_import <槽> \
+    --es dev_batch_kind <maps|saves|blueprints|mods> --es dev_batch_path <一个文件或一个目录的绝对路径>
+#   导出走 Exporter.zipSources、导入走 BatchIo.importSync —— 与界面那条 runImport 共用
+#   plan + applyAll（"多份 = 一个 zip"与"整包解开逐份导回来"都靠这条往返取证）
 #   ⚠️ 上面这些**报告型**的口落 `<外部 hub>/report-devtool.txt`（★ 共用这一个文件；不存在 report-cas.txt）；
 #     而 `dev_bp_page` / `dev_bp_import` / `dev_maps_page` / `dev_map_import` / `dev_zip_confirm` 是
 #     **驱动界面**的口（结果在弹窗/列表上），别去报告文件里找它们的判据。

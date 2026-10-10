@@ -177,6 +177,11 @@ public class ModsActivity extends BaseActivity {
                 R.string.mods_act_import_title, R.string.mods_act_import_sub, new Runnable() {
                     @Override public void run() { pickModPackage(); }
                 });
+        // ★ 第 127 轮：出口（模组这条线原来只有进口 —— 整槽 zip 拿不出"单独某几个模组"）
+        Util.bindAction(root, R.id.row_mod_export, R.drawable.ic_upload,
+                R.string.mods_export, R.string.mods_export_sub, new Runnable() {
+                    @Override public void run() { pickModExport(); }
+                });
         View copyRow = Util.bindActionValue(root, R.id.row_mod_copy, R.drawable.ic_zip,
                 R.string.mods_act_copy_title, new Runnable() {
                     @Override public void run() { pickCopyTarget(); }
@@ -220,7 +225,8 @@ public class ModsActivity extends BaseActivity {
     // ── F13 第三阶段：导入模组包 / 跨槽复制 ────────────────────────────────
 
     /**
-     * 挑一个模组包（`.zip` / `.jar`）。入口只有这一个 —— 落点就是**当前正在看的那个槽**。
+     * 挑模组包（`.zip` / `.jar`）—— **一次可以选多个**（第 127 轮）。
+     * 落点就是**当前正在看的那个槽**。
      * ⚠️ MIME 不设限（`setType` 传通配）：各家文件管理器对 zip/jar 报的 MIME 五花八门
      *   （`.msav` 那条路已经栽过一次），限死会让用户选不中自己的文件。
      */
@@ -233,52 +239,137 @@ public class ModsActivity extends BaseActivity {
             return;
         }
         sImportSlot = mSlot;
-        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
-        i.addCategory(Intent.CATEGORY_OPENABLE);
-        i.setType("*/*");
-        startActivityForResult(
-                Intent.createChooser(i, Trans.get(ModsActivity.this, R.string.chooser_pick_mod)), REQ_MOD_IMPORT);
+        BatchIo.pickFiles(ModsActivity.this, REQ_MOD_IMPORT, R.string.chooser_pick_mod);
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        // ★ 第 127 轮：批量导出的落点（勾了多份时走它；一份仍走单份那条路，没有 SAF 回调）
+        if (BatchIo.handleExportResult(this, requestCode, resultCode, data)) return;
         if (requestCode != REQ_MOD_IMPORT) return;
         // ★ 与 F15/F6 同一条纪律：无论成败**先清目标槽**，否则取消后残留的目标会被下一次接上
         final String slot = sImportSlot;
         sImportSlot = null;
-        if (resultCode != RESULT_OK || data == null || data.getData() == null || slot == null) {
+        if (resultCode != RESULT_OK || data == null || slot == null) {
             return;
         }
-        final Uri uri = data.getData();
-        // ★ 这里**必须**传 false（2026-10-04 澄清）：原来传的是一个恒为 false 的实例字段
-        //   （`mImportOverwrite`，全工程找不到任何一处写 true ⇒ 死字段，已删）。
-        //   "用户同意替换"这件事**不经过这里** —— 它是 doImport 的结果分支里
-        //   发现同名后弹框、再直接 `doImport(..., true)` 走一遍（见那里），
-        //   所以**不需要**跨 onActivityResult 存活，也就不该留一个恒假的字段。
-        doImport(slot, uri, queryDisplayName(uri), false);
+        java.util.List<BatchIo.Doc> docs = BatchIo.docsOf(this, data);
+        if (docs.isEmpty()) return;
+        // ★ 第 127 轮：多选 ⇒ 批量（按文件名落位，同名只问一次）
+        if (docs.size() > 1) {
+            BatchIo.runImport(this, slot, docs, BatchIo.KIND_MODS, new Runnable() {
+                @Override public void run() { rescan(); }
+            });
+            return;
+        }
+        // ★ 单份：`.zip` 有两种可能 —— **一个模组包**（99% 的情况）或者**我们自己导出的一整包**
+        //   （把一槽模组导出成 zip 再导回来）。后者必须解开逐份导，而判据只有读过 zip 才知道
+        //   ⇒ 先**后台探一下**（`bundleNames` 一看到包根的 `mod.hjson` 就立刻返回，
+        //   常见情况只读前几个条目），探完再决定走哪条路。
+        final BatchIo.Doc one = docs.get(0);
+        if (!BatchIo.isArchiveName(one.name)) {
+            doImport(slot, one.uri, one.name, false);       // 非 .zip/.jar：老路（由它去报"只认这两种"）
+            return;
+        }
+        new Thread(new Runnable() {
+            @Override public void run() {
+                boolean bundle = false;
+                java.io.InputStream in = null;
+                try {
+                    in = one.open(ModsActivity.this);
+                    bundle = BatchIo.bundleNames(in, new String[]{".jar", ".zip"},
+                            Mods.META_FILES) != null;
+                } catch (Throwable ignored) {
+                } finally {
+                    if (in != null) {
+                        try {
+                            in.close();
+                        } catch (Throwable ignored) {
+                        }
+                    }
+                }
+                final boolean fb = bundle;
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        if (Util.dead(ModsActivity.this)) return;
+                        if (fb) {
+                            BatchIo.runImport(ModsActivity.this, slot, docs, BatchIo.KIND_MODS,
+                                    new Runnable() {
+                                        @Override public void run() { rescan(); }
+                                    });
+                            return;
+                        }
+                        // ★ 这里**必须**传 false（2026-10-04 澄清）：原来传的是一个恒为 false 的
+                        //   实例字段（`mImportOverwrite`，全工程找不到任何一处写 true ⇒ 死字段，已删）。
+                        //   "用户同意替换"这件事**不经过这里** —— 它是 doImport 的结果分支里
+                        //   发现同名后弹框、再直接 `doImport(..., true)` 走一遍（见那里）。
+                        doImport(slot, one.uri, one.name, false);
+                    }
+                });
+            }
+        }, "mod-bundle-probe").start();
     }
 
-    /** SAF 的显示名（拿不到就回落成"mod.zip" —— 至少让后面的扩展名检查说得通） */
-    private String queryDisplayName(Uri uri) {
-        try {
-            android.database.Cursor c = getContentResolver().query(uri, null, null, null, null);
-            if (c != null) {
-                try {
-                    int idx = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME);
-                    if (idx >= 0 && c.moveToFirst()) {
-                        String n = c.getString(idx);
-                        if (n != null && !n.trim().isEmpty()) return n.trim();
-                    }
-                } finally {
-                    c.close();
-                }
-            }
-        } catch (Throwable ignored) {
+    /**
+     * 导出模组（第 127 轮）—— 勾 1 个 = 老样子（**文件形态**直接给那个 `.jar`/`.zip`），
+     * 勾 ≥2 个 = **一个 zip**。
+     *
+     * <p>★ **目录形态**的模组没有"一个文件"可给 ⇒ 两种情况下都打成 `<目录名>.zip`
+     *   （内容按目录**根**写的，游戏认这个形状）。批量时它在**外层 zip 里是一个嵌套 zip**
+     *   —— 这样"外层每一条 = 单份导入时用户会选到的那个文件"这条不变量才成立，
+     *   于是批量导入只有一条路（见 {@link BatchIo}）。
+     *
+     * <p>★ 坏包（读不出说明文件的）也列出来：用户可能正是要把它导出来发给作者看。
+     *   ⚠️ 口径 = `mScan.mods` + `mScan.broken`，**不含 `mScan.ignored`** —— 那些是
+     *   `mods/` 里既不是包、也没有说明文件的一级目录（实测：`vne/` 里只有一个
+     *   `version.txt`，是模组**自己写的数据目录**）。它们不是"能导出去的模组"；
+     *   要连这些杂项一起备份，走的是整槽导出（`Data.contentRoots` 那条口径）。
+     */
+    private void pickModExport() {
+        if (mScan == null) return;
+        final List<Mods.Info> all = new ArrayList<>();
+        if (mScan.mods != null) all.addAll(mScan.mods);
+        if (mScan.broken != null) all.addAll(mScan.broken);
+        if (all.isEmpty()) {
+            Toast.makeText(ModsActivity.this, Trans.get(ModsActivity.this,
+                    R.string.mods_export_none_fmt, mSlot), Toast.LENGTH_SHORT).show();
+            return;
         }
-        String last = uri.getLastPathSegment();
-        return (last == null || last.trim().isEmpty()) ? "mod.zip" : last.trim();
+        String[] titles = new String[all.size()];
+        String[] subs = new String[all.size()];
+        for (int i = 0; i < all.size(); i++) {
+            Mods.Info m = all.get(i);
+            // ⚠️ 标题用**文件名**：导出之后用户在文件管理器里看到的就是这个（模组名可能带色码）
+            titles[i] = m.fileName == null ? String.valueOf(m.file) : m.fileName;
+            subs[i] = m.title() + " · " + Util.formatSize(m.bytes)
+                    + (m.directory ? " · "
+                            + Trans.get(ModsActivity.this, R.string.mods_export_dir_hint) : "");
+        }
+        BatchIo.pickMulti(this, R.string.mods_export,
+                Trans.get(ModsActivity.this, R.string.batch_export_head_fmt, all.size()),
+                titles, subs, null, new BatchIo.OnPick() {
+                    @Override public void onPick(List<Integer> idx) {
+                        List<Exporter.Src> srcs = new ArrayList<>();
+                        for (Integer i : idx) {
+                            Mods.Info m = all.get(i.intValue());
+                            String name = m.file.getName();
+                            if (m.directory) {
+                                srcs.add(Exporter.Src.ofDir(m.file, name + ".zip"));
+                            } else {
+                                srcs.add(Exporter.Src.ofFile(m.file, name));
+                            }
+                        }
+                        BatchIo.startExport(ModsActivity.this, srcs,
+                                BatchIo.suggestZipName("mods"));
+                    }
+                });
     }
+
+    /** SAF 的显示名 —— 第 127 轮起**搬进了 {@link BatchIo#displayNameOf}**：
+     * 多选批量走的是同一件事（`data.getClipData()` 里每条都要问一次名字），
+     * 这里再留一份迟早会出现"单选认得名字、多选认得另一个名字"这种不一致。
+     */
 
     /**
      * 真正导入：流拷进 `<槽>/mods/<名>.part` → 按游戏判据验 → 就位。

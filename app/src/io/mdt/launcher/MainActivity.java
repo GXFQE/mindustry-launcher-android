@@ -3,6 +3,7 @@ package io.mdt.launcher;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.ProgressDialog;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.database.Cursor;
@@ -161,6 +162,8 @@ public class MainActivity extends BaseActivity {
                 || intent.hasExtra("dev_mapstats")
                 || intent.hasExtra("dev_crash_analyze")
                 || intent.hasExtra("dev_crash_corpus")
+                || intent.hasExtra("dev_batch_export")
+                || intent.hasExtra("dev_batch_import")
                 || intent.hasExtra("dev_msch");
         if (!isDev) return;
         if ((getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) == 0) {
@@ -554,6 +557,32 @@ public class MainActivity extends BaseActivity {
             si.putExtra(SavesActivity.EXTRA_SLOT, dsp.trim());
             startActivity(si);
             finish();
+            return;
+        }
+
+        // ── 第 127 轮：批量导入 / 导出的 dev 口（SAF 选择器自动化不了）───────────────
+        // 用法：`--es dev_batch_export <槽> --es dev_batch_kind <maps|saves|blueprints|mods>
+        //        --es dev_batch_path <目标 zip 的绝对路径>`
+        //       `--es dev_batch_import <槽> --es dev_batch_kind <...>
+        //        --es dev_batch_path <一个文件 或 一个目录 的绝对路径>`
+        // ★ 走的是与界面**同一份**实现：导出 = Exporter.zipSources、导入 = BatchIo.importSync
+        //   （它与界面那条 runImport 共用 plan + applyAll），只是把"用 SAF 选文件"换成路径。
+        // ⚠️ 路径必须落在应用够得着的地方（`Android/data/io.mdt.launcher/…`）——
+        //   targetSdk 36 下直接读 `/sdcard/Download` 会 EACCES（REF §85.12）。
+        String bExp = intent.getStringExtra("dev_batch_export");
+        String bImp = intent.getStringExtra("dev_batch_import");
+        boolean isExp = bExp != null && !bExp.trim().isEmpty();
+        boolean isImp = bImp != null && !bImp.trim().isEmpty();
+        if (isExp || isImp) {
+            String path = intent.getStringExtra("dev_batch_path");
+            String slot = isImp ? bImp.trim() : bExp.trim();
+            if ("true".equals(slot)) slot = Data.currentSlot(this);
+            if (path == null || path.trim().isEmpty()) {
+                reportDev("dev_batch: 缺少 dev_batch_path\n", "dev_batch");
+                return;
+            }
+            devBatch(slot, BatchIo.kindOfKey(intent.getStringExtra("dev_batch_kind")),
+                    new File(path.trim()), isExp);
             return;
         }
 
@@ -1044,6 +1073,112 @@ public class MainActivity extends BaseActivity {
                 reportDev(sb.toString(), "dev_zip_export");
             }
         }, "dev-zip-export").start();
+    }
+
+    /**
+     * 第 127 轮：**批量导入 / 导出**跑一遍（跳过 SAF 选择器，直接对设备绝对路径干活）。
+     *
+     * <p>★ 为什么必须有它：SAF 的"选多个文件 / 选一个保存位置"在 adb 下无法驱动，
+     * 而这一轮的两个承诺（"多份打成一个 zip"、"整包 zip 能解开逐份导回来"）
+     * 只能靠**往返**取证：导出 → 看 zip → 导入到另一个槽 → 比 md5。
+     * 走的实现与界面完全相同（{@link Exporter#zipSources} / {@link BatchIo#importSync}）。
+     *
+     * @param export true = 导出到 {@code path}（一个 zip）；false = 把 {@code path}
+     *               （**一个文件** 或 **一个目录**里的全部文件）当成待导入的一批
+     */
+    private void devBatch(final String slot, final int kind, final File path, final boolean export) {
+        new Thread(new Runnable() {
+            @Override public void run() {
+                StringBuilder sb = new StringBuilder();
+                sb.append(export ? "dev_batch_export" : "dev_batch_import")
+                  .append(" 槽=\"").append(slot).append("\" kind=").append(BatchIo.keyOf(kind))
+                  .append(" 路径=").append(path.getAbsolutePath()).append('\n');
+                try {
+                    if (export) {
+                        if (path.exists() && !path.delete()) sb.append("⚠ 旧文件删不掉，会接着写\n");
+                        List<Exporter.Src> srcs = collectSrcs(MainActivity.this, slot, kind);
+                        sb.append("扫到条目 ").append(srcs.size()).append(" 个\n");
+                        Exporter.Result r = Exporter.zipSources(MainActivity.this,
+                                Uri.fromFile(path), srcs);
+                        sb.append("zip: files=").append(r.files).append(" raw=").append(r.rawBytes)
+                          .append(" out=").append(r.outBytes).append('\n');
+                        sb.append("落盘大小=").append(path.length()).append('\n');
+                    } else {
+                        List<File> fs = new ArrayList<>();
+                        if (path.isFile()) {
+                            fs.add(path);
+                        } else {
+                            File[] kids = path.listFiles();
+                            if (kids != null) {
+                                java.util.Arrays.sort(kids);
+                                for (File f : kids) if (f.isFile()) fs.add(f);
+                            }
+                        }
+                        List<BatchIo.Doc> docs = BatchIo.docsFromFiles(fs);
+                        sb.append("待导入 ").append(docs.size()).append(" 个\n");
+                        BatchIo.Report rep = BatchIo.importSync(MainActivity.this, slot, docs, kind, true);
+                        sb.append(rep.text(MainActivity.this));
+                    }
+                } catch (Throwable t) {
+                    sb.append("FAILED: ").append(t).append('\n');
+                }
+                reportDev(sb.toString(), export ? "dev_batch_export" : "dev_batch_import");
+            }
+        }, "dev-batch").start();
+    }
+
+    /**
+     * 扫一个槽里某一类的**全部**条目，做成批量导出的清单（dev 口用）。
+     * ★ 与四个页面上的那份清单同源（同一个 `Maps.scan` / `Blueprints.scan` / `Mods.scan` /
+     *   `saves/` 直读）—— 页面按筛选后的列表勾选，dev 口导全部。
+     */
+    private static List<Exporter.Src> collectSrcs(Context ctx, String slot, int kind) {
+        List<Exporter.Src> out = new ArrayList<>();
+        if (kind == BatchIo.KIND_MAPS || kind == BatchIo.KIND_BLUEPRINTS) {
+            String apk = null;
+            try {
+                apk = Mods.targetsFor(ctx, slot).apkPath;
+            } catch (Throwable ignored) {
+            }
+            if (kind == BatchIo.KIND_MAPS) {
+                for (Maps.Item it : Maps.scan(ctx, slot, apk)) {
+                    if (it.file != null) out.add(Exporter.Src.ofFile(it.file, it.name()));
+                    else if (it.container != null && it.entry != null) {
+                        out.add(Exporter.Src.ofEntry(it.container, it.entry, it.name()));
+                    }
+                }
+            } else {
+                for (Blueprints.Item it : Blueprints.scan(ctx, slot)) {
+                    if (it.file != null) out.add(Exporter.Src.ofFile(it.file, it.name()));
+                    else if (it.container != null && it.entry != null) {
+                        out.add(Exporter.Src.ofEntry(it.container, it.entry, it.name()));
+                    }
+                }
+            }
+            return out;
+        }
+        if (kind == BatchIo.KIND_SAVES) {
+            File[] fs = new File(Data.dirOf(ctx, slot), "saves").listFiles();
+            if (fs != null) {
+                for (File f : fs) {
+                    if (f.isFile() && !f.getName().startsWith(".")) {
+                        out.add(Exporter.Src.ofFile(f, f.getName()));
+                    }
+                }
+            }
+            return out;
+        }
+        Mods.Scan sc = Mods.scan(ctx, slot);
+        for (Mods.Info m : sc.mods) {
+            String name = m.file.getName();
+            // ★ 目录形态的模组：导出成 `<目录名>.zip`（内容按目录根写，游戏认这个形状）
+            if (m.directory) out.add(Exporter.Src.ofDir(m.file, name + ".zip"));
+            else out.add(Exporter.Src.ofFile(m.file, name));
+        }
+        for (Mods.Info m : sc.broken) {
+            if (!m.directory) out.add(Exporter.Src.ofFile(m.file, m.file.getName()));
+        }
+        return out;
     }
 
     /**

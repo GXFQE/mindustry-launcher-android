@@ -88,7 +88,9 @@ yourself — even just a few lines — see **Translation file** below.
   (the save page is read-only — deleting a save is left to the game's own screen)
 - **The save list can be searched and sorted**: search by save name; sort by name / **newest first** /
   size (this page has no "problems only" — the unreadable ones already have a row of their own)
-- **Import / export `.msav`** saves, one file at a time
+- **Import / export `.msav`** saves, **several at a time** — picking just one keeps the old flow
+  (you are asked for the save name and clashes are handled one by one); picking several, or picking a
+  `.zip` we exported, imports them under their own file names and asks about clashes **once**
 - **Backup list**: every backup on its own row (time / how many files / size / what the main save
   inside is), and one tap to **restore** or **delete that one**
 - **Automatic backup, per slot**: enable it, set the minimum playtime (a shorter session is skipped)
@@ -110,9 +112,9 @@ yourself — even just a few lines — see **Translation file** below.
 - **Map resource statistics**: ore / ore in walls / mineable floor / bonus floor — the top level
   reports only the "reachable" numbers (wall ore only reports a total, since it needs a wall drill),
   and the evidence (which blocks, how many tiles, and what is covering them) can be expanded
-- **Import `.msav`**; **export from any source** — maps built into the game or into a mod live inside
-  the APK, and can still be exported directly (the exported file is byte-for-byte identical to the
-  source)
+- **Import `.msav`** (**several files at once**); **export from any source** — maps built into the
+  game or into a mod live inside the APK, and can still be exported directly (the exported file is
+  byte-for-byte identical to the source); **tick two or more and the export becomes one zip**
 - **Turn a save into a map**: pick one of this slot's saves, give it a name, and optionally pick a
   **source map** (this slot / the 114 built into the game / from mods) to fill in the generator
   settings
@@ -135,9 +137,9 @@ yourself — even just a few lines — see **Translation file** below.
   invisible to the launcher (it reads the block data shipped inside the mod package), so in a slot
   with such an enabled mod the wording becomes "N kinds were **not recognized** … this may be
   wrong", the detail page carries a visible *may be wrong* marker, and the reason sits one tap away
-- **Import `.msch`** (verified before it is put in place; on a name clash you are asked first, and
-  the old one moves to the transfer station); **export from any source**; deletion goes through the
-  transfer station and can be put back
+- **Import `.msch`** (**several at once**; verified before it is put in place; on a name clash you are
+  asked first, and the old one moves to the transfer station); **export from any source** — **tick two
+  or more and the export becomes one zip**; deletion goes through the transfer station and can be put back
 - The **technical details** section shows the evidence: the name table the file carries, how many
   tiles have a direction, any block names that had to be remapped, and the declared size against the
   tiles actually found
@@ -159,7 +161,10 @@ yourself — even just a few lines — see **Translation file** below.
   one, with who depends on whom
 - **Search, filter and sort**: by name / problems first / size, "problems only", and by type; a mixed
   mod shows up under several types — that is a fact, not a duplicate
-- Import mod packages; **copy this slot's mods to another slot**
+- Import mod packages (**several at once**; a zip we exported in one go can also be imported back);
+  **export mods**: one tick gives you that file, several ticks become one zip (a folder-form mod is
+  packed into the zip)
+- **Copy this slot's mods to another slot**
 
 ### Transfer station
 - Deleted maps, saves, **whole slots**, deleted **blueprints** and replaced mods are **moved here

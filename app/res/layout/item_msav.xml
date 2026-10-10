@@ -61,5 +61,21 @@
                 android:textColor="@color/fg_muted"
                 android:textSize="12sp" />
         </LinearLayout>
+
+        <!--
+          ★ 第 127 轮（批量导出）：勾选模式下的复选框。默认 GONE —— 单选模式（点一行直接干活）
+            的列表不该多出一个框。⚠️ `clickable=false` / `focusable=false` 是**必须**的：
+            触摸要整个交给 ListView（点行 = 勾选），否则点框本身会"点不动"，
+            而且那一行的高亮状态也会错乱。
+        -->
+        <CheckBox
+            android:id="@+id/msav_check"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_vertical"
+            android:layout_marginStart="6dp"
+            android:clickable="false"
+            android:focusable="false"
+            android:visibility="gone" />
     </LinearLayout>
 </LinearLayout>
