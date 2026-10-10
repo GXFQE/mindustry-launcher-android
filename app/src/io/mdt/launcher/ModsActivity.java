@@ -263,9 +263,10 @@ public class ModsActivity extends BaseActivity {
             });
             return;
         }
-        // ★ 单份：`.zip` 有两种可能 —— **一个模组包**（99% 的情况）或者**我们自己导出的一整包**
-        //   （把一槽模组导出成 zip 再导回来）。后者必须解开逐份导，而判据只有读过 zip 才知道
-        //   ⇒ 先**后台探一下**（`bundleNames` 一看到包根的 `mod.hjson` 就立刻返回，
+        // ★ 单份：`.zip` / `.jar` 有三种可能 —— **一个模组包**（99% 的情况）、**我们自己导出的
+        //   一整包**（把一槽模组导出成 zip 再导回来）、**一堆模组文件夹**打成的 zip
+        //   （包里一条 .jar/.zip 都没有）。后两种必须解开逐份导，而判据只有读过 zip 才知道
+        //   ⇒ 先**后台探一下**（`modsBatchWanted` 一看到包根的 `mod.hjson` 就立刻返回，
         //   常见情况只读前几个条目），探完再决定走哪条路。
         final BatchIo.Doc one = docs.get(0);
         if (!BatchIo.isArchiveName(one.name)) {
@@ -274,26 +275,11 @@ public class ModsActivity extends BaseActivity {
         }
         new Thread(new Runnable() {
             @Override public void run() {
-                boolean bundle = false;
-                java.io.InputStream in = null;
-                try {
-                    in = one.open(ModsActivity.this);
-                    bundle = BatchIo.bundleNames(in, new String[]{".jar", ".zip"},
-                            Mods.META_FILES) != null;
-                } catch (Throwable ignored) {
-                } finally {
-                    if (in != null) {
-                        try {
-                            in.close();
-                        } catch (Throwable ignored) {
-                        }
-                    }
-                }
-                final boolean fb = bundle;
+                final boolean bundle = BatchIo.modsBatchWanted(ModsActivity.this, one);
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
                         if (Util.dead(ModsActivity.this)) return;
-                        if (fb) {
+                        if (bundle) {
                             BatchIo.runImport(ModsActivity.this, slot, docs, BatchIo.KIND_MODS,
                                     new Runnable() {
                                         @Override public void run() { rescan(); }

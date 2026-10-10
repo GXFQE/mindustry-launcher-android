@@ -437,7 +437,7 @@
         用户平时根本看不到，"导出一张官方图"正是这条功能最大的用处。
     -->
     <string name="maps_export">Export map…</string>
-    <string name="maps_export_sub">Save one to the phone (any source works)</string>
+    <string name="maps_export_sub">Save to the phone (any source works); many at once become one zip</string>
     <string name="maps_export_none">No maps to export yet</string>
     <string name="maps_export_head_fmt">%1$d maps · tap one to export</string>
     <string name="maps_export_working">Writing…</string>
@@ -467,7 +467,7 @@
       ★ 2026-10-06 (round 115, batch 6): subtitles of the three rows on the **saves page**
         (second-level page), same shape as the mods / maps / blueprints pages.
     -->
-    <string name="save_page_import_sub">Pick one or more .msav from this device and put them in this slot</string>
+    <string name="save_page_import_sub">Pick .msav files from this device; many at once, or one zip</string>
     <string name="save_page_export_sub">Export the saves of this slot to this device</string>
     <string name="save_page_bad_sub">See why those few cannot be read</string>
     <string name="msav_bad_list_title_fmt">Unreadable saves (%1$d)</string>
@@ -477,7 +477,7 @@
     <string name="slot_page_saves">Saves</string>
     <string name="slot_page_saves_sub">See each save / import / export</string>
     <string name="slot_page_maps">Maps</string>
-    <string name="slot_page_maps_sub">this slot / game / mods</string>
+    <string name="slot_page_maps_sub">this slot / game / mods; many at once, or one zip</string>
     <string name="slot_page_gone_fmt">This slot is gone: %1$s</string>
     <!--
       ★ 槽页信息卡那两行（2026-10-04 修）。
@@ -717,9 +717,9 @@
         delete = **move into the trash**, never delete outright.
     -->
     <string name="bp_import">Import blueprint…</string>
-    <string name="bp_import_sub">Pick one or more .msch files from a file manager</string>
+    <string name="bp_import_sub">Pick one or more .msch files; a zip bundle works too</string>
     <string name="bp_export">Export blueprint…</string>
-    <string name="bp_export_sub">Write one out to a file (Download and so on)</string>
+    <string name="bp_export_sub">Write out to a file; many at once become one zip</string>
     <string name="bp_export_none">This slot has no blueprints yet</string>
     <string name="bp_export_head_fmt">%1$d in total, tap one to export it</string>
     <string name="bp_export_working">Writing the file…</string>
@@ -1718,7 +1718,7 @@
 
     <!-- ══ F13 第三阶段：模组包导入 / 跨槽复制 ══════════════════════════════ -->
     <string name="mods_act_import_title">Import mod package</string>
-    <string name="mods_act_import_sub">Pick one or more .zip / .jar on this device</string>
+    <string name="mods_act_import_sub">Pick .zip / .jar on this device; many at once, or one zip bundle</string>
     <string name="mods_act_copy_title">Copy this slot mods to…</string>
     <string name="mods_act_copy_sub_fmt">Copies the whole mod set of \"%1$s\" into another slot</string>
     <string name="chooser_pick_mod">Pick a mod package</string>
@@ -1846,7 +1846,10 @@
     <string name="batch_skip_exists">same name is already there, not replaced</string>
     <string name="batch_skip_dup">same name appears twice in this batch</string>
     <string name="batch_skip_too_many">too many items in one batch, skipped</string>
+    <string name="batch_skip_zip_no_entry_fmt">nothing importable inside this zip (looked for %1$s)</string>
+    <string name="batch_skip_zip_no_mod_fmt">no mod package (.zip / .jar) inside this zip, and no folder holding mod.hjson (looked for %1$s)</string>
     <string name="batch_note_unpacked_fmt">Unpacked %1$d files from %2$s</string>
+    <string name="batch_note_folders_fmt">Found %1$d mod folders inside %2$s, packed each into its own zip</string>
     <string name="batch_fail_unknown">unknown failure</string>
     <string name="batch_err_open_fmt">Cannot open %1$s</string>
     <string name="batch_import_map_issave">this is a save, not a map</string>

@@ -161,7 +161,8 @@ yourself — even just a few lines — see **Translation file** below.
   one, with who depends on whom
 - **Search, filter and sort**: by name / problems first / size, "problems only", and by type; a mixed
   mod shows up under several types — that is a fact, not a duplicate
-- Import mod packages (**several at once**; a zip we exported in one go can also be imported back);
+- Import mod packages (**several at once**; a zip we exported in one go can also be imported back,
+  and so can a zip that merely holds one folder per mod);
   **export mods**: one tick gives you that file, several ticks become one zip (a folder-form mod is
   packed into the zip)
 - **Copy this slot's mods to another slot**

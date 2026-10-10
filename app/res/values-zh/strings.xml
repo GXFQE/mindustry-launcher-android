@@ -432,7 +432,7 @@
         用户平时根本看不到，"导出一张官方图"正是这条功能最大的用处。
     -->
     <string name="maps_export">导出地图…</string>
-    <string name="maps_export_sub">选一张存到手机里（哪个来源都行）</string>
+    <string name="maps_export_sub">存到手机里（哪个来源都行）；多选时打成一个 zip</string>
     <string name="maps_export_none">还没有可导出的地图</string>
     <string name="maps_export_head_fmt">共 %1$d 张 · 点一张导出</string>
     <string name="maps_export_working">正在写入…</string>
@@ -462,7 +462,7 @@
       ★ 2026-10-06（第 115 轮第六批）：存档**页面**（二级页）顶上那三行的副标题 ——
         与模组页 / 地图页 / 蓝图页同一形状（用户：「存档页面也变成…二级页面吧」）。
     -->
-    <string name="save_page_import_sub">从本机选一份或多份 .msav 放进这个槽</string>
+    <string name="save_page_import_sub">从本机选 .msav（可多选，也可选一个 zip 整包）</string>
     <string name="save_page_export_sub">把这个槽的存档导到本机</string>
     <string name="save_page_bad_sub">读不出来的那几份，看看为什么</string>
     <string name="msav_bad_list_title_fmt">读不出来的存档（%1$d 份）</string>
@@ -472,7 +472,7 @@
     <string name="slot_page_saves">存档</string>
     <string name="slot_page_saves_sub">看每份是什么图 / 导入 / 导出</string>
     <string name="slot_page_maps">地图</string>
-    <string name="slot_page_maps_sub">本槽 / 游戏 / 模组自带</string>
+    <string name="slot_page_maps_sub">本槽 / 游戏 / 模组自带；可多选，也可选一个 zip 整包导入</string>
     <string name="slot_page_gone_fmt">这个槽已经不在了：%1$s</string>
     <!--
       ★ 槽页信息卡那两行（2026-10-04 修）。
@@ -884,9 +884,9 @@
       ★ 尺子与地图那条线一致：导入 = **先 .part + 我们的解析器验 + 再就位**；删除 = **挪进中转站**。
     -->
     <string name="bp_import">导入蓝图…</string>
-    <string name="bp_import_sub">从文件管理器选一个或多个 .msch 文件</string>
+    <string name="bp_import_sub">可选一个或多个 .msch；选一个 zip 整包也行</string>
     <string name="bp_export">导出蓝图…</string>
-    <string name="bp_export_sub">导出成文件（存到 Download 等）</string>
+    <string name="bp_export_sub">导出成文件（存到 Download 等）；多选时打成一个 zip</string>
     <string name="bp_export_none">这个槽还没有蓝图</string>
     <string name="bp_export_head_fmt">共 %1$d 份，点一份导出</string>
     <string name="bp_export_working">正在写文件…</string>
@@ -1681,7 +1681,7 @@
 
     <!-- ══ F13 第三阶段：模组包导入 / 跨槽复制 ══════════════════════════════ -->
     <string name="mods_act_import_title">导入模组包</string>
-    <string name="mods_act_import_sub">从本机选 .zip / .jar（可多选）</string>
+    <string name="mods_act_import_sub">从本机选 .zip / .jar（可多选，也可选一个 zip 整包）</string>
     <string name="mods_act_copy_title">复制本槽模组到…</string>
     <string name="mods_act_copy_sub_fmt">把「%1$s」里的模组整套复制到另一个槽</string>
     <string name="chooser_pick_mod">选择模组包</string>
@@ -1809,7 +1809,10 @@
     <string name="batch_skip_exists">槽里已有同名的一份，没有替换</string>
     <string name="batch_skip_dup">这一批里有两份重名</string>
     <string name="batch_skip_too_many">一次导入的份数太多，跳过</string>
+    <string name="batch_skip_zip_no_entry_fmt">这个 zip 里没有能导入的东西（找的是 %1$s）</string>
+    <string name="batch_skip_zip_no_mod_fmt">这个 zip 里既没有模组包（.zip / .jar），也没有装着 mod.hjson 的文件夹（找的是 %1$s）</string>
     <string name="batch_note_unpacked_fmt">从 %2$s 里解出 %1$d 份</string>
+    <string name="batch_note_folders_fmt">从 %2$s 里认出 %1$d 个模组文件夹，各自打成了一个 zip</string>
     <string name="batch_fail_unknown">未知失败</string>
     <string name="batch_err_open_fmt">打不开「%1$s」</string>
     <string name="batch_import_map_issave">这其实是一份存档，不是地图</string>

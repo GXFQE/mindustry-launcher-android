@@ -46,10 +46,20 @@ import java.util.zip.ZipEntry;
  *   顺带白送一个性质：**导出的 zip 能被同一套批量导入吃回去**（往返）。
  *
  * <h3>为什么"整包 zip"能被认出来（而不是要求用户选多个文件）</h3>
- * 判据 = {@link #bundleNames}：一个 zip 里**有**我们认识的后缀（`.msav` / `.msch` / `.jar`…），
- * 且**没有**包根上的模组说明文件（{@link Mods#META_FILES}）。
- * 后者是关键：模组包自己也是 zip，用户"选一个 .zip 当模组导入"是最常见的动作
- * —— 没有这条就会把一个正常的模组包当成"一整包"拆开。
+ * 判据 = {@link #probe}（一个压缩包读出来的三个事实）：
+ * <ol>
+ *   <li><b>不是 zip</b>（真 `.msav` 存档 / 地图就是 zlib 流）⇒ 走单份导入那条老路；</li>
+ *   <li><b>是 zip 且后缀命中</b>（`.msav` / `.msch` / `.jar`…）且**包根上没有**模组说明文件
+ *       （{@link Mods#META_FILES}）⇒ 我们导出的一整包，解开逐份导；</li>
+ *   <li><b>是 `.zip` 却一条都没命中</b> ⇒ 模组再试一次"里面是一堆**模组文件夹**"
+ *       （{@link #extractModFolders}），仍不是就**明说"包里没有 X"**。</li>
+ * </ol>
+ * 根上那条标记是关键：模组包自己也是 zip，用户"选一个 .zip 当模组导入"是最常见的动作
+ * —— 没有它就会把一个正常的模组包当成"一整包"拆开。
+ *
+ * ★ 2026-10-10 补的两条（用户原话：「先让导入支持 zip 形式的吧（批量选择依旧麻烦）」）：
+ * ① 界面那条与 dev/自检那条**共用 {@link #expand}**（原来各写一遍 ⇒ 判据漂了）；
+ * ② "一堆模组文件夹"打成的 zip 以前只会报「这个包不是游戏能加载的模组」——现在能整包导。
  *
  * <h3>批量导入的交互被压成"一次问"</h3>
  * 单份导入有两条交互（存档改名框 / 同名替换框）。批量时逐份弹框是折磨，所以：
@@ -549,41 +559,7 @@ final class BatchIo {
             @Override public void run() {
                 final File work = workDir(a);
                 final Report rep = new Report();
-                List<Item> items = new ArrayList<>();
-                for (Doc d : docs) {
-                    if (items.size() >= MAX_ITEMS) break;
-                    if (isArchiveName(d.name)) {
-                        String why = null;
-                        List<File> got = null;
-                        InputStream in = null;
-                        try {
-                            in = d.open(a);
-                            // null = "这不是一整包"（可能是模组包自己，也可能根本不是 zip）
-                            List<String> names = bundleNames(in, exts, rootMarkers);
-                            closeQuietly(in);
-                            in = null;
-                            if (names != null) {
-                                in = d.open(a);
-                                got = extractBundle(in, exts, work);
-                            }
-                        } catch (Throwable t) {
-                            // ⚠️ 这里**不报失败**：不是 zip / 读不动 ⇒ 就当普通文件往下走
-                            //   （真正的判据在各自的 `import*` 里，它的话比这里准）
-                            why = Util.ioReason(a, t);
-                            got = null;
-                        } finally {
-                            closeQuietly(in);
-                        }
-                        if (got != null) {
-                            for (File f : got) items.add(Item.ofFile(f));
-                            rep.notes.add(Trans.get(a, R.string.batch_note_unpacked_fmt,
-                                    got.size(), d.name));
-                            continue;
-                        }
-                        if (why != null) Log.i(TAG, "bundle probe skipped: " + d.name + " / " + why);
-                    }
-                    items.add(Item.ofUri(d.uri, d.name));
-                }
+                List<Item> items = expand(a, docs, exts, rootMarkers, work, rep);
 
                 final Plan plan = plan(dir, items, namer);
                 for (String d : plan.dup) {
@@ -819,7 +795,7 @@ final class BatchIo {
             });
         }
         final File dir = new File(Data.dirOf(ctx, slot), "mods");
-        return new Kind("mods", dir, new String[]{".jar", ".zip"}, Mods.META_FILES, new Namer() {
+        return new Kind("mods", dir, MOD_EXTS, Mods.META_FILES, new Namer() {
             @Override public String nameFor(String d) {
                 return d;       // 模组包的名字就是它的文件名（规则在 Mods.checkPackName 里）
             }
@@ -850,33 +826,9 @@ final class BatchIo {
         Report rep = new Report();
         File work = workDir(ctx);
         try {
-            List<Item> items = new ArrayList<>();
-            for (Doc d : docs) {
-                if (items.size() >= MAX_ITEMS) break;
-                if (isArchiveName(d.name)) {
-                    List<File> got = null;
-                    InputStream in = null;
-                    try {
-                        in = d.open(ctx);
-                        if (bundleNames(in, k.exts, k.rootMarkers) != null) {
-                            closeQuietly(in);
-                            in = d.open(ctx);
-                            got = extractBundle(in, k.exts, work);
-                        }
-                    } catch (Throwable ignored) {
-                        got = null;
-                    } finally {
-                        closeQuietly(in);
-                    }
-                    if (got != null) {
-                        for (File f : got) items.add(Item.ofFile(f));
-                        rep.notes.add(Trans.get(ctx, R.string.batch_note_unpacked_fmt,
-                                got.size(), d.name));
-                        continue;
-                    }
-                }
-                items.add(Item.ofUri(d.uri, d.name));
-            }
+            // ★ 与界面那条路**共用同一份判据**（`expand`）：两条路各写一遍就会漂，
+            //   第 127 轮就是"dev 那条少了几条"才让整包里的**模组文件夹**在界面上报错
+            List<Item> items = expand(ctx, docs, k.exts, k.rootMarkers, work, rep);
             Plan plan = plan(k.dir, items, k.namer);
             for (String d : plan.dup) {
                 rep.skipped.add(line(ctx, d, Trans.get(ctx, R.string.batch_skip_dup)));
@@ -911,24 +863,56 @@ final class BatchIo {
     }
 
     /**
-     * **这是不是"我们导出的一整包"**？返回包内命中的条目名（原样，含路径）；不是就返回 null。
-     *
-     * <p>判据两条（缺一不可）：
-     * <ol>
-     *   <li>至少有一条后缀命中的文件（`.msav` / `.msch` / `.jar`…）；</li>
-     *   <li>包**根上**没有模组说明文件（{@link Mods#META_FILES}）—— 否则那是一个模组包本身
-     *       （用户"选一个 zip 导入模组"是最常见的动作，判错就把模组拆成一堆碎片）。</li>
-     * </ol>
-     * ★ 一次顺序读（`ZipInputStream`），**不落地**：判完了要么重开流去解，要么当普通文件导。
+     * 只认 `.zip` —— "用户**想整包导入**"的判据（`.jar` 也可能是单个模组包，别替他下结论）。
+     * 用在：是 zip、可一条都没命中时，给一句明确的话而不是丢给单份导入报一句看不懂的。
      */
-    static List<String> bundleNames(InputStream in, String[] exts, String[] rootMarkers) {
-        if (in == null || exts == null || exts.length == 0) return null;
+    static boolean isZipName(String name) {
+        if (name == null) return false;
+        return name.trim().toLowerCase(Locale.ROOT).endsWith(".zip");
+    }
+
+    /**
+     * 读一个压缩包得出的三个事实。
+     *
+     * <p>★ 为什么不沿用"命中条目 or null"那个二态（2026-10-10 改）：它**分不开**
+     * <ol>
+     *   <li>「根本不是 zip」—— 真存档 / 真地图就是 zlib 流，必须走单份导入那条老路；</li>
+     *   <li>「是 zip，可一条都没命中」—— 用户想整包导入，这时该**明说**"包里没有 .msav"，
+     *       而不是把它当普通文件丢给各自的导入器（它只会说"这不是有效的存档"，用户看不懂）。</li>
+     * </ol>
+     */
+    static final class Probe {
+        /** 读得动、确实是个 zip */
+        boolean zip;
+        /** 包**根上**有模组说明文件（{@link Mods#META_FILES}）⇒ 这是"包本身"，不是一整包 */
+        boolean selfPack;
+        /** 后缀命中的条目名（原样，含路径）；`zip == true` 时有效，可能为空 */
+        final List<String> hits = new ArrayList<>();
+
+        /** 我们导出的一整包 */
+        boolean bundle() {
+            return zip && !selfPack && !hits.isEmpty();
+        }
+
+        /** 是个 zip、但一条都没命中（⇒ 要么明确报"没有 X"，要么再看是不是"一堆模组夹"） */
+        boolean emptyZip() {
+            return zip && !selfPack && hits.isEmpty();
+        }
+    }
+
+    /**
+     * 顺序读一遍 zip（**不落盘、不抛异常**）得出上面三个事实。
+     * 读不动（不是 zip / 坏了 / 流断了）就 `zip=false` —— 交给单份导入去报那句准确的话。
+     */
+    static Probe probe(InputStream in, String[] exts, String[] rootMarkers) {
+        Probe p = new Probe();
+        if (in == null || exts == null || exts.length == 0) return p;
         java.util.zip.ZipInputStream zin = null;
         try {
             zin = new java.util.zip.ZipInputStream(in);
-            List<String> hits = new ArrayList<>();
             ZipEntry e;
             while ((e = zin.getNextEntry()) != null) {
+                p.zip = true;                       // 能拿到第一条 ⇒ 它确实是个 zip
                 String raw = e.getName() == null ? "" : e.getName();
                 String flat = raw.replace('\\', '/');
                 if (e.isDirectory() || flat.endsWith("/")) continue;
@@ -936,23 +920,312 @@ final class BatchIo {
                 String base = slash < 0 ? flat : flat.substring(slash + 1);
                 if (slash < 0 && rootMarkers != null) {
                     for (String m : rootMarkers) {
-                        if (m != null && m.equalsIgnoreCase(base)) return null;   // 包本身，不是一整包
+                        if (m != null && m.equalsIgnoreCase(base)) {
+                            p.selfPack = true;      // 包本身，不是一整包
+                            p.hits.clear();
+                            return p;
+                        }
                     }
                 }
                 String lower = flat.toLowerCase(Locale.ROOT);
                 for (String x : exts) {
                     if (x != null && lower.endsWith(x.toLowerCase(Locale.ROOT))) {
-                        hits.add(flat);
+                        p.hits.add(flat);
                         break;
                     }
                 }
             }
-            return hits.isEmpty() ? null : hits;
         } catch (Throwable t) {
-            return null;        // 不是 zip（存档就是 zlib 流）/ 坏了 ⇒ 交给单份导入去报准确的话
+            p.zip = false;                          // 不是 zip（存档就是 zlib 流）/ 坏了
+            p.selfPack = false;
+            p.hits.clear();
         } finally {
             closeQuietly(zin);
         }
+        return p;
+    }
+
+    /**
+     * 一级子目录里**直接**放着模组说明文件（`mod.hjson` / `plugin.hjson`）的那些目录名。
+     *
+     * <p>用途：用户把好几个模组**文件夹**打成一个 zip（不是把模组包打成 zip）—— 那种包里
+     * 一条 `.jar` / `.zip` 都没有，靠"后缀命中"认不出来。2026-10-10 真机踩到：这种包走到单份
+     * 导入，只会报一句「这个包不是游戏能加载的模组」（用户明明只是想批量导入）。
+     *
+     * <p>⚠️ 只看**一级**（`<目录>/mod.hjson`）：再深就是模组内部的资源目录了，不能当模组看。
+     */
+    static List<String> modFolderNames(InputStream in, String[] metaFiles) {
+        List<String> out = new ArrayList<>();
+        if (in == null || metaFiles == null || metaFiles.length == 0) return out;
+        java.util.zip.ZipInputStream zin = null;
+        try {
+            zin = new java.util.zip.ZipInputStream(in);
+            ZipEntry e;
+            while ((e = zin.getNextEntry()) != null) {
+                String raw = e.getName() == null ? "" : e.getName();
+                String flat = raw.replace('\\', '/');
+                if (e.isDirectory() || flat.endsWith("/")) continue;
+                int slash = flat.lastIndexOf('/');
+                if (slash <= 0 || flat.indexOf('/') != slash) continue;       // 只要 `<一级>/<文件>`
+                String top = flat.substring(0, slash);
+                String base = flat.substring(slash + 1);
+                if (base.indexOf('/') >= 0) continue;
+                for (String m : metaFiles) {
+                    if (m != null && m.equalsIgnoreCase(base) && !out.contains(top)) {
+                        out.add(top);
+                        break;
+                    }
+                }
+            }
+        } catch (Throwable t) {
+            return new ArrayList<>();       // 读不动 ⇒ 没有模组夹（调用方本来也是"再看看"）
+        } finally {
+            closeQuietly(zin);
+        }
+        return out;
+    }
+
+    /**
+     * "再给我开一条新流" —— 同一个包要**读两遍**时用它（第一遍认形状、第二遍才解）。
+     * ⚠️ 别把同一个 `InputStream` 传两次：zip 是顺序流，第二遍什么也读不到（自检当场抓过：
+     *   `extractModFolders` 先认后解，用同一条流 ⇒ 解出 0 个）。
+     */
+    interface Reopen {
+        InputStream open() throws IOException;
+    }
+
+    /**
+     * 把「一堆模组文件夹」的整包**逐夹打成一个 zip** 落到 `workDir`（模组导入只吃"一个文件"）。
+     *
+     * <p>做法两步（都不需要把整包读进内存）：① {@link #modFolderNames} 认出哪几个一级目录是模组
+     * （**单独开一条流**）；② 把包内这些目录下的条目原样落进 `workDir/inner/<目录>/`，再用
+     * {@link Exporter#zipDirFlat} 把每个目录**平铺**打成一个 zip（条目名 = 相对该目录根）。
+     *
+     * <p>🔴 条目名过 {@link #safeRel}：`../` / 绝对路径一律丢掉（zip 的经典路径穿越，
+     * 而我们还要拿落盘路径去喂导入器）。
+     *
+     * @return 按包内出现顺序的 zip 列表；没有模组文件夹就返回空表
+     */
+    static List<File> extractModFolders(Reopen src, File workDir, String[] metaFiles) {
+        List<File> out = new ArrayList<>();
+        if (src == null || workDir == null || metaFiles == null || metaFiles.length == 0) return out;
+        InputStream first = null;
+        List<String> tops;
+        try {
+            first = src.open();
+            tops = modFolderNames(first, metaFiles);
+        } catch (Throwable t) {
+            return out;
+        } finally {
+            closeQuietly(first);
+        }
+        if (tops.isEmpty()) return out;
+        File stage = new File(workDir, "inner");
+        if (!stage.exists() && !stage.mkdirs() && !stage.isDirectory()) return out;
+        InputStream in = null;
+        java.util.zip.ZipInputStream zin = null;
+        try {
+            in = src.open();
+            zin = new java.util.zip.ZipInputStream(in);
+            ZipEntry e;
+            while ((e = zin.getNextEntry()) != null) {
+                String raw = e.getName() == null ? "" : e.getName();
+                String flat = raw.replace('\\', '/');
+                if (e.isDirectory() || flat.endsWith("/")) continue;
+                int slash = flat.indexOf('/');
+                if (slash <= 0) continue;
+                String top = flat.substring(0, slash);
+                if (!tops.contains(top)) continue;
+                String rel = safeRel(flat);
+                if (rel == null) continue;
+                File dst = new File(stage, rel);
+                File parent = dst.getParentFile();
+                if (parent != null && !parent.exists() && !parent.mkdirs() && !parent.isDirectory()) {
+                    continue;
+                }
+                FileOutputStream fo = new FileOutputStream(dst);
+                try {
+                    byte[] buf = new byte[65536];
+                    int n;
+                    while ((n = zin.read(buf)) > 0) fo.write(buf, 0, n);
+                } finally {
+                    fo.close();
+                }
+            }
+        } catch (Throwable t) {
+            return new ArrayList<>();
+        } finally {
+            closeQuietly(zin);
+            closeQuietly(in);
+        }
+        for (String top : tops) {
+            File dir = new File(stage, top);
+            if (!dir.isDirectory()) continue;
+            File zip = uniqueIn(workDir, Exporter.flatName(top) + ".zip");
+            FileOutputStream fo = null;
+            try {
+                fo = new FileOutputStream(zip);
+                Exporter.zipDirFlat(dir, fo, new Exporter.Result());
+            } catch (Throwable t) {
+                closeQuietly(fo);
+                Data.deleteTree(zip);
+                continue;
+            } finally {
+                closeQuietly(fo);
+            }
+            out.add(zip);
+        }
+        Data.deleteTree(stage);
+        return out;
+    }
+
+    /**
+     * 条目名的安全相对路径：`../`、绝对路径、空段一律返回 null。
+     * （`ZipInputStream` 不会替我们挡这些 —— 挡的是 `ZipOutputStream`。）
+     */
+    static String safeRel(String flat) {
+        if (flat == null) return null;
+        String f = flat.replace('\\', '/');
+        while (f.startsWith("/")) f = f.substring(1);
+        if (f.isEmpty()) return null;
+        for (String seg : f.split("/", -1)) {
+            if (seg.isEmpty() || ".".equals(seg) || "..".equals(seg)) return null;
+        }
+        return f;
+    }
+
+    /**
+     * **模组页那条路**要不要走批量：`.zip` / `.jar` 里装着好几份（我们导出的一整包），
+     * 或者整包里是"一堆模组文件夹"。都不是 ⇒ false（按老路当**一个模组包**导）。
+     * ⚠️ 会开两次流（先探后缀、再看模组夹），必须在**后台线程**调。
+     */
+    static boolean modsBatchWanted(Context ctx, Doc d) {
+        if (d == null || !isArchiveName(d.name)) return false;
+        InputStream in = null;
+        try {
+            in = d.open(ctx);
+            Probe p = probe(in, MOD_EXTS, Mods.META_FILES);
+            if (p.bundle()) return true;
+            if (!p.emptyZip()) return false;
+            closeQuietly(in);
+            in = d.open(ctx);
+            return !modFolderNames(in, Mods.META_FILES).isEmpty();
+        } catch (Throwable t) {
+            return false;
+        } finally {
+            closeQuietly(in);
+        }
+    }
+
+    /** 模组整包里认哪些条目（`.jar` / `.zip` 都是"一个模组包"） */
+    static final String[] MOD_EXTS = {".jar", ".zip"};
+
+    /**
+     * 「用户选的那几个文件」⇒「要逐份导入的条目」：**界面那条与 dev / 自检那条共用这一份**。
+     *
+     * <p>四条判据（全在这一处，别再各写一遍 —— 第 127 轮就是"少了一条"才漏掉整包里的模组夹）：
+     * <ol>
+     *   <li>不是压缩包（真 `.msav` 存档就是 zlib 流）⇒ 原样当一份；</li>
+     *   <li>是压缩包且后缀命中的（我们导出的一整包）⇒ 解开，逐条当一份；</li>
+     *   <li>是**模组包本身**（根上有 `mod.hjson`）⇒ 原样当一份（用户导的是一个模组）；</li>
+     *   <li>是 `.zip` 却一条都没命中 ⇒ 模组的"一堆**模组文件夹**"整包先单独试一次；
+     *       仍不是 ⇒ **明说"包里没有 X"**（跳过并记账），别丢给单份导入去报一句看不懂的。</li>
+     * </ol>
+     * ⚠️ 必须在**后台线程**调（会真的解几 MB~几十 MB）。
+     */
+    private static List<Item> expand(Context ctx, List<Doc> docs, String[] exts,
+                                     String[] rootMarkers, File work, Report rep) {
+        List<Item> items = new ArrayList<>();
+        if (docs == null) return items;
+        for (Doc d : docs) {
+            if (items.size() >= MAX_ITEMS) break;
+            if (!isArchiveName(d.name)) {
+                items.add(Item.ofUri(d.uri, d.name));
+                continue;
+            }
+            // 先读一遍判它是"一整包"还是"包本身"（判据见 Probe 的注释）
+            Probe p = null;
+            InputStream in = null;
+            try {
+                in = d.open(ctx);
+                p = probe(in, exts, rootMarkers);
+            } catch (Throwable t) {
+                // ⚠️ 打不开 / 读不动 ⇒ **不报失败**：当普通文件往下走，
+                //   真正的判据在各自的 `import*` 里，它的话比这里准
+                Log.i(TAG, "bundle probe skipped: " + d.name + " / " + Util.ioReason(ctx, t));
+                p = null;
+            } finally {
+                closeQuietly(in);
+                in = null;
+            }
+            if (p == null || !p.zip || p.selfPack) {
+                items.add(Item.ofUri(d.uri, d.name));
+                continue;
+            }
+            if (!p.hits.isEmpty()) {
+                List<File> got = null;
+                try {
+                    in = d.open(ctx);
+                    got = extractBundle(in, exts, work);
+                } catch (Throwable t) {
+                    Log.i(TAG, "bundle extract failed: " + d.name + " / " + Util.ioReason(ctx, t));
+                } finally {
+                    closeQuietly(in);
+                    in = null;
+                }
+                if (got != null && !got.isEmpty()) {
+                    for (File f : got) items.add(Item.ofFile(f));
+                    rep.notes.add(Trans.get(ctx, R.string.batch_note_unpacked_fmt, got.size(), d.name));
+                    continue;
+                }
+                rep.failed.add(line(ctx, d.name, Trans.get(ctx, R.string.batch_fail_unknown)));
+                continue;
+            }
+            // 是 zip、一条都没命中：模组再看是不是"一堆模组文件夹"
+            if (rootMarkers != null) {
+                final Doc fd = d;
+                final Context fc = ctx;
+                List<File> inner = null;
+                try {
+                    // ⚠️ 传**再开一条流**的钩子，不是流本身：`extractModFolders` 要读两遍
+                    inner = extractModFolders(new Reopen() {
+                        @Override public InputStream open() throws IOException {
+                            return fd.open(fc);
+                        }
+                    }, work, rootMarkers);
+                } catch (Throwable t) {
+                    Log.i(TAG, "mod folder extract failed: " + d.name + " / " + Util.ioReason(ctx, t));
+                }
+                if (inner != null && !inner.isEmpty()) {
+                    for (File f : inner) items.add(Item.ofFile(f));
+                    rep.notes.add(Trans.get(ctx, R.string.batch_note_folders_fmt, inner.size(), d.name));
+                    continue;
+                }
+            }
+            if (isZipName(d.name)) {
+                // ⚠️ 只传"找的是哪几种后缀"：报告里那一行已经带了文件名（`batch_report_line_fmt`）
+                rep.skipped.add(line(ctx, d.name, Trans.get(ctx,
+                        rootMarkers == null ? R.string.batch_skip_zip_no_entry_fmt
+                                             : R.string.batch_skip_zip_no_mod_fmt,
+                        hitText(exts))));
+                continue;
+            }
+            items.add(Item.ofUri(d.uri, d.name));
+        }
+        return items;
+    }
+
+    /** 报告里那句"包里没有 X"的 X：`.msav` / `.jar、.zip`（纯展示，不进资源） */
+    static String hitText(String[] exts) {
+        StringBuilder sb = new StringBuilder();
+        if (exts != null) {
+            for (String x : exts) {
+                if (x == null) continue;
+                if (sb.length() > 0) sb.append(" / ");
+                sb.append(x);
+            }
+        }
+        return sb.length() == 0 ? "?" : sb.toString();
     }
 
     /**

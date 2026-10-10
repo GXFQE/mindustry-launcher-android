@@ -315,6 +315,26 @@ public final class Exporter {
         }
     }
 
+    /**
+     * 把一个**目录平铺**打成一个 zip（条目名 = 相对该目录根的路径，**不是**嵌套 zip）。
+     *
+     * <p>用处：{@link BatchIo#extractModFolders} —— 用户把好几个模组**文件夹**打成一个 zip，
+     * 而模组导入只吃"一个文件"⇒ 每个文件夹先还原成一个"模组包形状"的 zip 再喂进去。
+     * （与 {@link #addTreeAsZip} 的区别：那个是往**外层 zip 里**塞一个嵌套条目，这个是自成一体。）
+     */
+    static void zipDirFlat(File dir, OutputStream raw, Result r) throws IOException {
+        if (dir == null || !dir.isDirectory()) {
+            throw new IOException("not a directory: " + dir);
+        }
+        ZipOutputStream zos = new ZipOutputStream(new BufferedOutputStream(raw, BUF));
+        try {
+            zos.setLevel(Deflater.BEST_SPEED);
+            addTree(dir, dir, zos, r == null ? new Result() : r);
+        } finally {
+            closeQuietly(zos);      // 必须关：zip 的中央目录在 close 时才写
+        }
+    }
+
     /** 只 flush、不 close 的包装流（给嵌套 zip 用，见 {@link #addTreeAsZip}） */
     private static final class NonClosing extends java.io.FilterOutputStream {
         NonClosing(OutputStream o) {

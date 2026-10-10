@@ -9953,31 +9953,86 @@ public final class SelfTest {
             }
             ok(stat, L, err2 != null, "★ 反向：源文件不存在 ⇒ 跳过它，全空时同样拒绝");
 
-            // ── ④ 整包判据（这是"别把模组包拆碎"的那一条）──────────────────────
+            // ── ④ 整包判据（这是"别把模组包拆碎"的那一条；三态见 `BatchIo.Probe`）──────
             String[] exts = {".msav"};
             java.io.InputStream in1 = new java.io.FileInputStream(zip);
-            List<String> names = BatchIo.bundleNames(in1, exts, null);
+            BatchIo.Probe p1 = BatchIo.probe(in1, exts, null);
             in1.close();
-            ok(stat, L, names != null && names.size() == 2,
-                    "★ 我们导出的一整包 ⇒ 认出来（命中 " + (names == null ? "null" : names.size())
-                            + " 条 .msav）");
+            ok(stat, L, p1.bundle() && p1.hits.size() == 2,
+                    "★ 我们导出的一整包 ⇒ 认出来（命中 " + p1.hits.size() + " 条 .msav）");
 
             File modPack = new File(root, "一个模组.zip");
             zipMany(modPack, new String[]{"mod.hjson", "maps/图.msav"},
                     new String[]{"name: some-mod\n", "inside"});
             java.io.InputStream in2 = new java.io.FileInputStream(modPack);
-            List<String> m2 = BatchIo.bundleNames(in2, exts, Mods.META_FILES);
+            BatchIo.Probe p2 = BatchIo.probe(in2, exts, Mods.META_FILES);
             in2.close();
-            ok(stat, L, m2 == null,
+            ok(stat, L, p2.zip && p2.selfPack && !p2.bundle() && p2.hits.isEmpty(),
                     "★ 元断言：**模组包本身**（根上有 mod.hjson，哪怕里面还带地图）⇒ 判成"
                             + "「这不是一整包」—— 否则用户导一个模组会被拆成碎片");
 
             File notZip = new File(root, "不是zip.msav");
             write(notZip, zlib("这不是 zip，是 zlib".getBytes("UTF-8")));
             java.io.InputStream in3 = new java.io.FileInputStream(notZip);
-            List<String> m3 = BatchIo.bundleNames(in3, exts, null);
+            BatchIo.Probe p3 = BatchIo.probe(in3, exts, null);
             in3.close();
-            ok(stat, L, m3 == null, "★ 反向：根本不是 zip（真存档就是 zlib 流）⇒ 不认，交给单份导入");
+            ok(stat, L, !p3.zip && !p3.selfPack && p3.hits.isEmpty(),
+                    "★ 反向：根本不是 zip（真存档就是 zlib 流）⇒ `zip=false`，交给单份导入");
+
+            // ★ 2026-10-10 补的**第三态**：是 zip、可一条都没命中 —— 旧实现把它与"不是 zip"
+            //   挤在同一个 null 里，于是这种包只能丢给单份导入去报一句看不懂的话。
+            File noHit = new File(root, "包里没东西.zip");
+            zipMany(noHit, new String[]{"readme.txt", "data/x.bin"}, new String[]{"a", "b"});
+            java.io.InputStream inNo = new java.io.FileInputStream(noHit);
+            BatchIo.Probe pNo = BatchIo.probe(inNo, exts, null);
+            inNo.close();
+            ok(stat, L, pNo.zip && pNo.emptyZip() && !pNo.bundle(),
+                    "★★ 第三态：是 zip、一条 .msav 都没有 ⇒ `emptyZip()`（要能说出"
+                            + "「包里没有 .msav」，而不是「这不是有效的地图」）");
+
+            ok(stat, L, pNo != p3 && pNo.zip != p3.zip,
+                    "★ 元断言：上面两态**真的不同**（旧实现两者都返回 null ⇒ 分不开）");
+
+            // 模组夹：一级子目录里**直接**放着 mod.hjson 的才算是"一个模组"
+            File folderPack = new File(root, "一堆模组夹.zip");
+            zipMany(folderPack, new String[]{"foldA/mod.hjson", "foldA/scripts/main.js",
+                            "foldB/mod.hjson", "foldB/deep/inner/mod.hjson", "readme.txt"},
+                    new String[]{"name: fold-a\n", "js", "name: fold-b\n", "deep", "r"});
+            java.io.InputStream inFold = new java.io.FileInputStream(folderPack);
+            List<String> tops = BatchIo.modFolderNames(inFold, Mods.META_FILES);
+            inFold.close();
+            ok(stat, L, tops.size() == 2 && tops.contains("foldA") && tops.contains("foldB"),
+                    "★★ 一堆模组**文件夹**的整包 ⇒ 认出 " + tops.size() + " 个模组夹"
+                            + "（只认一级：`foldB/deep/inner/mod.hjson` 不算 —— 那是模组内部的资源）");
+
+            File work2 = new File(root, "work2");
+            work2.mkdirs();
+            final File folderPackF = folderPack;
+            List<File> madeZips = BatchIo.extractModFolders(new BatchIo.Reopen() {
+                @Override public java.io.InputStream open() throws java.io.IOException {
+                    return new java.io.FileInputStream(folderPackF);
+                }
+            }, work2, Mods.META_FILES);
+            boolean shapeOk = madeZips.size() == 2;
+            for (File made : madeZips) {
+                java.io.InputStream zi = new java.io.FileInputStream(made);
+                BatchIo.Probe pz = BatchIo.probe(zi, BatchIo.MOD_EXTS, Mods.META_FILES);
+                zi.close();
+                if (!(pz.zip && pz.selfPack)) shapeOk = false;
+            }
+            ok(stat, L, shapeOk,
+                    "★★ 每个模组夹各自打成一个 zip（" + madeZips.size() + " 个）⇒ 每一个都是"
+                            + "「根上有 mod.hjson」的模组包形状（模组导入器才吃得下）");
+
+            ok(stat, L, BatchIo.safeRel("../evil/x") == null
+                            && BatchIo.safeRel("a/../b") == null
+                            && "abs/x".equals(BatchIo.safeRel("/abs/x"))
+                            && "a/b".equals(BatchIo.safeRel("a\\b")),
+                    "★ 路径穿越防线：`..` 一律返回 null（丢掉），绝对路径去掉前缀当相对路径用");
+
+            ok(stat, L, BatchIo.isZipName("a.ZIP") && !BatchIo.isZipName("a.jar")
+                            && BatchIo.isArchiveName("a.jar"),
+                    "★ 只有 `.zip` 才当「用户想整包导入」（`.jar` 也可能是单个模组包，不替他下结论）");
 
             // ── ⑤ 解包：只取文件名最后一段（这是路径穿越那条防线的**同一行代码**）
             //   ⚠️ 没法在这里造一条 `../../evil.msav` 的条目：Java / 安卓的 `ZipOutputStream`
@@ -10110,14 +10165,48 @@ public final class SelfTest {
             ok(stat, L, rmod.ok == 2 && new File(modsDir, "模一.zip").isFile()
                             && new File(modsDir, "模二.zip").isFile(),
                     "★ 批量导入模组 2 份：都落位（含「用游戏自己的判据验一遍」那道门）");
-            // 反向：拿一个不是模组的 txt 充当模组 ⇒ 必须**报失败**，不许静默成功
+            // 反向：包里**没有模组内容**（只有 readme.txt）⇒ 跳过，并由我们**说清找的是什么**
+            //   （旧实现：丢给单份导入 ⇒ 报「这个包不是游戏能加载的模组」，用户看不懂）
             File notMod = new File(root, "不是模组.zip");
             zipMany(notMod, new String[]{"readme.txt"}, new String[]{"hello"});
             BatchIo.Report rbad = BatchIo.importSync(ctx, SLOT_BATCH,
                     BatchIo.docsFromFiles(java.util.Arrays.asList(notMod)),
                     BatchIo.KIND_MODS, true);
-            ok(stat, L, rbad.ok == 0 && rbad.failed.size() == 1,
-                    "★ 反向：不是模组的包 ⇒ 计入**失败**并在报告里点名，不许静默成功");
+            ok(stat, L, rbad.ok == 0 && rbad.skipped.size() == 1 && rbad.failed.isEmpty(),
+                    "★ 反向：zip 里没有模组内容 ⇒ **跳过**并在报告里说清「找的是 .jar / .zip 与"
+                            + "装着 mod.hjson 的文件夹」（skipped=" + rbad.skipped.size() + "）");
+            // 反向之二：名字叫 .zip、内容根本不是 zip ⇒ 仍必须**报失败**，不许静默成功
+            File garbage = new File(root, "坏包.zip");
+            write(garbage, "这不是 zip".getBytes("UTF-8"));
+            BatchIo.Report rbad2 = BatchIo.importSync(ctx, SLOT_BATCH,
+                    BatchIo.docsFromFiles(java.util.Arrays.asList(garbage)),
+                    BatchIo.KIND_MODS, true);
+            ok(stat, L, rbad2.ok == 0 && rbad2.failed.size() == 1,
+                    "★ 反向之二：名字是 .zip、内容不是 zip ⇒ 交给单份导入，**计入失败**并点名"
+                            + "（failed=" + rbad2.failed.size() + "）");
+
+            // ★ 2026-10-10：整包里是"一堆模组**文件夹**"（用户 2026-10-10 反馈的点：
+            //   这种包以前只会报「这个包不是游戏能加载的模组」）
+            File modFolders = new File(root, "模组夹整包.zip");
+            zipMany(modFolders, new String[]{"夹A/mod.hjson", "夹A/scripts/main.js", "夹B/mod.hjson"},
+                    new String[]{"name: pack-a\n", "js", "name: pack-b\n"});
+            BatchIo.Report rfold = BatchIo.importSync(ctx, SLOT_BATCH,
+                    BatchIo.docsFromFiles(java.util.Arrays.asList(modFolders)),
+                    BatchIo.KIND_MODS, true);
+            ok(stat, L, rfold.ok == 2 && new File(modsDir, "夹A.zip").isFile()
+                            && new File(modsDir, "夹B.zip").isFile(),
+                    "★★ 一个 zip 里装着两个模组**文件夹** ⇒ 各自打成 zip 导进去（ok=" + rfold.ok
+                            + "，落位 夹A.zip / 夹B.zip）");
+            ok(stat, L, !rfold.notes.isEmpty(),
+                    "★ 报告里记了「从 x.zip 里认出 N 个模组文件夹，各自打成了一个 zip」");
+
+            // ★ 地图页那边同一件事：一个没有 .msav 的 zip ⇒ 跳过并说明（不是"不是有效的地图"）
+            BatchIo.Report rNo = BatchIo.importSync(ctx, SLOT_BATCH,
+                    BatchIo.docsFromFiles(java.util.Arrays.asList(noHit)),
+                    BatchIo.KIND_MAPS, true);
+            ok(stat, L, rNo.ok == 0 && rNo.skipped.size() == 1,
+                    "★ 地图页选一个没有 .msav 的 zip ⇒ 跳过并说清找的是 .msav"
+                            + "（skipped=" + rNo.skipped.size() + "）");
 
             // ── ⑧ 往返：导出成一整包 ⇒ 再导回来（一个 .zip 文件当整批）───────────
             List<Exporter.Src> round = new ArrayList<>();
