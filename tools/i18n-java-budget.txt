@@ -18,7 +18,11 @@
 #
 # 文件 = 上限（含中文的字符串字面量条数）
 
-MainActivity.java = 165   # 全部在 dev_* 直通口（仅 debuggable 构建可达）；2026-10-05 由 126 升到 152：
+MainActivity.java = 15    # ★ 2026-10-10：dev 直通口整块搬去 `app/src-dev/io/mdt/launcher/DevTools.java`
+                         #   （165 → 15；那 150 条跟着搬走了，而 `app/src-dev` **不在 SRC-02 的扫描范围**里，
+                         #    它只在 debuggable 构建进包 —— 见 docs/DEVELOPING.md「dev 源集」）。
+                         #   剩下这 15 条是产品路径上的，别再往这里加。
+                         # 历史（为什么曾经是 165）：2026-10-05 由 126 升到 152：
                          #   新增的是蓝图解析口 `dev_msch`（`--es dev_msch <路径>`）的落盘报告行 ——
                          #   与既有 dev 口同类（dev_mapstats / dev_mods_conflict…），**没有自己的界面文案**。
                          # 2026-10-08 由 152 升到 154：新增 F23 崩溃分析口 `dev_crash_analyze`

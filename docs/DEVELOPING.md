@@ -46,6 +46,73 @@ GBK 编码、批量删除）已固化在 build.sh 注释里。
 > 而签名用的 apksigner 跑在现代 JDK 上，会报
 > `UnrecoverableKeyException: failed to decrypt safe contents entry`（2026-10-04 实测踩过）。
 
+### dev 源集（2026-10-10 起：**产品版不带任何开发工具**）
+
+两样东西是**开发工具**，不是产品功能：
+
+| 类 | 规模 | 只被谁调用 |
+|---|---|---|
+| `SelfTest.java` | 约 1 万行 | `dev_*` 直通口（`dev_m3_selftest`） |
+| `DevTools.java` | 约 1300 行（原是 `MainActivity` 里的 16 个方法） | `MainActivity.checkDevIntent` |
+
+而 `dev_*` 那道口**只在 `FLAG_DEBUGGABLE` 下才跑**（产品版点下去只会弹「开发直通口在产品版不可用」）
+⇒ 产品版一直带着它们，纯粹白占一份 dex，还把「能对测试槽做破坏性验证」的代码送到用户机器上，
+只靠一道运行时白名单挡着。
+
+⇒ 构建按**与运行时那道门同一个谓词**裁剪（`build.sh` 的 `[2/4] javac`）：
+
+| 构建 | 源集 | 日志里会打 |
+|---|---|---|
+| dev（`DEBUGGABLE=true`） | `app/src`（全部） + **`app/src-dev`**（真实现） | `dev-only sources: included` |
+| 产品（默认） | `app/src`（**去掉 `SelfTest.java`**） + **`app/src-release`**（同名空壳） | `dev-only sources: EXCLUDED (product build -> stubs …)` |
+
+**受控 A/B（2026-10-10 实测；同一份源码树、同一台机器、同一时刻，唯一变量 = 源集 + debuggable 标志）**：
+
+| 量 | dev 包（带开发工具） | 产品包（空壳） | 差 |
+|---|---:|---:|---:|
+| `classes.dex` | 1 026 836 B | **688 244 B** | **−338 592 B（−33.0%）** |
+| 整个 APK（`Get-Item` 实测） | 734 317 B | **578 669 B** | **−155 648 B（−21.2%）** |
+
+其中**两刀分开算**：自检那一刀 `classes.dex` −30.0%（APK −143 360 B）、dev 直通口这一刀再
+**dex −30 216 B（−4.2%）/ APK −12 288 B（−2.1%）**。累计对比"动手之前那份产品包"
+（`classes.dex` 1 014 212 B / APK 709 741 B）：**dex −32.1%、APK −18.5%**。
+
+**真机判据**（不是"编译过就算"）：
+- dev 变体跑自检 **1052 通过 / 0 失败**；
+- 5 个只读 dev 口（`dev_maps_slot` / `dev_mods_scan` / `dev_crash_analyze` / `dev_mods_conflict` /
+  `dev_cas_stats`）重构前后**报告逐行相同**（归一化掉时间戳后 diff 为空；`dev_cas_stats` 那次差异
+  经**两次采样**确认是"中间跑过自检、池子被清过"的状态变化，不是代码变化）；
+- 产品版界面正常，且用 `dev_m3_selftest` / `dev_maps_slot` 触发时 `hub/report-m3.txt`
+  **一个字节都没被改写**、也**没写出** `report-devtool.txt`；
+- 产品包 `classes.dex` 里搜不到 `pageSkeleton`（真自检的私有方法名）与 `dev_batch_export` / `dev_cas_gc` /
+  `dev_maps_slot`（dev 口的键），dev 包里三个都在。
+
+#### `DevTools` 为什么长这样
+
+dev 口那 16 个方法用到的 15 个 helper（`alert` / `rescan` / `startVersion` …）**产品代码也在用**
+（量过：它们的依赖闭包是 42 个成员 / 785 行）⇒ **不能连 helper 一起搬**。所以：
+
+- `DevTools` **持有宿主**（`private final MainActivity a`），被搬的方法体**逐字未动**，
+  只把裸引用改成 `a.xxx` —— 而**方法之间的互相调用一行都没改**（它们仍是 `DevTools` 自己的实例方法）；
+- `MainActivity` 里那 16 个方法换成**一行** `DevTools.check(this, intent)`；
+- 被 dev 调用的 **16 个成员（15 个方法 + `mEntries`）从 `private` 放宽到包内可见** —— 方法体一行不动。
+  产品版没有 `DevTools` 的真实现，所以这些成员照样只有本类能碰。
+
+🔴 **四条纪律**：
+① **空壳与真实现的公开面必须逐字一致**（`MainActivity` 直接静态调用 `SelfTest.runM3/summaryOf/runHealthReport`
+   与 `DevTools.check`）。签名一漂 = **产品版编译不过、而 dev 版照样绿** ⇒ 改这些面之后
+   **两种构建都得跑一遍**（判据永远是日志末尾那行 `== BUILD OK ==`）；
+② **空壳里不许写逻辑**；不许出现中文字符串字面量（i18n 门禁 `SRC-02`）；
+③ ⚠️ **搬走中文代码会让 `SRC-02` 台账"虚高"** —— 门禁会报 `MainActivity.java 的中文字面量已经降到 **15** 条
+   （台账还写着 165）` 并**失败**。这是设计如此（那一列就是 P3 进度，**只许降**）⇒
+   **搬完要同步改 `tools/i18n-java-budget.txt` 那一行**。★ 顺带：`app/src-dev` / `app/src-release`
+   **不在 `SRC-02` 的扫描范围里**（它只走 `app/src`），所以搬进去的中文不用登台账；
+④ 空壳要**保住用户能感知的行为**：产品版以前会弹一句「开发直通口在产品版不可用」，
+   所以 `DevTools` 空壳保留了"看到 `dev_` 前缀就弹那一句"，不是简单 `return`。
+
+★ 与「跑自检必须先装 dev 变体」是同一条：产品版**没有**自检与 dev 口可跑，
+所以这两刀砍掉的是**死重**，不是能力。
+
 ## 资源
 
 （F1 起，2026-10-01）

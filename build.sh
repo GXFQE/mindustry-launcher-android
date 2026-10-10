@@ -262,7 +262,32 @@ fi
 echo "== [2/4] javac =="
 # F1: R.java 由 [1/4] 的 --java 生成在 build/gen（与手写源码同包 io.mdt.launcher，
 #     不需要 import）。收集放在 link 之后才能捡到它。
-mapfile -t SRC < <( { find "$ROOT/app/src" -name '*.java'; find "$OUT/gen" -name '*.java'; } | sort | while read -r f; do jpath "$f"; done )
+#
+# 🔴 dev 专属源集（2026-10-10）：`SelfTest.java`（约 1 万行）与 `DevTools.java`（dev 直通口，约 1300 行）
+#    都是**开发工具** —— 只被 `dev_*` 口调用，而那道口**只在 FLAG_DEBUGGABLE 下才跑**
+#    ⇒ 产品版带着它们纯属白占一份 dex，还把一个"能对测试槽做破坏性验证"的类送到用户机器上。
+#    ⇒ 按**与运行时那道门同一个谓词**裁剪：
+#         dev 版 = app/src（全部）      + app/src-dev（真实现）
+#         产品版 = app/src（去掉 SelfTest.java） + app/src-release（同名空壳）
+#    ⚠️ 空壳与真实现的**公开面必须逐字一致**（MainActivity 直接静态调用它们）⇒ 两种构建都得过。
+DEV_SRC_DIR="$ROOT/app/src-dev"
+PRODUCT_SRC_DIR="$ROOT/app/src-release"
+SELFTEST_ARGS=()
+if [ "$DEBUGGABLE" = "true" ]; then
+  [ -d "$DEV_SRC_DIR" ] || { echo "FAIL: missing dev source dir: $DEV_SRC_DIR" >&2; exit 1; }
+  EXTRA_SRC="$DEV_SRC_DIR"
+  echo "   dev-only sources: included (debuggable build)"
+else
+  [ -d "$PRODUCT_SRC_DIR" ] || { echo "FAIL: missing product stub dir: $PRODUCT_SRC_DIR" >&2; exit 1; }
+  SELFTEST_ARGS=( ! -name 'SelfTest.java' )
+  EXTRA_SRC="$PRODUCT_SRC_DIR"
+  echo "   dev-only sources: EXCLUDED (product build -> stubs from app/src-release)"
+fi
+mapfile -t SRC < <( {
+    find "$ROOT/app/src" -name '*.java' ${SELFTEST_ARGS[@]+"${SELFTEST_ARGS[@]}"}
+    find "$EXTRA_SRC" -name '*.java'
+    find "$OUT/gen" -name '*.java'
+  } | sort | while read -r f; do jpath "$f"; done )
 echo "sources: ${#SRC[@]}"
 [ "${#SRC[@]}" -gt 0 ] || { echo "FAIL: no sources found" >&2; exit 1; }
 "$JAVAC_8" -source 8 -target 8 -encoding UTF-8 -nowarn -Xlint:-options \
