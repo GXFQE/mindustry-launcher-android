@@ -325,6 +325,81 @@ public final class Exporter {
     }
 
     /**
+     * 这一份在**目录树**里该叫什么（2026-10-11 第 129 轮 ⑥c）。
+     * ★ 与 zip 侧的唯一差别：**目录形态的模组**在目录里没法当条目，只能落成 `<名字>.zip` 一个文档。
+     *   纯函数（自检钉住），SAF 的写盘在 {@link #saveToTree} 里。
+     */
+    static String treeName(Src s) {
+        if (s == null) return null;
+        String n = s.entryName();
+        if (n == null) return null;
+        return s.dir != null ? n + ".zip" : n;
+    }
+
+    /**
+     * 导出到**目录树**：一次落**多个独立文件**（`ACTION_OPEN_DOCUMENT_TREE` 那条路）。
+     *
+     * <p>与 {@link #zipSources} 的关系：**同一份 `Src` 语义、同一条去重规则**（{@link #uniqueName}），
+     * 只是目的地从"一个 zip 里的条目"变成"目录下的一个个文档"。★ 重名判据**不许再造第二条**。
+     *
+     * <p>`Result.files` 的语义不变 =「这一批有几**份**」（目录模组内部的文件数不计进来，同 zip 侧）。
+     */
+    public static Result saveToTree(Context ctx, Uri treeUri, List<Src> srcs, Step step)
+            throws IOException {
+        Result r = new Result();
+        if (srcs == null || srcs.isEmpty()) {
+            throw new IOException(Trans.get(ctx, R.string.exp_err_no_src));
+        }
+        android.content.ContentResolver cr = ctx.getContentResolver();
+        Uri dir;
+        try {
+            dir = android.provider.DocumentsContract.buildDocumentUriUsingTree(treeUri,
+                    android.provider.DocumentsContract.getTreeDocumentId(treeUri));
+        } catch (Throwable t) {
+            throw new IOException(Trans.get(ctx, R.string.exp_err_no_doc), t);
+        }
+        java.util.List<String> used = new java.util.ArrayList<>();
+        int seen = 0;
+        int written = 0;
+        int total = srcs.size();
+        for (Src s : srcs) {
+            seen++;
+            if (s == null || s.empty()) {
+                if (step != null) step.onStep(seen, total);
+                continue;
+            }
+            String name = uniqueName(used, treeName(s));
+            used.add(name);
+            String mime = name.toLowerCase(java.util.Locale.ROOT).endsWith(".zip")
+                    ? "application/zip" : "application/octet-stream";
+            Uri doc = android.provider.DocumentsContract.createDocument(cr, dir, mime, name);
+            if (doc == null) throw new IOException(Trans.get(ctx, R.string.exp_err_no_doc));
+            OutputStream out = cr.openOutputStream(doc, "w");
+            if (out == null) throw new IOException(Trans.get(ctx, R.string.exp_err_no_doc));
+            try {
+                if (s.dir != null) {
+                    // 目录形态：落成**嵌套 zip**（内层文件名数不计进 files，同 zip 侧）
+                    Result inner = new Result();
+                    zipDirFlat(s.dir, out, inner);
+                    r.rawBytes += inner.rawBytes;
+                } else if (s.file != null) {
+                    r.rawBytes += copyInto(s.file, out);
+                } else {
+                    r.rawBytes += copyEntry(ctx, s.container, s.entry, out);
+                }
+            } finally {
+                closeQuietly(out);      // 必须关：文档的字节这时才落全
+            }
+            r.files++;
+            written++;
+            if (step != null) step.onStep(seen, total);
+        }
+        if (written == 0) throw new IOException(Trans.get(ctx, R.string.exp_err_no_src));
+        Log.i(TAG, "export to tree ok: files=" + r.files + " raw=" + r.rawBytes);
+        return r;
+    }
+
+    /**
      * 把一个**目录**写成外层 zip 里的**一个嵌套 zip**条目。
      *
      * 🔴 关键在 {@link NonClosing}：内层 `ZipOutputStream.close()` 会把中央目录写出来、

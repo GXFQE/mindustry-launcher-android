@@ -88,6 +88,8 @@ final class BatchIo {
      *   因为"选回来之后往哪落"是各页面自己的事（只有它们知道槽名与内容类型）。
      */
     static final int REQ_EXPORT = 72;
+    /** ⑥c 导出到目录树（`ACTION_OPEN_DOCUMENT_TREE`；2026-10-11 第 129 轮） */
+    static final int REQ_TREE = 73;
 
     /** 一批待导入的条目里，最多认这么多（防止用户手滑选了几千个把界面卡死） */
     private static final int MAX_ITEMS = 500;
@@ -179,15 +181,46 @@ final class BatchIo {
     }
 
     /** 发起"存到哪"（一个 zip）—— 真正的写在 {@link #handleExportResult} 里 */
-    static void startExport(Activity a, List<Exporter.Src> srcs, String zipName) {
+    static void startExport(final Activity a, final List<Exporter.Src> srcs, final String zipName) {
         if (srcs == null || srcs.isEmpty()) {
             toast(a, Trans.get(a, R.string.batch_export_nothing));
             return;
         }
+        // ★ ⑥c（2026-10-11）：**≥2 份**时先问"存成一个 zip 还是存到目录"——
+        //   一份时两条路等价（zip 就是那个文件本身）⇒ **不问**，老样子直接走 createDoc（不打扰）。
+        if (srcs.size() < 2) {
+            startExportZip(a, srcs, zipName);
+            return;
+        }
+        new AlertDialog.Builder(a)
+                .setTitle(R.string.batch_export_dest_title)
+                .setItems(new CharSequence[] {
+                                Trans.get(a, R.string.batch_export_dest_zip),
+                                Trans.get(a, R.string.batch_export_dest_tree) },
+                        new DialogInterface.OnClickListener() {
+                            @Override public void onClick(DialogInterface d, int which) {
+                                if (which == 0) startExportZip(a, srcs, zipName);
+                                else startExportTree(a, srcs);
+                            }
+                        })
+                .setNegativeButton(android.R.string.cancel, null)
+                .show();
+    }
+
+    /** 一个 zip 那条路（老样子） */
+    private static void startExportZip(Activity a, List<Exporter.Src> srcs, String zipName) {
         sSrcs = srcs;
         a.startActivityForResult(Intent.createChooser(
                 Exporter.createDoc(zipName, "application/zip"),
                 Trans.get(a, R.string.chooser_export)), REQ_EXPORT);
+    }
+
+    /** 目录树那条路：选一个目录，之后每一份落成一个独立文档（⑥c） */
+    private static void startExportTree(Activity a, List<Exporter.Src> srcs) {
+        sSrcs = srcs;
+        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
+        i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+        a.startActivityForResult(i, REQ_TREE);
     }
 
     /**
@@ -196,7 +229,8 @@ final class BatchIo {
      *   残留的清单会被下一次选择"接上"，导出成上一批东西。
      */
     static boolean handleExportResult(final Activity a, int req, int res, Intent data) {
-        if (req != REQ_EXPORT) return false;
+        if (req != REQ_EXPORT && req != REQ_TREE) return false;
+        final boolean toTree = req == REQ_TREE;
         final List<Exporter.Src> srcs = sSrcs;
         sSrcs = null;
         if (res != Activity.RESULT_OK || data == null || data.getData() == null || srcs == null) {
@@ -217,7 +251,7 @@ final class BatchIo {
                 String err = null;
                 Exporter.Result r = null;
                 try {
-                    r = Exporter.zipSources(a, uri, srcs, new Exporter.Step() {
+                    Exporter.Step step = new Exporter.Step() {
                         @Override public void onStep(final int done, final int total) {
                             a.runOnUiThread(new Runnable() {
                                 @Override public void run() {
@@ -229,13 +263,16 @@ final class BatchIo {
                                 }
                             });
                         }
-                    });
+                    };
+                    r = toTree ? Exporter.saveToTree(a, uri, srcs, step)
+                               : Exporter.zipSources(a, uri, srcs, step);
                 } catch (Throwable t) {
                     err = Util.ioReason(a, t);
                     Log.w(TAG, "batch export failed", t);
                 }
                 final String fe = err;
                 final Exporter.Result fr = r;
+                final boolean tree = toTree;
                 a.runOnUiThread(new Runnable() {
                     @Override public void run() {
                         pd.dismiss();
@@ -244,7 +281,8 @@ final class BatchIo {
                             alert(a, Trans.get(a, R.string.export_failed), fe);
                             return;
                         }
-                        toast(a, Trans.get(a, R.string.batch_export_zip_done_fmt,
+                        toast(a, Trans.get(a, tree ? R.string.batch_export_tree_done_fmt
+                                                  : R.string.batch_export_zip_done_fmt,
                                 fr.files, Util.formatSize(fr.outBytes)));
                     }
                 });

@@ -10077,6 +10077,26 @@ public final class SelfTest {
                 zf2.close();
             }
 
+            // ── ②b ⑥c 目录树导出：**该叫什么名字**（纯函数；写盘那条路要真机选目录，见 §90.10）
+            ok(stat, L, "图.msav".equals(Exporter.treeName(Exporter.Src.ofFile(a, "图.msav")))
+                            && "模组包.zip".equals(Exporter.treeName(Exporter.Src.ofDir(a, "模组包"))),
+                    "⑥c ★ 目录里的名字：真文件照原名；**目录形态的模组**只能落成 `<名>.zip`");
+            //  重名判据**复用 zip 那条**（`uniqueName`）⇒ 这里钉住"同一份清单两条路给出同一套名字"
+            {
+                java.util.List<String> used = new java.util.ArrayList<>();
+                String n1 = Exporter.uniqueName(used, Exporter.treeName(Exporter.Src.ofFile(a, "同名.msav")));
+                used.add(n1);
+                String n2 = Exporter.uniqueName(used, Exporter.treeName(Exporter.Src.ofFile(a, "同名.msav")));
+                ok(stat, L, "同名.msav".equals(n1) && "同名 (2).msav".equals(n2),
+                        "⑥c ★元断言：目录那条路的去重**复用同一条判据**（同名 ⇒ `同名 (2).msav`），没有第二条规则");
+                //  ★ 元断言的反方向：**不同**名字不许被改（否则就是"来者都改"的假货）
+                java.util.List<String> used2 = new java.util.ArrayList<>();
+                used2.add("甲.msav");
+                ok(stat, L, "乙.msav".equals(Exporter.uniqueName(used2, "乙.msav"))
+                                && Exporter.treeName(null) == null,
+                        "⑥c ★元断言：不重名 ⇒ 原样；null ⇒ null（不猜）");
+            }
+
             // ── ③ 反向：空清单必须抛，不许写出一个 0 条目的 zip ────────────────
             String err = null;
             try {

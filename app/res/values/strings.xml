@@ -1828,6 +1828,11 @@
     <string name="batch_export_head_fmt">%1$d in total · tick what to export, then tap Export</string>
     <string name="batch_export_progress_title">Exporting</string>
     <string name="batch_export_zip_done_fmt">Exported %1$d items · %2$s</string>
+    <string name="batch_export_dest_title">Where to save</string>
+    <string name="batch_export_dest_zip">As a single zip</string>
+    <string name="batch_export_dest_tree">Into a folder</string>
+    <string name="batch_export_tree_done_fmt">Saved %1$d items into the folder</string>
+    <string name="exp_err_no_doc">That folder does not allow writing files</string>
     <string name="batch_import_progress_title">Importing</string>
     <string name="batch_import_progress_fmt">Importing %1$d items into %2$s</string>
     <string name="batch_import_nothing">No file was picked</string>

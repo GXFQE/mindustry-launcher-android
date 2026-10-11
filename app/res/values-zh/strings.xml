@@ -1791,6 +1791,11 @@
     <string name="batch_export_head_fmt">共 %1$d 份 · 勾选要导出的，再点「导出」</string>
     <string name="batch_export_progress_title">正在导出</string>
     <string name="batch_export_zip_done_fmt">已导出 %1$d 份 · %2$s</string>
+    <string name="batch_export_dest_title">导到哪里？</string>
+    <string name="batch_export_dest_zip">存成一个 zip</string>
+    <string name="batch_export_dest_tree">存到目录…</string>
+    <string name="batch_export_tree_done_fmt">已存 %1$d 份到目录</string>
+    <string name="exp_err_no_doc">这个位置不让写文件</string>
     <string name="batch_import_progress_title">正在导入</string>
     <string name="batch_import_progress_fmt">正在把 %1$d 份导入 %2$s</string>
     <string name="batch_import_nothing">没有选中任何文件</string>
