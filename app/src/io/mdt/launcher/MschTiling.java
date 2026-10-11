@@ -13,7 +13,7 @@ import java.util.Map;
  *   <li><b>字节码</b>：`mindustry.input.InputHandler$QueryEachable.each(Cons)` 的实现就是 <b>`return;`</b>
  *       —— 空方法。而 `Schematics.getBuffer` 传给 `drawPlanRegion` 的正是
  *       `new QueryEachable(null, plans)`（tree 为 null）⇒ `Block.findPlan(list, …)` **一个邻居都找不到**。</li>
- *   <li><b>实测</b>：PC 上直接跑游戏自己的 `getTiling`（`.tmp-prev-lab/TilingOracle.java`），
+ *   <li><b>实测</b>：PC 上直接跑游戏自己的 `getTiling`（`MDT-Android-Dev/_lab/msch/TilingOracle.java`），
  *       对 14 份真蓝图里**所有**走 autotiler 的方块（`conveyor` / `titanium-conveyor` / `conduit` /
  *       `pulse-conduit` / `plated-conduit` …）逐块导出 `bits` —— **`bits[0]` 一律是 0**、
  *       `bits[1]=bits[2]=1`、掩码 0。</li>

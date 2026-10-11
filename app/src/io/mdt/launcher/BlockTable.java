@@ -3,7 +3,7 @@ package io.mdt.launcher;
 /**
  * 自动生成的「方块名 → 配色 / 占地格数」表（勿手改）。
  * 生成器：MDT-Android-Dev/_lab/msch/GenBlockTable.java
- *        （工作副本：MDT-Android/.tmp-prev-lab/GenBlockTable.java，两份一样）
+ *        （工作副本另存于仓库外 `_lab-archive/`；探针工程见 `MDT-Android-Dev/_lab/msch/GenBlockTable.java`）
  * 生成于 2026-10-06；447 行（有配色 424，没有 23）。
  * 列（Tab 分隔）：name argb size rotate rotateDraw
  *   · argb = 8 位十六进制 ARGB（alpha 一律 FF —— 游戏 loadColors() 之后就是纯色）；

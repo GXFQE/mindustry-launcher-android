@@ -1,13 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  MDT 启动器的全部 UI 文案（F1）。
+  Mindustry Manager 的全部 UI 文案（F1）。
   纪律：
   a) 只收「用户可见」的界面文字；写进 hub/report-*.txt 的取证文本不进资源（留在代码里）。
   b) 带参数的用 %1$s 形式的位置参数，代码侧 getString(R.string.x, ...)。
   c) XML 注释里不要出现连续两个减号（写参数名时容易被带上），expat 会报 not well-formed。
 -->
 <resources>
-    <string name="app_name">MDT 启动器</string>
+    <!-- 中文那份见 values/strings.xml 的说明：**必须与英文那份不同字**（元断言的分辨力所系） -->
+    <string name="app_name">Mindustry 管理器</string>
+
+    <!-- 桌面图标下那一行（见 values/strings.xml 里 `app_name_short` 的说明）。
+         🔴 实测预算 ≈ 208 px（= 5.5 个中文字宽）：`MDT管理器` 约 198 px，**贴着上限** ——
+            再往后加一个中文字就会变成 `MDT管理..`；要改先量（`next/09` 末尾有量法与截图）。 -->
+    <string name="app_name_short">MDT管理器</string>
 
     <!-- 通用 -->
     <string name="close">关闭</string>

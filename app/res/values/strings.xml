@@ -1,13 +1,34 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  MDT 启动器的全部 UI 文案（F1）。
+  Mindustry Manager 的全部 UI 文案（F1）。
   纪律：
   a) 只收「用户可见」的界面文字；写进 hub/report-*.txt 的取证文本不进资源（留在代码里）。
   b) 带参数的用 %1$s 形式的位置参数，代码侧 getString(R.string.x, ...)。
   c) XML 注释里不要出现连续两个减号（写参数名时容易被带上），expat 会报 not well-formed。
 -->
 <resources>
-    <string name="app_name">MDT Launcher</string>
+    <!--
+      应用显示名（桌面图标下 / 任务切换 / 应用详情）。
+      🔴 **两套语言必须是两份**（en=「Mindustry Manager」/ zh=「Mindustry 管理器」）——
+         不是翻译洁癖：`SelfTest` 的 ㉙ 有一条元断言钉着它，守的是上面那条
+         「BaseActivity.onCreate 按应用内语言重设顶栏标题」的分辨力 ——
+         两套写成同一个字，那条断言就恒真、等于没验（2026-10-11 改名时确认过）。
+      ⚠️ 只改这里 = 只改**显示名**：包名 `io.mdt.launcher`、签名、目录名都不动
+         （换包名或换密钥都会让老用户必须卸载重装，而卸载会连槽与存档一起删）。
+    -->
+    <string name="app_name">Mindustry Manager</string>
+
+    <!--
+      桌面图标**底下那一行**的名字（= `MainActivity` 的 manifest label）。与 `app_name` 分开是必须的：
+      🔴 **系统给的预算只有 ~59 dp**（2026-10-11 真机实测：屏幕 1224×2700 / density 520 ⇒ 376.6 dp 宽，
+         5 列网格下图标 53 dp、图标下标签容器 **193 px = 59.4 dp**）。`Mindustry Manager` 要 ~366 px
+         ⇒ 桌面被截成 `Mindustry..`（用户 2026-10-11 报「名字太长显示不全」）。
+      ★ 分工：**图标下用短的**（这一条）；`app_name` 留给系统「应用信息」/ 最近任务 / 应用内顶栏
+         （顶栏由 `MainActivity.onCreate` 显式 `setTitle(app_name)` 顶回去 —— 别删那一行，
+         否则 `BaseActivity.applyLocalizedTitle()` 会按**清单里这份短标签**设标题，顶栏也跟着变短）。
+      ⚠️ 两套语言写同一个字是**可以**的（这里不是 `app_name`）：㉙ 那条元断言钉的是 `app_name`。
+    -->
+    <string name="app_name_short">MDT</string>
 
     <!-- 通用 -->
     <string name="close">Close</string>

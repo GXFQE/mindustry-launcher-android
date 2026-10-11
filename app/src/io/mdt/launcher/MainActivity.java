@@ -102,9 +102,27 @@ public class MainActivity extends BaseActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // 顶栏标题**显式**用全名：清单里 `MainActivity` 的 label 是**短名**
+        //   （`app_name_short`，只为了桌面图标下那行放得下 —— 见 strings.xml 的说明），
+        //   而 `BaseActivity.applyLocalizedTitle()` 会拿清单那份 label 当标题 ⇒ 不顶这一下，
+        //   顶栏也会跟着变成短名（这条跑在基类之后，照样覆盖得了）。
+        setTitle(Trans.get(this, R.string.app_name));
+        // S0 插件页（**临时位置**：直接铺在 MainActivity 上，等结论落定再拆成独立 Activity + 清单声明）。
+        //   为什么先这样做：清单与 values/strings.xml 那一轮正被另一个会话改着，不去跟它抢文件。
+        {
+            final String plugPage = getIntent().getStringExtra("plugin_page");
+            if (plugPage != null && plugPage.length() > 0) {
+                setContentView(PluginHost.buildPage(this, new java.io.File(plugPage)));
+                return;
+            }
+        }
         android.util.Log.i("MDTLauncher", "MainActivity onCreate");
         buildUi();
         checkDevIntent(getIntent());
+        // S0 插件化可行性实验（**临时**，结论落 REF 后可删）：`--es plugin_probe <夹具目录>`。
+        //   ★ 走独立 key 而不是 dev_* —— dev 口在产品版被拒，而本实验要验的恰恰是
+        //     "**非 debuggable** 的 product 构建能不能加载外部 APK 的类与资源"。
+        PluginHost.maybeRun(this, getIntent());
         // F9 深链：外部（浏览器 / 文件管理器）递进来的那一份 —— 冷启动走这里，
         //   已经在跑时走 onNewIntent（本 Activity 是 singleTop）
         DeepLink.claim(this, getIntent());
@@ -119,6 +137,7 @@ public class MainActivity extends BaseActivity {
         android.util.Log.i("MDTLauncher", "MainActivity onNewIntent");
         setIntent(intent);
         checkDevIntent(intent);
+        PluginHost.maybeRun(this, intent);   // S0 插件实验（临时，同上）
         DeepLink.claim(this, intent);       // F9 深链（热路径：应用已经在前台）
     }
     /**

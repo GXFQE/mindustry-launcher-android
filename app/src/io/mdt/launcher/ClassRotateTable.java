@@ -3,7 +3,7 @@ package io.mdt.launcher;
 /**
  * **方块类名 → 会不会按朝向转**（第 120 轮，生成表，**别手改**）。
  *
- * 生成器：`.tmp-prev-lab/GenClassRotate.java`（用法：`java GenClassRotate <游戏 jar> <本文件>`）。
+ * 生成器：`MDT-Android-Dev/_lab/msch/GenClassRotate.java`（用法：`java GenClassRotate <游戏 jar> <本文件>`）。
  *
  * <h3>为什么要有它</h3>
  * 数据模组的方块 JSON 用 `type` 指定**游戏 jar 里的类名**（实测：蓝钢拓展的

@@ -3,7 +3,7 @@ package io.mdt.launcher;
 /**
  * **autotiler 决策表要用的方块属性**（第 121 轮，生成表，**别手改**）。
  *
- * 生成器：`.tmp-prev-lab/GenBlendTable.java`（用法：`java GenBlendTable &lt;游戏 jar&gt; &lt;本文件&gt;`）。
+ * 生成器：`MDT-Android-Dev/_lab/msch/GenBlendTable.java`（用法：`java GenBlendTable &lt;游戏 jar&gt; &lt;本文件&gt;`）。
  *
  * 列（Tab 分隔）：`名字 outputsItems hasItems hasLiquids outputsLiquid acceptsItems noSideBlend rotatedOutput 家族号`
  * 家族号：0 不走 autotiler · 1 Conveyor · 2 ArmoredConveyor · 3 Duct · 4 ArmoredDuct ·
