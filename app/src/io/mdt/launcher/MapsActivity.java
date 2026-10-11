@@ -181,8 +181,14 @@ public class MapsActivity extends BaseActivity {
                     }
                 });
 
-        // ★ 2026-10-07（第 122 轮）：「筛选与排序」——与模组页同一行、同一个对话框形状
-        //   （用户：「把搜索 / 排序推广到地图 / 蓝图 / 存档列表」）。
+        // ★ 2026-10-11（第 129 轮）：**批量删除**（勾几份 ⇒ 一次性挪进中转站）。
+        //   与导出同一个勾选对话框；判据与单份删除**同一条**（见 `promptDeleteMaps` 的注释）。
+        Util.bindAction(root, R.id.row_maps_del, R.drawable.ic_trash,
+                R.string.batch_del_row, R.string.batch_del_sub, new Runnable() {
+                    @Override public void run() { promptDeleteMaps(); }
+                });
+
+        // ★ 2026-10-07（第 122 轮）：「筛选与排序」——与模组页同一行、同一个对话框形状        //   （用户：「把搜索 / 排序推广到地图 / 蓝图 / 存档列表」）。
         //   ⚠️ 对话框里那几条词（按名称 / 有问题的在前 / 按大小 / 只看有问题的 / 清空筛选）
         //   **复用模组页的资源**：四个列表页说的是同一件事，各写一份只会让用户语言包里
         //   多出四条一模一样的翻译 —— 而"模组"两个字并不在那几条词里，不会串味。
@@ -586,8 +592,87 @@ public class MapsActivity extends BaseActivity {
     }
 
     /**
-     * 把选中的那张图写进 SAF 目标。
-     * 两条路：本槽（以及目录形态模组）里的是**真文件**；游戏 APK / 模组包里的要**从 zip 条目流式拷**。
+     * 批量删除：勾几份 ⇒ 一次性挪进中转站（2026-10-11 第 129 轮，用户「批量删除」）。
+     *
+     * <p>★ 与单份删除（{@link MapDetailActivity}）**同一条门禁、同一个助手** ——
+     * 游戏在跑就挡住（那道判据在数据层也有一份）、旧件一律走 `Trash.move` 进中转站。
+     * 批量**不是**另一套删除，只是"多勾几份"。
+     *
+     * <p>★ 三个数分开报（{@link BatchIo.DelReport}）：挪走的 · 没挪动的（点名）·
+     * **本来就不该删的**（住在游戏 APK / 模组包里、或不在 `<槽>/maps` 下的）——
+     * 最后那一类**动手前**就告诉用户，否则他会以为"勾了 5 份删了 3 份是坏了"。
+     */
+    private void promptDeleteMaps() {
+        if (mItems == null || mItems.isEmpty()) {
+            Toast.makeText(this, R.string.maps_export_none, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (Data.gameAlive(this)) {
+            alert(Trans.get(this, R.string.game_busy_title),
+                    Trans.get(this, R.string.map_delete_busy_msg));
+            return;
+        }
+        final List<Maps.Item> items = mItems;
+        BatchIo.pickMulti(this, R.string.batch_del_row,
+                Trans.get(MapsActivity.this, R.string.batch_del_head_fmt, items.size()),
+                mTitles, mSubs, mThumbs, null, R.string.batch_del_btn_fmt, new BatchIo.OnPick() {
+                    @Override public void onPick(List<Integer> idx) {
+                        final File kindDir = new File(Data.dirOf(MapsActivity.this, mSlot), "maps");
+                        final List<File> files = new java.util.ArrayList<>();
+                        for (Integer i : idx) files.add(items.get(i.intValue()).file);
+                        int can = 0, cant = 0;
+                        for (File f : files) {
+                            if (BatchIo.deletable(f, kindDir)) can++; else cant++;
+                        }
+                        if (can == 0) {
+                            alert(Trans.get(MapsActivity.this, R.string.batch_del_row),
+                                    Trans.get(MapsActivity.this, R.string.batch_del_skipped_fmt, cant));
+                            return;
+                        }
+                        String msg = Trans.get(MapsActivity.this, R.string.batch_del_msg_fmt, can);
+                        if (cant > 0) {
+                            msg = msg + "\n\n"
+                                    + Trans.get(MapsActivity.this, R.string.batch_del_skipped_fmt, cant);
+                        }
+                        new AlertDialog.Builder(MapsActivity.this)
+                                .setTitle(R.string.batch_del_title)
+                                .setMessage(msg)
+                                .setPositiveButton(R.string.batch_del_ok,
+                                        new DialogInterface.OnClickListener() {
+                                            @Override public void onClick(DialogInterface d, int w) {
+                                                BatchIo.DelReport rep = BatchIo.deleteAll(
+                                                        MapsActivity.this, files, kindDir,
+                                                        MapFiles.trashDirOf(MapsActivity.this),
+                                                        new BatchIo.Deleter() {
+                                                            @Override public File delete(
+                                                                    android.content.Context c, File f,
+                                                                    File trashDir) {
+                                                                return MapFiles.deleteToTrash(c, kindDir,
+                                                                        f, trashDir);
+                                                            }
+                                                        });
+                                                refreshList();   // 图上没了 ⇒ 重新清点（不重建页面）
+                                                if (rep.failed == 0) {
+                                                    Toast.makeText(MapsActivity.this,
+                                                            Trans.get(MapsActivity.this,
+                                                                    R.string.batch_del_done_fmt, rep.moved),
+                                                            Toast.LENGTH_LONG).show();
+                                                } else {
+                                                    alert(Trans.get(MapsActivity.this, R.string.batch_del_row),
+                                                            Trans.get(MapsActivity.this, R.string.batch_del_done_fmt, rep.moved)
+                                                                    + "\n"
+                                                                    + Trans.get(MapsActivity.this, R.string.batch_del_none_fmt, rep.failed));
+                                                }
+                                            }
+                                        })
+                                .setNegativeButton(R.string.cancel, null)
+                                .show();
+                    }
+                });
+    }
+
+    /**
+     * 把选中的那张图写进 SAF 目标。     * 两条路：本槽（以及目录形态模组）里的是**真文件**；游戏 APK / 模组包里的要**从 zip 条目流式拷**。
      */
     private void exportItem(final Maps.Item it, final Uri uri) {
         final ProgressDialog pd = ProgressDialog.show(this, Trans.get(MapsActivity.this, R.string.maps_export),

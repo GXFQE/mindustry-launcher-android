@@ -70,6 +70,24 @@
             android:background="@color/divider" />
 
         <!--
+          ★ 2026-10-11（第 129 轮）：**批量删除**（地图 / 蓝图两页各一行，共用一份实现）。
+          判据三条：只有**槽里这一类目录的直接子项**删得动（模组包 / 游戏自带 / 子目录里的都删不了，
+          界面会明说几份删不了）· 旧件一律**挪进中转站**（`Trash.move`，跨卷安全）· 游戏在跑时挡住
+          （与单份删除同一道门）。细则 REF §90.7。
+        -->
+        <include
+            android:id="@+id/row_bp_del"
+            layout="@layout/row_action"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginStart="62dp"
+            android:background="@color/divider" />
+
+        <!--
           ★ 2026-10-07（第 122 轮）：「筛选与排序」（搜索词 + 排序 + 只看有问题的）。
           这一页的「有问题的」= **缺件或解析不了** —— 那正是这一页存在的理由
           （游戏那边缺件是静默的，只能在这里提前看见）。判据见 `Blueprints.isProblem`。

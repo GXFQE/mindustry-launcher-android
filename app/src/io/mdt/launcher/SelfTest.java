@@ -10333,6 +10333,70 @@ public final class SelfTest {
             java.io.ByteArrayOutputStream pout2 = new java.io.ByteArrayOutputStream();
             ok(stat, L, Exporter.zipSourcesTo(ctx, pout2, three).files == 3,
                     "★元断言：不传进度回调的老调用点照旧能用（4 参重载 = 传 null）");
+
+            // ── ⑩ 第 129 轮：**批量删除**的判据与三个出口 ──────────────────────
+            //    判据（能不能删）与循环（怎么数）都在 `BatchIo`；真正动文件那一下由各页给。
+            File delRoot = new File(root, "del-slot");
+            final File kindDir = new File(delRoot, "maps");
+            kindDir.mkdirs();
+            final File d1 = new File(kindDir, "d1.msav");
+            final File d2 = new File(kindDir, "d2.msav");
+            final File sub = new File(new File(kindDir, "sub"), "nested.msav");
+            File outside = new File(delRoot, "outside.msav");
+            write(d1, new byte[8]);
+            write(d2, new byte[8]);
+            sub.getParentFile().mkdirs();
+            write(sub, new byte[8]);
+            write(outside, new byte[8]);
+            final File delTrash = new File(delRoot, "trash");
+            ok(stat, L, BatchIo.deletable(d1, kindDir) && !BatchIo.deletable(sub, kindDir)
+                            && !BatchIo.deletable(outside, kindDir) && !BatchIo.deletable(null, kindDir)
+                            && !BatchIo.deletable(d1, null),
+                    "★★批量删除的判据：只有**这一类目录的直接子项**删得动（子目录里的 / 槽外的 / null 都不算）");
+            //  真删除器：走与各页同一个助手（`Trash.move`，跨卷安全），但**不**碰"游戏在不在跑"那道门
+            final BatchIo.Deleter realDel = new BatchIo.Deleter() {
+                @Override public File delete(Context c, File f, File t) {
+                    File to = new File(t, f.getName());
+                    return Trash.move(f, to) ? to : null;
+                }
+            };
+            final List<File> picked = new ArrayList<>();
+            picked.add(d1);
+            picked.add(sub);
+            picked.add(outside);
+            BatchIo.DelReport dr = BatchIo.deleteAll(ctx, picked, kindDir, delTrash, realDel);
+            ok(stat, L, dr.moved == 1 && dr.skipped == 2 && dr.failed == 0
+                            && !d1.isFile() && new File(delTrash, "d1.msav").isFile()
+                            && sub.isFile() && outside.isFile(),
+                    "★★批量删除：挪走 1（`d1` 真进了中转站）· **本来就不该删** 2（子目录/槽外那两份还在原地）"
+                            + " · 失败 0");
+            //  ★ 失败出口：文件在、位置也对，但助手没挪动 ⇒ 必须算**失败**并点名（不许静默算成功）
+            final File d3 = new File(kindDir, "d3.msav");
+            write(d3, new byte[8]);
+            BatchIo.DelReport drFail = BatchIo.deleteAll(ctx,
+                    java.util.Collections.singletonList(d3), kindDir, delTrash,
+                    new BatchIo.Deleter() {
+                        @Override public File delete(Context c, File f, File t) { return null; }
+                    });
+            ok(stat, L, drFail.failed == 1 && drFail.moved == 0
+                            && drFail.failedNames.contains("d3.msav") && d3.isFile(),
+                    "★批量删除的**失败出口**：助手没挪动 ⇒ 算失败并点名（文件还在原地）");
+            //  ★ 元断言：那一批的**交接**要能分辨两种解释 —— 挪走的不许并进"本来就不该删"里
+            ok(stat, L, dr.moved + dr.skipped + dr.failed == picked.size()
+                            && dr.skipped == 2 && dr.moved == 1,
+                    "★元断言：三个数加起来 = 勾的份数（一份都不许丢账，且「挪走」与「删不了」不许混）");
+            BatchIo.DelReport drNull = BatchIo.deleteAll(ctx, null, kindDir, delTrash, realDel);
+            ok(stat, L, drNull.moved == 0 && drNull.failed == 0 && drNull.skipped == 0
+                            && BatchIo.deleteAll(ctx, picked, kindDir, delTrash, null).moved == 0,
+                    "★元断言：`null` 列表 / `null` 删除器都不抛（三个数都是 0）");
+            //  ★★ 元断言（**真机抓出来的 bug**）：勾选对话框的正按钮那句词**由调用方给** ——
+            //     删除那条路原来复用了写死的「导出（N 份）」⇒ 用户勾完准备删、按钮却写着"导出"。
+            //     判据 = 两句词必须**不同**，且都要带份数（不然按钮就成了不会变的一句空话）。
+            String okExport = ctx.getString(R.string.batch_export_btn_fmt, 3);
+            String okDel = ctx.getString(R.string.batch_del_btn_fmt, 3);
+            ok(stat, L, !okExport.equals(okDel) && okExport.contains("3") && okDel.contains("3"),
+                    "★★元断言：删除那条路的勾选按钮 ≠ 导出那条（真机就踩了这个：" + okExport
+                            + " / " + okDel + "）");
         } catch (Throwable t) {
             ok(stat, L, false, "批量导入导出用例自身异常：" + t);
         } finally {

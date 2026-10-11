@@ -89,6 +89,22 @@
             android:background="@color/divider" />
 
         <!--
+          ★ 2026-10-11（第 129 轮）：**批量删除**（与蓝图页同一行、同一套实现，见 REF §90.7）。
+          ⚠️ 与上面几行的区别：这一行**会动文件** —— 但只挪进中转站，不直接删。
+        -->
+        <include
+            android:id="@+id/row_maps_del"
+            layout="@layout/row_action"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginStart="62dp"
+            android:background="@color/divider" />
+
+        <!--
           ★ 2026-10-07（第 122 轮）：「筛选与排序」（搜索词 + 排序 + 只看有问题的）。
           ★ 为什么放在**这一张卡里**而不是另起一卡：它与上面三行的作用域一样 ——
             都是"这一页的这份列表"；另起一卡会在页顶多出一块没有必要的区域。

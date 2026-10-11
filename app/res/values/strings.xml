@@ -1892,4 +1892,8 @@
     <string name="batch_del_none_fmt">%1$d of them could not be moved (they are still where they were)</string>
     <string name="batch_import_pct_fmt">Importing %1$d / %2$d</string>
     <string name="batch_export_pct_fmt">Packing %1$d / %2$d</string>
+    <string name="batch_del_row">Delete…</string>
+    <string name="batch_del_sub">Pick one or more; they move to the transfer station, not gone for good</string>
+    <string name="batch_del_head_fmt">%1$d in total · tick what to delete</string>
+    <string name="batch_del_skipped_fmt">%1$d of them live inside a mod package or a subfolder, so they cannot be deleted</string>
 </resources>

@@ -1851,4 +1851,8 @@
     <string name="batch_del_none_fmt">有 %1$d 份没挪动（还在原来的地方）</string>
     <string name="batch_import_pct_fmt">正在导入 %1$d / %2$d 份</string>
     <string name="batch_export_pct_fmt">正在打包 %1$d / %2$d 份</string>
+    <string name="batch_del_row">删除…</string>
+    <string name="batch_del_sub">可多选；旧件挪进中转站，不直接删掉</string>
+    <string name="batch_del_head_fmt">共 %1$d 份 · 勾选要删除的</string>
+    <string name="batch_del_skipped_fmt">有 %1$d 份住在模组包或子目录里，删不了</string>
 </resources>

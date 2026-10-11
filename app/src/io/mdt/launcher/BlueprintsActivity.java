@@ -143,6 +143,11 @@ public class BlueprintsActivity extends BaseActivity {
                         promptExport();
                     }
                 });
+        // ★ 2026-10-11（第 129 轮）：**批量删除**（与地图页同一行、同一套判据，细则 REF §90.7）
+        Util.bindAction(root, R.id.row_bp_del, R.drawable.ic_trash,
+                R.string.batch_del_row, R.string.batch_del_sub, new Runnable() {
+                    @Override public void run() { promptDelete(); }
+                });
         // ★ 2026-10-07（第 122 轮）：「筛选与排序」——与模组 / 地图页同一行、同一个对话框形状。
         //   ⚠️ 对话框里那几条词复用模组页的资源（名称 / 有问题的在前 / 大小 / 只看有问题的 /
         //   清空筛选）：四个列表页说的是同一件事，各写一份只会让用户语言包多四条重复翻译。
@@ -633,6 +638,90 @@ public class BlueprintsActivity extends BaseActivity {
                         }
                         BatchIo.startExport(BlueprintsActivity.this, srcs,
                                 BatchIo.suggestZipName("blueprints"));
+                    }
+                });
+    }
+
+    /**
+     * 批量删除：勾几份 ⇒ 一次性挪进中转站（2026-10-11 第 129 轮）。
+     * 与地图页**同一套判据**（{@link BatchIo#deletable} / {@link BatchIo#deleteAll}）、
+     * 与单份删除（{@link BlueprintDetailActivity}）**同一个助手**（`BlueprintFiles.deleteToTrash`）。
+     *
+     * <p>⚠️ 这一页的扫描是**递归**的（游戏也走到底），但那个助手只认 `<槽>/schematics` 的**直接子项**
+     * ⇒ 子目录里的那几份会被算进"本来就不该删"那一类，动手前就说清楚（不去改那条安全检查）。
+     */
+    private void promptDelete() {
+        if (mItems == null || mItems.isEmpty()) {
+            Toast.makeText(this, R.string.bp_export_none, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (Data.gameAlive(this)) {
+            alert(Trans.get(this, R.string.game_busy_title),
+                    Trans.get(this, R.string.bp_import_busy_msg));
+            return;
+        }
+        final List<Blueprints.Item> items = mItems;
+        String[] titles = new String[items.size()];
+        String[] subs = new String[items.size()];
+        for (int i = 0; i < items.size(); i++) {
+            titles[i] = items.get(i).displayName();
+            subs[i] = items.get(i).sourceLabel(this) + " · " + items.get(i).line(this);
+        }
+        BatchIo.pickMulti(this, R.string.batch_del_row,
+                Trans.get(BlueprintsActivity.this, R.string.batch_del_head_fmt, items.size()),
+                titles, subs, null, null, R.string.batch_del_btn_fmt, new BatchIo.OnPick() {
+                    @Override public void onPick(List<Integer> idx) {
+                        final File kindDir = BlueprintFiles.dirOf(BlueprintsActivity.this, mSlot);
+                        final List<File> files = new java.util.ArrayList<>();
+                        for (Integer i : idx) files.add(items.get(i.intValue()).file);
+                        int can = 0, cant = 0;
+                        for (File f : files) {
+                            if (BatchIo.deletable(f, kindDir)) can++; else cant++;
+                        }
+                        if (can == 0) {
+                            alert(Trans.get(BlueprintsActivity.this, R.string.batch_del_row),
+                                    Trans.get(BlueprintsActivity.this, R.string.batch_del_skipped_fmt, cant));
+                            return;
+                        }
+                        String msg = Trans.get(BlueprintsActivity.this, R.string.batch_del_msg_fmt, can);
+                        if (cant > 0) {
+                            msg = msg + "\n\n"
+                                    + Trans.get(BlueprintsActivity.this, R.string.batch_del_skipped_fmt, cant);
+                        }
+                        new android.app.AlertDialog.Builder(BlueprintsActivity.this)
+                                .setTitle(R.string.batch_del_title)
+                                .setMessage(msg)
+                                .setPositiveButton(R.string.batch_del_ok,
+                                        new android.content.DialogInterface.OnClickListener() {
+                                            @Override public void onClick(
+                                                    android.content.DialogInterface d, int w) {
+                                                BatchIo.DelReport rep = BatchIo.deleteAll(
+                                                        BlueprintsActivity.this, files, kindDir,
+                                                        BlueprintFiles.trashDirOf(BlueprintsActivity.this),
+                                                        new BatchIo.Deleter() {
+                                                            @Override public File delete(
+                                                                    android.content.Context c, File f,
+                                                                    File trashDir) {
+                                                                return BlueprintFiles.deleteToTrash(c, kindDir,
+                                                                        f, trashDir);
+                                                            }
+                                                        });
+                                                scan();      // 少了几份 ⇒ 重新清点
+                                                if (rep.failed == 0) {
+                                                    Toast.makeText(BlueprintsActivity.this,
+                                                            Trans.get(BlueprintsActivity.this,
+                                                                    R.string.batch_del_done_fmt, rep.moved),
+                                                            Toast.LENGTH_LONG).show();
+                                                } else {
+                                                    alert(Trans.get(BlueprintsActivity.this, R.string.batch_del_row),
+                                                            Trans.get(BlueprintsActivity.this, R.string.batch_del_done_fmt, rep.moved)
+                                                                    + "\n"
+                                                                    + Trans.get(BlueprintsActivity.this, R.string.batch_del_none_fmt, rep.failed));
+                                                }
+                                            }
+                                        })
+                                .setNegativeButton(R.string.cancel, null)
+                                .show();
                     }
                 });
     }

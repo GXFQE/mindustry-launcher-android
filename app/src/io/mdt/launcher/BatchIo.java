@@ -289,6 +289,20 @@ final class BatchIo {
     static void pickMulti(final Activity a, int titleRes, String head, String[] titles,
                           String[] subs, android.graphics.Bitmap[] thumbs, final Filler filler,
                           final OnPick cb) {
+        pickMulti(a, titleRes, head, titles, subs, thumbs, filler,
+                R.string.batch_export_btn_fmt, cb);
+    }
+
+    /**
+     * 同上，但**正按钮那句词由调用方给**（`okFmtRes` 里必须有 `%1$d` = 勾了几份）。
+     *
+     * <p>★ 2026-10-11 第 129 轮：这个参数是**真机抓出来的** —— 删除那条路复用了这个勾选框，
+     * 而正按钮原来写死成「导出（N 份）」⇒ 用户勾完准备删，按钮却写着"导出"。
+     * ⚠️ 以后再有第三条路（比如"移动"），**只需要多传一个资源，不许再抄一份对话框**。
+     */
+    static void pickMulti(final Activity a, int titleRes, String head, String[] titles,
+                          String[] subs, android.graphics.Bitmap[] thumbs, final Filler filler,
+                          final int okFmtRes, final OnPick cb) {
         if (titles == null || titles.length == 0) return;
         View box = a.getLayoutInflater().inflate(R.layout.dialog_msav_list, null);
         TextView h = (TextView) box.findViewById(R.id.msav_head);
@@ -303,7 +317,7 @@ final class BatchIo {
         final AlertDialog dlg = new AlertDialog.Builder(a)
                 .setTitle(titleRes)
                 .setView(box)
-                .setPositiveButton(R.string.batch_export_btn_fmt, null)
+                .setPositiveButton(okFmtRes, null)
                 .setNeutralButton(R.string.batch_export_all, null)
                 .setNegativeButton(R.string.cancel, null)
                 .create();
@@ -312,12 +326,12 @@ final class BatchIo {
             @Override public void onItemClick(AdapterView<?> p, View v, int pos, long id) {
                 ad.setChecked(pos, !ad.isChecked(pos));
                 ad.refreshCheck(lv, pos);
-                syncPickButtons(dlg, a, ad);
+                syncPickButtons(dlg, a, ad, okFmtRes);
             }
         });
         dlg.setOnShowListener(new DialogInterface.OnShowListener() {
             @Override public void onShow(DialogInterface d) {
-                syncPickButtons(dlg, a, ad);
+                syncPickButtons(dlg, a, ad, okFmtRes);
                 if (filler != null) {
                     // ★ 异步补内容的那条路（存档列表）：关了窗就让后台线程自己停
                     dlg.setOnDismissListener(new DialogInterface.OnDismissListener() {
@@ -345,7 +359,7 @@ final class BatchIo {
                                 boolean all = ad.checkedCount() == ad.getCount();
                                 ad.setAll(!all);
                                 lv.invalidateViews();   // 只重画可见行（够用：状态在适配器里）
-                                syncPickButtons(dlg, a, ad);
+                                syncPickButtons(dlg, a, ad, okFmtRes);
                             }
                         });
             }
@@ -354,11 +368,12 @@ final class BatchIo {
     }
 
     /** 正按钮报份数、中按钮报"下一步会做什么"（见 {@link #pickMulti} 的三条） */
-    private static void syncPickButtons(AlertDialog dlg, Context c, MsavListAdapter ad) {
+    private static void syncPickButtons(AlertDialog dlg, Context c, MsavListAdapter ad,
+                                        int okFmtRes) {
         if (dlg == null || ad == null) return;
         android.widget.Button pos = dlg.getButton(DialogInterface.BUTTON_POSITIVE);
         if (pos != null) {
-            pos.setText(Trans.get(c, R.string.batch_export_btn_fmt, ad.checkedCount()));
+            pos.setText(Trans.get(c, okFmtRes, ad.checkedCount()));
         }
         android.widget.Button neu = dlg.getButton(DialogInterface.BUTTON_NEUTRAL);
         if (neu != null) {
@@ -1449,6 +1464,80 @@ final class BatchIo {
 
     static void cleanup(File work) {
         if (work != null) Data.deleteTree(work);
+    }
+
+    // ══ 批量删除（地图 / 蓝图共用；**模组页没有单份删除这条路**，见 REF §90.7）══════
+
+    /**
+     * 一次批量删除的账：**三个出口各自计数**（一个都不许并进别的数里）。
+     *
+     * · {@link #moved}  真的挪进中转站了；
+     * · {@link #failed} 在槽里、但没挪动（点名，见 {@link #failedNames}）；
+     * · {@link #skipped} **本来就不该删**（住在游戏 APK / 模组包里、或不在这一类的目录下）——
+     *   ⚠️ 与 {@code failed} **分开**：它不是失败，界面上那句"有几份删不了"说的是它。
+     */
+    static final class DelReport {
+        int moved, failed, skipped;
+        final List<String> failedNames = new ArrayList<>();
+    }
+
+    /**
+     * 一份条目**能不能**被批量删 —— **判据的唯一实现**。
+     *
+     * <p>必须是：① 真的是个文件；② 是**这一类目录**（`<槽>/maps` / `<槽>/schematics`）的**直接子项**。
+     * 后一条与各页 `deleteToTrash` 里那道安全检查**同一条**（蓝图的扫描是递归的，但那个助手只认直接子项）
+     * —— 这里只是**提前**把话说清楚，免得把它算成"失败"。
+     */
+    static boolean deletable(File f, File kindDir) {
+        if (f == null || kindDir == null || !f.isFile()) return false;
+        File p = f.getParentFile();
+        if (p == null) return false;
+        try {
+            return kindDir.getCanonicalFile().equals(p.getCanonicalFile());
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /**
+     * 真正删一份的**唯一实现**由各页给（地图走 `MapFiles.deleteToTrash`、
+     * 蓝图走 `BlueprintFiles.deleteToTrash`）—— 与 {@link Importer} 同一个形状。
+     *
+     * @return 挪走后的那份（成功）或 null（没动）
+     */
+    interface Deleter {
+        File delete(Context ctx, File file, File trashDir);
+    }
+
+    /**
+     * 批量删除的**唯一循环**：逐个挪进中转站（`Trash.move` ⇒ 跨卷安全），三个出口都报数。
+     *
+     * <p>⚠️ 每条都过 {@link #deletable}：不在这一类的目录下的（子目录里的蓝图 / 游戏与模组包里的）
+     * 计进 {@link DelReport#skipped}，**不**去调那个助手（调了也只会返回 null，还会把账记错）。
+     */
+    static DelReport deleteAll(Context ctx, List<File> files, File kindDir, File trashDir,
+                               Deleter d) {
+        DelReport r = new DelReport();
+        if (files == null || d == null) return r;
+        for (File f : files) {
+            if (!deletable(f, kindDir)) {
+                r.skipped++;
+                continue;
+            }
+            try {
+                if (d.delete(ctx, f, trashDir) != null) {
+                    r.moved++;
+                } else {
+                    r.failed++;
+                    r.failedNames.add(f.getName());
+                }
+            } catch (Throwable t) {
+                Log.w(TAG, "batch delete item failed: " + f, t);
+                r.failed++;
+                r.failedNames.add(f.getName());
+            }
+        }
+        return r;
     }
 
     // ══ 小工具 ═════════════════════════════════════════════════════════════
