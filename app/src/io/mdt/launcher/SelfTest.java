@@ -5097,6 +5097,73 @@ public final class SelfTest {
                             && ms.find(null) == null,
                     "③ ★元断言：不存在的名字 / null ⇒ 查不到（证明上面那条不是恒真的）");
         }
+
+        // ③b ★★ **端到端（覆盖）**（2026-10-11 第 129 轮补上 §81.9 如实记着的那个缺口）
+        //   原来只有单元级证据（"键名撞得上"），**没有"覆盖真的生效"的证据**。
+        //   做法 = 自建两个临时槽（**不碰用户数据**）：
+        //     · `selftest-ovr` 里放一个**真模组**（自己压一张品红 `copper-wall.png` 进
+        //       `sprites-override/`）；
+        //     · `selftest-ovr-empty` 里什么都不放；
+        //   然后**拿设备上真 APK 的真图集**各开一张 sheet ⇒ 同一个 `copper-wall` 必须给出**不同来源**。
+        String apkPath = null;
+        for (Data.Slot s : Data.allSlots(ctx)) {
+            Mods.Target t = Mods.targetsFor(ctx, s.name);
+            if (t != null && t.apkPath != null && new File(t.apkPath).isFile()) {
+                apkPath = t.apkPath;
+                break;
+            }
+        }
+        if (apkPath == null) {
+            ok(stat, L, false, "③b 端到端（覆盖）：设备上没有任何版本 APK ⇒ 这条用例无从验证");
+        } else {
+            try {
+            final int MAGENTA = 0xFFFF00FF;
+            File ovrDir = Data.dirOf(ctx, "selftest-ovr");
+            File mroot = new File(new File(ovrDir, "mods"), "ovrprobe");
+            File ovr = new File(mroot, "sprites-override");
+            ovr.mkdirs();
+            write(new File(mroot, "mod.hjson"),
+                    ("{name: \"ovrprobe\", displayName: \"ovrprobe\", author: \"selftest\", "
+                            + "description: \"selftest fixture\", version: \"1.0\", "
+                            + "minGameVersion: 154}").getBytes("UTF-8"));
+            File png = new File(ovr, "copper-wall.png");
+            android.graphics.Bitmap bm = android.graphics.Bitmap.createBitmap(32, 32,
+                    android.graphics.Bitmap.Config.ARGB_8888);
+            bm.eraseColor(MAGENTA);
+            java.io.FileOutputStream fo = new java.io.FileOutputStream(png);
+            bm.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, fo);
+            fo.close();
+            bm.recycle();
+
+            MschSheet shA = MschSheet.open(ctx, apkPath, "selftest-ovr");
+            MschAtlas.Region ra = shA == null ? null : shA.find("copper-wall");
+            int[] px = (shA == null || ra == null) ? null : shA.pixels(ra);
+            MschSheet shB = MschSheet.open(ctx, apkPath, "selftest-ovr-empty");
+            MschAtlas.Region rb = shB == null ? null : shB.find("copper-wall");
+            ok(stat, L, ra != null && ra.page != null && ra.page.startsWith("@mod:")
+                            && px != null && px.length > 0 && px[0] == MAGENTA,
+                    "★★端到端（覆盖）：夹具模组的 `sprites-override/copper-wall.png` **真的赢了**"
+                            + "（来源 = " + (ra == null ? "null" : ra.page) + " · 第一个像素 = "
+                            + (px == null || px.length == 0 ? "?" : Integer.toHexString(px[0])) + "）");
+            ok(stat, L, rb != null && rb.page != null && !rb.page.startsWith("@mod:"),
+                    "★★端到端（覆盖）**反方向**：同一个名字在没有这个模组的槽里仍然走图集"
+                            + "（来源 = " + (rb == null ? "null" : rb.page) + "）");
+            //  ★ 元断言：覆盖**不许误伤别的名字** —— 夹具只覆盖 `copper-wall`，
+            //    那么两槽里问一个别的原版方块（`router`）必须**同源同坐标**
+            MschAtlas.Region ra2 = shA == null ? null : shA.find("router");
+            MschAtlas.Region rb2 = shB == null ? null : shB.find("router");
+            ok(stat, L, ra2 != null && rb2 != null && ra2.page != null
+                            && ra2.page.equals(rb2.page) && ra2.x == rb2.x && ra2.y == rb2.y,
+                    "★元断言：夹具只覆盖了 `copper-wall` ⇒ 别的原版方块（`router`）两槽**同源**"
+                            + "（覆盖不许误伤）");
+            Data.deleteTree(ovrDir);
+            Data.deleteTree(Data.dirOf(ctx, "selftest-ovr-empty"));
+            MschSheet.open(ctx, apkPath, Data.currentSlot(ctx));    // 把 sheet 缓存拨回真槽
+            } catch (Throwable t) {
+                // 夹具造不出来 = 这条用例没验成（**不算通过**）：如实报，别静默
+                ok(stat, L, false, "③b 端到端（覆盖）：夹具造不出来 ⇒ 这条用例没验成 — " + t);
+            }
+        }
         L.add("");
     }
 
