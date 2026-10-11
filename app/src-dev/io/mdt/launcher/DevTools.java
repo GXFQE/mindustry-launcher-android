@@ -114,7 +114,9 @@ final class DevTools {
                 || intent.hasExtra("dev_crash_corpus")
                 || intent.hasExtra("dev_batch_export")
                 || intent.hasExtra("dev_batch_import")
-                || intent.hasExtra("dev_msch");
+                || intent.hasExtra("dev_msch")
+                || intent.hasExtra("dev_plugins")
+                || intent.hasExtra("dev_pluginprobe");
         if (!isDev) return;
         if ((a.getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) == 0) {
             Toast.makeText(a, R.string.dev_blocked_toast, Toast.LENGTH_SHORT).show();
@@ -666,6 +668,20 @@ final class DevTools {
             return;
         }
         // ── 蓝图（.msch）解析：拿真文件跑一遍，把**逐格配置 + 缺哪些方块**落到报告 ────
+        // ── S0 插件化（**dev 侧演示**；产品版整块不带 —— 与 SelfTest 同一条裁剪规矩）──────────
+        // 用法：`--es dev_plugins <插件目录>`  ⇒ 用插件渲染一页（加载失败则兜底 + 明说原因）
+        //       `--es dev_pluginprobe <目录>`  ⇒ 跑 S0 实验，报告写 `hub/report-plugin.txt`
+        // ★ 为什么收进 dev 口（而不是留在 MainActivity 上）：插件页与实验都是**开发/验收用**的，
+        //   产品版不该带；这里的白名单 + debuggable 那道门正好和 SelfTest / DevTools 共用一套。
+        String plugPage = intent.getStringExtra("dev_plugins");
+        if (plugPage != null && !plugPage.isEmpty()) {
+            a.setContentView(PluginProbeDev.buildPage(a, new File(plugPage)));
+        }
+        String plugProbe = intent.getStringExtra("dev_pluginprobe");
+        if (plugProbe != null && !plugProbe.isEmpty()) {
+            PluginProbeDev.runExperimentAsync(a, new File(plugProbe));
+        }
+
         // 用法：`--es dev_msch /sdcard/xxx.msch [--es dev_msch_slot <槽>]`
         // ★ 为什么要这个口：① 判据在 PC 上（`_lab/msch/` 拿游戏自己的读取器当神谕），
         //   设备这边要看的是**同一份内核在真机上跑真文件**；② 界面入口还没有，
