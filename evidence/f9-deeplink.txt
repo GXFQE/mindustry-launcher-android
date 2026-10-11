@@ -1,0 +1,98 @@
+=== F9 深链（第 128 轮）构建期 + 真机验收 ===
+设备 HONOR ELP-AN00 / Android 16（API 36）· 序列号 AJYMUT4522007370 · adb D:\AndroidSDK\platform-tools\adb.exe
+构建：DEBUGGABLE=true SUFFIX=-dev ./build.sh install（自检用）→ 收尾 ./build.sh install 装回产品版
+
+--- 0. 构建期门禁 ---
+[0/4] i18n check：34 条元断言全过；[res] 1204 keys（新增 4 条 deeplink_*）；SRC-01 命中 0 处；
+      SRC-02 中文字面量台账 21 个文件 / 436（台账）vs 436（实测）—— 新代码没往 Java 里塞中文
+[2/4] javac：产品构建 dev-only sources: EXCLUDED
+[3/4] d8 + inject → [4/4] zipalign + sign ⇒ == BUILD OK ==
+
+--- 1. 编译后的清单（aapt2 dump xmltree，与官方逐条对照）---
+我们 MainActivity 的两组 filter（编译产物）：
+  content 组：scheme=content + mimeType=application/octet-stream / application/x-msav / application/zip
+  file    组：scheme=file + mimeType=*/* + pathPattern=.*\.msav / .*\.msch / .*\.zip
+官方 [Android][v160]Mindustry.apk 的 mindustry.android.AndroidLauncher：
+  scheme=mindustry · scheme=content + octet-stream / x-msav · scheme=file + */* + pathPattern=.*\.msav
+★ 本轮真踩的坑：源里写 `.*\.msav`（**一个**反斜杠）时，aapt2 把它编译成 `.*.msav`（反斜杠被当转义吃掉），
+  而官方 dump 是 `.*\.msav` ⇒ 源里必须写 `\\.`。aapt2 / 编译器对此**一声不响**。
+  ⇒ 自检用 `xmsav` / `xXmsav` 两条反方向当尺子（写坏成 `.*.msav` 时这两条会被匹配上 ⇒ 判死）。
+
+--- 2. 清单匹配（cmd package query-activities —— 问的是**装在这台机器上**的那一份）---
+content://x/y        + application/octet-stream → Activity #16，含 io.mdt.launcher.MainActivity
+file:///sdcard/x.msav + */*                    → Activity #91，含我们
+file:///sdcard/x.txt  + */*                    → 不含我们（反方向）
+file:///sdcard/xXmsav + */*                    → 不含我们（pathPattern 的尺子）
+★ 系统实际会开谁（cmd package resolve-activity --brief）：
+  content://… + octet-stream → com.hihonor.android.internal.app/.HwResolverActivity（选择器）
+  file://…    + */*          → com.hihonor.fileservice/.filepreview.view.PreviewActivity（isDefault=true，ROM 自带预览）
+
+--- 3. pathPattern 的第二个坑（本机 ROM；三方对照）---
+file:///sdcard/x.msav          → 我们 ✓ · 官方 Mindustry ✓ · MindustryX ✓
+file:///sdcard/x.y.msav        → 三者全 ✗
+file:///sdcard/foo.bar/x.msav  → 三者全 ✗
+file:///storage/emulated/0/Android/data/io.mdt.launcher/hub/dl/sample.msav → 我们 ✗（路径里有 `io.mdt.launcher` 的两个点）
+⇒ **路径里多一个点就不匹配**；官方那两个包（同一形状的 filter）表现与我们**完全一致**
+  ⇒ 这是系统的 `pathPattern` 行为，不是我们清单抄错。
+
+--- 4. 冷启动 .msav（file://，我们自己的外部目录里那份）---
+adb shell am force-stop io.mdt.launcher
+adb shell am start -n io.mdt.launcher/.MainActivity -a android.intent.action.VIEW \
+    -d file:///storage/emulated/0/Android/data/io.mdt.launcher/hub/dl/sample.msav -t '*/*'
+topResumedActivity = io.mdt.launcher/.MapsActivity
+slot-m3-deeplink/maps/sample.msav = 98162 B（与源文件同大小）
+证据截图：evidence/f9-1-map.png
+
+--- 5. 热路径（onNewIntent）· .msch ---
+先起主界面（top=MainActivity）再发同一条 VIEW：
+  Warning: Activity not started, intent has been delivered to currently running top-most instance.
+topResumedActivity = io.mdt.launcher/.BlueprintsActivity
+slot-m3-deeplink/schematics/sample.msch = 1325 B
+证据截图：evidence/f9-2-blueprints.png
+
+--- 6. 整包 zip（mdt-maps-20261011-1615.zip：甲.msav + sub/乙.msav）---
+topResumedActivity = io.mdt.launcher/.MapsActivity
+弹窗正文：共处理 2 份 / 导入成功：2 / 从 mdt-maps-20261011-1615.zip 里解出 2 份
+槽里：甲.msav · 乙.msav（`sub/乙.msav` 落成 basename ⇒ 解包只取最后一段那条防线生效）
+证据截图：evidence/f9-3-zip-bundle.png
+
+--- 7. 两条负路径 ---
+unknown.bin（文本内容）→ 弹窗标题 unknown.bin +「认不出这个文件是什么。支持：.msav 地图、.msch 蓝图，
+    以及本启动器导出的整包 zip。」（evidence/f9-4-unknown.png）
+file:///sdcard/Download/public.msav（公共目录）→ 头 4 字节读不到 ⇒「读不到这个文件：可能已经不在了…」
+    （evidence/f9-5-open-failed.png）
+  ⇒ API 36 + scoped storage 下我们读不了公共目录的 file:// —— 官方 filter4 那一格实测就是这个下场。
+
+--- 8. 走系统选择器真的点一次（隐式 intent）---
+adb shell am start -a android.intent.action.VIEW -d content://x/y -t application/octet-stream
+系统弹 HwResolverActivity「使用以下方式打开」：
+  第 1 页 8 个：音乐 / 压缩文件查看器 / 文件管理 / 使用荣耀文档查看 / WPS Office / 学习通 / DeepSeek / 保存到解压专家
+  第 2 页 8 个：MindustryX / 华为运动健康 / 保存到夸克网盘 / 发送到电脑 / 夸克 / (推荐) APK 安装器 /
+              **Mindustry**（官方） / **MDT 启动器**（我们）
+点「MDT 启动器」（选中态）→ 点「仅此一次」
+topResumedActivity = io.mdt.launcher/.MainActivity ⇒ 我们真的接到了这条 VIEW
+（URI 是假的 content://x/y ⇒ 如实弹「读不到这个文件」；evidence/f9-12-after-chooser-tap.png）
+⚠️ 这一步**自动化不了**：`adb shell am start --grant-read-uri-permission` 对真 content URI 会
+   SecurityException（UID 2000 没有那个 URI 的权限，系统提示走 ACTION_OPEN_DOCUMENT）
+   ⇒ content:// 那条只能用 query-activities（清单侧）+ 手点（路由侧）两侧夹住。
+
+--- 9. 自检（dev 版，hub/report-m3.txt）---
+「通过 1087 项，失败 0 项」（第 127 轮 1062 + 本节 25；第 126 轮收尾时是 1027，其后 +35）
+新一节「第 128 轮：F9 深链」25 条全绿，含：
+  · kindFor 判据表（后缀 / 魔数 / mime 三级 + 每级一条反方向）
+  · 两种「不知道」必须分开（UNKNOWN = 认不出 vs PROBE = 得读内容）
+  · wantsBatch / kindOfHits / kindOfBundleName 纯函数表 +「优先级固定、与命中顺序无关」元断言
+  · guessKind 端到端（四个真 zip）+「同一个包只换名字结果就不同」元断言
+  · **安装后清单门禁**：queryIntentActivities 认 .msav/.msch/.zip；`xmsav`/`xXmsav`/`.txt` 不认；
+    content 三种 mime 认、text/plain 不认；**游戏那个 Activity 一个 filter 都没有**；接住我们的是 MainActivity
+  · 4 条新文案实拼 + 无残留占位符
+⚠️ 中途把当前槽切到一次性测试槽 m3-deeplink 时自检是 1081/6 —— 6 条全在「贴图图集」那节（它要"当前槽有版本
+   指向"，拿不到 APK 就按约定判死）。拨回真槽「模组演示」后复跑 = **1087 / 0**。
+
+--- 10. 收尾 ---
+当前槽已拨回 `模组演示`（app_hub/mdt-slot.txt）· 测试槽 slot-m3-deeplink 与 hub/dl 夹具已删 ·
+/sdcard/x.msav 与 /sdcard/Download/public.msav 已删 · 设备上装回**产品版**（./build.sh install）。
+
+⚠️ 上面点名的 6 张截图（f9-1-map / f9-2-blueprints / f9-3-zip-bundle / f9-4-unknown /
+f9-5-open-failed / f9-12-after-chooser-tap）**只在本地**：`.gitignore:28` 把 `evidence/*.png`
+挡在仓库外（与既有的 android 报告一致）。它们的哈希与拍摄时刻在这一轮的会话记录里。

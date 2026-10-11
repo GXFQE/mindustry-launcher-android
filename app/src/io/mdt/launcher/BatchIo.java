@@ -872,6 +872,18 @@ final class BatchIo {
     }
 
     /**
+     * 这一批该走**批量**还是**单份**？—— 四个页面（SAF 那条路）与 F9 深链那条路
+     * **共用的唯一判据**（一处判据、两处调用；各写一遍就会漂）。
+     *
+     * <p>选 1 个普通文件 = 单份（各页自己的老路：命名框 / 逐个同名确认）；
+     * ≥2 份或一个压缩包（`.zip` / `.jar`）= 批量（见 {@link #runImport}）。
+     */
+    static boolean wantsBatch(List<Doc> docs) {
+        return docs != null && !docs.isEmpty()
+                && (docs.size() > 1 || isArchiveName(docs.get(0).name));
+    }
+
+    /**
      * 读一个压缩包得出的三个事实。
      *
      * <p>★ 为什么不沿用"命中条目 or null"那个二态（2026-10-10 改）：它**分不开**
@@ -943,6 +955,104 @@ final class BatchIo {
             closeQuietly(zin);
         }
         return p;
+    }
+
+    /**
+     * 开一条**新流**读一遍 zip 得出 {@link Probe}（读不动返回 null，不抛）。
+     *
+     * <p>🔴 为什么必须是"开一条新流"而不是把流传进来：`probe` 只读到**它需要的那个位置**
+     * 就返回（命中根上的 `mod.hjson` 时甚至只读前几条）⇒ **同一份要探两次就必须重新开流**
+     * —— 把同一条 `InputStream` 递给第二个读者，它只会读到 **0 个条目**
+     * （同 §88.11 那次：`extractModFolders` 先认模组夹后解包，第二遍就"打成 0 个"）。
+     *
+     * <p>⚠️ 打不开 / 读不动 ⇒ **不在这里报失败**：判"这份到底能不能导"的那一处是各自的
+     * `import*`，它的话比这里准（`expand` 与 {@link #guessKind} 都是这个口径）。
+     */
+    static Probe probeDoc(Context ctx, Doc d, String[] exts, String[] rootMarkers) {
+        InputStream in = null;
+        try {
+            in = d.open(ctx);
+            return probe(in, exts, rootMarkers);
+        } catch (Throwable t) {
+            Log.i(TAG, "bundle probe skipped: " + d.name + " / " + Util.ioReason(ctx, t));
+            return null;
+        } finally {
+            closeQuietly(in);
+        }
+    }
+
+    // ══ 深链（F9）：一个压缩包里装的是哪一类 ═════════════════════════════════
+
+    /** 定类时一次看全四种后缀（按内容判，不靠用户把包命名对） */
+    static final String[] GUESS_EXTS = {".msch", ".msav", ".jar", ".zip"};
+
+    /**
+     * **一个压缩包里装的是哪一类**（F9 深链用）。认不出 ⇒ -1，调用方给"这个包里没有…"那句话。
+     *
+     * <p>判据顺序（都是**内容**，不是文件名）：
+     * <ol>
+     *   <li>包根上就有 `mod.hjson` ⇒ 它本身就是**一个模组包**（mods）；</li>
+     *   <li>按命中的条目名定类（见 {@link #kindOfHits}）；</li>
+     *   <li>一条都没命中时，模组还有"一堆模组**文件夹**打成 zip"这种（见 {@link #modFolderNames}）。</li>
+     * </ol>
+     * ⚠️ 必须在**后台线程**调（会把整包读一遍，几十 MB）。
+     */
+    static int guessKind(Context ctx, Doc d) {
+        Probe p = probeDoc(ctx, d, GUESS_EXTS, Mods.META_FILES);
+        if (p == null || !p.zip) return -1;
+        if (p.selfPack) return KIND_MODS;
+        int k = kindOfHits(p.hits, d.name);
+        if (k >= 0) return k;
+        InputStream in = null;
+        try {
+            in = d.open(ctx);
+            if (!modFolderNames(in, Mods.META_FILES).isEmpty()) return KIND_MODS;
+        } catch (Throwable t) {
+            Log.i(TAG, "mod folders probe skipped: " + d.name + " / " + Util.ioReason(ctx, t));
+        } finally {
+            closeQuietly(in);
+        }
+        return -1;
+    }
+
+    /**
+     * ★ **纯函数**：按命中的条目名定类 —— 自检直接喂字符串钉判据表。
+     *
+     * <p>固定优先级（与命中顺序无关，别写成"遇到谁就返回谁"）：
+     * `.msch` ⇒ 蓝图 · `.jar` / 内层 `.zip` ⇒ 模组 · `.msav` ⇒ 地图/存档。
+     *
+     * <p>★ `.msav` 是**地图与存档同一个容器** ⇒ 光看内容分不开，靠**整包的文件名**分
+     * （我们自己的导出器就按 `mdt-<类>-…zip` 命名，见 {@link #kindOfBundleName}）；
+     * 分不出来一律按**地图页**处理 —— 那页自己会认出"这其实是一份存档"并说明（`MapFiles`）。
+     */
+    static int kindOfHits(List<String> hits, String bundleName) {
+        boolean bp = false, mod = false, map = false;
+        if (hits != null) {
+            for (String h : hits) {
+                String n = h == null ? "" : h.toLowerCase(Locale.ROOT);
+                if (n.endsWith(".msch")) bp = true;
+                else if (n.endsWith(".jar") || n.endsWith(".zip")) mod = true;
+                else if (n.endsWith(".msav")) map = true;
+            }
+        }
+        if (bp) return KIND_BLUEPRINTS;
+        if (mod) return KIND_MODS;
+        if (!map) return -1;
+        return kindOfBundleName(bundleName) == KIND_SAVES ? KIND_SAVES : KIND_MAPS;
+    }
+
+    /**
+     * 从**整包的文件名**认类型：我们自己的导出器命名规则是 `mdt-<类>-<日期>-<时间>.zip`
+     * （见 {@link #suggestZipName}，`<类>` 就是 {@link #keyOf} 那几个 ASCII key）。
+     * 认不出 ⇒ -1（那就只能按内容判）。
+     */
+    static int kindOfBundleName(String name) {
+        String n = name == null ? "" : name.trim().toLowerCase(Locale.ROOT);
+        if (!n.startsWith("mdt-")) return -1;
+        for (int k = KIND_MAPS; k <= KIND_MODS; k++) {
+            if (n.startsWith("mdt-" + keyOf(k) + "-")) return k;
+        }
+        return -1;
     }
 
     /**
@@ -1144,20 +1254,10 @@ final class BatchIo {
                 continue;
             }
             // 先读一遍判它是"一整包"还是"包本身"（判据见 Probe 的注释）
-            Probe p = null;
+            //   ⚠️ 打开与关闭都在 `probeDoc` 里（它自己开一条新流）—— 这里只留一个
+            //      **给下面解包复用**的变量，别把 `probeDoc` 那条流接过来用
+            Probe p = probeDoc(ctx, d, exts, rootMarkers);
             InputStream in = null;
-            try {
-                in = d.open(ctx);
-                p = probe(in, exts, rootMarkers);
-            } catch (Throwable t) {
-                // ⚠️ 打不开 / 读不动 ⇒ **不报失败**：当普通文件往下走，
-                //   真正的判据在各自的 `import*` 里，它的话比这里准
-                Log.i(TAG, "bundle probe skipped: " + d.name + " / " + Util.ioReason(ctx, t));
-                p = null;
-            } finally {
-                closeQuietly(in);
-                in = null;
-            }
             if (p == null || !p.zip || p.selfPack) {
                 items.add(Item.ofUri(d.uri, d.name));
                 continue;

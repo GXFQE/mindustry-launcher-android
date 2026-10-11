@@ -220,6 +220,10 @@ public class ModsActivity extends BaseActivity {
         // 布局里那些静态文案已搬到 Java（见 Trans）：布局够不到用户语言包
         Trans.bind(root, R.id.mod_search, R.string.mods_search_hint);
 
+        // F9 深链：本页是被外部"打开方式"（浏览器 / 文件管理器）叫起来的
+        //   ⇒ 与 SAF 那条路**同一份**分流判据（见 importDocs）
+        final java.util.List<BatchIo.Doc> dl = DeepLink.docsOf(getIntent(), this);
+        if (!dl.isEmpty()) importDocs(dl, mSlot);
     }
 
     // ── F13 第三阶段：导入模组包 / 跨槽复制 ────────────────────────────────
@@ -254,8 +258,30 @@ public class ModsActivity extends BaseActivity {
         if (resultCode != RESULT_OK || data == null || slot == null) {
             return;
         }
-        java.util.List<BatchIo.Doc> docs = BatchIo.docsOf(this, data);
-        if (docs.isEmpty()) return;
+        importDocs(BatchIo.docsOf(this, data), slot);
+    }
+
+    /**
+     * 导入入口的**唯一**判据 —— SAF 那条路（{@link #onActivityResult}）与 F9 深链那条路共用。
+     *
+     * <p>三条：① 游戏在跑 ⇒ 先挡（写槽的门禁；按钮那边也有一道同样的预检，
+     * 只是为了让用户别白选一次文件）；② 多份 ⇒ 批量；③ 单份走下面那条带 probe 的路。
+     *
+     * <p>★ 模组比另外三类**多一层**：一个 `.zip` / `.jar` 有三种可能 —— **一个模组包**
+     * （99% 的情况）、**我们自己导出的一整包**（把一槽模组导出成 zip 再导回来）、
+     * **一堆模组文件夹**打成的 zip（包里一条 .jar/.zip 都没有）。后两种必须解开逐份导，
+     * 而判据只有读过 zip 才知道 ⇒ 单份要先**后台探一下**（`modsBatchWanted` 一看到包根的
+     * `mod.hjson` 就立刻返回，常见情况只读前几个条目）。
+     * ⇒ 所以这里**不能**用 {@link BatchIo#wantsBatch} 替掉 ②：那会把"一个 .jar"直接当批量，
+     *   而"一个 .jar 到底是单个模组还是整包"正是要靠 probe 分的。
+     */
+    private void importDocs(java.util.List<BatchIo.Doc> docs, final String slot) {
+        if (docs == null || docs.isEmpty()) return;
+        if (Data.gameAlive(this)) {
+            alert(Trans.get(ModsActivity.this, R.string.game_busy_title),
+                    Trans.get(ModsActivity.this, R.string.mods_import_busy_msg));
+            return;
+        }
         // ★ 第 127 轮：多选 ⇒ 批量（按文件名落位，同名只问一次）
         if (docs.size() > 1) {
             BatchIo.runImport(this, slot, docs, BatchIo.KIND_MODS, new Runnable() {
@@ -263,11 +289,6 @@ public class ModsActivity extends BaseActivity {
             });
             return;
         }
-        // ★ 单份：`.zip` / `.jar` 有三种可能 —— **一个模组包**（99% 的情况）、**我们自己导出的
-        //   一整包**（把一槽模组导出成 zip 再导回来）、**一堆模组文件夹**打成的 zip
-        //   （包里一条 .jar/.zip 都没有）。后两种必须解开逐份导，而判据只有读过 zip 才知道
-        //   ⇒ 先**后台探一下**（`modsBatchWanted` 一看到包根的 `mod.hjson` 就立刻返回，
-        //   常见情况只读前几个条目），探完再决定走哪条路。
         final BatchIo.Doc one = docs.get(0);
         if (!BatchIo.isArchiveName(one.name)) {
             doImport(slot, one.uri, one.name, false);       // 非 .zip/.jar：老路（由它去报"只认这两种"）

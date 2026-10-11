@@ -105,6 +105,9 @@ public class MainActivity extends BaseActivity {
         android.util.Log.i("MDTLauncher", "MainActivity onCreate");
         buildUi();
         checkDevIntent(getIntent());
+        // F9 深链：外部（浏览器 / 文件管理器）递进来的那一份 —— 冷启动走这里，
+        //   已经在跑时走 onNewIntent（本 Activity 是 singleTop）
+        DeepLink.claim(this, getIntent());
         // F16：旧格式备份自动转 CAS（后台、幂等、静默）。
         // 放在这里而不是存档页 —— 启动器一打开就维护，用户不必"先去看一眼备份"。
         Backup.autoMigrateAsync(this);
@@ -116,6 +119,7 @@ public class MainActivity extends BaseActivity {
         android.util.Log.i("MDTLauncher", "MainActivity onNewIntent");
         setIntent(intent);
         checkDevIntent(intent);
+        DeepLink.claim(this, intent);       // F9 深链（热路径：应用已经在前台）
     }
     /**
      * dev 直通口的入口（`am start --es dev_xxx …`）。

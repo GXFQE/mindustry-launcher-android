@@ -100,16 +100,7 @@ final class SlotIo {
             //   见 {@link BatchIo#runImport}。
             List<BatchIo.Doc> docs = BatchIo.docsOf(a, data);
             if (docs.isEmpty()) return true;
-            if (docs.size() > 1 || BatchIo.isArchiveName(docs.get(0).name)) {
-                BatchIo.runImport(a, slot, docs, BatchIo.KIND_SAVES,
-                        h == null ? null : new Runnable() {
-                            @Override public void run() {
-                                h.onSlotChanged();      // 页面/槽页重扫自己（导入完列表要跟上）
-                            }
-                        });
-                return true;
-            }
-            importMsav(a, docs.get(0).uri, docs.get(0).name, slot, h);
+            importDocs(a, slot, docs, h);
             return true;
         }
         if (req == REQ_ZIP) {
@@ -591,7 +582,7 @@ final class SlotIo {
      */
 
     /** 目标槽是否正被游戏占用（占用了就不许往里写，除非是纯读的导出） */
-    private static boolean blockedByGame(Activity a, Data.Slot s) {
+    static boolean blockedByGame(Activity a, Data.Slot s) {
         if (s.active && Data.gameAlive(a)) {
             alert(a, Trans.get(a, R.string.game_busy_title),
                     Trans.get(a, R.string.game_busy_msg_fmt, s.name));
@@ -601,6 +592,31 @@ final class SlotIo {
     }
 
     // ── .msav 迁移 ────────────────────────────────────────────────────────
+
+    /**
+     * 存档导入入口的**唯一**判据 —— SAF 那条路（{@link #onActivityResult} 的 `REQ_MSAV`）
+     * 与 F9 深链那条路（{@link SavesActivity} 的入口）共用。
+     *
+     * <p>≥2 份或一个压缩包 ⇒ 批量（判据 {@link BatchIo#wantsBatch}）；
+     * 一份普通文件 ⇒ 单份那条老路（{@link #importMsav}：含改名框与逐个同名确认）。
+     *
+     * <p>⚠️ 写槽那道门禁（{@link #blockedByGame}）**没有**收进这里：它要的是 `Data.Slot`
+     * （判"是不是当前槽"），不是槽名 ⇒ 留在两处调用点上各过一遍，用的是同一个实现。
+     */
+    static void importDocs(Activity a, String slot, List<BatchIo.Doc> docs, SlotOps.Host h) {
+        if (docs == null || docs.isEmpty() || slot == null) return;
+        final SlotOps.Host hh = h;
+        if (BatchIo.wantsBatch(docs)) {
+            BatchIo.runImport(a, slot, docs, BatchIo.KIND_SAVES,
+                    hh == null ? null : new Runnable() {
+                        @Override public void run() {
+                            hh.onSlotChanged();         // 页面/槽页重扫自己（导入完列表要跟上）
+                        }
+                    });
+            return;
+        }
+        importMsav(a, docs.get(0).uri, docs.get(0).name, slot, h);
+    }
 
     /**
      * F15：槽菜单入口 —— 目标槽就是用户刚点的那个，**跳过选槽页**直接挑文件。

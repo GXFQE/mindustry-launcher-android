@@ -1821,4 +1821,15 @@
     <string name="mods_export_sub">可多选；多份会打包成一个 zip</string>
     <string name="mods_export_none_fmt">槽「%1$s」里没有可导出的模组</string>
     <string name="mods_export_dir_hint">目录形态，导出成 zip</string>
+
+    <!--
+      ══ F9 深链（第 128 轮）：外部（浏览器 / 文件管理器）把一份文件交给启动器 ══
+      ★ 只认本地文件（content / file 两种 scheme）；认不出时说"支持哪些"。
+      ★ `deeplink_reading` 是**读内容定类型**那一步的标题 —— 一个 zip 得先读一遍
+        才知道里面装的是模组 / 地图 / 存档 / 蓝图（判据见 BatchIo.guessKind）。
+    -->
+    <string name="deeplink_reading">正在识别这个压缩包…</string>
+    <string name="deeplink_unrecognized">认不出这个文件是什么。支持：.msav 地图、.msch 蓝图，以及本启动器导出的整包 zip。</string>
+    <string name="deeplink_zip_empty">这个压缩包里没有能导入的东西（模组 / 地图 / 存档 / 蓝图）。</string>
+    <string name="deeplink_open_failed">读不到这个文件：可能已经不在了，或者本应用没有读取它的权限（新版安卓下「下载」这类公共目录里的文件本应用读不了，用文件管理器「分享 / 打开方式」发过来才行）。</string>
 </resources>

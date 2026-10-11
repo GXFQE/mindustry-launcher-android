@@ -279,6 +279,8 @@ public final class SelfTest {
             langPack(ctx, L, stat);
             // ★ 第 127 轮：批量导入 / 导出（四种来源打一个 zip + 整包判据 + 端到端往返）
             batchIo(ctx, L, stat);
+            // ★ 第 128 轮：F9 深链（判据表 + 整包定类 + 端到端 + **安装后清单门禁**）
+            deepLink(ctx, L, stat);
             // ★ 篡改对象池的用例放**最后**：它会在池里留下一个内容坏掉的对象，
             //   之后任何"再备份一次"都会因为 `has()` 命中而复用坏对象（CAS 的固有
             //   假设是"池内不可变"）。放在最后就不影响别的用例。
@@ -4788,7 +4790,7 @@ public final class SelfTest {
      *   <li><b>认不出 ⇒ 中性色**不是**空格</b>（拿假表喂进去，要求颜色是 {@link MschPreview#UNKNOWN}）；</li>
      *   <li><b>负例</b>：null / 解不出来 / 没瓦片 / maxSide≤0 / 坐标炸出上限 ⇒ 一律 null，不崩、不留空框。</li>
      * </ol>
-     * ⚠️ 真语料那条**更硬的证据在 PC 侧**（`.tmp-prev-lab/CheckGeom.java`，2026-10-06 实跑）：
+     * ⚠️ 真语料那条**更硬的证据在 PC 侧**（`MDT-Android-Dev/_lab/msch/CheckGeom.java`，2026-10-06 实跑）：
      *   5369 份 `.msch` 里解得出来 5321 份；**「方块全认识」的 5009 份中 4911 份的包围盒
      *   与文件声明的宽高逐格相同**（对不上的 98 份全是自检/实验室造的夹具，或含**尺寸未知的
      *   模组方块**——后者本来就会算小，属预期）。自检这边不复现那个规模，只钉口径。
@@ -10234,6 +10236,268 @@ public final class SelfTest {
             Data.deleteTree(Data.dirOf(ctx, SLOT_BATCH));
         }
         L.add("");
+    }
+
+    /**
+     * 第 128 轮：**F9 深链**（外部点一个 `.msav` / `.msch` / 整包 zip ⇒ 该进哪一页）。
+     *
+     * <p>这一节钉四件事：
+     * <ol>
+     *   <li><b>判据表</b>（纯函数 `DeepLink.kindFor`）：后缀 → 内容魔数 → mime 三级，
+     *       每级各配一条反方向；★ 两种「不知道」必须分开：`UNKNOWN` = 认不出（该说那句话），
+     *       `PROBE` = 是个压缩包、得读一遍内容才知道是哪一类；</li>
+     *   <li><b>整包定类</b>（纯函数 `BatchIo.kindOfHits` / `kindOfBundleName`）：`.msav`
+     *       是地图与存档**同一个容器** ⇒ 靠整包文件名分；优先级固定、与命中顺序无关；</li>
+     *   <li><b>端到端</b>：真造几个 zip 喂 `BatchIo.guessKind`（内容说了算，名字只在
+     *       `.msav` 那一档当提示）；外加一条元断言 —— **同一个包换个名字结果就不同**；</li>
+     *   <li><b>安装后的清单门禁</b>：拿 `queryIntentActivities` 问系统我们到底认哪些。
+     *       ★ 这是唯一能发现「清单挂了但没人匹配」的尺子：aapt2 不检查 filter，而且
+     *       `pathPattern` 少一个反斜杠会**静默**变成另一个正则（见 `xXmsav` 那条反方向）；
+     *       同时钉住「游戏那个 Activity 一个 filter 都没有」这条架构判据。</li>
+     * </ol>
+     */
+    private static void deepLink(Context ctx, List<String> L, int[] stat) {
+        L.add("── 第 128 轮：F9 深链（点 .msav / .msch / 整包 zip 该进哪一页）──");
+
+        // ── ① 判据表：后缀 → 魔数 → mime（纯函数，喂字节就行）──────────────
+        byte[] zipHead = {'P', 'K', 3, 4};
+        byte[] mschHead = {'m', 's', 'c', 'h'};
+        byte[] zlibHead = {(byte) 0x78, (byte) 0x9c};
+        byte[] gzipHead = {0x1f, (byte) 0x8b};
+        byte[] textHead = "hello-this-is-not-a-container".getBytes();
+        ok(stat, L, DeepLink.kindFor("图.msav", null, null) == BatchIo.KIND_MAPS
+                        && DeepLink.kindFor("图.MSAV", null, null) == BatchIo.KIND_MAPS
+                        && DeepLink.kindFor("蓝图.msch", null, null) == BatchIo.KIND_BLUEPRINTS,
+                "① 后缀就是答案：`.msav`（含大写）⇒ 地图页 · `.msch` ⇒ 蓝图页");
+        ok(stat, L, DeepLink.kindFor("一整包.zip", null, null) == DeepLink.PROBE
+                        && DeepLink.kindFor("一个模组.jar", null, null) == BatchIo.KIND_MODS,
+                "① `.zip` ⇒ **必须读内容**才定类（整包可能是四类里任一类）；`.jar` ⇒ 一个模组包");
+        ok(stat, L, DeepLink.kindFor("download", null, mschHead) == BatchIo.KIND_BLUEPRINTS
+                        && DeepLink.kindFor("download", null, zlibHead) == BatchIo.KIND_MAPS
+                        && DeepLink.kindFor("download", null, gzipHead) == BatchIo.KIND_MAPS
+                        && DeepLink.kindFor("download", null, zipHead) == DeepLink.PROBE,
+                "★★ ④ 无后缀的下载文件（浏览器里最常见的那种名字）：靠头 4 字节认容器"
+                        + "（msch 头 / zlib / gzip / PK）");
+        ok(stat, L, DeepLink.kindFor("x.bin", "application/x-msav", null) == BatchIo.KIND_MAPS
+                        && DeepLink.kindFor("x.bin", "text/plain", textHead) == DeepLink.UNKNOWN
+                        && DeepLink.kindFor("x.bin", null, textHead) == DeepLink.UNKNOWN,
+                "① mime 兜底：`application/x-msav`（官方声明过的那个）⇒ 地图；什么都不是 ⇒ 认不出");
+        ok(stat, L, DeepLink.UNKNOWN != DeepLink.PROBE,
+                "★ 元断言：两种「不知道」不是一回事 —— 认不出（说那句话）vs 得读内容（去读一遍），"
+                        + "挤成同一个值就会对着 zip 说「认不出这个文件」");
+        ok(stat, L, DeepLink.isZipHead(zipHead) && DeepLink.isMschHead(mschHead)
+                        && DeepLink.isZlibHead(zlibHead) && DeepLink.isGzipHead(gzipHead)
+                        && !DeepLink.isZipHead(zlibHead) && !DeepLink.isMschHead(zipHead)
+                        && !DeepLink.isZlibHead(gzipHead) && !DeepLink.isGzipHead(zlibHead)
+                        && !DeepLink.isMschHead(zlibHead),
+                "① 四个魔数谓词各自的正反两面（`isZlibHead` 只认 78 01/9c/da/5e 那几种）");
+        ok(stat, L, !DeepLink.isZipHead(null) && !DeepLink.isZlibHead(new byte[1])
+                        && !DeepLink.isGzipHead(null) && !DeepLink.isMschHead(new byte[2])
+                        && !DeepLink.isZipHead(new byte[0]),
+                "① 短输入 / null 不许抛 —— 深链那条路拿到的是**外人给的数据**");
+
+        // ── ② 「一份还是一批」的唯一判据 ──────────────────────────────────
+        List<BatchIo.Doc> one = new java.util.ArrayList<>();
+        one.add(doc("图.msav"));
+        List<BatchIo.Doc> two = new java.util.ArrayList<>(one);
+        two.add(doc("图2.msav"));
+        List<BatchIo.Doc> oneZip = new java.util.ArrayList<>();
+        oneZip.add(doc("一整包.zip"));
+        List<BatchIo.Doc> oneJar = new java.util.ArrayList<>();
+        oneJar.add(doc("一个模组.jar"));
+        ok(stat, L, !BatchIo.wantsBatch(one) && BatchIo.wantsBatch(two)
+                        && BatchIo.wantsBatch(oneZip) && BatchIo.wantsBatch(oneJar)
+                        && !BatchIo.wantsBatch(null) && !BatchIo.wantsBatch(new java.util.ArrayList<BatchIo.Doc>()),
+                "★「一份还是一批」的唯一判据（四个页面 + 深链共用）：1 份普通文件 = 单份；"
+                        + "≥2 份或一个压缩包 = 批量；null / 空清单不许抛");
+
+        // ── ③ 整包定类：按命中条目 / 按整包文件名（都是纯函数）──────────────
+        List<String> hBp = new java.util.ArrayList<>();
+        hBp.add("sub/图.msch");
+        List<String> hMod = new java.util.ArrayList<>();
+        hMod.add("pack/a.jar");
+        hMod.add("pack/b.zip");
+        List<String> hMap = new java.util.ArrayList<>();
+        hMap.add("sub/图.msav");
+        List<String> hMix1 = new java.util.ArrayList<>();
+        hMix1.add("x.msch");
+        hMix1.add("y.jar");
+        List<String> hMix2 = new java.util.ArrayList<>();
+        hMix2.add("y.jar");
+        hMix2.add("x.msch");
+        ok(stat, L, BatchIo.kindOfHits(hBp, "随便.zip") == BatchIo.KIND_BLUEPRINTS
+                        && BatchIo.kindOfHits(hMod, "随便.zip") == BatchIo.KIND_MODS
+                        && BatchIo.kindOfHits(hMap, "随便.zip") == BatchIo.KIND_MAPS
+                        && BatchIo.kindOfHits(hMap, "mdt-saves-20261010-1930.zip") == BatchIo.KIND_SAVES
+                        && BatchIo.kindOfHits(new java.util.ArrayList<String>(), "x.zip") == -1,
+                "★ 按命中条目定类：`.msch` ⇒ 蓝图 · `.jar`/`.zip` ⇒ 模组 · `.msav` ⇒ 地图/存档"
+                        + "（同一个容器 ⇒ 靠整包名 `mdt-saves-…` 分成存档；一条都不命中 ⇒ -1）");
+        ok(stat, L, BatchIo.kindOfHits(hMix1, "x.zip") == BatchIo.kindOfHits(hMix2, "x.zip")
+                        && BatchIo.kindOfHits(hMix1, "x.zip") == BatchIo.KIND_BLUEPRINTS,
+                "★ 元断言：优先级固定、**与命中顺序无关**（别写成「遇到谁就返回谁」）");
+        ok(stat, L, BatchIo.kindOfBundleName("mdt-mods-20261010-1930.zip") == BatchIo.KIND_MODS
+                        && BatchIo.kindOfBundleName("MDT-MAPS-20261010-1930.zip") == BatchIo.KIND_MAPS
+                        && BatchIo.kindOfBundleName("mdt-blueprints-1.zip") == BatchIo.KIND_BLUEPRINTS
+                        && BatchIo.kindOfBundleName("用户自己起的名.zip") == -1,
+                "★ 整包文件名里的类型（我们导出器的命名规则 `mdt-<类>-…`，认不出 ⇒ -1）");
+
+        // ── ④ 端到端：真造几个 zip 喂 guessKind ────────────────────────────
+        File root = new File(Paths.privateDir(ctx), "selftest-deeplink");
+        deleteTree(root);
+        root.mkdirs();
+        try {
+            File mapsZip = new File(root, "随便一个名字.zip");
+            zipMany(mapsZip, new String[]{"sub/图.msav", "sub/图2.msav"},
+                    new String[]{"AAA", "BBB"});
+            int kMaps = BatchIo.guessKind(ctx, docsOf(mapsZip).get(0));
+            ok(stat, L, kMaps == BatchIo.KIND_MAPS,
+                    "★ 端到端：包里两条 `.msav` ⇒ 判成地图（**内容说了算**，名字是「随便一个名字」）");
+
+            File savesZip = new File(root, "mdt-saves-20261010-1930.zip");
+            copyFile(mapsZip, savesZip);
+            int kSaves = BatchIo.guessKind(ctx, docsOf(savesZip).get(0));
+            ok(stat, L, kSaves == BatchIo.KIND_SAVES && kMaps != kSaves,
+                    "★★ 元断言：**同一个包、只换名字 ⇒ 结果就不同**（地图 → 存档）"
+                            + " ⇒ 说明文件名那条提示真的被读了，不是写死的常量");
+
+            File bpZip = new File(root, "b.zip");
+            zipMany(bpZip, new String[]{"sub/图.msch"}, new String[]{"msch-head"});
+            ok(stat, L, BatchIo.guessKind(ctx, docsOf(bpZip).get(0)) == BatchIo.KIND_BLUEPRINTS,
+                    "★ 端到端：一条 `.msch` ⇒ 蓝图");
+
+            File modPack = new File(root, "一个模组.zip");
+            zipMany(modPack, new String[]{"mod.hjson", "maps/图.msav"},
+                    new String[]{"name: m\n", "x"});
+            ok(stat, L, BatchIo.guessKind(ctx, docsOf(modPack).get(0)) == BatchIo.KIND_MODS,
+                    "★ 包根上就是 `mod.hjson` ⇒ 它**本身**是一个模组包（哪怕里面还带地图）"
+                            + "⇒ 模组（拆碎它就是那个老 bug）");
+
+            File folderPack = new File(root, "一堆模组夹.zip");
+            zipMany(folderPack, new String[]{"a/mod.hjson", "b/mod.hjson"}, new String[]{"n", "n"});
+            ok(stat, L, BatchIo.guessKind(ctx, docsOf(folderPack).get(0)) == BatchIo.KIND_MODS,
+                    "★ 一条 .jar/.zip 都没有、但一级目录里放着 `mod.hjson` ⇒ 还是模组整包");
+
+            File nothing = new File(root, "没东西.zip");
+            zipMany(nothing, new String[]{"readme.txt", "a.bin"}, new String[]{"r", "b"});
+            ok(stat, L, BatchIo.guessKind(ctx, docsOf(nothing).get(0)) == -1,
+                    "★ 反向：zip 里一条都不命中 ⇒ -1（界面说「包里没有能导入的东西」，"
+                            + "而不是丢给单份导入去报一句用户看不懂的）");
+
+            File notZip = new File(root, "真存档.msav");
+            write(notZip, zlib("真存档是 zlib 流".getBytes("UTF-8")));
+            ok(stat, L, BatchIo.guessKind(ctx, docsOf(notZip).get(0)) == -1,
+                    "★ 反向：不是 zip（真存档/真地图就是 zlib 流）⇒ -1 —— 这条路它压根到不了"
+                            + "（`kindFor` 已按 zlib 魔数判给地图页了）");
+        } catch (Throwable t) {
+            ok(stat, L, false, "深链用例自身异常：" + t);
+        } finally {
+            deleteTree(root);
+        }
+
+        // ── ⑤ 安装后的清单门禁（aapt2 不检查 filter；这条是唯一能发现的尺子）──
+        ok(stat, L, listed(ctx, view("file:///sdcard/x.msav", "*/*"))
+                        && listed(ctx, view("file:///sdcard/x.msch", "*/*"))
+                        && listed(ctx, view("file:///sdcard/x.zip", "*/*")),
+                "★★ 系统真的把我们当成 `.msav` / `.msch` / `.zip` 的候选"
+                        + "（`queryIntentActivities` 问的是**装在这台机器上**的那份清单）");
+        ok(stat, L, "io.mdt.launcher.MainActivity".equals(
+                        resolvesTo(ctx, view("file:///sdcard/x.msav", "*/*"))),
+                "★ 接住它的就是我们自己的主入口（不是某个内容页 / 别的 Activity）");
+        ok(stat, L, !listed(ctx, view("file:///sdcard/x.txt", "*/*"))
+                        && !listed(ctx, view("file:///sdcard/xmsav", "*/*"))
+                        && !listed(ctx, view("file:///sdcard/xXmsav", "*/*")),
+                "★★ 反方向：`.txt` / `xmsav` / `xXmsav` 都**不**在候选里 —— 后两条正是"
+                        + "`pathPattern` 那个反斜杠的尺子（写成 `.*.msav` 时它们会被匹配上，"
+                        + "而 aapt2 / 编译器**一声不响**）");
+        ok(stat, L, listed(ctx, view("content://x/y", "application/octet-stream"))
+                        && listed(ctx, view("content://x/y", "application/x-msav"))
+                        && listed(ctx, view("content://x/y", "application/zip"))
+                        && !listed(ctx, view("content://x/y", "text/plain")),
+                "★★ content:// 那一条按 mime 认（官方原样 octet-stream / x-msav，我们加了 zip）；"
+                        + "`text/plain` 不认（别把所有文件都抢过来）");
+        ok(stat, L, !listedByGame(ctx, view("file:///sdcard/x.msav", "*/*")),
+                "★★ 游戏那个 Activity（`mindustry.android.AndroidLauncher`）**一个 filter 都没有**"
+                        + " —— 那个类在干净的 :game 进程里加载不了，filter 挂上去只会闪退");
+
+        // ── ⑥ 三句新文案实拼（漏映射 = 界面静默变空）────────────────────────
+        String t1 = Trans.get(ctx, R.string.deeplink_reading);
+        String t2 = Trans.get(ctx, R.string.deeplink_unrecognized);
+        String t3 = Trans.get(ctx, R.string.deeplink_zip_empty);
+        String t4 = Trans.get(ctx, R.string.deeplink_open_failed);
+        ok(stat, L, !t1.trim().isEmpty() && !t2.trim().isEmpty() && !t3.trim().isEmpty()
+                        && !t4.trim().isEmpty()
+                        && !t1.contains("%") && !t2.contains("%") && !t3.contains("%")
+                        && !t4.contains("%"),
+                "★ 四句深链文案都能实拼、且没有残留占位符（这四条都没参数）");
+        ok(stat, L, t2.contains(".msav") && t2.contains(".msch") && t2.contains("zip"),
+                "★ 「认不出」那句要说清**支持什么**（含 .msav / .msch / zip）");
+        L.add("");
+    }
+
+    /** 自检用：只带名字的一条（这些判据都用不到真 Uri） */
+    private static BatchIo.Doc doc(String name) {
+        return new BatchIo.Doc(android.net.Uri.parse("content://selftest/" + name), name);
+    }
+
+    /** 自检用：把真文件包成 `docsFromFiles` 要的清单 */
+    private static List<BatchIo.Doc> docsOf(File... fs) {
+        return BatchIo.docsFromFiles(java.util.Arrays.asList(fs));
+    }
+
+    /** 自检用：一个 VIEW Intent（scheme 在 uri 里，type 单独给） */
+    private static android.content.Intent view(String uri, String type) {
+        android.content.Intent i = new android.content.Intent(android.content.Intent.ACTION_VIEW);
+        i.setDataAndType(android.net.Uri.parse(uri), type);
+        return i;
+    }
+
+    /** 装在这台机器上的清单里，有没有**我们包的任何一个组件**在候选里？ */
+    private static boolean listed(Context ctx, android.content.Intent i) {
+        try {
+            List<android.content.pm.ResolveInfo> rs =
+                    ctx.getPackageManager().queryIntentActivities(i, 0);
+            for (android.content.pm.ResolveInfo r : rs) {
+                if (r.activityInfo != null
+                        && ctx.getPackageName().equals(r.activityInfo.packageName)) {
+                    return true;
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return false;
+    }
+
+    /** 候选里那个组件是谁（只认我们自己包的）。多个时给第一个 */
+    private static String resolvesTo(Context ctx, android.content.Intent i) {
+        try {
+            List<android.content.pm.ResolveInfo> rs =
+                    ctx.getPackageManager().queryIntentActivities(i, 0);
+            for (android.content.pm.ResolveInfo r : rs) {
+                if (r.activityInfo != null
+                        && ctx.getPackageName().equals(r.activityInfo.packageName)) {
+                    return r.activityInfo.name;
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return null;
+    }
+
+    /** 游戏那个 Activity 有没有被算成候选（**这条必须为假**，见 deepLink 的注释） */
+    private static boolean listedByGame(Context ctx, android.content.Intent i) {
+        try {
+            List<android.content.pm.ResolveInfo> rs =
+                    ctx.getPackageManager().queryIntentActivities(i, 0);
+            for (android.content.pm.ResolveInfo r : rs) {
+                if (r.activityInfo != null
+                        && ctx.getPackageName().equals(r.activityInfo.packageName)
+                        && Injector.GAME_ACTIVITY.equals(r.activityInfo.name)) {
+                    return true;
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return false;
     }
 
     /** 从 ZipFile 里读一条的字节（拿不到就返回空数组，让断言自己判死） */

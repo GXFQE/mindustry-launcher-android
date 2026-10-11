@@ -1858,4 +1858,16 @@
     <string name="mods_export_sub">Pick one or more; more than one is packed into a zip</string>
     <string name="mods_export_none_fmt">No mods to export in slot %1$s</string>
     <string name="mods_export_dir_hint">folder form, exported as a zip</string>
+
+    <!--
+      ══ F9 深链（第 128 轮）：外部（浏览器 / 文件管理器）把一份文件交给启动器 ══
+      ★ 只认本地文件（content / file 两种 scheme）；认不出时说"支持哪些"，
+        不说"你错了"，也不把内部判据（mime / 路径 / 后缀）甩给用户。
+      ★ `deeplink_reading` 是**读内容定类型**那一步的标题 —— 一个 zip 得先读一遍
+        才知道里面装的是模组 / 地图 / 存档 / 蓝图（判据见 BatchIo.guessKind）。
+    -->
+    <string name="deeplink_reading">Reading this zip…</string>
+    <string name="deeplink_unrecognized">Cannot tell what this file is. Supported: .msav maps, .msch blueprints, and bundle zips exported by this launcher.</string>
+    <string name="deeplink_zip_empty">Nothing importable inside this zip (mods / maps / saves / blueprints).</string>
+    <string name="deeplink_open_failed">Cannot read this file. It may be gone, or this app has no permission to read it (files in shared folders such as Download are not readable by this app on newer Android versions - share them through a file manager instead).</string>
 </resources>

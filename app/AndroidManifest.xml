@@ -148,6 +148,48 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+
+            <!--
+              ★★ F9 深链（第 128 轮）：浏览器 / 文件管理器 / 任何 App 点一个
+                 `.msav` 地图 · `.msch` 蓝图 · 整包 zip ⇒ 系统把文件直接交给我们。
+
+              🔴 **为什么挂在这里，而不是照抄官方挂在游戏那个 Activity 上**
+                 （`mindustry.android.AndroidLauncher`，官方 APK 的 filter 就在那一节）：
+                 那个类**不在我们的 APK 里** —— 它是 `:game` 进程跑完 Injector 六步、
+                 把游戏 dex 追加进**那个进程的 base ClassLoader** 之后才存在的。
+                 冷启动的深链会新起一个**干净的** `:game` 进程 ⇒ `ActivityThread`
+                 用自己那份 PathClassLoader 实例化它 ⇒ `ClassNotFoundException`
+                 （"Unable to instantiate activity"）：用户看到闪退，连人话都没有。
+                 MainActivity 在主进程、本来就是 exported=true + singleTop
+                 （天然有 onNewIntent）⇒ 由它分派到四个内容页，见 `DeepLink`。
+
+              ⚠️ 那三组官方 filter 里只有 `mindustry://`（联机深链）**没有**抄：
+                只有游戏自己能 join，得先把游戏拉起来再把 Intent 转发下去
+                 （要动 GameSlot / Injector），是另一批的事。
+
+              ⚠️ `application/octet-stream` 那一组是**官方原样**：content:// 的 Uri
+                 路径里通常没有文件名（`…/document/msf%3A1234`），认不了后缀 ⇒
+                 只能靠 mime 匹配；`file://` 那一组才带 pathPattern。
+              ⚠️ 判据只能靠"断言 + 真机"（aapt2 不检查 filter）：自检里有一条
+                 `queryIntentActivities` 的门禁，真机还各点了一次。
+            -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="content" android:mimeType="application/octet-stream"/>
+                <data android:scheme="content" android:mimeType="application/x-msav"/>
+                <data android:scheme="content" android:mimeType="application/zip"/>
+            </intent-filter>
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="file" android:host="*" android:mimeType="*/*"/>
+                <data android:pathPattern=".*\\.msav"/>
+                <data android:pathPattern=".*\\.msch"/>
+                <data android:pathPattern=".*\\.zip"/>
+            </intent-filter>
         </activity>
 
         <!--

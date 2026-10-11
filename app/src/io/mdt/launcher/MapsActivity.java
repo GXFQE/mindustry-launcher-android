@@ -215,6 +215,35 @@ public class MapsActivity extends BaseActivity {
             File df = new File(devPath.trim());
             importFile(Uri.fromFile(df), df.getName(), mSlot, false);
         }
+
+        // F9 深链：本页是被外部"打开方式"（浏览器 / 文件管理器）叫起来的
+        //   ⇒ 与 SAF 那条路**同一份**分流判据（见 importDocs）
+        final List<BatchIo.Doc> dl = DeepLink.docsOf(getIntent(), this);
+        if (!dl.isEmpty()) importDocs(dl, mSlot);
+    }
+
+    /**
+     * 导入入口的**唯一**判据 —— SAF 那条路（{@link #onActivityResult}）与 F9 深链那条路共用。
+     *
+     * <p>三条：① 游戏在跑 ⇒ 先挡（写槽的门禁，见 {@link Data#gameAlive}；
+     * 按钮那边也有一道同样的预检，只是为了让用户别白选一次文件）；
+     * ② ≥2 份或一个压缩包 ⇒ 批量（判据在 {@link BatchIo#wantsBatch}）；
+     * ③ 否则走单份那条老路（含「这其实是一份存档 ⇒ 问名字」与逐个同名确认）。
+     */
+    private void importDocs(List<BatchIo.Doc> docs, final String slot) {
+        if (docs == null || docs.isEmpty()) return;
+        if (Data.gameAlive(this)) {
+            alert(Trans.get(MapsActivity.this, R.string.game_busy_title),
+                    Trans.get(MapsActivity.this, R.string.maps_import_busy_msg));
+            return;
+        }
+        if (BatchIo.wantsBatch(docs)) {
+            BatchIo.runImport(this, slot, docs, BatchIo.KIND_MAPS, new Runnable() {
+                @Override public void run() { refreshList(); }
+            });
+            return;
+        }
+        importFile(docs.get(0).uri, docs.get(0).name, slot, false);
     }
 
     /**
@@ -476,16 +505,7 @@ public class MapsActivity extends BaseActivity {
         if (resultCode != RESULT_OK || data == null || slot == null) return;
         // ★ 第 127 轮：一批（多选 / 一个 zip）走批量；**一份普通文件**仍旧走单份那条路
         //   （那条路有「这其实是一份存档 ⇒ 问名字」和逐个同名确认，逐份弹框在批量里是折磨）
-        List<BatchIo.Doc> docs = BatchIo.docsOf(this, data);
-        if (docs.isEmpty()) return;
-        if (docs.size() > 1 || BatchIo.isArchiveName(docs.get(0).name)) {
-            BatchIo.runImport(this, slot, docs, BatchIo.KIND_MAPS, new Runnable() {
-                @Override public void run() { refreshList(); }
-            });
-            return;
-        }
-        Uri uri = docs.get(0).uri;
-        importFile(uri, docs.get(0).name, slot, false);
+        importDocs(BatchIo.docsOf(this, data), slot);
     }
 
     // ── 导出地图（用户 2026-10-03：「导入和导出都放页面顶上吧」） ──────────────

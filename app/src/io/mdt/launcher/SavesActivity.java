@@ -145,6 +145,20 @@ public class SavesActivity extends BaseActivity {
                 R.string.mods_filter_title, R.string.save_act_filter_sub, new Runnable() {
                     @Override public void run() { pickFilter(); }
                 });
+
+        // F9 深链：本页是被外部"打开方式"（浏览器 / 文件管理器）叫起来的。
+        //   ★ 先过与「导入存档」那一行**同一个**写槽门禁（`SlotIo.blockedByGame`：只有
+        //     当前槽被游戏占着时才挡），再走与 SAF 那条路**同一份**分流判据
+        //     （`SlotIo.importDocs`）—— 两条路各写一遍就会漂。
+        final java.util.List<BatchIo.Doc> dl = DeepLink.docsOf(getIntent(), this);
+        if (!dl.isEmpty()) {
+            Data.Slot s = findSlot();
+            if (s == null) {
+                gone();
+            } else if (!SlotIo.blockedByGame(this, s)) {
+                SlotIo.importDocs(this, mSlot, dl, mHost);
+            }
+        }
     }
 
     @Override protected void onSaveInstanceState(Bundle out) {
