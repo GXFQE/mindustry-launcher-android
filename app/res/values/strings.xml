@@ -1827,11 +1827,9 @@
     <string name="batch_export_nothing">Nothing is ticked yet</string>
     <string name="batch_export_head_fmt">%1$d in total · tick what to export, then tap Export</string>
     <string name="batch_export_progress_title">Exporting</string>
-    <string name="batch_export_progress_fmt">Packing %1$d items into one zip</string>
     <string name="batch_export_zip_done_fmt">Exported %1$d items · %2$s</string>
     <string name="batch_import_progress_title">Importing</string>
     <string name="batch_import_progress_fmt">Importing %1$d items into %2$s</string>
-    <string name="batch_import_running_fmt">Importing %1$d items</string>
     <string name="batch_import_nothing">No file was picked</string>
     <string name="batch_report_title">Batch import</string>
     <string name="batch_report_head_fmt">%1$d items processed</string>
@@ -1870,4 +1868,28 @@
     <string name="deeplink_unrecognized">Cannot tell what this file is. Supported: .msav maps, .msch blueprints, and bundle zips exported by this launcher.</string>
     <string name="deeplink_zip_empty">Nothing importable inside this zip (mods / maps / saves / blueprints).</string>
     <string name="deeplink_open_failed">Cannot read this file. It may be gone, or this app has no permission to read it (files in shared folders such as Download are not readable by this app on newer Android versions - share them through a file manager instead).</string>
+
+    <!--
+      ══ 「杂问题」那批（2026-10-11 第 129 轮）══
+      · `list_src_*`：四个列表页「筛选与排序」里新加的一档**来源**（只在地图/蓝图两页出现 ——
+        存档只有本槽一个来源，模组的来源是包形态、已经有"按类型"那一档）。
+        ⚠️ **不**复用 `map_from_slot` / `bp_from_slot` 那些片段：它们是**嵌在句子里**的小写片段
+        （`this slot` / `mod "x"`），拿来当菜单行会中英都别扭。
+      · `bp_name_hint`：蓝图导入撞名时那个「换个名字」框的提示。
+      · `batch_del_*`：批量删除（勾多份 ⇒ 一起挪进中转站）。
+      · `batch_*_pct_fmt`：进度条上那句「已做 N / 共 M」（原来是转圈的不确定进度）。
+    -->
+    <string name="list_src_any">Any source</string>
+    <string name="list_src_slot">This slot</string>
+    <string name="list_src_game">Built into the game</string>
+    <string name="list_src_mod">From a mod</string>
+    <string name="bp_name_hint">This name becomes the file name in this slot, so two copies can live side by side. The extension is added automatically.</string>
+    <string name="batch_del_btn_fmt">Delete (%1$d)</string>
+    <string name="batch_del_title">Delete these?</string>
+    <string name="batch_del_msg_fmt">%1$d items will be moved to the transfer station (not deleted outright), so you can put them back later.</string>
+    <string name="batch_del_ok">Move them</string>
+    <string name="batch_del_done_fmt">Moved %1$d items to the transfer station</string>
+    <string name="batch_del_none_fmt">%1$d of them could not be moved (they are still where they were)</string>
+    <string name="batch_import_pct_fmt">Importing %1$d / %2$d</string>
+    <string name="batch_export_pct_fmt">Packing %1$d / %2$d</string>
 </resources>

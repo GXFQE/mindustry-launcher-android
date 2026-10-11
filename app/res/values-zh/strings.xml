@@ -1790,11 +1790,9 @@
     <string name="batch_export_nothing">还没有勾选任何一份</string>
     <string name="batch_export_head_fmt">共 %1$d 份 · 勾选要导出的，再点「导出」</string>
     <string name="batch_export_progress_title">正在导出</string>
-    <string name="batch_export_progress_fmt">正在把 %1$d 份打包成一个 zip</string>
     <string name="batch_export_zip_done_fmt">已导出 %1$d 份 · %2$s</string>
     <string name="batch_import_progress_title">正在导入</string>
     <string name="batch_import_progress_fmt">正在把 %1$d 份导入 %2$s</string>
-    <string name="batch_import_running_fmt">正在导入 %1$d 份</string>
     <string name="batch_import_nothing">没有选中任何文件</string>
     <string name="batch_report_title">批量导入结果</string>
     <string name="batch_report_head_fmt">共处理 %1$d 份</string>
@@ -1832,4 +1830,25 @@
     <string name="deeplink_unrecognized">认不出这个文件是什么。支持：.msav 地图、.msch 蓝图，以及本启动器导出的整包 zip。</string>
     <string name="deeplink_zip_empty">这个压缩包里没有能导入的东西（模组 / 地图 / 存档 / 蓝图）。</string>
     <string name="deeplink_open_failed">读不到这个文件：可能已经不在了，或者本应用没有读取它的权限（新版安卓下「下载」这类公共目录里的文件本应用读不了，用文件管理器「分享 / 打开方式」发过来才行）。</string>
+
+    <!--
+      ══ 「杂问题」那批（2026-10-11 第 129 轮）══
+      · `list_src_*`：「筛选与排序」里新加的**来源**一档（地图 / 蓝图两页）。
+      · `bp_name_hint`：蓝图撞名时「换个名字」框的提示。
+      · `batch_del_*`：批量删除（挪进中转站，不直接删）。
+      · `batch_*_pct_fmt`：进度条上「已做 N / 共 M」。
+    -->
+    <string name="list_src_any">全部来源</string>
+    <string name="list_src_slot">本槽</string>
+    <string name="list_src_game">游戏自带</string>
+    <string name="list_src_mod">模组自带</string>
+    <string name="bp_name_hint">这个名字会成为槽里的文件名，两份同名蓝图就能各留一份；后缀会自动补上。</string>
+    <string name="batch_del_btn_fmt">删除（%1$d 份）</string>
+    <string name="batch_del_title">要删除这些吗？</string>
+    <string name="batch_del_msg_fmt">这 %1$d 份会被挪进中转站（不是直接删掉），以后还能放回来。</string>
+    <string name="batch_del_ok">挪进去</string>
+    <string name="batch_del_done_fmt">已把 %1$d 份挪进中转站</string>
+    <string name="batch_del_none_fmt">有 %1$d 份没挪动（还在原来的地方）</string>
+    <string name="batch_import_pct_fmt">正在导入 %1$d / %2$d 份</string>
+    <string name="batch_export_pct_fmt">正在打包 %1$d / %2$d 份</string>
 </resources>

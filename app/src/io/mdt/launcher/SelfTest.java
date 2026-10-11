@@ -4426,6 +4426,54 @@ public final class SelfTest {
                             && Maps.filterAndSort(mark, "", ListQuery.SORT_NAME, false).get(0) == m1,
                     "★元断言：「有问题的在前」与「按名称」的**结果必须不同**（否则这一档等于没做）");
 
+            // ── ①b 第 129 轮：**来源筛** + 搜作者 / 描述 ────────────────────
+            //    用户点单（2026-10-11「先把这堆杂问题解决了」）里的"搜索补两处"。
+            ok(stat, L, Maps.filterAndSort(maps, "", ListQuery.SORT_NAME, false,
+                            Maps.FROM_ANY).size() == 3
+                            && Maps.filterAndSort(maps, "", ListQuery.SORT_NAME, false,
+                                    Maps.FROM_SLOT).size() == 2
+                            && Maps.filterAndSort(maps, "", ListQuery.SORT_NAME, false,
+                                    Maps.FROM_GAME).size() == 1
+                            && Maps.filterAndSort(maps, "", ListQuery.SORT_NAME, false,
+                                    Maps.FROM_GAME).get(0) == m3
+                            && Maps.filterAndSort(maps, "", ListQuery.SORT_NAME, false,
+                                    Maps.FROM_MOD).isEmpty(),
+                    "★★地图：来源筛（本槽 2 / 游戏自带 1 / 模组自带 0）；`FROM_ANY` = 不筛");
+            ok(stat, L, Maps.matchesSource(m1, Maps.FROM_SLOT)
+                            && !Maps.matchesSource(m1, Maps.FROM_GAME)
+                            && Maps.matchesSource(null, Maps.FROM_ANY)
+                            && !Maps.matchesSource(null, Maps.FROM_SLOT)
+                            && Maps.matchesSource(m3, Maps.FROM_GAME),
+                    "★来源筛的判据（唯一实现）：null 与「筛某一类」都不许抛，`FROM_ANY` 一律算");
+            m1.meta.author = "Alice";
+            List<Maps.Item> byAuthor = Maps.filterAndSort(maps, "alice", ListQuery.SORT_NAME, false);
+            boolean authorHit = byAuthor.size() == 1 && byAuthor.get(0) == m1;
+            m1.meta.author = null;
+            ok(stat, L, authorHit
+                            && Maps.filterAndSort(maps, "alice", ListQuery.SORT_NAME, false).isEmpty(),
+                    "★★地图：按**作者**搜得到（Alice）；★元断言：把作者清掉就搜不到"
+                            + "（否则这条对「根本没搜作者」也成立）");
+            m2.meta.description = "desert canyon";
+            List<Maps.Item> byDesc = Maps.filterAndSort(maps, "canyon", ListQuery.SORT_NAME, false);
+            boolean descHit = byDesc.size() == 1 && byDesc.get(0) == m2;
+            m2.meta.description = null;
+            ok(stat, L, descHit
+                            && Maps.filterAndSort(maps, "canyon", ListQuery.SORT_NAME, false).isEmpty(),
+                    "★★地图：按**描述**搜得到（desert canyon）；反方向同一条元断言");
+            //  ★ 元断言：来源筛是**外加的一维**，旧的四参调用（= FROM_ANY）不许受影响
+            ok(stat, L, Maps.filterAndSort(maps, "", ListQuery.SORT_NAME, false).size() == 3
+                            && Maps.filterAndSort(maps, "", ListQuery.SORT_NAME, false).size()
+                                    == Maps.filterAndSort(maps, "", ListQuery.SORT_NAME, false,
+                                            Maps.FROM_ANY).size(),
+                    "★元断言：四参 `filterAndSort`（老调用点）= 五参传 `FROM_ANY`（判据只有一份）");
+            ok(stat, L, !ListQuery.filtering("", ListQuery.SORT_NAME, false, ListQuery.SORT_NAME)
+                            && ListQuery.filtering("", ListQuery.SORT_NAME, false,
+                                    ListQuery.SORT_NAME, true)
+                            && !ListQuery.filtering("", ListQuery.SORT_NAME, false,
+                                    ListQuery.SORT_NAME, false),
+                    "★`ListQuery.filtering` 新加的那一位：开着「外加的筛选维度」时"
+                            + "「显示 N / 共 M」必须出现（漏了就是「筛掉了东西但界面不说」）");
+
             // ── ② 蓝图：「有问题的」= 缺件或解析不了 ──────────────────────────
             Blueprints.Item b1 = new Blueprints.Item();
             b1.file = new File(dir, "x.msch");
@@ -4467,6 +4515,32 @@ public final class SelfTest {
                     "蓝图：「有问题的在前」⇒ 健康的那个排最后");
             ok(stat, L, bps.size() == 3 && bps.get(0) == b1 && bps.get(2) == b3,
                     "★纯函数：蓝图那份入参也没被改动");
+
+            // ── ②b 第 129 轮：蓝图的**来源筛** + 搜描述 ─────────────────────
+            Blueprints.Item b4 = new Blueprints.Item();
+            b4.from = Blueprints.FROM_MOD;              // 模组自带（b1~b3 的 from 默认 0 = 本槽）
+            b4.entry = "some-mod/schematics/neon.msch";
+            b4.bytes = 50;
+            b4.msch = Msch.read(new Sch(1, 16, 16).tag("name", "Neon")
+                    .tag("description", "canyon run").bytes());
+            List<Blueprints.Item> bps2 = new ArrayList<>(bps);
+            bps2.add(b4);
+            ok(stat, L, Blueprints.filterAndSort(bps2, "", ListQuery.SORT_NAME, false,
+                            Blueprints.FROM_SLOT).size() == 3
+                            && Blueprints.filterAndSort(bps2, "", ListQuery.SORT_NAME, false,
+                                    Blueprints.FROM_MOD).size() == 1
+                            && Blueprints.filterAndSort(bps2, "", ListQuery.SORT_NAME, false,
+                                    Blueprints.FROM_MOD).get(0) == b4
+                            && Blueprints.filterAndSort(bps2, "", ListQuery.SORT_NAME, false,
+                                    Blueprints.FROM_ANY).size() == 4,
+                    "★★蓝图：来源筛（本槽 3 / 模组自带 1）；`FROM_ANY` = 不筛（四份都在）");
+            List<Blueprints.Item> bDesc =
+                    Blueprints.filterAndSort(bps2, "canyon", ListQuery.SORT_NAME, false);
+            ok(stat, L, bDesc.size() == 1 && bDesc.get(0) == b4
+                            && Blueprints.filterAndSort(bps, "canyon",
+                                    ListQuery.SORT_NAME, false).isEmpty(),
+                    "★★蓝图：按**描述**搜得到（canyon run）；★元断言：那份不在列表里就搜不到"
+                            + "（证明命中真的来自描述那一项，不是名字）");
 
             // ── ③ 存档：直接拿 File 当一条记录（搜文件名 / 按大小 / 按时间）──────────
             //  ⚠️ 这一页**没有**「只看有问题的」（读不出来已有专用入口，见 ListQuery.FILE_KEY）
@@ -10229,6 +10303,36 @@ public final class SelfTest {
                             + "（ok=" + rr.ok + "，报告里记了「从 zip 里解出 2 份」）");
             ok(stat, L, !rr.notes.isEmpty(),
                     "★ 报告里说明了「这一批是从 zip 里解出来的」（notes=" + rr.notes.size() + "）");
+
+            // ── ⑨ 第 129 轮：**导出进度回调**（"只报数、不做决定"）───────────────
+            //    原来是转圈的不确定进度（目录形态的模组几十 MB 时要盯几秒）；
+            //    判据 = 按"一份一份"报数、顺序单调、且**不影响 `Result.files` 的口径**。
+            File q1 = new File(root, "p1.msav");
+            File q2 = new File(root, "p2.msav");
+            File q3 = new File(root, "p3.msav");
+            write(q1, new byte[16]);
+            write(q2, new byte[16]);
+            write(q3, new byte[16]);
+            List<Exporter.Src> three = new ArrayList<>();
+            three.add(Exporter.Src.ofFile(q1, "p1.msav"));
+            three.add(Exporter.Src.ofFile(q2, "p2.msav"));
+            three.add(Exporter.Src.ofFile(q3, "p3.msav"));
+            final List<String> steps = new ArrayList<>();
+            java.io.ByteArrayOutputStream pout = new java.io.ByteArrayOutputStream();
+            Exporter.Result pr = Exporter.zipSourcesTo(ctx, pout, three, new Exporter.Result(),
+                    new Exporter.Step() {
+                        @Override public void onStep(int done, int total) {
+                            steps.add(done + "/" + total);
+                        }
+                    });
+            ok(stat, L, pr.files == 3 && steps.size() == 3
+                            && "1/3".equals(steps.get(0)) && "3/3".equals(steps.get(2)),
+                    "★★第 129 轮：导出进度按**份**报数（3 份 ⇒ 1/3、2/3、3/3），"
+                            + "且不影响 `Result.files`（实得 " + pr.files + "）");
+            //  ★ 元断言：不传 step（老调用点）必须照样能导 —— 进度是**外加的**，不是新前提
+            java.io.ByteArrayOutputStream pout2 = new java.io.ByteArrayOutputStream();
+            ok(stat, L, Exporter.zipSourcesTo(ctx, pout2, three).files == 3,
+                    "★元断言：不传进度回调的老调用点照旧能用（4 参重载 = 传 null）");
         } catch (Throwable t) {
             ok(stat, L, false, "批量导入导出用例自身异常：" + t);
         } finally {

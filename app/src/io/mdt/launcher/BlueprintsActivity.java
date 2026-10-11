@@ -60,9 +60,13 @@ public class BlueprintsActivity extends BaseActivity {
     private static final String STATE_QUERY = "mdt-bp-query";
     private static final String STATE_SORT = "mdt-bp-sort";
     private static final String STATE_ONLY = "mdt-bp-only";
+    /** ★ 2026-10-11：新加的**来源筛**（`Blueprints.FROM_ANY` = 不筛）也要跟着转屏活下来 */
+    private static final String STATE_SRC = "mdt-bp-src";
     private String mQuery = "";
     private int mSort = ListQuery.SORT_NAME;
     private boolean mOnlyProblems;
+    /** 来源筛：`FROM_ANY` / `FROM_SLOT` / `FROM_MOD`（纯前端，一个文件都不碰） */
+    private int mSrc = Blueprints.FROM_ANY;
     private android.widget.EditText mSearch;
     private TextView mFiltered;
     /** 当前**显示**的那一批（筛过 / 排过）；`mItems` 仍是全部（导出对话框按它列） */
@@ -84,6 +88,7 @@ public class BlueprintsActivity extends BaseActivity {
             if (q != null) mQuery = q;
             mSort = b.getInt(STATE_SORT, ListQuery.SORT_NAME);
             mOnlyProblems = b.getBoolean(STATE_ONLY, false);
+            mSrc = b.getInt(STATE_SRC, Blueprints.FROM_ANY);
         }
 
         View root = getLayoutInflater().inflate(R.layout.activity_blueprints, null);
@@ -289,6 +294,7 @@ public class BlueprintsActivity extends BaseActivity {
         out.putString(STATE_QUERY, mQuery);
         out.putInt(STATE_SORT, mSort);
         out.putBoolean(STATE_ONLY, mOnlyProblems);
+        out.putInt(STATE_SRC, mSrc);
     }
 
     /**
@@ -301,8 +307,9 @@ public class BlueprintsActivity extends BaseActivity {
      */
     private void rebuildList() {
         if (mList == null || mItems == null) return;
-        mShown = Blueprints.filterAndSort(mItems, mQuery, mSort, mOnlyProblems);
-        boolean filtering = ListQuery.filtering(mQuery, mSort, mOnlyProblems, ListQuery.SORT_NAME);
+        mShown = Blueprints.filterAndSort(mItems, mQuery, mSort, mOnlyProblems, mSrc);
+        boolean filtering = ListQuery.filtering(mQuery, mSort, mOnlyProblems,
+                ListQuery.SORT_NAME, mSrc != Blueprints.FROM_ANY);
         String[] titles = new String[mShown.size()];
         String[] subs = new String[mShown.size()];
         android.graphics.Bitmap[] thumbs = new android.graphics.Bitmap[mShown.size()];
@@ -366,6 +373,8 @@ public class BlueprintsActivity extends BaseActivity {
     /**
      * 「筛选与排序」对话框（与模组 / 地图页同一个形状，也共用它那几条词）。
      * ★ 蓝图的「有问题的」= 缺件或解析不了 —— 这一页最该被筛出来的就是缺件那些。
+     * ★ 2026-10-11 补上**来源**三行（判据 `Blueprints.matchesSource`）：蓝图只有"本槽 / 模组自带"
+     *   两种来源，原来也是混在一张表里。**纯前端过滤，一个文件都不碰**。
      */
     private void pickFilter() {
         final String tick = "✓ ";
@@ -378,6 +387,12 @@ public class BlueprintsActivity extends BaseActivity {
                         + Trans.get(BlueprintsActivity.this, R.string.mods_filter_sort_size),
                 (mOnlyProblems ? tick : "")
                         + Trans.get(BlueprintsActivity.this, R.string.mods_filter_only),
+                (mSrc == Blueprints.FROM_ANY ? tick : "")
+                        + Trans.get(BlueprintsActivity.this, R.string.list_src_any),
+                (mSrc == Blueprints.FROM_SLOT ? tick : "")
+                        + Trans.get(BlueprintsActivity.this, R.string.list_src_slot),
+                (mSrc == Blueprints.FROM_MOD ? tick : "")
+                        + Trans.get(BlueprintsActivity.this, R.string.list_src_mod),
                 Trans.get(BlueprintsActivity.this, R.string.mods_filter_reset)};
         new android.app.AlertDialog.Builder(this)
                 .setTitle(R.string.mods_filter_title)
@@ -391,9 +406,16 @@ public class BlueprintsActivity extends BaseActivity {
                             mSort = ListQuery.SORT_SIZE;
                         } else if (which == 3) {
                             mOnlyProblems = !mOnlyProblems;
+                        } else if (which == 4) {
+                            mSrc = Blueprints.FROM_ANY;
+                        } else if (which == 5) {
+                            mSrc = Blueprints.FROM_SLOT;
+                        } else if (which == 6) {
+                            mSrc = Blueprints.FROM_MOD;
                         } else {
                             mSort = ListQuery.SORT_NAME;
                             mOnlyProblems = false;
+                            mSrc = Blueprints.FROM_ANY;
                             mQuery = "";
                             // 清框会经 TextWatcher 走一趟 rebuildList，这里再走一趟也无害（同模组页）
                             if (mSearch != null) mSearch.setText("");
@@ -493,6 +515,16 @@ public class BlueprintsActivity extends BaseActivity {
                                                     importFile(uri, displayName, slot, true);
                                                 }
                                             })
+                                    // ★ 2026-10-11（用户：「蓝图改名」）：原来只有"替换 / 取消"两条路
+                                    //   ⇒ 用户想留两份只能自己去文件管理器改名再导。现在给第三条路。
+                                    //   ⚠️ 与存档那条（`SlotIo.confirmMsavOverwrite` 的中性按钮）**同一句词**
+                                    //      （`msav_overwrite_rename`）：同一个问题，两种入口只能有一种答法。
+                                    .setNeutralButton(R.string.msav_overwrite_rename,
+                                            new android.content.DialogInterface.OnClickListener() {
+                                                @Override public void onClick(android.content.DialogInterface d, int w) {
+                                                    showBpNameDialog(uri, displayName, slot);
+                                                }
+                                            })
                                     .setNegativeButton(R.string.cancel, null)
                                     .show();
                             return;
@@ -506,6 +538,53 @@ public class BlueprintsActivity extends BaseActivity {
                 });
             }
         }, "bp-import").start();
+    }
+
+    /**
+     * 「换个名字」框 —— 蓝图撞名时那条中性出口（2026-10-11，用户点单「蓝图改名」）。
+     *
+     * <p>语义：换上来的名字**只决定槽里的文件名**（蓝图显示名是文件内部那个 `name`）——
+     * 这正是"想留两份"需要的：两份同名蓝图靠文件名区分（与存档那条同构，见 `SlotIo.showMsavNameDialog`）。
+     *
+     * <p>★ 复用 `dialog_msav_name.xml`（一个标签 + 一个输入框）：把提示换成蓝图那句、
+     * 把"不是 zlib"那行**藏掉** —— 为一件只差两行文案的事再抄一份 layout，就是又一处分叉。
+     * ★ 走的是**同一条导入路**（`importFile(uri, 新名字, slot, false)`）：不另造写入实现，
+     * 名字撞了还会回到同一个确认框。
+     */
+    private void showBpNameDialog(final android.net.Uri uri, final String displayName, final String slot) {
+        android.view.View form = getLayoutInflater().inflate(R.layout.dialog_msav_name, null);
+        final android.widget.EditText name =
+                (android.widget.EditText) form.findViewById(R.id.msav_name);
+        name.setText(BlueprintFiles.safeName(displayName));
+        name.setSelection(name.getText().length());
+        Trans.bind(form, R.id.tx_msav_name_hint, R.string.bp_name_hint);
+        form.findViewById(R.id.msav_warn).setVisibility(android.view.View.GONE);
+
+        final android.app.AlertDialog dlg = new android.app.AlertDialog.Builder(this)
+                .setTitle(Trans.get(BlueprintsActivity.this, R.string.bp_import))
+                .setView(form)
+                .setPositiveButton(R.string.bp_import, null)
+                .setNegativeButton(R.string.cancel, null)
+                .create();
+        dlg.setOnShowListener(new android.content.DialogInterface.OnShowListener() {
+            @Override public void onShow(android.content.DialogInterface d) {
+                dlg.getButton(android.content.DialogInterface.BUTTON_POSITIVE)
+                        .setOnClickListener(new android.view.View.OnClickListener() {
+                            @Override public void onClick(android.view.View v) {
+                                String raw = name.getText().toString().trim();
+                                if (raw.isEmpty()) {
+                                    android.widget.Toast.makeText(BlueprintsActivity.this,
+                                            Trans.get(BlueprintsActivity.this, R.string.msav_name_empty),
+                                            android.widget.Toast.LENGTH_SHORT).show();
+                                    return;
+                                }
+                                dlg.dismiss();
+                                importFile(uri, raw, slot, false);
+                            }
+                        });
+            }
+        });
+        dlg.show();
     }
 
     // ── 导出 ──────────────────────────────────────────────────────────────

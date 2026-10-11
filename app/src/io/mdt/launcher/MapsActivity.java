@@ -88,9 +88,13 @@ public class MapsActivity extends BaseActivity {
     private static final String STATE_QUERY = "mdt-maps-query";
     private static final String STATE_SORT = "mdt-maps-sort";
     private static final String STATE_ONLY = "mdt-maps-only";
+    /** ★ 2026-10-11：新加的**来源筛**（`Maps.FROM_ANY` = 不筛）也要跟着转屏活下来 */
+    private static final String STATE_SRC = "mdt-maps-src";
     private String mQuery = "";
     private int mSort = ListQuery.SORT_NAME;
     private boolean mOnlyProblems;
+    /** 来源筛：`Maps.FROM_ANY` / `FROM_SLOT` / `FROM_GAME` / `FROM_MOD`（纯前端，一个文件都不碰） */
+    private int mSrc = Maps.FROM_ANY;
     private EditText mSearch;
     private TextView mFiltered;
     /**
@@ -114,6 +118,7 @@ public class MapsActivity extends BaseActivity {
             if (q != null) mQuery = q;
             mSort = b.getInt(STATE_SORT, ListQuery.SORT_NAME);
             mOnlyProblems = b.getBoolean(STATE_ONLY, false);
+            mSrc = b.getInt(STATE_SRC, Maps.FROM_ANY);
         }
         setTitle(Trans.get(MapsActivity.this, R.string.maps_title_fmt, mSlot));
 
@@ -342,6 +347,7 @@ public class MapsActivity extends BaseActivity {
         out.putString(STATE_QUERY, mQuery);
         out.putInt(STATE_SORT, mSort);
         out.putBoolean(STATE_ONLY, mOnlyProblems);
+        out.putInt(STATE_SRC, mSrc);
     }
 
     /**
@@ -357,8 +363,9 @@ public class MapsActivity extends BaseActivity {
      */
     private void rebuildList() {
         if (mList == null || mItems == null) return;
-        mShown = Maps.filterAndSort(mItems, mQuery, mSort, mOnlyProblems);
-        boolean filtering = ListQuery.filtering(mQuery, mSort, mOnlyProblems, ListQuery.SORT_NAME);
+        mShown = Maps.filterAndSort(mItems, mQuery, mSort, mOnlyProblems, mSrc);
+        boolean filtering = ListQuery.filtering(mQuery, mSort, mOnlyProblems,
+                ListQuery.SORT_NAME, mSrc != Maps.FROM_ANY);
         String[] titles = new String[mShown.size()];
         String[] subs = new String[mShown.size()];
         android.graphics.Bitmap[] thumbs = new android.graphics.Bitmap[mShown.size()];
@@ -427,6 +434,8 @@ public class MapsActivity extends BaseActivity {
      * 「筛选与排序」对话框。
      * ★ 与模组页同一个形状（排序单选 + 「只看有问题的」开关 + 清空），也**共用它那几条词** ——
      *   四个列表页说的是同一件事。地图这一页没有"类型"那一维（那是模组独有的）。
+     * ★ 2026-10-11 补上**来源**四行（判据 `Maps.matchesSource`）：那三个来源原来是混在一张表里
+     *   靠 ` · ` 区分的，用户没法只看"游戏自带"或"某个模组带的"。**纯前端过滤，一个文件都不碰**。
      */
     private void pickFilter() {
         final String tick = "✓ ";
@@ -439,6 +448,14 @@ public class MapsActivity extends BaseActivity {
                         + Trans.get(MapsActivity.this, R.string.mods_filter_sort_size),
                 (mOnlyProblems ? tick : "")
                         + Trans.get(MapsActivity.this, R.string.mods_filter_only),
+                (mSrc == Maps.FROM_ANY ? tick : "")
+                        + Trans.get(MapsActivity.this, R.string.list_src_any),
+                (mSrc == Maps.FROM_SLOT ? tick : "")
+                        + Trans.get(MapsActivity.this, R.string.list_src_slot),
+                (mSrc == Maps.FROM_GAME ? tick : "")
+                        + Trans.get(MapsActivity.this, R.string.list_src_game),
+                (mSrc == Maps.FROM_MOD ? tick : "")
+                        + Trans.get(MapsActivity.this, R.string.list_src_mod),
                 Trans.get(MapsActivity.this, R.string.mods_filter_reset)};
         new AlertDialog.Builder(this)
                 .setTitle(R.string.mods_filter_title)
@@ -452,9 +469,18 @@ public class MapsActivity extends BaseActivity {
                             mSort = ListQuery.SORT_SIZE;
                         } else if (which == 3) {
                             mOnlyProblems = !mOnlyProblems;
+                        } else if (which == 4) {
+                            mSrc = Maps.FROM_ANY;
+                        } else if (which == 5) {
+                            mSrc = Maps.FROM_SLOT;
+                        } else if (which == 6) {
+                            mSrc = Maps.FROM_GAME;
+                        } else if (which == 7) {
+                            mSrc = Maps.FROM_MOD;
                         } else {
                             mSort = ListQuery.SORT_NAME;
                             mOnlyProblems = false;
+                            mSrc = Maps.FROM_ANY;
                             mQuery = "";
                             // 清框会经 TextWatcher 走一趟 rebuildList，这里再走一趟也无害（同模组页）
                             if (mSearch != null) mSearch.setText("");

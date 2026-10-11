@@ -183,6 +183,20 @@ public final class ListQuery {
      * ★ 与 {@link #apply} 的过滤条件**必须同步**：漏一维的症状是"筛掉了东西但界面不说"。
      */
     public static boolean filtering(String query, int sort, boolean onlyProblems, int defaultSort) {
-        return onlyProblems || sort != defaultSort || (query != null && !query.trim().isEmpty());
+        return filtering(query, sort, onlyProblems, defaultSort, false);
+    }
+
+    /**
+     * 同上，多了「这一页是否还开着一个**外加的**筛选维度」。
+     *
+     * ★ 为什么要有这个参数（2026-10-11）：地图 / 蓝图两页新加了「来源」那一档
+     *   （见 `Maps.matchesSource`），它不在 {@code onlyProblems}/{@code sort} 里 ⇒
+     *   不加这一位就会出现"筛掉了东西但「显示 N / 共 M」那一行不出现"
+     *   （那正是上面那条注释警告的症状）。模组页的"按类型"是自己算的，不受影响。
+     */
+    public static boolean filtering(String query, int sort, boolean onlyProblems, int defaultSort,
+                                    boolean extraFilter) {
+        return extraFilter || onlyProblems || sort != defaultSort
+                || (query != null && !query.trim().isEmpty());
     }
 }

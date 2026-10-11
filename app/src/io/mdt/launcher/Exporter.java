@@ -228,15 +228,29 @@ public final class Exporter {
     }
 
     /**
+     * 进度回调（**只报数、不做决定**）—— 界面拿它更新进度条；dev 口 / 自检传 `null`。
+     * ★ 2026-10-11：原来是转圈的不确定进度（模组几十 MB 时要盯几秒才动），现在按"一份一份"报。
+     */
+    interface Step {
+        void onStep(int done, int total);
+    }
+
+    /**
      * 把一批条目打成一个 zip 写进 SAF 目标（**批量导出的唯一出口**）。
      *
      * ★ 与 {@link #zipTo}（整槽备份那条）的分工：那个吃"目录树"，这个吃"一份一份的东西"
      *   —— 而"一份"可能是容器里的一条，也可能是一个目录（目录形态的模组）。
      */
     public static Result zipSources(Context ctx, Uri uri, List<Src> srcs) throws IOException {
+        return zipSources(ctx, uri, srcs, null);
+    }
+
+    /** 同上，带进度回调（`step` 可为 null） */
+    public static Result zipSources(Context ctx, Uri uri, List<Src> srcs, Step step)
+            throws IOException {
         Result r = new Result();
         Counting counter = new Counting(openOut(ctx, uri));
-        zipSourcesTo(ctx, counter, srcs, r);
+        zipSourcesTo(ctx, counter, srcs, r, step);
         r.outBytes = counter.n;
         Log.i(TAG, "export batch zip ok: files=" + r.files + " raw=" + r.rawBytes
                 + " out=" + r.outBytes);
@@ -249,11 +263,17 @@ public final class Exporter {
      * 不必依赖真机上的文件选择器。
      */
     static Result zipSourcesTo(Context ctx, OutputStream raw, List<Src> srcs) throws IOException {
-        return zipSourcesTo(ctx, raw, srcs, new Result());
+        return zipSourcesTo(ctx, raw, srcs, new Result(), null);
     }
 
     /** 带计数器的重载（{@link #zipSources} 用它把"压缩后字节数"取回来） */
     static Result zipSourcesTo(Context ctx, OutputStream raw, List<Src> srcs, Result r)
+            throws IOException {
+        return zipSourcesTo(ctx, raw, srcs, r, null);
+    }
+
+    /** 带计数器 + 进度回调的重载（`step` 可为 null） */
+    static Result zipSourcesTo(Context ctx, OutputStream raw, List<Src> srcs, Result r, Step step)
             throws IOException {
         if (r == null) r = new Result();
         if (srcs == null || srcs.isEmpty()) {
@@ -262,10 +282,16 @@ public final class Exporter {
         java.util.List<String> used = new java.util.ArrayList<>();
         ZipOutputStream zos = new ZipOutputStream(new BufferedOutputStream(raw, BUF));
         int written = 0;
+        int seen = 0;
+        int total = srcs.size();
         try {
             zos.setLevel(Deflater.BEST_SPEED);      // 大目录（模组几十 MB）速度优先，同 zipTo
             for (Src s : srcs) {
-                if (s == null || s.empty()) continue;
+                seen++;
+                if (s == null || s.empty()) {
+                    if (step != null) step.onStep(seen, total);
+                    continue;
+                }
                 String name = uniqueName(used, s.entryName());
                 used.add(name);
                 ZipEntry e = new ZipEntry(name);
@@ -289,6 +315,7 @@ public final class Exporter {
                 zos.closeEntry();
                 r.files++;
                 written++;
+                if (step != null) step.onStep(seen, total);
             }
             if (written == 0) throw new IOException(Trans.get(ctx, R.string.exp_err_no_src));
         } finally {

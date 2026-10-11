@@ -46,6 +46,8 @@ import java.util.zip.ZipFile;
 public final class Blueprints {
     /** 来源：本槽 / 模组自带 */
     public static final int FROM_SLOT = 0, FROM_MOD = 1;
+    /** 来源**筛**里的"不筛"（与上面两个来源不是同一组取值，同 {@link Maps#FROM_ANY}） */
+    public static final int FROM_ANY = -1;
 
     /** 一条蓝图记录 */
     public static final class Item {
@@ -280,26 +282,40 @@ public final class Blueprints {
     }
 
     /**
-     * 搜索 / 排序用的钥匙：搜「蓝图名 + 文件名」（蓝图内名可以重复，文件名才唯一），
-     * 按蓝图名排序、按大小排序。
+     * 蓝图列表的搜索 / 筛选 / 排序用的钥匙（4 参 `filterAndSort` 与 5 参那个共用）。
+     * ★ 搜「显示名 + 文件名 + **描述**」（描述是 2026-10-11 补的：`Msch` 已经解出来了，不要钱）；
+     *   来源筛由 `srcWant` 带进来（见 {@link #matchesSource}）。
+     * ⚠️ 蓝图内名可以重复，**文件名才唯一**（所以两个都进 haystack）。
      */
-    public static final ListQuery.Key<Item> KEY = new ListQuery.Key<Item>() {
-        @Override public String title(Item it) {
-            return it.displayName();
-        }
+    private static ListQuery.Key<Item> key(final int srcWant) {
+        return new ListQuery.Key<Item>() {
+            @Override public String title(Item it) {
+                return it.displayName();
+            }
 
-        @Override public String text(Item it) {
-            return ListQuery.haystack(it.displayName(), it.name());
-        }
+            @Override public String text(Item it) {
+                return ListQuery.haystack(it.displayName(), it.name(),
+                        it.msch == null ? null : it.msch.description());
+            }
 
-        @Override public long bytes(Item it) {
-            return it.bytes;
-        }
+            @Override public long bytes(Item it) {
+                return it.bytes;
+            }
 
-        @Override public boolean problem(Item it) {
-            return isProblem(it);
-        }
-    };
+            @Override public boolean problem(Item it) {
+                return isProblem(it);
+            }
+
+            @Override public boolean keep(Item it) {
+                return matchesSource(it, srcWant);
+            }
+        };
+    }
+
+    /** 来源筛的**唯一判据**（`FROM_ANY` 一律算） */
+    public static boolean matchesSource(Item it, int want) {
+        return want == FROM_ANY || (it != null && it.from == want);
+    }
 
     /**
      * 蓝图列表的搜索 / 筛选 / 排序（**纯函数**，判据在 {@link ListQuery#apply}）。
@@ -308,7 +324,13 @@ public final class Blueprints {
      */
     public static List<Item> filterAndSort(List<Item> items, String query, int sort,
                                            boolean onlyProblems) {
-        return ListQuery.apply(items, query, sort, onlyProblems, KEY);
+        return filterAndSort(items, query, sort, onlyProblems, FROM_ANY);
+    }
+
+    /** 同上，多一维**来源筛**（蓝图只有"本槽 / 模组自带"两种来源） */
+    public static List<Item> filterAndSort(List<Item> items, String query, int sort,
+                                           boolean onlyProblems, int srcWant) {
+        return ListQuery.apply(items, query, sort, onlyProblems, key(srcWant));
     }
 
     /**

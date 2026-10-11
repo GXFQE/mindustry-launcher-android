@@ -31,6 +31,8 @@ import java.util.zip.ZipFile;
 public final class Maps {
     /** 来源 */
     public static final int FROM_SLOT = 0, FROM_GAME = 1, FROM_MOD = 2;
+    /** 来源**筛**里的"不筛"（★ 与上面三个来源**不是同一组取值**：这是筛选维度，不是数据字段） */
+    public static final int FROM_ANY = -1;
 
     /** 一条地图记录 */
     public static final class Item {
@@ -350,26 +352,43 @@ public final class Maps {
     }
 
     /**
-     * 搜索 / 排序用的钥匙：搜「真名 + 文件名」（两个都要，用户手里可能是哪个都不一定），
+     * 搜索 / 排序用的钥匙：搜「真名 + 文件名 + **作者 + 描述**」（前两个用户手里可能是哪个都不一定；
+     * 后两个是 2026-10-11 补的 —— 用户按作者找图是常见事，而 meta 早就读过了，加进来不要钱），
      * 按真名排序、按大小排序（住的容器里那个条目大小 = `Item.bytes`，与界面上显示的一致）。
+     *
+     * ★ 来源筛（{@link #FROM_ANY} = 不筛）**由钥匙带进来**：`ListQuery.Key.keep` 是那一维的落点
+     *   （与模组页"按类型"同一个形状 —— 判据各写一份就会漂）。
      */
-    public static final ListQuery.Key<Item> KEY = new ListQuery.Key<Item>() {
-        @Override public String title(Item it) {
-            return it.displayName();
-        }
+    private static ListQuery.Key<Item> key(final int srcWant) {
+        return new ListQuery.Key<Item>() {
+            @Override public String title(Item it) {
+                return it.displayName();
+            }
 
-        @Override public String text(Item it) {
-            return ListQuery.haystack(it.displayName(), it.name());
-        }
+            @Override public String text(Item it) {
+                MsavMeta m = it.meta;
+                return ListQuery.haystack(it.displayName(), it.name(),
+                        m == null ? null : m.author, m == null ? null : m.description);
+            }
 
-        @Override public long bytes(Item it) {
-            return it.bytes;
-        }
+            @Override public long bytes(Item it) {
+                return it.bytes;
+            }
 
-        @Override public boolean problem(Item it) {
-            return isProblem(it);
-        }
-    };
+            @Override public boolean problem(Item it) {
+                return isProblem(it);
+            }
+
+            @Override public boolean keep(Item it) {
+                return matchesSource(it, srcWant);
+            }
+        };
+    }
+
+    /** 来源筛的**唯一判据**（`FROM_ANY` 一律算） */
+    public static boolean matchesSource(Item it, int want) {
+        return want == FROM_ANY || (it != null && it.from == want);
+    }
 
     /**
      * 地图列表的搜索 / 筛选 / 排序（**纯函数**，判据在 {@link ListQuery#apply}）。
@@ -377,7 +396,13 @@ public final class Maps {
      */
     public static List<Item> filterAndSort(List<Item> items, String query, int sort,
                                            boolean onlyProblems) {
-        return ListQuery.apply(items, query, sort, onlyProblems, KEY);
+        return filterAndSort(items, query, sort, onlyProblems, FROM_ANY);
+    }
+
+    /** 同上，多一维**来源筛**（4 参那个 = `FROM_ANY`，自检里那批老断言照旧有效） */
+    public static List<Item> filterAndSort(List<Item> items, String query, int sort,
+                                           boolean onlyProblems, int srcWant) {
+        return ListQuery.apply(items, query, sort, onlyProblems, key(srcWant));
     }
 
     // ── 记录 → Intent → 记录（地图详情页要用；**只传定位信息**，不传对象） ──────

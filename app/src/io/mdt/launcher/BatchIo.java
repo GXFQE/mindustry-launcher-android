@@ -203,15 +203,33 @@ final class BatchIo {
             return true;
         }
         final Uri uri = data.getData();
-        final ProgressDialog pd = ProgressDialog.show(a,
-                Trans.get(a, R.string.batch_export_progress_title),
-                Trans.get(a, R.string.batch_export_progress_fmt, srcs.size()), true, false);
+        // ★ 2026-10-11：导出侧也改成**确定进度**（份数已知；目录形态的模组可能几十 MB）
+        final ProgressDialog pd = new ProgressDialog(a);
+        pd.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
+        pd.setTitle(Trans.get(a, R.string.batch_export_progress_title));
+        pd.setMessage(Trans.get(a, R.string.batch_export_pct_fmt, 0, srcs.size()));
+        pd.setMax(srcs.size());
+        pd.setProgress(0);
+        pd.setCancelable(false);
+        pd.show();
         new Thread(new Runnable() {
             @Override public void run() {
                 String err = null;
                 Exporter.Result r = null;
                 try {
-                    r = Exporter.zipSources(a, uri, srcs);
+                    r = Exporter.zipSources(a, uri, srcs, new Exporter.Step() {
+                        @Override public void onStep(final int done, final int total) {
+                            a.runOnUiThread(new Runnable() {
+                                @Override public void run() {
+                                    if (Util.dead(a)) return;
+                                    pd.setMax(total);
+                                    pd.setProgress(done);
+                                    pd.setMessage(Trans.get(a, R.string.batch_export_pct_fmt,
+                                            done, total));
+                                }
+                            });
+                        }
+                    });
                 } catch (Throwable t) {
                     err = Util.ioReason(a, t);
                     Log.w(TAG, "batch export failed", t);
@@ -482,6 +500,14 @@ final class BatchIo {
     }
 
     /**
+     * 进度回调（**只报数、不做决定**）：界面拿它更新进度条；dev 口 / 自检传 `null`。
+     * ★ 2026-10-11：导入侧原来是转圈的不确定进度，现在按"一份一份"报（与导出侧同一个形状）。
+     */
+    interface Step {
+        void onStep(int done, int total);
+    }
+
+    /**
      * 真正把一份导进去 —— **四个内容页各自的实现**（每个 ~15 行，见各自 Activity）。
      * ⚠️ 实现里**不许**自己判"要不要问同名"（那件事已经由 {@link #plan} 一次性做完，
      *   传进来的 `overwrite` 就是答案）。
@@ -626,12 +652,30 @@ final class BatchIo {
     private static void phaseB(final Activity a, final List<Entry> todo, final Importer imp,
                                final Report rep, final File work, final boolean replace,
                                final Runnable onDone) {
-        final ProgressDialog pd = ProgressDialog.show(a,
-                Trans.get(a, R.string.batch_import_progress_title),
-                Trans.get(a, R.string.batch_import_running_fmt, todo.size()), true, false);
+        // ★ 2026-10-11：改成**确定进度**（原来是转圈的）—— 份数这一刻就已知（`todo.size()`），
+        //   而"模组几十 MB 时要盯几秒"正是用户抱怨的那种"看着像卡死"。
+        final ProgressDialog pd = new ProgressDialog(a);
+        pd.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
+        pd.setTitle(Trans.get(a, R.string.batch_import_progress_title));
+        pd.setMessage(Trans.get(a, R.string.batch_import_pct_fmt, 0, todo.size()));
+        pd.setMax(todo.size());
+        pd.setProgress(0);
+        pd.setCancelable(false);
+        pd.show();
         new Thread(new Runnable() {
             @Override public void run() {
-                applyAll(a, todo, imp, rep, replace);
+                applyAll(a, todo, imp, rep, replace, new Step() {
+                    @Override public void onStep(final int done, final int total) {
+                        a.runOnUiThread(new Runnable() {
+                            @Override public void run() {
+                                if (Util.dead(a)) return;       // 页面没了就别再碰那个 dialog
+                                pd.setMax(total);
+                                pd.setProgress(done);
+                                pd.setMessage(Trans.get(a, R.string.batch_import_pct_fmt, done, total));
+                            }
+                        });
+                    }
+                });
                 cleanup(work);
                 a.runOnUiThread(new Runnable() {
                     @Override public void run() {
@@ -649,13 +693,19 @@ final class BatchIo {
      * 逐份导的**唯一循环**（界面那条与 {@link #importSync} 共用）：
      * 成功 / 替换 / 跳过 / 失败四个出口，**一条都不许静默吞掉**
      * （批量最常见的坑就是"20 份导进去 18 份，另外 2 份什么都没说"）。
+     *
+     * @param step 每处理完一份报一次数（**可为 null**；dev 口与自检不需要进度条）
      */
     private static void applyAll(Context ctx, List<Entry> todo, Importer imp, Report rep,
-                                 boolean replace) {
+                                 boolean replace, Step step) {
         if (todo == null) return;
+        int seen = 0;
+        int total = todo.size();
         for (Entry e : todo) {
+            seen++;
             if (!replace && e.exists) {
                 rep.skipped.add(line(ctx, e.name, Trans.get(ctx, R.string.batch_skip_exists)));
+                if (step != null) step.onStep(seen, total);
                 continue;
             }
             InputStream in = null;
@@ -680,6 +730,7 @@ final class BatchIo {
                 rep.failed.add(line(ctx, e.name, Util.ioReason(ctx, t)));
             } finally {
                 closeQuietly(in);
+                if (step != null) step.onStep(seen, total);
             }
         }
     }
@@ -835,7 +886,7 @@ final class BatchIo {
             }
             // ⚠️ 同名那几份的"跳过"由 {@link #applyAll} 记（`replace == false` 时它自己会跳）
             //   —— 这里**不许**再记一遍，否则报告里同一份会被数两次（自检当场抓过）
-            applyAll(ctx, plan.entries, k.imp, rep, replace);
+            applyAll(ctx, plan.entries, k.imp, rep, replace, null);
         } finally {
             cleanup(work);
         }
