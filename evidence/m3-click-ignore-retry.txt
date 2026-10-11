@@ -1,0 +1,62 @@
+④ §86.19「摘要卡点名那行真的点得动」—— 真机验收（2026-10-11 第 129 轮）
+================================================================
+
+【为什么以前没验】§86.19 立规矩时只做到「断言 + 文案」：当时用户不在"待跳过"状态，
+没法真点那一下。规矩原文就是「把一行做成可点 ≠ 点得动（父容器可能把触摸吃掉）⇒ 真机上真点一次」。
+
+【装置】HONOR ELP-AN00 / Android 16 (API 36)；dev 变体（dev 口才可用）。
+一次性槽 slot-m3-click（**不碰用户槽**）。
+
+【探针模组】d8 只喂探针那一个类 ⇒ dex 里只有 probe/Probe，运行时缺 depmod.Dep。
+  源：.dsh/research/probes/depmod/{src/mindustry/mod/Mod.java(存根), src/depmod/Dep.java, src/probe/Probe.java}
+  包：.dsh/research/probes/depmod-probe.zip = mod.hjson 298 B + classes.dex 712 B
+  mod.hjson: java:true / main: probe.Probe / minGameVersion: 154 / name: depmod-probe
+
+【版本 → 槽】那个导入版 import:official-159.apk 本来就没分配 ⇒ 会回落到 default_slot。
+  于是只把 config.json 里**纯 ASCII** 的 "default_slot": "default" 临时 sed 成 "m3-click"，
+  收尾反向 sed 拨回（version_slots 里的中文值一个字节没动）。★ config 在 app_hub/config.json，
+  **不是** /data/data/<pkg>/config.json（后者不存在，早先一次读到的其实是 fallback 分支）。
+
+【真崩（第一次启动）】am start -n io.mdt.launcher/.MainActivity --es dev_launch_key import:official-159.apk
+  logcat:
+    I/System.out: [I] Loading mod: depmod-probe
+    E/AndroidRuntime: FATAL EXCEPTION: GLThread
+    E/AndroidRuntime: Process: io.mdt.launcher:game
+    E/AndroidRuntime: java.lang.RuntimeException: Error loading mod depmod-probe
+    Caused by: java.lang.NoClassDefFoundError: Failed resolution of: Ldepmod/Dep;
+  槽里出现 crashes/crash_1791710464394.txt（报告里 "Mods: depmod-probe:1.0"）、launchid.dat、last_log.txt
+
+【把「那行」逼出来】判据是 ModsText.crashStillLive：launchid.dat 在（+ 跳过开关开）或 有模组还带 -failed。
+  ⚠️ **第一次跑完后又启动了一次** ⇒ 游戏这次整槽载完（last_log 有 "Total time to load: 4245ms"）、
+  finishLaunch 删掉了 launchid.dat ⇒ 那行**正确地**不显示（这就是 2026-10-08 用户抓的
+  「已经不崩溃了为什么还显示最可能的原因」那条规矩在起作用）。
+  ⇒ 正解：删掉 settings.bin（让探针回到"启用"）→ force-stop 后**再启动一次**让它再崩
+  （★ 不 force-stop 时 am start 的 extra 被投给已在栈顶的实例，**根本不会重启游戏**）⇒
+  launchid.dat 回来（内容 `go away`）⇒ **直接**开模组页（不再启动第二次）。
+
+【点之前（转储原文）】
+  <node text="最可能的原因：depmod-probe（可点它忽略并再试）"
+        resource-id="io.mdt.launcher:id/mods_verdict" clickable="true"
+        bounds="[98,582][1133,659]" />
+  （码点：U+6700 U+53EF U+80FD U+7684 U+539F U+56E0 U+FF1A … U+FF08 U+53EF U+70B9 U+5B83 U+5FFD U+7565 U+5E76 U+518D U+8BD5 U+FF09）
+
+【真点】adb shell input tap 616 620（该行 bounds 的中心）⇒ **弹出了确认框**：
+  alertTitle 「停用「depmod-probe」？」
+  message    「改前会自动备份设置，改完会读回来核对，不对就自动…」
+  button2(取消, x 632-840) / button1(**就这样改**, x 840-1102 = 最右)
+  ⇒ 结论①：**父容器没有吃掉触摸**，这一行真点得动；结论②：它走的就是列表那条路同一个确认框
+  （Mods#ignoreAndRetry），没有另造一套。
+  证据截图：evidence/m3-click-1-confirm.png
+
+【确认】input tap 971 1664（最右那个按钮的中心）⇒
+  · settings.bin 里出现并读回 mod-depmod-probe-enabled（"改完会读回来核对"那条）
+  · launchid.dat **被清掉**（下次启动不会再整槽跳过 —— 正是 §86.18 那条修复）
+  · mods_verdict 那行**消失**（后果清掉了，卡片不再挂着"最可能的原因"）✓
+  证据截图：evidence/m3-click-2-after.png
+
+【清场】删 slot-m3-click；default_slot 反向 sed 回 "default"；app_hub/mdt-slot.txt 拨回「模组演示」；
+  删 /data/local/tmp/fixcfg*.sh；装回产品版。（用户的 5 个槽与原分配一个都没动。）
+
+【诚实边界】· 这条验的是「**单一嫌疑人**」那种形态（names.size()==1）——
+  并列（多个被点名）时那行**不可点**是设计，本轮没造那种夹具。
+  · 「旧数据摆状态」的捷径本轮之前已证伪（复制 crashes/*.txt + settings.bin ⇒ 页面「0 个模组」那行不出现）。
