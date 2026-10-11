@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ★ 这个字符串**只存在于插件里** —— 壳（app/）里没有同名 key。
+  所以"壳能取到这句话"就是"插件资源真的挂上了"的判据（而不是壳自己的兜底文案）。
+-->
+<resources>
+    <string name="plug_hello">来自插件的字符串</string>
+    <color name="plug_accent">#FF00C2A8</color>
+</resources>

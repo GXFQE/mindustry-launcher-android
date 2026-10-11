@@ -276,6 +276,7 @@ public final class SelfTest {
             modSprites(ctx, L, stat);
             // ★ 用户语言包（2026-10-07）：单键包只改那一条 + 占位符门禁 + 模板能装回自己
             //   ⚠️ 断言用的是**同一次调用里的对照**（装前 /= 装后逐键比对），与自检语言无关。
+            pluginPure(ctx, L, stat);       // S0 插件化（纯函数；加载器真机验收在插件页）
             langPack(ctx, L, stat);
             // ★ 第 127 轮：批量导入 / 导出（四种来源打一个 zip + 整包判据 + 端到端往返）
             batchIo(ctx, L, stat);
@@ -2152,6 +2153,62 @@ public final class SelfTest {
         settingsRoundtrip(ctx, L, stat);
         modsScan(ctx, L, stat);
         L.add("");
+    }
+
+    /**
+     * S0 插件化：**纯函数**判据。
+     *
+     * <p>加载器本身（置只读 / 预热预检 / addAssetPath / 注入宿主 CL）要真机跑，验收在"插件页"那一边
+     * （`--es plugin_page <目录>`）；这里钉的是**判据函数**与那套"每个拒绝原因都要有话说且互不相同"的元断言。
+     */
+    private static void pluginPure(Context ctx, List<String> L, int[] stat) {
+        L.add("");
+        L.add("【S0 插件化：纯函数】");
+        ok(stat, L, PluginHost.API == 1, "插件接口版本 = " + PluginHost.API);
+        ok(stat, L, PluginHost.apiCompatible(PluginHost.API), "api=1 ⇒ 认");
+        ok(stat, L, !PluginHost.apiCompatible(0) && !PluginHost.apiCompatible(2)
+                && !PluginHost.apiCompatible(99), "★ api≠1 一律不认（0 / 2 / 99）");
+        ok(stat, L, PluginHost.apiCompatible(-1) == false, "负数 api ⇒ 不认（不崩）");
+
+        // ★ 元断言：六个拒绝原因都要有一句能说给用户的话，而且**互不相同**
+        //   （落到同一句 ⇒ 界面上张冠李戴；这是"同一屏同一件事只说一次"那条规矩的镜像）
+        String[] codes = { "plugin_err_missing", "plugin_err_dex", "plugin_err_noclass",
+                           "plugin_err_entry", "plugin_err_api", "plugin_err_asset" };
+        int[] res = new int[codes.length];
+        boolean allNonZero = true, allDistinct = true;
+        for (int i = 0; i < codes.length; i++) {
+            res[i] = PluginHost.reasonRes(codes[i]);
+            if (res[i] == 0) allNonZero = false;
+            for (int j = 0; j < i; j++) if (res[i] == res[j]) allDistinct = false;
+        }
+        ok(stat, L, allNonZero, "六个拒绝原因都有对应文案");
+        ok(stat, L, allDistinct, "★ 六个拒绝原因的文案互不相同（否则界面会张冠李戴）");
+        ok(stat, L, PluginHost.reasonRes(null) == PluginHost.reasonRes("plugin_err_unknown_xyz"),
+                "空 / 未知原因都落到同一句兜底");
+        ok(stat, L, PluginHost.reasonRes("plugin_err_unknown_xyz") != 0, "兜底文案存在（界面不许空白）");
+        ok(stat, L, PluginHost.reasonRes(PluginHost.reasonRes(null) == 0 ? "x" : "plugin_err_api")
+                != PluginHost.reasonRes("plugin_err_missing"), "带参数的 api 那句与 missing 那句不同（防串台）");
+
+        // pluginFiles：只认 .apk、按名字排序、坏输入不崩
+        try {
+            File d = new File(ctx.getCacheDir(), "plug-files-" + System.currentTimeMillis());
+            if (!d.exists() && !d.mkdirs()) {
+                ok(stat, L, false, "建临时插件目录失败：" + path(d));
+            } else {
+                write(new File(d, "b.apk"), new byte[]{ 1 });
+                write(new File(d, "a.apk"), new byte[]{ 2 });
+                write(new File(d, "c.zip"), new byte[]{ 3 });
+                write(new File(d, "d.txt"), new byte[]{ 4 });
+                List<File> got = PluginHost.pluginFiles(d);
+                ok(stat, L, got.size() == 2, "只挑 .apk（拿到 " + got.size() + " 个）");
+                ok(stat, L, got.size() == 2 && "a.apk".equals(got.get(0).getName())
+                        && "b.apk".equals(got.get(1).getName()), "★ 按名字排序（a 在 b 前）");
+                ok(stat, L, PluginHost.pluginFiles(null).isEmpty(), "null 目录 ⇒ 空表（不崩）");
+                ok(stat, L, PluginHost.pluginFiles(new File(d, "nope")).isEmpty(), "目录不存在 ⇒ 空表");
+            }
+        } catch (Throwable t) {
+            ok(stat, L, false, "pluginFiles 用例异常：" + t);
+        }
     }
 
     private static void modsPure(List<String> L, int[] stat) {

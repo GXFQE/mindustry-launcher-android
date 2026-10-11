@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  插件夹具（S0 可行性实验用）—— **不是产品代码**，只是被壳动态加载的一个小程序 APK。
+  ★ 它故意**不声明任何组件**：可行性实验要验的正是"壳能不能加载一个外部 APK 的类与资源"，
+    组件（Activity/Service/权限）那部分是已知做不到的（清单只认已安装 APK），见 REF §87.13。
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="io.mdt.plugtest">
+
+    <application android:label="MDT PlugTest"/>
+</manifest>

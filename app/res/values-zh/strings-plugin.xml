@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 插件页文案（中文）—— 与 values/strings-plugin.xml 逐键对应；见那份的说明。 -->
+<resources>
+    <string name="plugin_page_title">插件</string>
+    <string name="plugin_page_sub">把插件 APK 放进 app_hub/plugins，点一下就用它来渲染这一页。</string>
+    <string name="plugin_none">那个目录里没有插件。</string>
+    <string name="plugin_loaded_fmt">已加载 %1$s（接口版本 %2$d）</string>
+    <string name="plugin_fallback_title">插件没能加载，这一页改用内置的实现。</string>
+    <string name="plugin_err_missing">插件文件不在了。</string>
+    <string name="plugin_err_dex">这个包读不了（是不是有效的 APK？）。</string>
+    <string name="plugin_err_noclass">插件里没有约定的入口类。</string>
+    <string name="plugin_err_entry">插件的入口用不了。</string>
+    <string name="plugin_err_api_fmt">接口版本不匹配：插件是 %1$d，本版本需要 %2$d。</string>
+    <string name="plugin_err_asset">插件的资源挂不上。</string>
+    <string name="plugin_err_other">插件加载失败。</string>
+</resources>

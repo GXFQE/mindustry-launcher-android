@@ -61,8 +61,97 @@ final class Reflect {
         return merged.length;
     }
 
-    /** AssetManager.addAssetPath —— 返回 cookie；0 表示没认这个路径 */
-    static int addAssetPath(AssetManager am, File path) throws Exception {
+    /**
+     * 反过来：把 extra 的 dexElements 排在**目标之前**（shadowing）——
+     * 这样同名类**插件赢**（只要那个类还没被加载/解析过）。
+     *
+     * <p>与 {@link #appendDexElements} 是同一个动作，只差拼接顺序；
+     * 两条一起构成"同名类到底谁能顶掉谁"的判据（S0 可行性实验 · Step E）。
+     */
+    static int prependDexElements(ClassLoader target, ClassLoader extra) throws Exception {
+        Object targetList = pathListOf(target);
+        Object extraList = pathListOf(extra);
+        Field elems = field(targetList.getClass(), "dexElements");
+
+        Object[] a = (Object[]) elems.get(targetList);
+        Object[] b = (Object[]) elems.get(extraList);
+
+        Object[] merged = (Object[]) Array.newInstance(
+                a.getClass().getComponentType(), a.length + b.length);
+        System.arraycopy(b, 0, merged, 0, b.length);
+        System.arraycopy(a, 0, merged, b.length, a.length);
+        elems.set(targetList, merged);
+        return merged.length;
+    }
+
+    /**
+     * 把一个 dex/APK **只注册一次**地注入目标 CL。
+     *
+     * <p>为什么不复用 {@link #appendDexElements}：那条路要先建一个 {@code DexClassLoader} 才能拿到
+     * elements，而同一个 dex 文件**注册给两个 CL 会让 ART 直接报错**
+     * （实测 `InternalError: Attempt to register dex file ... with multiple class loaders`）。
+     * 这里改成自己造 elements：`DexPathList.makeDexElements(...)` —— 只登记给目标 CL 一次。
+     *
+     * <p>⚠️ `makeDexElements` 的签名各版本变过（老版有 `optimizedDirectory`，新版换成 `boolean isTrusted`；
+     * 参数个数与顺序都动过）⇒ 这里**按参数类型现配实参**，不写死签名。
+     *
+     * @param prepend true = 插件排在宿主之前（同名类**插件赢**，前提是那个类还没被加载过）
+     * @return 注入后的 dexElements 总数；{@code suppressed} 里带出来的 IOException 由调用方读
+     */
+    static int injectDex(ClassLoader target, File apk, File optimizedDir, boolean prepend,
+                         java.util.List<String> notes) throws Exception {
+        Object targetList = pathListOf(target);
+        Method mk = null;
+        for (Method m : Class.forName("dalvik.system.DexPathList").getDeclaredMethods()) {
+            if ("makeDexElements".equals(m.getName())) { mk = m; break; }
+        }
+        if (mk == null) throw new NoSuchMethodException("DexPathList.makeDexElements");
+        mk.setAccessible(true);
+
+        java.util.List<File> files = new java.util.ArrayList<File>();
+        files.add(apk);
+        java.util.List<java.io.IOException> suppressed = new java.util.ArrayList<java.io.IOException>();
+
+        Class<?>[] pt = mk.getParameterTypes();
+        Object[] args = new Object[pt.length];
+        int listSeen = 0;
+        for (int i = 0; i < pt.length; i++) {
+            Class<?> c = pt[i];
+            if (ClassLoader.class.isAssignableFrom(c)) {
+                args[i] = target;
+            } else if (File.class.isAssignableFrom(c)) {
+                args[i] = optimizedDir;
+            } else if (java.util.List.class.isAssignableFrom(c)) {
+                args[i] = (listSeen++ == 0) ? files : suppressed;
+            } else if (c == boolean.class) {
+                args[i] = Boolean.FALSE;
+            } else {
+                args[i] = null;
+            }
+        }
+        Object[] made = (Object[]) mk.invoke(null, args);
+        if (notes != null) {
+            notes.add("makeDexElements(" + pt.length + " args) -> " + (made == null ? "null" : made.length)
+                    + " elements, suppressed=" + suppressed.size()
+                    + (suppressed.isEmpty() ? "" : (" [" + suppressed.get(0) + "]")));
+        }
+
+        Field elems = field(targetList.getClass(), "dexElements");
+        Object[] a = (Object[]) elems.get(targetList);
+        int n = (made == null) ? 0 : made.length;
+        Object[] merged = (Object[]) Array.newInstance(a.getClass().getComponentType(), a.length + n);
+        if (prepend) {
+            System.arraycopy(made, 0, merged, 0, n);
+            System.arraycopy(a, 0, merged, n, a.length);
+        } else {
+            System.arraycopy(a, 0, merged, 0, a.length);
+            System.arraycopy(made, 0, merged, a.length, n);
+        }
+        elems.set(targetList, merged);
+        return merged.length;
+    }
+
+    /** AssetManager.addAssetPath —— 返回 cookie；0 表示没认这个路径 */    static int addAssetPath(AssetManager am, File path) throws Exception {
         Method m = AssetManager.class.getDeclaredMethod("addAssetPath", String.class);
         m.setAccessible(true);
         Object cookie = m.invoke(am, path.getAbsolutePath());

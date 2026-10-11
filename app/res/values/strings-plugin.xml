@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  插件页文案（S0 可行性实验）。
+  ★ 故意**单独一个文件**：2026-10-11 那一轮 `values/strings.xml` 正被另一个会话改着，
+    这一份不去动它 —— Android 会把 values/ 下的所有 xml 合起来，效果一样。
+  ⚠️ 与 `values-zh/strings-plugin.xml` **逐键对应**，占位符序号集合也必须一致（门禁 RES-01/02）。
+-->
+<resources>
+    <string name="plugin_page_title">Plugins</string>
+    <string name="plugin_page_sub">Put plugin APKs into app_hub/plugins, then tap one to render this page with it.</string>
+    <string name="plugin_none">No plugin found in that folder.</string>
+    <string name="plugin_loaded_fmt">Loaded %1$s (api %2$d)</string>
+    <string name="plugin_fallback_title">The plugin did not load - this page falls back to the built-in view.</string>
+    <string name="plugin_err_missing">The plugin file is gone.</string>
+    <string name="plugin_err_dex">This package cannot be read (is it a valid APK?).</string>
+    <string name="plugin_err_noclass">The plugin has no agreed entry class.</string>
+    <string name="plugin_err_entry">The plugin entry is not usable.</string>
+    <string name="plugin_err_api_fmt">Interface version mismatch: plugin %1$d, this build needs %2$d.</string>
+    <string name="plugin_err_asset">The plugin resources cannot be mounted.</string>
+    <string name="plugin_err_other">The plugin failed to load.</string>
+</resources>
