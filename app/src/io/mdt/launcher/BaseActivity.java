@@ -100,6 +100,10 @@ public abstract class BaseActivity extends Activity {
         // ★ F23「崩了马上说一声」：记下"谁是当前前台页面"——崩溃提示要按这个决定
         //   "现在弹对话框"还是"只 Toast"（游戏还在前台时弹窗没人看得见）。见 CrashAlert。
         CrashAlert.activityResumed(this);
+        // ★ 第 131 轮：启动真的过了这一关 ⇒ 摘掉插件的安全阀（`Plugins.GUARD`）。
+        //   位置放在 super.onResume() **之后**：插件要是把主界面搞崩，异常发生在 super 里，
+        //   那就走不到这一句、安全阀留着 ⇒ 下次启动不注入插件（这才是要的行为）。
+        Plugins.markBootOk(this);
         if (!syncUiOnResume() || isFinishing()) return;
         // ★ 必须先把盘上的配置读回来：这两项都是在**另一个 Activity**（设置页）里改的，
         //   而 Config 是进程内单例、只在启动时 load 一次 —— 不 reload 就还是旧值。

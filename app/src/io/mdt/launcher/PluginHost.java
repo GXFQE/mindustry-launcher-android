@@ -44,7 +44,13 @@ public final class PluginHost {
 
     /** 加载成功后的句柄。 */
     public static final class Loaded {
-        public final DexClassLoader cl;
+        /**
+         * 解析插件类用的那个 ClassLoader。
+         * ★ 两条路给的不是同一种东西：{@link #load} 给插件自己的 {@code DexClassLoader}，
+         * 而 {@link #openInjected}（早注入那条路）给的是**宿主 CL** —— 那种情况下插件类就住在
+         * 宿主 CL 里，再建一个 DexClassLoader 会让 ART 报 "multiple class loaders"（S0 实测）。
+         */
+        public final ClassLoader cl;
         public final Context ctx;
         public final Class<?> entry;
         public final int api;
@@ -53,7 +59,7 @@ public final class PluginHost {
         public final String assetFrom;
         public final int cookie;
 
-        Loaded(DexClassLoader cl, Context ctx, Class<?> entry, int api,
+        Loaded(ClassLoader cl, Context ctx, Class<?> entry, int api,
                boolean readOnlySet, boolean stillWritable, String assetFrom, int cookie) {
             this.cl = cl; this.ctx = ctx; this.entry = entry; this.api = api;
             this.readOnlySet = readOnlySet; this.stillWritable = stillWritable;
@@ -85,6 +91,23 @@ public final class PluginHost {
     // ---- 加载 -----------------------------------------------------------------
 
     public static Loaded load(Context host, File apk) throws PluginException {
+        return open(host, apk, null);
+    }
+
+    /**
+     * 打开一个**已经注入宿主 CL** 的插件（启动早注入那条路，见 {@link Plugins}）。
+     *
+     * <p>★ 与 {@link #load} 的唯一区别：**不建 {@code DexClassLoader}**。同一个 dex 注册给两个
+     * ClassLoader 会让 ART 直接报 {@code InternalError: Attempt to register dex file ... with
+     * multiple class loaders}（S0 实测）—— 而那个 dex 已经由 {@link Reflect#injectDex} 注册给宿主 CL 了。
+     * 这里只跑后三道门：按名字取类（预热预检）→ 接口版本 → 挂资源。
+     */
+    static Loaded openInjected(Context host, File apk) throws PluginException {
+        return open(host, apk, host.getClassLoader());
+    }
+
+    /** @param injectedTo 非 null = 这个 dex 已经注册给它了 ⇒ 不再建 DexClassLoader */
+    private static Loaded open(Context host, File apk, ClassLoader injectedTo) throws PluginException {
         if (apk == null || !apk.isFile()) {
             throw new PluginException("plugin_err_missing", String.valueOf(apk));
         }
@@ -96,12 +119,16 @@ public final class PluginHost {
         boolean stillWritable = apk.canWrite();
 
         // (2) 预热预检
-        DexClassLoader cl;
-        try {
-            cl = new DexClassLoader(apk.getAbsolutePath(),
-                    host.getCodeCacheDir().getAbsolutePath(), null, host.getClassLoader());
-        } catch (Throwable t) {
-            throw new PluginException("plugin_err_dex", brief(t));
+        ClassLoader cl;
+        if (injectedTo != null) {
+            cl = injectedTo;
+        } else {
+            try {
+                cl = new DexClassLoader(apk.getAbsolutePath(),
+                        host.getCodeCacheDir().getAbsolutePath(), null, host.getClassLoader());
+            } catch (Throwable t) {
+                throw new PluginException("plugin_err_dex", brief(t));
+            }
         }
         Class<?> entry;
         try {

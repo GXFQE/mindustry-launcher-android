@@ -10,6 +10,23 @@ import android.util.Log;
 public class LauncherApp extends Application {
     public static final String TAG = "MDTLauncher";
 
+    /**
+     * ★★ 2026-10-11（第 131 轮）：**插件在进程最早点注入** —— 这是"重启生效"的全部实现。
+     *
+     * <p>为什么必须在这里（而不是像 S0 演示那样"打开插件页时才注入"）：类一旦被加载就换不掉，
+     * 只有宿主**还没加载过**的同名类才能被插件顶掉。等到 Activity 起来时，`MainActivity` 一大家子
+     * 早就在 CL 里了 ⇒ 插件永远只能新增自己的页面、碰不到宿主逻辑。
+     *
+     * <p>⚠️ 早注入是**唯一**能把启动器砖掉的动作 ⇒ 它与 {@link Plugins} 里的安全阀（guard）
+     * 是同一件事的两半，不能只留一半。这里没有 try/catch 是因为 `Plugins.injectEarly` 自己
+     * 绝不抛（它内部把任何异常都记下来并跳过插件）。
+     */
+    @Override
+    protected void attachBaseContext(android.content.Context base) {
+        super.attachBaseContext(base);
+        Plugins.injectEarly(this);
+    }
+
     @Override
     public void onCreate() {
         super.onCreate();

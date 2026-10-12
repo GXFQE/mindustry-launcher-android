@@ -116,7 +116,11 @@ final class DevTools {
                 || intent.hasExtra("dev_batch_import")
                 || intent.hasExtra("dev_msch")
                 || intent.hasExtra("dev_plugins")
-                || intent.hasExtra("dev_pluginprobe");
+                || intent.hasExtra("dev_pluginprobe")
+                || intent.hasExtra("dev_plugininstall")
+                || intent.hasExtra("dev_pluginstatus")
+                || intent.hasExtra("dev_pluginrestart")
+                || intent.hasExtra("dev_pluginclear");
         if (!isDev) return;
         if ((a.getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) == 0) {
             Toast.makeText(a, R.string.dev_blocked_toast, Toast.LENGTH_SHORT).show();
@@ -680,6 +684,45 @@ final class DevTools {
         String plugProbe = intent.getStringExtra("dev_pluginprobe");
         if (plugProbe != null && !plugProbe.isEmpty()) {
             PluginProbeDev.runExperimentAsync(a, new File(plugProbe));
+        }
+
+        // ── S0.5 插件「退出重开生效」那套机制（登记 + 早注入 + 安全阀 + 重开）──────────────
+        // 用法：`--es dev_plugininstall <hub 里的 apk> [--es dev_pluginid <id>] [--es dev_pluginver <ver>]
+        //         [--es dev_pluginnow true]`
+        //       `--es dev_pluginstatus 1` ⇒ 现在到底谁在生效（宿主 CL 里那两个同名类的 tag）
+        //       `--es dev_pluginrestart 1` ⇒ 挂闹钟 + 自杀（验"自动拉回"）
+        //       `--es dev_pluginguard 1` ⇒ 伪造"上次没走完" ⇒ 下次启动必须不注入 + 自动停用
+        //       `--es dev_pluginclear 1` ⇒ 清登记与报告（不动已装的 APK）
+        // ★ 为什么这些口必须存在：判据全在**开机的头几百毫秒**里（注入发生在
+        //   `LauncherApp.attachBaseContext`），界面还来不及画 ⇒ 只能靠"重开之后自己上报"。
+        String pInstall = intent.getStringExtra("dev_plugininstall");
+        if (pInstall != null && !pInstall.isEmpty()) {
+            String rep = PluginProbeDev.install(a, pInstall, intent.getStringExtra("dev_pluginid"),
+                    intent.getStringExtra("dev_pluginver"),
+                    "true".equals(String.valueOf(intent.getStringExtra("dev_pluginnow"))));
+            reportDev(rep, "dev_plugininstall");
+            return;
+        }
+        String pStatus = intent.getStringExtra("dev_pluginstatus");
+        if (pStatus != null && !pStatus.isEmpty()) {
+            reportDev(PluginProbeDev.status(a), "dev_pluginstatus");
+            return;
+        }
+        String pRestart = intent.getStringExtra("dev_pluginrestart");
+        if (pRestart != null && !pRestart.isEmpty()) {
+            int r = PluginProbeDev.restartNow(a);
+            // 挂不上就**如实说**（不许静默：用户会以为已经重启了）；
+            // 而"刚重开过"（恢复重放）要**静默** —— 那是系统把我们自己的 Intent 又送了一遍
+            if (r == Restart.FAILED) {
+                reportDev("restart alarm could not be scheduled - exit and reopen by hand\n",
+                        "dev_pluginrestart failed");
+            }
+            return;
+        }
+        String pClear = intent.getStringExtra("dev_pluginclear");
+        if (pClear != null && !pClear.isEmpty()) {
+            reportDev(PluginProbeDev.clear(a), "dev_pluginclear");
+            return;
         }
 
         // 用法：`--es dev_msch /sdcard/xxx.msch [--es dev_msch_slot <槽>]`

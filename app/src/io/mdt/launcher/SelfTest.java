@@ -277,6 +277,8 @@ public final class SelfTest {
             // ★ 用户语言包（2026-10-07）：单键包只改那一条 + 占位符门禁 + 模板能装回自己
             //   ⚠️ 断言用的是**同一次调用里的对照**（装前 /= 装后逐键比对），与自检语言无关。
             pluginPure(ctx, L, stat);       // S0 插件化（纯函数；加载器真机验收在插件页）
+            // ★ 第 131 轮：插件「退出重开生效」的登记表（active/pending 的纯函数）
+            pluginStatePure(ctx, L, stat);
             langPack(ctx, L, stat);
             // ★ 第 127 轮：批量导入 / 导出（四种来源打一个 zip + 整包判据 + 端到端往返）
             batchIo(ctx, L, stat);
@@ -2209,6 +2211,62 @@ public final class SelfTest {
         } catch (Throwable t) {
             ok(stat, L, false, "pluginFiles 用例异常：" + t);
         }
+    }
+
+    /**
+     * 第 131 轮 · 插件「退出重开生效」：**登记表纯函数**（{@code Plugins.state*}）+ 落点约定。
+     *
+     * <p>为什么这些非钉不可：登记表是"装了什么 / 这次该注入谁 / 崩了该摘掉谁"的**唯一事实来源**，
+     * 而它只有 `id=ver` 文本这一种形态。覆盖时多留一行、删除时连别人一起删、注释行被当条目 ——
+     * 在真机上都会表现成"插件莫名其妙没生效 / 莫名其妙被停用"，极难归因。
+     */
+    private static void pluginStatePure(Context ctx, List<String> L, int[] stat) {
+        L.add("");
+        L.add("【第 131 轮 · 插件登记表（active/pending）】");
+
+        String t = "a=1\nb=2\n";
+        ok(stat, L, "1".equals(Plugins.stateGet(t, "a")) && "2".equals(Plugins.stateGet(t, "b")),
+                "stateGet 按 id 取版本");
+        ok(stat, L, Plugins.stateGet(t, "zz") == null, "没有的 id ⇒ null");
+        ok(stat, L, Plugins.stateGet(null, "a") == null && Plugins.stateGet(t, null) == null
+                && Plugins.stateGet(t, "") == null, "null 文本 / 空 id ⇒ null（不崩）");
+
+        String put = Plugins.statePut(t, "a", "9");
+        ok(stat, L, "9".equals(Plugins.stateGet(put, "a")), "statePut 覆盖版本");
+        ok(stat, L, "2".equals(Plugins.stateGet(put, "b")), "★ 覆盖 a **没有**碰掉 b");
+        ok(stat, L, Plugins.stateIds(put).size() == 2,
+                "★ 覆盖不是追加：登记表还是 2 条（实得 " + Plugins.stateIds(put).size() + "）");
+        String add = Plugins.statePut(t, "c", "3");
+        ok(stat, L, Plugins.stateIds(add).size() == 3 && "3".equals(Plugins.stateGet(add, "c")),
+                "新 id 追加（不覆盖已有的）");
+
+        String rm = Plugins.stateRemove(t, "a");
+        ok(stat, L, Plugins.stateGet(rm, "a") == null, "stateRemove 删掉目标");
+        ok(stat, L, "2".equals(Plugins.stateGet(rm, "b")),
+                "★ 删 a 不碰 b —— 这一条才分辨得出「删对了」与「删光了」");
+        ok(stat, L, Plugins.stateIds(Plugins.stateRemove(t, "zz")).size() == 2,
+                "删不存在的 id ⇒ 内容等价（别的条目一条不少）");
+
+        String dirty = "# comment\n\nnoeq\nx=\nx=1\nx=2\ny=3\n";
+        List<String> ids = Plugins.stateIds(dirty);
+        ok(stat, L, ids.size() == 2, "脏登记表里只认 2 个真条目（实得 " + ids.size() + "）");
+        ok(stat, L, ids.contains("x") && ids.contains("y"),
+                "★ 注释行 / 空行 / 无等号行 / 空值行都不算条目");
+        ok(stat, L, "1".equals(Plugins.stateGet(dirty, "x")),
+                "同一 id 出现两次 ⇒ 取第一条（先到先得，可预期）");
+        ok(stat, L, "a=1 b=2".equals(Plugins.oneLine("a=1\nb=2\n")),
+                "oneLine 把多行压成一行（报告里引用登记表用）");
+
+        // 落点约定：**安装器写哪儿 == 加载器读哪儿**（两处各写一份字面量迟早会漂）
+        File apk = Plugins.apkOf(ctx, "myid", "7");
+        ok(stat, L, "7.apk".equals(apk.getName()), "落点名 = <ver>.apk（实得 " + apk.getName() + "）");
+        ok(stat, L, apk.getParentFile() != null && "myid".equals(apk.getParentFile().getName()),
+                "落点目录 = plugins/<id>/（实得 "
+                        + (apk.getParentFile() == null ? "null" : apk.getParentFile().getName()) + "）");
+        ok(stat, L, "plugins".equals(Plugins.dirNoCreate(ctx).getName()),
+                "登记表与插件 APK 同住 plugins/");
+        ok(stat, L, Plugins.dirNoCreate(ctx).equals(apk.getParentFile().getParentFile()),
+                "★ 两者是同一个目录（不是各算一遍路径）");
     }
 
     private static void modsPure(List<String> L, int[] stat) {

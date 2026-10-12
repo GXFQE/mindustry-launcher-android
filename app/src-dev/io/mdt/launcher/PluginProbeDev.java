@@ -252,4 +252,190 @@ final class PluginProbeDev {
         to.setReadOnly();
         return to;
     }
+
+    // =========================================================================
+    // S0.5（2026-10-11）：**"退出重开生效"那套机制的 dev 口**
+    //
+    // 产品侧的实现只有三个东西（`Plugins`：登记 + 早注入 + 安全阀；`Restart`：重开；
+    // `LauncherApp.attachBaseContext`：注入点）。这里只是**驱动与取证**：
+    //   --es dev_plugininstall <hub 里的 apk>  装进来（默认写 pending ⇒ 退出重开才生效）
+    //   --es dev_pluginstatus                  现在到底谁在生效（宿主 CL 里那两个同名类的 tag）
+    //   --es dev_pluginrestart                 挂闹钟 + 自杀（自动拉回）
+    //   --es dev_pluginclear                   清掉登记与报告（不动已装的 APK）
+    //
+    // 🔴 **安全阀（guard）没有 dev 口**，验法是从 adb 侧直接写那个文件：
+    //     printf 'fake\n' | adb shell "run-as io.mdt.launcher sh -c \
+    //       'cd /data/data/io.mdt.launcher && cat > app_hub/plugins/guard.txt'"
+    //     ⇒ 下一次正常启动必须 SKIP（不注入 + 清空 active.txt + 写 lastfail）。
+    //   为什么不做成 dev 口（第 131 轮踩了两次，两次都是它自己坏）：
+    //     ① 只在 Activity 里写 guard ⇒ 同一个 Activity 的 `onResume` 会把它摘掉（尺子没分辨力）；
+    //     ② 写完之后自杀 ⇒ 系统按**原 Intent 恢复那个任务** ⇒ `dev_pluginguard` 被反复重放，
+    //        循环里 `skipOnce` 又会把 guard 吃掉 —— 测出来的既不是"跳过"也不是"没跳过"。
+    //   ⇒ 凡是"要造一个'上次没走完'的状态"，就不要让那个状态的制造者自己还活着。
+    // =========================================================================
+
+    /** 装一份插件。{@code now=true} 才写 active（常规路径写 pending = 退出重开生效）。 */
+    static String install(Context ctx, String srcPath, String idArg, String verArg, boolean now) {
+        File src = new File(srcPath == null ? "" : srcPath);
+        String id = (idArg == null || idArg.trim().isEmpty()) ? baseName(src.getName()) : idArg.trim();
+        String ver = (verArg == null || verArg.trim().isEmpty()) ? "1" : verArg.trim();
+        StringBuilder sb = new StringBuilder();
+        sb.append("== dev_plugininstall ==\n");
+        sb.append("src        = ").append(srcPath).append('\n');
+        sb.append("id         = ").append(id).append('\n');
+        sb.append("ver        = ").append(ver).append('\n');
+        sb.append("takeEffect = ").append(now ? "active" : "pending (exit & reopen)").append('\n');
+        sb.append("result     = ").append(Plugins.install(ctx, src, id, ver, now)).append('\n');
+        sb.append("active     = ").append(Plugins.oneLine(Plugins.active(ctx))).append('\n');
+        sb.append("pending    = ").append(Plugins.oneLine(Plugins.pending(ctx))).append('\n');
+        appendListing(sb, ctx);
+        String text = sb.toString();
+        writeReport(ctx, "report-plugin-install.txt", text);
+        return text;
+    }
+
+    /**
+     * 现在的状态与**判据**。
+     * ★ 最要紧的两行是 `host tag PluginProbe / PluginProbe2`：壳里那两个类自己的 tag 是
+     * {@code SHELL} / {@code SHELL2}，插件夹具里那份是 {@code PLUGIN-*} ⇒ 拿到哪个字符串
+     * 就是"这一份类到底是谁在生效"。早注入要证的就是"**插件把宿主尚未加载的类顶掉了**"。
+     */
+    static String status(Context ctx) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("== plugin status ==\n");
+        sb.append("time        = ").append(new Date()).append('\n');
+        sb.append("pid         = ").append(android.os.Process.myPid()).append('\n');
+        sb.append("api         = ").append(PluginHost.API).append('\n');
+        sb.append("entry       = ").append(PluginHost.ENTRY).append('\n');
+        sb.append("pluginsDir  = ").append(Plugins.dirNoCreate(ctx)).append('\n');
+        sb.append("active      = ").append(Plugins.oneLine(Plugins.active(ctx))).append('\n');
+        sb.append("pending     = ").append(Plugins.oneLine(Plugins.pending(ctx))).append('\n');
+        sb.append("guardOn     = ").append(Plugins.guardOn(ctx)).append('\n');
+        sb.append('\n');
+        ClassLoader host = PluginProbeDev.class.getClassLoader();
+        sb.append("host tag PluginProbe  = ").append(tagOf(host, PROBE))
+                .append("   (shell's own = SHELL)\n");
+        sb.append("host tag PluginProbe2 = ").append(tagOf(host, PROBE2))
+                .append("   (shell's own = SHELL2)\n");
+        sb.append('\n');
+        String act = Plugins.active(ctx);
+        for (String id : Plugins.stateIds(act)) {
+            String ver = Plugins.stateGet(act, id);
+            File apk = Plugins.apkOf(ctx, id, ver);
+            sb.append("-- ").append(id).append('=').append(ver)
+                    .append(" file=").append(apk.getName()).append(" bytes=").append(apk.length()).append('\n');
+            try {
+                PluginHost.Loaded l = PluginHost.openInjected(ctx, apk);
+                sb.append("  openInjected = OK api=").append(l.api)
+                        .append(" assets=").append(l.assetFrom).append(" cookie=").append(l.cookie).append('\n');
+                Object s = l.entry.getMethod("hello", Context.class).invoke(null, l.ctx);
+                sb.append("  plugin's own resource = ").append(s).append('\n');
+                Object v = l.entry.getMethod("createView", Context.class).invoke(null, l.ctx);
+                sb.append("  createView = ").append(v == null ? "null" : v.getClass().getName()).append('\n');
+            } catch (PluginHost.PluginException e) {
+                sb.append("  openInjected = REJECTED ").append(e.reason)
+                        .append(" | ").append(e.detail).append('\n');
+            } catch (Throwable t) {
+                sb.append("  openInjected = UNEXPECTED ").append(brief(t)).append('\n');
+            }
+        }
+        sb.append('\n').append("-- boot report --\n").append(Plugins.bootReport(ctx)).append('\n');
+        sb.append("-- last skip --\n").append(Plugins.lastFail(ctx)).append('\n');
+        sb.append("-- restart marker --\n").append(readReport(ctx, "restart-marker.txt")).append('\n');
+        String text = sb.toString();
+        writeReport(ctx, "report-plugin-status.txt", text);
+        return text;
+    }
+
+    /**
+     * 「立即重启」：先落 marker（重开之后才比得出"pid 真的换了"），再挂闹钟，最后自杀。
+     *
+     * @return {@link Restart#OK} / {@link Restart#FAILED} / {@link Restart#THROTTLED}
+     */
+    static int restartNow(Context ctx) {
+        int r = Restart.schedule(ctx);
+        if (r == Restart.THROTTLED) return r;   // 恢复重放：连 marker 都别写（否则又会误导取证）
+        writeReport(ctx, "restart-marker.txt", "pid=" + android.os.Process.myPid()
+                + " at=" + System.currentTimeMillis() + " time=" + new Date() + " result=" + r + "\n");
+        if (r == Restart.OK) Restart.killSelf();
+        return r;
+    }
+
+    /**
+     * 清掉登记与报告（**不动已装的 APK** —— 卸载是界面那一轮的事）。
+     */
+    static String clear(Context ctx) {
+        File d = Plugins.dir(ctx);
+        StringBuilder sb = new StringBuilder();
+        sb.append("== dev_pluginclear ==\n");
+        for (String n : new String[] { Plugins.ACTIVE, Plugins.PENDING, Plugins.GUARD,
+                                        Plugins.LASTFAIL, Plugins.BOOT_REPORT }) {
+            File f = new File(d, n);
+            sb.append(n).append(" exists=").append(f.isFile())
+                    .append(" deleted=").append(!f.isFile() || f.delete()).append('\n');
+        }
+        appendListing(sb, ctx);
+        String text = sb.toString();
+        writeReport(ctx, "report-plugin-clear.txt", text);
+        return text;
+    }
+
+    private static void appendListing(StringBuilder sb, Context ctx) {
+        sb.append("-- installed --\n");
+        File d = Plugins.dirNoCreate(ctx);
+        File[] ids = d.listFiles();
+        if (ids == null || ids.length == 0) {
+            sb.append("(none)\n");
+            return;
+        }
+        java.util.Arrays.sort(ids);
+        for (File id : ids) {
+            if (id.isDirectory()) {
+                File[] vs = id.listFiles();
+                int n = vs == null ? 0 : vs.length;
+                sb.append("  ").append(id.getName()).append("/ (").append(n).append(" files)\n");
+                if (vs != null) {
+                    java.util.Arrays.sort(vs);
+                    for (File v : vs) {
+                        sb.append("      ").append(v.getName()).append("  ").append(v.length())
+                                .append(" B  canWrite=").append(v.canWrite()).append('\n');
+                    }
+                }
+            } else {
+                sb.append("  ").append(id.getName()).append("  ").append(id.length()).append(" B\n");
+            }
+        }
+    }
+
+    private static String tagOf(ClassLoader cl, String fqn) {
+        try {
+            return String.valueOf(cl.loadClass(fqn).getMethod("tag").invoke(null));
+        } catch (Throwable t) {
+            return "!" + brief(t);
+        }
+    }
+
+    private static String baseName(String fileName) {
+        if (fileName == null) return "plugin";
+        String n = fileName;
+        if (n.toLowerCase(java.util.Locale.ROOT).endsWith(".apk")) n = n.substring(0, n.length() - 4);
+        return n.isEmpty() ? "plugin" : n;
+    }
+
+    private static void writeReport(Context ctx, String name, String text) {
+        try {
+            Util.atomicWriteText(new File(Data.hubDir(ctx), name), text);
+        } catch (Throwable t) {
+            android.util.Log.w("MDTLauncher", "plugin report write failed: " + t);
+        }
+    }
+
+    private static String readReport(Context ctx, String name) {
+        try {
+            File f = new File(Data.hubDir(ctx), name);
+            return f.isFile() ? Util.readText(f) : "(none)\n";
+        } catch (Throwable t) {
+            return "(read failed: " + t + ")\n";
+        }
+    }
 }
