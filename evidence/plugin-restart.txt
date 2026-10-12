@@ -1,0 +1,120 @@
+# 第 131 轮证据：插件「退出重开生效」（早注入 + 安全阀 + 自动拉回）
+
+设备 HONOR ELP-AN00 / Android 16（API 36）· 夹具 `plugtest-v2.apk`（`tools/plugtest/build.sh` 产出，
+12691 B，含 `io.mdt.plugtest.PlugPage`(api=1) + 与宿主同名的 `io.mdt.launcher.PluginProbe`
+(tag `PLUGIN-v2`) / `PluginProbe2`(tag `PLUGIN-v2-2`)）。
+
+## 1) 装了但本程不生效（pending / active 两段式）
+
+```
+== dev_plugininstall ==
+src        = /sdcard/Android/data/io.mdt.launcher/hub/plugtest-v2.apk
+id         = probe
+ver        = 2
+takeEffect = pending (exit & reopen)
+result     = installed id=probe ver=2 -> pending.txt bytes=12691 readOnly=true stillWritable=false
+active     =
+pending    = probe=2
+-- installed --
+  probe/ (1 files)
+      2.apk  12691 B  canWrite=false
+```
+（`run-as` 读内部状态）`pending.txt = probe=2`；**`active.txt` 不存在** ⇒ 这一程还用不上它。
+
+## 2) 退出重开 ⇒ pending 提升 + 早注入（`LauncherApp.attachBaseContext`）
+
+重开之后 `active.txt = probe=2`、`pending.txt` 清空；内部启动报告：
+
+```
+== plugin early inject ==
+time   = Mon Oct 12 17:10:33 GMT+08:00 2026
+pid    = 29051
+active = probe=2
+- probe=2 file=2.apk INJECTED elems=2 [makeDexElements(4 args) -> 1 elements, suppressed=0] entry=OK api=1
+injected = 1 / 1
+```
+（这一份也在**外部 hub** 留了一份：产品版非 debuggable，`run-as` 拉不出内部文件。）
+
+## 3) 决定性判据：早注入顶掉了**宿主尚未加载**的同名类
+
+同一台机器、同一个 `dev_pluginstatus` 口，**两次采样**对照：
+
+| 采样 | `host tag PluginProbe` | `host tag PluginProbe2` |
+|---|---|---|
+| 对照（没装插件） | `SHELL` | `SHELL2` |
+| 装了并重开（本轮的机制） | **`PLUGIN-v2`** | **`PLUGIN-v2-2`** |
+
+已注入的插件仍能正常打开（不建第二个 `DexClassLoader`）：
+
+```
+-- probe=2 file=2.apk bytes=12691
+  openInjected = OK api=1 assets=new cookie=6
+  plugin's own resource = 来自插件的字符串
+  createView = android.widget.TextView
+```
+
+## 4) 安全阀（上次带插件启动没走完 ⇒ 本次不注入 + 自动停用）
+
+造法：`active=probe=2` 时从 adb 侧写 `app_hub/plugins/guard.txt`（**不经 Intent** ⇒ 不会被任务恢复重放），
+然后**正常启动**（不带任何 extra）：
+
+```
+-- active.txt（被自动停用）--
+(空)
+-- guard.txt --
+ls: app_hub/plugins/guard.txt: No such file or directory      ← 已被消费
+-- report-plugin-boot.txt --
+== plugin early inject ==
+time     = Mon Oct 12 17:07:44 GMT+08:00 2026
+SKIPPED: previous launch with plugins did not finish
+active was = probe=2
+-> nothing injected; active.txt cleared
+-- lastfail.txt --
+== plugin skip (previous launch did not finish) ==
+time      = Mon Oct 12 17:07:44 GMT+08:00 2026
+guard     = fake guard from adb
+active    = probe=2
+-> plugins disabled for this launch and removed from active.txt
+```
+随后 `dev_pluginstatus`：`guardOn = false`、`active =`（空）、tag 回到 `SHELL` / `SHELL2`，
+**应用照常起来**（pid 在、界面正常）⇒ 安全阀是"宁可这次不加载插件，也要起得来"。
+★ 另外：真实事故里也自动触发过一次（重启循环那次没走完的启动 ⇒ 下一次启动自动停用）。
+
+## 5) 自动拉回（`AlarmManager` + 自杀），且**幂等**
+
+```
+marker: pid=25419 at=1791795880053 time=... result=0      ← 挂上闹钟后自杀的那个进程
+[2s] pidof='25460'
+[4s] pidof='25460'   ...   [16s] pidof='25460'            ← 没人拉，自己回来了；16 秒内 pid 稳定
+```
+★ 反面（修之前）：不带幂等闸门时，系统按**原 Intent** 恢复任务 ⇒ 重启被反复重放
+（pid `23973 → 24572 → 24646`）⇒ 精确闹钟被限流 ⇒ **最后一次自杀没人拉，应用躺着是死的**。
+处置 = `Restart` 里 15 s 去重窗口（时间戳只在真的挂上闹钟之后写）。
+
+## 6) 产品版（非 debuggable）带插件冒烟
+
+```
+== plugin early inject ==
+time   = Mon Oct 12 17:11:39 GMT+08:00 2026
+pid    = 29493
+active = probe=2
+- probe=2 file=2.apk INJECTED elems=2 [...] entry=OK api=1
+injected = 1 / 1
+pidof = 29493 ; uiautomator 节点数 = 80 ; crashes/ 无新的 *_launcher.txt
+```
+dex（product）字节扫描：`PluginProbeDev` / `PluginProbe` / `PluginProbe2` / `dev_plugins` /
+`dev_plugininstall` / `dev_pluginrestart` **全 0**；`Plugins`(2) / `Restart`(2) / `PluginHost`(5) 在。
+APK：582 755 → **603 334 B**。
+
+## 7) 收尾：实验残留清理 + 零成本路径
+
+- `dev_pluginclear` 清掉 active/pending/guard/lastfail/boot report；`run-as rm` 删掉
+  `app_hub/plugins/probe/` 与 5 个平铺夹具 APK（S0 遗留）⇒ `app_hub/plugins/` 空。
+- 外部 hub 里本轮生成的 `report-plugin-*.txt` / `restart-marker.txt` / 推上去的夹具也删掉。
+- 最后一遍产品版冒烟：**无插件 ⇒ 连 `report-plugin-boot.txt` 都不产生**（零成本路径真的是零：
+  不读 dex、不写盘、不留痕），pid 在、界面 80 节点。
+
+## 8) 自检
+
+`dev_m3_selftest`：**通过 1140 项，失败 0 项**（第 130 轮末 1122 ⇒ 本轮 +18：
+登记表纯函数 14 条 + 落点约定 4 条，含「删 a 不碰 b」「覆盖不是追加」这类分辨力元断言）。
