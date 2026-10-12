@@ -1,0 +1,375 @@
+package io.mdt.launcher;
+
+import android.app.AlertDialog;
+import android.content.DialogInterface;
+import android.content.Intent;
+import android.net.Uri;
+import android.os.Bundle;
+import android.view.Gravity;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.LinearLayout;
+import android.widget.ScrollView;
+import android.widget.TextView;
+import android.widget.Toast;
+
+import java.io.File;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * **插件页**（第 132 轮，2026-10-12）：装 / 打开 / 启用 / 停用 / 删除 + 「立即重启」。
+ *
+ * <h3>这个页面存在的理由（也是它唯一要说清的一句话）</h3>
+ * 插件换版本**只能"退出重开"生效** —— S0 实测把天花板钉死了：**已经加载过的类换不掉**，
+ * 只有宿主还没加载过的同名类才能被插件顶掉（见 {@link Plugins} 的类注释）。
+ * ⇒ 所以本页每一处"启用 / 停用 / 装好了"的反馈都必须**同一句里点明**"退出重开生效"，
+ * 并且给一个真的能重开的按钮（{@link Restart}）—— 否则用户会以为点了没反应。
+ *
+ * <h3>为什么是"独立 Activity"而不是往主界面塞一行</h3>
+ * ① 设置页只放"能被改的项"（判据 = 点下去改变某个值，还是带你走），插件是**一整个页面**；
+ * ② 主界面一行 = 一件独立的事，插件是**低频全局入口** ⇒ 顶栏右上角（ActionBar 菜单，
+ *    与「设置」同一套规矩，见 {@code res/menu/main.xml}）。
+ *
+ * <h3>两条容易踩的</h3>
+ * <ul>
+ *   <li>「打开」走哪条路**取决于这个版本这程有没有被注入进宿主 CL**（{@link Plugins#isInjected}）：
+ *       注入过 ⇒ {@link PluginHost#openInjected}（**不能**再建 DexClassLoader，否则 ART 报
+ *       "multiple class loaders"）；没注入过（比如刚启用还没重开）⇒ {@link PluginHost#load}（自建 CL）。</li>
+ *   <li>界面上的状态**只有一个来源**：{@link Plugins#rowState}（待重启生效优先于生效中）——
+ *       别在这里另写一套判断，否则"装完新版"那一行会跟实际两样。</li>
+ * </ul>
+ */
+public class PluginsActivity extends BaseActivity {
+
+    /** 选插件 APK 的请求码（本页唯一一个 `startActivityForResult`）。 */
+    private static final int REQ_PICK = 0x9B01;
+
+    private LinearLayout mBody;
+    private ScrollView mScroll;
+
+    @Override
+    protected void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        setContentView(R.layout.activity_plugins);
+        // 🔴 edge-to-edge（targetSdk ≥ 35）：不补 insets 的话整页从 y=0 画、被状态栏+顶栏盖住
+        Util.applySystemInsets(findViewById(R.id.root));
+        mScroll = (ScrollView) findViewById(R.id.plugins_scroll);
+        mBody = (LinearLayout) findViewById(R.id.plugins_body);
+        rebuild();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        rebuild();
+    }
+
+    // ---- 页面 -----------------------------------------------------------------
+
+    private void rebuild() {
+        // ⚠️ 「打开」那一步会把 mScroll 的内容换成插件页 ⇒ 回来时必须把列表容器**重新挂上**，
+        //   否则 mBody 已经不在视图树里：页面看着"什么都没发生"（清空的是那个孤儿容器）
+        if (mScroll.getChildCount() != 1 || mScroll.getChildAt(0) != mBody) {
+            mScroll.removeAllViews();
+            mScroll.addView(mBody);
+        }
+        mBody.removeAllViews();
+        // ⚠️ 页内**不再重复**顶栏那句「插件」（同一屏同一件事只说一次）
+        addText(Trans.get(this, R.string.plugin_page_sub), 13f);
+
+        skipBanner();
+        addAction(Trans.get(this, R.string.plugin_import), new Runnable() {
+            @Override public void run() { pickPlugin(); }
+        });
+
+        List<String> ids = Plugins.installedIds(this);
+        if (ids.isEmpty()) {
+            addText(Trans.get(this, R.string.plugin_none), 15f);
+        } else {
+            String act = Plugins.active(this), pend = Plugins.pending(this), known = Plugins.known(this);
+            for (final String id : ids) {
+                String[] st = Plugins.rowState(act, pend, id);
+                String label;
+                if ("pending".equals(st[0])) {
+                    label = Trans.get(this, R.string.plugin_state_pending_fmt, id, st[1]);
+                } else if ("active".equals(st[0])) {
+                    label = Trans.get(this, R.string.plugin_state_active_fmt, id, st[1]);
+                } else {
+                    String k = Plugins.stateGet(known, id);
+                    label = k == null ? Trans.get(this, R.string.plugin_state_off_never, id)
+                                      : Trans.get(this, R.string.plugin_state_off_fmt, id, k);
+                }
+                addAction(label, new Runnable() {
+                    @Override public void run() { rowDialog(id); }
+                });
+            }
+        }
+
+        addText(Trans.get(this, R.string.plugin_restart_hint), 13f);
+        addAction(Trans.get(this, R.string.plugin_restart), new Runnable() {
+            @Override public void run() { restartNow(); }
+        });
+    }
+
+    /** 上次带插件启动没成功 ⇒ 在这个位置说清楚"谁被回滚 / 谁被停用"，并给一条恢复的路。 */
+    private void skipBanner() {
+        final List<String[]> skip = Plugins.lastSkip(this);
+        if (skip.isEmpty()) return;
+        // ★ 只讲**现在还装着的**那些：插件都卸载了就别翻旧账 —— 那句话此时没头没尾
+        //   （"probe：v2 没起来" 配着"还没有装插件"读起来像自相矛盾）
+        final List<String> ids = Plugins.installedIds(this);
+        final List<String[]> live = new ArrayList<String[]>();
+        boolean restorable = false;
+        for (String[] s : skip) {
+            if (!ids.contains(s[0])) continue;
+            live.add(s);
+            for (String v : Plugins.versionsOf(this, s[0])) if (v.equals(s[1])) restorable = true;
+        }
+        if (live.isEmpty()) return;
+        addText(Trans.get(this, R.string.plugin_skip_title), 15f);
+        for (String[] s : live) {
+            if ("rollback".equals(s[3])) {
+                addText(Trans.get(this, R.string.plugin_skip_rollback_fmt, s[0], s[1], s[2]), 14f);
+            } else {
+                addText(Trans.get(this, R.string.plugin_skip_disable_fmt, s[0], s[1]), 14f);
+            }
+        }
+        if (!restorable) return;   // 那一版的文件不在了 ⇒ 这个按钮按下去什么都不会发生，那就别给
+        addAction(Trans.get(this, R.string.plugin_skip_restore), new Runnable() {
+            @Override public void run() { restoreSkipped(live); }
+        });
+    }
+
+    /**
+     * 「把插件重新启用」：按上次的现场把**失败的那一版**重新记进 pending（退出重开再生效）。
+     * ⚠️ 只是"再试一次"的意思，不是"跳过安全阀" —— 再崩一次的话安全阀照样会回滚。
+     */
+    private void restoreSkipped(List<String[]> skip) {
+        int n = 0;
+        for (String[] s : skip) {
+            String ver = s[1];
+            if (ver == null || ver.isEmpty()) continue;
+            // ★ 那一版的文件得还在（用户可能已经卸载 / 启动成功那次被清过）——
+            //   补登一个不存在的文件只会让下次启动多一条 MISSING
+            boolean have = false;
+            for (String v : Plugins.versionsOf(this, s[0])) if (v.equals(ver)) have = true;
+            if (!have) continue;
+            Plugins.enable(this, s[0], ver);
+            n++;
+        }
+        if (n > 0) Toast.makeText(this, Trans.get(this, R.string.plugin_restart_hint),
+                Toast.LENGTH_LONG).show();
+        rebuild();
+    }
+
+    // ---- 一行的动作 -------------------------------------------------------------
+
+    private void rowDialog(final String id) {
+        final String act = Plugins.stateGet(Plugins.active(this), id);
+        final String pend = Plugins.stateGet(Plugins.pending(this), id);
+        final String[] vers = Plugins.versionsOf(this, id);
+        final String newest = vers.length == 0 ? null : vers[vers.length - 1];
+
+        List<String> items = new ArrayList<String>();
+        final List<String> actions = new ArrayList<String>();
+        final String cur = pend != null ? pend : act;   // 这一程"打算用"的那一版（待生效优先）
+        if (act != null) { items.add(Trans.get(this, R.string.plugin_action_open)); actions.add("open"); }
+        if (newest != null && !newest.equals(cur)) {
+            items.add(Trans.get(this, R.string.plugin_action_enable)); actions.add("enable");
+        }
+        items.add(Trans.get(this, R.string.plugin_action_disable));
+        actions.add("disable");
+        items.add(Trans.get(this, R.string.plugin_action_uninstall));
+        actions.add("uninstall");
+
+        new AlertDialog.Builder(this)
+                .setTitle(id)
+                .setItems(items.toArray(new CharSequence[0]), new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int which) {
+                        String a = actions.get(which);
+                        if ("open".equals(a)) {
+                            open(id, act);
+                        } else if ("enable".equals(a)) {
+                            Plugins.enable(PluginsActivity.this, id, newest);
+                            toastRestart(Trans.get(PluginsActivity.this, R.string.plugin_installed_fmt,
+                                    id, newest));
+                            rebuild();
+                        } else if ("disable".equals(a)) {
+                            Plugins.disable(PluginsActivity.this, id);
+                            rebuild();
+                        } else if ("uninstall".equals(a)) {
+                            Plugins.uninstall(PluginsActivity.this, id);
+                            Toast.makeText(PluginsActivity.this,
+                                    Trans.get(PluginsActivity.this, R.string.plugin_uninstalled_fmt, id),
+                                    Toast.LENGTH_SHORT).show();
+                            rebuild();
+                        }
+                    }
+                })
+                .setNegativeButton(Trans.get(this, R.string.cancel), null)
+                .show();
+    }
+
+    /** 「打开」：注入过就走宿主 CL 那条路，没注入过才自建 DexClassLoader（同一个 dex 不许注册两次）。 */
+    private void open(final String id, final String ver) {
+        File apk = Plugins.apkOf(this, id, ver);
+        View page;
+        try {
+            PluginHost.Loaded l = Plugins.isInjected(this, id, ver)
+                    ? PluginHost.openInjected(this, apk)
+                    : PluginHost.load(this, apk);
+            Object v = l.entry.getMethod("createView", android.content.Context.class).invoke(null, l.ctx);
+            LinearLayout box = new LinearLayout(this);
+            box.setOrientation(LinearLayout.VERTICAL);
+            addText(box, Trans.get(this, R.string.plugin_loaded_fmt, apk.getName(), l.api), 13f);
+            if (v instanceof View) box.addView((View) v);
+            page = box;
+        } catch (PluginHost.PluginException e) {
+            page = fallback(PluginHost.reasonRes(e.reason) == R.string.plugin_err_api_fmt
+                    ? Trans.get(this, PluginHost.reasonRes(e.reason), e.num1, e.num2)
+                    : Trans.get(this, PluginHost.reasonRes(e.reason)));
+        } catch (Throwable t) {
+            page = fallback(Trans.get(this, R.string.plugin_err_other));
+        }
+        // 插件自己的页面 + 一行「返回」（返回 = 重建本页）
+        LinearLayout root = new LinearLayout(this);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setPadding(dp(16), dp(16), dp(16), dp(16));
+        addAction(root, Trans.get(this, R.string.plugin_back), new Runnable() {
+            @Override public void run() { rebuild(); }
+        });
+        root.addView(page, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        mScroll.removeAllViews();
+        mScroll.addView(root);
+    }
+
+    /** 插件没加载成时的兜底视图：**只说一句人话**（原因来自 {@link PluginHost#reasonRes}）。 */
+    private View fallback(String why) {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        addText(box, Trans.get(this, R.string.plugin_fallback_title), 15f);
+        addText(box, why, 14f);
+        return box;
+    }
+
+    // ---- 装 / 重启 --------------------------------------------------------------
+
+    private void pickPlugin() {
+        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        i.addCategory(Intent.CATEGORY_OPENABLE);
+        // ⚠️ 通配：各家文件管理器对 .apk 报的 MIME 不一致（与模组导入、语言包那两处同一条坑）
+        i.setType("*/*");
+        startActivityForResult(Intent.createChooser(i, Trans.get(this, R.string.plugin_chooser_title)),
+                REQ_PICK);
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode != REQ_PICK) return;
+        if (resultCode != RESULT_OK || data == null || data.getData() == null) return;
+        final Uri uri = data.getData();
+        new Thread(new Runnable() {
+            @Override public void run() {
+                final File tmp = new File(getCacheDir(), "plugin-import.apk");
+                String msg;
+                try {
+                    InputStream in = getContentResolver().openInputStream(uri);
+                    if (in == null) throw new java.io.IOException("cannot open " + uri);
+                    try {
+                        Util.copyStream(in, tmp);
+                    } finally {
+                        in.close();
+                    }
+                    String id = baseName(tmp, uri);
+                    // ★ 版本号用"装进来的时刻"：用户手上没有版本号这个概念，
+                    //   而落点要唯一名（置只读的副本不能再被覆盖，见 ref/29 第 3 条）
+                    String ver = String.valueOf(System.currentTimeMillis() / 1000L);
+                    String r = Plugins.install(PluginsActivity.this, tmp, id, ver, false);
+                    msg = r.startsWith("FAILED")
+                            ? Trans.get(PluginsActivity.this, R.string.plugin_install_failed_fmt, r)
+                            : Trans.get(PluginsActivity.this, R.string.plugin_installed_fmt, id, ver);
+                } catch (final Throwable t) {
+                    // 按纪律：第一层只说"这件事没成"，原始异常进日志（§五"系统异常不许当弹窗正文"）
+                    android.util.Log.w(LauncherApp.TAG, "plugin import failed", t);
+                    msg = Trans.get(PluginsActivity.this, R.string.plugin_install_failed_fmt,
+                            t.getClass().getSimpleName());
+                } finally {
+                    tmp.delete();
+                }
+                final String m = msg;
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        toastRestart(m);
+                        rebuild();
+                    }
+                });
+            }
+        }, "plugin-import").start();
+    }
+
+    /** 文件名当插件 id（去掉 `.apk`）；拿不到就退回 uri 的最后一段。 */
+    private static String baseName(File tmp, Uri uri) {
+        String n = uri.getLastPathSegment();
+        if (n == null || n.isEmpty()) n = "plugin";
+        int slash = n.lastIndexOf('/');
+        if (slash >= 0) n = n.substring(slash + 1);
+        if (n.toLowerCase(java.util.Locale.ROOT).endsWith(".apk")) n = n.substring(0, n.length() - 4);
+        return n.isEmpty() ? "plugin" : n;
+    }
+
+    /** 「立即重启」：挂闹钟 + 自杀；**挂不上就如实说**（不许假装重启成功）。 */
+    private void restartNow() {
+        int r = Restart.schedule(this);
+        if (r == Restart.OK) {
+            Restart.killSelf();
+            return;
+        }
+        if (r == Restart.THROTTLED) return;   // 刚刚已经重开过（这是恢复重放）⇒ 静默
+        Toast.makeText(this, Trans.get(this, R.string.plugin_restart_failed), Toast.LENGTH_LONG).show();
+    }
+
+    private void toastRestart(String msg) {
+        Toast.makeText(this, msg + "\n" + Trans.get(this, R.string.plugin_restart_hint),
+                Toast.LENGTH_LONG).show();
+    }
+
+    // ---- 小工具 ----------------------------------------------------------------
+
+    private int dp(int v) {
+        return Math.round(v * getResources().getDisplayMetrics().density);
+    }
+
+    private void addText(String s, float size) {
+        addText(mBody, s, size);
+    }
+
+    private void addText(LinearLayout into, String s, float size) {
+        TextView t = new TextView(this);
+        t.setText(s);
+        t.setTextSize(size);
+        t.setPadding(0, dp(4), 0, dp(4));
+        into.addView(t);
+    }
+
+    private void addAction(String label, final Runnable r) {
+        addAction(mBody, label, r);
+    }
+
+    /** 一行"可点的动作"：整行可点（不靠小按钮 ⇒ 也不会出现"文字被挤没"那类）。 */
+    private void addAction(LinearLayout into, String label, final Runnable r) {
+        TextView t = new TextView(this);
+        t.setText(label);
+        t.setTextSize(16f);
+        t.setPadding(dp(8), dp(12), dp(8), dp(12));
+        t.setGravity(Gravity.START);
+        t.setClickable(true);
+        t.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { r.run(); }
+        });
+        into.addView(t);
+    }
+}

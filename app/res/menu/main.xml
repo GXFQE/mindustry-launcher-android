@@ -23,4 +23,16 @@
         android:icon="@drawable/ic_settings_bar"
         android:showAsAction="always"
         android:title="@string/act_settings_title" />
+
+    <!--
+      第 132 轮（2026-10-12）：**插件**也搬进顶栏菜单。
+      ★ 为什么放这儿而不是设置页：设置页只放"能被改的项"（点下去改变某个值），
+        插件是**一整个页面**（带你走）⇒ 属"全局 / 低频入口"，惯例位置就是顶栏右上角。
+      ⚠️ 图标同样必须是自带 `@color/on_appbar` 的那份（`ic_plugins_bar`）。
+    -->
+    <item
+        android:id="@+id/action_plugins"
+        android:icon="@drawable/ic_plugins_bar"
+        android:showAsAction="always"
+        android:title="@string/plugin_page_title" />
 </menu>

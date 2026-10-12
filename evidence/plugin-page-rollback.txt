@@ -1,0 +1,117 @@
+# 第 132 轮证据：插件页（产品侧）+ 回滚（真实失败形态）
+
+设备 HONOR ELP-AN00 / Android 16（API 36）· 夹具：`plugtest-v2.apk`（好插件，入口 `PlugPage` api=1）
+与**本轮新增**的 `plugtest-kill.apk`（`tools/plugtest/src/io/mdt/plugtest/PlugPageKill.java`：
+`api()` 里直接 `Process.killProcess(myPid())` ⇒ 壳的启动自查一调它就死在启动路径上）。
+
+## 1) 回滚 —— 用**真实失败形态**走一遍（不是手写 guard）
+
+```
+[1] 装 v1（好插件，立刻生效） ⇒ 重开 ⇒ 注入成功、启动走完
+    active.txt = probe=1     known.txt = probe=1     injected.txt = probe=1
+
+[2] 装 v2（会崩的那一版）⇒ 写 pending.txt = probe=2
+
+[3] 重开 ⇒ pending 提升成 active=probe=2 → 注入 v2 → api() 杀进程
+    （进程死、界面没起来 ⇒ guard.txt 留着）
+
+[4] 再重开（系统按原任务又拉了一次）⇒ 安全阀拦下 + 回滚：
+
+report-plugin-boot.txt:
+  == plugin early inject ==
+  time     = Mon Oct 12 17:25:27 GMT+08:00 2026
+  SKIPPED: previous launch with plugins did not finish
+  active was = probe=2
+  -> nothing injected; rolled back to probe=1
+
+lastskip.txt（结构化：id ⇥ 失败版本 ⇥ 回滚到 ⇥ rollback|disable）:
+  probe	2	1	rollback
+
+lastfail.txt（现场原文）:
+  == plugin skip (previous launch did not finish) ==
+  time      = Mon Oct 12 17:25:27 GMT+08:00 2026
+  guard     = == plugin early inject == time = ... pid = 2232 active = probe=2
+  active    = probe=2
+  known     = probe=1
+  rollback  = probe=1
+  -> rolled back to the last known-good version
+
+active.txt = probe=1
+
+[5] 再重开 ⇒ 回滚回去的那一版**真的能用**：
+  == plugin early inject ==
+  time   = Mon Oct 12 17:25:48 GMT+08:00 2026
+  pid    = 2550
+  active = probe=1
+  - probe=1 file=1.apk INJECTED elems=2 [...] entry=OK api=1
+  injected = 1 / 1
+  pidof = 2550（3/6/9/12 秒四次采样都是它 ⇒ 没有再死）
+```
+
+保留策略（成功启动后 prune）：`app_hub/plugins/probe/` 里留着 `1.apk`（已知可用）+ `2.apk`（失败现场，
+界面的「把插件重新启用」要能再试一次）。
+
+## 2) 插件页（顶栏入口 → 独立 Activity）
+
+主界面顶栏（`uiautomator dump`）：
+```
+resource-id="io.mdt.launcher:id/action_plugins"  content-desc="插件"  bounds="[1068,136][1224,292]"
+resource-id="io.mdt.launcher:id/action_settings" content-desc="设置"  bounds="[912,136][1068,292]"
+```
+点进去之后的页面内容（bounds + text，**修完 insets 之后**：第一行从 y=344 开始，顶栏到 292 结束）：
+```
+[52,344][1172,427]   可选的能力：装一份 APK 在这儿，退出重开之后才生效。
+[52,427][1172,519]   上次带插件启动没成功
+[52,519][1172,607]   probe：v2 没起来，已回滚到 v1
+[52,607][1172,755]   把插件重新启用
+[52,755][1172,903]   装一个插件 APK
+[52,903][1172,1051]  probe · 生效中 v1
+[52,1051][1172,1134] 换版本、启用或停用之后，要重启应用才生效。
+[52,1134][1172,1282] 立即重启
+[52,170][182,257]    插件          ← 顶栏自己的标题（页内不再重复）
+```
+
+## 3) 三个状态 + 动作（都在界面上点过）
+
+```
+点那一行 ⇒ 弹窗：[160,906] probe ｜ 打开 ｜ 启用（退出重开生效）｜ 停用（退出重开生效）｜ 删除 ｜ 取消
+「打开」 ⇒ 页面变成：
+   返回
+   已加载 1.apk（接口版本 1）
+   来自插件的字符串          ← 插件**自己的资源**真的挂上了
+「停用」 ⇒ 该行 = probe · 已停用（上次生效 v1）（active/pending 都清空）
+「启用」 ⇒ 该行 = probe · 退出重开生效 v2（pending.txt = probe=2）
+「删除」 ⇒ 该行消失，页面显示"还没有装插件。"，app_hub/plugins/probe/ 整个没了
+```
+
+## 4) product（非 debuggable）
+
+```
+active = demo=1
+== plugin early inject ==
+time   = Mon Oct 12 17:34:40 GMT+08:00 2026
+pid    = 9448
+- demo=1 file=1.apk INJECTED elems=2 [makeDexElements(4 args) -> 1 elements, suppressed=0] entry=OK api=1
+injected = 1 / 1
+```
+顶栏进插件页 ⇒ `可选的能力… / 装一个插件 APK / demo · 生效中 v1 / … / 立即重启`（可用），
+界面里卸载 demo ⇒ 「还没有装插件。」（可用）。
+dex 字节扫描：`PluginProbeDev` / `PluginProbe` / `PluginProbe2` / `dev_plugins` / `dev_plugininstall` /
+`dev_pluginrestart` **全 0**；`Plugins`(13) / `Restart`(3) / `PluginHost`(5) 在。
+product APK：603 334 → **611 680 B**。
+
+## 5) 自检
+
+`dev_m3_selftest`：**通过 1155 项，失败 0 项**（第 131 轮末 1140 ⇒ 本轮 +15：
+`rollbackActive` 三条判据 + 「回滚结果里不许留失败版」+ 多插件各自判 + `rowState` 三态 +
+`parseSkipLine` 正反例 + 菜单 `action_plugins` 带图标 + 插件页进 ㉛ 名单）。
+
+## 6) 本轮踩的坑（不报错、不崩，只有 dump/截图能看出来）
+
+```
+第一版插件页是**纯代码建视图**（new ScrollView + setContentView）：
+  标题 bounds = [52,52][1172,174]，而顶栏是 [..,136][..,292]
+  ⇒ view 在树里、有文字，但**一个像素都看不见**（与第 81 轮地图页同一个坑）
+修法：改成 XML 骨架（@+id/root）+ Util.applySystemInsets(root) + 把布局**补进自检 ㉛ 的名单**。
+```
+㉛ 只认名单里的 XML 布局 ⇒ **新页面要么进名单，要么就没有门禁兜着**。

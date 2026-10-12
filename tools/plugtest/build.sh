@@ -50,9 +50,11 @@ cp "$SRC_DIR/AndroidManifest.xml" "$MF_DIR/AndroidManifest.xml"
 # --- 每个变体：sed 出源码 → javac → d8 → 注入 → 对齐 → 签名 -------------------
 build_one() {
   local name="$1" api="$2" tag="$3" dropclass="$4" tag2="$5"
-  echo "== [$name] api=$api tag=$tag tag2=$tag2 dropclass=$dropclass =="
+  # 第 6 个参数（可选）= 换一个入口模板（`plugtest-kill` 用它造"启动就死"的那一版，见 PlugPageKill.java）
+  local tpl="${6:-$SRC_DIR/src/io/mdt/plugtest/PlugPage.java}"
+  echo "== [$name] api=$api tag=$tag tag2=$tag2 dropclass=$dropclass tpl=$(basename "$tpl") =="
   local d="$OUT/$name"; mkdir -p "$d/src/io/mdt/plugtest" "$d/src/io/mdt/launcher" "$d/classes" "$d/dex"
-  sed "s/__API__/$api/" "$SRC_DIR/src/io/mdt/plugtest/PlugPage.java" > "$d/src/io/mdt/plugtest/PlugPage.java"
+  sed "s/__API__/$api/" "$tpl" > "$d/src/io/mdt/plugtest/PlugPage.java"
   sed "s/__TAG__/$tag/"     "$SRC_DIR/src/io/mdt/launcher/PluginProbe.java" > "$d/src/io/mdt/launcher/PluginProbe.java"
   sed "s/__TAG2__/$tag2/"   "$SRC_DIR/src/io/mdt/launcher/PluginProbe2.java" > "$d/src/io/mdt/launcher/PluginProbe2.java"
   # 缺类变体：把入口类删掉（壳必须在"预热预检"就拒掉，而不是等到点下去才炸）
@@ -92,4 +94,6 @@ build_one plugtest-badapi  99 PLUGIN-badapi  0 PLUGIN-badapi-2
 build_one plugtest-noclass 1  PLUGIN-noclass 1 PLUGIN-noclass-2
 build_one plugtest-v1      1  PLUGIN-v1      0 PLUGIN-v1-2
 build_one plugtest-v2      1  PLUGIN-v2      0 PLUGIN-v2-2
+# 第 132 轮：**带它就启动不了**的那一版（回滚要拿真实失败形态验，不能只靠手写 guard）
+build_one plugtest-kill    1  PLUGIN-kill    0 PLUGIN-kill-2 "$SRC_DIR/src/io/mdt/plugtest/PlugPageKill.java"
 echo "== DONE =="

@@ -138,6 +138,16 @@
             android:exported="false"
             android:theme="@style/AppTheme"
             android:label="@string/bp_detail_title" />
+        <!--
+          第 132 轮（2026-10-12）：插件页（装 / 启用停用 / 删除 / 立即重启）。
+          ⚠️ **必须注册**：aapt2 不检查引用，漏了照样 BUILD OK，真机一点就崩（自检 ㉙ 盯着）。
+          ★ 顶栏那个入口只在 MainActivity（菜单是 per-Activity 的）。
+        -->
+        <activity
+            android:name=".PluginsActivity"
+            android:exported="false"
+            android:theme="@style/AppTheme"
+            android:label="@string/plugin_page_title" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

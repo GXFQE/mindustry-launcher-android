@@ -1,16 +1,41 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  插件页文案（S0 可行性实验）。
-  ★ 故意**单独一个文件**：2026-10-11 那一轮 `values/strings.xml` 正被另一个会话改着，
-    这一份不去动它 —— Android 会把 values/ 下的所有 xml 合起来，效果一样。
-  ⚠️ 与 `values-zh/strings-plugin.xml` **逐键对应**，占位符序号集合也必须一致（门禁 RES-01/02）。
+  插件页文案（第 132 轮：从 S0 的 dev 演示页升级成**产品页**）。
+  ★ 单独一个文件：`values/strings.xml` 太大、又常被并行改动，插件这一摊独立成篇更省事
+    （Android 会把 `values/` 下所有 xml 合起来，效果一样）。
+  ⚠️ 与 `values-zh/strings-plugin.xml` **逐键对应**（多/少一条 RES-01 就红），
+    占位符序号集合也必须一致（RES-02）。
+  ⚠️ 英文值里别写撇号（aapt2 会与转义打架，见 §五那条）。
+  🔴 最高频的那句话：**换版本 / 启用停用之后要"退出重开"才生效** ——
+    这是由 S0 量出来的硬事实（已加载的类换不掉）决定的，不是实现偷懒。
 -->
 <resources>
     <string name="plugin_page_title">Plugins</string>
-    <string name="plugin_page_sub">Put plugin APKs into app_hub/plugins, then tap one to render this page with it.</string>
-    <string name="plugin_none">No plugin found in that folder.</string>
+    <string name="plugin_page_sub">Optional extras. Install an APK here; it takes effect after you exit and reopen the app.</string>
+    <string name="plugin_none">No plugin installed yet.</string>
+    <string name="plugin_import">Install a plugin APK</string>
+    <string name="plugin_chooser_title">Pick a plugin APK</string>
+    <string name="plugin_state_active_fmt">%1$s · active v%2$s</string>
+    <string name="plugin_state_pending_fmt">%1$s · takes effect after a restart (v%2$s)</string>
+    <string name="plugin_state_off_fmt">%1$s · off (last active v%2$s)</string>
+    <string name="plugin_state_off_never">%1$s · off</string>
+    <string name="plugin_action_open">Open it</string>
+    <string name="plugin_action_enable">Turn on (after a restart)</string>
+    <string name="plugin_action_disable">Turn off (after a restart)</string>
+    <string name="plugin_action_uninstall">Delete it</string>
+    <string name="plugin_installed_fmt">Installed %1$s v%2$s - takes effect after a restart.</string>
+    <string name="plugin_install_failed_fmt">Could not install it: %1$s</string>
+    <string name="plugin_uninstalled_fmt">Deleted %1$s</string>
+    <string name="plugin_restart">Restart now</string>
+    <string name="plugin_restart_hint">Changing a plugin only takes effect after the app is restarted.</string>
+    <string name="plugin_restart_failed">This device would not let the app restart itself. Please close it and open it again by hand.</string>
+    <string name="plugin_back">Back</string>
+    <string name="plugin_skip_title">The last launch with plugins did not finish</string>
+    <string name="plugin_skip_rollback_fmt">%1$s: v%2$s did not work, rolled back to v%3$s</string>
+    <string name="plugin_skip_disable_fmt">%1$s: v%2$s did not work, turned off</string>
+    <string name="plugin_skip_restore">Turn the plugins back on</string>
     <string name="plugin_loaded_fmt">Loaded %1$s (api %2$d)</string>
-    <string name="plugin_fallback_title">The plugin did not load - this page falls back to the built-in view.</string>
+    <string name="plugin_fallback_title">The plugin did not load - showing the built-in view instead.</string>
     <string name="plugin_err_missing">The plugin file is gone.</string>
     <string name="plugin_err_dex">This package cannot be read (is it a valid APK?).</string>
     <string name="plugin_err_noclass">The plugin has no agreed entry class.</string>

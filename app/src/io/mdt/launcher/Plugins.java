@@ -54,6 +54,18 @@ final class Plugins {
     /** 待生效登记：装了但**这个进程**还用不上（「退出重开」后才搬到 {@link #ACTIVE}）。 */
     static final String PENDING = "pending.txt";
 
+    /**
+     * ★ 回滚用：每个 id **最后一次"带着它启动成功"过的版本**（{@link #markBootOk} 时抄下来）。
+     * 它是"保留上一份可用插件"这条要求的落点：注入失败被安全阀拦下时，回滚的目标就是它。
+     */
+    static final String KNOWN = "known.txt";
+
+    /** 本次启动**真的注入进宿主 CL** 的清单（`openInjected` 只能用在这些人身上，见 {@link #injected}）。 */
+    static final String INJECTED = "injected.txt";
+
+    /** 结构化记录"上次被安全阀拦下后每个插件怎么了"（界面按它说人话；格式见 {@link #parseSkipLine}）。 */
+    static final String LASTSKIP = "lastskip.txt";
+
     /** ★ 安全阀：注入前写、启动过了这一关才删。它在 ⇒ 上次带插件启动没走完 ⇒ 本次不注入。 */
     static final String GUARD = "guard.txt";
 
@@ -233,7 +245,13 @@ final class Plugins {
             }
             String activeText = promotePending(d);
             List<String> ids = stateIds(activeText);
-            if (ids.isEmpty()) return;   // ★ 零成本路径：没装插件 ⇒ 不读 dex、不写盘、不留痕
+            if (ids.isEmpty()) {
+                // 零成本路径**不写盘**；只有"上一次留了清单、这一次没插件了"才要清一下
+                // （不清的话「打开」会一直以为某一版还住在宿主 CL 里 ⇒ 走错分支）
+                File inj = new File(d, INJECTED);
+                if (inj.isFile() && inj.length() > 0) write(inj, "");
+                return;
+            }
 
             injected = true;
             String head = "== plugin early inject ==\n"
@@ -249,6 +267,7 @@ final class Plugins {
             File cc = base.getCodeCacheDir();
             if (cc != null && !cc.isDirectory()) cc.mkdirs();
             int ok = 0;
+            String injectedIds = "";   // 本程真的进了宿主 CL 的那些（openInjected 只许对它们用）
             for (String id : ids) {
                 String ver = stateGet(activeText, id);
                 File apk = apkOf(base, id, ver);
@@ -283,6 +302,7 @@ final class Plugins {
                         continue;
                     }
                     rep.append('\n');
+                    injectedIds = statePut(injectedIds, id, ver);   // 供 openInjected 判"这个 dex 已在宿主 CL 里"
                     ok++;
                 } catch (Throwable t) {
                     // 单个插件炸了不该拖死启动；也不留它在 active 里反复失败 ⇒ 就地摘掉它
@@ -294,6 +314,7 @@ final class Plugins {
             }
             rep.append("injected = ").append(ok).append(" / ").append(ids.size()).append('\n');
             String text = rep.toString();
+            write(new File(d, INJECTED), injectedIds);   // 「打开」那个按钮靠它决定用哪条路（见 openable）
             write(new File(d, BOOT_REPORT), text);
             // ★ 外部 hub 也留一份：产品版是**非 debuggable** 的（`run-as` 用不了），
             //   内部报告拉不出来 ⇒ 想看"开机那几百毫秒到底注入了什么"只能靠这一份。
@@ -318,10 +339,58 @@ final class Plugins {
      */
     static void markBootOk(Context ctx) {
         try {
-            File g = new File(dirNoCreate(ctx), GUARD);
+            File d = dirNoCreate(ctx);
+            File g = new File(d, GUARD);
             if (g.isFile()) g.delete();
+            // ★ 启动带着这些插件活下来了 ⇒ 它们就是"已知可用"的那一份（回滚的目标）
+            String act = readOrNull(new File(d, ACTIVE));
+            if (stateIds(act).isEmpty()) return;
+            String known = readOrNull(new File(d, KNOWN));
+            if (!oneLine(act).equals(oneLine(known))) {
+                write(new File(d, KNOWN), act);
+                pruneOldVersions(d, act);
+            }
         } catch (Throwable ignored) {
         }
+    }
+
+    /**
+     * 启动成功之后把**没用的旧版本**删掉，只留三份：**生效中 / 已知可用 / 待生效**。
+     *
+     * <p>为什么删：每次"装一版试一版"都会留一个 APK；而更新插件本来就会不断换版本 ⇒
+     * 不收就会一直涨。留下已知可用那一份就够回滚了（"保留上一份可用插件"这条要求的全部）。
+     * ⚠️ 只删**同一 id 下**的 `.apk`，且**只在启动成功之后**删 —— 失败路径上要留着现场。
+     */
+    private static void pruneOldVersions(File d, String activeText) {
+        java.util.Set<String> keep = new java.util.HashSet<String>();
+        for (String t : new String[] { activeText, readOrNull(new File(d, KNOWN)),
+                                       readOrNull(new File(d, PENDING)) }) {
+            for (String id : stateIds(t)) keep.add(id + "=" + stateGet(t, id));
+        }
+        // ★ 失败过的那一版**也留着**：界面上的「把插件重新启用」要能再试一次，
+        //   而且它是"为什么被回滚"的现场（下一次成功升级时才随 prune 一起清掉）。
+        for (String[] s : lastSkipFiles(d)) keep.add(s[0] + "=" + s[1]);
+        for (String id : stateIds(activeText)) {
+            File[] vs = new File(d, id).listFiles();
+            if (vs == null) continue;
+            for (File v : vs) {
+                if (!v.isFile() || !v.getName().endsWith(".apk")) continue;
+                String ver = v.getName().substring(0, v.getName().length() - 4);
+                if (!keep.contains(id + "=" + ver)) v.delete();
+            }
+        }
+    }
+
+    /** 从盘上的 {@link #LASTSKIP} 解析出跳过记录（给 prune 用；界面那份走 {@link #lastSkip(Context)}）。 */
+    private static List<String[]> lastSkipFiles(File d) {
+        List<String[]> out = new ArrayList<String[]>();
+        String text = readOrNull(new File(d, LASTSKIP));
+        if (text == null) return out;
+        for (String line : lines(text)) {
+            String[] p = parseSkipLine(line);
+            if (p != null) out.add(p);
+        }
+        return out;
     }
 
     /**
@@ -331,23 +400,113 @@ final class Plugins {
     private static void skipOnce(Context base, File d, File guard) {
         String g = readOrNull(guard);
         String activeText = readOrNull(new File(d, ACTIVE));
+        String knownText = readOrNull(new File(d, KNOWN));
+        // ★ 回滚：能退回"上一次带着它启动成功过的版本"就退，退不了才停用（判据是纯函数，见 rollbackActive）
+        String rolled = rollbackActive(knownText, activeText, availableKeys(d));
+        List<String> failedIds = stateIds(activeText);
+        StringBuilder skip = new StringBuilder();
+        for (String id : failedIds) {
+            String was = stateGet(activeText, id);
+            String now = stateGet(rolled, id);
+            skip.append(id).append('\t').append(was == null ? "" : was).append('\t')
+                    .append(now == null ? "" : now).append('\t')
+                    .append(now == null ? "disable" : "rollback").append('\n');
+        }
         try {
             write(new File(d, LASTFAIL),
                     "== plugin skip (previous launch did not finish) ==\n"
                             + "time      = " + new java.util.Date() + "\n"
                             + "guard     = " + oneLine(g) + "\n"
                             + "active    = " + oneLine(activeText) + "\n"
-                            + "-> plugins disabled for this launch and removed from active.txt\n");
+                            + "known     = " + oneLine(knownText) + "\n"
+                            + "rollback  = " + oneLine(rolled) + "\n"
+                            + "-> " + (stateIds(rolled).isEmpty()
+                                    ? "plugins disabled for this launch"
+                                    : "rolled back to the last known-good version") + "\n");
         } catch (Throwable ignored) {
         }
         if (guard.isFile()) guard.delete();
-        write(new File(d, ACTIVE), "");   // 自动停用：不再自动试第二次（否则会变成"每隔一次启动就死一次"）
+        write(new File(d, ACTIVE), rolled);
+        write(new File(d, LASTSKIP), skip.toString());
+        write(new File(d, INJECTED), "");
         write(new File(d, BOOT_REPORT),
                 "== plugin early inject ==\n"
                         + "time     = " + new java.util.Date() + "\n"
                         + "SKIPPED: previous launch with plugins did not finish\n"
                         + "active was = " + oneLine(activeText) + "\n"
-                        + "-> nothing injected; active.txt cleared\n");
+                        + "-> " + (stateIds(rolled).isEmpty()
+                                ? "nothing injected; active.txt cleared"
+                                : "nothing injected; rolled back to " + oneLine(rolled))
+                        + "\n");
+    }
+
+    /**
+     * 回滚计划（**纯函数**，判据由 SelfTest 钉）：拿"已知可用"与"这次失败的"两份登记 +
+     * 手上真的还有哪些 `id=ver` 文件，算出**这次该生效什么**。
+     *
+     * <p>三条判据（每一条都有断言盯着）：
+     * <ol>
+     *   <li>已知可用版本存在、**和失败的那一版不同**、**文件还在** ⇒ 回滚到它；</li>
+     *   <li>已知可用就是失败那一版（或没有记录）⇒ **停用**（回滚到同一版没有意义）；</li>
+     *   <li>已知可用的文件**已经不在了** ⇒ 也停用 —— 绝不写一个指向不存在文件的登记
+     *       （那会让下次启动多一条 MISSING，白付一次注入尝试）。</li>
+     * </ol>
+     */
+    static String rollbackActive(String knownText, String failedActiveText,
+                                 java.util.Set<String> available) {
+        StringBuilder out = new StringBuilder();
+        for (String id : stateIds(failedActiveText)) {
+            String bad = stateGet(failedActiveText, id);
+            String good = stateGet(knownText, id);
+            if (good == null || good.equals(bad)) continue;
+            if (available != null && !available.contains(id + "=" + good)) continue;
+            out.append(id).append('=').append(good).append('\n');
+        }
+        return out.toString();
+    }
+
+    /** 手上真的还有哪些 `id=ver`（扫 `plugins/<id>/*.apk`）。 */
+    static java.util.Set<String> availableKeys(File d) {
+        java.util.Set<String> out = new java.util.HashSet<String>();
+        File[] ids = d == null ? null : d.listFiles();
+        if (ids == null) return out;
+        for (File id : ids) {
+            if (!id.isDirectory()) continue;
+            File[] vs = id.listFiles();
+            if (vs == null) continue;
+            for (File v : vs) {
+                if (v.isFile() && v.getName().endsWith(".apk")) {
+                    out.add(id.getName() + "=" + v.getName().substring(0, v.getName().length() - 4));
+                }
+            }
+        }
+        return out;
+    }
+
+    /**
+     * 解析一行结构化跳过记录：`id \t 失败版本 \t 回滚到的版本(空=停用) \t rollback|disable`。
+     * @return {@code {id, was, now, action}}；不是这种行 ⇒ null（**纯函数**，界面与自检共用）
+     */
+    static String[] parseSkipLine(String line) {
+        if (line == null) return null;
+        String[] p = line.split("\t");
+        if (p.length != 4) return null;
+        String id = p[0].trim();
+        String action = p[3].trim();
+        if (id.isEmpty() || !("rollback".equals(action) || "disable".equals(action))) return null;
+        return new String[] { id, p[1].trim(), p[2].trim(), action };
+    }
+
+    /** 上次被拦下之后每个插件怎么了（已解析；界面直接用）。 */
+    static List<String[]> lastSkip(Context ctx) {
+        List<String[]> out = new ArrayList<String[]>();
+        String text = readOrNull(new File(dirNoCreate(ctx), LASTSKIP));
+        if (text == null) return out;
+        for (String line : lines(text)) {
+            String[] p = parseSkipLine(line);
+            if (p != null) out.add(p);
+        }
+        return out;
     }
 
     // ---- 给界面 / dev 口读的现场 -----------------------------------------------
@@ -379,6 +538,93 @@ final class Plugins {
     static String pending(Context ctx) {
         String s = readOrNull(new File(dirNoCreate(ctx), PENDING));
         return s == null ? "" : s;
+    }
+
+    /** 已知可用登记全文（回滚目标）。 */
+    static String known(Context ctx) {
+        String s = readOrNull(new File(dirNoCreate(ctx), KNOWN));
+        return s == null ? "" : s;
+    }
+
+    /** 本次启动真的进了宿主 CL 的清单全文。 */
+    static String injected(Context ctx) {
+        String s = readOrNull(new File(dirNoCreate(ctx), INJECTED));
+        return s == null ? "" : s;
+    }
+
+    // ---- 界面用的几个动作（判据在纯函数里，动作只负责落盘） ----------------------
+
+    /**
+     * 界面上这一行该怎么说（**纯函数**）：{@code {"active"|"pending"|"off", 版本或 ""}}。
+     * ★ 顺序有讲究：**待重启生效优先于生效中** —— 装了新版之后，用户最需要知道的是
+     *   "现在还没生效、重开才生效"；只说"生效中 v1"会让人以为新版已经用上了。
+     */
+    static String[] rowState(String activeText, String pendingText, String id) {
+        String pend = stateGet(pendingText, id);
+        if (pend != null) return new String[] { "pending", pend };
+        String act = stateGet(activeText, id);
+        if (act != null) return new String[] { "active", act };
+        return new String[] { "off", "" };
+    }
+
+    /** 装了哪些 id（按名字排序；没有 `.apk` 的目录不算）。 */
+    static List<String> installedIds(Context ctx) {
+        List<String> out = new ArrayList<String>();
+        File d = dirNoCreate(ctx);
+        File[] ids = d.listFiles();
+        if (ids == null) return out;
+        java.util.Arrays.sort(ids);
+        for (File f : ids) {
+            if (f.isDirectory() && versionsOf(ctx, f.getName()).length > 0) out.add(f.getName());
+        }
+        return out;
+    }
+
+    /** 某个 id 装了哪些版本（升序）。 */
+    static String[] versionsOf(Context ctx, String id) {
+        File[] vs = new File(dirNoCreate(ctx), id).listFiles();
+        if (vs == null) return new String[0];
+        java.util.Arrays.sort(vs);
+        List<String> out = new ArrayList<String>();
+        for (File v : vs) {
+            if (v.isFile() && v.getName().endsWith(".apk")) {
+                out.add(v.getName().substring(0, v.getName().length() - 4));
+            }
+        }
+        return out.toArray(new String[0]);
+    }
+
+    /** 启用某个版本 ⇒ 写 {@link #PENDING}（**退出重开才生效**）。 */
+    static void enable(Context ctx, String id, String ver) {
+        File f = new File(dir(ctx), PENDING);
+        write(f, statePut(readOrNull(f), id, ver));
+    }
+
+    /** 停用：从 {@link #ACTIVE} 与 {@link #PENDING} 都摘掉（退出重开之后它就不加载了）。 */
+    static void disable(Context ctx, String id) {
+        File a = new File(dir(ctx), ACTIVE), p = new File(dir(ctx), PENDING);
+        write(a, stateRemove(readOrNull(a), id));
+        write(p, stateRemove(readOrNull(p), id));
+    }
+
+    /** 卸载：删掉整个 `plugins/<id>/` + 从三份登记里摘掉。 */
+    static void uninstall(Context ctx, String id) {
+        disable(ctx, id);
+        File k = new File(dir(ctx), KNOWN);
+        write(k, stateRemove(readOrNull(k), id));
+        deleteTree(new File(dir(ctx), id));
+    }
+
+    private static void deleteTree(File f) {
+        if (f == null) return;
+        File[] kids = f.listFiles();
+        if (kids != null) for (File k : kids) deleteTree(k);
+        f.delete();
+    }
+
+    /** 这个版本的类这程是不是**已经在宿主 CL 里**了（决定「打开」走 openInjected 还是 load）。 */
+    static boolean isInjected(Context ctx, String id, String ver) {
+        return ver != null && ver.equals(stateGet(injected(ctx), id));
     }
 
     // ---- 小工具 ---------------------------------------------------------------

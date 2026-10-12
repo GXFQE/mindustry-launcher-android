@@ -1,9 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 插件页文案（中文）—— 与 values/strings-plugin.xml 逐键对应；见那份的说明。 -->
+<!-- 插件页文案（中文）—— 与 values/strings-plugin.xml 逐键对应；那份的头注释写了为什么这么定。 -->
 <resources>
     <string name="plugin_page_title">插件</string>
-    <string name="plugin_page_sub">把插件 APK 放进 app_hub/plugins，点一下就用它来渲染这一页。</string>
-    <string name="plugin_none">那个目录里没有插件。</string>
+    <string name="plugin_page_sub">可选的能力：装一份 APK 在这儿，退出重开之后才生效。</string>
+    <string name="plugin_none">还没有装插件。</string>
+    <string name="plugin_import">装一个插件 APK</string>
+    <string name="plugin_chooser_title">选一个插件 APK</string>
+    <string name="plugin_state_active_fmt">%1$s · 生效中 v%2$s</string>
+    <string name="plugin_state_pending_fmt">%1$s · 退出重开生效 v%2$s</string>
+    <string name="plugin_state_off_fmt">%1$s · 已停用（上次生效 v%2$s）</string>
+    <string name="plugin_state_off_never">%1$s · 已停用</string>
+    <string name="plugin_action_open">打开</string>
+    <string name="plugin_action_enable">启用（退出重开生效）</string>
+    <string name="plugin_action_disable">停用（退出重开生效）</string>
+    <string name="plugin_action_uninstall">删除</string>
+    <string name="plugin_installed_fmt">已装 %1$s v%2$s —— 退出重开生效。</string>
+    <string name="plugin_install_failed_fmt">没装成：%1$s</string>
+    <string name="plugin_uninstalled_fmt">已删除 %1$s</string>
+    <string name="plugin_restart">立即重启</string>
+    <string name="plugin_restart_hint">换版本、启用或停用之后，要重启应用才生效。</string>
+    <string name="plugin_restart_failed">这台设备不允许应用自己重启，请手动退出再打开。</string>
+    <string name="plugin_back">返回</string>
+    <string name="plugin_skip_title">上次带插件启动没成功</string>
+    <string name="plugin_skip_rollback_fmt">%1$s：v%2$s 没起来，已回滚到 v%3$s</string>
+    <string name="plugin_skip_disable_fmt">%1$s：v%2$s 没起来，已停用</string>
+    <string name="plugin_skip_restore">把插件重新启用</string>
     <string name="plugin_loaded_fmt">已加载 %1$s（接口版本 %2$d）</string>
     <string name="plugin_fallback_title">插件没能加载，这一页改用内置的实现。</string>
     <string name="plugin_err_missing">插件文件不在了。</string>

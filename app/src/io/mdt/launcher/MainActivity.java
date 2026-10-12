@@ -500,6 +500,9 @@ public class MainActivity extends BaseActivity {
         //   但它是**无障碍标签**与溢出菜单的文字，用户语言包必须能改到它。
         MenuItem it = menu.findItem(R.id.action_settings);
         if (it != null) it.setTitle(Trans.get(MainActivity.this, R.string.act_settings_title));
+        // ★ 第 132 轮：「插件」也走顶栏（低频但成页的入口，与「设置」同一套规矩）
+        MenuItem pl = menu.findItem(R.id.action_plugins);
+        if (pl != null) pl.setTitle(Trans.get(MainActivity.this, R.string.plugin_page_title));
         return true;
     }
 
@@ -507,6 +510,10 @@ public class MainActivity extends BaseActivity {
     public boolean onOptionsItemSelected(MenuItem item) {
         if (item.getItemId() == R.id.action_settings) {
             startActivity(new Intent(MainActivity.this, SettingsActivity.class));
+            return true;
+        }
+        if (item.getItemId() == R.id.action_plugins) {
+            startActivity(new Intent(MainActivity.this, PluginsActivity.class));
             return true;
         }
         return super.onOptionsItemSelected(item);

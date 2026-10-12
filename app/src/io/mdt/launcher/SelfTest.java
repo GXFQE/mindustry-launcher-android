@@ -134,7 +134,7 @@ public final class SelfTest {
             MainActivity.class, SlotsActivity.class, SlotActivity.class, ModsActivity.class,
             MapsActivity.class, MapDetailActivity.class, SettingsActivity.class,
             LogActivity.class, TrashActivity.class, BlueprintsActivity.class,
-            BlueprintDetailActivity.class, GameSlot.class, SavesActivity.class};
+            BlueprintDetailActivity.class, GameSlot.class, SavesActivity.class, PluginsActivity.class};
 
     private SelfTest() {}
 
@@ -2267,6 +2267,49 @@ public final class SelfTest {
                 "登记表与插件 APK 同住 plugins/");
         ok(stat, L, Plugins.dirNoCreate(ctx).equals(apk.getParentFile().getParentFile()),
                 "★ 两者是同一个目录（不是各算一遍路径）");
+
+        // ── 第 132 轮：回滚（"保留上一份可用插件"）+ 界面上那一行怎么说 + 跳过记录的解析 ──
+        L.add("  · 回滚 / 界面状态 / 跳过记录（第 132 轮）");
+        java.util.Set<String> have = new java.util.HashSet<String>();
+        have.add("probe=1");
+        have.add("probe=2");
+        String roll = Plugins.rollbackActive("probe=1\n", "probe=2\n", have);
+        ok(stat, L, "probe=1".equals(Plugins.oneLine(roll)),
+                "★ 已知可用 v1、这次 v2 失败、两份文件都在 ⇒ **回滚到 v1**");
+        ok(stat, L, !roll.contains("probe=2"), "★回滚结果里**不许**留下失败的那一版（否则等于没回滚）");
+        ok(stat, L, Plugins.stateIds(Plugins.rollbackActive("probe=2\n", "probe=2\n", have)).isEmpty(),
+                "已知可用就是失败那一版 ⇒ **停用**（回滚到同一版没有意义）");
+        ok(stat, L, Plugins.stateIds(Plugins.rollbackActive(null, "probe=2\n", have)).isEmpty(),
+                "没有已知可用记录 ⇒ 停用");
+        java.util.Set<String> onlyV2 = new java.util.HashSet<String>();
+        onlyV2.add("probe=2");
+        ok(stat, L, Plugins.stateIds(Plugins.rollbackActive("probe=1\n", "probe=2\n", onlyV2)).isEmpty(),
+                "★已知可用的**文件已经不在了** ⇒ 停用（绝不写一个指向不存在文件的登记）");
+        java.util.Set<String> two = new java.util.HashSet<String>();
+        two.add("a=1");
+        two.add("a=3");
+        two.add("b=1");
+        String mixed = Plugins.rollbackActive("a=1\nb=9\n", "a=3\nb=9\n", two);
+        ok(stat, L, "1".equals(Plugins.stateGet(mixed, "a")) && Plugins.stateGet(mixed, "b") == null,
+                "★ 多插件各自判：a 回滚到 1、b 停用（不是一刀切）");
+
+        String[] row = Plugins.rowState("probe=1\n", "probe=2\n", "probe");
+        ok(stat, L, "pending".equals(row[0]) && "2".equals(row[1]),
+                "★界面那一行：**待重启生效优先于生效中**（装了新版最该说的是「重开才生效」）");
+        String[] row2 = Plugins.rowState("probe=1\n", "", "probe");
+        ok(stat, L, "active".equals(row2[0]) && "1".equals(row2[1]), "没有待生效 ⇒ 报生效中");
+        ok(stat, L, "off".equals(Plugins.rowState("", "", "probe")[0]), "两边都没有 ⇒ 已停用");
+
+        String[] sl = Plugins.parseSkipLine("probe\t2\t1\trollback");
+        ok(stat, L, sl != null && "probe".equals(sl[0]) && "2".equals(sl[1])
+                && "1".equals(sl[2]) && "rollback".equals(sl[3]), "跳过记录：回滚那一行解析得出来");
+        String[] sl2 = Plugins.parseSkipLine("probe\t2\t\tdisable");
+        ok(stat, L, sl2 != null && sl2[2].isEmpty() && "disable".equals(sl2[3]),
+                "跳过记录：停用那一行（第三个字段空）也解析得出来");
+        ok(stat, L, Plugins.parseSkipLine("garbage") == null
+                && Plugins.parseSkipLine("probe\t2\t1\tnonsense") == null
+                && Plugins.parseSkipLine(null) == null && Plugins.parseSkipLine("") == null,
+                "★不是那个格式的行一律 null（界面据此决定要不要说话）");
     }
 
     private static void modsPure(List<String> L, int[] stat) {
@@ -8147,7 +8190,8 @@ public final class SelfTest {
                 "io.mdt.launcher.ModsActivity", "io.mdt.launcher.SlotActivity",
                 "io.mdt.launcher.MapsActivity", "io.mdt.launcher.MapDetailActivity",
                 "io.mdt.launcher.BlueprintsActivity", "io.mdt.launcher.BlueprintDetailActivity",
-                "io.mdt.launcher.TrashActivity", "io.mdt.launcher.SavesActivity"};
+                "io.mdt.launcher.TrashActivity", "io.mdt.launcher.SavesActivity",
+                "io.mdt.launcher.PluginsActivity"};
         int found = 0;
         for (String n : want) {
             if (canResolve(ctx, n)) found++;
@@ -8300,7 +8344,11 @@ public final class SelfTest {
                 R.layout.activity_trash, R.layout.activity_saves,
                 // ★ 2026-10-06（第 116 轮）：蓝图两页原来**漏在这份名单外**——
                 //   它们有 `@+id/root`（所以补上不会红），但"名单漏了不会有症状"正是 ㉛ 想防的漏。
-                R.layout.activity_blueprints, R.layout.activity_blueprint_detail};
+                R.layout.activity_blueprints, R.layout.activity_blueprint_detail,
+                // ★ 2026-10-12（第 132 轮）：插件页。第一版是**纯代码建视图**、没走这条骨架，
+                //   真机实测就是"标题落在 [52,52]（顶栏 136~292）⇒ 有文字但看不见"——
+                //   与第 81 轮地图页同一个坑 ⇒ 改成 XML 骨架并补进这份名单（名单漏了不会有症状）。
+                R.layout.activity_plugins};
         android.view.LayoutInflater inf = android.view.LayoutInflater.from(ctx);
         int good = 0;
         StringBuilder bad = new StringBuilder();
@@ -8492,6 +8540,12 @@ public final class SelfTest {
                             + "（图标必须是 ic_settings_bar —— 行内那份在顶栏上看不见）");
             boolean titled = it != null && it.getTitle() != null && it.getTitle().length() > 0;
             ok(stat, L, titled, "★顶栏菜单项有无障碍/溢出用的标题（Trans 会再覆盖一遍）");
+            // ★ 第 132 轮：插件入口也在这个菜单里（同样是"图标必须自带颜色"那条判据）
+            android.view.MenuItem pl = pm.getMenu().findItem(R.id.action_plugins);
+            ok(stat, L, pl != null && pl.getIcon() != null,
+                    "★顶栏菜单：res/menu/main.xml 里有 action_plugins **且带图标**（图标必须是 ic_plugins_bar）");
+            ok(stat, L, pl != null && pl.getTitle() != null && pl.getTitle().length() > 0,
+                    "★插件菜单项有无障碍/溢出用的标题");
         } catch (Throwable t) {
             ok(stat, L, false, "顶栏菜单检查自身异常：" + t);
         }

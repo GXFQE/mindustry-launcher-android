@@ -13,7 +13,7 @@ import java.util.Date;
 import java.util.List;
 
 /**
- * 插件化的 **dev 侧**：插件页 + S0 可行性实验。
+ * 插件化的 **dev 侧**：只剩 S0 可行性实验（插件页已搬回产品侧 `PluginsActivity`，第 132 轮）。
  *
  * <p>★ 为什么整块住 `app/src-dev`：这两件都是**开发/验收用的**（一个演示页 + 一个实验入口），
  * 产品版不该带着它们 —— 与 `DevTools` / `SelfTest` 同一条裁剪规矩（`build.sh` 的 `[2/4] javac`）。
@@ -32,79 +32,6 @@ final class PluginProbeDev {
     static final String PROBE2 = "io.mdt.launcher.PluginProbe2";
 
     private PluginProbeDev() {}
-
-    // ---- 插件页（dev 演示） ----------------------------------------------------
-
-    /** 建"插件"页：上面列候选，下面是被选中的插件渲染出来的内容。 */
-    static View buildPage(final Activity a, final File dir) {
-        final LinearLayout root = new LinearLayout(a);
-        root.setOrientation(LinearLayout.VERTICAL);
-        final int pad = Math.round(16 * a.getResources().getDisplayMetrics().density);
-        root.setPadding(pad, pad, pad, pad);
-
-        TextView title = new TextView(a);
-        title.setText(Trans.get(a, R.string.plugin_page_title));
-        title.setTextSize(22f);
-        root.addView(title);
-
-        TextView sub = new TextView(a);
-        sub.setText(Trans.get(a, R.string.plugin_page_sub));
-        sub.setTextSize(13f);
-        root.addView(sub);
-
-        final LinearLayout host = new LinearLayout(a);
-        host.setOrientation(LinearLayout.VERTICAL);
-        host.setPadding(0, pad, 0, 0);
-        root.addView(host);
-
-        List<File> files = PluginHost.pluginFiles(dir);
-        if (files.isEmpty()) {
-            TextView none = new TextView(a);
-            none.setText(Trans.get(a, R.string.plugin_none));
-            host.addView(none);
-            return root;
-        }
-        for (final File f : files) {
-            TextView row = new TextView(a);
-            row.setText(f.getName());
-            row.setPadding(pad, pad, pad, pad);
-            row.setOnClickListener(new View.OnClickListener() {
-                @Override public void onClick(View v) {
-                    render(a, f, host);
-                }
-            });
-            root.addView(row);
-        }
-        return root;
-    }
-
-    /** 把某个插件渲染进 {@code host}；失败就走兜底 + 说明。 */
-    static void render(Activity a, File apk, ViewGroup host) {
-        host.removeAllViews();
-        try {
-            PluginHost.Loaded l = PluginHost.load(a, apk);
-            TextView cap = new TextView(a);
-            cap.setText(Trans.get(a, R.string.plugin_loaded_fmt, apk.getName(), l.api));
-            host.addView(cap);
-            Object v = l.entry.getMethod("createView", Context.class).invoke(null, l.ctx);
-            if (v instanceof View) host.addView((View) v);
-        } catch (PluginHost.PluginException e) {
-            TextView t = new TextView(a);
-            t.setText(Trans.get(a, R.string.plugin_fallback_title));
-            host.addView(t);
-            TextView why = new TextView(a);
-            if ("plugin_err_api".equals(e.reason)) {
-                why.setText(Trans.get(a, PluginHost.reasonRes(e.reason), e.num1, e.num2));
-            } else {
-                why.setText(Trans.get(a, PluginHost.reasonRes(e.reason)));
-            }
-            host.addView(why);
-        } catch (Throwable t) {
-            TextView why = new TextView(a);
-            why.setText(Trans.get(a, R.string.plugin_err_other) + "\n" + brief(t));
-            host.addView(why);
-        }
-    }
 
     // ---- S0 可行性实验 ---------------------------------------------------------
 

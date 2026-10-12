@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  第 132 轮（2026-10-12）：「插件」的顶栏菜单图标。
+  ★ 与 `ic_settings_bar` 同一套规矩：**ActionBar 不会替菜单图标上色**，所以这里必须自带
+    `@color/on_appbar`（浅色主题=白、深色主题=浅灰）—— 忘了写就是个"看不见但点得着"的空洞。
+  ★ 画的是"模块 + 插头"：一个方块 + 右侧一个插头 + 顶上两根引脚（读作"加装件"），
+    纯 fill、没有描边 —— 描边带在半透明/小尺寸下会糊（见 ref/29「图标 / 矢量几何」那节）。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@color/on_appbar"
+        android:pathData="M4,8.5h10v7h-10z M14,10.5h6v3h-6z M6.2,4.5h1.8v4h-1.8z M10.2,4.5h1.8v4h-1.8z" />
+</vector>
