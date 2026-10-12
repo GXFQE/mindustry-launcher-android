@@ -50,6 +50,18 @@
     <string name="plugin_trust_short_official">Official</string>
     <string name="plugin_trust_short_third">Third party</string>
     <string name="plugin_trust_short_fmt">%1$s · handling %2$s</string>
+
+    <!-- 第 136 轮：把插件自述用起来（名字 + 信息那一屏）。标签自带分隔符，中英各一套 -->
+    <string name="plugin_action_info">Plugin info</string>
+    <string name="plugin_info_name">Id: %1$s</string>
+    <string name="plugin_info_selfname">Name: %1$s</string>
+    <string name="plugin_info_selfver">Version: %1$s</string>
+    <string name="plugin_info_author">Author: %1$s</string>
+    <string name="plugin_info_desc">About: %1$s</string>
+    <string name="plugin_info_entry">Entry class: %1$s</string>
+    <string name="plugin_info_source">Source: %1$s</string>
+    <string name="plugin_info_level">Handling: %1$s</string>
+    <string name="plugin_info_filever">File version: %1$s</string>
     <string name="plugin_level_l1">L1 lenient - keep it and try again next launch</string>
     <string name="plugin_level_l2">L2 roll back - go back to the last version that worked</string>
     <string name="plugin_level_l3">L3 strict - turn it off and quarantine that version</string>

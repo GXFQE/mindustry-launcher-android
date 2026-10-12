@@ -41,6 +41,18 @@
     <string name="plugin_trust_short_official">官方</string>
     <string name="plugin_trust_short_third">第三方</string>
     <string name="plugin_trust_short_fmt">%1$s · 处置 %2$s</string>
+
+    <!-- 第 136 轮：把插件自述用起来（名字 + 信息那一屏）。标签自带分隔符，中英各一套 -->
+    <string name="plugin_action_info">插件信息</string>
+    <string name="plugin_info_name">内部 id：%1$s</string>
+    <string name="plugin_info_selfname">名称：%1$s</string>
+    <string name="plugin_info_selfver">版本：%1$s</string>
+    <string name="plugin_info_author">作者：%1$s</string>
+    <string name="plugin_info_desc">说明：%1$s</string>
+    <string name="plugin_info_entry">入口类：%1$s</string>
+    <string name="plugin_info_source">来源：%1$s</string>
+    <string name="plugin_info_level">处置：%1$s</string>
+    <string name="plugin_info_filever">文件版本：%1$s</string>
     <string name="plugin_level_l1">L1 宽容 —— 先留着，下次启动再试</string>
     <string name="plugin_level_l2">L2 回滚 —— 退回上一份能用的版本</string>
     <string name="plugin_level_l3">L3 严格 —— 停用，并把这一版隔离</string>

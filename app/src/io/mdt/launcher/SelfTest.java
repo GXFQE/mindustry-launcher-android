@@ -2412,6 +2412,34 @@ public final class SelfTest {
                 "没判出来源的（=第三方口径）跟第三方同档，且同档内部**保持登记表顺序**");
         ok(stat, L, "[aa, cc]".equals(Plugins.injectOrder(tr, "aa=1\ncc=9\n").toString()),
                 "★trust 里有 bb 但 active 里没有它 ⇒ 不参与；cc 没记录 ⇒ 按第三方口径排后面");
+
+        // ── 第 136 轮：把自述用起来（界面上的名字 + 信息那一屏）──
+        L.add("  · 自述名字 / 信息行（第 136 轮）");
+        ok(stat, L, "probe".equals(Plugins.displayName(null, "probe"))
+                        && "probe".equals(Plugins.displayName("   ", "probe"))
+                        && "探针".equals(Plugins.displayName(" 探针 ", "probe")),
+                "★界面上的名字：自述优先、缺自述回落 id（空串/空白都算缺）");
+        java.util.List<String[]> pr = Plugins.dropEmptyPairs(
+                new String[] { "A: ", "B: ", "C: ", "D: " }, new String[] { "1", "", null, " 4 " });
+        ok(stat, L, pr.size() == 2 && "1".equals(pr.get(0)[1]) && "4".equals(pr.get(1)[1])
+                        && "D: ".equals(pr.get(1)[0]),
+                "★空字段整条去掉（空串/null 都不印）—— 不许出现「作者：null」；非空的照样留着（含 trim）");
+        ok(stat, L, Plugins.dropEmptyPairs(new String[] { "A: " }, new String[] { "1", "2" }).size() == 1
+                        && Plugins.dropEmptyPairs(null, null).isEmpty()
+                        && Plugins.dropEmptyPairs(new String[] { "A: " },
+                                new String[] { "  " }).isEmpty(),
+                "标签/值长度不一致时按短的算；全空 ⇒ 空表（信息弹窗会退化成不显示，别抛异常）");
+        String lblAuthor = Trans.get(ctx, R.string.plugin_info_author);
+        String lblLevel = Trans.get(ctx, R.string.plugin_info_level);
+        ok(stat, L, lblAuthor.contains("%1$s") && lblLevel.contains("%1$s"),
+                "★信息行的标签**自带 %1$s 占位符**（分隔符与语序跟着语言走；"
+                        + "⚠️ 靠「标签末尾空格」当分隔符不行 —— aapt2 会剥掉首尾空白，门禁 RES-04 抓过）—— 实得「"
+                        + lblAuthor + "」「" + lblLevel + "」");
+        ok(stat, L, String.format(lblAuthor, "mdt-fixture").contains("mdt-fixture"),
+                "★实拼一次：占位符真能填进去（防「占位符数量/类型不对」这种只在运行期炸的错）");
+        ok(stat, L, !Trans.get(ctx, R.string.plugin_action_info).isEmpty()
+                        && !Trans.get(ctx, R.string.plugin_info_selfname).isEmpty(),
+                "新加的两条文案中英都在（门禁 RES-01 只管键对齐，这里再实取一次）");
     }
 
     private static void modsPure(List<String> L, int[] stat) {

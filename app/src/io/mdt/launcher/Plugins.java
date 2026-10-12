@@ -331,7 +331,7 @@ final class Plugins {
         return s == null ? "" : s;
     }
 
-    /** 用户改等级（写 {@link #LEVELS}）；传空 / 非法值 ⇒ 清掉覆盖、回到按来源的默认值。 */
+    /** 用户改过等级（写 {@link #LEVELS}）；传空 / 非法值 ⇒ 清掉覆盖、回到按来源的默认值。 */
     static void setLevel(Context ctx, String id, String level) {
         File f = new File(dir(ctx), LEVELS);
         String cur = readOrNull(f);
@@ -347,6 +347,55 @@ final class Plugins {
         if (PluginTrust.L1.equals(level)) return PluginTrust.L2;
         if (PluginTrust.L2.equals(level)) return PluginTrust.L3;
         return PluginTrust.L1;
+    }
+
+    // ---- 界面上的名字与信息行（第 136 轮） -------------------------------------
+
+    /**
+     * 界面上叫它什么：**自述里的名字优先，缺自述才用 id**（纯函数）。
+     * ★ 单一来源 —— 列表行、弹窗标题、"上次跳过"横幅都用它，别在几处各写一份
+     *   （同一件事有两个名字 = 用户得自己做翻译）。
+     */
+    static String displayName(String metaName, String id) {
+        return (metaName == null || metaName.trim().isEmpty()) ? id : metaName.trim();
+    }
+
+    /** 这个插件当前那一版的自述名字（生效中 → 待生效 → 最新装的那一版 → 隔离件）。 */
+    static String displayNameOf(Context ctx, String id) {
+        String ver = stateGet(readOrNull(new File(dirNoCreate(ctx), ACTIVE)), id);
+        if (ver == null) ver = stateGet(readOrNull(new File(dirNoCreate(ctx), PENDING)), id);
+        if (ver == null) {
+            String[] vs = versionsOf(ctx, id);
+            if (vs.length > 0) ver = vs[vs.length - 1];
+        }
+        if (ver == null) {
+            String[] qs = quarantinedOf(ctx, id);
+            if (qs.length > 0) ver = qs[qs.length - 1];
+        }
+        if (ver == null) return id;
+        try {
+            return displayName(PluginMeta.read(ctx, apkOf(ctx, id, ver)).name, id);
+        } catch (Throwable t) {
+            return id;
+        }
+    }
+
+    /**
+     * 把「标签 + 值」里**值为空的整条去掉**（纯函数）。
+     * ★ 规矩：空字段不许印成 `null` / 空行 —— 用户看到「作者：null」只会以为坏了；
+     *   信息弹窗里少一行，比多一行垃圾强（与 §86.6「pass=false 时原因必须非空」同族）。
+     * @return 每条 {@code {label, value}}，顺序照传入
+     */
+    static List<String[]> dropEmptyPairs(String[] labels, String[] values) {
+        List<String[]> out = new ArrayList<String[]>();
+        if (labels == null || values == null) return out;
+        int n = Math.min(labels.length, values.length);
+        for (int i = 0; i < n; i++) {
+            String v = values[i];
+            if (v == null || v.trim().isEmpty()) continue;
+            out.add(new String[] { labels[i], v.trim() });
+        }
+        return out;
     }
 
     /**

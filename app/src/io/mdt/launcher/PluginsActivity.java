@@ -91,20 +91,22 @@ public class PluginsActivity extends BaseActivity {
             String act = Plugins.active(this), pend = Plugins.pending(this), known = Plugins.known(this);
             for (final String id : ids) {
                 String[] st = Plugins.rowState(act, pend, id);
+                // ★ 界面上说的名字 = 自述里的名字（缺自述才回落 id）—— 与横幅、弹窗同一处取（第 136 轮）
+                final String name = Plugins.displayNameOf(this, id);
                 String label;
                 if ("pending".equals(st[0])) {
-                    label = Trans.get(this, R.string.plugin_state_pending_fmt, id, st[1]);
+                    label = Trans.get(this, R.string.plugin_state_pending_fmt, name, st[1]);
                 } else if ("active".equals(st[0])) {
-                    label = Trans.get(this, R.string.plugin_state_active_fmt, id, st[1]);
+                    label = Trans.get(this, R.string.plugin_state_active_fmt, name, st[1]);
                 } else {
                     String k = Plugins.stateGet(known, id);
-                    label = k == null ? Trans.get(this, R.string.plugin_state_off_never, id)
-                                      : Trans.get(this, R.string.plugin_state_off_fmt, id, k);
+                    label = k == null ? Trans.get(this, R.string.plugin_state_off_never, name)
+                                      : Trans.get(this, R.string.plugin_state_off_fmt, name, k);
                 }
                 // ★ 有隔离件时行里要点明（否则用户看着"已停用"、不知道还能放回来）
                 String[] qv = Plugins.quarantinedOf(this, id);
                 if (qv.length > 0 && "off".equals(st[0])) {
-                    label = Trans.get(this, R.string.plugin_row_quarantined_fmt, id, qv[qv.length - 1]);
+                    label = Trans.get(this, R.string.plugin_row_quarantined_fmt, name, qv[qv.length - 1]);
                 }
                 // 第二行小字：来源 + 当前处置等级（弹窗里放不下它们 —— 见 rowDialog 的注释）
                 final String[] vs = Plugins.versionsOf(this, id);
@@ -145,14 +147,16 @@ public class PluginsActivity extends BaseActivity {
         addText(Trans.get(this, R.string.plugin_skip_title), 15f);
         for (String[] s : live) {
             boolean q = s.length > 5 && "yes".equals(s[5]);
+            // ★ 横幅里说的名字与列表行同一个来源（自述名字优先）—— 别让同一件事有两个名字
+            String name = Plugins.displayNameOf(this, s[0]);
             if ("retry".equals(s[3])) {
-                addText(Trans.get(this, R.string.plugin_skip_retry_fmt, s[0], s[1]), 14f);
+                addText(Trans.get(this, R.string.plugin_skip_retry_fmt, name, s[1]), 14f);
             } else if ("rollback".equals(s[3])) {
                 addText(Trans.get(this, q ? R.string.plugin_skip_rollback_q_fmt
-                                          : R.string.plugin_skip_rollback_fmt, s[0], s[1], s[2]), 14f);
+                                          : R.string.plugin_skip_rollback_fmt, name, s[1], s[2]), 14f);
             } else {
                 addText(Trans.get(this, q ? R.string.plugin_skip_quarantine_fmt
-                                          : R.string.plugin_skip_disable_fmt, s[0], s[1]), 14f);
+                                          : R.string.plugin_skip_disable_fmt, name, s[1]), 14f);
             }
         }
         if (!restorable) return;   // 那一版的文件不在了 ⇒ 这个按钮按下去什么都不会发生，那就别给
@@ -215,9 +219,11 @@ public class PluginsActivity extends BaseActivity {
         }
         items.add(Trans.get(this, R.string.plugin_action_level_fmt, lv, nextLv));
         actions.add("level");
+        items.add(Trans.get(this, R.string.plugin_action_info));
+        actions.add("info");
 
         new AlertDialog.Builder(this)
-                .setTitle(id)
+                .setTitle(Plugins.displayNameOf(this, id))
                 // ⚠️ 别在这里加 `.setMessage(...)`：框架的 AlertController 在"有 message"时会**把 items 吞掉**
                 //    （真机实测：同一段代码去掉 message 就正常显示 6 项，加上就只剩一个「取消」）。
                 //    ⇒ 来源 / 等级的信息放在**列表行下面那行小字**里，弹窗只负责动作。
@@ -253,10 +259,60 @@ public class PluginsActivity extends BaseActivity {
                                     Trans.get(PluginsActivity.this, R.string.plugin_level_set_fmt,
                                             id, nextLv), Toast.LENGTH_LONG).show();
                             rebuild();
+                        } else if ("info".equals(a)) {
+                            infoDialog(id, newest, trust, lv);
                         }
                     }
                 })
                 .setNegativeButton(Trans.get(this, R.string.cancel), null)
+                .show();
+    }
+
+    /**
+     * 「插件信息」：自述里那些**说明性**的字段（名称 / 自述版本 / 作者 / 说明）+ 入口类 + 来源 / 处置 / 文件版本。
+     *
+     * <p>★ 为什么单独开一个弹窗：框架那个"`setMessage` 与 `setItems` 同用会把 items 吞掉"的坑
+     * （第 133 轮真机踩的）⇒ **只有 message、没有 items 的弹窗**是安全的，所以信息单独一屏。
+     * ★ 空字段整条不印（{@link Plugins#dropEmptyPairs}）—— 不许出现「作者：null」或空行。
+     */
+    private void infoDialog(String id, String fileVer, String trust, String lv) {
+        File apk = fileVer == null ? null : Plugins.apkOf(this, id, fileVer);
+        PluginMeta.Info meta = apk == null ? null : PluginMeta.read(this, apk);
+        String[] labels = {
+                Trans.get(this, R.string.plugin_info_name),      // 内部 id（稳定键）
+                Trans.get(this, R.string.plugin_info_selfname),  // 自述名称
+                Trans.get(this, R.string.plugin_info_selfver),
+                Trans.get(this, R.string.plugin_info_author),
+                Trans.get(this, R.string.plugin_info_desc),
+                Trans.get(this, R.string.plugin_info_entry),
+                Trans.get(this, R.string.plugin_info_source),
+                Trans.get(this, R.string.plugin_info_level),
+                Trans.get(this, R.string.plugin_info_filever),
+        };
+        String entry = apk == null ? null : PluginMeta.entryOf(this, apk, PluginHost.DEFAULT_ENTRY);
+        String[] values = {
+                id,
+                meta == null ? null : meta.name,
+                meta == null ? null : meta.version,
+                meta == null ? null : meta.author,
+                meta == null ? null : meta.description,
+                entry,
+                Trans.get(this, PluginTrust.OFFICIAL.equals(trust) ? R.string.plugin_trust_official
+                                                                   : R.string.plugin_trust_third),
+                Trans.get(this, levelRes(lv)),
+                fileVer,
+        };
+        StringBuilder sb = new StringBuilder();
+        for (String[] pair : Plugins.dropEmptyPairs(labels, values)) {
+            if (sb.length() > 0) sb.append('\n');
+            // 标签资源自带 `%1$s` 占位符 ⇒ 分隔符与语序都跟着语言走
+            // （⚠️ 别用"标签末尾带空格"当分隔符：aapt2 会把首尾空白剥掉，装到机器上标签与值会连体 —— 门禁 RES-04 抓过）
+            sb.append(String.format(pair[0], pair[1]));
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(Plugins.displayNameOf(this, id))
+                .setMessage(sb.toString())
+                .setPositiveButton(Trans.get(this, R.string.cancel), null)
                 .show();
     }
 
