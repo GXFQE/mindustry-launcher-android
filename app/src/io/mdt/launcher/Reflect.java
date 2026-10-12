@@ -100,6 +100,21 @@ final class Reflect {
      */
     static int injectDex(ClassLoader target, File apk, File optimizedDir, boolean prepend,
                          java.util.List<String> notes) throws Exception {
+        return injectDex(target, apk, optimizedDir, prepend ? 0 : -1, notes);
+    }
+
+    /**
+     * 同上，但**自己指定插到哪个下标**（第 138 轮）。
+     *
+     * <p>为什么要这个：插件原先一律**前插**（排在宿主自己那份 dex 之前）⇒ 插件能顶掉宿主里
+     * **尚未加载**的类 —— 包括 `LogActivity` / 设置页这种"我们自己的逻辑"。全插件化之后宿主内核
+     * 必须永远可用、不可被替换 ⇒ 插件要插在**宿主自己那一段之后**（下标 = 宿主 dex 条数）。
+     * ★ 插件之间仍是"后注入的排前面"（都在这一段里前插）⇒ 内置→官方外接→第三方的优先级不变。
+     *
+     * @param at 插入下标；{@code < 0} = 追加到末尾（老语义的 {@code prepend=false}）
+     */
+    static int injectDex(ClassLoader target, File apk, File optimizedDir, int at,
+                         java.util.List<String> notes) throws Exception {
         Object targetList = pathListOf(target);
         Method mk = null;
         for (Method m : Class.forName("dalvik.system.DexPathList").getDeclaredMethods()) {
@@ -139,16 +154,33 @@ final class Reflect {
         Field elems = field(targetList.getClass(), "dexElements");
         Object[] a = (Object[]) elems.get(targetList);
         int n = (made == null) ? 0 : made.length;
-        Object[] merged = (Object[]) Array.newInstance(a.getClass().getComponentType(), a.length + n);
-        if (prepend) {
-            System.arraycopy(made, 0, merged, 0, n);
-            System.arraycopy(a, 0, merged, n, a.length);
-        } else {
-            System.arraycopy(a, 0, merged, 0, a.length);
-            System.arraycopy(made, 0, merged, a.length, n);
-        }
+        Object[] merged = mergeAt(a, made, at, a.getClass().getComponentType());
         elems.set(targetList, merged);
         return merged.length;
+    }
+
+    /**
+     * 把 {@code made} 插到 {@code a} 的下标 {@code at} 处（**纯函数**，自检直接喂假数组钉它）。
+     * {@code at < 0} ⇒ 追加到末尾；{@code at} 超界 ⇒ 夹到两端。
+     * ★ 这条数学就是"插件能不能顶掉宿主类"的全部所在，所以它必须能被断言钉住，而不是埋在反射里。
+     */
+    static Object[] mergeAt(Object[] a, Object[] made, int at, Class<?> componentType) {
+        int na = a == null ? 0 : a.length;
+        int nm = made == null ? 0 : made.length;
+        int idx = (at < 0) ? na : Math.max(0, Math.min(at, na));
+        Object[] merged = (Object[]) Array.newInstance(componentType, na + nm);
+        if (idx > 0) System.arraycopy(a, 0, merged, 0, idx);
+        if (nm > 0) System.arraycopy(made, 0, merged, idx, nm);
+        if (na - idx > 0) System.arraycopy(a, idx, merged, idx + nm, na - idx);
+        return merged;
+    }
+
+    /** 目标 CL 现在有多少个 dexElements（= 注入前读一次 ⇒ 那就是"宿主自己那一段"的长度）。 */
+    static int dexElementCount(ClassLoader target) throws Exception {
+        Object targetList = pathListOf(target);
+        Field elems = field(targetList.getClass(), "dexElements");
+        Object[] a = (Object[]) elems.get(targetList);
+        return a == null ? 0 : a.length;
     }
 
     /** AssetManager.addAssetPath —— 返回 cookie；0 表示没认这个路径 */    static int addAssetPath(AssetManager am, File path) throws Exception {

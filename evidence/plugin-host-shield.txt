@@ -1,0 +1,82 @@
+# 第 138 轮证据：修 B —— 插件不许顶掉宿主类（宿主内核必须永远可用）
+
+## 0) 起因（用户 2026-10-12）
+
+> 「如果官方内置插件都被禁用了是不是连日志都导不出了 / 反正官方内置需要谨慎处理，我们实际逻辑好像都在这个部分」
+
+核过的事实（都在宿主里、都不碰插件层）：**日志导出 / 崩溃分析 / 设置 / 备份恢复 / 插件页 / 安全阀全是宿主代码**
+（全库只有 `LauncherApp`、`Plugins`、`PluginsActivity` + dev 的 `SelfTest`/`PluginProbeDev` 调插件层；
+`LogActivity`、`CrashAnalysis` 里 **0 处**插件引用）⇒ **"全停用"不会让日志导不出**。
+
+但顺出来一个**真的**隐患（B）：插件 dex 原先一律**前插**在宿主自己那份 dex 之前，
+而"第三方优先"又让它更靠前 ⇒ **一个插件可以顶掉宿主里尚未加载的类**（日志页、设置页…）。
+⇒ 用户定：**先证明，再修**（结构版：插件一律插在宿主那一段之后）。
+
+## 1) 🔴 先证明：一个带同名 `io.mdt.launcher.LogActivity` 的插件**真的顶掉了日志页**
+
+夹具 `tools/plugtest/src/io/mdt/launcher/LogActivity.java`（**与宿主同类名**，只住夹具里），
+夹具变体 `plugtest-poison`；装成插件、冷启动后从主界面点「运行日志」：
+
+```
+启动报告（修之前：hostDex = 0 = 老的前插语义）
+  hostDex = 0
+  order  = probe=76bf4ef8(builtin) poison=1(official)
+  - poison=1 file=1.apk entry=poison.PlugPage INJECTED elems=3 … entry=OK api=1
+
+点「运行日志」之后那一屏：
+  ★ 日志页第一屏文字：
+     POISON: plugin provided this page
+     运行日志
+  ⇒ 🔴 宿主日志页被插件顶掉了（B 坐实）
+```
+
+## 2) ✅ 修：插件一律插在"宿主自己那一段 dex"之后
+
+- `Plugins.injectEarly`：注入前量一次边界（`Reflect.dexElementCount(host)` = 宿主自己的条数），
+  循环里**每个插件都插在那儿**（这一段内部仍是"后注入的排更前"）。
+- `Reflect.injectDex(target, apk, cc, int at, notes)` 新增按下标插入；老的四参重载仍在
+  （`prepend=true` ⇒ at=0、`false` ⇒ at=-1），dev 那些"故意前插"的实验不受影响。
+- 数学抽成**纯函数** `Reflect.mergeAt(a, made, at, componentType)` ⇒ 自检可以直接喂假数组钉它。
+
+```
+修之后同一套夹具、同一次点击：
+  hostDex = 1
+  order  = probe=76bf4ef8(builtin) poison=1(official)
+  ★ 日志页第一屏文字：
+     导出全部日志 / 游戏日志 + 启动器日志 + 崩溃报告 / 游戏日志 / 复制
+  ⇒ ✅ 日志页回到宿主自己的内容（B 修好了）
+  host tag PluginProbe  = SHELL      ← 插件再也盖不掉宿主类（原来是 PLUGIN-…）
+  shared tag (plugins)   = PLUGIN-poison   ← **插件之间的顺序没变**（最后注入的那个赢）
+```
+
+## 3) ✅ 不挡扩展（用户担心的那件事）：插件提供**新类**照样插进我们的页面
+
+同一个修好的构建上，点插件行 → 「打开」：
+
+```
+  返回
+  已加载 76bf4ef8.apk（接口版本 1）
+  来自插件的字符串  [PLUGIN-v1]
+  插件
+```
+⇒ 插件自己的页**照旧**渲染进我们的插件页（`io.mdt.plugtest.v1.PlugPage` 是宿主里没有的新类）
+⇒ **"排宿主之后"只砍掉"整类顶掉宿主"，一点不挡"插件往页面里插功能"**。
+
+## 4) 尺子也换了：`io.mdt.plugtest.SharedTag`
+
+修完 B 之后，旧的"谁赢"尺子 `io.mdt.launcher.PluginProbe`（**宿主里也有**）必然量不出来了
+（`host tag PluginProbe = SHELL`）⇒ 新增 `tools/plugtest/src/io/mdt/plugtest/SharedTag.java`
+（**宿主里没有**、每个变体 tag 不同），dev 状态报告新增一行 `shared tag (plugins) = …`。
+
+## 5) 自检
+
+1200 → **1205 / 0**（+5，全在 `mergeAt` 这条数学上）：
+
+- 插在宿主那一段之后（下标 = 宿主条数）⇒ 插件排最后；
+- **后注入的插件排在这一段的更前面** ⇒ 内置→官方外接→第三方优先级不变；
+- 老语义仍在（下标 0 = 前插、< 0 = 追加末尾）；
+- 越界夹到两端 / `made` 为 null 不炸 / 原数组为 null 也能用；
+- ★★ **元断言**：连注 5 个插件之后 **宿主那一段仍在最前**，且插件之间后注入的排更前。
+
+product：`BUILD OK`、`(no app/assets -- building without assets)`、起得来；
+设备清场（有毒夹具与 dev 内置夹具都删掉，插件页「还没有装插件。」）。

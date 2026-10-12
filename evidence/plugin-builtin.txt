@@ -108,3 +108,15 @@ app_hub/plugins/probe/quarantine/76bf4ef8.apk             ← 文件真被挪走
 封顶 / 三档顺序两条+元断言 / 同级保序 / `resolve` 唯一判据 / 经安全阀那条路的封顶元断言 / 内置循环）。
 product：`BUILD OK`、起得来、插件页「还没有装插件。」、dex 扫描 dev 专属全 0、
 **产品包 `assets/` 条目 = 0**。
+
+## 8) ⚠️ 一条给下次的提醒：dev 内置夹具**不在 git 里**
+
+`app/assets-dev/plugins/probe.apk` 被 `.gitignore` 挡住（`*.apk`）—— 这是**对的**（构建产物不该进仓库），
+但意味着**新克隆的工程做 dev 构建时内部没有内置插件**（代码走"零成本路径"，一切正常，只是验不了这条链路）。
+要重跑本轮的验证，先按 `app/assets-dev/plugins/README.md` 生成：
+
+```bash
+ANDROID_HOME=<sdk> ./tools/plugtest/build.sh
+cp "$TEMP/mdt-plugtest/plugtest-v1.apk" app/assets-dev/plugins/probe.apk
+```
+（`manifest.txt` 不用管：`build.sh` 每次现算。）

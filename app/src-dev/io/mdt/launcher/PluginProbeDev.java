@@ -244,6 +244,8 @@ final class PluginProbeDev {
                 .append("   (shell's own = SHELL)\n");
         sb.append("host tag PluginProbe2 = ").append(tagOf(host, PROBE2))
                 .append("   (shell's own = SHELL2)\n");
+        // ★ 插件之间的"谁赢"尺子：这个类**宿主里没有** ⇒ 修完 B（插件排宿主之后）照样量得出来
+        sb.append("shared tag (plugins)   = ").append(tagOf(host, "io.mdt.plugtest.SharedTag")).append('\n');
         sb.append('\n');
         String act = Plugins.active(ctx);
         for (String id : Plugins.stateIds(act)) {

@@ -695,6 +695,13 @@ final class Plugins {
             ClassLoader host = Plugins.class.getClassLoader();
             File cc = base.getCodeCacheDir();
             if (cc != null && !cc.isDirectory()) cc.mkdirs();
+            // 🔴 第 138 轮：插件一律插在**宿主自己那一段 dex 之后**（量一次边界，注入前读 = 宿主自己的条数）。
+            //    理由：全插件化之后宿主内核必须永远可用、不可被替换 —— 插件再也不许顶掉 `LogActivity` /
+            //    设置页这类宿主类。★ 插件之间仍是"后注入的排在这一段的前面"（都在这一段里前插）
+            //    ⇒ 内置 → 官方外接 → 第三方的优先级**一点没变**。
+            int hostDex = -1;
+            try { hostDex = Reflect.dexElementCount(host); } catch (Throwable ignored) { }
+            rep.append("hostDex = ").append(hostDex).append('\n');
             int ok = 0;
             String injectedIds = "";   // 本程真的进了宿主 CL 的那些（openInjected 只许对它们用）
             // 这次进程里已经解析过的入口类名 → 第一个用它的 id（同一个 FQN 只会被定义一次 ⇒ 报告要诚实）
@@ -718,7 +725,7 @@ final class Plugins {
                 }
                 try {
                     List<String> notes = new ArrayList<String>();
-                    int n = Reflect.injectDex(host, apk, cc, true, notes);
+                    int n = Reflect.injectDex(host, apk, cc, hostDex < 0 ? 0 : hostDex, notes);
                     rep.append(" INJECTED elems=").append(n);
                     if (!notes.isEmpty()) rep.append(" [").append(notes.get(notes.size() - 1)).append(']');
                     // ★★ 注入完**立刻自查**：入口类必须能从**宿主 CL** 取到、且接口版本对得上。

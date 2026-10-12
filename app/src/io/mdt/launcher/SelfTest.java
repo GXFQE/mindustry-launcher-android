@@ -2500,6 +2500,33 @@ public final class SelfTest {
                         "b1\t1\tbuiltin\nb2\t1\tbuiltin\no1\t1\tofficial\nt1\t1\tthird\n",
                         "t1=1\nb2=1\no1=1\nb1=1\n").toString()),
                 "同档内部保持登记表相对顺序（b2 在 b1 前面 ⇒ 排 b2 先）");
+        // ── 第 138 轮：插件插在"宿主自己那一段"之后 ──
+        //    ("插到哪"就是"插件能不能顶掉宿主类"的全部所在 ⇒ 做成纯函数、由断言钉死)
+        L.add("  · 注入下标：mergeAt（宿主那一段永远在最前；插件之间后注入的排更前）（第 138 轮）");
+        ok(stat, L, java.util.Arrays.equals(new Object[] { "h1", "h2", "p1" },
+                        Reflect.mergeAt(new Object[] { "h1", "h2" }, new Object[] { "p1" }, 2, String.class)),
+                "★插在宿主那一段之后（下标 = 宿主 dex 条数）⇒ 插件排最后，盖不到宿主");
+        ok(stat, L, java.util.Arrays.equals(new Object[] { "h1", "h2", "p2", "p1" },
+                        Reflect.mergeAt(new Object[] { "h1", "h2", "p1" }, new Object[] { "p2" }, 2, String.class)),
+                "★后注入的插件排在**这一段的更前面**（都在宿主之后内部前插）⇒ 内置→官方外接→第三方优先级不变");
+        ok(stat, L, java.util.Arrays.equals(new Object[] { "p", "h" },
+                        Reflect.mergeAt(new Object[] { "h" }, new Object[] { "p" }, 0, String.class))
+                        && java.util.Arrays.equals(new Object[] { "h", "p" },
+                        Reflect.mergeAt(new Object[] { "h" }, new Object[] { "p" }, -1, String.class)),
+                "老语义仍在：下标 0 = 前插（那条能盖宿主的路，dev 实验要用），< 0 = 追加末尾");
+        ok(stat, L, java.util.Arrays.equals(new Object[] { "h", "p" },
+                        Reflect.mergeAt(new Object[] { "h" }, new Object[] { "p" }, 99, String.class))
+                        && java.util.Arrays.equals(new Object[] { "h" },
+                        Reflect.mergeAt(new Object[] { "h" }, null, 1, String.class))
+                        && java.util.Arrays.equals(new Object[] { "p" },
+                        Reflect.mergeAt(null, new Object[] { "p" }, -1, String.class)),
+                "越界夹到两端 · made 为 null 不炸 · 原数组为 null 也能用");
+        Object[] arr = new Object[] { "HOST" };
+        for (int i = 0; i < 5; i++) arr = Reflect.mergeAt(arr, new Object[] { "p" + i }, 1, String.class);
+        boolean pinned = arr.length == 6 && "HOST".equals(arr[0]);
+        for (int i = 1; i < arr.length; i++) pinned = pinned && ("p" + (5 - i)).equals(arr[i]);
+        ok(stat, L, pinned,
+                "★★元断言：连注 5 个插件之后 **宿主那一段仍在最前**，且插件之间后注入的排更前");
     }
 
     private static void modsPure(List<String> L, int[] stat) {

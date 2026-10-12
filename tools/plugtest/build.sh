@@ -52,6 +52,8 @@ build_one() {
   local name="$1" api="$2" tag="$3" dropclass="$4" tag2="$5"
   # 第 6 个参数（可选）= 换一个入口模板（`plugtest-kill` 用它造"启动就死"的那一版，见 PlugPageKill.java）
   local tpl="${6:-$SRC_DIR/src/io/mdt/plugtest/PlugPage.java}"
+  # 第 7 个参数（可选）：`poison` = 额外塞一个**与宿主同名**的 LogActivity（验"插件能不能顶掉宿主逻辑"）
+  local extra="${7:-}"
   # ★ 第 135 轮：**入口类一插件一份** —— 每个变体住自己的子包（`io.mdt.plugtest.<variant>`），
   #   并把入口名写进 `assets/plugin.json`。理由（第 134 轮真机定案）：宿主 CL 对每个类名只定义一次，
   #   共用同一个入口 FQN 时入口归"第一个注入的"插件 ⇒ 后面那些插件点「打开」渲染的都是它的页。
@@ -78,6 +80,11 @@ build_one() {
     sed -i "/^package /a import io.mdt.plugtest.R;" "$srcpkg/PlugPage.java"
   fi
   sed "s/__TAG__/$tag/"     "$SRC_DIR/src/io/mdt/launcher/PluginProbe.java" > "$d/src/io/mdt/launcher/PluginProbe.java"
+  # ★ 插件之间的"谁赢"尺子：这个类**宿主里没有** ⇒ 修完 B 之后仍然量得出内置→官方→第三方的顺序
+  sed "s/__TAG__/$tag/"     "$SRC_DIR/src/io/mdt/plugtest/SharedTag.java" > "$d/src/io/mdt/plugtest/SharedTag.java"
+  if [ "$extra" = "poison" ]; then
+    cp "$SRC_DIR/src/io/mdt/launcher/LogActivity.java" "$d/src/io/mdt/launcher/LogActivity.java"
+  fi
   sed "s/__TAG2__/$tag2/"   "$SRC_DIR/src/io/mdt/launcher/PluginProbe2.java" > "$d/src/io/mdt/launcher/PluginProbe2.java"
   # 缺类变体：把入口类删掉（壳必须在"预热预检"就拒掉，而不是等到点下去才炸）
   if [ "$dropclass" = "1" ]; then rm -f "$srcpkg/PlugPage.java"; fi
@@ -120,6 +127,8 @@ NO_JSON=0
 build_one plugtest-badapi  99 PLUGIN-badapi  0 PLUGIN-badapi-2
 build_one plugtest-noclass 1  PLUGIN-noclass 1 PLUGIN-noclass-2
 build_one plugtest-v1      1  PLUGIN-v1      0 PLUGIN-v1-2
+# 第 138 轮：**有毒夹具** —— 里面塞一个与宿主同名的 `io.mdt.launcher.LogActivity`
+build_one plugtest-poison  1  PLUGIN-poison  0 PLUGIN-poison-2 "$SRC_DIR/src/io/mdt/plugtest/PlugPage.java" poison
 build_one plugtest-v2      1  PLUGIN-v2      0 PLUGIN-v2-2
 # 第 132 轮：**带它就启动不了**的那一版（回滚要拿真实失败形态验，不能只靠手写 guard）
 build_one plugtest-kill    1  PLUGIN-kill    0 PLUGIN-kill-2 "$SRC_DIR/src/io/mdt/plugtest/PlugPageKill.java"
