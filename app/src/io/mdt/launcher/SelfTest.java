@@ -5044,6 +5044,8 @@ public final class SelfTest {
      *   ① 存档详情    —— 地图名加不加、色码去没去
      *   ② 备份列表    —— 删一份的动作与"这份备份已经不在了"那句文案（走 Backup.delete 的空对象分支：不碰磁盘）
      *   ③+⑦ 存储占用 —— 合成一份 Report，验实拼出来的每一行 + 三条"该省的行必须省掉"
+     *                   ★ 第 140 轮补：**真机真跑一次 collect** —— 合成 Report 测不出
+     *                     "内部 app_hub 根本没被量"这个 bug（那正是用户报的那个）
      *   ④ 版本行      —— 带存档条数的那两句与不带的那两句**必须不同**（否则等于没加）
      *   ⑤ 模组类型    —— 四个标签必须两两不同（判据在 ⑲，这里钉"界面上的四个词"）
      *   ⑥ 蓝图细节    —— 名字表内容 / 截断 / 换算过的名字 / 带朝向格数 + 两条反向
@@ -5130,6 +5132,16 @@ public final class SelfTest {
         // ③+⑦ 存储占用（Storage.text —— 合成一份 Report，不碰真实数据）
         Storage.Report r = new Storage.Report();
         r.hubBytes = 300L * 1024 * 1024;
+        // ★ 第 140 轮：合成的那份里必须有**内部那一半** —— 否则"总分把内部算进去了"这条
+        //   断言会因为 internal/cache 都是 0 而恒真（尺子当场失效）。
+        r.internalBytes = 78L * 1024 * 1024 + 12L * 1024 * 1024 + 3L * 1024 * 1024;
+        r.importBytes = 78L * 1024 * 1024;
+        r.importCount = 1;
+        r.nativesBytes = 12L * 1024 * 1024;
+        r.pluginsBytes = 3L * 1024 * 1024;
+        r.pluginCount = 2;
+        r.cacheBytes = 36L * 1024 * 1024;
+        r.otherBytes = 17L * 1024 * 1024;
         r.slots.add(new Data.Slot("default", null, true, 51, 209L * 1024 * 1024));
         r.pool = new Backup.PoolStats();
         r.pool.snapshots = 20;
@@ -5144,8 +5156,24 @@ public final class SelfTest {
         r.redundantBytes = 2048L;
         String txt = Storage.text(ctx, r);
         ok(stat, L, txt.contains(ctx.getString(R.string.storage_total_fmt,
-                        Util.formatSize(r.hubBytes))),
-                "存储占用：第一行是总占用（与 hubBytes 同一个格式化）");
+                        Util.formatSize(r.totalBytes()))),
+                "存储占用：第一行是总占用（与 totalBytes 同一个格式化）");
+        ok(stat, L, r.totalBytes() == r.hubBytes + r.internalBytes + r.cacheBytes,
+                "★元断言：总分的口径**只有一处**（外部 hub + 内部 app_hub + 缓存），"
+                        + "不是各段自己再加一遍");
+        // ★★ 第 140 轮（用户报的 bug）：内部那一半必须逐项露出来
+        ok(stat, L, txt.contains(ctx.getString(R.string.storage_app_import_fmt, 1,
+                        Util.formatSize(r.importBytes))),
+                "存储占用：导入的游戏包一行（个数 + 体积）—— 这一行原来根本不存在");
+        ok(stat, L, txt.contains(ctx.getString(R.string.storage_app_natives_fmt,
+                        Util.formatSize(r.nativesBytes)))
+                        && txt.contains(ctx.getString(R.string.storage_app_plugins_fmt, 2,
+                        Util.formatSize(r.pluginsBytes)))
+                        && txt.contains(ctx.getString(R.string.storage_app_cache_fmt,
+                        Util.formatSize(r.cacheBytes))),
+                "存储占用：运行库 / 插件 / 缓存各一行");
+        ok(stat, L, txt.contains(Util.formatSize(r.otherBytes)),
+                "存储占用：外部 hub 里「上面几段都没算到」的那部分也有交代（预览 / 报告）");
         ok(stat, L, txt.contains(ctx.getString(R.string.storage_slot_line_fmt,
                         "default", 51, Util.formatSize(209L * 1024 * 1024))),
                 "存储占用：各槽一行（槽名 / 文件数 / 体积）");
@@ -5170,11 +5198,55 @@ public final class SelfTest {
         ok(stat, L, !t2.contains(ctx.getString(R.string.storage_backup_orphan_fmt,
                         Util.formatSize(0))),
                 "★反向：孤儿为 0 ⇒ 不许出现「另有 … 收回」那一行（元断言：这行不是恒真的）");
+        // ★ 第 140 轮：内部一片空白 ⇒ 说一句话，绝不摆「导入的游戏包：0 个」（与上面三条同族）
+        ok(stat, L, t2.contains(ctx.getString(R.string.storage_app_none))
+                        && !t2.contains(ctx.getString(R.string.storage_app_import_fmt, 0,
+                        Util.formatSize(0)))
+                        && !t2.contains(ctx.getString(R.string.storage_app_cache_fmt,
+                        Util.formatSize(0))),
+                "★反向：内部没东西 ⇒ 说「没有额外数据」，且**不出现**「导入的游戏包：0 个」");
+        ok(stat, L, txt.contains(ctx.getString(R.string.storage_app_import_fmt, 1,
+                        Util.formatSize(r.importBytes))),
+                "★对照：内部有东西 ⇒ 那一行必须出现（证明上一条不是整段没实现）");
         r.pool.orphanBytes = 5L * 1024 * 1024;
         ok(stat, L, Storage.text(ctx, r).contains(Util.formatSize(r.pool.orphanBytes)),
                 "★对照：孤儿不为 0 ⇒ 那一行必须出现（证明上一条不是因为整段没实现）");
         ok(stat, L, Storage.text(ctx, null).isEmpty(),
                 "★反向：Report 为 null ⇒ 返回空串（不崩、不返回半句话）");
+
+        // ★★ 第 140 轮：**真机真跑一次 collect** —— 上面全是合成 Report，
+        //   而用户报的那个 bug 恰恰在 collect（内部 app_hub 一个字节都没量）。
+        //   ⚠️ 这里**不调** `Importer.importDir`：那个会 `mkdirs`，而"没导入过的机器上
+        //     平白多出一个 import/ 目录"会改变 healthScan 对数据根里同名目录的判定。
+        Storage.Report real = Storage.collect(ctx);
+        File impDir = new File(Paths.privateDir(ctx), "import");
+        int apksOnDisk = 0;
+        File[] imps = impDir.listFiles();
+        if (imps != null) {
+            for (File f : imps) {
+                if (f.isFile() && f.getName().toLowerCase(java.util.Locale.US).endsWith(".apk")) {
+                    apksOnDisk++;
+                }
+            }
+        }
+        ok(stat, L, real.importCount == apksOnDisk,
+                "★真机：collect 数出来的导入包个数 == 磁盘上的 .apk 个数（" + apksOnDisk + "）");
+        ok(stat, L, real.internalBytes
+                        >= real.importBytes + real.nativesBytes + real.pluginsBytes,
+                "★真机：内部总量 ≥ 三项之和（" + Util.formatSize(real.internalBytes) + " ≥ "
+                        + Util.formatSize(real.importBytes + real.nativesBytes + real.pluginsBytes)
+                        + "）");
+        ok(stat, L, real.totalBytes()
+                        == real.hubBytes + real.internalBytes + real.cacheBytes,
+                "★真机：总分口径同一处（" + Util.formatSize(real.totalBytes()) + "）");
+        if (apksOnDisk > 0) {
+            ok(stat, L, Storage.text(ctx, real).contains(
+                            ctx.getString(R.string.storage_app_import_fmt,
+                                    real.importCount, Util.formatSize(real.importBytes))),
+                    "★★ 真机：这台机器上确实导入了 " + apksOnDisk + " 个游戏包（"
+                            + Util.formatSize(real.importBytes) + "）⇒ 存储占用里必须有这一行"
+                            + "（第 140 轮修的就是它）");
+        }
 
         // ④ 版本行 / 详情：带条数与不带条数**必须真的是两句话**
         String withSaves = ctx.getString(R.string.row_sub_saves_fmt, "com.x", "74.7 MB", 7);

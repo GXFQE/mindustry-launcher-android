@@ -359,11 +359,21 @@ public class SettingsActivity extends BaseActivity {
     // ── 用户语言包（lang.properties）────────────────────────────────────────
 
     /**
-     * 用户语言包那一行。已装 = 先弹"当前状态 + 移除 / 重选"，没装 = 直接开选择器。
+     * 用户语言包那一行。已装 = 先弹"当前状态 + 换一份 / 导出模板 / 移除"，没装 = "选一份 / 导出模板 / 取消"。
      *
      * ★ 范式与别处一致：**先在临时文件上校验，用户看到报告再决定装不装** ——
      *   一份占位符写错的包会让若干条文案静默回落（甚至崩主进程，见 {@link Trans}），
      *   所以"装之前把 rejected 摆给用户看"是这条功能的必要部分，不是可选项。
+     *
+     * ★★ 2026-10-12（第 140 轮）：**这一屏的按钮一度长到竖着排**（真机实测）——
+     *   文案是「选择 .PROPERTIES 文件 / 导出一份模板 / 取消」这种长短句，
+     *   三个加起来超过对话框宽度，`AlertController` 就退化成**竖排**，
+     *   于是「正 / 中 / 负」三个按钮从下往上摞成三行、顺序看着毫无规律。
+     *   ⇒ 两条纪律：**按钮文案要短**（动作词，判断依据放正文里）；
+     *     以及**破坏性动作不许坐在正按钮上**（原来「移除翻译文件」是 positive = 强调位）——
+     *     现在与 {@link TrashActivity} 同款放在 neutral（最左）。
+     *   ⚠️ 没装包那一屏原来的正文是**复读副标题**（「用内置翻译（跟随系统语言）」），
+     *     等于一个字的信息都没有，现在换成为这一步说清楚"能做什么"。
      */
     private void pickLangPack() {
         final Trans.Pack cur = Trans.installed(this) ? Trans.pack(this) : null;
@@ -371,8 +381,8 @@ public class SettingsActivity extends BaseActivity {
             // 没装包：也要能导出模板（译者第一步就是拿模板），所以给一个二选一
             new AlertDialog.Builder(this)
                     .setTitle(Trans.get(SettingsActivity.this, R.string.lang_dialog_title))
-                    .setMessage(Trans.get(SettingsActivity.this, R.string.lang_row_none))
-                    .setPositiveButton(Trans.get(SettingsActivity.this, R.string.lang_chooser_title),
+                    .setMessage(Trans.get(SettingsActivity.this, R.string.lang_dialog_none_msg))
+                    .setPositiveButton(Trans.get(SettingsActivity.this, R.string.lang_pack_pick),
                             new DialogInterface.OnClickListener() {
                                 @Override public void onClick(DialogInterface d, int w) {
                                     openLangPackPicker();
@@ -393,20 +403,20 @@ public class SettingsActivity extends BaseActivity {
                 .setMessage(Trans.get(SettingsActivity.this, R.string.lang_dialog_msg_fmt,
                         cur.file.getName(), cur.used(), cur.missing.size(),
                         cur.unknown.size(), cur.rejected.size()))
-                .setPositiveButton(Trans.get(SettingsActivity.this, R.string.lang_pack_remove),
-                        new DialogInterface.OnClickListener() {
-                            @Override public void onClick(DialogInterface d, int w) { removeLangPack(); }
-                        })
-                .setNeutralButton(Trans.get(SettingsActivity.this, R.string.lang_tpl_export),
-                        new DialogInterface.OnClickListener() {
-                            @Override public void onClick(DialogInterface d, int w) {
-                                exportLangTemplate();
-                            }
-                        })
-                .setNegativeButton(Trans.get(SettingsActivity.this, R.string.lang_chooser_title),
+                .setPositiveButton(Trans.get(SettingsActivity.this, R.string.lang_pack_pick),
                         new DialogInterface.OnClickListener() {
                             @Override public void onClick(DialogInterface d, int w) {
                                 openLangPackPicker();
+                            }
+                        })
+                .setNeutralButton(Trans.get(SettingsActivity.this, R.string.lang_pack_remove),
+                        new DialogInterface.OnClickListener() {
+                            @Override public void onClick(DialogInterface d, int w) { removeLangPack(); }
+                        })
+                .setNegativeButton(Trans.get(SettingsActivity.this, R.string.lang_tpl_export),
+                        new DialogInterface.OnClickListener() {
+                            @Override public void onClick(DialogInterface d, int w) {
+                                exportLangTemplate();
                             }
                         })
                 .show();
