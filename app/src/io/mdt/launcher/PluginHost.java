@@ -37,10 +37,22 @@ public final class PluginHost {
     /** 壳认的插件接口版本。插件报别的数 ⇒ 拒绝加载。 */
     public static final int API = 1;
 
-    /** 插件入口类（**只在字符串里出现** —— 壳的源码不编译期依赖插件）。 */
-    public static final String ENTRY = "io.mdt.plugtest.PlugPage";
+    /**
+     * **默认**插件入口类（只在字符串里出现 —— 壳的源码不编译期依赖插件）。
+     *
+     * <p>🔴 第 134 轮真机定案：入口类**必须一插件一份**，因为宿主 CL 对每个类名只定义一次 ——
+     * 共用同一个 FQN 时，入口归**第一个注入的**插件，后面那些插件点「打开」渲染的都是它的页。
+     * ⇒ 新插件走 {@link PluginMeta} 自述里的 {@code entry}；**没写自述的**（老插件 / S0 夹具）
+     * 才回落到这里，并且那种情况下启动报告会把它标成 {@code SHARED}。
+     */
+    public static final String DEFAULT_ENTRY = "io.mdt.plugtest.PlugPage";
 
     private PluginHost() {}
+
+    /** 入口名兜底（null / 空 ⇒ {@link #DEFAULT_ENTRY}）。 */
+    static String entryOr(String e) {
+        return (e == null || e.isEmpty()) ? DEFAULT_ENTRY : e;
+    }
 
     /** 加载成功后的句柄。 */
     public static final class Loaded {
@@ -91,7 +103,12 @@ public final class PluginHost {
     // ---- 加载 -----------------------------------------------------------------
 
     public static Loaded load(Context host, File apk) throws PluginException {
-        return open(host, apk, null);
+        return open(host, apk, null, DEFAULT_ENTRY);
+    }
+
+    /** 按插件自述的入口类名加载（见 {@link PluginMeta}）。 */
+    public static Loaded load(Context host, File apk, String entry) throws PluginException {
+        return open(host, apk, null, entryOr(entry));
     }
 
     /**
@@ -103,11 +120,17 @@ public final class PluginHost {
      * 这里只跑后三道门：按名字取类（预热预检）→ 接口版本 → 挂资源。
      */
     static Loaded openInjected(Context host, File apk) throws PluginException {
-        return open(host, apk, host.getClassLoader());
+        return open(host, apk, host.getClassLoader(), DEFAULT_ENTRY);
+    }
+
+    /** 按插件自述的入口类名打开已经注入宿主 CL 的那一份（多插件下"点谁开谁"靠它）。 */
+    static Loaded openInjected(Context host, File apk, String entry) throws PluginException {
+        return open(host, apk, host.getClassLoader(), entryOr(entry));
     }
 
     /** @param injectedTo 非 null = 这个 dex 已经注册给它了 ⇒ 不再建 DexClassLoader */
-    private static Loaded open(Context host, File apk, ClassLoader injectedTo) throws PluginException {
+    private static Loaded open(Context host, File apk, ClassLoader injectedTo, String entryName)
+            throws PluginException {
         if (apk == null || !apk.isFile()) {
             throw new PluginException("plugin_err_missing", String.valueOf(apk));
         }
@@ -132,10 +155,10 @@ public final class PluginHost {
         }
         Class<?> entry;
         try {
-            entry = cl.loadClass(ENTRY);
+            entry = cl.loadClass(entryName);
         } catch (Throwable t) {
             // ★ 别吞原因：第一次就是只打了类名，导致"为什么解不出入口类"看不出根因
-            throw new PluginException("plugin_err_noclass", ENTRY + " | " + brief(t));
+            throw new PluginException("plugin_err_noclass", entryName + " | " + brief(t));
         }
 
         // (3) 接口版本

@@ -52,14 +52,33 @@ build_one() {
   local name="$1" api="$2" tag="$3" dropclass="$4" tag2="$5"
   # 第 6 个参数（可选）= 换一个入口模板（`plugtest-kill` 用它造"启动就死"的那一版，见 PlugPageKill.java）
   local tpl="${6:-$SRC_DIR/src/io/mdt/plugtest/PlugPage.java}"
-  echo "== [$name] api=$api tag=$tag tag2=$tag2 dropclass=$dropclass tpl=$(basename "$tpl") =="
-  local d="$OUT/$name"; mkdir -p "$d/src/io/mdt/plugtest" "$d/src/io/mdt/launcher" "$d/classes" "$d/dex"
+  # ★ 第 135 轮：**入口类一插件一份** —— 每个变体住自己的子包（`io.mdt.plugtest.<variant>`），
+  #   并把入口名写进 `assets/plugin.json`。理由（第 134 轮真机定案）：宿主 CL 对每个类名只定义一次，
+  #   共用同一个入口 FQN 时入口归"第一个注入的"插件 ⇒ 后面那些插件点「打开」渲染的都是它的页。
+  #   ⚠️ `NO_JSON=1` 的那个变体（plugtest-ok）刻意**不写自述** ⇒ 用来证明"老插件照旧能加载"（回落默认入口）。
+  local suf="${name#plugtest-}"; suf="${suf//-/}"
+  local pkg="io.mdt.plugtest.$suf"
+  local entry="$pkg.PlugPage"
+  local json="{\"entry\":\"$entry\",\"name\":\"$name\",\"version\":\"1\",\"author\":\"mdt-fixture\"}"
+  local d="$OUT/$name"
+  local srcpkg="$d/src/io/mdt/plugtest/$suf"
+  if [ "${NO_JSON:-0}" = "1" ]; then
+    pkg="io.mdt.plugtest"; entry="io.mdt.plugtest.PlugPage"; json=""
+    srcpkg="$d/src/io/mdt/plugtest"
+  fi
+  echo "== [$name] api=$api tag=$tag tag2=$tag2 dropclass=$dropclass tpl=$(basename "$tpl") entry=$entry =="
+  mkdir -p "$srcpkg" "$d/src/io/mdt/launcher" "$d/classes" "$d/dex"
   # 入口页也带上这一版的编译期 tag（`PlugPage.tag()`）——多插件下"谁渲染的页"靠它才看得见
-  sed -e "s/__API__/$api/" -e "s/__TAGPAGE__/$tag/" "$tpl" > "$d/src/io/mdt/plugtest/PlugPage.java"
+  sed -e "s/__API__/$api/" -e "s/__TAGPAGE__/$tag/" -e "s|^package io.mdt.plugtest;|package $pkg;|" \
+      "$tpl" > "$srcpkg/PlugPage.java"
+  # 住子包时 R 得显式 import（同包时不需要，也不许重复写）
+  if [ "$pkg" != "io.mdt.plugtest" ]; then
+    sed -i "/^package /a import io.mdt.plugtest.R;" "$srcpkg/PlugPage.java"
+  fi
   sed "s/__TAG__/$tag/"     "$SRC_DIR/src/io/mdt/launcher/PluginProbe.java" > "$d/src/io/mdt/launcher/PluginProbe.java"
   sed "s/__TAG2__/$tag2/"   "$SRC_DIR/src/io/mdt/launcher/PluginProbe2.java" > "$d/src/io/mdt/launcher/PluginProbe2.java"
   # 缺类变体：把入口类删掉（壳必须在"预热预检"就拒掉，而不是等到点下去才炸）
-  if [ "$dropclass" = "1" ]; then rm -f "$d/src/io/mdt/plugtest/PlugPage.java"; fi
+  if [ "$dropclass" = "1" ]; then rm -f "$srcpkg/PlugPage.java"; fi
 
   # 注意：R.java 由 aapt2 link 生成，位置在 $OUT/gen
   local SRC=()
@@ -70,16 +89,18 @@ build_one() {
   ( cd "$d/classes" && "$JDK8/bin/jar" cf "$(wpath "$d/classes.jar")" . )
   "$JAVA" -cp "$(jpath "$BT/lib/d8.jar")" com.android.tools.r8.D8 \
     --min-api 26 --output "$(wpath "$d/dex")" "$(wpath "$d/classes.jar")"
-  # 把 classes.dex 注入 base.apk（与主构建同一种办法：python 改 zip）
-  "$PY" - "$(jpath "$OUT/base.apk")" "$(jpath "$d/dex/classes.dex")" "$(jpath "$OUT/$name.apk")" <<'PY'
-import sys, zipfile, shutil
-base, dex, out = sys.argv[1], sys.argv[2], sys.argv[3]
+  # 把 classes.dex（+ 自述）注入 base.apk（与主构建同一种办法：python 改 zip）
+  "$PY" - "$(jpath "$OUT/base.apk")" "$(jpath "$d/dex/classes.dex")" "$(jpath "$OUT/$name.apk")" "$json" <<'PY'
+import sys, zipfile
+base, dex, out, meta = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 zin = zipfile.ZipFile(base); zout = zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED)
 for it in zin.infolist():
     if it.filename in ('classes.dex',) or it.filename.startswith('classes') and it.filename.endswith('.dex'):
         continue
     zout.writestr(it, zin.read(it.filename))
 zout.write(dex, 'classes.dex')
+if meta:
+    zout.writestr('assets/plugin.json', meta)   # ★ 插件自述：入口类名一插件一份（第 135 轮）
 zout.close(); zin.close()
 PY
   "$BT/zipalign.exe" -f 4 "$(wpath "$OUT/$name.apk")" "$(wpath "$OUT/$name-aligned.apk")"
@@ -90,7 +111,10 @@ PY
   ls -l "$OUT/$name.apk"
 }
 
+# ★ `plugtest-ok` 刻意**不写自述**（NO_JSON=1）⇒ 入口回落默认 FQN，用来证明"老插件照旧能加载"
+NO_JSON=1
 build_one plugtest-ok      1  PLUGIN-ok      0 PLUGIN-ok-2
+NO_JSON=0
 build_one plugtest-badapi  99 PLUGIN-badapi  0 PLUGIN-badapi-2
 build_one plugtest-noclass 1  PLUGIN-noclass 1 PLUGIN-noclass-2
 build_one plugtest-v1      1  PLUGIN-v1      0 PLUGIN-v1-2

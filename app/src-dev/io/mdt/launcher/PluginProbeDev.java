@@ -110,7 +110,7 @@ final class PluginProbeDev {
                     + "   [expect SHELL: an already-loaded class cannot be replaced]");
             L.add("     host gets PROBE2 (never loaded)   = " + tagOf(hostCL.loadClass(PROBE2))
                     + "   [expect PLUGIN-v2-2: an unloaded same-name class CAN be shadowed]");
-            L.add("     host gets plugin entry class      = " + hostCL.loadClass(PluginHost.ENTRY).getName());
+            L.add("     host gets plugin entry class      = " + hostCL.loadClass(PluginHost.DEFAULT_ENTRY).getName());
             L.add("     copies: " + c1.getName() + " / " + c2.getName());
         } catch (Throwable t) {
             L.add("  FAILED " + brief(t));
@@ -233,7 +233,7 @@ final class PluginProbeDev {
         sb.append("time        = ").append(new Date()).append('\n');
         sb.append("pid         = ").append(android.os.Process.myPid()).append('\n');
         sb.append("api         = ").append(PluginHost.API).append('\n');
-        sb.append("entry       = ").append(PluginHost.ENTRY).append('\n');
+        sb.append("entry       = ").append(PluginHost.DEFAULT_ENTRY).append('\n');
         sb.append("pluginsDir  = ").append(Plugins.dirNoCreate(ctx)).append('\n');
         sb.append("active      = ").append(Plugins.oneLine(Plugins.active(ctx))).append('\n');
         sb.append("pending     = ").append(Plugins.oneLine(Plugins.pending(ctx))).append('\n');

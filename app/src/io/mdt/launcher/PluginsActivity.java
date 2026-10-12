@@ -272,9 +272,12 @@ public class PluginsActivity extends BaseActivity {
         File apk = Plugins.apkOf(this, id, ver);
         View page;
         try {
+            // ★ 入口类按**这个插件自己的**自述取（第 135 轮）——多插件下"点谁开谁"全靠它
+            //   （共用同一个入口 FQN 时，宿主 CL 只会认第一个注入的那个插件）
+            String entry = PluginMeta.entryOf(this, apk, PluginHost.DEFAULT_ENTRY);
             PluginHost.Loaded l = Plugins.isInjected(this, id, ver)
-                    ? PluginHost.openInjected(this, apk)
-                    : PluginHost.load(this, apk);
+                    ? PluginHost.openInjected(this, apk, entry)
+                    : PluginHost.load(this, apk, entry);
             Object v = l.entry.getMethod("createView", android.content.Context.class).invoke(null, l.ctx);
             LinearLayout box = new LinearLayout(this);
             box.setOrientation(LinearLayout.VERTICAL);

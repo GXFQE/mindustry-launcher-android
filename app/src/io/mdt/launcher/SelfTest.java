@@ -2368,6 +2368,50 @@ public final class SelfTest {
         ok(stat, L, Plugins.pairGet(Plugins.pairRemove(rt2, "tpp", "3"), "tpp", "3") == null
                         && Plugins.pairGet(Plugins.pairRemove(rt2, "tpp", "3"), "other", "1") != null,
                 "★删复合键不碰别的键（能分辨「删对了」与「删光了」）");
+
+        // ── 第 135 轮：插件自述（入口类名一插件一份）+ 注入顺序（官方先、第三方后）──
+        L.add("  · 插件自述元数据（entry 一插件一份）与注入顺序（第 135 轮）");
+        java.util.Map<String, String> jm = PluginMeta.flatJson(
+                "{\"entry\":\"io.mdt.plugtest.v1.PlugPage\",\"name\":\"probe\",\"version\":\"1\"}");
+        ok(stat, L, jm != null && "io.mdt.plugtest.v1.PlugPage".equals(jm.get("entry"))
+                        && "probe".equals(jm.get("name")) && "1".equals(jm.get("version")),
+                "自述 json 的扁平键值读得出来（entry / name / version）");
+        ok(stat, L, "d.E".equals(PluginMeta.flatJson("{\"a\":{\"b\":\"c\"},\"entry\":\"d.E\"}").get("entry"))
+                        && PluginMeta.flatJson("{\"a\":{\"b\":\"c\"},\"entry\":\"d.E\"}").size() == 1
+                        && !PluginMeta.flatJson("{\"a\":{\"b\":\"c\"},\"entry\":\"d.E\"}").containsKey("a"),
+                "★嵌套对象的**键与内容都不许**混进来（那个键的值是容器 ⇒ 整个丢掉；"
+                        + "否则它会跟嵌套后面第一个串配成一对，entry 反而丢了）");
+        ok(stat, L, "3".equals(PluginMeta.flatJson("{\"version\":3}").get("version"))
+                        && "true".equals(PluginMeta.flatJson("{\"x\":true}").get("x")),
+                "裸值（数字 / true）也收得下来（自述里版本号很可能是数字）");
+        ok(stat, L, PluginMeta.flatJson("不是 json") == null
+                        && PluginMeta.flatJson("{\"a\":\"没闭合") != null,
+                "不是对象 ⇒ null；引号没闭合 ⇒ 收下已认出来的那部分（**不许抛异常**）");
+        PluginMeta.Info mi = new PluginMeta.Info(null, null, null, null, null);
+        ok(stat, L, PluginHost.DEFAULT_ENTRY.equals(mi.entryOr(PluginHost.DEFAULT_ENTRY))
+                        && PluginHost.DEFAULT_ENTRY.equals(new PluginMeta.Info("", null, null, null, null)
+                                .entryOr(PluginHost.DEFAULT_ENTRY))
+                        && "a.B".equals(new PluginMeta.Info("a.B", null, null, null, null)
+                                .entryOr(PluginHost.DEFAULT_ENTRY)),
+                "★缺自述 / 空 entry ⇒ 回落默认入口（老插件照旧能加载）");
+        ok(stat, L, PluginHost.DEFAULT_ENTRY.equals(PluginHost.entryOr(null))
+                        && PluginHost.DEFAULT_ENTRY.equals(PluginHost.entryOr("")),
+                "入口名兜底只有一处（PluginHost.entryOr）");
+
+        // 注入顺序：官方先、第三方后 ⇒ 后注入的排更前 ⇒ 第三方赢同名类
+        String tr = "aa\t1\tofficial\nbb\t1\tthird\n";
+        ok(stat, L, "[aa, bb]".equals(Plugins.injectOrder(tr, "aa=1\nbb=1\n").toString()),
+                "官方在登记表前面 ⇒ 顺序仍是 aa(官方) → bb(第三方)");
+        ok(stat, L, "[aa, bb]".equals(Plugins.injectOrder(tr, "bb=1\naa=1\n").toString()),
+                "★★**安装顺序反了也一样**：第三方后注入这条规则不吃安装顺序（这就是用户要的"
+                        + "「第三方肯定能盖官方」）");
+        ok(stat, L, Plugins.injectOrder(tr, "aa=1\nbb=1\n").equals(Plugins.injectOrder(tr, "bb=1\naa=1\n")),
+                "★元断言：两种安装顺序的结果必须**逐项相同**（否则说明顺序还是被文件顺序决定的）");
+        ok(stat, L, "[aa, bb, cc]".equals(Plugins.injectOrder("aa\t1\tofficial\n",
+                        "aa=1\nbb=1\ncc=1\n").toString()),
+                "没判出来源的（=第三方口径）跟第三方同档，且同档内部**保持登记表顺序**");
+        ok(stat, L, "[aa, cc]".equals(Plugins.injectOrder(tr, "aa=1\ncc=9\n").toString()),
+                "★trust 里有 bb 但 active 里没有它 ⇒ 不参与；cc 没记录 ⇒ 按第三方口径排后面");
     }
 
     private static void modsPure(List<String> L, int[] stat) {

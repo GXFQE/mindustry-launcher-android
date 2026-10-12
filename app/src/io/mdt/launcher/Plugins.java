@@ -377,6 +377,62 @@ final class Plugins {
     // ---- 启动注入 -------------------------------------------------------------
 
     /**
+     * 报告里显示的入口类名：**包名尾段 + 类名**（`io.mdt.plugtest.v1.PlugPage` ⇒ `v1.PlugPage`）。
+     * ★ 只打简单名不够用：两个插件完全可以各自住一个子包、类名相同（夹具正是这样）
+     * ⇒ 那样报告里两行会一模一样，看不出"入口类一插件一份"到底生效没有。
+     */
+    private static String shortEntry(String fqn) {
+        if (fqn == null) return "(none)";
+        int last = fqn.lastIndexOf('.');
+        if (last <= 0) return fqn;
+        int prev = fqn.lastIndexOf('.', last - 1);
+        return prev < 0 ? fqn : fqn.substring(prev + 1);
+    }
+
+    /** 报告里那一行注入顺序（带上来源，规则是不是照"官方先、第三方后"一眼看得出来）。 */    private static String orderLine(String trustText, String activeText, List<String> order) {
+        StringBuilder sb = new StringBuilder();
+        for (String id : order) {
+            String ver = stateGet(activeText, id);
+            String t = pairGet(trustText, id, ver);
+            if (sb.length() > 0) sb.append(' ');
+            sb.append(id).append('=').append(ver).append('(').append(t == null ? "third" : t).append(')');
+        }
+        return sb.toString();
+    }
+
+    /**
+     * 这一程按什么顺序注入（**纯函数**，判据由 SelfTest 钉）。
+     *
+     * <p>规则（2026-10-12 用户定）：「**让第三方肯定可以覆盖官方**」——
+     * 每次注入都是**前插**（新 dex 拷到 `dexElements` 头部），所以**后注入的排得靠前、同名类它赢**
+     * ⇒ 把**官方排在前面、第三方排在后面**，第三方就赢。同一档内部保持登记表的相对顺序（稳定排序）。
+     *
+     * <p>⚠️ 两条边界：
+     * <ul>
+     *   <li>**与安装顺序无关** —— 顺序只由"来源 + 登记表"决定（所以用户后装官方也不会把第三方挤下去）。</li>
+     *   <li>**缺 trust 记录 ⇒ 当第三方**（默认不信任，与 {@link PluginTrust#classify} 同口径），
+     *       也就是说"没判出来源的插件"会排在官方之后、能盖官方。</li>
+     * </ul>
+     * @param trustText 来源登记（制表符三段 `id \t ver \t official|third`）
+     * @param activeText {@link #ACTIVE} 的内容
+     */
+    static List<String> injectOrder(String trustText, String activeText) {
+        List<String> ids = stateIds(activeText);
+        List<String> official = new ArrayList<String>();
+        List<String> third = new ArrayList<String>();
+        for (String id : ids) {
+            String ver = stateGet(activeText, id);
+            String t = pairGet(trustText, id, ver);
+            if (PluginTrust.OFFICIAL.equals(t)) official.add(id);
+            else third.add(id);                        // 第三方 / 没记录 ⇒ 都排后面（能盖官方）
+        }
+        List<String> out = new ArrayList<String>(ids.size());
+        out.addAll(official);
+        out.addAll(third);
+        return out;
+    }
+
+    /**
      * 在**进程最早点**（{@link LauncherApp#attachBaseContext}）按登记把插件注入宿主 ClassLoader。
      *
      * <p>⚠️ 绝不抛：这是启动路径，任何异常都只能记下来、跳过插件继续启动
@@ -402,12 +458,15 @@ final class Plugins {
                 if (inj.isFile() && inj.length() > 0) write(inj, "");
                 return;
             }
+            // ★ 注入顺序 = 官方先、第三方后（后注入的排更前 ⇒ 第三方赢同名类；见 injectOrder）
+            List<String> order = injectOrder(readOrNull(new File(d, TRUST)), activeText);
 
             injected = true;
             String head = "== plugin early inject ==\n"
                     + "time   = " + new java.util.Date() + "\n"
                     + "pid    = " + android.os.Process.myPid() + "\n"
-                    + "active = " + oneLine(activeText) + "\n";
+                    + "active = " + oneLine(activeText) + "\n"
+                    + "order  = " + orderLine(readOrNull(new File(d, TRUST)), activeText, order) + "\n";
 
             // ★ 先落安全阀，再动 dex —— 顺序不能反：反了就是"崩了也不知道上次注入了谁"
             write(new File(d, GUARD), head);
@@ -418,7 +477,9 @@ final class Plugins {
             if (cc != null && !cc.isDirectory()) cc.mkdirs();
             int ok = 0;
             String injectedIds = "";   // 本程真的进了宿主 CL 的那些（openInjected 只许对它们用）
-            for (String id : ids) {
+            // 这次进程里已经解析过的入口类名 → 第一个用它的 id（同一个 FQN 只会被定义一次 ⇒ 报告要诚实）
+            java.util.Map<String, String> entryOwner = new java.util.LinkedHashMap<String, String>();
+            for (String id : order) {
                 String ver = stateGet(activeText, id);
                 File apk = apkOf(base, id, ver);
                 rep.append("- ").append(id).append('=').append(ver)
@@ -427,6 +488,9 @@ final class Plugins {
                     rep.append(" MISSING\n");
                     continue;
                 }
+                // 入口类名：插件自述里写的（没有 ⇒ 默认入口，老插件照旧）
+                String entryName = PluginMeta.entryOf(base, apk, PluginHost.DEFAULT_ENTRY);
+                rep.append(" entry=").append(shortEntry(entryName));
                 // ART 只加载**只读** dex。内部存储上 setReadOnly() 生效（外部 FUSE 上恒 false）
                 if (apk.canWrite()) {
                     boolean ro = apk.setReadOnly();
@@ -441,9 +505,17 @@ final class Plugins {
                     //   两条理由：① 取不到 = 这次注入等于白干（报告里必须看得见，否则只能靠猜）；
                     //   ② 版本不匹配的插件**绝不许进宿主命名空间**（在插件页那层拒它已经太晚了 ——
                     //      类已经能被宿主任何代码解析到）。
-                    Class<?> entry = host.loadClass(PluginHost.ENTRY);
+                    String owner = entryOwner.get(entryName);
+                    Class<?> entry = host.loadClass(entryName);
                     int api = ((Integer) entry.getMethod("api").invoke(null)).intValue();
                     rep.append(" entry=OK api=").append(api);
+                    if (owner != null) {
+                        // 🔴 同一个入口 FQN 被第二个插件用上了：宿主 CL 只会定义一份 ⇒
+                        //    这一版的自查其实命中的是**别人的**入口类。报告必须说破（否则"entry=OK"会骗人）
+                        rep.append(" SHARED(entry class already defined by ").append(owner).append(')');
+                    } else {
+                        entryOwner.put(entryName, id);
+                    }
                     if (!PluginHost.apiCompatible(api)) {
                         rep.append(" -> API MISMATCH (host wants ").append(PluginHost.API).append(")\n");
                         dropFromActive(d, id, activeText);
@@ -462,7 +534,7 @@ final class Plugins {
                     rep.append("   -> removed from active.txt (will not be retried)\n");
                 }
             }
-            rep.append("injected = ").append(ok).append(" / ").append(ids.size()).append('\n');
+            rep.append("injected = ").append(ok).append(" / ").append(order.size()).append('\n');
             String text = rep.toString();
             write(new File(d, INJECTED), injectedIds);   // 「打开」那个按钮靠它决定用哪条路（见 openable）
             write(new File(d, BOOT_REPORT), text);

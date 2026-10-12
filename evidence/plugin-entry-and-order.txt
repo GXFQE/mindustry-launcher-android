@@ -1,0 +1,64 @@
+# 第 135 轮证据：插件自述（入口类一插件一份）+ 注入顺序（第三方优先）
+
+用户 2026-10-12 定的两条口径：
+- **「让第三方肯定可以覆盖官方」** ⇒ 同名类冲突时第三方赢（`injectOrder`：官方先注入、第三方后注入）；
+- **保持"插件能盖宿主未加载的类"**（不收紧）——`[插件们][宿主自己 dex]` 这个既有事实不变；
+- 入口类**一插件一份**（从插件自述读：`assets/plugin.json` → 清单 `meta-data` → 默认 FQN）。
+
+## 1) 注入顺序：两遍对调，规则不吃安装顺序
+
+```
+A: 官方(o1) 先装 → 第三方(t1) 后装      active.txt = o1=1 t1=1
+   启动报告  order  = o1=1(official) t1=1(third)
+   host tag PluginProbe = PLUGIN-tp        ← 同名类归**第三方**
+B: 第三方(t2) 先装 → 官方(o2) 后装      active.txt = t2=1 o2=1
+   启动报告  order  = o2=1(official) t2=1(third)     ← 顺序被规则重排了（不是文件顺序）
+   host tag PluginProbe = PLUGIN-tp        ← **仍然**归第三方
+```
+★ `order` 那一行就是判据（报告里直接打出来，不靠猜）；两遍结论相同 ⇒ 规则由"来源 + 登记表"决定，
+**跟安装顺序无关**（这正是用户要的"第三方肯定能盖官方"）。
+★ 判据怎么读：`PluginProbe` 是**同名宿主类**（壳里也有一份），`dev_pluginstatus` 读的是
+**宿主 CL 里真正解析到的那个类**的 tag ⇒ 它归谁就是谁赢了。
+
+## 2) 自述入口类：一插件一份（真机）
+
+```
+启动报告:
+  order  = o1=1(official) t1=1(third)
+  - o1=1 file=1.apk entry=v1.PlugPage         INJECTED … entry=OK api=1
+  - t1=1 file=1.apk entry=thirdparty.PlugPage INJECTED … entry=OK api=1     ← 两行入口**不同**
+```
+★ 报告里打的是"**包名尾段 + 类名**"（只打简单名两行会一模一样 —— 夹具正是"同名类、不同包"）。
+
+## 3) 界面「点谁开谁」（第 134 轮那个 bug 的修复验收）
+
+```
+★ 点 o1（官方那行）⇒ 页面 = 来自插件的字符串  [PLUGIN-v1]     ← 它自己的类
+★ 点 t1（第三方那行）⇒ 页面 = 来自插件的字符串  [PLUGIN-tp]   ← 它自己的类
+```
+（第 134 轮同样场景下，点文件里靠后的那个插件渲染的是**第一个**插件的类；现在各是各的。）
+判据 = 夹具入口页把编译期 tag 打进页面文字（`PlugPage.tag()`，第 134 轮加的）。
+
+## 4) 诚实报告：入口类被人先定义过要**说破**
+
+两个**没有自述**的插件（都回落默认入口 `io.mdt.plugtest.PlugPage`）：
+```
+  - k1=1 file=1.apk entry=plugtest.PlugPage INJECTED … entry=OK api=1
+  - k2=1 file=1.apk entry=plugtest.PlugPage INJECTED … entry=OK api=1 SHARED(entry class already defined by k1)
+```
+★ 没有这行标注的话，第二条的 `entry=OK api=1` 是**骗人的**（它命中的是 k1 的类）。
+★ 老插件（没写自述）照旧能加载 —— 这是**向后兼容**那条判据。
+
+## 5) 自检 + 构建
+
+`dev_m3_selftest`：**通过 1182 项，失败 0 项**（第 133 轮末 1171 ⇒ 本轮 +11：自述 json 四条 /
+entry 兜底两条 / `injectOrder` 五条含元断言）。
+★ 第一遍跑出来是 **1180 / 2 失败**，两条都是新断言抓出来的：
+- 🔴 **解析器真 bug**：深度 1 上遇到嵌套容器时没把"当前键"丢掉 ⇒ 嵌套结束后那个键会跟**后面第一个串**
+  配成一对（`{"a":{"b":"c"},"entry":"d.E"}` 解出 `a=entry`、`entry` 反而丢了）。修法 = 遇到容器就 `key = null`。
+- ⚠️ **我的断言写错了**：`injectOrder(tr, "aa=1\ncc=9\n")` 里 `cc` 没有 trust 记录 ⇒ 按第三方口径
+  **要排进去**（期望 `[aa]` 是我写错，正确是 `[aa, cc]`）。实现是对的，断言改了。
+
+product（非 debuggable）：`BUILD OK`、起得来、顶栏进插件页显示「还没有装插件。」；
+dex 扫描 dev 专属 **全 0**（`Plugins` 14 处在），且能在产品 dex 里找到本轮三个新标记
+（`io.mdt.plugin.entry` / `injectOrder` / `entryOr`）⇒ 新代码确实进了产品包；APK **619 872 B**。
