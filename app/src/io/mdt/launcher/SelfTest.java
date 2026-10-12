@@ -2310,6 +2310,64 @@ public final class SelfTest {
                 && Plugins.parseSkipLine("probe\t2\t1\tnonsense") == null
                 && Plugins.parseSkipLine(null) == null && Plugins.parseSkipLine("") == null,
                 "★不是那个格式的行一律 null（界面据此决定要不要说话）");
+
+        // ── 第 133 轮：信任模型（官方 = 与本应用同一把签名）与三档处置等级 ──
+        L.add("  · 来源 / 处置等级 / 跳过记录的新格式（第 133 轮）");
+        ok(stat, L, PluginTrust.OFFICIAL.equals("official") && PluginTrust.THIRD.equals("third"),
+                "来源就两种：official / third（判据是签名指纹，见 PluginTrust）");
+        ok(stat, L, "official".equals(PluginTrust.classify(ctx,
+                        new File(ctx.getApplicationInfo().sourceDir))),
+                "★判据有分辨力的前提：**本应用自己的 APK** 必须判成 official（同一个指纹比得上）");
+        ok(stat, L, PluginTrust.THIRD.equals(PluginTrust.classify(ctx, new File("/no/such.apk")))
+                        && PluginTrust.THIRD.equals(PluginTrust.classify(ctx, null)),
+                "★拿不到签名 / 文件不在 ⇒ 一律 third（默认不信任，别把默认值当事实说）");
+        ok(stat, L, PluginTrust.L2.equals(PluginTrust.defaultLevel(PluginTrust.OFFICIAL))
+                        && PluginTrust.L3.equals(PluginTrust.defaultLevel(PluginTrust.THIRD)),
+                "★默认等级：官方 L2 回滚 / 第三方 L3 严格");
+        ok(stat, L, PluginTrust.validLevel("L1") && PluginTrust.validLevel("L2")
+                        && PluginTrust.validLevel("L3") && !PluginTrust.validLevel("L9")
+                        && !PluginTrust.validLevel(null) && !PluginTrust.validLevel(""),
+                "等级闸门只认 L1/L2/L3（脏值不许进登记）");
+        ok(stat, L, "L1".equals(Plugins.levelOf("probe=L1\n", PluginTrust.THIRD, "probe")),
+                "★用户改过 ⇒ 用用户的（哪怕第三方也允许宽容）");
+        ok(stat, L, "L3".equals(Plugins.levelOf("probe=zzz\n", PluginTrust.THIRD, "probe"))
+                        && "L2".equals(Plugins.levelOf("", PluginTrust.OFFICIAL, "probe")),
+                "★没改过 / 改了脏值 ⇒ 回到按来源的默认值");
+        ok(stat, L, "L2".equals(Plugins.nextLevelAfterFail("L1", PluginTrust.RETRY_BUDGET))
+                        && "L1".equals(Plugins.nextLevelAfterFail("L1", 1))
+                        && "L3".equals(Plugins.nextLevelAfterFail("L3", 99)),
+                "★L1 用完重试预算 ⇒ 升到 L2（否则「宽容」会变成「每隔一次启动就死一次」）；别的档不升");
+        ok(stat, L, "L2".equals(Plugins.cycleLevel("L1")) && "L3".equals(Plugins.cycleLevel("L2"))
+                        && "L1".equals(Plugins.cycleLevel("L3")),
+                "等级循环 L1→L2→L3→L1（界面上那个「改成下一档」按钮）");
+        String[] sl3 = Plugins.parseSkipLine("probe\t2\t1\trollback\tL3\tyes");
+        ok(stat, L, sl3 != null && "L3".equals(sl3[4]) && "yes".equals(sl3[5]),
+                "跳过记录新格式（6 段：带等级与是否隔离）解析得出来");
+        String[] sl4 = Plugins.parseSkipLine("probe\t2\t1\trollback");
+        ok(stat, L, sl4 != null && sl4[4].isEmpty() && "no".equals(sl4[5]),
+                "★老格式（4 段，第 132 轮写的）也要解析得出来 —— 否则用户机器上那份老记录会让界面整段不说话");
+        String[] sl5 = Plugins.parseSkipLine("probe\t2\t\tretry\tL1\tno");
+        ok(stat, L, sl5 != null && "retry".equals(sl5[3]) && sl5[2].isEmpty(),
+                "L1 那条（保留登记 ⇒ 第三个字段为空）也解析得出来");
+
+        // ★★ 复合键（id+ver）的登记：**真机踩出来的那个 bug 的尺子**
+        //   反例：把 `id=ver` 当键塞进 statePut（它按**第一个** `=` 切键）⇒ 每次都当"新键"追加
+        //   ⇒ retry.txt 里出现两条 `tpp=3=1`、而读的时候永远读不到（重试预算因此永远用不完）。
+        String rt = Plugins.pairPut("", "tpp", "3", "1");
+        rt = Plugins.pairPut(rt, "tpp", "3", "2");
+        ok(stat, L, rt.split("\n").length == 1 && "2".equals(Plugins.pairGet(rt, "tpp", "3")),
+                "★复合键的同键只留一行（实得 " + rt.trim().replace("\t", "/") + "）—— "
+                        + "这条就是 retry 预算永远用不完那个 bug 的尺子");
+        ok(stat, L, Plugins.pairGet(rt, "tpp", "4") == null
+                        && Plugins.pairGet(rt, "tp", "3") == null,
+                "复合键按两段都比（只比前半段会串台）");
+        String rt2 = Plugins.pairPut(rt, "other", "1", "9");
+        ok(stat, L, Plugins.pairGet(rt2, "other", "1") != null
+                        && Plugins.pairGet(rt2, "tpp", "3") != null,
+                "加别的键不影响已有的");
+        ok(stat, L, Plugins.pairGet(Plugins.pairRemove(rt2, "tpp", "3"), "tpp", "3") == null
+                        && Plugins.pairGet(Plugins.pairRemove(rt2, "tpp", "3"), "other", "1") != null,
+                "★删复合键不碰别的键（能分辨「删对了」与「删光了」）");
     }
 
     private static void modsPure(List<String> L, int[] stat) {

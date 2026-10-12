@@ -34,4 +34,24 @@
     <string name="plugin_err_api_fmt">接口版本不匹配：插件是 %1$d，本版本需要 %2$d。</string>
     <string name="plugin_err_asset">插件的资源挂不上。</string>
     <string name="plugin_err_other">插件加载失败。</string>
+
+    <!-- 第 133 轮：信任模型（官方 = 与本应用同一把签名）与三档处置等级 -->
+    <string name="plugin_trust_official">官方（与本应用同一签名）</string>
+    <string name="plugin_trust_third">第三方（别的签名）</string>
+    <string name="plugin_trust_short_official">官方</string>
+    <string name="plugin_trust_short_third">第三方</string>
+    <string name="plugin_trust_short_fmt">%1$s · 处置 %2$s</string>
+    <string name="plugin_level_l1">L1 宽容 —— 先留着，下次启动再试</string>
+    <string name="plugin_level_l2">L2 回滚 —— 退回上一份能用的版本</string>
+    <string name="plugin_level_l3">L3 严格 —— 停用，并把这一版隔离</string>
+    <string name="plugin_info_fmt">%1$s\n来源：%2$s\n处置：%3$s</string>
+    <string name="plugin_action_level_fmt">处置 %1$s —— 改成 %2$s</string>
+    <string name="plugin_action_restore_fmt">把隔离的 v%1$s 放回来</string>
+    <string name="plugin_row_quarantined_fmt">%1$s · 已隔离 v%2$s</string>
+    <string name="plugin_skip_retry_fmt">%1$s：v%2$s 没起来，先留着，下次启动再试</string>
+    <string name="plugin_skip_rollback_q_fmt">%1$s：v%2$s 没起来，已回滚到 v%3$s，并把 v%2$s 隔离</string>
+    <string name="plugin_skip_quarantine_fmt">%1$s：v%2$s 没起来，已停用并隔离</string>
+    <string name="plugin_restored_fmt">已把 v%1$s 放回来，退出重开之后生效。</string>
+    <string name="plugin_restore_failed">没能把它放回来。</string>
+    <string name="plugin_level_set_fmt">%1$s 的处置等级已改成 %2$s（下次启动起生效）。</string>
 </resources>

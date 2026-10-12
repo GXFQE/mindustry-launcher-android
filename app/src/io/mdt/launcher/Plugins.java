@@ -66,6 +66,30 @@ final class Plugins {
     /** 结构化记录"上次被安全阀拦下后每个插件怎么了"（界面按它说人话；格式见 {@link #parseSkipLine}）。 */
     static final String LASTSKIP = "lastskip.txt";
 
+    /**
+     * 每个版本的**来源**（`id=ver:official|third`，装进来那一刻判一次就记下来）。
+     * ★ 为什么记下来而不是每次现算：判据要解析 APK 的签名块，而**启动路径上每一毫秒都要省**
+     * （早注入在 `attachBaseContext` 里）。装的时候算一次、之后读登记即可；界面要复核时可以再算。
+     */
+    static final String TRUST = "trust.txt";
+
+    /** 用户**改过**的处置等级（`id=L1|L2|L3`）；没改过的按来源取默认值（见 {@link PluginTrust}）。 */
+    static final String LEVELS = "levels.txt";
+
+    /** L1 的重试计数（制表符 `id \t ver \t 次数`）—— 连败到预算就升档，否则"再试一次"会变成循环。 */
+    static final String RETRY = "retry.txt";
+
+    /**
+     * 🔴 「这一程**没有**注入任何插件（安全阀跳过了）」的标记，只活一次启动。
+     *
+     * <p>为什么必须有它（第 133 轮真机踩出来的连锁 bug）：{@link #markBootOk} 的判据是
+     * "第一个 Activity 到了 onResume"，而**被跳过的那些启动同样满足它** ⇒ 于是那一版**刚崩过的**
+     * 插件会被抄进 {@link #KNOWN} 当成"已知可用"；后果是下一步要回滚时**已经没有回滚目标**
+     * （`known == was`）⇒ L2 只能退化成停用，用户的插件白丢（L1 那轮实测正是这么串起来的）。
+     * ⇒ 跳过的那一程只摘安全阀，**不许写 known、也不许 prune**（那两份都是"带插件成功"的产物）。
+     */
+    static final String NOLATCH = "nolatch.txt";
+
     /** ★ 安全阀：注入前写、启动过了这一关才删。它在 ⇒ 上次带插件启动没走完 ⇒ 本次不注入。 */
     static final String GUARD = "guard.txt";
 
@@ -170,6 +194,55 @@ final class Plugins {
         return text.split("\n");
     }
 
+    // ---- 复合键（id + ver）的登记：**制表符**分隔 ---------------------------------
+    //
+    // 🔴 为什么不复用 statePut/stateGet（第 133 轮真机踩的）：那两个按**第一个** `=` 切键，
+    //    所以 `id=ver=值` 这种三段的键会被切成 `id` ⇒ 写的时候每次都当"新键"追加一行
+    //    （实测 retry.txt 里出现两条 `tpp=3=1`），读的时候永远读不到（重试预算因此永远用不完）。
+    //    ⇒ 凡是"键本身含 `=`"的登记，一律走这三个（制表符三段：a \t b \t 值）。
+
+    /** 取复合键的值；没有 ⇒ null。 */
+    static String pairGet(String text, String a, String b) {
+        if (text == null || a == null || b == null) return null;
+        for (String line : lines(text)) {
+            String[] p = line.split("\t");
+            if (p.length == 3 && p[0].equals(a) && p[1].equals(b)) return p[2];
+        }
+        return null;
+    }
+
+    /** 写复合键（**同键只留一行** —— 这条正是上面那个 bug 的尺子）。 */
+    static String pairPut(String text, String a, String b, String v) {
+        if (a == null || b == null || v == null) return text == null ? "" : text;
+        StringBuilder sb = new StringBuilder();
+        boolean done = false;
+        for (String line : lines(text)) {
+            if (line.isEmpty()) continue;
+            String[] p = line.split("\t");
+            if (p.length == 3 && p[0].equals(a) && p[1].equals(b)) {
+                sb.append(a).append('\t').append(b).append('\t').append(v).append('\n');
+                done = true;
+            } else {
+                sb.append(line).append('\n');
+            }
+        }
+        if (!done) sb.append(a).append('\t').append(b).append('\t').append(v).append('\n');
+        return sb.toString();
+    }
+
+    /** 删复合键（不存在 ⇒ 内容等价）。 */
+    static String pairRemove(String text, String a, String b) {
+        if (text == null) return "";
+        StringBuilder sb = new StringBuilder();
+        for (String line : lines(text)) {
+            if (line.isEmpty()) continue;
+            String[] p = line.split("\t");
+            if (p.length == 3 && p[0].equals(a) && p[1].equals(b)) continue;
+            sb.append(line).append('\n');
+        }
+        return sb.toString();
+    }
+
     // ---- 安装 / 生效 -----------------------------------------------------------
 
     /**
@@ -201,11 +274,88 @@ final class Plugins {
             String key = now ? ACTIVE : PENDING;
             File f = new File(dir(ctx), key);
             write(f, statePut(readOrNull(f), id, ver));
+            // ★ 信任模型（第 133 轮）：装进来这一刻判一次来源，记进 trust.txt（启动路径不再解析签名块）
+            String trust = PluginTrust.classify(ctx, dst);
+            File tf = new File(dir(ctx), TRUST);
+            write(tf, trustPut(readOrNull(tf), id, ver, trust));
             return "installed id=" + id + " ver=" + ver + " -> " + key
-                    + " bytes=" + dst.length() + " readOnly=" + ro + " stillWritable=" + dst.canWrite();
+                    + " bytes=" + dst.length() + " readOnly=" + ro + " stillWritable=" + dst.canWrite()
+                    + " trust=" + trust;
         } catch (Throwable t) {
             return "FAILED " + brief(t);
         }
+    }
+
+    // ---- 来源与处置等级（第 133 轮） -------------------------------------------
+
+    /** 来源登记的格式是 `id=ver:trust`（**纯函数**，界面/自检共用）。 */
+    static String trustPut(String text, String id, String ver, String trust) {
+        return pairPut(text, id, ver, trust);
+    }
+
+    /** 某个版本的来源；没有记录 ⇒ 现算一次（拿不到签名按第三方）。 */
+    static String trustOf(Context ctx, String id, String ver) {
+        String t = pairGet(trust(ctx), id, ver);
+        if (PluginTrust.OFFICIAL.equals(t) || PluginTrust.THIRD.equals(t)) return t;
+        return PluginTrust.classify(ctx, apkOf(ctx, id, ver));
+    }
+
+    /** 来源登记全文。 */
+    static String trust(Context ctx) {
+        String s = readOrNull(new File(dirNoCreate(ctx), TRUST));
+        return s == null ? "" : s;
+    }
+
+    /**
+     * 这个插件这次该按哪一档处置（**纯函数**，判据由 SelfTest 钉）：
+     * 用户改过 ⇒ 用用户的；没改过 ⇒ 按来源的默认值（官方 L2 / 第三方 L3）。
+     */
+    static String levelOf(String levelsText, String trust, String id) {
+        String lv = stateGet(levelsText, id);
+        return PluginTrust.validLevel(lv) ? lv : PluginTrust.defaultLevel(trust);
+    }
+
+    /** L1 的重试计数（`id=ver:次数`）。 */
+    static int retryCount(String retryText, String id, String ver) {
+        try {
+            String v = pairGet(retryText, id, ver);
+            return v == null ? 0 : Integer.parseInt(v);
+        } catch (Throwable t) {
+            return 0;
+        }
+    }
+
+    /** 用户**改过**的等级登记全文。 */
+    static String levels(Context ctx) {
+        String s = readOrNull(new File(dirNoCreate(ctx), LEVELS));
+        return s == null ? "" : s;
+    }
+
+    /** 用户改等级（写 {@link #LEVELS}）；传空 / 非法值 ⇒ 清掉覆盖、回到按来源的默认值。 */
+    static void setLevel(Context ctx, String id, String level) {
+        File f = new File(dir(ctx), LEVELS);
+        String cur = readOrNull(f);
+        String next = PluginTrust.validLevel(level) ? statePut(cur, id, level) : stateRemove(cur, id);
+        write(f, next);
+        // 改了等级 ⇒ 连败计数清零（否则"改宽"之后下一次启动立刻又因预算用完而升档）
+        File rf = new File(dir(ctx), RETRY);
+        write(rf, pairRemove(readOrNull(rf), id, stateGet(readOrNull(new File(dir(ctx), ACTIVE)), id)));
+    }
+
+    /** 等级在界面上循环：L1 → L2 → L3 → L1（"改成更严一档"，到头回最宽）。 */
+    static String cycleLevel(String level) {
+        if (PluginTrust.L1.equals(level)) return PluginTrust.L2;
+        if (PluginTrust.L2.equals(level)) return PluginTrust.L3;
+        return PluginTrust.L1;
+    }
+
+    /**
+     * L1 连败之后该升到哪一档（**纯函数**）：预算没用完 ⇒ 还是 L1（再试一次）；用完了 ⇒ 升到 L2。
+     * ⚠️ 没有这条，"宽容"就等于"每隔一次启动就死一次"（S0 那条安全阀的初衷会被抵消）。
+     */
+    static String nextLevelAfterFail(String level, int fails) {
+        if (!PluginTrust.L1.equals(level)) return level;
+        return fails >= PluginTrust.RETRY_BUDGET ? PluginTrust.L2 : PluginTrust.L1;
     }
 
     /**
@@ -342,6 +492,12 @@ final class Plugins {
             File d = dirNoCreate(ctx);
             File g = new File(d, GUARD);
             if (g.isFile()) g.delete();
+            // 🔴 这一程是"被安全阀跳过的启动" ⇒ 只摘安全阀，**别**把刚崩过的那一版记成已知可用
+            File nl = new File(d, NOLATCH);
+            if (nl.isFile()) {
+                nl.delete();
+                return;
+            }
             // ★ 启动带着这些插件活下来了 ⇒ 它们就是"已知可用"的那一份（回滚的目标）
             String act = readOrNull(new File(d, ACTIVE));
             if (stateIds(act).isEmpty()) return;
@@ -394,24 +550,64 @@ final class Plugins {
     }
 
     /**
-     * 上次带插件启动没走完 ⇒ 本次一个插件都不注入 + **自动停用**（把现场搬进 {@link #LASTFAIL}、
-     * 清空 {@link #ACTIVE}），保证启动器永远起得来。恢复由用户在界面上做（下一轮接 UI）。
+     * 上次带插件启动没走完 ⇒ 本次一个插件都不注入，并按**每个插件的处置等级**分别收拾
+     * （第 133 轮：官方默认 L2 回滚 / 第三方默认 L3 严格；用户可改）。
+     *
+     * <p>三档的落点：
+     * <ul>
+     *   <li><b>L1 宽容</b> ⇒ 登记**留着**、下次启动再试一次；但 `retry.txt` 记连败次数，
+     *       到 {@link PluginTrust#RETRY_BUDGET} 就**升到 L2** —— 否则"宽容"会退化成
+     *       "每隔一次启动就死一次"（那正是安全阀当初要防的东西）。</li>
+     *   <li><b>L2 回滚</b> ⇒ 退回 {@link #KNOWN}（已知可用）那一版；退不了（没记录 / 文件不在）⇒ 停用。</li>
+     *   <li><b>L3 严格</b> ⇒ 先按 L2 回滚（有 known 就滚），**同时把这一版挪进 `quarantine/`**：
+     *       它不再进候选（{@link #versionsOf} 只看本层 `.apk`）、也就不会被"再试一次"误伤，
+     *       必须用户在插件页手动恢复。</li>
+     * </ul>
      */
     private static void skipOnce(Context base, File d, File guard) {
         String g = readOrNull(guard);
         String activeText = readOrNull(new File(d, ACTIVE));
         String knownText = readOrNull(new File(d, KNOWN));
-        // ★ 回滚：能退回"上一次带着它启动成功过的版本"就退，退不了才停用（判据是纯函数，见 rollbackActive）
-        String rolled = rollbackActive(knownText, activeText, availableKeys(d));
-        List<String> failedIds = stateIds(activeText);
+        String levelsText = readOrNull(new File(d, LEVELS));
+        String trustText = readOrNull(new File(d, TRUST));
+        String retryText = readOrNull(new File(d, RETRY));
+        java.util.Set<String> have = availableKeys(d);
+
+        StringBuilder nextActive = new StringBuilder();
         StringBuilder skip = new StringBuilder();
-        for (String id : failedIds) {
+        for (String id : stateIds(activeText)) {
             String was = stateGet(activeText, id);
-            String now = stateGet(rolled, id);
+            String trust = trustFrom(trustText, base, d, id, was);
+            String lv = levelOf(levelsText, trust, id);
+            int fails = retryCount(retryText, id, was) + 1;
+            retryText = pairPut(retryText, id, was, String.valueOf(fails));
+            String eff = nextLevelAfterFail(lv, fails);
+
+            String now = null;
+            String action;
+            boolean quarantined = false;
+            if (PluginTrust.L1.equals(eff)) {
+                now = was;                       // 留着：下次启动再试一次
+                action = "retry";
+            } else {
+                // L2 / L3 都要"退回已知可用那一版"（退不了就停用）
+                if (knownText != null && !was.equals(stateGet(knownText, id))
+                        && have.contains(id + "=" + stateGet(knownText, id))) {
+                    now = stateGet(knownText, id);
+                    action = "rollback";
+                } else {
+                    action = "disable";
+                }
+                if (PluginTrust.L3.equals(eff)) {
+                    quarantined = quarantine(d, id, was);
+                }
+            }
+            if (now != null) nextActive.append(id).append('=').append(now).append('\n');
             skip.append(id).append('\t').append(was == null ? "" : was).append('\t')
-                    .append(now == null ? "" : now).append('\t')
-                    .append(now == null ? "disable" : "rollback").append('\n');
+                    .append(now == null ? "" : now).append('\t').append(action).append('\t')
+                    .append(eff).append('\t').append(quarantined ? "yes" : "no").append('\n');
         }
+        String rolled = nextActive.toString();
         try {
             write(new File(d, LASTFAIL),
                     "== plugin skip (previous launch did not finish) ==\n"
@@ -419,25 +615,87 @@ final class Plugins {
                             + "guard     = " + oneLine(g) + "\n"
                             + "active    = " + oneLine(activeText) + "\n"
                             + "known     = " + oneLine(knownText) + "\n"
-                            + "rollback  = " + oneLine(rolled) + "\n"
-                            + "-> " + (stateIds(rolled).isEmpty()
-                                    ? "plugins disabled for this launch"
-                                    : "rolled back to the last known-good version") + "\n");
+                            + "levels    = " + oneLine(levelsText) + "\n"
+                            + "trust     = " + oneLine(trustText) + "\n"
+                            + "next      = " + oneLine(rolled) + "\n"
+                            + "skip      = " + oneLine(skip.toString()) + "\n");
         } catch (Throwable ignored) {
         }
         if (guard.isFile()) guard.delete();
         write(new File(d, ACTIVE), rolled);
         write(new File(d, LASTSKIP), skip.toString());
+        write(new File(d, RETRY), retryText);
         write(new File(d, INJECTED), "");
+        // 🔴 给这一程留个"没注入过"的标记：markBootOk 看到它就不写 known（见 NOLATCH 的注释）
+        write(new File(d, NOLATCH), oneLine(activeText) + "\n");
+        // ★ 跳过这一程也往**外部 hub** 留一份报告：产品版非 debuggable，`run-as` 拉不到内部那份
+        write(new File(Data.hubDir(base), BOOT_REPORT),
+                "== plugin early inject ==\n"
+                        + "time     = " + new java.util.Date() + "\n"
+                        + "SKIPPED: previous launch with plugins did not finish\n"
+                        + "active was = " + oneLine(activeText) + "\n"
+                        + "skip     = " + oneLine(skip.toString()) + "\n"
+                        + "next     = " + oneLine(rolled) + "\n");
         write(new File(d, BOOT_REPORT),
                 "== plugin early inject ==\n"
                         + "time     = " + new java.util.Date() + "\n"
                         + "SKIPPED: previous launch with plugins did not finish\n"
                         + "active was = " + oneLine(activeText) + "\n"
+                        + "per plugin = " + oneLine(skip.toString()) + "\n"
                         + "-> " + (stateIds(rolled).isEmpty()
-                                ? "nothing injected; active.txt cleared"
-                                : "nothing injected; rolled back to " + oneLine(rolled))
+                                ? "nothing injected this launch"
+                                : "nothing injected; next active = " + oneLine(rolled))
                         + "\n");
+    }
+
+    /** 来源登记里取（没有就现算一次）—— 跳过一次处置时要用它决定默认等级。 */
+    private static String trustFrom(String trustText, Context ctx, File d, String id, String ver) {
+        String t = pairGet(trustText, id, ver);
+        if (PluginTrust.OFFICIAL.equals(t) || PluginTrust.THIRD.equals(t)) return t;
+        return PluginTrust.classify(ctx, new File(new File(d, id), ver + ".apk"));
+    }
+
+    /** 把某一版挪进 `plugins/<id>/quarantine/`（挪成功 ⇒ true）。 */
+    private static boolean quarantine(File d, String id, String ver) {
+        try {
+            File from = new File(new File(d, id), ver + ".apk");
+            if (!from.isFile()) return false;
+            File q = new File(new File(d, id), "quarantine");
+            if (!q.isDirectory() && !q.mkdirs()) return false;
+            return from.renameTo(new File(q, ver + ".apk"));
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /** 被隔离的版本（升序）。 */
+    static String[] quarantinedOf(Context ctx, String id) {
+        File[] vs = new File(new File(dirNoCreate(ctx), id), "quarantine").listFiles();
+        if (vs == null) return new String[0];
+        java.util.Arrays.sort(vs);
+        List<String> out = new ArrayList<String>();
+        for (File v : vs) {
+            if (v.isFile() && v.getName().endsWith(".apk")) {
+                out.add(v.getName().substring(0, v.getName().length() - 4));
+            }
+        }
+        return out.toArray(new String[0]);
+    }
+
+    /** 把被隔离的一版挪回候选目录（用户手动恢复；挪成功 ⇒ true）。 */
+    static boolean restoreQuarantined(Context ctx, String id, String ver) {
+        try {
+            File q = new File(new File(dirNoCreate(ctx), id), "quarantine");
+            File from = new File(q, ver + ".apk");
+            if (!from.isFile()) return false;
+            File to = new File(new File(dirNoCreate(ctx), id), ver + ".apk");
+            if (!from.renameTo(to)) return false;
+            File rf = new File(dir(ctx), RETRY);
+            write(rf, pairRemove(readOrNull(rf), id, ver));   // 恢复 = 连败计数清零
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
     }
 
     /**
@@ -484,17 +742,27 @@ final class Plugins {
     }
 
     /**
-     * 解析一行结构化跳过记录：`id \t 失败版本 \t 回滚到的版本(空=停用) \t rollback|disable`。
-     * @return {@code {id, was, now, action}}；不是这种行 ⇒ null（**纯函数**，界面与自检共用）
+     * 解析一行结构化跳过记录：
+     * {@code id \t 失败版本 \t 回滚到的版本(空=停用) \t action \t 等级 \t 是否隔离(yes/no)}。
+     *
+     * <p>★ 字段数**向后兼容**：第 132 轮写的是 4 段（没有等级/隔离），老文件也解析得出来
+     * （等级记成空、隔离记成 no）—— 否则用户机器上那份老记录会让界面**整段不说话**。
+     * @return {@code {id, was, now, action, level, quarantined}}；不是这种行 ⇒ null（**纯函数**）
      */
     static String[] parseSkipLine(String line) {
         if (line == null) return null;
         String[] p = line.split("\t");
-        if (p.length != 4) return null;
+        if (p.length < 4 || p.length > 6) return null;
         String id = p[0].trim();
         String action = p[3].trim();
-        if (id.isEmpty() || !("rollback".equals(action) || "disable".equals(action))) return null;
-        return new String[] { id, p[1].trim(), p[2].trim(), action };
+        if (id.isEmpty()) return null;
+        if (!("retry".equals(action) || "rollback".equals(action) || "disable".equals(action))) {
+            return null;
+        }
+        String level = p.length > 4 ? p[4].trim() : "";
+        String quar = p.length > 5 ? p[5].trim() : "no";
+        return new String[] { id, p[1].trim(), p[2].trim(), action, level,
+                              "yes".equals(quar) ? "yes" : "no" };
     }
 
     /** 上次被拦下之后每个插件怎么了（已解析；界面直接用）。 */
@@ -567,7 +835,7 @@ final class Plugins {
         return new String[] { "off", "" };
     }
 
-    /** 装了哪些 id（按名字排序；没有 `.apk` 的目录不算）。 */
+    /** 装了哪些 id（按名字排序；**有隔离件的也算** —— 否则用户再也看不到、也就恢复不了它）。 */
     static List<String> installedIds(Context ctx) {
         List<String> out = new ArrayList<String>();
         File d = dirNoCreate(ctx);
@@ -575,7 +843,10 @@ final class Plugins {
         if (ids == null) return out;
         java.util.Arrays.sort(ids);
         for (File f : ids) {
-            if (f.isDirectory() && versionsOf(ctx, f.getName()).length > 0) out.add(f.getName());
+            if (!f.isDirectory()) continue;
+            if (versionsOf(ctx, f.getName()).length > 0 || quarantinedOf(ctx, f.getName()).length > 0) {
+                out.add(f.getName());
+            }
         }
         return out;
     }

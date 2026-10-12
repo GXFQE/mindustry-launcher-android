@@ -295,8 +295,12 @@ final class PluginProbeDev {
         File d = Plugins.dir(ctx);
         StringBuilder sb = new StringBuilder();
         sb.append("== dev_pluginclear ==\n");
+        // ⚠️ 第 133 轮把信任 / 等级 / 重试 / 跳过 / 禁记标记也一起清 —— 否则"清过"的现场还带着上一轮的
+        //    读数（实测：retry 与 lastskip 留着旧值，让我误判成"这次没走 skip"）
         for (String n : new String[] { Plugins.ACTIVE, Plugins.PENDING, Plugins.GUARD,
-                                        Plugins.LASTFAIL, Plugins.BOOT_REPORT }) {
+                                        Plugins.LASTFAIL, Plugins.BOOT_REPORT, Plugins.KNOWN,
+                                        Plugins.INJECTED, Plugins.LASTSKIP, Plugins.TRUST,
+                                        Plugins.LEVELS, Plugins.RETRY, Plugins.NOLATCH }) {
             File f = new File(d, n);
             sb.append(n).append(" exists=").append(f.isFile())
                     .append(" deleted=").append(!f.isFile() || f.delete()).append('\n');
@@ -347,6 +351,38 @@ final class PluginProbeDev {
         String n = fileName;
         if (n.toLowerCase(java.util.Locale.ROOT).endsWith(".apk")) n = n.substring(0, n.length() - 4);
         return n.isEmpty() ? "plugin" : n;
+    }
+
+    // ---- 第 133 轮：信任模型（官方 / 第三方）的取证口 ---------------------------
+
+    /**
+     * 把目录里每个 `.apk` 的**签名指纹**与**本应用自己的**指纹都打出来，并给出来源判定。
+     *
+     * <p>★ 这是信任模型唯一的判据来源：`official` 只可能出现在"与本应用同一把签名"上；
+     * 夹具里必须**两侧都有样本**（同一个插件用另一把密钥再签一份），否则测不出这个判据是不是恒真。
+     */
+    static String trustReport(Context ctx, File dir) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("== plugin trust (signature fingerprint) ==\n");
+        sb.append("time      = ").append(new Date()).append('\n');
+        sb.append("api       = ").append(android.os.Build.VERSION.SDK_INT).append('\n');
+        sb.append("self fp   = ").append(PluginTrust.selfFingerprint(ctx)).append('\n');
+        File[] all = dir == null ? null : dir.listFiles();
+        if (all == null) {
+            sb.append("(no such dir: ").append(dir).append(")\n");
+        } else {
+            java.util.Arrays.sort(all);
+            for (File f : all) {
+                if (!f.isFile() || !f.getName().endsWith(".apk")) continue;
+                sb.append("- ").append(f.getName())
+                        .append("\n    fp      = ").append(PluginTrust.apkFingerprint(ctx, f))
+                        .append("\n    verdict = ").append(PluginTrust.classify(ctx, f))
+                        .append('\n');
+            }
+        }
+        String text = sb.toString();
+        writeReport(ctx, "report-plugin-trust.txt", text);
+        return text;
     }
 
     private static void writeReport(Context ctx, String name, String text) {

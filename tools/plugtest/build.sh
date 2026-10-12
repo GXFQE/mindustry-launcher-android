@@ -96,4 +96,17 @@ build_one plugtest-v1      1  PLUGIN-v1      0 PLUGIN-v1-2
 build_one plugtest-v2      1  PLUGIN-v2      0 PLUGIN-v2-2
 # 第 132 轮：**带它就启动不了**的那一版（回滚要拿真实失败形态验，不能只靠手写 guard）
 build_one plugtest-kill    1  PLUGIN-kill    0 PLUGIN-kill-2 "$SRC_DIR/src/io/mdt/plugtest/PlugPageKill.java"
+
+# --- 第 133 轮：**第三方**对照样本（同一个插件，换另一把密钥签） -----------------
+# 信任模型的判据是"签名指纹 == 本应用自己的"。夹具必须**两侧都有**：
+#   plugtest-ok / v1 / v2 / kill 用 debug.keystore 签（与 dev 构建同一把 ⇒ 判「官方」）；
+#   plugtest-thirdparty 用 TP_KEYSTORE 签（⇒ 必须判「第三方」）。
+# 只用一侧的样本测不出这个判据是不是恒真（本工程那条"夹具要能分辨两种解释"的规矩）。
+if [ -n "${TP_KEYSTORE:-}" ]; then
+  KEYSTORE="$TP_KEYSTORE"
+  KS_ALIAS="${TP_ALIAS:-tp}"; KS_PASS="${TP_PASS:-tp123456}"; KEY_PASS="$KS_PASS"
+  build_one plugtest-thirdparty 1 PLUGIN-tp 0 PLUGIN-tp-2
+  # 第三方 + **会崩**的那一版：用来验「第三方默认 L3（停用 + 隔离）」
+  build_one plugtest-tp-kill 1 PLUGIN-tpk 0 PLUGIN-tpk-2 "$SRC_DIR/src/io/mdt/plugtest/PlugPageKill.java"
+fi
 echo "== DONE =="

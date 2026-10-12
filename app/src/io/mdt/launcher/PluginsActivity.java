@@ -101,7 +101,21 @@ public class PluginsActivity extends BaseActivity {
                     label = k == null ? Trans.get(this, R.string.plugin_state_off_never, id)
                                       : Trans.get(this, R.string.plugin_state_off_fmt, id, k);
                 }
-                addAction(label, new Runnable() {
+                // ★ 有隔离件时行里要点明（否则用户看着"已停用"、不知道还能放回来）
+                String[] qv = Plugins.quarantinedOf(this, id);
+                if (qv.length > 0 && "off".equals(st[0])) {
+                    label = Trans.get(this, R.string.plugin_row_quarantined_fmt, id, qv[qv.length - 1]);
+                }
+                // 第二行小字：来源 + 当前处置等级（弹窗里放不下它们 —— 见 rowDialog 的注释）
+                final String[] vs = Plugins.versionsOf(this, id);
+                String probeVer = st[1].isEmpty() ? (vs.length > 0 ? vs[vs.length - 1] : null) : st[1];
+                final String tr = probeVer == null ? PluginTrust.THIRD : Plugins.trustOf(this, id, probeVer);
+                final String sub = Trans.get(this, R.string.plugin_trust_short_fmt,
+                        Trans.get(this, PluginTrust.OFFICIAL.equals(tr)
+                                ? R.string.plugin_trust_short_official : R.string.plugin_trust_short_third),
+                        Plugins.levelOf(Plugins.levels(this), tr, id));
+                final String rowLabel = label;
+                addAction(label, sub, new Runnable() {
                     @Override public void run() { rowDialog(id); }
                 });
             }
@@ -130,10 +144,15 @@ public class PluginsActivity extends BaseActivity {
         if (live.isEmpty()) return;
         addText(Trans.get(this, R.string.plugin_skip_title), 15f);
         for (String[] s : live) {
-            if ("rollback".equals(s[3])) {
-                addText(Trans.get(this, R.string.plugin_skip_rollback_fmt, s[0], s[1], s[2]), 14f);
+            boolean q = s.length > 5 && "yes".equals(s[5]);
+            if ("retry".equals(s[3])) {
+                addText(Trans.get(this, R.string.plugin_skip_retry_fmt, s[0], s[1]), 14f);
+            } else if ("rollback".equals(s[3])) {
+                addText(Trans.get(this, q ? R.string.plugin_skip_rollback_q_fmt
+                                          : R.string.plugin_skip_rollback_fmt, s[0], s[1], s[2]), 14f);
             } else {
-                addText(Trans.get(this, R.string.plugin_skip_disable_fmt, s[0], s[1]), 14f);
+                addText(Trans.get(this, q ? R.string.plugin_skip_quarantine_fmt
+                                          : R.string.plugin_skip_disable_fmt, s[0], s[1]), 14f);
             }
         }
         if (!restorable) return;   // 那一版的文件不在了 ⇒ 这个按钮按下去什么都不会发生，那就别给
@@ -171,6 +190,13 @@ public class PluginsActivity extends BaseActivity {
         final String pend = Plugins.stateGet(Plugins.pending(this), id);
         final String[] vers = Plugins.versionsOf(this, id);
         final String newest = vers.length == 0 ? null : vers[vers.length - 1];
+        final String[] quar = Plugins.quarantinedOf(this, id);
+        final String qv = quar.length == 0 ? null : quar[quar.length - 1];
+
+        // ★ 来源 + 当前处置等级写进弹窗的正文（列表行有宽度预算，塞不下这些字）
+        final String trust = newest == null ? PluginTrust.THIRD : Plugins.trustOf(this, id, newest);
+        final String lv = Plugins.levelOf(Plugins.levels(this), trust, id);
+        final String nextLv = Plugins.cycleLevel(lv);
 
         List<String> items = new ArrayList<String>();
         final List<String> actions = new ArrayList<String>();
@@ -183,9 +209,18 @@ public class PluginsActivity extends BaseActivity {
         actions.add("disable");
         items.add(Trans.get(this, R.string.plugin_action_uninstall));
         actions.add("uninstall");
+        if (qv != null) {
+            items.add(Trans.get(this, R.string.plugin_action_restore_fmt, qv));
+            actions.add("restore");
+        }
+        items.add(Trans.get(this, R.string.plugin_action_level_fmt, lv, nextLv));
+        actions.add("level");
 
         new AlertDialog.Builder(this)
                 .setTitle(id)
+                // ⚠️ 别在这里加 `.setMessage(...)`：框架的 AlertController 在"有 message"时会**把 items 吞掉**
+                //    （真机实测：同一段代码去掉 message 就正常显示 6 项，加上就只剩一个「取消」）。
+                //    ⇒ 来源 / 等级的信息放在**列表行下面那行小字**里，弹窗只负责动作。
                 .setItems(items.toArray(new CharSequence[0]), new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int which) {
                         String a = actions.get(which);
@@ -205,11 +240,31 @@ public class PluginsActivity extends BaseActivity {
                                     Trans.get(PluginsActivity.this, R.string.plugin_uninstalled_fmt, id),
                                     Toast.LENGTH_SHORT).show();
                             rebuild();
+                        } else if ("restore".equals(a)) {
+                            boolean ok = Plugins.restoreQuarantined(PluginsActivity.this, id, qv);
+                            Toast.makeText(PluginsActivity.this,
+                                    Trans.get(PluginsActivity.this, ok ? R.string.plugin_restored_fmt
+                                                                       : R.string.plugin_restore_failed, qv),
+                                    Toast.LENGTH_LONG).show();
+                            rebuild();
+                        } else if ("level".equals(a)) {
+                            Plugins.setLevel(PluginsActivity.this, id, nextLv);
+                            Toast.makeText(PluginsActivity.this,
+                                    Trans.get(PluginsActivity.this, R.string.plugin_level_set_fmt,
+                                            id, nextLv), Toast.LENGTH_LONG).show();
+                            rebuild();
                         }
                     }
                 })
                 .setNegativeButton(Trans.get(this, R.string.cancel), null)
                 .show();
+    }
+
+    /** 等级 → 界面上那句人话（唯一映射处：别在几个地方各写一份）。 */
+    static int levelRes(String level) {
+        if (PluginTrust.L1.equals(level)) return R.string.plugin_level_l1;
+        if (PluginTrust.L3.equals(level)) return R.string.plugin_level_l3;
+        return R.string.plugin_level_l2;
     }
 
     /** 「打开」：注入过就走宿主 CL 那条路，没注入过才自建 DexClassLoader（同一个 dex 不许注册两次）。 */
@@ -357,6 +412,33 @@ public class PluginsActivity extends BaseActivity {
 
     private void addAction(String label, final Runnable r) {
         addAction(mBody, label, r);
+    }
+
+    /**
+     * 两行的一行：主行是可点的动作/条目，**副行给"来源 + 处置等级"**这种补充信息。
+     * ★ 为什么副行不塞进弹窗：框架的 AlertController 在同时有 `message` 时会把 `items` 吞掉
+     *   （真机实测），所以弹窗只放动作，信息放在列表里。
+     */
+    private void addAction(String label, String sub, final Runnable r) {
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(8), dp(10), dp(8), dp(10));
+        box.setClickable(true);
+        box.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { r.run(); }
+        });
+        TextView t = new TextView(this);
+        t.setText(label);
+        t.setTextSize(16f);
+        box.addView(t);
+        if (sub != null && !sub.isEmpty()) {
+            TextView s = new TextView(this);
+            s.setText(sub);
+            s.setTextSize(12f);
+            s.setTextColor(getResources().getColor(R.color.fg_muted));
+            box.addView(s);
+        }
+        mBody.addView(box);
     }
 
     /** 一行"可点的动作"：整行可点（不靠小按钮 ⇒ 也不会出现"文字被挤没"那类）。 */

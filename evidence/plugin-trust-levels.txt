@@ -1,0 +1,91 @@
+# 第 133 轮证据：插件信任模型（官方 / 第三方）+ 三档处置等级
+
+设备 HONOR ELP-AN00 / Android 16（API 36）· 夹具见 `tools/plugtest/`：
+`plugtest-thirdparty.apk`（同一个插件，**另一把密钥**签的）与 `plugtest-tp-kill.apk`
+（第三方 + `api()` 里直接杀进程 = 会崩在启动路径上）。
+
+## 1) 判据：应用内读 APK 签名，且两侧样本分得开
+
+`--es dev_plugintrust <目录>`（目录里放的是同一个 APK 的两份签名版本 + 官方那份）：
+
+```
+== plugin trust (signature fingerprint) ==
+time      = Mon Oct 12 17:50:54 GMT+08:00 2026
+api       = 36
+self fp   = 2cb7c4199ddd8559e2561eeae47bdabb8364968c077735167be683bc9f1cb0b8
+- kill-debugsigned.apk
+    fp      = 2cb7c4199ddd8559e2561eeae47bdabb8364968c077735167be683bc9f1cb0b8
+    verdict = official
+- ok-debugsigned.apk
+    fp      = 2cb7c4199ddd8559e2561eeae47bdabb8364968c077735167be683bc9f1cb0b8
+    verdict = official
+- ok-otherkey.apk
+    fp      = 1a1b45ffb23cf9cebee37e1350f95ef1b7bd0ae08ed7d15732bfea991a018dc0
+    verdict = third
+```
+★ 两侧样本**同一份代码、只换签名** ⇒ 判据既不是恒真也不是恒假（本工程"夹具要能分辨两种解释"那条）。
+★ 判据 = 「签名指纹 == 本应用自己的」：dev 构建里就是 debug 密钥、release 构建里就是发布密钥，
+不用把指纹写死。拿不到签名一律判 `third`（默认不信任）。
+
+## 2) 三档处置（真机，逐档）
+
+装插件时把来源记进 `trust.txt`（`tpp\t1\tthird` 这种**制表符**格式；见第 4 条那个坑），
+等级 = 用户改过的（`levels.txt`）优先、否则按来源取默认（官方 L2 / 第三方 L3）。
+
+**L3 严格（第三方默认）—— 回滚 + 隔离**
+```
+lastskip.txt : tpp	2	1	rollback	L3	yes
+active.txt   : tpp=1
+app_hub/plugins/tpp/ : 1.apk + quarantine/2.apk     ← 坏的那版被挪出候选目录
+```
+
+**L1 宽容（用户手动改宽）—— 留着、下次再试**
+```
+levels.txt   : tpp=L1
+第 1 次跳过  : lastskip = tpp	3	3	retry	L1	no    retry = tpp	3	1    active = tpp=3（登记留着）
+             ★ known 仍然是 tpp=1 —— **没被这一版污染**（见第 5 条那个坑）
+```
+
+**L2 回滚（预算用完自动升档；也是官方默认）**
+```
+第 2 次跳过  : lastskip = tpp	3	1	rollback	L2	no   retry = tpp	3	2   active = tpp=1
+             ★ 落点是 **rollback 到已知可用**，不是 disable（修复前实测会退化成 disable）
+```
+
+## 3) 界面（产品版也验过）
+
+```
+行（两行）: tpp · 生效中 v1
+            第三方 · 处置 L1
+点开的弹窗: tpp ｜ 打开 ｜ 启用（退出重开生效）｜ 停用（退出重开生效）｜ 删除 ｜
+            把隔离的 v2 放回来 ｜ 处置 L1 —— 改成 L2 ｜ 取消
+点「处置 L1 —— 改成 L2」 ⇒ levels.txt: tpp=L1 → tpp=L2
+点「把隔离的 v2 放回来」  ⇒ quarantine/ 空、tpp/ 里 1.apk + 2.apk + 3.apk
+清掉登记后再看（product）：tpp · 已停用 ／ 第三方 · 处置 L3   ← 按来源取的默认档
+```
+
+## 4) 踩到的坑之一 🔴：复合键不许塞进 `id=ver` 那种登记
+
+`statePut/stateGet` 按**第一个** `=` 切键 ⇒ 用 `tpp=3` 当键写进去，每次都被当成"新键"**追加一行**
+（实测 `retry.txt` 里出现两条 `tpp=3=1`），而读的时候永远读不到 ⇒ **L1 的重试预算永远用不完**。
+处置：复合键一律走制表符三段的 `pairPut/pairGet/pairRemove`（自检里有一条"同键只留一行"的元断言）。
+
+## 5) 踩到的坑之二 🔴🔴：被跳过的启动**不算**"带插件启动成功"
+
+`markBootOk` 的判据是"第一个 Activity 到了 onResume"，而 L1 那一档**故意让插件留在登记里**，
+于是那一程起来之后就把**刚崩过的版本**抄进了 `known.txt` 当成"已知可用"；
+等预算用完要升 L2 回滚时，`known == was` ⇒ **没有回滚目标，只能退化成停用**（用户的插件白丢）。
+处置：`skipOnce` 留一个只活一次启动的 `nolatch.txt`，`markBootOk` 见到它**只摘安全阀、不写 known、不 prune**。
+修复后实测：L1 那轮 `known` 稳定在 `tpp=1`，L2 那轮正确落在 `rollback`。
+
+## 6) 踩到的坑之三 ⚠️：`setMessage` 与 `setItems` 同时用，items 会被吞掉
+
+本轮把"来源 / 等级"写进弹窗 `setMessage(...)` 之后，真机上那个弹窗**只剩下一个「取消」**、
+6 个动作项全没了（去掉 message 就正常）。⇒ 弹窗只放动作，补充信息改放**列表行的第二行小字**。
+
+## 7) 自检与构建
+
+`dev_m3_selftest`：**通过 1171 项，失败 0 项**（第 132 轮末 1155 ⇒ +16：来源判据 / 默认档 /
+等级闸门 / L1 升档 / 等级循环 / 跳过记录新格式（含 4 段老格式兼容）/ 复合键那三条）。
+product（非 debuggable）冒烟：起得来、顶栏进插件页、两行信息正确；dex 扫描 dev 专属 **全 0**
+（`Plugins` 14 处在）；**product APK 611 680 → 619 872 B**。

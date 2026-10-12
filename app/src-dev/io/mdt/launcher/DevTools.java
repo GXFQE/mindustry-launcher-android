@@ -119,7 +119,8 @@ final class DevTools {
                 || intent.hasExtra("dev_plugininstall")
                 || intent.hasExtra("dev_pluginstatus")
                 || intent.hasExtra("dev_pluginrestart")
-                || intent.hasExtra("dev_pluginclear");
+                || intent.hasExtra("dev_pluginclear")
+                || intent.hasExtra("dev_plugintrust");
         if (!isDev) return;
         if ((a.getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) == 0) {
             Toast.makeText(a, R.string.dev_blocked_toast, Toast.LENGTH_SHORT).show();
@@ -716,6 +717,14 @@ final class DevTools {
         String pClear = intent.getStringExtra("dev_pluginclear");
         if (pClear != null && !pClear.isEmpty()) {
             reportDev(PluginProbeDev.clear(a), "dev_pluginclear");
+            return;
+        }
+        // ── 第 133 轮：信任模型（官方 / 第三方）──────────────────────────────────
+        // 用法：`--es dev_plugintrust <目录>` ⇒ 逐个 APK 打签名指纹 + 判定，报告写
+        //       `hub/report-plugin-trust.txt`（目录里要**两侧样本都有**，否则看不出判据有没有分辨力）
+        String pTrust = intent.getStringExtra("dev_plugintrust");
+        if (pTrust != null && !pTrust.isEmpty()) {
+            reportDev(PluginProbeDev.trustReport(a, new File(pTrust)), "dev_plugintrust");
             return;
         }
 
