@@ -187,18 +187,39 @@ final class Plugins {
             }
             File tf = new File(dir(ctx), TRUST);
             write(tf, trustPut(readOrNull(tf), id, ver, PluginTrust.BUILTIN));
-            boolean seen = stateIds(readOrNull(new File(dir(ctx), ACTIVE))).contains(id)
-                    || stateIds(readOrNull(new File(dir(ctx), PENDING))).contains(id)
-                    || stateGet(readOrNull(new File(dir(ctx), KNOWN)), id) != null;
-            if (!seen) {
-                File af = new File(dir(ctx), ACTIVE);
-                write(af, statePut(readOrNull(af), id, ver));   // 新内置 ⇒ 默认启用（本次就生效）
-                sb.append(id).append(":enabled ");
+            File af = new File(dir(ctx), ACTIVE);
+            String actText = readOrNull(af);
+            String act = builtinRegisterAction(
+                    stateGet(actText, id),
+                    stateGet(readOrNull(new File(dir(ctx), PENDING)), id),
+                    stateGet(readOrNull(new File(dir(ctx), KNOWN)), id),
+                    ver);
+            if ("enable".equals(act) || "upgrade".equals(act)) {
+                write(af, statePut(actText, id, ver));   // 新内置 ⇒ 默认启用；内容换了 ⇒ 升级（本次就生效）
+                sb.append(id).append(':').append(act).append(' ');
             }
         }
         return sb.toString().trim();
     }
 
+    /**
+     * 内置补放之后**要不要动 active**（**纯函数**，自检钉）。
+     *
+     * <p>三种情况要分清楚，否则"不能卸载"会连带把"升级"也堵死：
+     * <ul>
+     *   <li>全新（active/known 都没见过）⇒ <b>enable</b>（随本体发的能力默认开着）；</li>
+     *   <li>active 里的版本与新内容**不同** ⇒ <b>upgrade</b>（本体带了新版内置插件 ⇒ 换过去；
+     *       ⚠️ 这正是第 139 轮补的洞：原来只看"有没有见过"，于是新版会被永远挂在旧版上/停用状态）；</li>
+     *   <li>否则 <b>leave</b>：用户手动停用过（known 有、active 没）、或正在 pending（用户正要换版本）⇒
+     *       **一律别插手**（"不能卸载" ≠ "不能停用"，也 ≠ "可以擅自替你启用"）。</li>
+     * </ul>
+     * @return "enable" / "upgrade" / "leave"
+     */
+    static String builtinRegisterAction(String activeVer, String pendingVer, String knownVer, String newVer) {
+        if (pendingVer != null) return "leave";
+        if (activeVer == null) return knownVer == null ? "enable" : "leave";
+        return activeVer.equals(newVer) ? "leave" : "upgrade";
+    }
     /** 把 assets 里那份原封不动写成一个**只读**副本（复用 install 的那套约束：先删再写）。 */
     private static String writeBuiltinCopy(Context ctx, String assetName, String id, String ver) {
         java.io.InputStream in = null;
@@ -744,7 +765,11 @@ final class Plugins {
                         entryOwner.put(entryName, id);
                     }
                     if (!PluginHost.apiCompatible(api)) {
-                        rep.append(" -> API MISMATCH (host wants ").append(PluginHost.API).append(")\n");
+                        // ★ 拒绝原因要说清"区间"（第 139 轮）：只写"host wants 2"会把"太老"也说成"要 2"
+            int av = PluginHost.apiVerdict(api);
+            rep.append(" -> API REJECTED (plugin ").append(api)
+               .append(av > 0 ? " is newer than " : " is older than ")
+               .append("host range ").append(PluginHost.API_MIN).append("..").append(PluginHost.API).append(")\n");
                         dropFromActive(d, id, activeText);
                         activeText = readOrNull(new File(d, ACTIVE));
                         rep.append("   -> removed from active.txt\n");

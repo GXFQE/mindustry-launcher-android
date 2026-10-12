@@ -2166,10 +2166,13 @@ public final class SelfTest {
     private static void pluginPure(Context ctx, List<String> L, int[] stat) {
         L.add("");
         L.add("【S0 插件化：纯函数】");
-        ok(stat, L, PluginHost.API == 1, "插件接口版本 = " + PluginHost.API);
-        ok(stat, L, PluginHost.apiCompatible(PluginHost.API), "api=1 ⇒ 认");
-        ok(stat, L, !PluginHost.apiCompatible(0) && !PluginHost.apiCompatible(2)
-                && !PluginHost.apiCompatible(99), "★ api≠1 一律不认（0 / 2 / 99）");
+        ok(stat, L, PluginHost.API >= PluginHost.API_MIN && PluginHost.API_MIN >= 1,
+                "插件接口版本区间 = " + PluginHost.API_MIN + ".." + PluginHost.API + "（第 139 轮：严格相等 → 兼容区间）");
+        ok(stat, L, PluginHost.apiCompatible(PluginHost.API) && PluginHost.apiCompatible(PluginHost.API_MIN),
+                "区间两端都认（本机版本 + 还认的最老版本）");
+        ok(stat, L, !PluginHost.apiCompatible(PluginHost.API + 1) && !PluginHost.apiCompatible(99)
+                        && !PluginHost.apiCompatible(PluginHost.API_MIN - 1),
+                "★ 越界一律不认（比本机新 / 比最老还老；99 也拒）");
         ok(stat, L, PluginHost.apiCompatible(-1) == false, "负数 api ⇒ 不认（不崩）");
 
         // ★ 元断言：六个拒绝原因都要有一句能说给用户的话，而且**互不相同**
@@ -2527,6 +2530,59 @@ public final class SelfTest {
         for (int i = 1; i < arr.length; i++) pinned = pinned && ("p" + (5 - i)).equals(arr[i]);
         ok(stat, L, pinned,
                 "★★元断言：连注 5 个插件之后 **宿主那一段仍在最前**，且插件之间后注入的排更前");
+        // ── 第 139 轮：扩展点声明 + 接口版本兼容区间 ──
+        L.add("  · 扩展点声明 / 插槽筛选 / 接口版本区间（第 139 轮）");
+        java.util.List<Extensions.Item> ex = Extensions.parse(
+                "# 注释\n"
+                        + "\n"
+                        + "t1\t存档分析\t看看每个存档里有什么\tcom.x.A\n"
+                        + "broken\ttoo-few-fields\n"
+                        + "\t\t\tcom.x.B\n"
+                        + "t2\t\t\tcom.x.C\ttomorrow\n"
+                        + "t3\t工具\t\tcom.x.D\tplugins\n");
+        ok(stat, L, ex.size() == 3 && "t1".equals(ex.get(0).id) && "com.x.A".equals(ex.get(0).entry)
+                        && Extensions.SLOT_PLUGINS.equals(ex.get(0).slot),
+                "★扩展点声明只认「id \\t 标题 \\t 副标题 \\t 入口类名 [\\t 插槽]」；段数不够 / id 空 ⇒ 整行丢掉"
+                        + "（喂 5 行、实得 " + ex.size() + " 条）");
+        ok(stat, L, "t2".equals(ex.get(1).label()) && "工具".equals(ex.get(2).label()),
+                "★标题空 ⇒ 界面回落 id（与插件名同一策略：不印空白）");
+        ok(stat, L, "tomorrow".equals(ex.get(1).slot) && !Extensions.knownSlot("tomorrow")
+                        && Extensions.knownSlot(Extensions.SLOT_PLUGINS)
+                        && Extensions.forSlot(ex, Extensions.SLOT_PLUGINS).size() == 2,
+                "★认不出的插槽：解析时留着（不丢信息）、进不了插件页 —— 只显示认得的 2 条");
+        ok(stat, L, Extensions.parse(null).isEmpty() && Extensions.parse("").isEmpty()
+                        && Extensions.forSlot(null, Extensions.SLOT_PLUGINS).isEmpty()
+                        && Extensions.forSlot(ex, null).isEmpty(),
+                "空文本 / 没声明 / 空表 / 空插槽名 ⇒ 空表（**不许抛异常**：没声明扩展的插件走的就是这条路）");
+        java.util.List<Extensions.Item> exBad = Extensions.parse("t1\tA\tb\tcom.x.A\nbroken\ttoo-few\n");
+        java.util.List<Extensions.Item> exGood = Extensions.parse("t1\tA\tb\tcom.x.A\n");
+        ok(stat, L, exBad.size() == exGood.size() && exBad.size() == 1,
+                "★★元断言：同一份文本里混一条坏行 ⇒ **好条目一条不少**（坏条目只坑自己）");
+        ok(stat, L, PluginHost.apiVerdict(PluginHost.API_MIN) == 0
+                        && PluginHost.apiVerdict(PluginHost.API) == 0
+                        && PluginHost.apiVerdict(PluginHost.API + 1) == 1
+                        && PluginHost.apiVerdict(PluginHost.API_MIN - 1) == -1,
+                "★接口版本三态：区间 [" + PluginHost.API_MIN + ", " + PluginHost.API + "] 收 · 更新 ⇒ 太新 · 更老 ⇒ 太老");
+        ok(stat, L, PluginHost.apiCompatible(1) && PluginHost.apiCompatible(PluginHost.API)
+                        && !PluginHost.apiCompatible(PluginHost.API + 1) && !PluginHost.apiCompatible(0),
+                "★老插件（api=1，第 135 轮写的那些）**照旧能用** —— 改成区间不是收窄");
+        ok(stat, L, PluginHost.apiReasonRes(PluginHost.API + 1) == R.string.plugin_err_api_new_fmt
+                        && PluginHost.apiReasonRes(0) == R.string.plugin_err_api_old_fmt
+                        && PluginHost.apiReasonRes(PluginHost.API) == R.string.plugin_err_api_fmt
+                        && PluginHost.apiReasonRes(PluginHost.API + 1) != PluginHost.apiReasonRes(0),
+                "★拒绝那句话按三态分岔（太新 ⇒ 该升级启动器 / 太老 ⇒ 该更新插件）—— 两句必须不同");
+        ok(stat, L, !Trans.get(ctx, R.string.plugin_err_api_new_fmt).isEmpty()
+                        && !Trans.get(ctx, R.string.plugin_err_api_old_fmt).isEmpty(),
+                "两条分岔文案中英都在（门禁只管键对齐，这里再实取一次）");
+        // ★ 内置补放之后动不动 active：三种情况必须分清（第 139 轮补的洞：新版内置会被永远挂在旧版上）
+        ok(stat, L, "enable".equals(Plugins.builtinRegisterAction(null, null, null, "v2")),
+                "内置：从没见过 ⇒ 启用（随本体发的能力默认开着）");
+        ok(stat, L, "upgrade".equals(Plugins.builtinRegisterAction("v1", null, "v1", "v2")),
+                "★内置：内容换了（active 里是旧版）⇒ **升级**（旧版留在 known 里当回滚目标）");
+        ok(stat, L, "leave".equals(Plugins.builtinRegisterAction(null, null, "v1", "v2"))
+                        && "leave".equals(Plugins.builtinRegisterAction(null, "v2", "v1", "v2"))
+                        && "leave".equals(Plugins.builtinRegisterAction("v2", null, "v2", "v2")),
+                "★内置：用户停用过（known 有、active 没）/ 正在 pending / 已经是这一版 ⇒ 一律别插手");
     }
 
     private static void modsPure(List<String> L, int[] stat) {

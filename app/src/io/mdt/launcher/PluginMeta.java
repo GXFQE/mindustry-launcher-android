@@ -103,7 +103,8 @@ final class PluginMeta {
 
     // ---- 读 zip 里的一个小文件 -------------------------------------------------
 
-    private static String zipText(File apk, String name) {
+    /** 读 zip 里的一份文本（插件自述、扩展点声明都走它）—— 注入**之前**就要知道入口名，所以不能靠 AssetManager。 */
+    static String zipText(File apk, String name) {
         if (apk == null || !apk.isFile()) return null;
         ZipFile z = null;
         try {

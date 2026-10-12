@@ -35,7 +35,16 @@ import dalvik.system.DexClassLoader;
 public final class PluginHost {
 
     /** 壳认的插件接口版本。插件报别的数 ⇒ 拒绝加载。 */
-    public static final int API = 1;
+    public static final int API = 2;
+    /**
+     * 还认的**最老**契约版本（第 139 轮）。抬它 = 老插件被拒，界面会说清"太老、该更新插件"。
+     *
+     * <p>★ 为什么接口版本必须是**区间**而不是"严格相等"：全插件化的前提是"宿主基本不变、插件独立更新"，
+     * 严格相等等于**每加一个插件都得连宿主一起发**。规矩：**加法变更**（多一个可选字段 / 多一个插槽）
+     * **不抬版本**；只有**破坏性变更**（改了必填字段的含义 / 拿掉一个插槽的契约）才抬，
+     * 抬的时候同时决定要不要抬 {@link #API_MIN}（抬了就是明确拒绝老插件）。
+     */
+    public static final int API_MIN = 1;
 
     /**
      * **默认**插件入口类（只在字符串里出现 —— 壳的源码不编译期依赖插件）。
@@ -168,7 +177,14 @@ public final class PluginHost {
         } catch (Throwable t) {
             throw new PluginException("plugin_err_entry", brief(t));
         }
-        if (api != API) throw new PluginException("plugin_err_api", api + " != " + API, api, API);
+        if (!apiCompatible(api)) {
+            // num1 = 插件报的版本；num2 = 它越过的那个界（界面按 apiVerdict 分岔用不着它，日志/自检要看）
+            int v = apiVerdict(api);
+            throw new PluginException("plugin_err_api",
+                    "api " + api + (v > 0 ? " > " : " < ") + (v > 0 ? API : API_MIN)
+                            + " (accepted " + API_MIN + ".." + API + ")",
+                    api, v > 0 ? API : API_MIN);
+        }
 
         // (4) 挂资源
         AssetManager am;
@@ -213,7 +229,28 @@ public final class PluginHost {
 
     /** 接口版本认不认。 */
     public static boolean apiCompatible(int pluginApi) {
-        return pluginApi == API;
+        return apiVerdict(pluginApi) == 0;
+    }
+
+    /**
+     * 接口版本三态（**纯函数**，自检钉）：0 = 收 · +1 = 插件比本机新（该升级启动器）·
+     * -1 = 插件太老（该更新插件）。见 {@link #API} 那段注释里"为什么是区间"。
+     */
+    public static int apiVerdict(int pluginApi) {
+        if (pluginApi > API) return 1;
+        if (pluginApi < API_MIN) return -1;
+        return 0;
+    }
+
+    /**
+     * 接口版本那句话按三态**分岔**（一处判据 —— 界面别自己拼，也别只印一句"不匹配"让用户猜）。
+     * 太新 ⇒ 该升级启动器；太老 ⇒ 该更新插件。
+     */
+    public static int apiReasonRes(int pluginApi) {
+        int v = apiVerdict(pluginApi);
+        if (v > 0) return R.string.plugin_err_api_new_fmt;
+        if (v < 0) return R.string.plugin_err_api_old_fmt;
+        return R.string.plugin_err_api_fmt;
     }
 
     /**

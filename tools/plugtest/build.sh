@@ -64,6 +64,14 @@ build_one() {
   # ★ 自述还要覆盖「**有** description」这一侧（第 136 轮的界面要显示这一行；
   #   没有 description 的老夹具 `plugtest-ok` 反过来验"空字段整条省掉"）—— 两侧都要有样本。
   local json="{\"entry\":\"$entry\",\"name\":\"$name\",\"version\":\"1\",\"author\":\"mdt-fixture\",\"description\":\"$name fixture\"}"
+  # ★ 第 139 轮：扩展点声明（每行一条：id / 标题 / 副标题 / 入口类名 / 插槽(可省)）。
+  #   故意混一条**坏行**（只有 3 段）和一条**未来插槽** —— 前者该被整行丢掉、后者该被跳过，
+  #   两者都不许影响那条好行（界面与自检都钉这条）。
+  local ext="# $name extensions
+$name-tool	$name tool	opens a page from $name	$entry
+broken	too-few-fields
+later	for a slot this host does not know yet	-	$entry	tomorrow
+"
   local d="$OUT/$name"
   local srcpkg="$d/src/io/mdt/plugtest/$suf"
   if [ "${NO_JSON:-0}" = "1" ]; then
@@ -99,9 +107,9 @@ build_one() {
   "$JAVA" -cp "$(jpath "$BT/lib/d8.jar")" com.android.tools.r8.D8 \
     --min-api 26 --output "$(wpath "$d/dex")" "$(wpath "$d/classes.jar")"
   # 把 classes.dex（+ 自述）注入 base.apk（与主构建同一种办法：python 改 zip）
-  "$PY" - "$(jpath "$OUT/base.apk")" "$(jpath "$d/dex/classes.dex")" "$(jpath "$OUT/$name.apk")" "$json" <<'PY'
+  "$PY" - "$(jpath "$OUT/base.apk")" "$(jpath "$d/dex/classes.dex")" "$(jpath "$OUT/$name.apk")" "$json" "$ext" <<'PY'
 import sys, zipfile
-base, dex, out, meta = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
+base, dex, out, meta, ext = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]
 zin = zipfile.ZipFile(base); zout = zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED)
 for it in zin.infolist():
     if it.filename in ('classes.dex',) or it.filename.startswith('classes') and it.filename.endswith('.dex'):
@@ -110,6 +118,8 @@ for it in zin.infolist():
 zout.write(dex, 'classes.dex')
 if meta:
     zout.writestr('assets/plugin.json', meta)   # ★ 插件自述：入口类名一插件一份（第 135 轮）
+if ext:
+    zout.writestr('assets/extensions.txt', ext)   # ★ 扩展点声明（第 139 轮；每行一条，见 Extensions.java）
 zout.close(); zin.close()
 PY
   "$BT/zipalign.exe" -f 4 "$(wpath "$OUT/$name.apk")" "$(wpath "$OUT/$name-aligned.apk")"
@@ -129,6 +139,9 @@ build_one plugtest-noclass 1  PLUGIN-noclass 1 PLUGIN-noclass-2
 build_one plugtest-v1      1  PLUGIN-v1      0 PLUGIN-v1-2
 # 第 138 轮：**有毒夹具** —— 里面塞一个与宿主同名的 `io.mdt.launcher.LogActivity`
 build_one plugtest-poison  1  PLUGIN-poison  0 PLUGIN-poison-2 "$SRC_DIR/src/io/mdt/plugtest/PlugPage.java" poison
+# 第 139 轮：接口版本兼容区间的两侧样本（本机支持 1~2）
+build_one plugtest-api9    9  PLUGIN-api9    0 PLUGIN-api9-2
+build_one plugtest-api0    0  PLUGIN-api0    0 PLUGIN-api0-2
 build_one plugtest-v2      1  PLUGIN-v2      0 PLUGIN-v2-2
 # 第 132 轮：**带它就启动不了**的那一版（回滚要拿真实失败形态验，不能只靠手写 guard）
 build_one plugtest-kill    1  PLUGIN-kill    0 PLUGIN-kill-2 "$SRC_DIR/src/io/mdt/plugtest/PlugPageKill.java"

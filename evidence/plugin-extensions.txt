@@ -1,0 +1,107 @@
+# 第 139 轮证据：扩展点接口 v1（插件页插槽）+ 接口版本改成**兼容区间**
+
+用户 2026-10-12 定：**先把扩展接口搞定**（"这东西算是所有的前置"）；三处口径：
+- 第一批**只做插件页**这一个插槽；
+- **接口版本这轮顺手改成兼容区间**；
+- **先不搬功能**（现有功能等接口验通再搬）。
+
+## 1) 扩展点声明长什么样（每行一条）
+
+插件 APK 里 `assets/extensions.txt`（制表符分段，与内置清单 / 登记表同款）：
+
+```
+# 注释行随便写
+plugtest-v1-tool \t plugtest-v1 tool \t opens a page from plugtest-v1 \t io.mdt.plugtest.v1.PlugPage
+broken \t too-few-fields
+later \t for a slot this host does not know yet \t - \t io.mdt.plugtest.v1.PlugPage \t tomorrow
+```
+字段：`id \t 标题 \t 副标题 \t 入口类名 [\t 插槽]`（插槽缺省 = `plugins`）。
+
+**为什么是"每行一条"而不是塞进 `plugin.json`**：那个极简 JSON 解析器只吃**平铺对象**
+（第 135 轮踩过"深度 1 遇容器要丢键"），而"一台插件声明多条"天然是数组
+⇒ 与其现造一个小状态机，不如沿用本工程已经解析过无数次的制表符行格式（能写注释、diff 友好）。
+
+## 2) 真机结果（dev 构建，三个夹具 + 一个内置）
+
+```
+插件页：
+   plugtest-api0 · 已停用
+   官方 · 处置 L2
+   plugtest-api0 tool                 ← 它声明的条目
+   opens a page from plugtest-api0
+   plugtest-api9 · 已停用
+   官方 · 处置 L2
+   plugtest-api9 tool
+   opens a page from plugtest-api9
+   plugtest-v1 · 生效中 v71a22b1e
+   内置 · 处置 L1
+   plugtest-v1 tool
+   opens a page from plugtest-v1
+
+点「plugtest-v1 tool」之后：
+   返回
+   已加载 71a22b1e.apk（接口版本 1）
+   来自插件的字符串  [PLUGIN-v1]
+```
+⇒ ✅ **点扩展条目真的进了插件自己的页**（`PluginHost.openInjected(host, apk, 条目.entry)`，与「打开」同一条路）。
+⇒ ✅ **坏行（只有 3 段）与"未来插槽"（tomorrow）都没有出现在界面上**，而且**没有影响那条好行**。
+
+## 3) 接口版本：严格相等 → **兼容区间**
+
+- `PluginHost.API = 2`（本机认识的最新契约）、`API_MIN = 1`（还认的最老契约）；
+- 三态纯函数 `apiVerdict(int)`：**0 = 收** · **+1 = 插件比本机新** · **-1 = 插件太老**；
+- `apiCompatible` = 判据 0；注入循环与 UI 都只用这一处（**不再各写一遍**）；
+- 拒绝那句话**按三态分岔**（`apiReasonRes`）：太新 ⇒「该升级启动器」，太老 ⇒「该更新插件」——
+  一句"不匹配"会让用户不知道该升哪一边。
+
+真机（两个越界夹具 + 一个老夹具）：
+
+```
+order  = probe=76bf4ef8(builtin) api0=1(official)
+- probe=76bf4ef8 … entry=OK api=1                       ← 老插件（api=1）**照旧能用**
+- api0=1 … entry=OK api=0 -> API REJECTED (plugin 0 is older than host range 1..2)
+injected = 1 / 2
+```
+（api=9 那个同样被拒，报告写 `is newer than host range 1..2`。）
+
+⚠️ 第一遍这里读到的是旧措辞 `API MISMATCH (host wants 2)` —— 判据本身已经是 `apiCompatible`（**只有一处**），
+只是那句话没跟着区间改；已改成 "plugin N is older/newer than host range 1..2"。
+
+## 4) 自检抓到我"改了语义没改尺子"
+
+第一遍真机自检 **1212 / 2 失败**，两条都是**旧断言写死了严格相等**：
+```
+❌ 插件接口版本 = 2                    （原来断言 PluginHost.API == 1）
+❌ ★ api≠1 一律不认（0 / 2 / 99）      （原来要求 api=2 也被拒）
+```
+⇒ 已按区间语义重写（区间两端都认 / 越界一律不认 / 99 也拒）。
+**这正是自检该干的事**：改了行为语义，尺子必须同时改，否则它会替旧世界说话。
+
+## 5) 顺带补的一个洞：内置插件"不能卸载" ≠ "不能升级"
+
+内置的版本键 = **sha 前 8 位** ⇒ 本体换了内置内容就是**新版本**；而原先的规则是
+"**从没登记过**才默认启用" ⇒ 一个已经登记过的 id 换了内容会被永远挂在旧版/停用上。
+⇒ 抽成纯函数 `Plugins.builtinRegisterAction(activeVer, pendingVer, knownVer, newVer)`：
+**enable**（全新）/ **upgrade**（active 里是旧版 ⇒ 换过去，旧版留在 `known` 当回滚目标）/ **leave**（用户停用过、
+正在 pending、或已经是这一版 ⇒ **别插手**）。
+
+真机（把 `probe.apk` 换成带声明的新夹具 ⇒ sha 变了）：
+```
+active  = probe=71a22b1e
+builtin = probe:release=ok probe:upgrade      ← 升级，而不是"停在旧版"
+- probe=71a22b1e … INJECTED … entry=OK api=1
+```
+
+## 6) 自检与构建
+
+`1205 → 1217 / 0`（+12：扩展点解析 4 条含"混一条坏行 ⇒ 好条目一条不少"的元断言 · 接口版本三态与分岔 4 条 ·
+内置 upgrade 判据 3 条 · 文案实取 1 条）。product `BUILD OK`、`(no app/assets …)`、起得来；
+设备清场（api0/api9/内置夹具都删掉），插件页「还没有装插件。」。
+
+## 7) 这一格之后还缺什么（全插件化的顺序）
+
+1. **多插槽**：现在只有插件页。加插槽 = 加常量（**加法变更，不抬接口版本**）；
+2. **条目渲染再细一点**：图标（宿主还没有一套条目图标 ⇒ v1 先不要这个字段）、分组、空态；
+3. **搬运功能**：用这套接口把第一个真实功能（存档/模组分析之类）做成官方插件 ——
+   这才是"全插件化"的第一个活体用例；
+4. 分发（下载 + sha256 / 签名校验）。

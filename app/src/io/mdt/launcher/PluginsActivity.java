@@ -119,6 +119,8 @@ public class PluginsActivity extends BaseActivity {
                 addAction(label, sub, new Runnable() {
                     @Override public void run() { rowDialog(id); }
                 });
+                // ★ 这台插件声明的**能力条目**（第 139 轮）：列在它那一节下面，点条目 = 进那一条自己的页
+                if (probeVer != null) addExtensions(id, probeVer);
             }
         }
 
@@ -342,12 +344,22 @@ public class PluginsActivity extends BaseActivity {
 
     /** 「打开」：注入过就走宿主 CL 那条路，没注入过才自建 DexClassLoader（同一个 dex 不许注册两次）。 */
     private void open(final String id, final String ver) {
+        open(id, ver, null);
+    }
+
+    /**
+     * 同上，但可以指定入口类（第 139 轮：点插件声明的**能力条目**时，要开的是那一条自己的入口类）。
+     *
+     * @param entryOverride null = 用插件自述里的默认入口
+     */
+    private void open(final String id, final String ver, final String entryOverride) {
         File apk = Plugins.apkOf(this, id, ver);
         View page;
         try {
             // ★ 入口类按**这个插件自己的**自述取（第 135 轮）——多插件下"点谁开谁"全靠它
             //   （共用同一个入口 FQN 时，宿主 CL 只会认第一个注入的那个插件）
-            String entry = PluginMeta.entryOf(this, apk, PluginHost.DEFAULT_ENTRY);
+            String entry = entryOverride != null ? entryOverride
+                    : PluginMeta.entryOf(this, apk, PluginHost.DEFAULT_ENTRY);
             PluginHost.Loaded l = Plugins.isInjected(this, id, ver)
                     ? PluginHost.openInjected(this, apk, entry)
                     : PluginHost.load(this, apk, entry);
@@ -358,9 +370,12 @@ public class PluginsActivity extends BaseActivity {
             if (v instanceof View) box.addView((View) v);
             page = box;
         } catch (PluginHost.PluginException e) {
-            page = fallback(PluginHost.reasonRes(e.reason) == R.string.plugin_err_api_fmt
-                    ? Trans.get(this, PluginHost.reasonRes(e.reason), e.num1, e.num2)
-                    : Trans.get(this, PluginHost.reasonRes(e.reason)));
+            // ★ 接口版本那句按"太新 / 太老"分岔（第 139 轮）：一句"不匹配"让用户不知道该升哪一边
+            int rr = PluginHost.reasonRes(e.reason);
+            page = fallback(rr == R.string.plugin_err_api_fmt
+                    ? Trans.get(this, PluginHost.apiReasonRes(e.num1), e.num1,
+                            PluginHost.API_MIN, PluginHost.API)
+                    : Trans.get(this, rr));
         } catch (Throwable t) {
             page = fallback(Trans.get(this, R.string.plugin_err_other));
         }
@@ -484,6 +499,35 @@ public class PluginsActivity extends BaseActivity {
         t.setTextSize(size);
         t.setPadding(0, dp(4), 0, dp(4));
         into.addView(t);
+    }
+
+    /**
+     * 插件声明的"能力条目"那一行（第 139 轮）。
+     * ⚠️ 读的是插件 APK 里的声明（几 KB），**不加载插件代码** ⇒ 列表页不因为"某台插件坏了"而打不开；
+     * 真正的加载推迟到用户点它的那一刻（那条路本来就有 try/catch 兜底）。
+     */
+    private void addExtensions(final String id, final String ver) {
+        List<Extensions.Item> items = Extensions.forSlot(
+                Extensions.of(Plugins.apkOf(this, id, ver)), Extensions.SLOT_PLUGINS);
+        for (final Extensions.Item it : items) {
+            LinearLayout box = new LinearLayout(this);
+            box.setOrientation(LinearLayout.VERTICAL);
+            box.setPadding(dp(28), dp(6), dp(8), dp(6));
+            TextView title = new TextView(this);
+            title.setText(it.label());
+            title.setTextSize(15f);
+            box.addView(title);
+            if (it.subtitle != null && !it.subtitle.isEmpty()) {
+                TextView sub = new TextView(this);
+                sub.setText(it.subtitle);
+                sub.setTextSize(12f);
+                box.addView(sub);
+            }
+            box.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) { open(id, ver, it.entry); }
+            });
+            mBody.addView(box);
+        }
     }
 
     private void addAction(String label, final Runnable r) {
