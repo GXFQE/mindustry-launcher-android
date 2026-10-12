@@ -1,0 +1,110 @@
+# 第 137 轮证据：插件三分（官方内置 / 官方外接 / 第三方）
+
+用户 2026-10-12 定：
+- **载体** = 随本体发 APK，首次启动释放到内部存储；
+- **注入顺序 内置最低**（任何外部插件都能盖它）；
+- **内置的停用等级最低**（原话「停用了啥也没了啊」）⇒ 默认 **L1 最宽**，且**没有 L3 隔离**。
+
+## 0) 为什么内置必须"先落成文件"
+
+ART 只能从**真实文件路径**加载 dex（S0 硬约束）⇒ asset 里的字节必须先释放到内部存储，
+再走现有那套注入机器。⇒ 「不能卸载」= ① 界面不给删除入口 ② **文件被删/改坏时下次启动自动放回**。
+
+## 1) 载体与清单（构建期生成，不手抄哈希）
+
+- `app/assets/plugins/<id>.apk`（产品）+ `app/assets-dev/plugins/<id>.apk`（**测试夹具只进 dev 包**）；
+  `build.sh` 的 `[1/4]` 把两层拷进临时镜像、喂 `aapt2 -A`，并跑 `tools/builtin-manifest.py` 生成清单：
+
+```
+   (no app/assets -- building without assets)              ← 产品版这次没有内置插件
+   dev-only assets: included (…/app/assets-dev)
+   builtin manifest: 1 plugin(s) -> …/mdt-launcher-assets/plugins/manifest.txt
+     probe  probe.apk  76bf4ef8…（sha256 全量）
+```
+- 包里核对：**产品包 `assets/` 条目 = 0**；dev 包 = `assets/plugins/manifest.txt` + `assets/plugins/probe.apk`（2 条）。
+  ⇒ 测试夹具**没有**进产品包 ✓（产品 623 968 B / dev 812 527 B）。
+- 登记版本键 = **sha256 前 8 位**（内容变了就是新版本 ⇒ 换内容能自然升级/回滚）。
+
+## 2) 首次释放 + 注入（清空登记与目录后的一次真启动）
+
+```
+== plugin early inject ==
+active = probe=76bf4ef8
+order  = probe=76bf4ef8(builtin)
+builtin = probe:release=ok probe:enabled
+- probe=76bf4ef8 file=76bf4ef8.apk entry=v1.PlugPage INJECTED … entry=OK api=1
+injected = 1 / 1
+```
+内部存储上：`app_hub/plugins/probe/76bf4ef8.apk`（**只读** `-r--------`，12755 B）；
+`active.txt = probe=76bf4ef8`；`trust.txt = probe⇥76bf4ef8⇥builtin`。
+
+## 3) 界面三分 / 不给删除 / 信息里说明
+
+```
+插件页:  plugtest-v1 · 生效中 v76bf4ef8
+        内置 · 处置 L1                     ← 副行三分（内置 / 官方 / 第三方）
+行弹窗:  打开 ｜ 停用（退出重开生效）｜ 处置 L1 —— 改成 L2 ｜ 插件信息 ｜ 取消
+        ↑ **没有「删除」**
+信息:    … 来源：内置（随本体发放，不能卸载）
+         处置：L1 宽容 —— 先留着，下次启动再试
+         文件版本：76bf4ef8
+```
+
+## 4) 「不能卸载」的第二半：删掉文件 ⇒ 下次启动放回
+
+```
+删掉 app_hub/plugins/probe（整个目录）后冷启动：
+  active = probe=76bf4ef8
+  builtin = probe:release=ok            ← 放回（**没有** :enabled：known 里有它 ⇒ 不擅自改启用状态）
+  - probe=76bf4ef8 … INJECTED … entry=OK api=1
+  ls app_hub/plugins/probe → 76bf4ef8.apk
+```
+
+## 5) 第三方盖内置（内置最低）
+
+```
+装一个第三方夹具（与内置导出同名宿主类 PluginProbe）：
+  active = probe=76bf4ef8 tp=1
+  order  = probe=76bf4ef8(builtin) tp=1(third)      ← 内置先注入、第三方后注入
+  host tag PluginProbe = PLUGIN-tp                  ← 第三方赢内置 ✓
+```
+
+## 6) 内置的等级封顶与"停用出口"（🔴 这一步抓到真 bug）
+
+**干净重做**（文件在位、**没有** `trust.txt` ⇒ 必须靠"清单 + sha"认出内置）：
+
+```
+lastskip（id,失败版,回滚到,action,等级,隔离）= probe  76bf4ef8    disable  L2  no
+目录 = 只剩 76bf4ef8.apk，**没有** quarantine/
+再启动一次 ⇒ active = ''（停用保持，不会被补放悄悄开回来 ⇒ "不能卸载" ≠ "不能停用"）
+```
+- 期望 ①：等级被**夹到 L2**（内置没有 L3）✓；② 落点是**停用**（known == 当前版 ⇒ 没有回滚目标）✓；
+  ③ **没有隔离** ✓；④ 停用之后不会被自动开回来 ✓。
+
+### 🔴 抓到的 bug：同一段判据写了两处 ⇒ 漂了
+
+第一次跑这一步时读到的是：
+
+```
+lastskip = probe  76bf4ef8    disable  **L3**  **yes**     ← 内置被当成 L3 **隔离**了
+app_hub/plugins/probe/quarantine/76bf4ef8.apk             ← 文件真被挪走
+```
+根因：来源判据原先在 **两处各写一遍** —— `Plugins.trustOf`（界面那条路）我加内置时改了，
+`Plugins.trustFrom`（**安全阀那条路**）漏改 ⇒ 那里回落签名判据 ⇒ 把内置认成 `official`
+⇒ `capLevel` 不夹 ⇒ 走 L3 分支隔离。
+⇒ 修法：合并成 **`PluginTrust.resolve(recorded, builtinHit, signature)` 一处**，两条路都调它；
+自检补一条**元断言**「内置经安全阀那条路也要被夹到 L2」（正是这个 bug 的尺子）。
+
+### ⚠️ 顺带一条测法教训
+
+第一次跑 F 之前我**没清干净上一次实验的残留**（文件在上一个 bug 留下的 `quarantine/` 里、
+`trust.txt` 又被我删了）⇒ `isBuiltin` 靠 sha 比必然判否 ⇒ 读到的 `L3/no` 是"文件根本不在候选位置"
+造成的，**不是**修好了。⇒ 验证前先把上一次的场景**清干净**，否则判据会被污染（与 §85.14
+「轮询判据要含『这份产物是新的』」同族）。
+
+## 7) 自检 / 构建
+
+`dev_m3_selftest`：**1200 / 0**（第 136 轮末 1188 ⇒ 本轮 +12：清单解析三条 / 版本键 / 默认等级 /
+封顶 / 三档顺序两条+元断言 / 同级保序 / `resolve` 唯一判据 / 经安全阀那条路的封顶元断言 / 内置循环）。
+product：`BUILD OK`、起得来、插件页「还没有装插件。」、dex 扫描 dev 专属全 0、
+**产品包 `assets/` 条目 = 0**。

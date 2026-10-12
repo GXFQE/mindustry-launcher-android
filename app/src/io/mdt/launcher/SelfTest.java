@@ -2337,9 +2337,25 @@ public final class SelfTest {
                         && "L1".equals(Plugins.nextLevelAfterFail("L1", 1))
                         && "L3".equals(Plugins.nextLevelAfterFail("L3", 99)),
                 "★L1 用完重试预算 ⇒ 升到 L2（否则「宽容」会变成「每隔一次启动就死一次」）；别的档不升");
+        // ★★ 来源判据只能有一处（resolve）：第 137 轮真机踩的正是"两处各写一遍 ⇒ 漂了"
+        ok(stat, L, PluginTrust.BUILTIN.equals(PluginTrust.resolve("builtin", false, PluginTrust.OFFICIAL))
+                        && PluginTrust.BUILTIN.equals(PluginTrust.resolve(null, true, PluginTrust.OFFICIAL))
+                        && PluginTrust.OFFICIAL.equals(PluginTrust.resolve("official", false, PluginTrust.THIRD))
+                        && PluginTrust.THIRD.equals(PluginTrust.resolve(null, false, PluginTrust.THIRD))
+                        && PluginTrust.THIRD.equals(PluginTrust.resolve("脏值", false, PluginTrust.THIRD)),
+                "★来源判据的唯一入口 resolve：记录优先 → 清单命中（内置）→ 签名兜底");
+        ok(stat, L, "L2".equals(PluginTrust.capLevel(PluginTrust.resolve("builtin", false, PluginTrust.OFFICIAL),
+                        PluginTrust.L3)),
+                "★★元断言：**内置经安全阀那条路也要被夹到 L2** —— 反例就是漏认 builtin 时"
+                        + "回落成 official、L3 不夹、内置被真隔离（真机 lastskip 抓到过）");
         ok(stat, L, "L2".equals(Plugins.cycleLevel("L1")) && "L3".equals(Plugins.cycleLevel("L2"))
                         && "L1".equals(Plugins.cycleLevel("L3")),
                 "等级循环 L1→L2→L3→L1（界面上那个「改成下一档」按钮）");
+        ok(stat, L, "L2".equals(Plugins.cycleLevelFor(PluginTrust.BUILTIN, PluginTrust.L1))
+                        && "L1".equals(Plugins.cycleLevelFor(PluginTrust.BUILTIN, PluginTrust.L2))
+                        && "L1".equals(Plugins.cycleLevelFor(PluginTrust.BUILTIN, PluginTrust.L3))
+                        && "L3".equals(Plugins.cycleLevelFor(PluginTrust.THIRD, PluginTrust.L2)),
+                "★内置的循环只在 **L1↔L2**（它封顶 L2：界面若写「改成 L3」，用户点了会发现什么都没变 —— 真机当场抓到过）");
         String[] sl3 = Plugins.parseSkipLine("probe\t2\t1\trollback\tL3\tyes");
         ok(stat, L, sl3 != null && "L3".equals(sl3[4]) && "yes".equals(sl3[5]),
                 "跳过记录新格式（6 段：带等级与是否隔离）解析得出来");
@@ -2440,6 +2456,50 @@ public final class SelfTest {
         ok(stat, L, !Trans.get(ctx, R.string.plugin_action_info).isEmpty()
                         && !Trans.get(ctx, R.string.plugin_info_selfname).isEmpty(),
                 "新加的两条文案中英都在（门禁 RES-01 只管键对齐，这里再实取一次）");
+
+        // ── 第 137 轮：三分（官方内置 / 官方外接 / 第三方）──
+        L.add("  · 内置插件：清单解析 / 版本键 / 等级夹取 / 三档注入顺序（第 137 轮）");
+        String sha64 = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+        java.util.List<String[]> bm = Plugins.parseBuiltinManifest(
+                "# 注释\n"
+                        + "probe\tprobe.apk\t" + sha64 + "\n"
+                        + "\n"
+                        + "bad\ttoo-few-fields\n"
+                        + "short\tshort.apk\t0123\n"
+                        + "other\tother.apk\t" + sha64.toUpperCase() + "\n");
+        ok(stat, L, bm.size() == 2 && "probe".equals(bm.get(0)[0]) && "probe.apk".equals(bm.get(0)[1])
+                        && sha64.equals(bm.get(0)[2]),
+                "★内置清单：只认「id \\t 文件名 \\t sha256」三段（实得 " + bm.size() + " 条）");
+        ok(stat, L, sha64.equals(bm.get(1)[2]),
+                "★sha 统一转小写（大小写不同会被当成「被改过」⇒ 静默回落成外部插件）");
+        ok(stat, L, Plugins.parseBuiltinManifest(null).isEmpty()
+                        && Plugins.parseBuiltinManifest("").isEmpty()
+                        && Plugins.parseBuiltinManifest("只\t两段\n").isEmpty(),
+                "空 / 没有清单 / 段数不对 ⇒ 空表（**不许抛异常**：产品版没有内置插件时就走这条路）");
+        ok(stat, L, "01234567".equals(Plugins.builtinVersion(sha64))
+                        && Plugins.builtinVersion("abc") == null
+                        && Plugins.builtinVersion(null) == null,
+                "★内置的登记版本键 = sha256 **前 8 位**（内容变了就是新版本；太短 ⇒ null 不登记）");
+        ok(stat, L, PluginTrust.L1.equals(PluginTrust.defaultLevel(PluginTrust.BUILTIN))
+                        && PluginTrust.L1.equals(PluginTrust.DEFAULT_BUILTIN)
+                        && PluginTrust.L3.equals(PluginTrust.defaultLevel(PluginTrust.THIRD))
+                        && PluginTrust.L2.equals(PluginTrust.defaultLevel(PluginTrust.OFFICIAL)),
+                "★默认等级：内置 **L1 最宽**（用户定：停用了啥也没了）/ 官方 L2 / 第三方 L3");
+        ok(stat, L, PluginTrust.L2.equals(PluginTrust.capLevel(PluginTrust.BUILTIN, PluginTrust.L3))
+                        && PluginTrust.L1.equals(PluginTrust.capLevel(PluginTrust.BUILTIN, PluginTrust.L1))
+                        && PluginTrust.L3.equals(PluginTrust.capLevel(PluginTrust.THIRD, PluginTrust.L3)),
+                "★内置封顶 L2（没有 L3：隔离是把文件挪走，而内置下次启动会被放回）；别的档不夹");
+        String tr3 = "t\t1\tthird\nb\t1\tbuiltin\no\t1\tofficial\n";
+        ok(stat, L, "[b, o, t]".equals(Plugins.injectOrder(tr3, "t=1\nb=1\no=1\n").toString()),
+                "★三档注入顺序：内置 → 官方外接 → 第三方（内置最低 ⇒ 谁都能盖它）");
+        ok(stat, L, "[b, o, t]".equals(Plugins.injectOrder(tr3, "b=1\no=1\nt=1\n").toString())
+                        && Plugins.injectOrder(tr3, "t=1\nb=1\no=1\n")
+                                .equals(Plugins.injectOrder(tr3, "b=1\no=1\nt=1\n")),
+                "★元断言：两种登记表顺序结果**逐项相同**（三档顺序由来源决定，不吃文件顺序）");
+        ok(stat, L, "[b2, b1, o1, t1]".equals(Plugins.injectOrder(
+                        "b1\t1\tbuiltin\nb2\t1\tbuiltin\no1\t1\tofficial\nt1\t1\tthird\n",
+                        "t1=1\nb2=1\no1=1\nb1=1\n").toString()),
+                "同档内部保持登记表相对顺序（b2 在 b1 前面 ⇒ 排 b2 先）");
     }
 
     private static void modsPure(List<String> L, int[] stat) {

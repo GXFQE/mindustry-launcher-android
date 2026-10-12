@@ -250,12 +250,40 @@ else
   echo "   (no app/res -- building without resources)"
 fi
 
+# ---- assets：内置插件（第 137 轮）--------------------------------------------
+# 内置插件 = **随本体发放、不能卸载**的那些：APK 放进 `assets/plugins/<id>.apk`，
+# 运行时在进程最早点释放到内部存储（ART 只能加载真实文件路径 —— 不能直接用 asset 里的字节）。
+# 清单由**构建期生成**（id / 文件名 / sha256），运行时就靠 sha 判"还是不是原生那一份"。
+#   · 产品版看 `app/assets`；dev 版额外叠一层 `app/assets-dev`（**测试夹具只进 dev 包**）。
+#   · 两层都拷进临时镜像再喂 `aapt2 -A`（与 res 同一条理由：含中文的工程路径下 aapt2 会炸）。
+ASSET_ARGS=()
+ASSET_SRC="$ROOT/app/assets"
+ASSET_DEV="$ROOT/app/assets-dev"
+if [ -d "$ASSET_SRC" ] || { [ "$DEBUGGABLE" = "true" ] && [ -d "$ASSET_DEV" ]; }; then
+  ASSET_DIR="${ASSET_DIR:-/tmp/mdt-launcher-assets}"
+  rm -rf "$ASSET_DIR"; mkdir -p "$ASSET_DIR"
+  [ -d "$ASSET_SRC" ] && cp -r "$ASSET_SRC/." "$ASSET_DIR/"
+  if [ "$DEBUGGABLE" = "true" ] && [ -d "$ASSET_DEV" ]; then
+    cp -r "$ASSET_DEV/." "$ASSET_DIR/"
+    echo "   dev-only assets: included ($ASSET_DEV)"
+  fi
+  # 内置清单：扫 assets/plugins/*.apk，算 sha256（**别手抄哈希** —— 改了 APK 忘了改清单，
+  # 运行时就把它当"被改过的内置插件"、静默回落成外部插件，那种 bug 极难查）
+  if [ -d "$ASSET_DIR/plugins" ]; then
+    "$PYTHON" "$ROOT/tools/builtin-manifest.py" "$(jpath "$ASSET_DIR")" || exit 1
+  fi
+  ASSET_ARGS=( -A "$(wpath "$ASSET_DIR")" )
+else
+  echo "   (no app/assets -- building without assets)"
+fi
+
 "$BT/aapt2.exe" link \
   -o "$(wpath "$OUT/base.apk")" \
   -I "$(wpath "$AJAR")" \
   --manifest "$(wpath "$MANIFEST")" \
   --min-sdk-version 26 --target-sdk-version 36 \
   --java "$(wpath "$OUT/gen")" \
+  ${ASSET_ARGS[@]+"${ASSET_ARGS[@]}"} \
   ${RES_ARGS[@]+"${RES_ARGS[@]}"}
 
 # ---- [2/4] compile ---------------------------------------------------------

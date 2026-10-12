@@ -79,6 +79,149 @@ final class Plugins {
     /** L1 的重试计数（制表符 `id \t ver \t 次数`）—— 连败到预算就升档，否则"再试一次"会变成循环。 */
     static final String RETRY = "retry.txt";
 
+    // ---- 内置插件（随本体发放，第 137 轮）--------------------------------------
+    //
+    // 载体：本体 APK 里的 `assets/plugins/<id>.apk` + **构建期生成**的 `assets/plugins/manifest.txt`
+    //       （`id \t 文件名 \t sha256`，见 tools/builtin-manifest.py）。
+    // 为什么要释放：ART 只能从**真实文件路径**加载 dex（S0 硬约束）⇒ asset 里的字节必须先落成文件。
+    // 「不能卸载」= 界面不给删除入口 + 文件被删/改坏时**下次启动自动放回**。
+
+    /** 内置清单在 assets 里的路径。 */
+    static final String BUILTIN_MANIFEST = "plugins/manifest.txt";
+
+    /** 内置插件的登记版本键 = **sha256 前 8 位**（内容变了就是新版本 ⇒ 换内容能自然升级/回滚）。 */
+    static String builtinVersion(String sha) {
+        if (sha == null || sha.length() < 8) return null;
+        return sha.substring(0, 8);
+    }
+
+    /**
+     * 解析内置清单（**纯函数**）：每行 `id \t 文件名 \t sha256`。
+     * 空行 / `#` 注释跳过；段数不对、sha 长度不对的行**整行丢掉**（宁可少一个内置插件，
+     * 也不能拿半条记录去动文件）。
+     * @return 每条 {id, fileName, sha256}，顺序照文件
+     */
+    static List<String[]> parseBuiltinManifest(String text) {
+        List<String[]> out = new ArrayList<String[]>();
+        for (String line : lines(text)) {
+            String s = line.trim();
+            if (s.isEmpty() || s.startsWith("#")) continue;
+            String[] p = s.split("\t");
+            if (p.length != 3) continue;
+            String id = p[0].trim(), file = p[1].trim(), sha = p[2].trim();
+            if (id.isEmpty() || file.isEmpty() || sha.length() != 64) continue;
+            out.add(new String[] { id, file, sha.toLowerCase(java.util.Locale.ROOT) });
+        }
+        return out;
+    }
+
+    /** 读一份 assets 里的文本（没有 ⇒ null）。 */
+    static String readAsset(Context ctx, String path) {
+        java.io.InputStream in = null;
+        try {
+            in = ctx.getAssets().open(path);
+            byte[] buf = new byte[4096];
+            StringBuilder sb = new StringBuilder();
+            int n;
+            while ((n = in.read(buf)) > 0) sb.append(new String(buf, 0, n, "UTF-8"));
+            return sb.toString();
+        } catch (Throwable t) {
+            return null;
+        } finally {
+            try { if (in != null) in.close(); } catch (Throwable ignored) { }
+        }
+    }
+
+    /** 当前这一版里内置了哪些插件（清单为空 / 没有清单 ⇒ 空表 = 本体没带内置插件）。 */
+    static List<String[]> builtins(Context ctx) {
+        return parseBuiltinManifest(readAsset(ctx, BUILTIN_MANIFEST));
+    }
+
+    /**
+     * 这个 id+版本是不是**原生那份内置插件**（清单里有、且文件 sha 逐字相同）。
+     * 哈希对不上 ⇒ 不是内置（被换过/写坏），回落签名判据 —— 反正下次启动会被放回原生那份。
+     */
+    static boolean isBuiltin(Context ctx, String id, String ver) {
+        if (id == null || ver == null) return false;
+        for (String[] b : builtins(ctx)) {
+            if (!b[0].equals(id)) continue;
+            if (!ver.equals(builtinVersion(b[2]))) return false;
+            return b[2].equalsIgnoreCase(PluginTrust.sha256File(apkOf(ctx, id, ver)));
+        }
+        return false;
+    }
+
+    /** 清单里有这个 id 吗（不管哈希）—— 界面"给不给删除按钮"用它（哈希对不上时会放回，用户也删不掉）。 */
+    static boolean isBuiltinId(Context ctx, String id) {
+        for (String[] b : builtins(ctx)) if (b[0].equals(id)) return true;
+        return false;
+    }
+
+    /**
+     * 释放 / 放回内置插件（**进程最早点、安全阀之后**调）。
+     *
+     * <p>每一步：① 文件不在或 sha 不符 ⇒ 从 assets 重写一份只读副本；② 来源记成 `builtin`；
+     * ③ **只有从没登记过**（active/pending/known 里都没有）才默认启用 —— 用户手动停用过的内置插件
+     * 不能被这次补放悄悄开回来（"不能卸载"不等于"不能停用"）。
+     *
+     * @return 给启动报告看的一句话（没有内置插件 ⇒ 空串，零成本）
+     */
+    static String releaseBuiltins(Context ctx) {
+        List<String[]> items = builtins(ctx);
+        if (items.isEmpty()) return "";
+        StringBuilder sb = new StringBuilder();
+        for (String[] b : items) {
+            String id = b[0], file = b[1], sha = b[2];
+            String ver = builtinVersion(sha);
+            if (ver == null) continue;
+            File dst = apkOf(ctx, id, ver);
+            boolean native_ = sha.equalsIgnoreCase(PluginTrust.sha256File(dst));
+            if (!native_) {
+                String r = writeBuiltinCopy(ctx, file, id, ver);
+                sb.append(id).append(":release=").append(r).append(' ');
+                native_ = sha.equalsIgnoreCase(PluginTrust.sha256File(dst));
+            }
+            if (!native_) {
+                sb.append(id).append(":STILL-BAD ");
+                continue;
+            }
+            File tf = new File(dir(ctx), TRUST);
+            write(tf, trustPut(readOrNull(tf), id, ver, PluginTrust.BUILTIN));
+            boolean seen = stateIds(readOrNull(new File(dir(ctx), ACTIVE))).contains(id)
+                    || stateIds(readOrNull(new File(dir(ctx), PENDING))).contains(id)
+                    || stateGet(readOrNull(new File(dir(ctx), KNOWN)), id) != null;
+            if (!seen) {
+                File af = new File(dir(ctx), ACTIVE);
+                write(af, statePut(readOrNull(af), id, ver));   // 新内置 ⇒ 默认启用（本次就生效）
+                sb.append(id).append(":enabled ");
+            }
+        }
+        return sb.toString().trim();
+    }
+
+    /** 把 assets 里那份原封不动写成一个**只读**副本（复用 install 的那套约束：先删再写）。 */
+    private static String writeBuiltinCopy(Context ctx, String assetName, String id, String ver) {
+        java.io.InputStream in = null;
+        try {
+            File dst = apkOf(ctx, id, ver);
+            File parent = dst.getParentFile();
+            if (parent != null && !parent.isDirectory() && !parent.mkdirs()) return "FAILED mkdirs";
+            if (dst.exists() && !dst.delete()) return "FAILED cannot replace";
+            in = ctx.getAssets().open("plugins/" + assetName);
+            java.io.FileOutputStream out = new java.io.FileOutputStream(dst);
+            byte[] buf = new byte[1 << 16];
+            int n;
+            while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+            out.close();
+            boolean ro = dst.setReadOnly();
+            return ro ? "ok" : "ok(rw)";
+        } catch (Throwable t) {
+            return "FAILED " + brief(t);
+        } finally {
+            try { if (in != null) in.close(); } catch (Throwable ignored) { }
+        }
+    }
+
     /**
      * 🔴 「这一程**没有**注入任何插件（安全阀跳过了）」的标记，只活一次启动。
      *
@@ -295,9 +438,9 @@ final class Plugins {
 
     /** 某个版本的来源；没有记录 ⇒ 现算一次（拿不到签名按第三方）。 */
     static String trustOf(Context ctx, String id, String ver) {
-        String t = pairGet(trust(ctx), id, ver);
-        if (PluginTrust.OFFICIAL.equals(t) || PluginTrust.THIRD.equals(t)) return t;
-        return PluginTrust.classify(ctx, apkOf(ctx, id, ver));
+        File apk = apkOf(ctx, id, ver);
+        return PluginTrust.resolve(pairGet(trust(ctx), id, ver), isBuiltin(ctx, id, ver),
+                PluginTrust.classify(ctx, apk));
     }
 
     /** 来源登记全文。 */
@@ -312,7 +455,7 @@ final class Plugins {
      */
     static String levelOf(String levelsText, String trust, String id) {
         String lv = stateGet(levelsText, id);
-        return PluginTrust.validLevel(lv) ? lv : PluginTrust.defaultLevel(trust);
+        return PluginTrust.capLevel(trust, PluginTrust.validLevel(lv) ? lv : PluginTrust.defaultLevel(trust));
     }
 
     /** L1 的重试计数（`id=ver:次数`）。 */
@@ -347,6 +490,19 @@ final class Plugins {
         if (PluginTrust.L1.equals(level)) return PluginTrust.L2;
         if (PluginTrust.L2.equals(level)) return PluginTrust.L3;
         return PluginTrust.L1;
+    }
+
+    /**
+     * 按来源决定循环到哪一档（**纯函数**）。
+     * 🔴 内置只在 **L1 ↔ L2** 之间转：它被封顶在 L2（{@link PluginTrust#capLevel}），
+     * 界面上若还写「改成 L3」，用户点了会发现**什么都没变** —— 那种自相矛盾正是
+     * 2026-10-12 真机当场抓到的（弹窗写着"改成 L3"，实际被夹回 L2）。
+     */
+    static String cycleLevelFor(String trust, String level) {
+        if (PluginTrust.BUILTIN.equals(trust)) {
+            return PluginTrust.L1.equals(level) ? PluginTrust.L2 : PluginTrust.L1;
+        }
+        return cycleLevel(level);
     }
 
     // ---- 界面上的名字与信息行（第 136 轮） -------------------------------------
@@ -467,15 +623,18 @@ final class Plugins {
      */
     static List<String> injectOrder(String trustText, String activeText) {
         List<String> ids = stateIds(activeText);
+        List<String> builtin = new ArrayList<String>();
         List<String> official = new ArrayList<String>();
         List<String> third = new ArrayList<String>();
         for (String id : ids) {
             String ver = stateGet(activeText, id);
             String t = pairGet(trustText, id, ver);
-            if (PluginTrust.OFFICIAL.equals(t)) official.add(id);
-            else third.add(id);                        // 第三方 / 没记录 ⇒ 都排后面（能盖官方）
+            if (PluginTrust.BUILTIN.equals(t)) builtin.add(id);      // 最低：谁都能盖它
+            else if (PluginTrust.OFFICIAL.equals(t)) official.add(id);
+            else third.add(id);                                       // 第三方 / 没记录 ⇒ 能盖官方与内置
         }
         List<String> out = new ArrayList<String>(ids.size());
+        out.addAll(builtin);
         out.addAll(official);
         out.addAll(third);
         return out;
@@ -498,9 +657,20 @@ final class Plugins {
                 skipOnce(base, d, guard);
                 return;
             }
+            // ★ 内置插件释放/放回（第 137 轮）：放在**安全阀之后** —— 上一次没走完的那一程
+            //   不该顺手改登记（否则刚放回的会被 skipOnce 当成"失败的那个"处理）
+            String released = releaseBuiltins(base);
             String activeText = promotePending(d);
             List<String> ids = stateIds(activeText);
             if (ids.isEmpty()) {
+                // 内置释放失败（assets 缺文件 / 写盘失败）也要留一句话，否则"内置没生效"只能靠猜
+                if (!released.isEmpty()) {
+                    write(new File(Data.hubDir(base), BOOT_REPORT),
+                            "== plugin early inject ==\n"
+                                    + "time    = " + new java.util.Date() + "\n"
+                                    + "builtin = " + oneLine(released) + "\n"
+                                    + "-> nothing to inject (builtin release did not produce a usable file)\n");
+                }
                 // 零成本路径**不写盘**；只有"上一次留了清单、这一次没插件了"才要清一下
                 // （不清的话「打开」会一直以为某一版还住在宿主 CL 里 ⇒ 走错分支）
                 File inj = new File(d, INJECTED);
@@ -515,7 +685,8 @@ final class Plugins {
                     + "time   = " + new java.util.Date() + "\n"
                     + "pid    = " + android.os.Process.myPid() + "\n"
                     + "active = " + oneLine(activeText) + "\n"
-                    + "order  = " + orderLine(readOrNull(new File(d, TRUST)), activeText, order) + "\n";
+                    + "order  = " + orderLine(readOrNull(new File(d, TRUST)), activeText, order) + "\n"
+                    + (released.isEmpty() ? "" : "builtin = " + released + "\n");
 
             // ★ 先落安全阀，再动 dex —— 顺序不能反：反了就是"崩了也不知道上次注入了谁"
             write(new File(d, GUARD), head);
@@ -771,9 +942,10 @@ final class Plugins {
 
     /** 来源登记里取（没有就现算一次）—— 跳过一次处置时要用它决定默认等级。 */
     private static String trustFrom(String trustText, Context ctx, File d, String id, String ver) {
-        String t = pairGet(trustText, id, ver);
-        if (PluginTrust.OFFICIAL.equals(t) || PluginTrust.THIRD.equals(t)) return t;
-        return PluginTrust.classify(ctx, new File(new File(d, id), ver + ".apk"));
+        // ★ 与界面那条路**共用同一处判据**（第 137 轮真机踩过：这里漏认 builtin，
+        //   导致安全阀把内置当"官方"⇒ 等级封顶失效 ⇒ 内置被 L3 隔离）
+        return PluginTrust.resolve(pairGet(trustText, id, ver), isBuiltin(ctx, id, ver),
+                PluginTrust.classify(ctx, new File(new File(d, id), ver + ".apk")));
     }
 
     /** 把某一版挪进 `plugins/<id>/quarantine/`（挪成功 ⇒ true）。 */
@@ -999,12 +1171,19 @@ final class Plugins {
         write(p, stateRemove(readOrNull(p), id));
     }
 
-    /** 卸载：删掉整个 `plugins/<id>/` + 从三份登记里摘掉。 */
-    static void uninstall(Context ctx, String id) {
+    /**
+     * 卸载：删掉整个 `plugins/<id>/` + 从三份登记里摘掉。
+     * 🔴 **内置插件拒绝卸载**（用户 2026-10-12 定：「内置随启动器本体一起发放，不能卸载」）——
+     * 就算这里放行，下次启动 releaseBuiltins 也会把它放回来，界面上不如根本不给这个动作。
+     * @return true = 真卸了；false = 拒绝了（内置）
+     */
+    static boolean uninstall(Context ctx, String id) {
+        if (isBuiltinId(ctx, id)) return false;
         disable(ctx, id);
         File k = new File(dir(ctx), KNOWN);
         write(k, stateRemove(readOrNull(k), id));
         deleteTree(new File(dir(ctx), id));
+        return true;
     }
 
     private static void deleteTree(File f) {

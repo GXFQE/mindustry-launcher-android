@@ -113,8 +113,7 @@ public class PluginsActivity extends BaseActivity {
                 String probeVer = st[1].isEmpty() ? (vs.length > 0 ? vs[vs.length - 1] : null) : st[1];
                 final String tr = probeVer == null ? PluginTrust.THIRD : Plugins.trustOf(this, id, probeVer);
                 final String sub = Trans.get(this, R.string.plugin_trust_short_fmt,
-                        Trans.get(this, PluginTrust.OFFICIAL.equals(tr)
-                                ? R.string.plugin_trust_short_official : R.string.plugin_trust_short_third),
+                        Trans.get(this, trustShortRes(tr)),
                         Plugins.levelOf(Plugins.levels(this), tr, id));
                 final String rowLabel = label;
                 addAction(label, sub, new Runnable() {
@@ -200,7 +199,8 @@ public class PluginsActivity extends BaseActivity {
         // ★ 来源 + 当前处置等级写进弹窗的正文（列表行有宽度预算，塞不下这些字）
         final String trust = newest == null ? PluginTrust.THIRD : Plugins.trustOf(this, id, newest);
         final String lv = Plugins.levelOf(Plugins.levels(this), trust, id);
-        final String nextLv = Plugins.cycleLevel(lv);
+        // ★ 按来源算下一档：内置只在 L1↔L2 之间转（它被封顶在 L2，给 L3 只会骗人）
+        final String nextLv = Plugins.cycleLevelFor(trust, lv);
 
         List<String> items = new ArrayList<String>();
         final List<String> actions = new ArrayList<String>();
@@ -211,8 +211,12 @@ public class PluginsActivity extends BaseActivity {
         }
         items.add(Trans.get(this, R.string.plugin_action_disable));
         actions.add("disable");
-        items.add(Trans.get(this, R.string.plugin_action_uninstall));
-        actions.add("uninstall");
+        // 🔴 内置插件**不给删除入口**（随本体发放，不能卸载）—— 就算给了，下次启动也会被放回来
+        final boolean builtinRow = Plugins.isBuiltinId(this, id);
+        if (!builtinRow) {
+            items.add(Trans.get(this, R.string.plugin_action_uninstall));
+            actions.add("uninstall");
+        }
         if (qv != null) {
             items.add(Trans.get(this, R.string.plugin_action_restore_fmt, qv));
             actions.add("restore");
@@ -297,8 +301,7 @@ public class PluginsActivity extends BaseActivity {
                 meta == null ? null : meta.author,
                 meta == null ? null : meta.description,
                 entry,
-                Trans.get(this, PluginTrust.OFFICIAL.equals(trust) ? R.string.plugin_trust_official
-                                                                   : R.string.plugin_trust_third),
+                Trans.get(this, trustLongRes(trust)),
                 Trans.get(this, levelRes(lv)),
                 fileVer,
         };
@@ -314,6 +317,20 @@ public class PluginsActivity extends BaseActivity {
                 .setMessage(sb.toString())
                 .setPositiveButton(Trans.get(this, R.string.cancel), null)
                 .show();
+    }
+
+    /** 来源 → 界面上那个短名（唯一映射处：列表行与信息弹窗共用）。 */
+    static int trustShortRes(String trust) {
+        if (PluginTrust.BUILTIN.equals(trust)) return R.string.plugin_trust_short_builtin;
+        return PluginTrust.OFFICIAL.equals(trust) ? R.string.plugin_trust_short_official
+                                                  : R.string.plugin_trust_short_third;
+    }
+
+    /** 来源 → 完整说法（信息弹窗里用）。 */
+    static int trustLongRes(String trust) {
+        if (PluginTrust.BUILTIN.equals(trust)) return R.string.plugin_trust_builtin;
+        return PluginTrust.OFFICIAL.equals(trust) ? R.string.plugin_trust_official
+                                                  : R.string.plugin_trust_third;
     }
 
     /** 等级 → 界面上那句人话（唯一映射处：别在几个地方各写一份）。 */

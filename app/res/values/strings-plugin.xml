@@ -75,4 +75,7 @@
     <string name="plugin_restored_fmt">Put v%1$s back. It takes effect after a restart.</string>
     <string name="plugin_restore_failed">Could not put it back.</string>
     <string name="plugin_level_set_fmt">Handling for %1$s is now %2$s (from the next launch).</string>
-</resources>
+
+    <!-- 第 137 轮：三分（内置 / 官方外接 / 第三方）。内置 = 随本体发放、不能卸载 -->
+    <string name="plugin_trust_builtin">Built-in (ships with the app, cannot be uninstalled)</string>
+    <string name="plugin_trust_short_builtin">Built-in</string></resources>
