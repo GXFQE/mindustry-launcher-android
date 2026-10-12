@@ -54,7 +54,8 @@ build_one() {
   local tpl="${6:-$SRC_DIR/src/io/mdt/plugtest/PlugPage.java}"
   echo "== [$name] api=$api tag=$tag tag2=$tag2 dropclass=$dropclass tpl=$(basename "$tpl") =="
   local d="$OUT/$name"; mkdir -p "$d/src/io/mdt/plugtest" "$d/src/io/mdt/launcher" "$d/classes" "$d/dex"
-  sed "s/__API__/$api/" "$tpl" > "$d/src/io/mdt/plugtest/PlugPage.java"
+  # 入口页也带上这一版的编译期 tag（`PlugPage.tag()`）——多插件下"谁渲染的页"靠它才看得见
+  sed -e "s/__API__/$api/" -e "s/__TAGPAGE__/$tag/" "$tpl" > "$d/src/io/mdt/plugtest/PlugPage.java"
   sed "s/__TAG__/$tag/"     "$SRC_DIR/src/io/mdt/launcher/PluginProbe.java" > "$d/src/io/mdt/launcher/PluginProbe.java"
   sed "s/__TAG2__/$tag2/"   "$SRC_DIR/src/io/mdt/launcher/PluginProbe2.java" > "$d/src/io/mdt/launcher/PluginProbe2.java"
   # 缺类变体：把入口类删掉（壳必须在"预热预检"就拒掉，而不是等到点下去才炸）

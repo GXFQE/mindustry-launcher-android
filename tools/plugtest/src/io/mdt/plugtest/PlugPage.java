@@ -25,10 +25,21 @@ public final class PlugPage {
         return ctx.getString(R.string.plug_hello);
     }
 
+    /**
+     * 这一版夹具的**编译期标记**（`build.sh` 把 `__TAGPAGE__` 换掉，与同名宿主类那份 tag 同源）。
+     *
+     * <p>★ 加它的理由（2026-10-12 第 134 轮，多插件覆盖顺序实验）：装了 ≥2 个插件时，
+     * 入口类是**同一个 FQN**，宿主 CL 只会认其中一个 ⇒ 点 A 那行可能渲染出 B 的类。
+     * 把 tag 打进出**页面文字**，这件事就从"读代码推出来"变成"屏幕上看得见"。
+     */
+    public static String tag() {
+        return "__TAGPAGE__";
+    }
+
     /** 用插件自己的资源造一个 View（颜色也来自插件资源，避免"看起来像壳画的"）。 */
     public static View createView(Context ctx) {
         TextView t = new TextView(ctx);
-        t.setText(ctx.getString(R.string.plug_hello));
+        t.setText(ctx.getString(R.string.plug_hello) + "  [" + tag() + "]");
         t.setTextColor(ctx.getResources().getColor(R.color.plug_accent));
         t.setTextSize(20f);
         t.setPadding(32, 32, 32, 32);
