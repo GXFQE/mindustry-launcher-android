@@ -59,7 +59,9 @@ build_one() {
   local suf="${name#plugtest-}"; suf="${suf//-/}"
   local pkg="io.mdt.plugtest.$suf"
   local entry="$pkg.PlugPage"
-  local json="{\"entry\":\"$entry\",\"name\":\"$name\",\"version\":\"1\",\"author\":\"mdt-fixture\"}"
+  # ★ 自述还要覆盖「**有** description」这一侧（第 136 轮的界面要显示这一行；
+  #   没有 description 的老夹具 `plugtest-ok` 反过来验"空字段整条省掉"）—— 两侧都要有样本。
+  local json="{\"entry\":\"$entry\",\"name\":\"$name\",\"version\":\"1\",\"author\":\"mdt-fixture\",\"description\":\"$name fixture\"}"
   local d="$OUT/$name"
   local srcpkg="$d/src/io/mdt/plugtest/$suf"
   if [ "${NO_JSON:-0}" = "1" ]; then

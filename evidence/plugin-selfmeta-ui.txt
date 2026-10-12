@@ -68,3 +68,36 @@ RES-04  app/res/values/strings-plugin.xml:60 key 'plugin_info_author' 的值有�
   它把 padding 吃掉 ⇒ **总大小可以连着几轮一个字节都不变**（实测 `619 872 B` 三轮不变，而 dex raw 一直在长；
   上一轮我还按"总大小没变"怀疑过构建）。要量增长就量 **dex 的 raw 大小**。
 - ⚠️ 教训同族：**"读数没变"不等于"没变化"** —— 先问"这个量对我要测的东西敏感吗"。
+## 6) 补验：`description` 的**两侧**（第 136 轮收官时才补上的口子）
+
+上一轮验过的是"**空**字段整条省掉"，但夹具的 `plugin.json` **根本没写 `description`** ⇒
+"有描述时显示那一行"从来没验过 —— 这正是本工程那条"夹具要能**分辨两种解释**"要防的事。
+给夹具补上 `description`（`tools/plugtest/build.sh`：`"description":"$name fixture"`），
+同时保留没有自述的老夹具 `plugtest-ok` 作反侧：
+
+```
+★ 打开 d1（plugtest-v1，有自述）：
+   内部 id：d1
+   名称：plugtest-v1
+   版本：1
+   作者：mdt-fixture
+   说明：plugtest-v1 fixture          ← 有描述 ⇒ 显示
+   入口类：io.mdt.plugtest.v1.PlugPage
+   来源：官方（与本应用同一签名）
+   处置：L2 回滚 —— 退回上一份能用的版本
+   文件版本：1
+
+★ 打开 d2（plugtest-ok，没有自述）：
+   内部 id：d2
+   入口类：io.mdt.plugtest.PlugPage
+   来源：官方（与本应用同一签名）
+   处置：L2 回滚 —— 退回上一份能用的版本
+   文件版本：1
+   （名称 / 版本 / 作者 / 说明 **四行全不在**）
+```
+⇒ 同一屏里「有 ⇒ 显示」与「无 ⇒ 省掉」两侧都拍到了，`null` 一次都没出现。
+
+## 7) 收官时的自检与构建
+
+`dev_m3_selftest`：**1188 / 0**（与补验前一致 —— 这轮没动产品代码，只补了夹具与证据）。
+product：`BUILD OK`、起得来、插件页「还没有装插件。」。
