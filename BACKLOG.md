@@ -19,7 +19,7 @@
 | 03 | [`docs/backlog/03-一-P1-功能同步.md`](docs/backlog/03-一-P1-功能同步.md) | 一、P1：桌面版功能对照表（自动备份 / 导出 / 日志页 / 设置页 / 深浅色 / 进出一致） |
 | 04 | [`docs/backlog/04-二-P2-新增功能.md`](docs/backlog/04-二-P2-新增功能.md) | 二、P2：新增功能（`.msav` 解析器 / 智能模组管理 / HJSON 选型与实测 / 模组开发器 / 论坛 / 地图下载 / 深链 / 另一个窗口 / ★ **2.4b 改用 mdtbbs.cn 官方公开 API + MindAuth 登录** / **2.5b 游戏版本的第二条国内源 `file.mdtbbs.cn`**） |
 | 05 | [`docs/backlog/05-三-P2-M4-拆分建议.md`](docs/backlog/05-三-P2-M4-拆分建议.md) | 三、P2：M4 拆分建议 |
-| 06 | [`docs/backlog/06-四-P2P3-交互与美化.md`](docs/backlog/06-四-P2P3-交互与美化.md) | 四、P2/P3：交互与美化（UX 债 / 美化清单 / 存储模型核实 / CAS 实测账 / 版本命名 / 两条静默出错防线） |
+| 06 | [`docs/backlog/06-四-P2P3-交互与美化.md`](docs/backlog/06-四-P2P3-交互与美化.md) | 四、P2/P3：交互与美化（UX 债 / 美化清单 / 存储模型核实 / **4.4b 计划任务：游戏本体也走 CAS（2026-10-12 登记，未开工）** / CAS 实测账 / 版本命名 / 两条静默出错防线） |
 | 07 | [`docs/backlog/07-五-建议的动手顺序.md`](docs/backlog/07-五-建议的动手顺序.md) | 五、建议的动手顺序 |
 | 08 | [`docs/backlog/08-六-明确的不做清单.md`](docs/backlog/08-六-明确的不做清单.md) | 六、明确的"不做"清单（省得以后反复讨论） |
 
