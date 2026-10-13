@@ -112,13 +112,19 @@ public class SlotActivity extends BaseActivity {
                                 .setTitle(R.string.slot_page_export)
                                 .setItems(new String[]{
                                         Trans.get(SlotActivity.this, R.string.slot_op_import_slot),
-                                        Trans.get(SlotActivity.this, R.string.slot_op_export_slot)},
+                                        Trans.get(SlotActivity.this, R.string.slot_op_export_slot),
+                                        // ★ 第 141 轮：分享用整槽包（脱敏导出）。
+                                        //   ⚠️ 新项**加在最后** —— 前两项的下标（0/1）一个都没动，
+                                        //     所以任何"按下标点第几项"的老断言/肌肉记忆都不受影响。
+                                        Trans.get(SlotActivity.this, R.string.slot_op_share_slot)},
                                         new android.content.DialogInterface.OnClickListener() {
-                                            @Override public void onClick(android.content.DialogInterface d, int w) {
+                                            @Override
+                                            public void onClick(android.content.DialogInterface d, int w) {
                                                 Data.Slot s = findSlot();
                                                 if (s == null) { gone(); return; }
                                                 if (w == 0) SlotIo.importSlot(SlotActivity.this, s);
-                                                else SlotIo.exportSlot(SlotActivity.this, s);
+                                                else if (w == 1) SlotIo.exportSlot(SlotActivity.this, s);
+                                                else if (w == 2) SlotIo.shareSlot(SlotActivity.this, s);
                                             }
                                         })
                                 .setNegativeButton(R.string.cancel, null)

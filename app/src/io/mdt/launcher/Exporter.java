@@ -236,6 +236,31 @@ public final class Exporter {
     }
 
     /**
+     * 打包时的**逐条目钩子**（第 141 轮「分享包」用它剥身份信息）。
+     *
+     * <p>两件事，都按**相对槽数据根的路径**（zip 里的条目名）判：
+     * <ul>
+     *   <li>{@link #drop(String)} true ⇒ 这一条**整份不进包**（也不计入 `Result.files`）；</li>
+     *   <li>{@link #bytesOf(String)} 非 null ⇒ 用这份字节**代替**文件内容（null = 原样流式拷贝）。</li>
+     * </ul>
+     *
+     * <p>★ 两个刻意的设计：
+     * <ol>
+     *   <li>参数是 `rel` 而不是 `File` —— 判据必须**只认根级那个名字**
+     *     （`mods/config/settings.bin` 是模组自己的文件，`Data.contentSkipped` 之外
+     *     谁都不许动它）。给 `File` 的话调用方很自然会写成 `getName().equals(...)`，
+     *     那就是"任意深度都命中"。</li>
+     *   <li>**没有默认实现**：本接口是给"有明确剥/丢清单"的场景用的，
+     *     `null` 表示"什么都不做"（老行为），别实现一个空壳再传进来。</li>
+     * </ol>
+     */
+    interface Xform {
+        boolean drop(String rel);
+
+        byte[] bytesOf(String rel) throws IOException;
+    }
+
+    /**
      * 把一批条目打成一个 zip 写进 SAF 目标（**批量导出的唯一出口**）。
      *
      * ★ 与 {@link #zipTo}（整槽备份那条）的分工：那个吃"目录树"，这个吃"一份一份的东西"
@@ -540,6 +565,22 @@ public final class Exporter {
      */
     public static Result zipTo(Context ctx, Uri uri, File base, List<File> roots)
             throws IOException {
+        return zipTo(ctx, uri, base, roots, null);
+    }
+
+    /**
+     * 同上，带**逐条目钩子**（第 141 轮：分享包用它把 `settings.bin` 换成剥过身份信息的那一份、
+     * 并把 `server_list.json` 整份丢掉）。
+     *
+     * <p>★ 为什么不另写一个"分享包专用"的遍历：整槽导出这一条路上有**三处口径**
+     * （{@link Data#contentRoots} 打什么 / {@link Data#contentSkipped} 跳过什么 /
+     * {@link Util#relOf} 条目名怎么拼），任何一处抄第二遍都会漂 ——
+     * 而"分享包比普通包少了几个文件"这种漂是**没有任何症状**的。
+     *
+     * @param x 逐条目钩子（`null` = 老行为，原样打包）
+     */
+    public static Result zipTo(Context ctx, Uri uri, File base, List<File> roots, Xform x)
+            throws IOException {
         Result r = new Result();
         Counting counter = new Counting(openOut(ctx, uri));
         ZipOutputStream zos = new ZipOutputStream(new BufferedOutputStream(counter, BUF));
@@ -549,7 +590,7 @@ public final class Exporter {
             if (roots != null) {
                 for (File root : roots) {
                     if (root == null || !root.exists()) continue;
-                    addTree(base, root, zos, r);
+                    addTree(base, root, zos, r, x);
                 }
             }
         } finally {
@@ -563,6 +604,11 @@ public final class Exporter {
 
     private static void addTree(File base, File f, ZipOutputStream zos, Result r)
             throws IOException {
+        addTree(base, f, zos, r, null);
+    }
+
+    private static void addTree(File base, File f, ZipOutputStream zos, Result r, Xform x)
+            throws IOException {
         if (skip(f)) return;
 
         if (f.isDirectory()) {
@@ -574,11 +620,17 @@ public final class Exporter {
                 zos.closeEntry();
                 return;
             }
-            for (File k : kids) addTree(base, k, zos, r);
+            for (File k : kids) addTree(base, k, zos, r, x);
             return;
         }
 
         String rel = relOf(base, f);
+        // ★ 钩子①：整份不进包。**放在建条目之前** —— 于是它既不出现在 zip 里，
+        //   也不会计进 `Result.files`（"已导出 N 个文件"那句报数才是真的）。
+        if (x != null && x.drop(rel)) return;
+        // ★ 钩子②：要替换内容的（分享包的 settings.bin）—— 走字节数组，不再读原文件
+        byte[] repl = x == null ? null : x.bytesOf(rel);
+
         ZipEntry e = new ZipEntry(rel);
         // ⚠️ ZipEntry.setTime 对 1980 之前 / 2107 之后的时间会抛 IllegalArgumentException
         //    （坏掉的 mtime 在用户导入过的文件上真出现过）；越界就不带时间，不带也能解。
@@ -586,16 +638,21 @@ public final class Exporter {
         if (t >= 315532800000L && t <= 4354819199000L) e.setTime(t);
 
         zos.putNextEntry(e);
-        InputStream in = new FileInputStream(f);
-        try {
-            byte[] buf = new byte[BUF];
-            int n;
-            while ((n = in.read(buf)) > 0) {
-                zos.write(buf, 0, n);
-                r.rawBytes += n;
+        if (repl != null) {
+            zos.write(repl);
+            r.rawBytes += repl.length;
+        } else {
+            InputStream in = new FileInputStream(f);
+            try {
+                byte[] buf = new byte[BUF];
+                int n;
+                while ((n = in.read(buf)) > 0) {
+                    zos.write(buf, 0, n);
+                    r.rawBytes += n;
+                }
+            } finally {
+                closeQuietly(in);
             }
-        } finally {
-            closeQuietly(in);
         }
         zos.closeEntry();
         r.files++;

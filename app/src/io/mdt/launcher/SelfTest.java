@@ -118,10 +118,15 @@ public final class SelfTest {
     /** 第 127 轮：批量导入（模组 / 地图 / 存档 / 蓝图）用的槽 */
     public static final String SLOT_BATCH = "m3-batch";
 
+    /** ★ 第 141 轮：分享包（脱敏导出）—— 一个放夹具的源槽 + 一个解包回去的目标槽 */
+    public static final String SLOT_SHARE = "m3-share";
+    public static final String SLOT_SHARE_DST = "m3-share-dst";
+
     private static final String[] TEST_SLOTS = {
             SLOT, SLOT_RENAMED, CLONE_SRC, CLONE_DST, CLONE_EMPTY, CLONE_EMPTY_DST, SLOT_MODS,
             SLOT_SET, SLOT_PACK, SLOT_PACK_DST, SLOT_SAVE, SLOT_GONE, SLOT_GONE2,
-            SLOT_MODE, SLOT_MODE2, SLOT_S2M, SLOT_MSCH, SLOT_BP, SLOT_F23, SLOT_BATCH};
+            SLOT_MODE, SLOT_MODE2, SLOT_S2M, SLOT_MSCH, SLOT_BP, SLOT_F23, SLOT_BATCH,
+            SLOT_SHARE, SLOT_SHARE_DST};
 
     /**
      * 本工程**自己的全部页面**（㊱ 基类检查用）。
@@ -284,6 +289,8 @@ public final class SelfTest {
             batchIo(ctx, L, stat);
             // ★ 第 128 轮：F9 深链（判据表 + 整包定类 + 端到端 + **安装后清单门禁**）
             deepLink(ctx, L, stat);
+            // ★ 第 141 轮：分享包（脱敏导出）—— 判据表 + 两面元断言 + zip 往返 + 拒绝路径
+            sharePack(ctx, L, stat);
             // ★ 篡改对象池的用例放**最后**：它会在池里留下一个内容坏掉的对象，
             //   之后任何"再备份一次"都会因为 `has()` 命中而复用坏对象（CAS 的固有
             //   假设是"池内不可变"）。放在最后就不影响别的用例。
@@ -620,6 +627,247 @@ public final class SelfTest {
             out.add(p[2]);
         }
         return out;
+    }
+
+    /**
+     * ★ 第 141 轮：**分享包**（整槽导出的脱敏版）。
+     *
+     * <p>四段，每段都有一个"反方向"：
+     * <ol>
+     *   <li><b>判据表</b>：该命中的必须命中，**看着像但不该命中的也必须放过**
+     *     （`name` / `mod-*-steamid` 是用户明确要保留的两档；`usid` 没有横线、`ipx` 加了后缀都不算）；</li>
+     *   <li><b>两面元断言</b>：没有敏感键的槽 ⇒ 计划什么都不删、字节**原样**
+     *     （连重编码都不做 ⇒ 打出来的包与「导出整槽」逐字节相同）；</li>
+     *   <li><b>端到端往返</b>：真跑一次 {@link Exporter#zipTo}（带 {@link SlotIo#shareXform}）
+     *     ⇒ 解包回一个槽 ⇒ 敏感键没了、`server_list.json` 没了、
+     *     **其余条目 md5 全同**、模组目录里的同名 `settings.bin` **不许被动**；</li>
+     *   <li><b>拒绝路径</b>：`settings.bin` 读不出来 ⇒ 计划失败（界面据此拒绝导出——
+     *     宁可这一次不导出，也不许把"没确认过"的文件塞进一个标着"已脱敏"的包里）。</li>
+     * </ol>
+     *
+     * <p>⚠️ 全部落盘都在自己的两个一次性测试槽里（{@link #SLOT_SHARE} / {@link #SLOT_SHARE_DST}），
+     * 收尾统一删（在 {@link #TEST_SLOTS} 里登记）。
+     */
+    private static void sharePack(Context ctx, List<String> L, int[] stat) throws IOException {
+        L.add("── 第 141 轮：分享包（整槽导出的脱敏版）──");
+        try {
+            // ── ① 判据表：两面（命中的 / 看着像但不该命中的）─────────────────
+            Object[][] sens = {
+                    {"usid-103.91.208.146:64934", Boolean.TRUE,  "每台服务器一条的登录身份"},
+                    {"usid-a:1",                  Boolean.TRUE,  "同上（键名形态不固定）"},
+                    {"uuid",                      Boolean.TRUE,  "与 usid 并列的身份值"},
+                    {"ip",                        Boolean.TRUE,  "上次连过的服务器"},
+                    {"ip-bans",                   Boolean.TRUE,  "你封过的人的 IP"},
+                    {"banned-names",              Boolean.TRUE,  "你封过的人的昵称"},
+                    // ↓ 这一半才是"判据有牙"的地方：下面每一条都容易被顺手删掉
+                    {"name",                      Boolean.FALSE, "自己的昵称 ⇒ 用户明确选的就是「保留」"},
+                    {"mod-foo-steamid",           Boolean.FALSE, "模组的工坊 ID ⇒ 另一族，不在本轮范围"},
+                    {"save-0-name",               Boolean.FALSE, "存档名 ⇒ 内容，不是身份"},
+                    {"usid",                      Boolean.FALSE, "★前缀必须带 `-`，裸 `usid` 不许命中"},
+                    {"ipx",                       Boolean.FALSE, "★`ip` 是**精确**匹配，不是前缀"},
+                    {"uuidx",                     Boolean.FALSE, "同上"},
+                    {"ip-bans-2",                 Boolean.FALSE, "同上"},
+                    {"",                          Boolean.FALSE, "空键"},
+            };
+            int bad = 0;
+            StringBuilder badList = new StringBuilder();
+            for (Object[] c : sens) {
+                boolean want = ((Boolean) c[1]).booleanValue();
+                boolean got = SharePack.isSensitive((String) c[0]);
+                if (want != got) {
+                    bad++;
+                    badList.append('「').append(c[0]).append("」期望").append(want)
+                           .append("实得").append(got).append(' ');
+                }
+            }
+            ok(stat, L, bad == 0, "① 判据表 " + sens.length + " 条两面全过"
+                    + (bad == 0 ? "" : "（错的：" + badList + "）")
+                    + " —— 含 `name` / `mod-*-steamid` **故意不删**那两条");
+            ok(stat, L, SharePack.dropTop("server_list.json")
+                            && !SharePack.dropTop("mods/config/server_list.json")
+                            && !SharePack.dropTop("server_list.json.bak"),
+                    "① ★只丢**根级**那一个 `server_list.json`"
+                            + "（模组目录下的同名文件、加了后缀的都不动）");
+
+            // ── 夹具：两个槽 ────────────────────────────────────────────────
+            String e1 = Data.createSlot(ctx, SLOT_SHARE);
+            String e2 = Data.createSlot(ctx, SLOT_SHARE_DST);
+            ok(stat, L, e1 == null && e2 == null, "建测试槽 " + SLOT_SHARE + " / " + SLOT_SHARE_DST
+                    + (e1 == null && e2 == null ? "" : "：" + e1 + e2));
+            if (e1 != null || e2 != null) return;
+            File slot = Data.slotDir(ctx, SLOT_SHARE);
+            File setFile = new File(slot, "settings.bin");
+
+            // ── ② 干净夹具：一个敏感键都没有 ⇒ 计划什么都不删、字节原样 ──────
+            Object[][] clean = {
+                    {"name",            SettingsBin.TYPE_STRING, "player"},
+                    {"musicvol",        SettingsBin.TYPE_INT,    Integer.valueOf(100)},
+                    {"save-0-name",     SettingsBin.TYPE_STRING, "[gold]demo"},
+                    {"mod-foo-enabled", SettingsBin.TYPE_BOOL,   Boolean.TRUE},
+                    {"mod-foo-steamid", SettingsBin.TYPE_STRING, "3591460873"},
+            };
+            writeSettings(setFile, clean, false);
+            SettingsBin.Values cv = SettingsBin.read(setFile);
+            SharePack.Stripped cs = SharePack.strip(cv);
+            SharePack.Plan cplan = SharePack.plan(slot);
+            ok(stat, L, cplan.ok() && cplan.untouched() && cplan.removedKeys == 0
+                            && cplan.settings == null && cs.removedCount() == 0,
+                    "② ★两面元断言：**没有**敏感键的槽 ⇒ 计划一个键都不删、`settings` 留 null"
+                            + "（= 打包时**原样拷贝**，连重编码都不做）");
+            ok(stat, L, SettingsBin.sameValues(cv, cs.values)
+                            && SettingsBin.diffBytes(SettingsBin.encode(cv),
+                                    SettingsBin.encode(cs.values)) == 0,
+                    "② ★再证一遍：剥完的键表与原件逐条相同、**编出来的字节差 0 字节**"
+                            + "（这条就是「只删该删的」）");
+
+            // ── ③ 含敏感键的夹具：剥掉的逐条对得上，剩下的一个不少 ────────────
+            Object[][] dirty = {
+                    {"name",         SettingsBin.TYPE_STRING, "player"},
+                    {"usid-a:1",     SettingsBin.TYPE_STRING, "AAAA"},
+                    {"usid-b:2",     SettingsBin.TYPE_STRING, "BBBB"},
+                    {"uuid",         SettingsBin.TYPE_STRING, "UUUU"},
+                    {"ip",           SettingsBin.TYPE_STRING, "srv.example:6567"},
+                    {"ip-bans",      SettingsBin.TYPE_BINARY, new byte[]{1, 2}},
+                    {"banned-names", SettingsBin.TYPE_BINARY, new byte[]{3}},
+                    {"musicvol",     SettingsBin.TYPE_INT,    Integer.valueOf(100)},
+                    {"mod-foo-steamid", SettingsBin.TYPE_STRING, "3591460873"},
+            };
+            writeSettings(setFile, dirty, false);
+            SettingsBin.Values dv = SettingsBin.read(setFile);
+            SharePack.Stripped ds = SharePack.strip(dv);
+            List<String> wantRemoved = java.util.Arrays.asList(
+                    "usid-a:1", "usid-b:2", "uuid", "ip", "ip-bans", "banned-names");
+            ok(stat, L, ds.removed.equals(wantRemoved) && ds.serverIdCount() == 2,
+                    "③ 剥掉的键**按原顺序逐条**对得上（" + ds.removed + "），"
+                            + "其中服务器身份 " + ds.serverIdCount() + " 项");
+            List<String> leftKeys = new ArrayList<>(ds.values.all().keySet());
+            ok(stat, L, leftKeys.equals(java.util.Arrays.asList("name", "musicvol", "mod-foo-steamid"))
+                            && "player".equals(ds.values.getString("name", null))
+                            && ds.values.getInt("musicvol", -1) == 100
+                            && "3591460873".equals(ds.values.getString("mod-foo-steamid", null)),
+                    "③ ★剩下的键**一个不少、顺序不变、值没动**（" + leftKeys + "）");
+            File encFile = new File(slot, "selftest-encoded.bin");
+            write(encFile, SettingsBin.encode(ds.values));
+            SettingsBin.Values back = SettingsBin.readSafe(encFile, null);
+            ok(stat, L, back != null && SettingsBin.sameValues(ds.values, back),
+                    "③ ★剥完再编出来的字节**能被读回**（恰好 EOF + 键表逐条一致）"
+                            + "—— 这是「分享包还能被游戏导入」的前提");
+            encFile.delete();
+
+            // ── ④ 端到端：真跑两次 zipTo（普通 / 分享），再解包回来比字节 ─────
+            write(new File(slot, "server_list.json"), "{\"name\":\"x\"}".getBytes("UTF-8"));
+            write(new File(new File(slot, "saves"), "a.msav"), "SAVE-A".getBytes("UTF-8"));
+            write(new File(new File(slot, "maps"), "b.msav"), "MAP-B".getBytes("UTF-8"));
+            write(new File(new File(slot, "mods"), "keep/test.jar"), "JAR".getBytes("UTF-8"));
+            // ★ 模组目录里放一个**同名**文件 —— 判据只认根级 ⇒ 这个必须原样进包
+            File modSettings = new File(new File(slot, "mods"), "keep/settings.bin");
+            write(modSettings, "MOD-SETTINGS".getBytes("UTF-8"));
+            String md5Before = Util.md5(setFile);
+            String md5ModBefore = Util.md5(modSettings);
+
+            List<File> roots = Data.contentRoots(ctx, SLOT_SHARE);
+            File plainZip = new File(Paths.privateDir(ctx), "selftest-share-plain.zip");
+            File shareZip = new File(Paths.privateDir(ctx), "selftest-share-pack.zip");
+            if (plainZip.exists()) plainZip.delete();
+            if (shareZip.exists()) shareZip.delete();
+            SharePack.Plan plan = SharePack.plan(slot);
+            Exporter.Result rp = Exporter.zipTo(ctx, android.net.Uri.fromFile(plainZip), slot, roots);
+            Exporter.Result rs = Exporter.zipTo(ctx, android.net.Uri.fromFile(shareZip), slot, roots,
+                    SlotIo.shareXform(plan));
+            ok(stat, L, plan.ok() && plan.removedKeys == 6 && plan.serverIds == 2
+                            && plan.dropServerList && plan.settings != null,
+                    "④ 计划与实际一致：删 6 项（服务器身份 2 项）、丢掉服务器列表、"
+                            + "脱敏后的 settings 有 " + (plan.settings == null ? 0 : plan.settings.length)
+                            + " 字节");
+            SlotZip.Info ip = SlotZip.inspect(ctx, plainZip);
+            SlotZip.Info is = SlotZip.inspect(ctx, shareZip);
+            ok(stat, L, is.files == ip.files - 1,
+                    "④ ★分享包比普通包**正好少一条**（server_list.json）："
+                            + ip.files + " → " + is.files + " 个文件");
+            SlotZip.Result ex = SlotZip.extract(ctx, shareZip, is, SLOT_SHARE_DST, SlotWrite.REPLACE);
+            File dst = Data.slotDir(ctx, SLOT_SHARE_DST);
+            ok(stat, L, !new File(dst, "server_list.json").exists() && ex.files == is.files,
+                    "④ ★往返：解出来的槽里**没有** server_list.json（其余 " + ex.files + " 条都落位了）");
+            ok(stat, L, Util.md5(new File(dst, "saves/a.msav"))
+                            .equals(Util.md5(new File(slot, "saves/a.msav")))
+                            && Util.md5(new File(dst, "maps/b.msav"))
+                            .equals(Util.md5(new File(slot, "maps/b.msav")))
+                            && Util.md5(new File(new File(dst, "mods"), "keep/test.jar"))
+                            .equals(Util.md5(new File(new File(slot, "mods"), "keep/test.jar"))),
+                    "④ ★往返：其余条目**逐字节相同**（存档 / 地图 / 模组 md5 全同）");
+            File dstModSettings = new File(new File(dst, "mods"), "keep/settings.bin");
+            ok(stat, L, dstModSettings.isFile()
+                            && Util.md5(dstModSettings).equals(md5ModBefore),
+                    "④ ★模组目录里的同名 `settings.bin` **没被动**"
+                            + "（钩子的参数是相对路径 ⇒ 只有根级那个才命中）");
+            SettingsBin.Values dstSet = SettingsBin.readSafe(new File(dst, "settings.bin"), null);
+            int sensLeft = 0;
+            if (dstSet != null) {
+                for (String k : dstSet.all().keySet()) {
+                    if (SharePack.isSensitive(k)) sensLeft++;
+                }
+            }
+            ok(stat, L, dstSet != null && sensLeft == 0
+                            && "player".equals(dstSet.getString("name", null))
+                            && dstSet.getInt("musicvol", -1) == 100,
+                    "④ ★往返：解出来的 settings.bin **一个敏感键都没有**、"
+                            + "普通键都在（游戏读得回）");
+            ok(stat, L, Util.md5(setFile).equals(md5Before)
+                            && rp.files == ip.files && is.files == ip.files - 1,
+                    "④ ★元断言：源槽**一个字节都没被改**（settings.bin md5 没变）"
+                            + "—— 脱敏只发生在包里，不发生在槽里");
+            // ★ 元断言：dev 口与界面走的是同一份判据（`SlotIo.shareXform` 只做转接）
+            Exporter.Xform xf = SlotIo.shareXform(plan);
+            ok(stat, L, xf.drop("server_list.json") && !xf.drop("settings.bin")
+                            && xf.bytesOf("settings.bin") == plan.settings
+                            && xf.bytesOf("mods/keep/settings.bin") == null
+                            && xf.bytesOf("server_list.json") == null,
+                    "④ ★元断言：`shareXform` 只是把 SharePack 的判据**转接**到 zip 那条路上"
+                            + "（非根级同名文件取到 null = 原样拷贝）");
+
+            // ── ⑤ 拒绝路径：settings.bin 读不出来 ⇒ 计划失败（界面据此不导出）────
+            byte[] keepBytes = SettingsBin.readAllBytes(setFile);
+            write(setFile, new byte[]{0, 0, 0, 0});          // count = 0 ⇒ 游戏自己就判损坏
+            SharePack.Plan badPlan = SharePack.plan(slot);
+            ok(stat, L, !badPlan.ok() && badPlan.settings == null && badPlan.failReason != null,
+                    "⑤ ★读不出来的 settings.bin ⇒ 计划**失败**（界面据此拒绝导出、"
+                            + "原因只进日志）");
+            write(setFile, keepBytes);
+
+            // ── ⑥ 真实 settings.bin（只读；设备上还没有就跳过）────────────────
+            File real = null;
+            for (Data.Slot s0 : Data.allSlots(ctx)) {
+                File cand = new File(s0.dir, "settings.bin");
+                if (cand.isFile() && cand.length() > 0) {
+                    real = cand;
+                    break;
+                }
+            }
+            if (real == null) {
+                L.add("  （跳过⑥：设备上还没有任何真实 settings.bin —— 没跑过游戏）");
+            } else {
+                SharePack.Plan rplan = SharePack.plan(real.getParentFile());
+                SettingsBin.Values rv = SettingsBin.read(real);
+                SharePack.Stripped rs2 = SharePack.strip(rv);
+                int left = 0;
+                for (String k : rs2.values.all().keySet()) {
+                    if (SharePack.isSensitive(k)) left++;
+                }
+                ok(stat, L, rplan.ok() && left == 0
+                                && rs2.removedCount() == rplan.removedKeys
+                                && SettingsBin.sameValues(rv, SettingsBin.read(real)),
+                        "⑥ ★真实文件（只读）：" + real.getParentFile().getName()
+                                + "/settings.bin " + rv.size() + " 键 ⇒ 剥掉 "
+                                + rs2.removedCount() + " 项（含服务器身份 " + rs2.serverIdCount()
+                                + "），剥完**一个敏感键都不剩**；源文件未被改动");
+            }
+
+            if (plainZip.exists()) plainZip.delete();
+            if (shareZip.exists()) shareZip.delete();
+        } catch (Throwable t) {
+            stat[1]++;
+            L.add("❌ 分享包用例自身异常：" + t);
+        }
     }
 
     private static void tamperNegative(Context ctx, List<String> L, int[] stat)

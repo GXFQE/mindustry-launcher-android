@@ -91,6 +91,7 @@ final class DevTools {
                 || intent.hasExtra("dev_zip_import")
                 || intent.hasExtra("dev_zip_confirm")
                 || intent.hasExtra("dev_zip_export")
+                || intent.hasExtra("dev_share_export")
                 || intent.hasExtra("dev_cas_stats")
                 || intent.hasExtra("dev_cas_gc")
                 || intent.hasExtra("dev_cas_migrate")
@@ -309,6 +310,13 @@ final class DevTools {
         String zipExp = intent.getStringExtra("dev_zip_export");
         if (zipExp != null && !zipExp.isEmpty()) {
             devZipExport(intent.getStringExtra("dev_zip_slot"), new File(zipExp));
+            return;
+        }
+        // ★ 第 141 轮：分享用整槽包（脱敏导出）—— 与上面那条**并排**，
+        //   走的也是界面那条路（Data.contentRoots + Exporter.zipTo + SlotIo.shareXform）
+        String shareExp = intent.getStringExtra("dev_share_export");
+        if (shareExp != null && !shareExp.isEmpty()) {
+            devShareExport(intent.getStringExtra("dev_share_slot"), new File(shareExp));
             return;
         }
 
@@ -1012,6 +1020,62 @@ final class DevTools {
                 reportDev(sb.toString(), "dev_zip_export");
             }
         }, "dev-zip-export").start();
+    }
+
+
+    /**
+     * 第 141 轮：把「导出分享包」跑一遍写到**设备上的绝对路径**（跳过 SAF 选择器）。
+     *
+     * <p>与 {@link #devZipExport} 并排、只差一个 {@link SlotIo#shareXform}，目的同样是
+     * 把"这次到底打包了哪些条目、`settings.bin` 被剥成了什么样"变成可自动取证的产物
+     * （SAF 的"选一个保存位置"在 adb 下驱动不了）。
+     * 用法：`--es dev_share_export <绝对路径.zip> [--es dev_share_slot <槽>]`
+     */
+    private void devShareExport(final String slotArg, final File dest) {
+        final String slot = (slotArg == null || slotArg.isEmpty())
+                ? Data.currentSlot(a) : slotArg;
+        new Thread(new Runnable() {
+            @Override public void run() {
+                final StringBuilder sb = new StringBuilder();
+                sb.append("dev_share_export 槽=\"").append(slot).append("\" -> ")
+                  .append(dest.getAbsolutePath()).append('\n');
+                try {
+                    List<File> roots = Data.contentRoots(a, slot);
+                    sb.append("roots(").append(roots.size()).append(") = ");
+                    for (File f : roots) sb.append(f.getName()).append(f.isDirectory() ? "/ " : " ");
+                    sb.append('\n');
+                    SharePack.Plan plan = SharePack.plan(Data.dirOf(a, slot));
+                    sb.append("plan: ok=").append(plan.ok())
+                      .append(" hasSettings=").append(plan.hasSettings)
+                      .append(" removed=").append(plan.removedKeys)
+                      .append("(serverIds=").append(plan.serverIds).append(')')
+                      .append(" dropServerList=").append(plan.dropServerList)
+                      .append(" settingsBytes=").append(plan.settings == null ? "原样" : plan.settings.length)
+                      .append('\n');
+                    if (!plan.ok()) {
+                        // 🔴 与界面**同一个决定**：读不出来就不打包（`SlotIo.shareSlot` 在
+                        //    plan 失败时弹 `share_slot_err_settings` 并**不**启动 SAF）。
+                        //    这里要是照打不误，两条路就会给出两种行为 —— 而 dev 口正是
+                        //    用来证明"界面那条路会怎么做"的（第 88.11 那条教训）。
+                        sb.append("plan FAILED: ").append(plan.failReason).append('\n');
+                        sb.append("REFUSED: 与界面同路 —— 读不出来就不导出\n");
+                        reportDev(sb.toString(), "dev_share_export");
+                        return;
+                    }
+                    if (dest.exists() && !dest.delete()) {
+                        sb.append("⚠ 旧文件删不掉，会接着写\n");
+                    }
+                    Exporter.Result r = Exporter.zipTo(a, Uri.fromFile(dest),
+                            Data.dirOf(a, slot), roots, SlotIo.shareXform(plan));
+                    sb.append("zip: files=").append(r.files).append(" raw=").append(r.rawBytes)
+                      .append(" out=").append(r.outBytes).append('\n');
+                    sb.append("落盘大小=").append(dest.length()).append('\n');
+                } catch (Throwable t) {
+                    sb.append("FAILED: ").append(t).append('\n');
+                }
+                reportDev(sb.toString(), "dev_share_export");
+            }
+        }, "dev-share-export").start();
     }
 
 

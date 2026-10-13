@@ -159,6 +159,40 @@ public final class SettingsBin {
             return new Values(m, compressed, fileBytes);
         }
 
+        /**
+         * 复制一份并**删掉一个键** —— ★ 保序：其余键的位置**一个都不动**。
+         *
+         * <p>存在的理由（2026-10-13，第 141 轮「分享包」）：本类第一次做**删除**。
+         * 它与 {@link #with} 是同一条纪律的两半 —— 改键不挪位置、删键也不挪位置，
+         * 于是"**本来就没有敏感键**的槽跑一遍剥离"编出来的字节与原件**逐字节相同**
+         * （自检拿这条当"只删该删的"的元断言，比"看着像删对了"硬）。
+         *
+         * <p>⚠️ 键不存在 ⇒ 返回一份**等值副本**（不是 `this`）：调用方拿到的东西永远可以随便改，
+         * 不必去记"哪种情况下我拿到的是原件"。
+         */
+        public Values without(String key) {
+            LinkedHashMap<String, Object> m = copyMap();
+            m.remove(key);
+            return new Values(m, compressed, fileBytes);
+        }
+
+        /**
+         * 复制一份并删掉**一批**键（保序，见 {@link #without}）。
+         *
+         * <p>★ 为什么按"批"删而不是循环调 {@link #without}：`Values` 是不可变的，每删一个键
+         * 都要整表复制一遍 —— 真实文件有 5900+ 个键、要删的 30 来个，
+         * 循环就是 30 次全表复制（几十毫秒，还白造几万个对象）。
+         * 「哪些键算敏感」这条**策略**不在这里（那是 {@link SharePack} 的事），
+         * 本类只提供"给我一批键名，我一次删干净"这个通用动作。
+         */
+        public Values withoutKeys(java.util.Collection<String> keys) {
+            LinkedHashMap<String, Object> m = copyMap();
+            if (keys != null) {
+                for (String k : keys) m.remove(k);
+            }
+            return new Values(m, compressed, fileBytes);
+        }
+
         /** 深拷贝（`byte[]` 也复制 —— 免得调用方改到"原件"） */
         public Values copy() {
             return new Values(copyMap(), compressed, fileBytes);

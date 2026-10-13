@@ -103,6 +103,13 @@ yourself — even just a few lines — see **Translation file** below.
   **how the two sides merge**: **Update** (the new version wins), **Add missing** (what the slot has
   now wins, only missing files are added) or **Replace** (clear the slot first, then write the
   package in full) — and **a backup is taken first**, so a wrong choice can be undone
+- **A shareable package (identity removed)**: the same zip, but before it is packed the launcher
+  strips what could identify you — the per-server login identity the game keeps (`usid-…`), `uuid`,
+  the last server you joined, ban lists — and drops your saved-server list. **Your own backups are
+  left untouched** (a restore needs that data); this export is for handing the slot to someone else.
+  If the settings file cannot be read, the launcher **refuses to export** rather than ship a file it
+  could not check. (A single save file never carried any of this — the identity lives in the slot's
+  settings, not in the save.)
 - **Automatic cleanup** of redundant data-directory leftovers (switchable; a manual "clean up once
   now" stays available when it is off)
 

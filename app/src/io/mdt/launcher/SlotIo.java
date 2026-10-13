@@ -55,6 +55,8 @@ final class SlotIo {
     private static final int EXPORT_NONE = 0;
     private static final int EXPORT_FILE = 1;
     private static final int EXPORT_SLOT = 2;
+    /** ★ 第 141 轮：**分享用**整槽包（与 {@link #EXPORT_SLOT} 同一个包 + 剥身份信息） */
+    private static final int EXPORT_SHARE = 3;
 
     /** 调用方页面：导入/导出完成后刷新自己 */
         /** `saves/` 下只认文件（目录会被游戏用来放别的，不列） */
@@ -77,6 +79,12 @@ final class SlotIo {
     private static File sExportSrc;
     private static String sExportSlot;
     private static List<File> sExportRoots;
+    /**
+     * ★ 第 141 轮：分享包的**预计算结果**（`settings.bin` 剥完之后的字节 + 删了几个键）。
+     * 与上面那几个同一条纪律：**发起前重设、回调进来先清** ——
+     * 否则用户取消之后残留的计划会被下一次选择"接上"，导出一个上个槽脱敏过的包。
+     */
+    private static SharePack.Plan sSharePlan;
 
     private SlotIo() {}
 
@@ -120,14 +128,17 @@ final class SlotIo {
             final File src = sExportSrc;
             final String slot = sExportSlot;
             final List<File> roots = sExportRoots;
+            final SharePack.Plan plan = sSharePlan;
             sExportKind = EXPORT_NONE;
             sExportSrc = null;
             sExportSlot = null;
             sExportRoots = null;
+            sSharePlan = null;
             if (res != Activity.RESULT_OK || data == null || data.getData() == null) return true;
             Uri uri = data.getData();
             if (kind == EXPORT_FILE && src != null) doExportFile(a, uri, src);
             else if (kind == EXPORT_SLOT && slot != null) doExportSlot(a, uri, slot, roots);
+            else if (kind == EXPORT_SHARE && slot != null) doExportShare(a, uri, slot, roots, plan);
             return true;
         }
         return false;
@@ -481,8 +492,9 @@ final class SlotIo {
                         sExportSlot = s.name;
                         sExportRoots = roots;
                         sExportSrc = null;
+                        sSharePlan = null;
                         a.startActivityForResult(Intent.createChooser(
-                                Exporter.createDoc(suggestZipName(s.name), "application/zip"),
+                                Exporter.createDoc(suggestZipName(s.name, null), "application/zip"),
                                 Trans.get(a, R.string.chooser_export)), REQ_EXPORT);
                     }
                 })
@@ -490,8 +502,160 @@ final class SlotIo {
                 .show();
     }
 
-    /** 建议文件名：`mdt-<槽名>-20261001-1907.zip`（槽名保留原样；它已过 Data.sanitizeSlot） */
-    private static String suggestZipName(String slot) {
+    // ── ★ 第 141 轮：分享用整槽包（脱敏导出） ─────────────────────────────────
+
+    /**
+     * **分享用**整槽包：与 {@link #exportSlot} 打的是**同一个包**
+     * （同一份 {@link Data#contentRoots}、同一个 {@link Exporter#zipTo}），
+     * 只多两个**逐条目动作**（{@link Exporter.Xform}）：把 `settings.bin` 换成剥过身份信息的那份、
+     * 把 `server_list.json` 整份丢掉。判据（哪些键敏感 / 哪个文件要丢）全在 {@link SharePack}。
+     *
+     * <p>起因是用户 2026-10-13 的一句问话：「据说存档里包含玩家的 uid，分享存档会导致被冒充？」
+     * —— 取证结论写在 {@link SharePack} 的类注释里（单份**存档**其实不含任何身份字段；
+     * 真正含身份凭据的是**整槽包里的** `settings.bin`）。
+     *
+     * <p>🔴 **两段式（先算计划、再弹框、最后打包）**，两个理由：
+     * <ol>
+     *   <li>确认框里的数字必须是**真会发生**的（"这次会去掉 31 项"）——
+     *     若先让用户点「选择保存位置」、再在后台发现设置读不出来，那时系统**已经建出一个 0 字节的 zip**
+     *     （与 {@link #exportSlot} 把"空槽"拦在 SAF 之前是同一条纪律）；</li>
+     *   <li>解析 `settings.bin` 是 IO + CPU（真实文件 5908 个键 / 502 KB）⇒ 不能放 UI 线程。</li>
+     * </ol>
+     *
+     * <p>⚠️ 游戏在跑时**只提示不拦截** —— 与整槽导出同一条（导出是只读的，
+     * 最坏是拿到一份半写状态的存档；"必须先退游戏"会让只想备份一下的人平白多一步）。
+     */
+    static void shareSlot(Activity a, final Data.Slot s) {
+        final List<File> roots = Data.contentRoots(a, s.name);
+        if (roots.isEmpty()) {
+            // 与整槽导出共用同一句：这里拦下来，用户还没点"保存"，不会白留一个 0 字节文件
+            toast(a, Trans.get(a, R.string.export_slot_empty_fmt));
+            return;
+        }
+        final File dir = Data.dirOf(a, s.name);
+        new Thread(new Runnable() {
+            @Override public void run() {
+                final SharePack.Plan plan = SharePack.plan(dir);
+                a.runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        if (a.isFinishing()) return;
+                        if (!plan.ok()) {
+                            // ★ 读不出来 ⇒ **拒绝导出**（判据与话术见 SharePack 类注释②：
+                            //   不许把"没确认过"的文件塞进一个标着"已脱敏"的包里）。
+                            //   原始原因只进日志（它是维护者视角的，见 SharePack.Plan.failReason）。
+                            android.util.Log.w("MDTLauncher",
+                                    "share pack refused: " + plan.failReason);
+                            alert(a, Trans.get(a, R.string.export_failed),
+                                    Trans.get(a, R.string.share_slot_err_settings));
+                            return;
+                        }
+                        promptShare(a, s, roots, plan);
+                    }
+                });
+            }
+        }, "share-plan").start();
+    }
+
+    /** 分享包的确认框：**把这次会去掉什么说在脸上**，然后才让用户去选落点 */
+    private static void promptShare(final Activity a, final Data.Slot s, final List<File> roots,
+                                    final SharePack.Plan plan) {
+        StringBuilder extra = new StringBuilder();
+        if (plan.removedKeys > 0) {
+            extra.append(Trans.get(a, R.string.share_slot_found_fmt,
+                    plan.removedKeys, plan.serverIds));
+        } else {
+            extra.append(Trans.get(a, R.string.share_slot_none));
+        }
+        if (plan.dropServerList) {
+            extra.append('\n').append(Trans.get(a, R.string.share_slot_drop_list));
+        }
+        new AlertDialog.Builder(a)
+                .setTitle(Trans.get(a, R.string.share_slot_title_fmt, s.name))
+                .setMessage(Trans.get(a, R.string.share_slot_msg_fmt, extra.toString(),
+                        Data.gameAlive(a) ? Trans.get(a, R.string.export_slot_playing) : ""))
+                .setPositiveButton(R.string.export_ok, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int w) {
+                        sExportKind = EXPORT_SHARE;
+                        sExportSlot = s.name;
+                        sExportRoots = roots;
+                        sExportSrc = null;
+                        sSharePlan = plan;
+                        a.startActivityForResult(Intent.createChooser(
+                                Exporter.createDoc(suggestZipName(s.name, "share"), "application/zip"),
+                                Trans.get(a, R.string.chooser_export)), REQ_EXPORT);
+                    }
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    private static void doExportShare(final Activity a, final Uri uri, final String slot,
+                                      final List<File> roots, final SharePack.Plan plan) {
+        if (roots == null || roots.isEmpty()) {
+            alert(a, Trans.get(a, R.string.export_failed),
+                    Trans.get(a, R.string.export_slot_empty_fmt));
+            return;
+        }
+        final ProgressDialog pd = ProgressDialog.show(a,
+                Trans.get(a, R.string.export_progress_title),
+                Trans.get(a, R.string.share_progress_msg_fmt, slot), true, false);
+        new Thread(new Runnable() {
+            @Override public void run() {
+                String err = null;
+                Exporter.Result r = null;
+                try {
+                    r = Exporter.zipTo(a, uri, Data.dirOf(a, slot), roots, shareXform(plan));
+                } catch (Exception e) {
+                    err = Util.ioReason(a, e);
+                    android.util.Log.w("MDTLauncher", "export share pack failed", e);
+                }
+                final String fe = err;
+                final Exporter.Result fr = r;
+                a.runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        pd.dismiss();
+                        if (fe != null) {
+                            alert(a, Trans.get(a, R.string.export_failed), fe);
+                            return;
+                        }
+                        // ★ 两个出口分开说：**本来就没有身份信息**（"包和整槽导出一样"）
+                        //   与"去掉了 N 项"是两件事，混成一句会让前者看着像漏剥了
+                        //   （报告里那句 `untouched()` 也是同一个判据）。
+                        toast(a, plan != null && plan.removedKeys > 0
+                                ? Trans.get(a, R.string.share_slot_done_fmt,
+                                        fr.files, Util.formatSize(fr.outBytes), plan.removedKeys)
+                                : Trans.get(a, R.string.share_slot_done_clean_fmt,
+                                        fr.files, Util.formatSize(fr.outBytes)));
+                    }
+                });
+            }
+        }, "export-share").start();
+    }
+
+    /**
+     * 分享包那两个**逐条目动作**（界面与 dev 口共用这一处）。
+     * ⚠️ 这里只是把 {@link SharePack} 的判据接到 zip 那条路上 ——
+     *   **不许**在本方法里再写一遍"哪些键敏感 / 哪个文件要丢"（第 137 轮那条教训）。
+     */
+    static Exporter.Xform shareXform(final SharePack.Plan plan) {
+        return new Exporter.Xform() {
+            @Override public boolean drop(String rel) {
+                return SharePack.dropTop(rel);
+            }
+
+            @Override public byte[] bytesOf(String rel) {
+                return SharePack.bytesFor(rel, plan);
+            }
+        };
+    }
+
+    /**
+     * 建议文件名：`mdt-<槽名>[-<tag>]-20261001-1907.zip`
+     * （槽名保留原样；它已过 {@link Data#sanitizeSlot}）。
+     *
+     * @param tag 附加标记（分享包传 `share`；`null`/空 = 普通整槽包）
+     */
+    private static String suggestZipName(String slot, String tag) {
         String stamp = new SimpleDateFormat("yyyyMMdd-HHmm", Locale.US).format(new Date());
         String n = slot == null ? "" : slot.trim();
         // EXTRA_TITLE 支持非 ASCII，但把文件系统层面非法的字符先剔掉更稳
@@ -499,7 +663,8 @@ final class SlotIo {
              .replace('*', '_').replace('?', '_').replace('"', '_')
              .replace('<', '_').replace('>', '_').replace('|', '_').trim();
         if (n.isEmpty()) n = "slot";
-        return "mdt-" + n + "-" + stamp + ".zip";
+        String t = (tag == null || tag.trim().isEmpty()) ? "" : "-" + tag.trim();
+        return "mdt-" + n + t + "-" + stamp + ".zip";
     }
 
     /**
