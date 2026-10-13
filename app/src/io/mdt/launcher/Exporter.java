@@ -581,12 +581,23 @@ public final class Exporter {
      */
     public static Result zipTo(Context ctx, Uri uri, File base, List<File> roots, Xform x)
             throws IOException {
+        return zipTo(ctx, uri, base, roots, x, Deflater.BEST_SPEED);
+    }
+
+    /**
+     * 同上，外加**压缩级别**。
+     * ★ 为什么要多这一档（第 144 轮）：老口径是「大目录几十 MB，速度优先」（`BEST_SPEED`）——
+     *   那对**本地备份**是对的；而**分享包要过网络**（用户：「主要是想着尽可能小」）⇒
+     *   那一档改用 `BEST_COMPRESSION`，多花几秒换更小的包。
+     */
+    public static Result zipTo(Context ctx, Uri uri, File base, List<File> roots, Xform x,
+                               int level) throws IOException {
         Result r = new Result();
         Counting counter = new Counting(openOut(ctx, uri));
         ZipOutputStream zos = new ZipOutputStream(new BufferedOutputStream(counter, BUF));
         try {
             // 大目录（mods 几十 MB）速度优先：压缩比换时间，用户等着不烦
-            zos.setLevel(Deflater.BEST_SPEED);
+            zos.setLevel(level);
             if (roots != null) {
                 for (File root : roots) {
                     if (root == null || !root.exists()) continue;

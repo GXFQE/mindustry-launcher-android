@@ -55,24 +55,32 @@ public final class SharePack {
     /**
      * 整份**不放进分享包**的顶层条目（目录按前缀算：`crashes/…` 全部命中）。
      *
-     * <p>两类，理由不同（用户 2026-10-13 拍的第二刀："日志和可重建的缓存都丢了就行，
-     * 纯分享这东西没啥用吧"）：
+     * <p>三类，理由不同（用户 2026-10-13 两刀：「日志和可重建的缓存都丢了就行」＋
+     * 「分享包主要是想着尽可能小（毕竟大概需要网络传输）」）：
      * <ol>
      *   <li><b>会指向你的</b>：`server_list.json`（你在哪些服玩过）、`crashes/` 与
-     *     `last_log.txt`（**故障证据** —— 对分享毫无用处，却可能带昵称与服务地址）。</li>
-     *   <li><b>可重建的缓存</b>：`previews/`（我们自己生成的地图缩略图）与
-     *     `assetCache/`（游戏自己解出来的资产缓存）。收包的人那边游戏会重建
-     *     ⇒ 对分享是纯粹的体积。</li>
+     *     `last_log.txt`（**故障证据**），以及 🔴 `settings_backups/` ＋ `settings_backup.bin`
+     *     —— 这两个是**设置文件的副本**（本机实测：与本槽 `settings.bin` 同为 482 B / 23 键），
+     *     所以主文件里被剥掉的 `usid-*` / `uuid` **它们里面还留着**
+     *     ⇒ 丢掉它们是**补一个泄露**（第 141 轮只剥了主文件），不只是省体积。</li>
+     *   <li><b>可重建 / 能重新下回来的</b>：`previews/`（地图缩略图）、`assetCache/`
+     *     （游戏解出来的资产缓存）、`be_builds/`（下载回来的构建）。</li>
+     *   <li><b>与收包的人无关的</b>：`selftest-lang/`（**我们自己**自检 / 语言模板的残留，
+     *     本机实测 **127 889 B** —— 比当时整个分享包还大）、`files_moved_103`（我们 F0 的
+     *     迁移标记）、`screenshots/`（**你自己的截图**：既不是游戏数据，又可能是大图）。</li>
      * </ol>
-     * ⚠️ 两条如实的边界（别当它们不存在）：
-     *   · `crashes/` 与 `last_log.txt` 是 `Data.SLOT_EXCLUDE` 里**有意保留**的
-     *     （"故障前的唯一证据"）⇒ **只对分享包丢，本地备份那条路一个字都不动**；
-     *   · `assetCache/` 理论上可能装着某份地图/存档的**补丁资产**（`REF §72.8`：
-     *     编辑器导出会内嵌、就地保存不会）⇒ 跨机分享**极少数**地图可能因此缺件
-     *     （实测 `hasExternalAssets=true` 只有 2/312）。用户选了"丢"，这里如实记。
+     * ⚠️ 三条如实的边界（别当它们不存在）：
+     *   · `crashes/` 与 `last_log.txt` 是 {@link Data#SLOT_EXCLUDE} 里**有意保留**的
+     *     （「故障前的唯一证据」）⇒ **只对分享包丢，本地备份那条路一个字都不动**；
+     *   · `assetCache/` 理论上可能装着某份地图/存档的**补丁资产**（`REF §72.8`：编辑器导出会内嵌、
+     *     就地保存不会）⇒ 跨机分享**极少数**地图可能因此缺件（实测 `hasExternalAssets=true`
+     *     只有 2/312）。用户选了「丢」，这里如实记；
+     *   · `be_builds/` 本机没有样本，是按「下载产物、对方也能自己下」判的 —— 若有反例，摘掉即可。
      */
     public static final String[] DROP_TOPS = {
             DROP_FILE, "crashes", "last_log.txt", "previews", "assetCache",
+            "settings_backups", "settings_backup.bin", "be_builds", "screenshots",
+            "selftest-lang", "files_moved_103",
     };
 
     /**
@@ -209,6 +217,13 @@ public final class SharePack {
         public int serverIds;
         /** 这个槽**真的有**、且会被整份丢掉的那些顶层条目名（按 {@link #DROP_TOPS} 的顺序） */
         public final java.util.List<String> dropped = new java.util.ArrayList<String>();
+        /**
+         * 上面那些条目**未压缩**一共多少字节。
+         * ★ 为什么要它（用户 2026-10-13：「主要是想着尽可能小（毕竟大概需要网络传输）」）：
+         *   确认框里说一句「大约省下 N」，用户才知道这个包值不值得发。
+         * ⚠️ 口径 = **未压缩**字节数（真传输看压缩后，但压缩率取决于内容 ⇒ 只能给上界）。
+         */
+        public long droppedBytes;
         /** 读/解析失败的原因（**只给日志、dev 报告与自检看**；用户看到的是资源里那句话） */
         public String failReason;
 
@@ -235,7 +250,10 @@ public final class SharePack {
         if (slotDir == null || !slotDir.isDirectory()) return p;
         // 先记下"这个槽真的有哪几样"（有没有是一回事，丢不丢是另一回事 —— 判据在 dropTop）
         for (String n : DROP_TOPS) {
-            if (new File(slotDir, n).exists()) p.dropped.add(n);
+            File f = new File(slotDir, n);
+            if (!f.exists()) continue;
+            p.dropped.add(n);
+            p.droppedBytes += sizeOf(f);
         }
 
         File set = new File(slotDir, SETTINGS_FILE);
@@ -253,6 +271,18 @@ public final class SharePack {
             p.settings = null;
         }
         return p;
+    }
+
+    /** 一个文件 / 目录树的大小（只读；目录递归。给「去掉这些大约省下多少」用） */
+    static long sizeOf(File f) {
+        if (f == null) return 0;
+        if (f.isFile()) return f.length();
+        long n = 0;
+        File[] kids = f.listFiles();
+        if (kids != null) {
+            for (File k : kids) n += sizeOf(k);
+        }
+        return n;
     }
 
     /**

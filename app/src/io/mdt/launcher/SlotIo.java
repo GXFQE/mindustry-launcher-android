@@ -566,6 +566,12 @@ final class SlotIo {
         } else {
             extra.append(Trans.get(a, R.string.share_slot_none));
         }
+        // ★ 第 144 轮：再说一句「去掉这些东西大约省下多少」——
+        //   用户的目标就是「尽可能小、要过网络」⇒ 这个数得让他看见。
+        if (plan.droppedBytes > 0) {
+            extra.append('\n').append(Trans.get(a, R.string.share_slot_saved_fmt,
+                    Util.formatSize(plan.droppedBytes)));
+        }
         // ⚠️ 这里原来还有一句条件句「另外会去掉你收藏的服务器列表」——
         //   而类别句（`share_slot_msg_fmt`）里已经说过一遍 ⇒ 真机上那一屏**同一件事说两遍**
         //   （用户 2026-10-13：「怎么存在两遍啊」）。⇒ 类别由静态句统一说，**不再有第二句**；
@@ -605,7 +611,9 @@ final class SlotIo {
                 String err = null;
                 Exporter.Result r = null;
                 try {
-                    r = Exporter.zipTo(a, uri, Data.dirOf(a, slot), roots, shareXform(plan));
+                    // ★ 第 144 轮：分享包**要过网络** ⇒ 用最高压缩（本地备份那条路照旧 BEST_SPEED）
+                    r = Exporter.zipTo(a, uri, Data.dirOf(a, slot), roots, shareXform(plan),
+                            java.util.zip.Deflater.BEST_COMPRESSION);
                 } catch (Exception e) {
                     err = Util.ioReason(a, e);
                     android.util.Log.w("MDTLauncher", "export share pack failed", e);

@@ -690,10 +690,18 @@ public final class SelfTest {
             //   而模组目录里的同名东西、加了后缀的**一个都不许动**。
             String[] mustDrop = {"server_list.json", "crashes", "crashes/x.txt",
                     "last_log.txt", "previews", "previews/a.png", "assetCache",
-                    "assetCache/mods/x.bin"};
+                    "assetCache/mods/x.bin",
+                    // 第 144 轮新增的六类
+                    "settings_backups", "settings_backups/1700000000000.bin",
+                    "settings_backup.bin", "selftest-lang", "selftest-lang/template.properties",
+                    "files_moved_103", "screenshots", "screenshots/shot.png",
+                    "be_builds", "be_builds/server.jar"};
             String[] mustKeep = {"mods/config/server_list.json", "server_list.json.bak",
                     "mods/x/crashes/y.txt", "mods/x/last_log.txt", "maps/crashes.msav",
-                    "previews.bak", "mods/assetCache"};
+                    "previews.bak", "mods/assetCache",
+                    // ★ 反方向：模组目录里的**同名**东西一个都不许动
+                    "mods/keep/screenshots/mod.png", "mods/keep/settings_backups/m.bin",
+                    "settings_backups.bak", "maps/settings_backup.bin", "mods/x/be_builds/a.jar"};
             int dt = 0;
             StringBuilder dtWhy = new StringBuilder();
             for (String s : mustDrop) {
@@ -791,6 +799,22 @@ public final class SelfTest {
             // ★ 模组目录里放一个**同名**文件 —— 判据只认根级 ⇒ 这个必须原样进包
             File modSettings = new File(new File(slot, "mods"), "keep/settings.bin");
             write(modSettings, "MOD-SETTINGS".getBytes("UTF-8"));
+            // ★ 第 144 轮：再补六类。其中 `settings_backup*.bin` 是**带 usid 的设置副本**
+            //   —— 它们正是"只剥主文件、副本照漏"那个泄露的夹具（敏感值 = AAAA / UUUU）
+            write(new File(slot, "settings_backup.bin"),
+                    SettingsBin.encode(SettingsBin.read(setFile).without("musicvol")));
+            writeSettings(new File(new File(slot, "settings_backups"), "1700000000000.bin"),
+                    dirty, false);
+            File lang = new File(new File(slot, "selftest-lang"), "template.properties");
+            write(lang, "k=v\n".getBytes("UTF-8"));
+            write(new File(slot, "files_moved_103"), "103".getBytes("UTF-8"));
+            write(new File(new File(slot, "screenshots"), "shot.png"), "PNG".getBytes("UTF-8"));
+            write(new File(new File(slot, "be_builds"), "server.jar"), "BE".getBytes("UTF-8"));
+            // ★ 反方向：模组目录里的同名目录**不许**被连带丢掉
+            write(new File(new File(slot, "mods"), "keep/screenshots/mod.png"),
+                    "M-SHOT".getBytes("UTF-8"));
+            write(new File(new File(slot, "mods"), "keep/settings_backups/m.bin"),
+                    "M-SB".getBytes("UTF-8"));
             String md5Before = Util.md5(setFile);
             String md5ModBefore = Util.md5(modSettings);
             String md5ModCrashBefore = Util.md5(modCrash);
@@ -804,19 +828,53 @@ public final class SelfTest {
             Exporter.Result rp = Exporter.zipTo(ctx, android.net.Uri.fromFile(plainZip), slot, roots);
             Exporter.Result rs = Exporter.zipTo(ctx, android.net.Uri.fromFile(shareZip), slot, roots,
                     SlotIo.shareXform(plan));
+            List<String> wantDropped = java.util.Arrays.asList(
+                    "server_list.json", "crashes", "last_log.txt", "previews", "assetCache",
+                    "settings_backups", "settings_backup.bin", "be_builds", "screenshots",
+                    "selftest-lang", "files_moved_103");
             ok(stat, L, plan.ok() && plan.removedKeys == 6 && plan.serverIds == 2
-                            && plan.settings != null
-                            && plan.dropped.equals(java.util.Arrays.asList(
-                                    "server_list.json", "crashes", "last_log.txt",
-                                    "previews", "assetCache")),
-                    "④ 计划与实际一致：删 6 项（服务器身份 2 项）、丢掉 " + plan.dropped
-                            + "（**真的有哪几样**才报哪几样）、脱敏后的 settings 有 "
+                            && plan.settings != null && plan.dropped.equals(wantDropped),
+                    "④ 计划与实际一致：删 6 项（服务器身份 2 项）、丢掉 " + plan.dropped.size()
+                            + " 类（**真的有哪几样**才报哪几样）、脱敏后的 settings 有 "
                             + (plan.settings == null ? 0 : plan.settings.length) + " 字节");
+            ok(stat, L, plan.droppedBytes > 0
+                            && plan.droppedBytes >= new File(slot, "selftest-lang/template.properties").length(),
+                    "④ ★「大约省下多少」有据可依：droppedBytes = " + plan.droppedBytes
+                            + " B（含 selftest-lang 那份 " + lang.length() + " B）");
             SlotZip.Info ip = SlotZip.inspect(ctx, plainZip);
             SlotZip.Info is = SlotZip.inspect(ctx, shareZip);
-            ok(stat, L, is.files == ip.files - 5,
-                    "④ ★分享包比普通包**正好少五条**（服务器列表 + 崩溃报告 + 游戏日志"
-                            + " + 地图预览 + 资产缓存）：" + ip.files + " → " + is.files + " 个文件");
+            // ★ 条数差**按 zip 里的条目路径**算（第 144 轮踩的：第一版拿"顶层名字"去比，
+            //   而目录在 zip 里**没有自己的条目** ⇒ 少算了（19→8 差 11 条，只算出 6）。
+            //   ★ 这个数**只算这一次**，元断言也读它 —— 上一轮的教训就是它在断言里写了两份。
+            List<String> plainEntries = zipEntries(plainZip);
+            int expectDroppedFiles = 0;
+            for (String e : plainEntries) {
+                for (String n : plan.dropped) {
+                    if (e.equals(n) || e.startsWith(n + "/")) { expectDroppedFiles++; break; }
+                }
+            }
+            ok(stat, L, is.files == ip.files - expectDroppedFiles
+                            && expectDroppedFiles >= plan.dropped.size(),
+                    "④ ★分享包比普通包**正好少 plan.dropped 那些条目**：" + ip.files + " → "
+                            + is.files + " 个文件（少 " + expectDroppedFiles + " 条 / "
+                            + plan.dropped.size() + " 类）");
+            // ★★ 泄露断言（第 144 轮）：**整包扫一遍** —— 敏感值一个都不许出现在分享包里。
+            //   反方向同样要断言：**原件包里必须扫得到**（否则扫描本身是坏的、这条白过）。
+            // ★ 值全部取自上面 `dirty` 夹具（第 144 轮第一版把第 5 个编错了 ⇒ 原件包只中 4/5，
+            //   而那条断言要求"全中"——正是它把"我编了个不存在的值"当场揭出来）。
+            //   第 5 个用 `usid-a:1` **这个键名**：键也被剥掉 ⇒ 分享包里连它的字节都不该有。
+            String[] leaks = {"AAAA", "BBBB", "UUUU", "srv.example:6567", "usid-a:1"};
+            int leakInShare = 0, leakInPlain = 0;
+            StringBuilder leakWhy = new StringBuilder();
+            for (String v : leaks) {
+                if (zipHasValue(shareZip, v)) { leakInShare++; leakWhy.append(" 分享包里:").append(v); }
+                if (zipHasValue(plainZip, v)) leakInPlain++;
+            }
+            ok(stat, L, leakInShare == 0 && leakInPlain == leaks.length,
+                    "④ ★★泄露断言：**整包扫一遍**，分享包里 " + leaks.length + " 个敏感值命中 "
+                            + leakInShare + " 个（必须 0）；而**原件包**里命中 " + leakInPlain
+                            + " 个（必须全中 —— 否则是扫描坏了，不是真安全）"
+                            + leakWhy.toString());
             SlotZip.Result ex = SlotZip.extract(ctx, shareZip, is, SLOT_SHARE_DST, SlotWrite.REPLACE);
             File dst = Data.slotDir(ctx, SLOT_SHARE_DST);
             boolean noneDropped = !new File(dst, "server_list.json").exists()
@@ -855,7 +913,7 @@ public final class SelfTest {
                     "④ ★往返：解出来的 settings.bin **一个敏感键都没有**、"
                             + "普通键都在（游戏读得回）");
             ok(stat, L, Util.md5(setFile).equals(md5Before)
-                            && rp.files == ip.files && is.files == ip.files - 5,
+                            && rp.files == ip.files && is.files == ip.files - expectDroppedFiles,
                     "④ ★元断言：源槽**一个字节都没被改**（settings.bin md5 没变）"
                             + "—— 脱敏只发生在包里，不发生在槽里");
             // ★ 元断言：dev 口与界面走的是同一份判据（`SlotIo.shareXform` 只做转接）
@@ -873,6 +931,14 @@ public final class SelfTest {
                     "④b ★同一件事只说一次：分享包确认框里「服务器列表」出现 "
                             + countOf(shareMsg, "服务器列表") + " 次（必须恰好 1 次 ——"
                             + " 原来类别句与条件句各说一遍，用户当场抓到）");
+            // ★ 同屏自相矛盾是**硬伤**（§85.16.1 / §86.9；2026-10-08 用户抓过一次）：
+            //   类别句已经说"会丢掉日志 / 缓存 / 设置的历史备份"，那么"没有身份信息"那一句
+            //   **就不许**再对整包下结论（第一版写的是"包的内容与「导出整槽」完全一样"）。
+            String noneMsg = ctx.getString(R.string.share_slot_none);
+            ok(stat, L, !noneMsg.contains("完全一样") && !noneMsg.contains("一模一样")
+                            && noneMsg.contains("设置"),
+                    "④b ★`share_slot_none` 只讲**设置文件**、不对整包下结论"
+                            + "（否则与上面那句\"会丢掉日志与缓存\"当场矛盾）：" + noneMsg);
             String expMsg = ctx.getString(R.string.export_slot_msg_fmt, "");
             ok(stat, L, expMsg.contains("身份信息") && expMsg.contains("导出分享包"),
                     "④b ★整槽导出（**原件**那一档）的确认框里有泄露提示，并指向「导出分享包」"
@@ -880,6 +946,26 @@ public final class SelfTest {
             ok(stat, L, shareMsg.contains("缓存") && shareMsg.contains("日志"),
                     "④b ★分享包的类别句里说清了「日志与可重建的缓存」也会丢"
                             + "（用户：「纯分享这东西没啥用吧」）");
+
+            // ── ④c 压缩级别（第 144 轮：分享包要过网络 ⇒ 用 BEST_COMPRESSION）────────
+            File bulk = new File(slot, "selftest-bulk.txt");
+            StringBuilder rep = new StringBuilder();
+            for (int i = 0; i < 4000; i++) rep.append("the same line over and over 0123456789\n");
+            write(bulk, rep.toString().getBytes("UTF-8"));
+            File z1 = new File(Paths.privateDir(ctx), "selftest-level1.zip");
+            File z9 = new File(Paths.privateDir(ctx), "selftest-level9.zip");
+            if (z1.exists()) z1.delete();
+            if (z9.exists()) z9.delete();
+            Exporter.zipTo(ctx, android.net.Uri.fromFile(z1), slot,
+                    java.util.Arrays.asList(bulk), null, java.util.zip.Deflater.BEST_SPEED);
+            Exporter.zipTo(ctx, android.net.Uri.fromFile(z9), slot,
+                    java.util.Arrays.asList(bulk), null, java.util.zip.Deflater.BEST_COMPRESSION);
+            ok(stat, L, z9.length() < z1.length() && z9.length() > 0,
+                    "④c ★压缩级别确实在起作用：同一份 " + bulk.length() + " B 的文本，"
+                            + "级别 1 = " + z1.length() + " B，级别 9 = " + z9.length() + " B");
+            z1.delete();
+            z9.delete();
+            bulk.delete();
 
             // ── ⑤ 拒绝路径：settings.bin 读不出来 ⇒ 计划失败（界面据此不导出）────
             byte[] keepBytes = SettingsBin.readAllBytes(setFile);
@@ -1128,6 +1214,68 @@ public final class SelfTest {
                 + "|needles=" + r.needles.size()
                 + "|kind=" + (v == null ? "?" : String.valueOf(v.kind))
                 + "|text=" + (v == null ? "?" : CrashAnalysis.text(ctx, v));
+    }
+
+    /** 一个 zip 里的**文件条目名**（不含目录条目；给"少了几条"这类口径用） */
+    private static List<String> zipEntries(File zip) {
+        List<String> out = new ArrayList<>();
+        java.util.zip.ZipFile z = null;
+        try {
+            z = new java.util.zip.ZipFile(zip);
+            java.util.Enumeration<? extends java.util.zip.ZipEntry> es = z.entries();
+            while (es.hasMoreElements()) {
+                java.util.zip.ZipEntry e = es.nextElement();
+                if (e.isDirectory()) continue;
+                out.add(e.getName());
+            }
+        } catch (Throwable t) {
+            return out;
+        } finally {
+            if (z != null) try { z.close(); } catch (Throwable ignored) { }
+        }
+        return out;
+    }
+
+    /** 一个 zip 里**任一余目**的字节里有没有这个值（整包扫描；坏了就当没扫到 —— 所以配套要有反方向断言） */
+    private static boolean zipHasValue(File zip, String needle) {
+        java.util.zip.ZipFile z = null;
+        try {
+            byte[] nb = needle.getBytes("UTF-8");
+            z = new java.util.zip.ZipFile(zip);
+            java.util.Enumeration<? extends java.util.zip.ZipEntry> es = z.entries();
+            while (es.hasMoreElements()) {
+                java.util.zip.ZipEntry e = es.nextElement();
+                if (e.isDirectory()) continue;
+                java.io.InputStream in = z.getInputStream(e);
+                java.io.ByteArrayOutputStream bo = new java.io.ByteArrayOutputStream();
+                try {
+                    byte[] buf = new byte[8192];
+                    int n;
+                    while ((n = in.read(buf)) > 0) bo.write(buf, 0, n);
+                } finally {
+                    in.close();
+                }
+                if (indexOf(bo.toByteArray(), nb) >= 0) return true;
+            }
+        } catch (Throwable t) {
+            return false;
+        } finally {
+            if (z != null) try { z.close(); } catch (Throwable ignored) { }
+        }
+        return false;
+    }
+
+    /** 字节数组里找子串（`zipHasValue` 用；找不到 -1） */
+    private static int indexOf(byte[] hay, byte[] needle) {
+        if (hay == null || needle == null || needle.length == 0 || hay.length < needle.length) return -1;
+        for (int i = 0; i + needle.length <= hay.length; i++) {
+            boolean same = true;
+            for (int k = 0; k < needle.length; k++) {
+                if (hay[i + k] != needle[k]) { same = false; break; }
+            }
+            if (same) return i;
+        }
+        return -1;
     }
 
     /** 一个子串在文本里出现几次（**"同一件事只说一次"那类断言**用） */
