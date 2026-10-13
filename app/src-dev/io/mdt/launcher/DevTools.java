@@ -1052,7 +1052,7 @@ final class DevTools {
                       .append(" hasSettings=").append(plan.hasSettings)
                       .append(" removed=").append(plan.removedKeys)
                       .append("(serverIds=").append(plan.serverIds).append(')')
-                      .append(" dropServerList=").append(plan.dropServerList)
+                      .append(" dropped=").append(plan.dropped)
                       .append(" settingsBytes=").append(plan.settings == null ? "原样" : plan.settings.length)
                       .append('\n');
                     if (!plan.ok()) {

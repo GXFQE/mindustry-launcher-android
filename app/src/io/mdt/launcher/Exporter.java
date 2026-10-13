@@ -612,6 +612,9 @@ public final class Exporter {
         if (skip(f)) return;
 
         if (f.isDirectory()) {
+            // ★ 第 143 轮：目录也问一次钩子 —— ① 空目录（`crashes/` 里一份都没有）不会漏在包里；
+            //   ② 整棵子树直接剪掉，连遍历都省了。文件分支那条判据**一模一样**（同一个 drop）。
+            if (x != null && x.drop(relOf(base, f))) return;
             File[] kids = f.listFiles();
             if (kids == null || kids.length == 0) {
                 // 空目录也留一条：否则解包后整个目录结构消失

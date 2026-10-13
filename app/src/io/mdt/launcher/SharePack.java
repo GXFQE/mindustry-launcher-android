@@ -49,14 +49,31 @@ public final class SharePack {
     /** 要被**改写**（剥键）的那个顶层文件 —— 判据只认**槽数据根顶层**这一个位置 */
     public static final String SETTINGS_FILE = "settings.bin";
 
-    /**
-     * 整份**不放进分享包**的顶层条目。
-     *
-     * <p>`server_list.json` = 游戏自己那份服务器收藏夹（本机设备实测 **89 台**，每条 `{name, address}`）。
-     * 它既不是身份凭据、对**收包的人**也毫无用处（那是别人加的服务器列表），
-     * 留着只会告诉对方"你在哪些服玩过"。
-     */
+    /** 游戏自己那份服务器收藏夹（本机设备实测 **89 台**，每条 `{name, address}`）。 */
     public static final String DROP_FILE = "server_list.json";
+
+    /**
+     * 整份**不放进分享包**的顶层条目（目录按前缀算：`crashes/…` 全部命中）。
+     *
+     * <p>两类，理由不同（用户 2026-10-13 拍的第二刀："日志和可重建的缓存都丢了就行，
+     * 纯分享这东西没啥用吧"）：
+     * <ol>
+     *   <li><b>会指向你的</b>：`server_list.json`（你在哪些服玩过）、`crashes/` 与
+     *     `last_log.txt`（**故障证据** —— 对分享毫无用处，却可能带昵称与服务地址）。</li>
+     *   <li><b>可重建的缓存</b>：`previews/`（我们自己生成的地图缩略图）与
+     *     `assetCache/`（游戏自己解出来的资产缓存）。收包的人那边游戏会重建
+     *     ⇒ 对分享是纯粹的体积。</li>
+     * </ol>
+     * ⚠️ 两条如实的边界（别当它们不存在）：
+     *   · `crashes/` 与 `last_log.txt` 是 `Data.SLOT_EXCLUDE` 里**有意保留**的
+     *     （"故障前的唯一证据"）⇒ **只对分享包丢，本地备份那条路一个字都不动**；
+     *   · `assetCache/` 理论上可能装着某份地图/存档的**补丁资产**（`REF §72.8`：
+     *     编辑器导出会内嵌、就地保存不会）⇒ 跨机分享**极少数**地图可能因此缺件
+     *     （实测 `hasExternalAssets=true` 只有 2/312）。用户选了"丢"，这里如实记。
+     */
+    public static final String[] DROP_TOPS = {
+            DROP_FILE, "crashes", "last_log.txt", "previews", "assetCache",
+    };
 
     /**
      * 精确匹配就要删掉的键。
@@ -103,12 +120,21 @@ public final class SharePack {
     }
 
     /**
-     * 这个**顶层条目名**要不要整份丢掉。
-     * ⚠️ 只认根级那一个名字：`mods/config/server_list.json` 之类是别的模组的文件，不许动
-     *   （{@link Exporter.Xform} 传进来的就是相对槽数据根的路径）。
+     * 这个条目要不要整份丢掉（{@link Exporter.Xform} 传进来的是**相对槽数据根的路径**）。
+     * ⚠️ **只认根级**：`mods/config/server_list.json`、`mods/x/crashes/` 之类都是别的模组的文件，
+     *   一个字节都不许动 —— 所以命中判据是"**等于**那个名字"或"**以 `名字/` 开头**"，
+     *   而不是 `contains`/`endsWith`（那两个会把模组里的同名文件一起吃掉）。
+     * ★ 目录也走同一条判据（`crashes` 自己、以及 `crashes/x.txt` 都算命中）——
+     *   这样**空目录**也不会漏在包里（{@link Exporter} 的目录分支会拿它整棵剪掉）。
      */
     public static boolean dropTop(String rel) {
-        return DROP_FILE.equals(rel);
+        if (rel == null || rel.isEmpty()) return false;
+        for (String n : DROP_TOPS) {
+            if (n.equals(rel)) return true;
+            if (rel.length() > n.length() + 1 && rel.startsWith(n)
+                    && rel.charAt(n.length()) == '/') return true;
+        }
+        return false;
     }
 
     // ── 剥离（纯函数）────────────────────────────────────────────────────────
@@ -181,8 +207,8 @@ public final class SharePack {
         public int removedKeys;
         /** 上面那些里，`usid-*`（服务器身份）有几个 */
         public int serverIds;
-        /** 这个槽有没有 `server_list.json`（有 ⇒ 整份不放） */
-        public boolean dropServerList;
+        /** 这个槽**真的有**、且会被整份丢掉的那些顶层条目名（按 {@link #DROP_TOPS} 的顺序） */
+        public final java.util.List<String> dropped = new java.util.ArrayList<String>();
         /** 读/解析失败的原因（**只给日志、dev 报告与自检看**；用户看到的是资源里那句话） */
         public String failReason;
 
@@ -192,7 +218,7 @@ public final class SharePack {
 
         /** 这个包与「导出整槽」的内容**完全一样**吗（没删键、也没丢文件） */
         public boolean untouched() {
-            return removedKeys == 0 && !dropServerList;
+            return removedKeys == 0 && dropped.isEmpty();
         }
     }
 
@@ -207,7 +233,10 @@ public final class SharePack {
     public static Plan plan(File slotDir) {
         Plan p = new Plan();
         if (slotDir == null || !slotDir.isDirectory()) return p;
-        p.dropServerList = new File(slotDir, DROP_FILE).isFile();
+        // 先记下"这个槽真的有哪几样"（有没有是一回事，丢不丢是另一回事 —— 判据在 dropTop）
+        for (String n : DROP_TOPS) {
+            if (new File(slotDir, n).exists()) p.dropped.add(n);
+        }
 
         File set = new File(slotDir, SETTINGS_FILE);
         if (!set.isFile()) return p;                 // 空槽/新槽：没有设置文件，没什么可剥

@@ -566,9 +566,10 @@ final class SlotIo {
         } else {
             extra.append(Trans.get(a, R.string.share_slot_none));
         }
-        if (plan.dropServerList) {
-            extra.append('\n').append(Trans.get(a, R.string.share_slot_drop_list));
-        }
+        // ⚠️ 这里原来还有一句条件句「另外会去掉你收藏的服务器列表」——
+        //   而类别句（`share_slot_msg_fmt`）里已经说过一遍 ⇒ 真机上那一屏**同一件事说两遍**
+        //   （用户 2026-10-13：「怎么存在两遍啊」）。⇒ 类别由静态句统一说，**不再有第二句**；
+        //   自检里补了一条"同一屏只许出现一次"的断言钉住它。
         new AlertDialog.Builder(a)
                 .setTitle(Trans.get(a, R.string.share_slot_title_fmt, s.name))
                 .setMessage(Trans.get(a, R.string.share_slot_msg_fmt, extra.toString(),

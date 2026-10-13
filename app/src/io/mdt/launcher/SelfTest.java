@@ -685,11 +685,27 @@ public final class SelfTest {
             ok(stat, L, bad == 0, "① 判据表 " + sens.length + " 条两面全过"
                     + (bad == 0 ? "" : "（错的：" + badList + "）")
                     + " —— 含 `name` / `mod-*-steamid` **故意不删**那两条");
-            ok(stat, L, SharePack.dropTop("server_list.json")
-                            && !SharePack.dropTop("mods/config/server_list.json")
-                            && !SharePack.dropTop("server_list.json.bak"),
-                    "① ★只丢**根级**那一个 `server_list.json`"
-                            + "（模组目录下的同名文件、加了后缀的都不动）");
+            // ★ 第 143 轮：丢的从"一个文件"变成"五类"（日志 + 可重建的缓存），
+            //   两面都要钉：该丢的五类都命中（含**目录前缀**与**空目录自己**），
+            //   而模组目录里的同名东西、加了后缀的**一个都不许动**。
+            String[] mustDrop = {"server_list.json", "crashes", "crashes/x.txt",
+                    "last_log.txt", "previews", "previews/a.png", "assetCache",
+                    "assetCache/mods/x.bin"};
+            String[] mustKeep = {"mods/config/server_list.json", "server_list.json.bak",
+                    "mods/x/crashes/y.txt", "mods/x/last_log.txt", "maps/crashes.msav",
+                    "previews.bak", "mods/assetCache"};
+            int dt = 0;
+            StringBuilder dtWhy = new StringBuilder();
+            for (String s : mustDrop) {
+                if (!SharePack.dropTop(s)) { dt++; dtWhy.append(" 该丢没丢:").append(s); }
+            }
+            for (String s : mustKeep) {
+                if (SharePack.dropTop(s)) { dt++; dtWhy.append(" 不该丢却丢了:").append(s); }
+            }
+            ok(stat, L, dt == 0, "① ★丢的品类两面 " + mustDrop.length + "+" + mustKeep.length
+                    + " 条全过（**只认根级**：`mods/x/crashes/`、`previews.bak`、`maps/crashes.msav`"
+                    + " 一律不动；目录按前缀命中，空目录自己也命中）"
+                    + (dt == 0 ? "" : dtWhy.toString()));
 
             // ── 夹具：两个槽 ────────────────────────────────────────────────
             String e1 = Data.createSlot(ctx, SLOT_SHARE);
@@ -761,11 +777,23 @@ public final class SelfTest {
             write(new File(new File(slot, "saves"), "a.msav"), "SAVE-A".getBytes("UTF-8"));
             write(new File(new File(slot, "maps"), "b.msav"), "MAP-B".getBytes("UTF-8"));
             write(new File(new File(slot, "mods"), "keep/test.jar"), "JAR".getBytes("UTF-8"));
+            // ★ 第 143 轮：日志与可重建的缓存 —— **只对分享包丢**，本地备份/整槽导出照旧带着
+            write(new File(new File(slot, "crashes"), "crash_1_launcher.txt"),
+                    "CRASH".getBytes("UTF-8"));
+            write(new File(slot, "last_log.txt"), "GAMELOG".getBytes("UTF-8"));
+            write(new File(new File(slot, "previews"), "deadbeef.png"),
+                    "PNG".getBytes("UTF-8"));
+            write(new File(new File(slot, "assetCache"), "mods/x.bin"),
+                    "CACHE".getBytes("UTF-8"));
+            // ★ 模组目录里放一份**同名**的日志目录：判据只认根级 ⇒ 这个必须原样进包
+            File modCrash = new File(new File(slot, "mods"), "keep/crashes/mod.txt");
+            write(modCrash, "MODCRASH".getBytes("UTF-8"));
             // ★ 模组目录里放一个**同名**文件 —— 判据只认根级 ⇒ 这个必须原样进包
             File modSettings = new File(new File(slot, "mods"), "keep/settings.bin");
             write(modSettings, "MOD-SETTINGS".getBytes("UTF-8"));
             String md5Before = Util.md5(setFile);
             String md5ModBefore = Util.md5(modSettings);
+            String md5ModCrashBefore = Util.md5(modCrash);
 
             List<File> roots = Data.contentRoots(ctx, SLOT_SHARE);
             File plainZip = new File(Paths.privateDir(ctx), "selftest-share-plain.zip");
@@ -777,19 +805,31 @@ public final class SelfTest {
             Exporter.Result rs = Exporter.zipTo(ctx, android.net.Uri.fromFile(shareZip), slot, roots,
                     SlotIo.shareXform(plan));
             ok(stat, L, plan.ok() && plan.removedKeys == 6 && plan.serverIds == 2
-                            && plan.dropServerList && plan.settings != null,
-                    "④ 计划与实际一致：删 6 项（服务器身份 2 项）、丢掉服务器列表、"
-                            + "脱敏后的 settings 有 " + (plan.settings == null ? 0 : plan.settings.length)
-                            + " 字节");
+                            && plan.settings != null
+                            && plan.dropped.equals(java.util.Arrays.asList(
+                                    "server_list.json", "crashes", "last_log.txt",
+                                    "previews", "assetCache")),
+                    "④ 计划与实际一致：删 6 项（服务器身份 2 项）、丢掉 " + plan.dropped
+                            + "（**真的有哪几样**才报哪几样）、脱敏后的 settings 有 "
+                            + (plan.settings == null ? 0 : plan.settings.length) + " 字节");
             SlotZip.Info ip = SlotZip.inspect(ctx, plainZip);
             SlotZip.Info is = SlotZip.inspect(ctx, shareZip);
-            ok(stat, L, is.files == ip.files - 1,
-                    "④ ★分享包比普通包**正好少一条**（server_list.json）："
-                            + ip.files + " → " + is.files + " 个文件");
+            ok(stat, L, is.files == ip.files - 5,
+                    "④ ★分享包比普通包**正好少五条**（服务器列表 + 崩溃报告 + 游戏日志"
+                            + " + 地图预览 + 资产缓存）：" + ip.files + " → " + is.files + " 个文件");
             SlotZip.Result ex = SlotZip.extract(ctx, shareZip, is, SLOT_SHARE_DST, SlotWrite.REPLACE);
             File dst = Data.slotDir(ctx, SLOT_SHARE_DST);
-            ok(stat, L, !new File(dst, "server_list.json").exists() && ex.files == is.files,
-                    "④ ★往返：解出来的槽里**没有** server_list.json（其余 " + ex.files + " 条都落位了）");
+            boolean noneDropped = !new File(dst, "server_list.json").exists()
+                    && !new File(dst, "crashes").exists()
+                    && !new File(dst, "last_log.txt").exists()
+                    && !new File(dst, "previews").exists()
+                    && !new File(dst, "assetCache").exists();
+            ok(stat, L, noneDropped && ex.files == is.files,
+                    "④ ★往返：解出来的槽里**五样都不在**（服务器列表 / 崩溃报告 / 游戏日志"
+                            + " / 地图预览 / 资产缓存），其余 " + ex.files + " 条都落位了");
+            ok(stat, L, Util.md5(new File(new File(dst, "mods"), "keep/crashes/mod.txt"))
+                            .equals(md5ModCrashBefore),
+                    "④ ★模组目录里的 `crashes/` **原样进包**（判据只认根级 ⇒ 不许连带模组的内容）");
             ok(stat, L, Util.md5(new File(dst, "saves/a.msav"))
                             .equals(Util.md5(new File(slot, "saves/a.msav")))
                             && Util.md5(new File(dst, "maps/b.msav"))
@@ -815,7 +855,7 @@ public final class SelfTest {
                     "④ ★往返：解出来的 settings.bin **一个敏感键都没有**、"
                             + "普通键都在（游戏读得回）");
             ok(stat, L, Util.md5(setFile).equals(md5Before)
-                            && rp.files == ip.files && is.files == ip.files - 1,
+                            && rp.files == ip.files && is.files == ip.files - 5,
                     "④ ★元断言：源槽**一个字节都没被改**（settings.bin md5 没变）"
                             + "—— 脱敏只发生在包里，不发生在槽里");
             // ★ 元断言：dev 口与界面走的是同一份判据（`SlotIo.shareXform` 只做转接）
@@ -826,6 +866,20 @@ public final class SelfTest {
                             && xf.bytesOf("server_list.json") == null,
                     "④ ★元断言：`shareXform` 只是把 SharePack 的判据**转接**到 zip 那条路上"
                             + "（非根级同名文件取到 null = 原样拷贝）");
+
+            // ── ④b 两张资源的**措辞判据**（用户 2026-10-13 报的"说两遍"就在这）────────
+            String shareMsg = ctx.getString(R.string.share_slot_msg_fmt, "", "");
+            ok(stat, L, countOf(shareMsg, "服务器列表") == 1,
+                    "④b ★同一件事只说一次：分享包确认框里「服务器列表」出现 "
+                            + countOf(shareMsg, "服务器列表") + " 次（必须恰好 1 次 ——"
+                            + " 原来类别句与条件句各说一遍，用户当场抓到）");
+            String expMsg = ctx.getString(R.string.export_slot_msg_fmt, "");
+            ok(stat, L, expMsg.contains("身份信息") && expMsg.contains("导出分享包"),
+                    "④b ★整槽导出（**原件**那一档）的确认框里有泄露提示，并指向「导出分享包」"
+                            + "（用户 2026-10-13：「导出整槽给个敏感信息泄露提示」）");
+            ok(stat, L, shareMsg.contains("缓存") && shareMsg.contains("日志"),
+                    "④b ★分享包的类别句里说清了「日志与可重建的缓存」也会丢"
+                            + "（用户：「纯分享这东西没啥用吧」）");
 
             // ── ⑤ 拒绝路径：settings.bin 读不出来 ⇒ 计划失败（界面据此不导出）────
             byte[] keepBytes = SettingsBin.readAllBytes(setFile);
@@ -1074,6 +1128,17 @@ public final class SelfTest {
                 + "|needles=" + r.needles.size()
                 + "|kind=" + (v == null ? "?" : String.valueOf(v.kind))
                 + "|text=" + (v == null ? "?" : CrashAnalysis.text(ctx, v));
+    }
+
+    /** 一个子串在文本里出现几次（**"同一件事只说一次"那类断言**用） */
+    private static int countOf(String hay, String needle) {
+        if (hay == null || needle == null || needle.isEmpty()) return 0;
+        int n = 0, i = 0;
+        while ((i = hay.indexOf(needle, i)) >= 0) {
+            n++;
+            i += needle.length();
+        }
+        return n;
     }
 
     /** 两段文本里都有这个片段（表头两档的**共同部分**断言用） */

@@ -1067,7 +1067,7 @@
     <string name="backup_err_clone_target_current_fmt">「%1$s」是当前槽，不能作为克隆的目标。\n（源槽的内容会与它混在一起，之后就分不开了）</string>
     <string name="backup_err_slot_backups_delete_fmt">备份目录删除未完全成功：%1$s</string>
     <string name="export_slot_title_fmt">导出整槽「%1$s」</string>
-    <string name="export_slot_msg_fmt">把整个槽打包成一个 zip：存档 · 地图 · 蓝图 · 模组 · 设置。%1$s\n\n游戏自己也能导入这个包（设置 → 数据 → 导入数据）。</string>
+    <string name="export_slot_msg_fmt">把整个槽打包成一个 zip：存档 · 地图 · 蓝图 · 模组 · 设置。%1$s\n\n⚠️ 这个包里带着你的身份信息（每台服务器的登录身份等）—— 要交给别人，请改用「导出分享包」。\n\n游戏自己也能导入这个包（设置 → 数据 → 导入数据）。</string>
     <string name="export_slot_playing">\n\n⚠️ 游戏正在运行，此刻导出可能拿到写了一半的存档。</string>
     <string name="export_ok">选择保存位置</string>
     <string name="chooser_export">导出到…</string>
@@ -1091,10 +1091,9 @@
     -->
     <string name="slot_op_share_slot">导出分享包（已去除身份信息）…</string>
     <string name="share_slot_title_fmt">导出分享包「%1$s」</string>
-    <string name="share_slot_msg_fmt">这是给换机或分享给别人用的包，内容和「导出整槽」一样，只是打包前会先去掉身份信息：每台服务器的登录身份、uuid、上次连过的服务器、封禁名单，以及你收藏的服务器列表。\n\n%1$s%2$s\n\n要留着自己恢复用，请走「导出整槽」——那个包不做任何删改。</string>
+    <string name="share_slot_msg_fmt">这是给换机或分享给别人用的包，内容和「导出整槽」一样，只是打包前会先去掉身份信息：每台服务器的登录身份、uuid、上次连过的服务器、封禁名单，以及你收藏的服务器列表；另外还会丢掉日志与可重建的缓存（崩溃报告、游戏日志、地图预览、资产缓存）—— 纯分享的包留着这些只是占体积。\n\n%1$s%2$s\n\n要留着自己恢复用，请走「导出整槽」——那个包不做任何删改。</string>
     <string name="share_slot_found_fmt">这次会去掉 %1$d 项身份信息（其中服务器身份 %2$d 项）。</string>
     <string name="share_slot_none">这个槽里没有身份信息，包的内容与「导出整槽」完全一样。</string>
-    <string name="share_slot_drop_list">另外会去掉你收藏的服务器列表。</string>
     <string name="share_slot_err_settings">这个槽的设置文件读不出来（可能损坏），没法确认里面有没有身份信息 —— 为避免泄露，这次没有导出。</string>
     <string name="share_progress_msg_fmt">打包槽「%1$s」\n去除身份信息 · 压缩 · 写入…</string>
     <string name="share_slot_done_fmt">已导出分享包：%1$d 个文件，%2$s（已去除 %3$d 项身份信息）</string>

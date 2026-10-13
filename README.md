@@ -102,11 +102,15 @@ yourself — even just a few lines — see **Translation file** below.
   everything to a new phone or another slot. Both a slot import and a "restore backup" let you pick
   **how the two sides merge**: **Update** (the new version wins), **Add missing** (what the slot has
   now wins, only missing files are added) or **Replace** (clear the slot first, then write the
-  package in full) — and **a backup is taken first**, so a wrong choice can be undone
+  package in full) — and **a backup is taken first**, so a wrong choice can be undone. ⚠️ This
+  package **carries your identity data** (the login identity used on each server, among others):
+  to hand it to someone else, use the shareable package below instead
 - **A shareable package (identity removed)**: the same zip, but before it is packed the launcher
   strips what could identify you — the per-server login identity the game keeps (`usid-…`), `uuid`,
-  the last server you joined, ban lists — and drops your saved-server list. **Your own backups are
-  left untouched** (a restore needs that data); this export is for handing the slot to someone else.
+  the last server you joined, ban lists — and drops your saved-server list. It also drops the logs
+  and the rebuildable caches (crash reports, the game log, map previews, the asset cache): in a
+  package that is only meant to be shared, those are just weight. **Your own backups are left
+  untouched** (a restore needs that data).
   If the settings file cannot be read, the launcher **refuses to export** rather than ship a file it
   could not check. (A single save file never carried any of this — the identity lives in the slot's
   settings, not in the save.)
