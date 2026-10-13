@@ -1469,6 +1469,19 @@
     <string name="log_export_fail_fmt">导出失败：%1$s</string>
     <string name="log_export_empty">还没有任何日志可导出</string>
     <string name="log_export_no_picker">系统里没有可以「保存文件」的应用</string>
+
+    <!--
+      ══ 第 142 轮：脱敏日志（分享用）══════════════════════════════════════
+      ★ 「导出全部日志」那一行现在是一道门、两个出口：**原件**（下标 0，老行为）与
+        **脱敏版**（下标 1）。两条路的差别只有一个 —— 后者拼完再跑一遍 CrashScrub。
+      ★ 下面这几句里的「隐去 N 处」不是形容词：N 来自 CrashScrub.Result.hits，
+        与自检断言用的是同一个数。
+      ★ 占位符（<ext-data> / <server> / <device> …）一律 ASCII，**不进资源**：
+        它们出现在导出给别人看的文本里，不随界面语言变（见 CrashScrub 类注释）。
+    -->
+    <string name="log_export_raw">导出完整日志（原样）</string>
+    <string name="log_export_scrub">导出脱敏版（去掉隐私内容，分享用）</string>
+    <string name="log_export_scrub_ok_fmt">已导出 %1$s（隐去 %2$d 处）</string>
     <string name="log_export_absent">（缺失）</string>
     <string name="log_export_blank">（空文件）</string>
     <string name="log_export_big_fmt">（文件 %1$s，超出单份上限，只导出最后 %2$s）</string>

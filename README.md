@@ -185,6 +185,24 @@ yourself — even just a few lines — see **Translation file** below.
   station keeps at most 20 items (3 whole slots) and pushes out the oldest beyond that
 
 ### Logs and settings
+- **Export the logs — in full or ready to share**: the bundle (game log + launcher reports +
+  crash reports) can be exported **unchanged**, or as a **scrubbed copy** that removes what points
+  at you before you send it: data-root paths (and the slot name inside them), the device model,
+  the GL/driver string, and the values the launcher already knows — your player name, the servers
+  you joined, the login ids. Ports, relative paths, the ABI, the API level, the page size and the
+  **mod list** stay (crash analysis needs them), so the scrubbed copy is still worth reporting
+  with. If the settings file cannot be read the launcher just falls back to the pattern-based
+  pass — a corrupt setting must never stop you from exporting a log
+
+- **Export the logs — in full or ready to share**: the bundle (game log + launcher reports +
+  crash reports) can be exported **unchanged**, or as a **scrubbed copy** that removes what points
+  at you before you send it: data-root paths (and the slot name inside them), the device model,
+  the GL/driver string, and the values the launcher already knows — your player name, the servers
+  you joined, the login ids. Ports, relative paths, the ABI, the API level, the page size and the
+  **mod list** stay (crash analysis needs them), so the scrubbed copy is still worth reporting
+  with. If the settings file cannot be read the launcher just falls back to the pattern-based
+  pass — a corrupt setting must never stop you from exporting a log
+
 - **Runtime log page** (home → Runtime log): the launcher's own log, the game log, and crash
   reports as separate sections, each with its age and size; the oldest crash reports can be deleted
   from there, and **Export all logs** writes everything into one file

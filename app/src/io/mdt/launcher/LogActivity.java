@@ -151,6 +151,13 @@ public class LogActivity extends BaseActivity {
      *   {@link #onActivityResult} 里发现它是 null 会**重新拼一次**，而不是放弃导出。
      */
     private String mExportText;
+    /**
+     * ★ 第 142 轮：这次导出是不是**脱敏版**（+ 隐去了多少处）。
+     * ⚠️ 必须跨 SAF 存活：用户可能被系统回收后重建，那时正文丢了要**按同一种模式**重拼
+     *   —— 否则会出现"点的是脱敏、重拼出的是原件"这种最坏的组合。
+     */
+    private boolean mExportScrub;
+    private int mExportHits;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -205,9 +212,10 @@ public class LogActivity extends BaseActivity {
 
         // F20：导出全部日志。复用 row_action 范式（图标圈 + 标题/副标题 + 箭头），
         // ⚠️ bindAction 会**从行根**findViewById —— include 多次时 id 会重复（见 Util 注释）。
+        // ★ 第 142 轮：这一行现在给**两个出口**（完整 / 脱敏）⇒ 先弹一道门选。
         Util.bindAction(root, R.id.log_row_export, R.drawable.ic_download,
                 R.string.log_export, R.string.log_export_sub, new Runnable() {
-                    @Override public void run() { onClickExport(); }
+                    @Override public void run() { promptExport(); }
                 });
 
         Util.applySystemInsets(root);
@@ -613,15 +621,46 @@ public class LogActivity extends BaseActivity {
     // ── F20：一键导出全部日志 ──────────────────────────────────────────────
 
     /**
-     * 点"导出全部日志"。
+     * 「导出日志」这一行的**门**（第 142 轮）：完整（原始）与脱敏（分享用）二选一。
+     *
+     * <p>形状照抄槽页那条「整槽导入导出」：**一行 = 一件事，同一件事的两条路在一道门里选**
+     *   （REF §84）。⚠️ **原始那项排在最前**（下标 0）—— 老行为的下标不变。
+     *
+     * <p>★ 为什么值得分两个出口：这份文件是**要发出去的**（报 bug 时贴给别人），
+     *   而实测它带着 21 处绝对路径（含用户起的槽名）、设备型号、GL 驱动串
+     *   —— 见 {@link CrashScrub} 的类注释。但**自己留档**时那些信息恰恰有用
+     *   ⇒ 不做成"一律脱敏"，而是让用户在动手前就知道自己在导出哪一种。
+     */
+    private void promptExport() {
+        if (mSnap == null || !hasAnyLog(mSnap)) {
+            Toast.makeText(this, R.string.log_export_empty, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.log_export)
+                .setItems(new String[]{
+                        Trans.get(this, R.string.log_export_raw),
+                        Trans.get(this, R.string.log_export_scrub)},
+                        new DialogInterface.OnClickListener() {
+                            @Override public void onClick(DialogInterface d, int w) {
+                                onClickExport(w == 1);
+                            }
+                        })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    /**
+     * 真正导出（`scrub` = 走脱敏那一档）。
      *
      * 顺序：**先把三源全文拼好，再叫出 SAF 选择器**。
      * ★ 为什么不是"先选位置、再读文件":若在读的时候才发现"一个源都没有"，用户已经
      *   白选了路径、还得再解释一遍为什么什么都没导出。先拼（很便宜：总量在几十 KB 级）
      *   就能在**动手前**给出"还没有任何日志可导出"。
-     * ★ 拼装在后台线程：`fullText()` 会整读文件，几 MB 时放主线程就是一次卡顿。
+     * ★ 拼装在后台线程：`fullText()` 会整读文件，几 MB 时放主线程就是一次卡顿；
+     *   脱敏那一档还要读 `settings.bin` 取"已知敏感值"（{@link #readSecrets}）。
      */
-    private void onClickExport() {
+    private void onClickExport(final boolean scrub) {
         if (mSnap == null || !hasAnyLog(mSnap)) {
             Toast.makeText(this, R.string.log_export_empty, Toast.LENGTH_SHORT).show();
             return;
@@ -629,10 +668,13 @@ public class LogActivity extends BaseActivity {
         final Snap s = mSnap;
         new Thread(new Runnable() {
             @Override public void run() {
-                final String text = compose(LogActivity.this, s, exportHeader(LogActivity.this), mVerdicts);
+                final Composed c = build(LogActivity.this, s,
+                        exportHeader(LogActivity.this, scrub), mVerdicts, scrub);
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
-                        mExportText = text;
+                        mExportText = c.text;
+                        mExportScrub = scrub;
+                        mExportHits = c.hits;
                         try {
                             startActivityForResult(
                                     Exporter.createDoc(exportFileName(), "text/plain"), REQ_EXPORT);
@@ -655,6 +697,8 @@ public class LogActivity extends BaseActivity {
         // 用户取消（返回键 / 不选）⇒ 什么都不做，也不弹"失败"（那不是失败）
         if (res != RESULT_OK || data == null || data.getData() == null) {
             mExportText = null;
+            mExportScrub = false;
+            mExportHits = 0;
             return;
         }
         final android.net.Uri uri = data.getData();
@@ -662,11 +706,24 @@ public class LogActivity extends BaseActivity {
         // ⚠️ 重拼挪进下面那个**后台线程**：F23 的结论在"认不出"时会扫 dex，
         //    在 UI 线程里做就是一次可感知的卡顿（原来这里只拼文本，所以放在外面没问题）。
         final String pre = mExportText;
+        final boolean scrub = mExportScrub;
+        final int hits = mExportHits;
         mExportText = null;
+        mExportScrub = false;
+        mExportHits = 0;
         new Thread(new Runnable() {
             @Override public void run() {
-                final String text = (pre != null) ? pre
-                        : compose(LogActivity.this, mSnap, exportHeader(LogActivity.this), mVerdicts);
+                final String text;
+                final int nHidden;
+                if (pre != null) {
+                    text = pre;
+                    nHidden = hits;
+                } else {
+                    Composed cp = build(LogActivity.this, mSnap,
+                            exportHeader(LogActivity.this, scrub), mVerdicts, scrub);
+                    text = cp.text;
+                    nHidden = cp.hits;
+                }
                 long n = 0;
                 String err = null;
                 try {
@@ -681,7 +738,12 @@ public class LogActivity extends BaseActivity {
                     @Override public void run() {
                         Toast.makeText(LogActivity.this,
                                 ferr == null
-                                        ? Trans.get(LogActivity.this, R.string.log_export_ok_fmt, Util.formatSize(fn))
+                                        ? (scrub
+                                            ? Trans.get(LogActivity.this,
+                                                R.string.log_export_scrub_ok_fmt,
+                                                Util.formatSize(fn), nHidden)
+                                            : Trans.get(LogActivity.this,
+                                                R.string.log_export_ok_fmt, Util.formatSize(fn)))
                                         : Trans.get(LogActivity.this, R.string.log_export_fail_fmt, ferr),
                                 Toast.LENGTH_LONG).show();
                     }
@@ -705,6 +767,19 @@ public class LogActivity extends BaseActivity {
      *   （本项目的 ELF 对齐判据就是按页大小算的）。
      */
     static String exportHeader(Context ctx) {
+        return exportHeader(ctx, false);
+    }
+
+    /**
+     * 同上，`scrub` = 脱敏那一档（第 142 轮）。
+     *
+     * <p>★ **格式串只有一份** —— 只把三个**参数值**换掉：当前槽名 → `&lt;slot&gt;`、
+     *   数据根 / HUB 路径 → `&lt;ext-data&gt;` / `&lt;int-data&gt;`、设备型号 → `&lt;device&gt;`。
+     *   这样"两种导出的表头长得一样、只差敏感位"是结构上保证的，不是靠两处代码同步。
+     * ⚠️ ABI / API / 页大小**照旧保留** —— 它们是排障判据（本项目 ELF 对齐就是按页大小算的），
+     *   换掉它们等于把脱敏做成"把日志变没用"。
+     */
+    static String exportHeader(Context ctx, boolean scrub) {
         File root = Data.dataRoot(ctx);
         File hub = Data.hubDir(ctx);
         String ver;
@@ -718,10 +793,15 @@ public class LogActivity extends BaseActivity {
         return Trans.get(ctx, R.string.log_export_head_fmt,
                 new SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale.US).format(new Date()),
                 ver,
-                Data.currentSlot(ctx),
-                root == null ? Trans.get(ctx, R.string.log_export_absent) : root.getAbsolutePath(),
-                hub == null ? Trans.get(ctx, R.string.log_export_absent) : hub.getAbsolutePath(),
-                android.os.Build.MANUFACTURER + " " + android.os.Build.MODEL
+                scrub ? CrashScrub.P_SLOT : Data.currentSlot(ctx),
+                root == null ? Trans.get(ctx, R.string.log_export_absent)
+                        : (scrub ? CrashScrub.P_EXT : root.getAbsolutePath()),
+                hub == null ? Trans.get(ctx, R.string.log_export_absent)
+                        : (scrub ? CrashScrub.P_EXT : hub.getAbsolutePath()),
+                // ⚠️ 只有"厂商 + 型号"被换掉：`· Android 16 (API 36)` **留着** ——
+                //   系统版本与 API 级别是排障判据（自检 ④ 照这条承诺红过一次）。
+                CrashScrub.deviceFor(scrub, android.os.Build.MANUFACTURER + " "
+                        + android.os.Build.MODEL)
                         + " · Android " + android.os.Build.VERSION.RELEASE
                         + " (API " + android.os.Build.VERSION.SDK_INT + ")",
                 TextUtils.join(", ", android.os.Build.SUPPORTED_ABIS),
@@ -748,6 +828,29 @@ public class LogActivity extends BaseActivity {
      */
     static String compose(Context ctx, Snap s, String header,
                           java.util.Map<String, CrashAnalysis.Verdict> cache) {
+        return build(ctx, s, header, cache, false).text;
+    }
+
+    /** 一次拼装的结果：正文 + **脱敏隐去了多少处**（`scrub=false` 时恒为 0） */
+    static final class Composed {
+        final String text;
+        final int hits;
+
+        Composed(String text, int hits) {
+            this.text = text;
+            this.hits = hits;
+        }
+    }
+
+    /**
+     * 拼装（`scrub` = 拼完再整体跑一遍 {@link CrashScrub}）。
+     *
+     * <p>★ 为什么剥离放在**拼完之后、对整段文本**做一次（而不是每段各自剥）：
+     *   ① 表头与正文之间不会有"只剥了一边"的缝；② 计数只有一个口径（界面那句"隐去 N 处"）；
+     *   ③ 自检可以直接喂任意文本给 {@link CrashScrub#scrub} —— 判据不必穿过 UI。
+     */
+    static Composed build(Context ctx, Snap s, String header,
+                          java.util.Map<String, CrashAnalysis.Verdict> cache, boolean scrub) {
         StringBuilder sb = new StringBuilder();
         sb.append(header).append("\n\n");
 
@@ -773,7 +876,44 @@ public class LogActivity extends BaseActivity {
         } else {
             for (Doc d : s.crashes) appendCrashDoc(sb, ctx, d, cache);
         }
-        return sb.toString();
+        if (!scrub) return new Composed(sb.toString(), 0);
+        CrashScrub.Result r = CrashScrub.scrub(sb.toString(), readSecrets(ctx));
+        return new Composed(r.text, r.hits);
+    }
+
+    /**
+     * 「本来就知道的敏感值」——本槽 `settings.bin` 的 `name` / `ip` / `usid-*` / `uuid`
+     * + `server_list.json` 里的地址（{@link CrashScrub.Secrets}）。
+     *
+     * <p>🔴 **读不出来不算失败**：日志脱敏是"锦上添花"那一层，绝不能因为设置文件损坏
+     *   就让用户**导不出日志**（那才是最坏的结果：本来要报 bug，结果什么也拿不到）。
+     *   ⇒ 这里一律吞掉异常，能取多少取多少；通用模式（路径 / IPv4 / 设备型号）照样生效。
+     * ⚠️ 会读盘 ⇒ 只在后台线程调用（{@link #onClickExport} / dev 口）。
+     */
+    static CrashScrub.Secrets readSecrets(Context ctx) {
+        CrashScrub.Secrets out = new CrashScrub.Secrets();
+        try {
+            String slot = Data.currentSlot(ctx);
+            File dir = Data.dirOf(ctx, slot);
+            if (dir == null) return out;
+            SettingsBin.Values v = SettingsBin.readSafe(new File(dir, SharePack.SETTINGS_FILE), null);
+            out = CrashScrub.Secrets.from(v);
+            File list = new File(dir, SharePack.DROP_FILE);
+            if (list.isFile()) out.addAddressesFromJson(readTextFile(list));
+        } catch (Throwable ignored) {
+            // 见方法注释：读不到就退化成"只做通用模式"
+        }
+        return out;
+    }
+
+    /** 整个文件读成字符串（**只给 {@link #readSecrets} 用**；读不到给空串） */
+    private static String readTextFile(File f) {
+        try {
+            byte[] b = SettingsBin.readAllBytes(f);
+            return new String(b, "UTF-8");
+        } catch (Throwable t) {
+            return "";
+        }
     }
 
     /** F23：崩溃报告那一段 = **结论行**（有结论时）+ 原文 */

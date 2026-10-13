@@ -342,7 +342,10 @@ final class DevTools {
         // ── F20：日志导出 ──────────────────────────────────────────────────
         String logsExp = intent.getStringExtra("dev_logs_export");
         if (logsExp != null && !logsExp.isEmpty()) {
-            devLogsExport(new File(logsExp));
+            // ★ 第 142 轮：同一个口跑**脱敏那一档**（`--es dev_logs_scrub 1`）。
+            //   走的是界面那条路（同一个 LogActivity.build + 同一个 CrashScrub），
+            //   因为 SAF 没法自动化 —— 而"脱敏到底剥掉了什么"只能靠取回产物看。
+            devLogsExport(new File(logsExp), intent.hasExtra("dev_logs_scrub"));
             return;
         }
 
@@ -1252,6 +1255,7 @@ final class DevTools {
      * dev_logs_export：把"全部日志"导出成**一个文件**并落盘（F20）。
      *
      * 用法：`--es dev_logs_export &lt;绝对路径.txt&gt;`
+     *      ＋（可选）`--es dev_logs_scrub 1` ⇒ 跑**脱敏那一档**（第 142 轮）
      *
      * ★ 为什么必须有这个口：导出本身走 SAF 选择器（系统界面），**没法自动化点** ——
      *   而"导出的内容对不对"恰恰是唯一值得验的东西（漏一段不会崩、不会报错）。
@@ -1260,19 +1264,22 @@ final class DevTools {
      * ⚠️ 落点用 {@link Util#atomicWriteText}（先写 .tmp 再改名）：避免 adb 在
      *   写一半时把文件取走、拿到半截内容后误判成"导出有 bug"。
      */
-    private void devLogsExport(final File dst) {
+    private void devLogsExport(final File dst, final boolean scrub) {
         new Thread(new Runnable() {
             @Override public void run() {
                 String rep;
                 try {
                     LogActivity.Snap s = LogActivity.readAll(a);
-                    String text = LogActivity.compose(a, s,
-                            LogActivity.exportHeader(a));
+                    LogActivity.Composed c = LogActivity.build(a, s,
+                            LogActivity.exportHeader(a, scrub), null, scrub);
+                    String text = c.text;
                     Util.atomicWriteText(dst, text);
-                    rep = "dev_logs_export ok\n"
+                    rep = "dev_logs_export ok" + (scrub ? "（脱敏档）" : "（原件）") + "\n"
                             + "目标 = " + dst.getAbsolutePath() + "\n"
                             + "正文 = " + text.length() + " 字符 / " + text.getBytes("UTF-8").length + " B\n"
                             + "落盘 = " + dst.length() + " B\n"
+                            + "隐去 = " + c.hits + " 处\n"
+                            + (scrub ? "已知敏感值 = " + LogActivity.readSecrets(a).size() + " 条\n" : "")
                             + (LogActivity.hasAnyLog(s) ? "" : "⚠️ 三个源一个都不存在（导出的是空壳）\n");
                 } catch (Throwable t) {
                     rep = "dev_logs_export failed: " + t;

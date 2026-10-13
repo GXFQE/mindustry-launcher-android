@@ -291,6 +291,8 @@ public final class SelfTest {
             deepLink(ctx, L, stat);
             // ★ 第 141 轮：分享包（脱敏导出）—— 判据表 + 两面元断言 + zip 往返 + 拒绝路径
             sharePack(ctx, L, stat);
+            // ★ 第 142 轮：脱敏日志 / 崩溃报告（判据表两面 + 反方向 + 结论不变）
+            crashScrub(ctx, L, stat);
             // ★ 篡改对象池的用例放**最后**：它会在池里留下一个内容坏掉的对象，
             //   之后任何"再备份一次"都会因为 `has()` 命中而复用坏对象（CAS 的固有
             //   假设是"池内不可变"）。放在最后就不影响别的用例。
@@ -868,6 +870,215 @@ public final class SelfTest {
             stat[1]++;
             L.add("❌ 分享包用例自身异常：" + t);
         }
+    }
+
+    /**
+     * ★ 第 142 轮：**脱敏日志 / 崩溃报告**（分享用那一档）。
+     *
+     * <p>四段，每段都有"反方向"：
+     * <ol>
+     *   <li><b>判据表</b>：该命中的（数据根路径 / 槽名 / IPv4 / Windows 用户目录 / 邮箱 /
+     *     GL 驱动串 / 已知值）必须命中，而且**留下排障要用的结构**（端口、相对路径、
+     *     `GLES 3.2.0` 这个能力档）；</li>
+     *   <li><b>反方向</b>：异常类名 / `Caused by` / 模组清单 / 包名 / API 级别 / ABI /
+     *     版本号 / `github.com` 一律**一个字节都不许动**（这一面才是"模型清单留给归因"那条承诺）；</li>
+     *   <li><b>两面元断言</b>：一段本来就没有敏感内容的文本 ⇒ `unchanged()` 且**逐字节相同**；</li>
+     *   <li><b>结论不变</b>（最值钱的一条）：拿**设备上真实的崩溃报告**，剥之前与剥之后各跑一遍
+     *     {@link CrashAnalysis}，断言诊断结论**逐字相同** —— 脱敏不许把归因弄丢。</li>
+     * </ol>
+     * ⚠️ 全程**只读**（真实报告一个字都不写）；没有现成报告时如实说"跳过"。
+     */
+    private static void crashScrub(Context ctx, List<String> L, int[] stat) {
+        L.add("── 第 142 轮：脱敏日志 / 崩溃报告 ──");
+        try {
+            // ── ① 通用模式 + 已知值（判据表，两面）──────────────────────────
+            CrashScrub.Secrets sec = new CrashScrub.Secrets();
+            sec.playerNames.add("NullPointerException");
+            sec.addresses.add("frp-ten.com");
+            sec.ids.add("7Aj7NeK2QwA=");
+
+            Object[][] cases = {
+                    // {输入, 结果必须**含**, 结果必须**不含**}
+                    {"/storage/emulated/0/Android/data/io.mdt.launcher/slot-" + "\u5f20\u4e09"
+                            + "/saves/\u6211\u7684\u6863.msav",
+                     CrashScrub.P_EXT + "/slot-" + CrashScrub.P_SLOT + "/saves/\u6211\u7684\u6863.msav",
+                     "\u5f20\u4e09"},
+                    {"/data/user/0/io.mdt.launcher/files/report-m3.txt",
+                     CrashScrub.P_INT + "/files/report-m3.txt", "/data/user/0"},
+                    {"C:\\Users\\someone\\AppData\\Local\\Mindustry\\saves", CrashScrub.P_PATH, "someone"},
+                    {"Connecting to 1.2.3.4:6567 ...", "Connecting to " + CrashScrub.P_SERVER + ":6567",
+                     "1.2.3.4"},
+                    {"mail: someone@example.com", "mail: " + CrashScrub.P_EMAIL, "someone@"},
+                    {"usid-103.91.208.146:64934 = 7Aj7NeK2QwA=", CrashScrub.P_ID,
+                     "7Aj7NeK2QwA="},
+                    {"\u76f4\u8fde frp-ten.com:64934 \u5931\u8d25", CrashScrub.P_SERVER + ":64934",
+                     "frp-ten.com"},
+                    {"player NullPointerException joined", CrashScrub.P_PLAYER,
+                     "NullPointerException"},
+                    {"GL Version: GLES 3.2.0 / Qualcomm / Adreno (TM) 735 / OpenGL ES 3.2 "
+                            + "V@0762.46 (GIT@6275e17561) (Date:01/23/26)",
+                     "GL Version: GLES 3.2.0 " + CrashScrub.P_GL, "Adreno"},
+                    // ★ 游戏的日志行是**另一种写法**（真机产物教的：第一版漏了它，
+                    //   脱敏档里还剩 1 处 `Adreno`）
+                    {"[I] [GL] Version: GLES 3.2.0 / Qualcomm / Adreno (TM) 735 / OpenGL ES 3.2 "
+                            + "V@0762.46 (GIT@6275e17561) (Date:01/23/26)",
+                     "[I] [GL] Version: GLES 3.2.0 " + CrashScrub.P_GL, "Adreno"},
+                    // ★ 反方向（报告头里另外两行不许被当成 GL 行）**不放进这张表**：
+                    //   这张表的语义是"必须命中"（下面还要求 hits>0），纯反方向会自相矛盾
+                    //   —— 第一版就是这么写的，自检当场红。⇒ 见下面单独那条断言。
+            };
+            int bad = 0;
+            StringBuilder why = new StringBuilder();
+            for (Object[] c : cases) {
+                CrashScrub.Result r = CrashScrub.scrub((String) c[0], sec);
+                boolean ok = r.text.contains((String) c[1])
+                        && (!r.text.contains((String) c[2]))
+                        && r.hits > 0;
+                if (!ok) {
+                    bad++;
+                    why.append("\n      \u2717 \u8f93\u5165=").append((String) c[0])
+                       .append(" \u5b9e\u5f97=").append(r.text);
+                }
+            }
+            ok(stat, L, bad == 0, "\u2460 \u5224\u636e\u8868 " + cases.length
+                    + " \u6761\uff08\u542b\u300c\u7aef\u53e3\u7559\u7740\u300d\u300c\u76f8\u5bf9\u8def\u5f84\u7559\u7740\u300d"
+                    + "\u300cGLES \u80fd\u529b\u6863\u7559\u7740\u300d\u4e09\u6761\u7ed3\u6784\u6027\u65ad\u8a00\uff09"
+                    + (bad == 0 ? "" : why.toString()));
+            // ★ 反方向：报告头里那两行（`Java Version:` / `Version: unknown build 0`）
+            //   不许被当成 GL 行 —— `Version:` 前面必须真的有 `GL`（或 `[GL]`）。
+            String noGl = "Java Version: 0\nVersion: unknown build 0";
+            ok(stat, L, noGl.equals(CrashScrub.scrub(noGl, sec).text),
+                    "\u2460 \u2605\u53cd\u65b9\u5411\uff1a\u62a5\u544a\u5934\u7684 `Java Version:` / `Version: unknown build 0`\u4e0d\u4f1a\u88ab\u5f53\u6210 GL \u884c");
+
+            // ── ② 反方向：归因要用的东西一个字节都不许动 ────────────────────
+            String keep = "Mindustry has crashed.\n"
+                    + "Version: unknown build 0\n"
+                    + "Android API level: 36\n"
+                    + "OS: Linux x (aarch64)\n"
+                    + "Mods: [\u903b\u8f91\u4e2d\u6587, foo:1.0]\n"
+                    + "Likely Cause: foo (foo v1.0)\n"
+                    + "java.lang.NullPointerException\n"
+                    + "\tat io.mdt.launcher.MainActivity.onCreate(MainActivity.java:12)\n"
+                    + "\tat /data/app/~~0V4XL6KA0AbC==/io.mdt.launcher-hSv==/base.apk\n"
+                    + "Caused by: java.lang.IllegalStateException: 160.5\n"
+                    + "https://github.com/TinyLake/MindustryX/issues/new\n"
+                    + "uiscale 0.1 / arm64-v8a / 16384 B\n";
+            CrashScrub.Result kr = CrashScrub.scrub(keep, null);
+            ok(stat, L, kr.unchanged() && keep.equals(kr.text),
+                    "\u2461 \u2605\u53cd\u65b9\u5411\uff1a\u5f02\u5e38\u7c7b\u540d / Caused by / \u6a21\u7ec4\u6e05\u5355 / "
+                            + "\u5305\u540d / API \u7ea7\u522b / ABI / \u9875\u5927\u5c0f / \u7248\u672c\u53f7 / github.com "
+                            + "\u4e00\u4e2a\u5b57\u8282\u90fd\u6ca1\u52a8\uff08hits=" + kr.hits + "\uff09");
+            ok(stat, L, keep.equals(CrashScrub.scrub(keep, sec).text),
+                    "\u2461 \u2605\u53cc\u9762\u5143\u65ad\u8a00\uff1a\u540c\u4e00\u6bb5\u6587\u672c + \u5df2\u77e5\u503c"
+                            + "\uff08\u5176\u4e2d\u6635\u79f0\u4e0e `java.lang.NullPointerException` **\u649e\u540d**\uff09"
+                            + "\u4ecd\u7136**\u9010\u5b57\u8282\u76f8\u540c**\uff1a\u649e\u5728\u6807\u8bc6\u7b26\u91cc\u7684\u90a3\u4e00\u5904"
+                            + "**\u4e0d\u8bb8\u66ff\u6362**\uff08\u5426\u5219\u4f1a\u628a\u5f02\u5e38\u7c7b\u540d\u6539\u6210 <player>\u3001"
+                            + "\u628a\u5f52\u56e0\u5f04\u574f\uff09");
+            // \u2605 \u5b88\u680f\u672c\u8eab\u7684\u4e24\u9762\uff1a\u8be5\u6362\u7684\u5730\u65b9\u7167\u6362\u3001\u4e0d\u8be5\u52a8\u7684\u5730\u65b9\u4e0d\u52a8
+            ok(stat, L, CrashScrub.bareStanding("joined: NullPointerException!", 8,
+                            "NullPointerException")
+                            && !CrashScrub.bareStanding("java.lang.NullPointerException", 10,
+                                    "NullPointerException")
+                            && !CrashScrub.bareStanding("xNullPointerException", 1,
+                                    "NullPointerException"),
+                    "\u2461 \u2605\u5b88\u680f\u4e24\u9762\uff1a\u72ec\u7acb\u51fa\u73b0\u7684\u6635\u79f0\u8be5\u6362\uff1b"
+                            + "\u8ddf\u5728 `.` \u540e\u9762\u6216\u7c98\u5728\u5b57\u6bcd\u91cc\u7684\u4e0d\u8be5\u6362");
+
+            // ── ③ 真报告：剥前 / 剥后，结论必须逐字相同 ──────────────────────
+            File cdir = new File(Data.dataRoot(ctx), "crashes");
+            File[] reps = cdir.isDirectory() ? cdir.listFiles() : null;
+            int tested = 0, mismatched = 0, hidden = 0, changed = 0;
+            StringBuilder mm = new StringBuilder();
+            if (reps != null) {
+                for (File f : reps) {
+                    if (f == null || !f.isFile()) continue;
+                    String raw = read(f);
+                    if (raw == null || raw.trim().isEmpty()) continue;
+                    CrashScrub.Result sr = CrashScrub.scrub(raw, LogActivity.readSecrets(ctx));
+                    CrashAnalysis.Report r1 = CrashAnalysis.parse(raw);
+                    CrashAnalysis.Report r2 = CrashAnalysis.parse(sr.text);
+                    String s1 = sig(ctx, r1);
+                    String s2 = sig(ctx, r2);
+                    tested++;
+                    hidden += sr.hits;
+                    // ★ 防"白过"：`Result.text` 曾经照抄输入 ⇒ 下面那条"结论相同"
+                    //   是在拿**没剥过**的文本跟原件比。这一行是它的反方向判据。
+                    if (!sr.text.equals(raw)) changed++;
+                    if (!s1.equals(s2)) {
+                        mismatched++;
+                        mm.append("\n      \u2717 ").append(f.getName())
+                          .append("\n        \u524d=").append(s1)
+                          .append("\n        \u540e=").append(s2);
+                    }
+                }
+            }
+            if (tested == 0) {
+                L.add("  \uff08\u8df3\u8fc7\u2462\uff1a\u8bbe\u5907\u4e0a\u8fd8\u6ca1\u6709\u771f\u5b9e\u5d29\u6e83\u62a5\u544a\uff09");
+            } else {
+                ok(stat, L, mismatched == 0, "\u2462 \u2605\u7ed3\u8bba\u4e0d\u53d8\uff1a" + tested
+                        + " \u4efd**\u771f\u5b9e**\u5d29\u6e83\u62a5\u544a\u5265\u524d\u5265\u540e\uff0c"
+                        + CrashAnalysis.class.getSimpleName()
+                        + " \u7684\u8bca\u65ad\u7b7e\u540d\u9010\u5b57\u76f8\u540c\uff08\u672c\u6b21\u9690\u53bb "
+                        + hidden + " \u5904\uff09" + (mismatched == 0 ? "" : mm.toString()));
+                // ★ 元断言：脱敏**确实动了东西**（否则上面那条"相同"是白过的）
+                ok(stat, L, hidden > 0,
+                        "\u2462 \u2605\u5143\u65ad\u8a00\uff1a\u8fd9\u6279\u771f\u5b9e\u62a5\u544a\u91cc**\u786e\u5b9e\u9690\u53bb\u4e86 "
+                                + hidden + " \u5904**\uff08\u5426\u5219\u4e0a\u4e00\u6761\u201c\u7ed3\u8bba\u76f8\u540c\u201d"
+                                + "\u662f\u767d\u8fc7\u7684\uff09");
+                ok(stat, L, changed == tested && changed > 0,
+                        "\u2462 \u2605\u53cd\u65b9\u5411\uff1a\u8fd9 " + tested
+                                + " \u4efd\u62a5\u544a\u5265\u5b8c**\u771f\u7684\u53d8\u4e86**"
+                                + "\uff08\u5426\u5219\u4e0a\u4e00\u6761\u662f\u62ff\u672a\u5265\u7684\u526f\u672c\u5728\u6bd4"
+                                + "\uff1aResult.text \u66fe\u7ecf\u7167\u6284\u8f93\u5165\uff09");
+            }
+
+            // ── ④ 表头：同一个格式串，脱敏档只换三个值 ──────────────────────
+            String h1 = LogActivity.exportHeader(ctx, false);
+            String h2 = LogActivity.exportHeader(ctx, true);
+            String slot = Data.currentSlot(ctx);
+            ok(stat, L, h2.contains(CrashScrub.P_SLOT) && h2.contains(CrashScrub.P_EXT)
+                            && h2.contains(CrashScrub.P_DEVICE)
+                            && (slot == null || !h2.contains(slot)),
+                    "\u2463 \u8868\u5934\uff08\u8131\u654f\u6863\uff09\uff1a\u5f53\u524d\u69fd\u540d / \u6570\u636e\u6839\u8def\u5f84 / "
+                            + "\u8bbe\u5907\u578b\u53f7\u90fd\u6362\u6210\u4e86\u5360\u4f4d\u7b26");
+            ok(stat, L, h1.contains(slot == null ? "" : slot) && !h1.contains(CrashScrub.P_DEVICE),
+                    "\u2463 \u53cd\u65b9\u5411\uff1a**\u539f\u4ef6**\u90a3\u4e00\u6863\u7684\u8868\u5934\u7167\u65e7\u5e26\u69fd\u540d\u4e0e\u771f\u673a\u578b");
+            ok(stat, L, bothHave(h1, h2, "arm64") && bothHave(h1, h2, "API")
+                            && bothHave(h1, h2, Compat.pageSize() + " B"),
+                    "\u2463 \u2605ABI / API / \u9875\u5927\u5c0f\u5728**\u4e24\u6863\u91cc\u90fd\u5728**"
+                            + "\uff08\u5b83\u4eec\u662f\u6392\u969c\u5224\u636e\uff0c\u4e0d\u80fd\u8ddf\u7740\u654f\u611f\u4fe1\u606f\u4e00\u8d77\u88ab\u62b9\uff09");
+
+            // ── ⑤ 已知值那一半：设置里没有就没得剥（也正是"两面"的另一面）────
+            CrashScrub.Secrets empty = new CrashScrub.Secrets();
+            ok(stat, L, empty.isEmpty() && empty.size() == 0,
+                    "\u2464 \u7a7a\u7684\u654f\u611f\u503c\u8868 \u21d2 \u53ea\u8d70\u901a\u7528\u6a21\u5f0f"
+                            + "\uff08\u4e0d\u62a5\u9519\u3001\u4e0d\u731b\u5220\uff09");
+        } catch (Throwable t) {
+            stat[1]++;
+            L.add("\u274c \u8131\u654f\u65e5\u5fd7\u7528\u4f8b\u81ea\u8eab\u5f02\u5e38\uff1a" + t);
+        }
+    }
+
+    /** 诊断签名：**只取"归因靠什么"那几个字段**（脱敏前后必须逐字相同） */
+    private static String sig(android.content.Context ctx, CrashAnalysis.Report r) {
+        if (r == null) return "null";
+        CrashAnalysis.Verdict v = null;
+        try {
+            v = CrashAnalysis.judgeFull(ctx, r, Data.currentSlot(ctx));
+        } catch (Throwable ignored) {
+        }
+        return "empty=" + r.empty + "|vanilla=" + r.vanilla + "|mods=" + r.modsRaw
+                + "|likely=" + r.likelyName + "/" + r.likelyInternal
+                + "|cause=" + r.cause + "|ev=" + r.causeEvidence
+                + "|frames=" + r.frameCount + "|chain=" + r.chain.size()
+                + "|needles=" + r.needles.size()
+                + "|kind=" + (v == null ? "?" : String.valueOf(v.kind))
+                + "|text=" + (v == null ? "?" : CrashAnalysis.text(ctx, v));
+    }
+
+    /** 两段文本里都有这个片段（表头两档的**共同部分**断言用） */
+    private static boolean bothHave(String a, String b, String needle) {
+        return a != null && b != null && a.contains(needle) && b.contains(needle);
     }
 
     private static void tamperNegative(Context ctx, List<String> L, int[] stat)
