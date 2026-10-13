@@ -949,11 +949,17 @@ public final class SelfTest {
             ok(stat, L, shareLen <= 100 && exportLen <= 105,
                     "④b ★两个确认框的**字数预算**（「尽量不要大段文本」）：分享包 " + shareLen
                             + " 字（≤100）、整槽导出 " + exportLen + " 字（≤105）");
+            // ★ 第 146 轮（用户：「你不觉得这句话很奇怪吗」）：这句只许说**用户听得懂的一件事** ——
+            //   "这里没有可去掉的东西"（ref/29 第 29 条：要单独说出来，否则像漏剥了）。
+            //   ⚠️ 上一轮为修矛盾把它缩到了实现层（"设置文件""原样进包"），反而看不懂了 ⇒
+            //   这里同时钉三条：① 说了"没有身份信息" ② 不对整包下结论（不许"完全一样"）
+            //   ③ **不许出现实现词**（"设置文件"/"进包"）。
             String noneMsg = ctx.getString(R.string.share_slot_none);
             ok(stat, L, !noneMsg.contains("完全一样") && !noneMsg.contains("一模一样")
-                            && noneMsg.contains("设置"),
-                    "④b ★`share_slot_none` 只讲**设置文件**、不对整包下结论"
-                            + "（否则与上面那句\"会丢掉日志与缓存\"当场矛盾）：" + noneMsg);
+                            && noneMsg.contains("没有身份信息")
+                            && !noneMsg.contains("设置文件") && !noneMsg.contains("进包"),
+                    "④b ★`share_slot_none` 说人话：说了「没有身份信息」、不对整包下结论、"
+                            + "**不出现实现词**（设置文件 / 进包）：" + noneMsg);
             String expMsg = ctx.getString(R.string.export_slot_msg_fmt, "");
             ok(stat, L, expMsg.contains("身份信息") && expMsg.contains("导出分享包"),
                     "④b ★整槽导出（**原件**那一档）的确认框里有泄露提示，并指向「导出分享包」"
