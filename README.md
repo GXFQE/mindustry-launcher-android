@@ -105,7 +105,8 @@ yourself — even just a few lines — see **Translation file** below.
   package in full) — and **a backup is taken first**, so a wrong choice can be undone. ⚠️ This
   package **carries your identity data** (the login identity used on each server, among others):
   to hand it to someone else, use the shareable package below instead
-- **A shareable package (identity removed)**: the same zip, but before it is packed the launcher
+- **A shareable package (for sending to others)**: to move to a new phone or to keep your own copy,
+  use the plain export above — that one changes nothing. This package is the one to hand out:
   strips what could identify you — the per-server login identity the game keeps (`usid-…`), `uuid`,
   the last server you joined, ban lists — and drops your saved-server list. It also drops the logs,
   the rebuildable caches, and anything else that is only useful to you: crash reports, the game log,

@@ -927,13 +927,28 @@ public final class SelfTest {
 
             // ── ④b 两张资源的**措辞判据**（用户 2026-10-13 报的"说两遍"就在这）────────
             String shareMsg = ctx.getString(R.string.share_slot_msg_fmt, "", "");
-            ok(stat, L, countOf(shareMsg, "服务器列表") == 1,
-                    "④b ★同一件事只说一次：分享包确认框里「服务器列表」出现 "
-                            + countOf(shareMsg, "服务器列表") + " 次（必须恰好 1 次 ——"
-                            + " 原来类别句与条件句各说一遍，用户当场抓到）");
+            // ⚠️ 第 145 轮收文时，那句话里的品类清单并成了「身份信息」（原来那串
+            //   "…以及你收藏的服务器列表" 整段删了）⇒ **尺子跟着口径走**：改量「身份信息」。
+            //   钉的还是同一件事：**那句承诺不许在同一屏出现两遍**（原来是类别句 + 条件句
+            //   各说一遍，用户当场抓到）。
+            ok(stat, L, countOf(shareMsg, "身份信息") == 1,
+                    "④b ★同一件事只说一次：分享包确认框里「身份信息」出现 "
+                            + countOf(shareMsg, "身份信息") + " 次（必须恰好 1 次）");
             // ★ 同屏自相矛盾是**硬伤**（§85.16.1 / §86.9；2026-10-08 用户抓过一次）：
             //   类别句已经说"会丢掉日志 / 缓存 / 设置的历史备份"，那么"没有身份信息"那一句
             //   **就不许**再对整包下结论（第一版写的是"包的内容与「导出整槽」完全一样"）。
+            // ★ 第 145 轮（用户两条）：① **出口的定位句不许互相抢** —— 界面里「整槽导入导出」
+            //   那行的副标题写的就是「换机迁移用（zip）」，所以分享包**不许**再说自己是给换机用的
+            //   （它要做的恰恰是把人**指回**「导出整槽」）；② **确认框有字数预算**
+            //   （用户原话「尽量不要大段文本」）—— 预算写死在这里，涨回去就红。
+            int shareLen = ctx.getString(R.string.share_slot_msg_fmt, "", "").length();
+            int exportLen = ctx.getString(R.string.export_slot_msg_fmt, "").length();
+            ok(stat, L, !shareMsg.contains("给换机") && shareMsg.contains("导出整槽"),
+                    "④b ★分享包的定位句：不抢「换机」（要指向「导出整槽」）"
+                            + "—— 界面里换机那行本来就是「导出整槽」的");
+            ok(stat, L, shareLen <= 100 && exportLen <= 105,
+                    "④b ★两个确认框的**字数预算**（「尽量不要大段文本」）：分享包 " + shareLen
+                            + " 字（≤100）、整槽导出 " + exportLen + " 字（≤105）");
             String noneMsg = ctx.getString(R.string.share_slot_none);
             ok(stat, L, !noneMsg.contains("完全一样") && !noneMsg.contains("一模一样")
                             && noneMsg.contains("设置"),
