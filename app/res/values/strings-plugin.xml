@@ -81,4 +81,7 @@
     <string name="plugin_trust_short_builtin">Built-in</string>
     <!-- 第 139 轮：接口版本改成**兼容区间**（插件 %1$d，本机支持 %2$d~%3$d）⇒ 拒绝那句话按"太新/太老"分岔 -->
     <string name="plugin_err_api_new_fmt">The plugin needs a newer interface (plugin %1$d; this build supports %2$d-%3$d) - update the launcher.</string>
-    <string name="plugin_err_api_old_fmt">The plugin uses an interface that is too old (plugin %1$d; this build supports %2$d-%3$d) - update the plugin.</string></resources>
+    <string name="plugin_err_api_old_fmt">The plugin uses an interface that is too old (plugin %1$d; this build supports %2$d-%3$d) - update the plugin.</string>
+    <!-- 第 148 轮 C2：插件自述里的 access 声明（它要碰什么）。永远显示一行，没有就明说"没有声明" -->
+    <string name="plugin_info_access">Wants access to: %1$s</string>
+    <string name="plugin_access_none">nothing extra declared</string></resources>

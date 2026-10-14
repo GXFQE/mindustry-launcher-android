@@ -1,34 +1,45 @@
 package io.mdt.launcher;
 
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 插件**扩展点声明**（第 139 轮 v1）：插件声明"我能往宿主哪些地方加什么条目"。
+ * 插件**扩展点声明**（第 139 轮 v1；第 148 轮搬到 JSON）。
  *
- * <p>文件在插件 APK 里，路径 {@link #ASSET}；**每行一条**（制表符分段，与内置清单 / 登记表同款）：
+ * <p>声明就写在插件自述里，与"我是谁"同一个文件（{@code assets/plugin.json}）：
  *
  * <pre>
- * id \t 标题 \t 副标题 \t 入口类名 \t 插槽(可省，缺省 plugins)
+ * {
+ *   "entry": "com.x.Main", "name": "存档分析", "version": "1.2",
+ *   "access": ["slots"],                                  ← 我要碰什么（第 148 轮 C2）
+ *   "extensions": [                                       ← 我能提供什么
+ *     { "id": "save-analyze", "title": "存档分析", "subtitle": "看看每个存档里有什么",
+ *       "entry": "com.x.SavePage", "slot": "plugins" }
+ *   ]
+ * }
  * </pre>
  *
  * <ul>
- *   <li><b>为什么不塞进 {@code plugin.json}</b>：那个极简 JSON 解析器只吃**平铺对象**
- *       （第 135 轮踩过"深度 1 遇容器要丢键"），而"一台插件声明多条"天然是数组
- *       ⇒ 与其现造一个小状态机，不如沿用本工程已经解析过无数次的制表符行格式（可写注释、diff 友好）。</li>
- *   <li><b>坏条目只坑自己</b>：段数不对 / id 或入口类名为空 ⇒ **整行丢掉** ——
- *       绝不因为一行写坏就让整个插件页或其它条目消失（自检有元断言钉这条）。</li>
- *   <li><b>认不出的插槽 ⇒ 跳过</b>（宿主这一版没那个地方），但会在启动报告里记一行，
- *       免得"插件说它有这个功能、界面上却没有"变成无头案（第 134 轮"静默跳过"的教训）。</li>
- *   <li><b>v1 先没有图标字段</b>：宿主还没有一套"条目图标"，先别让插件写一个我们画不出来的名字。
- *       以后加字段 = **加法变更 ⇒ 不抬接口版本**（宿主忽略多余的第 6、7 段即可）。</li>
+ *   <li><b>为什么改回 JSON</b>（第 139 轮选了"每行一条"的 txt）：那个决定的理由是
+ *       "极简 JSON 解析器只吃平铺对象" —— 而这条理由**当时就不成立**：{@code org.json} 是
+ *       **框架自带**的（`android.jar` 里就有），本工程 {@link Config} 早就在用它解嵌套数组。
+ *       ⇒ 拿一个不该存在的限制当理由，就得改回来；扩展点的字段只会越来越多（图标 / 分组 /
+ *       多插槽 / 权限），**能长的格式**才是对的。</li>
+ *   <li><b>零兼容负担</b>：扩展点这个格式**没有任何发布版用过**（v0.4 在第 139 轮之前就发了）
+ *       ⇒ 直接换掉旧格式，**不留双格式**（两套格式并存 = 判据两处必漂，本工程的老账）。</li>
+ *   <li><b>坏条目只坑自己</b>：数组里某一条不是对象 / {@code id} 或 {@code entry} 空 ⇒
+ *       **只丢那一条**；整个文件坏 / 没有 {@code extensions} ⇒ 空表（**不抛异常**）。</li>
+ *   <li><b>认不出的插槽 ⇒ 跳过</b>（宿主这一版没那个地方）。</li>
  * </ul>
  */
 final class Extensions {
 
-    /** 声明文件在插件 APK 里的路径。 */
-    static final String ASSET = "assets/extensions.txt";
+    /** 自述文件（与入口类名、名字、access 同一个文件）。 */
+    static final String ASSET = PluginMeta.ASSET_JSON;
 
     /**
      * v1 只有这一个插槽：**插件页**（插件能力总入口）。
@@ -57,29 +68,34 @@ final class Extensions {
     private Extensions() { }
 
     /**
-     * 解析（**纯函数**，自检直接喂文本钉它）。
-     * 空行与 `#` 开头的注释行跳过；段数 < 4 或 id / 入口类名为空 ⇒ 丢掉那一行。
+     * 解析自述里的 {@code extensions}（**纯函数**，自检直接喂 JSON 文本钉它）。
+     * 见类注释：坏条目只坑自己、整个坏了返回空表。
      */
-    static List<Item> parse(String text) {
+    static List<Item> parse(String jsonText) {
         List<Item> out = new ArrayList<Item>();
-        if (text == null) return out;
-        for (String raw : text.split("\n")) {
-            String line = raw.trim();
-            if (line.isEmpty() || line.startsWith("#")) continue;
-            String[] p = line.split("\t");
-            if (p.length < 4) continue;                       // 半条记录不许进反射
-            String id = p[0].trim();
-            String title = p[1].trim();
-            String sub = p[2].trim();
-            String entry = p[3].trim();
-            String slot = (p.length >= 5 && !p[4].trim().isEmpty()) ? p[4].trim() : SLOT_PLUGINS;
-            if (id.isEmpty() || entry.isEmpty()) continue;
-            out.add(new Item(id, title, sub, entry, slot));
+        if (jsonText == null || jsonText.trim().isEmpty()) return out;
+        try {
+            JSONObject root = new JSONObject(jsonText);
+            JSONArray arr = root.optJSONArray("extensions");
+            if (arr == null) return out;
+            for (int i = 0; i < arr.length(); i++) {
+                JSONObject o = arr.optJSONObject(i);
+                if (o == null) continue;                        // 不是对象 ⇒ 丢这一条
+                String id = trim(o.optString("id", ""));
+                String entry = trim(o.optString("entry", ""));
+                if (id.isEmpty() || entry.isEmpty()) continue;   // 半条记录不许进反射
+                String slot = trim(o.optString("slot", ""));
+                if (slot.isEmpty()) slot = SLOT_PLUGINS;
+                out.add(new Item(id, trim(o.optString("title", "")), trim(o.optString("subtitle", "")),
+                        entry, slot));
+            }
+        } catch (Throwable t) {
+            return new ArrayList<Item>();                       // 自述坏了 ⇒ 当"没有扩展"，别崩页面
         }
         return out;
     }
 
-    /** 读某个插件 APK 里的声明（没这个文件 ⇒ 空表 = 这台插件不提供条目，**不是错误**）。 */
+    /** 读某个插件 APK 里的声明（没这个文件 / 没这一节 ⇒ 空表，**不是错误**）。 */
     static List<Item> of(File apk) {
         return parse(PluginMeta.zipText(apk, ASSET));
     }
@@ -92,8 +108,12 @@ final class Extensions {
         return out;
     }
 
-    /** 这一版认得的插槽（别的名字 ⇒ 跳过；报告里会记）。 */
+    /** 这一版认得的插槽（别的名字 ⇒ 跳过；启动报告里会记）。 */
     static boolean knownSlot(String slot) {
         return SLOT_PLUGINS.equals(slot);
+    }
+
+    private static String trim(String s) {
+        return s == null ? "" : s.trim();
     }
 }

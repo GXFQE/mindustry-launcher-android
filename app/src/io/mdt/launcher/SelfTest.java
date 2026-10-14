@@ -3224,19 +3224,22 @@ public final class SelfTest {
         ok(stat, L, pinned,
                 "★★元断言：连注 5 个插件之后 **宿主那一段仍在最前**，且插件之间后注入的排更前");
         // ── 第 139 轮：扩展点声明 + 接口版本兼容区间 ──
-        L.add("  · 扩展点声明 / 插槽筛选 / 接口版本区间（第 139 轮）");
+        L.add("  · 扩展点声明（自述 JSON 里的 extensions 数组）/ 插槽筛选 / 接口版本区间（第 139 轮，第 148 轮搬 JSON）");
         java.util.List<Extensions.Item> ex = Extensions.parse(
-                "# 注释\n"
-                        + "\n"
-                        + "t1\t存档分析\t看看每个存档里有什么\tcom.x.A\n"
-                        + "broken\ttoo-few-fields\n"
-                        + "\t\t\tcom.x.B\n"
-                        + "t2\t\t\tcom.x.C\ttomorrow\n"
-                        + "t3\t工具\t\tcom.x.D\tplugins\n");
+                "{"
+                        + "\"entry\":\"com.x.Main\",\"name\":\"存档分析\","
+                        + "\"extensions\":["
+                        + "  {\"id\":\"t1\",\"title\":\"存档分析\",\"subtitle\":\"看看每个存档里有什么\",\"entry\":\"com.x.A\"},"
+                        + "  {\"id\":\"broken\",\"title\":\"没有 entry\"},"
+                        + "  {\"id\":\"\",\"title\":\"id 空\",\"entry\":\"com.x.B\"},"
+                        + "  \"我是字符串不是对象\","
+                        + "  {\"id\":\"t2\",\"entry\":\"com.x.C\",\"slot\":\"tomorrow\"},"
+                        + "  {\"id\":\"t3\",\"title\":\"工具\",\"entry\":\"com.x.D\",\"slot\":\"plugins\"}"
+                        + "]}");
         ok(stat, L, ex.size() == 3 && "t1".equals(ex.get(0).id) && "com.x.A".equals(ex.get(0).entry)
-                        && Extensions.SLOT_PLUGINS.equals(ex.get(0).slot),
-                "★扩展点声明只认「id \\t 标题 \\t 副标题 \\t 入口类名 [\\t 插槽]」；段数不够 / id 空 ⇒ 整行丢掉"
-                        + "（喂 5 行、实得 " + ex.size() + " 条）");
+                        && Extensions.SLOT_PLUGINS.equals(ex.get(0).slot) && "工具".equals(ex.get(2).title),
+                "★扩展点声明读自述里 extensions 数组（org.json）：喂 6 条坏样本、实得 " + ex.size() + " 条"
+                        + " —— 缺 entry / id 空 / 不是对象 ⇒ 只丢那一条");
         ok(stat, L, "t2".equals(ex.get(1).label()) && "工具".equals(ex.get(2).label()),
                 "★标题空 ⇒ 界面回落 id（与插件名同一策略：不印空白）");
         ok(stat, L, "tomorrow".equals(ex.get(1).slot) && !Extensions.knownSlot("tomorrow")
@@ -3244,13 +3247,19 @@ public final class SelfTest {
                         && Extensions.forSlot(ex, Extensions.SLOT_PLUGINS).size() == 2,
                 "★认不出的插槽：解析时留着（不丢信息）、进不了插件页 —— 只显示认得的 2 条");
         ok(stat, L, Extensions.parse(null).isEmpty() && Extensions.parse("").isEmpty()
+                        && Extensions.parse("这不是 json").isEmpty()
+                        && Extensions.parse("{\"entry\":\"com.x.Main\"}").isEmpty()
+                        && Extensions.parse("{\"extensions\":\"不是数组\"}").isEmpty()
                         && Extensions.forSlot(null, Extensions.SLOT_PLUGINS).isEmpty()
                         && Extensions.forSlot(ex, null).isEmpty(),
-                "空文本 / 没声明 / 空表 / 空插槽名 ⇒ 空表（**不许抛异常**：没声明扩展的插件走的就是这条路）");
-        java.util.List<Extensions.Item> exBad = Extensions.parse("t1\tA\tb\tcom.x.A\nbroken\ttoo-few\n");
-        java.util.List<Extensions.Item> exGood = Extensions.parse("t1\tA\tb\tcom.x.A\n");
+                "没自述 / 空文本 / JSON 坏 / 没 extensions / extensions 不是数组 / 空表 / 空插槽名 ⇒ 空表"
+                        + "（**不许抛异常**：没有扩展的插件走的就是这条路）");
+        java.util.List<Extensions.Item> exBad = Extensions.parse(
+                "{\"extensions\":[{\"id\":\"t1\",\"entry\":\"com.x.A\"},{\"id\":\"broken\"}]}");
+        java.util.List<Extensions.Item> exGood = Extensions.parse(
+                "{\"extensions\":[{\"id\":\"t1\",\"entry\":\"com.x.A\"}]}");
         ok(stat, L, exBad.size() == exGood.size() && exBad.size() == 1,
-                "★★元断言：同一份文本里混一条坏行 ⇒ **好条目一条不少**（坏条目只坑自己）");
+                "★★元断言：同一份 JSON 里混一条坏条目 ⇒ **好条目一条不少**（坏条目只坑自己）");
         ok(stat, L, PluginHost.apiVerdict(PluginHost.API_MIN) == 0
                         && PluginHost.apiVerdict(PluginHost.API) == 0
                         && PluginHost.apiVerdict(PluginHost.API + 1) == 1

@@ -72,4 +72,7 @@
     <string name="plugin_trust_short_builtin">内置</string>
     <!-- 第 139 轮：接口版本改成**兼容区间**（插件 %1$d，本机支持 %2$d~%3$d）⇒ 拒绝那句话按"太新/太老"分岔 -->
     <string name="plugin_err_api_new_fmt">插件要求的接口版本比本机新（插件 %1$d，本版本支持 %2$d~%3$d）—— 该升级启动器。</string>
-    <string name="plugin_err_api_old_fmt">插件用的接口版本太老（插件 %1$d，本版本支持 %2$d~%3$d）—— 该更新插件。</string></resources>
+    <string name="plugin_err_api_old_fmt">插件用的接口版本太老（插件 %1$d，本版本支持 %2$d~%3$d）—— 该更新插件。</string>
+    <!-- 第 148 轮 C2：插件自述里的 access 声明（它要碰什么）。永远显示一行，没有就明说"没有声明" -->
+    <string name="plugin_info_access">要碰什么：%1$s</string>
+    <string name="plugin_access_none">没有额外声明</string></resources>

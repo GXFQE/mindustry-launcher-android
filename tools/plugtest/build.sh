@@ -63,15 +63,12 @@ build_one() {
   local entry="$pkg.PlugPage"
   # ★ 自述还要覆盖「**有** description」这一侧（第 136 轮的界面要显示这一行；
   #   没有 description 的老夹具 `plugtest-ok` 反过来验"空字段整条省掉"）—— 两侧都要有样本。
-  local json="{\"entry\":\"$entry\",\"name\":\"$name\",\"version\":\"1\",\"author\":\"mdt-fixture\",\"description\":\"$name fixture\"}"
-  # ★ 第 139 轮：扩展点声明（每行一条：id / 标题 / 副标题 / 入口类名 / 插槽(可省)）。
-  #   故意混一条**坏行**（只有 3 段）和一条**未来插槽** —— 前者该被整行丢掉、后者该被跳过，
-  #   两者都不许影响那条好行（界面与自检都钉这条）。
-  local ext="# $name extensions
-$name-tool	$name tool	opens a page from $name	$entry
-broken	too-few-fields
-later	for a slot this host does not know yet	-	$entry	tomorrow
-"
+  # ★ 第 148 轮：扩展点声明搬进自述 JSON（org.json 解嵌套）。故意混两条坏样本：
+  #   `broken` 没有 entry（该被丢掉）、`later` 用了宿主不认识的插槽（该被跳过）——
+  #   两者都不许影响那条好条目，界面与自检都钉这条。
+  #   ⚠️ 必须先算出来：下面那行 `json=` 里要用它（bash 顺序执行，后定义就取到空串）。
+  local exts="[{\"id\":\"$name-tool\",\"title\":\"$name tool\",\"subtitle\":\"opens a page from $name\",\"entry\":\"$entry\"},{\"id\":\"broken\",\"title\":\"missing entry\"},{\"id\":\"later\",\"title\":\"future slot\",\"entry\":\"$entry\",\"slot\":\"tomorrow\"}]"
+  local json="{\"entry\":\"$entry\",\"name\":\"$name\",\"version\":\"1\",\"author\":\"mdt-fixture\",\"description\":\"$name fixture\",\"access\":[\"slots\",\"telepathy\"],\"extensions\":$exts}"
   local d="$OUT/$name"
   local srcpkg="$d/src/io/mdt/plugtest/$suf"
   if [ "${NO_JSON:-0}" = "1" ]; then
@@ -107,9 +104,9 @@ later	for a slot this host does not know yet	-	$entry	tomorrow
   "$JAVA" -cp "$(jpath "$BT/lib/d8.jar")" com.android.tools.r8.D8 \
     --min-api 26 --output "$(wpath "$d/dex")" "$(wpath "$d/classes.jar")"
   # 把 classes.dex（+ 自述）注入 base.apk（与主构建同一种办法：python 改 zip）
-  "$PY" - "$(jpath "$OUT/base.apk")" "$(jpath "$d/dex/classes.dex")" "$(jpath "$OUT/$name.apk")" "$json" "$ext" <<'PY'
+  "$PY" - "$(jpath "$OUT/base.apk")" "$(jpath "$d/dex/classes.dex")" "$(jpath "$OUT/$name.apk")" "$json" <<'PY'
 import sys, zipfile
-base, dex, out, meta, ext = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4], sys.argv[5]
+base, dex, out, meta = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 zin = zipfile.ZipFile(base); zout = zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED)
 for it in zin.infolist():
     if it.filename in ('classes.dex',) or it.filename.startswith('classes') and it.filename.endswith('.dex'):
@@ -118,8 +115,7 @@ for it in zin.infolist():
 zout.write(dex, 'classes.dex')
 if meta:
     zout.writestr('assets/plugin.json', meta)   # ★ 插件自述：入口类名一插件一份（第 135 轮）
-if ext:
-    zout.writestr('assets/extensions.txt', ext)   # ★ 扩展点声明（第 139 轮；每行一条，见 Extensions.java）
+
 zout.close(); zin.close()
 PY
   "$BT/zipalign.exe" -f 4 "$(wpath "$OUT/$name.apk")" "$(wpath "$OUT/$name-aligned.apk")"

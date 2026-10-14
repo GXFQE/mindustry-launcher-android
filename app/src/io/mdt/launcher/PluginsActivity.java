@@ -294,6 +294,7 @@ public class PluginsActivity extends BaseActivity {
                 Trans.get(this, R.string.plugin_info_source),
                 Trans.get(this, R.string.plugin_info_level),
                 Trans.get(this, R.string.plugin_info_filever),
+                Trans.get(this, R.string.plugin_info_access),
         };
         String entry = apk == null ? null : PluginMeta.entryOf(this, apk, PluginHost.DEFAULT_ENTRY);
         String[] values = {
@@ -306,6 +307,9 @@ public class PluginsActivity extends BaseActivity {
                 Trans.get(this, trustLongRes(trust)),
                 Trans.get(this, levelRes(lv)),
                 fileVer,
+                // ★ 第 148 轮 C2：「它要碰什么」**永远显示一行**（哪怕是"没有声明"）——
+                //   安全相关的字段留白 = 用户分不清"没声明"和"我们没看见"。声明是**告知**，不是沙箱。
+                accessText(apk),
         };
         StringBuilder sb = new StringBuilder();
         for (String[] pair : Plugins.dropEmptyPairs(labels, values)) {
@@ -506,6 +510,17 @@ public class PluginsActivity extends BaseActivity {
      * ⚠️ 读的是插件 APK 里的声明（几 KB），**不加载插件代码** ⇒ 列表页不因为"某台插件坏了"而打不开；
      * 真正的加载推迟到用户点它的那一刻（那条路本来就有 try/catch 兜底）。
      */
+    /**
+     * 「它要碰什么」那一行（第 148 轮 C2）：没有声明就明说"没有声明"，**不留白**。
+     * 名字原样列出（认不出的也列 —— 用户有权知道插件要什么，我们认不认得是另一回事）。
+     */
+    private String accessText(File apk) {
+        if (apk == null) return Trans.get(this, R.string.plugin_access_none);
+        java.util.List<String> a = PluginMeta.accessOf(apk);
+        if (a.isEmpty()) return Trans.get(this, R.string.plugin_access_none);
+        return android.text.TextUtils.join(", ", a);
+    }
+
     private void addExtensions(final String id, final String ver) {
         List<Extensions.Item> items = Extensions.forSlot(
                 Extensions.of(Plugins.apkOf(this, id, ver)), Extensions.SLOT_PLUGINS);

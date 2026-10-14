@@ -205,7 +205,11 @@ public final class PluginHost {
 
         Resources res = new Resources(am, host.getResources().getDisplayMetrics(),
                 host.getResources().getConfiguration());
-        return new Loaded(cl, new PContext(host, am, res, cl), entry, api,
+        // 插件自己的目录：与它的 APK 同住 `<插件>/`（apk 的父目录就是那个 id 目录）
+        File home = apk.getParentFile();
+        File pdata = home == null ? null : new File(home, "data");
+        File pcache = home == null ? null : new File(home, "cache");
+        return new Loaded(cl, new PContext(host, am, res, cl, pdata, pcache), entry, api,
                 roSet, stillWritable, from, cookie);
     }
 
@@ -214,15 +218,41 @@ public final class PluginHost {
         private final AssetManager am;
         private final Resources res;
         private final ClassLoader cl;
+        /** 这台插件自己的目录（`<插件>/data`、`<插件>/cache`，第 148 轮 C1）。 */
+        private final File files, cache;
 
-        PContext(Context base, AssetManager am, Resources res, ClassLoader cl) {
+        PContext(Context base, AssetManager am, Resources res, ClassLoader cl, File files, File cache) {
             super(base);
             this.am = am; this.res = res; this.cl = cl;
+            this.files = files; this.cache = cache;
         }
 
         @Override public AssetManager getAssets() { return am; }
         @Override public Resources getResources() { return res; }
         @Override public ClassLoader getClassLoader() { return cl; }
+
+        /**
+         * ★ 第 148 轮 C1：插件写"自己的数据"要落在**它自己的目录**里（`<插件>/data`），
+         * 与它的 APK 同住一个 id 目录 ⇒ 卸载/回滚时一套动作就能连数据一起收拾。
+         *
+         * <p>⚠️ 说清楚这是什么：宿主与插件**同进程、同 ClassLoader** ⇒ 这是**约定**，不是沙箱 ——
+         * 插件真要绕过（自己拼 `/data/data/io.mdt.launcher/...`）我们拦不住。当沙箱用会出事。
+         */
+        @Override public File getFilesDir() {
+            if (files != null) {
+                if (!files.isDirectory()) files.mkdirs();
+                return files;
+            }
+            return super.getFilesDir();
+        }
+
+        @Override public File getCacheDir() {
+            if (cache != null) {
+                if (!cache.isDirectory()) cache.mkdirs();
+                return cache;
+            }
+            return super.getCacheDir();
+        }
     }
 
     // ---- 判据函数（纯函数部分由 SelfTest 钉住） ---------------------------------

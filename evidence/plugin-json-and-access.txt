@@ -1,0 +1,73 @@
+# 第 148 轮证据：扩展点声明搬到 JSON + 权限与数据目录的约定（C 的前半）
+
+用户 2026-10-14 定：「**真的不如使用 json，后面还好扩展**」＋「**现在地基以及交互还差什么**，
+实际拆启动器功能估计挺麻烦先不急」⇒ 本轮做 **A（JSON）+ C（权限与数据目录）**。
+
+## 1) A：声明格式搬回 JSON（承认上一轮的理由站不住脚）
+
+第 139 轮我把扩展点声明做成了"每行一条"的 `assets/extensions.txt`，理由是"极简 JSON 解析器只吃平铺对象"。
+**查证后这条理由当时就不成立**：`org.json` 是**框架自带**的（android.jar 里就有），
+本工程 `Config.java` 早就在 `import org.json.JSONObject/JSONArray` 解析嵌套数组。
+
+⇒ 改法：声明回到自述 `assets/plugin.json` 里，用 `org.json` 解：
+
+```json
+{
+  "entry": "io.mdt.plugtest.v1.PlugPage", "name": "plugtest-v1", "version": "1",
+  "author": "mdt-fixture", "description": "plugtest-v1 fixture",
+  "access": ["slots", "telepathy"],
+  "extensions": [
+    { "id": "plugtest-v1-tool", "title": "plugtest-v1 tool",
+      "subtitle": "opens a page from plugtest-v1", "entry": "io.mdt.plugtest.v1.PlugPage" },
+    { "id": "broken", "title": "missing entry" },
+    { "id": "later", "title": "future slot", "entry": "io.mdt.plugtest.v1.PlugPage", "slot": "tomorrow" }
+  ]
+}
+```
+
+- **删掉 `extensions.txt`**，不留双格式（两套格式并存 = 判据两处必漂，本工程的老账）；
+  `grep extensions.txt` 在 `app/src`、`app/src-dev`、`tools/plugtest` 里 **0 处残留**。
+- 夹具里**故意混两条坏样本**：`broken` 没有 `entry`（该被丢掉）、`later` 用宿主不认识的插槽（该被跳过）
+  ⇒ 两者都不许影响那条好条目。
+
+## 2) 真机结果（dev 构建）
+
+```
+插件页：plugtest-v1 · 生效中 vb5596f3b
+       内置 · 处置 L1
+       plugtest-v1 tool                    ← JSON 里的 extensions 照旧渲染出来
+       opens a page from plugtest-v1
+
+插件信息（最后一行）：
+   … 处置：L1 宽容 —— 先留着，下次启动再试
+     文件版本：b5596f3b
+     要碰什么：slots, telepathy            ← ★ C2：access 声明读到，**认不出的也原样摆给用户看**
+```
+自检 **1267 / 0**（扩展点那组断言整组改成喂 JSON；新增"没 extensions / 不是数组 / JSON 坏 ⇒ 空表不抛"三条）。
+
+## 3) C 定了什么（以及**它不是什么**）
+
+- **C2 已完成（读取 + 告知）**：自述里的 `access` 数组 ⇒ 插件信息弹窗**永远显示一行**
+  （没有声明就明说「没有额外声明」）：安全相关的字段**留白是歧义的**（用户分不清"没声明"和"我们没看见"）。
+  名字**原样列出**（含宿主不认识的，比如 `telepathy`）——用户有权知道插件要什么。
+- **C2 的另一半是"构造上就成立"**：宿主**从来不主动**把槽 / 存档 / 模组的路径交给插件；
+  插件拿到的只有一个 `Context`（见下）⇒ "未声明就不给现成入口"目前是**没有入口可给**。
+- **C1-a 已完成（代码）**：插件拿到的 `Context`（`PluginHost.PContext`）把
+  `getFilesDir()` / `getCacheDir()` 指到 **`<插件>/data`**、**`<插件>/cache`**
+  （与它的 APK 同住 `<plugins>/<id>/` ⇒ 将来"卸载连数据一起收拾"只需要动一个目录）。
+  ⚠️ **懒创建**：插件不调 `getFilesDir()` 就不会有那个目录。
+- 🔴 **必须说清楚（口径）**：宿主与插件**同进程、同 ClassLoader** ⇒ 上面这些是**约定 + 告知**，
+  **不是沙箱** —— 插件真要自己拼 `/data/data/io.mdt.launcher/...` 我们拦不住。
+  想真隔离只有两条路：独立进程（像 `:game`）或 Android 的 isolatedProcess（那样插件就拿不到我们的 Context）。
+  **拿它当沙箱用会出事。**
+
+## 4) 我要如实说的两件
+
+1. **私有目录没在真机上验到**：`<id>/data` 是**懒创建**的，而夹具这一轮还没调用过 `getFilesDir()`
+   ⇒ `ls app_hub/plugins/probe` 只有 `b5596f3b.apk`、没有 `data/`。**这是行为正确但没验到**
+   ⇒ 待办：让夹具在 `createView` 里往 `ctx.getFilesDir()` 写一个文件，再看目录出现（下轮与"卸载进中转站"一起做）。
+2. 🔴 **"卸载进中转站"我写完又撤回了**（差点埋雷）：查清 API 才发现
+   `Trash.remove(path, trashDir)` **不是"搬进中转站"**，而是"把**已经在中转站里**的东西彻底删掉"
+   （先 `isDirectChild(path, trashDir)` 检查，再 `deleteTree`）⇒ 拿它当搬运会**静默丢掉插件数据**。
+   而且插件住**内部**存储、中转站目录在**外部** hub ⇒ 真要搬得走"跨卷：复制 → 校验 → 删源"那套。
+   ⇒ 整块回退（`Trash.java` 与 HEAD 逐字相同），留给下一轮，并写进 `next/22`。

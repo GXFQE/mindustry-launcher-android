@@ -38,6 +38,9 @@ import java.util.zip.ZipFile;
  */
 final class PluginMeta {
 
+    /** 插件自述在 APK 里的路径（入口类名 / 名字 / 扩展点 / access 都在这一个文件里）。 */
+    static final String ASSET_JSON = "assets/plugin.json";
+
     /** `assets/plugin.json` 里认这几个键；值都是字符串（数字也会被当字符串收下来）。 */
     static final String K_ENTRY = "entry", K_NAME = "name", K_VERSION = "version",
             K_AUTHOR = "author", K_DESC = "description";
@@ -72,7 +75,7 @@ final class PluginMeta {
         Map<String, String> m = new LinkedHashMap<String, String>();
         // ① assets/plugin.json（后读的覆盖先读的 ⇒ 放在最后读优先级最高的那一步）
         try {
-            Map<String, String> j = flatJson(zipText(apk, "assets/plugin.json"));
+            Map<String, String> j = flatJson(zipText(apk, ASSET_JSON));
             if (j != null) m.putAll(j);
         } catch (Throwable ignored) {
         }
@@ -102,6 +105,34 @@ final class PluginMeta {
     }
 
     // ---- 读 zip 里的一个小文件 -------------------------------------------------
+
+    /**
+     * 自述里的 `access` 声明（第 148 轮 C2）：**这台插件说它要碰什么**。
+     *
+     * <p>⚠️ 说清楚它是什么：宿主与插件**同进程、同 ClassLoader**，拦不住它自己去读
+     * `/data/data/io.mdt.launcher/...` ⇒ 这个声明是**告知 + 约定**：
+     * ① 装机/信息里把清单摆给用户看；② 宿主**从来不主动**把槽/存档/模组的路径交给插件
+     * （要数据就自己声明、自己按公开 API 拿）。**别把它当沙箱**。
+     *
+     * @return 声明里的字符串（原样、去空白、去空项）；没有 / 不是数组 ⇒ 空表
+     */
+    static java.util.List<String> accessOf(File apk) {
+        java.util.List<String> out = new java.util.ArrayList<String>();
+        String text = zipText(apk, ASSET_JSON);
+        if (text == null || text.trim().isEmpty()) return out;
+        try {
+            org.json.JSONArray a = new org.json.JSONObject(text).optJSONArray("access");
+            if (a == null) return out;
+            for (int i = 0; i < a.length(); i++) {
+                String s = a.optString(i, "").trim();
+                if (!s.isEmpty()) out.add(s);
+            }
+        } catch (Throwable ignored) { }
+        return out;
+    }
+
+    /** 宿主这一版**认得**的 access 名（认不出的照样显示给用户看，只是没有对应的现成入口）。 */
+    static final String[] KNOWN_ACCESS = { "slots", "mods", "logs" };
 
     /** 读 zip 里的一份文本（插件自述、扩展点声明都走它）—— 注入**之前**就要知道入口名，所以不能靠 AssetManager。 */
     static String zipText(File apk, String name) {

@@ -1214,6 +1214,11 @@ final class Plugins {
         disable(ctx, id);
         File k = new File(dir(ctx), KNOWN);
         write(k, stateRemove(readOrNull(k), id));
+        // ⚠️ 第 148 轮原本想把整台插件搬进中转站（"卸载可恢复"），**查清 API 后撤回了**：
+        //   `Trash.remove(path, trashDir)` 不是"搬进去"，而是"把**已经在中转站里**的东西彻底删掉"
+        //   （它先查 `isDirectChild(path, trashDir)`，再 `deleteTree`）⇒ 拿它当搬运用会**静默丢掉插件数据**。
+        //   而且插件住**内部**存储、中转站目录在**外部** hub ⇒ 真要搬得走"跨卷：复制→校验→删源"那套。
+        //   ⇒ 这件事连同"中转站里加插件分类"整块留给下一轮（见 `next/22` 的待办）。
         deleteTree(new File(dir(ctx), id));
         return true;
     }
