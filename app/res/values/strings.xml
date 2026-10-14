@@ -1966,4 +1966,7 @@
     <string name="batch_del_sub">Pick one or more; they move to the transfer station, not gone for good</string>
     <string name="batch_del_head_fmt">%1$d in total · tick what to delete</string>
     <string name="batch_del_skipped_fmt">%1$d of them live inside a mod package or a subfolder, so they cannot be deleted</string>
-</resources>
+
+    <!-- 第 148 轮：插件也能从中转站一键放回（放回去是未启用状态） -->
+    <string name="trash_restore_plugin_fmt">Put \"%1$s\" back into the plugin list? It comes back disabled.</string>
+    <string name="trash_restore_plugin_ok_fmt">\"%1$s\" is back in the plugin list - still disabled, enable it yourself.</string></resources>

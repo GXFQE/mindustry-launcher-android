@@ -75,4 +75,6 @@
     <string name="plugin_err_api_old_fmt">插件用的接口版本太老（插件 %1$d，本版本支持 %2$d~%3$d）—— 该更新插件。</string>
     <!-- 第 148 轮 C2：插件自述里的 access 声明（它要碰什么）。永远显示一行，没有就明说"没有声明" -->
     <string name="plugin_info_access">要碰什么：%1$s</string>
-    <string name="plugin_access_none">没有额外声明</string></resources>
+    <string name="plugin_access_none">没有额外声明</string>
+    <!-- 第 148 轮 C1-b：卸载搬不动时不许默不作声（插件还在、数据没丢） -->
+    <string name="plugin_uninstall_failed">卸载没成功 —— 插件还装着，什么都没删。</string></resources>

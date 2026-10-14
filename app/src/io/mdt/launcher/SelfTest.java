@@ -3260,6 +3260,37 @@ public final class SelfTest {
                 "{\"extensions\":[{\"id\":\"t1\",\"entry\":\"com.x.A\"}]}");
         ok(stat, L, exBad.size() == exGood.size() && exBad.size() == 1,
                 "★★元断言：同一份 JSON 里混一条坏条目 ⇒ **好条目一条不少**（坏条目只坑自己）");
+        // ★ 第 148 轮 C1-b：卸载 / 一键恢复那一对（**真文件走一遍** —— 这是"数据没丢"的唯一硬证据）
+        String rid = "selftest-restore";
+        File pdir = Plugins.dir(ctx);
+        File srcDir = new File(pdir, rid);
+        File moved = new File(Trash.pluginsDir(ctx), Trash.nameFor("plugins", rid));
+        try {
+            srcDir.mkdirs();
+            java.io.FileOutputStream fo = new java.io.FileOutputStream(new File(srcDir, "x.bin"));
+            fo.write(new byte[] { 1, 2, 3 }); fo.close();
+            ok(stat, L, Trash.move(srcDir, moved) && !srcDir.exists() && new File(moved, "x.bin").isFile(),
+                    "★卸载那一步：**整台目录**（APK + 数据）搬进中转站，源不在了（跨卷靠 Trash.move）");
+            Trash.Item it = Trash.parse(moved);
+            ok(stat, L, it != null && it.kind == Trash.Kind.PLUGIN && rid.equals(it.name),
+                    "★中转站认得它是插件（Kind.PLUGIN + 名字剥掉戳）");
+            Trash.Result r1 = Trash.restorePlugin(ctx, it);
+            ok(stat, L, r1.ok && new File(srcDir, "x.bin").isFile() && !moved.exists(),
+                    "★★一键恢复：放回 `app_hub/plugins/<id>`（里面的文件跟着回去），中转站那份没了");
+            // 名字被占 ⇒ 只报"重名"，**绝不覆盖**（覆盖 = 悄悄毁掉用户现在装着的那个）
+            File moved2 = new File(Trash.pluginsDir(ctx), Trash.nameFor("plugins", rid));
+            Trash.move(srcDir, moved2);
+            srcDir.mkdirs();
+            Trash.Result r2 = Trash.restorePlugin(ctx, Trash.parse(moved2));
+            ok(stat, L, !r2.ok && r2.nameTaken,
+                    "★重名时只报重名（不覆盖现装的那个）");
+            Trash.move(moved2, srcDir);
+        } catch (Throwable te) {
+            ok(stat, L, false, "卸载/恢复那条路抛了异常：" + te);
+        } finally {
+            if (moved.exists()) Data.deleteTree(moved);
+            if (srcDir.exists()) Data.deleteTree(srcDir);
+        }
         ok(stat, L, PluginHost.apiVerdict(PluginHost.API_MIN) == 0
                         && PluginHost.apiVerdict(PluginHost.API) == 0
                         && PluginHost.apiVerdict(PluginHost.API + 1) == 1

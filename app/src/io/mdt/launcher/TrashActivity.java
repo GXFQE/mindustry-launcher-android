@@ -156,6 +156,11 @@ public class TrashActivity extends BaseActivity {
             d.setPositiveButton(R.string.trash_restore, new DialogInterface.OnClickListener() {
                 @Override public void onClick(DialogInterface dlg, int w) { confirmRestoreSlot(it); }
             });
+        } else if (it.kind == Trash.Kind.PLUGIN) {
+            // 插件：放回去 = 回到 app_hub/plugins/<id>（**未启用**，用户自己按启用）—— 第 148 轮
+            d.setPositiveButton(R.string.trash_restore, new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface dlg, int w) { confirmRestorePlugin(it); }
+            });
         } else if (it.kind != Trash.Kind.OTHER) {
             d.setPositiveButton(R.string.trash_restore, new DialogInterface.OnClickListener() {
                 @Override public void onClick(DialogInterface dlg, int w) { askSlot(it); }
@@ -292,6 +297,41 @@ public class TrashActivity extends BaseActivity {
                 });
             }
         }, "trash-restore").start();
+    }
+
+    /** 插件：确认「放回插件列表」（说清"放回去是未启用状态"） */
+    private void confirmRestorePlugin(final Trash.Item it) {
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.trash_restore_confirm_title)
+                .setMessage(Trans.get(TrashActivity.this, R.string.trash_restore_plugin_fmt, TrashText.title(it)))
+                .setPositiveButton(R.string.trash_restore, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int w) { doRestorePlugin(it); }
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    private void doRestorePlugin(final Trash.Item it) {
+        new Thread(new Runnable() {
+            @Override public void run() {
+                final Trash.Result r = Trash.restorePlugin(TrashActivity.this, it);
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        if (Util.dead(TrashActivity.this)) return;
+                        if (r.ok) {
+                            Toast.makeText(TrashActivity.this,
+                                    Trans.get(TrashActivity.this, R.string.trash_restore_plugin_ok_fmt,
+                                            TrashText.title(it)),
+                                    Toast.LENGTH_LONG).show();
+                            scan();
+                            return;
+                        }
+                        alert(Trans.get(TrashActivity.this, R.string.trash_restore_confirm_title),
+                                TrashText.reason(TrashActivity.this, r));
+                    }
+                });
+            }
+        }, "trash-restore-plugin").start();
     }
 
     private int dp(int v) {

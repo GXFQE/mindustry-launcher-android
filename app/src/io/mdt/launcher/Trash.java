@@ -221,7 +221,7 @@ public final class Trash {
     // ── 条目 ──────────────────────────────────────────────────────────────
 
     /** 认得出是什么：地图 / 模组 / 存档 / 整个槽 / 蓝图 / 其它（其它**不能恢复** —— 没有地方放回去） */
-    public enum Kind { MAP, MOD, SAVE, SLOT, SCHEM, OTHER }
+    public enum Kind { MAP, MOD, SAVE, SLOT, SCHEM, PLUGIN, OTHER }
 
     /** 中转站里的一项 */
     public static final class Item {
@@ -262,8 +262,7 @@ public final class Trash {
         if (DIR_SAVES.equals(p)) return Kind.SAVE;
         if (DIR_SLOTS.equals(p)) return Kind.SLOT;
         if (DIR_SCHEMS.equals(p)) return Kind.SCHEM;
-        // 插件整包：归"其它"（中转站里看得见、算得进占用；**一键恢复**还没做 —— 见 next/22）
-        if (DIR_PLUGINS.equals(p)) return Kind.OTHER;
+        if (DIR_PLUGINS.equals(p)) return Kind.PLUGIN;   // 插件整包（第 148 轮 C1-b：可一键放回）
         if (dirForm) return Kind.MOD;                     // 手工丢进来的目录：多半是目录形态的模组
         String n = name == null ? "" : name.toLowerCase(java.util.Locale.ROOT);
         if (n.endsWith(".msav")) return Kind.MAP;
@@ -760,6 +759,29 @@ public final class Trash {
      * 槽在外部存储）⇒ 退化成"复制 + 校验 + 删原件"：**只有校验通过之后才删源**，
      * 否则"复制失败 + 删了源"就是**静默丢数据**（本工程最忌讳的那一类）。
      */
+    /**
+     * 把一台**卸载掉的插件**从中转站放回 `app_hub/plugins/<id>`（第 148 轮 C1-b 的第二半）。
+     *
+     * <p>⚠️ 放回去是**未启用**状态（卸载时已经把登记摘干净了）—— 要不要再启用**让用户自己按**，
+     * 我们不替他决定（"恢复"≠"替你打开"）。
+     * ⚠️ 名字被占（同名插件又装了一个）⇒ {@code nameTaken}，界面会说清而不是覆盖。
+     */
+    public static Result restorePlugin(Context ctx, Item it) {
+        Result r = new Result();
+        if (it == null || it.path == null) return r.fail(Result.T_NO_TARGET, "no item", null);
+        if (it.kind != Kind.PLUGIN) return r.fail(Result.T_NO_KIND, "not a plugin: " + it.name, it.name);
+        File dst = new File(Plugins.dir(ctx), it.name);
+        if (dst.exists()) {
+            // ⚠️ `nameTaken` 不是 `fail()` 自动带的（那两处老代码也是手工设的）—— 漏了它界面就不会去问"换名字"
+            r.fail(Result.T_NAME_TAKEN, "taken: " + dst, it.name);
+            r.nameTaken = true;
+            return r;
+        }
+        if (!move(it.path, dst)) return r.fail(Result.T_MOVE_FAILED, "move failed: " + it.path, it.name);
+        r.ok = true;
+        return r;
+    }
+
     static boolean move(File from, File to) {
         if (from == null || to == null) return false;
         try {

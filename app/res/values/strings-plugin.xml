@@ -84,4 +84,6 @@
     <string name="plugin_err_api_old_fmt">The plugin uses an interface that is too old (plugin %1$d; this build supports %2$d-%3$d) - update the plugin.</string>
     <!-- 第 148 轮 C2：插件自述里的 access 声明（它要碰什么）。永远显示一行，没有就明说"没有声明" -->
     <string name="plugin_info_access">Wants access to: %1$s</string>
-    <string name="plugin_access_none">nothing extra declared</string></resources>
+    <string name="plugin_access_none">nothing extra declared</string>
+    <!-- 第 148 轮 C1-b：卸载搬不动时不许默不作声（插件还在、数据没丢） -->
+    <string name="plugin_uninstall_failed">Uninstall did not work - the plugin is still installed and nothing was deleted.</string></resources>

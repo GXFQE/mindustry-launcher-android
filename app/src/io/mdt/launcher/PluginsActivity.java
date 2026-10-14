@@ -247,7 +247,14 @@ public class PluginsActivity extends BaseActivity {
                             Plugins.disable(PluginsActivity.this, id);
                             rebuild();
                         } else if ("uninstall".equals(a)) {
-                            Plugins.uninstall(PluginsActivity.this, id);
+                            // ★ 搬不动时 uninstall 返回 false、插件**还在**（数据没丢）⇒ 界面必须说一句，
+                    //   否则用户以为已经删掉了（第 148 轮 C1-b）
+                    boolean uninstalled = Plugins.uninstall(PluginsActivity.this, id);
+                    if (!uninstalled) {
+                        Toast.makeText(PluginsActivity.this,
+                                Trans.get(PluginsActivity.this, R.string.plugin_uninstall_failed),
+                                Toast.LENGTH_LONG).show();
+                    }
                             Toast.makeText(PluginsActivity.this,
                                     Trans.get(PluginsActivity.this, R.string.plugin_uninstalled_fmt, id),
                                     Toast.LENGTH_SHORT).show();
