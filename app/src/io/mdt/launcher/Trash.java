@@ -79,6 +79,8 @@ public final class Trash {
     static final String DIR_SLOTS = "slots-trash";
     /** 蓝图（`.msch`，2026-10-05 第 110 轮）—— 新目录，没有历史包袱 */
     static final String DIR_SCHEMS = "schematics-trash";
+    /** 插件（整个 `<id>/` 目录，含 APK 与它的数据，第 148 轮）—— 新目录，没有历史包袱 */
+    static final String DIR_PLUGINS = "plugins-trash";
 
     /** 槽容器里的两半（整槽进站时把"槽本体"与"它的备份"装在一起，恢复时一起回去） */
     static final String INNER_SLOT = "slot";
@@ -120,13 +122,24 @@ public final class Trash {
     }
 
     /** 蓝图的中转站：`&lt;hub&gt;/schematics-trash/`（删蓝图 = 挪进来，同名导入时旧的也来这里） */
+    /**
+     * 插件那类中转站目录（卸载插件时整台搬进来，第 148 轮）。
+     * ⚠️ 它在**外部** hub，而插件住**内部** `app_hub/plugins` ⇒ 搬运动作**必须**走
+     * {@link #move}（renameTo 失败 ⇒ 复制 + 校验长度 + 才删源），不许裸 `renameTo`。
+     */
+    public static File pluginsDir(Context ctx) {
+        File d = new File(Data.hubDir(ctx), DIR_PLUGINS);
+        if (!d.isDirectory()) d.mkdirs();
+        return d;
+    }
+
     public static File schemsDir(Context ctx) {
         return new File(Data.hubDir(ctx), DIR_SCHEMS);
     }
 
     /** 五个目录（清空 / 统计 / 列表要一起看 —— 用户眼里中转站只有一个） */
     public static File[] allDirs(Context ctx) {
-        return new File[]{mapsDir(ctx), modsDir(ctx), savesDir(ctx), slotsDir(ctx), schemsDir(ctx)};
+        return new File[]{mapsDir(ctx), modsDir(ctx), savesDir(ctx), slotsDir(ctx), schemsDir(ctx), pluginsDir(ctx)};
     }
 
     // ── 名字：编码 / 解码 ─────────────────────────────────────────────────
@@ -249,6 +262,8 @@ public final class Trash {
         if (DIR_SAVES.equals(p)) return Kind.SAVE;
         if (DIR_SLOTS.equals(p)) return Kind.SLOT;
         if (DIR_SCHEMS.equals(p)) return Kind.SCHEM;
+        // 插件整包：归"其它"（中转站里看得见、算得进占用；**一键恢复**还没做 —— 见 next/22）
+        if (DIR_PLUGINS.equals(p)) return Kind.OTHER;
         if (dirForm) return Kind.MOD;                     // 手工丢进来的目录：多半是目录形态的模组
         String n = name == null ? "" : name.toLowerCase(java.util.Locale.ROOT);
         if (n.endsWith(".msav")) return Kind.MAP;

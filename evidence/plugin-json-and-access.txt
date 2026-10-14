@@ -61,13 +61,33 @@
   想真隔离只有两条路：独立进程（像 `:game`）或 Android 的 isolatedProcess（那样插件就拿不到我们的 Context）。
   **拿它当沙箱用会出事。**
 
-## 4) 我要如实说的两件
+## 4) C1-b（收官补做）：插件数据目录 + **卸载搬进中转站**（真机验过）
 
-1. **私有目录没在真机上验到**：`<id>/data` 是**懒创建**的，而夹具这一轮还没调用过 `getFilesDir()`
-   ⇒ `ls app_hub/plugins/probe` 只有 `b5596f3b.apk`、没有 `data/`。**这是行为正确但没验到**
-   ⇒ 待办：让夹具在 `createView` 里往 `ctx.getFilesDir()` 写一个文件，再看目录出现（下轮与"卸载进中转站"一起做）。
-2. 🔴 **"卸载进中转站"我写完又撤回了**（差点埋雷）：查清 API 才发现
-   `Trash.remove(path, trashDir)` **不是"搬进中转站"**，而是"把**已经在中转站里**的东西彻底删掉"
-   （先 `isDirectChild(path, trashDir)` 检查，再 `deleteTree`）⇒ 拿它当搬运会**静默丢掉插件数据**。
-   而且插件住**内部**存储、中转站目录在**外部** hub ⇒ 真要搬得走"跨卷：复制 → 校验 → 删源"那套。
-   ⇒ 整块回退（`Trash.java` 与 HEAD 逐字相同），留给下一轮，并写进 `next/22`。
+```
+① 插件写"自己的数据"落到哪（夹具 createView 里调 ctx.getFilesDir() 写一个文件）：
+   app_hub/plugins/probe/            →  2ed851ab.apk   data
+   app_hub/plugins/probe/data/       →  plug-test.txt        ← ✅ 落在**插件自己的目录**里
+   （上一轮这条"没验到"，原因是懒创建 + 夹具还没调用过 getFilesDir()）
+
+② 卸载（外部夹具 x2，tab 内点「删除」）：
+   app_hub/plugins/x2                →  **没了**
+   hub/plugins-trash/20261014-223003-886__plugins__x2/   →  1.apk      ← ✅ 整台进了中转站
+   （内部 → 外部是**跨卷**：靠 `Trash.move` 的"renameTo 失败 ⇒ 复制 + 校验长度 + 才删源"）
+```
+⚠️ **我第一遍点错了行**：夹具自述名都叫 `plugtest-v1`，内置那条与外部那条**同名** ⇒ 我点到内置
+（它本来就不给删，"弹窗里没有删除"是**正确行为**），于是什么都没发生。换名字唯一的夹具才是有效实验
+—— 与 §85.16.3「测试辅助别按界面文案定位」同族：**同名两行时，按键要按位置/唯一特征**。
+
+## 4b) 还没做的（如实说）
+
+- **一键恢复没做**：`plugins-trash` 里的件被归成 `Kind.OTHER`，而 `Trash.restore*` 对 `OTHER` 会
+  直接返回 `T_NO_KIND`（"unknown kind"）⇒ 用户目前**看得见、能手动取回**，但**不能一键恢复**。
+  做它要新增 `Kind.PLUGIN` + `kindIn` 映射 + 恢复目标（`Plugins.dir`）+ 中转站文案。
+- **卸载失败界面没说话**：`uninstall` 搬不动时返回 `false`（**刻意不退化成删除** —— 删了就真没了），
+  但插件页还没把这个 `false` 说给用户听。
+
+
+1. ✅ **私有目录那条已在收官时验到**（见上面 §4）：夹具写 `getFilesDir()` ⇒ `<插件>/data/plug-test.txt` 出现。
+2. ✅ **那条"写错 API"的教训仍然成立，但结论已经补全**：真正的搬运是 **`Trash.move(src, dst)`**
+   （renameTo 失败 ⇒ 复制 + 校验长度 + 才删源）；`Trash.remove` 是"从中转站彻底删"。**收官时已改用 `Trash.move`**，
+   并刻意让"搬不动"**返回 false、保持还装着**（绝不退化成删除）。

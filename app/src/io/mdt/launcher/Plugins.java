@@ -1219,7 +1219,13 @@ final class Plugins {
         //   （它先查 `isDirectChild(path, trashDir)`，再 `deleteTree`）⇒ 拿它当搬运用会**静默丢掉插件数据**。
         //   而且插件住**内部**存储、中转站目录在**外部** hub ⇒ 真要搬得走"跨卷：复制→校验→删源"那套。
         //   ⇒ 这件事连同"中转站里加插件分类"整块留给下一轮（见 `next/22` 的待办）。
-        deleteTree(new File(dir(ctx), id));
+        // ★ 第 148 轮 C1-b：**卸载 = 整台搬进中转站**（APK + 它的数据在同一个 id 目录里 ⇒ 一步收齐），
+        //   走 `Trash.move`（跨卷安全：renameTo 失败 ⇒ 复制 + 校验长度 + 才删源）。
+        //   🔴 **搬不动就保持"还装着"**（返回 false，界面会说），绝不像原来那样直接 deleteTree：
+        //      删了就真没了，而"卸载失败"用户还能再试一次 / 手动看看为什么。
+        File home = new File(dir(ctx), id);
+        File into = new File(Trash.pluginsDir(ctx), Trash.nameFor("plugins", id));
+        if (!Trash.move(home, into)) return false;
         return true;
     }
 
