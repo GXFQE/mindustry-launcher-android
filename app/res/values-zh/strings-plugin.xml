@@ -40,7 +40,7 @@
     <string name="plugin_trust_third">第三方（别的签名）</string>
     <string name="plugin_trust_short_official">官方</string>
     <string name="plugin_trust_short_third">第三方</string>
-    <string name="plugin_trust_short_fmt">%1$s · 处置 %2$s</string>
+    <string name="plugin_trust_short_fmt">%1$s · %2$s</string>
 
     <!-- 第 136 轮：把插件自述用起来（名字 + 信息那一屏）。标签自带分隔符，中英各一套 -->
     <string name="plugin_action_info">插件信息</string>
@@ -53,11 +53,11 @@
     <string name="plugin_info_source">来源：%1$s</string>
     <string name="plugin_info_level">处置：%1$s</string>
     <string name="plugin_info_filever">文件版本：%1$s</string>
-    <string name="plugin_level_l1">L1 宽容 —— 先留着，下次启动再试</string>
-    <string name="plugin_level_l2">L2 回滚 —— 退回上一份能用的版本</string>
-    <string name="plugin_level_l3">L3 严格 —— 停用，并把这一版隔离</string>
+    <string name="plugin_level_l1">下次启动再试一次</string>
+    <string name="plugin_level_l2">退回上一份能用的版本</string>
+    <string name="plugin_level_l3">停用，并把这一版隔离</string>
     <string name="plugin_info_fmt">%1$s\n来源：%2$s\n处置：%3$s</string>
-    <string name="plugin_action_level_fmt">处置 %1$s —— 改成 %2$s</string>
+    <string name="plugin_action_level_fmt">现在是「%1$s」，改成「%2$s」</string>
     <string name="plugin_action_restore_fmt">把隔离的 v%1$s 放回来</string>
     <string name="plugin_row_quarantined_fmt">%1$s · 已隔离 v%2$s</string>
     <string name="plugin_skip_retry_fmt">%1$s：v%2$s 没起来，先留着，下次启动再试</string>
@@ -65,7 +65,7 @@
     <string name="plugin_skip_quarantine_fmt">%1$s：v%2$s 没起来，已停用并隔离</string>
     <string name="plugin_restored_fmt">已把 v%1$s 放回来，退出重开之后生效。</string>
     <string name="plugin_restore_failed">没能把它放回来。</string>
-    <string name="plugin_level_set_fmt">%1$s 的处置等级已改成 %2$s（下次启动起生效）。</string>
+    <string name="plugin_level_set_fmt">%1$s 的处置已改成：%2$s（下次启动起生效）。</string>
 
     <!-- 第 137 轮：三分（内置 / 官方外接 / 第三方）。内置 = 随本体发放、不能卸载 -->
     <string name="plugin_trust_builtin">内置（随本体发放，不能卸载）</string>
@@ -77,4 +77,8 @@
     <string name="plugin_info_access">要碰什么：%1$s</string>
     <string name="plugin_access_none">没有额外声明</string>
     <!-- 第 148 轮 C1-b：卸载搬不动时不许默不作声（插件还在、数据没丢） -->
-    <string name="plugin_uninstall_failed">卸载没成功 —— 插件还装着，什么都没删。</string></resources>
+    <string name="plugin_uninstall_failed">卸载没成功 —— 插件还装着，什么都没删。</string>
+    <!-- 第 149 轮：列表行放不下整句 ⇒ 给"短形式"；★ 界面上**不许**出现 L1/L2/L3 这种内部代号 -->
+    <string name="plugin_level_short_l1">下次会再试</string>
+    <string name="plugin_level_short_l2">退回上一版</string>
+    <string name="plugin_level_short_l3">停用并隔离</string></resources>

@@ -49,7 +49,7 @@
     <string name="plugin_trust_third">Third party (a different signature)</string>
     <string name="plugin_trust_short_official">Official</string>
     <string name="plugin_trust_short_third">Third party</string>
-    <string name="plugin_trust_short_fmt">%1$s · handling %2$s</string>
+    <string name="plugin_trust_short_fmt">%1$s · %2$s</string>
 
     <!-- 第 136 轮：把插件自述用起来（名字 + 信息那一屏）。标签自带分隔符，中英各一套 -->
     <string name="plugin_action_info">Plugin info</string>
@@ -62,11 +62,11 @@
     <string name="plugin_info_source">Source: %1$s</string>
     <string name="plugin_info_level">Handling: %1$s</string>
     <string name="plugin_info_filever">File version: %1$s</string>
-    <string name="plugin_level_l1">L1 lenient - keep it and try again next launch</string>
-    <string name="plugin_level_l2">L2 roll back - go back to the last version that worked</string>
-    <string name="plugin_level_l3">L3 strict - turn it off and quarantine that version</string>
+    <string name="plugin_level_l1">Try again next launch</string>
+    <string name="plugin_level_l2">Back to the last version that worked</string>
+    <string name="plugin_level_l3">Off, and this version is quarantined</string>
     <string name="plugin_info_fmt">%1$s\nSource: %2$s\nHandling: %3$s</string>
-    <string name="plugin_action_level_fmt">Handling %1$s - change to %2$s</string>
+    <string name="plugin_action_level_fmt">Now %1$s - change to %2$s</string>
     <string name="plugin_action_restore_fmt">Put the quarantined v%1$s back</string>
     <string name="plugin_row_quarantined_fmt">%1$s · quarantined v%2$s</string>
     <string name="plugin_skip_retry_fmt">%1$s: v%2$s did not work - kept, will be tried again</string>
@@ -74,7 +74,7 @@
     <string name="plugin_skip_quarantine_fmt">%1$s: v%2$s did not work - turned off and quarantined</string>
     <string name="plugin_restored_fmt">Put v%1$s back. It takes effect after a restart.</string>
     <string name="plugin_restore_failed">Could not put it back.</string>
-    <string name="plugin_level_set_fmt">Handling for %1$s is now %2$s (from the next launch).</string>
+    <string name="plugin_level_set_fmt">Handling for %1$s is now: %2$s (from the next launch).</string>
 
     <!-- 第 137 轮：三分（内置 / 官方外接 / 第三方）。内置 = 随本体发放、不能卸载 -->
     <string name="plugin_trust_builtin">Built-in (ships with the app, cannot be uninstalled)</string>
@@ -86,4 +86,8 @@
     <string name="plugin_info_access">Wants access to: %1$s</string>
     <string name="plugin_access_none">nothing extra declared</string>
     <!-- 第 148 轮 C1-b：卸载搬不动时不许默不作声（插件还在、数据没丢） -->
-    <string name="plugin_uninstall_failed">Uninstall did not work - the plugin is still installed and nothing was deleted.</string></resources>
+    <string name="plugin_uninstall_failed">Uninstall did not work - the plugin is still installed and nothing was deleted.</string>
+    <!-- round 149: the row has no space for a full sentence, so a short form. No internal codes (L1/L2/L3) on screen. -->
+    <string name="plugin_level_short_l1">Retries next launch</string>
+    <string name="plugin_level_short_l2">Rolls back one version</string>
+    <string name="plugin_level_short_l3">Off and quarantined</string></resources>

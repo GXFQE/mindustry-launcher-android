@@ -114,7 +114,7 @@ public class PluginsActivity extends BaseActivity {
                 final String tr = probeVer == null ? PluginTrust.THIRD : Plugins.trustOf(this, id, probeVer);
                 final String sub = Trans.get(this, R.string.plugin_trust_short_fmt,
                         Trans.get(this, trustShortRes(tr)),
-                        Plugins.levelOf(Plugins.levels(this), tr, id));
+                        Trans.get(this, levelShortRes(Plugins.levelOf(Plugins.levels(this), tr, id))));
                 final String rowLabel = label;
                 addAction(label, sub, new Runnable() {
                     @Override public void run() { rowDialog(id); }
@@ -223,7 +223,8 @@ public class PluginsActivity extends BaseActivity {
             items.add(Trans.get(this, R.string.plugin_action_restore_fmt, qv));
             actions.add("restore");
         }
-        items.add(Trans.get(this, R.string.plugin_action_level_fmt, lv, nextLv));
+        items.add(Trans.get(this, R.string.plugin_action_level_fmt,
+                        Trans.get(this, levelShortRes(lv)), Trans.get(this, levelShortRes(nextLv))));
         actions.add("level");
         items.add(Trans.get(this, R.string.plugin_action_info));
         actions.add("info");
@@ -270,7 +271,7 @@ public class PluginsActivity extends BaseActivity {
                             Plugins.setLevel(PluginsActivity.this, id, nextLv);
                             Toast.makeText(PluginsActivity.this,
                                     Trans.get(PluginsActivity.this, R.string.plugin_level_set_fmt,
-                                            id, nextLv), Toast.LENGTH_LONG).show();
+                                            id, Trans.get(PluginsActivity.this, levelRes(nextLv))), Toast.LENGTH_LONG).show();
                             rebuild();
                         } else if ("info".equals(a)) {
                             infoDialog(id, newest, trust, lv);
@@ -347,6 +348,17 @@ public class PluginsActivity extends BaseActivity {
     }
 
     /** 等级 → 界面上那句人话（唯一映射处：别在几个地方各写一份）。 */
+    /**
+     * 三档的**短形式**（列表行 / 动作标签用 —— 那里放不下整句）。
+     * ★ 与 {@link #levelRes} 同一条判据：**界面上不许出现 L1/L2/L3 这种内部代号**（用户看不到代码里的名字，
+     * 只该看到"会发生什么"）。
+     */
+    static int levelShortRes(String level) {
+        if (PluginTrust.L1.equals(level)) return R.string.plugin_level_short_l1;
+        if (PluginTrust.L3.equals(level)) return R.string.plugin_level_short_l3;
+        return R.string.plugin_level_short_l2;
+    }
+
     static int levelRes(String level) {
         if (PluginTrust.L1.equals(level)) return R.string.plugin_level_l1;
         if (PluginTrust.L3.equals(level)) return R.string.plugin_level_l3;
