@@ -62,9 +62,9 @@
     <string name="plugin_info_source">Source: %1$s</string>
     <string name="plugin_info_level">Handling: %1$s</string>
     <string name="plugin_info_filever">File version: %1$s</string>
-    <string name="plugin_level_l1">Try again next launch</string>
-    <string name="plugin_level_l2">Back to the last version that worked</string>
-    <string name="plugin_level_l3">Off, and this version is quarantined</string>
+    <string name="plugin_level_l1">After a failure: keep it, try again next launch</string>
+    <string name="plugin_level_l2">After a failure: switch back to the last version that worked</string>
+    <string name="plugin_level_l3">After a failure: turn it off and quarantine this version</string>
     <string name="plugin_info_fmt">%1$s\nSource: %2$s\nHandling: %3$s</string>
     <string name="plugin_action_level_fmt">Now %1$s - change to %2$s</string>
     <string name="plugin_action_restore_fmt">Put the quarantined v%1$s back</string>
@@ -88,6 +88,6 @@
     <!-- 第 148 轮 C1-b：卸载搬不动时不许默不作声（插件还在、数据没丢） -->
     <string name="plugin_uninstall_failed">Uninstall did not work - the plugin is still installed and nothing was deleted.</string>
     <!-- round 149: the row has no space for a full sentence, so a short form. No internal codes (L1/L2/L3) on screen. -->
-    <string name="plugin_level_short_l1">Retries next launch</string>
-    <string name="plugin_level_short_l2">Rolls back one version</string>
-    <string name="plugin_level_short_l3">Off and quarantined</string></resources>
+    <string name="plugin_level_short_l1">Retry on failure</string>
+    <string name="plugin_level_short_l2">Older version on failure</string>
+    <string name="plugin_level_short_l3">Off on failure</string></resources>

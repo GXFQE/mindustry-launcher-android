@@ -53,9 +53,9 @@
     <string name="plugin_info_source">来源：%1$s</string>
     <string name="plugin_info_level">处置：%1$s</string>
     <string name="plugin_info_filever">文件版本：%1$s</string>
-    <string name="plugin_level_l1">下次启动再试一次</string>
-    <string name="plugin_level_l2">退回上一份能用的版本</string>
-    <string name="plugin_level_l3">停用，并把这一版隔离</string>
+    <string name="plugin_level_l1">失败后先留着它，下次启动再试</string>
+    <string name="plugin_level_l2">失败后换回它上一份能用的版本</string>
+    <string name="plugin_level_l3">失败后停用它，并把这一版隔离</string>
     <string name="plugin_info_fmt">%1$s\n来源：%2$s\n处置：%3$s</string>
     <string name="plugin_action_level_fmt">现在是「%1$s」，改成「%2$s」</string>
     <string name="plugin_action_restore_fmt">把隔离的 v%1$s 放回来</string>
@@ -79,6 +79,6 @@
     <!-- 第 148 轮 C1-b：卸载搬不动时不许默不作声（插件还在、数据没丢） -->
     <string name="plugin_uninstall_failed">卸载没成功 —— 插件还装着，什么都没删。</string>
     <!-- 第 149 轮：列表行放不下整句 ⇒ 给"短形式"；★ 界面上**不许**出现 L1/L2/L3 这种内部代号 -->
-    <string name="plugin_level_short_l1">下次会再试</string>
-    <string name="plugin_level_short_l2">退回上一版</string>
-    <string name="plugin_level_short_l3">停用并隔离</string></resources>
+    <string name="plugin_level_short_l1">失败后再试</string>
+    <string name="plugin_level_short_l2">失败后换旧版</string>
+    <string name="plugin_level_short_l3">失败后停用并隔离</string></resources>
