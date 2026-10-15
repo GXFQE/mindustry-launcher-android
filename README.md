@@ -181,26 +181,49 @@ yourself — even just a few lines — see **Translation file** below.
   packed into the zip)
 - **Copy this slot's mods to another slot**
 
+### Plug-ins
+- The entry is **the icon at the top right of the home screen** (the gear is Settings, the one to its
+  **right** is Plug-ins): an APK that **adds abilities to the launcher**. This version expects you to
+  bring your own — tap **Install a plug-in APK** and pick one in the system file picker
+- **Installing does not take effect right away**: the row says "takes effect after a restart" and the
+  page offers **Restart the launcher now** (the same after switching version, enabling or disabling).
+  If the device does not let an app restart itself, it tells you to quit and open it again
+- One row per plug-in: **name · state** (active / takes effect after a restart / disabled /
+  quarantined) plus **which copy is installed**; the second line gives the **origin** (built in /
+  official / third party) and **what happens if it crashes** (retry next launch / fall back to the
+  previous working copy / disable and quarantine it)
+- Tapping a row lets you **open** its page, **enable / disable** it, **delete** it (it moves to the
+  transfer station), and read **Plug-in info**: the name, version, author, description, entry class
+  and "what it touches" from the plug-in's own description, plus its internal id, origin, handling
+  and install time
+- Plug-ins can add **entries** to the interface (the only extension point in this version): they are
+  listed under the plug-in and open its own page. If the entries it declares are not supported by this
+  version, that is stated there — **the plug-in itself keeps working**
+- **Disabling** just stops loading it (the file stays); **deleting** moves it to the transfer station,
+  from where you can **put it back** — it comes back **disabled**, and enabling it again is your call
+- **A crashing plug-in does not take the launcher down with it**: if a launch with plug-ins did not
+  finish, the next one skips loading them and applies the handling above (retry / fall back / disable
+  and quarantine), tells you what happened, and offers **re-enable the plug-in**; a quarantined copy
+  has to be put back by hand on the plug-ins page
+- The **interface version** a plug-in asks for has to be inside the range this build supports: too
+  new says the launcher should be updated, too old says the plug-in should be updated
+- A plug-in's data lives in its own layer (`data`, `cache`, created when used)
+- ⚠️ **This is not a sandbox**: a plug-in runs in the **same process** as the launcher and can touch
+  whatever the launcher can; the "what it touches" line is a **declaration, not a permission wall** —
+  so only install plug-ins you trust
+
 ### Transfer station
-- Deleted maps, saves, **whole slots**, deleted **blueprints** and replaced mods are **moved here
-  first** instead of disappearing
-- The list shows what it is (map / save / mod / blueprint / whole slot / other), which slot it came
-  from, its size, and when it arrived; you can **put it back** (the slot it came from is preselected)
+- Deleted maps, saves, **whole slots**, deleted **blueprints**, replaced mods and **uninstalled
+  plug-ins** are **moved here first** instead of disappearing
+- The list shows what it is (map / save / mod / blueprint / whole slot / **uninstalled plug-in** /
+  other files), which slot it came from, its size, and when it arrived; you can **put it back** (the
+  slot it came from is preselected)
 - A deleted slot brings **its backups** along and they come back with it; if the name is taken you
   can **put it back under another name**
 - You can also **delete for good** or **empty** it (both ask again and state the count and size); the
   station keeps at most 20 items (3 whole slots) and pushes out the oldest beyond that
 
 ### Logs and settings
-- **Export the logs — in full or ready to share**: the bundle (game log + launcher reports +
-  crash reports) can be exported **unchanged**, or as a **scrubbed copy** that removes what points
-  at you before you send it: data-root paths (and the slot name inside them), the device model,
-  the GL/driver string, and the values the launcher already knows — your player name, the servers
-  you joined, the login ids. Ports, relative paths, the ABI, the API level, the page size and the
-  **mod list** stay (crash analysis needs them), so the scrubbed copy is still worth reporting
-  with. If the settings file cannot be read the launcher just falls back to the pattern-based
-  pass — a corrupt setting must never stop you from exporting a log
-
 - **Export the logs — in full or ready to share**: the bundle (game log + launcher reports +
   crash reports) can be exported **unchanged**, or as a **scrubbed copy** that removes what points
   at you before you send it: data-root paths (and the slot name inside them), the device model,
@@ -221,8 +244,6 @@ yourself — even just a few lines — see **Translation file** below.
   always shown, and vanilla crashes (`Mods: none`) or the launcher's own crash dumps are never
   blamed on a mod. **Export all logs now carries these verdicts** (the receiver does not have to
   redo the analysis)
-- **Transfer station** (home → Transfer station): deleted maps, mods, slots and blueprints wait
-  there and can be put back
 - **Theme**: follow system / light / dark, and **Language**: follow system / English / 简体中文 —
   both switched inside the app, without touching system settings
 - **You can translate the interface text yourself**: Settings (the gear at the top right) →
@@ -247,6 +268,11 @@ yourself — even just a few lines — see **Translation file** below.
   only be distributed by sideloading
 - **No in-app file manager**: importing and exporting always goes through the system file picker; this
   is not a general-purpose save manager — deleting a save is still the game's job
+- **Plug-ins can only be installed by hand in this version**: there is no plug-in store, no download
+  and no update check yet (distribution and verification come later), and the only extension point so
+  far is "add entries to the interface" — plugging into the game side is not possible yet
+- **Plug-ins are not sandboxed**: they run in the launcher's own process and can touch whatever the
+  launcher can — only install ones you trust
 - **This repository does not contain the game**: Mindustry and third-party builds such as
   MindustryX are copyright their respective authors, under their own licences
 
