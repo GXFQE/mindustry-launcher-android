@@ -1913,4 +1913,6 @@
 
     <!-- 第 148 轮：插件也能从中转站一键放回（放回去是未启用状态） -->
     <string name="trash_restore_plugin_fmt">把「%1$s」放回插件列表？放回去是未启用状态。</string>
-    <string name="trash_restore_plugin_ok_fmt">「%1$s」已放回插件列表 —— 还是未启用，要自己按启用。</string></resources>
+    <string name="trash_restore_plugin_ok_fmt">「%1$s」已放回插件列表 —— 还是未启用，要自己按启用。</string>
+    <!-- 第 149 轮：中转站里那件是"卸载掉的插件"（原来掉进"其他文件"） -->
+    <string name="trash_kind_plugin">卸载的插件</string></resources>

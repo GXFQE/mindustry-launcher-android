@@ -1969,4 +1969,6 @@
 
     <!-- 第 148 轮：插件也能从中转站一键放回（放回去是未启用状态） -->
     <string name="trash_restore_plugin_fmt">Put \"%1$s\" back into the plugin list? It comes back disabled.</string>
-    <string name="trash_restore_plugin_ok_fmt">\"%1$s\" is back in the plugin list - still disabled, enable it yourself.</string></resources>
+    <string name="trash_restore_plugin_ok_fmt">\"%1$s\" is back in the plugin list - still disabled, enable it yourself.</string>
+    <!-- round 149: the item is an uninstalled plugin (it used to fall into "Other files") -->
+    <string name="trash_kind_plugin">Uninstalled plugin</string></resources>

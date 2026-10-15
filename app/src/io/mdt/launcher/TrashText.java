@@ -29,6 +29,7 @@ public final class TrashText {
             case SAVE: return Trans.get(c, R.string.trash_kind_save);
             case SLOT: return Trans.get(c, R.string.trash_kind_slot);
             case SCHEM: return Trans.get(c, R.string.trash_kind_schem);
+            case PLUGIN: return Trans.get(c, R.string.trash_kind_plugin);   // 卸载的插件（第 149 轮补）
             default: return Trans.get(c, R.string.trash_kind_other);
         }
     }
@@ -66,7 +67,11 @@ public final class TrashText {
         StringBuilder sb = new StringBuilder();
         sb.append(kindLabel(c, it));
         // ★ 整槽不写"来自槽「x」"：标题**就是**那个槽名（写两遍是废话，还会把这一行挤长）
-        if (it.kind != Trash.Kind.SLOT) sb.append(" · ").append(fromLabel(c, it));
+        // ★ 整槽 / 插件都不写"来自槽「x」"：整槽的标题就是槽名；插件的来源是"被卸载"，
+        //   写「来自槽「plugins」」是拿中转站**目录名**当槽名 ⇒ 说错来源（第 149 轮真机看到的）
+        if (it.kind != Trash.Kind.SLOT && it.kind != Trash.Kind.PLUGIN) {
+            sb.append(" · ").append(fromLabel(c, it));
+        }
         sb.append(" · ").append(Util.formatSize(it.bytes));
         if (it.kind == Trash.Kind.SLOT && it.files > 0) {
             sb.append(" · ").append(Trans.get(c, R.string.trash_files_fmt, it.files));
