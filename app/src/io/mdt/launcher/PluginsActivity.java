@@ -578,8 +578,16 @@ public class PluginsActivity extends BaseActivity {
     }
 
     private void addExtensions(final String id, final String ver) {
-        List<Extensions.Item> items = Extensions.forSlot(
-                Extensions.of(Plugins.apkOf(this, id, ver)), Extensions.SLOT_PLUGINS);
+        List<Extensions.Item> all = Extensions.of(Plugins.apkOf(this, id, ver));
+        List<Extensions.Item> items = Extensions.forSlot(all, Extensions.SLOT_PLUGINS);
+        // ★ 声明了入口、但这一版一个都用不上 ⇒ 说一句。原来这里什么都不显示，用户会以为
+        //   "插件没生效"（插件本身其实照常注入、照常工作 —— 见 Extensions.allUnknown 的注释）。
+        if (items.isEmpty()) {
+            if (Extensions.allUnknown(all, Extensions.SLOT_PLUGINS)) {
+                addText(Trans.get(this, R.string.plugin_ext_unsupported), 13f);
+            }
+            return;
+        }
         for (final Extensions.Item it : items) {
             LinearLayout box = new LinearLayout(this);
             box.setOrientation(LinearLayout.VERTICAL);

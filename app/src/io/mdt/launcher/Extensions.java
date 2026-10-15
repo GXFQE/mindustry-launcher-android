@@ -113,6 +113,20 @@ final class Extensions {
         return SLOT_PLUGINS.equals(slot);
     }
 
+    /**
+     * 这个插件**声明了入口，但这一版一个都用不上**（判据：声明非空，而本插槽里一条都没有）。
+     *
+     * <p>★ 为什么要单独判：插件页原来对这种情况**什么都不显示** —— 插件装上了、启用了、
+     * 启动时也照常注入，只是界面里不多出任何条目 ⇒ 用户会以为"没生效 / 装坏了"。
+     * 这一版只有 {@link #SLOT_PLUGINS} 一个插槽，所以"声明了别的插槽名"就是这种情况。
+     *
+     * <p>⚠️ 与"这个插件没声明任何入口"（完全正常，多数插件就是纯后台）分开 —— 那种不该提示。
+     */
+    static boolean allUnknown(List<Item> all, String slot) {
+        if (all == null || all.isEmpty() || slot == null) return false;
+        return forSlot(all, slot).isEmpty();
+    }
+
     private static String trim(String s) {
         return s == null ? "" : s.trim();
     }

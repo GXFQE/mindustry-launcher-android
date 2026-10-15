@@ -1074,7 +1074,7 @@
     <string name="backup_err_clone_target_current_fmt">「%1$s」是当前槽，不能作为克隆的目标。\n（源槽的内容会与它混在一起，之后就分不开了）</string>
     <string name="backup_err_slot_backups_delete_fmt">备份目录删除未完全成功：%1$s</string>
     <string name="export_slot_title_fmt">导出整槽「%1$s」</string>
-    <string name="export_slot_msg_fmt">把整个槽打包成一个 zip（存档 · 地图 · 蓝图 · 模组 · 设置）。%1$s\n\n⚠ 包里有你的身份信息 —— 要交给别人请用「导出分享包」。\n\n游戏里也能导入（设置 → 数据 → 导入数据）。</string>
+    <string name="export_slot_msg_fmt">把整个槽打包成一个 zip（存档 · 地图 · 蓝图 · 模组 · 设置）。%1$s\n\n⚠ 包里可能带着你的账号身份信息 —— 要交给别人请用「导出分享包」。\n\n游戏里也能导入（设置 → 数据 → 导入数据）。</string>
     <string name="export_slot_playing">\n\n⚠ 游戏正在运行，此刻导出可能拿到写了一半的存档。</string>
     <string name="export_ok">选择保存位置</string>
     <string name="chooser_export">导出到…</string>
@@ -1093,12 +1093,16 @@
       ★ 下面这几句里的「已去除身份信息」是**承诺**、不是形容词：`SharePack.plan` 读不出来
         （文件损坏）时走 `share_slot_err_settings` **拒绝导出** —— 不许把"没确认过"的文件
         塞进一个标着"已脱敏"的包里。
+      ★ 第 150 轮（发版前）**把承诺收边界**：这个类只剥 `settings.bin` 里的**账号级**身份
+        （usid-* / uuid / ip / ip-bans / banned-names）—— 地图 / 蓝图 meta 里的 `steamid`
+        （= 你在创意工坊发布那条的记录）**本类不管**（见 SharePack 类注释与 REF §91）⇒
+        文案里一律写成「**账号**身份信息」，并在确认框里明说地图/蓝图上可能还留着发布记录。
       ★ 文案分工：**类别**由这里说（用户能懂的话），**条数**由代码算（`%1$d`）。
         别在代码里拼"要去掉 uuid 与 ip"这种句子 —— 那是文案，得跟着语言走。
     -->
-    <string name="slot_op_share_slot">导出分享包（已去除身份信息）…</string>
+    <string name="slot_op_share_slot">导出分享包（去掉账号身份信息）…</string>
     <string name="share_slot_title_fmt">导出分享包「%1$s」</string>
-    <string name="share_slot_msg_fmt">发给别人用的包；自己换机或留档请用「导出整槽」——那个包一个字不删。\n打包前会去掉身份信息，并丢掉日志、可重建的缓存与只对你自己有用的文件。\n\n%1$s%2$s</string>
+    <string name="share_slot_msg_fmt">给别人用的包；换机或留档用「导出整槽」，那个包一个字不删。\n打包前会去掉账号身份信息，并丢掉日志、可重建的缓存与只对你有用的文件。\n地图和蓝图上可能还留着创意工坊的发布记录（这一版不处理）。\n\n%1$s%2$s</string>
     <string name="share_slot_saved_fmt">这个包比「导出整槽」小 %1$s。</string>
     <string name="share_slot_found_fmt">这次会去掉 %1$d 项身份信息（其中服务器身份 %2$d 项）。</string>
     <string name="share_slot_none">检查过了：这个槽里没有身份信息。</string>

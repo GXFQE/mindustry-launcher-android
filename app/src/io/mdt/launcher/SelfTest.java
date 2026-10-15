@@ -3260,6 +3260,23 @@ public final class SelfTest {
                         && Extensions.knownSlot(Extensions.SLOT_PLUGINS)
                         && Extensions.forSlot(ex, Extensions.SLOT_PLUGINS).size() == 2,
                 "★认不出的插槽：解析时留着（不丢信息）、进不了插件页 —— 只显示认得的 2 条");
+            // ★ 第 150 轮（发版前）：**声明了入口但这一版一个都用不上** ⇒ 插件页要说一句，
+            //   否则用户以为"插件没生效"（插件其实照常注入、照常工作）。
+            java.util.List<Extensions.Item> onlyTomorrow = Extensions.forSlot(ex, "tomorrow");
+            ok(stat, L, onlyTomorrow.size() == 1
+                            && Extensions.allUnknown(onlyTomorrow, Extensions.SLOT_PLUGINS)
+                            && !Extensions.allUnknown(ex, Extensions.SLOT_PLUGINS)
+                            && !Extensions.allUnknown(ex, "tomorrow")
+                            && !Extensions.allUnknown(new ArrayList<Extensions.Item>(),
+                                    Extensions.SLOT_PLUGINS)
+                            && !Extensions.allUnknown(onlyTomorrow, null),
+                    "★元断言：`allUnknown` 只在「声明非空 + 本插槽一条都没有」时为真 —— "
+                            + "声明了别家插槽 ⇒ 真；混着认得的 ⇒ 假；**什么都没声明 ⇒ 假**"
+                            + "（纯后台插件不该被提示）；空表 / 空插槽名 ⇒ 假");
+            String extNote = ctx.getString(R.string.plugin_ext_unsupported);
+            ok(stat, L, extNote.length() > 0 && extNote.length() <= 32
+                            && !extNote.contains("%"),
+                    "★那句提示要短、且没有残留占位符：" + extNote + "（" + extNote.length() + " 字）");
         ok(stat, L, Extensions.parse(null).isEmpty() && Extensions.parse("").isEmpty()
                         && Extensions.parse("这不是 json").isEmpty()
                         && Extensions.parse("{\"entry\":\"com.x.Main\"}").isEmpty()
