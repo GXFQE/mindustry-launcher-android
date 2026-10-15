@@ -85,8 +85,7 @@ public class GameSlot extends BaseActivity {
         }
         if (target == null || !target.exists()) {
             fail(Trans.get(GameSlot.this, R.string.step_prepare),
-                    Trans.get(GameSlot.this, R.string.game_pkg_missing_fmt,
-                            pkg != null ? "pkg=" + pkg : "apk=" + apkPath), null);
+                    Trans.get(GameSlot.this, R.string.game_pkg_missing_fmt), null);
             return;
         }
         final String shown = (label == null ? target.getName() : label);
@@ -120,7 +119,8 @@ public class GameSlot extends BaseActivity {
         } catch (Injector.LaunchError e) {
             fail(e.step, e.getMessage(), e);
         } catch (Throwable e) {
-            fail(Trans.get(GameSlot.this, R.string.step_unknown), String.valueOf(e), e);
+            fail(Trans.get(GameSlot.this, R.string.step_unknown),
+                    Trans.get(GameSlot.this, R.string.launch_err_unknown), e);
         }
     }
 
@@ -148,18 +148,24 @@ public class GameSlot extends BaseActivity {
         }
     }
 
+    /**
+     * 启动失败弹窗。
+     *
+     * <p>🔴 2026-10-15（第 150 轮）：这条**只给第一层** —— 环节名（人话）+ 一句原因。
+     * 原来还追加了 `cause.getClass().getSimpleName()` 与 4 行 `at …` 堆栈，用户拿到的是一屏
+     * `LaunchError / at io.mdt.launcher.Injector…(Injector.java:224)`（§78：类名与原始异常
+     * **只许出现在"原始诊断"那一层**）。现在原文进 `report-launch.txt`（{@link Injector} 写）。
+     * <p>⚠️ "详细记录已写进运行日志"那句**只在真有报告时**才说 —— 找不到游戏包那条路
+     * 在 Injector 之前就返回、**根本没写报告**（真机实测 report-launch.txt 一字未动）。
+     */
     private void fail(String step, String msg, Throwable cause) {
         mStatus.setText(Trans.get(GameSlot.this, R.string.game_start_failed_fmt, step));
         StringBuilder sb = new StringBuilder();
         sb.append(Trans.get(GameSlot.this, R.string.game_step_stuck_fmt, step, msg));
         if (cause != null) {
-            sb.append("\n\n").append(cause.getClass().getSimpleName());
-            StackTraceElement[] st = cause.getStackTrace();
-            for (int i = 0; i < st.length && i < 4; i++) {
-                sb.append("\n  at ").append(st[i]);
-            }
+            sb.append(Trans.get(GameSlot.this, R.string.game_report_hint));
+            android.util.Log.w("MDTLauncher", "launch failed at " + step, cause);
         }
-        sb.append(Trans.get(GameSlot.this, R.string.game_report_hint));
         new AlertDialog.Builder(this)
                 .setTitle(R.string.game_cannot_start)
                 .setMessage(sb.toString())

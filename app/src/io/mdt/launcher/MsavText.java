@@ -99,7 +99,10 @@ public final class MsavText {
         //   我们这里是纯文本列表 ⇒ 必须去色，否则一行里全是 `[gold]` 这种噪声（真机截图里就是）。
         //   判据复用 Mods 里那份 arc 等价实现（`Strings.stripColors`），不另写一份。
         String n = Mods.stripColors(m.displayName());
-        if (!n.isEmpty()) parts.add(n);
+        // ★ 第 150 轮：真名**可能本身就是个数字**（真机：槽里那张地图的真名就是 `27`）——
+        //   而这一行三个字段都没标签 ⇒ 「游戏自带 · 27 · 600 × 600」里的 27 会被读成"大小/数量"。
+        //   加「」把"这是名字"说清楚，且不占宽度预算（列表行的宽度是硬约束，别加标签）。
+        if (!n.isEmpty()) parts.add("「" + n + "」");
         if (isSave) {
             String pt = playtimeText(c, m);
             if (!pt.isEmpty()) parts.add(Trans.get(c, R.string.msav_played_fmt, pt));

@@ -224,9 +224,10 @@ public final class Injector {
             injectDex(app, baseCl, plan.apk, log);
         } catch (Throwable e) {
             t.mark("dexInject");
+            logThrowable(log, e);
             report(app, log);
             throw new LaunchError(Trans.get(activity, R.string.step_dex),
-                    String.valueOf(e), e);
+                    Trans.get(activity, R.string.launch_err_dex), e);
         }
         t.mark("dexInject");
 
@@ -235,9 +236,10 @@ public final class Injector {
             loadNatives(app, plan.apk, log);
         } catch (Throwable e) {
             t.mark("nativeLoad");
+            logThrowable(log, e);
             report(app, log);
             throw new LaunchError(Trans.get(activity, R.string.step_native),
-                    String.valueOf(e), e);
+                    Trans.get(activity, R.string.launch_err_native), e);
         }
         t.mark("nativeLoad");
 
@@ -246,9 +248,10 @@ public final class Injector {
             flagNativesLoaded(baseCl, log);
         } catch (Throwable e) {
             t.mark("nativeFlag");
+            logThrowable(log, e);
             report(app, log);
             throw new LaunchError(Trans.get(activity, R.string.step_native_flag),
-                    String.valueOf(e), e);
+                    Trans.get(activity, R.string.launch_err_native_flag), e);
         }
         t.mark("nativeFlag");
 
@@ -257,9 +260,10 @@ public final class Injector {
             mountAssets(app, activity, plan, log);
         } catch (Throwable e) {
             t.mark("assetMount");
+            logThrowable(log, e);
             report(app, log);
             throw new LaunchError(Trans.get(activity, R.string.step_assets),
-                    String.valueOf(e), e);
+                    Trans.get(activity, R.string.launch_err_assets), e);
         }
         t.mark("assetMount");
 
@@ -268,9 +272,10 @@ public final class Injector {
             startGame(activity, baseCl, log);
         } catch (Throwable e) {
             t.mark("startActivity");
+            logThrowable(log, e);
             report(app, log);
             throw new LaunchError(Trans.get(activity, R.string.step_start),
-                    String.valueOf(e), e);
+                    Trans.get(activity, R.string.launch_err_start), e);
         }
         t.mark("startActivity");
 
@@ -478,6 +483,19 @@ public final class Injector {
     }
 
     // ── 报告通道 ──────────────────────────────────────────────────────────
+
+    /**
+     * 把异常**原样**记进启动报告（★ 它是"原始诊断"那一层）。
+     *
+     * <p>🔴 2026-10-15：这些异常原来是 `String.valueOf(e)` 直接进 {@link LaunchError#getMessage()}
+     * ⇒ 用户看到的启动失败弹窗里是 `java.lang.NoSuchMethodError: …`。现在第一层只说人话
+     * （`launch_err_dex` 那几条），**原文挪到这里**——排查要的东西一个字不少。
+     */
+    private static void logThrowable(StringBuilder log, Throwable e) {
+        if (e == null) return;
+        log.append("!! ").append(e).append('\n');
+        log.append(Log.getStackTraceString(e)).append('\n');
+    }
 
     /**
      * 启动报告写 hub/（**外部**目录，debuggable=false 下 adb 可直接读）+ logcat。

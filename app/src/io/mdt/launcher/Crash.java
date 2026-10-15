@@ -94,7 +94,9 @@ final class Crash {
         Writer w = null;
         try {
             w = new OutputStreamWriter(new FileOutputStream(tmp), "UTF-8");
-            w.write("MDT 安卓启动器 —— 崩溃报告\n");
+            // ★ 第 150 轮：产品名统一成「MDT 启动器」（原来这里写「MDT 安卓启动器」，与顶栏/导出报头
+            //   三种写法并存）。⚠️ 改它会动到 `SelfTest` 里那两条按首行认领的断言 —— 已同步。
+            w.write("MDT 启动器 —— 崩溃报告\n");
             w.write("时刻：" + new java.util.Date().toString()
                     + "（" + System.currentTimeMillis() + "）\n");
             w.write("线程：" + (t == null ? "?" : t.getName())

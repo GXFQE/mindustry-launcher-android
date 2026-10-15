@@ -93,11 +93,18 @@ final class Storage {
 
         /**
          * **真实占用** —— 第一行那句话用的就是它（唯一口径）。
-         * ★ 别在别处再算一遍：三处的定义（外部 hub / 内部 app_hub / 缓存）只会漂。
+         * ★ 别在别处再算一遍：四处的定义（外部 hub / 内部 app_hub / 缓存 / **各槽**）只会漂。
+         *
+         * <p>🔴 2026-10-15（第 150 轮）**把各槽并了进来**：原来只算前三项，而各槽住在
+         * `<…/io.mdt.launcher>/slot-<名>`（与 hub **同级**）⇒ 真机上出现"总占用 429.0 MB"
+         * 紧跟着"槽「default」：1.4 GB"这种**第一行比它下面的某一节还小**的自打脸，
+         * 而页面标题又是"存储占用"（用户当然按"这软件占了我多少"去读）。
+         * ⇒ 口径 = 这份页面上**列出来的东西之和**（下面各节加得起来）。
+         * ⚠️ 改这一处要同时改 `SelfTest` 里那两条元断言（已同步）。
          */
         public long totalBytes() {
             return Math.max(0L, hubBytes) + Math.max(0L, internalBytes)
-                    + Math.max(0L, cacheBytes);
+                    + Math.max(0L, cacheBytes) + Math.max(0L, slotBytes);
         }
     }
 

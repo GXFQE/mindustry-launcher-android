@@ -24,7 +24,10 @@ final class CasText {
     /** 把异常翻成给用户看的一句话：是 `Cas` 的码化异常就查资源，否则原样返回消息 */
     static String reason(Context c, java.io.IOException e) {
         if (e instanceof Cas.CasException) return reason(c, (Cas.CasException) e);
-        return e == null || e.getMessage() == null ? String.valueOf(e) : e.getMessage();
+        // ★ 2026-10-15：非码化异常（系统 errno）原来是 `getMessage()` 原样上屏
+        //   （英文界面/中文界面都会冒 `ENOSPC (No space left on device)`）⇒ 走 ioReason：
+        //   认识的 errno 才翻，其余给一句"读写失败"。
+        return Util.ioReason(c, e, Trans.get(c, R.string.io_reason_failed));
     }
 
     static String reason(Context c, Cas.CasException e) {
@@ -38,8 +41,8 @@ final class CasText {
             case Cas.C_NO_SHA256: return Trans.get(c, R.string.cas_err_no_sha256);
             case Cas.C_MKDIR: return Trans.get(c, R.string.cas_err_mkdir_fmt, e.s1);
             default:
-                // 新加了码却忘了在这里加映射 ⇒ 不崩，但会退回异常原文（中文）
-                return e.getMessage() == null ? String.valueOf(e) : e.getMessage();
+                // 新加了码却忘了在这里加映射 ⇒ 不崩，但**不许**退回异常原文（中文/英文天书）
+                return Util.ioReason(c, e, Trans.get(c, R.string.io_reason_failed));
         }
     }
 }

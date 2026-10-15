@@ -267,7 +267,9 @@ public class SettingsActivity extends BaseActivity {
                     body = Storage.text(app, Storage.collect(app));
                 } catch (Throwable t) {
                     body = null;
-                    err = String.valueOf(t);
+                    // ★ 2026-10-15：`err` 现在只当"失败"的标记 —— 原文（`String.valueOf(t)`）
+                    //   原来会被拼进弹窗正文，用户看到的是 `java.lang.IllegalStateException: …`。
+                    err = "failed";
                     android.util.Log.w("MDTLauncher", "storage stats failed: " + t);
                 }
                 final String fBody = body;
@@ -276,7 +278,7 @@ public class SettingsActivity extends BaseActivity {
                     @Override public void run() {
                         if (Util.dead(SettingsActivity.this) || !dlg.isShowing()) return;
                         dlg.setMessage(fErr == null ? fBody
-                                : Trans.get(SettingsActivity.this, R.string.storage_failed, fErr));
+                                : Trans.get(SettingsActivity.this, R.string.storage_failed));
                     }
                 });
             }
@@ -434,7 +436,10 @@ public class SettingsActivity extends BaseActivity {
                 try {
                     n = Trans.writeTemplate(SettingsActivity.this, tmp, null);
                 } catch (Throwable t) {
-                    err = t.toString();
+                    // ★ 2026-10-15：原来是 `t.toString()` ⇒ 「模板写不出来：java.io.IOException: …
+                    //   No space left on device」；现在走 `Util.ioReason`（认识的 errno 才翻）。
+                    err = Util.ioReason(SettingsActivity.this, t,
+                            Trans.get(SettingsActivity.this, R.string.io_reason_failed));
                     android.util.Log.w("MDTLauncher", "template write failed: " + t);
                 }
                 final String ferr = err;
@@ -480,7 +485,8 @@ public class SettingsActivity extends BaseActivity {
                         in.close();
                     }
                 } catch (Throwable t) {
-                    err = t.toString();
+                    err = Util.ioReason(SettingsActivity.this, t,
+                            Trans.get(SettingsActivity.this, R.string.io_reason_failed));
                     android.util.Log.w("MDTLauncher", "template save failed: " + t);
                 }
                 if (sTemplateTmp != null) sTemplateTmp.delete();
@@ -542,8 +548,13 @@ public class SettingsActivity extends BaseActivity {
                     runOnUiThread(new Runnable() {
                         @Override public void run() {
                             // ★ 按纪律：第一层只说"这件事没成"，原始异常进日志（见 §五"系统异常不许当弹窗正文"）
+                            //   🔴 2026-10-15：这里原来下一行就是 `e.toString()`（注释与代码相反，
+                            //     用户拿到的是 `java.io.FileNotFoundException: /data/user/0/…`）。
                             android.util.Log.w("MDTLauncher", "lang pack read failed: " + e);
-                            Toast.makeText(SettingsActivity.this, e.toString(),
+                            Toast.makeText(SettingsActivity.this,
+                                    Util.ioReason(SettingsActivity.this, e,
+                                            Trans.get(SettingsActivity.this,
+                                                    R.string.lang_pack_read_failed)),
                                     Toast.LENGTH_LONG).show();
                         }
                     });
@@ -615,7 +626,9 @@ public class SettingsActivity extends BaseActivity {
                     }
                     Trans.installFromFile(SettingsActivity.this);
                 } catch (Throwable t) {
-                    err = t.toString();
+                    // ★ 2026-10-15：原来是 `t.toString()`（异常原文当 Toast 正文）
+                    err = Util.ioReason(SettingsActivity.this, t,
+                            Trans.get(SettingsActivity.this, R.string.lang_pack_install_failed));
                     android.util.Log.w("MDTLauncher", "lang pack install failed: " + t);
                 }
                 tmp.delete();      // 成功失败都清掉（校验用的临时件没用了）
@@ -639,7 +652,10 @@ public class SettingsActivity extends BaseActivity {
             Trans.uninstall(SettingsActivity.this);
         } catch (Throwable t) {
             android.util.Log.w("MDTLauncher", "lang pack uninstall failed: " + t);
-            Toast.makeText(SettingsActivity.this, t.toString(), Toast.LENGTH_LONG).show();
+            Toast.makeText(SettingsActivity.this,
+                    Util.ioReason(SettingsActivity.this, t,
+                            Trans.get(SettingsActivity.this, R.string.lang_pack_remove_failed)),
+                    Toast.LENGTH_LONG).show();
         }
         recreate();
     }

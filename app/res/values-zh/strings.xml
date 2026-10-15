@@ -29,7 +29,7 @@
     <string name="act_add_game_title">添加游戏</string>
     <string name="act_add_game_sub">导入 APK 文件 · 扫描已安装的游戏</string>
     <string name="act_add_title">添加包名</string>
-    <string name="act_add_sub">扫描其他已安装的游戏版本</string>
+    <string name="act_add_sub">按包名添加已安装的游戏</string>
     <string name="act_import_title">导入 APK</string>
     <string name="act_import_sub">从本机文件选择（经系统文件选择器）</string>
     <string name="act_saves_title">存档与备份</string>
@@ -119,7 +119,7 @@
     <string name="add_package_title">添加包名</string>
     <string name="add_package_msg">按精确包名查已装的游戏版本</string>
     <string name="add_package_hint">如 io.anuke.mindustry</string>
-    <string name="detail_slot_line_fmt">\n\n存档槽: %1$s</string>
+    <string name="detail_slot_line_fmt">\n\n存档槽：%1$s</string>
     <!-- ★ 2026-10-06（一档④）：这个版本指向的槽里有多少份存档 / 上次什么时候启动的（只在详情弹窗里）
          🔴 措辞两处都刻意保守：
             ① 说「上次**启动**」不说「上次玩」—— 记账写在**点启动的那一刻**（`Config.sessionStart`），
@@ -136,14 +136,14 @@
       那是**有损显示**，详情弹窗负责把原文还回来 —— 排障时才有得对照，否则只能去 `pm dump` 里翻。
       只在"确实剥过"时才出现（versionTrimmed()），纯 `159.7` 这种不会有这一行。
     -->
-    <string name="detail_raw_ver_fmt">\n原始版本名: %1$s</string>
+    <string name="detail_raw_ver_fmt">\n原始版本名：%1$s</string>
     <!--
       fork 声明的"基座版本"（MindustryX 的 APK 里 assets/mod.hjson 的 minGameVersion）。
       它是"这个 fork 和官方某一版**数据格式相同、共用槽不提示**"的全部依据，
       所以必须说出来 —— 否则用户只看到"该提示的没提示"，无从判断对不对。
       只在确实声明了、且与显示版本不同时出现（官方本体不会有这一行）。
     -->
-    <string name="detail_upstream_fmt">\n基座版本: %1$s（与官方同版本共用槽不会提示）</string>
+    <string name="detail_upstream_fmt">\n基座版本：%1$s（与官方同版本共用槽不会提示）</string>
     <string name="detail_imported_note">\n\n导入副本位于应用私有目录；删除不影响你选导入时的原文件。</string>
     <!--
       F8：已装版本也给只读事实。★ 这两句的差别是**有意的** —— 导入的能给删除按钮、系统装的不能，
@@ -153,9 +153,9 @@
     <!-- 这三行要读整个包（几十 MB）⇒ 先弹窗、算完再补，所以有"正在读取"这一句 -->
     <string name="detail_probing">\n\n正在读取这个包的信息…</string>
     <string name="detail_md5_fmt">\n\n文件校验码：%1$s</string>
-    <string name="detail_abi_fmt">\n架构: %1$s</string>
+    <string name="detail_abi_fmt">\n架构：%1$s</string>
     <string name="detail_abi_unknown">读不出来</string>
-    <string name="detail_build_fmt">\n构建号: %1$d</string>
+    <string name="detail_build_fmt">\n构建号：%1$d</string>
     <string name="delete_import_title">删除导入版本？</string>
     <string name="delete_import_msg_fmt">将删除应用内的副本：%1$s\n（不影响导入时的原文件）</string>
     <!--
@@ -281,7 +281,7 @@
     <string name="delete_slot_confirm_title_fmt">删除槽「%1$s」？</string>
     <!-- ⚠️ 这里**不能**用 `**` 表示强调：弹窗是纯文本（AlertDialog.setMessage），
          `**` 会原样显示成星号。要加重语气只能靠措辞。全工程同此纪律。 -->
-    <string name="delete_slot_warn">这个槽的全部数据会挪进中转站（连同它的备份），之后可以在主界面「中转站」里放回来：\n\n</string>
+    <string name="delete_slot_warn">这个槽的全部数据会挪进中转站，之后可以在主界面「中转站」里放回来：\n\n</string>
     <string name="delete_slot_files_fmt">%1$d 个文件 · %2$s\n</string>
     <string name="delete_slot_with_backups_fmt">\n它的 %1$d 份备份一起挪走。</string>
     <string name="delete_slot_no_backups">\n（这个槽没有备份）</string>
@@ -339,7 +339,7 @@
     <string name="restore_done">恢复完成</string>
     <string name="restore_not_run">恢复未执行</string>
 
-    <string name="game_busy_title">先退出游戏</string>
+    <string name="game_busy_title">游戏正在运行</string>
     <string name="game_busy_msg_fmt">槽「%1$s」正被游戏占用，现在写入会被覆盖。请先退出游戏。</string>
     <string name="chooser_pick_msav">选择 .msav 存档</string>
     <string name="msav_import_progress_title">导入存档</string>
@@ -381,6 +381,7 @@
         别写成"直接当普通图开"（那会让人以为点开就能玩）。
     -->
     <string name="map_save_name_title">把这份存档转成地图</string>
+    <string name="map_save_failed_why">没能转换这份存档</string>
     <string name="map_save_name_hint">这是存档，还不是地图（文件里没有名字）。\n下面这个名字会写进文件里 —— 游戏和编辑器显示的就是它。</string>
     <string name="map_save_nocores_warn">⚠ 这张图里没有玩家核心：编辑器里能打开，但直接当普通图开可能立刻结束。</string>
     <!--
@@ -409,6 +410,7 @@
     <string name="mapsave_reason_broken">文件里的数据块坏了</string>
     <string name="map_import_ok_fmt">已导入「%1$s」</string>
     <string name="map_import_fail_fmt">导入失败：%1$s</string>
+    <string name="map_import_read_failed">这份文件读不进来 —— 可能已经不在了，或者没有读取权限</string>
     <string name="map_overwrite_title">同名地图已存在</string>
     <string name="map_overwrite_msg_fmt">这个槽里已经有「%1$s」了。\n替换的话旧的会挪进中转站，不会直接删掉。</string>
     <string name="map_overwrite_ok">替换</string>
@@ -470,7 +472,7 @@
     -->
     <string name="save_page_import_sub">从本机选 .msav（可多选，也可选一个 zip 整包）</string>
     <string name="save_page_export_sub">把这个槽的存档导到本机</string>
-    <string name="save_page_bad_sub">读不出来的那几份，看看为什么</string>
+    <string name="save_page_bad_sub">一份一份列出原因</string>
     <string name="msav_bad_list_title_fmt">读不出来的存档（%1$d 份）</string>
     <string name="msav_all_ok">这个槽的存档现在都读得出来</string>
     <!-- 冲突体检没做成时的白话提示（2026-10-04 补）：原来是把异常对象直接拼进正文。 -->
@@ -617,13 +619,13 @@
     <string name="settings_err_backup_verify">备份校验失败（写出的备份读不回或与原文件不一致）</string>
     <string name="settings_selfcheck_mismatch">写回后读出的键表与预期不一致</string>
     <string name="settings_selfcheck_unreadable">写回后读不出来</string>
-    <string name="settings_err_verify_rollback_fmt">自检失败（%1$s）⇒ 已用备份还原原文件</string>
+    <string name="settings_err_verify_rollback_fmt">自检失败（%1$s），已用备份还原原文件</string>
     <string name="settings_err_verify_rollback_fail_fmt">自检失败（%1$s）且还原失败</string>
-    <string name="settings_err_verify_deleted_fmt">自检失败（%1$s）⇒ 已删除刚新建的文件</string>
+    <string name="settings_err_verify_deleted_fmt">自检失败（%1$s），已删掉刚新建的文件</string>
     <!-- 这几条由 `Mods` 的启停路径给（同一个 Result 类型 ⇒ 码集与文案都同一处维护） -->
     <string name="settings_err_no_slot_dir_fmt">拿不到槽「%1$s」的目录（外部存储可能没挂载）</string>
     <string name="settings_err_game_running">游戏正在运行，现在改会被它覆盖 —— 请先退出游戏再改。</string>
-    <string name="settings_err_settings_unreadable">这个槽的设置读不出来 ⇒ 拒绝改写。\n请先让游戏跑一次（它会重建设置），或从备份恢复后再试。</string>
+    <string name="settings_err_settings_unreadable">这个槽的设置读不出来，所以没有改写。\n请先让游戏跑一次（它会重建设置），或从备份恢复后再试。</string>
     <string name="settings_err_no_mods">没有可改的模组</string>
     <string name="settings_err_no_internal_name">内部名为空 —— 先扫出这个模组再改</string>
     <!--
@@ -665,28 +667,28 @@
       ══ 六道加载门（P3）：`Mods.gates` 原来在 Java 里拼中文 ════════════════
       ★ `note` 只在**失败**时给；`label` 里不塞数据，数据一律进 note。
     -->
-    <string name="mods_gate_android_load">安卓能加载它</string>
-    <string name="mods_gate_android_load_note">它写明要 Java，但包里没有安卓能跑的代码 ⇒ 游戏会试着加载、然后跳过</string>
+    <string name="mods_gate_android_load">安卓能加载</string>
+    <string name="mods_gate_android_load_note">它写明要 Java，但包里没有安卓能跑的代码，游戏会试着加载、然后跳过</string>
     <string name="mods_ignore_retry_note">顺带会清掉「上次没跑完」的标记 —— 否则下次启动还是整槽跳过，关掉它等于白关</string>
-    <string name="mods_gate_enabled">游戏里启用着它</string>
-    <string name="mods_gate_enabled_note">还没读到游戏的设置文件 ⇒ 这里显示的是默认值（没写过 = 启用）</string>
+    <string name="mods_gate_enabled">游戏里启用着</string>
+    <string name="mods_gate_enabled_note">还没读到游戏的设置文件，这里显示的是默认值（没写过 = 启用）</string>
     <!-- ★ 2026-10-08：这一关**不通过**时原来没有原因（note 只跟着"设置读没读到"）⇒ 详情页直接印出 null。
          现在原因与动作都收在这一关（"点启用"归它；下面"上次启动"那一关只讲机制，避免同屏重复）。 -->
     <string name="mods_gate_enabled_off">它被关掉了 —— 点「启用」就能打开</string>
     <string name="mods_gate_enabled_unknown">设置文件还没读出来，拿不到它的开关状态</string>
     <string name="mods_gate_version">游戏版本够新</string>
     <string name="mods_gate_version_note_fmt">它要求 %1$s 以上，当前是 %2$s</string>
-    <string name="mods_gate_minver">满足最低版本要求</string>
+    <string name="mods_gate_minver">达到游戏的加载门槛</string>
     <string name="mods_gate_minver_none">它没写要求哪个游戏版本，游戏会当成太老的模组跳过</string>
     <string name="mods_gate_minver_old_fmt">它写的最低版本是 %1$d，太老了（要 %2$d 以上）—— 游戏会跳过它</string>
-    <string name="mods_gate_blacklist">不在游戏的禁用名单里</string>
+    <string name="mods_gate_blacklist">没有被游戏禁用</string>
     <string name="mods_gate_blacklist_note_fmt">在名单里：%1$s</string>
     <string name="mods_gate_last_crash">上次启动正常结束（没触发整槽跳过）</string>
     <!-- ★ 2026-10-08：这道门的标签**跟着状态换措辞**（用户：「前面打个叉号后面说正常结束谁知道到底是正不正常啊」）
          —— ✓/❌ 那套（"❌ 满足最低版本要求"）只适用于**要求/状态**式判据；
          "过去时的叙述"配 ❌ 会自相矛盾，所以不通过时直接说**发生了什么**。 -->
     <string name="mods_gate_last_crash_bad">上次启动崩到了整槽跳过</string>
-    <string name="mods_gate_last_crash_note">上次启动没跑完，但你关掉了「启动崩溃后禁用模组」⇒ 不会整槽跳过</string>
+    <string name="mods_gate_last_crash_note">上次启动没跑完，但你关掉了「启动崩溃后禁用模组」，所以不会整槽跳过</string>
     <!-- ★ 不通过时的"该做什么"：**跟着这个模组当前的状态走**（用户：「想再试就点启用，但现在状态就是启用（这矛盾啊）」）
          —— 关着的才说"点启用"；开着的说重试/怎么让它别再被跳过。
          ⚠️ 原来还写「游戏把它标成失败」：那是**全槽级**标记（一崩 12 个模组全有），
@@ -698,7 +700,7 @@
          ⚠️ 原文里「（照抄 Mods.resolveDependencies）」是**维护者自我说明 / 源码出处**，
             按文案纪律 ⑤ 不该出现在界面上 ⇒ 已去掉（依据仍在代码注释里）。 -->
     <string name="mods_import_open_failed">打不开所选文件（可能没有读取权限）</string>
-    <string name="mods_detail_no_target">没有版本指向这个槽 ⇒ 这里的模组不会在任何一次启动里被加载。</string>
+    <string name="mods_detail_no_target">没有版本指向这个槽，所以这里的模组不会被加载。</string>
     <string name="mods_detail_target_fmt">指向这个槽的版本：%1$s（比对取其中最低的 %2$s）</string>
     <string name="mods_detail_depchain">依赖链判定：</string>
     <string name="mods_detail_repo_override_fmt">%1$s（settings 覆盖）</string>
@@ -724,12 +726,12 @@
     <string name="conflict_join_and">\u0020与\u0020</string>
     <string name="conflict_note_dex_fmt">读不了「%1$s」的 classes.dex</string>
     <string name="conflict_note_log">读不了游戏日志</string>
-    <string name="conflict_contained_fmt">「%1$s」里已经带了「%2$s」⇒ 两个一起开 = 同一套功能装两遍，会互相抢；建议只留一个</string>
+    <string name="conflict_contained_fmt">「%1$s」里已经带了「%2$s」：两个一起开就是同一套功能装两遍，会互相抢；建议只留一个</string>
     <string name="conflict_shared_fmt">%1$s 都想接管游戏里的%2$s —— 只能有一个生效（是谁，看下面的游戏记录）</string>
     <string name="conflict_mentioned_fmt">「%1$s」的简介里提到了「%2$s」</string>
     <string name="mods_dep_required_fmt">必需：%1$s</string>
     <string name="mods_dep_soft_fmt">软依赖：%1$s</string>
-    <string name="mods_scan_dup_fmt">%1$s 和 %2$s 是同一个模组的两份 ⇒ 游戏里只认一个（后放进去的那个）。</string>
+    <string name="mods_scan_dup_fmt">%1$s 和 %2$s 是同一个模组的两份，游戏里只认一个（后放进去的那个）。</string>
     <!--
       ══ 模组包导入 / 跨槽复制的**结果与失败原因**（P3）══════════════════════
       ★ `Mods.PackResult.report()` **就是弹窗正文** ⇒ 给用户看的；而 `importPackage` / `copyMods`
@@ -762,7 +764,7 @@
     <string name="pack_report_where_fmt">位置：%1$s</string>
     <string name="pack_report_size_fmt">大小：%1$s</string>
     <string name="pack_report_mod_fmt">模组：%1$s  %2$s</string>
-    <string name="pack_report_names_fmt">游戏里的名字：%1$s   它要求游戏 %2$s</string>
+    <string name="pack_report_names_fmt">包里的名字：%1$s\n它要求游戏 %2$s</string>
     <string name="pack_report_copied_fmt">✅ 复制完成：%1$d 项，%2$s</string>
     <string name="pack_report_skipped_fmt">跳过 %1$d 项（目标槽已有同名）：%2$s</string>
     <string name="pack_report_failed_list_fmt">❌ 失败 %1$d 项：%2$s</string>
@@ -794,12 +796,12 @@
       ⚠️ 加一个码就要在这里加一条（+ values/ 那一份），漏了不崩、界面静默变"原因不明"。
     -->
     <string name="msch_reason_no_file">没有拿到文件</string>
-    <string name="msch_reason_file_too_big_fmt">这个文件太大，不像是蓝图（超过 %1$d 字节）</string>
+    <string name="msch_reason_file_too_big_fmt">这个文件太大，不像是蓝图（超过 %1$s）</string>
     <string name="msch_reason_not_blueprint">这不是蓝图文件</string>
     <string name="msch_reason_newer_fmt">这份蓝图是更新版本的游戏存的（v%1$d）</string>
     <string name="msch_reason_broken">文件内容坏了</string>
     <string name="msch_reason_huge">这个文件解开后太大，没有读它</string>
-    <string name="msch_reason_too_large_fmt">蓝图尺寸超出游戏上限（%1$d × %2$d）</string>
+    <string name="msch_reason_too_large_fmt">蓝图太大了：%1$d × %2$d（游戏最多 128 × 128）</string>
     <string name="msch_reason_too_many_fmt">蓝图里的建筑太多了（%1$d 个）</string>
     <string name="msch_reason_half">这个文件像是写到一半</string>
     <string name="msch_reason_config">蓝图里有读不懂的建筑设置</string>
@@ -861,6 +863,9 @@
     <string name="bp_tech_dict_names_fmt">名字表里写着：%1$s</string>
     <string name="bp_tech_dict_names_more_fmt">名字表里写着：%1$s（还有 %2$d 个）</string>
     <string name="bp_tech_renamed_fmt">换算过名字的方块：%1$s</string>
+    <!-- ★ 第 150 轮：超过 6 条时也要说"还有 N 个"（同族的字典那一行早就有，这一族原来静默截断） -->
+    <string name="bp_tech_renamed_more_fmt">换算过名字的方块：%1$s（还有 %2$d 个）</string>
+    <!-- ★ 第 150 轮：超过 6 条时也要说"还有 N 个"（同族的字典那一行早就有，这一族原来静默截断） -->
     <string name="bp_tech_rot_fmt">带朝向的方块：%1$s 格</string>
     <string name="bp_tech_tags_fmt">标签：%1$s</string>
     <string name="bp_tech_contentmap_fmt">自带名字对照表：%1$s</string>
@@ -900,7 +905,9 @@
     <string name="bp_export_nosrc">找不到这份蓝图的来源</string>
     <string name="bp_import_ok_fmt">已导入 %1$s</string>
     <string name="bp_import_fail_fmt">%1$s</string>
-    <string name="bp_import_busy_msg">游戏正在跑。先进游戏退出，再来导入 —— 这一局里存下来的蓝图会被覆盖。</string>
+    <string name="bp_import_read_failed">这个文件读不出来 —— 可能坏了，或者不是蓝图</string>
+    <string name="bp_import_busy_msg">游戏正在运行，现在导入蓝图会被它覆盖。请先退出游戏。</string>
+    <string name="bp_delete_busy_msg">游戏正在运行，现在删蓝图会跟它抢文件。请先退出游戏再删。</string>
     <string name="bp_overwrite_title">已经有同名的蓝图</string>
     <string name="bp_overwrite_msg_fmt">槽里已经有一份叫 %1$s 的蓝图。替换会把旧的那份挪进中转站。</string>
     <string name="bp_overwrite_ok">替换</string>
@@ -1018,7 +1025,7 @@
     <string name="backup_err_no_data_fmt">槽「%1$s」还没有数据目录，没有可备份的内容。</string>
     <string name="backup_err_mkdir_fmt">创建备份目录失败：%1$s</string>
     <string name="backup_err_same_second">同一秒内已经有一份同名的备份了，稍等一下再试</string>
-    <string name="backup_err_nothing_fmt">槽「%1$s」里没有可备份的内容。\n%2$s\n是空的，或只剩 %3$s 这类游戏自己会重建的东西。</string>
+    <string name="backup_err_nothing_fmt">槽「%1$s」里没有可备份的内容。\n%2$s 是空的，或只剩 %3$s 这类游戏自己会重建的东西。</string>
     <string name="backup_err_snapshot_mkdir_fmt">创建备份目录失败：%1$s</string>
     <string name="backup_err_snapshot_missing">这份备份已经不在了</string>
     <string name="backup_err_delete_partial_fmt">删除未完全成功：%1$s</string>
@@ -1030,7 +1037,7 @@
     <string name="backup_restore_err_no_dst">⚠ 拿不到目标槽目录</string>
     <string name="backup_restore_err_mkdir_fmt">⚠ 创建目标目录失败：%1$s</string>
     <string name="backup_restore_bad_missing_fmt">%1$s（缺失）</string>
-    <string name="backup_restore_bad_size_fmt">%1$s（大小 %2$d≠%3$d）</string>
+    <string name="backup_restore_bad_size_fmt">%1$s（实际大小 %2$s，备份里是 %3$s）</string>
     <string name="backup_restore_bad_md5_fmt">%1$s（md5 不符）</string>
     <string name="backup_restore_err_selfcheck_fmt">⚠ 这份备份自身校验没过，已拒绝恢复（没有动你的数据）：\n%1$s</string>
     <!--⚠ 缩进一律**不写进资源**（aapt2 会把前导/尾随空白剥掉，判据 RES-04）——
@@ -1059,7 +1066,7 @@
     <string name="backup_restore_ok_snapshot_fmt">备份：%1$s\n</string>
     <string name="backup_restore_ok_files_fmt">文件：%1$d / %2$d （%3$s）\n</string>
     <string name="backup_restore_ok_where_fmt">位置：%1$s\n</string>
-    <string name="backup_restore_ok_kept_fmt">保留了 %1$d 个文件现在的版本\n</string>
+    <string name="backup_restore_ok_kept_fmt">有 %1$d 个同名文件保持原样（没有覆盖）\n</string>
     <string name="backup_restore_ok_wiped_fmt">已先清空：%1$s\n</string>
     <string name="backup_restore_partial_fmt">\n⚠ 有文件没写成功：\n%1$s</string>
     <string name="backup_err_not_manifest">不是 MDT 备份清单</string>
@@ -1067,8 +1074,8 @@
     <string name="backup_err_clone_target_current_fmt">「%1$s」是当前槽，不能作为克隆的目标。\n（源槽的内容会与它混在一起，之后就分不开了）</string>
     <string name="backup_err_slot_backups_delete_fmt">备份目录删除未完全成功：%1$s</string>
     <string name="export_slot_title_fmt">导出整槽「%1$s」</string>
-    <string name="export_slot_msg_fmt">把整个槽打包成一个 zip（存档 · 地图 · 蓝图 · 模组 · 设置）。%1$s\n\n⚠️ 包里有你的身份信息 —— 要交给别人请用「导出分享包」。\n\n游戏里也能导入（设置 → 数据 → 导入数据）。</string>
-    <string name="export_slot_playing">\n\n⚠️ 游戏正在运行，此刻导出可能拿到写了一半的存档。</string>
+    <string name="export_slot_msg_fmt">把整个槽打包成一个 zip（存档 · 地图 · 蓝图 · 模组 · 设置）。%1$s\n\n⚠ 包里有你的身份信息 —— 要交给别人请用「导出分享包」。\n\n游戏里也能导入（设置 → 数据 → 导入数据）。</string>
+    <string name="export_slot_playing">\n\n⚠ 游戏正在运行，此刻导出可能拿到写了一半的存档。</string>
     <string name="export_ok">选择保存位置</string>
     <string name="chooser_export">导出到…</string>
     <string name="export_progress_title">导出中</string>
@@ -1092,7 +1099,7 @@
     <string name="slot_op_share_slot">导出分享包（已去除身份信息）…</string>
     <string name="share_slot_title_fmt">导出分享包「%1$s」</string>
     <string name="share_slot_msg_fmt">发给别人用的包；自己换机或留档请用「导出整槽」——那个包一个字不删。\n打包前会去掉身份信息，并丢掉日志、可重建的缓存与只对你自己有用的文件。\n\n%1$s%2$s</string>
-    <string name="share_slot_saved_fmt">去掉这些东西大约省下 %1$s。</string>
+    <string name="share_slot_saved_fmt">这个包比「导出整槽」小 %1$s。</string>
     <string name="share_slot_found_fmt">这次会去掉 %1$d 项身份信息（其中服务器身份 %2$d 项）。</string>
     <string name="share_slot_none">检查过了：这个槽里没有身份信息。</string>
     <string name="share_slot_err_settings">这个槽的设置文件读不出来（可能损坏），没法确认里面有没有身份信息 —— 为避免泄露，这次没有导出。</string>
@@ -1115,7 +1122,7 @@
     <string name="zip_confirm_head_fmt">%1$d 个文件 · %2$s</string>
     <string name="zip_confirm_tops_fmt">\n包含：%1$s</string>
     <string name="zip_confirm_strip_fmt">\n\n（包外面套了一层「%1$s」，解包时会自动去掉）</string>
-    <string name="zip_tag_native">\n\n里面有游戏的设置文件 —— 这是游戏自带「导出数据」的格式。</string>
+    <string name="zip_tag_native">\n\n里面有游戏的设置文件。整槽导出和游戏自带的「导出数据」都长这样。</string>
     <string name="zip_tag_custom">\n\n没有游戏的设置文件 —— 像是本启动器导出的包。</string>
     <string name="zip_warn_unknown">看不出这是 Mindustry 的数据包。仍然要导入吗？</string>
     <string name="zip_warn_skipped_fmt">有 %1$d 个条目的路径不安全，会被跳过。</string>
@@ -1146,8 +1153,8 @@
     <string name="backup_auto_zip">自动 · 整槽导入前</string>
     <string name="backup_auto_restore">自动 · 恢复前</string>
     <string name="slot_autobak_done_fmt">\n改前已自动备份：%1$s</string>
-    <string name="zip_import_kept_fmt">\n保留了 %1$d 个文件现在的版本。</string>
-    <string name="zip_import_skipped_fmt">\n⚠️ 跳过 %1$d 个不安全条目</string>
+    <string name="zip_import_kept_fmt">\n有 %1$d 个同名文件保持原样（没有覆盖）。</string>
+    <string name="zip_import_skipped_fmt">\n⚠ 跳过 %1$d 个不安全条目</string>
     <string name="zip_import_failed">导入失败</string>
     <string name="zip_nothing">这个 zip 里没有可解包的文件。</string>
 
@@ -1192,10 +1199,10 @@
     <string name="launch_progress_title">正在启动</string>
     <string name="launch_progress_msg_fmt">%1$s\n正在准备存档槽 · 检查这个包…</string>
     <string name="game_start_failed_fmt">启动失败（%1$s）</string>
-    <string name="game_step_stuck_fmt">卡在步骤：%1$s\n\n%2$s</string>
+    <string name="game_step_stuck_fmt">出错的环节：%1$s\n\n%2$s</string>
     <string name="game_report_hint">\n\n详细记录已写进运行日志（主界面 → 运行日志）。</string>
     <string name="game_cannot_start">无法启动</string>
-    <string name="game_pkg_missing_fmt">找不到要启动的游戏包\n（%1$s）</string>
+    <string name="game_pkg_missing_fmt">找不到要启动的游戏包 —— 它可能已经被卸载或删掉了。</string>
     <string name="step_prepare">准备</string>
     <string name="step_unknown">未知</string>
     <!--
@@ -1203,16 +1210,22 @@
       ★ `Injector.LaunchError.step` / 它带的 msg **就是启动失败弹窗正文** ⇒ 给用户看的。
       ⚠️ **报告里的键不是这些**（那些是 ASCII：`prewarm` / `dexInject` / …，与语言无关）。
     -->
-    <string name="step_prewarm">预热</string>
-    <string name="step_dex">dex 注入</string>
-    <string name="step_native">native 库</string>
-    <string name="step_native_flag">native 标志</string>
-    <string name="step_assets">资产挂载</string>
+    <string name="step_prewarm">检查游戏包</string>
+    <string name="step_dex">加载游戏代码</string>
+    <string name="step_native">加载图形库</string>
+    <string name="step_native_flag">初始化图形库</string>
+    <string name="step_assets">读取游戏资源</string>
     <string name="step_start">启动游戏</string>
     <string name="launch_err_bad_package">游戏包不存在或不可读</string>
     <string name="launch_err_no_activity_fmt">无法从游戏包中解析出 %1$s\n该文件可能不是 Mindustry 系 APK，或已损坏。</string>
     <string name="launch_err_no_abi_fmt">APK 里没有适配本机的 native 库（设备 %1$s）</string>
     <string name="launch_err_no_native_loaded">没有任何 native 库被加载</string>
+    <string name="launch_err_dex">游戏代码加载不了 —— 这个包可能不是原版包，或者已经损坏。</string>
+    <string name="launch_err_native">图形库加载不了 —— 这个包可能和本机不兼容。</string>
+    <string name="launch_err_native_flag">图形库的初始化没走完。</string>
+    <string name="launch_err_assets">游戏的资源读不出来 —— 这个包可能不完整。</string>
+    <string name="launch_err_start">游戏入口拉不起来。</string>
+    <string name="launch_err_unknown">启动过程中出了点意外（具体见运行日志）。</string>
 
     <!-- ══ F3 全局设置页（按 Android 语义：这里只放"所有槽共用"的项） ══════ -->
     <string name="act_settings_title">设置</string>
@@ -1252,8 +1265,8 @@
     <string name="set_storage_title">存储占用</string>
     <string name="set_storage_sub">备份省了多少、各类数据各占多少</string>
     <string name="storage_loading">正在统计…</string>
-    <string name="storage_failed">统计失败：%1$s</string>
-    <string name="storage_total_fmt">启动器数据共占 %1$s</string>
+    <string name="storage_failed">统计失败 —— 返回上一页再进一次试试。</string>
+    <string name="storage_total_fmt">这些数据合计占 %1$s</string>
     <string name="storage_sec_app">启动器自身</string>
     <string name="storage_app_import_fmt">导入的游戏包：%1$d 个 · %2$s</string>
     <string name="storage_app_natives_fmt">从游戏包里解出的运行库：%1$s</string>
@@ -1268,8 +1281,8 @@
     <string name="storage_backup_none">还没有备份。</string>
     <string name="storage_backup_fmt">%1$d 份备份 · 占 %2$s · 不共用内容的话要 %3$s（省了 %4$s）</string>
     <string name="storage_pct_fmt">%1$d%%</string>
-    <string name="storage_backup_legacy_fmt">其中 %1$d 份还是旧格式 · %2$s</string>
-    <string name="storage_backup_orphan_fmt">另有 %1$s 现在没有备份在用，下次自动清理时收回</string>
+    <string name="storage_backup_legacy_fmt">其中 %1$d 份还是旧格式（占 %2$s）</string>
+    <string name="storage_backup_orphan_fmt">另有 %1$s 暂时没有备份在用，下次自动清理会收回去</string>
     <string name="storage_sec_trash">中转站</string>
     <string name="storage_trash_line_fmt">%1$s：%2$d 项 · %3$s</string>
     <string name="storage_trash_none">（空的）</string>
@@ -1277,14 +1290,14 @@
     <string name="storage_clean_fmt">%1$d 处 · %2$s（在设置里「立即清理一次」可清）</string>
 
     <string name="trash_title">中转站</string>
-    <string name="trash_sub">删掉的地图和槽、被替换的模组和存档先挪到这里，可以再放回去</string>
+    <string name="trash_sub">删除或替换掉的旧文件先挪到这里 · 可以再放回去</string>
     <string name="trash_head_fmt">共 %1$d 份 · %2$s</string>
     <string name="trash_empty">还没有东西挪进来。\n删地图、删槽，或者替换模组和存档时，旧的那份会挪到这里。</string>
     <string name="trash_scanning">正在清点…</string>
     <string name="trash_scan_failed">中转站没清点出来。返回上一页再进一次试试。</string>
     <string name="trash_empty_all">清空中转站</string>
     <string name="trash_empty_all_sub">把这里的东西全部彻底删掉</string>
-    <string name="trash_empty_confirm_title">全部彻底删掉？</string>
+    <string name="trash_empty_confirm_title">全部永久删除？</string>
     <string name="trash_empty_confirm_fmt">把里面 %1$d 份（%2$s）全部彻底删掉？\n\n删掉就找不回来了。</string>
     <string name="trash_emptied_fmt">已清空，释放了 %1$s</string>
     <string name="trash_empty_fail">有东西没删掉，稍后再试</string>
@@ -1316,7 +1329,7 @@
     <string name="trash_slot_taken_fmt">已经有一个叫「%1$s」的槽了。\n\n给这个换个名字，两个都能留着。</string>
     <string name="trash_slot_bad_name">这个名字不能用</string>
 
-    <string name="trash_delete_one">彻底删除</string>
+    <string name="trash_delete_one">永久删除</string>
     <string name="trash_delete_one_confirm_fmt">把「%1$s」彻底删掉？\n\n删掉就找不回来了。</string>
     <string name="trash_deleted_fmt">已彻底删掉「%1$s」</string>
     <string name="trash_delete_fail">删不掉，稍后再试</string>
@@ -1368,7 +1381,7 @@
 
     <string name="set_logs_title">日志保留份数</string>
     <string name="set_logs_sub_fmt">崩溃报告保留 %1$d 份，超出丢最旧</string>
-    <string name="set_logs_dialog_title">日志保留份数（1 - 999）</string>
+    <string name="set_logs_dialog_title">日志保留份数（1 ~ 999）</string>
     <string name="set_logs_hint">20</string>
     <string name="set_logs_bad">只能填 1 ~ 999 的整数</string>
 
@@ -1480,6 +1493,7 @@
         它们出现在导出给别人看的文本里，不随界面语言变（见 CrashScrub 类注释）。
     -->
     <string name="log_export_raw">导出完整日志（原样）</string>
+    <string name="log_export_write_failed">文件写不进去</string>
     <string name="log_export_scrub">导出脱敏版（去掉隐私内容，分享用）</string>
     <string name="log_export_scrub_ok_fmt">已导出 %1$s（隐去 %2$d 处）</string>
     <string name="log_export_absent">（缺失）</string>
@@ -1515,7 +1529,7 @@
     <string name="mods_slot_pick_title">看哪个槽的模组？</string>
 
     <string name="mods_empty_fmt">这个槽里还没有模组。\n把 .jar / .zip 放进：\n%1$s</string>
-    <string name="mods_ignored_fmt">另有 %1$d 个条目游戏不会加载（不是模组包，里面也没有说明文件）</string>
+    <string name="mods_ignored_fmt">另有 %1$d 个文件夹不会被加载（它们不是模组包）</string>
     <string name="mods_orphan_fmt">设置里还留着 %1$d 个模组的开关，但包已经不在（历史残留）</string>
     <string name="mods_broken_head">读不出说明文件的包（游戏会直接跳过）</string>
     <string name="mods_problem_head">冲突与问题</string>
@@ -1549,7 +1563,7 @@
     <string name="mods_detail_mp_fmt">联机：%1$s</string>
     <string name="mods_badge_willfail">加载会失败</string>
     <string name="mods_warn_no_mainjs_fmt">⚠ 有 %1$d 个脚本，却没有入口脚本 —— 游戏不会跑它</string>
-    <string name="mods_warn_willfail">⚠ 它写明要 Java，但包里没有安卓能用的代码 ⇒ 游戏会跳过它</string>
+    <string name="mods_warn_willfail">⚠ 它写明要 Java，但包里没有安卓能用的代码，游戏会跳过它</string>
 
     <!--
       F13 第四阶段：模组间冲突体检（用户：「话说有办法检查到如果有人会把 logicsugar 和 neon
@@ -1603,26 +1617,30 @@
     <string name="mods_warn_minmajor_fmt">⚠ 它写的最低版本是 %1$d，太老了（要 %2$d 以上）—— 游戏会跳过它</string>
     <string name="mods_warn_noversion_fmt">⚠ 它没写要求哪个游戏版本 —— 游戏会当成太老的模组跳过</string>
     <string name="mods_warn_blacklist_fmt">⚠ 它在游戏的黑名单里：%1$s</string>
-    <string name="mods_warn_dup">⚠ 和另一个包重名 ⇒ 游戏里只有一个会生效</string>
+    <string name="mods_warn_dup">⚠ 和另一个包重名，游戏里只有一个会生效</string>
     <!-- ★ 2026-10-08 机制定案后精确化（`-failed` 的正主：游戏在"上次没跑完"的下一次启动里
          把**整槽模组关掉**，并给当时开着的那些写下这条记录 —— 见 Mods.failedKey 的 Javadoc）：
          ① 还会再跳一次（launchid 在 + modcrashdisable 开）② 用户关了跳过开关 ③ 跳过已经发生过 -->
     <!-- ★ 2026-10-08 用户：「现在这个状态下次启动所有模组都会禁用，但是还是显示启用」
          —— 两句都是真的（模组现在确实开着；下次启动游戏确实会把它们关掉），
          但一个在卡片、一个在列表里，读起来就像自相矛盾 ⇒ **同一句里把两个时刻都说了**。 -->
-    <string name="mods_warn_failed">⚠ 下次启动游戏会把整槽模组关掉（现在开着的也一样）</string>
+    <string name="mods_warn_failed">⚠ 下次启动游戏时会把整槽模组关掉（现在开着的也一样）</string>
     <string name="mods_warn_failed_applied">⚠ 游戏把整槽模组标成「加载失败」并关掉了 —— 点「启用」可恢复</string>
-    <string name="mods_warn_failed_noskip">⚠ 上次启动没跑完：整槽模组被记了一笔（你已关掉跳过，下次还会加载）</string>
+    <string name="mods_warn_failed_noskip">⚠ 上次启动没跑完：整槽被标成「加载失败」（你关掉了跳过，下次还会加载）</string>
     <string name="mods_warn_blamed">⚠ 上次崩溃很可能与它有关</string>
 
     <!-- 摘要卡第二行：点名的**短**形式（长依据留给运行日志 —— 2026-10-08 用户说"感觉好乱"）
          ⚠️ 只有"分得出是哪一个"时才用它；并列（报告指向多个）走 mods_verdict_fmt 的整句 -->
-    <string name="mods_blame_one_tap_fmt">最可能的原因：%1$s（可点它忽略并再试）</string>
+    <string name="mods_blame_one_tap_fmt">最可能的原因：%1$s（点它忽略并再试）</string>
     <string name="mods_blame_one_fmt">最可能的原因：「%1$s」（依据在运行日志）</string>
 
     <!-- F23「崩了马上说一声」（2026-10-08 用户点单：有没有办法让他崩溃以后立马弹窗提示啊） -->
     <string name="crash_alert_title">游戏崩了</string>
     <string name="crash_alert_toast_fmt">游戏崩了：%1$s</string>
+    <!-- 启动器自己的报告（crash_*_launcher.txt）落在同一个目录 ⇒ 别叫它"游戏崩了" -->
+    <string name="crash_alert_title_launcher">启动器出错了</string>
+    <string name="crash_alert_toast_launcher_fmt">启动器出错了：%1$s</string>
+    <string name="crash_alert_ignore_failed">没能忽略它 —— 详情见运行日志。</string>
     <string name="crash_alert_ignore">忽略它并再试</string>
     <string name="crash_alert_ignored_fmt">已忽略「%1$s」—— 直接启动试试（这次会加载其余的模组）</string>
     <string name="crash_alert_ignore_missing">没在模组列表里找到它（可能已经删了）</string>
@@ -1667,12 +1685,12 @@
     <string name="mods_detail_setting_fmt">%1$s = %2$s</string>
     <string name="mods_detail_meta_head">说明文件原文（最多显示前 %1$d 字）</string>
     <string name="mods_detail_size_fmt">大小：%1$s · %2$s</string>
-    <string name="mods_detail_allok">✅ 这个版本能加载它</string>
+    <string name="mods_detail_allok">✅ 没有过不了的关</string>
     <string name="mods_detail_somefail_fmt">⚠ 有 %1$d 项过不了，点「技术细节」看是哪几项</string>
     <string name="mods_detail_tech">技术细节</string>
     <string name="mods_detail_path_fmt">位置：%1$s</string>
         <string name="mods_toggle_btn_on">启用它</string>
-    <string name="mods_toggle_btn_off">停用它</string>
+    <string name="mods_toggle_btn_off">关闭它</string>
     <string name="mods_toggle_ask_on_fmt">启用「%1$s」？</string>
     <string name="mods_toggle_ask_off_fmt">停用「%1$s」？</string>
     <string name="mods_detail_gate_ok_note_fmt">✅ %1$s\n　　 %2$s</string>
@@ -1697,8 +1715,8 @@
     <string name="mods_toggle_disable">关闭此模组</string>
     <string name="mods_toggle_do">就这样改</string>
     <string name="mods_toggle_done">已改动</string>
-    <string name="mods_toggle_noop">没动文件</string>
-    <string name="mods_toggle_failed">未改动</string>
+    <string name="mods_toggle_noop">本来就是这样的</string>
+    <string name="mods_toggle_failed">没改成</string>
     <string name="mods_toggle_game_off">游戏没在运行（可以安全改写）</string>
     <string name="mods_toggle_game_alive">游戏正在运行，现在改会被它覆盖，请先退出游戏</string>
     <!--
@@ -1718,6 +1736,12 @@
     <string name="mods_word_on">启用</string>
     <string name="mods_word_off">关闭</string>
     <string name="mods_toggle_ok_fmt">已把「%1$s」%2$s。</string>
+    <!-- ★ 第 150 轮：上面那条**已不再被调用**（填「启用」时是病句）——
+         但**不删**：它随正式版发出去过，用户语言包里可能还写着它（死键留着，判据见 REF §84.8）。 -->
+    <string name="mods_toggle_ok_off_fmt">已关闭「%1$s」。</string>
+    <string name="mods_toggle_ok_on_fmt">已启用「%1$s」。</string>
+    <!-- ★ 第 150 轮：上面那条**已不再被调用**（填「启用」时是病句）——
+         但**不删**：它随正式版发出去过，用户语言包里可能还写着它（死键留着，判据见 REF §84.8）。 -->
     <string name="mods_batch_ok_fmt">已把 %1$d 个模组的开关改好。</string>
     <string name="mods_toggle_backup_note">\n\n设置已备份，改完也核对过。</string>
     <string name="mods_toggle_verified_note">\n\n改完读回核对过。</string>
@@ -1740,7 +1764,7 @@
     <string name="mods_import_exists_title">已存在同名模组</string>
     <string name="mods_import_exists_msg_fmt">这个槽里已经有「%1$s」了。\n\n替换会把旧的挪进中转站，不直接删掉。要替换吗？</string>
     <string name="mods_import_replace">替换</string>
-    <string name="mods_import_compat_ok_fmt">目标游戏 %1$s ≥ 它要求的 %2$s —— 能加载</string>
+    <string name="mods_import_compat_ok_fmt">目标游戏 %1$s 不低于它要求的 %2$s —— 能加载</string>
     <string name="mods_import_compat_bad_fmt">⚠ 游戏版本 %1$s 低于它要求的 %2$s —— 装了也不会加载</string>
     <string name="mods_import_nogame">还没有版本指向这个槽。先给某个版本分配它，否则装了也不会加载</string>
     <string name="mods_copy_pick_title">复制到哪个槽？</string>
@@ -1748,6 +1772,8 @@
     <string name="mods_copy_confirm_title_fmt">复制到「%1$s」？</string>
     <string name="mods_copy_confirm_msg_fmt">把「%1$s」的模组整套复制到「%2$s」：\n共 %3$d 项 · %4$s\n\n其中 %5$d 项目标槽已有，会跳过。\n启停状态不跟着复制。</string>
     <string name="mods_copy_progress_fmt">正在把 %1$d 项复制到「%2$s」…</string>
+    <string name="mods_copy_progress_title">正在复制模组</string>
+    <string name="mods_copy_result_title">复制结果</string>
     <string name="mods_copy_done">复制完成</string>
     <string name="mods_copy_title_ok">开始复制</string>
     <string name="mods_copy_blocked">游戏正在运行，现在复制会被它干扰。请先退出游戏。</string>
@@ -1816,7 +1842,11 @@
     <string name="lang_dialog_title">翻译文件</string>
     <string name="lang_dialog_none_msg">还没有导入翻译文件。可以选一份 .properties 装上，也可以先导出模板自己翻译。</string>
     <string name="lang_row_title">翻译文件</string>
-    <string name="lang_row_none">用内置翻译（跟随系统语言）</string>
+    <string name="lang_row_none">用启动器自带的文字（跟随上面「语言」那一行）</string>
+    <!-- 语言包三路失败的**人话**（原文只进日志） -->
+    <string name="lang_pack_read_failed">这份文件读不出来 —— 换一份再试</string>
+    <string name="lang_pack_install_failed">没能装上这份翻译文件</string>
+    <string name="lang_pack_remove_failed">没能移除翻译文件</string>
     <string name="lang_chooser_title">选择 .properties 文件</string>
     <string name="lang_pack_pick">选择文件</string>
     <string name="lang_pack_ok">装上</string>

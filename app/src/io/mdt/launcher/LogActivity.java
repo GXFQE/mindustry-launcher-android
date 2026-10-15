@@ -730,7 +730,11 @@ public class LogActivity extends BaseActivity {
                     n = Exporter.writeText(LogActivity.this, uri, text);
                 } catch (Throwable t) {
                     // ⚠️ 异常**必须说出来**：目标不可写、用户选的盘被拔了 —— 静默成功最坏
-                    err = (t.getMessage() == null ? t.toString() : t.getMessage());
+                    //   ★ 2026-10-15：但**不把异常原文当那句正文**（原来是 `t.getMessage()`，
+                    //     用户看到 `ENOSPC (No space left on device)`）⇒ 认识的 errno 才翻。
+                    android.util.Log.w("MDTLauncher", "log export failed", t);
+                    err = Util.ioReason(LogActivity.this, t,
+                            Trans.get(LogActivity.this, R.string.log_export_write_failed));
                 }
                 final String ferr = err;
                 final long fn = n;

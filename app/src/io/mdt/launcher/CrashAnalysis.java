@@ -139,7 +139,7 @@ final class CrashAnalysis {
         /** 空文件 / 全是空白 ⇒ 没什么可分析的 */
         boolean empty;
         String emptyReason = "";
-        /** 首行是启动器自己的报告头（`MDT 安卓启动器 —— 崩溃报告`） */
+        /** 首行是启动器自己的报告头（`MDT 启动器 —— 崩溃报告`；判据只看首行**以 `MDT` 开头**，不看中文） */
         boolean launcherOwn;
 
         String firstLine = "";

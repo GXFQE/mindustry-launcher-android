@@ -940,8 +940,11 @@ public class MainActivity extends BaseActivity {
                 try {
                     entry = Importer.importApk(MainActivity.this, uri, name);
                 } catch (Exception e) {
-                    err = e.getMessage();
-                    if (err == null || err.isEmpty()) err = String.valueOf(e);
+                    // ★ 2026-10-15：原来是 `getMessage()`，消息为空时退回 `String.valueOf(e)`
+                    //   ⇒ 弹窗正文会出现 `java.io.IOException: …` 甚至只有类名。
+                    //   `Importer` 抛的都是资源文案 ⇒ `ioReason` 原样透传；系统 errno 才翻。
+                    err = Util.ioReason(MainActivity.this, e,
+                            Trans.get(MainActivity.this, R.string.import_failed));
                     android.util.Log.w("MDTLauncher", "import failed: " + err, e);
                 }
                 final String ferr = err;

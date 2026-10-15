@@ -15,24 +15,31 @@
     <string name="plugin_none">No plugin installed yet.</string>
     <string name="plugin_import">Install a plugin APK</string>
     <string name="plugin_chooser_title">Pick a plugin APK</string>
-    <string name="plugin_state_active_fmt">%1$s · active v%2$s</string>
-    <string name="plugin_state_pending_fmt">%1$s · takes effect after a restart (v%2$s)</string>
-    <string name="plugin_state_off_fmt">%1$s · off (last active v%2$s)</string>
+    <string name="plugin_state_active_fmt">%1$s · active (the copy installed %2$s)</string>
+    <string name="plugin_state_pending_fmt">%1$s · takes effect after a restart (the copy installed %2$s)</string>
+    <string name="plugin_state_off_fmt">%1$s · off (last active was the copy from %2$s)</string>
     <string name="plugin_state_off_never">%1$s · off</string>
     <string name="plugin_action_open">Open it</string>
     <string name="plugin_action_enable">Turn on (after a restart)</string>
     <string name="plugin_action_disable">Turn off (after a restart)</string>
-    <string name="plugin_action_uninstall">Delete it</string>
-    <string name="plugin_installed_fmt">Installed %1$s v%2$s - takes effect after a restart.</string>
+    <string name="plugin_action_uninstall">Delete it (moves to the bin)</string>
+    <!-- %2$s is the INSTALL TIME (Plugins.versionLabel turns the epoch-seconds token into MM-dd HH:mm).
+         The raw token used to be shown as a version number ("v1792090201"). -->
+    <string name="plugin_installed_fmt">Installed %1$s - this copy is from %2$s. Takes effect after a restart.</string>
     <string name="plugin_install_failed_fmt">Could not install it: %1$s</string>
-    <string name="plugin_uninstalled_fmt">Deleted %1$s</string>
-    <string name="plugin_restart">Restart now</string>
-    <string name="plugin_restart_hint">Changing a plugin only takes effect after the app is restarted.</string>
+    <!-- Plain-word reasons for a failed install (the raw ASCII FAILED code stays in the log). -->
+    <string name="plugin_install_pick_lost">that file cannot be found any more — pick it again</string>
+    <string name="plugin_install_no_dir">the plugin folder could not be created (storage or permission problem)</string>
+    <string name="plugin_install_stuck_old">the old copy could not be removed — restart the app and try again</string>
+    <string name="plugin_install_unknown">this package could not be read — try another file</string>
+    <string name="plugin_uninstalled_fmt">%1$s moved to the bin</string>
+    <string name="plugin_restart">Restart the app now</string>
+    <string name="plugin_restart_hint">Changing a plugin only takes effect after you exit and reopen the app.</string>
     <string name="plugin_restart_failed">This device would not let the app restart itself. Please close it and open it again by hand.</string>
     <string name="plugin_back">Back</string>
     <string name="plugin_skip_title">The last launch with plugins did not finish</string>
-    <string name="plugin_skip_rollback_fmt">%1$s: v%2$s did not work, rolled back to v%3$s</string>
-    <string name="plugin_skip_disable_fmt">%1$s: v%2$s did not work, turned off</string>
+    <string name="plugin_skip_rollback_fmt">%1$s: the copy from %2$s did not work - switched back to the copy from %3$s</string>
+    <string name="plugin_skip_disable_fmt">%1$s: the copy from %2$s did not work - turned off</string>
     <string name="plugin_skip_restore">Turn the plugins back on</string>
     <string name="plugin_loaded_fmt">Loaded %1$s (api %2$d)</string>
     <string name="plugin_fallback_title">The plugin did not load - showing the built-in view instead.</string>
@@ -61,18 +68,18 @@
     <string name="plugin_info_entry">Entry class: %1$s</string>
     <string name="plugin_info_source">Source: %1$s</string>
     <string name="plugin_info_level">Handling: %1$s</string>
-    <string name="plugin_info_filever">File version: %1$s</string>
+    <string name="plugin_info_filever">Installed at: %1$s</string>
     <string name="plugin_level_l1">After a failure: keep it, try again next launch</string>
     <string name="plugin_level_l2">After a failure: switch back to the last version that worked</string>
     <string name="plugin_level_l3">After a failure: turn it off and quarantine this version</string>
     <string name="plugin_info_fmt">%1$s\nSource: %2$s\nHandling: %3$s</string>
     <string name="plugin_action_level_fmt">Now %1$s - change to %2$s</string>
-    <string name="plugin_action_restore_fmt">Put the quarantined v%1$s back</string>
-    <string name="plugin_row_quarantined_fmt">%1$s · quarantined v%2$s</string>
-    <string name="plugin_skip_retry_fmt">%1$s: v%2$s did not work - kept, will be tried again</string>
-    <string name="plugin_skip_rollback_q_fmt">%1$s: v%2$s did not work - rolled back to v%3$s and quarantined v%2$s</string>
-    <string name="plugin_skip_quarantine_fmt">%1$s: v%2$s did not work - turned off and quarantined</string>
-    <string name="plugin_restored_fmt">Put v%1$s back. It takes effect after a restart.</string>
+    <string name="plugin_action_restore_fmt">Put the quarantined copy from %1$s back</string>
+    <string name="plugin_row_quarantined_fmt">%1$s · quarantined (the copy installed %2$s)</string>
+    <string name="plugin_skip_retry_fmt">%1$s: the copy from %2$s did not work - kept, will be tried again</string>
+    <string name="plugin_skip_rollback_q_fmt">%1$s: the copy from %2$s did not work - switched back to the copy from %3$s and quarantined the bad one</string>
+    <string name="plugin_skip_quarantine_fmt">%1$s: the copy from %2$s did not work - turned off and quarantined</string>
+    <string name="plugin_restored_fmt">Put the copy from %1$s back. It takes effect after a restart.</string>
     <string name="plugin_restore_failed">Could not put it back.</string>
     <string name="plugin_level_set_fmt">Handling for %1$s is now: %2$s (from the next launch).</string>
 

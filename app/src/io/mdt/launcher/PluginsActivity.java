@@ -95,18 +95,22 @@ public class PluginsActivity extends BaseActivity {
                 final String name = Plugins.displayNameOf(this, id);
                 String label;
                 if ("pending".equals(st[0])) {
-                    label = Trans.get(this, R.string.plugin_state_pending_fmt, name, st[1]);
+                    label = Trans.get(this, R.string.plugin_state_pending_fmt, name,
+                            Plugins.versionLabel(st[1]));
                 } else if ("active".equals(st[0])) {
-                    label = Trans.get(this, R.string.plugin_state_active_fmt, name, st[1]);
+                    label = Trans.get(this, R.string.plugin_state_active_fmt, name,
+                            Plugins.versionLabel(st[1]));
                 } else {
                     String k = Plugins.stateGet(known, id);
                     label = k == null ? Trans.get(this, R.string.plugin_state_off_never, name)
-                                      : Trans.get(this, R.string.plugin_state_off_fmt, name, k);
+                                      : Trans.get(this, R.string.plugin_state_off_fmt, name,
+                                              Plugins.versionLabel(k));
                 }
                 // ★ 有隔离件时行里要点明（否则用户看着"已停用"、不知道还能放回来）
                 String[] qv = Plugins.quarantinedOf(this, id);
                 if (qv.length > 0 && "off".equals(st[0])) {
-                    label = Trans.get(this, R.string.plugin_row_quarantined_fmt, name, qv[qv.length - 1]);
+                    label = Trans.get(this, R.string.plugin_row_quarantined_fmt, name,
+                            Plugins.versionLabel(qv[qv.length - 1]));
                 }
                 // 第二行小字：来源 + 当前处置等级（弹窗里放不下它们 —— 见 rowDialog 的注释）
                 final String[] vs = Plugins.versionsOf(this, id);
@@ -151,13 +155,16 @@ public class PluginsActivity extends BaseActivity {
             // ★ 横幅里说的名字与列表行同一个来源（自述名字优先）—— 别让同一件事有两个名字
             String name = Plugins.displayNameOf(this, s[0]);
             if ("retry".equals(s[3])) {
-                addText(Trans.get(this, R.string.plugin_skip_retry_fmt, name, s[1]), 14f);
+                addText(Trans.get(this, R.string.plugin_skip_retry_fmt, name,
+                        Plugins.versionLabel(s[1])), 14f);
             } else if ("rollback".equals(s[3])) {
                 addText(Trans.get(this, q ? R.string.plugin_skip_rollback_q_fmt
-                                          : R.string.plugin_skip_rollback_fmt, name, s[1], s[2]), 14f);
+                                          : R.string.plugin_skip_rollback_fmt, name,
+                        Plugins.versionLabel(s[1]), Plugins.versionLabel(s[2])), 14f);
             } else {
                 addText(Trans.get(this, q ? R.string.plugin_skip_quarantine_fmt
-                                          : R.string.plugin_skip_disable_fmt, name, s[1]), 14f);
+                                          : R.string.plugin_skip_disable_fmt, name,
+                        Plugins.versionLabel(s[1])), 14f);
             }
         }
         if (!restorable) return;   // 那一版的文件不在了 ⇒ 这个按钮按下去什么都不会发生，那就别给
@@ -220,7 +227,8 @@ public class PluginsActivity extends BaseActivity {
             actions.add("uninstall");
         }
         if (qv != null) {
-            items.add(Trans.get(this, R.string.plugin_action_restore_fmt, qv));
+            items.add(Trans.get(this, R.string.plugin_action_restore_fmt,
+                    Plugins.versionLabel(qv)));
             actions.add("restore");
         }
         items.add(Trans.get(this, R.string.plugin_action_level_fmt,
@@ -241,8 +249,10 @@ public class PluginsActivity extends BaseActivity {
                             open(id, act);
                         } else if ("enable".equals(a)) {
                             Plugins.enable(PluginsActivity.this, id, newest);
+                            // ★ 名字走 displayNameOf（原来传的是内部 id），时间走 versionLabel
                             toastRestart(Trans.get(PluginsActivity.this, R.string.plugin_installed_fmt,
-                                    id, newest));
+                                    Plugins.displayNameOf(PluginsActivity.this, id),
+                                    Plugins.versionLabel(newest)));
                             rebuild();
                         } else if ("disable".equals(a)) {
                             Plugins.disable(PluginsActivity.this, id);
@@ -251,20 +261,26 @@ public class PluginsActivity extends BaseActivity {
                             // ★ 搬不动时 uninstall 返回 false、插件**还在**（数据没丢）⇒ 界面必须说一句，
                     //   否则用户以为已经删掉了（第 148 轮 C1-b）
                     boolean uninstalled = Plugins.uninstall(PluginsActivity.this, id);
-                    if (!uninstalled) {
-                        Toast.makeText(PluginsActivity.this,
-                                Trans.get(PluginsActivity.this, R.string.plugin_uninstall_failed),
-                                Toast.LENGTH_LONG).show();
-                    }
-                            Toast.makeText(PluginsActivity.this,
-                                    Trans.get(PluginsActivity.this, R.string.plugin_uninstalled_fmt, id),
-                                    Toast.LENGTH_SHORT).show();
+                            // 🔴 2026-10-15：成功那句原来**无条件**弹 —— 失败时会先说
+                            //   「卸载没成功…什么都没删」紧接着又说「已删除 X」（真机同屏两条 Toast 打架）。
+                            //   名字也走 displayNameOf（别把内部 id 端给用户）。
+                            if (uninstalled) {
+                                Toast.makeText(PluginsActivity.this,
+                                        Trans.get(PluginsActivity.this, R.string.plugin_uninstalled_fmt,
+                                                Plugins.displayNameOf(PluginsActivity.this, id)),
+                                        Toast.LENGTH_SHORT).show();
+                            } else {
+                                Toast.makeText(PluginsActivity.this,
+                                        Trans.get(PluginsActivity.this, R.string.plugin_uninstall_failed),
+                                        Toast.LENGTH_LONG).show();
+                            }
                             rebuild();
                         } else if ("restore".equals(a)) {
                             boolean ok = Plugins.restoreQuarantined(PluginsActivity.this, id, qv);
                             Toast.makeText(PluginsActivity.this,
                                     Trans.get(PluginsActivity.this, ok ? R.string.plugin_restored_fmt
-                                                                       : R.string.plugin_restore_failed, qv),
+                                                                       : R.string.plugin_restore_failed,
+                                            Plugins.versionLabel(qv)),
                                     Toast.LENGTH_LONG).show();
                             rebuild();
                         } else if ("level".equals(a)) {
@@ -314,7 +330,7 @@ public class PluginsActivity extends BaseActivity {
                 entry,
                 Trans.get(this, trustLongRes(trust)),
                 Trans.get(this, levelRes(lv)),
-                fileVer,
+                Plugins.versionLabel(fileVer),
                 // ★ 第 148 轮 C2：「它要碰什么」**永远显示一行**（哪怕是"没有声明"）——
                 //   安全相关的字段留白 = 用户分不清"没声明"和"我们没看见"。声明是**告知**，不是沙箱。
                 accessText(apk),
@@ -454,18 +470,24 @@ public class PluginsActivity extends BaseActivity {
                         in.close();
                     }
                     String id = baseName(tmp, uri);
-                    // ★ 版本号用"装进来的时刻"：用户手上没有版本号这个概念，
-                    //   而落点要唯一名（置只读的副本不能再被覆盖，见 ref/29 第 3 条）
+                    // ★ 这一版的身份 = "装进来的那一刻"（epoch 秒）：它是**落点目录名 + 状态键**，
+                    //   必须唯一（置只读的副本不能再被覆盖，见 ref/29 第 3 条）。
+                    //   ⚠️ 但它**不是版本号**、也不该那样显示（第 150 轮：`Plugins.versionLabel` 把它
+                    //   转成 `MM-dd HH:mm` 再上屏；自述里的版本号另有其字段）。
                     String ver = String.valueOf(System.currentTimeMillis() / 1000L);
                     String r = Plugins.install(PluginsActivity.this, tmp, id, ver, false);
                     msg = r.startsWith("FAILED")
-                            ? Trans.get(PluginsActivity.this, R.string.plugin_install_failed_fmt, r)
-                            : Trans.get(PluginsActivity.this, R.string.plugin_installed_fmt, id, ver);
+                            ? Trans.get(PluginsActivity.this, R.string.plugin_install_failed_fmt,
+                                    installFailReason(r))
+                            : Trans.get(PluginsActivity.this, R.string.plugin_installed_fmt,
+                                    id, Plugins.versionLabel(ver));
                 } catch (final Throwable t) {
                     // 按纪律：第一层只说"这件事没成"，原始异常进日志（§五"系统异常不许当弹窗正文"）
                     android.util.Log.w(LauncherApp.TAG, "plugin import failed", t);
+                    // 🔴 2026-10-15：原来这里传的是 `t.getClass().getSimpleName()`
+                    //   ⇒ 用户看到「没装成：FileNotFoundException」（那句注释说的和做的相反）。
                     msg = Trans.get(PluginsActivity.this, R.string.plugin_install_failed_fmt,
-                            t.getClass().getSimpleName());
+                            Trans.get(PluginsActivity.this, R.string.plugin_install_unknown));
                 } finally {
                     tmp.delete();
                 }
@@ -488,6 +510,21 @@ public class PluginsActivity extends BaseActivity {
         if (slash >= 0) n = n.substring(slash + 1);
         if (n.toLowerCase(java.util.Locale.ROOT).endsWith(".apk")) n = n.substring(0, n.length() - 4);
         return n.isEmpty() ? "plugin" : n;
+    }
+
+    /**
+     * `Plugins.install` 的失败返回值是**内部英文码 + 绝对路径**（`FAILED mkdirs /data/…`）——
+     * 那是给日志看的，**不进第一层**（2026-10-15 起）。这里只按**类别**给一句人话；
+     * 认不出的类别一律「换一份再试」，绝不把那串原文端给用户。
+     */
+    private String installFailReason(String r) {
+        String s = r == null ? "" : r;
+        if (s.contains("missing src") || s.contains("bad id")) {
+            return Trans.get(this, R.string.plugin_install_pick_lost);
+        }
+        if (s.contains("mkdirs")) return Trans.get(this, R.string.plugin_install_no_dir);
+        if (s.contains("cannot replace")) return Trans.get(this, R.string.plugin_install_stuck_old);
+        return Trans.get(this, R.string.plugin_install_unknown);
     }
 
     /** 「立即重启」：挂闹钟 + 自杀；**挂不上就如实说**（不许假装重启成功）。 */

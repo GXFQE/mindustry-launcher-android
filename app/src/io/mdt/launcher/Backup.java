@@ -144,8 +144,18 @@ public final class Backup {
         /** 本次真正新增到对象池的字节数（create 时填；列出时无意义） */
         public long storedNew;
 
+        /**
+         * 界面上那一行：**人读的时间** + 备注。
+         *
+         * <p>🔴 2026-10-15（第 150 轮）：原来直接用目录名那个戳（`20261004-153012   备注`）——
+         * 同一屏里中转站/存档列表写的是 `10-04 15:30`，两套格式并存，用户得自己做翻译。
+         * ⚠️ **目录名不能动**（`stamp()`，`yyyyMMdd-HHmmss`，字典序 = 时间序、跨卷移动全靠它），
+         * 所以这里只换**显示**；秒保留（一分钟内可能有好几份自动备份，只到分就分不出谁是谁）。
+         */
         public String title() {
-            return stamp(created) + (label.isEmpty() ? "" : "   " + label);
+            String t = Trash.timeTextSec(created);
+            if (t.isEmpty()) t = stamp(created);      // 时间读不出来时退回原名（别显示空白行）
+            return label.isEmpty() ? t : t + " · " + label;
         }
 
         // ⚠️ 这里原来还有一个 `subtitle()`（`N 个文件 · 体积`）—— 2026-10-05 核实**全库无调用**
@@ -392,8 +402,9 @@ public final class Backup {
                     continue;
                 }
                 if (f.length() != e.size) {
+                    // ★ 第 150 轮：原来印两个无标签裸数字（「大小 12≠13」）⇒ 人读体积 + 谁是谁
                     bad.add(Trans.get(ctx, R.string.backup_restore_bad_size_fmt,
-                            e.rel, f.length(), e.size));
+                            e.rel, Util.formatSize(f.length()), Util.formatSize(e.size)));
                     continue;
                 }
                 if (!Util.md5(f).equals(e.hash)) {

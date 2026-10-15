@@ -558,6 +558,31 @@ final class Plugins {
     }
 
     /**
+     * 版本**令牌** → 人读标签：令牌就是"装进来那一刻"的 epoch 秒（见 `PluginsActivity` 装的那一处），
+     * 所以这里直接把它当时间格式化。
+     *
+     * <p>🔴 2026-10-15（第 150 轮）：原来这个令牌**原样上屏**（`v1792090201`），6 处都在用 ——
+     * 用户上一轮问的「什么东西是退回上一版」根因就是它（两个十位数比大小，谁也看不出谁旧）。
+     * 令牌本身**不能换**（它同时是落点目录名与状态键）⇒ 只把**显示**换掉。
+     *
+     * <p>⚠️ 认不出（不是 2001~2100 之间的秒）就**原样返回** —— 手写的 / 别处来的令牌不该被吃掉。
+     */
+    static String versionLabel(String ver) {
+        if (ver == null) return "";
+        String s = ver.trim();
+        if (s.isEmpty()) return "";
+        try {
+            long sec = Long.parseLong(s);
+            if (sec > 1000000000L && sec < 4102444800L) {
+                return new java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.US)
+                        .format(new java.util.Date(sec * 1000L));
+            }
+        } catch (Throwable ignored) {
+        }
+        return s;
+    }
+
+    /**
      * 把「标签 + 值」里**值为空的整条去掉**（纯函数）。
      * ★ 规矩：空字段不许印成 `null` / 空行 —— 用户看到「作者：null」只会以为坏了；
      *   信息弹窗里少一行，比多一行垃圾强（与 §86.6「pass=false 时原因必须非空」同族）。

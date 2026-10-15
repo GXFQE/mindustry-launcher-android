@@ -41,7 +41,8 @@ public final class MschText {
             case Msch.E_NULL_FILE:
                 return Trans.get(c, R.string.msch_reason_no_file);
             case Msch.E_FILE_TOO_BIG:
-                return Trans.get(c, R.string.msch_reason_file_too_big_fmt, n1);
+                // ★ 第 150 轮：原来是裸字节数（「超过 8388608 字节」）⇒ 走同一个体积格式化
+                return Trans.get(c, R.string.msch_reason_file_too_big_fmt, Util.formatSize(n1));
             case Msch.E_HEADER:
                 return Trans.get(c, R.string.msch_reason_not_blueprint);
             case Msch.E_VERSION:
@@ -91,7 +92,7 @@ public final class MschText {
                 : Trans.get(c, R.string.bp_tech_dict_names_fmt, sb.toString());
     }
 
-    /** 文件里写旧名、被我们换算过的方块（最多 6 条）。没有 ⇒ 空串 */
+    /** 文件里写旧名、被我们换算过的方块（最多 6 条，其余报个数）。没有 ⇒ 空串 */
     public static String techRemapped(Context c, java.util.List<String> pairs) {
         if (pairs == null || pairs.isEmpty()) return "";
         final int cap = 6;
@@ -100,7 +101,11 @@ public final class MschText {
             if (sb.length() > 0) sb.append(", ");
             sb.append(pairs.get(i));
         }
-        return Trans.get(c, R.string.bp_tech_renamed_fmt, sb.toString());
+        // ★ 第 150 轮：超过 6 条时**要说还有几个** —— 同族的字典那一行（techDictNames）早就有这句，
+        //   这一族原来是静默截断（用户看到 6 条，不知道后面还有没有）。
+        return pairs.size() > cap
+                ? Trans.get(c, R.string.bp_tech_renamed_more_fmt, sb.toString(), pairs.size() - cap)
+                : Trans.get(c, R.string.bp_tech_renamed_fmt, sb.toString());
     }
 
     /** 带朝向的方块格数（0 ⇒ 空串：一行"0 格"没有信息量） */

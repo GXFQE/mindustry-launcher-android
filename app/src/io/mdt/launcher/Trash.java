@@ -823,14 +823,26 @@ public final class Trash {
      * 口径与 {@link MsavMeta#savedText} 一致 —— 中转站列表和存档列表要能直接对比着看。
      */
     public static String timeText(long ms) {
+        return timeText(ms, false);
+    }
+
+    /**
+     * 与 {@link #timeText} 同一个口径，只多带**秒** —— 给"一分钟内可能有好几份"的地方用
+     * （备份快照：自动备份与手动备份可能落在同一分钟里，只到分就分不出谁是谁）。
+     */
+    public static String timeTextSec(long ms) {
+        return timeText(ms, true);
+    }
+
+    private static String timeText(long ms, boolean withSec) {
         if (ms <= 0) return "";
         try {
             java.util.Calendar c = java.util.Calendar.getInstance();
             c.setTimeInMillis(ms);
             int y = c.get(java.util.Calendar.YEAR);
             int nowYear = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR);
-            java.text.SimpleDateFormat f = new java.text.SimpleDateFormat(
-                    y == nowYear ? "MM-dd HH:mm" : "yyyy-MM-dd HH:mm", java.util.Locale.US);
+            String pat = (y == nowYear ? "MM-dd HH:mm" : "yyyy-MM-dd HH:mm") + (withSec ? ":ss" : "");
+            java.text.SimpleDateFormat f = new java.text.SimpleDateFormat(pat, java.util.Locale.US);
             return f.format(new java.util.Date(ms));
         } catch (Throwable t) {
             return "";

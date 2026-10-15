@@ -156,7 +156,7 @@ public final class SelfTest {
         List<String> L = new ArrayList<>();
         int[] stat = {0, 0};   // {pass, fail}
         long t0 = System.currentTimeMillis();
-        L.add("MDT M3 自检   " + new java.util.Date().toString());
+        L.add("MDT 自检   " + new java.util.Date().toString());
         L.add("数据根 = " + path(Data.dataRoot(ctx)));
         L.add("HUB 外部 = " + path(Data.hubDir(ctx)));
         L.add("当前槽 = " + Data.currentSlot(ctx));
@@ -326,7 +326,7 @@ public final class SelfTest {
         }
 
         List<String> out = new ArrayList<>();
-        out.add(L.get(0));            // 「MDT M3 自检   <日期>」
+        out.add(L.get(0));            // 「MDT 自检   <日期>」
         out.add("");
         out.add(summary);
         if (fails.isEmpty()) {
@@ -3153,6 +3153,20 @@ public final class SelfTest {
                         && !Trans.get(ctx, R.string.plugin_info_selfname).isEmpty(),
                 "新加的两条文案中英都在（门禁 RES-01 只管键对齐，这里再实取一次）");
 
+        // ── 第 150 轮：插件那一版的身份是"装进来的时刻"（epoch 秒）—— 它**不许**当版本号上屏 ──
+        //   判据 = 纯函数 `Plugins.versionLabel`：认得时间戳 ⇒ 给人读的 `MM-dd HH:mm`；
+        //   认不出 ⇒ **原样返回**（别把别处来的令牌吃掉）。两侧都钉住，否则"恒返回原样"也能过。
+        String vl = Plugins.versionLabel("1792090201");
+        ok(stat, L, "10-15 18:50".equals(vl) || vl.matches("\\d{2}-\\d{2} \\d{2}:\\d{2}"),
+                "★插件版本的显示：epoch 秒 → 人读时间（不是 v1792090201）—— 实得「" + vl + "」");
+        ok(stat, L, !vl.contains("1792090201") && "not-a-token".equals(Plugins.versionLabel("not-a-token"))
+                        && "".equals(Plugins.versionLabel(null)) && "".equals(Plugins.versionLabel("  ")),
+                "★反方向：不是时间戳的令牌**原样返回**、null/空白 ⇒ 空串（别乱格式化成 1970）");
+        ok(stat, L, ctx.getString(R.string.plugin_state_active_fmt).contains("%2$s")
+                        && !ctx.getString(R.string.plugin_state_active_fmt).contains("v%2$s")
+                        && !ctx.getString(R.string.plugin_info_filever).contains("1792090201"),
+                "★那 6 处模板也不再自称 `v…`（占位符还在，但含义换成「装进来的时间」）");
+
         // ── 第 137 轮：三分（官方内置 / 官方外接 / 第三方）──
         L.add("  · 内置插件：清单解析 / 版本键 / 等级夹取 / 三档注入顺序（第 137 轮）");
         String sha64 = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
@@ -4261,8 +4275,9 @@ public final class SelfTest {
                 "★元断言：把 `none (vanilla)` 换成 `neon:110008` ⇒ 必须不再判成 vanilla");
 
         // ── 夹具 5：**启动器自己**的崩溃报告（同一套 `crashes/` 目录里的另一种形态）──
+        //   ★ 第 150 轮：产品名统一成「MDT 启动器」（`Crash.dump` 写的首行也跟着改了）
         String fxOwn = fx(new String[]{
-                "MDT 安卓启动器 —— 崩溃报告",
+                "MDT 启动器 —— 崩溃报告",
                 "时刻：Mon Oct 05 22:28:11 GMT+08:00 2026（1759674491000）",
                 "线程：main（id=1）",
                 "版本：0.3（vc 3，debuggable=false）",
@@ -4279,7 +4294,7 @@ public final class SelfTest {
                         CrashAnalysis.judge(r5, mods3, CrashAnalysis.DEX))));
         ok(stat, L, CrashAnalysis.judge(r5, mods3, fakeDexAll()).kind == CrashAnalysis.KIND_LAUNCHER,
                 "★元断言：哪怕给一把\"什么都能命中\"的探针，启动器的报告也不许被点名");
-        CrashAnalysis.Report r5b = CrashAnalysis.parse(fxOwn.replace("MDT 安卓启动器 —— 崩溃报告",
+        CrashAnalysis.Report r5b = CrashAnalysis.parse(fxOwn.replace("MDT 启动器 —— 崩溃报告",
                 "Mindustry has crashed. How unfortunate."));
         ok(stat, L, !r5b.launcherOwn, "★元断言：首行不是我们的报告头 ⇒ 不再判成启动器报告");
 
@@ -5855,6 +5870,17 @@ public final class SelfTest {
             ok(stat, L, !capped.contains("blk11")
                             && !capped.equals(MschText.techDictNames(ctx, many.subList(0, 8))),
                     "蓝图细节：超过 8 个名字 ⇒ 截断并换成「还有 N 个」那句");
+            // ★ 第 150 轮：**换算那一行**原来超 6 条静默截断（同族的字典那一行早就有"还有 N 个"）
+            List<String> manyPairs = new ArrayList<>();
+            for (int i = 0; i < 9; i++) manyPairs.add("old" + i + " → new" + i);
+            String remapCap = MschText.techRemapped(ctx, manyPairs);
+            ok(stat, L, remapCap.contains("还有") && remapCap.contains("3")
+                            && !remapCap.contains("new8")
+                            && !MschText.techRemapped(ctx, manyPairs.subList(0, 6)).contains("还有"),
+                    "★蓝图细节：换算行超过 6 条也要说「还有 N 个」（原来静默截断）："
+                            + remapCap.replace('\n', ' '));
+            ok(stat, L, pairs.get(0).contains(" → ") && !pairs.get(0).contains("->"),
+                    "★蓝图细节：换算用的箭头是人读的「 → 」而不是日志味的 `->`：" + pairs.get(0));
         } catch (Throwable t) {
             stat[1]++;
             L.add("❌ ㊺ 的磁盘夹具那段自己抛了异常：" + t);
@@ -5876,6 +5902,9 @@ public final class SelfTest {
         r.cacheBytes = 36L * 1024 * 1024;
         r.otherBytes = 17L * 1024 * 1024;
         r.slots.add(new Data.Slot("default", null, true, 51, 209L * 1024 * 1024));
+        // ★ 第 150 轮：各槽**并进总分**了 ⇒ 夹具必须把 slotBytes 也喂上，
+        //   否则下面那条元断言会因为它是 0 而**恒真**（尺子当场失效）。
+        r.slotBytes = 209L * 1024 * 1024;
         r.pool = new Backup.PoolStats();
         r.pool.snapshots = 20;
         r.pool.logical = 3L * 1024 * 1024 * 1024;
@@ -5891,9 +5920,9 @@ public final class SelfTest {
         ok(stat, L, txt.contains(ctx.getString(R.string.storage_total_fmt,
                         Util.formatSize(r.totalBytes()))),
                 "存储占用：第一行是总占用（与 totalBytes 同一个格式化）");
-        ok(stat, L, r.totalBytes() == r.hubBytes + r.internalBytes + r.cacheBytes,
-                "★元断言：总分的口径**只有一处**（外部 hub + 内部 app_hub + 缓存），"
-                        + "不是各段自己再加一遍");
+        ok(stat, L, r.totalBytes() == r.hubBytes + r.internalBytes + r.cacheBytes + r.slotBytes,
+                "★元断言：总分的口径**只有一处**（外部 hub + 内部 app_hub + 缓存 + **各槽**），"
+                        + "不是各段自己再加一遍（第 150 轮把各槽并了进来 —— 原来总分比某一节还小）");
         // ★★ 第 140 轮（用户报的 bug）：内部那一半必须逐项露出来
         ok(stat, L, txt.contains(ctx.getString(R.string.storage_app_import_fmt, 1,
                         Util.formatSize(r.importBytes))),
@@ -5970,7 +5999,7 @@ public final class SelfTest {
                         + Util.formatSize(real.importBytes + real.nativesBytes + real.pluginsBytes)
                         + "）");
         ok(stat, L, real.totalBytes()
-                        == real.hubBytes + real.internalBytes + real.cacheBytes,
+                        == real.hubBytes + real.internalBytes + real.cacheBytes + real.slotBytes,
                 "★真机：总分口径同一处（" + Util.formatSize(real.totalBytes()) + "）");
         if (apksOnDisk > 0) {
             ok(stat, L, Storage.text(ctx, real).contains(
@@ -7677,13 +7706,20 @@ public final class SelfTest {
                 ctx.getString(R.string.mods_toggle_game_off));
         ok(stat, L, toggleMsg.contains("游戏没在运行") && toggleMsg.startsWith("改前会自动备份设置"),
                 "★启停确认框按**一个**参数实拼（资源原写 %6$s）：" + toggleMsg);
-        String okMsg = ctx.getString(R.string.mods_toggle_ok_fmt, "蓝钢拓展", "关闭");
+        // ★ 第 150 轮：结果句从「已把「X」%2$s。」（填「启用」时是病句）改成**两条整句**。
+        //   旧 key `mods_toggle_ok_fmt` 留着（发出去过），但**不该再有调用点** —— 下面那条元断言钉它。
+        String okOffMsg = ctx.getString(R.string.mods_toggle_ok_off_fmt, "蓝钢拓展");
+        String okOnMsg = ctx.getString(R.string.mods_toggle_ok_on_fmt, "蓝钢拓展");
         String failMsg = ctx.getString(R.string.mods_toggle_fail_msg_fmt, "游戏正在运行");
         String noopMsg = ctx.getString(R.string.mods_toggle_noop_msg_fmt, "蓝钢拓展", "启用");
-        ok(stat, L, okMsg.equals("已把「蓝钢拓展」关闭。")
+        ok(stat, L, okOffMsg.equals("已关闭「蓝钢拓展」。") && okOnMsg.equals("已启用「蓝钢拓展」。")
                         && failMsg.startsWith("没改成：游戏正在运行")
                         && noopMsg.equals("「蓝钢拓展」本来就是启用的，文件一个字节都没动。"),
-                "★启停结果弹窗三条整句实拼：" + okMsg + " ｜ " + noopMsg);
+                "★启停结果弹窗三条整句实拼：" + okOffMsg + " ｜ " + okOnMsg + " ｜ " + noopMsg);
+        ok(stat, L, !okOnMsg.contains("已把") && !okOffMsg.contains("已把")
+                        && ctx.getString(R.string.mods_toggle_ok_fmt).contains("%2$s"),
+                "★元断言：两条结果句都是**整句**（「已把「X」启用」这种病句不可能再拼出来）；"
+                        + "旧模板留着但只当语言包兼容键");
         String ow = ctx.getString(R.string.msav_overwrite_msg_fmt, "default", "困难模式.msav");
         // ★ 2026-10-05（第二批）：这句的措辞变了 —— 同名那份现在**进中转站**（以前是"直接删掉"）。
         //   判据随之改成"说了中转站、而且不再承诺删掉"（旧措辞里的「找不回来」必须消失）。
@@ -8866,6 +8902,20 @@ public final class SelfTest {
             ss2.dir = snap2; ss2.slot = "s"; ss2.version = 1;
             ok(stat, L, Backup.msavLine(ctx, ss2).isEmpty(),
                     "★反向：快照里没有存档 ⇒ 返回空串（不是编一行出来）");
+
+            // ★ 第 150 轮：快照那一行的标题改成人读时间（原来是目录名那个戳 `20261004-153012`，
+            //   与中转站/存档列表的 `10-04 15:30` 两套格式并存）
+            Backup.Snapshot st = new Backup.Snapshot();
+            st.created = System.currentTimeMillis();
+            st.label = "手动备份";
+            String ttl = st.title();
+            ok(stat, L, ttl.contains(":") && ttl.endsWith("手动备份") && ttl.contains(" · ")
+                            && !ttl.matches("\\d{8}-\\d{6}.*"),
+                    "★快照行标题 = 人读时间 · 备注（不再是 `20261004-153012` 那种目录名戳）：" + ttl);
+            Backup.Snapshot st2 = new Backup.Snapshot();
+            st2.created = System.currentTimeMillis();
+            ok(stat, L, !st2.title().isEmpty() && !st2.title().contains("·"),
+                    "★反向：没有备注时不留尾随分隔符：" + st2.title());
 
             // ③ 反向：v2 清单指向一个池里不存在的对象 ⇒ 不抛、返回空串
             File snap3 = new File(root, "cas-missing");

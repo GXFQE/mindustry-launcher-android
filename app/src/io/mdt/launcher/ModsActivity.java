@@ -545,7 +545,10 @@ public class ModsActivity extends BaseActivity {
         // 两个非当前槽之间互拷与它无关（别用一条过宽的规矩挡掉无害的操作）。
         final String cur = Data.currentSlot(this);
         if (Data.gameAlive(this) && (mSlot.equals(cur) || toSlot.equals(cur))) {
-            alert(Trans.get(ModsActivity.this, R.string.mods_copy_done), Trans.get(ModsActivity.this, R.string.mods_copy_blocked));
+            // ★ 2026-10-15：这里原来复用 `mods_copy_done`（「复制完成」）当标题 ——
+            //   正文却是"游戏正在运行，请先退出游戏"（同一屏自打脸）。拦下就说拦下。
+            alert(Trans.get(ModsActivity.this, R.string.game_busy_title),
+                    Trans.get(ModsActivity.this, R.string.mods_copy_blocked));
             return;
         }
         int count = 0;
@@ -554,7 +557,7 @@ public class ModsActivity extends BaseActivity {
             for (File f : kids) if (!Data.contentSkipped(f)) count++;
         }
         final ProgressDialog pd = ProgressDialog.show(this,
-                Trans.get(ModsActivity.this, R.string.mods_copy_done),
+                Trans.get(ModsActivity.this, R.string.mods_copy_progress_title),
                 Trans.get(ModsActivity.this, R.string.mods_copy_progress_fmt, count, toSlot), true, false);
         new Thread(new Runnable() {
             @Override public void run() {
@@ -572,7 +575,9 @@ public class ModsActivity extends BaseActivity {
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
                         pd.dismiss();
-                        alert(Trans.get(ModsActivity.this, R.string.mods_copy_done), fe != null ? fe : fpr.report(ModsActivity.this));
+                        // ★ 标题按结局给：这里是**结果**（可能成功、也可能整批失败）
+                        alert(Trans.get(ModsActivity.this, R.string.mods_copy_result_title),
+                                fe != null ? fe : fpr.report(ModsActivity.this));
                         rescan();
                     }
                 });
@@ -1478,7 +1483,12 @@ public class ModsActivity extends BaseActivity {
             String note = getString(r.backup != null ? R.string.mods_toggle_backup_note
                                                      : R.string.mods_toggle_verified_note);
             msg = (count > 0 ? Trans.get(ModsActivity.this, R.string.mods_batch_ok_fmt, count)
-                             : Trans.get(ModsActivity.this, R.string.mods_toggle_ok_fmt, shownName, toggleWord(on)))
+                             // ★ 第 150 轮：结果句改成**两条整句**（旧模板填「启用」时是病句
+                             //   「已把「X」启用。」）—— `mods_toggle_ok_fmt` 因此不再被调用，
+                             //   但**不删**（它随正式版发出去过，用户语言包里可能还写着它）。
+                             : Trans.get(ModsActivity.this,
+                                     on ? R.string.mods_toggle_ok_on_fmt : R.string.mods_toggle_ok_off_fmt,
+                                     shownName == null ? "" : shownName))
                     + note;
         }
         AlertDialog.Builder b = new AlertDialog.Builder(this)

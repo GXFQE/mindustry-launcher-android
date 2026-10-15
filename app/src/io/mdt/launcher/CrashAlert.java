@@ -198,8 +198,12 @@ public final class CrashAlert {
         if (!claims(Config.get().crashAlerted(), key)) return;   // 便宜的预检（省一次分析）
         final CrashAnalysis.Verdict v = CrashAnalysis.analyzeReport(app, f, slot);
         if (v == null) return;
-        final String line = Trans.get(app, R.string.crash_alert_toast_fmt,
-                CrashAnalysis.brief(app, v));
+        // ★ 2026-10-15：启动器自己的报告（`crash_*_launcher.txt`）落在**同一个目录**里，
+        //   照旧会说成"游戏崩了" —— 那句正文自己又写着"不是游戏"（真机截图）。
+        //   标题与前缀都按 kind 分岔。
+        final boolean launcherOwn = v.kind == CrashAnalysis.KIND_LAUNCHER;
+        final String line = Trans.get(app, launcherOwn ? R.string.crash_alert_toast_launcher_fmt
+                : R.string.crash_alert_toast_fmt, CrashAnalysis.brief(app, v));
         new Handler(Looper.getMainLooper()).post(new Runnable() {
             @Override public void run() {
                 // ① 立刻说一声：Toast 是系统浮层 ⇒ 游戏还在前台也看得见
@@ -256,7 +260,8 @@ public final class CrashAlert {
         final java.util.List<String> internals = CrashAnalysis.blamedInternals(v);
         final boolean soleSuspect = internals != null && internals.size() == 1;
         android.app.AlertDialog.Builder b = new android.app.AlertDialog.Builder(a)
-                .setTitle(R.string.crash_alert_title)
+                .setTitle(v != null && v.kind == CrashAnalysis.KIND_LAUNCHER
+                        ? R.string.crash_alert_title_launcher : R.string.crash_alert_title)
                 .setMessage(CrashAnalysis.text(a, v))
                 .setPositiveButton(R.string.crash_alert_open, new android.content.DialogInterface.OnClickListener() {
                     @Override public void onClick(android.content.DialogInterface d, int w) {
@@ -300,7 +305,8 @@ public final class CrashAlert {
                     ? Trans.get(a, R.string.crash_alert_ignored_fmt, m.title())
                     : SettingsText.userReason(a, r), Toast.LENGTH_LONG).show();
         } catch (Throwable e) {
-            Toast.makeText(a, String.valueOf(e), Toast.LENGTH_LONG).show();
+            android.util.Log.w("MDTLauncher", "ignore-and-retry failed", e);
+            Toast.makeText(a, Trans.get(a, R.string.crash_alert_ignore_failed), Toast.LENGTH_LONG).show();
         }
     }
 }

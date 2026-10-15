@@ -44,7 +44,7 @@
     <string name="act_add_game_title">Add game</string>
     <string name="act_add_game_sub">Import an APK file · Scan installed games</string>
     <string name="act_add_title">Add package name</string>
-    <string name="act_add_sub">Scan other installed game versions</string>
+    <string name="act_add_sub">Add an installed game by package name</string>
     <string name="act_import_title">Import APK</string>
     <string name="act_import_sub">Pick a file on this device (system file picker)</string>
     <string name="act_saves_title">Saves &amp; Backups</string>
@@ -298,7 +298,7 @@
     <string name="delete_slot_confirm_title_fmt">Delete slot \"%1$s\"?</string>
     <!-- ⚠️ 这里**不能**用 `**` 表示强调：弹窗是纯文本（AlertDialog.setMessage），
          `**` 会原样显示成星号。要加重语气只能靠措辞。全工程同此纪律。 -->
-    <string name="delete_slot_warn">Everything in this slot moves to the transfer station, its backups included. You can put it back from the transfer station on the home screen:\n\n</string>
+    <string name="delete_slot_warn">Everything in this slot moves to the transfer station. You can put it back from there (home screen):\n\n</string>
     <string name="delete_slot_files_fmt">%1$d files · %2$s\n</string>
     <string name="delete_slot_with_backups_fmt">\nIts %1$d backups move along with it.</string>
     <string name="delete_slot_no_backups">\n(this slot has no backups)</string>
@@ -356,7 +356,7 @@
     <string name="restore_done">Restore complete</string>
     <string name="restore_not_run">Restore not performed</string>
 
-    <string name="game_busy_title">Exit the game first</string>
+    <string name="game_busy_title">The game is running</string>
     <string name="game_busy_msg_fmt">Slot \"%1$s\" is in use by the game and would be overwritten. Exit the game first.</string>
     <string name="chooser_pick_msav">Pick a .msav save</string>
     <string name="msav_import_progress_title">Import save</string>
@@ -401,6 +401,7 @@
       ★ 文案口径：终点是**游戏里的编辑器**（导入 → 导入地图 → 试玩），别写成"直接当普通图开"。
     -->
     <string name="map_save_name_title">Turn this save into a map</string>
+    <string name="map_save_failed_why">could not convert this save</string>
     <string name="map_save_name_hint">This is a save file, not a map yet (it has no name inside).\nThe name below is written into the file — the game and the editor show exactly it.</string>
     <string name="map_save_nocores_warn">⚠ This world has no player core: the editor can open it, but starting it as a normal map may end immediately.</string>
     <!--
@@ -429,6 +430,7 @@
     <string name="mapsave_reason_broken">A data block inside the file is damaged</string>
     <string name="map_import_ok_fmt">Imported \"%1$s\"</string>
     <string name="map_import_fail_fmt">Import failed: %1$s</string>
+    <string name="map_import_read_failed">this file cannot be read — it may be gone, or the app has no permission to read it</string>
     <string name="map_overwrite_title">A map with this name already exists</string>
     <string name="map_overwrite_msg_fmt">This slot already has \"%1$s\".\nReplacing moves the old one to the transfer station instead of deleting it.</string>
     <string name="map_overwrite_ok">Replace</string>
@@ -490,7 +492,7 @@
     -->
     <string name="save_page_import_sub">Pick .msav files from this device; many at once, or one zip</string>
     <string name="save_page_export_sub">Export the saves of this slot to this device</string>
-    <string name="save_page_bad_sub">See why those few cannot be read</string>
+    <string name="save_page_bad_sub">Lists the reason for each one</string>
     <string name="msav_bad_list_title_fmt">Unreadable saves (%1$d)</string>
     <string name="msav_all_ok">All saves in this slot are readable right now</string>
     <!-- 冲突体检没做成时的白话提示（2026-10-04 补）：原来是把异常对象直接拼进正文。 -->
@@ -641,12 +643,12 @@
       ⚠️ 加一个码就要在这里加一条（+ values-zh 那一份），漏了不崩、界面静默变"原因不明"。
     -->
     <string name="msch_reason_no_file">No file was given</string>
-    <string name="msch_reason_file_too_big_fmt">This file is too big to be a blueprint (over %1$d bytes)</string>
+    <string name="msch_reason_file_too_big_fmt">This file is too big to be a blueprint (over %1$s)</string>
     <string name="msch_reason_not_blueprint">This is not a blueprint file</string>
     <string name="msch_reason_newer_fmt">This blueprint was saved by a newer version of the game (v%1$d)</string>
     <string name="msch_reason_broken">The contents of this file are damaged</string>
     <string name="msch_reason_huge">This file unpacks to something far too large, so it was not read</string>
-    <string name="msch_reason_too_large_fmt">This blueprint is bigger than the game allows (%1$d × %2$d)</string>
+    <string name="msch_reason_too_large_fmt">The blueprint is too large: %1$d × %2$d (the game allows up to 128 × 128)</string>
     <string name="msch_reason_too_many_fmt">This blueprint has too many buildings (%1$d)</string>
     <string name="msch_reason_half">This file looks half-written</string>
     <string name="msch_reason_config">A building setting in this blueprint cannot be read</string>
@@ -707,6 +709,7 @@
     <string name="bp_tech_dict_names_fmt">Names in the table: %1$s</string>
     <string name="bp_tech_dict_names_more_fmt">Names in the table: %1$s (%2$d more)</string>
     <string name="bp_tech_renamed_fmt">Block names we remapped: %1$s</string>
+    <string name="bp_tech_renamed_more_fmt">Block names we remapped: %1$s (%2$d more)</string>
     <string name="bp_tech_rot_fmt">Tiles with a direction: %1$s</string>
     <string name="bp_tech_tags_fmt">Tags: %1$s</string>
     <string name="bp_tech_contentmap_fmt">Carries its own name table: %1$s</string>
@@ -748,7 +751,9 @@
     <string name="bp_export_nosrc">The source of this blueprint cannot be found</string>
     <string name="bp_import_ok_fmt">Imported %1$s</string>
     <string name="bp_import_fail_fmt">%1$s</string>
-    <string name="bp_import_busy_msg">The game is running. Quit the game first, then import — blueprints saved in the current session would be overwritten.</string>
+    <string name="bp_import_read_failed">this file cannot be read — it may be damaged, or not a blueprint</string>
+    <string name="bp_import_busy_msg">The game is running; importing blueprints now would be overwritten by it. Exit the game first.</string>
+    <string name="bp_delete_busy_msg">The game is running; deleting blueprints now would fight it over the files. Exit the game first.</string>
     <string name="bp_overwrite_title">A blueprint with that name is already here</string>
     <string name="bp_overwrite_msg_fmt">This slot already has a blueprint called %1$s. Replacing moves the old one into the trash.</string>
     <string name="bp_overwrite_ok">Replace</string>
@@ -844,7 +849,7 @@
     <string name="mods_gate_enabled_unknown">the settings file could not be read, so its switch state is unknown</string>
     <string name="mods_gate_version">the game version is new enough</string>
     <string name="mods_gate_version_note_fmt">it needs %1$s or newer; this one is %2$s</string>
-    <string name="mods_gate_minver">meets the minimum version</string>
+    <string name="mods_gate_minver">meets the load threshold</string>
     <string name="mods_gate_minver_none">it does not say which game version it needs, so the game treats it as too old and skips it</string>
     <string name="mods_gate_minver_old_fmt">its minimum version is %1$d, which is too old (it needs %2$d or newer) — the game will skip it</string>
     <string name="mods_gate_blacklist">not on the game blacklist</string>
@@ -887,12 +892,12 @@
     <string name="conflict_join_and">\u0020and\u0020</string>
     <string name="conflict_note_dex_fmt">could not read the classes.dex inside \"%1$s\"</string>
     <string name="conflict_note_log">could not read the game log</string>
-    <string name="conflict_contained_fmt">\"%1$s\" already bundles \"%2$s\" ⇒ turning both on installs the same feature twice and they fight; keep only one</string>
+    <string name="conflict_contained_fmt">\"%1$s\" already bundles \"%2$s\" - turning both on installs the same feature twice and they fight; keep only one</string>
     <string name="conflict_shared_fmt">%1$s all try to take over %2$s in the game — only one can win (see the game log below)</string>
     <string name="conflict_mentioned_fmt">the description of \"%1$s\" mentions \"%2$s\"</string>
     <string name="mods_dep_required_fmt">required: %1$s</string>
     <string name="mods_dep_soft_fmt">soft dependency: %1$s</string>
-    <string name="mods_scan_dup_fmt">%1$s and %2$s are two copies of the same mod ⇒ the game only uses one (whichever was placed later).</string>
+    <string name="mods_scan_dup_fmt">%1$s and %2$s are two copies of the same mod, so the game only uses one (whichever was placed later).</string>
     <!--
       ══ 模组包导入 / 跨槽复制的**结果与失败原因**（P3）══════════════════════
       ★ `Mods.PackResult.report()` **就是弹窗正文**（`ModsActivity` 三处直接把它塞进 `alert`）
@@ -927,7 +932,7 @@
     <string name="pack_report_where_fmt">Where: %1$s</string>
     <string name="pack_report_size_fmt">Size: %1$s</string>
     <string name="pack_report_mod_fmt">Mod: %1$s  %2$s</string>
-    <string name="pack_report_names_fmt">Name in the game: %1$s   it needs game %2$s</string>
+    <string name="pack_report_names_fmt">Name inside the package: %1$s\nIt needs game %2$s</string>
     <string name="pack_report_copied_fmt">✅ copy done: %1$d items, %2$s</string>
     <string name="pack_report_skipped_fmt">skipped %1$d items (the target slot already has the same name): %2$s</string>
     <string name="pack_report_failed_list_fmt">❌ %1$d items failed: %2$s</string>
@@ -1054,7 +1059,7 @@
     <string name="backup_err_no_data_fmt">Slot \"%1$s\" has no data directory yet, so there is nothing to back up.</string>
     <string name="backup_err_mkdir_fmt">Could not create the backup directory: %1$s</string>
     <string name="backup_err_same_second">A backup with that name already exists in this second — try again in a moment</string>
-    <string name="backup_err_nothing_fmt">Slot \"%1$s\" has nothing to back up.\n%2$s\nIt is empty, or only has %3$s, which the game recreates by itself.</string>
+    <string name="backup_err_nothing_fmt">Slot \"%1$s\" has nothing to back up.\n%2$s is empty, or only has %3$s, which the game recreates by itself.</string>
     <string name="backup_err_snapshot_mkdir_fmt">Could not create the backup directory: %1$s</string>
     <string name="backup_err_snapshot_missing">That backup is gone</string>
     <string name="backup_err_delete_partial_fmt">Deletion did not fully succeed: %1$s</string>
@@ -1066,7 +1071,7 @@
     <string name="backup_restore_err_no_dst">⚠ Cannot reach the target slot directory</string>
     <string name="backup_restore_err_mkdir_fmt">⚠ Could not create the target directory: %1$s</string>
     <string name="backup_restore_bad_missing_fmt">%1$s (missing)</string>
-    <string name="backup_restore_bad_size_fmt">%1$s (size %2$d≠%3$d)</string>
+    <string name="backup_restore_bad_size_fmt">%1$s (actual size %2$s, but the backup has %3$s)</string>
     <string name="backup_restore_bad_md5_fmt">%1$s (md5 mismatch)</string>
     <string name="backup_restore_err_selfcheck_fmt">⚠ This backup failed its own check, so the restore was refused (your data was not touched):\n%1$s</string>
     <!--␣缩进一律**不写进资源**（aapt2 会把前导/尾随空白剥掉，判据 RES-04）——
@@ -1091,7 +1096,7 @@
     <string name="backup_restore_ok_snapshot_fmt">Backup: %1$s\n</string>
     <string name="backup_restore_ok_files_fmt">Files: %1$d / %2$d (%3$s)\n</string>
     <string name="backup_restore_ok_where_fmt">Where: %1$s\n</string>
-    <string name="backup_restore_ok_kept_fmt">Kept %1$d files as they are now\n</string>
+    <string name="backup_restore_ok_kept_fmt">%1$d files with the same name were left as they are (not overwritten)\n</string>
     <string name="backup_restore_ok_wiped_fmt">Cleared first: %1$s\n</string>
     <string name="backup_restore_partial_fmt">\n⚠ Some files were not written:\n%1$s</string>
     <string name="backup_err_not_manifest">Not an MDT backup manifest</string>
@@ -1099,8 +1104,8 @@
     <string name="backup_err_clone_target_current_fmt">\"%1$s\" is the current slot, so it cannot be the clone target.\n(the source slot content would mix with it and could never be separated again)</string>
     <string name="backup_err_slot_backups_delete_fmt">Could not fully delete the backup directory: %1$s</string>
     <string name="export_slot_title_fmt">Export whole slot \"%1$s\"</string>
-    <string name="export_slot_msg_fmt">Packs the whole slot into one zip (saves · maps · schematics · mods · settings).%1$s\n\n⚠️ This package holds your identity data — to hand it to someone else, use \"Export a shareable package\".\n\nThe game can import it as well (Settings → Data → Import data).</string>
-    <string name="export_slot_playing">\n\n⚠️ The game is running; the export may capture a half-written save.</string>
+    <string name="export_slot_msg_fmt">Packs the whole slot into one zip (saves · maps · schematics · mods · settings).%1$s\n\n⚠ This package holds your identity data — to hand it to someone else, use \"Export a shareable package\".\n\nThe game can import it as well (Settings → Data → Import data).</string>
+    <string name="export_slot_playing">\n\n⚠ The game is running; the export may capture a half-written save.</string>
     <string name="export_ok">Choose where to save</string>
     <string name="chooser_export">Export to…</string>
     <string name="export_progress_title">Exporting</string>
@@ -1124,7 +1129,7 @@
     <string name="slot_op_share_slot">Export a shareable package (identity removed)…</string>
     <string name="share_slot_title_fmt">Export shareable package \"%1$s\"</string>
     <string name="share_slot_msg_fmt">A package for sending to others; to move to a new phone or keep a copy, use \"Export the whole slot\" (that package changes nothing).\nPacking removes identity data and drops the logs, the rebuildable caches and whatever is only useful to you.\n\n%1$s%2$s</string>
-    <string name="share_slot_saved_fmt">Dropping those saves about %1$s.</string>
+    <string name="share_slot_saved_fmt">This pack is about %1$s smaller than a full-slot export.</string>
     <string name="share_slot_found_fmt">This time %1$d identity entries will be removed (%2$d of them are server identities).</string>
     <string name="share_slot_none">Checked: this slot holds no identity data.</string>
     <string name="share_slot_err_settings">The settings file of this slot cannot be read (it may be corrupt), so there is no way to tell whether it holds identity data. To avoid leaking it, nothing was exported.</string>
@@ -1147,7 +1152,7 @@
     <string name="zip_confirm_head_fmt">%1$d files · %2$s</string>
     <string name="zip_confirm_tops_fmt">\nContains: %1$s</string>
     <string name="zip_confirm_strip_fmt">\n\n(The package has an extra \"%1$s\" wrapper, which is stripped when extracting)</string>
-    <string name="zip_tag_native">\n\nIt contains the game settings file — this is the format the game itself writes with \"Export data\".</string>
+    <string name="zip_tag_native">\n\nIt contains the game settings file. Both a full-slot export and the game\u0027s own \"Export data\" look like this.</string>
     <string name="zip_tag_custom">\n\nNo game settings file — this looks like a package exported by this launcher.</string>
     <string name="zip_warn_unknown">This does not look like a Mindustry data package. Import anyway?</string>
     <string name="zip_warn_skipped_fmt">%1$d entries have unsafe paths and will be skipped.</string>
@@ -1175,11 +1180,11 @@
     <string name="backup_auto_zip">automatic, before a slot import</string>
     <string name="backup_auto_restore">automatic, before a restore</string>
     <string name="slot_autobak_done_fmt">\nBacked up first: %1$s</string>
-    <string name="zip_import_kept_fmt">\nKept the current version of %1$d files.</string>
+    <string name="zip_import_kept_fmt">\n%1$d files with the same name were left as they are (not overwritten).</string>
 
     <string name="zip_import_ok_fmt">Imported into slot \"%1$s\": %2$d files, %3$s%4$s</string>
     <string name="zip_import_wiped_fmt">\nCleared first: %1$s</string>
-    <string name="zip_import_skipped_fmt">\n⚠️ Skipped %1$d unsafe entries</string>
+    <string name="zip_import_skipped_fmt">\n⚠ Skipped %1$d unsafe entries</string>
     <string name="zip_import_failed">Import failed</string>
     <string name="zip_nothing">This zip has no files to extract.</string>
 
@@ -1224,10 +1229,10 @@
     <string name="launch_progress_title">Starting</string>
     <string name="launch_progress_msg_fmt">%1$s\npreparing the save slot · checking this package…</string>
     <string name="game_start_failed_fmt">Launch failed (%1$s)</string>
-    <string name="game_step_stuck_fmt">Stuck at step: %1$s\n\n%2$s</string>
+    <string name="game_step_stuck_fmt">Failed at: %1$s\n\n%2$s</string>
     <string name="game_report_hint">\n\nA detailed record was written to the runtime log (Home → Runtime log).</string>
     <string name="game_cannot_start">Cannot start</string>
-    <string name="game_pkg_missing_fmt">Cannot find the game package to start\n(%1$s)</string>
+    <string name="game_pkg_missing_fmt">Cannot find the game package to start. It may have been uninstalled or deleted.</string>
     <string name="step_prepare">prepare</string>
     <string name="step_unknown">unknown</string>
     <!--
@@ -1238,16 +1243,22 @@
         `nativeFlag` / `assetMount` / `startActivity`，见 `Timing.mark` 的实参），
         与界面语言**无关**，别把它们一起"翻译"掉。
     -->
-    <string name="step_prewarm">warm-up</string>
-    <string name="step_dex">dex injection</string>
-    <string name="step_native">native libraries</string>
-    <string name="step_native_flag">native flag</string>
-    <string name="step_assets">asset mounting</string>
+    <string name="step_prewarm">checking the game package</string>
+    <string name="step_dex">loading game code</string>
+    <string name="step_native">loading the graphics library</string>
+    <string name="step_native_flag">initializing the graphics library</string>
+    <string name="step_assets">reading game resources</string>
     <string name="step_start">starting the game</string>
     <string name="launch_err_bad_package">the game package is missing or unreadable</string>
     <string name="launch_err_no_activity_fmt">could not find %1$s in the game package\nthe file may not be a Mindustry-family APK, or it may be damaged</string>
     <string name="launch_err_no_abi_fmt">the APK has no native libraries for this device (%1$s)</string>
     <string name="launch_err_no_native_loaded">no native library was loaded</string>
+    <string name="launch_err_dex">could not load the game code — this package may not be an official build, or it may be damaged</string>
+    <string name="launch_err_native">could not load the graphics library — this package may not work on this device</string>
+    <string name="launch_err_native_flag">the graphics library did not finish initializing</string>
+    <string name="launch_err_assets">could not read the game resources — this package may be incomplete</string>
+    <string name="launch_err_start">could not start the game\'s entry point</string>
+    <string name="launch_err_unknown">something unexpected went wrong while starting (details are in the runtime log)</string>
 
     <!-- ══ F3 全局设置页（按 Android 语义：这里只放"所有槽共用"的项） ══════ -->
     <string name="act_settings_title">Settings</string>
@@ -1290,8 +1301,8 @@
     <string name="set_storage_title">Storage used</string>
     <string name="set_storage_sub">What backups save, and where the space goes</string>
     <string name="storage_loading">Counting…</string>
-    <string name="storage_failed">Could not count: %1$s</string>
-    <string name="storage_total_fmt">Launcher data: %1$s in total</string>
+    <string name="storage_failed">Could not measure storage — go back and open this again.</string>
+    <string name="storage_total_fmt">These add up to %1$s</string>
     <string name="storage_sec_app">The launcher itself</string>
     <string name="storage_app_import_fmt">Imported game packages: %1$d · %2$s</string>
     <string name="storage_app_natives_fmt">Native libraries unpacked from them: %1$s</string>
@@ -1306,8 +1317,8 @@
     <string name="storage_backup_none">No backups yet.</string>
     <string name="storage_backup_fmt">%1$d backups · %2$s on disk · %3$s if nothing were shared (%4$s saved)</string>
     <string name="storage_pct_fmt">%1$d%%</string>
-    <string name="storage_backup_legacy_fmt">%1$d of them are still the old format · %2$s</string>
-    <string name="storage_backup_orphan_fmt">%1$s more is not used by any backup and is reclaimed by the next cleanup</string>
+    <string name="storage_backup_legacy_fmt">%1$d of them are still the old format (%2$s)</string>
+    <string name="storage_backup_orphan_fmt">%1$s more is not used by any backup; the next cleanup reclaims it</string>
     <string name="storage_sec_trash">Transfer station</string>
     <string name="storage_trash_line_fmt">%1$s: %2$d · %3$s</string>
     <string name="storage_trash_none">(empty)</string>
@@ -1315,14 +1326,14 @@
     <string name="storage_clean_fmt">%1$d place(s) · %2$s (\"Clean now\" in settings)</string>
 
     <string name="trash_title">Transfer station</string>
-    <string name="trash_sub">Deleted maps and slots, replaced mods and saves wait here. You can put them back.</string>
+    <string name="trash_sub">Deleted or replaced files wait here first. You can put them back.</string>
     <string name="trash_head_fmt">%1$d items · %2$s</string>
     <string name="trash_empty">Nothing here yet.\nDeleting a map or a slot, or replacing a mod or a save, moves the old one here.</string>
     <string name="trash_scanning">Listing…</string>
     <string name="trash_scan_failed">Could not list the transfer station. Go back and enter again.</string>
     <string name="trash_empty_all">Empty the transfer station</string>
     <string name="trash_empty_all_sub">Deletes everything here for good</string>
-    <string name="trash_empty_confirm_title">Delete everything?</string>
+    <string name="trash_empty_confirm_title">Delete all permanently?</string>
     <string name="trash_empty_confirm_fmt">Delete all %1$d items (%2$s) for good?\n\nThis cannot be undone.</string>
     <string name="trash_emptied_fmt">Emptied, freed %1$s</string>
     <string name="trash_empty_fail">Some items could not be deleted, try again</string>
@@ -1354,7 +1365,7 @@
     <string name="trash_slot_taken_fmt">There is already a slot named \"%1$s\".\n\nGive this one another name and both stay.</string>
     <string name="trash_slot_bad_name">That name cannot be used</string>
 
-    <string name="trash_delete_one">Delete for good</string>
+    <string name="trash_delete_one">Delete permanently</string>
     <string name="trash_delete_one_confirm_fmt">Delete \"%1$s\" for good?\n\nThis cannot be undone.</string>
     <string name="trash_deleted_fmt">Deleted \"%1$s\"</string>
     <string name="trash_delete_fail">Could not delete it, try again</string>
@@ -1432,7 +1443,7 @@
 
     <string name="set_logs_title">Log files kept</string>
     <string name="set_logs_sub_fmt">Keeps %1$d crash reports, discarding the oldest</string>
-    <string name="set_logs_dialog_title">Log files kept (1 - 999)</string>
+    <string name="set_logs_dialog_title">Log files kept (1 ~ 999)</string>
     <string name="set_logs_hint">20</string>
     <string name="set_logs_bad">Enter an integer from 1 to 999</string>
 
@@ -1549,6 +1560,7 @@
         它们出现在导出给别人看的文本里，不随界面语言变（见 CrashScrub 类注释）。
     -->
     <string name="log_export_raw">Export the complete logs (unchanged)</string>
+    <string name="log_export_write_failed">the file could not be written</string>
     <string name="log_export_scrub">Export a shareable copy (private data removed)</string>
     <string name="log_export_scrub_ok_fmt">Exported %1$s (%2$d places hidden)</string>
     <string name="log_export_absent">(missing)</string>
@@ -1584,7 +1596,7 @@
     <string name="mods_slot_pick_title">Which slot mods do you want to see?</string>
 
     <string name="mods_empty_fmt">This slot has no mods yet.\nPut .jar / .zip into:\n%1$s</string>
-    <string name="mods_ignored_fmt">%1$d more entries will not be loaded by the game (not mod packages, and no description file inside)</string>
+    <string name="mods_ignored_fmt">%1$d more folders will not be loaded (they are not mod packages)</string>
     <string name="mods_orphan_fmt">Settings still hold toggles for %1$d mods whose packages are gone (leftovers)</string>
     <string name="mods_broken_head">Packages whose description file cannot be read (the game skips them outright)</string>
     <string name="mods_problem_head">Conflicts and problems</string>
@@ -1674,9 +1686,9 @@
     <string name="mods_warn_noversion_fmt">⚠ It does not declare which game version it needs — the game will treat it as too old and skip it</string>
     <string name="mods_warn_blacklist_fmt">⚠ It is on the game blacklist: %1$s</string>
     <string name="mods_warn_dup">⚠ Duplicate name with another package — only one of them takes effect in the game</string>
-    <string name="mods_warn_failed">⚠ the next launch switches off every mod in this slot (even the ones that are on now)</string>
+    <string name="mods_warn_failed">⚠ the next game launch switches off every mod in this slot (even the ones that are on now)</string>
     <string name="mods_warn_failed_applied">⚠ the game marked every mod in this slot as failed to load and switched it off — press Enable to restore</string>
-    <string name="mods_warn_failed_noskip">⚠ The last launch did not finish: the mods were flagged (you turned skip off, so they still load)</string>
+    <string name="mods_warn_failed_noskip">⚠ The last launch did not finish: the whole slot is marked as failed to load (you turned skip off, so they still load)</string>
     <string name="mods_warn_blamed">⚠ It is the likely cause of the last crash</string>
 
     <!-- Summary card, second line: short form (the long evidence lives in the log page) -->
@@ -1686,6 +1698,10 @@
     <!-- F23 "tell me right away" (2026-10-08, user request) -->
     <string name="crash_alert_title">The game crashed</string>
     <string name="crash_alert_toast_fmt">The game crashed: %1$s</string>
+    <!-- Launcher's own report (crash_*_launcher.txt) lands in the same folder: do not call it "the game". -->
+    <string name="crash_alert_title_launcher">The launcher hit an error</string>
+    <string name="crash_alert_toast_launcher_fmt">The launcher hit an error: %1$s</string>
+    <string name="crash_alert_ignore_failed">Could not ignore it — see the runtime log for details.</string>
     <string name="crash_alert_ignore">Ignore it and retry</string>
     <string name="crash_alert_ignored_fmt">ignored %1$s - just launch again (the rest of the mods will load this time)</string>
     <string name="crash_alert_ignore_missing">it is not in the mod list anymore (maybe deleted)</string>
@@ -1722,7 +1738,7 @@
     <string name="mods_detail_setting_fmt">%1$s = %2$s</string>
     <string name="mods_detail_meta_head">Description file as written (first %1$d characters)</string>
     <string name="mods_detail_size_fmt">Size: %1$s · %2$s</string>
-    <string name="mods_detail_allok">✅ This version can load it</string>
+    <string name="mods_detail_allok">✅ Nothing here blocks it</string>
     <string name="mods_detail_somefail_fmt">⚠ %1$d gates fail; tap \"Technical details\" to see which</string>
     <string name="mods_detail_tech">Technical details</string>
     <string name="mods_detail_path_fmt">Location: %1$s</string>
@@ -1749,8 +1765,8 @@
     <string name="mods_toggle_disable">Disable this mod</string>
     <string name="mods_toggle_do">Apply it</string>
     <string name="mods_toggle_done">Changed</string>
-    <string name="mods_toggle_noop">No file change</string>
-    <string name="mods_toggle_failed">Not changed</string>
+    <string name="mods_toggle_noop">Already like that</string>
+    <string name="mods_toggle_failed">Could not change it</string>
     <string name="mods_toggle_game_off">The game is not running (safe to rewrite)</string>
     <string name="mods_toggle_game_alive">The game is running; the change would be overwritten. Exit the game first.</string>
     <!--
@@ -1770,6 +1786,10 @@
     <string name="mods_word_on">on</string>
     <string name="mods_word_off">off</string>
     <string name="mods_toggle_ok_fmt">Turned \"%1$s\" %2$s.</string>
+    <!-- Superseded in round 150 (the %2$s form reads wrong for "on") but kept: it shipped. -->
+    <string name="mods_toggle_ok_off_fmt">Turned off \"%1$s\".</string>
+    <string name="mods_toggle_ok_on_fmt">Turned on \"%1$s\".</string>
+    <!-- Superseded in round 150 (the %2$s form reads wrong for "on") but kept: it shipped. -->
     <string name="mods_batch_ok_fmt">Toggled %1$d mods.</string>
     <string name="mods_toggle_backup_note">\n\nThe settings were backed up and verified afterwards.</string>
     <string name="mods_toggle_verified_note">\n\nRead back and verified afterwards.</string>
@@ -1792,7 +1812,7 @@
     <string name="mods_import_exists_title">A mod with this name already exists</string>
     <string name="mods_import_exists_msg_fmt">This slot already has \"%1$s\".\n\nReplacing moves the old one to the transfer station instead of deleting it. Replace?</string>
     <string name="mods_import_replace">Replace</string>
-    <string name="mods_import_compat_ok_fmt">Target game %1$s ≥ its requirement %2$s — it will load</string>
+    <string name="mods_import_compat_ok_fmt">Target game %1$s is at or above its requirement %2$s - it will load</string>
     <string name="mods_import_compat_bad_fmt">⚠ Game version %1$s is below its requirement %2$s — it will not load even if installed</string>
     <string name="mods_import_nogame">No version points at this slot yet. Assign one first, or it will not load even if installed</string>
     <string name="mods_copy_pick_title">Copy to which slot?</string>
@@ -1800,6 +1820,8 @@
     <string name="mods_copy_confirm_title_fmt">Copy into \"%1$s\"?</string>
     <string name="mods_copy_confirm_msg_fmt">Copies the whole mod set of \"%1$s\" into \"%2$s\":\n%3$d items · %4$s\n\n%5$d of them already exist there and will be skipped.\nToggle states are not copied.</string>
     <string name="mods_copy_progress_fmt">Copying %1$d items into \"%2$s\"…</string>
+    <string name="mods_copy_progress_title">Copying mods</string>
+    <string name="mods_copy_result_title">Copy result</string>
     <string name="mods_copy_done">Copy complete</string>
     <string name="mods_copy_title_ok">Start copying</string>
     <string name="mods_copy_blocked">The game is running and would interfere with the copy. Exit the game first.</string>
@@ -1868,7 +1890,11 @@
     <string name="lang_dialog_title">Translation file</string>
     <string name="lang_dialog_none_msg">No translation file yet. Pick a .properties file to install, or export a template to translate yourself.</string>
     <string name="lang_row_title">Translation file</string>
-    <string name="lang_row_none">Use the built-in translation (system language)</string>
+    <string name="lang_row_none">Use the built-in text (follows the Language row above)</string>
+    <!-- Plain words for the three lang-pack failures (the raw exception stays in the log). -->
+    <string name="lang_pack_read_failed">this file cannot be read — try another one</string>
+    <string name="lang_pack_install_failed">could not install this translation file</string>
+    <string name="lang_pack_remove_failed">could not remove the translation file</string>
     <string name="lang_chooser_title">Pick a .properties file</string>
     <string name="lang_pack_pick">Pick a file</string>
     <string name="lang_pack_ok">Install</string>

@@ -116,7 +116,8 @@ public class BlueprintDetailActivity extends BaseActivity {
      */
     private void confirmDelete() {
         if (Data.gameAlive(this)) {
-            alert(Trans.get(BlueprintDetailActivity.this, R.string.game_busy_title), Trans.get(BlueprintDetailActivity.this, R.string.bp_import_busy_msg));
+            alert(Trans.get(BlueprintDetailActivity.this, R.string.game_busy_title),
+                    Trans.get(BlueprintDetailActivity.this, R.string.bp_delete_busy_msg));
             return;
         }
         new android.app.AlertDialog.Builder(this)

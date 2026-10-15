@@ -730,7 +730,14 @@ public class MapsActivity extends BaseActivity {
                     runOnUiThread(new Runnable() {
                         @Override public void run() {
                             pd.dismiss();
-                            alert(Trans.get(MapsActivity.this, R.string.maps_import), t.toString());
+                            // ★ 2026-10-15：这里原来是 `t.toString()`（全工程最后一处把
+                            //   `java.io.FileNotFoundException: /data/user/0/…` 当弹窗正文的地方）
+                            //   ⇒ 与同页导出那条一致，走 `Util.ioReason`（认识的 errno 才翻，
+                            //   我们的中文原样透传，原文进日志）。
+                            android.util.Log.w("MDTLauncher", "map import failed", t);
+                            alert(Trans.get(MapsActivity.this, R.string.maps_import),
+                                    Util.ioReason(MapsActivity.this, t,
+                                            Trans.get(MapsActivity.this, R.string.map_import_read_failed)));
                         }
                     });
                     return;
@@ -1137,7 +1144,11 @@ public class MapsActivity extends BaseActivity {
                     runOnUiThread(new Runnable() {
                         @Override public void run() {
                             pd.dismiss();
-                            alert(Trans.get(MapsActivity.this, R.string.map_save_name_title), t.toString());
+                            // ★ 2026-10-15：原来是 `t.toString()`（异常原文 + 绝对路径当弹窗正文）
+                            android.util.Log.w("MDTLauncher", "save-as-map failed", t);
+                            alert(Trans.get(MapsActivity.this, R.string.map_save_name_title),
+                                    Util.ioReason(MapsActivity.this, t,
+                                            Trans.get(MapsActivity.this, R.string.map_save_failed_why)));
                         }
                     });
                     return;

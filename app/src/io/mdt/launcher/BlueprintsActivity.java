@@ -483,7 +483,13 @@ public class BlueprintsActivity extends BaseActivity {
                     runOnUiThread(new Runnable() {
                         @Override public void run() {
                             pd.dismiss();
-                            alert(Trans.get(BlueprintsActivity.this, R.string.bp_import), String.valueOf(t));
+                            // ★ 2026-10-15：原来是 `String.valueOf(t)`（异常原文当弹窗正文）
+                            //   ⇒ 与同页导出那条一致走 `Util.ioReason`，原文进日志。
+                            android.util.Log.w("MDTLauncher", "bp import failed", t);
+                            alert(Trans.get(BlueprintsActivity.this, R.string.bp_import),
+                                    Util.ioReason(BlueprintsActivity.this, t,
+                                            Trans.get(BlueprintsActivity.this,
+                                                    R.string.bp_import_read_failed)));
                         }
                     });
                     return;
@@ -535,14 +541,32 @@ public class BlueprintsActivity extends BaseActivity {
                             return;
                         }
                         // ⚠️ 失败原因走**码 → 文案**（`Msch` 只给码；`error` 原文是给报告与自检的）
+                        //   ★ 2026-10-15：`broken == null` 时原来的 `r.error` **可能是"类名: 消息"**
+                        //     （`BlueprintFiles` 读不动的那些路）⇒ 过一层 `plainError`，别把
+                        //     `FileNotFoundException: /storage/…` 当正文（同族已有"原始异常不进第一层"的规矩）。
                         String why = r.broken != null ? MschText.reason(BlueprintsActivity.this, r.broken)
-                                : r.error;
+                                : plainError(r.error);
                         alert(Trans.get(BlueprintsActivity.this, R.string.bp_import),
                                 Trans.get(BlueprintsActivity.this, R.string.bp_import_fail_fmt, why));
                     }
                 });
             }
         }, "bp-import").start();
+    }
+
+    /**
+     * `BlueprintFiles.Result.error` 的两副面孔：**我们自己的中文**（原样透传，它本来就是给人看的）
+     * 与 **`类名: 消息`**（`getSimpleName()+": "+getMessage()` 那一族 ⇒ 换成人话）。
+     *
+     * ★ 判据与 {@link MsavText#userReason} / {@link SettingsText#userReason} 同一套正则
+     *   （"异常形态"才翻）—— 第 78 轮立的那条：**判据 = 这句话会不会被原样显示**。
+     */
+    private String plainError(String err) {
+        String e = err == null ? "" : err.trim();
+        if (e.isEmpty() || e.matches("^[A-Za-z_$][A-Za-z0-9_$.]*(Exception|Error)\\b.*")) {
+            return Trans.get(this, R.string.bp_import_read_failed);
+        }
+        return e;
     }
 
     /**
@@ -657,7 +681,7 @@ public class BlueprintsActivity extends BaseActivity {
         }
         if (Data.gameAlive(this)) {
             alert(Trans.get(this, R.string.game_busy_title),
-                    Trans.get(this, R.string.bp_import_busy_msg));
+                    Trans.get(this, R.string.bp_delete_busy_msg));
             return;
         }
         final List<Blueprints.Item> items = mItems;

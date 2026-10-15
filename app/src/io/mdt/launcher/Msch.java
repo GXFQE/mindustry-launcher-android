@@ -1315,7 +1315,9 @@ public final class Msch {
         for (Tile t : tiles) {
             if (t == null || t.rawName == null || t.block == null) continue;
             if (t.rawName.equals(t.block)) continue;
-            String pair = t.rawName + " -> " + t.block;
+            // ★ 第 150 轮：箭头从 ASCII 的 `->` 换成人读的 `→`（与导航路径同一个符号；列表里全是 ASCII
+            //   箭头会显得像日志而不是给人看的说明）
+            String pair = t.rawName + " → " + t.block;
             if (!out.contains(pair)) out.add(pair);
         }
         return out;
