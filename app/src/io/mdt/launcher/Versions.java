@@ -1,6 +1,7 @@
 package io.mdt.launcher;
 
 import android.content.Context;
+import android.util.Log;
 import android.content.pm.ApplicationInfo;
 import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
@@ -25,6 +26,8 @@ import java.util.regex.Pattern;
  *   用户数据只增不毁，缺失项留给后续版本做显式的「失效标记 + 用户确认清理」。
  */
 public final class Versions {
+
+    private static final String TAG = "MDTLauncher";
     private Versions() {}
 
     /**
@@ -300,11 +303,24 @@ public final class Versions {
      * 否则一个没有 `mod.hjson` 的官方包会被读无数次）。
      */
     public static void resolveUpstreamVersions(List<Entry> group) {
+        resolveUpstreamVersions(group, null);
+    }
+
+    /**
+     * @param ctx 用来给**导入**条目补真包名（{@link Entry#realPkg}，原端/改端判据要用）；
+     *            传 null 就只读基座版本（ZipFile 不需要 Context）
+     */
+    public static void resolveUpstreamVersions(List<Entry> group, Context ctx) {
         if (group == null) return;
         for (Entry e : group) {
             if (e == null || e.upstreamChecked) continue;
             e.upstreamChecked = true;
             e.upstreamVersion = readUpstreamVersion(e.apkPath == null ? null : new File(e.apkPath));
+            // ★ 同一个"已检查过"的闸门里顺带补**真包名**（只对导入条目、且还没值）——
+            //   原端/改端判据要用它（见 `Entry.modded()`）；已装条目本来就有 pkg。
+            if (e.imported && (e.realPkg == null || e.realPkg.isEmpty())) {
+                e.realPkg = readArchivePkg(ctx, e.apkPath);
+            }
         }
     }
 
@@ -354,6 +370,12 @@ public final class Versions {
         return true;
     }
 
+    /**
+     * 官方 Mindustry 的包名 —— **"原端 / 改端"判据的一半**（见 {@link Entry#modded()}）。
+     * ⚠️ 只列**官方本体**那一份；fork（MindustryX 等）不在表里，它们算改端。
+     */
+    public static final String OFFICIAL_PKG = "io.anuke.mindustry";
+
     public static class Entry {
         public String pkg;
         public String label;
@@ -363,6 +385,22 @@ public final class Versions {
         public boolean imported;
         public String importFile;  // imported: app_hub/import/ 下的文件名
         public String md5 = "";
+
+        /**
+         * ★ 用户给这个版本起的名字（2026-10-16 用户：「加个允许给自己导入的游戏命名」）。
+         * 空串 = 没起名 ⇒ 显示时回落到 APK 自己的 {@link #label}。
+         * 存哪：{@link Config#nameOf(String)}（key 与"版本 → 槽"分配**同一套**）。
+         */
+        public String customName = "";
+
+        /**
+         * ★ 导入 APK 的**真包名**（`getPackageArchiveInfo` 读出来）。
+         *
+         * <p>为什么要它：{@link #pkg} 对导入条目是个内部占位串 `imported`（不该给用户看），
+         * 而"这是原端还是改端"要看真包名 —— 见 {@link #modded()}。
+         * 读一次就存这儿（与 `upstreamChecked` 同一趟后台 IO）。
+         */
+        public String realPkg = "";
 
         /**
          * ★★ APK **自己声明的上游基座版本** —— 只有 MindustryX 系 fork 会声明。
@@ -440,9 +478,7 @@ public final class Versions {
          */
         public String upstreamNote() {
             String u = upstreamVersion == null ? "" : upstreamVersion.trim();
-            if (u.isEmpty()) return null;
-            if (u.equals(displayVersion())) return null;
-            return u;
+            return u.isEmpty() ? null : u;
         }
 
         /**
@@ -467,8 +503,59 @@ public final class Versions {
          * ⚠️ 纪律（承 F17b）：`title()` 去掉后缀后**与 `displayName()` 完全等价**
          *   ⇒ 属于"两个入口、一段实现"，**已删除**。别再加回来 —— 要标记就去副标题做。
          */
-        public String displayName() {
-            return label + "  " + displayVersion();
+        public String displayName(Context ctx) {
+            return displayLabel() + "  " + typeWord(ctx) + "  " + displayVersion();
+        }
+
+        /**
+         * ★★ **原端 / 改端**（2026-10-16 用户要的标题形态：
+         * 「自定义名 类型（原端/改端） 版本号 基于原版版本号」）。
+         *
+         * <p>判据（两条任一 ⇒ 改端）：
+         * <ol>
+         *   <li>**声明了基座版本**（`assets/mod.hjson` 的 `minGameVersion`）—— MindustryX 一类；</li>
+         *   <li>**包名不是官方那一份**（`io.anuke.mindustry`）—— 导入的 APK 用
+         *       {@link #realPkg}（扫描时读一次）；已装条目直接看 {@link #pkg}。</li>
+         * </ol>
+         *
+         * <p>⚠️ **已知边界**（如实记）：既不声明基座、又沿用官方包名的私有改端会被判成"原端" ——
+         *   这种包在数据上与原版**无法区分**（真实判据只有"签名/代码内容"，
+         *   而那要读整个 dex，代价与本功能不成比例）。界面上它至少还留着
+         *   {@link #label}（APK 自己的名字）可对照。
+         */
+        public boolean modded() {
+            if (upstreamVersion != null && !upstreamVersion.trim().isEmpty()) return true;
+            String p = imported ? realPkg : pkg;
+            return p != null && !p.isEmpty() && !OFFICIAL_PKG.equals(p);
+        }
+
+        /** 类型词（本地化）—— 只在这里取词，别在调用方拼 */
+        public String typeWord(Context ctx) {
+            return Trans.get(ctx, modded() ? R.string.version_type_modded : R.string.version_type_official);
+        }
+
+        /**
+         * 显示用的**名称**：用户起的名字优先，其次 APK 自己的 label。
+         * ⚠️ 原名的可见性由详情弹窗那一行承担（{@link #hasCustomName()}）。
+         */
+        public String displayLabel() {
+            return (customName == null || customName.trim().isEmpty()) ? label : customName.trim();
+        }
+
+        /**
+         * ★ **详情弹窗里那一行「原名」**（用户起过名字时才给；没起名给空串）。
+         *
+         * <p>抽到这里是为了两件事：**只有一处实现**（自检能逐字钉），以及——
+         * 用户给过名字之后，他可能忘了那是什么包 ⇒ 原名必须还看得见。
+         * 与"剥过构建前缀 ⇒ 详情里还原文"是同一条纪律：界面上可以有损，详情是唯一能对照的地方。
+         */
+        public String origNameLine(Context ctx) {
+            return hasCustomName() ? Trans.get(ctx, R.string.detail_orig_name_fmt, label) : "";
+        }
+
+        /** 用户起过名字吗（详情弹窗据此多显示一行「原名」） */
+        public boolean hasCustomName() {
+            return customName != null && !customName.trim().isEmpty();
         }
 
         /**
@@ -508,6 +595,21 @@ public final class Versions {
         return def.isEmpty() ? Data.SLOT_DEFAULT : def;
     }
 
+    /**
+     * 读一个 APK 文件里声明的**包名**（不安装它）。
+     * ⚠️ 读不到（坏包 / 缺权限）返回空串 —— 调用方按"未知"处理，**不抛**。
+     */
+    static String readArchivePkg(Context ctx, String apkPath) {
+        if (ctx == null || apkPath == null || apkPath.isEmpty()) return "";
+        try {
+            android.content.pm.PackageInfo pi = ctx.getPackageManager()
+                    .getPackageArchiveInfo(apkPath, 0);
+            return pi == null || pi.packageName == null ? "" : pi.packageName;
+        } catch (Throwable t) {
+            Log.w(TAG, "readArchivePkg failed for " + apkPath + ": " + t);
+            return "";
+        }
+    }
     /** 按精确包名取 base.apk（未安装返回 null） */
     public static File apkOfPackage(Context ctx, String pkg) {
         try {
@@ -542,6 +644,7 @@ public final class Versions {
                 e.versionName = pi.versionName == null ? "?" : pi.versionName;
                 e.apkPath = ai.sourceDir;
                 e.apkSize = new File(ai.sourceDir).length();
+                e.customName = Config.get().nameOf(e.key());
                 out.add(e);
             } catch (PackageManager.NameNotFoundException nn) {
                 // 未安装：跳过
@@ -570,6 +673,8 @@ public final class Versions {
             e.apkPath = f.getAbsolutePath();
             e.apkSize = f.length();
             e.md5 = o.optString("md5", "");
+            e.realPkg = o.optString("pkg", "");   // 导入时若记过真包名就直接用（老记录没有 ⇒ 扫描时补读）
+            e.customName = Config.get().nameOf(e.key());
             out.add(e);
         }
         return out;

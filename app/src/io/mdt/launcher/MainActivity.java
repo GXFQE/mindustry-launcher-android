@@ -708,7 +708,7 @@ public class MainActivity extends BaseActivity {
     /**
      * 版本行主标题（F7）：`名称  版本号`，其中**版本号**降一档字色与字号。
      *
-     * ★ 为什么需要这个方法：`Versions.Entry.displayName()` 只给拼接好的纯文本，
+     * ★ 为什么需要这个方法：`Versions.Entry.displayName(ctx)` 只给拼接好的纯文本，
      *   而这一行在竖屏下只有 569px 可用宽（右边被「槽徽标 + 槽按钮」吃掉约 460px），
      *   长版本号（如 `8-official-2026.09.X37`）必然被 ellipsize 切掉 ——
      *   而切掉的**恰好是版本号本身**（用户报的「游戏的版本号被折叠了」）。
@@ -735,8 +735,14 @@ public class MainActivity extends BaseActivity {
      *   ⚠️ 全工程显示版本号的代码只有这两条入口，别再写第三处 substring。
      */
     private CharSequence buildTitle(Versions.Entry e) {
-        String plain = e.displayName();
+        String plain = e.displayName(this);
         String ver = e.displayVersion();
+        // ★ 2026-10-16：标题现在是「名称  原端|改端  版本号（基于 X）」⇒ 弱化区间改成
+        //   **名称之后的所有内容**（类型词 + 版本号 + 尾注）。原来只弱化版本号那一段，
+        //   类型词会是全强度，读起来像"名字的一部分"（用户要的是"名称 + 类型 + 版本"三层）。
+        //   ⚠️ 起点用 `displayLabel().length()`（名称本身的长度）—— 比 `indexOf(ver)` 稳：
+        //      名称里可能含数字，甚至恰好含版本号那样的子串。
+        int labelEnd = e.displayLabel().length();
         // ★ 第 41 轮：fork 的**基座版本**在这里就备注出来（用户：「可以在MDTX显示中备注
         //   对应MDT版本」）—— 它是"这个版本为什么和官方某一版不互相提示"的依据，
         //   而列表行是用户唯一会主动看的地方（详情弹窗要长按才知道）。
@@ -748,20 +754,13 @@ public class MainActivity extends BaseActivity {
         // ⚠️ 在 `plain` 上定位、套用到 `full`（尾注只加在**后面** ⇒ 前缀位置不变）。
         //   反过来在 `full` 上 indexOf 也能跑，但一旦尾注里出现与版本号相同的子串
         //   （基座版本恰好等于显示版本时就可能）就会定位到错的区间，静默染错地方。
-        int s = plain.indexOf(ver);
-        int t = s + ver.length();
-        if (s < 0 || t > plain.length()) return full;   // 定位失败：退回纯文本，绝不崩
+        int s = labelEnd;
+        int t = full.length();
+        if (s < 0 || s >= t) return full;   // 定位失败：退回纯文本，绝不崩
         SpannableString ss = new SpannableString(full);
         int muted = getResources().getColor(R.color.fg_muted, getTheme());
         ss.setSpan(new ForegroundColorSpan(muted), s, t, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
         ss.setSpan(new RelativeSizeSpan(0.87f), s, t, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-        // 尾注与版本号同样处理（弱化成副信息）—— "MindustryX" 是主体，其后都是它的注解。
-        if (full.length() > plain.length()) {
-            ss.setSpan(new ForegroundColorSpan(muted), t, full.length(),
-                    Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-            ss.setSpan(new RelativeSizeSpan(0.87f), t, full.length(),
-                    Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-        }
         return ss;
     }
 
@@ -817,7 +816,7 @@ public class MainActivity extends BaseActivity {
         //      （对比 `Compat.probe` 要读 9.5 MB dex，那个仍然必须后台线程。）
         //   ⚠️ 仍然**不能**提到 `scanAll()` 里：那里是"扫描"，这里是"扫描完的加工"，
         //      而且 `upstreamChecked` 只能防同一批 Entry 内重复读。放这里刚好每次 rescan 一次。
-        Versions.resolveUpstreamVersions(mEntries);
+        Versions.resolveUpstreamVersions(mEntries, this);
         Map<String, List<Versions.Entry>> bySlot = new HashMap<>();
         for (Versions.Entry e : mEntries) {
             String s = Versions.slotFor(e);
@@ -841,7 +840,7 @@ public class MainActivity extends BaseActivity {
                 List<Versions.Entry> peers = Versions.conflictPeers(e, l);
                 if (peers.isEmpty()) continue;
                 mConflict.put(e.key(), new Share(
-                        Versions.conflictPeerDesc(MainActivity.this, peers.get(0).displayName(),
+                        Versions.conflictPeerDesc(MainActivity.this, peers.get(0).displayName(this),
                                 peers.size() + 1),
                         anyExplicit));
             }
@@ -869,7 +868,7 @@ public class MainActivity extends BaseActivity {
 
     /**
      * 「继续上次」按钮。
-     * ★ 用 `Entry.displayName()`（名称 + **规范化后**的版本号），与列表行**逐字同一套规则** ——
+     * ★ 用 `Entry.displayName(ctx)`（名称 + **规范化后**的版本号），与列表行**逐字同一套规则** ——
      *   以前这里只给 `e.label`，于是同一个版本在列表里是「MindustryX  8-official-2026.09.X37」、
      *   在按钮里是「MindustryX」，两种叫法（用户：「继续上次也显示版本号」）。
      *   ⚠️ 别退回 `e.label + " " + e.versionName`：那会重新带上 `8-official-` 前缀。
@@ -884,7 +883,7 @@ public class MainActivity extends BaseActivity {
             return;
         }
         mBtnContinue.setVisibility(View.VISIBLE);
-        mContinueText.setText(Trans.get(MainActivity.this, R.string.main_continue_fmt, e.displayName()));
+        mContinueText.setText(Trans.get(MainActivity.this, R.string.main_continue_fmt, e.displayName(this)));
         mBtnContinue.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { startVersion(e); }
         });
@@ -1014,7 +1013,7 @@ public class MainActivity extends BaseActivity {
         new AlertDialog.Builder(this)
                 .setTitle(R.string.launch_conflict_title)
                 .setMessage(Trans.get(MainActivity.this, R.string.launch_conflict_msg_fmt,
-                        e.displayName(), share.peer, Versions.slotFor(e)))
+                        e.displayName(this), share.peer, Versions.slotFor(e)))
                 .setPositiveButton(R.string.launch_conflict_go,
                         new DialogInterface.OnClickListener() {
                             @Override public void onClick(DialogInterface d, int w) {
@@ -1042,7 +1041,7 @@ public class MainActivity extends BaseActivity {
         sLaunching = true;
         final ProgressDialog pd = ProgressDialog.show(this,
                 Trans.get(MainActivity.this, R.string.launch_progress_title),
-                Trans.get(MainActivity.this, R.string.launch_progress_msg_fmt, e.displayName()), true, false);
+                Trans.get(MainActivity.this, R.string.launch_progress_msg_fmt, e.displayName(this)), true, false);
         new Thread(new Runnable() {
             @Override public void run() {
                 // F5：先等自动备份收尾 —— 否则"备份正在读槽"会和"游戏起来在写槽"打架。
@@ -1055,7 +1054,7 @@ public class MainActivity extends BaseActivity {
                 //   ⚠️ 复检不过就**不启动** —— 否则用户白等一次 :game 拉起，只看到一个看不懂的错。
                 Compat.Probe cp = compatProbeOf(e);
                 if (cp != null && !cp.runnable()) {
-                    final String msg = e.displayName() + "\n\n" + Compat.rejectReason(MainActivity.this, cp);
+                    final String msg = e.displayName(MainActivity.this) + "\n\n" + Compat.rejectReason(MainActivity.this, cp);
                     runOnUiThread(new Runnable() {
                         @Override public void run() {
                             // 这条出口也要收掉进度框 + 清标志，否则用户被永久挡住（点不动了）
@@ -1220,6 +1219,52 @@ public class MainActivity extends BaseActivity {
                 .show();
     }
 
+    /**
+     * ★ 给一个**导入**版本命名（2026-10-16 用户：「加个允许给自己导入的游戏命名」）。
+     *
+     * <p>落点只有一处：`Config.setNameOf(key, 名字)` —— 名字进列表行标题、详情标题、
+     * 「继续上次」按钮（都走 `Entry.displayLabel()`），**不动 APK 本身**。
+     * 留空 / 点「恢复原名」都等于清除（回落到 APK 自己的 label）。
+     */
+    private void promptRename(final Versions.Entry e) {
+        final EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_TEXT);
+        input.setHint(e.label);                       // 提示就是原名：留空=恢复它
+        input.setText(e.hasCustomName() ? e.customName : "");
+        input.setSelection(input.getText().length());
+        int pad = dp(20);
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(pad, 0, pad, 0);
+        box.addView(input, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.version_name_title)
+                .setMessage(R.string.version_name_msg)
+                .setView(box)
+                .setPositiveButton(R.string.save, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int w) {
+                        applyName(e, input.getText().toString());
+                    }
+                })
+                .setNeutralButton(R.string.version_name_reset, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int w) {
+                        applyName(e, "");
+                    }
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    /** 写名字 + 刷新列表行（名字影响标题 ⇒ 必须重扫，否则改完看不见变化） */
+    private void applyName(Versions.Entry e, String name) {
+        boolean clear = name == null || name.trim().isEmpty();
+        Config.get().setNameOf(e.key(), clear ? "" : name);
+        android.widget.Toast.makeText(this, clear ? getString(R.string.version_name_reset_done)
+                : Trans.get(this, R.string.version_name_saved_fmt, name.trim()),
+                android.widget.Toast.LENGTH_SHORT).show();
+        rescan();
+    }
     private void showDetail(final Versions.Entry e) {
         String slotLine = Trans.get(MainActivity.this, R.string.detail_slot_line_fmt, Versions.slotFor(e))
                 + Trans.get(MainActivity.this, R.string.detail_slot_hint);
@@ -1236,26 +1281,38 @@ public class MainActivity extends BaseActivity {
         //      这里只是"先确保读过"（幂等，详情可能来自一个没进过列表的条目）。
         List<Versions.Entry> one = new ArrayList<>();
         one.add(e);
-        Versions.resolveUpstreamVersions(one);
+        Versions.resolveUpstreamVersions(one, this);
         String up = e.upstreamNote();
         String upLine = (up != null) ? Trans.get(MainActivity.this, R.string.detail_upstream_fmt, up) : "";
         // ★ F8：已装版本也给"只读事实"（构建号 / 架构 / 位置 / 大小），并**说明为什么不给删**。
         //   已装 = 系统里那一份，删它会连累别的用同一份安装的应用 ⇒ 只读是**设计**，不是漏做。
-        final String head = e.subtitle(this) + rawLine + upLine + slotLine
+        // ★ 2026-10-16：用户给过名字 ⇒ **原名必须还看得见**（他可能忘了当初叫它什么）。
+        //   与"剥过构建前缀 ⇒ 详情里还原文"是同一条纪律：界面上可以有损，详情是唯一能对照的地方。
+        String nameLine = e.origNameLine(this);   // 实现只有一处（Versions.Entry#origNameLine）
+        final String head = e.subtitle(this) + nameLine + rawLine + upLine + slotLine
                 + getString(e.imported ? R.string.detail_imported_note : R.string.detail_installed_note);
         AlertDialog.Builder b = new AlertDialog.Builder(this)
-                .setTitle(e.displayName())
+                .setTitle(e.displayName(this))
                 .setMessage(head + Trans.get(MainActivity.this, R.string.detail_probing))
-                .setPositiveButton(R.string.close, null)
-                .setNeutralButton(R.string.slot_label, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) {
-                        pickSlot(e);
-                    }
-                });
+                .setPositiveButton(R.string.close, null);
+        // ★ 第三个按钮：**导入项给「命名」**（2026-10-16 用户选的形状）——
+        //   换槽在列表行上本来就有按钮（常用动作不该多一层），详情里这个位置留给命名。
+        //   已装版本没得命名（那是系统里那一份）⇒ 保持原来的「槽」。
         if (e.imported) {
+            b.setNeutralButton(R.string.version_name_btn, new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface d, int w) {
+                    promptRename(e);
+                }
+            });
             b.setNegativeButton(R.string.delete, new DialogInterface.OnClickListener() {
                 @Override public void onClick(DialogInterface d, int w) {
                     confirmDeleteImport(e);
+                }
+            });
+        } else {
+            b.setNeutralButton(R.string.slot_label, new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface d, int w) {
+                    pickSlot(e);
                 }
             });
         }
@@ -1335,7 +1392,7 @@ public class MainActivity extends BaseActivity {
     private void confirmDeleteImport(final Versions.Entry e) {
         new AlertDialog.Builder(this)
                 .setTitle(R.string.delete_import_title)
-                .setMessage(Trans.get(MainActivity.this, R.string.delete_import_msg_fmt, e.displayName()))
+                .setMessage(Trans.get(MainActivity.this, R.string.delete_import_msg_fmt, e.displayName(this)))
                 .setPositiveButton(R.string.delete, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int w) {
                         Importer.removeImport(MainActivity.this, e.importFile);

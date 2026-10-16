@@ -44,6 +44,8 @@ public final class Config {
     private static final String K_IMPORTS = "imports";
     /** M3：版本 → 存档槽 的分配表 { "&lt;版本key&gt;": "&lt;槽名&gt;" } */
     private static final String K_VSLOTS = "version_slots";
+    /** 用户给版本起的名字 { "&lt;版本key&gt;": "&lt;名字&gt;" }（与 K_VSLOTS 同 key 规则） */
+    private static final String K_VNAMES = "version_names";
     /** F3：新发现的版本缺省用哪个槽（空串 = 由调用方回落到 Data.SLOT_DEFAULT） */
     private static final String K_DEF_SLOT = "default_slot";
     /** F7：日志保留份数（日志页用） */
@@ -270,6 +272,7 @@ public final class Config {
         put(K_IMPORTS, out);
         // 导入副本没了，它的槽分配也一并清掉（不留悬空引用）
         setSlotOf("import:" + file, "");
+        setNameOf("import:" + file, "");   // ★ 版本没了，名字也一起清（否则会留给下一次同文件名的导入）
         save();
     }
 
@@ -299,6 +302,38 @@ public final class Config {
             return;
         }
         put(K_VSLOTS, m);
+        save();
+    }
+
+    // ── 给版本起的名字（2026-10-16 用户：「加个允许给自己导入的游戏命名」）──────
+
+    /**
+     * 用户给某个版本起的名字。key 规则与 {@link #slotOf} **完全一样**
+     * （{@link Versions.Entry#key()}：已装 = 包名；已导入 = `import:` + 文件名）。
+     *
+     * <p>没起名返回空串（调用方回落到 APK 自己的 label）。
+     * ★ 为什么和槽分配**同一套 key**：两者都是"按版本 key 存一条用户数据"，
+     * 再来一套 key 规则就是第三次实现同一件事（`ref/29` 第 32 条同族）。
+     */
+    public synchronized String nameOf(String key) {
+        if (key == null || key.isEmpty()) return "";
+        JSONObject m = mRoot.optJSONObject(K_VNAMES);
+        return m == null ? "" : m.optString(key, "");
+    }
+
+    /** 名字传空串 = 清除（回落到 APK 自己的 label） */
+    public synchronized void setNameOf(String key, String name) {
+        if (key == null || key.isEmpty()) return;
+        JSONObject m = mRoot.optJSONObject(K_VNAMES);
+        if (m == null) m = new JSONObject();
+        try {
+            if (name == null || name.trim().isEmpty()) m.remove(key);
+            else m.put(key, name.trim());
+        } catch (Exception e) {
+            Log.w(TAG, "setNameOf failed for '" + key + "': " + e);
+            return;
+        }
+        put(K_VNAMES, m);
         save();
     }
 

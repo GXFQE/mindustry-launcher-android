@@ -1578,16 +1578,16 @@ public final class SelfTest {
         Versions.Entry nm = new Versions.Entry();
         nm.label = "MindustryX";
         nm.versionName = "8-official-2026.09.X37";
-        ok(stat, L, "MindustryX  2026.09.X37".equals(nm.displayName()),
-                "displayName = `名称  版本号`：" + nm.displayName());
+        ok(stat, L, "MindustryX  原端  2026.09.X37".equals(nm.displayName(ctx)),
+                "displayName = `名称  原端|改端  版本号`：" + nm.displayName(ctx));
         ok(stat, L, nm.versionTrimmed(), "剥过前缀 ⇒ 详情弹窗要露出原文");
 
         Versions.Entry im = new Versions.Entry();
         im.label = "official-159";
         im.versionName = "8-official-159.7";
         im.imported = true;
-        ok(stat, L, "official-159  159.7".equals(im.displayName()),
-                "导入项显示名 = `名称  版本号`，**不带**（导入）：" + im.displayName());
+        ok(stat, L, "official-159  原端  159.7".equals(im.displayName(ctx)),
+                "导入项显示名 = `名称  原端|改端  版本号`，**不带**（导入）：" + im.displayName(ctx));
 
         // ★ F17c：导入身份**不进主标题**（用户：「那个（导入）看起来很奇怪，放下面去」）。
         //   旧实现 `title()=displayName()+"（导入）"` 在竖屏把标题挤成 `…159.7（导` + `入）`，
@@ -1596,12 +1596,12 @@ public final class SelfTest {
         Versions.Entry imPlain = new Versions.Entry();
         imPlain.label = "official-159";
         imPlain.versionName = "8-official-159.7";
-        ok(stat, L, imPlain.displayName().equals(im.displayName()),
-                "imported 位**不影响**显示名（身份只在副标题）：" + im.displayName());
+        ok(stat, L, imPlain.displayName(ctx).equals(im.displayName(ctx)),
+                "imported 位**不影响**显示名（身份只在副标题）：" + im.displayName(ctx));
         // ⚠️ 断言盯"该消失的那个具体标记"，不要写 !contains("导入") ——
         //   名称里合法带"导入"二字（如 label 就叫「导入版」）会把好数据判成坏（F17b 同型坑）。
         //   这里 label 固定为 `official-159`（不含该串），所以本判据是安全的。
-        ok(stat, L, !im.displayName().contains("（导入）"),
+        ok(stat, L, !im.displayName(ctx).contains("（导入）"),
                 "主标题不含「（导入）」后缀");
 
         Versions.Entry raw = new Versions.Entry();
@@ -1793,7 +1793,7 @@ public final class SelfTest {
         ok(stat, L, p2.size() == 1,
                 "对 146 而言两个 159.7 副本折成 1 个对手");
         String c = ctx.getString(R.string.row_conflict_fmt,
-                Versions.conflictPeerDesc(ctx, p2.get(0).displayName(), p2.size() + 1));
+                Versions.conflictPeerDesc(ctx, p2.get(0).displayName(ctx), p2.size() + 1));
         L.add("    实拼 ⇒ " + c);
         ok(stat, L, !c.contains("等 "),
                 "★ 副本不虚报：146 那行不写「等 2 个版本」（那是条目数，不是版本数）");
@@ -1974,19 +1974,63 @@ public final class SelfTest {
         //      它的显示版本本来就取自 `version.properties` 的上游 build（`Importer.readVersion`），
         //      与 `minGameVersion` **同源同值** ⇒ 行首已经是 `160.1`，再缀"基于 160.1"是同义反复。
         Versions.Entry impFork = mkEntry("tmp-import-test", "8-official-160.1", "160.1");
-        ok(stat, L, "160.1".equals(impFork.displayVersion()) && impFork.upstreamNote() == null,
-                "★ 导入的 fork：显示版本恰等于基座 ⇒ **不备注**（否则是「160.1（基于 160.1）」）");
+        ok(stat, L, "160.1".equals(impFork.displayVersion()) && "160.1".equals(impFork.upstreamNote()),
+                "★ 导入的 fork：显示版本恰等于基座也**照样备注**（2026-10-16 用户要标题带「基于 X」；"
+                        + "标题另有「改端」二字，不再同义反复）");
         //   ★ 元断言：证明上一条不是"恒 null"——同一个方法对已装 fork 必须给值。
-        ok(stat, L, installed.upstreamNote() != null && impFork.upstreamNote() == null,
-                "★元断言：upstreamNote 对「已装 fork / 导入 fork」给出不同答案（判据有分辨力）");
+        ok(stat, L, installed.upstreamNote() != null && impFork.upstreamNote() != null && noDecl.upstreamNote() == null,
+                "★元断言：upstreamNote 只对**没声明基座**的返回 null（声明过的都显示 —— 用户 2026-10-16 要标题里带「基于 X」）");
 
+        // ★★ ⑫ 给版本命名 + 原端/改端（2026-10-16 用户：「加个允许给自己导入的游戏命名」，
+        //    标题形态：「自定义名 类型（原端/改端） 版本号 基于原版版本号」）。
+        Versions.Entry named = mkEntry("official-159", "8-official-159.7", null);
+        named.customName = "我的整合包";
+        ok(stat, L, "我的整合包".equals(named.displayLabel()) && named.hasCustomName(),
+                "★ 起过名 ⇒ 显示名用自定义名（不是 APK 的 label）");
+        ok(stat, L, named.displayName(ctx).equals("我的整合包  原端  159.7"),
+                "★ 命名后的显示名 = `自定义名  类型  版本号`：" + named.displayName(ctx));
+        named.customName = "";
+        ok(stat, L, "official-159".equals(named.displayLabel()) && !named.hasCustomName(),
+                "★ 名字清空 ⇒ 回落到 APK 自己的 label");
+        // 类型判据两个方向（都从**字段**来，不是看名字猜）
+        Versions.Entry forkDecl = mkEntry("MindustryX", "8-official-2026.09.X37", "160.1");
+        Versions.Entry forkPkg = mkEntry("", "159.7", null);
+        forkPkg.imported = true; forkPkg.realPkg = "com.example.somefork";
+        Versions.Entry vanilla = mkEntry("Mindustry", "159.7", null);
+        vanilla.pkg = Versions.OFFICIAL_PKG;
+        ok(stat, L, forkDecl.modded() && forkPkg.modded() && !vanilla.modded(),
+                "★原端/改端判据：声明基座 ⇒ 改端 · 包名不是官方那份 ⇒ 改端 · 官方包名且没声明 ⇒ 原端"
+                        + "（实际 " + forkDecl.modded() + "/" + forkPkg.modded() + "/" + vanilla.modded() + "）");
+        // 自检语言被 force 成中文（见 runM3 开头）⇒ 类型词可以逐字钉
+        ok(stat, L, "原端".equals(vanilla.typeWord(ctx)) && "改端".equals(forkDecl.typeWord(ctx)),
+                "★类型词走资源：原端 / 改端（自检语言下逐字可比）："
+                        + vanilla.typeWord(ctx) + " / " + forkDecl.typeWord(ctx));
+        // 「原名」那一行：起过名才有，且逐字带原名；没起名必须是空串（否则详情里会多一行空白）
+        named.customName = "我的整合包";
+        ok(stat, L, named.origNameLine(ctx).equals("\n原名：official-159"),
+                "★起过名 ⇒ 详情里给一行「原名」（逐字）：" + named.origNameLine(ctx).replace("\n", "⏎"));
+        named.customName = "";
+        ok(stat, L, named.origNameLine(ctx).isEmpty(),
+                "★没起名 ⇒ 空串（详情里不多一行）");
+        // Config 往返（**用完就清**，不留脏数据）
+        Config.get().setNameOf("selftest:ver", "  名字带空格  ");
+        ok(stat, L, "名字带空格".equals(Config.get().nameOf("selftest:ver")),
+                "★名字进 config 会 trim：" + Config.get().nameOf("selftest:ver"));
+        Config.get().setNameOf("selftest:ver", "  ");
+        ok(stat, L, "".equals(Config.get().nameOf("selftest:ver")),
+                "★留空 = 清除（回落到原名），不写空串进 config");
+        // 删导入副本 ⇒ 名字跟着清（不留悬空引用）
+        Config.get().setNameOf("import:selftest-fake.apk", "临时");
+        Config.get().removeImport("selftest-fake.apk");
+        ok(stat, L, "".equals(Config.get().nameOf("import:selftest-fake.apk")),
+                "★删掉导入副本后，它的名字也被清掉（同槽分配那条口径）");
         // ⑪ 列表行实拼：尾注真的接在主标题后面，且**不该显示时逐字等于 displayName()**。
-        String withNote = installed.displayName()
+        String withNote = installed.displayName(ctx)
                 + ctx.getString(R.string.row_upstream_fmt, installed.upstreamNote());
-        ok(stat, L, withNote.equals("MindustryX  2026.09.X37（基于 160.1）"),
+        ok(stat, L, withNote.equals("MindustryX  改端  2026.09.X37（基于 160.1）"),
                 "★ 列表行实拼 ⇒ `" + withNote + "`");
-        ok(stat, L, noDecl.displayName().equals("Mindustry  159.7"),
-                "★ 官方行实拼 ⇒ 无尾注（与加尾注之前逐字相同）");
+        ok(stat, L, noDecl.displayName(ctx).equals("Mindustry  原端  159.7"),
+                "★ 官方行实拼 ⇒ 名称 + 原端 + 版本号，无尾注");
         L.add("");
     }
 

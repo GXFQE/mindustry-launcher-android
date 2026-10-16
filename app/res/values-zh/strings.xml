@@ -1956,4 +1956,16 @@
     <string name="trash_restore_plugin_fmt">把「%1$s」放回插件列表？放回去是未启用状态。</string>
     <string name="trash_restore_plugin_ok_fmt">「%1$s」已放回插件列表 —— 还是未启用，要自己按启用。</string>
     <!-- 第 149 轮：中转站里那件是"卸载掉的插件"（原来掉进"其他文件"） -->
-    <string name="trash_kind_plugin">卸载的插件</string></resources>
+    <string name="trash_kind_plugin">卸载的插件</string>
+    <string name="version_name_btn">命名</string>
+    <string name="save">保存</string>
+    <string name="version_type_official">原端</string>
+    <string name="version_type_modded">改端</string>
+    <string name="version_name_title">给这个版本命名</string>
+    <string name="version_name_msg">只改启动器里显示的名字（列表行、这里、继续上次都用它），不动 APK 本身。留空 = 恢复原名。</string>
+    <string name="version_name_hint">例如：我的 MindustryX</string>
+    <string name="version_name_reset">恢复原名</string>
+    <string name="version_name_saved_fmt">已命名为「%1$s」</string>
+    <string name="version_name_reset_done">已恢复原名</string>
+    <string name="detail_orig_name_fmt">\n原名：%1$s</string>
+</resources>

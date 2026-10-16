@@ -2006,4 +2006,16 @@
     <string name="trash_restore_plugin_fmt">Put \"%1$s\" back into the plugin list? It comes back disabled.</string>
     <string name="trash_restore_plugin_ok_fmt">\"%1$s\" is back in the plugin list - still disabled, enable it yourself.</string>
     <!-- round 149: the item is an uninstalled plugin (it used to fall into "Other files") -->
-    <string name="trash_kind_plugin">Uninstalled plugin</string></resources>
+    <string name="trash_kind_plugin">Uninstalled plugin</string>
+    <string name="version_name_btn">Name</string>
+    <string name="save">Save</string>
+    <string name="version_type_official">Vanilla</string>
+    <string name="version_type_modded">Modded</string>
+    <string name="version_name_title">Name this version</string>
+    <string name="version_name_msg">Only changes the name shown in the launcher (list row, here, and Continue). The APK itself is untouched. Leave empty to restore the original name.</string>
+    <string name="version_name_hint">For example: My MindustryX</string>
+    <string name="version_name_reset">Restore original</string>
+    <string name="version_name_saved_fmt">Named it \"%1$s\"</string>
+    <string name="version_name_reset_done">Original name restored</string>
+    <string name="detail_orig_name_fmt">\nOriginal name: %1$s</string>
+</resources>
