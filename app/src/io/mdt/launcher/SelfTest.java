@@ -141,6 +141,30 @@ public final class SelfTest {
             LogActivity.class, TrashActivity.class, BlueprintsActivity.class,
             BlueprintDetailActivity.class, GameSlot.class, SavesActivity.class, PluginsActivity.class};
 
+    /**
+     * ★★ 有「向上」箭头的页面 = 清单里**声明了父级的**（2026-10-16 用户报的：模组页回主页面、
+     * 存档页回槽页、地图/蓝图页**根本没有返回**）。判据只能靠断言 —— 清单里漏一行 / 写错一行，
+     * 编译器与门禁都不响，真机上就少一个返回或回到错的层级。
+     * ⇒ 二级 / 三级页必须有父级；主页面与游戏页必须没有。
+     */
+    /** 页面 → 它声明的父级（**确切值**，不是"非空即可"：写错层级时也要红） */
+    private static final Object[][] PAGES_WITH_UP = {
+            {SlotsActivity.class, "MainActivity"},
+            {SlotActivity.class, "SlotsActivity"},
+            {ModsActivity.class, "SlotActivity"},
+            {SavesActivity.class, "SlotActivity"},
+            {MapsActivity.class, "SlotActivity"},
+            {MapDetailActivity.class, "MapsActivity"},
+            {BlueprintsActivity.class, "SlotActivity"},
+            {BlueprintDetailActivity.class, "BlueprintsActivity"},
+            {SettingsActivity.class, "MainActivity"},
+            {LogActivity.class, "SettingsActivity"},
+            {TrashActivity.class, "MainActivity"},
+            {PluginsActivity.class, "MainActivity"}};
+
+    /** 主页面与游戏页：**不许**有父级（有的话主页面会平白多出一个返回箭头） */
+    private static final Class<?>[] PAGES_WITHOUT_UP = {MainActivity.class, GameSlot.class};
+
     private SelfTest() {}
 
     // ── 主入口 ────────────────────────────────────────────────────────────
@@ -230,6 +254,8 @@ public final class SelfTest {
             activityRegistration(ctx, L, stat);
             // ★ ㊱ 基类检查：每个页面都必须继承 BaseActivity（否则深浅色设置对它无效）
             activityThemeBase(ctx, L, stat);
+            // ★ ㊱b 顶栏「向上」箭头的清单依据（有父级才有箭头；箭头 = 上一页）
+            activityUpParent(ctx, L, stat);
             // ★ ㊲ 主进程崩溃落盘（真写一份探针报告再删掉）
             crashDump(ctx, L, stat);
             // ★ F23 崩溃分析：四层判据（真语料夹具 + 每层的反方向/元断言）—— 紧挨着 ㊲：
@@ -9365,6 +9391,45 @@ public final class SelfTest {
      * ★ 元断言：拿 `android.app.Activity` 这个**不是** BaseActivity 的类喂同一个判据，
      *   必须判否，否则这条可能只是在恒真地打勾。
      */
+    /**
+     * ★★ ㊱b 顶栏「向上」箭头的清单依据（2026-10-16 用户报的）：
+     * **模组页点返回回主页面、存档页回槽页、地图与蓝图页根本没有返回。**
+     *
+     * 原因 = 平台只在清单声明了 `android:parentActivityName` 的页面上画箭头，
+     * 而各页那一行是**各写各的**（漏了就没箭头、写错就回到错的层级）。
+     * 统一之后：二级 / 三级页必须声明父级，主页面与游戏页必须不声明。
+     * ⚠️ 只断言"声明了没有"这一层 —— 箭头**点下去**的行为（= `finish()`，上一页）在
+     *   `BaseActivity.onOptionsItemSelected` 里，靠真机点（自检跑在后台线程里，点不了）。
+     */
+    private static void activityUpParent(Context ctx, List<String> L, int[] stat) {
+        android.content.pm.PackageManager pm = ctx.getPackageManager();
+        for (Object[] pair : PAGES_WITH_UP) {
+            Class<?> c = (Class<?>) pair[0];
+            String want = (String) pair[1];
+            String p = parentOf(pm, c);
+            String simple = p == null ? null : p.substring(p.lastIndexOf('.') + 1);
+            ok(stat, L, want.equals(simple),
+                    "★有箭头的页面必须声明父级：" + c.getSimpleName() + " → " + want
+                            + (p == null ? "（**没声明** ⇒ 顶栏不会出现返回箭头）"
+                                         : ("（实际 " + simple + "）")));
+        }
+        for (Class<?> c : PAGES_WITHOUT_UP) {
+            String p = parentOf(pm, c);
+            ok(stat, L, p == null || p.isEmpty(),
+                    "★顶层页不许声明父级：" + c.getSimpleName()
+                            + (p == null ? "（对）" : "（声明成了 " + p + " ⇒ 会平白多一个返回箭头）"));
+        }
+    }
+
+    private static String parentOf(android.content.pm.PackageManager pm, Class<?> c) {
+        try {
+            android.content.pm.ActivityInfo ai = pm.getActivityInfo(
+                    new android.content.ComponentName(c.getPackage().getName(), c.getName()), 0);
+            return ai == null ? null : ai.parentActivityName;
+        } catch (Throwable t) {
+            return null;   // 拿不到就当没声明（断言会红，这才是要的）
+        }
+    }
     private static void activityThemeBase(Context ctx, List<String> L, int[] stat) {
         L.add("── ㊱ 每个页面都必须继承 BaseActivity（否则深浅色设置对它无效）──");
         int n = 0;

@@ -107,6 +107,7 @@
             android:name=".MapsActivity"
             android:exported="false"
             android:theme="@style/AppTheme"
+            android:parentActivityName=".SlotActivity"
             android:label="@string/maps_title" />
         <!--
           F21 地图详情：大图 + 元数据 + 四段可折叠的资源统计（地矿/墙矿/可采地板/加成地板）。
@@ -117,11 +118,13 @@
             android:name=".MapDetailActivity"
             android:exported="false"
             android:theme="@style/AppTheme"
+            android:parentActivityName=".MapsActivity"
             android:label="@string/map_detail_title" />
         <activity
             android:name=".SlotActivity"
             android:exported="false"
             android:theme="@style/AppTheme"
+            android:parentActivityName=".SlotsActivity"
             android:label="@string/slot_page_title" />
         <!--
           F22 蓝图（.msch）：列表页 + 详情页（2026-10-05 第 109 轮）。
@@ -132,11 +135,13 @@
             android:name=".BlueprintsActivity"
             android:exported="false"
             android:theme="@style/AppTheme"
+            android:parentActivityName=".SlotActivity"
             android:label="@string/bp_title" />
         <activity
             android:name=".BlueprintDetailActivity"
             android:exported="false"
             android:theme="@style/AppTheme"
+            android:parentActivityName=".BlueprintsActivity"
             android:label="@string/bp_detail_title" />
         <!--
           第 132 轮（2026-10-12）：插件页（装 / 启用停用 / 删除 / 立即重启）。
@@ -147,6 +152,7 @@
             android:name=".PluginsActivity"
             android:exported="false"
             android:theme="@style/AppTheme"
+            android:parentActivityName=".MainActivity"
             android:label="@string/plugin_page_title" />
         <activity
             android:name=".MainActivity"
@@ -237,7 +243,7 @@
             android:exported="false"
             android:theme="@style/AppTheme"
             android:label="@string/mods_title"
-            android:parentActivityName=".MainActivity"/>
+            android:parentActivityName=".SlotActivity"/>
 
         <!--
           F3 全局设置：默认槽 / 日志保留份数 / 运行日志 / 关于。
@@ -275,7 +281,7 @@
             android:exported="false"
             android:theme="@style/AppTheme"
             android:label="@string/trash_title"
-            android:parentActivityName=".SettingsActivity"/>
+            android:parentActivityName=".MainActivity"/>
 
         <!--
           游戏坑位：加载流程（存档槽交换 / 预热 / dex 注入 / load native / 挂资产链）

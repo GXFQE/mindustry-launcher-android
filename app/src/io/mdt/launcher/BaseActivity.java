@@ -70,6 +70,43 @@ public abstract class BaseActivity extends Activity {
     protected void onCreate(android.os.Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         applyLocalizedTitle();
+        applyUpAffordance();
+    }
+
+    /**
+     * ★★ 二级 / 三级页的「返回」统一成一条（2026-10-16 用户报的问题）：
+     * **模组页点返回回主页面、存档页回槽页、地图与蓝图页根本**没有**返回。**
+     *
+     * ── 原因 ──────────────────────────────────────────────────────────────
+     * 平台的"向上"箭头是**清单里声明了 `android:parentActivityName` 才会画**，
+     * 而点下去走的是**声明的父级** —— 于是各页的表现取决于清单里那一行，写漏 = 没有返回，
+     * 写错 = 回到错的层级（模组页原来声明的是主页，可它平时是从**槽页**进的）。
+     *
+     * ── 决定 ──────────────────────────────────────────────────────────────
+     * ① 有箭头：清单里声明了父级的页面（即所有二级 / 三级页）；
+     * ② 点箭头 = **返回我来的那一页**（`finish()`），**不是**跳到声明的父级 ——
+     *    同一页可能从多处进（地图页既能从槽页进、也能从批量导入的深链进），而
+     *    `parentActivityName` 只能写一个；照父级跳会在另一条路上跳错层，
+     *    更糟的是槽页**没有槽名会立刻 `finish()`**（用户会看到闪一下）。
+     *    `finish()` 永远等于"上一页"，与系统返回手势一致。
+     * ③ 主页面与游戏页（`GameSlot`）没有父级 ⇒ 不画箭头；
+     *    ⚠️ 这里**先判父级再取 ActionBar** —— GameSlot 跑的是六步启动管线，
+     *    少碰它的窗口一下是一下（它也没有 ActionBar）。
+     */
+    private void applyUpAffordance() {
+        if (getParentActivityIntent() == null) return;
+        android.app.ActionBar ab = getActionBar();
+        if (ab != null) ab.setDisplayHomeAsUpEnabled(true);
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(android.view.MenuItem item) {
+        // 箭头 = 上一页（见 applyUpAffordance 的三条）；其余菜单项照旧交给子类 / 框架。
+        if (item.getItemId() == android.R.id.home) {
+            finish();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 
     /**
