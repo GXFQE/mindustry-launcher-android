@@ -19,9 +19,12 @@ import java.util.Map;
  * 地图详情页（F21）：大图 + 元数据 + **四段可折叠的资源统计**（地矿 / 墙矿 / 可采地板 / 加成地板）
  * + 技术细节（依据）。
  *
- * <h3>口径（用户 2026-10-03 当场定的，见 REF §61.1）</h3>
- * **墙拆不掉 ⇒ 墙下的矿永久拿不到，必须排除**。所以每段的头号数字是"**能采到**"的格数，
- * 被墙压住的那些只在副行里报出来（不是丢掉，是分开说）。
+ * <h3>口径（用户 2026-10-03 当场定的，见 REF §61；2026-10-16 墙矿那一段改过，见 §95）</h3>
+ * **墙拆不掉 ⇒ 墙下的矿永久拿不到，必须排除**（这条是对**地矿 / 地板**说的）。所以每段的头号数字是
+ * "**能采到**"的格数，被墙压住的那些只在副行里报出来（不是丢掉，是分开说）。
+ * ★ **墙矿不一样**（用户 2026-10-16 定的邻域口径 + 对齐游戏 `Tile.wallDrop()`）：它本来就长在墙里，
+ * "能采"按**上下左右有没有空位可摆墙钻**算（宿主方块可拆也算能采）；拿不到的那些叫
+ * 「四周都是墙」——**不叫**"在墙下"（那句话对墙矿自相矛盾，见 {@link #rowView}）。
  *
  * <h3>两层结构（§59 的纪律）</h3>
  * 第一层 = 每段一行摘要（"6 种 · 能采到 12,345 格"），点开才是每一种的明细；
@@ -178,14 +181,15 @@ public class MapDetailActivity extends BaseActivity {
     /**
      * 一段资源：摘要常驻，明细点开才出来。
      *
-     * 🔴 **口径必须三段一致**（用户 2026-10-04 指出："沙子的数量怎么两个值"）：
+     * 🔴 **口径必须四段一致**（用户 2026-10-04 指出："沙子的数量怎么两个值"）：
      *   同一批格子可以**同时**算「可采地板」和「加成地板」（沙地既掉沙又含油），
      *   要是两段的头号数字一个用"能采到"、一个用"总格数"，用户就会看到**同名两个数**
      *   （沙子 13,976 / 沙子（含油）51,314）—— 看着像 bug，其实是两个量。
      *   ⇒ 现在：**每行头号数字一律「能采 X 格」**，副行给「共 Y 格」；摘要给「共 Y 格，其中能采到 X 格」。
-     *   ⚠️ 唯一例外是「墙矿」段：它的行名带「（墙）」，与「地矿」段不会同名，
-     *   而且墙矿本来就长在墙里（按"能采"算整段是 0），所以那一段头号数字用**总格数**，并在摘要里说明
-     *   「长在墙里，需要用墙钻」。
+     *   ★ 2026-10-16 起「墙矿」段也并进这一条（原先它是例外、只报总格数）：
+     *   用户定的邻域口径（四邻全墙 ⇒ 被墙遮挡）算出来的"能采 / 被墙遮挡"必须上屏，
+     *   否则等于没算（首轮审计当场抓的）。它那行副行的措辞是**另一句**（`stats_row_walled_fmt`）——
+     *   墙矿本来就长在墙里，套"在墙下，拿不到"是自相矛盾（2026-10-04 用户原话）。
      */
     private void addSection(String title, List<MapStats.Row> rows, boolean wallKind) {
         View card = getLayoutInflater().inflate(R.layout.card_stat_section, mBox, false);
@@ -194,7 +198,10 @@ public class MapDetailActivity extends BaseActivity {
         int reach = MapStats.sum(rows, MapStats.SUM_REACH);
         String sum;
         if (wallKind) {
-            sum = Trans.get(MapDetailActivity.this, R.string.stats_sum_wall_fmt, rows.size(), MapStatsMods.num(total));
+            sum = reach == total
+                    ? Trans.get(MapDetailActivity.this, R.string.stats_sum_wall_fmt, rows.size(), MapStatsMods.num(total))
+                    : Trans.get(MapDetailActivity.this, R.string.stats_sum_wall_split_fmt, rows.size(),
+                    MapStatsMods.num(total), MapStatsMods.num(reach));
         } else if (reach == total) {
             sum = Trans.get(MapDetailActivity.this, R.string.stats_sum_same_fmt, rows.size(), MapStatsMods.num(total));
         } else {
@@ -225,35 +232,29 @@ public class MapDetailActivity extends BaseActivity {
         ((TextView) v.findViewById(R.id.stat_row_title)).setText(
                 row.attrs == null || row.attrs.isEmpty() ? row.label
                         : Trans.get(MapDetailActivity.this, R.string.stats_row_attr_fmt, row.label, row.attrs));
-        if (wallKind) {
-            ((TextView) v.findViewById(R.id.stat_row_count))
-                    .setText(Trans.get(MapDetailActivity.this, R.string.stats_row_total_fmt, MapStatsMods.num(row.total)));
-        } else {
-            ((TextView) v.findViewById(R.id.stat_row_count))
-                    .setText(Trans.get(MapDetailActivity.this, R.string.stats_row_reach_fmt, MapStatsMods.num(row.reachable())));
-        }
+        // ★ 头号数字**四段一律「能采 X 格」**（2026-10-16 起墙矿也一样，见 addSection 的注释）
+        ((TextView) v.findViewById(R.id.stat_row_count))
+                .setText(Trans.get(MapDetailActivity.this, R.string.stats_row_reach_fmt, MapStatsMods.num(row.reachable())));
         StringBuilder sb = new StringBuilder();
         // ★ 有"拿不到"的部分时才另起一行报总数 —— 数字只有一个来源，用户不会再看到两个值
-        if (!wallKind && row.total != row.reachable()) {
+        if (row.total != row.reachable()) {
             sb.append(Trans.get(MapDetailActivity.this, R.string.stats_row_total_fmt, MapStatsMods.num(row.total)));
         }
         if (row.drop != null && !row.drop.isEmpty()) {
             cat(sb, Trans.get(MapDetailActivity.this, R.string.stats_row_drop_fmt, row.drop));
         }
-        // 🔴 「墙矿」段**不报遮挡**（用户 2026-10-04 问："什么叫做矿墙在墙下拿不到？"）：
-        //   墙矿**本身就长在墙里**，说它"在墙下"是自相矛盾的措辞；而它的"能采"按地钻口径几乎恒为 0
-        //   （实测全语料 3.2% 例外）。⇒ 那一段只用**总格数**，摘要写"长在墙里，需要用墙钻"
-        //   （用户的术语：地矿/墙矿 ↔ 地钻/墙钻；**不要**写"普通钻头采不了"）。
-        if (!wallKind) {
-            if (row.buried > 0) {
-                cat(sb, Trans.get(MapDetailActivity.this, R.string.stats_row_buried_fmt, MapStatsMods.num(row.buried)));
-            }
-            if (row.loose > 0) {
-                cat(sb, Trans.get(MapDetailActivity.this, R.string.stats_row_loose_fmt, MapStatsMods.num(row.loose)));
-            }
-            if (row.unknown > 0) {
-                cat(sb, Trans.get(MapDetailActivity.this, R.string.stats_row_unknown_fmt, MapStatsMods.num(row.unknown)));
-            }
+        // 🔴 「墙矿」段的"拿不到"是**另一句话**（用户 2026-10-04 问："什么叫做矿墙在墙下拿不到？"）：
+        //   墙矿**本身就长在墙里**，说它"在墙下"是自相矛盾的措辞 ⇒ 墙矿只说"四周都是墙，挖不到"。
+        if (row.buried > 0) {
+            cat(sb, wallKind
+                    ? Trans.get(MapDetailActivity.this, R.string.stats_row_walled_fmt, MapStatsMods.num(row.buried))
+                    : Trans.get(MapDetailActivity.this, R.string.stats_row_buried_fmt, MapStatsMods.num(row.buried)));
+        }
+        if (row.loose > 0) {
+            cat(sb, Trans.get(MapDetailActivity.this, R.string.stats_row_loose_fmt, MapStatsMods.num(row.loose)));
+        }
+        if (row.unknown > 0) {
+            cat(sb, Trans.get(MapDetailActivity.this, R.string.stats_row_unknown_fmt, MapStatsMods.num(row.unknown)));
         }
         TextView sub = (TextView) v.findViewById(R.id.stat_row_sub);
         if (sb.length() > 0) {

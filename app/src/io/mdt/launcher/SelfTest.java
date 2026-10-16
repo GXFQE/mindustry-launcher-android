@@ -9865,6 +9865,55 @@ public final class SelfTest {
                 "★反向：认不出的遮挡者记成「未知」，绝不算进「能采」"
                         + (cu3 == null ? "" : "（实际 未知 " + cu3.unknown + " / 能采 " + cu3.reachable() + "）"));
 
+        // ⑥b **墙矿**（2026-10-16 第二轮）：邻域口径 + 游戏 `Tile.wallDrop()` 口径 + 一格只算一次
+        //     fixture 见 {@link #wallGrid()}：6×5，逐格安排好的九种情况
+        MsavTiles.Tiles wt = wallGrid();
+        MapStats.Result wr = MapStats.analyze(wt, v, nm);
+        MapStats.Row wThor = rowOf(wr.oreWalls, "钍");
+        MapStats.Row wGraph = rowOf(wr.oreWalls, "graphitic-wall");
+        MapStats.Row oThor = rowOf(wr.ores, "钍");
+        MapStats.Row oCu = rowOf(wr.ores, "铜");
+        ok(stat, L, wThor != null && wThor.total == 3 && wThor.reachable() == 1 && wThor.buried == 2,
+                "★墙矿（矿层）：3 格 = 能采 1（四邻有空）+ 被墙遮挡 2（四邻全墙 / **出界算墙**）"
+                        + (wThor == null ? "" : "（实际 共 " + wThor.total + " / 能采 " + wThor.reachable()
+                        + " / 遮挡 " + wThor.buried + "）"));
+        ok(stat, L, wGraph != null && wGraph.total == 2 && wGraph.reachable() == 2
+                        && "graphitic-wall".equals(wGraph.label),
+                "★墙矿（方块层「自己带掉落」那支）：2 格都能采；行名 = **方块名**（不是掉落物名+（墙））"
+                        + (wGraph == null ? "" : "（实际 " + wGraph.label + " / " + wGraph.total + " 格）"));
+        ok(stat, L, rowOf(wr.oreWalls, "graphite") == null,
+                "★元断言：方块层那支**不再**拼「掉落物名+（墙）」—— 否则会多出一行「graphite（墙）」");
+        ok(stat, L, oThor != null && oThor.total == 3 && oThor.reachable() == 3 && oThor.buried == 0,
+                "★「墙矿摆在非墙格」⇒ 归**地矿**：air / 玩家墙 / 传送带 各 1 格，3 格都能采"
+                        + (oThor == null ? "" : "（实际 共 " + oThor.total + " / 能采 " + oThor.reachable() + "）"));
+        ok(stat, L, oCu != null && oCu.total == 1 && oCu.reachable() == 0 && oCu.buried == 1,
+                "★地矿被永久墙压住 ⇒ 能采 0 / 共 1（对照：同一张图里墙矿那几格不算「被压」）");
+        ok(stat, L, wr.blockers.size() == 1 && "stone-wall".equals(wr.blockers.get(0).label)
+                        && wr.blockers.get(0).total == 1,
+                "★★「挡住资源的方块」只算**压着地矿**的那 1 格：承载墙矿的 3 面 stone-wall **不在**名单里"
+                        + (wr.blockers.isEmpty() ? ""
+                        : "（实际 " + wr.blockers.get(0).label + " " + wr.blockers.get(0).total + " 格）"));
+        ok(stat, L, MapStats.sum(wr.oreWalls, MapStats.SUM_TOTAL) == 5
+                        && MapStats.sum(wr.ores, MapStats.SUM_TOTAL) == 4,
+                "★★元断言：墙矿段合计 **5** 格（矿层 4 + 石墨墙 2 − 重复 1）、地矿段 4 格 —— 一格只算一次");
+        // 反方向：宿主那面墙**可拆**时照样能采（哪怕四邻全墙）；方块层那支的行名 = 方块名
+        MapStats.Table vt = MapStats.copyOf(v);
+        MapStats.Def bl2 = vt.row("boulder");
+        if (bl2 != null) {
+            bl2.solid = true;
+            bl2.itemDrop = "stone";
+        }
+        MapStats.Result wr2 = MapStats.analyze(wallGridOne("boulder"), vt, nm);
+        MapStats.Row g2 = wr2.oreWalls.isEmpty() ? null : wr2.oreWalls.get(0);
+        ok(stat, L, bl2 != null && g2 != null && "boulder".equals(g2.label)
+                        && g2.total == 1 && g2.reachable() == 1,
+                "★宿主**可拆** ⇒ 能采（哪怕四邻全墙）：旧口径「可拆遮挡=能采」的落点"
+                        + (g2 == null ? "" : "（实际 " + g2.label + " / 能采 " + g2.reachable() + "）"));
+        // 反向：**没打补丁**的 boulder（solid=false）根本不算墙矿 —— 证明上面那条判据真的在看字段
+        MapStats.Result wr3 = MapStats.analyze(wallGridOne("boulder"), v, nm);
+        ok(stat, L, wr3.oreWalls.isEmpty(),
+                "★反向：未打补丁的 boulder（solid=false）不算墙矿 —— 判据看的是字段，不是名字");
+
         // ⑦ 译名链：**模组自己的 bundle** ⨁ 版本 APK 的 bundle（模组优先 —— 与游戏叠加顺序一致）
         File tmp = new File(Paths.privateDir(ctx), "selftest-mapstats");
         deleteTree(tmp);
@@ -10091,8 +10140,86 @@ public final class SelfTest {
         return t;
     }
 
-    /** 假译名：铜/钍/沙 + 属性词（真译名要从版本 APK 读，这里只验"组装"这一段） */
-    private static MapStats.Names fakeNames() {
+    /**
+     * 6×5 的手工地图：**墙矿的各种情况**（2026-10-16 第二轮的口径，逐格安排）。
+     *
+     * <pre>
+     *        x=0      x=1        x=2        x=3         x=4          x=5
+     *  y=0   air      墙         墙         墙          墙        ★墙矿（上/右出界 ⇒ 遮挡）
+     *  y=1   air   ①能采(1)   ②遮挡(2)      墙         air           墙
+     *  y=2   air     air       air      ④玩家墙→地矿  ⑤传送带→地矿  ⑥假墙矿→地矿
+     *  y=3 ⑨地矿被压   air    ⑦石墨墙能采    air      ⑧石墨墙+墙矿     air
+     *  y=4   air     air       air        air         air           air
+     * </pre>
+     * 括号里是"矿层墙矿"的格数；④⑤ 落回地矿（方块不是实心天然墙）、⑥ 是假墙矿（air）、
+     * ⑧ 两条都命中（方块层石墨墙 + 矿层钍墙矿）⇒ **只算石墨那一次**。
+     */
+    private static MsavTiles.Tiles wallGrid() {
+        MsavTiles.Tiles t = new MsavTiles.Tiles();
+        t.width = 6;
+        t.height = 5;
+        String[] names = {"air", "stone-wall", "boulder", "copper-wall", "conveyor",
+                "graphitic-wall", "ore-wall-thorium", "ore-copper", "stone"};
+        for (String s : names) t.blockNames.add(s);
+        int n = 30;
+        t.floors = new short[n];
+        t.ores = new short[n];
+        t.blocks = new short[n];
+        for (int i = 0; i < n; i++) t.floors[i] = 8;          // 石头地板（不掉东西 ⇒ 不进地板统计）
+        // y=0：x=1..4 四格墙（其中 (2,0) 是 ② 的北墙）
+        t.blocks[1] = 1;
+        t.blocks[2] = 1;
+        t.blocks[3] = 1;
+        t.blocks[4] = 1;
+        // ① 墙矿·能采：(1,1) 的墙 + 矿，左邻 (0,1) 是 air
+        t.blocks[7] = 1;
+        t.ores[7] = 6;
+        // ② 墙矿·被墙遮挡：(2,1) 四邻全墙 = (1,1) / (3,1) / (2,0) / (2,2)
+        t.blocks[8] = 1;
+        t.ores[8] = 6;
+        t.blocks[9] = 1;
+        t.blocks[14] = 1;
+        // ③ 墙矿·出界算有墙：(5,0) 上/右越界，左 (4,0)、下 (5,1) 都是墙
+        t.blocks[5] = 1;
+        t.ores[5] = 6;
+        t.blocks[11] = 1;
+        // ④⑤⑥ 墙矿摆在**非墙格** ⇒ 地矿（玩家墙 / 传送带 / air）
+        t.blocks[15] = 3;
+        t.ores[15] = 6;
+        t.blocks[16] = 4;
+        t.ores[16] = 6;
+        t.ores[17] = 6;
+        // ⑦ 方块层那支（石墨墙）：独一格，左邻 air ⇒ 能采
+        t.blocks[20] = 5;
+        // ⑧ 双重计数格：方块层石墨墙 + 矿层钍墙矿 ⇒ 只算石墨那一次
+        t.blocks[22] = 5;
+        t.ores[22] = 6;
+        // ⑨ 地矿被永久墙压：(0,3) 石头墙 + 铜矿
+        t.blocks[18] = 1;
+        t.ores[18] = 7;
+        return t;
+    }
+
+    /** 3×3：中心放 `<name>` 那个方块，四邻里全是 stone-wall（验"宿主可拆 ⇒ 能采"那条） */
+    private static MsavTiles.Tiles wallGridOne(String name) {
+        MsavTiles.Tiles t = new MsavTiles.Tiles();
+        t.width = 3;
+        t.height = 3;
+        t.blockNames.add("air");
+        t.blockNames.add("stone-wall");
+        t.blockNames.add(name);
+        t.floors = new short[9];
+        t.ores = new short[9];
+        t.blocks = new short[9];
+        t.blocks[1] = 1;
+        t.blocks[3] = 1;
+        t.blocks[4] = 2;                                      // 中心 = 被测的那个方块
+        t.blocks[5] = 1;
+        t.blocks[7] = 1;
+        return t;
+    }
+
+    /** 假译名：铜/钍/沙 + 属性词（真译名要从版本 APK 读，这里只验"组装"这一段） */    private static MapStats.Names fakeNames() {
         return new MapStats.Names() {
             @Override public String block(String i) {
                 return i;

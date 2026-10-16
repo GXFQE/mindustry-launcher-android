@@ -863,8 +863,8 @@ final class DevTools {
                         sum += r.millis;
                         sb.append("· ").append(it.name()).append("  ").append(r.width).append('x')
                           .append(r.height).append("  统计 ").append(r.millis).append(" ms\n");
-                        // 两类矿的口径（第 84 轮）：**地矿**（地板上的矿，用地钻）用「能采」口径；
-                        // **墙矿**（墙里的矿，要用墙钻）只报总格数、不报遮挡（见 MapDetailActivity）
+                        // 四段**同一口径**（2026-10-16 起墙矿也并进来）：头号数字「能采」，
+                        // 总数/遮挡进括号；墙矿的遮挡措辞是"四周是墙"（它长在墙里，不是"在墙下"）
                         sb.append("    地矿: ").append(a.rowsOf(r.ores, false)).append('\n');
                         if (!r.oreWalls.isEmpty()) {
                             sb.append("    墙矿: ").append(a.rowsOf(r.oreWalls, true)).append('\n');

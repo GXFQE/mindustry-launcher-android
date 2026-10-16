@@ -26,13 +26,13 @@ import java.util.zip.ZipFile;
  * 地图「资源统计」的**纯 Java 核心**（F21，第 83 轮）：算出一张地图里
  * **地矿 / 墙矿 / 可采地板 / 加成地板**各占多少格，并把"被拆不掉的墙压住的格子"从"拿得到"里剔出去。
  *
- * <h3>判据链（每一环都有实测，见 REF §61）</h3>
+ * <h3>判据链（每一环都有实测，见 REF §61 / §95）</h3>
  * <pre>
  *   ① 瓦片      MsavTiles（F10 已有，386/386 逐格与游戏一致）
  *   ② 定义表    「有效内容定义表」= 原版表 ⨁ 模组 content JSON ⨁ 地图自带数据补丁
  *   ③ 计数      按 content id **预计算标志** + int[] 计数（循环里不许出现字符串/HashMap：
  *                实测朴素写法 15.31 ms/张，这样写 1.64 ms/张，见 §61.5）
- *   ④ 遮挡      露天 / 可拆（计入）/ **永久（排除）** / 未知
+ *   ④ 遮挡      露天 / 可拆（计入）/ **永久（排除）** / 未知   ← **地矿 / 地板**用这一套
  *   ⑤ 译名      该槽版本 APK 的 bundle（UTF-8）；矿照 OreBlock 口径 = 物品名
  * </pre>
  *
@@ -47,6 +47,37 @@ import java.util.zip.ZipFile;
  * `Tile.drop()` 在墙下**仍返回矿的物品**（物品在、拿不到）⇒ "有矿但采不到"必须自己剔。
  * ⚠️ 编辑器里能删墙，但那是**改地图**，不算"游戏内可得资源"。
  *
+ * <h3>★★ 墙矿（2026-10-16 用户定口径 + 2026-10-16 对齐游戏字节码）</h3>
+ * 判据**照抄游戏** `mindustry.world.Tile#wallDrop()`（v160.4 字节码逐字核过，
+ * 墙钻一族 `BeamDrill` 数矿读的就是它）：
+ * <pre>
+ *   if(block.solid){
+ *       if(block.itemDrop != null)                       return block.itemDrop;   // ① 方块自己就是墙矿
+ *       else if(overlay.wallOre &amp;&amp; !block.synthetic())   return overlay.itemDrop; // ② 矿层那支墙矿
+ *       else                                             return null;             // ③ 都不是
+ *   }
+ *   return null;
+ * </pre>
+ * 落成我们的四条（**一格只算一次**、`①压②`）：
+ * <ol>
+ *   <li><b>方块自带掉落</b>（`solid` + `itemDrop` 非空 + 不是矿）⇒ 墙矿，
+ *       行名用**方块自己的名字**（`graphitic-wall` ⇒「石墨墙」；模组注册的同类方块一样接得住）；</li>
+ *   <li><b>矿层 `wallOre`</b> 且方块**实心、不是 synthetic** ⇒ 墙矿，
+ *       行名照 `OreBlock` 口径 = 掉落物名 + 「（墙）」；</li>
+ *   <li>矿层 `wallOre` 但方块是 air / 建筑 / 玩家墙（synthetic）/ 认不出 ⇒ 按**地矿**算
+ *       —— 这就是用户 2026-10-16 说的「墙矿放在非墙体上会被视为地矿（反过来不行）」；</li>
+ *   <li>同一格两条都命中（矿层 `ore-wall-x` + 方块层 `graphitic-wall`）⇒ 只算方块那一支
+ *       —— 游戏 `wallDrop()` 里 `block.itemDrop` **优先**，我们跟着走。</li>
+ * </ol>
+ *
+ * <p><b>墙矿「拿不拿得到」</b>（这一支**不用**上面的露天/可拆/永久，那套是说"矿被什么压着"的）：
+ * <pre>
+ *   能挖     = 上下左右有一个空位（摆得下墙钻）**或**宿主方块自己**可拆**（拆掉就成了假墙矿 ⇒ 地钻能采）
+ *   被墙遮挡 = 四邻全是墙 / 出界，且宿主拆不掉
+ * </pre>
+ * ⚠️ **越界算"有墙"**（用户 2026-10-16 明确：「越界肯定算有墙啊」）—— 地图外没有空位可摆机器。
+ * ★ 方块层那支（石墨墙）**不**进"挡住资源的方块"名单：它自己就是那格的资源，不是障碍物。
+ *
  * <h3>为什么这些表要 PC 侧导、不能端上现推</h3>
  * `type:` 没写的字段取的是**类默认值**（不是 false），而"裸 new 一个类拿默认值"需要
  * 游戏运行时环境：实测裸 new 时名字必须唯一（否则 content 注册表报
@@ -57,7 +88,8 @@ import java.util.zip.ZipFile;
  *
  * <h3>本类刻意不碰 Android</h3>
  * 连 JSON 都是自带的极小读取器（见 {@link Json}），这样它能在 PC 上单独编译，
- * 拿 460 个语料与 F21 的既有产物逐格对照（`_lab/msav/f21/StatsCheck.java`）。
+ * 拿 460 个语料与 F21 的既有产物逐格对照（`_lab/msav/f21/StatsCheck.java`；
+ * 2026-10-16 的逐情况审计台 = `_lab/msav/f21/audit-20261016/`）。
  *
  * 🔴 本类**只读**：不 mkdirs、不落盘、不改任何东西。
  */
@@ -1278,9 +1310,9 @@ public final class MapStats {
         // ★ 预计算：每个 content id 的类别与遮挡类别。循环里**只有 int 数组**（§61.5：15.31 → 1.64 ms）
         //   category 用**位掩码**：一格可以同时是"可采地板"和"加成地板"
         //   （沙地既掉沙、又含水 —— 第 82 轮的样例输出里它两段都出现，这是**对的**，不是重复计数）
-        final int ORE = 1, ORE_WALL = 2, MINE_FLOOR = 4, BONUS_FLOOR = 8;
         byte[] cat = new byte[m];
         byte[] occl = new byte[m];              // 0 露天 1 可拆 2 永久 3 未知
+        boolean[] wall = new boolean[m];        // 方块层：**这一格自己就是墙矿**（游戏 wallDrop 第一支）
         Def[] defs = new Def[m];
         int airId = t.airId();
         for (int id = 0; id < m; id++) {
@@ -1292,8 +1324,10 @@ public final class MapStats {
                 continue;
             }
             if (d.isOre) cat[id] |= (byte) (d.wallOre ? ORE_WALL : ORE);
-            if (d.isFloor) {
-                // 两条**独立**的判据（照 Occ3）：可采地板看掉落物、加成地板看属性/移速/伤害
+            // ★ 方块层里**自己就是墙矿**的方块（`graphitic-wall` 一类，判据见 wallHost）：
+            //   它落在**方块层**而不是矿层 ⇒ 只标类别不够，循环里要单独计数。
+            wall[id] = wallHost(d);
+            if (d.isFloor) {                // 两条**独立**的判据（照 Occ3）：可采地板看掉落物、加成地板看属性/移速/伤害
                 if (!d.itemDrop.isEmpty() && !d.isOre) cat[id] |= MINE_FLOOR;
                 if (d.bonus()) cat[id] |= BONUS_FLOOR;
             }
@@ -1305,21 +1339,41 @@ public final class MapStats {
         int[] blocker = new int[m];
         int[] unkOreId = new int[m], unkFloorId = new int[m];
         final short[] fl = t.floors, ov = t.ores, bl = t.blocks;
+        final int tw = t.width, th = t.height;
         for (int i = 0; i < n; i++) {
             int o = ov[i], f = fl[i], b = bl[i];
+            // ★ 每格的遮挡类别（**地矿 / 地板**用）：0 露天 1 可拆 2 永久 3 未知
             int oc = (b >= 0 && b < m) ? occl[b] : 3;
-            boolean ore = false, mine = false;
+            Def db = (b >= 0 && b < m) ? defs[b] : null;
+            // ★★ 墙矿（口径见类注释）：游戏 `Tile.wallDrop()` 两条前置
+            //   ① 方块层**自己就带掉落** ⇒ 这一格是墙矿（优先，矿物层那支不再计）
+            //   ② 矿层 `wallOre` 且方块**实心、不是 synthetic** ⇒ 矿层那支墙矿
+            //      （方块是 air / 建筑 / 玩家墙 / 认不出 ⇒ 落回**地矿**）
+            boolean blockWall = b >= 0 && b < m && wall[b];
+            boolean hostCounts = db == null || (db.solid && !db.synthetic);
+            boolean hiddenOre = false, mine = false;
             if (o >= 0 && o < m && o != airId) {
                 int c = cat[o];
-                if ((c & ORE) != 0) {
+                if ((c & ORE) != 0) {                       // 地矿：走原有遮挡口径
                     cOre[oc][o]++;
-                    ore = true;
-                } else if ((c & ORE_WALL) != 0) {
-                    cWall[oc][o]++;
-                    ore = true;
+                    hiddenOre = true;
+                } else if ((c & ORE_WALL) != 0) {           // 矿层里的墙矿
+                    if (blockWall) {
+                        // 这一格方块层已经算过一次墙矿（游戏里 wallDrop 取方块那一支）⇒ 矿层这支**不再计**，
+                        // 否则同一格会被数两遍（旧实现就是这样，语料里 236 格 / 6 图）
+                    } else if (hostCounts) {
+                        cWall[wallReachable(bl, tw, th, i, db) ? 0 : 2][o]++;
+                    } else {                                // 假墙矿 / 建筑上 / 玩家墙上 ⇒ 地矿
+                        cOre[oc][o]++;
+                        hiddenOre = true;
+                    }
                 } else if (defs[o] == null) {
                     unkOreId[o]++;
                 }
+            }
+            // 方块层里**自己就是墙矿**的方块：只要这一格有它，就算一格（与矿层那支互斥）
+            if (blockWall) {
+                cWall[wallReachable(bl, tw, th, i, db) ? 0 : 2][b]++;
             }
             if (f >= 0 && f < m && f != airId) {
                 int c = cat[f];
@@ -1334,14 +1388,17 @@ public final class MapStats {
                     unkFloorId[f]++;
                 }
             }
-            // 永久遮挡者：只统计它压住了**矿物或可采地板**的那些格（那才是"拿不到"的损失）
-            if (oc == 2 && b >= 0 && b < m && (ore || mine)) blocker[b]++;
+            // 永久遮挡者：只统计它压住了**地矿或可采地板**的那些格（那才是"拿不到"的损失）。
+            // 🔴 墙矿**不算**：它的宿主墙不是障碍物 —— 那格的资源就是它自己；墙矿"拿不到"
+            //    由墙矿段的「能采 / 被墙遮挡」表达（旧实现把 112,207 格宿主墙也列成"挡住资源的方块"，
+            //    真机上与墙矿段同屏自相矛盾）。
+            if (oc == 2 && b >= 0 && b < m && (hiddenOre || mine)) blocker[b]++;
         }
 
-        build(r.ores, cOre, t.blockNames, defs, nm, false, false, tab.itemNames);
-        build(r.oreWalls, cWall, t.blockNames, defs, nm, false, false, tab.itemNames);
-        build(r.floors, cFloor, t.blockNames, defs, nm, true, false, tab.itemNames);
-        build(r.bonuses, cBonus, t.blockNames, defs, nm, false, true, tab.itemNames);
+        build(r.ores, cOre, t.blockNames, defs, nm, false, false, tab.itemNames, false);
+        build(r.oreWalls, cWall, t.blockNames, defs, nm, false, false, tab.itemNames, true);
+        build(r.floors, cFloor, t.blockNames, defs, nm, true, false, tab.itemNames, false);
+        build(r.bonuses, cBonus, t.blockNames, defs, nm, false, true, tab.itemNames, false);
 
         // 永久遮挡者 top
         List<Row> bs = new ArrayList<>();
@@ -1424,8 +1481,78 @@ public final class MapStats {
         return "";
     }
 
+    /**
+     * 资源**类别位掩码**（一格可以同时是"可采地板"和"加成地板"）。
+     * ⚠️ 只用于**矿层**：`build()` 靠 `ORE_WALL` 决定「（墙）」后缀，方块层那支自己判（见 {@link #wallHost}）。
+     */
+    static final int ORE = 1, ORE_WALL = 2, MINE_FLOOR = 4, BONUS_FLOOR = 8;
+
+    /**
+     * 这个方块**自己就是墙矿**（游戏 `Tile.wallDrop()` 的第一支）：实心 + 自带掉落 + 不是矿。
+     *
+     * <p>原版里只有 `graphitic-wall`（石墨，实测全游戏仅此 1 个），但**模组一样接得住**
+     * （用户 2026-10-16：「如果有人注册的类似石墨墙的东西」；语料里真有
+     * `exoprosopa-bethinecobalt`）。多格的 `*-wall-large` 不吃这条（实测 `itemDrop` 为空）。</p>
+     *
+     * <p>⚠️ 与游戏**有意差一处**：游戏只看 `block.solid &amp;&amp; block.itemDrop != null`，
+     * 不排除矿类；可矿石类方块出现在**方块层**是编辑器/游戏都写不出来的东西（实测 462 张语料里 0 格），
+     * 真出现了也会让同一样东西在地矿/墙矿两段各报一次 ⇒ 这里加 `!isOre`。</p>
+     */
+    static boolean wallHost(Def d) {
+        return d != null && !d.isOre && d.solid && !d.itemDrop.isEmpty();
+    }
+
+    /** 这一行是**矿层**那支墙矿（游戏第二支的原料）：`isOre && wallOre` */
+    static boolean wallOreKind(Def d) {
+        return d != null && d.isOre && d.wallOre;
+    }
+
+    /**
+     * 这一格墙矿**拿不拿得到**（墙矿那一支专用的口径，**不用**露天/可拆/永久那套——
+     * 那套说的是"矿层被什么压着"，而墙矿本来就长在墙里）：
+     *
+     * <ol>
+     *   <li>宿主方块自己**可拆** ⇒ 拿得到（拆掉就成假墙矿，地钻能采；2026-10-04 定的"可拆遮挡=能采"）；</li>
+     *   <li>否则看**上下左右有没有空位**（摆得下墙钻）⇒ 拿得到。</li>
+     * </ol>
+     *
+     * @param host 宿主方块（矿层那支 = 承载它的墙；方块层那支 = 它自己）—— 认不出时传 null
+     */
+    static boolean wallReachable(short[] blocks, int w, int h, int i, Def host) {
+        if (host != null && host.removable()) return true;
+        return anyNeighborOpen(blocks, w, h, i);
+    }
+
+    /**
+     * 这一格的**上下左右**里，有没有"没有墙"的格（用户 2026-10-16 定的墙矿口径）。     *
+     * <p>「没墙」= 该格方块层是 air —— 也就是**有空位摆机器**。
+     * 用于区分「墙矿（能挖）」与「被墙遮挡的墙矿（四邻全是墙，挖不到）」。</p>
+     *
+     * <p>⚠️ **越界算"有墙"**（用户 2026-10-16 明确：「越界肯定算有墙啊」）——
+     * 地图外没有空位可摆机器，所以边缘那圈墙矿不该因为"外面是空的"而被判成能挖。</p>
+     */
+    static boolean anyNeighborOpen(short[] blocks, int w, int h, int i) {
+        int x = i % w, y = i / w;
+        if (x > 0 && isAirAt(blocks, i - 1)) return true;
+        if (x < w - 1 && isAirAt(blocks, i + 1)) return true;
+        if (y > 0 && isAirAt(blocks, i - w)) return true;
+        if (y < h - 1 && isAirAt(blocks, i + w)) return true;
+        return false;               // 四邻都是墙 / 出界 ⇒ 视为"四邻全是墙"
+    }
+
+    private static boolean isAirAt(short[] blocks, int i) {
+        int b = blocks[i] & 0xFFFF;
+        return b == 0;              // blockNames[0] 恒为 air（MsavTiles 的约定，见 airId()）
+    }
+
+    /**
+     * @param wallTab 这一栏是不是「墙矿」栏 —— 只有它会走"矿层墙矿"的整名模板。
+     *                计数本身已经按格分好了（非墙格上的墙矿进 `cOre`），这里只管取名：
+     *                **矿层**那支 = 掉落物名 + 「（墙）」；**方块层**那支 = 方块自己的名字。
+     */
     private static void build(List<Row> out, int[][] c, List<String> names, Def[] defs, Names nm,
-                             boolean floor, boolean bonus, Map<String, String> itemNames) {
+                             boolean floor, boolean bonus, Map<String, String> itemNames,
+                             boolean wallTab) {
         Map<String, Row> byLabel = new LinkedHashMap<>();
         for (int id = 0; id < c[0].length; id++) {
             int total = c[0][id] + c[1][id] + c[2][id] + c[3][id];
@@ -1447,7 +1574,12 @@ public final class MapStats {
                 // 矿：照 OreBlock 的口径 = 掉落物名（`OreBlock` 构造器里 `localizedName = item.localizedName`，
                 // 字节码已核）；认不出来就退回方块名
                 String base;
-                if (d == null || d.itemDrop.isEmpty()) {
+                if (wallHost(d)) {
+                    // ★ **方块层那一支**（石墨墙一类）：名字用**方块自己的名字**（`graphitic-wall` ⇒「石墨墙」），
+                    //   不是掉落物名。判据上它跟 OreBlock 无关，套「掉落物名+（墙）」会印出
+                    //   「石材（墙）」（`stone-cliff` 那种能拆的道具）—— 2026-10-16 审计抓的。
+                    base = blockLabel(nm, internal, d, internal);
+                } else if (d == null || d.itemDrop.isEmpty()) {
                     base = blockLabel(nm, internal, d, internal);
                 } else {
                     base = itemLabel(nm, d, itemNames);
@@ -1455,7 +1587,10 @@ public final class MapStats {
                 }
                 if (base == null || base.isEmpty()) base = pretty(internal);
                 label = base;
-                if (d != null && d.wallOre && nm != null) label = nm.wallName(base);
+                // ★ 「（墙）」只给**矿层那一支**（照 OreBlock 口径 = 掉落物名 + 后缀）：
+                //   假墙矿（`ore-wall-*` 摆在非墙格）归**地矿**栏 ⇒ 不带；
+                //   方块层那支用方块自己的名字（「石墨墙」）⇒ 再加「（墙）」就重复了。
+                if (wallTab && wallOreKind(d) && nm != null) label = nm.wallName(base);
             }
             Row row = byLabel.get(label);
             if (row == null) {

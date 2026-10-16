@@ -1813,10 +1813,15 @@
       🔴 别写"普通钻头采不了" —— 用户明确纠正过，要写"需要用墙钻"。
     -->
     <string name="stats_sum_wall_fmt">%1$d 种 · 共 %2$s 格（长在墙里，需要用墙钻）</string>
+    <!-- ★ 2026-10-16：墙矿段也报「能采」了 —— 用户定的邻域口径（四邻全墙 ⇒ 被墙遮挡）原先算出来但没上屏。
+         摘要跟其它三段同构（共 Y 格，其中能采 X 格），只保留「需要用墙钻」这句定位。 -->
+    <string name="stats_sum_wall_split_fmt">%1$d 种 · 共 %2$s 格，其中能采 %3$s 格（长在墙里，需要用墙钻）</string>
     <string name="stats_row_reach_fmt">能采 %1$s 格</string>
     <string name="stats_row_total_fmt">共 %1$s 格</string>
     <string name="stats_row_drop_fmt">掉落 %1$s</string>
     <string name="stats_row_buried_fmt">%1$s 格在墙下，拿不到</string>
+    <!-- ★ 墙矿专用的「拿不到」：**不说**"在墙下"（墙矿本来就长在墙里，那句自相矛盾），只说状态 + 结论。 -->
+    <string name="stats_row_walled_fmt">%1$s 格四周都是墙，挖不到</string>
     <string name="stats_row_loose_fmt">%1$s 格被建筑或石头盖着（拆掉就能采）</string>
     <string name="stats_row_unknown_fmt">%1$s 格认不出被什么挡着</string>
     <string name="stats_more_fmt">还有 %1$d 种没列出来</string>

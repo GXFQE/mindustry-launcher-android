@@ -169,7 +169,7 @@ public class MainActivity extends BaseActivity {
     /**
      * dev 报告用：把一类的每一行拼成一行文字。
      *
-     * 🔴 与界面**同一口径**（用户 2026-10-04 指出"沙子的数量怎么两个值"）：
+     * 🔴 与界面**同一口径**（用户 2026-10-04 指出"沙子的数量怎么两个值"；2026-10-16 墙矿段也并进来了）：
      *   头号数字一律「能采 R」，总数与遮挡情况放括号里 —— 报告与截图对不上就没法当证据。
      */
     static String rowsOf(java.util.List<MapStats.Row> rows, boolean wallKind) {
@@ -179,17 +179,13 @@ public class MainActivity extends BaseActivity {
         for (MapStats.Row r : rows) {
             if (n++ > 0) sb.append(" · ");
             sb.append(r.label);
-            if (wallKind) {
-                // 墙矿：**不报遮挡**（它本身就长在墙里；说"在墙下"是矛盾的措辞）—— 见 MapDetailActivity 的注释
-                sb.append(" 共 ").append(r.total).append(" 格");
-            } else {
-                sb.append(" 能采 ").append(r.reachable()).append(" 格");
-                if (r.total != r.reachable()) sb.append("（共 ").append(r.total);
-                if (r.buried > 0) sb.append(" · 墙下 ").append(r.buried);
-                if (r.loose > 0) sb.append(" · 建筑下 ").append(r.loose);
-                if (r.unknown > 0) sb.append(" · 未知 ").append(r.unknown);
-                if (r.total != r.reachable()) sb.append('）');
-            }
+            sb.append(" 能采 ").append(r.reachable()).append(" 格");
+            if (r.total != r.reachable()) sb.append("（共 ").append(r.total);
+            // 墙矿的"拿不到"是**另一句话**：它长在墙里，不是"在墙下"（与界面同一措辞）
+            if (r.buried > 0) sb.append(wallKind ? " · 四周是墙 " : " · 墙下 ").append(r.buried);
+            if (r.loose > 0) sb.append(" · 建筑下 ").append(r.loose);
+            if (r.unknown > 0) sb.append(" · 未知 ").append(r.unknown);
+            if (r.total != r.reachable()) sb.append('）');
             if (!r.drop.isEmpty()) sb.append("[掉落 ").append(r.drop).append(']');
         }
         return sb.toString();

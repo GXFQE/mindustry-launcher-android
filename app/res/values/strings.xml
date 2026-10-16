@@ -1860,10 +1860,14 @@
       🔴 别写"普通钻头采不了" —— 用户明确纠正过，要写"需要用墙钻"。
     -->
     <string name="stats_sum_wall_fmt">%1$d kinds · %2$s tiles (grows inside walls, needs a wall drill)</string>
+    <!-- ★ 2026-10-16: the wall section now reports reachable tiles too (neighbour rule), same shape as the other three. -->
+    <string name="stats_sum_wall_split_fmt">%1$d kinds · %2$s tiles, of which %3$s are reachable (grows inside walls, needs a wall drill)</string>
     <string name="stats_row_reach_fmt">%1$s tiles reachable</string>
     <string name="stats_row_total_fmt">%1$s tiles total</string>
     <string name="stats_row_drop_fmt">drops %1$s</string>
     <string name="stats_row_buried_fmt">%1$s tiles under a wall, out of reach</string>
+    <!-- ★ Wall ore has its own wording: it does not sit "under" a wall, it sits inside one. -->
+    <string name="stats_row_walled_fmt">%1$s tiles walled in on all sides, out of reach</string>
     <string name="stats_row_loose_fmt">%1$s tiles covered by buildings or rocks (mineable once cleared)</string>
     <string name="stats_row_unknown_fmt">%1$s tiles blocked by something unrecognised</string>
     <string name="stats_more_fmt">%1$d more kinds not listed</string>
