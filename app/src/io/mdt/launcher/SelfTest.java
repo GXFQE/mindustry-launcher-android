@@ -9961,12 +9961,15 @@ public final class SelfTest {
         MapStats.Row fSand = rowOf(fr.floors, "sand-floor");   // 地板行的名字走 blockLabel（不是掉落物名）
         MapStats.Row fSalt = rowOf(fr.bonuses, "salt");        // 同上：加成地板那行也是方块名
         MapStats.Row fWallTh = rowOf(fr.oreWalls, "钍（墙）"); // 真墙矿那支（矿层）
-        ok(stat, L, fSand != null && fSand.total == 5 && fSand.reachable() == 1 && fSand.priority == 4,
-                "★矿层压过地板：沙地板 5 格 ⇒ **只有 1 格能采**，另 4 格「上面有矿，按上面的矿算」"
+        ok(stat, L, fSand != null && fSand.total == 5 && fSand.reachable() == 1 && fSand.priority == 2 && fSand.buried == 2,
+                "★矿层压过地板：沙地板 5 格 ⇒ **只有 1 格能采**；2 格「上面有矿，按上面的矿算」（露天 / 假墙矿各一）＋ 2 格「在墙下」（方块是普通墙 / 可采墙 ⇒ 钻头进不去）"
                         + "（地矿 ×2 / **假墙矿** / **真墙矿**各一）"
                         + (fSand == null ? "" : "（实际 共 " + fSand.total + " / 能采 " + fSand.reachable()
                         + " / 按上面的矿算 " + fSand.priority + "）"));
-        ok(stat, L, fCu != null && fCu.total == 3 && fCu.reachable() == 2 && fCu.buried == 1,
+        ok(stat, L, fSand != null && fSand.buried == 2,
+                "★★用户补的那条：可采地板上面有矿**但方块是拆不掉的墙** ⇒ 记「在墙下」，"
+                        + "**不是**「按上面的矿算」（钻头根本进不去，谈优先级没意义）"
+                        + (fSand == null ? "" : "（实际 墙下 " + fSand.buried + " / 按上面的矿算 " + fSand.priority + "）"));        ok(stat, L, fCu != null && fCu.total == 3 && fCu.reachable() == 2 && fCu.buried == 1,
                 "★地矿照常算：铜 3 格（能采 2 + 墙下 1）—— 地板那支不算，矿这支才算"
                         + (fCu == null ? "" : "（实际 共 " + fCu.total + " / 能采 " + fCu.reachable()
                         + " / 墙下 " + fCu.buried + "）"));
