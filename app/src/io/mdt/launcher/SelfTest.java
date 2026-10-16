@@ -9906,10 +9906,12 @@ public final class SelfTest {
         MapStats.Row wGraph = rowOf(wr.oreWalls, "graphitic-wall");
         MapStats.Row oThor = rowOf(wr.ores, "钍");
         MapStats.Row oCu = rowOf(wr.ores, "铜");
-        ok(stat, L, wThor != null && wThor.total == 3 && wThor.reachable() == 1 && wThor.buried == 2,
-                "★墙矿（矿层）：3 格 = 能采 1（四邻有空）+ 被墙遮挡 2（四邻全墙 / **出界算墙**）"
+        ok(stat, L, wThor != null && wThor.total == 4 && wThor.reachable() == 1 && wThor.buried == 2
+                        && wThor.capped == 1,
+                "★墙矿（矿层）：4 格 = 能采 1（四邻有空）+ 四周是墙 2（含**出界算墙**）+ **压在墙矿底下 1**"
+                        + "（⑧ 那格底下是石墨墙 ⇒ 按底下的墙计、上面这层算遮挡，2026-10-16 用户追加）"
                         + (wThor == null ? "" : "（实际 共 " + wThor.total + " / 能采 " + wThor.reachable()
-                        + " / 遮挡 " + wThor.buried + "）"));
+                        + " / 四周是墙 " + wThor.buried + " / 压在墙矿底下 " + wThor.capped + "）"));
         ok(stat, L, wGraph != null && wGraph.total == 2 && wGraph.reachable() == 2
                         && "graphitic-wall".equals(wGraph.label),
                 "★墙矿（方块层「自己带掉落」那支）：2 格都能采；行名 = **方块名**（不是掉落物名+（墙））"
@@ -9926,9 +9928,10 @@ public final class SelfTest {
                 "★★「挡住资源的方块」只算**压着地矿**的那 1 格：承载墙矿的 3 面 stone-wall **不在**名单里"
                         + (wr.blockers.isEmpty() ? ""
                         : "（实际 " + wr.blockers.get(0).label + " " + wr.blockers.get(0).total + " 格）"));
-        ok(stat, L, MapStats.sum(wr.oreWalls, MapStats.SUM_TOTAL) == 5
+        ok(stat, L, MapStats.sum(wr.oreWalls, MapStats.SUM_TOTAL) == 6
                         && MapStats.sum(wr.ores, MapStats.SUM_TOTAL) == 4,
-                "★★元断言：墙矿段合计 **5** 格（矿层 4 + 石墨墙 2 − 重复 1）、地矿段 4 格 —— 一格只算一次");
+                "★★元断言：墙矿段合计 **6** 格（矿层 4 + 石墨墙 2）、地矿段 4 格 —— "
+                        + "⑧ 那格**每层各算一次**（方块层 = 那格的资源；矿层 = 上面那层矿压在它底下、拿不到）");
         // 反方向：宿主那面墙**可拆**时照样能采（哪怕四邻全墙）；方块层那支的行名 = 方块名
         MapStats.Table vt = MapStats.copyOf(v);
         MapStats.Def bl2 = vt.row("boulder");
@@ -10224,7 +10227,8 @@ public final class SelfTest {
         t.ores[17] = 6;
         // ⑦ 方块层那支（石墨墙）：独一格，左邻 air ⇒ 能采
         t.blocks[20] = 5;
-        // ⑧ 双重计数格：方块层石墨墙 + 矿层钍墙矿 ⇒ 只算石墨那一次
+        // ⑧ **压在墙矿底下**那格：方块层石墨墙 + 矿层钍墙矿
+        //    ⇒ 方块层那行算一格（底下这面墙就是那格的资源），矿层那行多算一格**遮挡**（capped）
         t.blocks[22] = 5;
         t.ores[22] = 6;
         // ⑨ 地矿被永久墙压：(0,3) 石头墙 + 铜矿

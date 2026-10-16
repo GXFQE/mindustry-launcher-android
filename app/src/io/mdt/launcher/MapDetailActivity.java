@@ -250,6 +250,12 @@ public class MapDetailActivity extends BaseActivity {
                     ? Trans.get(MapDetailActivity.this, R.string.stats_row_walled_fmt, MapStatsMods.num(row.buried))
                     : Trans.get(MapDetailActivity.this, R.string.stats_row_buried_fmt, MapStatsMods.num(row.buried)));
         }
+        // ★★ 2026-10-16 用户追加：「墙矿位置下面的墙自己也是墙矿（石墨墙一类）⇒ 按底下的墙计，
+        //    上面的墙矿视为遮挡」。⚠️ 与上一句**分开说**：都是"挖不到"，但原因不同
+        //    （`ref/29` 第 45 条：blocker 要按来因拆）。
+        if (wallKind && row.capped > 0) {
+            cat(sb, Trans.get(MapDetailActivity.this, R.string.stats_row_capped_fmt, MapStatsMods.num(row.capped)));
+        }
         if (row.loose > 0) {
             cat(sb, Trans.get(MapDetailActivity.this, R.string.stats_row_loose_fmt, MapStatsMods.num(row.loose)));
         }
