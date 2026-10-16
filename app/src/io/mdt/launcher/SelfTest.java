@@ -2005,6 +2005,22 @@ public final class SelfTest {
         ok(stat, L, "原端".equals(vanilla.typeWord(ctx)) && "改端".equals(forkDecl.typeWord(ctx)),
                 "★类型词走资源：原端 / 改端（自检语言下逐字可比）："
                         + vanilla.typeWord(ctx) + " / " + forkDecl.typeWord(ctx));
+        // ★ 类型词的开关（2026-10-16 用户：「继续上次不要显示那个类型」）：
+        //   withType=false 只去掉**类型那一段**，名称 / 版本号 / 基座尾注一字不动。
+        Versions.Entry noType = mkEntry("MindustryX", "8-official-2026.09.X37", "160.1");
+        String withT = noType.displayName(ctx), withoutT = noType.displayName(ctx, false);
+        ok(stat, L, withT.contains("改端") && !withoutT.contains("改端"),
+                "★withType=false ⇒ 不出现类型词：" + withoutT);
+        ok(stat, L, withT.equals(noType.displayLabel() + "  " + noType.typeWord(ctx) + "  " + noType.displayVersion())
+                        && withoutT.equals(noType.displayLabel() + "  " + noType.displayVersion()),
+                "★元断言：两串只差类型那一段（名称/版本号两串都有，拼法只有一处）："
+                        + withT + " / " + withoutT);
+        ok(stat, L, withoutT.equals("MindustryX  2026.09.X37"),
+                "★「继续上次」那一行逐字 = `名称  版本号`：" + withoutT);
+        // 没名字的条目也一样（不因为没起过名就漏掉版本号）
+        ok(stat, L, noType.displayName(ctx, true).startsWith(noType.displayLabel()),
+                "★两种取法都以名称为前缀");
+
         // 「原名」那一行：起过名才有，且逐字带原名；没起名必须是空串（否则详情里会多一行空白）
         named.customName = "我的整合包";
         ok(stat, L, named.origNameLine(ctx).equals("\n原名：official-159"),

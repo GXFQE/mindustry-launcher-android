@@ -883,7 +883,10 @@ public class MainActivity extends BaseActivity {
             return;
         }
         mBtnContinue.setVisibility(View.VISIBLE);
-        mContinueText.setText(Trans.get(MainActivity.this, R.string.main_continue_fmt, e.displayName(this)));
+        // ★ 2026-10-16 用户：「继续上次不要显示那个类型」—— 这行是纯文本按钮，没有列表行那种
+        //   弱化层次，类型词在这里只是把"叫什么、哪一版"往后挤（见 Entry#displayName(ctx, boolean)）。
+        mContinueText.setText(Trans.get(MainActivity.this, R.string.main_continue_fmt,
+                e.displayName(this, false)));
         mBtnContinue.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { startVersion(e); }
         });

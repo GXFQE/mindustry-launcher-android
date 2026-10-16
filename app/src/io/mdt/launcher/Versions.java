@@ -504,7 +504,22 @@ public final class Versions {
          *   ⇒ 属于"两个入口、一段实现"，**已删除**。别再加回来 —— 要标记就去副标题做。
          */
         public String displayName(Context ctx) {
-            return displayLabel() + "  " + typeWord(ctx) + "  " + displayVersion();
+            return displayName(ctx, true);
+        }
+
+        /**
+         * 同上，但可以**不要类型词**（`withType = false`）。
+         *
+         * <p>为什么要有这个开关（2026-10-16 用户：「继续上次不要显示那个类型」）：
+         * 列表行里类型是**弱化的小字**（见 `MainActivity.buildTitle` 的弱化区间），一眼就知道
+         * 它是注解；而「继续上次」是个**纯文本按钮**，没有那个层次 ⇒ `MindustryX  改端  2026.09.X37
+         * （基于 160.1）` 读起来只是很长的一串，用户要的信息（叫什么、哪一版）被挤到后面。
+         *
+         * ⚠️ 但这**不是**"另写一份拼接"：类型词取舍只是同一个方法的参数，
+         *    名称/版本号/基座尾注的拼法**仍然只有这一处**（F17b：两个入口、一段实现）。
+         */
+        public String displayName(Context ctx, boolean withType) {
+            return displayLabel() + "  " + (withType ? typeWord(ctx) + "  " : "") + displayVersion();
         }
 
         /**
