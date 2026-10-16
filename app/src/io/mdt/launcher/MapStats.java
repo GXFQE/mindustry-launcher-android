@@ -66,15 +66,15 @@ import java.util.zip.ZipFile;
  *       行名照 `OreBlock` 口径 = 掉落物名 + 「（墙）」；</li>
  *   <li>矿层 `wallOre` 但方块是 air / 建筑 / 玩家墙（synthetic）/ 认不出 ⇒ 按**地矿**算
  *       —— 这就是用户 2026-10-16 说的「墙矿放在非墙体上会被视为地矿（反过来不行）」；</li>
- *   <li>同一格两条都命中（矿层 `ore-wall-x` + 方块层 `graphitic-wall`）⇒ **按底下的墙计**
- *       （游戏 `wallDrop()` 里 `block.itemDrop` **优先**，我们跟着走），
- *       而上面那层墙矿**记为"压在墙矿底下"（{@link Row#capped}）**、
- *       ★★ 2026-10-16 用户追加：「如果墙矿位置下面的墙本身属于类似石墨墙的这种墙，
- *       按底下的墙计（上面的墙矿视为遮挡）」——
- *       方块层那行照常算一格（能采/被墙遮挡按它的邻域判），矿层那行**多一格遮挡**：
- *       墙钻在那格采到的是底下那面墙，上面这层矿**拿不到**。
+ *   <li>同一格两条都命中（矿层 `ore-wall-x` + 方块层 `graphitic-wall`）⇒ **按底下的墙算**
+ *       —— 游戏 `wallDrop()` 里 `block.itemDrop` **优先**（①压②），我们跟着走；
+ *       而上面那层墙矿记为**"按底下的墙算"（{@link Row#priority}）**：
+ *       ★★ 2026-10-16 用户：「如果墙矿位置下面的墙本身属于类似石墨墙的这种墙，
+ *       **按底下的墙计**（上面的墙矿视为遮挡）」。
+ *       🔴 同一天用户又纠正了措辞：**这是优先级问题，不是"被墙压住"** ⇒
+ *       界面 / 报告 / 文档里**不许**写成「压在…底下 / 被墙盖住 / 遮挡」，只说**"按底下的墙算"**。
  *       ⚠️ 这与 {@link #wallHost} 那条"一格只算一次"不冲突：**每层各算一次**，
- *       而且两处的**含义不同**（方块层 = 那格的资源；矿层 = 上面那层矿的下场）。</li>
+ *       而且两处的**含义不同**（方块层 = 那格的资源；矿层 = 这一格的矿按优先级让给了底下那面墙）。</li>
  * </ol>
  *
  * <p><b>墙矿「拿不拿得到」</b>（这一支**不用**上面的露天/可拆/永久，那套是说"矿被什么压着"的）：
@@ -1257,17 +1257,20 @@ public final class MapStats {
         public String source = SRC_VANILLA;
         public int total, open, loose, buried, unknown;
         /**
-         * ★★ **压在墙矿底下**的格数（2026-10-16 用户追加的口径）—— 只对**矿层**那支有意义。
+         * ★★ **按底下的墙算**的格数（2026-10-16 用户定的口径）—— 只对**矿层**那支有意义。
          *
          * <p>这一格的**方块层自己就是墙矿**（`graphitic-wall` 一类「实心 + 自带掉落」的墙）⇒
-         * 按**底下的墙**计（方块层那一行），而上面这层墙矿**视为遮挡**：
-         * 游戏里 `Tile.wallDrop()` 只返回方块那支的掉落 ⇒ 这格的墙钻采到的是底下那面墙，
-         * 上面这层矿**拿不到**。
+         * 同一格两层都命中，按游戏 `Tile.wallDrop()` 的**优先级**（①`block.itemDrop` 压②矿层 `wallOre`）
+         * **按底下的墙算**：方块层那一行照常算一格，而上面这层墙矿**不是"能采"**
+         * —— 墙钻在这格采到的是底下那面墙。
          *
-         * ⚠️ 与 {@link #buried}（四周都是墙）分开记：两者都是"挖不到"，但**原因不同**
-         * （`ref/29` 第 45 条：blocker 要按来因拆）。`total` **包含**它，{@link #reachable()} **不含**。
+         * <p>🔴 用户 2026-10-16 纠正过措辞：**这是优先级问题，不是"被墙压住"**
+         * ⇒ 文案与规矩里**不许**写成「压在…底下 / 被墙盖住 / 遮挡」，只说"按底下的墙算"。
+         *
+         * <p>⚠️ 与 {@link #buried}（四周都是墙）分开记：两者的**原因**不同
+         * （`ref/29` 第 45/47 条：来因要拆开说）。`total` **包含**它，{@link #reachable()} **不含**。
          */
-        public int capped;
+        public int priority;
 
         /** **拿得到**的格数 = 露天 + 可拆遮挡 （永久遮挡**排除**） */
         public int reachable() {
@@ -1356,8 +1359,8 @@ public final class MapStats {
         // 计数：[类别][遮挡][id]
         int[][] cOre = new int[4][m], cWall = new int[4][m], cFloor = new int[4][m], cBonus = new int[4][m];
         int[] blocker = new int[m];
-        // ★ 矿层墙矿里**被底下的墙矿盖住**的那些格（按矿 id 数；见 `Row.capped` 的长注释）
-        int[] capOre = new int[m];
+        // ★ 矿层墙矿里**按底下的墙算**的那些格（按矿 id 数；见 `Row.priority` 的长注释）
+        int[] prioOre = new int[m];
         int[] unkOreId = new int[m], unkFloorId = new int[m];
         final short[] fl = t.floors, ov = t.ores, bl = t.blocks;
         final int tw = t.width, th = t.height;
@@ -1381,10 +1384,11 @@ public final class MapStats {
                 } else if ((c & ORE_WALL) != 0) {           // 矿层里的墙矿
                     if (blockWall) {
                         // ★★ 这一格**底下的墙自己就是墙矿**（石墨墙一类）⇒ 按**底下的墙**计
-                        //    （下面方块层那支会算它），而上面这层墙矿**视为遮挡** ——
+                        //    （下面方块层那支会算它），而上面这层墙矿**不是"能采"** ——
                         //    游戏 `wallDrop()` 只返回方块那支的掉落，墙钻在这格采到的是底下那面墙
-                        //    （2026-10-16 用户追加的口径）。⚠️ 与"四周都是墙"分开记，原因不同。
-                        capOre[o]++;
+                        //    （2026-10-16 用户定的口径）。⚠️ 与"四周都是墙"分开记，原因不同。
+                        //    🔴 用户同一天纠正过措辞：这是**优先级**问题，不是"被墙压住"/"遮挡"。
+                        prioOre[o]++;
                     } else if (hostCounts) {
                         cWall[wallReachable(bl, tw, th, i, db) ? 0 : 2][o]++;
                     } else {                                // 假墙矿 / 建筑上 / 玩家墙上 ⇒ 地矿
@@ -1396,8 +1400,8 @@ public final class MapStats {
                 }
             }
             // 方块层里**自己就是墙矿**的方块：只要这一格有它，就算一格
-            // ⚠️ 与矿层那支**不再互斥**（2026-10-16 用户追加）：矿层那支改成记"压在墙矿底下"（capOre），
-            //    两处含义不同（方块层 = 那格的资源；矿层 = 上面那层矿拿不到）⇒ 各自算各自的。
+            // ⚠️ 与矿层那支**不再互斥**（2026-10-16 用户定）：矿层那支改成记"按底下的墙算"（prioOre），
+            //    两处含义不同（方块层 = 那格的资源；矿层 = 这一格的矿按优先级让给了底下那面墙）。
             if (blockWall) {
                 cWall[wallReachable(bl, tw, th, i, db) ? 0 : 2][b]++;
             }
@@ -1422,7 +1426,7 @@ public final class MapStats {
         }
 
         build(r.ores, cOre, t.blockNames, defs, nm, false, false, tab.itemNames, false, null);
-        build(r.oreWalls, cWall, t.blockNames, defs, nm, false, false, tab.itemNames, true, capOre);
+        build(r.oreWalls, cWall, t.blockNames, defs, nm, false, false, tab.itemNames, true, prioOre);
         build(r.floors, cFloor, t.blockNames, defs, nm, true, false, tab.itemNames, false, null);
         build(r.bonuses, cBonus, t.blockNames, defs, nm, false, true, tab.itemNames, false, null);
 
@@ -1575,16 +1579,16 @@ public final class MapStats {
      * @param wallTab 这一栏是不是「墙矿」栏 —— 只有它会走"矿层墙矿"的整名模板。
      *                计数本身已经按格分好了（非墙格上的墙矿进 `cOre`），这里只管取名：
      *                **矿层**那支 = 掉落物名 + 「（墙）」；**方块层**那支 = 方块自己的名字。
-     * @param cappedOrNull 矿层墙矿里「被底下的墙矿盖住」的格数（按矿 id；见 {@link Row#capped}）。
+     * @param priorityOrNull 矿层墙矿里「按底下的墙算」的格数（按矿 id；见 {@link Row#priority}）。
      *                     只有墙矿栏需要它，别的栏传 `null`。它**计入 total、不计入 reachable**。
      */
     private static void build(List<Row> out, int[][] c, List<String> names, Def[] defs, Names nm,
                              boolean floor, boolean bonus, Map<String, String> itemNames,
-                             boolean wallTab, int[] cappedOrNull) {
+                             boolean wallTab, int[] priorityOrNull) {
         Map<String, Row> byLabel = new LinkedHashMap<>();
         for (int id = 0; id < c[0].length; id++) {
-            int capped = cappedOrNull == null ? 0 : cappedOrNull[id];
-            int total = c[0][id] + c[1][id] + c[2][id] + c[3][id] + capped;
+            int prio = priorityOrNull == null ? 0 : priorityOrNull[id];
+            int total = c[0][id] + c[1][id] + c[2][id] + c[3][id] + prio;
             if (total <= 0) continue;
             String internal = names.get(id);
             Def d = defs[id];
@@ -1636,7 +1640,7 @@ public final class MapStats {
             row.loose += c[1][id];
             row.buried += c[2][id];
             row.unknown += c[3][id];
-            row.capped += capped;
+            row.priority += prio;
         }
         out.addAll(byLabel.values());
         sort(out);
@@ -1676,17 +1680,17 @@ public final class MapStats {
         });
     }
 
-    /** 一类资源的总格数（`what` = SUM_*；`SUM_CAPPED` 只对墙矿栏有意义，见 {@link Row#capped}） */
+    /** 一类资源的总格数（`what` = SUM_*；`SUM_PRIORITY` 只对墙矿栏有意义，见 {@link Row#priority}） */
     public static int sum(List<Row> rows, int what) {
         int s = 0;
         for (Row r : rows) {
             s += what == 0 ? r.total : what == 1 ? r.reachable() : what == 2 ? r.buried
-                    : what == 3 ? r.unknown : r.capped;
+                    : what == 3 ? r.unknown : r.priority;
         }
         return s;
     }
 
-    public static final int SUM_TOTAL = 0, SUM_REACH = 1, SUM_BURIED = 2, SUM_UNKNOWN = 3, SUM_CAPPED = 4;
+    public static final int SUM_TOTAL = 0, SUM_REACH = 1, SUM_BURIED = 2, SUM_UNKNOWN = 3, SUM_PRIORITY = 4;
 
     private static int sum(int[] a) {
         int s = 0;

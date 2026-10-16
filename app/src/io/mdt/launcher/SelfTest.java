@@ -9907,11 +9907,11 @@ public final class SelfTest {
         MapStats.Row oThor = rowOf(wr.ores, "钍");
         MapStats.Row oCu = rowOf(wr.ores, "铜");
         ok(stat, L, wThor != null && wThor.total == 4 && wThor.reachable() == 1 && wThor.buried == 2
-                        && wThor.capped == 1,
-                "★墙矿（矿层）：4 格 = 能采 1（四邻有空）+ 四周是墙 2（含**出界算墙**）+ **压在墙矿底下 1**"
-                        + "（⑧ 那格底下是石墨墙 ⇒ 按底下的墙计、上面这层算遮挡，2026-10-16 用户追加）"
+                        && wThor.priority == 1,
+                "★墙矿（矿层）：4 格 = 能采 1（四邻有空）+ 四周是墙 2（含**出界算墙**）+ **按底下的墙算 1**"
+                        + "（⑧ 那格底下是石墨墙 ⇒ 游戏 `wallDrop` 里方块掉落**优先**，不是「被墙压住」）"
                         + (wThor == null ? "" : "（实际 共 " + wThor.total + " / 能采 " + wThor.reachable()
-                        + " / 四周是墙 " + wThor.buried + " / 压在墙矿底下 " + wThor.capped + "）"));
+                        + " / 四周是墙 " + wThor.buried + " / 按底下的墙算 " + wThor.priority + "）"));
         ok(stat, L, wGraph != null && wGraph.total == 2 && wGraph.reachable() == 2
                         && "graphitic-wall".equals(wGraph.label),
                 "★墙矿（方块层「自己带掉落」那支）：2 格都能采；行名 = **方块名**（不是掉落物名+（墙））"
@@ -9931,7 +9931,7 @@ public final class SelfTest {
         ok(stat, L, MapStats.sum(wr.oreWalls, MapStats.SUM_TOTAL) == 6
                         && MapStats.sum(wr.ores, MapStats.SUM_TOTAL) == 4,
                 "★★元断言：墙矿段合计 **6** 格（矿层 4 + 石墨墙 2）、地矿段 4 格 —— "
-                        + "⑧ 那格**每层各算一次**（方块层 = 那格的资源；矿层 = 上面那层矿压在它底下、拿不到）");
+                        + "⑧ 那格**每层各算一次**（方块层 = 那格的资源；矿层 = 这一格的矿按**优先级**让给了底下那面墙）");
         // 反方向：宿主那面墙**可拆**时照样能采（哪怕四邻全墙）；方块层那支的行名 = 方块名
         MapStats.Table vt = MapStats.copyOf(v);
         MapStats.Def bl2 = vt.row("boulder");
@@ -10227,8 +10227,9 @@ public final class SelfTest {
         t.ores[17] = 6;
         // ⑦ 方块层那支（石墨墙）：独一格，左邻 air ⇒ 能采
         t.blocks[20] = 5;
-        // ⑧ **压在墙矿底下**那格：方块层石墨墙 + 矿层钍墙矿
-        //    ⇒ 方块层那行算一格（底下这面墙就是那格的资源），矿层那行多算一格**遮挡**（capped）
+        // ⑧ **按底下的墙算**那格：方块层石墨墙 + 矿层钍墙矿
+        //    ⇒ 方块层那行算一格（底下这面墙就是那格的资源），矿层那行多算一格**按底下的墙算**（priority）
+        //    🔴 用户 2026-10-16 纠正过措辞：这是**优先级**（`wallDrop` ①压②），不是「被墙压住」
         t.blocks[22] = 5;
         t.ores[22] = 6;
         // ⑨ 地矿被永久墙压：(0,3) 石头墙 + 铜矿

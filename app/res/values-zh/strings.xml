@@ -1822,7 +1822,7 @@
     <string name="stats_row_buried_fmt">%1$s 格在墙下，拿不到</string>
     <!-- ★ 墙矿专用的「拿不到」：**不说**"在墙下"（墙矿本来就长在墙里，那句自相矛盾），只说状态 + 结论。 -->
     <string name="stats_row_walled_fmt">%1$s 格四周都是墙，挖不到</string>
-    <string name="stats_row_capped_fmt">%1$s 格压在墙矿底下，挖不到</string>
+    <string name="stats_row_priority_fmt">%1$s 格底下也是墙矿，按底下的墙算</string>
     <string name="stats_row_loose_fmt">%1$s 格被建筑或石头盖着（拆掉就能采）</string>
     <string name="stats_row_unknown_fmt">%1$s 格认不出被什么挡着</string>
     <string name="stats_more_fmt">还有 %1$d 种没列出来</string>
