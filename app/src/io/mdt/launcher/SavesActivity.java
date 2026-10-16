@@ -34,7 +34,9 @@ public class SavesActivity extends BaseActivity {
     public static final String EXTRA_SLOT = "slot";
 
     private String mSlot;
-    private ListView mList;
+    private android.view.ViewGroup mList;
+    /** 行单击（容器形态没有 `OnItemClickListener`，见 `onCreate`） */
+    private MsavListAdapter.RowClick mRowClick;
     private TextView mHead;
     private TextView mEmpty;
     private View mBadRow;
@@ -92,13 +94,15 @@ public class SavesActivity extends BaseActivity {
 
         mHead = (TextView) root.findViewById(R.id.save_head);
         mEmpty = (TextView) root.findViewById(R.id.save_empty);
-        mList = (ListView) root.findViewById(R.id.save_list);
-        mList.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-            @Override public void onItemClick(AdapterView<?> p, View v, int pos, long id) {
+        // ★★ 2026-10-16（第 151b 轮）：列表改成整页 `ScrollView` 里手工挂载的容器（见 `activity_saves.xml` 头）。
+        //   行单击因此挂在每一行上（容器没有 `OnItemClickListener`）——由 `SlotIo.fillSaves` 挂。
+        mList = (android.view.ViewGroup) root.findViewById(R.id.save_list);
+        mRowClick = new MsavListAdapter.RowClick() {
+            @Override public void onRow(int pos) {
                 if (pos < 0 || pos >= mFiles.length) return;
                 SlotIo.showSaveDetail(SavesActivity.this, mSlot, mFiles[pos]);
             }
-        });
+        };
         mBadRow = root.findViewById(R.id.row_save_bad);
         mBadDiv = root.findViewById(R.id.div_save_bad);
 
@@ -228,7 +232,7 @@ public class SavesActivity extends BaseActivity {
         mFiles = shown.toArray(new File[0]);
         if (mFillToken != null) mFillToken[0] = false;
         mFillToken = new boolean[]{true};
-        SlotIo.fillSaves(this, mSlot, mList, mFillToken, mFiles);
+        SlotIo.fillSaves(this, mSlot, mList, mFillToken, mFiles, mRowClick);
 
         boolean filtering = ListQuery.filtering(mQuery, mSort, false, ListQuery.SORT_NAME);
         // 表头那句同时承担"有几份"（标题里放不下多行，见 dialog_msav_list.xml 的实测）

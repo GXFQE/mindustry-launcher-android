@@ -45,8 +45,10 @@ public class TrashActivity extends BaseActivity {
 
     private TextView mHead;
     private TextView mEmpty;
-    private ListView mList;
+    private android.view.ViewGroup mList;
     private MsavListAdapter mAdapter;
+    /** 行单击（容器形态没有 `OnItemClickListener`，见 `onCreate`） */
+    private MsavListAdapter.RowClick mRowClick;
     /** 当前列表（点第几项 ⇒ 拿哪一份） */
     private List<Trash.Item> mItems;
 
@@ -62,7 +64,8 @@ public class TrashActivity extends BaseActivity {
 
         mHead = (TextView) root.findViewById(R.id.trash_head);
         mEmpty = (TextView) root.findViewById(R.id.trash_empty);
-        mList = (ListView) root.findViewById(R.id.trash_list);
+        // ★★ 2026-10-16（第 151b 轮）：列表改成整页 `ScrollView` 里手工挂载的容器（见 `activity_trash.xml` 头）
+        mList = (android.view.ViewGroup) root.findViewById(R.id.trash_list);
         mHead.setText(Trans.get(TrashActivity.this, R.string.trash_scanning));
 
         Util.bindAction(root, R.id.row_trash_empty_all, R.drawable.ic_trash,
@@ -70,11 +73,11 @@ public class TrashActivity extends BaseActivity {
                     @Override public void run() { confirmEmptyAll(); }
                 });
 
-        mList.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener() {
-            @Override public void onItemClick(android.widget.AdapterView<?> p, View v, int pos, long id) {
+        mRowClick = new MsavListAdapter.RowClick() {
+            @Override public void onRow(int pos) {
                 if (mItems != null && pos >= 0 && pos < mItems.size()) showActions(mItems.get(pos));
             }
-        });
+        };
     }
 
     /** 每次回本页重扫一次（用户可能刚从地图页删了一张图过来） */
@@ -117,7 +120,7 @@ public class TrashActivity extends BaseActivity {
                         mItems = items;
                         mHead.setText(TrashText.head(TrashActivity.this, items.size(), bytes));
                         mAdapter = new MsavListAdapter(TrashActivity.this, titles, subs);
-                        mList.setAdapter(mAdapter);
+                        mAdapter.fillInto(mList, mRowClick);
                         // ★ 空态：整块**收掉**不放空框（用户 2026-10-04 的口径），
                         //   而且这句要说清"为什么会空"与"什么动作会把东西挪进来"。
                         if (mEmpty != null) {

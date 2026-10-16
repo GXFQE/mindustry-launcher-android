@@ -6,19 +6,31 @@
     原来这里是**弹窗菜单**（看每份存档… / 导出存档… / 导入存档…），
     而模组 / 地图 / 蓝图那三条早就是**页面**了 ⇒ 存档补齐同一形状。
 
-  ★ 结构照抄 `activity_blueprints`：页面自己的 ListView（**不套 ScrollView** ⇒ 没有 F2b 那条"高度塌掉"）+
-    表头 + **动作行放顶上**（用户 2026-10-03 定案：动作行放底部会盖住列表末行）。
+  ★ 结构照抄 `activity_blueprints`：表头 + 动作行放顶上
+    （用户 2026-10-03 定案：动作行放底部会盖住列表末行）。
+
+  ★★ 2026-10-16（第 151b 轮）：**根从 `LinearLayout` 改成 `ScrollView`，列表从 `ListView`
+     改成手工挂载的 `LinearLayout`**（与主界面 F2c / 存档页 F3b 同一条口径）。
+     原来那句"不套 ScrollView ⇒ 没有 F2b 那条高度塌掉"只对**竖屏**成立：
+     横屏可用高只有 1224px(376dp) − ActionBar，顶部区一撑满，`weight` 子视图只能拿 0
+     ⇒ 搜索框与整张列表被挤到屏幕外、根又不能滚 = 用户报的「横屏根本点不到下面」。
+     ⚠️ `ScrollView` 里**不能**再放 `ListView`（它只按单行估高 ⇒ 滚不到底，F3b 的 AOSP 公式级根因）。
 
   🔴 根节点必须有 `@+id/root`，且 Activity 必须调 `Util.applySystemInsets(root)`：
      targetSdk ≥ 35 强制 edge-to-edge ⇒ 漏了这一步整页从 y=0 开始画、被状态栏 + 顶栏整块盖住，
      而且**全程不报错**（第 81 轮踩过，自检 ㉛ 会拦）。
 -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
+    android:fillViewport="true"
     android:background="@color/bg">
+
+  <LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
 
     <!--
       ★ 表头（份数这类信息**不能塞标题**：ActionBar 标题是单行的，超了直接省略号，
@@ -149,13 +161,12 @@
         android:textColor="@color/fg_muted"
         android:visibility="gone" />
 
-    <ListView
+    <!-- ★★ 列表容器：不是 `ListView`（见文件头 2026-10-16 那条）；行由 `SlotIo.fillSaves` 手工挂载 -->
+    <LinearLayout
         android:id="@+id/save_list"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:divider="@null"
-        android:dividerHeight="0dp"
-        android:paddingBottom="8dp"
-        android:clipToPadding="false" />
-</LinearLayout>
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingBottom="8dp" />
+  </LinearLayout>
+</ScrollView>

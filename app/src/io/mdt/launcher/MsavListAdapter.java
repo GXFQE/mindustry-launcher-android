@@ -19,6 +19,18 @@ import android.widget.TextView;
  *   后台读完 meta 再补第二行）⇒ 就地改数组 + {@link #notifyDataSetChanged()} 最省事。
  */
 final class MsavListAdapter extends BaseAdapter {
+
+    /**
+     * 点整行（**容器形态**专用）。
+     *
+     * ★ 为什么不用 `AdapterView.OnItemClickListener`：那个接口只在 `ListView` 上有；
+     *   页面已经改成「整页 `ScrollView` + 手工挂载」（F3b），行是我们自己 `addView` 的
+     *   ⇒ 单击直接挂在行根上，回调里给的就是**显示下标**（与 `getView` 的 i 同一套）。
+     */
+    interface RowClick {
+        void onRow(int i);
+    }
+
     private final LayoutInflater inf;
     private final String[] titles;
     private final String[] subs;
@@ -104,6 +116,54 @@ final class MsavListAdapter extends BaseAdapter {
     }
 
     /**
+     * ★★ **把整张列表填进一个容器**（2026-10-16 第 151b 轮：四个列表页并进 F2c/F3b 那条线）。
+     *
+     * <p>为什么：页面原来是「顶部固定 + `ListView` `0dp/weight=1`」——竖屏够高没事，
+     * **横屏可用高只有 376dp − ActionBar**，动作卡一撑满，`weight` 子视图只能拿 0
+     * ⇒ 搜索框与整张列表**被挤到屏幕外，而且根是 `LinearLayout` 不能滚** = 用户报的
+     * 「横屏根本点不到下面」。F2c 早就在主界面 / 存档页上定过口径：**整页 `ScrollView`
+     * + 列表用 `LinearLayout` 手工挂载**（F3b 证明了 `ScrollView` 里的 `ListView`
+     * 只按单行估高 ⇒ 滚不到底）。这四个页面当时没并进来，现在补上。
+     *
+     * <p>⚠️ 与 `ListView` 的区别：**所有行都会挂上**（没有回收）。这四个页面本来就要
+     * 一次性持有全部缩略图数组，条目量在几十~几百，实测可接受；换来的是"整页一起滚、横竖屏同一个行为"。
+     *
+     * @param click 行单击回调（`null` = 这些行不需要点击）
+     */
+    void fillInto(android.view.ViewGroup container, final RowClick click) {
+        if (container == null) return;
+        container.removeAllViews();
+        for (int i = 0; i < getCount(); i++) {
+            View row = getView(i, null, container);
+            if (click != null) {
+                final int idx = i;
+                row.setOnClickListener(new View.OnClickListener() {
+                    @Override public void onClick(View v) { click.onRow(idx); }
+                });
+            }
+            container.addView(row);
+        }
+    }
+
+    /**
+     * 取第 i 行**当前挂着的那个 View**。
+     *
+     * ⚠️ 两种容器**都在用**，别只留一种：
+     *   · 页面 = `LinearLayout`（手工挂载）⇒ 子 View 与下标**一一对应**；
+     *   · 对话框 = `ListView`（`dialog_msav_list.xml`，勾选 / 选一份那两条路）⇒ 只有可见区有子 View，
+     *     要减 `getFirstVisiblePosition()`。
+     * 两种都返回 `null` 表示"这一行现在不在屏幕上"——调用方照旧什么都不做（滚回来时 `getView` 会用新值渲染）。
+     */
+    private static View rowAt(android.view.ViewGroup list, int i) {
+        if (list == null) return null;
+        if (list instanceof android.widget.ListView) {
+            android.widget.ListView lv = (android.widget.ListView) list;
+            return lv.getChildAt(i - lv.getFirstVisiblePosition());
+        }
+        return i >= 0 && i < list.getChildCount() ? list.getChildAt(i) : null;
+    }
+
+    /**
      * ★★ **只刷新某一行**（2026-10-04 第 86 轮）。副标题异步补上来时用它，**不要** `notifyDataSetChanged()`。
      *
      * 为什么：`notifyDataSetChanged()` 会让整张列表重排 —— 用户在填充过程中滚动时，
@@ -112,9 +172,9 @@ final class MsavListAdapter extends BaseAdapter {
      *
      * ⚠️ 不在可见区就**什么都不做**：滚回来时 {@link #getView} 自然会用新值渲染。
      */
-    void refreshSub(android.widget.ListView lv, int i) {
-        if (lv == null || i < 0 || i >= subs.length) return;
-        View row = lv.getChildAt(i - lv.getFirstVisiblePosition());
+    void refreshSub(android.view.ViewGroup list, int i) {
+        if (i < 0 || i >= subs.length) return;
+        View row = rowAt(list, i);
         if (row == null) return;
         TextView s = (TextView) row.findViewById(R.id.msav_sub);
         if (s != null) bindSub(s, i);
@@ -135,9 +195,9 @@ final class MsavListAdapter extends BaseAdapter {
      * 再抄两遍就是三份同样的实现（其中一份改了、另两份不改的时候**不报错**，
      * 症状是"有的页面滑一下缩略图就没了"）⇒ 收在这里做**唯一实现**。
      */
-    void refreshThumb(android.widget.ListView lv, int i) {
-        if (lv == null || thumbs == null || i < 0 || i >= thumbs.length) return;
-        View row = lv.getChildAt(i - lv.getFirstVisiblePosition());
+    void refreshThumb(android.view.ViewGroup list, int i) {
+        if (thumbs == null || i < 0 || i >= thumbs.length) return;
+        View row = rowAt(list, i);
         if (row == null) return;                 // 不在可见区：滚回来时 getView 自然用新值渲染
         android.widget.ImageView iv = (android.widget.ImageView) row.findViewById(R.id.msav_thumb);
         if (iv == null) return;
@@ -189,9 +249,9 @@ final class MsavListAdapter extends BaseAdapter {
     }
 
     /** ★ 只刷新某一行的复选框（同 {@link #refreshSub}：别用 `notifyDataSetChanged`） */
-    void refreshCheck(android.widget.ListView lv, int i) {
-        if (checked == null || lv == null || i < 0 || i >= checked.length) return;
-        View row = lv.getChildAt(i - lv.getFirstVisiblePosition());
+    void refreshCheck(android.view.ViewGroup list, int i) {
+        if (checked == null || i < 0 || i >= checked.length) return;
+        View row = rowAt(list, i);
         if (row == null) return;
         bindCheck(row, i);
     }

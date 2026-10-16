@@ -49,8 +49,10 @@ public class BlueprintsActivity extends BaseActivity {
 
     private String mSlot;
     private List<Blueprints.Item> mItems;
-    private ListView mList;
+    private android.view.ViewGroup mList;
     private MsavListAdapter mAdapter;
+    /** 行单击（容器形态没有 `OnItemClickListener`，见 `onCreate`） */
+    private MsavListAdapter.RowClick mRowClick;
     private TextView mHead, mEmpty;
     /** 已经扫过一轮（第一次 `onResume` 紧跟 `onCreate`，靠它避免开局扫两遍） */
     private boolean mScanned;
@@ -100,12 +102,13 @@ public class BlueprintsActivity extends BaseActivity {
         mHead.setText(Trans.get(BlueprintsActivity.this, R.string.bp_reading));
         mEmpty = (TextView) root.findViewById(R.id.bp_empty);
 
-        mList = (ListView) root.findViewById(R.id.bp_list);
-        mList.setOnItemClickListener(new AdapterView.OnItemClickListener() {
-            @Override public void onItemClick(AdapterView<?> p, View v, int pos, long id) {
+        // ★★ 2026-10-16（第 151b 轮）：列表改成整页 `ScrollView` 里手工挂载的容器（见 `activity_blueprints.xml` 头）
+        mList = (android.view.ViewGroup) root.findViewById(R.id.bp_list);
+        mRowClick = new MsavListAdapter.RowClick() {
+            @Override public void onRow(int pos) {
                 if (mShown != null && pos >= 0 && pos < mShown.size()) showDetail(mShown.get(pos));
             }
-        });
+        };
 
         // 搜索框 + 「显示 N / 共 M」那一行（纯前端过滤，一个文件都不碰）
         mSearch = (android.widget.EditText) root.findViewById(R.id.bp_search);
@@ -326,7 +329,7 @@ public class BlueprintsActivity extends BaseActivity {
             thumbs[i] = (k < 0 || mThumbs == null) ? null : mThumbs[k];
         }
         mAdapter = new MsavListAdapter(this, titles, subs, thumbs);
-        mList.setAdapter(mAdapter);
+        mAdapter.fillInto(mList, mRowClick);
 
         if (mFiltered != null) {
             mFiltered.setVisibility(filtering ? View.VISIBLE : View.GONE);

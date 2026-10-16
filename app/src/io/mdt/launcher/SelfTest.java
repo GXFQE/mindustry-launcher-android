@@ -9530,11 +9530,14 @@ public final class SelfTest {
 
         try {
             android.view.View v = inf.inflate(R.layout.activity_maps, null);
-            android.view.ViewGroup g = (android.view.ViewGroup) v;
+            // ★ 2026-10-16（第 151b 轮）：根已经是 `ScrollView`，内容全在**内层那一层** LinearLayout 里
+            //   ⇒ 下标要按内层算（直接按根算会全是 -1，把一条真判据变成永远失败的假警报）
+            android.view.ViewGroup inner = v instanceof android.widget.ScrollView
+                    ? (android.view.ViewGroup) ((android.view.ViewGroup) v).getChildAt(0) : null;
             android.view.View actions = v.findViewById(R.id.maps_actions);
             android.view.View list = v.findViewById(R.id.maps_list);
-            int ia = actions == null ? -1 : g.indexOfChild(actions);
-            int il = list == null ? -1 : g.indexOfChild(list);
+            int ia = (inner == null || actions == null) ? -1 : inner.indexOfChild(actions);
+            int il = (inner == null || list == null) ? -1 : inner.indexOfChild(list);
             boolean rows = v.findViewById(R.id.row_maps_import) != null
                     && v.findViewById(R.id.row_maps_export) != null;
             ok(stat, L, rows && ia >= 0 && il >= 0 && ia < il,
@@ -9542,6 +9545,36 @@ public final class SelfTest {
                             + il + " 个) **之前** ⇒ 两行就在页面顶上");
         } catch (Throwable t) {
             ok(stat, L, false, "地图页布局检查自身异常：" + t);
+        }
+
+        // ★★ 2026-10-16（第 151b 轮）：四个列表页必须都是「**整页 ScrollView + 手工挂载容器**」。
+        //   为什么值得单独钉：横屏可用高只有 1224px(376dp) − ActionBar，老结构
+        //   （顶部固定 + `ListView` `0dp/weight=1`）会把第 N 行、搜索框与整张列表**挤出屏幕**，
+        //   而根是 `LinearLayout` 不能滚 ⇒ 用户报的「横屏根本点不到下面」（F2c 的根因，第 151b 轮复发）。
+        //   判据三条：根是 `ScrollView`、根 id 还是 `@+id/root`（insets 靠它）、列表 id 是**容器**不是 `ListView`。
+        {
+            String[] names = {"地图页", "存档页", "蓝图页", "中转站"};
+            int[] lays = {R.layout.activity_maps, R.layout.activity_saves,
+                    R.layout.activity_blueprints, R.layout.activity_trash};
+            int[] ids = {R.id.maps_list, R.id.save_list, R.id.bp_list, R.id.trash_list};
+            StringBuilder badPages = new StringBuilder();
+            for (int i = 0; i < lays.length; i++) {
+                try {
+                    android.view.View v = inf.inflate(lays[i], null);
+                    boolean scroll = v instanceof android.widget.ScrollView;
+                    android.view.View list = v.findViewById(ids[i]);
+                    boolean container = list instanceof android.widget.LinearLayout;
+                    if (!scroll || v.getId() != R.id.root || !container) {
+                        badPages.append(names[i]).append('（').append(scroll ? "" : "根不是 ScrollView ")
+                                .append(container ? "" : "列表不是容器").append("） ");
+                    }
+                } catch (Throwable t) {
+                    badPages.append(names[i]).append("（inflate 炸） ");
+                }
+            }
+            ok(stat, L, badPages.length() == 0,
+                    "★★四个列表页都是「整页 ScrollView + 手工挂载容器」（横屏点不到下面的根因）："
+                            + (badPages.length() == 0 ? "4/4 合格" : "不合格：" + badPages));
         }
 
         // ★ 2026-10-07（第 122 轮）：三个列表页（地图 / 蓝图 / 存档）的**搜索 / 筛选控件**

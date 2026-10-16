@@ -15,13 +15,27 @@
      有文字，但**一个像素都看不见**，列表顶上还像"被切掉一行"。
      ⚠️ 别改成 `android:fitsSystemWindows="true"`：Util.java 里写过它在 edge-to-edge 下不可靠，
         而且另外 5 个页面走的都是 applySystemInsets（两套写法并存 = 迟早只修一边）。
+
+  ★★ 2026-10-16（第 151b 轮）：**根从 `LinearLayout` 改成 `ScrollView`，列表从 `ListView`
+     改成手工挂载的 `LinearLayout`** —— 与主界面 / 存档页（F2c / F3b）同一条口径。
+     为什么必须改：原来是「顶部固定 + 列表 `0dp/weight=1`」，而**横屏可用高只有
+     1224px(376dp) − ActionBar**；动作卡（5 行 ≈ 400dp）一撑满，`weight` 子视图只能拿 0
+     ⇒ 第 5 行、搜索框与整张列表**被挤到屏幕外**，根又不能滚 = 用户报的「横屏根本点不到下面」。
+     真机复现：横屏 `uiautomator dump` 到 `row_maps_del` 就没了（`maps_search` / `maps_list`
+     一个都不在树里，因为**完全落在屏幕外的节点不上报**）。
+     ⚠️ 这张卡里的 5 行**顺序不许动**（动作卡在列表之前 —— 自检 ㉛ 钉着）。
 -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
+    android:fillViewport="true"
     android:background="@color/bg">
+
+  <LinearLayout
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
 
     <TextView
         android:id="@+id/maps_head"
@@ -153,8 +167,8 @@
       ⚠️ 为什么必须有：这句 `maps_empty_fmt` 早就写好了，但**全工程零引用**（孤儿串）——
          一张图都没有时，用户只看到表头「本槽 0 · 游戏自带 0 · 模组自带 0」+ 一整片空白，
          既不知道"为什么没有"，也不知道"下一步该干什么"。而"槽还没指到版本"时必然出现。
-      🔴 位置必须在 ListView **之前**：下面那个 ListView 是 `weight=1`（吃掉剩余高度），
-         空态若排在它后面，就会被顶到屏幕最底部（其它页面的空态都紧跟卡片）。
+      🔴 位置必须在列表容器 **之前**（列表现在是 `wrap_content` 的手工容器，见文件尾）：
+         空态若排在它后面，就会被顶到整页最底部（其它页面的空态都紧跟卡片）。
       ⚠️ 样式与别的页面空态一致（见 activity_main.xml 的 ver_empty）。
     -->
     <TextView
@@ -169,13 +183,18 @@
         android:textColor="@color/fg_muted"
         android:visibility="gone" />
 
-    <ListView
+    <!--
+      ★★ 列表容器：**不是 `ListView`**（2026-10-16 第 151b 轮，F3b 口径）。
+        · 放在整页 `ScrollView` 里的 `ListView` 只按**单行**估高 ⇒ 滚不到底（F3b 的根因，AOSP 公式级）；
+        · 而"顶部固定 + 列表自滚"那个老结构在横屏根本分不到高度（见文件头）。
+        ⇒ 行由 `MsavListAdapter.fillInto()` 手工挂载，滚动交给外层 `ScrollView`。
+      ⚠️ 它必须排在搜索框 / 空态**之后**（那两句是"列表的说明"，跑到列表下面就读不通了）。
+    -->
+    <LinearLayout
         android:id="@+id/maps_list"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:divider="@null"
-        android:dividerHeight="0dp"
-        android:paddingBottom="8dp"
-        android:clipToPadding="false" />
-</LinearLayout>
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingBottom="8dp" />
+  </LinearLayout>
+</ScrollView>

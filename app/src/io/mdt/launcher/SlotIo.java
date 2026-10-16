@@ -184,13 +184,19 @@ final class SlotIo {
      *
      * @param aliveOrNull 对话框的"还开着吗"标志；页面传 **null**
      * @param files 要显示的（顺序就是列表顺序）；调用方拿它按下标取文件，**不要重扫**
+     * @param click 行单击（**容器形态**用；对话框那条路仍走 `ListView` 的 `OnItemClickListener`，传 null）
      *
      * <p>⚠️ 第 127 轮起**只剩这一个重载**：原来那个"自己扫一遍再填"的 3 参版本只有
      *   导出对话框在用，而它改走 {@link BatchIo#pickMulti}（适配器由那边造）⇒ 已删；
      *   "异步补内容"那一半拆到 {@link #fillSavesInto}（勾选对话框也要同一份实现）。
+     * <p>★★ 2026-10-16（第 151b 轮）：第 3 参从 `ListView` 放宽成 `ViewGroup` ——
+     *   存档页改成"整页可滚 + 手工挂载容器"（横屏点不到下面的那个 bug），
+     *   而对话框那条路仍然传 `ListView`；两种容器都由
+     *   {@link MsavListAdapter#fillInto} / `refresh*` 内部判（见那里的 `rowAt`）。
      */
-    static File[] fillSaves(final Activity a, final String slotName, final android.widget.ListView lv,
-                            final boolean[] aliveOrNull, final File[] files) {
+    static File[] fillSaves(final Activity a, final String slotName, final android.view.ViewGroup lv,
+                            final boolean[] aliveOrNull, final File[] files,
+                            final MsavListAdapter.RowClick click) {
         final String[] titles = new String[files.length];
         final String[] subs = new String[files.length];
         final android.graphics.Bitmap[] thumbs = new android.graphics.Bitmap[files.length];
@@ -199,7 +205,11 @@ final class SlotIo {
             subs[i] = Util.formatSize(files[i].length());
         }
         final MsavListAdapter adapter = new MsavListAdapter(a, titles, subs, thumbs);
-        lv.setAdapter(adapter);
+        if (lv instanceof android.widget.ListView) {
+            ((android.widget.ListView) lv).setAdapter(adapter);      // 对话框那条路（F13 的列表）
+        } else {
+            adapter.fillInto(lv, click);                              // 页面那条路（整页可滚）
+        }
         fillSavesInto(a, slotName, lv, adapter, aliveOrNull, files);
         return files;
     }
@@ -210,7 +220,7 @@ final class SlotIo {
      *   但"名字 + 大小先出，meta 行与缩略图后台再补"这件事必须**只有一份实现**
      *   （两份的话，哪天改了"只刷那一行"的做法就会有一边反弹回整片重排）。
      */
-    static void fillSavesInto(final Activity a, final String slotName, final android.widget.ListView lv,
+    static void fillSavesInto(final Activity a, final String slotName, final android.view.ViewGroup lv,
                               final MsavListAdapter adapter, final boolean[] aliveOrNull,
                               final File[] files) {
         new Thread(new Runnable() {

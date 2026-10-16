@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ListView;
@@ -58,8 +59,10 @@ public class MapsActivity extends BaseActivity {
      *   `recreate()` 没有别的刷新手段，而转图那条路走的是"结果弹窗"（用户不点关闭就一直是旧列表，
      *   真机上就出现过"已经转好了、表头还写着本槽 0"——用户当场提的："导入之后要自动刷新页面啊"）。
      */
-    private ListView mList;
+    private ViewGroup mList;
     private MsavListAdapter mAdapter;
+    /** 行单击（容器形态没有 `OnItemClickListener`，见 `onCreate` 里的注释） */
+    private MsavListAdapter.RowClick mRowClick;
     private List<Maps.Item> mItems;
     private String mApkPath;
     /**
@@ -197,13 +200,18 @@ public class MapsActivity extends BaseActivity {
                     @Override public void run() { pickFilter(); }
                 });
 
-        final ListView lv = (ListView) root.findViewById(R.id.maps_list);
+        // ★★ 2026-10-16（第 151b 轮）：列表不再是 `ListView`，而是整页 `ScrollView` 里手工挂载的
+        //   容器（理由见 `activity_maps.xml` 头：横屏可用高不够时 `weight` 子视图会归零 ⇒
+        //   搜索框与列表被挤出屏幕，而且根不能滚）。**单击因此挂在每一行上**，
+        //   回调里的下标就是"当前显示的那一份"的下标（与 `getView` 的 i 同一套）。
+        final ViewGroup lv = (ViewGroup) root.findViewById(R.id.maps_list);
         mList = lv;
-        lv.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener() {
-            @Override public void onItemClick(android.widget.AdapterView<?> p, View v, int pos, long id) {
+        // 行单击 → 打开详情页（原来由 ListView 的 OnItemClickListener 提供）
+        mRowClick = new MsavListAdapter.RowClick() {
+            @Override public void onRow(int pos) {
                 if (mShown != null && pos >= 0 && pos < mShown.size()) showDetail(mShown.get(pos));
             }
-        });
+        };
 
         // 搜索框（纯前端过滤，只在这里的内存里筛）+ 「显示 N / 共 M」那一行
         mSearch = (EditText) root.findViewById(R.id.maps_search);
@@ -271,7 +279,7 @@ public class MapsActivity extends BaseActivity {
     }
 
     /** 三来源清点 + 缩略图**后台逐张渲染**（出来一张刷一张） */
-    private void scan(final ListView lv) {
+    private void scan(final ViewGroup lv) {
         new Thread(new Runnable() {
             @Override public void run() {
                 final List<Maps.Item> items;
@@ -382,7 +390,7 @@ public class MapsActivity extends BaseActivity {
             thumbs[i] = (k < 0 || mThumbs == null) ? null : mThumbs[k];
         }
         mAdapter = new MsavListAdapter(this, titles, subs, thumbs);
-        mList.setAdapter(mAdapter);
+        mAdapter.fillInto(mList, mRowClick);
 
         if (mFiltered != null) {
             mFiltered.setVisibility(filtering ? View.VISIBLE : View.GONE);
