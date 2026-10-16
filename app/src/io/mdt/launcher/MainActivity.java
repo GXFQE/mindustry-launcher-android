@@ -735,14 +735,15 @@ public class MainActivity extends BaseActivity {
      *   ⚠️ 全工程显示版本号的代码只有这两条入口，别再写第三处 substring。
      */
     private CharSequence buildTitle(Versions.Entry e) {
-        String plain = e.displayName(this);
+        // ★ 列表行：名字超预算自己省略（类型 + 版本号在末尾，必须保住 —— 见 NAME_MAX_UNITS）
+        String plain = e.displayName(this, true, true);
         String ver = e.displayVersion();
         // ★ 2026-10-16：标题现在是「名称  原端|改端  版本号（基于 X）」⇒ 弱化区间改成
         //   **名称之后的所有内容**（类型词 + 版本号 + 尾注）。原来只弱化版本号那一段，
         //   类型词会是全强度，读起来像"名字的一部分"（用户要的是"名称 + 类型 + 版本"三层）。
         //   ⚠️ 起点用 `displayLabel().length()`（名称本身的长度）—— 比 `indexOf(ver)` 稳：
         //      名称里可能含数字，甚至恰好含版本号那样的子串。
-        int labelEnd = e.displayLabel().length();
+        int labelEnd = Versions.clipName(e.displayLabel(), Versions.NAME_MAX_UNITS).length();
         // ★ 第 41 轮：fork 的**基座版本**在这里就备注出来（用户：「可以在MDTX显示中备注
         //   对应MDT版本」）—— 它是"这个版本为什么和官方某一版不互相提示"的依据，
         //   而列表行是用户唯一会主动看的地方（详情弹窗要长按才知道）。

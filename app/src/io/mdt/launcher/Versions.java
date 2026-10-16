@@ -371,6 +371,52 @@ public final class Versions {
     }
 
     /**
+     * ★★ **列表行里名字的预算**（单位 = "半个全角字"：一个汉字/全角记 2，其余记 1）。
+     *
+     * <p>为什么要有（2026-10-16 用户先自己试了长名字，然后定下"给名字一个长度上限"）：
+     * 版本行标题是 `maxLines=2 + ellipsize=end`，而**类型与版本号在末尾** ⇒ 名字长到占满两行时，
+     * 被省略号吃掉的正是它们 —— 用户要的恰好是"名字可以省，类型和版本必须留"。
+     *
+     * <p>值是**量出来的、不是拍的**（2026-10-17 真机 1224×2700、标题字号见 `item_version.xml`）：
+     * 一行可用宽度 ≈ 570 px，实测汉字 ≈ 34 px、拉丁/数字 ≈ 25~28 px
+     * ⇒ 20 单位最坏 ≈ 340 px（10 个汉字）到 500 px（20 个拉丁字），都**稳在一行内**，
+     * 第二行留给 `改端  2026.09.X37（基于 160.1）` 这种最长的限定语（实测 620 px 能放下）。
+     * ⚠️ 换了字号 / 换了行内控件（比如徽标变宽）要重新量，别照抄这个数。
+     */
+    public static final int NAME_MAX_UNITS = 20;
+
+    /**
+     * 按 {@link #NAME_MAX_UNITS} 截断一个名字（超了末尾加 `…`）。**纯函数**，自检直接钉。
+     *
+     * <p>⚠️ 只影响**列表行**的观感：名字全称在详情弹窗里照旧（`Entry.displayName` 不截）——
+     * 与"版本号剥过构建前缀 / 详情里还原文"同一条纪律：界面上可以有损，详情是能对照的地方。
+     */
+    public static String clipName(String name, int maxUnits) {
+        if (name == null) return "";
+        int units = 0, i = 0;
+        for (; i < name.length(); ) {
+            int cp = name.codePointAt(i);
+            int w = isWide(cp) ? 2 : 1;
+            if (units + w > maxUnits) break;
+            units += w;
+            i += Character.charCount(cp);
+        }
+        return i >= name.length() ? name : name.substring(0, i) + "…";
+    }
+
+    /** 汉字 / 全角标点算"宽"（预算里记 2） */
+    private static boolean isWide(int cp) {
+        return (cp >= 0x1100 && cp <= 0x115F)          // 韩文字母
+                || (cp >= 0x2E80 && cp <= 0xA4CF)      // 部首 / 汉字 / 假名 / 全角标点
+                || (cp >= 0xAC00 && cp <= 0xD7A3)      // 韩文音节
+                || (cp >= 0xF900 && cp <= 0xFAFF)      // 兼容汉字
+                || (cp >= 0xFE30 && cp <= 0xFE6F)      // 全角标点
+                || (cp >= 0xFF00 && cp <= 0xFF60)      // 全角字符
+                || (cp >= 0xFFE0 && cp <= 0xFFE6)
+                || (cp >= 0x20000 && cp <= 0x3FFFD);   // 扩展区汉字
+    }
+
+    /**
      * 官方 Mindustry 的包名 —— **"原端 / 改端"判据的一半**（见 {@link Entry#modded()}）。
      * ⚠️ 只列**官方本体**那一份；fork（MindustryX 等）不在表里，它们算改端。
      */
@@ -519,7 +565,17 @@ public final class Versions {
          *    名称/版本号/基座尾注的拼法**仍然只有这一处**（F17b：两个入口、一段实现）。
          */
         public String displayName(Context ctx, boolean withType) {
-            return displayLabel() + "  " + (withType ? typeWord(ctx) + "  " : "") + displayVersion();
+            return displayName(ctx, withType, false);
+        }
+
+        /**
+         * @param clipName 名字超预算时**自己省略**（只在列表行用 —— 见 {@link Versions#NAME_MAX_UNITS}）。
+         *                 详情弹窗 / 删除确认 / 冲突点名都传 false：那里名字随便换行，不该有损。
+         */
+        public String displayName(Context ctx, boolean withType, boolean clipName) {
+            String nm = displayLabel();
+            if (clipName) nm = Versions.clipName(nm, Versions.NAME_MAX_UNITS);
+            return nm + "  " + (withType ? typeWord(ctx) + "  " : "") + displayVersion();
         }
 
         /**

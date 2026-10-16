@@ -2005,6 +2005,25 @@ public final class SelfTest {
         ok(stat, L, "原端".equals(vanilla.typeWord(ctx)) && "改端".equals(forkDecl.typeWord(ctx)),
                 "★类型词走资源：原端 / 改端（自检语言下逐字可比）："
                         + vanilla.typeWord(ctx) + " / " + forkDecl.typeWord(ctx));
+        // ★ 名字预算（2026-10-16 用户先自己试了长名字，再定下"名字可以省，类型和版本必须留"）：
+        ok(stat, L, "我的整合包".equals(Versions.clipName("我的整合包", 20)),
+                "★短名字不动：" + Versions.clipName("我的整合包", 20));
+        ok(stat, L, Versions.clipName("123456123456123456", 20).equals("123456123456123456"),
+                "★用户真机试过的 18 位名字（20 单位内）**原样不截**");
+        String longName = "1234561234561234561234567890";
+        ok(stat, L, Versions.clipName(longName, 20).equals("12345612345612345612…"),
+                "★超预算 ⇒ 末尾加省略号：" + Versions.clipName(longName, 20));
+        ok(stat, L, Versions.clipName("汉字汉字汉字汉字汉字汉字", 20).equals("汉字汉字汉字汉字汉字…"),
+                "★汉字按 2 单位算（20 单位 = 10 个汉字）：" + Versions.clipName("汉字汉字汉字汉字汉字汉字", 20));
+        // 用户要的那条不变量：**截了名字，类型与版本一个都不许少**
+        Versions.Entry longE = mkEntry("official-159", "8-official-159.7", null);
+        longE.customName = longName;
+        String rowT = longE.displayName(ctx, true, true);
+        ok(stat, L, rowT.startsWith("12345612345612345612…") && rowT.contains("原端") && rowT.endsWith("159.7"),
+                "★列表行截了名字，类型与版本仍在：" + rowT);
+        ok(stat, L, longE.displayName(ctx, true, false).startsWith(longName),
+                "★详情弹窗那种不截的场合仍是全名：" + longE.displayName(ctx, true, false));
+
         // ★ 类型词的开关（2026-10-16 用户：「继续上次不要显示那个类型」）：
         //   withType=false 只去掉**类型那一段**，名称 / 版本号 / 基座尾注一字不动。
         Versions.Entry noType = mkEntry("MindustryX", "8-official-2026.09.X37", "160.1");
