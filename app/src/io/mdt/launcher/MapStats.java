@@ -85,6 +85,22 @@ import java.util.zip.ZipFile;
  * ⚠️ **越界算"有墙"**（用户 2026-10-16 明确：「越界肯定算有墙啊」）—— 地图外没有空位可摆机器。
  * ★ 方块层那支（石墨墙）**不**进"挡住资源的方块"名单：它自己就是那格的资源，不是障碍物。
  *
+ * <h3>★★ 优先级链：**方块 &gt; 矿层 &gt; 地板**（游戏 `Tile.wallDrop()` / `Tile.drop()` 的两段字节码，2026-10-16）</h3>
+ * 一格只有**一种**东西能被钻头采到，游戏的两段字节码把顺序写死了：
+ * <pre>
+ *   wallDrop():  if(block.solid &amp;&amp; block.itemDrop != null) return block.itemDrop;   // ① 方块
+ *                else if(overlay.wallOre &amp;&amp; !block.synthetic) return overlay.itemDrop; // ② 矿层（墙矿）
+ *   drop():      if(overlay != air &amp;&amp; overlay.itemDrop != null) return overlay.itemDrop; // ② 矿层
+ *                else                                          return floor.itemDrop;   // ③ 地板
+ * </pre>
+ * ⇒ 两条**同族**的"优先级"（都记进 {@link Row#priority}，都只说"按谁算"，**不**说"被压住"）：
+ * <ol>
+ *   <li><b>方块 &gt; 矿层</b>：方块层自己就是墙矿 ⇒ 按底下的墙算（矿层那行多记一格）；</li>
+ *   <li><b>矿层 &gt; 地板</b>：可采地板上面有矿 ⇒ **按上面的矿算**（地板那行多记一格，
+ *       用户 2026-10-16：「可采地板上面有地矿按照地矿计算」「这个也算做优先级问题」）。
+ *       ⚠️ 加成地板**不受影响**：属性（含水/含油/高温…）是泵一类读**地板**，与钻头采什么无关。</li>
+ * </ol>
+ *
  * <h3>为什么这些表要 PC 侧导、不能端上现推</h3>
  * `type:` 没写的字段取的是**类默认值**（不是 false），而"裸 new 一个类拿默认值"需要
  * 游戏运行时环境：实测裸 new 时名字必须唯一（否则 content 注册表报
@@ -1257,18 +1273,22 @@ public final class MapStats {
         public String source = SRC_VANILLA;
         public int total, open, loose, buried, unknown;
         /**
-         * ★★ **按底下的墙算**的格数（2026-10-16 用户定的口径）—— 只对**矿层**那支有意义。
+         * ★★ **按优先级让给别人**的格数（2026-10-16 用户定的两处口径）—— 只对**矿层**那支与
+         * **可采地板**那支有意义：
          *
-         * <p>这一格的**方块层自己就是墙矿**（`graphitic-wall` 一类「实心 + 自带掉落」的墙）⇒
-         * 同一格两层都命中，按游戏 `Tile.wallDrop()` 的**优先级**（①`block.itemDrop` 压②矿层 `wallOre`）
-         * **按底下的墙算**：方块层那一行照常算一格，而上面这层墙矿**不是"能采"**
-         * —— 墙钻在这格采到的是底下那面墙。
+         * <p>① **矿层那支**（矿层墙矿 + 底下那面墙自己也是墙矿，`graphitic-wall` 一类）：
+         * 游戏 `Tile.wallDrop()` 是 `①block.itemDrop` 压 `②矿层 wallOre` ⇒ **按底下的墙算**
+         * —— 方块层那一行照常算一格，而这层墙矿**不是"能采"**（墙钻在这格采到的是底下那面墙）。
          *
-         * <p>🔴 用户 2026-10-16 纠正过措辞：**这是优先级问题，不是"被墙压住"**
-         * ⇒ 文案与规矩里**不许**写成「压在…底下 / 被墙盖住 / 遮挡」，只说"按底下的墙算"。
+         * <p>② **可采地板那支**（可采地板 + 上面有矿）：游戏 `Tile.drop()` 是 **矿层压地板**
+         * （`if(overlay != air && overlay.itemDrop != null) return overlay.itemDrop;`）⇒
+         * 这一格钻头采到的是**上面的矿** ⇒ 不再算"可采地板"，只记一格"按上面的矿算"
+         * （用户 2026-10-16 指出，并明确「这个也算做优先级问题」）。
          *
-         * <p>⚠️ 与 {@link #buried}（四周都是墙）分开记：两者的**原因**不同
-         * （`ref/29` 第 45/47 条：来因要拆开说）。`total` **包含**它，{@link #reachable()} **不含**。
+         * <p>🔴 措辞纪律（用户纠正过一次）：这是**优先级**问题 ⇒ 文案/规矩里**不许**写成
+         * 「压在…底下 / 被墙盖住 / 遮挡」（那套词留给 {@link #buried} 与 {@link #loose}）。
+         *
+         * <p>`total` **包含**它，{@link #reachable()} **不含**（能采的判定只看"谁赢"）。
          */
         public int priority;
 
@@ -1361,6 +1381,8 @@ public final class MapStats {
         int[] blocker = new int[m];
         // ★ 矿层墙矿里**按底下的墙算**的那些格（按矿 id 数；见 `Row.priority` 的长注释）
         int[] prioOre = new int[m];
+        // ★ 可采地板里**上面有矿 ⇒ 按上面的矿算**的那些格（按地板 id 数；同上一套优先级）
+        int[] prioFloor = new int[m];
         int[] unkOreId = new int[m], unkFloorId = new int[m];
         final short[] fl = t.floors, ov = t.ores, bl = t.blocks;
         final int tw = t.width, th = t.height;
@@ -1376,12 +1398,20 @@ public final class MapStats {
             boolean blockWall = b >= 0 && b < m && wall[b];
             boolean hostCounts = db == null || (db.solid && !db.synthetic);
             boolean hiddenOre = false, mine = false;
+            // ★★ 这一格的**矿层是矿**（地矿或墙矿）—— 游戏 `Tile.drop()` 里**矿层优先于地板**：
+            //    if(overlay != air && overlay.itemDrop != null) return overlay.itemDrop;
+            //    else                                            return floor.itemDrop;
+            //    ⇒ 上面有矿的地板，钻头采到的是**矿**，不是地板那点掉落（用户 2026-10-16 指出的，
+            //      并明确「这个也算做优先级问题」）。⇒ 那格不再算「可采地板」，只记一格"按上面的矿算"。
+            boolean oreOverlay = false;
             if (o >= 0 && o < m && o != airId) {
                 int c = cat[o];
                 if ((c & ORE) != 0) {                       // 地矿：走原有遮挡口径
                     cOre[oc][o]++;
                     hiddenOre = true;
+                    oreOverlay = true;
                 } else if ((c & ORE_WALL) != 0) {           // 矿层里的墙矿
+                    oreOverlay = true;
                     if (blockWall) {
                         // ★★ 这一格**底下的墙自己就是墙矿**（石墨墙一类）⇒ 按**底下的墙**计
                         //    （下面方块层那支会算它），而上面这层墙矿**不是"能采"** ——
@@ -1408,9 +1438,17 @@ public final class MapStats {
             if (f >= 0 && f < m && f != airId) {
                 int c = cat[f];
                 if ((c & MINE_FLOOR) != 0) {
-                    cFloor[oc][f]++;
-                    mine = true;
+                    if (oreOverlay) {
+                        // ★★ **矿层 > 地板**（与"方块 > 矿层"同一套优先级，用户 2026-10-16）：
+                        //    这一格钻头采到的是上面的矿 ⇒ 不算"可采地板"，只记一格"按上面的矿算"。
+                        //    ⚠️ 不设 mine ⇒ 也不进「挡住资源的方块」（那格的损失算在矿那边了）。
+                        prioFloor[f]++;
+                    } else {
+                        cFloor[oc][f]++;
+                        mine = true;
+                    }
                 }
+                // 加成地板**不受影响**：属性（含水/含油/高温…）由泵一类读**地板**，与钻头采什么无关。
                 if ((c & BONUS_FLOOR) != 0) {
                     cBonus[oc][f]++;
                 }
@@ -1427,7 +1465,7 @@ public final class MapStats {
 
         build(r.ores, cOre, t.blockNames, defs, nm, false, false, tab.itemNames, false, null);
         build(r.oreWalls, cWall, t.blockNames, defs, nm, false, false, tab.itemNames, true, prioOre);
-        build(r.floors, cFloor, t.blockNames, defs, nm, true, false, tab.itemNames, false, null);
+        build(r.floors, cFloor, t.blockNames, defs, nm, true, false, tab.itemNames, false, prioFloor);
         build(r.bonuses, cBonus, t.blockNames, defs, nm, false, true, tab.itemNames, false, null);
 
         // 永久遮挡者 top

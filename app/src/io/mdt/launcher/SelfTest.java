@@ -9950,6 +9950,39 @@ public final class SelfTest {
         ok(stat, L, wr3.oreWalls.isEmpty(),
                 "★反向：未打补丁的 boulder（solid=false）不算墙矿 —— 判据看的是字段，不是名字");
 
+        // ⑥c **矿层 > 地板**（2026-10-16 用户：「可采地板上面有地矿按照地矿计算」「这个也算做优先级问题」，
+        //    随后补充「**不只是上面有地矿，有镂空墙矿（假墙矿）也会覆盖可采地板**」）：
+        //    游戏 `Tile.drop()` = `if(overlay.itemDrop != null) return overlay.itemDrop; else return floor.itemDrop;`
+        //    ⇒ 上面有**任何一种矿**的地板，钻头采到的是矿 ⇒ 那格**不算"可采地板"**，只记"按上面的矿算"。
+        //    fixture 见 {@link #floorOreGrid()}：沙地板 ×5，其中 4 格被矿按优先级顶掉（地矿 ×2 / 假墙矿 / 真墙矿）。
+        MapStats.Result fr = MapStats.analyze(floorOreGrid(), v, nm);
+        MapStats.Row fCu = rowOf(fr.ores, "铜");
+        MapStats.Row fTh = rowOf(fr.ores, "钍");            // 假墙矿归**地矿** ⇒ 也进这一行
+        MapStats.Row fSand = rowOf(fr.floors, "sand-floor");   // 地板行的名字走 blockLabel（不是掉落物名）
+        MapStats.Row fSalt = rowOf(fr.bonuses, "salt");        // 同上：加成地板那行也是方块名
+        MapStats.Row fWallTh = rowOf(fr.oreWalls, "钍（墙）"); // 真墙矿那支（矿层）
+        ok(stat, L, fSand != null && fSand.total == 5 && fSand.reachable() == 1 && fSand.priority == 4,
+                "★矿层压过地板：沙地板 5 格 ⇒ **只有 1 格能采**，另 4 格「上面有矿，按上面的矿算」"
+                        + "（地矿 ×2 / **假墙矿** / **真墙矿**各一）"
+                        + (fSand == null ? "" : "（实际 共 " + fSand.total + " / 能采 " + fSand.reachable()
+                        + " / 按上面的矿算 " + fSand.priority + "）"));
+        ok(stat, L, fCu != null && fCu.total == 3 && fCu.reachable() == 2 && fCu.buried == 1,
+                "★地矿照常算：铜 3 格（能采 2 + 墙下 1）—— 地板那支不算，矿这支才算"
+                        + (fCu == null ? "" : "（实际 共 " + fCu.total + " / 能采 " + fCu.reachable()
+                        + " / 墙下 " + fCu.buried + "）"));
+        ok(stat, L, fTh != null && fTh.total == 1 && fTh.reachable() == 1,
+                "★★用户补的那条：**假墙矿**（矿层墙矿摆在 air 上）照样压地板 —— 它归**地矿**段（钍 1 格）"
+                        + "，而它底下的沙照样不算可采"
+                        + (fTh == null ? "" : "（实际 共 " + fTh.total + " / 能采 " + fTh.reachable() + "）"));
+        ok(stat, L, fWallTh != null && fWallTh.total == 1 && fWallTh.reachable() == 1,
+                "★**真墙矿**（矿层墙矿 + 实心天然墙宿主）也压地板：它进**墙矿**段的矿层那支"
+                        + (fWallTh == null ? "" : "（实际 共 " + fWallTh.total + " / 能采 " + fWallTh.reachable() + "）"));
+        ok(stat, L, MapStats.sum(fr.floors, MapStats.SUM_REACH) == 1,
+                "★★元断言：可采地板段合计能采 **1** 格（不是 5）—— 上面有矿的地板不能算「能采」（用户指出的正是这一处）");
+        ok(stat, L, fSalt != null && fSalt.total == 1,
+                "★加成地板**不受影响**：salt（含水含油）上面压着铜矿照样算 —— 属性是泵读地板，与钻头采什么无关"
+                        + (fSalt == null ? "" : "（实际 共 " + fSalt.total + " 格）"));
+
         // ⑦ 译名链：**模组自己的 bundle** ⨁ 版本 APK 的 bundle（模组优先 —— 与游戏叠加顺序一致）
         File tmp = new File(Paths.privateDir(ctx), "selftest-mapstats");
         deleteTree(tmp);
@@ -10254,6 +10287,49 @@ public final class SelfTest {
         t.blocks[4] = 2;                                      // 中心 = 被测的那个方块
         t.blocks[5] = 1;
         t.blocks[7] = 1;
+        return t;
+    }
+
+    /**
+     * 3×3：**矿层 &gt; 地板**（2026-10-16 用户：「可采地板上面有地矿按照地矿计算」「这个也算做优先级问题」，
+     * 随后补充：「**不只是上面有地矿，有镂空墙矿（假墙矿）也会覆盖可采地板**」）。
+     *
+     * <pre>
+     *        x=0                    x=1                      x=2
+     *  y=0  沙 + 地矿铜（露天）      沙（真能采）              沙 + 地矿铜 + 石头墙（矿在墙下）
+     *  y=1  盐（加成）+ 地矿铜       沙 + **假墙矿**（air）      沙 + **真墙矿**（石头墙宿主）
+     *  y=2  石头                   石头                     石头
+     * </pre>
+     *
+     * 游戏依据 = `Tile.drop()`：`if(overlay != air && overlay.itemDrop != null) return overlay.itemDrop;
+     * else return floor.itemDrop;` ⇒ 上面有**任何一种矿**（地矿 / 真墙矿 / 假墙矿）的地板，
+     * 钻头采到的是**矿**。⚠️ 语料 462 张里"假墙矿压地板"恰好 **0 格**（172 图里只有地矿 357,212 格、
+     * 真墙矿 4,798 格）⇒ 这一条**只能靠本夹具**钉住，别拿语料当覆盖证明。
+     */
+    private static MsavTiles.Tiles floorOreGrid() {
+        MsavTiles.Tiles t = new MsavTiles.Tiles();
+        t.width = 3;
+        t.height = 3;
+        String[] names = {"air", "stone", "sand-floor", "salt", "stone-wall", "boulder",
+                "ore-copper", "ore-wall-thorium", "ore-crystal-thorium"};
+        for (String s : names) t.blockNames.add(s);
+        t.floors = new short[9];
+        t.ores = new short[9];
+        t.blocks = new short[9];
+        for (int i = 0; i < 9; i++) t.floors[i] = 1;      // 默认石头地板（不掉东西）
+        t.floors[0] = 2;                                  // 沙 + 地矿铜（露天）⇒ 按上面的矿算
+        t.ores[0] = 6;
+        t.floors[1] = 2;                                  // 沙，无矿 ⇒ 真能采
+        t.floors[2] = 2;                                  // 沙 + 地矿铜 + 石头墙 ⇒ 矿在墙下
+        t.ores[2] = 6;
+        t.blocks[2] = 4;
+        t.floors[3] = 3;                                  // 盐（加成）+ 地矿铜 ⇒ 加成照算
+        t.ores[3] = 6;
+        t.floors[4] = 2;                                  // 沙 + **假墙矿**（方块是 air）⇒ 矿层归地矿
+        t.ores[4] = 7;
+        t.floors[5] = 2;                                  // 沙 + **真墙矿**（宿主 = 石头墙）
+        t.ores[5] = 7;
+        t.blocks[5] = 4;
         return t;
     }
 

@@ -183,8 +183,9 @@ public class MainActivity extends BaseActivity {
             if (r.total != r.reachable()) sb.append("（共 ").append(r.total);
             // 墙矿的"拿不到"是**另一句话**：它长在墙里，不是"在墙下"（与界面同一措辞）
             if (r.buried > 0) sb.append(wallKind ? " · 四周是墙 " : " · 墙下 ").append(r.buried);
-            // ★ 同一格里底下的墙自己也是墙矿 ⇒ 按**优先级**算它（与上一句分开报，原因不同）
-            if (wallKind && r.priority > 0) sb.append(" · 按底下的墙算 ").append(r.priority);
+            // ★ 优先级（同族两条）：墙矿那支 = 按底下的墙算；可采地板那支 = 按上面的矿算
+            //   （与界面同一句话；原因不同，所以单独一段）
+            if (r.priority > 0) sb.append(wallKind ? " · 按底下的墙算 " : " · 按上面的矿算 ").append(r.priority);
             if (r.loose > 0) sb.append(" · 建筑下 ").append(r.loose);
             if (r.unknown > 0) sb.append(" · 未知 ").append(r.unknown);
             if (r.total != r.reachable()) sb.append('）');

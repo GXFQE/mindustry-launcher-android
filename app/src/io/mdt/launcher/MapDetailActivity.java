@@ -250,11 +250,14 @@ public class MapDetailActivity extends BaseActivity {
                     ? Trans.get(MapDetailActivity.this, R.string.stats_row_walled_fmt, MapStatsMods.num(row.buried))
                     : Trans.get(MapDetailActivity.this, R.string.stats_row_buried_fmt, MapStatsMods.num(row.buried)));
         }
-        // ★★ 2026-10-16 用户：「墙矿位置下面的墙自己也是墙矿（石墨墙一类）⇒ 按底下的墙计」。
-        //    🔴 用户同一天纠正了措辞：**这是优先级问题，不是"被墙压住"** ⇒ 只说"按底下的墙算"。
-        //    ⚠️ 与上一句**分开说**：原因不同（`ref/29` 第 45/47 条：来因要拆开）。
-        if (wallKind && row.priority > 0) {
-            cat(sb, Trans.get(MapDetailActivity.this, R.string.stats_row_priority_fmt, MapStatsMods.num(row.priority)));
+        // ★★ 2026-10-16 用户的**优先级**口径（同族两条，`ref/29` 第 47 条）：只有"按谁算"，**不说**"被压住"——
+        //    ① 墙矿那支：底下的墙自己也是墙矿（石墨墙一类）⇒「按底下的墙算」；
+        //    ② 可采地板那支：上面有矿（`Tile.drop()` 里矿层压地板）⇒「按上面的矿算」。
+        //    ⚠️ 与"拿不到"分开说：原因不同（`ref/29` 第 45/47 条：来因要拆开）。
+        if (row.priority > 0) {
+            cat(sb, Trans.get(MapDetailActivity.this, wallKind
+                    ? R.string.stats_row_wall_priority_fmt : R.string.stats_row_floor_priority_fmt,
+                    MapStatsMods.num(row.priority)));
         }
         if (row.loose > 0) {
             cat(sb, Trans.get(MapDetailActivity.this, R.string.stats_row_loose_fmt, MapStatsMods.num(row.loose)));
