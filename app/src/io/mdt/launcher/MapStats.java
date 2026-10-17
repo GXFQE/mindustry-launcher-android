@@ -1410,6 +1410,36 @@ public final class MapStats {
         }
     }
 
+    /**
+     * **「核心区」的统计**（2026-10-17 用户：「再加一个统计可建造的核心区面积，以及实际最多能放多少个核心」，
+     * 并当场纠正：「**核心区是一个专门的地板啊**」）。
+     *
+     * <p>核心区 = 游戏里的 `core-zone` 地板（bundle 里就叫「核心区」/“Core Zone”）——
+     * 战役图用它标核心的降落区。所以"面积"不是我们发明的概念，是**数这种地板的格数**。</p>
+     *
+     * <p>「最多能放几个核心」按**最小的一种核心**（`core-shard` / `core-bastion` 里的 3×3）算
+     * （用户：「按允许星球最小的算吧」），算法是**不重叠的可行摆法**：</p>
+     * <ul>
+     *   <li>先把"核心区里**能建**"的格挑出来（判据与可建造桶完全一样：地板不是深液体、允许放东西；
+     *       方块层是 air / 建筑（能拆）/ 石头（能直接压上去））；</li>
+     *   <li>再按连通块分开（一块核心区 = 一个降落区），**每块各按 3×3 网格对齐**，
+     *       9 种对齐里取能摆最多的那种；各块相加。</li>
+     * </ul>
+     * ⚠️ 这给的是**摆得出来的数**，**不是理论最优**（精确最大是 NP-hard 的装箱问题）——
+     * 界面文案只说"最多能摆"，依据写在卡片里，别写成"理论上限"。
+     */
+    public static final class Core {
+        /** 核心的边长（取最小的一种：3×3） */
+        public static final int SIZE = 3;
+
+        /** 整片核心区：地板是 `core-zone` 的格数（不管上面有没有东西） */
+        public int zone;
+        /** 其中**能建**的格数（判据与 {@link Buildable} 同一条） */
+        public int usable;
+        /** 最多能摆几个 {@link #SIZE}×{@link #SIZE} 的核心（不重叠；每块核心区分开对齐） */
+        public int max;
+    }
+
     /** 统计结果（**只给数据，不给文案** —— 文案在 strings.xml，见文案纪律） */
     public static final class Result {
         public boolean ok;
@@ -1426,6 +1456,8 @@ public final class MapStats {
         public int unkOre, unkFloor, unkBonus;
         /** 「能放一般建筑」的格数（六桶；见 {@link Buildable}） */
         public final Buildable buildable = new Buildable();
+        /** 「核心区」（`core-zone` 地板）的面积与最多能摆几个核心（见 {@link Core}） */
+        public final Core core = new Core();
         /** 定义表的来源（技术细节层；**码 + 数字**，见 {@link Note}） */
         public List<Note> notes = new ArrayList<>();
         public long millis;
@@ -1463,12 +1495,16 @@ public final class MapStats {
         boolean[] clear = new boolean[m];       // 方块层腾得出来：air / 建筑（能拆） / 石头（能直接压上去）
         boolean[] floorDeep = new boolean[m];   // 地板：深液体（单位会沉）⇒ 一般建筑放不上去
         boolean[] floorPlace = new boolean[m];  // 地板：允许在上面放东西（placeableOn）
+        // ★ 「核心区」那个地板的 id（游戏里 `core-zone`，bundle 名就叫「核心区」）——
+        //   2026-10-17 用户：「核心区是一个专门的地板啊」。
+        boolean[] coreZone = new boolean[m];
         Def[] defs = new Def[m];
         int airId = t.airId();
         for (int id = 0; id < m; id++) {
             String name = t.blockNames.get(id);
             Def d = tab.row(name);
             defs[id] = d;
+            coreZone[id] = "core-zone".equals(name);
             if (d == null) {
                 occl[id] = (byte) ("air".equals(name) ? 0 : 3);
                 continue;
@@ -1499,6 +1535,8 @@ public final class MapStats {
         int[] unkOreId = new int[m], unkFloorId = new int[m];
         // ★ 「地板不让建」那桶按**地板 id** 数（界面那行要说清楚是哪块地板，见 Buildable#floorKinds）
         int[] noPlaceId = new int[m];
+        // ★ 核心区里"能建"的格（给"最多能摆几个核心"用；只有核心区那几百格会被置 true）
+        boolean[] usable = new boolean[n];
         final short[] fl = t.floors, ov = t.ores, bl = t.blocks;
         final int tw = t.width, th = t.height;
         for (int i = 0; i < n; i++) {
@@ -1599,6 +1637,15 @@ public final class MapStats {
             } else {
                 r.buildable.cleared++;
             }
+            // ★ 「核心区」（`core-zone` 地板）：整片面积 + 其中**能建**的格
+            //   （"能建"的判据与上面那条链完全一样；给后面的"最多能摆几个核心"用）。
+            if (f >= 0 && f < m && coreZone[f]) {
+                r.core.zone++;
+                if (b >= 0 && b < m && clear[b] && !floorDeep[f] && floorPlace[f]) {
+                    usable[i] = true;
+                    r.core.usable++;
+                }
+            }
         }
 
         build(r.ores, cOre, t.blockNames, defs, nm, false, false, tab.itemNames, false, null);
@@ -1621,6 +1668,9 @@ public final class MapStats {
                 return a.label.compareTo(b.label);
             }
         });
+
+        // ★ 核心区里最多能摆几个核心（不重叠；每块核心区各按 3×3 网格对齐，见 {@link Core}）
+        r.core.max = packCores(usable, tw, th, Core.SIZE);
 
         // 永久遮挡者 top
         List<Row> bs = new ArrayList<>();
@@ -1654,6 +1704,72 @@ public final class MapStats {
         r.millis = (System.nanoTime() - t0) / 1000000L;
         r.micros = (System.nanoTime() - t0) / 1000L;
         return r;
+    }
+
+    /**
+     * 在 {@code usable} 标记的格子里，最多能摆几个 k×k 的正方形（**不重叠**）。
+     *
+     * <p>做法：按**连通块**分开（一块核心区 = 一个降落区），每块取它自己的外框，在 9 种网格对齐
+     * （左上角 x%k / y%k）里各数一遍、取最多的那种；各块相加。
+     * 每块内部按同一对齐摆 ⇒ 同一块的格子互不重叠；不同块离得远 ⇒ 也不会重叠。</p>
+     *
+     * <p>⚠️ 结果是**摆得出来的数**，不是理论最优（正方形装箱的精确最大值是 NP-hard）——
+     * 矩形块上它恰好等于 ⌊W/k⌋·⌊H/k⌋，不规则块上可能偏小。界面只说"最多能摆"，
+     * 别写成"理论上限"（`Core` 的类注释里有同一条纪律）。</p>
+     */
+    static int packCores(boolean[] usable, int w, int h, int k) {
+        int n = w * h;
+        int[] stack = null;
+        boolean[] seen = null;
+        int total = 0;
+        for (int i = 0; i < n; i++) {
+            if (!usable[i]) continue;
+            if (seen == null) {                 // 这张图没有核心区 ⇒ 一次都不分配
+                seen = new boolean[n];
+                stack = new int[n];
+            }
+            if (seen[i]) continue;
+            int minX = w, minY = h, maxX = -1, maxY = -1;
+            int sp = 0;
+            stack[sp++] = i;
+            seen[i] = true;
+            while (sp > 0) {
+                int cur = stack[--sp];
+                int x = cur % w, y = cur / w;
+                if (x < minX) minX = x;
+                if (x > maxX) maxX = x;
+                if (y < minY) minY = y;
+                if (y > maxY) maxY = y;
+                if (x > 0 && usable[cur - 1] && !seen[cur - 1]) { seen[cur - 1] = true; stack[sp++] = cur - 1; }
+                if (x < w - 1 && usable[cur + 1] && !seen[cur + 1]) { seen[cur + 1] = true; stack[sp++] = cur + 1; }
+                if (y > 0 && usable[cur - w] && !seen[cur - w]) { seen[cur - w] = true; stack[sp++] = cur - w; }
+                if (y < h - 1 && usable[cur + w] && !seen[cur + w]) { seen[cur + w] = true; stack[sp++] = cur + w; }
+            }
+            int best = 0;
+            for (int ox = 0; ox < k; ox++) {
+                for (int oy = 0; oy < k; oy++) {
+                    int c = 0;
+                    for (int y = minY + oy; y + k - 1 <= maxY; y += k) {
+                        for (int x = minX + ox; x + k - 1 <= maxX; x += k) {
+                            if (fits(usable, w, x, y, k)) c++;
+                        }
+                    }
+                    if (c > best) best = c;
+                }
+            }
+            total += best;
+        }
+        return total;
+    }
+
+    private static boolean fits(boolean[] usable, int w, int x, int y, int k) {
+        for (int yy = 0; yy < k; yy++) {
+            int row = (y + yy) * w;
+            for (int xx = 0; xx < k; xx++) {
+                if (!usable[row + x + xx]) return false;
+            }
+        }
+        return true;
     }
 
     /**

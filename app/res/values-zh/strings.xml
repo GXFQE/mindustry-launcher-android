@@ -1859,6 +1859,17 @@
     <string name="stats_build_sub_deep_fmt">深液体 %1$s 格</string>
     <string name="stats_build_sub_floor_fmt">%1$s地板 %2$s 格</string>
     <string name="stats_build_row_unknown">认不出</string>
+    <!--
+      ★★ 2026-10-17 用户第二次点单：「再加一个统计可建造的核心区面积，以及实际最多能放多少个核心」，
+      并当场纠正「核心区是一个专门的地板啊」——所以这块**不是**我们发明的概念，
+      是数游戏里的 `core-zone` 地板（bundle 里的中文名就是「核心区」）。
+      · 面积 = 核心区里**能建**的格数（与「可建造」同一套判据）；
+      · 个数 = 按**最小的一种核心（3×3）**、互不重叠能摆几个 —— 是"摆得出来的数"，不是理论最优。
+    -->
+    <string name="stats_section_core">核心区</string>
+    <string name="stats_core_sum_fmt">%1$s 格 · 最多能摆 %2$s 个核心（3×3）</string>
+    <string name="stats_core_row_zone">整片核心区</string>
+    <string name="stats_core_note">个数按 3×3 的核心算，互不重叠；每块核心区单独对齐</string>
     <string name="stats_tech_size_fmt">地图 %1$d × %2$d，共 %3$s 格</string>
     <string name="stats_tech_table_fmt">内容表：%1$s</string>
     <string name="stats_tech_names_fmt">名字来源：%1$s</string>

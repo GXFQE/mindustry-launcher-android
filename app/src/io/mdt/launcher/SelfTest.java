@@ -10186,6 +10186,27 @@ public final class SelfTest {
         ok(stat, L, b5.floorKinds.size() == 2 && b5.floorBlocked == 2,
                 "★两种地板时（space + empty）⇒ 2 种、共 2 格（界面副行列名单）"
                         + "（实际 " + b5.floorKinds.size() + " 种 / " + b5.floorBlocked + " 格）");
+
+        // ⑥e **核心区**（2026-10-17 用户：「再加一个统计可建造的核心区面积，以及实际最多能放多少个核心」，
+        //    并纠正「核心区是一个专门的地板啊」）——核心区 = 游戏里的 `core-zone` 地板。
+        //    夹具 {@link #coreZoneGrid()}：12×8，中间一块 6×6 的核心区。
+        MapStats.Result cr = MapStats.analyze(coreZoneGrid(), v, nm);
+        ok(stat, L, cr.core.zone == 36 && cr.core.usable == 36 && cr.core.max == 4,
+                "★核心区：一片 6×6（36 格全能建）⇒ 最多摆 **4** 个 3×3 核心（6÷3 × 6÷3）"
+                        + "（实际 整片 " + cr.core.zone + " / 能建 " + cr.core.usable
+                        + " / 最多 " + cr.core.max + "）");
+        // 反方向：往核心区里摆一面**天然石墙**（拆不掉）⇒ 能建 35，且正好废掉一个 3×3 落位 ⇒ 剩 3
+        MsavTiles.Tiles cg2 = coreZoneGrid();
+        cg2.blocks[2 * 12 + 2] = 3;                       // (2,2) = stone-wall
+        MapStats.Result cr2 = MapStats.analyze(cg2, v, nm);
+        ok(stat, L, cr2.core.zone == 36 && cr2.core.usable == 35 && cr2.core.max == 3,
+                "★反方向：核心区里压一面拆不掉的石墙 ⇒ 能建 36→35、最多 4→3（核心摆不下那 9 格）"
+                        + "（实际 能建 " + cr2.core.usable + " / 最多 " + cr2.core.max + "）");
+        // 元断言：没有核心区的地图不许凭空冒出数（`grid()` 是普通 3×3 图）
+        MapStats.Result cr3 = MapStats.analyze(grid(), v, nm);
+        ok(stat, L, cr3.core.zone == 0 && cr3.core.usable == 0 && cr3.core.max == 0,
+                "★元断言：没有 core-zone 地板的图 ⇒ 核心区三个数都是 0（界面上整张卡不出现）"
+                        + "（实际 " + cr3.core.zone + "/" + cr3.core.usable + "/" + cr3.core.max + "）");
         // 表里那两列本身（PC 侧用真游戏对象核过，这里钉住数值，防表被换错）
         MapStats.Def dw = v.row("deep-water"), sw = v.row("shallow-water"), sp = v.row("space");
         ok(stat, L, dw != null && dw.deep && sw != null && !sw.deep
@@ -10605,6 +10626,33 @@ public final class SelfTest {
         t.floors[9] = 7;
         t.blocks[10] = 9;                                     // 认不出的方块
         t.floors[11] = 10;                                    // 认不出的地板
+        return t;
+    }
+
+    /**
+     * 12×8 的手工地图：**核心区**（游戏里的 `core-zone` 地板）6×6 一块（x=1..6、y=1..6）。
+     *
+     * <p>期望：整片 **36** 格、能建 **36** 格、最多摆 **4** 个 3×3 核心（6÷3 × 6÷3）。
+     * 变体（自检里往 (2,2) 放一面天然石墙）：能建 35、最多 3 —— 那面墙正好废掉一个 3×3 落位。</p>
+     *
+     * <p>判据来源：核心区 = `core-zone` 地板（bundle 中文名「核心区」）；"最多几个"按**不重叠**
+     * 的可行摆法（每块核心区各按 3×3 网格对齐），见 {@link MapStats.Core} 与
+     * {@link MapStats#packCores}。</p>
+     */
+    private static MsavTiles.Tiles coreZoneGrid() {
+        MsavTiles.Tiles t = new MsavTiles.Tiles();
+        t.width = 12;
+        t.height = 8;
+        String[] names = {"air", "stone", "core-zone", "stone-wall"};
+        for (String s : names) t.blockNames.add(s);
+        int n = 12 * 8;
+        t.floors = new short[n];
+        t.ores = new short[n];
+        t.blocks = new short[n];
+        for (int i = 0; i < n; i++) t.floors[i] = 1;                 // 石头地板
+        for (int y = 1; y <= 6; y++) {
+            for (int x = 1; x <= 6; x++) t.floors[y * 12 + x] = 2;   // 核心区
+        }
         return t;
     }
 

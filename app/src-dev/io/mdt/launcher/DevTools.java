@@ -881,6 +881,12 @@ final class DevTools {
                         if (bd.floorBlocked > 0) sb.append(" · 地板不让建 ").append(bd.floorBlocked);
                         if (bd.unknown > 0) sb.append(" · 认不出 ").append(bd.unknown);
                         sb.append("）\n");
+                        // ★ 核心区（2026-10-17）：`core-zone` 地板的面积 + 最多能摆几个 3×3 核心
+                        if (r.core.zone > 0) {
+                            sb.append("    核心区: ").append(r.core.zone).append(" 格（能建 ")
+                              .append(r.core.usable).append("）· 最多 ").append(r.core.max)
+                              .append(" 个 3×3 核心\n");
+                        }
                         sb.append("    挡住资源的: ").append(a.blockersOf(r)).append('\n');
                         if (r.unkOre + r.unkFloor + r.unkBonus > 0) {
                             sb.append("    认不出的格子: 矿 ").append(r.unkOre).append(" / 地板 ")
