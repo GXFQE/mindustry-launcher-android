@@ -385,7 +385,7 @@
     <!-- 地图增删（F10）-->
     <string name="maps_import">Import map…</string>
     <!-- ★ 第 155 轮：一行两路（从文件 / 从本槽存档）—— 副标题把两条路都说出来 -->
-    <string name="maps_import_sub">Pick a file or a save here; multi-select, or one zip</string>
+    <string name="maps_import_sub">Pick a file or a save here (.msav); multi-select, or one zip</string>
     <string name="maps_import_pick">Import a map</string>
     <string name="maps_import_from_file">From a file…</string>
     <!--

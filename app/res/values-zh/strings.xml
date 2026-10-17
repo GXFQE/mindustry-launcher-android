@@ -368,7 +368,7 @@
     <!-- 地图增删（F10）-->
     <string name="maps_import">导入地图…</string>
     <!-- ★ 第 155 轮：一行两路（从文件 / 从本槽存档）—— 副标题把两条路都说出来 -->
-    <string name="maps_import_sub">从文件或本槽存档；可多选，也能选整包 zip</string>
+    <string name="maps_import_sub">从文件或本槽存档 (.msav)；可多选或整包 zip</string>
     <string name="maps_import_pick">导入地图</string>
     <string name="maps_import_from_file">从文件…</string>
     <!-- ★★ 2026-10-05「本槽存档 → 地图」（REF §72.10）：不过系统文件选择器，直接从本槽的存档里挑 -->
@@ -474,7 +474,7 @@
       ★ 2026-10-06（第 115 轮第六批）：存档**页面**（二级页）顶上那三行的副标题 ——
         与模组页 / 地图页 / 蓝图页同一形状（用户：「存档页面也变成…二级页面吧」）。
     -->
-    <string name="save_page_import_sub">从本机选 .msav；可多选，也能选整包 zip</string>
+    <string name="save_page_import_sub">从本机选 .msav；可多选或整包 zip</string>
     <string name="save_page_export_sub">存到手机；多选时打成一个 zip</string>
     <string name="save_page_bad_sub">一份一份列出原因</string>
     <string name="msav_bad_list_title_fmt">读不出来的存档（%1$d 份）</string>
@@ -904,7 +904,7 @@
       ★ 尺子与地图那条线一致：导入 = **先 .part + 我们的解析器验 + 再就位**；删除 = **挪进中转站**。
     -->
     <string name="bp_import">导入蓝图…</string>
-    <string name="bp_import_sub">从本机选 .msch；可多选，也能选整包 zip</string>
+    <string name="bp_import_sub">从本机选 .msch；可多选或整包 zip</string>
     <string name="bp_export">导出蓝图…</string>
     <string name="bp_export_sub">存到手机；多选时打成一个 zip</string>
     <string name="bp_export_none">这个槽还没有蓝图</string>
@@ -1766,7 +1766,7 @@
 
     <!-- ══ F13 第三阶段：模组包导入 / 跨槽复制 ══════════════════════════════ -->
     <string name="mods_act_import_title">导入模组…</string>
-    <string name="mods_act_import_sub">从本机选 .jar / .zip；可多选，也能选整包 zip</string>
+    <string name="mods_act_import_sub">从本机选 .jar / .zip；可多选或整包 zip</string>
     <string name="mods_act_copy_title">复制本槽模组到…</string>
     <string name="mods_act_copy_sub_fmt">把「%1$s」的模组整套复制到另一个槽</string>
     <string name="chooser_pick_mod">选择模组包</string>
