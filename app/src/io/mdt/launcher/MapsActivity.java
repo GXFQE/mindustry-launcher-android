@@ -141,40 +141,13 @@ public class MapsActivity extends BaseActivity {
         mHead.setText(Trans.get(MapsActivity.this, R.string.maps_scanning));
         mEmpty = (TextView) root.findViewById(R.id.maps_empty);
 
+        // ★ 2026-10-17（第 155 轮）：「导入地图…」= **一行两路**（从文件 / 从本槽存档）。
+        //   原来是两行（`row_maps_import` + `row_maps_from_save`），而它们是同一件事的两条路
+        //   —— 都是往本槽 `maps/` 里加一张图 ⇒ 照主界面「添加游戏」的成例合成一行（REF §84）。
+        //   用户原话：「有些页面（比如地图）按钮已经够多了，要不整合下？」
         Util.bindAction(root, R.id.row_maps_import, R.drawable.ic_download,
-                R.string.maps_import, R.string.slot_page_maps_sub, new Runnable() {
-                    @Override public void run() {
-                        // ★ 2026-10-04：**先判游戏在不在跑**（拦在 SAF 选择器之前，别让用户白选一次）。
-                        //   导入是往槽的 maps/ 里**写**（还会把同名旧图挪去中转站），
-                        //   而工程里凡"写槽"的路径都有这道门禁（导入存档/整槽、备份、恢复、改设置）；
-                        //   地图与模组导入原来漏了 —— 游戏本局写的图会被覆盖或被挪走。
-                        if (Data.gameAlive(MapsActivity.this)) {
-                            alert(Trans.get(MapsActivity.this, R.string.game_busy_title),
-                                    Trans.get(MapsActivity.this, R.string.maps_import_busy_msg));
-                            return;
-                        }
-                        sMapTarget = mSlot;
-                        // ★ 第 127 轮：**可多选**（`EXTRA_ALLOW_MULTIPLE`）——
-                        //   选 1 份 = 老样子（含"这其实是存档"的命名框），选 ≥2 份或选了一个
-                        //   zip = 批量（见 onActivityResult / BatchIo.runImport）。
-                        BatchIo.pickFiles(MapsActivity.this, REQ_MAP, R.string.maps_import);
-                    }
-                });
-
-        // ★ 2026-10-05「本槽存档 → 地图」（REF §72.10）：**不过系统文件选择器**。
-        //   手机上的存档就在本槽 `saves/` 里，而 SAF 够不到 `Android/data/…`
-        //   ⇒ 走「导入地图…」得先导出到 Download 再选回来（用户："我就是不希望手动导入"）。
-        //   与导入同一条门禁：这是往槽的 `maps/` 里写（旧图会进中转站）。
-        Util.bindAction(root, R.id.row_maps_from_save, R.drawable.ic_save,
-                R.string.maps_from_save, R.string.maps_from_save_sub, new Runnable() {
-                    @Override public void run() {
-                        if (Data.gameAlive(MapsActivity.this)) {
-                            alert(Trans.get(MapsActivity.this, R.string.game_busy_title),
-                                    Trans.get(MapsActivity.this, R.string.maps_import_busy_msg));
-                            return;
-                        }
-                        pickSlotSave();
-                    }
+                R.string.maps_import, R.string.maps_import_sub, new Runnable() {
+                    @Override public void run() { promptImportSource(); }
                 });
 
         // ★ 导出与导入成对放在**页面顶上**（用户 2026-10-03 定案）
@@ -604,17 +577,23 @@ public class MapsActivity extends BaseActivity {
                 });
     }
 
-    /** 口径二选一（两句话自己说清区别；不靠"第几个按钮"记语义） */
+    /**
+     * 出口四选一：**模式（详细 / 简洁）× 去处（保存到文件 / 直接分享）**。
+     *
+     * <p>★ 为什么不"先问去处、再问模式"：那是**两个弹窗、两次点击**；四个选项一个弹窗、
+     * 一次点击，而且每一条都是一句完整的话。★ 映射**按码**（{@link StatsExporter#modeOf(int)}
+     * / {@link StatsExporter#shares(int)}），不按"第几个" —— 顺序只由
+     * {@link StatsExporter#optionLabels()} 决定，改顺序不会让语义漂。</p>
+     */
     private void promptStatsMode(final List<Maps.Item> items) {
-        final String[] modes = new String[]{
-                Trans.get(this, R.string.stats_export_mode_detail),
-                Trans.get(this, R.string.stats_export_mode_brief)};
+        int[] ids = StatsExporter.optionLabels();
+        final String[] opts = new String[ids.length];
+        for (int i = 0; i < ids.length; i++) opts[i] = Trans.get(this, ids[i]);
         new AlertDialog.Builder(this)
                 .setTitle(R.string.stats_export_batch)
-                .setItems(modes, new DialogInterface.OnClickListener() {
+                .setItems(opts, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int which) {
-                        runStatsExport(items, which == 1
-                                ? MapStatsExport.MODE_BRIEF : MapStatsExport.MODE_DETAIL);
+                        runStatsExport(items, StatsExporter.modeOf(which), StatsExporter.shares(which));
                     }
                 })
                 .setNegativeButton(R.string.cancel, null)
@@ -622,12 +601,16 @@ public class MapsActivity extends BaseActivity {
     }
 
     /**
-     * 逐张统计 → 拼成一个 JSONL → SAF。
+     * 逐张统计 → 拼成一个 JSONL → **保存到 SAF** 或 **直接分享**（第 155 轮）。
      *
      * <p>★ 计数口径（与批量导出同一条纪律）：**读不出的那几张要单独报**，不许悄悄消失 ——
      * 勾了 10 张、文件里只有 8 块，用户会以为坏了。</p>
+     *
+     * <p>★ 分享这条路**不落用户目录**：内容写进 `cache/share/`，由 {@link ShareProvider}
+     * 以 `content://` 交给系统分享面板；用户看到的文件名来自本方法算出的 `name`
+     * （provider 的 `DISPLAY_NAME`），所以名字与"保存到文件"那条路**逐字相同**。</p>
      */
-    private void runStatsExport(final List<Maps.Item> items, final int mode) {
+    private void runStatsExport(final List<Maps.Item> items, final int mode, final boolean share) {
         final ProgressDialog pd = ProgressDialog.show(this,
                 Trans.get(this, R.string.stats_export_batch),
                 Trans.get(this, R.string.stats_export_progress_fmt, 0, items.size()), true, false);
@@ -671,12 +654,29 @@ public class MapsActivity extends BaseActivity {
                 }
                 // ★ 用户 2026-10-17 定的形态：「**选择一个地图就是 json，多个就是 jsonl**」
                 //   ⇒ 勾 1 张 = 一份 `.json`（整份文档）；勾多张 = 一个 `.jsonl`（**一行一张图**）。
-                final String text = rs.size() == 1
-                        ? MapStatsExport.jsonDoc(rs.get(0), ms.get(0))
-                        : MapStatsExport.jsonlBatch(rs, ms);
                 final int ok = rs.size();
                 final int sk = skipped;
                 final Maps.Item fok = firstOk;
+                final String text = ok == 0 ? ""
+                        : ok == 1 ? MapStatsExport.jsonDoc(rs.get(0), ms.get(0))
+                        : MapStatsExport.jsonlBatch(rs, ms);
+                // 单张 = `.json` + `application/json`；多张 = `.jsonl` + `application/x-ndjson`
+                final String name = StatsExporter.fileName(mSlot, fok, ok);
+                final String mime = ok == 1 ? "application/json" : StatsExporter.MIME;
+                // ★ 第 155 轮：直接分享 —— 落点**不是**用户选的 SAF，而是我们自己的缓存
+                //   （`cache/share/<name>`），由 ShareProvider 用 content:// 交给分享面板。
+                //   ⚠️ 在**这个后台线程**里写：内容可能有几百 KB~MB，别占 UI 线程。
+                Uri staged = null;
+                Throwable stageErr = null;
+                if (share && ok > 0) {
+                    try {
+                        staged = StatsExporter.stage(MapsActivity.this, name, text);
+                    } catch (Throwable t) {
+                        stageErr = t;
+                    }
+                }
+                final Uri fstage = staged;
+                final Throwable ferr = stageErr;
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
                         pd.dismiss();
@@ -689,9 +689,21 @@ public class MapsActivity extends BaseActivity {
                                     .show();
                             return;
                         }
-                        // 单张 = `.json` + `application/json`；多张 = `.jsonl` + `application/x-ndjson`
-                        String name = StatsExporter.fileName(mSlot, fok, ok);
-                        String mime = ok == 1 ? "application/json" : StatsExporter.MIME;
+                        if (share) {
+                            // ★ 分享这条路：写缓存失败就**明说失败**，绝不悄悄退回"保存到文件"
+                            //   （用户选的是分享，落到一个没打开保存框的状态 = 看起来什么都没发生）
+                            if (ferr != null || fstage == null) {
+                                new AlertDialog.Builder(MapsActivity.this)
+                                        .setTitle(Trans.get(MapsActivity.this, R.string.export_failed))
+                                        .setMessage(Util.ioReason(MapsActivity.this, ferr,
+                                                Trans.get(MapsActivity.this, R.string.exp_err_no_doc)))
+                                        .setPositiveButton(R.string.close, null)
+                                        .show();
+                                return;
+                            }
+                            StatsExporter.launchShare(MapsActivity.this, fstage, mime);
+                            return;
+                        }
                         try {
                             StatsExporter.begin(MapsActivity.this, name, text, mime, ok, sk);
                         } catch (Throwable t) {
@@ -949,6 +961,48 @@ public class MapsActivity extends BaseActivity {
                 });
             }
         }, "map-import").start();
+    }
+
+    // ── 导入地图：一行两路（第 155 轮） ─────────────────────────────────────
+
+    /**
+     * 「导入地图…」的二选一：**从文件** / **从本槽存档**（同一件事的两条路）。
+     *
+     * <p>★ 门禁放在弹窗**之前**：两条路都是往槽的 `maps/` 里写（旧图会进中转站），
+     * 而游戏在跑时写进去会被覆盖 —— 先拦，别让用户答完二选一再说"不行"。</p>
+     */
+    private void promptImportSource() {
+        // ★ 2026-10-04：先判游戏在不在跑（拦在 SAF 选择器 / 二选一之前，别让用户白选一次）。
+        //   导入是往槽的 maps/ 里**写**，而工程里凡"写槽"的路径都有这道门禁
+        //   （导入存档/整槽、备份、恢复、改设置）；地图与模组导入原来漏了。
+        if (Data.gameAlive(this)) {
+            alert(Trans.get(this, R.string.game_busy_title),
+                    Trans.get(this, R.string.maps_import_busy_msg));
+            return;
+        }
+        String[] items = new String[]{
+                Trans.get(this, R.string.maps_import_from_file),
+                Trans.get(this, R.string.maps_from_save)};
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.maps_import_pick)
+                .setItems(items, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int which) {
+                        if (which == 0) importFromFile(); else pickSlotSave();
+                    }
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    /**
+     * 从系统文件选择器导入。
+     *
+     * ★ 第 127 轮：**可多选**（`EXTRA_ALLOW_MULTIPLE`）—— 选 1 份 = 老样子（含"这其实是存档"
+     *   的命名框），选 ≥2 份或选了一个 zip = 批量（见 onActivityResult / BatchIo.runImport）。
+     */
+    private void importFromFile() {
+        sMapTarget = mSlot;
+        BatchIo.pickFiles(MapsActivity.this, REQ_MAP, R.string.maps_import);
     }
 
     // ── 「存档视为地图」（2026-10-05，REF §72） ─────────────────────────────

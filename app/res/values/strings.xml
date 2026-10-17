@@ -384,6 +384,10 @@
     <string name="slot_op_maps">Maps (this slot / game / mods)…</string>
     <!-- 地图增删（F10）-->
     <string name="maps_import">Import map…</string>
+    <!-- ★ 第 155 轮：一行两路（从文件 / 从本槽存档）—— 副标题把两条路都说出来 -->
+    <string name="maps_import_sub">From a file, or from a save in this slot</string>
+    <string name="maps_import_pick">Import a map</string>
+    <string name="maps_import_from_file">From a file…</string>
     <!--
       ★★ 2026-10-05「本槽存档 → 地图」（REF §72.10）：**不过系统文件选择器**。
       ★ 为什么：手机上的存档就在本槽 `saves/` 里，而系统文件选择器够不到 `Android/data/…`
@@ -2066,8 +2070,17 @@
 
     <string name="stats_export_batch">Export statistics…</string>
     <string name="stats_export_batch_sub">Pick one or more: one map makes a .json, several make a .jsonl (detailed or brief)</string>
-    <string name="stats_export_mode_detail">Detailed: everything</string>
-    <string name="stats_export_mode_brief">Brief: only what you can mine</string>
+    <!--
+      ★ 第 155 轮：出口四选一 = **模式 × 去处**（保存到文件 / 直接分享）。
+        「直接分享」不落用户目录：内容进 cache/share，由 ShareProvider 以 content:// 交给分享面板。
+      ⚠️ 四条都要说清**区别**（同一屏四个近义项，读者靠"保存/分享"和"详细/简洁"两个词分辨）。
+    -->
+    <string name="stats_export_opt_save_detail">Save to a file: detailed (everything)</string>
+    <string name="stats_export_opt_save_brief">Save to a file: brief (mineable only)</string>
+    <string name="stats_export_opt_share_detail">Share now: detailed (everything)</string>
+    <string name="stats_export_opt_share_brief">Share now: brief (mineable only)</string>
+    <string name="share_chooser">Share to…</string>
+    <string name="share_no_app">No app on this device can receive this file.</string>
     <string name="stats_export_progress_fmt">Counting %1$d / %2$d…</string>
     <string name="stats_export_batch_ok_fmt">Exported statistics of %1$d maps (%2$s)</string>
     <string name="stats_export_batch_ok_skipped_fmt">Exported statistics of %1$d maps (%2$s); %3$d more could not be read and were skipped</string>

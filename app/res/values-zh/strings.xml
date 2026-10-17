@@ -367,6 +367,10 @@
     <string name="slot_op_maps">地图（本槽 / 游戏 / 模组）…</string>
     <!-- 地图增删（F10）-->
     <string name="maps_import">导入地图…</string>
+    <!-- ★ 第 155 轮：一行两路（从文件 / 从本槽存档）—— 副标题把两条路都说出来 -->
+    <string name="maps_import_sub">从文件，或从本槽的存档</string>
+    <string name="maps_import_pick">导入地图</string>
+    <string name="maps_import_from_file">从文件…</string>
     <!-- ★★ 2026-10-05「本槽存档 → 地图」（REF §72.10）：不过系统文件选择器，直接从本槽的存档里挑 -->
     <string name="maps_from_save">本槽存档 → 地图…</string>
     <string name="maps_from_save_sub">从本槽的存档里挑一份（不用文件选择器）</string>
@@ -2020,8 +2024,16 @@
 
     <string name="stats_export_batch">导出统计…</string>
     <string name="stats_export_batch_sub">勾一张或多张：一张出 .json，多张出 .jsonl（详细 / 简洁）</string>
-    <string name="stats_export_mode_detail">详细：全部数据</string>
-    <string name="stats_export_mode_brief">简洁：只含能采到的</string>
+    <!--
+      ★ 第 155 轮：出口四选一 = 模式 × 去处（保存到文件 / 直接分享）。
+        「直接分享」不落用户目录：内容进缓存，由 ShareProvider 以 content:// 交给分享面板。
+    -->
+    <string name="stats_export_opt_save_detail">保存到文件：详细（全部数据）</string>
+    <string name="stats_export_opt_save_brief">保存到文件：简洁（只含能采到的）</string>
+    <string name="stats_export_opt_share_detail">直接分享：详细（全部数据）</string>
+    <string name="stats_export_opt_share_brief">直接分享：简洁（只含能采到的）</string>
+    <string name="share_chooser">分享到…</string>
+    <string name="share_no_app">这台设备上没有能接收这个文件的应用。</string>
     <string name="stats_export_progress_fmt">正在统计 %1$d / %2$d…</string>
     <string name="stats_export_batch_ok_fmt">已导出 %1$d 张地图的统计（%2$s）</string>
     <string name="stats_export_batch_ok_skipped_fmt">已导出 %1$d 张地图的统计（%2$s）；另有 %3$d 张读不出，已跳过</string>

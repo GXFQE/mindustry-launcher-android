@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  分享出口的「第三方接收夹具」（第 155 轮）—— **不是产品**，只用来证明
+  `content://io.mdt.launcher.share/<名字>` 真的能被**另一个 UID** 读走（微信那条路走不了自动化：
+  微信有应用锁，人脸/密码挡在分享面板后面）。
+
+  判据：本夹具把收到的流写到自己的外部目录 `files/received.bin`，并把
+  DISPLAY_NAME / SIZE / 字节数 / sha256 / getType 写进 `files/result.txt`；
+  与启动器 `cache/share/<名字>` 那一份逐字节比对（sha256 相同 = 授权与 provider 都对）。
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="io.mdt.shareprobe">
+
+    <uses-sdk android:minSdkVersion="26" android:targetSdkVersion="36"/>
+
+    <application android:label="ShareProbe" android:debuggable="false">
+        <activity
+            android:name=".ProbeActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.DeviceDefault">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <data android:mimeType="*/*"/>
+            </intent-filter>
+        </activity>
+    </application>
+</manifest>

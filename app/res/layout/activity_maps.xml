@@ -59,27 +59,18 @@
         android:layout_marginEnd="14dp"
         android:layout_marginBottom="8dp">
 
-        <include
-            android:id="@+id/row_maps_import"
-            layout="@layout/row_action"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:layout_marginStart="62dp"
-            android:background="@color/divider" />
-
         <!--
-          ★ 2026-10-05「本槽存档 → 地图」（REF §72.10）：**不过系统文件选择器**。
-          为什么必须有：手机上的存档就在本槽 `saves/` 里，而 SAF 够不到 `Android/data/…`
-          ⇒ 走「导入地图…」那条路，用户得先把存档导出到 Download 再选回来（用户原话：
-          「我就是不希望手动导入啊，要不然我为什么不用原版」）。
-          放**导入与导出之间**：三者都读作"进/出这份地图列表"，顺序 = 从文件来 / 从存档来 / 导出去。
+          ★ 2026-10-17（第 155 轮）：**两行合成一行** —— 原来「导入地图…」（从文件）与
+            「本槽存档 → 地图…」（从 `saves/` 挑一份）各占一行，而它们是**同一件事的两条路**
+            （都是往本槽 `maps/` 里加一张图）⇒ 照主界面「添加游戏」的成例（REF §84）：
+            一行 + 弹窗二选一。
+          为什么必须合：用户 2026-10-17「有些页面（比如地图）按钮已经够多了，要不整合下？」——
+            这张卡 6 行时，横屏 376dp 的可用高连**列表都看不见**（见文件头 151b 的注释）。
+          ⚠️ 从存档那条路**不过**系统文件选择器：手机上的存档就在本槽 `saves/` 里，而 SAF
+            够不到 `Android/data/…`（用户原话：「我就是不希望手动导入啊，要不然我为什么不用原版」）。
         -->
         <include
-            android:id="@+id/row_maps_from_save"
+            android:id="@+id/row_maps_import"
             layout="@layout/row_action"
             android:layout_width="match_parent"
             android:layout_height="wrap_content" />

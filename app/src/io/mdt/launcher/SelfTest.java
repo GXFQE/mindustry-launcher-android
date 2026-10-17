@@ -10672,6 +10672,117 @@ public final class SelfTest {
                 "★声明里的「在哪」只带文件名 / `包!/条目`（绝对路径不许进导出文件）："
                         + xw1 + " / " + xw2);
 
+        // ★★ 第 155 轮：「直接分享」= cache/share + 自建 provider（本工程无 androidx ⇒ 没有 FileProvider）
+        //    ① 四个出口 = 模式 × 去处：标签两两不同，映射按**码**、不按"第几个"
+        int[] optIds = StatsExporter.optionLabels();
+        java.util.Set<Integer> optSet = new java.util.HashSet<>();
+        for (int rid : optIds) optSet.add(rid);
+        ok(stat, L, optIds.length == 4 && optSet.size() == 4
+                        && StatsExporter.modeOf(StatsExporter.OPT_SAVE_DETAIL) == MapStatsExport.MODE_DETAIL
+                        && StatsExporter.modeOf(StatsExporter.OPT_SAVE_BRIEF) == MapStatsExport.MODE_BRIEF
+                        && StatsExporter.modeOf(StatsExporter.OPT_SHARE_DETAIL) == MapStatsExport.MODE_DETAIL
+                        && StatsExporter.modeOf(StatsExporter.OPT_SHARE_BRIEF) == MapStatsExport.MODE_BRIEF
+                        && !StatsExporter.shares(StatsExporter.OPT_SAVE_DETAIL)
+                        && !StatsExporter.shares(StatsExporter.OPT_SAVE_BRIEF)
+                        && StatsExporter.shares(StatsExporter.OPT_SHARE_DETAIL)
+                        && StatsExporter.shares(StatsExporter.OPT_SHARE_BRIEF),
+                "★导出统计 = 2 种模式 × 2 种去处：四个标签两两不同（" + optSet.size() + "/4），"
+                        + "序号 → (模式, 是否分享) 的映射与常量一致");
+        //    ② 路径判据：只认 cache/share 下的**一个平铺名字**（中文/空格放行；`..`/分隔符/换行全拒）
+        ok(stat, L, ShareProvider.safeName("mdt-stats-沙漠 基地-20261017-190000.json")
+                        && ShareProvider.safeName("a (2).jsonl")
+                        && !ShareProvider.safeName("../databases/x")
+                        && !ShareProvider.safeName("..")
+                        && !ShareProvider.safeName("a/b.json")
+                        && !ShareProvider.safeName("a\\b.json")
+                        && !ShareProvider.safeName("a\nb.json")
+                        && !ShareProvider.safeName("")
+                        && !ShareProvider.safeName(null),
+                "★分享文件名：中文/空格/括号放行，`..`、`/`、`\\`、换行、空名一律拒 —— "
+                        + "provider 只能读 `cache/share/` 下的一个平铺文件");
+        boolean escape = false;
+        try {
+            ShareProvider.fileOf(ctx, "../databases/selftest-no");
+        } catch (java.io.FileNotFoundException e) {
+            escape = true;
+        } catch (Throwable ignored) {
+        }
+        ok(stat, L, escape, "★反方向：`../databases/…` 必须抛 FileNotFoundException（不是\"读到别处\"）");
+        //    ③ stage：内容进 cache/share（UTF-8 **不带 BOM**），URI 是 content://<authority>/<名字>
+        File shareTmp = new File(ShareProvider.dirOf(ctx), "selftest-share-中文.json");
+        try { shareTmp.delete(); } catch (Throwable ignored) { }
+        byte[] wantShare = "{\"a\":1}\n".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        android.net.Uri shareUri = null;
+        Throwable stageErr = null;
+        try {
+            shareUri = StatsExporter.stage(ctx, shareTmp.getName(), "{\"a\":1}\n");
+        } catch (Throwable st) {
+            stageErr = st;
+        }
+        int firstByte = -1;
+        try {
+            java.io.FileInputStream in = new java.io.FileInputStream(shareTmp);
+            try { firstByte = in.read(); } finally { in.close(); }
+        } catch (Throwable ignored) {
+        }
+        ok(stat, L, stageErr == null && shareTmp.isFile()
+                        && shareTmp.length() == wantShare.length
+                        && firstByte == '{'
+                        && shareUri != null
+                        && ShareProvider.AUTHORITY.equals(shareUri.getAuthority())
+                        && shareTmp.getName().equals(shareUri.getLastPathSegment()),
+                "★stage：写进 `cache/share/`（UTF-8，**首字节就是 `{`** —— 没有 BOM），返回 "
+                        + "content://<authority>/<名字>（实际 " + shareUri + "）");
+        //    ④ 接收方查 query 拿到的必须是**我们的文件名与字节数**（缺了微信就自己编一个）
+        android.database.Cursor sc = null;
+        String scName = null;
+        long scSize = -1;
+        try {
+            sc = ShareProvider.cursorFor(shareTmp, null);
+            if (sc != null && sc.moveToFirst()) {
+                scName = sc.getString(sc.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME));
+                scSize = sc.getLong(sc.getColumnIndex(android.provider.OpenableColumns.SIZE));
+            }
+        } finally {
+            if (sc != null) sc.close();
+        }
+        ok(stat, L, shareTmp.getName().equals(scName) && scSize == shareTmp.length(),
+                "★provider 的 query 给出 DISPLAY_NAME + SIZE（微信/QQ 靠它显示文件卡片）："
+                        + scName + " / " + scSize + " B");
+        //    ⑤ 清单里**真的**声明了 provider（aapt2 不检查引用，漏了只在真机炸 Unknown URL）
+        try {
+            android.content.pm.ProviderInfo pi = ctx.getPackageManager()
+                    .getProviderInfo(new android.content.ComponentName(ctx, ShareProvider.class), 0);
+            ok(stat, L, pi != null && !pi.exported && pi.grantUriPermissions
+                            && ShareProvider.AUTHORITY.equals(pi.authority),
+                    "★ShareProvider 在清单里：authority=" + ShareProvider.AUTHORITY
+                            + "、exported=false、grantUriPermissions=true"
+                            + "（漏了就是分享时 Unknown URL content://…）");
+        } catch (Throwable pt) {
+            ok(stat, L, false, "★ShareProvider 没在清单里注册（分享会炸 Unknown URL）：" + pt);
+        }
+        //    ⑥ 缓存清理：只清 24h 之前的（刚写完的那份微信可能还在读）
+        boolean pruneOk = false;
+        File pruneDir = new File(Paths.privateDir(ctx), "selftest-share-prune");
+        try {
+            deleteTree(pruneDir);
+            pruneDir.mkdirs();
+            File oldF = new File(pruneDir, "old.json");
+            File newF = new File(pruneDir, "new.json");
+            write(oldF, "old".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            write(newF, "new".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            oldF.setLastModified(1000000000000L);           // 2001 年
+            int pruned = StatsExporter.prune(pruneDir,
+                    System.currentTimeMillis() - 24L * 3600L * 1000L);
+            pruneOk = pruned == 1 && !oldF.exists() && newF.isFile();
+        } catch (Throwable e) {
+            pruneOk = false;
+        }
+        ok(stat, L, pruneOk,
+                "★分享缓存清理：24h 之前的删掉、刚写的留住（否则微信还在读时就没了）");
+        deleteTree(pruneDir);
+        try { shareTmp.delete(); } catch (Throwable ignored) { }
+
         // ⑦ 译名链：**模组自己的 bundle** ⨁ 版本 APK 的 bundle（模组优先 —— 与游戏叠加顺序一致）
         File tmp = new File(Paths.privateDir(ctx), "selftest-mapstats");
         deleteTree(tmp);

@@ -100,6 +100,24 @@
             android:name="android.max_aspect"
             android:value="2.1"/>
 
+        <!--
+          ★ 第 155 轮：「导出统计 → 直接分享」的 content:// 出口
+            （`content://io.mdt.launcher.share/<名字>`，读的永远是 `cache/share/` 下的一个平铺文件）。
+
+          ⚠️ **必须注册**：aapt2 不检查引用，漏了照样 BUILD OK，真机分享时才炸
+             `IllegalArgumentException: Unknown URL content://…`（自检按 `getProviderInfo` 盯这条，
+             与「Activity 漏注册」同一族）。
+          ⚠️ provider 在**每个进程**都会实例化（包括 `:game`）⇒ `onCreate` 里只许 return true，
+             否则等于给每次游戏启动加一道初始化。
+          ⚠️ `exported=false` + `grantUriPermissions=true` 是 FileProvider 那套形状：
+             谁都没法直接读，只有**拿到一次 URI 授权**的接收方（微信/QQ/蓝牙…）能读。
+        -->
+        <provider
+            android:name=".ShareProvider"
+            android:authorities="io.mdt.launcher.share"
+            android:exported="false"
+            android:grantUriPermissions="true"/>
+
         <!-- 主进程（UI）：版本列表 / 导入 / 设置。
              singleTop：已在前台时再被拉起（如 dev_import_path 热路径）走 onNewIntent，
              而不是叠加一个新实例。 -->

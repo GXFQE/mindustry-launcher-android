@@ -10,6 +10,7 @@ import android.widget.Toast;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.security.DigestOutputStream;
@@ -19,16 +20,20 @@ import java.util.Date;
 import java.util.Locale;
 
 /**
- * 「导出统计」的**唯一落地实现**（第 154 轮）：声明拼装 + 地图身份取证 + SAF 写出 + 成败提示。
+ * 「导出统计」的**唯一落地实现**（第 154 轮，第 155 轮补「直接分享」）：声明拼装 + 地图身份取证
+ * + 写出 + 成败提示。
  *
- * <p>调用方两条路，**共用这一份**：
+ * <p>调用方只有一条（第 154 轮把详情页那个入口删了）：地图页勾几张批量
+ * （{@link MapsActivity}）。**出口有两个**，共用同一份文本与同一个文件名：
  * <ul>
- *   <li>地图详情页：单张（{@link MapDetailActivity}）</li>
- *   <li>地图页：勾几张批量（{@link MapsActivity}）</li>
+ *   <li>{@link #begin}  —— 保存到用户选的 SAF 落点（{@link Exporter#createDoc}）；</li>
+ *   <li>{@link #stage} + {@link #launchShare} —— 写进 `cache/share/`，由
+ *       {@link ShareProvider} 以 `content://` 交给系统分享面板（**不落用户目录**）。</li>
  * </ul>
- * 🔴 为什么不各写一遍：文件名、MIME、声明字段、隐私口径（不带路径）、失败措辞这五处
- * 任何一处抄第二遍都会漂，而"导出文件里少了/多了什么"**在界面上没有任何症状** ——
- * 等收数据的人发现时已经发出去了（与 `ref/29` 第 88 条同族）。</p>
+ * 🔴 为什么这两个出口必须共用 {@link #fileName} / {@link #MIME} / 声明拼装：文件名、MIME、
+ * 声明字段、隐私口径（不带路径）、失败措辞这五处任何一处抄第二遍都会漂，而"导出文件里
+ * 少了/多了什么"**在界面上没有任何症状** —— 等收数据的人发现时已经发出去了
+ * （与 `ref/29` 第 88 条同族）。</p>
  *
  * <h3>格式</h3>
  * JSONL（{@link MapStatsExport#FORMAT}）：一行声明 + 一行一条记录；批量 = 每张图一个这样的块，
@@ -46,6 +51,20 @@ final class StatsExporter {
     static final String MIME = "application/x-ndjson";
     /** SAF 回来时认这个请求码（两个调用方共用一个） */
     static final int REQ = 1542;
+
+    /**
+     * 「导出统计」的四个出口 = **模式（详细 / 简洁）× 去处（保存 / 分享）**（第 155 轮）。
+     *
+     * <p>★ 序号**只由 {@link #optionLabels()} 的顺序决定**；语义一律走 {@link #modeOf(int)} /
+     * {@link #shares(int)} —— 对话框里点第几个与"第几个"没有关系，改顺序不会让语义漂。</p>
+     */
+    static final int OPT_SAVE_DETAIL = 0;
+    static final int OPT_SAVE_BRIEF = 1;
+    static final int OPT_SHARE_DETAIL = 2;
+    static final int OPT_SHARE_BRIEF = 3;
+
+    /** 分享缓存留多久（毫秒）：**给接收方足够的时间读完**，下次分享时顺手清掉更老的 */
+    private static final long KEEP_MS = 24L * 3600L * 1000L;
 
     /** 等 SAF 回来时那几样东西（**成败都先清空**，见 {@link #handle}） */
     private static String sText;
@@ -132,6 +151,99 @@ final class StatsExporter {
             }
         }, "stats-export-write").start();
         return true;
+    }
+
+    // ── 直接分享（第 155 轮）：写缓存 → content:// → 系统分享面板 ─────────────
+
+    /** 四个出口在对话框里的**顺序**（只在这里定义一次；语义见 {@link #modeOf} / {@link #shares}） */
+    static int[] optionLabels() {
+        return new int[]{
+                R.string.stats_export_opt_save_detail,
+                R.string.stats_export_opt_save_brief,
+                R.string.stats_export_opt_share_detail,
+                R.string.stats_export_opt_share_brief};
+    }
+
+    /** 这个出口用哪种口径（详细 / 简洁） */
+    static int modeOf(int opt) {
+        return opt == OPT_SAVE_BRIEF || opt == OPT_SHARE_BRIEF
+                ? MapStatsExport.MODE_BRIEF : MapStatsExport.MODE_DETAIL;
+    }
+
+    /** 这个出口是"直接分享"还是"保存到文件" */
+    static boolean shares(int opt) {
+        return opt == OPT_SHARE_DETAIL || opt == OPT_SHARE_BRIEF;
+    }
+
+    /**
+     * 把文本写进 `cache/share/<name>`，返回给分享面板用的 `content://`。
+     *
+     * <p>★ 与 {@link #begin} 的区别只是**去哪**：这条不经过 SAF、不落用户目录；
+     * 文件名/MIME/内容与保存那条**逐字相同**（同一个 {@link #fileName}、同一份文本）。</p>
+     *
+     * <p>⚠️ 写盘的字节是 UTF-8 **不带 BOM**（与 {@link Exporter#writeText} 同一条口径：
+     * 带 BOM 的话 JSON 解析器会在第一个字符上翻车）。</p>
+     */
+    static Uri stage(Context c, String name, String text) throws IOException {
+        if (!ShareProvider.safeName(name)) throw new IOException("bad share name");
+        File d = ShareProvider.dirOf(c);
+        // ★ 顺手清旧：**不能立刻删刚写完的那份**（微信是异步读的），所以只清 24h 之前的。
+        prune(d, System.currentTimeMillis() - KEEP_MS);
+        File f = new File(d, name);
+        OutputStream out = null;
+        try {
+            out = new java.io.BufferedOutputStream(new java.io.FileOutputStream(f), 65536);
+            out.write((text == null ? "" : text).getBytes("UTF-8"));
+            out.flush();
+        } finally {
+            if (out != null) {
+                try { out.close(); } catch (Throwable ignored) { }
+            }
+        }
+        return ShareProvider.uriOf(name);
+    }
+
+    /**
+     * 清掉 `dir` 里早于 `cutoff` 的文件，返回删掉几个。
+     *
+     * <p>★ 纯函数（吃目录 + 时刻）：自检拿一个临时目录就能钉住"老的删、新的留"，
+     * 不必等一天。</p>
+     */
+    static int prune(File dir, long cutoff) {
+        File[] fs = dir == null ? null : dir.listFiles();
+        int n = 0;
+        if (fs != null) {
+            for (File f : fs) {
+                if (f.isFile() && f.lastModified() < cutoff && f.delete()) n++;
+            }
+        }
+        return n;
+    }
+
+    /**
+     * 打开系统分享面板（**不自己列 App**：微信/QQ/蓝牙/荣耀分享都靠系统选择器，
+     * 自己维护一份名单既要跟着别人改包名，又拿不到系统的"常用联系人"排序）。
+     *
+     * <p>🔴 两个细节缺一不可：{@code FLAG_GRANT_READ_URI_PERMISSION} 给接收方一次读权限；
+     * {@code ClipData} 再显式带一份 —— `EXTRA_STREAM` 在部分版本上不会被自动搬进 ClipData，
+     * 授权就跟着丢了（结果是接收方打开时 `SecurityException`）。</p>
+     */
+    static void launchShare(Activity a, Uri uri, String mime) {
+        if (uri == null) return;
+        Intent send = new Intent(Intent.ACTION_SEND);
+        send.setType(mime == null || mime.isEmpty() ? "application/octet-stream" : mime);
+        send.putExtra(Intent.EXTRA_STREAM, uri);
+        send.setClipData(android.content.ClipData.newRawUri("", uri));
+        send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        try {
+            a.startActivity(Intent.createChooser(send, Trans.get(a, R.string.share_chooser)));
+        } catch (Throwable t) {
+            new android.app.AlertDialog.Builder(a)
+                    .setTitle(Trans.get(a, R.string.export_failed))
+                    .setMessage(Trans.get(a, R.string.share_no_app))
+                    .setPositiveButton(R.string.close, null)
+                    .show();
+        }
     }
 
     // ── 声明里的那几样东西（单张 / 批量共用） ────────────────────────────
