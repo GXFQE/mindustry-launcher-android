@@ -16,6 +16,7 @@ import android.widget.Toast;
 
 import java.io.File;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 地图页（槽的子页面，REF §56）—— **从槽二级页面进**，返回就回那一页。
@@ -181,6 +182,16 @@ public class MapsActivity extends BaseActivity {
                 R.string.maps_export, R.string.maps_export_sub, new Runnable() {
                     @Override public void run() {
                         promptExportMap();
+                    }
+                });
+
+        // ★ 2026-10-17（第 154 轮）：「导出统计…」—— **批量**导出这张列表的统计数字
+        //   （用户：「我是想着批量导出使用 jsonl 或者 csv…可以加个详细模式（全部数据）和简洁模式（仅含可采的）」）。
+        //   ⚠️ 与上面那行是两件事：那个出去的是**地图文件**，这个出去的是**统计**（JSONL）。
+        Util.bindAction(root, R.id.row_maps_export_stats, R.drawable.ic_upload,
+                R.string.stats_export_batch, R.string.stats_export_batch_sub, new Runnable() {
+                    @Override public void run() {
+                        promptExportStats();
                     }
                 });
 
@@ -523,6 +534,8 @@ public class MapsActivity extends BaseActivity {
 
     @Override protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        // ★ 第 154 轮：导出统计（批量）的落点 —— 与详情页那张单张**共用同一个助手**
+        if (StatsExporter.handle(this, requestCode, resultCode, data)) return;
         // ★ 第 127 轮：批量导出的落点（勾了多份时走它；一份仍走下面 REQ_MAP_EXPORT 那条老路）
         if (BatchIo.handleExportResult(this, requestCode, resultCode, data)) return;
         if (requestCode == REQ_MAP_DETAIL) {
@@ -562,6 +575,130 @@ public class MapsActivity extends BaseActivity {
      *   勾 1 份仍走**单份那条路**（原文件名 + `REQ_MAP_EXPORT`），勾 ≥2 份打成**一个 zip**。
      *   同一条判据贯穿四个内容页，见 {@link BatchIo} 的类注释。
      */
+    // ── 导出统计（第 154 轮：批量 + 详细 / 简洁两种口径） ──────────────────────
+
+    /**
+     * 「导出统计…」：先勾地图（与导出/删除同一个多选对话框），再选**口径**，最后一并算完写成一个文件。
+     *
+     * <p>用户 2026-10-17：「我是想着批量导出使用 jsonl 或者 csv…可以加个详细模式（全部数据）和
+     * 简洁模式（仅含可采的）」。</p>
+     *
+     * <p>⚠️ 与「导出地图…」是两件事：那个出去的是**地图文件**（`.msav`），这个出去的是**统计数字**
+     * （`.jsonl`）—— 副标题要把区别说出来，否则两行看着像同一件事的两种说法。</p>
+     */
+    private void promptExportStats() {
+        if (mItems == null || mItems.isEmpty()) {
+            Toast.makeText(this, Trans.get(this, R.string.maps_export_none), Toast.LENGTH_SHORT).show();
+            return;
+        }
+        final List<Maps.Item> items = mItems;
+        BatchIo.pickMulti(this, R.string.stats_export_batch,
+                Trans.get(MapsActivity.this, R.string.batch_export_head_fmt, items.size()),
+                mTitles, mSubs, mThumbs, new BatchIo.OnPick() {
+                    @Override public void onPick(List<Integer> idx) {
+                        if (idx == null || idx.isEmpty()) return;
+                        List<Maps.Item> picked = new java.util.ArrayList<>();
+                        for (Integer i : idx) picked.add(items.get(i.intValue()));
+                        promptStatsMode(picked);
+                    }
+                });
+    }
+
+    /** 口径二选一（两句话自己说清区别；不靠"第几个按钮"记语义） */
+    private void promptStatsMode(final List<Maps.Item> items) {
+        final String[] modes = new String[]{
+                Trans.get(this, R.string.stats_export_mode_detail),
+                Trans.get(this, R.string.stats_export_mode_brief)};
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.stats_export_batch)
+                .setItems(modes, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int which) {
+                        runStatsExport(items, which == 1
+                                ? MapStatsExport.MODE_BRIEF : MapStatsExport.MODE_DETAIL);
+                    }
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    /**
+     * 逐张统计 → 拼成一个 JSONL → SAF。
+     *
+     * <p>★ 计数口径（与批量导出同一条纪律）：**读不出的那几张要单独报**，不许悄悄消失 ——
+     * 勾了 10 张、文件里只有 8 块，用户会以为坏了。</p>
+     */
+    private void runStatsExport(final List<Maps.Item> items, final int mode) {
+        final ProgressDialog pd = ProgressDialog.show(this,
+                Trans.get(this, R.string.stats_export_batch),
+                Trans.get(this, R.string.stats_export_progress_fmt, 0, items.size()), true, false);
+        new Thread(new Runnable() {
+            @Override public void run() {
+                String apk = null;
+                try {
+                    apk = Mods.targetsFor(MapsActivity.this, mSlot).apkPath;
+                } catch (Throwable ignored) {
+                }
+                final Map<String, String> labels = MapStatsMods.attrLabels(MapsActivity.this);
+                final List<MapStats.Result> rs = new java.util.ArrayList<>();
+                final List<MapStatsExport.Meta> ms = new java.util.ArrayList<>();
+                int skipped = 0;
+                for (int i = 0; i < items.size(); i++) {
+                    final int done = i;
+                    runOnUiThread(new Runnable() {
+                        @Override public void run() {
+                            if (Util.dead(MapsActivity.this)) return;
+                            pd.setMessage(Trans.get(MapsActivity.this,
+                                    R.string.stats_export_progress_fmt, done, items.size()));
+                        }
+                    });
+                    Maps.Item it = items.get(i);
+                    MapStatsMods.Built b = null;
+                    try {
+                        b = MapStatsMods.run(MapsActivity.this, mSlot, it, apk, labels);
+                    } catch (Throwable t) {
+                        android.util.Log.w("MDTLauncher", "stats export: one map failed", t);
+                    }
+                    if (b == null || b.result == null || !b.result.ok
+                            || (b.error != null && !b.error.isEmpty())) {
+                        skipped++;
+                        continue;
+                    }
+                    rs.add(b.result);
+                    ms.add(StatsExporter.metaOf(MapsActivity.this, mSlot, it, b, apk,
+                            StatsExporter.shaOfMap(MapsActivity.this, it), mode));
+                }
+                final String text = MapStatsExport.jsonlBatch(rs, ms);
+                final int ok = rs.size();
+                final int sk = skipped;
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        pd.dismiss();
+                        if (Util.dead(MapsActivity.this)) return;
+                        if (ok == 0) {
+                            new AlertDialog.Builder(MapsActivity.this)
+                                    .setTitle(Trans.get(MapsActivity.this, R.string.stats_export_batch))
+                                    .setMessage(Trans.get(MapsActivity.this, R.string.stats_export_batch_none))
+                                    .setPositiveButton(R.string.close, null)
+                                    .show();
+                            return;
+                        }
+                        String name = StatsExporter.fileName(mSlot, null, ok);
+                        try {
+                            StatsExporter.begin(MapsActivity.this, name, text,
+                                    StatsExporter.MIME, ok, sk);
+                        } catch (Throwable t) {
+                            new AlertDialog.Builder(MapsActivity.this)
+                                    .setTitle(Trans.get(MapsActivity.this, R.string.export_failed))
+                                    .setMessage(Trans.get(MapsActivity.this, R.string.exp_err_no_doc))
+                                    .setPositiveButton(R.string.close, null)
+                                    .show();
+                        }
+                    }
+                });
+            }
+        }, "stats-export-batch").start();
+    }
+
     private void promptExportMap() {
         if (mItems == null || mItems.isEmpty()) {
             Toast.makeText(this, R.string.maps_export_none, Toast.LENGTH_SHORT).show();

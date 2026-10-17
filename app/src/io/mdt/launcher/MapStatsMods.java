@@ -54,6 +54,12 @@ public final class MapStatsMods {
         public String bundleNote = "";
         /** 读表 + 统计的总耗时（毫秒） */
         public long millis;
+        /** 参与统计的模组包数（-1 = 没读出来；0 = 只有原版）—— 导出的**声明**里要写它 */
+        public int packs = -1;
+        /** 游戏这一轮**不加载模组**（上次崩过，`modcrashdisable` 生效）—— 导出时要说清 */
+        public boolean modsSkipped;
+        /** 模组读不出来（只按原版算） */
+        public boolean modsFailed;
     }
 
     private static final class Cached {
@@ -275,6 +281,11 @@ public final class MapStatsMods {
         else if (sc.failed) b.modNote = Trans.get(ctx, R.string.stats_note_mods_failed);
         else b.modNote = Trans.get(ctx, R.string.stats_note_mods_fmt,
                 sc.packs, sc.added, sc.overridden);
+        // ★ 2026-10-17（导出）：这三个数要给**声明**用 —— 拿到一份导出文件的人得知道
+        //   这些数字是"原版 + 几个模组"算出来的（模组数不同，同一张图的数会不同）。
+        b.packs = sc.packs;
+        b.modsSkipped = sc.skipMods;
+        b.modsFailed = sc.failed;
         if (sc.bundlesWithText > 0) {
             b.bundleNote = Trans.get(ctx, R.string.stats_note_bundles_fmt,
                     sc.bundlesWithText, sc.bundle.keys());

@@ -55,15 +55,26 @@
                 android:textSize="13sp"
                 android:textColor="@color/fg" />
 
-            <!-- 只有**本槽**的图才给删除入口（游戏自带 / 模组自带的那两张在包里，删不了） -->
+            <!--
+              操作行（第 154 轮：「导出统计」**所有**地图都有；「删除」只对本槽的图）。
+              ★ `detail_actions` 由"只有本槽才显示"改成**常显** —— 导出与来源无关。
+                删除那行仍在代码里按 `Maps.FROM_SLOT` GONE 掉（游戏自带 / 模组自带的在包里，删不了）。
+              ⚠️ 两行之间**不加分割线**：本页最多两行、且第二行多数时候不出现
+                （其他页的 row_action 也是直接摞，见 activity_slot.xml）。
+            -->
             <LinearLayout
                 android:id="@+id/detail_actions"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:layout_marginTop="10dp"
-                android:background="@drawable/card_bg"
-                android:visibility="gone">
+                android:background="@drawable/card_bg">
+
+                <include
+                    android:id="@+id/row_detail_export"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
 
                 <include
                     android:id="@+id/row_detail_delete"

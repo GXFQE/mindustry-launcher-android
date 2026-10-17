@@ -10418,6 +10418,226 @@ public final class SelfTest {
                         + "（深液体=" + (dtar != null && dtar.deep) + " / 不让放= "
                         + (dvoid != null && !dvoid.placeableOn) + "）");
 
+        // ⑥f **导出统计**（2026-10-17 用户：「给我们的统计表加个导出的功能…导出文件加一个由启动器
+        //    导出的声明（同时包含必要参数…）」）——格式 = **JSONL**（一行声明 + 一行一条记录），
+        //    入口 = 地图详情页的「导出统计数据」。
+        //    ★ 尺子三条：① **行数 == 记录数**（名字里的换行必须被转义，否则"一行一条"这个承诺就没了）
+        //      ② 每行都能被我们**自己的** JSON 读回、`kind` 都在已知集合里
+        //      ③ 数字与界面同源（reachable = open + loose、可建造六桶相加 == 总格数）
+        MapStats.Result xr = MapStats.analyze(coreZoneGrid(), v, nm, "serpulo");
+        MapStatsExport.Meta xm = new MapStatsExport.Meta();
+        xm.exportedAt = "2026-10-17T16:20:00+08:00";
+        xm.launcherVersion = "0.5-preview";
+        xm.launcherCode = 5;
+        xm.launcherPackage = "io.mdt.launcher";
+        xm.slot = "test";
+        xm.mapName = "core-zone-6x6.msav";
+        xm.mapSource = "slot";
+        xm.mapWhere = "core-zone-6x6.msav";
+        xm.mapBytes = 1234;
+        xm.mapSha256 = "0123456789abcdef";
+        xm.planet = "serpulo";
+        xm.gameApk = "Mindustry-160.4.apk";
+        xm.gameVersion = "160.4";
+        xm.tableRows = 600;
+        xm.mods = 2;
+        xm.notice = "由 MDT 安卓启动器导出 · " + MapStatsExport.SITE;
+        final int xWant = 1 + xr.ores.size() + xr.oreWalls.size() + xr.floors.size()
+                + xr.bonuses.size() + 2 + xr.unknowns.size();
+        String xj = MapStatsExport.jsonl(xr, xm);
+        java.util.List<String> xls = new java.util.ArrayList<>();
+        for (String s : xj.split("\n", -1)) if (!s.isEmpty()) xls.add(s);
+        ok(stat, L, xls.size() == xWant && xj.endsWith("\n") && !xj.contains("\n\n"),
+                "★导出行数 = 声明 1 + 记录 " + (xWant - 1) + "（末尾恰好一个换行、没有空行）"
+                        + "（实际 " + xls.size() + " 行，期望 " + xWant + "）");
+        Map<String, Object> xm0 = xls.isEmpty() ? null : MapStats.jsonOf(xls.get(0));
+        ok(stat, L, xm0 != null && "meta".equals(String.valueOf(xm0.get("kind")))
+                        && MapStatsExport.FORMAT.equals(String.valueOf(xm0.get("format")))
+                        && MapStatsExport.GENERATOR.equals(String.valueOf(xm0.get("generator")))
+                        && MapStatsExport.SITE.equals(String.valueOf(xm0.get("site")))
+                        && "detail".equals(String.valueOf(xm0.get("mode")))
+                        && intOf(xm0, "index") == 1 && intOf(xm0, "count") == 1
+                        && String.valueOf(xm0.get("notice")).contains("https://"),
+                "★第一行是**声明**：kind=meta · format · generator · site（宣传位）· notice（含项目地址）"
+                        + " · mode / index / count（批量时用来分段）");
+        Object xmap = xm0 == null ? null : xm0.get("map");
+        Object xlau = xm0 == null ? null : xm0.get("launcher");
+        Object xcnt = xm0 == null ? null : xm0.get("content");
+        ok(stat, L, xmap instanceof Map && xlau instanceof Map && xcnt instanceof Map
+                        && "0123456789abcdef".equals(String.valueOf(((Map<?, ?>) xmap).get("sha256")))
+                        && intOf((Map<?, ?>) xmap, "cells") == xr.cells
+                        && intOf((Map<?, ?>) xmap, "width") == xr.width
+                        && "0.5-preview".equals(String.valueOf(((Map<?, ?>) xlau).get("version")))
+                        && intOf((Map<?, ?>) xlau, "versionCode") == 5
+                        && "serpulo".equals(String.valueOf(((Map<?, ?>) xcnt).get("planet")))
+                        && intOf((Map<?, ?>) xcnt, "mods") == 2,
+                "★声明里的**来源参数**都带上了：启动器版本/versionCode、地图 sha256、宽高格数、"
+                        + "星球、模组数");
+        java.util.Set<String> xKnown = new java.util.HashSet<>(java.util.Arrays.asList(
+                "meta", "ore", "oreWall", "floor", "bonus", "buildable", "core", "unknownContent"));
+        boolean xAll = !xls.isEmpty();
+        for (String s : xls) {
+            Map<String, Object> o = MapStats.jsonOf(s);
+            if (o == null || !xKnown.contains(String.valueOf(o.get("kind")))) {
+                xAll = false;
+                break;
+            }
+        }
+        ok(stat, L, xAll, "★每一行都读得回 JSON、`kind` 都在已知集合里（" + xls.size() + " 行）");
+        Map<String, Object> xb = null, xc = null;
+        for (String s : xls) {
+            Map<String, Object> o = MapStats.jsonOf(s);
+            if (o == null) continue;
+            String k = String.valueOf(o.get("kind"));
+            if ("buildable".equals(k)) xb = o;
+            else if ("core".equals(k)) xc = o;
+        }
+        ok(stat, L, xb != null && xc != null
+                        && intOf(xb, "sum") == xr.cells
+                        && intOf(xb, "free") + intOf(xb, "cleared") + intOf(xb, "walled")
+                        + intOf(xb, "deep") + intOf(xb, "floorBlocked") + intOf(xb, "unknown") == xr.cells
+                        && intOf(xc, "zone") == xr.core.zone && intOf(xc, "usable") == xr.core.usable
+                        && intOf(xc, "max") == xr.core.max && intOf(xc, "size") == xr.core.size
+                        && "planet".equals(String.valueOf(xc.get("basis"))),
+                "★可建造那行：六桶相加 == 总格数（" + xr.cells + "）且 sum 字段就是它；"
+                        + "核心区那行与 Result 同源（zone/usable/max/size/basis）");
+        // ★★ 转义：名字里塞 引号 / 反斜杠 / 换行 / 制表 ⇒ 仍然**一行一条**，读回来逐字相同
+        MapStats.Row evil = new MapStats.Row();
+        evil.label = "引号\"反斜杠\\换行\n制表\t结束";
+        evil.origin = MapStats.ORIGIN_MOD;
+        evil.source = MapStats.SRC_MOD + "（改）";
+        evil.internals.add("a\"b");
+        evil.total = 7;
+        evil.open = 3;
+        evil.loose = 1;
+        MapStats.Result xe = MapStats.analyze(coreZoneGrid(), v, nm, "serpulo");
+        xe.ores.add(evil);
+        String xej = MapStatsExport.jsonl(xe, xm);
+        java.util.List<String> xels = new java.util.ArrayList<>();
+        for (String s : xej.split("\n", -1)) if (!s.isEmpty()) xels.add(s);
+        Map<String, Object> xeRow = null;
+        for (String s : xels) {
+            Map<String, Object> o = MapStats.jsonOf(s);
+            if (o != null && evil.label.equals(String.valueOf(o.get("name")))) xeRow = o;
+        }
+        ok(stat, L, xels.size() == xWant + 1 && xeRow != null,
+                "★名字里带 引号/反斜杠/换行/制表 ⇒ 转义后**行数不变**（" + xWant + " → " + xels.size()
+                        + "，只多我们自己加的那一条），名字读回来逐字相同");
+        ok(stat, L, xeRow != null && "mod".equals(String.valueOf(xeRow.get("origin")))
+                        && "模组（改）".equals(String.valueOf(xeRow.get("source")))
+                        && intOf(xeRow, "reachable") == evil.reachable()
+                        && intOf(xeRow, "total") == 7
+                        && xeRow.get("total") instanceof Number,
+                "★`origin` 是**码**（mod，不是那句中文文案）、`source` 原样留着；"
+                        + "reachable = open + loose = 4；格数是**数字**（不是 `1,234` 那种字符串）");
+        // ★ 隐私：声明的「在哪」只能用文件名 / `包!/条目`（`Item.where` 对槽内文件是绝对路径）
+        Maps.Item xit = new Maps.Item();
+        xit.file = new File("/storage/emulated/0/Android/data/io.mdt.launcher/files/maps/0.msav");
+        xit.container = new File("/storage/emulated/0/Android/data/io.mdt.launcher/files/import/game.apk");
+        xit.entry = "assets/maps/2.msav";
+        String xw1 = StatsExporter.whereOf(xit);
+        xit.file = null;
+        String xw2 = StatsExporter.whereOf(xit);
+        ok(stat, L, "0.msav".equals(xw1) && "game.apk!/assets/maps/2.msav".equals(xw2)
+                        && !xw1.contains("/") && !xw2.contains("/storage") && !xw2.contains("/Android")
+                        && !xj.contains("/storage") && !xj.contains("/data/"),
+                "★声明里的「在哪」只带文件名 / `包!/条目`（绝对路径不许进导出文件）："
+                        + xw1 + " / " + xw2);
+
+        // ★ 单张 = **一个 JSON 文档**（用户 2026-10-17：「单独导出使用 json 就行」）
+        String xdoc = MapStatsExport.jsonDoc(xr, xm);
+        Map<String, Object> xd = MapStats.jsonOf(xdoc);
+        Object xrec = xd == null ? null : xd.get("records");
+        ok(stat, L, xd != null && MapStatsExport.FORMAT.equals(String.valueOf(xd.get("format")))
+                        && xd.get("meta") instanceof Map
+                        && xrec instanceof List
+                        && ((List<?>) xrec).size() == intOf(xd, "recordCount")
+                        && ((List<?>) xrec).size() == xWant - 1,
+                "★单张导出是一个 **JSON 文档**：format / meta / recordCount / records ——"
+                        + " records 条数 == recordCount == " + (xWant - 1)
+                        + "（实际 " + (xrec instanceof List ? ((List<?>) xrec).size() : -1) + "）");
+        // ★★ 简洁模式（用户：「仅含可采的」）—— 只写 reachable > 0 的记录，且不写 buildable / core
+        MapStats.Result xb2 = new MapStats.Result();
+        xb2.ok = true;
+        xb2.width = 12;
+        xb2.height = 8;
+        xb2.cells = 96;
+        MapStats.Row okRow = new MapStats.Row();
+        okRow.label = "可采的那种";
+        okRow.total = 10;
+        okRow.open = 4;
+        okRow.loose = 1;
+        MapStats.Row zeroRow = new MapStats.Row();
+        zeroRow.label = "一格都拿不到";
+        zeroRow.total = 10;
+        zeroRow.buried = 10;
+        xb2.ores.add(okRow);
+        xb2.ores.add(zeroRow);
+        MapStatsExport.Meta xmb = new MapStatsExport.Meta();
+        xmb.exportedAt = xm.exportedAt;
+        xmb.launcherVersion = xm.launcherVersion;
+        xmb.launcherCode = xm.launcherCode;
+        xmb.launcherPackage = xm.launcherPackage;
+        xmb.slot = xm.slot;
+        xmb.mapName = "b.msav";
+        xmb.mapSource = "slot";
+        xmb.mapWhere = "b.msav";
+        xmb.mapSha256 = "bb";
+        xmb.planet = "serpulo";
+        xmb.notice = xm.notice;
+        xmb.mode = MapStatsExport.MODE_BRIEF;
+        String xbj = MapStatsExport.jsonl(xb2, xmb);
+        boolean briefOk = true;
+        int briefRows = 0;
+        boolean hasBuildable = false, hasZero = false, briefMode = false;
+        for (String s : xbj.split("\n", -1)) {
+            if (s.isEmpty()) continue;
+            Map<String, Object> o = MapStats.jsonOf(s);
+            if (o == null) { briefOk = false; break; }
+            if ("meta".equals(String.valueOf(o.get("kind")))) {
+                briefMode = "brief".equals(String.valueOf(o.get("mode")));
+                if (intOf(o, "records") != 1) briefOk = false;
+                continue;
+            }
+            briefRows++;
+            if ("buildable".equals(String.valueOf(o.get("kind")))) hasBuildable = true;
+            if ("一格都拿不到".equals(String.valueOf(o.get("name")))) hasZero = true;
+            // ★ 元断言：简洁模式里**不许**出现 reachable == 0 的记录
+            if (intOf(o, "reachable") <= 0) briefOk = false;
+        }
+        ok(stat, L, briefOk && briefMode && !hasBuildable && !hasZero && briefRows == 1,
+                "★简洁模式：只写 **reachable > 0** 的记录（" + briefRows + " 条）；不可采的那条、"
+                        + "以及 buildable / core 都不写（`mode` 标注 brief、`records` 也对得上）");
+        // ★★ 批量 = 每张图一个「声明 + 记录」块（index / count 标位置；records 说几条就得几条）
+        xmb.mode = MapStatsExport.MODE_DETAIL;
+        String xbatch = MapStatsExport.jsonlBatch(
+                java.util.Arrays.asList(xr, xb2), java.util.Arrays.asList(xm, xmb));
+        int blocks = 0, inBlock = 0, seen = 0;
+        boolean bIndex = true, bRecords = true, bParsed = true;
+        Map<String, Object> prevMeta = null;
+        for (String s : xbatch.split("\n", -1)) {
+            if (s.isEmpty()) continue;
+            Map<String, Object> o = MapStats.jsonOf(s);
+            if (o == null) { bParsed = false; break; }
+            if ("meta".equals(String.valueOf(o.get("kind")))) {
+                if (prevMeta != null && inBlock != intOf(prevMeta, "records")) bRecords = false;
+                prevMeta = o;
+                blocks++;
+                inBlock = 0;
+                if (intOf(o, "index") != blocks || intOf(o, "count") != 2) bIndex = false;
+            } else {
+                inBlock++;
+                seen++;
+            }
+        }
+        if (prevMeta != null && inBlock != intOf(prevMeta, "records")) bRecords = false;
+        // 期望条数 = 两块各自的 `records` 之和（**别写死数字**：口径一改这条就会变成假红/假绿）
+        final int seenWant = MapStatsExport.records(xr, false) + MapStatsExport.records(xb2, false);
+        ok(stat, L, bParsed && blocks == 2 && bIndex && bRecords && seen == seenWant,
+                "★批量 = 每张图一个「声明 + 记录」块：index 1/2、count 2，且每块 meta.records"
+                        + " == 该块的记录条数（" + blocks + " 块 / " + seen + " 条记录，期望 "
+                        + seenWant + "）");
+
         // ⑦ 译名链：**模组自己的 bundle** ⨁ 版本 APK 的 bundle（模组优先 —— 与游戏叠加顺序一致）
         File tmp = new File(Paths.privateDir(ctx), "selftest-mapstats");
         deleteTree(tmp);
@@ -12894,6 +13114,24 @@ public final class SelfTest {
         if (cond) stat[0]++;
         else stat[1]++;
         L.add((cond ? "  ✅ " : "  ❌ ") + msg);
+    }
+
+    /**
+     * 从 {@link MapStats#jsonOf} 的结果里取一个整数（第 154 轮导出的尺子用）。
+     *
+     * <p>我们的 JSON 读取器把数字当 {@link Number}（Integer / Long / Double 都可能），
+     * **也可能缺失**（字段没写）⇒ 缺失与解析失败都返回 {@link Integer#MIN_VALUE}，
+     * 这样"字段丢了"与"值是 0"不会混成一句"通过"。</p>
+     */
+    private static int intOf(Map<?, ?> m, String k) {
+        Object v = m == null ? null : m.get(k);
+        if (v instanceof Number) return (int) Math.round(((Number) v).doubleValue());
+        if (v == null) return Integer.MIN_VALUE;
+        try {
+            return (int) Math.round(Double.parseDouble(String.valueOf(v)));
+        } catch (Throwable t) {
+            return Integer.MIN_VALUE;
+        }
     }
 
     private static String path(File f) {

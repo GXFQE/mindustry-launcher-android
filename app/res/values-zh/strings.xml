@@ -2008,4 +2008,25 @@
     <string name="version_name_saved_fmt">已命名为「%1$s」</string>
     <string name="version_name_reset_done">已恢复原名</string>
     <string name="detail_orig_name_fmt">\n原名：%1$s</string>
+
+    <string name="stats_export">导出统计数据</string>
+    <string name="stats_export_sub">存成 .jsonl（本页数字 + 来源与版本）</string>
+    <string name="stats_export_working">正在准备导出文件…</string>
+    <string name="stats_export_ok_fmt">已导出 %1$s（%2$s）</string>
+    <string name="stats_export_fail_fmt">导出失败：%1$s</string>
+    <string name="stats_export_notice_fmt">由 MDT 安卓启动器导出 · %1$s · 数字口径见启动器的地图统计；如果看着不对，请把这个文件发回去</string>
+
+
+    <string name="stats_export_failed_plain">统计没能整理成文件，回去重新打开这张图再试。</string>
+
+
+    <string name="stats_export_batch">导出统计…</string>
+    <string name="stats_export_batch_sub">选一张或多张，导出一个 JSONL（详细 / 简洁）</string>
+    <string name="stats_export_mode_detail">详细：全部数据</string>
+    <string name="stats_export_mode_brief">简洁：只含能采到的</string>
+    <string name="stats_export_progress_fmt">正在统计 %1$d / %2$d…</string>
+    <string name="stats_export_batch_ok_fmt">已导出 %1$d 张地图的统计（%2$s）</string>
+    <string name="stats_export_batch_ok_skipped_fmt">已导出 %1$d 张地图的统计（%2$s）；另有 %3$d 张读不出，已跳过</string>
+    <string name="stats_export_batch_none">这些地图一张都读不出来，没有可导出的。</string>
+
 </resources>

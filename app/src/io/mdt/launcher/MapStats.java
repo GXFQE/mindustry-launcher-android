@@ -136,6 +136,20 @@ public final class MapStats {
     public static final String SRC_MOD = "模组";
     public static final String SRC_PATCH = "地图补丁";
 
+    /**
+     * 一行内容**从哪来**的稳定码（2026-10-17 加，导出用）。
+     *
+     * <p>🔴 为什么不能拿 {@link #SRC_VANILLA} 那几个常量当判据：它们是**文案值**
+     * （`"原版"` / `"模组"` / `"地图补丁"`，还带 `模组（新）`/`模组（改）` 这种后缀）——
+     * 门禁 `SRC-01` 明令不许把"值为文案的常量"当判断依据（文案一改判据就静默失效）。
+     * ⇒ 判据用这里的枚举码，{@code source} 只留给人看。</p>
+     */
+    public static final int ORIGIN_VANILLA = 0;
+    public static final int ORIGIN_MOD = 1;
+    public static final int ORIGIN_PATCH = 2;
+    /** 认不出（模组里用了我们没解析到的类型） */
+    public static final int ORIGIN_UNKNOWN = 3;
+
     // ══ 一、一张定义表的行 ═══════════════════════════════════════════════════
 
     /**
@@ -194,6 +208,8 @@ public final class MapStats {
         public float speed = 1f, damage = 0f;
         /** 这行从哪来（{@link #SRC_VANILLA} 等；技术细节层显示） */
         public String source = SRC_VANILLA;
+        /** 这行从哪来（**判据用这个码**，见 {@link MapStats#ORIGIN_VANILLA} —— 别拿上面那句文案当判据） */
+        public int origin = ORIGIN_VANILLA;
         /**
          * 这行的**模组内容前缀**（原版行为空）。
          *
@@ -291,6 +307,7 @@ public final class MapStats {
             d.speed = speed;
             d.damage = damage;
             d.source = source;
+            d.origin = origin;
             d.prefix = prefix;
             d.localizedName = localizedName;
             return d;
@@ -439,6 +456,7 @@ public final class MapStats {
             if (c.length < 18) continue;
             Def d = Def.of(c);
             d.source = source;
+            d.origin = ORIGIN_VANILLA;
             t.byName.put(d.name, d);
         }
     }
@@ -1155,6 +1173,7 @@ public final class MapStats {
             String reg = jsonName(json, base, p.prefix);
             nd.name = reg;
             nd.source = SRC_MOD + "（新）";
+            nd.origin = ORIGIN_MOD;
             nd.prefix = p.prefix;
             nd.localizedName = str(json.get("localizedName"), "");
             if (!nd.localizedName.isEmpty()) t.jsonNames++;
@@ -1192,6 +1211,7 @@ public final class MapStats {
         }
         applyJson(old, json, p.prefix);
         old.source = SRC_MOD + "（改）";
+        old.origin = ORIGIN_MOD;
         r.overridden++;
         return "覆盖";
     }
@@ -1347,6 +1367,7 @@ public final class MapStats {
             @SuppressWarnings("unchecked") Map<String, Object> fields = (Map<String, Object>) e.getValue();
             applyJson(d, fields, "");          // 地图补丁没有模组前缀 ⇒ 按原样解析引用
             d.source = SRC_PATCH;
+            d.origin = ORIGIN_PATCH;
             n++;
             if (logs != null && logs.size() < 8) logs.add(name);
         }
@@ -1381,6 +1402,7 @@ public final class MapStats {
                 // 游戏 `DataPatcher` 给新增内容加 `dp-` 前缀（实测 §61.3）
                 nd.name = "dp-" + base;
                 nd.source = SRC_PATCH;
+                nd.origin = ORIGIN_PATCH;
                 applyJson(nd, json, "");
                 t.put(nd);
                 n++;
@@ -1413,6 +1435,8 @@ public final class MapStats {
         /** 这一行合并了哪些内部名（技术细节层） */
         public final List<String> internals = new ArrayList<>();
         public String source = SRC_VANILLA;
+        /** 同 {@link Def#origin}：**判据用码**（导出写 `origin`，界面写 `source`） */
+        public int origin = ORIGIN_VANILLA;
         public int total, open, loose, buried, unknown;
         /**
          * ★★ **按优先级让给别人**的格数（2026-10-16 用户定的两处口径）—— 只对**矿层**那支与
@@ -1939,6 +1963,7 @@ public final class MapStats {
             row.buried = blocker[id];
             row.total = blocker[id];
             row.source = d == null ? "认不出" : d.source;
+            row.origin = d == null ? ORIGIN_UNKNOWN : d.origin;
             bs.add(row);
         }
         sort(bs);
@@ -2202,6 +2227,7 @@ public final class MapStats {
                 row.attrs = attrs;
                 row.liquid = liquid;
                 row.source = d == null ? "认不出" : d.source;
+                row.origin = d == null ? ORIGIN_UNKNOWN : d.origin;
                 byLabel.put(label, row);
             }
             row.internals.add(internal);

@@ -1,0 +1,404 @@
+package io.mdt.launcher;
+
+import java.util.List;
+
+/**
+ * 把一张地图的统计（{@link MapStats.Result}）导成 **JSONL**：**第一行是声明（meta），之后一行一条记录**。
+ *
+ * <h3>为什么是 JSONL 而不是 CSV</h3>
+ * 统计里既有标量（格数）也有小列表（`internals` 合并了哪几个内部名、`floorKinds` 哪几种地板），
+ * CSV 只能把它们拍扁成"a|b|c"这种约定，而**约定就得写文档、读的人还得照着拆**；
+ * JSONL 一行一个自描述对象，`jq`/pandas/awk 都能直接读，加字段也不会破坏老读者。
+ * ⚠️ **一行一条**这件事本身是判据：导出文本里出现的换行只允许是"记录分隔"，
+ * 所以名字里的 `\n` / `\r` / `\t` 必须转义（自检有一条专门喂带引号/反斜杠/换行的名字）。
+ *
+ * <h3>第一行（声明）里放什么</h3>
+ * 用户 2026-10-17 点单时提了两个用途：
+ * <ol>
+ *   <li><b>数据出问题时确定来源</b> —— 启动器版本 + 导出时刻 + 槽名 + 地图身份（名字/来源/大小/sha256）
+ *       + 参与统计的内容表（原版行数、模组包数、地图补丁条数）+ 星球；</li>
+ *   <li><b>有人发数据时顺便宣传启动器</b> —— {@link #GENERATOR} / {@link #SITE} 与一句
+ *       {@link Meta#notice}</li>
+ * </ol>
+ * ⚠️ 两条**不许**进文件的：
+ * <ul>
+ *   <li><b>本机路径</b>（`map.where` 对槽内文件是绝对路径）—— 只取文件名 / `包!/条目`；</li>
+ *   <li>**设备标识**（序列号 / usid / 邮箱…）—— 这份文件是给人转发的，与分享包同一个纪律。</li>
+ * </ul>
+ *
+ * <p>本类**不碰 Android**（纯 Java）：自检与 PC 探针都能直接喂 {@link MapStats.Result} 断言。</p>
+ */
+public final class MapStatsExport {
+
+    /** 文件格式版本（**加字段不改它；改口径/改字段含义才升**） */
+    public static final String FORMAT = "mdt-mapstats/1";
+    /** 生成者（数据字段，**不跟界面语言走** —— 收数据的人要能一眼认出是谁导的） */
+    public static final String GENERATOR = "MDT Launcher for Android";
+    /** 项目地址（宣传位；同时也是"数据有问题往哪报"） */
+    public static final String SITE = "https://github.com/GXFQE/mindustry-launcher-android";
+
+    private MapStatsExport() {}
+
+    /**
+     * 声明里那些**只有调用方知道**的东西（版本、时间、地图身份、来源）。
+     *
+     * <p>⚠️ 这里全是**数据**：`map.source` 用 `slot` / `game` / `mod` 这种稳定码，
+     * 中文（「本槽」「游戏自带」）留给人看的 `notice` / `name`。</p>
+     */
+    public static final class Meta {
+        /** 导出时刻（ISO-8601，带时区偏移，如 `2026-10-17T16:20:00+08:00`） */
+        public String exportedAt = "";
+        public String launcherVersion = "";
+        public int launcherCode;
+        public String launcherPackage = "";
+        /** 槽名（**不是**路径） */
+        public String slot = "";
+        /** 地图名（列表上那一行） */
+        public String mapName = "";
+        /** `slot` / `game` / `mod` */
+        public String mapSource = "";
+        /** 槽内文件 = 文件名；包内 = `<容器名>!/<条目>`（**都不含本机路径**） */
+        public String mapWhere = "";
+        public long mapBytes = -1;
+        /** 地图字节的 sha256（**定位它的唯一硬证据**；空 = 没算出来） */
+        public String mapSha256 = "";
+        /** 存档 `tags.rules` 里的 `planet:`（空 = 没写这个键 = 塞普罗） */
+        public String planet = "";
+        /** 统计用的版本 APK（文件名）与它的版本名 */
+        public String gameApk = "";
+        public String gameVersion = "";
+        /** 有效内容表行数 */
+        public int tableRows = -1;
+        /** 参与统计的模组包数（-1 = 没读出来） */
+        public int mods = -1;
+        /** 游戏这一轮**不加载模组**（上次崩过，`modcrashdisable` 生效） */
+        public boolean modsSkipped;
+        /** 模组读不出来（只按原版算） */
+        public boolean modsFailed;
+        /** 声明句（**由调用方按界面语言给**，含项目地址 —— 纯 Java 里不写文案） */
+        public String notice = "";
+
+        /** 导出模式：{@link MapStatsExport#MODE_DETAIL} / {@link MapStatsExport#MODE_BRIEF} */
+        public int mode = MODE_DETAIL;
+        /** 批次里的位置（1 起）与总份数；单张导出 = 1 / 1（由 {@link #jsonlBatch} 填） */
+        public int index = 1;
+        public int count = 1;
+    }
+
+    /** **详细**：全部数据（格数拆开、来源、内部名、认不出的内容、可建造/核心区） */
+    public static final int MODE_DETAIL = 0;
+    /**
+     * **简洁**：只含「能采到」的那些记录（`reachable > 0`），每条只留
+     * `kind` / `name` / `reachable` / `total`。
+     *
+     * <p>用户 2026-10-17：「可以加个详细模式（全部数据）和简洁模式（仅含可采的）」——
+     * 简洁模式是拿去做表格用的：一张图一行一种资源，没有数字的行**没有信息量**，
+     * 所以直接不写（而不是写一条 0）。⚠️ 这条是**判据**：简洁模式里出现 `reachable == 0`
+     * 就算错（自检有一条元断言钉着）。</p>
+     */
+    public static final int MODE_BRIEF = 1;
+
+    /** 导出全文（末尾带换行；UTF-8 写出去） */
+    public static String jsonl(MapStats.Result r, Meta m) {
+        boolean brief = m.mode == MODE_BRIEF;
+        StringBuilder sb = new StringBuilder(4096);
+        sb.append(metaLine(r, m, records(r, brief))).append('\n');
+        rows(sb, r.ores, "ore", brief);
+        rows(sb, r.oreWalls, "oreWall", brief);
+        rows(sb, r.floors, "floor", brief);
+        rows(sb, r.bonuses, "bonus", brief);
+        if (!brief) {
+            sb.append(buildableLine(r.buildable)).append('\n');
+            sb.append(coreLine(r.core)).append('\n');
+            if (r.unknowns != null) {
+                for (MapStats.Unk u : r.unknowns) {
+                    if (u == null) continue;
+                    sb.append(new Obj("unknownContent")
+                            .str("name", u.name)
+                            .num("ore", u.ore).num("floor", u.floor).num("bonus", u.bonus)
+                            .end()).append('\n');
+                }
+            }
+        }
+        return sb.toString();
+    }
+
+    /**
+     * **批量**：一条文件里放多张图 —— 每张图 = 一个「声明 + 它的记录」块（`index` / `count` 标位置）。
+     *
+     * <p>为什么不做成"一个 JSON 数组"：JSONL 的承诺是**一行一条**，收数据的人可以
+     * `grep` / `jq` 逐行处理、坏一行也不毁整份；一个巨型数组反而要求整体合法。</p>
+     *
+     * <p>★ `index` / `count` **在这里填**（不交给调用方）—— 批次语义只该有一处实现。</p>
+     */
+    public static String jsonlBatch(List<MapStats.Result> rs, List<Meta> ms) {
+        StringBuilder sb = new StringBuilder(8192);
+        int n = rs == null ? 0 : rs.size();
+        for (int i = 0; i < n; i++) {
+            MapStats.Result r = rs.get(i);
+            Meta m = ms == null || i >= ms.size() ? null : ms.get(i);
+            if (r == null || m == null) continue;
+            m.index = i + 1;
+            m.count = n;
+            sb.append(jsonl(r, m));
+        }
+        return sb.toString();
+    }
+
+    /**
+     * **单张导出的「一个 JSON 文档」形态**（用户 2026-10-17：「单独导出使用 json 就行」）。
+     *
+     * <p>结构 = `{format, generator, site, meta, recordCount, records:[...]}`：
+     * `meta` 就是 JSONL 那第一行（声明），`records` 就是后面那些行 —— **同一批字段、同一套拼装**，
+     * 所以两种格式不会漂。批量仍走 {@link #jsonlBatch}（JSONL 的价值在"一行一条、可逐行处理"，
+     * 单张没必要按行拆）。</p>
+     */
+    public static String jsonDoc(MapStats.Result r, Meta m) {
+        String body = jsonl(r, m);
+        int cut = body.indexOf('\n');
+        if (cut < 0) return "{}";
+        StringBuilder sb = new StringBuilder(body.length() + 96);
+        sb.append("{\"format\":").append(Str.quote(FORMAT))
+                .append(",\"generator\":").append(Str.quote(GENERATOR))
+                .append(",\"site\":").append(Str.quote(SITE))
+                .append(",\"meta\":").append(body, 0, cut)
+                .append(",\"recordCount\":").append(records(r, m.mode == MODE_BRIEF))
+                .append(",\"records\":[");
+        // ★ 只按裸 `\n` 切 —— 名字里的换行已被转义成 `\n`（两个字符），不会混进来。
+        //   自检有一条"名字里带换行 ⇒ 行数不变"钉着这个前提。
+        String rest = body.substring(cut + 1);
+        boolean first = true;
+        int from = 0;
+        for (int i = 0; i < rest.length(); i++) {
+            if (rest.charAt(i) != '\n') continue;
+            if (i > from) {
+                if (!first) sb.append(',');
+                sb.append(rest, from, i);
+                first = false;
+            }
+            from = i + 1;
+        }
+        return sb.append("]}").toString();
+    }
+
+    /** 这份导出会写多少条**记录**（不含声明行；简洁模式只算 `reachable > 0` 的） */
+    static int records(MapStats.Result r, boolean brief) {
+        int n = keep(r.ores, brief) + keep(r.oreWalls, brief) + keep(r.floors, brief)
+                + keep(r.bonuses, brief);
+        if (brief) return n;
+        n += 2;                                  // buildable + core
+        if (r.unknowns != null) n += r.unknowns.size();
+        return n;
+    }
+
+    private static int keep(List<MapStats.Row> rows, boolean brief) {
+        if (rows == null) return 0;
+        if (!brief) return rows.size();
+        int n = 0;
+        for (MapStats.Row x : rows) {
+            if (x != null && x.reachable() > 0) n++;
+        }
+        return n;
+    }
+
+    // ── 第一行：声明 ──────────────────────────────────────────────────────
+
+    static String metaLine(MapStats.Result r, Meta m, int records) {
+        Obj o = new Obj("meta");
+        o.str("format", FORMAT)
+                .str("generator", GENERATOR)
+                .str("site", SITE)
+                .str("notice", m.notice)
+                .str("mode", m.mode == MODE_BRIEF ? "brief" : "detail")
+                .num("index", m.index)
+                .num("count", m.count)
+                .num("records", records);
+        o.raw("launcher", "{" + Str.of("version", m.launcherVersion)
+                + ",\"versionCode\":" + m.launcherCode
+                + ",\"package\":" + Str.quote(m.launcherPackage) + "}");
+        o.str("exportedAt", m.exportedAt).str("slot", m.slot);
+        o.raw("map", "{" + Str.of("name", m.mapName)
+                + ",\"source\":" + Str.quote(m.mapSource)
+                + ",\"where\":" + Str.quote(m.mapWhere)
+                + ",\"bytes\":" + m.mapBytes
+                + ",\"sha256\":" + Str.quote(m.mapSha256)
+                + ",\"width\":" + r.width
+                + ",\"height\":" + r.height
+                + ",\"cells\":" + r.cells + "}");
+        o.raw("content", "{" + Str.of("table", "vanilla+mods+patch")
+                + ",\"rows\":" + m.tableRows
+                + ",\"mods\":" + (m.mods < 0 ? "null" : String.valueOf(m.mods))
+                + ",\"modsSkipped\":" + m.modsSkipped
+                + ",\"modsFailed\":" + m.modsFailed
+                + ",\"planet\":" + Str.quote(m.planet)
+                + ",\"gameApk\":" + Str.quote(m.gameApk)
+                + ",\"gameVersion\":" + Str.quote(m.gameVersion) + "}");
+        o.raw("engine", "{\"stats\":\"F21\",\"millis\":" + r.millis
+                + ",\"micros\":" + r.micros
+                + ",\"notes\":" + notes(r.notes) + "}");
+        return o.end();
+    }
+
+    private static String notes(List<MapStats.Note> ns) {
+        if (ns == null || ns.isEmpty()) return "[]";
+        StringBuilder b = new StringBuilder("[");
+        for (int i = 0; i < ns.size(); i++) {
+            MapStats.Note n = ns.get(i);
+            if (n == null) continue;
+            if (b.length() > 1) b.append(',');
+            b.append("{\"code\":").append(n.code).append(",\"n\":").append(n.n)
+                    .append(",\"n2\":").append(n.n2).append('}');
+        }
+        return b.append(']').toString();
+    }
+
+    // ── 数据行 ────────────────────────────────────────────────────────────
+
+    private static void rows(StringBuilder sb, List<MapStats.Row> rows, String kind, boolean brief) {
+        if (rows == null) return;
+        for (MapStats.Row x : rows) {
+            if (x == null) continue;
+            // ★ 简洁模式只写「能采到」的（用户：「仅含可采的」）—— 0 格的行没有信息量
+            if (brief && x.reachable() <= 0) continue;
+            Obj o = new Obj(kind);
+            if (brief) {
+                o.str("name", x.label).num("reachable", x.reachable()).num("total", x.total);
+                sb.append(o.end()).append('\n');
+                continue;
+            }
+            o.str("name", x.label)
+                    .str("origin", origin(x.origin))
+                    .str("source", x.source)
+                    .raw("internals", Str.arr(x.internals));
+            o.num("total", x.total)
+                    .num("reachable", x.reachable())
+                    .num("open", x.open)
+                    .num("loose", x.loose)
+                    .num("buried", x.buried)
+                    .num("priority", x.priority)
+                    .num("unknown", x.unknown);
+            if (x.drop != null && !x.drop.isEmpty()) o.str("drop", x.drop);
+            if (x.liquid != null && !x.liquid.isEmpty()) o.str("liquid", x.liquid);
+            if (x.attrs != null && !x.attrs.isEmpty()) o.str("attrs", x.attrs);
+            sb.append(o.end()).append('\n');
+        }
+    }
+
+    static String buildableLine(MapStats.Buildable b) {
+        int sum = b.free + b.cleared + b.walled + b.deep + b.floorBlocked + b.unknown;
+        Obj o = new Obj("buildable");
+        o.num("free", b.free).num("cleared", b.cleared).num("walled", b.walled)
+                .num("deep", b.deep).num("floorBlocked", b.floorBlocked).num("unknown", b.unknown)
+                .num("sum", sum);
+        StringBuilder k = new StringBuilder("[");
+        if (b.floorKinds != null) {
+            for (MapStats.Buildable.Kind kind : b.floorKinds) {
+                if (kind == null) continue;
+                if (k.length() > 1) k.append(',');
+                k.append('{').append(Str.of("name", kind.label))
+                        .append(",\"tiles\":").append(kind.tiles).append('}');
+            }
+        }
+        o.raw("floorKinds", k.append(']').toString());
+        return o.end();
+    }
+
+    static String coreLine(MapStats.Core c) {
+        Obj o = new Obj("core");
+        o.num("zone", c.zone).num("usable", c.usable).num("max", c.max).num("size", c.size)
+                .str("basis", c.basis == MapStats.Core.BASIS_PLANET ? "planet" : "default")
+                .bool("skip", c.skip);
+        return o.end();
+    }
+
+    /**
+     * 来源码 → 稳定字符串（`vanilla` / `mod` / `patch` / `other`）。
+     *
+     * <p>🔴 输入是 {@link MapStats#ORIGIN_VANILLA} 那套**枚举码**，不是 {@code Row.source} 那句文案 ——
+     * 「原版 / 模组（改）/ 地图补丁」是给人看的，还带后缀；拿它做判据**一改文案就静默失效**
+     * （门禁 `SRC-01` 专门抓这个，我第一版就是这么写的，被当场拦下）。</p>
+     */
+    static String origin(int code) {
+        switch (code) {
+            case MapStats.ORIGIN_MOD: return "mod";
+            case MapStats.ORIGIN_PATCH: return "patch";
+            case MapStats.ORIGIN_UNKNOWN: return "other";
+            default: return "vanilla";
+        }
+    }
+
+    // ── 极小的 JSON 拼装（只写不读；读的那份在 MapStats 里） ──────────────
+
+    private static final class Obj {
+        private final StringBuilder b;
+
+        Obj(String kind) {
+            b = new StringBuilder(192);
+            b.append("{\"kind\":").append(Str.quote(kind));
+        }
+
+        Obj str(String k, String v) {
+            b.append(',').append(Str.quote(k)).append(':').append(Str.quote(v == null ? "" : v));
+            return this;
+        }
+
+        Obj num(String k, long v) {
+            b.append(',').append(Str.quote(k)).append(':').append(v);
+            return this;
+        }
+
+        Obj bool(String k, boolean v) {
+            b.append(',').append(Str.quote(k)).append(':').append(v);
+            return this;
+        }
+
+        Obj raw(String k, String json) {
+            b.append(',').append(Str.quote(k)).append(':').append(json);
+            return this;
+        }
+
+        String end() {
+            return b.append('}').toString();
+        }
+    }
+
+    private static final class Str {
+        static String of(String k, String v) {
+            return quote(k) + ":" + quote(v == null ? "" : v);
+        }
+
+        /** JSON 字符串字面量（控制字符一律转义 —— 它们是"一行一条"的判据） */
+        static String quote(String s) {
+            if (s == null) return "null";
+            StringBuilder o = new StringBuilder(s.length() + 2);
+            o.append('"');
+            for (int i = 0; i < s.length(); i++) {
+                char c = s.charAt(i);
+                switch (c) {
+                    case '"': o.append("\\\""); break;
+                    case '\\': o.append("\\\\"); break;
+                    case '\n': o.append("\\n"); break;
+                    case '\r': o.append("\\r"); break;
+                    case '\t': o.append("\\t"); break;
+                    default:
+                        if (c < 0x20 || c == 0x7f) {
+                            o.append(String.format(java.util.Locale.ROOT, "\\u%04x", (int) c));
+                        } else {
+                            o.append(c);
+                        }
+                }
+            }
+            return o.append('"').toString();
+        }
+
+        static String arr(List<String> xs) {
+            if (xs == null || xs.isEmpty()) return "[]";
+            StringBuilder b = new StringBuilder("[");
+            for (String x : xs) {
+                if (b.length() > 1) b.append(',');
+                b.append(quote(x));
+            }
+            return b.append(']').toString();
+        }
+    }
+}
