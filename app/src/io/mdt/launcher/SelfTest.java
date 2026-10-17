@@ -10342,19 +10342,51 @@ public final class SelfTest {
         // 元断言：**不要求放核心区**的核心不许被算进来（c3 是 5×5 且 requiresCoreZone=false，永远不该出现）
         ok(stat, L, MapStats.coreSizeForTable(rows, "ve-c") == 0 && MapStats.coreSizeForTable(rows, "") == 0,
                 "★元断言：requiresCoreZone=false 的核心不算（所以 ve-c 是 0），没有星球时也不乱算");
-        // ★★ 代码类模组（VE 那种）：JSON 只是补丁、`type` 甚至被注释掉 ⇒ 里面的 requiresCoreZone:false
-        //    **不许采信**（用户 2026-10-17：「**VE 不是随便摆啊**」）—— 没有 type 就当"要放核心区"
+        // ★★ 代码/脚本类模组（VE 那种）：核心在 `scripts/blocks.js` 里 `extend(CoreBlock, …)` 建、
+        //    size 也在脚本里设，JSON 只是补丁（type 甚至被注释掉）。
+        //    🔴 2026-10-17 用户定调「**不用非要兼容 VE 那个破问题了（毕竟代码模组是什么都能搞出来）**」
+        //    ⇒ **看不见就不算**：没有 `type: CoreBlock` 的方块不当核心；有 type 但**没写 size** 的也不算。
         java.util.List<MapStats.Def> veRows = new java.util.ArrayList<>();
         MapStats.Def v1 = new MapStats.Def(); v1.name = "ve-core-general";
         MapStats.applyJson(v1, MapStats.jsonOf("{\"size\":4,\"requiresCoreZone\":false,"
-                + "\"shownPlanets\":[\"ve-a\"]}"), "ve");       // 没有 type ⇒ 代码类方块
+                + "\"shownPlanets\":[\"ve-a\"]}"), "ve");       // 没有 type ⇒ 脚本建块
         MapStats.Def v2 = new MapStats.Def(); v2.name = "ve-core-json3";
         MapStats.applyJson(v2, MapStats.jsonOf("{\"type\":\"CoreBlock\",\"size\":3,"
-                + "\"requiresCoreZone\":true,\"shownPlanets\":[\"ve-a\"]}"), "ve");  // 有 type ⇒ 看得见
-        veRows.add(v1); veRows.add(v2);
+                + "\"requiresCoreZone\":true,\"shownPlanets\":[\"ve-a\"]}"), "ve");  // 有 type + size ⇒ 看得见
+        MapStats.Def v3 = new MapStats.Def(); v3.name = "ve-core-nosize";
+        MapStats.applyJson(v3, MapStats.jsonOf("{\"type\":\"CoreBlock\",\"requiresCoreZone\":true,"
+                + "\"shownPlanets\":[\"ve-a\"]}"), "ve");       // 有 type、**没写 size**
+        veRows.add(v1); veRows.add(v2); veRows.add(v3);
         ok(stat, L, MapStats.coreSizeForTable(veRows, "ve-a") == 3,
-                "★代码/脚本类模组的方块（JSON 没写 type ⇒ 看不见它的类）**不猜**：v1 不算，只有 v2（自己声明了 type 且要核心区）才算，"
+                "★看不见的不算：v1（没有 type，脚本建块）与 v3（没写 size）都不算，只有 v2 算 3×3"
                         + "（实际 最小 " + MapStats.coreSizeForTable(veRows, "ve-a") + "）");
+        // 元断言：**不许拿 1×1 顶上**（曾经的兜底「size 缺省 → 1」会把 147 格核心区算成 147 个核心）
+        java.util.List<MapStats.Def> noSizeRows = new java.util.ArrayList<>();
+        noSizeRows.add(v3);
+        ok(stat, L, MapStats.coreSizeForTable(noSizeRows, "ve-a") == 0,
+                "★元断言：核心读不到 size ⇒ 这颗星球**不统计**（0），不猜 1×1"
+                        + "（实际 " + MapStats.coreSizeForTable(noSizeRows, "ve-a") + "）");
+        // ★ 键序不该影响结论（原来 `requiresCoreZone` 采信与否取决于 type 有没有先被读到；
+        //   JSON 是**保序**解析 ⇒ 同一个文件换个书写顺序结论就反了 —— 本机实测复现过）
+        MapStats.Def o1 = new MapStats.Def(); o1.name = "ve-core-order";
+        MapStats.applyJson(o1, MapStats.jsonOf("{\"requiresCoreZone\":true,\"size\":4,"
+                + "\"type\":\"CoreBlock\",\"shownPlanets\":[\"ve-a\"]}"), "ve");
+        java.util.List<MapStats.Def> orderRows = new java.util.ArrayList<>();
+        orderRows.add(o1);
+        ok(stat, L, MapStats.coreSizeForTable(orderRows, "ve-a") == 4,
+                "★元断言：把 requiresCoreZone 写在 type **前面**结论不变（仍是 4×4）"
+                        + "（实际 " + MapStats.coreSizeForTable(orderRows, "ve-a") + "）");
+        // ★ 反方向：`requiresCoreZone:false` 写在 type **前面**也照样采信（旧实现会因为
+        //   "type 还没读到"把它当成"必须放核心区"⇒ 4×4 **错误地**被算进来；这条专钉那个顺序依赖）
+        MapStats.Def o2 = new MapStats.Def(); o2.name = "ve-core-order2";
+        MapStats.applyJson(o2, MapStats.jsonOf("{\"requiresCoreZone\":false,\"size\":4,"
+                + "\"type\":\"CoreBlock\",\"shownPlanets\":[\"ve-a\"]}"), "ve");
+        java.util.List<MapStats.Def> orderRows2 = new java.util.ArrayList<>();
+        orderRows2.add(o2);
+        ok(stat, L, MapStats.coreSizeForTable(orderRows2, "ve-a") == 0,
+                "★元断言：requiresCoreZone=false 写在 type 前面 ⇒ 仍然**不算**（0，不是 4）——"
+                        + "钉住「采信与否跟键序无关」"
+                        + "（实际 " + MapStats.coreSizeForTable(orderRows2, "ve-a") + "）");
         // 元断言：反方向 —— 塞普罗/埃里克尔的图**不许**被 skip 掉（否则界面上这条永远看不见）
         ok(stat, L, !crO.core.skip && !crS.core.skip,
                 "★元断言：认得出来的星球（erekir / serpulo）不许 skip（实际 " + crO.core.skip + "/" + crS.core.skip + "）");

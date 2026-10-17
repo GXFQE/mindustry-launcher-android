@@ -164,24 +164,25 @@ public final class MapStats {
         public boolean placeableOn = true;
 
         /**
-         * 方块的**边长**（游戏 `Block.size`；1 = 单格）。★ 2026-10-17 为"模组星球的核心多大"加：
-         * 能不能摆进核心区得看核心方块自己的尺寸。
+         * 方块的**边长**（游戏 `Block.size`；1 = 单格）。★ 2026-10-17 为"模组星球的核心多大"加。
+         *
+         * <p>🔴 默认 **0 = 不知道**（JSON 没写这个字段算不出来）：模组方块的 size 也可能写在
+         * 类/脚本里（VE 是 `extend(CoreBlock, …)` 之后 `b.size = 3`）⇒ 读不到就不猜 ——
+         * 用户 2026-10-17：「**不用非要兼容 VE 那个破问题了（毕竟代码模组是什么都能搞出来）**」。</p>
          */
-        public int size = 1;
+        public int size;
 
         /**
          * ★ 这是**核心**，而且**必须放在核心区里**才成立（游戏 `CoreBlock.requiresCoreZone`）。
          *
          * <p>用户 2026-10-17：「**如果该核心不限制必须放在核心区上也要忽略**」—— `requiresCoreZone=false`
-         * 的核心随便摆，不该拿它来算"核心区里能摆几个"。</p>
+         * 的核心随便摆，不该拿它来算"核心区里能摆几个"。**只采信 JSON 自己写的值**，
+         * 不按"type 有没有先被读到"分岔（那会因 JSON 书写顺序而变）。</p>
          */
         public boolean coreZoneOnly;
 
-        /** 这行是**核心方块**（JSON 里的 type: CoreBlock，或名字里带 core；原版那六种按名字认） */
+        /** 这行是**核心方块**：只认 JSON 里 `type` 写明 CoreBlock 的（看不见定义的一律不猜） */
         public boolean isCore;
-
-        /** JSON **自己声明了** type（= 这个方块的类我们看得见）：只有它为真才采信 requiresCoreZone */
-        public boolean jsonTyped;
 
         /**
          * 这条内容在**哪些星球页**出现（游戏 UnlockableContent.shownPlanets，JSON 里就是
@@ -1239,20 +1240,17 @@ public final class MapStats {
             //    `Floor.drownTime`（`isDeep()` 就是它 > 0）与 `Block.placeableOn`
             else if ("drownTime".equals(k)) d.deep = num(v, 0f) > 0f;
             else if ("placeableOn".equals(k)) d.placeableOn = bool(v, d.placeableOn);
-            // ★ 2026-10-17：核心的"多大"与"是不是必须放核心区"（模组星球靠这两条判能不能用）
+            // ★ 2026-10-17：核心的"多大"与"是不是必须放核心区"（模组星球靠这两条判能不能用）。
+            //   🔴 **只照 JSON 自己写的值**，不按"`type` 有没有先被读到"分岔 —— 原来写成
+            //      `d.jsonTyped ? 采信 : true`，而 JSON 是**保序**解析（LinkedHashMap）⇒ 同一个文件
+            //      把 requiresCoreZone 挪到 type 前面，结论就反过来（本机实测复现）。用户 2026-10-17
+            //      定调「不用非要兼容 VE」⇒ "看不见类定义的方块按必须放核心区算"这条兜底整个删掉，
+            //      看不见的方块干脆不当核心（见 {@link #coreSizeForTable}）。
             else if ("size".equals(k)) d.size = (int) num(v, d.size);
-            else if ("requiresCoreZone".equals(k)) {
-                // ★ 这个字段**只有 CoreBlock 有** ⇒ 写它就等于自称"我是核心"（比名字靠谱，也不靠 type：
-                //   VE 那种脚本建块、JSON 只补字段的写法，type 是注释掉的，但这个字段真写了）
-                d.isCore = true;
-                // ★ 只有 JSON **自己声明了 type** 时才采信（代码类方块的 JSON 补丁会被代码盖掉，
-                //   VE 的 core-*.json 全是 requiresCoreZone:false，但游戏里它们明明要放核心区）
-                d.coreZoneOnly = d.jsonTyped ? bool(v, d.coreZoneOnly) : true;
-            }
+            else if ("requiresCoreZone".equals(k)) d.coreZoneOnly = bool(v, d.coreZoneOnly);
             // ★ 2026-10-17：核心的星球归属（游戏 UnlockableContent.shownPlanets / isOnPlanet）
             else if ("shownPlanets".equals(k)) d.shownPlanets = planetSet(v);
             else if ("type".equals(k)) {
-                d.jsonTyped = true;
                 if (String.valueOf(v).toLowerCase().contains("coreblock")) d.isCore = true;
             }
             // 其余字段（requirements / size / health / plans …）与"能不能采"无关，不建模
@@ -1630,8 +1628,8 @@ public final class MapStats {
      * 且只留「必须放在核心区」的那些（`CoreBlock.requiresCoreZone`，用户：「如果该核心不限制必须
      * 放在核心区上也要忽略」）。</p>
      *
-     * <p>⚠️ **模组星球返回 0（不统计）**：一个模组可能有一堆星球、每个星球核心都不同，而"某星球有哪几种
-     * 核心"只写在模组的**科技树代码**里（编译进 dex，静态读不出来）⇒ 我们**不猜**，这条统计直接不做
+     * <p>⚠️ 这条只管**原版两颗星球**（塞普罗 / 埃里克尔）：别的星球名返回 0，由调用方再问
+     * {@link #coreSizeForTable}（模组星球，只认看得见的 JSON 核心）—— 两处都答不上来 ⇒ 不统计
      * （用户：「**整个科技中不包含核心**」就不统计 —— 读不到同样按"没有"处理）。</p>
      *
      * @return 3 / 4 / 5 / 6；**0 = 不统计**（星球认不出，或它的核心里没有一个必须放核心区）
@@ -1660,21 +1658,19 @@ public final class MapStats {
     }
 
     /**
-     * 同上，外加**这张图属于哪颗星球**（`tags.rules` 里的 `planet:<名字>`，2026-10-17 用户：
-     * 「**不对，不是区块名啊，存档本身就有属于什么科技树啊**」）。
-     *
-     * <p>语料 462 张：`planet:erekir` **169** 张、`planet:sun` 73、其余是模组星球；
-     * **没有这个键的 114 张 = 塞普罗**（`Rules` 的默认值，游戏自己加载时也这么算）。</p>
-     *
-     * @param planet 星球名（`MsavMeta#planet`；空 = 缺键 = 塞普罗；陌生名字按"不知道"处理）
-     */
-    /**
      * 这颗星球"算得上"的核心里最小的边长（**模组星球走这条**；0 = 一个都没有 ⇒ 不统计）。
      *
      * <p>判据照原版数据库自己的分类（用户：「原版不是有个核心数据库吗，那个东西好像本身就有分类」）：
      * 一条内容属于哪些星球由 `UnlockableContent.shownPlanets` 决定，`isOnPlanet` 的口径是
-     * **空集合 = 所有星球都有**（`javap -c` 核过）。再叠上用户的规则：
-     * 只留 `requiresCoreZone == true` 的（不要求放核心区的核心随便摆，不该拿来算核心区）。</p>
+     * **空集合 = 所有星球都有**（`javap -c` 核过）。再叠上两条：
+     * ① 只留 `requiresCoreZone == true` 的（不要求放核心区的核心随便摆，不该拿来算核心区）；
+     * ② **必须读得到 `size`** —— "最多能摆几个"按核心边长网格对齐，不知道几×几就没有答案。</p>
+     *
+     * <p>🔴 2026-10-17 用户定调：「**不用非要兼容 VE 那个破问题了（毕竟代码模组是什么都能搞出来）**」
+     * ⇒ 只认 **JSON 自己声明了 `type: CoreBlock`** 的方块（类定义看得见），且 `size` 也必须是 JSON 写的。
+     * 代码/脚本建块（VE 的 core 在 `scripts/blocks.js` 里 `extend(CoreBlock, …)`，size 也在脚本里设）
+     * ⇒ **看不见就不算**，那颗星球整条统计不做；不再为它加"有 requiresCoreZone 就当核心"、
+     * "没写 size 就当 1×1"这类兜底（后者会让一片 147 格的核心区算出"147 个 1×1 核心"）。</p>
      */
     public static int coreSizeForTable(Iterable<Def> rows, String planet) {
         int min = 0;
@@ -1687,14 +1683,24 @@ public final class MapStats {
             if (!d.isCore) continue;
             if (!d.coreZoneOnly) continue;
             if (!d.shownPlanets.isEmpty() && !d.shownPlanets.contains("," + planet + ",")) continue;
-            // 原版六种以硬编码为准（生成表里没有 size 列，读出来是默认 1）；模组核心才用 JSON 的 size
+            // 原版六种以硬编码为准（生成表里没有 size 列）；模组核心才用 JSON 的 size，**没写 = 不知道**
             int sz = vanillaCoreSize(d.name);
-            if (sz <= 0) sz = d.size > 0 ? d.size : 1;
+            if (sz <= 0) sz = d.size;
             if (sz <= 0) continue;
             if (min == 0 || sz < min) min = sz;
         }
         return min;
     }
+
+    /**
+     * 同上，外加**这张图属于哪颗星球**（`tags.rules` 里的 `planet:<名字>`，2026-10-17 用户：
+     * 「**不对，不是区块名啊，存档本身就有属于什么科技树啊**」）。
+     *
+     * <p>语料 462 张：`planet:erekir` **169** 张、`planet:sun` 73、其余是模组星球；
+     * **没有这个键的 114 张 = 塞普罗**（`Rules` 的默认值，游戏自己加载时也这么算）。</p>
+     *
+     * @param planet 星球名（`MsavMeta#planet`；空 = 缺键 = 塞普罗；陌生名字按"不知道"处理）
+     */
 
     public static Result analyze(MsavTiles.Tiles t, Table tab, Names nm, String planet) {
         long t0 = System.nanoTime();
@@ -1902,14 +1908,14 @@ public final class MapStats {
             }
         });
 
-        // ★ 核心区里最多能摆几个核心（不重叠；每块核心区各按 3×3 网格对齐，见 {@link Core}）
-        // 埃里克尔核心（且没有塞普罗核心）⇒ 按该星球最小的 4×4 算；其余退回 3×3（见 Core#size）。
-        // ★ 2026-10-17：**存档自带的战役区块名优先**（用户：「存档里应该就有是啥星球吧」）——
-        //   区块名认得出来就按它定星球（自定义地图没有这个键，退回实摆核心那套）。
+        // ★ 核心区里最多能摆几个核心（不重叠；每块核心区各按核心边长网格对齐，见 {@link Core}）
+        // 边长 = **该星球最小的核心**（塞普罗 3×3 / 埃里克尔 4×4，见 Core#size）。
         // planet = null ⇒ 调用方没给（没读过 meta / 单测），算"没线索"；
         // planet = "" ⇒ **存档没写这个键 = 塞普罗**（`Rules` 的默认值，游戏自己加载时也是这个口径）。
         int hint = planet == null ? 0 : coreSizeFor(planet);
-        // ★ 模组星球：硬编码那六种答不上来 ⇒ 按内容表里的「核心 + 星球归属」算（一个都没有就不统计）
+        // ★ 模组星球：原版那六种答不上来 ⇒ 按内容表里**看得见的 JSON 核心**算（核心 + 星球归属 + size）。
+        //   🔴 读不到就不统计（不为代码/脚本类模组兜底）—— 用户 2026-10-17：
+        //   「不用非要兼容 VE 那个破问题了（毕竟代码模组是什么都能搞出来）」。
         if (hint == 0 && planet != null && !planet.isEmpty()) hint = coreSizeForTable(tab.byName.values(), planet);
         if (hint != 0) {
             r.core.size = hint;
