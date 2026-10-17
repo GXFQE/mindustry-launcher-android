@@ -306,7 +306,10 @@ public final class MapStatsMods {
         if (bn.nModBase > 0) {
             b.namesNotes.add(Trans.get(ctx, R.string.stats_note_names_mod_base_fmt, bn.nModBase));
         }
-        b.result = MapStats.analyze(b.tiles, b.table, b.names);
+        // ★ 2026-10-17 用户：「不对，不是区块名啊，存档本身就有属于什么科技树啊」—— 确实有：
+        //   存档 `tags.rules` 里带 `planet:<名字>`（`Rules.planet`，缺键 = 塞普罗默认）⇒ 最小核心 3×3 / 4×4。
+        String planet = it == null || it.meta == null ? null : it.meta.planet;
+        b.result = MapStats.analyze(b.tiles, b.table, b.names, planet);
         if (!b.result.ok) b.error = b.result.error;
         b.millis = System.currentTimeMillis() - t0;
         return b;

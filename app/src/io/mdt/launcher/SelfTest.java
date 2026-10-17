@@ -10272,28 +10272,56 @@ public final class SelfTest {
         ok(stat, L, cr3.core.zone == 0 && cr3.core.usable == 0 && cr3.core.max == 0,
                 "★元断言：没有 core-zone 地板的图 ⇒ 核心区三个数都是 0（界面上整张卡不出现）"
                         + "（实际 " + cr3.core.zone + "/" + cr3.core.usable + "/" + cr3.core.max + "）");
-        // ★ 边长按**星球**走（2026-10-17 用户：「**埃里克尔最小核心不是 3×3 的啊**」）：
-        //   同一片 6×6，摆着 `core-bastion`（埃里克尔最小，4×4）⇒ 按 4×4 算 ⇒ 只能摆 1 个；
-        //   再摆一颗 `core-shard`（塞普罗）⇒ 两种都有 ⇒ 退回全局最小的 3×3（4 个）。
-        MsavTiles.Tiles cgE = coreZoneGrid();
-        cgE.blockNames.add("core-bastion");                    // id = 4
-        cgE.blocks[3 * 12 + 3] = 4;                            // (3,3) 摆一颗埃里克尔核心
-        MapStats.Result crE = MapStats.analyze(cgE, v, nm);
-        ok(stat, L, crE.core.size == 4 && crE.core.max == 1,
-                "★埃里克尔：图上摆的是 core-bastion（4×4）⇒ 按 4×4 算，6×6 里只摆得下 **1** 个"
-                        + "（实际 边长 " + crE.core.size + " / 最多 " + crE.core.max + "）");
-        MsavTiles.Tiles cgB = coreZoneGrid();
-        cgB.blockNames.add("core-bastion");                    // id = 4
-        cgB.blockNames.add("core-shard");                      // id = 5
-        cgB.blocks[3 * 12 + 3] = 4;                            // 埃里克尔核心
-        cgB.blocks[1 * 12 + 1] = 5;                            // + 塞普罗核心
-        MapStats.Result crB = MapStats.analyze(cgB, v, nm);
-        ok(stat, L, crB.core.size == 3 && crB.core.max == 4,
-                "★两种核心都有的图 ⇒ 退回全局最小的 3×3（4 个）"
-                        + "（实际 边长 " + crB.core.size + " / 最多 " + crB.core.max + "）");
-        // 元断言：没摆任何核心 ⇒ 默认 3×3（上面 cr 就是这种图，写在这儿让"默认"有据可查）
-        ok(stat, L, cr.core.size == 3,
-                "★一颗核心都没摆 ⇒ 退回 3×3（实际 " + cr.core.size + "）");
+        // ★ 边长按**星球**走（2026-10-17 用户：「**埃里克尔最小核心不是 3×3 的啊**」→
+        //   「**把原来的按照地图核心判断删了**」→ 「**不对，不是区块名啊，存档本身就有属于什么科技树啊**」）
+        //   —— 判据**只有一处**：存档 `tags.rules` 里写的 `planet:<名字>`（`Rules.planet`）⇒ 该星球最小的核心；
+        //   查不出就明说，按最小的一种（3×3）算。
+        //   ⚠️ 尺子要能算出 false：**同一张夹具**换星球名/不换，边长必须跟着变。
+        ok(stat, L, cr.core.size == 3 && cr.core.basis == MapStats.Core.BASIS_DEFAULT,
+                "★没写星球（`analyze` 不带 hint）⇒ 取全局最小的 3×3，并标注来源=没线索（实际 边长 " + cr.core.size
+                        + " / 来源 " + cr.core.basis + "）");
+        // ★★ 星球名 → 最小核心边长（缺键 = 塞普罗：`Rules` 构造器里 `planet = Planets.serpulo`）
+        ok(stat, L, MapStats.coreSizeFor("erekir") == 4 && MapStats.coreSizeFor("serpulo") == 3
+                        && MapStats.coreSizeFor("") == 3 && MapStats.coreSizeFor(null) == 3
+                        && MapStats.coreSizeFor("sun") == 0 && MapStats.coreSizeFor("ve-cyclant") == 0,
+                "★星球名→最小核心：erekir=4（bastion）/ serpulo 与没写=3（shard）/ sun 与模组星球=0（不统计）"
+                        + "（实际 " + MapStats.coreSizeFor("erekir") + "/" + MapStats.coreSizeFor("serpulo")
+                        + "/" + MapStats.coreSizeFor("") + "/" + MapStats.coreSizeFor("sun") + "）");
+        // ★ 六种原版核心的边长（jar 里 Block.size 反射核过；表里没这两列，写死在 anillaCoreSize）
+        ok(stat, L, MapStats.vanillaCoreSize("core-shard") == 3 && MapStats.vanillaCoreSize("core-foundation") == 4
+                        && MapStats.vanillaCoreSize("core-nucleus") == 5 && MapStats.vanillaCoreSize("core-bastion") == 4
+                        && MapStats.vanillaCoreSize("core-citadel") == 5 && MapStats.vanillaCoreSize("core-acropolis") == 6
+                        && MapStats.vanillaCoreSize("conveyor") == 0,
+                "★六种核心的边长：shard 3 / foundation 4 / nucleus 5 · bastion 4 / citadel 5 / acropolis 6；非核心=0");
+        // 从 `rules` 那段 JSON 里抠星球名（存档真的长这样：`…limitHeight:133,planet:erekir}`）
+        ok(stat, L, "erekir".equals(MsavMeta.planetIn("{teams:{0:{}},limitHeight:133,planet:erekir}"))
+                        && "serpulo".equals(MsavMeta.planetIn("planet:serpulo,x:1"))
+                        && MsavMeta.planetIn("{teams:{0:{}}}").isEmpty()
+                        && MsavMeta.planetIn(null).isEmpty(),
+                "★从 rules JSON 里抠 planet：erekir / serpulo 抠得出来，没有这个键时是空串");
+        // 同一条 6×6 核心区，写上埃里克尔 ⇒ 4×4 ⇒ 只摆得下 1 个（3×3 时是 4 个）
+        MapStats.Result crO = MapStats.analyze(coreZoneGrid(), v, nm, "erekir");
+        ok(stat, L, crO.core.size == 4 && crO.core.max == 1 && crO.core.basis == MapStats.Core.BASIS_PLANET,
+                "★同一片核心区 + 存档写 planet:erekir ⇒ 按 4×4，6×6 里只摆得下 1 个"
+                        + "（实际 边长 " + crO.core.size + " / 最多 " + crO.core.max + "）");
+        // 塞普罗 ⇒ 3×3 ⇒ 4 个（与上面那张同一块地板，只有星球名不同）
+        MapStats.Result crS = MapStats.analyze(coreZoneGrid(), v, nm, "serpulo");
+        ok(stat, L, crS.core.size == 3 && crS.core.max == 4 && crS.core.basis == MapStats.Core.BASIS_PLANET,
+                "★同一片核心区 + 存档写 planet:serpulo ⇒ 按 3×3，摆得下 4 个"
+                        + "（实际 边长 " + crS.core.size + " / 最多 " + crS.core.max + "）");
+        // 元断言：「存档里没写 planet 这个键」= 塞普罗默认（`Rules` 构造器自带 serpulo）⇒ 3×3 且来源=星球
+        MapStats.Result crE0 = MapStats.analyze(coreZoneGrid(), v, nm, "");
+        ok(stat, L, crE0.core.size == 3 && crE0.core.basis == MapStats.Core.BASIS_PLANET,
+                "★存档里没写 planet（空串）⇒ 按默认的塞普罗算 3×3，来源=星球（实际 边长 " + crE0.core.size
+                        + " / 来源 " + crE0.core.basis + "）");
+        // 元断言：陌生星球（太阳 / 模组星球）**不许**猜 ⇒ 与"没线索"同一条路（3×3 + 没线索）
+        MapStats.Result crU = MapStats.analyze(coreZoneGrid(), v, nm, "sun");
+        ok(stat, L, crU.core.skip && crU.core.size == 3,
+                "★模组/陌生星球（planet:sun）⇒ **不统计**（界面整张卡不出现），不去猜它的核心"
+                        + "（实际 skip=" + crU.core.skip + "）");
+        // 元断言：反方向 —— 塞普罗/埃里克尔的图**不许**被 skip 掉（否则界面上这条永远看不见）
+        ok(stat, L, !crO.core.skip && !crS.core.skip,
+                "★元断言：认得出来的星球（erekir / serpulo）不许 skip（实际 " + crO.core.skip + "/" + crS.core.skip + "）");
         // 表里那两列本身（PC 侧用真游戏对象核过，这里钉住数值，防表被换错）
         MapStats.Def dw = v.row("deep-water"), sw = v.row("shallow-water"), sp = v.row("space");
         ok(stat, L, dw != null && dw.deep && sw != null && !sw.deep

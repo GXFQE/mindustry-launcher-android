@@ -1875,7 +1875,8 @@
     <string name="stats_section_core">核心区</string>
     <string name="stats_core_sum_fmt">%1$s 格 · 最多能摆 %2$s 个核心（%3$s×%3$s）</string>
     <string name="stats_core_row_zone">整片核心区</string>
-    <string name="stats_core_note_fmt">个数按 %1$s×%1$s 的核心算（图上摆的核心里最小的那种），互不重叠</string>
+    <string name="stats_core_note_planet_fmt">个数按 %1$s×%1$s 的核心算（按存档里写的星球判的），互不重叠</string>
+    <string name="stats_core_note_default_fmt">个数按 %1$s×%1$s 的核心算（这张图查不出用的是哪颗星球，按最小的一种算），互不重叠</string>
     <string name="stats_tech_size_fmt">地图 %1$d × %2$d，共 %3$s 格</string>
     <string name="stats_tech_table_fmt">内容表：%1$s</string>
     <string name="stats_tech_names_fmt">名字来源：%1$s</string>

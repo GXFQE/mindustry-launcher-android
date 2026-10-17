@@ -78,6 +78,32 @@ public final class MsavMeta {
     /** 存档所用地图的名字（老地图也可能有 ⇒ 别拿它当"这是存档"的判据） */
     public String mapname;
 
+    /**
+     * 这张图属于**哪颗星球**（`rules` 那段 JSON 里的 `planet:<名字>`；空 = 没写这个键）。
+     *
+     * <p>用户 2026-10-17：「**存档本身就有属于什么科技树啊**」—— 确实有：`mindustry.game.Rules.planet`
+     * （`javap` 核过）被序列化进 `rules`，例：`…limitHeight:133,planet:erekir}`。</p>
+     *
+     * <p>⚠️ **缺键 = 塞普罗**（默认值）：`Rules` 构造器里 `planet = Planets.serpulo`，而 JSON 不写默认值
+     * ⇒ 那些没有这个键的图都是塞普罗（游戏自己加载时也是这个口径）。</p>
+     */
+    public String planet;
+
+    /** 从 `rules` 那段 JSON 里抠 `planet:<名字>`（认不出返回 ""；别被别的字段里的同名子串骗） */
+    public static String planetIn(String rules) {
+        if (rules == null) return "";
+        int i = rules.indexOf("planet:");
+        if (i < 0) return "";
+        int j = i + "planet:".length();
+        int end = j;
+        while (end < rules.length()) {
+            char c = rules.charAt(end);
+            if (c == ',' || c == '}' || c == ']' || Character.isWhitespace(c)) break;
+            end++;
+        }
+        return rules.substring(j, end);
+    }
+
     // ── 结果 ─────────────────────────────────────────────────────────────
     /** 元数据**读出来了**（🔴 只保证 meta 那一块 —— 它后面的区域我们没读，**不代表整份文件完整**；
      *  要确认完整性见 {@link #read(File, boolean)} 的 verifyWhole 参数） */
@@ -289,6 +315,7 @@ public final class MsavMeta {
         author = tags.get("author");
         description = tags.get("description");
         mapname = tags.get("mapname");
+        planet = planetIn(tags.get("rules"));
     }
 
     // ── 取值：缺键/解析不出 ⇒ 默认值（照抄游戏 `StringMap.getInt(k, d)` 的容错口径） ──

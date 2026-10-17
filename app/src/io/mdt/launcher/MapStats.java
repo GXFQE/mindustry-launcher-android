@@ -162,6 +162,20 @@ public final class MapStats {
          * 与 {@link #deep}（缺列时 false）**方向相反**，别照着 `on()` 的习惯想当然。
          */
         public boolean placeableOn = true;
+
+        /**
+         * 方块的**边长**（游戏 `Block.size`；1 = 单格）。★ 2026-10-17 为"模组星球的核心多大"加：
+         * 能不能摆进核心区得看核心方块自己的尺寸。
+         */
+        public int size = 1;
+
+        /**
+         * ★ 这是**核心**，而且**必须放在核心区里**才成立（游戏 `CoreBlock.requiresCoreZone`）。
+         *
+         * <p>用户 2026-10-17：「**如果该核心不限制必须放在核心区上也要忽略**」—— `requiresCoreZone=false`
+         * 的核心随便摆，不该拿它来算"核心区里能摆几个"。</p>
+         */
+        public boolean coreZoneOnly;
         public String itemDrop = "", liquidDrop = "", attributes = "";
         public float speed = 1f, damage = 0f;
         /** 这行从哪来（{@link #SRC_VANILLA} 等；技术细节层显示） */
@@ -1212,6 +1226,9 @@ public final class MapStats {
             //    `Floor.drownTime`（`isDeep()` 就是它 > 0）与 `Block.placeableOn`
             else if ("drownTime".equals(k)) d.deep = num(v, 0f) > 0f;
             else if ("placeableOn".equals(k)) d.placeableOn = bool(v, d.placeableOn);
+            // ★ 2026-10-17：核心的"多大"与"是不是必须放核心区"（模组星球靠这两条判能不能用）
+            else if ("size".equals(k)) d.size = (int) num(v, d.size);
+            else if ("requiresCoreZone".equals(k)) d.coreZoneOnly = bool(v, d.coreZoneOnly);
             // 其余字段（requirements / size / health / plans …）与"能不能采"无关，不建模
         }
     }
@@ -1487,14 +1504,14 @@ public final class MapStats {
         /**
          * 这张图按哪种核心算（**界面要把这个数写出来**）。
          *
-         * <p>🔴 2026-10-17 用户：「**埃里克尔最小核心不是 3×3 的啊**」—— 我原来写死 3×3（塞普罗的 shard），
-         * 而埃里克尔最小的 `core-bastion` 是 **4×4**。判据 = **看地图上实际摆出来的核心**
-         * （方块层里有没有 `core-bastion` / `core-citadel` / `core-acropolis`，
-         * ⚠️ **不能看 `blockNames`**：那是内容池，六种核心全在，462 张图张张都有）。</p>
+         * <p>🔴 2026-10-17 用户：「**埃里克尔最小核心不是 3×3 的啊**」—— 塞普罗最小 `core-shard` 是 3×3，
+         * 埃里克尔最小 `core-bastion` 是 **4×4**，不是全局常数。</p>
          *
-         * <p>语料实测（329 张有核心区的图）：只有塞普罗核心 60 · 只有埃里克尔核心 **188** · 两种都有 30 ·
-         * 一颗核心都没有 51。⇒ 规则 = **有埃里克尔核心且没有塞普罗核心 ⇒ 4×4**，其余（含两种都有 /
-         * 一颗都没有）**退回 3×3**（全局最小，且自定义图本来就允许全套内容）。</p>
+         * <p>判据只有一处：**存档里写的星球**（`tags.rules` 的 `planet:`，用户：「存档本身就有属于什么科技树啊」；
+         * 翻译表见 {@link MapStats#sizeOfPlanet}）⇒ 该星球最小的核心。
+         * 认不出（自定义地图没有这个键、或模组区块）就**明说"没有线索"**、按全局最小的 3×3 算
+         * —— **不再从图上摆的核心去猜星球**（2026-10-17 用户：「建议把原来的按照地图核心判断删了」：
+         * 猜出来的结论没法算出 false，而且图上摆着哪颗星球的核不等于这张图属于哪颗星球）。</p>
          */
         public int size = SIZE_SER;
 
@@ -1504,6 +1521,23 @@ public final class MapStats {
         public int usable;
         /** 最多能摆几个 {@link #size}×{@link #size} 的核心（不重叠；每块核心区分开对齐） */
         public int max;
+
+        /**
+         * **这条统计不适用**（模组星球的核心读不到，或它的核心不要求放核心区）⇒ 界面整张卡不出现。
+         * 用户 2026-10-17：「整个科技中不包含核心」就不统计。
+         */
+        public boolean skip;
+
+        /** 边长是**按存档里写的星球**定的（{@link #basis}） */
+        public static final int BASIS_PLANET = 1;
+        /** 两边都没有线索 ⇒ 取全局最小的 3×3 */
+        public static final int BASIS_DEFAULT = 3;
+
+        /**
+         * {@link #size} 是**怎么来的**（界面括号里的依据要跟着它换措辞 —— 不然会出现
+         * "按图上摆的核心里最小的那种"而图上根本没有核心这种自相矛盾）。
+         */
+        public int basis = BASIS_DEFAULT;
     }
 
     /** 统计结果（**只给数据，不给文案** —— 文案在 strings.xml，见文案纪律） */
@@ -1531,8 +1565,72 @@ public final class MapStats {
         public long micros;
     }
 
-    /** 统计一张地图。{@code tiles} 必须是**完整地图**（不是 preview，见 {@link MapLoad#decodeFull}） */
+    /** 塞普罗（**默认星球**：`Rules` 构造器里 `planet = Planets.serpulo`，缺键也是它） */
+    public static final String PLANET_SERPULO = "serpulo";
+    /** 埃里克尔 */
+    public static final String PLANET_EREKIR = "erekir";
+
+    /** 塞普罗的核心（equiresCoreZone 全是 true；边长 3 / 4 / 5） */
+    private static final String[] CORES_SERPULO = {"core-shard", "core-foundation", "core-nucleus"};
+    /** 埃里克尔的核心里最小的那种边长 4（bastion；citadel 5 / acropolis 6） */
+    private static final String[] CORES_EREKIR = {"core-bastion", "core-citadel", "core-acropolis"};
+
+    /** 原版六种核心的边长（jar 里 `Block.size` 反射核过；表里没这两列，所以写在这儿并进自检） */
+    static int vanillaCoreSize(String name) {
+        if ("core-shard".equals(name)) return 3;
+        if ("core-foundation".equals(name) || "core-bastion".equals(name)) return 4;
+        if ("core-nucleus".equals(name) || "core-citadel".equals(name)) return 5;
+        if ("core-acropolis".equals(name)) return 6;
+        return 0;
+    }
+
+    /**
+     * 这张图的星球上**算得上的核心**里最小的边长 —— 0 表示**这条统计不适用**。
+     *
+     * <p>🔴 判据 = **存档自带的星球名**（`tags.rules` 里的 `planet:<名字>`，见 {@link MsavMeta#planet}；
+     * 用户 2026-10-17：「**存档本身就有属于什么科技树啊**」）⇒ 该星球**科技树里的核心**，
+     * 且只留「必须放在核心区」的那些（`CoreBlock.requiresCoreZone`，用户：「如果该核心不限制必须
+     * 放在核心区上也要忽略」）。</p>
+     *
+     * <p>⚠️ **模组星球返回 0（不统计）**：一个模组可能有一堆星球、每个星球核心都不同，而"某星球有哪几种
+     * 核心"只写在模组的**科技树代码**里（编译进 dex，静态读不出来）⇒ 我们**不猜**，这条统计直接不做
+     * （用户：「**整个科技中不包含核心**」就不统计 —— 读不到同样按"没有"处理）。</p>
+     *
+     * @return 3 / 4 / 5 / 6；**0 = 不统计**（星球认不出，或它的核心里没有一个必须放核心区）
+     */
+    public static int coreSizeFor(String planet) {
+        boolean ere = PLANET_EREKIR.equals(planet);
+        boolean ser = planet == null || planet.isEmpty() || PLANET_SERPULO.equals(planet);
+        if (!ere && !ser) return 0;
+        String[] names = ere ? CORES_EREKIR : CORES_SERPULO;
+        int min = 0;
+        for (String n : names) {
+            int sz = vanillaCoreSize(n);
+            if (sz <= 0) continue;
+            if (min == 0 || sz < min) min = sz;
+        }
+        return min;
+    }
+
+    /**
+     * 统计一张地图。{@code tiles} 必须是**完整地图**（不是 preview，见 {@link MapLoad#decodeFull}）。
+     *
+     * <p>不知道星球名（`tags` 里没写、或者不是塞普罗/埃里克尔）—— 用这条，边长按最小的一种算。</p>
+     */
     public static Result analyze(MsavTiles.Tiles t, Table tab, Names nm) {
+        return analyze(t, tab, nm, null);
+    }
+
+    /**
+     * 同上，外加**这张图属于哪颗星球**（`tags.rules` 里的 `planet:<名字>`，2026-10-17 用户：
+     * 「**不对，不是区块名啊，存档本身就有属于什么科技树啊**」）。
+     *
+     * <p>语料 462 张：`planet:erekir` **169** 张、`planet:sun` 73、其余是模组星球；
+     * **没有这个键的 114 张 = 塞普罗**（`Rules` 的默认值，游戏自己加载时也这么算）。</p>
+     *
+     * @param planet 星球名（`MsavMeta#planet`；空 = 缺键 = 塞普罗；陌生名字按"不知道"处理）
+     */
+    public static Result analyze(MsavTiles.Tiles t, Table tab, Names nm, String planet) {
         long t0 = System.nanoTime();
         Result r = new Result();
         if (t == null || !t.ok()) {
@@ -1564,10 +1662,7 @@ public final class MapStats {
         // ★ 「核心区」那个地板的 id（游戏里 `core-zone`，bundle 名就叫「核心区」）——
         //   2026-10-17 用户：「核心区是一个专门的地板啊」。
         boolean[] coreZone = new boolean[m];
-        // ★ 核心方块按星球分类（2026-10-17 用户：「埃里克尔最小核心不是 3×3 的啊」）：
-        //   塞普罗 = shard/foundation/nucleus（最小 3×3）、埃里克尔 = bastion/citadel/acropolis（最小 4×4）。
-        //   ⚠️ 判据看**方块层里真摆出来的**，不看 `blockNames`（那是内容池，六种核心全在）。
-        boolean[] coreSer = new boolean[m], coreEre = new boolean[m];
+
         Def[] defs = new Def[m];
         int airId = t.airId();
         for (int id = 0; id < m; id++) {
@@ -1575,8 +1670,6 @@ public final class MapStats {
             Def d = tab.row(name);
             defs[id] = d;
             coreZone[id] = "core-zone".equals(name);
-            coreSer[id] = "core-shard".equals(name) || "core-foundation".equals(name) || "core-nucleus".equals(name);
-            coreEre[id] = "core-bastion".equals(name) || "core-citadel".equals(name) || "core-acropolis".equals(name);
             if (d == null) {
                 occl[id] = (byte) ("air".equals(name) ? 0 : 3);
                 continue;
@@ -1607,8 +1700,7 @@ public final class MapStats {
         int[] unkOreId = new int[m], unkFloorId = new int[m];
         // ★ 「地板不让建」那桶按**地板 id** 数（界面那行要说清楚是哪块地板，见 Buildable#floorKinds）
         int[] noPlaceId = new int[m];
-        // ★ 这张图摆的是哪颗星球的核心（埃里克尔核心 ⇒ 按 4×4 算）
-        boolean serCore = false, ereCore = false;
+
         // ★ 核心区里"能建"的格（给"最多能摆几个核心"用；只有核心区那几百格会被置 true）
         boolean[] usable = new boolean[n];
         final short[] fl = t.floors, ov = t.ores, bl = t.blocks;
@@ -1720,11 +1812,7 @@ public final class MapStats {
                     r.core.usable++;
                 }
             }
-            // ★ 这张图摆的是哪颗星球的核心（决定按 3×3 还是 4×4 算，见 {@link Core#size}）
-            if (b >= 0 && b < m) {
-                if (coreEre[b]) ereCore = true;
-                else if (coreSer[b]) serCore = true;
-            }
+
         }
 
         build(r.ores, cOre, t.blockNames, defs, nm, false, false, tab.itemNames, false, null);
@@ -1749,8 +1837,21 @@ public final class MapStats {
         });
 
         // ★ 核心区里最多能摆几个核心（不重叠；每块核心区各按 3×3 网格对齐，见 {@link Core}）
-        // 埃里克尔核心（且没有塞普罗核心）⇒ 按该星球最小的 4×4 算；其余退回 3×3（见 Core#size）
-        r.core.size = (ereCore && !serCore) ? Core.SIZE_ERE : Core.SIZE_SER;
+        // 埃里克尔核心（且没有塞普罗核心）⇒ 按该星球最小的 4×4 算；其余退回 3×3（见 Core#size）。
+        // ★ 2026-10-17：**存档自带的战役区块名优先**（用户：「存档里应该就有是啥星球吧」）——
+        //   区块名认得出来就按它定星球（自定义地图没有这个键，退回实摆核心那套）。
+        // planet = null ⇒ 调用方没给（没读过 meta / 单测），算"没线索"；
+        // planet = "" ⇒ **存档没写这个键 = 塞普罗**（`Rules` 的默认值，游戏自己加载时也是这个口径）。
+        int hint = planet == null ? 0 : coreSizeFor(planet);
+        if (hint != 0) {
+            r.core.size = hint;
+            r.core.basis = Core.BASIS_PLANET;
+        } else {
+            // ★ 0 = 这条统计不适用（模组星球读不到它的核心 / 它的核心不要求放核心区）⇒ 界面整张卡不出现
+            r.core.size = Core.SIZE_SER;
+            r.core.basis = Core.BASIS_DEFAULT;
+            r.core.skip = true;
+        }
         r.core.max = packCores(usable, tw, th, r.core.size);
 
         // 永久遮挡者 top

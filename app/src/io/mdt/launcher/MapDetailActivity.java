@@ -264,7 +264,8 @@ public class MapDetailActivity extends BaseActivity {
      */
     private void addCore(MapStats.Result r) {
         MapStats.Core c = r.core;
-        if (c.zone <= 0) return;
+        // zone<=0：这张图没有核心区地板；skip：星球的核心读不到 / 核心不要求放核心区 ⇒ 这条统计不做
+        if (c.zone <= 0 || c.skip) return;
         View card = getLayoutInflater().inflate(R.layout.card_stat_section, mBox, false);
         ((TextView) card.findViewById(R.id.stat_card_title))
                 .setText(Trans.get(MapDetailActivity.this, R.string.stats_section_core));
@@ -277,7 +278,10 @@ public class MapDetailActivity extends BaseActivity {
             buildRow(body, Trans.get(MapDetailActivity.this, R.string.stats_core_row_zone), c.zone, null);
         }
         // ★ 边长要写出来（塞普罗 3×3 / 埃里克尔 4×4）—— 2026-10-17 用户：「埃里克尔最小核心不是 3×3 的啊」
-        line(body, Trans.get(MapDetailActivity.this, R.string.stats_core_note_fmt, String.valueOf(c.size)));
+        //   括号里的**依据跟着来源换措辞**（存档里写的星球 / 没线索 ⇒ 取最小的一种）。
+        int noteRes = c.basis == MapStats.Core.BASIS_PLANET ? R.string.stats_core_note_planet_fmt
+                : R.string.stats_core_note_default_fmt;
+        line(body, Trans.get(MapDetailActivity.this, noteRes, String.valueOf(c.size)));
         Util.bindExpandableCard(card, R.id.stat_card, R.id.stat_card_body, R.id.stat_card_chevron);
         mBox.addView(card);
     }
