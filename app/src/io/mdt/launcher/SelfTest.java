@@ -10319,6 +10319,27 @@ public final class SelfTest {
         ok(stat, L, crU.core.skip && crU.core.size == 3,
                 "★模组/陌生星球（planet:sun）⇒ **不统计**（界面整张卡不出现），不去猜它的核心"
                         + "（实际 skip=" + crU.core.skip + "）");
+        // ★★ 模组星球：按内容表里的「核心 + 星球归属」算（照原版数据库 shownPlanets 的口径）
+        //    夹具 = 三条模组核心：3×3 且只属于 ve-a / 4×4 属于 ve-a 与 ve-b / 5×5 不要求核心区
+        java.util.List<MapStats.Def> rows = new java.util.ArrayList<>();
+        MapStats.Def c1 = new MapStats.Def(); c1.name = "ve-core-1";
+        MapStats.applyJson(c1, MapStats.jsonOf("{\"type\":\"CoreBlock\",\"size\":3,\"requiresCoreZone\":true,"
+                + "\"shownPlanets\":[\"ve-a\"]}"), "ve");
+        MapStats.Def c2 = new MapStats.Def(); c2.name = "ve-core-2";
+        MapStats.applyJson(c2, MapStats.jsonOf("{\"type\":\"CoreBlock\",\"size\":4,\"requiresCoreZone\":true,"
+                + "\"shownPlanets\":[\"ve-a\",\"ve-b\"]}"), "ve");
+        MapStats.Def c3 = new MapStats.Def(); c3.name = "ve-core-3";
+        MapStats.applyJson(c3, MapStats.jsonOf("{\"type\":\"CoreBlock\",\"size\":5,\"requiresCoreZone\":false}"), "ve");
+        rows.add(c1); rows.add(c2); rows.add(c3);
+        ok(stat, L, MapStats.coreSizeForTable(rows, "ve-a") == 3 && MapStats.coreSizeForTable(rows, "ve-b") == 4
+                        && MapStats.coreSizeForTable(rows, "ve-c") == 0,
+                "★模组星球按 shownPlanets + requiresCoreZone 取最小核心：ve-a=3 / ve-b=4 / ve-c 没有它的核心=0"
+                        + "（实际 " + MapStats.coreSizeForTable(rows, "ve-a") + "/"
+                        + MapStats.coreSizeForTable(rows, "ve-b") + "/"
+                        + MapStats.coreSizeForTable(rows, "ve-c") + "）");
+        // 元断言：**不要求放核心区**的核心不许被算进来（c3 是 5×5 且 requiresCoreZone=false，永远不该出现）
+        ok(stat, L, MapStats.coreSizeForTable(rows, "ve-c") == 0 && MapStats.coreSizeForTable(rows, "") == 0,
+                "★元断言：requiresCoreZone=false 的核心不算（所以 ve-c 是 0），没有星球时也不乱算");
         // 元断言：反方向 —— 塞普罗/埃里克尔的图**不许**被 skip 掉（否则界面上这条永远看不见）
         ok(stat, L, !crO.core.skip && !crS.core.skip,
                 "★元断言：认得出来的星球（erekir / serpulo）不许 skip（实际 " + crO.core.skip + "/" + crS.core.skip + "）");

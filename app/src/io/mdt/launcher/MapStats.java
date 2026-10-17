@@ -176,6 +176,16 @@ public final class MapStats {
          * 的核心随便摆，不该拿它来算"核心区里能摆几个"。</p>
          */
         public boolean coreZoneOnly;
+
+        /** 这行是**核心方块**（JSON 里 	ype: CoreBlock；原版表按名字认，见 {@link #VANILLA_CORES}） */
+        public boolean isCore;
+
+        /**
+         * 这条内容在**哪些星球页**出现（游戏 UnlockableContent.shownPlanets，JSON 里就是
+         * "shownPlanets": ["cyclant","phoon"]；逗号包住便于 contains）。
+         * **空 = 所有星球都有**（游戏 isOnPlanet 的判据，javap -c 核过）。
+         */
+        public String shownPlanets = "";
         public String itemDrop = "", liquidDrop = "", attributes = "";
         public float speed = 1f, damage = 0f;
         /** 这行从哪来（{@link #SRC_VANILLA} 等；技术细节层显示） */
@@ -1229,8 +1239,23 @@ public final class MapStats {
             // ★ 2026-10-17：核心的"多大"与"是不是必须放核心区"（模组星球靠这两条判能不能用）
             else if ("size".equals(k)) d.size = (int) num(v, d.size);
             else if ("requiresCoreZone".equals(k)) d.coreZoneOnly = bool(v, d.coreZoneOnly);
+            // ★ 2026-10-17：核心的星球归属（游戏 UnlockableContent.shownPlanets / isOnPlanet）
+            else if ("shownPlanets".equals(k)) d.shownPlanets = planetSet(v);
+            else if ("type".equals(k) && String.valueOf(v).toLowerCase().contains("coreblock")) d.isCore = true;
             // 其余字段（requirements / size / health / plans …）与"能不能采"无关，不建模
         }
+    }
+
+    /** JSON 里的名字数组 → `",a,b,"`（便于 contains；空数组/非数组 ⇒ ""） */
+    static String planetSet(Object v) {
+        if (!(v instanceof java.util.List)) return "";
+        StringBuilder sb = new StringBuilder(",");
+        for (Object o : (java.util.List<?>) v) {
+            if (o == null) continue;
+            String s = String.valueOf(o).trim();
+            if (!s.isEmpty()) sb.append(s).append(',');
+        }
+        return sb.length() <= 1 ? "" : sb.toString();
     }
 
     /** 属性对象 → `water=1.0;`（与表里的写法一致，便于技术细节层原样显示） */
@@ -1630,6 +1655,28 @@ public final class MapStats {
      *
      * @param planet 星球名（`MsavMeta#planet`；空 = 缺键 = 塞普罗；陌生名字按"不知道"处理）
      */
+    /**
+     * 这颗星球"算得上"的核心里最小的边长（**模组星球走这条**；0 = 一个都没有 ⇒ 不统计）。
+     *
+     * <p>判据照原版数据库自己的分类（用户：「原版不是有个核心数据库吗，那个东西好像本身就有分类」）：
+     * 一条内容属于哪些星球由 `UnlockableContent.shownPlanets` 决定，`isOnPlanet` 的口径是
+     * **空集合 = 所有星球都有**（`javap -c` 核过）。再叠上用户的规则：
+     * 只留 `requiresCoreZone == true` 的（不要求放核心区的核心随便摆，不该拿来算核心区）。</p>
+     */
+    public static int coreSizeForTable(Iterable<Def> rows, String planet) {
+        int min = 0;
+        for (Def d : rows) {
+            if (d == null || d.name == null) continue;
+            boolean core = d.isCore || vanillaCoreSize(d.name) > 0;
+            if (!core || !d.coreZoneOnly) continue;
+            if (!d.shownPlanets.isEmpty() && !d.shownPlanets.contains("," + planet + ",")) continue;
+            int sz = d.size > 0 ? d.size : vanillaCoreSize(d.name);
+            if (sz <= 0) continue;
+            if (min == 0 || sz < min) min = sz;
+        }
+        return min;
+    }
+
     public static Result analyze(MsavTiles.Tiles t, Table tab, Names nm, String planet) {
         long t0 = System.nanoTime();
         Result r = new Result();
@@ -1843,6 +1890,8 @@ public final class MapStats {
         // planet = null ⇒ 调用方没给（没读过 meta / 单测），算"没线索"；
         // planet = "" ⇒ **存档没写这个键 = 塞普罗**（`Rules` 的默认值，游戏自己加载时也是这个口径）。
         int hint = planet == null ? 0 : coreSizeFor(planet);
+        // ★ 模组星球：硬编码那六种答不上来 ⇒ 按内容表里的「核心 + 星球归属」算（一个都没有就不统计）
+        if (hint == 0 && planet != null && !planet.isEmpty()) hint = coreSizeForTable(tab.byName.values(), planet);
         if (hint != 0) {
             r.core.size = hint;
             r.core.basis = Core.BASIS_PLANET;
