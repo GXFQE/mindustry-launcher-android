@@ -1382,6 +1382,25 @@ public final class MapStats {
         public int deep;
         /** 地板本身不让放（`placeableOn=false`：space / empty） */
         public int floorBlocked;
+        /**
+         * {@link #floorBlocked} 那桶里**按地板种类**分开（2026-10-17 用户问「地板不让建是啥」之后补的）。
+         *
+         * <p>为的是让界面上那行能说出**是哪块地板**，而不是一句"地板不让建"——
+         * 这一桶只统计**认得出**的地板（认不出的进 {@link #unknown}）⇒ 名字一定拿得到。
+         * 原版平时只有 1 种（`space` ⇒ 游戏里的「太空」），模组可能更多（多种时界面走兜底标题 + 副行列名单）。</p>
+         */
+        public final List<Kind> floorKinds = new ArrayList<>();
+
+        /** 一种地板 + 它占的格数（只用于 {@link #floorKinds}） */
+        public static final class Kind {
+            public final String label;
+            public final int tiles;
+
+            Kind(String label, int tiles) {
+                this.label = label;
+                this.tiles = tiles;
+            }
+        }
         /** 方块层或地板认不出（模组内容没解析到）⇒ 不敢下结论，单独一桶 */
         public int unknown;
 
@@ -1478,6 +1497,8 @@ public final class MapStats {
         // ★ 可采地板里**上面有矿 ⇒ 按上面的矿算**的那些格（按地板 id 数；同上一套优先级）
         int[] prioFloor = new int[m];
         int[] unkOreId = new int[m], unkFloorId = new int[m];
+        // ★ 「地板不让建」那桶按**地板 id** 数（界面那行要说清楚是哪块地板，见 Buildable#floorKinds）
+        int[] noPlaceId = new int[m];
         final short[] fl = t.floors, ov = t.ores, bl = t.blocks;
         final int tw = t.width, th = t.height;
         for (int i = 0; i < n; i++) {
@@ -1572,6 +1593,7 @@ public final class MapStats {
                 r.buildable.deep++;
             } else if (!floorPlace[f]) {
                 r.buildable.floorBlocked++;
+                noPlaceId[f]++;
             } else if (b == airId) {
                 r.buildable.free++;
             } else {
@@ -1583,6 +1605,22 @@ public final class MapStats {
         build(r.oreWalls, cWall, t.blockNames, defs, nm, false, false, tab.itemNames, true, prioOre);
         build(r.floors, cFloor, t.blockNames, defs, nm, true, false, tab.itemNames, false, prioFloor);
         build(r.bonuses, cBonus, t.blockNames, defs, nm, false, true, tab.itemNames, false, null);
+
+        // ★ 「地板不让建」按**地板种类**分开：界面那行写「太空地板（放不了）」，而不是一句"地板不让建"
+        //   （用户 2026-10-17：「这个地板不让建是啥啊」→「总感觉说法有点奇怪」）。
+        //   这一桶只统计认得出的地板 ⇒ 名字一定拿得到；多种时界面走兜底标题 + 副行列名单。
+        for (int id = 0; id < m; id++) {
+            if (noPlaceId[id] <= 0) continue;
+            Def d = defs[id];
+            r.buildable.floorKinds.add(new Buildable.Kind(
+                    blockLabel(nm, t.blockNames.get(id), d, t.blockNames.get(id)), noPlaceId[id]));
+        }
+        Collections.sort(r.buildable.floorKinds, new Comparator<Buildable.Kind>() {
+            @Override public int compare(Buildable.Kind a, Buildable.Kind b) {
+                if (a.tiles != b.tiles) return b.tiles - a.tiles;
+                return a.label.compareTo(b.label);
+            }
+        });
 
         // 永久遮挡者 top
         List<Row> bs = new ArrayList<>();

@@ -184,12 +184,16 @@ public class MapDetailActivity extends BaseActivity {
     /**
      * 「可建造」卡片（2026-10-17 用户点单）：一张图里能放**一般建筑**多少格。
      *
-     * <p>六桶（空地 / 拆掉后能建 / 墙和树 / 深液体 / 地板不让建 / 认不出）**恰好加满整张图**，
+     * <p>六桶（空地 / 拆掉后能建 / 墙和树 / 深液体 / 太空地板 等 / 认不出）**恰好加满整张图**，
      * 所以这里不另报总格数 —— 技术细节那张卡的「地图 N × M，共 Z 格」已经说过一次。
      * 判据与游戏 `Build.validPlaceIgnoreUnits` 对齐，见 {@link MapStats.Buildable}。</p>
      *
-     * <p>⚠️ 后两桶（地板不让建 / 认不出）平时是 0（原版只有 space/empty 是那种地板），
+     * <p>⚠️ 后两桶（太空地板 / 认不出）平时是 0（原版只有 space/empty 是那种地板），
      * 有才显示 —— 免得每张图都挂两行 0。</p>
+     *
+     * <p>🔴 措辞被用户打回来**两次**（2026-10-17）：「这个地板不让建是啥啊」→「说法有点奇怪」→
+     * 「你管单位会沉干嘛啊，我们统计的建筑」⇒ 两条纪律：① 行名写**对象**、能拿到名字就把名字写出来；
+     * ② 括号里**只讲"这里放不了东西"**，别用它来解释单位会怎样（那是另一个统计）。</p>
      */
     private void addBuild(MapStats.Result r) {
         MapStats.Buildable b = r.buildable;
@@ -200,24 +204,51 @@ public class MapDetailActivity extends BaseActivity {
                 .setText(Trans.get(MapDetailActivity.this, R.string.stats_build_sum_fmt,
                         MapStatsMods.num(b.count())));
         LinearLayout body = (LinearLayout) card.findViewById(R.id.stat_card_body);
-        buildRow(body, R.string.stats_build_row_free, b.free);
-        buildRow(body, R.string.stats_build_row_cleared, b.cleared);
-        buildRow(body, R.string.stats_build_row_walled, b.walled);
-        buildRow(body, R.string.stats_build_row_deep, b.deep);
-        if (b.floorBlocked > 0) buildRow(body, R.string.stats_build_row_floor, b.floorBlocked);
-        if (b.unknown > 0) buildRow(body, R.string.stats_build_row_unknown, b.unknown);
+        buildRow(body, Trans.get(MapDetailActivity.this, R.string.stats_build_row_free), b.free, null);
+        buildRow(body, Trans.get(MapDetailActivity.this, R.string.stats_build_row_cleared), b.cleared, null);
+        buildRow(body, Trans.get(MapDetailActivity.this, R.string.stats_build_row_walled), b.walled, null);
+        buildRow(body, Trans.get(MapDetailActivity.this, R.string.stats_build_row_deep), b.deep, null);
+        if (b.floorBlocked > 0) {
+            // ★ 2026-10-17（用户问「这个地板不让建是啥啊」→「说法有点奇怪」）：把**是哪块地板**说出来。
+            //   一种时行名直接带名字（原版几乎都是 space ⇒ 游戏里的「太空」）；
+            //   多种时行名用兜底，副行逐个列（`太空 500 格 · 空 36 格`）——
+            //   这一桶只统计认得出的地板，所以名字一定拿得到。
+            String title;
+            String sub = null;
+            if (b.floorKinds.size() == 1) {
+                title = Trans.get(MapDetailActivity.this, R.string.stats_build_row_floor_one_fmt,
+                        b.floorKinds.get(0).label);
+            } else {
+                title = Trans.get(MapDetailActivity.this, R.string.stats_build_row_floor);
+                StringBuilder sb = new StringBuilder();
+                for (MapStats.Buildable.Kind k : b.floorKinds) {
+                    if (sb.length() > 0) sb.append(" · ");
+                    sb.append(Trans.get(MapDetailActivity.this, R.string.stats_tech_count_fmt,
+                            k.label, k.tiles));
+                }
+                sub = sb.toString();
+            }
+            buildRow(body, title, b.floorBlocked, sub);
+        }
+        if (b.unknown > 0) {
+            buildRow(body, Trans.get(MapDetailActivity.this, R.string.stats_build_row_unknown), b.unknown, null);
+        }
         Util.bindExpandableCard(card, R.id.stat_card, R.id.stat_card_body, R.id.stat_card_chevron);
         mBox.addView(card);
     }
 
-    /** 「可建造」卡片里的一行：左边是什么（`item_stat` 的样式），右边「N 格」 */
-    private void buildRow(LinearLayout parent, int titleRes, int n) {
+    /** 「可建造」卡片里的一行：左边是什么（`item_stat` 的样式），右边「N 格」，`sub` 可空 */
+    private void buildRow(LinearLayout parent, String title, int n, String sub) {
         View v = getLayoutInflater().inflate(R.layout.item_stat, parent, false);
-        ((TextView) v.findViewById(R.id.stat_row_title))
-                .setText(Trans.get(MapDetailActivity.this, titleRes));
+        ((TextView) v.findViewById(R.id.stat_row_title)).setText(title);
         ((TextView) v.findViewById(R.id.stat_row_count))
                 .setText(Trans.get(MapDetailActivity.this, R.string.stats_build_count_fmt,
                         MapStatsMods.num(n)));
+        if (sub != null && !sub.isEmpty()) {
+            TextView subView = (TextView) v.findViewById(R.id.stat_row_sub);
+            subView.setText(sub);
+            subView.setVisibility(View.VISIBLE);
+        }
         parent.addView(v);
     }
 

@@ -10171,6 +10171,21 @@ public final class SelfTest {
         ok(stat, L, b4.floorBlocked == 0 && b4.free == 3,
                 "★反方向③：space 地板换成石头地板 ⇒ 地板不让建 1→0、空地 2→3（`placeableOn` 那一列真的在用）"
                         + "（实际 地板 " + b4.floorBlocked + " / 空地 " + b4.free + "）");
+        // ★ 2026-10-17（用户：「这个地板不让建是啥啊」→「说法有点奇怪」）：
+        //   那一桶要能说出**是哪块地板**（界面据此把行名写成「太空地板（放不了）」）。
+        ok(stat, L, bb.floorKinds.size() == 1 && "space".equals(bb.floorKinds.get(0).label)
+                        && bb.floorKinds.get(0).tiles == 1,
+                "★「地板不让建」按地板分种类：space 1 格（界面行名要用它，不能只说一句「地板不让建」）"
+                        + (bb.floorKinds.isEmpty() ? "（实际 空）"
+                        : "（实际 " + bb.floorKinds.size() + " 种 / " + bb.floorKinds.get(0).label
+                        + " " + bb.floorKinds.get(0).tiles + " 格）"));
+        // 两种时：界面走兜底标题 + 副行列名单（原版另一个 placeableOn=false 的地板是 empty）
+        MsavTiles.Tiles bg5 = buildGrid();
+        bg5.blockNames.set(10, "empty");
+        MapStats.Buildable b5 = MapStats.analyze(bg5, v, nm).buildable;
+        ok(stat, L, b5.floorKinds.size() == 2 && b5.floorBlocked == 2,
+                "★两种地板时（space + empty）⇒ 2 种、共 2 格（界面副行列名单）"
+                        + "（实际 " + b5.floorKinds.size() + " 种 / " + b5.floorBlocked + " 格）");
         // 表里那两列本身（PC 侧用真游戏对象核过，这里钉住数值，防表被换错）
         MapStats.Def dw = v.row("deep-water"), sw = v.row("shallow-water"), sp = v.row("space");
         ok(stat, L, dw != null && dw.deep && sw != null && !sw.deep

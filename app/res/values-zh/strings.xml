@@ -1850,8 +1850,13 @@
     <string name="stats_build_row_free">空地</string>
     <string name="stats_build_row_cleared">建筑或石头（拆掉后能建）</string>
     <string name="stats_build_row_walled">墙和树（拆不掉）</string>
-    <string name="stats_build_row_deep">深液体（建不了）</string>
-    <string name="stats_build_row_floor">地板不让建</string>
+    <!-- ★ 2026-10-17：这两行**只讲"这里放不了东西"**，别拿单位行为解释。
+         用户两次打回来：「这个地板不让建是啥啊」/「说法有点奇怪」→ 行名改成对象 + 带出地板名；
+         后又「你管单位会沉干嘛啊，我们统计的建筑」→ 把「单位会沉」删掉。
+         ⚠️ 口径词与摘要统一：摘要写「能放一般建筑」，行里就用「放不了」，别混"建不了/不让建"。 -->
+    <string name="stats_build_row_deep">深液体（放不了）</string>
+    <string name="stats_build_row_floor_one_fmt">%1$s地板（放不了）</string>
+    <string name="stats_build_row_floor">特殊地板（放不了）</string>
     <string name="stats_build_row_unknown">认不出</string>
     <string name="stats_tech_size_fmt">地图 %1$d × %2$d，共 %3$s 格</string>
     <string name="stats_tech_table_fmt">内容表：%1$s</string>
