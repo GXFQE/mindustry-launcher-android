@@ -15,6 +15,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.util.List;
 import java.util.Map;
 
@@ -670,7 +672,7 @@ public class MapsActivity extends BaseActivity {
                 Throwable stageErr = null;
                 if (share && ok > 0) {
                     try {
-                        staged = StatsExporter.stage(MapsActivity.this, name, text);
+                        staged = ShareOut.stageText(MapsActivity.this, name, text);
                     } catch (Throwable t) {
                         stageErr = t;
                     }
@@ -701,7 +703,7 @@ public class MapsActivity extends BaseActivity {
                                         .show();
                                 return;
                             }
-                            StatsExporter.launchShare(MapsActivity.this, fstage, mime);
+                            ShareOut.launch(MapsActivity.this, fstage);
                             return;
                         }
                         try {
@@ -727,12 +729,17 @@ public class MapsActivity extends BaseActivity {
         final List<Maps.Item> items = mItems;
         BatchIo.pickMulti(this, R.string.maps_export,
                 Trans.get(MapsActivity.this, R.string.batch_export_head_fmt, items.size()),
-                mTitles, mSubs, mThumbs, new BatchIo.OnPick() {
-                    @Override public void onPick(List<Integer> idx) {
+                mTitles, mSubs, mThumbs, null, R.string.batch_export_btn_fmt,
+                R.string.pick_share_toggle, new BatchIo.OnPickShare() {
+                    @Override public void onPick(List<Integer> idx, boolean share) {
                         if (idx.size() == 1) {
                             // ★ 文件名用**原始名**：`0.msav` 这种就是游戏里认的名字，
                             //   "安全化"成 ASCII 之后用户在文件管理器里认不出来（同存档导出那条纪律）
                             Maps.Item it = items.get(idx.get(0).intValue());
+                            if (share) {
+                                exportItemShared(it);
+                                return;
+                            }
                             sExportItem = it;
                             startActivityForResult(Intent.createChooser(
                                     Exporter.createDoc(it.name(), "application/octet-stream"),
@@ -750,8 +757,13 @@ public class MapsActivity extends BaseActivity {
                                 srcs.add(Exporter.Src.ofEntry(it.container, it.entry, it.name()));
                             }
                         }
-                        BatchIo.startExport(MapsActivity.this, srcs,
-                                BatchIo.suggestZipName("maps"));
+                        if (share) {
+                            BatchIo.startShare(MapsActivity.this, srcs,
+                                    BatchIo.suggestZipName("maps"));
+                        } else {
+                            BatchIo.startExport(MapsActivity.this, srcs,
+                                    BatchIo.suggestZipName("maps"));
+                        }
                     }
                 });
     }
@@ -834,6 +846,57 @@ public class MapsActivity extends BaseActivity {
                                 .show();
                     }
                 });
+    }
+
+    /**
+     * 单份地图的**分享**出口（第 156 轮）：不弹 SAF，落 `cache/share/` 再交给系统面板。
+     *
+     * <p>文件名与内容跟 {@link #exportItem} 那条**逐字相同**（同一个原始名、同一段流式拷贝），
+     * 只是目的地不同 —— 两条路共用 {@link Exporter#copyTo} / {@link Exporter#copyEntry}，
+     * 别再写第三份"怎么把这张图弄出来"。</p>
+     *
+     * <p>⚠️ 失败就明说失败，**不许**悄悄退回"保存到文件"（用户勾的是分享）。</p>
+     */
+    private void exportItemShared(final Maps.Item it) {
+        final ProgressDialog pd = ProgressDialog.show(this, Trans.get(MapsActivity.this, R.string.maps_export),
+                Trans.get(MapsActivity.this, R.string.maps_export_working), true, false);
+        new Thread(new Runnable() {
+            @Override public void run() {
+                Uri uri = null;
+                String err = null;
+                try {
+                    uri = ShareOut.stage(MapsActivity.this, it.name(), new ShareOut.Body() {
+                        @Override public void write(OutputStream out) throws IOException {
+                            if (it.file != null && it.file.isFile()) {
+                                Exporter.copyTo(it.file, out);
+                            } else if (it.container != null && it.entry != null) {
+                                Exporter.copyEntry(MapsActivity.this, it.container, it.entry, out);
+                            } else {
+                                throw new IOException(Trans.get(MapsActivity.this,
+                                        R.string.maps_export_nosrc));
+                            }
+                        }
+                    });
+                } catch (Throwable t) {
+                    err = Util.ioReason(MapsActivity.this, t,
+                            Trans.get(MapsActivity.this, R.string.maps_export_nosrc));
+                    android.util.Log.w("MDTLauncher", "map share failed", t);
+                }
+                final Uri fu = uri;
+                final String fe = err;
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        pd.dismiss();
+                        if (Util.dead(MapsActivity.this)) return;
+                        if (fe != null) {
+                            alert(Trans.get(MapsActivity.this, R.string.export_failed), fe);
+                            return;
+                        }
+                        ShareOut.launch(MapsActivity.this, fu);
+                    }
+                });
+            }
+        }, "map-share").start();
     }
 
     /**

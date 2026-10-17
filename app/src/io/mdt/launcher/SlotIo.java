@@ -16,6 +16,7 @@ import android.widget.Toast;
 import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
+import java.io.OutputStream;
 import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Date;
@@ -313,10 +314,16 @@ final class SlotIo {
                         // ★ 与存档页**同一套**补内容实现（后台渐进补 + 只刷那一行）
                         fillSavesInto(a, s.name, lv, ad, alive, ordered);
                     }
-                }, new BatchIo.OnPick() {
-                    @Override public void onPick(List<Integer> idx) {
+                }, R.string.batch_export_btn_fmt, R.string.pick_share_toggle,
+                new BatchIo.OnPickShare() {
+                    @Override public void onPick(List<Integer> idx, boolean share) {
                         if (idx.size() == 1) {
-                            startExportSave(a, ordered[idx.get(0).intValue()]);
+                            File f = ordered[idx.get(0).intValue()];
+                            if (share) {
+                                shareSave(a, f);
+                                return;
+                            }
+                            startExportSave(a, f);
                             return;
                         }
                         List<Exporter.Src> srcs = new java.util.ArrayList<>();
@@ -324,7 +331,11 @@ final class SlotIo {
                             File f = ordered[i.intValue()];
                             srcs.add(Exporter.Src.ofFile(f, f.getName()));
                         }
-                        BatchIo.startExport(a, srcs, BatchIo.suggestZipName("saves"));
+                        if (share) {
+                            BatchIo.startShare(a, srcs, BatchIo.suggestZipName("saves"));
+                        } else {
+                            BatchIo.startExport(a, srcs, BatchIo.suggestZipName("saves"));
+                        }
                     }
                 });
     }
@@ -459,6 +470,40 @@ final class SlotIo {
         a.startActivityForResult(Intent.createChooser(
                 Exporter.createDoc(f.getName(), "application/octet-stream"),
                 Trans.get(a, R.string.chooser_export)), REQ_EXPORT);
+    }
+
+    /**
+     * 单份存档的**分享**出口（第 156 轮）：落 `cache/share/` 再交给系统面板。
+     *
+     * <p>⚠️ 这条路**不需要脱敏**：§91① 的取证（写侧字节码 + 416 份语料 + 用本机真实 `usid`
+     * 反搜）确认**单份存档结构上没有身份字段**；含身份凭据的是**整槽包里的 `settings.bin`**
+     * —— 那是分享包那条路的事，别把脱敏逻辑搬到这里。</p>
+     */
+    static void shareSave(final Activity a, final File f) {
+        new Thread(new Runnable() {
+            @Override public void run() {
+                android.net.Uri uri = null;
+                String err = null;
+                try {
+                    uri = ShareOut.stageCopy(a, f.getName(), f);
+                } catch (Throwable t) {
+                    err = Util.ioReason(a, t);
+                    android.util.Log.w("MDTLauncher", "save share failed", t);
+                }
+                final android.net.Uri fu = uri;
+                final String fe = err;
+                a.runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        if (Util.dead(a)) return;
+                        if (fe != null) {
+                            alert(a, Trans.get(a, R.string.export_failed), fe);
+                            return;
+                        }
+                        ShareOut.launch(a, fu);
+                    }
+                });
+            }
+        }, "save-share").start();
     }
 
     /** 存档行第二行（只此一处）：口径在 {@link MsavText#shortLine} */
@@ -602,6 +647,13 @@ final class SlotIo {
                                 Trans.get(a, R.string.chooser_export)), REQ_EXPORT);
                     }
                 })
+                .setNeutralButton(R.string.share_pack_btn, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int w) {
+                        // ★ 第 156 轮：「直接分享」—— 与上面那条打的是**同一个包**（同一个 plan、
+                        //   同一个 zipToOut、同一个压缩级别），只是落点是缓存而不是 SAF。
+                        doSharePackCached(a, s.name, roots, plan);
+                    }
+                })
                 .setNegativeButton(R.string.cancel, null)
                 .show();
     }
@@ -649,6 +701,58 @@ final class SlotIo {
                 });
             }
         }, "export-share").start();
+    }
+
+    /**
+     * 分享包的**缓存出口**（第 156 轮）：与 {@link #doExportShare} 打的是**同一个包**
+     * （同一个 {@link SharePack.Plan}、同一个 {@code zipToOut}、同一个 `BEST_COMPRESSION`），
+     * 区别只是**去哪**：不回 SAF，落 `cache/share/` 再由 {@link ShareOut} 交给系统面板。
+     *
+     * <p>⚠️ 这是个**大文件**（几十~几百 MB）：分享缓存留 24h，期间它一直占着缓存
+     * （{@code Storage.Report} 的缓存项已经把它算进去）。写失败就明说，不退回保存。</p>
+     */
+    private static void doSharePackCached(final Activity a, final String slot,
+                                          final List<File> roots, final SharePack.Plan plan) {
+        if (roots == null || roots.isEmpty()) {
+            alert(a, Trans.get(a, R.string.export_failed),
+                    Trans.get(a, R.string.export_slot_empty_fmt));
+            return;
+        }
+        final ProgressDialog pd = ProgressDialog.show(a,
+                Trans.get(a, R.string.export_progress_title),
+                Trans.get(a, R.string.share_progress_msg_fmt, slot), true, false);
+        final String name = suggestZipName(slot, "share");
+        new Thread(new Runnable() {
+            @Override public void run() {
+                android.net.Uri uri = null;
+                String err = null;
+                try {
+                    uri = ShareOut.stage(a, name, new ShareOut.Body() {
+                        @Override public void write(OutputStream out) throws IOException {
+                            Exporter.zipToOut(a, out, Data.dirOf(a, slot), roots,
+                                    shareXform(plan),
+                                    java.util.zip.Deflater.BEST_COMPRESSION);
+                        }
+                    });
+                } catch (Throwable t) {
+                    err = Util.ioReason(a, t);
+                    android.util.Log.w("MDTLauncher", "share pack (cache) failed", t);
+                }
+                final android.net.Uri fu = uri;
+                final String fe = err;
+                a.runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        pd.dismiss();
+                        if (a.isFinishing()) return;
+                        if (fe != null) {
+                            alert(a, Trans.get(a, R.string.export_failed), fe);
+                            return;
+                        }
+                        ShareOut.launch(a, fu);
+                    }
+                });
+            }
+        }, "share-pack-cache").start();
     }
 
     /**

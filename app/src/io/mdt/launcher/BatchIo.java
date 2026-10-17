@@ -22,6 +22,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -224,6 +225,72 @@ final class BatchIo {
     }
 
     /**
+     * **批量分享**（第 156 轮）：勾中的那几份打成一个 zip 落 `cache/share/`，再交给系统面板。
+     *
+     * <p>与保存那条的区别只是**去哪**：一份时 zip 里就是那一份（与单份文件名一致），
+     * 多份时外层 zip 里每条 = 单份导出时会拿到的那个文件（同一条判据，见类头注释）。
+     * 文件内容与 {@link #handleExportResult} 那条**逐字节相同**（同一个 {@code zipSourcesTo}）。</p>
+     *
+     * <p>⚠️ 失败**不许**退回保存：用户勾的是"直接分享"，落回 SAF 会让人以为分享面板正在弹。</p>
+     */
+    static void startShare(final Activity a, final List<Exporter.Src> srcs, final String zipName) {
+        if (srcs == null || srcs.isEmpty()) {
+            toast(a, Trans.get(a, R.string.batch_export_nothing));
+            return;
+        }
+        final ProgressDialog pd = new ProgressDialog(a);
+        pd.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
+        pd.setTitle(Trans.get(a, R.string.batch_export_progress_title));
+        pd.setMessage(Trans.get(a, R.string.batch_export_pct_fmt, 0, srcs.size()));
+        pd.setMax(srcs.size());
+        pd.setProgress(0);
+        pd.setCancelable(false);
+        pd.show();
+        new Thread(new Runnable() {
+            @Override public void run() {
+                Uri uri = null;
+                String err = null;
+                try {
+                    uri = ShareOut.stage(a, zipName, new ShareOut.Body() {
+                        @Override public void write(OutputStream out) throws IOException {
+                            Exporter.Step step = new Exporter.Step() {
+                                @Override public void onStep(final int done, final int total) {
+                                    a.runOnUiThread(new Runnable() {
+                                        @Override public void run() {
+                                            if (Util.dead(a)) return;
+                                            pd.setMax(total);
+                                            pd.setProgress(done);
+                                            pd.setMessage(Trans.get(a,
+                                                    R.string.batch_export_pct_fmt, done, total));
+                                        }
+                                    });
+                                }
+                            };
+                            Exporter.zipSourcesTo(a, out, srcs, new Exporter.Result(), step);
+                        }
+                    });
+                } catch (Throwable t) {
+                    err = Util.ioReason(a, t);
+                    Log.w(TAG, "batch share failed", t);
+                }
+                final Uri fu = uri;
+                final String fe = err;
+                a.runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        pd.dismiss();
+                        if (Util.dead(a)) return;
+                        if (fe != null) {
+                            alert(a, Trans.get(a, R.string.export_failed), fe);
+                            return;
+                        }
+                        ShareOut.launch(a, fu);
+                    }
+                });
+            }
+        }, "batch-share").start();
+    }
+
+    /**
      * 转发 `onActivityResult`。返回 true = 这个请求码是我们的、已经处理（调用方直接 return）。
      * ★ 与 `SlotIo.onActivityResult` 同一条：**无论成败先清待办**，否则用户取消之后
      *   残留的清单会被下一次选择"接上"，导出成上一批东西。
@@ -298,6 +365,11 @@ final class BatchIo {
         void onPick(List<Integer> indexes);
     }
 
+    /** 勾选回调 + **去处**（第 156 轮）：`share == true` ⇒ 不去 SAF，直接落缓存分享 */
+    interface OnPickShare {
+        void onPick(List<Integer> indexes, boolean share);
+    }
+
     /**
      * 对话框显示之后、把副标题 / 缩略图**异步补上**的钩子（存档那条列表要它 ——
      * 名字 + 大小先出，"这存档是哪张图的"与预览图后台再补，见 {@link SlotIo#fillSavesInto}）。
@@ -341,6 +413,26 @@ final class BatchIo {
     static void pickMulti(final Activity a, int titleRes, String head, String[] titles,
                           String[] subs, android.graphics.Bitmap[] thumbs, final Filler filler,
                           final int okFmtRes, final OnPick cb) {
+        pickMulti(a, titleRes, head, titles, subs, thumbs, filler, okFmtRes, 0,
+                new OnPickShare() {
+                    @Override public void onPick(List<Integer> indexes, boolean share) {
+                        cb.onPick(indexes);
+                    }
+                });
+    }
+
+    /**
+     * 同上，但多一个**去处**（第 156 轮）：`shareLabelRes != 0` 时列表底下多一行勾选框
+     * （「直接分享（不保存到文件）」），勾上就**不弹 SAF**、直接落 `cache/share/` 分享。
+     *
+     * <p>★ 为什么不改成"先问保存还是分享"：那条路会让**每一次导出**都多一次点击，而保存仍是主流。
+     *   勾选框的代价是 0 次（保存时不用理它）。</p>
+     * <p>⚠️ 勾上之后正按钮那句话要跟着变（「导出（3 份）」→「分享（3 份）」）——
+     *   见 §90.7：按钮必须说清按下去会发生什么。</p>
+     */
+    static void pickMulti(final Activity a, int titleRes, String head, String[] titles,
+                          String[] subs, android.graphics.Bitmap[] thumbs, final Filler filler,
+                          final int okFmtRes, int shareLabelRes, final OnPickShare cb) {
         if (titles == null || titles.length == 0) return;
         View box = a.getLayoutInflater().inflate(R.layout.dialog_msav_list, null);
         TextView h = (TextView) box.findViewById(R.id.msav_head);
@@ -351,6 +443,13 @@ final class BatchIo {
                 new MsavListAdapter(a, titles, subs, thumbs, new boolean[titles.length]);
         lv.setAdapter(ad);
         final boolean[] alive = {true};
+        final android.widget.CheckBox shareBox =
+                (android.widget.CheckBox) box.findViewById(R.id.pick_share);
+        final boolean canShare = shareLabelRes != 0;
+        if (canShare) {
+            shareBox.setVisibility(View.VISIBLE);
+            shareBox.setText(Trans.get(a, shareLabelRes));
+        }
 
         final AlertDialog dlg = new AlertDialog.Builder(a)
                 .setTitle(titleRes)
@@ -364,12 +463,21 @@ final class BatchIo {
             @Override public void onItemClick(AdapterView<?> p, View v, int pos, long id) {
                 ad.setChecked(pos, !ad.isChecked(pos));
                 ad.refreshCheck(lv, pos);
-                syncPickButtons(dlg, a, ad, okFmtRes);
+                syncPickButtons(dlg, a, ad, okFmtRes, shareBox);
             }
         });
         dlg.setOnShowListener(new DialogInterface.OnShowListener() {
             @Override public void onShow(DialogInterface d) {
-                syncPickButtons(dlg, a, ad, okFmtRes);
+                syncPickButtons(dlg, a, ad, okFmtRes, shareBox);
+                if (canShare) {
+                    shareBox.setOnCheckedChangeListener(
+                            new android.widget.CompoundButton.OnCheckedChangeListener() {
+                                @Override public void onCheckedChanged(
+                                        android.widget.CompoundButton b, boolean checked) {
+                                    syncPickButtons(dlg, a, ad, okFmtRes, shareBox);
+                                }
+                            });
+                }
                 if (filler != null) {
                     // ★ 异步补内容的那条路（存档列表）：关了窗就让后台线程自己停
                     dlg.setOnDismissListener(new DialogInterface.OnDismissListener() {
@@ -388,7 +496,7 @@ final class BatchIo {
                                     return;                 // 不关窗：勾选还留着
                                 }
                                 dlg.dismiss();
-                                cb.onPick(idx);
+                                cb.onPick(idx, canShare && shareBox.isChecked());
                             }
                         });
                 dlg.getButton(DialogInterface.BUTTON_NEUTRAL).setOnClickListener(
@@ -397,7 +505,7 @@ final class BatchIo {
                                 boolean all = ad.checkedCount() == ad.getCount();
                                 ad.setAll(!all);
                                 lv.invalidateViews();   // 只重画可见行（够用：状态在适配器里）
-                                syncPickButtons(dlg, a, ad, okFmtRes);
+                                syncPickButtons(dlg, a, ad, okFmtRes, shareBox);
                             }
                         });
             }
@@ -405,13 +513,17 @@ final class BatchIo {
         dlg.show();
     }
 
-    /** 正按钮报份数、中按钮报"下一步会做什么"（见 {@link #pickMulti} 的三条） */
+    /** 正按钮报份数（**跟着去处换词**）、中按钮报"下一步会做什么"（见 {@link #pickMulti} 的三条） */
     private static void syncPickButtons(AlertDialog dlg, Context c, MsavListAdapter ad,
-                                        int okFmtRes) {
+                                        int okFmtRes, android.widget.CheckBox shareBox) {
         if (dlg == null || ad == null) return;
+        boolean share = shareBox != null && shareBox.getVisibility() == View.VISIBLE
+                && shareBox.isChecked();
         android.widget.Button pos = dlg.getButton(DialogInterface.BUTTON_POSITIVE);
         if (pos != null) {
-            pos.setText(Trans.get(c, okFmtRes, ad.checkedCount()));
+            pos.setText(share
+                    ? Trans.get(c, R.string.batch_share_btn_fmt, ad.checkedCount())
+                    : Trans.get(c, okFmtRes, ad.checkedCount()));
         }
         android.widget.Button neu = dlg.getButton(DialogInterface.BUTTON_NEUTRAL);
         if (neu != null) {

@@ -1106,7 +1106,7 @@
     -->
     <string name="slot_op_share_slot">导出分享包（去掉账号身份信息）…</string>
     <string name="share_slot_title_fmt">导出分享包「%1$s」</string>
-    <string name="share_slot_msg_fmt">给别人用的包；换机或留档用「导出整槽」，那个包一个字不删。\n打包前会去掉账号身份信息，并丢掉日志、可重建的缓存与只对你有用的文件。\n地图和蓝图上可能还留着创意工坊的发布记录（这一版不处理）。\n\n%1$s%2$s</string>
+    <string name="share_slot_msg_fmt">给别人用的包；换机或留档用「导出整槽」，那个包一个字不删。\n打包前会去掉账号身份信息，并丢掉日志、可重建的缓存与只对你有用的文件。\n地图/蓝图上的创意工坊记录会原样保留（只是物品 ID）。\n\n%1$s%2$s</string>
     <string name="share_slot_saved_fmt">这个包比「导出整槽」小 %1$s。</string>
     <string name="share_slot_found_fmt">这次会去掉 %1$d 项身份信息（其中服务器身份 %2$d 项）。</string>
     <string name="share_slot_none">检查过了：这个槽里没有身份信息。</string>
@@ -2034,6 +2034,9 @@
     <string name="stats_export_opt_share_brief">直接分享：简洁（只含能采到的）</string>
     <string name="share_chooser">分享到…</string>
     <string name="share_no_app">这台设备上没有能接收这个文件的应用。</string>
+    <string name="pick_share_toggle">直接分享（不保存到文件）</string>
+    <string name="batch_share_btn_fmt">分享（%1$d 份）</string>
+    <string name="share_pack_btn">直接分享</string>
     <string name="stats_export_progress_fmt">正在统计 %1$d / %2$d…</string>
     <string name="stats_export_batch_ok_fmt">已导出 %1$d 张地图的统计（%2$s）</string>
     <string name="stats_export_batch_ok_skipped_fmt">已导出 %1$d 张地图的统计（%2$s）；另有 %3$d 张读不出，已跳过</string>

@@ -854,6 +854,21 @@ public final class SelfTest {
             Exporter.Result rp = Exporter.zipTo(ctx, android.net.Uri.fromFile(plainZip), slot, roots);
             Exporter.Result rs = Exporter.zipTo(ctx, android.net.Uri.fromFile(shareZip), slot, roots,
                     SlotIo.shareXform(plan));
+            // ★ 第 156 轮：分享走的是**缓存**那条路（`zipToOut` 吃 OutputStream）——
+            //   它必须与 SAF 那条**逐字节相同**，否则"同一份分享包，发给别人的和存下来的不一样"。
+            File cacheZip = new File(Paths.privateDir(ctx), "selftest-share-cache.zip");
+            if (cacheZip.exists()) cacheZip.delete();
+            java.io.FileOutputStream cfo = new java.io.FileOutputStream(cacheZip);
+            try {
+                Exporter.zipToOut(ctx, cfo, slot, roots, SlotIo.shareXform(plan),
+                        java.util.zip.Deflater.BEST_SPEED);
+            } finally {
+                cfo.close();
+            }
+            ok(stat, L, Util.md5(shareZip).equals(Util.md5(cacheZip)) && cacheZip.length() > 0,
+                    "★分享包「缓存那条路」与「SAF 那条路」逐字节相同（md5 " + Util.md5(cacheZip)
+                            + "，`zipToOut` 与 `zipTo` 共用同一份打包实现）");
+            if (cacheZip.exists()) cacheZip.delete();
             List<String> wantDropped = java.util.Arrays.asList(
                     "server_list.json", "crashes", "last_log.txt", "previews", "assetCache",
                     "settings_backups", "settings_backup.bin", "be_builds", "screenshots",
@@ -10708,6 +10723,33 @@ public final class SelfTest {
         } catch (Throwable ignored) {
         }
         ok(stat, L, escape, "★反方向：`../databases/…` 必须抛 FileNotFoundException（不是\"读到别处\"）");
+        //    ②c 生产侧的名字**洗而不是拒**（用户的图名可能带 `:`、`?`、换行 —— 拒了这张图就永远发不出去）
+        StringBuilder longName = new StringBuilder();
+        for (int i = 0; i < 200; i++) longName.append('x');
+        String longFixed = ShareOut.fixName(longName + ".msav");
+        ok(stat, L, "a_b_c.json".equals(ShareOut.fixName("a/b:c.json"))
+                        && "file".equals(ShareOut.fixName("   "))
+                        && "file".equals(ShareOut.fixName(null))
+                        && "a_b.msav".equals(ShareOut.fixName("a\nb.msav"))
+                        && longFixed.endsWith(".msav") && longFixed.length() <= 100
+                        && ShareProvider.safeName(longFixed),
+                "★名字清洗：`/`、`:`、换行 → `_`；空名 → `file`；超长**保留扩展名**地截短，"
+                        + "洗出来的名字仍过 provider 的判据（" + longFixed.length() + " 字符）");
+        //    ②d 同名不覆盖：连发两张同名的图，第一份不许被第二份换掉
+        File uniqDir = new File(Paths.privateDir(ctx), "selftest-share-uniq");
+        deleteTree(uniqDir);
+        uniqDir.mkdirs();
+        File u1 = ShareOut.unique(uniqDir, "a.msav");
+        File u2 = null;
+        try {
+            write(u1, new byte[]{1});
+            u2 = ShareOut.unique(uniqDir, "a.msav");
+        } catch (Throwable ignored) {
+        }
+        ok(stat, L, u2 != null && "a.msav".equals(u1.getName()) && "a (2).msav".equals(u2.getName())
+                        && !u2.exists(),
+                "★同名不覆盖：第二份叫 `a (2).msav`（否则第一份在接收方读之前就被换掉了）");
+        deleteTree(uniqDir);
         //    ③ stage：内容进 cache/share（UTF-8 **不带 BOM**），URI 是 content://<authority>/<名字>
         File shareTmp = new File(ShareProvider.dirOf(ctx), "selftest-share-中文.json");
         try { shareTmp.delete(); } catch (Throwable ignored) { }
@@ -10715,7 +10757,7 @@ public final class SelfTest {
         android.net.Uri shareUri = null;
         Throwable stageErr = null;
         try {
-            shareUri = StatsExporter.stage(ctx, shareTmp.getName(), "{\"a\":1}\n");
+            shareUri = ShareOut.stageText(ctx, shareTmp.getName(), "{\"a\":1}\n");
         } catch (Throwable st) {
             stageErr = st;
         }
@@ -10749,6 +10791,30 @@ public final class SelfTest {
         ok(stat, L, shareTmp.getName().equals(scName) && scSize == shareTmp.length(),
                 "★provider 的 query 给出 DISPLAY_NAME + SIZE（微信/QQ 靠它显示文件卡片）："
                         + scName + " / " + scSize + " B");
+        //    ⑤b stageCopy：拷过去的字节与源文件**逐字节相同**（地图 / 存档 / 蓝图都走这条）
+        boolean copyOk = false;
+        String copyName = null;
+        try {
+            // 清掉上次跑留下的同名件（`unique` 会给它加 ` (2)`，那不是这次要验的东西）
+            File sdir = ShareProvider.dirOf(ctx);
+            File[] olds = sdir.listFiles();
+            if (olds != null) {
+                for (File f : olds) {
+                    if (f.getName().startsWith("副本")) f.delete();
+                }
+            }
+            File copySrc = new File(Paths.privateDir(ctx), "selftest-share-copy.msav");
+            write(copySrc, new byte[]{7, 0, 1, 2, 3, (byte) 0xff, 9});
+            android.net.Uri copyUri = ShareOut.stageCopy(ctx, "副本.msav", copySrc);
+            File copyOut = ShareProvider.fileOf(ctx, copyUri.getLastPathSegment());
+            copyOk = Util.md5(copySrc).equals(Util.md5(copyOut));
+            copyName = copyOut.getName();
+            copySrc.delete();
+        } catch (Throwable e) {
+            copyOk = false;
+        }
+        ok(stat, L, copyOk && "副本.msav".equals(copyName),
+                "★stageCopy：分享缓存里那份与源文件 md5 相同、名字是原名（地图/存档/蓝图都走这条）");
         //    ⑤ 清单里**真的**声明了 provider（aapt2 不检查引用，漏了只在真机炸 Unknown URL）
         try {
             android.content.pm.ProviderInfo pi = ctx.getPackageManager()
@@ -10772,7 +10838,7 @@ public final class SelfTest {
             write(oldF, "old".getBytes(java.nio.charset.StandardCharsets.UTF_8));
             write(newF, "new".getBytes(java.nio.charset.StandardCharsets.UTF_8));
             oldF.setLastModified(1000000000000L);           // 2001 年
-            int pruned = StatsExporter.prune(pruneDir,
+            int pruned = ShareOut.prune(pruneDir,
                     System.currentTimeMillis() - 24L * 3600L * 1000L);
             pruneOk = pruned == 1 && !oldF.exists() && newF.isFile();
         } catch (Throwable e) {

@@ -30,6 +30,27 @@
         android:textSize="12sp"
         android:visibility="gone" />
 
+    <!--
+      ★ 第 156 轮：「直接分享」这个**去处**收在动作自己的对话框里，页面上不多一行
+        （与「导出统计」的四选一同一条：去处属于动作，不属于列表）。
+        导出类调用方才会让它可见（删除那条路不传 ⇒ `GONE`）。
+
+      ⚠️ 必须放在**列表上面**：列表是 `wrap_content`（`maxHeight` 对 ListView 不生效），
+        116 份地图会把自定义内容顶出对话框可视区 —— 放在列表下面时真机上**根本看不到这一行**
+        （2026-10-17 截图实测）。放上面还能保证滚动列表时它一直在。
+    -->
+    <CheckBox
+        android:id="@+id/pick_share"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:paddingTop="2dp"
+        android:paddingBottom="6dp"
+        android:textColor="@color/fg"
+        android:textSize="14sp"
+        android:visibility="gone" />
+
     <ListView
         android:id="@+id/msav_list"
         android:layout_width="match_parent"

@@ -355,8 +355,9 @@ public class ModsActivity extends BaseActivity {
         }
         BatchIo.pickMulti(this, R.string.mods_export,
                 Trans.get(ModsActivity.this, R.string.batch_export_head_fmt, all.size()),
-                titles, subs, null, new BatchIo.OnPick() {
-                    @Override public void onPick(List<Integer> idx) {
+                titles, subs, null, null, R.string.batch_export_btn_fmt,
+                R.string.pick_share_toggle, new BatchIo.OnPickShare() {
+                    @Override public void onPick(List<Integer> idx, boolean share) {
                         List<Exporter.Src> srcs = new ArrayList<>();
                         for (Integer i : idx) {
                             Mods.Info m = all.get(i.intValue());
@@ -367,8 +368,13 @@ public class ModsActivity extends BaseActivity {
                                 srcs.add(Exporter.Src.ofFile(m.file, name));
                             }
                         }
-                        BatchIo.startExport(ModsActivity.this, srcs,
-                                BatchIo.suggestZipName("mods"));
+                        if (share) {
+                            BatchIo.startShare(ModsActivity.this, srcs,
+                                    BatchIo.suggestZipName("mods"));
+                        } else {
+                            BatchIo.startExport(ModsActivity.this, srcs,
+                                    BatchIo.suggestZipName("mods"));
+                        }
                     }
                 });
     }

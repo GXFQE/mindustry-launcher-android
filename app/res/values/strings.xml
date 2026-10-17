@@ -1135,7 +1135,7 @@
     -->
     <string name="slot_op_share_slot">Export a shareable package (account identity removed)…</string>
     <string name="share_slot_title_fmt">Export shareable package \"%1$s\"</string>
-    <string name="share_slot_msg_fmt">A package for sending to others; to move to a new phone or keep a copy, use \"Export the whole slot\" (that package changes nothing).\nPacking removes the account identity data and drops the logs, the rebuildable caches and whatever is only useful to you.\nMaps and blueprints may still carry a record of what you published to the Workshop (not handled in this version).\n\n%1$s%2$s</string>
+    <string name="share_slot_msg_fmt">A package for sending to others; to move to a new phone or keep a copy, use \"Export the whole slot\" (that package changes nothing).\nPacking removes the account identity data and drops the logs, the rebuildable caches and whatever is only useful to you.\nAny Workshop record on a map or blueprint is kept as is (it is only an item ID).\n\n%1$s%2$s</string>
     <string name="share_slot_saved_fmt">This pack is about %1$s smaller than a full-slot export.</string>
     <string name="share_slot_found_fmt">This time %1$d identity entries will be removed (%2$d of them are server identities).</string>
     <string name="share_slot_none">Checked: this slot holds no identity data.</string>
@@ -2081,6 +2081,9 @@
     <string name="stats_export_opt_share_brief">Share now: brief (mineable only)</string>
     <string name="share_chooser">Share to…</string>
     <string name="share_no_app">No app on this device can receive this file.</string>
+    <string name="pick_share_toggle">Share right away (no file saved)</string>
+    <string name="batch_share_btn_fmt">Share (%1$d)</string>
+    <string name="share_pack_btn">Share now</string>
     <string name="stats_export_progress_fmt">Counting %1$d / %2$d…</string>
     <string name="stats_export_batch_ok_fmt">Exported statistics of %1$d maps (%2$s)</string>
     <string name="stats_export_batch_ok_skipped_fmt">Exported statistics of %1$d maps (%2$s); %3$d more could not be read and were skipped</string>

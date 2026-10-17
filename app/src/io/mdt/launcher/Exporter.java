@@ -46,6 +46,7 @@ public final class Exporter {
         public int files;        // 写进去的文件条目数（不含目录条目）
         public long rawBytes;    // 原始内容总字节
         public long outBytes;    // 落盘 zip 的字节数（压缩后）
+        public int skipped;      // 打不开而跳过的条目数（见 addTree 里那条判据）
     }
 
     private Exporter() {}
@@ -72,23 +73,37 @@ public final class Exporter {
     /** 把一个文件流式写进 SAF 目标。返回写入字节数。 */
     public static long writeFile(Context ctx, Uri uri, File src) throws IOException {
         if (src == null || !src.isFile()) throw new IOException(Trans.get(ctx, R.string.exp_err_src_missing_fmt, String.valueOf(src)));
-        InputStream in = new FileInputStream(src);
         OutputStream out = null;
-        long n = 0;
+        long n;
         try {
             out = openOut(ctx, uri);
+            n = copyTo(src, out);
+        } finally {
+            closeQuietly(out);
+        }
+        Log.i(TAG, "export file ok: " + src.getName() + " -> " + n + " B");
+        return n;
+    }
+
+    /**
+     * 文件 → **任意输出流**（SAF 与分享缓存两条路共用这一份）。
+     *
+     * ★ 第 156 轮抽出来的：{@code writeFile} 原来自己写着一段 64KB 循环，而分享那条路
+     *   也要同一段 —— 再抄一份就会出现"分享出去的文件和保存的差几个字节"这种没有症状的漂。
+     */
+    static long copyTo(File src, OutputStream out) throws IOException {
+        InputStream in = new FileInputStream(src);
+        long n = 0;
+        try {
             byte[] buf = new byte[BUF];
             int r;
             while ((r = in.read(buf)) > 0) {
                 out.write(buf, 0, r);
                 n += r;
             }
-            out.flush();
         } finally {
-            closeQuietly(out);
             closeQuietly(in);
         }
-        Log.i(TAG, "export file ok: " + src.getName() + " -> " + n + " B");
         return n;
     }
 
@@ -542,16 +557,22 @@ public final class Exporter {
      *   盖在旧内容上面、尾巴留着旧的，而**看起来是一次正常的导出**。
      */
     public static long writeText(Context ctx, Uri uri, String text) throws IOException {
-        byte[] b = (text == null ? "" : text).getBytes("UTF-8");
         OutputStream out = null;
+        long n;
         try {
             out = openOut(ctx, uri);
-            out.write(b);
-            out.flush();
+            n = writeTextTo(out, text);
         } finally {
             closeQuietly(out);
         }
-        Log.i(TAG, "export text ok: " + b.length + " B -> " + uri);
+        Log.i(TAG, "export text ok: " + n + " B -> " + uri);
+        return n;
+    }
+
+    /** 文本 → 任意输出流（UTF-8，不带 BOM）；分享缓存那条路用它 */
+    static long writeTextTo(OutputStream out, String text) throws IOException {
+        byte[] b = (text == null ? "" : text).getBytes("UTF-8");
+        out.write(b);
         return b.length;
     }
 
@@ -592,8 +613,25 @@ public final class Exporter {
      */
     public static Result zipTo(Context ctx, Uri uri, File base, List<File> roots, Xform x,
                                int level) throws IOException {
+        OutputStream out = null;
+        try {
+            out = openOut(ctx, uri);
+            return zipToOut(ctx, out, base, roots, x, level);
+        } finally {
+            closeQuietly(out);
+        }
+    }
+
+    /**
+     * 同一份打包逻辑，写进**任意输出流**（第 156 轮：分享缓存那条路要用它）。
+     *
+     * ⚠️ 调用方负责**关流**：zip 的中央目录必须在 close 时才写完，所以这里**不能**提前关
+     *   —— 这也是为什么它不自带 `openOut`（SAF 那条在上面的重载里关）。
+     */
+    static Result zipToOut(Context ctx, OutputStream out, File base, List<File> roots, Xform x,
+                           int level) throws IOException {
         Result r = new Result();
-        Counting counter = new Counting(openOut(ctx, uri));
+        Counting counter = new Counting(out);
         ZipOutputStream zos = new ZipOutputStream(new BufferedOutputStream(counter, BUF));
         try {
             // 大目录（mods 几十 MB）速度优先：压缩比换时间，用户等着不烦
@@ -605,7 +643,7 @@ public final class Exporter {
                 }
             }
         } finally {
-            closeQuietly(zos);   // 必须关：zip 的中央目录在 close 时才写
+            zos.close();   // 必须关：zip 的中央目录在 close 时才写
         }
         r.outBytes = counter.n;
         Log.i(TAG, "export zip ok: files=" + r.files + " raw=" + r.rawBytes
@@ -639,6 +677,15 @@ public final class Exporter {
         }
 
         String rel = relOf(base, f);
+        // ★ 第 156 轮（真机撞出来的）：目录里可能有**文件名不是合法 UTF-8** 的条目
+        //   （`listFiles()` 解出来是替换字符，再编码回去就是另一个名字 ⇒ 一打开 ENOENT）。
+        //   真机实测：一张 2025 年留下的 `\346\262` 让**整槽导出 / 分享包整个失败**。
+        //   ⇒ 打不开的条目**跳过**（用户在任何文件管理器里也打不开它），别让它毁掉整包。
+        if (!f.isFile()) {
+            r.skipped++;
+            Log.w(TAG, "zip skip unreadable entry: " + f.getAbsolutePath());
+            return;
+        }
         // ★ 钩子①：整份不进包。**放在建条目之前** —— 于是它既不出现在 zip 里，
         //   也不会计进 `Result.files`（"已导出 N 个文件"那句报数才是真的）。
         if (x != null && x.drop(rel)) return;

@@ -9,6 +9,8 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.OutputStream;
 import java.util.List;
 
 /**
@@ -643,13 +645,19 @@ public class BlueprintsActivity extends BaseActivity {
         }
         BatchIo.pickMulti(this, R.string.bp_export,
                 Trans.get(BlueprintsActivity.this, R.string.batch_export_head_fmt, items.size()),
-                titles, subs, null, new BatchIo.OnPick() {
-                    @Override public void onPick(List<Integer> idx) {
+                titles, subs, null, null, R.string.batch_export_btn_fmt,
+                R.string.pick_share_toggle, new BatchIo.OnPickShare() {
+                    @Override public void onPick(List<Integer> idx, boolean share) {
                         if (idx.size() == 1) {
                             // ★ 文件名用**原始名**：那才是游戏里认的名字（同地图/存档导出那条纪律）
-                            sExportItem = items.get(idx.get(0).intValue());
+                            Blueprints.Item it = items.get(idx.get(0).intValue());
+                            if (share) {
+                                exportItemShared(it);
+                                return;
+                            }
+                            sExportItem = it;
                             startActivityForResult(Intent.createChooser(
-                                    Exporter.createDoc(sExportItem.name(), "application/octet-stream"),
+                                    Exporter.createDoc(it.name(), "application/octet-stream"),
                                     Trans.get(BlueprintsActivity.this, R.string.chooser_export)),
                                     REQ_BP_EXPORT);
                             return;
@@ -663,8 +671,13 @@ public class BlueprintsActivity extends BaseActivity {
                                 srcs.add(Exporter.Src.ofEntry(it.container, it.entry, it.name()));
                             }
                         }
-                        BatchIo.startExport(BlueprintsActivity.this, srcs,
-                                BatchIo.suggestZipName("blueprints"));
+                        if (share) {
+                            BatchIo.startShare(BlueprintsActivity.this, srcs,
+                                    BatchIo.suggestZipName("blueprints"));
+                        } else {
+                            BatchIo.startExport(BlueprintsActivity.this, srcs,
+                                    BatchIo.suggestZipName("blueprints"));
+                        }
                     }
                 });
     }
@@ -751,6 +764,51 @@ public class BlueprintsActivity extends BaseActivity {
                                 .show();
                     }
                 });
+    }
+
+    /** 单份蓝图的**分享**出口（第 156 轮）：同地图那条，落缓存再交给系统面板 */
+    private void exportItemShared(final Blueprints.Item it) {
+        final android.app.ProgressDialog pd = android.app.ProgressDialog.show(this,
+                Trans.get(BlueprintsActivity.this, R.string.bp_export),
+                Trans.get(BlueprintsActivity.this, R.string.bp_export_working), true, false);
+        new Thread(new Runnable() {
+            @Override public void run() {
+                android.net.Uri uri = null;
+                String err = null;
+                try {
+                    uri = ShareOut.stage(BlueprintsActivity.this, it.name(), new ShareOut.Body() {
+                        @Override public void write(OutputStream out) throws IOException {
+                            if (it.file != null && it.file.isFile()) {
+                                Exporter.copyTo(it.file, out);
+                            } else if (it.container != null && it.entry != null) {
+                                Exporter.copyEntry(BlueprintsActivity.this, it.container,
+                                        it.entry, out);
+                            } else {
+                                throw new IOException(Trans.get(BlueprintsActivity.this,
+                                        R.string.bp_export_nosrc));
+                            }
+                        }
+                    });
+                } catch (Throwable t) {
+                    err = Util.ioReason(BlueprintsActivity.this, t,
+                            Trans.get(BlueprintsActivity.this, R.string.bp_export_nosrc));
+                    android.util.Log.w("MDTLauncher", "bp share failed", t);
+                }
+                final android.net.Uri fu = uri;
+                final String fe = err;
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        pd.dismiss();
+                        if (Util.dead(BlueprintsActivity.this)) return;
+                        if (fe != null) {
+                            alert(Trans.get(BlueprintsActivity.this, R.string.export_failed), fe);
+                            return;
+                        }
+                        ShareOut.launch(BlueprintsActivity.this, fu);
+                    }
+                });
+            }
+        }, "bp-share").start();
     }
 
     /** 把选中的那份写进 SAF 目标：本槽是真文件、模组自带要从 zip 条目流式拷 */

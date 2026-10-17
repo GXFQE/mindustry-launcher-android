@@ -175,76 +175,8 @@ final class StatsExporter {
         return opt == OPT_SHARE_DETAIL || opt == OPT_SHARE_BRIEF;
     }
 
-    /**
-     * 把文本写进 `cache/share/<name>`，返回给分享面板用的 `content://`。
-     *
-     * <p>★ 与 {@link #begin} 的区别只是**去哪**：这条不经过 SAF、不落用户目录；
-     * 文件名/MIME/内容与保存那条**逐字相同**（同一个 {@link #fileName}、同一份文本）。</p>
-     *
-     * <p>⚠️ 写盘的字节是 UTF-8 **不带 BOM**（与 {@link Exporter#writeText} 同一条口径：
-     * 带 BOM 的话 JSON 解析器会在第一个字符上翻车）。</p>
-     */
-    static Uri stage(Context c, String name, String text) throws IOException {
-        if (!ShareProvider.safeName(name)) throw new IOException("bad share name");
-        File d = ShareProvider.dirOf(c);
-        // ★ 顺手清旧：**不能立刻删刚写完的那份**（微信是异步读的），所以只清 24h 之前的。
-        prune(d, System.currentTimeMillis() - KEEP_MS);
-        File f = new File(d, name);
-        OutputStream out = null;
-        try {
-            out = new java.io.BufferedOutputStream(new java.io.FileOutputStream(f), 65536);
-            out.write((text == null ? "" : text).getBytes("UTF-8"));
-            out.flush();
-        } finally {
-            if (out != null) {
-                try { out.close(); } catch (Throwable ignored) { }
-            }
-        }
-        return ShareProvider.uriOf(name);
-    }
-
-    /**
-     * 清掉 `dir` 里早于 `cutoff` 的文件，返回删掉几个。
-     *
-     * <p>★ 纯函数（吃目录 + 时刻）：自检拿一个临时目录就能钉住"老的删、新的留"，
-     * 不必等一天。</p>
-     */
-    static int prune(File dir, long cutoff) {
-        File[] fs = dir == null ? null : dir.listFiles();
-        int n = 0;
-        if (fs != null) {
-            for (File f : fs) {
-                if (f.isFile() && f.lastModified() < cutoff && f.delete()) n++;
-            }
-        }
-        return n;
-    }
-
-    /**
-     * 打开系统分享面板（**不自己列 App**：微信/QQ/蓝牙/荣耀分享都靠系统选择器，
-     * 自己维护一份名单既要跟着别人改包名，又拿不到系统的"常用联系人"排序）。
-     *
-     * <p>🔴 两个细节缺一不可：{@code FLAG_GRANT_READ_URI_PERMISSION} 给接收方一次读权限；
-     * {@code ClipData} 再显式带一份 —— `EXTRA_STREAM` 在部分版本上不会被自动搬进 ClipData，
-     * 授权就跟着丢了（结果是接收方打开时 `SecurityException`）。</p>
-     */
-    static void launchShare(Activity a, Uri uri, String mime) {
-        if (uri == null) return;
-        Intent send = new Intent(Intent.ACTION_SEND);
-        send.setType(mime == null || mime.isEmpty() ? "application/octet-stream" : mime);
-        send.putExtra(Intent.EXTRA_STREAM, uri);
-        send.setClipData(android.content.ClipData.newRawUri("", uri));
-        send.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
-        try {
-            a.startActivity(Intent.createChooser(send, Trans.get(a, R.string.share_chooser)));
-        } catch (Throwable t) {
-            new android.app.AlertDialog.Builder(a)
-                    .setTitle(Trans.get(a, R.string.export_failed))
-                    .setMessage(Trans.get(a, R.string.share_no_app))
-                    .setPositiveButton(R.string.close, null)
-                    .show();
-        }
-    }
+    // ★ 第 156 轮：`stage` / `prune` / `launchShare` 整块搬进了 {@link ShareOut}
+    //   —— 分享出口现在四个内容页 + 分享包共用一份实现，这里不再留第二份。
 
     // ── 声明里的那几样东西（单张 / 批量共用） ────────────────────────────
 
