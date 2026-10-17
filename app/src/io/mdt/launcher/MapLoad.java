@@ -160,6 +160,16 @@ public final class MapLoad {
     }
 
     /**
+     * **预览画法版本**：渲染规则一变（朝向 / 配色 / 混合 / 缩放）就必须 +1。
+     *
+     * <p>它进缓存键。⚠️ 光改渲染器是不够的 —— 磁盘上那些旧 PNG 会继续被当成"已经算好了"
+     * 直接供出去，用户重启十次都还是旧图（2026-10-17 修「所有地图预览上下颠倒」时就靠它失效）。</p>
+     *
+     * <p>v2：`.msav` 第 0 行是**最下面**那一行，绘制时要上下翻转。</p>
+     */
+    static final int PREVIEW_VERSION = 2;
+
+    /**
      * 「内存 → 磁盘 → 现渲染」的**唯一实现**（地图 / 存档 / 蓝图三条预览线共用）。
      *
      * @param keyBase  缓存身份（改了内容就得换 key；地图/存档那条 = 路径+大小+时间，
@@ -169,7 +179,7 @@ public final class MapLoad {
      *                 但"没版本 / 老格式"这种原因不会自己变好，代价只是重算一遍）
      */
     static Bitmap cached(Context ctx, String keyBase, int maxSide, Renderer renderer) {
-        String key = keyBase + "@" + maxSide;
+        String key = keyBase + "@" + maxSide + "@v" + PREVIEW_VERSION;
         synchronized (MEM) {
             Bitmap b = MEM.get(key);
             if (b != null && !b.isRecycled()) return b;

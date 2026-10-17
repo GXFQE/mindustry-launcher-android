@@ -9289,6 +9289,30 @@ public final class SelfTest {
             distinct = seen.size();
             ok(stat, L, img != null && img.width == 8 && img.height == 8 && distinct >= 4,
                     "★元断言：人造瓦片渲染出 " + distinct + " 种颜色（≥4）⇒ 渲染器不是「画一片纯色」的假货");
+            // ⑤ ★★ 朝向（用户 2026-10-17：「所有的地图渲染图片都是上下颠倒的」）：
+            //    `.msav` 里**第 0 行是最下面那一行**（游戏坐标 y=0 在底），位图第 0 行却在顶
+            //    ⇒ 文件里只有**最底一行**特殊时，画出来必须仍在**图片最底那一行**。
+            MsavTiles.Tiles flip = new MsavTiles.Tiles();
+            flip.width = 8;
+            flip.height = 8;
+            flip.floors = new short[64];
+            flip.ores = new short[64];
+            flip.blocks = new short[64];
+            for (int i = 0; i < 64; i++) flip.floors[i] = 2;        // 全是同一种地板
+            for (int x = 0; x < 8; x++) flip.floors[x] = 3;         // 只把 y=0（**最底那行**）换掉
+            MapPreview.Img fi = MapPreview.render(flip, fakePal, 8);
+            int wantBottom = 0xFF808080;                            // id 3 的颜色
+            int wantTop = 0xFF204080;                               // id 2 的颜色
+            boolean orient = fi != null && fi.width == 8 && fi.height == 8;
+            if (orient) {
+                for (int x = 0; x < 8; x++) {
+                    if (fi.pixels[7 * 8 + x] != wantBottom) orient = false;
+                    if (fi.pixels[x] != wantTop) orient = false;
+                }
+            }
+            ok(stat, L, orient,
+                    "★朝向：文件里**最底那一行**的瓦片，画出来仍在**图片最底那行**"
+                            + "（不翻就是整张图上下颠倒；游戏 `MapIO` 也是 `height-1-y`）");
             // ④ 缓存键不能撞（撞了就会显示别人的预览图）
             ok(stat, L, !MapLoad.md5("a|1").equals(MapLoad.md5("a|2"))
                             && MapLoad.md5("x").length() == 16,

@@ -56,8 +56,12 @@ public final class MapPreview {
                 // 把一个 scale×scale 的小块平均一下（直接采样会在缩略图上丢细节）
                 int r = 0, g = 0, b = 0, cnt = 0;
                 for (int dy = 0; dy < scale; dy++) {
-                    int y = oy * scale + dy;
-                    if (y >= t.height) break;
+                    // 🔴 **上下翻转**：`.msav` 里**第 0 行是最下面那一行**（游戏坐标 y=0 在底），
+                    //   而位图第 0 行是**最上面**那一行 ⇒ 不翻就是整张图上下颠倒
+                    //   （用户 2026-10-17：「所有的地图渲染图片都是上下颠倒的」）。
+                    //   游戏自己也是这么干的：`MapIO.generatePreview` 里 `pixmap.set(x, height-1-y, color)`。
+                    int y = t.height - 1 - (oy * scale + dy);
+                    if (y < 0) break;
                     for (int dx = 0; dx < scale; dx++) {
                         int x = ox * scale + dx;
                         if (x >= t.width) break;
@@ -75,7 +79,11 @@ public final class MapPreview {
         return new Img(ow, oh, out);
     }
 
-    /** 单格取色（规则的唯一实现，render 与自检共用） */
+    /** 单格取色（规则的唯一实现，render 与自检共用）
+     *
+     * <p>⚠️ `y` 是**游戏坐标**（0 = 最下面那一行，与 `.msav` 的行序一致）；把颜色写进位图时
+     * 要翻过来（见 {@link #render}）—— 这两件事别混。</p>
+     */
     public static int colorAt(MsavTiles.Tiles t, int[] palette, int x, int y) {
         int i = y * t.width + x;
         int wall = pal(palette, t.blocks[i]);
