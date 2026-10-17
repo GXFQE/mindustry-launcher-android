@@ -184,16 +184,21 @@ public class MapDetailActivity extends BaseActivity {
     /**
      * 「可建造」卡片（2026-10-17 用户点单）：一张图里能放**一般建筑**多少格。
      *
-     * <p>六桶（空地 / 拆掉后能建 / 墙和树 / 深液体 / 太空地板 等 / 认不出）**恰好加满整张图**，
+     * <p>数据是**六桶**（空地 / 拆掉后能建 / 墙和树 / 深液体 / 特殊地板 / 认不出）**恰好加满整张图**，
      * 所以这里不另报总格数 —— 技术细节那张卡的「地图 N × M，共 Z 格」已经说过一次。
      * 判据与游戏 `Build.validPlaceIgnoreUnits` 对齐，见 {@link MapStats.Buildable}。</p>
      *
-     * <p>⚠️ 后两桶（太空地板 / 认不出）平时是 0（原版只有 space/empty 是那种地板），
+     * <p>界面上是**五行**：「深液体」与「地板不让建」**合成一行**（用户 2026-10-17：「这俩合并下吧」）——
+     * 行名是对象「放不了的地板」，副行按种类列（`深液体 2,026 格 · 太空地板 536 格`），
+     * 两个桶的数一个不少、只是不各占一行。</p>
+     *
+     * <p>⚠️ 后两桶（特殊地板 / 认不出）平时是 0（原版只有 space/empty 是那种地板），
      * 有才显示 —— 免得每张图都挂两行 0。</p>
      *
-     * <p>🔴 措辞被用户打回来**两次**（2026-10-17）：「这个地板不让建是啥啊」→「说法有点奇怪」→
-     * 「你管单位会沉干嘛啊，我们统计的建筑」⇒ 两条纪律：① 行名写**对象**、能拿到名字就把名字写出来；
-     * ② 括号里**只讲"这里放不了东西"**，别用它来解释单位会怎样（那是另一个统计）。</p>
+     * <p>🔴 这一段的措辞被用户打回来**三次**（2026-10-17）：「这个地板不让建是啥啊」→「说法有点奇怪」→
+     * 「你管单位会沉干嘛啊，我们统计的建筑」→「这俩合并下吧」⇒ 三条纪律：① 行名写**对象**、
+     * 能拿到名字就把名字写出来；② 只说"这里放不了东西"，别用它解释单位会怎样（那是另一个统计）；
+     * ③ **同一件事别拆成两行**（深液体与特殊地板都是"地板放不了"，合一行 + 副行列种类）。</p>
      */
     private void addBuild(MapStats.Result r) {
         MapStats.Buildable b = r.buildable;
@@ -207,28 +212,22 @@ public class MapDetailActivity extends BaseActivity {
         buildRow(body, Trans.get(MapDetailActivity.this, R.string.stats_build_row_free), b.free, null);
         buildRow(body, Trans.get(MapDetailActivity.this, R.string.stats_build_row_cleared), b.cleared, null);
         buildRow(body, Trans.get(MapDetailActivity.this, R.string.stats_build_row_walled), b.walled, null);
-        buildRow(body, Trans.get(MapDetailActivity.this, R.string.stats_build_row_deep), b.deep, null);
-        if (b.floorBlocked > 0) {
-            // ★ 2026-10-17（用户问「这个地板不让建是啥啊」→「说法有点奇怪」）：把**是哪块地板**说出来。
-            //   一种时行名直接带名字（原版几乎都是 space ⇒ 游戏里的「太空」）；
-            //   多种时行名用兜底，副行逐个列（`太空 500 格 · 空 36 格`）——
-            //   这一桶只统计认得出的地板，所以名字一定拿得到。
-            String title;
-            String sub = null;
-            if (b.floorKinds.size() == 1) {
-                title = Trans.get(MapDetailActivity.this, R.string.stats_build_row_floor_one_fmt,
-                        b.floorKinds.get(0).label);
-            } else {
-                title = Trans.get(MapDetailActivity.this, R.string.stats_build_row_floor);
-                StringBuilder sb = new StringBuilder();
-                for (MapStats.Buildable.Kind k : b.floorKinds) {
-                    if (sb.length() > 0) sb.append(" · ");
-                    sb.append(Trans.get(MapDetailActivity.this, R.string.stats_tech_count_fmt,
-                            k.label, k.tiles));
-                }
-                sub = sb.toString();
+        // ★ 深液体 + 特殊地板 = 一行「放不了的地板」，副行把种类逐个列出来
+        //   （用户先后要求：行名说人话、别拿单位行为解释、这两行合并）。
+        int noFloor = b.deep + b.floorBlocked;
+        if (noFloor > 0) {
+            StringBuilder sub = new StringBuilder();
+            if (b.deep > 0) {
+                sub.append(Trans.get(MapDetailActivity.this, R.string.stats_build_sub_deep_fmt,
+                        MapStatsMods.num(b.deep)));
             }
-            buildRow(body, title, b.floorBlocked, sub);
+            for (MapStats.Buildable.Kind k : b.floorKinds) {
+                if (sub.length() > 0) sub.append(" · ");
+                sub.append(Trans.get(MapDetailActivity.this, R.string.stats_build_sub_floor_fmt,
+                        k.label, MapStatsMods.num(k.tiles)));
+            }
+            buildRow(body, Trans.get(MapDetailActivity.this, R.string.stats_build_row_nofoor),
+                    noFloor, sub.length() == 0 ? null : sub.toString());
         }
         if (b.unknown > 0) {
             buildRow(body, Trans.get(MapDetailActivity.this, R.string.stats_build_row_unknown), b.unknown, null);

@@ -1898,12 +1898,12 @@
     <string name="stats_build_row_free">Empty ground</string>
     <string name="stats_build_row_cleared">Buildings or rocks (clearable)</string>
     <string name="stats_build_row_walled">Walls and trees (cannot be cleared)</string>
-    <!-- ★ 2026-10-17: these two rows only say "you cannot place anything here" — do not explain it
-         via unit behaviour ("units sink" was rejected: this is a building statistic).
-         Wording stays parallel with the summary ("tiles can hold a normal building"). -->
-    <string name="stats_build_row_deep">Deep liquid (cannot build)</string>
-    <string name="stats_build_row_floor_one_fmt">%1$s floor (cannot build)</string>
-    <string name="stats_build_row_floor">Special floor (cannot build)</string>
+    <!-- ★ 2026-10-17: deep liquid and the non-placeable floor are **one row** now (user: "merge these two").
+         The row names the object; the sub line lists the kinds: `deep liquid 2,026 tiles · space floor 536 tiles`.
+         Do not explain it via unit behaviour ("units sink" was rejected: this is a building statistic). -->
+    <string name="stats_build_row_nofoor">Floors you cannot build on</string>
+    <string name="stats_build_sub_deep_fmt">Deep liquid %1$s tiles</string>
+    <string name="stats_build_sub_floor_fmt">%1$s floor %2$s tiles</string>
     <string name="stats_build_row_unknown">Unrecognised</string>
     <string name="stats_tech_size_fmt">Map %1$d × %2$d, %3$s tiles total</string>
     <string name="stats_tech_table_fmt">Content table: %1$s</string>
