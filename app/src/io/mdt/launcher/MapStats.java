@@ -1479,14 +1479,30 @@ public final class MapStats {
      * 界面文案只说"最多能摆"，依据写在卡片里，别写成"理论上限"。
      */
     public static final class Core {
-        /** 核心的边长（取最小的一种：3×3） */
-        public static final int SIZE = 3;
+        /** **塞普罗**最小的核心 = `core-shard`，3×3 */
+        public static final int SIZE_SER = 3;
+        /** **埃里克尔**最小的核心 = `core-bastion`，4×4 */
+        public static final int SIZE_ERE = 4;
+
+        /**
+         * 这张图按哪种核心算（**界面要把这个数写出来**）。
+         *
+         * <p>🔴 2026-10-17 用户：「**埃里克尔最小核心不是 3×3 的啊**」—— 我原来写死 3×3（塞普罗的 shard），
+         * 而埃里克尔最小的 `core-bastion` 是 **4×4**。判据 = **看地图上实际摆出来的核心**
+         * （方块层里有没有 `core-bastion` / `core-citadel` / `core-acropolis`，
+         * ⚠️ **不能看 `blockNames`**：那是内容池，六种核心全在，462 张图张张都有）。</p>
+         *
+         * <p>语料实测（329 张有核心区的图）：只有塞普罗核心 60 · 只有埃里克尔核心 **188** · 两种都有 30 ·
+         * 一颗核心都没有 51。⇒ 规则 = **有埃里克尔核心且没有塞普罗核心 ⇒ 4×4**，其余（含两种都有 /
+         * 一颗都没有）**退回 3×3**（全局最小，且自定义图本来就允许全套内容）。</p>
+         */
+        public int size = SIZE_SER;
 
         /** 整片核心区：地板是 `core-zone` 的格数（不管上面有没有东西） */
         public int zone;
         /** 其中**能建**的格数（判据与 {@link Buildable} 同一条） */
         public int usable;
-        /** 最多能摆几个 {@link #SIZE}×{@link #SIZE} 的核心（不重叠；每块核心区分开对齐） */
+        /** 最多能摆几个 {@link #size}×{@link #size} 的核心（不重叠；每块核心区分开对齐） */
         public int max;
     }
 
@@ -1548,6 +1564,10 @@ public final class MapStats {
         // ★ 「核心区」那个地板的 id（游戏里 `core-zone`，bundle 名就叫「核心区」）——
         //   2026-10-17 用户：「核心区是一个专门的地板啊」。
         boolean[] coreZone = new boolean[m];
+        // ★ 核心方块按星球分类（2026-10-17 用户：「埃里克尔最小核心不是 3×3 的啊」）：
+        //   塞普罗 = shard/foundation/nucleus（最小 3×3）、埃里克尔 = bastion/citadel/acropolis（最小 4×4）。
+        //   ⚠️ 判据看**方块层里真摆出来的**，不看 `blockNames`（那是内容池，六种核心全在）。
+        boolean[] coreSer = new boolean[m], coreEre = new boolean[m];
         Def[] defs = new Def[m];
         int airId = t.airId();
         for (int id = 0; id < m; id++) {
@@ -1555,6 +1575,8 @@ public final class MapStats {
             Def d = tab.row(name);
             defs[id] = d;
             coreZone[id] = "core-zone".equals(name);
+            coreSer[id] = "core-shard".equals(name) || "core-foundation".equals(name) || "core-nucleus".equals(name);
+            coreEre[id] = "core-bastion".equals(name) || "core-citadel".equals(name) || "core-acropolis".equals(name);
             if (d == null) {
                 occl[id] = (byte) ("air".equals(name) ? 0 : 3);
                 continue;
@@ -1585,6 +1607,8 @@ public final class MapStats {
         int[] unkOreId = new int[m], unkFloorId = new int[m];
         // ★ 「地板不让建」那桶按**地板 id** 数（界面那行要说清楚是哪块地板，见 Buildable#floorKinds）
         int[] noPlaceId = new int[m];
+        // ★ 这张图摆的是哪颗星球的核心（埃里克尔核心 ⇒ 按 4×4 算）
+        boolean serCore = false, ereCore = false;
         // ★ 核心区里"能建"的格（给"最多能摆几个核心"用；只有核心区那几百格会被置 true）
         boolean[] usable = new boolean[n];
         final short[] fl = t.floors, ov = t.ores, bl = t.blocks;
@@ -1696,6 +1720,11 @@ public final class MapStats {
                     r.core.usable++;
                 }
             }
+            // ★ 这张图摆的是哪颗星球的核心（决定按 3×3 还是 4×4 算，见 {@link Core#size}）
+            if (b >= 0 && b < m) {
+                if (coreEre[b]) ereCore = true;
+                else if (coreSer[b]) serCore = true;
+            }
         }
 
         build(r.ores, cOre, t.blockNames, defs, nm, false, false, tab.itemNames, false, null);
@@ -1720,7 +1749,9 @@ public final class MapStats {
         });
 
         // ★ 核心区里最多能摆几个核心（不重叠；每块核心区各按 3×3 网格对齐，见 {@link Core}）
-        r.core.max = packCores(usable, tw, th, Core.SIZE);
+        // 埃里克尔核心（且没有塞普罗核心）⇒ 按该星球最小的 4×4 算；其余退回 3×3（见 Core#size）
+        r.core.size = (ereCore && !serCore) ? Core.SIZE_ERE : Core.SIZE_SER;
+        r.core.max = packCores(usable, tw, th, r.core.size);
 
         // 永久遮挡者 top
         List<Row> bs = new ArrayList<>();

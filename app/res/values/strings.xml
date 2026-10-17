@@ -1909,13 +1909,15 @@
     <string name="stats_build_row_unknown">Unrecognised</string>
     <!--
       ★★ 2026-10-17: "core zone" is the game's own floor (`core-zone`) — count its tiles, then work out
-      how many of the smallest cores (3×3) fit there without overlapping. The count is a feasible packing,
+      how many of the **planet's smallest core** (Serpulo `core-shard` 3×3 / Erekir `core-bastion` 4×4)
+      fit there without overlapping. Which planet is decided by the cores actually placed on the map
+      (`MapStats.Core#size`), and the size is printed in the summary. The count is a feasible packing,
       not the theoretical optimum.
     -->
     <string name="stats_section_core">Core zone</string>
-    <string name="stats_core_sum_fmt">%1$s tiles · room for %2$s cores (3×3)</string>
+    <string name="stats_core_sum_fmt">%1$s tiles · room for %2$s cores (%3$s×%3$s)</string>
     <string name="stats_core_row_zone">Whole core zone</string>
-    <string name="stats_core_note">Cores counted at 3×3, non-overlapping; each core zone patch aligned on its own</string>
+    <string name="stats_core_note_fmt">Cores counted at %1$s×%1$s (the smallest core placed on the map), non-overlapping</string>
     <string name="stats_tech_size_fmt">Map %1$d × %2$d, %3$s tiles total</string>
     <string name="stats_tech_table_fmt">Content table: %1$s</string>
     <string name="stats_tech_names_fmt">Name sources: %1$s</string>

@@ -257,7 +257,8 @@ public class MapDetailActivity extends BaseActivity {
      * 并当场纠正「**核心区是一个专门的地板啊**」）。
      *
      * <p>核心区 = 游戏里的 `core-zone` 地板（bundle 中文名就叫「核心区」），战役图用它标核心的降落区。
-     * 所以卡片就两个数：**能建的面积**、**最多能摆几个 3×3 的核心**（最小的一种，用户：「按允许星球最小的算」）。</p>
+     * 所以卡片就两个数：**能建的面积**、**最多能摆几个核心**（按该星球最小的一种：塞普罗 core-shard 3×3 /
+     * 埃里克尔 core-bastion 4×4，见 {@link MapStats.Core#size}）。</p>
      *
      * <p>⚠️ 地图上没有核心区（zone=0）就整张卡不出现 —— 免得大部分自定义图都挂一个 0。</p>
      */
@@ -269,13 +270,14 @@ public class MapDetailActivity extends BaseActivity {
                 .setText(Trans.get(MapDetailActivity.this, R.string.stats_section_core));
         ((TextView) card.findViewById(R.id.stat_card_summary))
                 .setText(Trans.get(MapDetailActivity.this, R.string.stats_core_sum_fmt,
-                        MapStatsMods.num(c.usable), MapStatsMods.num(c.max)));
+                        MapStatsMods.num(c.usable), MapStatsMods.num(c.max), String.valueOf(c.size)));
         LinearLayout body = (LinearLayout) card.findViewById(R.id.stat_card_body);
         // 整片面积只在"有格被占着"时才提（平时两数相等，说了就是重复）
         if (c.usable != c.zone) {
             buildRow(body, Trans.get(MapDetailActivity.this, R.string.stats_core_row_zone), c.zone, null);
         }
-        line(body, Trans.get(MapDetailActivity.this, R.string.stats_core_note));
+        // ★ 边长要写出来（塞普罗 3×3 / 埃里克尔 4×4）—— 2026-10-17 用户：「埃里克尔最小核心不是 3×3 的啊」
+        line(body, Trans.get(MapDetailActivity.this, R.string.stats_core_note_fmt, String.valueOf(c.size)));
         Util.bindExpandableCard(card, R.id.stat_card, R.id.stat_card_body, R.id.stat_card_chevron);
         mBox.addView(card);
     }

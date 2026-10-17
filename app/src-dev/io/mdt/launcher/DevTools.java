@@ -885,7 +885,7 @@ final class DevTools {
                         if (r.core.zone > 0) {
                             sb.append("    核心区: ").append(r.core.zone).append(" 格（能建 ")
                               .append(r.core.usable).append("）· 最多 ").append(r.core.max)
-                              .append(" 个 3×3 核心\n");
+                              .append(" 个 ").append(r.core.size).append("×").append(r.core.size).append(" 核心\n");
                         }
                         sb.append("    挡住资源的: ").append(a.blockersOf(r)).append('\n');
                         if (r.unkOre + r.unkFloor + r.unkBonus > 0) {

@@ -10272,6 +10272,28 @@ public final class SelfTest {
         ok(stat, L, cr3.core.zone == 0 && cr3.core.usable == 0 && cr3.core.max == 0,
                 "★元断言：没有 core-zone 地板的图 ⇒ 核心区三个数都是 0（界面上整张卡不出现）"
                         + "（实际 " + cr3.core.zone + "/" + cr3.core.usable + "/" + cr3.core.max + "）");
+        // ★ 边长按**星球**走（2026-10-17 用户：「**埃里克尔最小核心不是 3×3 的啊**」）：
+        //   同一片 6×6，摆着 `core-bastion`（埃里克尔最小，4×4）⇒ 按 4×4 算 ⇒ 只能摆 1 个；
+        //   再摆一颗 `core-shard`（塞普罗）⇒ 两种都有 ⇒ 退回全局最小的 3×3（4 个）。
+        MsavTiles.Tiles cgE = coreZoneGrid();
+        cgE.blockNames.add("core-bastion");                    // id = 4
+        cgE.blocks[3 * 12 + 3] = 4;                            // (3,3) 摆一颗埃里克尔核心
+        MapStats.Result crE = MapStats.analyze(cgE, v, nm);
+        ok(stat, L, crE.core.size == 4 && crE.core.max == 1,
+                "★埃里克尔：图上摆的是 core-bastion（4×4）⇒ 按 4×4 算，6×6 里只摆得下 **1** 个"
+                        + "（实际 边长 " + crE.core.size + " / 最多 " + crE.core.max + "）");
+        MsavTiles.Tiles cgB = coreZoneGrid();
+        cgB.blockNames.add("core-bastion");                    // id = 4
+        cgB.blockNames.add("core-shard");                      // id = 5
+        cgB.blocks[3 * 12 + 3] = 4;                            // 埃里克尔核心
+        cgB.blocks[1 * 12 + 1] = 5;                            // + 塞普罗核心
+        MapStats.Result crB = MapStats.analyze(cgB, v, nm);
+        ok(stat, L, crB.core.size == 3 && crB.core.max == 4,
+                "★两种核心都有的图 ⇒ 退回全局最小的 3×3（4 个）"
+                        + "（实际 边长 " + crB.core.size + " / 最多 " + crB.core.max + "）");
+        // 元断言：没摆任何核心 ⇒ 默认 3×3（上面 cr 就是这种图，写在这儿让"默认"有据可查）
+        ok(stat, L, cr.core.size == 3,
+                "★一颗核心都没摆 ⇒ 退回 3×3（实际 " + cr.core.size + "）");
         // 表里那两列本身（PC 侧用真游戏对象核过，这里钉住数值，防表被换错）
         MapStats.Def dw = v.row("deep-water"), sw = v.row("shallow-water"), sp = v.row("space");
         ok(stat, L, dw != null && dw.deep && sw != null && !sw.deep
