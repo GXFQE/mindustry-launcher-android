@@ -1242,6 +1242,9 @@ public final class MapStats {
             // ★ 2026-10-17：核心的"多大"与"是不是必须放核心区"（模组星球靠这两条判能不能用）
             else if ("size".equals(k)) d.size = (int) num(v, d.size);
             else if ("requiresCoreZone".equals(k)) {
+                // ★ 这个字段**只有 CoreBlock 有** ⇒ 写它就等于自称"我是核心"（比名字靠谱，也不靠 type：
+                //   VE 那种脚本建块、JSON 只补字段的写法，type 是注释掉的，但这个字段真写了）
+                d.isCore = true;
                 // ★ 只有 JSON **自己声明了 type** 时才采信（代码类方块的 JSON 补丁会被代码盖掉，
                 //   VE 的 core-*.json 全是 requiresCoreZone:false，但游戏里它们明明要放核心区）
                 d.coreZoneOnly = d.jsonTyped ? bool(v, d.coreZoneOnly) : true;
