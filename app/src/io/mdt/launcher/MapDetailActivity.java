@@ -328,12 +328,28 @@ public class MapDetailActivity extends BaseActivity {
         mBox.addView(card);
     }
 
-    /** 一行：名字 + 「能采 X 格」，副行说"总共多少 / 掉落什么 / 被什么挡住" */
+    /**
+     * 一行：名字 + 「能采 X 格」，副行说"总共多少 / 掉落什么 / 被什么挡住"。
+     *
+     * <p>★ 2026-10-17 用户：「**括号标注一下液体可采**」—— 加成地板里那几块液体地板（深水 / 石油 / 冷冻液 /
+     * 矿渣液 / 芳油）的收益是"上泵能抽"，所以括号里**先写「可抽 X」**、再接属性词
+     * （`矿渣液（可抽 矿渣 · 高温）`）。液体名走 {@link MapStats.Names#liquid}（游戏 bundle 的
+     * `liquid.&lt;id&gt;.name`），**不在这里写死**。</p>
+     */
     private View rowView(LinearLayout parent, MapStats.Row row, boolean wallKind) {
         View v = getLayoutInflater().inflate(R.layout.item_stat, parent, false);
+        String bracket = row.attrs == null ? "" : row.attrs;
+        if (row.liquid != null && !row.liquid.isEmpty()) {
+            // ★ 一律写液体名（`深水（可抽 水）`/`芳油（可抽 芳油）`）。
+            //   🔴 2026-10-17 用户：「为什么矿渣是可抽矿渣，但芳油就是可抽液体啊」——
+            //   我曾按"行名 == 液体名就省略"去重，结果同一列里两种写法混着出现；
+            //   宁可重复一个词，也不要同一列两种格式（判据要**一致**，不是"聪明"）。
+            String liq = Trans.get(MapDetailActivity.this, R.string.stats_bonus_liquid_fmt, row.liquid);
+            bracket = bracket.isEmpty() ? liq : liq + " · " + bracket;
+        }
         ((TextView) v.findViewById(R.id.stat_row_title)).setText(
-                row.attrs == null || row.attrs.isEmpty() ? row.label
-                        : Trans.get(MapDetailActivity.this, R.string.stats_row_attr_fmt, row.label, row.attrs));
+                bracket.isEmpty() ? row.label
+                        : Trans.get(MapDetailActivity.this, R.string.stats_row_attr_fmt, row.label, bracket));
         // ★ 头号数字**四段一律「能采 X 格」**（2026-10-16 起墙矿也一样，见 addSection 的注释）
         ((TextView) v.findViewById(R.id.stat_row_count))
                 .setText(Trans.get(MapDetailActivity.this, R.string.stats_row_reach_fmt, MapStatsMods.num(row.reachable())));

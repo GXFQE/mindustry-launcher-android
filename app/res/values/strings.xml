@@ -1875,6 +1875,8 @@
     <string name="stats_more_fmt">%1$d more kinds not listed</string>
     <!-- 加成地板的名字要带属性词（含水/含油/高温…）：那才是它有用的地方 -->
     <string name="stats_row_attr_fmt">%1$s (%2$s)</string>
+    <!-- ★ 2026-10-17: liquid floors are a bonus because a pump can extract from them — say it in the bracket. -->
+    <string name="stats_bonus_liquid_fmt">pumpable %1$s</string>
     <!-- 属性词：游戏自己的语言包**没有** attribute.* 的译名（中英都没有），只能用我们自己的 -->
     <string name="stats_attr_water">water</string>
     <string name="stats_attr_oil">oil</string>

@@ -222,6 +222,16 @@ public final class BundleNames implements MapStats.Names {
         return s == null || s.isEmpty() ? key : s;
     }
 
+    /**
+     * 液体名（`water` ⇒ 「水」/“Water”）：游戏 bundle 里是 `liquid.<id>.name`。
+     *
+     * <p>★ 加成地板那行「可抽 X」用它（2026-10-17 用户：「括号标注一下液体可采」）。
+     * 取不到返回**空串**（调用方退回内部名）—— 与 {@link #block} / {@link #item} 同一套口径。</p>
+     */
+    @Override public String liquid(String internal) {
+        return internal == null || internal.isEmpty() ? "" : pick("liquid." + internal + ".name", "");
+    }
+
     /** 补丁/模组能把 `[accent]` 这类标记写进名字 ⇒ 显示前一律剥掉（判据同 {@link Colors}） */
     private static String clean(String s) {
         return s == null ? "" : Colors.strip(s).trim();

@@ -9925,39 +9925,59 @@ public final class SelfTest {
         ok(stat, L, sand != null && "sand".equals(sand.itemDrop) && sand.isFloor && !sand.isOre
                         && sand.bonus(),
                 "沙地（内部名 sand-floor）：掉落 sand ⇒ 可采地板；同时带含油的属性 ⇒ 也算加成地板（一格两用）");
-        // ★ 2026-10-17 用户：「**我们只统计加成地板，不要统计减成地板**」——
-        //   纯惩罚的地板（只让单位变慢）与**属性全为负**的石头都不许进这一段。
+        // ★ 2026-10-17 用户两句话定下这一条：先「**我们只统计加成地板，不要统计减成地板**」，
+        //   我按"没属性/移速<1"砍掉液体地板后立刻被纠正「**这不对吧，液体可以用泵抽啊**」——
+        //   ⇒ 「加成」= **能拿到东西**：液体可抽（`liquidDrop`）/ 属性有正值 / 移速>1 / 伤害<0。
         MapStats.Def bnShallow = v.row("shallow-water");
         MapStats.Def bnDeep = v.row("deep-water");
         MapStats.Def bnTar = v.row("tar");
-        MapStats.Def bnSandWater = v.row("sand-water");
-        ok(stat, L, bnShallow != null && !bnShallow.bonus() && bnDeep != null && !bnDeep.bonus()
-                        && bnTar != null && !bnTar.bonus() && bnSandWater != null && !bnSandWater.bonus(),
-                "★减成地板不算加成：「水」(shallow-water) / 深水 / 石油 / 浅滩 —— 只让单位变慢、一个属性都没有");
+        MapStats.Def bnCryo = v.row("pooled-cryofluid");
+        ok(stat, L, bnShallow != null && bnShallow.bonus() && bnDeep != null && bnDeep.bonus()
+                        && bnTar != null && bnTar.bonus() && bnCryo != null && bnCryo.bonus(),
+                "★液体地板算加成（虽然让单位变慢，但**能上泵抽**）：「水」5 格速 / 深水 2 格速 / 石油 / 冷冻液");
         MapStats.Def bnBasalt = v.row("basalt");
         MapStats.Def bnCarbon = v.row("carbon-stone");
-        ok(stat, L, bnBasalt != null && !bnBasalt.bonus() && bnCarbon != null && !bnCarbon.bonus(),
-                "★属性**全为负**的石头也不算加成（玄武岩 water=-0.25 / 碳石 water=-1.0）");
+        MapStats.Def bnRedStone = v.row("red-stone");
+        ok(stat, L, bnBasalt != null && !bnBasalt.bonus() && bnCarbon != null && !bnCarbon.bonus()
+                        && bnRedStone != null && !bnRedStone.bonus(),
+                "★「减成」= 属性全为负、又没有液体可抽的石头（玄武岩 water=-0.25 / 碳石 water=-1.0 / 红石）");
         MapStats.Def bnSalt = v.row("salt");
         MapStats.Def bnHot = v.row("hotrock");
         ok(stat, L, bnSalt != null && bnSalt.bonus() && bnHot != null && bnHot.bonus(),
                 "★反方向：盐碱地（water=-0.3 但 oil=0.3）/ 热岩（heat=0.5 但 water=-0.5）**仍算**加成 —— "
-                        + "判据是「有没有正值」，不是「有没有负值」");
-        // 元断言：原版里"算加成"的地板必须**一个都不剩**是纯惩罚的（否则这条尺子只测了上面 4 个特例）
-        int badBonus = 0, goodBonus = 0;
-        for (String n : new String[]{"arkycite-floor", "pooled-cryofluid", "darksand-water",
-                "red-stone", "yellow-stone", "regolith", "rhyolite", "char"}) {
+                        + "判据是「有没有收益」，不是「有没有负值」");
+        // 元断言：11 种**能抽液体**的地板一个都不许漏；12 种**干石头**一个都不许进（只测 4 个特例挡不住误伤）
+        int liqBonus = 0, dryBonus = 0;
+        String[] liqFloors = {"arkycite-floor", "darksand-tainted-water", "darksand-water",
+                "deep-tainted-water", "deep-water", "molten-slag", "pooled-cryofluid", "sand-water",
+                "shallow-water", "tainted-water", "tar"};
+        for (String n : liqFloors) {
             MapStats.Def d = v.row(n);
-            if (d != null && d.bonus()) badBonus++;
+            if (d != null && d.bonus()) liqBonus++;
         }
-        for (String n : new String[]{"sand-floor", "shale", "darksand", "spore-moss", "molten-slag",
-                "magmarock", "red-stone-vent", "mud"}) {
+        String[] dryFloors = {"basalt", "carbon-stone", "char", "dense-red-stone", "ferric-craters",
+                "ferric-stone", "red-stone", "regolith", "rhyolite", "rhyolite-crater",
+                "rough-rhyolite", "yellow-stone"};
+        for (String n : dryFloors) {
             MapStats.Def d = v.row(n);
-            if (d != null && d.bonus()) goodBonus++;
+            if (d != null && d.bonus()) dryBonus++;
         }
-        ok(stat, L, badBonus == 0 && goodBonus == 8,
-                "★元断言：8 种纯惩罚/全负地板一个都没进加成（" + badBonus + "/8 命中，应为 0）；"
-                        + "8 种正面地板全进（" + goodBonus + "/8，应为 8）");
+        ok(stat, L, liqBonus == 11 && dryBonus == 0,
+                "★元断言：11 种能抽液体的地板**全进**加成（" + liqBonus + "/11）；"
+                        + "12 种干石头**全不进**（" + dryBonus + "/12 命中，应为 0）");
+        // 原版总账：45 张"有点特别"的地板 ⇒ 33 张算加成、12 张不算（改了口径就得能报出这两个数）
+        int bonusAll = 0, oddAll = 0;
+        for (MapStats.Def d : v.byName.values()) {
+            if (d == null || !d.isFloor) continue;
+            boolean odd = !(d.liquidDrop == null || d.liquidDrop.isEmpty())
+                    || !d.attributes.isEmpty() || d.speed != 1f || d.damage != 0f;
+            if (!odd) continue;
+            oddAll++;
+            if (d.bonus()) bonusAll++;
+        }
+        ok(stat, L, oddAll == 45 && bonusAll == 33,
+                "★原版总账：45 张「有点特别」的地板 ⇒ **33 张算加成**、12 张不算"
+                        + "（实际 " + oddAll + " / " + bonusAll + "）");
         // 元断言：表里**存在**拆不掉的（否则上面那条"能拆"的断言可能只是因为全都 removable）
         int perm = 0;
         for (String n : new String[]{"cliff", "sand-wall", "shale-wall", "dune-wall", "pine"}) {
@@ -10162,6 +10182,18 @@ public final class SelfTest {
         ok(stat, L, fSalt != null && fSalt.total == 1,
                 "★加成地板**不受影响**：salt（含水含油）上面压着铜矿照样算 —— 属性是泵读地板，与钻头采什么无关"
                         + (fSalt == null ? "" : "（实际 共 " + fSalt.total + " 格）"));
+
+        // ★ 2026-10-17 用户：「**括号标注一下液体可采**」—— 加成地板里液体那几行要把"能抽什么"写进括号
+        //   （`MapStats.Row#liquid` ← 游戏 bundle 的 `liquid.<id>.name`，界面拼成「（可抽 水）」）。
+        MapStats.Result bgL = MapStats.analyze(buildGrid(), v, nm);
+        MapStats.Row rowShallow = rowOf(bgL.bonuses, "shallow-water");
+        MapStats.Row rowDeepW = rowOf(bgL.bonuses, "deep-water");
+        ok(stat, L, rowShallow != null && "水".equals(rowShallow.liquid)
+                        && rowDeepW != null && "水".equals(rowDeepW.liquid),
+                "★加成地板带「可抽 X」：浅水 / 深水（liquidDrop = water）⇒ 液体名「水」（界面写「可抽 水」）"
+                        + (rowShallow == null ? "" : "（实际 " + rowShallow.liquid + "）"));
+        ok(stat, L, fSalt != null && fSalt.liquid.isEmpty(),
+                "★反向：没有 liquidDrop 的加成地板（盐碱地）⇒ 液体名空，界面不会凭空写「可抽」");
 
         // ⑥d **可建造（一般建筑）**（2026-10-17 用户：「再加一个可建造建筑的格数（这里建筑按照一般建筑
         //    计算，即不能放在墙体 / 部分液体上，地图原有的建筑可拆掉）」）。
@@ -10711,6 +10743,15 @@ public final class SelfTest {
                 if ("water".equals(key)) return "水";
                 if ("oil".equals(key)) return "油";
                 return key;
+            }
+
+            @Override public String liquid(String i) {
+                if ("water".equals(i)) return "水";
+                if ("oil".equals(i)) return "石油";
+                if ("cryofluid".equals(i)) return "冷冻液";
+                if ("slag".equals(i)) return "矿渣";
+                if ("arkycite".equals(i)) return "芳油";
+                return "";                         // 认不出 ⇒ 调用方退回内部名（验那条兜底）
             }
         };
     }

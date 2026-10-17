@@ -203,21 +203,26 @@ public final class MapStats {
         }
 
         /**
-         * 是不是"**加成**地板"（有正面作用）。
+         * 是不是"**加成**地板"（给玩家东西的地板）。
          *
-         * <p>判据 = 至少一项**正面**效果：① 某个属性值 **&gt; 0**（水 / 油 / 热 / 孢子 / 蒸汽 / 光 / 沙）
-         * ② 移速 **&gt; 1**（加速地板，原版没有，模组可能有）③ 伤害 **&lt; 0**（回血地板）。</p>
+         * <p>判据 = 至少一项**收益**：① **`liquidDrop` 非空**（上面能上泵抽液体 —— 泵读的是**地板**）② 某个属性值
+         * **&gt; 0**（水 / 油 / 热 / 孢子 / 蒸汽 / 光 / 沙）③ 移速 **&gt; 1**（加速地板，原版没有，模组可能有）
+         * ④ 伤害 **&lt; 0**（回血地板）。</p>
          *
-         * <p>🔴 2026-10-17 用户：「**我们只统计加成地板，不要统计减成地板**」。
-         * 旧判据是「有属性 / 移速≠1 / 伤害≠0」，把**纯惩罚**的地板也算了进来 ——
-         * 深水 / 水（`shallow-water`）/ 浅滩 / 石油 / 冷冻液 / 芳油（只是让单位变慢）、
-         * 以及玄武岩一类**属性全为负**（`water=-0.25`）的石头。它们现在都不再算加成地板。</p>
+         * <p>🔴 2026-10-17 用户两句话定下这一条：先「**我们只统计加成地板，不要统计减成地板**」，
+         * 我按"有属性 / 移速≠1 / 伤害≠0"砍掉一批，用户立刻纠正「**这不对吧，液体可以用泵抽啊**」——
+         * 深水 / 水（`shallow-water`）/ 浅滩 / 石油 / 冷冻液 / 芳油虽然**让单位变慢**，但它们是
+         * **能抽的液体地板**（`liquidDrop` = 水 / 油 / 冷冻液 / 矿渣 / 芳油），收益是真的 ⇒ **必须算加成**。</p>
          *
-         * <p>⚠️ **两样都有的仍算加成**：盐碱地 `water=-0.3;oil=0.3;`（有正的油）、
-         * 热岩 `heat=0.5;water=-0.5;`（有正的热）—— 判据是"**有没有正值**"，不是"负值数量"。</p>
+         * <p>现在真正被排除的只有**属性全为负、又没有液体可抽**的石头：玄武岩 `water=-0.25`、
+         * 红石 / 黄石 / 碳石 / 铁石 / 铁陨石坑 / 高密红石 / 风化岩 / 流纹岩 / 粗糙流纹岩 / 流纹岩坑 / 焦土
+         * （`water=-1.0` 这类）—— 它们既不产东西、又挂着负属性，才是"减成"。</p>
+         *
+         * <p>⚠️ **两样都有的仍算加成**：盐碱地 `water=-0.3;oil=0.3;`、热岩 `heat=0.5;water=-0.5;`、
+         * 熔渣 `heat=0.85` —— 判据是"**有没有收益**"，不是"负值数量"。</p>
          */
         public boolean bonus() {
-            return speed > 1f || damage < 0f || hasPositiveAttr();
+            return !liquidDrop.isEmpty() || speed > 1f || damage < 0f || hasPositiveAttr();
         }
 
         /** 属性串（`water=-0.3;oil=0.3;`）里有没有**正值** */
@@ -490,6 +495,15 @@ public final class MapStats {
 
         /** 属性词（`water` → 「含水」）；认不出就返回原键 */
         String attr(String key);
+
+        /**
+         * **液体**的显示名（`water` → 「水」/“Water”）—— 加成地板那行「可抽 X」用它。
+         *
+         * <p>⚠️ 与 {@link #attr} 分开：属性是"这块地板的属性"，液体是"上泵能抽到什么"，
+         * 两回事（热岩 `heat=0.5` 有属性但没有液体可抽；深水没有属性但能抽水）。
+         * 取不到就返回空串，调用方退回内部名。</p>
+         */
+        String liquid(String internal);
     }
 
     /** 没有译名时的兜底：内部名 → 可读（`dark-metal` → `Dark Metal`） */
@@ -1335,6 +1349,14 @@ public final class MapStats {
         public String drop = "";
         /** 属性词（加成地板才有，如「含水 含油」） */
         public String attrs = "";
+        /**
+         * **能抽的液体名**（加成地板才有，如「水」/「石油」；空 = 这地板抽不出液体）。
+         *
+         * <p>2026-10-17 用户：「**括号标注一下液体可采**」—— 加成地板里那几块液体地板
+         * （深水 / 石油 / 冷冻液 / 矿渣液 / 芳油…）对玩家来说的收益就是"上泵能抽"，
+         * 界面那行要把它写进括号里。</p>
+         */
+        public String liquid = "";
         /** 这一行合并了哪些内部名（技术细节层） */
         public final List<String> internals = new ArrayList<>();
         public String source = SRC_VANILLA;
@@ -1928,7 +1950,7 @@ public final class MapStats {
             if (total <= 0) continue;
             String internal = names.get(id);
             Def d = defs[id];
-            String label, drop = "", attrs = "";
+            String label, drop = "", attrs = "", liquid = "";
             if (floor) {
                 label = blockLabel(nm, internal, d, internal);
                 if (d != null && !d.itemDrop.isEmpty()) {
@@ -1939,6 +1961,11 @@ public final class MapStats {
             } else if (bonus) {
                 label = blockLabel(nm, internal, d, internal);
                 attrs = attrWords(d, nm);
+                // ★ 「可抽 X」（2026-10-17 用户：「括号标注一下液体可采」）—— 取不到译名退回内部名
+                if (d != null && !d.liquidDrop.isEmpty()) {
+                    String liq = nm == null ? "" : nm.liquid(d.liquidDrop);
+                    liquid = liq == null || liq.isEmpty() ? d.liquidDrop : liq;
+                }
             } else {
                 // 矿：照 OreBlock 的口径 = 掉落物名（`OreBlock` 构造器里 `localizedName = item.localizedName`，
                 // 字节码已核）；认不出来就退回方块名
@@ -1967,6 +1994,7 @@ public final class MapStats {
                 row.label = label;
                 row.drop = drop;
                 row.attrs = attrs;
+                row.liquid = liquid;
                 row.source = d == null ? "认不出" : d.source;
                 byLabel.put(label, row);
             }

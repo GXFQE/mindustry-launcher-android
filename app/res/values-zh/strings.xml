@@ -1829,6 +1829,9 @@
     <string name="stats_more_fmt">还有 %1$d 种没列出来</string>
     <!-- 加成地板的名字要带属性词（含水/含油/高温…）：那才是它有用的地方 -->
     <string name="stats_row_attr_fmt">%1$s（%2$s）</string>
+    <!-- ★ 2026-10-17 用户：「括号标注一下液体可采」——加成地板里那几块**液体地板**（深水/石油/冷冻液/矿渣液/芳油）
+         对玩家的收益就是"上泵能抽"，所以括号里先写这一句，再接属性词（`可抽 矿渣 · 高温`）。 -->
+    <string name="stats_bonus_liquid_fmt">可抽 %1$s</string>
     <!-- 属性词：游戏自己的语言包**没有** attribute.* 的译名（中英都没有），只能用我们自己的 -->
     <string name="stats_attr_water">含水</string>
     <string name="stats_attr_oil">含油</string>
