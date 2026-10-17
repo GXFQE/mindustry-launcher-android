@@ -368,7 +368,7 @@
     <!-- 地图增删（F10）-->
     <string name="maps_import">导入地图…</string>
     <!-- ★ 第 155 轮：一行两路（从文件 / 从本槽存档）—— 副标题把两条路都说出来 -->
-    <string name="maps_import_sub">从文件或本槽的存档；.msav</string>
+    <string name="maps_import_sub">从文件或本槽存档；可多选，也能选整包 zip</string>
     <string name="maps_import_pick">导入地图</string>
     <string name="maps_import_from_file">从文件…</string>
     <!-- ★★ 2026-10-05「本槽存档 → 地图」（REF §72.10）：不过系统文件选择器，直接从本槽的存档里挑 -->
@@ -444,7 +444,7 @@
         用户平时根本看不到，"导出一张官方图"正是这条功能最大的用处。
     -->
     <string name="maps_export">导出地图…</string>
-    <string name="maps_export_sub">存到手机里（哪个来源都行）；多选时打成一个 zip</string>
+    <string name="maps_export_sub">存到手机；多选时打成一个 zip</string>
     <string name="maps_export_none">还没有可导出的地图</string>
     <string name="maps_export_head_fmt">共 %1$d 张 · 点一张导出</string>
     <string name="maps_export_working">正在写入…</string>
@@ -474,8 +474,8 @@
       ★ 2026-10-06（第 115 轮第六批）：存档**页面**（二级页）顶上那三行的副标题 ——
         与模组页 / 地图页 / 蓝图页同一形状（用户：「存档页面也变成…二级页面吧」）。
     -->
-    <string name="save_page_import_sub">从本机选 .msav（可多选，也可选一个 zip 整包）</string>
-    <string name="save_page_export_sub">把这个槽的存档导到本机</string>
+    <string name="save_page_import_sub">从本机选 .msav；可多选，也能选整包 zip</string>
+    <string name="save_page_export_sub">存到手机；多选时打成一个 zip</string>
     <string name="save_page_bad_sub">一份一份列出原因</string>
     <string name="msav_bad_list_title_fmt">读不出来的存档（%1$d 份）</string>
     <string name="msav_all_ok">这个槽的存档现在都读得出来</string>
@@ -904,9 +904,9 @@
       ★ 尺子与地图那条线一致：导入 = **先 .part + 我们的解析器验 + 再就位**；删除 = **挪进中转站**。
     -->
     <string name="bp_import">导入蓝图…</string>
-    <string name="bp_import_sub">可选一个或多个 .msch；选一个 zip 整包也行</string>
+    <string name="bp_import_sub">从本机选 .msch；可多选，也能选整包 zip</string>
     <string name="bp_export">导出蓝图…</string>
-    <string name="bp_export_sub">导出成文件（存到 Download 等）；多选时打成一个 zip</string>
+    <string name="bp_export_sub">存到手机；多选时打成一个 zip</string>
     <string name="bp_export_none">这个槽还没有蓝图</string>
     <string name="bp_export_head_fmt">共 %1$d 份，点一份导出</string>
     <string name="bp_export_working">正在写文件…</string>
@@ -1587,11 +1587,11 @@
     <!-- 列表的搜索/筛选/排序（用户点单第②项） -->
     <string name="mods_search_hint">搜索模组名或文件名</string>
     <string name="mods_act_filter_title">筛选与排序</string>
-    <string name="mods_act_filter_sub">搜名字 · 只看有问题的 · 按类型</string>
+    <string name="mods_act_filter_sub">按名称搜索 · 只看有问题的 · 按类型</string>
     <string name="mods_filter_title">筛选与排序</string>
     <!-- 批量启停（第③项）：一次读写改完整槽的开关 -->
     <string name="mods_act_batch_title">批量启停</string>
-    <string name="mods_act_batch_sub">把这一槽的模组一次全开或全关（会先备份）</string>
+    <string name="mods_act_batch_sub">一次全开或全关（先备份）</string>
     <string name="mods_batch_title">批量启停</string>
     <string name="mods_batch_on">全部启用</string>
     <string name="mods_batch_off">全部关闭</string>
@@ -1619,7 +1619,7 @@
     <string name="mods_filter_reset">清空筛选</string>
     <string name="mods_filtered_fmt">显示 %1$d / %2$d 个模组（已筛选）</string>
     <string name="mods_empty_filtered">没有符合条件的模组</string>
-    <string name="mods_act_conflict_sub">看看有没有互相打架的</string>
+    <string name="mods_act_conflict_sub">看哪些模组会互相覆盖</string>
     <string name="mods_conflict_title">模组冲突检查</string>
     <string name="mods_conflict_progress">正在检查各模组的代码…</string>
     <string name="mods_dup_fmt">%1$s · 重名</string>
@@ -1766,9 +1766,9 @@
 
     <!-- ══ F13 第三阶段：模组包导入 / 跨槽复制 ══════════════════════════════ -->
     <string name="mods_act_import_title">导入模组…</string>
-    <string name="mods_act_import_sub">从本机选 .zip / .jar（可多选，也可选一个 zip 整包）</string>
+    <string name="mods_act_import_sub">从本机选 .jar / .zip；可多选，也能选整包 zip</string>
     <string name="mods_act_copy_title">复制本槽模组到…</string>
-    <string name="mods_act_copy_sub_fmt">把「%1$s」里的模组整套复制到另一个槽</string>
+    <string name="mods_act_copy_sub_fmt">把「%1$s」的模组整套复制到另一个槽</string>
     <string name="chooser_pick_mod">选择模组包</string>
     <string name="mods_import_progress_title">导入模组包</string>
     <string name="mods_import_progress_fmt">正在把「%1$s」放进槽「%2$s」…</string>
@@ -1961,7 +1961,7 @@
     <string name="batch_import_map_issave">这其实是一份存档，不是地图</string>
     <string name="batch_import_save_nonstandard">不是标准存档，游戏可能读不出来</string>
     <string name="mods_export">导出模组…</string>
-    <string name="mods_export_sub">可多选；多份会打包成一个 zip</string>
+    <string name="mods_export_sub">存到手机；多选时打成一个 zip</string>
     <string name="mods_export_none_fmt">槽「%1$s」里没有可导出的模组</string>
     <string name="mods_export_dir_hint">目录形态，导出成 zip</string>
 
@@ -1997,7 +1997,7 @@
     <string name="batch_import_pct_fmt">正在导入 %1$d / %2$d 份</string>
     <string name="batch_export_pct_fmt">正在打包 %1$d / %2$d 份</string>
     <string name="batch_del_row">删除…</string>
-    <string name="batch_del_sub">可多选；旧件挪进中转站，不直接删掉</string>
+    <string name="batch_del_sub">可多选；挪进中转站，不直接删掉</string>
     <string name="batch_del_head_fmt">共 %1$d 份 · 勾选要删除的</string>
     <string name="batch_del_skipped_fmt">有 %1$d 份住在模组包或子目录里，删不了</string>
 
@@ -2028,7 +2028,7 @@
 
 
     <string name="stats_export_batch">导出统计…</string>
-    <string name="stats_export_batch_sub">勾一张或多张：一张出 .json，多张出 .jsonl（详细 / 简洁）</string>
+    <string name="stats_export_batch_sub">一张出 .json，多张出 .jsonl</string>
     <!--
       ★ 第 155 轮：出口四选一 = 模式 × 去处（保存到文件 / 直接分享）。
         「直接分享」不落用户目录：内容进缓存，由 ShareProvider 以 content:// 交给分享面板。

@@ -385,7 +385,7 @@
     <!-- 地图增删（F10）-->
     <string name="maps_import">Import map…</string>
     <!-- ★ 第 155 轮：一行两路（从文件 / 从本槽存档）—— 副标题把两条路都说出来 -->
-    <string name="maps_import_sub">From a file or a save in this slot (.msav)</string>
+    <string name="maps_import_sub">Pick a file or a save here; multi-select, or one zip</string>
     <string name="maps_import_pick">Import a map</string>
     <string name="maps_import_from_file">From a file…</string>
     <!--
@@ -464,7 +464,7 @@
         用户平时根本看不到，"导出一张官方图"正是这条功能最大的用处。
     -->
     <string name="maps_export">Export map…</string>
-    <string name="maps_export_sub">Save to the phone (any source works); many at once become one zip</string>
+    <string name="maps_export_sub">Save to the phone; several become one zip</string>
     <string name="maps_export_none">No maps to export yet</string>
     <string name="maps_export_head_fmt">%1$d maps · tap one to export</string>
     <string name="maps_export_working">Writing…</string>
@@ -494,8 +494,8 @@
       ★ 2026-10-06 (round 115, batch 6): subtitles of the three rows on the **saves page**
         (second-level page), same shape as the mods / maps / blueprints pages.
     -->
-    <string name="save_page_import_sub">Pick .msav files from this device; many at once, or one zip</string>
-    <string name="save_page_export_sub">Export the saves of this slot to this device</string>
+    <string name="save_page_import_sub">Pick .msav files here; multi-select, or one zip</string>
+    <string name="save_page_export_sub">Save to the phone; several become one zip</string>
     <string name="save_page_bad_sub">Lists the reason for each one</string>
     <string name="msav_bad_list_title_fmt">Unreadable saves (%1$d)</string>
     <string name="msav_all_ok">All saves in this slot are readable right now</string>
@@ -749,9 +749,9 @@
         delete = **move into the trash**, never delete outright.
     -->
     <string name="bp_import">Import blueprint…</string>
-    <string name="bp_import_sub">Pick one or more .msch files; a zip bundle works too</string>
+    <string name="bp_import_sub">Pick .msch files here; multi-select, or one zip</string>
     <string name="bp_export">Export blueprint…</string>
-    <string name="bp_export_sub">Write out to a file; many at once become one zip</string>
+    <string name="bp_export_sub">Save to the phone; several become one zip</string>
     <string name="bp_export_none">This slot has no blueprints yet</string>
     <string name="bp_export_head_fmt">%1$d in total, tap one to export it</string>
     <string name="bp_export_working">Writing the file…</string>
@@ -1656,7 +1656,7 @@
     <string name="mods_filter_title">Filter and sort</string>
     <!-- 批量启停（第③项）：一次读写改完整槽的开关 -->
     <string name="mods_act_batch_title">Batch toggle</string>
-    <string name="mods_act_batch_sub">Turn every mod in this slot on or off at once (backs up first)</string>
+    <string name="mods_act_batch_sub">Switch all on or off at once (backs up first)</string>
     <string name="mods_batch_title">Batch toggle</string>
     <string name="mods_batch_on">Enable all</string>
     <string name="mods_batch_off">Disable all</string>
@@ -1685,7 +1685,7 @@
     <string name="mods_filter_reset">Clear filters</string>
     <string name="mods_filtered_fmt">Showing %1$d / %2$d mods (filtered)</string>
     <string name="mods_empty_filtered">No mods match the filter</string>
-    <string name="mods_act_conflict_sub">See whether any of them clash</string>
+    <string name="mods_act_conflict_sub">Which mods overlap each other</string>
     <string name="mods_conflict_title">Mod conflict check</string>
     <string name="mods_conflict_progress">Checking the code of each mod…</string>
     <string name="mods_dup_fmt">%1$s · duplicate name</string>
@@ -1812,9 +1812,9 @@
 
     <!-- ══ F13 第三阶段：模组包导入 / 跨槽复制 ══════════════════════════════ -->
     <string name="mods_act_import_title">Import a mod…</string>
-    <string name="mods_act_import_sub">Pick .zip / .jar on this device; many at once, or one zip bundle</string>
+    <string name="mods_act_import_sub">Pick .jar / .zip here; multi-select, or one zip</string>
     <string name="mods_act_copy_title">Copy this slot mods to…</string>
-    <string name="mods_act_copy_sub_fmt">Copies the whole mod set of \"%1$s\" into another slot</string>
+    <string name="mods_act_copy_sub_fmt">Copy the mods of \"%1$s\" to another slot</string>
     <string name="chooser_pick_mod">Pick a mod package</string>
     <string name="mods_import_progress_title">Import mod package</string>
     <string name="mods_import_progress_fmt">Putting \"%1$s\" into slot \"%2$s\"…</string>
@@ -2002,7 +2002,7 @@
     <string name="batch_import_map_issave">this is a save, not a map</string>
     <string name="batch_import_save_nonstandard">not a standard save, the game may not read it</string>
     <string name="mods_export">Export mods…</string>
-    <string name="mods_export_sub">Pick one or more; more than one is packed into a zip</string>
+    <string name="mods_export_sub">Save to the phone; several become one zip</string>
     <string name="mods_export_none_fmt">No mods to export in slot %1$s</string>
     <string name="mods_export_dir_hint">folder form, exported as a zip</string>
 
@@ -2042,7 +2042,7 @@
     <string name="batch_import_pct_fmt">Importing %1$d / %2$d</string>
     <string name="batch_export_pct_fmt">Packing %1$d / %2$d</string>
     <string name="batch_del_row">Delete…</string>
-    <string name="batch_del_sub">Pick one or more; they move to the transfer station, not gone for good</string>
+    <string name="batch_del_sub">Multi-select; they move to the transfer station, not deleted</string>
     <string name="batch_del_head_fmt">%1$d in total · tick what to delete</string>
     <string name="batch_del_skipped_fmt">%1$d of them live inside a mod package or a subfolder, so they cannot be deleted</string>
 
@@ -2073,7 +2073,7 @@
 
 
     <string name="stats_export_batch">Export statistics…</string>
-    <string name="stats_export_batch_sub">Pick one or more: one map makes a .json, several make a .jsonl (detailed or brief)</string>
+    <string name="stats_export_batch_sub">One map makes a .json, several make a .jsonl</string>
     <!--
       ★ 第 155 轮：出口四选一 = **模式 × 去处**（保存到文件 / 直接分享）。
         「直接分享」不落用户目录：内容进 cache/share，由 ShareProvider 以 content:// 交给分享面板。
