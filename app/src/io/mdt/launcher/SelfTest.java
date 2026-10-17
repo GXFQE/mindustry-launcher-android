@@ -10815,6 +10815,17 @@ public final class SelfTest {
         }
         ok(stat, L, copyOk && "副本.msav".equals(copyName),
                 "★stageCopy：分享缓存里那份与源文件 md5 相同、名字是原名（地图/存档/蓝图都走这条）");
+        //    ⑤b-2 分享行：**四个视图都在**且默认 GONE（`findViewById` 对缺 id 是静默 null ⇒ 必须断言）
+        android.view.View shareRowV = android.view.LayoutInflater.from(ctx)
+                .inflate(R.layout.dialog_msav_list, null);
+        ok(stat, L, shareRowV.findViewById(R.id.pick_share_row) != null
+                        && shareRowV.findViewById(R.id.pick_share) != null
+                        && shareRowV.findViewById(R.id.pick_share_box) != null
+                        && shareRowV.findViewById(R.id.pick_share_divider) != null
+                        && shareRowV.findViewById(R.id.pick_share_row).getVisibility()
+                                == android.view.View.GONE,
+                "★分享行：行 / 文字 / 方框 / 分割线四个 id 都在、默认 GONE"
+                        + "（缺一个 = 静默 null，真机上只是少一行）");
         //    ⑤ 清单里**真的**声明了 provider（aapt2 不检查引用，漏了只在真机炸 Unknown URL）
         try {
             android.content.pm.ProviderInfo pi = ctx.getPackageManager()

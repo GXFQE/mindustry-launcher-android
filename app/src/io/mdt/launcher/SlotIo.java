@@ -647,14 +647,17 @@ final class SlotIo {
                                 Trans.get(a, R.string.chooser_export)), REQ_EXPORT);
                     }
                 })
-                .setNeutralButton(R.string.share_pack_btn, new DialogInterface.OnClickListener() {
+                // ★ 2026-10-17 用户：「分享包取消放中间也很奇怪」—— 本机三按钮的排列是
+                //   **neutral | negative | positive** ⇒ 要让「取消」在最左，它就得是 neutral，
+                //   「直接分享」退回 negative。三个动作的**语义**没变（取消 = 什么都不做）。
+                .setNeutralButton(R.string.cancel, null)
+                .setNegativeButton(R.string.share_pack_btn, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int w) {
                         // ★ 第 156 轮：「直接分享」—— 与上面那条打的是**同一个包**（同一个 plan、
                         //   同一个 zipToOut、同一个压缩级别），只是落点是缓存而不是 SAF。
                         doSharePackCached(a, s.name, roots, plan);
                     }
                 })
-                .setNegativeButton(R.string.cancel, null)
                 .show();
     }
 

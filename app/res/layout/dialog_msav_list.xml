@@ -38,17 +38,51 @@
       ⚠️ 必须放在**列表上面**：列表是 `wrap_content`（`maxHeight` 对 ListView 不生效），
         116 份地图会把自定义内容顶出对话框可视区 —— 放在列表下面时真机上**根本看不到这一行**
         （2026-10-17 截图实测）。放上面还能保证滚动列表时它一直在。
+
+      ★★ 2026-10-17 用户真机反馈两处，都在这一块：
+        ① **对勾要跟列表里的对勾同列**（原来做成一个左对齐的裸 CheckBox ⇒ 方框在最左、
+           文字缩进 100px，看着像"错位的一行"）⇒ 改成**一行**：文字在左、方框在右，
+           与列表每行的方框对齐；
+        ② **它得看起来像个可点的控件**（原来是一行没有边界的字，很不起眼）⇒ 整行可点
+           （点字也算勾）+ 下沿一条分割线，把它和列表分开。
     -->
-    <CheckBox
-        android:id="@+id/pick_share"
+    <LinearLayout
+        android:id="@+id/pick_share_row"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
         android:paddingStart="20dp"
-        android:paddingEnd="20dp"
-        android:paddingTop="2dp"
+        android:paddingEnd="24dp"
+        android:paddingTop="6dp"
         android:paddingBottom="6dp"
-        android:textColor="@color/fg"
-        android:textSize="14sp"
+        android:background="?android:attr/selectableItemBackground"
+        android:clickable="true"
+        android:focusable="true"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/pick_share"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:textColor="@color/fg"
+            android:textSize="14sp" />
+
+        <CheckBox
+            android:id="@+id/pick_share_box"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:clickable="false"
+            android:focusable="false" />
+    </LinearLayout>
+
+    <View
+        android:id="@+id/pick_share_divider"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/divider"
         android:visibility="gone" />
 
     <ListView

@@ -443,12 +443,16 @@ final class BatchIo {
                 new MsavListAdapter(a, titles, subs, thumbs, new boolean[titles.length]);
         lv.setAdapter(ad);
         final boolean[] alive = {true};
+        final View shareRow = box.findViewById(R.id.pick_share_row);
+        final View shareDivider = box.findViewById(R.id.pick_share_divider);
+        final TextView shareLabel = (TextView) box.findViewById(R.id.pick_share);
         final android.widget.CheckBox shareBox =
-                (android.widget.CheckBox) box.findViewById(R.id.pick_share);
+                (android.widget.CheckBox) box.findViewById(R.id.pick_share_box);
         final boolean canShare = shareLabelRes != 0;
         if (canShare) {
-            shareBox.setVisibility(View.VISIBLE);
-            shareBox.setText(Trans.get(a, shareLabelRes));
+            shareRow.setVisibility(View.VISIBLE);
+            shareDivider.setVisibility(View.VISIBLE);
+            shareLabel.setText(Trans.get(a, shareLabelRes));
         }
 
         final AlertDialog dlg = new AlertDialog.Builder(a)
@@ -470,13 +474,14 @@ final class BatchIo {
             @Override public void onShow(DialogInterface d) {
                 syncPickButtons(dlg, a, ad, okFmtRes, shareBox);
                 if (canShare) {
-                    shareBox.setOnCheckedChangeListener(
-                            new android.widget.CompoundButton.OnCheckedChangeListener() {
-                                @Override public void onCheckedChanged(
-                                        android.widget.CompoundButton b, boolean checked) {
-                                    syncPickButtons(dlg, a, ad, okFmtRes, shareBox);
-                                }
-                            });
+                    // ★ 整行可点（方框本身 `clickable=false`，触摸归这一行）——
+                    //   用户点字也算勾；勾了正按钮跟着换词。
+                    shareRow.setOnClickListener(new View.OnClickListener() {
+                        @Override public void onClick(View v) {
+                            shareBox.setChecked(!shareBox.isChecked());
+                            syncPickButtons(dlg, a, ad, okFmtRes, shareBox);
+                        }
+                    });
                 }
                 if (filler != null) {
                     // ★ 异步补内容的那条路（存档列表）：关了窗就让后台线程自己停
@@ -517,8 +522,7 @@ final class BatchIo {
     private static void syncPickButtons(AlertDialog dlg, Context c, MsavListAdapter ad,
                                         int okFmtRes, android.widget.CheckBox shareBox) {
         if (dlg == null || ad == null) return;
-        boolean share = shareBox != null && shareBox.getVisibility() == View.VISIBLE
-                && shareBox.isChecked();
+        boolean share = shareBox != null && shareBox.isChecked() && shareBox.isShown();
         android.widget.Button pos = dlg.getButton(DialogInterface.BUTTON_POSITIVE);
         if (pos != null) {
             pos.setText(share
