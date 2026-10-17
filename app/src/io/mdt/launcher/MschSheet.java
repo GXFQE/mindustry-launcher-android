@@ -19,7 +19,7 @@ import java.util.zip.ZipFile;
  * 读图集目录 + 按矩形裁贴图。渲染逻辑在纯 Java 的 {@link MschSprite} 里。
  *
  * <pre>
- *   APK                                    hub/previews/atlas/&lt;apk 指纹&gt;/
+ *   APK                                    hub/previews/v&lt;画法版本&gt;/atlas/&lt;apk 指纹&gt;/
  *     assets/sprites/sprites.aatls  ──解目录──▶ 区域名 → 页 + 矩形
  *     assets/sprites/sprites.png    ──按需抽出──▶ sprites.png
  *                                                    │ BitmapRegionDecoder.decodeRegion(矩形)

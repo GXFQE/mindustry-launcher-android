@@ -9317,6 +9317,26 @@ public final class SelfTest {
             ok(stat, L, !MapLoad.md5("a|1").equals(MapLoad.md5("a|2"))
                             && MapLoad.md5("x").length() == 16,
                     "★缓存键：不同来源给出不同短哈希（撞了会显示错图），长度固定 16");
+            // ⑤ 换画法版本时的**旧缓存清理**（用户 2026-10-17：「加吧」—— 那些旧 PNG 只会占空间）
+            //    尺子：造一个"根上遗留 PNG + v1 旧目录 + v2 当前目录"，清完必须只剩 v2 里的那两张
+            File proot = new File(Paths.privateDir(ctx), "selftest-purge");
+            deleteTree(proot);
+            write(new File(proot, "legacy.png"), new byte[]{1, 2, 3});
+            write(new File(proot, "v1/old.png"), new byte[]{1});
+            File v2 = new File(proot, "v2");
+            write(new File(v2, "keep1.png"), new byte[]{1});
+            write(new File(v2, "keep2.png"), new byte[]{1});
+            int purged = MapLoad.purgeOld(proot, 2);
+            boolean keepOk = new File(v2, "keep1.png").isFile() && new File(v2, "keep2.png").isFile();
+            boolean goneOk = !new File(proot, "legacy.png").exists() && !new File(proot, "v1").exists();
+            int again = MapLoad.purgeOld(proot, 2);              // 第二次：标记已写，什么都不该再删
+            deleteTree(proot);
+            ok(stat, L, purged == 3 && keepOk && goneOk && again == 0,
+                    "★旧缓存清理：`previews/` 根上的遗留 PNG 与别的 `v<N>/` 一起删干净（本次 " + purged
+                            + " 项），**当前版本那个目录原样留着**，第二次调用不再动手（" + again + " 项）");
+            String cd = MapLoad.cacheDir(ctx) == null ? "" : MapLoad.cacheDir(ctx).getAbsolutePath();
+            ok(stat, L, cd.endsWith("previews" + File.separator + "v" + MapLoad.PREVIEW_VERSION),
+                    "★缓存目录带上画法版本（`previews/v" + MapLoad.PREVIEW_VERSION + "`）—— 换画法就换目录，旧的整棵删掉");
         } catch (Throwable t) {
             ok(stat, L, false, "预览用例自身异常：" + t);
         } finally {

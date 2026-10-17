@@ -35,11 +35,64 @@ public final class MapLoad {
 
     private MapLoad() {}
 
-    /** 缓存目录：`hub/previews/`（放 HUB 自己的目录里，和槽数据分开） */
+    /**
+     * 缓存目录：`hub/previews/v<版本>/`（放 HUB 自己的目录里，和槽数据分开）。
+     *
+     * <p>★ **一层版本子目录**：`v2/` 这种名字让"这份图是哪种画法画的"从文件名就能看出来，
+     * 旧版本的目录直接整棵删掉就行（不用猜哪个 PNG 是旧算法产的）。
+     * 换版本那次会顺手清一次（见 {@link #purgeOld}），此后每次启动只多一次 `stat`。</p>
+     */
     public static File cacheDir(Context ctx) {
-        File d = new File(Data.hubDir(ctx), "previews");
+        File root = new File(Data.hubDir(ctx), "previews");
+        File d = new File(root, "v" + PREVIEW_VERSION);
         if (!d.isDirectory() && !d.mkdirs() && !d.isDirectory()) return null;
+        if (!marker(root).isFile()) purgeOld(root, PREVIEW_VERSION);
         return d;
+    }
+
+    /** "这个版本已经清过了"的标记文件（换版本自然换名字 ⇒ 新版本会再清一次） */
+    private static File marker(File root) {
+        return new File(root, ".v" + PREVIEW_VERSION);
+    }
+
+    /**
+     * 清掉**别的画法版本**留下的预览图，返回删掉的文件/目录数（自检直接钉它）。
+     *
+     * <p>清两样：① `previews/` 根上的 `*.png`（v1 及更早**直接放在根上**，没有子目录）；
+     * ② 其它 `v<N>/` 目录。**当前版本那个目录原样留着**，点文件（`.v*` 标记）也不碰。
+     * 这些都是**可再生**的东西（重算一遍就是同样的图），所以直接删、不走中转站。</p>
+     */
+    static int purgeOld(File root, int version) {
+        if (root == null) return 0;
+        File keep = new File(root, "v" + version);
+        int n = 0;
+        File[] kids = root.listFiles();
+        if (kids != null) {
+            for (File f : kids) {
+                String name = f.getName();
+                if (f.equals(keep) || name.startsWith(".")) continue;
+                if (f.isDirectory()) {
+                    n += rmTree(f);
+                } else if (f.delete()) {
+                    n++;
+                }
+            }
+        }
+        try {
+            java.io.FileOutputStream out = new java.io.FileOutputStream(marker(root));
+            out.write(1);
+            out.close();
+        } catch (Throwable ignored) {
+        }
+        return n;
+    }
+
+    /** 递归硬删（**只给缓存用** —— 用户数据一律走 `Trash.move`） */
+    private static int rmTree(File f) {
+        int n = 0;
+        File[] kids = f.listFiles();
+        if (kids != null) for (File k : kids) n += k.isDirectory() ? rmTree(k) : (k.delete() ? 1 : 0);
+        return n + (f.delete() ? 1 : 0);
     }
 
     /**
