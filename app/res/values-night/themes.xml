@@ -23,6 +23,9 @@
 
         <!-- F5b：对话框样式（深色版；与 values 同一份，只换 parent） -->
         <item name="android:alertDialogTheme">@style/AppDialogTheme</item>
+
+        <!-- 第 158b 轮：顶栏 ⋮ 溢出菜单圆角（与对话框同步，样式只在 values/ 定义一份） -->
+        <item name="android:actionOverflowMenuStyle">@style/AppOverflowMenu</item>
     </style>
 
     <!-- F5b：深色对话框 —— parent 换成深色对话框主题，windowBackground 复用同一份 dlg_bg

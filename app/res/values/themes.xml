@@ -37,6 +37,23 @@
 
         <!-- F5b：所有 AlertDialog 走自己的样式（否则是系统默认灰底，与卡片风格脱节） -->
         <item name="android:alertDialogTheme">@style/AppDialogTheme</item>
+
+        <!-- 第 158b 轮：顶栏 ⋮ 溢出菜单也要圆角（与对话框同步，见 popup_bg.xml） -->
+        <item name="android:actionOverflowMenuStyle">@style/AppOverflowMenu</item>
+    </style>
+
+    <!--
+      第 158b 轮：顶栏「⋮」溢出菜单的样式。
+      ★ 只换 `android:popupBackground`（方角 → 14dp 圆角卡片）；其余全继承框架的
+        `Widget.Material.PopupMenu.Overflow` —— 里面管着项的高度 / 文字外观 / 图标槽位，
+        少继承了它，菜单项的排版会整个塌掉。
+      ★ 走 `android:actionOverflowMenuStyle` 而不是 `android:popupMenuStyle`：
+        后者是「长按弹的上下文菜单」，前者才是 ActionBar 右上角那个 ⋮。
+      ⚠️ 只在 values/ 定义一份：背景里的颜色全是语义色，深色主题自动跟随
+        （与 AppBarStyle 同一个理由）。
+    -->
+    <style name="AppOverflowMenu" parent="@android:style/Widget.Material.PopupMenu.Overflow">
+        <item name="android:popupBackground">@drawable/popup_bg</item>
     </style>
 
     <!--

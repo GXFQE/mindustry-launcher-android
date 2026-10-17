@@ -10887,6 +10887,32 @@ public final class SelfTest {
                         && m158.findItem(R.id.action_slot_delete) != null,
                 "★★槽页顶栏 ⋮ = 重命名 / 克隆 / 删除三件（" + m158.size() + " 项）");
 
+        // ── 第 158b 轮：⋮ 溢出菜单的弹窗也有圆角（与对话框同一套皮肤）─────────────
+        //  用户：「能加个圆角吗（和其他弹出窗同步）」。判据不在像素上，而在**主题链**上：
+        //  AppTheme → actionOverflowMenuStyle → popupBackground → 我们的 popup_bg。
+        //  链上任一环掉了（改主题、删 style、删 drawable）界面会静默回到方角，编译器不管。
+        //  ⚠️ **别用 ctx.getTheme() 查**：`ctx` 是 `LocaleMode.force()` 造出来的
+        //     `createConfigurationContext` 上下文，它的 theme 是**框架默认**、不是 AppTheme
+        //     （第一版就这么写的 ⇒ 实测落到 popup_background_material，自检当场红）。
+        //     ⇒ 一律先 `newTheme()` + `applyStyle(R.style.AppTheme)` 再查。
+        android.content.res.Resources.Theme th158 = ctx.getResources().newTheme();
+        th158.applyStyle(R.style.AppTheme, true);
+        int menuStyleRes = 0;
+        android.content.res.TypedArray ta158 = th158
+                .obtainStyledAttributes(new int[]{android.R.attr.actionOverflowMenuStyle});
+        try { menuStyleRes = ta158.getResourceId(0, 0); } finally { ta158.recycle(); }
+        int popupBgRes = 0;
+        String popupBgName = "?";
+        if (menuStyleRes != 0) {
+            android.content.res.TypedArray ta158b = th158.obtainStyledAttributes(
+                    menuStyleRes, new int[]{android.R.attr.popupBackground});
+            try { popupBgRes = ta158b.getResourceId(0, 0); } finally { ta158b.recycle(); }
+            if (popupBgRes != 0) popupBgName = ctx.getResources().getResourceEntryName(popupBgRes);
+        }
+        ok(stat, L, menuStyleRes != 0 && "popup_bg".equals(popupBgName),
+                "★⋮ 溢出菜单背景 = popup_bg（圆角 14dp + 描边，与对话框同一套皮肤）"
+                        + "—— 主题链 actionOverflowMenuStyle → popupBackground 实测落到 " + popupBgName);
+
         // ── 第 157 轮：四个内容页**同一套**（用户列了四条不一致）────────────────
         //  ① 行名：只有「导入模组包」不带省略号、还多一个"包"字 ⇒ 统一成「导入X…」
         ok(stat, L, Trans.get(ctx, R.string.mods_act_import_title).endsWith("…")
