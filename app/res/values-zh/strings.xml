@@ -503,7 +503,7 @@
     <string name="slot_page_info_other_fmt">不是当前槽 · 目标游戏 %1$s</string>
     <string name="slot_page_info_other_nogame">不是当前槽 · 还没指定版本</string>
     <string name="slot_page_ops">备份与恢复</string>
-    <string name="slot_page_ops_sub">备份 / 看有哪些 / 克隆 / 备份策略</string>
+    <string name="slot_page_ops_sub">备份一份 · 看有哪些 · 定策略</string>
     <string name="slot_page_export">整槽导入导出</string>
     <string name="slot_page_export_sub">换机迁移用（zip）</string>
     <string name="maps_title">地图</string>

@@ -10860,6 +10860,33 @@ public final class SelfTest {
         deleteTree(pruneDir);
         try { shareTmp.delete(); } catch (Throwable ignored) { }
 
+        // ── 第 158 轮：槽页的 ⋮ 与「备份与恢复」各管各的 ─────────────────────────
+        //  用户原话：「为什么对槽本身的操作在备份与恢复中啊」——原来那个对话框六项里混着
+        //  克隆 / 重命名 / 删除此槽。现在后三项搬去顶栏 ⋮，对话框只剩"备份该有的三件事"。
+        final String[] ops158 = SlotOps.opsMenuLabels(ctx);
+        ok(stat, L, ops158.length == 3
+                        && ops158[0].equals(Trans.get(ctx, R.string.slot_op_backup))
+                        && ops158[1].equals(Trans.get(ctx, R.string.slot_op_backups))
+                        && ops158[2].equals(Trans.get(ctx, R.string.slot_op_policy))
+                        && !java.util.Arrays.asList(ops158).contains(
+                                Trans.get(ctx, R.string.slot_op_rename))
+                        && !java.util.Arrays.asList(ops158).contains(
+                                Trans.get(ctx, R.string.slot_op_delete))
+                        && !java.util.Arrays.asList(ops158).contains(
+                                Trans.get(ctx, R.string.slot_op_clone)),
+                "★★「备份与恢复」= 备份 / 看有哪些 / 定策略 **三项**，且不含改名 / 删除 / 克隆"
+                        + "（那三件动的是槽本身，搬去了顶栏 ⋮）");
+        //  顶栏菜单里确实有那三项（漏一条 = 用户再也改不了名 / 删不掉槽；编译器管不到清单）
+        android.widget.PopupMenu pm158 = new android.widget.PopupMenu(ctx,
+                new android.view.View(ctx));
+        pm158.getMenuInflater().inflate(R.menu.slot, pm158.getMenu());
+        android.view.Menu m158 = pm158.getMenu();
+        ok(stat, L, m158.size() == 3
+                        && m158.findItem(R.id.action_slot_rename) != null
+                        && m158.findItem(R.id.action_slot_clone) != null
+                        && m158.findItem(R.id.action_slot_delete) != null,
+                "★★槽页顶栏 ⋮ = 重命名 / 克隆 / 删除三件（" + m158.size() + " 项）");
+
         // ── 第 157 轮：四个内容页**同一套**（用户列了四条不一致）────────────────
         //  ① 行名：只有「导入模组包」不带省略号、还多一个"包"字 ⇒ 统一成「导入X…」
         ok(stat, L, Trans.get(ctx, R.string.mods_act_import_title).endsWith("…")

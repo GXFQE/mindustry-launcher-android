@@ -43,6 +43,23 @@ final class SlotOps {
 
     private SlotOps() {}
 
+    /**
+     * 「备份与恢复」对话框的**三个标签 —— 唯一清单**（第 158 轮）。
+     *
+     * <p>★ 为什么抽成方法：这个数组原来在 `SlotActivity.promptSlotOps()` 里写着**六项**，
+     * 混进了「克隆 / 重命名 / 删除此槽」；后三项搬去顶栏 ⋮ 之后，界面与自检要看**同一份**清单
+     * （自检才断言得出"备份对话框里不再有改名 / 删除"，而不是靠人去数）。</p>
+     *
+     * <p>⚠️ 顺序 = 下标：0 备份 / 1 看有哪些 / 2 策略。加项**只许往末尾加**
+     * （与 `BatchIo` 那几条清单同一个规矩）。</p>
+     */
+    static String[] opsMenuLabels(android.content.Context a) {
+        return new String[]{
+                Trans.get(a, R.string.slot_op_backup),
+                Trans.get(a, R.string.slot_op_backups),
+                Trans.get(a, R.string.slot_op_policy)};
+    }
+
     // ── 备份 ──────────────────────────────────────────────────────────────
 
     static void backup(final Activity a, final Data.Slot s, final Host h) {

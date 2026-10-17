@@ -175,36 +175,75 @@ public class SlotActivity extends BaseActivity {
     };
 
     /**
-     * 「备份与恢复」的六项：**直接在本页弹对应的对话框**（实现见 {@link SlotOps}）。
+     * 「备份与恢复」的三项：**直接在本页弹对应的对话框**（实现见 {@link SlotOps}）。
      * ⚠️ `Data.Slot` 要在**点菜单时**现取（`findSlot()`）—— 用户可能刚在别处改过这个槽。
+     *
+     * ★ 第 158 轮（用户：「为什么对槽本身的操作在备份与恢复中啊」）：这个对话框原来有**六项**，
+     *   里面混着「克隆此槽 / 重命名此槽 / 删除此槽」。现在后三项搬去**顶栏 ⋮**
+     *   （`menu/slot.xml`）—— 它们动的是**槽本身**（身份 / 生死 / 副本），不是备份。
+     *   本对话框只剩「还是一条备份该有的三件事」：备一份 / 看有哪些 / 定策略。
+     *   ⚠️ 下标随之变成 0/1/2 —— 老代码里"点第 3 项 = 允许"这种记忆在这儿**不再成立**，
+     *     所以这里**不按下标 switch 到不同方法**，而是走 {@link SlotOps#opsMenuItems} 那份唯一清单。
      */
     private void promptSlotOps() {
         final Data.Slot s = findSlot();
         if (s == null) { gone(); return; }
+        final String[] labels = SlotOps.opsMenuLabels(this);
         new android.app.AlertDialog.Builder(this)
                 .setTitle(R.string.slot_page_ops)
-                .setItems(new String[]{
-                        Trans.get(SlotActivity.this, R.string.slot_op_backup),
-                        Trans.get(SlotActivity.this, R.string.slot_op_backups),
-                        Trans.get(SlotActivity.this, R.string.slot_op_clone),
-                        Trans.get(SlotActivity.this, R.string.slot_op_policy),
-                        Trans.get(SlotActivity.this, R.string.slot_op_rename),
-                        Trans.get(SlotActivity.this, R.string.slot_op_delete)},
+                .setItems(labels,
                         new android.content.DialogInterface.OnClickListener() {
                             @Override public void onClick(android.content.DialogInterface d, int w) {
                                 switch (w) {
                                     case 0: SlotOps.backup(SlotActivity.this, s, mHost); break;
                                     case 1: SlotOps.backups(SlotActivity.this, s, mHost); break;
-                                    case 2: SlotOps.cloneSlot(SlotActivity.this, s, mHost); break;
-                                    case 3: SlotOps.backupPolicy(SlotActivity.this, s, mHost); break;
-                                    case 4: SlotOps.renameSlot(SlotActivity.this, s, mHost); break;
-                                    case 5: SlotOps.deleteSlot(SlotActivity.this, s, mHost); break;
+                                    case 2: SlotOps.backupPolicy(SlotActivity.this, s, mHost); break;
                                     default: break;
                                 }
                             }
                         })
                 .setNegativeButton(R.string.cancel, null)
                 .show();
+    }
+
+    /**
+     * 槽页顶栏的 ⋮ 菜单（第 158 轮）：**对槽本身的操作** —— 重命名 / 克隆 / 删除。
+     *
+     * <p>为什么在顶栏而不占一行：见 `ref/29` §84「全局 / 低频入口放顶栏右上角」；
+     * 页面每多一行，下面的列表就再往下推一格。三个都是低频 + 前两个不可逆
+     * （删除会连带该槽的备份一起进中转站），放溢出菜单里还顺带少一分误触。</p>
+     *
+     * <p>⚠️ 标题必须用 {@link Trans} 覆盖一遍：`android:title` 只是无障碍 / 溢出菜单的标签，
+     * 用户语言包改不到它（与 MainActivity 同一个理由）。</p>
+     */
+    @Override
+    public boolean onCreateOptionsMenu(android.view.Menu menu) {
+        getMenuInflater().inflate(R.menu.slot, menu);
+        setMenuTitle(menu, R.id.action_slot_rename, R.string.slot_op_rename);
+        setMenuTitle(menu, R.id.action_slot_clone, R.string.slot_op_clone);
+        setMenuTitle(menu, R.id.action_slot_delete, R.string.slot_op_delete);
+        return true;
+    }
+
+    private void setMenuTitle(android.view.Menu menu, int id, int str) {
+        android.view.MenuItem it = menu.findItem(id);
+        if (it != null) it.setTitle(Trans.get(SlotActivity.this, str));
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(android.view.MenuItem item) {
+        int id = item.getItemId();
+        if (id != R.id.action_slot_rename && id != R.id.action_slot_clone
+                && id != R.id.action_slot_delete) {
+            return super.onOptionsItemSelected(item);
+        }
+        // 槽可能已经不在（别处删了 / 改了名）⇒ 与点行时同一条判据
+        final Data.Slot s = findSlot();
+        if (s == null) { gone(); return true; }
+        if (id == R.id.action_slot_rename) SlotOps.renameSlot(this, s, mHost);
+        else if (id == R.id.action_slot_clone) SlotOps.cloneSlot(this, s, mHost);
+        else SlotOps.deleteSlot(this, s, mHost);
+        return true;
     }
 
     // ★ 2026-10-03：这里的 `runOp` / `pickOps` / `opLabel` 三个方法**已删** ——

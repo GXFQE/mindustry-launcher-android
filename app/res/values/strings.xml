@@ -523,7 +523,7 @@
     <string name="slot_page_info_other_fmt">Not the current slot · target game %1$s</string>
     <string name="slot_page_info_other_nogame">Not the current slot · no version assigned yet</string>
     <string name="slot_page_ops">Backup &amp; restore</string>
-    <string name="slot_page_ops_sub">Backup / see backups / clone / backup policy</string>
+    <string name="slot_page_ops_sub">Back up · see backups · set policy</string>
     <string name="slot_page_export">Whole-slot import &amp; export</string>
     <string name="slot_page_export_sub">For moving to a new phone (zip)</string>
     <string name="maps_title">Maps</string>

@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  槽页（SlotActivity）的顶栏菜单（第 158 轮，2026-10-17）。
+
+  ★ 起因（用户）：「为什么对槽本身的操作在备份与恢复中啊」——
+    原来这三项**塞在**「备份与恢复」那个对话框里（连同备份 / 看备份 / 备份策略共 6 项），
+    于是"给这个槽改名""删掉这个槽"被读成了备份功能的一部分。判据很清楚：
+    它们动的是**槽本身**（身份 / 生死 / 副本），不是备份。
+  ★ 为什么搬到顶栏而不是再加一行：`ref/29` §84 那条 —— 全局 / 低频入口放顶栏右上角；
+    页面每多一行，下面的列表就再往下推一格。
+
+  ⚠️ 与 main.xml 同一套规矩：
+    a) 用 **framework 的** `android:showAsAction`（本工程零 AndroidX，没有 app: 命名空间）；
+    b) 三个都写 `never` ⇒ 系统自己在 ActionBar 上画那个 **⋮**（不用我们出图标，
+       也就不存在"菜单图标没上色"那个坑）；文字只在溢出菜单里出现；
+    c) `android:title` 只是无障碍 / 溢出菜单的标签，真标题在
+       SlotActivity.onCreateOptionsMenu 里用 `Trans` 覆盖（文案唯一入口那条纪律）。
+-->
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item
+        android:id="@+id/action_slot_rename"
+        android:showAsAction="never"
+        android:title="@string/slot_op_rename" />
+
+    <item
+        android:id="@+id/action_slot_clone"
+        android:showAsAction="never"
+        android:title="@string/slot_op_clone" />
+
+    <item
+        android:id="@+id/action_slot_delete"
+        android:showAsAction="never"
+        android:title="@string/slot_op_delete" />
+</menu>
