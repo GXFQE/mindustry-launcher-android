@@ -10503,23 +10503,29 @@ public final class SelfTest {
         List<?> xbrec = xbd != null && xbd.get("records") instanceof List
                 ? (List<?>) xbd.get("records") : null;
         boolean briefOk = xbd != null && "brief".equals(String.valueOf(xbd.get("mode")))
-                && xbrec != null && xbrec.size() == 1;
-        boolean briefZero = false, briefBuildable = false, briefTotal = false;
+                && xbrec != null && xbrec.size() == 3;
+        boolean briefZero = false, briefBuildable = false, briefCore = false;
+        boolean briefTotal = false, briefUnknown = false;
         if (xbrec != null) {
             for (Object oo : xbrec) {
                 Map<?, ?> o = (Map<?, ?>) oo;
-                // ★ 元断言：简洁模式里**不许**出现 reachable == 0 的记录
-                if (intOf(o, "reachable") <= 0) briefOk = false;
+                // ★ 元断言：简洁模式里**不许**出现 reachable == 0 的记录（只看有 reachable 的那种记录）
+                if (o.containsKey("reachable") && intOf(o, "reachable") <= 0) briefOk = false;
                 // ★ 元断言：简洁模式**只留可采数据** —— 不许有 `total`（用户：「把 total 删了啊」）
                 if (o.get("total") != null) briefTotal = true;
-                if ("buildable".equals(String.valueOf(o.get("kind")))) briefBuildable = true;
+                String k = String.valueOf(o.get("kind"));
+                if ("buildable".equals(k)) briefBuildable = true;
+                if ("core".equals(k)) briefCore = true;
+                if ("unknownContent".equals(k)) briefUnknown = true;
                 if ("一格都拿不到".equals(String.valueOf(o.get("name")))) briefZero = true;
             }
         }
-        ok(stat, L, briefOk && !briefZero && !briefBuildable && !briefTotal,
-                "★简洁模式：只写 **reachable > 0** 的记录（" + (xbrec == null ? -1 : xbrec.size())
-                        + " 条），每条只有 `kind`/`name`/`reachable`（**没有 `total`**）；"
-                        + "不可采的那条与 buildable / core 也都不写");
+        ok(stat, L, briefOk && !briefZero && briefBuildable && briefCore
+                        && !briefTotal && !briefUnknown,
+                "★简洁模式：可采记录只写 **reachable > 0** 的那条（`kind`/`name`/`reachable`，**无 `total`**），"
+                        + "另带 **buildable（可建造区域）+ core（核心区域）**；"
+                        + "不可采的那条与 unknownContent 都不写（共 " + (xbrec == null ? -1 : xbrec.size())
+                        + " 条）");
         // ★★ 批量：**一行 = 一张图**（用户「每个地图是 jsonl 中的一条」）
         xmb.mode = MapStatsExport.MODE_DETAIL;
         String xbatch = MapStatsExport.jsonlBatch(

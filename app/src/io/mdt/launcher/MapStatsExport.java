@@ -89,7 +89,8 @@ public final class MapStatsExport {
     public static final int MODE_DETAIL = 0;
     /**
      * **简洁**：只含「能采到」的那些记录（`reachable > 0`），每条只留
-     * `kind` / `name` / `reachable`。
+     * `kind` / `name` / `reachable`；另外**两种口径都带** `buildable`（可建造区域）与
+     * `core`（核心区域）—— 用户 2026-10-17：「我们统计的可建造区域以及核心区域也算」。
      *
      * <p>用户 2026-10-17：「可以加个详细模式（全部数据）和简洁模式（仅含可采的）」→
      * 「**简洁模式只要可采数据**」→「**把 total 删了啊**」—— `total` 是"这层一共多少格"，
@@ -181,17 +182,18 @@ public final class MapStatsExport {
         rowJson(sb, r.oreWalls, "oreWall", brief);
         rowJson(sb, r.floors, "floor", brief);
         rowJson(sb, r.bonuses, "bonus", brief);
-        if (!brief) {
-            appendJson(sb, buildableLine(r.buildable));
-            appendJson(sb, coreLine(r.core));
-            if (r.unknowns != null) {
-                for (MapStats.Unk u : r.unknowns) {
-                    if (u == null) continue;
-                    appendJson(sb, new Obj("unknownContent")
-                            .str("name", u.name)
-                            .num("ore", u.ore).num("floor", u.floor).num("bonus", u.bonus)
-                            .end());
-                }
+        // ★ 可建造区域 / 核心区域**两种口径都要**（用户 2026-10-17：「我们统计的可建造区域以及
+        //   核心区域也算」）—— 它们本来就是"一段区域有多少格"的结论，不是可采资源明细的一部分，
+        //   所以在简洁模式里也原样带上；只有 `unknownContent`（认不出的内容）仍只进详细模式。
+        appendJson(sb, buildableLine(r.buildable));
+        appendJson(sb, coreLine(r.core));
+        if (!brief && r.unknowns != null) {
+            for (MapStats.Unk u : r.unknowns) {
+                if (u == null) continue;
+                appendJson(sb, new Obj("unknownContent")
+                        .str("name", u.name)
+                        .num("ore", u.ore).num("floor", u.floor).num("bonus", u.bonus)
+                        .end());
             }
         }
         return sb.append(']').toString();
