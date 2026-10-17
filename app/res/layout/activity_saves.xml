@@ -76,6 +76,23 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content" />
 
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginStart="62dp"
+            android:background="@color/divider" />
+
+        <!--
+          ★ 第 157 轮：存档也能删（与地图 / 蓝图 / 模组同一套：旧件挪进中转站）。
+            用户 2026-10-17：「地图和蓝图能删，存档和模组又不能删」。
+          ⚠️ 不碰 `saves/` 之外的东西（`BatchIo.deletable` 是唯一判据）。
+        -->
+        <include
+            android:id="@+id/row_save_del"
+            layout="@layout/row_action"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
         <!--
           ★ **只在真有读不出来的存档时出现**（`SavesActivity.refresh()` 按
             `MsavMeta.summarize` 的数决定显隐）—— 与槽页副标题那句 ⚠ 同一个口径。

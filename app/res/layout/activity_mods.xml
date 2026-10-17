@@ -159,8 +159,15 @@
                     android:layout_marginStart="62dp"
                     android:background="@color/divider" />
 
+                <!--
+                  第 127 轮（批量导入导出）：模组这条线原来**只有进口没有出口**
+                  （整槽 zip 那条出口把模组混在里面，拿不出"单独某几个模组"）。
+                  ★ 第 157 轮（用户：「导入导出不相邻」）：**紧跟在导入下面** ——
+                    原来中间夹着「复制到其他槽」，四个页面里只有这一页是"进 / 别的动作 / 出"。
+                    四个内容页的顺序统一成：导入 → 导出 → 本页专属 → 删除 → 筛选。
+                -->
                 <include
-                    android:id="@+id/row_mod_copy"
+                    android:id="@+id/row_mod_export"
                     layout="@layout/row_action"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
@@ -171,13 +178,8 @@
                     android:layout_marginStart="62dp"
                     android:background="@color/divider" />
 
-                <!--
-                  第 127 轮（批量导入导出）：模组这条线原来**只有进口没有出口**
-                  （整槽 zip 那条出口把模组混在里面，拿不出"单独某几个模组"）。
-                  ★ 放在「导入模组包」的下面一格：进和出挨着，与地图页 / 蓝图页同一个形状。
-                -->
                 <include
-                    android:id="@+id/row_mod_export"
+                    android:id="@+id/row_mod_copy"
                     layout="@layout/row_action"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
@@ -206,7 +208,25 @@
                     android:background="@color/divider" />
 
                 <include
-                    android:id="@+id/row_mod_filter"
+                    android:id="@+id/row_mod_batch"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="62dp"
+                    android:background="@color/divider" />
+
+                <!--
+                  ★ 第 157 轮：模组也能删了（与地图 / 蓝图 / 存档同一套：旧件挪进中转站）。
+                    四个页面都能删是用户 2026-10-17 拍的：「地图和蓝图能删，存档和模组又不能删」。
+                  ⚠️ 模组包里自带的条目删不了（它们住在那个 zip 里）—— 由 `BatchIo.deletable` 挡，
+                    并计进「删不了 N 份」，不是报失败。
+                -->
+                <include
+                    android:id="@+id/row_mod_del"
                     layout="@layout/row_action"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
@@ -218,7 +238,7 @@
                     android:background="@color/divider" />
 
                 <include
-                    android:id="@+id/row_mod_batch"
+                    android:id="@+id/row_mod_filter"
                     layout="@layout/row_action"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />

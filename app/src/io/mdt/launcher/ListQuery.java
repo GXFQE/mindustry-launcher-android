@@ -93,6 +93,40 @@ public final class ListQuery {
         }
     };
 
+    /**
+     * 存档页那把钥匙：**文件名 + 游戏里的存档名**（第 157 轮）。
+     *
+     * <p>★ 为什么不是 {@link #FILE_KEY}：存档的文件名是 `0.msav`，而用户记住的、界面上
+     * 副标题里显示的是**游戏内的存档名**（「Ancient Caldera」）—— 只搜文件名等于
+     * "看得见的搜不到"（用户 2026-10-17：「存档只有搜索存档名」，而它实际连存档名都不搜）。</p>
+     *
+     * <p>⚠️ 存档名要**解 zlib 头**才拿得到（`MsavMeta.read`），不能在输入时逐份解析
+     * —— `names` 由页面在后台预热后喂进来；没预热到的只按文件名匹配。</p>
+     */
+    public static Key<java.io.File> fileKey(final java.util.Map<String, String> names) {
+        return new Key<java.io.File>() {
+            @Override public String text(java.io.File f) {
+                if (f == null) return "";
+                String n = names == null ? null : names.get(f.getAbsolutePath());
+                return (n == null || n.isEmpty())
+                        ? f.getName() : haystack(f.getName(), n);
+            }
+
+            @Override public long bytes(java.io.File f) {
+                return f == null ? 0L : f.length();
+            }
+
+            @Override public long time(java.io.File f) {
+                return f == null ? 0L : f.lastModified();
+            }
+
+            /** 排序仍按**文件名**（存档名不是文件名，拿它排会让"0/1/2.msav"乱序） */
+            @Override public String title(java.io.File f) {
+                return f == null ? "" : f.getName();
+            }
+        };
+    }
+
     private ListQuery() {}
 
     /**

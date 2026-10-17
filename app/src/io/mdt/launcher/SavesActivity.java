@@ -1,13 +1,17 @@
 package io.mdt.launcher;
 
+import android.app.AlertDialog;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ListView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.io.File;
+import java.util.List;
 
 /**
  * 某个槽的**存档列表页**（二级页面，2026-10-06 第 115 轮第六批）。
@@ -19,8 +23,9 @@ import java.io.File;
  *
  * <p>🔴 **两条纪律**（与那三个页面一字不差）：
  * <ul>
- *   <li>**只读**：本页不提供删除 —— 存档是用户的东西，删只走游戏自己的界面
- *       （口径见 {@link SlotIo#showUnreadable} 的注释）；</li>
+ *   <li>**删除只在"挪进中转站"这个意义上**（第 157 轮起；原来这页是彻底只读）：勾选 → 确认 →
+ *       `Trash.savesDir`，随时能从中转站放回去。判据与地图 / 蓝图同一条：
+ *       **只允许动 `saves/` 的直接子项**（{@link BatchIo#deletable}）；</li>
  *   <li>SAF 的「导入」走 `startActivityForResult` ⇒ **本页必须转发 `onActivityResult`**
  *       （少了它就是"选完文件什么都没发生"）。</li>
  * </ul>
@@ -48,6 +53,16 @@ public class SavesActivity extends BaseActivity {
      * ★ 分开的理由：表头那句"共几份"说的是全部，而"显示 N / 共 M"那句说的是两者之比。
      */
     private File[] mAll = new File[0];
+    /**
+     * 存档文件的**游戏内存档名**缓存（绝对路径 → 名字）。第 157 轮加。
+     *
+     * <p>★ 搜索要能搜到「Ancient Caldera」这种名字 —— 它住在 zlib 头里，得解析才拿得到，
+     * 所以不能每次输入都现解：页面打开后由 {@link #warmSaveNames()} 在后台预热一遍，
+     * 还没预热到的那几份只按文件名匹配（预热完会自己重筛一次）。</p>
+     */
+    private final java.util.Map<String, String> mNames = new java.util.HashMap<>();
+    /** 预热线程只跑一趟（每次重建列表不该再解一遍全部存档） */
+    private boolean mNamesWarmed;
 
     // ── 搜索 / 排序（2026-10-07 第 122 轮；**纯前端**，一个文件都不碰）────────────
     /** 转屏要恢复的两个状态（同模组 / 地图 / 蓝图页那条教训） */
@@ -135,6 +150,10 @@ public class SavesActivity extends BaseActivity {
                         SlotIo.exportSave(SavesActivity.this, s);
                     }
                 });
+        Util.bindAction(root, R.id.row_save_del, R.drawable.ic_trash,
+                R.string.batch_del_row, R.string.batch_del_sub, new Runnable() {
+                    @Override public void run() { promptDeleteSaves(); }
+                });
         Util.bindAction(root, R.id.row_save_bad, R.drawable.ic_health,
                 R.string.slot_op_show_bad_saves, R.string.save_page_bad_sub, new Runnable() {
                     @Override public void run() {
@@ -190,6 +209,7 @@ public class SavesActivity extends BaseActivity {
         if (mList == null || Util.dead(this)) return;
         mAll = SlotIo.listSaves(this, mSlot);
         rebuildList();
+        warmSaveNames();
 
         // 「看看哪几份读不出来」**只在真有**的时候出现 —— 口径 = `MsavMeta.summarize`
         // （与槽页副标题、那个弹窗**同一处**实现；读 meta 要开流 ⇒ 走后台）
@@ -228,7 +248,7 @@ public class SavesActivity extends BaseActivity {
     private void rebuildList() {
         if (mList == null) return;
         java.util.List<File> shown = ListQuery.apply(java.util.Arrays.asList(mAll), mQuery, mSort,
-                false, ListQuery.FILE_KEY);
+                false, ListQuery.fileKey(mNames));
         mFiles = shown.toArray(new File[0]);
         if (mFillToken != null) mFillToken[0] = false;
         mFillToken = new boolean[]{true};
@@ -253,6 +273,134 @@ public class SavesActivity extends BaseActivity {
                     ? Trans.get(SavesActivity.this, R.string.save_empty_filtered)
                     : Trans.get(SavesActivity.this, R.string.export_no_save_fmt, mSlot));
         }
+    }
+
+    /**
+     * 后台把每份存档的**游戏内存档名**解出来存进 {@link #mNames}（第 157 轮）。
+     *
+     * <p>为什么不在输入时现解：`MsavMeta.read` 要开 zlib 流读头，几十份存档 × 每次按键
+     * 会卡住输入；而这件事本来在补副标题那一趟里就要做一次。这里单独跑一趟、只跑一次，
+     * 跑完如果用户正在筛（`mQuery` 非空）就**再筛一遍**（否则刚预热到的名字要等下次输入才生效）。</p>
+     */
+    private void warmSaveNames() {
+        if (mNamesWarmed) return;
+        mNamesWarmed = true;
+        final File[] all = mAll;
+        new Thread(new Runnable() {
+            @Override public void run() {
+                boolean added = false;
+                for (File f : all) {
+                    if (Util.dead(SavesActivity.this)) return;
+                    String k = f.getAbsolutePath();
+                    if (mNames.containsKey(k)) continue;
+                    String n = null;
+                    try {
+                        MsavMeta m = MsavMeta.read(f);
+                        // ★ 用 `displayName()`（名字 → 地图名兜底），**不是** `name`：
+                        //   真机实测这几份存档的 `name` 是空的，副标题里那个名字来自 `mapname`
+                        //   ⇒ 拿 `name` 当搜索词等于又白做一遍（界面看得见、搜不到）。
+                        // ★ 还要**去色码**：真名带 `[gold]…[red]…`（列表副标题也是这么去的）——
+                        //   不去的话「sidestory lavacaster」这种跨色码的词就搜不到。
+                        n = m == null ? null : Mods.stripColors(m.displayName());
+                    } catch (Throwable ignored) {
+                    }
+                    mNames.put(k, n == null ? "" : n);
+                    if (n != null && !n.isEmpty()) added = true;
+                }
+                if (!added) return;
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        if (Util.dead(SavesActivity.this)) return;
+                        if (!mQuery.trim().isEmpty()) rebuildList();   // 名字刚到位 ⇒ 重筛一次
+                    }
+                });
+            }
+        }, "save-names").start();
+    }
+
+    /**
+     * 删除存档（第 157 轮）：与地图 / 蓝图 / 模组**同一套** —— 勾选 → 确认 → **挪进中转站**。
+     *
+     * <p>★ 为什么现在允许删：原来这一页是"只读"（存档是用户的命根子）；改成删的
+     * **落点是中转站**（可原样放回）之后，代价与"游戏里删档"差一个数量级 —— 与地图 / 蓝图
+     * 那条出口是同一个道理。判据仍然是"只允许动 `saves/` 的直接子项"。</p>
+     */
+    private void promptDeleteSaves() {
+        if (mAll == null || mAll.length == 0) {
+            Toast.makeText(this, Trans.get(this, R.string.export_no_save_fmt, mSlot),
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (Data.gameAlive(this)) {
+            alert(Trans.get(this, R.string.game_busy_title),
+                    Trans.get(this, R.string.save_del_busy_msg));
+            return;
+        }
+        final File[] all = mAll;
+        String[] titles = new String[all.length];
+        String[] subs = new String[all.length];
+        for (int i = 0; i < all.length; i++) {
+            titles[i] = all[i].getName();
+            String n = mNames.get(all[i].getAbsolutePath());
+            subs[i] = (n == null || n.isEmpty()) ? Util.formatSize(all[i].length())
+                    : Util.formatSize(all[i].length()) + " · 「" + n + "」";
+        }
+        BatchIo.pickMulti(this, R.string.batch_del_row,
+                Trans.get(this, R.string.batch_del_head_fmt, all.length),
+                titles, subs, null, null, R.string.batch_del_btn_fmt, new BatchIo.OnPick() {
+                    @Override public void onPick(List<Integer> idx) {
+                        final File kindDir = new File(Data.dirOf(SavesActivity.this, mSlot), "saves");
+                        final java.util.List<File> files = new java.util.ArrayList<>();
+                        for (Integer i : idx) files.add(all[i.intValue()]);
+                        int can = 0, cant = 0;
+                        for (File f : files) {
+                            if (BatchIo.deletable(f, kindDir)) can++; else cant++;
+                        }
+                        if (can == 0) {
+                            alert(Trans.get(SavesActivity.this, R.string.batch_del_row),
+                                    Trans.get(SavesActivity.this, R.string.batch_del_skipped_fmt, cant));
+                            return;
+                        }
+                        String msg = Trans.get(SavesActivity.this, R.string.batch_del_msg_fmt, can);
+                        if (cant > 0) {
+                            msg = msg + "\n\n" + Trans.get(SavesActivity.this,
+                                    R.string.batch_del_skipped_fmt, cant);
+                        }
+                        new AlertDialog.Builder(SavesActivity.this)
+                                .setTitle(R.string.batch_del_title)
+                                .setMessage(msg)
+                                .setPositiveButton(R.string.batch_del_ok,
+                                        new DialogInterface.OnClickListener() {
+                                            @Override public void onClick(DialogInterface d, int w) {
+                                                BatchIo.DelReport rep = BatchIo.deleteAll(
+                                                        SavesActivity.this, files, kindDir,
+                                                        Trash.savesDir(SavesActivity.this),
+                                                        new BatchIo.Deleter() {
+                                                            @Override public File delete(
+                                                                    android.content.Context c, File f,
+                                                                    File trashDir) {
+                                                                return SlotIo.deleteSaveToTrash(c, kindDir,
+                                                                        f, trashDir);
+                                                            }
+                                                        });
+                                                refresh();
+                                                if (rep.failed == 0) {
+                                                    Toast.makeText(SavesActivity.this,
+                                                            Trans.get(SavesActivity.this,
+                                                                    R.string.batch_del_done_fmt, rep.moved),
+                                                            Toast.LENGTH_LONG).show();
+                                                } else {
+                                                    alert(Trans.get(SavesActivity.this, R.string.batch_del_row),
+                                                            Trans.get(SavesActivity.this, R.string.batch_del_done_fmt, rep.moved)
+                                                                    + "\n"
+                                                                    + Trans.get(SavesActivity.this, R.string.batch_del_none_fmt, rep.failed));
+                                                }
+                                            }
+                                        })
+                                .setNegativeButton(R.string.cancel, null)
+                                .show();
+                    }
+                });
     }
 
     /**
@@ -306,5 +454,14 @@ public class SavesActivity extends BaseActivity {
             if (mSlot.equals(x.name)) return x;
         }
         return null;
+    }
+    /** 一句话提示（与地图 / 蓝图 / 模组页**同名同形**；本页原来没有它，第 157 轮补） */
+    private void alert(String title, String msg) {
+        if (Util.dead(this)) return;
+        new AlertDialog.Builder(this)
+                .setTitle(title)
+                .setMessage(msg)
+                .setPositiveButton(R.string.close, null)
+                .show();
     }
 }

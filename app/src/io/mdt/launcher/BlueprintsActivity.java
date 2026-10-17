@@ -98,7 +98,7 @@ public class BlueprintsActivity extends BaseActivity {
         View root = getLayoutInflater().inflate(R.layout.activity_blueprints, null);
         Util.applySystemInsets(root);
         setContentView(root);
-        setTitle(R.string.bp_title);
+        setTitle(Trans.get(BlueprintsActivity.this, R.string.bp_title_fmt, mSlot));
 
         mHead = (TextView) root.findViewById(R.id.bp_head);
         mHead.setText(Trans.get(BlueprintsActivity.this, R.string.bp_reading));

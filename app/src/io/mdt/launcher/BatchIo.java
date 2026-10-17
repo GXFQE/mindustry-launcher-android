@@ -1643,7 +1643,18 @@ final class BatchIo {
      * —— 这里只是**提前**把话说清楚，免得把它算成"失败"。
      */
     static boolean deletable(File f, File kindDir) {
-        if (f == null || kindDir == null || !f.isFile()) return false;
+        return deletableItem(f, kindDir, false);
+    }
+
+    /**
+     * 同上，但**允许目录**（第 157 轮：模组可以是文件夹形态 `mods/某个模组/`）。
+     *
+     * <p>⚠️ 只给模组页用 —— 地图 / 蓝图 / 存档都是单文件；把 `allowDir=true` 用到那三页上，
+     * 就等于允许把一个目录当成"一份"删掉。</p>
+     */
+    static boolean deletableItem(File f, File kindDir, boolean allowDir) {
+        if (f == null || kindDir == null) return false;
+        if (allowDir ? !f.exists() : !f.isFile()) return false;
         File p = f.getParentFile();
         if (p == null) return false;
         try {
@@ -1671,10 +1682,16 @@ final class BatchIo {
      */
     static DelReport deleteAll(Context ctx, List<File> files, File kindDir, File trashDir,
                                Deleter d) {
+        return deleteAll(ctx, files, kindDir, trashDir, d, false);
+    }
+
+    /** 同上，但**允许目录**（模组页：文件夹形态的模组也是一份） */
+    static DelReport deleteAll(Context ctx, List<File> files, File kindDir, File trashDir,
+                               Deleter d, boolean allowDirs) {
         DelReport r = new DelReport();
         if (files == null || d == null) return r;
         for (File f : files) {
-            if (!deletable(f, kindDir)) {
+            if (!deletableItem(f, kindDir, allowDirs)) {
                 r.skipped++;
                 continue;
             }

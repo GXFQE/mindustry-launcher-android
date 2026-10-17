@@ -165,6 +165,33 @@ final class SlotIo {
     }
 
     /**
+     * 删除一份存档 —— **挪去中转站，不硬删**（第 157 轮；与 `MapFiles` / `BlueprintFiles` 同一条纪律）。
+     *
+     * <p>🔴 安全判据（两条都过才动）：
+     * ① 它必须是 `savesDir` 的**直接子项**；
+     * ② 游戏进程没在跑（存档正被游戏读写，抢文件会写出半份）。</p>
+     *
+     * @return 成功返回中转站里的那份；否则 null
+     */
+    static File deleteSaveToTrash(android.content.Context ctx, File savesDir, File saveFile, File trashDir) {
+        if (savesDir == null || saveFile == null || trashDir == null) return null;
+        if (Data.gameAlive(ctx)) return null;                       // 游戏在跑：不动
+        try {
+            if (!savesDir.getCanonicalFile().equals(saveFile.getParentFile().getCanonicalFile())) {
+                return null;                                        // 不是这个目录的直接子项
+            }
+        } catch (Throwable t) {
+            return null;
+        }
+        if (!saveFile.isFile()) return null;
+        if (!trashDir.isDirectory() && !trashDir.mkdirs() && !trashDir.isDirectory()) return null;
+        File moved = new File(trashDir, Trash.nameFor(Trash.slotLabel(savesDir), saveFile.getName()));
+        if (!Trash.move(saveFile, moved)) return null;               // 跨卷兜底（见 MapFiles.place）
+        Trash.prune(trashDir, Trash.KEEP);
+        return moved;
+    }
+
+    /**
      * ★★ 2026-10-06（第 115 轮第六批）：把一个槽的存档列表**填进一个 ListView**。
      *
      * <p>为什么要抽出来：这份列表原来只填进**对话框**（`exportSave` / `showSaves`），

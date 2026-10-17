@@ -385,7 +385,7 @@
     <!-- 地图增删（F10）-->
     <string name="maps_import">Import map…</string>
     <!-- ★ 第 155 轮：一行两路（从文件 / 从本槽存档）—— 副标题把两条路都说出来 -->
-    <string name="maps_import_sub">From a file, or from a save in this slot</string>
+    <string name="maps_import_sub">From a file or a save in this slot (.msav)</string>
     <string name="maps_import_pick">Import a map</string>
     <string name="maps_import_from_file">From a file…</string>
     <!--
@@ -549,9 +549,13 @@
     <string name="maps_act_filter_sub">Search by name · problems only</string>
     <string name="maps_filtered_fmt">Showing %1$d / %2$d maps (filtered)</string>
     <string name="maps_empty_filtered">No maps match the filter</string>
-    <string name="slot_op_import_save">Import a save (.msav)…</string>
+    <string name="slot_op_import_save">Import a save…</string>
     <string name="slot_op_import_slot">Import a whole slot (zip)…</string>
-    <string name="slot_op_export_save">Export a save (.msav)…</string>
+    <string name="slot_op_export_save">Export a save…</string>
+<string name="save_del_busy_msg">The game is running; deleting saves now would race it. Quit the game first.</string>
+<string name="mods_del_busy_msg">The game is running; deleting mods now would race it. Quit the game first.</string>
+<string name="mods_title_fmt">Mods in slot \"%1$s\"</string>
+<string name="bp_title_fmt">Blueprints in slot \"%1$s\"</string>
     <!--
       ══ Save list / save detail (2026-10-06) ══════════════════════════════════
       "What map is this save, how long did I play" used to be visible in only two places:
@@ -569,7 +573,7 @@
         再来一个开关就是同一件事两个入口。取而代之的是**按时间**那一档 ——
         存档是真文件、有修改时间，"最新保存的在前"最常用。
     -->
-    <string name="save_search_hint">Search save name</string>
+    <string name="save_search_hint">Search save or file name</string>
     <string name="save_act_filter_sub">Search by name · newest first</string>
     <string name="save_filter_sort_time">Newest first</string>
     <string name="save_filtered_fmt">Showing %1$d / %2$d saves (filtered)</string>
@@ -1807,7 +1811,7 @@
     <string name="mods_toggle_detail_title">Technical details</string>
 
     <!-- ══ F13 第三阶段：模组包导入 / 跨槽复制 ══════════════════════════════ -->
-    <string name="mods_act_import_title">Import mod package</string>
+    <string name="mods_act_import_title">Import a mod…</string>
     <string name="mods_act_import_sub">Pick .zip / .jar on this device; many at once, or one zip bundle</string>
     <string name="mods_act_copy_title">Copy this slot mods to…</string>
     <string name="mods_act_copy_sub_fmt">Copies the whole mod set of \"%1$s\" into another slot</string>

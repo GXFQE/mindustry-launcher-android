@@ -1051,6 +1051,37 @@ public final class Mods {
     }
 
     /**
+     * 删掉一个模组 —— **挪去中转站，不硬删**（第 157 轮；与地图 / 蓝图 / 存档同一条纪律）。
+     *
+     * <p>🔴 安全判据（两条都过才动）：
+     * ① 它必须是 `modsDir` 的**直接子项**（模组包里自带的条目不在 `mods/` 下，删不动）；
+     * ② 游戏进程没在跑（模组 jar 正被 `:game` 进程的 ClassLoader 打开着）。</p>
+     *
+     * <p>⚠️ 模组可以是**文件夹形态**（`mods/某个模组/mod.hjson`）⇒ 这里允许目录，
+     * 而地图 / 蓝图 / 存档那三页只允许单文件（判据见 {@code BatchIo.deletableItem}）。</p>
+     *
+     * @return 成功返回中转站里的那份；否则 null
+     */
+    public static File deleteToTrash(Context ctx, File modsDir, File mod, File trashDir) {
+        if (modsDir == null || mod == null || trashDir == null) return null;
+        if (Data.gameAlive(ctx)) return null;
+        try {
+            if (!modsDir.getCanonicalFile().equals(mod.getParentFile().getCanonicalFile())) {
+                return null;                                        // 不是这个目录的直接子项
+            }
+        } catch (Throwable t) {
+            return null;
+        }
+        if (!mod.isFile() && !mod.isDirectory()) return null;
+        if (!trashDir.isDirectory() && !trashDir.mkdirs() && !trashDir.isDirectory()) return null;
+        File moved = new File(trashDir, Trash.nameFor(Trash.slotLabel(modsDir), mod.getName()));
+        if (moved.exists()) Data.deleteTree(moved);                 // 同名旧中转项（理论上带时间戳，不会撞）
+        if (!Trash.move(mod, moved)) return null;                   // 跨卷兜底：复制 + 校验 + 删源
+        Trash.prune(trashDir, Trash.KEEP);
+        return moved;
+    }
+
+    /**
      * 把已经写好的同目录临时条目 `tmp` 就位成 `dst`。
      *
      * ★★ 原条目**先挪去 trash（挪不删）**，改名成功之后才删 —— 本工程"绝不静默丢数据"的老规矩。

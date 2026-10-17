@@ -57,6 +57,11 @@ public class ModsActivity extends BaseActivity {
     /** 槽是不是**外面给定的**（槽二级页面传进来的 ⇒ 本页不给"换槽"入口） */
     private boolean mSlotFixed;
     private Mods.Scan mScan;
+    /**
+     * 当前**显示出来的**那批模组（第 157 轮）：删除的勾选框按它取条目。
+     * ★ 必须与列表同一次 `filterAndSort` —— 另扫一遍就会"勾了 A、删了 B"。
+     */
+    private List<Mods.Info> mShown = new ArrayList<>();
     private Mods.Resolved mResolved;
 
     /**
@@ -199,6 +204,11 @@ public class ModsActivity extends BaseActivity {
                 R.string.mods_act_batch_title, R.string.mods_act_batch_sub, new Runnable() {
                     @Override public void run() { pickBatch(); }
                 });
+        // ★ 第 157 轮：四个内容页都能删（旧件挪进中转站）
+        Util.bindAction(root, R.id.row_mod_del, R.drawable.ic_trash,
+                R.string.batch_del_row, R.string.batch_del_sub, new Runnable() {
+                    @Override public void run() { promptDeleteMods(); }
+                });
 
         mContainer = (LinearLayout) root.findViewById(R.id.mod_container);
         mEmpty = (TextView) root.findViewById(R.id.mod_empty);
@@ -216,6 +226,8 @@ public class ModsActivity extends BaseActivity {
 
         Util.applySystemInsets(root);
         setContentView(root);
+        // ★ 第 157 轮：四个内容页的标题统一成「槽「X」的X」（原来只有存档 / 地图带槽名）
+        setTitle(Trans.get(this, R.string.mods_title_fmt, mSlot));
 
         // 布局里那些静态文案已搬到 Java（见 Trans）：布局够不到用户语言包
         Trans.bind(root, R.id.mod_search, R.string.mods_search_hint);
@@ -316,6 +328,94 @@ public class ModsActivity extends BaseActivity {
                 });
             }
         }, "mod-bundle-probe").start();
+    }
+
+    /**
+     * 删除模组（第 157 轮）：与地图 / 蓝图 / 存档**同一套** —— 勾选 → 确认 → **挪进中转站**。
+     *
+     * <p>★ 勾的条目取的是 {@link #mShown}（列表**当前显示的那一批**）—— 与导出那条路
+     * 故意的不同：导出允许"导全部（含被筛掉的）"，删除只能删"你眼前看到的"。</p>
+     * <p>⚠️ 目录形态的模组也是一份（`BatchIo.deletableItem(..., true)`）；
+     * 模组包内部自带的条目根本不在 `mods/` 下，天然进不来。</p>
+     */
+    private void promptDeleteMods() {
+        if (mShown == null || mShown.isEmpty()) {
+            Toast.makeText(ModsActivity.this, Trans.get(ModsActivity.this,
+                    R.string.mods_export_none_fmt, mSlot), Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (Data.gameAlive(this)) {
+            alert(Trans.get(this, R.string.game_busy_title),
+                    Trans.get(this, R.string.mods_del_busy_msg));
+            return;
+        }
+        final List<Mods.Info> shown = new ArrayList<>(mShown);
+        String[] titles = new String[shown.size()];
+        String[] subs = new String[shown.size()];
+        for (int i = 0; i < shown.size(); i++) {
+            Mods.Info m = shown.get(i);
+            titles[i] = m.title();
+            subs[i] = (m.fileName == null ? "" : m.fileName) + " · " + Util.formatSize(m.bytes)
+                    + (m.directory ? " · "
+                            + Trans.get(ModsActivity.this, R.string.mods_export_dir_hint) : "");
+        }
+        BatchIo.pickMulti(this, R.string.batch_del_row,
+                Trans.get(ModsActivity.this, R.string.batch_del_head_fmt, shown.size()),
+                titles, subs, null, null, R.string.batch_del_btn_fmt, new BatchIo.OnPick() {
+                    @Override public void onPick(List<Integer> idx) {
+                        final File kindDir = mScan == null ? null : mScan.modsDir;
+                        if (kindDir == null) return;
+                        final List<File> files = new ArrayList<>();
+                        for (Integer i : idx) files.add(shown.get(i.intValue()).file);
+                        int can = 0, cant = 0;
+                        for (File f : files) {
+                            if (BatchIo.deletableItem(f, kindDir, true)) can++; else cant++;
+                        }
+                        if (can == 0) {
+                            alert(Trans.get(ModsActivity.this, R.string.batch_del_row),
+                                    Trans.get(ModsActivity.this, R.string.batch_del_skipped_fmt, cant));
+                            return;
+                        }
+                        String msg = Trans.get(ModsActivity.this, R.string.batch_del_msg_fmt, can);
+                        if (cant > 0) {
+                            msg = msg + "\n\n" + Trans.get(ModsActivity.this,
+                                    R.string.batch_del_skipped_fmt, cant);
+                        }
+                        new AlertDialog.Builder(ModsActivity.this)
+                                .setTitle(R.string.batch_del_title)
+                                .setMessage(msg)
+                                .setPositiveButton(R.string.batch_del_ok,
+                                        new DialogInterface.OnClickListener() {
+                                            @Override public void onClick(DialogInterface d, int w) {
+                                                BatchIo.DelReport rep = BatchIo.deleteAll(
+                                                        ModsActivity.this, files, kindDir,
+                                                        Trash.modsDir(ModsActivity.this),
+                                                        new BatchIo.Deleter() {
+                                                            @Override public File delete(
+                                                                    android.content.Context c, File f,
+                                                                    File trashDir) {
+                                                                return Mods.deleteToTrash(c, kindDir,
+                                                                        f, trashDir);
+                                                            }
+                                                        }, true);
+                                                rescan();
+                                                if (rep.failed == 0) {
+                                                    Toast.makeText(ModsActivity.this,
+                                                            Trans.get(ModsActivity.this,
+                                                                    R.string.batch_del_done_fmt, rep.moved),
+                                                            Toast.LENGTH_LONG).show();
+                                                } else {
+                                                    alert(Trans.get(ModsActivity.this, R.string.batch_del_row),
+                                                            Trans.get(ModsActivity.this, R.string.batch_del_done_fmt, rep.moved)
+                                                                    + "\n"
+                                                                    + Trans.get(ModsActivity.this, R.string.batch_del_none_fmt, rep.failed));
+                                                }
+                                            }
+                                        })
+                                .setNegativeButton(R.string.cancel, null)
+                                .show();
+                    }
+                });
     }
 
     /**
@@ -902,6 +1002,7 @@ public class ModsActivity extends BaseActivity {
         }
         List<Mods.Info> shown = Mods.filterAndSort(all, mQuery, mSort, mOnlyProblems, mType,
                 sts.toArray(new Mods.State[0]));
+        mShown = shown;
         boolean filtering = mOnlyProblems || mType != Mods.TYPE_ANY || !mQuery.trim().isEmpty()
                 || mSort != Mods.SORT_NAME;
         if (mFiltered != null) {

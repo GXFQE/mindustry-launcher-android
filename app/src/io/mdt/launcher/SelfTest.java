@@ -10860,6 +10860,86 @@ public final class SelfTest {
         deleteTree(pruneDir);
         try { shareTmp.delete(); } catch (Throwable ignored) { }
 
+        // ── 第 157 轮：四个内容页**同一套**（用户列了四条不一致）────────────────
+        //  ① 行名：只有「导入模组包」不带省略号、还多一个"包"字 ⇒ 统一成「导入X…」
+        ok(stat, L, Trans.get(ctx, R.string.mods_act_import_title).endsWith("…")
+                        && !Trans.get(ctx, R.string.slot_op_import_save).contains(".msav")
+                        && !Trans.get(ctx, R.string.slot_op_export_save).contains(".msav")
+                        && Trans.get(ctx, R.string.maps_import_sub).contains(".msav")
+                        && Trans.get(ctx, R.string.save_page_import_sub).contains(".msav")
+                        && Trans.get(ctx, R.string.bp_import_sub).contains(".msch"),
+                "★行名统一：四页都是「导入X… / 导出X…」，**格式只写在副标题**"
+                        + "（原来只有存档那两行带（.msav）⇒ 地图也是 .msav 却不写）");
+        //  ② 顺序：导入 / 导出**必须相邻**（模组页原来中间夹着「复制到其他槽」）
+        android.view.View modsV = android.view.LayoutInflater.from(ctx)
+                .inflate(R.layout.activity_mods, null);
+        android.view.View impV = modsV.findViewById(R.id.row_mod_import);
+        android.view.View expV = modsV.findViewById(R.id.row_mod_export);
+        android.view.View par = impV == null ? null : (android.view.View) impV.getParent();
+        int gap = -1;
+        if (par instanceof android.view.ViewGroup && expV != null && expV.getParent() == par) {
+            android.view.ViewGroup g = (android.view.ViewGroup) par;
+            gap = Math.abs(g.indexOfChild(expV) - g.indexOfChild(impV));
+        }
+        ok(stat, L, gap == 2,
+                "★★模组页：导入与导出**相邻**（中间只隔一条分割线，差 " + gap + " 个子视图）"
+                        + "—— 原来是「导入 / 复制 / 导出」");
+        //  ③ 删除：四个页面都有那一行（`findViewById` 缺 id 是静默 null ⇒ 必须断言）
+        ok(stat, L, modsV.findViewById(R.id.row_mod_del) != null
+                        && android.view.LayoutInflater.from(ctx)
+                                .inflate(R.layout.activity_saves, null)
+                                .findViewById(R.id.row_save_del) != null,
+                "★删除行：存档页与模组页都有了（row_save_del / row_mod_del）"
+                        + " —— 缺 id 只会静默少一行，编译器不管");
+        //  ④ 存档搜索：**游戏内存档名**也要搜得到（`fileKey(名字表)`；老钥匙 fileKey 不给名字）
+        File kdir = new File(Paths.privateDir(ctx), "selftest-157");
+        deleteTree(kdir);
+        try {
+            kdir.mkdirs();
+            File ka = new File(kdir, "0.msav");
+            File kb = new File(kdir, "1.msav");
+            write(ka, new byte[10]);
+            write(kb, new byte[10]);
+            java.util.List<File> kAll = java.util.Arrays.asList(ka, kb);
+            java.util.Map<String, String> kNames = new java.util.HashMap<>();
+            kNames.put(ka.getAbsolutePath(), "Ancient Caldera");
+            ListQuery.Key<File> kk = ListQuery.fileKey(kNames);
+            ok(stat, L, ListQuery.apply(kAll, "caldera", ListQuery.SORT_NAME, false, kk)
+                            .size() == 1
+                            && ListQuery.apply(kAll, "caldera", ListQuery.SORT_NAME, false, kk)
+                                    .get(0) == ka
+                            && ListQuery.apply(kAll, "caldera", ListQuery.SORT_NAME, false,
+                                    ListQuery.FILE_KEY).isEmpty(),
+                    "★★存档：按**游戏内存档名**搜得到（caldera → 0.msav），而只搜文件名那条路搜不到"
+                            + " —— 这就是「存档只有搜索存档名」那句话背后少掉的能力");
+            ok(stat, L, ListQuery.apply(kAll, "1.msav", ListQuery.SORT_NAME, false, kk).size() == 1
+                            && ListQuery.apply(kAll, "", ListQuery.SORT_NAME, false, kk).get(0) == ka,
+                    "★反向对照：预热过名字**不耽误**按文件名搜；排序仍按文件名（0 在 1 前面）");
+            //  ⑤ 删除判据：模组允许目录形态，别的页面**只许文件**
+            File kModDir = new File(kdir, "mods");
+            File kMod = new File(kModDir, "某模组");
+            kMod.mkdirs();
+            write(new File(kMod, "mod.hjson"), "name: x".getBytes("UTF-8"));
+            ok(stat, L, BatchIo.deletableItem(kMod, kModDir, true)
+                            && !BatchIo.deletableItem(kMod, kModDir, false)
+                            && !BatchIo.deletableItem(kMod, kdir, true),
+                    "★删除判据：目录形态的模组只有**模组页**能删（allowDir=true），"
+                            + "地图/蓝图/存档那条路一律只认单文件；不在这一类目录下的永远不行");
+            //  ⑥ 真删一次：目录整棵进中转站，原件不在了
+            File kTrash = new File(kdir, "trash");
+            File kMoved = Mods.deleteToTrash(ctx, kModDir, kMod, kTrash);
+            ok(stat, L, kMoved != null && !kMod.exists()
+                            && new File(kMoved, "mod.hjson").isFile(),
+                    "★★模组删除走中转站：`mods/某模组/` 整棵挪进站里（mod.hjson 还在），原件不在了"
+                            + " —— 与地图/蓝图/存档同一条出口");
+            ok(stat, L, Mods.deleteToTrash(ctx, kModDir, kdir, kTrash) == null,
+                    "★反方向：不在 `mods/` 直接子项上的东西，删除助手一律返回 null（不删）");
+        } catch (Throwable t157) {
+            ok(stat, L, false, "第 157 轮的夹具自己抛了异常：" + t157);
+        } finally {
+            deleteTree(kdir);
+        }
+
         // ⑦ 译名链：**模组自己的 bundle** ⨁ 版本 APK 的 bundle（模组优先 —— 与游戏叠加顺序一致）
         File tmp = new File(Paths.privateDir(ctx), "selftest-mapstats");
         deleteTree(tmp);
