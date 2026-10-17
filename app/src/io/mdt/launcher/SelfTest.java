@@ -10316,9 +10316,11 @@ public final class SelfTest {
                         + " / 来源 " + crE0.core.basis + "）");
         // 元断言：陌生星球（太阳 / 模组星球）**不许**猜 ⇒ 与"没线索"同一条路（3×3 + 没线索）
         MapStats.Result crU = MapStats.analyze(coreZoneGrid(), v, nm, "sun");
-        ok(stat, L, crU.core.skip && crU.core.size == 3,
-                "★模组/陌生星球（planet:sun）⇒ **不统计**（界面整张卡不出现），不去猜它的核心"
-                        + "（实际 skip=" + crU.core.skip + "）");
+        // 原版那六种核心的 shownPlanets 是空的（isOnPlanet 口径 = 所有星球都有）⇒ 陌生星球也拿得到 3×3，
+        // 于是"一个核心都没有"只剩"内容池里真的没有核心"这一种情况（那条由 VE 那种全 false 的夹具覆盖）。
+        ok(stat, L, !crU.core.skip && crU.core.size == 3,
+                "★陌生星球（planet:sun）⇒ 原版核心不限定星球 ⇒ 按最小的 3×3 算（不 skip）"
+                        + "（实际 skip=" + crU.core.skip + " / 边长 " + crU.core.size + "）");
         // ★★ 模组星球：按内容表里的「核心 + 星球归属」算（照原版数据库 shownPlanets 的口径）
         //    夹具 = 三条模组核心：3×3 且只属于 ve-a / 4×4 属于 ve-a 与 ve-b / 5×5 不要求核心区
         java.util.List<MapStats.Def> rows = new java.util.ArrayList<>();
@@ -10340,6 +10342,19 @@ public final class SelfTest {
         // 元断言：**不要求放核心区**的核心不许被算进来（c3 是 5×5 且 requiresCoreZone=false，永远不该出现）
         ok(stat, L, MapStats.coreSizeForTable(rows, "ve-c") == 0 && MapStats.coreSizeForTable(rows, "") == 0,
                 "★元断言：requiresCoreZone=false 的核心不算（所以 ve-c 是 0），没有星球时也不乱算");
+        // ★★ 代码类模组（VE 那种）：JSON 只是补丁、`type` 甚至被注释掉 ⇒ 里面的 requiresCoreZone:false
+        //    **不许采信**（用户 2026-10-17：「**VE 不是随便摆啊**」）—— 没有 type 就当"要放核心区"
+        java.util.List<MapStats.Def> veRows = new java.util.ArrayList<>();
+        MapStats.Def v1 = new MapStats.Def(); v1.name = "ve-core-general";
+        MapStats.applyJson(v1, MapStats.jsonOf("{\"size\":4,\"requiresCoreZone\":false,"
+                + "\"shownPlanets\":[\"ve-a\"]}"), "ve");       // 没有 type ⇒ 代码类方块
+        MapStats.Def v2 = new MapStats.Def(); v2.name = "ve-core-json3";
+        MapStats.applyJson(v2, MapStats.jsonOf("{\"type\":\"CoreBlock\",\"size\":3,"
+                + "\"requiresCoreZone\":false,\"shownPlanets\":[\"ve-a\"]}"), "ve");  // 有 type ⇒ 采信
+        veRows.add(v1); veRows.add(v2);
+        ok(stat, L, MapStats.coreSizeForTable(veRows, "ve-a") == 4,
+                "★代码类模组的核心（JSON 没写 type、却写着 requiresCoreZone:false）仍按「必须放核心区」算，"
+                        + "而 JSON 自己声明了 type 的那种 false 才采信（实际 最小 " + MapStats.coreSizeForTable(veRows, "ve-a") + "）");
         // 元断言：反方向 —— 塞普罗/埃里克尔的图**不许**被 skip 掉（否则界面上这条永远看不见）
         ok(stat, L, !crO.core.skip && !crS.core.skip,
                 "★元断言：认得出来的星球（erekir / serpulo）不许 skip（实际 " + crO.core.skip + "/" + crS.core.skip + "）");

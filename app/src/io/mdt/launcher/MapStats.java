@@ -177,8 +177,11 @@ public final class MapStats {
          */
         public boolean coreZoneOnly;
 
-        /** 这行是**核心方块**（JSON 里 	ype: CoreBlock；原版表按名字认，见 {@link #VANILLA_CORES}） */
+        /** 这行是**核心方块**（JSON 里的 type: CoreBlock，或名字里带 core；原版那六种按名字认） */
         public boolean isCore;
+
+        /** JSON **自己声明了** type（= 这个方块的类我们看得见）：只有它为真才采信 requiresCoreZone */
+        public boolean jsonTyped;
 
         /**
          * 这条内容在**哪些星球页**出现（游戏 UnlockableContent.shownPlanets，JSON 里就是
@@ -1238,10 +1241,17 @@ public final class MapStats {
             else if ("placeableOn".equals(k)) d.placeableOn = bool(v, d.placeableOn);
             // ★ 2026-10-17：核心的"多大"与"是不是必须放核心区"（模组星球靠这两条判能不能用）
             else if ("size".equals(k)) d.size = (int) num(v, d.size);
-            else if ("requiresCoreZone".equals(k)) d.coreZoneOnly = bool(v, d.coreZoneOnly);
+            else if ("requiresCoreZone".equals(k)) {
+                // ★ 只有 JSON **自己声明了 type** 时才采信（代码类方块的 JSON 补丁会被代码盖掉，
+                //   VE 的 core-*.json 全是 requiresCoreZone:false，但游戏里它们明明要放核心区）
+                d.coreZoneOnly = d.jsonTyped ? bool(v, d.coreZoneOnly) : true;
+            }
             // ★ 2026-10-17：核心的星球归属（游戏 UnlockableContent.shownPlanets / isOnPlanet）
             else if ("shownPlanets".equals(k)) d.shownPlanets = planetSet(v);
-            else if ("type".equals(k) && String.valueOf(v).toLowerCase().contains("coreblock")) d.isCore = true;
+            else if ("type".equals(k)) {
+                d.jsonTyped = true;
+                if (String.valueOf(v).toLowerCase().contains("coreblock")) d.isCore = true;
+            }
             // 其余字段（requirements / size / health / plans …）与"能不能采"无关，不建模
         }
     }
@@ -1667,10 +1677,18 @@ public final class MapStats {
         int min = 0;
         for (Def d : rows) {
             if (d == null || d.name == null) continue;
-            boolean core = d.isCore || vanillaCoreSize(d.name) > 0;
-            if (!core || !d.coreZoneOnly) continue;
+            boolean core = d.isCore || vanillaCoreSize(d.name) > 0
+                    || d.name.toLowerCase().contains("core");
+            // `core-zone`（核心区地板本身）名字里也有 core，它不是核心方块
+            if (core && "core-zone".equals(d.name)) core = false;
+            if (!core) continue;
+            // 要不要"必须放核心区"：只有 JSON 自己声明过 type 的才信它的 false；其余一律按"要"算
+            boolean needsZone = !d.jsonTyped || d.coreZoneOnly;
+            if (!needsZone) continue;
             if (!d.shownPlanets.isEmpty() && !d.shownPlanets.contains("," + planet + ",")) continue;
-            int sz = d.size > 0 ? d.size : vanillaCoreSize(d.name);
+            // 原版六种以硬编码为准（生成表里没有 size 列，读出来是默认 1）；模组核心才用 JSON 的 size
+            int sz = vanillaCoreSize(d.name);
+            if (sz <= 0) sz = d.size > 0 ? d.size : 1;
             if (sz <= 0) continue;
             if (min == 0 || sz < min) min = sz;
         }
