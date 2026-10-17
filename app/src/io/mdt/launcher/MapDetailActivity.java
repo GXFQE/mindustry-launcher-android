@@ -162,11 +162,13 @@ public class MapDetailActivity extends BaseActivity {
         MapStats.Result r = b.result;
         boolean any = !r.ores.isEmpty() || !r.oreWalls.isEmpty() || !r.floors.isEmpty()
                 || !r.bonuses.isEmpty();
-        if (!any) {
+        // ★ 2026-10-17：没矿**不再整页退出** —— 「可建造」那一段与矿无关（一张只有墙和空地的图
+        //   照样有可建造格数）。那句提示保留在原位，说明为什么上面四段是空的。
+        if (any) {
+            mState.setVisibility(View.GONE);
+        } else {
             mState.setText(Trans.get(MapDetailActivity.this, R.string.stats_none));
-            return;
         }
-        mState.setVisibility(View.GONE);
         // 两类矿的口径（用户 2026-10-04 定）：**地矿**（长在地板上，用**地钻**）用"能采到"口径；
         // **墙矿**（长在墙里，要用**墙钻**）只报总格数、不报遮挡（它本身就是墙；行名带「（墙）」不会同名）
         if (!r.ores.isEmpty()) addSection(Trans.get(MapDetailActivity.this, R.string.stats_section_ore), r.ores, false);
@@ -175,7 +177,48 @@ public class MapDetailActivity extends BaseActivity {
         //   ⇒ 两段口径必须一致（都是「能采 X 格」+ 副行「共 Y 格」），否则用户会看到同名两个数
         if (!r.floors.isEmpty()) addSection(Trans.get(MapDetailActivity.this, R.string.stats_section_floor), r.floors, false);
         if (!r.bonuses.isEmpty()) addSection(Trans.get(MapDetailActivity.this, R.string.stats_section_bonus), r.bonuses, false);
+        addBuild(r);
         addTech(b);
+    }
+
+    /**
+     * 「可建造」卡片（2026-10-17 用户点单）：一张图里能放**一般建筑**多少格。
+     *
+     * <p>六桶（空地 / 拆掉后能建 / 墙和树 / 深液体 / 地板不让建 / 认不出）**恰好加满整张图**，
+     * 所以这里不另报总格数 —— 技术细节那张卡的「地图 N × M，共 Z 格」已经说过一次。
+     * 判据与游戏 `Build.validPlaceIgnoreUnits` 对齐，见 {@link MapStats.Buildable}。</p>
+     *
+     * <p>⚠️ 后两桶（地板不让建 / 认不出）平时是 0（原版只有 space/empty 是那种地板），
+     * 有才显示 —— 免得每张图都挂两行 0。</p>
+     */
+    private void addBuild(MapStats.Result r) {
+        MapStats.Buildable b = r.buildable;
+        View card = getLayoutInflater().inflate(R.layout.card_stat_section, mBox, false);
+        ((TextView) card.findViewById(R.id.stat_card_title))
+                .setText(Trans.get(MapDetailActivity.this, R.string.stats_section_build));
+        ((TextView) card.findViewById(R.id.stat_card_summary))
+                .setText(Trans.get(MapDetailActivity.this, R.string.stats_build_sum_fmt,
+                        MapStatsMods.num(b.count())));
+        LinearLayout body = (LinearLayout) card.findViewById(R.id.stat_card_body);
+        buildRow(body, R.string.stats_build_row_free, b.free);
+        buildRow(body, R.string.stats_build_row_cleared, b.cleared);
+        buildRow(body, R.string.stats_build_row_walled, b.walled);
+        buildRow(body, R.string.stats_build_row_deep, b.deep);
+        if (b.floorBlocked > 0) buildRow(body, R.string.stats_build_row_floor, b.floorBlocked);
+        if (b.unknown > 0) buildRow(body, R.string.stats_build_row_unknown, b.unknown);
+        Util.bindExpandableCard(card, R.id.stat_card, R.id.stat_card_body, R.id.stat_card_chevron);
+        mBox.addView(card);
+    }
+
+    /** 「可建造」卡片里的一行：左边是什么（`item_stat` 的样式），右边「N 格」 */
+    private void buildRow(LinearLayout parent, int titleRes, int n) {
+        View v = getLayoutInflater().inflate(R.layout.item_stat, parent, false);
+        ((TextView) v.findViewById(R.id.stat_row_title))
+                .setText(Trans.get(MapDetailActivity.this, titleRes));
+        ((TextView) v.findViewById(R.id.stat_row_count))
+                .setText(Trans.get(MapDetailActivity.this, R.string.stats_build_count_fmt,
+                        MapStatsMods.num(n)));
+        parent.addView(v);
     }
 
     /**

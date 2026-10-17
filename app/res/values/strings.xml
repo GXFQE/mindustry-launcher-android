@@ -1883,6 +1883,24 @@
     <string name="stats_attr_steam">steam</string>
     <string name="stats_attr_light">light</string>
     <string name="stats_attr_sand">sand</string>
+    <!--
+      ★★ 2026-10-17 "buildable tiles" section (user: "add the number of tiles where a building can be
+      built — counting an ordinary building: it cannot go on walls / some liquids, and buildings already
+      on the map can be deconstructed").
+      Rule follows the game's `Build.validPlaceIgnoreUnits`: the floor is not deep liquid and allows
+      placement; the block layer is air / a building (deconstructible) / a rock (can be built over).
+      The six buckets sum to the whole map, so the summary does not repeat the total tile count.
+      NOTE "deep liquid", not "liquid": shallow water IS buildable (pumps sit in it); only drownTime > 0 blocks.
+    -->
+    <string name="stats_section_build">Buildable</string>
+    <string name="stats_build_sum_fmt">%1$s tiles can hold a normal building</string>
+    <string name="stats_build_count_fmt">%1$s tiles</string>
+    <string name="stats_build_row_free">Empty ground</string>
+    <string name="stats_build_row_cleared">Buildings or rocks (clearable)</string>
+    <string name="stats_build_row_walled">Walls and trees (cannot be cleared)</string>
+    <string name="stats_build_row_deep">Deep liquid (cannot build)</string>
+    <string name="stats_build_row_floor">Floor blocks building</string>
+    <string name="stats_build_row_unknown">Unrecognised</string>
     <string name="stats_tech_size_fmt">Map %1$d × %2$d, %3$s tiles total</string>
     <string name="stats_tech_table_fmt">Content table: %1$s</string>
     <string name="stats_tech_names_fmt">Name sources: %1$s</string>

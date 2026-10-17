@@ -101,6 +101,19 @@ import java.util.zip.ZipFile;
  *       ⚠️ 加成地板**不受影响**：属性（含水/含油/高温…）是泵一类读**地板**，与钻头采什么无关。</li>
  * </ol>
  *
+ * <h3>★★ 可建造（一般建筑）的格数（2026-10-17 用户点单）</h3>
+ * 用户原话：「**再加一个可建造建筑的格数**（这里建筑按照一般建筑计算，即不能放在墙体 / 部分液体上，
+ * 地图原有的建筑可拆掉）」。判据照游戏 `mindustry.world.Build#validPlaceIgnoreUnits`
+ * （160.4 / 160.7 字节码逐句核过），逐格两条：
+ * <pre>
+ *   地板   !floor.isDeep()（深液体：单位会沉） && floor.placeableOn
+ *   方块   air || block.synthetic()（= 游戏 hasBuilding()，即"这是座建筑"、能拆）
+ *              || block.alwaysReplace（石头一类：游戏允许直接压上去）
+ * </pre>
+ * ⇒ 结果分六桶（空地 / 拆掉后能建 / 墙 / 深液体 / 地板不让建 / 认不出），见 {@link Buildable}；
+ * **六个桶加起来 == 总格数**（自检有元断言）。⚠️ 浅水**能**建（水泵就摆水里），别把 `liquidDrop`
+ * 当"液体上不能建"的判据 —— 只有 `drownTime > 0` 的深液体才挡。
+ *
  * <h3>为什么这些表要 PC 侧导、不能端上现推</h3>
  * `type:` 没写的字段取的是**类默认值**（不是 false），而"裸 new 一个类拿默认值"需要
  * 游戏运行时环境：实测裸 new 时名字必须唯一（否则 content 注册表报
@@ -133,6 +146,22 @@ public final class MapStats {
         public String name = "";
         public boolean isFloor, isOverlay, isOre, isStatic, synthetic, solid, wallOre;
         public boolean playerUnmineable, breakable, destructible, alwaysReplace, unitMoveBreakable;
+        /**
+         * ★ 地板**单位会沉下去**（游戏 `Floor.isDeep()` = `drownTime > 0`）⇒ 一般建筑放不上去。
+         *
+         * <p>2026-10-17 为「可建造格数」加的一列。原版 6 种：`deep-water` / `deep-tainted-water` /
+         * `tar` / `molten-slag` / `arkycite-floor` / `pooled-cryofluid`（浅水不算！浅水能建）。</p>
+         */
+        public boolean deep;
+
+        /**
+         * ★ 地板**允许在上面放东西**（游戏字段 `Block.placeableOn`）。原版只有 `space` / `empty`
+         * 是 false（那两张图/空图专用）。
+         *
+         * 🔴 默认值必须是 **true**：表里没有这一列的老行 = "能放"。
+         * 与 {@link #deep}（缺列时 false）**方向相反**，别照着 `on()` 的习惯想当然。
+         */
+        public boolean placeableOn = true;
         public String itemDrop = "", liquidDrop = "", attributes = "";
         public float speed = 1f, damage = 0f;
         /** 这行从哪来（{@link #SRC_VANILLA} 等；技术细节层显示） */
@@ -193,6 +222,8 @@ public final class MapStats {
             d.destructible = destructible;
             d.alwaysReplace = alwaysReplace;
             d.unitMoveBreakable = unitMoveBreakable;
+            d.placeableOn = placeableOn;
+            d.deep = deep;
             d.itemDrop = itemDrop;
             d.liquidDrop = liquidDrop;
             d.attributes = attributes;
@@ -204,7 +235,7 @@ public final class MapStats {
             return d;
         }
 
-        /** 18 列（name 在 c[0]）—— 与表文件**逐字对应**，自检拿它做往返 */
+        /** 18 列 + 2026-10-17 加的两列（name 在 c[0]）—— 与表文件**逐字对应**，自检拿它做往返 */
         static Def of(String[] c) {
             Def d = new Def();
             d.name = c[0];
@@ -225,6 +256,10 @@ public final class MapStats {
             d.destructible = on(c, 15);
             d.alwaysReplace = on(c, 16);
             d.unitMoveBreakable = on(c, 17);
+            // ⚠️ 这两列是后加的：老表（18 列）读进来时 placeableOn 必须落 **true**（能放），
+            //    deep 落 false —— 与字段声明的默认值一致
+            d.placeableOn = c.length > 18 ? on(c, 18) : true;
+            d.deep = on(c, 19);
             return d;
         }
 
@@ -232,7 +267,7 @@ public final class MapStats {
             return new String[]{name, b(isFloor), b(isOverlay), b(isOre), b(isStatic), b(synthetic),
                     b(solid), b(wallOre), itemDrop, b(playerUnmineable), String.valueOf(speed),
                     String.valueOf(damage), liquidDrop, attributes, b(breakable), b(destructible),
-                    b(alwaysReplace), b(unitMoveBreakable), source};
+                    b(alwaysReplace), b(unitMoveBreakable), b(placeableOn), b(deep), source};
         }
 
         private static boolean on(String[] c, int i) {
@@ -1131,6 +1166,10 @@ public final class MapStats {
             else if ("wallOre".equals(k)) d.wallOre = bool(v, d.wallOre);
             else if ("speedMultiplier".equals(k)) d.speed = num(v, d.speed);
             else if ("damageTaken".equals(k)) d.damage = num(v, d.damage);
+            // ★★ 2026-10-17（「可建造格数」）：深液体 / 地板能不能放 —— 与游戏同名字段
+            //    `Floor.drownTime`（`isDeep()` 就是它 > 0）与 `Block.placeableOn`
+            else if ("drownTime".equals(k)) d.deep = num(v, 0f) > 0f;
+            else if ("placeableOn".equals(k)) d.placeableOn = bool(v, d.placeableOn);
             // 其余字段（requirements / size / health / plans …）与"能不能采"无关，不建模
         }
     }
@@ -1308,6 +1347,50 @@ public final class MapStats {
         }
     }
 
+    /**
+     * ★★ **能放一般建筑的格数**（2026-10-17 用户点单：「再加一个可建造建筑的格数（这里建筑按照
+     * 一般建筑计算，即不能放在墙体 / 部分液体上，地图原有的建筑可拆掉）」）。
+     *
+     * <h3>判据照抄游戏，不是我们发明的</h3>
+     * `mindustry.world.Build#validPlaceIgnoreUnits`（160.4 / 160.7 字节码逐句核过）对
+     * **1×1、floating=false、requiresWater=false、placeableLiquid=false** 的普通建筑逐格要求：
+     * <pre>
+     *   ① 地板：!tile.floor().isDeep()      —— 深液体（单位会沉）上放不了；**浅水能放**（水泵就摆水里）
+     *           tile.floor().placeableOn    —— 原版只有 space / empty 两个地板是 false
+     *   ② 方块层：要么是 air，要么 `block.synthetic()`（= `update || destructible`，也就是游戏自己的
+     *      `hasBuilding()` —— "这是座建筑"），要么 `block.alwaysReplace`（石头一类：任何方块都能直接压上去）
+     * </pre>
+     * ⇒ 用户那句「地图原有的建筑可拆掉」落地成 **`synthetic`**：带 building 的方块在地图加载时会变成
+     * 真建筑，拆掉就空出来了；而天然墙 / 树 / 暗金属四个标志全 0（{@link Def#removable()} 为假）⇒
+     * **永远建不了**。`alwaysReplace` 那一支是石头/灌木（游戏 `Block.canReplace` 第一句就认它）。
+     *
+     * <h3>优先级：方块层 &gt; 地板层</h3>
+     * 两样都不行时算**方块层**的账（与矿那两处"按谁算"同族）：墙正好压在深液体上，挡住它的是墙。
+     *
+     * <h3>这几个数字必须刚好加起来</h3>
+     * {@link #free} + {@link #cleared} + {@link #walled} + {@link #deep} + {@link #floorBlocked}
+     * + {@link #unknown} == {@link Result#cells}（自检有一条元断言钉着，界面也按这个顺序列）。
+     */
+    public static final class Buildable {
+        /** 空地（方块层是 air，地板也允许放） */
+        public int free;
+        /** 要先拆点东西：建筑或石头一类（`synthetic` / `alwaysReplace`） */
+        public int cleared;
+        /** 方块层是拆不掉的天然地形（墙 / 树 / 暗金属…） */
+        public int walled;
+        /** 地板是深液体（单位会沉：深水 / 岩浆 / 焦油 / 酸液 / 低温液…） */
+        public int deep;
+        /** 地板本身不让放（`placeableOn=false`：space / empty） */
+        public int floorBlocked;
+        /** 方块层或地板认不出（模组内容没解析到）⇒ 不敢下结论，单独一桶 */
+        public int unknown;
+
+        /** **能放建筑的格数** = 空地 + 拆掉后能建 */
+        public int count() {
+            return free + cleared;
+        }
+    }
+
     /** 统计结果（**只给数据，不给文案** —— 文案在 strings.xml，见文案纪律） */
     public static final class Result {
         public boolean ok;
@@ -1322,6 +1405,8 @@ public final class MapStats {
         /** 认不出的内容（按格数降序） */
         public final List<Unk> unknowns = new ArrayList<>();
         public int unkOre, unkFloor, unkBonus;
+        /** 「能放一般建筑」的格数（六桶；见 {@link Buildable}） */
+        public final Buildable buildable = new Buildable();
         /** 定义表的来源（技术细节层；**码 + 数字**，见 {@link Note}） */
         public List<Note> notes = new ArrayList<>();
         public long millis;
@@ -1355,6 +1440,10 @@ public final class MapStats {
         byte[] cat = new byte[m];
         byte[] occl = new byte[m];              // 0 露天 1 可拆 2 永久 3 未知
         boolean[] wall = new boolean[m];        // 方块层：**这一格自己就是墙矿**（游戏 wallDrop 第一支）
+        // ★ 2026-10-17「可建造格数」的三个预计算（口径见 {@link Buildable} 的类注释）
+        boolean[] clear = new boolean[m];       // 方块层腾得出来：air / 建筑（能拆） / 石头（能直接压上去）
+        boolean[] floorDeep = new boolean[m];   // 地板：深液体（单位会沉）⇒ 一般建筑放不上去
+        boolean[] floorPlace = new boolean[m];  // 地板：允许在上面放东西（placeableOn）
         Def[] defs = new Def[m];
         int airId = t.airId();
         for (int id = 0; id < m; id++) {
@@ -1374,6 +1463,11 @@ public final class MapStats {
                 if (d.bonus()) cat[id] |= BONUS_FLOOR;
             }
             occl[id] = (byte) (d.isAir() ? 0 : d.removable() ? 1 : 2);
+            // ★ 可建造：`synthetic` 就是游戏的 `hasBuilding()`（= update || destructible）⇒ 那是座建筑、
+            //   地图加载后会变成真建筑、拆掉就空出来；`alwaysReplace` = 石头一类，游戏允许直接压上去。
+            clear[id] = d.isAir() || d.synthetic || d.alwaysReplace;
+            floorDeep[id] = d.deep;
+            floorPlace[id] = d.placeableOn;
         }
 
         // 计数：[类别][遮挡][id]
@@ -1466,6 +1560,23 @@ public final class MapStats {
             //    由墙矿段的「能采 / 被墙遮挡」表达（旧实现把 112,207 格宿主墙也列成"挡住资源的方块"，
             //    真机上与墙矿段同屏自相矛盾）。
             if (oc == 2 && b >= 0 && b < m && (hiddenOre || mine)) blocker[b]++;
+            // ★★ 可建造（一般建筑）—— 六桶，加起来必须等于总格数（见 {@link Buildable}）。
+            //    **方块层 > 地板层**：墙正好压在深液体上时算墙的账；认不出的单独一桶、不硬猜。
+            boolean bKnown = b >= 0 && b < m && (b == airId || defs[b] != null);
+            boolean fKnown = f >= 0 && f < m && defs[f] != null;
+            if (!bKnown || !fKnown) {
+                r.buildable.unknown++;
+            } else if (!clear[b]) {
+                r.buildable.walled++;
+            } else if (floorDeep[f]) {
+                r.buildable.deep++;
+            } else if (!floorPlace[f]) {
+                r.buildable.floorBlocked++;
+            } else if (b == airId) {
+                r.buildable.free++;
+            } else {
+                r.buildable.cleared++;
+            }
         }
 
         build(r.ores, cOre, t.blockNames, defs, nm, false, false, tab.itemNames, false, null);

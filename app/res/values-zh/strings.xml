@@ -1837,6 +1837,22 @@
     <string name="stats_attr_steam">蒸汽</string>
     <string name="stats_attr_light">光照</string>
     <string name="stats_attr_sand">含沙</string>
+    <!--
+      ★★ 2026-10-17「可建造建筑」那一段（用户：「再加一个可建造建筑的格数（这里建筑按照一般建筑计算，
+      即不能放在墙体 / 部分液体上，地图原有的建筑可拆掉）」）。
+      口径照游戏 `Build.validPlaceIgnoreUnits`：地板不是深液体、且允许放东西；方块层是 air / 建筑（能拆）/
+      石头（能直接压上去）。**六桶加起来 == 整张图**，所以摘要里不再重复总格数（技术细节那张卡已写）。
+      ⚠️「深液体」不是「液体」：浅水**能**建（水泵就摆水里），只有 drownTime > 0 的才挡。
+    -->
+    <string name="stats_section_build">可建造</string>
+    <string name="stats_build_sum_fmt">能放一般建筑 %1$s 格</string>
+    <string name="stats_build_count_fmt">%1$s 格</string>
+    <string name="stats_build_row_free">空地</string>
+    <string name="stats_build_row_cleared">建筑或石头（拆掉后能建）</string>
+    <string name="stats_build_row_walled">墙和树（拆不掉）</string>
+    <string name="stats_build_row_deep">深液体（建不了）</string>
+    <string name="stats_build_row_floor">地板不让建</string>
+    <string name="stats_build_row_unknown">认不出</string>
     <string name="stats_tech_size_fmt">地图 %1$d × %2$d，共 %3$s 格</string>
     <string name="stats_tech_table_fmt">内容表：%1$s</string>
     <string name="stats_tech_names_fmt">名字来源：%1$s</string>

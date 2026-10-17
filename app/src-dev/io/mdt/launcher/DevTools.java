@@ -871,6 +871,16 @@ final class DevTools {
                         }
                         sb.append("    可采地板: ").append(a.rowsOf(r.floors, false)).append('\n');
                         sb.append("    加成地板: ").append(a.rowsOf(r.bonuses, false)).append('\n');
+                        // ★ 可建造（2026-10-17）：与界面**同一口径、同一顺序**（六桶加起来 == 总格数）
+                        MapStats.Buildable bd = r.buildable;
+                        sb.append("    可建造: 能建 ").append(bd.count()).append(" / 共 ").append(r.cells)
+                          .append(" 格（空地 ").append(bd.free)
+                          .append(" · 拆掉后 ").append(bd.cleared)
+                          .append(" · 墙和树 ").append(bd.walled)
+                          .append(" · 深液体 ").append(bd.deep);
+                        if (bd.floorBlocked > 0) sb.append(" · 地板不让建 ").append(bd.floorBlocked);
+                        if (bd.unknown > 0) sb.append(" · 认不出 ").append(bd.unknown);
+                        sb.append("）\n");
                         sb.append("    挡住资源的: ").append(a.blockersOf(r)).append('\n');
                         if (r.unkOre + r.unkFloor + r.unkBonus > 0) {
                             sb.append("    认不出的格子: 矿 ").append(r.unkOre).append(" / 地板 ")

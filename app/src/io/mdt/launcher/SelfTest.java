@@ -10130,6 +10130,75 @@ public final class SelfTest {
                 "★加成地板**不受影响**：salt（含水含油）上面压着铜矿照样算 —— 属性是泵读地板，与钻头采什么无关"
                         + (fSalt == null ? "" : "（实际 共 " + fSalt.total + " 格）"));
 
+        // ⑥d **可建造（一般建筑）**（2026-10-17 用户：「再加一个可建造建筑的格数（这里建筑按照一般建筑
+        //    计算，即不能放在墙体 / 部分液体上，地图原有的建筑可拆掉）」）。
+        //    判据照游戏 `Build.validPlaceIgnoreUnits`（见 {@link MapStats.Buildable}）：
+        //    地板 `!isDeep() && placeableOn`；方块层 air / 建筑（`synthetic` = 游戏 `hasBuilding`，能拆）/
+        //    `alwaysReplace`（石头一类，游戏允许直接压上去）。fixture 见 {@link #buildGrid()}：4×3 逐格排满六桶。
+        MapStats.Result br = MapStats.analyze(buildGrid(), v, nm);
+        MapStats.Buildable bb = br.buildable;
+        ok(stat, L, bb.free == 2 && bb.cleared == 3 && bb.walled == 2 && bb.deep == 2
+                        && bb.floorBlocked == 1 && bb.unknown == 2,
+                "★可建造六桶：空地 2（石地 / **浅水**）· 拆掉后 3（传送带 / 玩家墙 / 石头）· 墙 2（含「墙压在深液体上」那格）"
+                        + " · 深液体 2 · 地板不让建 1（space）· 认不出 2"
+                        + "（实际 " + bb.free + "/" + bb.cleared + "/" + bb.walled + "/" + bb.deep
+                        + "/" + bb.floorBlocked + "/" + bb.unknown + "）");
+        ok(stat, L, bb.count() == 5,
+                "★「能放一般建筑」= 空地 + 拆掉后能建 = 5 格（实际 " + bb.count() + "）");
+        ok(stat, L, bb.free + bb.cleared + bb.walled + bb.deep + bb.floorBlocked + bb.unknown
+                        == br.cells,
+                "★★元断言：六桶之和 == 总格数 " + br.cells + "（实得 "
+                        + (bb.free + bb.cleared + bb.walled + bb.deep + bb.floorBlocked + bb.unknown)
+                        + "）—— 少一格就是有格子掉出了分类");
+        // 反方向①：同一个坑位把**天然墙换成玩家墙** ⇒ 墙 → 拆掉后能建（判据看字段，不看名字）
+        MsavTiles.Tiles bg2 = buildGrid();
+        bg2.blocks[6] = 2;                                    // (2,1)：stone-wall ⇒ copper-wall
+        MapStats.Buildable b2 = MapStats.analyze(bg2, v, nm).buildable;
+        ok(stat, L, b2.walled == 1 && b2.cleared == 4,
+                "★反方向①：天然墙换成玩家墙 ⇒ 墙 2→1、拆掉后 3→4（`synthetic` 就是游戏的 `hasBuilding`）"
+                        + "（实际 墙 " + b2.walled + " / 拆掉 " + b2.cleared + "）");
+        // 反方向②：浅水换成**深水** ⇒ 空地 → 深液体（浅水能建，只有 drownTime > 0 才挡）
+        MsavTiles.Tiles bg3 = buildGrid();
+        bg3.floors[1] = 7;                                    // (1,0)：water ⇒ deep-water
+        MapStats.Buildable b3 = MapStats.analyze(bg3, v, nm).buildable;
+        ok(stat, L, b3.deep == 3 && b3.free == 1,
+                "★反方向②：浅水换成深水 ⇒ 深液体 2→3、空地 2→1（水泵能摆浅水里，别拿 liquidDrop 当判据）"
+                        + "（实际 深液体 " + b3.deep + " / 空地 " + b3.free + "）");
+        // 反方向③：space 地板换成石头地板 ⇒ 地板不让建 1→0、空地 2→3
+        MsavTiles.Tiles bg4 = buildGrid();
+        bg4.floors[3] = 5;
+        MapStats.Buildable b4 = MapStats.analyze(bg4, v, nm).buildable;
+        ok(stat, L, b4.floorBlocked == 0 && b4.free == 3,
+                "★反方向③：space 地板换成石头地板 ⇒ 地板不让建 1→0、空地 2→3（`placeableOn` 那一列真的在用）"
+                        + "（实际 地板 " + b4.floorBlocked + " / 空地 " + b4.free + "）");
+        // 表里那两列本身（PC 侧用真游戏对象核过，这里钉住数值，防表被换错）
+        MapStats.Def dw = v.row("deep-water"), sw = v.row("shallow-water"), sp = v.row("space");
+        ok(stat, L, dw != null && dw.deep && sw != null && !sw.deep
+                        && sp != null && !sp.placeableOn,
+                "★表里的新两列：deep-water 是深液体 / shallow-water 不是（浅水能建）/ space 不让放东西");
+        int deepFloors = 0;
+        for (String n : new String[]{"deep-water", "deep-tainted-water", "tar", "molten-slag",
+                "arkycite-floor", "pooled-cryofluid", "shallow-water", "sand-water", "tainted-water"}) {
+            MapStats.Def d = v.row(n);
+            if (d != null && d.deep) deepFloors++;
+        }
+        ok(stat, L, deepFloors == 6,
+                "★元断言：9 种液体地板里**恰好 6 种**是深液体（其余是浅水，能建）：" + deepFloors + "/6");
+        // 模组 JSON：`drownTime` / `placeableOn` 与游戏同名字段（不然模组加的深液体永远算成能建）
+        MapStats.Table jt3 = MapStats.copyOf(v);
+        MapStats.Pack jp3 = new MapStats.Pack();
+        jp3.prefix = "x";
+        MapStats.applyModContent(jt3, jp3, "content/blocks/env/deep-tar.json",
+                "{\n  type: Floor\n  drownTime: 100\n}", new MapStats.ModResult());
+        MapStats.Def dtar = jt3.row("x-deep-tar");
+        MapStats.applyModContent(jt3, jp3, "content/blocks/env/void.json",
+                "{\n  type: Floor\n  placeableOn: false\n}", new MapStats.ModResult());
+        MapStats.Def dvoid = jt3.row("x-void");
+        ok(stat, L, dtar != null && dtar.deep && dvoid != null && !dvoid.placeableOn,
+                "★模组 JSON 的 drownTime > 0 ⇒ 深液体；placeableOn: false ⇒ 不让放（不是只认原版那 6 个名字）"
+                        + "（深液体=" + (dtar != null && dtar.deep) + " / 不让放= "
+                        + (dvoid != null && !dvoid.placeableOn) + "）");
+
         // ⑦ 译名链：**模组自己的 bundle** ⨁ 版本 APK 的 bundle（模组优先 —— 与游戏叠加顺序一致）
         File tmp = new File(Paths.privateDir(ctx), "selftest-mapstats");
         deleteTree(tmp);
@@ -10480,7 +10549,52 @@ public final class SelfTest {
         return t;
     }
 
-    /** 假译名：铜/钍/沙 + 属性词（真译名要从版本 APK 读，这里只验"组装"这一段） */    private static MapStats.Names fakeNames() {
+    /**
+     * 4×3 的手工地图：**「能放一般建筑」的六种情况**（2026-10-17 那一桶，逐格安排）。
+     *
+     * <pre>
+     *        x=0                 x=1                     x=2                    x=3
+     *  y=0  石地                 **浅水**                **深水**              **space 地板**
+     *  y=1  传送带（建筑）        玩家墙（建筑）          天然石头墙             石头（alwaysReplace）
+     *  y=2  air + 深水           石头墙 + 深水（墙优先）  认不出的方块           air + 认不出的地板
+     * </pre>
+     *
+     * 期望：空地 2 · 拆掉后 3 · 墙 2 · 深液体 2 · 地板不让建 1 · 认不出 2 = 12 格；
+     * 「能放一般建筑」= 2 + 3 = 5。
+     *
+     * ⚠️ 这张夹具专门钉住三件容易搞错的事：① **浅水能建**（只有 `drownTime > 0` 的深液体才挡）；
+     * ② **玩家墙算建筑**（`synthetic` = 游戏 `hasBuilding`，能拆）而天然石头墙不算；
+     * ③ **方块层优先于地板层**（石头墙压在深水上 ⇒ 记墙，不记深液体）。
+     */
+    private static MsavTiles.Tiles buildGrid() {
+        MsavTiles.Tiles t = new MsavTiles.Tiles();
+        t.width = 4;
+        t.height = 3;
+        String[] names = {"air", "stone-wall", "copper-wall", "conveyor", "boulder", "stone",
+                "shallow-water", "deep-water", "space", "mystery-mod-wall", "mystery-mod-floor"};
+        for (String s : names) t.blockNames.add(s);
+        int n = 12;
+        t.floors = new short[n];
+        t.ores = new short[n];
+        t.blocks = new short[n];
+        for (int i = 0; i < n; i++) t.floors[i] = 5;          // 默认石头地板
+        t.floors[1] = 6;                                      // 浅水（能建）
+        t.floors[2] = 7;                                      // 深水（不能建）
+        t.floors[3] = 8;                                      // space（地板本身不让放）
+        t.floors[8] = 7;                                      // 深水 + 空地 ⇒ 深液体
+        t.blocks[4] = 3;                                      // 传送带 ⇒ 拆掉后能建
+        t.blocks[5] = 2;                                      // 玩家墙 ⇒ 拆掉后能建
+        t.blocks[6] = 1;                                      // 天然石头墙 ⇒ 建不了
+        t.blocks[7] = 4;                                      // 石头（alwaysReplace）⇒ 直接能建
+        t.blocks[9] = 1;                                      // 天然墙压在深水上 ⇒ 算墙（方块层优先）
+        t.floors[9] = 7;
+        t.blocks[10] = 9;                                     // 认不出的方块
+        t.floors[11] = 10;                                    // 认不出的地板
+        return t;
+    }
+
+    /** 假译名：铜/钍/沙 + 属性词（真译名要从版本 APK 读，这里只验"组装"这一段） */
+    private static MapStats.Names fakeNames() {
         return new MapStats.Names() {
             @Override public String block(String i) {
                 return i;
