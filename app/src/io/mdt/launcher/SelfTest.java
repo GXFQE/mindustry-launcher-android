@@ -10504,19 +10504,22 @@ public final class SelfTest {
                 ? (List<?>) xbd.get("records") : null;
         boolean briefOk = xbd != null && "brief".equals(String.valueOf(xbd.get("mode")))
                 && xbrec != null && xbrec.size() == 1;
-        boolean briefZero = false, briefBuildable = false;
+        boolean briefZero = false, briefBuildable = false, briefTotal = false;
         if (xbrec != null) {
             for (Object oo : xbrec) {
                 Map<?, ?> o = (Map<?, ?>) oo;
                 // ★ 元断言：简洁模式里**不许**出现 reachable == 0 的记录
                 if (intOf(o, "reachable") <= 0) briefOk = false;
+                // ★ 元断言：简洁模式**只留可采数据** —— 不许有 `total`（用户：「把 total 删了啊」）
+                if (o.get("total") != null) briefTotal = true;
                 if ("buildable".equals(String.valueOf(o.get("kind")))) briefBuildable = true;
                 if ("一格都拿不到".equals(String.valueOf(o.get("name")))) briefZero = true;
             }
         }
-        ok(stat, L, briefOk && !briefZero && !briefBuildable,
+        ok(stat, L, briefOk && !briefZero && !briefBuildable && !briefTotal,
                 "★简洁模式：只写 **reachable > 0** 的记录（" + (xbrec == null ? -1 : xbrec.size())
-                        + " 条）；不可采的那条与 buildable / core **都不写**");
+                        + " 条），每条只有 `kind`/`name`/`reachable`（**没有 `total`**）；"
+                        + "不可采的那条与 buildable / core 也都不写");
         // ★★ 批量：**一行 = 一张图**（用户「每个地图是 jsonl 中的一条」）
         xmb.mode = MapStatsExport.MODE_DETAIL;
         String xbatch = MapStatsExport.jsonlBatch(

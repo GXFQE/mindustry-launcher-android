@@ -89,12 +89,12 @@ public final class MapStatsExport {
     public static final int MODE_DETAIL = 0;
     /**
      * **简洁**：只含「能采到」的那些记录（`reachable > 0`），每条只留
-     * `kind` / `name` / `reachable` / `total`。
+     * `kind` / `name` / `reachable`。
      *
-     * <p>用户 2026-10-17：「可以加个详细模式（全部数据）和简洁模式（仅含可采的）」——
-     * 简洁模式是拿去做表格用的：一张图一行一种资源，没有数字的行**没有信息量**，
-     * 所以直接不写（而不是写一条 0）。⚠️ 这条是**判据**：简洁模式里出现 `reachable == 0`
-     * 就算错（自检有一条元断言钉着）。</p>
+     * <p>用户 2026-10-17：「可以加个详细模式（全部数据）和简洁模式（仅含可采的）」→
+     * 「**简洁模式只要可采数据**」→「**把 total 删了啊**」—— `total` 是"这层一共多少格"，
+     * **不是可采数据**，所以这里不写；要总量请用详细模式。⚠️ 这条是**判据**：
+     * 简洁模式里出现 `reachable == 0` 或出现 `total` 都算错（自检有元断言钉着）。</p>
      */
     public static final int MODE_BRIEF = 1;
 
@@ -222,11 +222,12 @@ public final class MapStatsExport {
         if (rows == null) return;
         for (MapStats.Row x : rows) {
             if (x == null) continue;
-            // ★ 简洁模式只写「能采到」的（用户：「仅含可采的」）—— 0 格的行没有信息量
+            // ★ 简洁模式只写「能采到」的（用户：「仅含可采的」「把 total 删了啊」）——
+            //   0 格的行没有信息量；`total` 也不是"可采数据"，只留 `kind` / `name` / `reachable`。
             if (brief && x.reachable() <= 0) continue;
             Obj o = new Obj(kind);
             if (brief) {
-                o.str("name", x.label).num("reachable", x.reachable()).num("total", x.total);
+                o.str("name", x.label).num("reachable", x.reachable());
                 appendJson(sb, o.end());
                 continue;
             }
