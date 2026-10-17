@@ -10437,11 +10437,9 @@ public final class SelfTest {
                         && MapStatsExport.GENERATOR.equals(String.valueOf(xd.get("generator")))
                         && MapStatsExport.SITE.equals(String.valueOf(xd.get("site")))
                         && String.valueOf(xd.get("notice")).contains("https://")
-                        && "detail".equals(String.valueOf(xd.get("mode")))
-                        && intOf(xd, "index") == 1 && intOf(xd, "count") == 1
                         && xrec instanceof List && xRecs > 0,
-                "★单张导出 = **一份 JSON 文档**（一层平铺）：format/generator/site/notice/mode/index/count"
-                        + " + launcher/exportedAt/slot/map/content/engine + records（" + xRecs + " 条）");
+                "★单张导出 = **一份 JSON 文档**（一层平铺）：format/generator/site/notice"
+                        + " + launcher/exportedAt/slot/map + records（" + xRecs + " 条）");
         // ★★ 用户 2026-10-17：「"format"/"generator"/"site"怎么都是一行两个」⇒ 事实**只许写一次**
         ok(stat, L, keyCount(xdoc, "format") == 1 && keyCount(xdoc, "generator") == 1
                         && keyCount(xdoc, "site") == 1 && keyCount(xdoc, "notice") == 1
@@ -10451,15 +10449,22 @@ public final class SelfTest {
                         + keyCount(xdoc, "meta") + " 处）");
         Map<?, ?> xmap = xd == null || !(xd.get("map") instanceof Map) ? null : (Map<?, ?>) xd.get("map");
         Map<?, ?> xlau = xd == null || !(xd.get("launcher") instanceof Map) ? null : (Map<?, ?>) xd.get("launcher");
-        Map<?, ?> xcnt = xd == null || !(xd.get("content") instanceof Map) ? null : (Map<?, ?>) xd.get("content");
-        ok(stat, L, xmap != null && xlau != null && xcnt != null
+        // ★★ 声明**瘦身**（用户 2026-10-17：「声明可以留着…但是可以稍微简洁一些」，理由是内部记账
+        //    用户拿去反馈也用不到）⇒ 这几项**必须已经不在**了，否则就是又胖回去了
+        ok(stat, L, xmap != null && xlau != null
+                        && "core-zone-6x6.msav".equals(String.valueOf(xmap.get("name")))
                         && "0123456789abcdef".equals(String.valueOf(xmap.get("sha256")))
-                        && intOf(xmap, "cells") == xr.cells && intOf(xmap, "width") == xr.width
+                        && String.valueOf(xmap.get("game")).contains("160")
                         && "0.5-preview".equals(String.valueOf(xlau.get("version")))
-                        && intOf(xlau, "versionCode") == 5
-                        && "serpulo".equals(String.valueOf(xcnt.get("planet")))
-                        && intOf(xcnt, "mods") == 2,
-                "★声明里的**来源参数**：launcher 版本/vc · 地图 sha256/宽高格数 · 星球/模组数");
+                        && intOf(xlau, "code") == 5
+                        && "serpulo".equals(String.valueOf(xmap.get("planet")))
+                        && intOf(xmap, "mods") == 2
+                        && xd.get("mode") == null && xd.get("index") == null && xd.get("count") == null
+                        && xd.get("content") == null && xd.get("engine") == null
+                        && xmap.get("where") == null && xmap.get("bytes") == null
+                        && xmap.get("cells") == null && xlau.get("package") == null,
+                "★声明**瘦身**后只剩用得上的：launcher 版本·vc / 地图名·sha256·游戏版本·模组数·星球；"
+                        + "`mode`/`index`/`count`/`content`/`engine`/包名/字节数/尺寸/路径**都不写**");
         java.util.Set<String> xKnown = new java.util.HashSet<>(java.util.Arrays.asList(
                 "ore", "oreWall", "floor", "bonus", "buildable", "core", "unknownContent"));
         boolean xAll = xrec instanceof List && !((List<?>) xrec).isEmpty();
@@ -10503,9 +10508,12 @@ public final class SelfTest {
         Map<String, Object> xbd = MapStats.jsonOf(MapStatsExport.jsonDoc(xb2, xmb));
         List<?> xbrec = xbd != null && xbd.get("records") instanceof List
                 ? (List<?>) xbd.get("records") : null;
-        // 整行只有两个键（没有 format/launcher/engine/slot/… 那些细节）
-        boolean briefShape = xbd != null && xbd.size() == 2
-                && "b.msav".equals(String.valueOf(xbd.get("map"))) && xbrec != null;
+        // 整行 = 瘦身声明（9 个键）+ records；没有 mode/index/count/content/engine 那些
+        boolean briefShape = xbd != null && xbd.size() == 9
+                && xbd.get("map") instanceof Map
+                && "b.msav".equals(String.valueOf(((Map<?, ?>) xbd.get("map")).get("name")))
+                && xbd.get("mode") == null && xbd.get("content") == null && xbd.get("engine") == null
+                && xbrec != null;
         // 这张夹具没有任何格数结论（六桶全 0）、也没有核心区 ⇒ 只剩那一条可采记录
         boolean briefOk = briefShape && xbrec.size() == 1;
         boolean briefZero = false, briefTotal = false, briefUnknown = false;
@@ -10519,7 +10527,7 @@ public final class SelfTest {
             if ("一格都拿不到".equals(String.valueOf(o.get("name")))) briefZero = true;
         }
         ok(stat, L, briefOk && !briefZero && !briefTotal && !briefUnknown,
-                "★简洁模式 = **另一张表**：整行只有 `map` + `records`（没有 format/launcher/engine/… 那堆细节）；"
+                "★简洁模式 = 瘦身声明（format/generator/site/notice·launcher·exportedAt·slot·map）+ records；"
                         + "可采记录只写 `reachable > 0` 的 `kind`/`name`/`reachable`（无 `total`）；"
                         + "没有真实数字时（六桶全 0 / 没核心区）那两条**也不写**");
         // ★ 反方向：有真实数字的图（有格数、有核心区）⇒ buildable / core 必须在，且数与 Result 同源
@@ -10563,14 +10571,15 @@ public final class SelfTest {
         for (int i = 0; bShape && i < xlines.size(); i++) {
             Map<String, Object> o = MapStats.jsonOf(xlines.get(i));
             if (o == null || !(o.get("records") instanceof List)) { bShape = false; break; }
-            if (intOf(o, "index") != i + 1 || intOf(o, "count") != 2) bShape = false;
+            // 瘦身声明里**不再有** index/count（行号就是位置）；每行仍带着自己的 map
+            if (o.get("index") != null || o.get("count") != null) bShape = false;
             if (!(o.get("map") instanceof Map)) bShape = false;
         }
         // ★ 单张与批量里的同一张图**逐字节相同**（一份拼装、两处用 —— 否则两个格式会漂）
         boolean bSame = bShape && xlines.get(0).equals(MapStatsExport.jsonDoc(xr, xm));
         ok(stat, L, bShape && bSame,
-                "★批量 = **一行一张图**（" + xlines.size() + " 行 / 2 张）：index/count 标位置、"
-                        + "每行一张图的 map，且与单张导出那份**逐字节相同**");
+                "★批量 = **一行一张图**（" + xlines.size() + " 行 / 2 张）：每行自己带 map（不再写 "
+                        + "index/count —— 行号就是位置），且与单张导出那份**逐字节相同**");
         // ★★ 转义：名字里塞 引号 / 反斜杠 / 换行 / 制表 ⇒ 仍然**一行一张**，读回来逐字相同
         MapStats.Row evil = new MapStats.Row();
         evil.label = "引号\"反斜杠\\换行\n制表\t结束";

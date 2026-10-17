@@ -118,39 +118,43 @@ public final class MapStatsExport {
         return m.mode == MODE_BRIEF ? briefDoc(r, m) : detailDoc(r, m);
     }
 
-    /** 详细：声明（format/generator/site/notice/launcher/exportedAt/slot/map/content/engine）+ 全部记录 */
-    private static String detailDoc(MapStats.Result r, Meta m) {
-        Obj o = new Obj();
+    /**
+     * 声明（**两种口径共用一份**）—— 用户 2026-10-17：「声明可以留着（毕竟可以反馈/宣传），
+     * 但是可以稍微简洁一些」。
+     *
+     * <p>只留"出了事能顺着查回去"的那几项：格式版本 · 谁导的 · 项目地址 · 导出时刻 · 哪个槽 ·
+     * 地图名 + sha256 + 游戏版本 + 模组数 + 星球。**其余一律不写**：
+     * `mode` / `index` / `count` / 包名 / 字节数 / 宽高格数 / 来源路径 / 内容表规模 / 引擎耗时 /
+     * `modsSkipped`·`modsFailed` —— 那些是内部记账，用户拿去反馈也用不到。</p>
+     */
+    private static void header(Obj o, Meta m) {
         o.str("format", FORMAT)
                 .str("generator", GENERATOR)
                 .str("site", SITE)
-                .str("notice", m.notice)
-                .str("mode", "detail")
-                .num("index", m.index)
-                .num("count", m.count);
+                .str("notice", m.notice);
         o.raw("launcher", "{" + Str.of("version", m.launcherVersion)
-                + ",\"versionCode\":" + m.launcherCode
-                + ",\"package\":" + Str.quote(m.launcherPackage) + "}");
+                + ",\"code\":" + m.launcherCode + "}");
         o.str("exportedAt", m.exportedAt).str("slot", m.slot);
         o.raw("map", "{" + Str.of("name", m.mapName)
-                + ",\"source\":" + Str.quote(m.mapSource)
-                + ",\"where\":" + Str.quote(m.mapWhere)
-                + ",\"bytes\":" + m.mapBytes
                 + ",\"sha256\":" + Str.quote(m.mapSha256)
-                + ",\"width\":" + r.width
-                + ",\"height\":" + r.height
-                + ",\"cells\":" + r.cells + "}");
-        o.raw("content", "{" + Str.of("table", "vanilla+mods+patch")
-                + ",\"rows\":" + m.tableRows
+                + ",\"game\":" + Str.quote(gameOf(m))
                 + ",\"mods\":" + (m.mods < 0 ? "null" : String.valueOf(m.mods))
-                + ",\"modsSkipped\":" + m.modsSkipped
-                + ",\"modsFailed\":" + m.modsFailed
-                + ",\"planet\":" + Str.quote(m.planet)
-                + ",\"gameApk\":" + Str.quote(m.gameApk)
-                + ",\"gameVersion\":" + Str.quote(m.gameVersion) + "}");
-        o.raw("engine", "{\"stats\":\"F21\",\"millis\":" + r.millis
-                + ",\"micros\":" + r.micros
-                + ",\"notes\":" + notes(r.notes) + "}");
+                + ",\"planet\":" + Str.quote(m.planet) + "}");
+    }
+
+    /** `Mindustry-160.apk 160` 这种一句话的出处（缺哪个就只写另一个） */
+    private static String gameOf(Meta m) {
+        String apk = m.gameApk == null ? "" : m.gameApk;
+        String ver = m.gameVersion == null ? "" : m.gameVersion;
+        if (apk.isEmpty()) return ver;
+        if (ver.isEmpty()) return apk;
+        return apk + " " + ver;
+    }
+
+    /** 详细：声明 + **全部字段**的记录（给人核对/存证用） */
+    private static String detailDoc(MapStats.Result r, Meta m) {
+        Obj o = new Obj();
+        header(o, m);
         o.raw("records", recordsJson(r));
         return o.end();
     }
@@ -159,18 +163,19 @@ public final class MapStatsExport {
      * **简洁**：**只要玩家在真实体验里用得上的数字**（用户 2026-10-17：「不要那堆细节，
      * 只要用户在真实体验时可以用到的数据」）。
      *
-     * <p>整行只有两样：`map`（这张图叫什么，一行一张图得认得出）与 `records`——
-     * 每种资源**能采到多少格**、**能建多少格**、**核心区多少格 / 最多摆几个核心**。
-     * 🔴 不写的东西（都是"细节"，玩家用不上）：启动器/版本/时刻/槽/引擎耗时、`sha256`/尺寸/字节数、
-     * 内容表规模、`origin`/`source`/`internals`、`total`、明露/散落/埋住/优先级、可建造六桶与地板名单、
-     * 核心区 `usable`/`size`/`basis`/`skip`、认不出的内容。</p>
+     * <p>结构 = **瘦身声明**（见 {@link #header}）+ `records`——每种资源**能采到多少格**、
+     * **能建多少格**、**核心区多少格 / 最多摆几个核心**。声明用户明确要求留着
+     * （「毕竟可以反馈/宣传」），但只留查得回来源的那几项；`records` 里只留玩家真会用到的数。
+     * 🔴 记录里不写的（都是"细节"，玩家用不上）：`origin`/`source`/`internals`、`total`、
+     * 明露/散落/埋住/优先级、可建造六桶与地板名单、核心区 `usable`/`size`/`basis`/`skip`、
+     * 认不出的内容。</p>
      *
      * <p>⚠️ 两条**判据**（自检钉着）：`reachable == 0` 的行不写；核心区没有真实数据
      * （`zone == 0` 或 `skip`）时 `core` 这一条也不写 —— 与界面上"整张卡不出现"同一个判据。</p>
      */
     private static String briefDoc(MapStats.Result r, Meta m) {
         Obj o = new Obj();
-        o.str("map", m.mapName);
+        header(o, m);
         StringBuilder sb = new StringBuilder(1024).append('[');
         briefRows(sb, r.ores, "ore");
         briefRows(sb, r.oreWalls, "oreWall");
