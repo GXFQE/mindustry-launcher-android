@@ -1677,14 +1677,12 @@ public final class MapStats {
         int min = 0;
         for (Def d : rows) {
             if (d == null || d.name == null) continue;
-            boolean core = d.isCore || vanillaCoreSize(d.name) > 0
-                    || d.name.toLowerCase().contains("core");
-            // `core-zone`（核心区地板本身）名字里也有 core，它不是核心方块
-            if (core && "core-zone".equals(d.name)) core = false;
-            if (!core) continue;
-            // 要不要"必须放核心区"：只有 JSON 自己声明过 type 的才信它的 false；其余一律按"要"算
-            boolean needsZone = !d.jsonTyped || d.coreZoneOnly;
-            if (!needsZone) continue;
+            // ★ 只认 **JSON 自己声明了 type: CoreBlock** 的方块（`isCore`）。
+            //   名字里带 core 的兜底已经删掉：用户 2026-10-17「**用名字是最不靠谱的啊**」，
+            //   而代码/脚本类模组（VE 是 JSON + JS + Java：`hasScripts:true` / `java:true`）
+            //   核心的类在 dex 或 JS 里，我们看不见 ⇒ 不猜（那条星球就不统计）。
+            if (!d.isCore) continue;
+            if (!d.coreZoneOnly) continue;
             if (!d.shownPlanets.isEmpty() && !d.shownPlanets.contains("," + planet + ",")) continue;
             // 原版六种以硬编码为准（生成表里没有 size 列，读出来是默认 1）；模组核心才用 JSON 的 size
             int sz = vanillaCoreSize(d.name);
