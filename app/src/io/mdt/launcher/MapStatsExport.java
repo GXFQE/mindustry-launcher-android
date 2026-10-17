@@ -99,129 +99,27 @@ public final class MapStatsExport {
     public static final int MODE_BRIEF = 1;
 
     /**
-     * **内部**：把一张图的「声明行 + 每记录一行」拼成文本（{@link #jsonDoc} 拿它压成一个 JSON）。
-     *
-     * <p>⚠️ 这**不是**对外的文件格式 —— 对外的两种形态是
-     * {@link #jsonDoc}（单张 = 整份 `.json`）与 {@link #jsonlBatch}（多张 = 一个 `.jsonl`，
-     * **一行一张图**）。这里保留逐行形态只为拼装方便 + 自检能逐条核对。</p>
-     */
-    public static String jsonl(MapStats.Result r, Meta m) {
-        boolean brief = m.mode == MODE_BRIEF;
-        StringBuilder sb = new StringBuilder(4096);
-        sb.append(metaLine(r, m, records(r, brief))).append('\n');
-        rows(sb, r.ores, "ore", brief);
-        rows(sb, r.oreWalls, "oreWall", brief);
-        rows(sb, r.floors, "floor", brief);
-        rows(sb, r.bonuses, "bonus", brief);
-        if (!brief) {
-            sb.append(buildableLine(r.buildable)).append('\n');
-            sb.append(coreLine(r.core)).append('\n');
-            if (r.unknowns != null) {
-                for (MapStats.Unk u : r.unknowns) {
-                    if (u == null) continue;
-                    sb.append(new Obj("unknownContent")
-                            .str("name", u.name)
-                            .num("ore", u.ore).num("floor", u.floor).num("bonus", u.bonus)
-                            .end()).append('\n');
-                }
-            }
-        }
-        return sb.toString();
-    }
-
-    /**
-     * **批量**：一个 JSONL 文件，**一行 = 一张地图的完整 JSON**（与单张导出那份文档**逐字节同构**）。
-     *
-     * <p>用户 2026-10-17：「我的意思是**每个地图是 jsonl 中的一条**」—— 所以不是"声明块 + 若干行记录"，
-     * 而是**一张图一行**：`jq -c` / `grep` 逐行处理时，每行都是一张图的全量数据（声明 + 记录都在里面）；
-     * `meta.index` / `meta.count` 仍标出它在批次里的位置（文件少了几行时好定位是哪张）。</p>
-     *
-     * <p>★ 一行成立的**前提** = 生成的 JSON 里**没有任何裸换行**（名字里的换行已转义成 `\n` 两个字符）——
-     * 自检有一条"名字里带换行 ⇒ 行数不变"钉着这个前提。</p>
-     *
-     * <p>★ `index` / `count` **在这里填**（不交给调用方）—— 批次语义只该有一处实现。</p>
-     */
-    public static String jsonlBatch(List<MapStats.Result> rs, List<Meta> ms) {
-        StringBuilder sb = new StringBuilder(8192);
-        int n = rs == null ? 0 : rs.size();
-        for (int i = 0; i < n; i++) {
-            MapStats.Result r = rs.get(i);
-            Meta m = ms == null || i >= ms.size() ? null : ms.get(i);
-            if (r == null || m == null) continue;
-            m.index = i + 1;
-            m.count = n;
-            sb.append(jsonDoc(r, m)).append('\n');
-        }
-        return sb.toString();
-    }
-
-    /**
      * **一张地图的完整 JSON**（单张导出 = 整份文件；批量 = JSONL 的**一行**，用户 2026-10-17 定的形态）。
      *
-     * <p>结构 = `{format, generator, site, meta, recordCount, records:[...]}`：
-     * `meta` 是声明，`records` 是这张图的各条记录（详细模式含 `buildable` / `core` / `unknownContent`）。
-     * 两种格式**共用这一份拼装** ⇒ 单张与批量里同一张图的内容不会漂。</p>
+     * <p>结构 = **一层平铺**：`{format, generator, site, notice, mode, index, count, launcher,
+     * exportedAt, slot, map, content, engine, records:[...]}` —— 每个事实**只出现一次**。
+     * ⚠️ 原来这里是"文档头 + `meta` 各带一份 format/generator/site"（用户当场问
+     * 「"format"/"generator"/"site"怎么都是一行两个」）；现在 `meta` 那层删掉了，
+     * 与 `records` 重复的 `recordCount` / `meta.records` 也一并删掉。</p>
+     *
+     * <p>`records` 每条都带 `kind`（`ore`/`oreWall`/`floor`/`bonus`/`buildable`/`core`/`unknownContent`）；
+     * 详细模式含 `buildable`/`core`/`unknownContent`，简洁模式只有"能采到的"那几条。</p>
      */
     public static String jsonDoc(MapStats.Result r, Meta m) {
-        String body = jsonl(r, m);
-        int cut = body.indexOf('\n');
-        if (cut < 0) return "{}";
-        StringBuilder sb = new StringBuilder(body.length() + 96);
-        sb.append("{\"format\":").append(Str.quote(FORMAT))
-                .append(",\"generator\":").append(Str.quote(GENERATOR))
-                .append(",\"site\":").append(Str.quote(SITE))
-                .append(",\"meta\":").append(body, 0, cut)
-                .append(",\"recordCount\":").append(records(r, m.mode == MODE_BRIEF))
-                .append(",\"records\":[");
-        // ★ 只按裸 `\n` 切 —— 名字里的换行已被转义成 `\n`（两个字符），不会混进来。
-        //   自检有一条"名字里带换行 ⇒ 行数不变"钉着这个前提。
-        String rest = body.substring(cut + 1);
-        boolean first = true;
-        int from = 0;
-        for (int i = 0; i < rest.length(); i++) {
-            if (rest.charAt(i) != '\n') continue;
-            if (i > from) {
-                if (!first) sb.append(',');
-                sb.append(rest, from, i);
-                first = false;
-            }
-            from = i + 1;
-        }
-        return sb.append("]}").toString();
-    }
-
-    /** 这份导出会写多少条**记录**（不含声明行；简洁模式只算 `reachable > 0` 的） */
-    static int records(MapStats.Result r, boolean brief) {
-        int n = keep(r.ores, brief) + keep(r.oreWalls, brief) + keep(r.floors, brief)
-                + keep(r.bonuses, brief);
-        if (brief) return n;
-        n += 2;                                  // buildable + core
-        if (r.unknowns != null) n += r.unknowns.size();
-        return n;
-    }
-
-    private static int keep(List<MapStats.Row> rows, boolean brief) {
-        if (rows == null) return 0;
-        if (!brief) return rows.size();
-        int n = 0;
-        for (MapStats.Row x : rows) {
-            if (x != null && x.reachable() > 0) n++;
-        }
-        return n;
-    }
-
-    // ── 第一行：声明 ──────────────────────────────────────────────────────
-
-    static String metaLine(MapStats.Result r, Meta m, int records) {
-        Obj o = new Obj("meta");
+        boolean brief = m.mode == MODE_BRIEF;
+        Obj o = new Obj();
         o.str("format", FORMAT)
                 .str("generator", GENERATOR)
                 .str("site", SITE)
                 .str("notice", m.notice)
-                .str("mode", m.mode == MODE_BRIEF ? "brief" : "detail")
+                .str("mode", brief ? "brief" : "detail")
                 .num("index", m.index)
-                .num("count", m.count)
-                .num("records", records);
+                .num("count", m.count);
         o.raw("launcher", "{" + Str.of("version", m.launcherVersion)
                 + ",\"versionCode\":" + m.launcherCode
                 + ",\"package\":" + Str.quote(m.launcherPackage) + "}");
@@ -245,7 +143,64 @@ public final class MapStatsExport {
         o.raw("engine", "{\"stats\":\"F21\",\"millis\":" + r.millis
                 + ",\"micros\":" + r.micros
                 + ",\"notes\":" + notes(r.notes) + "}");
+        o.raw("records", recordsJson(r, brief));
         return o.end();
+    }
+
+    /**
+     * **批量**：一个 JSONL 文件，**一行 = 一张地图的完整 JSON**（与单张导出那份文档**逐字节同构**）。
+     *
+     * <p>用户 2026-10-17：「我的意思是**每个地图是 jsonl 中的一条**」—— 所以不是"声明块 + 若干行记录"，
+     * 而是**一张图一行**：`jq -c` / `grep` 逐行处理时，每行都是一张图的全量数据；
+     * `index` / `count` 标出它在批次里的位置（文件少了几行时好定位是哪张）。</p>
+     *
+     * <p>★ 一行成立的**前提** = 生成的 JSON 里**没有任何裸换行**（名字里的换行已转义成 `\n` 两个字符）——
+     * 自检有一条"名字里带换行 ⇒ 行数不变"钉着这个前提。</p>
+     *
+     * <p>★ `index` / `count` **在这里填**（不交给调用方）—— 批次语义只该有一处实现。</p>
+     */
+    public static String jsonlBatch(List<MapStats.Result> rs, List<Meta> ms) {
+        StringBuilder sb = new StringBuilder(8192);
+        int n = rs == null ? 0 : rs.size();
+        for (int i = 0; i < n; i++) {
+            MapStats.Result r = rs.get(i);
+            Meta m = ms == null || i >= ms.size() ? null : ms.get(i);
+            if (r == null || m == null) continue;
+            m.index = i + 1;
+            m.count = n;
+            sb.append(jsonDoc(r, m)).append('\n');
+        }
+        return sb.toString();
+    }
+
+    /** `records` 数组（详细 / 简洁在这里分流，调用方只看得到一个数组） */
+    private static String recordsJson(MapStats.Result r, boolean brief) {
+        StringBuilder sb = new StringBuilder(2048);
+        sb.append('[');
+        rowJson(sb, r.ores, "ore", brief);
+        rowJson(sb, r.oreWalls, "oreWall", brief);
+        rowJson(sb, r.floors, "floor", brief);
+        rowJson(sb, r.bonuses, "bonus", brief);
+        if (!brief) {
+            appendJson(sb, buildableLine(r.buildable));
+            appendJson(sb, coreLine(r.core));
+            if (r.unknowns != null) {
+                for (MapStats.Unk u : r.unknowns) {
+                    if (u == null) continue;
+                    appendJson(sb, new Obj("unknownContent")
+                            .str("name", u.name)
+                            .num("ore", u.ore).num("floor", u.floor).num("bonus", u.bonus)
+                            .end());
+                }
+            }
+        }
+        return sb.append(']').toString();
+    }
+
+    /** 往数组里追加一个已拼好的 JSON 对象（第一个不加逗号） */
+    private static void appendJson(StringBuilder sb, String json) {
+        if (sb.length() > 1) sb.append(',');
+        sb.append(json);
     }
 
     private static String notes(List<MapStats.Note> ns) {
@@ -263,7 +218,7 @@ public final class MapStatsExport {
 
     // ── 数据行 ────────────────────────────────────────────────────────────
 
-    private static void rows(StringBuilder sb, List<MapStats.Row> rows, String kind, boolean brief) {
+    private static void rowJson(StringBuilder sb, List<MapStats.Row> rows, String kind, boolean brief) {
         if (rows == null) return;
         for (MapStats.Row x : rows) {
             if (x == null) continue;
@@ -272,7 +227,7 @@ public final class MapStatsExport {
             Obj o = new Obj(kind);
             if (brief) {
                 o.str("name", x.label).num("reachable", x.reachable()).num("total", x.total);
-                sb.append(o.end()).append('\n');
+                appendJson(sb, o.end());
                 continue;
             }
             o.str("name", x.label)
@@ -289,7 +244,7 @@ public final class MapStatsExport {
             if (x.drop != null && !x.drop.isEmpty()) o.str("drop", x.drop);
             if (x.liquid != null && !x.liquid.isEmpty()) o.str("liquid", x.liquid);
             if (x.attrs != null && !x.attrs.isEmpty()) o.str("attrs", x.attrs);
-            sb.append(o.end()).append('\n');
+            appendJson(sb, o.end());
         }
     }
 
@@ -339,30 +294,44 @@ public final class MapStatsExport {
     // ── 极小的 JSON 拼装（只写不读；读的那份在 MapStats 里） ──────────────
 
     private static final class Obj {
-        private final StringBuilder b;
+        private final StringBuilder b = new StringBuilder(192);
+
+        /** 不带 `kind` 的对象（导出文档的顶层就是它 —— 一张图的统计不需要"我是个 meta"这种自我介绍） */
+        Obj() {
+            b.append('{');
+        }
 
         Obj(String kind) {
-            b = new StringBuilder(192);
-            b.append("{\"kind\":").append(Str.quote(kind));
+            this();
+            b.append("\"kind\":").append(Str.quote(kind));
+        }
+
+        /** 逗号只在"已经有内容"时加 —— 无 kind 的对象第一个字段不能以逗号开头 */
+        private void sep() {
+            if (b.length() > 1) b.append(',');
         }
 
         Obj str(String k, String v) {
-            b.append(',').append(Str.quote(k)).append(':').append(Str.quote(v == null ? "" : v));
+            sep();
+            b.append(Str.quote(k)).append(':').append(Str.quote(v == null ? "" : v));
             return this;
         }
 
         Obj num(String k, long v) {
-            b.append(',').append(Str.quote(k)).append(':').append(v);
+            sep();
+            b.append(Str.quote(k)).append(':').append(v);
             return this;
         }
 
         Obj bool(String k, boolean v) {
-            b.append(',').append(Str.quote(k)).append(':').append(v);
+            sep();
+            b.append(Str.quote(k)).append(':').append(v);
             return this;
         }
 
         Obj raw(String k, String json) {
-            b.append(',').append(Str.quote(k)).append(':').append(json);
+            sep();
+            b.append(Str.quote(k)).append(':').append(json);
             return this;
         }
 

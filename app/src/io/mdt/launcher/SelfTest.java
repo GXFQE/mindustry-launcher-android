@@ -10420,15 +10420,15 @@ public final class SelfTest {
 
         // ⑥f **导出统计**（2026-10-17 用户：「给我们的统计表加个导出的功能…导出文件加一个由启动器
         //    导出的声明」→「我的意思是**每个地图是 jsonl 中的一条**」→「**删掉内部入口**，入口选择
-        //    一个地图就是 json，多个就是 jsonl」）
-        //    形态：**一张地图 = 一份 JSON 文档**（`.json`）；勾多张 = 一个 `.jsonl`，**一行就是这样一份**。
-        //    ★ 尺子：① 行数 == 勾的张数（名字里的换行必须被转义，否则"一行一张"就没了）
-        //      ② 每行都读得回、`recordCount` == records 条数、`meta.index/count` 对得上
+        //    一个地图就是 json，多个就是 jsonl」→「**"format"/"generator"/"site"怎么都是一行两个**」）
+        //    形态：**一张地图 = 一份 JSON 文档**（一层平铺、每个事实只写一次）；勾多张 = 一个 JSONL，
+        //    **一行就是这样一份**。
+        //    ★ 尺子：① 行数 == 勾的张数（名字里的换行必须被转义）
+        //      ② 每个事实**只出现一次**（不许再有 `meta` 层 / `recordCount`）
         //      ③ 数字与界面同源（可建造六桶相加 == 总格数、核心区与 Result 同源）
         MapStats.Result xr = MapStats.analyze(coreZoneGrid(), v, nm, "serpulo");
         MapStatsExport.Meta xm = statsMeta("core-zone-6x6.msav", "0123456789abcdef",
                 MapStatsExport.MODE_DETAIL);
-        final int xWant = MapStatsExport.records(xr, false);
         String xdoc = MapStatsExport.jsonDoc(xr, xm);
         Map<String, Object> xd = MapStats.jsonOf(xdoc);
         Object xrec = xd == null ? null : xd.get("records");
@@ -10436,28 +10436,30 @@ public final class SelfTest {
         ok(stat, L, xd != null && MapStatsExport.FORMAT.equals(String.valueOf(xd.get("format")))
                         && MapStatsExport.GENERATOR.equals(String.valueOf(xd.get("generator")))
                         && MapStatsExport.SITE.equals(String.valueOf(xd.get("site")))
-                        && xd.get("meta") instanceof Map
-                        && xRecs == intOf(xd, "recordCount") && xRecs == xWant,
-                "★单张导出 = **一份 JSON 文档**：format / generator / site / meta / recordCount / records"
-                        + "（records 条数 == recordCount == " + xWant + "，实际 " + xRecs + "）");
-        Map<?, ?> xm0 = xd != null && xd.get("meta") instanceof Map ? (Map<?, ?>) xd.get("meta") : null;
-        Object xmap = xm0 == null ? null : xm0.get("map");
-        Object xlau = xm0 == null ? null : xm0.get("launcher");
-        Object xcnt = xm0 == null ? null : xm0.get("content");
-        ok(stat, L, xm0 != null && "meta".equals(String.valueOf(xm0.get("kind")))
-                        && "detail".equals(String.valueOf(xm0.get("mode")))
-                        && intOf(xm0, "index") == 1 && intOf(xm0, "count") == 1
-                        && String.valueOf(xm0.get("notice")).contains("https://")
-                        && xmap instanceof Map && xlau instanceof Map && xcnt instanceof Map
-                        && "0123456789abcdef".equals(String.valueOf(((Map<?, ?>) xmap).get("sha256")))
-                        && intOf((Map<?, ?>) xmap, "cells") == xr.cells
-                        && intOf((Map<?, ?>) xmap, "width") == xr.width
-                        && "0.5-preview".equals(String.valueOf(((Map<?, ?>) xlau).get("version")))
-                        && intOf((Map<?, ?>) xlau, "versionCode") == 5
-                        && "serpulo".equals(String.valueOf(((Map<?, ?>) xcnt).get("planet")))
-                        && intOf((Map<?, ?>) xcnt, "mods") == 2,
-                "★声明（meta）：kind/mode/index/count · notice 含项目地址 · launcher 版本/vc ·"
-                        + " 地图 sha256/宽高格数 · 星球/模组数");
+                        && String.valueOf(xd.get("notice")).contains("https://")
+                        && "detail".equals(String.valueOf(xd.get("mode")))
+                        && intOf(xd, "index") == 1 && intOf(xd, "count") == 1
+                        && xrec instanceof List && xRecs > 0,
+                "★单张导出 = **一份 JSON 文档**（一层平铺）：format/generator/site/notice/mode/index/count"
+                        + " + launcher/exportedAt/slot/map/content/engine + records（" + xRecs + " 条）");
+        // ★★ 用户 2026-10-17：「"format"/"generator"/"site"怎么都是一行两个」⇒ 事实**只许写一次**
+        ok(stat, L, keyCount(xdoc, "format") == 1 && keyCount(xdoc, "generator") == 1
+                        && keyCount(xdoc, "site") == 1 && keyCount(xdoc, "notice") == 1
+                        && keyCount(xdoc, "meta") == 0 && keyCount(xdoc, "recordCount") == 0,
+                "★每个事实**只写一次**：format/generator/site/notice 各 1 处，且不再有 `meta` 层与"
+                        + " `recordCount`（实际 format " + keyCount(xdoc, "format") + " 处 / meta "
+                        + keyCount(xdoc, "meta") + " 处）");
+        Map<?, ?> xmap = xd == null || !(xd.get("map") instanceof Map) ? null : (Map<?, ?>) xd.get("map");
+        Map<?, ?> xlau = xd == null || !(xd.get("launcher") instanceof Map) ? null : (Map<?, ?>) xd.get("launcher");
+        Map<?, ?> xcnt = xd == null || !(xd.get("content") instanceof Map) ? null : (Map<?, ?>) xd.get("content");
+        ok(stat, L, xmap != null && xlau != null && xcnt != null
+                        && "0123456789abcdef".equals(String.valueOf(xmap.get("sha256")))
+                        && intOf(xmap, "cells") == xr.cells && intOf(xmap, "width") == xr.width
+                        && "0.5-preview".equals(String.valueOf(xlau.get("version")))
+                        && intOf(xlau, "versionCode") == 5
+                        && "serpulo".equals(String.valueOf(xcnt.get("planet")))
+                        && intOf(xcnt, "mods") == 2,
+                "★声明里的**来源参数**：launcher 版本/vc · 地图 sha256/宽高格数 · 星球/模组数");
         java.util.Set<String> xKnown = new java.util.HashSet<>(java.util.Arrays.asList(
                 "ore", "oreWall", "floor", "bonus", "buildable", "core", "unknownContent"));
         boolean xAll = xrec instanceof List && !((List<?>) xrec).isEmpty();
@@ -10498,12 +10500,10 @@ public final class SelfTest {
         xb2.ores.add(zeroRow);
         MapStatsExport.Meta xmb = statsMeta("b.msav", "bb", MapStatsExport.MODE_BRIEF);
         Map<String, Object> xbd = MapStats.jsonOf(MapStatsExport.jsonDoc(xb2, xmb));
-        Map<?, ?> xbm = xbd != null && xbd.get("meta") instanceof Map ? (Map<?, ?>) xbd.get("meta") : null;
         List<?> xbrec = xbd != null && xbd.get("records") instanceof List
                 ? (List<?>) xbd.get("records") : null;
-        boolean briefOk = xbd != null && xbm != null
-                && "brief".equals(String.valueOf(xbm.get("mode")))
-                && xbrec != null && xbrec.size() == 1 && intOf(xbd, "recordCount") == 1;
+        boolean briefOk = xbd != null && "brief".equals(String.valueOf(xbd.get("mode")))
+                && xbrec != null && xbrec.size() == 1;
         boolean briefZero = false, briefBuildable = false;
         if (xbrec != null) {
             for (Object oo : xbrec) {
@@ -10526,19 +10526,15 @@ public final class SelfTest {
         boolean bShape = xlines.size() == 2;
         for (int i = 0; bShape && i < xlines.size(); i++) {
             Map<String, Object> o = MapStats.jsonOf(xlines.get(i));
-            if (o == null || !(o.get("meta") instanceof Map) || !(o.get("records") instanceof List)) {
-                bShape = false;
-                break;
-            }
-            Map<?, ?> m = (Map<?, ?>) o.get("meta");
-            if (intOf(m, "index") != i + 1 || intOf(m, "count") != 2) bShape = false;
-            if (intOf(o, "recordCount") != ((List<?>) o.get("records")).size()) bShape = false;
+            if (o == null || !(o.get("records") instanceof List)) { bShape = false; break; }
+            if (intOf(o, "index") != i + 1 || intOf(o, "count") != 2) bShape = false;
+            if (!(o.get("map") instanceof Map)) bShape = false;
         }
         // ★ 单张与批量里的同一张图**逐字节相同**（一份拼装、两处用 —— 否则两个格式会漂）
         boolean bSame = bShape && xlines.get(0).equals(MapStatsExport.jsonDoc(xr, xm));
         ok(stat, L, bShape && bSame,
-                "★批量 = **一行一张图**（" + xlines.size() + " 行 / 2 张）：每行 recordCount 对得上、"
-                        + "index/count 标位置，且与单张导出那份**逐字节相同**");
+                "★批量 = **一行一张图**（" + xlines.size() + " 行 / 2 张）：index/count 标位置、"
+                        + "每行一张图的 map，且与单张导出那份**逐字节相同**");
         // ★★ 转义：名字里塞 引号 / 反斜杠 / 换行 / 制表 ⇒ 仍然**一行一张**，读回来逐字相同
         MapStats.Row evil = new MapStats.Row();
         evil.label = "引号\"反斜杠\\换行\n制表\t结束";
@@ -13081,6 +13077,18 @@ public final class SelfTest {
         } catch (Throwable t) {
             return Integer.MIN_VALUE;
         }
+    }
+
+    /** ⑥f 用：某个键在文本里出现几次（钉"每个事实只写一次"） */
+    private static int keyCount(String json, String key) {
+        if (json == null || key == null) return 0;
+        String pat = "\"" + key + "\":";
+        int n = 0, from = 0, i;
+        while ((i = json.indexOf(pat, from)) >= 0) {
+            n++;
+            from = i + pat.length();
+        }
+        return n;
     }
 
     /** ⑥f 用：造一份**声明**（除地图名 / sha / 口径外都固定 —— 断言只该盯这几样） */
