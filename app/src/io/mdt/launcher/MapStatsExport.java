@@ -93,9 +93,10 @@ public final class MapStatsExport {
      * `core`（核心区域）—— 用户 2026-10-17：「我们统计的可建造区域以及核心区域也算」。
      *
      * <p>用户 2026-10-17：「可以加个详细模式（全部数据）和简洁模式（仅含可采的）」→
-     * 「**简洁模式只要可采数据**」→「**把 total 删了啊**」—— `total` 是"这层一共多少格"，
-     * **不是可采数据**，所以这里不写；要总量请用详细模式。⚠️ 这条是**判据**：
-     * 简洁模式里出现 `reachable == 0` 或出现 `total` 都算错（自检有元断言钉着）。</p>
+     * 「**简洁模式只要可采数据**」→「**把 total 删了啊**」→「**简洁模式只有真实数据的啊**」——
+     * `total` 是"这层一共多少格"，不是可采数据；核心区没数（`zone == 0` / `skip`）时那一串 0
+     * 也不是数据 ⇒ **这两种都不写**。⚠️ 这条是**判据**：简洁模式里出现 `reachable == 0`、
+     * 出现 `total`、或出现"没有核心区却写了 core"，都算错（自检有元断言钉着）。</p>
      */
     public static final int MODE_BRIEF = 1;
 
@@ -112,13 +113,19 @@ public final class MapStatsExport {
      * 详细模式含 `buildable`/`core`/`unknownContent`，简洁模式只有"能采到的"那几条。</p>
      */
     public static String jsonDoc(MapStats.Result r, Meta m) {
-        boolean brief = m.mode == MODE_BRIEF;
+        // ★ 两种口径**不是"同一条文档少写几个字段"**：简洁模式是**另一张表**
+        //   （用户 2026-10-17：「不要那堆细节，只要用户在真实体验时可以用到的数据」）
+        return m.mode == MODE_BRIEF ? briefDoc(r, m) : detailDoc(r, m);
+    }
+
+    /** 详细：声明（format/generator/site/notice/launcher/exportedAt/slot/map/content/engine）+ 全部记录 */
+    private static String detailDoc(MapStats.Result r, Meta m) {
         Obj o = new Obj();
         o.str("format", FORMAT)
                 .str("generator", GENERATOR)
                 .str("site", SITE)
                 .str("notice", m.notice)
-                .str("mode", brief ? "brief" : "detail")
+                .str("mode", "detail")
                 .num("index", m.index)
                 .num("count", m.count);
         o.raw("launcher", "{" + Str.of("version", m.launcherVersion)
@@ -144,8 +151,48 @@ public final class MapStatsExport {
         o.raw("engine", "{\"stats\":\"F21\",\"millis\":" + r.millis
                 + ",\"micros\":" + r.micros
                 + ",\"notes\":" + notes(r.notes) + "}");
-        o.raw("records", recordsJson(r, brief));
+        o.raw("records", recordsJson(r));
         return o.end();
+    }
+
+    /**
+     * **简洁**：**只要玩家在真实体验里用得上的数字**（用户 2026-10-17：「不要那堆细节，
+     * 只要用户在真实体验时可以用到的数据」）。
+     *
+     * <p>整行只有两样：`map`（这张图叫什么，一行一张图得认得出）与 `records`——
+     * 每种资源**能采到多少格**、**能建多少格**、**核心区多少格 / 最多摆几个核心**。
+     * 🔴 不写的东西（都是"细节"，玩家用不上）：启动器/版本/时刻/槽/引擎耗时、`sha256`/尺寸/字节数、
+     * 内容表规模、`origin`/`source`/`internals`、`total`、明露/散落/埋住/优先级、可建造六桶与地板名单、
+     * 核心区 `usable`/`size`/`basis`/`skip`、认不出的内容。</p>
+     *
+     * <p>⚠️ 两条**判据**（自检钉着）：`reachable == 0` 的行不写；核心区没有真实数据
+     * （`zone == 0` 或 `skip`）时 `core` 这一条也不写 —— 与界面上"整张卡不出现"同一个判据。</p>
+     */
+    private static String briefDoc(MapStats.Result r, Meta m) {
+        Obj o = new Obj();
+        o.str("map", m.mapName);
+        StringBuilder sb = new StringBuilder(1024).append('[');
+        briefRows(sb, r.ores, "ore");
+        briefRows(sb, r.oreWalls, "oreWall");
+        briefRows(sb, r.floors, "floor");
+        briefRows(sb, r.bonuses, "bonus");
+        // 可建造区域：只有**真数**才写（六桶全 0 = 没有结论，别写个 0 冒充数据）
+        int bs = buildableSum(r.buildable);
+        if (bs > 0) appendJson(sb, new Obj("buildable").num("sum", bs).end());
+        if (r.core != null && !r.core.skip && r.core.zone > 0) {
+            appendJson(sb, new Obj("core").num("zone", r.core.zone).num("max", r.core.max).end());
+        }
+        o.raw("records", sb.append(']').toString());
+        return o.end();
+    }
+
+    /** 简洁模式的一行资源：`kind` / `name` / `reachable`（不可采的不写） */
+    private static void briefRows(StringBuilder sb, List<MapStats.Row> rows, String kind) {
+        if (rows == null) return;
+        for (MapStats.Row x : rows) {
+            if (x == null || x.reachable() <= 0) continue;
+            appendJson(sb, new Obj(kind).str("name", x.label).num("reachable", x.reachable()).end());
+        }
     }
 
     /**
@@ -174,20 +221,21 @@ public final class MapStatsExport {
         return sb.toString();
     }
 
-    /** `records` 数组（详细 / 简洁在这里分流，调用方只看得到一个数组） */
-    private static String recordsJson(MapStats.Result r, boolean brief) {
+    /** **详细**模式的 `records` 数组（全部字段） */
+    private static String recordsJson(MapStats.Result r) {
         StringBuilder sb = new StringBuilder(2048);
         sb.append('[');
-        rowJson(sb, r.ores, "ore", brief);
-        rowJson(sb, r.oreWalls, "oreWall", brief);
-        rowJson(sb, r.floors, "floor", brief);
-        rowJson(sb, r.bonuses, "bonus", brief);
-        // ★ 可建造区域 / 核心区域**两种口径都要**（用户 2026-10-17：「我们统计的可建造区域以及
-        //   核心区域也算」）—— 它们本来就是"一段区域有多少格"的结论，不是可采资源明细的一部分，
-        //   所以在简洁模式里也原样带上；只有 `unknownContent`（认不出的内容）仍只进详细模式。
+        rowJson(sb, r.ores, "ore");
+        rowJson(sb, r.oreWalls, "oreWall");
+        rowJson(sb, r.floors, "floor");
+        rowJson(sb, r.bonuses, "bonus");
         appendJson(sb, buildableLine(r.buildable));
-        appendJson(sb, coreLine(r.core));
-        if (!brief && r.unknowns != null) {
+        // ★ 核心区**只写真实数据**：`zone == 0`（这张图没有 core-zone 地板）或 `skip`（看不见核心 ⇒
+        //   算不出来）时不写 —— 写一串 0 / 默认值不是数据（与界面"整张卡不出现"同一判据）。
+        if (r.core != null && !r.core.skip && r.core.zone > 0) {
+            appendJson(sb, coreLine(r.core));
+        }
+        if (r.unknowns != null) {
             for (MapStats.Unk u : r.unknowns) {
                 if (u == null) continue;
                 appendJson(sb, new Obj("unknownContent")
@@ -220,19 +268,11 @@ public final class MapStatsExport {
 
     // ── 数据行 ────────────────────────────────────────────────────────────
 
-    private static void rowJson(StringBuilder sb, List<MapStats.Row> rows, String kind, boolean brief) {
+    private static void rowJson(StringBuilder sb, List<MapStats.Row> rows, String kind) {
         if (rows == null) return;
         for (MapStats.Row x : rows) {
             if (x == null) continue;
-            // ★ 简洁模式只写「能采到」的（用户：「仅含可采的」「把 total 删了啊」）——
-            //   0 格的行没有信息量；`total` 也不是"可采数据"，只留 `kind` / `name` / `reachable`。
-            if (brief && x.reachable() <= 0) continue;
             Obj o = new Obj(kind);
-            if (brief) {
-                o.str("name", x.label).num("reachable", x.reachable());
-                appendJson(sb, o.end());
-                continue;
-            }
             o.str("name", x.label)
                     .str("origin", origin(x.origin))
                     .str("source", x.source)
@@ -251,8 +291,14 @@ public final class MapStatsExport {
         }
     }
 
+    /** 可建造六桶之和（**只有这一处**实现 —— 简洁模式只用这个数，别在别处再抄一遍） */
+    static int buildableSum(MapStats.Buildable b) {
+        if (b == null) return 0;
+        return b.free + b.cleared + b.walled + b.deep + b.floorBlocked + b.unknown;
+    }
+
     static String buildableLine(MapStats.Buildable b) {
-        int sum = b.free + b.cleared + b.walled + b.deep + b.floorBlocked + b.unknown;
+        int sum = buildableSum(b);
         Obj o = new Obj("buildable");
         o.num("free", b.free).num("cleared", b.cleared).num("walled", b.walled)
                 .num("deep", b.deep).num("floorBlocked", b.floorBlocked).num("unknown", b.unknown)

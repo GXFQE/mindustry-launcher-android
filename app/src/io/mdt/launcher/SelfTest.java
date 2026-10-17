@@ -10481,7 +10481,8 @@ public final class SelfTest {
                         && "planet".equals(String.valueOf(xc.get("basis"))),
                 "★records 每条的 kind 都认得；可建造那行六桶相加 == 总格数（" + xr.cells
                         + "）；核心区那行与 Result 同源（zone/usable/max/size/basis）");
-        // ★★ 简洁模式（用户：「仅含可采的」）—— 只写 reachable > 0 的记录，且不写 buildable / core
+        // ★★ 简洁模式 = **另一张表**（用户 2026-10-17：「不要那堆细节，只要用户在真实体验时
+        //    可以用到的数据」）：整行只有 `map` + `records` —— 能采多少 / 能建多少 / 核心区多少·最多几个
         MapStats.Result xb2 = new MapStats.Result();
         xb2.ok = true;
         xb2.width = 12;
@@ -10502,30 +10503,56 @@ public final class SelfTest {
         Map<String, Object> xbd = MapStats.jsonOf(MapStatsExport.jsonDoc(xb2, xmb));
         List<?> xbrec = xbd != null && xbd.get("records") instanceof List
                 ? (List<?>) xbd.get("records") : null;
-        boolean briefOk = xbd != null && "brief".equals(String.valueOf(xbd.get("mode")))
-                && xbrec != null && xbrec.size() == 3;
-        boolean briefZero = false, briefBuildable = false, briefCore = false;
-        boolean briefTotal = false, briefUnknown = false;
-        if (xbrec != null) {
-            for (Object oo : xbrec) {
-                Map<?, ?> o = (Map<?, ?>) oo;
-                // ★ 元断言：简洁模式里**不许**出现 reachable == 0 的记录（只看有 reachable 的那种记录）
-                if (o.containsKey("reachable") && intOf(o, "reachable") <= 0) briefOk = false;
-                // ★ 元断言：简洁模式**只留可采数据** —— 不许有 `total`（用户：「把 total 删了啊」）
-                if (o.get("total") != null) briefTotal = true;
-                String k = String.valueOf(o.get("kind"));
-                if ("buildable".equals(k)) briefBuildable = true;
-                if ("core".equals(k)) briefCore = true;
-                if ("unknownContent".equals(k)) briefUnknown = true;
-                if ("一格都拿不到".equals(String.valueOf(o.get("name")))) briefZero = true;
+        // 整行只有两个键（没有 format/launcher/engine/slot/… 那些细节）
+        boolean briefShape = xbd != null && xbd.size() == 2
+                && "b.msav".equals(String.valueOf(xbd.get("map"))) && xbrec != null;
+        // 这张夹具没有任何格数结论（六桶全 0）、也没有核心区 ⇒ 只剩那一条可采记录
+        boolean briefOk = briefShape && xbrec.size() == 1;
+        boolean briefZero = false, briefTotal = false, briefUnknown = false;
+        for (Object oo : xbrec == null ? java.util.Collections.emptyList() : xbrec) {
+            Map<?, ?> o = (Map<?, ?>) oo;
+            // ★ 元断言：不许出现 reachable == 0 的记录
+            if (o.containsKey("reachable") && intOf(o, "reachable") <= 0) briefOk = false;
+            // ★ 元断言：不许有 `total`（用户：「把 total 删了啊」）
+            if (o.get("total") != null) briefTotal = true;
+            if ("unknownContent".equals(String.valueOf(o.get("kind")))) briefUnknown = true;
+            if ("一格都拿不到".equals(String.valueOf(o.get("name")))) briefZero = true;
+        }
+        ok(stat, L, briefOk && !briefZero && !briefTotal && !briefUnknown,
+                "★简洁模式 = **另一张表**：整行只有 `map` + `records`（没有 format/launcher/engine/… 那堆细节）；"
+                        + "可采记录只写 `reachable > 0` 的 `kind`/`name`/`reachable`（无 `total`）；"
+                        + "没有真实数字时（六桶全 0 / 没核心区）那两条**也不写**");
+        // ★ 反方向：有真实数字的图（有格数、有核心区）⇒ buildable / core 必须在，且数与 Result 同源
+        Map<String, Object> xbr = MapStats.jsonOf(MapStatsExport.jsonDoc(xr,
+                statsMeta("d.msav", "dd", MapStatsExport.MODE_BRIEF)));
+        List<?> xbrrec = xbr != null && xbr.get("records") instanceof List
+                ? (List<?>) xbr.get("records") : null;
+        int bSum = Integer.MIN_VALUE, coreZone = Integer.MIN_VALUE, coreMax = Integer.MIN_VALUE;
+        int bDetailKeys = 0;              // buildable 里**不许有**六桶 / 地板名单这些细节键
+        boolean brTotal = false;
+        for (Object oo : xbrrec == null ? java.util.Collections.emptyList() : xbrrec) {
+            Map<?, ?> o = (Map<?, ?>) oo;
+            if (o.get("total") != null) brTotal = true;
+            String k = String.valueOf(o.get("kind"));
+            if ("buildable".equals(k)) {
+                bSum = intOf(o, "sum");
+                for (String bk : new String[]{"free", "cleared", "walled", "deep",
+                        "floorBlocked", "unknown", "floorKinds"}) {
+                    if (o.containsKey(bk)) bDetailKeys++;
+                }
+            }
+            if ("core".equals(k)) {
+                coreZone = intOf(o, "zone");
+                coreMax = intOf(o, "max");
             }
         }
-        ok(stat, L, briefOk && !briefZero && briefBuildable && briefCore
-                        && !briefTotal && !briefUnknown,
-                "★简洁模式：可采记录只写 **reachable > 0** 的那条（`kind`/`name`/`reachable`，**无 `total`**），"
-                        + "另带 **buildable（可建造区域）+ core（核心区域）**；"
-                        + "不可采的那条与 unknownContent 都不写（共 " + (xbrec == null ? -1 : xbrec.size())
-                        + " 条）");
+        ok(stat, L, xbrrec != null && bSum == xr.cells && bDetailKeys == 0
+                        && coreZone == xr.core.zone && coreMax == xr.core.max && xr.core.zone > 0
+                        && !brTotal,
+                "★反方向：有真实数字的图 ⇒ `buildable.sum` == 总格数（" + xr.cells + "）、"
+                        + "`core{zone,max}` 与 Result 同源（zone " + xr.core.zone + " / max "
+                        + xr.core.max + "）；六桶 / 地板名单 / `total` 这些**细节都不写**");
+
         // ★★ 批量：**一行 = 一张图**（用户「每个地图是 jsonl 中的一条」）
         xmb.mode = MapStatsExport.MODE_DETAIL;
         String xbatch = MapStatsExport.jsonlBatch(
