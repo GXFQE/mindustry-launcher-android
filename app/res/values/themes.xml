@@ -54,6 +54,23 @@
     -->
     <style name="AppOverflowMenu" parent="@android:style/Widget.Material.PopupMenu.Overflow">
         <item name="android:popupBackground">@drawable/popup_bg</item>
+        <!--
+          第 158c 轮：**别盖住顶栏**（用户看到圆角后仍说「还是看起来感觉好奇怪」）。
+          框架默认 `overlapAnchor = true` ⇒ 弹窗的**上边缘对齐 ⋮ 的上边缘**，
+          于是卡片压在顶栏和那个 ⋮ 上，看着像浮在半空的贴纸，而不是"从 ⋮ 拉下来的菜单"。
+          改成 false 之后弹窗从 ⋮ 的**下缘**开始长；再给 4dp 让它离按钮有点缝。
+          ⚠️ 这两条不会改变宽度：溢出菜单的最小宽度是平台给的（本机实测 196dp），
+            所以右边会留一段空白 —— 那是 Android 溢出菜单的固有样子，别去硬掰
+            （`popupMinWidth` 不是公开属性，改不了）。
+        -->
+        <item name="android:overlapAnchor">false</item>
+        <item name="android:dropDownVerticalOffset">4dp</item>
+        <!--
+          第 158c 轮：**要那圈阴影**。换掉框架背景时它一起没了 ⇒ 卡片的颜色（夜间 #1B1D22）
+          与页底（#101114）只差一点点，看上去就是"页面上贴了一块稍亮的方块"，很怪。
+          补 `popupElevation`：窗口会自己投一层影，卡片立刻"浮"起来（对话框不需要，因为它有暗色背景罩着）。
+        -->
+        <item name="android:popupElevation">8dp</item>
     </style>
 
     <!--

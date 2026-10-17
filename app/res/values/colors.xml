@@ -23,6 +23,11 @@
     <color name="card_press">#FFEFF1F5</color>
     <color name="card_stroke">#FFE3E5EA</color>
 
+    <!-- 第 158c 轮：顶栏 ⋮ 弹出菜单（比卡片亮一档 + 描边稍深）—— 它没有对话框那层暗色背景罩着，
+         用卡片色会"像页面上贴了一块"，见 drawable/popup_bg.xml -->
+    <color name="popup">#FFFFFFFF</color>
+    <color name="popup_stroke">#FFD8DCE4</color>
+
     <!-- 顶栏（ActionBar + 状态栏） -->
     <color name="appbar">#FF3F51B5</color>
     <color name="on_appbar">#FFFFFFFF</color>

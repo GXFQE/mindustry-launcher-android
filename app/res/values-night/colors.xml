@@ -21,6 +21,10 @@
     <color name="card_press">#FF262931</color>
     <color name="card_stroke">#FF2A2D34</color>
 
+    <!-- 第 158c 轮：顶栏 ⋮ 弹出菜单 —— 夜间卡片色与页底只差一点点，必须提亮一档才"浮"得起来 -->
+    <color name="popup">#FF262A33</color>
+    <color name="popup_stroke">#FF3A4049</color>
+
     <!-- 顶栏：深色下顶栏用卡面色，标题用亮字 -->
     <color name="appbar">#FF1B1D22</color>
     <color name="on_appbar">#FFE6E7E9</color>
