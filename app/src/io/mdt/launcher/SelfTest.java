@@ -9925,6 +9925,39 @@ public final class SelfTest {
         ok(stat, L, sand != null && "sand".equals(sand.itemDrop) && sand.isFloor && !sand.isOre
                         && sand.bonus(),
                 "沙地（内部名 sand-floor）：掉落 sand ⇒ 可采地板；同时带含油的属性 ⇒ 也算加成地板（一格两用）");
+        // ★ 2026-10-17 用户：「**我们只统计加成地板，不要统计减成地板**」——
+        //   纯惩罚的地板（只让单位变慢）与**属性全为负**的石头都不许进这一段。
+        MapStats.Def bnShallow = v.row("shallow-water");
+        MapStats.Def bnDeep = v.row("deep-water");
+        MapStats.Def bnTar = v.row("tar");
+        MapStats.Def bnSandWater = v.row("sand-water");
+        ok(stat, L, bnShallow != null && !bnShallow.bonus() && bnDeep != null && !bnDeep.bonus()
+                        && bnTar != null && !bnTar.bonus() && bnSandWater != null && !bnSandWater.bonus(),
+                "★减成地板不算加成：「水」(shallow-water) / 深水 / 石油 / 浅滩 —— 只让单位变慢、一个属性都没有");
+        MapStats.Def bnBasalt = v.row("basalt");
+        MapStats.Def bnCarbon = v.row("carbon-stone");
+        ok(stat, L, bnBasalt != null && !bnBasalt.bonus() && bnCarbon != null && !bnCarbon.bonus(),
+                "★属性**全为负**的石头也不算加成（玄武岩 water=-0.25 / 碳石 water=-1.0）");
+        MapStats.Def bnSalt = v.row("salt");
+        MapStats.Def bnHot = v.row("hotrock");
+        ok(stat, L, bnSalt != null && bnSalt.bonus() && bnHot != null && bnHot.bonus(),
+                "★反方向：盐碱地（water=-0.3 但 oil=0.3）/ 热岩（heat=0.5 但 water=-0.5）**仍算**加成 —— "
+                        + "判据是「有没有正值」，不是「有没有负值」");
+        // 元断言：原版里"算加成"的地板必须**一个都不剩**是纯惩罚的（否则这条尺子只测了上面 4 个特例）
+        int badBonus = 0, goodBonus = 0;
+        for (String n : new String[]{"arkycite-floor", "pooled-cryofluid", "darksand-water",
+                "red-stone", "yellow-stone", "regolith", "rhyolite", "char"}) {
+            MapStats.Def d = v.row(n);
+            if (d != null && d.bonus()) badBonus++;
+        }
+        for (String n : new String[]{"sand-floor", "shale", "darksand", "spore-moss", "molten-slag",
+                "magmarock", "red-stone-vent", "mud"}) {
+            MapStats.Def d = v.row(n);
+            if (d != null && d.bonus()) goodBonus++;
+        }
+        ok(stat, L, badBonus == 0 && goodBonus == 8,
+                "★元断言：8 种纯惩罚/全负地板一个都没进加成（" + badBonus + "/8 命中，应为 0）；"
+                        + "8 种正面地板全进（" + goodBonus + "/8，应为 8）");
         // 元断言：表里**存在**拆不掉的（否则上面那条"能拆"的断言可能只是因为全都 removable）
         int perm = 0;
         for (String n : new String[]{"cliff", "sand-wall", "shale-wall", "dune-wall", "pine"}) {

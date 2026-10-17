@@ -202,9 +202,37 @@ public final class MapStats {
             return "air".equals(name);
         }
 
-        /** 是不是"加成地板"（有属性 / 移速≠1 / 伤害≠0）—— 照 Occ3 的判据 */
+        /**
+         * 是不是"**加成**地板"（有正面作用）。
+         *
+         * <p>判据 = 至少一项**正面**效果：① 某个属性值 **&gt; 0**（水 / 油 / 热 / 孢子 / 蒸汽 / 光 / 沙）
+         * ② 移速 **&gt; 1**（加速地板，原版没有，模组可能有）③ 伤害 **&lt; 0**（回血地板）。</p>
+         *
+         * <p>🔴 2026-10-17 用户：「**我们只统计加成地板，不要统计减成地板**」。
+         * 旧判据是「有属性 / 移速≠1 / 伤害≠0」，把**纯惩罚**的地板也算了进来 ——
+         * 深水 / 水（`shallow-water`）/ 浅滩 / 石油 / 冷冻液 / 芳油（只是让单位变慢）、
+         * 以及玄武岩一类**属性全为负**（`water=-0.25`）的石头。它们现在都不再算加成地板。</p>
+         *
+         * <p>⚠️ **两样都有的仍算加成**：盐碱地 `water=-0.3;oil=0.3;`（有正的油）、
+         * 热岩 `heat=0.5;water=-0.5;`（有正的热）—— 判据是"**有没有正值**"，不是"负值数量"。</p>
+         */
         public boolean bonus() {
-            return !attributes.isEmpty() || speed != 1f || damage != 0f;
+            return speed > 1f || damage < 0f || hasPositiveAttr();
+        }
+
+        /** 属性串（`water=-0.3;oil=0.3;`）里有没有**正值** */
+        private boolean hasPositiveAttr() {
+            if (attributes == null || attributes.isEmpty()) return false;
+            for (String kv : attributes.split(";")) {
+                int eq = kv.indexOf('=');
+                if (eq <= 0) continue;
+                try {
+                    if (Float.parseFloat(kv.substring(eq + 1).trim()) > 0f) return true;
+                } catch (NumberFormatException ignored) {
+                    // 认不出的值当 0 处理（不因此把地板算成加成）
+                }
+            }
+            return false;
         }
 
         Def copy() {
