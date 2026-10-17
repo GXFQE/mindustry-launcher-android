@@ -641,6 +641,7 @@ public class MapsActivity extends BaseActivity {
                 final Map<String, String> labels = MapStatsMods.attrLabels(MapsActivity.this);
                 final List<MapStats.Result> rs = new java.util.ArrayList<>();
                 final List<MapStatsExport.Meta> ms = new java.util.ArrayList<>();
+                Maps.Item firstOk = null;
                 int skipped = 0;
                 for (int i = 0; i < items.size(); i++) {
                     final int done = i;
@@ -663,13 +664,19 @@ public class MapsActivity extends BaseActivity {
                         skipped++;
                         continue;
                     }
+                    if (firstOk == null) firstOk = it;
                     rs.add(b.result);
                     ms.add(StatsExporter.metaOf(MapsActivity.this, mSlot, it, b, apk,
                             StatsExporter.shaOfMap(MapsActivity.this, it), mode));
                 }
-                final String text = MapStatsExport.jsonlBatch(rs, ms);
+                // ★ 用户 2026-10-17 定的形态：「**选择一个地图就是 json，多个就是 jsonl**」
+                //   ⇒ 勾 1 张 = 一份 `.json`（整份文档）；勾多张 = 一个 `.jsonl`（**一行一张图**）。
+                final String text = rs.size() == 1
+                        ? MapStatsExport.jsonDoc(rs.get(0), ms.get(0))
+                        : MapStatsExport.jsonlBatch(rs, ms);
                 final int ok = rs.size();
                 final int sk = skipped;
+                final Maps.Item fok = firstOk;
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
                         pd.dismiss();
@@ -682,10 +689,11 @@ public class MapsActivity extends BaseActivity {
                                     .show();
                             return;
                         }
-                        String name = StatsExporter.fileName(mSlot, null, ok);
+                        // 单张 = `.json` + `application/json`；多张 = `.jsonl` + `application/x-ndjson`
+                        String name = StatsExporter.fileName(mSlot, fok, ok);
+                        String mime = ok == 1 ? "application/json" : StatsExporter.MIME;
                         try {
-                            StatsExporter.begin(MapsActivity.this, name, text,
-                                    StatsExporter.MIME, ok, sk);
+                            StatsExporter.begin(MapsActivity.this, name, text, mime, ok, sk);
                         } catch (Throwable t) {
                             new AlertDialog.Builder(MapsActivity.this)
                                     .setTitle(Trans.get(MapsActivity.this, R.string.export_failed))

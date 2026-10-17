@@ -44,19 +44,12 @@ public class MapDetailActivity extends BaseActivity {
     public static final String EXTRA_SLOT = "slot";
     /** 一页最多列几行（超出的折叠段里只报"还有 N 种"） */
     private static final int ROW_CAP = 15;
-    /** SAF 回来时写「导出统计」的请求码（第 154 轮） */
-    private static final int REQ_EXPORT_STATS = 1541;
 
     private String mSlot;
     private Maps.Item mItem;
     private String mApkPath;
     private TextView mState;
     private LinearLayout mBox;
-    /** 统计结果（导出要的就是它；null = 还没数出来/数失败了） */
-    private MapStatsMods.Built mBuilt;
-    /** 等 SAF 回来时要写出去的那份文本（**成败都要先清掉**，见 onActivityResult） */
-    private String mExportText;
-    private String mExportName = "";
 
     @Override protected void onCreate(Bundle b) {
         super.onCreate(b);
@@ -77,27 +70,18 @@ public class MapDetailActivity extends BaseActivity {
         mState = (TextView) root.findViewById(R.id.stats_state);
         mBox = (LinearLayout) root.findViewById(R.id.stats_box);
 
-        // ★ 第 154 轮：操作卡**常显** —— 「导出统计」三种来源的地图都有（本槽 / 游戏自带 / 模组自带）；
-        //   「删除」仍只对本槽的图（另外两种在 APK 与模组包里面）。
-        View actions = root.findViewById(R.id.detail_actions);
-        Util.bindAction(actions, R.id.row_detail_export, R.drawable.ic_upload,
-                R.string.stats_export, R.string.stats_export_sub, new Runnable() {
-                    @Override public void run() {
-                        startExport();
-                    }
-                });
-        // ★ 数出来之前导出没有可导的东西 ⇒ 先藏起来，{@link #render} 成功时再显示（判据只有那一处）
-        actions.findViewById(R.id.row_detail_export).setVisibility(View.GONE);
+        // ★ 只有**本槽**的图能删（游戏自带 / 模组自带的在 APK 和模组包里面）
+        // 🔴 2026-10-17 用户定调：「**删掉内部入口**，入口选择一个地图就是 json，多个就是 jsonl」
+        //   ⇒ 本页**不再有**「导出统计」那一行 —— 导出统一从地图页进（勾 1 张 = `.json`，多张 = `.jsonl`）。
         if (mItem.from == Maps.FROM_SLOT && mItem.file != null) {
+            View actions = root.findViewById(R.id.detail_actions);
+            actions.setVisibility(View.VISIBLE);
             Util.bindAction(actions, R.id.row_detail_delete, R.drawable.ic_zip,
                     R.string.map_delete, R.string.map_delete_sub, new Runnable() {
                         @Override public void run() {
                             confirmDelete();
                         }
                     });
-        } else {
-            // ⚠️ 卡片常显之后，删除那行必须**显式** GONE —— 否则留下一个点了没反应的「删除地图」
-            actions.findViewById(R.id.row_detail_delete).setVisibility(View.GONE);
         }
         loadPreview(root);
         startStats();
@@ -174,14 +158,6 @@ public class MapDetailActivity extends BaseActivity {
     }
 
     private void render(MapStatsMods.Built b) {
-        mBuilt = b;
-        // ★ 「导出统计」只在这张图**真的数出来**之后出现（没数就没有可导的东西；
-        //   导一份空表给收数据的人是纯噪声）。判据只有这一处。
-        View ex = findViewById(R.id.row_detail_export);
-        if (ex != null) {
-            ex.setVisibility(b.result != null && b.result.ok
-                    && (b.error == null || b.error.isEmpty()) ? View.VISIBLE : View.GONE);
-        }
         if (b.error != null && !b.error.isEmpty()) {
             mState.setText(Trans.get(MapDetailActivity.this, R.string.stats_failed_fmt, b.error));
             return;
@@ -501,70 +477,6 @@ public class MapDetailActivity extends BaseActivity {
         tv.setTextColor(getResources().getColor(R.color.fg_muted));
         body.addView(tv);
     }
-
-    // ── 导出统计（第 154 轮：用户「给我们的统计表加个导出的功能」） ──────────────
-
-    /**
-     * 把**这一页的统计**导成一个 **JSON 文档**（格式与字段见 {@link MapStatsExport}）。
-     *
-     * <p>用户点单时给了两个用途：<b>数据出问题时确定来源</b> + <b>转发时顺带宣传启动器</b>
-     * ⇒ 文件里有"声明"（生成者 / 项目地址 / 启动器版本 / 导出时刻 / 槽 / 地图身份与 sha256 /
-     * 内容表与模组数 / 星球）和记录数组。🔴 单张走**一个 JSON**、批量走 JSONL
-     * （用户 2026-10-17：「单独导出使用 json 就行」）—— 单张就一份数据，没必要按行拆。</p>
-     *
-     * <p>🔴 声明/取证/写出去都收在 {@link StatsExporter}（与批量那条**共用一份**）：
-     * ① **不许把本机路径写进文件**（`Maps.Item.where` 对槽内文件是绝对路径）—— 只取文件名 / `包!/条目`；
-     * ② 这份文件是**给人转发**的 ⇒ 与分享包同一个隐私口径（不带设备标识、不带 usid）。</p>
-     */
-    private void startExport() {
-        final MapStats.Result r = mBuilt == null ? null : mBuilt.result;
-        if (r == null || !r.ok) return;                 // 那行本来就是藏着的；这里再挡一次
-        final ProgressDialog pd = ProgressDialog.show(this,
-                Trans.get(MapDetailActivity.this, R.string.stats_export),
-                Trans.get(MapDetailActivity.this, R.string.stats_export_working), true, false);
-        new Thread(new Runnable() {
-            @Override public void run() {
-                String text = null;
-                String name = "";
-                try {
-                    MapStatsExport.Meta m = StatsExporter.metaOf(MapDetailActivity.this, mSlot, mItem,
-                            mBuilt, mApkPath, StatsExporter.shaOfMap(MapDetailActivity.this, mItem),
-                            MapStatsExport.MODE_DETAIL);
-                    text = MapStatsExport.jsonDoc(r, m);
-                    name = StatsExporter.fileName(mSlot, mItem, 1);
-                } catch (Throwable t) {
-                    android.util.Log.w("MDTLauncher", "stats export build failed", t);
-                }
-                final String ft = text;
-                final String fn = name;
-                runOnUiThread(new Runnable() {
-                    @Override public void run() {
-                        pd.dismiss();
-                        if (Util.dead(MapDetailActivity.this)) return;
-                        if (ft == null) {
-                            alert(Trans.get(MapDetailActivity.this, R.string.export_failed),
-                                    Trans.get(MapDetailActivity.this, R.string.stats_export_failed_plain));
-                            return;
-                        }
-                        try {
-                            StatsExporter.begin(MapDetailActivity.this, fn, ft,
-                                    "application/json", 1, 0);
-                        } catch (Throwable t) {
-                            // 极简 ROM 上可能一个能收 ACTION_CREATE_DOCUMENT 的应用都没有
-                            alert(Trans.get(MapDetailActivity.this, R.string.export_failed),
-                                    Trans.get(MapDetailActivity.this, R.string.exp_err_no_doc));
-                        }
-                    }
-                });
-            }
-        }, "stats-export").start();
-    }
-
-    @Override protected void onActivityResult(int req, int res, Intent data) {
-        super.onActivityResult(req, res, data);
-        StatsExporter.handle(this, req, res, data);
-    }
-
 
     private void confirmDelete() {
         // ★ 2026-10-04：**先判游戏在不在跑**（与 MapFiles.deleteToTrash 里那道是同一个判据，

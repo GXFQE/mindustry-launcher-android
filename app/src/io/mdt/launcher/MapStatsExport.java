@@ -98,7 +98,13 @@ public final class MapStatsExport {
      */
     public static final int MODE_BRIEF = 1;
 
-    /** 导出全文（末尾带换行；UTF-8 写出去） */
+    /**
+     * **内部**：把一张图的「声明行 + 每记录一行」拼成文本（{@link #jsonDoc} 拿它压成一个 JSON）。
+     *
+     * <p>⚠️ 这**不是**对外的文件格式 —— 对外的两种形态是
+     * {@link #jsonDoc}（单张 = 整份 `.json`）与 {@link #jsonlBatch}（多张 = 一个 `.jsonl`，
+     * **一行一张图**）。这里保留逐行形态只为拼装方便 + 自检能逐条核对。</p>
+     */
     public static String jsonl(MapStats.Result r, Meta m) {
         boolean brief = m.mode == MODE_BRIEF;
         StringBuilder sb = new StringBuilder(4096);
@@ -124,10 +130,14 @@ public final class MapStatsExport {
     }
 
     /**
-     * **批量**：一条文件里放多张图 —— 每张图 = 一个「声明 + 它的记录」块（`index` / `count` 标位置）。
+     * **批量**：一个 JSONL 文件，**一行 = 一张地图的完整 JSON**（与单张导出那份文档**逐字节同构**）。
      *
-     * <p>为什么不做成"一个 JSON 数组"：JSONL 的承诺是**一行一条**，收数据的人可以
-     * `grep` / `jq` 逐行处理、坏一行也不毁整份；一个巨型数组反而要求整体合法。</p>
+     * <p>用户 2026-10-17：「我的意思是**每个地图是 jsonl 中的一条**」—— 所以不是"声明块 + 若干行记录"，
+     * 而是**一张图一行**：`jq -c` / `grep` 逐行处理时，每行都是一张图的全量数据（声明 + 记录都在里面）；
+     * `meta.index` / `meta.count` 仍标出它在批次里的位置（文件少了几行时好定位是哪张）。</p>
+     *
+     * <p>★ 一行成立的**前提** = 生成的 JSON 里**没有任何裸换行**（名字里的换行已转义成 `\n` 两个字符）——
+     * 自检有一条"名字里带换行 ⇒ 行数不变"钉着这个前提。</p>
      *
      * <p>★ `index` / `count` **在这里填**（不交给调用方）—— 批次语义只该有一处实现。</p>
      */
@@ -140,18 +150,17 @@ public final class MapStatsExport {
             if (r == null || m == null) continue;
             m.index = i + 1;
             m.count = n;
-            sb.append(jsonl(r, m));
+            sb.append(jsonDoc(r, m)).append('\n');
         }
         return sb.toString();
     }
 
     /**
-     * **单张导出的「一个 JSON 文档」形态**（用户 2026-10-17：「单独导出使用 json 就行」）。
+     * **一张地图的完整 JSON**（单张导出 = 整份文件；批量 = JSONL 的**一行**，用户 2026-10-17 定的形态）。
      *
      * <p>结构 = `{format, generator, site, meta, recordCount, records:[...]}`：
-     * `meta` 就是 JSONL 那第一行（声明），`records` 就是后面那些行 —— **同一批字段、同一套拼装**，
-     * 所以两种格式不会漂。批量仍走 {@link #jsonlBatch}（JSONL 的价值在"一行一条、可逐行处理"，
-     * 单张没必要按行拆）。</p>
+     * `meta` 是声明，`records` 是这张图的各条记录（详细模式含 `buildable` / `core` / `unknownContent`）。
+     * 两种格式**共用这一份拼装** ⇒ 单张与批量里同一张图的内容不会漂。</p>
      */
     public static String jsonDoc(MapStats.Result r, Meta m) {
         String body = jsonl(r, m);

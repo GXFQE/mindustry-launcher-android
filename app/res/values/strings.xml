@@ -2056,18 +2056,16 @@
     <string name="detail_orig_name_fmt">\nOriginal name: %1$s</string>
 
     <string name="stats_export">Export statistics</string>
-    <string name="stats_export_sub">Save this page as .jsonl (numbers plus where they came from)</string>
     <string name="stats_export_working">Preparing the file…</string>
     <string name="stats_export_ok_fmt">Exported %1$s (%2$s)</string>
     <string name="stats_export_fail_fmt">Could not export: %1$s</string>
     <string name="stats_export_notice_fmt">Exported by MDT Launcher for Android · %1$s · these numbers follow the map-stat rules of the launcher; if they look wrong, send this file back</string>
 
 
-    <string name="stats_export_failed_plain">Could not put the statistics into a file. Open this map again and retry.</string>
 
 
     <string name="stats_export_batch">Export statistics…</string>
-    <string name="stats_export_batch_sub">Pick one or more maps; one JSONL file (detailed or brief)</string>
+    <string name="stats_export_batch_sub">Pick one or more: one map makes a .json, several make a .jsonl (detailed or brief)</string>
     <string name="stats_export_mode_detail">Detailed: everything</string>
     <string name="stats_export_mode_brief">Brief: only what you can mine</string>
     <string name="stats_export_progress_fmt">Counting %1$d / %2$d…</string>
