@@ -260,8 +260,17 @@ public class SavesActivity extends BaseActivity {
         SlotIo.fillSaves(this, mSlot, mList, mFillToken, mFiles, mRowClick);
 
         boolean filtering = ListQuery.filtering(mQuery, mSort, false, ListQuery.SORT_NAME);
-        // 表头那句同时承担"有几份"（标题里放不下多行，见 dialog_msav_list.xml 的实测）
-        mHead.setText(Trans.get(SavesActivity.this, R.string.saves_list_head_fmt, mAll.length));
+        // 表头那句同时承担"有几份"（标题里放不下多行，见 dialog_msav_list.xml 的实测）。
+        // ★ 第 165 轮：第二段改成**计数**（「其中备份 N 份」），与另外三页同一个模板
+        //   （「本槽 N <量词> · 一条事实」）—— 原来那里是一句操作提示「点一份看它是什么图」，
+        //   四页里只有它是提示语。`-backup` 是**游戏自己**写的备份（`X.msav-backup.msav`），
+        //   它们也是列表里的行 ⇒ 报出来能解释"为什么份数是存档的两倍"。
+        int backups = 0;
+        for (File f : mAll) {
+            if (f != null && f.getName().contains("-backup")) backups++;
+        }
+        mHead.setText(Trans.get(SavesActivity.this, R.string.saves_list_head_fmt,
+                mAll.length, backups));
         if (mFiltered != null) {
             mFiltered.setVisibility(filtering ? View.VISIBLE : View.GONE);
             if (filtering) {

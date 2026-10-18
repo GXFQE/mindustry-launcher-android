@@ -566,7 +566,7 @@
       the game's own UI (same rule as the "which saves are unreadable" list).
     -->
     <string name="saves_list_title_fmt">Saves in slot \"%1$s\"</string>
-    <string name="saves_list_head_fmt">In this slot %1$d · tap one to see what map it is</string>
+    <string name="saves_list_head_fmt">In this slot %1$d · %2$d are backups</string>
     <!-- round 164: the page empty state (NOT the export message `export_no_save_fmt`) -->
     <string name="saves_empty_fmt">Slot \"%1$s\" has no saves yet.\nSaves made in the game show up here.</string>
     <!--

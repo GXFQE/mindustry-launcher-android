@@ -545,7 +545,7 @@
         （与「看看哪几份读不出来」那条同一个口径）。
     -->
     <string name="saves_list_title_fmt">槽「%1$s」的存档</string>
-    <string name="saves_list_head_fmt">本槽 %1$d 份 · 点一份看它是什么图</string>
+    <string name="saves_list_head_fmt">本槽 %1$d 份 · 其中备份 %2$d 份</string>
     <!-- 第 164 轮：页面空态（**不是**导出那条 `export_no_save_fmt` —— 那句在导出里还要用，别动） -->
     <string name="saves_empty_fmt">槽「%1$s」里还没有存档。\n在游戏里存的档会出现在这里。</string>
     <!--
