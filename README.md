@@ -20,12 +20,17 @@ versions installed side by side, each with separate **saves / maps / blueprints 
 
 | Official Android build | With this launcher |
 |---|---|
-| One version at a time — a second install overwrites the first | Several versions installed at once (159.7 / 160.4 / MindustryX X37 …), none overwriting the others |
-| Every version shares one set of saves, so switching versions replaces them | Each version is assigned to a **slot**; saves / maps / blueprints / mods are fully independent |
-| Going back to an old version for an old save means shuffling files by hand | Switch versions with one tap; **Continue** picks up the version you launched last |
-| "Why is this mod not taking effect?" — no way to find out | Every mod states whether it will load and why (type, dependencies, version gate, blacklist); conflicts between mods are listed one by one |
+| One version at a time — a second install overwrites the first, and going back means shuffling files by hand | Several versions installed side by side (159.7 / 160.4 / MindustryX X37 …), switch with one tap; **Continue** resumes the one you launched last |
+| Every version shares one set of saves, so switching versions replaces them | Each version gets a **slot**: saves / maps / blueprints / mods are fully independent |
+| "Why is this mod not taking effect?" — no way to find out | Every mod says whether it will load and why (type, dependencies, version gate, blacklist); conflicts are listed one by one |
+| Saves / maps / blueprints / mods are stuck inside the app, so a new phone means starting over | All of them can be **imported and exported in batches**; a whole slot can be packed into one zip (settings included) |
+| How much ore a map holds and where you can build can only be counted inside the game | The map page reports **ore / wall ore / buildable tiles / core zone**, and can export it as JSON / JSONL |
+| Which blocks a blueprint is missing, or which map a save belongs to — invisible in the official UI | Lists carry **previews**; a blueprint names its missing blocks (and where it is unsure); a save shows the name the game gave it |
+| A crash is just a crash — no idea who caused it | **Crash analysis** names the mod (and the evidence); the report can be exported, optionally **scrubbed first** |
+| Sharing a save or a whole slot risks carrying your account data along | The **shareable package** strips login identities, server records and everything only useful to you; logs have a scrubbed export too |
 | Backups pile up and eat space | Backups are content-addressed and shared between slots — measured on a real device: 3 slots × 20 backups, 9.1 GB of data in **448 MB** |
 | A mis-tap deletes a map, a mod or a whole slot for good | Deleting any of them **moves it to the transfer station** first, and it can be put back |
+| New features only arrive when the official build ships them | Plug-ins can add abilities to the launcher (young: for now you install an APK by hand) |
 
 **How it works**: the official APK is loaded **as-is, as a plug-in** — no repacking, no
 re-signing, no change to the game's package name. The game's own signature checks, save format and
