@@ -6,6 +6,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 插件能用的**宿主能力门面**（第 159 轮，插件接口 v3；第 160 轮 v4；第 161 轮 v5）。
@@ -35,6 +36,7 @@ import java.util.List;
  * 应报 4；只写 {@code createView(PluginApi)} / 只用 v3 能力的报 3 也行。
  * **v5 起**多了只读数据面（{@link #slots()} / {@link #contents(String)} / {@link #pageItems()} /
  * {@link #open(ItemInfo)}），用它们的插件报 5。
+ * **v6 起**补齐设置 / 日志 / 中转站 / 版本 / {@link #selectedItems()}，用它们的插件报 6。
  * 报 1/2 的老插件宿主不会走 {@code createView(PluginApi)} 那条路（仍按 v1/v2 的
  * {@code createView(Context)} 加载）。
  *
@@ -53,7 +55,7 @@ import java.util.List;
  */
 public interface PluginApi {
 
-    /** 宿主这一版支持的插件接口版本（当前 = 5）。 */
+    /** 宿主这一版支持的插件接口版本（当前 = 6）。 */
     int hostApi();
 
     /**
@@ -111,11 +113,39 @@ public interface PluginApi {
     /**
      * 当前页面看到的数据（只读快照）。
      *
-     * <p>v5 第一阶段覆盖：四个内容页（各自那一类）、槽列表（槽条目）、地图 / 蓝图详情
-     * （当前那一份）。其余页面（主界面 / 设置 / 日志 / 中转站）返回空表，等第二阶段。
+     * <p>v5~v6 覆盖：四个内容页（各自那一类）、槽列表（槽条目）、地图 / 蓝图详情（当前那一份）、
+     * 主界面（版本列表）、设置（设置项）、日志（日志 / 崩溃报告文件）、中转站（条目）。
      * 内容页返回的是**该槽的数据源**，不是搜索 / 筛选后的子集。
      */
     List<ItemInfo> pageItems();
+
+    /**
+     * 当前页面选中的条目。
+     *
+     * <p>⚠️ 只有**详情页**有稳定的"当前选中"：地图详情 / 蓝图详情返回那一份。
+     * 四个内容页的勾选是**导出 / 删除弹窗里的临时状态**，页面不保存 ⇒ 那里返回空表
+     * （要"勾选后交给插件"得先改成持久多选，见 P2 交接）。需要整页数据请用 {@link #pageItems()}。
+     */
+    List<ItemInfo> selectedItems();
+
+    /**
+     * 设置项的只读快照（白名单，不包含 session / 崩溃记账 / 导入表这类内部键）。
+     *
+     * <p>键：{@code config_version} · {@code theme_mode} · {@code app_language} · {@code default_slot} ·
+     * {@code max_log_files} · {@code auto_clean_redundant} · {@code last_version}，以及每个槽的
+     * {@code backup.<槽>.enabled} / {@code .min_minutes} / {@code .max_backups}。
+     * 值是**原始值**的字符串形式（语言空串 = 跟随系统）。
+     */
+    Map<String, String> settings();
+
+    /** 日志与崩溃报告文件（只读快照；用 {@link #open(ItemInfo)} 读正文）。 */
+    List<ItemInfo> logs();
+
+    /** 中转站条目（各 trash 目录的一级条目；目录条目不能 open）。 */
+    List<ItemInfo> trash();
+
+    /** 主界面版本列表（已安装 + 已导入；APK 路径可用于 open）。 */
+    List<ItemInfo> versions();
 
     /**
      * 打开一个条目的字节流。

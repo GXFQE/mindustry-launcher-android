@@ -8,14 +8,15 @@ import android.widget.TextView;
 import java.io.File;
 import java.io.InputStream;
 import java.util.List;
+import java.util.Map;
 
 import io.mdt.launcher.api.ItemInfo;
 import io.mdt.launcher.api.PluginApi;
 import io.mdt.launcher.api.SlotInfo;
 
 /**
- * 第 159~161 轮的**页面动作**夹具：演示 {@code createView(PluginApi)}、{@code content} 插槽
- * 与 v5 只读数据面（槽 / 四类内容 / 页面快照 / open）。
+ * 第 159~162 轮的**页面动作**夹具：演示 {@code createView(PluginApi)}、{@code content} 插槽
+ * 与只读数据面（槽 / 四类内容 / 设置 / 日志 / 中转站 / 版本 / 页面快照 / open）。
  *
  * <p>壳只按名字反射调用（{@code api()} + {@code createView(PluginApi)}），编译期不依赖它。
  * 页面把上下文、各类条目数与第一条的路径打印出来 —— 真机上一眼就能看出"宿主传对了没有"。
@@ -24,7 +25,7 @@ import io.mdt.launcher.api.SlotInfo;
  */
 public final class PlugPage {
 
-    /** 插件接口版本：v5 只读数据面。 */
+    /** 插件接口版本：v6 只读数据面。 */
     public static int api() {
         return __API__;
     }
@@ -41,6 +42,11 @@ public final class PlugPage {
         List<ItemInfo> mods = api.contents(ItemInfo.KIND_MODS);
         List<ItemInfo> bps = api.contents(ItemInfo.KIND_BLUEPRINTS);
         List<ItemInfo> page = api.pageItems();
+        List<ItemInfo> selItems = api.selectedItems();
+        Map<String, String> settings = api.settings();
+        List<ItemInfo> logs = api.logs();
+        List<ItemInfo> trash = api.trash();
+        List<ItemInfo> vers = api.versions();
         String open = "n/a";
         if (!maps.isEmpty() && maps.get(0).readable) {
             InputStream in = null;
@@ -50,6 +56,19 @@ public final class PlugPage {
                 open = "firstByte=" + b;
             } catch (Throwable t) {
                 open = "open failed: " + t.getClass().getSimpleName();
+            } finally {
+                if (in != null) try { in.close(); } catch (Throwable ignored) { }
+            }
+        }
+        String openLog = "n/a";
+        if (!logs.isEmpty() && logs.get(0).readable) {
+            InputStream in = null;
+            try {
+                in = api.open(logs.get(0));
+                int b = in.read();
+                openLog = "firstByte=" + b;
+            } catch (Throwable t) {
+                openLog = "open failed: " + t.getClass().getSimpleName();
             } finally {
                 if (in != null) try { in.close(); } catch (Throwable ignored) { }
             }
@@ -73,10 +92,13 @@ public final class PlugPage {
                 + "\nslot=" + api.slot()
                 + "\nselectedFile=" + sel
                 + "\nslots=" + slots.size() + " pageItems=" + page.size()
+                + " selectedItems=" + selItems.size()
                 + "\nsaves=" + saves.size() + " maps=" + maps.size()
                 + " mods=" + mods.size() + " blueprints=" + bps.size()
+                + "\nsettings=" + settings.size() + " logs=" + logs.size()
+                + " trash=" + trash.size() + " versions=" + vers.size()
                 + "\nfirstMap=" + first(maps)
-                + "\nopen=" + open
+                + "\nopen=" + open + " openLog=" + openLog
                 + "\nslotDir=" + api.slotDir().getAbsolutePath());
         box.addView(info);
 

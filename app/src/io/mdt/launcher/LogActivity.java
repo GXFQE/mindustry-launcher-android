@@ -283,9 +283,42 @@ public class LogActivity extends BaseActivity {
      *   的情况下拿到同一份快照 —— 若各写一份"读日志"的逻辑，导出的内容与页面看到的
      *   就会慢慢分叉（本轮 F19/F20 反复吃过这个亏：同一件事必须只有一个实现）。
      */
+    /**
+     * 插件只读数据面（v6）：**当前存在的**日志与崩溃报告文件，按页面同样的三个源。
+     *
+     * <p>与 {@link #readAll(Context)} 共用同一组 {@link #HUB_FILES} / 目录口径；
+     * 不加载正文（插件自己用 {@code PluginApi.open()} 读），避免一次性读进大文件。
+     */
+    static List<File> pluginLogFiles(Context ctx) {
+        List<File> out = new ArrayList<File>();
+        if (ctx == null) return out;
+        File dataRoot = Data.dataRoot(ctx);
+        if (dataRoot != null) {
+            File game = new File(dataRoot, "last_log.txt");
+            if (game.isFile()) out.add(game);
+        }
+        File hub = Data.hubDir(ctx);
+        if (hub != null) {
+            for (int i = 0; i < HUB_FILES.length; i++) {
+                File f = new File(hub, HUB_FILES[i]);
+                if (f.isFile()) out.add(f);
+            }
+        }
+        File cdir = dataRoot == null ? null : new File(dataRoot, "crashes");
+        File[] fs = cdir != null && cdir.isDirectory() ? cdir.listFiles() : null;
+        if (fs != null) {
+            Arrays.sort(fs, new Comparator<File>() {
+                @Override public int compare(File a, File b) {
+                    return b.getName().compareTo(a.getName());
+                }
+            });
+            for (File f : fs) if (f.isFile()) out.add(f);
+        }
+        return out;
+    }
+
     static Snap readAll(Context ctx) {
         Snap s = new Snap();
-
         File dataRoot = Data.dataRoot(ctx);
         if (dataRoot == null) {
             s.dataRootMissing = true;

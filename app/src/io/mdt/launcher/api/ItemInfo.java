@@ -27,6 +27,14 @@ public final class ItemInfo {
     public static final String KIND_MODS = "mods";
     public static final String KIND_BLUEPRINTS = "blueprints";
     public static final String KIND_SLOT = "slot";
+    /** 第 162 轮：主界面版本列表。 */
+    public static final String KIND_VERSION = "version";
+    /** 第 162 轮：日志 / 崩溃报告文件。 */
+    public static final String KIND_LOGS = "logs";
+    /** 第 162 轮：中转站条目。 */
+    public static final String KIND_TRASH = "trash";
+    /** 第 162 轮：设置项（它不是文件，path 为 null，值在 subtitle / extra）。 */
+    public static final String KIND_SETTING = "setting";
 
     /** 内容类别：{@code saves} / {@code maps} / {@code mods} / {@code blueprints} / {@code slot}。 */
     public final String kind;

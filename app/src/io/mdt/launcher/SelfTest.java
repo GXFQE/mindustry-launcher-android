@@ -3109,6 +3109,36 @@ public final class SelfTest {
         } catch (Throwable t) {
             ok(stat, L, false, "PluginData.open threw: " + t);
         }
+
+        // ── round 162: v6 = settings / logs / trash / versions / selectedItems ──
+        ok(stat, L, PluginHost.API >= 6,
+                "host plugin api >= 6 (settings/logs/trash/versions)");
+        try {
+            Map<String, String> st = PluginData.settings(ctx);
+            ok(stat, L, st.containsKey("theme_mode") && st.containsKey("app_language")
+                            && st.containsKey("default_slot") && st.containsKey("max_log_files"),
+                    "PluginData.settings() exposes the public keys");
+            ok(stat, L, !st.containsKey("session") && !st.containsKey("crash_alert_last")
+                            && !st.containsKey("known_packages"),
+                    "PluginData.settings() excludes internal keys");
+            List<ItemInfo> settingItems = PluginData.pageItems(ctx, "settings", curSlot, null);
+            ok(stat, L, settingItems.size() == st.size(),
+                    "pageItems(settings) mirrors the settings map");
+            ok(stat, L, PluginData.selectedItems(ctx, "maps", curSlot, null).isEmpty(),
+                    "selectedItems(maps) is empty: list pages keep no selection");
+            List<ItemInfo> logs = PluginData.logs(ctx);
+            List<ItemInfo> trashList = PluginData.trash(ctx);
+            List<ItemInfo> vers = PluginData.versions(ctx);
+            ok(stat, L, logs != null && trashList != null && vers != null && !vers.isEmpty(),
+                    "logs()/trash()/versions() return snapshots (" + logs.size() + "/"
+                            + trashList.size() + "/" + vers.size() + ")");
+            File sel = new File(ctx.getCacheDir(), "plug-sel-" + System.currentTimeMillis() + ".msav");
+            write(sel, "x".getBytes("UTF-8"));
+            ok(stat, L, PluginData.selectedItems(ctx, "map-detail", curSlot, sel).size() == 1,
+                    "selectedItems(map-detail) returns the selected file");
+        } catch (Throwable t) {
+            ok(stat, L, false, "PluginData v6 surface threw: " + t);
+        }
         java.util.List<Extensions.Item> exPage = Extensions.parse(
                 "{\"extensions\":["
                         + "{\"id\":\"cs\",\"title\":\"Saves tool\",\"entry\":\"com.x.S\","

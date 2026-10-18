@@ -205,14 +205,16 @@ yourself — even just a few lines — see **Translation file** below.
   opens the plug-in's own page, which can read the current slot and its folders (read-only) through the
   host API; a **detail page also exposes the selected file** (that map / blueprint). The small
   "From plugin: …" line marks it
-- Plug-ins can read data through v5: **every slot** (name / folder / current), the saves, maps, mods and
+- Plug-ins can read data through v6: **every slot** (name / folder / current), the saves, maps, mods and
   blueprints of **any slot** (with source, size, time, plus metadata such as map size and author,
-  blueprint size and block count, mod version and dependencies), and **the items of the current page**
-  (`pageItems()`). They can also **open a slot file or an entry inside a game APK / mod zip directly**,
-  without knowing the container format. Scans read file headers, so plug-ins should do it off the main
-  thread
-- Settings values, log text and the transfer-station list are **not exposed to plug-ins yet** (next
-  round)
+  blueprint size and block count, mod version and dependencies), **the items of the current page**
+  (`pageItems()`), **settings** (a whitelist: theme / language / default slot / log count / auto-clean /
+  backup policies), **log and crash-report files**, **transfer-station entries** and **the version
+  list**. They can also **open a slot file or an entry inside a game APK / mod zip directly**, without
+  knowing the container format. Scans read file headers, so plug-ins should do it off the main thread
+- `selectedItems()` is only stable on a **detail page** (that one map / blueprint). On the four content
+  pages the ticks live in the export / delete dialog and are not kept by the page, so it returns empty;
+  handing a selection to a plug-in would need persistent multi-select first
 - **Disabling** just stops loading it (the file stays); **deleting** moves it to the transfer station,
   from where you can **put it back** — it comes back **disabled**, and enabling it again is your call
 - **A crashing plug-in does not take the launcher down with it**: if a launch with plug-ins did not
@@ -287,8 +289,8 @@ yourself — even just a few lines — see **Translation file** below.
   home screen / slot list / slot page / four content pages / Settings / Logs / transfer station / map
   and blueprint detail pages; **the game launch page and the plug-ins page itself are excluded** (the
   former must not touch the launch pipeline, the latter is the plug-in manager). The read surface
-  covers slots + the four content kinds + opening bytes; settings / logs / transfer station / computed
-  stats are not exposed yet, and there is no hook into the game side
+  covers slots + the four content kinds + settings / logs / transfer station / versions + opening
+  bytes; computed stats are not exposed yet, and there is no hook into the game side
 - **Plug-ins are not sandboxed**: they run in the launcher's own process and can touch whatever the
   launcher can — only install ones you trust
 - **This repository does not contain the game**: Mindustry and third-party builds such as

@@ -98,32 +98,178 @@ final class PluginData {
         }
         if ("map-detail".equals(page)) return one(ctx, selected, ItemInfo.KIND_MAPS);
         if ("blueprint-detail".equals(page)) return one(ctx, selected, ItemInfo.KIND_BLUEPRINTS);
-        return new ArrayList<ItemInfo>();      // v5 第一阶段：其余页面留空
+        if ("main".equals(page)) return versions(ctx);
+        if ("settings".equals(page)) return settingItems(ctx);
+        if ("logs".equals(page)) return logs(ctx);
+        if ("trash".equals(page)) return trash(ctx);
+        return new ArrayList<ItemInfo>();      // 插件页 / 启动页没有内容数据
     }
 
-    static InputStream open(ItemInfo item) throws IOException {
-        if (item == null) throw new IOException("item is null");
+    static List<ItemInfo> selectedItems(Context ctx, String page, String slot, File selected) {
+        if ("map-detail".equals(page) || "blueprint-detail".equals(page)) {
+            return one(ctx, selected,
+                    "map-detail".equals(page) ? ItemInfo.KIND_MAPS : ItemInfo.KIND_BLUEPRINTS);
+        }
+        // 四个内容页的勾选是 BatchIo.pickMulti 的临时弹窗状态，页面不保存
+        return new ArrayList<ItemInfo>();
+    }
+
+    // ---- 设置 / 日志 / 中转站 / 版本 ------------------------------------------
+
+    static Map<String, String> settings(Context ctx) {
+        Map<String, String> out = new LinkedHashMap<String, String>();
+        if (ctx == null) return out;
+        Config c = Config.get();
+        try {
+            c.reload(ctx);
+        } catch (Throwable ignored) {
+        }
+        out.put("config_version", String.valueOf(Config.CONFIG_VERSION));
+        out.put("theme_mode", String.valueOf(c.themeMode()));
+        out.put("app_language", safe(c.appLanguage()));
+        out.put("default_slot", safe(c.defaultSlot()));
+        out.put("max_log_files", String.valueOf(c.maxLogFiles()));
+        out.put("auto_clean_redundant", String.valueOf(c.autoCleanRedundant()));
+        out.put("last_version", safe(c.lastVersion()));
+        List<String> slots = new ArrayList<String>(Data.slotNames(ctx));
+        String cur = Data.currentSlot(ctx);
+        if (cur != null && !cur.isEmpty() && !slots.contains(cur)) slots.add(cur);
+        for (String s : slots) {
+            Config.BackupPolicy p = c.backupPolicy(s);
+            out.put("backup." + s + ".enabled", String.valueOf(p.enabled));
+            out.put("backup." + s + ".min_minutes", String.valueOf(p.minMinutes));
+            out.put("backup." + s + ".max_backups", String.valueOf(p.maxBackups));
+        }
+        return Collections.unmodifiableMap(out);
+    }
+
+    static List<ItemInfo> logs(Context ctx) {
+        List<ItemInfo> out = new ArrayList<ItemInfo>();
+        if (ctx == null) return out;
+        for (File f : LogActivity.pluginLogFiles(ctx)) {
+            Map<String, String> ex = new LinkedHashMap<String, String>();
+            String cat = categoryOfLog(ctx, f);
+            ex.put("category", cat);
+            out.add(new ItemInfo(ItemInfo.KIND_LOGS, f.getName(), cat,
+                    f.getAbsolutePath(), null, null, f.length(), f.lastModified(),
+                    "logs", null, false, f.canRead(), ex));
+        }
+        return out;
+    }
+
+    static List<ItemInfo> trash(Context ctx) {
+        List<ItemInfo> out = new ArrayList<ItemInfo>();
+        if (ctx == null) return out;
+        String[] cats = {"maps", "mods", "saves", "slots", "schematics", "plugins"};
+        File[] dirs = Trash.allDirs(ctx);
+        for (int i = 0; i < dirs.length && i < cats.length; i++) {
+            File dir = dirs[i];
+            File[] fs = dir == null ? null : dir.listFiles();
+            if (fs == null) continue;
+            List<File> list = new ArrayList<File>();
+            for (File f : fs) list.add(f);
+            Collections.sort(list, new Comparator<File>() {
+                @Override public int compare(File a, File b) {
+                    return b.getName().compareTo(a.getName());
+                }
+            });
+            for (File f : list) {
+                Map<String, String> ex = new LinkedHashMap<String, String>();
+                ex.put("category", cats[i]);
+                out.add(new ItemInfo(ItemInfo.KIND_TRASH, f.getName(), cats[i],
+                        f.getAbsolutePath(), null, null,
+                        f.isDirectory() ? 0L : f.length(), f.lastModified(),
+                        "trash", null, f.isDirectory(), f.isFile() && f.canRead(), ex));
+            }
+        }
+        return out;
+    }
+
+    static List<ItemInfo> versions(Context ctx) {
+        List<ItemInfo> out = new ArrayList<ItemInfo>();
+        if (ctx == null) return out;
+        List<Versions.Entry> entries;
+        try {
+            entries = Versions.scanAll(ctx);
+        } catch (Throwable t) {
+            return out;
+        }
+        for (Versions.Entry e : entries) {
+            if (e == null) continue;
+            File apk = e.apkPath == null || e.apkPath.isEmpty() ? null : new File(e.apkPath);
+            Map<String, String> ex = new LinkedHashMap<String, String>();
+            put(ex, "pkg", e.pkg);
+            put(ex, "realPkg", e.realPkg);
+            put(ex, "versionName", e.versionName);
+            put(ex, "displayVersion", e.displayVersion());
+            put(ex, "imported", String.valueOf(e.imported));
+            put(ex, "importFile", e.importFile);
+            put(ex, "md5", e.md5);
+            put(ex, "customName", e.customName);
+            put(ex, "upstreamVersion", e.upstreamVersion);
+            put(ex, "slot", Versions.slotFor(e));
+            String sub = e.displayVersion();
+            if (e.pkg != null && !e.pkg.isEmpty()) sub = sub + " · " + e.pkg;
+            out.add(new ItemInfo(ItemInfo.KIND_VERSION, e.displayName(ctx), sub,
+                    apk == null ? null : apk.getAbsolutePath(), null, null,
+                    e.apkSize, apk == null ? 0L : apk.lastModified(),
+                    e.imported ? "import" : "installed", null, false,
+                    apk != null && apk.isFile() && apk.canRead(), ex));
+        }
+        return out;
+    }
+
+    private static List<ItemInfo> settingItems(Context ctx) {
+        List<ItemInfo> out = new ArrayList<ItemInfo>();
+        for (Map.Entry<String, String> e : settings(ctx).entrySet()) {
+            String v = e.getValue() == null ? "" : e.getValue();
+            Map<String, String> ex = new LinkedHashMap<String, String>();
+            ex.put("key", e.getKey());
+            ex.put("value", v);
+            out.add(new ItemInfo(ItemInfo.KIND_SETTING, e.getKey(), v,
+                    null, null, null, 0L, 0L, "config", null, false, false, ex));
+        }
+        return out;
+    }
+
+    private static String categoryOfLog(Context ctx, File f) {
+        File crashes = Data.dataRoot(ctx) == null ? null : new File(Data.dataRoot(ctx), "crashes");
+        if (crashes != null && f.getParentFile() != null
+                && f.getParentFile().getAbsolutePath().equals(crashes.getAbsolutePath())) {
+            return "crash";
+        }
+        File hub = Data.hubDir(ctx);
+        if (hub != null && f.getParentFile() != null
+                && f.getParentFile().getAbsolutePath().equals(hub.getAbsolutePath())) {
+            return "launcher";
+        }
+        return "game";
+    }
+
+    static InputStream open(ItemInfo item) throws IOException {        if (item == null) throw new IOException("item is null");
         if (item.path != null) {
             File f = new File(item.path);
             if (f.isFile()) return new FileInputStream(f);
         }
         if (item.container != null && item.entry != null) {
             final ZipFile zip = new ZipFile(item.container);
-            ZipEntry e = zip.getEntry(item.entry);
-            if (e == null) {
-                zip.close();
-                throw new IOException("entry not found: " + item.entry);
-            }
-            final InputStream in = zip.getInputStream(e);
-            return new FilterInputStream(in) {
-                @Override public void close() throws IOException {
-                    try {
-                        super.close();
-                    } finally {
-                        zip.close();
+            try {
+                ZipEntry e = zip.getEntry(item.entry);
+                if (e == null) throw new IOException("entry not found: " + item.entry);
+                final InputStream in = zip.getInputStream(e);
+                return new FilterInputStream(in) {
+                    @Override public void close() throws IOException {
+                        try {
+                            super.close();
+                        } finally {
+                            zip.close();
+                        }
                     }
-                }
-            };
+                };
+            } catch (IOException e) {
+                zip.close();
+                throw e;
+            }
         }
         throw new IOException("item is not readable: " + item.title);
     }
@@ -311,6 +457,10 @@ final class PluginData {
 
     private static String err(String e) {
         return e == null || e.trim().isEmpty() ? null : e;
+    }
+
+    private static String safe(String s) {
+        return s == null ? "" : s;
     }
 
     private static void put(Map<String, String> m, String k, String v) {
