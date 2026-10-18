@@ -276,6 +276,14 @@
             android:textColor="@color/fg_muted"
             android:textSize="12sp"
             android:visibility="gone" />
+        <!-- ★ 空态排在**列表容器之前** —— 第 166 轮把这两块调换了顺序：
+             原来模组页是「容器 → 空态」，另外三页是「空态 → 容器」⇒ 空槽时那 8dp 内边距
+             一会落在字上面、一会落在字下面（用户：「底下也还不一样啊」）。
+             现在四页统一：筛选提示 → 空态 → 列表容器 → 底部留白。 -->
+        <TextView
+            android:id="@+id/mod_empty"
+            style="@style/PageEmpty" />
+
         <!-- 模组列表容器（条目由 ModsActivity.rebuildList() 全展开挂载）
              第 163 轮：底部内边距 12dp → **8dp**，与另外三页的 `*_list` 对齐 -->
         <LinearLayout
@@ -286,17 +294,6 @@
             android:paddingStart="@dimen/page_pad"
             android:paddingEnd="@dimen/page_pad"
             android:paddingBottom="8dp" />
-
-        <TextView
-            android:id="@+id/mod_empty"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:padding="28dp"
-            android:gravity="center"
-            android:textAlignment="center"
-            android:textSize="13sp"
-            android:lineSpacingExtra="4dp"
-            android:textColor="@color/fg_muted" />
 
         <!-- F5b：底部留白（滚到底时末项与导航栏留出间隙）。见 activity_main.xml -->
         <View

@@ -149,14 +149,7 @@
     -->
     <TextView
         android:id="@+id/bp_empty"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:padding="28dp"
-        android:gravity="center"
-        android:textAlignment="center"
-        android:textSize="13sp"
-        android:lineSpacingExtra="4dp"
-        android:textColor="@color/fg_muted"
+        style="@style/PageEmpty"
         android:visibility="gone" />
 
     <!-- ★★ 列表容器：不是 `ListView`（见文件头 2026-10-16 那条）；行由 `MsavListAdapter.fillInto` 手工挂载 -->

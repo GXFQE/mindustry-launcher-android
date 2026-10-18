@@ -182,14 +182,7 @@
     -->
     <TextView
         android:id="@+id/maps_empty"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:padding="28dp"
-        android:gravity="center"
-        android:textAlignment="center"
-        android:textSize="13sp"
-        android:lineSpacingExtra="4dp"
-        android:textColor="@color/fg_muted"
+        style="@style/PageEmpty"
         android:visibility="gone" />
 
     <!--

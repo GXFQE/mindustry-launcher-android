@@ -516,7 +516,7 @@
     <!-- ★ 2026-10-04：这句原来"全工程零引用"（地图页没有空态），现在真的用上了。
          ⚠️ 同时**收短**：原来挤在一行里三句（"本槽没有，模组没自带，游戏自带的要等…"），
             空态只需要"为什么没有 + 下一步"两件事（对齐 empty_versions 的写法）。 -->
-    <string name="maps_empty_fmt">槽「%1$s」里还没有地图。\n给某个版本分配这个槽之后，游戏自带的地图就会出现。</string>
+    <string name="maps_empty_fmt">槽「%1$s」里还没有地图。\n分配一个游戏版本给它，自带的地图就会出现。</string>
     <!--
       ★ 2026-10-07（第 122 轮）：地图列表的搜索 / 排序。
       用户：「把搜索 / 排序推广到地图 / 蓝图 / 存档列表」—— 模组页（F13 第二批）已有这一套。
@@ -1543,7 +1543,7 @@
     <string name="mods_row_slot_sub_fmt">正在看「%1$s」的模组</string>
     <string name="mods_slot_pick_title">看哪个槽的模组？</string>
 
-    <string name="mods_empty_fmt">槽「%1$s」里还没有模组。\n把 .jar / .zip 放进：\n%2$s</string>
+    <string name="mods_empty_fmt">槽「%1$s」里还没有模组。\n把 .jar / .zip 放进模组目录（点上面那行看路径）。</string>
     <string name="mods_ignored_fmt">另有 %1$d 个文件夹不会被加载（它们不是模组包）</string>
     <string name="mods_orphan_fmt">设置里还留着 %1$d 个模组的开关，但包已经不在（历史残留）</string>
     <string name="mods_broken_head">读不出说明文件的包（游戏会直接跳过）</string>

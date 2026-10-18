@@ -8069,8 +8069,22 @@ public final class SelfTest {
         ok(stat, L, lp.contains("正在准备存档槽") && lp.contains("2026.09.X37"),
                 "★启动进度提示实拼：" + lp.replace('\n', ' '));
         String ep = ctx.getString(R.string.maps_empty_fmt, "default");
-        ok(stat, L, ep.contains("default") && ep.contains("给某个版本分配这个槽"),
+        ok(stat, L, ep.contains("default") && ep.indexOf('\n') > 0,
                 "★地图页空态实拼：" + ep.replace('\n', ' '));
+        // ★ 第 166 轮：四页空态必须是**同一个形状**（主句 + 一句提示 = 恰好一个换行）。
+        //   任何一页多一行（比如模组页原来把绝对路径也印在空态里），底部那块就不是同一个盒子
+        //   —— 用户连着两轮说「底下也还不一样」。**判据与具体措辞无关**，只钉形状。
+        String[] emptyBodies = {
+                ctx.getString(R.string.mods_empty_fmt, "default"),
+                ctx.getString(R.string.saves_empty_fmt, "default"),
+                ctx.getString(R.string.maps_empty_fmt, "default"),
+                ctx.getString(R.string.bp_empty, "default"),
+        };
+        for (String body : emptyBodies) {
+            int nl = body.indexOf('\n');
+            ok(stat, L, nl > 0 && nl < body.length() - 1 && body.indexOf('\n', nl + 1) < 0,
+                    "★四页空态同一个形状（主句⏎一句提示，不许有第三行）：" + body.replace('\n', ' '));
+        }
         L.add("");
     }
 

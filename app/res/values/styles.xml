@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  第 166 轮：四页（模组 / 存档 / 地图 / 蓝图）共用的样式。
+  ★ 只收「必须一模一样」的那几块 —— 用户连着三轮说「这四个不一样」，
+    每次都是靠**逐页手写同一套属性**维持一致，改一处忘一处就又漂了。
+-->
+<resources>
+
+    <!--
+      空态那块（`mod_empty` / `save_empty` / `maps_empty` / `bp_empty`）。
+      ★ 为什么给固定 `minHeight`：四页的空态**文字长度天然不同**（存档两句都短、地图那句长到折行），
+        只靠 `wrap_content` 的话四页底部的**块高就不一样** —— 用户：「底下也还不一样啊」。
+        120dp 装两行 13sp 有余；只有超过它才会长高 ⇒ 每页都写「主句 + 一句提示」两行短句，
+        四页就一定是**同一个盒子**（自检口径见 `ref/29` 第 64 条）。
+      ⚠️ 改这里会同时改四页 —— 要单独调某一页，先想清楚它凭什么跟别人不一样。
+    -->
+    <style name="PageEmpty">
+        <item name="android:layout_width">match_parent</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:minHeight">120dp</item>
+        <item name="android:padding">28dp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textAlignment">center</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:lineSpacingExtra">4dp</item>
+        <item name="android:textColor">@color/fg_muted</item>
+    </style>
+
+</resources>

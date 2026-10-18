@@ -1018,8 +1018,10 @@ public class ModsActivity extends BaseActivity {
         if (mEmpty != null) {
             mEmpty.setVisibility(shown.isEmpty() ? View.VISIBLE : View.GONE);
             if (shown.isEmpty()) {
+                // 第 166 轮：把这句里的**绝对路径**挪走了 —— 它会把空态撑成 4 行，
+                //   四页底部的块高就不一样了（路径仍在上面那行展开后的「模组目录」里）。
                 mEmpty.setText(!filtering && all.isEmpty()
-                        ? Trans.get(ModsActivity.this, R.string.mods_empty_fmt, mSlot, mScan.modsDirPath())
+                        ? Trans.get(ModsActivity.this, R.string.mods_empty_fmt, mSlot)
                         : Trans.get(ModsActivity.this, R.string.mods_empty_filtered));
             }
         }
