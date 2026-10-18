@@ -1114,7 +1114,7 @@
     <string name="backup_err_clone_target_current_fmt">\"%1$s\" is the current slot, so it cannot be the clone target.\n(the source slot content would mix with it and could never be separated again)</string>
     <string name="backup_err_slot_backups_delete_fmt">Could not fully delete the backup directory: %1$s</string>
     <string name="export_slot_title_fmt">Export whole slot \"%1$s\"</string>
-    <string name="export_slot_msg_fmt">Packs the whole slot into one zip (saves · maps · schematics · mods · settings).%1$s\n\n⚠ This package may hold your account identity data — to hand it to someone else, use \"Export a shareable package\".\n\nThe game can import it as well (Settings → Data → Import data).</string>
+    <string name="export_slot_msg_fmt">Packs the whole slot into one zip: saves · maps · schematics · mods · settings, plus previews, logs and server records — more than the game\u0027s own \"Export data\".%1$s\n\n⚠ It may hold account identity data — to hand it to someone else use \"Export a shareable package\".\n\nThe game can import it too (Settings → Data → Import data).</string>
     <string name="export_slot_playing">\n\n⚠ The game is running; the export may capture a half-written save.</string>
     <string name="export_ok">Choose where to save</string>
     <string name="chooser_export">Export to…</string>
@@ -1165,7 +1165,7 @@
     <string name="zip_confirm_head_fmt">%1$d files · %2$s</string>
     <string name="zip_confirm_tops_fmt">\nContains: %1$s</string>
     <string name="zip_confirm_strip_fmt">\n\n(The package has an extra \"%1$s\" wrapper, which is stripped when extracting)</string>
-    <string name="zip_tag_native">\n\nIt contains the game settings file. Both a full-slot export and the game\u0027s own \"Export data\" look like this.</string>
+    <string name="zip_tag_native">\n\nIt contains the game settings file (the game\u0027s own \"Export data\" looks like this too).</string>
     <string name="zip_tag_custom">\n\nNo game settings file — this looks like a package exported by this launcher.</string>
     <string name="zip_warn_unknown">This does not look like a Mindustry data package. Import anyway?</string>
     <string name="zip_warn_skipped_fmt">%1$d entries have unsafe paths and will be skipped.</string>

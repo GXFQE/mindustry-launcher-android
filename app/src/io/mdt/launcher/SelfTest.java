@@ -993,9 +993,9 @@ public final class SelfTest {
             ok(stat, L, !shareMsg.contains("给换机") && shareMsg.contains("导出整槽"),
                     "④b ★分享包的定位句：不抢「换机」（要指向「导出整槽」）"
                             + "—— 界面里换机那行本来就是「导出整槽」的");
-            ok(stat, L, shareLen <= 100 && exportLen <= 105,
+            ok(stat, L, shareLen <= 100 && exportLen <= 130,
                     "④b ★两个确认框的**字数预算**（「尽量不要大段文本」）：分享包 " + shareLen
-                            + " 字（≤100）、整槽导出 " + exportLen + " 字（≤105）");
+                            + " 字（≤100）、整槽导出 " + exportLen + " 字（≤130，第 168 轮要容下“比游戏那份多”）");
             // ★ 第 146 轮（用户：「你不觉得这句话很奇怪吗」）：这句只许说**用户听得懂的一件事** ——
             //   "这里没有可去掉的东西"（ref/29 第 29 条：要单独说出来，否则像漏剥了）。
             //   ⚠️ 上一轮为修矛盾把它缩到了实现层（"设置文件""原样进包"），反而看不懂了 ⇒
@@ -1011,6 +1011,16 @@ public final class SelfTest {
             ok(stat, L, expMsg.contains("身份信息") && expMsg.contains("导出分享包"),
                     "④b ★整槽导出（**原件**那一档）的确认框里有泄露提示，并指向「导出分享包」"
                             + "（用户 2026-10-13：「导出整槽给个敏感信息泄露提示」）");
+            // ★ 第 168 轮（用户：「导出整槽里面写着游戏中的导出方式，但好像实际导出的不一样吧」）：
+            //   我们的包是游戏「导出数据」的**严格超集**（`ref/40` §93.7 的字节码表：多出
+            //   previews/ · crashes/ · last_log.txt · server_list.json · 设置备份 · 模组写在数据根
+            //   顶层的目录）⇒ 文案**不许**把两者说成一样，必须明说"比它多"。
+            ok(stat, L, expMsg.contains("导出数据")
+                            && (expMsg.contains("多") || expMsg.contains("外加"))
+                            && !expMsg.contains("一模一样") && !expMsg.contains("完全一样")
+                            && !expMsg.contains("长这样"),
+                    "④b ★整槽导出的确认框：说清了「比游戏自带的『导出数据』多」，"
+                            + "没把两者说成同一个包：" + expMsg.replace('\n', ' '));
             ok(stat, L, shareMsg.contains("缓存") && shareMsg.contains("日志"),
                     "④b ★分享包的类别句里说清了「日志与可重建的缓存」也会丢"
                             + "（用户：「纯分享这东西没啥用吧」）");
