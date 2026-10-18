@@ -1543,7 +1543,7 @@
     <string name="mods_row_slot_sub_fmt">正在看「%1$s」的模组</string>
     <string name="mods_slot_pick_title">看哪个槽的模组？</string>
 
-    <string name="mods_empty_fmt">槽「%1$s」里还没有模组。\n把 .jar / .zip 放进模组目录（点上面那行看路径）。</string>
+    <string name="mods_empty_fmt">槽「%1$s」里还没有模组。\n从本机导入 .jar / .zip 就会出现在这里。</string>
     <string name="mods_ignored_fmt">另有 %1$d 个文件夹不会被加载（它们不是模组包）</string>
     <string name="mods_orphan_fmt">设置里还留着 %1$d 个模组的开关，但包已经不在（历史残留）</string>
     <string name="mods_broken_head">读不出说明文件的包（游戏会直接跳过）</string>

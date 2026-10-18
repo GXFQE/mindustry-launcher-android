@@ -1608,7 +1608,7 @@
     <string name="mods_row_slot_sub_fmt">Viewing mods of \"%1$s\"</string>
     <string name="mods_slot_pick_title">Which slot mods do you want to see?</string>
 
-    <string name="mods_empty_fmt">Slot \"%1$s\" has no mods yet.\nPut .jar / .zip into the mods folder (tap the line above to see its path).</string>
+    <string name="mods_empty_fmt">Slot \"%1$s\" has no mods yet.\nImport .jar / .zip from this device and they show up here.</string>
     <string name="mods_ignored_fmt">%1$d more folders will not be loaded (they are not mod packages)</string>
     <string name="mods_orphan_fmt">Settings still hold toggles for %1$d mods whose packages are gone (leftovers)</string>
     <string name="mods_broken_head">Packages whose description file cannot be read (the game skips them outright)</string>
