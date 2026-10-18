@@ -77,6 +77,8 @@ yourself — even just a few lines — see **Translation file** below.
 - **Create / rename / clone / delete**. Cloning copies a slot into a new one (the source is backed up
   first, and the source itself is left alone); deleting a slot moves it — **and its backups** — to the
   transfer station, and it can be put back, under a new name if the old one is taken
+  (rename / clone / delete live in the **⋮ menu at the top right of the slot page**; the
+  "Backup & restore" row holds only the backup actions)
 - Open a slot and everything inside it is one row away: **Mods**, **Saves**, **Maps**,
   **Blueprints**, **Backup & restore**, **Whole-slot import & export**
 
@@ -85,12 +87,13 @@ yourself — even just a few lines — see **Translation file** below.
   version assigned to the slot)
 - **See each save**: which map it is, its size, wave, playtime, author and when it was saved;
   unreadable files are listed separately with the reason instead of silently disappearing
-  (the save page is read-only — deleting a save is left to the game's own screen)
 - **The save list can be searched and sorted**: search by save name; sort by name / **newest first** /
   size (this page has no "problems only" — the unreadable ones already have a row of their own)
 - **Import / export `.msav`** saves, **several at a time** — picking just one keeps the old flow
   (you are asked for the save name and clashes are handled one by one); picking several, or picking a
   `.zip` we exported, imports them under their own file names and asks about clashes **once**
+- **Delete saves**: tick one or several → they move to the transfer station (not hard-deleted) and can
+  be put back; the launcher refuses while the game is running
 - **Backup list**: every backup on its own row (time / how many files / size / what the main save
   inside is), and one tap to **restore** or **delete that one**
 - **Automatic backup, per slot**: enable it, set the minimum playtime (a shorter session is skipped)
@@ -117,6 +120,10 @@ yourself — even just a few lines — see **Translation file** below.
   If the settings file cannot be read, the launcher **refuses to export** rather than ship a file it
   could not check. (A single save file never carried any of this — the identity lives in the slot's
   settings, not in the save.)
+- **Every export can be shared directly**: maps / saves / blueprints / mods (one or several) gain a
+  **Share directly (nothing saved to a file)** tick in the export dialog — with it ticked the positive
+  button becomes **Share**, the file goes to the cache and is handed to the system share sheet, and the
+  cache is cleaned up after 24 hours
 - **Automatic cleanup** of redundant data-directory leftovers (switchable; a manual "clean up once
   now" stays available when it is off)
 
@@ -126,6 +133,11 @@ yourself — even just a few lines — see **Translation file** below.
 - **Map resource statistics**: ore / ore in walls / mineable floor / bonus floor — the top level
   reports only the "reachable" numbers (wall ore only reports a total, since it needs a wall drill),
   and the evidence (which blocks, how many tiles, and what is covering them) can be expanded
+- **Export statistics**: tick one map for a `.json`, two or more for a `.jsonl` (one line per map);
+  two levels of detail — **full** (everything) or **brief** (only the numbers you can actually use);
+  and two destinations — **save to a file** or **share directly** (send it in a chat, nothing lands in
+  your folders). The file records the exporter version, the export time, the slot, the map source and
+  its sha256, so a report can be traced back
 - **Import `.msav`** (**several files at once**); **export from any source** — maps built into the
   game or into a mod live inside the APK, and can still be exported directly (the exported file is
   byte-for-byte identical to the source); **tick two or more and the export becomes one zip**
@@ -179,6 +191,8 @@ yourself — even just a few lines — see **Translation file** below.
   and so can a zip that merely holds one folder per mod);
   **export mods**: one tick gives you that file, several ticks become one zip (a folder-form mod is
   packed into the zip)
+- **Delete mods**: tick one or several → they move to the transfer station; folder-form mods can be
+  deleted too
 - **Copy this slot's mods to another slot**
 
 ### Plug-ins
