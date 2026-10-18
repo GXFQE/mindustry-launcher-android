@@ -69,6 +69,9 @@
                     android:layout_height="wrap_content" />
             </LinearLayout>
 
+            <!-- 第 160 轮：插件动作区（没有条目整块 GONE）；selectedFile = 这一份蓝图 -->
+            <include layout="@layout/plugin_section" />
+
             <TextView
                 android:id="@+id/bp_detail_state"
                 android:layout_width="match_parent"

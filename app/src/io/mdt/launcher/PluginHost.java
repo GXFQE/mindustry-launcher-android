@@ -42,11 +42,12 @@ public final class PluginHost {
      * 壳认的插件接口版本。
      *
      * <p>v1 = 只有 {@code api() + createView(Context)}；v2 = 自述 JSON + access；
-     * **v3（第 159 轮）= 加上 {@link PluginApi} 与 {@code content} 插槽**。
-     * 插件报 3 才意味着"我会用 {@code createView(PluginApi)}"，报 1/2 的老插件照旧走
-     * {@code createView(Context)}；区间下限不变（{@link #API_MIN} = 1）。
+     * **v3（第 159 轮）= 加上 {@link PluginApi} 与 {@code content} 插槽**；
+     * **v4（第 160 轮）= 同一插槽扩到全部页面 + {@link PluginApi#selectedFile()}**。
+     * 插件报 4 才意味着"我会用 selectedFile / 全页动作"，报 1/2/3 的照旧；
+     * 区间下限不变（{@link #API_MIN} = 1）。
      */
-    public static final int API = 3;
+    public static final int API = 4;
     /**
      * 还认的**最老**契约版本（第 139 轮）。抬它 = 老插件被拒，界面会说清"太老、该更新插件"。
      *
@@ -125,12 +126,12 @@ public final class PluginHost {
     // ---- 加载 -----------------------------------------------------------------
 
     public static Loaded load(Context host, File apk) throws PluginException {
-        return open(host, apk, null, DEFAULT_ENTRY, null, null);
+        return open(host, apk, null, DEFAULT_ENTRY, null, null, null);
     }
 
     /** 按插件自述的入口类名加载（见 {@link PluginMeta}）。 */
     public static Loaded load(Context host, File apk, String entry) throws PluginException {
-        return open(host, apk, null, entryOr(entry), null, null);
+        return open(host, apk, null, entryOr(entry), null, null, null);
     }
 
     /**
@@ -141,7 +142,17 @@ public final class PluginHost {
      */
     public static Loaded load(Context host, File apk, String entry, String page, String slot)
             throws PluginException {
-        return open(host, apk, null, entryOr(entry), page, slot);
+        return open(host, apk, null, entryOr(entry), page, slot, null);
+    }
+
+    /**
+     * 第 160 轮：再加"当前选中项"（详情页那一份地图 / 蓝图）。
+     *
+     * @param selected {@link io.mdt.launcher.api.PluginApi#selectedFile()}；非详情页传 null
+     */
+    public static Loaded load(Context host, File apk, String entry, String page, String slot,
+                              File selected) throws PluginException {
+        return open(host, apk, null, entryOr(entry), page, slot, selected);
     }
 
     /**
@@ -153,23 +164,29 @@ public final class PluginHost {
      * 这里只跑后三道门：按名字取类（预热预检）→ 接口版本 → 挂资源。
      */
     static Loaded openInjected(Context host, File apk) throws PluginException {
-        return open(host, apk, host.getClassLoader(), DEFAULT_ENTRY, null, null);
+        return open(host, apk, host.getClassLoader(), DEFAULT_ENTRY, null, null, null);
     }
 
     /** 按插件自述的入口类名打开已经注入宿主 CL 的那一份（多插件下"点谁开谁"靠它）。 */
     static Loaded openInjected(Context host, File apk, String entry) throws PluginException {
-        return open(host, apk, host.getClassLoader(), entryOr(entry), null, null);
+        return open(host, apk, host.getClassLoader(), entryOr(entry), null, null, null);
     }
 
     /** 同 {@link #load(Context, File, String, String, String)}，但走"已注入宿主 CL"那条路。 */
     static Loaded openInjected(Context host, File apk, String entry, String page, String slot)
             throws PluginException {
-        return open(host, apk, host.getClassLoader(), entryOr(entry), page, slot);
+        return open(host, apk, host.getClassLoader(), entryOr(entry), page, slot, null);
+    }
+
+    /** 同 {@link #load(Context, File, String, String, String, File)}，但走"已注入宿主 CL"那条路。 */
+    static Loaded openInjected(Context host, File apk, String entry, String page, String slot,
+                               File selected) throws PluginException {
+        return open(host, apk, host.getClassLoader(), entryOr(entry), page, slot, selected);
     }
 
     /** @param injectedTo 非 null = 这个 dex 已经注册给它了 ⇒ 不再建 DexClassLoader */
     private static Loaded open(Context host, File apk, ClassLoader injectedTo, String entryName,
-                               String page, String slot) throws PluginException {
+                               String page, String slot, File selected) throws PluginException {
         if (apk == null || !apk.isFile()) {
             throw new PluginException("plugin_err_missing", String.valueOf(apk));
         }
@@ -244,7 +261,7 @@ public final class PluginHost {
                 ? Extensions.SLOT_PLUGINS : page.trim();
         String useSlot = (slot == null || slot.trim().isEmpty())
                 ? Data.currentSlot(host) : slot.trim();
-        PContext pc = new PContext(host, am, res, cl, pdata, pcache, usePage, useSlot);
+        PContext pc = new PContext(host, am, res, cl, pdata, pcache, usePage, useSlot, selected);
         return new Loaded(cl, pc, pc, entry, api, roSet, stillWritable, from, cookie);
     }
 
@@ -274,20 +291,22 @@ public final class PluginHost {
         private final File files, cache;
         /** 从哪个页面来的 / 哪个槽（第 159 轮 v3）。 */
         private final String page, slot;
+        /** 详情页当前选中的那一份（第 160 轮 v4）；其余页 null。 */
+        private final File selected;
 
         PContext(Context base, AssetManager am, Resources res, ClassLoader cl, File files, File cache,
-                 String page, String slot) {
+                 String page, String slot, File selected) {
             super(base);
             this.am = am; this.res = res; this.cl = cl;
             this.files = files; this.cache = cache;
-            this.page = page; this.slot = slot;
+            this.page = page; this.slot = slot; this.selected = selected;
         }
 
         @Override public AssetManager getAssets() { return am; }
         @Override public Resources getResources() { return res; }
         @Override public ClassLoader getClassLoader() { return cl; }
 
-        // ---- PluginApi（v3）-----------------------------------------------
+        // ---- PluginApi（v3 / v4）------------------------------------------
 
         @Override public int hostApi() { return API; }
 
@@ -296,6 +315,8 @@ public final class PluginHost {
         @Override public String page() { return page; }
 
         @Override public String slot() { return slot; }
+
+        @Override public File selectedFile() { return selected; }
 
         @Override public File slotDir() { return Data.dirOf(getBaseContext(), slot); }
 

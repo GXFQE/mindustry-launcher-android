@@ -46,6 +46,9 @@ import java.util.Map;
     //   产品版没有 DevTools 的真实现，所以这些成员照样只有本类能碰。
 public class MainActivity extends BaseActivity {
 
+    /** 第 160 轮：主界面也挂插件动作区（布局里有 plugin_section）。 */
+    @Override protected String pluginPageId() { return Extensions.PAGE_MAIN; }
+
     private static final int REQ_IMPORT = 41;
 
     List<Versions.Entry> mEntries;

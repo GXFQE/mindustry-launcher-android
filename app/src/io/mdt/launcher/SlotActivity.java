@@ -24,6 +24,10 @@ import java.io.File;
  *   ⇒ 新页面照抄这三页的类声明就会再次踩进来。
  */
 public class SlotActivity extends BaseActivity {
+
+    /** 第 160 轮：槽详情页挂插件动作区；插件看到的就是**这个槽**，不是"当前槽"。 */
+    @Override protected String pluginPageId() { return Extensions.PAGE_SLOT; }
+    @Override protected String pluginSlot() { return mSlot; }
     /** 传进来的槽名（本页的一切都以它为准） */
     public static final String EXTRA_SLOT = "slot";
 

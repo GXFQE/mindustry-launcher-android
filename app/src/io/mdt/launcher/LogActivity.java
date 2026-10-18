@@ -69,6 +69,9 @@ import java.util.Locale;
  */
 public class LogActivity extends BaseActivity {
 
+    /** 第 160 轮：日志页也挂插件动作区（导出/分析类插件就落在这里）。 */
+    @Override protected String pluginPageId() { return Extensions.PAGE_LOGS; }
+
     private static final String TAG = "MDTLauncher";
 
     /** 正文最多显示多少行（超长文件只显示尾部，meta 里会标注） */

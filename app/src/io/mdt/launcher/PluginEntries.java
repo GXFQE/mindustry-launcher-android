@@ -14,14 +14,14 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * 把插件声明的**内容页动作**画成内容页里的一行（第 159 轮，扩展点 v2）。
+ * 把插件声明的**页面动作**画成一行（第 159 轮扩展点 v2；第 160 轮扩到全部页面）。
  *
  * <p>三件事，顺序固定：
  * <ol>
  *   <li>取**生效中**的插件（{@link Plugins#active}）—— 待重启生效 / 已停用的不出现，
  *       否则用户会看到"停用了还在"；</li>
  *   <li>读每个 APK 的自述（{@link Extensions#of}，**几 KB，不加载插件代码**）⇒ 只要这一页的条目；</li>
- *   <li>插到"筛选"那一行**之前**（各行顺序仍是：导入 → 导出 → 专属动作 → 删除 → 筛选）。</li>
+ *   <li>四个内容页插到「删除」之前；其余页面插到统一那块「插件」卡里（没有条目整块 GONE）。</li>
  * </ol>
  *
  * <p>★ 只读声明、不加载插件代码：某台插件坏了最多是它那一行不出现，页面照常打开；
@@ -75,14 +75,49 @@ final class PluginEntries {
      *                    （第 157 轮定下的顺序，插件动作属于"这一个页面专属的事"）
      */
     static void attach(Activity a, ViewGroup box, String page, String slot, int beforeRowId) {
+        attach(a, box, page, slot, beforeRowId, null);
+    }
+
+    /** 同 {@link #attach(Activity, ViewGroup, String, String, int)}，额外带上详情页选中项。 */
+    static void attach(Activity a, ViewGroup box, String page, String slot, int beforeRowId,
+                       File selected) {
         if (a == null || box == null) return;
         List<Entry> rows = collect(a, page);
         if (rows.isEmpty()) return;
         int at = insertIndex(box, beforeRowId);
         for (Entry e : rows) {
             box.addView(divider(a), at++);
-            box.addView(row(a, e, page, slot), at++);
+            box.addView(row(a, e, page, slot, selected), at++);
         }
+    }
+
+    /**
+     * 往通用页面的「插件」卡里挂动作行（第 160 轮）。
+     *
+     * <p>卡片是布局里一段固定 include（{@code plugin_section} + {@code plugin_section_rows}）；
+     * 没有条目就整块 {@code GONE} —— **不占高度、不留空卡**。
+     * 放的位置由各页布局决定（主界面在首卡下面、设置页在底部……）。
+     */
+    static void attachPage(Activity a, String page, String slot, File selected) {
+        if (a == null || page == null) return;
+        View section = a.findViewById(R.id.plugin_section);
+        if (section == null) return;                     // 这一页没有挂载点 ⇒ 静默跳过
+        ViewGroup box = (ViewGroup) section.findViewById(R.id.plugin_section_rows);
+        if (box == null) return;
+
+        List<Entry> rows = collect(a, page);
+        box.removeAllViews();
+        if (rows.isEmpty()) {
+            section.setVisibility(View.GONE);
+            return;
+        }
+        TextView title = (TextView) section.findViewById(R.id.plugin_section_title);
+        if (title != null) title.setText(Trans.get(a, R.string.plugin_section_title));
+        for (int i = 0; i < rows.size(); i++) {
+            if (i > 0) box.addView(divider(a));
+            box.addView(row(a, rows.get(i), page, slot, selected));
+        }
+        section.setVisibility(View.VISIBLE);
     }
 
     /** 插到目标行**上面那条分割线**之前；找不到目标行就追加到末尾。 */
@@ -107,7 +142,8 @@ final class PluginEntries {
         return v;
     }
 
-    private static View row(final Activity a, final Entry e, final String page, final String slot) {
+    private static View row(final Activity a, final Entry e, final String page, final String slot,
+                            final File selected) {
         View row = LayoutInflater.from(a).inflate(R.layout.row_action, null, false);
         ((ImageView) row.findViewById(R.id.act_icon)).setImageResource(R.drawable.ic_plugins_bar);
         ((TextView) row.findViewById(R.id.act_title)).setText(e.item.label());
@@ -115,7 +151,8 @@ final class PluginEntries {
                 .setText(Trans.get(a, R.string.plugin_ext_from_fmt, e.name));
         row.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
-                PluginsActivity.start(a, e.id, e.ver, e.item.entry, page, slot, e.item.label());
+                PluginsActivity.start(a, e.id, e.ver, e.item.entry, page, slot,
+                        e.item.label(), selected);
             }
         });
         return row;

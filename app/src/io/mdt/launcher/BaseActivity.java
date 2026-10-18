@@ -61,6 +61,38 @@ public abstract class BaseActivity extends Activity {
         super.attachBaseContext(changed ? base.createConfigurationContext(cfg) : base);
     }
 
+    /**
+     * 第 160 轮：**所有页面**统一挂插件动作区（页面布局里有 {@code plugin_section} 才挂）。
+     *
+     * <p>放在 {@code onPostCreate}：子类 {@code onCreate} 已经 `setContentView`，容器一定在树里；
+     * 又比 {@code onResume} 早，用户第一眼就能看到。没有条目的页会整块 `GONE`，不占高度。
+     *
+     * <p>★ 四个内容页不走这里（它们把动作行插在「删除」上面，见 {@code PluginEntries.attach}）
+     * —— 它们的布局里没有 {@code plugin_section}，`pluginPageId()` 也不 override（默认 null）。
+     */
+    @Override
+    protected void onPostCreate(android.os.Bundle savedInstanceState) {
+        super.onPostCreate(savedInstanceState);
+        String page = pluginPageId();
+        if (page == null || isFinishing()) return;
+        PluginEntries.attachPage(this, page, pluginSlot(), pluginSelectedFile());
+    }
+
+    /** 这一页的插件 page id；null = 本页不挂通用插件区（内容页 / 插件页 / 游戏页）。 */
+    protected String pluginPageId() {
+        return null;
+    }
+
+    /** 这一页给插件的槽（默认当前槽；槽详情页 override 成自己那一槽）。 */
+    protected String pluginSlot() {
+        return Data.currentSlot(this);
+    }
+
+    /** 详情页当前选中的那一份；其余页 null。 */
+    protected java.io.File pluginSelectedFile() {
+        return null;
+    }
+
     /** 子类返回 false 可关掉"回到前台时自查界面配置"（GameSlot 用） */
     protected boolean syncUiOnResume() {
         return true;

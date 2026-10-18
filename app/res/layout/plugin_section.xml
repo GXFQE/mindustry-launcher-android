@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 第 160 轮：所有页面通用的「插件」动作区；没有条目时整块 GONE（PluginEntries.attachPage）。
+     放哪儿由各页 include 的位置决定；卡片样式与四个内容页的操作卡同一套。 -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/plugin_section"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="8dp"
+    android:layout_marginBottom="8dp"
+    android:background="@drawable/card_bg"
+    android:orientation="vertical"
+    android:paddingTop="6dp"
+    android:paddingBottom="6dp"
+    android:visibility="gone">
+
+    <TextView
+        android:id="@+id/plugin_section_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:paddingTop="6dp"
+        android:paddingBottom="2dp"
+        android:text="@string/plugin_section_title"
+        android:textColor="@color/fg_muted"
+        android:textSize="12sp" />
+
+    <LinearLayout
+        android:id="@+id/plugin_section_rows"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical" />
+</LinearLayout>

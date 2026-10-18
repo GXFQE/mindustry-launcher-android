@@ -5,19 +5,21 @@ import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import java.io.File;
+
 import io.mdt.launcher.api.PluginApi;
 
 /**
- * 第 159 轮的**内容页动作**夹具：演示 {@code createView(PluginApi)} 与 {@code content} 插槽。
+ * 第 159/160 轮的**页面动作**夹具：演示 {@code createView(PluginApi)} 与 {@code content} 插槽。
  *
  * <p>壳只按名字反射调用（{@code api()} + {@code createView(PluginApi)}），编译期不依赖它。
- * 页面把 {@code page / slot / 各目录} 打印出来 —— 真机上一眼就能看出"宿主传对了没有"。
+ * 页面把 {@code page / slot / selectedFile / 各目录} 打印出来 —— 真机上一眼就能看出"宿主传对了没有"。
  *
  * <p>★ 字符串字面量一律 ASCII（门禁 SRC-02）。
  */
 public final class PlugPage {
 
-    /** 插件接口版本：用 PluginApi + content 插槽 ⇒ 报 3。 */
+    /** 插件接口版本：用 PluginApi + 全页动作 + selectedFile ⇒ 报 4。 */
     public static int api() {
         return __API__;
     }
@@ -25,7 +27,11 @@ public final class PlugPage {
     /** 宿主优先调这一个（比 createView(Context) 更具体）。 */
     public static View createView(PluginApi api) {
         Context c = api.context();
-        api.log("content fixture opened: page=" + api.page() + " slot=" + api.slot());
+        File selected = api.selectedFile();
+        String sel = selected == null ? "null"
+                : (selected.getName() + " @ " + selected.getAbsolutePath());
+        api.log("content fixture opened: page=" + api.page() + " slot=" + api.slot()
+                + " selected=" + (selected == null ? "null" : selected.getAbsolutePath()));
         LinearLayout box = new LinearLayout(c);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding(32, 32, 32, 32);
@@ -40,6 +46,7 @@ public final class PlugPage {
         info.setText("hostApi=" + api.hostApi()
                 + "\npage=" + api.page()
                 + "\nslot=" + api.slot()
+                + "\nselectedFile=" + sel
                 + "\nslotDir=" + api.slotDir().getAbsolutePath()
                 + "\nsavesDir=" + api.savesDir().getAbsolutePath()
                 + "\nmodsDir=" + api.modsDir().getAbsolutePath());

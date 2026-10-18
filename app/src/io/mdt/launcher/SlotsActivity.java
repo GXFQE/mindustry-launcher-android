@@ -78,6 +78,9 @@ import java.util.Locale;
  */
 public class SlotsActivity extends BaseActivity {
 
+    /** 第 160 轮：槽列表页也挂插件动作区。 */
+    @Override protected String pluginPageId() { return Extensions.PAGE_SLOTS; }
+
 
 
 

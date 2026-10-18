@@ -70,6 +70,9 @@
                     android:layout_height="wrap_content" />
             </LinearLayout>
 
+            <!-- 第 160 轮：插件动作区（没有条目整块 GONE） -->
+            <include layout="@layout/plugin_section" />
+
             <!-- ══ 卡 1：游戏日志（当前槽） ══════════════════════════════════ -->
             <LinearLayout
                 android:layout_width="match_parent"

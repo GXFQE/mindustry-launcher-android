@@ -60,6 +60,16 @@
             android:layout_height="wrap_content" />
     </LinearLayout>
 
+    <!-- 第 160 轮：插件动作区（没有条目整块 GONE）；与 trash_actions 一样再留 14dp -->
+    <include
+        layout="@layout/plugin_section"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="14dp"
+        android:layout_marginEnd="14dp"
+        android:layout_marginTop="8dp"
+        android:layout_marginBottom="8dp" />
+
     <TextView
         android:id="@+id/trash_empty"
         android:layout_width="match_parent"

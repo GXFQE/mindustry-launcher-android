@@ -238,6 +238,9 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
             </LinearLayout>
+
+            <!-- 第 160 轮：插件动作区（没有条目整块 GONE） -->
+            <include layout="@layout/plugin_section" />
         </LinearLayout>
 
         <!-- ── 版本列表容器（条目由 MainActivity.rebuildList() 全展开挂载） ── -->

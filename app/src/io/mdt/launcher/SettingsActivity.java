@@ -45,6 +45,9 @@ import android.net.Uri;
  */
 public class SettingsActivity extends BaseActivity {
 
+    /** 第 160 轮：设置页底部单独一块「插件」卡（不混进设置项）。 */
+    @Override protected String pluginPageId() { return Extensions.PAGE_SETTINGS; }
+
     private static final int LOG_MIN = 1;
     private static final int LOG_MAX = 999;
     /** 用户语言包的文件选择请求码（本页唯一一个 `startActivityForResult`） */

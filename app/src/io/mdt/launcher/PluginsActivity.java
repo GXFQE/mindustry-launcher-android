@@ -54,6 +54,8 @@ public class PluginsActivity extends BaseActivity {
     static final String EXTRA_PAGE = "plugin_page";
     static final String EXTRA_SLOT = "plugin_slot";
     static final String EXTRA_LABEL = "plugin_label";
+    /** 第 160 轮：详情页当前选中的那一份（绝对路径）；其余页不带。 */
+    static final String EXTRA_FILE = "plugin_file";
 
     private LinearLayout mBody;
     private ScrollView mScroll;
@@ -77,7 +79,8 @@ public class PluginsActivity extends BaseActivity {
             open(id.trim(), getIntent().getStringExtra(EXTRA_VER),
                     getIntent().getStringExtra(EXTRA_ENTRY),
                     getIntent().getStringExtra(EXTRA_PAGE),
-                    getIntent().getStringExtra(EXTRA_SLOT));
+                    getIntent().getStringExtra(EXTRA_SLOT),
+                    fileExtra(getIntent().getStringExtra(EXTRA_FILE)));
         } else {
             rebuild();
         }
@@ -90,9 +93,9 @@ public class PluginsActivity extends BaseActivity {
         rebuild();
     }
 
-    /** 从内容页的动作行进来（第 159 轮）。 */
+    /** 从内容页 / 通用页的动作行进来（第 159 轮；第 160 轮带选中项）。 */
     static void start(Activity a, String id, String ver, String entry,
-                      String page, String slot, String label) {
+                      String page, String slot, String label, File selected) {
         Intent i = new Intent(a, PluginsActivity.class);
         i.putExtra(EXTRA_ID, id);
         i.putExtra(EXTRA_VER, ver);
@@ -100,7 +103,15 @@ public class PluginsActivity extends BaseActivity {
         i.putExtra(EXTRA_PAGE, page);
         i.putExtra(EXTRA_SLOT, slot);
         i.putExtra(EXTRA_LABEL, label);
+        if (selected != null) i.putExtra(EXTRA_FILE, selected.getAbsolutePath());
         a.startActivity(i);
+    }
+
+    /** 空 / 不存在 ⇒ null（插件只该拿到"真的有一份"的选中项）。 */
+    private static File fileExtra(String path) {
+        if (path == null || path.trim().isEmpty()) return null;
+        File f = new File(path.trim());
+        return f.isFile() ? f : null;
     }
 
     // ---- 页面 -----------------------------------------------------------------
@@ -420,7 +431,7 @@ public class PluginsActivity extends BaseActivity {
 
     /** 「打开」：注入过就走宿主 CL 那条路，没注入过才自建 DexClassLoader（同一个 dex 不许注册两次）。 */
     private void open(final String id, final String ver) {
-        open(id, ver, null, Extensions.SLOT_PLUGINS, Data.currentSlot(this));
+        open(id, ver, null, Extensions.SLOT_PLUGINS, Data.currentSlot(this), null);
     }
 
     /**
@@ -429,17 +440,18 @@ public class PluginsActivity extends BaseActivity {
      * @param entryOverride null = 用插件自述里的默认入口
      */
     private void open(final String id, final String ver, final String entryOverride) {
-        open(id, ver, entryOverride, Extensions.SLOT_PLUGINS, Data.currentSlot(this));
+        open(id, ver, entryOverride, Extensions.SLOT_PLUGINS, Data.currentSlot(this), null);
     }
 
     /**
      * 第 159 轮：把"从哪一页来 / 哪个槽"一起交给插件（{@link io.mdt.launcher.api.PluginApi}）。
      *
-     * @param page {@code plugins} 或四个内容页之一；null ⇒ plugins
+     * @param page {@code plugins} 或任一页面 id；null ⇒ plugins
      * @param slot 当前槽；null ⇒ 当前槽
+     * @param selected 详情页当前那一份；其余页 null
      */
     private void open(final String id, final String ver, final String entryOverride,
-                      String page, String slot) {
+                      String page, String slot, File selected) {
         final String usePage = (page == null || page.trim().isEmpty())
                 ? Extensions.SLOT_PLUGINS : page.trim();
         final String useSlot = (slot == null || slot.trim().isEmpty())
@@ -452,8 +464,8 @@ public class PluginsActivity extends BaseActivity {
             String entry = entryOverride != null ? entryOverride
                     : PluginMeta.entryOf(this, apk, PluginHost.DEFAULT_ENTRY);
             PluginHost.Loaded l = Plugins.isInjected(this, id, ver)
-                    ? PluginHost.openInjected(this, apk, entry, usePage, useSlot)
-                    : PluginHost.load(this, apk, entry, usePage, useSlot);
+                    ? PluginHost.openInjected(this, apk, entry, usePage, useSlot, selected)
+                    : PluginHost.load(this, apk, entry, usePage, useSlot, selected);
             // ★ 一处实现（第 159 轮）：优先 createView(PluginApi)，老插件回落 createView(Context)
             View v = PluginHost.createView(l);
             LinearLayout box = new LinearLayout(this);

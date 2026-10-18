@@ -48,17 +48,29 @@ final class Extensions {
     static final String SLOT_PLUGINS = "plugins";
 
     /**
-     * 第 159 轮（接口 v3）：**内容页动作** —— 在存档 / 地图 / 模组 / 蓝图页的操作卡里加一行。
+     * 第 159 轮（接口 v3）：**页面动作** —— 在页面里加一行。
      *
-     * <p>条目必须再写一个 {@code page}（{@link #PAGE_SAVES} 等）；认不出的 page ⇒ 这一条不渲染
-     * （但解析时留着，便于报告 / 以后加页面）。
+     * <p>第 160 轮（v4）起不再限于四个内容页：条目必须再写一个 {@code page}
+     * （{@link #PAGE_MAIN} / {@link #PAGE_SLOT} / {@link #PAGE_MAP_DETAIL} …）；
+     * 认不出的 page ⇒ 这一条不渲染（但解析时留着，便于报告 / 以后加页面）。
      */
     static final String SLOT_CONTENT = "content";
 
+    /** 四个内容页（第 159 轮）。 */
     static final String PAGE_SAVES = "saves";
     static final String PAGE_MAPS = "maps";
     static final String PAGE_MODS = "mods";
     static final String PAGE_BLUEPRINTS = "blueprints";
+
+    /** 其余页面（第 160 轮）。 */
+    static final String PAGE_MAIN = "main";
+    static final String PAGE_SLOTS = "slots";
+    static final String PAGE_SLOT = "slot";
+    static final String PAGE_SETTINGS = "settings";
+    static final String PAGE_LOGS = "logs";
+    static final String PAGE_TRASH = "trash";
+    static final String PAGE_MAP_DETAIL = "map-detail";
+    static final String PAGE_BLUEPRINT_DETAIL = "blueprint-detail";
 
     /** 一条"能力条目"。 */
     static final class Item {
@@ -143,10 +155,14 @@ final class Extensions {
         return SLOT_PLUGINS.equals(slot) || SLOT_CONTENT.equals(slot);
     }
 
-    /** 这一版认得的内容页（只有 content 插槽的条目用得上）。 */
+    /** 这一版认得的内容页 / 功能页（只有 content 插槽的条目用得上）。 */
     static boolean knownPage(String page) {
         return PAGE_SAVES.equals(page) || PAGE_MAPS.equals(page)
-                || PAGE_MODS.equals(page) || PAGE_BLUEPRINTS.equals(page);
+                || PAGE_MODS.equals(page) || PAGE_BLUEPRINTS.equals(page)
+                || PAGE_MAIN.equals(page) || PAGE_SLOTS.equals(page)
+                || PAGE_SLOT.equals(page) || PAGE_SETTINGS.equals(page)
+                || PAGE_LOGS.equals(page) || PAGE_TRASH.equals(page)
+                || PAGE_MAP_DETAIL.equals(page) || PAGE_BLUEPRINT_DETAIL.equals(page);
     }
 
     /** 这一条现在**真的会被渲染**吗（唯一的"用得上"判据，报告 / 提示都走它）。 */

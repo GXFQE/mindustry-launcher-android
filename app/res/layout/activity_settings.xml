@@ -190,6 +190,9 @@
                     android:textIsSelectable="true"
                     android:textColor="@color/fg_muted" />
             </LinearLayout>
+
+            <!-- 第 160 轮：插件动作区（没有条目整块 GONE）；单独一张卡，不混进设置项 -->
+            <include layout="@layout/plugin_section" />
         </LinearLayout>
 
         <!-- F5b：底部留白（滚到底时末项与导航栏留出间隙）。见 activity_main.xml -->

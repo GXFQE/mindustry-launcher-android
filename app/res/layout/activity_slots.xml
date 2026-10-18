@@ -124,6 +124,9 @@
                 -->
                 
             </LinearLayout>
+
+            <!-- 第 160 轮：插件动作区（没有条目整块 GONE） -->
+            <include layout="@layout/plugin_section" />
         </LinearLayout>
 
         <!-- 槽列表容器（条目由 SlotsActivity.rebuildList() 全展开挂载） -->

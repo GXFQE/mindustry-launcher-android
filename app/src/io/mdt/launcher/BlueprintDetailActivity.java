@@ -29,6 +29,13 @@ import java.util.List;
  *   （见 {@link BlueprintsActivity} 的类注释；自检 ㊱ / ㉛ 分别盯着这两条）。
  */
 public class BlueprintDetailActivity extends BaseActivity {
+
+    /** 第 160 轮：蓝图详情页挂插件动作区；selectedFile = 这一份蓝图。 */
+    @Override protected String pluginPageId() { return Extensions.PAGE_BLUEPRINT_DETAIL; }
+    @Override protected String pluginSlot() { return mSlot; }
+    @Override protected java.io.File pluginSelectedFile() {
+        return mItem == null ? null : mItem.file;
+    }
     /** 目标槽（译文与内容表都按它取） */
     public static final String EXTRA_SLOT = "slot";
     /** 一段里最多列几行（超出的只报"还有 N 种"） */

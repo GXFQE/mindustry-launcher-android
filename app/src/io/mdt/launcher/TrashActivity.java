@@ -43,6 +43,9 @@ import java.util.List;
  */
 public class TrashActivity extends BaseActivity {
 
+    /** 第 160 轮：中转站页也挂插件动作区。 */
+    @Override protected String pluginPageId() { return Extensions.PAGE_TRASH; }
+
     private TextView mHead;
     private TextView mEmpty;
     private android.view.ViewGroup mList;

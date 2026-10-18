@@ -5,7 +5,7 @@ import android.content.Context;
 import java.io.File;
 
 /**
- * 插件能用的**宿主能力门面**（第 159 轮，插件接口 v3）。
+ * 插件能用的**宿主能力门面**（第 159 轮，插件接口 v3；第 160 轮扩到 v4）。
  *
  * <h3>插件怎么拿到它</h3>
  * 入口类可以写两个静态方法，宿主**优先**用前一个：
@@ -28,7 +28,8 @@ import java.io.File;
  *
  * <h3>版本</h3>
  * {@link #hostApi()} 报的是**宿主**这一版支持的接口版本（与插件入口 {@code api()} 报的
- * "我要的版本"不是同一个数）。用本接口的插件，入口 {@code api()} 应报 3；
+ * "我要的版本"不是同一个数）。用 {@link #selectedFile()} 或全页动作的插件，入口 {@code api()}
+ * 应报 4；只写 {@code createView(PluginApi)} / 只用 v3 能力的报 3 也行。
  * 报 1/2 的老插件宿主不会走 {@code createView(PluginApi)} 那条路（仍按 v1/v2 的
  * {@code createView(Context)} 加载）。
  *
@@ -36,7 +37,7 @@ import java.io.File;
  */
 public interface PluginApi {
 
-    /** 宿主这一版支持的插件接口版本（当前 = 3）。 */
+    /** 宿主这一版支持的插件接口版本（当前 = 4）。 */
     int hostApi();
 
     /**
@@ -48,13 +49,24 @@ public interface PluginApi {
     Context context();
 
     /**
-     * 这个页面是从哪来的：{@code plugins}（插件页）或四个内容页之一
-     * （{@code saves} / {@code maps} / {@code mods} / {@code blueprints}）。
+     * 这个页面是从哪来的。取值：
+     * {@code plugins}（插件页）· {@code main} · {@code slots} · {@code slot} ·
+     * {@code saves} / {@code maps} / {@code mods} / {@code blueprints}（四个内容页）·
+     * {@code map-detail} / {@code blueprint-detail}（详情页）·
+     * {@code settings} / {@code logs} / {@code trash}。
      */
     String page();
 
     /** 当前槽名（内容页就是那一页正在看的槽；插件页 = 当前槽）。 */
     String slot();
+
+    /**
+     * **详情页当前选中的那一份文件**（地图详情 / 蓝图详情）；其余页面返回 {@code null}。
+     *
+     * <p>只读约定：想改内容请走 {@link #savesDir()} / {@link #mapsDir()} 那一层自己处理，
+     * 不要原地改写宿主正在看的这份文件。
+     */
+    File selectedFile();
 
     /** 当前槽的数据根（= 游戏会读的那个目录）。 */
     File slotDir();

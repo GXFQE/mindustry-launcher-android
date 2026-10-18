@@ -40,6 +40,13 @@ import java.util.Map;
  *   本页仍按系统配色。见 {@link SlotActivity} 类注释。
  */
 public class MapDetailActivity extends BaseActivity {
+
+    /** 第 160 轮：地图详情页挂插件动作区；selectedFile = 这一张图。 */
+    @Override protected String pluginPageId() { return Extensions.PAGE_MAP_DETAIL; }
+    @Override protected String pluginSlot() { return mSlot; }
+    @Override protected java.io.File pluginSelectedFile() {
+        return mItem == null ? null : mItem.file;
+    }
     /** 目标槽（**本页一切以它为准**：模组表、译文都按它取） */
     public static final String EXTRA_SLOT = "slot";
     /** 一页最多列几行（超出的折叠段里只报"还有 N 种"） */

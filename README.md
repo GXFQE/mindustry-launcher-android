@@ -199,10 +199,12 @@ yourself — even just a few lines — see **Translation file** below.
 - Plug-ins can add **entries** to the interface: they are listed under the plug-in and open its own
   page. If the entries it declares are not supported by this version, that is stated there — **the
   plug-in itself keeps working**
-- Plug-ins can also add an **action row** to the Saves / Maps / Mods / Blueprints pages (this version
-  has two extension points: entries on the plug-ins page and actions on those four pages). Tapping the
-  row opens the plug-in's own page, which can read the current slot and its folders (read-only) through
-  the host API; the small "From plugin: …" line marks it
+- Plug-ins can also add an **action row** to almost every page: the home screen, the slot list, the
+  slot page, the four content pages, Settings, Logs, the transfer station, and the map / blueprint
+  detail pages (**the game launch page and the plug-ins page itself are excluded**). Tapping the row
+  opens the plug-in's own page, which can read the current slot and its folders (read-only) through the
+  host API; a **detail page also exposes the selected file** (that map / blueprint). The small
+  "From plugin: …" line marks it
 - **Disabling** just stops loading it (the file stays); **deleting** moves it to the transfer station,
   from where you can **put it back** — it comes back **disabled**, and enabling it again is your call
 - **A crashing plug-in does not take the launcher down with it**: if a launch with plug-ins did not
@@ -273,9 +275,11 @@ yourself — even just a few lines — see **Translation file** below.
 - **No in-app file manager**: importing and exporting always goes through the system file picker; this
   is not a general-purpose save manager — deleting a save is still the game's job
 - **Plug-ins can only be installed by hand in this version**: there is no plug-in store, no download
-  and no update check yet (distribution and verification come later), and the extension points so far
-  are "entries on the plug-ins page" and "action rows on the four content pages" — there is no
-  home-screen / settings / background-task slot yet and no hook into the game side
+  and no update check yet (distribution and verification come later). The extension points cover the
+  home screen / slot list / slot page / four content pages / Settings / Logs / transfer station / map
+  and blueprint detail pages; **the game launch page and the plug-ins page itself are excluded** (the
+  former must not touch the launch pipeline, the latter is the plug-in manager), and there is no hook
+  into the game side yet
 - **Plug-ins are not sandboxed**: they run in the launcher's own process and can touch whatever the
   launcher can — only install ones you trust
 - **This repository does not contain the game**: Mindustry and third-party builds such as

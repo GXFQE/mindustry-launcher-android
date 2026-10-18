@@ -100,4 +100,5 @@
     <string name="plugin_level_short_l2">Older version on failure</string>
     <string name="plugin_level_short_l3">Off on failure</string>
     <!-- round 159: a content-page action row says where it came from (the title is the plugin's own) -->
-    <string name="plugin_ext_from_fmt">From plugin: %1$s</string></resources>
+    <string name="plugin_ext_from_fmt">From plugin: %1$s</string>
+    <string name="plugin_section_title">Plug-ins</string></resources>

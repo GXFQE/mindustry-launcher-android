@@ -3006,6 +3006,40 @@ public final class SelfTest {
         // ── round 159: v3 = PluginApi + content slot ──
         ok(stat, L, PluginHost.API >= 3,
                 "host plugin api >= 3 (content slot + PluginApi)");
+        // ── round 160: v4 = all pages + selectedFile ──
+        ok(stat, L, PluginHost.API >= 4,
+                "host plugin api >= 4 (all pages + selectedFile)");
+        String[] allPages = { Extensions.PAGE_MAIN, Extensions.PAGE_SLOTS,
+                Extensions.PAGE_SLOT, Extensions.PAGE_SAVES, Extensions.PAGE_MAPS,
+                Extensions.PAGE_MODS, Extensions.PAGE_BLUEPRINTS, Extensions.PAGE_SETTINGS,
+                Extensions.PAGE_LOGS, Extensions.PAGE_TRASH,
+                Extensions.PAGE_MAP_DETAIL, Extensions.PAGE_BLUEPRINT_DETAIL };
+        boolean allPagesKnown = true;
+        for (String p : allPages) if (!Extensions.knownPage(p)) allPagesKnown = false;
+        ok(stat, L, allPagesKnown && !Extensions.knownPage("tomorrow"),
+                "knownPage covers 12 pages and still rejects unknown");
+        java.util.List<Extensions.Item> exAllPages = Extensions.parse(
+                "{\"extensions\":["
+                        + "{\"id\":\"pm\",\"title\":\"Main tool\",\"entry\":\"com.x.Main\","
+                        + "\"slot\":\"content\",\"page\":\"main\"},"
+                        + "{\"id\":\"pd\",\"title\":\"Detail tool\",\"entry\":\"com.x.D\","
+                        + "\"slot\":\"content\",\"page\":\"map-detail\"},"
+                        + "{\"id\":\"ps\",\"title\":\"Slot tool\",\"entry\":\"com.x.Slot\","
+                        + "\"slot\":\"content\",\"page\":\"slot\"}"
+                        + "]}");
+        ok(stat, L, Extensions.forPage(exAllPages, Extensions.PAGE_MAIN).size() == 1
+                        && "pm".equals(Extensions.forPage(exAllPages, Extensions.PAGE_MAIN).get(0).id)
+                        && Extensions.forPage(exAllPages, Extensions.PAGE_MAP_DETAIL).size() == 1
+                        && Extensions.forPage(exAllPages, Extensions.PAGE_SLOT).size() == 1
+                        && Extensions.forPage(exAllPages, Extensions.PAGE_SETTINGS).isEmpty(),
+                "forPage works for main / slot / map-detail");
+        try {
+            java.lang.reflect.Method m = PluginApi.class.getMethod("selectedFile");
+            ok(stat, L, m.getReturnType() == java.io.File.class,
+                    "PluginApi.selectedFile() returns File");
+        } catch (Throwable t) {
+            ok(stat, L, false, "PluginApi.selectedFile missing: " + t);
+        }
         java.util.List<Extensions.Item> exPage = Extensions.parse(
                 "{\"extensions\":["
                         + "{\"id\":\"cs\",\"title\":\"Saves tool\",\"entry\":\"com.x.S\","
