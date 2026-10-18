@@ -6,20 +6,25 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import java.io.File;
+import java.io.InputStream;
+import java.util.List;
 
+import io.mdt.launcher.api.ItemInfo;
 import io.mdt.launcher.api.PluginApi;
+import io.mdt.launcher.api.SlotInfo;
 
 /**
- * 第 159/160 轮的**页面动作**夹具：演示 {@code createView(PluginApi)} 与 {@code content} 插槽。
+ * 第 159~161 轮的**页面动作**夹具：演示 {@code createView(PluginApi)}、{@code content} 插槽
+ * 与 v5 只读数据面（槽 / 四类内容 / 页面快照 / open）。
  *
  * <p>壳只按名字反射调用（{@code api()} + {@code createView(PluginApi)}），编译期不依赖它。
- * 页面把 {@code page / slot / selectedFile / 各目录} 打印出来 —— 真机上一眼就能看出"宿主传对了没有"。
+ * 页面把上下文、各类条目数与第一条的路径打印出来 —— 真机上一眼就能看出"宿主传对了没有"。
  *
  * <p>★ 字符串字面量一律 ASCII（门禁 SRC-02）。
  */
 public final class PlugPage {
 
-    /** 插件接口版本：用 PluginApi + 全页动作 + selectedFile ⇒ 报 4。 */
+    /** 插件接口版本：v5 只读数据面。 */
     public static int api() {
         return __API__;
     }
@@ -30,8 +35,28 @@ public final class PlugPage {
         File selected = api.selectedFile();
         String sel = selected == null ? "null"
                 : (selected.getName() + " @ " + selected.getAbsolutePath());
+        List<SlotInfo> slots = api.slots();
+        List<ItemInfo> saves = api.contents(ItemInfo.KIND_SAVES);
+        List<ItemInfo> maps = api.contents(ItemInfo.KIND_MAPS);
+        List<ItemInfo> mods = api.contents(ItemInfo.KIND_MODS);
+        List<ItemInfo> bps = api.contents(ItemInfo.KIND_BLUEPRINTS);
+        List<ItemInfo> page = api.pageItems();
+        String open = "n/a";
+        if (!maps.isEmpty() && maps.get(0).readable) {
+            InputStream in = null;
+            try {
+                in = api.open(maps.get(0));
+                int b = in.read();
+                open = "firstByte=" + b;
+            } catch (Throwable t) {
+                open = "open failed: " + t.getClass().getSimpleName();
+            } finally {
+                if (in != null) try { in.close(); } catch (Throwable ignored) { }
+            }
+        }
         api.log("content fixture opened: page=" + api.page() + " slot=" + api.slot()
-                + " selected=" + (selected == null ? "null" : selected.getAbsolutePath()));
+                + " selected=" + (selected == null ? "null" : selected.getAbsolutePath())
+                + " slots=" + slots.size() + " pageItems=" + page.size());
         LinearLayout box = new LinearLayout(c);
         box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding(32, 32, 32, 32);
@@ -42,14 +67,17 @@ public final class PlugPage {
         box.addView(title);
 
         TextView info = new TextView(c);
-        info.setTextSize(14f);
+        info.setTextSize(13f);
         info.setText("hostApi=" + api.hostApi()
                 + "\npage=" + api.page()
                 + "\nslot=" + api.slot()
                 + "\nselectedFile=" + sel
-                + "\nslotDir=" + api.slotDir().getAbsolutePath()
-                + "\nsavesDir=" + api.savesDir().getAbsolutePath()
-                + "\nmodsDir=" + api.modsDir().getAbsolutePath());
+                + "\nslots=" + slots.size() + " pageItems=" + page.size()
+                + "\nsaves=" + saves.size() + " maps=" + maps.size()
+                + " mods=" + mods.size() + " blueprints=" + bps.size()
+                + "\nfirstMap=" + first(maps)
+                + "\nopen=" + open
+                + "\nslotDir=" + api.slotDir().getAbsolutePath());
         box.addView(info);
 
         final Context toastCtx = c;
@@ -65,5 +93,13 @@ public final class PlugPage {
         });
         box.addView(btn);
         return box;
+    }
+
+    private static String first(List<ItemInfo> list) {
+        if (list == null || list.isEmpty()) return "none";
+        ItemInfo i = list.get(0);
+        if (i.path != null) return i.title + " @ " + i.path;
+        if (i.container != null) return i.title + " @ " + i.container + "!/" + i.entry;
+        return i.title;
     }
 }

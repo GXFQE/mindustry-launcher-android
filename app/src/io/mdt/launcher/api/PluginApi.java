@@ -3,9 +3,12 @@ package io.mdt.launcher.api;
 import android.content.Context;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.List;
 
 /**
- * 插件能用的**宿主能力门面**（第 159 轮，插件接口 v3；第 160 轮扩到 v4）。
+ * 插件能用的**宿主能力门面**（第 159 轮，插件接口 v3；第 160 轮 v4；第 161 轮 v5）。
  *
  * <h3>插件怎么拿到它</h3>
  * 入口类可以写两个静态方法，宿主**优先**用前一个：
@@ -30,14 +33,27 @@ import java.io.File;
  * {@link #hostApi()} 报的是**宿主**这一版支持的接口版本（与插件入口 {@code api()} 报的
  * "我要的版本"不是同一个数）。用 {@link #selectedFile()} 或全页动作的插件，入口 {@code api()}
  * 应报 4；只写 {@code createView(PluginApi)} / 只用 v3 能力的报 3 也行。
+ * **v5 起**多了只读数据面（{@link #slots()} / {@link #contents(String)} / {@link #pageItems()} /
+ * {@link #open(ItemInfo)}），用它们的插件报 5。
  * 报 1/2 的老插件宿主不会走 {@code createView(PluginApi)} 那条路（仍按 v1/v2 的
  * {@code createView(Context)} 加载）。
+ *
+ * <h3>只读数据（v5）</h3>
+ * 数据分成两层：
+ * <ul>
+ *   <li><b>文件层</b>：{@link #slots()} 列所有槽，{@link #contents(String, String)}
+ *       列任意槽的存档 / 地图 / 模组 / 蓝图，条目里带路径、大小、时间、来源与元数据；</li>
+ *   <li><b>字节层</b>：{@link #open(ItemInfo)} 统一打开槽内文件或 APK / 模组 zip 里的条目。
+ *       插件不用自己判断 {@code container + entry} 怎么拼。</li>
+ * </ul>
+ * ⚠️ 扫描要读文件头（地图 / 存档 / 模组），**别在主线程调用**；拿到的 {@link ItemInfo}
+ * 是**当时**的快照，文件被改后请重新取。
  *
  * <p>★ 本文件的字符串字面量一律 ASCII（门禁 SRC-02）。
  */
 public interface PluginApi {
 
-    /** 宿主这一版支持的插件接口版本（当前 = 4）。 */
+    /** 宿主这一版支持的插件接口版本（当前 = 5）。 */
     int hostApi();
 
     /**
@@ -67,6 +83,49 @@ public interface PluginApi {
      * 不要原地改写宿主正在看的这份文件。
      */
     File selectedFile();
+
+    /**
+     * 所有槽（名称 / 目录 / 是否当前 / 是否远古包本体借住 {@code files/}）。
+     *
+     * <p>顺序由宿主决定（当前槽在最前，其余按名字）；拿到的是一份快照。
+     */
+    List<SlotInfo> slots();
+
+    /**
+     * 当前槽的某一类内容（只读快照）。
+     *
+     * @param kind {@link ItemInfo#KIND_SAVES} / {@link ItemInfo#KIND_MAPS} /
+     *             {@link ItemInfo#KIND_MODS} / {@link ItemInfo#KIND_BLUEPRINTS}；
+     *             认不出的 kind ⇒ 空表（不崩）
+     */
+    List<ItemInfo> contents(String kind);
+
+    /**
+     * 任意槽的某一类内容。
+     *
+     * @param slot 槽名；null / 空 ⇒ 当前槽
+     * @param kind 同上
+     */
+    List<ItemInfo> contents(String slot, String kind);
+
+    /**
+     * 当前页面看到的数据（只读快照）。
+     *
+     * <p>v5 第一阶段覆盖：四个内容页（各自那一类）、槽列表（槽条目）、地图 / 蓝图详情
+     * （当前那一份）。其余页面（主界面 / 设置 / 日志 / 中转站）返回空表，等第二阶段。
+     * 内容页返回的是**该槽的数据源**，不是搜索 / 筛选后的子集。
+     */
+    List<ItemInfo> pageItems();
+
+    /**
+     * 打开一个条目的字节流。
+     *
+     * <p>槽内文件直接开文件；{@code container + entry} 的包内条目由宿主开 zip 并保证
+     * 流关闭时把 zip 一起关掉。调用方负责 {@code close()}。
+     *
+     * @throws IOException 条目为 null、不可读、目录、或包内条目不存在
+     */
+    InputStream open(ItemInfo item) throws IOException;
 
     /** 当前槽的数据根（= 游戏会读的那个目录）。 */
     File slotDir();

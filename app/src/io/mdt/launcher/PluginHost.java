@@ -7,10 +7,15 @@ import android.content.res.Resources;
 import android.view.View;
 
 import java.io.File;
+import java.io.IOException;
+import java.io.InputStream;
 import java.lang.reflect.Method;
+import java.util.List;
 
 import dalvik.system.DexClassLoader;
+import io.mdt.launcher.api.ItemInfo;
 import io.mdt.launcher.api.PluginApi;
+import io.mdt.launcher.api.SlotInfo;
 
 /**
  * 插件加载器（**产品侧**：只加载、只判据，不带任何 UI）。
@@ -43,11 +48,12 @@ public final class PluginHost {
      *
      * <p>v1 = 只有 {@code api() + createView(Context)}；v2 = 自述 JSON + access；
      * **v3（第 159 轮）= 加上 {@link PluginApi} 与 {@code content} 插槽**；
-     * **v4（第 160 轮）= 同一插槽扩到全部页面 + {@link PluginApi#selectedFile()}**。
-     * 插件报 4 才意味着"我会用 selectedFile / 全页动作"，报 1/2/3 的照旧；
+     * **v4（第 160 轮）= 同一插槽扩到全部页面 + {@link PluginApi#selectedFile()}**；
+     * **v5（第 161 轮）= 只读数据面：槽列表 / 四类内容 / 页面快照 / 统一字节流**。
+     * 插件报 5 才意味着"我会用只读数据面 / selectedFile / 全页动作"，报 1/2/3/4 的照旧；
      * 区间下限不变（{@link #API_MIN} = 1）。
      */
-    public static final int API = 4;
+    public static final int API = 5;
     /**
      * 还认的**最老**契约版本（第 139 轮）。抬它 = 老插件被拒，界面会说清"太老、该更新插件"。
      *
@@ -317,6 +323,28 @@ public final class PluginHost {
         @Override public String slot() { return slot; }
 
         @Override public File selectedFile() { return selected; }
+
+        // ---- PluginApi（v5 只读数据面）-------------------------------------
+
+        @Override public List<SlotInfo> slots() {
+            return PluginData.slots(getBaseContext());
+        }
+
+        @Override public List<ItemInfo> contents(String kind) {
+            return PluginData.contents(getBaseContext(), slot, kind);
+        }
+
+        @Override public List<ItemInfo> contents(String slot, String kind) {
+            return PluginData.contents(getBaseContext(), slot, kind);
+        }
+
+        @Override public List<ItemInfo> pageItems() {
+            return PluginData.pageItems(getBaseContext(), page, slot, selected);
+        }
+
+        @Override public InputStream open(ItemInfo item) throws IOException {
+            return PluginData.open(item);
+        }
 
         @Override public File slotDir() { return Data.dirOf(getBaseContext(), slot); }
 

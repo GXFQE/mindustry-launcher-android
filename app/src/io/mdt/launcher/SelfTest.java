@@ -1,16 +1,21 @@
 package io.mdt.launcher;
 
 import android.content.Context;
+import io.mdt.launcher.api.ItemInfo;
 import io.mdt.launcher.api.PluginApi;
+import io.mdt.launcher.api.SlotInfo;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.zip.GZIPOutputStream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 /**
  * M3 自检（开发用，只在 debuggable 构建里可由 adb 触发）。
@@ -3039,6 +3044,70 @@ public final class SelfTest {
                     "PluginApi.selectedFile() returns File");
         } catch (Throwable t) {
             ok(stat, L, false, "PluginApi.selectedFile missing: " + t);
+        }
+
+        // ── round 161: v5 = read-only data (slots / contents / pageItems / open) ──
+        ok(stat, L, PluginHost.API >= 5,
+                "host plugin api >= 5 (read-only data surface)");
+        String curSlot = Data.currentSlot(ctx);
+        try {
+            List<SlotInfo> slotList = PluginData.slots(ctx);
+            boolean hasCurrent = false;
+            for (SlotInfo si : slotList) {
+                if (si != null && si.current && si.name.equals(curSlot)) hasCurrent = true;
+            }
+            ok(stat, L, !slotList.isEmpty() && hasCurrent,
+                    "PluginData.slots() lists the current slot (" + slotList.size() + ")");
+            ok(stat, L, PluginData.contents(ctx, curSlot, "nope").isEmpty(),
+                    "unknown content kind => empty (no crash)");
+            ok(stat, L, PluginData.contents(ctx, curSlot, ItemInfo.KIND_MAPS) != null
+                            && PluginData.pageItems(ctx, ItemInfo.KIND_MAPS, curSlot, null) != null,
+                    "contents(maps) / pageItems(maps) return a list");
+        } catch (Throwable t) {
+            ok(stat, L, false, "PluginData slots/contents threw: " + t);
+        }
+        try {
+            File dir = ctx.getCacheDir();
+            if (!dir.exists() && !dir.mkdirs()) {
+                ok(stat, L, false, "cache dir unavailable for open test");
+            } else {
+                File plain = new File(dir, "plug-open-" + System.currentTimeMillis() + ".txt");
+                write(plain, "abc".getBytes("UTF-8"));
+                ItemInfo fi = new ItemInfo("x", "a.txt", "", plain.getAbsolutePath(),
+                        null, null, plain.length(), plain.lastModified(), "", null,
+                        false, true, null);
+                InputStream in = PluginData.open(fi);
+                byte[] got = new byte[3];
+                int n = in.read(got);
+                in.close();
+                ok(stat, L, n == 3 && "abc".equals(new String(got, "UTF-8")),
+                        "open(file ItemInfo) reads bytes");
+
+                File zip = new File(dir, "plug-open-" + System.currentTimeMillis() + ".zip");
+                ZipOutputStream zo = new ZipOutputStream(new FileOutputStream(zip));
+                zo.putNextEntry(new ZipEntry("a.txt"));
+                zo.write("hello".getBytes("UTF-8"));
+                zo.closeEntry();
+                zo.close();
+                ItemInfo zi = new ItemInfo("x", "a.txt", "", null,
+                        zip.getAbsolutePath(), "a.txt", 5, 0, "", null, false, true, null);
+                InputStream zin = PluginData.open(zi);
+                ByteArrayOutputStream bo = new ByteArrayOutputStream();
+                byte[] buf = new byte[16];
+                while ((n = zin.read(buf)) > 0) bo.write(buf, 0, n);
+                zin.close();
+                ok(stat, L, "hello".equals(new String(bo.toByteArray(), "UTF-8")),
+                        "open(zip-entry ItemInfo) reads the entry and closes the zip");
+                boolean thrown = false;
+                try {
+                    PluginData.open(null);
+                } catch (IOException expected) {
+                    thrown = true;
+                }
+                ok(stat, L, thrown, "open(null) throws IOException");
+            }
+        } catch (Throwable t) {
+            ok(stat, L, false, "PluginData.open threw: " + t);
         }
         java.util.List<Extensions.Item> exPage = Extensions.parse(
                 "{\"extensions\":["
