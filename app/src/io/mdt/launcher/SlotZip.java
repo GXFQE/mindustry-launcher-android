@@ -80,6 +80,13 @@ public final class SlotZip {
         public boolean hasSaves;
         /** 命中了任何一个 {@link #KNOWN_TOPS} */
         public boolean known;
+        /**
+         * 根级**零散文件**（`0.msav` / `x.msch`，没有目录）—— 我们「批量导出」打的就是这种包。
+         * ★ 第 169 轮加：用户拿一个存档批量包去「导入整槽」，确认框同时说
+         *   「像是本启动器导出的包」和「看不出这是 Mindustry 的数据包」（两句自相矛盾），
+         *   而且解包会把 `0.msav` 原样丢在**槽根**上（游戏根本不读那里）⇒ 等于白导。
+         */
+        public boolean loose;
         /** 被剥掉的单层包裹目录（`the-dir/`，含尾斜杠；空串 = 没剥） */
         public String strip = "";
         /** 顶级条目名（已剥包裹目录、去重、排序，最多 8 个） */
@@ -87,6 +94,25 @@ public final class SlotZip {
 
         public boolean empty() {
             return files == 0 && dirs == 0;
+        }
+
+        /**
+         * 确认框里该说哪一句（0 = 不知道该怎么说）。
+         *
+         * ★ 三态**只在这里判**：`SlotIo` 拿它拼文案，自检拿它做断言 ——
+         *   以前是"上一句按 `nativeFormat`、下一句按 `known`、警告再按 `known`"三处各判一次 ⇒
+         *   互相矛盾的两句能同时出现（第 169 轮用户截图）。
+         */
+        int tagRes() {
+            return nativeFormat ? R.string.zip_tag_native
+                    : loose ? R.string.zip_tag_loose
+                    : known ? R.string.zip_tag_custom
+                    : 0;
+        }
+
+        /** 要不要说「看不出这是 Mindustry 的数据包」—— 与 {@link #tagRes()} **互斥** */
+        boolean showUnknown() {
+            return tagRes() == 0;
         }
     }
 
@@ -211,6 +237,7 @@ public final class SlotZip {
             if (!tops.contains(top)) tops.add(top);
             if ("settings.bin".equals(r)) inf.nativeFormat = true;
             if ("saves".equals(top)) inf.hasSaves = true;
+            if (slash < 0 && isLooseName(r)) inf.loose = true;
         }
         Collections.sort(tops);
         for (int i = 0; i < tops.size() && i < 8; i++) inf.tops.add(tops.get(i));
@@ -224,6 +251,31 @@ public final class SlotZip {
         Log.i(TAG, "zip inspect: files=" + inf.files + " dirs=" + inf.dirs
                 + " native=" + inf.nativeFormat + " strip='" + inf.strip + "'");
         return inf;
+    }
+
+    /**
+     * 根级**零散文件**的判据（`0.msav` / `x.msch`）：我们「批量导出」打出来的包就是这样。
+     * ⚠️ 必须与 {@link #routeLoose} 用**同一对后缀** —— 否则会出现"识别成零散包、却不改落点"。
+     */
+    static boolean isLooseName(String n) {
+        if (n == null) return false;
+        String l = n.toLowerCase(java.util.Locale.ROOT);
+        return l.endsWith(".msav") || l.endsWith(".msch");
+    }
+
+    /**
+     * 零散文件的落点改写：根级 `.msav` ⇒ `saves/`，`.msch` ⇒ `schematics/`。
+     *
+     * ★ 为什么必须改：槽根**不是**游戏读的目录（游戏只读 `saves/` / `schematics/` …），
+     *   原样写在槽根上等于"导进去什么都没变"—— 而这种失败**没有任何症状**。
+     * ★ 只动**根级**（路径里没有 `/`）的文件：`saves/a.msav` 这种已经在目录里的一个字节都不改。
+     */
+    static String routeLoose(String n) {
+        if (n == null || n.indexOf('/') >= 0) return n;
+        String l = n.toLowerCase(java.util.Locale.ROOT);
+        if (l.endsWith(".msav")) return "saves/" + n;
+        if (l.endsWith(".msch")) return "schematics/" + n;
+        return n;
     }
 
     // ── ③ 解包 ────────────────────────────────────────────────────────────
@@ -273,6 +325,9 @@ public final class SlotZip {
                     n = n.substring(strip.length());
                     if (n.isEmpty()) continue;
                 }
+                // ★ 第 169 轮：根级零散文件按类型归位（`0.msav` ⇒ `saves/0.msav`）——
+                //   我们的「批量导出」就是这么打包的，原样写在槽根上游戏读不到。
+                n = routeLoose(n);
                 File to = new File(root, n.replace('/', File.separatorChar));
                 if (e.isDirectory()) {
                     mkdirs(ctx, to);

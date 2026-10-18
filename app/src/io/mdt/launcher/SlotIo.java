@@ -1242,12 +1242,15 @@ final class SlotIo {
             sb.append(Trans.get(a, R.string.zip_confirm_strip_fmt,
                     inf.strip.substring(0, inf.strip.length() - 1)));
         }
-        sb.append(inf.nativeFormat ? Trans.get(a, R.string.zip_tag_native)
-                                   : Trans.get(a, R.string.zip_tag_custom));
+        // ★ 第 169 轮：这里原来自己判 `nativeFormat ? native : custom`，警告又按 `known` 判
+        //   ⇒ 一个"根级零散存档"的包会**同时**说「像是本启动器导出的包」和
+        //   「看不出这是 Mindustry 的数据包」（用户截图）。三态收进 `SlotZip.Info.tagRes()`。
+        int tagRes = inf.tagRes();
+        if (tagRes != 0) sb.append(Trans.get(a, tagRes));
         list.setText(sb.toString());
 
         StringBuilder wn = new StringBuilder();
-        if (!inf.known) wn.append(Trans.get(a, R.string.zip_warn_unknown));
+        if (inf.showUnknown()) wn.append(Trans.get(a, R.string.zip_warn_unknown));
         if (inf.skipped > 0) {
             if (wn.length() > 0) wn.append("\n\n");
             wn.append(Trans.get(a, R.string.zip_warn_skipped_fmt, inf.skipped));

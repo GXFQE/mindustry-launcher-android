@@ -1166,6 +1166,7 @@
     <string name="zip_confirm_tops_fmt">\nContains: %1$s</string>
     <string name="zip_confirm_strip_fmt">\n\n(The package has an extra \"%1$s\" wrapper, which is stripped when extracting)</string>
     <string name="zip_tag_native">\n\nIt contains the game settings file (the game\u0027s own \"Export data\" looks like this too).</string>
+    <string name="zip_tag_loose">\n\nIt holds loose save / schematic files (no saves/ style folders) \u2014 they go into the matching folder by type.</string>
     <string name="zip_tag_custom">\n\nNo game settings file — this looks like a package exported by this launcher.</string>
     <string name="zip_warn_unknown">This does not look like a Mindustry data package. Import anyway?</string>
     <string name="zip_warn_skipped_fmt">%1$d entries have unsafe paths and will be skipped.</string>

@@ -128,11 +128,14 @@ public final class SelfTest {
     public static final String SLOT_SHARE = "m3-share";
     public static final String SLOT_SHARE_DST = "m3-share-dst";
 
+    /** ★ 第 169 轮：零散文件（批量导出那种包）解包落点用的槽 */
+    public static final String SLOT_LOOSE_DST = "m3-loose-dst";
+
     private static final String[] TEST_SLOTS = {
             SLOT, SLOT_RENAMED, CLONE_SRC, CLONE_DST, CLONE_EMPTY, CLONE_EMPTY_DST, SLOT_MODS,
             SLOT_SET, SLOT_PACK, SLOT_PACK_DST, SLOT_SAVE, SLOT_GONE, SLOT_GONE2,
             SLOT_MODE, SLOT_MODE2, SLOT_S2M, SLOT_MSCH, SLOT_BP, SLOT_F23, SLOT_BATCH,
-            SLOT_SHARE, SLOT_SHARE_DST};
+            SLOT_SHARE, SLOT_SHARE_DST, SLOT_LOOSE_DST};
 
     /**
      * 本工程**自己的全部页面**（㊱ 基类检查用）。
@@ -971,6 +974,94 @@ public final class SelfTest {
                             && xf.bytesOf("server_list.json") == null,
                     "④ ★元断言：`shareXform` 只是把 SharePack 的判据**转接**到 zip 那条路上"
                             + "（非根级同名文件取到 null = 原样拷贝）");
+
+            // ── ④a2 第 169 轮：整槽导入的确认框**不许有整块没字**、也不许两句话自相矛盾 ──
+            //   用户截图（2026-10-18）：三个单选的标签、标题、"自动备份"那一行**全是空的**
+            //   （只剩三个圆圈和一个空底框），同时上半部分说「像是本启动器导出的包」、
+            //   下面又说「看不出这是 Mindustry 的数据包」。
+            {
+                // ① 五处静态文案：布局里刻意没有 `android:text` ⇒ 必须有代码填。
+                //    判据是**真的 inflate 一遍再读 text**（"代码里有这行"不算数：
+                //    上一版的 bug 恰恰是绑定只写在另一条路上）。
+                android.view.View form = android.view.LayoutInflater.from(ctx)
+                        .inflate(R.layout.dialog_slot_mode, null);
+                SlotModes.bindTexts(ctx, form);
+                int[] ids = {R.id.tx_slot_mode_title, R.id.slot_mode_update,
+                        R.id.slot_mode_keep, R.id.slot_mode_replace,
+                        R.id.tx_slot_mode_autobak_note};
+                int[] res = {R.string.slot_mode_title, R.string.slot_mode_update,
+                        R.string.slot_mode_keep, R.string.slot_mode_replace,
+                        R.string.slot_mode_autobak_note};
+                int blank = 0;
+                StringBuilder why = new StringBuilder();
+                for (int i = 0; i < ids.length; i++) {
+                    android.widget.TextView tv = (android.widget.TextView) form.findViewById(ids[i]);
+                    CharSequence t = tv == null ? null : tv.getText();
+                    if (t == null || t.toString().trim().isEmpty()) {
+                        blank++;
+                        why.append(" 空:").append(ctx.getString(res[i]));
+                    }
+                }
+                ok(stat, L, blank == 0,
+                        "④a2 ★模式选择器五处文案**真的填上了**（标题 / 三个模式名 / 自动备份那句）："
+                                + "空着 " + blank + " 处" + why);
+                // ② 三态互斥：每一档只说一句，且"看不出这是数据包"只在不认识时才说。
+                SlotZip.Info iN = new SlotZip.Info();
+                iN.nativeFormat = true;
+                SlotZip.Info iK = new SlotZip.Info();
+                iK.known = true;
+                SlotZip.Info iL = new SlotZip.Info();
+                iL.loose = true;
+                SlotZip.Info iU = new SlotZip.Info();
+                ok(stat, L, iN.tagRes() == R.string.zip_tag_native && !iN.showUnknown()
+                                && iK.tagRes() == R.string.zip_tag_custom && !iK.showUnknown()
+                                && iL.tagRes() == R.string.zip_tag_loose && !iL.showUnknown()
+                                && iU.tagRes() == 0 && iU.showUnknown(),
+                        "④a2 ★三态互斥（同一个判据 `tagRes()`）：「原生 / 本启动器的包 / 零散文件 / "
+                                + "不认识」各说一句，且**只有不认识时**才说「看不出这是数据包」"
+                                + "—— 用户截图里那两句同时出现是旧版三处各判一次造成的");
+                // ③ 零散文件的落点：批量导出的包（根级 `0.msav`）解包后必须进 `saves/`，
+                //    否则文件落在槽根 = 游戏读不到 = "导进去什么都没变"（而且没有症状）。
+                File looseZip = new File(Paths.privateDir(ctx), "selftest-loose.zip");
+                if (looseZip.exists()) looseZip.delete();
+                java.util.zip.ZipOutputStream lz =
+                        new java.util.zip.ZipOutputStream(new java.io.FileOutputStream(looseZip));
+                try {
+                    lz.putNextEntry(new java.util.zip.ZipEntry("0.msav"));
+                    lz.write(gzip("loose-save".getBytes("UTF-8")));
+                    lz.closeEntry();
+                    lz.putNextEntry(new java.util.zip.ZipEntry("0.msav-backup.msav"));
+                    lz.write(gzip("loose-backup".getBytes("UTF-8")));
+                    lz.closeEntry();
+                    lz.putNextEntry(new java.util.zip.ZipEntry("hello.msch"));
+                    lz.write("schematic".getBytes("UTF-8"));
+                    lz.closeEntry();
+                } finally {
+                    lz.close();
+                }
+                SlotZip.Info li = SlotZip.inspect(ctx, looseZip);
+                File looseDst = Data.slotDir(ctx, SLOT_LOOSE_DST);
+                boolean okLoose = li.loose && !li.known && li.tagRes() == R.string.zip_tag_loose;
+                SlotZip.Result lr = null;
+                try {
+                    if (looseDst.isDirectory()) deleteTree(looseDst);
+                    lr = SlotZip.extract(ctx, looseZip, li, SLOT_LOOSE_DST, SlotWrite.REPLACE);
+                } catch (Exception e) {
+                    android.util.Log.w("MDTLauncher", "loose zip extract failed", e);
+                }
+                ok(stat, L, okLoose && lr != null
+                                && new File(new File(looseDst, "saves"), "0.msav").isFile()
+                                && new File(new File(looseDst, "saves"), "0.msav-backup.msav").isFile()
+                                && new File(new File(looseDst, "schematics"), "hello.msch").isFile()
+                                && !new File(looseDst, "0.msav").exists()
+                                && !new File(looseDst, "hello.msch").exists(),
+                        "④a2 ★零散的存档 / 蓝图（批量导出的包，根级 `0.msav` / `hello.msch`）"
+                                + "解包**落进对应目录**（saves/ · schematics/）、槽根不留；"
+                                + "识别成「零散文件」那一档（loose=" + li.loose
+                                + " known=" + li.known + "）");
+                if (looseZip.exists()) looseZip.delete();
+                if (looseDst.isDirectory()) deleteTree(looseDst);
+            }
 
             // ── ④b 两张资源的**措辞判据**（用户 2026-10-13 报的"说两遍"就在这）────────
             String shareMsg = ctx.getString(R.string.share_slot_msg_fmt, "", "");

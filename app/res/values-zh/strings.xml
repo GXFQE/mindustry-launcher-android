@@ -1138,6 +1138,7 @@
     <string name="zip_confirm_tops_fmt">\n包含：%1$s</string>
     <string name="zip_confirm_strip_fmt">\n\n（包外面套了一层「%1$s」，解包时会自动去掉）</string>
     <string name="zip_tag_native">\n\n里面有游戏的设置文件（游戏自带的「导出数据」也长这样）。</string>
+    <string name="zip_tag_loose">\n\n里面是零散的存档 / 蓝图文件（没有 saves/ 这类目录）\u2014\u2014 会按类型放进对应目录。</string>
     <string name="zip_tag_custom">\n\n没有游戏的设置文件 —— 像是本启动器导出的包。</string>
     <string name="zip_warn_unknown">看不出这是 Mindustry 的数据包。仍然要导入吗？</string>
     <string name="zip_warn_skipped_fmt">有 %1$d 个条目的路径不安全，会被跳过。</string>

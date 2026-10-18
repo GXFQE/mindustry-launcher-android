@@ -254,12 +254,9 @@ final class SlotOps {
     private static void confirmRestore(final Activity a, final Data.Slot s,
                                        final Backup.Snapshot ss, final Host h) {
         View form = a.getLayoutInflater().inflate(R.layout.dialog_slot_mode, null);
-        // 布局里那些静态文案已搬到 Java（见 Trans）：布局够不到用户语言包
-        Trans.bind(form, R.id.tx_slot_mode_title, R.string.slot_mode_title);
-        Trans.bind(form, R.id.slot_mode_update, R.string.slot_mode_update);
-        Trans.bind(form, R.id.slot_mode_keep, R.string.slot_mode_keep);
-        Trans.bind(form, R.id.slot_mode_replace, R.string.slot_mode_replace);
-        Trans.bind(form, R.id.tx_slot_mode_autobak_note, R.string.slot_mode_autobak_note);
+        // 布局里那些静态文案已搬到 Java（见 Trans）：布局够不到用户语言包。
+        // ★ 第 169 轮：这五处绑定搬进 `SlotModes.bindTexts`（由 `SlotModes.bind` 统一调用）——
+        //   原先只写在**这一条路**上，整槽 zip 导入那条路整块没有字。
         final SlotModes modes = SlotModes.bind(a, form);
         new AlertDialog.Builder(a)
                 .setTitle(R.string.restore_confirm_title)

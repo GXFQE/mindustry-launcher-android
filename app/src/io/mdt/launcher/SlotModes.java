@@ -33,8 +33,26 @@ final class SlotModes {
      * 接上单选组（默认勾"更新"），并立刻刷一次摘要。
      * ⚠️ 找不到控件就返回 null —— 调用方必须容忍（宁可少一个模式选择，也不能崩在弹窗里）。
      */
+    /**
+     * 把这套控件里的**五处静态文案**填上（标题 / 三个模式名 / 自动备份那句）。
+     *
+     * ★ 第 169 轮修的 bug：布局里刻意不写 `android:text`（文案要过 `Trans`，布局够不到
+     *   用户语言包），而这段绑定原来**只写在快照恢复那条路上**（`SlotOps.confirmRestore`）
+     *   ⇒ 整槽 zip 导入那条路整块**没有字**（用户截图：三个单选只剩圆圈、"自动备份"只剩一个空底框）。
+     *   ⇒ 绑定搬到这里、由 {@link #bind} 统一调用：**同一个控件的接线只有一份**。
+     */
+    static void bindTexts(android.content.Context c, View form) {
+        if (c == null || form == null) return;
+        Trans.bind(form, R.id.tx_slot_mode_title, R.string.slot_mode_title);
+        Trans.bind(form, R.id.slot_mode_update, R.string.slot_mode_update);
+        Trans.bind(form, R.id.slot_mode_keep, R.string.slot_mode_keep);
+        Trans.bind(form, R.id.slot_mode_replace, R.string.slot_mode_replace);
+        Trans.bind(form, R.id.tx_slot_mode_autobak_note, R.string.slot_mode_autobak_note);
+    }
+
     static SlotModes bind(Activity a, View form) {
         if (a == null || form == null) return null;
+        bindTexts(a, form);
         RadioGroup g = (RadioGroup) form.findViewById(R.id.slot_mode_group);
         TextView h = (TextView) form.findViewById(R.id.slot_mode_hint);
         if (g == null) return null;
