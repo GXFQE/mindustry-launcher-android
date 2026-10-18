@@ -60,234 +60,72 @@ yourself — even just a few lines — see **Translation file** below.
 ## What it can do
 
 ### Versions
-- Scan Mindustry / MindustryX builds that are **already installed**, or **import** a copy of an APK
-  (streamed copy, with a pre-check before it lands)
-- One row per version; tap the row to launch, tap **Slot** on the right to pick its slot (that dialog
-  also offers **See details**), and **long-press** the row for details: source path, size, checksum,
-  raw version name, base version, ABI, build number — plus "this slot has N saves" and "last launch"
-  (this is also where an imported copy is deleted)
-- Assign a slot per version; several versions may share a slot **only when their version numbers
-  match** — otherwise the row warns that they will overwrite each other's saves
-- **Refuse packages that will not run**: a probe at import time and again before launch, checking
-  four capabilities rather than a version number — the game's entry class is in the dex, the arc
-  native library is present, the package's ABI matches the device, and the library's load-page
-  alignment fits this device
-- **Continue**: remembers the version you launched last and goes straight back to it
-- Each row also says **how many saves that version's slot holds**
+- Scan games **already installed**, or **import** a copy of an APK
+- One row per version: tap to launch, **Slot** to change its slot, long-press for details
+- Details: source, size, checksum, raw version name, ABI, build number, save count
+- Two versions sharing a slot get a warning that their saves will overwrite each other
+- **Packages that will not run are refused** — checked at import and again before launch
+- **Continue** resumes the version you launched last
 
 ### Slots
-- Every version points at a slot; a slot is one complete set of game data (`saves` / `maps` /
-  `blueprints` / `mods` / settings)
-- **Create / rename / clone / delete**. Cloning copies a slot into a new one (the source is backed up
-  first, and the source itself is left alone); deleting a slot moves it — **and its backups** — to the
-  transfer station, and it can be put back, under a new name if the old one is taken
-  (rename / clone / delete live in the **⋮ menu at the top right of the slot page**; the
-  "Backup & restore" row holds only the backup actions)
-- Open a slot and everything inside it is one row away: **Mods**, **Saves**, **Maps**,
-  **Blueprints**, **Backup & restore**, **Whole-slot import & export**
+- A slot is one complete set of data: saves / maps / blueprints / mods / settings
+- Create it from the row; rename / clone / delete live in the **⋮** menu
+- Cloning backs up the source first; a deleted slot takes its backups to the transfer station and can be put back
 
-### Saves and data
-- **Save list with thumbnails**: every save shows a small picture of its map (that one needs a
-  version assigned to the slot)
-- **See each save**: which map it is, its size, wave, playtime, author and when it was saved;
-  unreadable files are listed separately with the reason instead of silently disappearing
-- **The save list can be searched and sorted**: search by save name; sort by name / **newest first** /
-  size (this page has no "problems only" — the unreadable ones already have a row of their own)
-- **Import / export `.msav`** saves, **several at a time** — picking just one keeps the old flow
-  (you are asked for the save name and clashes are handled one by one); picking several, or picking a
-  `.zip` we exported, imports them under their own file names and asks about clashes **once**
-- **Delete saves**: tick one or several → they move to the transfer station (not hard-deleted) and can
-  be put back; the launcher refuses while the game is running
-- **Backup list**: every backup on its own row (time / how many files / size / what the main save
-  inside is), and one tap to **restore** or **delete that one**
-- **Automatic backup, per slot**: enable it, set the minimum playtime (a shorter session is skipped)
-  and the maximum number of backups (past that the oldest goes); anything you are about to overwrite
-  is backed up first, whatever the setting says
-- **Content-addressed store**: backups share identical files through a global object pool — measured
-  on a real device, 3 slots × 20 backups holding 9.1 GB of data take **448 MB** on disk
-- **Whole-slot export / import as one zip** (maps, blueprints, mods and settings included) — move
-  everything to a new phone or another slot. Both a slot import and a "restore backup" let you pick
-  **how the two sides merge**: **Update** (the new version wins), **Add missing** (what the slot has
-  now wins, only missing files are added) or **Replace** (clear the slot first, then write the
-  package in full) — and **a backup is taken first**, so a wrong choice can be undone. ⚠️ This
-  package **carries your identity data** (the login identity used on each server, among others):
-  to hand it to someone else, use the shareable package below instead
-- **A shareable package (for sending to others)**: to move to a new phone or to keep your own copy,
-  use the plain export above — that one changes nothing. This package is the one to hand out:
-  strips what could identify you — the per-server login identity the game keeps (`usid-…`), `uuid`,
-  the last server you joined, ban lists — and drops your saved-server list. It also drops the logs,
-  the rebuildable caches, and anything else that is only useful to you: crash reports, the game log,
-  map previews, the asset cache, the history of your settings, your own screenshots. The shareable
-  package is packed at the highest compression, and the dialog tells you roughly how much smaller
-  it will be (on a mostly empty slot: 262 KB → 436 B). **Your own backups are left untouched**
-  (a restore needs that data).
-  If the settings file cannot be read, the launcher **refuses to export** rather than ship a file it
-  could not check. (A single save file never carried any of this — the identity lives in the slot's
-  settings, not in the save.)
-- **Every export can be shared directly**: maps / saves / blueprints / mods (one or several) gain a
-  **Share directly (nothing saved to a file)** tick in the export dialog — with it ticked the positive
-  button becomes **Share**, the file goes to the cache and is handed to the system share sheet, and the
-  cache is cleaned up after 24 hours
-- **Automatic cleanup** of redundant data-directory leftovers (switchable; a manual "clean up once
-  now" stays available when it is off)
+### Saves
+- Thumbnails in the list; an unreadable file gets its own row with the reason
+- Search and sort: name / newest first / size
+- Import / export `.msav`: several at once, or a whole zip
+- Deleting moves it to the transfer station; refused while the game is running
+- Automatic backups: set when to trigger and how many to keep; a backup is taken before any overwrite
+- Deduplicated: 3 slots × 20 backups, 9.1 GB of data in **448 MB**
+- Whole-slot export / import: one zip, three merge modes (update / add missing / replace)
+- Shareable package: identity data is stripped before you hand it to someone
+- Every export can be sent straight to the share sheet without saving a file
 
 ### Maps
-- Map list (cards with a **preview image**, from this slot / built into the game / shipped inside
-  mods) plus a separate detail page
-- **Map resource statistics**: ore / ore in walls / mineable floor / bonus floor — the top level
-  reports only the "reachable" numbers (wall ore only reports a total, since it needs a wall drill),
-  and the evidence (which blocks, how many tiles, and what is covering them) can be expanded
-- **Export statistics**: tick one map for a `.json`, two or more for a `.jsonl` (one line per map);
-  two levels of detail — **full** (everything) or **brief** (only the numbers you can actually use);
-  and two destinations — **save to a file** or **share directly** (send it in a chat, nothing lands in
-  your folders). The file records the exporter version, the export time, the slot, the map source and
-  its sha256, so a report can be traced back
-- **Import `.msav`** (**several files at once**); **export from any source** — maps built into the
-  game or into a mod live inside the APK, and can still be exported directly (the exported file is
-  byte-for-byte identical to the source); **tick two or more and the export becomes one zip**
-- **Turn a save into a map**: pick one of this slot's saves, give it a name, and optionally pick a
-  **source map** (this slot / the 114 built into the game / from mods) to fill in the generator
-  settings
-- Deletion goes through the transfer station (moved aside, not hard-deleted); a name clash asks first
-  and moves the old map there too
-- **Search and sort**: by map name or file name; sort by name / **problems first** / size;
-  "problems only" means the maps whose metadata cannot be read
+- Cards with previews (this slot / built into the game / from mods)
+- Resource statistics: ore / wall ore / mineable floor / bonus floor
+- Export statistics: `.json` for one map, `.jsonl` for several; full or brief; save or share
+- Import / export `.msav`: several at once; maps built into the game or a mod can be exported too
+- Turn a save into a map (an optional source map fills in the generator settings)
+- Search and sort; deletion goes through the transfer station
 
 ### Blueprints
-- **Thumbnails and a whole-blueprint preview**: the list draws the real sprites, and the detail page
-  draws the blueprint pixel by pixel with the same artwork the game uses. Both need a version assigned
-  to this slot, because the artwork is read out of that version APK (with no version, nothing is drawn
-  rather than something made up)
-- Blueprint list (this slot + **shipped inside mods**) with a separate detail page: blocks used,
-  missing blocks, and a **technical details** section
-- **Missing-block warning**: when the game meets a block it does not know, it silently drops that
-  tile — the list row names how many kinds are missing, and the detail page lists them one by one
-  (usually because the mod that brings them is not enabled)
-- **The warning says so when it may be wrong**: mods that add their blocks in code or scripts are
-  invisible to the launcher (it reads the block data shipped inside the mod package), so in a slot
-  with such an enabled mod the wording becomes "N kinds were **not recognized** … this may be
-  wrong", the detail page carries a visible *may be wrong* marker, and the reason sits one tap away
-- **Import `.msch`** (**several at once**; verified before it is put in place; on a name clash you are
-  asked first, and the old one moves to the transfer station); **export from any source** — **tick two
-  or more and the export becomes one zip**; deletion goes through the transfer station and can be put back
-- The **technical details** section shows the evidence: the name table the file carries, how many
-  tiles have a direction, any block names that had to be remapped, and the declared size against the
-  tiles actually found
-- **Search and sort**: by blueprint name or file name; sort by name / **problems first** / size;
-  "problems only" means **missing blocks or an unreadable file** (the uncertain "may be wrong" ones
-  count too)
+- Thumbnails in the list, a tile-by-tile preview on the detail page
+- Details: blocks used, missing blocks, technical details
+- Missing-block warnings; a "may be wrong" marker when it cannot be sure
+- Import / export `.msch`: several at once
+- Search and sort; deletion goes through the transfer station
 
 ### Mods
-- Mods live inside a slot's page (main screen → **Saves & Backups** → a slot → **Mods**), and the page
-  can switch to another slot without going back
-- **Enable / disable** mods one by one or **in bulk** (this writes the game's own switch file: backed
-  up first, atomic write, verified after writing, and refused while the game is running)
-- **Every mod states whether it will load and why**: type (Java / scripts / resources), form (jar /
-  zip / directory), dependencies — required, soft and circular — the version gate, the game's
-  blacklist, whether it is switched on, and whether the last launch ended in a crash that would make
-  the game skip all mods
-- **Conflict check**: two mods implementing the same thing, duplicate copies of one mod, packages
-  whose description file cannot be read, and leftover switches for mods that are gone — listed one by
-  one, with who depends on whom
-- **Search, filter and sort**: by name / problems first / size, "problems only", and by type; a mixed
-  mod shows up under several types — that is a fact, not a duplicate
-- Import mod packages (**several at once**; a zip we exported in one go can also be imported back,
-  and so can a zip that merely holds one folder per mod);
-  **export mods**: one tick gives you that file, several ticks become one zip (a folder-form mod is
-  packed into the zip)
-- **Delete mods**: tick one or several → they move to the transfer station; folder-form mods can be
-  deleted too
-- **Copy this slot's mods to another slot**
+- Enable / disable one by one or in bulk (writes the game's own switch; backed up first)
+- Every mod says whether it will load and why
+- Conflict check: who overrides what, duplicate copies, unreadable packages, leftover switches
+- Search, filter and sort; import / export; delete; copy to another slot
 
 ### Plug-ins
-- The entry is **the icon at the top right of the home screen** (the gear is Settings, the one to its
-  **right** is Plug-ins): an APK that **adds abilities to the launcher**. This version expects you to
-  bring your own — tap **Install a plug-in APK** and pick one in the system file picker
-- **Installing does not take effect right away**: the row says "takes effect after a restart" and the
-  page offers **Restart the launcher now** (the same after switching version, enabling or disabling).
-  If the device does not let an app restart itself, it tells you to quit and open it again
-- One row per plug-in: **name · state** (active / takes effect after a restart / disabled /
-  quarantined) plus **which copy is installed**; the second line gives the **origin** (built in /
-  official / third party) and **what happens if it crashes** (retry next launch / fall back to the
-  previous working copy / disable and quarantine it)
-- Tapping a row lets you **open** its page, **enable / disable** it, **delete** it (it moves to the
-  transfer station), and read **Plug-in info**: the name, version, author, description, entry class
-  and "what it touches" from the plug-in's own description, plus its internal id, origin, handling
-  and install time
-- Plug-ins can add **entries** to the interface: they are listed under the plug-in and open its own
-  page. If the entries it declares are not supported by this version, that is stated there — **the
-  plug-in itself keeps working**
-- Plug-ins can also add an **action row** to almost every page: the home screen, the slot list, the
-  slot page, the four content pages, Settings, Logs, the transfer station, and the map / blueprint
-  detail pages (**the game launch page and the plug-ins page itself are excluded**). Tapping the row
-  opens the plug-in's own page, which can read the current slot and its folders (read-only) through the
-  host API; a **detail page also exposes the selected file** (that map / blueprint). The small
-  "From plugin: …" line marks it
-- Plug-ins can read data through v6: **every slot** (name / folder / current), the saves, maps, mods and
-  blueprints of **any slot** (with source, size, time, plus metadata such as map size and author,
-  blueprint size and block count, mod version and dependencies), **the items of the current page**
-  (`pageItems()`), **settings** (a whitelist: theme / language / default slot / log count / auto-clean /
-  backup policies), **log and crash-report files**, **transfer-station entries** and **the version
-  list**. They can also **open a slot file or an entry inside a game APK / mod zip directly**, without
-  knowing the container format. Scans read file headers, so plug-ins should do it off the main thread
-- `selectedItems()` is only stable on a **detail page** (that one map / blueprint). On the four content
-  pages the ticks live in the export / delete dialog and are not kept by the page, so it returns empty;
-  handing a selection to a plug-in would need persistent multi-select first
-- **Disabling** just stops loading it (the file stays); **deleting** moves it to the transfer station,
-  from where you can **put it back** — it comes back **disabled**, and enabling it again is your call
-- **A crashing plug-in does not take the launcher down with it**: if a launch with plug-ins did not
-  finish, the next one skips loading them and applies the handling above (retry / fall back / disable
-  and quarantine), tells you what happened, and offers **re-enable the plug-in**; a quarantined copy
-  has to be put back by hand on the plug-ins page
-- The **interface version** a plug-in asks for has to be inside the range this build supports: too
-  new says the launcher should be updated, too old says the plug-in should be updated
-- A plug-in's data lives in its own layer (`data`, `cache`, created when used)
-- ⚠️ **This is not a sandbox**: a plug-in runs in the **same process** as the launcher and can touch
-  whatever the launcher can; the "what it touches" line is a **declaration, not a permission wall** —
-  so only install plug-ins you trust
+- The entry is the icon at the top right (right of the gear); install an APK to add abilities
+- Takes effect after a restart; the page offers **Restart the launcher now**
+- One row each: name · state · origin · what happens if it crashes
+- Open its page, enable / disable, delete, read its info
+- Can add an action row to almost every page (not the launch page or the plug-ins page)
+- Can read slots and content, settings, logs, the transfer station and the version list, and open files
+- A crash does not take the launcher down: retry / roll back / quarantine, and the page explains it
+- ⚠️ Not a sandbox: only install what you trust
 
 ### Transfer station
-- Deleted maps, saves, **whole slots**, deleted **blueprints**, replaced mods and **uninstalled
-  plug-ins** are **moved here first** instead of disappearing
-- The list shows what it is (map / save / mod / blueprint / whole slot / **uninstalled plug-in** /
-  other files), which slot it came from, its size, and when it arrived; you can **put it back** (the
-  slot it came from is preselected)
-- A deleted slot brings **its backups** along and they come back with it; if the name is taken you
-  can **put it back under another name**
-- You can also **delete for good** or **empty** it (both ask again and state the count and size); the
-  station keeps at most 20 items (3 whole slots) and pushes out the oldest beyond that
+- Deleted things land here instead of disappearing
+- Shows what it is, which slot it came from, and its size
+- Put it back (source slot preselected), or delete / empty it for good
+- Keeps at most 20 items (3 whole slots)
 
 ### Logs and settings
-- **Export the logs — in full or ready to share**: the bundle (game log + launcher reports +
-  crash reports) can be exported **unchanged**, or as a **scrubbed copy** that removes what points
-  at you before you send it: data-root paths (and the slot name inside them), the device model,
-  the GL/driver string, and the values the launcher already knows — your player name, the servers
-  you joined, the login ids. Ports, relative paths, the ABI, the API level, the page size and the
-  **mod list** stay (crash analysis needs them), so the scrubbed copy is still worth reporting
-  with. If the settings file cannot be read the launcher just falls back to the pattern-based
-  pass — a corrupt setting must never stop you from exporting a log
-
-- **Runtime log page** (home → Runtime log): the launcher's own log, the game log, and crash
-  reports as separate sections, each with its age and size; the oldest crash reports can be deleted
-  from there, and **Export all logs** writes everything into one file
-- **Crash analysis**: after a crash, **which mod did it** — the crash card on the log page states a
-  one-line verdict, plus the evidence behind it (the game's own `Likely Cause`, an
-  `Error loading mod` line in the report, a class from the stack trace, or a missing symbol found in
-  that mod's `classes.dex`). The mods page summary also shows "Last crash: …".
-  It **says "cannot tell" when it cannot tell** — verdicts are stated as "probably", the evidence is
-  always shown, and vanilla crashes (`Mods: none`) or the launcher's own crash dumps are never
-  blamed on a mod. **Export all logs now carries these verdicts** (the receiver does not have to
-  redo the analysis)
-- **Theme**: follow system / light / dark, and **Language**: follow system / English / 简体中文 —
-  both switched inside the app, without touching system settings
-- **You can translate the interface text yourself**: Settings (the gear at the top right) →
-  **Translation file** — import a `lang.properties` and it overrides **any** string in the interface
-  (menus and dialogs included, because all interface text goes through one entry point); placeholder
-  mistakes are listed before you install it, and you can **export a template** to start from
-- **Settings** (**the gear at the top right**; only things you can *change*): default slot for newly
-  found versions, how many crash reports to keep, automatic cleanup (with a manual "clean up once now"),
-  and **storage used** (what each slot, the backups and the transfer station take, and how much the
-  content-addressed store saves)
+- Export logs unchanged, or scrubbed (paths / device / account details removed)
+- Runtime log page: launcher log, game log and crash reports in sections
+- Crash analysis: names the mod with its evidence, and says so when it cannot tell
+- Theme, language, translation file
+- Settings: default slot, crash reports to keep, automatic cleanup, storage used
 
 ## What is not there yet
 
@@ -302,13 +140,10 @@ yourself — even just a few lines — see **Translation file** below.
   only be distributed by sideloading
 - **No in-app file manager**: importing and exporting always goes through the system file picker; this
   is not a general-purpose save manager — deleting a save is still the game's job
-- **Plug-ins can only be installed by hand in this version**: there is no plug-in store, no download
-  and no update check yet (distribution and verification come later). The extension points cover the
-  home screen / slot list / slot page / four content pages / Settings / Logs / transfer station / map
-  and blueprint detail pages; **the game launch page and the plug-ins page itself are excluded** (the
-  former must not touch the launch pipeline, the latter is the plug-in manager). The read surface
-  covers slots + the four content kinds + settings / logs / transfer station / versions + opening
-  bytes; computed stats are not exposed yet, and there is no hook into the game side
+- **Plug-ins can only be installed by hand**: no plug-in store, no downloads and no update checks yet
+- **Where plug-ins can hook in**: the home screen / slot list / slot page / four content pages /
+  Settings / Logs / transfer station / map and blueprint details (**not** the launch page or the
+  plug-ins page itself); computed stats and the in-game side are not exposed yet
 - **Plug-ins are not sandboxed**: they run in the launcher's own process and can touch whatever the
   launcher can — only install ones you trust
 - **This repository does not contain the game**: Mindustry and third-party builds such as
