@@ -41,9 +41,11 @@ point the game at that directory when it starts.
 1. **Get a game APK yourself** — this repository **does not include** the game. Use the official
    Mindustry from the official channel, or a build such as MindustryX. (Heavily modified packages
    may not load.)
-2. **Install the launcher** — for now you have to build it yourself (see
-   [Building](docs/DEVELOPING.md#构建)). It requires **Android 8.0 (API 26)** or newer; during
-   development it was verified on a real device running **Android 16 (API 36)**.
+2. **Install the launcher** — download it from
+   [Releases](https://github.com/GXFQE/mindustry-launcher-android/releases) (the one marked
+   Pre-release), or build it yourself (see [Building](docs/DEVELOPING.md#构建)). It requires
+   **Android 8.0 (API 26)** or newer; during development it was verified on a real device running
+   **Android 16 (API 36)**.
 3. **Import and play**:
    - Open the launcher → **Add game** and pick one of the two: **Import APK** to choose your APK
      (a copy is made into the app's private directory), or **Add package name** to scan game
@@ -129,25 +131,20 @@ yourself — even just a few lines — see **Translation file** below.
 
 ## What is not there yet
 
-- **Only a pre-release, and the work is not finished** — the interface, the data format and the
-  features can all change; there is no stable release yet. If you need stability, wait, or build it
-  yourself
-- **The launcher has no networking**: map downloads, a forum panel, update checks and launcher
-  self-updates **are not implemented** (v1 is deliberately "local only: scan what is installed +
-  import your own"). This does not limit the game itself — the internet permission is declared, so
-  multiplayer, the server list and in-game downloads work as usual
-- **Not on Google Play**: loading another APK as a plug-in does not fit its policies, so it can
-  only be distributed by sideloading
-- **No in-app file manager**: importing and exporting always goes through the system file picker; this
-  is not a general-purpose save manager — deleting a save is still the game's job
-- **Plug-ins can only be installed by hand**: no plug-in store, no downloads and no update checks yet
-- **Where plug-ins can hook in**: the home screen / slot list / slot page / four content pages /
-  Settings / Logs / transfer station / map and blueprint details (**not** the launch page or the
-  plug-ins page itself); computed stats and the in-game side are not exposed yet
-- **Plug-ins are not sandboxed**: they run in the launcher's own process and can touch whatever the
-  launcher can — only install ones you trust
-- **This repository does not contain the game**: Mindustry and third-party builds such as
-  MindustryX are copyright their respective authors, under their own licences
+- **Networking**: map downloads, a forum panel, update checks, launcher self-updates — v1 is
+  local-only (scan what is installed, import your own). The game itself is unaffected: multiplayer,
+  the server list and in-game downloads work as usual
+- **Plug-in distribution**: install an APK by hand; no store, no downloads, no update checks
+- **Plug-in data**: computed stats and the in-game side are not exposed yet
+
+## What is not planned
+
+- **Google Play**: loading another APK as a plug-in does not fit its policies; sideload only
+- **A built-in file manager**: imports and exports go through the system file picker (and this is not
+  a general-purpose save manager)
+- **A plug-in sandbox**: plug-ins share the launcher's process; "what it touches" is a declaration,
+  not a permission wall — only install what you trust
+- **Bundling the game**: copyright stays with its authors — bring your own APK
 
 ---
 
