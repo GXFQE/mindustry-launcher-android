@@ -166,5 +166,10 @@
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:paddingBottom="8dp" />
+
+    <!-- 第 163 轮：底部留白 —— 与另外三页同一份（原来只有模组页有） -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/page_bottom_space" />
   </LinearLayout>
 </ScrollView>

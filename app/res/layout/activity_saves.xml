@@ -185,5 +185,11 @@
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:paddingBottom="8dp" />
+
+    <!-- 第 163 轮：底部留白 —— 四页必须同一份（模组页一直有，这三页漏了 ⇒
+         滚到底时末项离导航栏比模组页更近；用户：「顶上和底下也不一样」） -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/page_bottom_space" />
   </LinearLayout>
 </ScrollView>

@@ -271,7 +271,9 @@ public class SavesActivity extends BaseActivity {
         }
         boolean empty = mFiles.length == 0;
         mEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
-        mList.setVisibility(empty ? View.GONE : View.VISIBLE);
+        // ⚠️ **不要**在空态时把列表容器 `GONE`（第 163 轮删掉的那一行）：
+        //   另外三页（模组 / 地图 / 蓝图）都让它留着 —— 它只贡献 8dp 底部内边距，
+        //   藏起来会让本页底部比那三页少一截（用户：「顶上和底下也不一样」）。
         if (empty) {
             // ⚠️ 那句"还没有存档"**复用**导入那条资源（「槽「X」里还没有存档。」）—— 同一件事只留一句文案
             mEmpty.setText(filtering
