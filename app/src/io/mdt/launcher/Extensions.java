@@ -47,16 +47,30 @@ final class Extensions {
      */
     static final String SLOT_PLUGINS = "plugins";
 
+    /**
+     * 第 159 轮（接口 v3）：**内容页动作** —— 在存档 / 地图 / 模组 / 蓝图页的操作卡里加一行。
+     *
+     * <p>条目必须再写一个 {@code page}（{@link #PAGE_SAVES} 等）；认不出的 page ⇒ 这一条不渲染
+     * （但解析时留着，便于报告 / 以后加页面）。
+     */
+    static final String SLOT_CONTENT = "content";
+
+    static final String PAGE_SAVES = "saves";
+    static final String PAGE_MAPS = "maps";
+    static final String PAGE_MODS = "mods";
+    static final String PAGE_BLUEPRINTS = "blueprints";
+
     /** 一条"能力条目"。 */
     static final class Item {
-        final String id, title, subtitle, entry, slot;
+        final String id, title, subtitle, entry, slot, page;
 
-        Item(String id, String title, String subtitle, String entry, String slot) {
+        Item(String id, String title, String subtitle, String entry, String slot, String page) {
             this.id = id;
             this.title = title;
             this.subtitle = subtitle;
             this.entry = entry;
             this.slot = slot;
+            this.page = page;
         }
 
         /** 界面上那个名字：标题空就回落 id（与插件名同一策略：**不印空白**）。 */
@@ -86,8 +100,9 @@ final class Extensions {
                 if (id.isEmpty() || entry.isEmpty()) continue;   // 半条记录不许进反射
                 String slot = trim(o.optString("slot", ""));
                 if (slot.isEmpty()) slot = SLOT_PLUGINS;
+                String page = trim(o.optString("page", ""));   // 只有 content 插槽用得上
                 out.add(new Item(id, trim(o.optString("title", "")), trim(o.optString("subtitle", "")),
-                        entry, slot));
+                        entry, slot, page));
             }
         } catch (Throwable t) {
             return new ArrayList<Item>();                       // 自述坏了 ⇒ 当"没有扩展"，别崩页面
@@ -108,23 +123,56 @@ final class Extensions {
         return out;
     }
 
+    /**
+     * 只要**某个内容页**的条目（**纯函数**，第 159 轮）。
+     *
+     * <p>判据三条缺一不可：插槽 == {@link #SLOT_CONTENT} · page 逐字相等 ·
+     * 这个 page 是本版认得的（认不出的 page 不渲染，见 {@link #knownPage}）。
+     */
+    static List<Item> forPage(List<Item> all, String page) {
+        List<Item> out = new ArrayList<Item>();
+        if (all == null || page == null || !knownPage(page)) return out;
+        for (Item i : all) {
+            if (SLOT_CONTENT.equals(i.slot) && page.equals(i.page)) out.add(i);
+        }
+        return out;
+    }
+
     /** 这一版认得的插槽（别的名字 ⇒ 跳过；启动报告里会记）。 */
     static boolean knownSlot(String slot) {
-        return SLOT_PLUGINS.equals(slot);
+        return SLOT_PLUGINS.equals(slot) || SLOT_CONTENT.equals(slot);
+    }
+
+    /** 这一版认得的内容页（只有 content 插槽的条目用得上）。 */
+    static boolean knownPage(String page) {
+        return PAGE_SAVES.equals(page) || PAGE_MAPS.equals(page)
+                || PAGE_MODS.equals(page) || PAGE_BLUEPRINTS.equals(page);
+    }
+
+    /** 这一条现在**真的会被渲染**吗（唯一的"用得上"判据，报告 / 提示都走它）。 */
+    static boolean usable(Item i) {
+        if (i == null || !knownSlot(i.slot)) return false;
+        if (SLOT_CONTENT.equals(i.slot)) return knownPage(i.page);
+        return true;
     }
 
     /**
-     * 这个插件**声明了入口，但这一版一个都用不上**（判据：声明非空，而本插槽里一条都没有）。
+     * 这个插件**声明了入口，但这一版一个都用不上**（判据：声明非空，而所有条目的
+     * 插槽 / page 本版都不认得）。
      *
      * <p>★ 为什么要单独判：插件页原来对这种情况**什么都不显示** —— 插件装上了、启用了、
      * 启动时也照常注入，只是界面里不多出任何条目 ⇒ 用户会以为"没生效 / 装坏了"。
-     * 这一版只有 {@link #SLOT_PLUGINS} 一个插槽，所以"声明了别的插槽名"就是这种情况。
      *
      * <p>⚠️ 与"这个插件没声明任何入口"（完全正常，多数插件就是纯后台）分开 —— 那种不该提示。
+     *
+     * <p>⚠️ 第 159 轮起判据是"**有没有任何一条能用**"，不再看"在不在某个插槽里"：
+     * 一个只声明了内容页动作的插件，在插件页也不该被说成"这一版不支持"。
+     * 参数 {@code slot} 只为老调用点保留（**不再参与判断**）。
      */
     static boolean allUnknown(List<Item> all, String slot) {
         if (all == null || all.isEmpty() || slot == null) return false;
-        return forSlot(all, slot).isEmpty();
+        for (Item i : all) if (usable(i)) return false;
+        return true;
     }
 
     private static String trim(String s) {

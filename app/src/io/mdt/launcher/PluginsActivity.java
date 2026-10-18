@@ -1,5 +1,6 @@
 package io.mdt.launcher;
 
+import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -46,8 +47,18 @@ public class PluginsActivity extends BaseActivity {
     /** 选插件 APK 的请求码（本页唯一一个 `startActivityForResult`）。 */
     private static final int REQ_PICK = 0x9B01;
 
+    // ---- 第 159 轮：从内容页直接打开某个条目（复用本页，不另建 Activity） ----
+    static final String EXTRA_ID = "plugin_id";
+    static final String EXTRA_VER = "plugin_ver";
+    static final String EXTRA_ENTRY = "plugin_entry";
+    static final String EXTRA_PAGE = "plugin_page";
+    static final String EXTRA_SLOT = "plugin_slot";
+    static final String EXTRA_LABEL = "plugin_label";
+
     private LinearLayout mBody;
     private ScrollView mScroll;
+    /** true = 这一趟是"直接打开某一条目"（返回 = 回上一页，不是回插件列表）。 */
+    private boolean mDirect;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -57,13 +68,39 @@ public class PluginsActivity extends BaseActivity {
         Util.applySystemInsets(findViewById(R.id.root));
         mScroll = (ScrollView) findViewById(R.id.plugins_scroll);
         mBody = (LinearLayout) findViewById(R.id.plugins_body);
-        rebuild();
+        String id = getIntent() == null ? null : getIntent().getStringExtra(EXTRA_ID);
+        if (id != null && !id.trim().isEmpty()) {
+            // ★ 内容页的动作行：标题用插件自己声明的名字，返回 = 回内容页（不是插件列表）
+            mDirect = true;
+            String label = getIntent().getStringExtra(EXTRA_LABEL);
+            if (label != null && !label.trim().isEmpty()) setTitle(label.trim());
+            open(id.trim(), getIntent().getStringExtra(EXTRA_VER),
+                    getIntent().getStringExtra(EXTRA_ENTRY),
+                    getIntent().getStringExtra(EXTRA_PAGE),
+                    getIntent().getStringExtra(EXTRA_SLOT));
+        } else {
+            rebuild();
+        }
     }
 
     @Override
     protected void onResume() {
         super.onResume();
+        if (mDirect) return;            // 直接打开的页：回来时**不许**把页面换回插件列表
         rebuild();
+    }
+
+    /** 从内容页的动作行进来（第 159 轮）。 */
+    static void start(Activity a, String id, String ver, String entry,
+                      String page, String slot, String label) {
+        Intent i = new Intent(a, PluginsActivity.class);
+        i.putExtra(EXTRA_ID, id);
+        i.putExtra(EXTRA_VER, ver);
+        i.putExtra(EXTRA_ENTRY, entry);
+        i.putExtra(EXTRA_PAGE, page);
+        i.putExtra(EXTRA_SLOT, slot);
+        i.putExtra(EXTRA_LABEL, label);
+        a.startActivity(i);
     }
 
     // ---- 页面 -----------------------------------------------------------------
@@ -383,7 +420,7 @@ public class PluginsActivity extends BaseActivity {
 
     /** 「打开」：注入过就走宿主 CL 那条路，没注入过才自建 DexClassLoader（同一个 dex 不许注册两次）。 */
     private void open(final String id, final String ver) {
-        open(id, ver, null);
+        open(id, ver, null, Extensions.SLOT_PLUGINS, Data.currentSlot(this));
     }
 
     /**
@@ -392,40 +429,59 @@ public class PluginsActivity extends BaseActivity {
      * @param entryOverride null = 用插件自述里的默认入口
      */
     private void open(final String id, final String ver, final String entryOverride) {
+        open(id, ver, entryOverride, Extensions.SLOT_PLUGINS, Data.currentSlot(this));
+    }
+
+    /**
+     * 第 159 轮：把"从哪一页来 / 哪个槽"一起交给插件（{@link io.mdt.launcher.api.PluginApi}）。
+     *
+     * @param page {@code plugins} 或四个内容页之一；null ⇒ plugins
+     * @param slot 当前槽；null ⇒ 当前槽
+     */
+    private void open(final String id, final String ver, final String entryOverride,
+                      String page, String slot) {
+        final String usePage = (page == null || page.trim().isEmpty())
+                ? Extensions.SLOT_PLUGINS : page.trim();
+        final String useSlot = (slot == null || slot.trim().isEmpty())
+                ? Data.currentSlot(this) : slot.trim();
         File apk = Plugins.apkOf(this, id, ver);
-        View page;
+        View pageView;
         try {
             // ★ 入口类按**这个插件自己的**自述取（第 135 轮）——多插件下"点谁开谁"全靠它
             //   （共用同一个入口 FQN 时，宿主 CL 只会认第一个注入的那个插件）
             String entry = entryOverride != null ? entryOverride
                     : PluginMeta.entryOf(this, apk, PluginHost.DEFAULT_ENTRY);
             PluginHost.Loaded l = Plugins.isInjected(this, id, ver)
-                    ? PluginHost.openInjected(this, apk, entry)
-                    : PluginHost.load(this, apk, entry);
-            Object v = l.entry.getMethod("createView", android.content.Context.class).invoke(null, l.ctx);
+                    ? PluginHost.openInjected(this, apk, entry, usePage, useSlot)
+                    : PluginHost.load(this, apk, entry, usePage, useSlot);
+            // ★ 一处实现（第 159 轮）：优先 createView(PluginApi)，老插件回落 createView(Context)
+            View v = PluginHost.createView(l);
             LinearLayout box = new LinearLayout(this);
             box.setOrientation(LinearLayout.VERTICAL);
             addText(box, Trans.get(this, R.string.plugin_loaded_fmt, apk.getName(), l.api), 13f);
-            if (v instanceof View) box.addView((View) v);
-            page = box;
+            if (v != null) box.addView(v);
+            pageView = box;
         } catch (PluginHost.PluginException e) {
             // ★ 接口版本那句按"太新 / 太老"分岔（第 139 轮）：一句"不匹配"让用户不知道该升哪一边
             int rr = PluginHost.reasonRes(e.reason);
-            page = fallback(rr == R.string.plugin_err_api_fmt
+            pageView = fallback(rr == R.string.plugin_err_api_fmt
                     ? Trans.get(this, PluginHost.apiReasonRes(e.num1), e.num1,
                             PluginHost.API_MIN, PluginHost.API)
                     : Trans.get(this, rr));
         } catch (Throwable t) {
-            page = fallback(Trans.get(this, R.string.plugin_err_other));
+            pageView = fallback(Trans.get(this, R.string.plugin_err_other));
         }
-        // 插件自己的页面 + 一行「返回」（返回 = 重建本页）
+        // 插件自己的页面 + 一行「返回」（直接打开的 ⇒ 回上一页；从列表点的 ⇒ 重建本页）
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(16), dp(16), dp(16), dp(16));
         addAction(root, Trans.get(this, R.string.plugin_back), new Runnable() {
-            @Override public void run() { rebuild(); }
+            @Override public void run() {
+                if (mDirect) finish();
+                else rebuild();
+            }
         });
-        root.addView(page, new LinearLayout.LayoutParams(
+        root.addView(pageView, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         mScroll.removeAllViews();
         mScroll.addView(root);

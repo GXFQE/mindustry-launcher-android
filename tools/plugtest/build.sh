@@ -54,6 +54,8 @@ build_one() {
   local tpl="${6:-$SRC_DIR/src/io/mdt/plugtest/PlugPage.java}"
   # 第 7 个参数（可选）：`poison` = 额外塞一个**与宿主同名**的 LogActivity（验"插件能不能顶掉宿主逻辑"）
   local extra="${7:-}"
+  # 第 8 个参数（可选）：`content` = 第 159 轮的**内容页动作**变体（slot=content + page）
+  local kind="${8:-}"
   # ★ 第 135 轮：**入口类一插件一份** —— 每个变体住自己的子包（`io.mdt.plugtest.<variant>`），
   #   并把入口名写进 `assets/plugin.json`。理由（第 134 轮真机定案）：宿主 CL 对每个类名只定义一次，
   #   共用同一个入口 FQN 时入口归"第一个注入的"插件 ⇒ 后面那些插件点「打开」渲染的都是它的页。
@@ -68,6 +70,11 @@ build_one() {
   #   两者都不许影响那条好条目，界面与自检都钉这条。
   #   ⚠️ 必须先算出来：下面那行 `json=` 里要用它（bash 顺序执行，后定义就取到空串）。
   local exts="[{\"id\":\"$name-tool\",\"title\":\"$name tool\",\"subtitle\":\"opens a page from $name\",\"entry\":\"$entry\"},{\"id\":\"broken\",\"title\":\"missing entry\"},{\"id\":\"later\",\"title\":\"future slot\",\"entry\":\"$entry\",\"slot\":\"tomorrow\"}]"
+  # 第 159 轮：content 变体声明三条 —— 存档 / 地图各一条，再混一条**认不出的 page**
+  # （真机上要看到前两条、看不到第三条；只验"能显示"测不出"会不会乱显示"）。
+  if [ "$kind" = "content" ]; then
+    exts="[{\"id\":\"$name-saves\",\"title\":\"content save tool\",\"subtitle\":\"shows the slot and dirs\",\"entry\":\"$entry\",\"slot\":\"content\",\"page\":\"saves\"},{\"id\":\"$name-maps\",\"title\":\"content map tool\",\"subtitle\":\"same entry, map page\",\"entry\":\"$entry\",\"slot\":\"content\",\"page\":\"maps\"},{\"id\":\"$name-future\",\"title\":\"future page tool\",\"entry\":\"$entry\",\"slot\":\"content\",\"page\":\"tomorrow\"}]"
+  fi
   local json="{\"entry\":\"$entry\",\"name\":\"$name\",\"version\":\"1\",\"author\":\"mdt-fixture\",\"description\":\"$name fixture\",\"access\":[\"slots\",\"telepathy\"],\"extensions\":$exts}"
   local d="$OUT/$name"
   local srcpkg="$d/src/io/mdt/plugtest/$suf"
@@ -77,6 +84,9 @@ build_one() {
   fi
   echo "== [$name] api=$api tag=$tag tag2=$tag2 dropclass=$dropclass tpl=$(basename "$tpl") entry=$entry =="
   mkdir -p "$srcpkg" "$d/src/io/mdt/launcher" "$d/classes" "$d/dex"
+  # 第 159 轮：插件编译期的 PluginApi 桩（运行期由宿主那份同名类接管）
+  mkdir -p "$d/src/io/mdt/launcher/api"
+  cp "$SRC_DIR/src/io/mdt/launcher/api/PluginApi.java" "$d/src/io/mdt/launcher/api/PluginApi.java"
   # 入口页也带上这一版的编译期 tag（`PlugPage.tag()`）——多插件下"谁渲染的页"靠它才看得见
   sed -e "s/__API__/$api/" -e "s/__TAGPAGE__/$tag/" -e "s|^package io.mdt.plugtest;|package $pkg;|" \
       "$tpl" > "$srcpkg/PlugPage.java"
@@ -141,6 +151,8 @@ build_one plugtest-api0    0  PLUGIN-api0    0 PLUGIN-api0-2
 build_one plugtest-v2      1  PLUGIN-v2      0 PLUGIN-v2-2
 # 第 132 轮：**带它就启动不了**的那一版（回滚要拿真实失败形态验，不能只靠手写 guard）
 build_one plugtest-kill    1  PLUGIN-kill    0 PLUGIN-kill-2 "$SRC_DIR/src/io/mdt/plugtest/PlugPageKill.java"
+# 第 159 轮：**内容页动作**夹具（api=3 + PluginApi + slot=content/page=saves|maps）
+build_one plugtest-content 3  PLUGIN-content 0 PLUGIN-content-2 "$SRC_DIR/src/io/mdt/plugtest/PlugPageContent.java" "" content
 
 # --- 第 133 轮：**第三方**对照样本（同一个插件，换另一把密钥签） -----------------
 # 信任模型的判据是"签名指纹 == 本应用自己的"。夹具必须**两侧都有**：

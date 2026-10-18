@@ -210,6 +210,10 @@ public class ModsActivity extends BaseActivity {
                     @Override public void run() { promptDeleteMods(); }
                 });
 
+        // ★ 第 159 轮（扩展点 v2）：插件声明的**模组页动作**插在「删除」上面
+        PluginEntries.attach(this, (android.view.ViewGroup) root.findViewById(R.id.mods_actions),
+                Extensions.PAGE_MODS, mSlot, R.id.row_mod_del);
+
         mContainer = (LinearLayout) root.findViewById(R.id.mod_container);
         mEmpty = (TextView) root.findViewById(R.id.mod_empty);
         // 第②项：搜索框（纯前端过滤，只在内存里筛，一个文件都不碰）

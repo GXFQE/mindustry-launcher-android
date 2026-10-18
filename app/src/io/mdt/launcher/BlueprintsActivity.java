@@ -163,6 +163,10 @@ public class BlueprintsActivity extends BaseActivity {
                     @Override public void run() { pickFilter(); }
                 });
 
+        // ★ 第 159 轮（扩展点 v2）：插件声明的**蓝图页动作**插在「删除」上面
+        PluginEntries.attach(this, (android.view.ViewGroup) root.findViewById(R.id.bp_actions),
+                Extensions.PAGE_BLUEPRINTS, mSlot, R.id.row_bp_del);
+
         scan();
 
         // dev 口：把"选文件"换成路径（SAF 选择器自动化不了）—— ⚠️ 必须放在 scan() 之后，

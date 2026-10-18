@@ -89,4 +89,6 @@
     <!-- 第 149 轮：列表行放不下整句 ⇒ 给"短形式"；★ 界面上**不许**出现 L1/L2/L3 这种内部代号 -->
     <string name="plugin_level_short_l1">失败后再试</string>
     <string name="plugin_level_short_l2">失败后换旧版</string>
-    <string name="plugin_level_short_l3">失败后停用并隔离</string></resources>
+    <string name="plugin_level_short_l3">失败后停用并隔离</string>
+    <!-- 第 159 轮：内容页动作行的副标题（标题是插件自己声明的） -->
+    <string name="plugin_ext_from_fmt">来自插件：%1$s</string></resources>

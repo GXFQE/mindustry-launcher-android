@@ -196,9 +196,13 @@ yourself — even just a few lines — see **Translation file** below.
   transfer station), and read **Plug-in info**: the name, version, author, description, entry class
   and "what it touches" from the plug-in's own description, plus its internal id, origin, handling
   and install time
-- Plug-ins can add **entries** to the interface (the only extension point in this version): they are
-  listed under the plug-in and open its own page. If the entries it declares are not supported by this
-  version, that is stated there — **the plug-in itself keeps working**
+- Plug-ins can add **entries** to the interface: they are listed under the plug-in and open its own
+  page. If the entries it declares are not supported by this version, that is stated there — **the
+  plug-in itself keeps working**
+- Plug-ins can also add an **action row** to the Saves / Maps / Mods / Blueprints pages (this version
+  has two extension points: entries on the plug-ins page and actions on those four pages). Tapping the
+  row opens the plug-in's own page, which can read the current slot and its folders (read-only) through
+  the host API; the small "From plugin: …" line marks it
 - **Disabling** just stops loading it (the file stays); **deleting** moves it to the transfer station,
   from where you can **put it back** — it comes back **disabled**, and enabling it again is your call
 - **A crashing plug-in does not take the launcher down with it**: if a launch with plug-ins did not
@@ -269,8 +273,9 @@ yourself — even just a few lines — see **Translation file** below.
 - **No in-app file manager**: importing and exporting always goes through the system file picker; this
   is not a general-purpose save manager — deleting a save is still the game's job
 - **Plug-ins can only be installed by hand in this version**: there is no plug-in store, no download
-  and no update check yet (distribution and verification come later), and the only extension point so
-  far is "add entries to the interface" — plugging into the game side is not possible yet
+  and no update check yet (distribution and verification come later), and the extension points so far
+  are "entries on the plug-ins page" and "action rows on the four content pages" — there is no
+  home-screen / settings / background-task slot yet and no hook into the game side
 - **Plug-ins are not sandboxed**: they run in the launcher's own process and can touch whatever the
   launcher can — only install ones you trust
 - **This repository does not contain the game**: Mindustry and third-party builds such as

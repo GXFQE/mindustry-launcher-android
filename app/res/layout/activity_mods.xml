@@ -122,6 +122,7 @@
 
             <!-- 操作卡：只读的槽切换（模组住在槽里 ⇒ 跨槽视图就是"换个槽看"） -->
             <LinearLayout
+                android:id="@+id/mods_actions"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/card_gap"

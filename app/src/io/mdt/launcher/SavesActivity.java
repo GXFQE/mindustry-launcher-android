@@ -169,6 +169,11 @@ public class SavesActivity extends BaseActivity {
                     @Override public void run() { pickFilter(); }
                 });
 
+        // ★ 第 159 轮（扩展点 v2）：插件声明的**存档页动作**插在「删除」上面
+        //   （只读声明、不加载插件代码；没插件就一个像素都不动）
+        PluginEntries.attach(this, (android.view.ViewGroup) root.findViewById(R.id.save_actions),
+                Extensions.PAGE_SAVES, mSlot, R.id.row_save_del);
+
         // F9 深链：本页是被外部"打开方式"（浏览器 / 文件管理器）叫起来的。
         //   ★ 先过与「导入存档」那一行**同一个**写槽门禁（`SlotIo.blockedByGame`：只有
         //     当前槽被游戏占着时才挡），再走与 SAF 那条路**同一份**分流判据

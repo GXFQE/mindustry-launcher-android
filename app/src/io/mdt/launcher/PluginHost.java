@@ -4,10 +4,13 @@ import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.res.AssetManager;
 import android.content.res.Resources;
+import android.view.View;
 
 import java.io.File;
+import java.lang.reflect.Method;
 
 import dalvik.system.DexClassLoader;
+import io.mdt.launcher.api.PluginApi;
 
 /**
  * 插件加载器（**产品侧**：只加载、只判据，不带任何 UI）。
@@ -21,7 +24,8 @@ import dalvik.system.DexClassLoader;
  *       {@code setReadOnly()} 恒返回 false（实测），而**内部存储**上才生效 ⇒ 判据是"ART 认不认"，
  *       所以这里只**记录**、不拒绝；真正的裁决在下面的 {@link DexClassLoader}。</li>
  *   <li><b>预热预检</b> —— 抛一次性 {@link DexClassLoader} 把入口类解出来：缺类/坏包在这里就该被拒；</li>
- *   <li><b>接口版本</b> —— 入口报的 api 不是 {@link #API} ⇒ 拒（否则后面每个反射调用都是掷骰子）；</li>
+ *   <li><b>接口版本</b> —— 入口报的 api 不在 [{@link #API_MIN}, {@link #API}] 区间 ⇒ 拒
+ *       （否则后面每个反射调用都是掷骰子）；</li>
  *   <li><b>挂资源</b> —— 优先**新建**一个 {@code AssetManager}（不污染宿主），失败才退回宿主那份。</li>
  * </ol>
  *
@@ -34,8 +38,15 @@ import dalvik.system.DexClassLoader;
  */
 public final class PluginHost {
 
-    /** 壳认的插件接口版本。插件报别的数 ⇒ 拒绝加载。 */
-    public static final int API = 2;
+    /**
+     * 壳认的插件接口版本。
+     *
+     * <p>v1 = 只有 {@code api() + createView(Context)}；v2 = 自述 JSON + access；
+     * **v3（第 159 轮）= 加上 {@link PluginApi} 与 {@code content} 插槽**。
+     * 插件报 3 才意味着"我会用 {@code createView(PluginApi)}"，报 1/2 的老插件照旧走
+     * {@code createView(Context)}；区间下限不变（{@link #API_MIN} = 1）。
+     */
+    public static final int API = 3;
     /**
      * 还认的**最老**契约版本（第 139 轮）。抬它 = 老插件被拒，界面会说清"太老、该更新插件"。
      *
@@ -73,6 +84,8 @@ public final class PluginHost {
          */
         public final ClassLoader cl;
         public final Context ctx;
+        /** 同一份 ctx 暴露成插件能力门面（v3）；老插件忽略它即可。 */
+        public final PluginApi env;
         public final Class<?> entry;
         public final int api;
         public final boolean readOnlySet;
@@ -80,9 +93,9 @@ public final class PluginHost {
         public final String assetFrom;
         public final int cookie;
 
-        Loaded(ClassLoader cl, Context ctx, Class<?> entry, int api,
+        Loaded(ClassLoader cl, Context ctx, PluginApi env, Class<?> entry, int api,
                boolean readOnlySet, boolean stillWritable, String assetFrom, int cookie) {
-            this.cl = cl; this.ctx = ctx; this.entry = entry; this.api = api;
+            this.cl = cl; this.ctx = ctx; this.env = env; this.entry = entry; this.api = api;
             this.readOnlySet = readOnlySet; this.stillWritable = stillWritable;
             this.assetFrom = assetFrom; this.cookie = cookie;
         }
@@ -112,12 +125,23 @@ public final class PluginHost {
     // ---- 加载 -----------------------------------------------------------------
 
     public static Loaded load(Context host, File apk) throws PluginException {
-        return open(host, apk, null, DEFAULT_ENTRY);
+        return open(host, apk, null, DEFAULT_ENTRY, null, null);
     }
 
     /** 按插件自述的入口类名加载（见 {@link PluginMeta}）。 */
     public static Loaded load(Context host, File apk, String entry) throws PluginException {
-        return open(host, apk, null, entryOr(entry));
+        return open(host, apk, null, entryOr(entry), null, null);
+    }
+
+    /**
+     * 第 159 轮：带上"从哪个页面来的 / 哪个槽"加载 —— 内容页的插件动作走这一条。
+     *
+     * @param page {@link io.mdt.launcher.api.PluginApi#page()}（null ⇒ plugins）
+     * @param slot 当前槽（null ⇒ {@link Data#currentSlot(Context)}）
+     */
+    public static Loaded load(Context host, File apk, String entry, String page, String slot)
+            throws PluginException {
+        return open(host, apk, null, entryOr(entry), page, slot);
     }
 
     /**
@@ -129,17 +153,23 @@ public final class PluginHost {
      * 这里只跑后三道门：按名字取类（预热预检）→ 接口版本 → 挂资源。
      */
     static Loaded openInjected(Context host, File apk) throws PluginException {
-        return open(host, apk, host.getClassLoader(), DEFAULT_ENTRY);
+        return open(host, apk, host.getClassLoader(), DEFAULT_ENTRY, null, null);
     }
 
     /** 按插件自述的入口类名打开已经注入宿主 CL 的那一份（多插件下"点谁开谁"靠它）。 */
     static Loaded openInjected(Context host, File apk, String entry) throws PluginException {
-        return open(host, apk, host.getClassLoader(), entryOr(entry));
+        return open(host, apk, host.getClassLoader(), entryOr(entry), null, null);
+    }
+
+    /** 同 {@link #load(Context, File, String, String, String)}，但走"已注入宿主 CL"那条路。 */
+    static Loaded openInjected(Context host, File apk, String entry, String page, String slot)
+            throws PluginException {
+        return open(host, apk, host.getClassLoader(), entryOr(entry), page, slot);
     }
 
     /** @param injectedTo 非 null = 这个 dex 已经注册给它了 ⇒ 不再建 DexClassLoader */
-    private static Loaded open(Context host, File apk, ClassLoader injectedTo, String entryName)
-            throws PluginException {
+    private static Loaded open(Context host, File apk, ClassLoader injectedTo, String entryName,
+                               String page, String slot) throws PluginException {
         if (apk == null || !apk.isFile()) {
             throw new PluginException("plugin_err_missing", String.valueOf(apk));
         }
@@ -209,27 +239,87 @@ public final class PluginHost {
         File home = apk.getParentFile();
         File pdata = home == null ? null : new File(home, "data");
         File pcache = home == null ? null : new File(home, "cache");
-        return new Loaded(cl, new PContext(host, am, res, cl, pdata, pcache), entry, api,
-                roSet, stillWritable, from, cookie);
+        // 第 159 轮：老调用点（插件页 / dev 实验）没有页面信息 ⇒ 一律当"插件页 + 当前槽"
+        String usePage = (page == null || page.trim().isEmpty())
+                ? Extensions.SLOT_PLUGINS : page.trim();
+        String useSlot = (slot == null || slot.trim().isEmpty())
+                ? Data.currentSlot(host) : slot.trim();
+        PContext pc = new PContext(host, am, res, cl, pdata, pcache, usePage, useSlot);
+        return new Loaded(cl, pc, pc, entry, api, roSet, stillWritable, from, cookie);
+    }
+
+    /**
+     * 调插件的入口方法（第 159 轮：**一处实现**，别在界面里各写一遍）。
+     *
+     * <p>顺序：{@code createView(PluginApi)} 优先，没有才回落 {@code createView(Context)}
+     * （v1/v2 老插件就只有后者）。两种都取不到 ⇒ 抛 {@link NoSuchMethodException} 由调用方兜底。
+     */
+    static View createView(Loaded l) throws Exception {
+        if (l == null || l.entry == null) throw new IllegalArgumentException("plugin not loaded");
+        try {
+            Method m = l.entry.getMethod("createView", PluginApi.class);
+            return (View) m.invoke(null, l.env);
+        } catch (NoSuchMethodException noApi) {
+            Method m = l.entry.getMethod("createView", Context.class);
+            return (View) m.invoke(null, l.ctx);
+        }
     }
 
     /** 只带插件资源的 Context —— 插件代码拿到的必须是它（拿宿主的 ctx 就取不到插件资源）。 */
-    private static final class PContext extends ContextWrapper {
+    private static final class PContext extends ContextWrapper implements PluginApi {
         private final AssetManager am;
         private final Resources res;
         private final ClassLoader cl;
         /** 这台插件自己的目录（`<插件>/data`、`<插件>/cache`，第 148 轮 C1）。 */
         private final File files, cache;
+        /** 从哪个页面来的 / 哪个槽（第 159 轮 v3）。 */
+        private final String page, slot;
 
-        PContext(Context base, AssetManager am, Resources res, ClassLoader cl, File files, File cache) {
+        PContext(Context base, AssetManager am, Resources res, ClassLoader cl, File files, File cache,
+                 String page, String slot) {
             super(base);
             this.am = am; this.res = res; this.cl = cl;
             this.files = files; this.cache = cache;
+            this.page = page; this.slot = slot;
         }
 
         @Override public AssetManager getAssets() { return am; }
         @Override public Resources getResources() { return res; }
         @Override public ClassLoader getClassLoader() { return cl; }
+
+        // ---- PluginApi（v3）-----------------------------------------------
+
+        @Override public int hostApi() { return API; }
+
+        @Override public Context context() { return this; }
+
+        @Override public String page() { return page; }
+
+        @Override public String slot() { return slot; }
+
+        @Override public File slotDir() { return Data.dirOf(getBaseContext(), slot); }
+
+        @Override public File savesDir() { return new File(slotDir(), "saves"); }
+
+        @Override public File modsDir() { return new File(slotDir(), "mods"); }
+
+        @Override public File mapsDir() { return new File(slotDir(), "maps"); }
+
+        @Override public File blueprintsDir() { return new File(slotDir(), "schematics"); }
+
+        @Override public void toast(final String message) {
+            final Context c = getBaseContext();
+            new android.os.Handler(android.os.Looper.getMainLooper()).post(new Runnable() {
+                @Override public void run() {
+                    android.widget.Toast.makeText(c, message == null ? "" : message,
+                            android.widget.Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+
+        @Override public void log(String message) {
+            android.util.Log.i("MDTPlugin", message == null ? "" : message);
+        }
 
         /**
          * ★ 第 148 轮 C1：插件写"自己的数据"要落在**它自己的目录**里（`<插件>/data`），

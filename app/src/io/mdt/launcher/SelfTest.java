@@ -1,6 +1,7 @@
 package io.mdt.launcher;
 
 import android.content.Context;
+import io.mdt.launcher.api.PluginApi;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -2970,6 +2971,20 @@ public final class SelfTest {
         L.add("");
     }
 
+    /** round 159: both overloads exist -> the PluginApi one must win. */
+    public static final class ApiEntryProbe {
+        static int picked;
+        public static int api() { return PluginHost.API; }
+        public static android.view.View createView(PluginApi env) { picked = 3; return null; }
+        public static android.view.View createView(Context ctx) { picked = 1; return null; }
+    }
+
+    /** round 159: a v1/v2 plugin only has createView(Context). */
+    public static final class CtxEntryProbe {
+        public static int api() { return PluginHost.API; }
+        public static android.view.View createView(Context ctx) { return null; }
+    }
+
     /**
      * S0 插件化：**纯函数**判据。
      *
@@ -2987,6 +3002,59 @@ public final class SelfTest {
                         && !PluginHost.apiCompatible(PluginHost.API_MIN - 1),
                 "★ 越界一律不认（比本机新 / 比最老还老；99 也拒）");
         ok(stat, L, PluginHost.apiCompatible(-1) == false, "负数 api ⇒ 不认（不崩）");
+
+        // ── round 159: v3 = PluginApi + content slot ──
+        ok(stat, L, PluginHost.API >= 3,
+                "host plugin api >= 3 (content slot + PluginApi)");
+        java.util.List<Extensions.Item> exPage = Extensions.parse(
+                "{\"extensions\":["
+                        + "{\"id\":\"cs\",\"title\":\"Saves tool\",\"entry\":\"com.x.S\","
+                        + "\"slot\":\"content\",\"page\":\"saves\"},"
+                        + "{\"id\":\"cm\",\"title\":\"Maps tool\",\"entry\":\"com.x.M\","
+                        + "\"slot\":\"content\",\"page\":\"maps\"},"
+                        + "{\"id\":\"cx\",\"title\":\"Future tool\",\"entry\":\"com.x.X\","
+                        + "\"slot\":\"content\",\"page\":\"tomorrow\"}"
+                        + "]}");
+        ok(stat, L, exPage.size() == 3 && "cs".equals(exPage.get(0).id)
+                        && Extensions.SLOT_CONTENT.equals(exPage.get(0).slot)
+                        && Extensions.PAGE_SAVES.equals(exPage.get(0).page),
+                "content item keeps slot+page (size=" + exPage.size() + ")");
+        ok(stat, L, Extensions.forPage(exPage, Extensions.PAGE_SAVES).size() == 1
+                        && "cs".equals(Extensions.forPage(exPage, Extensions.PAGE_SAVES).get(0).id)
+                        && Extensions.forPage(exPage, Extensions.PAGE_MAPS).size() == 1
+                        && Extensions.forPage(exPage, Extensions.PAGE_MODS).isEmpty()
+                        && Extensions.forPage(exPage, Extensions.PAGE_BLUEPRINTS).isEmpty(),
+                "forPage: each page gets only its own entries");
+        ok(stat, L, Extensions.knownSlot(Extensions.SLOT_CONTENT)
+                        && Extensions.knownPage(Extensions.PAGE_SAVES)
+                        && Extensions.knownPage(Extensions.PAGE_BLUEPRINTS)
+                        && !Extensions.knownPage("tomorrow")
+                        && Extensions.forPage(exPage, "tomorrow").isEmpty(),
+                "unknown page is not rendered (but the item is still parsed)");
+        ok(stat, L, Extensions.usable(exPage.get(0)) && !Extensions.usable(exPage.get(2)),
+                "usable = known slot + known page");
+        java.util.List<Extensions.Item> onlyFuture = new ArrayList<Extensions.Item>();
+        onlyFuture.add(exPage.get(2));
+        ok(stat, L, Extensions.allUnknown(onlyFuture, Extensions.SLOT_PLUGINS)
+                        && !Extensions.allUnknown(exPage, Extensions.SLOT_PLUGINS),
+                "allUnknown counts usable entries across slots (content-only plugin is not unsupported)");
+        ok(stat, L, Extensions.forPage(exPage, null).isEmpty()
+                        && Extensions.forPage(null, Extensions.PAGE_SAVES).isEmpty(),
+                "forPage(null) = empty (no crash)");
+        try {
+            ApiEntryProbe.picked = 0;
+            PluginHost.Loaded la = new PluginHost.Loaded(null, null, null, ApiEntryProbe.class,
+                    PluginHost.API, false, false, null, 0);
+            PluginHost.createView(la);
+            ok(stat, L, ApiEntryProbe.picked == 3,
+                    "createView(PluginApi) wins when both overloads exist");
+            PluginHost.Loaded lc = new PluginHost.Loaded(null, null, null, CtxEntryProbe.class,
+                    PluginHost.API, false, false, null, 0);
+            ok(stat, L, PluginHost.createView(lc) == null,
+                    "old createView(Context) still works");
+        } catch (Throwable t) {
+            ok(stat, L, false, "createView dispatch threw: " + t);
+        }
 
         // ★ 元断言：六个拒绝原因都要有一句能说给用户的话，而且**互不相同**
         //   （落到同一句 ⇒ 界面上张冠李戴；这是"同一屏同一件事只说一次"那条规矩的镜像）

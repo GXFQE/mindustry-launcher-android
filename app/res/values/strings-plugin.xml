@@ -98,4 +98,6 @@
     <!-- round 149: the row has no space for a full sentence, so a short form. No internal codes (L1/L2/L3) on screen. -->
     <string name="plugin_level_short_l1">Retry on failure</string>
     <string name="plugin_level_short_l2">Older version on failure</string>
-    <string name="plugin_level_short_l3">Off on failure</string></resources>
+    <string name="plugin_level_short_l3">Off on failure</string>
+    <!-- round 159: a content-page action row says where it came from (the title is the plugin's own) -->
+    <string name="plugin_ext_from_fmt">From plugin: %1$s</string></resources>
