@@ -114,7 +114,6 @@ yourself — even just a few lines — see **Translation file** below.
 - Can add an action row to almost every page (not the launch page or the plug-ins page)
 - Can read slots and content, settings, logs, the transfer station and the version list, and open files
 - A crash does not take the launcher down: retry / roll back / quarantine, and the page explains it
-- ⚠️ Not a sandbox: only install what you trust
 
 ### Transfer station
 - Deleted things land here instead of disappearing
