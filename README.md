@@ -20,16 +20,15 @@ versions installed side by side, each with separate **saves / maps / blueprints 
 
 | Official Android build | With this launcher |
 |---|---|
-| One version at a time — a second install overwrites the first, and going back means shuffling files by hand | Several versions installed side by side (159.7 / 160.4 / MindustryX X37 …), switch with one tap; **Continue** resumes the one you launched last |
-| Every version shares one set of saves, so switching versions replaces them | Each version gets a **slot**: saves / maps / blueprints / mods are fully independent |
-| "Why is this mod not taking effect?" — no way to find out | Every mod says whether it will load and why (type, dependencies, version gate, blacklist); conflicts are listed one by one |
-| Saves / maps / blueprints / mods are stuck inside the app, so a new phone means starting over | All of them can be **imported and exported in batches**; a whole slot can be packed into one zip (settings included) |
+| One version at a time — a second install overwrites the first; going back means reinstalling and moving saves by hand | Several versions installed side by side (159.7 / 160.4 / MindustryX X37 …), switch with one tap; **Continue** resumes the one you launched last |
+| Every version shares one set of data (saves / maps / mods / settings), so switching versions replaces it | Each version gets a **slot**: saves / maps / blueprints / mods / settings are fully independent |
+| Backing up means copying the whole data directory yourself | **Automatic backups** (per slot: when to trigger, how many to keep), content-addressed and shared between slots — measured on a real device: 3 slots × 20 backups, 9.1 GB of data in **448 MB** |
+| Deleting a save, a map or a blueprint is final | Deleting any of them **moves it to the transfer station** first, and it can be put back |
+| The game does say why a mod failed to load (missing dependency / version too low / blacklisted), but it never checks whether **two mods override the same content** | A **conflict check** lists who overrides what, duplicate copies of one mod, unreadable packages and leftover switches |
+| A crash leaves a log (which can be exported), but nothing says **which mod did it** | **Crash analysis** gives a verdict and its evidence; the report can be exported with that verdict, optionally **scrubbed first** |
 | How much ore a map holds and where you can build can only be counted inside the game | The map page reports **ore / wall ore / buildable tiles / core zone**, and can export it as JSON / JSONL |
-| Which blocks a blueprint is missing, or which map a save belongs to — invisible in the official UI | Lists carry **previews**; a blueprint names its missing blocks (and where it is unsure); a save shows the name the game gave it |
-| A crash is just a crash — no idea who caused it | **Crash analysis** names the mod (and the evidence); the report can be exported, optionally **scrubbed first** |
-| Sharing a save or a whole slot risks carrying your account data along | The **shareable package** strips login identities, server records and everything only useful to you; logs have a scrubbed export too |
-| Backups pile up and eat space | Backups are content-addressed and shared between slots — measured on a real device: 3 slots × 20 backups, 9.1 GB of data in **448 MB** |
-| A mis-tap deletes a map, a mod or a whole slot for good | Deleting any of them **moves it to the transfer station** first, and it can be put back |
+| A blueprint only reports its size and block count; which blocks are missing you find out by building it | The list names the **missing blocks** (and where it is unsure) |
+| Exporting the whole data set takes the settings and login identities with it (the game does not separate them) | The **shareable package** strips login identities, server records and everything only useful to you |
 | New features only arrive when the official build ships them | Plug-ins can add abilities to the launcher (young: for now you install an APK by hand) |
 
 **How it works**: the official APK is loaded **as-is, as a plug-in** — no repacking, no
