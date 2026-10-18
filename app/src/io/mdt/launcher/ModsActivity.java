@@ -895,12 +895,14 @@ public class ModsActivity extends BaseActivity {
 
     private void fillHeader() {
         if (mSummary != null) {
+            // 第 164 轮：这行与另外三页同一模板「本槽 N <量词> · 附加…」——
+            //   原来带「槽 X」，而 ActionBar 标题本来就是「槽「X」的模组」⇒ 同屏说了两遍。
             if (!mTarget.any()) {
                 mSummary.setText(Trans.get(ModsActivity.this, R.string.mods_summary_nogame_fmt,
-                        mScan.mods.size(), mSlot));
+                        mScan.mods.size()));
             } else {
                 mSummary.setText(Trans.get(ModsActivity.this, R.string.mods_summary_fmt,
-                        mScan.mods.size(), mSlot, join(mTarget.versions)));
+                        mScan.mods.size(), join(mTarget.versions)));
             }
         }
         if (mSlotSub != null) {
@@ -1017,7 +1019,7 @@ public class ModsActivity extends BaseActivity {
             mEmpty.setVisibility(shown.isEmpty() ? View.VISIBLE : View.GONE);
             if (shown.isEmpty()) {
                 mEmpty.setText(!filtering && all.isEmpty()
-                        ? Trans.get(ModsActivity.this, R.string.mods_empty_fmt, mScan.modsDirPath())
+                        ? Trans.get(ModsActivity.this, R.string.mods_empty_fmt, mSlot, mScan.modsDirPath())
                         : Trans.get(ModsActivity.this, R.string.mods_empty_filtered));
             }
         }

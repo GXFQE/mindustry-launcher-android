@@ -532,7 +532,7 @@
     <string name="maps_scan_failed">Could not list the maps. Go back and enter again.</string>
     <string name="maps_scanning">Listing maps…</string>
     <string name="maps_title_fmt">Maps in slot \"%1$s\"</string>
-    <string name="maps_counts_fmt">this slot %1$d · built into game %2$d · from mods %3$d</string>
+    <string name="maps_counts_fmt">In this slot %1$d · built into game %2$d · from mods %3$d</string>
     <!-- ★ 2026-10-04：这句原来"全工程零引用"（地图页没有空态），现在真的用上了。
          ⚠️ 同时**收短**：原来挤在一行里三句（"本槽没有，模组没自带，游戏自带的要等…"），
             空态只需要"为什么没有 + 下一步"两件事（对齐 empty_versions 的写法）。 -->
@@ -566,7 +566,9 @@
       the game's own UI (same rule as the "which saves are unreadable" list).
     -->
     <string name="saves_list_title_fmt">Saves in slot \"%1$s\"</string>
-    <string name="saves_list_head_fmt">%1$d saves · tap one to see what map it is</string>
+    <string name="saves_list_head_fmt">In this slot %1$d · tap one to see what map it is</string>
+    <!-- round 164: the page empty state (NOT the export message `export_no_save_fmt`) -->
+    <string name="saves_empty_fmt">Slot \"%1$s\" has no saves yet.\nSaves made in the game show up here.</string>
     <!--
       ★ 2026-10-07（第 122 轮）：存档列表的搜索 / 排序（判据与文案口径见 activity_maps 那一节）。
       ⚠️ 这一页**没有**"只看有问题的"：存档的"读不出来"已经有专用入口（上面那一行），
@@ -673,8 +675,8 @@
     <string name="bp_detail_title">Blueprint</string>
     <string name="slot_page_blueprints">Blueprints</string>
     <string name="slot_page_blueprints_sub">Blueprints in this slot and in its mods</string>
-    <string name="bp_head_fmt">In this slot %1$d · From mods %2$d</string>
-    <string name="bp_empty">This slot has no blueprints yet, and none of its mods bring any.\nBlueprints saved in the game show up here.</string>
+    <string name="bp_head_fmt">In this slot %1$d · from mods %2$d</string>
+    <string name="bp_empty">Slot \"%1$s\" has no blueprints yet.\nBlueprints saved in the game show up here.</string>
     <!--
       ★ 2026-10-07（第 122 轮）：蓝图列表的搜索 / 排序。
       ★ 这一页的"有问题的" = **缺件或解析不了**（判据见 Blueprints.isProblem）——
@@ -1596,8 +1598,8 @@
     <string name="act_mods_sub">Version requirements · dependencies · toggles</string>
     <string name="mods_title">Mods</string>
 
-    <string name="mods_summary_fmt">%1$d mods · slot %2$s · target game %3$s</string>
-    <string name="mods_summary_nogame_fmt">%1$d mods · slot %2$s · no version points at this slot</string>
+    <string name="mods_summary_fmt">In this slot %1$d · target game %2$s</string>
+    <string name="mods_summary_nogame_fmt">In this slot %1$d · no version points at this slot</string>
     <string name="mods_detail_fmt">Mod directory\n%1$s\n\nGame toggles\n%2$s\n\nLast launch\n%3$s</string>
     <string name="mods_crash_yes">⚠ The last launch did not finish. If the game is set to disable mods after a crash, it will skip every mod</string>
     <string name="mods_crash_no">The last launch finished normally</string>
@@ -1606,7 +1608,7 @@
     <string name="mods_row_slot_sub_fmt">Viewing mods of \"%1$s\"</string>
     <string name="mods_slot_pick_title">Which slot mods do you want to see?</string>
 
-    <string name="mods_empty_fmt">This slot has no mods yet.\nPut .jar / .zip into:\n%1$s</string>
+    <string name="mods_empty_fmt">Slot \"%1$s\" has no mods yet.\nPut .jar / .zip into:\n%2$s</string>
     <string name="mods_ignored_fmt">%1$d more folders will not be loaded (they are not mod packages)</string>
     <string name="mods_orphan_fmt">Settings still hold toggles for %1$d mods whose packages are gone (leftovers)</string>
     <string name="mods_broken_head">Packages whose description file cannot be read (the game skips them outright)</string>

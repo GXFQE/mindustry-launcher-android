@@ -350,7 +350,7 @@ public class BlueprintsActivity extends BaseActivity {
             if (none) {
                 mEmpty.setText(filtering
                         ? Trans.get(BlueprintsActivity.this, R.string.bp_empty_filtered)
-                        : Trans.get(BlueprintsActivity.this, R.string.bp_empty));
+                        : Trans.get(BlueprintsActivity.this, R.string.bp_empty, mSlot));
             }
         }
     }

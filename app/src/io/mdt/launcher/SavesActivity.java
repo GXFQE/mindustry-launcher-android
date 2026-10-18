@@ -275,10 +275,12 @@ public class SavesActivity extends BaseActivity {
         //   另外三页（模组 / 地图 / 蓝图）都让它留着 —— 它只贡献 8dp 底部内边距，
         //   藏起来会让本页底部比那三页少一截（用户：「顶上和底下也不一样」）。
         if (empty) {
-            // ⚠️ 那句"还没有存档"**复用**导入那条资源（「槽「X」里还没有存档。」）—— 同一件事只留一句文案
+            // 第 164 轮：空态改用**页面专用**的 `saves_empty_fmt`（「槽「X」里还没有存档。」+ 一句提示），
+            //   与另外三页同一模板（主句 + 提示行）。★ 仍然**不**复用 `export_no_save_fmt`：
+            //   那句是导出失败时弹的，只有主句、不该带"档会出现在这里"。
             mEmpty.setText(filtering
                     ? Trans.get(SavesActivity.this, R.string.save_empty_filtered)
-                    : Trans.get(SavesActivity.this, R.string.export_no_save_fmt, mSlot));
+                    : Trans.get(SavesActivity.this, R.string.saves_empty_fmt, mSlot));
         }
     }
 

@@ -512,7 +512,7 @@
     <string name="maps_scan_failed">地图没清点出来。返回上一页再进一次试试。</string>
     <string name="maps_scanning">正在清点地图…</string>
     <string name="maps_title_fmt">槽「%1$s」的地图</string>
-    <string name="maps_counts_fmt">本槽 %1$d · 游戏自带 %2$d · 模组自带 %3$d</string>
+    <string name="maps_counts_fmt">本槽 %1$d 张 · 游戏自带 %2$d · 模组自带 %3$d</string>
     <!-- ★ 2026-10-04：这句原来"全工程零引用"（地图页没有空态），现在真的用上了。
          ⚠️ 同时**收短**：原来挤在一行里三句（"本槽没有，模组没自带，游戏自带的要等…"），
             空态只需要"为什么没有 + 下一步"两件事（对齐 empty_versions 的写法）。 -->
@@ -545,7 +545,9 @@
         （与「看看哪几份读不出来」那条同一个口径）。
     -->
     <string name="saves_list_title_fmt">槽「%1$s」的存档</string>
-    <string name="saves_list_head_fmt">共 %1$d 份 · 点一份看它是什么图</string>
+    <string name="saves_list_head_fmt">本槽 %1$d 份 · 点一份看它是什么图</string>
+    <!-- 第 164 轮：页面空态（**不是**导出那条 `export_no_save_fmt` —— 那句在导出里还要用，别动） -->
+    <string name="saves_empty_fmt">槽「%1$s」里还没有存档。\n在游戏里存的档会出现在这里。</string>
     <!--
       ★ 2026-10-07（第 122 轮）：存档列表的搜索 / 排序（口径见地图那一节）。
       ⚠️ 这一页**没有**"只看有问题的"：存档的"读不出来"已经有专用入口（上面那一行），
@@ -827,8 +829,8 @@
     <string name="bp_detail_title">蓝图详情</string>
     <string name="slot_page_blueprints">蓝图</string>
     <string name="slot_page_blueprints_sub">本槽与模组自带的蓝图</string>
-    <string name="bp_head_fmt">本槽 %1$d · 模组自带 %2$d</string>
-    <string name="bp_empty">本槽还没有蓝图，模组也没带。\n在游戏里存下来的蓝图会出现在这里。</string>
+    <string name="bp_head_fmt">本槽 %1$d 张 · 模组自带 %2$d</string>
+    <string name="bp_empty">槽「%1$s」里还没有蓝图。\n在游戏里存下来的蓝图会出现在这里。</string>
     <!--
       ★ 2026-10-07（第 122 轮）：蓝图列表的搜索 / 排序。
       ★ 这一页的"有问题的" = **缺件或解析不了**（判据见 Blueprints.isProblem）——
@@ -1531,8 +1533,8 @@
     <string name="act_mods_sub">版本要求 · 依赖 · 启停</string>
     <string name="mods_title">模组</string>
 
-    <string name="mods_summary_fmt">%1$d 个模组 · 槽 %2$s · 目标游戏 %3$s</string>
-    <string name="mods_summary_nogame_fmt">%1$d 个模组 · 槽 %2$s · 没有版本指向这个槽</string>
+    <string name="mods_summary_fmt">本槽 %1$d 个 · 目标游戏 %2$s</string>
+    <string name="mods_summary_nogame_fmt">本槽 %1$d 个 · 没有版本指向这个槽</string>
     <string name="mods_detail_fmt">模组目录\n%1$s\n\n游戏里的开关\n%2$s\n\n上次启动\n%3$s</string>
     <string name="mods_crash_yes">⚠ 上次启动没跑完。游戏若开着「启动崩溃后禁用模组」，会把全部模组跳过</string>
     <string name="mods_crash_no">上次启动正常跑完了</string>
@@ -1541,7 +1543,7 @@
     <string name="mods_row_slot_sub_fmt">正在看「%1$s」的模组</string>
     <string name="mods_slot_pick_title">看哪个槽的模组？</string>
 
-    <string name="mods_empty_fmt">这个槽里还没有模组。\n把 .jar / .zip 放进：\n%1$s</string>
+    <string name="mods_empty_fmt">槽「%1$s」里还没有模组。\n把 .jar / .zip 放进：\n%2$s</string>
     <string name="mods_ignored_fmt">另有 %1$d 个文件夹不会被加载（它们不是模组包）</string>
     <string name="mods_orphan_fmt">设置里还留着 %1$d 个模组的开关，但包已经不在（历史残留）</string>
     <string name="mods_broken_head">读不出说明文件的包（游戏会直接跳过）</string>
