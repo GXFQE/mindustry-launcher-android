@@ -25,7 +25,7 @@
 
     <!-- 主界面（F1b 卡片化：操作行拆「主标题 + 副标题」；顶部信息改「摘要 + 可展开详情」） -->
     <string name="main_summary_fmt">%1$d 个版本 · 当前槽 %2$s</string>
-    <string name="main_detail_fmt">存档数据\n%1$s\n\n启动器数据\n%2$s</string>
+    <string name="main_detail_fmt">存档数据\n%1$s\n\n管理器数据\n%2$s</string>
     <string name="act_add_game_title">添加游戏</string>
     <string name="act_add_game_sub">导入 APK 文件 · 扫描已安装的游戏</string>
     <string name="act_add_title">添加包名</string>
@@ -1139,7 +1139,7 @@
     <string name="zip_confirm_strip_fmt">\n\n（包外面套了一层「%1$s」，解包时会自动去掉）</string>
     <string name="zip_tag_native">\n\n里面有游戏的设置文件（游戏自带的「导出数据」也长这样）。</string>
     <string name="zip_tag_loose">\n\n里面是零散的存档 / 蓝图文件（没有 saves/ 这类目录）\u2014\u2014 会按类型放进对应目录。</string>
-    <string name="zip_tag_custom">\n\n没有游戏的设置文件 —— 像是本启动器导出的包。</string>
+    <string name="zip_tag_custom">\n\n没有游戏的设置文件 —— 像是本管理器导出的包。</string>
     <string name="zip_warn_unknown">看不出这是 Mindustry 的数据包。仍然要导入吗？</string>
     <string name="zip_warn_skipped_fmt">有 %1$d 个条目的路径不安全，会被跳过。</string>
     <!-- 通用：导入动作的确认按钮（zip 与 .msav 共用；非 gzip 的 .msav 用 import_anyway） -->
@@ -1283,7 +1283,7 @@
     <string name="storage_loading">正在统计…</string>
     <string name="storage_failed">统计失败 —— 返回上一页再进一次试试。</string>
     <string name="storage_total_fmt">这些数据合计占 %1$s</string>
-    <string name="storage_sec_app">启动器自身</string>
+    <string name="storage_sec_app">管理器自身</string>
     <string name="storage_app_import_fmt">导入的游戏包：%1$d 个 · %2$s</string>
     <string name="storage_app_natives_fmt">从游戏包里解出的运行库：%1$s</string>
     <string name="storage_app_plugins_fmt">插件：%1$d 个 · %2$s</string>
@@ -1430,10 +1430,9 @@
     <string name="storage_clear_none">没有临时分享文件。</string>
     <string name="storage_clear_fail">清理失败。</string>
 
-    <string name="about_fmt">版本 %1$s（内部编号 %2$d）\n包名 %3$s\n\n当前槽数据\n%4$s\n\n启动器数据\n%5$s</string>
+    <string name="about_fmt">版本 %1$s（内部编号 %2$d）\n包名 %3$s\n\n当前槽数据\n%4$s\n\n管理器数据\n%5$s</string>
 
     <!-- 第 175 轮：「关于」从设置页搬成独立二级页 -->
-    <string name="about_app_name">MDT 安卓启动器</string>
     <string name="about_summary_fmt">版本 %1$s（构建 %2$d）\n包名 %3$s</string>
     <string name="about_row_sub">版本、许可证与开源地址</string>
     <string name="about_section_links">开源与反馈</string>
@@ -1444,7 +1443,7 @@
     <string name="about_license_title">开源许可证</string>
     <string name="about_license_sub">GNU General Public License v3.0</string>
     <string name="about_section_data">数据位置</string>
-    <string name="about_data_fmt">当前槽数据\n%1$s\n\n启动器数据\n%2$s</string>
+    <string name="about_data_fmt">当前槽数据\n%1$s\n\n管理器数据\n%2$s</string>
     <string name="about_footer">版权所有 (C) 2026 GXFQE · GPL-3.0</string>
     <string name="about_link_failed">没有能打开这个链接的应用。</string>
 
@@ -1472,10 +1471,10 @@
 
     <!-- ══ F7 运行日志页 ══════════════════════════════════════════════════ -->
     <string name="act_logs_title">运行日志</string>
-    <string name="act_logs_sub">游戏日志 · 启动器报告 · 崩溃堆栈</string>
+    <string name="act_logs_sub">游戏日志 · 管理器报告 · 崩溃堆栈</string>
     <string name="log_title">运行日志</string>
     <string name="log_game_title">游戏日志</string>
-    <string name="log_hub_title">启动器日志</string>
+    <string name="log_hub_title">管理器日志</string>
     <string name="log_crash_title">崩溃报告</string>
     <string name="log_copy">复制</string>
     <string name="log_loading">正在读取…</string>
@@ -1514,7 +1513,7 @@
     <string name="crash_verdict_none_oom">看起来是内存不足（崩在申请内存那一步）—— 常见于内容 / 存档太多，而不是某个类找不到。</string>
     <string name="crash_verdict_none_nomods">这个槽里没有带代码（classes.dex）的模组，没有可归因的对象。</string>
     <string name="crash_verdict_weak_fmt">弱线索：「%1$s」—— %2$s</string>
-    <string name="crash_verdict_launcher">这是启动器自己的崩溃报告（不是游戏），不做模组归因。</string>
+    <string name="crash_verdict_launcher">这是管理器自己的崩溃报告（不是游戏），不做模组归因。</string>
     <string name="crash_verdict_broken_fmt">读不出这份报告（%1$s）。</string>
     <string name="crash_reason_empty">文件是空的</string>
     <string name="crash_reason_null">文件读不出来</string>
@@ -1525,7 +1524,7 @@
     <string name="crash_ev_not_loaded_fmt">%1$s（这次启动没加载它）</string>
 
     <!-- F23 第二批：把结论送到「导出文件」与「模组页」—— 结论不能只活在日志页上 -->
-    <string name="log_export_verdict">启动器对这份报告的判断：</string>
+    <string name="log_export_verdict">管理器对这份报告的判断：</string>
     <string name="mods_verdict_fmt">上次崩溃的判断：%1$s</string>
     <string name="log_copied_fmt">已复制%1$s</string>
     <string name="log_copy_empty">这里没有可复制的内容</string>
@@ -1538,7 +1537,7 @@
 
     <!-- F20：一键导出「全部日志」成一个文件（需求原文：「加一个一键导出所以日志的功能」） -->
     <string name="log_export">导出全部日志</string>
-    <string name="log_export_sub">游戏日志 + 启动器日志 + 崩溃报告</string>
+    <string name="log_export_sub">游戏日志 + 管理器日志 + 崩溃报告</string>
     <string name="log_export_ok_fmt">已导出 %1$s</string>
     <string name="log_export_fail_fmt">导出失败：%1$s</string>
     <string name="log_export_empty">还没有任何日志可导出</string>
@@ -1561,9 +1560,9 @@
     <string name="log_export_blank">（空文件）</string>
     <string name="log_export_big_fmt">（文件 %1$s，超出单份上限，只导出最后 %2$s）</string>
     <!-- ⚠️ 这八行是**导出文件的内容**（不是界面文案）：留给用户/我离线看，改格式前先想清楚 -->
-    <string name="log_export_head_fmt">MDT 启动器 · 全部日志导出\n导出时间：%1$s\n应用版本：%2$s\n当前槽：%3$s\n数据根：%4$s\nHUB：%5$s\n设备：%6$s\nABI：%7$s\n页大小：%8$s</string>
+    <string name="log_export_head_fmt">MDT 管理器 · 全部日志导出\n导出时间：%1$s\n应用版本：%2$s\n当前槽：%3$s\n数据根：%4$s\nHUB：%5$s\n设备：%6$s\nABI：%7$s\n页大小：%8$s</string>
     <string name="log_export_s1">① 游戏日志（当前槽的 last_log.txt）</string>
-    <string name="log_export_s2">② 启动器日志（hub/report-*.txt）</string>
+    <string name="log_export_s2">② 管理器日志（hub/report-*.txt）</string>
     <string name="log_export_s3_fmt">③ 崩溃报告（crashes/，共 %1$d 份）</string>
     <string name="log_export_sec_fmt">──────── %1$s（%2$s）────────</string>
 
@@ -1699,8 +1698,8 @@
     <string name="crash_alert_title">游戏崩了</string>
     <string name="crash_alert_toast_fmt">游戏崩了：%1$s</string>
     <!-- 启动器自己的报告（crash_*_launcher.txt）落在同一个目录 ⇒ 别叫它"游戏崩了" -->
-    <string name="crash_alert_title_launcher">启动器出错了</string>
-    <string name="crash_alert_toast_launcher_fmt">启动器出错了：%1$s</string>
+    <string name="crash_alert_title_launcher">管理器出错了</string>
+    <string name="crash_alert_toast_launcher_fmt">管理器出错了：%1$s</string>
     <string name="crash_alert_ignore_failed">没能忽略它 —— 详情见运行日志。</string>
     <string name="crash_alert_ignore">忽略它并再试</string>
     <string name="crash_alert_ignored_fmt">已忽略「%1$s」—— 直接启动试试（这次会加载其余的模组）</string>
@@ -1950,7 +1949,7 @@
     <string name="lang_dialog_title">翻译文件</string>
     <string name="lang_dialog_none_msg">还没有导入翻译文件。可以选一份 .properties 装上，也可以先导出模板自己翻译。</string>
     <string name="lang_row_title">翻译文件</string>
-    <string name="lang_row_none">用启动器自带的文字（跟随上面「语言」那一行）</string>
+    <string name="lang_row_none">用管理器自带的文字（跟随上面「语言」那一行）</string>
     <!-- 语言包三路失败的**人话**（原文只进日志） -->
     <string name="lang_pack_read_failed">这份文件读不出来 —— 换一份再试</string>
     <string name="lang_pack_install_failed">没能装上这份翻译文件</string>
@@ -2020,7 +2019,7 @@
         才知道里面装的是模组 / 地图 / 存档 / 蓝图（判据见 BatchIo.guessKind）。
     -->
     <string name="deeplink_reading">正在识别这个压缩包…</string>
-    <string name="deeplink_unrecognized">认不出这个文件是什么。支持：.msav 地图、.msch 蓝图，以及本启动器导出的整包 zip。</string>
+    <string name="deeplink_unrecognized">认不出这个文件是什么。支持：.msav 地图、.msch 蓝图，以及本管理器导出的整包 zip。</string>
     <string name="deeplink_zip_empty">这个压缩包里没有能导入的东西（模组 / 地图 / 存档 / 蓝图）。</string>
     <string name="deeplink_open_failed">读不到这个文件：可能已经不在了，或者本应用没有读取它的权限（新版安卓下「下载」这类公共目录里的文件本应用读不了，用文件管理器「分享 / 打开方式」发过来才行）。</string>
 
@@ -2059,7 +2058,7 @@
     <string name="version_type_official">原端</string>
     <string name="version_type_modded">改端</string>
     <string name="version_name_title">给这个版本命名</string>
-    <string name="version_name_msg">只改启动器里显示的名字（列表行、这里、继续上次都用它），不动 APK 本身。留空 = 恢复原名。</string>
+    <string name="version_name_msg">只改管理器里显示的名字（列表行、这里、继续上次都用它），不动 APK 本身。留空 = 恢复原名。</string>
     <string name="version_name_hint">例如：我的 MindustryX</string>
     <string name="version_name_reset">恢复原名</string>
     <string name="version_name_saved_fmt">已命名为「%1$s」</string>
@@ -2070,7 +2069,7 @@
     <string name="stats_export_working">正在准备导出文件…</string>
     <string name="stats_export_ok_fmt">已导出 %1$s（%2$s）</string>
     <string name="stats_export_fail_fmt">导出失败：%1$s</string>
-    <string name="stats_export_notice_fmt">由 MDT 安卓启动器导出 · %1$s · 数字口径见启动器的地图统计；如果看着不对，请把这个文件发回去</string>
+    <string name="stats_export_notice_fmt">由 MDT 管理器导出 · %1$s · 数字口径见管理器的地图统计；如果看着不对，请把这个文件发回去</string>
 
 
 

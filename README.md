@@ -1,10 +1,10 @@
 English · [简体中文](README.zh.md)
 
-# MDT Launcher — a multi-version launcher for Mindustry on Android
+# MDT Manager — a multi-version manager for Mindustry on Android
 
 The official Android build of Mindustry **only lets you keep one version installed** — install a
 second one and it overwrites the first. There is a single set of saves too, so switching versions
-pushes the old progress aside. This launcher gives every version its own **save slot**: several
+pushes the old progress aside. This manager gives every version its own **save slot**: several
 versions installed side by side, each with separate **saves / maps / blueprints / mods**.
 
 > ⚠️ **Pre-release only — the feature set is not finished.** The APK is on
@@ -18,7 +18,7 @@ versions installed side by side, each with separate **saves / maps / blueprints 
 
 ## What it solves
 
-| Official Android build | With this launcher |
+| Official Android build | With this manager |
 |---|---|
 | One version at a time — a second install overwrites the first; going back means reinstalling and moving saves by hand | Several versions installed side by side (159.7 / 160.4 / MindustryX X37 …), switch with one tap; **Continue** resumes the one you launched last |
 | Every version shares one set of data (saves / maps / mods / settings), so switching versions replaces it | Each version gets a **slot**: saves / maps / blueprints / mods / settings are fully independent |
@@ -29,11 +29,11 @@ versions installed side by side, each with separate **saves / maps / blueprints 
 | How much ore a map holds and where you can build can only be counted inside the game | The map page reports **ore / wall ore / buildable tiles / core zone**, and can export it as JSON / JSONL |
 | A blueprint only reports its size and block count; which blocks are missing you find out by building it | The list names the **missing blocks** (and where it is unsure) |
 | Exporting the whole data set takes the settings and login identities with it (the game does not separate them) | The **shareable package** strips login identities, server records and everything only useful to you |
-| New features only arrive when the official build ships them | Plug-ins can add abilities to the launcher (young: for now you install an APK by hand) |
+| New features only arrive when the official build ships them | Plug-ins can add abilities to the manager (young: for now you install an APK by hand) |
 
 **How it works**: the official APK is loaded **as-is, as a plug-in** — no repacking, no
 re-signing, no change to the game's package name. The game's own signature checks, save format and
-mod ecosystem are untouched; the launcher's only job is to give each version its own data root and
+mod ecosystem are untouched; the manager's only job is to give each version its own data root and
 point the game at that directory when it starts.
 
 ## Getting started
@@ -41,13 +41,13 @@ point the game at that directory when it starts.
 1. **Get a game APK yourself** — this repository **does not include** the game. Use the official
    Mindustry from the official channel, or a build such as MindustryX. (Heavily modified packages
    may not load.)
-2. **Install the launcher** — download it from
+2. **Install the manager** — download it from
    [Releases](https://github.com/GXFQE/mindustry-launcher-android/releases) (the one marked
    Pre-release), or build it yourself (see [Building](docs/DEVELOPING.md#构建)). It requires
    **Android 8.0 (API 26)** or newer; during development it was verified on a real device running
    **Android 16 (API 36)**.
 3. **Import and play**:
-   - Open the launcher → **Add game** and pick one of the two: **Import APK** to choose your APK
+   - Open the manager → **Add game** and pick one of the two: **Import APK** to choose your APK
      (a copy is made into the app's private directory), or **Add package name** to scan game
      versions already installed on the phone;
    - assign it a **slot** (use a different slot per version and the saves will not overwrite each
@@ -109,12 +109,12 @@ yourself — even just a few lines — see **Translation file** below.
 
 ### Plug-ins
 - The entry is the icon at the top right (right of the gear); install an APK to add abilities
-- Takes effect after a restart; the page offers **Restart the launcher now**
+- Takes effect after a restart; the page offers **Restart the manager now**
 - One row each: name · state · origin · what happens if it crashes
 - Open its page, enable / disable, delete, read its info
 - Can add an action row to almost every page (not the launch page or the plug-ins page)
 - Can read slots and content, settings, logs, the transfer station and the version list, and open files
-- A crash does not take the launcher down: retry / roll back / quarantine, and the page explains it
+- A crash does not take the manager down: retry / roll back / quarantine, and the page explains it
 
 ### Transfer station
 - Deleted things land here instead of disappearing
@@ -124,7 +124,7 @@ yourself — even just a few lines — see **Translation file** below.
 
 ### Logs and settings
 - Export logs unchanged, or scrubbed (paths / device / account details removed)
-- Runtime log page: launcher log, game log and crash reports in sections
+- Runtime log page: manager log, game log and crash reports in sections
 - Crash analysis: names the mod with its evidence, and says so when it cannot tell
 - Theme, language, translation file
 - Settings: default slot, crash alerts, crash reports to keep, trash retention, automatic cleanup, storage used
@@ -132,7 +132,7 @@ yourself — even just a few lines — see **Translation file** below.
 
 ## What is not there yet
 
-- **Networking**: map downloads, a forum panel, update checks, launcher self-updates — v1 is
+- **Networking**: map downloads, a forum panel, update checks, manager self-updates — v1 is
   local-only (scan what is installed, import your own). The game itself is unaffected: multiplayer,
   the server list and in-game downloads work as usual
 - **Plug-in distribution**: install an APK by hand; no store, no downloads, no update checks
@@ -143,7 +143,7 @@ yourself — even just a few lines — see **Translation file** below.
 - **Google Play**: loading another APK as a plug-in does not fit its policies; sideload only
 - **A built-in file manager**: imports and exports go through the system file picker (and this is not
   a general-purpose save manager)
-- **A plug-in sandbox**: plug-ins share the launcher's process; "what it touches" is a declaration,
+- **A plug-in sandbox**: plug-ins share the manager's process; "what it touches" is a declaration,
   not a permission wall — only install what you trust
 - **Bundling the game**: copyright stays with its authors — bring your own APK
 

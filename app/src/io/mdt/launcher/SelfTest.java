@@ -4718,10 +4718,10 @@ public final class SelfTest {
         ok(stat, L, !r4b.vanilla && r4b.mods.contains("neon"),
                 "★元断言：把 `none (vanilla)` 换成 `neon:110008` ⇒ 必须不再判成 vanilla");
 
-        // ── 夹具 5：**启动器自己**的崩溃报告（同一套 `crashes/` 目录里的另一种形态）──
-        //   ★ 第 150 轮：产品名统一成「MDT 启动器」（`Crash.dump` 写的首行也跟着改了）
+        // ── 夹具 5：**管理器自己**的崩溃报告（同一套 `crashes/` 目录里的另一种形态）──
+        //   ★ 第 176 轮：产品名统一成「MDT 管理器」（`Crash.dump` 写的首行也跟着改了）
         String fxOwn = fx(new String[]{
-                "MDT 启动器 —— 崩溃报告",
+                "MDT 管理器 —— 崩溃报告",
                 "时刻：Mon Oct 05 22:28:11 GMT+08:00 2026（1759674491000）",
                 "线程：main（id=1）",
                 "版本：0.3（vc 3，debuggable=false）",
@@ -4738,7 +4738,7 @@ public final class SelfTest {
                         CrashAnalysis.judge(r5, mods3, CrashAnalysis.DEX))));
         ok(stat, L, CrashAnalysis.judge(r5, mods3, fakeDexAll()).kind == CrashAnalysis.KIND_LAUNCHER,
                 "★元断言：哪怕给一把\"什么都能命中\"的探针，启动器的报告也不许被点名");
-        CrashAnalysis.Report r5b = CrashAnalysis.parse(fxOwn.replace("MDT 启动器 —— 崩溃报告",
+        CrashAnalysis.Report r5b = CrashAnalysis.parse(fxOwn.replace("MDT 管理器 —— 崩溃报告",
                 "Mindustry has crashed. How unfortunate."));
         ok(stat, L, !r5b.launcherOwn, "★元断言：首行不是我们的报告头 ⇒ 不再判成启动器报告");
 
@@ -13986,7 +13986,7 @@ public final class SelfTest {
         m.gameVersion = "160.4";
         m.tableRows = 600;
         m.mods = 2;
-        m.notice = "由 MDT 安卓启动器导出 · " + MapStatsExport.SITE;
+        m.notice = "由 MDT 管理器导出 · " + MapStatsExport.SITE;
         m.mode = mode;
         return m;
     }

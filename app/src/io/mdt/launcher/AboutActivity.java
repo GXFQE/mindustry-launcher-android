@@ -31,7 +31,7 @@ public final class AboutActivity extends BaseActivity {
         setTitle(Trans.get(this, R.string.about_card_title));
 
         android.view.View root = findViewById(R.id.root);
-        Trans.bind(root, R.id.about_app_name, R.string.about_app_name);
+        Trans.bind(root, R.id.about_app_name, R.string.app_name);
         Trans.bind(root, R.id.about_section_links, R.string.about_section_links);
         Trans.bind(root, R.id.about_section_data, R.string.about_section_data);
         Trans.bind(root, R.id.about_footer, R.string.about_footer);

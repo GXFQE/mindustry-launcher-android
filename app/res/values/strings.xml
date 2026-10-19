@@ -40,7 +40,7 @@
 
     <!-- 主界面（F1b 卡片化：操作行拆「主标题 + 副标题」；顶部信息改「摘要 + 可展开详情」） -->
     <string name="main_summary_fmt">%1$d versions · current slot %2$s</string>
-    <string name="main_detail_fmt">Save data\n%1$s\n\nLauncher data\n%2$s</string>
+    <string name="main_detail_fmt">Save data\n%1$s\n\nManager data\n%2$s</string>
     <string name="act_add_game_title">Add game</string>
     <string name="act_add_game_sub">Import an APK file · Scan installed games</string>
     <string name="act_add_title">Add package name</string>
@@ -1167,7 +1167,7 @@
     <string name="zip_confirm_strip_fmt">\n\n(The package has an extra \"%1$s\" wrapper, which is stripped when extracting)</string>
     <string name="zip_tag_native">\n\nIt contains the game settings file (the game\u0027s own \"Export data\" looks like this too).</string>
     <string name="zip_tag_loose">\n\nIt holds loose save / schematic files (no saves/ style folders) \u2014 they go into the matching folder by type.</string>
-    <string name="zip_tag_custom">\n\nNo game settings file — this looks like a package exported by this launcher.</string>
+    <string name="zip_tag_custom">\n\nNo game settings file — this looks like a package exported by this manager.</string>
     <string name="zip_warn_unknown">This does not look like a Mindustry data package. Import anyway?</string>
     <string name="zip_warn_skipped_fmt">%1$d entries have unsafe paths and will be skipped.</string>
     <!-- 通用：导入动作的确认按钮（zip 与 .msav 共用；非 gzip 的 .msav 用 import_anyway） -->
@@ -1317,7 +1317,7 @@
     <string name="storage_loading">Counting…</string>
     <string name="storage_failed">Could not measure storage — go back and open this again.</string>
     <string name="storage_total_fmt">These add up to %1$s</string>
-    <string name="storage_sec_app">The launcher itself</string>
+    <string name="storage_sec_app">The manager itself</string>
     <string name="storage_app_import_fmt">Imported game packages: %1$d · %2$s</string>
     <string name="storage_app_natives_fmt">Native libraries unpacked from them: %1$s</string>
     <string name="storage_app_plugins_fmt">Plugins: %1$d · %2$s</string>
@@ -1490,10 +1490,9 @@
     <string name="storage_clear_none">No temporary share files.</string>
     <string name="storage_clear_fail">Could not clear the cache.</string>
 
-    <string name="about_fmt">version %1$s (build %2$d)\npackage %3$s\n\nCurrent slot data\n%4$s\n\nLauncher data\n%5$s</string>
+    <string name="about_fmt">version %1$s (build %2$d)\npackage %3$s\n\nCurrent slot data\n%4$s\n\nManager data\n%5$s</string>
 
     <!-- 第 175 轮：「关于」从设置页搬成独立二级页 -->
-    <string name="about_app_name">MDT Launcher</string>
     <string name="about_summary_fmt">Version %1$s (build %2$d)\nPackage %3$s</string>
     <string name="about_row_sub">Version, licence and source code</string>
     <string name="about_section_links">Open source and feedback</string>
@@ -1504,7 +1503,7 @@
     <string name="about_license_title">Licence</string>
     <string name="about_license_sub">GNU General Public License v3.0</string>
     <string name="about_section_data">Data locations</string>
-    <string name="about_data_fmt">Current slot\n%1$s\n\nLauncher data\n%2$s</string>
+    <string name="about_data_fmt">Current slot\n%1$s\n\nManager data\n%2$s</string>
     <string name="about_footer">Copyright (C) 2026 GXFQE · GPL-3.0</string>
     <string name="about_link_failed">No app can open this link.</string>
     <string name="about_repo_url" translatable="false">https://github.com/GXFQE/mindustry-launcher-android</string>
@@ -1535,10 +1534,10 @@
 
     <!-- ══ F7 运行日志页 ══════════════════════════════════════════════════ -->
     <string name="act_logs_title">Runtime log</string>
-    <string name="act_logs_sub">Game log · launcher reports · crash stacks</string>
+    <string name="act_logs_sub">Game log · manager reports · crash stacks</string>
     <string name="log_title">Runtime log</string>
     <string name="log_game_title">Game log</string>
-    <string name="log_hub_title">Launcher log</string>
+    <string name="log_hub_title">Manager log</string>
     <string name="log_crash_title">Crash reports</string>
     <string name="log_copy">Copy</string>
     <string name="log_loading">Reading…</string>
@@ -1582,7 +1581,7 @@
     <string name="crash_verdict_none_oom">This looks like running out of memory (it crashed while allocating) — usually too much content loaded, not a missing class or a changed interface.</string>
     <string name="crash_verdict_none_nomods">There is no mod with code (classes.dex) in this slot, so there is nothing to blame.</string>
     <string name="crash_verdict_weak_fmt">Weak lead: \"%1$s\" — %2$s</string>
-    <string name="crash_verdict_launcher">This report was written by the launcher itself, not by the game — no mod attribution.</string>
+    <string name="crash_verdict_launcher">This report was written by the manager itself, not by the game — no mod attribution.</string>
     <string name="crash_verdict_broken_fmt">Could not read this report (%1$s).</string>
     <string name="crash_reason_empty">the file is empty</string>
     <string name="crash_reason_null">the file could not be read</string>
@@ -1593,7 +1592,7 @@
     <string name="crash_ev_not_loaded_fmt">%1$s (it was not loaded in that launch)</string>
 
     <!-- F23 第二批：把结论送到"导出文件"与"模组页" —— 结论不能只活在日志页上 -->
-    <string name="log_export_verdict">What the launcher made of this report:</string>
+    <string name="log_export_verdict">What the manager made of this report:</string>
     <string name="mods_verdict_fmt">Verdict on the last crash: %1$s</string>
     <string name="log_copied_fmt">Copied %1$s</string>
     <string name="log_copy_empty">Nothing to copy here</string>
@@ -1606,7 +1605,7 @@
 
     <!-- F20：一键导出「全部日志」成一个文件（需求原文：「加一个一键导出所以日志的功能」） -->
     <string name="log_export">Export all logs</string>
-    <string name="log_export_sub">Game log + launcher logs + crash reports</string>
+    <string name="log_export_sub">Game log + manager logs + crash reports</string>
     <string name="log_export_ok_fmt">Exported %1$s</string>
     <string name="log_export_fail_fmt">Export failed: %1$s</string>
     <string name="log_export_empty">No logs to export yet</string>
@@ -1629,9 +1628,9 @@
     <string name="log_export_blank">(empty file)</string>
     <string name="log_export_big_fmt">(file %1$s exceeds the per-file limit, exporting only the last %2$s)</string>
     <!-- ⚠️ 这八行是**导出文件的内容**（不是界面文案）：留给用户/我离线看，改格式前先想清楚 -->
-    <string name="log_export_head_fmt">MDT Launcher · full log export\nexported at: %1$s\napp version: %2$s\ncurrent slot: %3$s\ndata root: %4$s\nHUB: %5$s\ndevice: %6$s\nABI: %7$s\npage size: %8$s</string>
+    <string name="log_export_head_fmt">MDT Manager · full log export\nexported at: %1$s\napp version: %2$s\ncurrent slot: %3$s\ndata root: %4$s\nHUB: %5$s\ndevice: %6$s\nABI: %7$s\npage size: %8$s</string>
     <string name="log_export_s1">(1) Game log (last_log.txt of the current slot)</string>
-    <string name="log_export_s2">(2) Launcher logs (hub/report-*.txt)</string>
+    <string name="log_export_s2">(2) Manager logs (hub/report-*.txt)</string>
     <string name="log_export_s3_fmt">(3) Crash reports (crashes/, %1$d files)</string>
     <string name="log_export_sec_fmt">──────── %1$s (%2$s) ────────</string>
 
@@ -1761,8 +1760,8 @@
     <string name="crash_alert_title">The game crashed</string>
     <string name="crash_alert_toast_fmt">The game crashed: %1$s</string>
     <!-- Launcher's own report (crash_*_launcher.txt) lands in the same folder: do not call it "the game". -->
-    <string name="crash_alert_title_launcher">The launcher hit an error</string>
-    <string name="crash_alert_toast_launcher_fmt">The launcher hit an error: %1$s</string>
+    <string name="crash_alert_title_launcher">The manager hit an error</string>
+    <string name="crash_alert_toast_launcher_fmt">The manager hit an error: %1$s</string>
     <string name="crash_alert_ignore_failed">Could not ignore it — see the runtime log for details.</string>
     <string name="crash_alert_ignore">Ignore it and retry</string>
     <string name="crash_alert_ignored_fmt">ignored %1$s - just launch again (the rest of the mods will load this time)</string>
@@ -2065,7 +2064,7 @@
         才知道里面装的是模组 / 地图 / 存档 / 蓝图（判据见 BatchIo.guessKind）。
     -->
     <string name="deeplink_reading">Reading this zip…</string>
-    <string name="deeplink_unrecognized">Cannot tell what this file is. Supported: .msav maps, .msch blueprints, and bundle zips exported by this launcher.</string>
+    <string name="deeplink_unrecognized">Cannot tell what this file is. Supported: .msav maps, .msch blueprints, and bundle zips exported by this manager.</string>
     <string name="deeplink_zip_empty">Nothing importable inside this zip (mods / maps / saves / blueprints).</string>
     <string name="deeplink_open_failed">Cannot read this file. It may be gone, or this app has no permission to read it (files in shared folders such as Download are not readable by this app on newer Android versions - share them through a file manager instead).</string>
 
@@ -2107,7 +2106,7 @@
     <string name="version_type_official">Vanilla</string>
     <string name="version_type_modded">Modded</string>
     <string name="version_name_title">Name this version</string>
-    <string name="version_name_msg">Only changes the name shown in the launcher (list row, here, and Continue). The APK itself is untouched. Leave empty to restore the original name.</string>
+    <string name="version_name_msg">Only changes the name shown in the manager (list row, here, and Continue). The APK itself is untouched. Leave empty to restore the original name.</string>
     <string name="version_name_hint">For example: My MindustryX</string>
     <string name="version_name_reset">Restore original</string>
     <string name="version_name_saved_fmt">Named it \"%1$s\"</string>
@@ -2118,7 +2117,7 @@
     <string name="stats_export_working">Preparing the file…</string>
     <string name="stats_export_ok_fmt">Exported %1$s (%2$s)</string>
     <string name="stats_export_fail_fmt">Could not export: %1$s</string>
-    <string name="stats_export_notice_fmt">Exported by MDT Launcher for Android · %1$s · these numbers follow the map-stat rules of the launcher; if they look wrong, send this file back</string>
+    <string name="stats_export_notice_fmt">Exported by MDT Manager for Android · %1$s · these numbers follow the map-stat rules of the manager; if they look wrong, send this file back</string>
 
 
 

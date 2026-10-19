@@ -33,7 +33,7 @@ public final class MapStatsExport {
     /** 文件格式版本（**加字段不改它；改口径/改字段含义才升**） */
     public static final String FORMAT = "mdt-mapstats/1";
     /** 生成者（数据字段，**不跟界面语言走** —— 收数据的人要能一眼认出是谁导的） */
-    public static final String GENERATOR = "MDT Launcher for Android";
+    public static final String GENERATOR = "MDT Manager for Android";
     /** 项目地址（宣传位；同时也是"数据有问题往哪报"） */
     public static final String SITE = "https://github.com/GXFQE/mindustry-launcher-android";
 
