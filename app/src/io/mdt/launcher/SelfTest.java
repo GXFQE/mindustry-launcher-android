@@ -148,7 +148,8 @@ public final class SelfTest {
             MainActivity.class, SlotsActivity.class, SlotActivity.class, ModsActivity.class,
             MapsActivity.class, MapDetailActivity.class, SettingsActivity.class,
             LogActivity.class, TrashActivity.class, BlueprintsActivity.class,
-            BlueprintDetailActivity.class, GameSlot.class, SavesActivity.class, PluginsActivity.class};
+            BlueprintDetailActivity.class, GameSlot.class, SavesActivity.class, PluginsActivity.class,
+            ResourcesActivity.class};
 
     /**
      * ★★ 有「向上」箭头的页面 = 清单里**声明了父级的**（2026-10-16 用户报的：模组页回主页面、
@@ -169,7 +170,8 @@ public final class SelfTest {
             {SettingsActivity.class, "MainActivity"},
             {LogActivity.class, "SettingsActivity"},
             {TrashActivity.class, "MainActivity"},
-            {PluginsActivity.class, "MainActivity"}};
+            {PluginsActivity.class, "MainActivity"},
+            {ResourcesActivity.class, "MainActivity"}};
 
     /** 主页面与游戏页：**不许**有父级（有的话主页面会平白多出一个返回箭头） */
     private static final Class<?>[] PAGES_WITHOUT_UP = {MainActivity.class, GameSlot.class};
@@ -274,6 +276,8 @@ public final class SelfTest {
             mapCrud(ctx, L, stat);
             // ★ ㉚ F10 地图导出：包内条目流式拷出（字节一致 + 两向反向 + 元断言）
             mapExport(ctx, L, stat);
+            // ★ 第 171 轮：游戏资源页的数据层（类型分组 + 只导出勾选类型 + 路径保留）
+            gameAssets(ctx, L, stat);
             // ★ ㉛ 页面骨架：根节点必须带 @id/root（补 insets 的落点）+ 地图页两行都在顶上
             pageSkeleton(ctx, L, stat);
             // ★ ㉜ F21 地图资源统计：纯函数 + 现场造的小地图（不碰磁盘、不依赖别的用例）
@@ -9816,7 +9820,7 @@ public final class SelfTest {
                 "io.mdt.launcher.MapsActivity", "io.mdt.launcher.MapDetailActivity",
                 "io.mdt.launcher.BlueprintsActivity", "io.mdt.launcher.BlueprintDetailActivity",
                 "io.mdt.launcher.TrashActivity", "io.mdt.launcher.SavesActivity",
-                "io.mdt.launcher.PluginsActivity"};
+                "io.mdt.launcher.PluginsActivity", "io.mdt.launcher.ResourcesActivity"};
         int found = 0;
         for (String n : want) {
             if (canResolve(ctx, n)) found++;
@@ -9979,6 +9983,141 @@ public final class SelfTest {
         L.add("");
     }
 
+    /**
+     * 第 171 轮：游戏资源页的数据层。
+     *
+     * <p>三件事都必须有分辨力：
+     * <ol>
+     *   <li>**只扫 `assets/`**：`classes.dex` / `lib/` 不许混进来；</li>
+     *   <li>**按类型选**：勾「贴图」导出的 zip 里不许出现音频（用户原话：要贴图不想被塞一堆音频）；</li>
+     *   <li>**路径保留**：zip 条目名必须是 `assets/sprites/...`，不能扁平化成
+     *       `assets_sprites_...`（那样解包后全挤在一层）。</li>
+     * </ol>
+     *
+     * <p>另配一条反向：条目在扫描后消失 ⇒ 跳过并计入 `skipped`，但已有条目照写；
+     * 以及 `zipName` 的空值 / 中文兜底 —— 文件名不能变成空串或带路径分隔符。
+     */
+    private static void gameAssets(Context ctx, List<String> L, int[] stat) {
+        L.add("── ㉚b 游戏资源页（类型分组 + 只导出勾选类型 + 路径保留）──");
+        File root = new File(Paths.privateDir(ctx), "selftest-assets");
+        deleteTree(root);
+        if (!root.isDirectory() && !root.mkdirs()) {
+            ok(stat, L, false, "建临时目录失败：" + root);
+            return;
+        }
+        try {
+            File apk = new File(root, "game.apk");
+            String[][] files = {
+                    {"assets/sprites/sprites.aatls", "AATLS"},
+                    {"assets/sprites/sprites.png", "PNG"},
+                    {"assets/sounds/click.ogg", "OGG1"},
+                    {"assets/music/theme.ogg", "OGG2"},
+                    {"assets/maps/a.msav", "MSAV"},
+                    {"assets/bundles/bundle.properties", "KEY=VALUE"},
+                    {"assets/fonts/font.ttf", "TTF"},
+                    {"assets/icons/icon_64.png", "ICON"},
+                    {"assets/cubemaps/stars/front.png", "CUBE"},
+                    {"assets/baseparts/1.msch", "MSCH"},
+                    {"assets/shaders/a.frag", "SHADER"},
+                    {"assets/scripts/a.js", "SCRIPT"},
+                    {"assets/root.dat", "ROOT"},
+                    {"classes.dex", "DEX"},
+                    {"lib/arm64-v8a/libx.so", "SO"},
+            };
+            java.util.zip.ZipOutputStream zos =
+                    new java.util.zip.ZipOutputStream(new FileOutputStream(apk));
+            try {
+                for (String[] f : files) {
+                    zos.putNextEntry(new ZipEntry(f[0]));
+                    zos.write(f[1].getBytes("UTF-8"));
+                    zos.closeEntry();
+                }
+            } finally {
+                zos.close();
+            }
+
+            GameAssets.Catalog c = GameAssets.scan(apk);
+            ok(stat, L, c.entries == 13,
+                    "★只数 assets/：13 条（classes.dex / lib 不算）—— 实际 " + c.entries);
+            ok(stat, L, c.groups.size() == 12,
+                    "★12 类（贴图/音效/音乐/地图/文本/字体/图标/星空图/蓝图素材/着色器/脚本/其他）—— 实际 "
+                            + c.groups.size());
+            GameAssets.Group sp = c.group(GameAssets.GROUP_SPRITES);
+            ok(stat, L, sp != null && sp.count() == 2 && sp.bytes == 8,
+                    "★贴图类 2 条 / 8 B（AATLS + PNG）");
+            ok(stat, L, GameAssets.GROUP_OTHER.equals(GameAssets.groupOf("assets/root.dat"))
+                            && GameAssets.GROUP_SPRITES.equals(
+                                    GameAssets.groupOf("assets/sprites-override/logo.png")),
+                    "★特殊落点：根级 data → other；sprites-override → 贴图");
+
+            List<String> keys = new ArrayList<String>();
+            keys.add(GameAssets.GROUP_SPRITES);
+            List<GameAssets.Entry> sel = c.selected(keys);
+            boolean noAudio = true;
+            for (GameAssets.Entry e : sel) {
+                if (e.name.contains("/sounds/") || e.name.contains("/music/")) noAudio = false;
+            }
+            ok(stat, L, sel.size() == 2 && noAudio,
+                    "★勾贴图 ⇒ 只有 2 条贴图，**没有**音频（反向判据）");
+
+            List<String> names = new ArrayList<String>();
+            for (GameAssets.Entry e : sel) names.add(e.name);
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            Exporter.Result r = Exporter.zipEntriesTo(ctx, out, apk, names,
+                    new Exporter.Result(), null);
+            ok(stat, L, r.files == 2 && r.rawBytes == 8,
+                    "★导出贴图 zip：2 条 / 8 B（实际 " + r.files + " / " + r.rawBytes + "）");
+
+            java.util.zip.ZipInputStream zin = new java.util.zip.ZipInputStream(
+                    new ByteArrayInputStream(out.toByteArray()));
+            int n = 0;
+            boolean pathsOk = true;
+            boolean audio = false;
+            java.util.Map<String, String> got = new java.util.HashMap<String, String>();
+            try {
+                ZipEntry ze;
+                while ((ze = zin.getNextEntry()) != null) {
+                    n++;
+                    String name = ze.getName();
+                    if (!name.startsWith("assets/sprites/")) pathsOk = false;
+                    if (name.contains("/sounds/") || name.contains("/music/")) audio = true;
+                    ByteArrayOutputStream b = new ByteArrayOutputStream();
+                    byte[] buf = new byte[256];
+                    int k;
+                    while ((k = zin.read(buf)) > 0) b.write(buf, 0, k);
+                    got.put(name, b.toString("UTF-8"));
+                }
+            } finally {
+                zin.close();
+            }
+            ok(stat, L, n == 2 && pathsOk && !audio,
+                    "★zip 条目名保留 `assets/sprites/...` 路径，且没有音频");
+            ok(stat, L, "AATLS".equals(got.get("assets/sprites/sprites.aatls"))
+                            && "PNG".equals(got.get("assets/sprites/sprites.png")),
+                    "★条目内容逐字节一致（AATLS / PNG）");
+
+            // 反向：扫描后条目消失 ⇒ 跳过，已有条目照写（不是整包失败）
+            List<String> withMissing = new ArrayList<String>(names);
+            withMissing.add("assets/sprites/not-there.png");
+            Exporter.Result r2 = Exporter.zipEntriesTo(ctx, new ByteArrayOutputStream(), apk,
+                    withMissing, new Exporter.Result(), null);
+            ok(stat, L, r2.files == 2 && r2.skipped == 1,
+                    "★反向：缺失条目被跳过（files=2 / skipped=1），不拖垮已有条目");
+
+            ok(stat, L, "Mindustry-2026.09.X37-sprites.zip".equals(
+                            GameAssets.zipName("2026.09.X37", keys)),
+                    "★zip 文件名：版本 + 选中类型");
+            ok(stat, L, "Mindustry-game-sprites.zip".equals(
+                            GameAssets.zipName("中文版本名", keys)),
+                    "★zip 文件名：非 ASCII 版本名兜底成 game");
+        } catch (Throwable t) {
+            ok(stat, L, false, "游戏资源用例自身异常：" + t);
+        } finally {
+            deleteTree(root);
+        }
+        L.add("");
+    }
+
     /** 拷贝**必须**失败时返回异常消息；成功返回 null（调用方据此判死） */
     private static String failOfCopy(Context ctx, File container, String entry) {
         try {
@@ -10012,7 +10151,7 @@ public final class SelfTest {
                 // ★ 2026-10-12（第 132 轮）：插件页。第一版是**纯代码建视图**、没走这条骨架，
                 //   真机实测就是"标题落在 [52,52]（顶栏 136~292）⇒ 有文字但看不见"——
                 //   与第 81 轮地图页同一个坑 ⇒ 改成 XML 骨架并补进这份名单（名单漏了不会有症状）。
-                R.layout.activity_plugins};
+                R.layout.activity_plugins, R.layout.activity_resources};
         android.view.LayoutInflater inf = android.view.LayoutInflater.from(ctx);
         int good = 0;
         StringBuilder bad = new StringBuilder();

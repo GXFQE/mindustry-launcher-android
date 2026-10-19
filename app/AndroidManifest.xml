@@ -172,6 +172,17 @@
             android:theme="@style/AppTheme"
             android:parentActivityName=".MainActivity"
             android:label="@string/plugin_page_title" />
+        <!--
+          第 171 轮：游戏资源页（长按版本 → 详情里的「资源」）。
+          只读版本 APK 的 assets/，按类型勾选后导出一个 zip。
+          ⚠️ **必须注册**：aapt2 不检查引用，漏了照样 BUILD OK，真机一点就崩（自检 ㉙ 盯着）。
+        -->
+        <activity
+            android:name=".ResourcesActivity"
+            android:exported="false"
+            android:theme="@style/AppTheme"
+            android:parentActivityName=".MainActivity"
+            android:label="@string/resources_title" />
         <activity
             android:name=".MainActivity"
             android:exported="true"

@@ -1301,19 +1301,31 @@ public class MainActivity extends BaseActivity {
         AlertDialog.Builder b = new AlertDialog.Builder(this)
                 .setTitle(e.displayName(this))
                 .setMessage(head + Trans.get(MainActivity.this, R.string.detail_probing))
-                .setPositiveButton(R.string.close, null);
+                // ★ 第 171 轮：资源是按版本走的 ⇒ 放在版本详情里，省一次「选哪个版本」。
+                //   导入项（屏幕左→右）：删除 / 命名 / 资源；已装项：槽 / 关闭 / 资源。
+                //   ⚠️ 导入项没有「关闭」按钮：三个位置被资源 / 命名 / 删除占满，
+                //      点弹窗外面或按返回即可关闭（与现有可取消行为一致）。
+                .setPositiveButton(R.string.resources_btn, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int w) {
+                        openResources(e);
+                    }
+                });
         // ★ 第三个按钮：**导入项给「命名」**（2026-10-16 用户选的形状）——
         //   换槽在列表行上本来就有按钮（常用动作不该多一层），详情里这个位置留给命名。
         //   已装版本没得命名（那是系统里那一份）⇒ 保持原来的「槽」。
         if (e.imported) {
-            b.setNeutralButton(R.string.version_name_btn, new DialogInterface.OnClickListener() {
-                @Override public void onClick(DialogInterface d, int w) {
-                    promptRename(e);
-                }
-            });
-            b.setNegativeButton(R.string.delete, new DialogInterface.OnClickListener() {
+            // 🔴 本 ROM（HONOR）的 AlertDialog 屏幕顺序是 neutral / negative / positive
+            //   （AGENTS §90.6：按钮 id 与屏幕排列对不上）⇒ **破坏性动作放 neutral（最左）**，
+            //   所以删除走 neutral、命名走 negative。别再按“negative 在左”的常识换回去：
+            //   换回去删除就会落在正中间（用户 2026-10-19 当场抓过）。
+            b.setNeutralButton(R.string.delete, new DialogInterface.OnClickListener() {
                 @Override public void onClick(DialogInterface d, int w) {
                     confirmDeleteImport(e);
+                }
+            });
+            b.setNegativeButton(R.string.version_name_btn, new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface d, int w) {
+                    promptRename(e);
                 }
             });
         } else {
@@ -1322,6 +1334,7 @@ public class MainActivity extends BaseActivity {
                     pickSlot(e);
                 }
             });
+            b.setNegativeButton(R.string.close, null);
         }
         final AlertDialog dlg = b.create();
         dlg.show();
@@ -1394,6 +1407,24 @@ public class MainActivity extends BaseActivity {
         }
         if (code > 0) sb.append(Trans.get(MainActivity.this, R.string.detail_build_fmt, code));
         return sb.toString();
+    }
+
+    /**
+     * 第 171 轮：从版本详情打开「游戏资源」。
+     *
+     * <p>只传**定位信息**（APK 路径 + 显示名 + 显示版本号），不传 Entry 对象；
+     * 资源页自己读包，不依赖列表里的任何缓存。路径拿不到就明确说“读不了”，不猜。
+     */
+    private void openResources(final Versions.Entry e) {
+        if (e == null || e.apkPath == null || e.apkPath.trim().isEmpty()) {
+            Toast.makeText(this, R.string.resources_unreadable, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        Intent i = new Intent(this, ResourcesActivity.class);
+        i.putExtra(ResourcesActivity.EXTRA_APK, e.apkPath);
+        i.putExtra(ResourcesActivity.EXTRA_NAME, e.displayName(this));
+        i.putExtra(ResourcesActivity.EXTRA_VERSION, e.displayVersion());
+        startActivity(i);
     }
 
     private void confirmDeleteImport(final Versions.Entry e) {

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  游戏资源页（第 171 轮）中文文案。
+  ★ 与 values/strings-resources.xml 逐键对应；占位符序号 / 类型必须一致
+    （Trans 的装包门禁与 RES-02 都按这两份比）。
+-->
+<resources>
+    <string name="resources_btn">资源</string>
+    <string name="resources_title">游戏资源</string>
+    <string name="resources_total_fmt">%1$d 个文件 · %2$s</string>
+    <string name="resources_note">勾选要导出的类型；zip 里只放勾选的类型。贴图导出的是整页图集，不是单张精灵图。</string>
+    <string name="resources_group_line_fmt">%1$d 个文件 · %2$s</string>
+    <string name="resources_group_sprites">贴图 / 图集</string>
+    <string name="resources_group_sounds">音效</string>
+    <string name="resources_group_music">音乐</string>
+    <string name="resources_group_maps">地图</string>
+    <string name="resources_group_bundles">语言 / 文本</string>
+    <string name="resources_group_fonts">字体</string>
+    <string name="resources_group_icons">图标</string>
+    <string name="resources_group_cubemaps">星空图</string>
+    <string name="resources_group_baseparts">蓝图素材</string>
+    <string name="resources_group_shaders">着色器</string>
+    <string name="resources_group_scripts">脚本</string>
+    <string name="resources_group_other">其他</string>
+    <string name="resources_selected_none">未选类型</string>
+    <string name="resources_selected_fmt">已选 %1$d 类 · 约 %2$s</string>
+    <string name="resources_select_all">全选</string>
+    <string name="resources_select_none">全不选</string>
+    <string name="resources_export">导出选中</string>
+    <string name="resources_scanning">正在读包…</string>
+    <string name="resources_unreadable">读不了这个包。</string>
+    <string name="resources_no_assets">这个包里没有 assets/ 资源。</string>
+    <string name="resources_exporting">正在导出…</string>
+    <string name="resources_progress_fmt">正在写入 %1$d / %2$d…</string>
+    <string name="resources_export_ok_fmt">已导出 %1$d 个文件（%2$s）。</string>
+    <string name="resources_export_error">导出选中的资源失败。</string>
+</resources>

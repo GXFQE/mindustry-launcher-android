@@ -174,6 +174,100 @@ public final class Exporter {
         return n;
     }
 
+    /**
+     * 把**容器（APK / zip）里的一批原始条目**原样打成一个 zip（第 171 轮，游戏资源页）。
+     *
+     * <p>与 {@link #zipSources} 的区别：这里吃的是**条目名**，不是 {@code Src}；
+     * 条目名**按原样保留**（`assets/sprites/...` 的目录形状不扁平化），因为用户拿到的
+     * 应该是能直接看出“这是哪一类游戏资源”的包。
+     *
+     * <p>★ 仍然是流式：681 条 / 78 MB 也不会把内容读进内存。
+     * <p>⚠️ 条目在扫描后消失了（包被换掉 / 损坏）就**跳过**并计入 {@link Result#skipped}；
+     * 只有一条都没写出来才抛错 —— 不拿“写了 0 条”伪装成功。
+     */
+    public static Result zipEntries(Context ctx, Uri uri, File container,
+                                    List<String> entries, Step step) throws IOException {
+        Result r = new Result();
+        Counting counter = new Counting(openOut(ctx, uri));
+        try {
+            zipEntriesTo(ctx, counter, container, entries, r, step);
+        } catch (IOException e) {
+            // `zipEntriesTo` 在“一条都没写出来”之前可能还没建 ZipOutputStream；
+            // 这时 SAF 流还在我们手里，必须自己关（否则目标文件留一个半开句柄）。
+            closeQuietly(counter);
+            throw e;
+        }
+        r.outBytes = counter.n;
+        Log.i(TAG, "export assets zip ok: files=" + r.files + " raw=" + r.rawBytes
+                + " out=" + r.outBytes);
+        return r;
+    }
+
+    /** 与 SAF 解耦的版本（自检直接喂 {@link java.io.ByteArrayOutputStream}）。 */
+    static Result zipEntriesTo(Context ctx, OutputStream raw, File container,
+                               List<String> entries, Result r, Step step) throws IOException {
+        if (r == null) r = new Result();
+        if (container == null || !container.isFile()) {
+            throw new IOException(Trans.get(ctx, R.string.exp_err_pkg_missing_fmt,
+                    String.valueOf(container)));
+        }
+        if (entries == null || entries.isEmpty()) {
+            throw new IOException(Trans.get(ctx, R.string.exp_err_no_src));
+        }
+        java.util.zip.ZipFile zf = null;
+        ZipOutputStream zos = null;
+        try {
+            zf = new java.util.zip.ZipFile(container);
+            zos = new ZipOutputStream(new BufferedOutputStream(raw, BUF));
+            zos.setLevel(Deflater.BEST_SPEED);
+            int seen = 0;
+            int total = entries.size();
+            for (String name : entries) {
+                seen++;
+                if (name == null || name.trim().isEmpty()) {
+                    if (step != null) step.onStep(seen, total);
+                    continue;
+                }
+                java.util.zip.ZipEntry ze = zf.getEntry(name);
+                if (ze == null || ze.isDirectory()) {
+                    r.skipped++;
+                    if (step != null) step.onStep(seen, total);
+                    continue;
+                }
+                ZipEntry out = new ZipEntry(name);
+                long t = ze.getTime();
+                // 同 addTree：1980 之前 / 2107 之后的时间会让 setTime 抛 IllegalArgumentException
+                if (t >= 315532800000L && t <= 4354819199000L) out.setTime(t);
+                zos.putNextEntry(out);
+                InputStream in = null;
+                try {
+                    in = zf.getInputStream(ze);
+                    byte[] buf = new byte[BUF];
+                    int n;
+                    while ((n = in.read(buf)) > 0) {
+                        zos.write(buf, 0, n);
+                        r.rawBytes += n;
+                    }
+                } finally {
+                    closeQuietly(in);
+                }
+                zos.closeEntry();
+                r.files++;
+                if (step != null) step.onStep(seen, total);
+            }
+            if (r.files == 0) throw new IOException(Trans.get(ctx, R.string.exp_err_no_src));
+        } finally {
+            closeQuietly(zos);      // 必须关：zip 的中央目录在 close 时才写
+            if (zf != null) {
+                try {
+                    zf.close();
+                } catch (Throwable ignored) {
+                }
+            }
+        }
+        return r;
+    }
+
     // ── 批量导出（多份 → 一个 zip；第 127 轮） ───────────────────────────────
 
     /**

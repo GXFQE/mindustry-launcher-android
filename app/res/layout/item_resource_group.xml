@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  游戏资源页的一类（第 171 轮）。
+  ★ 整行是 CheckBox 的文字区：点标题就能勾；副标题只是说明，不单独做点击目标 ——
+    与 dialog_policy 的「开关 + 说明」同一节奏，避免再写一套触摸处理。
+  ★ CheckBox 的 text / 副标题都由 Activity 用 Trans 写入，XML 里不写 android:text。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingStart="14dp"
+    android:paddingEnd="14dp"
+    android:paddingTop="10dp"
+    android:paddingBottom="10dp">
+
+    <CheckBox
+        android:id="@+id/resources_group_check"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textColor="@color/fg"
+        android:textSize="15sp" />
+
+    <TextView
+        android:id="@+id/resources_group_sub"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="36dp"
+        android:paddingTop="1dp"
+        android:lineSpacingExtra="2dp"
+        android:textColor="@color/fg_muted"
+        android:textSize="12sp" />
+</LinearLayout>

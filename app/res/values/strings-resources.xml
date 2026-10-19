@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  游戏资源页（第 171 轮）：长按版本 → 详情里的「资源」→ 按类型勾选 → 导出 zip。
+
+  ★ 为什么单独一个文件：这一页的文案与版本列表 / 插件页分开，改的时候不往
+    两份 2000 行的 strings.xml 里塞；aapt2 会把它们并进同一个 resources.arsc。
+  ★ 纪律与主 strings.xml 相同：只放用户可见文案；带参数的用 %1$s / %1$d；
+    英文值里不写撇号（aapt2 / 语言包校验的边界）。
+-->
+<resources>
+    <string name="resources_btn">Assets</string>
+    <string name="resources_title">Game assets</string>
+    <string name="resources_total_fmt">%1$d files · %2$s</string>
+    <string name="resources_note">Pick the types to export. Only checked types go into the zip. Sprites are whole atlas pages, not individual images.</string>
+    <string name="resources_group_line_fmt">%1$d files · %2$s</string>
+    <string name="resources_group_sprites">Sprites / atlases</string>
+    <string name="resources_group_sounds">Sound effects</string>
+    <string name="resources_group_music">Music</string>
+    <string name="resources_group_maps">Maps</string>
+    <string name="resources_group_bundles">Text / bundles</string>
+    <string name="resources_group_fonts">Fonts</string>
+    <string name="resources_group_icons">Icons</string>
+    <string name="resources_group_cubemaps">Cubemaps</string>
+    <string name="resources_group_baseparts">Base schematics</string>
+    <string name="resources_group_shaders">Shaders</string>
+    <string name="resources_group_scripts">Scripts</string>
+    <string name="resources_group_other">Other</string>
+    <string name="resources_selected_none">No type selected</string>
+    <string name="resources_selected_fmt">Selected %1$d types · about %2$s</string>
+    <string name="resources_select_all">Select all</string>
+    <string name="resources_select_none">Select none</string>
+    <string name="resources_export">Export selected</string>
+    <string name="resources_scanning">Reading package…</string>
+    <string name="resources_unreadable">Cannot read this package.</string>
+    <string name="resources_no_assets">This package has no assets/ resources.</string>
+    <string name="resources_exporting">Exporting…</string>
+    <string name="resources_progress_fmt">Writing %1$d / %2$d…</string>
+    <string name="resources_export_ok_fmt">Exported %1$d files (%2$s).</string>
+    <string name="resources_export_error">Could not export the selected assets.</string>
+</resources>
