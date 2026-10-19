@@ -33,8 +33,12 @@ import java.util.List;
  *   <li>不启动游戏、不碰 {@code addAssetPath}，与地图页读游戏自带图是同一条载体。</li>
  * </ul>
  *
- * <p>★ 默认**一类都不勾**：一进来就全选会让人误点出 78 MB；摘要里实时报
- * “已选 N 类 · 约 X MB”，0 类时导出按钮不可点。
+ * <p>★ 默认**一类都不勾**：一进来就全选会让人误点出 78 MB；导出行的副标题实时报
+ * “已选 N 类 · 约 X MB”，0 类时整行不可点。
+ *
+ * <p>★ 第 172 轮对齐四页风格：顶部灰字摘要 + 操作卡（全选 / 全不选 / 导出）+ 逐条
+ * 卡片列表 + 空态 + 底部留白；不再自造固定底栏。用户 2026-10-19：「感觉这个页面和
+ * 其他页面风格有点不搭啊」。
  */
 public final class ResourcesActivity extends BaseActivity {
 
@@ -52,13 +56,12 @@ public final class ResourcesActivity extends BaseActivity {
     private GameAssets.Catalog mCatalog;
 
     private TextView mHead;
-    private TextView mTotal;
     private TextView mNote;
+    private LinearLayout mActions;
     private LinearLayout mGroups;
     private TextView mEmpty;
-    private LinearLayout mSummaryCard;
-    private TextView mSummary;
-    private TextView mExport;
+    private View mExportRow;
+    private TextView mExportSub;
 
     private final List<Row> mRows = new ArrayList<Row>();
     private ArrayList<String> mPendingNames;
@@ -82,33 +85,33 @@ public final class ResourcesActivity extends BaseActivity {
         setTitle(Trans.get(this, R.string.resources_title));
 
         mHead = (TextView) findViewById(R.id.resources_head);
-        mTotal = (TextView) findViewById(R.id.resources_total);
         mNote = (TextView) findViewById(R.id.resources_note);
+        mActions = (LinearLayout) findViewById(R.id.resources_actions);
         mGroups = (LinearLayout) findViewById(R.id.resources_groups);
         mEmpty = (TextView) findViewById(R.id.resources_empty);
-        mSummaryCard = (LinearLayout) findViewById(R.id.resources_summary_card);
-        mSummary = (TextView) findViewById(R.id.resources_summary);
-        mExport = (TextView) findViewById(R.id.resources_export);
 
-        Trans.bind((TextView) findViewById(R.id.resources_select_all), R.string.resources_select_all);
-        Trans.bind((TextView) findViewById(R.id.resources_select_none), R.string.resources_select_none);
-        Trans.bind((TextView) findViewById(R.id.resources_export), R.string.resources_export);
-
-        findViewById(R.id.resources_select_all).setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) {
-                selectAll(true);
-            }
-        });
-        findViewById(R.id.resources_select_none).setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) {
-                selectAll(false);
-            }
-        });
-        mExport.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) {
-                exportSelected();
-            }
-        });
+        // 三行操作与地图 / 存档 / 蓝图 / 模组页同一套：row_action + 图标 + 标题/副标题。
+        Util.bindAction(findViewById(R.id.root), R.id.row_resources_all,
+                R.drawable.ic_select_all, R.string.resources_select_all,
+                R.string.resources_select_all_sub, new Runnable() {
+                    @Override public void run() {
+                        selectAll(true);
+                    }
+                });
+        Util.bindAction(findViewById(R.id.root), R.id.row_resources_none,
+                R.drawable.ic_select_none, R.string.resources_select_none,
+                R.string.resources_select_none_sub, new Runnable() {
+                    @Override public void run() {
+                        selectAll(false);
+                    }
+                });
+        mExportRow = Util.bindActionValue(findViewById(R.id.root), R.id.row_resources_export,
+                R.drawable.ic_zip, R.string.resources_export, new Runnable() {
+                    @Override public void run() {
+                        exportSelected();
+                    }
+                });
+        mExportSub = (TextView) mExportRow.findViewById(R.id.act_sub);
 
         String apk = getIntent() == null ? null : getIntent().getStringExtra(EXTRA_APK);
         mName = getIntent() == null ? null : getIntent().getStringExtra(EXTRA_NAME);
@@ -134,9 +137,8 @@ public final class ResourcesActivity extends BaseActivity {
         mApk = new File(apk.trim());
         mNote.setText(Trans.get(this, R.string.resources_scanning));
         mNote.setVisibility(View.VISIBLE);
-        mTotal.setVisibility(View.GONE);
-        mExport.setEnabled(false);
-        mExport.setAlpha(0.4f);
+        mExportRow.setEnabled(false);
+        mExportRow.setAlpha(0.4f);
         scan();
     }
 
@@ -178,25 +180,32 @@ public final class ResourcesActivity extends BaseActivity {
 
     private void showCatalog(GameAssets.Catalog c) {
         mCatalog = c;
-        mTotal.setText(Trans.get(this, R.string.resources_total_fmt,
-                c.entries, Util.formatSize(c.bytes)));
-        mTotal.setVisibility(View.VISIBLE);
+        mHead.setText(Trans.get(this, R.string.resources_head_fmt,
+                mName, c.entries, Util.formatSize(c.bytes)));
         if (c.groups.isEmpty()) {
             showEmpty(R.string.resources_no_assets);
             return;
         }
         mNote.setText(Trans.get(this, R.string.resources_note));
         mNote.setVisibility(View.VISIBLE);
+        mActions.setVisibility(View.VISIBLE);
         mGroups.removeAllViews();
         mRows.clear();
         LayoutInflater inf = getLayoutInflater();
-        for (GameAssets.Group g : c.groups) {
+        for (final GameAssets.Group g : c.groups) {
             View row = inf.inflate(R.layout.item_resource_group, mGroups, false);
-            CheckBox check = (CheckBox) row.findViewById(R.id.resources_group_check);
+            TextView title = (TextView) row.findViewById(R.id.resources_group_title);
             TextView sub = (TextView) row.findViewById(R.id.resources_group_sub);
-            check.setText(labelOf(g.key));
+            final CheckBox check = (CheckBox) row.findViewById(R.id.resources_group_check);
+            View card = row.findViewById(R.id.resources_group_row);
+            title.setText(labelOf(g.key));
             sub.setText(Trans.get(this, R.string.resources_group_line_fmt,
                     g.count(), Util.formatSize(g.bytes)));
+            card.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) {
+                    check.setChecked(!check.isChecked());
+                }
+            });
             check.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
                 @Override public void onCheckedChanged(CompoundButton b, boolean checked) {
                     updateSummary();
@@ -206,7 +215,6 @@ public final class ResourcesActivity extends BaseActivity {
             mRows.add(new Row(g.key, check));
         }
         mGroups.setVisibility(View.VISIBLE);
-        mSummaryCard.setVisibility(View.VISIBLE);
         mEmpty.setVisibility(View.GONE);
         updateSummary();
     }
@@ -214,13 +222,12 @@ public final class ResourcesActivity extends BaseActivity {
     private void showEmpty(int resId) {
         mEmpty.setText(Trans.get(this, resId));
         mEmpty.setVisibility(View.VISIBLE);
+        mActions.setVisibility(View.GONE);
         mGroups.setVisibility(View.GONE);
-        mSummaryCard.setVisibility(View.GONE);
-        mTotal.setVisibility(View.GONE);
         mNote.setVisibility(View.GONE);
         mExporting = false;
-        mExport.setEnabled(false);
-        mExport.setAlpha(0.4f);
+        mExportRow.setEnabled(false);
+        mExportRow.setAlpha(0.4f);
     }
 
     private String labelOf(String key) {
@@ -251,13 +258,13 @@ public final class ResourcesActivity extends BaseActivity {
             GameAssets.Group g = mCatalog == null ? null : mCatalog.group(r.key);
             if (g != null) bytes += g.bytes;
         }
-        mSummary.setText(n == 0
+        mExportSub.setText(n == 0
                 ? Trans.get(this, R.string.resources_selected_none)
                 : Trans.get(this, R.string.resources_selected_fmt,
                         n, Util.formatSize(bytes)));
         boolean can = n > 0 && !mExporting && mCatalog != null;
-        mExport.setEnabled(can);
-        mExport.setAlpha(can ? 1f : 0.4f);
+        mExportRow.setEnabled(can);
+        mExportRow.setAlpha(can ? 1f : 0.4f);
     }
 
     private void exportSelected() {

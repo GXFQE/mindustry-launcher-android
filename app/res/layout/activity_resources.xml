@@ -1,176 +1,115 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  游戏资源页（第 171 轮）：长按版本 → 详情里的「资源」。
+  游戏资源页（第 171 轮，第 172 轮对齐四页风格）：长按版本 → 详情里的「资源」。
 
-  形状：
-    版本名 / 总条目 / 说明
-    可滚动的类型卡（每行一个 CheckBox + 条数/大小）
-    固定的底部卡：已选摘要 + 全选/全不选 + 导出选中
+  结构照 maps / saves / blueprints / mods 四页：
+    整页 ScrollView（横竖屏通用）
+      ├ 顶部灰字摘要（12sp · fg_muted · 左右 20dp · 上 12dp · 下 6dp）
+      ├ 说明（同一规格，第二行）
+      ├ 操作卡（card_bg · 左右 14dp · 下 8dp）：全选 / 全不选 / 导出选中…
+      ├ 空态（style/PageEmpty，排在列表前）
+      ├ 列表容器（逐条卡片，条目自己带 10dp 外边距，与 item_msav 同款）
+      └ 底部留白（@dimen/page_bottom_space）
 
   ★ 根节点必须有 @+id/root，Activity 必须调 Util.applySystemInsets(root) ——
-    targetSdk ≥ 35 强制 edge-to-edge；漏了整页从 y=0 开始画、被状态栏 + 顶栏盖住，
-    而 view 在 uiautomator dump 里还在（与 activity_plugins 第一版的坑同一族）。
-  ★ 为什么底部卡在 ScrollView **外面**：12 类一屏放不下，导出按钮若跟在列表末尾，
-    用户勾完贴图还得往下滚过 11 类才找得到它。固定底部让「已选 N 类 / 导出」始终可见；
-    列表区用 weight=1 吃掉剩余高度（横屏也不会把按钮顶出去）。
-  ★ 本页所有可见文字都由 Activity 用 Trans 写入；XML 里不写 android:text
-    （否则用户语言包够不到那几处）。
+    targetSdk ≥ 35 强制 edge-to-edge；漏了整页从 y=0 开始画、被状态栏 + 顶栏盖住。
+  ★ 不再自造“固定底部导出栏”：四页的导出动作都在顶部操作卡里，用户按页面
+    从上往下读；固定底栏会多出一层与其它页不同的结构（2026-10-19 用户：
+    「感觉这个页面和其他页面风格有点不搭啊」）。
+  ★ 本页所有可见文字都由 Activity 用 Trans 写入；XML 里不写 android:text。
 -->
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/bg"
-    android:orientation="vertical">
-
-    <ScrollView
-        android:id="@+id/resources_scroll"
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1"
-        android:fillViewport="true"
-        android:scrollbars="vertical">
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:paddingStart="@dimen/page_pad"
-                android:paddingEnd="@dimen/page_pad"
-                android:paddingTop="12dp"
-                android:paddingBottom="10dp">
-
-                <TextView
-                    android:id="@+id/resources_head"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:fontFamily="sans-serif-medium"
-                    android:textColor="@color/fg"
-                    android:textSize="16sp" />
-
-                <TextView
-                    android:id="@+id/resources_total"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:paddingTop="2dp"
-                    android:textColor="@color/fg_muted"
-                    android:textSize="12sp" />
-
-                <TextView
-                    android:id="@+id/resources_note"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:paddingTop="8dp"
-                    android:lineSpacingExtra="2dp"
-                    android:textColor="@color/fg_muted"
-                    android:textSize="12sp" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/resources_groups"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="@dimen/page_pad"
-                android:layout_marginEnd="@dimen/page_pad"
-                android:background="@drawable/card_bg"
-                android:divider="@color/divider"
-                android:orientation="vertical"
-                android:showDividers="middle"
-                android:visibility="gone" />
-
-            <TextView
-                android:id="@+id/resources_empty"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:gravity="center"
-                android:padding="28dp"
-                android:lineSpacingExtra="4dp"
-                android:textAlignment="center"
-                android:textColor="@color/fg_muted"
-                android:textSize="13sp"
-                android:visibility="gone" />
-
-            <Space
-                android:layout_width="match_parent"
-                android:layout_height="8dp" />
-        </LinearLayout>
-    </ScrollView>
+    android:fillViewport="true"
+    android:scrollbars="vertical">
 
     <LinearLayout
-        android:id="@+id/resources_summary_card"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginStart="@dimen/page_pad"
-        android:layout_marginEnd="@dimen/page_pad"
-        android:layout_marginTop="6dp"
-        android:layout_marginBottom="12dp"
-        android:background="@drawable/card_bg"
-        android:orientation="vertical"
-        android:padding="14dp"
-        android:visibility="gone">
+        android:orientation="vertical">
 
         <TextView
-            android:id="@+id/resources_summary"
+            android:id="@+id/resources_head"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textColor="@color/fg"
-            android:textSize="13sp" />
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
+            android:paddingTop="12dp"
+            android:paddingBottom="6dp"
+            android:lineSpacingExtra="2dp"
+            android:textColor="@color/fg_muted"
+            android:textSize="12sp" />
+
+        <TextView
+            android:id="@+id/resources_note"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingStart="20dp"
+            android:paddingEnd="20dp"
+            android:paddingBottom="6dp"
+            android:lineSpacingExtra="2dp"
+            android:textColor="@color/fg_muted"
+            android:textSize="12sp" />
 
         <LinearLayout
+            android:id="@+id/resources_actions"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:gravity="end"
-            android:orientation="horizontal">
+            android:layout_marginStart="14dp"
+            android:layout_marginEnd="14dp"
+            android:layout_marginBottom="8dp"
+            android:background="@drawable/card_bg"
+            android:orientation="vertical"
+            android:visibility="gone">
 
-            <TextView
-                android:id="@+id/resources_select_all"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="@drawable/btn_ghost"
-                android:clickable="true"
-                android:focusable="true"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
-                android:paddingTop="7dp"
-                android:paddingBottom="7dp"
-                android:textColor="@color/accent"
-                android:textSize="13sp" />
+            <include
+                android:id="@+id/row_resources_all"
+                layout="@layout/row_action"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
 
-            <TextView
-                android:id="@+id/resources_select_none"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:background="@drawable/btn_ghost"
-                android:clickable="true"
-                android:focusable="true"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp"
-                android:paddingTop="7dp"
-                android:paddingBottom="7dp"
-                android:textColor="@color/accent"
-                android:textSize="13sp" />
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginStart="62dp"
+                android:background="@color/divider" />
+
+            <include
+                android:id="@+id/row_resources_none"
+                layout="@layout/row_action"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginStart="62dp"
+                android:background="@color/divider" />
+
+            <include
+                android:id="@+id/row_resources_export"
+                layout="@layout/row_action"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content" />
         </LinearLayout>
 
         <TextView
-            android:id="@+id/resources_export"
+            android:id="@+id/resources_empty"
+            style="@style/PageEmpty"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:id="@+id/resources_groups"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="10dp"
-            android:background="@drawable/btn_primary"
-            android:clickable="true"
-            android:focusable="true"
-            android:gravity="center"
-            android:paddingTop="13dp"
-            android:paddingBottom="13dp"
-            android:textColor="@color/on_accent"
-            android:textSize="15sp"
-            android:fontFamily="sans-serif-medium" />
+            android:orientation="vertical"
+            android:paddingBottom="8dp" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/page_bottom_space" />
     </LinearLayout>
-</LinearLayout>
+</ScrollView>

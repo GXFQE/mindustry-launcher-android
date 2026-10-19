@@ -10,8 +10,8 @@
 <resources>
     <string name="resources_btn">Assets</string>
     <string name="resources_title">Game assets</string>
-    <string name="resources_total_fmt">%1$d files · %2$s</string>
-    <string name="resources_note">Pick the types to export. Only checked types go into the zip. Sprites are whole atlas pages, not individual images.</string>
+    <string name="resources_head_fmt">%1$s · %2$d files · %3$s</string>
+    <string name="resources_note">Only checked types go into the zip. Sprites are whole atlas pages, not individual images.</string>
     <string name="resources_group_line_fmt">%1$d files · %2$s</string>
     <string name="resources_group_sprites">Sprites / atlases</string>
     <string name="resources_group_sounds">Sound effects</string>
@@ -28,8 +28,10 @@
     <string name="resources_selected_none">No type selected</string>
     <string name="resources_selected_fmt">Selected %1$d types · about %2$s</string>
     <string name="resources_select_all">Select all</string>
+    <string name="resources_select_all_sub">Check every type</string>
     <string name="resources_select_none">Select none</string>
-    <string name="resources_export">Export selected</string>
+    <string name="resources_select_none_sub">Clear the selection</string>
+    <string name="resources_export">Export selected…</string>
     <string name="resources_scanning">Reading package…</string>
     <string name="resources_unreadable">Cannot read this package.</string>
     <string name="resources_no_assets">This package has no assets/ resources.</string>
