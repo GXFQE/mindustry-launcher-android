@@ -3,6 +3,7 @@ package io.mdt.launcher;
 import android.app.Activity;
 import android.app.AlertDialog;
 import android.app.ProgressDialog;
+import android.content.Context;
 import android.content.DialogInterface;
 import android.text.Editable;
 import android.text.InputType;
@@ -273,18 +274,42 @@ final class SlotOps {
                 .show();
     }
 
+    /** 一次整槽恢复的结果：恢复结果 + 动手前那份快照（可能为 null） */
+    static final class Restored {
+        final Backup.RestoreResult result;
+        final Backup.Snapshot preOp;
+
+        Restored(Backup.RestoreResult result, Backup.Snapshot preOp) {
+            this.result = result;
+            this.preOp = preOp;
+        }
+    }
+
+    /**
+     * ★ 第 178 轮（杀后台 P1）：整槽恢复的**唯一上层入口**。
+     *
+     * <p>与 {@link SlotZip#importSlot} 同一条纪律：界面（{@link #doRestore}）与
+     * dev 口（`DevTools#devBackupRestore`）原先各走各的 —— 界面先
+     * {@link AutoBackup#beforeSlotOp}、dev 直接 {@link Backup#restore}。
+     * 现在两条路共用这一处，"恢复选错模式也退得回来"对 dev 同样成立。
+     */
+    static Restored restoreSlot(Context ctx, String slot, Backup.Snapshot ss, int mode) {
+        Backup.Snapshot pre = AutoBackup.beforeSlotOp(ctx, slot,
+                Trans.get(ctx, R.string.backup_auto_restore));
+        return new Restored(Backup.restore(ctx, slot, ss, mode), pre);
+    }
+
     private static void doRestore(final Activity a, final Data.Slot s,
                                   final Backup.Snapshot ss, final int mode, final Host h) {
         final ProgressDialog pd = ProgressDialog.show(a, Trans.get(a, R.string.restore_progress_title),
                 Trans.get(a, R.string.restore_progress_msg), true, false);
         new Thread(new Runnable() {
             @Override public void run() {
-                // ★★ 槽操作前的自动备份（用户 2026-10-05：「在槽操作前都自动备份吧」）：
-                //    在**恢复之前**先留一份"现在的样子" —— 恢复选错模式也退得回来。
-                final Backup.Snapshot auto =
-                        AutoBackup.beforeSlotOp(a, s.name, Trans.get(a, R.string.backup_auto_restore));
+                // ★★ 第 178 轮：pre-op 与恢复是**同一个入口**（UI/dev 共用）。
+                final Restored rs = restoreSlot(a, s.name, ss, mode);
+                final Backup.Snapshot auto = rs.preOp;
                 // ★ 成败读 rr.ok，**不许读报告开头**（那是文案，一本地化就判错；门禁规则 SRC-01）
-                Backup.RestoreResult rr = Backup.restore(a, s.name, ss, mode);
+                final Backup.RestoreResult rr = rs.result;
                 final String report = rr.report + (auto == null ? ""
                         : Trans.get(a, R.string.slot_autobak_done_fmt, auto.title()));
                 a.runOnUiThread(new Runnable() {

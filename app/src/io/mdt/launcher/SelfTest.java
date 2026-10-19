@@ -336,6 +336,8 @@ public final class SelfTest {
             crashScrub(ctx, L, stat);
             // ★ 第 177 轮：杀后台 P0 —— 槽指针 / SAF 待办 / 导入残留 / 启动自愈 / 前台服务
             killSafety(ctx, L, stat);
+            // ★ 第 178 轮：杀后台 P1 —— 整槽导入 UI/dev 共用 pre-op + 中断清扫
+            wholeSlotPreOp(ctx, L, stat);
             // ★ 篡改对象池的用例放**最后**：它会在池里留下一个内容坏掉的对象，
             //   之后任何"再备份一次"都会因为 `has()` 命中而复用坏对象（CAS 的固有
             //   假设是"池内不可变"）。放在最后就不影响别的用例。
@@ -1469,6 +1471,118 @@ public final class SelfTest {
     /** 两段文本里都有这个片段（表头两档的**共同部分**断言用） */
     private static boolean bothHave(String a, String b, String needle) {
         return a != null && b != null && a.contains(needle) && b.contains(needle);
+    }
+
+    /**
+     * ★ 第 178 轮（杀后台 P1）：整槽导入的 **pre-op 只有一处**。
+     *
+     * <p>被修的反例（2026-10-19 排查 P1）：界面在解包前 `AutoBackup.beforeSlotOp`，
+     * dev 口 `dev_zip_import` 只驱动数据层 ⇒ 同一个「覆盖」导入，界面可撤销、dev 不可。
+     * 现在两者都走 {@link SlotZip#importSlot}。
+     *
+     * <p>尺子要**两面**：
+     * <ol>
+     *   <li>低层 {@link SlotZip#extract} 不产生快照（否则下面那条是白过）；</li>
+     *   <li>共享入口 {@code importSlot} 在覆盖前产生 1 份快照，且快照里含被覆盖的文件；</li>
+     *   <li>空槽时快照为 null，但导入**照常完成**（安全网不是门禁）；</li>
+     *   <li>导入成功后中断标记 `slot.import` 已清；</li>
+     *   <li>模拟"解包中途被杀"：标记 + 槽内 `*.part` ⇒ 启动 Recovery 按标记清掉。</li>
+     * </ol>
+     */
+    private static void wholeSlotPreOp(Context ctx, List<String> L, int[] stat) throws IOException {
+        L.add("── 第 178 轮 · 杀后台 P1（整槽导入 UI/dev 共用 pre-op + 中断清扫）──");
+        String tag = Long.toString(Math.abs(System.nanoTime() % 1000000L));
+        String a = "zzpreopA" + tag;
+        String b = "zzpreopB" + tag;
+        String c = "zzpreopC" + tag;
+        String d = "zzpreopD" + tag;
+        File zip = new File(ctx.getCacheDir(), "zz-preop-" + tag + ".zip");
+        try {
+            // 夹具：两个槽都有旧内容（pre-op 要能拍到东西）
+            File ad = Data.slotDir(ctx, a);
+            File bd = Data.slotDir(ctx, b);
+            File cd = Data.slotDir(ctx, c);
+            if (ad == null || bd == null || cd == null) throw new IOException("null slot dir");
+            writeTmp(new File(ad, "saves"), "x.msav", "A-OLD");
+            writeTmp(new File(bd, "saves"), "x.msav", "B-OLD");
+            writeTmp(new File(cd, "saves"), "x.msav", "C-OLD");
+            // 模拟解包中断留下的半截件（Recovery 只该按标记清这个槽）
+            writeTmp(new File(cd, "saves"), "x.msav.part", "HALF");
+
+            // 小 zip：一条 saves/y.msav
+            ZipOutputStream zo = new ZipOutputStream(new FileOutputStream(zip));
+            try {
+                zo.putNextEntry(new ZipEntry("saves/y.msav"));
+                zo.write("Y".getBytes("UTF-8"));
+                zo.closeEntry();
+            } finally {
+                zo.close();
+            }
+            SlotZip.Info inf = SlotZip.inspect(ctx, zip);
+            ok(stat, L, inf != null && inf.files == 1, "夹具 zip 可读（1 个文件条目）");
+
+            // ① 低层 extract：不产生快照（反方向）
+            SlotZip.Result r1 = SlotZip.extract(ctx, zip, inf, a, SlotWrite.UPDATE);
+            ok(stat, L, r1.files == 1, "低层 extract 正常解包");
+            ok(stat, L, Backup.list(ctx, a).isEmpty(),
+                    "★反方向：低层 extract **不**做 pre-op（否则下一条分不清是谁做的）");
+
+            // ② 共享入口：覆盖前快照 + 正常解包
+            SlotZip.Imported im = SlotZip.importSlot(ctx, zip, inf, b, SlotWrite.REPLACE);
+            ok(stat, L, im.preOp != null, "★共享入口在「覆盖」前留下快照");
+            ok(stat, L, im.preOp != null && im.preOp.count >= 1 && im.preOp.bytes > 0,
+                    "快照里含被覆盖的旧文件（不是空壳）");
+            ok(stat, L, im.result.files == 1
+                            && new File(Data.slotDir(ctx, b), "saves/y.msav").isFile(),
+                    "共享入口把包解开到位");
+            ok(stat, L, Backup.list(ctx, b).size() == 1,
+                    "★备份列表恰好 +1（UI/dev 走同一处，不会各拍一次）");
+            ok(stat, L, Pending.take(ctx, SlotZip.PEND_IMPORT) == null,
+                    "导入成功后中断标记已清（下次启动不会误扫）");
+
+            // ②b 整槽恢复：与导入同一条纪律（UI/dev 共用 pre-op）
+            int beforeRestore = Backup.list(ctx, b).size();
+            SlotOps.Restored rs = SlotOps.restoreSlot(ctx, b, im.preOp, SlotWrite.REPLACE);
+            ok(stat, L, rs.result != null && rs.result.ok, "共享恢复入口成功");
+            ok(stat, L, rs.preOp != null, "★恢复前也留快照（选错模式退得回来）");
+            ok(stat, L, Backup.list(ctx, b).size() == beforeRestore + 1,
+                    "★恢复的 pre-op 只 +1（不会和导入各拍一次）");
+            File bsaves = new File(Data.slotDir(ctx, b), "saves");
+            ok(stat, L, new File(bsaves, "x.msav").isFile()
+                            && !new File(bsaves, "y.msav").exists(),
+                    "恢复把旧内容放回、覆盖掉导入内容");
+
+            // ③ 空槽：pre-op 为 null，但导入照常
+            SlotZip.Imported imd = SlotZip.importSlot(ctx, zip, inf, d, SlotWrite.KEEP_OLD);
+            ok(stat, L, imd.preOp == null, "空槽没有可备份内容 ⇒ pre-op = null");
+            ok(stat, L, imd.result.files == 1
+                            && new File(Data.slotDir(ctx, d), "saves/y.msav").isFile(),
+                    "★pre-op 为 null 也**不拦**导入（安全网不是门禁）");
+
+            // ④ 中断标记 + 启动清扫：只清标记里那个槽的 .part
+            JSONObject meta = new JSONObject();
+            try {
+                meta.put("slot", c);
+            } catch (Throwable ignored) {
+            }
+            ok(stat, L, Pending.put(ctx, SlotZip.PEND_IMPORT, meta), "写入中断标记");
+            String rep = Recovery.runNow(ctx);
+            ok(stat, L, !new File(cd, "saves/x.msav.part").exists(),
+                    "★启动 Recovery 按标记清掉槽内 `*.part`");
+            ok(stat, L, new File(cd, "saves/x.msav").isFile(),
+                    "同目录的正式存档**不动**（只清 `.part`）");
+            ok(stat, L, rep.contains("interrupted slot import"),
+                    "自愈摘要点名了「被中断的整槽导入」");
+            ok(stat, L, Pending.take(ctx, SlotZip.PEND_IMPORT) == null,
+                    "★清扫后标记已取走（不会每次启动都扫）");
+        } finally {
+            Pending.clear(ctx, SlotZip.PEND_IMPORT);
+            for (String s : new String[]{a, b, c, d}) {
+                Backup.deleteSlotBackups(ctx, s);
+                Data.deleteSlotForever(ctx, s);
+            }
+            zip.delete();
+        }
     }
 
     /**

@@ -1391,10 +1391,12 @@ final class SlotIo {
                 SlotZip.Result r = null;
                 Backup.Snapshot auto = null;
                 try {
-                    // ★★ 槽操作前的自动备份（用户 2026-10-05：「在槽操作前都自动备份吧」）。
-                    //    放在**解包之前**、同一个后台线程里 —— 它就是给"这一下改坏了"兜底的。
-                    auto = AutoBackup.beforeSlotOp(a, slot, Trans.get(a, R.string.backup_auto_zip));
-                    r = SlotZip.extract(a, zip, inf, slot, mode);
+                    // ★★ 第 178 轮（杀后台 P1）：**pre-op 与解包现在是同一个入口**
+                    //    {@link SlotZip#importSlot} —— dev 口走同一处，不再出现
+                    //    "界面导入可撤销、dev 导入不可撤销"。
+                    SlotZip.Imported im = SlotZip.importSlot(a, zip, inf, slot, mode);
+                    auto = im.preOp;
+                    r = im.result;
                 } catch (Exception e) {
                     err = Util.ioReason(a, e);
                     android.util.Log.w("MDTLauncher", "zip extract failed: " + err, e);

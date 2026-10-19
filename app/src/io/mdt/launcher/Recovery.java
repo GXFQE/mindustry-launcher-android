@@ -2,7 +2,9 @@ package io.mdt.launcher;
 
 import android.content.Context;
 import android.util.Log;
+import org.json.JSONObject;
 import java.io.File;
+import java.util.List;
 
 /**
  * 启动时的**临时文件自愈**（第 177 轮，杀后台 P0）。
@@ -55,6 +57,19 @@ final class Recovery {
         // 1) 整槽导入 stage 的中间件（固定名；新进程里不可能是活的）
         del(sb, new File(priv, "zip-import.tmp"), "zip import temp");
         del(sb, new File(priv, "zip-import.tmp.part"), "zip import temp (.part)");
+        // 1b) 被强杀在**解包中途**的整槽导入：标记里有目标槽 ⇒ 清该槽的 `*.part`
+        //     （第 178 轮，杀后台 P1；`SlotZip.importSlot` 写标记、成功/失败都清）
+        try {
+            JSONObject im = Pending.take(ctx, SlotZip.PEND_IMPORT);
+            if (im != null) {
+                String slot = im.optString("slot", "");
+                int n = sweepSlotParts(ctx, slot);
+                sb.append("interrupted slot import: \"").append(slot)
+                  .append("\" (removed ").append(n).append(" .part files)\n");
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "recovery: slot import sweep failed", t);
+        }
         // 2) 原子写残留（rename 之前被杀）
         File[] pfs = priv.listFiles();
         if (pfs != null) {
@@ -93,6 +108,38 @@ final class Recovery {
             }
         }
         return sb.toString();
+    }
+
+    /**
+     * 被中断的整槽导入：只清**那个槽**内容根下的 `*.part`。
+     *
+     * <p>为什么需要标记而不是全盘扫：`.part` 是 `SlotZip` 逐文件写盘的中间态，
+     * 名字可能是任意数据文件（`saves/x.msav.part` / `mods/foo.jar.part`）。
+     * 启动时没有我们的长操作在跑，但用户/模组自带一个合法 `.part` 文件也不是不可能
+     * ⇒ 只有"确实有导入标记"的槽才动。
+     */
+    private static int sweepSlotParts(Context ctx, String slot) {
+        if (slot == null || slot.trim().isEmpty()) return 0;
+        int[] n = {0};
+        try {
+            List<File> roots = Data.contentRoots(ctx, slot);
+            for (File f : roots) sweepParts(f, n);
+        } catch (Throwable t) {
+            Log.w(TAG, "recovery: slot part sweep failed (" + slot + ")", t);
+        }
+        return n[0];
+    }
+
+    private static void sweepParts(File f, int[] n) {
+        if (f == null || !f.exists()) return;
+        if (f.isDirectory()) {
+            File[] fs = f.listFiles();
+            if (fs != null) {
+                for (File c : fs) sweepParts(c, n);
+            }
+            return;
+        }
+        if (f.getName().endsWith(".part") && f.delete()) n[0]++;
     }
 
     private static void sweepBatchDirs(File cache) {

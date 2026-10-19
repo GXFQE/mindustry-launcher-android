@@ -944,8 +944,14 @@ final class DevTools {
                         sb.append("选中 v").append(ss.version).append(" 快照：")
                           .append(ss.title()).append("  ").append(ss.count)
                           .append(" 个文件 ").append(Util.formatSize(ss.bytes)).append('\n');
-                        Backup.RestoreResult rr =
-                                Backup.restore(a, slot, ss);
+                        Backup.RestoreResult rr;
+                        // ★ 第 178 轮（杀后台 P1）：与界面共用 pre-op + 恢复的同一入口
+                        SlotOps.Restored rs = SlotOps.restoreSlot(a, slot, ss, SlotWrite.UPDATE);
+                        rr = rs.result;
+                        sb.append("pre-op: ")
+                          .append(rs.preOp == null ? "无（空槽/失败，恢复照常）"
+                                  : rs.preOp.title())
+                          .append('\n');
                         sb.append(rr.ok ? "OK" : "FAILED").append('\n')
                           .append(rr.report).append('\n');
                     }
@@ -1222,7 +1228,14 @@ final class DevTools {
                         sb.append("inspect: files=").append(inf.files)
                           .append(" native=").append(inf.nativeFormat)
                           .append(" strip=\"").append(inf.strip).append("\"\n");
-                        SlotZip.Result r = SlotZip.extract(a, tmp, inf, slot, mode);
+                        // ★ 第 178 轮（杀后台 P1）：与界面走**同一个**上层入口
+                        //   （pre-op 快照 + 解包 + 中断标记），不再只驱动数据层。
+                        SlotZip.Imported im = SlotZip.importSlot(a, tmp, inf, slot, mode);
+                        SlotZip.Result r = im.result;
+                        sb.append("pre-op: ")
+                          .append(im.preOp == null ? "无（空槽/失败，导入照常）"
+                                  : im.preOp.title())
+                          .append('\n');
                         sb.append("extract: files=").append(r.files)
                           .append(" bytes=").append(r.bytes)
                           .append(" skipped=").append(r.skipped)

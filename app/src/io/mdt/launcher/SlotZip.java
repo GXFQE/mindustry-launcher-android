@@ -3,6 +3,7 @@ package io.mdt.launcher;
 import android.content.Context;
 import android.net.Uri;
 import android.util.Log;
+import org.json.JSONObject;
 import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
@@ -288,6 +289,52 @@ public final class SlotZip {
     }
 
     // ── ③ 解包 ────────────────────────────────────────────────────────────
+
+    /** 一次整槽导入的结果：解包结果 + 动手前那份快照（可能为 null） */
+    public static final class Imported {
+        public final Result result;
+        public final Backup.Snapshot preOp;
+
+        Imported(Result result, Backup.Snapshot preOp) {
+            this.result = result;
+            this.preOp = preOp;
+        }
+    }
+
+    /**
+     * ★ 第 178 轮（杀后台 P1）：整槽导入的**唯一上层入口**。
+     *
+     * <p>为什么必须只有这一处：界面（{@link SlotIo#doZipExtract}）与 dev 口
+     * （`DevTools#devZipImport`）原先各走各的 —— 界面在解包前调
+     * {@link AutoBackup#beforeSlotOp}，dev 口只驱动数据层、**没有 pre-op**。
+     * 同一个「覆盖」导入，从界面做可撤销、从 dev 做不可撤销（2026-10-19 排查 P1）。
+     *
+     * <p>顺序：**先快照、再写盘**。快照失败 / 空槽 ⇒ {@code preOp = null}，
+     * 导入照常（安全网不是门禁，见 {@link AutoBackup#beforeSlotOp}）。
+     *
+     * <p>中断兜底：解包前写 `Pending` 标记 `slot.import`，成功/失败都清；
+     * 进程被杀时标记留着，下次启动由 {@link Recovery#runNow} 清掉该槽的 `*.part`。
+     * 标记是**派生状态**，写失败不影响导入（只是少了这次清扫）。
+     */
+    public static Imported importSlot(Context ctx, File zip, Info info, String slot, int mode)
+            throws IOException {
+        Backup.Snapshot pre = AutoBackup.beforeSlotOp(ctx, slot,
+                Trans.get(ctx, R.string.backup_auto_zip));
+        JSONObject meta = new JSONObject();
+        try {
+            meta.put("slot", slot == null ? "" : slot);
+        } catch (Throwable ignored) {
+        }
+        Pending.put(ctx, PEND_IMPORT, meta);
+        try {
+            return new Imported(extract(ctx, zip, info, slot, mode), pre);
+        } finally {
+            Pending.clear(ctx, PEND_IMPORT);
+        }
+    }
+
+    /** 整槽导入中断标记（`Pending` kind；启动时由 Recovery 取走并清 `.part`） */
+    static final String PEND_IMPORT = "slot.import";
 
     /**
      * 把 zip 解包进槽目录（zip 根 = 槽目录，与 {@link Exporter} 完全对称）。
