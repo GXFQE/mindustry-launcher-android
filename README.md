@@ -128,6 +128,7 @@ yourself — even just a few lines — see **Translation file** below.
 - Crash analysis: names the mod with its evidence, and says so when it cannot tell
 - Theme, language, translation file
 - Settings: default slot, crash alerts, crash reports to keep, trash retention, automatic cleanup, storage used
+- About page: version / data locations / GitHub repository, issues, GPL-3.0
 
 ## What is not there yet
 

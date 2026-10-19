@@ -1492,6 +1492,25 @@
 
     <string name="about_fmt">version %1$s (build %2$d)\npackage %3$s\n\nCurrent slot data\n%4$s\n\nLauncher data\n%5$s</string>
 
+    <!-- 第 175 轮：「关于」从设置页搬成独立二级页 -->
+    <string name="about_app_name">MDT Launcher</string>
+    <string name="about_summary_fmt">Version %1$s (build %2$d)\nPackage %3$s</string>
+    <string name="about_row_sub">Version, licence and source code</string>
+    <string name="about_section_links">Open source and feedback</string>
+    <string name="about_repo_title">Source code</string>
+    <string name="about_repo_sub">github.com/GXFQE/mindustry-launcher-android</string>
+    <string name="about_issues_title">Report an issue</string>
+    <string name="about_issues_sub">github.com/GXFQE/mindustry-launcher-android/issues</string>
+    <string name="about_license_title">Licence</string>
+    <string name="about_license_sub">GNU General Public License v3.0</string>
+    <string name="about_section_data">Data locations</string>
+    <string name="about_data_fmt">Current slot\n%1$s\n\nLauncher data\n%2$s</string>
+    <string name="about_footer">Copyright (C) 2026 GXFQE · GPL-3.0</string>
+    <string name="about_link_failed">No app can open this link.</string>
+    <string name="about_repo_url" translatable="false">https://github.com/GXFQE/mindustry-launcher-android</string>
+    <string name="about_issues_url" translatable="false">https://github.com/GXFQE/mindustry-launcher-android/issues</string>
+    <string name="about_license_url" translatable="false">https://github.com/GXFQE/mindustry-launcher-android/blob/main/LICENSE</string>
+
     <!-- ══ F5 自动备份（每槽一套策略，对齐桌面版的「存档分类设置」） ══════ -->
     <string name="slot_op_policy">Automatic backup settings…</string>
     <string name="policy_title_fmt">Automatic backup for \"%1$s\"</string>

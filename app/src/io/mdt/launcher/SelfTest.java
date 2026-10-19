@@ -147,7 +147,7 @@ public final class SelfTest {
     private static final Class<?>[] PAGES = {
             MainActivity.class, SlotsActivity.class, SlotActivity.class, ModsActivity.class,
             MapsActivity.class, MapDetailActivity.class, SettingsActivity.class,
-            LogActivity.class, TrashActivity.class, BlueprintsActivity.class,
+            AboutActivity.class, LogActivity.class, TrashActivity.class, BlueprintsActivity.class,
             BlueprintDetailActivity.class, GameSlot.class, SavesActivity.class, PluginsActivity.class,
             ResourcesActivity.class};
 
@@ -168,6 +168,7 @@ public final class SelfTest {
             {BlueprintsActivity.class, "SlotActivity"},
             {BlueprintDetailActivity.class, "BlueprintsActivity"},
             {SettingsActivity.class, "MainActivity"},
+            {AboutActivity.class, "SettingsActivity"},
             {LogActivity.class, "SettingsActivity"},
             {TrashActivity.class, "MainActivity"},
             {PluginsActivity.class, "MainActivity"},
@@ -9830,7 +9831,8 @@ public final class SelfTest {
                 "io.mdt.launcher.MapsActivity", "io.mdt.launcher.MapDetailActivity",
                 "io.mdt.launcher.BlueprintsActivity", "io.mdt.launcher.BlueprintDetailActivity",
                 "io.mdt.launcher.TrashActivity", "io.mdt.launcher.SavesActivity",
-                "io.mdt.launcher.PluginsActivity", "io.mdt.launcher.ResourcesActivity"};
+                "io.mdt.launcher.PluginsActivity", "io.mdt.launcher.ResourcesActivity",
+                "io.mdt.launcher.AboutActivity"};
         int found = 0;
         for (String n : want) {
             if (canResolve(ctx, n)) found++;
@@ -10161,7 +10163,7 @@ public final class SelfTest {
                 // ★ 2026-10-12（第 132 轮）：插件页。第一版是**纯代码建视图**、没走这条骨架，
                 //   真机实测就是"标题落在 [52,52]（顶栏 136~292）⇒ 有文字但看不见"——
                 //   与第 81 轮地图页同一个坑 ⇒ 改成 XML 骨架并补进这份名单（名单漏了不会有症状）。
-                R.layout.activity_plugins, R.layout.activity_resources};
+                R.layout.activity_plugins, R.layout.activity_resources, R.layout.activity_about};
         android.view.LayoutInflater inf = android.view.LayoutInflater.from(ctx);
         int good = 0;
         StringBuilder bad = new StringBuilder();

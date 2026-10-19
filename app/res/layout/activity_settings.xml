@@ -188,35 +188,24 @@
                     android:layout_height="wrap_content" />
             </LinearLayout>
 
-            <!-- 关于：只读，不参与交互 -->
+            <!--
+              关于：第 175 轮从「设置页内联信息卡」改成**独立二级页入口**。
+              ★ 这是设置页唯一一个"点开是另一个页面"的行 —— 理由：版本 / 包名 / 数据路径 /
+                开源地址属于"看"而不是"改"，塞在设置里既占地方又打乱三类设置的分区。
+              （「中转站」「运行日志」仍不许搬回设置；它们主界面有工具卡。）
+            -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/card_gap"
-                android:orientation="vertical"
                 android:background="@drawable/card_bg"
-                android:paddingStart="14dp"
-                android:paddingEnd="14dp"
-                android:paddingTop="14dp"
-                android:paddingBottom="14dp">
+                android:orientation="vertical">
 
-                <TextView
-                    android:id="@+id/tx_about_card_title"
+                <include
+                    android:id="@+id/row_about"
+                    layout="@layout/row_action"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:fontFamily="sans-serif-medium"
-                    android:textColor="@color/fg"
-                    android:textSize="15sp" />
-
-                <TextView
-                    android:id="@+id/about_text"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:paddingTop="8dp"
-                    android:lineSpacingExtra="3dp"
-                    android:textColor="@color/fg_muted"
-                    android:textIsSelectable="true"
-                    android:textSize="12sp" />
+                    android:layout_height="wrap_content" />
             </LinearLayout>
 
             <!-- 第 160 轮：插件动作区（没有条目整块 GONE）；单独一张卡，不混进设置项 -->

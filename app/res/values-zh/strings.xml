@@ -1432,6 +1432,22 @@
 
     <string name="about_fmt">版本 %1$s（内部编号 %2$d）\n包名 %3$s\n\n当前槽数据\n%4$s\n\n启动器数据\n%5$s</string>
 
+    <!-- 第 175 轮：「关于」从设置页搬成独立二级页 -->
+    <string name="about_app_name">MDT 安卓启动器</string>
+    <string name="about_summary_fmt">版本 %1$s（构建 %2$d）\n包名 %3$s</string>
+    <string name="about_row_sub">版本、许可证与开源地址</string>
+    <string name="about_section_links">开源与反馈</string>
+    <string name="about_repo_title">开源仓库</string>
+    <string name="about_repo_sub">github.com/GXFQE/mindustry-launcher-android</string>
+    <string name="about_issues_title">问题反馈</string>
+    <string name="about_issues_sub">github.com/GXFQE/mindustry-launcher-android/issues</string>
+    <string name="about_license_title">开源许可证</string>
+    <string name="about_license_sub">GNU General Public License v3.0</string>
+    <string name="about_section_data">数据位置</string>
+    <string name="about_data_fmt">当前槽数据\n%1$s\n\n启动器数据\n%2$s</string>
+    <string name="about_footer">版权所有 (C) 2026 GXFQE · GPL-3.0</string>
+    <string name="about_link_failed">没有能打开这个链接的应用。</string>
+
     <!-- ══ F5 自动备份（每槽一套策略，对齐桌面版的「存档分类设置」） ══════ -->
     <string name="slot_op_policy">自动备份设置…</string>
     <string name="policy_title_fmt">「%1$s」的自动备份</string>

@@ -286,6 +286,17 @@
             android:parentActivityName=".MainActivity"/>
 
         <!--
+          第 175 轮：「关于」独立二级页（版本 / 包名 / 数据位置 / 开源地址 / 许可证）。
+          入口在设置页底部；只读，不碰游戏 ClassLoader。
+        -->
+        <activity
+            android:name=".AboutActivity"
+            android:exported="false"
+            android:theme="@style/AppTheme"
+            android:label="@string/about_card_title"
+            android:parentActivityName=".SettingsActivity"/>
+
+        <!--
           F7 运行日志：只读展示 <数据根>/last_log.txt、hub/report-*.txt、<数据根>/crashes/*.txt。
           主进程即可 —— 纯文件读，不碰游戏 ClassLoader。
           ⚠️ 本 ROM 滤掉应用自己的 logcat，这些文件就是唯一的运行期证据出口（REFERENCE §14）。

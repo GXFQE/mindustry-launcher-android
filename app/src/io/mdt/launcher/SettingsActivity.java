@@ -4,7 +4,6 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.content.pm.PackageInfo;
 import android.os.Bundle;
 import android.text.InputType;
 import android.view.View;
@@ -170,27 +169,19 @@ public class SettingsActivity extends BaseActivity {
         //   （用户点单）。它仍然不属于任何一个槽（所以没进槽页），只是不再住"设置"里。
         //   副标题历史上是固定一句、不显示份数/体积（那要递归扫盘），这一点没变。
 
-        // 「关于」全部取运行期事实，不写死版本 —— 免得出现"日志说 0.2、界面写 0.1"
-        String verName = "?";
-        int verCode = 0;
-        try {
-            PackageInfo pi = getPackageManager().getPackageInfo(getPackageName(), 0);
-            verName = pi.versionName;
-            verCode = pi.versionCode;
-        } catch (Exception e) {
-            android.util.Log.w("MDTLauncher", "read PackageInfo failed: " + e);
-        }
-        File dataRoot = Data.dataRoot(this);
-        ((TextView) root.findViewById(R.id.about_text)).setText(Trans.get(SettingsActivity.this, R.string.about_fmt,
-                verName, verCode, getPackageName(),
-                dataRoot == null ? "?" : dataRoot.getAbsolutePath(),
-                Data.hubDir(this).getAbsolutePath()));
+        // 第 175 轮：「关于」搬成独立二级页（版本 / 包名 / 数据路径 / 开源地址 / 许可证）。
+        // 页面只读；入口是设置页底部单独一行（不混进三类设置）。
+        Util.bindAction(root, R.id.row_about, R.drawable.ic_app,
+                R.string.about_card_title, R.string.about_row_sub, new Runnable() {
+                    @Override public void run() {
+                        startActivity(new Intent(SettingsActivity.this, AboutActivity.class));
+                    }
+                });
 
         Util.applySystemInsets(root);
         setContentView(root);
 
         // 布局里那些静态文案已搬到 Java（见 Trans）：布局够不到用户语言包
-        Trans.bind(root, R.id.tx_about_card_title, R.string.about_card_title);
         // 第 174 轮：设置页分区标题（设置项变多之后靠它们找）
         Trans.bind(root, R.id.settings_section_appearance, R.string.settings_section_appearance);
         Trans.bind(root, R.id.settings_section_startup, R.string.settings_section_startup);
