@@ -178,6 +178,17 @@ final class ShareOut {
         return prune(ShareProvider.dirOf(ctx), System.currentTimeMillis() - KEEP_MS);
     }
 
+    /**
+     * 第 174 轮：设置页「存储占用」里的手动清理 —— 清掉**全部**分享/统计临时缓存。
+     *
+     * <p>与 {@link #prune(Context)} 的区别：那个只清 24h 之前的，这个是用户主动要求
+     * "现在就清"；正在被接收方读取的那份可能会失效（确认框里已经写明）。
+     * 只动 {@code cache/share/} 这一层，不碰槽、不碰游戏数据。
+     */
+    static int clear(Context ctx) {
+        return prune(ShareProvider.dirOf(ctx), Long.MAX_VALUE);
+    }
+
     // ── 交给系统 ──────────────────────────────────────────────────────────
 
     /**

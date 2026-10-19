@@ -1410,6 +1410,26 @@
     <string name="set_trash_slots_hint">3</string>
     <string name="set_trash_bad">只能填 1 ~ 999 的整数</string>
 
+    <!-- 第 174 轮：设置页分区标题 + 崩溃提示开关 + 清理临时缓存 -->
+    <string name="settings_section_appearance">外观与语言</string>
+    <string name="settings_section_startup">启动与存储</string>
+    <string name="settings_section_alerts">通知与日志</string>
+
+    <string name="set_crash_alert_title">崩溃提示</string>
+    <string name="set_crash_alert_on">已开启 · 报告仍保存</string>
+    <string name="set_crash_alert_off">已关闭 · 报告仍保存</string>
+    <string name="set_crash_alert_pick_title">崩溃提示</string>
+    <string name="set_crash_alert_enable">开启崩溃提示</string>
+    <string name="set_crash_alert_disable">关闭崩溃提示</string>
+
+    <string name="storage_clear_cache">清理缓存</string>
+    <string name="storage_clear_title">清理临时缓存</string>
+    <string name="storage_clear_msg">只清掉「直接分享」留下的临时文件；正在发送的文件可能失败。</string>
+    <string name="storage_clear_btn">清理</string>
+    <string name="storage_clear_done_fmt">已清理 %1$d 份临时文件。</string>
+    <string name="storage_clear_none">没有临时分享文件。</string>
+    <string name="storage_clear_fail">清理失败。</string>
+
     <string name="about_fmt">版本 %1$s（内部编号 %2$d）\n包名 %3$s\n\n当前槽数据\n%4$s\n\n启动器数据\n%5$s</string>
 
     <!-- ══ F5 自动备份（每槽一套策略，对齐桌面版的「存档分类设置」） ══════ -->

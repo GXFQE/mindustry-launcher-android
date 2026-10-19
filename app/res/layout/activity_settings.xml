@@ -2,15 +2,17 @@
 <!--
   F3：全局设置页骨架（与 activity_main / activity_saves 同款卡片风）。
 
-  结构：
-    外层 ScrollView（整页滚，横竖屏通用）
-      └ 内层 LinearLayout（vertical）
-          ├ 设置项卡   —— row_action（复用：副标题显示"当前值"）
-          └ 关于卡     —— 只读信息（版本 / 包名 / 数据根 / HUB）
+  第 174 轮：**按类别拆成三张卡**（用户：「设置真的应该分个类，后面数量多了可能非常难找」）：
+    外观与语言  —— 深浅色 / 语言 / 翻译文件
+    启动与存储  —— 默认槽 / 自动清理 / 中转站保留份数 / 存储占用
+    通知与日志  —— 崩溃提示 / 日志保留份数
+    关于        —— 只读信息
 
-  ★ 为什么是 ScrollView：与另两页同因（横屏可用高仅 376dp，竖着放不下会压扁内容）。
-  ★ 为什么列表/条目用 LinearLayout 而非 ListView：见 MainActivity.rebuildList() 的注释（F3b 根因）。
-  ★ 根节点不设 padding：Util.applySystemInsets() 会写 root 的 padding（四边叠加）。
+  ★ 判据没变：本页只放**所有槽共用、能被改的项**；按槽生效的（自动备份三件套）仍在存档页。
+    「中转站」「运行日志」是页面入口，仍在主界面工具卡 —— 分区不是为了把它们搬回来。
+  ★ 结构仍是 ScrollView + 手工挂载的 LinearLayout（横屏可用高 376dp；ListView 会被压扁）。
+  ★ 根节点必须有 `@+id/root`，Activity 必须调 `Util.applySystemInsets(root)`。
+  ★ 所有可见文字都由 SettingsActivity 用 Trans 写入；XML 里不写 android:text。
 -->
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/root"
@@ -34,25 +36,24 @@
             android:paddingTop="12dp"
             android:paddingBottom="14dp">
 
-            <!--
-              设置项：只有"所有槽共用"的项才放这里；按槽生效的项在存档页的槽菜单里。
-              ★ 2026-10-08（第 123 轮，用户点单）：本卡**只放"能被改的项"** ——
-                「中转站」「运行日志」这两个**页面入口**搬去了主界面的工具卡
-                （它们不是设置：一个是回收站、一个是诊断日志页）。
-                ⚠️ 以后别再往这里加"点开是另一个页面"的行 —— 判据见
-                SelfTest.pageSkeleton 里"row_storage 必须是本卡最后一行"那条断言。
-            -->
+            <!-- ══ 外观与语言 ══════════════════════════════════════════════ -->
+            <TextView
+                android:id="@+id/settings_section_appearance"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:paddingTop="2dp"
+                android:paddingBottom="6dp"
+                android:textColor="@color/fg_muted"
+                android:textSize="12sp" />
+
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:background="@drawable/card_bg">
+                android:background="@drawable/card_bg"
+                android:orientation="vertical">
 
-                <!--
-                  F15：深浅色。排在最上面 —— 它是纯"外观"项，且是用户最常回来改的一项
-                  （晚上想变深、白天想变浅），放第一个最省一次滑动。
-                  副标题显示当前值（与「默认槽 / 日志保留份数」同款：内容即当前状态）。
-                -->
                 <include
                     android:id="@+id/row_theme"
                     layout="@layout/row_action"
@@ -65,12 +66,6 @@
                     android:layout_marginStart="62dp"
                     android:background="@color/divider" />
 
-                <!--
-                  P2：界面语言。紧挨着深浅色 —— 这两项是 BaseActivity **在同一个
-                  Configuration 上一起写**的（uiMode 的 night 位 + locale 位），
-                  也都是"改完立刻重建本页"的项，放一起用户找得到。
-                  副标题显示当前值（与深浅色 / 默认槽同款：内容即当前状态）。
-                -->
                 <include
                     android:id="@+id/row_language"
                     layout="@layout/row_action"
@@ -83,22 +78,30 @@
                     android:layout_marginStart="62dp"
                     android:background="@color/divider" />
 
-                <!--
-                  用户语言包（lang.properties）：紧挨着「语言」—— 两者都是"界面文字从哪来"，
-                  区别是这一项由用户丢文件，而上一项是内置翻译。
-                  副标题 = 当前状态（与深浅色 / 默认槽同款：内容即当前状态）。
-                -->
                 <include
                     android:id="@+id/row_lang_pack"
                     layout="@layout/row_action"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
+            </LinearLayout>
 
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="62dp"
-                    android:background="@color/divider" />
+            <!-- ══ 启动与存储 ══════════════════════════════════════════════ -->
+            <TextView
+                android:id="@+id/settings_section_startup"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:paddingTop="18dp"
+                android:paddingBottom="6dp"
+                android:textColor="@color/fg_muted"
+                android:textSize="12sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/card_bg"
+                android:orientation="vertical">
 
                 <include
                     android:id="@+id/row_def_slot"
@@ -112,40 +115,7 @@
                     android:layout_marginStart="62dp"
                     android:background="@color/divider" />
 
-                <include
-                    android:id="@+id/row_logs"
-                    layout="@layout/row_action"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content" />
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="62dp"
-                    android:background="@color/divider" />
-
-                <!--
-                  第 173 轮：中转站保留份数（普通条目 / 整个槽分开）。
-                  ★ 紧跟在「日志保留份数」下面 —— 两项都是"保留多少份、超出丢最旧"的保留策略。
-                -->
-                <include
-                    android:id="@+id/row_trash_keep"
-                    layout="@layout/row_action"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content" />
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="62dp"
-                    android:background="@color/divider" />
-
-                <!--
-                  F20：自动清理数据根残留（开关）。
-                  ★ 放在这张卡的末位：前四项用户天天改，这一项一年碰不了一次。
-                  ★ 这一行同时是「手动清理」的入口 —— 关掉自动之后仍要能清，
-                    否则用户一关就再没有别的办法（第 57 轮把体检入口删掉了）。
-                -->
+                <!-- F20：自动清理数据根残留（开关） + 手动清理入口。 -->
                 <include
                     android:id="@+id/row_auto_clean"
                     layout="@layout/row_action"
@@ -158,19 +128,61 @@
                     android:layout_marginStart="62dp"
                     android:background="@color/divider" />
 
-                <!--
-                  存储占用（一档③+⑦，2026-10-06）。
-                  ★ **这一行现在是本卡的末位**（2026-10-08，第 123 轮）：它下面原来的
-                    「中转站」搬去主界面的工具卡了（用户点单：中转站 / 运行日志不是"设置"）。
-                    ⚠️ 连带后果：2026-10-06 那句"下一行就是中转站本体，用户看完占了 120 MB
-                    接着就想进去处理"的**就近原则已经不成立** —— 想保留那点顺手，
-                    得把这一行也搬去工具卡（本轮没搬，见 REF §84）。
-                  ★ 只读弹窗：数字在后台算（要遍历对象池与所有槽），所以点开先显示"正在统计…"。
-                  ★ 为什么不单开一页：这一页只有数字、没有交互 ⇒ 弹窗足够，
-                    也省掉"新页面必须补 insets / 继承 BaseActivity / 注册清单"这三件都踩过的事。
-                -->
+                <!-- 第 173 轮：中转站保留份数（普通条目 / 整个槽分开）。 -->
+                <include
+                    android:id="@+id/row_trash_keep"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="62dp"
+                    android:background="@color/divider" />
+
+                <!-- 存储占用：只读弹窗，但弹窗里带「清理缓存」动作。 -->
                 <include
                     android:id="@+id/row_storage"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
+            <!-- ══ 通知与日志 ══════════════════════════════════════════════ -->
+            <TextView
+                android:id="@+id/settings_section_alerts"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:paddingTop="18dp"
+                android:paddingBottom="6dp"
+                android:textColor="@color/fg_muted"
+                android:textSize="12sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/card_bg"
+                android:orientation="vertical">
+
+                <!-- 第 174 轮：崩溃提示总开关（默认开；关掉不影响报告落盘/分析）。 -->
+                <include
+                    android:id="@+id/row_crash_alert"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="62dp"
+                    android:background="@color/divider" />
+
+                <!-- F7：日志保留份数（设置值，不是页面入口）。 -->
+                <include
+                    android:id="@+id/row_logs"
                     layout="@layout/row_action"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
@@ -189,22 +201,22 @@
                 android:paddingBottom="14dp">
 
                 <TextView
-                        android:id="@+id/tx_about_card_title"
+                    android:id="@+id/tx_about_card_title"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:textSize="15sp"
                     android:fontFamily="sans-serif-medium"
-                    android:textColor="@color/fg" />
+                    android:textColor="@color/fg"
+                    android:textSize="15sp" />
 
                 <TextView
                     android:id="@+id/about_text"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:paddingTop="8dp"
-                    android:textSize="12sp"
                     android:lineSpacingExtra="3dp"
+                    android:textColor="@color/fg_muted"
                     android:textIsSelectable="true"
-                    android:textColor="@color/fg_muted" />
+                    android:textSize="12sp" />
             </LinearLayout>
 
             <!-- 第 160 轮：插件动作区（没有条目整块 GONE）；单独一张卡，不混进设置项 -->

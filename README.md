@@ -127,7 +127,7 @@ yourself — even just a few lines — see **Translation file** below.
 - Runtime log page: launcher log, game log and crash reports in sections
 - Crash analysis: names the mod with its evidence, and says so when it cannot tell
 - Theme, language, translation file
-- Settings: default slot, crash reports to keep, trash retention, automatic cleanup, storage used
+- Settings: default slot, crash alerts, crash reports to keep, trash retention, automatic cleanup, storage used
 
 ## What is not there yet
 

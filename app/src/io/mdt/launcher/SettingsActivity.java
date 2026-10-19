@@ -38,10 +38,15 @@ import android.net.Uri;
  * JVM 参数 / GitHub 镜像 / 隐藏窗口 / 永久删除）一律不做。
  *
  * ★ 2026-10-08（第 123 轮，用户点单）补的第二条判据：本页只放**能被改的项**
- *   （深浅色 / 语言 / 用户语言包 / 默认槽 / 日志保留份数 / 自动清理 / 存储占用）。
+ *   （深浅色 / 语言 / 用户语言包 / 默认槽 / 日志保留份数 / 中转站保留份数 /
+ *   崩溃提示 / 自动清理 / 存储占用）。
  *   「中转站」「运行日志」是**页面入口**，已搬去主界面的工具卡 ——
  *   "去设置里找一个页面"本来就不该是用户的心智模型。
  *   ⚠️ 以后别再往这里加"点开是另一个页面"的行（判据见 SelfTest.pageSkeleton）。
+ *
+ * ★ 第 174 轮（用户「设置真的应该分个类」）：按**用途**分成三张卡 ——
+ *   外观与语言 / 启动与存储 / 通知与日志；新增项放对应卡，别再往一张卡里堆。
+ *   分区标题是 12sp 灰字，文字由 {@link Trans} 写入，不在 XML 写 android:text。
  */
 public class SettingsActivity extends BaseActivity {
 
@@ -62,6 +67,8 @@ public class SettingsActivity extends BaseActivity {
     private TextView mLangSub;
     private TextView mSlotSub;
     private TextView mLogsSub;
+    /** 第 174 轮：崩溃提示开关那一行的副标题（已开启 / 已关闭） */
+    private TextView mCrashSub;
     /** 第 173 轮：中转站保留份数那一行的副标题（普通 / 整槽） */
     private TextView mTrashSub;
     /** F20：自动清理残留那一行的副标题（已开 / 已关） */
@@ -113,6 +120,14 @@ public class SettingsActivity extends BaseActivity {
                     @Override public void run() { pickDefaultSlot(); }
                 });
         mSlotSub = (TextView) rowSlot.findViewById(R.id.act_sub);
+
+        // 第 174 轮：崩溃提示总开关。放在日志份数上面 —— 两项都属于「通知与日志」，
+        // 一个管"要不要主动说"，一个管"留几份报告"。
+        View rowCrash = Util.bindActionValue(root, R.id.row_crash_alert, R.drawable.ic_terminal,
+                R.string.set_crash_alert_title, new Runnable() {
+                    @Override public void run() { promptCrashAlert(); }
+                });
+        mCrashSub = (TextView) rowCrash.findViewById(R.id.act_sub);
 
         View rowLogs = Util.bindActionValue(root, R.id.row_logs, R.drawable.ic_log,
                 R.string.set_logs_title, new Runnable() {
@@ -176,6 +191,10 @@ public class SettingsActivity extends BaseActivity {
 
         // 布局里那些静态文案已搬到 Java（见 Trans）：布局够不到用户语言包
         Trans.bind(root, R.id.tx_about_card_title, R.string.about_card_title);
+        // 第 174 轮：设置页分区标题（设置项变多之后靠它们找）
+        Trans.bind(root, R.id.settings_section_appearance, R.string.settings_section_appearance);
+        Trans.bind(root, R.id.settings_section_startup, R.string.settings_section_startup);
+        Trans.bind(root, R.id.settings_section_alerts, R.string.settings_section_alerts);
 
     }
 
@@ -201,6 +220,11 @@ public class SettingsActivity extends BaseActivity {
         }
         if (mLogsSub != null) {
             mLogsSub.setText(Trans.get(SettingsActivity.this, R.string.set_logs_sub_fmt, Config.get().maxLogFiles()));
+        }
+        if (mCrashSub != null) {
+            mCrashSub.setText(Trans.get(SettingsActivity.this,
+                    Config.get().crashAlertEnabled() ? R.string.set_crash_alert_on
+                            : R.string.set_crash_alert_off));
         }
         if (mTrashSub != null) {
             mTrashSub.setText(Trans.get(SettingsActivity.this, R.string.set_trash_sub_fmt,
@@ -272,6 +296,12 @@ public class SettingsActivity extends BaseActivity {
         final AlertDialog dlg = new AlertDialog.Builder(this)
                 .setTitle(R.string.set_storage_title)
                 .setMessage(R.string.storage_loading)
+                // 第 174 轮：临时分享缓存的手动清理。文案短（三按钮排版），细节在确认框里。
+                .setNeutralButton(R.string.storage_clear_cache, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int w) {
+                        confirmClearShareCache();
+                    }
+                })
                 .setPositiveButton(R.string.close, null)
                 .create();
         dlg.show();
@@ -300,6 +330,59 @@ public class SettingsActivity extends BaseActivity {
                 });
             }
         }, "storage-stats").start();
+    }
+
+    /**
+     * 第 174 轮：清掉 `cache/share/` 里的临时分享 / 统计缓存。
+     *
+     * <p>为什么只清这一层：`getCacheDir()` 里还有地图缩略图、游戏运行时临时件等，
+     * 那些删了会重新生成、也可能正在被用；这里只动「直接分享」留下的那一份。
+     * 正在被接收方读取的文件可能失效，所以先确认。
+     */
+    private void confirmClearShareCache() {
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.storage_clear_title)
+                .setMessage(R.string.storage_clear_msg)
+                .setPositiveButton(R.string.storage_clear_btn, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int w) {
+                        clearShareCache();
+                    }
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    private void clearShareCache() {
+        final android.content.Context app = getApplicationContext();
+        new Thread(new Runnable() {
+            @Override public void run() {
+                int n = 0;
+                boolean ok = true;
+                try {
+                    n = ShareOut.clear(app);
+                } catch (Throwable t) {
+                    ok = false;
+                    android.util.Log.w("MDTLauncher", "clear share cache failed: " + t);
+                }
+                final int count = n;
+                final boolean good = ok;
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        if (isFinishing()) return;
+                        if (!good) {
+                            Toast.makeText(SettingsActivity.this,
+                                    R.string.storage_clear_fail, Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        Toast.makeText(SettingsActivity.this,
+                                count > 0 ? Trans.get(SettingsActivity.this,
+                                        R.string.storage_clear_done_fmt, count)
+                                        : Trans.get(SettingsActivity.this, R.string.storage_clear_none),
+                                Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+        }, "clear-share-cache").start();
     }
 
     /** 立即清理一次（后台线程 —— 要扫数据根；清完回主线程报数量） */
@@ -745,6 +828,30 @@ public class SettingsActivity extends BaseActivity {
                         fillValues();
                     }
                 })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    /**
+     * 第 174 轮：崩溃提示开关（默认开）。
+     *
+     * <p>关掉只影响 {@link CrashAlert} 的 Toast / 弹窗；报告仍然照常落盘、照常进崩溃分析。
+     * 选项用单选列表（与深浅色同款），不另造 Switch —— 本页所有行都是"点一下弹选择"。
+     */
+    private void promptCrashAlert() {
+        final boolean on = Config.get().crashAlertEnabled();
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.set_crash_alert_pick_title)
+                .setSingleChoiceItems(new String[]{
+                                Trans.get(SettingsActivity.this, R.string.set_crash_alert_enable),
+                                Trans.get(SettingsActivity.this, R.string.set_crash_alert_disable)},
+                        on ? 0 : 1, new DialogInterface.OnClickListener() {
+                            @Override public void onClick(DialogInterface d, int w) {
+                                d.dismiss();
+                                Config.get().setCrashAlertEnabled(w == 0);
+                                fillValues();
+                            }
+                        })
                 .setNegativeButton(R.string.cancel, null)
                 .show();
     }

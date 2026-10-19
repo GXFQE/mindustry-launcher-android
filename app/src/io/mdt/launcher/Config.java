@@ -75,7 +75,10 @@ public final class Config {
      * <p>★ 为什么要有它："崩了马上弹窗"有两条路（进程活着时立刻 Toast / 回到界面时补弹），
      * 没有这个记帐就会**同一份崩两次提示两次**；反过来，不记又能重开应用再烦一次。
      */
-    private static final String K_ALERT = "crash_alert_last";    /**
+    private static final String K_ALERT = "crash_alert_last";
+    /** 第 174 轮：崩溃提示总开关（默认开；关掉只影响提示，不影响报告落盘 / 分析）。 */
+    private static final String K_CRASH_ALERT_ENABLED = "crash_alert_enabled";
+    /**
      * 一档④（2026-10-06）：每个版本**上次启动的时刻** { "&lt;版本key&gt;": 毫秒 }。
      *
      * ★ 为什么需要它：{@link #sessionStartedAt()} 记的是"**正在进行**的那一次"，
@@ -106,6 +109,8 @@ public final class Config {
      *   而且第 57 轮把体检的可见入口删掉之后，它连"发生过"都不会说一声。
      */
     public static final boolean DEF_AUTO_CLEAN = true;
+    /** 崩溃提示的出厂默认 = **开**（第 174 轮加的开关；关掉不影响报告本身）。 */
+    public static final boolean DEF_CRASH_ALERT = true;
 
     private static volatile Config sInstance;
 
@@ -238,6 +243,26 @@ public final class Config {
 
     public synchronized void setCrashAlerted(String v) {
         put(K_ALERT, v == null ? "" : v);
+        save();
+    }
+
+    /**
+     * 崩溃提示总开关（默认开）。
+     *
+     * <p>★ 关掉只影响 {@link CrashAlert} 的 Toast / 弹窗；崩溃报告照常落盘、照常进
+     * 崩溃分析页。坏值退默认 + WARNING 点名键名（与 autoClean / maxLogFiles 同纪律）。
+     */
+    public synchronized boolean crashAlertEnabled() {
+        if (!mRoot.has(K_CRASH_ALERT_ENABLED)) return DEF_CRASH_ALERT;
+        Object v = mRoot.opt(K_CRASH_ALERT_ENABLED);
+        if (v instanceof Boolean) return ((Boolean) v).booleanValue();
+        Log.w(TAG, "config key '" + K_CRASH_ALERT_ENABLED + "' is not a boolean (" + v
+                + "), falling back to default " + DEF_CRASH_ALERT);
+        return DEF_CRASH_ALERT;
+    }
+
+    public synchronized void setCrashAlertEnabled(boolean on) {
+        put(K_CRASH_ALERT_ENABLED, Boolean.valueOf(on));
         save();
     }
 

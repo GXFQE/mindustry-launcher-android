@@ -1470,6 +1470,26 @@
     <string name="set_trash_slots_hint">3</string>
     <string name="set_trash_bad">Enter integers from 1 to 999</string>
 
+    <!-- 第 174 轮：设置页分区标题 + 崩溃提示开关 + 清理临时缓存 -->
+    <string name="settings_section_appearance">Appearance and language</string>
+    <string name="settings_section_startup">Startup and storage</string>
+    <string name="settings_section_alerts">Notifications and logs</string>
+
+    <string name="set_crash_alert_title">Crash alerts</string>
+    <string name="set_crash_alert_on">On · reports still saved</string>
+    <string name="set_crash_alert_off">Off · reports still saved</string>
+    <string name="set_crash_alert_pick_title">Crash alerts</string>
+    <string name="set_crash_alert_enable">Show crash alerts</string>
+    <string name="set_crash_alert_disable">Do not show crash alerts</string>
+
+    <string name="storage_clear_cache">Clear cache</string>
+    <string name="storage_clear_title">Clear temporary cache</string>
+    <string name="storage_clear_msg">Only temporary files left by direct share are removed. A file still being sent may fail.</string>
+    <string name="storage_clear_btn">Clear</string>
+    <string name="storage_clear_done_fmt">Removed %1$d temporary files.</string>
+    <string name="storage_clear_none">No temporary share files.</string>
+    <string name="storage_clear_fail">Could not clear the cache.</string>
+
     <string name="about_fmt">version %1$s (build %2$d)\npackage %3$s\n\nCurrent slot data\n%4$s\n\nLauncher data\n%5$s</string>
 
     <!-- ══ F5 自动备份（每槽一套策略，对齐桌面版的「存档分类设置」） ══════ -->

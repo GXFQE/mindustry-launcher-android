@@ -5383,9 +5383,15 @@ public final class SelfTest {
                             && CrashAlert.pick(null, "", 0) == null,
                     "★目录不存在 / null ⇒ 不炸也不报（监视循环每 700 ms 跑一次，容错是硬要求）");
             String oldAlert = Config.get().crashAlerted();
+            boolean oldAlertEnabled = Config.get().crashAlertEnabled();
             Config.get().setCrashAlerted("m3|crash_400.txt");
-            ok(stat, L, "m3|crash_400.txt".equals(Config.get().crashAlerted()),
-                    "★「同一份只提示一次」的记帐能落盘再读回（Config.crash_alert_last）");
+            Config.get().setCrashAlertEnabled(!oldAlertEnabled);
+            boolean alertToggled = Config.get().crashAlertEnabled() == !oldAlertEnabled;
+            Config.get().setCrashAlertEnabled(oldAlertEnabled);
+            ok(stat, L, alertToggled
+                            && "m3|crash_400.txt".equals(Config.get().crashAlerted()),
+                    "★「同一份只提示一次」的记帐能落盘再读回（Config.crash_alert_last）；"
+                            + "第 174 轮崩溃提示开关也能落盘再读回");
             Config.get().setCrashAlerted(oldAlert);
             // 🔴 2026-10-08 真机：「游戏崩溃时怎么弹了两个一模一样的窗啊」
             //   根因：三条路（监视 / 回界面补 / 补弹 pending）各自"先查再写"，

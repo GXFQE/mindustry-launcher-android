@@ -130,6 +130,13 @@ public final class CrashAlert {
                             dir = crashesDir(app, slot);
                             seen = newestName(dir);        // 换槽时重新快照 ⇒ 不报旧报告
                         }
+                        // 第 174 轮：关掉提示时把 seen 推到最新、清掉待弹那份 ——
+                        // 这样重新开启后只报**之后**的新报告，不会把关着期间的旧报告翻出来。
+                        if (!Config.get().crashAlertEnabled()) {
+                            seen = newestName(dir);
+                            sPending = null;
+                            continue;
+                        }
                         File f = pick(dir, seen, 0);
                         if (f == null) continue;
                         seen = f.getName();
@@ -151,6 +158,10 @@ public final class CrashAlert {
      */
     static void catchUp(Activity a) {
         if (Util.dead(a)) return;
+        if (!Config.get().crashAlertEnabled()) {
+            sPending = null;
+            return;
+        }
         String slot = Data.currentSlot(a);
         File root = Data.dirOf(a, slot);
         if (root == null) return;
@@ -194,6 +205,7 @@ public final class CrashAlert {
     // ── 提示 ─────────────────────────────────────────────────────────────
 
     private static void announce(final Context app, final String slot, final File f) {
+        if (!Config.get().crashAlertEnabled()) return;
         final String key = slot + "|" + f.getName();
         if (!claims(Config.get().crashAlerted(), key)) return;   // 便宜的预检（省一次分析）
         final CrashAnalysis.Verdict v = CrashAnalysis.analyzeReport(app, f, slot);
@@ -206,6 +218,7 @@ public final class CrashAlert {
                 : R.string.crash_alert_toast_fmt, CrashAnalysis.brief(app, v));
         new Handler(Looper.getMainLooper()).post(new Runnable() {
             @Override public void run() {
+                if (!Config.get().crashAlertEnabled()) return;
                 // ① 立刻说一声：Toast 是系统浮层 ⇒ 游戏还在前台也看得见
                 try {
                     Toast.makeText(app, line, Toast.LENGTH_LONG).show();
@@ -228,6 +241,10 @@ public final class CrashAlert {
 
     /** 回到界面时把"已 Toast 但还没弹窗"的那一份补上 */
     private static void flushPending() {
+        if (!Config.get().crashAlertEnabled()) {
+            sPending = null;
+            return;
+        }
         final File f = sPending;
         final String slot = sPendingSlot;
         final Activity top = sTop == null ? null : sTop.get();
@@ -238,6 +255,7 @@ public final class CrashAlert {
             @Override public void run() {
                 final CrashAnalysis.Verdict v = CrashAnalysis.analyzeReport(app, f, slot);
                 if (v == null) return;
+                if (!Config.get().crashAlertEnabled()) return;
                 // 🔴 弹之前过原子闸门（原来这里是**无条件**弹 —— 第三条会产生重复窗的路）
                 if (!claim(slot + "|" + f.getName())) return;
                 new Handler(Looper.getMainLooper()).post(new Runnable() {
