@@ -59,6 +59,17 @@
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
 
     <!--
+      ★ 第 177 轮（杀后台 P0）：长操作的前台服务。
+      实机证据：整槽导出/导入、APK 导入、备份在跑的时候，进程没有任何前台身份，
+      切走就只剩半截产物（34 MB 坏 zip / 部分槽 / 78 MB 的 .part）。
+      `dataSync` 是唯一贴切的类型（本地文件读写，不是媒体播放/定位）。
+      ⚠️ Android 14 起类型必须与权限成对声明，漏了 `FOREGROUND_SERVICE_DATA_SYNC`
+         会在 startForeground 时抛 SecurityException（而且只有真机能看见）。
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
+
+    <!--
       ★ F1 实测修正：theme **只挂在我们自己的 Activity 上，不挂 application**。
       原因（aapt2 dump 官方 APK 得出）：官方的 theme 是声明在 application 节点上的
       `@style/ArcTheme`（parent 指向 framework 的全屏无标题主题），游戏 Activity
@@ -117,6 +128,17 @@
             android:authorities="io.mdt.launcher.share"
             android:exported="false"
             android:grantUriPermissions="true"/>
+
+        <!--
+          ★ 第 177 轮（杀后台 P0）：长操作期间的前台服务（只挂通知，不执行任务）。
+          exported=false：只由本应用 startForegroundService；`dataSync` 与上面两条权限成对。
+          ⚠️ 漏注册的症状 = startForegroundService 抛 ActivityNotFoundException（被 Work 吞掉，
+             于是"静默没有前台服务" —— 自检里有一条按 PackageManager 解析这个类名的断言）。
+        -->
+        <service
+            android:name=".WorkService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync"/>
 
         <!-- 主进程（UI）：版本列表 / 导入 / 设置。
              singleTop：已在前台时再被拉起（如 dev_import_path 热路径）走 onNewIntent，

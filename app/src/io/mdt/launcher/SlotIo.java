@@ -12,6 +12,7 @@ import android.view.View;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
+import org.json.JSONObject;
 
 import java.io.File;
 import java.io.FileFilter;
@@ -59,6 +60,12 @@ final class SlotIo {
     /** ★ 第 141 轮：**分享用**整槽包（与 {@link #EXPORT_SLOT} 同一个包 + 剥身份信息） */
     private static final int EXPORT_SHARE = 3;
 
+    // ── 第 177 轮（杀后台 P0）：SAF 待办的磁盘日志名 ───────────────────────
+    // 静态字段只活到进程死为止；这三份是同一件事的"磁盘那半"。
+    private static final String PEND_MSAV = "slots.msav";
+    private static final String PEND_ZIP = "slots.zip";
+    private static final String PEND_EXPORT = "slots.export";
+
     /** 调用方页面：导入/导出完成后刷新自己 */
         /** `saves/` 下只认文件（目录会被游戏用来放别的，不列） */
     private static final FileFilter ONLY_FILES = new FileFilter() {
@@ -99,9 +106,16 @@ final class SlotIo {
         if (req == REQ_MSAV) {
             // ★ 与 REQ_ZIP / REQ_EXPORT 同一条纪律：无论成败**先清目标槽**。
             //   否则用户取消后残留的槽会被下一次选择"接上"，文件落进上一个槽里。
-            final String slot = sMsavTarget;
+            final JSONObject pend = Pending.take(a, PEND_MSAV);
+            String slot = sMsavTarget;
             sMsavTarget = null;
-            if (res != Activity.RESULT_OK || data == null || slot == null) {
+            if (slot == null && pend != null) slot = pend.optString("slot", null);
+            if (res != Activity.RESULT_OK || data == null) {
+                return true;
+            }
+            if (slot == null || slot.trim().isEmpty()) {
+                // 进程被杀过、磁盘待办也没了 ⇒ **不能猜**槽，别把文件落进错误的槽
+                Toast.makeText(a, R.string.pending_lost, Toast.LENGTH_LONG).show();
                 return true;
             }
             // ★ 第 127 轮：**可多选**。选 1 份 = 老样子（含改名框与逐个同名确认）；
@@ -113,10 +127,15 @@ final class SlotIo {
             return true;
         }
         if (req == REQ_ZIP) {
-            final String slot = sZipSlot;
+            final JSONObject pend = Pending.take(a, PEND_ZIP);
+            String slot = sZipSlot;
             sZipSlot = null;
-            if (res != Activity.RESULT_OK || data == null || data.getData() == null
-                    || slot == null) {
+            if (slot == null && pend != null) slot = pend.optString("slot", null);
+            if (res != Activity.RESULT_OK || data == null || data.getData() == null) {
+                return true;
+            }
+            if (slot == null || slot.trim().isEmpty()) {
+                Toast.makeText(a, R.string.pending_lost, Toast.LENGTH_LONG).show();
                 return true;
             }
             readZipThenConfirm(a, data.getData(), queryDisplayName(a, data.getData()), slot, h);
@@ -125,21 +144,53 @@ final class SlotIo {
         if (req == REQ_EXPORT) {
             // ★ 无论成败都先清状态：用户取消之后残留的导出目标会被下一次选择"接上"，
             //   变成导出了上一个槽的东西。
-            final int kind = sExportKind;
-            final File src = sExportSrc;
-            final String slot = sExportSlot;
-            final List<File> roots = sExportRoots;
-            final SharePack.Plan plan = sSharePlan;
+            final JSONObject pend = Pending.take(a, PEND_EXPORT);
+            int kind = sExportKind;
+            File src = sExportSrc;
+            String slot = sExportSlot;
+            List<File> roots = sExportRoots;
+            SharePack.Plan plan = sSharePlan;
             sExportKind = EXPORT_NONE;
             sExportSrc = null;
             sExportSlot = null;
             sExportRoots = null;
             sSharePlan = null;
+            // ★ 第 177 轮：内存里没有 ⇒ 从磁盘待办补（进程被系统回收过的那条路）。
+            if (pend != null) {
+                if (kind == EXPORT_NONE) kind = pend.optInt("kind", EXPORT_NONE);
+                if (slot == null) slot = pend.optString("slot", null);
+                if (src == null) {
+                    String p = pend.optString("src", null);
+                    if (p != null && !p.isEmpty()) src = new File(p);
+                }
+            }
             if (res != Activity.RESULT_OK || data == null || data.getData() == null) return true;
+            if (kind == EXPORT_NONE) {
+                Toast.makeText(a, R.string.pending_lost, Toast.LENGTH_LONG).show();
+                return true;
+            }
             Uri uri = data.getData();
-            if (kind == EXPORT_FILE && src != null) doExportFile(a, uri, src);
-            else if (kind == EXPORT_SLOT && slot != null) doExportSlot(a, uri, slot, roots);
-            else if (kind == EXPORT_SHARE && slot != null) doExportShare(a, uri, slot, roots, plan);
+            if (kind == EXPORT_FILE) {
+                if (src == null) {
+                    Toast.makeText(a, R.string.pending_lost, Toast.LENGTH_LONG).show();
+                } else {
+                    doExportFile(a, uri, src);
+                }
+            } else if (kind == EXPORT_SLOT) {
+                if (slot == null) {
+                    Toast.makeText(a, R.string.pending_lost, Toast.LENGTH_LONG).show();
+                } else {
+                    doExportSlot(a, uri, slot,
+                            roots == null ? Data.contentRoots(a, slot) : roots);
+                }
+            } else if (kind == EXPORT_SHARE) {
+                if (slot == null) {
+                    Toast.makeText(a, R.string.pending_lost, Toast.LENGTH_LONG).show();
+                } else {
+                    doExportShare(a, uri, slot,
+                            roots == null ? Data.contentRoots(a, slot) : roots, plan);
+                }
+            }
             return true;
         }
         return false;
@@ -494,6 +545,9 @@ final class SlotIo {
         sExportKind = EXPORT_FILE;
         sExportSrc = f;
         sExportSlot = null;
+        sExportRoots = null;
+        sSharePlan = null;
+        Pending.put(a, PEND_EXPORT, exportJson(EXPORT_FILE, null, f));   // 第 177 轮
         a.startActivityForResult(Intent.createChooser(
                 Exporter.createDoc(f.getName(), "application/octet-stream"),
                 Trans.get(a, R.string.chooser_export)), REQ_EXPORT);
@@ -575,6 +629,7 @@ final class SlotIo {
                         sExportRoots = roots;
                         sExportSrc = null;
                         sSharePlan = null;
+                        Pending.put(a, PEND_EXPORT, exportJson(EXPORT_SLOT, s.name, null));
                         a.startActivityForResult(Intent.createChooser(
                                 Exporter.createDoc(suggestZipName(s.name, null), "application/zip"),
                                 Trans.get(a, R.string.chooser_export)), REQ_EXPORT);
@@ -669,6 +724,7 @@ final class SlotIo {
                         sExportRoots = roots;
                         sExportSrc = null;
                         sSharePlan = plan;
+                        Pending.put(a, PEND_EXPORT, exportJson(EXPORT_SHARE, s.name, null));
                         a.startActivityForResult(Intent.createChooser(
                                 Exporter.createDoc(suggestZipName(s.name, "share"), "application/zip"),
                                 Trans.get(a, R.string.chooser_export)), REQ_EXPORT);
@@ -702,16 +758,26 @@ final class SlotIo {
             @Override public void run() {
                 String err = null;
                 Exporter.Result r = null;
+                SharePack.Plan p = plan;
                 try {
-                    // ★ 第 144 轮：分享包**要过网络** ⇒ 用最高压缩（本地备份那条路照旧 BEST_SPEED）
-                    r = Exporter.zipTo(a, uri, Data.dirOf(a, slot), roots, shareXform(plan),
-                            java.util.zip.Deflater.BEST_COMPRESSION);
+                    // ★ 第 177 轮：进程重建后内存里的 plan 没了 ⇒ 现算一份
+                    //   （派生量不落盘：`settings.bin` 的字节 + 删了几个键都能从槽目录重算）。
+                    if (p == null) p = SharePack.plan(Data.dirOf(a, slot));
+                    if (!p.ok()) {
+                        // 与 shareSlot 的预检同一句话：读不出来就**拒绝导出**
+                        err = Trans.get(a, R.string.share_slot_err_settings);
+                    } else {
+                        // ★ 第 144 轮：分享包**要过网络** ⇒ 用最高压缩（本地备份那条路照旧 BEST_SPEED）
+                        r = Exporter.zipTo(a, uri, Data.dirOf(a, slot), roots, shareXform(p),
+                                java.util.zip.Deflater.BEST_COMPRESSION);
+                    }
                 } catch (Exception e) {
                     err = Util.ioReason(a, e);
                     android.util.Log.w("MDTLauncher", "export share pack failed", e);
                 }
                 final String fe = err;
                 final Exporter.Result fr = r;
+                final SharePack.Plan fp = p;
                 a.runOnUiThread(new Runnable() {
                     @Override public void run() {
                         pd.dismiss();
@@ -722,9 +788,9 @@ final class SlotIo {
                         // ★ 两个出口分开说：**本来就没有身份信息**（"包和整槽导出一样"）
                         //   与"去掉了 N 项"是两件事，混成一句会让前者看着像漏剥了
                         //   （报告里那句 `untouched()` 也是同一个判据）。
-                        toast(a, plan != null && plan.removedKeys > 0
+                        toast(a, fp != null && fp.removedKeys > 0
                                 ? Trans.get(a, R.string.share_slot_done_fmt,
-                                        fr.files, Util.formatSize(fr.outBytes), plan.removedKeys)
+                                        fr.files, Util.formatSize(fr.outBytes), fp.removedKeys)
                                 : Trans.get(a, R.string.share_slot_done_clean_fmt,
                                         fr.files, Util.formatSize(fr.outBytes)));
                     }
@@ -800,6 +866,36 @@ final class SlotIo {
                 return SharePack.bytesFor(rel, plan);
             }
         };
+    }
+
+    // ── 第 177 轮（杀后台 P0）：SAF 待办的磁盘表示 ──────────────────────────
+
+    /** `{"slot": "..."}`（导入类待办的最小信息） */
+    private static JSONObject slotJson(String slot) {
+        JSONObject o = new JSONObject();
+        try {
+            o.put("slot", slot == null ? "" : slot);
+        } catch (Throwable ignored) {
+        }
+        return o;
+    }
+
+    /**
+     * 导出类待办的最小信息：**只记"从哪来、到哪去"**。
+     *
+     * <p>`roots` 与分享包的 `SharePack.Plan` **刻意不落盘**：前者能从槽名重算
+     * （`Data.contentRoots`），后者能从槽目录重算（`SharePack.plan`）。
+     * 把派生量写进日志只会制造"日志与磁盘不一致"的第二个真相。
+     */
+    private static JSONObject exportJson(int kind, String slot, File src) {
+        JSONObject o = new JSONObject();
+        try {
+            o.put("kind", kind);
+            if (slot != null) o.put("slot", slot);
+            if (src != null) o.put("src", src.getAbsolutePath());
+        } catch (Throwable ignored) {
+        }
+        return o;
     }
 
     /**
@@ -946,6 +1042,7 @@ final class SlotIo {
     static void importSave(Activity a, final Data.Slot s) {
         if (blockedByGame(a, s)) return;
         sMsavTarget = s.name;
+        Pending.put(a, PEND_MSAV, slotJson(s.name));       // 第 177 轮：磁盘那半
         pickMsavFile(a);
     }
 
@@ -1131,6 +1228,7 @@ final class SlotIo {
     static void importSlot(Activity a, final Data.Slot s) {
         if (blockedByGame(a, s)) return;
         sZipSlot = s.name;
+        Pending.put(a, PEND_ZIP, slotJson(s.name));        // 第 177 轮：磁盘那半
         pickZipFile(a);
     }
 

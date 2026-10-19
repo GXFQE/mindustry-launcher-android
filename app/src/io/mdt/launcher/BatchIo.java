@@ -16,6 +16,8 @@ import android.widget.AdapterView;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -175,6 +177,9 @@ final class BatchIo {
     /** 跨回调的待导出清单（发起前重设、回调进来先清 —— 同 {@link SlotIo} 的纪律） */
     private static List<Exporter.Src> sSrcs;
 
+    /** 第 177 轮（杀后台 P0）：同一份清单的磁盘表示 —— 进程被杀后靠它恢复 */
+    private static final String PEND_EXPORT = "batch.export";
+
     /** 批量导出的建议 zip 名：`mdt-<类型>-20261009-1930.zip`（类型是 ASCII，不进资源） */
     static String suggestZipName(String kind) {
         String stamp = new SimpleDateFormat("yyyyMMdd-HHmm", Locale.US).format(new Date());
@@ -211,6 +216,7 @@ final class BatchIo {
     /** 一个 zip 那条路（老样子） */
     private static void startExportZip(Activity a, List<Exporter.Src> srcs, String zipName) {
         sSrcs = srcs;
+        Pending.put(a, PEND_EXPORT, srcsJson(srcs));         // 第 177 轮：磁盘那半
         a.startActivityForResult(Intent.createChooser(
                 Exporter.createDoc(zipName, "application/zip"),
                 Trans.get(a, R.string.chooser_export)), REQ_EXPORT);
@@ -219,9 +225,66 @@ final class BatchIo {
     /** 目录树那条路：选一个目录，之后每一份落成一个独立文档（⑥c） */
     private static void startExportTree(Activity a, List<Exporter.Src> srcs) {
         sSrcs = srcs;
+        Pending.put(a, PEND_EXPORT, srcsJson(srcs));         // 第 177 轮：磁盘那半
         Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT_TREE);
         i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION | Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
         a.startActivityForResult(i, REQ_TREE);
+    }
+
+    // ── 第 177 轮（杀后台 P0）：待导出清单的磁盘表示 ────────────────────────
+    //
+    // 只记"这一份从哪来"（真文件 / 容器条目 / 目录）+ 显示名；派生量一概不记。
+
+    private static JSONObject srcsJson(List<Exporter.Src> srcs) {
+        JSONArray arr = new JSONArray();
+        if (srcs != null) {
+            for (Exporter.Src s : srcs) {
+                if (s == null) continue;
+                JSONObject o = new JSONObject();
+                try {
+                    o.put("name", s.entryName());
+                    if (s.file != null) {
+                        o.put("file", s.file.getAbsolutePath());
+                    } else if (s.dir != null) {
+                        o.put("dir", s.dir.getAbsolutePath());
+                    } else if (s.container != null && s.entry != null) {
+                        o.put("container", s.container.getAbsolutePath());
+                        o.put("entry", s.entry);
+                    } else {
+                        continue;       // 本来就没有源，不写进日志
+                    }
+                    arr.put(o);
+                } catch (Throwable ignored) {
+                }
+            }
+        }
+        JSONObject root = new JSONObject();
+        try {
+            root.put("items", arr);
+        } catch (Throwable ignored) {
+        }
+        return root;
+    }
+
+    private static List<Exporter.Src> srcsFromJson(JSONObject root) {
+        List<Exporter.Src> out = new ArrayList<>();
+        JSONArray arr = root == null ? null : root.optJSONArray("items");
+        if (arr == null) return out;
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject o = arr.optJSONObject(i);
+            if (o == null) continue;
+            String name = o.optString("name", "file");
+            String file = o.optString("file", "");
+            String dir = o.optString("dir", "");
+            String container = o.optString("container", "");
+            String entry = o.optString("entry", "");
+            if (!file.isEmpty()) out.add(Exporter.Src.ofFile(new File(file), name));
+            else if (!dir.isEmpty()) out.add(Exporter.Src.ofDir(new File(dir), name));
+            else if (!container.isEmpty() && !entry.isEmpty()) {
+                out.add(Exporter.Src.ofEntry(new File(container), entry, name));
+            }
+        }
+        return out;
     }
 
     /**
@@ -298,11 +361,20 @@ final class BatchIo {
     static boolean handleExportResult(final Activity a, int req, int res, Intent data) {
         if (req != REQ_EXPORT && req != REQ_TREE) return false;
         final boolean toTree = req == REQ_TREE;
-        final List<Exporter.Src> srcs = sSrcs;
+        // ★ 第 177 轮：先取走磁盘待办（成败都取），内存里没有就用它重建
+        final JSONObject pend = Pending.take(a, PEND_EXPORT);
+        List<Exporter.Src> srcs = sSrcs;
         sSrcs = null;
-        if (res != Activity.RESULT_OK || data == null || data.getData() == null || srcs == null) {
+        if (srcs == null && pend != null) srcs = srcsFromJson(pend);
+        if (res != Activity.RESULT_OK || data == null || data.getData() == null) {
             return true;
         }
+        if (srcs == null || srcs.isEmpty()) {
+            // 进程被杀过、磁盘待办也没了 ⇒ 不能猜"导出哪一批"；明说一次
+            Toast.makeText(a, R.string.pending_lost, Toast.LENGTH_LONG).show();
+            return true;
+        }
+        final List<Exporter.Src> fsrcs = srcs;
         final Uri uri = data.getData();
         // ★ 2026-10-11：导出侧也改成**确定进度**（份数已知；目录形态的模组可能几十 MB）
         final ProgressDialog pd = new ProgressDialog(a);
@@ -331,8 +403,8 @@ final class BatchIo {
                             });
                         }
                     };
-                    r = toTree ? Exporter.saveToTree(a, uri, srcs, step)
-                               : Exporter.zipSources(a, uri, srcs, step);
+                    r = toTree ? Exporter.saveToTree(a, uri, fsrcs, step)
+                               : Exporter.zipSources(a, uri, fsrcs, step);
                 } catch (Throwable t) {
                     err = Util.ioReason(a, t);
                     Log.w(TAG, "batch export failed", t);

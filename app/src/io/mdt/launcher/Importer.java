@@ -47,15 +47,32 @@ public final class Importer {
 
     /** 拷贝 + 校验 + 预热预检 + 登记。失败抛 IOException（.part 副本已清理）。 */
     public static JSONObject importApk(Context ctx, Uri uri, String displayName) throws IOException {
+        // ★ 第 177 轮：78 MB 的拷贝 + 校验 + 预热都在这一段里，给它一个前台身份
+        Work.begin(ctx, R.string.work_import_apk);
+        try {
+            return importApk0(ctx, uri, displayName);
+        } finally {
+            Work.end(ctx);
+        }
+    }
+
+    private static JSONObject importApk0(Context ctx, Uri uri, String displayName) throws IOException {
         File dir = importDir(ctx);
         String base = sanitizeName(displayName);
         if (base.isEmpty()) base = "import-" + System.currentTimeMillis() + ".apk";
         if (!base.toLowerCase(Locale.US).endsWith(".apk")) base = base + ".apk";
         File file = new File(dir, base);
         File tmp = new File(dir, base + ".part");
+        // 旧副本的"临时让位"名（只在 rename 不能覆盖目标时用；见下面那段）
+        File old = new File(dir, base + ".old");
 
-        // 同名重导 = 替换旧副本（只动我们自己管理的私有副本）
-        if (file.exists()) { file.setWritable(true); file.delete(); }
+        // ★ 第 177 轮（杀后台 P0）：**绝不再先删旧副本**。
+        //   旧实现是 `file.delete()` 再拷 `.part`（Importer.java:58/64）；真机实测在
+        //   414 ms 时 force-stop，旧 APK 已删、`.part` 完整但没就位、config 仍指着旧名
+        //   ⇒ 这个版本直接变砖（`apk` 找不到，连启动入口都没有）。
+        //   现在旧副本留到**新包校验/预热通过并完成 rename** 为止。
+        //   Linux 的 rename 对已存在的目标是**原子替换** ⇒ 顺利时这一步就够了。
+        if (old.exists()) { old.setWritable(true); old.delete(); }   // 上次中断的残留
         if (tmp.exists()) { tmp.setWritable(true); tmp.delete(); }
 
         InputStream in = ctx.getContentResolver().openInputStream(uri);
@@ -116,14 +133,30 @@ public final class Importer {
         Log.i(TAG, "import prewarm ok: " + c.getName() + " from " + tmp.getName());
 
         // rename 只需要目录写权限，只读文件本身不影响；
-        // 个别实现拒绝时退化为「临时可写 → 改名 → 恢复只读」。
+        // 顺带覆盖掉同名的旧副本（Linux 语义 = 原子替换）。
         if (!tmp.renameTo(file)) {
+            // ★ 个别实现拒绝"覆盖式 rename"：这时才让旧副本临时改名让位。
+            //   中途被杀 ⇒ 盘上是 `file.old` + `file.part`、`file` 不在 ——
+            //   启动时的 {@link #recover} 会把 `.old` 改回去（旧版本仍然可用）。
+            boolean had = file.exists();
+            if (had && !file.renameTo(old)) {
+                cleanup(tmp);
+                throw new IOException(Trans.get(ctx, R.string.imp_err_rename_fmt, file.getName()));
+            }
             tmp.setWritable(true);
             if (!tmp.renameTo(file)) {
+                // 新包没就位 ⇒ 把旧包原样还回去，绝不让用户变砖
+                if (had && old.exists()) {
+                    old.setWritable(true);
+                    if (!old.renameTo(file)) {
+                        Log.w(TAG, "import rollback failed: " + old + " -> " + file);
+                    }
+                }
                 cleanup(tmp);
                 throw new IOException(Trans.get(ctx, R.string.imp_err_rename_fmt, tmp.getName()));
             }
             file.setReadOnly();
+            if (old.exists()) { old.setWritable(true); old.delete(); }
         }
 
         JSONObject e = new JSONObject();
@@ -144,13 +177,71 @@ public final class Importer {
 
     /** 删除导入副本 + 配置登记。只动我们私有目录里的副本。 */
     public static void removeImport(Context ctx, String file) {
-        File f = new File(importDir(ctx), file);
+        File dir = importDir(ctx);
+        File f = new File(dir, file);
         if (f.exists()) {
             f.setWritable(true);
             if (!f.delete()) Log.w(TAG, "import file delete failed: " + f);
         }
+        // 顺手清同名残留（杀在导入中途的 `.part` / 让位用的 `.old`）
+        deleteQuiet(new File(dir, file + ".part"));
+        deleteQuiet(new File(dir, file + ".old"));
         Config.get().removeImport(file);
         Log.i(TAG, "import removed: " + file);
+    }
+
+    /**
+     * 启动时的**导入目录自愈**（第 177 轮，杀后台 P0）。
+     *
+     * <p>处理的三种残留（都是真机造出来过的）：
+     * <ul>
+     *   <li>`<base>.part`：拷贝/校验中途被杀。**删掉** —— 配置里还没有它，
+     *       而且同名的旧副本此刻要么还在 `<base>`、要么在 `<base>.old`；</li>
+     *   <li>`<base>.old` 且 `<base>` 不存在：rename 让位窗口里被杀 ⇒ **改回去**，
+     *       旧版本继续可用（这是"版本变砖"那条的兜底）；</li>
+     *   <li>`<base>.old` 且 `<base>` 存在：新包已就位 ⇒ 删掉让位副本。</li>
+     * </ul>
+     *
+     * @return 一行人读的处理摘要（没做事返回空串；只进日志/报告，不上界面）
+     */
+    public static String recover(Context ctx) {
+        File dir = new File(Paths.privateDir(ctx), "import");
+        File[] fs = dir.isDirectory() ? dir.listFiles() : null;
+        if (fs == null || fs.length == 0) return "";
+        StringBuilder sb = new StringBuilder();
+        for (File f : fs) {
+            String n = f.getName();
+            if (!f.isFile()) continue;
+            if (n.endsWith(".old")) {
+                String base = n.substring(0, n.length() - 4);
+                File target = new File(dir, base);
+                if (!target.exists()) {
+                    long len = f.length();          // rename 之后 f 就没了，先取
+                    f.setWritable(true);
+                    if (f.renameTo(target)) {
+                        sb.append("restored ").append(base).append(" (").append(len)
+                          .append(" B)\n");
+                        continue;
+                    }
+                    Log.w(TAG, "import recover: restore failed " + f);
+                }
+                if (deleteQuiet(f)) sb.append("dropped stale .old ").append(n).append('\n');
+            } else if (n.endsWith(".part")) {
+                long len = f.length();
+                if (deleteQuiet(f)) sb.append("dropped .part ").append(n)
+                        .append(" (").append(len).append(" B)\n");
+            }
+        }
+        if (sb.length() > 0) Log.i(TAG, "import recover:\n" + sb);
+        return sb.toString();
+    }
+
+    private static boolean deleteQuiet(File f) {
+        if (f == null || !f.exists()) return false;
+        f.setWritable(true);
+        if (f.delete()) return true;
+        Log.w(TAG, "delete failed: " + f);
+        return false;
     }
 
     private static void cleanup(File tmp) {

@@ -23,6 +23,18 @@
     <string name="saves_title">存档与备份</string>
     <string name="gameslot_title">GameSlot</string>
 
+    <!-- 第 177 轮（杀后台 P0）：长操作的前台服务通知（WorkService） -->
+    <string name="work_channel_name">后台任务</string>
+    <string name="work_notif_title">正在处理文件…</string>
+    <string name="work_notif_plain">正在处理…</string>
+    <string name="work_export">正在导出</string>
+    <string name="work_import">正在导入</string>
+    <string name="work_backup">正在备份</string>
+    <string name="work_restore">正在恢复</string>
+    <string name="work_import_apk">正在导入游戏包</string>
+    <!-- SAF 待办在进程重建后找不到目标时说的话（第 177 轮） -->
+    <string name="pending_lost">上一次操作的目标丢了（应用可能被系统回收过），请重新操作一次。</string>
+
     <!-- 主界面（F1b 卡片化：操作行拆「主标题 + 副标题」；顶部信息改「摘要 + 可展开详情」） -->
     <string name="main_summary_fmt">%1$d 个版本 · 当前槽 %2$s</string>
     <string name="main_detail_fmt">存档数据\n%1$s\n\n管理器数据\n%2$s</string>

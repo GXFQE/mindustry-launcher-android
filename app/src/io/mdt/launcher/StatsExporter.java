@@ -7,6 +7,7 @@ import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.net.Uri;
 import android.widget.Toast;
+import org.json.JSONObject;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -72,6 +73,9 @@ final class StatsExporter {
     private static int sMaps;
     private static int sSkipped;
 
+    /** 第 177 轮（杀后台 P0）：同一份待办的磁盘表示 —— 进程被杀后靠它恢复 */
+    private static final String PEND = "stats.export";
+
     private StatsExporter() {}
 
     // ── 出口：文本拼好了 → 让用户选落点 ──────────────────────────────────
@@ -88,6 +92,18 @@ final class StatsExporter {
         sName = name;
         sMaps = Math.max(1, maps);
         sSkipped = Math.max(0, skipped);
+        // ★ 第 177 轮（杀后台 P0）：**正文也要落盘** —— 统计文本可能几十 KB~几 MB，
+        //   塞不进 Bundle（TransactionTooLarge），所以放 `app_hub/pending/stats.export.txt`。
+        //   SAF 选择器打开时进程被杀，回来仍能写出同一份内容。
+        Pending.putText(a, PEND, text);
+        JSONObject meta = new JSONObject();
+        try {
+            meta.put("name", name);
+            meta.put("maps", Math.max(1, maps));
+            meta.put("skipped", Math.max(0, skipped));
+        } catch (Throwable ignored) {
+        }
+        Pending.put(a, PEND, meta);
         a.startActivityForResult(
                 Exporter.createDoc(name, mime == null || mime.isEmpty() ? MIME : mime), REQ);
     }
@@ -95,24 +111,56 @@ final class StatsExporter {
     /** 在 Activity 的 `onActivityResult` 里调；不是我们的请求码就返回 false（别抢别人的码） */
     static boolean handle(final Activity a, int req, int res, Intent data) {
         if (req != REQ) return false;
+        // ★ 第 177 轮：先取走磁盘待办（摘要），正文在后台线程里取（可能几 MB）
+        final JSONObject pend = Pending.take(a, PEND);
         // ★ 与地图导出同一条纪律：无论成败**先清掉待写的那一份**（否则下一次导出会写错内容）
-        final String text = sText;
-        final String name = sName;
-        final int maps = sMaps;
-        final int skipped = sSkipped;
+        final String memText = sText;
+        String name = sName;
+        int maps = sMaps;
+        int skipped = sSkipped;
         sText = null;
         sName = null;
         sMaps = 1;
         sSkipped = 0;
-        if (res != Activity.RESULT_OK || data == null || data.getData() == null || text == null) {
+        if (res != Activity.RESULT_OK || data == null || data.getData() == null) {
+            // 用户取消：正文待办（可能有几 MB）也要清掉，别留在 app_hub 里
+            Pending.clear(a, PEND);
             return true;
         }
+        if (pend != null) {
+            if (name == null) name = pend.optString("name", null);
+            if (maps <= 1) maps = Math.max(1, pend.optInt("maps", 1));
+            if (skipped <= 0) skipped = Math.max(0, pend.optInt("skipped", 0));
+        }
+        if (memText == null && pend == null) {
+            Pending.clear(a, PEND);
+            Toast.makeText(a, R.string.pending_lost, Toast.LENGTH_LONG).show();
+            return true;
+        }
+        final String fname = name == null ? "stats" : name;
+        final int fmaps = maps;
+        final int fskipped = skipped;
         final Uri uri = data.getData();
         final ProgressDialog pd = ProgressDialog.show(a,
                 Trans.get(a, R.string.stats_export),
                 Trans.get(a, R.string.stats_export_working), true, false);
         new Thread(new Runnable() {
             @Override public void run() {
+                // 内存里有就用内存的；进程重建过就取磁盘正文（取完即删）
+                String text = memText;
+                String disk = Pending.takeText(a, PEND);
+                if (text == null) text = disk;
+                if (text == null) {
+                    a.runOnUiThread(new Runnable() {
+                        @Override public void run() {
+                            pd.dismiss();
+                            if (!Util.dead(a)) {
+                                Toast.makeText(a, R.string.pending_lost, Toast.LENGTH_LONG).show();
+                            }
+                        }
+                    });
+                    return;
+                }
                 long n = -1;
                 Throwable err = null;
                 try {
@@ -136,14 +184,14 @@ final class StatsExporter {
                             return;
                         }
                         String msg;
-                        if (maps <= 1) {
-                            msg = Trans.get(a, R.string.stats_export_ok_fmt, name, Util.formatSize(fn));
-                        } else if (skipped > 0) {
+                        if (fmaps <= 1) {
+                            msg = Trans.get(a, R.string.stats_export_ok_fmt, fname, Util.formatSize(fn));
+                        } else if (fskipped > 0) {
                             msg = Trans.get(a, R.string.stats_export_batch_ok_skipped_fmt,
-                                    maps, Util.formatSize(fn), skipped);
+                                    fmaps, Util.formatSize(fn), fskipped);
                         } else {
                             msg = Trans.get(a, R.string.stats_export_batch_ok_fmt,
-                                    maps, Util.formatSize(fn));
+                                    fmaps, Util.formatSize(fn));
                         }
                         Toast.makeText(a, msg, Toast.LENGTH_LONG).show();
                     }

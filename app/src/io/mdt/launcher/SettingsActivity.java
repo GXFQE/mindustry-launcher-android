@@ -12,6 +12,7 @@ import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+import org.json.JSONObject;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -61,6 +62,8 @@ public class SettingsActivity extends BaseActivity {
     /** 模板先落这里，用户选完落点再整份写过去（取消就删掉） */
     private File sTemplateTmp;
     private int sTemplateCount;
+    /** 第 177 轮（杀后台 P0）：模板待办的磁盘表示（进程被杀后靠它恢复） */
+    private static final String PEND_TPL = "settings.langtpl";
 
     private TextView mThemeSub;
     private TextView mLangSub;
@@ -546,6 +549,15 @@ public class SettingsActivity extends BaseActivity {
                         }
                         sTemplateTmp = tmp;
                         sTemplateCount = fn;
+                        // ★ 第 177 轮（杀后台 P0）：模板路径落盘 —— 进程在选择器打开时被杀，
+                        //   回来仍能写出去（旧代码字段一空就静默放弃，还留一个 tmp 在缓存里）。
+                        JSONObject meta = new JSONObject();
+                        try {
+                            meta.put("tmp", tmp.getAbsolutePath());
+                            meta.put("count", fn);
+                        } catch (Throwable ignored) {
+                        }
+                        Pending.put(SettingsActivity.this, PEND_TPL, meta);
                         // ★ 走 SAF 的"存到哪"（与导出一份存档同一条路：不需要任何存储权限）
                         startActivityForResult(
                                 Intent.createChooser(
@@ -582,6 +594,7 @@ public class SettingsActivity extends BaseActivity {
                 }
                 if (sTemplateTmp != null) sTemplateTmp.delete();
                 sTemplateTmp = null;
+                Pending.clear(SettingsActivity.this, PEND_TPL);
                 final String ferr = err;
                 final int n = sTemplateCount;
                 runOnUiThread(new Runnable() {
@@ -609,11 +622,30 @@ public class SettingsActivity extends BaseActivity {
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
         if (requestCode == REQ_LANG_TPL) {
+            // ★ 第 177 轮：先取走磁盘待办（成败都取）
+            final JSONObject pend = Pending.take(this, PEND_TPL);
             if (resultCode == RESULT_OK && data != null && data.getData() != null) {
+                if (sTemplateTmp == null && pend != null) {
+                    String p = pend.optString("tmp", "");
+                    if (!p.isEmpty()) sTemplateTmp = new File(p);
+                    sTemplateCount = pend.optInt("count", 0);
+                }
+                if (sTemplateTmp == null || !sTemplateTmp.isFile()) {
+                    // 进程被杀过、磁盘待办也没了 ⇒ 不假装保存成功
+                    Toast.makeText(this, R.string.pending_lost, Toast.LENGTH_LONG).show();
+                    return;
+                }
                 saveTemplateTo(data.getData());
-            } else if (sTemplateTmp != null) {
-                sTemplateTmp.delete();      // 用户在系统选择器里取消了
-                sTemplateTmp = null;
+            } else {
+                // 用户在系统选择器里取消了（或文件已经没了）⇒ 删掉临时模板
+                if (sTemplateTmp != null) {
+                    sTemplateTmp.delete();
+                    sTemplateTmp = null;
+                }
+                if (pend != null) {
+                    String p = pend.optString("tmp", "");
+                    if (!p.isEmpty()) new File(p).delete();
+                }
             }
             return;
         }

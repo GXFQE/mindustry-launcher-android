@@ -7,6 +7,7 @@ import android.widget.AdapterView;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
+import org.json.JSONObject;
 
 import java.io.File;
 import java.io.IOException;
@@ -46,6 +47,9 @@ public class BlueprintsActivity extends BaseActivity {
      */
     private static String sImportSlot;
     private static Blueprints.Item sExportItem;
+    /** 第 177 轮（杀后台 P0）：SAF 待办的磁盘表示（进程被杀后靠它恢复） */
+    private static final String PEND_IMPORT = "bp.import";
+    private static final String PEND_EXPORT = "bp.export";
     /** dev 口用：把"选文件"换成路径（SAF 自动化不了） */
     public static final String EXTRA_DEV_IMPORT = "dev_bp_import";
 
@@ -137,6 +141,7 @@ public class BlueprintsActivity extends BaseActivity {
                             return;
                         }
                         sImportSlot = mSlot;
+                        Pending.put(BlueprintsActivity.this, PEND_IMPORT, slotJson(mSlot));
                         // ★ 第 127 轮：**可多选**（选 1 份 = 老样子；≥2 份或一个 zip = 批量，
                         //   见 onActivityResult / BatchIo.runImport）
                         BatchIo.pickFiles(BlueprintsActivity.this, REQ_BP_IMPORT, R.string.bp_import);
@@ -456,17 +461,29 @@ public class BlueprintsActivity extends BaseActivity {
         if (BatchIo.handleExportResult(this, requestCode, resultCode, data)) return;
         if (requestCode == REQ_BP_EXPORT) {
             // ★ 与导入同一条纪律：无论成败**先清掉待写的那一条**（否则下一次导出会认错蓝图）
-            final Blueprints.Item it = sExportItem;
+            final JSONObject pend = Pending.take(this, PEND_EXPORT);
+            Blueprints.Item it = sExportItem;
             sExportItem = null;
-            if (resultCode != RESULT_OK || data == null || data.getData() == null || it == null) return;
+            if (it == null && pend != null) it = itemFromJson(pend);
+            if (resultCode != RESULT_OK || data == null || data.getData() == null) return;
+            if (it == null) {
+                Toast.makeText(this, R.string.pending_lost, Toast.LENGTH_LONG).show();
+                return;
+            }
             exportItem(it, data.getData());
             return;
         }
         if (requestCode != REQ_BP_IMPORT) return;
         // ★ 与地图那条同一纪律：无论成败**先清目标槽**
-        final String slot = sImportSlot;
+        final JSONObject pend = Pending.take(this, PEND_IMPORT);
+        String slot = sImportSlot;
         sImportSlot = null;
-        if (resultCode != RESULT_OK || data == null || slot == null) return;
+        if (slot == null && pend != null) slot = pend.optString("slot", null);
+        if (resultCode != RESULT_OK || data == null) return;
+        if (slot == null || slot.trim().isEmpty()) {
+            Toast.makeText(this, R.string.pending_lost, Toast.LENGTH_LONG).show();
+            return;
+        }
         // ★ 第 127 轮：一批（多选 / 一个 zip）走批量；**一份普通文件**仍走单份那条路
         //   （那条路有逐个同名确认，逐份弹框在批量里是折磨）
         importDocs(BatchIo.docsOf(this, data), slot);
@@ -660,6 +677,7 @@ public class BlueprintsActivity extends BaseActivity {
                                 return;
                             }
                             sExportItem = it;
+                            Pending.put(BlueprintsActivity.this, PEND_EXPORT, itemJson(it));
                             startActivityForResult(Intent.createChooser(
                                     Exporter.createDoc(it.name(), "application/octet-stream"),
                                     Trans.get(BlueprintsActivity.this, R.string.chooser_export)),
@@ -813,6 +831,53 @@ public class BlueprintsActivity extends BaseActivity {
                 });
             }
         }, "bp-share").start();
+    }
+
+    // ── 第 177 轮（杀后台 P0）：SAF 待办的磁盘表示 ──────────────────────────
+
+    private static JSONObject slotJson(String slot) {
+        JSONObject o = new JSONObject();
+        try {
+            o.put("slot", slot == null ? "" : slot);
+        } catch (Throwable ignored) {
+        }
+        return o;
+    }
+
+    private static JSONObject itemJson(Blueprints.Item it) {
+        JSONObject o = new JSONObject();
+        try {
+            o.put("from", it.from);
+            o.put("source", it.source == null ? "" : it.source);
+            o.put("where", it.where == null ? "" : it.where);
+            o.put("bytes", it.bytes);
+            if (it.file != null) o.put("file", it.file.getAbsolutePath());
+            if (it.container != null && it.entry != null) {
+                o.put("container", it.container.getAbsolutePath());
+                o.put("entry", it.entry);
+            }
+        } catch (Throwable ignored) {
+        }
+        return o;
+    }
+
+    private static Blueprints.Item itemFromJson(JSONObject o) {
+        if (o == null) return null;
+        String file = o.optString("file", "");
+        String container = o.optString("container", "");
+        String entry = o.optString("entry", "");
+        if (file.isEmpty() && (container.isEmpty() || entry.isEmpty())) return null;
+        Blueprints.Item it = new Blueprints.Item();
+        it.from = o.optInt("from", Blueprints.FROM_SLOT);
+        it.source = o.optString("source", "");
+        it.where = o.optString("where", "");
+        it.bytes = o.optLong("bytes", 0);
+        if (!file.isEmpty()) it.file = new File(file);
+        if (!container.isEmpty() && !entry.isEmpty()) {
+            it.container = new File(container);
+            it.entry = entry;
+        }
+        return it;
     }
 
     /** 把选中的那份写进 SAF 目标：本槽是真文件、模组自带要从 zip 条目流式拷 */

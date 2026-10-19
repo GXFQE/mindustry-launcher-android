@@ -61,6 +61,14 @@ public class LauncherApp extends Application {
         if (!Data.gameAlive(this)) {
             String r = Data.reclaimLegacy(this);
             if (r != null) Log.i(TAG, "F0 一次性迁移：\n" + r);
+            // ★ 第 177 轮（杀后台 P0）：长操作被强杀留下的 temp / `.part` / `.old`
+            //   在这里清掉（同步 —— 此刻不可能有我们的长操作在跑，没有竞态）。
+            //   见 Recovery 的类注释；`Data.gameAlive` 为真时绝不动（游戏可能正在写槽）。
+            try {
+                Recovery.runNow(this);
+            } catch (Throwable t) {
+                Log.w(TAG, "startup recovery failed: " + t);
+            }
         }
         Config.get().load(this);
         Log.i(TAG, "app up, privateDir=" + Paths.privateDir(this)

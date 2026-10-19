@@ -110,6 +110,15 @@ final class ShareOut {
      * @throws IOException 写失败（半个文件**会被删掉**，不留垃圾）
      */
     static Uri stage(Context ctx, String name, Body body) throws IOException {
+        Work.begin(ctx, R.string.work_export);      // 第 177 轮：分享包可能是几十 MB
+        try {
+            return stage0(ctx, name, body);
+        } finally {
+            Work.end(ctx);
+        }
+    }
+
+    private static Uri stage0(Context ctx, String name, Body body) throws IOException {
         File dir = ShareProvider.dirOf(ctx);
         prune(dir, System.currentTimeMillis() - KEEP_MS);
         File f = unique(dir, fixName(name));

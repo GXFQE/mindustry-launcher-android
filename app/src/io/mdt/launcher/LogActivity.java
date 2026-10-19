@@ -17,6 +17,7 @@ import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+import org.json.JSONObject;
 import java.io.File;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -88,6 +89,13 @@ public class LogActivity extends BaseActivity {
     private static final int EXPORT_MAX_BYTES = 8 * 1024 * 1024;
     /** SAF 导出请求码 */
     private static final int REQ_EXPORT = 4711;
+
+    /**
+     * 待导出模式的磁盘日志名（第 177 轮，杀后台 P0）。
+     * ⚠️ 与 {@link #mExportScrub} 是同一件事的两层：内存里那份用于正常路径，
+     *   这份用于"进程在 SAF 选择器打开时被杀"—— 没有它就只能按"原件"重拼。
+     */
+    private static final String PEND_EXPORT = "log.export";
 
     /**
      * 启动器侧报告：文件名 + 展示名。
@@ -711,12 +719,23 @@ public class LogActivity extends BaseActivity {
                         mExportText = c.text;
                         mExportScrub = scrub;
                         mExportHits = c.hits;
+                        // ★ 第 177 轮（杀后台 P0）：把"这次是脱敏还是原件"写进内部存储。
+                        //   进程在选择器打开时被杀 ⇒ 重建后 mExportScrub 变回 false，
+                        //   旧代码就会把**原件**拼出来写出去（用户点的是脱敏）。
+                        JSONObject meta = new JSONObject();
+                        try {
+                            meta.put("scrub", scrub);
+                            meta.put("hits", c.hits);
+                        } catch (Throwable ignored) {
+                        }
+                        Pending.put(LogActivity.this, PEND_EXPORT, meta);
                         try {
                             startActivityForResult(
                                     Exporter.createDoc(exportFileName(), "text/plain"), REQ_EXPORT);
                         } catch (android.content.ActivityNotFoundException e) {
                             // 极简 ROM 上可能一个能收 ACTION_CREATE_DOCUMENT 的应用都没有
                             mExportText = null;
+                            Pending.clear(LogActivity.this, PEND_EXPORT);
                             Toast.makeText(LogActivity.this, R.string.log_export_no_picker,
                                     Toast.LENGTH_LONG).show();
                         }
@@ -730,6 +749,8 @@ public class LogActivity extends BaseActivity {
     protected void onActivityResult(int req, int res, Intent data) {
         super.onActivityResult(req, res, data);
         if (req != REQ_EXPORT) return;
+        // ★ 第 177 轮：**无论成败先取走磁盘待办**（与 SlotIo/BatchIo 同一条纪律）。
+        final JSONObject pend = Pending.take(this, PEND_EXPORT);
         // 用户取消（返回键 / 不选）⇒ 什么都不做，也不弹"失败"（那不是失败）
         if (res != RESULT_OK || data == null || data.getData() == null) {
             mExportText = null;
@@ -741,9 +762,27 @@ public class LogActivity extends BaseActivity {
         // 兼容被系统回收后重建的情况：正文丢了就重拼一份（读盘很便宜，比重导一次强）
         // ⚠️ 重拼挪进下面那个**后台线程**：F23 的结论在"认不出"时会扫 dex，
         //    在 UI 线程里做就是一次可感知的卡顿（原来这里只拼文本，所以放在外面没问题）。
-        final String pre = mExportText;
-        final boolean scrub = mExportScrub;
-        final int hits = mExportHits;
+        String pre = mExportText;
+        boolean scrub = mExportScrub;
+        int hits = mExportHits;
+        if (pre == null) {
+            // 🔴 正文丢了 ⇒ **模式必须从磁盘待办里来**。两样都没有时**不许猜**：
+            //   按旧代码的默认（false = 原件）重拼，用户点的是"脱敏"，导出的却是原件 ——
+            //   那是隐私承诺失效。宁可明说"目标丢了，请重试"。
+            Boolean mode = exportScrubOf(mExportScrub, pend);
+            if (mode == null) {
+                mExportText = null;
+                mExportScrub = false;
+                mExportHits = 0;
+                Toast.makeText(this, R.string.pending_lost, Toast.LENGTH_LONG).show();
+                return;
+            }
+            scrub = mode.booleanValue();
+            hits = pend.optInt("hits", 0);
+        }
+        final String fpre = pre;
+        final boolean fscrub = scrub;
+        final int fhits = hits;
         mExportText = null;
         mExportScrub = false;
         mExportHits = 0;
@@ -751,12 +790,15 @@ public class LogActivity extends BaseActivity {
             @Override public void run() {
                 final String text;
                 final int nHidden;
-                if (pre != null) {
-                    text = pre;
-                    nHidden = hits;
+                if (fpre != null) {
+                    text = fpre;
+                    nHidden = fhits;
                 } else {
-                    Composed cp = build(LogActivity.this, mSnap,
-                            exportHeader(LogActivity.this, scrub), mVerdicts, scrub);
+                    // 进程重建后 mSnap 可能还没读回来 ⇒ 现读一份（与页面同一实现）
+                    Snap snap = mSnap;
+                    if (snap == null) snap = readAll(LogActivity.this);
+                    Composed cp = build(LogActivity.this, snap,
+                            exportHeader(LogActivity.this, fscrub), mVerdicts, fscrub);
                     text = cp.text;
                     nHidden = cp.hits;
                 }
@@ -778,7 +820,7 @@ public class LogActivity extends BaseActivity {
                     @Override public void run() {
                         Toast.makeText(LogActivity.this,
                                 ferr == null
-                                        ? (scrub
+                                        ? (fscrub
                                             ? Trans.get(LogActivity.this,
                                                 R.string.log_export_scrub_ok_fmt,
                                                 Util.formatSize(fn), nHidden)
@@ -790,6 +832,24 @@ public class LogActivity extends BaseActivity {
                 });
             }
         }, "log-export-write").start();
+    }
+
+    /**
+     * 这次导出到底是脱敏还是原件 —— **唯一判据**（第 177 轮，杀后台 P0）。
+     *
+     * <p>`memScrub` 是内存里记着的模式（正常路径）；正文丢了的时候只能靠磁盘待办
+     * {@code pend}。两个都没有 ⇒ 返回 **null = 不知道**，调用方必须**拒绝导出**
+     * （按 `false` 猜就是"用户点脱敏、导出原件"那条隐私 bug）。
+     *
+     * <p>提成纯函数是为了让自检能喂两向：{@code (false,null) -> null}、
+     * {@code (false, {"scrub":true}) -> TRUE}、{@code (true,null) -> TRUE}。
+     */
+    static Boolean exportScrubOf(boolean memScrub, JSONObject pend) {
+        if (memScrub) return Boolean.TRUE;
+        // ★ `pend` 存在但**没有 scrub 键**（写日志时 JSON 构造失败）也不能猜：
+        //   缺键 = 不知道这次是哪种模式 ⇒ 返回 null ⇒ 拒绝导出。
+        if (pend == null || !pend.has("scrub")) return null;
+        return Boolean.valueOf(pend.optBoolean("scrub", false));
     }
 
     /** 建议文件名：全 ASCII + 时间戳（`EXTRA_TITLE` 只是建议，用户能改） */

@@ -38,6 +38,18 @@
     <string name="saves_title">Saves &amp; Backups</string>
     <string name="gameslot_title">GameSlot</string>
 
+    <!-- 第 177 轮（杀后台 P0）：长操作的前台服务通知（WorkService） -->
+    <string name="work_channel_name">Background work</string>
+    <string name="work_notif_title">Working on files…</string>
+    <string name="work_notif_plain">Working…</string>
+    <string name="work_export">Exporting</string>
+    <string name="work_import">Importing</string>
+    <string name="work_backup">Backing up</string>
+    <string name="work_restore">Restoring</string>
+    <string name="work_import_apk">Importing game package</string>
+    <!-- SAF 待办在进程重建后找不到目标时说的话（第 177 轮） -->
+    <string name="pending_lost">The previous action lost its target (the app may have been closed by the system). Please try again.</string>
+
     <!-- 主界面（F1b 卡片化：操作行拆「主标题 + 副标题」；顶部信息改「摘要 + 可展开详情」） -->
     <string name="main_summary_fmt">%1$d versions · current slot %2$s</string>
     <string name="main_detail_fmt">Save data\n%1$s\n\nManager data\n%2$s</string>

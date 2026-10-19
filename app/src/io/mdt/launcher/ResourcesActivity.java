@@ -14,6 +14,8 @@ import android.widget.CompoundButton;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+import org.json.JSONArray;
+import org.json.JSONObject;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -49,6 +51,8 @@ public final class ResourcesActivity extends BaseActivity {
     private static final String TAG = "MDTLauncher";
     private static final int REQ_EXPORT = 5001;
     private static final String STATE_PENDING = "pending";
+    /** 第 177 轮（杀后台 P0）：待导出条目清单的磁盘表示 */
+    private static final String PEND_EXPORT = "resources.export";
 
     private File mApk;
     private String mName = "";
@@ -284,6 +288,17 @@ public final class ResourcesActivity extends BaseActivity {
         }
         mPendingNames = new ArrayList<String>(entries.size());
         for (GameAssets.Entry e : entries) mPendingNames.add(e.name);
+        // ★ 第 177 轮（杀后台 P0）：条目清单落盘 —— SAF 选择器打开时进程被杀，
+        //   回来仍知道"要导出哪几条"（否则静默 no-op）。`mApk` 也从 intent 重建。
+        JSONObject meta = new JSONObject();
+        JSONArray arr = new JSONArray();
+        for (String n : mPendingNames) arr.put(n);
+        try {
+            meta.put("names", arr);
+            if (mApk != null) meta.put("apk", mApk.getAbsolutePath());
+        } catch (Throwable ignored) {
+        }
+        Pending.put(this, PEND_EXPORT, meta);
         mExporting = true;
         updateSummary();
 
@@ -293,6 +308,18 @@ public final class ResourcesActivity extends BaseActivity {
                 Trans.get(this, R.string.chooser_export)), REQ_EXPORT);
     }
 
+    private static List<String> namesFromJson(JSONObject o) {
+        if (o == null) return null;
+        JSONArray arr = o.optJSONArray("names");
+        if (arr == null) return null;
+        List<String> out = new ArrayList<String>();
+        for (int i = 0; i < arr.length(); i++) {
+            String n = arr.optString(i, null);
+            if (n != null && !n.isEmpty()) out.add(n);
+        }
+        return out.isEmpty() ? null : out;
+    }
+
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode != REQ_EXPORT) {
@@ -300,13 +327,27 @@ public final class ResourcesActivity extends BaseActivity {
             return;
         }
         mExporting = false;
-        final List<String> names = mPendingNames;
+        // ★ 第 177 轮：先取走磁盘待办（成败都取）
+        final JSONObject pend = Pending.take(this, PEND_EXPORT);
+        List<String> names = mPendingNames;
         mPendingNames = null;
-        if (resultCode != RESULT_OK || data == null || data.getData() == null || names == null) {
+        if (names == null) names = namesFromJson(pend);
+        if (mApk == null && pend != null) {
+            String p = pend.optString("apk", "");
+            if (!p.isEmpty()) mApk = new File(p);
+        }
+        if (resultCode != RESULT_OK || data == null || data.getData() == null) {
+            updateSummary();
+            return;
+        }
+        if (names == null || names.isEmpty() || mApk == null) {
+            Toast.makeText(this, R.string.pending_lost, Toast.LENGTH_LONG).show();
             updateSummary();
             return;
         }
         final Uri uri = data.getData();
+        final File apk = mApk;
+        final List<String> fnames = names;
         final ProgressDialog pd = ProgressDialog.show(this,
                 Trans.get(this, R.string.resources_export),
                 Trans.get(this, R.string.resources_exporting), true, false);
@@ -315,7 +356,7 @@ public final class ResourcesActivity extends BaseActivity {
                 Exporter.Result r = null;
                 Throwable err = null;
                 try {
-                    r = Exporter.zipEntries(ResourcesActivity.this, uri, mApk, names,
+                    r = Exporter.zipEntries(ResourcesActivity.this, uri, apk, fnames,
                             new Exporter.Step() {
                                 @Override public void onStep(final int done, final int total) {
                                     if (done != total && done % 10 != 0) return;

@@ -7,6 +7,7 @@ import android.util.Log;
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -185,22 +186,25 @@ public final class Exporter {
      * <p>⚠️ 条目在扫描后消失了（包被换掉 / 损坏）就**跳过**并计入 {@link Result#skipped}；
      * 只有一条都没写出来才抛错 —— 不拿“写了 0 条”伪装成功。
      */
-    public static Result zipEntries(Context ctx, Uri uri, File container,
-                                    List<String> entries, Step step) throws IOException {
-        Result r = new Result();
-        Counting counter = new Counting(openOut(ctx, uri));
+    public static Result zipEntries(final Context ctx, final Uri uri, final File container,
+                                    final List<String> entries, final Step step) throws IOException {
+        Work.begin(ctx, R.string.work_export);
         try {
-            zipEntriesTo(ctx, counter, container, entries, r, step);
-        } catch (IOException e) {
-            // `zipEntriesTo` 在“一条都没写出来”之前可能还没建 ZipOutputStream；
-            // 这时 SAF 流还在我们手里，必须自己关（否则目标文件留一个半开句柄）。
-            closeQuietly(counter);
-            throw e;
+            final Result r = new Result();
+            viaCache(ctx, uri, "assets", new Zipper() {
+                @Override public Result write(OutputStream out) throws IOException {
+                    Counting counter = new Counting(out);
+                    zipEntriesTo(ctx, counter, container, entries, r, step);
+                    r.outBytes = counter.n;
+                    return r;
+                }
+            });
+            Log.i(TAG, "export assets zip ok: files=" + r.files + " raw=" + r.rawBytes
+                    + " out=" + r.outBytes);
+            return r;
+        } finally {
+            Work.end(ctx);
         }
-        r.outBytes = counter.n;
-        Log.i(TAG, "export assets zip ok: files=" + r.files + " raw=" + r.rawBytes
-                + " out=" + r.outBytes);
-        return r;
     }
 
     /** 与 SAF 解耦的版本（自检直接喂 {@link java.io.ByteArrayOutputStream}）。 */
@@ -380,15 +384,25 @@ public final class Exporter {
     }
 
     /** 同上，带进度回调（`step` 可为 null） */
-    public static Result zipSources(Context ctx, Uri uri, List<Src> srcs, Step step)
-            throws IOException {
-        Result r = new Result();
-        Counting counter = new Counting(openOut(ctx, uri));
-        zipSourcesTo(ctx, counter, srcs, r, step);
-        r.outBytes = counter.n;
-        Log.i(TAG, "export batch zip ok: files=" + r.files + " raw=" + r.rawBytes
-                + " out=" + r.outBytes);
-        return r;
+    public static Result zipSources(final Context ctx, final Uri uri, final List<Src> srcs,
+                                    final Step step) throws IOException {
+        Work.begin(ctx, R.string.work_export);
+        try {
+            final Result r = new Result();
+            viaCache(ctx, uri, "batch", new Zipper() {
+                @Override public Result write(OutputStream out) throws IOException {
+                    Counting counter = new Counting(out);
+                    zipSourcesTo(ctx, counter, srcs, r, step);
+                    r.outBytes = counter.n;
+                    return r;
+                }
+            });
+            Log.i(TAG, "export batch zip ok: files=" + r.files + " raw=" + r.rawBytes
+                    + " out=" + r.outBytes);
+            return r;
+        } finally {
+            Work.end(ctx);
+        }
     }
 
     /**
@@ -479,6 +493,16 @@ public final class Exporter {
      * <p>`Result.files` 的语义不变 =「这一批有几**份**」（目录模组内部的文件数不计进来，同 zip 侧）。
      */
     public static Result saveToTree(Context ctx, Uri treeUri, List<Src> srcs, Step step)
+            throws IOException {
+        Work.begin(ctx, R.string.work_export);
+        try {
+            return saveToTree0(ctx, treeUri, srcs, step);
+        } finally {
+            Work.end(ctx);
+        }
+    }
+
+    private static Result saveToTree0(Context ctx, Uri treeUri, List<Src> srcs, Step step)
             throws IOException {
         Result r = new Result();
         if (srcs == null || srcs.isEmpty()) {
@@ -651,6 +675,7 @@ public final class Exporter {
      *   盖在旧内容上面、尾巴留着旧的，而**看起来是一次正常的导出**。
      */
     public static long writeText(Context ctx, Uri uri, String text) throws IOException {
+        Work.begin(ctx, R.string.work_export);
         OutputStream out = null;
         long n;
         try {
@@ -658,6 +683,7 @@ public final class Exporter {
             n = writeTextTo(out, text);
         } finally {
             closeQuietly(out);
+            Work.end(ctx);
         }
         Log.i(TAG, "export text ok: " + n + " B -> " + uri);
         return n;
@@ -705,14 +731,18 @@ public final class Exporter {
      *   那对**本地备份**是对的；而**分享包要过网络**（用户：「主要是想着尽可能小」）⇒
      *   那一档改用 `BEST_COMPRESSION`，多花几秒换更小的包。
      */
-    public static Result zipTo(Context ctx, Uri uri, File base, List<File> roots, Xform x,
-                               int level) throws IOException {
-        OutputStream out = null;
+    public static Result zipTo(final Context ctx, final Uri uri, final File base,
+                               final List<File> roots, final Xform x, final int level)
+            throws IOException {
+        Work.begin(ctx, R.string.work_export);
         try {
-            out = openOut(ctx, uri);
-            return zipToOut(ctx, out, base, roots, x, level);
+            return viaCache(ctx, uri, "slot", new Zipper() {
+                @Override public Result write(OutputStream out) throws IOException {
+                    return zipToOut(ctx, out, base, roots, x, level);
+                }
+            });
         } finally {
-            closeQuietly(out);
+            Work.end(ctx);
         }
     }
 
@@ -833,6 +863,65 @@ public final class Exporter {
     }
 
     // ── 底层 ──────────────────────────────────────────────────────────────
+
+    /**
+     * 导出的**中转缓存目录**（第 177 轮，杀后台 P0）：`cache/export/`。
+     *
+     * <p>★ 为什么要有它：SAF 的 `content://` 只能拿到一个**写句柄**，没法"先写 `.part`
+     * 再 rename"（rename 是文件系统语义，DocumentsProvider 不一定给）。真机实测：
+     * 整槽导出 600 ms 时 force-stop，用户选中的那个 zip 里是 **15,681,686 B 的坏包**
+     * （`BadZipFile`）。现在改成 **先在缓存里把 zip 完整写出来、再整段拷给 SAF** ——
+     * 目标文件只在"包已经完整"之后才被打开/创建，构建阶段的杀法不会在用户目录里
+     * 留下半截 zip（拷贝阶段仍有窗口，但那是几十 MB 的顺序写，且有前台服务兜着）。
+     *
+     * <p>代价是缓存要能放下整包（整槽 34 MB ~ 几百 MB）。放不下时会以 ENOSPC 失败，
+     * 用户看到的是"导出失败"而不是一个打不开的坏包 —— 这个方向的错更安全。
+     * 残留由 {@link Recovery#runNow} 在下次启动时清掉。
+     */
+    static File exportCacheDir(Context ctx) {
+        File d = new File(ctx.getCacheDir(), "export");
+        if (!d.isDirectory() && !d.mkdirs() && !d.isDirectory()) {
+            Log.w(TAG, "export cache dir not writable: " + d);
+        }
+        return d;
+    }
+
+    /** 在缓存文件上写一个 zip（{@link #viaCache} 的回调；返回的 {@link Result} 原样带回） */
+    private interface Zipper {
+        Result write(OutputStream out) throws IOException;
+    }
+
+    /**
+     * 「先在缓存里写完整，再整段拷给 SAF」—— 整槽导出 / 批量导出 / 资源导出共用一份。
+     * 见 {@link #exportCacheDir} 里的事故说明。
+     */
+    private static Result viaCache(Context ctx, Uri uri, String tag, Zipper z) throws IOException {
+        File dir = exportCacheDir(ctx);
+        File tmp = new File(dir, "mdt-export-" + tag + "-" + System.currentTimeMillis()
+                + "-" + System.nanoTime() + ".zip.part");
+        try {
+            Result r;
+            FileOutputStream fos = new FileOutputStream(tmp);
+            try {
+                r = z.write(fos);
+            } finally {
+                closeQuietly(fos);       // zip 流自己会关；这里兜"还没建流就抛"的那条
+            }
+            OutputStream out = null;
+            try {
+                out = openOut(ctx, uri);
+                copyTo(tmp, out);
+                out.flush();
+            } finally {
+                closeQuietly(out);
+            }
+            return r == null ? new Result() : r;
+        } finally {
+            if (tmp.exists() && !tmp.delete()) {
+                Log.w(TAG, "export cache temp delete failed: " + tmp);
+            }
+        }
+    }
 
     /**
      * 拿一个可写流。

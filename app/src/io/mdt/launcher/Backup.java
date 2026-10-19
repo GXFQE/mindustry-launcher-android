@@ -193,6 +193,15 @@ public final class Backup {
      * @param label 用户可读备注，可为空
      */
     public static Snapshot create(Context ctx, String slot, String label) throws IOException {
+        Work.begin(ctx, R.string.work_backup);       // 第 177 轮：100 MB 级的长操作
+        try {
+            return create0(ctx, slot, label);
+        } finally {
+            Work.end(ctx);
+        }
+    }
+
+    private static Snapshot create0(Context ctx, String slot, String label) throws IOException {
         boolean live = slot.equals(Data.currentSlot(ctx));
         if (live && Data.gameAlive(ctx)) {
             throw new IOException(Trans.get(ctx, R.string.backup_err_game_running));
@@ -332,6 +341,15 @@ public final class Backup {
      * **返回 {@link RestoreResult}**：成败是一个**布尔值**，不是从报告文案里读出来的。
      */
     public static RestoreResult restore(Context ctx, String slot, Snapshot ss, int mode) {
+        Work.begin(ctx, R.string.work_restore);      // 第 177 轮：恢复是写操作，同样会写很久
+        try {
+            return restore0(ctx, slot, ss, mode);
+        } finally {
+            Work.end(ctx);
+        }
+    }
+
+    private static RestoreResult restore0(Context ctx, String slot, Snapshot ss, int mode) {
         mode = SlotWrite.sane(mode);
         if (ss == null || ss.dir == null || !ss.dir.exists()) {
             return fail(Trans.get(ctx, R.string.backup_restore_err_no_snapshot));

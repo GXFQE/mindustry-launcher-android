@@ -4,6 +4,7 @@ import android.content.Context;
 import io.mdt.launcher.api.ItemInfo;
 import io.mdt.launcher.api.PluginApi;
 import io.mdt.launcher.api.SlotInfo;
+import org.json.JSONObject;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -333,6 +334,8 @@ public final class SelfTest {
             sharePack(ctx, L, stat);
             // ★ 第 142 轮：脱敏日志 / 崩溃报告（判据表两面 + 反方向 + 结论不变）
             crashScrub(ctx, L, stat);
+            // ★ 第 177 轮：杀后台 P0 —— 槽指针 / SAF 待办 / 导入残留 / 启动自愈 / 前台服务
+            killSafety(ctx, L, stat);
             // ★ 篡改对象池的用例放**最后**：它会在池里留下一个内容坏掉的对象，
             //   之后任何"再备份一次"都会因为 `has()` 命中而复用坏对象（CAS 的固有
             //   假设是"池内不可变"）。放在最后就不影响别的用例。
@@ -1466,6 +1469,253 @@ public final class SelfTest {
     /** 两段文本里都有这个片段（表头两档的**共同部分**断言用） */
     private static boolean bothHave(String a, String b, String needle) {
         return a != null && b != null && a.contains(needle) && b.contains(needle);
+    }
+
+    /**
+     * ★ 第 177 轮（杀后台 P0）：「进程被强杀之后，盘上留下什么 / 下次启动怎么自愈」。
+     *
+     * <p>覆盖五件事，每条都有**反方向**或"没有分辨力"的前提断言：
+     * <ol>
+     *   <li>{@link Pending}：写→取→再取为空；非法 kind 被拒（防路径注入）；</li>
+     *   <li>槽指针：原子写 + `.bak`；半截名 / 悬空名 / 非法名都**不能**被采信；</li>
+     *   <li>{@link Importer#recover}：`.old` 改回去、`.part` 删掉、目标在时清 `.old`；</li>
+     *   <li>{@link Recovery#runNow}：`zip-import.tmp` / 导出缓存 / 语言模板临时件都清掉，且**幂等**；</li>
+     *   <li>前台服务：`Work.begin/end` 不抛、服务能在清单里解析、通知渠道真的建出来
+     *       （= `WorkService.onStartCommand` 被系统调到）。</li>
+     * </ol>
+     * 日志脱敏那一条是**隐私**判据：{@link LogActivity#exportScrubOf} 在两处都没有模式时
+     * 必须返回 null（拒绝导出），不许默认成"原件"。
+     */
+    private static void killSafety(Context ctx, List<String> L, int[] stat) throws IOException {
+        L.add("── 第 177 轮 · 杀后台 P0（SAF 待办 / 槽指针 / 导入残留 / 启动自愈 / 前台服务）──");
+
+        // ① Pending：写→取→再取为空 + 非法 kind
+        String kind = "selftest.pending";
+        Pending.clear(ctx, kind);
+        ok(stat, L, Pending.take(ctx, kind) == null, "没有待办时 take 返回 null（不是异常）");
+        JSONObject meta = new JSONObject();
+        try {
+            meta.put("slot", "a");
+        } catch (Throwable ignored) {
+        }
+        ok(stat, L, Pending.put(ctx, kind, meta), "待办写盘成功");
+        JSONObject got = Pending.take(ctx, kind);
+        ok(stat, L, got != null && "a".equals(got.optString("slot", null)),
+                "取回的槽名与写入一致");
+        ok(stat, L, Pending.take(ctx, kind) == null, "★取走即删（第二次 take 必须为 null）");
+        ok(stat, L, Pending.putText(ctx, kind, "hello") && "hello".equals(Pending.takeText(ctx, kind)),
+                "正文待办往返（统计导出那条路）");
+        ok(stat, L, Pending.takeText(ctx, kind) == null, "正文取走即删");
+        ok(stat, L, !Pending.put(ctx, "../evil", meta),
+                "★非法 kind 被拒（否则可以往 app_hub 外面写文件）");
+
+        // ①b 日志脱敏模式：两处都没有 ⇒ null（拒绝导出），不是 false（原件）
+        ok(stat, L, LogActivity.exportScrubOf(false, null) == null,
+                "★隐私判据：内存与磁盘都没有模式 ⇒ null ⇒ 拒绝导出（不许默认原件）");
+        ok(stat, L, LogActivity.exportScrubOf(false, new JSONObject()) == null,
+                "★待办存在但缺 scrub 键 ⇒ 也是 null（坏 JSON 不许被当成「原件」）");
+        JSONObject scrubMeta = new JSONObject();
+        try {
+            scrubMeta.put("scrub", true);
+        } catch (Throwable ignored) {
+        }
+        ok(stat, L, Boolean.TRUE.equals(LogActivity.exportScrubOf(false, scrubMeta)),
+                "磁盘说脱敏 ⇒ TRUE（重建后仍按脱敏导出）");
+        JSONObject rawMeta = new JSONObject();
+        try {
+            rawMeta.put("scrub", false);
+        } catch (Throwable ignored) {
+        }
+        ok(stat, L, Boolean.FALSE.equals(LogActivity.exportScrubOf(false, rawMeta)),
+                "磁盘说原件 ⇒ FALSE（不是 null，别把正常路也拒了）");
+        ok(stat, L, Boolean.TRUE.equals(LogActivity.exportScrubOf(true, null)),
+                "内存说脱敏 ⇒ TRUE（正常路径）");
+
+        // ② 槽指针：原子写 + .bak + 三种非法值
+        String origMain = textOrEmpty(Paths.slotRecord(ctx));
+        String origBak = textOrEmpty(Paths.slotRecordBackup(ctx));
+        String origCur = Data.currentSlot(ctx);
+        String ptr = "zzptr" + Math.abs(System.nanoTime() % 100000L);
+        String half = ptr.substring(0, 4);
+        String dangling = "zznope" + Math.abs(System.nanoTime() % 100000L);
+        File ptrDir = Data.slotDir(ctx, ptr);
+        File halfDir = Data.slotDir(ctx, half);
+        File danglingDir = Data.slotDir(ctx, dangling);
+        try {
+            deleteTree(ptrDir);
+            deleteTree(danglingDir);
+            if (ptrDir != null) ptrDir.mkdirs();
+            boolean halfFree = halfDir == null || !halfDir.exists();
+            ok(stat, L, halfFree, "★夹具前提：半截名「" + half + "」盘上没有目录"
+                    + "（有的话它本来就合法，这条判据等于在测空气）");
+
+            Paths.writeSlotName(ctx, ptr);
+            ok(stat, L, ptr.equals(Data.currentSlot(ctx)),
+                    "写新槽名后 currentSlot 立刻是它");
+            ok(stat, L, ptr.equals(textOrEmpty(Paths.slotRecordBackup(ctx))),
+                    "★.bak 与主文件同值（读侧的第二副本）");
+
+            if (halfFree) {
+                // 模拟旧版 FileWriter 的 truncate/write 窗口：主文件半截，.bak 完好
+                Util.atomicWriteText(Paths.slotRecord(ctx), half);
+                ok(stat, L, ptr.equals(Data.currentSlot(ctx)),
+                        "★半截槽名「" + half + "」不被采信，回落到 .bak 的「" + ptr + "」");
+                ok(stat, L, ptr.equals(textOrEmpty(Paths.slotRecord(ctx))),
+                        "★读侧顺手把主文件修好了（下次不必再走 .bak）");
+            }
+
+            // 主文件合法、备份被写坏 ⇒ 主文件说了算（不要本末倒置）
+            Util.atomicWriteText(Paths.slotRecord(ctx), ptr);
+            Util.atomicWriteText(Paths.slotRecordBackup(ctx), "slot-bad-name");
+            ok(stat, L, ptr.equals(Data.currentSlot(ctx)),
+                    "主文件合法时优先主文件（备份坏了不影响）");
+
+            // 语法合法但盘上没有槽目录 ⇒ 悬空，必须回 default
+            Util.atomicWriteText(Paths.slotRecord(ctx), dangling);
+            Util.atomicWriteText(Paths.slotRecordBackup(ctx), dangling);
+            ok(stat, L, Paths.SLOT_DEFAULT.equals(Data.currentSlot(ctx)),
+                    "★悬空槽名「" + dangling + "」（没有 slot- 目录）⇒ 回落 default");
+
+            // 非法字符 ⇒ default
+            Util.atomicWriteText(Paths.slotRecord(ctx), "../evil");
+            Util.atomicWriteText(Paths.slotRecordBackup(ctx), "../evil");
+            ok(stat, L, Paths.SLOT_DEFAULT.equals(Data.currentSlot(ctx)),
+                    "★非法槽名「../evil」⇒ 回落 default（不能拼出槽目录以外的路径）");
+
+            // 两份都没有 ⇒ default（历史行为）
+            Paths.slotRecord(ctx).delete();
+            Paths.slotRecordBackup(ctx).delete();
+            ok(stat, L, Paths.SLOT_DEFAULT.equals(Data.currentSlot(ctx)),
+                    "两份都没有 ⇒ default（与历史行为一致）");
+        } finally {
+            deleteTree(ptrDir);
+            // ⚠️ 不删 halfDir / danglingDir：它们**本来就不该存在**；若存在则是用户的槽，
+            //   测试绝不能替用户删（这条 finally 只清我们自己创建的 zzptr 目录）。
+            // 原样还回去（老版本只有主文件、没有 .bak 也要能还原）
+            if (origMain.isEmpty()) {
+                Paths.slotRecord(ctx).delete();
+                Paths.slotRecordBackup(ctx).delete();
+            } else {
+                Util.atomicWriteText(Paths.slotRecord(ctx), origMain);
+                Util.atomicWriteText(Paths.slotRecordBackup(ctx),
+                        origBak.isEmpty() ? origMain : origBak);
+            }
+            ok(stat, L, origCur.equals(Data.currentSlot(ctx)),
+                    "★收尾：当前槽已还原为「" + origCur + "」");
+        }
+
+        // ③ Importer.recover：`.old` 改回去 / `.part` 删掉 / 目标在时清 `.old`
+        File impDir = new File(Paths.privateDir(ctx), "import");
+        if (!impDir.isDirectory()) impDir.mkdirs();
+        String base = "zz-selftest-import-" + Math.abs(System.nanoTime() % 100000L) + ".apk";
+        File target = new File(impDir, base);
+        File old = new File(impDir, base + ".old");
+        File part = new File(impDir, base + ".part");
+        try {
+            writeTmp(impDir, base + ".part", "PARTIAL");
+            Importer.recover(ctx);
+            ok(stat, L, !part.exists(), "导入残留：`.part` 被清掉（半截包不能当成品）");
+
+            writeTmp(impDir, base + ".old", "OLD-GOOD");
+            Importer.recover(ctx);
+            ok(stat, L, target.isFile() && "OLD-GOOD".equals(Util.readText(target)),
+                    "★导入残留：目标缺失时 `.old` 被改回去（旧版本不变砖）");
+            ok(stat, L, !old.exists(), "改回去之后 `.old` 不再留着");
+
+            writeTmp(impDir, base + ".old", "OLD-GOOD");
+            Importer.recover(ctx);
+            ok(stat, L, target.isFile() && "OLD-GOOD".equals(Util.readText(target))
+                            && !old.exists(),
+                    "目标已就位时只清 `.old`，不覆盖新包");
+        } finally {
+            target.setWritable(true);
+            target.delete();
+            old.setWritable(true);
+            old.delete();
+            part.setWritable(true);
+            part.delete();
+        }
+
+        // ④ Recovery.runNow：整槽导入 temp / 导出缓存 / 语言模板临时件
+        File zipTmp = new File(Paths.privateDir(ctx), "zip-import.tmp");
+        File exDir = Exporter.exportCacheDir(ctx);
+        File exTmp = new File(exDir, "zz-selftest-export.part");
+        File langTmp = new File(ctx.getCacheDir(), "lang.properties.tmp");
+        try {
+            writeTmp(Paths.privateDir(ctx), "zip-import.tmp", "STAGED");
+            writeTmp(exDir, "zz-selftest-export.part", "HALF");
+            writeTmp(ctx.getCacheDir(), "lang.properties.tmp", "TPL");
+            String cleaned = Recovery.runNow(ctx);
+            ok(stat, L, !zipTmp.exists(),
+                    "★启动自愈：`zip-import.tmp` 被清掉（34 MB 的 stage 残留）");
+            ok(stat, L, !exTmp.exists(), "启动自愈：导出缓存里的半截 zip 被清掉");
+            ok(stat, L, !langTmp.exists(), "启动自愈：语言模板临时件被清掉");
+            ok(stat, L, cleaned.contains("zip-import.tmp"),
+                    "自愈摘要点名了清掉的东西（不是默默做完）");
+            ok(stat, L, Recovery.runNow(ctx).isEmpty(),
+                    "★自愈是幂等的：再跑一遍没有可清的东西");
+        } finally {
+            zipTmp.delete();
+            exTmp.delete();
+            langTmp.delete();
+        }
+
+        // ⑤ 前台服务：清单注册 + 类型 + 权限 + 真的建出通知渠道
+        boolean svc = false;
+        boolean typeOk = false;
+        try {
+            android.content.pm.ServiceInfo si = ctx.getPackageManager().getServiceInfo(
+                    new android.content.ComponentName(ctx, WorkService.class), 0);
+            svc = si != null;
+            typeOk = si != null && (si.getForegroundServiceType()
+                    & android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC) != 0;
+        } catch (Throwable t) {
+            L.add("  （解析 WorkService 失败：" + t + "）");
+        }
+        ok(stat, L, svc, "★WorkService 已在清单注册（漏了 = 前台服务静默不生效）");
+        ok(stat, L, typeOk, "★WorkService 的 foregroundServiceType 含 dataSync");
+        ok(stat, L, hasPermission(ctx, android.Manifest.permission.FOREGROUND_SERVICE),
+                "已声明 FOREGROUND_SERVICE");
+        ok(stat, L, hasPermission(ctx, "android.permission.FOREGROUND_SERVICE_DATA_SYNC"),
+                "已声明 FOREGROUND_SERVICE_DATA_SYNC（Android 14 起与类型成对）");
+        boolean channel = false;
+        try {
+            Work.begin(ctx, R.string.work_export);
+            ok(stat, L, true, "Work.begin 不抛（启动失败也只是降级）");
+            android.app.NotificationManager nm = (android.app.NotificationManager)
+                    ctx.getSystemService(Context.NOTIFICATION_SERVICE);
+            for (int i = 0; i < 40 && !channel; i++) {
+                channel = nm != null && nm.getNotificationChannel("mdt.work") != null;
+                if (!channel) Thread.sleep(50);
+            }
+            Work.end(ctx);
+        } catch (Throwable t) {
+            ok(stat, L, false, "Work.begin/end 抛了：" + t);
+        }
+        ok(stat, L, channel,
+                "★前台服务真的跑到了 onCreate（通知渠道已建立；只是解析到类名不算）");
+        L.add("");
+    }
+
+    private static String textOrEmpty(File f) {
+        try {
+            return Util.readText(f).trim();
+        } catch (Throwable t) {
+            return "";
+        }
+    }
+
+    private static boolean hasPermission(Context ctx, String perm) {
+        try {
+            android.content.pm.PackageInfo pi = ctx.getPackageManager().getPackageInfo(
+                    ctx.getPackageName(), android.content.pm.PackageManager.GET_PERMISSIONS);
+            if (pi == null || pi.requestedPermissions == null) return false;
+            for (String p : pi.requestedPermissions) {
+                if (perm.equals(p)) return true;
+            }
+        } catch (Throwable ignored) {
+        }
+        return false;
     }
 
     private static void tamperNegative(Context ctx, List<String> L, int[] stat)

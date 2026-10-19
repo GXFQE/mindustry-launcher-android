@@ -1,6 +1,7 @@
 package io.mdt.launcher;
 
 import android.content.Context;
+import android.util.Log;
 import java.io.File;
 
 /**
@@ -57,6 +58,8 @@ import java.io.File;
  *   这正是探针实测到"官方 159.7 跑完把 MindustryX 的 cache/ 整个删掉"的原因。
  */
 final class Paths {
+    private static final String TAG = "MDTLauncher";
+
     private Paths() {}
 
     // ── 槽的命名（★ 唯一来源；Data 的那几个常量是别名，别再各写一份字面量）──────
@@ -133,19 +136,109 @@ final class Paths {
     }
 
     /**
+     * 槽记录的**备份**（第 177 轮，杀后台 P0）。
+     *
+     * <p>为什么要它：2026-10-19 真机实测把 `mdt-slot.txt` 写成半截 `te` 之后，
+     * 当前槽就变成 `te` —— 那个目录不存在，界面于是说"这个槽还没跑过游戏"，
+     * 而 `slot-default` 的数据**看起来全没了**（其实还在盘上）。旧实现用
+     * `FileWriter` 直写，truncate 与 write 之间被杀就会留空/半截/垃圾。
+     *
+     * <p>现在写侧是**原子改写**（`Util.atomicWriteText`：`.tmp` + rename），
+     * 同时留这一份 `.bak` 作为第二副本；读侧遇到非法值会先用它恢复。
+     */
+    static File slotRecordBackup(Context ctx) {
+        return new File(privateDir(ctx), "mdt-slot.txt.bak");
+    }
+
+    /**
      * **当前槽名的唯一读取实现**（`Data.currentSlot` 直接转调这里）。
      *
      * ★ 放在 `Paths` 而不是 `Data`：`dirOf()` 要按槽名算路径，若两边各读一次盘，
      *   就会出现"同一个槽名两个来源"（本项目已多次栽在这类重复实现上）。
+     *
+     * ★★ 第 177 轮（杀后台 P0）：读到的值必须**真的能指向一个槽**才采信 ——
+     *   判据 = 「是保留值 `shared` / 是本轮远古包的 `legacyOwner` / 或 `slot-<名>` 目录存在」。
+     *   非法或悬空 ⇒ 先试 {@link #slotRecordBackup}，再退回 {@link #SLOT_DEFAULT}。
+     *   半截文件名（`te`）正是靠"目录不存在"这一条被挡住的：它虽然语法合法，
+     *   但盘上没有 `slot-te`，采信它等于把用户切到一个空世界。
+     *
      * ⚠️ 读不到 / 为空 ⇒ 退回 {@link #SLOT_DEFAULT}（与历史行为一致）。
      */
     static String readSlotName(Context ctx) {
-        try {
-            String s = Util.readText(slotRecord(ctx)).trim();
-            if (!s.isEmpty()) return s;
-        } catch (Throwable ignored) {
+        String main = readSlotText(slotRecord(ctx));
+        String ok = acceptSlot(ctx, main);
+        if (ok != null) return ok;
+
+        String bak = readSlotText(slotRecordBackup(ctx));
+        ok = acceptSlot(ctx, bak);
+        if (ok != null) {
+            // 主文件坏了，但备份还能用 ⇒ 顺手把主文件修好（下次启动不必再走这条）
+            try {
+                Util.atomicWriteText(slotRecord(ctx), ok);
+            } catch (Throwable t) {
+                Log.w(TAG, "slot pointer restore failed: " + t);
+            }
+            Log.w(TAG, "slot pointer recovered from .bak: " + ok
+                    + " (main was: " + main + ")");
+            return ok;
+        }
+
+        if (!main.isEmpty()) {
+            Log.w(TAG, "slot pointer rejected, fallback default: " + main);
         }
         return SLOT_DEFAULT;
+    }
+
+    /**
+     * 写当前槽名（**唯一写实现**；`Data.rememberSlot` 转调这里）。
+     *
+     * <p>先写 `.bak`、再原子写主文件：两步都是 `.tmp` + rename。
+     * 在两步之间被杀 ⇒ 主文件还是旧值（合法），备份是新值 —— 下次读主文件仍能起来。
+     *
+     * <p>★ 为什么写之前**先建目录**：读侧按"`slot-<名>` 目录存在"校验。
+     * `prepareSlot` 会在 `rememberSlot` 之后才 `mkdirs`（`:game` 里也是先记名、
+     * 再取数据根），中间那一瞬间若按读侧规则判，刚写下的新槽会被判成悬空、
+     * 退回 `default` ⇒ 游戏写进 default 而指针说新槽。先建目录把这条窗口关掉。
+     * 空目录本身没有内容，不会被当成"已有存档"，也不会影响 `createSlot` 的判据。
+     */
+    static void writeSlotName(Context ctx, String name) throws java.io.IOException {
+        String n = name == null ? "" : name.trim();
+        if (n.isEmpty()) throw new java.io.IOException("empty slot name");
+        if (!SLOT_SHARED.equals(n)) {
+            File d = slotDir(ctx, n);
+            if (d != null && !d.isDirectory() && !d.mkdirs() && !d.isDirectory()) {
+                throw new java.io.IOException("cannot create slot dir: " + d);
+            }
+        }
+        Util.atomicWriteText(slotRecordBackup(ctx), n);
+        Util.atomicWriteText(slotRecord(ctx), n);
+    }
+
+    private static String readSlotText(File f) {
+        try {
+            return Util.readText(f).trim();
+        } catch (Throwable ignored) {
+            return "";
+        }
+    }
+
+    /**
+     * 这个值能不能当当前槽（见 {@link #readSlotName} 的判据）。
+     * 返回 null = 不能；否则返回归一化后的名字。
+     */
+    private static String acceptSlot(Context ctx, String raw) {
+        String s = raw == null ? "" : raw.trim();
+        if (s.isEmpty()) return null;
+        if (SLOT_SHARED.equals(s)) return s;
+        // 语法层：控制字符 / 路径分隔符 / `slot-` 前缀 / `.` / `..` / 超长 / shared
+        if (!s.equals(Data.sanitizeSlot(s))) return null;
+        // 远古包借住 files/：本槽本体不在 slot-<名>，它是合法的。
+        // ⚠️ 这里**直接读盘**而不是只信 `Data.legacyOwner` 的缓存：跨进程时主进程
+        //   那份缓存要等 onResume 才刷新，而读指针可能发生在更早（例如备份列表）。
+        if (s.equals(readSlotText(legacyRecord(ctx)))) return s;
+        if (s.equals(Data.legacyOwner(ctx))) return s;
+        File d = slotDir(ctx, s);
+        return d != null && d.isDirectory() ? s : null;
     }
 
     /**

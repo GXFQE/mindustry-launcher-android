@@ -13,6 +13,7 @@ import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+import org.json.JSONObject;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.List;
@@ -107,6 +108,9 @@ public class ModsActivity extends BaseActivity {
      *      类注释里还写明了理由 —— 本类当时漏了（本类甚至已经为转屏存了 4 个 STATE_*）。
      */
     private static String sImportSlot;
+
+    /** 第 177 轮（杀后台 P0）：SAF 待办的磁盘日志名 —— 进程被杀后靠它恢复目标槽 */
+    private static final String PEND_IMPORT = "mods.import";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -259,6 +263,14 @@ public class ModsActivity extends BaseActivity {
             return;
         }
         sImportSlot = mSlot;
+        // ★ 第 177 轮：目标槽同时写进磁盘 —— 系统在选择器打开时把进程杀掉，
+        //   静态字段就没了；旧代码静默 no-op（真机 2.7 实测）。
+        JSONObject meta = new JSONObject();
+        try {
+            meta.put("slot", mSlot);
+        } catch (Throwable ignored) {
+        }
+        Pending.put(this, PEND_IMPORT, meta);
         BatchIo.pickFiles(ModsActivity.this, REQ_MOD_IMPORT, R.string.chooser_pick_mod);
     }
 
@@ -269,9 +281,16 @@ public class ModsActivity extends BaseActivity {
         if (BatchIo.handleExportResult(this, requestCode, resultCode, data)) return;
         if (requestCode != REQ_MOD_IMPORT) return;
         // ★ 与 F15/F6 同一条纪律：无论成败**先清目标槽**，否则取消后残留的目标会被下一次接上
-        final String slot = sImportSlot;
+        final JSONObject pend = Pending.take(this, PEND_IMPORT);
+        String slot = sImportSlot;
         sImportSlot = null;
-        if (resultCode != RESULT_OK || data == null || slot == null) {
+        if (slot == null && pend != null) slot = pend.optString("slot", null);
+        if (resultCode != RESULT_OK || data == null) {
+            return;
+        }
+        if (slot == null || slot.trim().isEmpty()) {
+            // 进程被杀过、磁盘待办也没了 ⇒ **不能猜**槽；明说一次，别静默丢掉用户选的文件
+            Toast.makeText(this, R.string.pending_lost, Toast.LENGTH_LONG).show();
             return;
         }
         importDocs(BatchIo.docsOf(this, data), slot);

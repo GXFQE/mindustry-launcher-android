@@ -135,6 +135,15 @@ public final class SlotZip {
 
     /** 拷到 `app_hub/zip-import.tmp`；用完必须 {@link #unstage}。 */
     public static File stage(Context ctx, Uri uri) throws IOException {
+        Work.begin(ctx, R.string.work_import);       // 第 177 轮：几十 MB 的拷贝
+        try {
+            return stage0(ctx, uri);
+        } finally {
+            Work.end(ctx);
+        }
+    }
+
+    private static File stage0(Context ctx, Uri uri) throws IOException {
         if (uri == null) throw new IOException(Trans.get(ctx, R.string.slotzip_err_no_uri));
         InputStream in = ctx.getContentResolver().openInputStream(uri);
         if (in == null) throw new IOException(Trans.get(ctx, R.string.slotzip_err_open_failed));
@@ -288,6 +297,16 @@ public final class SlotZip {
      *             · {@link SlotWrite#REPLACE}（先按 {@link Data#contentRootsOf} 清空槽内容，再整份写入）
      */
     public static Result extract(Context ctx, File zip, Info info, String slot, int mode)
+            throws IOException {
+        Work.begin(ctx, R.string.work_import);       // 第 177 轮：解包 + 逐个 .part + rename
+        try {
+            return extract0(ctx, zip, info, slot, mode);
+        } finally {
+            Work.end(ctx);
+        }
+    }
+
+    private static Result extract0(Context ctx, File zip, Info info, String slot, int mode)
             throws IOException {
         mode = SlotWrite.sane(mode);
         File root = Data.dirOf(ctx, slot);

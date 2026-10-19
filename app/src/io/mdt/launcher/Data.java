@@ -4,7 +4,6 @@ import android.app.ActivityManager;
 import android.content.Context;
 import android.util.Log;
 import java.io.File;
-import java.io.FileWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -169,14 +168,14 @@ public final class Data {
         return Paths.readSlotName(ctx);
     }
 
+    /**
+     * 记下当前槽。★ 唯一写在 {@link Paths#writeSlotName}（原子写 + `.bak` + 目录先建）——
+     * 第 177 轮（杀后台 P0）把它从 `FileWriter` 直写改过去：真机把半截 `te`
+     * 当成合法槽名之后，界面看起来像"存档全没了"。
+     */
     private static void rememberSlot(Context ctx, String name) {
         try {
-            FileWriter w = new FileWriter(Paths.slotRecord(ctx));
-            try {
-                w.write(name);
-            } finally {
-                w.close();
-            }
+            Paths.writeSlotName(ctx, name);
         } catch (Throwable t) {
             Log.w(TAG, "remember slot failed: " + t);
         }
@@ -235,12 +234,9 @@ public final class Data {
 
     private static void writeLegacyOwner(Context ctx, String slot) {
         try {
-            FileWriter w = new FileWriter(Paths.legacyRecord(ctx));
-            try {
-                w.write(slot == null ? "" : slot);
-            } finally {
-                w.close();
-            }
+            // ★ 第 177 轮：与槽指针同一条纪律 —— 这个标记也决定 `dirOf` 往哪找本体，
+            //   半截值同样会让"存档看起来没了"。原子写。
+            Util.atomicWriteText(Paths.legacyRecord(ctx), slot == null ? "" : slot);
         } catch (Throwable t) {
             Log.w(TAG, "write legacy owner failed: " + t);
         }

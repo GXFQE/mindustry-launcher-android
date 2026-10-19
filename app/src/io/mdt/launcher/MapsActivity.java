@@ -13,6 +13,7 @@ import android.widget.LinearLayout;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
+import org.json.JSONObject;
 
 import java.io.File;
 import java.io.IOException;
@@ -84,6 +85,10 @@ public class MapsActivity extends BaseActivity {
     /** 导出：SAF 回来时要写出去的那一条（**成败都先清空**，见 onActivityResult）。
      *  ★ static 的理由同 {@link #sMapTarget}（转屏/回收后回调仍要认得它）。 */
     private static Maps.Item sExportItem;
+
+    // ── 第 177 轮（杀后台 P0）：SAF 待办的磁盘表示（进程被杀后靠它恢复）──────────
+    private static final String PEND_IMPORT = "maps.import";
+    private static final String PEND_EXPORT = "maps.export";
     /** 列表三件套（导出对话框直接复用这一批文本与缩略图，不必重扫、重渲染） */
     private String[] mTitles;
     private String[] mSubs;
@@ -524,17 +529,29 @@ public class MapsActivity extends BaseActivity {
         }
         if (requestCode == REQ_MAP_EXPORT) {
             // ★ 与导入同一条纪律：无论成败**先清掉待写的那一条**（否则下一次导出会认错图）
-            final Maps.Item it = sExportItem;
+            final JSONObject pend = Pending.take(this, PEND_EXPORT);
+            Maps.Item it = sExportItem;
             sExportItem = null;
-            if (resultCode != RESULT_OK || data == null || data.getData() == null || it == null) return;
+            if (it == null && pend != null) it = itemFromJson(pend);
+            if (resultCode != RESULT_OK || data == null || data.getData() == null) return;
+            if (it == null) {
+                Toast.makeText(this, R.string.pending_lost, Toast.LENGTH_LONG).show();
+                return;
+            }
             exportItem(it, data.getData());
             return;
         }
         if (requestCode != REQ_MAP) return;
         // ★ 与存档那条同一纪律：无论成败**先清目标槽**
-        final String slot = sMapTarget;
+        final JSONObject pend = Pending.take(this, PEND_IMPORT);
+        String slot = sMapTarget;
         sMapTarget = null;
-        if (resultCode != RESULT_OK || data == null || slot == null) return;
+        if (slot == null && pend != null) slot = pend.optString("slot", null);
+        if (resultCode != RESULT_OK || data == null) return;
+        if (slot == null || slot.trim().isEmpty()) {
+            Toast.makeText(this, R.string.pending_lost, Toast.LENGTH_LONG).show();
+            return;
+        }
         // ★ 第 127 轮：一批（多选 / 一个 zip）走批量；**一份普通文件**仍旧走单份那条路
         //   （那条路有「这其实是一份存档 ⇒ 问名字」和逐个同名确认，逐份弹框在批量里是折磨）
         importDocs(BatchIo.docsOf(this, data), slot);
@@ -745,6 +762,7 @@ public class MapsActivity extends BaseActivity {
                                 return;
                             }
                             sExportItem = it;
+                            Pending.put(MapsActivity.this, PEND_EXPORT, itemJson(it));
                             startActivityForResult(Intent.createChooser(
                                     Exporter.createDoc(it.name(), "application/octet-stream"),
                                     Trans.get(MapsActivity.this, R.string.chooser_export)),
@@ -901,6 +919,54 @@ public class MapsActivity extends BaseActivity {
                 });
             }
         }, "map-share").start();
+    }
+
+    // ── 第 177 轮（杀后台 P0）：SAF 待办的磁盘表示 ──────────────────────────
+
+    private static JSONObject slotJson(String slot) {
+        JSONObject o = new JSONObject();
+        try {
+            o.put("slot", slot == null ? "" : slot);
+        } catch (Throwable ignored) {
+        }
+        return o;
+    }
+
+    /** 只记"这一张从哪来"；`meta` 等派生量不落盘（导出只需要源和名字）。 */
+    private static JSONObject itemJson(Maps.Item it) {
+        JSONObject o = new JSONObject();
+        try {
+            o.put("from", it.from);
+            o.put("source", it.source == null ? "" : it.source);
+            o.put("where", it.where == null ? "" : it.where);
+            o.put("bytes", it.bytes);
+            if (it.file != null) o.put("file", it.file.getAbsolutePath());
+            if (it.container != null && it.entry != null) {
+                o.put("container", it.container.getAbsolutePath());
+                o.put("entry", it.entry);
+            }
+        } catch (Throwable ignored) {
+        }
+        return o;
+    }
+
+    private static Maps.Item itemFromJson(JSONObject o) {
+        if (o == null) return null;
+        String file = o.optString("file", "");
+        String container = o.optString("container", "");
+        String entry = o.optString("entry", "");
+        if (file.isEmpty() && (container.isEmpty() || entry.isEmpty())) return null;
+        Maps.Item it = new Maps.Item();
+        it.from = o.optInt("from", Maps.FROM_SLOT);
+        it.source = o.optString("source", "");
+        it.where = o.optString("where", "");
+        it.bytes = o.optLong("bytes", 0);
+        if (!file.isEmpty()) it.file = new File(file);
+        if (!container.isEmpty() && !entry.isEmpty()) {
+            it.container = new File(container);
+            it.entry = entry;
+        }
+        return it;
     }
 
     /**
@@ -1069,6 +1135,7 @@ public class MapsActivity extends BaseActivity {
      */
     private void importFromFile() {
         sMapTarget = mSlot;
+        Pending.put(this, PEND_IMPORT, slotJson(mSlot));     // 第 177 轮：磁盘那半
         BatchIo.pickFiles(MapsActivity.this, REQ_MAP, R.string.maps_import);
     }
 
