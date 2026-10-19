@@ -61,6 +61,15 @@ public final class Config {
     /** F20：进存档页时自动清理数据根残留（默认开；关掉后只能手动清） */
     private static final String K_AUTO_CLEAN = "auto_clean_redundant";
     /**
+     * 第 173 轮：中转站保留份数。
+     *
+     * <p>普通条目（地图 / 存档 / 蓝图 / 模组 / 插件）与**整个槽**分开：一个槽可能几十 MB，
+     * 沿用普通条目的份数会让中转站悄悄占掉一两个 GB。默认值与 {@link Trash#KEEP} /
+     * {@link Trash#KEEP_SLOTS} 相同；坏值退默认 + WARNING 点名键名。
+     */
+    private static final String K_TRASH_KEEP = "trash_keep";
+    private static final String K_TRASH_KEEP_SLOTS = "trash_keep_slots";
+    /**
      * F23 之后：**已经提示过**的那一份崩溃报告（`&lt;槽&gt;|&lt;文件名&gt;`）—— 同一份只提示一次。
      *
      * <p>★ 为什么要有它："崩了马上弹窗"有两条路（进程活着时立刻 Toast / 回到界面时补弹），
@@ -88,6 +97,9 @@ public final class Config {
     public static final int DEF_BACKUP_MAX = 20;
     /** 日志保留份数的出厂默认（对齐桌面版 DEFAULT_LOG_KEEP）。 */
     public static final int DEF_LOG_FILES = 20;
+    /** 中转站保留份数的出厂默认（普通条目 / 整个槽）—— 与 Trash.KEEP / KEEP_SLOTS 对齐。 */
+    public static final int DEF_TRASH_KEEP = 20;
+    public static final int DEF_TRASH_KEEP_SLOTS = 3;
     /**
      * ★ F20：进存档页时自动清理数据根残留的出厂默认 = **开**（保持第 57 轮以来的行为不变）。
      *   ⚠️ 加开关的理由：这是全工程**唯一一个"静默删文件"**的动作（见 {@link Data#autoCleanRedundant}），
@@ -419,6 +431,47 @@ public final class Config {
 
     public synchronized void setMaxLogFiles(int v) {
         put(K_LOGS, Math.max(1, Math.min(999, v)));
+        save();
+    }
+
+    // ── 第 173 轮：中转站保留份数（普通条目 / 整个槽分开） ───────────────────
+
+    /**
+     * 读一个 1..999 的整数键：坏值 / 越界都退默认，并 WARNING **点名键名**。
+     * 与 {@link #maxLogFiles()} 同一套纪律；中转站两项共用这一份，别各写一遍。
+     */
+    private synchronized int intKey(String key, int def, int min, int max) {
+        if (!mRoot.has(key)) return def;
+        Object v = mRoot.opt(key);
+        if (v instanceof Number) {
+            int n = ((Number) v).intValue();
+            if (n >= min && n <= max) return n;
+            Log.w(TAG, "config key '" + key + "' out of range (" + n
+                    + "), falling back to default " + def);
+        } else {
+            Log.w(TAG, "config key '" + key + "' is not a number (" + v
+                    + "), falling back to default " + def);
+        }
+        return def;
+    }
+
+    /** 中转站普通条目（地图 / 存档 / 蓝图 / 模组 / 插件）保留份数。 */
+    public synchronized int trashKeep() {
+        return intKey(K_TRASH_KEEP, DEF_TRASH_KEEP, 1, 999);
+    }
+
+    public synchronized void setTrashKeep(int v) {
+        put(K_TRASH_KEEP, Math.max(1, Math.min(999, v)));
+        save();
+    }
+
+    /** 中转站里**整个槽**的保留份数（默认 3，一个槽可能几十 MB）。 */
+    public synchronized int trashKeepSlots() {
+        return intKey(K_TRASH_KEEP_SLOTS, DEF_TRASH_KEEP_SLOTS, 1, 999);
+    }
+
+    public synchronized void setTrashKeepSlots(int v) {
+        put(K_TRASH_KEEP_SLOTS, Math.max(1, Math.min(999, v)));
         save();
     }
 

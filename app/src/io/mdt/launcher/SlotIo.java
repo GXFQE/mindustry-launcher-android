@@ -187,7 +187,7 @@ final class SlotIo {
         if (!trashDir.isDirectory() && !trashDir.mkdirs() && !trashDir.isDirectory()) return null;
         File moved = new File(trashDir, Trash.nameFor(Trash.slotLabel(savesDir), saveFile.getName()));
         if (!Trash.move(saveFile, moved)) return null;               // 跨卷兜底（见 MapFiles.place）
-        Trash.prune(trashDir, Trash.KEEP);
+        Trash.pruneIn(trashDir);
         return moved;
     }
 

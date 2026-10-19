@@ -189,7 +189,7 @@ public final class BlueprintFiles {
             throw new IllegalStateException(
                     Trans.get(ctx, R.string.bpfile_err_rename_fmt, dest.getAbsolutePath()));
         }
-        if (backup != null) Trash.prune(trashDir, Trash.KEEP);
+        if (backup != null) Trash.pruneIn(trashDir);
     }
 
     /**
@@ -217,7 +217,7 @@ public final class BlueprintFiles {
                 Trash.nameFor(Trash.slotLabel(dir), file.getName()));
         // ★ 跨文件系统安全（见 place 的注释）：rename 失败就"复制 + 校验 + 删源"
         if (!Trash.move(file, moved)) return null;
-        Trash.prune(trashDir, Trash.KEEP);
+        Trash.pruneIn(trashDir);
         return moved;
     }
 

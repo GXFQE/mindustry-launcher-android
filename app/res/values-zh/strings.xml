@@ -1401,6 +1401,15 @@
     <string name="set_logs_hint">20</string>
     <string name="set_logs_bad">只能填 1 ~ 999 的整数</string>
 
+    <string name="set_trash_title">中转站保留份数</string>
+    <string name="set_trash_sub_fmt">普通 %1$d 份 · 整个槽 %2$d 份</string>
+    <string name="set_trash_dialog_title">中转站保留份数（1 ~ 999）</string>
+    <string name="set_trash_items_label">普通条目：地图 / 存档 / 蓝图 / 模组 / 插件</string>
+    <string name="set_trash_slots_label">整个槽</string>
+    <string name="set_trash_hint">20</string>
+    <string name="set_trash_slots_hint">3</string>
+    <string name="set_trash_bad">只能填 1 ~ 999 的整数</string>
+
     <string name="about_fmt">版本 %1$s（内部编号 %2$d）\n包名 %3$s\n\n当前槽数据\n%4$s\n\n启动器数据\n%5$s</string>
 
     <!-- ══ F5 自动备份（每槽一套策略，对齐桌面版的「存档分类设置」） ══════ -->

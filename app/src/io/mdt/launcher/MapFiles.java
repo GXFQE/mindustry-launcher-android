@@ -481,7 +481,7 @@ public final class MapFiles {
             throw new IllegalStateException(
                     Trans.get(ctx, R.string.mapfile_err_rename_fmt, dest.getAbsolutePath()));
         }
-        if (backup != null) Trash.prune(trashDir, Trash.KEEP);
+        if (backup != null) Trash.pruneIn(trashDir);
     }
 
     /**
@@ -509,7 +509,7 @@ public final class MapFiles {
                 Trash.nameFor(Trash.slotLabel(mapsDir), mapFile.getName()));
         // 🔴 同样用 `Trash.move`（跨卷兜底）——见 {@link #place} 里的长注释
         if (!Trash.move(mapFile, moved)) return null;
-        Trash.prune(trashDir, Trash.KEEP);
+        Trash.pruneIn(trashDir);
         return moved;
     }
 }

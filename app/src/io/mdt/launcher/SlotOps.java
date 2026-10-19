@@ -535,7 +535,7 @@ final class SlotOps {
         } else {
             sb.append(Trans.get(a, R.string.delete_slot_no_backups));
         }
-        sb.append(Trans.get(a, R.string.delete_slot_cap_fmt, Trash.KEEP_SLOTS));
+        sb.append(Trans.get(a, R.string.delete_slot_cap_fmt, Trash.keepSlots()));
         new AlertDialog.Builder(a)
                 .setTitle(Trans.get(a, R.string.delete_slot_confirm_title_fmt, s.name))
                 .setMessage(sb.toString())

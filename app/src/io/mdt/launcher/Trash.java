@@ -60,17 +60,22 @@ import java.util.List;
  */
 public final class Trash {
 
-    /** 中转站保留份数（超出按下标里那个时间戳删最旧）：它是"能取回"的兜底，不是第二份存档 */
-    public static final int KEEP = 20;
+    /**
+     * 中转站普通条目的**出厂默认**保留份数（超出按下标里那个时间戳删最旧）：
+     * 它是"能取回"的兜底，不是第二份存档。
+     * ★ 第 173 轮起实际值走 {@link Config#trashKeep()}（设置页可改）；这里只留默认值给文档 / 自检。
+     */
+    public static final int KEEP = Config.DEF_TRASH_KEEP;
 
     /**
-     * **整个槽**的保留个数（2026-10-05 第二批）。
+     * **整个槽**的**出厂默认**保留个数（2026-10-05 第二批）。
      *
      * 为什么与上一条分开：一份地图/存档是 KB 级，一个槽可以是**几十 MB**（设备上「冲突演示」槽
      * 就是 78 MB）⇒ 沿用 20 会让"中转站"悄悄占掉一两个 GB。3 个足够"刚删错就回来"，
      * 而且这个数字**写进了删除确认框的文案**（超出会被静默顶掉，不能不说）。
+     * ★ 第 173 轮起实际值走 {@link Config#trashKeepSlots()}（设置页可改）。
      */
-    public static final int KEEP_SLOTS = 3;
+    public static final int KEEP_SLOTS = Config.DEF_TRASH_KEEP_SLOTS;
 
     /** 五个中转站目录名（`&lt;hub&gt;/` 下）—— 前四个字面量与旧代码逐字相同，改名会让老用户的东西失联 */
     static final String DIR_MAPS = "maps-trash";
@@ -271,12 +276,22 @@ public final class Trash {
         return Kind.OTHER;
     }
 
-    /** 这一类留几份（只有"整个槽"另有一套 —— 见 {@link #KEEP_SLOTS}） */
-    public static int keepFor(Kind k) {
-        return k == Kind.SLOT ? KEEP_SLOTS : KEEP;
+    /** 普通条目当前保留份数（设置页可改；默认 20）。 */
+    public static int keep() {
+        return Config.get().trashKeep();
     }
 
-    /** 按**目录自己的类型**修剪（`maps-trash` 用 20、`slots-trash` 用 3） */
+    /** 整个槽当前保留份数（设置页可改；默认 3）。 */
+    public static int keepSlots() {
+        return Config.get().trashKeepSlots();
+    }
+
+    /** 这一类留几份（只有"整个槽"另有一套 —— 见 {@link #keepSlots()}）。 */
+    public static int keepFor(Kind k) {
+        return k == Kind.SLOT ? keepSlots() : keep();
+    }
+
+    /** 按**目录自己的类型**修剪（`maps-trash` 用普通份数、`slots-trash` 用整槽份数） */
     public static int pruneIn(File dir) {
         return prune(dir, keepFor(kindIn(dir, "", false)));
     }

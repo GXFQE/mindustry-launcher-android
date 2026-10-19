@@ -1077,7 +1077,7 @@ public final class Mods {
         File moved = new File(trashDir, Trash.nameFor(Trash.slotLabel(modsDir), mod.getName()));
         if (moved.exists()) Data.deleteTree(moved);                 // 同名旧中转项（理论上带时间戳，不会撞）
         if (!Trash.move(mod, moved)) return null;                   // 跨卷兜底：复制 + 校验 + 删源
-        Trash.prune(trashDir, Trash.KEEP);
+        Trash.pruneIn(trashDir);
         return moved;
     }
 
@@ -1145,7 +1145,7 @@ public final class Mods {
             }
             // ★ 成功之后**不删**那份旧条目：它留在 `hub/mods-trash/` 等用户来取
             //   （中转站页面能列出来、能恢复 —— 见 {@link TrashActivity}；只按份数修剪，别让它无限长）
-            Trash.prune(trashDir, Trash.KEEP);
+            Trash.pruneIn(trashDir);
             return;
         }
         // 中转站不可用（或中转失败）⇒ 退化成"先删再改名"：源件仍在别处，最坏是用户重来一次

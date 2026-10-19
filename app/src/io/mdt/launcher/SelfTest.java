@@ -9216,21 +9216,25 @@ public final class SelfTest {
                     "③ ★换个名字放回去 ⇒ 两个槽都在，而且**快照跟着回来了**"
                             + "（" + Backup.list(ctx, SLOT_GONE + "2").size() + " 份）");
 
-            // ── ④ 份数上限：整个槽是 3、其余是 20（口径在 keepFor / pruneIn） ──
-            ok(stat, L, Trash.keepFor(Trash.Kind.SLOT) == Trash.KEEP_SLOTS
-                            && Trash.keepFor(Trash.Kind.MAP) == Trash.KEEP,
-                    "④ 份数上限按类型分开：整槽 " + Trash.KEEP_SLOTS + " / 其余 " + Trash.KEEP);
+            // ── ④ 份数上限：整个槽与普通条目分开（当前值来自设置；默认 3 / 20） ──
+            int keepItems = Trash.keep();
+            int keepSlots = Trash.keepSlots();
+            ok(stat, L, Trash.keepFor(Trash.Kind.SLOT) == keepSlots
+                            && Trash.keepFor(Trash.Kind.MAP) == keepItems,
+                    "④ 份数上限按类型分开：整槽 " + keepSlots + " / 其余 " + keepItems);
             File fake = new File(root4(ctx), Trash.DIR_SLOTS);
             deleteTree(fake.getParentFile());
             fake.mkdirs();
             String[] stamps = {"20260101-000000-001", "20260102-000000-002",
                     "20260103-000000-003", "20260104-000000-004", "20260105-000000-005"};
             for (String st : stamps) new File(fake, st + Trash.SEP + "x" + Trash.SEP + "x").mkdirs();
-            int pruned = Trash.pruneIn(fake);
-            ok(stat, L, pruned == 2 && Trash.list(fake).size() == Trash.KEEP_SLOTS
+            // ★ 这里钉的是 prune 本身（固定 keep=3），不依赖用户当前设置；
+            //   设置值到 keepFor 的映射在上面那条断言里已经分开验过。
+            int pruned = Trash.prune(fake, 3);
+            ok(stat, L, pruned == 2 && Trash.list(fake).size() == 3
                             && !new File(fake, stamps[0] + Trash.SEP + "x" + Trash.SEP + "x").exists(),
-                    "④ ★按目录类型修剪：铺 5 个假容器 ⇒ 删最旧的 2 个、留 " + Trash.list(fake).size()
-                            + " 个（用地图那套 20 就会一个都不删）");
+                    "④ ★修剪：铺 5 个假容器 ⇒ 删最旧的 2 个、留 " + Trash.list(fake).size()
+                            + " 个（keep=3）");
             deleteTree(fake.getParentFile());
 
             // ── ⑤ 收尾：自检不许在用户的中转站里留东西 ────────────────────

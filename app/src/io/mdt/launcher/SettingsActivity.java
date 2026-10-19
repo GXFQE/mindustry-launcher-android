@@ -62,6 +62,8 @@ public class SettingsActivity extends BaseActivity {
     private TextView mLangSub;
     private TextView mSlotSub;
     private TextView mLogsSub;
+    /** 第 173 轮：中转站保留份数那一行的副标题（普通 / 整槽） */
+    private TextView mTrashSub;
     /** F20：自动清理残留那一行的副标题（已开 / 已关） */
     private TextView mAutoCleanSub;
     /** 用户语言包那一行的副标题（当前状态） */
@@ -117,6 +119,14 @@ public class SettingsActivity extends BaseActivity {
                     @Override public void run() { promptLogs(); }
                 });
         mLogsSub = (TextView) rowLogs.findViewById(R.id.act_sub);
+
+        // 第 173 轮：中转站保留份数（普通条目 / 整个槽分开）—— 与日志份数相邻，
+        // 两项都是"保留多少份、超出丢最旧"的保留策略。
+        View rowTrash = Util.bindActionValue(root, R.id.row_trash_keep, R.drawable.ic_trash,
+                R.string.set_trash_title, new Runnable() {
+                    @Override public void run() { promptTrashKeep(); }
+                });
+        mTrashSub = (TextView) rowTrash.findViewById(R.id.act_sub);
 
         // F7：运行日志入口 —— ★ 2026-10-08（第 123 轮）**搬去主界面的工具卡**了
         //   （用户点单：「中转站和运行日志不应该放在设置里」）。本页从此只放"能被改的项"，
@@ -191,6 +201,10 @@ public class SettingsActivity extends BaseActivity {
         }
         if (mLogsSub != null) {
             mLogsSub.setText(Trans.get(SettingsActivity.this, R.string.set_logs_sub_fmt, Config.get().maxLogFiles()));
+        }
+        if (mTrashSub != null) {
+            mTrashSub.setText(Trans.get(SettingsActivity.this, R.string.set_trash_sub_fmt,
+                    Config.get().trashKeep(), Config.get().trashKeepSlots()));
         }
         if (mAutoCleanSub != null) {
             mAutoCleanSub.setText(Config.get().autoCleanRedundant()
@@ -728,6 +742,77 @@ public class SettingsActivity extends BaseActivity {
                     @Override public void onClick(DialogInterface d, int w) {
                         Config.get().setDefaultSlot(slots.get(w).name);
                         d.dismiss();
+                        fillValues();
+                    }
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    /**
+     * 第 173 轮：中转站保留份数 —— 普通条目与整个槽分开填。
+     *
+     * <p>为什么用两个输入框而不是一个：一个槽可能几十 MB，普通条目是 KB 级；
+     * 合成一个数字就只能在"小文件留太少"和"大槽占太多"之间二选一。
+     * 默认值来自 {@link Config#DEF_TRASH_KEEP} / {@link Config#DEF_TRASH_KEEP_SLOTS}。
+     */
+    private void promptTrashKeep() {
+        final EditText items = new EditText(this);
+        items.setInputType(InputType.TYPE_CLASS_NUMBER);
+        items.setSingleLine(true);
+        items.setHint(R.string.set_trash_hint);
+        items.setText(String.valueOf(Config.get().trashKeep()));
+
+        final EditText slots = new EditText(this);
+        slots.setInputType(InputType.TYPE_CLASS_NUMBER);
+        slots.setSingleLine(true);
+        slots.setHint(R.string.set_trash_slots_hint);
+        slots.setText(String.valueOf(Config.get().trashKeepSlots()));
+
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(20), 0, dp(20), 0);
+
+        TextView itemsLabel = new TextView(this);
+        itemsLabel.setText(Trans.get(SettingsActivity.this, R.string.set_trash_items_label));
+        itemsLabel.setTextSize(13);
+        itemsLabel.setTextColor(getResources().getColor(R.color.fg_muted, getTheme()));
+        itemsLabel.setLineSpacing(dp(2), 1f);
+        itemsLabel.setPadding(0, 0, 0, dp(4));
+        box.addView(itemsLabel);
+        box.addView(items, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        TextView slotsLabel = new TextView(this);
+        slotsLabel.setText(Trans.get(SettingsActivity.this, R.string.set_trash_slots_label));
+        slotsLabel.setTextSize(13);
+        slotsLabel.setTextColor(getResources().getColor(R.color.fg_muted, getTheme()));
+        slotsLabel.setPadding(0, dp(10), 0, dp(4));
+        box.addView(slotsLabel);
+        box.addView(slots, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.set_trash_dialog_title)
+                .setView(box)
+                .setPositiveButton(R.string.policy_save, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int w) {
+                        int n;
+                        int s;
+                        try {
+                            n = Integer.parseInt(items.getText().toString().trim());
+                            s = Integer.parseInt(slots.getText().toString().trim());
+                        } catch (NumberFormatException e) {
+                            n = -1;
+                            s = -1;
+                        }
+                        if (n < 1 || n > 999 || s < 1 || s > 999) {
+                            Toast.makeText(SettingsActivity.this, R.string.set_trash_bad,
+                                    Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        Config.get().setTrashKeep(n);
+                        Config.get().setTrashKeepSlots(s);
                         fillValues();
                     }
                 })

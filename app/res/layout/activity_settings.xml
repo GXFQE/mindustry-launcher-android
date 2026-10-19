@@ -125,6 +125,22 @@
                     android:background="@color/divider" />
 
                 <!--
+                  第 173 轮：中转站保留份数（普通条目 / 整个槽分开）。
+                  ★ 紧跟在「日志保留份数」下面 —— 两项都是"保留多少份、超出丢最旧"的保留策略。
+                -->
+                <include
+                    android:id="@+id/row_trash_keep"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="62dp"
+                    android:background="@color/divider" />
+
+                <!--
                   F20：自动清理数据根残留（开关）。
                   ★ 放在这张卡的末位：前四项用户天天改，这一项一年碰不了一次。
                   ★ 这一行同时是「手动清理」的入口 —— 关掉自动之后仍要能清，
