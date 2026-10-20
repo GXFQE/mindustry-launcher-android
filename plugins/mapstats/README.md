@@ -26,12 +26,16 @@ adb shell am start -n io.mdt.launcher/io.mdt.launcher.MainActivity \
 ## 现在做什么 / 还没做什么
 
 - ✅ 自带 `.msav` 解析（`core/` 是宿主那几个纯 Java 类的拷贝：`MapStats` / `MsavTiles` /
-  `MsavPatches` / `MapStatsExport` / `Hjson` + 三张表）；只走 `PluginApi`：`pick` / `open` /
-  `runBackground` / `progress` / `theme` / `shareText` / `export` / `closePage`。
+  `MsavPatches` / `MapStatsExport` / `Hjson` / `BundleNames` / `Colors` + 三张表）；只走 `PluginApi`：
+  `pick` / `open` / `runBackground` / `progress` / `theme` / `shareText` / `export` / `closePage` /
+  `modsSkipped`。
 - ✅ 数字与宿主对得上（真机 0.msav：地矿 2,595 / 可采地板 51,314 / 加成地板 118,873 / 可建造 31,083）。
-- ⏳ 译名：现在用 `MapStats.pretty()` 的内部名兜底（界面上是 `Scrap` / `Sand Floor`），
-  下一轮把宿主 `BundleNames` + 版本 APK / 模组 bundle 那条路搬进来（要先确认插件怎么拿版本 APK 的字节）。
-- ⏳ 模组叠加：`core` 只用了原版定义表；`MapStatsMods` 的"扫模组包 / 打补丁"还没搬。
-- ⏳ 星球：宿主从 `Maps.Item.meta.planet` 读（决定最小核心 3×3 / 4×4），插件现在没有 meta 可读 ⇒ 按塞普罗算。
+- ✅ **译名**：版本 APK 的 `bundles/` + 本槽模组的 `*-bundles/`（与宿主同源，`MapStats.readBundles`）；
+  真机中文界面显示「废料 / 铅 / 铜 / 煤炭 / 钛 / 钍」「沙子 / 盐碱地 / 深水 / 水 / 浅滩 / 页岩地 / 石油」。
+- ✅ **模组叠加**：只用宿主给的事实（`ItemInfo.extra` 的 `enabled` / `willFailJavaLoad` / `rootPrefix`
+  + `api.modsSkipped()`，v8），调 `MapStats.overlayMods` 建有效内容表；判据不重写。
+- ⏳ 星球：宿主从 `Maps.Item.meta.planet` 读（决定最小核心 3×3 / 4×4），插件没有 meta ⇒ 按塞普罗算。
+- ⏳ JSON 的声明（版本 APK / 模组数 / 补丁数 / 星球）还没进插件那份。
 - ⏳ 宿主那一份（`MapStats*` / `MapDetailActivity` 统计段 / `MapsActivity` 导出统计 / `StatsExporter`）
-  等插件补到 parity 再删；删的时候自检里那 1,000+ 行统计断言要一起迁到插件侧。
+  等上面两条补完再删；删的时候自检里那 1,000+ 行统计断言要一起迁到插件侧（插件工程目前**没有自检**）。
+

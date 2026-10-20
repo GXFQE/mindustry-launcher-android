@@ -7,15 +7,20 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import java.io.ByteArrayInputStream;
+import java.io.File;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 
 import io.mdt.launcher.api.ItemInfo;
 import io.mdt.launcher.api.PickCallback;
 import io.mdt.launcher.api.PluginApi;
 import io.mdt.launcher.api.PluginTheme;
+import io.mdt.plugins.mapstats.core.BundleNames;
 import io.mdt.plugins.mapstats.core.MapStats;
 import io.mdt.plugins.mapstats.core.MsavTiles;
 
@@ -31,9 +36,9 @@ import io.mdt.plugins.mapstats.core.MsavTiles;
  */
 public final class MapStatsPage {
 
-    /** 接口版本：v7（主题 / 后台任务 + 进度 / 关页 / 分享·保存 / 勾选）。 */
+    /** 接口版本：v8（v7 的"做事"层 + `modsSkipped()`）。 */
     public static int api() {
-        return 7;
+        return 8;
     }
 
     /** 当前这一页的统计产物（页面重建就重新算）。 */
@@ -137,6 +142,17 @@ public final class MapStatsPage {
         api.runBackground("mapstats", new Runnable() {
             @Override public void run() {
                 final List<Built> out = new ArrayList<>();
+                // 内容表与译名按"当前槽"备一次（原版表 ⨁ 已启用模组 + 版本 APK / 模组 bundle）
+                MapStats.Table table;
+                MapStats.Names names;
+                try {
+                    Prepped prep = prepare(api, c);
+                    table = prep.table;
+                    names = prep.names;
+                } catch (Throwable e) {
+                    table = MapStats.vanilla();
+                    names = new RawNames();
+                }
                 for (int i = 0; i < items.size(); i++) {
                     ItemInfo it = items.get(i);
                     api.progress(i + 1, items.size());
@@ -149,7 +165,7 @@ public final class MapStatsPage {
                         if (t == null || !t.ok()) {
                             b.error = "unreadable";
                         } else {
-                            b.result = MapStats.analyze(t, MapStats.vanilla(), new RawNames(), null);
+                            b.result = MapStats.analyze(t, table, names, null);
                             b.millis = b.result.millis;
                         }
                     } catch (Throwable e) {
@@ -170,6 +186,125 @@ public final class MapStatsPage {
                 });
             }
         });
+    }
+
+    /** 一次统计的"前置事实"：内容表 + 译名 + 这一轮游戏会不会加载模组。 */
+    private static final class Prepped {
+        MapStats.Table table;
+        MapStats.Names names;
+        boolean modsSkipped;
+    }
+
+    /**
+     * 备齐 {@link MapStats#analyze} 要的三样东西：有效内容表、译名、（可选的）模组事实。
+     *
+     * <p>模组那层**只用宿主给的数字**（`ItemInfo.extra` 的 `enabled` / `willFailJavaLoad` /
+     * `rootPrefix`）与 `api.modsSkipped()`，判据仍只有宿主那一处 —— 插件不重算"哪些模组是活的"。
+     * 译名与宿主 {@code MapStatsMods} + {@code BundleNames} 同源（同一份 `MapStats.readBundles`）。
+     */
+    private static Prepped prepare(PluginApi api, Context c) {
+        Prepped out = new Prepped();
+        out.table = MapStats.copyOf(MapStats.vanilla());
+        File apk = versionApkOf(api);
+        List<MapStats.Pack> packs = new ArrayList<>();
+        try {
+            out.modsSkipped = api.modsSkipped();
+        } catch (Throwable ignored) {
+        }
+        if (!out.modsSkipped) {
+            List<ItemInfo> mods;
+            try {
+                mods = api.contents(ItemInfo.KIND_MODS);
+            } catch (Throwable t) {
+                mods = new ArrayList<>();
+            }
+            for (ItemInfo m : mods) {
+                if (m == null || m.path == null) continue;
+                if (!"true".equals(m.extra.get("enabled"))) continue;
+                if ("true".equals(m.extra.get("willFailJavaLoad"))) continue;
+                File f = new File(m.path);
+                if (!f.exists()) continue;
+                MapStats.Pack p = new MapStats.Pack();
+                p.label = m.title;
+                String internal = m.extra.get("internalName");
+                p.internal = internal == null ? "" : internal;
+                p.prefix = internal != null && !internal.isEmpty() ? internal : m.title;
+                p.rootPrefix = m.extra.get("rootPrefix") == null ? "" : m.extra.get("rootPrefix");
+                p.hasCode = "true".equals(m.extra.get("java"))
+                        || "true".equals(m.extra.get("hasClassesDex"))
+                        || "true".equals(m.extra.get("hasScripts"));
+                p.hidden = "true".equals(m.extra.get("hidden"));
+                if (f.isDirectory()) {
+                    p.dir = f;
+                } else {
+                    p.pkg = f;
+                }
+                packs.add(p);
+            }
+            try {
+                MapStats.overlayMods(out.table, packs);
+            } catch (Throwable ignored) {
+                // 一个包的 JSON 坏了不该让整页失败；overlayMods 自己已经是逐包 catch
+            }
+        }
+        MapStats.BundleLang lang = MapStats.bundleLang(localeSuffix(c));
+        MapStats.Bundles bundles = MapStats.readBundles(packs, lang);
+        out.names = new BundleNames(apk, bundles, attrLabels(c), lang,
+                c.getString(R.string.ms_wall_name_fmt));
+        return out;
+    }
+
+    /** 当前槽对应的版本 APK（找不到就 null —— `BundleNames` 会退回模组译文 / 内部名）。 */
+    private static File versionApkOf(PluginApi api) {
+        String slot = api.slot();
+        File apk = null;
+        List<ItemInfo> versions;
+        try {
+            versions = api.versions();
+        } catch (Throwable t) {
+            return null;
+        }
+        for (ItemInfo v : versions) {
+            if (v == null || v.path == null || !v.readable) continue;
+            File f = new File(v.path);
+            if (!f.isFile()) continue;
+            if (apk == null) apk = f;
+            String s = v.extra.get("slot");
+            if (slot != null && slot.equals(s)) {
+                apk = f;
+                break;
+            }
+        }
+        return apk;
+    }
+
+    /** 属性词表（键 = 游戏 `Attribute` 的名字）。 */
+    private static Map<String, String> attrLabels(Context c) {
+        Map<String, String> m = new HashMap<>();
+        m.put("water", c.getString(R.string.ms_attr_water));
+        m.put("oil", c.getString(R.string.ms_attr_oil));
+        m.put("heat", c.getString(R.string.ms_attr_heat));
+        m.put("spores", c.getString(R.string.ms_attr_spores));
+        m.put("steam", c.getString(R.string.ms_attr_steam));
+        m.put("light", c.getString(R.string.ms_attr_light));
+        m.put("sand", c.getString(R.string.ms_attr_sand));
+        return m;
+    }
+
+    /** 界面语言 → bundle 后缀（`zh_CN` / `en` / `pt_BR`）。 */
+    private static String localeSuffix(Context c) {
+        try {
+            Locale l = c.getResources().getConfiguration().getLocales().isEmpty()
+                    ? Locale.getDefault()
+                    : c.getResources().getConfiguration().getLocales().get(0);
+            if (l == null) return "";
+            String lang = l.getLanguage();
+            if (lang == null || lang.isEmpty()) return "";
+            String country = l.getCountry();
+            return (country == null || country.isEmpty()) ? lang : (lang + "_" + country);
+        } catch (Throwable t) {
+            return "";
+        }
     }
 
     private static void render(Context c, PluginTheme th, TextView status,

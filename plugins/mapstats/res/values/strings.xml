@@ -20,4 +20,12 @@
     <string name="ms_export">Save JSON</string>
     <string name="ms_close">Close</string>
     <string name="ms_nothing">No results yet.</string>
+    <string name="ms_wall_name_fmt">%1$s (wall)</string>
+    <string name="ms_attr_water">water</string>
+    <string name="ms_attr_oil">oil</string>
+    <string name="ms_attr_heat">heat</string>
+    <string name="ms_attr_spores">spores</string>
+    <string name="ms_attr_steam">steam</string>
+    <string name="ms_attr_light">light</string>
+    <string name="ms_attr_sand">sand</string>
 </resources>

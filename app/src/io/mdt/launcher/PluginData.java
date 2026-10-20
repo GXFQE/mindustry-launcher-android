@@ -78,6 +78,24 @@ final class PluginData {
         return out;
     }
 
+    /**
+     * 游戏这一轮会不会加载模组（v8 `PluginApi.modsSkipped()` 的**唯一实现**）。
+     *
+     * <p>判据只有一处：`Mods.scan(...).skipModLoading`（= 上次启动崩过 + `modcrashdisable`）。
+     * 插件别自己拼 `launchid.dat` 与设置的组合 —— 那条判据在 {@code Mods} 里，写两处必漂。
+     */
+    static boolean modsSkipped(Context ctx, String slot) {
+        if (ctx == null) return false;
+        try {
+            String s = slot == null || slot.trim().isEmpty() ? Data.currentSlot(ctx) : slot.trim();
+            if (s == null || s.isEmpty()) return false;
+            Mods.Scan scan = Mods.scan(ctx, s);
+            return scan != null && scan.skipModLoading;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
     static List<ItemInfo> pageItems(Context ctx, String page, String slot, File selected) {
         if (ctx == null || page == null) return new ArrayList<ItemInfo>();
         if (ItemInfo.KIND_SAVES.equals(page)) return contents(ctx, slot, ItemInfo.KIND_SAVES);
@@ -430,6 +448,10 @@ final class PluginData {
             ex.put("hasClassesDex", String.valueOf(m.hasClassesDex));
             ex.put("hasScripts", String.valueOf(m.hasScripts));
             ex.put("jsCount", String.valueOf(m.jsCount));
+            // v8：内容表要用到的三条事实（判据都在宿主 Mods 里，插件照抄数字就行）
+            ex.put("enabled", String.valueOf(m.enabled));
+            ex.put("willFailJavaLoad", String.valueOf(m.willFailJavaLoad()));
+            put(ex, "rootPrefix", m.rootPrefix);
             String title = m.displayName == null || m.displayName.trim().isEmpty()
                     ? m.fileName : m.displayName.trim();
             String sub = modSubtitle(m);

@@ -10,7 +10,7 @@ import java.util.Map;
 
 /**
  * 插件能用的**宿主能力门面**（第 159 轮，插件接口 v3；第 160 轮 v4；第 161 轮 v5；
- * 第 162 轮 v6；第 187 轮 v7）。
+ * 第 162 轮 v6；第 187 轮 v7；第 188 轮 v8）。
  *
  * <h3>插件怎么拿到它</h3>
  * 入口类可以写两个静态方法，宿主**优先**用前一个：
@@ -42,6 +42,7 @@ import java.util.Map;
  * {@link #progress(int, int)} · {@link #closePage()} · {@link #share(String, InputStream)} /
  * {@link #shareText(String, String)} / {@link #export(String, String, InputStream)} ·
  * {@link #pick(String, PickCallback)}，用它们的插件报 7。
+ * **v8 起**补模组事实：{@link #modsSkipped()}（这一轮游戏会不会加载模组），用它的插件报 8。
  * 报 1/2 的老插件宿主不会走 {@code createView(PluginApi)} 那条路（仍按 v1/v2 的
  * {@code createView(Context)} 加载）。
  *
@@ -60,7 +61,7 @@ import java.util.Map;
  */
 public interface PluginApi {
 
-    /** 宿主这一版支持的插件接口版本（当前 = 7）。 */
+    /** 宿主这一版支持的插件接口版本（当前 = 8）。 */
     int hostApi();
 
     /**
@@ -151,6 +152,17 @@ public interface PluginApi {
 
     /** 主界面版本列表（已安装 + 已导入；APK 路径可用于 open）。 */
     List<ItemInfo> versions();
+
+    /**
+     * 游戏这一轮**会不会加载模组**（{@code false} = 会加载）。
+     *
+     * <p>为什么要问：上次崩过时游戏会整个跳过模组（`modcrashdisable`），这时"按模组算"的
+     * 内容表与用户实际看到的游戏不一致。宿主的判据只有一处（{@code Mods.scan} 的
+     * {@code skipModLoading}），插件别自己拼 {@code launchid.dat} + 设置的组合。
+     *
+     * <p>v8 起。拿不到（槽不存在 / 读挂了）⇒ {@code false}。
+     */
+    boolean modsSkipped();
 
     /**
      * 打开一个条目的字节流。

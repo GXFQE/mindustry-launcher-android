@@ -20,4 +20,12 @@
     <string name="ms_export">保存 JSON</string>
     <string name="ms_close">关闭</string>
     <string name="ms_nothing">还没有结果。</string>
+    <string name="ms_wall_name_fmt">%1$s（墙）</string>
+    <string name="ms_attr_water">含水</string>
+    <string name="ms_attr_oil">含油</string>
+    <string name="ms_attr_heat">高温</string>
+    <string name="ms_attr_spores">孢子</string>
+    <string name="ms_attr_steam">蒸汽</string>
+    <string name="ms_attr_light">光照</string>
+    <string name="ms_attr_sand">含沙</string>
 </resources>

@@ -59,7 +59,7 @@ public final class PluginHost {
      * 插件报 5/6/7 才意味着"我会用这些能力"，报 1/2/3/4 的照旧；
      * 区间下限不变（{@link #API_MIN} = 1）。
      */
-    public static final int API = 7;
+    public static final int API = 8;
     /**
      * 还认的**最老**契约版本（第 139 轮）。抬它 = 老插件被拒，界面会说清"太老、该更新插件"。
      *
@@ -366,6 +366,10 @@ public final class PluginHost {
 
         @Override public List<ItemInfo> versions() {
             return PluginData.versions(getBaseContext());
+        }
+
+        @Override public boolean modsSkipped() {
+            return PluginData.modsSkipped(getBaseContext(), slot);
         }
 
         @Override public InputStream open(ItemInfo item) throws IOException {

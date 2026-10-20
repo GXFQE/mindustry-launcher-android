@@ -3740,6 +3740,35 @@ public final class SelfTest {
         } catch (Throwable t) {
             ok(stat, L, false, "v7 API missing: " + t);
         }
+
+        // ── round 188: v8 = modsSkipped + 模组事实三条（enabled / willFailJavaLoad / rootPrefix）──
+        ok(stat, L, PluginHost.API >= 8, "host plugin api >= 8 (modsSkipped)");
+        try {
+            java.lang.reflect.Method ms = PluginApi.class.getMethod("modsSkipped");
+            ok(stat, L, ms.getReturnType() == boolean.class,
+                    "PluginApi.modsSkipped() returns boolean");
+            List<ItemInfo> modItems = PluginData.contents(ctx, curSlot, ItemInfo.KIND_MODS);
+            boolean keysOk = modExtrasOk(modItems);
+            int checkedMods = modItems.size();
+            if (checkedMods == 0) {
+                // 当前槽没有模组时，去**别的槽**找一个（本机有「冲突演示 / 模组演示」这类演示槽）
+                for (SlotInfo si : PluginData.slots(ctx)) {
+                    if (si == null || si.name == null) continue;
+                    List<ItemInfo> mi = PluginData.contents(ctx, si.name, ItemInfo.KIND_MODS);
+                    if (mi.isEmpty()) continue;
+                    keysOk = modExtrasOk(mi);
+                    checkedMods = mi.size();
+                    break;
+                }
+            }
+            ok(stat, L, keysOk, "mods items carry enabled/willFailJavaLoad/rootPrefix ("
+                    + checkedMods + ")");
+            ok(stat, L, PluginData.modsSkipped(ctx, curSlot)
+                            == Mods.scan(ctx, curSlot).skipModLoading,
+                    "modsSkipped mirrors Mods.scan.skipModLoading");
+        } catch (Throwable t) {
+            ok(stat, L, false, "v8 API missing: " + t);
+        }
         try {
             List<ItemInfo> pickMaps = PluginData.pickItems(ctx, curSlot, ItemInfo.KIND_MAPS);
             List<ItemInfo> pickNone = PluginData.pickItems(ctx, curSlot, "nope");
@@ -14491,6 +14520,18 @@ public final class SelfTest {
         if (cond) stat[0]++;
         else stat[1]++;
         L.add((cond ? "  ✅ " : "  ❌ ") + msg);
+    }
+
+    /** v8：模组条目必须带三条事实（`enabled` / `willFailJavaLoad` / `rootPrefix`）；空表算通过。 */
+    private static boolean modExtrasOk(List<ItemInfo> mods) {
+        if (mods == null) return true;
+        for (ItemInfo mi : mods) {
+            if (mi == null) continue;
+            if (mi.extra.get("enabled") == null) return false;
+            if (mi.extra.get("willFailJavaLoad") == null) return false;
+            if (mi.extra.get("rootPrefix") == null) return false;
+        }
+        return true;
     }
 
     /**
