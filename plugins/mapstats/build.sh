@@ -28,6 +28,23 @@ KS_ALIAS="${KS_ALIAS:-androiddebugkey}"; KS_PASS="${KS_PASS:-android}"; KEY_PASS
 wpath() { "$CYGPATH" -w "$1"; }
 jpath() { "$CYGPATH" -m "$1"; }
 
+# ---- 插件侧自检（纯 Java，PC 上跑）：`plugins/mapstats/build.sh check` -------------
+# ★ 为什么要有它：核心类是从宿主拷来的，宿主那份自检测的是宿主拷贝；插件改坏了它抓不到。
+if [ "${1:-}" = "check" ]; then
+  echo "== mapstats check (PC) =="
+  CHK="$OUT/check"; rm -rf "$CHK"; mkdir -p "$CHK"
+  SRC=()
+  while IFS= read -r f; do SRC+=("$f"); done < <( { find "$SRC_DIR/src/io/mdt/plugins/mapstats/core" -name '*.java'; echo "$SRC_DIR/tools/Check.java"; } | sort )
+  if ! "$JAVAC_8" -encoding UTF-8 -source 8 -target 8 -nowarn \
+        -classpath "$(wpath "$AJAR")" -d "$(wpath "$CHK")" "${SRC[@]}" > "$CHK/javac.log" 2>&1; then
+    grep -v '^注:' "$CHK/javac.log" | tail -30
+    echo "!! check 编译失败" >&2
+    exit 1
+  fi
+  "$JDK8/bin/java" -cp "$(wpath "$CHK")" io.mdt.plugins.mapstats.core.Check
+  exit $?
+fi
+
 rm -rf "$OUT"; mkdir -p "$OUT"
 
 # 🔴 与主构建同一个坑：aapt2 在含中文的工程路径下会 "failed to open directory"
