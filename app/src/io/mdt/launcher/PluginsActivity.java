@@ -335,9 +335,11 @@ public class PluginsActivity extends BaseActivity {
             Plugins.enable(this, s[0], ver);
             n++;
         }
-        if (n > 0) Toast.makeText(this, Trans.get(this, R.string.plugin_restart_hint),
-                Toast.LENGTH_LONG).show();
         rebuild();
+        // ★ 第 181 轮（用户）：「启用 / 停用之后加个提示，问要不要重启管理器」——
+        //   原来只弹一句 Toast（用户还得自己滚到底下找「立即重启」）⇒ 现在直接问，
+        //   「稍后」= 关掉弹窗、页面上的「待重启」徽标和底部那张卡照样在。
+        if (n > 0) askRestart(Trans.get(this, R.string.plugin_restart_hint));
     }
 
     // ---- 一行的动作 -------------------------------------------------------------
@@ -395,31 +397,41 @@ public class PluginsActivity extends BaseActivity {
                         } else if ("enable".equals(a)) {
                             Plugins.enable(PluginsActivity.this, id, newest);
                             // ★ 名字走 displayNameOf（原来传的是内部 id），时间走 versionLabel
-                            toastRestart(Trans.get(PluginsActivity.this, R.string.plugin_installed_fmt,
+                            String done = Trans.get(PluginsActivity.this, R.string.plugin_enabled_fmt,
                                     Plugins.displayNameOf(PluginsActivity.this, id),
-                                    Plugins.versionLabel(newest)));
+                                    Plugins.versionLabel(newest));
                             rebuild();
+                            askRestart(done);
                         } else if ("disable".equals(a)) {
+                            // ★ 只有"这一程本来在跑的那一份"被拿掉才需要重启；
+                            //   只取消 pending（还没加载过）的话重启也没意义 ⇒ 只给一句 Toast。
+                            boolean wasActive = Plugins.stateGet(Plugins.active(PluginsActivity.this), id) != null;
                             Plugins.disable(PluginsActivity.this, id);
+                            String done = Trans.get(PluginsActivity.this, R.string.plugin_disabled_fmt,
+                                    Plugins.displayNameOf(PluginsActivity.this, id));
                             rebuild();
+                            if (wasActive) askRestart(done);
+                            else Toast.makeText(PluginsActivity.this, done, Toast.LENGTH_SHORT).show();
                         } else if ("uninstall".equals(a)) {
                             // ★ 搬不动时 uninstall 返回 false、插件**还在**（数据没丢）⇒ 界面必须说一句，
-                    //   否则用户以为已经删掉了（第 148 轮 C1-b）
-                    boolean uninstalled = Plugins.uninstall(PluginsActivity.this, id);
+                            //   否则用户以为已经删掉了（第 148 轮 C1-b）
+                            boolean wasActive = Plugins.stateGet(Plugins.active(PluginsActivity.this), id) != null;
+                            boolean uninstalled = Plugins.uninstall(PluginsActivity.this, id);
                             // 🔴 2026-10-15：成功那句原来**无条件**弹 —— 失败时会先说
                             //   「卸载没成功…什么都没删」紧接着又说「已删除 X」（真机同屏两条 Toast 打架）。
                             //   名字也走 displayNameOf（别把内部 id 端给用户）。
                             if (uninstalled) {
-                                Toast.makeText(PluginsActivity.this,
-                                        Trans.get(PluginsActivity.this, R.string.plugin_uninstalled_fmt,
-                                                Plugins.displayNameOf(PluginsActivity.this, id)),
-                                        Toast.LENGTH_SHORT).show();
+                                String done = Trans.get(PluginsActivity.this, R.string.plugin_uninstalled_fmt,
+                                        Plugins.displayNameOf(PluginsActivity.this, id));
+                                rebuild();
+                                if (wasActive) askRestart(done);
+                                else Toast.makeText(PluginsActivity.this, done, Toast.LENGTH_SHORT).show();
                             } else {
                                 Toast.makeText(PluginsActivity.this,
                                         Trans.get(PluginsActivity.this, R.string.plugin_uninstall_failed),
                                         Toast.LENGTH_LONG).show();
+                                rebuild();
                             }
-                            rebuild();
                         } else if ("restore".equals(a)) {
                             boolean ok = Plugins.restoreQuarantined(PluginsActivity.this, id, qv);
                             Toast.makeText(PluginsActivity.this,
@@ -663,6 +675,7 @@ public class PluginsActivity extends BaseActivity {
             @Override public void run() {
                 final File tmp = new File(getCacheDir(), "plugin-import.apk");
                 String msg;
+                boolean ok = false;
                 try {
                     InputStream in = getContentResolver().openInputStream(uri);
                     if (in == null) throw new java.io.IOException("cannot open " + uri);
@@ -678,11 +691,12 @@ public class PluginsActivity extends BaseActivity {
                     //   转成 `MM-dd HH:mm` 再上屏；自述里的版本号另有其字段）。
                     String ver = String.valueOf(System.currentTimeMillis() / 1000L);
                     String r = Plugins.install(PluginsActivity.this, tmp, id, ver, false);
-                    msg = r.startsWith("FAILED")
-                            ? Trans.get(PluginsActivity.this, R.string.plugin_install_failed_fmt,
-                                    installFailReason(r))
-                            : Trans.get(PluginsActivity.this, R.string.plugin_installed_fmt,
-                                    id, Plugins.versionLabel(ver));
+                    ok = !r.startsWith("FAILED");
+                    msg = ok
+                            ? Trans.get(PluginsActivity.this, R.string.plugin_installed_fmt,
+                                    id, Plugins.versionLabel(ver))
+                            : Trans.get(PluginsActivity.this, R.string.plugin_install_failed_fmt,
+                                    installFailReason(r));
                 } catch (final Throwable t) {
                     // 按纪律：第一层只说"这件事没成"，原始异常进日志（§五"系统异常不许当弹窗正文"）
                     android.util.Log.w(LauncherApp.TAG, "plugin import failed", t);
@@ -694,10 +708,14 @@ public class PluginsActivity extends BaseActivity {
                     tmp.delete();
                 }
                 final String m = msg;
+                final boolean doneOk = ok;
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
-                        toastRestart(m);
                         rebuild();
+                        // ★ 装失败时**不再**顺带说"退出重开生效"（原来失败也走 toastRestart，
+                        //   读起来像"没装成，但记得重开"）；成功才问要不要重启。
+                        if (doneOk) askRestart(m);
+                        else Toast.makeText(PluginsActivity.this, m, Toast.LENGTH_LONG).show();
                     }
                 });
             }
@@ -740,9 +758,24 @@ public class PluginsActivity extends BaseActivity {
         Toast.makeText(this, Trans.get(this, R.string.plugin_restart_failed), Toast.LENGTH_LONG).show();
     }
 
-    private void toastRestart(String msg) {
-        Toast.makeText(this, msg + "\n" + Trans.get(this, R.string.plugin_restart_hint),
-                Toast.LENGTH_LONG).show();
+    /**
+     * 改动已经落盘、但**这一程不生效** ⇒ 直接问一句"现在要不要重启管理器"。
+     * 「稍后」= 关掉弹窗，页面上的「待重启」徽标与底部那张「立即重启管理器」卡照样在。
+     * ★ 只有真的需要退出重开时才调它（安装 / 启用 / 停用或卸载了**正在跑**的那一份 / 重新启用）。
+     */
+    private void askRestart(CharSequence message) {
+        if (isFinishing()) return;
+        new AlertDialog.Builder(this)
+                .setTitle(Trans.get(this, R.string.plugin_restart_ask_title))
+                .setMessage(message)
+                .setPositiveButton(Trans.get(this, R.string.plugin_restart_now),
+                        new DialogInterface.OnClickListener() {
+                            @Override public void onClick(DialogInterface d, int which) {
+                                restartNow();
+                            }
+                        })
+                .setNegativeButton(Trans.get(this, R.string.plugin_restart_later), null)
+                .show();
     }
 
     // ---- 小工具 ----------------------------------------------------------------

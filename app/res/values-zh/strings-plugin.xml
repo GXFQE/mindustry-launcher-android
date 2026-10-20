@@ -25,7 +25,10 @@
     <string name="plugin_action_uninstall">删除（挪进中转站）</string>
     <!-- ⚠️ `%2$s` 是**装进来的时刻**（`Plugins.versionLabel` 转成人读的 MM-dd HH:mm），不是版本号 ——
          内部那份令牌本来是 epoch 秒，直接上屏就是「v1792090201」（第 150 轮，用户：「什么东西是退回上一版」）。 -->
-    <string name="plugin_installed_fmt">已装 %1$s（%2$s 装的那份）—— 退出重开生效。</string>
+    <string name="plugin_installed_fmt">已装好 %1$s（%2$s 那份）。</string>
+    <!-- 第 181 轮：装 / 启用 / 停用之后直接问"要不要重启"，不再是只念一句 Toast。 -->
+    <string name="plugin_enabled_fmt">已启用 %1$s（%2$s 那份）。</string>
+    <string name="plugin_disabled_fmt">已停用 %1$s。</string>
     <string name="plugin_install_failed_fmt">没装成：%1$s</string>
     <!-- 装不上的**人话**原因（内部那个 ASCII 失败码只进日志、不上屏） -->
     <string name="plugin_install_pick_lost">那个文件已经找不到了 —— 重新选一次</string>
@@ -36,6 +39,9 @@
     <!-- 第 180 轮：产品名已统一成「Mindustry 管理器」，这里原来还写着「启动器」。 -->
     <string name="plugin_restart">立即重启管理器</string>
     <string name="plugin_restart_hint">换版本、启用或停用之后，要退出重开才生效。</string>
+    <string name="plugin_restart_ask_title">要现在重启管理器吗？</string>
+    <string name="plugin_restart_now">现在重启</string>
+    <string name="plugin_restart_later">稍后</string>
     <string name="plugin_ext_unsupported">这个插件声明的入口，这一版还不支持（插件本身照常工作）</string>
     <string name="plugin_restart_failed">这台设备不允许应用自己重启，请手动退出再打开。</string>
     <string name="plugin_back">返回</string>

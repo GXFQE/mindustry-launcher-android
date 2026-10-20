@@ -34,7 +34,10 @@
     <string name="plugin_action_uninstall">Delete it (moves to the bin)</string>
     <!-- %2$s is the INSTALL TIME (Plugins.versionLabel turns the epoch-seconds token into MM-dd HH:mm).
          The raw token used to be shown as a version number ("v1792090201"). -->
-    <string name="plugin_installed_fmt">Installed %1$s - this copy is from %2$s. Takes effect after a restart.</string>
+    <string name="plugin_installed_fmt">Installed %1$s (the copy from %2$s).</string>
+    <!-- 第 181 轮：装 / 启用 / 停用之后直接问"要不要重启"，不再是只念一句 Toast。 -->
+    <string name="plugin_enabled_fmt">Turned on %1$s (the copy from %2$s).</string>
+    <string name="plugin_disabled_fmt">Turned off %1$s.</string>
     <string name="plugin_install_failed_fmt">Could not install it: %1$s</string>
     <!-- Plain-word reasons for a failed install (the raw ASCII FAILED code stays in the log). -->
     <string name="plugin_install_pick_lost">that file cannot be found any more — pick it again</string>
@@ -45,6 +48,9 @@
     <!-- 第 180 轮：产品名已统一成「Mindustry 管理器」，英文侧本来就不带 launcher，不用改。 -->
     <string name="plugin_restart">Restart the app now</string>
     <string name="plugin_restart_hint">Changing a plugin only takes effect after you exit and reopen the app.</string>
+    <string name="plugin_restart_ask_title">Restart the manager now?</string>
+    <string name="plugin_restart_now">Restart now</string>
+    <string name="plugin_restart_later">Later</string>
     <string name="plugin_ext_unsupported">The entries this plugin declares are not supported by this version yet (the plugin itself still works)</string>
     <string name="plugin_restart_failed">This device would not let the app restart itself. Please close it and open it again by hand.</string>
     <string name="plugin_back">Back</string>
