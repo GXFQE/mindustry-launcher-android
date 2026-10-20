@@ -85,7 +85,7 @@
     <string name="plugin_level_l2">失败后换回它上一份能用的版本</string>
     <string name="plugin_level_l3">失败后停用它，并把这一版隔离</string>
     <string name="plugin_info_fmt">%1$s\n来源：%2$s\n处置：%3$s</string>
-    <string name="plugin_action_level_fmt">现在是「%1$s」，改成「%2$s」</string>
+    <string name="plugin_action_level_fmt">改成「%1$s」</string>
     <string name="plugin_action_restore_fmt">把隔离的那份放回来</string>
     <string name="plugin_row_quarantined_fmt">%1$s · 已隔离（%2$s 装的那份）</string>
     <string name="plugin_skip_retry_fmt">%1$s：%2$s没起来，先留着，下次启动再试</string>

@@ -420,7 +420,7 @@ public class PluginsActivity extends BaseActivity {
             actions.add("restore");
         }
         items.add(Trans.get(this, R.string.plugin_action_level_fmt,
-                        Trans.get(this, levelShortRes(lv)), Trans.get(this, levelShortRes(nextLv))));
+                        Trans.get(this, levelShortRes(nextLv))));
         actions.add("level");
         items.add(Trans.get(this, R.string.plugin_action_info));
         actions.add("info");

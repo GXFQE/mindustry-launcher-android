@@ -94,7 +94,7 @@
     <string name="plugin_level_l2">After a failure: switch back to the last version that worked</string>
     <string name="plugin_level_l3">After a failure: turn it off and quarantine this version</string>
     <string name="plugin_info_fmt">%1$s\nSource: %2$s\nHandling: %3$s</string>
-    <string name="plugin_action_level_fmt">Now %1$s - change to %2$s</string>
+    <string name="plugin_action_level_fmt">Change to %1$s</string>
     <string name="plugin_action_restore_fmt">Put the quarantined copy back</string>
     <string name="plugin_row_quarantined_fmt">%1$s · quarantined (the copy installed %2$s)</string>
     <string name="plugin_skip_retry_fmt">%1$s: %2$s did not work - kept, will be tried again</string>
