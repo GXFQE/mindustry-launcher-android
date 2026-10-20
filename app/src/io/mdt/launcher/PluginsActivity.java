@@ -36,7 +36,7 @@ import java.util.List;
  * <h3>版式（第 180 轮改过）</h3>
  * 一列纯文字（「名字 · 状态（…装的那份）」+ 缩进的能力条目 + 满屏句子）读起来就是"文字堆积"。
  * 现在：状态进**徽标**、来源/处置进第二行小字、能力条目收进**同一张卡**里当续行、
- * 安装与重启各是一张 {@code row_action} 卡、失败记录是一张警告色卡。
+ * 安装与重启各是一张 {@code row_action} 卡（放在列表**上面**，插件多了也够得着）、失败记录是一张警告色卡。
  * =⇒ 改版式时优先动 XML（{@code activity_plugins} / {@code item_plugin}），别又在这里堆 TextView。
  *
  * <h3>两条容易踩的</h3>
@@ -68,6 +68,8 @@ public class PluginsActivity extends BaseActivity {
     /** 列表骨架（含底部两张静态卡）：直接打开的插件页会把 ScrollView 内容换掉，回来时要重新挂它。 */
     private View mBodyRoot;
     private ScrollView mScroll;
+    /** 跳过横幅的动态容器（第 183 轮：它仍在最上面，安装 / 重启卡在它下面、列表上面）。 */
+    private LinearLayout mSkip;
     /** true = 这一趟是"直接打开某一条目"（返回 = 回上一页，不是回插件列表）。 */
     private boolean mDirect;
 
@@ -79,6 +81,7 @@ public class PluginsActivity extends BaseActivity {
         Util.applySystemInsets(findViewById(R.id.root));
         mScroll = (ScrollView) findViewById(R.id.plugins_scroll);
         mBodyRoot = findViewById(R.id.plugins_body);
+        mSkip = (LinearLayout) findViewById(R.id.plugins_skip);
         mBody = (LinearLayout) findViewById(R.id.plugins_dynamic);
         bindStaticCards();
         String id = getIntent() == null ? null : getIntent().getStringExtra(EXTRA_ID);
@@ -134,9 +137,10 @@ public class PluginsActivity extends BaseActivity {
             mScroll.removeAllViews();
             mScroll.addView(mBodyRoot);
         }
+        mSkip.removeAllViews();
         mBody.removeAllViews();
 
-        // 跳过横幅在最上面（已经发生过的事优先于常态列表）
+        // 跳过横幅在最上面（已经发生过的事优先于常态动作与列表）
         skipBanner();
 
         List<String> ids = Plugins.installedIds(this);
@@ -166,7 +170,7 @@ public class PluginsActivity extends BaseActivity {
         }
     }
 
-    /** 把底部两张静态卡接上动作（只绑一次；`rebuild()` 不会碰它们）。 */
+    /** 把两张静态动作卡接上动作（只绑一次；`rebuild()` 不会碰它们）。 */
     private void bindStaticCards() {
         View root = findViewById(R.id.root);
         View install = Util.bindActionValue(root, R.id.row_plugin_install, R.drawable.ic_add,
@@ -278,7 +282,7 @@ public class PluginsActivity extends BaseActivity {
         }
         if (live.isEmpty()) return;
 
-        View card = getLayoutInflater().inflate(R.layout.plugin_skip_card, mBody, false);
+        View card = getLayoutInflater().inflate(R.layout.plugin_skip_card, mSkip, false);
         ((TextView) card.findViewById(R.id.plugin_skip_title))
                 .setText(Trans.get(this, R.string.plugin_skip_title));
 
@@ -315,7 +319,7 @@ public class PluginsActivity extends BaseActivity {
         } else {
             restore.setVisibility(View.GONE);
         }
-        mBody.addView(card);
+        mSkip.addView(card);
     }
 
     /**

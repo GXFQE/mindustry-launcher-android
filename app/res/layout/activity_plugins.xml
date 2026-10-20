@@ -1,17 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  插件页（第 132 轮，2026-10-12；第 180 轮改版：从"一列文字"改成卡片 + 分区）。
+  插件页（第 132 轮，2026-10-12；第 180 轮改版：从"一列文字"改成卡片 + 分区；
+  第 183 轮：安装 / 重启挪到列表上面 —— 插件一多，最底下够不着）。
 
   结构（自上而下）：
     ┌ 跳过横幅（上次带插件启动没成功；有记录才出现）
+    ├ 安装卡（row_action：装一个插件 APK）
+    ├ 重启卡（row_action：立即重启管理器）
     ├ 「已安装」分区标题（有插件时才出现）
     ├ 插件卡（名称 / 状态徽标 / 来源·处置 / 它声明的能力条目）
-    ├ 空态卡（一个插件都没有时）
-    ├ 安装卡（row_action：装一个插件 APK）
-    └ 重启卡（row_action：立即重启管理器）
+    └ 空态卡（一个插件都没有时）
 
-  ★ 动态区（`plugins_dynamic`）与底部两张静态卡分开：静态卡只绑一次
-    （`Util.bindActionValue`），`rebuild()` 只清动态区 —— 否则每次回来都要重绑一遍。
+  ★ 两张静态卡只绑一次（`Util.bindActionValue`），`rebuild()` 只清动态区 ——
+    否则每次回来都要重绑一遍。
+  ★ 安装 / 重启放在列表**上面**：它们是页面级动作，不该被插件数量推到屏幕外；
+    跳过横幅仍在最前（已经发生过的失败优先于常态动作与列表）。
   ★ 根节点必须有 `@+id/root`，且 Activity 必须调 `Util.applySystemInsets(root)` ——
     targetSdk ≥ 35 强制 edge-to-edge；没有这一步**整页从屏幕 y=0 开始画**，被状态栏 + 顶栏盖住。
     ⚠️ 别改成 `android:fitsSystemWindows="true"`（Util.java 里有定论：edge-to-edge 下不可靠）。
@@ -41,19 +44,18 @@
             android:paddingTop="12dp"
             android:paddingBottom="24dp">
 
-            <!-- 动态区：跳过横幅 / 「已安装」标题 / 插件卡 / 空态卡（PluginsActivity.rebuild） -->
+            <!-- 跳过横幅（动态；有记录才出现，见 PluginsActivity.skipBanner） -->
             <LinearLayout
-                android:id="@+id/plugins_dynamic"
+                android:id="@+id/plugins_skip"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical" />
 
-            <!-- 安装（页面级动作，永远在列表下面） -->
+            <!-- 安装（页面级动作：放列表上面，插件再多也不用滚到底） -->
             <LinearLayout
                 android:id="@+id/plugins_install_card"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/card_gap"
                 android:background="@drawable/card_bg"
                 android:orientation="vertical">
 
@@ -79,6 +81,14 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
             </LinearLayout>
+
+            <!-- 动态区：「已安装」标题 / 插件卡 / 空态卡（PluginsActivity.rebuild） -->
+            <LinearLayout
+                android:id="@+id/plugins_dynamic"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:orientation="vertical" />
         </LinearLayout>
     </ScrollView>
 </LinearLayout>
