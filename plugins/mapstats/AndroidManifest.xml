@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  官方插件 mapstats（第 188 轮）：把宿主的「地图资源统计」搬出来后**只声明包名**。
+  与夹具一样**不声明任何组件** —— 插件是壳动态加载的代码 + 资源，不是独立应用。
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="io.mdt.plugins.mapstats">
+
+    <application android:label="MDT Map Stats"/>
+</manifest>

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ms_title">Map resources</string>
+    <string name="ms_hint">Pick one or more maps; counts run in the background.</string>
+    <string name="ms_pick">Pick maps…</string>
+    <string name="ms_pick_empty">Nothing selected.</string>
+    <string name="ms_busy_fmt">Counting %1$d / %2$d…</string>
+    <string name="ms_failed_fmt">Failed: %1$s</string>
+    <string name="ms_done_fmt">Done in %1$s ms.</string>
+    <string name="ms_map_head_fmt">%1$s · %2$d×%3$d</string>
+    <string name="ms_sec_ores">Ores</string>
+    <string name="ms_sec_walls">Ore walls</string>
+    <string name="ms_sec_floors">Mineable floors</string>
+    <string name="ms_sec_bonus">Bonus floors</string>
+    <string name="ms_row_fmt">%1$s  %2$d</string>
+    <string name="ms_buildable_fmt">Buildable: %1$d tiles</string>
+    <string name="ms_core_fmt">Core zone: %1$d tiles · up to %2$d cores (size %3$d)</string>
+    <string name="ms_unknown_fmt">Unrecognised tiles: %1$d</string>
+    <string name="ms_share">Share JSON</string>
+    <string name="ms_export">Save JSON</string>
+    <string name="ms_close">Close</string>
+    <string name="ms_nothing">No results yet.</string>
+</resources>

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="ms_title">地图资源统计</string>
+    <string name="ms_hint">选一张或多张地图；计数在后台跑。</string>
+    <string name="ms_pick">选择地图…</string>
+    <string name="ms_pick_empty">没有选中地图。</string>
+    <string name="ms_busy_fmt">正在统计 %1$d / %2$d…</string>
+    <string name="ms_failed_fmt">统计失败：%1$s</string>
+    <string name="ms_done_fmt">用时 %1$s 毫秒。</string>
+    <string name="ms_map_head_fmt">%1$s · %2$d×%3$d</string>
+    <string name="ms_sec_ores">地矿</string>
+    <string name="ms_sec_walls">墙矿</string>
+    <string name="ms_sec_floors">可采地板</string>
+    <string name="ms_sec_bonus">加成地板</string>
+    <string name="ms_row_fmt">%1$s  %2$d</string>
+    <string name="ms_buildable_fmt">可建造：%1$d 格</string>
+    <string name="ms_core_fmt">核心区：%1$d 格 · 最多 %2$d 个核心（边长 %3$d）</string>
+    <string name="ms_unknown_fmt">认不出的格子：%1$d</string>
+    <string name="ms_share">分享 JSON</string>
+    <string name="ms_export">保存 JSON</string>
+    <string name="ms_close">关闭</string>
+    <string name="ms_nothing">还没有结果。</string>
+</resources>
