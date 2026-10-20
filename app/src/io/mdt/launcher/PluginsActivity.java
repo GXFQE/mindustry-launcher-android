@@ -229,7 +229,9 @@ public class PluginsActivity extends BaseActivity {
         t.setText(text);
         t.setTextSize(12f);
         t.setTextColor(getResources().getColor(R.color.fg_muted));
-        t.setPadding(dp(4), dp(2), dp(4), dp(6));
+        // 分区标题：上面 6dp（+ 容器的 10dp = 16dp，比普通卡片间距多一点，起分组作用）、
+        // 下面 10dp（与卡片间距一致）—— 第 185 轮按真机量出来的像素对齐。
+        t.setPadding(dp(4), dp(6), dp(4), dp(10));
         mBody.addView(t);
     }
 
