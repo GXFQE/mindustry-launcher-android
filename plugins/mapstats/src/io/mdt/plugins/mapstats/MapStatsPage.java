@@ -51,7 +51,7 @@ public final class MapStatsPage {
      * 所以用 v9 的「当前这一项」+ `section` 插槽，让宿主把这一整段画在详情页里。</p>
      */
     public static int api() {
-        return 11;
+        return 12;
     }
 
     /** 当前这一页的统计产物（页面重建就重新算）。 */
@@ -80,9 +80,10 @@ public final class MapStatsPage {
     }
 
     public static View createView(final PluginApi api) {
-        // ★ 地图页进来 = **导出**（不是看统计）：拾取 → 问口径 → 直接写盘/分享 → 回上一页。
-        //   统计只在详情页那块 section 里（用户 2026-10-21：「不要把导出和统计混一起」）。
-        if (!"map-detail".equals(api.page())) return exportOnly(api);
+        // 这个插件没有"自己的页面"：
+        //   · 统计 = 地图详情页里的 section（v9）
+        //   · 导出 = 地图页那一行的 **action** 插槽（v12，点了在当前页跑 run()，不换页）
+        if (!"map-detail".equals(api.page())) return noPage(api);
         final Context c = api.context();
         final PluginTheme th = api.theme();
         final LinearLayout root = new LinearLayout(c);
@@ -212,45 +213,65 @@ public final class MapStatsPage {
         return root;
     }
 
-    /**
-     * **导出**（地图页那条入口）：不画统计卡片、不放口径按钮 ——
-     * 进来就开选择器 → 选完由宿主弹「怎么导出」→ 后台算 → 直接写盘 / 分享 → 回上一页。
-     */
-    private static View exportOnly(final PluginApi api) {
+    /** 这个插件没有独立页面 —— 统计在详情页、导出在地图页那一行（点了直接跑）。 */
+    private static View noPage(final PluginApi api) {
         final Context c = api.context();
         final PluginTheme th = api.theme();
-        final LinearLayout root = new LinearLayout(c);
+        LinearLayout root = new LinearLayout(c);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(th.background);
+        TextView t = new TextView(c);
+        t.setText(c.getString(R.string.ms_no_page));
+        t.setTextSize(14f);
+        t.setTextColor(th.textMuted);
+        root.addView(t);
+        return root;
+    }
 
-        // 页面标题由宿主顶栏给（扩展声明的 title），这里只留一行状态
-        final TextView status = new TextView(c);
-        status.setText(c.getString(R.string.ms_exporting));
-        status.setTextSize(15f);
-        status.setTextColor(th.textMuted);
-        status.setPadding(0, th.dp(8), 0, 0);
-        root.addView(status);
-
-        final LinearLayout sink = new LinearLayout(c);      // 结果不画（导出不需要看卡片）
-        final List<Built> built = new ArrayList<>();
-
-        // 页面挂上之后再开选择器（立刻开会撞着页面还没 attach）
-        status.post(new Runnable() {
-            @Override public void run() {
-                api.pick(ItemInfo.KIND_MAPS, new PickCallback() {
-                    @Override public void onPicked(List<ItemInfo> items) {
-                        if (items == null || items.isEmpty()) {
-                            api.toast(c.getString(R.string.ms_pick_empty));
-                            api.closePage();
-                            return;
-                        }
-                        askExport(api, c, th, status, sink, built, items,
-                                new int[]{MapStatsExport.MODE_DETAIL}, new View[2]);
+    /**
+     * **动作入口**（v12 `slot: action`）：由 `MapsActivity` 那一行直接调用，**不单开页面**。
+     *
+     * <p>流程与搬家前宿主那条「导出统计…」一致：选择器 → 问口径（宿主弹窗）→ 后台算 →
+     * 直接进系统保存框 / 分享面板。**取消 = 什么都不做**（不会有"卡在正在导出"的页面）。
+     */
+    public static void run(final PluginApi api) {
+        final Context c = api.context();
+        api.pick(ItemInfo.KIND_MAPS, new PickCallback() {
+            @Override public void onPicked(final List<ItemInfo> items) {
+                if (items == null || items.isEmpty()) return;
+                api.choose(c.getString(R.string.ms_export_ask), new String[]{
+                        c.getString(R.string.ms_opt_save_detail),
+                        c.getString(R.string.ms_opt_save_brief),
+                        c.getString(R.string.ms_opt_share_detail),
+                        c.getString(R.string.ms_opt_share_brief)}, new PluginApi.Choose() {
+                    @Override public void onChoose(final int idx) {
+                        if (idx < 0) return;
+                        final int mode = (idx % 2 == 0)
+                                ? MapStatsExport.MODE_DETAIL : MapStatsExport.MODE_BRIEF;
+                        final boolean share = idx >= 2;
+                        api.runBackground("mapstats", new Runnable() {
+                            @Override public void run() {
+                                List<Built> built = computeAll(api, c, items);
+                                final String js = jsonOf(built, c, mode);
+                                if (js == null) {
+                                    api.toast(c.getString(R.string.ms_nothing));
+                                    return;
+                                }
+                                if (share) {
+                                    api.shareText(fileName(built), js);
+                                    api.toast(c.getString(R.string.ms_share_done,
+                                            fileName(built)));
+                                } else {
+                                    api.export(fileName(built), mimeOf(built),
+                                            new ByteArrayInputStream(
+                                                    js.getBytes(StandardCharsets.UTF_8)));
+                                }
+                            }
+                        });
                     }
                 });
             }
         });
-        return root;
     }
 
     /** 详情页上「当前这一项」：v9 直给；老宿主退回按文件对 / 页面快照只有一个。 */
@@ -309,6 +330,66 @@ public final class MapStatsPage {
         });
     }
 
+    /** 后台把若干张地图算完（**视图 / 无视图两条路共用这一份**）。 */
+    private static List<Built> computeAll(final PluginApi api, final Context c,
+                                          final List<ItemInfo> items) {
+        final List<Built> out = new ArrayList<>();
+        // 内容表与译名按"当前槽"备一次（原版表 ⨁ 已启用模组 + 版本 APK / 模组 bundle）
+        Prepped prep = new Prepped();
+        prep.table = MapStats.vanilla();
+        prep.names = new RawNames();
+        try {
+            prep = prepare(api, c);
+        } catch (Throwable ignored) {
+            // 备不出来就退回原版表 + 内部名（页面照常出数）
+        }
+        final MapStats.Table table = prep.table;
+        final MapStats.Names names = prep.names;
+        final String prepApkName = prep.gameApk;
+        final String prepApkVersion = prep.gameVersion;
+        final int tableRows = prep.tableRows;
+        final int packs = prep.packs;
+        final boolean modsSkipped = prep.modsSkipped;
+        final boolean modsFailed = prep.modsFailed;
+        for (int i = 0; i < items.size(); i++) {
+            ItemInfo it = items.get(i);
+            api.progress(i + 1, items.size());
+            Built b = new Built();
+            b.name = it.title == null ? "map" : it.title;
+            b.mapName = it.title == null ? "" : it.title;
+            b.slot = api.slot() == null ? "" : api.slot();
+            b.where = whereOf(it);
+            b.source = sourceOf(it);
+            b.bytes = it.size > 0 ? it.size : -1;
+            b.planet = it.extra.get("planet") == null ? "" : it.extra.get("planet");
+            b.gameApk = prepApkName;
+            b.gameVersion = prepApkVersion;
+            b.tableRows = tableRows;
+            b.packs = packs;
+            b.modsSkipped = modsSkipped;
+            b.modsFailed = modsFailed;
+            InputStream in = null;
+            try {
+                in = api.open(it);
+                MsavTiles.Tiles t = MsavTiles.read(in, false);
+                if (t == null || !t.ok()) {
+                    b.error = "unreadable";
+                } else {
+                    b.result = MapStats.analyze(t, table, names,
+                            b.planet.isEmpty() ? null : b.planet);
+                    b.millis = b.result.millis;
+                }
+            } catch (Throwable e) {
+                b.error = String.valueOf(e.getMessage());
+            } finally {
+                closeQuietly(in);
+            }
+            b.sha = shaOf(api, it);
+            out.add(b);
+        }
+        return out;
+    }
+
     /** 后台算、主线程画。 */
     private static void run(final PluginApi api, final Context c, final PluginTheme th,
                             final TextView status, final LinearLayout results,
@@ -322,62 +403,8 @@ public final class MapStatsPage {
                 : c.getString(R.string.ms_busy_fmt, 1, items.size()));
         api.runBackground("mapstats", new Runnable() {
             @Override public void run() {
-                final List<Built> out = new ArrayList<>();
-                // 内容表与译名按"当前槽"备一次（原版表 ⨁ 已启用模组 + 版本 APK / 模组 bundle）
-                Prepped prep = new Prepped();
-                prep.table = MapStats.vanilla();
-                prep.names = new RawNames();
-                try {
-                    prep = prepare(api, c);
-                } catch (Throwable ignored) {
-                    // 备不出来就退回原版表 + 内部名（页面照常出数）
-                }
-                final MapStats.Table table = prep.table;
-                final MapStats.Names names = prep.names;
-                final String prepApkName = prep.gameApk;
-                final String prepApkVersion = prep.gameVersion;
-                final int tableRows = prep.tableRows;
-                final int packs = prep.packs;
-                final boolean modsSkipped = prep.modsSkipped;
-                final boolean modsFailed = prep.modsFailed;
-                for (int i = 0; i < items.size(); i++) {
-                    ItemInfo it = items.get(i);
-                    api.progress(i + 1, items.size());
-                    Built b = new Built();
-                    b.name = it.title == null ? "map" : it.title;
-                    b.mapName = it.title == null ? "" : it.title;
-                    b.slot = api.slot() == null ? "" : api.slot();
-                    b.where = whereOf(it);
-                    b.source = sourceOf(it);
-                    b.bytes = it.size > 0 ? it.size : -1;
-                    b.planet = it.extra.get("planet") == null ? "" : it.extra.get("planet");
-                    b.gameApk = prepApkName;
-                    b.gameVersion = prepApkVersion;
-                    b.tableRows = tableRows;
-                    b.packs = packs;
-                    b.modsSkipped = modsSkipped;
-                    b.modsFailed = modsFailed;
-                    InputStream in = null;
-                    try {
-                        in = api.open(it);
-                        MsavTiles.Tiles t = MsavTiles.read(in, false);
-                        if (t == null || !t.ok()) {
-                            b.error = "unreadable";
-                        } else {
-                            b.result = MapStats.analyze(t, table, names,
-                                    b.planet.isEmpty() ? null : b.planet);
-                            b.millis = b.result.millis;
-                        }
-                    } catch (Throwable e) {
-                        b.error = String.valueOf(e.getMessage());
-                    } finally {
-                        closeQuietly(in);
-                    }
-                    b.sha = shaOf(api, it);
-                    out.add(b);
-                }
-                // ★ 必须挂在**已 attach 的 view** 上 post：导出页里 results 是不进界面的壳，
-                //   对未 attach 的 view 调 post ⇒ 进它的 HandlerActionQueue，永远不执行（真机卡"正在统计"）
+                final List<Built> out = computeAll(api, c, items);
+                // ★ 必须挂在**已 attach 的 view** 上 post（对没 attach 的 view post 永不执行 —— 真机踩过）
                 status.post(new Runnable() {
                     @Override public void run() {
                         built.clear();

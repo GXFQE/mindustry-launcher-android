@@ -11,9 +11,9 @@
     {
       "id": "mapstats-maps",
       "title": "导出统计…",
-      "subtitle": "只导出，不看统计：一张 .json、多张 .jsonl；详细 / 简洁，保存或分享",
+      "subtitle": "选一张或多张；详细 / 简洁，直接保存或分享",
       "entry": "io.mdt.plugins.mapstats.MapStatsPage",
-      "slot": "content",
+      "slot": "action",
       "page": "maps"
     },
     {

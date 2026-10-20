@@ -59,11 +59,12 @@ public final class PluginHost {
      * **v9（第 193 轮）= 详情页的「当前这一项」（{@link PluginApi#selectedItem()}）
      * + `section` 插槽（插件把自己的一段界面直接画进宿主页，统计不再另开一页）；
      * **v10（第 195 轮）= `choose()`：插件要问「怎么导出」时由**宿主**弹原生对话框**；
-     * **v11（第 196 轮）= `export(..., after)`：保存真的结束后回调插件**。
+     * **v11（第 196 轮）= `export(..., after)`：保存真的结束后回调插件**；
+     * **v12（第 197 轮）= `action` 插槽 + `run(PluginApi)` 入口：点了就在**当前页**跑，不单开页面**。
      * 插件报 5/6/7 才意味着"我会用这些能力"，报 1/2/3/4 的照旧；
      * 区间下限不变（{@link #API_MIN} = 1）。
      */
-    public static final int API = 11;
+    public static final int API = 12;
     /**
      * 还认的**最老**契约版本（第 139 轮）。抬它 = 老插件被拒，界面会说清"太老、该更新插件"。
      *
@@ -312,6 +313,23 @@ public final class PluginHost {
         } catch (NoSuchMethodException noApi) {
             Method m = l.entry.getMethod("createView", Context.class);
             return (View) m.invoke(null, l.ctx);
+        }
+    }
+
+    /**
+     * 调插件的**动作**入口（v12：`slot: action`）—— **不建页面、不换页**。
+     *
+     * <p>顺序同 {@link #createView}：{@code run(PluginApi)} 优先，没有才回落 {@code run(Context)}。
+     * 两种都没有 ⇒ 抛 {@link NoSuchMethodException}，由调用方兜底（点了没反应，页面照常）。
+     */
+    static void runEntry(Loaded l) throws Exception {
+        if (l == null || l.entry == null) throw new IllegalArgumentException("plugin not loaded");
+        try {
+            Method m = l.entry.getMethod("run", PluginApi.class);
+            m.invoke(null, l.env);
+        } catch (NoSuchMethodException noApi) {
+            Method m = l.entry.getMethod("run", Context.class);
+            m.invoke(null, l.ctx);
         }
     }
 

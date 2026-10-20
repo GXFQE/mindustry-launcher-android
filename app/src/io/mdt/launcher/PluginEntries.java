@@ -74,6 +74,67 @@ final class PluginEntries {
      *                    四个内容页的顺序因此仍是「导入 → 导出 → 专属动作 → 删除 → 筛选」
      *                    （第 157 轮定下的顺序，插件动作属于"这一个页面专属的事"）
      */
+    /** 这一页该画哪些**动作**（`slot: action`）；与 {#collect} 同一套取数。 */
+    static List<Entry> collectActions(Context ctx, String page) {
+        List<Entry> out = new ArrayList<Entry>();
+        if (ctx == null || page == null || !Extensions.knownPage(page)) return out;
+        String active = Plugins.active(ctx);
+        for (String id : Plugins.stateIds(active)) {
+            String ver = Plugins.stateGet(active, id);
+            if (ver == null || ver.isEmpty()) continue;
+            File apk = Plugins.apkOf(ctx, id, ver);
+            List<Extensions.Item> items = Extensions.forAction(Extensions.of(apk), page);
+            if (items.isEmpty()) continue;
+            String name = Plugins.displayNameOf(ctx, id);
+            for (Extensions.Item it : items) out.add(new Entry(id, ver, name, it));
+        }
+        return out;
+    }
+
+    /**
+     * 把插件声明的**动作**画成一行（**点了不换页**）：在当前页加载插件并调它的 {@code run(...)}。
+     *
+     * <p>对话框 / 选择器 / SAF / 进度都落在**原来那一页**上 —— 与搬家前宿主自己那条"导出统计…"
+     * 一模一样（用户 2026-10-21：「像原来那样不单开页面能行吗」）。
+     */
+    static void attachAction(Activity a, ViewGroup box, String page, String slot, int beforeRowId) {
+        if (a == null || box == null) return;
+        List<Entry> rows = collectActions(a, page);
+        if (rows.isEmpty()) return;
+        int at = insertIndex(box, beforeRowId);
+        for (Entry e : rows) {
+            box.addView(divider(a), at++);
+            box.addView(actionRow(a, e, page, slot), at++);
+        }
+    }
+
+    private static View actionRow(final Activity a, final Entry e, final String page,
+                                  final String slot) {
+        View row = LayoutInflater.from(a).inflate(R.layout.row_action, null, false);
+        ((ImageView) row.findViewById(R.id.act_icon)).setImageResource(R.drawable.ic_plugins_bar);
+        ((TextView) row.findViewById(R.id.act_title)).setText(e.item.label());
+        String sub = e.item.subtitle == null ? "" : e.item.subtitle.trim();
+        ((TextView) row.findViewById(R.id.act_sub)).setText(sub.isEmpty()
+                ? Trans.get(a, R.string.plugin_ext_from_fmt, e.name) : sub);
+        row.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                try {
+                    File apk = Plugins.apkOf(a, e.id, e.ver);
+                    if (apk == null || !apk.isFile()) return;
+                    PluginHost.Loaded l = Plugins.isInjected(a, e.id, e.ver)
+                            ? PluginHost.openInjected(a, apk, e.item.entry, page, slot, null, null)
+                            : PluginHost.load(a, apk, e.item.entry, page, slot, null, null);
+                    PluginHost.runEntry(l);
+                } catch (Throwable t) {
+                    // 一份坏插件不该影响这一页（与段落插槽同一条规矩）
+                    android.widget.Toast.makeText(a, a.getString(R.string.plugin_err_other),
+                            android.widget.Toast.LENGTH_LONG).show();
+                }
+            }
+        });
+        return row;
+    }
+
     /** 这一页该画哪些**段落**（`slot: section`）；与 {#collect} 同一套取数。 */
     static List<Entry> collectSections(Context ctx, String page) {
         List<Entry> out = new ArrayList<Entry>();

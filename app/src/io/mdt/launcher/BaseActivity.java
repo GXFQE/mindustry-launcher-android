@@ -104,6 +104,14 @@ public abstract class BaseActivity extends Activity {
     }
 
     @Override
+    protected void onActivityResult(int requestCode, int resultCode, android.content.Intent data) {
+        super.onActivityResult(requestCode, resultCode, data);
+        // 第 197 轮：插件导出（SAF 保存）现在**任何页面**都可能发起（action 插槽不换页）
+        // ⇒ 认领放在基类这一处；否则结果落到没人管的 Activity 上（真机：文件 0 字节）
+        if (PluginActions.onActivityResult(this, requestCode, resultCode, data)) return;
+    }
+
+    @Override
     protected void onCreate(android.os.Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         applyLocalizedTitle();

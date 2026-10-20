@@ -184,6 +184,9 @@ public class MapsActivity extends BaseActivity {
         // ★ 第 159 轮（扩展点 v2）：插件声明的**地图页动作**插在「删除」上面
         PluginEntries.attach(this, (ViewGroup) root.findViewById(R.id.maps_actions),
                 Extensions.PAGE_MAPS, mSlot, R.id.row_maps_del);
+        // ★ 第 197 轮（v12）：**动作**行（点了在当前页跑插件，不换页）—— 导出统计走这条
+        PluginEntries.attachAction(this, (ViewGroup) root.findViewById(R.id.maps_actions),
+                Extensions.PAGE_MAPS, mSlot, R.id.row_maps_del);
 
         // ★★ 2026-10-16（第 151b 轮）：列表不再是 `ListView`，而是整页 `ScrollView` 里手工挂载的
         //   容器（理由见 `activity_maps.xml` 头：横屏可用高不够时 `weight` 子视图会归零 ⇒

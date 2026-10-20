@@ -77,6 +77,13 @@ final class Extensions {
      * 地图统计原来长在地图详情页里，点开地图就看见；搬成插件后不该变成「再点一行、再跳一页」。</p>
      */
     static final String SLOT_SECTION = "section";
+    /**
+     * 第 197 轮（v12）：**动作插槽** —— 点了就在**当前页**跑插件，不单开页面。
+     *
+     * <p>用户 2026-10-21：「像原来那样不单开页面能行吗」—— 导出这种"选完就做事"的流程
+     * 不该先跳一个空页；插件只要实现 {@code run(PluginApi)}，对话框 / SAF / 进度都落在原来的页上。</p>
+     */
+    static final String SLOT_ACTION = "action";
     static final String PAGE_BLUEPRINT_DETAIL = "blueprint-detail";
 
     /** 一条"能力条目"。 */
@@ -148,6 +155,18 @@ final class Extensions {
      * <p>判据三条缺一不可：插槽 == {@link #SLOT_CONTENT} · page 逐字相等 ·
      * 这个 page 是本版认得的（认不出的 page 不渲染，见 {@link #knownPage}）。
      */
+    /** 这一页该画哪些**动作**（`slot: action`）：纯函数，顺序 = 声明顺序。 */
+    static List<Item> forAction(List<Item> all, String page) {
+        List<Item> out = new ArrayList<Item>();
+        if (all == null || page == null || !knownPage(page)) return out;
+        for (Item it : all) {
+            if (!SLOT_ACTION.equals(it.slot)) continue;
+            if (!page.equals(it.page)) continue;
+            out.add(it);
+        }
+        return out;
+    }
+
     /** 这一页该画哪些**段落**（`slot: section`）：纯函数，顺序 = 声明顺序。 */
     static List<Item> forSection(List<Item> all, String page) {
         List<Item> out = new ArrayList<Item>();
@@ -171,7 +190,8 @@ final class Extensions {
 
     /** 这一版认得的插槽（别的名字 ⇒ 跳过；启动报告里会记）。 */
     static boolean knownSlot(String slot) {
-        return SLOT_PLUGINS.equals(slot) || SLOT_CONTENT.equals(slot);
+        return SLOT_PLUGINS.equals(slot) || SLOT_CONTENT.equals(slot)
+                || SLOT_SECTION.equals(slot) || SLOT_ACTION.equals(slot);
     }
 
     /** 这一版认得的内容页 / 功能页（只有 content 插槽的条目用得上）。 */

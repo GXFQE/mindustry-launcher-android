@@ -227,6 +227,8 @@ final class PluginActions {
             sPending = null;
         }
         if (p == null) return true;
+        android.util.Log.i(TAG, "export result uri=" + (data == null ? null : data.getData())
+                + " tmp=" + p.tmp.length());
         final Uri uri = (resultCode == Activity.RESULT_OK && data != null) ? data.getData() : null;
         if (uri == null) {
             p.tmp.delete();
@@ -244,6 +246,7 @@ final class PluginActions {
                     p.tmp.delete();
                 }
                 final String e = err;
+                android.util.Log.i(TAG, "export write err=" + e);
                 a.runOnUiThread(new Runnable() {
                     @Override public void run() {
                         toast(a, e == null

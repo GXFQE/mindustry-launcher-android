@@ -725,8 +725,6 @@ public class PluginsActivity extends BaseActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
-        // 第 187 轮：插件 export（SAF 保存）走这里，认领了就不再往下走
-        if (PluginActions.onActivityResult(this, requestCode, resultCode, data)) return;
         if (requestCode != REQ_PICK) return;
         if (resultCode != RESULT_OK || data == null || data.getData() == null) return;
         final Uri uri = data.getData();
