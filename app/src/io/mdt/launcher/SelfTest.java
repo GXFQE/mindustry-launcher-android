@@ -338,6 +338,8 @@ public final class SelfTest {
             killSafety(ctx, L, stat);
             // ★ 第 178 轮：杀后台 P1 —— 整槽导入 UI/dev 共用 pre-op + 中断清扫
             wholeSlotPreOp(ctx, L, stat);
+            // ★ 第 179 轮：杀后台 P2 —— CAS 暂存件启动清扫 + launchid.dat 自愈/熔断
+            p2SelfHeal(ctx, L, stat);
             // ★ 篡改对象池的用例放**最后**：它会在池里留下一个内容坏掉的对象，
             //   之后任何"再备份一次"都会因为 `has()` 命中而复用坏对象（CAS 的固有
             //   假设是"池内不可变"）。放在最后就不影响别的用例。
@@ -1471,6 +1473,100 @@ public final class SelfTest {
     /** 两段文本里都有这个片段（表头两档的**共同部分**断言用） */
     private static boolean bothHave(String a, String b, String needle) {
         return a != null && b != null && a.contains(needle) && b.contains(needle);
+    }
+
+    /**
+     * ★ 第 179 轮（杀后台 P2）：两件启动自愈。
+     *
+     * <ol>
+     *   <li><b>CAS 暂存件</b>：自动备份被强杀留下的 `objects/tmp/obj-*.part`
+     *       （实测 90 MB）不再等 1 h —— {@link Cas#sweepTmpNow()} 启动即清；</li>
+     *   <li><b>`launchid.dat`</b>：force-stop / 清理器留下的 marker 在**没有更新的崩溃报告**时
+     *       自动清；有报告不清；同一槽最多清 {@link LaunchMarker#MAX_CLEARS} 次（熔断），
+     *       正常启动（marker 不在）后计数归零。</li>
+     * </ol>
+     *
+     * <p>尺子两面：纯判据的真值表 + 真实槽上的"清 / 不清 / 熔断 / 重置"四条路径。
+     * 报告守卫用**造一份比 marker 新的报告**验证 —— 没有反方向的话，"永远不清"也会全绿。
+     */
+    private static void p2SelfHeal(Context ctx, List<String> L, int[] stat) throws IOException {
+        L.add("── 第 179 轮 · 杀后台 P2（CAS 暂存件启动清扫 + launchid.dat 自愈）──");
+        // ① 纯判据真值表
+        ok(stat, L, !LaunchMarker.canClear(false, false, 1L, 0L, 0),
+                "marker 不在 ⇒ 不清");
+        ok(stat, L, !LaunchMarker.canClear(true, true, 1L, 0L, 0),
+                "游戏在跑 ⇒ 不清");
+        ok(stat, L, !LaunchMarker.canClear(true, false, 100L, 200L, 0),
+                "★有比 marker 新的崩溃报告 ⇒ 不清（真崩留给用户）");
+        ok(stat, L, !LaunchMarker.canClear(true, false, 100L, 0L, LaunchMarker.MAX_CLEARS),
+                "★清满 MAX_CLEARS 次 ⇒ 熔断");
+        ok(stat, L, LaunchMarker.canClear(true, false, 100L, 100L, 0),
+                "报告与 marker 同刻/更旧 ⇒ 可清");
+        ok(stat, L, LaunchMarker.canClear(true, false, 100L, 0L, LaunchMarker.MAX_CLEARS - 1),
+                "还没到上限 ⇒ 可清");
+
+        // ② 真实槽：无报告 ⇒ 清；重建 ⇒ 计数递增；满 3 次 ⇒ 保留
+        String tag = Long.toString(Math.abs(System.nanoTime() % 1000000L));
+        String slot = "zzlm" + tag;
+        File root = Data.slotDir(ctx, slot);
+        if (root == null) throw new IOException("null slot dir");
+        try {
+            File lid = new File(root, "launchid.dat");
+            writeTmp(root, "launchid.dat", "1234567");
+            String r1 = LaunchMarker.maybeClear(ctx, slot);
+            ok(stat, L, r1 != null && !lid.exists(),
+                    "★无崩溃报告 ⇒ 自动清掉 launchid.dat");
+            ok(stat, L, r1 != null && r1.contains("attempt 1/"), "摘要点名 attempt 1/N");
+
+            writeTmp(root, "launchid.dat", "1234567");
+            LaunchMarker.maybeClear(ctx, slot);
+            writeTmp(root, "launchid.dat", "1234567");
+            LaunchMarker.maybeClear(ctx, slot);
+            writeTmp(root, "launchid.dat", "1234567");
+            String r4 = LaunchMarker.maybeClear(ctx, slot);
+            ok(stat, L, r4 == null && lid.exists(),
+                    "★第 4 次不再清（熔断，marker 保留）");
+
+            // 正常启动（marker 已不在）⇒ 计数归零；再来一次应重新 attempt 1
+            lid.delete();
+            LaunchMarker.maybeClear(ctx, slot);
+            writeTmp(root, "launchid.dat", "1234567");
+            String r5 = LaunchMarker.maybeClear(ctx, slot);
+            ok(stat, L, r5 != null && r5.contains("attempt 1/"),
+                    "★marker 不在时计数归零（正常启动后重新获得 3 次预算）");
+
+            // 报告守卫：造一份比 marker 新的报告 ⇒ 不清；删掉报告 ⇒ 清
+            writeTmp(root, "launchid.dat", "1234567");
+            File crashes = new File(root, "crashes");
+            File rep = new File(crashes, "crash_zz.txt");
+            writeTmp(crashes, "crash_zz.txt", "not a real report");
+            rep.setLastModified(lid.lastModified() + 5000L);
+            String r6 = LaunchMarker.maybeClear(ctx, slot);
+            ok(stat, L, r6 == null && lid.exists(),
+                    "★有更新的崩溃报告 ⇒ 不清（反方向）");
+            rep.delete();
+            String r7 = LaunchMarker.maybeClear(ctx, slot);
+            ok(stat, L, r7 != null && !lid.exists(),
+                    "删掉报告后 ⇒ 又能清（不是永远不清）");
+        } finally {
+            // 清掉熔断状态：先删 marker，再让 maybeClear 走 reset 分支
+            new File(root, "launchid.dat").delete();
+            LaunchMarker.maybeClear(ctx, slot);
+            Backup.deleteSlotBackups(ctx, slot);
+            Data.deleteSlotForever(ctx, slot);
+        }
+
+        // ③ CAS 暂存件：启动清扫不等 1 h
+        File casTmp = new File(new File(Backup.casBaseDir(ctx), "objects"), "tmp");
+        if (!casTmp.isDirectory() && !casTmp.mkdirs() && !casTmp.isDirectory()) {
+            ok(stat, L, false, "造不出 CAS tmp 夹具");
+        } else {
+            File part = new File(casTmp, "obj-zz-" + tag + ".part");
+            writeTmp(casTmp, part.getName(), "HALF");
+            int n = new Cas(Backup.casBaseDir(ctx)).sweepTmpNow();
+            ok(stat, L, n >= 1 && !part.exists(),
+                    "★启动清扫把 objects/tmp 的 .part 立刻删掉（不等 1 h）");
+        }
     }
 
     /**

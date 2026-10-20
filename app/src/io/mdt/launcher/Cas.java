@@ -409,6 +409,26 @@ final class Cas {
         }
     }
 
+    /**
+     * ★ 第 179 轮（杀后台 P2）：**启动时的立即清扫**。
+     *
+     * <p>{@link #sweepTmp()} 只在每次 {@link #put} 开头跑，而且门槛 1 h ——
+     * 自动备份被强杀后留下的 `objects/tmp/obj-*.part`（实测 90 MB）要等下一次备份
+     * 或 1 h 才消失。主进程刚起来这一刻**不可能**有 put 在跑，所以启动时可以把
+     * tmp 下所有暂存件直接删掉，不必等年龄。
+     *
+     * @return 删掉的件数
+     */
+    int sweepTmpNow() {
+        File[] fs = tmpDir.listFiles();
+        if (fs == null) return 0;
+        int n = 0;
+        for (File f : fs) {
+            if (f.isFile() && f.delete()) n++;
+        }
+        return n;
+    }
+
     private static MessageDigest newDigest() throws IOException {
         try {
             return MessageDigest.getInstance("SHA-256");

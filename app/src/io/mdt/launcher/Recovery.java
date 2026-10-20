@@ -17,6 +17,8 @@ import java.util.List;
  *   <li>{@code app_hub/import/*.old}（同名重导的"旧包让位"窗口，必须改回去）；</li>
  *   <li>{@code cache/export/*}（整槽导出先落缓存再拷给 SAF 的中间件）；</li>
  *   <li>{@code cache/batch-*}（批量导入的临时目录）；</li>
+ *   <li>{@code cas/objects/tmp/obj-*.part}（自动备份被强杀的 90 MB 暂存件，第 179 轮）；</li>
+ *   <li>force-stop 留下的 {@code launchid.dat}（无更新的崩溃报告才清，带熔断，第 179 轮）；</li>
  *   <li>原子写的 {@code *.tmp}（`Util.atomicWriteText` 在 rename 前被杀）。</li>
  * </ul>
  *
@@ -89,6 +91,23 @@ final class Recovery {
         }
         // 3b) 语言模板的临时件（设置页"导出翻译模板"在选择器打开时被杀）
         del(sb, new File(ctx.getCacheDir(), "lang.properties.tmp"), "language template temp");
+        // 3c) CAS 写入暂存区：自动备份被杀留下的 `objects/tmp/obj-*.part`
+        //     （第 179 轮，杀后台 P2 —— 原来要等 1 h 或下一次备份才清）
+        try {
+            int n = new Cas(Backup.casBaseDir(ctx)).sweepTmpNow();
+            if (n > 0) {
+                sb.append("dropped ").append(n).append(" CAS temp object(s)\n");
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "recovery: CAS tmp sweep failed", t);
+        }
+        // 3d) launchid.dat 自愈：force-stop / 清理器留下的 marker（无崩溃报告才清，带熔断）
+        try {
+            String lm = LaunchMarker.maybeClear(ctx, Data.currentSlot(ctx));
+            if (lm != null) sb.append(lm);
+        } catch (Throwable t) {
+            Log.w(TAG, "recovery: launchid auto-clear failed", t);
+        }
 
         // 4) 批量导入的临时目录：可能几百个文件，按年龄过滤后放后台删
         final File cache = ctx.getCacheDir();
