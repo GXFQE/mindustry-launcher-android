@@ -111,7 +111,7 @@ final class PluginEntries {
     private static View actionRow(final Activity a, final Entry e, final String page,
                                   final String slot) {
         View row = LayoutInflater.from(a).inflate(R.layout.row_action, null, false);
-        ((ImageView) row.findViewById(R.id.act_icon)).setImageResource(R.drawable.ic_plugins_bar);
+        ((ImageView) row.findViewById(R.id.act_icon)).setImageResource(R.drawable.ic_stats);
         ((TextView) row.findViewById(R.id.act_title)).setText(e.item.label());
         String sub = e.item.subtitle == null ? "" : e.item.subtitle.trim();
         ((TextView) row.findViewById(R.id.act_sub)).setText(sub.isEmpty()

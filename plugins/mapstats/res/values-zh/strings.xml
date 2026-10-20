@@ -40,8 +40,8 @@
     <string name="mss_section_tech">技术细节</string>
     <string name="mss_sum_fmt">%1$d 种 · 共 %2$s 格，其中能采到 %3$s 格</string>
     <string name="mss_sum_same_fmt">%1$d 种 · 共 %2$s 格</string>
-    <string name="mss_sum_wall_fmt">%1$d 种 · 共 %2$s 格（长在墙里，需要用墙钻）</string>
-    <string name="mss_sum_wall_split_fmt">%1$d 种 · 共 %2$s 格，其中能采 %3$s 格（长在墙里，需要用墙钻）</string>
+    <string name="mss_sum_wall_fmt">%1$d 种 · 共 %2$s 格</string>
+    <string name="mss_sum_wall_split_fmt">%1$d 种 · 共 %2$s 格，其中能采 %3$s 格</string>
     <string name="mss_row_reach_fmt">能采 %1$s 格</string>
     <string name="mss_row_total_fmt">共 %1$s 格</string>
     <string name="mss_row_drop_fmt">掉落 %1$s</string>

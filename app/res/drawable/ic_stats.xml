@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 第 200 轮：统计类动作行的图标（原来借用 ic_plugins_bar，用户 2026-10-21：「导出的图标能不能不是插件那个图标」）。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@color/icon_tint"
+        android:pathData="M4,20h4V10H4zM10,20h4V4h-4zM16,20h4v-7h-4z" />
+</vector>
