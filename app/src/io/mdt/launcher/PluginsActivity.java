@@ -290,15 +290,15 @@ public class PluginsActivity extends BaseActivity {
             String line;
             if ("retry".equals(s[3])) {
                 line = Trans.get(this, R.string.plugin_skip_retry_fmt, name,
-                        Plugins.versionLabel(s[1]));
+                        verLabel(s[0], s[1]));
             } else if ("rollback".equals(s[3])) {
                 line = Trans.get(this, q ? R.string.plugin_skip_rollback_q_fmt
                                          : R.string.plugin_skip_rollback_fmt, name,
-                        Plugins.versionLabel(s[1]), Plugins.versionLabel(s[2]));
+                        verLabel(s[0], s[1]), verLabel(s[0], s[2]));
             } else {
                 line = Trans.get(this, q ? R.string.plugin_skip_quarantine_fmt
                                          : R.string.plugin_skip_disable_fmt, name,
-                        Plugins.versionLabel(s[1]));
+                        verLabel(s[0], s[1]));
             }
             if (sb.length() > 0) sb.append('\n');
             sb.append(line);
@@ -374,8 +374,8 @@ public class PluginsActivity extends BaseActivity {
             actions.add("uninstall");
         }
         if (qv != null) {
-            items.add(Trans.get(this, R.string.plugin_action_restore_fmt,
-                    Plugins.versionLabel(qv)));
+            // ★ 第 182 轮：不再把版本令牌（内置是 sha 前 8 位）拼进动作名 —— 「把隔离的那份放回来」就够
+            items.add(Trans.get(this, R.string.plugin_action_restore_fmt));
             actions.add("restore");
         }
         items.add(Trans.get(this, R.string.plugin_action_level_fmt,
@@ -396,10 +396,10 @@ public class PluginsActivity extends BaseActivity {
                             open(id, act);
                         } else if ("enable".equals(a)) {
                             Plugins.enable(PluginsActivity.this, id, newest);
-                            // ★ 名字走 displayNameOf（原来传的是内部 id），时间走 versionLabel
+                            // ★ 名字走 displayNameOf（原来传的是内部 id），"哪一份"走 verLabel（不端令牌）
                             String done = Trans.get(PluginsActivity.this, R.string.plugin_enabled_fmt,
                                     Plugins.displayNameOf(PluginsActivity.this, id),
-                                    Plugins.versionLabel(newest));
+                                    verLabel(id, newest));
                             rebuild();
                             askRestart(done);
                         } else if ("disable".equals(a)) {
@@ -436,8 +436,7 @@ public class PluginsActivity extends BaseActivity {
                             boolean ok = Plugins.restoreQuarantined(PluginsActivity.this, id, qv);
                             Toast.makeText(PluginsActivity.this,
                                     Trans.get(PluginsActivity.this, ok ? R.string.plugin_restored_fmt
-                                                                       : R.string.plugin_restore_failed,
-                                            Plugins.versionLabel(qv)),
+                                                                       : R.string.plugin_restore_failed),
                                     Toast.LENGTH_LONG).show();
                             rebuild();
                         } else if ("level".equals(a)) {
@@ -465,6 +464,8 @@ public class PluginsActivity extends BaseActivity {
     private void infoDialog(String id, String fileVer, String trust, String lv) {
         File apk = fileVer == null ? null : Plugins.apkOf(this, id, fileVer);
         PluginMeta.Info meta = apk == null ? null : PluginMeta.read(this, apk);
+        // ★ 第 182 轮：内置插件的"文件版本"是 sha 前 8 位，不是装进来的时间 ⇒ 这行只在真的是时间戳时才印
+        boolean timeVer = Plugins.isTimeVersion(fileVer);
         String[] labels = {
                 Trans.get(this, R.string.plugin_info_name),      // 内部 id（稳定键）
                 Trans.get(this, R.string.plugin_info_selfname),  // 自述名称
@@ -474,7 +475,7 @@ public class PluginsActivity extends BaseActivity {
                 Trans.get(this, R.string.plugin_info_entry),
                 Trans.get(this, R.string.plugin_info_source),
                 Trans.get(this, R.string.plugin_info_level),
-                Trans.get(this, R.string.plugin_info_filever),
+                timeVer ? Trans.get(this, R.string.plugin_info_filever) : "",
                 Trans.get(this, R.string.plugin_info_access),
         };
         String entry = apk == null ? null : PluginMeta.entryOf(this, apk, PluginHost.DEFAULT_ENTRY);
@@ -487,7 +488,7 @@ public class PluginsActivity extends BaseActivity {
                 entry,
                 Trans.get(this, trustLongRes(trust)),
                 Trans.get(this, levelRes(lv)),
-                Plugins.versionLabel(fileVer),
+                timeVer ? Plugins.versionLabel(fileVer) : "",
                 // ★ 第 148 轮 C2：「它要碰什么」**永远显示一行**（哪怕是"没有声明"）——
                 //   安全相关的字段留白 = 用户分不清"没声明"和"我们没看见"。声明是**告知**，不是沙箱。
                 accessText(apk),
@@ -694,7 +695,7 @@ public class PluginsActivity extends BaseActivity {
                     ok = !r.startsWith("FAILED");
                     msg = ok
                             ? Trans.get(PluginsActivity.this, R.string.plugin_installed_fmt,
-                                    id, Plugins.versionLabel(ver))
+                                    id, verLabel(id, ver))
                             : Trans.get(PluginsActivity.this, R.string.plugin_install_failed_fmt,
                                     installFailReason(r));
                 } catch (final Throwable t) {
@@ -756,6 +757,21 @@ public class PluginsActivity extends BaseActivity {
         }
         if (r == Restart.THROTTLED) return;   // 刚刚已经重开过（这是恢复重放）⇒ 静默
         Toast.makeText(this, Trans.get(this, R.string.plugin_restart_failed), Toast.LENGTH_LONG).show();
+    }
+
+    /**
+     * 界面上怎么指代"哪一份"：时间戳 → 「10-20 16:57 那份」；内置 → 「内置那份」；其他 → 「已安装那份」。
+     * 🔴 绝不把内部版本令牌（内置插件是 sha256 前 8 位）当成人话端给用户（第 182 轮用户指出）。
+     */
+    private String verLabel(String id, String ver) {
+        if (ver == null || ver.trim().isEmpty()) return "";
+        if (Plugins.isTimeVersion(ver)) {
+            return Trans.get(this, R.string.plugin_ver_at_fmt, Plugins.versionLabel(ver));
+        }
+        if (id != null && PluginTrust.BUILTIN.equals(Plugins.trustOf(this, id, ver))) {
+            return Trans.get(this, R.string.plugin_ver_builtin);
+        }
+        return Trans.get(this, R.string.plugin_ver_installed);
     }
 
     /**

@@ -34,10 +34,14 @@
     <string name="plugin_action_uninstall">Delete it (moves to the bin)</string>
     <!-- %2$s is the INSTALL TIME (Plugins.versionLabel turns the epoch-seconds token into MM-dd HH:mm).
          The raw token used to be shown as a version number ("v1792090201"). -->
-    <string name="plugin_installed_fmt">Installed %1$s (the copy from %2$s).</string>
+    <string name="plugin_installed_fmt">Installed %1$s (%2$s).</string>
     <!-- 第 181 轮：装 / 启用 / 停用之后直接问"要不要重启"，不再是只念一句 Toast。 -->
-    <string name="plugin_enabled_fmt">Turned on %1$s (the copy from %2$s).</string>
+    <string name="plugin_enabled_fmt">Turned on %1$s (%2$s).</string>
     <string name="plugin_disabled_fmt">Turned off %1$s.</string>
+    <!-- 第 182 轮：界面指代"哪一份"只用这三种人话；内置插件的版本令牌是 sha 前 8 位，绝不能直接上屏。 -->
+    <string name="plugin_ver_at_fmt">the copy from %1$s</string>
+    <string name="plugin_ver_builtin">the built-in copy</string>
+    <string name="plugin_ver_installed">the installed copy</string>
     <string name="plugin_install_failed_fmt">Could not install it: %1$s</string>
     <!-- Plain-word reasons for a failed install (the raw ASCII FAILED code stays in the log). -->
     <string name="plugin_install_pick_lost">that file cannot be found any more — pick it again</string>
@@ -55,8 +59,8 @@
     <string name="plugin_restart_failed">This device would not let the app restart itself. Please close it and open it again by hand.</string>
     <string name="plugin_back">Back</string>
     <string name="plugin_skip_title">The last launch with plugins did not finish</string>
-    <string name="plugin_skip_rollback_fmt">%1$s: the copy from %2$s did not work - switched back to the copy from %3$s</string>
-    <string name="plugin_skip_disable_fmt">%1$s: the copy from %2$s did not work - turned off</string>
+    <string name="plugin_skip_rollback_fmt">%1$s: %2$s did not work - switched back to %3$s</string>
+    <string name="plugin_skip_disable_fmt">%1$s: %2$s did not work - turned off</string>
     <string name="plugin_skip_restore">Turn the plugins back on</string>
     <string name="plugin_loaded_fmt">Loaded %1$s (api %2$d)</string>
     <string name="plugin_fallback_title">The plugin did not load - showing the built-in view instead.</string>
@@ -91,12 +95,12 @@
     <string name="plugin_level_l3">After a failure: turn it off and quarantine this version</string>
     <string name="plugin_info_fmt">%1$s\nSource: %2$s\nHandling: %3$s</string>
     <string name="plugin_action_level_fmt">Now %1$s - change to %2$s</string>
-    <string name="plugin_action_restore_fmt">Put the quarantined copy from %1$s back</string>
+    <string name="plugin_action_restore_fmt">Put the quarantined copy back</string>
     <string name="plugin_row_quarantined_fmt">%1$s · quarantined (the copy installed %2$s)</string>
-    <string name="plugin_skip_retry_fmt">%1$s: the copy from %2$s did not work - kept, will be tried again</string>
-    <string name="plugin_skip_rollback_q_fmt">%1$s: the copy from %2$s did not work - switched back to the copy from %3$s and quarantined the bad one</string>
-    <string name="plugin_skip_quarantine_fmt">%1$s: the copy from %2$s did not work - turned off and quarantined</string>
-    <string name="plugin_restored_fmt">Put the copy from %1$s back. It takes effect after a restart.</string>
+    <string name="plugin_skip_retry_fmt">%1$s: %2$s did not work - kept, will be tried again</string>
+    <string name="plugin_skip_rollback_q_fmt">%1$s: %2$s did not work - switched back to %3$s and quarantined the bad one</string>
+    <string name="plugin_skip_quarantine_fmt">%1$s: %2$s did not work - turned off and quarantined</string>
+    <string name="plugin_restored_fmt">Put the quarantined copy back. It takes effect after a restart.</string>
     <string name="plugin_restore_failed">Could not put it back.</string>
     <string name="plugin_level_set_fmt">Handling for %1$s is now: %2$s (from the next launch).</string>
 

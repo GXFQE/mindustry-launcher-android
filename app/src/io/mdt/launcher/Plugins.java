@@ -565,21 +565,36 @@ final class Plugins {
      * 用户上一轮问的「什么东西是退回上一版」根因就是它（两个十位数比大小，谁也看不出谁旧）。
      * 令牌本身**不能换**（它同时是落点目录名与状态键）⇒ 只把**显示**换掉。
      *
-     * <p>⚠️ 认不出（不是 2001~2100 之间的秒）就**原样返回** —— 手写的 / 别处来的令牌不该被吃掉。
+     * <p>★ 第 182 轮：内置插件的令牌是 **sha256 前 8 位**（{@link #builtinVersion}）—— 它**不是时间**，
+     * 界面上不能拿它当"装进来的时间"或"哪一份"的指代（用户：「用那个像哈希一样的编码作为指代真的合适吗」）。
+     * 界面先用 {@link #isTimeVersion} 分流：时间戳 → `MM-dd HH:mm`；内置 → 「内置那份」；其余 → 「已安装那份」。
+     *
+     * <p>⚠️ 认不出（不是 2001~2100 之间的秒）就**原样返回** —— 手写的 / 别处来的令牌不该被吃掉
+     * （这是数据层的兜底；**界面**不直接把它端给用户）。
      */
     static String versionLabel(String ver) {
         if (ver == null) return "";
         String s = ver.trim();
         if (s.isEmpty()) return "";
-        try {
+        if (isTimeVersion(s)) {
             long sec = Long.parseLong(s);
-            if (sec > 1000000000L && sec < 4102444800L) {
-                return new java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.US)
-                        .format(new java.util.Date(sec * 1000L));
-            }
-        } catch (Throwable ignored) {
+            return new java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.US)
+                    .format(new java.util.Date(sec * 1000L));
         }
         return s;
+    }
+
+    /** 这个版本令牌是不是"装进来的时间戳"（能格式化成 `MM-dd HH:mm` 给人看）。 */
+    static boolean isTimeVersion(String ver) {
+        if (ver == null) return false;
+        String s = ver.trim();
+        if (s.isEmpty()) return false;
+        try {
+            long sec = Long.parseLong(s);
+            return sec > 1000000000L && sec < 4102444800L;
+        } catch (Throwable ignored) {
+            return false;
+        }
     }
 
     /**

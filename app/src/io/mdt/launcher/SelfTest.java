@@ -4049,6 +4049,12 @@ public final class SelfTest {
         ok(stat, L, !vl.contains("1792090201") && "not-a-token".equals(Plugins.versionLabel("not-a-token"))
                         && "".equals(Plugins.versionLabel(null)) && "".equals(Plugins.versionLabel("  ")),
                 "★反方向：不是时间戳的令牌**原样返回**、null/空白 ⇒ 空串（别乱格式化成 1970）");
+        // ★ 第 182 轮：内置插件的版本键 = sha256 前 8 位（如 `2ed851ab`），**不是时间**
+        //   ⇒ 界面拿 `isTimeVersion` 分流成「内置那份」/「已安装那份」，绝不把哈希当时间或指代。
+        ok(stat, L, Plugins.isTimeVersion("1792090201") && !Plugins.isTimeVersion("2ed851ab")
+                        && !Plugins.isTimeVersion("not-a-token")
+                        && !Plugins.isTimeVersion(null) && !Plugins.isTimeVersion("  "),
+                "★sha 前 8 位的版本键不是时间戳（内置插件）⇒ 界面不许把它当「装进来的时间」或「哪一份」上屏");
         ok(stat, L, ctx.getString(R.string.plugin_state_active_fmt).contains("%2$s")
                         && !ctx.getString(R.string.plugin_state_active_fmt).contains("v%2$s")
                         && !ctx.getString(R.string.plugin_info_filever).contains("1792090201"),
