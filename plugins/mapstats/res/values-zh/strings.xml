@@ -28,4 +28,7 @@
     <string name="ms_attr_steam">蒸汽</string>
     <string name="ms_attr_light">光照</string>
     <string name="ms_attr_sand">含沙</string>
-</resources>
+    <string name="ms_map_head_planet_fmt">%1$s · %2$d×%3$d · %4$s</string>
+    <string name="ms_core_note_planet_fmt">个数按 %1$s×%1$s 的核心算（按存档里写的星球判的），互不重叠</string>
+    <string name="ms_core_note_default_fmt">个数按 %1$s×%1$s 的核心算（这张图查不出用的是哪颗星球，按最小的一种算），互不重叠</string>
+    <string name="ms_export_notice_fmt">由 MDT 管理器导出 · %1$s · 数字口径见管理器的地图统计；如果看着不对，请把这个文件发回去</string></resources>

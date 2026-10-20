@@ -28,4 +28,7 @@
     <string name="ms_attr_steam">steam</string>
     <string name="ms_attr_light">light</string>
     <string name="ms_attr_sand">sand</string>
-</resources>
+    <string name="ms_map_head_planet_fmt">%1$s · %2$d×%3$d · %4$s</string>
+    <string name="ms_core_note_planet_fmt">Counts assume %1$s×%1$s cores (based on the planet saved in the map), non-overlapping</string>
+    <string name="ms_core_note_default_fmt">Counts assume %1$s×%1$s cores (no planet in this map, so the smallest is assumed), non-overlapping</string>
+    <string name="ms_export_notice_fmt">Exported by MDT Manager for Android · %1$s · these numbers follow the map-stat rules of the manager; if they look wrong, send this file back</string></resources>

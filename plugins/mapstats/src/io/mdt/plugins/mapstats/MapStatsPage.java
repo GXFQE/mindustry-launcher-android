@@ -10,7 +10,10 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -22,6 +25,7 @@ import io.mdt.launcher.api.PluginApi;
 import io.mdt.launcher.api.PluginTheme;
 import io.mdt.plugins.mapstats.core.BundleNames;
 import io.mdt.plugins.mapstats.core.MapStats;
+import io.mdt.plugins.mapstats.core.MapStatsExport;
 import io.mdt.plugins.mapstats.core.MsavTiles;
 
 /**
@@ -47,6 +51,23 @@ public final class MapStatsPage {
         MapStats.Result result;
         long millis;
         String error = "";
+        /** 存档 `tags.rules` 里的 `planet:`（空 = 没写这个键 = 塞普罗） */
+        String planet = "";
+        /** 列表上那一行的名字 / 来源 / 位置（声明里用；槽内 = 文件名，包内 = `包!/条目`） */
+        String mapName = "";
+        String where = "";
+        String source = "";
+        long bytes = -1;
+        /** 地图字节的 sha256（投喂失败 = 空串，不编） */
+        String sha = "";
+        /** 统计用的那套事实（每张图都要进声明） */
+        String slot = "";
+        String gameApk = "";
+        String gameVersion = "";
+        int tableRows = -1;
+        int packs = -1;
+        boolean modsSkipped;
+        boolean modsFailed;
     }
 
     public static View createView(final PluginApi api) {
@@ -100,22 +121,22 @@ public final class MapStatsPage {
         final View[] actions = new View[2];
         actions[0] = addButton(root, c, th, c.getString(R.string.ms_share), new View.OnClickListener() {
             @Override public void onClick(View v) {
-                String js = jsonOf(built);
+                String js = jsonOf(built, c);
                 if (js == null) {
                     api.toast(c.getString(R.string.ms_nothing));
                     return;
                 }
-                api.shareText("mapstats.json", js);
+                api.shareText(fileName(built), js);
             }
         });
         actions[1] = addButton(root, c, th, c.getString(R.string.ms_export), new View.OnClickListener() {
             @Override public void onClick(View v) {
-                String js = jsonOf(built);
+                String js = jsonOf(built, c);
                 if (js == null) {
                     api.toast(c.getString(R.string.ms_nothing));
                     return;
                 }
-                api.export("mapstats.json", "application/json",
+                api.export(fileName(built), mimeOf(built),
                         new ByteArrayInputStream(js.getBytes(StandardCharsets.UTF_8)));
             }
         });
@@ -143,21 +164,39 @@ public final class MapStatsPage {
             @Override public void run() {
                 final List<Built> out = new ArrayList<>();
                 // 内容表与译名按"当前槽"备一次（原版表 ⨁ 已启用模组 + 版本 APK / 模组 bundle）
-                MapStats.Table table;
-                MapStats.Names names;
+                Prepped prep = new Prepped();
+                prep.table = MapStats.vanilla();
+                prep.names = new RawNames();
                 try {
-                    Prepped prep = prepare(api, c);
-                    table = prep.table;
-                    names = prep.names;
-                } catch (Throwable e) {
-                    table = MapStats.vanilla();
-                    names = new RawNames();
+                    prep = prepare(api, c);
+                } catch (Throwable ignored) {
+                    // 备不出来就退回原版表 + 内部名（页面照常出数）
                 }
+                final MapStats.Table table = prep.table;
+                final MapStats.Names names = prep.names;
+                final String prepApkName = prep.gameApk;
+                final String prepApkVersion = prep.gameVersion;
+                final int tableRows = prep.tableRows;
+                final int packs = prep.packs;
+                final boolean modsSkipped = prep.modsSkipped;
+                final boolean modsFailed = prep.modsFailed;
                 for (int i = 0; i < items.size(); i++) {
                     ItemInfo it = items.get(i);
                     api.progress(i + 1, items.size());
                     Built b = new Built();
                     b.name = it.title == null ? "map" : it.title;
+                    b.mapName = it.title == null ? "" : it.title;
+                    b.slot = api.slot() == null ? "" : api.slot();
+                    b.where = whereOf(it);
+                    b.source = sourceOf(it);
+                    b.bytes = it.size > 0 ? it.size : -1;
+                    b.planet = it.extra.get("planet") == null ? "" : it.extra.get("planet");
+                    b.gameApk = prepApkName;
+                    b.gameVersion = prepApkVersion;
+                    b.tableRows = tableRows;
+                    b.packs = packs;
+                    b.modsSkipped = modsSkipped;
+                    b.modsFailed = modsFailed;
                     InputStream in = null;
                     try {
                         in = api.open(it);
@@ -165,7 +204,8 @@ public final class MapStatsPage {
                         if (t == null || !t.ok()) {
                             b.error = "unreadable";
                         } else {
-                            b.result = MapStats.analyze(t, table, names, null);
+                            b.result = MapStats.analyze(t, table, names,
+                                    b.planet.isEmpty() ? null : b.planet);
                             b.millis = b.result.millis;
                         }
                     } catch (Throwable e) {
@@ -173,6 +213,7 @@ public final class MapStatsPage {
                     } finally {
                         closeQuietly(in);
                     }
+                    b.sha = shaOf(api, it);
                     out.add(b);
                 }
                 results.post(new Runnable() {
@@ -181,22 +222,31 @@ public final class MapStatsPage {
                         built.addAll(out);
                         render(c, th, status, results, out);
                         View[] actions = actionsOf(results);
-                        setEnabled(actions, jsonOf(built) != null);
+                        setEnabled(actions, jsonOf(built, c) != null);
                     }
                 });
             }
         });
     }
 
-    /** 一次统计的"前置事实"：内容表 + 译名 + 这一轮游戏会不会加载模组。 */
+    /** 一次统计的"前置事实"：内容表 + 译名 + 这一轮游戏会不会加载模组（进声明）。 */
     private static final class Prepped {
         MapStats.Table table;
         MapStats.Names names;
         boolean modsSkipped;
+        /** 模组那一层读不动（只按原版算） */
+        boolean modsFailed;
+        /** 参与叠加的模组包数 */
+        int packs;
+        /** 有效内容表行数 */
+        int tableRows = -1;
+        /** 统计用的版本 APK（文件名）与版本名 */
+        String gameApk = "";
+        String gameVersion = "";
     }
 
     /**
-     * 备齐 {@link MapStats#analyze} 要的三样东西：有效内容表、译名、（可选的）模组事实。
+     * 备齐 {@link MapStats#analyze} 要的东西：有效内容表、译名、（可选的）模组事实。
      *
      * <p>模组那层**只用宿主给的数字**（`ItemInfo.extra` 的 `enabled` / `willFailJavaLoad` /
      * `rootPrefix`）与 `api.modsSkipped()`，判据仍只有宿主那一处 —— 插件不重算"哪些模组是活的"。
@@ -206,6 +256,8 @@ public final class MapStatsPage {
         Prepped out = new Prepped();
         out.table = MapStats.copyOf(MapStats.vanilla());
         File apk = versionApkOf(api);
+        out.gameApk = apk == null ? "" : apk.getName();
+        out.gameVersion = versionNameOf(api);
         List<MapStats.Pack> packs = new ArrayList<>();
         try {
             out.modsSkipped = api.modsSkipped();
@@ -242,11 +294,16 @@ public final class MapStatsPage {
                 packs.add(p);
             }
             try {
+                out.table = MapStats.copyOf(MapStats.vanilla());
                 MapStats.overlayMods(out.table, packs);
-            } catch (Throwable ignored) {
-                // 一个包的 JSON 坏了不该让整页失败；overlayMods 自己已经是逐包 catch
+                out.packs = packs.size();
+            } catch (Throwable t) {
+                out.modsFailed = true;
+                out.packs = -1;
+                out.table = MapStats.copyOf(MapStats.vanilla());
             }
         }
+        out.tableRows = out.table.rowCount();
         MapStats.BundleLang lang = MapStats.bundleLang(localeSuffix(c));
         MapStats.Bundles bundles = MapStats.readBundles(packs, lang);
         out.names = new BundleNames(apk, bundles, attrLabels(c), lang,
@@ -254,10 +311,36 @@ public final class MapStatsPage {
         return out;
     }
 
-    /** 当前槽对应的版本 APK（找不到就 null —— `BundleNames` 会退回模组译文 / 内部名）。 */
+    /** **这个槽**指向的版本 APK 的版本名（没有就空串 —— 与 {@link #versionApkOf} 同一处判据）。 */
+    private static String versionNameOf(PluginApi api) {
+        String slot = api.slot();
+        List<ItemInfo> versions;
+        try {
+            versions = api.versions();
+        } catch (Throwable t) {
+            return "";
+        }
+        for (ItemInfo v : versions) {
+            if (v == null) continue;
+            String s = v.extra.get("slot");
+            if (slot == null || !slot.equals(s)) continue;
+            String name = v.extra.get("versionName");
+            return name == null ? "" : name;
+        }
+        return "";
+    }
+
+    /**
+     * **这个槽**指向的版本 APK（没有就 null —— `BundleNames` 会退回模组译文 / 内部名）。
+     *
+     * <p>🔴 真机对照抓到的口径：**不许拿"随便哪个版本 APK"兜底**。槽没指定版本时
+     * （界面写着「不是当前槽 · 还没指定版本」）宿主也只按模组译文 + 内部名显示
+     * （`Ore Tungsten`），插件若拿别的版本的 bundle 顶上去会翻成「钨」，还会让
+     * 「矿层墙矿」与「地矿」**撞名合并** —— 同一张图宿主 5 种、插件 3 种。
+     * 判据与宿主 `MapStatsMods` 里 `Versions.slotFor(e)` 那一处保持一致。</p>
+     */
     private static File versionApkOf(PluginApi api) {
         String slot = api.slot();
-        File apk = null;
         List<ItemInfo> versions;
         try {
             versions = api.versions();
@@ -266,16 +349,12 @@ public final class MapStatsPage {
         }
         for (ItemInfo v : versions) {
             if (v == null || v.path == null || !v.readable) continue;
-            File f = new File(v.path);
-            if (!f.isFile()) continue;
-            if (apk == null) apk = f;
             String s = v.extra.get("slot");
-            if (slot != null && slot.equals(s)) {
-                apk = f;
-                break;
-            }
+            if (slot == null || !slot.equals(s)) continue;
+            File f = new File(v.path);
+            if (f.isFile()) return f;
         }
-        return apk;
+        return null;
     }
 
     /** 属性词表（键 = 游戏 `Attribute` 的名字）。 */
@@ -319,7 +398,10 @@ public final class MapStatsPage {
             MapStats.Result r = b.result;
             millis += b.millis;
             TextView head = new TextView(c);
-            head.setText(c.getString(R.string.ms_map_head_fmt, b.name, r.width, r.height));
+            head.setText(b.planet == null || b.planet.isEmpty()
+                    ? c.getString(R.string.ms_map_head_fmt, b.name, r.width, r.height)
+                    : c.getString(R.string.ms_map_head_planet_fmt, b.name, r.width, r.height,
+                            b.planet));
             head.setTextSize(15f);
             head.setTypeface(Typeface.DEFAULT_BOLD);
             head.setTextColor(th.text);
@@ -337,6 +419,12 @@ public final class MapStatsPage {
                 addLine(results, c, th,
                         c.getString(R.string.ms_core_fmt, r.core.usable, r.core.max, r.core.size),
                         th.text, 13f);
+                // 依据（与宿主详情页同一句话）：按存档里的星球判 / 查不出星球按最小的算
+                addLine(results, c, th, c.getString(
+                                r.core.basis == MapStats.Core.BASIS_PLANET
+                                        ? R.string.ms_core_note_planet_fmt
+                                        : R.string.ms_core_note_default_fmt, r.core.size),
+                        th.textMuted, 12f);
             }
             int unknown = r.unkOre + r.unkFloor + r.unkBonus;
             if (unknown > 0) {
@@ -397,64 +485,140 @@ public final class MapStatsPage {
         }
     }
 
-    // ---- 出口：JSON（v1 只出这份统计本身；声明 / 版本信息等下一轮补齐） -----------------
+    // ---- 出口：JSONL（与宿主 `MapStatsExport` 同一份实现 = 同一个格式） ----------------
 
-    private static String jsonOf(List<Built> list) {
-        boolean any = false;
-        for (Built b : list) if (b.result != null && b.result.ok) { any = true; break; }
-        if (!any) return null;
-        StringBuilder sb = new StringBuilder("{\"plugin\":\"mapstats\",\"maps\":[");
-        boolean first = true;
+    /**
+     * 一份或多份统计 → **与宿主相同的导出文本**。
+     *
+     * <p>口径照抄宿主 `MapsActivity`：**一张 = 一个 JSON 文档**（`jsonDoc`），
+     * **多张 = JSONL**（`jsonlBatch`，一行一张图）—— 用的是插件里那份
+     * {@link MapStatsExport}（从宿主整块拷来的纯 Java 类），插件不另写一套。</p>
+     */
+    private static String jsonOf(List<Built> list, Context c) {
+        List<MapStats.Result> rs = new ArrayList<>();
+        List<MapStatsExport.Meta> ms = new ArrayList<>();
+        String notice = c.getString(R.string.ms_export_notice_fmt, MapStatsExport.SITE);
         for (Built b : list) {
             if (b.result == null || !b.result.ok) continue;
-            if (!first) sb.append(',');
-            first = false;
-            MapStats.Result r = b.result;
-            sb.append("{\"map\":").append(q(b.name))
-                    .append(",\"width\":").append(r.width)
-                    .append(",\"height\":").append(r.height)
-                    .append(",\"cells\":").append(r.cells)
-                    .append(",\"ores\":").append(rows(r.ores))
-                    .append(",\"oreWalls\":").append(rows(r.oreWalls))
-                    .append(",\"floors\":").append(rows(r.floors))
-                    .append(",\"bonuses\":").append(rows(r.bonuses))
-                    .append(",\"buildable\":{\"free\":").append(r.buildable.free)
-                    .append(",\"cleared\":").append(r.buildable.cleared)
-                    .append(",\"count\":").append(r.buildable.count()).append('}')
-                    .append(",\"core\":{\"skip\":").append(r.core.skip)
-                    .append(",\"zone\":").append(r.core.zone)
-                    .append(",\"usable\":").append(r.core.usable)
-                    .append(",\"max\":").append(r.core.max)
-                    .append(",\"size\":").append(r.core.size).append('}')
-                    .append('}');
+            rs.add(b.result);
+            ms.add(metaOf(b, c, notice));
         }
-        sb.append("]}");
-        return sb.toString();
+        if (rs.isEmpty()) return null;
+        return rs.size() == 1
+                ? MapStatsExport.jsonDoc(rs.get(0), ms.get(0))
+                : MapStatsExport.jsonlBatch(rs, ms);
     }
 
-    private static String rows(List<MapStats.Row> rows) {
-        StringBuilder sb = new StringBuilder("[");
-        for (int i = 0; i < rows.size(); i++) {
-            MapStats.Row r = rows.get(i);
-            if (i > 0) sb.append(',');
-            sb.append("{\"label\":").append(q(r.label))
-                    .append(",\"total\":").append(r.total)
-                    .append(",\"reachable\":").append(r.reachable())
-                    .append('}');
+    /** 建议文件名（照抄宿主 `StatsExporter.fileName` 的形状：`mdt-stats-<名>-<时间>.json[l]`）。 */
+    private static String fileName(List<Built> list) {
+        int n = 0;
+        String first = "";
+        for (Built b : list) {
+            if (b.result == null || !b.result.ok) continue;
+            n++;
+            if (first.isEmpty()) first = b.mapName;
         }
-        return sb.append(']').toString();
+        String base;
+        if (n > 1) {
+            base = (list.isEmpty() || list.get(0).slot.isEmpty() ? "maps" : list.get(0).slot)
+                    + "-" + n + "maps";
+        } else {
+            base = first.isEmpty() ? "map" : first;
+            int dot = base.lastIndexOf('.');
+            if (dot > 0) base = base.substring(0, dot);
+        }
+        base = safeName(base);
+        String ts = new SimpleDateFormat("yyyyMMdd-HHmmss", Locale.ROOT).format(new Date());
+        return "mdt-stats-" + (base.isEmpty() ? "" : base + "-") + ts + (n > 1 ? ".jsonl" : ".json");
     }
 
-    private static String q(String s) {
-        if (s == null) return "null";
-        StringBuilder sb = new StringBuilder("\"");
-        for (int i = 0; i < s.length(); i++) {
+    /** mime 跟着文件类型走（宿主同一套：单张 `application/json` / 批量 `application/x-ndjson`）。 */
+    private static String mimeOf(List<Built> list) {
+        int n = 0;
+        for (Built b : list) if (b.result != null && b.result.ok) n++;
+        return n > 1 ? "application/x-ndjson" : "application/json";
+    }
+
+    /** 文件名安全化（去掉路径分隔符与控制字符、空格换连字符、截断）——与宿主同一口径。 */
+    private static String safeName(String s) {
+        if (s == null) return "";
+        StringBuilder b = new StringBuilder();
+        for (int i = 0; i < s.length() && b.length() < 48; i++) {
             char ch = s.charAt(i);
-            if (ch == '"' || ch == '\\') sb.append('\\').append(ch);
-            else if (ch < 0x20) sb.append(String.format(java.util.Locale.ROOT, "\\u%04x", (int) ch));
-            else sb.append(ch);
+            if (ch == '/' || ch == '\\' || ch == ':' || ch == '*' || ch == '?' || ch == '"'
+                    || ch == '<' || ch == '>' || ch == '|' || ch < 0x20) continue;
+            b.append(ch == ' ' ? '-' : ch);
         }
-        return sb.append('"').toString();
+        return b.toString();
+    }
+
+    /** 插件版的声明（字段口径照抄宿主 `StatsExporter.metaOf`；拿不到的就空着，别编）。 */
+    private static MapStatsExport.Meta metaOf(Built b, Context c, String notice) {
+        MapStatsExport.Meta m = new MapStatsExport.Meta();
+        m.exportedAt = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.ROOT)
+                .format(new Date());
+        try {
+            android.content.pm.PackageInfo pi =
+                    c.getPackageManager().getPackageInfo(c.getPackageName(), 0);
+            m.launcherVersion = pi.versionName == null ? "" : pi.versionName;
+            m.launcherCode = pi.versionCode;
+        } catch (Throwable ignored) {
+        }
+        m.launcherPackage = c.getPackageName();
+        m.slot = b.slot;
+        m.mapName = b.mapName;
+        m.mapSource = b.source;
+        m.mapWhere = b.where;
+        m.mapBytes = b.bytes;
+        m.mapSha256 = b.sha == null ? "" : b.sha;
+        m.planet = b.planet == null ? "" : b.planet;
+        m.gameApk = b.gameApk;
+        m.gameVersion = b.gameVersion;
+        m.tableRows = b.tableRows;
+        m.mods = b.packs;
+        m.modsSkipped = b.modsSkipped;
+        m.modsFailed = b.modsFailed;
+        m.notice = notice;
+        m.mode = MapStatsExport.MODE_DETAIL;
+        return m;
+    }
+
+    /** 声明里「这张图在哪」：槽内 = 文件名，包内 = `容器名!/条目`（**不含本机路径**）。 */
+    private static String whereOf(ItemInfo it) {
+        if (it == null) return "";
+        if (it.container != null && it.entry != null) {
+            return new File(it.container).getName() + "!/" + it.entry;
+        }
+        return it.path == null ? "" : new File(it.path).getName();
+    }
+
+    /** 声明里的来源码（`slot` / `game` / `mod`，宿主 `StatsExporter` 的同一套词）。 */
+    private static String sourceOf(ItemInfo it) {
+        if (it == null) return "";
+        if (it.container == null) return "slot";
+        String n = new File(it.container).getName().toLowerCase(Locale.ROOT);
+        if (n.endsWith(".apk") || n.contains("mindustry") || n.contains("base")) return "game";
+        return "mod";
+    }
+
+    /** 地图字节的 sha256（**定位它最硬的证据**）；算不出来返回空串。 */
+    private static String shaOf(PluginApi api, ItemInfo it) {
+        InputStream in = null;
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            in = api.open(it);
+            byte[] buf = new byte[1 << 16];
+            int n;
+            while ((n = in.read(buf)) > 0) md.update(buf, 0, n);
+            byte[] d = md.digest();
+            StringBuilder sb = new StringBuilder(d.length * 2);
+            for (byte x : d) sb.append(String.format(Locale.ROOT, "%02x", x & 0xff));
+            return sb.toString();
+        } catch (Throwable t) {
+            return "";
+        } finally {
+            closeQuietly(in);
+        }
     }
 
     /** 没有译名表时的兜底：内部名 → 可读（`dark-metal` → `Dark Metal`）。 */

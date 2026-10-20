@@ -34,8 +34,12 @@ adb shell am start -n io.mdt.launcher/io.mdt.launcher.MainActivity \
   真机中文界面显示「废料 / 铅 / 铜 / 煤炭 / 钛 / 钍」「沙子 / 盐碱地 / 深水 / 水 / 浅滩 / 页岩地 / 石油」。
 - ✅ **模组叠加**：只用宿主给的事实（`ItemInfo.extra` 的 `enabled` / `willFailJavaLoad` / `rootPrefix`
   + `api.modsSkipped()`，v8），调 `MapStats.overlayMods` 建有效内容表；判据不重写。
-- ⏳ 星球：宿主从 `Maps.Item.meta.planet` 读（决定最小核心 3×3 / 4×4），插件没有 meta ⇒ 按塞普罗算。
-- ⏳ JSON 的声明（版本 APK / 模组数 / 补丁数 / 星球）还没进插件那份。
-- ⏳ 宿主那一份（`MapStats*` / `MapDetailActivity` 统计段 / `MapsActivity` 导出统计 / `StatsExporter`）
-  等上面两条补完再删；删的时候自检里那 1,000+ 行统计断言要一起迁到插件侧（插件工程目前**没有自检**）。
+- ✅ **星球**：地图条目自带 `extra["planet"]`（宿主从 `tags.rules` 抠的）⇒ `analyze(..., planet)`，
+  核心区边长按星球（塞普罗 3×3 / 埃里克尔 4×4），依据那行与宿主同一句话。
+- ✅ **导出口径与宿主相同**：单张 = `.json`（`MapStatsExport.jsonDoc`）、多张 = `.jsonl`
+  （`jsonlBatch`，一行一张图）、文件名 `mdt-stats-<名>-<时间>.json[l]`、mime 跟着走、声明里有
+  槽 / 图名 / sha256 / 星球 / 版本 APK / 模组数 / 内容表行数。**用的是插件里那份 `MapStatsExport`**，
+  格式没有第二份实现。
+- ⏳ 还没验：一颗**指定了版本**的槽里模组叠加后的数字（本机 `冲突演示` 槽 11 个模组全没启用，
+  叠加是恒等）；宿主那份（`MapStats*` / 详情页统计段 / 导出统计 / `StatsExporter`）等验收后再删。
 

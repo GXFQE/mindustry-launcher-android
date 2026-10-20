@@ -372,6 +372,16 @@ public final class MapStats {
     /** 一张「有效内容定义表」：名字 → 定义 */
     public static final class Table {
         final Map<String, Def> byName = new HashMap<>();
+
+        /**
+         * 有效内容表行数（声明里的 `content.rows`）。
+         *
+         * <p>★ 插件侧加的唯一一处**公开口子**：宿主里是包内字段 `byName`，而插件页在别的包里。
+         * 语义与宿主 {@code StatsExporter.metaOf} 读 `table.byName.size()` 逐字一致。</p>
+         */
+        public int rowCount() {
+            return byName.size();
+        }
         /**
          * **物品**的名字（来自模组的 `content/items/**`）—— 键 = 注册名，值 = JSON 里写的中文名。
          *
