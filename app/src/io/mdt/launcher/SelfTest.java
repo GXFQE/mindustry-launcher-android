@@ -4055,6 +4055,12 @@ public final class SelfTest {
                         && !Plugins.isTimeVersion("not-a-token")
                         && !Plugins.isTimeVersion(null) && !Plugins.isTimeVersion("  "),
                 "★sha 前 8 位的版本键不是时间戳（内置插件）⇒ 界面不许把它当「装进来的时间」或「哪一份」上屏");
+        // ★ 第 184 轮：返回键该回列表还是回调用方（用户：「进入插件后返回是到主页」）
+        ok(stat, L, PluginsActivity.backToPluginList(false, true)
+                        && !PluginsActivity.backToPluginList(false, false)
+                        && !PluginsActivity.backToPluginList(true, true)
+                        && !PluginsActivity.backToPluginList(true, false),
+                "★从列表点进插件页返回 ⇒ 回列表；直接打开的页返回 ⇒ 回调用方（不是回主页）");
         ok(stat, L, ctx.getString(R.string.plugin_state_active_fmt).contains("%2$s")
                         && !ctx.getString(R.string.plugin_state_active_fmt).contains("v%2$s")
                         && !ctx.getString(R.string.plugin_info_filever).contains("1792090201"),

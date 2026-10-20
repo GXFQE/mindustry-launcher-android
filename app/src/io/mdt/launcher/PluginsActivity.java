@@ -72,6 +72,8 @@ public class PluginsActivity extends BaseActivity {
     private LinearLayout mSkip;
     /** true = 这一趟是"直接打开某一条目"（返回 = 回上一页，不是回插件列表）。 */
     private boolean mDirect;
+    /** true = 列表已换成了某个插件的页面（此时系统返回 / 顶栏箭头该回列表，而不是退出本页）。 */
+    private boolean mPluginOpen;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -107,6 +109,37 @@ public class PluginsActivity extends BaseActivity {
         rebuild();
     }
 
+    /**
+     * 返回键（第 184 轮，用户报「进入插件后返回是到主页」）：
+     * 从**插件列表**点进插件页 ⇒ 先回列表；**直接打开**的那一页 ⇒ 回调用方（finish）。
+     * 这里与顶栏箭头共用 {@link #backToPluginList}，别各写一套。
+     */
+    @Override
+    public void onBackPressed() {
+        if (backToPluginList(mDirect, mPluginOpen)) {
+            rebuild();
+            return;
+        }
+        super.onBackPressed();
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(android.view.MenuItem item) {
+        if (item.getItemId() == android.R.id.home && backToPluginList(mDirect, mPluginOpen)) {
+            rebuild();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+    /**
+     * 「返回」该回哪：从列表点进来的插件页 ⇒ 回列表；直接打开的页 ⇒ 回调用方。
+     * 纯函数（自检钉真值表），返回键 / 顶栏箭头 / 页面底部那个「返回」都用它。
+     */
+    static boolean backToPluginList(boolean direct, boolean pluginOpen) {
+        return !direct && pluginOpen;
+    }
+
     /** 从内容页 / 通用页的动作行进来（第 159 轮；第 160 轮带选中项）。 */
     static void start(Activity a, String id, String ver, String entry,
                       String page, String slot, String label, File selected) {
@@ -131,6 +164,8 @@ public class PluginsActivity extends BaseActivity {
     // ---- 页面 -----------------------------------------------------------------
 
     private void rebuild() {
+        // 回到列表了 ⇒ 系统返回 / 顶栏箭头不再"先回列表"（下一按就该退出本页）
+        mPluginOpen = false;
         // ⚠️ 「打开」那一步会把 mScroll 的内容换成插件页 ⇒ 回来时必须把列表骨架**重新挂上**，
         //   否则 mBodyRoot 已经不在视图树里：页面看着"什么都没发生"（清空的是那个孤儿容器）
         if (mScroll.getChildCount() != 1 || mScroll.getChildAt(0) != mBodyRoot) {
@@ -585,8 +620,11 @@ public class PluginsActivity extends BaseActivity {
             LinearLayout box = new LinearLayout(this);
             box.setOrientation(LinearLayout.VERTICAL);
             // 「已加载 xxx（接口 N）」是给用户判断"这份到底跑没跑起来"的，字号压小、不抢插件自己的页面
+            // ★ 第 184 轮：原来传的是 `apk.getName()`（内置插件就是 `2ed851ab.apk` —— 又是 sha 前 8 位），
+            //   改成插件的自述名字；"哪一份"由卡片 / 信息弹窗负责，别在这里再漏一次内部令牌。
             TextView loaded = new TextView(this);
-            loaded.setText(Trans.get(this, R.string.plugin_loaded_fmt, apk.getName(), l.api));
+            loaded.setText(Trans.get(this, R.string.plugin_loaded_fmt,
+                    Plugins.displayNameOf(this, id), l.api));
             loaded.setTextSize(12f);
             loaded.setTextColor(getResources().getColor(R.color.fg_muted));
             loaded.setPadding(0, 0, 0, dp(8));
@@ -618,8 +656,8 @@ public class PluginsActivity extends BaseActivity {
         back.setFocusable(false);
         back.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
-                if (mDirect) finish();
-                else rebuild();
+                if (backToPluginList(mDirect, mPluginOpen)) rebuild();
+                else finish();
             }
         });
         LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(
@@ -630,6 +668,8 @@ public class PluginsActivity extends BaseActivity {
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         mScroll.removeAllViews();
         mScroll.addView(root);
+        // ★ 页面已换成插件页：系统返回 / 顶栏箭头要先回列表（第 184 轮，用户报的正是"直接回主页"）
+        mPluginOpen = true;
     }
 
     /** 插件没加载成时的兜底视图：**只说一句人话**（原因来自 {@link PluginHost#reasonRes}）。 */
