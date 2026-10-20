@@ -2,7 +2,9 @@ package io.mdt.launcher;
 
 import android.content.Context;
 import io.mdt.launcher.api.ItemInfo;
+import io.mdt.launcher.api.PickCallback;
 import io.mdt.launcher.api.PluginApi;
+import io.mdt.launcher.api.PluginTheme;
 import io.mdt.launcher.api.SlotInfo;
 import org.json.JSONObject;
 import java.io.ByteArrayInputStream;
@@ -3704,6 +3706,72 @@ public final class SelfTest {
                     "selectedItems(map-detail) returns the selected file");
         } catch (Throwable t) {
             ok(stat, L, false, "PluginData v6 surface threw: " + t);
+        }
+
+        // ── round 187: v7 = theme / background work / closePage / share / export / pick ──
+        ok(stat, L, PluginHost.API >= 7,
+                "host plugin api >= 7 (theme/work/closePage/share/export/pick)");
+        try {
+            java.lang.reflect.Method m = PluginApi.class.getMethod("theme");
+            ok(stat, L, m.getReturnType() == PluginTheme.class,
+                    "PluginApi.theme() returns PluginTheme");
+            final PluginTheme pt = new PluginTheme(0xFF112233, 1, 2, 3, 4, 5, 6, 7, 8, 9,
+                    true, 2f, 2.5f);
+            ok(stat, L, pt.dp(8) == 16 && pt.sp(4) == 10 && pt.dark
+                            && pt.background == 0xFF112233,
+                    "PluginTheme dp/sp/dark + raw ARGB");
+            java.lang.reflect.Method rb = PluginApi.class.getMethod(
+                    "runBackground", String.class, Runnable.class);
+            java.lang.reflect.Method pr = PluginApi.class.getMethod("progress", int.class, int.class);
+            java.lang.reflect.Method cl = PluginApi.class.getMethod("closePage");
+            java.lang.reflect.Method sh = PluginApi.class.getMethod(
+                    "share", String.class, InputStream.class);
+            java.lang.reflect.Method st = PluginApi.class.getMethod(
+                    "shareText", String.class, String.class);
+            java.lang.reflect.Method ex = PluginApi.class.getMethod(
+                    "export", String.class, String.class, InputStream.class);
+            java.lang.reflect.Method pk = PluginApi.class.getMethod(
+                    "pick", String.class, PickCallback.class);
+            ok(stat, L, rb.getReturnType() == void.class && pr.getReturnType() == void.class
+                            && cl.getReturnType() == void.class && sh.getReturnType() == void.class
+                            && st.getReturnType() == void.class && ex.getReturnType() == void.class
+                            && pk.getReturnType() == void.class,
+                    "v7 methods all present and all void");
+        } catch (Throwable t) {
+            ok(stat, L, false, "v7 API missing: " + t);
+        }
+        try {
+            List<ItemInfo> pickMaps = PluginData.pickItems(ctx, curSlot, ItemInfo.KIND_MAPS);
+            List<ItemInfo> pickNone = PluginData.pickItems(ctx, curSlot, "nope");
+            List<ItemInfo> logs2 = PluginData.logs(ctx);
+            List<ItemInfo> pickLogs = PluginData.pickItems(ctx, curSlot, ItemInfo.KIND_LOGS);
+            ok(stat, L, pickMaps != null && pickMaps.size()
+                            == PluginData.contents(ctx, curSlot, ItemInfo.KIND_MAPS).size(),
+                    "pickItems(maps) mirrors contents(maps) (" + pickMaps.size() + ")");
+            ok(stat, L, pickNone != null && pickNone.isEmpty(),
+                    "pickItems(unknown kind) => empty (no crash)");
+            ok(stat, L, pickLogs.size() == logs2.size(),
+                    "pickItems(logs) mirrors logs()");
+        } catch (Throwable t) {
+            ok(stat, L, false, "PluginData.pickItems threw: " + t);
+        }
+        ok(stat, L, PluginActions.mimeOf(null, "a.zip").equals("application/zip")
+                        && PluginActions.mimeOf("text/plain", "a.zip").equals("text/plain")
+                        && PluginActions.mimeOf(null, "a.msav").equals("application/octet-stream"),
+                "mimeOf: explicit > extension > octet-stream");
+        try {
+            android.content.pm.PackageInfo pi = ctx.getPackageManager().getPackageInfo(
+                    ctx.getPackageName(), android.content.pm.PackageManager.GET_PERMISSIONS);
+            boolean hasNotif = false;
+            if (pi != null && pi.requestedPermissions != null) {
+                for (String p : pi.requestedPermissions) {
+                    if ("android.permission.POST_NOTIFICATIONS".equals(p)) hasNotif = true;
+                }
+            }
+            ok(stat, L, hasNotif,
+                    "manifest declares POST_NOTIFICATIONS (progress notification)");
+        } catch (Throwable t) {
+            ok(stat, L, false, "requestedPermissions check threw: " + t);
         }
         java.util.List<Extensions.Item> exPage = Extensions.parse(
                 "{\"extensions\":["

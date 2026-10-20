@@ -89,6 +89,9 @@ build_one() {
   cp "$SRC_DIR/src/io/mdt/launcher/api/PluginApi.java" "$d/src/io/mdt/launcher/api/PluginApi.java"
   cp "$SRC_DIR/src/io/mdt/launcher/api/SlotInfo.java" "$d/src/io/mdt/launcher/api/SlotInfo.java"
   cp "$SRC_DIR/src/io/mdt/launcher/api/ItemInfo.java" "$d/src/io/mdt/launcher/api/ItemInfo.java"
+  # 第 187 轮（v7）：主题 / 勾选回调也是插件编译期要看见的类型
+  cp "$SRC_DIR/src/io/mdt/launcher/api/PluginTheme.java" "$d/src/io/mdt/launcher/api/PluginTheme.java"
+  cp "$SRC_DIR/src/io/mdt/launcher/api/PickCallback.java" "$d/src/io/mdt/launcher/api/PickCallback.java"
   # 入口页也带上这一版的编译期 tag（`PlugPage.tag()`）——多插件下"谁渲染的页"靠它才看得见
   sed -e "s/__API__/$api/" -e "s/__TAGPAGE__/$tag/" -e "s|^package io.mdt.plugtest;|package $pkg;|" \
       "$tpl" > "$srcpkg/PlugPage.java"
@@ -154,7 +157,7 @@ build_one plugtest-v2      1  PLUGIN-v2      0 PLUGIN-v2-2
 # 第 132 轮：**带它就启动不了**的那一版（回滚要拿真实失败形态验，不能只靠手写 guard）
 build_one plugtest-kill    1  PLUGIN-kill    0 PLUGIN-kill-2 "$SRC_DIR/src/io/mdt/plugtest/PlugPageKill.java"
 # 第 159 轮：**内容页动作**夹具（api=3 + PluginApi + slot=content/page=saves|maps）
-build_one plugtest-content 6  PLUGIN-content 0 PLUGIN-content-2 "$SRC_DIR/src/io/mdt/plugtest/PlugPageContent.java" "" content
+build_one plugtest-content 7  PLUGIN-content 0 PLUGIN-content-2 "$SRC_DIR/src/io/mdt/plugtest/PlugPageContent.java" "" content
 
 # --- 第 133 轮：**第三方**对照样本（同一个插件，换另一把密钥签） -----------------
 # 信任模型的判据是"签名指纹 == 本应用自己的"。夹具必须**两侧都有**：

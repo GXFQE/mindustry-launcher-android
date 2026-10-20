@@ -658,8 +658,7 @@ public class PluginsActivity extends BaseActivity {
         back.setFocusable(false);
         back.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
-                if (backToPluginList(mDirect, mPluginOpen)) rebuild();
-                else finish();
+                closePluginPage();
             }
         });
         LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(
@@ -672,6 +671,17 @@ public class PluginsActivity extends BaseActivity {
         mScroll.addView(root);
         // ★ 页面已换成插件页：系统返回 / 顶栏箭头要先回列表（第 184 轮，用户报的正是"直接回主页"）
         mPluginOpen = true;
+    }
+
+    /**
+     * 关掉插件页、回到"打开它的那一页"（第 187 轮：插件自己的 {@code closePage()} 也走这里）。
+     *
+     * <p>★ 一处实现：页面底部「返回」按钮、系统返回键、顶栏箭头、插件调用的 closePage
+     * 全都落到同一个去处 —— 从列表点进来的回列表，直达进来的回调用方。
+     */
+    void closePluginPage() {
+        if (backToPluginList(mDirect, mPluginOpen)) rebuild();
+        else finish();
     }
 
     /** 插件没加载成时的兜底视图：**只说一句人话**（原因来自 {@link PluginHost#reasonRes}）。 */
@@ -715,6 +725,8 @@ public class PluginsActivity extends BaseActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        // 第 187 轮：插件 export（SAF 保存）走这里，认领了就不再往下走
+        if (PluginActions.onActivityResult(this, requestCode, resultCode, data)) return;
         if (requestCode != REQ_PICK) return;
         if (resultCode != RESULT_OK || data == null || data.getData() == null) return;
         final Uri uri = data.getData();

@@ -121,4 +121,17 @@
     <string name="plugin_level_short_l3">Off on failure</string>
     <!-- round 159: a content-page action row says where it came from (the title is the plugin's own) -->
     <string name="plugin_ext_from_fmt">From plugin: %1$s</string>
-    <string name="plugin_section_title">Plug-ins</string></resources>
+    <string name="plugin_section_title">Plug-ins</string>
+
+    <!-- 第 187 轮（插件接口 v7）：插件页里的动作 —— 分享 / 保存 / 勾选 / 关页。
+         句子只讲"成没成 + 为什么"，失败原因由 Util.ioReason 给。 -->
+    <string name="plugin_no_page">This action only works from inside a plugin page.</string>
+    <string name="plugin_share_failed_fmt">Could not share it: %1$s</string>
+    <string name="plugin_export_failed_fmt">Could not save it: %1$s</string>
+    <string name="plugin_export_done">Saved.</string>
+    <string name="plugin_export_busy">Another file is still waiting to be saved - finish that one first.</string>
+    <string name="plugin_pick_title">Pick items</string>
+    <string name="plugin_pick_head">Picked items go to the plugin</string>
+    <string name="plugin_pick_ok_fmt">Done (%1$d)</string>
+    <string name="plugin_pick_empty">Nothing to pick here.</string>
+</resources>

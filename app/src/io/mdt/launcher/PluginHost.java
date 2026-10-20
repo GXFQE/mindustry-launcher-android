@@ -1,5 +1,6 @@
 package io.mdt.launcher;
 
+import android.app.Activity;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.res.AssetManager;
@@ -15,7 +16,9 @@ import java.util.Map;
 
 import dalvik.system.DexClassLoader;
 import io.mdt.launcher.api.ItemInfo;
+import io.mdt.launcher.api.PickCallback;
 import io.mdt.launcher.api.PluginApi;
+import io.mdt.launcher.api.PluginTheme;
 import io.mdt.launcher.api.SlotInfo;
 
 /**
@@ -51,11 +54,12 @@ public final class PluginHost {
      * **v3（第 159 轮）= 加上 {@link PluginApi} 与 {@code content} 插槽**；
      * **v4（第 160 轮）= 同一插槽扩到全部页面 + {@link PluginApi#selectedFile()}**；
      * **v5（第 161 轮）= 只读数据面：槽列表 / 四类内容 / 页面快照 / 统一字节流**；
-     * **v6（第 162 轮）= 设置 / 日志 / 中转站 / 版本 / selectedItems**。
-     * 插件报 5/6 才意味着"我会用这些能力"，报 1/2/3/4 的照旧；
+     * **v6（第 162 轮）= 设置 / 日志 / 中转站 / 版本 / selectedItems**；
+     * **v7（第 187 轮）= 做事：主题 / 后台任务与进度 / 关页 / 分享·保存 / 勾选**。
+     * 插件报 5/6/7 才意味着"我会用这些能力"，报 1/2/3/4 的照旧；
      * 区间下限不变（{@link #API_MIN} = 1）。
      */
-    public static final int API = 6;
+    public static final int API = 7;
     /**
      * 还认的**最老**契约版本（第 139 轮）。抬它 = 老插件被拒，界面会说清"太老、该更新插件"。
      *
@@ -390,6 +394,116 @@ public final class PluginHost {
 
         @Override public void log(String message) {
             android.util.Log.i("MDTPlugin", message == null ? "" : message);
+        }
+
+        // ---- PluginApi（v7：做事）------------------------------------------
+
+        @Override public PluginTheme theme() {
+            Context base = getBaseContext();
+            android.content.res.Resources r = base.getResources();
+            android.content.res.Configuration cfg = r.getConfiguration();
+            android.util.DisplayMetrics dm = r.getDisplayMetrics();
+            boolean dark = (cfg.uiMode & android.content.res.Configuration.UI_MODE_NIGHT_MASK)
+                    == android.content.res.Configuration.UI_MODE_NIGHT_YES;
+            return new PluginTheme(
+                    r.getColor(R.color.bg),
+                    r.getColor(R.color.card),
+                    r.getColor(R.color.card_stroke),
+                    r.getColor(R.color.divider),
+                    r.getColor(R.color.fg),
+                    r.getColor(R.color.fg_muted),
+                    r.getColor(R.color.accent),
+                    r.getColor(R.color.on_accent),
+                    r.getColor(R.color.appbar),
+                    r.getColor(R.color.on_appbar),
+                    dark, dm.density, dm.scaledDensity);
+        }
+
+        @Override public void runBackground(final String label, final Runnable body) {
+            if (body == null) return;
+            final Context base = getBaseContext();
+            final Context app = base.getApplicationContext() == null
+                    ? base : base.getApplicationContext();
+            // ★ 第 187 轮：把 Activity 交给 Work —— 通知权限只能在界面上申请
+            final Context work = base instanceof Activity ? base : app;
+            Thread t = new Thread(new Runnable() {
+                @Override public void run() {
+                    Work.begin(work, R.string.work_notif_plain, label);
+                    try {
+                        body.run();
+                    } catch (Throwable err) {
+                        // ★ 插件的异常不许带走整个进程（非主线程的未捕获异常默认会杀进程）
+                        android.util.Log.w("MDTPlugin", "background task failed", err);
+                    } finally {
+                        Work.end(work);
+                    }
+                }
+            }, "mdt-plugin-work");
+            t.start();
+        }
+
+        @Override public void progress(int done, int total) {
+            Context base = getBaseContext();
+            Work.progress(base.getApplicationContext() == null
+                    ? base : base.getApplicationContext(), done, total);
+        }
+
+        @Override public void closePage() {
+            final Context base = getBaseContext();
+            new android.os.Handler(android.os.Looper.getMainLooper()).post(new Runnable() {
+                @Override public void run() {
+                    if (base instanceof PluginsActivity) {
+                        ((PluginsActivity) base).closePluginPage();
+                    } else if (base instanceof Activity && !((Activity) base).isFinishing()) {
+                        ((Activity) base).finish();
+                    }
+                }
+            });
+        }
+
+        @Override public void share(String name, InputStream content) {
+            Activity a = activityOrNull();
+            if (a == null) {
+                PluginActions.closeQuietly(content);
+                noPage();
+                return;
+            }
+            PluginActions.share(a, name, content);
+        }
+
+        @Override public void shareText(String name, String text) {
+            Activity a = activityOrNull();
+            if (a == null) {
+                noPage();
+                return;
+            }
+            PluginActions.shareText(a, name, text);
+        }
+
+        @Override public void export(String name, String mime, InputStream content) {
+            Activity a = activityOrNull();
+            if (a == null) {
+                PluginActions.closeQuietly(content);
+                noPage();
+                return;
+            }
+            PluginActions.export(a, name, mime, content);
+        }
+
+        @Override public void pick(String kind, PickCallback callback) {
+            Activity a = activityOrNull();
+            PluginActions.pick(a, getBaseContext(), slot, kind, callback);
+        }
+
+        /** 这些动作要一个真的 Activity（分享面板 / SAF / 对话框）；dev 页里也成立。 */
+        private Activity activityOrNull() {
+            Context b = getBaseContext();
+            return b instanceof Activity ? (Activity) b : null;
+        }
+
+        /** "这个动作只能在插件页里用" —— 只有拿不到 Activity 时才会走到。 */
+        private void noPage() {
+            toast(Trans.get(getBaseContext(), R.string.plugin_no_page));
         }
 
         /**

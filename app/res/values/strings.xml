@@ -42,6 +42,8 @@
     <string name="work_channel_name">Background work</string>
     <string name="work_notif_title">Working on files…</string>
     <string name="work_notif_plain">Working…</string>
+    <!-- 第 187 轮：插件后台任务的进度（拼在插件给的那句话后面：<标签> · 3 / 10） -->
+    <string name="work_progress_fmt">%1$d / %2$d</string>
     <string name="work_export">Exporting</string>
     <string name="work_import">Importing</string>
     <string name="work_backup">Backing up</string>

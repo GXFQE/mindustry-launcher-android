@@ -112,4 +112,16 @@
     <string name="plugin_level_short_l3">失败后停用并隔离</string>
     <!-- 第 159 轮：内容页动作行的副标题（标题是插件自己声明的） -->
     <string name="plugin_ext_from_fmt">来自插件：%1$s</string>
-    <string name="plugin_section_title">插件</string></resources>
+    <string name="plugin_section_title">插件</string>
+
+    <!-- 第 187 轮（插件接口 v7）：插件页里的动作 —— 分享 / 保存 / 勾选 / 关页。 -->
+    <string name="plugin_no_page">这个动作只能在插件页里用。</string>
+    <string name="plugin_share_failed_fmt">分享没成：%1$s</string>
+    <string name="plugin_export_failed_fmt">没能保存：%1$s</string>
+    <string name="plugin_export_done">已保存。</string>
+    <string name="plugin_export_busy">还有一份在等保存 —— 先把那份处理完。</string>
+    <string name="plugin_pick_title">选择条目</string>
+    <string name="plugin_pick_head">选中后交给插件</string>
+    <string name="plugin_pick_ok_fmt">完成（%1$d）</string>
+    <string name="plugin_pick_empty">这里没有可选的条目。</string>
+</resources>

@@ -9,7 +9,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 插件能用的**宿主能力门面**（第 159 轮，插件接口 v3；第 160 轮 v4；第 161 轮 v5）。
+ * 插件能用的**宿主能力门面**（第 159 轮，插件接口 v3；第 160 轮 v4；第 161 轮 v5；
+ * 第 162 轮 v6；第 187 轮 v7）。
  *
  * <h3>插件怎么拿到它</h3>
  * 入口类可以写两个静态方法，宿主**优先**用前一个：
@@ -37,6 +38,10 @@ import java.util.Map;
  * **v5 起**多了只读数据面（{@link #slots()} / {@link #contents(String)} / {@link #pageItems()} /
  * {@link #open(ItemInfo)}），用它们的插件报 5。
  * **v6 起**补齐设置 / 日志 / 中转站 / 版本 / {@link #selectedItems()}，用它们的插件报 6。
+ * **v7 起**给"做事"的那一层：{@link #theme()} · {@link #runBackground(String, Runnable)} /
+ * {@link #progress(int, int)} · {@link #closePage()} · {@link #share(String, InputStream)} /
+ * {@link #shareText(String, String)} / {@link #export(String, String, InputStream)} ·
+ * {@link #pick(String, PickCallback)}，用它们的插件报 7。
  * 报 1/2 的老插件宿主不会走 {@code createView(PluginApi)} 那条路（仍按 v1/v2 的
  * {@code createView(Context)} 加载）。
  *
@@ -55,7 +60,7 @@ import java.util.Map;
  */
 public interface PluginApi {
 
-    /** 宿主这一版支持的插件接口版本（当前 = 6）。 */
+    /** 宿主这一版支持的插件接口版本（当前 = 7）。 */
     int hostApi();
 
     /**
@@ -177,4 +182,88 @@ public interface PluginApi {
 
     /** 写一行宿主日志（前缀固定，方便过滤）。 */
     void log(String message);
+
+    // ---- v7：做事 ---------------------------------------------------------------
+
+    /**
+     * 插件页能用的**配色与尺寸**（跟随宿主深浅色）。
+     *
+     * <p>为什么给：插件页的 Context 是 {@code ContextWrapper}（主题借宿主的、资源是插件的），
+     * 插件自己画卡片 / 文字时没有可查的语义色，深色模式下这一页会变成唯一不跟着变的地方。
+     * 返回的是**已经解析好的 ARGB**（见 {@link PluginTheme}）。
+     */
+    PluginTheme theme();
+
+    /**
+     * 在**后台线程**跑一段活，期间宿主挂一条常驻通知（前台服务优先级）。
+     *
+     * <p>为什么不自己 {@code new Thread}：长任务（扫描 / 打包 / 批量转换）在用户切走后会被
+     * 系统直接回收 —— 宿主那套前台服务门面是包内类，插件够不着，于是这里代劳。
+     *
+     * <p>约定：{@code body} 在后台线程执行，**异常会被宿主接住并写日志**（不会带走整个进程）；
+     * 跑完通知自动撤掉。{@code label} 是通知正文（给用户看的一句话，可为 null ⇒ 用通用文案）。
+     * 同一时刻可以有多段，计数是嵌套安全的。
+     */
+    void runBackground(String label, Runnable body);
+
+    /**
+     * 更新那条常驻通知上的进度（{@code done}/{@code total}）。
+     *
+     * <p>只在 {@link #runBackground} 那段活里、且有通知挂着时有效；其余时候**静默忽略**
+     * （没有通知可更新不是错误）。{@code total <= 0} ⇒ 显示成不确定进度。
+     * 可以频繁调用（宿主同一份通知原地更新，不会刷屏）。
+     */
+    void progress(int done, int total);
+
+    /**
+     * 关掉插件页，回到**打开它的那一页**（与页面左上「返回」同一个去处）。
+     *
+     * <p>用于插件自己的「完成 / 关闭」按钮 —— 以前只能等用户按系统返回。
+     * 从插件列表点进来的 ⇒ 回列表；从内容页动作行走「直达」进来的 ⇒ 回那个内容页。
+     * 调用后插件页即被回收，别再对它做 UI 操作（后台线程照常可以跑完）。
+     */
+    void closePage();
+
+    /**
+     * 把一份内容交给**系统分享面板**（不经过 SAF，也不落用户目录）。
+     *
+     * <p>宿主把流写进 {@code cache/share/}（同名自动加序号、24h 后自己清），再把
+     * {@code content://} 交给系统；接收方（微信 / QQ / 文件管理器）照常读。
+     *
+     * <p>⚠️ 流由宿主负责关闭（调用后不要再动它）；方法本身**异步**，失败会 Toast 说明原因。
+     * 用于"插件算出来的报告 / 改写后的一份文件"这类结果的出口。
+     */
+    void share(String name, InputStream content);
+
+    /** 同 {@link #share(String, InputStream)}，但直接给一段文本（UTF-8，不带 BOM）。 */
+    void shareText(String name, String text);
+
+    /**
+     * 让用户选一个落点**保存**一份内容（系统 SAF，不申请存储权限）。
+     *
+     * <p>与 {@link #share} 的区别：这个会落进用户自己选的位置（长期保留），分享那份只是临时缓存。
+     * 异步完成；成功 / 失败都会 Toast。同一时刻只允许一份在等保存（再来一份会被拒绝并提示）。
+     *
+     * @param name 建议文件名（用户可改）
+     * @param mime MIME；null / 空 ⇒ 按扩展名推（认不出就是 {@code application/octet-stream}）
+     * @param content 内容（宿主负责关闭）
+     */
+    void export(String name, String mime, InputStream content);
+
+    /**
+     * 让用户从**当前槽的某一类内容**里勾选，结果回调给插件。
+     *
+     * <p>为什么不是"插件自己在页面上列一遍再勾"：宿主那一套勾选框（整行可点、正按钮报份数、
+     * 全选/清空跟着状态换词）已经踩过坑；插件自己再造一份，用户就会在两个地方见到两种行为。
+     * 另一个原因：四个内容页的勾选是导出 / 删除弹窗里的**临时状态**，页面不保存 ⇒
+     * {@link #selectedItems()} 在列表页永远是空表。
+     *
+     * <p>支持的 {@code kind}：{@link ItemInfo#KIND_SAVES} / {@link ItemInfo#KIND_MAPS} /
+     * {@link ItemInfo#KIND_MODS} / {@link ItemInfo#KIND_BLUEPRINTS}，以及
+     * {@link ItemInfo#KIND_LOGS} / {@link ItemInfo#KIND_TRASH} / {@link ItemInfo#KIND_VERSION}；
+     * 其余值 ⇒ 直接回调空表（不弹窗）。
+     *
+     * <p>扫描在后台、弹窗在主线程；回调也在主线程（见 {@link PickCallback}）。
+     */
+    void pick(String kind, PickCallback callback);
 }

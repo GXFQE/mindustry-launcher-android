@@ -114,6 +114,27 @@ final class PluginData {
         return new ArrayList<ItemInfo>();
     }
 
+    /**
+     * 第 187 轮（v7）：{@code pick(kind)} 的取数——**只读快照**，与 {@link #contents} 同源。
+     *
+     * <p>四种内容走 {@link #contents}（复用宿主扫描器）；另外支持日志 / 中转站 / 版本
+     * （就是页面上那三份清单）。认不出的 kind ⇒ 空表（不抛、不崩）。
+     *
+     * <p>⚠️ 会读文件头 / 开包，调用方必须放后台线程。
+     */
+    static List<ItemInfo> pickItems(Context ctx, String slot, String kind) {
+        if (ctx == null || kind == null) return new ArrayList<ItemInfo>();
+        String k = kind.trim().toLowerCase(Locale.ROOT);
+        if (ItemInfo.KIND_SAVES.equals(k) || ItemInfo.KIND_MAPS.equals(k)
+                || ItemInfo.KIND_MODS.equals(k) || ItemInfo.KIND_BLUEPRINTS.equals(k)) {
+            return contents(ctx, slot, k);
+        }
+        if (ItemInfo.KIND_LOGS.equals(k) || "log".equals(k)) return logs(ctx);
+        if (ItemInfo.KIND_TRASH.equals(k)) return trash(ctx);
+        if (ItemInfo.KIND_VERSION.equals(k) || "versions".equals(k)) return versions(ctx);
+        return new ArrayList<ItemInfo>();
+    }
+
     // ---- 设置 / 日志 / 中转站 / 版本 ------------------------------------------
 
     static Map<String, String> settings(Context ctx) {

@@ -5,6 +5,7 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
 import android.os.Build;
 import android.os.IBinder;
@@ -21,6 +22,8 @@ import android.util.Log;
  */
 public class WorkService extends Service {
     static final String EXTRA_LABEL = "label";
+    /** 第 187 轮：调用方直接给的一句话（插件后台任务的标签）；非空时盖过 {@link #EXTRA_LABEL}。 */
+    static final String EXTRA_TEXT = "text";
     private static final String TAG = "MDTLauncher";
     private static final String CHANNEL = "mdt.work";
     private static final int NOTIF_ID = 0x4d4454;   // "MDT"
@@ -47,8 +50,13 @@ public class WorkService extends Service {
         //    并把整个主进程带走 —— 2026-10-19 真机就炸在这里。
         String text;
         try {
-            int label = intent == null ? 0 : intent.getIntExtra(EXTRA_LABEL, 0);
-            text = label == 0 ? getString(R.string.work_notif_plain) : Trans.get(this, label);
+            String given = intent == null ? null : intent.getStringExtra(EXTRA_TEXT);
+            if (given != null && !given.trim().isEmpty()) {
+                text = given.trim();
+            } else {
+                int label = intent == null ? 0 : intent.getIntExtra(EXTRA_LABEL, 0);
+                text = label == 0 ? getString(R.string.work_notif_plain) : Trans.get(this, label);
+            }
         } catch (Throwable t) {
             text = "";          // 文案失败也绝不能拖累 startForeground
         }
@@ -82,6 +90,47 @@ public class WorkService extends Service {
             }
         }
         return START_NOT_STICKY;
+    }
+
+    /**
+     * 原地更新那条常驻通知上的进度（第 187 轮，{@link Work#progress} 唯一调用方）。
+     *
+     * <p>⚠️ 只能**更新**：服务没起来 / 通知没挂上时不许在这里新建一条（那会凭空多出一条
+     * 没人收的通知）；调用方（{@link Work#progress}）已经用 `sUp` 把这条路闸住了。
+     */
+    static void update(Context ctx, String text, int done, int total) {
+        if (ctx == null) return;
+        try {
+            NotificationManager nm =
+                    (NotificationManager) ctx.getSystemService(Context.NOTIFICATION_SERVICE);
+            if (nm == null) return;
+            String progress = Trans.get(ctx, R.string.work_progress_fmt, done, total);
+            String body = (text == null || text.trim().isEmpty())
+                    ? progress : text.trim() + " · " + progress;
+            Notification.Builder b = new Notification.Builder(ctx, CHANNEL)
+                    .setSmallIcon(android.R.drawable.stat_sys_download)
+                    .setContentTitle(ctx.getString(R.string.work_notif_title))
+                    .setContentText(body)
+                    .setOngoing(true)
+                    .setOnlyAlertOnce(true)
+                    .setShowWhen(false);
+            try {
+                Intent open = new Intent(ctx, MainActivity.class);
+                open.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
+                b.setContentIntent(PendingIntent.getActivity(ctx, 0, open,
+                        PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT));
+            } catch (Throwable ignored) {
+                // 没有 contentIntent 也能更新
+            }
+            if (total > 0) {
+                b.setProgress(total, Math.max(0, Math.min(done, total)), false);
+            } else {
+                b.setProgress(0, 0, true);
+            }
+            nm.notify(NOTIF_ID, b.build());
+        } catch (Throwable t) {
+            Log.w(TAG, "work progress update failed: " + t);
+        }
     }
 
     @Override public void onDestroy() {

@@ -70,6 +70,16 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC"/>
 
     <!--
+      ★ 第 187 轮（插件接口 v7）当场查出来的：**通知从来没显示过**。
+      第 177 轮加了前台服务，但清单里没有 `POST_NOTIFICATIONS`（Android 13 起是运行时权限）
+      ⇒ 系统把这条常驻通知整个丢掉：真机 `appops get … POST_NOTIFICATION` = **ignore**，
+      `dumpsys notification` 里既没有记录、下拉通知栏也看不见（前台服务本身照常生效）。
+      插件 v7 的 `progress()` 要更新这条通知 ⇒ 补声明 + 在**真的开始长操作时**申请一次
+      （见 `Work.begin`：只在有 Activity、且本次进程还没问过时弹，不骚扰）。
+    -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+
+    <!--
       ★ F1 实测修正：theme **只挂在我们自己的 Activity 上，不挂 application**。
       原因（aapt2 dump 官方 APK 得出）：官方的 theme 是声明在 application 节点上的
       `@style/ArcTheme`（parent 指向 framework 的全屏无标题主题），游戏 Activity
