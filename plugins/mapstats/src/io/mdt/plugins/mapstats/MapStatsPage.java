@@ -51,7 +51,7 @@ public final class MapStatsPage {
      * 所以用 v9 的「当前这一项」+ `section` 插槽，让宿主把这一整段画在详情页里。</p>
      */
     public static int api() {
-        return 12;
+        return 13;
     }
 
     /** 当前这一页的统计产物（页面重建就重新算）。 */
@@ -251,7 +251,8 @@ public final class MapStatsPage {
                         final boolean share = idx >= 2;
                         api.runBackground("mapstats", new Runnable() {
                             @Override public void run() {
-                                List<Built> built = computeAll(api, c, items);
+                                List<Built> built = computeAll(api, c, items, true);
+                                api.progressCardClose();
                                 final String js = jsonOf(built, c, mode);
                                 if (js == null) {
                                     api.toast(c.getString(R.string.ms_nothing));
@@ -333,6 +334,12 @@ public final class MapStatsPage {
     /** 后台把若干张地图算完（**视图 / 无视图两条路共用这一份**）。 */
     private static List<Built> computeAll(final PluginApi api, final Context c,
                                           final List<ItemInfo> items) {
+        return computeAll(api, c, items, false);
+    }
+
+    /** `card = true` 时每算一张就更新宿主那个进度弹窗（详情页不需要）。 */
+    private static List<Built> computeAll(final PluginApi api, final Context c,
+                                          final List<ItemInfo> items, final boolean card) {
         final List<Built> out = new ArrayList<>();
         // 内容表与译名按"当前槽"备一次（原版表 ⨁ 已启用模组 + 版本 APK / 模组 bundle）
         Prepped prep = new Prepped();
@@ -354,6 +361,11 @@ public final class MapStatsPage {
         for (int i = 0; i < items.size(); i++) {
             ItemInfo it = items.get(i);
             api.progress(i + 1, items.size());
+            if (card) {
+                api.progressCard(c.getString(R.string.ms_export_title),
+                        c.getString(R.string.ms_busy_fmt, i + 1, items.size()),
+                        i + 1, items.size());
+            }
             Built b = new Built();
             b.name = it.title == null ? "map" : it.title;
             b.mapName = it.title == null ? "" : it.title;

@@ -285,6 +285,12 @@ public interface PluginApi {
         void onAfter(boolean ok);
     }
 
+    /** **v13**：宿主进度弹窗（`total <= 0` 当不确定进度）。 */
+    void progressCard(String title, String message, int done, int total);
+
+    /** **v13**：关掉那个进度弹窗。 */
+    void progressCardClose();
+
     /**
      * 让用户从**当前槽的某一类内容**里勾选，结果回调给插件。
      *

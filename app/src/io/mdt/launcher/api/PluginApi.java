@@ -296,6 +296,17 @@ public interface PluginApi {
      */
     void export(String name, String mime, InputStream content, After after);
 
+    /**
+     * **v13**：宿主自己的**进度弹窗**（搬家前那句「正在统计 N / M…」就是它）。
+     *
+     * <p>插件 ctx 不是 Activity、自己弹不了窗；这条让插件在**原页面**上要一个
+     * 不可取消的横向进度框。`total <= 0` 当不确定进度。</p>
+     */
+    void progressCard(String title, String message, int done, int total);
+
+    /** **v13**：关掉上面那个进度弹窗（保存 / 分享 / 取消之后都要关）。 */
+    void progressCardClose();
+
         /** 保存结束（成功 / 取消或失败）后的回调；插件据此收尾（比如关掉导出页）。 */
     interface After {
         void onAfter(boolean ok);

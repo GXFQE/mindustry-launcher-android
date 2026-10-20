@@ -60,11 +60,12 @@ public final class PluginHost {
      * + `section` 插槽（插件把自己的一段界面直接画进宿主页，统计不再另开一页）；
      * **v10（第 195 轮）= `choose()`：插件要问「怎么导出」时由**宿主**弹原生对话框**；
      * **v11（第 196 轮）= `export(..., after)`：保存真的结束后回调插件**；
-     * **v12（第 197 轮）= `action` 插槽 + `run(PluginApi)` 入口：点了就在**当前页**跑，不单开页面**。
+     * **v12（第 197 轮）= `action` 插槽 + `run(PluginApi)` 入口：点了就在**当前页**跑，不单开页面**；
+     * **v13（第 198 轮）= `progressCard()`：宿主进度弹窗（搬家前「正在统计 N / M…」那个）**。
      * 插件报 5/6/7 才意味着"我会用这些能力"，报 1/2/3/4 的照旧；
      * 区间下限不变（{@link #API_MIN} = 1）。
      */
-    public static final int API = 12;
+    public static final int API = 13;
     /**
      * 还认的**最老**契约版本（第 139 轮）。抬它 = 老插件被拒，界面会说清"太老、该更新插件"。
      *
@@ -560,6 +561,49 @@ public final class PluginHost {
 
         @Override public void export(String name, String mime, InputStream content) {
             export(name, mime, content, null);
+        }
+
+        /** v13：一个宿主进度弹窗（同一时刻只有一个）。 */
+        private android.app.ProgressDialog card;
+
+        @Override public void progressCard(final String title, final String message,
+                                           final int done, final int total) {
+            final Activity a = activityOrNull();
+            if (a == null) return;
+            a.runOnUiThread(new Runnable() {
+                @Override public void run() {
+                    try {
+                        if (card == null) {
+                            card = new android.app.ProgressDialog(a);
+                            card.setProgressStyle(android.app.ProgressDialog.STYLE_HORIZONTAL);
+                            card.setCancelable(false);
+                            card.setTitle(title);
+                            card.show();
+                        }
+                        card.setMessage(message);
+                        if (total > 0) {
+                            card.setMax(total);
+                            card.setProgress(Math.max(0, Math.min(done, total)));
+                        }
+                    } catch (Throwable ignored) {
+                        // 页面在销毁 / 没窗口 ⇒ 不显示而已，别把导出弄挂
+                    }
+                }
+            });
+        }
+
+        @Override public void progressCardClose() {
+            final Activity a = activityOrNull();
+            final Runnable close = new Runnable() {
+                @Override public void run() {
+                    try {
+                        if (card != null && card.isShowing()) card.dismiss();
+                    } catch (Throwable ignored) { }
+                    card = null;
+                }
+            };
+            if (a == null) { close.run(); return; }
+            a.runOnUiThread(close);
         }
 
         @Override public void export(String name, String mime, InputStream content, After after) {
