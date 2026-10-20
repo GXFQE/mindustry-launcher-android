@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  插件卡里的「能力条目」行（第 180 轮从纯代码建视图改成 XML）。
+  结构：[缩进到插件名称的位置]  条目名 / 副标题  [›]
+  ★ 缩进 50dp = 卡片左 padding 14 + 图标 24 + 间距 12 —— 与上面那行插件名对齐；
+    分割线也用同一个起点（`PluginsActivity.cardDivider`），看起来才是同一张卡的续行。
+  ★ 点击由 Activity 落到 `open(id, ver, entry)`（进那一条自己的页）。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:background="?android:attr/selectableItemBackground"
+    android:clickable="true"
+    android:focusable="false"
+    android:paddingStart="50dp"
+    android:paddingEnd="12dp"
+    android:paddingTop="9dp"
+    android:paddingBottom="9dp">
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/plugin_ext_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:singleLine="true"
+            android:ellipsize="end"
+            android:textSize="14sp"
+            android:textColor="@color/fg" />
+
+        <TextView
+            android:id="@+id/plugin_ext_sub"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="2dp"
+            android:maxLines="2"
+            android:ellipsize="end"
+            android:textSize="12sp"
+            android:textColor="@color/fg_muted" />
+    </LinearLayout>
+
+    <ImageView
+        android:layout_width="16dp"
+        android:layout_height="16dp"
+        android:layout_marginStart="6dp"
+        android:src="@drawable/ic_chevron"
+        android:tint="@color/fg_muted" />
+</LinearLayout>

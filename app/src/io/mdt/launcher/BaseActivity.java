@@ -128,7 +128,12 @@ public abstract class BaseActivity extends Activity {
     private void applyUpAffordance() {
         if (getParentActivityIntent() == null) return;
         android.app.ActionBar ab = getActionBar();
-        if (ab != null) ab.setDisplayHomeAsUpEnabled(true);
+        if (ab == null) return;
+        ab.setDisplayHomeAsUpEnabled(true);
+        // ★ 第 180 轮（真机截图发现）：框架默认的返回箭头取 `textColorPrimary` —— 浅色主题下是
+        //   近黑色，压在彩色的 appbar 上几乎看不清（标题走 AppBarTitle 是对的，只有箭头不对）。
+        //   ⇒ 换成自带 @color/on_appbar 的那份；深色主题下同样是浅色箭头，两份主题都不用第二份资源。
+        ab.setHomeAsUpIndicator(R.drawable.ic_up);
     }
 
     @Override

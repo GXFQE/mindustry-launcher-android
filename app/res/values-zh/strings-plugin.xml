@@ -2,7 +2,9 @@
 <!-- 插件页文案（中文）—— 与 values/strings-plugin.xml 逐键对应；那份的头注释写了为什么这么定。 -->
 <resources>
     <string name="plugin_page_title">插件</string>
-    <string name="plugin_page_sub">可选的能力：装一份 APK 在这儿，退出重开之后才生效。</string>
+    <!-- 第 180 轮：这句话从"页面顶部一段说明"改成「装一个插件 APK」那行的副标题；
+         重启那句移到底部「立即重启」那行的副标题（同一屏同一件事只说一次）。 -->
+    <string name="plugin_page_sub">可选的能力：装一份 APK 在这儿。</string>
     <string name="plugin_none">还没有装插件。</string>
     <string name="plugin_import">装一个插件 APK</string>
     <string name="plugin_chooser_title">选一个插件 APK</string>
@@ -10,6 +12,13 @@
     <string name="plugin_state_pending_fmt">%1$s · 退出重开生效（%2$s 装的那份）</string>
     <string name="plugin_state_off_fmt">%1$s · 已停用（上次生效的是 %2$s 那份）</string>
     <string name="plugin_state_off_never">%1$s · 已停用</string>
+    <!-- 第 180 轮：列表卡上的**短**状态徽标（句子形式留给弹窗 / Toast）；
+         中文三到四个字，英文也尽量短 —— 徽标是拿来扫的，不是拿来讲道理的。 -->
+    <string name="plugin_section_installed">已安装</string>
+    <string name="plugin_badge_active">生效中</string>
+    <string name="plugin_badge_pending">待重启</string>
+    <string name="plugin_badge_off">已停用</string>
+    <string name="plugin_badge_quarantined">已隔离</string>
     <string name="plugin_action_open">打开</string>
     <string name="plugin_action_enable">启用（退出重开生效）</string>
     <string name="plugin_action_disable">停用（退出重开生效）</string>
@@ -24,7 +33,8 @@
     <string name="plugin_install_stuck_old">旧的那份删不掉 —— 退出重开再试</string>
     <string name="plugin_install_unknown">这个包读不进来 —— 换一份文件再试</string>
     <string name="plugin_uninstalled_fmt">已把 %1$s 挪进中转站</string>
-    <string name="plugin_restart">立即重启启动器</string>
+    <!-- 第 180 轮：产品名已统一成「Mindustry 管理器」，这里原来还写着「启动器」。 -->
+    <string name="plugin_restart">立即重启管理器</string>
     <string name="plugin_restart_hint">换版本、启用或停用之后，要退出重开才生效。</string>
     <string name="plugin_ext_unsupported">这个插件声明的入口，这一版还不支持（插件本身照常工作）</string>
     <string name="plugin_restart_failed">这台设备不允许应用自己重启，请手动退出再打开。</string>
@@ -79,7 +89,7 @@
     <string name="plugin_trust_builtin">内置（随本体发放，不能卸载）</string>
     <string name="plugin_trust_short_builtin">内置</string>
     <!-- 第 139 轮：接口版本改成**兼容区间**（插件 %1$d，本机支持 %2$d~%3$d）⇒ 拒绝那句话按"太新/太老"分岔 -->
-    <string name="plugin_err_api_new_fmt">插件要求的接口版本比本机新（插件 %1$d，本版本支持 %2$d~%3$d）—— 该升级启动器。</string>
+    <string name="plugin_err_api_new_fmt">插件要求的接口版本比本机新（插件 %1$d，本版本支持 %2$d~%3$d）—— 该升级管理器。</string>
     <string name="plugin_err_api_old_fmt">插件用的接口版本太老（插件 %1$d，本版本支持 %2$d~%3$d）—— 该更新插件。</string>
     <!-- 第 148 轮 C2：插件自述里的 access 声明（它要碰什么）。永远显示一行，没有就明说"没有声明" -->
     <string name="plugin_info_access">要碰什么：%1$s</string>

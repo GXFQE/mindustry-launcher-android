@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 第 180 轮：警告卡的底（「上次带插件启动没成功」）。
+     颜色取 chip_bg_warn —— 与列表里的警告徽标同一个语义色，深浅主题各由 values/values-night 切换。 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/chip_bg_warn" />
+    <corners android:radius="14dp" />
+</shape>

@@ -4221,10 +4221,25 @@ public final class SelfTest {
                         && PluginHost.apiReasonRes(0) == R.string.plugin_err_api_old_fmt
                         && PluginHost.apiReasonRes(PluginHost.API) == R.string.plugin_err_api_fmt
                         && PluginHost.apiReasonRes(PluginHost.API + 1) != PluginHost.apiReasonRes(0),
-                "★拒绝那句话按三态分岔（太新 ⇒ 该升级启动器 / 太老 ⇒ 该更新插件）—— 两句必须不同");
+                "★拒绝那句话按三态分岔（太新 ⇒ 该升级管理器 / 太老 ⇒ 该更新插件）—— 两句必须不同");
         ok(stat, L, !Trans.get(ctx, R.string.plugin_err_api_new_fmt).isEmpty()
                         && !Trans.get(ctx, R.string.plugin_err_api_old_fmt).isEmpty(),
                 "两条分岔文案中英都在（门禁只管键对齐，这里再实取一次）");
+        // ★ 第 180 轮：插件卡的状态徽标（改版后行里不再拼整句 ⇒ 徽标必须自己把四态分清）
+        ok(stat, L, PluginsActivity.badgeTextRes("active", false) == R.string.plugin_badge_active
+                        && PluginsActivity.badgeTextRes("pending", false) == R.string.plugin_badge_pending
+                        && PluginsActivity.badgeTextRes("off", false) == R.string.plugin_badge_off
+                        && PluginsActivity.badgeTextRes("off", true) == R.string.plugin_badge_quarantined
+                        && PluginsActivity.badgeTextRes("pending", true) == R.string.plugin_badge_pending,
+                "★插件卡徽标四态：生效 / 待重启 / 已停用 / 已隔离（待重启优先于隔离）");
+        ok(stat, L, PluginsActivity.badgeBgRes("active", false) == R.drawable.badge_slot
+                        && PluginsActivity.badgeBgRes("pending", false) == R.drawable.badge_slot_warn
+                        && PluginsActivity.badgeBgRes("off", false) == R.drawable.badge_muted
+                        && PluginsActivity.badgeBgRes("off", true) == R.drawable.badge_slot_warn
+                        && PluginsActivity.badgeColorRes("active", false) == R.color.chip_fg
+                        && PluginsActivity.badgeColorRes("off", false) == R.color.fg_muted
+                        && PluginsActivity.badgeColorRes("off", true) == R.color.chip_fg_warn,
+                "★插件卡徽标配色：生效 = accent / 待重启·隔离 = 警告 / 停用 = 中性（三种底不混用）");
         // ★ 内置补放之后动不动 active：三种情况必须分清（第 139 轮补的洞：新版内置会被永远挂在旧版上）
         ok(stat, L, "enable".equals(Plugins.builtinRegisterAction(null, null, null, "v2")),
                 "内置：从没见过 ⇒ 启用（随本体发的能力默认开着）");

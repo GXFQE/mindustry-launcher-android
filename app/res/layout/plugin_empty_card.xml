@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  插件页空态卡（第 180 轮）：没有插件时不再只剩一行灰字，而是一张和列表同宽的卡。
+  ★ 文案沿用 `plugin_none`；块高/字号/居中沿用四页共用的 `@style/PageEmpty`
+    （自检里那条「四页空态是同一个盒子」的判据只管四个内容页，这里不掺进去，
+     但样式仍取同一个 —— 改样式时本页跟着变是一致性，不是耦合）。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="@dimen/card_gap"
+    android:background="@drawable/card_bg"
+    android:orientation="vertical">
+
+    <TextView
+        android:id="@+id/plugin_empty"
+        style="@style/PageEmpty" />
+</LinearLayout>

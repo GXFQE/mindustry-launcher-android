@@ -33,6 +33,12 @@ import java.util.List;
  * ② 主界面一行 = 一件独立的事，插件是**低频全局入口** ⇒ 顶栏右上角（ActionBar 菜单，
  *    与「设置」同一套规矩，见 {@code res/menu/main.xml}）。
  *
+ * <h3>版式（第 180 轮改过）</h3>
+ * 一列纯文字（「名字 · 状态（…装的那份）」+ 缩进的能力条目 + 满屏句子）读起来就是"文字堆积"。
+ * 现在：状态进**徽标**、来源/处置进第二行小字、能力条目收进**同一张卡**里当续行、
+ * 安装与重启各是一张 {@code row_action} 卡、失败记录是一张警告色卡。
+ * =⇒ 改版式时优先动 XML（{@code activity_plugins} / {@code item_plugin}），别又在这里堆 TextView。
+ *
  * <h3>两条容易踩的</h3>
  * <ul>
  *   <li>「打开」走哪条路**取决于这个版本这程有没有被注入进宿主 CL**（{@link Plugins#isInjected}）：
@@ -57,7 +63,10 @@ public class PluginsActivity extends BaseActivity {
     /** 第 160 轮：详情页当前选中的那一份（绝对路径）；其余页不带。 */
     static final String EXTRA_FILE = "plugin_file";
 
+    /** 动态区（跳过横幅 / 分区标题 / 插件卡 / 空态）：`rebuild()` 只清这一层。 */
     private LinearLayout mBody;
+    /** 列表骨架（含底部两张静态卡）：直接打开的插件页会把 ScrollView 内容换掉，回来时要重新挂它。 */
+    private View mBodyRoot;
     private ScrollView mScroll;
     /** true = 这一趟是"直接打开某一条目"（返回 = 回上一页，不是回插件列表）。 */
     private boolean mDirect;
@@ -69,7 +78,9 @@ public class PluginsActivity extends BaseActivity {
         // 🔴 edge-to-edge（targetSdk ≥ 35）：不补 insets 的话整页从 y=0 画、被状态栏+顶栏盖住
         Util.applySystemInsets(findViewById(R.id.root));
         mScroll = (ScrollView) findViewById(R.id.plugins_scroll);
-        mBody = (LinearLayout) findViewById(R.id.plugins_body);
+        mBodyRoot = findViewById(R.id.plugins_body);
+        mBody = (LinearLayout) findViewById(R.id.plugins_dynamic);
+        bindStaticCards();
         String id = getIntent() == null ? null : getIntent().getStringExtra(EXTRA_ID);
         if (id != null && !id.trim().isEmpty()) {
             // ★ 内容页的动作行：标题用插件自己声明的名字，返回 = 回内容页（不是插件列表）
@@ -117,72 +128,141 @@ public class PluginsActivity extends BaseActivity {
     // ---- 页面 -----------------------------------------------------------------
 
     private void rebuild() {
-        // ⚠️ 「打开」那一步会把 mScroll 的内容换成插件页 ⇒ 回来时必须把列表容器**重新挂上**，
-        //   否则 mBody 已经不在视图树里：页面看着"什么都没发生"（清空的是那个孤儿容器）
-        if (mScroll.getChildCount() != 1 || mScroll.getChildAt(0) != mBody) {
+        // ⚠️ 「打开」那一步会把 mScroll 的内容换成插件页 ⇒ 回来时必须把列表骨架**重新挂上**，
+        //   否则 mBodyRoot 已经不在视图树里：页面看着"什么都没发生"（清空的是那个孤儿容器）
+        if (mScroll.getChildCount() != 1 || mScroll.getChildAt(0) != mBodyRoot) {
             mScroll.removeAllViews();
-            mScroll.addView(mBody);
+            mScroll.addView(mBodyRoot);
         }
         mBody.removeAllViews();
-        // ⚠️ 页内**不再重复**顶栏那句「插件」（同一屏同一件事只说一次）
-        addText(Trans.get(this, R.string.plugin_page_sub), 13f);
 
+        // 跳过横幅在最上面（已经发生过的事优先于常态列表）
         skipBanner();
-        addAction(Trans.get(this, R.string.plugin_import), new Runnable() {
-            @Override public void run() { pickPlugin(); }
-        });
 
         List<String> ids = Plugins.installedIds(this);
         if (ids.isEmpty()) {
-            addText(Trans.get(this, R.string.plugin_none), 15f);
-        } else {
-            String act = Plugins.active(this), pend = Plugins.pending(this), known = Plugins.known(this);
-            for (final String id : ids) {
-                String[] st = Plugins.rowState(act, pend, id);
-                // ★ 界面上说的名字 = 自述里的名字（缺自述才回落 id）—— 与横幅、弹窗同一处取（第 136 轮）
-                final String name = Plugins.displayNameOf(this, id);
-                String label;
-                if ("pending".equals(st[0])) {
-                    label = Trans.get(this, R.string.plugin_state_pending_fmt, name,
-                            Plugins.versionLabel(st[1]));
-                } else if ("active".equals(st[0])) {
-                    label = Trans.get(this, R.string.plugin_state_active_fmt, name,
-                            Plugins.versionLabel(st[1]));
-                } else {
-                    String k = Plugins.stateGet(known, id);
-                    label = k == null ? Trans.get(this, R.string.plugin_state_off_never, name)
-                                      : Trans.get(this, R.string.plugin_state_off_fmt, name,
-                                              Plugins.versionLabel(k));
-                }
-                // ★ 有隔离件时行里要点明（否则用户看着"已停用"、不知道还能放回来）
-                String[] qv = Plugins.quarantinedOf(this, id);
-                if (qv.length > 0 && "off".equals(st[0])) {
-                    label = Trans.get(this, R.string.plugin_row_quarantined_fmt, name,
-                            Plugins.versionLabel(qv[qv.length - 1]));
-                }
-                // 第二行小字：来源 + 当前处置等级（弹窗里放不下它们 —— 见 rowDialog 的注释）
-                final String[] vs = Plugins.versionsOf(this, id);
-                String probeVer = st[1].isEmpty() ? (vs.length > 0 ? vs[vs.length - 1] : null) : st[1];
-                final String tr = probeVer == null ? PluginTrust.THIRD : Plugins.trustOf(this, id, probeVer);
-                final String sub = Trans.get(this, R.string.plugin_trust_short_fmt,
-                        Trans.get(this, trustShortRes(tr)),
-                        Trans.get(this, levelShortRes(Plugins.levelOf(Plugins.levels(this), tr, id))));
-                final String rowLabel = label;
-                addAction(label, sub, new Runnable() {
-                    @Override public void run() { rowDialog(id); }
-                });
-                // ★ 这台插件声明的**能力条目**（第 139 轮）：列在它那一节下面，点条目 = 进那一条自己的页
-                if (probeVer != null) addExtensions(id, probeVer);
-            }
+            View empty = getLayoutInflater().inflate(R.layout.plugin_empty_card, mBody, false);
+            ((TextView) empty.findViewById(R.id.plugin_empty))
+                    .setText(Trans.get(this, R.string.plugin_none));
+            mBody.addView(empty);
+            return;
         }
 
-        addText(Trans.get(this, R.string.plugin_restart_hint), 13f);
-        addAction(Trans.get(this, R.string.plugin_restart), new Runnable() {
-            @Override public void run() { restartNow(); }
-        });
+        // 分区标题：只有真有插件时才出现（空态卡自己已经说清"还没有装插件"）
+        addSectionHeader(Trans.get(this, R.string.plugin_section_installed));
+
+        String act = Plugins.active(this), pend = Plugins.pending(this);
+        String levels = Plugins.levels(this);
+        for (final String id : ids) {
+            String[] st = Plugins.rowState(act, pend, id);
+            String[] vs = Plugins.versionsOf(this, id);
+            String[] quar = Plugins.quarantinedOf(this, id);
+            // 这一行"在说哪一份"：待生效的那份优先，其次是最新装的那份
+            String probeVer = st[1].isEmpty() ? (vs.length > 0 ? vs[vs.length - 1] : null) : st[1];
+            String trust = probeVer == null ? PluginTrust.THIRD : Plugins.trustOf(this, id, probeVer);
+            String level = Plugins.levelOf(levels, trust, id);
+            addPluginCard(id, Plugins.displayNameOf(this, id), st[0], quar.length > 0,
+                    trust, level, probeVer);
+        }
     }
 
-    /** 上次带插件启动没成功 ⇒ 在这个位置说清楚"谁被回滚 / 谁被停用"，并给一条恢复的路。 */
+    /** 把底部两张静态卡接上动作（只绑一次；`rebuild()` 不会碰它们）。 */
+    private void bindStaticCards() {
+        View root = findViewById(R.id.root);
+        View install = Util.bindActionValue(root, R.id.row_plugin_install, R.drawable.ic_add,
+                R.string.plugin_import, new Runnable() {
+                    @Override public void run() { pickPlugin(); }
+                });
+        ((TextView) install.findViewById(R.id.act_sub))
+                .setText(Trans.get(this, R.string.plugin_page_sub));
+
+        View restart = Util.bindActionValue(root, R.id.row_plugin_restart, R.drawable.ic_restart,
+                R.string.plugin_restart, new Runnable() {
+                    @Override public void run() { restartNow(); }
+                });
+        ((TextView) restart.findViewById(R.id.act_sub))
+                .setText(Trans.get(this, R.string.plugin_restart_hint));
+    }
+
+    /** 分区标题（与设置页 / 关于页同一个规格：12sp 灰字，上下留白按位置给）。 */
+    private void addSectionHeader(String text) {
+        TextView t = new TextView(this);
+        t.setText(text);
+        t.setTextSize(12f);
+        t.setTextColor(getResources().getColor(R.color.fg_muted));
+        t.setPadding(dp(4), dp(2), dp(4), dp(6));
+        mBody.addView(t);
+    }
+
+    /**
+     * 一张插件卡：名称 + 状态徽标 + 「来源 · 处置」+ 它声明的能力条目。
+     *
+     * @param state       {@link Plugins#rowState} 的 {@code [0]}（active / pending / off）
+     * @param quarantined 手上还有隔离件（off 时徽标改说「已隔离」）
+     * @param ver         这一行在说的那一份（null = 只剩隔离件、没有候选）
+     */
+    private void addPluginCard(final String id, String name, String state, boolean quarantined,
+                               String trust, String level, final String ver) {
+        View card = getLayoutInflater().inflate(R.layout.item_plugin, mBody, false);
+        ((TextView) card.findViewById(R.id.plugin_name)).setText(name);
+        bindBadge((TextView) card.findViewById(R.id.plugin_badge), state, quarantined);
+        // 第二行：来源 + 处置等级（安装时刻不进列表 —— 那会让这行超出宽度预算；信息弹窗里有）
+        ((TextView) card.findViewById(R.id.plugin_meta)).setText(
+                Trans.get(this, R.string.plugin_trust_short_fmt,
+                        Trans.get(this, trustShortRes(trust)),
+                        Trans.get(this, levelShortRes(level))));
+        // ★ 监听挂在**卡片本体**上（不是外层的行距容器）：`card_bg_press` 的按下态画在卡片上，
+        //   挂错层的话点下去没有任何反馈（外层没有背景），uiautomator 里还会多出一个可点节点。
+        card.findViewById(R.id.plugin_card).setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { rowDialog(id); }
+        });
+        if (ver != null) bindExtensions(card, id, ver);
+        mBody.addView(card);
+    }
+
+    /**
+     * 状态徽标：**短词** + 三种语义色（生效 = accent / 待生效与隔离 = 警告 / 停用 = 中性）。
+     * ★ 判据只有这一处 —— 列表行不再拼「名字 · 状态（…装的那份）」那种整句：
+     *   名字与状态在这一行里已经各有一个位置了，整句会把它读成一堆字
+     *   （整句形式 `plugin_state_*` 只留在老版本/用户语言包里，界面不再引用）。
+     * ★ 三个映射写成**纯函数**（`badgeTextRes` / `badgeBgRes` / `badgeColorRes`），自检直接钉四态；
+     *   以前这类"颜色 / 文案跟着状态走"的判断散在布局里，改一处忘一处就成了"两个状态长一样"。
+     */
+    static int badgeTextRes(String state, boolean quarantined) {
+        if ("pending".equals(state)) return R.string.plugin_badge_pending;
+        if (quarantined) return R.string.plugin_badge_quarantined;
+        if ("active".equals(state)) return R.string.plugin_badge_active;
+        return R.string.plugin_badge_off;
+    }
+
+    static int badgeBgRes(String state, boolean quarantined) {
+        if ("pending".equals(state) || quarantined) return R.drawable.badge_slot_warn;
+        return "active".equals(state) ? R.drawable.badge_slot : R.drawable.badge_muted;
+    }
+
+    static int badgeColorRes(String state, boolean quarantined) {
+        if ("pending".equals(state) || quarantined) return R.color.chip_fg_warn;
+        return "active".equals(state) ? R.color.chip_fg : R.color.fg_muted;
+    }
+
+    private void bindBadge(TextView badge, String state, boolean quarantined) {
+        badge.setText(Trans.get(this, badgeTextRes(state, quarantined)));
+        badge.setBackgroundResource(badgeBgRes(state, quarantined));
+        badge.setTextColor(getResources().getColor(badgeColorRes(state, quarantined)));
+    }
+
+    /** 1dp 分割线，起点与卡片里那行插件名对齐（50dp = 14 padding + 24 图标 + 12 间距）。 */
+    private View cardDivider() {
+        View v = new View(this);
+        v.setBackgroundColor(getResources().getColor(R.color.divider));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(1));
+        lp.setMarginStart(dp(50));
+        v.setLayoutParams(lp);
+        return v;
+    }
+
+    /** 上次带插件启动没成功 ⇒ 一张警告卡说清楚"谁被回滚 / 谁被停用"，并给一条恢复的路。 */
     private void skipBanner() {
         final List<String[]> skip = Plugins.lastSkip(this);
         if (skip.isEmpty()) return;
@@ -197,28 +277,45 @@ public class PluginsActivity extends BaseActivity {
             for (String v : Plugins.versionsOf(this, s[0])) if (v.equals(s[1])) restorable = true;
         }
         if (live.isEmpty()) return;
-        addText(Trans.get(this, R.string.plugin_skip_title), 15f);
+
+        View card = getLayoutInflater().inflate(R.layout.plugin_skip_card, mBody, false);
+        ((TextView) card.findViewById(R.id.plugin_skip_title))
+                .setText(Trans.get(this, R.string.plugin_skip_title));
+
+        // 每个插件一行；名字与列表卡同一个来源（自述名字优先）—— 别让同一件事有两个名字
+        StringBuilder sb = new StringBuilder();
         for (String[] s : live) {
             boolean q = s.length > 5 && "yes".equals(s[5]);
-            // ★ 横幅里说的名字与列表行同一个来源（自述名字优先）—— 别让同一件事有两个名字
             String name = Plugins.displayNameOf(this, s[0]);
+            String line;
             if ("retry".equals(s[3])) {
-                addText(Trans.get(this, R.string.plugin_skip_retry_fmt, name,
-                        Plugins.versionLabel(s[1])), 14f);
+                line = Trans.get(this, R.string.plugin_skip_retry_fmt, name,
+                        Plugins.versionLabel(s[1]));
             } else if ("rollback".equals(s[3])) {
-                addText(Trans.get(this, q ? R.string.plugin_skip_rollback_q_fmt
-                                          : R.string.plugin_skip_rollback_fmt, name,
-                        Plugins.versionLabel(s[1]), Plugins.versionLabel(s[2])), 14f);
+                line = Trans.get(this, q ? R.string.plugin_skip_rollback_q_fmt
+                                         : R.string.plugin_skip_rollback_fmt, name,
+                        Plugins.versionLabel(s[1]), Plugins.versionLabel(s[2]));
             } else {
-                addText(Trans.get(this, q ? R.string.plugin_skip_quarantine_fmt
-                                          : R.string.plugin_skip_disable_fmt, name,
-                        Plugins.versionLabel(s[1])), 14f);
+                line = Trans.get(this, q ? R.string.plugin_skip_quarantine_fmt
+                                         : R.string.plugin_skip_disable_fmt, name,
+                        Plugins.versionLabel(s[1]));
             }
+            if (sb.length() > 0) sb.append('\n');
+            sb.append(line);
         }
-        if (!restorable) return;   // 那一版的文件不在了 ⇒ 这个按钮按下去什么都不会发生，那就别给
-        addAction(Trans.get(this, R.string.plugin_skip_restore), new Runnable() {
-            @Override public void run() { restoreSkipped(live); }
-        });
+        ((TextView) card.findViewById(R.id.plugin_skip_detail)).setText(sb.toString());
+
+        TextView restore = (TextView) card.findViewById(R.id.plugin_skip_restore);
+        if (restorable) {
+            // 那一版的文件不在了 ⇒ 这个按钮按下去什么都不会发生，那就别给
+            restore.setText(Trans.get(this, R.string.plugin_skip_restore));
+            restore.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) { restoreSkipped(live); }
+            });
+        } else {
+            restore.setVisibility(View.GONE);
+        }
+        mBody.addView(card);
     }
 
     /**
@@ -253,7 +350,7 @@ public class PluginsActivity extends BaseActivity {
         final String[] quar = Plugins.quarantinedOf(this, id);
         final String qv = quar.length == 0 ? null : quar[quar.length - 1];
 
-        // ★ 来源 + 当前处置等级写进弹窗的正文（列表行有宽度预算，塞不下这些字）
+        // ★ 来源 + 处置等级：列表卡第二行已经写着同一份判据；这里用它决定"下一档是什么"与"要不要给恢复"
         final String trust = newest == null ? PluginTrust.THIRD : Plugins.trustOf(this, id, newest);
         final String lv = Plugins.levelOf(Plugins.levels(this), trust, id);
         // ★ 按来源算下一档：内置只在 L1↔L2 之间转（它被封顶在 L2，给 L3 只会骗人）
@@ -470,7 +567,13 @@ public class PluginsActivity extends BaseActivity {
             View v = PluginHost.createView(l);
             LinearLayout box = new LinearLayout(this);
             box.setOrientation(LinearLayout.VERTICAL);
-            addText(box, Trans.get(this, R.string.plugin_loaded_fmt, apk.getName(), l.api), 13f);
+            // 「已加载 xxx（接口 N）」是给用户判断"这份到底跑没跑起来"的，字号压小、不抢插件自己的页面
+            TextView loaded = new TextView(this);
+            loaded.setText(Trans.get(this, R.string.plugin_loaded_fmt, apk.getName(), l.api));
+            loaded.setTextSize(12f);
+            loaded.setTextColor(getResources().getColor(R.color.fg_muted));
+            loaded.setPadding(0, 0, 0, dp(8));
+            box.addView(loaded);
             if (v != null) box.addView(v);
             pageView = box;
         } catch (PluginHost.PluginException e) {
@@ -483,16 +586,29 @@ public class PluginsActivity extends BaseActivity {
         } catch (Throwable t) {
             pageView = fallback(Trans.get(this, R.string.plugin_err_other));
         }
-        // 插件自己的页面 + 一行「返回」（直接打开的 ⇒ 回上一页；从列表点的 ⇒ 重建本页）
+        // 插件自己的页面 + 一个「返回」按钮（直接打开的 ⇒ 回上一页；从列表点的 ⇒ 重建本页）
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
-        root.setPadding(dp(16), dp(16), dp(16), dp(16));
-        addAction(root, Trans.get(this, R.string.plugin_back), new Runnable() {
-            @Override public void run() {
+        root.setPadding(dp(16), dp(12), dp(16), dp(16));
+        TextView back = new TextView(this);
+        back.setText(Trans.get(this, R.string.plugin_back));
+        back.setTextSize(14f);
+        back.setTextColor(getResources().getColor(R.color.accent));
+        back.setBackgroundResource(R.drawable.btn_ghost);
+        back.setPadding(dp(14), dp(7), dp(14), dp(7));
+        back.setGravity(Gravity.CENTER);
+        back.setClickable(true);
+        back.setFocusable(false);
+        back.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
                 if (mDirect) finish();
                 else rebuild();
             }
         });
+        LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        blp.bottomMargin = dp(12);
+        root.addView(back, blp);
         root.addView(pageView, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         mScroll.removeAllViews();
@@ -503,8 +619,26 @@ public class PluginsActivity extends BaseActivity {
     private View fallback(String why) {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
-        addText(box, Trans.get(this, R.string.plugin_fallback_title), 15f);
-        addText(box, why, 14f);
+        // 加载失败 = 警告，用与跳过横幅同一张警告底（不是又一块普通白卡）
+        box.setBackgroundResource(R.drawable.card_warn_bg);
+        box.setPadding(dp(14), dp(14), dp(14), dp(14));
+
+        TextView title = new TextView(this);
+        title.setText(Trans.get(this, R.string.plugin_fallback_title));
+        title.setTextSize(14f);
+        // 与布局里的 fontFamily="sans-serif-medium" 同一款（代码建的视图拿不到 XML 那个属性）
+        title.setTypeface(android.graphics.Typeface.create("sans-serif-medium",
+                android.graphics.Typeface.NORMAL));
+        title.setTextColor(getResources().getColor(R.color.chip_fg_warn));
+        title.setPadding(0, 0, 0, dp(6));
+        box.addView(title);
+
+        TextView detail = new TextView(this);
+        detail.setText(why);
+        detail.setTextSize(14f);
+        detail.setTextColor(getResources().getColor(R.color.fg));
+        detail.setLineSpacing(dp(3), 1f);
+        box.addView(detail);
         return box;
     }
 
@@ -617,23 +751,6 @@ public class PluginsActivity extends BaseActivity {
         return Math.round(v * getResources().getDisplayMetrics().density);
     }
 
-    private void addText(String s, float size) {
-        addText(mBody, s, size);
-    }
-
-    private void addText(LinearLayout into, String s, float size) {
-        TextView t = new TextView(this);
-        t.setText(s);
-        t.setTextSize(size);
-        t.setPadding(0, dp(4), 0, dp(4));
-        into.addView(t);
-    }
-
-    /**
-     * 插件声明的"能力条目"那一行（第 139 轮）。
-     * ⚠️ 读的是插件 APK 里的声明（几 KB），**不加载插件代码** ⇒ 列表页不因为"某台插件坏了"而打不开；
-     * 真正的加载推迟到用户点它的那一刻（那条路本来就有 try/catch 兜底）。
-     */
     /**
      * 「它要碰什么」那一行（第 148 轮 C2）：没有声明就明说"没有声明"，**不留白**。
      * 名字原样列出（认不出的也列 —— 用户有权知道插件要什么，我们认不认得是另一回事）。
@@ -645,80 +762,45 @@ public class PluginsActivity extends BaseActivity {
         return android.text.TextUtils.join(", ", a);
     }
 
-    private void addExtensions(final String id, final String ver) {
+    /**
+     * 插件声明的"能力条目"（第 139 轮）：列在插件卡里、点条目 = 进那一条自己的页。
+     * ⚠️ 读的是插件 APK 里的声明（几 KB），**不加载插件代码** ⇒ 列表页不因为"某台插件坏了"而打不开；
+     * 真正的加载推迟到用户点它的那一刻（那条路本来就有 try/catch 兜底）。
+     */
+    private void bindExtensions(View card, final String id, final String ver) {
         List<Extensions.Item> all = Extensions.of(Plugins.apkOf(this, id, ver));
         List<Extensions.Item> items = Extensions.forSlot(all, Extensions.SLOT_PLUGINS);
-        // ★ 声明了入口、但这一版一个都用不上 ⇒ 说一句。原来这里什么都不显示，用户会以为
+        LinearLayout box = (LinearLayout) card.findViewById(R.id.plugin_exts);
+        // ★ 声明了入口、但这一版一个都用不上 ⇒ 在卡里说一句。原来这里什么都不显示，用户会以为
         //   "插件没生效"（插件本身其实照常注入、照常工作 —— 见 Extensions.allUnknown 的注释）。
         if (items.isEmpty()) {
-            if (Extensions.allUnknown(all, Extensions.SLOT_PLUGINS)) {
-                addText(Trans.get(this, R.string.plugin_ext_unsupported), 13f);
-            }
+            if (!Extensions.allUnknown(all, Extensions.SLOT_PLUGINS)) return;
+            box.setVisibility(View.VISIBLE);
+            box.addView(cardDivider());
+            TextView note = new TextView(this);
+            note.setText(Trans.get(this, R.string.plugin_ext_unsupported));
+            note.setTextSize(12f);
+            note.setTextColor(getResources().getColor(R.color.fg_muted));
+            note.setLineSpacing(dp(2), 1f);
+            note.setPadding(dp(50), dp(8), dp(14), dp(10));
+            box.addView(note);
             return;
         }
+        box.setVisibility(View.VISIBLE);
         for (final Extensions.Item it : items) {
-            LinearLayout box = new LinearLayout(this);
-            box.setOrientation(LinearLayout.VERTICAL);
-            box.setPadding(dp(28), dp(6), dp(8), dp(6));
-            TextView title = new TextView(this);
-            title.setText(it.label());
-            title.setTextSize(15f);
-            box.addView(title);
-            if (it.subtitle != null && !it.subtitle.isEmpty()) {
-                TextView sub = new TextView(this);
+            box.addView(cardDivider());
+            View row = getLayoutInflater().inflate(R.layout.item_plugin_ext, box, false);
+            ((TextView) row.findViewById(R.id.plugin_ext_title)).setText(it.label());
+            TextView sub = (TextView) row.findViewById(R.id.plugin_ext_sub);
+            if (it.subtitle == null || it.subtitle.isEmpty()) {
+                sub.setVisibility(View.GONE);
+            } else {
                 sub.setText(it.subtitle);
-                sub.setTextSize(12f);
-                box.addView(sub);
             }
-            box.setOnClickListener(new View.OnClickListener() {
+            row.setOnClickListener(new View.OnClickListener() {
                 @Override public void onClick(View v) { open(id, ver, it.entry); }
             });
-            mBody.addView(box);
+            box.addView(row);
         }
-    }
-
-    private void addAction(String label, final Runnable r) {
-        addAction(mBody, label, r);
-    }
-
-    /**
-     * 两行的一行：主行是可点的动作/条目，**副行给"来源 + 处置等级"**这种补充信息。
-     * ★ 为什么副行不塞进弹窗：框架的 AlertController 在同时有 `message` 时会把 `items` 吞掉
-     *   （真机实测），所以弹窗只放动作，信息放在列表里。
-     */
-    private void addAction(String label, String sub, final Runnable r) {
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(8), dp(10), dp(8), dp(10));
-        box.setClickable(true);
-        box.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { r.run(); }
-        });
-        TextView t = new TextView(this);
-        t.setText(label);
-        t.setTextSize(16f);
-        box.addView(t);
-        if (sub != null && !sub.isEmpty()) {
-            TextView s = new TextView(this);
-            s.setText(sub);
-            s.setTextSize(12f);
-            s.setTextColor(getResources().getColor(R.color.fg_muted));
-            box.addView(s);
-        }
-        mBody.addView(box);
-    }
-
-    /** 一行"可点的动作"：整行可点（不靠小按钮 ⇒ 也不会出现"文字被挤没"那类）。 */
-    private void addAction(LinearLayout into, String label, final Runnable r) {
-        TextView t = new TextView(this);
-        t.setText(label);
-        t.setTextSize(16f);
-        t.setPadding(dp(8), dp(12), dp(8), dp(12));
-        t.setGravity(Gravity.START);
-        t.setClickable(true);
-        t.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { r.run(); }
-        });
-        into.addView(t);
     }
 }

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 第 180 轮：插件页「已停用」徽标（中性态）。
+     透明底 + 1dp 淡描边 + fg_muted 字：既压在 accent / 警告两种底色之外，
+     也不会在深浅两套主题里变成"另一个强调色"（圆角与 badge_slot 同为 9dp）。 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@android:color/transparent" />
+    <corners android:radius="9dp" />
+    <stroke android:width="1dp" android:color="@color/card_stroke" />
+</shape>

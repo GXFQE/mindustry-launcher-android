@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  第 180 轮：警告图标（三角 + 感叹号），用在「上次带插件启动没成功」那张卡上。
+  ★ 纯 fill、没有描边（描边带在小尺寸下会糊，见 ref/29「图标 / 矢量几何」）。
+  ★ fillColor 取 icon_tint；使用处的 ImageView 用 android:tint 换成警告色。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@color/icon_tint"
+        android:pathData="M1,21h22L12,2 1,21zM13,18h-2v-2h2v2zM13,14h-2v-4h2v4z" />
+</vector>
