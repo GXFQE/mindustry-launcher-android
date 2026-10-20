@@ -98,4 +98,5 @@
     <string name="ms_save_done">已保存：%1$s</string>
     <string name="ms_share_done">已分享：%1$s</string>
     <string name="ms_no_page">统计在地图详情页里；导出在地图页的「导出统计…」。</string>
+    <string name="ms_export_partial_fmt">有 %1$d 张没统计出来，已跳过。</string>
 </resources>

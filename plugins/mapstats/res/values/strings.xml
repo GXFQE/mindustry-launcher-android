@@ -98,4 +98,5 @@
     <string name="ms_save_done">Saved: %1$s</string>
     <string name="ms_share_done">Shared: %1$s</string>
     <string name="ms_no_page">Stats live on the map detail page; export is the "Export stats" row on the maps page.</string>
+    <string name="ms_export_partial_fmt">%1$d maps could not be analysed and were skipped.</string>
 </resources>

@@ -253,6 +253,13 @@ public final class MapStatsPage {
                             @Override public void run() {
                                 List<Built> built = computeAll(api, c, items, true);
                                 api.progressCardClose();
+                                int failed = 0;
+                                for (Built b : built) {
+                                    if (b.result == null || !b.result.ok) failed++;
+                                }
+                                if (failed > 0) {
+                                    api.toast(c.getString(R.string.ms_export_partial_fmt, failed));
+                                }
                                 final String js = jsonOf(built, c, mode);
                                 if (js == null) {
                                     api.toast(c.getString(R.string.ms_nothing));
@@ -650,7 +657,11 @@ public final class MapStatsPage {
                 addLine(results, c, th, c.getString(R.string.ms_unknown_fmt, unknown), th.textMuted, 13f);
             }
         }
-        status.setText(c.getString(R.string.ms_done_fmt, millis));
+        if (inline) {
+            status.setVisibility(View.GONE);
+        } else {
+            status.setText(c.getString(R.string.ms_done_fmt, millis));
+        }
     }
 
     /** 一张可折叠卡片（标题 + 摘要常驻，明细点开）—— 返回装明细的那一列 */
@@ -670,8 +681,10 @@ public final class MapStatsPage {
         lp.topMargin = th.dp(8);
         box.addView(card, lp);
 
+        // 标题这一行：文字 + 箭头（与宿主行同一个图标，展开时转向下）
         LinearLayout head = new LinearLayout(c);
         head.setOrientation(LinearLayout.HORIZONTAL);
+        head.setGravity(android.view.Gravity.CENTER_VERTICAL);
         TextView t = new TextView(c);
         t.setText(title);
         t.setTextSize(14f);
@@ -679,29 +692,37 @@ public final class MapStatsPage {
         t.setTextColor(th.text);
         head.addView(t, new LinearLayout.LayoutParams(0,
                 LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        final TextView chev = new TextView(c);
-        chev.setText("\u25B8");
-        chev.setTextSize(14f);
-        chev.setTextColor(th.textMuted);
-        head.addView(chev);
-        card.addView(head);
+        final android.widget.ImageView chev = new android.widget.ImageView(c);
+        int chevId = c.getResources().getIdentifier("ic_chevron", "drawable", c.getPackageName());
+        if (chevId != 0) {
+            chev.setImageResource(chevId);
+            chev.setColorFilter(th.textMuted);
+        }
+        int chevPx = th.dp(18);
+        head.addView(chev, new LinearLayout.LayoutParams(chevPx, chevPx));
+
+        // ★ 整块可点：标题 + 摘要都算"展开的触发区"（只点标题那行太小，用户 2026-10-21 反馈）
+        final LinearLayout top = new LinearLayout(c);
+        top.setOrientation(LinearLayout.VERTICAL);
+        top.addView(head);
+        card.addView(top);
 
         TextView sum = new TextView(c);
         sum.setText(summary);
         sum.setTextSize(12f);
         sum.setTextColor(th.textMuted);
         sum.setPadding(0, th.dp(3), 0, 0);
-        card.addView(sum);
+        top.addView(sum);
 
         final LinearLayout body = new LinearLayout(c);
         body.setOrientation(LinearLayout.VERTICAL);
         body.setVisibility(View.GONE);
         card.addView(body);
-        head.setOnClickListener(new View.OnClickListener() {
+        top.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
                 boolean show = body.getVisibility() != View.VISIBLE;
                 body.setVisibility(show ? View.VISIBLE : View.GONE);
-                chev.setText(show ? "\u25BE" : "\u25B8");
+                chev.setRotation(show ? 90f : 0f);
             }
         });
         return body;
