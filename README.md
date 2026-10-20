@@ -88,8 +88,9 @@ yourself — even just a few lines — see **Translation file** below.
 
 ### Maps
 - Cards with previews (this slot / built into the game / from mods)
-- Resource statistics: ore / wall ore / mineable floor / bonus floor
-- Export statistics: `.json` for one map, `.jsonl` for several; full or brief; save or share
+- Resource statistics (**official plugin `mapstats`**): ore / wall ore / mineable floor / bonus floor,
+  buildable area, core zone (planet-aware) - plus JSON export (one map = `.json`, several = `.jsonl`,
+  full or brief, save or share)
 - Import / export `.msav`: several at once; maps built into the game or a mod can be exported too
 - Turn a save into a map (an optional source map fills in the generator settings)
 - Search and sort; deletion goes through the transfer station

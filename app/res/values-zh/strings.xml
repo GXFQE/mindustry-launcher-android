@@ -977,10 +977,6 @@
     <string name="stats_note_mods_failed">模组读不动，只按原版算</string>
     <string name="stats_note_mods_fmt">%1$d 个模组（新增 %2$d 条，覆盖 %3$d 条）</string>
     <string name="stats_note_bundles_fmt">%1$d 个带译文，共 %2$d 条</string>
-    <string name="stats_note_patch_changed_fmt">地图自带补丁 %1$d 条（改了 %2$d 处）</string>
-    <string name="stats_note_vanilla_table_fmt">原版方块表 %1$d 条</string>
-    <string name="stats_note_json_names_fmt">名字写在内容文件里的有 %1$d 条（这些模组不带译文文件）</string>
-    <string name="stats_note_unknown_type_fmt">模组里有 %1$d 处内容用了我们认不出的类型（只算进「认不出」那一桶）</string>
     <string name="stats_note_names_apk_fmt">%1$s 语言包 %2$d 条</string>
     <string name="stats_note_names_no_apk">版本里没有这门语言的译文</string>
     <string name="stats_note_names_mod_fmt">模组语言包 %1$d 条</string>
@@ -1858,50 +1854,25 @@
       —— 界面上不出现 content / def / patch / id 这类词。
     -->
     <string name="map_detail_title">地图详情</string>
-    <string name="stats_working">正在数这张图的资源…</string>
-    <string name="stats_failed_fmt">数不出来：%1$s</string>
     <!-- ★ 2026-10-04：统计失败时给用户的白话（原来走 stats_failed_fmt + 异常消息，
          消息为空时还会显示成 Java 类名 —— 见 MapDetailActivity.startStats 的 catch）。 -->
-    <string name="stats_failed_plain">这张图的资源没数出来。返回上一页再进一次试试。</string>
-    <string name="stats_none">这张图里没有能采的资源。</string>
-    <string name="stats_section_ore">地矿</string>
-    <string name="stats_section_orewall">墙矿</string>
-    <string name="stats_section_floor">可采地板</string>
-    <string name="stats_section_bonus">加成地板</string>
-    <string name="stats_section_tech">技术细节</string>
     <!--
       ★ 口径（用户 2026-10-04 指出："沙子的数量怎么两个值"）：
         每行头号数字**一律**是「能采 X 格」，副行才给「共 Y 格」——
         同一批格子会同时算「可采地板」和「加成地板」，两段口径不一致就会出现"同名两个数"。
         唯一例外是「墙矿」段（行名带「（墙）」、不可能同名），它用总格数并在摘要里说明。
     -->
-    <string name="stats_sum_fmt">%1$d 种 · 共 %2$s 格，其中能采到 %3$s 格</string>
-    <string name="stats_sum_same_fmt">%1$d 种 · 共 %2$s 格</string>
     <!--
       矿的两类（用户 2026-10-04 定的口径）：**地矿**（长在地板上）用**地钻**；
       **墙矿**（长在墙里）要用**墙钻**。
       🔴 别写"普通钻头采不了" —— 用户明确纠正过，要写"需要用墙钻"。
     -->
-    <string name="stats_sum_wall_fmt">%1$d 种 · 共 %2$s 格（长在墙里，需要用墙钻）</string>
     <!-- ★ 2026-10-16：墙矿段也报「能采」了 —— 用户定的邻域口径（四邻全墙 ⇒ 被墙遮挡）原先算出来但没上屏。
          摘要跟其它三段同构（共 Y 格，其中能采 X 格），只保留「需要用墙钻」这句定位。 -->
-    <string name="stats_sum_wall_split_fmt">%1$d 种 · 共 %2$s 格，其中能采 %3$s 格（长在墙里，需要用墙钻）</string>
-    <string name="stats_row_reach_fmt">能采 %1$s 格</string>
-    <string name="stats_row_total_fmt">共 %1$s 格</string>
-    <string name="stats_row_drop_fmt">掉落 %1$s</string>
-    <string name="stats_row_buried_fmt">%1$s 格在墙下，拿不到</string>
     <!-- ★ 墙矿专用的「拿不到」：**不说**"在墙下"（墙矿本来就长在墙里，那句自相矛盾），只说状态 + 结论。 -->
-    <string name="stats_row_walled_fmt">%1$s 格四周都是墙，挖不到</string>
-    <string name="stats_row_wall_priority_fmt">%1$s 格底下也是墙矿，按底下的墙算</string>
-    <string name="stats_row_floor_priority_fmt">%1$s 格上面有矿，按上面的矿算</string>
-    <string name="stats_row_loose_fmt">%1$s 格被建筑或石头盖着（拆掉就能采）</string>
-    <string name="stats_row_unknown_fmt">%1$s 格认不出被什么挡着</string>
-    <string name="stats_more_fmt">还有 %1$d 种没列出来</string>
     <!-- 加成地板的名字要带属性词（含水/含油/高温…）：那才是它有用的地方 -->
-    <string name="stats_row_attr_fmt">%1$s（%2$s）</string>
     <!-- ★ 2026-10-17 用户：「括号标注一下液体可采」——加成地板里那几块**液体地板**（深水/石油/冷冻液/矿渣液/芳油）
          对玩家的收益就是"上泵能抽"，所以括号里先写这一句，再接属性词（`可抽 矿渣 · 高温`）。 -->
-    <string name="stats_bonus_liquid_fmt">可抽 %1$s</string>
     <!-- 属性词：游戏自己的语言包**没有** attribute.* 的译名（中英都没有），只能用我们自己的 -->
     <string name="stats_attr_water">含水</string>
     <string name="stats_attr_oil">含油</string>
@@ -1917,21 +1888,11 @@
       石头（能直接压上去）。**六桶加起来 == 整张图**，所以摘要里不再重复总格数（技术细节那张卡已写）。
       ⚠️「深液体」不是「液体」：浅水**能**建（水泵就摆水里），只有 drownTime > 0 的才挡。
     -->
-    <string name="stats_section_build">可建造</string>
-    <string name="stats_build_sum_fmt">能放一般建筑 %1$s 格</string>
-    <string name="stats_build_count_fmt">%1$s 格</string>
-    <string name="stats_build_row_free">空地</string>
-    <string name="stats_build_row_cleared">建筑或石头（拆掉后能建）</string>
-    <string name="stats_build_row_walled">墙和树（拆不掉）</string>
     <!-- ★ 2026-10-17：深液体 与 「地板不让建」 **合成同一行**（用户：「这俩合并下吧」）——
          行名是对象（「放不了的地板」），副行按种类列：`深液体 2,026 格 · 太空地板 536 格`。
          措辞被用户打回两轮：「这个地板不让建是啥啊」「说法有点奇怪」→ 行名写对象 + 带出真名；
          「你管单位会沉干嘛啊，我们统计的建筑」→ 括号/副行只说"这里放不了东西"，别拿单位行为解释建筑统计。
          ⚠️ 口径词与摘要统一：摘要「能放一般建筑」→ 行里「放不了」，不混"建不了/不让建"。 -->
-    <string name="stats_build_row_nofoor">放不了的地板</string>
-    <string name="stats_build_sub_deep_fmt">深液体 %1$s 格</string>
-    <string name="stats_build_sub_floor_fmt">%1$s地板 %2$s 格</string>
-    <string name="stats_build_row_unknown">认不出</string>
     <!--
       ★★ 2026-10-17 用户第二次点单：「再加一个统计可建造的核心区面积，以及实际最多能放多少个核心」，
       并当场纠正「核心区是一个专门的地板啊」——所以这块**不是**我们发明的概念，
@@ -1942,20 +1903,7 @@
       🔴 2026-10-17 用户：「**埃里克尔最小核心不是 3×3 的啊**」⇒ 边长按**图上实际摆的核心**判
         （`MapStats.Core#size`），界面把边长写出来（`（4×4）`）。
     -->
-    <string name="stats_section_core">核心区</string>
-    <string name="stats_core_sum_fmt">%1$s 格 · 最多能摆 %2$s 个核心（%3$s×%3$s）</string>
-    <string name="stats_core_row_zone">整片核心区</string>
-    <string name="stats_core_note_planet_fmt">个数按 %1$s×%1$s 的核心算（按存档里写的星球判的），互不重叠</string>
-    <string name="stats_core_note_default_fmt">个数按 %1$s×%1$s 的核心算（这张图查不出用的是哪颗星球，按最小的一种算），互不重叠</string>
-    <string name="stats_tech_size_fmt">地图 %1$d × %2$d，共 %3$s 格</string>
-    <string name="stats_tech_table_fmt">内容表：%1$s</string>
-    <string name="stats_tech_names_fmt">名字来源：%1$s</string>
-    <string name="stats_tech_time_fmt">本页统计用时 %1$d 毫秒</string>
-    <string name="stats_tech_blockers_fmt">挡住资源的方块：%1$s</string>
-    <string name="stats_tech_unknown_fmt">认不出的内容：%1$s</string>
     <string name="stats_tech_none">没有</string>
-    <string name="stats_tech_count_fmt">%1$s %2$d 格</string>
-    <string name="stats_tech_item_fmt">%1$s（%2$s）</string>
     <!-- ══ 用户语言包（lang.properties）的校验提示 ══ -->
     <string name="lang_err_bare_percent">「%1$s」这里的百分号没配对（要显示百分号本身得写两个）</string>
     <string name="lang_err_ph_count">占位符个数不一样：原文 %1$d 个，你的 %2$d 个（原：%3$s，你的：%4$s）</string>
@@ -2079,33 +2027,18 @@
     <string name="version_name_reset_done">已恢复原名</string>
     <string name="detail_orig_name_fmt">\n原名：%1$s</string>
 
-    <string name="stats_export">导出统计数据</string>
-    <string name="stats_export_working">正在准备导出文件…</string>
-    <string name="stats_export_ok_fmt">已导出 %1$s（%2$s）</string>
-    <string name="stats_export_fail_fmt">导出失败：%1$s</string>
-    <string name="stats_export_notice_fmt">由 MDT 管理器导出 · %1$s · 数字口径见管理器的地图统计；如果看着不对，请把这个文件发回去</string>
 
 
 
 
-    <string name="stats_export_batch">导出统计…</string>
-    <string name="stats_export_batch_sub">一张出 .json，多张出 .jsonl</string>
     <!--
       ★ 第 155 轮：出口四选一 = 模式 × 去处（保存到文件 / 直接分享）。
         「直接分享」不落用户目录：内容进缓存，由 ShareProvider 以 content:// 交给分享面板。
     -->
-    <string name="stats_export_opt_save_detail">保存到文件：详细（全部数据）</string>
-    <string name="stats_export_opt_save_brief">保存到文件：简洁（只含能采到的）</string>
-    <string name="stats_export_opt_share_detail">直接分享：详细（全部数据）</string>
-    <string name="stats_export_opt_share_brief">直接分享：简洁（只含能采到的）</string>
     <string name="share_chooser">分享到…</string>
     <string name="share_no_app">这台设备上没有能接收这个文件的应用。</string>
     <string name="pick_share_toggle">直接分享（不保存到文件）</string>
     <string name="batch_share_btn_fmt">分享（%1$d 份）</string>
     <string name="share_pack_btn">直接分享</string>
-    <string name="stats_export_progress_fmt">正在统计 %1$d / %2$d…</string>
-    <string name="stats_export_batch_ok_fmt">已导出 %1$d 张地图的统计（%2$s）</string>
-    <string name="stats_export_batch_ok_skipped_fmt">已导出 %1$d 张地图的统计（%2$s）；另有 %3$d 张读不出，已跳过</string>
-    <string name="stats_export_batch_none">这些地图一张都读不出来，没有可导出的。</string>
 
 </resources>

@@ -11,7 +11,7 @@ import java.io.File;
  *
  * <p>起因（2026-10-19 真机实测）：所有"选完文件再动手"的动作都把目标存在
  * Activity 的静态字段里（`ModsActivity.sImportSlot`、`SlotIo.sZipSlot`、
- * `BatchIo.sSrcs`、`StatsExporter.sText` …）。系统在文件选择器打开时把应用杀了，
+ * `BatchIo.sSrcs` …）。系统在文件选择器打开时把应用杀了，
  * 字段就没了；用户选完文件回来，`onActivityResult` 看到 null **静默 return** ——
  * 界面上是"我选完了，什么都没发生"。日志脱敏那条更糟：重建后 `mExportScrub=false`，
  * 用户点的是脱敏，导出的却是原件。

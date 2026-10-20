@@ -94,24 +94,6 @@
             android:background="@color/divider" />
 
         <!--
-          ★ 2026-10-17（第 154 轮）：「导出统计…」—— 用户「我是想着批量导出使用 jsonl 或者 csv…
-            可以加个详细模式（全部数据）和简洁模式（仅含可采的）」。
-          ⚠️ 与上面那行「导出地图…」是**两件事**：那个出去的是地图文件（.msav），
-            这个出去的是统计数字（.jsonl）—— 图标都是"往外"，副标题必须把区别说出来。
-        -->
-        <include
-            android:id="@+id/row_maps_export_stats"
-            layout="@layout/row_action"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:layout_marginStart="62dp"
-            android:background="@color/divider" />
-
-        <!--
           ★ 2026-10-11（第 129 轮）：**批量删除**（与蓝图页同一行、同一套实现，见 REF §90.7）。
           ⚠️ 与上面几行的区别：这一行**会动文件** —— 但只挪进中转站，不直接删。
         -->

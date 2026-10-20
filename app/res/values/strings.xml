@@ -1003,10 +1003,6 @@
     <string name="stats_note_mods_failed">Mods could not be read, so this counts vanilla only</string>
     <string name="stats_note_mods_fmt">%1$d mods (%2$d entries added, %3$d overridden)</string>
     <string name="stats_note_bundles_fmt">%1$d of the packs ship translations, %2$d entries in all</string>
-    <string name="stats_note_patch_changed_fmt">This map carries its own patch: %1$d entries, %2$d of them applied</string>
-    <string name="stats_note_vanilla_table_fmt">Vanilla blocks: %1$d entries</string>
-    <string name="stats_note_json_names_fmt">%1$d names are written inside the content files (those mods ship no translation file)</string>
-    <string name="stats_note_unknown_type_fmt">%1$d pieces of content in the mods use a type we do not recognise (counted only under unrecognised)</string>
     <string name="stats_note_names_apk_fmt">%1$s: %2$d entries</string>
     <string name="stats_note_names_no_apk">The version APK has no translation for this language</string>
     <string name="stats_note_names_mod_fmt">mods add %1$d entries</string>
@@ -1907,48 +1903,23 @@
       —— 界面上不出现 content / def / patch / id 这类词。
     -->
     <string name="map_detail_title">Map details</string>
-    <string name="stats_working">Counting the resources on this map…</string>
-    <string name="stats_failed_fmt">Could not count: %1$s</string>
     <!-- ★ 2026-10-04：统计失败时给用户的白话（原来走 stats_failed_fmt + 异常消息，
          消息为空时还会显示成 Java 类名 —— 见 MapDetailActivity.startStats 的 catch）。 -->
-    <string name="stats_failed_plain">Could not count the resources on this map. Go back and enter again.</string>
-    <string name="stats_none">This map has no resources you can mine.</string>
-    <string name="stats_section_ore">Ore</string>
-    <string name="stats_section_orewall">Ore in walls</string>
-    <string name="stats_section_floor">Mineable floor</string>
-    <string name="stats_section_bonus">Bonus floor</string>
-    <string name="stats_section_tech">Technical details</string>
     <!--
       ★ 口径（用户 2026-10-04 指出："沙子的数量怎么两个值"）：
         每行头号数字**一律**是「能采 X 格」，副行才给「共 Y 格」——
         同一批格子会同时算「可采地板」和「加成地板」，两段口径不一致就会出现"同名两个数"。
         唯一例外是「墙矿」段（行名带「（墙）」、不可能同名），它用总格数并在摘要里说明。
     -->
-    <string name="stats_sum_fmt">%1$d kinds · %2$s tiles, of which %3$s are reachable</string>
-    <string name="stats_sum_same_fmt">%1$d kinds · %2$s tiles</string>
     <!--
       矿的两类（用户 2026-10-04 定的口径）：**地矿**（长在地板上）用**地钻**；
       **墙矿**（长在墙里）要用**墙钻**。
       🔴 别写"普通钻头采不了" —— 用户明确纠正过，要写"需要用墙钻"。
     -->
-    <string name="stats_sum_wall_fmt">%1$d kinds · %2$s tiles (grows inside walls, needs a wall drill)</string>
     <!-- ★ 2026-10-16: the wall section now reports reachable tiles too (neighbour rule), same shape as the other three. -->
-    <string name="stats_sum_wall_split_fmt">%1$d kinds · %2$s tiles, of which %3$s are reachable (grows inside walls, needs a wall drill)</string>
-    <string name="stats_row_reach_fmt">%1$s tiles reachable</string>
-    <string name="stats_row_total_fmt">%1$s tiles total</string>
-    <string name="stats_row_drop_fmt">drops %1$s</string>
-    <string name="stats_row_buried_fmt">%1$s tiles under a wall, out of reach</string>
     <!-- ★ Wall ore has its own wording: it does not sit "under" a wall, it sits inside one. -->
-    <string name="stats_row_walled_fmt">%1$s tiles walled in on all sides, out of reach</string>
-    <string name="stats_row_wall_priority_fmt">%1$s tiles also hold wall ore underneath, counted as that wall</string>
-    <string name="stats_row_floor_priority_fmt">%1$s tiles hold ore above, counted as that ore</string>
-    <string name="stats_row_loose_fmt">%1$s tiles covered by buildings or rocks (mineable once cleared)</string>
-    <string name="stats_row_unknown_fmt">%1$s tiles blocked by something unrecognised</string>
-    <string name="stats_more_fmt">%1$d more kinds not listed</string>
     <!-- 加成地板的名字要带属性词（含水/含油/高温…）：那才是它有用的地方 -->
-    <string name="stats_row_attr_fmt">%1$s (%2$s)</string>
     <!-- ★ 2026-10-17: liquid floors are a bonus because a pump can extract from them — say it in the bracket. -->
-    <string name="stats_bonus_liquid_fmt">pumpable %1$s</string>
     <!-- 属性词：游戏自己的语言包**没有** attribute.* 的译名（中英都没有），只能用我们自己的 -->
     <string name="stats_attr_water">water</string>
     <string name="stats_attr_oil">oil</string>
@@ -1966,19 +1937,9 @@
       The six buckets sum to the whole map, so the summary does not repeat the total tile count.
       NOTE "deep liquid", not "liquid": shallow water IS buildable (pumps sit in it); only drownTime > 0 blocks.
     -->
-    <string name="stats_section_build">Buildable</string>
-    <string name="stats_build_sum_fmt">%1$s tiles can hold a normal building</string>
-    <string name="stats_build_count_fmt">%1$s tiles</string>
-    <string name="stats_build_row_free">Empty ground</string>
-    <string name="stats_build_row_cleared">Buildings or rocks (clearable)</string>
-    <string name="stats_build_row_walled">Walls and trees (cannot be cleared)</string>
     <!-- ★ 2026-10-17: deep liquid and the non-placeable floor are **one row** now (user: "merge these two").
          The row names the object; the sub line lists the kinds: `deep liquid 2,026 tiles · space floor 536 tiles`.
          Do not explain it via unit behaviour ("units sink" was rejected: this is a building statistic). -->
-    <string name="stats_build_row_nofoor">Floors you cannot build on</string>
-    <string name="stats_build_sub_deep_fmt">Deep liquid %1$s tiles</string>
-    <string name="stats_build_sub_floor_fmt">%1$s floor %2$s tiles</string>
-    <string name="stats_build_row_unknown">Unrecognised</string>
     <!--
       ★★ 2026-10-17: "core zone" is the game's own floor (`core-zone`) — count its tiles, then work out
       how many of the **planet's smallest core** (Serpulo `core-shard` 3×3 / Erekir `core-bastion` 4×4)
@@ -1986,20 +1947,7 @@
       (`MapStats.Core#size`), and the size is printed in the summary. The count is a feasible packing,
       not the theoretical optimum.
     -->
-    <string name="stats_section_core">Core zone</string>
-    <string name="stats_core_sum_fmt">%1$s tiles · room for %2$s cores (%3$s×%3$s)</string>
-    <string name="stats_core_row_zone">Whole core zone</string>
-    <string name="stats_core_note_planet_fmt">Cores counted at %1$s×%1$s (planet taken from the save file), non-overlapping</string>
-    <string name="stats_core_note_default_fmt">Cores counted at %1$s×%1$s (this map does not say which planet it belongs to, so the smallest size is used), non-overlapping</string>
-    <string name="stats_tech_size_fmt">Map %1$d × %2$d, %3$s tiles total</string>
-    <string name="stats_tech_table_fmt">Content table: %1$s</string>
-    <string name="stats_tech_names_fmt">Name sources: %1$s</string>
-    <string name="stats_tech_time_fmt">This page took %1$d ms to compute</string>
-    <string name="stats_tech_blockers_fmt">Blocks covering resources: %1$s</string>
-    <string name="stats_tech_unknown_fmt">Unrecognised content: %1$s</string>
     <string name="stats_tech_none">none</string>
-    <string name="stats_tech_count_fmt">%1$s %2$d tiles</string>
-    <string name="stats_tech_item_fmt">%1$s (%2$s)</string>
     <!-- ══ 用户语言包（lang.properties）的校验提示 ══ -->
     <string name="lang_err_bare_percent">A percent sign near \u0022%1$s\u0022 is not paired (a literal percent must be doubled)</string>
     <string name="lang_err_ph_count">Placeholder count differs: original has %1$d, yours has %2$d (original: %3$s, yours: %4$s)</string>
@@ -2127,34 +2075,19 @@
     <string name="version_name_reset_done">Original name restored</string>
     <string name="detail_orig_name_fmt">\nOriginal name: %1$s</string>
 
-    <string name="stats_export">Export statistics</string>
-    <string name="stats_export_working">Preparing the file…</string>
-    <string name="stats_export_ok_fmt">Exported %1$s (%2$s)</string>
-    <string name="stats_export_fail_fmt">Could not export: %1$s</string>
-    <string name="stats_export_notice_fmt">Exported by MDT Manager for Android · %1$s · these numbers follow the map-stat rules of the manager; if they look wrong, send this file back</string>
 
 
 
 
-    <string name="stats_export_batch">Export statistics…</string>
-    <string name="stats_export_batch_sub">One map makes a .json, several make a .jsonl</string>
     <!--
       ★ 第 155 轮：出口四选一 = **模式 × 去处**（保存到文件 / 直接分享）。
         「直接分享」不落用户目录：内容进 cache/share，由 ShareProvider 以 content:// 交给分享面板。
       ⚠️ 四条都要说清**区别**（同一屏四个近义项，读者靠"保存/分享"和"详细/简洁"两个词分辨）。
     -->
-    <string name="stats_export_opt_save_detail">Save to a file: detailed (everything)</string>
-    <string name="stats_export_opt_save_brief">Save to a file: brief (mineable only)</string>
-    <string name="stats_export_opt_share_detail">Share now: detailed (everything)</string>
-    <string name="stats_export_opt_share_brief">Share now: brief (mineable only)</string>
     <string name="share_chooser">Share to…</string>
     <string name="share_no_app">No app on this device can receive this file.</string>
     <string name="pick_share_toggle">Share right away (no file saved)</string>
     <string name="batch_share_btn_fmt">Share (%1$d)</string>
     <string name="share_pack_btn">Share now</string>
-    <string name="stats_export_progress_fmt">Counting %1$d / %2$d…</string>
-    <string name="stats_export_batch_ok_fmt">Exported statistics of %1$d maps (%2$s)</string>
-    <string name="stats_export_batch_ok_skipped_fmt">Exported statistics of %1$d maps (%2$s); %3$d more could not be read and were skipped</string>
-    <string name="stats_export_batch_none">None of these maps could be read, so there is nothing to export.</string>
 
 </resources>

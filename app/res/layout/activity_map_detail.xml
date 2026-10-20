@@ -74,23 +74,6 @@
 
             <!-- 第 160 轮：插件动作区（没有条目整块 GONE）；selectedFile = 这一张图 -->
             <include layout="@layout/plugin_section" />
-
-            <TextView
-                android:id="@+id/stats_state"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:paddingTop="14dp"
-                android:paddingBottom="4dp"
-                android:lineSpacingExtra="2dp"
-                android:textSize="13sp"
-                android:textColor="@color/fg_muted" />
-
-            <!-- 四段资源统计 + 技术细节，运行时按需 inflate card_stat_section 填进来 -->
-            <LinearLayout
-                android:id="@+id/stats_box"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical" />
         </LinearLayout>
     </ScrollView>
 </LinearLayout>
