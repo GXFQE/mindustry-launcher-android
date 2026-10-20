@@ -3580,6 +3580,20 @@ public final class SelfTest {
         ok(stat, L, PluginHost.API >= 3,
                 "host plugin api >= 3 (content slot + PluginApi)");
         // ── round 160: v4 = all pages + selectedFile ──
+        // v9（第 193 轮）：section 插槽 + selectedItem —— 详情页里的统计靠它"长回去"
+        List<Extensions.Item> v9 = new ArrayList<>();
+        v9.add(new Extensions.Item("a", "t", "s", "E", Extensions.SLOT_SECTION,
+                Extensions.PAGE_MAP_DETAIL));
+        v9.add(new Extensions.Item("b", "t", "s", "E", Extensions.SLOT_CONTENT,
+                Extensions.PAGE_MAP_DETAIL));
+        v9.add(new Extensions.Item("c", "t", "s", "E", Extensions.SLOT_SECTION,
+                Extensions.PAGE_MAPS));
+        ok(stat, L, PluginHost.API >= 9
+                        && Extensions.forSection(v9, Extensions.PAGE_MAP_DETAIL).size() == 1
+                        && "a".equals(Extensions.forSection(v9, Extensions.PAGE_MAP_DETAIL).get(0).id)
+                        && Extensions.forSection(v9, Extensions.PAGE_MAPS).size() == 1,
+                "★v9 段落插槽：只有 slot=section 且 page 相同的那条命中（content 行 / 别的页不算），"
+                        + "接口版本 = " + PluginHost.API);
         ok(stat, L, PluginHost.API >= 4,
                 "host plugin api >= 4 (all pages + selectedFile)");
         String[] allPages = { Extensions.PAGE_MAIN, Extensions.PAGE_SLOTS,

@@ -32,6 +32,9 @@ public class MapDetailActivity extends BaseActivity {
     /** 第 160 轮：地图详情页挂插件动作区；selectedFile = 这一张图。 */
     @Override protected String pluginPageId() { return Extensions.PAGE_MAP_DETAIL; }
     @Override protected String pluginSlot() { return mSlot; }
+    @Override protected io.mdt.launcher.api.ItemInfo pluginSelectedItem() {
+        return mItem == null ? null : PluginData.mapItem(this, mItem);
+    }
     @Override protected java.io.File pluginSelectedFile() {
         return mItem == null ? null : mItem.file;
     }
@@ -70,6 +73,12 @@ public class MapDetailActivity extends BaseActivity {
                     });
         }
         loadPreview(root);
+
+        // 第 193 轮（v9）：插件可以把一段界面画在详情页里（地图统计就长在这 —— 与搬家前同一个位置）
+        android.view.ViewGroup section = (android.view.ViewGroup)
+                root.findViewById(R.id.plugin_section_body);
+        PluginEntries.attachSection(this, section, Extensions.PAGE_MAP_DETAIL, mSlot,
+                mItem.file, pluginSelectedItem());
     }
 
     /** 大图 + 版本 APK：两件事都要开 zip，**一起在后台做** */

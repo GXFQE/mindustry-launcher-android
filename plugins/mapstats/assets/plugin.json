@@ -1,1 +1,28 @@
-{"entry":"io.mdt.plugins.mapstats.MapStatsPage","name":"mapstats","version":"1","author":"mdt","description":"map resource statistics (ores / walls / floors / buildable / core zone)","access":["slots"],"extensions":[{"id":"mapstats-maps","title":"资源统计","subtitle":"统计地图里的矿物 / 可采地板 / 可建造区域","entry":"io.mdt.plugins.mapstats.MapStatsPage","slot":"content","page":"maps"}]}
+{
+  "entry": "io.mdt.plugins.mapstats.MapStatsPage",
+  "name": "mapstats",
+  "version": "1",
+  "author": "mdt",
+  "description": "map resource statistics (ores / walls / floors / buildable / core zone)",
+  "access": [
+    "slots"
+  ],
+  "extensions": [
+    {
+      "id": "mapstats-maps",
+      "title": "资源统计",
+      "subtitle": "统计地图里的矿物 / 可采地板 / 可建造区域",
+      "entry": "io.mdt.plugins.mapstats.MapStatsPage",
+      "slot": "content",
+      "page": "maps"
+    },
+    {
+      "id": "mapstats-section",
+      "title": "资源统计",
+      "subtitle": "统计这张地图的矿物 / 可采地板 / 可建造区域",
+      "entry": "io.mdt.plugins.mapstats.MapStatsPage",
+      "slot": "section",
+      "page": "map-detail"
+    }
+  ]
+}

@@ -114,7 +114,20 @@ final class PluginData {
             }
             return out;
         }
-        if ("map-detail".equals(page)) return one(ctx, selected, ItemInfo.KIND_MAPS);
+        if ("map-detail".equals(page)) {
+            // 槽内文件能对上的 ⇒ 给**扫描出来的完整条目**（标题 / 星球 / 元数据都在）；
+            // 对不上（游戏 / 模组包里的）仍然是 null —— 那类条目由 v9 `selectedItem()` 直给。
+            if (selected != null) {
+                for (ItemInfo it : contents(ctx, slot, ItemInfo.KIND_MAPS)) {
+                    if (it.path != null && selected.getAbsolutePath().equals(it.path)) {
+                        List<ItemInfo> hit = new ArrayList<ItemInfo>();
+                        hit.add(it);
+                        return hit;
+                    }
+                }
+            }
+            return one(ctx, selected, ItemInfo.KIND_MAPS);
+        }
         if ("blueprint-detail".equals(page)) return one(ctx, selected, ItemInfo.KIND_BLUEPRINTS);
         if ("main".equals(page)) return versions(ctx);
         if ("settings".equals(page)) return settingItems(ctx);
@@ -359,32 +372,38 @@ final class PluginData {
         } catch (Throwable ignored) {
         }
         List<Maps.Item> items = Maps.scan(ctx, slot, apk);
-        for (Maps.Item it : items) {
-            Map<String, String> ex = new LinkedHashMap<String, String>();
-            if (it.meta != null) {
-                put(ex, "width", it.meta.width);
-                put(ex, "height", it.meta.height);
-                put(ex, "wave", it.meta.wave);
-                put(ex, "build", it.meta.build);
-                put(ex, "saved", it.meta.saved);
-                put(ex, "playtime", it.meta.playtime);
-                put(ex, "name", it.meta.name);
-                put(ex, "author", it.meta.author);
-                put(ex, "description", it.meta.description);
-                put(ex, "mapname", it.meta.mapname);
-                put(ex, "planet", it.meta.planet);
-                ex.put("ok", String.valueOf(it.meta.ok));
-            }
-            File f = it.file;
-            File c = it.container;
-            out.add(new ItemInfo(ItemInfo.KIND_MAPS, it.name(), it.line(ctx),
-                    f == null ? null : f.getAbsolutePath(),
-                    c == null ? null : c.getAbsolutePath(), it.entry,
-                    it.bytes, f != null ? f.lastModified() : (c == null ? 0L : c.lastModified()),
-                    it.sourceLabel(ctx), err(it.error),
-                    false, f != null ? f.canRead() : (c != null && it.entry != null),
-                    ex));
+        for (Maps.Item it : items) out.add(mapItem(ctx, it));
+    }
+
+    /**
+     * 一张地图 ⇒ {@link ItemInfo}（第 193 轮 v9 抽出来：`pageItems()` 与
+     * {@link PluginApi#selectedItem()} **必须是同一份转换**，否则详情页与列表页给的字段会漂）。
+     */
+    static ItemInfo mapItem(Context ctx, Maps.Item it) {
+        Map<String, String> ex = new LinkedHashMap<String, String>();
+        if (it.meta != null) {
+            put(ex, "width", it.meta.width);
+            put(ex, "height", it.meta.height);
+            put(ex, "wave", it.meta.wave);
+            put(ex, "build", it.meta.build);
+            put(ex, "saved", it.meta.saved);
+            put(ex, "playtime", it.meta.playtime);
+            put(ex, "name", it.meta.name);
+            put(ex, "author", it.meta.author);
+            put(ex, "description", it.meta.description);
+            put(ex, "mapname", it.meta.mapname);
+            put(ex, "planet", it.meta.planet);
+            ex.put("ok", String.valueOf(it.meta.ok));
         }
+        File f = it.file;
+        File c = it.container;
+        return new ItemInfo(ItemInfo.KIND_MAPS, it.name(), it.line(ctx),
+                f == null ? null : f.getAbsolutePath(),
+                c == null ? null : c.getAbsolutePath(), it.entry,
+                it.bytes, f != null ? f.lastModified() : (c == null ? 0L : c.lastModified()),
+                it.sourceLabel(ctx), err(it.error),
+                false, f != null ? f.canRead() : (c != null && it.entry != null),
+                ex);
     }
 
     private static void scanBlueprints(Context ctx, String slot, List<ItemInfo> out) {

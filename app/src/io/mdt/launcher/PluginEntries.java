@@ -74,6 +74,52 @@ final class PluginEntries {
      *                    四个内容页的顺序因此仍是「导入 → 导出 → 专属动作 → 删除 → 筛选」
      *                    （第 157 轮定下的顺序，插件动作属于"这一个页面专属的事"）
      */
+    /** 这一页该画哪些**段落**（`slot: section`）；与 {#collect} 同一套取数。 */
+    static List<Entry> collectSections(Context ctx, String page) {
+        List<Entry> out = new ArrayList<Entry>();
+        if (ctx == null || page == null || !Extensions.knownPage(page)) return out;
+        String active = Plugins.active(ctx);
+        for (String id : Plugins.stateIds(active)) {
+            String ver = Plugins.stateGet(active, id);
+            if (ver == null || ver.isEmpty()) continue;
+            File apk = Plugins.apkOf(ctx, id, ver);
+            List<Extensions.Item> items = Extensions.forSection(Extensions.of(apk), page);
+            if (items.isEmpty()) continue;
+            String name = Plugins.displayNameOf(ctx, id);
+            for (Extensions.Item it : items) out.add(new Entry(id, ver, name, it));
+        }
+        return out;
+    }
+
+    /**
+     * 把插件声明的**段落**画进宿主页里（第 193 轮 v9）。
+     *
+     * <p>某一份插件坏掉 ⇒ 跳过它、其余照画（页面绝不变白）。没有段落 ⇒ 容器整块 {@code GONE}。
+     */
+    static void attachSection(Activity a, ViewGroup box, String page, String slot, File selected,
+                              io.mdt.launcher.api.ItemInfo item) {
+        if (a == null || box == null) return;
+        List<Entry> rows = collectSections(a, page);
+        if (rows.isEmpty()) {
+            box.setVisibility(View.GONE);
+            return;
+        }
+        box.setVisibility(View.VISIBLE);
+        for (Entry e : rows) {
+            try {
+                File apk = Plugins.apkOf(a, e.id, e.ver);
+                if (apk == null || !apk.isFile()) continue;
+                PluginHost.Loaded l = Plugins.isInjected(a, e.id, e.ver)
+                        ? PluginHost.openInjected(a, apk, e.item.entry, page, slot, selected, item)
+                        : PluginHost.load(a, apk, e.item.entry, page, slot, selected, item);
+                View v = PluginHost.createView(l);
+                if (v != null) box.addView(v);
+            } catch (Throwable ignored) {
+                // 一份坏的插件不该把宿主页弄白（与列表那一行同一条规矩）
+            }
+        }
+    }
+
     static void attach(Activity a, ViewGroup box, String page, String slot, int beforeRowId) {
         attach(a, box, page, slot, beforeRowId, null);
     }

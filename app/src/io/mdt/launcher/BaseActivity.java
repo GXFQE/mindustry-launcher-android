@@ -89,6 +89,11 @@ public abstract class BaseActivity extends Activity {
     }
 
     /** 详情页当前选中的那一份；其余页 null。 */
+    /** 第 193 轮（v9）：详情页当前这一项（完整条目；默认没有）。 */
+    protected io.mdt.launcher.api.ItemInfo pluginSelectedItem() {
+        return null;
+    }
+
     protected java.io.File pluginSelectedFile() {
         return null;
     }

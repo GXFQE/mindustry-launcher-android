@@ -93,6 +93,16 @@ public interface PluginApi {
     File selectedFile();
 
     /**
+     * **v9**：详情页上**当前这一项**（{@link #selectedFile()} 只有槽内文件才给得出值，
+     * 游戏自带 / 模组自带的地图住在一个 APK / zip 里，没有本机文件）。
+     *
+     * <p>返回的东西完整到足以交给 {@link #open(ItemInfo)}（含 {@code container} 与 {@code entry}），
+     * 所以插件可以在详情页上直接统计「这一张」—— 用户点开地图就看见数字，不用再去列表里挑一遍。
+     * 非详情页 / 没选中 ⇒ {@code null}。</p>
+     */
+    ItemInfo selectedItem();
+
+    /**
      * 所有槽（名称 / 目录 / 是否当前 / 是否远古包本体借住 {@code files/}）。
      *
      * <p>顺序由宿主决定（当前槽在最前，其余按名字）；拿到的是一份快照。

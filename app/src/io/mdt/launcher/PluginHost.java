@@ -55,11 +55,13 @@ public final class PluginHost {
      * **v4（第 160 轮）= 同一插槽扩到全部页面 + {@link PluginApi#selectedFile()}**；
      * **v5（第 161 轮）= 只读数据面：槽列表 / 四类内容 / 页面快照 / 统一字节流**；
      * **v6（第 162 轮）= 设置 / 日志 / 中转站 / 版本 / selectedItems**；
-     * **v7（第 187 轮）= 做事：主题 / 后台任务与进度 / 关页 / 分享·保存 / 勾选**。
+     * **v7（第 187 轮）= 做事：主题 / 后台任务与进度 / 关页 / 分享·保存 / 勾选**；
+     * **v9（第 193 轮）= 详情页的「当前这一项」（{@link PluginApi#selectedItem()}）
+     * + `section` 插槽（插件把自己的一段界面直接画进宿主页，统计不再另开一页）**。
      * 插件报 5/6/7 才意味着"我会用这些能力"，报 1/2/3/4 的照旧；
      * 区间下限不变（{@link #API_MIN} = 1）。
      */
-    public static final int API = 8;
+    public static final int API = 9;
     /**
      * 还认的**最老**契约版本（第 139 轮）。抬它 = 老插件被拒，界面会说清"太老、该更新插件"。
      *
@@ -138,12 +140,12 @@ public final class PluginHost {
     // ---- 加载 -----------------------------------------------------------------
 
     public static Loaded load(Context host, File apk) throws PluginException {
-        return open(host, apk, null, DEFAULT_ENTRY, null, null, null);
+        return open(host, apk, null, DEFAULT_ENTRY, null, null, null, null);
     }
 
     /** 按插件自述的入口类名加载（见 {@link PluginMeta}）。 */
     public static Loaded load(Context host, File apk, String entry) throws PluginException {
-        return open(host, apk, null, entryOr(entry), null, null, null);
+        return open(host, apk, null, entryOr(entry), null, null, null, null);
     }
 
     /**
@@ -154,7 +156,7 @@ public final class PluginHost {
      */
     public static Loaded load(Context host, File apk, String entry, String page, String slot)
             throws PluginException {
-        return open(host, apk, null, entryOr(entry), page, slot, null);
+        return open(host, apk, null, entryOr(entry), page, slot, null, null);
     }
 
     /**
@@ -164,7 +166,16 @@ public final class PluginHost {
      */
     public static Loaded load(Context host, File apk, String entry, String page, String slot,
                               File selected) throws PluginException {
-        return open(host, apk, null, entryOr(entry), page, slot, selected);
+        return open(host, apk, null, entryOr(entry), page, slot, selected, null);
+    }
+
+    /**
+     * 第 193 轮（v9）：再带上「当前这一项」的完整条目（游戏 / 模组包里的也算）。
+     * `section` 插槽靠它把统计画在详情页里。
+     */
+    public static Loaded load(Context host, File apk, String entry, String page, String slot,
+                              File selected, ItemInfo item) throws PluginException {
+        return open(host, apk, null, entryOr(entry), page, slot, selected, item);
     }
 
     /**
@@ -176,29 +187,36 @@ public final class PluginHost {
      * 这里只跑后三道门：按名字取类（预热预检）→ 接口版本 → 挂资源。
      */
     static Loaded openInjected(Context host, File apk) throws PluginException {
-        return open(host, apk, host.getClassLoader(), DEFAULT_ENTRY, null, null, null);
+        return open(host, apk, host.getClassLoader(), DEFAULT_ENTRY, null, null, null, null);
     }
 
     /** 按插件自述的入口类名打开已经注入宿主 CL 的那一份（多插件下"点谁开谁"靠它）。 */
     static Loaded openInjected(Context host, File apk, String entry) throws PluginException {
-        return open(host, apk, host.getClassLoader(), entryOr(entry), null, null, null);
+        return open(host, apk, host.getClassLoader(), entryOr(entry), null, null, null, null);
     }
 
     /** 同 {@link #load(Context, File, String, String, String)}，但走"已注入宿主 CL"那条路。 */
     static Loaded openInjected(Context host, File apk, String entry, String page, String slot)
             throws PluginException {
-        return open(host, apk, host.getClassLoader(), entryOr(entry), page, slot, null);
+        return open(host, apk, host.getClassLoader(), entryOr(entry), page, slot, null, null);
     }
 
-    /** 同 {@link #load(Context, File, String, String, String, File)}，但走"已注入宿主 CL"那条路。 */
+    /** 同 {@link #load(Context, File, String, String, String, File)}，但走「已注入宿主 CL」那条路。 */
     static Loaded openInjected(Context host, File apk, String entry, String page, String slot,
                                File selected) throws PluginException {
-        return open(host, apk, host.getClassLoader(), entryOr(entry), page, slot, selected);
+        return open(host, apk, host.getClassLoader(), entryOr(entry), page, slot, selected, null);
+    }
+
+    /** 同 {@link #load(Context, File, String, String, String, File, ItemInfo)}，走注入那条路。 */
+    static Loaded openInjected(Context host, File apk, String entry, String page, String slot,
+                               File selected, ItemInfo item) throws PluginException {
+        return open(host, apk, host.getClassLoader(), entryOr(entry), page, slot, selected, item);
     }
 
     /** @param injectedTo 非 null = 这个 dex 已经注册给它了 ⇒ 不再建 DexClassLoader */
     private static Loaded open(Context host, File apk, ClassLoader injectedTo, String entryName,
-                               String page, String slot, File selected) throws PluginException {
+                               String page, String slot, File selected, ItemInfo item)
+            throws PluginException {
         if (apk == null || !apk.isFile()) {
             throw new PluginException("plugin_err_missing", String.valueOf(apk));
         }
@@ -273,7 +291,8 @@ public final class PluginHost {
                 ? Extensions.SLOT_PLUGINS : page.trim();
         String useSlot = (slot == null || slot.trim().isEmpty())
                 ? Data.currentSlot(host) : slot.trim();
-        PContext pc = new PContext(host, am, res, cl, pdata, pcache, usePage, useSlot, selected);
+        PContext pc = new PContext(host, am, res, cl, pdata, pcache, usePage, useSlot, selected,
+                item);
         return new Loaded(cl, pc, pc, entry, api, roSet, stillWritable, from, cookie);
     }
 
@@ -305,13 +324,15 @@ public final class PluginHost {
         private final String page, slot;
         /** 详情页当前选中的那一份（第 160 轮 v4）；其余页 null。 */
         private final File selected;
+        /** v9：详情页上当前这一项（含容器 / 条目）。 */
+        private final ItemInfo item;
 
         PContext(Context base, AssetManager am, Resources res, ClassLoader cl, File files, File cache,
-                 String page, String slot, File selected) {
+                 String page, String slot, File selected, ItemInfo item) {
             super(base);
             this.am = am; this.res = res; this.cl = cl;
             this.files = files; this.cache = cache;
-            this.page = page; this.slot = slot; this.selected = selected;
+            this.page = page; this.slot = slot; this.selected = selected; this.item = item;
         }
 
         @Override public AssetManager getAssets() { return am; }
@@ -329,6 +350,8 @@ public final class PluginHost {
         @Override public String slot() { return slot; }
 
         @Override public File selectedFile() { return selected; }
+
+        @Override public ItemInfo selectedItem() { return item; }
 
         // ---- PluginApi（v5 只读数据面）-------------------------------------
 

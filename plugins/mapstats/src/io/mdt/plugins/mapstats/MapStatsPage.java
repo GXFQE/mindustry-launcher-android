@@ -40,9 +40,18 @@ import io.mdt.plugins.mapstats.core.MsavTiles;
  */
 public final class MapStatsPage {
 
-    /** 接口版本：v8（v7 的"做事"层 + `modsSkipped()`）。 */
+    /** 一张卡片里最多列几行（与宿主详情页同一个数） */
+    private static final int ROW_CAP = 15;
+
+    /**
+     * 接口版本：**v9**（v8 之上要 {@code selectedItem()} 与 `section` 插槽）。
+     *
+     * <p>为什么要 v9：统计要长回**地图详情页里**（与搬家前一样，点开地图就看见数字）。
+     * v4 的 {@code selectedFile()} 只给得出槽内文件，游戏自带 / 模组自带的地图拿不到 ——
+     * 所以用 v9 的「当前这一项」+ `section` 插槽，让宿主把这一整段画在详情页里。</p>
+     */
     public static int api() {
-        return 8;
+        return 9;
     }
 
     /** 当前这一页的统计产物（页面重建就重新算）。 */
@@ -76,23 +85,25 @@ public final class MapStatsPage {
         final LinearLayout root = new LinearLayout(c);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setBackgroundColor(th.background);
+        // v9（第 193 轮）：从**地图详情页**加载 = 画在详情页里的一段（不是插件自己的整页）
+        final boolean inline = "map-detail".equals(api.page());
 
         final TextView title = new TextView(c);
         title.setText(c.getString(R.string.ms_title));
         title.setTextSize(20f);
         title.setTypeface(Typeface.DEFAULT_BOLD);
         title.setTextColor(th.text);
-        root.addView(title);
+        if (!inline) root.addView(title);
 
         final TextView hint = new TextView(c);
         hint.setText(c.getString(R.string.ms_hint));
         hint.setTextSize(13f);
         hint.setTextColor(th.textMuted);
         hint.setPadding(0, th.dp(6), 0, 0);
-        root.addView(hint);
+        if (!inline) root.addView(hint);
 
         final TextView status = new TextView(c);
-        status.setText(c.getString(R.string.ms_nothing));
+        status.setText(c.getString(inline ? R.string.ms_busy_inline : R.string.ms_nothing));
         status.setTextSize(13f);
         status.setTextColor(th.textMuted);
         status.setPadding(0, th.dp(10), 0, 0);
@@ -104,7 +115,7 @@ public final class MapStatsPage {
 
         final List<Built> built = new ArrayList<>();
 
-        addButton(root, c, th, c.getString(R.string.ms_pick), new View.OnClickListener() {
+        if (!inline) addButton(root, c, th, c.getString(R.string.ms_pick), new View.OnClickListener() {
             @Override public void onClick(View v) {
                 api.pick(ItemInfo.KIND_MAPS, new PickCallback() {
                     @Override public void onPicked(List<ItemInfo> items) {
@@ -119,7 +130,7 @@ public final class MapStatsPage {
         });
 
         final View[] actions = new View[2];
-        actions[0] = addButton(root, c, th, c.getString(R.string.ms_share), new View.OnClickListener() {
+        if (!inline) actions[0] = addButton(root, c, th, c.getString(R.string.ms_share), new View.OnClickListener() {
             @Override public void onClick(View v) {
                 String js = jsonOf(built, c);
                 if (js == null) {
@@ -129,7 +140,7 @@ public final class MapStatsPage {
                 api.shareText(fileName(built), js);
             }
         });
-        actions[1] = addButton(root, c, th, c.getString(R.string.ms_export), new View.OnClickListener() {
+        if (!inline) actions[1] = addButton(root, c, th, c.getString(R.string.ms_export), new View.OnClickListener() {
             @Override public void onClick(View v) {
                 String js = jsonOf(built, c);
                 if (js == null) {
@@ -142,7 +153,7 @@ public final class MapStatsPage {
         });
         setEnabled(actions, false);
 
-        addButton(root, c, th, c.getString(R.string.ms_close), new View.OnClickListener() {
+        if (!inline) addButton(root, c, th, c.getString(R.string.ms_close), new View.OnClickListener() {
             @Override public void onClick(View v) {
                 api.closePage();
             }
@@ -150,7 +161,46 @@ public final class MapStatsPage {
 
         // 有结果之后才让"分享 / 保存"可点（与宿主那条"没有结果就别给出口"一致）
         results.setTag(actions);
+
+        // 详情页里的这一段：**自动**统计当前这一张（不用再点"选择地图"）
+        if (inline) {
+            final ItemInfo one = inlineItem(api);
+            if (one != null) {
+                final List<ItemInfo> only = new ArrayList<ItemInfo>();
+                only.add(one);
+                run(api, c, th, status, results, built, only);
+            } else {
+                status.setText(c.getString(R.string.ms_nothing));
+            }
+        }
         return root;
+    }
+
+    /** 详情页上「当前这一项」：v9 直给；老宿主退回按文件对 / 页面快照只有一个。 */
+    private static ItemInfo inlineItem(PluginApi api) {
+        try {
+            ItemInfo one = api.selectedItem();
+            if (one != null) return one;
+        } catch (Throwable ignored) {
+        }
+        File sel;
+        try {
+            sel = api.selectedFile();
+        } catch (Throwable t) {
+            return null;
+        }
+        try {
+            List<ItemInfo> all = api.pageItems();
+            if (all != null) {
+                if (sel == null && all.size() == 1) return all.get(0);
+                for (ItemInfo it : all) {
+                    if (it == null || it.path == null || sel == null) continue;
+                    if (sel.getAbsolutePath().equals(it.path)) return it;
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        return null;
     }
 
     /** 后台算、主线程画。 */
@@ -159,7 +209,9 @@ public final class MapStatsPage {
                             final List<Built> built, final List<ItemInfo> items) {
         built.clear();
         results.removeAllViews();
-        status.setText(c.getString(R.string.ms_busy_fmt, 1, items.size()));
+        final boolean inline = "map-detail".equals(api.page());
+        status.setText(inline ? c.getString(R.string.ms_busy_inline)
+                : c.getString(R.string.ms_busy_fmt, 1, items.size()));
         api.runBackground("mapstats", new Runnable() {
             @Override public void run() {
                 final List<Built> out = new ArrayList<>();
@@ -220,7 +272,7 @@ public final class MapStatsPage {
                     @Override public void run() {
                         built.clear();
                         built.addAll(out);
-                        render(c, th, status, results, out);
+                        render(c, th, status, results, out, inline);
                         View[] actions = actionsOf(results);
                         setEnabled(actions, jsonOf(built, c) != null);
                     }
@@ -387,7 +439,7 @@ public final class MapStatsPage {
     }
 
     private static void render(Context c, PluginTheme th, TextView status,
-                               LinearLayout results, List<Built> list) {
+                               LinearLayout results, List<Built> list, boolean inline) {
         results.removeAllViews();
         long millis = 0;
         for (Built b : list) {
@@ -398,34 +450,24 @@ public final class MapStatsPage {
             MapStats.Result r = b.result;
             millis += b.millis;
             TextView head = new TextView(c);
+            if (inline) head.setVisibility(View.GONE);
             head.setText(b.planet == null || b.planet.isEmpty()
                     ? c.getString(R.string.ms_map_head_fmt, b.name, r.width, r.height)
-                    : c.getString(R.string.ms_map_head_planet_fmt, b.name, r.width, r.height,
-                            b.planet));
+                    : c.getString(R.string.ms_map_head_planet_fmt, b.name, r.width, r.height, b.planet));
             head.setTextSize(15f);
             head.setTypeface(Typeface.DEFAULT_BOLD);
             head.setTextColor(th.text);
             head.setPadding(0, th.dp(14), 0, 0);
             results.addView(head);
 
-            section(results, c, th, c.getString(R.string.ms_sec_ores), r.ores);
-            section(results, c, th, c.getString(R.string.ms_sec_walls), r.oreWalls);
-            section(results, c, th, c.getString(R.string.ms_sec_floors), r.floors);
-            section(results, c, th, c.getString(R.string.ms_sec_bonus), r.bonuses);
-
-            addLine(results, c, th, c.getString(R.string.ms_buildable_fmt, r.buildable.count()),
-                    th.text, 13f);
-            if (!r.core.skip && r.core.zone > 0) {
-                addLine(results, c, th,
-                        c.getString(R.string.ms_core_fmt, r.core.usable, r.core.max, r.core.size),
-                        th.text, 13f);
-                // 依据（与宿主详情页同一句话）：按存档里的星球判 / 查不出星球按最小的算
-                addLine(results, c, th, c.getString(
-                                r.core.basis == MapStats.Core.BASIS_PLANET
-                                        ? R.string.ms_core_note_planet_fmt
-                                        : R.string.ms_core_note_default_fmt, r.core.size),
-                        th.textMuted, 12f);
-            }
+            // 与宿主详情页同一套卡片：摘要常驻、明细点开
+            addSection(results, c, th, c.getString(R.string.mss_section_ore), r.ores, false);
+            addSection(results, c, th, c.getString(R.string.mss_section_orewall), r.oreWalls, true);
+            addSection(results, c, th, c.getString(R.string.mss_section_floor), r.floors, false);
+            addSection(results, c, th, c.getString(R.string.mss_section_bonus), r.bonuses, false);
+            addBuild(results, c, th, r);
+            addCore(results, c, th, r);
+            addTech(results, c, th, b);
             int unknown = r.unkOre + r.unkFloor + r.unkBonus;
             if (unknown > 0) {
                 addLine(results, c, th, c.getString(R.string.ms_unknown_fmt, unknown), th.textMuted, 13f);
@@ -434,19 +476,259 @@ public final class MapStatsPage {
         status.setText(c.getString(R.string.ms_done_fmt, millis));
     }
 
-    private static void section(LinearLayout box, Context c, PluginTheme th, String title,
-                                List<MapStats.Row> rows) {
+    /** 一张可折叠卡片（标题 + 摘要常驻，明细点开）—— 返回装明细的那一列 */
+    private static LinearLayout card(LinearLayout box, Context c, PluginTheme th,
+                                     String title, String summary) {
+        LinearLayout card = new LinearLayout(c);
+        card.setOrientation(LinearLayout.VERTICAL);
+        android.graphics.drawable.GradientDrawable bg =
+                new android.graphics.drawable.GradientDrawable();
+        bg.setColor(th.card);
+        bg.setCornerRadius(th.dp(12));
+        bg.setStroke(Math.max(1, th.dp(1)), th.cardStroke);
+        card.setBackground(bg);
+        card.setPadding(th.dp(14), th.dp(10), th.dp(14), th.dp(10));
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = th.dp(8);
+        box.addView(card, lp);
+
+        LinearLayout head = new LinearLayout(c);
+        head.setOrientation(LinearLayout.HORIZONTAL);
+        TextView t = new TextView(c);
+        t.setText(title);
+        t.setTextSize(14f);
+        t.setTypeface(Typeface.DEFAULT_BOLD);
+        t.setTextColor(th.text);
+        head.addView(t, new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        final TextView chev = new TextView(c);
+        chev.setText("\u25B8");
+        chev.setTextSize(14f);
+        chev.setTextColor(th.textMuted);
+        head.addView(chev);
+        card.addView(head);
+
+        TextView sum = new TextView(c);
+        sum.setText(summary);
+        sum.setTextSize(12f);
+        sum.setTextColor(th.textMuted);
+        sum.setPadding(0, th.dp(3), 0, 0);
+        card.addView(sum);
+
+        final LinearLayout body = new LinearLayout(c);
+        body.setOrientation(LinearLayout.VERTICAL);
+        body.setVisibility(View.GONE);
+        card.addView(body);
+        head.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                boolean show = body.getVisibility() != View.VISIBLE;
+                body.setVisibility(show ? View.VISIBLE : View.GONE);
+                chev.setText(show ? "\u25BE" : "\u25B8");
+            }
+        });
+        return body;
+    }
+
+    private static void addSection(LinearLayout box, Context c, PluginTheme th, String title,
+                                   List<MapStats.Row> rows, boolean wallKind) {
         if (rows == null || rows.isEmpty()) return;
-        TextView h = new TextView(c);
-        h.setText(title);
-        h.setTextSize(14f);
-        h.setTypeface(Typeface.DEFAULT_BOLD);
-        h.setTextColor(th.accent);
-        h.setPadding(0, th.dp(10), 0, 0);
-        box.addView(h);
-        for (MapStats.Row r : rows) {
-            addLine(box, c, th, c.getString(R.string.ms_row_fmt, r.label, r.total), th.text, 13f);
+        int total = MapStats.sum(rows, MapStats.SUM_TOTAL);
+        int reach = MapStats.sum(rows, MapStats.SUM_REACH);
+        String sum;
+        if (wallKind) {
+            sum = reach == total
+                    ? c.getString(R.string.mss_sum_wall_fmt, rows.size(), num(total))
+                    : c.getString(R.string.mss_sum_wall_split_fmt, rows.size(), num(total),
+                            num(reach));
+        } else if (reach == total) {
+            sum = c.getString(R.string.mss_sum_same_fmt, rows.size(), num(total));
+        } else {
+            sum = c.getString(R.string.mss_sum_fmt, rows.size(), num(total), num(reach));
         }
+        LinearLayout body = card(box, c, th, title, sum);
+        int n = Math.min(rows.size(), ROW_CAP);
+        for (int i = 0; i < n; i++) rowView(body, c, th, rows.get(i), wallKind);
+        if (rows.size() > n) {
+            addLine(body, c, th, c.getString(R.string.mss_more_fmt, rows.size() - n),
+                    th.textMuted, 12f);
+        }
+    }
+
+    /** 一行：名字 + 「能采 X 格」，副行说"总共多少 / 掉落什么 / 被什么挡住" */
+    private static void rowView(LinearLayout body, Context c, PluginTheme th,
+                                MapStats.Row row, boolean wallKind) {
+        String bracket = row.attrs == null ? "" : row.attrs;
+        if (row.liquid != null && !row.liquid.isEmpty()) {
+            String liq = c.getString(R.string.mss_bonus_liquid_fmt, row.liquid);
+            bracket = bracket.isEmpty() ? liq : liq + " · " + bracket;
+        }
+        LinearLayout line = new LinearLayout(c);
+        line.setOrientation(LinearLayout.HORIZONTAL);
+        line.setPadding(0, th.dp(8), 0, 0);
+        TextView name = new TextView(c);
+        name.setText(bracket.isEmpty()
+                ? row.label : c.getString(R.string.mss_row_attr_fmt, row.label, bracket));
+        name.setTextSize(13f);
+        name.setTextColor(th.text);
+        line.addView(name, new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        TextView cnt = new TextView(c);
+        cnt.setText(c.getString(R.string.mss_row_reach_fmt, num(row.reachable())));
+        cnt.setTextSize(13f);
+        cnt.setTextColor(th.text);
+        line.addView(cnt);
+        body.addView(line);
+
+        StringBuilder sb = new StringBuilder();
+        if (row.total != row.reachable()) {
+            cat(sb, c.getString(R.string.mss_row_total_fmt, num(row.total)));
+        }
+        if (row.drop != null && !row.drop.isEmpty()) {
+            cat(sb, c.getString(R.string.mss_row_drop_fmt, row.drop));
+        }
+        if (row.buried > 0) {
+            cat(sb, wallKind ? c.getString(R.string.mss_row_walled_fmt, num(row.buried))
+                    : c.getString(R.string.mss_row_buried_fmt, num(row.buried)));
+        }
+        if (row.priority > 0) {
+            cat(sb, wallKind ? c.getString(R.string.mss_row_wall_priority_fmt, num(row.priority))
+                    : c.getString(R.string.mss_row_floor_priority_fmt, num(row.priority)));
+        }
+        if (row.loose > 0) cat(sb, c.getString(R.string.mss_row_loose_fmt, num(row.loose)));
+        if (row.unknown > 0) cat(sb, c.getString(R.string.mss_row_unknown_fmt, num(row.unknown)));
+        if (sb.length() > 0) addLine(body, c, th, sb.toString(), th.textMuted, 12f);
+    }
+
+    private static void addBuild(LinearLayout box, Context c, PluginTheme th, MapStats.Result r) {
+        MapStats.Buildable b = r.buildable;
+        LinearLayout body = card(box, c, th, c.getString(R.string.mss_section_build),
+                c.getString(R.string.mss_build_sum_fmt, num(b.count())));
+        buildRow(body, c, th, c.getString(R.string.mss_build_row_free), b.free, null);
+        buildRow(body, c, th, c.getString(R.string.mss_build_row_cleared), b.cleared, null);
+        buildRow(body, c, th, c.getString(R.string.mss_build_row_walled), b.walled, null);
+        int noFloor = b.deep + b.floorBlocked;
+        if (noFloor > 0) {
+            StringBuilder sub = new StringBuilder();
+            if (b.deep > 0) {
+                sub.append(c.getString(R.string.mss_build_sub_deep_fmt, num(b.deep)));
+            }
+            for (MapStats.Buildable.Kind k : b.floorKinds) {
+                if (sub.length() > 0) sub.append(" · ");
+                sub.append(c.getString(R.string.mss_build_sub_floor_fmt, k.label, num(k.tiles)));
+            }
+            buildRow(body, c, th, c.getString(R.string.mss_build_row_nofoor), noFloor,
+                    sub.length() == 0 ? null : sub.toString());
+        }
+        if (b.unknown > 0) {
+            buildRow(body, c, th, c.getString(R.string.mss_build_row_unknown), b.unknown, null);
+        }
+    }
+
+    private static void buildRow(LinearLayout body, Context c, PluginTheme th, String title,
+                                 int n, String sub) {
+        LinearLayout line = new LinearLayout(c);
+        line.setOrientation(LinearLayout.HORIZONTAL);
+        line.setPadding(0, th.dp(8), 0, 0);
+        TextView name = new TextView(c);
+        name.setText(title);
+        name.setTextSize(13f);
+        name.setTextColor(th.text);
+        line.addView(name, new LinearLayout.LayoutParams(0,
+                LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
+        TextView cnt = new TextView(c);
+        cnt.setText(c.getString(R.string.mss_build_count_fmt, num(n)));
+        cnt.setTextSize(13f);
+        cnt.setTextColor(th.text);
+        line.addView(cnt);
+        body.addView(line);
+        if (sub != null && !sub.isEmpty()) addLine(body, c, th, sub, th.textMuted, 12f);
+    }
+
+    private static void addCore(LinearLayout box, Context c, PluginTheme th, MapStats.Result r) {
+        MapStats.Core core = r.core;
+        if (core.zone <= 0 || core.skip) return;
+        LinearLayout body = card(box, c, th, c.getString(R.string.mss_section_core),
+                c.getString(R.string.mss_core_sum_fmt, num(core.usable), num(core.max),
+                        String.valueOf(core.size)));
+        if (core.usable != core.zone) {
+            buildRow(body, c, th, c.getString(R.string.mss_core_row_zone), core.zone, null);
+        }
+        addLine(body, c, th, c.getString(
+                        core.basis == MapStats.Core.BASIS_PLANET
+                                ? R.string.mss_core_note_planet_fmt
+                                : R.string.mss_core_note_default_fmt, String.valueOf(core.size)),
+                th.textMuted, 12f);
+    }
+
+    private static void addTech(LinearLayout box, Context c, PluginTheme th, Built b) {
+        MapStats.Result r = b.result;
+        LinearLayout body = card(box, c, th, c.getString(R.string.mss_section_tech),
+                c.getString(R.string.mss_tech_size_fmt, r.width, r.height, num(r.cells)));
+        List<String> notes = new ArrayList<>();
+        for (MapStats.Note nt : r.notes) {
+            String s = noteText(c, nt);
+            if (!s.isEmpty()) notes.add(s);
+        }
+        addLine(body, c, th, c.getString(R.string.mss_tech_table_fmt, join(notes)), th.textMuted, 12f);
+        addLine(body, c, th, c.getString(R.string.mss_tech_names_fmt,
+                c.getString(R.string.mss_tech_names_value_fmt,
+                        b.gameApk.isEmpty() ? "—" : b.gameApk, Math.max(b.packs, 0), b.tableRows)),
+                th.textMuted, 12f);
+        if (!r.blockers.isEmpty()) {
+            StringBuilder sb = new StringBuilder();
+            for (MapStats.Row row : r.blockers) {
+                if (sb.length() > 0) sb.append(" · ");
+                sb.append(c.getString(R.string.mss_tech_count_fmt, row.label, row.total));
+            }
+            addLine(body, c, th, c.getString(R.string.mss_tech_blockers_fmt, sb.toString()),
+                    th.textMuted, 12f);
+        }
+        StringBuilder unk = new StringBuilder();
+        for (MapStats.Unk u : r.unknowns) {
+            if (unk.length() > 0) unk.append(" · ");
+            unk.append(c.getString(R.string.mss_tech_count_fmt, u.name, u.total()));
+        }
+        addLine(body, c, th, c.getString(R.string.mss_tech_unknown_fmt,
+                        unk.length() == 0 ? c.getString(R.string.mss_tech_none) : unk.toString()),
+                th.textMuted, 12f);
+        addLine(body, c, th, c.getString(R.string.mss_tech_time_fmt, b.millis), th.textMuted, 12f);
+    }
+
+    private static String noteText(Context c, MapStats.Note nt) {
+        if (nt == null) return "";
+        switch (nt.code) {
+            case MapStats.Note.VANILLA_TABLE:
+                return c.getString(R.string.mss_note_vanilla_table_fmt, nt.n);
+            case MapStats.Note.PATCH_CHANGED:
+                return c.getString(R.string.mss_note_patch_changed_fmt, nt.n2, nt.n);
+            case MapStats.Note.JSON_NAMES:
+                return c.getString(R.string.mss_note_json_names_fmt, nt.n);
+            case MapStats.Note.UNKNOWN_TYPE:
+                return c.getString(R.string.mss_note_unknown_type_fmt, nt.n);
+            default:
+                return "";
+        }
+    }
+
+    private static String num(int v) {
+        return String.format(Locale.getDefault(), "%,d", v);
+    }
+
+    private static void cat(StringBuilder sb, String s) {
+        if (s == null || s.isEmpty()) return;
+        if (sb.length() > 0) sb.append(" · ");
+        sb.append(s);
+    }
+
+    private static String join(List<String> xs) {
+        StringBuilder sb = new StringBuilder();
+        for (String s : xs) {
+            if (s == null || s.isEmpty()) continue;
+            if (sb.length() > 0) sb.append(" · ");
+            sb.append(s);
+        }
+        return sb.length() == 0 ? "—" : sb.toString();
     }
 
     private static void addLine(LinearLayout box, Context c, PluginTheme th, String text,

@@ -70,6 +70,13 @@ final class Extensions {
     static final String PAGE_LOGS = "logs";
     static final String PAGE_TRASH = "trash";
     static final String PAGE_MAP_DETAIL = "map-detail";
+    /**
+     * 第 193 轮（v9）：**段落插槽** —— 插件把一段界面直接画进宿主页里。
+     *
+     * <p>与 {@link #SLOT_CONTENT}（画一行、点开是插件自己的页）的区别正是用户那句「希望能和原来效果一样」：
+     * 地图统计原来长在地图详情页里，点开地图就看见；搬成插件后不该变成「再点一行、再跳一页」。</p>
+     */
+    static final String SLOT_SECTION = "section";
     static final String PAGE_BLUEPRINT_DETAIL = "blueprint-detail";
 
     /** 一条"能力条目"。 */
@@ -141,6 +148,18 @@ final class Extensions {
      * <p>判据三条缺一不可：插槽 == {@link #SLOT_CONTENT} · page 逐字相等 ·
      * 这个 page 是本版认得的（认不出的 page 不渲染，见 {@link #knownPage}）。
      */
+    /** 这一页该画哪些**段落**（`slot: section`）：纯函数，顺序 = 声明顺序。 */
+    static List<Item> forSection(List<Item> all, String page) {
+        List<Item> out = new ArrayList<Item>();
+        if (all == null || page == null || !knownPage(page)) return out;
+        for (Item it : all) {
+            if (!SLOT_SECTION.equals(it.slot)) continue;
+            if (!page.equals(it.page)) continue;
+            out.add(it);
+        }
+        return out;
+    }
+
     static List<Item> forPage(List<Item> all, String page) {
         List<Item> out = new ArrayList<Item>();
         if (all == null || page == null || !knownPage(page)) return out;
