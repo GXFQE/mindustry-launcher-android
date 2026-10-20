@@ -57,11 +57,12 @@ public final class PluginHost {
      * **v6（第 162 轮）= 设置 / 日志 / 中转站 / 版本 / selectedItems**；
      * **v7（第 187 轮）= 做事：主题 / 后台任务与进度 / 关页 / 分享·保存 / 勾选**；
      * **v9（第 193 轮）= 详情页的「当前这一项」（{@link PluginApi#selectedItem()}）
-     * + `section` 插槽（插件把自己的一段界面直接画进宿主页，统计不再另开一页）**。
+     * + `section` 插槽（插件把自己的一段界面直接画进宿主页，统计不再另开一页）；
+     * **v10（第 195 轮）= `choose()`：插件要问「怎么导出」时由**宿主**弹原生对话框**。
      * 插件报 5/6/7 才意味着"我会用这些能力"，报 1/2/3/4 的照旧；
      * 区间下限不变（{@link #API_MIN} = 1）。
      */
-    public static final int API = 9;
+    public static final int API = 10;
     /**
      * 还认的**最老**契约版本（第 139 轮）。抬它 = 老插件被拒，界面会说清"太老、该更新插件"。
      *
@@ -352,6 +353,37 @@ public final class PluginHost {
         @Override public File selectedFile() { return selected; }
 
         @Override public ItemInfo selectedItem() { return item; }
+
+        @Override public void choose(final String title, final String[] options,
+                                     final Choose callback) {
+            final Context base = getBaseContext();
+            if (!(base instanceof Activity) || options == null || options.length == 0) {
+                if (callback != null) callback.onChoose(-1);
+                return;
+            }
+            new android.os.Handler(android.os.Looper.getMainLooper()).post(new Runnable() {
+                @Override public void run() {
+                    Activity a = (Activity) base;
+                    if (a.isFinishing()) {
+                        if (callback != null) callback.onChoose(-1);
+                        return;
+                    }
+                    new android.app.AlertDialog.Builder(a)
+                            .setTitle(title)
+                            .setItems(options, new android.content.DialogInterface.OnClickListener() {
+                                @Override public void onClick(android.content.DialogInterface d, int which) {
+                                    if (callback != null) callback.onChoose(which);
+                                }
+                            })
+                            .setOnCancelListener(new android.content.DialogInterface.OnCancelListener() {
+                                @Override public void onCancel(android.content.DialogInterface d) {
+                                    if (callback != null) callback.onChoose(-1);
+                                }
+                            })
+                            .show();
+                }
+            });
+        }
 
         // ---- PluginApi（v5 只读数据面）-------------------------------------
 

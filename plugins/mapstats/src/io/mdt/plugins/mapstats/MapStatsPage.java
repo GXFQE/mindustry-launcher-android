@@ -51,7 +51,7 @@ public final class MapStatsPage {
      * 所以用 v9 的「当前这一项」+ `section` 插槽，让宿主把这一整段画在详情页里。</p>
      */
     public static int api() {
-        return 9;
+        return 10;
     }
 
     /** 当前这一页的统计产物（页面重建就重新算）。 */
@@ -107,14 +107,16 @@ public final class MapStatsPage {
         status.setTextSize(13f);
         status.setTextColor(th.textMuted);
         status.setPadding(0, th.dp(10), 0, 0);
-        root.addView(status);
 
         final LinearLayout results = new LinearLayout(c);
         results.setOrientation(LinearLayout.VERTICAL);
-        root.addView(results);
 
         final List<Built> built = new ArrayList<>();
+        // 导出口径：详细（全部数据）/ 简洁（仅可采）
+        final int[] mode = {MapStatsExport.MODE_DETAIL};
+        final View[] modeViews = new View[2];
 
+        // ★ 动作放**最上面**（§79）：选 20 张地图时按钮不会被结果卡片顶出屏幕
         if (!inline) addButton(root, c, th, c.getString(R.string.ms_pick), new View.OnClickListener() {
             @Override public void onClick(View v) {
                 api.pick(ItemInfo.KIND_MAPS, new PickCallback() {
@@ -123,19 +125,16 @@ public final class MapStatsPage {
                             api.toast(c.getString(R.string.ms_pick_empty));
                             return;
                         }
-                        run(api, c, th, status, results, built, items);
+                        askExport(api, c, th, status, results, built, items, mode, modeViews);
                     }
                 });
             }
         });
 
-        // 导出口径：详细（全部数据）/ 简洁（仅可采）—— 与搬家前那个四选项对话框同一套口径
-        final int[] mode = {MapStatsExport.MODE_DETAIL};
-        final View[] modeViews = new View[2];
         if (!inline) {
             LinearLayout modeRow = new LinearLayout(c);
             modeRow.setOrientation(LinearLayout.HORIZONTAL);
-            modeRow.setPadding(0, th.dp(12), 0, 0);
+            modeRow.setPadding(0, th.dp(8), 0, 0);
             root.addView(modeRow);
             for (int i = 0; i < 2; i++) {
                 final int pick = i;
@@ -192,13 +191,17 @@ public final class MapStatsPage {
         // 有结果之后才让"分享 / 保存"可点（与宿主那条"没有结果就别给出口"一致）
         results.setTag(actions);
 
+        // 结果是"动作下面的一块"，多长都不影响按钮的位置
+        root.addView(status);
+        root.addView(results);
+
         // 详情页里的这一段：**自动**统计当前这一张（不用再点"选择地图"）
         if (inline) {
             final ItemInfo one = inlineItem(api);
             if (one != null) {
                 final List<ItemInfo> only = new ArrayList<ItemInfo>();
                 only.add(one);
-                run(api, c, th, status, results, built, only);
+                run(api, c, th, status, results, built, only, -1, false);
             } else {
                 status.setText(c.getString(R.string.ms_nothing));
             }
@@ -233,10 +236,39 @@ public final class MapStatsPage {
         return null;
     }
 
+    /**
+     * 选完地图 ⇒ **由宿主弹窗问一句「怎么导出」**（第 195 轮；用户 2026-10-21：
+     * 「选择一堆会把按钮顶到下面 真的没法做弹窗吗」）。
+     *
+     * <p>取消 ⇒ 只出卡片、不导出（结果仍然能看）。</p>
+     */
+    private static void askExport(final PluginApi api, final Context c, final PluginTheme th,
+                                  final TextView status, final LinearLayout results,
+                                  final List<Built> built, final List<ItemInfo> items,
+                                  final int[] mode, final View[] modeViews) {
+        api.choose(c.getString(R.string.ms_export_ask), new String[]{
+                c.getString(R.string.ms_opt_save_detail),
+                c.getString(R.string.ms_opt_save_brief),
+                c.getString(R.string.ms_opt_share_detail),
+                c.getString(R.string.ms_opt_share_brief)}, new PluginApi.Choose() {
+            @Override public void onChoose(int idx) {
+                if (idx < 0) {
+                    run(api, c, th, status, results, built, items, -1, false);
+                    return;
+                }
+                mode[0] = (idx % 2 == 0)
+                        ? MapStatsExport.MODE_DETAIL : MapStatsExport.MODE_BRIEF;
+                paintMode(modeViews, th, mode[0]);
+                run(api, c, th, status, results, built, items, mode[0], idx >= 2);
+            }
+        });
+    }
+
     /** 后台算、主线程画。 */
     private static void run(final PluginApi api, final Context c, final PluginTheme th,
                             final TextView status, final LinearLayout results,
-                            final List<Built> built, final List<ItemInfo> items) {
+                            final List<Built> built, final List<ItemInfo> items,
+                            final int exportMode, final boolean exportShare) {
         built.clear();
         results.removeAllViews();
         final boolean inline = "map-detail".equals(api.page());
@@ -305,6 +337,18 @@ public final class MapStatsPage {
                         render(c, th, status, results, out, inline);
                         View[] actions = actionsOf(results);
                         setEnabled(actions, jsonOf(built, c, MapStatsExport.MODE_DETAIL) != null);
+                        if (exportMode >= 0) {
+                            String js = jsonOf(built, c, exportMode);
+                            if (js == null) {
+                                api.toast(c.getString(R.string.ms_nothing));
+                            } else if (exportShare) {
+                                api.shareText(fileName(built), js);
+                            } else {
+                                api.export(fileName(built), mimeOf(built),
+                                        new ByteArrayInputStream(
+                                                js.getBytes(StandardCharsets.UTF_8)));
+                            }
+                        }
                     }
                 });
             }

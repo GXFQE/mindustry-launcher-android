@@ -88,4 +88,9 @@
     <string name="ms_busy_inline">正在统计…</string>
     <string name="ms_mode_detail">详细</string>
     <string name="ms_mode_brief">简洁（只列能采的）</string>
+    <string name="ms_export_ask">怎么导出？</string>
+    <string name="ms_opt_save_detail">保存（详细）</string>
+    <string name="ms_opt_save_brief">保存（简洁，只列能采的）</string>
+    <string name="ms_opt_share_detail">分享（详细）</string>
+    <string name="ms_opt_share_brief">分享（简洁）</string>
 </resources>

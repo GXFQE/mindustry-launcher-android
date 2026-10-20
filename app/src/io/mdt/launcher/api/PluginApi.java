@@ -102,6 +102,22 @@ public interface PluginApi {
      */
     ItemInfo selectedItem();
 
+    /** 选完之后的回调（{@code index < 0} = 用户取消 / 弹不出来）。 */
+    interface Choose {
+        void onChoose(int index);
+    }
+
+    /**
+     * **v10**：让**宿主**弹一个"选一项"的对话框（标题 + 若干选项）。
+     *
+     * <p>为什么必须由宿主弹：插件拿到的 ctx 不是 Activity，自己 {@code new AlertDialog} 会
+     * {@code BadTokenException}（没有窗口令牌）。而"选完一堆东西马上问一句怎么导出"这件事
+     * 只有真弹窗能做好 —— 把按钮放在结果下面，选 20 张地图就被顶出屏幕（用户 2026-10-21 原话）。</p>
+     *
+     * <p>回调在主线程；{@code options} 为空或宿主不可用 ⇒ 回调 {@code -1}，插件自己兜底。</p>
+     */
+    void choose(String title, String[] options, Choose callback);
+
     /**
      * 所有槽（名称 / 目录 / 是否当前 / 是否远古包本体借住 {@code files/}）。
      *

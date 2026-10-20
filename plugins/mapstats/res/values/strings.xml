@@ -88,4 +88,9 @@
     <string name="ms_busy_inline">Counting…</string>
     <string name="ms_mode_detail">Full</string>
     <string name="ms_mode_brief">Brief (reachable only)</string>
+    <string name="ms_export_ask">How should it be exported?</string>
+    <string name="ms_opt_save_detail">Save (full)</string>
+    <string name="ms_opt_save_brief">Save (brief, reachable only)</string>
+    <string name="ms_opt_share_detail">Share (full)</string>
+    <string name="ms_opt_share_brief">Share (brief)</string>
 </resources>

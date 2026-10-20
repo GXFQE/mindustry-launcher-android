@@ -99,6 +99,14 @@ public interface PluginApi {
      */
     ItemInfo selectedItem();
 
+    /** 选完之后的回调（{@code index < 0} = 用户取消 / 弹不出来）。 */
+    interface Choose {
+        void onChoose(int index);
+    }
+
+    /** **v10**：由宿主弹一个「选一项」的对话框（插件自己的 ctx 不是 Activity，弹不了窗）。 */
+    void choose(String title, String[] options, Choose callback);
+
     /**
      * 所有槽（名称 / 目录 / 是否当前 / 是否远古包本体借住 {@code files/}）。
      *
