@@ -38,30 +38,6 @@ import java.util.zip.ZipFile;
  */
 public final class MapStatsMods {
 
-    /** 一次统计的全套产物 */
-    public static final class Built {
-        public MapStats.Table table;
-        public MapStats.Names names;
-        public MapStats.Result result;
-        public MsavTiles.Tiles tiles;
-        /** 失败原因（人话；成功时为空） */
-        public String error = "";
-        /** 模组/补丁那一层的一句话依据（技术细节层显示） */
-        public String modNote = "";
-        /** 译名来源那几层（技术细节层显示）—— **多条整句**，由显示侧连起来 */
-        public final List<String> namesNotes = new ArrayList<>();
-        /** 模组译文那一层（技术细节层显示）—— 单独一行，**不往别的句子尾巴上拼** */
-        public String bundleNote = "";
-        /** 读表 + 统计的总耗时（毫秒） */
-        public long millis;
-        /** 参与统计的模组包数（-1 = 没读出来；0 = 只有原版）—— 导出的**声明**里要写它 */
-        public int packs = -1;
-        /** 游戏这一轮**不加载模组**（上次崩过，`modcrashdisable` 生效）—— 导出时要说清 */
-        public boolean modsSkipped;
-        /** 模组读不出来（只按原版算） */
-        public boolean modsFailed;
-    }
-
     private static final class Cached {
         String stamp = "";
         SlotContent content;
@@ -73,7 +49,7 @@ public final class MapStatsMods {
         /** 模组译文（**两层**：语言包 / 基础包）—— 版本 APK 里查不到的名字靠它翻 */
         public MapStats.Bundles bundle = new MapStats.Bundles();
         /** 这一层的一句话依据（技术细节层显示）—— ⚠️ 中文，只给**维护者**看；
-         *  给用户的那份在 {@link Built#modNote} 等字段里、按界面语言拼 */
+         *  给用户的那份由界面按语言拼（插件 mapstats 那份在它自己的页面里） */
         public String note = "";
         /** 带译文的模组包数 */
         public int bundlesWithText;
@@ -256,74 +232,6 @@ public final class MapStatsMods {
     /** 槽被改动（换模组、导入包）后主动作废缓存 —— 自检与 dev 口用 */
     public static synchronized void invalidate() {
         CACHE.clear();
-    }
-
-    /**
-     * 跑一次完整统计（**必须在后台线程调**）。
-     *
-     * @param attrLabels 属性词（`water` → 「含水」）—— 文案来自 `strings.xml`，核心里不写死
-     */
-    public static Built run(Context ctx, String slot, Maps.Item it, String apkPath,
-                            Map<String, String> attrLabels) {
-        long t0 = System.currentTimeMillis();
-        Built b = new Built();
-        b.tiles = MapLoad.decodeFull(it);
-        if (b.tiles == null || !b.tiles.ok()) {
-            b.error = "这张地图读不出来";
-            return b;
-        }
-        // ★ 缓存里那份表**不能**被改（补丁会改行）⇒ 用前先深拷贝；译文与它同源，一起拿
-        SlotContent sc = contentFor(ctx, slot);
-        b.table = MapStats.copyOf(sc.table);
-        // ★ 依据文案在**这里**按界面语言拼（`SlotContent` 只给数字）——
-        //   原来是在 `contentFor` 里拼中文 ⇒ 英文界面下"技术细节"那几行也是中文
-        if (sc.skipMods) b.modNote = Trans.get(ctx, R.string.stats_note_skip_mods);
-        else if (sc.failed) b.modNote = Trans.get(ctx, R.string.stats_note_mods_failed);
-        else b.modNote = Trans.get(ctx, R.string.stats_note_mods_fmt,
-                sc.packs, sc.added, sc.overridden);
-        // ★ 2026-10-17（导出）：这三个数要给**声明**用 —— 拿到一份导出文件的人得知道
-        //   这些数字是"原版 + 几个模组"算出来的（模组数不同，同一张图的数会不同）。
-        b.packs = sc.packs;
-        b.modsSkipped = sc.skipMods;
-        b.modsFailed = sc.failed;
-        if (sc.bundlesWithText > 0) {
-            b.bundleNote = Trans.get(ctx, R.string.stats_note_bundles_fmt,
-                    sc.bundlesWithText, sc.bundle.keys());
-        }
-        if (!b.tiles.patchEntries.isEmpty()) {
-            List<String> logs = new ArrayList<>();
-            MapStats.applyPatches(b.table, b.tiles.patchEntries, logs);
-            // ⚠️ 这里**不再**单独拼一句补丁依据：`applyPatches` 自己会把
-            //    `Note.PATCH_CHANGED` 记进 `Table.notes`，两处都写会在界面上出现**同一条两遍**
-            //    （我 2026-10-04 引入过这个重复，真机截图能看出来）。
-        }
-        BundleNames bn = new BundleNames(apkPath == null ? null : new File(apkPath), sc.bundle,
-                attrLabels, MapStats.bundleLang(bundleLocaleSuffix(ctx)),
-                Trans.get(ctx, R.string.stats_wall_name_fmt));
-        b.names = bn;
-        // ★ 名字来源（依据）：数字在 BundleNames 里，**句子在这里按界面语言拼**
-        if (bn.nApkLocale > 0) {
-            b.namesNotes.add(Trans.get(ctx, R.string.stats_note_names_apk_fmt,
-                    bn.apkName, bn.nApkLocale));
-        } else {
-            b.namesNotes.add(Trans.get(ctx, R.string.stats_note_names_no_apk));
-        }
-        if (bn.nModLocale > 0) {
-            b.namesNotes.add(Trans.get(ctx, R.string.stats_note_names_mod_fmt, bn.nModLocale));
-        }
-        if (bn.nApkBase > 0) {
-            b.namesNotes.add(Trans.get(ctx, R.string.stats_note_names_apk_base_fmt, bn.nApkBase));
-        }
-        if (bn.nModBase > 0) {
-            b.namesNotes.add(Trans.get(ctx, R.string.stats_note_names_mod_base_fmt, bn.nModBase));
-        }
-        // ★ 2026-10-17 用户：「不对，不是区块名啊，存档本身就有属于什么科技树啊」—— 确实有：
-        //   存档 `tags.rules` 里带 `planet:<名字>`（`Rules.planet`，缺键 = 塞普罗默认）⇒ 最小核心 3×3 / 4×4。
-        String planet = it == null || it.meta == null ? null : it.meta.planet;
-        b.result = MapStats.analyze(b.tiles, b.table, b.names, planet);
-        if (!b.result.ok) b.error = b.result.error;
-        b.millis = System.currentTimeMillis() - t0;
-        return b;
     }
 
     /** 属性词表：键 = 游戏 `Attribute` 的名字（`water`/`oil`/`heat`/`spores`/`steam`/`light`/`sand`） */

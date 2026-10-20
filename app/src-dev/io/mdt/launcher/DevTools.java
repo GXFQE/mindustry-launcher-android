@@ -110,7 +110,6 @@ final class DevTools {
                 || intent.hasExtra("dev_bp_page")
                 || intent.hasExtra("dev_saves_page")
                 || intent.hasExtra(BlueprintsActivity.EXTRA_DEV_IMPORT)
-                || intent.hasExtra("dev_mapstats")
                 || intent.hasExtra("dev_crash_analyze")
                 || intent.hasExtra("dev_crash_corpus")
                 || intent.hasExtra("dev_batch_export")
@@ -673,15 +672,6 @@ final class DevTools {
             }, "dev-crash-corpus").start();
             return;
         }
-        // ── F21：地图资源统计（真机计时 + 逐项数字）─────────────────────────────
-        // 用法：`--es dev_mapstats <槽名>`（空/true = 当前槽）[--es dev_mapstats_file <某个 .msav>]
-        // ★ 为什么要这个口：① 设备性能 F21 只在 PC 上量过（估计 20~40 ms/张）；
-        //   ② 界面入口要点开"地图 → 某张图"，自动化很脆；③ 报告要能落盘慢慢看。
-        String dstat = intent.getStringExtra("dev_mapstats");
-        if (dstat != null && !dstat.isEmpty()) {
-            devMapStats(dstat, intent.getStringExtra("dev_mapstats_file"));
-            return;
-        }
         // ── 蓝图（.msch）解析：拿真文件跑一遍，把**逐格配置 + 缺哪些方块**落到报告 ────
         // ── S0 插件化（**dev 侧实验**；产品版整块不带 —— 与 SelfTest 同一条裁剪规矩）──────────
         // 用法：`--es dev_pluginprobe <目录>` ⇒ 跑 S0 实验，报告写 `hub/report-plugin.txt`
@@ -817,105 +807,6 @@ final class DevTools {
 
 
     /** F21 的 dev 口：跑一遍统计并把**逐项数字 + 真机耗时**落到 `hub/report-devtool.txt` */
-    private void devMapStats(final String slotArg, final String fileArg) {
-        final String useSlot = ("true".equals(slotArg.trim()) || slotArg.trim().isEmpty())
-                ? Data.currentSlot(a) : slotArg.trim();
-        new Thread(new Runnable() {
-            @Override public void run() {
-                StringBuilder sb = new StringBuilder();
-                sb.append("槽 = ").append(useSlot).append('\n');
-                long t0 = System.currentTimeMillis();
-                try {
-                    Mods.Target tgt = Mods.targetsFor(a, useSlot);
-                    sb.append("目标游戏 = ").append(tgt.label.isEmpty() ? "（没指到版本）" : tgt.label)
-                      .append('\n');
-                    sb.append("游戏 APK = ")
-                      .append(tgt.apkPath == null || tgt.apkPath.isEmpty() ? "（没有）" : tgt.apkPath)
-                      .append('\n');
-                    java.util.Map<String, String> labels = MapStatsMods.attrLabels(a);
-                    java.util.List<Maps.Item> items = new java.util.ArrayList<>();
-                    if (fileArg != null && !fileArg.trim().isEmpty()) {
-                        Maps.Item one = new Maps.Item();
-                        one.from = Maps.FROM_SLOT;
-                        one.source = "dev";
-                        one.file = new File(fileArg.trim());
-                        one.where = one.file.getAbsolutePath();
-                        one.bytes = one.file.length();
-                        one.meta = Maps.metaOf(one);
-                        items.add(one);
-                    } else {
-                        items.addAll(Maps.scan(a, useSlot, tgt.apkPath));
-                    }
-                    if (items.size() > 60) items = items.subList(0, 60);
-                    long min = Long.MAX_VALUE, max = 0, sum = 0;
-                    int ok = 0;
-                    for (Maps.Item it : items) {
-                        MapStatsMods.Built b =
-                                MapStatsMods.run(a, useSlot, it, tgt.apkPath, labels);
-                        if (b.error != null && !b.error.isEmpty()) {
-                            sb.append("❌ ").append(it.name()).append("  ").append(b.error).append('\n');
-                            continue;
-                        }
-                        MapStats.Result r = b.result;
-                        ok++;
-                        min = Math.min(min, r.millis);
-                        max = Math.max(max, r.millis);
-                        sum += r.millis;
-                        sb.append("· ").append(it.name()).append("  ").append(r.width).append('x')
-                          .append(r.height).append("  统计 ").append(r.millis).append(" ms\n");
-                        // 四段**同一口径**（2026-10-16 起墙矿也并进来）：头号数字「能采」，
-                        // 总数/遮挡进括号；墙矿的遮挡措辞是"四周是墙"（它长在墙里，不是"在墙下"）
-                        sb.append("    地矿: ").append(a.rowsOf(r.ores, false)).append('\n');
-                        if (!r.oreWalls.isEmpty()) {
-                            sb.append("    墙矿: ").append(a.rowsOf(r.oreWalls, true)).append('\n');
-                        }
-                        sb.append("    可采地板: ").append(a.rowsOf(r.floors, false)).append('\n');
-                        sb.append("    加成地板: ").append(a.rowsOf(r.bonuses, false)).append('\n');
-                        // ★ 可建造（2026-10-17）：与界面**同一口径、同一顺序**（六桶加起来 == 总格数）
-                        MapStats.Buildable bd = r.buildable;
-                        sb.append("    可建造: 能建 ").append(bd.count()).append(" / 共 ").append(r.cells)
-                          .append(" 格（空地 ").append(bd.free)
-                          .append(" · 拆掉后 ").append(bd.cleared)
-                          .append(" · 墙和树 ").append(bd.walled)
-                          .append(" · 深液体 ").append(bd.deep);
-                        if (bd.floorBlocked > 0) sb.append(" · 地板不让建 ").append(bd.floorBlocked);
-                        if (bd.unknown > 0) sb.append(" · 认不出 ").append(bd.unknown);
-                        sb.append("）\n");
-                        // ★ 核心区（2026-10-17）：`core-zone` 地板的面积 + 最多能摆几个核心
-                        //   （边长按星球：存档里写的星球 > 没线索就取最小）
-                        if (r.core.zone > 0) {
-                            if (r.core.skip) {
-                                sb.append("    核心区: ").append(r.core.zone).append(" 格（能建 ")
-                                  .append(r.core.usable).append("）· 跳过（星球的核心读不到）\n");
-                            } else {
-                                sb.append("    核心区: ").append(r.core.zone).append(" 格（能建 ")
-                                  .append(r.core.usable).append("）· 最多 ").append(r.core.max)
-                                  .append(" 个 ").append(r.core.size).append("×").append(r.core.size)
-                                  .append(" 核心（来源 ").append(r.core.basis == MapStats.Core.BASIS_PLANET
-                                    ? "存档里的星球" : "没线索，取最小")
-                                  .append("）\n");
-                            }
-                        }
-                        sb.append("    挡住资源的: ").append(a.blockersOf(r)).append('\n');
-                        if (r.unkOre + r.unkFloor + r.unkBonus > 0) {
-                            sb.append("    认不出的格子: 矿 ").append(r.unkOre).append(" / 地板 ")
-                              .append(r.unkFloor).append(" / 加成 ").append(r.unkBonus).append('\n');
-                        }
-                    }
-                    sb.append("\n表 = ").append(MapStats.vanilla().size()).append(" 条原版");
-                    sb.append("\n统计成功 ").append(ok).append('/').append(items.size()).append(" 张");
-                    if (ok > 0) {
-                        sb.append("；单张 最小 ").append(min).append(" ms / 平均 ")
-                          .append(sum / ok).append(" ms / 最大 ").append(max).append(" ms");
-                    }
-                    sb.append("\n整口用时 ").append(System.currentTimeMillis() - t0).append(" ms\n");
-                } catch (Throwable t) {
-                    sb.append("dev_mapstats 失败：").append(t).append('\n');
-                }
-                reportDev(sb.toString(), "dev_mapstats · 槽 " + useSlot);
-            }
-        }, "dev-mapstats").start();
-    }
 
 
     /**
