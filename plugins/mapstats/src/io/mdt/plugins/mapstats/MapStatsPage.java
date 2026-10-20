@@ -692,14 +692,12 @@ public final class MapStatsPage {
         t.setTextColor(th.text);
         head.addView(t, new LinearLayout.LayoutParams(0,
                 LinearLayout.LayoutParams.WRAP_CONTENT, 1f));
-        final android.widget.ImageView chev = new android.widget.ImageView(c);
-        int chevId = c.getResources().getIdentifier("ic_chevron", "drawable", c.getPackageName());
-        if (chevId != 0) {
-            chev.setImageResource(chevId);
-            chev.setColorFilter(th.textMuted);
-        }
-        int chevPx = th.dp(18);
-        head.addView(chev, new LinearLayout.LayoutParams(chevPx, chevPx));
+        // 与宿主行同一个"可进入 / 可展开"指示：一只细箭头（字体里的 ❯，展开时转向下）
+        final TextView chev = new TextView(c);
+        chev.setText("\u276F");
+        chev.setTextSize(14f);
+        chev.setTextColor(th.textMuted);
+        head.addView(chev);
 
         // ★ 整块可点：标题 + 摘要都算"展开的触发区"（只点标题那行太小，用户 2026-10-21 反馈）
         final LinearLayout top = new LinearLayout(c);
