@@ -53,11 +53,14 @@ final class PluginActions {
         final File tmp;
         final String name;
         final String mime;
+        /** v11：保存结束后回调插件（可为 null）。 */
+        final io.mdt.launcher.api.PluginApi.After after;
 
-        Pending(File tmp, String name, String mime) {
+        Pending(File tmp, String name, String mime, io.mdt.launcher.api.PluginApi.After after) {
             this.tmp = tmp;
             this.name = name;
             this.mime = mime;
+            this.after = after;
         }
     }
 
@@ -138,6 +141,13 @@ final class PluginActions {
      */
     static void export(final Activity a, final String name, final String mime,
                        final InputStream content) {
+        export(a, name, mime, content, null);
+    }
+
+    /** v11：带"保存结束"回调（成功 / 取消都会回调）。 */
+    static void export(final Activity a, final String name, final String mime,
+                       final InputStream content,
+                       final io.mdt.launcher.api.PluginApi.After after) {
         if (a == null || content == null) {
             closeQuietly(content);
             return;
@@ -176,9 +186,11 @@ final class PluginActions {
                         }
                         if (a.isFinishing()) {
                             tmp.delete();
+                            if (after != null) after.onAfter(false);
                             return;
                         }
-                        Pending p = new Pending(tmp, ShareOut.fixName(name), mimeOf(mime, name));
+                        Pending p = new Pending(tmp, ShareOut.fixName(name), mimeOf(mime, name),
+                                after);
                         synchronized (LOCK) {
                             if (sPending != null) {
                                 tmp.delete();
@@ -218,6 +230,7 @@ final class PluginActions {
         final Uri uri = (resultCode == Activity.RESULT_OK && data != null) ? data.getData() : null;
         if (uri == null) {
             p.tmp.delete();
+            if (p.after != null) p.after.onAfter(false);
             return true;
         }
         new Thread(new Runnable() {
@@ -236,6 +249,7 @@ final class PluginActions {
                         toast(a, e == null
                                 ? Trans.get(a, R.string.plugin_export_done)
                                 : Trans.get(a, R.string.plugin_export_failed_fmt, e));
+                        if (p.after != null) p.after.onAfter(e == null);
                     }
                 });
             }

@@ -3588,7 +3588,7 @@ public final class SelfTest {
                 Extensions.PAGE_MAP_DETAIL));
         v9.add(new Extensions.Item("c", "t", "s", "E", Extensions.SLOT_SECTION,
                 Extensions.PAGE_MAPS));
-        ok(stat, L, PluginHost.API >= 10 && PluginHost.API >= 9
+        ok(stat, L, PluginHost.API >= 11 && PluginHost.API >= 10 && PluginHost.API >= 9
                         && Extensions.forSection(v9, Extensions.PAGE_MAP_DETAIL).size() == 1
                         && "a".equals(Extensions.forSection(v9, Extensions.PAGE_MAP_DETAIL).get(0).id)
                         && Extensions.forSection(v9, Extensions.PAGE_MAPS).size() == 1,

@@ -277,6 +277,14 @@ public interface PluginApi {
      */
     void export(String name, String mime, InputStream content);
 
+    /** **v11**：同上，保存结束后回调（成功 = true；取消 / 失败 = false）。 */
+    void export(String name, String mime, InputStream content, After after);
+
+    /** 保存结束后的回调。 */
+    interface After {
+        void onAfter(boolean ok);
+    }
+
     /**
      * 让用户从**当前槽的某一类内容**里勾选，结果回调给插件。
      *

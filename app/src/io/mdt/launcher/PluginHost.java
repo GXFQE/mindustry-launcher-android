@@ -58,11 +58,12 @@ public final class PluginHost {
      * **v7（第 187 轮）= 做事：主题 / 后台任务与进度 / 关页 / 分享·保存 / 勾选**；
      * **v9（第 193 轮）= 详情页的「当前这一项」（{@link PluginApi#selectedItem()}）
      * + `section` 插槽（插件把自己的一段界面直接画进宿主页，统计不再另开一页）；
-     * **v10（第 195 轮）= `choose()`：插件要问「怎么导出」时由**宿主**弹原生对话框**。
+     * **v10（第 195 轮）= `choose()`：插件要问「怎么导出」时由**宿主**弹原生对话框**；
+     * **v11（第 196 轮）= `export(..., after)`：保存真的结束后回调插件**。
      * 插件报 5/6/7 才意味着"我会用这些能力"，报 1/2/3/4 的照旧；
      * 区间下限不变（{@link #API_MIN} = 1）。
      */
-    public static final int API = 10;
+    public static final int API = 11;
     /**
      * 还认的**最老**契约版本（第 139 轮）。抬它 = 老插件被拒，界面会说清"太老、该更新插件"。
      *
@@ -540,13 +541,17 @@ public final class PluginHost {
         }
 
         @Override public void export(String name, String mime, InputStream content) {
+            export(name, mime, content, null);
+        }
+
+        @Override public void export(String name, String mime, InputStream content, After after) {
             Activity a = activityOrNull();
             if (a == null) {
                 PluginActions.closeQuietly(content);
                 noPage();
                 return;
             }
-            PluginActions.export(a, name, mime, content);
+            PluginActions.export(a, name, mime, content, after);
         }
 
         @Override public void pick(String kind, PickCallback callback) {

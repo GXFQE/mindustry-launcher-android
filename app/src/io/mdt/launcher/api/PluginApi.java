@@ -289,6 +289,20 @@ public interface PluginApi {
     void export(String name, String mime, InputStream content);
 
     /**
+     * **v11**：同上，但**保存结束后回调**（成功 = true；取消 / 失败 = false）。
+     *
+     * <p>为什么要它：插件想在"用户真的存好了"之后才关掉导出页 —— 早一步关，
+     * 宿主会看到 {@code isFinishing()} 直接把这次保存取消掉（真机踩过）。</p>
+     */
+    void export(String name, String mime, InputStream content, After after);
+
+        /** 保存结束（成功 / 取消或失败）后的回调；插件据此收尾（比如关掉导出页）。 */
+    interface After {
+        void onAfter(boolean ok);
+    }
+
+
+    /**
      * 让用户从**当前槽的某一类内容**里勾选，结果回调给插件。
      *
      * <p>为什么不是"插件自己在页面上列一遍再勾"：宿主那一套勾选框（整行可点、正按钮报份数、

@@ -51,7 +51,7 @@ public final class MapStatsPage {
      * 所以用 v9 的「当前这一项」+ `section` 插槽，让宿主把这一整段画在详情页里。</p>
      */
     public static int api() {
-        return 10;
+        return 11;
     }
 
     /** 当前这一页的统计产物（页面重建就重新算）。 */
@@ -80,6 +80,9 @@ public final class MapStatsPage {
     }
 
     public static View createView(final PluginApi api) {
+        // ★ 地图页进来 = **导出**（不是看统计）：拾取 → 问口径 → 直接写盘/分享 → 回上一页。
+        //   统计只在详情页那块 section 里（用户 2026-10-21：「不要把导出和统计混一起」）。
+        if (!"map-detail".equals(api.page())) return exportOnly(api);
         final Context c = api.context();
         final PluginTheme th = api.theme();
         final LinearLayout root = new LinearLayout(c);
@@ -201,11 +204,52 @@ public final class MapStatsPage {
             if (one != null) {
                 final List<ItemInfo> only = new ArrayList<ItemInfo>();
                 only.add(one);
-                run(api, c, th, status, results, built, only, -1, false);
+                run(api, c, th, status, results, built, only, -1, false, false);
             } else {
                 status.setText(c.getString(R.string.ms_nothing));
             }
         }
+        return root;
+    }
+
+    /**
+     * **导出**（地图页那条入口）：不画统计卡片、不放口径按钮 ——
+     * 进来就开选择器 → 选完由宿主弹「怎么导出」→ 后台算 → 直接写盘 / 分享 → 回上一页。
+     */
+    private static View exportOnly(final PluginApi api) {
+        final Context c = api.context();
+        final PluginTheme th = api.theme();
+        final LinearLayout root = new LinearLayout(c);
+        root.setOrientation(LinearLayout.VERTICAL);
+        root.setBackgroundColor(th.background);
+
+        // 页面标题由宿主顶栏给（扩展声明的 title），这里只留一行状态
+        final TextView status = new TextView(c);
+        status.setText(c.getString(R.string.ms_exporting));
+        status.setTextSize(15f);
+        status.setTextColor(th.textMuted);
+        status.setPadding(0, th.dp(8), 0, 0);
+        root.addView(status);
+
+        final LinearLayout sink = new LinearLayout(c);      // 结果不画（导出不需要看卡片）
+        final List<Built> built = new ArrayList<>();
+
+        // 页面挂上之后再开选择器（立刻开会撞着页面还没 attach）
+        status.post(new Runnable() {
+            @Override public void run() {
+                api.pick(ItemInfo.KIND_MAPS, new PickCallback() {
+                    @Override public void onPicked(List<ItemInfo> items) {
+                        if (items == null || items.isEmpty()) {
+                            api.toast(c.getString(R.string.ms_pick_empty));
+                            api.closePage();
+                            return;
+                        }
+                        askExport(api, c, th, status, sink, built, items,
+                                new int[]{MapStatsExport.MODE_DETAIL}, new View[2]);
+                    }
+                });
+            }
+        });
         return root;
     }
 
@@ -253,13 +297,14 @@ public final class MapStatsPage {
                 c.getString(R.string.ms_opt_share_brief)}, new PluginApi.Choose() {
             @Override public void onChoose(int idx) {
                 if (idx < 0) {
-                    run(api, c, th, status, results, built, items, -1, false);
+                    run(api, c, th, status, results, built, items, -1, false, false);
                     return;
                 }
+                boolean exportFlow = "maps".equals(api.page());
                 mode[0] = (idx % 2 == 0)
                         ? MapStatsExport.MODE_DETAIL : MapStatsExport.MODE_BRIEF;
                 paintMode(modeViews, th, mode[0]);
-                run(api, c, th, status, results, built, items, mode[0], idx >= 2);
+                run(api, c, th, status, results, built, items, mode[0], idx >= 2, exportFlow);
             }
         });
     }
@@ -268,7 +313,8 @@ public final class MapStatsPage {
     private static void run(final PluginApi api, final Context c, final PluginTheme th,
                             final TextView status, final LinearLayout results,
                             final List<Built> built, final List<ItemInfo> items,
-                            final int exportMode, final boolean exportShare) {
+                            final int exportMode, final boolean exportShare,
+                            final boolean closeAfter) {
         built.clear();
         results.removeAllViews();
         final boolean inline = "map-detail".equals(api.page());
@@ -330,7 +376,9 @@ public final class MapStatsPage {
                     b.sha = shaOf(api, it);
                     out.add(b);
                 }
-                results.post(new Runnable() {
+                // ★ 必须挂在**已 attach 的 view** 上 post：导出页里 results 是不进界面的壳，
+                //   对未 attach 的 view 调 post ⇒ 进它的 HandlerActionQueue，永远不执行（真机卡"正在统计"）
+                status.post(new Runnable() {
                     @Override public void run() {
                         built.clear();
                         built.addAll(out);
@@ -341,12 +389,28 @@ public final class MapStatsPage {
                             String js = jsonOf(built, c, exportMode);
                             if (js == null) {
                                 api.toast(c.getString(R.string.ms_nothing));
+                                if (closeAfter) api.closePage();
                             } else if (exportShare) {
                                 api.shareText(fileName(built), js);
+                                if (closeAfter) {
+                                    api.toast(c.getString(R.string.ms_share_done,
+                                            fileName(built)));
+                                    status.postDelayed(new Runnable() {
+                                        @Override public void run() { api.closePage(); }
+                                    }, 600);
+                                }
                             } else {
+                                // v11：**用户真的存好了**再关页（早一步关会把这次保存取消掉）
                                 api.export(fileName(built), mimeOf(built),
-                                        new ByteArrayInputStream(
-                                                js.getBytes(StandardCharsets.UTF_8)));
+                                        new ByteArrayInputStream(js.getBytes(StandardCharsets.UTF_8)),
+                                        new PluginApi.After() {
+                                            @Override public void onAfter(boolean ok) {
+                                                if (!closeAfter) return;
+                                                if (ok) api.toast(c.getString(
+                                                        R.string.ms_save_done, fileName(built)));
+                                                api.closePage();
+                                            }
+                                        });
                             }
                         }
                     }

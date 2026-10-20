@@ -93,4 +93,8 @@
     <string name="ms_opt_save_brief">Save (brief, reachable only)</string>
     <string name="ms_opt_share_detail">Share (full)</string>
     <string name="ms_opt_share_brief">Share (brief)</string>
+    <string name="ms_export_title">Export stats</string>
+    <string name="ms_exporting">Exporting…</string>
+    <string name="ms_save_done">Saved: %1$s</string>
+    <string name="ms_share_done">Shared: %1$s</string>
 </resources>
