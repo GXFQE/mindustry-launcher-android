@@ -10,8 +10,8 @@
   "extensions": [
     {
       "id": "mapstats-maps",
-      "title": "资源统计",
-      "subtitle": "统计地图里的矿物 / 可采地板 / 可建造区域",
+      "title": "导出统计…",
+      "subtitle": "一张 .json、多张 .jsonl；详细 / 简洁，保存或分享",
       "entry": "io.mdt.plugins.mapstats.MapStatsPage",
       "slot": "content",
       "page": "maps"

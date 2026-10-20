@@ -86,4 +86,6 @@
     <string name="mss_tech_names_value_fmt">%1$s · %2$d mods · %3$d content rows</string>
     <string name="mss_detail_hint">The numbers for this map are below; you can also pick another.</string>
     <string name="ms_busy_inline">Counting…</string>
+    <string name="ms_mode_detail">Full</string>
+    <string name="ms_mode_brief">Brief (reachable only)</string>
 </resources>

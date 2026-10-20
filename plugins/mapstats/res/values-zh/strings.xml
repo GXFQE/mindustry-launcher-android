@@ -86,4 +86,6 @@
     <string name="mss_tech_names_value_fmt">%1$s · 模组 %2$d 个 · 内容表 %3$d 行</string>
     <string name="mss_detail_hint">这张图的统计在下面；也可以换一张。</string>
     <string name="ms_busy_inline">正在统计…</string>
+    <string name="ms_mode_detail">详细</string>
+    <string name="ms_mode_brief">简洁（只列能采的）</string>
 </resources>

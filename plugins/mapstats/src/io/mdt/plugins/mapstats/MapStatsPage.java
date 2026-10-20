@@ -129,10 +129,40 @@ public final class MapStatsPage {
             }
         });
 
+        // 导出口径：详细（全部数据）/ 简洁（仅可采）—— 与搬家前那个四选项对话框同一套口径
+        final int[] mode = {MapStatsExport.MODE_DETAIL};
+        final View[] modeViews = new View[2];
+        if (!inline) {
+            LinearLayout modeRow = new LinearLayout(c);
+            modeRow.setOrientation(LinearLayout.HORIZONTAL);
+            modeRow.setPadding(0, th.dp(12), 0, 0);
+            root.addView(modeRow);
+            for (int i = 0; i < 2; i++) {
+                final int pick = i;
+                TextView t = new TextView(c);
+                t.setText(c.getString(i == 0 ? R.string.ms_mode_detail : R.string.ms_mode_brief));
+                t.setTextSize(14f);
+                t.setPadding(th.dp(12), th.dp(6), th.dp(12), th.dp(6));
+                LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.WRAP_CONTENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT);
+                lp.setMarginEnd(th.dp(8));
+                modeRow.addView(t, lp);
+                modeViews[i] = t;
+                t.setOnClickListener(new View.OnClickListener() {
+                    @Override public void onClick(View v) {
+                        mode[0] = pick == 0 ? MapStatsExport.MODE_DETAIL : MapStatsExport.MODE_BRIEF;
+                        paintMode(modeViews, th, mode[0]);
+                    }
+                });
+            }
+            paintMode(modeViews, th, mode[0]);
+        }
+
         final View[] actions = new View[2];
         if (!inline) actions[0] = addButton(root, c, th, c.getString(R.string.ms_share), new View.OnClickListener() {
             @Override public void onClick(View v) {
-                String js = jsonOf(built, c);
+                String js = jsonOf(built, c, mode[0]);
                 if (js == null) {
                     api.toast(c.getString(R.string.ms_nothing));
                     return;
@@ -142,7 +172,7 @@ public final class MapStatsPage {
         });
         if (!inline) actions[1] = addButton(root, c, th, c.getString(R.string.ms_export), new View.OnClickListener() {
             @Override public void onClick(View v) {
-                String js = jsonOf(built, c);
+                String js = jsonOf(built, c, mode[0]);
                 if (js == null) {
                     api.toast(c.getString(R.string.ms_nothing));
                     return;
@@ -274,7 +304,7 @@ public final class MapStatsPage {
                         built.addAll(out);
                         render(c, th, status, results, out, inline);
                         View[] actions = actionsOf(results);
-                        setEnabled(actions, jsonOf(built, c) != null);
+                        setEnabled(actions, jsonOf(built, c, MapStatsExport.MODE_DETAIL) != null);
                     }
                 });
             }
@@ -731,6 +761,22 @@ public final class MapStatsPage {
         return sb.length() == 0 ? "—" : sb.toString();
     }
 
+    /** 两个口径按钮：选中的那个描边 + 主色，另一个灰字（一眼看出现在是哪种） */
+    private static void paintMode(View[] views, PluginTheme th, int mode) {
+        for (int i = 0; i < views.length; i++) {
+            if (!(views[i] instanceof TextView)) continue;
+            TextView t = (TextView) views[i];
+            boolean on = (i == 0) == (mode == MapStatsExport.MODE_DETAIL);
+            android.graphics.drawable.GradientDrawable bg =
+                    new android.graphics.drawable.GradientDrawable();
+            bg.setColor(on ? th.card : 0x00000000);
+            bg.setCornerRadius(th.dp(14));
+            bg.setStroke(Math.max(1, th.dp(1)), on ? th.accent : th.cardStroke);
+            t.setBackground(bg);
+            t.setTextColor(on ? th.accent : th.textMuted);
+        }
+    }
+
     private static void addLine(LinearLayout box, Context c, PluginTheme th, String text,
                                 int color, float size) {
         TextView t = new TextView(c);
@@ -776,14 +822,14 @@ public final class MapStatsPage {
      * **多张 = JSONL**（`jsonlBatch`，一行一张图）—— 用的是插件里那份
      * {@link MapStatsExport}（从宿主整块拷来的纯 Java 类），插件不另写一套。</p>
      */
-    private static String jsonOf(List<Built> list, Context c) {
+    private static String jsonOf(List<Built> list, Context c, int mode) {
         List<MapStats.Result> rs = new ArrayList<>();
         List<MapStatsExport.Meta> ms = new ArrayList<>();
         String notice = c.getString(R.string.ms_export_notice_fmt, MapStatsExport.SITE);
         for (Built b : list) {
             if (b.result == null || !b.result.ok) continue;
             rs.add(b.result);
-            ms.add(metaOf(b, c, notice));
+            ms.add(metaOf(b, c, notice, mode));
         }
         if (rs.isEmpty()) return null;
         return rs.size() == 1
@@ -835,7 +881,7 @@ public final class MapStatsPage {
     }
 
     /** 插件版的声明（字段口径照抄宿主 `StatsExporter.metaOf`；拿不到的就空着，别编）。 */
-    private static MapStatsExport.Meta metaOf(Built b, Context c, String notice) {
+    private static MapStatsExport.Meta metaOf(Built b, Context c, String notice, int mode) {
         MapStatsExport.Meta m = new MapStatsExport.Meta();
         m.exportedAt = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssXXX", Locale.ROOT)
                 .format(new Date());
@@ -861,7 +907,7 @@ public final class MapStatsPage {
         m.modsSkipped = b.modsSkipped;
         m.modsFailed = b.modsFailed;
         m.notice = notice;
-        m.mode = MapStatsExport.MODE_DETAIL;
+        m.mode = mode;
         return m;
     }
 
