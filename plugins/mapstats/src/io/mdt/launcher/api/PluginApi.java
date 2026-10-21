@@ -331,6 +331,9 @@ public interface PluginApi {
 
     interface Cancel { void onCancel(); }
 
+    /** **v16**：换掉一个条目的内容（同目录临时文件 + 原子替换；游戏在跑时拒绝）。 */
+    void writeItem(ItemInfo item, java.io.InputStream content, Done callback);
+
     /**
      * 让用户从**当前槽的某一类内容**里勾选，结果回调给插件。
      *

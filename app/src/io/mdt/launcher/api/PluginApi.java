@@ -358,6 +358,15 @@ public interface PluginApi {
     /** 进度框被取消。 */
     interface Cancel { void onCancel(); }
 
+    // ---- v16（第 206 轮）：写回条目 ----
+
+    /**
+     * **v16**：把一个条目的内容**换掉**（仅限槽内 maps / saves / mods / blueprints 里的**已存在**文件）。
+     *
+     * <p>同目录写临时文件再原子替换；游戏在跑时拒绝（`false`）。内容读完后宿主负责关闭。</p>
+     */
+    void writeItem(ItemInfo item, java.io.InputStream content, Done callback);
+
         /** 保存结束（成功 / 取消或失败）后的回调；插件据此收尾（比如关掉导出页）。 */
     interface After {
         void onAfter(boolean ok);

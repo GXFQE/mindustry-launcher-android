@@ -64,11 +64,12 @@ public final class PluginHost {
      * **v12（第 197 轮）= `action` 插槽 + `run(PluginApi)` 入口：点了就在**当前页**跑，不单开页面**；
      * **v13（第 198 轮）= `progressCard()`：宿主进度弹窗（搬家前「正在统计 N / M…」那个）**；
      * **v14（第 202 轮）= `dataDir()` / `gameRunning()` / `hostIcon()` / `confirm()` / `prompt()`**；
-     * **v15（第 205 轮）= `pickFile()` / `openItem()` / `trashItem()` / 可取消 `progressCard()`**。
+     * **v15（第 205 轮）= `pickFile()` / `openItem()` / `trashItem()` / 可取消 `progressCard()`**；
+     * **v16（第 206 轮）= `writeItem()`：同目录临时文件 + 原子替换，游戏在跑时拒绝**。
      * 插件报 5/6/7 才意味着"我会用这些能力"，报 1/2/3/4 的照旧；
      * 区间下限不变（{@link #API_MIN} = 1）。
      */
-    public static final int API = 15;
+    public static final int API = 16;
     /**
      * 还认的**最老**契约版本（第 139 轮）。抬它 = 老插件被拒，界面会说清"太老、该更新插件"。
      *
@@ -759,6 +760,49 @@ public final class PluginHost {
             cardCancel = cancel;
             cardCancelable = cancelable;
             progressCard(title, message, done, total);
+        }
+
+        @Override public void writeItem(ItemInfo it, InputStream content, Done callback) {
+            boolean ok = false;
+            try {
+                if (it != null && it.path != null && content != null
+                        && !Data.gameAlive(getBaseContext())) {
+                    File f = new File(it.path);
+                    File dir = f.getParentFile();
+                    if (f.isFile() && dir != null && insideSlot(dir, f)) {
+                        File tmp = new File(dir, "." + f.getName() + ".tmp");
+                        java.io.FileOutputStream os = new java.io.FileOutputStream(tmp);
+                        try {
+                            PluginActions.copy(content, os);
+                            os.flush();
+                            os.getFD().sync();
+                        } finally {
+                            os.close();
+                            content.close();
+                        }
+                        ok = tmp.renameTo(f);
+                        if (!ok) tmp.delete();
+                    }
+                }
+            } catch (Throwable t) {
+                android.util.Log.i("MDTLauncher", "writeItem err=" + t);
+            } finally {
+                try { if (content != null) content.close(); } catch (Throwable ignored) { }
+            }
+            if (callback != null) callback.onDone(ok);
+        }
+
+        /** 只许写在槽内那四个内容目录里（写入面唯一的口子）。 */
+        private boolean insideSlot(File dir, File f) {
+            try {
+                String d = dir.getCanonicalPath();
+                String[] roots = {mapsDir().getCanonicalPath(), savesDir().getCanonicalPath(),
+                        modsDir().getCanonicalPath(), blueprintsDir().getCanonicalPath()};
+                for (String r : roots) {
+                    if (d.equals(r) || d.startsWith(r + File.separator)) return true;
+                }
+            } catch (Throwable ignored) { }
+            return false;
         }
 
         @Override public void progressCardClose() {

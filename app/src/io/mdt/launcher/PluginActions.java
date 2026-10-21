@@ -445,7 +445,7 @@ final class PluginActions {
         try { c.close(); } catch (Throwable ignored) { }
     }
 
-    private static void copy(InputStream in, OutputStream out) throws IOException {
+    static void copy(InputStream in, OutputStream out) throws IOException {
         byte[] buf = new byte[BUF];
         int n;
         while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
