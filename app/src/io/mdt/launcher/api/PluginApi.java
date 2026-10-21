@@ -61,7 +61,7 @@ import java.util.Map;
  */
 public interface PluginApi {
 
-    /** 宿主这一版支持的插件接口版本（当前 = 8）。 */
+    /** 宿主这一版支持的插件接口版本（当前 = 14）。 */
     int hostApi();
 
     /**
