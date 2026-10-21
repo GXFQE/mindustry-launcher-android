@@ -3571,6 +3571,29 @@ public final class SelfTest {
                 "插件接口版本区间 = " + PluginHost.API_MIN + ".." + PluginHost.API + "（第 139 轮：严格相等 → 兼容区间）");
         ok(stat, L, PluginHost.apiCompatible(PluginHost.API) && PluginHost.apiCompatible(PluginHost.API_MIN),
                 "区间两端都认（本机版本 + 还认的最老版本）");
+        ok(stat, L, PluginApi.DOC_VERSION == PluginHost.API,
+                "★ 文档版本常量 == 宿主接口版本（PluginApi.DOC_VERSION = "
+                        + PluginApi.DOC_VERSION + "，PluginHost.API = " + PluginHost.API + "）");
+        {
+            StringBuilder missing = new StringBuilder();
+            int checked = 0;
+            for (java.lang.reflect.Method m : PluginApi.class.getDeclaredMethods()) {
+                if (m.isSynthetic()) continue;
+                checked++;
+                try {
+                    java.lang.reflect.Method impl = Class.forName("io.mdt.launcher.PluginHost$PContext")
+                            .getMethod(m.getName(), m.getParameterTypes());
+                    if (java.lang.reflect.Modifier.isAbstract(impl.getModifiers())) {
+                        missing.append(m.getName()).append(" ");
+                    }
+                } catch (Throwable e) {
+                    missing.append(m.getName()).append(" ");
+                }
+            }
+            ok(stat, L, missing.length() == 0,
+                    "★ PluginApi 的每个方法宿主都实现了（查了 " + checked + " 个"
+                            + (missing.length() == 0 ? "" : "；缺：" + missing) + "）");
+        }
         ok(stat, L, !PluginHost.apiCompatible(PluginHost.API + 1) && !PluginHost.apiCompatible(99)
                         && !PluginHost.apiCompatible(PluginHost.API_MIN - 1),
                 "★ 越界一律不认（比本机新 / 比最老还老；99 也拒）");

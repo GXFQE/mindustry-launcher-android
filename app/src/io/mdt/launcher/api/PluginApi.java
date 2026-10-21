@@ -61,6 +61,15 @@ import java.util.Map;
  */
 public interface PluginApi {
 
+    /**
+     * 文档里写的接口版本（**必须等于**宿主 `PluginHost.API`；自检有一条元断言钉着）。
+     *
+     * <p>为什么要有这个常量：注释里的「当前 = N」运行期读不到，一个写 17、一个写 18 也没人发现；
+     * 常量 + 断言才拦得住。</p>
+     */
+    int DOC_VERSION = 17;
+
+
     /** 宿主这一版支持的插件接口版本（当前 = 14）。 */
     int hostApi();
 
