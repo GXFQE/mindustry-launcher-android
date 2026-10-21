@@ -74,6 +74,8 @@ public class PluginsActivity extends BaseActivity {
     private boolean mDirect;
     /** true = 列表已换成了某个插件的页面（此时系统返回 / 顶栏箭头该回列表，而不是退出本页）。 */
     private boolean mPluginOpen;
+    /** v17：当前插件页那个 Loaded（关页 / 销毁时叫 unload）。 */
+    private PluginHost.Loaded mPageLoaded;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -618,6 +620,7 @@ public class PluginsActivity extends BaseActivity {
                     ? PluginHost.openInjected(this, apk, entry, usePage, useSlot, selected)
                     : PluginHost.load(this, apk, entry, usePage, useSlot, selected);
             // ★ 一处实现（第 159 轮）：优先 createView(PluginApi)，老插件回落 createView(Context)
+            mPageLoaded = l;
             View v = PluginHost.createView(l);
             LinearLayout box = new LinearLayout(this);
             box.setOrientation(LinearLayout.VERTICAL);
@@ -680,11 +683,24 @@ public class PluginsActivity extends BaseActivity {
      * 全都落到同一个去处 —— 从列表点进来的回列表，直达进来的回调用方。
      */
     void closePluginPage() {
+        releasePage();
         if (backToPluginList(mDirect, mPluginOpen)) rebuild();
         else finish();
     }
 
     /** 插件没加载成时的兜底视图：**只说一句人话**（原因来自 {@link PluginHost#reasonRes}）。 */
+    /** 关插件页：先让插件收尾（v17），再做导航。 */
+    private void releasePage() {
+        PluginHost.Loaded l = mPageLoaded;
+        mPageLoaded = null;
+        if (l != null) PluginHost.unload(l);
+    }
+
+    @Override protected void onDestroy() {
+        releasePage();
+        super.onDestroy();
+    }
+
     private View fallback(String why) {
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);

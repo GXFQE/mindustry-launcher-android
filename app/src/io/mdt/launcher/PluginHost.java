@@ -65,11 +65,12 @@ public final class PluginHost {
      * **v13（第 198 轮）= `progressCard()`：宿主进度弹窗（搬家前「正在统计 N / M…」那个）**；
      * **v14（第 202 轮）= `dataDir()` / `gameRunning()` / `hostIcon()` / `confirm()` / `prompt()`**；
      * **v15（第 205 轮）= `pickFile()` / `openItem()` / `trashItem()` / 可取消 `progressCard()`**；
-     * **v16（第 206 轮）= `writeItem()`：同目录临时文件 + 原子替换，游戏在跑时拒绝**。
+     * **v16（第 206 轮）= `writeItem()`：同目录临时文件 + 原子替换，游戏在跑时拒绝**；
+     * **v17（第 207 轮）= 入口类可选钩子 `static void unload()`：插件页关闭 / 换页 / 销毁时收尾**。
      * 插件报 5/6/7 才意味着"我会用这些能力"，报 1/2/3/4 的照旧；
      * 区间下限不变（{@link #API_MIN} = 1）。
      */
-    public static final int API = 16;
+    public static final int API = 17;
     /**
      * 还认的**最老**契约版本（第 139 轮）。抬它 = 老插件被拒，界面会说清"太老、该更新插件"。
      *
@@ -339,6 +340,27 @@ public final class PluginHost {
     }
 
     /** 只带插件资源的 Context —— 插件代码拿到的必须是它（拿宿主的 ctx 就取不到插件资源）。 */
+    /**
+     * **v17**：叫插件收尾 —— 入口类可选 `static void unload()`（或 `unload(Context)`）。
+     *
+     * <p>调用点：插件页被关掉 / 换页 / Activity 销毁。插件在里面停线程、关定时器；
+     * 抛异常一律吞掉（收尾不该把宿主带崩）。</p>
+     */
+    static void unload(Loaded l) {
+        if (l == null || l.entry == null) return;
+        try {
+            try {
+                l.entry.getMethod("unload").invoke(null);
+                return;
+            } catch (NoSuchMethodException ignored) { }
+            try {
+                l.entry.getMethod("unload", Context.class).invoke(null, l.ctx);
+            } catch (NoSuchMethodException ignored) { }
+        } catch (Throwable t) {
+            android.util.Log.i("MDTLauncher", "plugin unload failed: " + t);
+        }
+    }
+
     private static final class PContext extends ContextWrapper implements PluginApi {
         private final AssetManager am;
         private final Resources res;
