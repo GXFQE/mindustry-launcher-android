@@ -609,7 +609,10 @@ public final class PluginHost {
 
         // ---- v14 ---------------------------------------------------------
 
-        @Override public File dataDir() { return files; }
+        @Override public File dataDir() {
+            if (!files.isDirectory()) files.mkdirs();
+            return files;
+        }
 
         @Override public boolean gameRunning() { return Data.gameAlive(this); }
 
