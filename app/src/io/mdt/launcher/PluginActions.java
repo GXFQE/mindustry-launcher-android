@@ -289,6 +289,8 @@ final class PluginActions {
                 sPick = null;
             }
             if (pp == null) return true;
+            android.util.Log.i(TAG, "pick result code=" + resultCode + " data=" + data
+                    + " uri=" + (data == null ? null : data.getData()));
             final Uri pickUri = (resultCode == Activity.RESULT_OK && data != null)
                     ? data.getData() : null;
             if (pickUri == null) {
@@ -301,6 +303,9 @@ final class PluginActions {
                     File out = null;
                     String err = null;
                     try {
+                        if (!pp.dir.isDirectory() && !pp.dir.mkdirs()) {
+                            throw new IOException("cache dir: " + pp.dir);
+                        }
                         out = new File(pp.dir, "pick-" + System.currentTimeMillis() + "-"
                                 + ShareOut.fixName(name));
                         InputStream in = a.getContentResolver().openInputStream(pickUri);
@@ -314,6 +319,7 @@ final class PluginActions {
                         }
                     } catch (Throwable t) {
                         err = Util.ioReason(a, t);
+                        android.util.Log.i(TAG, "pick copy err=" + err);
                         if (out != null) out.delete();
                         out = null;
                     }
