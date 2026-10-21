@@ -2099,4 +2099,7 @@
     <string name="batch_share_btn_fmt">Share (%1$d)</string>
     <string name="share_pack_btn">Share now</string>
 
+    <string name="plugin_pick_busy">A plugin is already waiting for a file pick</string>
+    <string name="plugin_pick_failed_fmt">Could not read that file: %1$s</string>
+    <string name="plugin_open_failed_fmt">Could not open that page: %1$s</string>
 </resources>

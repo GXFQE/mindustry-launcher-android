@@ -2055,4 +2055,7 @@
     <string name="batch_share_btn_fmt">分享（%1$d 份）</string>
     <string name="share_pack_btn">直接分享</string>
 
+    <string name="plugin_pick_busy">插件正在等另一个文件选择</string>
+    <string name="plugin_pick_failed_fmt">没能读那个文件：%1$s</string>
+    <string name="plugin_open_failed_fmt">打不开那一页：%1$s</string>
 </resources>

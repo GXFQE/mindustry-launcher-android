@@ -330,6 +330,34 @@ public interface PluginApi {
     /** 输入框回调；`null` = 用户取消。 */
     interface Prompt { void onPrompt(String text); }
 
+    // ---- v15（第 205 轮）：读写用户选的任意文件 / 跳详情 / 挪中转站 / 可取消进度 ----
+
+    /**
+     * **v15**：让用户挑一个**系统里的任意文件**（SAF），宿主把它复制到**插件缓存**再交给你。
+     *
+     * <p>取消 ⇒ 回调 `(null, null)`。文件在插件自己的 `cache/` 里，读完自己删或不管（会被回收）。</p>
+     */
+    void pickFile(String mime, PickFile callback);
+
+    /** **v15**：跳到某个条目的详情页（地图 / 存档 → 地图详情；蓝图 → 蓝图详情；模组 → 模组页）。 */
+    void openItem(ItemInfo item);
+
+    /** **v15**：把条目挪进中转站（不是真删；与界面删除同一套规则）。失败回调 false。 */
+    void trashItem(ItemInfo item, Done callback);
+
+    /** **v15**：可取消的进度弹窗（4 参那条不可取消）。取消时回调，插件应尽快收尾。 */
+    void progressCard(String title, String message, int done, int total,
+                      boolean cancelable, Cancel cancel);
+
+    /** 选文件回调；取消时两个参数都是 null。 */
+    interface PickFile { void onPicked(String name, java.io.File file); }
+
+    /** 结果回调（挪中转站是否成功）。 */
+    interface Done { void onDone(boolean ok); }
+
+    /** 进度框被取消。 */
+    interface Cancel { void onCancel(); }
+
         /** 保存结束（成功 / 取消或失败）后的回调；插件据此收尾（比如关掉导出页）。 */
     interface After {
         void onAfter(boolean ok);

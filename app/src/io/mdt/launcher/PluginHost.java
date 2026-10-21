@@ -3,6 +3,7 @@ package io.mdt.launcher;
 import android.app.Activity;
 import android.content.Context;
 import android.content.ContextWrapper;
+import android.content.Intent;
 import android.content.res.AssetManager;
 import android.content.res.Resources;
 import android.view.View;
@@ -62,11 +63,12 @@ public final class PluginHost {
      * **v11（第 196 轮）= `export(..., after)`：保存真的结束后回调插件**；
      * **v12（第 197 轮）= `action` 插槽 + `run(PluginApi)` 入口：点了就在**当前页**跑，不单开页面**；
      * **v13（第 198 轮）= `progressCard()`：宿主进度弹窗（搬家前「正在统计 N / M…」那个）**；
-     * **v14（第 202 轮）= `dataDir()` / `gameRunning()` / `hostIcon()` / `confirm()` / `prompt()`**。
+     * **v14（第 202 轮）= `dataDir()` / `gameRunning()` / `hostIcon()` / `confirm()` / `prompt()`**；
+     * **v15（第 205 轮）= `pickFile()` / `openItem()` / `trashItem()` / 可取消 `progressCard()`**。
      * 插件报 5/6/7 才意味着"我会用这些能力"，报 1/2/3/4 的照旧；
      * 区间下限不变（{@link #API_MIN} = 1）。
      */
-    public static final int API = 14;
+    public static final int API = 15;
     /**
      * 还认的**最老**契约版本（第 139 轮）。抬它 = 老插件被拒，界面会说清"太老、该更新插件"。
      *
@@ -564,8 +566,10 @@ public final class PluginHost {
             export(name, mime, content, null);
         }
 
-        /** v13：一个宿主进度弹窗（同一时刻只有一个）。 */
+        /** v13：一个宿主进度弹窗（同一时刻只有一个）；v15 起可取消。 */
         private android.app.ProgressDialog card;
+        private boolean cardCancelable;
+        private Cancel cardCancel;
 
         @Override public void progressCard(final String title, final String message,
                                            final int done, final int total) {
@@ -577,7 +581,16 @@ public final class PluginHost {
                         if (card == null) {
                             card = new android.app.ProgressDialog(a);
                             card.setProgressStyle(android.app.ProgressDialog.STYLE_HORIZONTAL);
-                            card.setCancelable(false);
+                            card.setCancelable(cardCancelable);
+                            card.setOnCancelListener(
+                                    new android.content.DialogInterface.OnCancelListener() {
+                                        @Override public void onCancel(
+                                                android.content.DialogInterface d) {
+                                            final Cancel cb = cardCancel;
+                                            card = null;
+                                            if (cb != null) cb.onCancel();
+                                        }
+                                    });
                             card.setTitle(title);
                             card.show();
                         }
@@ -686,6 +699,66 @@ public final class PluginHost {
                     }
                 }
             });
+        }
+
+        // ---- v15 ---------------------------------------------------------
+
+        @Override public void pickFile(String mime, PickFile callback) {
+            PluginActions.pickFile(activityOrNull(), cache, mime, callback);
+        }
+
+        @Override public void openItem(ItemInfo it) {
+            final Activity a = activityOrNull();
+            if (a == null || it == null) return;
+            try {
+                Intent i;
+                if (ItemInfo.KIND_BLUEPRINTS.equals(it.kind)) {
+                    i = new Intent(a, BlueprintDetailActivity.class);
+                    i.putExtra(BlueprintDetailActivity.EXTRA_SLOT, slot);
+                } else if (ItemInfo.KIND_MODS.equals(it.kind)) {
+                    i = new Intent(a, ModsActivity.class);
+                    i.putExtra("slot", slot);
+                } else {
+                    i = new Intent(a, MapDetailActivity.class);
+                    i.putExtra(MapDetailActivity.EXTRA_SLOT, slot);
+                }
+                i.putExtra("source", it.source == null ? "" : it.source);
+                i.putExtra("bytes", it.size);
+                if (it.path != null) i.putExtra("file", it.path);
+                if (it.container != null) i.putExtra("container", it.container);
+                if (it.entry != null) i.putExtra("entry", it.entry);
+                a.startActivity(i);
+            } catch (Throwable t) {
+                toast(Trans.get(getBaseContext(), R.string.plugin_open_failed_fmt,
+                        Util.ioReason(getBaseContext(), t)));
+            }
+        }
+
+        @Override public void trashItem(ItemInfo it, Done callback) {
+            boolean ok = false;
+            try {
+                File f = it == null || it.path == null ? null : new File(it.path);
+                Context c = getBaseContext();
+                if (f != null && f.exists()) {
+                    if (ItemInfo.KIND_MODS.equals(it.kind)) {
+                        ok = Mods.deleteToTrash(c, modsDir(), f, Trash.modsDir(c)) != null;
+                    } else if (ItemInfo.KIND_BLUEPRINTS.equals(it.kind)) {
+                        ok = BlueprintFiles.deleteToTrash(c, blueprintsDir(), f,
+                                BlueprintFiles.trashDirOf(c)) != null;
+                    } else {
+                        ok = MapFiles.deleteToTrash(c, mapsDir(), f,
+                                MapFiles.trashDirOf(c)) != null;
+                    }
+                }
+            } catch (Throwable ignored) { }
+            if (callback != null) callback.onDone(ok);
+        }
+
+        @Override public void progressCard(String title, String message, int done, int total,
+                                           boolean cancelable, final Cancel cancel) {
+            cardCancel = cancel;
+            cardCancelable = cancelable;
+            progressCard(title, message, done, total);
         }
 
         @Override public void progressCardClose() {

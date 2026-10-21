@@ -42,12 +42,28 @@ final class PluginActions {
     /** SAF 保存的请求码（{@link PluginsActivity#onActivityResult} 先问这一条）。 */
     static final int REQ_EXPORT = 0x9B10;
 
+    /** v15：SAF **打开**一个文件的请求码。 */
+    static final int REQ_PICK = 0x9B11;
+
     private static final String TAG = "MDTLauncher";
     private static final Object LOCK = new Object();
     private static final int BUF = 65536;
 
     /** 正在等用户选落点的那一份（同一时刻只允许一份，否则请求码 / 临时文件会串）。 */
     private static Pending sPending;
+
+    /** v15：正在等用户挑一份文件（同时只允许一份）。 */
+    private static PickPending sPick;
+
+    static final class PickPending {
+        final File dir;
+        final io.mdt.launcher.api.PluginApi.PickFile cb;
+
+        PickPending(File dir, io.mdt.launcher.api.PluginApi.PickFile cb) {
+            this.dir = dir;
+            this.cb = cb;
+        }
+    }
 
     static final class Pending {
         final File tmp;
@@ -214,12 +230,107 @@ final class PluginActions {
         }, "mdt-plugin-export").start();
     }
 
+    /** v15：让用户挑系统里的任意文件，复制到插件 `cache/` 再回调（取消 ⇒ 两个 null）。 */
+    static void pickFile(final Activity a, final File dir, final String mime,
+                         final io.mdt.launcher.api.PluginApi.PickFile cb) {
+        if (a == null || dir == null) {
+            if (cb != null) cb.onPicked(null, null);
+            return;
+        }
+        synchronized (LOCK) {
+            if (sPick != null) {
+                toast(a, Trans.get(a, R.string.plugin_pick_busy));
+                return;
+            }
+            sPick = new PickPending(dir, cb);
+        }
+        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        i.addCategory(Intent.CATEGORY_OPENABLE);
+        i.setType(mime == null || mime.isEmpty() ? "*/*" : mime);
+        try {
+            a.startActivityForResult(i, REQ_PICK);
+        } catch (Throwable t) {
+            synchronized (LOCK) { sPick = null; }
+            toast(a, Trans.get(a, R.string.plugin_pick_failed_fmt, Util.ioReason(a, t)));
+            if (cb != null) cb.onPicked(null, null);
+        }
+    }
+
+    /** SAF 返回的名字（拿不到就用兜底名）。 */
+    private static String displayName(Activity a, Uri uri) {
+        try {
+            android.database.Cursor c = a.getContentResolver().query(uri,
+                    new String[]{android.provider.OpenableColumns.DISPLAY_NAME}, null, null, null);
+            if (c != null) {
+                try {
+                    if (c.moveToFirst()) {
+                        String n = c.getString(0);
+                        if (n != null && !n.trim().isEmpty()) return n.trim();
+                    }
+                } finally {
+                    c.close();
+                }
+            }
+        } catch (Throwable ignored) { }
+        String last = uri.getLastPathSegment();
+        return last == null ? "picked" : last;
+    }
+
     /**
      * 本 Activity 的 {@code onActivityResult} 先问这里；认领了（返回 true）就别再往下走。
      *
      * <p>用户取消 ⇒ 静默删临时件（取消不是错误，不 Toast）。
      */
     static boolean onActivityResult(final Activity a, int requestCode, int resultCode, Intent data) {
+        if (requestCode == REQ_PICK) {
+            final PickPending pp;
+            synchronized (LOCK) {
+                pp = sPick;
+                sPick = null;
+            }
+            if (pp == null) return true;
+            final Uri pickUri = (resultCode == Activity.RESULT_OK && data != null)
+                    ? data.getData() : null;
+            if (pickUri == null) {
+                if (pp.cb != null) pp.cb.onPicked(null, null);
+                return true;
+            }
+            final String name = displayName(a, pickUri);
+            new Thread(new Runnable() {
+                @Override public void run() {
+                    File out = null;
+                    String err = null;
+                    try {
+                        out = new File(pp.dir, "pick-" + System.currentTimeMillis() + "-"
+                                + ShareOut.fixName(name));
+                        InputStream in = a.getContentResolver().openInputStream(pickUri);
+                        if (in == null) throw new IOException("openInputStream = null");
+                        java.io.FileOutputStream os = new java.io.FileOutputStream(out);
+                        try {
+                            copy(in, os);
+                        } finally {
+                            closeQuietly(in);
+                            closeQuietly(os);
+                        }
+                    } catch (Throwable t) {
+                        err = Util.ioReason(a, t);
+                        if (out != null) out.delete();
+                        out = null;
+                    }
+                    final File f = out;
+                    final String e = err;
+                    a.runOnUiThread(new Runnable() {
+                        @Override public void run() {
+                            if (f == null && e != null) {
+                                toast(a, Trans.get(a, R.string.plugin_pick_failed_fmt, e));
+                            }
+                            if (pp.cb != null) pp.cb.onPicked(f == null ? null : name, f);
+                        }
+                    });
+                }
+            }, "mdt-plugin-pick").start();
+            return true;
+        }
         if (requestCode != REQ_EXPORT) return false;
         final Pending p;
         synchronized (LOCK) {

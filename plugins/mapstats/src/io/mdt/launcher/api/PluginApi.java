@@ -312,6 +312,25 @@ public interface PluginApi {
     /** 输入框回调。 */
     interface Prompt { void onPrompt(String text); }
 
+    /** **v15**：系统里挑任意文件（宿主复制到插件缓存）。取消 ⇒ (null, null)。 */
+    void pickFile(String mime, PickFile callback);
+
+    /** **v15**：跳条目详情页。 */
+    void openItem(ItemInfo item);
+
+    /** **v15**：挪进中转站（不是真删）。 */
+    void trashItem(ItemInfo item, Done callback);
+
+    /** **v15**：可取消的进度弹窗。 */
+    void progressCard(String title, String message, int done, int total,
+                      boolean cancelable, Cancel cancel);
+
+    interface PickFile { void onPicked(String name, java.io.File file); }
+
+    interface Done { void onDone(boolean ok); }
+
+    interface Cancel { void onCancel(); }
+
     /**
      * 让用户从**当前槽的某一类内容**里勾选，结果回调给插件。
      *
