@@ -862,22 +862,31 @@
     <!--
       ══ 六道加载门（P3）：`Mods.gates` 原来在 Java 里拼中文 ════════════════
       ★ `note` 只在**失败**时给（通过了就只画一行 ✅）；`label` 里**不塞数据**，数据一律进 note。
+      ★★ 2026-10-21: every gate also has a `*_bad` label - a failed line must SAY what is wrong.
+         ("X  the game has it switched on" reads like "it is not switched on"; the blacklist gate
+         used to say "not disabled", which users read as the same switch in the opposite polarity.)
       ⚠️ 那句"太老了（要 N 以上）"里有两个数字 ⇒ 按 `%n$` 写（门禁 RES-02 比对两套语言的参数集合）。
     -->
     <string name="mods_gate_android_load">Android can load it</string>
+    <string name="mods_gate_android_load_bad">Android cannot load it</string>
     <string name="mods_gate_android_load_note">it says it needs Java, but the package has no code Android can run, so the game will try to load it and then skip it</string>
     <string name="mods_ignore_retry_note">this also clears the last-launch-did-not-finish mark - otherwise the next launch still skips the whole slot and switching it off would do nothing</string>
     <string name="mods_gate_enabled">the game has it switched on</string>
+    <string name="mods_gate_enabled_bad">the game has it switched off</string>
+    <string name="mods_gate_enabled_unknown_label">the game switch could not be read</string>
     <string name="mods_gate_enabled_note">the game settings file has not been read yet, so this shows the default (never written means enabled)</string>
-    <string name="mods_gate_enabled_off">it is turned off — press Enable to turn it on</string>
+    <string name="mods_gate_enabled_off">press Enable to turn it on</string>
     <string name="mods_gate_enabled_unknown">the settings file could not be read, so its switch state is unknown</string>
     <string name="mods_gate_version">the game version is new enough</string>
+    <string name="mods_gate_version_bad">the game version is too old</string>
     <string name="mods_gate_version_note_fmt">it needs %1$s or newer; this one is %2$s</string>
     <string name="mods_gate_minver">meets the load threshold</string>
+    <string name="mods_gate_minver_bad">the game version it declares is too old</string>
     <string name="mods_gate_minver_none">it does not say which game version it needs, so the game treats it as too old and skips it</string>
     <string name="mods_gate_minver_old_fmt">its minimum version is %1$d, which is too old (it needs %2$d or newer) — the game will skip it</string>
     <string name="mods_gate_blacklist">not on the game blacklist</string>
-    <string name="mods_gate_blacklist_note_fmt">it is on the list: %1$s</string>
+    <string name="mods_gate_blacklist_bad">on the game blacklist</string>
+    <string name="mods_gate_blacklist_note_fmt">the game will skip it (the list names %1$s)</string>
     <string name="mods_gate_last_crash">the last launch finished normally (no slot-wide skip)</string>
     <!-- Label flips with the state: an X next to a past-tense "finished normally" reads as nonsense. -->
     <string name="mods_gate_last_crash_bad">the last launch crashed into skipping the whole slot</string>

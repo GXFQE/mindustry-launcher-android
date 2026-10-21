@@ -666,7 +666,9 @@
     <string name="mods_detail_settings_head_fmt">游戏里的开关（读自 settings.bin · %1$s）</string>
     <string name="mods_state_content_errors">内容有错</string>
     <string name="mods_state_missing_deps">缺少必需依赖</string>
-    <string name="mods_state_incomplete_deps">依赖被禁用/失效</string>
+    <!-- ★ 2026-10-21：这句原来写「依赖**被禁用**或失效」（原文中间还有个斜杠）—— 与"游戏把某个模组
+         列进黑名单"撞词（用户：「什么叫做启用但是没有被禁用啊」）⇒ 开关这一套统一说「关掉」。 -->
+    <string name="mods_state_incomplete_deps">依赖被关掉或失效</string>
     <string name="mods_state_circular_deps">循环依赖</string>
     <string name="mods_state_unsupported">与当前游戏版本不兼容</string>
     <!-- ★ 2026-10-08 用户真机澄清：「是游戏崩溃自己关的啊」—— 原来写「被用户关闭」是**把游戏干的事
@@ -691,23 +693,35 @@
     <!--
       ══ 六道加载门（P3）：`Mods.gates` 原来在 Java 里拼中文 ════════════════
       ★ `note` 只在**失败**时给；`label` 里不塞数据，数据一律进 note。
+      ★★ 2026-10-21（用户：「**怎么还有叉号后面跟肯定词**」＋「什么叫做启用但是没有被禁用啊」）：
+         ① 每道门的 label 都有 `*_bad` 一版 —— **不通过时直接说"坏了什么"**，不再拿肯定句配 ❌
+            （「❌ 游戏里启用着」读起来像"没有启用着"，用户三次踩同一类）；
+         ② 那两句打架的根是**两个机制用了同一对词**：「启用」是模组自己的开关，
+            而「禁用」原来是游戏**写死的黑名单** ⇒ 黑名单那一关只说「黑名单」，不再出现「禁用」。
     -->
     <string name="mods_gate_android_load">安卓能加载</string>
+    <string name="mods_gate_android_load_bad">安卓加载不了</string>
     <string name="mods_gate_android_load_note">它写明要 Java，但包里没有安卓能跑的代码，游戏会试着加载、然后跳过</string>
     <string name="mods_ignore_retry_note">顺带会清掉「上次没跑完」的标记 —— 否则下次启动还是整槽跳过，关掉它等于白关</string>
-    <string name="mods_gate_enabled">游戏里启用着</string>
+    <string name="mods_gate_enabled">游戏里已启用</string>
+    <string name="mods_gate_enabled_bad">游戏里已关闭</string>
+    <string name="mods_gate_enabled_unknown_label">游戏里的开关没读到</string>
     <string name="mods_gate_enabled_note">还没读到游戏的设置文件，这里显示的是默认值（没写过 = 启用）</string>
     <!-- ★ 2026-10-08：这一关**不通过**时原来没有原因（note 只跟着"设置读没读到"）⇒ 详情页直接印出 null。
-         现在原因与动作都收在这一关（"点启用"归它；下面"上次启动"那一关只讲机制，避免同屏重复）。 -->
-    <string name="mods_gate_enabled_off">它被关掉了 —— 点「启用」就能打开</string>
+         现在原因与动作都收在这一关（"点启用"归它；下面"上次启动"那一关只讲机制，避免同屏重复）。
+         ★ 2026-10-21：说明里不再复述「它被关掉了」（label 已经说了）⇒ 只留**动作**。 -->
+    <string name="mods_gate_enabled_off">点「启用」就能打开</string>
     <string name="mods_gate_enabled_unknown">设置文件还没读出来，拿不到它的开关状态</string>
     <string name="mods_gate_version">游戏版本够新</string>
+    <string name="mods_gate_version_bad">游戏版本不够新</string>
     <string name="mods_gate_version_note_fmt">它要求 %1$s 以上，当前是 %2$s</string>
     <string name="mods_gate_minver">达到游戏的加载门槛</string>
+    <string name="mods_gate_minver_bad">它声明的游戏版本太老</string>
     <string name="mods_gate_minver_none">它没写要求哪个游戏版本，游戏会当成太老的模组跳过</string>
     <string name="mods_gate_minver_old_fmt">它写的最低版本是 %1$d，太老了（要 %2$d 以上）—— 游戏会跳过它</string>
-    <string name="mods_gate_blacklist">没有被游戏禁用</string>
-    <string name="mods_gate_blacklist_note_fmt">在名单里：%1$s</string>
+    <string name="mods_gate_blacklist">不在游戏的黑名单里</string>
+    <string name="mods_gate_blacklist_bad">在游戏的黑名单里</string>
+    <string name="mods_gate_blacklist_note_fmt">游戏会跳过它（名单上写的是 %1$s）</string>
     <string name="mods_gate_last_crash">上次启动正常结束（没触发整槽跳过）</string>
     <!-- ★ 2026-10-08：这道门的标签**跟着状态换措辞**（用户：「前面打个叉号后面说正常结束谁知道到底是正不正常啊」）
          —— ✓/❌ 那套（"❌ 满足最低版本要求"）只适用于**要求/状态**式判据；
