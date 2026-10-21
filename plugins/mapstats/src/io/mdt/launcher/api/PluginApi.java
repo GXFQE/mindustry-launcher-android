@@ -291,6 +291,27 @@ public interface PluginApi {
     /** **v13**：关掉那个进度弹窗。 */
     void progressCardClose();
 
+    /** **v14**：插件自己的可写目录。 */
+    java.io.File dataDir();
+
+    /** **v14**：游戏在跑吗。 */
+    boolean gameRunning();
+
+    /** **v14**：宿主图标（拿不到 null）。 */
+    android.graphics.drawable.Drawable hostIcon(String name);
+
+    /** **v14**：是 / 否弹窗。 */
+    void confirm(String title, String message, String okText, Confirm callback);
+
+    /** **v14**：输入弹窗（取消回调 null）。 */
+    void prompt(String title, String hint, String initial, String okText, Prompt callback);
+
+    /** 确认框回调。 */
+    interface Confirm { void onConfirm(boolean ok); }
+
+    /** 输入框回调。 */
+    interface Prompt { void onPrompt(String text); }
+
     /**
      * 让用户从**当前槽的某一类内容**里勾选，结果回调给插件。
      *

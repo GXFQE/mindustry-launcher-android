@@ -307,6 +307,29 @@ public interface PluginApi {
     /** **v13**：关掉上面那个进度弹窗（保存 / 分享 / 取消之后都要关）。 */
     void progressCardClose();
 
+    // ---- v14（第 202 轮）：不搞权限门，但把"正常开发者都需要"的东西补齐 ----
+
+    /** **v14**：插件自己的可写目录（`<插件>/data`，宿主建好）。 */
+    java.io.File dataDir();
+
+    /** **v14**：游戏现在在跑吗（跑着时别去动存档 / 模组文件）。 */
+    boolean gameRunning();
+
+    /** **v14**：宿主图标（按 res 名取，比如 `ic_map`）；拿不到返回 null。 */
+    android.graphics.drawable.Drawable hostIcon(String name);
+
+    /** **v14**：是 / 否弹窗（宿主那套），用户点了才回调。 */
+    void confirm(String title, String message, String okText, Confirm callback);
+
+    /** **v14**：要一段文字（宿主那套输入弹窗）；取消回调 null。 */
+    void prompt(String title, String hint, String initial, String okText, Prompt callback);
+
+    /** 确认框回调。 */
+    interface Confirm { void onConfirm(boolean ok); }
+
+    /** 输入框回调；`null` = 用户取消。 */
+    interface Prompt { void onPrompt(String text); }
+
         /** 保存结束（成功 / 取消或失败）后的回调；插件据此收尾（比如关掉导出页）。 */
     interface After {
         void onAfter(boolean ok);

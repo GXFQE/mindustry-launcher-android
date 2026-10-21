@@ -61,11 +61,12 @@ public final class PluginHost {
      * **v10（第 195 轮）= `choose()`：插件要问「怎么导出」时由**宿主**弹原生对话框**；
      * **v11（第 196 轮）= `export(..., after)`：保存真的结束后回调插件**；
      * **v12（第 197 轮）= `action` 插槽 + `run(PluginApi)` 入口：点了就在**当前页**跑，不单开页面**；
-     * **v13（第 198 轮）= `progressCard()`：宿主进度弹窗（搬家前「正在统计 N / M…」那个）**。
+     * **v13（第 198 轮）= `progressCard()`：宿主进度弹窗（搬家前「正在统计 N / M…」那个）**；
+     * **v14（第 202 轮）= `dataDir()` / `gameRunning()` / `hostIcon()` / `confirm()` / `prompt()`**。
      * 插件报 5/6/7 才意味着"我会用这些能力"，报 1/2/3/4 的照旧；
      * 区间下限不变（{@link #API_MIN} = 1）。
      */
-    public static final int API = 13;
+    public static final int API = 14;
     /**
      * 还认的**最老**契约版本（第 139 轮）。抬它 = 老插件被拒，界面会说清"太老、该更新插件"。
      *
@@ -587,6 +588,101 @@ public final class PluginHost {
                         }
                     } catch (Throwable ignored) {
                         // 页面在销毁 / 没窗口 ⇒ 不显示而已，别把导出弄挂
+                    }
+                }
+            });
+        }
+
+        // ---- v14 ---------------------------------------------------------
+
+        @Override public File dataDir() { return files; }
+
+        @Override public boolean gameRunning() { return Data.gameAlive(this); }
+
+        @Override public android.graphics.drawable.Drawable hostIcon(String name) {
+            try {
+                Context hostCtx = getBaseContext();
+                int id = hostCtx.getResources().getIdentifier(name, "drawable",
+                        hostCtx.getPackageName());
+                return id == 0 ? null : hostCtx.getResources().getDrawable(id, hostCtx.getTheme());
+            } catch (Throwable t) {
+                return null;
+            }
+        }
+
+        @Override public void confirm(final String title, final String message,
+                                      final String okText, final Confirm callback) {
+            final Context base = getBaseContext();
+            if (!(base instanceof Activity)) {
+                if (callback != null) callback.onConfirm(false);
+                return;
+            }
+            final Activity a = (Activity) base;
+            a.runOnUiThread(new Runnable() {
+                @Override public void run() {
+                    try {
+                        new android.app.AlertDialog.Builder(a)
+                                .setTitle(title)
+                                .setMessage(message)
+                                .setPositiveButton(okText,
+                                        new android.content.DialogInterface.OnClickListener() {
+                                            @Override public void onClick(
+                                                    android.content.DialogInterface d, int w) {
+                                                if (callback != null) callback.onConfirm(true);
+                                            }
+                                        })
+                                .setNegativeButton(android.R.string.cancel,
+                                        new android.content.DialogInterface.OnClickListener() {
+                                            @Override public void onClick(
+                                                    android.content.DialogInterface d, int w) {
+                                                if (callback != null) callback.onConfirm(false);
+                                            }
+                                        })
+                                .show();
+                    } catch (Throwable t) {
+                        if (callback != null) callback.onConfirm(false);
+                    }
+                }
+            });
+        }
+
+        @Override public void prompt(final String title, final String hint, final String initial,
+                                     final String okText, final Prompt callback) {
+            final Context base = getBaseContext();
+            if (!(base instanceof Activity)) {
+                if (callback != null) callback.onPrompt(null);
+                return;
+            }
+            final Activity a = (Activity) base;
+            a.runOnUiThread(new Runnable() {
+                @Override public void run() {
+                    try {
+                        final android.widget.EditText input = new android.widget.EditText(a);
+                        input.setHint(hint == null ? "" : hint);
+                        if (initial != null) input.setText(initial);
+                        new android.app.AlertDialog.Builder(a)
+                                .setTitle(title)
+                                .setView(input)
+                                .setPositiveButton(okText,
+                                        new android.content.DialogInterface.OnClickListener() {
+                                            @Override public void onClick(
+                                                    android.content.DialogInterface d, int w) {
+                                                if (callback != null) {
+                                                    callback.onPrompt(
+                                                            input.getText().toString().trim());
+                                                }
+                                            }
+                                        })
+                                .setNegativeButton(android.R.string.cancel,
+                                        new android.content.DialogInterface.OnClickListener() {
+                                            @Override public void onClick(
+                                                    android.content.DialogInterface d, int w) {
+                                                if (callback != null) callback.onPrompt(null);
+                                            }
+                                        })
+                                .show();
+                    } catch (Throwable t) {
+                        if (callback != null) callback.onPrompt(null);
                     }
                 }
             });
