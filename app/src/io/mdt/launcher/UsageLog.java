@@ -34,6 +34,7 @@ final class UsageLog {
     private static final long BEAT_MS = 5_000L;
     static final long MAX_SESSION_MS = 12L * 3600_000L;
 
+    private static Application appCtx;
     private static Thread beat;
     private static volatile boolean beating;
 
@@ -64,7 +65,10 @@ final class UsageLog {
 
     /** 在 {@code :game} 进程的 Application 里装旁观者（不改游戏任何代码）。 */
     static void install(final Application app) {
+        appCtx = app;
         recover(app);
+        installCrash();
+        installScreen(app);
         app.registerActivityLifecycleCallbacks(new Application.ActivityLifecycleCallbacks() {
             @Override public void onActivityCreated(Activity a, Bundle b) { }
             @Override public void onActivityStarted(Activity a) { }
@@ -78,6 +82,48 @@ final class UsageLog {
             @Override public void onActivitySaveInstanceState(Activity a, Bundle b) { }
             @Override public void onActivityDestroyed(Activity a) { }
         });
+    }
+
+    /** 崩溃：先写一条 C，再交回原来的处理器（不改变崩溃行为）。 */
+    private static void installCrash() {
+        final Thread.UncaughtExceptionHandler prev = Thread.getDefaultUncaughtExceptionHandler();
+        Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
+            @Override public void uncaughtException(Thread t, Throwable e) {
+                try {
+                    appendTo(runFile(appCtx), "C " + System.currentTimeMillis()
+                            + " " + e.getClass().getName());
+                } catch (Throwable ignored) { }
+                if (prev != null) {
+                    prev.uncaughtException(t, e);
+                } else {
+                    System.exit(1);
+                }
+            }
+        });
+    }
+
+    /** 亮屏 / 熄屏：让"前台时长"能区分"熄屏挂着"。 */
+    private static void installScreen(final Application app) {
+        try {
+            android.content.BroadcastReceiver r = new android.content.BroadcastReceiver() {
+                @Override public void onReceive(android.content.Context c, android.content.Intent i) {
+                    try {
+                        String a = i == null ? null : i.getAction();
+                        if (android.content.Intent.ACTION_SCREEN_OFF.equals(a)) {
+                            appendTo(runFile(appCtx), "SC off " + System.currentTimeMillis());
+                        } else if (android.content.Intent.ACTION_SCREEN_ON.equals(a)) {
+                            appendTo(runFile(appCtx), "SC on " + System.currentTimeMillis());
+                        }
+                    } catch (Throwable ignored) { }
+                }
+            };
+            android.content.IntentFilter f = new android.content.IntentFilter();
+            f.addAction(android.content.Intent.ACTION_SCREEN_OFF);
+            f.addAction(android.content.Intent.ACTION_SCREEN_ON);
+            app.registerReceiver(r, f);
+        } catch (Throwable t) {
+            Log.w(TAG, "screen receiver failed: " + t);
+        }
     }
 
     /** 游戏 Activity：住在这个进程里、又不是我们自己的页。 */
