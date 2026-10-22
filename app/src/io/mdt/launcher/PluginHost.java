@@ -862,8 +862,8 @@ public final class PluginHost {
             return false;
         }
 
-        @Override public File usageLog() {
-            return UsageLog.file(getBaseContext());
+        @Override public File usageDir() {
+            return UsageLog.dir(getBaseContext());
         }
 
         @Override public void progressCardClose() {

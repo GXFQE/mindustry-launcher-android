@@ -1081,6 +1081,11 @@ public class MainActivity extends BaseActivity {
                     i.putExtra("pkg", e.pkg);
                 }
                 final String slot = Versions.slotFor(e);
+                // 第 215 轮：启动事实与运行期分开记（启动记录写完不可变）
+                try {
+                    UsageLog.recordLaunch(MainActivity.this, e.label, slot, e.apkPath);
+                } catch (Throwable ignored) { }
+
                 i.putExtra("slot", slot);
                 // ★ F0：顺带把上面那次探测的结论透传下去（该包支不支持属性注入），
                 //   :game 就不必把同一个 APK 的 dex 再读一遍。

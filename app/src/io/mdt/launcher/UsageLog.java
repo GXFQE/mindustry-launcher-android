@@ -27,7 +27,10 @@ import java.io.FileOutputStream;
 final class UsageLog {
 
     private static final String TAG = "MDTUsage";
-    private static final String FILE = "usage.txt";
+    /** 目录：`<hub>/usage/`，里面两条流分开。 */
+    private static final String DIR = "usage";
+    private static final String LAUNCH = "launch.tsv";
+    private static final String RUN = "run.tsv";
     private static final long BEAT_MS = 5_000L;
     static final long MAX_SESSION_MS = 12L * 3600_000L;
 
@@ -36,8 +39,27 @@ final class UsageLog {
 
     private UsageLog() { }
 
-    static File file(Context ctx) {
-        return new File(Data.hubDir(ctx), FILE);
+    static File dir(Context ctx) {
+        return new File(Data.hubDir(ctx), DIR);
+    }
+
+    /** 运行期一条流（S/B/E），可能断（被杀）。 */
+    static File runFile(Context ctx) {
+        return new File(dir(ctx), RUN);
+    }
+
+    /** 启动记录一条流（L），写完不可变、永远完整。 */
+    static File launchFile(Context ctx) {
+        return new File(dir(ctx), LAUNCH);
+    }
+
+    /**
+     * 启动那一刻就知道的事实（版本 / 槽 / apk），由宿主在起游戏前写入。
+     * 与运行期分开：运行记录会断，启动记录不会。
+     */
+    static void recordLaunch(Context ctx, String version, String slot, String apk) {
+        appendTo(launchFile(ctx), "L " + System.currentTimeMillis() + " "
+                + clean(version) + " " + clean(slot) + " " + clean(apk));
     }
 
     /** 在 {@code :game} 进程的 Application 里装旁观者（不改游戏任何代码）。 */
@@ -68,7 +90,7 @@ final class UsageLog {
     private static synchronized void begin(Context ctx, Activity a) {
         if (beating) return;
         long now = System.currentTimeMillis();
-        append(ctx, "S " + now + " " + clean(Data.currentSlot(ctx)));
+        appendTo(runFile(ctx), "S " + now + " " + clean(Data.currentSlot(ctx)));
         startBeat(ctx.getApplicationContext());
         Log.i(TAG, "session start slot=" + Data.currentSlot(ctx));
     }
@@ -76,14 +98,14 @@ final class UsageLog {
     private static synchronized void end(Context ctx) {
         if (!beating) return;
         stopBeat();
-        append(ctx, "E " + System.currentTimeMillis());
+        appendTo(runFile(ctx), "E " + System.currentTimeMillis());
         Log.i(TAG, "session end");
     }
 
     /** 上次没结束的会话：end = min(now, lastBeat + 5s)，只少不多。 */
     private static void recover(Context ctx) {
         long start = -1, last = -1;
-        for (String l : readLines(ctx)) {
+        for (String l : readLines(runFile(ctx))) {
             if (l.startsWith("S ")) {
                 start = num(l, 1, -1);
                 last = start;
@@ -97,7 +119,7 @@ final class UsageLog {
         long end = last > 0 ? Math.min(System.currentTimeMillis(), last + BEAT_MS)
                 : Math.min(System.currentTimeMillis(), start + BEAT_MS);
         if (end - start > MAX_SESSION_MS) end = start + MAX_SESSION_MS;
-        append(ctx, "E " + end);
+        appendTo(runFile(ctx), "E " + end);
     }
 
     private static void startBeat(final Context ctx) {
@@ -110,7 +132,7 @@ final class UsageLog {
                     } catch (InterruptedException e) {
                         return;
                     }
-                    if (beating) append(ctx, "B " + System.currentTimeMillis());
+                    if (beating) appendTo(runFile(ctx), "B " + System.currentTimeMillis());
                 }
             }
         }, "mdt-usage-beat");
@@ -125,9 +147,8 @@ final class UsageLog {
         if (t != null) t.interrupt();
     }
 
-    private static void append(Context ctx, String line) {
+    private static void appendTo(File f, String line) {
         try {
-            File f = file(ctx);
             File d = f.getParentFile();
             if (d != null && !d.isDirectory()) d.mkdirs();
             FileOutputStream os = new FileOutputStream(f, true);
@@ -141,9 +162,8 @@ final class UsageLog {
         }
     }
 
-    private static String[] readLines(Context ctx) {
+    private static String[] readLines(File f) {
         try {
-            File f = file(ctx);
             if (!f.isFile()) return new String[0];
             java.io.BufferedReader r = new java.io.BufferedReader(
                     new java.io.InputStreamReader(new java.io.FileInputStream(f), "UTF-8"));

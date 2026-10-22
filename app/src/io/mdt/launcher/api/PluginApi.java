@@ -377,12 +377,16 @@ public interface PluginApi {
     void writeItem(ItemInfo item, java.io.InputStream content, Done callback);
 
     /**
-     * **v18**：游戏会话流水文件（TSV，追加写；**只读**）。
+     * **v18**：会话记录的**目录**（只读），里面两条流分开：
      *
-     * <p>由宿主在 {@code :game} 进程里记：`S start slot` / `B ts`（5 秒心跳）/ `E ts`。
-     * 没有 E 的会话按 `min(now, lastB + 5s)` 收口。</p>
+     * <ul>
+     *   <li>`launch.tsv` —— 启动那一刻的事实（`L ts ver slot apk`），写在起游戏之前，**永远完整**</li>
+     *   <li>`run.tsv` —— 运行期事实（`S ts slot` / `B ts` 5 秒心跳 / `E ts`），进程被杀就会断</li>
+     * </ul>
+     *
+     * <p>没有 E 的会话按 `min(now, lastB + 5s)` 收口（只少不多），单条上限 12 小时。</p>
      */
-    java.io.File usageLog();
+    java.io.File usageDir();
 
         /** 保存结束（成功 / 取消或失败）后的回调；插件据此收尾（比如关掉导出页）。 */
     interface After {
