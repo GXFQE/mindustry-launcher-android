@@ -644,7 +644,8 @@ public class PluginsActivity extends BaseActivity {
                             PluginHost.API_MIN, PluginHost.API)
                     : Trans.get(this, rr));
         } catch (Throwable t) {
-            pageView = fallback(Trans.get(this, R.string.plugin_err_other));
+            pageView = fallback(Trans.get(this, R.string.plugin_err_page_fmt,
+                    Plugins.displayNameOf(this, id)));
         }
         // 插件自己的页面 + 一个「返回」按钮（直接打开的 ⇒ 回上一页；从列表点的 ⇒ 重建本页）
         LinearLayout root = new LinearLayout(this);

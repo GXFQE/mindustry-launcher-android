@@ -56,6 +56,7 @@ public static void unload();                    // 可选：收尾（也认 unlo
 - 入口类**一个插件一份**，方法都是 `static`，由宿主反射调用。
 - `createView` / `run` 在**主线程**调用；耗时活请自己起线程，并用 `runBackground` 报告进度。
 - `unload` 只在"插件页关闭 / 换页 / Activity 销毁"时调用；**进程被杀不会调用**，关键数据请落盘在拿到结果时。
+  `unload` 里抛异常**不会弹窗**（只写 `plugin unload failed:` 日志），别在里面做必须成功的事。
 
 ## 4. 接口清单
 

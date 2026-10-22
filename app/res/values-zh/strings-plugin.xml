@@ -61,7 +61,7 @@
     <string name="plugin_err_entry">插件的入口用不了。</string>
     <string name="plugin_err_api_fmt">接口版本不匹配：插件是 %1$d，本版本需要 %2$d。</string>
     <string name="plugin_err_asset">插件的资源挂不上。</string>
-    <string name="plugin_err_other">插件加载失败。</string>
+    <string name="plugin_err_other">插件加载失败。可以试试停用后重新装一次。</string>
 
     <!-- 第 133 轮：信任模型（官方 = 与本应用同一把签名）与三档处置等级 -->
     <string name="plugin_trust_official">官方（与本应用同一签名）</string>
@@ -124,4 +124,5 @@
     <string name="plugin_pick_head">选中后交给插件</string>
     <string name="plugin_pick_ok_fmt">完成（%1$d）</string>
     <string name="plugin_pick_empty">这里没有可选的条目。</string>
+    <string name="plugin_err_page_fmt">「%1$s」这个插件出错了，页面没画出来。可以停用它，或换一版插件。</string>
 </resources>
