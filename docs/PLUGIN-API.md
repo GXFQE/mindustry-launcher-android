@@ -204,14 +204,14 @@ java.io.File usageDir();   // <hub>/usage/
 
 | 行 | 含义 |
 |---|---|
-| `S <ts> <槽>` | 会话开始（游戏 Activity resumed） |
-| `B <ts>` | 心跳，每 5 秒一次 |
+| `S <ts>` | 会话开始（游戏 Activity resumed；槽/版本在 `launch.tsv`，按时间就近 join） |
+| `B <ts>` | 心跳，每 30 秒一次 |
 | `E <ts>` | 会话结束（paused） |
 | `C <ts> <异常类>` | 崩溃（先写这条，再交回原处理器；不改变崩溃行为） |
 | `SC off|on <ts>` | 熄屏 / 亮屏（让"前台时长"能区分熄屏挂着） |
 
 读侧约定：
-- 没有 `E` 的会话按 `min(now, lastB + 5s)` 收口 —— **只少不多**
+- 没有 `E` 的会话按 `min(now, lastB + 30s)` 收口 —— **只少不多**
 - 单条会话上限 12 小时
 - 「游戏前台时长」：含主菜单 / 暂停 / 地图编辑器；不含切到别的 App
 
@@ -219,8 +219,8 @@ java.io.File usageDir();   // <hub>/usage/
 
 ```
 launch.tsv: L 1792686560273 official-159 预览验收 /data/user/0/io.mdt.launcher/app_hub/import/official-159.apk
-run.tsv:    S 1792686560665 预览验收
-            B 1792686565669
+run.tsv:    S 1792686560665
+            B 1792686565669  (30 秒一个)
             E 1792686572423
             SC off 1792686882692
             SC on  1792686885360

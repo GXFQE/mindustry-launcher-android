@@ -17,12 +17,12 @@ import java.io.FileOutputStream;
  *
  * <p>格式（{@code <hub>/usage.txt}，追加写，一行一条，空格分隔）：</p>
  * <pre>
- * S &lt;startMs&gt; &lt;slot&gt;   会话开始（游戏 Activity resumed）
+ * S &lt;startMs&gt;   会话开始（游戏 Activity resumed；槽在 launch.tsv 里）
  * B &lt;ts&gt;                 心跳（5 秒一次；进程被杀就断）
  * E &lt;ts&gt;                 会话结束（游戏 Activity paused）
  * </pre>
  *
- * <p>没有 E 的会话：读方按 {@code min(now, lastB + 5s)} 收口（只少不多），单条上限 12 小时。</p>
+ * <p>没有 E 的会话：读方按 {@code min(now, lastB + 30s)} 收口（只少不多），单条上限 12 小时。</p>
  */
 final class UsageLog {
 
@@ -31,7 +31,8 @@ final class UsageLog {
     private static final String DIR = "usage";
     private static final String LAUNCH = "launch.tsv";
     private static final String RUN = "run.tsv";
-    private static final long BEAT_MS = 5_000L;
+    /** 心跳间隔：30 秒（更密没必要——我们本来就只记下界）。 */
+    private static final long BEAT_MS = 30_000L;
     static final long MAX_SESSION_MS = 12L * 3600_000L;
 
     private static Application appCtx;
@@ -136,7 +137,7 @@ final class UsageLog {
     private static synchronized void begin(Context ctx, Activity a) {
         if (beating) return;
         long now = System.currentTimeMillis();
-        appendTo(runFile(ctx), "S " + now + " " + clean(Data.currentSlot(ctx)));
+        appendTo(runFile(ctx), "S " + now);
         startBeat(ctx.getApplicationContext());
         Log.i(TAG, "session start slot=" + Data.currentSlot(ctx));
     }
