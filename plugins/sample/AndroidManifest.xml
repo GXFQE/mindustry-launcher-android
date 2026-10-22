@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 文档配套示例插件：只声明包名，不声明任何组件（插件不是独立应用）。 -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="io.mdt.plugins.sample">
+    <application android:label="MDT Sample Plugin"/>
+</manifest>

@@ -1,0 +1,14 @@
+{
+  "entry": "io.mdt.plugins.sample.SamplePlugin",
+  "name": "sample",
+  "version": "1",
+  "author": "mdt-doc",
+  "description": "PLUGIN-API.md 的配套示例：section + action + unload",
+  "access": ["slots"],
+  "extensions": [
+    { "id": "sample-detail", "title": "样例：这一份", "subtitle": "读标题/大小与前 8 字节",
+      "entry": "io.mdt.plugins.sample.SamplePlugin", "slot": "section", "page": "map-detail" },
+    { "id": "sample-export", "title": "样例：导出清单…", "subtitle": "勾选若干净地图 → json / csv",
+      "entry": "io.mdt.plugins.sample.SamplePlugin", "slot": "action", "page": "maps" }
+  ]
+}

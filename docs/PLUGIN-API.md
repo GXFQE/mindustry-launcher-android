@@ -156,3 +156,20 @@ public static void unload();                    // 可选：收尾（也认 unlo
 - `writeItem` 只允许改**槽内四类目录里已存在的文件**（canonical 前缀校验），不能新建、不能写到别处。
 - 插件的数据住在 `<插件>/data`（`dataDir()`），缓存住 `<插件>/cache`（`pickFile` 落点）。
 - 界面文案请走 `api.context().getString(...)` 或插件自带资源；宿主的 `Trans` 只服务宿主自己。
+
+## 9. 配套示例：`plugins/sample/`
+
+仓库里的 `plugins/sample/` 是一个**按本文档从零写出来**的最小完整插件（约 150 行），用来当模板与冒烟测试：
+
+- `section` 挂在 `map-detail`：显示当前地图的标题 / 大小，并读**前 8 字节**证明 `open()` 真的能读
+- `action` 挂在 `maps`：勾选地图 → 选 json / csv → `export(..., after)`
+- `unload()`：关页时写一行 `SAMPLE unload` 日志
+
+构建（与 mapstats 同一条链）：
+
+```bash
+ANDROID_HOME=<sdk> bash plugins/sample/build.sh
+# 产物：%TEMP%/mdt-sample/mapstats.apk
+```
+
+装到设备上：用插件页「装一个插件 APK…」，或开发口 `--es dev_plugininstall <apk>`。
