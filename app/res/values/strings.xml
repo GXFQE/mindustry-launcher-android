@@ -2102,4 +2102,5 @@
     <string name="plugin_pick_busy">A plugin is already waiting for a file pick</string>
     <string name="plugin_pick_failed_fmt">Could not read that file: %1$s</string>
     <string name="plugin_open_failed_fmt">Could not open that page: %1$s</string>
+    <string name="plugin_pick_too_large">That file is too large (64 MB limit) and was not read</string>
 </resources>

@@ -52,6 +52,9 @@ final class PluginActions {
     /** 正在等用户选落点的那一份（同一时刻只允许一份，否则请求码 / 临时文件会串）。 */
     private static Pending sPending;
 
+    /** v15：挑文件的上限（超过就拒，别把几百 MB 复制进插件 cache）。 */
+    static final long MAX_PICK_BYTES = 64L * 1024 * 1024;
+
     /** v15：正在等用户挑一份文件（同时只允许一份）。 */
     private static PickPending sPick;
 
@@ -317,6 +320,9 @@ final class PluginActions {
                             closeQuietly(in);
                             closeQuietly(os);
                         }
+                        if (out.length() > MAX_PICK_BYTES) {
+                            throw new IOException("too large: " + out.length());
+                        }
                     } catch (Throwable t) {
                         err = Util.ioReason(a, t);
                         android.util.Log.i(TAG, "pick copy err=" + err);
@@ -328,7 +334,9 @@ final class PluginActions {
                     a.runOnUiThread(new Runnable() {
                         @Override public void run() {
                             if (f == null && e != null) {
-                                toast(a, Trans.get(a, R.string.plugin_pick_failed_fmt, e));
+                                toast(a, e.startsWith("too large")
+                                        ? Trans.get(a, R.string.plugin_pick_too_large)
+                                        : Trans.get(a, R.string.plugin_pick_failed_fmt, e));
                             }
                             if (pp.cb != null) pp.cb.onPicked(f == null ? null : name, f);
                         }

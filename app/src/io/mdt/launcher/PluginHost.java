@@ -765,7 +765,8 @@ public final class PluginHost {
             try {
                 File f = it == null || it.path == null ? null : new File(it.path);
                 Context c = getBaseContext();
-                if (f != null && f.exists()) {
+                // v16 加固：只动"住在对应目录里"的条目；别的路径一律拒绝（别把任意文件挪进某类中转站）
+                if (f != null && f.exists() && insideDir(f, dirForKind(it.kind))) {
                     if (ItemInfo.KIND_MODS.equals(it.kind)) {
                         ok = Mods.deleteToTrash(c, modsDir(), f, Trash.modsDir(c)) != null;
                     } else if (ItemInfo.KIND_BLUEPRINTS.equals(it.kind)) {
@@ -787,6 +788,10 @@ public final class PluginHost {
             progressCard(title, message, done, total);
         }
 
+        /** v16 加固：同一目标路径的写要互斥（两个插件同时写同一份存档）。 */
+        private final java.util.concurrent.ConcurrentHashMap<String, Object> writeLocks =
+                new java.util.concurrent.ConcurrentHashMap<String, Object>();
+
         @Override public void writeItem(ItemInfo it, InputStream content, Done callback) {
             boolean ok = false;
             try {
@@ -795,7 +800,16 @@ public final class PluginHost {
                     File f = new File(it.path);
                     File dir = f.getParentFile();
                     if (f.isFile() && dir != null && insideSlot(dir, f)) {
-                        File tmp = new File(dir, "." + f.getName() + ".tmp");
+                        String key = f.getCanonicalPath();
+                        Object lock = writeLocks.get(key);
+                        if (lock == null) {
+                            Object fresh = new Object();
+                            lock = writeLocks.putIfAbsent(key, fresh);
+                            if (lock == null) lock = fresh;
+                        }
+                        synchronized (lock) {
+                        File tmp = new File(dir, "." + f.getName() + "."
+                                + Long.toHexString(System.nanoTime()) + ".tmp");
                         java.io.FileOutputStream os = new java.io.FileOutputStream(tmp);
                         try {
                             PluginActions.copy(content, os);
@@ -807,6 +821,7 @@ public final class PluginHost {
                         }
                         ok = tmp.renameTo(f);
                         if (!ok) tmp.delete();
+                        }
                     }
                 }
             } catch (Throwable t) {
@@ -815,6 +830,23 @@ public final class PluginHost {
                 try { if (content != null) content.close(); } catch (Throwable ignored) { }
             }
             if (callback != null) callback.onDone(ok);
+        }
+
+        /** 条目种类 → 它该住的那个目录。 */
+        private File dirForKind(String kind) {
+            if (ItemInfo.KIND_MODS.equals(kind)) return modsDir();
+            if (ItemInfo.KIND_BLUEPRINTS.equals(kind)) return blueprintsDir();
+            if (ItemInfo.KIND_SAVES.equals(kind)) return savesDir();
+            return mapsDir();
+        }
+
+        /** 文件是否就在这个目录里（canonical 前缀）。 */
+        private boolean insideDir(File f, File dir) {
+            try {
+                return f.getCanonicalPath().startsWith(dir.getCanonicalPath() + File.separator);
+            } catch (Throwable t) {
+                return false;
+            }
         }
 
         /** 只许写在槽内那四个内容目录里（写入面唯一的口子）。 */
