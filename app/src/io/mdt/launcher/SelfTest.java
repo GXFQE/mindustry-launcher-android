@@ -3613,7 +3613,7 @@ public final class SelfTest {
                 Extensions.PAGE_MAPS));
         v9.add(new Extensions.Item("d", "t", "s", "E", Extensions.SLOT_ACTION,
                 Extensions.PAGE_MAPS));
-        ok(stat, L, PluginHost.API >= 17 && PluginHost.API >= 16 && PluginHost.API >= 15 && PluginHost.API >= 14 && PluginHost.API >= 13 && PluginHost.API >= 12 && PluginHost.API >= 11 && PluginHost.API >= 10 && PluginHost.API >= 9
+        ok(stat, L, PluginHost.API >= 18 && PluginHost.API >= 17 && PluginHost.API >= 16 && PluginHost.API >= 15 && PluginHost.API >= 14 && PluginHost.API >= 13 && PluginHost.API >= 12 && PluginHost.API >= 11 && PluginHost.API >= 10 && PluginHost.API >= 9
                         && Extensions.forAction(v9, Extensions.PAGE_MAPS).size() == 1
                         && "d".equals(Extensions.forAction(v9, Extensions.PAGE_MAPS).get(0).id)
                         && Extensions.forAction(v9, Extensions.PAGE_MAP_DETAIL).isEmpty()

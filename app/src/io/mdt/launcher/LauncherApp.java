@@ -70,6 +70,15 @@ public class LauncherApp extends Application {
                 Log.w(TAG, "startup recovery failed: " + t);
             }
         }
+        // 第 214 轮：游戏会话流水只在 :game 进程里记（宿主/插件只读）
+        try {
+            String proc = android.app.Application.getProcessName();
+            if (proc != null && proc.endsWith(":game")) {
+                UsageLog.install(this);
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "usage log install failed: " + t);
+        }
         Config.get().load(this);
         Log.i(TAG, "app up, privateDir=" + Paths.privateDir(this)
                 + " pid=" + android.os.Process.myPid());

@@ -325,6 +325,9 @@ public interface PluginApi {
     void progressCard(String title, String message, int done, int total,
                       boolean cancelable, Cancel cancel);
 
+    /** **v18**：会话流水文件（TSV，只读）。 */
+    java.io.File usageLog();
+
     interface PickFile { void onPicked(String name, java.io.File file); }
 
     interface Done { void onDone(boolean ok); }

@@ -67,7 +67,7 @@ public interface PluginApi {
      * <p>为什么要有这个常量：注释里的「当前 = N」运行期读不到，一个写 17、一个写 18 也没人发现；
      * 常量 + 断言才拦得住。</p>
      */
-    int DOC_VERSION = 17;
+    int DOC_VERSION = 18;
 
 
     /** 宿主这一版支持的插件接口版本（当前 = 14）。 */
@@ -375,6 +375,14 @@ public interface PluginApi {
      * <p>同目录写临时文件再原子替换；游戏在跑时拒绝（`false`）。内容读完后宿主负责关闭。</p>
      */
     void writeItem(ItemInfo item, java.io.InputStream content, Done callback);
+
+    /**
+     * **v18**：游戏会话流水文件（TSV，追加写；**只读**）。
+     *
+     * <p>由宿主在 {@code :game} 进程里记：`S start slot` / `B ts`（5 秒心跳）/ `E ts`。
+     * 没有 E 的会话按 `min(now, lastB + 5s)` 收口。</p>
+     */
+    java.io.File usageLog();
 
         /** 保存结束（成功 / 取消或失败）后的回调；插件据此收尾（比如关掉导出页）。 */
     interface After {
