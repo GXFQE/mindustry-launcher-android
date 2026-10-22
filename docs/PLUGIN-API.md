@@ -173,3 +173,13 @@ ANDROID_HOME=<sdk> bash plugins/sample/build.sh
 ```
 
 装到设备上：用插件页「装一个插件 APK…」，或开发口 `--es dev_plugininstall <apk>`。
+
+### 冒烟脚本（改接口时必须跑）
+
+```bash
+bash tools/sample-smoke.sh                # 当前装的是 dev 变体
+bash tools/sample-smoke.sh --dev-install  # 先构建/安装 dev 变体
+```
+
+它做三件事：构建样例 → 装进 dev 宿主 → 重启后断言"装上了、没崩"，最后打印两处**肉眼**检查点
+（地图页的 action 行、地图详情页的 section）。改 `PluginApi` / 注入 / 槽位之后跑一遍，能挡住"文档写着但实际用不了"。
