@@ -2,7 +2,6 @@ package io.mdt.launcher;
 
 import android.content.Context;
 import io.mdt.launcher.api.ItemInfo;
-import io.mdt.launcher.api.PickCallback;
 import io.mdt.launcher.api.PluginApi;
 import io.mdt.launcher.api.PluginTheme;
 import io.mdt.launcher.api.SlotInfo;
@@ -3648,12 +3647,26 @@ public final class SelfTest {
                         && Extensions.forPage(exAllPages, Extensions.PAGE_SLOT).size() == 1
                         && Extensions.forPage(exAllPages, Extensions.PAGE_SETTINGS).isEmpty(),
                 "forPage works for main / slot / map-detail");
-        try {
-            java.lang.reflect.Method m = PluginApi.class.getMethod("selectedFile");
-            ok(stat, L, m.getReturnType() == java.io.File.class,
-                    "PluginApi.selectedFile() returns File");
-        } catch (Throwable t) {
-            ok(stat, L, false, "PluginApi.selectedFile missing: " + t);
+        {
+            // ★ v20：重复能力已删（selectedFile / settings / hostIcon）—— 删掉的东西不许悄悄长回来
+            StringBuilder back = new StringBuilder();
+            String[] gone = { "selectedFile", "settings", "hostIcon" };
+            for (String g : gone) {
+                try {
+                    PluginApi.class.getMethod(g);
+                    back.append(g).append(' ');
+                } catch (NoSuchMethodException expected) { }
+            }
+            ok(stat, L, back.length() == 0,
+                    "★ v20 删掉的重复接口确实不在了（selectedFile / settings / hostIcon）"
+                            + (back.length() == 0 ? "" : "；又长回来：" + back));
+            try {
+                java.lang.reflect.Method one = PluginApi.class.getMethod("selectedItem");
+                ok(stat, L, ItemInfo.class == one.getReturnType(),
+                        "PluginApi.selectedItem() returns ItemInfo（代替 selectedFile）");
+            } catch (Throwable t) {
+                ok(stat, L, false, "PluginApi.selectedItem missing: " + t);
+            }
         }
 
         // ── round 161: v5 = read-only data (slots / contents / pageItems / open) ──
@@ -3773,7 +3786,7 @@ public final class SelfTest {
             java.lang.reflect.Method ex = PluginApi.class.getMethod(
                     "export", String.class, String.class, InputStream.class);
             java.lang.reflect.Method pk = PluginApi.class.getMethod(
-                    "pick", String.class, PickCallback.class);
+                    "pickContent", String.class, PluginApi.PickContent.class);
             ok(stat, L, rb.getReturnType() == void.class && pr.getReturnType() == void.class
                             && cl.getReturnType() == void.class && sh.getReturnType() == void.class
                             && st.getReturnType() == void.class && ex.getReturnType() == void.class
@@ -3885,11 +3898,20 @@ public final class SelfTest {
                     PluginHost.API, false, false, null, 0);
             PluginHost.createView(la);
             ok(stat, L, ApiEntryProbe.picked == 3,
-                    "createView(PluginApi) wins when both overloads exist");
+                    "createView(PluginApi) is the only entry path（Context 重载即使存在也不看）");
             PluginHost.Loaded lc = new PluginHost.Loaded(null, null, null, CtxEntryProbe.class,
                     PluginHost.API, false, false, null, 0);
-            ok(stat, L, PluginHost.createView(lc) == null,
-                    "old createView(Context) still works");
+            boolean rejected = false;
+            String how = "";
+            try {
+                PluginHost.createView(lc);
+            } catch (PluginHost.PluginException e) {
+                rejected = "plugin_err_entry".equals(e.reason);
+                how = e.reason;
+            }
+            ok(stat, L, rejected,
+                    "★ 只有 createView(Context) 的老插件被拒（plugin_err_entry），不再回落"
+                            + (rejected ? "" : "；实际=" + how));
         } catch (Throwable t) {
             ok(stat, L, false, "createView dispatch threw: " + t);
         }
@@ -4365,9 +4387,11 @@ public final class SelfTest {
                         && PluginHost.apiVerdict(PluginHost.API + 1) == 1
                         && PluginHost.apiVerdict(PluginHost.API_MIN - 1) == -1,
                 "★接口版本三态：区间 [" + PluginHost.API_MIN + ", " + PluginHost.API + "] 收 · 更新 ⇒ 太新 · 更老 ⇒ 太老");
-        ok(stat, L, PluginHost.apiCompatible(1) && PluginHost.apiCompatible(PluginHost.API)
-                        && !PluginHost.apiCompatible(PluginHost.API + 1) && !PluginHost.apiCompatible(0),
-                "★老插件（api=1，第 135 轮写的那些）**照旧能用** —— 改成区间不是收窄");
+        ok(stat, L, PluginHost.apiCompatible(PluginHost.API_MIN)
+                        && PluginHost.apiCompatible(PluginHost.API)
+                        && !PluginHost.apiCompatible(PluginHost.API_MIN - 1)
+                        && !PluginHost.apiCompatible(1) && !PluginHost.apiCompatible(0),
+                "★v20 冻结基线：区间两端都认，比下限老的（含 v1）一律拒 —— 老加载路径已删");
         ok(stat, L, PluginHost.apiReasonRes(PluginHost.API + 1) == R.string.plugin_err_api_new_fmt
                         && PluginHost.apiReasonRes(0) == R.string.plugin_err_api_old_fmt
                         && PluginHost.apiReasonRes(PluginHost.API) == R.string.plugin_err_api_fmt

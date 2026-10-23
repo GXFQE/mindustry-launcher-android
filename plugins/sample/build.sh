@@ -63,7 +63,8 @@ cp "$SRC_DIR/AndroidManifest.xml" "$MF_DIR/AndroidManifest.xml"
 echo "== [2/4] javac =="
 mkdir -p "$OUT/classes"
 SRC=()
-while IFS= read -r f; do SRC+=("$f"); done < <( { find "$SRC_DIR/src" -name '*.java'; find "$OUT/gen" -name '*.java'; } | sort )
+# v20：API 桩直接编宿主那份（插件工程里不再放副本 ⇒ 不会漂）
+while IFS= read -r f; do SRC+=("$f"); done < <( { find "$SRC_DIR/src" -name '*.java'; find "$ROOT/app/src/io/mdt/launcher/api" -name '*.java'; find "$OUT/gen" -name '*.java'; } | sort )
 # 🔴 javac 的失败**不许**被吞掉：`javac ... || true` 会把"少一个符号"变成"少一批 class"，
 #    而入口类照样能编出来 ⇒ APK 看着正常、真机才 NoClassDefFound（第 188 轮踩过）。
 if ! "$JAVAC_8" -encoding UTF-8 -source 8 -target 8 -nowarn \

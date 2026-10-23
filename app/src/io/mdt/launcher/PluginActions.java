@@ -16,7 +16,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import io.mdt.launcher.api.ItemInfo;
-import io.mdt.launcher.api.PickCallback;
+import io.mdt.launcher.api.PluginApi;
+import io.mdt.launcher.api.Result;
 
 /**
  * 插件接口 v7 里**"做事"那几条**的唯一实现（第 187 轮）。
@@ -152,6 +153,11 @@ final class PluginActions {
 
     // ── 保存（SAF）─────────────────────────────────────────────────────────
 
+    /** 回调插件的"保存结束"（{@code after} 允许为 null；回调一定在主线程）。 */
+    static void after(PluginApi.After after, Result r) {
+        if (after != null) after.onAfter(r);
+    }
+
     /**
      * 先把流落到缓存里的临时文件（后台），再让用户选落点；结果回来时才真正写出去。
      *
@@ -163,18 +169,19 @@ final class PluginActions {
         export(a, name, mime, content, null);
     }
 
-    /** v11：带"保存结束"回调（成功 / 取消都会回调）。 */
+    /** v11：带"保存结束"回调（成功 / 取消 / 失败**都会回调**）。 */
     static void export(final Activity a, final String name, final String mime,
-                       final InputStream content,
-                       final io.mdt.launcher.api.PluginApi.After after) {
+                       final InputStream content, final PluginApi.After after) {
         if (a == null || content == null) {
             closeQuietly(content);
+            after(after, Result.fail(a == null ? "no-page" : "invalid"));
             return;
         }
         synchronized (LOCK) {
             if (sPending != null) {
                 closeQuietly(content);
                 toast(a, Trans.get(a, R.string.plugin_export_busy));
+                after(after, Result.fail("busy"));
                 return;
             }
         }
@@ -201,11 +208,12 @@ final class PluginActions {
                     @Override public void run() {
                         if (e != null) {
                             toast(a, Trans.get(a, R.string.plugin_export_failed_fmt, e));
+                            after(after, Result.fail("io"));
                             return;
                         }
                         if (a.isFinishing()) {
                             tmp.delete();
-                            if (after != null) after.onAfter(false);
+                            after(after, Result.fail("canceled"));
                             return;
                         }
                         Pending p = new Pending(tmp, ShareOut.fixName(name), mimeOf(mime, name),
@@ -214,6 +222,7 @@ final class PluginActions {
                             if (sPending != null) {
                                 tmp.delete();
                                 toast(a, Trans.get(a, R.string.plugin_export_busy));
+                                after(after, Result.fail("busy"));
                                 return;
                             }
                             sPending = p;
@@ -226,6 +235,7 @@ final class PluginActions {
                             tmp.delete();
                             toast(a, Trans.get(a, R.string.plugin_export_failed_fmt,
                                     Util.ioReason(a, t)));
+                            after(after, Result.fail("no-page"));
                         }
                     }
                 });
@@ -357,7 +367,7 @@ final class PluginActions {
         final Uri uri = (resultCode == Activity.RESULT_OK && data != null) ? data.getData() : null;
         if (uri == null) {
             p.tmp.delete();
-            if (p.after != null) p.after.onAfter(false);
+            after(p.after, Result.fail("canceled"));
             return true;
         }
         new Thread(new Runnable() {
@@ -377,7 +387,7 @@ final class PluginActions {
                         toast(a, e == null
                                 ? Trans.get(a, R.string.plugin_export_done)
                                 : Trans.get(a, R.string.plugin_export_failed_fmt, e));
-                        if (p.after != null) p.after.onAfter(e == null);
+                        after(p.after, e == null ? Result.ok() : Result.fail("io"));
                     }
                 });
             }
@@ -393,7 +403,7 @@ final class PluginActions {
      * <p>取数在后台（扫描会读文件头 / 开包），弹窗与回调在主线程；取消 / 空表都回调空表。
      */
     static void pick(final Activity a, final Context ctx, final String slot, final String kind,
-                     final PickCallback callback) {
+                     final PluginApi.PickContent callback) {
         if (a == null) {
             if (callback != null) callback.onPicked(new ArrayList<ItemInfo>());
             return;

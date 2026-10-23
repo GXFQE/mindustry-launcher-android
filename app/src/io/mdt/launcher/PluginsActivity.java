@@ -619,7 +619,7 @@ public class PluginsActivity extends BaseActivity {
             PluginHost.Loaded l = Plugins.isInjected(this, id, ver)
                     ? PluginHost.openInjected(this, apk, entry, usePage, useSlot, selected)
                     : PluginHost.load(this, apk, entry, usePage, useSlot, selected);
-            // ★ 一处实现（第 159 轮）：优先 createView(PluginApi)，老插件回落 createView(Context)
+            // ★ 一处实现（第 159 轮）：v20 起只有 createView(PluginApi)，没有老写法回落
             mPageLoaded = l;
             View v = PluginHost.createView(l);
             LinearLayout box = new LinearLayout(this);

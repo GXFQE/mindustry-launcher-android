@@ -37,7 +37,8 @@ public final class PlugPage {
     }
 
     /** 用插件自己的资源造一个 View（颜色也来自插件资源，避免"看起来像壳画的"）。 */
-    public static View createView(Context ctx) {
+    public static View createView(io.mdt.launcher.api.PluginApi api) {
+        android.content.Context ctx = api.context();
         // ★ 第 148 轮：写一次"插件自己的数据目录" —— 壳把 getFilesDir() 指到了 `<插件>/data`，
         //   写出来的文件必须落在那里（宿主与插件的**约定**，不是沙箱）。
         try {

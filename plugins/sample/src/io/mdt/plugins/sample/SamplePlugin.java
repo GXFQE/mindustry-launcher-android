@@ -12,9 +12,9 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 import io.mdt.launcher.api.ItemInfo;
-import io.mdt.launcher.api.PickCallback;
 import io.mdt.launcher.api.PluginApi;
 import io.mdt.launcher.api.PluginTheme;
+import io.mdt.launcher.api.Result;
 
 /**
  * 文档配套示例（PLUGIN-API.md）：一个最小但完整的插件。
@@ -28,7 +28,7 @@ import io.mdt.launcher.api.PluginTheme;
 public final class SamplePlugin {
 
     public static int api() {
-        return 17;
+        return 20;
     }
 
     public static View createView(PluginApi api) {
@@ -75,7 +75,7 @@ public final class SamplePlugin {
     }
 
     public static void run(final PluginApi api) {
-        api.pick("maps", new PickCallback() {
+        api.pickContent(ItemInfo.KIND_MAPS, new PluginApi.PickContent() {
             @Override public void onPicked(List<ItemInfo> items) {
                 if (items == null || items.isEmpty()) {
                     api.toast("nothing selected");
@@ -91,8 +91,8 @@ public final class SamplePlugin {
                                 api.export(name, mime,
                                         new ByteArrayInputStream(out.getBytes(StandardCharsets.UTF_8)),
                                         new PluginApi.After() {
-                                            @Override public void onAfter(boolean ok) {
-                                                api.log("SAMPLE export ok=" + ok);
+                                            @Override public void onAfter(Result r) {
+                                                api.log("SAMPLE export " + r);
                                             }
                                         });
                             }

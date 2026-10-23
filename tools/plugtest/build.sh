@@ -5,7 +5,7 @@
 #
 # 产出（放进 build/plugtest/）：
 #   plugtest-ok.apk     接口版本匹配、类与资源都正常   ⇒ 壳必须**加载成功**
-#   plugtest-badapi.apk 接口版本 = 99（壳只认 1）      ⇒ 壳必须**拒绝**并说明原因
+#   plugtest-badapi.apk 接口版本 = 99（壳只认 20）     ⇒ 壳必须**拒绝**并说明原因
 #   plugtest-noclass.apk 没有 PlugPage 这个类           ⇒ 壳必须**拒绝**（缺类）
 #   plugtest-v1.apk / plugtest-v2.apk 同名类（PluginProbe）两份不同 tag ⇒ shadowing 实验
 # ★ **不给 d8 喂旧 class**：每个变体各自 jam 一遍（否则热替换测试会被上一版污染）。
@@ -84,14 +84,9 @@ build_one() {
   fi
   echo "== [$name] api=$api tag=$tag tag2=$tag2 dropclass=$dropclass tpl=$(basename "$tpl") entry=$entry =="
   mkdir -p "$srcpkg" "$d/src/io/mdt/launcher" "$d/classes" "$d/dex"
-  # 第 159 轮：插件编译期的 PluginApi 桩（运行期由宿主那份同名类接管）
+  # v20：插件编译期的 API 桩直接取宿主那份（这里不再维护副本 ⇒ 不会漂）
   mkdir -p "$d/src/io/mdt/launcher/api"
-  cp "$SRC_DIR/src/io/mdt/launcher/api/PluginApi.java" "$d/src/io/mdt/launcher/api/PluginApi.java"
-  cp "$SRC_DIR/src/io/mdt/launcher/api/SlotInfo.java" "$d/src/io/mdt/launcher/api/SlotInfo.java"
-  cp "$SRC_DIR/src/io/mdt/launcher/api/ItemInfo.java" "$d/src/io/mdt/launcher/api/ItemInfo.java"
-  # 第 187 轮（v7）：主题 / 勾选回调也是插件编译期要看见的类型
-  cp "$SRC_DIR/src/io/mdt/launcher/api/PluginTheme.java" "$d/src/io/mdt/launcher/api/PluginTheme.java"
-  cp "$SRC_DIR/src/io/mdt/launcher/api/PickCallback.java" "$d/src/io/mdt/launcher/api/PickCallback.java"
+  cp "$ROOT/app/src/io/mdt/launcher/api/"*.java "$d/src/io/mdt/launcher/api/"
   # 入口页也带上这一版的编译期 tag（`PlugPage.tag()`）——多插件下"谁渲染的页"靠它才看得见
   sed -e "s/__API__/$api/" -e "s/__TAGPAGE__/$tag/" -e "s|^package io.mdt.plugtest;|package $pkg;|" \
       "$tpl" > "$srcpkg/PlugPage.java"
@@ -143,21 +138,21 @@ PY
 
 # ★ `plugtest-ok` 刻意**不写自述**（NO_JSON=1）⇒ 入口回落默认 FQN，用来证明"老插件照旧能加载"
 NO_JSON=1
-build_one plugtest-ok      1  PLUGIN-ok      0 PLUGIN-ok-2
+build_one plugtest-ok      20 PLUGIN-ok      0 PLUGIN-ok-2
 NO_JSON=0
 build_one plugtest-badapi  99 PLUGIN-badapi  0 PLUGIN-badapi-2
-build_one plugtest-noclass 1  PLUGIN-noclass 1 PLUGIN-noclass-2
-build_one plugtest-v1      1  PLUGIN-v1      0 PLUGIN-v1-2
+build_one plugtest-noclass 20 PLUGIN-noclass 1 PLUGIN-noclass-2
+build_one plugtest-v1      20 PLUGIN-v1      0 PLUGIN-v1-2
 # 第 138 轮：**有毒夹具** —— 里面塞一个与宿主同名的 `io.mdt.launcher.LogActivity`
-build_one plugtest-poison  1  PLUGIN-poison  0 PLUGIN-poison-2 "$SRC_DIR/src/io/mdt/plugtest/PlugPage.java" poison
-# 第 139 轮：接口版本兼容区间的两侧样本（本机支持 1~2）
-build_one plugtest-api9    9  PLUGIN-api9    0 PLUGIN-api9-2
+build_one plugtest-poison  20 PLUGIN-poison  0 PLUGIN-poison-2 "$SRC_DIR/src/io/mdt/plugtest/PlugPage.java" poison
+# 第 139 轮：接口版本区间两侧的样本（v20 起区间 = 20..20 ⇒ 19 太老、99 太新）
+build_one plugtest-api19   19 PLUGIN-api19   0 PLUGIN-api19-2
 build_one plugtest-api0    0  PLUGIN-api0    0 PLUGIN-api0-2
-build_one plugtest-v2      1  PLUGIN-v2      0 PLUGIN-v2-2
+build_one plugtest-v2      20 PLUGIN-v2      0 PLUGIN-v2-2
 # 第 132 轮：**带它就启动不了**的那一版（回滚要拿真实失败形态验，不能只靠手写 guard）
-build_one plugtest-kill    1  PLUGIN-kill    0 PLUGIN-kill-2 "$SRC_DIR/src/io/mdt/plugtest/PlugPageKill.java"
-# 第 159 轮：**内容页动作**夹具（api=3 + PluginApi + slot=content/page=saves|maps）
-build_one plugtest-content 7  PLUGIN-content 0 PLUGIN-content-2 "$SRC_DIR/src/io/mdt/plugtest/PlugPageContent.java" "" content
+build_one plugtest-kill    20 PLUGIN-kill    0 PLUGIN-kill-2 "$SRC_DIR/src/io/mdt/plugtest/PlugPageKill.java"
+# 第 159 轮：**内容页动作**夹具（v20 + slot=content/page=saves|maps）
+build_one plugtest-content 20 PLUGIN-content 0 PLUGIN-content-2 "$SRC_DIR/src/io/mdt/plugtest/PlugPageContent.java" "" content
 
 # --- 第 133 轮：**第三方**对照样本（同一个插件，换另一把密钥签） -----------------
 # 信任模型的判据是"签名指纹 == 本应用自己的"。夹具必须**两侧都有**：
@@ -167,8 +162,8 @@ build_one plugtest-content 7  PLUGIN-content 0 PLUGIN-content-2 "$SRC_DIR/src/io
 if [ -n "${TP_KEYSTORE:-}" ]; then
   KEYSTORE="$TP_KEYSTORE"
   KS_ALIAS="${TP_ALIAS:-tp}"; KS_PASS="${TP_PASS:-tp123456}"; KEY_PASS="$KS_PASS"
-  build_one plugtest-thirdparty 1 PLUGIN-tp 0 PLUGIN-tp-2
+  build_one plugtest-thirdparty 20 PLUGIN-tp 0 PLUGIN-tp-2
   # 第三方 + **会崩**的那一版：用来验「第三方默认 L3（停用 + 隔离）」
-  build_one plugtest-tp-kill 1 PLUGIN-tpk 0 PLUGIN-tpk-2 "$SRC_DIR/src/io/mdt/plugtest/PlugPageKill.java"
+  build_one plugtest-tp-kill 20 PLUGIN-tpk 0 PLUGIN-tpk-2 "$SRC_DIR/src/io/mdt/plugtest/PlugPageKill.java"
 fi
 echo "== DONE =="

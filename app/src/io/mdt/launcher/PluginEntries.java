@@ -125,6 +125,10 @@ final class PluginEntries {
                             ? PluginHost.openInjected(a, apk, e.item.entry, page, slot, null, null)
                             : PluginHost.load(a, apk, e.item.entry, page, slot, null, null);
                     PluginHost.runEntry(l);
+                } catch (PluginHost.PluginException pe) {
+                    // 一份坏插件不该影响这一页；但拒绝原因要说清（与插件页同一个 reasonRes）
+                    android.widget.Toast.makeText(a, a.getString(PluginHost.reasonRes(pe.reason)),
+                            android.widget.Toast.LENGTH_LONG).show();
                 } catch (Throwable t) {
                     // 一份坏插件不该影响这一页（与段落插槽同一条规矩）
                     android.widget.Toast.makeText(a, a.getString(R.string.plugin_err_other),

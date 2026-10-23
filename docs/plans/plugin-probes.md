@@ -7,12 +7,12 @@
 
 - `UsageLog` 在 **`:game` 进程**记录启动 / 心跳 / 结束 / 崩溃 / 熄屏，只记"下界"；
 - 两条流：`hub/usage/launch.tsv`（启动事实，写完不可变）与 `run.tsv`（运行期事实）；
-- `PluginApi` v18 = `File usageDir()`。
+- `PluginApi` v18 = `File usageDir()`；**v20（2026-10-23）= 整理后的冻结基线**（见 `docs/PLUGIN-API.md`）。
   字段、真机产物与读取约定见 `docs/PLUGIN-API.md` 第 10 节。
 
 ## 已定、未实现
 
-### B0. 游戏设置面：直接给解析结果（2026-10-23 晚定，计划 v19）
+### B0. 游戏设置面：直接给解析结果（2026-10-23 晚定，计划 v21：v20 基线之后的加法）
 
 **代替原计划的 `modState()`**：宿主不替插件解释键的含义，只给「解析结果 + 带护栏的写」。
 
@@ -92,7 +92,7 @@ Result perform(String action, Bundle args);   // Result = ok / needsRestart / re
 
 ### 现在缺的接口（按优先级）
 
-1. **`gameSettings()` / `writeGameSettings()`（v19，见 B0）**
+1. **`gameSettings()` / `writeGameSettings()`（v21，见 B0）**
    - 冲突检测要 `mod-<名>-enabled` / `-failed`；崩溃归因要"这个模组当时是不是开着"
    - ~~`modState(item)`~~ 已取消（2026-10-23 晚）：语义归插件，宿主只给解析结果 + 安全写
 2. **动作注册表（缩到非设置动作）**
@@ -125,7 +125,7 @@ Result perform(String action, Bundle args);   // Result = ok / needsRestart / re
 
 ### 顺序
 
-1. **B0 设置面**（`gameSettings` / `writeGameSettings`，v19）
+1. **B0 设置面**（`gameSettings` / `writeGameSettings`，v21）
 2. `analyzer` + 崩溃页/模组页插入点；动作注册表只剩 `item.open` / `version.launch`（可与 1 并行）
 3. 迁移冲突检测（简单）→ 再迁移崩溃归因
 

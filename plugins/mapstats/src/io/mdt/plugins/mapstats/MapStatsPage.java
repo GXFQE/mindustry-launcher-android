@@ -20,9 +20,9 @@ import java.util.Locale;
 import java.util.Map;
 
 import io.mdt.launcher.api.ItemInfo;
-import io.mdt.launcher.api.PickCallback;
 import io.mdt.launcher.api.PluginApi;
 import io.mdt.launcher.api.PluginTheme;
+import io.mdt.launcher.api.Result;
 import io.mdt.plugins.mapstats.core.BundleNames;
 import io.mdt.plugins.mapstats.core.MapStats;
 import io.mdt.plugins.mapstats.core.MapStatsExport;
@@ -31,10 +31,10 @@ import io.mdt.plugins.mapstats.core.MsavTiles;
 /**
  * 官方插件 mapstats 的页面：地图资源统计（第 188 轮，从宿主的 F21 搬出来）。
  *
- * <p>宿主只按名字反射调 {@link #api()} + {@link #createView(PluginApi)}；编译期只依赖
- * {@code io.mdt.launcher.api} 那几个类（壳与插件各一份，运行时父加载器的赢）。
+ * <p>宿主只按名字反射调 {@link #api()} + {@link #createView(PluginApi)}；编译期依赖
+ * {@code app/src/io/mdt/launcher/api}（构建时直接编宿主那份，插件工程里不再放副本）。
  *
- * <p>数据全走 v7 门面：{@code pick} 选图、{@code open} 读字节、{@code runBackground} 跑计数、
+ * <p>数据全走宿主门面：{@code pickContent} 选图、{@code open} 读字节、{@code runBackground} 跑计数、
  * {@code progress} 报进度、{@code share} / {@code export} 出结果、{@code theme} 上色。
  * ⚠️ 本文件的字符串字面量一律 ASCII（与宿主同一条纪律）。
  */
@@ -44,14 +44,14 @@ public final class MapStatsPage {
     private static final int ROW_CAP = 15;
 
     /**
-     * 接口版本：**v9**（v8 之上要 {@code selectedItem()} 与 `section` 插槽）。
+     * 接口版本：**v20**（2026-10-23 冻结基线；插件编译时直接对着宿主那份 API）。
      *
-     * <p>为什么要 v9：统计要长回**地图详情页里**（与搬家前一样，点开地图就看见数字）。
-     * v4 的 {@code selectedFile()} 只给得出槽内文件，游戏自带 / 模组自带的地图拿不到 ——
-     * 所以用 v9 的「当前这一项」+ `section` 插槽，让宿主把这一整段画在详情页里。</p>
+     * <p>为什么不再报 13：v20 之前 mapstats 用 try/catch 去兼容老宿主（`selectedFile` 回落 /
+     * 缺方法兜底）。冻结后"报什么版本就只跑在什么版本上"，那些兜底全删了 ——
+     * 报 20 表示它用到了 v20 的接口面（真要用新方法再抬这个数）。
      */
     public static int api() {
-        return 13;
+        return 20;
     }
 
     /** 当前这一页的统计产物（页面重建就重新算）。 */
@@ -123,7 +123,7 @@ public final class MapStatsPage {
         // ★ 动作放**最上面**（§79）：选 20 张地图时按钮不会被结果卡片顶出屏幕
         if (!inline) addButton(root, c, th, c.getString(R.string.ms_pick), new View.OnClickListener() {
             @Override public void onClick(View v) {
-                api.pick(ItemInfo.KIND_MAPS, new PickCallback() {
+                api.pickContent(ItemInfo.KIND_MAPS, new PluginApi.PickContent() {
                     @Override public void onPicked(List<ItemInfo> items) {
                         if (items == null || items.isEmpty()) {
                             api.toast(c.getString(R.string.ms_pick_empty));
@@ -236,7 +236,7 @@ public final class MapStatsPage {
      */
     public static void run(final PluginApi api) {
         final Context c = api.context();
-        api.pick(ItemInfo.KIND_MAPS, new PickCallback() {
+        api.pickContent(ItemInfo.KIND_MAPS, new PluginApi.PickContent() {
             @Override public void onPicked(final List<ItemInfo> items) {
                 if (items == null || items.isEmpty()) return;
                 api.choose(c.getString(R.string.ms_export_ask), new String[]{
@@ -282,31 +282,9 @@ public final class MapStatsPage {
         });
     }
 
-    /** 详情页上「当前这一项」：v9 直给；老宿主退回按文件对 / 页面快照只有一个。 */
+    /** 详情页上「当前这一项」；v20 起宿主保证给得出，不用再退回 selectedFile 对文件。 */
     private static ItemInfo inlineItem(PluginApi api) {
-        try {
-            ItemInfo one = api.selectedItem();
-            if (one != null) return one;
-        } catch (Throwable ignored) {
-        }
-        File sel;
-        try {
-            sel = api.selectedFile();
-        } catch (Throwable t) {
-            return null;
-        }
-        try {
-            List<ItemInfo> all = api.pageItems();
-            if (all != null) {
-                if (sel == null && all.size() == 1) return all.get(0);
-                for (ItemInfo it : all) {
-                    if (it == null || it.path == null || sel == null) continue;
-                    if (sel.getAbsolutePath().equals(it.path)) return it;
-                }
-            }
-        } catch (Throwable ignored) {
-        }
-        return null;
+        return api.selectedItem();
     }
 
     /**
@@ -450,9 +428,9 @@ public final class MapStatsPage {
                                 api.export(fileName(built), mimeOf(built),
                                         new ByteArrayInputStream(js.getBytes(StandardCharsets.UTF_8)),
                                         new PluginApi.After() {
-                                            @Override public void onAfter(boolean ok) {
+                                            @Override public void onAfter(Result r) {
                                                 if (!closeAfter) return;
-                                                if (ok) api.toast(c.getString(
+                                                if (r.ok) api.toast(c.getString(
                                                         R.string.ms_save_done, fileName(built)));
                                                 api.closePage();
                                             }

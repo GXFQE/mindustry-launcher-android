@@ -67,7 +67,7 @@ final class PluginProbeDev {
             L.add("  stillWritable = " + ok.stillWritable + "   (judge by ART, not chmod)");
             L.add("  assets from = " + ok.assetFrom + " cookie=" + ok.cookie);
             L.add("  plugin str  = " + ok.entry.getMethod("hello", Context.class).invoke(null, ok.ctx));
-            Object v = ok.entry.getMethod("createView", Context.class).invoke(null, ok.ctx);
+            Object v = ok.entry.getMethod("createView", io.mdt.launcher.api.PluginApi.class).invoke(null, ok.env);
             if (v instanceof TextView) {
                 TextView t = (TextView) v;
                 L.add("  createView  = text[" + t.getText() + "] color=#"
@@ -83,7 +83,7 @@ final class PluginProbeDev {
 
         L.add("");
         L.add("-- (2) bad plugins --");
-        reject(ctx, L, new File(dir, "plugtest-badapi.apk"), "api=99 (shell wants 1)");
+        reject(ctx, L, new File(dir, "plugtest-badapi.apk"), "api=99 (shell wants 20)");
         reject(ctx, L, new File(dir, "plugtest-noclass.apk"), "entry class missing");
         reject(ctx, L, new File(dir, "plugtest-nothing.apk"), "file does not exist");
 
@@ -259,7 +259,7 @@ final class PluginProbeDev {
                         .append(" assets=").append(l.assetFrom).append(" cookie=").append(l.cookie).append('\n');
                 Object s = l.entry.getMethod("hello", Context.class).invoke(null, l.ctx);
                 sb.append("  plugin's own resource = ").append(s).append('\n');
-                Object v = l.entry.getMethod("createView", Context.class).invoke(null, l.ctx);
+                Object v = l.entry.getMethod("createView", io.mdt.launcher.api.PluginApi.class).invoke(null, l.env);
                 sb.append("  createView = ").append(v == null ? "null" : v.getClass().getName()).append('\n');
             } catch (PluginHost.PluginException e) {
                 sb.append("  openInjected = REJECTED ").append(e.reason)

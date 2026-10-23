@@ -29,7 +29,7 @@ public final class PlugPage {
         return "never";
     }
 
-    public static View createView(Context ctx) {
+    public static View createView(io.mdt.launcher.api.PluginApi api) {
         return null;
     }
 }

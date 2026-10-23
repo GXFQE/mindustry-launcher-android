@@ -17,9 +17,9 @@ import java.util.Map;
 
 import dalvik.system.DexClassLoader;
 import io.mdt.launcher.api.ItemInfo;
-import io.mdt.launcher.api.PickCallback;
 import io.mdt.launcher.api.PluginApi;
 import io.mdt.launcher.api.PluginTheme;
+import io.mdt.launcher.api.Result;
 import io.mdt.launcher.api.SlotInfo;
 
 /**
@@ -51,35 +51,28 @@ public final class PluginHost {
     /**
      * 壳认的插件接口版本。
      *
-     * <p>v1 = 只有 {@code api() + createView(Context)}；v2 = 自述 JSON + access；
-     * **v3（第 159 轮）= 加上 {@link PluginApi} 与 {@code content} 插槽**；
-     * **v4（第 160 轮）= 同一插槽扩到全部页面 + {@link PluginApi#selectedFile()}**；
-     * **v5（第 161 轮）= 只读数据面：槽列表 / 四类内容 / 页面快照 / 统一字节流**；
-     * **v6（第 162 轮）= 设置 / 日志 / 中转站 / 版本 / selectedItems**；
-     * **v7（第 187 轮）= 做事：主题 / 后台任务与进度 / 关页 / 分享·保存 / 勾选**；
-     * **v9（第 193 轮）= 详情页的「当前这一项」（{@link PluginApi#selectedItem()}）
-     * + `section` 插槽（插件把自己的一段界面直接画进宿主页，统计不再另开一页）；
-     * **v10（第 195 轮）= `choose()`：插件要问「怎么导出」时由**宿主**弹原生对话框**；
-     * **v11（第 196 轮）= `export(..., after)`：保存真的结束后回调插件**；
-     * **v12（第 197 轮）= `action` 插槽 + `run(PluginApi)` 入口：点了就在**当前页**跑，不单开页面**；
-     * **v13（第 198 轮）= `progressCard()`：宿主进度弹窗（搬家前「正在统计 N / M…」那个）**；
-     * **v14（第 202 轮）= `dataDir()` / `gameRunning()` / `hostIcon()` / `confirm()` / `prompt()`**；
-     * **v15（第 205 轮）= `pickFile()` / `openItem()` / `trashItem()` / 可取消 `progressCard()`**；
-     * **v16（第 206 轮）= `writeItem()`：同目录临时文件 + 原子替换，游戏在跑时拒绝**；
-     * **v17（第 207 轮）= 入口类可选钩子 `static void unload()`：插件页关闭 / 换页 / 销毁时收尾**。
-     * 插件报 5/6/7 才意味着"我会用这些能力"，报 1/2/3/4 的照旧；
-     * 区间下限不变（{@link #API_MIN} = 1）。
+     * <p>**v20（2026-10-23）= 冻结基线**：把逐年长出来的接口彻底整理了一遍 ——
+     * 去掉重复能力（`selectedFile` / `settings` / `hostIcon`）、统一结果类型（{@link Result}）、
+     * 重载收成默认方法、只认 {@code createView(PluginApi)} / {@code run(PluginApi)}
+     * （不再回落 {@code createView(Context)}）。
+     *
+     * <p>v1~v19 的逐版记录留在 `docs/PLUGIN-API.md` 与 git 历史里；**从 v20 起**：
+     * 加法变更只抬 {@link #API}（{@link #API_MIN} 不动，老插件照样装得进），
+     * 破坏性变更才抬 {@link #API_MIN}。
      */
-    public static final int API = 18;
+    public static final int API = 20;
     /**
-     * 还认的**最老**契约版本（第 139 轮）。抬它 = 老插件被拒，界面会说清"太老、该更新插件"。
+     * 还认的**最老**契约版本。
      *
      * <p>★ 为什么接口版本必须是**区间**而不是"严格相等"：全插件化的前提是"宿主基本不变、插件独立更新"，
      * 严格相等等于**每加一个插件都得连宿主一起发**。规矩：**加法变更**（多一个可选字段 / 多一个插槽）
-     * **不抬版本**；只有**破坏性变更**（改了必填字段的含义 / 拿掉一个插槽的契约）才抬，
-     * 抬的时候同时决定要不要抬 {@link #API_MIN}（抬了就是明确拒绝老插件）。
+     * **不抬下限**；只有**破坏性变更**（改了必填字段的含义 / 拿掉一个插槽的契约）才抬，
+     * 抬了就是明确拒绝老插件。
+     *
+     * <p>2026-10-23 抬到 20：v1~v6 的老加载路径（{@code createView(Context)}）一起删掉 ——
+     * 那次整理之前公开的 v0.6-preview 只到 API 6，而没有第三方插件在跑。
      */
-    public static final int API_MIN = 1;
+    public static final int API_MIN = 20;
 
     /**
      * **默认**插件入口类（只在字符串里出现 —— 壳的源码不编译期依赖插件）。
@@ -171,7 +164,8 @@ public final class PluginHost {
     /**
      * 第 160 轮：再加"当前选中项"（详情页那一份地图 / 蓝图）。
      *
-     * @param selected {@link io.mdt.launcher.api.PluginApi#selectedFile()}；非详情页传 null
+     * @param selected 详情页当前那一份**槽内文件**（内部快照；插件侧用
+     *                 {@link io.mdt.launcher.api.PluginApi#selectedItem()} 取，包内条目也算）；非详情页传 null
      */
     public static Loaded load(Context host, File apk, String entry, String page, String slot,
                               File selected) throws PluginException {
@@ -308,34 +302,32 @@ public final class PluginHost {
     /**
      * 调插件的入口方法（第 159 轮：**一处实现**，别在界面里各写一遍）。
      *
-     * <p>顺序：{@code createView(PluginApi)} 优先，没有才回落 {@code createView(Context)}
-     * （v1/v2 老插件就只有后者）。两种都取不到 ⇒ 抛 {@link NoSuchMethodException} 由调用方兜底。
+     * <p>v20 起只认 {@code createView(PluginApi)}：老写法 {@code createView(Context)} **不再回落**，
+     * 缺这个方法 ⇒ {@link PluginException}（{@code plugin_err_entry}），界面照常给兜底页。
      */
     static View createView(Loaded l) throws Exception {
         if (l == null || l.entry == null) throw new IllegalArgumentException("plugin not loaded");
         try {
             Method m = l.entry.getMethod("createView", PluginApi.class);
             return (View) m.invoke(null, l.env);
-        } catch (NoSuchMethodException noApi) {
-            Method m = l.entry.getMethod("createView", Context.class);
-            return (View) m.invoke(null, l.ctx);
+        } catch (NoSuchMethodException e) {
+            throw new PluginException("plugin_err_entry", "no createView(PluginApi)");
         }
     }
 
     /**
      * 调插件的**动作**入口（v12：`slot: action`）—— **不建页面、不换页**。
      *
-     * <p>顺序同 {@link #createView}：{@code run(PluginApi)} 优先，没有才回落 {@code run(Context)}。
-     * 两种都没有 ⇒ 抛 {@link NoSuchMethodException}，由调用方兜底（点了没反应，页面照常）。
+     * <p>v20 起只认 {@code run(PluginApi)}：缺它 ⇒ {@link PluginException}（{@code plugin_err_entry}），
+     * 调用方给一句提示（点了没反应 = 最糟的失败方式）。
      */
     static void runEntry(Loaded l) throws Exception {
         if (l == null || l.entry == null) throw new IllegalArgumentException("plugin not loaded");
         try {
             Method m = l.entry.getMethod("run", PluginApi.class);
             m.invoke(null, l.env);
-        } catch (NoSuchMethodException noApi) {
-            Method m = l.entry.getMethod("run", Context.class);
-            m.invoke(null, l.ctx);
+        } catch (NoSuchMethodException e) {
+            throw new PluginException("plugin_err_entry", "no run(PluginApi)");
         }
     }
 
@@ -396,8 +388,6 @@ public final class PluginHost {
 
         @Override public String slot() { return slot; }
 
-        @Override public File selectedFile() { return selected; }
-
         @Override public ItemInfo selectedItem() { return item; }
 
         @Override public void choose(final String title, final String[] options,
@@ -437,10 +427,6 @@ public final class PluginHost {
             return PluginData.slots(getBaseContext());
         }
 
-        @Override public List<ItemInfo> contents(String kind) {
-            return PluginData.contents(getBaseContext(), slot, kind);
-        }
-
         @Override public List<ItemInfo> contents(String slot, String kind) {
             return PluginData.contents(getBaseContext(), slot, kind);
         }
@@ -451,10 +437,6 @@ public final class PluginHost {
 
         @Override public List<ItemInfo> selectedItems() {
             return PluginData.selectedItems(getBaseContext(), page, slot, selected);
-        }
-
-        @Override public Map<String, String> settings() {
-            return PluginData.settings(getBaseContext());
         }
 
         @Override public List<ItemInfo> logs() {
@@ -585,17 +567,13 @@ public final class PluginHost {
             PluginActions.shareText(a, name, text);
         }
 
-        @Override public void export(String name, String mime, InputStream content) {
-            export(name, mime, content, null);
-        }
-
         /** v13：一个宿主进度弹窗（同一时刻只有一个）；v15 起可取消。 */
         private android.app.ProgressDialog card;
         private boolean cardCancelable;
         private Cancel cardCancel;
 
-        @Override public void progressCard(final String title, final String message,
-                                           final int done, final int total) {
+        private void showCard(final String title, final String message,
+                              final int done, final int total) {
             final Activity a = activityOrNull();
             if (a == null) return;
             a.runOnUiThread(new Runnable() {
@@ -637,17 +615,6 @@ public final class PluginHost {
         }
 
         @Override public boolean gameRunning() { return Data.gameAlive(this); }
-
-        @Override public android.graphics.drawable.Drawable hostIcon(String name) {
-            try {
-                Context hostCtx = getBaseContext();
-                int id = hostCtx.getResources().getIdentifier(name, "drawable",
-                        hostCtx.getPackageName());
-                return id == 0 ? null : hostCtx.getResources().getDrawable(id, hostCtx.getTheme());
-            } catch (Throwable t) {
-                return null;
-            }
-        }
 
         @Override public void confirm(final String title, final String message,
                                       final String okText, final Confirm callback) {
@@ -761,12 +728,17 @@ public final class PluginHost {
         }
 
         @Override public void trashItem(ItemInfo it, Done callback) {
-            boolean ok = false;
+            Result r;
             try {
                 File f = it == null || it.path == null ? null : new File(it.path);
                 Context c = getBaseContext();
                 // v16 加固：只动"住在对应目录里"的条目；别的路径一律拒绝（别把任意文件挪进某类中转站）
-                if (f != null && f.exists() && insideDir(f, dirForKind(it.kind))) {
+                if (f == null || !f.exists()) {
+                    r = Result.fail("not-found");
+                } else if (!insideDir(f, dirForKind(it.kind))) {
+                    r = Result.fail("not-in-slot");
+                } else {
+                    boolean ok;
                     if (ItemInfo.KIND_MODS.equals(it.kind)) {
                         ok = Mods.deleteToTrash(c, modsDir(), f, Trash.modsDir(c)) != null;
                     } else if (ItemInfo.KIND_BLUEPRINTS.equals(it.kind)) {
@@ -776,16 +748,20 @@ public final class PluginHost {
                         ok = MapFiles.deleteToTrash(c, mapsDir(), f,
                                 MapFiles.trashDirOf(c)) != null;
                     }
+                    r = ok ? Result.ok() : Result.fail("io");
                 }
-            } catch (Throwable ignored) { }
-            if (callback != null) callback.onDone(ok);
+            } catch (Throwable t) {
+                r = Result.fail("io");
+            }
+            if (callback != null) callback.onDone(r);
         }
 
-        @Override public void progressCard(String title, String message, int done, int total,
+        @Override public void progressCard(final String title, final String message,
+                                           final int done, final int total,
                                            boolean cancelable, final Cancel cancel) {
             cardCancel = cancel;
             cardCancelable = cancelable;
-            progressCard(title, message, done, total);
+            showCard(title, message, done, total);
         }
 
         /** v16 加固：同一目标路径的写要互斥（两个插件同时写同一份存档）。 */
@@ -793,43 +769,51 @@ public final class PluginHost {
                 new java.util.concurrent.ConcurrentHashMap<String, Object>();
 
         @Override public void writeItem(ItemInfo it, InputStream content, Done callback) {
-            boolean ok = false;
+            Result r = Result.fail("invalid");
             try {
-                if (it != null && it.path != null && content != null
-                        && !Data.gameAlive(getBaseContext())) {
-                    File f = new File(it.path);
-                    File dir = f.getParentFile();
-                    if (f.isFile() && dir != null && insideSlot(dir, f)) {
-                        String key = f.getCanonicalPath();
-                        Object lock = writeLocks.get(key);
-                        if (lock == null) {
-                            Object fresh = new Object();
-                            lock = writeLocks.putIfAbsent(key, fresh);
-                            if (lock == null) lock = fresh;
-                        }
-                        synchronized (lock) {
-                        File tmp = new File(dir, "." + f.getName() + "."
-                                + Long.toHexString(System.nanoTime()) + ".tmp");
-                        java.io.FileOutputStream os = new java.io.FileOutputStream(tmp);
-                        try {
-                            PluginActions.copy(content, os);
-                            os.flush();
-                            os.getFD().sync();
-                        } finally {
-                            os.close();
-                            content.close();
-                        }
-                        ok = tmp.renameTo(f);
-                        if (!ok) tmp.delete();
+                if (it != null && it.path != null && content != null) {
+                    if (Data.gameAlive(getBaseContext())) {
+                        r = Result.fail("game-running");
+                    } else {
+                        File f = new File(it.path);
+                        File dir = f.getParentFile();
+                        if (f.isFile() && dir != null && insideSlot(dir, f)) {
+                            String key = f.getCanonicalPath();
+                            Object lock = writeLocks.get(key);
+                            if (lock == null) {
+                                Object fresh = new Object();
+                                lock = writeLocks.putIfAbsent(key, fresh);
+                                if (lock == null) lock = fresh;
+                            }
+                            synchronized (lock) {
+                                File tmp = new File(dir, "." + f.getName() + "."
+                                        + Long.toHexString(System.nanoTime()) + ".tmp");
+                                java.io.FileOutputStream os = new java.io.FileOutputStream(tmp);
+                                boolean ok;
+                                try {
+                                    PluginActions.copy(content, os);
+                                    os.flush();
+                                    os.getFD().sync();
+                                } finally {
+                                    os.close();
+                                    content.close();
+                                }
+                                ok = tmp.renameTo(f);
+                                if (!ok) tmp.delete();
+                                r = ok ? Result.ok() : Result.fail("io");
+                            }
+                        } else {
+                            r = Result.fail("not-in-slot");
                         }
                     }
                 }
             } catch (Throwable t) {
                 android.util.Log.i("MDTLauncher", "writeItem err=" + t);
+                r = Result.fail("io");
             } finally {
                 try { if (content != null) content.close(); } catch (Throwable ignored) { }
             }
-            if (callback != null) callback.onDone(ok);
+            if (callback != null) callback.onDone(r);
         }
 
         /** 条目种类 → 它该住的那个目录。 */
@@ -890,7 +874,7 @@ public final class PluginHost {
             PluginActions.export(a, name, mime, content, after);
         }
 
-        @Override public void pick(String kind, PickCallback callback) {
+        @Override public void pickContent(String kind, PickContent callback) {
             Activity a = activityOrNull();
             PluginActions.pick(a, getBaseContext(), slot, kind, callback);
         }

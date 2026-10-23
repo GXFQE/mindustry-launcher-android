@@ -8,10 +8,8 @@ import android.widget.TextView;
 import java.io.File;
 import java.io.InputStream;
 import java.util.List;
-import java.util.Map;
 
 import io.mdt.launcher.api.ItemInfo;
-import io.mdt.launcher.api.PickCallback;
 import io.mdt.launcher.api.PluginApi;
 import io.mdt.launcher.api.PluginTheme;
 import io.mdt.launcher.api.SlotInfo;
@@ -28,15 +26,16 @@ import io.mdt.launcher.api.SlotInfo;
  */
 public final class PlugPage {
 
-    /** 插件接口版本：v7 = 主题 + 后台任务 + 关页 + 分享 / 保存 + 勾选。 */
+    /** 插件接口版本：v20 冻结基线。 */
     public static int api() {
         return __API__;
     }
 
-    /** 宿主优先调这一个（比 createView(Context) 更具体）。 */
+    /** v20 唯一的页面入口。 */
     public static View createView(final PluginApi api) {
         final Context c = api.context();
-        File selected = api.selectedFile();
+        ItemInfo selItem = api.selectedItem();
+        File selected = selItem == null || selItem.path == null ? null : new File(selItem.path);
         String sel = selected == null ? "null"
                 : (selected.getName() + " @ " + selected.getAbsolutePath());
         List<SlotInfo> slots = api.slots();
@@ -46,7 +45,6 @@ public final class PlugPage {
         List<ItemInfo> bps = api.contents(ItemInfo.KIND_BLUEPRINTS);
         List<ItemInfo> page = api.pageItems();
         List<ItemInfo> selItems = api.selectedItems();
-        Map<String, String> settings = api.settings();
         List<ItemInfo> logs = api.logs();
         List<ItemInfo> trash = api.trash();
         List<ItemInfo> vers = api.versions();
@@ -98,12 +96,12 @@ public final class PlugPage {
         info.setText("hostApi=" + api.hostApi()
                 + "\npage=" + api.page()
                 + "\nslot=" + api.slot()
-                + "\nselectedFile=" + sel
+                + "\nselected=" + sel
                 + "\nslots=" + slots.size() + " pageItems=" + page.size()
                 + " selectedItems=" + selItems.size()
                 + "\nsaves=" + saves.size() + " maps=" + maps.size()
                 + " mods=" + mods.size() + " blueprints=" + bps.size()
-                + "\nsettings=" + settings.size() + " logs=" + logs.size()
+                + "\nlogs=" + logs.size()
                 + " trash=" + trash.size() + " versions=" + vers.size()
                 + "\ntheme dark=" + th.dark + " bg=" + Integer.toHexString(th.background)
                 + " dp8=" + th.dp(8) + " sp14=" + th.sp(14)
@@ -143,7 +141,7 @@ public final class PlugPage {
 
         addButton(box, c, th, "pick maps (host dialog)", new View.OnClickListener() {
             @Override public void onClick(View v) {
-                api.pick(ItemInfo.KIND_MAPS, new PickCallback() {
+                api.pickContent(ItemInfo.KIND_MAPS, new PluginApi.PickContent() {
                     @Override public void onPicked(List<ItemInfo> items) {
                         StringBuilder sb = new StringBuilder("picked=" + items.size());
                         for (int i = 0; i < items.size() && i < 3; i++) {
