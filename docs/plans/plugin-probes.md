@@ -12,6 +12,25 @@
 
 ## 已定、未实现
 
+### B0. 游戏设置面：直接给解析结果（2026-10-23 晚定，计划 v19）
+
+**代替原计划的 `modState()`**：宿主不替插件解释键的含义，只给「解析结果 + 带护栏的写」。
+
+```java
+Map<String,Object> gameSettings();   // 当前槽；文件不存在 ⇒ 空表；读不出来 ⇒ null
+void writeGameSettings(Map<String,Object> changes, SettingsDone cb);  // 只改给定键；值为 null ⇒ 删键
+interface SettingsDone { void onDone(boolean ok, String reason); }
+// reason: game-running / unreadable / bad-type / verify-failed
+```
+
+- 值域 = `settings.bin` 六种类型：`Boolean` / `Integer` / `Long` / `Float` / `String` / `byte[]`
+- **归宿主（机制，不是语义）**：解析 / 编码、保序、未知键原样保留、`compressed` 沿用；游戏在跑拒绝、写前备份（`<hub>/settings-backups/slot-<槽>/`，留 20）、原子写、写后读回自检 + 不过自动还原（五步全复用 `SettingsBin.applyBools` 那套）
+- **归插件（语义）**：键名含义、缺省值（`-enabled` 不存在 = 启用）、`-enabled` / `-failed` 成对写、错误文案（宿主 `SettingsText` 用不了）
+- 命名别混：现有 `settings()` 是**启动器偏好**（SharedPreferences），不是游戏设置
+- 性能：真实文件 5900+ 键 / ~500 KB ⇒ 读别放主线程；写走后台 + 回调
+- 代价：模组页不搬 ⇒ “正确关模组”会有两份实现（宿主 `Mods.setEnabled` + 插件）；成对写契约要写进 `PLUGIN-API.md`
+- 宿主侧改动只是把 `applyBools` 泛化成 `applyValues`；`SettingsBin` 是纯 Java，PC 上就能拿真实文件做逐字节往返 ⇒ 约 1 轮
+
 ### B1. 统计插件 `usagestats`
 宿主只"记"，插件只"看"：读 `usageDir()` → 启动次数 / 版本分布 / 会话时长 / 崩溃 / 熄屏 → 柱状图 + CSV/PNG 导出。
 
@@ -40,7 +59,7 @@
 String[] actions();
 Result perform(String action, Bundle args);   // Result = ok / needsRestart / reason
 ```
-首批：`mod.enable` / `mod.disable` / `item.open` / `version.launch`。加动作 = 宿主注册一行，接口不变。
+首批：`item.open` / `version.launch`（⚠️ **`mod.enable` / `mod.disable` 不再开**，2026-10-23 晚：设置面已能安全写，见 B0；再开一道门就是同一件事两份实现）。加动作 = 宿主注册一行，接口不变。
 保留硬约束（游戏在跑时拒绝写 `settings.bin`），但**不强制**宿主确认框。
 
 ### B4. 崩溃归因 / 模组冲突检查插件化
@@ -62,7 +81,7 @@ Result perform(String action, Bundle args);   // Result = ok / needsRestart / re
 
 ## 待推送
 
-截至 2026-10-23：除本笔提交外没有待推送；S302 不通时 `git push` 会挂起 / 被 reset，下次一并推。
+截至 2026-10-23 晚：本地有未推送的文档提交（`9cdf607` + `a815863` + 本轮设计变更）；具体领先几笔**现查** `git status -sb`。S302 不通时 `git push` 会挂起 / 被 reset，下次一并推。
 
 ---
 
@@ -73,16 +92,16 @@ Result perform(String action, Bundle args);   // Result = ok / needsRestart / re
 
 ### 现在缺的接口（按优先级）
 
-1. **`settings()` / `modState(item)`（只读）**
+1. **`gameSettings()` / `writeGameSettings()`（v19，见 B0）**
    - 冲突检测要 `mod-<名>-enabled` / `-failed`；崩溃归因要"这个模组当时是不是开着"
-   - 现在插件只能自己解析 `settings.bin` —— 语义（默认值、成对写、`-failed` 的真实含义）会漂
-2. **动作注册表**
+   - ~~`modState(item)`~~ 已取消（2026-10-23 晚）：语义归插件，宿主只给解析结果 + 安全写
+2. **动作注册表（缩到非设置动作）**
    ```java
    String[] actions();
    Result perform(String action, Bundle args);   // {ok, needsRestart, reason}
    ```
-   - 首批动作：`mod.enable` / `mod.disable` / `item.open` / `version.launch`
-   - "含禁用"这部分必须走它：直接写 `settings.bin` 会绕开"游戏在跑就拒绝"等硬约束
+   - 首批只剩 `item.open` / `version.launch`
+   - ~~`mod.enable` / `mod.disable`~~：改走 B0 的设置写入口（"游戏在跑就拒绝"的硬约束在那一层）
    - 不强制确认框（插件本来就能改文件），但**硬约束保留**
 3. **`analyzer` 扩展（数据型，不画 UI）**
    ```java
@@ -106,10 +125,9 @@ Result perform(String action, Bundle args);   // Result = ok / needsRestart / re
 
 ### 顺序
 
-1. `settings()` / `modState()`
-2. 动作注册表
-3. `analyzer` + 崩溃页/模组页插入点
-4. 迁移冲突检测（简单）→ 再迁移崩溃归因
+1. **B0 设置面**（`gameSettings` / `writeGameSettings`，v19）
+2. `analyzer` + 崩溃页/模组页插入点；动作注册表只剩 `item.open` / `version.launch`（可与 1 并行）
+3. 迁移冲突检测（简单）→ 再迁移崩溃归因
 
 
 ### 总原则（2026-10-23 定）
