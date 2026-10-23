@@ -111,6 +111,8 @@ public class GameSlot extends BaseActivity {
         plan.apk = target;
         try {
             Injector.Timing t = Injector.launch(this, plan);
+            // dev：探针验证台（产品版 ProbeLab 是空壳，见 app/src-release）
+            ProbeLab.runIfArmed(this);
             // ⚠️ 这句写在 **:game 进程**自己的 Config 实例上并落盘；主进程内存里那份看不到，
             //   必须靠 MainActivity.onResume → Config.reload 才能读到
             //   （否则「继续上次」要重启启动器才更新，2026-10-01 复现）。

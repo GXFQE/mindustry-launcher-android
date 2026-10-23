@@ -150,6 +150,16 @@
             android:exported="false"
             android:foregroundServiceType="dataSync"/>
 
+        <!--
+          ★ 第 222 轮：探针的**隔离进程**（`:probe`）。
+          探针代码崩了只死这个进程，不连带游戏；它只读 `/proc/<游戏 pid>/…` 这类进程级指标
+          （Java 堆 / GC / 帧时间仍必须进程内做）。
+        -->
+        <service
+            android:name=".ProbeService"
+            android:exported="false"
+            android:process=":probe"/>
+
         <!-- 主进程（UI）：版本列表 / 导入 / 设置。
              singleTop：已在前台时再被拉起（如 dev_import_path 热路径）走 onNewIntent，
              而不是叠加一个新实例。 -->

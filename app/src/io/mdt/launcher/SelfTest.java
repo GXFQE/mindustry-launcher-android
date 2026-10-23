@@ -3608,6 +3608,15 @@ public final class SelfTest {
         } catch (Throwable t) {
             ok(stat, L, false, "v22 crashReportsDir missing: " + t);
         }
+        // ★ 第 222 轮：`:probe` 隔离进程必须在清单里（漏注册 ⇒ 静默跑在主进程，验证结论全错）
+        try {
+            android.content.pm.ServiceInfo si = ctx.getPackageManager().getServiceInfo(
+                    new android.content.ComponentName(ctx, ProbeService.class), 0);
+            ok(stat, L, si.processName != null && si.processName.endsWith(":probe"),
+                    "★ :probe 隔离进程已注册（process=" + si.processName + "）");
+        } catch (Throwable t) {
+            ok(stat, L, false, ":probe service missing: " + t);
+        }
         settingsApplyValues(ctx, L, stat);
         // ★ 跳过报告的生命周期（第 220 轮修）：正常启动清掉横幅来源，但保留诊断档案。
         //   改前 LASTSKIP 只写不删 ⇒ 一次跳过 = 插件页永久横幅（真机挂了 6 天）。

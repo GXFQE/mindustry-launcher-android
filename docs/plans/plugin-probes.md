@@ -23,13 +23,46 @@
 
 ### B2. 探针（性能数据）
 - **A′（宿主持有探针表 + 声明式聚合）已放弃**：每次加指标都要改宿主发版，扩展性差。
-- 改走 **D：插件自定义探针**，宿主只做机制：
+- 改走 **D：插件自定义探针**，宿主只做机制（2026-10-23 定）：
   ```java
-  interface Probe { String name(); void reset(); void sample(); String summary(); }
+  interface Probe {
+      String name();
+      void reset(java.io.File dir);   // 宿主给的本会话 telemetry 目录
+      void sample();
+      void summary();                 // 可选：会话结束前收尾
+  }
   ```
-  插件 `plugin.json` 声明 `telemetry.probes: [{class, sec}]`；宿主在 `:game` 进程 `DexClassLoader` 只加载探针类，
-  定时 `sample()`，会话结束 `summary()` → 写一行 `A <ts> <name> <k=v…>`；**不落原始样本**。
-- 异常全吞 + 单次超时（>200ms 记警告）+ 连续失败停用该探针（写 `F <ts> probe <name> …`）。
+  插件 `plugin.json` 声明 `telemetry.probes: [{class, sec, inProcess}]`；宿主在对应进程里
+  `DexClassLoader` 只加载探针类，定时 `sample()`，会话结束前 `summary()`。
+  **数据由插件自己写**（写进 `dir`，格式插件定）—— 宿主管目录、会话边界、调度与失败隔离，
+  不替插件定义指标格式（与设置面同一条分层：机制归宿主、语义归插件）。
+  ★ **宿主不聚合、不展示**（2026-10-23 用户）：探针数据只有插件自己读；宿主不解析文件内容，
+  所以"格式漂移"不是问题，也不需要统一 schema。
+  宿主只额外写一条失败记录（`F …`，连续失败停用的依据）。
+- 两种运行位置：
+  - **进程内（`:game`）**：能拿 Java 级指标（堆 / GC / 线程 / 帧时间）和游戏状态；
+    风险 = 探针代码住在游戏进程里，崩了是游戏崩。官方默认，第三方启用时弹告知。
+  - **`:probe` 隔离进程**（保留，2026-10-23 用户确认）：同 UID 的独立进程，读
+    `/proc/<游戏 pid>/…` 那类**进程级**指标（CPU / RSS / 线程数 / IO）；拿不到 Java 堆 / GC / 帧时间。
+    风险低 ⇒ 适合"信息不强"的插件，也是默认更安全的选项。
+    ⚠️ 待验证：Android 16 上同 UID 能否读 `/proc/<pid>/stat|status|io`（这一条先做）。
+- 游戏状态（`Vars` / `World`）**不是宿主的事**：宿主不提供字段表、不替插件编译游戏类。
+  插件真要看游戏状态，自己按需**反射**（字段缺失就降级/跳过）—— 硬编码与版本适配都是插件自己的成本，
+  不要求按游戏版本各编一份；不做游戏状态探针的插件完全不用碰这些。
+  ★ 2026-10-23 用户补充：游戏字段大多跨版本稳定，而且**插件本来就由插件作者自己维护更新**（跟游戏模组一样）
+  ⇒ 宿主不做兼容层、不承诺字段稳定，插件自己适配。
+  ⚠️ 进程内探针引用游戏类时的运行时前提仍是：`:game` 进程已加载那份游戏 dex。
+- 异常全吞 + 单次超时（>200ms 记警告）+ 连续失败停用该探针（宿主写 `F` 记录）。
+- **2026-10-23 真机验证（第 222 轮，dev 夹具）**：
+  - `:probe` 隔离进程（清单 `android:process=":probe"`）能读 `:game` 的
+    `/proc/<pid>/{stat,status,io,cmdline,maps}`（同 UID）—— `VmRSS` / `Threads` / `rchar` 都拿到了。
+  - `:game` 注入游戏 dex 后，CL 能 `Class.forName("mindustry.Vars", false)`（136 个字段，`state` 在）。
+  - 插件探针 APK 能在 `:game` 里 `DexClassLoader` 加载并实例化、自己写 telemetry 文件。
+  - 🔴 **加载探针 dex 必须从内部存储的只读副本**：Android 14+ 直接加载 `/sdcard/...` 的可写 APK
+    会抛 `SecurityException: Writable dex file ... is not allowed`；而且只读副本**不能原地覆盖**
+    （先 `delete` 再复制）——与插件注入的 S0 规则同源。
+  - 骨架已进仓库：`ProbeService`（`:probe`）、`ProbeLab`（dev 验证台，产品版空壳）、
+    夹具 `ProbeFixture`；正式 `Probe` 接口与调度器还没做。
 - **官方 / 第三方的区别 = 是否给提示，不是能不能用**（2026-10-23 用户订正）：
   - 第三方**同样可以**声明进程内探针（能力不设门槛）
   - **官方**：不额外提示；**第三方**：启用时弹风险告知 + 崩溃报告里标"第三方，进程内"

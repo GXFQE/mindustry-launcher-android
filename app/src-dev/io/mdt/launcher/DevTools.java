@@ -78,6 +78,7 @@ final class DevTools {
                 || intent.hasExtra("dev_saves")
                 || intent.hasExtra("dev_launch_key")
                 || intent.hasExtra("dev_health")
+        || intent.hasExtra("dev_probetest")
                 || intent.hasExtra("dev_new_slot")
                 || intent.hasExtra("dev_assign_key")
                 || intent.hasExtra("dev_settings")
@@ -202,6 +203,12 @@ final class DevTools {
         if (intent.hasExtra("dev_health")) {
             boolean clean = "1".equals(intent.getStringExtra("dev_health"));
             a.runHealth(clean);
+            return;
+        }
+
+        // 第 222 轮：探针隔离进程的可读性验证（`:probe` 读 `:game` 的 /proc）
+        if (intent.hasExtra("dev_probetest")) {
+            a.startService(new Intent(a, ProbeService.class));
             return;
         }
 

@@ -90,6 +90,11 @@ build_one() {
   # 入口页也带上这一版的编译期 tag（`PlugPage.tag()`）——多插件下"谁渲染的页"靠它才看得见
   sed -e "s/__API__/$api/" -e "s/__TAGPAGE__/$tag/" -e "s|^package io.mdt.plugtest;|package $pkg;|" \
       "$tpl" > "$srcpkg/PlugPage.java"
+  # v22 探针夹具只跟着 content 变体走（`ProbeLab` 按这个类名反射加载）
+  if [ "$tpl" = "$SRC_DIR/src/io/mdt/plugtest/PlugPageContent.java" ]; then
+    sed "s|^package io.mdt.plugtest;|package $pkg;|" \
+        "$SRC_DIR/src/io/mdt/plugtest/ProbeFixture.java" > "$srcpkg/ProbeFixture.java"
+  fi
   # 住子包时 R 得显式 import（同包时不需要，也不许重复写）
   if [ "$pkg" != "io.mdt.plugtest" ]; then
     sed -i "/^package /a import io.mdt.plugtest.R;" "$srcpkg/PlugPage.java"
