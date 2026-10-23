@@ -6,6 +6,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 插件能用的**全部宿主能力**（唯一入口）。宿主实现、插件调用。
@@ -56,7 +57,7 @@ public interface PluginApi {
      * <p>为什么要有这个常量：注释里的「当前 = N」运行期读不到，一个写 17、一个写 20 也没人发现；
      * 常量 + 断言才拦得住。</p>
      */
-    int DOC_VERSION = 20;
+    int DOC_VERSION = 21;
 
     // ══ 环境 ═══════════════════════════════════════════════════════════════
 
@@ -351,6 +352,40 @@ public interface PluginApi {
     void export(String name, String mime, InputStream content, After after);
 
     // ══ 写与整理 ═══════════════════════════════════════════════════════════
+
+    /**
+     * **v21**：当前槽 {@code settings.bin} 的解析结果（只读快照，**保序**）。
+     *
+     * <p>值类型就是文件里的六种：{@code Boolean} / {@code Integer} / {@code Long} /
+     * {@code Float} / {@code String} / {@code byte[]}；调用方自己按类型判。
+     *
+     * <p>返回值有三种情况：
+     * <ul>
+     *   <li>文件不存在 ⇒ **空表**（全部是游戏默认值）；</li>
+     *   <li>读不出来（坏文件 / 权限）⇒ **{@code null}**，别当"空设置"处理；</li>
+     *   <li>正常 ⇒ 键值表（游戏自己写的未知键也原样返回）。</li>
+     * </ul>
+     *
+     * <p>⚠️ 真实文件 5900+ 个键 / ~500 KB ⇒ **别在主线程调**。键的含义（默认值、成对写）
+     * 归插件自己 —— 宿主只负责"解出来"。
+     */
+    Map<String, Object> gameSettings();
+
+    /**
+     * **v21**：改当前槽的游戏设置（**只改给定键**；值为 {@code null} ⇒ 删掉这个键）。
+     *
+     * <p>宿主负责的四条机制（是安全，不是语义）：
+     * 游戏在跑 ⇒ 拒绝（{@code game-running}）；写前备份到
+     * {@code <hub>/settings-backups/slot-<槽>/}（留 20 份）；原子写；
+     * 写后读回自检，不过 ⇒ 自动还原。未知键与键顺序原样保留。
+     *
+     * <p>**语义归插件**：比如 {@code mod-<名>-enabled} 不存在 = 启用、
+     * 改 {@code -enabled} 时要同时清 {@code -failed}（否则留下永远清不掉的陈旧记录）。
+     *
+     * <p>异步：读写都在后台线程，{@link Done#onDone(Result)} 回主线程。
+     * 失败 reason：{@code game-running} / {@code unreadable} / {@code invalid} / {@code io}。
+     */
+    void writeGameSettings(Map<String, Object> changes, Done done);
 
     /**
      * 把一个条目的内容**换掉**（仅限槽内 maps / saves / mods / blueprints 里的**已存在**文件）。

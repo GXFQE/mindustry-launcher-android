@@ -12,24 +12,11 @@
 
 ## 已定、未实现
 
-### B0. 游戏设置面：直接给解析结果（2026-10-23 晚定，计划 v21：v20 基线之后的加法）
+### B0. ~~游戏设置面~~ ✅ 已实现（v21，第 220 轮）
 
-**代替原计划的 `modState()`**：宿主不替插件解释键的含义，只给「解析结果 + 带护栏的写」。
-
-```java
-Map<String,Object> gameSettings();   // 当前槽；文件不存在 ⇒ 空表；读不出来 ⇒ null
-void writeGameSettings(Map<String,Object> changes, SettingsDone cb);  // 只改给定键；值为 null ⇒ 删键
-interface SettingsDone { void onDone(boolean ok, String reason); }
-// reason: game-running / unreadable / bad-type / verify-failed
-```
-
-- 值域 = `settings.bin` 六种类型：`Boolean` / `Integer` / `Long` / `Float` / `String` / `byte[]`
-- **归宿主（机制，不是语义）**：解析 / 编码、保序、未知键原样保留、`compressed` 沿用；游戏在跑拒绝、写前备份（`<hub>/settings-backups/slot-<槽>/`，留 20）、原子写、写后读回自检 + 不过自动还原（五步全复用 `SettingsBin.applyBools` 那套）
-- **归插件（语义）**：键名含义、缺省值（`-enabled` 不存在 = 启用）、`-enabled` / `-failed` 成对写、错误文案（宿主 `SettingsText` 用不了）
-- 命名别混：现有 `settings()` 是**启动器偏好**（SharedPreferences），不是游戏设置
-- 性能：真实文件 5900+ 键 / ~500 KB ⇒ 读别放主线程；写走后台 + 回调
-- 代价：模组页不搬 ⇒ “正确关模组”会有两份实现（宿主 `Mods.setEnabled` + 插件）；成对写契约要写进 `PLUGIN-API.md`
-- 宿主侧改动只是把 `applyBools` 泛化成 `applyValues`；`SettingsBin` 是纯 Java，PC 上就能拿真实文件做逐字节往返 ⇒ 约 1 轮
+`gameSettings()` / `writeGameSettings()` 已进接口面（`API = 21`、`API_MIN = 20`）：
+宿主只给 `settings.bin` 的解析结果 + 带护栏的写（游戏在跑拒绝、备份、原子写、读回自检还原），
+键的含义 / 缺省值 / 成对写归插件。契约与真机验证见 `docs/PLUGIN-API.md` §4「游戏设置」与 `next/42`。
 
 ### B1. 统计插件 `usagestats`
 宿主只"记"，插件只"看"：读 `usageDir()` → 启动次数 / 版本分布 / 会话时长 / 崩溃 / 熄屏 → 柱状图 + CSV/PNG 导出。
@@ -92,26 +79,23 @@ Result perform(String action, Bundle args);   // Result = ok / needsRestart / re
 
 ### 现在缺的接口（按优先级）
 
-1. **`gameSettings()` / `writeGameSettings()`（v21，见 B0）**
-   - 冲突检测要 `mod-<名>-enabled` / `-failed`；崩溃归因要"这个模组当时是不是开着"
-   - ~~`modState(item)`~~ 已取消（2026-10-23 晚）：语义归插件，宿主只给解析结果 + 安全写
-2. **动作注册表（缩到非设置动作）**
+1. **动作注册表（缩到非设置动作）**
    ```java
    String[] actions();
    Result perform(String action, Bundle args);   // {ok, needsRestart, reason}
    ```
    - 首批只剩 `item.open` / `version.launch`
-   - ~~`mod.enable` / `mod.disable`~~：改走 B0 的设置写入口（"游戏在跑就拒绝"的硬约束在那一层）
+   - ~~`mod.enable` / `mod.disable`~~：改走 v21 的设置写入口（"游戏在跑就拒绝"的硬约束在那一层）
    - 不强制确认框（插件本来就能改文件），但**硬约束保留**
-3. **`analyzer` 扩展（数据型，不画 UI）**
+2. **`analyzer` 扩展（数据型，不画 UI）**
    ```java
    interface Analyzer { List<Finding> analyze(ItemInfo item, PluginApi api); }
    // Finding = { title, detail, severity, evidence[] }
    ```
    - 宿主用现有归因卡 / 模组行样式渲染 ⇒ 保住"和原来一样"
-4. **崩溃报告的读取入口**
+3. **崩溃报告的读取入口**
    - 明确 `crashes/` 的报告能被插件读到（`crashReports()`，或确认 `logs()` 覆盖它）
-5. **插入点**
+4. **插入点**
    - 崩溃页、模组页要能挂 `analyzer`（现在的 `section` 能否挂到这两页要现场确认）
 6. **变更通知**
    - 插件改了设置后，宿主的模组页要重读（否则列表还是旧状态）
@@ -125,8 +109,8 @@ Result perform(String action, Bundle args);   // Result = ok / needsRestart / re
 
 ### 顺序
 
-1. **B0 设置面**（`gameSettings` / `writeGameSettings`，v21）
-2. `analyzer` + 崩溃页/模组页插入点；动作注册表只剩 `item.open` / `version.launch`（可与 1 并行）
+1. ~~B0 设置面~~ ✅ 已实现（v21）
+2. `analyzer` + 崩溃页/模组页插入点；动作注册表只剩 `item.open` / `version.launch`
 3. 迁移冲突检测（简单）→ 再迁移崩溃归因
 
 

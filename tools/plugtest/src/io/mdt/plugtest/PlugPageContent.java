@@ -26,6 +26,9 @@ import io.mdt.launcher.api.SlotInfo;
  */
 public final class PlugPage {
 
+    /** v21 活体用例用的键（游戏不认识、写完立刻删）。 */
+    private static final String PROBE_KEY = "mdt-selftest-probe";
+
     /** 插件接口版本：v20 冻结基线。 */
     public static int api() {
         return __API__;
@@ -166,6 +169,43 @@ public final class PlugPage {
                 api.export("plugin-export.txt", "text/plain",
                         new java.io.ByteArrayInputStream(data));
                 out.setText("export: asked the host");
+            }
+        });
+
+        // v21（第 220 轮）：设置面的活体用例 —— 读当前槽 settings.bin 的解析结果
+        addButton(box, c, th, "read game settings (v21)", new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                java.util.Map<String, Object> gs = api.gameSettings();
+                out.setText(gs == null ? "gameSettings=null (unreadable)"
+                        : "gameSettings=" + gs.size() + " keys; probe=" + gs.get(PROBE_KEY));
+            }
+        });
+
+        // 写 → 读回 → 删掉（全走插件接口；键是游戏不认识的，写完立刻清）
+        addButton(box, c, th, "write settings probe (v21)", new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                final java.util.LinkedHashMap<String, Object> put =
+                        new java.util.LinkedHashMap<String, Object>();
+                put.put(PROBE_KEY, "probe-" + System.currentTimeMillis());
+                api.writeGameSettings(put, new PluginApi.Done() {
+                    @Override public void onDone(io.mdt.launcher.api.Result r1) {
+                        if (!r1.ok) {
+                            out.setText("write failed: " + r1.reason);
+                            return;
+                        }
+                        java.util.Map<String, Object> gs = api.gameSettings();
+                        final Object got = gs == null ? null : gs.get(PROBE_KEY);
+                        final java.util.LinkedHashMap<String, Object> del =
+                                new java.util.LinkedHashMap<String, Object>();
+                        del.put(PROBE_KEY, null);
+                        api.writeGameSettings(del, new PluginApi.Done() {
+                            @Override public void onDone(io.mdt.launcher.api.Result r2) {
+                                out.setText("write ok; readback=" + got
+                                        + "; cleanup=" + (r2.ok ? "ok" : r2.reason));
+                            }
+                        });
+                    }
+                });
             }
         });
 

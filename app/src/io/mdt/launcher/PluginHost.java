@@ -56,11 +56,14 @@ public final class PluginHost {
      * 重载收成默认方法、只认 {@code createView(PluginApi)} / {@code run(PluginApi)}
      * （不再回落 {@code createView(Context)}）。
      *
+     * <p>**v21（2026-10-23 第 220 轮）= 加法**：`gameSettings()` / `writeGameSettings()` ——
+     * 直接给 `settings.bin` 的解析结果与安全写，键的语义归插件（见 `docs/PLUGIN-API.md`）。
+     *
      * <p>v1~v19 的逐版记录留在 `docs/PLUGIN-API.md` 与 git 历史里；**从 v20 起**：
      * 加法变更只抬 {@link #API}（{@link #API_MIN} 不动，老插件照样装得进），
      * 破坏性变更才抬 {@link #API_MIN}。
      */
-    public static final int API = 20;
+    public static final int API = 21;
     /**
      * 还认的**最老**契约版本。
      *
@@ -762,6 +765,79 @@ public final class PluginHost {
             cardCancel = cancel;
             cardCancelable = cancelable;
             showCard(title, message, done, total);
+        }
+
+        // ---- v21：游戏设置面（解析结果 + 安全写；语义归插件）------------------
+
+        @Override public Map<String, Object> gameSettings() {
+            File file = Mods.settingsFileOf(getBaseContext(), slot);
+            if (file == null || !file.isFile()) return new java.util.LinkedHashMap<String, Object>();
+            String[] why = new String[1];
+            SettingsBin.Values v = SettingsBin.readSafe(file, why);
+            if (v == null) {
+                android.util.Log.i("MDTPlugin", "gameSettings unreadable: " + why[0]);
+                return null;
+            }
+            java.util.LinkedHashMap<String, Object> out = new java.util.LinkedHashMap<String, Object>();
+            for (Map.Entry<String, Object> e : v.all().entrySet()) {
+                Object x = e.getValue();
+                out.put(e.getKey(), x instanceof byte[] ? ((byte[]) x).clone() : x);
+            }
+            return out;
+        }
+
+        @Override public void writeGameSettings(Map<String, Object> changes, final Done done) {
+            final Context c = getBaseContext();
+            final String useSlot = slot;
+            final java.util.LinkedHashMap<String, Object> copy =
+                    new java.util.LinkedHashMap<String, Object>();
+            if (changes != null) {
+                for (Map.Entry<String, Object> e : changes.entrySet()) {
+                    Object v = e.getValue();
+                    copy.put(e.getKey(), v instanceof byte[] ? ((byte[]) v).clone() : v);
+                }
+            }
+            new Thread(new Runnable() {
+                @Override public void run() {
+                    final Result r = writeSettingsNow(c, useSlot, copy);
+                    new android.os.Handler(android.os.Looper.getMainLooper()).post(new Runnable() {
+                        @Override public void run() {
+                            if (done != null) done.onDone(r);
+                        }
+                    });
+                }
+            }, "mdt-plugin-settings").start();
+        }
+
+        /** 设置写的门禁与调用（后台线程；把 `SettingsBin.Result` 翻成给插件的 reason）。 */
+        private Result writeSettingsNow(Context c, String useSlot,
+                                        java.util.LinkedHashMap<String, Object> changes) {
+            File file = Mods.settingsFileOf(c, useSlot);
+            if (file == null) return Result.fail("not-found");
+            if (Data.gameAlive(c)) return Result.fail("game-running");
+            if (changes == null || changes.isEmpty()) return Result.fail("invalid");
+            for (Map.Entry<String, Object> e : changes.entrySet()) {
+                if (e.getKey() == null || e.getKey().isEmpty()) return Result.fail("invalid");
+                Object v = e.getValue();
+                if (v == null) continue;                     // null = 删键
+                try {
+                    SettingsBin.checkValueType(v);
+                } catch (Throwable t) {
+                    return Result.fail("invalid");
+                }
+            }
+            if (file.isFile()) {
+                String[] why = new String[1];
+                if (SettingsBin.readSafe(file, why) == null) return Result.fail("unreadable");
+            }
+            SettingsBin.Result sr = SettingsBin.applyValues(file,
+                    Mods.settingsBackupDirOf(c, useSlot), changes);
+            if (sr.ok) return Result.ok();
+            if (sr.errCode == SettingsBin.Result.E_GAME_RUNNING) return Result.fail("game-running");
+            if (sr.errCode == SettingsBin.Result.E_SETTINGS_UNREADABLE) return Result.fail("unreadable");
+            if (sr.errCode == SettingsBin.Result.E_NO_KEYS
+                    || sr.errCode == SettingsBin.Result.E_NULL_FILE) return Result.fail("invalid");
+            return Result.fail("io");
         }
 
         /** v16 加固：同一目标路径的写要互斥（两个插件同时写同一份存档）。 */

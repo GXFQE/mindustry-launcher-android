@@ -46,7 +46,7 @@ Mods.java = 65   # ★ **用户可见路径已全部本地化/码化**：`State`
                  # 的口径；`-failed` 的真义见 `failedKey` 的 Javadoc）⇒ 新增 4 条 `changeDesc` 说明
                  # （"本来就是…状态，也没有失败记录" / "顺带清掉了 mod-<名字>-failed = true" 等）。
                  # 与相邻的 `changeDesc` 同族：**技术细节第二层**，不是弹窗第一层。
-SettingsBin.java = 50   # ★ 已码化：失败文案走 errCode+参数（SettingsText 映射）；剩的是 read/write 的 IOException 原文、report()/changeDesc(技术细节第二层) —— 依据，有意保留
+SettingsBin.java = 59   # ★ 已码化：失败文案走 errCode+参数（SettingsText 映射）；剩的是 read/write 的 IOException 原文、report()/changeDesc(技术细节第二层) —— 依据，有意保留。★ 2026-10-23 第 220 轮：applyValues 的 changeDesc（删除/未设置/新建）与坏类型提示共 9 条，同属"报告/自检"层、不上用户界面 ⇒ 50 → 59
 MsavMeta.java = 32   # ★ 已码化：8 条 error 走 errCode+参数（MsavText 映射）；这些句子只给报告/自检看
 Compat.java = 26   # 只进 report-devtool.txt / 崩溃报告（取证文本）
 ModsActivity.java = 26   # 全部在 `report()` 里（dev 落盘转储，只有 `MainActivity` 的 `dev_*` 口调它） —— 与 `MainActivity` 的 126 条同类；**它没有自己的用户可见文案**

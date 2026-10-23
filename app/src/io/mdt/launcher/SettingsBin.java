@@ -643,6 +643,114 @@ public final class SettingsBin {
     }
 
     /**
+     * ★★ 一次改**任意类型**的多个键（v21：插件设置面）。
+     *
+     * <p>安全流水线与 {@link #applyBools} **完全是同一套**（读 → 备份 → 原子写 → 读回自检 →
+     * 不过就还原，见 {@link #commit}）；区别只在语义：
+     * <ul>
+     *   <li>支持 `settings.bin` 的六种类型：Boolean / Integer / Long / Float / String / byte[]；</li>
+     *   <li>值为 {@code null} ⇒ **删掉这个键**；</li>
+     *   <li>**不**替调用方猜"键不存在 = 默认值"：键不存在而目标非 null ⇒ 照写（目标 null 且键不存在 ⇒ 跳过）；</li>
+     *   <li>不认识的类型 ⇒ {@link IllegalArgumentException}（调用方应先校验）。</li>
+     * </ul>
+     *
+     * <p>⚠️ 语义（键是什么意思、默认值是什么、哪些键要成对写）**归调用方** —— 本类只做
+     * "把这张表安全地写进去"，与 {@code applyBools} 注释里那条分层纪律同源。
+     */
+    public static Result applyValues(File file, File backupDir, java.util.Map<String, Object> values) {
+        Result r = new Result();
+        r.file = file;
+        if (file == null) {
+            return err(r, Result.E_NULL_FILE, "目标文件为 null", null, null);
+        }
+        if (values == null || values.isEmpty()) {
+            return err(r, Result.E_NO_KEYS, "没有要改的键", null, null);
+        }
+        try {
+            // ① 读原件（坏文件 ⇒ read() 直接抛，绝不往下走）
+            boolean fresh = !file.isFile();
+            Values before;
+            byte[] beforeBytes;
+            if (!fresh) {
+                before = read(file);
+                beforeBytes = readAllBytes(file);
+            } else {
+                before = new Values(new LinkedHashMap<String, Object>(), false, 0);
+                beforeBytes = new byte[0];
+            }
+            r.bytesBefore = beforeBytes.length;
+            r.keys = before.size();
+
+            // ①b 只改"真的会变"的键
+            StringBuilder desc = new StringBuilder();
+            Values after = before;
+            int changed = 0;
+            for (java.util.Map.Entry<String, Object> e : values.entrySet()) {
+                String key = e.getKey();
+                if (key == null || key.isEmpty()) {
+                    return err(r, Result.E_NO_KEYS, "键名为空", null, null);
+                }
+                Object want = e.getValue();
+                Object old = after.all().get(key);
+                if (want == null) {
+                    if (old == null) continue;               // 本来就没有 ⇒ 什么都不用做
+                    after = after.without(key);
+                    changed++;
+                    if (desc.length() > 0) desc.append("；");
+                    desc.append(key).append(": ").append(show(old)).append(" → （删除）");
+                } else {
+                    checkValueType(want);
+                    if (old != null && sameValue(old, want)) continue;
+                    after = after.with(key, cloneValue(want));
+                    changed++;
+                    if (desc.length() > 0) desc.append("；");
+                    desc.append(key).append(": ")
+                        .append(old == null ? "（未设置）" : show(old))
+                        .append(" → ").append(show(want));
+                }
+            }
+            if (changed == 0) {
+                r.ok = true;
+                r.noop = true;
+                r.changeDesc = "这 " + values.size() + " 个键本来就已经是目标值，文件一个字节都没动";
+                return r;
+            }
+            if (fresh) desc.insert(0, "（新建 settings.bin）");
+            r.changeDesc = desc.toString();
+            return commit(r, file, backupDir, before, beforeBytes, after);
+        } catch (Throwable t) {
+            r.error = t.getClass().getSimpleName() + ": " + t.getMessage();
+            return r;
+        }
+    }
+
+    /** 值必须是 settings.bin 能编码的六种之一（调用方先校验，别等写坏文件）。 */
+    public static void checkValueType(Object v) {
+        if (v instanceof Boolean || v instanceof Integer || v instanceof Long
+                || v instanceof Float || v instanceof String || v instanceof byte[]) {
+            return;
+        }
+        throw new IllegalArgumentException("不支持的值类型：" + v.getClass().getName());
+    }
+
+    private static boolean sameValue(Object a, Object b) {
+        if (a instanceof byte[] && b instanceof byte[]) {
+            return Arrays.equals((byte[]) a, (byte[]) b);
+        }
+        return a.equals(b);
+    }
+
+    private static Object cloneValue(Object v) {
+        return v instanceof byte[] ? ((byte[]) v).clone() : v;
+    }
+
+    /** 报告里的一行值（二进制只说长度，别把几 KB 字节倒进日志）。 */
+    private static String show(Object v) {
+        if (v instanceof byte[]) return "binary(" + ((byte[]) v).length + ")";
+        return String.valueOf(v);
+    }
+
+    /**
      * 改完之后的**同一套收尾**：② 备份 → ③ 原子写 → ④ 读回自检 → ⑤ 不过就还原。
      * ★ 单键与多键**共用这一处**：安全流水线只许有一份实现 ——
      *   两处实现迟早只改一处，而这里改错的代价是「游戏的设置被删掉」（见类注释）。

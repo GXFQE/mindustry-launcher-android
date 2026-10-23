@@ -152,7 +152,7 @@ build_one plugtest-v2      20 PLUGIN-v2      0 PLUGIN-v2-2
 # 第 132 轮：**带它就启动不了**的那一版（回滚要拿真实失败形态验，不能只靠手写 guard）
 build_one plugtest-kill    20 PLUGIN-kill    0 PLUGIN-kill-2 "$SRC_DIR/src/io/mdt/plugtest/PlugPageKill.java"
 # 第 159 轮：**内容页动作**夹具（v20 + slot=content/page=saves|maps）
-build_one plugtest-content 20 PLUGIN-content 0 PLUGIN-content-2 "$SRC_DIR/src/io/mdt/plugtest/PlugPageContent.java" "" content
+build_one plugtest-content 21 PLUGIN-content 0 PLUGIN-content-2 "$SRC_DIR/src/io/mdt/plugtest/PlugPageContent.java" "" content
 
 # --- 第 133 轮：**第三方**对照样本（同一个插件，换另一把密钥签） -----------------
 # 信任模型的判据是"签名指纹 == 本应用自己的"。夹具必须**两侧都有**：

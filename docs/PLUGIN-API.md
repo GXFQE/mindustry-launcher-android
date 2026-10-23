@@ -5,7 +5,8 @@
 
 ## 1. 版本与兼容（v20 冻结基线）
 
-- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..20**。
+- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..21**。
+  （v20 是冻结基线，v21 是它的第一个**加法**：游戏设置面。）
 - 插件 `api()` 报的是「我需要的最低宿主接口版本」。用不到的新能力**不要**报高 ——
   报高了只会在老宿主上被拒，换不来任何东西。
 - **不要用 try/catch 去兼容老宿主**：报什么版本就只会跑在什么版本上。`api()` 报 20，
@@ -56,7 +57,7 @@
 ## 3. 入口类约定
 
 ```java
-public static int api();                        // 必需：你需要的接口版本（当前 20）
+public static int api();                        // 必需：你需要的接口版本（当前 21；用不到设置面就报 20）
 public static View createView(PluginApi api);   // content / section 用
 public static void run(PluginApi api);          // action 用（在原页跑，不换页）
 public static void unload();                    // 可选：收尾（也认 unload(Context)）
@@ -76,7 +77,7 @@ public static void unload();                    // 可选：收尾（也认 unlo
 
 | 方法 | 说明 |
 |---|---|
-| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 20） |
+| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 21） |
 | `context()` | 插件上下文（**只用来取资源 / 主题 / 建 View**） |
 | `page()` / `slot()` | 从哪一页来 / 当前槽名 |
 | `theme()` | 主题色与 dp/sp（别自己写死颜色，见 `PluginTheme`） |
@@ -129,6 +130,27 @@ public static void unload();                    // 可选：收尾（也认 unlo
 | `writeItem(item, stream, cb)` | 换掉**槽内四类目录里已存在**文件的字节（原子替换；游戏在跑时拒绝） |
 | `trashItem(item, cb)` | 挪进中转站（不是真删，规则与界面删除同一套） |
 | `openItem(item)` | 跳详情页（地图/存档 → 地图详情；蓝图 → 蓝图详情；模组 → 模组页） |
+
+### 游戏设置（v21）
+
+`settings.bin` 的**解析结果**与**安全写**：键的含义归你，格式与安全归宿主。
+
+```java
+Map<String, Object> gameSettings();                               // 只读快照（保序）
+void writeGameSettings(Map<String, Object> changes, Done done);   // 只改给定键；null = 删键
+```
+
+- 值域 = 文件里的六种：`Boolean` / `Integer` / `Long` / `Float` / `String` / `byte[]`。
+- `gameSettings()`：文件不存在 ⇒ **空表**；读不出来 ⇒ **`null`**（别当"空设置"处理）。
+  真实文件 5900+ 键 / ~500 KB ⇒ **别在主线程调**。
+- `writeGameSettings()`：后台线程读写，`Done.onDone(Result)` 回主线程；
+  失败 reason = `game-running` / `unreadable` / `invalid` / `io`。
+- **宿主保证的机制**（不是语义）：游戏在跑 ⇒ 拒绝 · 写前备份到
+  `<hub>/settings-backups/slot-<槽>/`（留 20 份）· 原子写 · 写后读回自检、不过自动还原 ·
+  未知键与键顺序原样保留。
+- **插件负责的语义**：键名含义、缺省值、成对写。例如 `mod-<名>-enabled` **不存在 = 启用**；
+  改 `-enabled` 时要同时清 `-failed`，否则留下永远清不掉的陈旧记录。
+- 写是**合并**：没给的键一个都不动；删键用 `changes.put(key, null)`。
 
 ### 页面
 
@@ -248,3 +270,5 @@ v1~v19 的逐版记录留在 git 历史与 `.dsh/memory/next/` 的轮次记录�
 v20（2026-10-23）把逐年长出来的接口整理了一遍：删掉 `selectedFile` / `settings` / `hostIcon`、
 `pick` 改名 `pickContent`、`Done`/`After` 换成 `Result`、重载收成默认方法、
 删掉 v1~v6 的老加载路径。之后只按第 1 节的规则演进。
+v21（2026-10-23 第 220 轮）**第一个加法**：`gameSettings()` / `writeGameSettings()`（游戏设置面），
+`API_MIN` 不动 ⇒ 报 20 的插件照旧装得进。

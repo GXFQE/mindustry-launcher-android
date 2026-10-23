@@ -3573,6 +3573,19 @@ public final class SelfTest {
         ok(stat, L, PluginApi.DOC_VERSION == PluginHost.API,
                 "★ 文档版本常量 == 宿主接口版本（PluginApi.DOC_VERSION = "
                         + PluginApi.DOC_VERSION + "，PluginHost.API = " + PluginHost.API + "）");
+        // ★ v21（第 220 轮）：设置面（加法，只抬上限）
+        ok(stat, L, PluginHost.API >= 21,
+                "host plugin api >= 21 (gameSettings / writeGameSettings)");
+        try {
+            java.lang.reflect.Method g = PluginApi.class.getMethod("gameSettings");
+            java.lang.reflect.Method w = PluginApi.class.getMethod("writeGameSettings",
+                    java.util.Map.class, PluginApi.Done.class);
+            ok(stat, L, g.getReturnType() == java.util.Map.class && w.getReturnType() == void.class,
+                    "v21：gameSettings() -> Map / writeGameSettings(Map, Done)");
+        } catch (Throwable t) {
+            ok(stat, L, false, "v21 API missing: " + t);
+        }
+        settingsApplyValues(ctx, L, stat);
         {
             StringBuilder missing = new StringBuilder();
             int checked = 0;
@@ -4513,6 +4526,74 @@ public final class SelfTest {
         for (int i = 0; i < 4000; i++) deep.append('[');
         ok(stat, L, noEscape(deep.toString(), Hjson.ARC_160),
                 "★深嵌套不逃逸：只许成功或 ParseException，不许 StackOverflowError 之类跑出来");
+    }
+
+    /**
+     * v21（第 220 轮）：`SettingsBin.applyValues` 的尺子 —— 六种类型 / 删键 / 未知键保留 /
+     * noop 不写 / 键顺序。用**真实格式**的文件（写 → 改 → 读回），不碰宿主的任何槽。
+     */
+    private static void settingsApplyValues(Context ctx, List<String> L, int[] stat) {
+        L.add("  · v21 applyValues：六种类型 / 删键 / 未知键保留 / noop 不写");
+        File dir = new File(Paths.privateDir(ctx), "selftest-applyvalues");
+        deleteTree(dir);
+        dir.mkdirs();
+        try {
+            File f = new File(dir, "settings.bin");
+            Object[][] es = {
+                    {"k-bool", Integer.valueOf(SettingsBin.TYPE_BOOL), Boolean.TRUE},
+                    {"k-int", Integer.valueOf(SettingsBin.TYPE_INT), Integer.valueOf(7)},
+                    {"k-long", Integer.valueOf(SettingsBin.TYPE_LONG), Long.valueOf(8L)},
+                    {"k-float", Integer.valueOf(SettingsBin.TYPE_FLOAT), Float.valueOf(1.25f)},
+                    {"k-str", Integer.valueOf(SettingsBin.TYPE_STRING), "旧值"},
+                    {"k-bin", Integer.valueOf(SettingsBin.TYPE_BINARY), new byte[]{9, 8, 7}},
+                    {"keep-unknown", Integer.valueOf(SettingsBin.TYPE_STRING), "游戏新增的键"},
+            };
+            writeSettings(f, es, false);
+            java.util.LinkedHashMap<String, Object> ch =
+                    new java.util.LinkedHashMap<String, Object>();
+            ch.put("k-bool", Boolean.FALSE);
+            ch.put("k-int", Integer.valueOf(8));
+            ch.put("k-long", Long.valueOf(9L));
+            ch.put("k-float", Float.valueOf(2.5f));
+            ch.put("k-str", "新值");
+            ch.put("k-bin", new byte[]{1, 2});
+            ch.put("keep-unknown", "游戏新增的键");     // 同值 ⇒ 不写
+            ch.put("k-new", "新增");
+            ch.put("k-gone", null);                    // 不存在 ⇒ 跳过
+            SettingsBin.Result r = SettingsBin.applyValues(f, new File(dir, "bk"), ch);
+            ok(stat, L, r.ok && r.verified && !r.noop && r.backup != null,
+                    "applyValues 成功（备份 + 读回自检）：" + r.changeDesc);
+            SettingsBin.Values v = SettingsBin.read(f);
+            ok(stat, L, !v.getBool("k-bool", true)
+                            && v.getInt("k-int", 0) == 8
+                            && Long.valueOf(9L).equals(v.all().get("k-long"))
+                            && Float.valueOf(2.5f).equals(v.all().get("k-float"))
+                            && "新值".equals(v.getString("k-str", ""))
+                            && java.util.Arrays.equals(new byte[]{1, 2},
+                                    (byte[]) v.all().get("k-bin"))
+                            && "新增".equals(v.getString("k-new", ""))
+                            && "游戏新增的键".equals(v.getString("keep-unknown", "")),
+                    "六种类型 + 新增键 + 未知键都按预期");
+            java.util.List<String> keys = new java.util.ArrayList<String>(v.all().keySet());
+            ok(stat, L, keys.indexOf("keep-unknown") == 6
+                            && keys.indexOf("k-new") == keys.size() - 1,
+                    "键顺序：未知键原位不动，新键追加到末尾");
+            long afterLen = f.length();
+            SettingsBin.Result r2 = SettingsBin.applyValues(f, new File(dir, "bk"), ch);
+            ok(stat, L, r2.ok && r2.noop && f.length() == afterLen,
+                    "第二次同样改动 ⇒ noop（文件一个字节没动）");
+            java.util.LinkedHashMap<String, Object> del =
+                    new java.util.LinkedHashMap<String, Object>();
+            del.put("k-str", null);
+            SettingsBin.Result r3 = SettingsBin.applyValues(f, new File(dir, "bk"), del);
+            SettingsBin.Values v3 = SettingsBin.read(f);
+            ok(stat, L, r3.ok && !v3.has("k-str") && "新增".equals(v3.getString("k-new", "")),
+                    "null 值 = 删键（别的键不动）");
+        } catch (Throwable t) {
+            ok(stat, L, false, "applyValues 抛了：" + t);
+        } finally {
+            if (dir.exists()) Data.deleteTree(dir);
+        }
     }
 
     private static void settingsRoundtrip(Context ctx, List<String> L, int[] stat) {
