@@ -3640,6 +3640,32 @@ public final class SelfTest {
                         && ps.get(0).sec == 1 && !ps.get(0).inProcess
                         && ps.get(1).inProcess && ps.get(1).sec == 5,
                 "★v23 探针声明解析：坏条目丢掉、sec 夹到 [1,3600]、inProcess 缺省 true");
+        // 风险告知的两侧：第三方 + 进程内才弹；官方 / 纯隔离不弹
+        ok(stat, L, PluginProbes.needsRiskPrompt(PluginTrust.THIRD, ps)
+                        && !PluginProbes.needsRiskPrompt(PluginTrust.OFFICIAL, ps)
+                        && !PluginProbes.needsRiskPrompt(PluginTrust.BUILTIN, ps)
+                        && !PluginProbes.needsRiskPrompt(PluginTrust.THIRD,
+                                PluginProbes.parse("p", "1", "P",
+                                        "{\"telemetry\":{\"probes\":[{\"class\":\"A\","
+                                                + "\"inProcess\":false}]}}")),
+                "★v23 风险告知只对「第三方 + 进程内」弹（官方 / 纯隔离不弹）");
+        // 崩溃提示：最近一次本槽会话的 probes.txt 要能被读出来
+        try {
+            File tel = new File(Data.hubDir(ctx), "usage/telemetry");
+            File sess = new File(tel, "20260101-000000-selftest");
+            if (!sess.isDirectory()) sess.mkdirs();
+            java.io.FileOutputStream fo = new java.io.FileOutputStream(
+                    new File(sess, "probes.txt"));
+            fo.write("p1\tFixture\t1\t1\n".getBytes("UTF-8"));
+            fo.close();
+            String note = ProbeRunner.sessionNote(ctx, "selftest");
+            ok(stat, L, note != null && note.contains("Fixture"),
+                    "★v23 崩溃提示能读出本轮探针（" + note + "）");
+            new File(sess, "probes.txt").delete();
+            sess.delete();
+        } catch (Throwable t) {
+            ok(stat, L, false, "sessionNote 失败：" + t);
+        }
         settingsApplyValues(ctx, L, stat);
         // ★ 跳过报告的生命周期（第 220 轮修）：正常启动清掉横幅来源，但保留诊断档案。
         //   改前 LASTSKIP 只写不删 ⇒ 一次跳过 = 插件页永久横幅（真机挂了 6 天）。

@@ -49,6 +49,14 @@
     <string name="plugin_task_done">Finished</string>
     <string name="plugin_task_failed">Failed</string>
     <string name="plugin_task_canceled">Canceled</string>
+    <!-- v23：探针的风险告知与崩溃提示 -->
+    <string name="plugin_probe_risk_title">Run a probe in the game process?</string>
+    <string name="plugin_probe_risk_msg">This third-party plugin declares an in-process probe. A faulty probe can take the game down with it. Enable anyway?</string>
+    <string name="probe_note_fmt">Plugins in this session: %1$s</string>
+    <string name="probe_note_official_fmt">%1$s (official%2$s)</string>
+    <string name="probe_note_third_fmt">%1$s (third-party%2$s)</string>
+    <string name="probe_note_where_in">, in-process</string>
+    <string name="probe_note_where_iso">, isolated</string>
     <string name="work_export">Exporting</string>
     <string name="work_import">Importing</string>
     <string name="work_backup">Backing up</string>

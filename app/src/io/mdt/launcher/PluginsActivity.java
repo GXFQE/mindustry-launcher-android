@@ -438,13 +438,31 @@ public class PluginsActivity extends BaseActivity {
                         if ("open".equals(a)) {
                             open(id, act);
                         } else if ("enable".equals(a)) {
-                            Plugins.enable(PluginsActivity.this, id, newest);
-                            // ★ 名字走 displayNameOf（原来传的是内部 id），"哪一份"走 verLabel（不端令牌）
-                            String done = Trans.get(PluginsActivity.this, R.string.plugin_enabled_fmt,
-                                    Plugins.displayNameOf(PluginsActivity.this, id),
-                                    verLabel(id, newest));
-                            rebuild();
-                            askRestart(done);
+                            // ★ v23：第三方 + 进程内探针 ⇒ 启用前弹一次风险告知（官方 / 隔离进程不弹）
+                            final String want = newest;
+                            java.util.List<PluginProbes.Spec> specs = PluginProbes.parse(id, want, "",
+                                    PluginMeta.zipText(Plugins.apkOf(PluginsActivity.this, id, want),
+                                            Extensions.ASSET));
+                            if (PluginProbes.needsRiskPrompt(
+                                    Plugins.trustOf(PluginsActivity.this, id, want), specs)) {
+                                new AlertDialog.Builder(PluginsActivity.this)
+                                        .setTitle(Trans.get(PluginsActivity.this,
+                                                R.string.plugin_probe_risk_title))
+                                        .setMessage(Trans.get(PluginsActivity.this,
+                                                R.string.plugin_probe_risk_msg))
+                                        .setPositiveButton(Trans.get(PluginsActivity.this,
+                                                        R.string.plugin_action_enable),
+                                                new DialogInterface.OnClickListener() {
+                                                    @Override public void onClick(DialogInterface d2, int w2) {
+                                                        doEnable(id, want);
+                                                    }
+                                                })
+                                        .setNegativeButton(Trans.get(PluginsActivity.this,
+                                                R.string.cancel), null)
+                                        .show();
+                            } else {
+                                doEnable(id, want);
+                            }
                         } else if ("disable".equals(a)) {
                             // ★ 只有"这一程本来在跑的那一份"被拿掉才需要重启；
                             //   只取消 pending（还没加载过）的话重启也没意义 ⇒ 只给一句 Toast。
@@ -836,6 +854,15 @@ public class PluginsActivity extends BaseActivity {
      * 界面上怎么指代"哪一份"：时间戳 → 「10-20 16:57 那份」；内置 → 「内置那份」；其他 → 「已安装那份」。
      * 🔴 绝不把内部版本令牌（内置插件是 sha256 前 8 位）当成人话端给用户（第 182 轮用户指出）。
      */
+    /** 启用一版并问要不要重启（v23 抽出来：探针风险告知确认后走同一个出口）。 */
+    private void doEnable(String id, String ver) {
+        Plugins.enable(this, id, ver);
+        String done = Trans.get(this, R.string.plugin_enabled_fmt,
+                Plugins.displayNameOf(this, id), verLabel(id, ver));
+        rebuild();
+        askRestart(done);
+    }
+
     private String verLabel(String id, String ver) {
         if (ver == null || ver.trim().isEmpty()) return "";
         if (Plugins.isTimeVersion(ver)) {

@@ -34,6 +34,14 @@
     <string name="plugin_task_done">已完成</string>
     <string name="plugin_task_failed">失败了</string>
     <string name="plugin_task_canceled">已取消</string>
+    <!-- v23：探针的风险告知与崩溃提示 -->
+    <string name="plugin_probe_risk_title">在游戏进程里运行探针？</string>
+    <string name="plugin_probe_risk_msg">这个第三方插件声明了进程内探针。探针出问题可能把游戏一起带崩。仍然启用吗？</string>
+    <string name="probe_note_fmt">本次会话有插件参与：%1$s</string>
+    <string name="probe_note_official_fmt">%1$s（官方%2$s）</string>
+    <string name="probe_note_third_fmt">%1$s（第三方%2$s）</string>
+    <string name="probe_note_where_in">，进程内</string>
+    <string name="probe_note_where_iso">，隔离进程</string>
     <string name="work_export">正在导出</string>
     <string name="work_import">正在导入</string>
     <string name="work_backup">正在备份</string>

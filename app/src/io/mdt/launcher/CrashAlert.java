@@ -277,10 +277,14 @@ public final class CrashAlert {
         //   只在**单一嫌疑人**时才给这个按钮（并列时点哪一个都不对）。
         final java.util.List<String> internals = CrashAnalysis.blamedInternals(v);
         final boolean soleSuspect = internals != null && internals.size() == 1;
+        // v23：这一局有插件探针参与 ⇒ 弹窗顶部先说一句（官方也标；第三方 + 进程内更要说）
+        String msg = CrashAnalysis.text(a, v);
+        String probeNote = ProbeRunner.sessionNote(a, slot);
+        if (probeNote != null) msg = probeNote + "\n\n" + msg;
         android.app.AlertDialog.Builder b = new android.app.AlertDialog.Builder(a)
                 .setTitle(v != null && v.kind == CrashAnalysis.KIND_LAUNCHER
                         ? R.string.crash_alert_title_launcher : R.string.crash_alert_title)
-                .setMessage(CrashAnalysis.text(a, v))
+                .setMessage(msg)
                 .setPositiveButton(R.string.crash_alert_open, new android.content.DialogInterface.OnClickListener() {
                     @Override public void onClick(android.content.DialogInterface d, int w) {
                         try {

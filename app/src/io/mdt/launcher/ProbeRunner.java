@@ -109,6 +109,87 @@ final class ProbeRunner {
                 fail(s, "load: " + t);
             }
         }
+        writeManifest();
+    }
+
+    /** 把这一轮参与会话的探针写进 `probes.txt`（崩溃提示与以后的事后统计都读它）。 */
+    private void writeManifest() {
+        if (jobs.isEmpty()) return;
+        try {
+            FileOutputStream out = new FileOutputStream(new File(sessionDir, "probes.txt"), true);
+            try {
+                for (Job j : jobs) {
+                    PluginProbes.Spec s = j.spec;
+                    boolean third = PluginTrust.THIRD.equals(
+                            Plugins.trustOf(ctx, s.pluginId, s.ver));
+                    out.write((s.pluginId + "\t" + s.pluginName + "\t" + (third ? 1 : 0)
+                            + "\t" + (s.inProcess ? 1 : 0) + "\n").getBytes("UTF-8"));
+                }
+            } finally {
+                try { out.close(); } catch (Throwable ignored) { }
+            }
+        } catch (Throwable ignored) {
+        }
+    }
+
+    /**
+     * 最近一次**本槽**会话里参与过的探针（给崩溃提示用；没有/太旧 ⇒ null）。
+     *
+     * <p>读 `telemetry/<会话>/probes.txt`，按插件去重；只在 24 小时内、且会话名以
+     * `-<槽>` 结尾时采用（旧会话不该给新崩溃背锅）。
+     */
+    static String sessionNote(Context ctx, String slot) {
+        try {
+            File tel = new File(Data.hubDir(ctx), "usage/telemetry");
+            File[] dirs = tel.listFiles();
+            if (dirs == null) return null;
+            File best = null;
+            long bestT = 0;
+            for (File d : dirs) {
+                if (d == null || !d.isDirectory()) continue;
+                if (slot != null && !slot.isEmpty() && !d.getName().endsWith("-" + slot)) continue;
+                File pf = new File(d, "probes.txt");
+                if (!pf.isFile()) continue;
+                long t = pf.lastModified();
+                if (t > bestT) {
+                    bestT = t;
+                    best = pf;
+                }
+            }
+            if (best == null || System.currentTimeMillis() - bestT > 24L * 3600 * 1000) return null;
+            java.util.LinkedHashMap<String, String> items =
+                    new java.util.LinkedHashMap<String, String>();
+            java.io.BufferedReader r = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(new java.io.FileInputStream(best), "UTF-8"));
+            try {
+                String line;
+                while ((line = r.readLine()) != null) {
+                    String[] p = line.split("\t");
+                    if (p.length < 4) continue;
+                    String id = p[0];
+                    String name = p[1];
+                    boolean third = "1".equals(p[2]);
+                    boolean inProc = "1".equals(p[3]);
+                    String where = Trans.get(ctx, inProc ? R.string.probe_note_where_in
+                            : R.string.probe_note_where_iso);
+                    String item = Trans.get(ctx, third ? R.string.probe_note_third_fmt
+                            : R.string.probe_note_official_fmt, name, where);
+                    items.put(id, item);
+                }
+            } finally {
+                try { r.close(); } catch (Throwable ignored) { }
+            }
+            if (items.isEmpty()) return null;
+            StringBuilder sb = new StringBuilder();
+            String sep = Trans.get(ctx, R.string.list_join_sep);
+            for (String item : items.values()) {
+                if (sb.length() > 0) sb.append(sep);
+                sb.append(item);
+            }
+            return Trans.get(ctx, R.string.probe_note_fmt, sb.toString());
+        } catch (Throwable t) {
+            return null;
+        }
     }
 
     private void tick(final Job j) {

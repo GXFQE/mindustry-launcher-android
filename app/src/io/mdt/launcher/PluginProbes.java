@@ -85,4 +85,17 @@ final class PluginProbes {
         }
         return out;
     }
+
+    /**
+     * 启用前要不要弹"进程内探针"风险告知（**纯函数**，自检直接喂两侧）。
+     *
+     * <p>只对**第三方 + 至少一条 inProcess** 弹：官方插件作者就是我们自己；隔离进程崩了不连带游戏。
+     */
+    static boolean needsRiskPrompt(String trust, List<Spec> specs) {
+        if (!PluginTrust.THIRD.equals(trust) || specs == null) return false;
+        for (Spec s : specs) {
+            if (s.inProcess) return true;
+        }
+        return false;
+    }
 }
