@@ -5,8 +5,8 @@
 
 ## 1. 版本与兼容（v20 冻结基线）
 
-- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..21**。
-  （v20 是冻结基线，v21 是它的第一个**加法**：游戏设置面。）
+- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..22**。
+  （v20 是冻结基线；v21 = 游戏设置面；v22 = 后台任务 + 游戏事件。）
 - 插件 `api()` 报的是「我需要的最低宿主接口版本」。用不到的新能力**不要**报高 ——
   报高了只会在老宿主上被拒，换不来任何东西。
 - **不要用 try/catch 去兼容老宿主**：报什么版本就只会跑在什么版本上。`api()` 报 20，
@@ -57,7 +57,7 @@
 ## 3. 入口类约定
 
 ```java
-public static int api();                        // 必需：你需要的接口版本（当前 21；用不到设置面就报 20）
+public static int api();                        // 必需：你需要的接口版本（当前 22；用不到新能力就报 20）
 public static View createView(PluginApi api);   // content / section 用
 public static void run(PluginApi api);          // action 用（在原页跑，不换页）
 public static void unload();                    // 可选：收尾（也认 unload(Context)）
@@ -77,7 +77,7 @@ public static void unload();                    // 可选：收尾（也认 unlo
 
 | 方法 | 说明 |
 |---|---|
-| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 21） |
+| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 22） |
 | `context()` | 插件上下文（**只用来取资源 / 主题 / 建 View**） |
 | `page()` / `slot()` | 从哪一页来 / 当前槽名 |
 | `theme()` | 主题色与 dp/sp（别自己写死颜色，见 `PluginTheme`） |
@@ -114,7 +114,40 @@ public static void unload();                    // 可选：收尾（也认 unlo
 
 ### 任务
 
-`runBackground(label, body)` + `progress(done, total)`：后台线程跑活，宿主负责常驻通知与进度。
+| 方法 | 说明 |
+|---|---|
+| `runBackground(label, body)` | 页内长活：后台线程 + 前台服务通知；不给句柄、不发完成通知 |
+| `submit(label, body)`（v22） | **后台任务**：返回 `Task`；页面关了照跑，完成/失败/取消各发一条通知 |
+| `progress(done, total)` | 更新常驻通知上的进度 |
+
+`Task` = `id()` / `running()` / `cancel()`（取消 = 置标记 + `interrupt()`，任务体自己配合）。
+
+⚠️ 生命周期 = **本进程**：进程被系统杀就没了（没有 WorkManager）⇒ 下载要断点续传、
+分析要把 checkpoint 落进 `dataDir()`。`unload()` 不会取消任务 —— 别在 `unload` 里杀任务。
+
+### 事件（v22）
+
+在 `plugin.json` 里用 `event` 声明（**不是** `slot`）：
+
+```json
+"extensions": [
+  { "id": "ev-start", "entry": "com.example.MyPlugin", "event": "game-start" },
+  { "id": "ev-exit",  "entry": "com.example.MyPlugin", "event": "game-exit"  }
+]
+```
+
+入口方法：
+
+```java
+public static void onEvent(PluginApi api, String name, Map<String, String> data);
+```
+
+- `data` 目前有 `name` / `slot` / `version`（拿不到就不放这个键）。
+- 回调在 **UI 线程**（可以用 `confirm` / `toast`）；异常只进 `MDTPlugin` 日志，不影响别的插件。
+- 每次派发会 `load` 一份插件、跑完 `unload`：适合"启动前 / 退出后做一件事"，
+  **不适合当常驻监听** —— 常驻请用 `submit()`。
+- ⚠️ 只在**启动器进程活着**时交付：游戏期间启动器被系统杀 / 在最近任务里划掉 ⇒
+  `game-exit` **不会**触发（"补报"还没做）。
 
 ### 出口
 
@@ -272,3 +305,5 @@ v20（2026-10-23）把逐年长出来的接口整理了一遍：删掉 `selected
 删掉 v1~v6 的老加载路径。之后只按第 1 节的规则演进。
 v21（2026-10-23 第 220 轮）**第一个加法**：`gameSettings()` / `writeGameSettings()`（游戏设置面），
 `API_MIN` 不动 ⇒ 报 20 的插件照旧装得进。
+v22（2026-10-23 第 221 轮）：`submit()` / `Task`（后台任务，完成/失败/取消通知）+
+`event` 扩展（`game-start` / `game-exit`，不需要新接口方法）；`API_MIN` 仍不动。

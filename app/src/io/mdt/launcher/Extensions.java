@@ -89,14 +89,22 @@ final class Extensions {
     /** 一条"能力条目"。 */
     static final class Item {
         final String id, title, subtitle, entry, slot, page;
+        /** v23：事件名（`game-start` / `game-exit`）；空 = 不是事件条目。 */
+        final String event;
 
         Item(String id, String title, String subtitle, String entry, String slot, String page) {
+            this(id, title, subtitle, entry, slot, page, "");
+        }
+
+        Item(String id, String title, String subtitle, String entry, String slot, String page,
+             String event) {
             this.id = id;
             this.title = title;
             this.subtitle = subtitle;
             this.entry = entry;
             this.slot = slot;
             this.page = page;
+            this.event = event == null ? "" : event;
         }
 
         /** 界面上那个名字：标题空就回落 id（与插件名同一策略：**不印空白**）。 */
@@ -127,8 +135,9 @@ final class Extensions {
                 String slot = trim(o.optString("slot", ""));
                 if (slot.isEmpty()) slot = SLOT_PLUGINS;
                 String page = trim(o.optString("page", ""));   // 只有 content 插槽用得上
+                String event = trim(o.optString("event", ""));  // v23：事件扩展
                 out.add(new Item(id, trim(o.optString("title", "")), trim(o.optString("subtitle", "")),
-                        entry, slot, page));
+                        entry, slot, page, event));
             }
         } catch (Throwable t) {
             return new ArrayList<Item>();                       // 自述坏了 ⇒ 当"没有扩展"，别崩页面

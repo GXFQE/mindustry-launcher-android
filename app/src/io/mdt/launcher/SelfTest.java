@@ -3585,6 +3585,22 @@ public final class SelfTest {
         } catch (Throwable t) {
             ok(stat, L, false, "v21 API missing: " + t);
         }
+        // ★ v22（第 221 轮）：后台任务（加法）
+        ok(stat, L, PluginHost.API >= 22, "host plugin api >= 22 (submit / Task)");
+        try {
+            java.lang.reflect.Method sub = PluginApi.class.getMethod("submit",
+                    String.class, Runnable.class);
+            java.lang.reflect.Method cancel = PluginApi.Task.class.getMethod("cancel");
+            java.lang.reflect.Method running = PluginApi.Task.class.getMethod("running");
+            java.lang.reflect.Method tid = PluginApi.Task.class.getMethod("id");
+            ok(stat, L, sub.getReturnType() == PluginApi.Task.class
+                            && cancel.getReturnType() == void.class
+                            && running.getReturnType() == boolean.class
+                            && tid.getReturnType() == String.class,
+                    "v22：submit(String, Runnable) -> Task（id / running / cancel）");
+        } catch (Throwable t) {
+            ok(stat, L, false, "v22 API missing: " + t);
+        }
         settingsApplyValues(ctx, L, stat);
         // ★ 跳过报告的生命周期（第 220 轮修）：正常启动清掉横幅来源，但保留诊断档案。
         //   改前 LASTSKIP 只写不删 ⇒ 一次跳过 = 插件页永久横幅（真机挂了 6 天）。
@@ -3656,6 +3672,19 @@ public final class SelfTest {
                         && Extensions.forSection(v9, Extensions.PAGE_MAPS).size() == 1,
                 "★v9 段落插槽：只有 slot=section 且 page 相同的那条命中（content 行 / 别的页不算），"
                         + "接口版本 = " + PluginHost.API);
+        // ── v22（第 221 轮）：事件扩展 = extensions 里的 `event` 字段（不抬 API 版本）──
+        List<Extensions.Item> ev = Extensions.parse(
+                "{\"extensions\":["
+                        + "{\"id\":\"e1\",\"entry\":\"E\",\"event\":\"game-start\"},"
+                        + "{\"id\":\"e2\",\"entry\":\"E\",\"event\":\"game-exit\"},"
+                        + "{\"id\":\"e3\",\"entry\":\"E\"}]}");
+        ok(stat, L, ev.size() == 3 && "game-start".equals(ev.get(0).event)
+                        && "game-exit".equals(ev.get(1).event) && "".equals(ev.get(2).event)
+                        && Extensions.SLOT_PLUGINS.equals(ev.get(0).slot),
+                "★v22 事件扩展：event 字段解析出来（缺省 = 空，slot 默认 plugins）；实得 size="
+                        + ev.size() + " e0=" + (ev.isEmpty() ? "-" : ev.get(0).event)
+                        + " slot=" + (ev.isEmpty() ? "-" : ev.get(0).slot)
+                        + " e2=" + (ev.size() < 3 ? "-" : ev.get(2).event));
         ok(stat, L, PluginHost.API >= 4,
                 "host plugin api >= 4 (all pages + selectedFile)");
         String[] allPages = { Extensions.PAGE_MAIN, Extensions.PAGE_SLOTS,

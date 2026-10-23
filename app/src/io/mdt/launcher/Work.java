@@ -1,6 +1,10 @@
 package io.mdt.launcher;
 
 import android.app.Activity;
+import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -190,6 +194,46 @@ final class Work {
     static void onServiceDown() {
         synchronized (LOCK) {
             sUp = false;
+        }
+    }
+
+    /**
+     * 插件任务的**完成通知**（v22，第 221 轮）：成功 / 失败 / 被取消。
+     *
+     * <p>和前台服务复用同一个渠道（`mdt.work`，IMPORTANCE_LOW）：任务跑的时候用户已经
+     * 在通知栏见过那条进度通知，完成时再响一声反而烦。渠道可能还没建（任务短到服务没起来），
+     * 所以这里兜底建一次。
+     *
+     * <p>点开回到管理器主界面（不是插件页：任务可能来自任意页，宿主不知道用户想回哪）。
+     */
+    static void notifyDone(Context ctx, String title, String text, int id) {
+        if (ctx == null) return;
+        try {
+            Context app = ctx.getApplicationContext() == null ? ctx : ctx.getApplicationContext();
+            NotificationManager nm = (NotificationManager) app.getSystemService(
+                    Context.NOTIFICATION_SERVICE);
+            if (nm == null) return;
+            if (Build.VERSION.SDK_INT >= 26 && nm.getNotificationChannel(WorkService.CHANNEL) == null) {
+                NotificationChannel ch = new NotificationChannel(WorkService.CHANNEL,
+                        app.getString(R.string.work_channel_name),
+                        NotificationManager.IMPORTANCE_LOW);
+                ch.setShowBadge(false);
+                nm.createNotificationChannel(ch);
+            }
+            Intent open = new Intent(app, MainActivity.class);
+            open.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            PendingIntent pi = PendingIntent.getActivity(app, id, open,
+                    PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+            Notification.Builder b = new Notification.Builder(app, WorkService.CHANNEL)
+                    .setSmallIcon(android.R.drawable.stat_sys_download_done)
+                    .setContentTitle(title == null ? app.getString(R.string.plugin_task_title) : title)
+                    .setContentText(text)
+                    .setAutoCancel(true)
+                    .setShowWhen(true)
+                    .setContentIntent(pi);
+            nm.notify(id, b.build());
+        } catch (Throwable t) {
+            Log.w(TAG, "task notification failed: " + t);
         }
     }
 }

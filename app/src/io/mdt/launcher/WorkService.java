@@ -25,7 +25,8 @@ public class WorkService extends Service {
     /** 第 187 轮：调用方直接给的一句话（插件后台任务的标签）；非空时盖过 {@link #EXTRA_LABEL}。 */
     static final String EXTRA_TEXT = "text";
     private static final String TAG = "MDTLauncher";
-    private static final String CHANNEL = "mdt.work";
+    /** 通知渠道 id（{@link Work#notifyDone} 复用同一个渠道）。 */
+    static final String CHANNEL = "mdt.work";
     private static final int NOTIF_ID = 0x4d4454;   // "MDT"
 
     @Override public void onCreate() {

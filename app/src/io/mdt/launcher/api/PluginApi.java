@@ -57,7 +57,7 @@ public interface PluginApi {
      * <p>为什么要有这个常量：注释里的「当前 = N」运行期读不到，一个写 17、一个写 20 也没人发现；
      * 常量 + 断言才拦得住。</p>
      */
-    int DOC_VERSION = 21;
+    int DOC_VERSION = 22;
 
     // ══ 环境 ═══════════════════════════════════════════════════════════════
 
@@ -296,6 +296,46 @@ public interface PluginApi {
      * 同一时刻可以有多段，计数是嵌套安全的。
      */
     void runBackground(String label, Runnable body);
+
+    /**
+     * 后台任务的句柄（v22）。
+     *
+     * <p>生命周期 = **本进程**：页面关掉、人切走都照跑；进程被系统杀就没了
+     * （没有 WorkManager，本工程纯 framework）⇒ 下载要断点续传、分析要把 checkpoint
+     * 落进 {@link #dataDir()}。
+     */
+    interface Task {
+        /** 本次任务 id（日志 / 报告用；同一进程内不重复）。 */
+        String id();
+
+        /** 还在跑吗（完成 / 失败 / 取消之后返回 false）。 */
+        boolean running();
+
+        /**
+         * 请求取消：置标记 + {@link Thread#interrupt()}。
+         *
+         * <p>任务体要自己配合 —— 阻塞 IO 会收到中断，纯计算请轮询
+         * {@code Thread.currentThread().isInterrupted()}。
+         */
+        void cancel();
+    }
+
+    /**
+     * **v22**：提交一个后台任务 —— 页面关了照跑，完成 / 失败 / 被取消各发一条通知。
+     *
+     * <p>与 {@link #runBackground} 的关系：同一个底座（独立线程 + 前台服务），差别只有两点：
+     * <ul>
+     *   <li>拿到 {@link Task} 句柄，可以 {@link Task#cancel()}、可以问 {@link Task#running()}；</li>
+     *   <li>结束时会发一条**完成通知**（成功 / 失败 / 已取消）—— 用户切走之后也知道结果。</li>
+     * </ul>
+     *
+     * <p>⚠️ 页面关闭时宿主会调 {@code unload()}，**但任务不会因此停止**；
+     * 想把"页面收尾"和"任务取消"分开的插件，别在 {@code unload} 里取消任务。
+     *
+     * <p>{@code body} 在后台线程执行，异常被宿主接住并写 `MDTPlugin` 日志（不会带走进程）。
+     * {@code label} 是通知标题 / 正文（给用户看的一句话，可为 null）。
+     */
+    Task submit(String label, Runnable body);
 
     /**
      * 更新那条常驻通知上的进度（{@code done}/{@code total}）。

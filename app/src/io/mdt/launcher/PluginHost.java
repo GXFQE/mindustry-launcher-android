@@ -59,11 +59,14 @@ public final class PluginHost {
      * <p>**v21（2026-10-23 第 220 轮）= 加法**：`gameSettings()` / `writeGameSettings()` ——
      * 直接给 `settings.bin` 的解析结果与安全写，键的语义归插件（见 `docs/PLUGIN-API.md`）。
      *
+     * <p>**v22（2026-10-23 第 221 轮）= 加法**：`submit()` / `Task` —— 跨页面存活的后台任务，
+     * 完成/失败/取消都通知用户（下载、复杂分析的底座）。
+     *
      * <p>v1~v19 的逐版记录留在 `docs/PLUGIN-API.md` 与 git 历史里；**从 v20 起**：
      * 加法变更只抬 {@link #API}（{@link #API_MIN} 不动，老插件照样装得进），
      * 破坏性变更才抬 {@link #API_MIN}。
      */
-    public static final int API = 21;
+    public static final int API = 22;
     /**
      * 还认的**最老**契约版本。
      *
@@ -511,25 +514,13 @@ public final class PluginHost {
 
         @Override public void runBackground(final String label, final Runnable body) {
             if (body == null) return;
-            final Context base = getBaseContext();
-            final Context app = base.getApplicationContext() == null
-                    ? base : base.getApplicationContext();
-            // ★ 第 187 轮：把 Activity 交给 Work —— 通知权限只能在界面上申请
-            final Context work = base instanceof Activity ? base : app;
-            Thread t = new Thread(new Runnable() {
-                @Override public void run() {
-                    Work.begin(work, R.string.work_notif_plain, label);
-                    try {
-                        body.run();
-                    } catch (Throwable err) {
-                        // ★ 插件的异常不许带走整个进程（非主线程的未捕获异常默认会杀进程）
-                        android.util.Log.w("MDTPlugin", "background task failed", err);
-                    } finally {
-                        Work.end(work);
-                    }
-                }
-            }, "mdt-plugin-work");
-            t.start();
+            // 页内长活：同一个任务底座，但不发完成通知（地图统计那种 1 秒的活不该多一条通知）
+            PluginTasks.start(getBaseContext(), label, body, false);
+        }
+
+        @Override public PluginApi.Task submit(String label, Runnable body) {
+            if (body == null) return null;
+            return PluginTasks.start(getBaseContext(), label, body, true);
         }
 
         @Override public void progress(int done, int total) {

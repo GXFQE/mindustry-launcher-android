@@ -102,16 +102,19 @@ Result perform(String action, Bundle args);   // Result = ok / needsRestart / re
 
 ### 其他已确认、以后再加的能力
 
-- **`event` 扩展**：`game-exit`（游戏退出时弹窗/提示）、`app-foreground`
-  - 弹窗用宿主 `confirm()`（样式一致），不要插件自己 `AlertDialog`
-  - 用户直接在最近任务清掉、不再回界面 ⇒ **不会触发**
+- **`event` 扩展**：✅ 已实现（v22，第 221 轮）—— `game-start` / `game-exit`，入口
+  `onEvent(PluginApi, String, Map)`。⚠️ 只在启动器进程活着时交付（划掉就丢 `game-exit`），
+  "补报"未做；`app-foreground` 也还没加。
 - **`boot` 钩子**：插件开机跑一次（只有官方插件考虑；宿主在后台时会被杀，不能当常驻用）
+- **任务接口**：✅ 已实现（v22，第 221 轮）—— `submit(label, body) → Task`（跨页面、完成通知、取消）；
+  下载原语（Range 续传）未做，插件暂时自己写 HTTP。
 
 ### 顺序
 
 1. ~~B0 设置面~~ ✅ 已实现（v21）
-2. `analyzer` + 崩溃页/模组页插入点；动作注册表只剩 `item.open` / `version.launch`
-3. 迁移冲突检测（简单）→ 再迁移崩溃归因
+2. ~~任务接口 + 游戏事件~~ ✅ 已实现（v22）
+3. `analyzer` + 崩溃页/模组页插入点；动作注册表只剩 `item.open` / `version.launch`
+4. 迁移冲突检测（简单）→ 再迁移崩溃归因
 
 
 ### 总原则（2026-10-23 定）

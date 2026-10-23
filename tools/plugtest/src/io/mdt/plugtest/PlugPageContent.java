@@ -163,6 +163,43 @@ public final class PlugPage {
             }
         });
 
+        // v22（第 221 轮）：后台任务 —— 页面关了照跑，完成/取消各发通知
+        addButton(box, c, th, "submit 4s task (v22)", new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                PluginApi.Task t = api.submit("fixture task", new Runnable() {
+                    @Override public void run() {
+                        try {
+                            Thread.sleep(4000);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        }
+                    }
+                });
+                out.setText("task submitted: " + (t == null ? "null"
+                        : t.id() + " running=" + t.running()));
+            }
+        });
+        addButton(box, c, th, "submit + cancel (v22)", new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                final PluginApi.Task t = api.submit("cancel me", new Runnable() {
+                    @Override public void run() {
+                        try {
+                            Thread.sleep(10000);
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                        }
+                    }
+                });
+                new android.os.Handler(android.os.Looper.getMainLooper()).postDelayed(
+                        new Runnable() {
+                            @Override public void run() {
+                                if (t != null) t.cancel();
+                                out.setText("canceled: " + (t == null ? "null" : t.running()));
+                            }
+                        }, 1000);
+            }
+        });
+
         addButton(box, c, th, "export text (SAF)", new View.OnClickListener() {
             @Override public void onClick(View v) {
                 byte[] data = "export from plugin\n".getBytes();
@@ -216,6 +253,12 @@ public final class PlugPage {
         });
 
         return box;
+    }
+
+    /** v22：事件扩展入口（game-start / game-exit）—— 宿主按 plugin.json 的 `event` 字段调。 */
+    public static void onEvent(io.mdt.launcher.api.PluginApi api, String name,
+                               java.util.Map<String, String> data) {
+        api.log("EVENT " + name + " " + data);
     }
 
     /** 一行"像宿主动作行"的按钮（纯文字 + 强调色，够真机点就行）。 */

@@ -44,6 +44,11 @@
     <string name="work_notif_plain">Working…</string>
     <!-- 第 187 轮：插件后台任务的进度（拼在插件给的那句话后面：<标签> · 3 / 10） -->
     <string name="work_progress_fmt">%1$d / %2$d</string>
+    <!-- 第 221 轮（v22）：插件任务的完成通知 -->
+    <string name="plugin_task_title">Plugin task</string>
+    <string name="plugin_task_done">Finished</string>
+    <string name="plugin_task_failed">Failed</string>
+    <string name="plugin_task_canceled">Canceled</string>
     <string name="work_export">Exporting</string>
     <string name="work_import">Importing</string>
     <string name="work_backup">Backing up</string>
