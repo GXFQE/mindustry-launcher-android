@@ -180,7 +180,7 @@ public interface PluginApi {
      * </ul>
      *
      * <p>没有 E 的会话按 {@code min(now, lastB + 30s)} 收口（只少不多），单条上限 12 小时。
-     * 字段与读取约定见 {@code docs/PLUGIN-API.md} 第 10 节。
+     * 字段与读取约定见 {@code docs/PLUGIN-API.md} 第 9 节。
      */
     File usageDir();
 

@@ -1,7 +1,8 @@
 # mapstats —— 官方插件（地图资源统计）
 
 第 188 轮起从宿主 F21 搬出来的**第一个官方插件**。目标是把宿主那套"重解析器 + 页面"整块搬成插件，
-顺手用真实功能给插件接口（v7）当活体用例。
+顺手用真实功能给插件接口当活体用例。**v20（第 219 轮）起报 20**：插件编译时直接编宿主那份
+`app/src/io/mdt/launcher/api`（工程里不再放 API 副本），也不再写兼容老宿主的 try/catch。
 
 ## 构建
 
@@ -27,8 +28,8 @@ adb shell am start -n io.mdt.launcher/io.mdt.launcher.MainActivity \
 
 - ✅ 自带 `.msav` 解析（`core/` 是宿主那几个纯 Java 类的拷贝：`MapStats` / `MsavTiles` /
   `MsavPatches` / `MapStatsExport` / `Hjson` / `BundleNames` / `Colors` + 三张表）；只走 `PluginApi`：
-  `pick` / `open` / `runBackground` / `progress` / `theme` / `shareText` / `export` / `closePage` /
-  `modsSkipped`。
+  `pickContent` / `open` / `runBackground` / `progress` / `progressCard` / `theme` / `choose` /
+  `shareText` / `export`（`After` 收 `Result`）/ `closePage` / `modsSkipped`。
 - ✅ 数字与宿主对得上（真机 0.msav：地矿 2,595 / 可采地板 51,314 / 加成地板 118,873 / 可建造 31,083；
   埃里克尔槽：地矿 5 种 1,232 / 墙矿 4 种 846 / 加成 8 种 40,657 / 可建造 89,480 / 核心区 195·8 个 4×4）。
 - ✅ **译名**：版本 APK 的 `bundles/` + 本槽模组的 `*-bundles/`（与宿主同源，`MapStats.readBundles`）；
