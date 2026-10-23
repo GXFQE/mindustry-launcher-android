@@ -917,6 +917,10 @@ public final class PluginHost {
             return UsageLog.dir(getBaseContext());
         }
 
+        @Override public File crashReportsDir() {
+            return CrashAlert.crashesDir(getBaseContext(), slot());
+        }
+
         @Override public void progressCardClose() {
             final Activity a = activityOrNull();
             final Runnable close = new Runnable() {

@@ -186,6 +186,17 @@ public interface PluginApi {
     File usageDir();
 
     /**
+     * 当前槽的**崩溃报告目录**（只读，v22）。
+     *
+     * <p>里面既有游戏自己写的 {@code crash_*.txt}，也有启动器写的
+     * {@code crash_*_launcher.txt}；格式与归因方法见 {@code docs/crash-corpus/}。
+     * 目录可能不存在（这个槽没崩过）—— **也会返回路径**，自己判 {@code isDirectory()}。
+     *
+     * <p>给 analyzer / 归因类插件读原料用；宿主不保证文件名以外的任何顺序。
+     */
+    File crashReportsDir();
+
+    /**
      * 打开一个条目的字节流。
      *
      * <p>槽内文件直接开文件；{@code container + entry} 的包内条目由宿主开 zip 并保证

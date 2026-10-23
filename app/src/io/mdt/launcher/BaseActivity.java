@@ -182,6 +182,20 @@ public abstract class BaseActivity extends Activity {
     }
 
     @Override
+    protected void onStart() {
+        super.onStart();
+        // ★ v22：插件事件（boot / app-foreground），以及"游戏这一程结束了"的判定
+        //   （正常返回 / 启动器被杀后的补报，判据都在 PluginEvents 里）。
+        PluginEvents.onForeground(this);
+    }
+
+    @Override
+    protected void onStop() {
+        PluginEvents.onBackground();
+        super.onStop();
+    }
+
+    @Override
     protected void onResume() {
         super.onResume();
         // ★ F23「崩了马上说一声」：记下"谁是当前前台页面"——崩溃提示要按这个决定

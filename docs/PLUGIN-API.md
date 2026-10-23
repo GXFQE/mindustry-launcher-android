@@ -94,6 +94,7 @@ public static void unload();                    // 可选：收尾（也认 unlo
 | `open(item)` | 打开条目的字节流（文件或容器条目统一） |
 | `modsSkipped()` / `gameRunning()` | 这一轮会不会加载模组 / 游戏在不在跑 |
 | `usageDir()` | 会话记录目录（见第 9 节） |
+| `crashReportsDir()`（v22） | 当前槽的崩溃报告目录（只读；可能不存在） |
 
 ### 目录
 
@@ -132,9 +133,18 @@ public static void unload();                    // 可选：收尾（也认 unlo
 ```json
 "extensions": [
   { "id": "ev-start", "entry": "com.example.MyPlugin", "event": "game-start" },
-  { "id": "ev-exit",  "entry": "com.example.MyPlugin", "event": "game-exit"  }
+  { "id": "ev-exit",  "entry": "com.example.MyPlugin", "event": "game-exit"  },
+  { "id": "ev-boot",  "entry": "com.example.MyPlugin", "event": "boot"       },
+  { "id": "ev-fg",    "entry": "com.example.MyPlugin", "event": "app-foreground" }
 ]
 ```
+
+| 事件 | 什么时候 |
+|---|---|
+| `boot` | 本次进程起来后**第一次**回到界面（每个进程一次） |
+| `app-foreground` | 每次从后台回到前台（含 `boot` 那一次） |
+| `game-start` | 点"启动"、兼容性复检通过之后，`startActivity` 之前 |
+| `game-exit` | 回到启动器、且上一件事是启动游戏 |
 
 入口方法：
 
@@ -142,12 +152,13 @@ public static void unload();                    // 可选：收尾（也认 unlo
 public static void onEvent(PluginApi api, String name, Map<String, String> data);
 ```
 
-- `data` 目前有 `name` / `slot` / `version`（拿不到就不放这个键）。
+- `data` 目前有 `name` / `slot` / `version`（拿不到就不放这个键）；
+  `game-exit` 若是启动器被杀后**补报**的，多一个 `backfill=1`。
 - 回调在 **UI 线程**（可以用 `confirm` / `toast`）；异常只进 `MDTPlugin` 日志，不影响别的插件。
 - 每次派发会 `load` 一份插件、跑完 `unload`：适合"启动前 / 退出后做一件事"，
   **不适合当常驻监听** —— 常驻请用 `submit()`。
-- ⚠️ 只在**启动器进程活着**时交付：游戏期间启动器被系统杀 / 在最近任务里划掉 ⇒
-  `game-exit` **不会**触发（"补报"还没做）。
+- ⚠️ `game-exit` 的交付：启动器在游戏期间被系统杀 / 最近任务划掉 ⇒ 重启后靠落盘标记补报；
+  如果重启时**游戏还在跑**，不补报（标记留着，等下一次回到前台且游戏已退出）。
 
 ### 出口
 
@@ -306,4 +317,5 @@ v20（2026-10-23）把逐年长出来的接口整理了一遍：删掉 `selected
 v21（2026-10-23 第 220 轮）**第一个加法**：`gameSettings()` / `writeGameSettings()`（游戏设置面），
 `API_MIN` 不动 ⇒ 报 20 的插件照旧装得进。
 v22（2026-10-23 第 221 轮）：`submit()` / `Task`（后台任务，完成/失败/取消通知）+
-`event` 扩展（`game-start` / `game-exit`，不需要新接口方法）；`API_MIN` 仍不动。
+`event` 扩展（`boot` / `app-foreground` / `game-start` / `game-exit`，含被杀后的补报）+
+`crashReportsDir()`（归因插件读原料）；`API_MIN` 仍不动。

@@ -3601,6 +3601,13 @@ public final class SelfTest {
         } catch (Throwable t) {
             ok(stat, L, false, "v22 API missing: " + t);
         }
+        try {
+            java.lang.reflect.Method cr = PluginApi.class.getMethod("crashReportsDir");
+            ok(stat, L, cr.getReturnType() == java.io.File.class,
+                    "v22：crashReportsDir() -> File（归因插件读原料）");
+        } catch (Throwable t) {
+            ok(stat, L, false, "v22 crashReportsDir missing: " + t);
+        }
         settingsApplyValues(ctx, L, stat);
         // ★ 跳过报告的生命周期（第 220 轮修）：正常启动清掉横幅来源，但保留诊断档案。
         //   改前 LASTSKIP 只写不删 ⇒ 一次跳过 = 插件页永久横幅（真机挂了 6 天）。

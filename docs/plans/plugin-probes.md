@@ -93,28 +93,29 @@ Result perform(String action, Bundle args);   // Result = ok / needsRestart / re
    // Finding = { title, detail, severity, evidence[] }
    ```
    - 宿主用现有归因卡 / 模组行样式渲染 ⇒ 保住"和原来一样"
-3. **崩溃报告的读取入口**
-   - 明确 `crashes/` 的报告能被插件读到（`crashReports()`，或确认 `logs()` 覆盖它）
+3. **崩溃报告的读取入口**：✅ 已实现（v22，`crashReportsDir()`）
 4. **插入点**
    - 崩溃页、模组页要能挂 `analyzer`（现在的 `section` 能否挂到这两页要现场确认）
 6. **变更通知**
-   - 插件改了设置后，宿主的模组页要重读（否则列表还是旧状态）
+   - ✅ 不需要新接口：`ModsActivity.onResume` → `rescan()` 每次回来都重读设置
+     （插件写完设置、用户返回模组页即生效）
 
 ### 其他已确认、以后再加的能力
 
-- **`event` 扩展**：✅ 已实现（v22，第 221 轮）—— `game-start` / `game-exit`，入口
-  `onEvent(PluginApi, String, Map)`。⚠️ 只在启动器进程活着时交付（划掉就丢 `game-exit`），
-  "补报"未做；`app-foreground` 也还没加。
-- **`boot` 钩子**：插件开机跑一次（只有官方插件考虑；宿主在后台时会被杀，不能当常驻用）
-- **任务接口**：✅ 已实现（v22，第 221 轮）—— `submit(label, body) → Task`（跨页面、完成通知、取消）；
-  下载原语（Range 续传）未做，插件暂时自己写 HTTP。
+- **`event` 扩展**：✅ 已实现（v22，第 221 轮）—— `boot` / `app-foreground` / `game-start` /
+  `game-exit`，入口 `onEvent(PluginApi, String, Map)`；`game-exit` 在启动器被杀后有"补报"
+  （落盘标记 + 游戏进程判活，`backfill=1`）。
+- **`boot` 钩子**：✅ 已实现（v22，作为 `boot` 事件；每个进程一次；仍不是真常驻）
+- **任务接口**：✅ 已实现（v22，第 221 轮）—— `submit(label, body) → Task`（跨页面、完成通知、取消）。
+- **下载原语**：⏸ 暂缓（2026-10-23 用户：启动器还没有联网功能）；插件暂时自己写 HTTP。
 
 ### 顺序
 
 1. ~~B0 设置面~~ ✅ 已实现（v21）
-2. ~~任务接口 + 游戏事件~~ ✅ 已实现（v22）
+2. ~~任务接口 + 游戏事件（含 boot / app-foreground / 补报）~~ ✅ 已实现（v22）
 3. `analyzer` + 崩溃页/模组页插入点；动作注册表只剩 `item.open` / `version.launch`
 4. 迁移冲突检测（简单）→ 再迁移崩溃归因
+5. `:game` 探针（**待再定**，用户 2026-10-23：先不碰）
 
 
 ### 总原则（2026-10-23 定）

@@ -99,16 +99,6 @@ public class MainActivity extends BaseActivity {
      */
     private static boolean sLaunching;
 
-    /**
-     * 「刚把游戏拉起来」——下一次 {@link #onResume()} 就是**从游戏回来**（v22 事件扩展用）。
-     *
-     * <p>⚠️ 它是 static：转屏 / Activity 重建后仍要知道"这一程是去玩游戏了"。
-     * 进程被系统杀 ⇒ 这个标记连同事件一起丢（`game-exit` 不补报，见 {@link PluginEvents}）。
-     */
-    private static boolean sGameOut;
-    private static String sGameSlot;
-    private static String sGameVersion;
-
     /** 版本 key → 同槽共用情况（没有共用就不在此表）。 */
     private final HashMap<String, Share> mConflict = new HashMap<>();
 
@@ -405,12 +395,6 @@ public class MainActivity extends BaseActivity {
         //   清掉启动互斥标志。少了这一句，"点过一次之后就再也点不动"（见 sLaunching）。
         //   ⚠️ 它同时是"线程半路死掉"那条路的兜底清理。
         sLaunching = false;
-        // ★ v22：上一次是"去玩游戏" ⇒ 现在回来了，派发 game-exit（只在这一种情形下触发；
-        //   从设置页 / 插件页回来不会走到这里 —— sGameOut 只在 startActivity 之前置位）。
-        if (sGameOut) {
-            sGameOut = false;
-            PluginEvents.gameExit(this, sGameSlot, sGameVersion);
-        }
         // ★ 先同步盘上的配置，再画界面。
         //   `last_version` 是 :game 进程在**游戏启动成功后**才写的（GameSlot → Config.setLastVersion），
         //   而本进程内存里那份 Config 不会自己变（load 幂等）⇒ 不重读的话「继续上次」要
@@ -1126,9 +1110,6 @@ public class MainActivity extends BaseActivity {
                         //   放在 startActivity 之前：插件可能要先做准备（切配置 / 记一笔）。
                         final String label = e.displayName(MainActivity.this);
                         PluginEvents.gameStart(MainActivity.this, slot, label);
-                        sGameOut = true;
-                        sGameSlot = slot;
-                        sGameVersion = label;
                         startActivity(i);
                     }
                 });
