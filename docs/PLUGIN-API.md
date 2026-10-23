@@ -5,8 +5,8 @@
 
 ## 1. 版本与兼容（v20 冻结基线）
 
-- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..22**。
-  （v20 是冻结基线；v21 = 游戏设置面；v22 = 后台任务 + 游戏事件。）
+- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..23**。
+  （v20 是冻结基线；v21 = 游戏设置面；v22 = 后台任务 + 游戏事件；v23 = 探针。）
 - 插件 `api()` 报的是「我需要的最低宿主接口版本」。用不到的新能力**不要**报高 ——
   报高了只会在老宿主上被拒，换不来任何东西。
 - **不要用 try/catch 去兼容老宿主**：报什么版本就只会跑在什么版本上。`api()` 报 20，
@@ -57,7 +57,7 @@
 ## 3. 入口类约定
 
 ```java
-public static int api();                        // 必需：你需要的接口版本（当前 22；用不到新能力就报 20）
+public static int api();                        // 必需：你需要的接口版本（当前 23；用不到新能力就报 20）
 public static View createView(PluginApi api);   // content / section 用
 public static void run(PluginApi api);          // action 用（在原页跑，不换页）
 public static void unload();                    // 可选：收尾（也认 unload(Context)）
@@ -77,7 +77,7 @@ public static void unload();                    // 可选：收尾（也认 unlo
 
 | 方法 | 说明 |
 |---|---|
-| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 22） |
+| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 23） |
 | `context()` | 插件上下文（**只用来取资源 / 主题 / 建 View**） |
 | `page()` / `slot()` | 从哪一页来 / 当前槽名 |
 | `theme()` | 主题色与 dp/sp（别自己写死颜色，见 `PluginTheme`） |
@@ -159,6 +159,38 @@ public static void onEvent(PluginApi api, String name, Map<String, String> data)
   **不适合当常驻监听** —— 常驻请用 `submit()`。
 - ⚠️ `game-exit` 的交付：启动器在游戏期间被系统杀 / 最近任务划掉 ⇒ 重启后靠落盘标记补报；
   如果重启时**游戏还在跑**，不补报（标记留着，等下一次回到前台且游戏已退出）。
+
+### 探针（v23）
+
+插件在 `plugin.json` 里声明（**不走** `extensions`）：
+
+```json
+"telemetry": {
+  "probes": [
+    { "class": "com.example.HeapProbe", "sec": 5,  "inProcess": true  },
+    { "class": "com.example.ProcProbe", "sec": 10, "inProcess": false }
+  ]
+}
+```
+
+```java
+public interface Probe {
+    String name();
+    void reset(ProbeEnv env);
+    void sample();
+    default void summary() { }
+}
+```
+
+- `inProcess: true` ⇒ 跑在 `:game`（能反射游戏类、拿 Java 堆 / GC / 帧时间；崩了是游戏崩）
+- `inProcess: false` ⇒ 跑在 `:probe` 隔离进程（只能读 `/proc/<游戏 pid>`，崩了不连带游戏）
+- `ProbeEnv`：`dir()`（本会话给这个插件的目录）/ `pid()` / `inProcess()` / `slot()`
+- **数据由插件自己写**（格式自定）；宿主不解析、不聚合、不展示
+- 调度：每 `sec` 秒一次（1..3600，缺省 5）；`sample()` 在后台线程，单次 >200 ms 记失败；
+  连续 3 次失败 ⇒ 停用该探针并写 `probe-fail.txt`
+- 目录：`<hub>/usage/telemetry/<会话>/<插件 id>/`
+- ⚠️ 探针 APK 必须住在**内部存储且只读**（Android 14+ 拒绝加载可写 dex）——宿主按这条存插件
+- `summary()` 只在进程正常收尾时调用（进程被杀不会）
 
 ### 出口
 
@@ -319,3 +351,5 @@ v21（2026-10-23 第 220 轮）**第一个加法**：`gameSettings()` / `writeGa
 v22（2026-10-23 第 221 轮）：`submit()` / `Task`（后台任务，完成/失败/取消通知）+
 `event` 扩展（`boot` / `app-foreground` / `game-start` / `game-exit`，含被杀后的补报）+
 `crashReportsDir()`（归因插件读原料）；`API_MIN` 仍不动。
+v23（2026-10-23 第 223 轮）：`Probe` / `ProbeEnv` + `telemetry.probes`（`:game` 进程内 /
+`:probe` 隔离进程两种探针）；数据由插件自己写，宿主只调度与隔离。

@@ -21,15 +21,16 @@
 ### B1. 统计插件 `usagestats`
 宿主只"记"，插件只"看"：读 `usageDir()` → 启动次数 / 版本分布 / 会话时长 / 崩溃 / 熄屏 → 柱状图 + CSV/PNG 导出。
 
-### B2. 探针（性能数据）
+### B2. 探针（性能数据）—— ✅ 已实现（v23，第 223 轮）
+
 - **A′（宿主持有探针表 + 声明式聚合）已放弃**：每次加指标都要改宿主发版，扩展性差。
 - 改走 **D：插件自定义探针**，宿主只做机制（2026-10-23 定）：
   ```java
   interface Probe {
       String name();
-      void reset(java.io.File dir);   // 宿主给的本会话 telemetry 目录
+      void reset(ProbeEnv env);   // env.dir() = 本会话给这个插件的目录；env.pid()/inProcess()/slot()
       void sample();
-      void summary();                 // 可选：会话结束前收尾
+      default void summary() { }
   }
   ```
   插件 `plugin.json` 声明 `telemetry.probes: [{class, sec, inProcess}]`；宿主在对应进程里

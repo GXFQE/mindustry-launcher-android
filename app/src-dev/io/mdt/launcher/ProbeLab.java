@@ -74,7 +74,9 @@ final class ProbeLab {
             if (!dir.isDirectory() && !dir.mkdirs()) {
                 sb.append("telemetry dir = FAIL (mkdirs)\n");
             } else {
-                c.getMethod("reset", File.class).invoke(p, dir);
+                c.getMethod("reset", io.mdt.launcher.api.ProbeEnv.class).invoke(p,
+                        new io.mdt.launcher.api.ProbeEnv(dir, android.os.Process.myPid(),
+                                true, Data.currentSlot(ctx)));
                 c.getMethod("sample").invoke(p);
                 File out = new File(dir, "probe.tsv");
                 sb.append("probe = OK ").append(c.getName()).append('\n');
@@ -85,15 +87,6 @@ final class ProbeLab {
             sb.append("probe = FAIL ").append(t).append('\n');
         }
         writeText(new File(Data.hubDir(ctx), "report-probe-lab.txt"), sb.toString());
-
-        // ④ 顺带验 `:probe` 隔离进程：让它读**当前** `:game` 进程的 /proc（同 UID、跨进程）
-        try {
-            android.content.Intent svc = new android.content.Intent(ctx, ProbeService.class);
-            svc.putExtra(ProbeService.EXTRA_PID, android.os.Process.myPid());
-            ctx.startService(svc);
-        } catch (Throwable t) {
-            Log.w("MDTPlugin", "probe service start failed", t);
-        }
     }
 
     private static void copyFile(File src, File dst) throws java.io.IOException {

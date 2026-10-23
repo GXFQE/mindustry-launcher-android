@@ -25,13 +25,39 @@ public class ProbeService extends Service {
 
     /** 0 / 不给 ⇒ 自己找 `:game` 进程。 */
     static final String EXTRA_PID = "pid";
+    /** true ⇒ 起探针调度器（正式路径）；false ⇒ 只做一次 /proc 可读性报告（验证台）。 */
+    static final String EXTRA_RUN = "run";
+    /** 会话目录名（两边共用）。 */
+    static final String EXTRA_SESSION = "session";
 
     @Override public IBinder onBind(Intent intent) {
         return null;
     }
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
-        final int hinted = intent == null ? 0 : intent.getIntExtra(EXTRA_PID, 0);
+        final int pid = intent == null ? 0 : intent.getIntExtra(EXTRA_PID, 0);
+        final boolean run = intent != null && intent.getBooleanExtra(EXTRA_RUN, false);
+        final String session = intent == null ? null : intent.getStringExtra(EXTRA_SESSION);
+        if (run) {
+            final ProbeRunner runner = ProbeRunner.start(this, pid, false, session);
+            new Thread(new Runnable() {
+                @Override public void run() {
+                    // 游戏进程没了就收尾（上限 12 小时，防御性）
+                    for (int i = 0; i < 6 * 60 * 60 * 2; i++) {
+                        if (pid <= 0 || !new File("/proc/" + pid).exists()) break;
+                        try {
+                            Thread.sleep(2000);
+                        } catch (InterruptedException e) {
+                            break;
+                        }
+                    }
+                    runner.stop();
+                    stopSelf();
+                }
+            }, "mdt-probe-watch").start();
+            return START_NOT_STICKY;
+        }
+        final int hinted = pid;
         Thread t = new Thread(new Runnable() {
             @Override public void run() {
                 probe(hinted);

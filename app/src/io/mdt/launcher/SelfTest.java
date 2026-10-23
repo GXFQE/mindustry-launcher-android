@@ -3617,6 +3617,29 @@ public final class SelfTest {
         } catch (Throwable t) {
             ok(stat, L, false, ":probe service missing: " + t);
         }
+        // ★ v23（第 223 轮）：探针接口与声明解析
+        ok(stat, L, PluginHost.API >= 23, "host plugin api >= 23 (probe)");
+        try {
+            java.lang.reflect.Method reset = io.mdt.launcher.api.Probe.class.getMethod("reset",
+                    io.mdt.launcher.api.ProbeEnv.class);
+            java.lang.reflect.Method sample = io.mdt.launcher.api.Probe.class.getMethod("sample");
+            java.lang.reflect.Method name = io.mdt.launcher.api.Probe.class.getMethod("name");
+            java.lang.reflect.Method dir = io.mdt.launcher.api.ProbeEnv.class.getMethod("dir");
+            ok(stat, L, reset.getReturnType() == void.class
+                            && sample.getReturnType() == void.class
+                            && name.getReturnType() == String.class
+                            && dir.getReturnType() == java.io.File.class,
+                    "★v23：Probe{name, reset(ProbeEnv), sample} / ProbeEnv.dir() 正确");
+        } catch (Throwable t) {
+            ok(stat, L, false, "v23 Probe missing: " + t);
+        }
+        List<PluginProbes.Spec> ps = PluginProbes.parse("p", "1", "P",
+                "{\"telemetry\":{\"probes\":[{\"class\":\"A\",\"sec\":0,\"inProcess\":false},"
+                        + "{\"class\":\"\"},{\"class\":\"B\"}]}}");
+        ok(stat, L, ps.size() == 2
+                        && ps.get(0).sec == 1 && !ps.get(0).inProcess
+                        && ps.get(1).inProcess && ps.get(1).sec == 5,
+                "★v23 探针声明解析：坏条目丢掉、sec 夹到 [1,3600]、inProcess 缺省 true");
         settingsApplyValues(ctx, L, stat);
         // ★ 跳过报告的生命周期（第 220 轮修）：正常启动清掉横幅来源，但保留诊断档案。
         //   改前 LASTSKIP 只写不删 ⇒ 一次跳过 = 插件页永久横幅（真机挂了 6 天）。

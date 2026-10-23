@@ -32,6 +32,9 @@ import java.io.File;
  */
 public class GameSlot extends BaseActivity {
 
+    /** v23：进程内探针调度器（null = 没有探针 / 已停）。 */
+    private ProbeRunner mProbes;
+
     /**
      * 入口页透传的"该包要不要走改名交换"（F0）。
      * ★ 为什么要透传：`MainActivity.startVersion` 为了 F18 的兼容性复检**本来就要**
@@ -113,6 +116,7 @@ public class GameSlot extends BaseActivity {
             Injector.Timing t = Injector.launch(this, plan);
             // dev：探针验证台（产品版 ProbeLab 是空壳，见 app/src-release）
             ProbeLab.runIfArmed(this);
+            startProbes();
             // ⚠️ 这句写在 **:game 进程**自己的 Config 实例上并落盘；主进程内存里那份看不到，
             //   必须靠 MainActivity.onResume → Config.reload 才能读到
             //   （否则「继续上次」要重启启动器才更新，2026-10-01 复现）。
@@ -160,6 +164,28 @@ public class GameSlot extends BaseActivity {
      * <p>⚠️ "详细记录已写进运行日志"那句**只在真有报告时**才说 —— 找不到游戏包那条路
      * 在 Injector 之前就返回、**根本没写报告**（真机实测 report-launch.txt 一字未动）。
      */
+    /**
+     * v23：起探针 —— 进程内的自己跑，隔离的交给 `:probe`。
+     *
+     * <p>会话目录名 = `yyyyMMdd-HHmmss-<槽>`：两边的探针写进**同一个会话目录**，
+     * 插件事后按目录读就行（宿主不聚合）。
+     */
+    private void startProbes() {
+        try {
+            String session = new java.text.SimpleDateFormat("yyyyMMdd-HHmmss",
+                    java.util.Locale.US).format(new java.util.Date())
+                    + "-" + Data.currentSlot(this);
+            mProbes = ProbeRunner.start(this, android.os.Process.myPid(), true, session);
+            Intent svc = new Intent(this, ProbeService.class);
+            svc.putExtra(ProbeService.EXTRA_PID, android.os.Process.myPid());
+            svc.putExtra(ProbeService.EXTRA_RUN, true);
+            svc.putExtra(ProbeService.EXTRA_SESSION, session);
+            startService(svc);
+        } catch (Throwable t) {
+            android.util.Log.w("MDTPlugin", "probe start failed", t);
+        }
+    }
+
     private void fail(String step, String msg, Throwable cause) {
         mStatus.setText(Trans.get(GameSlot.this, R.string.game_start_failed_fmt, step));
         StringBuilder sb = new StringBuilder();

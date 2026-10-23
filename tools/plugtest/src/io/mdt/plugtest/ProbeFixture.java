@@ -3,41 +3,56 @@ package io.mdt.plugtest;
 import java.io.File;
 import java.io.FileOutputStream;
 
+import io.mdt.launcher.api.Probe;
+import io.mdt.launcher.api.ProbeEnv;
+
 /**
- * 探针夹具（`:game` 进程内加载的验证用类，2026-10-23 第 222 轮）。
+ * 探针夹具（v23）：实现正式接口，进程内 / `:probe` 两侧都能跑。
  *
- * <p>刻意不实现宿主接口（探针契约还没冻结）：只按方法名被反射调用
- * `name()` / `reset(File)` / `sample()`，证明"插件 dex 能在游戏进程里加载并跑"。
- * 数据自己写，宿主不解析格式（B2 的分层）。
+ * <p>只写自己目录里的 `probe.tsv`（宿主不解析格式）；进程内多写一行 `inProcess=1`，
+ * 隔离进程写 `inProcess=0` —— 用来区分两边的数据。
  */
-public final class ProbeFixture {
+public final class ProbeFixture implements Probe {
 
-    private File dir;
+    private ProbeEnv env;
+    private File out;
 
-    public String name() {
+    @Override public String name() {
         return "fixture";
     }
 
-    public void reset(File dir) {
-        this.dir = dir;
+    @Override public void reset(ProbeEnv env) {
+        this.env = env;
+        this.out = env == null ? null : new File(env.dir(), "probe.tsv");
     }
 
-    public void sample() {
-        if (dir == null) return;
+    @Override public void sample() {
+        if (out == null) return;
         try {
-            File f = new File(dir, "probe.tsv");
-            FileOutputStream out = new FileOutputStream(f, true);
+            FileOutputStream o = new FileOutputStream(out, true);
             try {
-                out.write(("sample " + System.currentTimeMillis() + "\n").getBytes("UTF-8"));
+                o.write(("sample " + System.currentTimeMillis()
+                        + " inProcess=" + (env != null && env.inProcess() ? 1 : 0)
+                        + " pid=" + (env == null ? 0 : env.pid()) + "\n").getBytes("UTF-8"));
             } finally {
-                try { out.close(); } catch (Throwable ignored) { }
+                try { o.close(); } catch (Throwable ignored) { }
             }
         } catch (Throwable ignored) {
             // 探针失败不许影响游戏
         }
     }
 
-    public String summary() {
-        return "fixture ok";
+    @Override public void summary() {
+        if (out == null) return;
+        try {
+            FileOutputStream o = new FileOutputStream(out, true);
+            try {
+                o.write(("summary inProcess=" + (env != null && env.inProcess() ? 1 : 0) + "\n")
+                        .getBytes("UTF-8"));
+            } finally {
+                try { o.close(); } catch (Throwable ignored) { }
+            }
+        } catch (Throwable ignored) {
+        }
     }
 }
