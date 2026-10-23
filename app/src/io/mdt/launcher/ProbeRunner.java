@@ -205,6 +205,7 @@ final class ProbeRunner {
     private static String noteOf(Context ctx, File probes) {
         java.util.LinkedHashMap<String, String> items =
                 new java.util.LinkedHashMap<String, String>();
+        java.util.HashSet<String> inProcSeen = new java.util.HashSet<String>();
         java.io.BufferedReader r = null;
         try {
             r = new java.io.BufferedReader(
@@ -217,11 +218,14 @@ final class ProbeRunner {
                 String name = p[1];
                 boolean third = "1".equals(p[2]);
                 boolean inProc = "1".equals(p[3]);
+                // 同一插件两边都声明时：**进程内优先**（风险更高、更该说）
+                if (items.containsKey(id) && (!inProc || inProcSeen.contains(id))) continue;
                 String where = Trans.get(ctx, inProc ? R.string.probe_note_where_in
                         : R.string.probe_note_where_iso);
                 String item = Trans.get(ctx, third ? R.string.probe_note_third_fmt
                         : R.string.probe_note_official_fmt, name, where);
                 items.put(id, item);
+                if (inProc) inProcSeen.add(id);
             }
         } catch (Throwable t) {
             return null;
