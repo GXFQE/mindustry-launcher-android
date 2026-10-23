@@ -132,22 +132,13 @@ final class ProbeRunner {
         }
     }
 
-    /**
-     * 最近一次**本槽**会话里参与过的探针（给崩溃提示用；没有/太旧 ⇒ null）。
-     *
-     * <p>读 `telemetry/<会话>/probes.txt`，按插件去重；只在 24 小时内、且会话名以
-     * `-<槽>` 结尾时采用（旧会话不该给新崩溃背锅）。
-     */
+    /** 最近一次**本槽**会话里参与过的探针（崩溃弹窗用；24 小时内）。 */
     static String sessionNote(Context ctx, String slot) {
         try {
-            File tel = new File(Data.hubDir(ctx), "usage/telemetry");
-            File[] dirs = tel.listFiles();
-            if (dirs == null) return null;
             File best = null;
             long bestT = 0;
-            for (File d : dirs) {
-                if (d == null || !d.isDirectory()) continue;
-                if (slot != null && !slot.isEmpty() && !d.getName().endsWith("-" + slot)) continue;
+            for (File d : telemetryDirs(ctx)) {
+                if (!matchesSlot(d, slot)) continue;
                 File pf = new File(d, "probes.txt");
                 if (!pf.isFile()) continue;
                 long t = pf.lastModified();
@@ -157,39 +148,96 @@ final class ProbeRunner {
                 }
             }
             if (best == null || System.currentTimeMillis() - bestT > 24L * 3600 * 1000) return null;
-            java.util.LinkedHashMap<String, String> items =
-                    new java.util.LinkedHashMap<String, String>();
-            java.io.BufferedReader r = new java.io.BufferedReader(
-                    new java.io.InputStreamReader(new java.io.FileInputStream(best), "UTF-8"));
-            try {
-                String line;
-                while ((line = r.readLine()) != null) {
-                    String[] p = line.split("\t");
-                    if (p.length < 4) continue;
-                    String id = p[0];
-                    String name = p[1];
-                    boolean third = "1".equals(p[2]);
-                    boolean inProc = "1".equals(p[3]);
-                    String where = Trans.get(ctx, inProc ? R.string.probe_note_where_in
-                            : R.string.probe_note_where_iso);
-                    String item = Trans.get(ctx, third ? R.string.probe_note_third_fmt
-                            : R.string.probe_note_official_fmt, name, where);
-                    items.put(id, item);
-                }
-            } finally {
-                try { r.close(); } catch (Throwable ignored) { }
-            }
-            if (items.isEmpty()) return null;
-            StringBuilder sb = new StringBuilder();
-            String sep = Trans.get(ctx, R.string.list_join_sep);
-            for (String item : items.values()) {
-                if (sb.length() > 0) sb.append(sep);
-                sb.append(item);
-            }
-            return Trans.get(ctx, R.string.probe_note_fmt, sb.toString());
+            return noteOf(ctx, best);
         } catch (Throwable t) {
             return null;
         }
+    }
+
+    /**
+     * **指定时刻**那一局参与过的探针（崩溃报告页用）。
+     *
+     * <p>取「会话开始 ≤ 报告时间」里最近的一局，且间隔 ≤ 12 小时 —— 昨天的崩溃不该贴今天的探针。
+     */
+    static String sessionNoteFor(Context ctx, String slot, long when) {
+        try {
+            File best = null;
+            long bestStart = 0;
+            for (File d : telemetryDirs(ctx)) {
+                if (!matchesSlot(d, slot)) continue;
+                File pf = new File(d, "probes.txt");
+                if (!pf.isFile()) continue;
+                long start = sessionStart(d.getName());
+                if (start <= 0 || start > when) continue;
+                if (when - start > 12L * 3600 * 1000) continue;
+                if (start > bestStart) {
+                    bestStart = start;
+                    best = pf;
+                }
+            }
+            return best == null ? null : noteOf(ctx, best);
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    private static File[] telemetryDirs(Context ctx) {
+        File[] dirs = new File(Data.hubDir(ctx), "usage/telemetry").listFiles();
+        return dirs == null ? new File[0] : dirs;
+    }
+
+    private static boolean matchesSlot(File d, String slot) {
+        return d != null && d.isDirectory()
+                && (slot == null || slot.isEmpty() || d.getName().endsWith("-" + slot));
+    }
+
+    /** 会话目录名前 15 位 `yyyyMMdd-HHmmss` → 毫秒（解不出 ⇒ 0）。 */
+    private static long sessionStart(String name) {
+        try {
+            if (name == null || name.length() < 15) return 0;
+            return new java.text.SimpleDateFormat("yyyyMMdd-HHmmss", java.util.Locale.US)
+                    .parse(name.substring(0, 15)).getTime();
+        } catch (Throwable t) {
+            return 0;
+        }
+    }
+
+    private static String noteOf(Context ctx, File probes) {
+        java.util.LinkedHashMap<String, String> items =
+                new java.util.LinkedHashMap<String, String>();
+        java.io.BufferedReader r = null;
+        try {
+            r = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(new java.io.FileInputStream(probes), "UTF-8"));
+            String line;
+            while ((line = r.readLine()) != null) {
+                String[] p = line.split("\t");
+                if (p.length < 4) continue;
+                String id = p[0];
+                String name = p[1];
+                boolean third = "1".equals(p[2]);
+                boolean inProc = "1".equals(p[3]);
+                String where = Trans.get(ctx, inProc ? R.string.probe_note_where_in
+                        : R.string.probe_note_where_iso);
+                String item = Trans.get(ctx, third ? R.string.probe_note_third_fmt
+                        : R.string.probe_note_official_fmt, name, where);
+                items.put(id, item);
+            }
+        } catch (Throwable t) {
+            return null;
+        } finally {
+            if (r != null) {
+                try { r.close(); } catch (Throwable ignored) { }
+            }
+        }
+        if (items.isEmpty()) return null;
+        StringBuilder sb = new StringBuilder();
+        String sep = Trans.get(ctx, R.string.list_join_sep);
+        for (String item : items.values()) {
+            if (sb.length() > 0) sb.append(sep);
+            sb.append(item);
+        }
+        return Trans.get(ctx, R.string.probe_note_fmt, sb.toString());
     }
 
     private void tick(final Job j) {

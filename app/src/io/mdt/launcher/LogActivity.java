@@ -503,6 +503,24 @@ public class LogActivity extends BaseActivity {
      *   键 = 路径 + 大小 + mtime（改了/换了就是另一份）。
      * ★ 结果回来时要两道校验（stamp 且 mShownCrash 仍是它）—— 与 F7 那套"过期结果丢弃"同源。
      */
+    /**
+     * 崩溃结论 + v24 探针提示。
+     *
+     * <p>提示按**这份报告的时间**挑会话（{@link ProbeRunner#sessionNoteFor}）：昨天的崩溃
+     * 不该贴今天的探针；12 小时以外一律不贴。
+     */
+    private String verdictText(Doc d, CrashAnalysis.Verdict v) {
+        String text = CrashAnalysis.text(this, v);
+        try {
+            long when = d != null && d.file != null
+                    ? d.file.lastModified() : System.currentTimeMillis();
+            String note = ProbeRunner.sessionNoteFor(this, Data.currentSlot(this), when);
+            if (note != null) text = note + "\n\n" + text;
+        } catch (Throwable ignored) {
+        }
+        return text;
+    }
+
     private void analyzeCrash(final Doc d) {
         if (d == null || d.file == null) {
             hideVerdict();
@@ -511,7 +529,7 @@ public class LogActivity extends BaseActivity {
         final String key = verdictKey(d);
         CrashAnalysis.Verdict cached = mVerdicts.get(key);
         if (cached != null) {
-            showVerdict(CrashAnalysis.text(this, cached));
+            showVerdict(verdictText(d, cached));
             return;
         }
         final int stamp = ++mAnalyzeStamp;
@@ -528,7 +546,7 @@ public class LogActivity extends BaseActivity {
                     @Override public void run() {
                         if (stamp != mAnalyzeStamp || mShownCrash != d) return;
                         mVerdicts.put(key, full);
-                        showVerdict(CrashAnalysis.text(LogActivity.this, full));
+                        showVerdict(verdictText(d, full));
                     }
                 });
             }

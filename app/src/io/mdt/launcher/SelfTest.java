@@ -3661,6 +3661,16 @@ public final class SelfTest {
             String note = ProbeRunner.sessionNote(ctx, "selftest");
             ok(stat, L, note != null && note.contains("Fixture"),
                     "★v23 崩溃提示能读出本轮探针（" + note + "）");
+            long start = 0;
+            try {
+                start = new java.text.SimpleDateFormat("yyyyMMdd-HHmmss", java.util.Locale.US)
+                        .parse(sess.getName().substring(0, 15)).getTime();
+            } catch (Throwable ignored) {
+            }
+            String at = ProbeRunner.sessionNoteFor(ctx, "selftest", start + 60_000);
+            String far = ProbeRunner.sessionNoteFor(ctx, "selftest", start - 13L * 3600 * 1000);
+            ok(stat, L, at != null && far == null,
+                    "★v24 报告页提示按报告时间挑会话（12h 外不贴）");
             new File(sess, "probes.txt").delete();
             sess.delete();
         } catch (Throwable t) {
