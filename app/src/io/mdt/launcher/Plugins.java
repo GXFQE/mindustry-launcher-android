@@ -718,6 +718,11 @@ final class Plugins {
                 skipOnce(base, d, guard);
                 return;
             }
+            // ★ 这一程**不是**被安全阀拦下的 ⇒ 上一次的跳过报告已经过时：清掉横幅的来源。
+            //   ⚠️ 必须放在注入入口（一进程一次），不能放 markBootOk —— 那里每次 Activity
+            //   onResume 都跑，跳过那一程的第二次 onResume 就会把用户还没看见的横幅清掉。
+            //   `lastfail.txt` 是诊断档案（给取证用），留着；横幅只读 `lastskip.txt`。
+            clearSkipReport(d);
             // ★ 内置插件释放/放回（第 137 轮）：放在**安全阀之后** —— 上一次没走完的那一程
             //   不该顺手改登记（否则刚放回的会被 skipOnce 当成"失败的那个"处理）
             String released = releaseBuiltins(base);
@@ -844,6 +849,21 @@ final class Plugins {
     /** 把某个插件从生效登记里摘掉（注入失败 / 版本不匹配时用）。 */
     private static void dropFromActive(File d, String id, String activeText) {
         write(new File(d, ACTIVE), stateRemove(activeText, id));
+    }
+
+    /**
+     * 正常启动（没有被安全阀拦下）⇒ 上一次的跳过报告已经过时，删掉横幅的来源 {@link #LASTSKIP}。
+     *
+     * <p>为什么必须有这一处：`LASTSKIP` 原来**只写不删** —— 一次跳过之后横幅永久挂在插件页上，
+     * 重试成功、插件全正常注入也不消失（2026-10-23 用户真机：一条 10-17 的旧现场挂了 6 天）。
+     * 保留 {@link #LASTFAIL}（诊断档案，取证用）；它没有界面入口。
+     *
+     * <p>⚠️ 调点只有 {@link #injectEarly}：{@link #markBootOk} 每次 Activity onResume 都会跑，
+     * 放那里会在"被跳过的那一程"的第二次 onResume 就清掉（用户还没看见）。
+     */
+    static void clearSkipReport(File d) {
+        File s = new File(d, LASTSKIP);
+        if (s.isFile()) s.delete();
     }
 
     /**

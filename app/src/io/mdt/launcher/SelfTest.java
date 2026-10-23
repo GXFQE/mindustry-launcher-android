@@ -3586,6 +3586,28 @@ public final class SelfTest {
             ok(stat, L, false, "v21 API missing: " + t);
         }
         settingsApplyValues(ctx, L, stat);
+        // ★ 跳过报告的生命周期（第 220 轮修）：正常启动清掉横幅来源，但保留诊断档案。
+        //   改前 LASTSKIP 只写不删 ⇒ 一次跳过 = 插件页永久横幅（真机挂了 6 天）。
+        File sd = new File(Paths.privateDir(ctx), "selftest-skipreport");
+        deleteTree(sd);
+        sd.mkdirs();
+        try {
+            File sk = new File(sd, Plugins.LASTSKIP);
+            File lf = new File(sd, Plugins.LASTFAIL);
+            java.io.FileOutputStream fo = new java.io.FileOutputStream(sk);
+            fo.write("probe\t1\t2\tretry\tL1\tno\n".getBytes("UTF-8"));
+            fo.close();
+            fo = new java.io.FileOutputStream(lf);
+            fo.write("== plugin skip ==\n".getBytes("UTF-8"));
+            fo.close();
+            Plugins.clearSkipReport(sd);
+            ok(stat, L, !sk.exists() && lf.isFile(),
+                    "★ 正常启动清 lastskip（横幅不永久挂着）、lastfail 留作诊断档案");
+        } catch (Throwable t) {
+            ok(stat, L, false, "clearSkipReport 抛了：" + t);
+        } finally {
+            if (sd.exists()) Data.deleteTree(sd);
+        }
         {
             StringBuilder missing = new StringBuilder();
             int checked = 0;
