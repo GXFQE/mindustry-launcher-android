@@ -5,8 +5,8 @@
 
 ## 1. 版本与兼容（v20 冻结基线）
 
-- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..23**。
-  （v20 是冻结基线；v21 = 游戏设置面；v22 = 后台任务 + 游戏事件；v23 = 探针。）
+- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..24**。
+  （v20 是冻结基线；v21 = 游戏设置面；v22 = 后台任务 + 游戏事件；v23 = 探针；v24 = 分析器。）
 - 插件 `api()` 报的是「我需要的最低宿主接口版本」。用不到的新能力**不要**报高 ——
   报高了只会在老宿主上被拒，换不来任何东西。
 - **不要用 try/catch 去兼容老宿主**：报什么版本就只会跑在什么版本上。`api()` 报 20，
@@ -57,7 +57,7 @@
 ## 3. 入口类约定
 
 ```java
-public static int api();                        // 必需：你需要的接口版本（当前 23；用不到新能力就报 20）
+public static int api();                        // 必需：你需要的接口版本（当前 24；用不到新能力就报 20）
 public static View createView(PluginApi api);   // content / section 用
 public static void run(PluginApi api);          // action 用（在原页跑，不换页）
 public static void unload();                    // 可选：收尾（也认 unload(Context)）
@@ -77,7 +77,7 @@ public static void unload();                    // 可选：收尾（也认 unlo
 
 | 方法 | 说明 |
 |---|---|
-| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 23） |
+| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 24） |
 | `context()` | 插件上下文（**只用来取资源 / 主题 / 建 View**） |
 | `page()` / `slot()` | 从哪一页来 / 当前槽名 |
 | `theme()` | 主题色与 dp/sp（别自己写死颜色，见 `PluginTheme`） |
@@ -193,6 +193,32 @@ public interface Probe {
 - `summary()` 只在进程正常收尾时调用（进程被杀不会）
 - ⚠️ **第三方 + `inProcess`**：在插件页启用时会弹一次风险告知（官方 / 纯隔离进程不弹）
 - 崩溃弹窗顶部会加一句「本次会话有插件参与：…」（标官方/第三方、进程内/隔离进程）
+
+### 分析器（v24）
+
+插件给结论，宿主画。在自述里声明（**入口类里再加一个静态方法**）：
+
+```json
+{ "id": "conflict", "title": "冲突检查", "entry": "com.example.ModTool",
+  "slot": "analyzer", "page": "mods" }
+```
+
+```java
+public static List<Finding> analyze(ItemInfo item, PluginApi api);
+```
+
+```java
+public final class Finding {
+    public static final int INFO = 0, WARN = 1, ERROR = 2;
+    public Finding(String title, String detail, int severity, String... evidence);
+    // title / detail / severity / evidence 只读字段
+}
+```
+
+- 宿主对页面里**每一项**调用一次，收集 `Finding` 画成列表顶上的卡片（最多显示 6 条）
+- 插件**不画 UI**（没有宿主的卡片/主题，硬画不像）⇒ 风格天然一致
+- 当前只支持 `page: "mods"`（崩溃页还没接）
+- 单条抛异常只丢这一条，不影响别的条目/页面
 
 ### 出口
 
@@ -355,3 +381,4 @@ v22（2026-10-23 第 221 轮）：`submit()` / `Task`（后台任务，完成/�
 `crashReportsDir()`（归因插件读原料）；`API_MIN` 仍不动。
 v23（2026-10-23 第 223 轮）：`Probe` / `ProbeEnv` + `telemetry.probes`（`:game` 进程内 /
 `:probe` 隔离进程两种探针）；数据由插件自己写，宿主只调度与隔离。
+v24（2026-10-23 第 224 轮）：`Finding` + `slot: analyzer`（`page: mods`）—— 插件给结论、宿主渲染；`API_MIN` 仍不动。

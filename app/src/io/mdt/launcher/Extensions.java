@@ -84,6 +84,8 @@ final class Extensions {
      * 不该先跳一个空页；插件只要实现 {@code run(PluginApi)}，对话框 / SAF / 进度都落在原来的页上。</p>
      */
     static final String SLOT_ACTION = "action";
+    /** v24：分析器 —— 插件给结论（{@link io.mdt.launcher.api.Finding}），宿主渲染。 */
+    static final String SLOT_ANALYZER = "analyzer";
     static final String PAGE_BLUEPRINT_DETAIL = "blueprint-detail";
 
     /** 一条"能力条目"。 */

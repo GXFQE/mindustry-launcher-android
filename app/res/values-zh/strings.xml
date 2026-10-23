@@ -42,6 +42,7 @@
     <string name="probe_note_third_fmt">%1$s（第三方%2$s）</string>
     <string name="probe_note_where_in">，进程内</string>
     <string name="probe_note_where_iso">，隔离进程</string>
+    <string name="mods_analysis_title">插件分析</string>
     <string name="work_export">正在导出</string>
     <string name="work_import">正在导入</string>
     <string name="work_backup">正在备份</string>

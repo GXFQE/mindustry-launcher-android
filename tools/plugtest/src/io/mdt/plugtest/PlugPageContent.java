@@ -280,4 +280,17 @@ public final class PlugPage {
         if (i.container != null) return i.title + " @ " + i.container + "!/" + i.entry;
         return i.title;
     }
+
+    /** v24 分析器夹具：每个模组给一条结论（宿主负责渲染成列表顶上的卡）。 */
+    public static List<io.mdt.launcher.api.Finding> analyze(ItemInfo item,
+            io.mdt.launcher.api.PluginApi api) {
+        List<io.mdt.launcher.api.Finding> out =
+                new java.util.ArrayList<io.mdt.launcher.api.Finding>();
+        if (item != null) {
+            out.add(new io.mdt.launcher.api.Finding("fixture: " + item.title,
+                    "analyzed by plugtest-content", io.mdt.launcher.api.Finding.WARN,
+                    item.path == null ? "" : item.path));
+        }
+        return out;
+    }
 }

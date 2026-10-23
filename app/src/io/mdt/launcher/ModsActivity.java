@@ -81,6 +81,9 @@ public class ModsActivity extends BaseActivity {
     private TextView mFiltered;
 
     private LinearLayout mContainer;
+    /** v24：分析器结论卡（世代号防旧结果贴到新列表上）。 */
+    private int mAnalysisGen;
+    private TextView mAnalysisCard;
     private TextView mEmpty;
     private TextView mSummary;
     private TextView mDetail;
@@ -1051,6 +1054,44 @@ public class ModsActivity extends BaseActivity {
             bindRow(v, m, m.metaError != null);
             mContainer.addView(v);
         }
+        // v24：分析器（后台跑，回来时世代没变才贴结论卡）
+        final List<Mods.Info> snapshot = new ArrayList<Mods.Info>(shown);
+        final String slot = mSlot;
+        final int gen = ++mAnalysisGen;
+        new Thread(new Runnable() {
+            @Override public void run() {
+                final List<io.mdt.launcher.api.Finding> fs =
+                        PluginAnalysis.analyzeMods(ModsActivity.this, slot, snapshot);
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        if (gen == mAnalysisGen) showAnalysis(fs);
+                    }
+                });
+            }
+        }, "mdt-mod-analysis").start();
+    }
+
+    /** 把插件给的结论画成列表顶上的一张卡（宿主样式；插件不画 UI）。 */
+    private void showAnalysis(List<io.mdt.launcher.api.Finding> fs) {
+        if (mContainer == null) return;
+        if (mAnalysisCard != null) {
+            mContainer.removeView(mAnalysisCard);
+            mAnalysisCard = null;
+        }
+        if (fs == null || fs.isEmpty()) return;
+        StringBuilder sb = new StringBuilder(Trans.get(this, R.string.mods_analysis_title));
+        int n = 0;
+        for (io.mdt.launcher.api.Finding f : fs) {
+            if (n++ >= 6) break;
+            sb.append('\n').append(f.title);
+            if (!f.detail.isEmpty()) sb.append(": ").append(f.detail);
+        }
+        TextView tv = new TextView(this);
+        tv.setText(sb.toString());
+        int pad = (int) (12 * getResources().getDisplayMetrics().density);
+        tv.setPadding(pad, pad, pad, pad);
+        mAnalysisCard = tv;
+        mContainer.addView(tv, 0);
     }
 
     /**

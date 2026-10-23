@@ -3666,6 +3666,26 @@ public final class SelfTest {
         } catch (Throwable t) {
             ok(stat, L, false, "sessionNote 失败：" + t);
         }
+        // ★ v24：分析器（Finding + analyzer 扩展点）
+        ok(stat, L, PluginHost.API >= 24, "host plugin api >= 24 (analyzer)");
+        try {
+            io.mdt.launcher.api.Finding f = new io.mdt.launcher.api.Finding(
+                    "t", "d", io.mdt.launcher.api.Finding.WARN, "e1");
+            ok(stat, L, "t".equals(f.title) && "d".equals(f.detail)
+                            && f.severity == io.mdt.launcher.api.Finding.WARN
+                            && f.evidence.length == 1,
+                    "★v24：Finding{title, detail, severity, evidence} 正确");
+        } catch (Throwable t) {
+            ok(stat, L, false, "v24 Finding missing: " + t);
+        }
+        List<io.mdt.launcher.api.Finding> dummy =
+                new java.util.ArrayList<io.mdt.launcher.api.Finding>();
+        List<Extensions.Item> an = Extensions.parse(
+                "{\"extensions\":[{\"id\":\"a\",\"title\":\"A\",\"entry\":\"E\","
+                        + "\"slot\":\"analyzer\",\"page\":\"mods\"}]}");
+        List<Extensions.Item> anMods = Extensions.forSlot(an, Extensions.SLOT_ANALYZER);
+        ok(stat, L, anMods.size() == 1 && Extensions.PAGE_MODS.equals(anMods.get(0).page),
+                "★v24：analyzer 扩展点解析（slot+page=mods）");
         settingsApplyValues(ctx, L, stat);
         // ★ 跳过报告的生命周期（第 220 轮修）：正常启动清掉横幅来源，但保留诊断档案。
         //   改前 LASTSKIP 只写不删 ⇒ 一次跳过 = 插件页永久横幅（真机挂了 6 天）。

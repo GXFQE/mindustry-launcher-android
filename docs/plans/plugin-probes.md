@@ -83,14 +83,15 @@ Result perform(String action, Bundle args);   // Result = ok / needsRestart / re
 首批：`item.open` / `version.launch`（⚠️ **`mod.enable` / `mod.disable` 不再开**，2026-10-23 晚：设置面已能安全写，见 B0；再开一道门就是同一件事两份实现）。加动作 = 宿主注册一行，接口不变。
 保留硬约束（游戏在跑时拒绝写 `settings.bin`），但**不强制**宿主确认框。
 
-### B4. 崩溃归因 / 模组冲突检查插件化
+### B4. 崩溃归因 / 模组冲突检查插件化 —— ✅ 已实现（v24，第 224 轮）
 - **UI 留宿主**（插件没有宿主的卡片/徽标/主题，硬画必然不像）⇒ 插件只给结构化结论：
   ```java
-  interface Analyzer { List<Finding> analyze(ItemInfo item, PluginApi api); }
+  public static List<Finding> analyze(ItemInfo item, PluginApi api);
   // Finding = { title, detail, severity, evidence[] }
   ```
-  新扩展类型 `slot: "analyzer"`，宿主用现有归因/模组页的样式渲染。
-- 先行试水：冲突检查（数据结构简单）；崩溃归因随后。
+  扩展类型 `slot: "analyzer"` + `page: "mods"`，宿主把结论画成模组列表顶上的卡片。
+- 先行试水：**模组页**（每条模组调用一次，宿主最多显示 6 条）；
+  ⚠️ 崩溃页还没接（`page` 只认 `mods`）。
 
 ## 已否决
 
