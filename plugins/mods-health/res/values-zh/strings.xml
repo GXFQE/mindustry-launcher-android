@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <!--
   conflict 插件的文案（中文）。
   ★ 与 values/strings.xml 一一对应；`cf_join_and` 两侧的空格是**排版**（`\u0020`），别删。
@@ -7,7 +7,6 @@
 <resources>
     <string name="cf_contained_title_fmt">「%1$s」里已经带了「%2$s」</string>
     <string name="cf_contained_detail">两个一起开会互相抢，建议只留一个。</string>
-    <string name="cf_mentioned_title_fmt">「%1$s」的简介里提到了「%2$s」</string>
     <string name="cf_log_title_fmt">上次启动的日志里有 %1$d 行提到这些模组</string>
 
     <string name="cf_none">没发现明显冲突</string>

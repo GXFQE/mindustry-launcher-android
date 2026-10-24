@@ -83,13 +83,10 @@ public final class ModsHealth {
             return -1;
         }
 
-        /** 这个模组参与了任何一条结构结论（内置 / 被提及）。 */
+        /** 这个模组参与了任何一条结构结论（内置）。 */
         boolean isInvolved(int i) {
             if (r == null || i < 0) return false;
             for (Conflicts.Pair p : r.contained) {
-                if (p.a == i || p.b == i) return true;
-            }
-            for (Conflicts.Pair p : r.mentioned) {
                 if (p.a == i || p.b == i) return true;
             }
             return false;
@@ -259,11 +256,6 @@ public final class ModsHealth {
                     c.getString(R.string.cf_contained_title_fmt, title(mods, p.a), title(mods, p.b)),
                     c.getString(R.string.cf_contained_detail), Finding.ERROR,
                     mods.get(p.a).path, mods.get(p.b).path).anchor(mods.get(p.a).path));
-        }
-        for (Conflicts.Pair p : r.mentioned) {
-            out.add(new Finding(
-                    c.getString(R.string.cf_mentioned_title_fmt, title(mods, p.a), title(mods, p.b)),
-                    "", Finding.INFO));
         }
         if (!log.lines.isEmpty()) {
             out.add(new Finding(c.getString(R.string.cf_log_title_fmt, log.lines.size()),

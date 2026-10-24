@@ -18,11 +18,10 @@ import java.util.zip.ZipFile;
 /**
  * 模组间冲突体检的**判据本体**（第 229 轮从宿主 {@code Mods.findConflicts} 搬出来）。
  *
- * <p>两层，从硬到软：
+ * <p>这一版只剩**一层判决性判据**：
  * <ol>
  *   <li><b>内置检测（判决）</b>：把每个模组的主类名（{@code main} → {@code pkg/Main}）当**字节串**，
  *       在**别的模组**的 {@code classes.dex} 里找 ⇒ 命中就是"A 把 B 的代码打包进去了"；</li>
- *   <li><b>简介提及（线索）</b>：A 的简介里出现 B 的名字 —— 免费信号，可能只是配套说明。</li>
  * </ol>
  * 另外把**游戏日志里提到这些模组的行**摘出来（那才是"谁真的接管了"的判据）。
  *
@@ -72,8 +71,6 @@ public final class Conflicts {
     public static final class Result {
         /** A 的 dex 里含 B 的主类。 */
         public final List<Pair> contained = new ArrayList<Pair>();
-        /** A 的简介里提到 B。 */
-        public final List<Pair> mentioned = new ArrayList<Pair>();
         /** 读不出来的 dex（模组下标）。 */
         public final List<Integer> dexErrors = new ArrayList<Integer>();
         /** 带 {@code main} 的模组数。 */
@@ -143,23 +140,10 @@ public final class Conflicts {
                         javaIdx.get(q).intValue()));
             }
         }
-
-        // ② 简介提及（免费信号）
-        for (int i = 0; i < mods.size(); i++) {
-            Mod a = mods.get(i);
-            if (a == null || a.description == null || a.description.trim().isEmpty()) continue;
-            for (int j = 0; j < mods.size(); j++) {
-                if (i == j) continue;
-                Mod b = mods.get(j);
-                if (b == null) continue;
-                String t = b.title == null ? "" : b.title.trim();
-                String n = b.name == null ? "" : b.name.trim();
-                // 与宿主同一条门槛：名字太短（<3）不算，否则到处误命中
-                boolean hit = (t.length() >= 3 && containsIgnoreCase(a.description, t))
-                        || (n.length() >= 3 && !n.equals(t) && containsIgnoreCase(a.description, n));
-                if (hit) c.mentioned.add(new Pair(i, j));
-            }
-        }
+        // 🔴 第 229 轮删掉了「简介提及」这一层（用户 2026-10-24：「简介中提到其他模组可以收起来
+        //    或者删掉（让人觉得莫名其妙）」）：A 的简介里出现 B 的名字，九成只是"本模组需要 B"
+        //    或"和 B 搭配用" —— 当成"冲突线索"报出来，用户既没法行动也不知道它想说什么。
+        //    ⇒ 整层撤掉（`Result.mentioned` 一并删），**宁可少说**。
         return c;
     }
 

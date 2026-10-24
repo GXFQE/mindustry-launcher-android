@@ -69,9 +69,6 @@ public final class Check {
         check(!hasPair(r.contained, 0, 2) && !hasPair(r.contained, 2, 0),
                 "★反向：无关模组 C 与 A 之间不报「内置」");
 
-        check(hasPair(r.mentioned, 0, 1), "简介提及：A 的简介里写了 Small Mod ⇒ 线索里有 A→B");
-        check(!hasPair(r.mentioned, 1, 0), "★反向：B 的简介没提 A ⇒ 不报 B→A");
-
         // ★ 元断言：把 B 的主类从 A 的 dex 里删掉 ⇒ 必须不再报「内置」（证明上一条不是恒真）
         File a2Dir = new File(work, "a2-big-only");
         dex(a2Dir, "FAKE-DEX big/BigMod only");
