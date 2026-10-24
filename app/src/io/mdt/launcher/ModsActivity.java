@@ -1262,20 +1262,8 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
             // ★ 走 metaReason()（异常类名/全限定名要翻成白话），不是原始 metaError（那是给排查看的）
             warns.add(Trans.get(ModsActivity.this, R.string.mods_warn_meta_fmt, ModsText.infoMetaReason(this, m)));
         } else {
-            if (!Mods.isAtLeast(mTarget.build, mTarget.revision, m.minGameVersion)) {
-                warns.add(Trans.get(ModsActivity.this, R.string.mods_warn_version_fmt,
-                        m.minGameVersion, mTarget.label));
-            }
-            // ★ 门槛分两档（`Vars.java:53/55`）：Java 模组 154、**脚本 / 数据模组 136** ——
-            //   原来只判了 Java 那一半 ⇒ 没写 `minGameVersion` 的 JS 模组会被游戏静默跳过，
-            //   而这里连一句解释都没有（徽标却写着"不支持"）。真机对照见 Mods.gates 的注释。
-            int minMajor = m.minMajor();
-            int needMajor = m.isJava() ? Mods.MIN_JAVA_MOD_GAME_VERSION : Mods.MIN_MOD_GAME_VERSION;
-            if (minMajor < needMajor && !m.legacyCompatible) {
-                warns.add(minMajor <= 0
-                        ? Trans.get(ModsActivity.this, R.string.mods_warn_noversion_fmt)
-                        : Trans.get(ModsActivity.this, R.string.mods_warn_minmajor_fmt, minMajor, needMajor));
-            }
+            // v25（P3b）：版本判断（包要求的版本 / 安卓门槛）已整块搬进 mods-health 插件 ——
+            //   比较在那边做，宿主这里**不再自己比一遍**（两处判据必漂）。
             // v25（P3）：黑名单 / 重名 / 依赖这几句的**文案**搬到 mods-health 插件了
             //   （它挂在这一行上）；宿主只留徽标那个**结果**（「不支持」/「①重名」/「缺依赖」）。
             // ★ 2026-10-08 改：这里原来写的是 `if (m.failed) warns.add(mods_warn_failed)`

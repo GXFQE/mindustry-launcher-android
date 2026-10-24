@@ -1759,9 +1759,6 @@
     <string name="mods_badge_broken">Cannot read description file</string>
 
     <string name="mods_warn_meta_fmt">⚠ %1$s</string>
-    <string name="mods_warn_version_fmt">⚠ Requires game %1$s, current is %2$s — it may not start</string>
-    <string name="mods_warn_minmajor_fmt">⚠ It declares minimum version %1$d, which is too old (needs %2$d or newer) — the game will skip it</string>
-    <string name="mods_warn_noversion_fmt">⚠ It does not declare which game version it needs — the game will treat it as too old and skip it</string>
     <string name="mods_warn_failed">⚠ the next game launch switches off every mod in this slot (even the ones that are on now)</string>
     <string name="mods_warn_failed_applied">⚠ the game marked every mod in this slot as failed to load and switched it off — press Enable to restore</string>
     <string name="mods_warn_failed_noskip">⚠ The last launch did not finish: the whole slot is marked as failed to load (you turned skip off, so they still load)</string>

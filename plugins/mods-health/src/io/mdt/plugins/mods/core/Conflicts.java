@@ -79,6 +79,60 @@ public final class Conflicts {
         public List<String> dependencies = new ArrayList<String>();
         /** 游戏里这个模组是开着的（依赖连坐要看它）。 */
         public boolean enabled = true;
+
+        // ---- v25（P3b）：版本判断要的事实（宿主给，比较由插件做）----
+        /** 包里写的 `minGameVersion` 原文（可为空）。 */
+        public String minGameVersion = "";
+        /** 游戏给的老包豁免（`legacyCompatible`）。 */
+        public boolean legacyCompatible;
+        /** 这个槽指向的游戏版本（build.revision）。 */
+        public int targetBuild;
+        public int targetRevision;
+        /** 安卓上两类模组的最低门槛（游戏自己的 `Vars`：Java / 脚本·数据）。 */
+        public int minJavaMajor = 154;
+        public int minModMajor = 136;
+    }
+
+    /** 这个包读得到说明文件吗（没有 internalName 就是读不出 meta 的坏包）。 */
+    static boolean hasMeta(Mod m) {
+        return m != null && m.internalName != null && !m.internalName.trim().isEmpty();
+    }
+
+    /**
+     * 游戏自己的版本比较（`Mods.isAtLeast` 的**逐行照抄**，第 229 轮 P3b 搬进来）。
+     *
+     * <p>`build.revision` 形态（`"159.7"`）比到小版本；纯整数形态比 build；
+     * 目标版本未知（{@code build <= 0}）或没写 ⇒ **算通过**（不许把"不知道"当"不兼容"）。
+     */
+    static boolean isAtLeast(int build, int revision, String str) {
+        if (build <= 0 || str == null || str.trim().isEmpty()) return true;
+        String v = str.trim();
+        int dot = v.indexOf('.');
+        if (dot != -1) {
+            int major = parseInt(v.substring(0, dot));
+            int minor = parseInt(v.substring(dot + 1));
+            return build > major || (build == major && revision >= minor);
+        }
+        return build >= parseInt(v);
+    }
+
+    /** `Strings.parseInt(str, 0)`：非数字 ⇒ 0（游戏就是这么写的，不抛）。 */
+    static int parseInt(String s) {
+        if (s == null) return 0;
+        try {
+            return Integer.parseInt(s.trim());
+        } catch (Throwable t) {
+            return 0;
+        }
+    }
+
+    /** `ModMeta.getMinMajor()`：`.` 前那一段，取不出数字 ⇒ 0。 */
+    static int minMajorOf(String minGameVersion) {
+        if (minGameVersion == null) return 0;
+        String v = minGameVersion.trim();
+        if (v.isEmpty()) return 0;
+        int dot = v.indexOf('.');
+        return parseInt(dot > 0 ? v.substring(0, dot) : v);
     }
 
     /**
@@ -128,6 +182,10 @@ public final class Conflicts {
         public static final int DUPLICATED = 6;
         /** 在游戏的黑名单里。 */
         public static final int BLACKLISTED = 7;
+        /** 包要求的游戏版本比这个槽的新。 */
+        public static final int NEEDS_NEWER_GAME = 8;
+        /** `minGameVersion` 没写 / 写得太低（安卓门槛）。 */
+        public static final int MIN_MAJOR_LOW = 9;
 
         /** 哪个模组（下标）。 */
         public final int index;
@@ -194,6 +252,9 @@ public final class Conflicts {
         for (int i = 0; i < mods.size(); i++) {
             Mod m = mods.get(i);
             if (m == null) continue;
+            // 没读到说明文件（没有 internalName）⇒ 这些"深度"判据一概不适用：
+            // 那是宿主的文件级错误，硬比版本会得出「门槛写得太低（0 < 136）」这种噪声。
+            if (!hasMeta(m)) continue;
             if (m.java && !m.hasClassesDex) {
                 c.issues.add(new Issue(i, Issue.WILL_FAIL_JAVA_LOAD, 0));
             }
@@ -216,7 +277,7 @@ public final class Conflicts {
         }
         for (int i = 0; i < mods.size(); i++) {
             Mod m = mods.get(i);
-            if (m == null) continue;
+            if (m == null || !hasMeta(m)) continue;
             if (m.duplicated) {
                 String other = "";
                 for (int j = 0; j < mods.size(); j++) {
@@ -239,6 +300,16 @@ public final class Conflicts {
                 c.issues.add(new Issue(i, Issue.DEP_OFF, 0, missingDep(mods, byName, m, true)));
             } else if ("CIRCULAR_DEPENDENCIES".equals(m.depState)) {
                 c.issues.add(new Issue(i, Issue.DEP_CIRCLE, 0));
+            }
+            // v25（P3b）：版本 —— 游戏自己的判据，照抄（见 isAtLeast / minMajor 的注释）
+            if (!isAtLeast(m.targetBuild, m.targetRevision, m.minGameVersion)) {
+                c.issues.add(new Issue(i, Issue.NEEDS_NEWER_GAME, 0, m.minGameVersion.trim()));
+            } else {
+                int minMajor = minMajorOf(m.minGameVersion);
+                int need = m.java ? m.minJavaMajor : m.minModMajor;
+                if (minMajor < need && !m.legacyCompatible) {
+                    c.issues.add(new Issue(i, Issue.MIN_MAJOR_LOW, minMajor, String.valueOf(need)));
+                }
             }
         }
 

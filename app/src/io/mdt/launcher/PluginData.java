@@ -486,6 +486,14 @@ final class PluginData {
                 put(ex, "depState", ds == null ? "" : ds.name());
             }
             put(ex, "blacklisted", String.valueOf(Mods.isBlacklisted(m.name, m.version)));
+            // v25（P3b）：版本判断要的事实 —— **比较交给插件**（宿主不再自己比一遍）
+            put(ex, "legacyCompatible", String.valueOf(m.legacyCompatible));
+            put(ex, "minJavaMajor", String.valueOf(Mods.MIN_JAVA_MOD_GAME_VERSION));
+            put(ex, "minModMajor", String.valueOf(Mods.MIN_MOD_GAME_VERSION));
+            if (target != null) {
+                put(ex, "targetBuild", String.valueOf(target.build));
+                put(ex, "targetRevision", String.valueOf(target.revision));
+            }
             put(ex, "failed", String.valueOf(m.failed));
             put(ex, "willFailJavaLoad", String.valueOf(m.willFailJavaLoad()));
             ex.put("java", String.valueOf(m.java));

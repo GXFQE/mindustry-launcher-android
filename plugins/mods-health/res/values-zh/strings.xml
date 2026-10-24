@@ -33,6 +33,12 @@
     <string name="cf_blacklist_title">在游戏的黑名单里</string>
     <string name="cf_blacklist_detail">游戏自己拒绝加载它 —— 换个版本试。</string>
 
+    <!-- v25（P3b）：版本门槛（游戏自己的判据，比较在插件里做） -->
+    <string name="cf_newer_title_fmt">要 %1$s 以上的游戏版本</string>
+    <string name="cf_newer_detail">这个槽的游戏版本更旧，游戏会跳过这个包。</string>
+    <string name="cf_minmajor_title_fmt">版本门槛写得太低了（%1$s &lt; %2$s）</string>
+    <string name="cf_minmajor_detail_fmt">安卓上的模组至少要 %1$s；没写的按 0 算 —— 游戏会跳过它。</string>
+
     <string name="cf_note_dex_title_fmt">读不了「%1$s」的 classes.dex</string>
     <string name="cf_note_log">读不了游戏日志</string>
 </resources>

@@ -184,6 +184,13 @@ public final class ModsHealth {
             m.duplicated = "true".equals(extra(it, "duplicated"));
             m.blacklisted = "true".equals(extra(it, "blacklisted"));
             m.enabled = !"false".equals(extra(it, "enabled"));
+            // v25（P3b）：版本判断的事实（比较在插件里做）
+            m.minGameVersion = extra(it, "minGameVersion");
+            m.legacyCompatible = "true".equals(extra(it, "legacyCompatible"));
+            m.targetBuild = intExtra(it, "targetBuild");
+            m.targetRevision = intExtra(it, "targetRevision");
+            if (intExtra(it, "minJavaMajor") > 0) m.minJavaMajor = intExtra(it, "minJavaMajor");
+            if (intExtra(it, "minModMajor") > 0) m.minModMajor = intExtra(it, "minModMajor");
             m.dependencies.clear();
             for (int i = 0; ; i++) {
                 String d = extra(it, "dep." + i);
@@ -323,6 +330,14 @@ public final class ModsHealth {
             } else if (is.kind == Conflicts.Issue.BLACKLISTED) {
                 out.add(new Finding(c.getString(R.string.cf_blacklist_title),
                         c.getString(R.string.cf_blacklist_detail), Finding.ERROR).anchor(path));
+            } else if (is.kind == Conflicts.Issue.NEEDS_NEWER_GAME) {
+                out.add(new Finding(c.getString(R.string.cf_newer_title_fmt, is.other),
+                        c.getString(R.string.cf_newer_detail), Finding.ERROR).anchor(path));
+            } else if (is.kind == Conflicts.Issue.MIN_MAJOR_LOW) {
+                out.add(new Finding(c.getString(R.string.cf_minmajor_title_fmt,
+                        String.valueOf(is.jsCount), is.other),
+                        c.getString(R.string.cf_minmajor_detail_fmt, is.other),
+                        Finding.ERROR).anchor(path));
             }
         }
         for (Integer idx : r.dexErrors) {

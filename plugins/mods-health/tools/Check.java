@@ -80,19 +80,19 @@ public final class Check {
         // ── v25（P2）：结构判据（会不会加载 / 脚本跑不跑）—— 从宿主搬来的两条 ──────────
         List<Conflicts.Mod> modsS = new ArrayList<Conflicts.Mod>();
         Conflicts.Mod noDex = new Conflicts.Mod();
-        noDex.path = "/x/nodex.jar"; noDex.title = "No Dex";
+        noDex.path = "/x/nodex.jar"; noDex.title = "No Dex"; noDex.internalName = "nodex";
         noDex.java = true; noDex.hasClassesDex = false;
         Conflicts.Mod okDex = new Conflicts.Mod();
-        okDex.path = "/x/ok.jar"; okDex.title = "Ok Dex";
+        okDex.path = "/x/ok.jar"; okDex.title = "Ok Dex"; okDex.internalName = "okdex";
         okDex.java = true; okDex.hasClassesDex = true;
         Conflicts.Mod oneJs = new Conflicts.Mod();
-        oneJs.path = "/x/one.zip"; oneJs.title = "One Js";
+        oneJs.path = "/x/one.zip"; oneJs.title = "One Js"; oneJs.internalName = "onejs";
         oneJs.hasScripts = true; oneJs.jsCount = 1; oneJs.hasMainJs = false;
         Conflicts.Mod twoJs = new Conflicts.Mod();
-        twoJs.path = "/x/two.zip"; twoJs.title = "Two Js";
+        twoJs.path = "/x/two.zip"; twoJs.title = "Two Js"; twoJs.internalName = "twojs";
         twoJs.hasScripts = true; twoJs.jsCount = 2; twoJs.hasMainJs = false;
         Conflicts.Mod twoJsOk = new Conflicts.Mod();
-        twoJsOk.path = "/x/twook.zip"; twoJsOk.title = "Two Js Ok";
+        twoJsOk.path = "/x/twook.zip"; twoJsOk.title = "Two Js Ok"; twoJsOk.internalName = "twojsok";
         twoJsOk.hasScripts = true; twoJsOk.jsCount = 2; twoJsOk.hasMainJs = true;
         modsS.add(noDex);
         modsS.add(okDex);
@@ -122,7 +122,7 @@ public final class Check {
         Conflicts.Mod dupB = new Conflicts.Mod();
         dupB.path = "/d/dupb.zip"; dupB.title = "Dup B"; dupB.internalName = "dup"; dupB.duplicated = true;
         Conflicts.Mod blMod = new Conflicts.Mod();
-        blMod.path = "/d/bl.zip"; blMod.title = "Bad"; blMod.blacklisted = true;
+        blMod.path = "/d/bl.zip"; blMod.title = "Bad"; blMod.internalName = "bad"; blMod.blacklisted = true;
         Conflicts.Mod okDep = new Conflicts.Mod();
         okDep.path = "/d/ok.zip"; okDep.title = "Ok"; okDep.internalName = "ok"; okDep.depState = "ENABLED";
         modsD.add(hostMod); modsD.add(dupA); modsD.add(dupB); modsD.add(blMod); modsD.add(okDep);
@@ -135,6 +135,49 @@ public final class Check {
         check("Dup B".equals(issueOther(rD.issues, 1, Conflicts.Issue.DUPLICATED)),
                 "重名：说得出另一份是谁（" + issueOther(rD.issues, 1, Conflicts.Issue.DUPLICATED) + "）");
         check(hasIssue(rD.issues, 3, Conflicts.Issue.BLACKLISTED), "黑名单：在名单里就标出来");
+        Conflicts.Mod brokenMeta = new Conflicts.Mod();
+        brokenMeta.path = "/d/broken.zip"; brokenMeta.title = "Broken";
+        brokenMeta.minGameVersion = ""; brokenMeta.targetBuild = 160;
+        List<Conflicts.Mod> modsB = new ArrayList<Conflicts.Mod>();
+        modsB.add(brokenMeta);
+        Conflicts.Result rB = Conflicts.scan(modsB);
+        check(rB.issues.isEmpty(),
+                "★反向：读不出说明文件的包不许报版本门槛（它连 internalName 都没有）");
+        // ── v25（P3b）：版本判断（旧的包 / 门槛）—— 照拄游戏自己的判法 ────────────
+        check(Conflicts.isAtLeast(160, 1, "159.7"), "isAtLeast：160.1 >= 159.7");
+        check(!Conflicts.isAtLeast(159, 0, "159.7"), "isAtLeast 反向：159.0 < 159.7（小版本也要比）");
+        check(Conflicts.isAtLeast(160, 0, "159"), "isAtLeast：纯整数形态比 build");
+        check(Conflicts.isAtLeast(0, 0, "999"), "isAtLeast：目标版本未知 ⇒ 算通过（不许把不知道当不兼容）");
+        check(Conflicts.minMajorOf("159.7") == 159 && Conflicts.minMajorOf("") == 0
+                && Conflicts.minMajorOf("abc") == 0, "minMajorOf：取点前一段，取不出 ⇒ 0");
+
+        List<Conflicts.Mod> modsV = new ArrayList<Conflicts.Mod>();
+        Conflicts.Mod tooNew = new Conflicts.Mod();
+        tooNew.path = "/v/too-new.zip"; tooNew.title = "Too New"; tooNew.internalName = "toonew";
+        tooNew.targetBuild = 160; tooNew.targetRevision = 1; tooNew.minGameVersion = "170";
+        Conflicts.Mod lowMajor = new Conflicts.Mod();
+        lowMajor.path = "/v/low.zip"; lowMajor.title = "Low Major"; lowMajor.internalName = "lowmajor";
+        lowMajor.targetBuild = 160; lowMajor.targetRevision = 1; lowMajor.minGameVersion = "146";
+        lowMajor.minModMajor = 154; lowMajor.java = false;
+        Conflicts.Mod legacy = new Conflicts.Mod();
+        legacy.path = "/v/legacy.zip"; legacy.title = "Legacy"; legacy.internalName = "legacy";
+        legacy.targetBuild = 160; legacy.targetRevision = 1; legacy.minGameVersion = "";
+        legacy.legacyCompatible = true;
+        Conflicts.Mod plain = new Conflicts.Mod();
+        plain.path = "/v/plain.zip"; plain.title = "Plain"; plain.internalName = "plain";
+        plain.targetBuild = 160; plain.targetRevision = 1; plain.minGameVersion = "159.7";
+        modsV.add(tooNew); modsV.add(lowMajor); modsV.add(legacy); modsV.add(plain);
+        Conflicts.Result rV = Conflicts.scan(modsV);
+        check(hasIssue(rV.issues, 0, Conflicts.Issue.NEEDS_NEWER_GAME),
+                "版本：包要求 170 而游戏是 160 ⇒ 报 NEEDS_NEWER_GAME");
+        check(hasIssue(rV.issues, 1, Conflicts.Issue.MIN_MAJOR_LOW),
+                "门槛：minGameVersion 146 < 脚本模组的 154 ⇒ 报 MIN_MAJOR_LOW");
+        check(!hasIssue(rV.issues, 2, Conflicts.Issue.MIN_MAJOR_LOW),
+                "★反向：legacyCompatible 的包不报门槛（游戏自己给的豁免）");
+        check(!hasIssue(rV.issues, 3, Conflicts.Issue.NEEDS_NEWER_GAME)
+                && !hasIssue(rV.issues, 3, Conflicts.Issue.MIN_MAJOR_LOW),
+                "★反向：版本合适的包一条版本结论都不许有");
+
         check(!hasIssue(rD.issues, 4, Conflicts.Issue.DEP_MISSING)
                 && !hasIssue(rD.issues, 4, Conflicts.Issue.DUPLICATED)
                 && !hasIssue(rD.issues, 4, Conflicts.Issue.BLACKLISTED),

@@ -33,6 +33,12 @@
     <string name="cf_blacklist_title">on the game blacklist</string>
     <string name="cf_blacklist_detail">the game itself refuses to load it; try another version.</string>
 
+    <!-- v25 (P3b): version thresholds (the game own rule; the comparison lives here) -->
+    <string name="cf_newer_title_fmt">needs game version %1$s or newer</string>
+    <string name="cf_newer_detail">this slot runs an older game build, so the game skips this pack.</string>
+    <string name="cf_minmajor_title_fmt">minGameVersion is too low (%1$s &lt; %2$s)</string>
+    <string name="cf_minmajor_detail_fmt">Android mods need at least %1$s; a missing value counts as 0, so the game skips it.</string>
+
     <string name="cf_note_dex_title_fmt">could not read the classes.dex inside \"%1$s\"</string>
     <string name="cf_note_log">could not read the game log</string>
 </resources>
