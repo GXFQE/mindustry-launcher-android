@@ -88,8 +88,10 @@ public final class ModsHealth {
                     intExtra(item, "targetRevision"), v)) {
                 return "unsupported";
             }
-            int need = "true".equals(extra(item, "java"))
-                    ? intExtra(item, "minJavaMajor") : intExtra(item, "minModMajor");
+            int floor = intExtra(item, "minJavaMajor");
+            int need = intExtra(item, "targetBuild") >= floor
+                    ? ("true".equals(extra(item, "java")) ? floor : intExtra(item, "minModMajor"))
+                    : 0;
             if (need > 0 && Conflicts.minMajorOf(v) < need
                     && !"true".equals(extra(item, "legacyCompatible"))) {
                 return "unsupported";

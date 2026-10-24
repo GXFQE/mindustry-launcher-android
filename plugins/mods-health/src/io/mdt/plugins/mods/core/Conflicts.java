@@ -306,8 +306,11 @@ public final class Conflicts {
                 c.issues.add(new Issue(i, Issue.NEEDS_NEWER_GAME, 0, m.minGameVersion.trim()));
             } else {
                 int minMajor = minMajorOf(m.minGameVersion);
-                int need = m.java ? m.minJavaMajor : m.minModMajor;
-                if (minMajor < need && !m.legacyCompatible) {
+                // 两个门槛常量是 **v8 才有的**（v146 的 `Vars.java` 里没有）
+                // ⇒ 目标游戏是 v7/v6 时不能套这个门槛（否则误报老版本的正常模组）。
+                int need = m.targetBuild >= m.minJavaMajor
+                        ? (m.java ? m.minJavaMajor : m.minModMajor) : 0;
+                if (need > 0 && minMajor < need && !m.legacyCompatible) {
                     c.issues.add(new Issue(i, Issue.MIN_MAJOR_LOW, minMajor, String.valueOf(need)));
                 }
             }

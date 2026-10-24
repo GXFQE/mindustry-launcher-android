@@ -174,6 +174,18 @@ public final class Check {
                 "门槛：minGameVersion 146 < 脚本模组的 154 ⇒ 报 MIN_MAJOR_LOW");
         check(!hasIssue(rV.issues, 2, Conflicts.Issue.MIN_MAJOR_LOW),
                 "★反向：legacyCompatible 的包不报门槛（游戏自己给的豁免）");
+        // ★ v7 回归：目标是 v146（v7）时，154/136 这个门槛**压根不存在**
+        //   （v146 的 Vars.java 里没有那两个常量）—— 写 146 的 Java 模组在 v146 上必须算合格。
+        Conflicts.Mod v7Mod = new Conflicts.Mod();
+        v7Mod.path = "/v7/legacy.zip"; v7Mod.title = "V7 Java"; v7Mod.internalName = "v7java";
+        v7Mod.java = true; v7Mod.targetBuild = 146; v7Mod.targetRevision = 0;
+        v7Mod.minGameVersion = "146";
+        List<Conflicts.Mod> mods7 = new ArrayList<Conflicts.Mod>();
+        mods7.add(v7Mod);
+        Conflicts.Result r7 = Conflicts.scan(mods7);
+        check(!hasIssue(r7.issues, 0, Conflicts.Issue.MIN_MAJOR_LOW),
+                "★v7 回归：v146 上写 146 的 Java 模组不能报门槛太低");
+
         check(!hasIssue(rV.issues, 3, Conflicts.Issue.NEEDS_NEWER_GAME)
                 && !hasIssue(rV.issues, 3, Conflicts.Issue.MIN_MAJOR_LOW),
                 "★反向：版本合适的包一条版本结论都不许有");

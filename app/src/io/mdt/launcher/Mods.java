@@ -1944,8 +1944,10 @@ public final class Mods {
         //     缺省  ⇒ 日志只有 `Loading mod:`，无脚本输出、无崩溃文件（**静默跳过**）
         //     "140" ⇒ 脚本跑起来、崩溃文件出现
         int minMajor = m.minMajor();
-        int need = m.isJava() ? MIN_JAVA_MOD_GAME_VERSION : MIN_MOD_GAME_VERSION;
-        boolean majorOk = minMajor >= need || m.legacyCompatible;
+        // v8 才有这个门槛（v146 的 `Vars.java` 里没有它）⇒ 目标是 v7/v6 时这一关直接算过
+        int need = gameBuild >= MIN_JAVA_MOD_GAME_VERSION
+                ? (m.isJava() ? MIN_JAVA_MOD_GAME_VERSION : MIN_MOD_GAME_VERSION) : 0;
+        boolean majorOk = need <= 0 || minMajor >= need || m.legacyCompatible;
         out.add(new Gate(Trans.get(ctx, majorOk
                         ? R.string.mods_gate_minver : R.string.mods_gate_minver_bad),
                 majorOk,
@@ -2097,8 +2099,12 @@ public final class Mods {
         //   ⚠️ 原来这里写的是 `m.isJava() && …` ⇒ **脚本模组整类漏判**：没写 `minGameVersion`
         //      的 JS 模组被游戏判 unsupported（脚本永远不跑），我们这边却显示"启用"。
         //      真机对照见 {@link #gates} 里那段注释。
-        int need = m.isJava() ? MIN_JAVA_MOD_GAME_VERSION : MIN_MOD_GAME_VERSION;
-        if (m.minMajor() < need && !m.legacyCompatible) return State.UNSUPPORTED;
+        // 🔴 2026-10-24（第 229 轮 P3b）：这两个常量是 **v8 才有的**（v146 的 `Vars.java`
+        //   里根本没有它们，已对比）⇒ 目标游戏是 v7/v6 时**不能套这个门槛**，
+        //   否则 v146 的 Java 模组（写 146）在 v146 上会被误报成"版本不对"。
+        int need = gameBuild >= MIN_JAVA_MOD_GAME_VERSION
+                ? (m.isJava() ? MIN_JAVA_MOD_GAME_VERSION : MIN_MOD_GAME_VERSION) : 0;
+        if (need > 0 && m.minMajor() < need && !m.legacyCompatible) return State.UNSUPPORTED;
         if (!m.enabled) return State.DISABLED;
         return State.ENABLED;
     }
