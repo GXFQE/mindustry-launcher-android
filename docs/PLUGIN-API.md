@@ -1,4 +1,4 @@
-# 插件接口（PluginApi）—— 给插件开发者看的那一份
+﻿# 插件接口（PluginApi）—— 给插件开发者看的那一份
 
 > 面向写插件的人；宿主内部的实现细节看 `docs/flows/` 与 `.dsh/memory/ref/`。
 > 文档里的版本号必须等于 `PluginHost.API`，自检有一条元断言钉着（`PluginApi.DOC_VERSION`）。
@@ -231,6 +231,49 @@ public final class Finding {
 - **所有页面都支持**（`page` 与插件拿到的 `pageItems()` 是同一个数据源，2026-10-24 第 227 轮放开）
 - 单条抛异常只丢这一条，不影响别的条目/页面
 
+#### v25：`Finding.anchor` —— 挂到某一项上
+
+```java
+new Finding(title, detail, severity, evidence).anchor(item.path);
+```
+
+- 有 `anchor` ⇒ 宿主画在**那一行**（行上 `⚠ <title>`，`detail` 进详情弹窗的「插件结论」小节）；
+- 没有 ⇒ 仍旧进底部「插件」卡（同一页可以混用）；
+- 键是 `ItemInfo.path`（与 `contents()` 里的那一项**逐字相同**）；
+- 分析器在**列表渲染之后**才回来 ⇒ 宿主拿到后会重画一次列表（模组页就是这么做的）。
+
+### 筛选 / 排序注入（v25）
+
+插件可以往页面的「筛选与排序」菜单里加自己的一项（与 `extensions` 同一个数组）：
+
+```json
+{ "id": "conflict-filter", "title": "有冲突的模组", "entry": "com.example.ModTool",
+  "slot": "filter", "page": "mods" }
+{ "id": "risk-sort", "title": "按冲突风险", "entry": "com.example.ModTool",
+  "slot": "sort", "page": "mods" }
+```
+
+入口类（**必须是声明了 `api()` 的那个类** —— 宿主 `PluginHost.open` 要拿它判版本）提供：
+
+```java
+public static boolean accept(ItemInfo item, PluginApi api);        // filter：要不要这一项
+public static int compare(ItemInfo a, ItemInfo b, PluginApi api);  // sort：<0 靠前
+```
+
+- **只在用户选中那一项时才算一次**，结果由宿主缓存（不会在打字搜索时反复加载插件）；
+- 计算在后台线程，算的时候弹一个「正在问插件…」的进度框；
+- 插件坏了 / 删了 / 方法缺失 ⇒ 当没筛、按原序，页面不崩；
+- 内置的搜索 / 排序先做，插件这一层最后做（同一份结果顺序就是最终顺序）。
+
+### HJSON 解析（v25）
+
+```java
+String json = api.parseHjson(file);   // 标准 JSON 文本；失败/读不了 ⇒ null
+```
+
+宿主用自己读 `mod.hjson` 的同一条路（先 ARC 160 方言、再 159），插件拿 `org.json` 取字段 ——
+**解析归宿主、用法归插件**。模组包自己的 meta 本来就在 `ItemInfo.extra` 里，不用再解析一次。
+
 ### 出口
 
 | 方法 | 说明 |
@@ -393,6 +436,8 @@ v22（2026-10-23 第 221 轮）：`submit()` / `Task`（后台任务，完成/�
 v23（2026-10-23 第 223 轮）：`Probe` / `ProbeEnv` + `telemetry.probes`（`:game` 进程内 /
 `:probe` 隔离进程两种探针）；数据由插件自己写，宿主只调度与隔离。
 v24（2026-10-23 第 224 轮）：`Finding` + `slot: analyzer`（`page: mods`）—— 插件给结论、宿主渲染；`API_MIN` 仍不动。
+v25（2026-10-24 第 229 轮）：`Finding.anchor`（结论挂到某一行）+ `slot: filter` / `slot: sort`
+（插件注入自己的筛选与排序）+ `parseHjson(File)`（宿主解析、插件用）；`API_MIN` 仍不动。
 
 **第一个「纯 analyzer」插件**：`plugins/conflict`（第 229 轮，模组冲突检查）。宿主管了四年
 （第 229 轮之前）的那行「查模组冲突」整块删掉，判据搬进插件的 `core/Conflicts.java`；

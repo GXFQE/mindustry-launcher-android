@@ -1,22 +1,22 @@
-#!/usr/bin/env bash
+﻿#!/usr/bin/env bash
 # =============================================================================
-# 官方插件 conflict 的构建（第 229 轮）—— 与主构建同一条手工链：
+# 官方插件 mods-health 的构建（第 229 轮）—— 与主构建同一条手工链：
 #   aapt2 compile/link -> javac(8) -> d8 -> 注入 classes.dex + assets/plugin.json
 #   -> zipalign -> apksigner
 #
-# 产出：${CONFLICT_OUT:-%TEMP%/mdt-conflict}/conflict.apk
+# 产出：${MODSHEALTH_OUT:-%TEMP%/mdt-mods-health}/mods-health.apk
 # ★ 产物别放 build/ —— 主构建 build.sh 会把它整个删掉（见 AGENTS §六）。
 # ★ 签名默认用 debug.keystore：与本地宿主同一把钥匙 ⇒ 宿主判「官方」。
-# ★ 插件 id = APK 文件名（dev 口 `dev_plugininstall` 的缺省 id 取文件名）⇒ 这里固定叫 conflict.apk。
+# ★ 插件 id = APK 文件名（dev 口 `dev_plugininstall` 的缺省 id 取文件名）⇒ 这里固定叫 mods-health.apk。
 #
 # 用法：
-#   ANDROID_HOME=D:/AndroidSDK bash plugins/conflict/build.sh          # 构建 APK
-#   ANDROID_HOME=D:/AndroidSDK bash plugins/conflict/build.sh check    # 只在 PC 上跑判据自检
+#   ANDROID_HOME=D:/AndroidSDK bash plugins/mods-health/build.sh          # 构建 APK
+#   ANDROID_HOME=D:/AndroidSDK bash plugins/mods-health/build.sh check    # 只在 PC 上跑判据自检
 # =============================================================================
 set -e
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-SRC_DIR="$ROOT/plugins/conflict"
-OUT="${CONFLICT_OUT:-${TEMP:-/tmp}/mdt-conflict}"
+SRC_DIR="$ROOT/plugins/mods-health"
+OUT="${MODSHEALTH_OUT:-${TEMP:-/tmp}/mdt-mods-health}"
 PY="${PYTHON:-/c/ProgramData/anaconda3/python.exe}"
 CYGPATH=/usr/bin/cygpath
 
@@ -33,21 +33,21 @@ KS_ALIAS="${KS_ALIAS:-androiddebugkey}"; KS_PASS="${KS_PASS:-android}"; KEY_PASS
 wpath() { "$CYGPATH" -w "$1"; }
 jpath() { "$CYGPATH" -m "$1"; }
 
-# ---- 插件侧自检（纯 Java，PC 上跑）：`plugins/conflict/build.sh check` -------------
+# ---- 插件侧自检（纯 Java，PC 上跑）：`plugins/mods-health/build.sh check` -------------
 # ★ 为什么要有它：三层判据已经不在宿主里了（宿主 SelfTest 抓不到），而"判据本身对不对"
 #   只能在夹具上验 —— 真机上只有一份现成的模组组合，验不出反方向。
 if [ "${1:-}" = "check" ]; then
-  echo "== conflict check (PC) =="
+  echo "== mods-health check (PC) =="
   CHK="$OUT/check"; rm -rf "$CHK"; mkdir -p "$CHK"
   SRC=()
-  while IFS= read -r f; do SRC+=("$f"); done < <( { find "$SRC_DIR/src/io/mdt/plugins/conflict/core" -name '*.java'; echo "$SRC_DIR/tools/Check.java"; } | sort )
+  while IFS= read -r f; do SRC+=("$f"); done < <( { find "$SRC_DIR/src/io/mdt/plugins/mods/core" -name '*.java'; echo "$SRC_DIR/tools/Check.java"; } | sort )
   if ! "$JAVAC_8" -encoding UTF-8 -source 8 -target 8 -nowarn \
         -classpath "$(wpath "$AJAR")" -d "$(wpath "$CHK")" "${SRC[@]}" > "$CHK/javac.log" 2>&1; then
     grep -v '^注:' "$CHK/javac.log" | tail -30
     echo "!! check 编译失败" >&2
     exit 1
   fi
-  "$JDK8/bin/java" -cp "$(wpath "$CHK")" io.mdt.plugins.conflict.core.Check
+  "$JDK8/bin/java" -cp "$(wpath "$CHK")" io.mdt.plugins.mods.core.Check
   exit $?
 fi
 
@@ -56,7 +56,7 @@ rm -rf "$OUT"; mkdir -p "$OUT"
 # 🔴 与主构建同一个坑：aapt2 在含中文的工程路径下会 "failed to open directory"
 #    ⇒ res 与 manifest 先拷到 ASCII 路径（/tmp 镜像）再喂给它。
 echo "== [1/4] aapt2 =="
-RES_DIR="/tmp/mdt-conflict-res"; MF_DIR="/tmp/mdt-conflict-manifest"
+RES_DIR="/tmp/mdt-mods-health-res"; MF_DIR="/tmp/mdt-mods-health-manifest"
 rm -rf "$RES_DIR" "$MF_DIR" "$OUT/res.zip"; mkdir -p "$RES_DIR" "$MF_DIR"
 cp -r "$SRC_DIR/res/." "$RES_DIR/"
 cp "$SRC_DIR/AndroidManifest.xml" "$MF_DIR/AndroidManifest.xml"
@@ -81,8 +81,8 @@ if ! "$JAVAC_8" -encoding UTF-8 -source 8 -target 8 -nowarn \
   exit 1
 fi
 grep -v '^注:' "$OUT/javac.log" | tail -3 || true
-test -f "$OUT/classes/io/mdt/plugins/conflict/ConflictPlugin.class" || { echo "!! 入口类没编出来" >&2; exit 1; }
-test -f "$OUT/classes/io/mdt/plugins/conflict/core/Conflicts.class" || { echo "!! 判据类没编出来" >&2; exit 1; }
+test -f "$OUT/classes/io/mdt/plugins/mods/ModsHealth.class" || { echo "!! 入口类没编出来" >&2; exit 1; }
+test -f "$OUT/classes/io/mdt/plugins/mods/core/Conflicts.class" || { echo "!! 判据类没编出来" >&2; exit 1; }
 
 echo "== [3/4] d8 + inject =="
 mkdir -p "$OUT/dex"
@@ -90,7 +90,7 @@ mkdir -p "$OUT/dex"
 "$JAVA" -cp "$(jpath "$BT/lib/d8.jar")" com.android.tools.r8.D8 \
   --min-api 26 --output "$(wpath "$OUT/dex")" "$(wpath "$OUT/classes.jar")"
 "$PY" - "$(jpath "$OUT/base.apk")" "$(jpath "$OUT/dex/classes.dex")" \
-  "$(jpath "$OUT/conflict.apk")" "$(jpath "$SRC_DIR/assets/plugin.json")" <<'PY'
+  "$(jpath "$OUT/mods-health.apk")" "$(jpath "$SRC_DIR/assets/plugin.json")" <<'PY'
 import sys, zipfile
 base, dex, out, meta = sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4]
 zin = zipfile.ZipFile(base); zout = zipfile.ZipFile(out, 'w', zipfile.ZIP_DEFLATED)
@@ -104,15 +104,15 @@ zout.close(); zin.close()
 PY
 
 echo "== [4/4] zipalign + sign =="
-"$BT/zipalign.exe" -f 4 "$(wpath "$OUT/conflict.apk")" "$(wpath "$OUT/conflict-aligned.apk")"
-mv "$OUT/conflict-aligned.apk" "$OUT/conflict.apk"
+"$BT/zipalign.exe" -f 4 "$(wpath "$OUT/mods-health.apk")" "$(wpath "$OUT/mods-health-aligned.apk")"
+mv "$OUT/mods-health-aligned.apk" "$OUT/mods-health.apk"
 "$JAVA" -jar "$(jpath "$BT/lib/apksigner.jar")" sign \
   --ks "$(wpath "$KEYSTORE")" --ks-key-alias "$KS_ALIAS" \
-  --ks-pass "pass:$KS_PASS" --key-pass "pass:$KEY_PASS" "$(wpath "$OUT/conflict.apk")"
+  --ks-pass "pass:$KS_PASS" --key-pass "pass:$KEY_PASS" "$(wpath "$OUT/mods-health.apk")"
 
-ls -l "$OUT/conflict.apk"
-"$PY" - "$(jpath "$OUT/conflict.apk")" <<'PY'
+ls -l "$OUT/mods-health.apk"
+"$PY" - "$(jpath "$OUT/mods-health.apk")" <<'PY'
 import hashlib, sys
 print("sha256 =", hashlib.sha256(open(sys.argv[1], 'rb').read()).hexdigest())
 PY
-echo "== CONFLICT BUILD OK =="
+echo "== MODS-HEALTH BUILD OK =="

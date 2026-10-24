@@ -769,6 +769,12 @@
     <string name="mods_dep_required_fmt">必需：%1$s</string>
     <string name="mods_dep_soft_fmt">软依赖：%1$s</string>
     <string name="mods_scan_dup_fmt">%1$s 和 %2$s 是同一个模组的两份，游戏里只认一个（后放进去的那个）。</string>
+    <!-- v25：插件挂到某一项上的结论（行上是短标签，详情里才给 detail） -->
+    <string name="mods_plugin_warn_fmt">⚠ %1$s</string>
+    <string name="mods_plugin_head">插件结论</string>
+    <string name="mods_plugin_issue_fmt">%1$s：%2$s</string>
+    <string name="mods_plugin_issue_plain">%1$s</string>
+    <string name="mods_filter_plugin_wait">正在问插件…</string>
     <!--
       ══ 模组包导入 / 跨槽复制的**结果与失败原因**（P3）══════════════════════
       ★ `Mods.PackResult.report()` **就是弹窗正文** ⇒ 给用户看的；而 `importPackage` / `copyMods`

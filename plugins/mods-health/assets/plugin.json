@@ -1,0 +1,34 @@
+﻿{
+  "entry": "io.mdt.plugins.mods.ModsHealth",
+  "name": "mods-health",
+  "version": "1",
+  "author": "mdt",
+  "description": "mod health check (bundled code / description mentions / game log)",
+  "access": [
+    "mods"
+  ],
+  "extensions": [
+    {
+      "id": "mods-analyzer",
+      "title": "模组体检",
+      "subtitle": "冲突 / 结构 / 上次日志",
+      "entry": "io.mdt.plugins.mods.ModsHealth",
+      "slot": "analyzer",
+      "page": "mods"
+    },
+    {
+      "id": "conflict-filter",
+      "title": "有冲突的模组",
+      "entry": "io.mdt.plugins.mods.ModsHealth",
+      "slot": "filter",
+      "page": "mods"
+    },
+    {
+      "id": "risk-sort",
+      "title": "按冲突风险",
+      "entry": "io.mdt.plugins.mods.ModsHealth",
+      "slot": "sort",
+      "page": "mods"
+    }
+  ]
+}

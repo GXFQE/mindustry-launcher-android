@@ -66,7 +66,7 @@ public final class PluginHost {
      * 加法变更只抬 {@link #API}（{@link #API_MIN} 不动，老插件照样装得进），
      * 破坏性变更才抬 {@link #API_MIN}。
      */
-    public static final int API = 24;
+    public static final int API = 25;
     /**
      * 还认的**最老**契约版本。
      *
@@ -759,6 +759,27 @@ public final class PluginHost {
         }
 
         // ---- v21：游戏设置面（解析结果 + 安全写；语义归插件）------------------
+
+        @Override public String parseHjson(File file) {
+            if (file == null || !file.isFile()) return null;
+            String raw;
+            try {
+                raw = Util.readText(file);
+            } catch (Throwable t) {
+                return null;
+            }
+            if (raw == null) return null;
+            // 与宿主自己读 mod.hjson 同一条路：先 160 方言、不行再 159（见 Mods.parseMeta）
+            try {
+                return Hjson.toJsonText(raw, Hjson.ARC_160);
+            } catch (Throwable first) {
+                try {
+                    return Hjson.toJsonText(raw, Hjson.ARC_159);
+                } catch (Throwable second) {
+                    return null;
+                }
+            }
+        }
 
         @Override public Map<String, Object> gameSettings() {
             File file = Mods.settingsFileOf(getBaseContext(), slot);

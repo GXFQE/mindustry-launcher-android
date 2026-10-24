@@ -5,7 +5,7 @@
     不是独立应用（aapt2 只要求有个 manifest）。
 -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="io.mdt.plugins.conflict">
+    package="io.mdt.plugins.mods">
 
-    <application android:label="MDT Conflict Check"/>
+    <application android:label="MDT Mods Health"/>
 </manifest>

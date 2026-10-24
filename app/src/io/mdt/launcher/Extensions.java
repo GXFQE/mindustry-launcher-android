@@ -86,6 +86,16 @@ final class Extensions {
     static final String SLOT_ACTION = "action";
     /** v24：分析器 —— 插件给结论（{@link io.mdt.launcher.api.Finding}），宿主渲染。 */
     static final String SLOT_ANALYZER = "analyzer";
+    /**
+     * **v25**：筛选 —— 页面的筛选菜单里多一项，选中后按插件的
+     * {@code static boolean accept(ItemInfo, PluginApi)} 过滤。
+     */
+    static final String SLOT_FILTER = "filter";
+    /**
+     * **v25**：排序 —— 排序菜单里多一项，按插件的
+     * {@code static int compare(ItemInfo, ItemInfo, PluginApi)} 排（&lt;0 靠前）。
+     */
+    static final String SLOT_SORT = "sort";
     static final String PAGE_BLUEPRINT_DETAIL = "blueprint-detail";
 
     /** 一条"能力条目"。 */
@@ -205,7 +215,9 @@ final class Extensions {
                 || SLOT_SECTION.equals(slot) || SLOT_ACTION.equals(slot)
                 // ★ v24 加了 analyzer 却漏了这一行 ⇒ 只声明 analyzer 的插件会被插件页
                 //   说成「这一版还不支持」（第 229 轮：conflict 插件第一次撞上）。
-                || SLOT_ANALYZER.equals(slot);
+                || SLOT_ANALYZER.equals(slot)
+                // v25：插件能往页面的筛选 / 排序里加自己的一项
+                || SLOT_FILTER.equals(slot) || SLOT_SORT.equals(slot);
     }
 
     /** 这一版认得的内容页 / 功能页（只有 content 插槽的条目用得上）。 */

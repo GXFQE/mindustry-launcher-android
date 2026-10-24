@@ -929,6 +929,12 @@
     <string name="mods_dep_required_fmt">required: %1$s</string>
     <string name="mods_dep_soft_fmt">soft dependency: %1$s</string>
     <string name="mods_scan_dup_fmt">%1$s and %2$s are two copies of the same mod, so the game only uses one (whichever was placed later).</string>
+    <!-- v25: findings a plug-in anchored to one item (short label on the row, detail in the dialog) -->
+    <string name="mods_plugin_warn_fmt">⚠ %1$s</string>
+    <string name="mods_plugin_head">Plug-in findings</string>
+    <string name="mods_plugin_issue_fmt">%1$s: %2$s</string>
+    <string name="mods_plugin_issue_plain">%1$s</string>
+    <string name="mods_filter_plugin_wait">asking the plug-in…</string>
     <!--
       ══ 模组包导入 / 跨槽复制的**结果与失败原因**（P3）══════════════════════
       ★ `Mods.PackResult.report()` **就是弹窗正文**（`ModsActivity` 三处直接把它塞进 `alert`）

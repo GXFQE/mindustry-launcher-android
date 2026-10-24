@@ -1,4 +1,4 @@
-package io.mdt.plugins.conflict;
+package io.mdt.plugins.mods;
 
 import android.content.Context;
 
@@ -13,18 +13,14 @@ import java.util.Locale;
 import io.mdt.launcher.api.Finding;
 import io.mdt.launcher.api.ItemInfo;
 import io.mdt.launcher.api.PluginApi;
-import io.mdt.plugins.conflict.core.Conflicts;
+import io.mdt.plugins.mods.core.Conflicts;
 
 /**
- * 冲突检查插件（官方，第 229 轮）：把宿主原来那行「查模组冲突」搬成 <b>analyzer</b>。
+ * 模组体检插件（官方，第 229 轮；v25 起叫 mods-health）。
  *
  * <p>宿主对模组页的**每一项**调用一次 {@link #analyze}；本插件给的是**整槽**结论，
  * 所以只在「这一页的第一个模组」那一次调用里返回内容，其余返回空表 —— 否则同一份结论
- * 会在卡片里重复 N 遍。
- *
- * <p>★ 为什么"整槽"结论还要按项回调：analyzer 的契约就是逐项（{@code Finding} 没有
- * item 字段，宿主把结论画成**一张卡**）。第一项 = 宿主的 {@code pageItems()} 第一项，
- * 与本插件 {@code api.contents(mods).get(0)} 同源同序 —— 判据不是"回调顺序"。
+ * 会在卡片里重复 N 遍。挂到某一项上的结论（{@link Finding#anchor}）例外：宿主画在那一行上。
  *
  * <p>★ 判据在 {@link Conflicts}（纯 Java、可 PC 侧自检）；这里只做三件事：
  * 把 {@link ItemInfo} 映射成判据要的事实、把结果拼成资源文案、把结果**按 mods/ 签名缓存**
@@ -32,11 +28,11 @@ import io.mdt.plugins.conflict.core.Conflicts;
  *
  * <p>★ 本文件的字符串字面量一律 ASCII（与宿主同一个门禁口径）。
  */
-public final class ConflictPlugin {
+public final class ModsHealth {
 
-    /** analyzer 是 v24 才有的扩展点。 */
+    /** analyzer 是 v24 的扩展点；v25 起还要用 {@code Finding.anchor}。 */
     public static int api() {
-        return 24;
+        return 25;
     }
 
     private static final Object LOCK = new Object();
@@ -61,12 +57,53 @@ public final class ConflictPlugin {
         try {
             return analyze0(item, api);
         } catch (Throwable t) {
-            api.log("conflict: analyze failed: " + t);
+            api.log("mods-health: analyze failed: " + t);
             return Collections.emptyList();
         }
     }
 
-    private static List<Finding> analyze0(ItemInfo item, PluginApi api) {
+    /** 一次扫描的快照（筛选 / 排序按 path 查，不依赖回调顺序）。 */
+    static final class Snapshot {
+        final List<Conflicts.Mod> mods;
+        final Conflicts.Result r;
+        final String ownerPath;
+
+        Snapshot(List<Conflicts.Mod> mods, Conflicts.Result r, String ownerPath) {
+            this.mods = mods;
+            this.r = r;
+            this.ownerPath = ownerPath;
+        }
+
+        int indexOf(String path) {
+            if (path == null || mods == null) return -1;
+            for (int i = 0; i < mods.size(); i++) {
+                Conflicts.Mod m = mods.get(i);
+                if (m != null && path.equals(m.path)) return i;
+            }
+            return -1;
+        }
+
+        /** 这个模组参与了任何一条结构结论（内置 / 被提及）。 */
+        boolean isInvolved(int i) {
+            if (r == null || i < 0) return false;
+            for (Conflicts.Pair p : r.contained) {
+                if (p.a == i || p.b == i) return true;
+            }
+            for (Conflicts.Pair p : r.mentioned) {
+                if (p.a == i || p.b == i) return true;
+            }
+            return false;
+        }
+    }
+
+    /**
+     * 取当前槽的扫描快照（按 `mods/` 签名缓存；变了才重扫）。
+     *
+     * <p>v25：宿主注入的筛选 / 排序（{@code Views}）也走这一份缓存 ——
+     * 用户在菜单里点一下，宿主会在后台线程调这里，别每次都重扫 dex。
+     */
+    static Snapshot snapshot(PluginApi api) {
+        if (api == null) return null;
         Context c = api.context();
         String sig = signature(api, c);
         synchronized (LOCK) {
@@ -77,21 +114,28 @@ public final class ConflictPlugin {
                 cResult = Conflicts.scan(cMods);
                 cOwner = all.isEmpty() ? null : all.get(0).path;
                 cSig = sig;
-                api.log("conflict: " + cResult.javaMods + " java mods, "
+                api.log("mods-health: " + cResult.javaMods + " java mods, "
                         + cResult.scannedBytes + " dex bytes, "
                         + (System.currentTimeMillis() - t0) + " ms");
             }
-            if (cResult == null || cOwner == null || item.path == null
-                    || !item.path.equals(cOwner)) {
-                if (++cCalls <= 4) {
-                    api.log("conflict: skip#" + cCalls + " item=" + item.path + " owner=" + cOwner);
-                }
-                return Collections.emptyList();
-            }
-            List<Finding> fs = findings(c, api, cResult, cMods);
-            api.log("conflict: emit " + fs.size() + " findings (item=" + item.path + ")");
-            return fs;
+            return new Snapshot(cMods, cResult, cOwner);
         }
+    }
+
+    private static List<Finding> analyze0(ItemInfo item, PluginApi api) {
+        Context c = api.context();
+        Snapshot s = snapshot(api);
+        if (s == null || s.r == null || s.ownerPath == null || item.path == null
+                || !item.path.equals(s.ownerPath)) {
+            if (++cCalls <= 4) {
+                api.log("mods-health: skip#" + cCalls + " item=" + item.path
+                        + " owner=" + (s == null ? null : s.ownerPath));
+            }
+            return Collections.emptyList();
+        }
+        List<Finding> fs = findings(c, api, s.r, s.mods);
+        api.log("mods-health: emit " + fs.size() + " findings (item=" + item.path + ")");
+        return fs;
     }
 
     // ---- 事实映射 -------------------------------------------------------------
@@ -148,6 +192,50 @@ public final class ConflictPlugin {
         return list == null || list.isEmpty() ? Locale.getDefault() : list.get(0);
     }
 
+    // ---- v25：注入到「筛选与排序」里的两项（宿主按 slot=filter/sort 调这两个静态方法）----
+
+    /**
+     * 筛选：只留下参与冲突（内置 / 被提及）的模组。
+     *
+     * <p>★ 判据与卡片里的结论**同源**（同一份按签名缓存的 {@link Snapshot}）——
+     * 别另写一套，否则"筛出来的"和"卡片里说的"会漂。
+     * ⚠️ 入口类必须是**声明了 `api()` 的那个类**（宿主 {@code PluginHost.open} 要拿它判版本），
+     * 所以这两个方法放在这里，而不是单独一个 `Views` 类（第 229 轮踩过：`NoSuchMethodException: Views.api`）。
+     */
+    public static boolean accept(ItemInfo item, PluginApi api) {
+        if (item == null || api == null || item.path == null) return false;
+        try {
+            Snapshot s = snapshot(api);
+            if (s == null) return false;
+            int i = s.indexOf(item.path);
+            return i >= 0 && s.isInvolved(i);
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /** 排序：参与冲突的排前面（同一档内按标题，保证稳定、可解释）。 */
+    public static int compare(ItemInfo a, ItemInfo b, PluginApi api) {
+        int ra = risk(a, api);
+        int rb = risk(b, api);
+        if (ra != rb) return ra < rb ? -1 : 1;
+        String ta = a == null || a.title == null ? "" : a.title;
+        String tb = b == null || b.title == null ? "" : b.title;
+        return ta.compareToIgnoreCase(tb);
+    }
+
+    private static int risk(ItemInfo it, PluginApi api) {
+        try {
+            if (it == null || api == null || it.path == null) return 1;
+            Snapshot s = snapshot(api);
+            if (s == null) return 1;
+            int i = s.indexOf(it.path);
+            return i >= 0 && s.isInvolved(i) ? 0 : 1;
+        } catch (Throwable t) {
+            return 1;
+        }
+    }
+
     // ---- 结论 → 文案 -----------------------------------------------------------
 
     /**
@@ -166,10 +254,11 @@ public final class ConflictPlugin {
         Conflicts.Log log = Conflicts.readLog(new File(api.slotDir(), "last_log.txt"), mods);
 
         for (Conflicts.Pair p : r.contained) {
+            // v25：挂到**容器那一行**上（"这个包里已经带了别人"是这个包自己的事）
             out.add(new Finding(
                     c.getString(R.string.cf_contained_title_fmt, title(mods, p.a), title(mods, p.b)),
                     c.getString(R.string.cf_contained_detail), Finding.ERROR,
-                    mods.get(p.a).path, mods.get(p.b).path));
+                    mods.get(p.a).path, mods.get(p.b).path).anchor(mods.get(p.a).path));
         }
         for (Conflicts.Pair p : r.mentioned) {
             out.add(new Finding(

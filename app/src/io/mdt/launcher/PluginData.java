@@ -463,6 +463,20 @@ final class PluginData {
             put(ex, "minGameVersion", m.minGameVersion);
             put(ex, "dependencies", join(m.dependencies));
             put(ex, "softDependencies", join(m.softDependencies));
+            // v25：给插件的是**逐条**依赖（原来只有拼好的一串，插件拆不出来）
+            if (m.dependencies != null) {
+                for (int i = 0; i < m.dependencies.size(); i++) {
+                    put(ex, "dep." + i, m.dependencies.get(i));
+                }
+            }
+            if (m.softDependencies != null) {
+                for (int i = 0; i < m.softDependencies.size(); i++) {
+                    put(ex, "softdep." + i, m.softDependencies.get(i));
+                }
+            }
+            put(ex, "duplicated", String.valueOf(m.duplicated));
+            put(ex, "failed", String.valueOf(m.failed));
+            put(ex, "willFailJavaLoad", String.valueOf(m.willFailJavaLoad()));
             ex.put("java", String.valueOf(m.java));
             ex.put("hidden", String.valueOf(m.hidden));
             ex.put("hasClassesDex", String.valueOf(m.hasClassesDex));

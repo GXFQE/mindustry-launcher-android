@@ -14,9 +14,14 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 import org.json.JSONObject;
+import io.mdt.launcher.api.Finding;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 模组管理（F13 · **第一阶段：只读扫描**）。
@@ -40,7 +45,7 @@ import java.util.List;
  *  · 不改 `settings.bin`（启停要写它，而那有三条硬约束：改前备份 / 原子写 / 写后自检，
  *    见 {@link SettingsBin} 的类注释）—— **等这一阶段验收过、定案再做**。
  */
-public class ModsActivity extends BaseActivity {
+public class ModsActivity extends BaseActivity implements PluginEntries.FindingsSink {
 
     /** v24（第 226 轮）：本页的插件挂载点（content / action / section 统一由 BaseActivity 挂）。 */
     @Override protected String pluginPageId() { return Extensions.PAGE_MODS; }
@@ -99,6 +104,24 @@ public class ModsActivity extends BaseActivity {
      * （2026-10-08 用户真机反馈："为什么无关模组也被判定到了"）。
      */
     private java.util.Set<String> mBlamed = new java.util.HashSet<>();
+    /**
+     * v25（第 229 轮）：分析器**挂到某一项上**的结论（key = `ItemInfo.path`）。
+     *
+     * <p>不挂的结论仍然进页面底部那张「插件」卡（`PluginEntries.showFindings`）；
+     * 挂了的是"这一行有问题"，画在这一行的 ⚠ 区里，`detail` 进详情弹窗。分析器在**列表渲染之后**
+     * 才回来（后台线程），所以拿到时要 `rebuildList()` 一次。
+     */
+    private final Map<String, List<Finding>> mIssues = new HashMap<>();
+    /**
+     * v25：插件注入的**筛选**结果（item path 集合；null = 没选）。只在选中那一刻算一次，
+     * 之后每次 `rebuildList()` 直接用它 —— 别在打字搜索时反复调插件。
+     */
+    private java.util.Set<String> mPluginFilterPaths;
+    /** 当前选中的插件筛选（`pluginId/itemId`，界面打勾用） */
+    private String mPluginFilterKey;
+    /** v25：插件注入的**排序**结果（按顺序的 item path；null = 没选） */
+    private List<String> mPluginSortPaths;
+    private String mPluginSortKey;
     private TextView mSlotSub;
     private TextView mCopySub;
 
@@ -986,9 +1009,34 @@ public class ModsActivity extends BaseActivity {
         }
         List<Mods.Info> shown = Mods.filterAndSort(all, mQuery, mSort, mOnlyProblems, mType,
                 sts.toArray(new Mods.State[0]));
+        // v25：插件注入的筛选 / 排序 —— 结果在「筛选与排序」里选中那一刻就算好了（缓存在字段里），
+        // 这里只做纯内存的过滤与排名，别把插件调用塞进每次 rebuild（打字搜索会卡）。
+        if (mPluginFilterPaths != null) {
+            List<Mods.Info> keep = new ArrayList<>();
+            for (Mods.Info m : shown) {
+                if (mPluginFilterPaths.contains(pathOf(m))) keep.add(m);
+            }
+            shown = keep;
+        }
+        if (mPluginSortPaths != null && !mPluginSortPaths.isEmpty()) {
+            final Map<String, Integer> rank = new HashMap<>();
+            for (int i = 0; i < mPluginSortPaths.size(); i++) {
+                rank.put(mPluginSortPaths.get(i), Integer.valueOf(i));
+            }
+            final int missing = mPluginSortPaths.size();
+            Collections.sort(shown, new Comparator<Mods.Info>() {
+                @Override public int compare(Mods.Info a, Mods.Info b) {
+                    Integer ra = rank.get(pathOf(a));
+                    Integer rb = rank.get(pathOf(b));
+                    int va = ra == null ? missing : ra.intValue();
+                    int vb = rb == null ? missing : rb.intValue();
+                    return va < vb ? -1 : (va > vb ? 1 : 0);
+                }
+            });
+        }
         mShown = shown;
         boolean filtering = mOnlyProblems || mType != Mods.TYPE_ANY || !mQuery.trim().isEmpty()
-                || mSort != Mods.SORT_NAME;
+                || mSort != Mods.SORT_NAME || mPluginFilterPaths != null;
         if (mFiltered != null) {
             mFiltered.setVisibility(filtering ? View.VISIBLE : View.GONE);
             mFiltered.setText(Trans.get(ModsActivity.this, R.string.mods_filtered_fmt, shown.size(), all.size()));
@@ -1014,6 +1062,28 @@ public class ModsActivity extends BaseActivity {
     }
 
     /**
+     * v25（第 229 轮）：分析器回来了 —— 收下"挂到项上"的结论，再重画一次列表。
+     *
+     * <p>分析器在**列表渲染之后**才回来（后台线程，见 {@code PluginEntries.attachPage}），
+     * 所以要重画；只重画列表，不重扫、不动设置。
+     */
+    @Override public void onPluginFindings(List<Finding> fs) {
+        mIssues.clear();
+        if (fs != null) {
+            for (Finding f : fs) {
+                if (f == null || f.anchorPath == null) continue;
+                List<Finding> one = mIssues.get(f.anchorPath);
+                if (one == null) {
+                    one = new ArrayList<Finding>();
+                    mIssues.put(f.anchorPath, one);
+                }
+                one.add(f);
+            }
+        }
+        if (mContainer != null) rebuildList();
+    }
+
+    /**
      * 「筛选与排序」对话框。
      * ★ 不为它新建 layout：排序（单选）+ 只看有问题的（开关）+ 类型（四选一）+ 清空，
      *   用一个列表表达（当前项打勾）—— 少一个 layout 文件就少一处跟主题有关的坑（见 FLOWS F2b）。
@@ -1022,48 +1092,137 @@ public class ModsActivity extends BaseActivity {
      */
     private void pickFilter() {
         final String tick = "✓ ";
-        final String[] items = {
-                (mSort == Mods.SORT_NAME ? tick : "") + Trans.get(ModsActivity.this, R.string.mods_filter_sort_name),
-                (mSort == Mods.SORT_STATE ? tick : "") + Trans.get(ModsActivity.this, R.string.mods_filter_sort_state),
-                (mSort == Mods.SORT_SIZE ? tick : "") + Trans.get(ModsActivity.this, R.string.mods_filter_sort_size),
-                (mOnlyProblems ? tick : "") + Trans.get(ModsActivity.this, R.string.mods_filter_only),
-                (mType == Mods.TYPE_ANY ? tick : "") + Trans.get(ModsActivity.this, R.string.mods_filter_type_all),
-                (mType == Mods.TYPE_JAVA ? tick : "") + Trans.get(ModsActivity.this, R.string.mods_filter_type_java),
-                (mType == Mods.TYPE_JS ? tick : "") + Trans.get(ModsActivity.this, R.string.mods_filter_type_js),
-                (mType == Mods.TYPE_DATA ? tick : "") + Trans.get(ModsActivity.this, R.string.mods_filter_type_data),
-                Trans.get(ModsActivity.this, R.string.mods_filter_reset)};
+        final List<String> labels = new ArrayList<>();
+        final List<Runnable> acts = new ArrayList<>();
+        addChoice(labels, acts, (mSort == Mods.SORT_NAME ? tick : "")
+                + Trans.get(ModsActivity.this, R.string.mods_filter_sort_name), new Runnable() {
+            @Override public void run() { mSort = Mods.SORT_NAME; rebuildList(); }
+        });
+        addChoice(labels, acts, (mSort == Mods.SORT_STATE ? tick : "")
+                + Trans.get(ModsActivity.this, R.string.mods_filter_sort_state), new Runnable() {
+            @Override public void run() { mSort = Mods.SORT_STATE; rebuildList(); }
+        });
+        addChoice(labels, acts, (mSort == Mods.SORT_SIZE ? tick : "")
+                + Trans.get(ModsActivity.this, R.string.mods_filter_sort_size), new Runnable() {
+            @Override public void run() { mSort = Mods.SORT_SIZE; rebuildList(); }
+        });
+        addChoice(labels, acts, (mOnlyProblems ? tick : "")
+                + Trans.get(ModsActivity.this, R.string.mods_filter_only), new Runnable() {
+            @Override public void run() { mOnlyProblems = !mOnlyProblems; rebuildList(); }
+        });
+        addTypeChoice(labels, acts, Mods.TYPE_ANY, R.string.mods_filter_type_all);
+        addTypeChoice(labels, acts, Mods.TYPE_JAVA, R.string.mods_filter_type_java);
+        addTypeChoice(labels, acts, Mods.TYPE_JS, R.string.mods_filter_type_js);
+        addTypeChoice(labels, acts, Mods.TYPE_DATA, R.string.mods_filter_type_data);
+
+        // v25：插件注入的排序 / 筛选（**选中才算**：算的时候要加载插件，走后台线程）
+        for (final PluginViews.View v : PluginViews.of(this, Extensions.PAGE_MODS, Extensions.SLOT_SORT)) {
+            addChoice(labels, acts, (v.key().equals(mPluginSortKey) ? tick : "") + v.title(),
+                    new Runnable() {
+                        @Override public void run() { pickPluginSort(v); }
+                    });
+        }
+        for (final PluginViews.View v : PluginViews.of(this, Extensions.PAGE_MODS, Extensions.SLOT_FILTER)) {
+            addChoice(labels, acts, (v.key().equals(mPluginFilterKey) ? tick : "") + v.title(),
+                    new Runnable() {
+                        @Override public void run() { pickPluginFilter(v); }
+                    });
+        }
+
+        addChoice(labels, acts, Trans.get(ModsActivity.this, R.string.mods_filter_reset),
+                new Runnable() {
+                    @Override public void run() {
+                        mSort = Mods.SORT_NAME;
+                        mOnlyProblems = false;
+                        mType = Mods.TYPE_ANY;
+                        mQuery = "";
+                        mPluginFilterPaths = null;
+                        mPluginFilterKey = null;
+                        mPluginSortPaths = null;
+                        mPluginSortKey = null;
+                        if (mSearch != null) mSearch.setText("");
+                        rebuildList();
+                    }
+                });
+
         new AlertDialog.Builder(this)
                 .setTitle(R.string.mods_filter_title)
-                .setItems(items, new DialogInterface.OnClickListener() {
+                .setItems(labels.toArray(new String[0]), new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int which) {
-                        if (which == 0) {
-                            mSort = Mods.SORT_NAME;
-                        } else if (which == 1) {
-                            mSort = Mods.SORT_STATE;
-                        } else if (which == 2) {
-                            mSort = Mods.SORT_SIZE;
-                        } else if (which == 3) {
-                            mOnlyProblems = !mOnlyProblems;
-                        } else if (which == 4) {
-                            mType = Mods.TYPE_ANY;
-                        } else if (which == 5) {
-                            mType = Mods.TYPE_JAVA;
-                        } else if (which == 6) {
-                            mType = Mods.TYPE_JS;
-                        } else if (which == 7) {
-                            mType = Mods.TYPE_DATA;
-                        } else {
-                            mSort = Mods.SORT_NAME;
-                            mOnlyProblems = false;
-                            mType = Mods.TYPE_ANY;
-                            mQuery = "";
-                            if (mSearch != null) mSearch.setText("");
-                        }
-                        rebuildList();
+                        Runnable r = acts.get(which);
+                        if (r != null) r.run();
                     }
                 })
                 .setNegativeButton(R.string.close, null)
                 .show();
+    }
+
+    /** v25：给「筛选与排序」列表加一行（label + 点下去做什么）。 */
+    private static void addChoice(List<String> labels, List<Runnable> acts, String label, Runnable act) {
+        labels.add(label);
+        acts.add(act);
+    }
+
+    private void addTypeChoice(List<String> labels, List<Runnable> acts,
+                               final int type, int textRes) {
+        String tick = "✓ ";
+        addChoice(labels, acts, (mType == type ? tick : "")
+                + Trans.get(ModsActivity.this, textRes), new Runnable() {
+            @Override public void run() { mType = type; rebuildList(); }
+        });
+    }
+
+    /** v25：选中一个插件排序 ⇒ 后台算一遍顺序，缓存下来再重画。 */
+    private void pickPluginSort(final PluginViews.View v) {
+        final ProgressDialog pd = ProgressDialog.show(this, null,
+                Trans.get(ModsActivity.this, R.string.mods_filter_plugin_wait), true, false);
+        new Thread(new Runnable() {
+            @Override public void run() {
+                final List<String> paths = new ArrayList<>();
+                try {
+                    List<io.mdt.launcher.api.ItemInfo> items = PluginData.pageItems(
+                            ModsActivity.this, Extensions.PAGE_MODS, mSlot, (File) null);
+                    for (io.mdt.launcher.api.ItemInfo it : PluginViews.sorted(ModsActivity.this, v, items, mSlot)) {
+                        if (it.path != null) paths.add(it.path);
+                    }
+                } catch (Throwable ignored) {
+                }
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        pd.dismiss();
+                        mPluginSortPaths = paths.isEmpty() ? null : paths;
+                        mPluginSortKey = paths.isEmpty() ? null : v.key();
+                        rebuildList();
+                    }
+                });
+            }
+        }, "plugin-sort").start();
+    }
+
+    /** v25：选中一个插件筛选 ⇒ 后台问一遍"这一项算不算"，缓存通过的 path 集合。 */
+    private void pickPluginFilter(final PluginViews.View v) {
+        final ProgressDialog pd = ProgressDialog.show(this, null,
+                Trans.get(ModsActivity.this, R.string.mods_filter_plugin_wait), true, false);
+        new Thread(new Runnable() {
+            @Override public void run() {
+                java.util.Set<String> ok = null;
+                try {
+                    List<io.mdt.launcher.api.ItemInfo> items = PluginData.pageItems(
+                            ModsActivity.this, Extensions.PAGE_MODS, mSlot, (File) null);
+                    ok = PluginViews.accepted(ModsActivity.this, v, items, mSlot);
+                } catch (Throwable ignored) {
+                }
+                final java.util.Set<String> fok = ok;
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        pd.dismiss();
+                        mPluginFilterPaths = fok;
+                        mPluginFilterKey = fok == null ? null : v.key();
+                        rebuildList();
+                    }
+                });
+            }
+        }, "plugin-filter").start();
     }
 
     private void bindRow(View v, final Mods.Info m, boolean broken) {
@@ -1156,6 +1315,15 @@ public class ModsActivity extends BaseActivity {
                 warns.add(Trans.get(ModsActivity.this, R.string.mods_warn_state_fmt, ModsText.stateLabel(this, st)));
             }
         }
+        // v25：分析器挂在这一行上的结论（短标签；`detail` 在详情弹窗里看）
+        List<Finding> issues = mIssues.get(pathOf(m));
+        if (issues != null) {
+            for (Finding f : issues) {
+                if (f.title != null && !f.title.isEmpty()) {
+                    warns.add(Trans.get(ModsActivity.this, R.string.mods_plugin_warn_fmt, f.title));
+                }
+            }
+        }
         if (warns.isEmpty()) {
             warn.setVisibility(View.GONE);
         } else {
@@ -1168,8 +1336,15 @@ public class ModsActivity extends BaseActivity {
         });
     }
 
-    private static String joinLines(List<String> xs) {
-        StringBuilder sb = new StringBuilder();
+    /**
+     * v25：模组条目的"身份" = 绝对路径（与 {@code ItemInfo.path} **逐字相同**）。
+     * 插件挂结论（`Finding.anchor`）与注入的筛选用的是同一个键。
+     */
+    private static String pathOf(Mods.Info m) {
+        return m == null || m.file == null ? "" : m.file.getAbsolutePath();
+    }
+
+    private static String joinLines(List<String> xs) {        StringBuilder sb = new StringBuilder();
         for (String x : xs) {
             if (sb.length() > 0) sb.append('\n');
             sb.append(x);
@@ -1311,6 +1486,17 @@ public class ModsActivity extends BaseActivity {
         }
         sb.append('\n').append(fail == 0 ? Trans.get(ModsActivity.this, R.string.mods_detail_allok)
                 : Trans.get(ModsActivity.this, R.string.mods_detail_somefail_fmt, fail));
+        // v25：插件挂在这一项上的结论（行上只给短标签，这里给 detail）
+        List<Finding> issues = mIssues.get(pathOf(m));
+        if (issues != null && !issues.isEmpty()) {
+            sb.append("\n\n").append(Trans.get(ModsActivity.this, R.string.mods_plugin_head));
+            for (Finding f : issues) {
+                String d = f.detail == null ? "" : f.detail.trim();
+                sb.append('\n').append(d.isEmpty()
+                        ? Trans.get(ModsActivity.this, R.string.mods_plugin_issue_plain, f.title)
+                        : Trans.get(ModsActivity.this, R.string.mods_plugin_issue_fmt, f.title, d));
+            }
+        }
         return sb.toString();
     }
 

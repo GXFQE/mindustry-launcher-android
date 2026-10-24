@@ -57,7 +57,7 @@ public interface PluginApi {
      * <p>为什么要有这个常量：注释里的「当前 = N」运行期读不到，一个写 17、一个写 20 也没人发现；
      * 常量 + 断言才拦得住。</p>
      */
-    int DOC_VERSION = 24;
+    int DOC_VERSION = 25;
 
     // ══ 环境 ═══════════════════════════════════════════════════════════════
 
@@ -403,6 +403,19 @@ public interface PluginApi {
     void export(String name, String mime, InputStream content, After after);
 
     // ══ 写与整理 ═══════════════════════════════════════════════════════════
+
+    /**
+     * **v25**：用**宿主的** HJSON 解析器把一个文件转成标准 JSON 文本（插件不用自己实现解析）。
+     *
+     * <p>宿主先按 ARC 160 的方言解析，失败再按 159 试一次（与宿主自己读 {@code mod.hjson}
+     * 完全同一条路）；都失败 ⇒ {@code null}。读不出来（不存在 / 权限）也返回 {@code null}。
+     *
+     * <p>返回值是**标准 JSON 文本**，插件用 {@code org.json.JSONObject} / {@code JSONArray} 自己取字段 ——
+     * 怎么用（判据、阈值）归插件。
+     *
+     * <p>⚠️ 会读文件 ⇒ **别在主线程对大文件调**（模组包的 meta 只有几 KB，没问题）。
+     */
+    String parseHjson(File file);
 
     /**
      * **v21**：当前槽 {@code settings.bin} 的解析结果（只读快照，**保序**）。

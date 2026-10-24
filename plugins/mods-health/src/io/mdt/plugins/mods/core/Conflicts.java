@@ -1,4 +1,4 @@
-package io.mdt.plugins.conflict.core;
+package io.mdt.plugins.mods.core;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedReader;

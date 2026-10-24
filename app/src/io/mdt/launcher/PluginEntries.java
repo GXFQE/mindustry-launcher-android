@@ -214,6 +214,16 @@ final class PluginEntries {
     }
 
     /**
+     * v25：页面想自己画「挂到某一项上」的结论时实现它（模组页就是）。
+     *
+     * <p>不实现也不丢：`anchorPath` 的结论会退化成卡片里的一条（`showFindings` 只是画不出"画在哪一行"）。
+     * 分析器回来时在**主线程**回调，页面可以直接重画列表。
+     */
+    interface FindingsSink {
+        void onPluginFindings(java.util.List<io.mdt.launcher.api.Finding> fs);
+    }
+
+    /**
      * 通用页面的「插件」卡：**三种插入一次挂齐**（v24 第 226 轮统一）。
      *
      * <ul>
@@ -283,12 +293,24 @@ final class PluginEntries {
             final io.mdt.launcher.api.ItemInfo fitem = item;
             new Thread(new Runnable() {
                 @Override public void run() {
-                    final java.util.List<io.mdt.launcher.api.Finding> fs =
+                    final java.util.List<io.mdt.launcher.api.Finding> all =
                             PluginAnalysis.analyzePage(a, fp, fslot, fsel, fitem);
                     a.runOnUiThread(new Runnable() {
                         @Override public void run() {
                             if (!(sec.getTag() instanceof Integer) || (Integer) sec.getTag() != token) return;
-                            showFindings(a, sec, body, fs);
+                            // v25：挂到项上的归页面自己画（行 / 详情）；不挂的进卡片
+                            java.util.List<io.mdt.launcher.api.Finding> card =
+                                    new java.util.ArrayList<io.mdt.launcher.api.Finding>();
+                            java.util.List<io.mdt.launcher.api.Finding> anchored =
+                                    new java.util.ArrayList<io.mdt.launcher.api.Finding>();
+                            for (io.mdt.launcher.api.Finding f : all) {
+                                if (f == null) continue;
+                                if (f.anchorPath == null) card.add(f); else anchored.add(f);
+                            }
+                            if (!anchored.isEmpty() && a instanceof FindingsSink) {
+                                ((FindingsSink) a).onPluginFindings(anchored);
+                            }
+                            showFindings(a, sec, body, card);
                         }
                     });
                 }
