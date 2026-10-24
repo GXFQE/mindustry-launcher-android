@@ -13849,6 +13849,26 @@ public final class SelfTest {
             ok(stat, L, rbad2.ok == 0 && rbad2.failed.size() == 1,
                     "★ 反向之二：名字是 .zip、内容不是 zip ⇒ 交给单份导入，**计入失败**并点名"
                             + "（failed=" + rbad2.failed.size() + "）");
+            // ★ 第 233 轮（P5）：批量导入记下**落点**（体检按落点认"这一份"；跳过/失败的不进）
+            ok(stat, L, rmod.imported.size() == 2 && rbad.imported.isEmpty(),
+                    "★v233：`Report.imported` 只记真正落位的（2 份 / 跳过的那次 0 份）");
+            // ★ 第 233 轮（P5）：导入体检的**渲染** —— 文案本体来自插件，宿主只加"空态"那句
+            try {
+                java.util.List<io.mdt.launcher.api.Finding> noIssue =
+                        new java.util.ArrayList<io.mdt.launcher.api.Finding>();
+                String okLine = ModsText.importHealth(ctx, noIssue);
+                ok(stat, L, okLine != null && okLine.contains("插件"),
+                        "★v233：体检没有结论 ⇒ 给「插件没发现问题」那句（插件没装时整段不显示，靠 has 分）");
+                java.util.List<io.mdt.launcher.api.Finding> oneIssue =
+                        new java.util.ArrayList<io.mdt.launcher.api.Finding>();
+                oneIssue.add(new io.mdt.launcher.api.Finding("缺必需依赖「X」", "游戏会跳过它。",
+                        io.mdt.launcher.api.Finding.ERROR));
+                String line = ModsText.importHealth(ctx, oneIssue);
+                ok(stat, L, line.contains("缺必需依赖「X」") && line.contains("游戏会跳过它。"),
+                        "★v233：体检正文直接用插件的 title/detail（宿主不另写一套判断）");
+            } catch (Throwable t) {
+                ok(stat, L, false, "importHealth failed: " + t);
+            }
 
             // ★ 2026-10-10：整包里是"一堆模组**文件夹**"（用户 2026-10-10 反馈的点：
             //   这种包以前只会报「这个包不是游戏能加载的模组」）

@@ -713,6 +713,8 @@ final class BatchIo {
         String reason;
         /** 可选的一句备注（如"不是标准存档"）—— 导入**成功**时也能带 */
         String warn;
+        /** 成功时的落点（只有模组导入填它：批量体检按落点认"这一份"） */
+        File dest;
 
         static Outcome good() {
             Outcome o = new Outcome();
@@ -764,6 +766,8 @@ final class BatchIo {
         final List<String> skipped = new ArrayList<>();
         final List<String> failed = new ArrayList<>();
         final List<String> notes = new ArrayList<>();
+        /** 第 233 轮（P5）：**真正落位**的文件（体检按它认"这一份"；跳过/失败的不在里面） */
+        final List<File> imported = new ArrayList<>();
 
         int total() {
             return ok + replaced + skipped.size() + failed.size();
@@ -814,7 +818,7 @@ final class BatchIo {
     static void runImport(final Activity a, final File dir, final List<Doc> docs,
                           final String[] exts, final String[] rootMarkers,
                           final Namer namer, final Importer imp, final String slotLabel,
-                          final Runnable onDone) {
+                          final String slot, final int kind, final Runnable onDone) {
         if (docs == null || docs.isEmpty()) {
             toast(a, Trans.get(a, R.string.batch_import_nothing));
             return;
@@ -856,7 +860,7 @@ final class BatchIo {
                             return;
                         }
                         if (conflicts == 0) {
-                            phaseB(a, todo, imp, rep, work, true, onDone);
+                            phaseB(a, todo, imp, rep, work, true, slot, kind, onDone);
                             return;
                         }
                         // ★ 有同名 ⇒ **只问一次**（这一批里撞了多少份、一共多少份都说清楚）
@@ -867,19 +871,19 @@ final class BatchIo {
                                 .setPositiveButton(R.string.batch_overwrite_ok,
                                         new DialogInterface.OnClickListener() {
                                             @Override public void onClick(DialogInterface d, int w) {
-                                                phaseB(a, todo, imp, rep, work, true, onDone);
+                                                phaseB(a, todo, imp, rep, work, true, slot, kind, onDone);
                                             }
                                         })
                                 .setNegativeButton(R.string.cancel,
                                         new DialogInterface.OnClickListener() {
                                             @Override public void onClick(DialogInterface d, int w) {
-                                                phaseB(a, todo, imp, rep, work, false, onDone);
+                                                phaseB(a, todo, imp, rep, work, false, slot, kind, onDone);
                                             }
                                         });
                         // ⚠️ 返回键 = 与"取消"同一条路（**不能**只是关窗：不导入的话要收尾 + 报数）
                         b.setOnCancelListener(new DialogInterface.OnCancelListener() {
                             @Override public void onCancel(DialogInterface d) {
-                                phaseB(a, todo, imp, rep, work, false, onDone);
+                                phaseB(a, todo, imp, rep, work, false, slot, kind, onDone);
                             }
                         });
                         b.show();
@@ -892,7 +896,7 @@ final class BatchIo {
     /** 第二阶段：逐份导（`replace` = 用户对"同名"那个问题的回答） */
     private static void phaseB(final Activity a, final List<Entry> todo, final Importer imp,
                                final Report rep, final File work, final boolean replace,
-                               final Runnable onDone) {
+                               final String slot, final int kind, final Runnable onDone) {
         // ★ 2026-10-11：改成**确定进度**（原来是转圈的）—— 份数这一刻就已知（`todo.size()`），
         //   而"模组几十 MB 时要盯几秒"正是用户抱怨的那种"看着像卡死"。
         final ProgressDialog pd = new ProgressDialog(a);
@@ -917,6 +921,8 @@ final class BatchIo {
                         });
                     }
                 });
+                // 第 233 轮（P5）：模组批量导入 ⇒ 一份一份补上插件体检（**只警告、不拦**）
+                if (kind == KIND_MODS) appendModHealth(a, slot, rep);
                 cleanup(work);
                 a.runOnUiThread(new Runnable() {
                     @Override public void run() {
@@ -960,6 +966,7 @@ final class BatchIo {
                 if (o.ok) {
                     if (e.exists) rep.replaced++;
                     else rep.ok++;
+                    if (o.dest != null) rep.imported.add(o.dest);
                     if (o.warn != null) rep.notes.add(line(ctx, e.name, o.warn));
                 } else if (o.skip) {
                     rep.skipped.add(line(ctx, e.name, o.reason));
@@ -1096,7 +1103,11 @@ final class BatchIo {
                                            boolean overwrite) {
                 Mods.PackResult pr = Mods.importPackage(c, dir, name, in, overwrite,
                         Mods.trashDirOf(c));
-                if (pr.ok) return Outcome.good();
+                if (pr.ok) {
+                    Outcome o = Outcome.good();
+                    o.dest = pr.dest;
+                    return o;
+                }
                 return Outcome.fail(ModsText.packReason(c, pr));
             }
         });
@@ -1105,7 +1116,7 @@ final class BatchIo {
     /** 界面那条路：多选 + 一次性同名确认 + 报告（四个页面各一句） */
     static void runImport(Activity a, String slot, List<Doc> docs, int kind, Runnable onDone) {
         Kind k = kindOf(a, slot, kind);
-        runImport(a, k.dir, docs, k.exts, k.rootMarkers, k.namer, k.imp, slot, onDone);
+        runImport(a, k.dir, docs, k.exts, k.rootMarkers, k.namer, k.imp, slot, slot, kind, onDone);
     }
 
     /**
@@ -1128,10 +1139,38 @@ final class BatchIo {
             // ⚠️ 同名那几份的"跳过"由 {@link #applyAll} 记（`replace == false` 时它自己会跳）
             //   —— 这里**不许**再记一遍，否则报告里同一份会被数两次（自检当场抓过）
             applyAll(ctx, plan.entries, k.imp, rep, replace, null);
+            // ★ 与界面那条路**共用**这一份体检（第 233 轮 P5）；dev 口 / 自检因此也能验到同样的报告
+            if (kind == KIND_MODS) appendModHealth(ctx, slot, rep);
         } finally {
             cleanup(work);
         }
         return rep;
+    }
+
+    /**
+     * 第 233 轮（P5）：批量导入模组后，把**插件**的逐项结论补进报告（只警告、不拦）。
+     *
+     * <p>★ 与单份那条路**共用** {@link PluginAnalysis#anchoredByPath}（同一份判据，别另写一遍）；
+     * 插件没装 ⇒ 一条都不加（"没查"不等于"没问题"）。扫描只在整批结束后做**一次**。
+     */
+    private static void appendModHealth(Context ctx, String slot, Report rep) {
+        if (rep == null || rep.imported.isEmpty()) return;
+        if (!PluginAnalysis.has(ctx, Extensions.PAGE_MODS)) return;
+        java.util.Map<String, java.util.List<io.mdt.launcher.api.Finding>> byPath;
+        try {
+            byPath = PluginAnalysis.anchoredByPath(ctx, slot);
+        } catch (Throwable t) {
+            Log.w(TAG, "batch health failed", t);
+            return;
+        }
+        for (File f : rep.imported) {
+            java.util.List<io.mdt.launcher.api.Finding> fs = byPath.get(f.getAbsolutePath());
+            if (fs == null) continue;
+            for (io.mdt.launcher.api.Finding one : fs) {
+                if (one == null) continue;
+                rep.notes.add(Trans.get(ctx, R.string.batch_import_health_fmt, f.getName(), one.title));
+            }
+        }
     }
 
     /** dev 口用：把一批**应用读得到的**路径变成待导入条目（`file://` 在 ContentResolver 上照样能开） */

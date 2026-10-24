@@ -95,6 +95,37 @@ final class PluginAnalysis {
         return out;
     }
 
+    /**
+     * 第 233 轮（P5，导入体检）：`path → 挂在这一项上的结论`。
+     *
+     * <p>★ 复用**整页**那一遍（插件的 analyzer 按"页面第一项"给整槽结论，见 {@link #analyzePage}），
+     * 只挑 {@code anchorPath} 精确等于该值的 —— **槽级 / 卡片结论不要**：导入弹窗要回答的是
+     * "这个包怎么了"，不是"这个槽怎么了"。
+     *
+     * <p>表里**每一项都有一条**（没结论的就是空表）—— 这样"扫到了、没问题"与"没扫到这一项"
+     * 能分清（导入体检靠它决定是"✅ 没问题"还是干脆不显示）。没有分析器声明时返回空表；
+     * 调用方用 {@link #has} 区分"没装插件"与"没发现问题"（没装插件 ⇒ 整段不显示，
+     * 绝不说"没问题"）。
+     */
+    static java.util.Map<String, java.util.List<Finding>> anchoredByPath(Context ctx, String slot) {
+        java.util.Map<String, java.util.List<Finding>> out =
+                new java.util.LinkedHashMap<String, java.util.List<Finding>>();
+        for (ItemInfo it : PluginData.pageItems(ctx, Extensions.PAGE_MODS, slot, null)) {
+            if (it == null || it.path == null || out.containsKey(it.path)) continue;
+            out.put(it.path, new ArrayList<Finding>());
+        }
+        for (Finding f : analyzePage(ctx, Extensions.PAGE_MODS, slot, null, null)) {
+            if (f == null || f.anchorPath == null) continue;
+            java.util.List<Finding> one = out.get(f.anchorPath);
+            if (one == null) {
+                one = new ArrayList<Finding>();
+                out.put(f.anchorPath, one);
+            }
+            one.add(f);
+        }
+        return out;
+    }
+
     private static void runOne(Context ctx, File apk, Extensions.Item it, String page,
                                String slot, File selected, ItemInfo item,
                                List<ItemInfo> items, List<Finding> out,

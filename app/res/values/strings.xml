@@ -1851,6 +1851,9 @@
     <string name="mods_import_compat_ok_fmt">Target game %1$s is at or above its requirement %2$s - it will load</string>
     <string name="mods_import_compat_bad_fmt">⚠ Game version %1$s is below its requirement %2$s — it will not load even if installed</string>
     <string name="mods_import_nogame">No version points at this slot yet. Assign one first, or it will not load even if installed</string>
+    <string name="mods_import_health_head">Health check (plug-in):</string>
+    <string name="mods_import_health_ok">✅ The plug-in found nothing that would stop it from loading (dependencies / structure / version / blacklist).</string>
+    <string name="batch_import_health_fmt">Health · %1$s · %2$s</string>
     <string name="mods_copy_pick_title">Copy to which slot?</string>
     <string name="mods_copy_no_target">There is only this one slot, so there is nowhere to copy to</string>
     <string name="mods_copy_confirm_title_fmt">Copy into \"%1$s\"?</string>

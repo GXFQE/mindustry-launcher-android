@@ -295,4 +295,28 @@ final class ModsText {
                 return r.error == null ? "" : r.error;
         }
     }
+
+    /**
+     * 第 233 轮（P5，导入体检）：导入结果弹窗里「体检」那一段的正文。
+     *
+     * <p>★ **文案本体是插件给的**（{@code Finding.title/detail}）—— 宿主只加"没发现问题"这句空态，
+     * 不另写一套判断（否则又回到"导入说一套、列表说另一套"）。
+     *
+     * <p>插件没装时调用方**整段不显示**（用 {@code PluginAnalysis.has} 判断）；
+     * 这里收 {@code null} / 空表 ⇒ "没发现问题"，不是"没查"。
+     */
+    static String importHealth(Context c, java.util.List<io.mdt.launcher.api.Finding> fs) {
+        StringBuilder sb = new StringBuilder();
+        if (fs != null) {
+            for (io.mdt.launcher.api.Finding f : fs) {
+                if (f == null) continue;
+                String d = f.detail == null ? "" : f.detail.trim();
+                sb.append(d.isEmpty()
+                        ? Trans.get(c, R.string.mods_plugin_issue_plain, f.title)
+                        : Trans.get(c, R.string.mods_plugin_issue_fmt, f.title, d)).append('\n');
+            }
+        }
+        String body = sb.toString().trim();
+        return body.isEmpty() ? Trans.get(c, R.string.mods_import_health_ok) : body;
+    }
 }

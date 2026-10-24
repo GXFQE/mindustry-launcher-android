@@ -1798,6 +1798,9 @@
     <string name="mods_import_compat_ok_fmt">目标游戏 %1$s 不低于它要求的 %2$s —— 能加载</string>
     <string name="mods_import_compat_bad_fmt">⚠ 游戏版本 %1$s 低于它要求的 %2$s —— 装了也不会加载</string>
     <string name="mods_import_nogame">还没有版本指向这个槽。先给某个版本分配它，否则装了也不会加载</string>
+    <string name="mods_import_health_head">体检（插件）：</string>
+    <string name="mods_import_health_ok">✅ 插件没发现会让它加载失败的问题（依赖 / 结构 / 版本 / 黑名单）。</string>
+    <string name="batch_import_health_fmt">体检 · %1$s · %2$s</string>
     <string name="mods_copy_pick_title">复制到哪个槽？</string>
     <string name="mods_copy_no_target">只有这一个槽，没有可复制的目标</string>
     <string name="mods_copy_confirm_title_fmt">复制到「%1$s」？</string>

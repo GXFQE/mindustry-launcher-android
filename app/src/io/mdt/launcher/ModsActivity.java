@@ -561,6 +561,8 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
                 Mods.PackResult pr = null;
                 String err = null;
                 File destDir = null;
+                // 第 233 轮（P5）：导入成功后算一次插件体检（后台线程；插件没装 ⇒ null）
+                java.util.Map<String, java.util.List<Finding>> health = null;
                 try {
                     destDir = new File(Data.dirOf(ModsActivity.this, slot), "mods");
                     java.io.InputStream in = getContentResolver().openInputStream(uri);
@@ -579,7 +581,11 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
                     android.util.Log.w("MDTLauncher", "mods op failed", t);
                     err = Util.ioReason(ModsActivity.this, t);
                 }
+                if (pr != null && pr.ok && pr.meta != null) {
+                    health = healthForImport(ModsActivity.this, slot);
+                }
                 final Mods.PackResult fpr = pr;
+                final java.util.Map<String, java.util.List<Finding>> fhealth = health;
                 final String fe = err;
                 final File fdir = destDir;
                 runOnUiThread(new Runnable() {
@@ -614,7 +620,7 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
                             alert(Trans.get(ModsActivity.this, R.string.mods_import_failed), fpr.report(ModsActivity.this));
                             return;
                         }
-                        showImportResult(fpr);
+                        showImportResult(fpr, fhealth);
                         rescan();
                     }
                 });
@@ -622,8 +628,27 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
         }, "mod-import").start();
     }
 
+    /**
+     * 第 233 轮（P5）：导入成功后的**插件体检**（在导入线程里算，别占 UI 线程）。
+     *
+     * <p>返回 {@code null} = 插件没装 / 算失败 ⇒ 弹窗**整段不显示**（不是"没问题"——
+     * "没查"和"查了没问题"必须能分辨）。只收**挂在这一项上**的结论：
+     * 槽级结论（整槽跳过 / 孤儿开关）与"这个包怎么了"无关。
+     */
+    private static java.util.Map<String, java.util.List<Finding>> healthForImport(
+            android.content.Context ctx, String slot) {
+        try {
+            if (!PluginAnalysis.has(ctx, Extensions.PAGE_MODS)) return null;
+            return PluginAnalysis.anchoredByPath(ctx, slot);
+        } catch (Throwable t) {
+            android.util.Log.w("MDTLauncher", "import health failed", t);
+            return null;
+        }
+    }
+
     /** 导入结果 + **版本兼容性提示**（F13 的头号卖点，在"刚装进去"这一刻就该说） */
-    private void showImportResult(Mods.PackResult pr) {
+    private void showImportResult(Mods.PackResult pr,
+                                  java.util.Map<String, java.util.List<Finding>> health) {
         StringBuilder sb = new StringBuilder(pr.report(this));
         Mods.Target t = Mods.targetsFor(this, mSlot);
         if (pr.meta != null) {
@@ -631,12 +656,25 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
             sb.append('\n');
             if (!t.any()) {
                 sb.append(Trans.get(ModsActivity.this, R.string.mods_import_nogame)).append('\n');
-            } else if (Mods.isAtLeast(t.build, t.revision, pr.meta.minGameVersion)) {
-                sb.append(Trans.get(ModsActivity.this, R.string.mods_import_compat_ok_fmt,
-                        t.label, pr.meta.minGameVersion)).append('\n');
-            } else {
-                sb.append(Trans.get(ModsActivity.this, R.string.mods_import_compat_bad_fmt,
-                        t.label, pr.meta.minGameVersion)).append('\n');
+            } else if (health == null) {
+                // ★ 第 233 轮（P5）：插件在时**版本那条由插件说**（它给「要 160 以上的游戏版本」），
+                //   别再让同一个结论在同一个弹窗里出现两种说法；插件不在才退回宿主这句。
+                if (Mods.isAtLeast(t.build, t.revision, pr.meta.minGameVersion)) {
+                    sb.append(Trans.get(ModsActivity.this, R.string.mods_import_compat_ok_fmt,
+                            t.label, pr.meta.minGameVersion)).append('\n');
+                } else {
+                    sb.append(Trans.get(ModsActivity.this, R.string.mods_import_compat_bad_fmt,
+                            t.label, pr.meta.minGameVersion)).append('\n');
+                }
+            }
+        }
+        if (health != null) {
+            String path = pr.dest == null ? null : pr.dest.getAbsolutePath();
+            // ★ 只有"扫描里真有这一项"才说体检 —— 扫不到（路径对不上）时说"没问题"等于骗人
+            if (path != null && health.containsKey(path)) {
+                sb.append('\n').append(Trans.get(ModsActivity.this,
+                        R.string.mods_import_health_head)).append('\n');
+                sb.append(ModsText.importHealth(this, health.get(path))).append('\n');
             }
         }
         new AlertDialog.Builder(this)
