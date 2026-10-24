@@ -31,9 +31,9 @@ import io.mdt.plugins.mods.core.Gates;
  */
 public final class ModsHealth {
 
-    /** analyzer 是 v24 的扩展点；v25 起还要用 {@code Finding.anchor}。 */
+    /** v24 的 analyzer + v25 的 `Finding.anchor` / 筛选排序 + v26 的 `state()` + v27 的门与摘要卡。 */
     public static int api() {
-        return 25;
+        return 27;
     }
 
     private static final Object LOCK = new Object();

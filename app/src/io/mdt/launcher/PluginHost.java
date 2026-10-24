@@ -62,11 +62,15 @@ public final class PluginHost {
      * <p>**v22（2026-10-23 第 221 轮）= 加法**：`submit()` / `Task` —— 跨页面存活的后台任务，
      * 完成/失败/取消都通知用户（下载、复杂分析的底座）。
      *
+     * <p>**v23~v27（2026-10-23~24）= 加法**：探针（v23）、分析器（v24）、
+     * 结论挂行 + 筛选/排序注入 + `parseHjson`（v25）、逐项判定 `state()`（v26）、
+     * 详情页的门 `gates()` + 槽级结论进摘要卡 `Finding.summary()`（v27）—— 逐版见 `docs/PLUGIN-API.md`。
+     *
      * <p>v1~v19 的逐版记录留在 `docs/PLUGIN-API.md` 与 git 历史里；**从 v20 起**：
      * 加法变更只抬 {@link #API}（{@link #API_MIN} 不动，老插件照样装得进），
      * 破坏性变更才抬 {@link #API_MIN}。
      */
-    public static final int API = 26;
+    public static final int API = 27;
     /**
      * 还认的**最老**契约版本。
      *

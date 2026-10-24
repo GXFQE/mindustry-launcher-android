@@ -48,18 +48,14 @@
 - **槽级事实用槽级措辞**：整槽跳过是槽级事实（"上次启动崩到了整槽跳过"），
   `-failed` 才是这个模组自己的记录（"游戏上次把它标成了「加载失败」"）。
 
-⚠️ `api()` 仍报 25（v26 `state()` / v27 `gates()`、`Finding.summary()` 都是加法，老宿主会静默少掉它们）——
-下一轮把它抬到 27 并同步 `PluginHost.API`（见 `next/47` §十八 的待办）。
-
 > 🔴 第 229 轮删掉了原来那层「共同全局钩子」（`mindustry/logic/LCanvas` ⇒ 都想接管逻辑编辑器）：
 > 它靠一张**写死的类名表**，而"引用一个类"≠"接管它"。用户 2026-10-24：「建议把这种硬编码还是
 > 半成品的东西删掉」⇒ 整层撤掉。**宁可少说**。
 
 ## 接口
 
-- `api() = 25`（v24 的 analyzer + v25 的 `Finding.anchor` 与 filter/sort 插槽）；另外实现了 v26 的
-  可选 `state()`（**逐项判定**：宿主拿它画行徽标 / 筛选 / 详情，词表见 `docs/PLUGIN-API.md`）
-  与 v27 的 `gates()` / `Finding.summary()`。
+- `api() = 27`（v24 analyzer + v25 `Finding.anchor` / filter-sort 注入 + v26 `state()` +
+  v27 `gates()` / `Finding.summary()`；区间 20..27）。
 - 声明：analyzer 一条 + `slot: filter` / `slot: sort` 各一条（见 `assets/plugin.json`）。
 - 入口类实现 `analyze(ItemInfo, PluginApi)` / `accept(...)` / `compare(...)` / `state(...)` / `gates(...)`，
   **全部挂在同一个类上**（宿主 `PluginHost.open` 只认声明了 `api()` 的那个类 ——

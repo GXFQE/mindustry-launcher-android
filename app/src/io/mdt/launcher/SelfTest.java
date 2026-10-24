@@ -3686,6 +3686,24 @@ public final class SelfTest {
         } catch (Throwable t) {
             ok(stat, L, false, "v24 Finding missing: " + t);
         }
+        // ★ v27：详情页的门 + 槽级结论进摘要卡（API 抬到 27 的判据 —— 光看常量不算）
+        ok(stat, L, PluginHost.API >= 27, "host plugin api >= 27 (gates / summary)");
+        try {
+            io.mdt.launcher.api.Gate bad = new io.mdt.launcher.api.Gate("L", false, "why");
+            io.mdt.launcher.api.Gate good = new io.mdt.launcher.api.Gate("L", true, "");
+            io.mdt.launcher.api.Finding sum = new io.mdt.launcher.api.Finding(
+                    "t", "d", io.mdt.launcher.api.Finding.INFO).summary();
+            io.mdt.launcher.api.Finding onRow = new io.mdt.launcher.api.Finding(
+                    "t", "d", io.mdt.launcher.api.Finding.INFO).anchor("/x").summary();
+            ok(stat, L, "L".equals(bad.label) && !bad.pass && "why".equals(bad.note) && good.pass,
+                    "★v27：Gate{label, pass, note} 三个字段原样可读");
+            ok(stat, L, sum.surface == io.mdt.launcher.api.Finding.SURFACE_SUMMARY
+                            && onRow.surface == io.mdt.launcher.api.Finding.SURFACE_SUMMARY
+                            && "/x".equals(onRow.anchorPath),
+                    "★v27：Finding.summary() 进摘要卡，且不抹掉 anchor（挂行优先）");
+        } catch (Throwable t) {
+            ok(stat, L, false, "v27 Gate / summary missing: " + t);
+        }
         List<io.mdt.launcher.api.Finding> dummy =
                 new java.util.ArrayList<io.mdt.launcher.api.Finding>();
         List<Extensions.Item> an = Extensions.parse(
