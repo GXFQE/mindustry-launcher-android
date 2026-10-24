@@ -250,6 +250,19 @@
             </LinearLayout>
         </LinearLayout>
 
+        <!-- v24（第 225 轮）：插件段落（`slot: section`, `page: mods`）。
+             没条目时整块 GONE（ModsActivity 里按 rows 有没有孩子决定）。
+             外面包一层给左右 14dp —— include 的根布局自己没有边距。 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="14dp"
+            android:layout_marginEnd="14dp"
+            android:orientation="vertical">
+
+            <include layout="@layout/plugin_section" />
+        </LinearLayout>
+
         <!-- 搜索框（第②项：排序/筛选/搜索）—— 纯前端过滤，**不改任何文件** -->
         <EditText
             android:id="@+id/mod_search"

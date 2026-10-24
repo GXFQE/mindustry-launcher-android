@@ -220,6 +220,17 @@ public class ModsActivity extends BaseActivity {
         // ★ 第 159 轮（扩展点 v2）：插件声明的**模组页动作**插在「删除」上面
         PluginEntries.attach(this, (android.view.ViewGroup) root.findViewById(R.id.mods_actions),
                 Extensions.PAGE_MODS, mSlot, R.id.row_mod_del);
+        // v24（第 225 轮）：动作行（slot: action）也接到模组页（与地图页同款）
+        PluginEntries.attachAction(this, (android.view.ViewGroup) root.findViewById(R.id.mods_actions),
+                Extensions.PAGE_MODS, mSlot, R.id.row_mod_del);
+        // v24（第 225 轮）：段落（slot: section）内嵌到模组页；没条目时整块 GONE
+        android.view.ViewGroup psec = (android.view.ViewGroup) root.findViewById(R.id.plugin_section);
+        android.view.ViewGroup psecRows = (android.view.ViewGroup) root.findViewById(R.id.plugin_section_rows);
+        PluginEntries.attachSection(this, psecRows, Extensions.PAGE_MODS, mSlot, null, null);
+        if (psec != null) {
+            psec.setVisibility(psecRows != null && psecRows.getChildCount() > 0
+                    ? android.view.View.VISIBLE : android.view.View.GONE);
+        }
 
         mContainer = (LinearLayout) root.findViewById(R.id.mod_container);
         mEmpty = (TextView) root.findViewById(R.id.mod_empty);

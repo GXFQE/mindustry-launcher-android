@@ -54,6 +54,14 @@
 
 `page` 取值：`main` / `slots` / `slot` / `saves` / `maps` / `mods` / `blueprints` / `map-detail` / `blueprint-detail` / `settings` / `logs` / `trash`。
 
+⚠️ 不是每个 slot 都在所有 page 上挂了钩子（声明了但宿主没接 = 不显示，不报错）：
+
+| slot | 当前已接的 page |
+|---|---|
+| `content` | 全部（四内容页的动作区、主页面等） |
+| `section` | `map-detail`、`mods`（v225 接上） |
+| `action` | `maps`、`mods`（v225 接上） |
+
 ## 3. 入口类约定
 
 ```java
