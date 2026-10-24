@@ -39,4 +39,9 @@
     <color name="chip_fg">#FFAFB8FF</color>
     <color name="chip_bg_warn">#FF3A2426</color>
     <color name="chip_fg_warn">#FFFFB4AB</color>
+
+    <!-- v24（第 228 轮）：分析器结论的严重度（深色态要亮一档） -->
+    <color name="plugin_sev_info">#FF9AA0A6</color>
+    <color name="plugin_sev_warn">#FFFFCC80</color>
+    <color name="plugin_sev_error">#FFFF8A80</color>
 </resources>

@@ -287,9 +287,12 @@ public final class PlugPage {
         List<io.mdt.launcher.api.Finding> out =
                 new java.util.ArrayList<io.mdt.launcher.api.Finding>();
         if (item != null) {
-            out.add(new io.mdt.launcher.api.Finding("fixture: " + item.title,
-                    "analyzed by plugtest-content", io.mdt.launcher.api.Finding.WARN,
-                    item.path == null ? "" : item.path));
+            // 夹具：每项 4 条、三种严重度轮着来 —— 既验颜色/标签，也验「显示全部」（主页面 3 项 = 12 条）
+            for (int i = 0; i < 4; i++) {
+                out.add(new io.mdt.launcher.api.Finding("fixture " + i + ": " + item.title,
+                        "analyzed by plugtest-content", i % 3,
+                        item.path == null ? "" : item.path));
+            }
         }
         return out;
     }

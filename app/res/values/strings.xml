@@ -58,6 +58,10 @@
     <string name="probe_note_where_in">, in-process</string>
     <string name="probe_note_where_iso">, isolated</string>
     <string name="plugin_analysis_title">Plugin analysis</string>
+    <string name="plugin_sev_info">Info</string>
+    <string name="plugin_sev_warn">Warning</string>
+    <string name="plugin_sev_error">Problem</string>
+    <string name="plugin_analysis_more_fmt">Show all (%1$d more)</string>
     <string name="work_export">Exporting</string>
     <string name="work_import">Importing</string>
     <string name="work_backup">Backing up</string>

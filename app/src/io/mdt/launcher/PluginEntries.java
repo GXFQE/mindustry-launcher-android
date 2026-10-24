@@ -297,22 +297,79 @@ final class PluginEntries {
     }
 
     /** 把插件给的结论画成「插件」卡里的一段文字（最多 6 条）。 */
+    /** 把插件给的结论画成「插件」卡里的一段（按严重度上色；超过 6 条给「显示全部」）。 */
     private static void showFindings(Activity a, View section, ViewGroup body,
                                      java.util.List<io.mdt.launcher.api.Finding> fs) {
         if (a == null || section == null || body == null || fs == null || fs.isEmpty()) return;
-        StringBuilder sb = new StringBuilder(Trans.get(a, R.string.plugin_analysis_title));
-        int n = 0;
-        for (io.mdt.launcher.api.Finding f : fs) {
-            if (n++ >= 6) break;
-            sb.append('\n').append(f.title);
-            if (!f.detail.isEmpty()) sb.append(": ").append(f.detail);
+        final LinearLayout col = new LinearLayout(a);
+        col.setOrientation(LinearLayout.VERTICAL);
+        int pad = dp(a, 10);
+        col.setPadding(pad, pad, pad, pad);
+
+        TextView head = new TextView(a);
+        head.setText(Trans.get(a, R.string.plugin_analysis_title));
+        head.setTextColor(a.getResources().getColor(R.color.fg_muted));
+        head.setTextSize(12f);
+        col.addView(head);
+
+        final int LIMIT = 6;
+        final int shown = Math.min(fs.size(), LIMIT);
+        for (int i = 0; i < shown; i++) col.addView(findingRow(a, fs.get(i)));
+
+        if (fs.size() > shown) {
+            TextView more = new TextView(a);
+            more.setText(Trans.get(a, R.string.plugin_analysis_more_fmt, fs.size() - shown));
+            more.setTextColor(a.getResources().getColor(R.color.accent));
+            more.setTextSize(13f);
+            more.setPadding(0, dp(a, 8), 0, 0);
+            more.setClickable(true);
+            more.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) {
+                    col.removeView(v);
+                    for (int i = shown; i < fs.size(); i++) col.addView(findingRow(a, fs.get(i)));
+                }
+            });
+            col.addView(more);
         }
-        TextView tv = new TextView(a);
-        tv.setText(sb.toString());
-        int pad = (int) (10 * a.getResources().getDisplayMetrics().density);
-        tv.setPadding(pad, pad, pad, pad);
-        body.addView(tv);
+        body.addView(col);
         section.setVisibility(View.VISIBLE);
+    }
+
+    /** 一条结论：`[严重度] 标题` + 灰色明细。 */
+    private static View findingRow(Activity a, io.mdt.launcher.api.Finding f) {
+        LinearLayout row = new LinearLayout(a);
+        row.setOrientation(LinearLayout.VERTICAL);
+        row.setPadding(0, dp(a, 8), 0, 0);
+
+        TextView title = new TextView(a);
+        title.setText(severityLabel(a, f.severity) + " · " + f.title);
+        title.setTextColor(severityColor(a, f.severity));
+        title.setTextSize(14f);
+        row.addView(title);
+
+        if (!f.detail.isEmpty()) {
+            TextView d = new TextView(a);
+            d.setText(f.detail);
+            d.setTextColor(a.getResources().getColor(R.color.fg_muted));
+            d.setTextSize(12f);
+            d.setPadding(0, dp(a, 2), 0, 0);
+            row.addView(d);
+        }
+        return row;
+    }
+
+    private static String severityLabel(Activity a, int sev) {
+        int r = sev == io.mdt.launcher.api.Finding.ERROR ? R.string.plugin_sev_error
+                : sev == io.mdt.launcher.api.Finding.WARN ? R.string.plugin_sev_warn
+                : R.string.plugin_sev_info;
+        return Trans.get(a, r);
+    }
+
+    private static int severityColor(Activity a, int sev) {
+        int r = sev == io.mdt.launcher.api.Finding.ERROR ? R.color.plugin_sev_error
+                : sev == io.mdt.launcher.api.Finding.WARN ? R.color.plugin_sev_warn
+                : R.color.plugin_sev_info;
+        return a.getResources().getColor(r);
     }
 
     /** 插到目标行**上面那条分割线**之前；找不到目标行就追加到末尾。 */
