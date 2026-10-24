@@ -785,9 +785,17 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
         mScan = Mods.scan(this, mSlot);
         mResolved = Mods.resolveDependencies(mScan.mods);
         mTarget = Mods.targetsFor(this, mSlot);
+        // 🔴 v26（第 229 轮）：插件给的判定 / 结论是**上一次分析**的快照 ——
+        //   启停之后不清掉，行上就还是旧状态（用户报的就是这个：
+        //   「点全部启用后必须退出页面重进才有变化」）。
+        //   先清掉 ⇒ 立刻回落到宿主自己的判定（它是刚扫出来的），
+        //   再重挂一次插件卡（重跑分析，回来时再刷一次）。
+        mVerdicts.clear();
+        mIssues.clear();
         rebuildList();
         fillHeader();
         refreshCrashVerdict();
+        PluginEntries.attachPage(this, Extensions.PAGE_MODS, mSlot, null);
     }
 
     /**
