@@ -221,6 +221,8 @@ public final class SelfTest {
             versionLabel(ctx, L, stat);
             conflictLabel(ctx, L, stat);
             conflictGroup(ctx, L, stat);
+            // ★ 2026-10-24：一个版本绑多个槽（多存档 / 不复制 APK）—— 绑定表 + 展开 + 行身份
+            versionBindings(ctx, L, stat);
             upstreamCompat(ctx, L, stat);
             slotLineSpacing(ctx, L, stat);
             logExport(ctx, L, stat);
@@ -2383,6 +2385,168 @@ public final class SelfTest {
         L.add("    实拼 ⇒ " + c);
         ok(stat, L, !c.contains("等 "),
                 "★ 副本不虚报：146 那行不写「等 2 个版本」（那是条目数，不是版本数）");
+        L.add("");
+    }
+
+    /**
+     * ★ 2026-10-24：**一个版本绑多个槽**（每绑一个槽 = 列表里多一行启动项）。
+     *
+     * 需求原文：「同一个版本有可能有玩家需要两个不同存档，每次启动换槽很麻烦，
+     * 但是复制一份又占地方」。⇒ 不复制 APK、不复制存档，只多绑一个槽。
+     *
+     * <p>本段钉住四件事（每条都配反方向，否则可能是恒真装饰）：
+     *   ① Config 的绑定表：加 / 重加（去重）/ 换 / 移除 / 持久化（reload 后还在）；
+     *   ② 槽改名与删除的**两种语义**分开：主分配"回落"、附加绑定"那一行消失"；
+     *   ③ 展开：主行在前、附加行在后、字段照抄（仍是同一个 APK）、与主槽重复的不展开，
+     *      以及一条元断言 —— 没有绑定时**不许**多出行；
+     *   ④ 行身份 `(版本, 槽)` 唯一（同槽冲突表就靠它，否则两行互相覆盖）、
+     *      摘要卡的计数按"版本数"而不是"行数"。
+     *
+     * ⚠️ 全程用**假 key**（`selftest:` 前缀，与包名 / `import:` 都不可能撞），收尾清干净；
+     *   不碰用户真实的版本绑定。
+     */
+    private static final String BIND_KEY = "selftest:bind";
+    private static final String BIND_A = "m3-bind-a";
+    private static final String BIND_B = "m3-bind-b";
+    private static final String BIND_C = "m3-bind-c";
+
+    private static void versionBindings(Context ctx, List<String> L, int[] stat) {
+        L.add("── ㉟ 一个版本绑多个槽（多存档，不复制 APK） ──");
+        Config cfg = Config.get();
+        try {
+            cfg.clearBindings(BIND_KEY);
+            cfg.clearBindings("import:selftest.apk");
+
+            // ① 加 / 去重
+            ok(stat, L, cfg.extraSlotsOf(BIND_KEY).isEmpty(), "起始：没有附加绑定");
+            ok(stat, L, cfg.addExtraSlot(BIND_KEY, BIND_A), "加第一个附加槽 " + BIND_A);
+            ok(stat, L, !cfg.addExtraSlot(BIND_KEY, BIND_A), "★ 重复加同一个槽 ⇒ 拒绝（不产生两行一样的）");
+            ok(stat, L, cfg.addExtraSlot(BIND_KEY, BIND_B), "加第二个附加槽 " + BIND_B);
+            List<String> xs = cfg.extraSlotsOf(BIND_KEY);
+            ok(stat, L, xs.size() == 2 && BIND_A.equals(xs.get(0)) && BIND_B.equals(xs.get(1)),
+                    "顺序 = 写入顺序（列表行顺序不许自己变）：" + xs);
+            ok(stat, L, cfg.hasSlotBinding(BIND_KEY, BIND_A) && !cfg.hasSlotBinding(BIND_KEY, BIND_C),
+                    "hasSlotBinding 只认真的绑着的槽");
+            ok(stat, L, cfg.slotOf(BIND_KEY).isEmpty(),
+                    "★ 附加绑定**不动主分配**（主槽仍然空着 = 回落默认槽）");
+            // ★ 主槽还没显式分配时，"默认槽"也**算已绑**：否则"再加一个槽"会加出一行看不见的启动项
+            //   （展开时按"与主槽重复"跳过），而 Toast 还说"已加一行" —— 静默空操作。
+            final String defSlot = cfg.defaultSlot().isEmpty() ? Data.SLOT_DEFAULT : cfg.defaultSlot();
+            ok(stat, L, !cfg.addExtraSlot(BIND_KEY, defSlot),
+                    "★ 未分配主槽时，默认槽（" + defSlot + "）不能加成附加绑定（避免加出一行看不见的）");
+
+            // ② 换一行（行级）：主槽 / 附加槽两条路各一次
+            ok(stat, L, cfg.replaceSlotBinding(BIND_KEY, BIND_A, BIND_C) == Config.BIND_OK
+                            && cfg.extraSlotsOf(BIND_KEY).contains(BIND_C)
+                            && !cfg.extraSlotsOf(BIND_KEY).contains(BIND_A),
+                    "换附加绑定 " + BIND_A + " → " + BIND_C + "（原地替换，顺序不动）");
+            ok(stat, L, cfg.replaceSlotBinding(BIND_KEY, BIND_C, BIND_B) == Config.BIND_TARGET_TAKEN,
+                    "★ 换到一个**已经绑着**的槽 ⇒ 拒绝（否则两行一模一样）");
+            ok(stat, L, cfg.replaceSlotBinding(BIND_KEY, "nope", BIND_A) == Config.BIND_NOT_FOUND,
+                    "换一个不存在的绑定 ⇒ 明确报「找不到」（不是静默成功）");
+            cfg.setSlotOf(BIND_KEY, "m3-bind-p");
+            ok(stat, L, cfg.replaceSlotBinding(BIND_KEY, "m3-bind-p", "m3-bind-q") == Config.BIND_OK
+                            && "m3-bind-q".equals(cfg.slotOf(BIND_KEY)),
+                    "换**主槽**走同一句话（主行与附加行行为一致）");
+
+            // ③ 持久化：这些绑定必须真的在 config.json 里（reload 之后还在）
+            cfg.reload(ctx);
+            List<String> after = cfg.extraSlotsOf(BIND_KEY);
+            ok(stat, L, after.size() == 2 && after.contains(BIND_B) && after.contains(BIND_C)
+                            && "m3-bind-q".equals(cfg.slotOf(BIND_KEY)),
+                    "★ 落盘往返：reload 之后附加绑定与主槽都还在（" + after + "）");
+
+            // ④ 槽改名 / 删除的两种语义
+            Config.Retarget r1 = cfg.retargetSlots(BIND_C, BIND_C + "x");
+            ok(stat, L, r1.extras == 1 && r1.primary == 0
+                            && cfg.extraSlotsOf(BIND_KEY).contains(BIND_C + "x"),
+                    "★ 槽改名 ⇒ 附加绑定跟着改（extras=1，主分配不动）");
+            Config.Retarget r2 = cfg.retargetSlots("m3-bind-q", "m3-bind-q2");
+            ok(stat, L, r2.primary == 1 && "m3-bind-q2".equals(cfg.slotOf(BIND_KEY)),
+                    "★ 槽改名 ⇒ 主分配跟着改（primary=1）");
+            Config.Retarget r3 = cfg.retargetSlots(BIND_C + "x", "");
+            ok(stat, L, r3.extras == 1 && !cfg.extraSlotsOf(BIND_KEY).contains(BIND_C + "x")
+                            && cfg.extraSlotsOf(BIND_KEY).size() == 1,
+                    "★ 槽被删 ⇒ **那一行消失**（不是回落成第二行一样的）");
+            Config.Retarget r4 = cfg.retargetSlots("m3-bind-q2", "");
+            ok(stat, L, r4.primary == 1 && cfg.slotOf(BIND_KEY).isEmpty(),
+                    "★ 主槽被删 ⇒ 主分配清除（那一行还在，回落默认槽）");
+
+            // ⑤ 移除 / 删版本的清理
+            ok(stat, L, cfg.removeExtraSlot(BIND_KEY, BIND_B) && cfg.extraSlotsOf(BIND_KEY).isEmpty(),
+                    "移除最后一个附加绑定 ⇒ 列表清空（config 里不留空数组）");
+            ok(stat, L, !cfg.removeExtraSlot(BIND_KEY, BIND_B), "再移除一次 ⇒ false（不假装成功）");
+            cfg.addExtraSlot("import:selftest.apk", BIND_A);
+            cfg.removeImport("selftest.apk");
+            ok(stat, L, cfg.extraSlotsOf("import:selftest.apk").isEmpty(),
+                    "★ 删掉导入版本 ⇒ 它的附加绑定也清掉（不留指向不存在版本的行）");
+
+            // ⑥ 展开：主行 + 附加行（自检用假查表，不依赖设备上装了什么）
+            Versions.Entry base = mkEntry("Mindustry", "8-official-159.7", null);
+            base.pkg = "selftest.pkg";
+            base.apkPath = "/nonexistent/selftest.apk";
+            base.apkSize = 1234;
+            base.md5 = "deadbeef";
+            base.customName = "我给的名字";
+            cfg.setSlotOf(base.key(), BIND_A);
+            final java.util.Map<String, List<String>> fake = new java.util.HashMap<>();
+            List<String> ex = new ArrayList<>();
+            ex.add(BIND_A);   // ★ 与主槽重复 ⇒ 必须跳过
+            ex.add(BIND_B);
+            fake.put(base.key(), ex);
+            Versions.ExtraLookup lookup = new Versions.ExtraLookup() {
+                @Override public List<String> extraSlotsOf(String key) {
+                    List<String> v = fake.get(key);
+                    return v == null ? new ArrayList<String>() : v;
+                }
+            };
+            List<Versions.Entry> bases = new ArrayList<>();
+            bases.add(base);
+            List<Versions.Entry> rows = Versions.expandBindings(bases, lookup);
+            ok(stat, L, rows.size() == 2, "展开 1 个版本 + 2 个绑定（其中一个与主槽重复）⇒ 2 行，实得 " + rows.size());
+            ok(stat, L, rows.get(0) == base && BIND_A.equals(Versions.slotFor(rows.get(0))),
+                    "主行在**最前**、用主槽");
+            Versions.Entry extra = rows.size() > 1 ? rows.get(1) : null;
+            ok(stat, L, extra != null && BIND_B.equals(extra.boundSlot) && BIND_B.equals(Versions.slotFor(extra)),
+                    "附加行带自己的槽");
+            ok(stat, L, extra != null && base.label.equals(extra.label)
+                            && base.versionName.equals(extra.versionName)
+                            && base.apkPath.equals(extra.apkPath)
+                            && base.apkSize == extra.apkSize
+                            && base.md5.equals(extra.md5)
+                            && base.customName.equals(extra.customName),
+                    "★ 附加行**照抄**主行的包信息 ⇒ 同一份 APK（零额外空间，也不复制存档）");
+            ok(stat, L, extra != null && !Versions.rowKey(base).equals(Versions.rowKey(extra)),
+                    "★ 行身份 (版本,槽) 两行不同（同槽冲突表就靠它）");
+            ok(stat, L, Versions.explicitSlot(extra) && Versions.explicitSlot(base),
+                    "两行都算「显式指定」（冲突拦截口径）");
+            ok(stat, L, Versions.distinctVersions(rows) == 1,
+                    "★ 计数口径：两行 = **1 个版本**（摘要卡不能说成 2 个版本）");
+
+            // 元断言：没有绑定 / 没有查表 ⇒ **不许**多出行
+            ok(stat, L, Versions.expandBindings(bases, null).size() == 1,
+                    "★元断言：查表为 null ⇒ 只 1 行（证明上面 2 行不是恒真）");
+            fake.remove(base.key());
+            ok(stat, L, Versions.expandBindings(bases, lookup).size() == 1,
+                    "★元断言：这个版本没有附加绑定 ⇒ 只 1 行");
+            Versions.Entry other = mkEntry("MindustryX", "8-official-2026.09.X37", "160.1");
+            other.pkg = "selftest.pkg2";
+            List<Versions.Entry> two = new ArrayList<>();
+            two.add(base);
+            two.add(other);
+            ok(stat, L, Versions.distinctVersions(two) == 2,
+                    "★元断言：两个不同版本 ⇒ 2（证明 distinctVersions 不是恒 1）");
+        } catch (Throwable t) {
+            ok(stat, L, false, "版本多槽用例异常：" + t);
+        } finally {
+            try {
+                Config.get().clearBindings(BIND_KEY);
+                Config.get().clearBindings("import:selftest.apk");
+                Config.get().clearBindings("selftest.pkg");
+                Config.get().clearBindings("selftest.pkg2");
+            } catch (Throwable ignored) {
+            }
+        }
         L.add("");
     }
 

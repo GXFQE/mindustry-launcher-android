@@ -155,6 +155,23 @@
     <string name="slot_set_fmt">Set to slot \"%1$s\"</string>
     <string name="slot_label">Save slot</string>
     <!--
+      2026-10-24: one game version may be bound to several slots (each binding = one extra row).
+      The user's words: "the same version may need two different saves; switching slots on every
+      launch is a pain, but making a copy takes space" ⇒ an extra row SHARES the same game files
+      (no copy, no extra space) and only points at another slot. Saves are not copied.
+      ⚠️ Say "add a row / remove this row" — never "clone": clone implies the saves were copied too.
+    -->
+    <string name="binding_add_btn">Another slot…</string>
+    <string name="binding_remove_btn">Remove…</string>
+    <string name="binding_add_title_fmt">Add a slot for \"%1$s\"</string>
+    <string name="binding_new_slot">New slot…</string>
+    <!-- ★ One line only: a second line (after \n) is cut to "…" by the system on real devices. -->
+    <string name="binding_added_fmt">Added a row using slot \"%1$s\"</string>
+    <string name="binding_removed">Removed this row (saves untouched)</string>
+    <string name="binding_taken_fmt">This version already uses slot \"%1$s\"</string>
+    <string name="binding_failed">Could not change this row (the config may have been changed elsewhere).</string>
+    <string name="slot_deleted_extras_fmt">(%1$d rows that only used this slot were removed)</string>
+    <!--
       ★ 2026-10-06 (round 115, batch 4): plain-language versions of **system** failures,
       used by `Util.ioReason`. Only known errnos are translated; our own resource
       messages pass through untouched, and the raw text still goes to the log/report.

@@ -523,8 +523,10 @@ final class SlotOps {
                         String clean = Data.sanitizeSlot(nv);
                         if (clean != null) {
                             Backup.renameSlotBackups(a, s.name, clean);
-                            int n = Config.get().retargetSlots(s.name, clean);
-                            if (n > 0) toast(a, Trans.get(a, R.string.renamed_slots_fmt, n));
+                            // ★ 返回值是 Retarget（主分配 / 附加绑定分开计数）—— 附加绑定改名后，
+                            //   那个版本的另一行仍然指着新名字（一个版本可以绑多个槽，见 Config.K_VEXTRA）
+                            Config.Retarget r = Config.get().retargetSlots(s.name, clean);
+                            if (r.total() > 0) toast(a, Trans.get(a, R.string.renamed_slots_fmt, r.total()));
                         }
                         h.onSlotChanged();
                     }
@@ -574,10 +576,16 @@ final class SlotOps {
                             alert(a, Trans.get(a, R.string.delete_failed),
                                     TrashText.reason(a, r));
                         } else {
-                            int n = Config.get().retargetSlots(s.name, "");
+                            // ★ 两种受影响的行**分开说**：主分配是"回落到默认槽"（那一行还在），
+                            //   附加绑定是"那一行直接没了"（它存在的理由就是这个槽）。
+                            //   混成一句话（"N 个版本回落到默认槽"）会让用户去找一行根本没了的启动项。
+                            Config.Retarget rt = Config.get().retargetSlots(s.name, "");
+                            String tail = (rt.primary > 0
+                                    ? Trans.get(a, R.string.slot_deleted_fallback_fmt, rt.primary) : "")
+                                    + (rt.extras > 0
+                                    ? Trans.get(a, R.string.slot_deleted_extras_fmt, rt.extras) : "");
                             Toast.makeText(a,
-                                    Trans.get(a, R.string.slot_deleted_fmt, s.name)
-                                            + (n > 0 ? Trans.get(a, R.string.slot_deleted_fallback_fmt, n) : ""),
+                                    Trans.get(a, R.string.slot_deleted_fmt, s.name) + tail,
                                     Toast.LENGTH_LONG).show();
                         }
                         h.onSlotChanged();

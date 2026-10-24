@@ -138,6 +138,30 @@
     <string name="slot_set_fmt">已设为槽「%1$s」</string>
     <string name="slot_label">存档槽</string>
     <!--
+      2026-10-24：一个版本绑多个槽（每绑一个 = 列表里多一行启动项）。
+      需求原文：「同一个版本有可能有玩家需要两个不同存档，每次启动换槽很麻烦，
+      但是复制一份又占地方」⇒ 新行与主行**共用同一份游戏本体**，只换槽，存档不复制。
+      ⚠️ 界面上一律说"加一行 / 移除这一行"，别说"克隆" —— 克隆会让人以为存档也复制了。
+    -->
+    <string name="binding_add_btn">再加一个槽…</string>
+    <string name="binding_remove_btn">移除这一项</string>
+    <string name="binding_add_title_fmt">给「%1$s」再加一个槽</string>
+    <!--
+      ⚠️ 为什么这句说明放在"加完之后"的 Toast 里、而不是列表弹窗的正文里：
+        本机（HONOR / Android 16）`setMessage` + `setItems` 并存时**列表整块不渲染**
+        （真机 dump 里连 ListView 都没有，只剩正文与取消按钮）—— 见 MainActivity.promptAddBinding。
+    -->
+    <string name="binding_new_slot">新建一个槽…</string>
+    <!--
+      ★ Toast **只能一行**（真机实测：带 \n 的第二行会被系统截成「…」，等于没说）。
+        ⇒ 这里只说"加了哪一行"，"共用游戏本体、不占空间"那件事交给文档/README 说。
+    -->
+    <string name="binding_added_fmt">已加一行：用槽「%1$s」</string>
+    <string name="binding_removed">已移除这一行（存档没动）</string>
+    <string name="binding_taken_fmt">这个版本已经在用槽「%1$s」了</string>
+    <string name="binding_failed">这一行没能改动（配置可能被别处改过）。</string>
+    <string name="slot_deleted_extras_fmt">（%1$d 个只绑了这个槽的启动项已移除）</string>
+    <!--
       ★ 2026-10-06（第 115 轮第四批）：**系统异常**翻成白话的那几句（`Util.ioReason` 用）。
       ⚠️ 只翻**认识的 errno**；我们自己抛的资源文案**原样透传**（见 Util.ioReason 的注释）。
       原文不丢：调用方照旧写日志 / 落盘报告。

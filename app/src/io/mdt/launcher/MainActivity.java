@@ -531,8 +531,11 @@ public class MainActivity extends BaseActivity {
         rebuildList();
         if (mStatusSummary != null) {
             File dataRoot = Data.dataRoot(this);
+            // ★ 计数口径 = **游戏版本数**（`distinctVersions`），不是列表行数：
+            //   一个版本可以绑多个槽、每绑一个槽多一行（同一个 APK 不复制）⇒
+            //   按行数会报成"2 个版本"，而用户只看得到一个版本。判据收在 Versions。
             mStatusSummary.setText(Trans.get(MainActivity.this, R.string.main_summary_fmt,
-                    mEntries.size(), Data.currentSlot(this)));
+                    Versions.distinctVersions(mEntries), Data.currentSlot(this)));
             mStatusDetail.setText(Trans.get(MainActivity.this, R.string.main_detail_fmt,
                     dataRoot == null ? "?" : dataRoot.getAbsolutePath(),
                     Data.hubDir(this).getAbsolutePath()));
@@ -674,7 +677,7 @@ public class MainActivity extends BaseActivity {
         // ★ 徽标跟着 peer 走（= 只要有共用就提示），**不跟 block** ——
         //   "隐式共用"不拦启动，但仍要让用户看见"这两个会互相覆盖"；
         //   否则提示会随拦截口径一起消失，而它恰恰是唯一能提前告知的地方。
-        Share share = mConflict.get(e.key());
+        Share share = mConflict.get(Versions.rowKey(e));
         boolean clash = share != null;
         badge.setBackgroundResource(clash ? R.drawable.badge_slot_warn : R.drawable.badge_slot);
         badge.setTextColor(getResources().getColor(
@@ -837,17 +840,19 @@ public class MainActivity extends BaseActivity {
             // 单条目组不可能有对手（`conflictPeers` 必然返回空），直接跳过省一次分组遍历。
             // ⚠️ 它**不再**承担"省一次 IO"的职责了 —— 基座版本已在方法开头为**全部**条目读过。
             if (l.size() < 2) continue;
-            // 组内是否有人**显式**指定过槽（未分配不算）
+            // 组内是否有人**显式**指定过槽（未分配不算；附加绑定永远算 —— 见 Versions.explicitSlot）
             boolean anyExplicit = false;
             for (Versions.Entry e : l) {
-                if (!Config.get().slotOf(e.key()).isEmpty()) { anyExplicit = true; break; }
+                if (Versions.explicitSlot(e)) { anyExplicit = true; break; }
             }
             for (Versions.Entry e : l) {
                 // ★ 版本号不同的才算对手；同版本号的副本一律不计
                 //   ⇒ 不进 mConflict ⇒ 徽标不染色、不提示、启动也不拦（三处同一份判据）
                 List<Versions.Entry> peers = Versions.conflictPeers(e, l);
                 if (peers.isEmpty()) continue;
-                mConflict.put(e.key(), new Share(
+                // ★ 键必须是**行身份**（版本 + 槽），不是版本 key：同一个版本绑两个槽时，
+                //   两行可能各自跟不同的版本抢各自的槽 —— 按 key 存会互相覆盖（静默张冠李戴）。
+                mConflict.put(Versions.rowKey(e), new Share(
                         Versions.conflictPeerDesc(MainActivity.this, peers.get(0).displayName(this),
                                 peers.size() + 1),
                         anyExplicit));
@@ -861,17 +866,33 @@ public class MainActivity extends BaseActivity {
      *   **不是** `Entry.key()`（导入版是 "import:" + 文件名）⇒ 两种键都要试。
      * ★ 存的是键、显示的是名 —— 两者解耦，所以改显示文案（如剥掉 `8-official-` 前缀）
      *   不会影响这里的匹配，反之亦然。
+     *
+     * ★★ 一个版本可以绑多个槽（列表里同一个 key 有多行）⇒ **必须再按"上次真正用的槽"选回那一行**：
+     *   `Data.currentSlot()` 就是上次启动写下的槽（唯一写入点是 `Data.prepareSlot`）。
+     *   只按 key 取第一个的话，上次从"存档B"那行启动、点「继续上次」会落回主行的槽 ——
+     *   界面看着一模一样，进去却是另一套存档（这类错**不会报任何错**）。
      */
     private Versions.Entry lastEntry() {
         String lv = Config.get().lastVersion();
         if (lv == null || lv.isEmpty() || mEntries == null) return null;
+        Versions.Entry e = pickBinding(lv, true);
+        if (e != null) return e;
+        return pickBinding(lv, false);
+    }
+
+    /**
+     * @param byKey true = 按 `Entry.key()` 匹配；false = 按导入文件名匹配（`last_version` 的两种历史写法）
+     */
+    private Versions.Entry pickBinding(String lv, boolean byKey) {
+        Versions.Entry first = null;
+        final String cur = Data.currentSlot(this);
         for (Versions.Entry e : mEntries) {
-            if (lv.equals(e.key())) return e;
+            boolean hit = byKey ? lv.equals(e.key()) : (e.imported && lv.equals(e.importFile));
+            if (!hit) continue;
+            if (cur != null && cur.equals(Versions.slotFor(e))) return e;
+            if (first == null) first = e;
         }
-        for (Versions.Entry e : mEntries) {
-            if (e.imported && lv.equals(e.importFile)) return e;
-        }
-        return null;
+        return first;
     }
 
     /**
@@ -1016,7 +1037,7 @@ public class MainActivity extends BaseActivity {
         //   ⚠️ FLOWS 原步骤里还有一条「当前槽 `saves/` 里有解析失败的 `.msav` → 提示但不阻塞」，
         //      **本轮不做**：它依赖 F10（`.msav` 解析器），而 F10 还没做。硬用"文件大小是否
         //      为 0"之类的假判据去顶替，只会把好存档误报成坏的 —— 宁可先不做。
-        final Share share = mConflict.get(e.key());
+        final Share share = mConflict.get(Versions.rowKey(e));
         if (share == null || !share.block) {
             startVersionConfirmed(e);
             return;
@@ -1128,11 +1149,21 @@ public class MainActivity extends BaseActivity {
      *   实现只有一处：{@link Versions#slotFor}（口径与注释也搬过去了）。
      */
 
-    /** 给某个版本指定存档槽 */
+    /**
+     * 给**这一行**指定存档槽（行内入口）。
+     *
+     * ★ 2026-10-24：从"给这个版本指定槽"变成"给**这一行**指定槽" —— 一个版本可以绑多个槽
+     *   （见 {@link Versions#expandBindings}），所以必须说清改的是哪一行；否则在附加行上点换槽
+     *   会改到主行，界面上看着"点了没反应"。
+     * ★★ 按钮排布（2026-10-24 用户「只能用第一个创建后面的删除吗」之后改的）：
+     *   右边**永远是**「再加一个槽…」—— 任何一行都能加下一条，不再"只有第一行能加"。
+     *   左边随行分岔：主行「看详情…」/ 附加行「移除这一项」（附加行少一个详情入口，
+     *   长按那一行照样能看；换来的是"加 / 移除"都在同一处，各一次点击）。
+     */
     private void pickSlot(final Versions.Entry e) {
         final List<Data.Slot> slots = Data.allSlots(this);
         final String[] names = new String[slots.size()];
-        String cur = Versions.slotFor(e);
+        final String cur = Versions.slotFor(e);
         int checked = 0;
         for (int i = 0; i < slots.size(); i++) {
             Data.Slot s = slots.get(i);
@@ -1147,28 +1178,161 @@ public class MainActivity extends BaseActivity {
                     + "  " + Trans.get(MainActivity.this, R.string.slot_entry_fmt, s.files, Util.formatSize(s.bytes));
             if (s.name.equals(cur)) checked = i;
         }
-        new AlertDialog.Builder(this)
+        AlertDialog.Builder b = new AlertDialog.Builder(this)
                 .setTitle(Trans.get(MainActivity.this, R.string.slot_pick_title_fmt, e.label))
                 .setSingleChoiceItems(names, checked, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int w) {
-                        Config.get().setSlotOf(e.key(), slots.get(w).name);
                         d.dismiss();
+                        String want = slots.get(w).name;
+                        // ★ 这个版本已经绑着目标槽（尤其是另一行）⇒ 不动，并说清原因：
+                        //   允许的话会得到两行**一模一样**的启动项，点哪行都一样 —— 那是骗人的。
+                        if (!want.equals(cur) && Config.get().hasSlotBinding(e.key(), want)) {
+                            Toast.makeText(MainActivity.this,
+                                    Trans.get(MainActivity.this, R.string.binding_taken_fmt, want),
+                                    Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        // ★ 主行与附加行走**不同的写路径**（2026-10-24 真机前发现的口子）：
+                        //   主行可能**从来没有显式分配过**槽（一直在用默认槽），此时"旧槽名"在
+                        //   `version_slots` 里根本没有对应项 ⇒ 拿 (key, 旧槽名) 去替换会返回"找不到"，
+                        //   界面就报"改不动"。主行一律走 setSlotOf（写入显式分配），附加行才走替换。
+                        int r;
+                        if (e.boundSlot == null) {
+                            Config.get().setSlotOf(e.key(), want);
+                            r = Config.BIND_OK;
+                        } else {
+                            r = Config.get().replaceSlotBinding(e.key(), e.boundSlot, want);
+                        }
+                        if (r == Config.BIND_TARGET_TAKEN) {
+                            Toast.makeText(MainActivity.this,
+                                    Trans.get(MainActivity.this, R.string.binding_taken_fmt, want),
+                                    Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        if (r != Config.BIND_OK) {
+                            Toast.makeText(MainActivity.this,
+                                    Trans.get(MainActivity.this, R.string.binding_failed),
+                                    Toast.LENGTH_LONG).show();
+                            return;
+                        }
                         Toast.makeText(MainActivity.this,
-                                Trans.get(MainActivity.this, R.string.slot_set_fmt, slots.get(w).name),
+                                Trans.get(MainActivity.this, R.string.slot_set_fmt, want),
                                 Toast.LENGTH_SHORT).show();
                         rescan();
                     }
                 })
                 .setNegativeButton(R.string.cancel, null)
-                // ★ 2026-10-06（用户定案）：**详情并进这个弹窗** ——
-                //   行内宽度已用尽（加 22dp 箭头会把版本号挤成省略号），而这里是"点一下就看见"的地方。
-                //   原来这个位置的「管理槽…」让位（主页「存档与备份」里仍有管理槽的入口）。
-                .setNeutralButton(R.string.row_detail_btn, new DialogInterface.OnClickListener() {
+                // 右边永远能加一条（任何一行都行）
+                .setPositiveButton(R.string.binding_add_btn, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int w) {
-                        showDetail(e);
+                        d.dismiss();
+                        promptAddBinding(e);
+                    }
+                });
+        if (e.boundSlot != null) {
+            // 左边：只摘掉这一行（版本本体与那个槽里的存档都不动）
+            b.setNeutralButton(R.string.binding_remove_btn, new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface d, int w) {
+                    boolean ok = Config.get().removeExtraSlot(e.key(), e.boundSlot);
+                    Toast.makeText(MainActivity.this,
+                            ok ? Trans.get(MainActivity.this, R.string.binding_removed)
+                               : Trans.get(MainActivity.this, R.string.binding_failed),
+                            Toast.LENGTH_LONG).show();
+                    rescan();
+                }
+            });
+        } else {
+            // ★ 2026-10-06（用户定案）：**详情并进这个弹窗** ——
+            //   行内宽度已用尽（加 22dp 箭头会把版本号挤成省略号），而这里是"点一下就看见"的地方。
+            //   原来这个位置的「管理槽…」让位（主页「存档与备份」里仍有管理槽的入口）。
+            // ⚠️ 附加行没有这个位置（被「移除这一项」占了）：详情走长按那一行。
+            b.setNeutralButton(R.string.row_detail_btn, new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface d, int w) {
+                    showDetail(e);
+                }
+            });
+        }
+        b.show();
+    }
+
+    /**
+     * 「再加一个槽…」：同一个版本的第二套存档。
+     *
+     * ★ 为什么不复制任何东西：游戏本体（APK / dex / 资产）**共用同一份**，新的一行只是绑到
+     *   另一个槽（存档 / 设置 / 模组住在槽里）。需求原文：「**复制一份又占地方**」。
+     * ★ 存档**不复制**：新槽从空开始；要连存档一起复制用「克隆此槽」（那是另一件事）。
+     */
+    private void promptAddBinding(final Versions.Entry e) {
+        final List<Data.Slot> all = Data.allSlots(this);
+        final List<Data.Slot> free = new ArrayList<>();
+        for (Data.Slot s : all) {
+            // ★ 判据用 Config.hasSlotBinding（**版本级**：实际主槽 + 全部附加绑定）——
+            //   按行算会漏掉主行那个槽（第 236 轮真机：附加行上打开列表时，主槽还在列表里）。
+            if (!Config.get().hasSlotBinding(e.key(), s.name)) free.add(s);
+        }
+        final String[] names = new String[free.size() + 1];
+        for (int i = 0; i < free.size(); i++) {
+            Data.Slot s = free.get(i);
+            names[i] = s.name + (s.active ? Trans.get(MainActivity.this, R.string.slot_current_suffix) : "")
+                    + "  " + Trans.get(MainActivity.this, R.string.slot_entry_fmt, s.files, Util.formatSize(s.bytes));
+        }
+        names[free.size()] = Trans.get(MainActivity.this, R.string.binding_new_slot);
+        // ⚠️ 这里**不能**同时 `setMessage`：本机（HONOR / Android 16）上"正文 + 列表"并存时
+        //   列表**整块不渲染**（真机 dump 里连 ListView 都没有，只剩正文和取消按钮）。
+        //   ⇒ 说明改口到两个地方说：按钮本身叫「再加一个槽」，加完的 Toast 里说"存档从空槽开始"。
+        new AlertDialog.Builder(this)
+                .setTitle(Trans.get(MainActivity.this, R.string.binding_add_title_fmt,
+                        e.displayName(this, false)))
+                .setItems(names, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int w) {
+                        if (w == free.size()) { promptNewSlotFor(e); return; }
+                        addBinding(e, free.get(w).name);
                     }
                 })
+                .setNegativeButton(R.string.cancel, null)
                 .show();
+    }
+
+    /** 当场新建一个空槽，然后把它绑成这一版的新启动项（省得先跑去存档页建槽） */
+    private void promptNewSlotFor(final Versions.Entry e) {
+        final EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_TEXT);
+        input.setHint(R.string.new_slot_hint);
+        int pad = dp(20);
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(pad, 0, pad, 0);
+        box.addView(input, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.new_slot_title)
+                .setMessage(R.string.new_slot_msg)
+                .setView(box)
+                .setPositiveButton(R.string.create, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int w) {
+                        String raw = input.getText().toString();
+                        String err = Data.createSlot(MainActivity.this, raw);
+                        if (err != null) {
+                            alert(Trans.get(MainActivity.this, R.string.create_failed), err);
+                            return;
+                        }
+                        String name = Data.sanitizeSlot(raw);
+                        addBinding(e, name == null ? raw.trim() : name);
+                    }
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    /** 落一个附加绑定 + 报数（成功/失败都说话 —— 静默失败会让用户以为点空了） */
+    private void addBinding(Versions.Entry e, String slot) {
+        boolean ok = Config.get().addExtraSlot(e.key(), slot);
+        // ⚠️ Toast 只给一行：带 \n 的第二行会被系统截成「…」（真机抓过），写了等于没写。
+        Toast.makeText(this,
+                ok ? Trans.get(this, R.string.binding_added_fmt, slot)
+                   : Trans.get(this, R.string.binding_taken_fmt, slot),
+                Toast.LENGTH_SHORT).show();
+        rescan();
     }
 
     /** 结束 :game 进程；返回是否确实动过手（用于决定要不要等一下） */
@@ -1326,7 +1490,11 @@ public class MainActivity extends BaseActivity {
         // ★ 第三个按钮：**导入项给「命名」**（2026-10-16 用户选的形状）——
         //   换槽在列表行上本来就有按钮（常用动作不该多一层），详情里这个位置留给命名。
         //   已装版本没得命名（那是系统里那一份）⇒ 保持原来的「槽」。
-        if (e.imported) {
+        // ★★ 2026-10-24：**附加行（同一版本的第二套存档）不提供"删除 / 命名"** ——
+        //   那两个动作作用于**整个版本**（删了会连主行一起没、命名也是给版本改名），
+        //   而用户站在"存档B"那一行上按删除，心里想的是"删掉这一行"。⇒ 附加行走已装版那套
+        //   （槽 / 关闭），版本级动作只在主行做。
+        if (e.imported && e.boundSlot == null) {
             // 🔴 本 ROM（HONOR）的 AlertDialog 屏幕顺序是 neutral / negative / positive
             //   （AGENTS §90.6：按钮 id 与屏幕排列对不上）⇒ **破坏性动作放 neutral（最左）**，
             //   所以删除走 neutral、命名走 negative。别再按“negative 在左”的常识换回去：

@@ -440,6 +440,17 @@ public final class Versions {
         public String customName = "";
 
         /**
+         * ★ **这一行绑的附加槽**（`null` = 主行，槽由「版本 → 槽」分配 + 默认槽算出来）。
+         *
+         * <p>一个版本可以绑多个槽，每绑一个槽列表里就多一行（见 {@link #expandBindings}）——
+         * 用户的场景是「同一个版本两套存档，每次启动换槽很麻烦，复制一份又占地方」。
+         * 附加行与主行**共用同一份 APK**（同一个 {@link #apkPath}，零额外空间）。
+         *
+         * ⚠️ 判据只有一处：{@link Versions#slotFor}。别在界面里写 `e.boundSlot != null ? … : …`。
+         */
+        public String boundSlot;
+
+        /**
          * ★ 导入 APK 的**真包名**（`getPackageArchiveInfo` 读出来）。
          *
          * <p>为什么要它：{@link #pkg} 对导入条目是个内部占位串 `imported`（不该给用户看），
@@ -660,10 +671,35 @@ public final class Versions {
      */
     public static String slotFor(Entry e) {
         if (e == null) return Data.SLOT_DEFAULT;
+        // ★ 附加绑定（一个版本绑多个槽时的那几行）—— 它自带槽，不参与"分配 + 默认槽"那条链
+        if (e.boundSlot != null && !e.boundSlot.isEmpty()) return e.boundSlot;
         String s = Config.get().slotOf(e.key());
         if (!s.isEmpty()) return s;
         String def = Config.get().defaultSlot();
         return def.isEmpty() ? Data.SLOT_DEFAULT : def;
+    }
+
+    /**
+     * 这一行是不是**用户显式指定**过槽（而不是靠默认槽落下来的）。
+     * ★ 同槽冲突预检要用它决定"拦不拦"（全隐式只提示、不拦，理由见 `MainActivity.computeConflicts`）——
+     *   附加行永远是显式的（它存在的理由就是那个槽），漏了这一条会让"克隆出来的那一行"
+     *   在冲突组里被当成隐式，于是该拦的时候不拦。
+     */
+    public static boolean explicitSlot(Entry e) {
+        if (e == null) return false;
+        if (e.boundSlot != null && !e.boundSlot.isEmpty()) return true;
+        return !Config.get().slotOf(e.key()).isEmpty();
+    }
+
+    /**
+     * **行身份**：(版本 key, 实际槽)。一个版本绑多个槽时，任何"按版本建的表"都必须用它。
+     *
+     * <p>★ 现成的反例就是同槽冲突预检：它按 key 存结论时，同一版本的两行会**互相覆盖**
+     *   （A 行跟 B 版本抢槽、C 行跟 D 版本抢槽 ⇒ 最后存下的只有一份），
+     *   于是徽标/拦截会张冠李戴，而且**没有任何报错**。用 `(key, 槽)` 就天然唯一。
+     */
+    public static String rowKey(Entry e) {
+        return e == null ? "" : (e.key() + "\u0000" + slotFor(e));
     }
 
     /**
@@ -692,11 +728,93 @@ public final class Versions {
         }
     }
 
-    /** 已装（白名单 + 用户手填包名）+ 已导入，合并展示。 */
+    /** 已装（白名单 + 用户手填包名）+ 已导入，合并展示；**每个槽绑定一行**（见 {@link #expandBindings}）。 */
     public static List<Entry> scanAll(Context ctx) {
-        List<Entry> out = new ArrayList<>(scanInstalled(ctx));
-        out.addAll(scanImported(ctx));
+        List<Entry> bases = new ArrayList<>(scanInstalled(ctx));
+        bases.addAll(scanImported(ctx));
+        return expandBindings(bases, new ExtraLookup() {
+            @Override public List<String> extraSlotsOf(String key) {
+                return Config.get().extraSlotsOf(key);
+            }
+        });
+    }
+
+    /**
+     * "这个版本还额外绑了哪些槽" —— 抽成接口只有一个目的：**自检能把它换成假的**。
+     * 否则"展开"这件事只能靠真实 config.json + 真实已装包才测得了，而那是不可控的。
+     */
+    public interface ExtraLookup {
+        List<String> extraSlotsOf(String key);
+    }
+
+    /**
+     * 把"扫描出来的版本"展开成"列表里的行"：主行在前，每个附加绑定跟一行。
+     *
+     * <p>★★ 为什么要展开、而不是让界面自己算：版本列表 / 模组页"哪些版本落到这个槽" /
+     *   插件拿到的版本清单 / 存档计数 —— 它们全部从 {@code scanAll} 取数。只在一处展开，
+     *   这四处就自动一致；谁要是在界面里另拼一份"克隆行"，模组页就会按"没这个版本"算版本要求
+     *   （= 一个不会有任何报错、只给出错误警告的分叉）。
+     *
+     * <p>⚠️ 附加行与主槽相同的槽会被跳过（不展开）—— 界面上不该出现两行**一模一样**的启动项。
+     *   正常情况下 Config 那一层已经挡住了，这里是第二道：config.json 可能被手改 / 也可能来自旧版本。
+     */
+    public static List<Entry> expandBindings(List<Entry> bases, ExtraLookup extras) {
+        List<Entry> out = new ArrayList<>();
+        if (bases == null) return out;
+        for (Entry b : bases) {
+            if (b == null) continue;
+            out.add(b);
+            if (extras == null) continue;
+            List<String> xs;
+            try {
+                xs = extras.extraSlotsOf(b.key());
+            } catch (Throwable t) {
+                xs = null;                       // 查不到就当作没有：宁可少一行，不要让整个列表崩
+            }
+            if (xs == null) continue;
+            final String baseSlot = slotFor(b);
+            for (String s : xs) {
+                if (s == null || s.isEmpty() || s.equals(baseSlot)) continue;
+                out.add(copyForBinding(b, s));
+            }
+        }
         return out;
+    }
+
+    /**
+     * 附加行的 Entry：**复用主行的包信息**（同一份 APK，不复制任何字节），只换槽。
+     *
+     * <p>★ `upstreamChecked` 照抄主行：主行还没读过基座版本时，这里也不冒充读过
+     *   （否则那一行的"基于 X"永远空着，而且没有任何症状）。真读了会多花 ~2 ms/行，可接受。
+     */
+    private static Entry copyForBinding(Entry b, String slot) {
+        Entry e = new Entry();
+        e.pkg = b.pkg;
+        e.label = b.label;
+        e.versionName = b.versionName;
+        e.apkPath = b.apkPath;
+        e.apkSize = b.apkSize;
+        e.imported = b.imported;
+        e.importFile = b.importFile;
+        e.md5 = b.md5;
+        e.customName = b.customName;
+        e.realPkg = b.realPkg;
+        e.upstreamVersion = b.upstreamVersion;
+        e.upstreamChecked = b.upstreamChecked;
+        e.boundSlot = slot;
+        return e;
+    }
+
+    /**
+     * 列表里**有几个游戏版本**（同一版本绑多个槽只算一个）。
+     * ★ 摘要卡那个 `N versions` 必须走这里：按行数报的话，一个版本绑两个槽会写成"2 versions"，
+     *   而用户只装了一个版本 —— 这是"界面上报的事实与用户能看到的东西对不上"。
+     */
+    public static int distinctVersions(List<Entry> entries) {
+        if (entries == null) return 0;
+        Set<String> keys = new LinkedHashSet<>();
+        for (Entry e : entries) if (e != null) keys.add(e.key());
+        return keys.size();
     }
 
     static List<Entry> scanInstalled(Context ctx) {

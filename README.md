@@ -63,12 +63,16 @@ yourself — even just a few lines — see **Translation file** below.
 
 ### Versions
 - Scan games **already installed**, or **import** a copy of an APK
-- One row per version: tap to launch, **Slot** to change its slot, long-press for details
+- One row per launch entry: tap to launch, **Slot** to change its slot, long-press for details
+- **One version can be bound to several slots** (**Slot → Another slot…**): the list gets a second row that
+  shares the same game files (no APK copy, no extra space), while saves / settings / mods live in their own
+  slots — for two save sets without duplicating ~75 MB. **Any** row can add another one; **Remove…** drops
+  just that row (saves and the version stay)
 - Details: source, size, checksum, raw version name, ABI, build number, save count
 - Long-press a version → **Assets**: export the game package resources by type (sprites / sounds / music / maps / text / fonts and more); only the checked types go into the zip
 - Two versions sharing a slot get a warning that their saves will overwrite each other
 - **Packages that will not run are refused** — checked at import and again before launch
-- **Continue** resumes the version you launched last
+- **Continue** resumes the row you launched last (when one version has several slots, it comes back to the slot it used)
 
 ### Slots
 - A slot is one complete set of data: saves / maps / blueprints / mods / settings

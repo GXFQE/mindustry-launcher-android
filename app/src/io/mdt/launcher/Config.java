@@ -44,6 +44,17 @@ public final class Config {
     private static final String K_IMPORTS = "imports";
     /** M3：版本 → 存档槽 的分配表 { "&lt;版本key&gt;": "&lt;槽名&gt;" } */
     private static final String K_VSLOTS = "version_slots";
+    /**
+     * 一个版本**额外**绑定的槽 { "&lt;版本key&gt;": ["&lt;槽名&gt;", ...] } —— 每个额外绑定 = 列表里多一行。
+     *
+     * <p>★ 为什么另起一个键、不把 {@link #K_VSLOTS} 的值改成数组：那边存的是一根字符串，
+     *   老版本启动器用 `optString` 读；换成数组后老版本读到的是 `["x"]` 这种**非法槽名**
+     *   ⇒ 注入不了数据根 ⇒ 存档看起来没了。新键对老版本是**未知键**（原样保留、不解析）⇒ 降级安全。
+     *   ⚠️ 于是"这个版本用哪些槽"有两个存储位（主槽 / 附加槽），但**读写只许走本类下面那几个方法**
+     *   （`extraSlotsOf` / `addExtraSlot` / `removeExtraSlot` / `replaceSlotBinding` / `retargetSlots`），
+     *   别在别处直接碰这两个键 —— 两处各写一遍必漂，而症状只会是"某个槽的绑定莫名不见了"。
+     */
+    private static final String K_VEXTRA = "version_extra_slots";
     /** 用户给版本起的名字 { "&lt;版本key&gt;": "&lt;名字&gt;" }（与 K_VSLOTS 同 key 规则） */
     private static final String K_VNAMES = "version_names";
     /** F3：新发现的版本缺省用哪个槽（空串 = 由调用方回落到 Data.SLOT_DEFAULT） */
@@ -307,8 +318,9 @@ public final class Config {
             out.put(o == null ? org.json.JSONObject.NULL : o);
         }
         put(K_IMPORTS, out);
-        // 导入副本没了，它的槽分配也一并清掉（不留悬空引用）
-        setSlotOf("import:" + file, "");
+        // 导入副本没了，它的槽分配也一并清掉（不留悬空引用）——
+        // ★ 包括**这一版新增的附加绑定**（否则列表里会留下一行"指向不存在的版本"的启动项）
+        clearBindings("import:" + file);
         setNameOf("import:" + file, "");   // ★ 版本没了，名字也一起清（否则会留给下一次同文件名的导入）
         save();
     }
@@ -340,6 +352,175 @@ public final class Config {
         }
         put(K_VSLOTS, m);
         save();
+    }
+
+    // ── 一个版本绑多个槽（每个额外绑定 = 列表里一行启动项）───────────────────
+    //
+    // 需求原文（2026-10-24）：「同一个版本有可能有玩家需要两个不同存档，每次启动换槽很麻烦，
+    // 但是复制一份又占地方」。⇒ 不复制 APK，只**多绑一个槽**：每绑一个槽，列表里就多一行，
+    // 点哪行走哪个槽的存档。判据（哪一行用哪个槽）只有一处：{@link Versions#slotFor}。
+
+    /** 这个版本**额外**绑了哪些槽（保持写入顺序；主槽不在这里，见 {@link #slotOf}） */
+    public synchronized List<String> extraSlotsOf(String key) {
+        List<String> out = new ArrayList<>();
+        if (key == null || key.isEmpty()) return out;
+        JSONObject m = mRoot.optJSONObject(K_VEXTRA);
+        JSONArray a = m == null ? null : m.optJSONArray(key);
+        if (a == null) return out;
+        for (int i = 0; i < a.length(); i++) {
+            String s = a.optString(i, "");
+            if (!s.isEmpty() && !out.contains(s)) out.add(s);
+        }
+        return out;
+    }
+
+    /**
+     * 这个版本是不是已经绑着这个槽（实际主槽 + 全部附加绑定）。
+     *
+     * <p>★ 主槽要取**实际会用的那个**：没显式分配过时是默认槽（`defaultSlot` 或 `default`）。
+     *   只看 `slotOf` 的话，"还没分配过槽的版本 + 选默认槽"会被当成没绑过 ⇒ 加一行**看不见的行**
+     *   （展开时按"与主槽重复"跳过），而 Toast 还说"已加一行"。
+     * ★ **调用方别再自己按行算一遍**（第 236 轮真机抓过）：曾经在 `Versions` 里另写了一个
+     *   "这一行的槽 + 附加绑定"的版本 ⇒ 在**附加行**上打开加槽列表时，主行正在用的那个槽照样列出来，
+     *   点了才被这里拒掉。列表与写入必须是同一份判据。
+     */
+    public synchronized boolean hasSlotBinding(String key, String slot) {
+        if (slot == null || slot.isEmpty()) return false;
+        if (slot.equals(effectivePrimaryOf(key))) return true;
+        return extraSlotsOf(key).contains(slot);
+    }
+
+    /** 这个版本**实际**会用的主槽（显式分配 → 默认槽 → 内置 `default`）—— 与 `Versions.slotFor` 同口径 */
+    private String effectivePrimaryOf(String key) {
+        String s = slotOf(key);
+        if (!s.isEmpty()) return s;
+        String d = defaultSlot();
+        return d.isEmpty() ? Paths.SLOT_DEFAULT : d;
+    }
+
+    /**
+     * 追加一个附加绑定。已绑着（主槽或别的附加槽）⇒ 返回 false 且**什么都不写**
+     * （不做"覆盖"，否则界面上会悄悄少一行 —— 变化必须是用户点出来的那一下）。
+     */
+    public synchronized boolean addExtraSlot(String key, String slot) {
+        if (key == null || key.isEmpty() || slot == null || slot.isEmpty()) return false;
+        if (hasSlotBinding(key, slot)) return false;
+        JSONObject m = mRoot.optJSONObject(K_VEXTRA);
+        if (m == null) m = new JSONObject();
+        try {
+            JSONArray a = m.optJSONArray(key);
+            if (a == null) a = new JSONArray();
+            a.put(slot);
+            m.put(key, a);
+        } catch (Exception e) {
+            Log.w(TAG, "addExtraSlot failed for '" + key + "': " + e);
+            return false;
+        }
+        put(K_VEXTRA, m);
+        save();
+        return true;
+    }
+
+    /** 去掉一个附加绑定（主槽不在此列；动主槽请用 {@link #setSlotOf}） */
+    public synchronized boolean removeExtraSlot(String key, String slot) {
+        if (key == null || key.isEmpty() || slot == null || slot.isEmpty()) return false;
+        JSONObject m = mRoot.optJSONObject(K_VEXTRA);
+        JSONArray a = m == null ? null : m.optJSONArray(key);
+        if (a == null) return false;
+        List<String> kept = new ArrayList<>();
+        boolean changed = false;
+        for (int i = 0; i < a.length(); i++) {
+            String s = a.optString(i, "");
+            if (slot.equals(s)) changed = true;
+            else if (!s.isEmpty()) kept.add(s);
+        }
+        if (!changed) return false;
+        try {
+            if (kept.isEmpty()) {
+                m.remove(key);                          // 不留空数组（config.json 里一行噪音）
+            } else {
+                JSONArray arr = new JSONArray();
+                for (String s : kept) arr.put(s);
+                m.put(key, arr);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "removeExtraSlot failed for '" + key + "': " + e);
+            return false;
+        }
+        storeExtra(m);
+        return true;
+    }
+
+    /**
+     * 落盘 {@link #K_VEXTRA}。**空了就把整个键删掉** —— 真机验收时 config.json 里留下了
+     * `"version_extra_slots": {}`，虽然无害，但一个空对象会让人以为"这里有东西"。
+     */
+    private void storeExtra(JSONObject m) {
+        if (m == null || m.length() == 0) mRoot.remove(K_VEXTRA);
+        else put(K_VEXTRA, m);
+        save();
+    }
+
+    /** {@link #replaceSlotBinding} 的返回值（都是"用户能看懂"的原因，不是异常） */
+    public static final int BIND_OK = 0;
+    public static final int BIND_TARGET_TAKEN = 1;   // 目标槽这个版本已经绑着
+    public static final int BIND_NOT_FOUND = 2;      // old 不在这个版本上（别人刚改过？）
+    public static final int BIND_BAD_ARG = 3;
+
+    /**
+     * 把**这一行**从 oldSlot 换到 newSlot —— 主槽走 {@link #K_VSLOTS}，附加槽原地改数组。
+     *
+     * <p>★ 为什么不能"直接 setSlotOf(key, new)"：那样在任何一行上点换槽都会改到**主行**，
+     *   附加行看着没反应（或更糟：两行变成同一个槽、界面一模一样却互不相干）。
+     */
+    public synchronized int replaceSlotBinding(String key, String oldSlot, String newSlot) {
+        if (key == null || key.isEmpty() || oldSlot == null || oldSlot.isEmpty()
+                || newSlot == null || newSlot.isEmpty()) return BIND_BAD_ARG;
+        if (oldSlot.equals(newSlot)) return BIND_OK;
+        if (hasSlotBinding(key, newSlot)) return BIND_TARGET_TAKEN;
+
+        JSONObject vs = mRoot.optJSONObject(K_VSLOTS);
+        if (vs != null && oldSlot.equals(vs.optString(key, ""))) {
+            try {
+                vs.put(key, newSlot);
+            } catch (Exception e) {
+                Log.w(TAG, "replaceSlotBinding(primary) failed: " + e);
+                return BIND_NOT_FOUND;
+            }
+            put(K_VSLOTS, vs);
+            save();
+            return BIND_OK;
+        }
+
+        JSONObject ex = mRoot.optJSONObject(K_VEXTRA);
+        JSONArray a = ex == null ? null : ex.optJSONArray(key);
+        if (a == null) return BIND_NOT_FOUND;
+        boolean hit = false;
+        JSONArray out = new JSONArray();
+        for (int i = 0; i < a.length(); i++) {
+            String s = a.optString(i, "");
+            if (oldSlot.equals(s)) { out.put(newSlot); hit = true; }
+            else out.put(s);
+        }
+        if (!hit) return BIND_NOT_FOUND;
+        try {
+            ex.put(key, out);
+        } catch (Exception e) {
+            Log.w(TAG, "replaceSlotBinding(extra) failed: " + e);
+            return BIND_NOT_FOUND;
+        }
+        put(K_VEXTRA, ex);
+        save();
+        return BIND_OK;
+    }
+
+    /** 去掉一个版本的**全部**绑定（删导入版本 / 自检清理）—— 主槽与附加槽一起清 */
+    public synchronized void clearBindings(String key) {
+        setSlotOf(key, "");
+        JSONObject ex = mRoot.optJSONObject(K_VEXTRA);
+        if (ex == null || !ex.has(key)) return;
+        ex.remove(key);
+        storeExtra(ex);
     }
 
     // ── 给版本起的名字（2026-10-16 用户：「加个允许给自己导入的游戏命名」）──────
@@ -375,32 +556,102 @@ public final class Config {
     }
 
     /**
-     * 槽改名 / 删除后修正分配表：把指向 oldName 的都改成 newName；
-     * newName 为空表示槽被删了 ⇒ 清除分配（回落到默认槽）。
-     * 返回被改动的版本数（供 UI 提示）。
+     * 槽改名 / 删除后修正绑定表（**主槽与附加绑定都要修**）。
+     *
+     * <p>语义差别（界面上必须分开说）：
+     *   · 主槽：`newName` 非空 ⇒ 改名跟过去；空 ⇒ **清除分配**（回落到默认槽，这一行还在）；
+     *   · 附加绑定：`newName` 非空 ⇒ 改名跟过去；空 ⇒ **这一行整个消失**（它存在的理由就是那个槽）。
+     *   ⇒ 所以返回值要分开计数，别把"消失了几行"说成"回落到默认槽"。
      */
-    public synchronized int retargetSlots(String oldName, String newName) {
-        JSONObject m = mRoot.optJSONObject(K_VSLOTS);
-        if (m == null || oldName == null || oldName.isEmpty()) return 0;
-        java.util.Iterator<String> it = m.keys();
-        List<String> hit = new ArrayList<>();
-        while (it.hasNext()) {
-            String k = it.next();
-            if (oldName.equals(m.optString(k, ""))) hit.add(k);
-        }
-        if (hit.isEmpty()) return 0;
-        try {
-            for (String k : hit) {
-                if (newName == null || newName.isEmpty()) m.remove(k);
-                else m.put(k, newName);
+    public static final class Retarget {
+        /** 主分配被改/被清的版本数 */
+        public int primary;
+        /** 附加绑定被改 / 被移除的**行**数 */
+        public int extras;
+        public int total() { return primary + extras; }
+    }
+
+    /**
+     * 见 {@link Retarget}。实现只有这一处 —— 两个存储位（主槽 / 附加槽）在同一个循环外一起收口，
+     * 免得"改名修了主槽、附加行还指着旧名字"这种只在真机上慢慢发现的漂移。
+     */
+    public synchronized Retarget retargetSlots(String oldName, String newName) {
+        Retarget r = new Retarget();
+        if (oldName == null || oldName.isEmpty()) return r;
+        boolean drop = (newName == null || newName.isEmpty());
+
+        // ① 主分配 { key: slot }
+        JSONObject vs = mRoot.optJSONObject(K_VSLOTS);
+        if (vs != null) {
+            List<String> hit = new ArrayList<>();
+            java.util.Iterator<String> it = vs.keys();
+            while (it.hasNext()) {
+                String k = it.next();
+                if (oldName.equals(vs.optString(k, ""))) hit.add(k);
             }
-        } catch (Exception e) {
-            Log.w(TAG, "retargetSlots failed: " + e);
-            return 0;
+            try {
+                for (String k : hit) {
+                    if (drop) vs.remove(k);
+                    else vs.put(k, newName);
+                }
+            } catch (Exception e) {
+                Log.w(TAG, "retargetSlots(primary) failed: " + e);
+                hit.clear();
+            }
+            if (!hit.isEmpty()) {
+                r.primary = hit.size();
+                put(K_VSLOTS, vs);
+            }
         }
-        put(K_VSLOTS, m);
-        save();
-        return hit.size();
+
+        // ② 附加绑定 { key: [slot, ...] }
+        JSONObject ex = mRoot.optJSONObject(K_VEXTRA);
+        if (ex != null) {
+            List<String> keys = new ArrayList<>();
+            java.util.Iterator<String> it = ex.keys();
+            while (it.hasNext()) keys.add(it.next());
+            boolean touched = false;
+            for (String k : keys) {
+                JSONArray a = ex.optJSONArray(k);
+                if (a == null) continue;
+                List<String> kept = new ArrayList<>();
+                boolean changed = false;
+                for (int i = 0; i < a.length(); i++) {
+                    String s = a.optString(i, "");
+                    if (s.isEmpty()) continue;
+                    if (oldName.equals(s)) {
+                        changed = true;
+                        // ★ 改名与删槽**都要计数**：界面上"跟着改了 N 行" / "消失了 N 行"都靠这个数
+                        //   （第 236 轮自检当场抓到：只在删槽那条分支里 ++，改名时 extras 恒为 0）。
+                        r.extras++;
+                        if (drop) continue;                      // 这一行没了
+                        s = newName;
+                    }
+                    // 改名时可能撞上同一版本已有的绑定（极少见，但撞了就必须去重，否则两行一模一样）
+                    if (!kept.contains(s)) kept.add(s);
+                }
+                if (!changed) continue;
+                touched = true;
+                try {
+                    if (kept.isEmpty()) {
+                        ex.remove(k);
+                    } else {
+                        JSONArray arr = new JSONArray();
+                        for (String s : kept) arr.put(s);
+                        ex.put(k, arr);
+                    }
+                } catch (Exception e) {
+                    Log.w(TAG, "retargetSlots(extra) failed for '" + k + "': " + e);
+                }
+            }
+            if (touched) {
+                if (ex.length() == 0) mRoot.remove(K_VEXTRA);   // 空对象不留（同 storeExtra）
+                else put(K_VEXTRA, ex);
+            }
+        }
+
+        if (r.total() > 0) save();
+        return r;
     }
 
     /** 供 UI 展示：所有已分配关系（key → slot），按 key 排序 */
