@@ -10,6 +10,7 @@ import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Locale;
 import java.util.Set;
 import java.util.zip.ZipEntry;
@@ -66,6 +67,39 @@ public final class Conflicts {
         public int jsCount;
         /** {@code scripts/main.js} 在（多个脚本时游戏**只认**它）。 */
         public boolean hasMainJs;
+
+        // ---- v25（P3）：宿主解析/查表得到的**事实**（判据与文案在插件这边）----
+        /** `Mods.resolveDependencies` 给出的状态名（ENABLED / MISSING_DEPENDENCIES / ...）。 */
+        public String depState = "";
+        /** 和别的包 internalName 相同（游戏只认一份）。 */
+        public boolean duplicated;
+        /** 在游戏的黑名单里。 */
+        public boolean blacklisted;
+        /** 必需依赖的 internalName（逐条）。 */
+        public List<String> dependencies = new ArrayList<String>();
+        /** 游戏里这个模组是开着的（依赖连坐要看它）。 */
+        public boolean enabled = true;
+    }
+
+    /**
+     * 找出"是哪一条依赖"（只为文案；**不判状态** —— 状态是宿主给的 {@link Mod#depState}）。
+     *
+     * @param off true = 找"存在但被关着"的那条；false = 找"根本不在槽里"的那条
+     */
+    private static String missingDep(List<Mod> mods, Map<String, Integer> byName, Mod self, boolean off) {
+        List<String> deps = self.dependencies;
+        if (deps == null) return "";
+        for (String d : deps) {
+            if (d == null || d.trim().isEmpty()) continue;
+            Integer at = byName.get(d.trim());
+            if (at == null) {
+                if (!off) return d.trim();            // 找不到 = 缺
+            } else {
+                Mod dep = mods.get(at.intValue());
+                if (off && dep != null && !dep.enabled) return d.trim();
+            }
+        }
+        return "";
     }
 
     /** 两个模组下标（{@code a} 是"谁在说"：容器 / 提到别人的那个）。 */
@@ -84,6 +118,16 @@ public final class Conflicts {
         public static final int WILL_FAIL_JAVA_LOAD = 1;
         /** 多个脚本却没有 {@code scripts/main.js} ⇒ 游戏不会跑它们。 */
         public static final int NO_MAIN_SCRIPT = 2;
+        /** 缺必需依赖。 */
+        public static final int DEP_MISSING = 3;
+        /** 依赖的模组被关着（连坐）。 */
+        public static final int DEP_OFF = 4;
+        /** 循环依赖。 */
+        public static final int DEP_CIRCLE = 5;
+        /** 和另一个包是同一个模组的两份。 */
+        public static final int DUPLICATED = 6;
+        /** 在游戏的黑名单里。 */
+        public static final int BLACKLISTED = 7;
 
         /** 哪个模组（下标）。 */
         public final int index;
@@ -91,11 +135,18 @@ public final class Conflicts {
         public final int kind;
         /** 只有 {@link #NO_MAIN_SCRIPT} 用得上（脚本个数）。 */
         public final int jsCount;
+        /** 依赖名 / 重名那一份的标题（别的 kind 为空串）。 */
+        public final String other;
 
         public Issue(int index, int kind, int jsCount) {
+            this(index, kind, jsCount, "");
+        }
+
+        public Issue(int index, int kind, int jsCount, String other) {
             this.index = index;
             this.kind = kind;
             this.jsCount = jsCount;
+            this.other = other == null ? "" : other;
         }
     }
 
@@ -153,7 +204,45 @@ public final class Conflicts {
             }
         }
 
-        // ② 主类模式：meta.main → dex 里的描述符形态（pkg/Main）
+        // ② 依赖 / 重名 / 黑名单（v25 P3）：**状态是宿主算出来的事实**，这里只负责
+        //    "是哪一条依赖" + 文案。⚠️ 别在这里重写一遍递归解析 —— 两处判据必漂。
+        Map<String, Integer> byName = new java.util.HashMap<String, Integer>();
+        for (int i = 0; i < mods.size(); i++) {
+            Mod m = mods.get(i);
+            if (m != null && m.internalName != null && !m.internalName.isEmpty()
+                    && !byName.containsKey(m.internalName)) {
+                byName.put(m.internalName, Integer.valueOf(i));
+            }
+        }
+        for (int i = 0; i < mods.size(); i++) {
+            Mod m = mods.get(i);
+            if (m == null) continue;
+            if (m.duplicated) {
+                String other = "";
+                for (int j = 0; j < mods.size(); j++) {
+                    if (j == i) continue;
+                    Mod o = mods.get(j);
+                    if (o != null && m.internalName != null
+                            && m.internalName.equalsIgnoreCase(o.internalName)) {
+                        other = o.title == null ? "" : o.title;
+                        break;
+                    }
+                }
+                c.issues.add(new Issue(i, Issue.DUPLICATED, 0, other));
+            }
+            if (m.blacklisted) {
+                c.issues.add(new Issue(i, Issue.BLACKLISTED, 0));
+            }
+            if ("MISSING_DEPENDENCIES".equals(m.depState)) {
+                c.issues.add(new Issue(i, Issue.DEP_MISSING, 0, missingDep(mods, byName, m, false)));
+            } else if ("INCOMPLETE_DEPENDENCIES".equals(m.depState)) {
+                c.issues.add(new Issue(i, Issue.DEP_OFF, 0, missingDep(mods, byName, m, true)));
+            } else if ("CIRCULAR_DEPENDENCIES".equals(m.depState)) {
+                c.issues.add(new Issue(i, Issue.DEP_CIRCLE, 0));
+            }
+        }
+
+        // ③ 主类模式：meta.main → dex 里的描述符形态（pkg/Main）
         List<Integer> javaIdx = new ArrayList<Integer>();
         for (int i = 0; i < mods.size(); i++) {
             Mod m = mods.get(i);

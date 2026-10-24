@@ -16,6 +16,9 @@
 | 内置检测 | 问题 | A 的 `classes.dex` 里出现 B 的**主类描述符** ⇒ A 把 B 的代码打包了（**挂到 A 那一行**，v25） |
 | 声明了 Java 却没 dex | 问题 | 游戏会跳过整个包（安卓找不到入口类）—— 判据 `java && !hasClassesDex`，行上只给"为什么" |
 | 多脚本却没有 main.js | 警告 | `jsCount >= 2 && !hasMainJs` ⇒ 游戏只认 `main.js`，这些脚本不会跑（单个脚本不算） |
+| 缺依赖 / 依赖被关 / 循环依赖 | 问题 | 状态来自宿主 `Mods.resolveDependencies`（`ItemInfo.extra.depState`）——插件只说"缺哪一条"，**不重写解析** |
+| 同一个模组装了两份 | 警告 | `duplicated`（宿主按 internalName 判）——两份都标，说得出另一份是谁 |
+| 在游戏的黑名单里 | 问题 | `blacklisted`（宿主查它那张表） |
 | 游戏日志 | 信息 | 上次启动的 `last_log.txt` 里提到这些模组的行（"谁真的接管了"） |
 
 再加一条「检查了 N 个带代码的模组（X MB）」—— **只在没发现冲突时**出现

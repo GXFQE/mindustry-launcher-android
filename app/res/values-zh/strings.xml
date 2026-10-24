@@ -1698,8 +1698,6 @@
     <string name="mods_warn_version_fmt">⚠ 要求游戏 %1$s，当前是 %2$s —— 可能进不去</string>
     <string name="mods_warn_minmajor_fmt">⚠ 它写的最低版本是 %1$d，太老了（要 %2$d 以上）—— 游戏会跳过它</string>
     <string name="mods_warn_noversion_fmt">⚠ 它没写要求哪个游戏版本 —— 游戏会当成太老的模组跳过</string>
-    <string name="mods_warn_blacklist_fmt">⚠ 它在游戏的黑名单里：%1$s</string>
-    <string name="mods_warn_dup">⚠ 和另一个包重名，游戏里只有一个会生效</string>
     <!-- ★ 2026-10-08 机制定案后精确化（`-failed` 的正主：游戏在"上次没跑完"的下一次启动里
          把**整槽模组关掉**，并给当时开着的那些写下这条记录 —— 见 Mods.failedKey 的 Javadoc）：
          ① 还会再跳一次（launchid 在 + modcrashdisable 开）② 用户关了跳过开关 ③ 跳过已经发生过 -->

@@ -111,6 +111,36 @@ public final class Check {
         check(!hasIssue(rS.issues, 4, Conflicts.Issue.NO_MAIN_SCRIPT),
                 "★反向：2 个脚本且有 main.js ⇒ 不报");
 
+        // ── v25（P3）：依赖 / 重名 / 黑名单（**状态是宿主的事实**，这里只验"哪一条 + 报不报"）──
+        List<Conflicts.Mod> modsD = new ArrayList<Conflicts.Mod>();
+        Conflicts.Mod hostMod = new Conflicts.Mod();
+        hostMod.path = "/d/host.zip"; hostMod.title = "Host";
+        hostMod.internalName = "host"; hostMod.depState = "MISSING_DEPENDENCIES";
+        hostMod.dependencies.add("libgone");
+        Conflicts.Mod dupA = new Conflicts.Mod();
+        dupA.path = "/d/dupa.zip"; dupA.title = "Dup A"; dupA.internalName = "dup"; dupA.duplicated = true;
+        Conflicts.Mod dupB = new Conflicts.Mod();
+        dupB.path = "/d/dupb.zip"; dupB.title = "Dup B"; dupB.internalName = "dup"; dupB.duplicated = true;
+        Conflicts.Mod blMod = new Conflicts.Mod();
+        blMod.path = "/d/bl.zip"; blMod.title = "Bad"; blMod.blacklisted = true;
+        Conflicts.Mod okDep = new Conflicts.Mod();
+        okDep.path = "/d/ok.zip"; okDep.title = "Ok"; okDep.internalName = "ok"; okDep.depState = "ENABLED";
+        modsD.add(hostMod); modsD.add(dupA); modsD.add(dupB); modsD.add(blMod); modsD.add(okDep);
+        Conflicts.Result rD = Conflicts.scan(modsD);
+        check(hasIssue(rD.issues, 0, Conflicts.Issue.DEP_MISSING), "依赖：宿主说缺依赖 ⇒ 报 DEP_MISSING");
+        check("libgone".equals(issueOther(rD.issues, 0, Conflicts.Issue.DEP_MISSING)),
+                "依赖：点得出缺的是哪一条（" + issueOther(rD.issues, 0, Conflicts.Issue.DEP_MISSING) + "）");
+        check(hasIssue(rD.issues, 1, Conflicts.Issue.DUPLICATED) && hasIssue(rD.issues, 2, Conflicts.Issue.DUPLICATED),
+                "重名：两份都要标（只标一份就变成「另一份没问题」了）");
+        check("Dup B".equals(issueOther(rD.issues, 1, Conflicts.Issue.DUPLICATED)),
+                "重名：说得出另一份是谁（" + issueOther(rD.issues, 1, Conflicts.Issue.DUPLICATED) + "）");
+        check(hasIssue(rD.issues, 3, Conflicts.Issue.BLACKLISTED), "黑名单：在名单里就标出来");
+        check(!hasIssue(rD.issues, 4, Conflicts.Issue.DEP_MISSING)
+                && !hasIssue(rD.issues, 4, Conflicts.Issue.DUPLICATED)
+                && !hasIssue(rD.issues, 4, Conflicts.Issue.BLACKLISTED),
+                "★反向：一切正常的模组一条结构结论都不许有");
+
+
 
         // ── zip 形态：根前缀（下潜一层）里的 classes.dex 也要找得到 ────────────────
         File z = new File(work, "z-nested.zip");
@@ -210,6 +240,13 @@ public final class Check {
         } finally {
             w.close();
         }
+    }
+
+    private static String issueOther(List<Conflicts.Issue> xs, int index, int kind) {
+        for (Conflicts.Issue it : xs) {
+            if (it.index == index && it.kind == kind) return it.other;
+        }
+        return "";
     }
 
     private static boolean hasIssue(List<Conflicts.Issue> xs, int index, int kind) {

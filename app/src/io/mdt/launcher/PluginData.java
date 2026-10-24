@@ -436,8 +436,12 @@ final class PluginData {
         Mods.Scan scan = Mods.scan(ctx, slot);
         if (scan == null) return;
         Map<String, ItemInfo> byPath = new LinkedHashMap<String, ItemInfo>();
-        addMods(byPath, scan.mods, ctx);
-        addMods(byPath, scan.broken, ctx);
+        // v25（P3）：解析结果与目标版本是"事实"（宿主算出来给插件用）；
+        // "这些事实意味着什么"归插件。⚠️ 只调一次：两批条目共用同一份。
+        Mods.Resolved resolved = Mods.resolveDependencies(scan.mods);
+        Mods.Target target = Mods.targetsFor(ctx, slot);
+        addMods(byPath, scan.mods, ctx, resolved, target);
+        addMods(byPath, scan.broken, ctx, resolved, target);
         List<ItemInfo> list = new ArrayList<ItemInfo>(byPath.values());
         Collections.sort(list, new Comparator<ItemInfo>() {
             @Override public int compare(ItemInfo a, ItemInfo b) {
@@ -447,7 +451,8 @@ final class PluginData {
         out.addAll(list);
     }
 
-    private static void addMods(Map<String, ItemInfo> byPath, List<Mods.Info> infos, Context ctx) {
+    private static void addMods(Map<String, ItemInfo> byPath, List<Mods.Info> infos, Context ctx,
+                                Mods.Resolved resolved, Mods.Target target) {
         if (infos == null) return;
         for (Mods.Info m : infos) {
             if (m == null || m.file == null) continue;
@@ -475,6 +480,12 @@ final class PluginData {
                 }
             }
             put(ex, "duplicated", String.valueOf(m.duplicated));
+            // v25（P3）：依赖解析结果（宿主 `Mods.resolveDependencies` 的**产物**，不是插件再算一遍）
+            if (resolved != null && m.internalName != null) {
+                Mods.State ds = resolved.stateOf(m.internalName);
+                put(ex, "depState", ds == null ? "" : ds.name());
+            }
+            put(ex, "blacklisted", String.valueOf(Mods.isBlacklisted(m.name, m.version)));
             put(ex, "failed", String.valueOf(m.failed));
             put(ex, "willFailJavaLoad", String.valueOf(m.willFailJavaLoad()));
             ex.put("java", String.valueOf(m.java));

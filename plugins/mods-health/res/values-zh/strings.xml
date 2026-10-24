@@ -3,7 +3,8 @@
   mods-health 插件的文案（中文）。
   ★ 与 values/strings.xml 一一对应（键集合必须相同）。
   ★ 第 229 轮（用户「感觉有点占地方啊」）：一行一条；解释只留"要动手"的那条。
-  ★ 第 229 轮 P2：「会不会加载 / 脚本跑不跑」从宿主搬到这里（宿主只留徽标状态）。
+  ★ 第 229 轮 P2/P3：「会不会加载 / 脚本跑不跑 / 依赖 / 重名 / 黑名单」从宿主搬到这里
+    （宿主只留徽标那个"结果"）。
 -->
 <resources>
     <string name="cf_contained_title_fmt">「%1$s」里已经带了「%2$s」</string>
@@ -19,6 +20,18 @@
     <string name="cf_willfail_detail">游戏会跳过它 —— 安卓找不到入口类，整个包都不加载。</string>
     <string name="cf_nomainjs_title_fmt">有 %1$d 个脚本，却没有 main.js</string>
     <string name="cf_nomainjs_detail">多个脚本时游戏只认 main.js，这些脚本不会跑。</string>
+
+    <!-- v25（P3）：依赖 / 重名 / 黑名单（状态是宿主算的，话是我们说的） -->
+    <string name="cf_dep_missing_title_fmt">缺必需依赖「%1$s」</string>
+    <string name="cf_dep_missing_detail">这个依赖不在槽里，游戏会跳过它。</string>
+    <string name="cf_dep_off_title_fmt">依赖的「%1$s」被关着</string>
+    <string name="cf_dep_off_detail">依赖关着，它也不会加载 —— 两个一起开，或者两个都关。</string>
+    <string name="cf_dep_circle_title">依赖绕成环了</string>
+    <string name="cf_dep_circle_detail">几个模组互相依赖，游戏排不出加载顺序，会跳过它们。</string>
+    <string name="cf_dup_title_fmt">和「%1$s」是同一个模组的两份</string>
+    <string name="cf_dup_detail">游戏只认其中一份（后放进去的那个），另一份等于没装。</string>
+    <string name="cf_blacklist_title">在游戏的黑名单里</string>
+    <string name="cf_blacklist_detail">游戏自己拒绝加载它 —— 换个版本试。</string>
 
     <string name="cf_note_dex_title_fmt">读不了「%1$s」的 classes.dex</string>
     <string name="cf_note_log">读不了游戏日志</string>

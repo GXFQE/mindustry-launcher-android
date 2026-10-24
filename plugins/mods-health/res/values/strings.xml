@@ -3,7 +3,8 @@
   mods-health 插件的文案（英文 = 默认，values-zh = 中文）。
   ★ 键集合必须与 values-zh 相同。
   ★ 英文值里**不放撇号**（与宿主同一个口径：aapt2 会把裸撇号读坏）。
-  ★ 第 229 轮 P2：「会不会加载 / 脚本跑不跑」从宿主搬到这里（宿主只留徽标状态）。
+  ★ 第 229 轮 P2/P3：「会不会加载 / 脚本跑不跑 / 依赖 / 重名 / 黑名单」从宿主搬到这里
+    （宿主只留徽标那个"结果"）。
 -->
 <resources>
     <string name="cf_contained_title_fmt">\"%1$s\" already bundles \"%2$s\"</string>
@@ -14,11 +15,23 @@
     <string name="cf_none_detail_fmt">checked %1$d mods that carry code (%2$s); some conflicts only show up once the game runs.</string>
     <string name="cf_no_code">no mods with code in this slot</string>
 
-    <!-- v25 (P2): structure findings, moved out of the host; short label on the row, detail in the dialog -->
+    <!-- v25 (P2): structure findings, short label on the row, detail in the dialog -->
     <string name="cf_willfail_title">declares Java but ships no code</string>
     <string name="cf_willfail_detail">the game skips it: Android cannot find the entry class, so the whole pack does not load.</string>
     <string name="cf_nomainjs_title_fmt">%1$d scripts, but no main.js</string>
     <string name="cf_nomainjs_detail">with several scripts the game only runs main.js, so these never run.</string>
+
+    <!-- v25 (P3): dependencies, duplicates, blacklist -->
+    <string name="cf_dep_missing_title_fmt">missing required dependency \"%1$s\"</string>
+    <string name="cf_dep_missing_detail">that dependency is not in this slot, so the game skips this mod.</string>
+    <string name="cf_dep_off_title_fmt">dependency \"%1$s\" is turned off</string>
+    <string name="cf_dep_off_detail">this mod will not load either; turn both on, or turn both off.</string>
+    <string name="cf_dep_circle_title">dependencies form a cycle</string>
+    <string name="cf_dep_circle_detail">these mods depend on each other, so the game cannot order them and skips them.</string>
+    <string name="cf_dup_title_fmt">same mod as \"%1$s\", installed twice</string>
+    <string name="cf_dup_detail">the game uses only one copy (the one placed later); the other is effectively not installed.</string>
+    <string name="cf_blacklist_title">on the game blacklist</string>
+    <string name="cf_blacklist_detail">the game itself refuses to load it; try another version.</string>
 
     <string name="cf_note_dex_title_fmt">could not read the classes.dex inside \"%1$s\"</string>
     <string name="cf_note_log">could not read the game log</string>

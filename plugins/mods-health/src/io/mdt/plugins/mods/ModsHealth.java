@@ -179,6 +179,17 @@ public final class ModsHealth {
             m.hasScripts = "true".equals(extra(it, "hasScripts"));
             m.hasMainJs = "true".equals(extra(it, "hasMainJs"));
             m.jsCount = intExtra(it, "jsCount");
+            // v25（P3）：宿主算出来的依赖状态 / 重名 / 黑名单（判据与文案在这边）
+            m.depState = extra(it, "depState");
+            m.duplicated = "true".equals(extra(it, "duplicated"));
+            m.blacklisted = "true".equals(extra(it, "blacklisted"));
+            m.enabled = !"false".equals(extra(it, "enabled"));
+            m.dependencies.clear();
+            for (int i = 0; ; i++) {
+                String d = extra(it, "dep." + i);
+                if (d.isEmpty()) break;
+                m.dependencies.add(d);
+            }
             out.add(m);
         }
         return out;
@@ -297,6 +308,21 @@ public final class ModsHealth {
             } else if (is.kind == Conflicts.Issue.NO_MAIN_SCRIPT) {
                 out.add(new Finding(c.getString(R.string.cf_nomainjs_title_fmt, is.jsCount),
                         c.getString(R.string.cf_nomainjs_detail), Finding.WARN).anchor(path));
+            } else if (is.kind == Conflicts.Issue.DEP_MISSING) {
+                out.add(new Finding(c.getString(R.string.cf_dep_missing_title_fmt, is.other),
+                        c.getString(R.string.cf_dep_missing_detail), Finding.ERROR).anchor(path));
+            } else if (is.kind == Conflicts.Issue.DEP_OFF) {
+                out.add(new Finding(c.getString(R.string.cf_dep_off_title_fmt, is.other),
+                        c.getString(R.string.cf_dep_off_detail), Finding.ERROR).anchor(path));
+            } else if (is.kind == Conflicts.Issue.DEP_CIRCLE) {
+                out.add(new Finding(c.getString(R.string.cf_dep_circle_title),
+                        c.getString(R.string.cf_dep_circle_detail), Finding.ERROR).anchor(path));
+            } else if (is.kind == Conflicts.Issue.DUPLICATED) {
+                out.add(new Finding(c.getString(R.string.cf_dup_title_fmt, is.other),
+                        c.getString(R.string.cf_dup_detail), Finding.WARN).anchor(path));
+            } else if (is.kind == Conflicts.Issue.BLACKLISTED) {
+                out.add(new Finding(c.getString(R.string.cf_blacklist_title),
+                        c.getString(R.string.cf_blacklist_detail), Finding.ERROR).anchor(path));
             }
         }
         for (Integer idx : r.dexErrors) {

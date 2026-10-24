@@ -1276,10 +1276,8 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
                         ? Trans.get(ModsActivity.this, R.string.mods_warn_noversion_fmt)
                         : Trans.get(ModsActivity.this, R.string.mods_warn_minmajor_fmt, minMajor, needMajor));
             }
-            if (Mods.isBlacklisted(m.name, m.version)) {
-                warns.add(Trans.get(ModsActivity.this, R.string.mods_warn_blacklist_fmt, m.name + ":" + m.version));
-            }
-            if (m.duplicated) warns.add(Trans.get(ModsActivity.this, R.string.mods_warn_dup));
+            // v25（P3）：黑名单 / 重名 / 依赖这几句的**文案**搬到 mods-health 插件了
+            //   （它挂在这一行上）；宿主只留徽标那个**结果**（「不支持」/「①重名」/「缺依赖」）。
             // ★ 2026-10-08 改：这里原来写的是 `if (m.failed) warns.add(mods_warn_failed)`
             //   —— 但 `failed` 是**游戏自己**在 settings 里写的 `mod-<名字>-failed`，模组加载期
             //   一崩，游戏会把**本槽全部**模组都标上（它下次"整槽跳过"的机制）⇒ 逐行显示会被读成
@@ -1311,8 +1309,9 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
                 //   带游戏的失败记录 ⇒ 「游戏里显示「加载失败」」；用户手动关的 ⇒ 「它现在是关着的」。
                 warns.add(Trans.get(ModsActivity.this, m.failed
                         ? R.string.mods_warn_failed_mark : R.string.mods_warn_disabled));
-            } else if (ModsText.needsReason(st)) {
-                // 依赖 / 版本那几类：徽标报结果，这里补"为什么"（`⚠ 缺少必需依赖`）
+            } else if (st == Mods.State.CONTENT_ERRORS) {
+                // 依赖 / 版本那几类已归插件（v25 P2/P3）；只剩"内容有错"这类**宿主扫描出来**的
+                // 文件级问题，仍然由宿主补一句"为什么"。
                 warns.add(Trans.get(ModsActivity.this, R.string.mods_warn_state_fmt, ModsText.stateLabel(this, st)));
             }
         }
@@ -1345,7 +1344,8 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
         return m == null || m.file == null ? "" : m.file.getAbsolutePath();
     }
 
-    private static String joinLines(List<String> xs) {        StringBuilder sb = new StringBuilder();
+    private static String joinLines(List<String> xs) {
+        StringBuilder sb = new StringBuilder();
         for (String x : xs) {
             if (sb.length() > 0) sb.append('\n');
             sb.append(x);
