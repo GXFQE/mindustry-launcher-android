@@ -98,6 +98,9 @@ public final class Conflicts {
         /** `bundles/<文件名>.properties` → 里面声明的键（覆盖原版文案的通道）。 */
         public final Map<String, Set<String>> bundleKeys =
                 new java.util.LinkedHashMap<String, Set<String>>();
+        /** `content/<类型>/**.json` 里**不带 `type`** 的补丁目标（覆盖原版数据的通道）。 */
+        public final Map<String, Set<String>> contentPatches =
+                new java.util.LinkedHashMap<String, Set<String>>();
     }
 
     /** 这个包读得到说明文件吗（没有 internalName 就是读不出 meta 的坏包）。 */
@@ -217,6 +220,8 @@ public final class Conflicts {
         public final List<String> sprites = new ArrayList<String>();
         /** 两边都声明、且**原版真的有的**文案键（已排序）。 */
         public final List<String> keys = new ArrayList<String>();
+        /** 两边都在打的**原版内容补丁**（`类型:名字`，如 `block:mass-driver`，已排序）。 */
+        public final List<String> contents = new ArrayList<String>();
 
         public Overlap(int a, int b) {
             this.a = a;
@@ -426,6 +431,7 @@ public final class Conflicts {
         //    先排掉"同一份代码两份壳"（重名 / A 里带了 B）—— 那是别的结论，不是覆盖冲突。
         Set<String> cont = new HashSet<String>();
         for (Pair p : c.contained) cont.add(p.a + ":" + p.b);
+        Map<String, Set<String>> vanillaNames = Overrides.vanillaNames(vanillaKeys);
         for (int i = 0; i < mods.size(); i++) Overrides.read(mods.get(i));
         for (int i = 0; i < mods.size(); i++) {
             Mod a = mods.get(i);
@@ -437,8 +443,10 @@ public final class Conflicts {
                 if (a.internalName != null && a.internalName.equalsIgnoreCase(b.internalName)) continue;
                 if (cont.contains(i + ":" + j) || cont.contains(j + ":" + i)) continue;
                 Overlap o = new Overlap(i, j);
-                Overrides.merge(a, b, vanillaKeys, o.sprites, o.keys);
-                if (!o.sprites.isEmpty() || !o.keys.isEmpty()) c.overlaps.add(o);
+                Overrides.merge(a, b, vanillaKeys, vanillaNames, o.sprites, o.keys, o.contents);
+                if (!o.sprites.isEmpty() || !o.keys.isEmpty() || !o.contents.isEmpty()) {
+                    c.overlaps.add(o);
+                }
             }
         }
         // 🔴 第 229 轮删掉了「简介提及」这一层（用户 2026-10-24：「简介中提到其他模组可以收起来

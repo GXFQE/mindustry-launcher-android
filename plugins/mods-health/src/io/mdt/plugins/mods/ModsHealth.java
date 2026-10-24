@@ -447,6 +447,17 @@ public final class ModsHealth {
                             c.getString(R.string.cf_ovr_key_detail_fmt, ex),
                             Finding.WARN, bp, ap).anchor(bp));
                 }
+                if (!o.contents.isEmpty()) {
+                    String ex = contentExamples(c, o.contents, sep, more);
+                    out.add(new Finding(
+                            c.getString(R.string.cf_ovr_content_title_fmt, bn, o.contents.size()),
+                            c.getString(R.string.cf_ovr_content_detail_fmt, ex),
+                            Finding.WARN, ap, bp).anchor(ap));
+                    out.add(new Finding(
+                            c.getString(R.string.cf_ovr_content_title_fmt, an, o.contents.size()),
+                            c.getString(R.string.cf_ovr_content_detail_fmt, ex),
+                            Finding.WARN, bp, ap).anchor(bp));
+                }
             }
         }
         if (!log.lines.isEmpty()) {
@@ -556,6 +567,36 @@ public final class ModsHealth {
         }
         if (list != null && list.size() > n) sb.append(more);
         return sb.toString();
+    }
+
+    /** 内容补丁的例子：`block:mass-driver` → 「方块 mass-driver」（类型词走资源）。 */
+    private static String contentExamples(Context c, java.util.List<String> list, String sep, String more) {
+        StringBuilder sb = new StringBuilder();
+        int n = Math.min(3, list == null ? 0 : list.size());
+        for (int i = 0; i < n; i++) {
+            if (sb.length() > 0) sb.append(sep);
+            String id = list.get(i);
+            int colon = id.indexOf(':');
+            String type = colon > 0 ? id.substring(0, colon) : "";
+            String name = colon > 0 ? id.substring(colon + 1) : id;
+            sb.append(c.getString(R.string.cf_ovr_target_fmt, c.getString(typeWord(type)), name));
+        }
+        if (list != null && list.size() > n) sb.append(more);
+        return sb.toString();
+    }
+
+    /** 内容类型的用户词（不出现 `ContentType` 这类内部名）。 */
+    private static int typeWord(String type) {
+        if ("block".equals(type)) return R.string.cf_ovr_type_block;
+        if ("item".equals(type)) return R.string.cf_ovr_type_item;
+        if ("liquid".equals(type)) return R.string.cf_ovr_type_liquid;
+        if ("unit".equals(type)) return R.string.cf_ovr_type_unit;
+        if ("status".equals(type)) return R.string.cf_ovr_type_status;
+        if ("sector".equals(type)) return R.string.cf_ovr_type_sector;
+        if ("planet".equals(type)) return R.string.cf_ovr_type_planet;
+        if ("weather".equals(type)) return R.string.cf_ovr_type_weather;
+        if ("team".equals(type)) return R.string.cf_ovr_type_team;
+        return R.string.cf_ovr_type_other;
     }
 
     /** 与宿主 {@code Util.formatSize} 同一个口径（1.2 KB / 7.5 MB），别在插件里另造一套。 */

@@ -16,6 +16,20 @@
     <string name="cf_ovr_sprite_detail_fmt">例：%1$s —— sprites-override 里的同名贴图只有一份能生效（后加载的赢）。</string>
     <string name="cf_ovr_key_title_fmt">和「%1$s」都改了 %2$d 句原版文案</string>
     <string name="cf_ovr_key_detail_fmt">例：%1$s —— 模组文案按加载顺序合并，后加载的盖掉先加载的。</string>
+    <!-- 第 234 轮：两个模组都在给同一份原版内容打补丁（content 里不带 type 的 JSON = 改数值） -->
+    <string name="cf_ovr_content_title_fmt">和「%1$s」都改了 %2$d 个原版内容</string>
+    <string name="cf_ovr_content_detail_fmt">例：%1$s —— 两个包都往同一份原版数据上写字段（数值、造价…），后加载的盖掉先加载的。</string>
+    <string name="cf_ovr_target_fmt">%1$s %2$s</string>
+    <string name="cf_ovr_type_block">方块</string>
+    <string name="cf_ovr_type_item">物品</string>
+    <string name="cf_ovr_type_liquid">液体</string>
+    <string name="cf_ovr_type_unit">单位</string>
+    <string name="cf_ovr_type_status">状态</string>
+    <string name="cf_ovr_type_sector">区块</string>
+    <string name="cf_ovr_type_planet">星球</string>
+    <string name="cf_ovr_type_weather">天气</string>
+    <string name="cf_ovr_type_team">队伍</string>
+    <string name="cf_ovr_type_other">内容</string>
     <string name="cf_log_title_fmt">上次启动的日志里有 %1$d 行提到这些模组</string>
 
     <string name="cf_none">没发现明显冲突</string>

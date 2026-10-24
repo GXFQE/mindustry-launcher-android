@@ -16,6 +16,20 @@
     <string name="cf_ovr_sprite_detail_fmt">e.g. %1$s - only one copy in sprites-override can win (the later mod loads last).</string>
     <string name="cf_ovr_key_title_fmt">changes the same %2$d vanilla string(s) as \"%1$s\"</string>
     <string name="cf_ovr_key_detail_fmt">e.g. %1$s - mod bundles merge in load order, so the later mod wins.</string>
+    <!-- round 234: two mods patch the same vanilla content (content JSON without type = field edits) -->
+    <string name="cf_ovr_content_title_fmt">changes the same %2$d vanilla entries as \"%1$s\"</string>
+    <string name="cf_ovr_content_detail_fmt">e.g. %1$s - both mods write fields onto the same vanilla data (numbers, costs, ...); the later mod wins.</string>
+    <string name="cf_ovr_target_fmt">%1$s %2$s</string>
+    <string name="cf_ovr_type_block">block</string>
+    <string name="cf_ovr_type_item">item</string>
+    <string name="cf_ovr_type_liquid">liquid</string>
+    <string name="cf_ovr_type_unit">unit</string>
+    <string name="cf_ovr_type_status">status</string>
+    <string name="cf_ovr_type_sector">sector</string>
+    <string name="cf_ovr_type_planet">planet</string>
+    <string name="cf_ovr_type_weather">weather</string>
+    <string name="cf_ovr_type_team">team</string>
+    <string name="cf_ovr_type_other">content</string>
     <string name="cf_log_title_fmt">the last game log mentions these mods on %1$d lines</string>
 
     <string name="cf_none">no obvious conflicts found</string>

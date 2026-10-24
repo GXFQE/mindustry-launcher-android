@@ -408,6 +408,19 @@ public final class Check {
         used.put("cf_ovr_sprite_detail_fmt", 1);
         used.put("cf_ovr_key_title_fmt", 2);
         used.put("cf_ovr_key_detail_fmt", 1);
+        used.put("cf_ovr_content_title_fmt", 2);
+        used.put("cf_ovr_content_detail_fmt", 1);
+        used.put("cf_ovr_target_fmt", 2);
+        used.put("cf_ovr_type_block", 0);
+        used.put("cf_ovr_type_item", 0);
+        used.put("cf_ovr_type_liquid", 0);
+        used.put("cf_ovr_type_unit", 0);
+        used.put("cf_ovr_type_status", 0);
+        used.put("cf_ovr_type_sector", 0);
+        used.put("cf_ovr_type_planet", 0);
+        used.put("cf_ovr_type_weather", 0);
+        used.put("cf_ovr_type_team", 0);
+        used.put("cf_ovr_type_other", 0);
         checkRes(used);
     }
 
@@ -488,6 +501,119 @@ public final class Check {
                         && zm.bundleKeys.get("bundle.properties") != null
                         && zm.bundleKeys.get("bundle.properties").contains("misc.help"),
                 "★读覆盖通道：zip 形态也读得到（sprites-override 路径 / bundle 键）");
+
+        // ── 内容补丁（第 235 轮补：最常见的"改数值"—— content 里不带 type 的 JSON）──
+        //    源码依据：v159 `ContentParser` 在名字找得到原版内容、又没有 `type` 时，
+        //    直接拿那个原版对象、把 JSON 字段写上去（有了 type 反而当新内容）。
+        check(!Overrides.hasTopLevelType("{\"research\":{\"objectives\":[{\"type\":\"SectorComplete\"}]}}"),
+                "★顶层没 type、嵌套有 type ⇒ 仍算补丁（别用全文匹配）");
+        check(Overrides.hasTopLevelType("{\"type\":\"GenericCrafter\",\"health\":1}"),
+                "★顶层有 type ⇒ 新内容，不算覆盖");
+        check(!Overrides.hasTopLevelType("{ // type: fake\n \"health\": 1 }"), "★注释里的 type 不算");
+        check(!Overrides.hasTopLevelType("{ \"description\": \"type: looks like a field\" }"),
+                "★字符串值里的 type 不算");
+
+        File pa = new File(work, "ovr-patch-a");
+        File pb = new File(work, "ovr-patch-b");
+        File pc = new File(work, "ovr-patch-c");
+        content(pa, "blocks/mass-driver.json", "{\n  \"itemCapacity\": 999,\n  \"health\": 1234\n}\n");
+        content(pa, "blocks/launch-pad.json",
+                "{\n  \"name\": \"改过的发射台\",\n  \"research\": { \"objectives\": [ { \"type\": \"SectorComplete\" } ] }\n}\n");
+        content(pb, "blocks/mass-driver.json", "{\n  \"reload\": 30\n}\n");
+        content(pc, "blocks/mass-driver.json", "{\n  \"health\": 1\n}\n");
+        content(pc, "blocks/zz-new.json", "{\n  \"type\": \"GenericCrafter\"\n}\n");
+        content(pc, "blocks/zz-unknown.json", "{\n  \"health\": 5\n}\n");
+        List<Conflicts.Mod> pm = new ArrayList<Conflicts.Mod>();
+        pm.add(mod(pa, "Patch A", "", ""));
+        pm.add(mod(pb, "Patch B", "", ""));
+        pm.add(mod(pc, "Patch C", "", ""));
+        Set<String> vk = new HashSet<String>();
+        vk.add("block.mass-driver.name");
+        vk.add("block.launch-pad.name");
+        Conflicts.Result pr = Conflicts.scan(pm, vk);
+        check(overlapContents(pr, 0, 1).contains("block:mass-driver"),
+                "★两个模组都给原版 mass-driver 打补丁（不带 type 的 JSON）⇒ 报");
+        check(!overlapContents(pr, 0, 1).contains("block:launch-pad"),
+                "★反向：只有 A 打了 launch-pad ⇒ 不报");
+        check(!overlapContents(pr, 0, 2).contains("block:zz-new"),
+                "★带 type 的 JSON = 新内容 ⇒ 不算覆盖（A 的嵌套 type 也照样算补丁）");
+        check(!overlapContents(pr, 0, 2).contains("block:zz-unknown"),
+                "★名字不在原版清单里 ⇒ 不报（那是新内容）");
+        check(overlapContents(pr, 0, 2).contains("block:mass-driver"),
+                "★C 也打了 mass-driver ⇒ 与 A 报");
+
+        File zp = new File(work, "ovr-patch.zip");
+        zipContent(zp, "content/blocks/mass-driver.json", "{ \"health\": 2 }");
+        Conflicts.Mod zpm = new Conflicts.Mod();
+        zpm.path = zp.getAbsolutePath();
+        zpm.title = "Zip Patch";
+        zpm.internalName = "zip-patch";
+        Overrides.read(zpm);
+        check(zpm.contentPatches.get("block") != null
+                        && zpm.contentPatches.get("block").contains("mass-driver"),
+                "★读内容补丁：zip 形态也读得到（content/blocks/*.json 无 type）");
+
+        // 有的包外面还套一层目录（host 把这层算成 rootPrefix）⇒ 三条通道都要先剥掉它
+        File zw = new File(work, "ovr-wrapped.zip");
+        zipWrapped(zw);
+        Conflicts.Mod zwm = new Conflicts.Mod();
+        zwm.path = zw.getAbsolutePath();
+        zwm.rootPrefix = "Pack/";
+        zwm.title = "Wrapped";
+        zwm.internalName = "wrapped";
+        Overrides.read(zwm);
+        check(zwm.overrideSprites.contains("zz-shared.png")
+                        && zwm.bundleKeys.containsKey("bundle.properties")
+                        && zwm.contentPatches.get("block") != null
+                        && zwm.contentPatches.get("block").contains("mass-driver"),
+                "★包外套一层目录（rootPrefix）⇒ 贴图 / 文案 / 内容三条都读得到");
+    }
+
+    private static void zipWrapped(File file) throws Exception {
+        ZipOutputStream z = new ZipOutputStream(new FileOutputStream(file));
+        try {
+            put(z, "Pack/mod.json", "name: wrapped\n");
+            put(z, "Pack/sprites-override/zz-shared.png", "png");
+            put(z, "Pack/bundles/bundle.properties", "misc.help=x\n");
+            put(z, "Pack/content/blocks/mass-driver.json", "{ \"health\": 1 }");
+            put(z, "Other/should-be-ignored.png", "png");
+        } finally {
+            z.close();
+        }
+    }
+
+    private static void put(ZipOutputStream z, String path, String body) throws Exception {
+        z.putNextEntry(new ZipEntry(path));
+        z.write(body.getBytes("UTF-8"));
+        z.closeEntry();
+    }
+
+    private static void content(File dir, String rel, String body) throws Exception {
+        File f = new File(dir, "content/" + rel);
+        File p = f.getParentFile();
+        if (p != null) p.mkdirs();
+        writeText(f, body);
+    }
+
+    private static void zipContent(File file, String path, String body) throws Exception {
+        ZipOutputStream z = new ZipOutputStream(new FileOutputStream(file));
+        try {
+            z.putNextEntry(new ZipEntry("mod.json"));
+            z.write("name: zip-patch\n".getBytes("UTF-8"));
+            z.closeEntry();
+            z.putNextEntry(new ZipEntry(path));
+            z.write(body.getBytes("UTF-8"));
+            z.closeEntry();
+        } finally {
+            z.close();
+        }
+    }
+
+    private static java.util.List<String> overlapContents(Conflicts.Result r, int a, int b) {
+        for (Conflicts.Overlap o : r.overlaps) {
+            if ((o.a == a && o.b == b) || (o.a == b && o.b == a)) return o.contents;
+        }
+        return new ArrayList<String>();
     }
 
     private static void override(File dir, String[] sprites, String bundleName,
