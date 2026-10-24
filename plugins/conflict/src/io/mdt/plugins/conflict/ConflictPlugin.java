@@ -160,19 +160,21 @@ public final class ConflictPlugin {
 
     // ---- 结论 → 文案 -----------------------------------------------------------
 
+    /**
+     * 把结论拼成卡片上那几行。
+     *
+     * <p>🔴 第 229 轮修订（用户：「感觉有点占地方啊」）：**默认每行只占一行** ——
+     * 原来每条都带一句解释、外加一行"检查了 N 个"的统计，五条结论就吃掉半屏。
+     * ⇒ 现在：① 统计**只在没发现冲突时**出现（发现冲突时，结论本身已经证明扫过了）；
+     * ② 解释只留"要用户动手"的那一条（重复实现 ⇒ 建议只留一个）；③ 日志**不再贴原文**
+     * （长的依据归运行日志，卡片只给结论 —— 与 §85.16.2 同一条）。
+     */
     private static List<Finding> findings(Context c, PluginApi api, Conflicts.Result r,
                                           List<Conflicts.Mod> mods, List<Conflicts.Hook> hooks) {
         List<Finding> out = new ArrayList<Finding>();
         // 日志每次进页面都重读（很便宜）：它每次启动游戏都会变，不该被 dex 扫描那份缓存冻住
         Conflicts.Log log = Conflicts.readLog(new File(api.slotDir(), "last_log.txt"), mods);
 
-        if (r.javaMods == 0) {
-            out.add(new Finding(c.getString(R.string.cf_no_code),
-                    c.getString(R.string.cf_no_code_detail), Finding.INFO));
-        } else {
-            out.add(new Finding(c.getString(R.string.cf_scanned_fmt, r.javaMods, size(r.scannedBytes)),
-                    "", Finding.INFO));
-        }
         for (Conflicts.Pair p : r.contained) {
             out.add(new Finding(
                     c.getString(R.string.cf_contained_title_fmt, title(mods, p.a), title(mods, p.b)),
@@ -183,41 +185,35 @@ public final class ConflictPlugin {
             String hook = h.hook >= 0 && h.hook < hooks.size() ? hooks.get(h.hook).name : "";
             out.add(new Finding(
                     c.getString(R.string.cf_shared_title_fmt, joinNames(c, mods, h.mods), hook),
-                    c.getString(R.string.cf_shared_detail), Finding.WARN));
+                    "", Finding.WARN));
         }
         for (Conflicts.Pair p : r.mentioned) {
             out.add(new Finding(
                     c.getString(R.string.cf_mentioned_title_fmt, title(mods, p.a), title(mods, p.b)),
-                    c.getString(R.string.cf_mentioned_detail), Finding.INFO));
+                    "", Finding.INFO));
         }
-        if (!log.lines.isEmpty()) out.add(logFinding(c, log));
-        if (r.contained.isEmpty() && r.sharedHooks.isEmpty() && r.mentioned.isEmpty()
-                && log.lines.isEmpty()) {
-            out.add(new Finding(c.getString(R.string.cf_none),
-                    c.getString(R.string.cf_none_hint), Finding.INFO));
+        if (!log.lines.isEmpty()) {
+            out.add(new Finding(c.getString(R.string.cf_log_title_fmt, log.lines.size()),
+                    "", Finding.INFO));
+        }
+        if (out.isEmpty()) {
+            // 一条结论都没有时才说"没冲突" —— 顺便把"扫了多少"只在这里说一次
+            if (r.javaMods > 0) {
+                out.add(new Finding(c.getString(R.string.cf_none),
+                        c.getString(R.string.cf_none_detail_fmt, r.javaMods, size(r.scannedBytes)),
+                        Finding.INFO));
+            } else {
+                out.add(new Finding(c.getString(R.string.cf_no_code), "", Finding.INFO));
+            }
         }
         for (Integer idx : r.dexErrors) {
             out.add(new Finding(c.getString(R.string.cf_note_dex_title_fmt, title(mods, idx.intValue())),
-                    c.getString(R.string.cf_note_dex_detail), Finding.WARN));
+                    "", Finding.WARN));
         }
         if (log.unreadable) {
             out.add(new Finding(c.getString(R.string.cf_note_log), "", Finding.INFO));
         }
         return out;
-    }
-
-    private static Finding logFinding(Context c, Conflicts.Log log) {
-        StringBuilder sb = new StringBuilder();
-        int n = Math.min(3, log.lines.size());
-        for (int i = 0; i < n; i++) {
-            if (i > 0) sb.append('\n');
-            sb.append(clip(log.lines.get(i), 160));
-        }
-        if (log.lines.size() > n) {
-            sb.append('\n').append(c.getString(R.string.cf_log_more_fmt, log.lines.size() - n));
-        }
-        return new Finding(c.getString(R.string.cf_log_title_fmt, log.lines.size()),
-                sb.toString(), Finding.INFO);
     }
 
     private static String joinNames(Context c, List<Conflicts.Mod> mods, List<Integer> idx) {
@@ -237,12 +233,6 @@ public final class ConflictPlugin {
         if (p == null || p.isEmpty()) return "";
         int slash = Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\'));
         return slash >= 0 ? p.substring(slash + 1) : p;
-    }
-
-    private static String clip(String s, int max) {
-        if (s == null) return "";
-        String t = s.trim();
-        return t.length() <= max ? t : t.substring(0, max) + "…";
     }
 
     /** 与宿主 {@code Util.formatSize} 同一个口径（1.2 KB / 7.5 MB），别在插件里另造一套。 */
