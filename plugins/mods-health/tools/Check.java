@@ -10,7 +10,7 @@ import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 /**
- * 插件侧自检（PC 上跑，`bash plugins/conflict/build.sh check`）。
+ * 插件侧自检（PC 上跑，`bash plugins/mods-health/build.sh check`）。
  *
  * <p>★ 为什么必须有它：判据第 229 轮从宿主搬到了这里，宿主 SelfTest 从此**看不到**它们；
  * 而真机上只有一份现成的模组组合 —— 判不出"反方向"（不该报的有没有误报）。

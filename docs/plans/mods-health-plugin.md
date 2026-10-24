@@ -8,7 +8,10 @@
 > （这样 mod.hjson/mod.json 也可以给插件接口），但文件错误（zip 损坏、不是游戏模组）纯宿主也会报，
 > 插件负责深度检测以及启停控制」。
 >
-> 状态：**P0~P3b(版本) 已落地（2026-10-24，v25）**；P3b(槽级) / 徽标 / P4 / P5 未开工（见 §五）。
+> 状态：**P0~P4 已落地（2026-10-24，接口 v25~v27）**；P5 未开工。
+> 同日补（第 230 轮）：六道门的判据搬进插件 `core/Gates.java` 并补了 PC 侧尺子（插件 check 41 → 69），
+> 见 `next/47` §十九。⚠️ 接口常量 `PluginHost.API` 仍是 26（v27 的 `Gate` / `gates()` / `summary()`
+> 已进代码但没抬版本），收口待做。
 
 ## 一、分工（用户第二轮定的边界）
 
@@ -88,9 +91,9 @@ public Map<String,Object> parseHjson(File file);
 1. `Mods.Scan.problems`（重复包）/ `ignored`（不加载）/ `orphanKeys`（孤儿开关）；
 2. `Mods.Info` 派生：`willFailJavaLoad` / `jsCount`·`hasScripts` / `hidden` / `minGameVersion` 比较 / 依赖解析 `states`；
 3. `ModsText`：`stateLabel` / `badgeSaysIt` / `cardNote` / `infoMetaReason` / 各种 warn 行；
-4. `ModsActivity` 详情：六道门（`Mods.gates`）与依赖链文案；
+4. `ModsActivity` 详情：六道门（**已搬** —— 插件 `core/Gates.java`，宿主只剩绘制）与依赖链文案；
 5. 「只看有问题的」筛选（`Mods.isProblem`）；
-6. 冲突检查（已搬，`plugins/conflict`）。
+6. 冲突检查（**已搬**，`plugins/mods-health`）。
 
 **留下**：分类与文件级错误的**判据与文案**（用户明确说这两类宿主也会报）。
 
@@ -99,6 +102,8 @@ public Map<String,Object> parseHjson(File file);
 analyzer 今天是**列表渲染完之后异步跑、只往卡片里塞**。行徽标 / 筛选都要**渲染前**的结果 ⇒
 P1 要把插件调用提到"扫描后、绑定前"，一份结果给三处（行、详情、筛选）用，**不许调三次**。
 插件不在 / 崩了 ⇒ 这份结果为空（页面顶部一行「没装体检插件」，可点去插件页）。
+⚠️ **实际实现（2026-10-24）**：插件不在 / 崩了 ⇒ 结论为空，卡片与门**整块不显示**；
+「没装体检插件」那行**没做**（按"宁可少说"）—— 要补的话单独开一条，别当 P1 已完成。
 
 ## 五、分步
 
@@ -108,10 +113,9 @@ P1 要把插件调用提到"扫描后、绑定前"，一份结果给三处（行
 | P1 ✅ | v25 接口：`Finding.anchor` + filter/sort 注入 + `parseHjson` + extra 补字段；宿主渲染（行徽标 / 详情 / 筛选 / 排序） | 真机：Neon 行出现「⚠ 里已经带了 Logic Sugar」；筛选「有冲突的模组」= 2/13；排序「按冲突风险」把它俩排到最前；自检 1548/0 |
 | P2 ✅ | 搬"能不能加载 / 脚本不生效"两条（**解析失败归宿主** —— 用户定的"文件级错误纯宿主也会报"） | 判据进 `Conflicts.scan`（PC 自检 19 条）；文案进插件、挂行上；宿主删掉那两句；真机两例都对 |
 | P3a ✅ | 搬**依赖三态 / 重复包 / 黑名单**：宿主把 `depState`／`duplicated`／`blacklisted` 当**事实**给插件，文案与"缺哪一条/重的是哪份"在插件 | PC 自检 25/0；真机三例（重名两份、缺依赖、黑名单）都对 |
-| P3b-槽级 ✅ | **孤儿开关**搬进插件（Conflicts.orphanKeys）；**整槽跳过也归插件**（v27 Finding.summary()，结论归插件、**位置在摘要卡**），宿主保留回落 | 插件 check 41/0；宿主摘要卡优先用插件结论、空才用 ModsText.cardNote。**崩溃记录不归这个插件**（归因需要独立插件 + 插件间接口） |
-| P3b-槽级 ✅(1/2) | **孤儿开关已搬**（判据 `Conflicts.orphanKeys`，事实来自 `gameSettings()` + `contents`）。**整槽跳过按用户 2026-10-24 的决定留在摘要卡**（它是"这个槽怎么了"，跟"哪个模组有问题"是两件事） | 插件 check 41/0；宿主摘要卡那两行与文案删掉。**崩溃记录不归这个插件**（归因需要独立插件 + 插件间接口，用户 2026-10-24 定） |
+| P3b-槽级 ✅ | **孤儿开关**搬进插件（`Conflicts.orphanKeys`）；**整槽跳过也归插件**（v27 `Finding.summary()`，结论归插件、**位置在摘要卡**），宿主保留回落 | 插件 check 41/0；真机摘要卡优先用插件结论、空才用 `ModsText.cardNote`。**崩溃记录不归这个插件**（归因需要独立插件 + 插件间接口，用户 2026-10-24 定） |
 | P3c-徽标 ✅ | 行徽标也交给插件（v26 `state()`：固定词表 token），宿主映射回 `Mods.State`；插件缺省才回落到宿主自己的判定 | 真机 `plugin verdicts: 13`；no-version 夹具徽标仍「版本不符」 |
-| P4 | 详情页六道门结构化（插件给 `List<Gate{ok,label,detail}>`） | 六道门逐条与今天一致（报告对照） |
+| P4 ✅ | 详情页六道门结构化（插件给 `List<Gate{label,pass,note}>`，v27） | 六道门逐条与搬家前一致；判据在 `core/Gates.java`、PC 自检逐道验（第 230 轮补，插件 check 69/0）；真机「❌ 版本门槛太低」那组逐字验过（见 `next/47` §十九） |
 | P5 | 导入前的体检也用同一套判据（**拦截**留宿主，**文案**归插件） | 导入失败原因与体检结论不再各写一套 |
 
 ## 六、不做什么

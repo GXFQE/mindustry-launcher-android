@@ -24,7 +24,7 @@ versions installed side by side, each with separate **saves / maps / blueprints 
 | Every version shares one set of data (saves / maps / mods / settings), so switching versions replaces it | Each version gets a **slot**: saves / maps / blueprints / mods / settings are fully independent |
 | Backing up means copying the whole data directory yourself | **Automatic backups** (per slot: when to trigger, how many to keep), content-addressed and shared between slots — measured on a real device: 3 slots × 20 backups, 9.1 GB of data in **448 MB** |
 | Deleting a save, a map or a blueprint is final | Deleting any of them **moves it to the transfer station** first, and it can be put back |
-| The game does say why a mod failed to load (missing dependency / version too low / blacklisted), but it never checks whether **two mods override the same content** | The **conflict-check plug-in** lists who bundles whom, whose description mentions whom, and what the last game log said |
+| The game does say why a mod failed to load (missing dependency / version too low / blacklisted), but it never checks whether **two mods override the same content** | The **mods-health plug-in** checks who bundles whom, structure problems, dependencies, duplicates, blacklist and version thresholds, and what the last game log said |
 | A crash leaves a log (which can be exported), but nothing says **which mod did it** | **Crash analysis** gives a verdict and its evidence; the report can be exported with that verdict, optionally **scrubbed first** |
 | How much ore a map holds and where you can build can only be counted inside the game | The map page reports **ore / wall ore / buildable tiles / core zone**, and can export it as JSON / JSONL |
 | A blueprint only reports its size and block count; which blocks are missing you find out by building it | The list names the **missing blocks** (and where it is unsure) |
@@ -105,7 +105,8 @@ yourself — even just a few lines — see **Translation file** below.
 ### Mods
 - Enable / disable one by one or in bulk (writes the game's own switch; backed up first)
 - Every mod says whether it will load and why
-- Conflict check (**plug-in**, `plugins/conflict`): who bundles whom, whose description mentions whom, and what the last game log said
+- Mod health (**plug-in**, `plugins/mods-health`): who bundles whom, structure problems (declared Java without code, several scripts without `main.js`), missing / disabled / circular dependencies, duplicate packages, blacklist, version thresholds, and what the last game log said
+- Its verdicts drive the row badges and the extra **filter / sort** entries on this page
 - Search, filter and sort; import / export; delete; copy to another slot
 
 ### Plug-ins
@@ -113,7 +114,8 @@ yourself — even just a few lines — see **Translation file** below.
 - Takes effect after a restart; the page offers **Restart the manager now**
 - One row each: name · state · origin · what happens if it crashes
 - Open its page, enable / disable, delete, read its info
-- Can add an action row to almost every page (not the launch page or the plug-ins page)
+- Can add an entry row, a card or an action to almost every page (not the launch page or the plug-ins page)
+- Can put its conclusions on rows and cards (severity-coloured), offer its own filter / sort entries, and supply the pass / fail checks in a mod's technical details
 - Can read slots and content, settings, logs, the transfer station and the version list, and open files
 - A crash does not take the manager down: retry / roll back / quarantine, and the page explains it
 

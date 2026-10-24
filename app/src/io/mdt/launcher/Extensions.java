@@ -214,7 +214,7 @@ final class Extensions {
         return SLOT_PLUGINS.equals(slot) || SLOT_CONTENT.equals(slot)
                 || SLOT_SECTION.equals(slot) || SLOT_ACTION.equals(slot)
                 // ★ v24 加了 analyzer 却漏了这一行 ⇒ 只声明 analyzer 的插件会被插件页
-                //   说成「这一版还不支持」（第 229 轮：conflict 插件第一次撞上）。
+                //   说成「这一版还不支持」（第 229 轮：mods-health 插件第一次撞上）。
                 || SLOT_ANALYZER.equals(slot)
                 // v25：插件能往页面的筛选 / 排序里加自己的一项
                 || SLOT_FILTER.equals(slot) || SLOT_SORT.equals(slot);

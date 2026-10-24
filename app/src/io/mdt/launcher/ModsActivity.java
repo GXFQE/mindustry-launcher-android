@@ -1549,7 +1549,7 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
             return sb.toString();
         }
         // ★ 第 85 轮：模组**自己写的"这是什么"**原来从没上过界面 ——
-        //   `description` 只被冲突检测拿去当"简介提及"的线索用（见 Mods.findMentions）。
+        //   `description` 原来只被冲突检测拿去当线索用（那层「简介提及」已于第 229 轮删除）。
         //   而"这模组干什么的"恰恰是用户挑模组时第一个想知道的。
         //   ⚠️ 只给一行：优先它声明的 `subtitle`（本来就是标语），没有才截 `description` 的第一行；
         //      全文仍在第二层「技术细节」的说明文件原文里（信息没删，只是分层）。

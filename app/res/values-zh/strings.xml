@@ -1607,9 +1607,8 @@
     <string name="mods_badge_willfail">加载会失败</string>
 
     <!--
-      F13 第四阶段：模组间冲突体检（用户：「话说有办法检查到如果有人会把 logicsugar 和 neon
-      同时加载这种情况吗」）。★ 判据与实测分辨力见 REF §53：内置检测（判决）/ 共同全局钩子（提示）/
-      简介提及（线索）/ 游戏日志归因（决定性）。
+      F13 第四阶段：模组间冲突体检 —— 第 229 轮已整块搬进官方插件 `plugins/mods-health`
+      （判据在插件的 `core/Conflicts.java` / `core/Gates.java`）；「共同全局钩子」与「简介提及」两层已删。
     -->
     <!-- 列表的搜索/筛选/排序（用户点单第②项） -->
     <string name="mods_search_hint">搜索模组名或文件名</string>

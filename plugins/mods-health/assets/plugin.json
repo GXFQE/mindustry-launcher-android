@@ -1,9 +1,9 @@
-﻿{
+{
   "entry": "io.mdt.plugins.mods.ModsHealth",
   "name": "mods-health",
   "version": "1",
   "author": "mdt",
-  "description": "mod health check (bundled code / description mentions / game log)",
+  "description": "mod health check (bundles / structure / dependencies / versions / game log)",
   "access": [
     "mods"
   ],

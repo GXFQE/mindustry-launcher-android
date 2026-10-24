@@ -82,7 +82,7 @@ GBK 编码、批量删除）已固化在 build.sh 注释里。
 - 5 个只读 dev 口（`dev_maps_slot` / `dev_mods_scan` / `dev_crash_analyze` / `dev_mods_conflict` /
   `dev_cas_stats`）重构前后**报告逐行相同**（归一化掉时间戳后 diff 为空；`dev_cas_stats` 那次差异
   —— ⚠️ 这是 2026-10-10 的**历史测量**；`dev_mods_conflict` 已在第 229 轮随冲突体检搬进
-  `plugins/conflict` 而删除，现在那份判据由插件自带的自检验（`build.sh check`）钉着。
+  `plugins/mods-health` 而删除，现在那份判据由插件自带的自检验（`build.sh check`）钉着。
   经**两次采样**确认是"中间跑过自检、池子被清过"的状态变化，不是代码变化）；
 - 产品版界面正常，且用 `dev_m3_selftest` / `dev_maps_slot` 触发时 `hub/report-m3.txt`
   **一个字节都没被改写**、也**没写出** `report-devtool.txt`；
@@ -425,7 +425,6 @@ $ADB shell am start -n io.mdt.launcher/.MainActivity --es dev_mapstats <槽> \
 $ADB shell am start -n io.mdt.launcher/.MainActivity --es dev_mods_scan <槽>
 $ADB shell am start -n io.mdt.launcher/.MainActivity --es dev_mods_toggle <槽> \
     --es dev_mods_name <内部名> [--ez dev_mods_on true|false]      # 不带 on = 取反
-$ADB shell am start -n io.mdt.launcher/.MainActivity --es dev_mods_conflict <槽>
 $ADB shell am start -n io.mdt.launcher/.MainActivity --es dev_mods_import <模组包路径> \
     [--es dev_mods_slot <槽>] [--ez dev_mods_overwrite true]
 $ADB shell am start -n io.mdt.launcher/.MainActivity --es dev_mods_copy <源槽> \
@@ -527,7 +526,8 @@ MapStats / MapStatsMods / MapStatsTable
                 内容表与地图资源统计（**纯 Java 内核**；Mods 那侧负责"取数"）
 SaveAsMap       「存档视为地图」的改写器（纯逻辑，REF §72）
 Mods / ModsActivity / ModsText
-                模组扫描 / 启停（写 settings.bin）/ 导入复制 / 冲突体检 +「码 → 文案」
+                模组扫描 / 启停（写 settings.bin）/ 导入复制 +「码 → 文案」
+                （冲突体检与六道门已搬进官方插件 `plugins/mods-health`；宿主只留绘制与回落）
 SettingsBin / SettingsText
                 settings.bin 的读 / 写（**改前备份 + 原子写 + 写后自检**）+ 文案
 BundleNames     内容译名（两层 bundle：语言层 / 基础层，**层内模组优先**）

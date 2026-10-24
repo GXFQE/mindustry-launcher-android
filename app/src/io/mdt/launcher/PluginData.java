@@ -513,7 +513,7 @@ final class PluginData {
             put(ex, "settingsKnown", String.valueOf(m.settingsKnown));
             put(ex, "launchIdExists", String.valueOf(scan != null && scan.launchIdExists));
             // 目录形态的"根"（`resolveRoot` 下潜一层之后那一层）：插件找 classes.dex 要用它，
-            // 别让插件自己再推一遍这条规则（第 229 轮，conflict 插件）。
+            // 别让插件自己再推一遍这条规则（第 229 轮，mods-health 插件）。
             if (m.directory && m.rootDir != null) put(ex, "rootDir", m.rootDir.getAbsolutePath());
             String title = m.displayName == null || m.displayName.trim().isEmpty()
                     ? m.fileName : m.displayName.trim();

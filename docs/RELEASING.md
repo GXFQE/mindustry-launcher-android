@@ -11,7 +11,7 @@
 |---|---|---|---|
 | 启动器版本 `versionName` | 用户看到的版本 | 发布时定 | `0.7.0-preview` |
 | `versionCode` | Android 判升级用的整数 | 发布序号 | `7` |
-| 插件接口版本 | `PluginApi.API` / `API_MIN` | 接口变更时 | `24` |
+| 插件接口版本 | `PluginHost.API` / `PluginHost.API_MIN` | 接口变更时 | `26`（以 `PluginHost.API` 为准，现查） |
 | 游戏版本 | 官方 APK 自己的 `versionName` | 游戏作者 | `8-official-160` |
 
 开发轮次（「第 226 轮」）只是内部记录，**不进版本号**。

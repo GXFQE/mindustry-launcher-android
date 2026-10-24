@@ -34,8 +34,8 @@ wpath() { "$CYGPATH" -w "$1"; }
 jpath() { "$CYGPATH" -m "$1"; }
 
 # ---- 插件侧自检（纯 Java，PC 上跑）：`plugins/mods-health/build.sh check` -------------
-# ★ 为什么要有它：三层判据已经不在宿主里了（宿主 SelfTest 抓不到），而"判据本身对不对"
-#   只能在夹具上验 —— 真机上只有一份现成的模组组合，验不出反方向。
+# ★ 为什么要有它：结构 / 依赖 / 冲突 / 六道门的判据都不在宿主里了（宿主 SelfTest 抓不到），
+#   而"判据本身对不对"只能在夹具上验 —— 真机上只有一份现成的模组组合，验不出反方向。
 if [ "${1:-}" = "check" ]; then
   echo "== mods-health check (PC) =="
   CHK="$OUT/check"; rm -rf "$CHK"; mkdir -p "$CHK"

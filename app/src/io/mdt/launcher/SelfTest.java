@@ -4495,7 +4495,7 @@ public final class SelfTest {
                             + "声明了别家插槽 ⇒ 真；混着认得的 ⇒ 假；**什么都没声明 ⇒ 假**"
                             + "（纯后台插件不该被提示）；空表 / 空插槽名 ⇒ 假");
             // ★ 第 229 轮：v24 加了 analyzer 插槽，`knownSlot` 漏了它 ⇒ 只声明 analyzer 的插件
-            //   （官方 conflict 插件就是这种）会被插件页说成「这一版还不支持」。
+            //   （官方 mods-health 插件就是这种）会被插件页说成「这一版还不支持」。
             java.util.List<Extensions.Item> onlyAnalyzer = Extensions.parse(
                     "{\"extensions\":[{\"id\":\"a\",\"entry\":\"com.x.A\","
                             + "\"slot\":\"analyzer\",\"page\":\"mods\"}]}");

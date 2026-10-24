@@ -1,12 +1,13 @@
-﻿# 插件接口（PluginApi）—— 给插件开发者看的那一份
+# 插件接口（PluginApi）—— 给插件开发者看的那一份
 
 > 面向写插件的人；宿主内部的实现细节看 `docs/flows/` 与 `.dsh/memory/ref/`。
 > 文档里的版本号必须等于 `PluginHost.API`，自检有一条元断言钉着（`PluginApi.DOC_VERSION`）。
 
 ## 1. 版本与兼容（v20 冻结基线）
 
-- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..24**。
-  （v20 是冻结基线；v21 = 游戏设置面；v22 = 后台任务 + 游戏事件；v23 = 探针；v24 = 分析器。）
+- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..26**。
+  （v20 是冻结基线；v21 = 游戏设置面；v22 = 后台任务 + 游戏事件；v23 = 探针；v24 = 分析器；
+  v25 = 结论挂行 + 筛选/排序注入 + HJSON；v26 = 逐项判定。）
 - 插件 `api()` 报的是「我需要的最低宿主接口版本」。用不到的新能力**不要**报高 ——
   报高了只会在老宿主上被拒，换不来任何东西。
 - **不要用 try/catch 去兼容老宿主**：报什么版本就只会跑在什么版本上。`api()` 报 20，
@@ -15,6 +16,9 @@
   老插件照旧装得进；**破坏性**（改语义 / 删方法）才抬下限。
 - 报的版本**高于**本机 ⇒ 拒绝并说明「宿主太旧」；低于 `API_MIN` ⇒ 说明「插件太旧」。
   v1~v19 的老写法（`createView(Context)` 等）从 v20 起**不再回落**。
+- ⚠️ 代码里还进了三件 **v27 的加法**（`api/Gate`、可选 `gates()`、`Finding.summary()`），
+  但 `PluginHost.API` **还没抬到 27** ⇒ **现在报 27 会被判「宿主太旧」**；
+  等常量抬上去再按 27 写（接口面见下面 v26 之后的两节）。
 
 ## 2. 插件包结构
 
@@ -65,7 +69,7 @@
 ## 3. 入口类约定
 
 ```java
-public static int api();                        // 必需：你需要的接口版本（当前 24；用不到新能力就报 20）
+public static int api();                        // 必需：你需要的接口版本（当前 26；用不到新能力就报 20）
 public static View createView(PluginApi api);   // content / section 用
 public static void run(PluginApi api);          // action 用（在原页跑，不换页）
 public static void unload();                    // 可选：收尾（也认 unload(Context)）
@@ -85,7 +89,7 @@ public static void unload();                    // 可选：收尾（也认 unlo
 
 | 方法 | 说明 |
 |---|---|
-| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 24） |
+| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 26） |
 | `context()` | 插件上下文（**只用来取资源 / 主题 / 建 View**） |
 | `page()` / `slot()` | 从哪一页来 / 当前槽名 |
 | `theme()` | 主题色与 dp/sp（别自己写死颜色，见 `PluginTheme`） |
@@ -208,7 +212,7 @@ public interface Probe {
 插件给结论，宿主画。在自述里声明（**入口类里再加一个静态方法**）：
 
 ```json
-{ "id": "conflict", "title": "冲突检查", "entry": "com.example.ModTool",
+{ "id": "mods-health", "title": "模组体检", "entry": "com.example.ModTool",
   "slot": "analyzer", "page": "mods" }
 ```
 
@@ -265,6 +269,36 @@ public static String state(ItemInfo item, PluginApi api);   // 返回下面词�
 - 返回 `null`（或没实现这个方法）⇒ 宿主回落到它自己的判定。读不出说明文件的坏包就该走这条：
   那是**文件级错误**，归宿主；
 - 词表是**闭集**：多写一个不认识的 token 等于没给（宿主回落）。要加新状态，先改宿主。
+
+### 详情页的门（v27，代码已进、`PluginHost.API` 待抬）
+
+```java
+public static List<Gate> gates(ItemInfo item, PluginApi api);   // 可选
+```
+
+```java
+public final class Gate {
+    public final String label;    // 给人看的一行（通过与不通过各一条文案）
+    public final boolean pass;
+    public final String note;     // 补充说明；通过时一般留空
+}
+```
+
+- 宿主对页面里**每一项**调用一次；返回空表 ⇒ 那一项**不显示**门（宿主自己那份判据已删，别指望回落）；
+- `pass == false` 时 `note` **必须非空**（「❌ + 没有原因」等于白说）；
+- `label` 必须**跟着状态换**（❌ 后面不许跟肯定句），通过的标签与不通过的标签是两条不同文案；
+- **槽级事实用槽级措辞**：整槽跳过不是"它崩了"；`-failed` 才是这个模组自己的记录；
+- **不要猜默认值**：`extra.settingsKnown == false` 时「启用」只是默认值，要补一句说明。
+
+### 槽级结论放摘要卡（v27，同上）
+
+```java
+new Finding(title, detail, severity, evidence).summary();
+```
+
+- 只对**不挂行**的结论有效；`anchor()` 优先（挂行的仍画在那一行）；
+- 落点是页面的**摘要卡**（"这个槽怎么了"），不是底部的「插件」卡 —— 用于整槽跳过这类槽级事实；
+- 同一件事只说一次：槽级结论进了摘要卡，就不要再按行重复。
 
 ### 筛选 / 排序注入（v25）
 
@@ -464,11 +498,17 @@ v25（2026-10-24 第 229 轮）：`Finding.anchor`（结论挂到某一行）+ `
 （插件注入自己的筛选与排序）+ `parseHjson(File)`（宿主解析、插件用）；`API_MIN` 仍不动。
 v26（同日）：可选 `state(ItemInfo, PluginApi)` —— 插件给**逐项判定**（固定词表），宿主拿它画徽标 /
 筛选 / 详情，并回落到自己的判定。
+v27（同日第 229 轮 P4）：`api/Gate` + 可选 `gates(ItemInfo, PluginApi)`（详情页六道加载门）+
+`Finding.summary()`（不挂行的槽级结论进摘要卡）。
+⚠️ **这三件已经进宿主代码，但 `PluginHost.API` 仍是 26** —— 抬常量与收紧文档在同一次接口收口里做；
+在那之前插件报 27 会被判「宿主太旧」。
 
-**第一个「纯 analyzer」插件**：`plugins/conflict`（第 229 轮，模组冲突检查）。宿主管了四年
-（第 229 轮之前）的那行「查模组冲突」整块删掉，判据搬进插件的 `core/Conflicts.java`；
-界面只剩宿主的 analyzer 卡片。两个注意点（都在那个工程里踩过）：
+**官方体检插件**：`plugins/mods-health`（第 229 轮，前身叫 `conflict`）。宿主原来的那行
+「查模组冲突」整块删掉，判据搬进插件的 `core/Conflicts.java` 与 `core/Gates.java`；
+界面只剩宿主的 `analyzer` 卡、行徽标、筛选/排序注入与详情页的门。三个注意点（都在那个工程里踩过）：
 - `analyzer` 是**逐项**回调，而 `Finding` 没有 item 字段 ⇒ 整槽结论只在「页面第一项」那一次给，
   否则同一份结论会在卡片里重复 N 遍（插件按 `contents(mods).get(0)` 判，**不是**按回调顺序）；
-- analyzer 每次进页面都会跑 ⇒ 重活要按 `mods/` 签名缓存（那个插件按「名字:大小:mtime」缓存三层判据，
-  日志摘录不缓存 —— 它每次启动游戏都会变）。
+- analyzer 每次进页面都会跑 ⇒ 重活要按 `mods/` 签名缓存（那个插件按「名字:大小:mtime」缓存判据，
+  日志摘录不缓存 —— 它每次启动游戏都会变）；
+- 门的**判据与文案分家**：判据（哪道门过、用哪条文案 key、要什么参数）必须放在插件 core 里，
+  入口类只做 `key → R.string` 映射 —— 否则 `build.sh check` 编不到它，宿主一删断言就一条尺子都没有。
