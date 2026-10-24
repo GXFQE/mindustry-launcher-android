@@ -233,6 +233,12 @@ final class PluginEntries {
          * 结论归插件，位置在摘要卡 —— 两件事分开。
          */
         void onPluginSummary(java.util.List<io.mdt.launcher.api.Finding> fs);
+
+        /**
+         * **v27**：插件给的「六道加载门」结论（path → 门）。
+         * 空表 = 没有插件能算 ⇒ 详情页回落到宿主自己的 {@code Mods.gates}。
+         */
+        void onPluginGates(java.util.Map<String, java.util.List<io.mdt.launcher.api.Gate>> gates);
     }
 
     /**
@@ -307,8 +313,11 @@ final class PluginEntries {
                 @Override public void run() {
                     final java.util.Map<String, String> verdicts =
                             new java.util.HashMap<String, String>();
+                    // v27：六道门的插件结论（path → 门）
+                    final java.util.Map<String, java.util.List<io.mdt.launcher.api.Gate>> gates =
+                            new java.util.HashMap<String, java.util.List<io.mdt.launcher.api.Gate>>();
                     final java.util.List<io.mdt.launcher.api.Finding> all =
-                            PluginAnalysis.analyzePage(a, fp, fslot, fsel, fitem, verdicts);
+                            PluginAnalysis.analyzePage(a, fp, fslot, fsel, fitem, verdicts, gates);
                     a.runOnUiThread(new Runnable() {
                         @Override public void run() {
                             if (!(sec.getTag() instanceof Integer) || (Integer) sec.getTag() != token) return;
@@ -332,6 +341,7 @@ final class PluginEntries {
                                 }
                                 ((FindingsSink) a).onPluginStates(verdicts);
                                 ((FindingsSink) a).onPluginSummary(summary);
+                                ((FindingsSink) a).onPluginGates(gates);
                             }
                             showFindings(a, sec, body, card);
                         }

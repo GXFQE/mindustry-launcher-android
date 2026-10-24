@@ -123,6 +123,11 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
      */
     private final java.util.List<String> mSlotNotes = new java.util.ArrayList<String>();
     /**
+     * v27：插件给的「六道加载门」结论（path → 门）。空表 = 没插件能算 ⇒ 用宿主自己的。
+     */
+    private final java.util.Map<String, java.util.List<io.mdt.launcher.api.Gate>> mGates =
+            new java.util.HashMap<String, java.util.List<io.mdt.launcher.api.Gate>>();
+    /**
      * v25：插件注入的**筛选**结果（item path 集合；null = 没选）。只在选中那一刻算一次，
      * 之后每次 `rebuildList()` 直接用它 —— 别在打字搜索时反复调插件。
      */
@@ -1096,6 +1101,12 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
      * 所以要重画；只重画列表，不重扫、不动设置。
      */
     /** v27：插件要放在**摘要卡**里的槽级结论到了 —— 收下并重画摘要卡。 */
+    /** v27：六道门的插件结论到了 —— 收下（下次开详情用）。 */
+    @Override public void onPluginGates(java.util.Map<String, java.util.List<io.mdt.launcher.api.Gate>> gates) {
+        mGates.clear();
+        if (gates != null) mGates.putAll(gates);
+    }
+
     @Override public void onPluginSummary(java.util.List<Finding> fs) {
         mSlotNotes.clear();
         if (fs != null) {
@@ -1400,6 +1411,19 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
     }
 
     /**
+     * v27：详情页那六道门——**插件算过就用插件的**，没有才用宿主自己的。
+     */
+    private List<Mods.Gate> gatesOf(Mods.Info m) {
+        java.util.List<io.mdt.launcher.api.Gate> pg = mGates.get(pathOf(m));
+        if (pg != null && !pg.isEmpty()) {
+            List<Mods.Gate> out = new ArrayList<Mods.Gate>();
+            for (io.mdt.launcher.api.Gate g : pg) out.add(new Mods.Gate(g.label, g.pass, g.note));
+            return out;
+        }
+        return Mods.gates(this, m, mTarget.build, mTarget.revision, mScan);
+    }
+
+    /**
      * v25：模组条目的"身份" = 绝对路径（与 {@code ItemInfo.path} **逐字相同**）。
      * 插件挂结论（`Finding.anchor`）与注入的筛选用的是同一个键。
      */
@@ -1544,7 +1568,7 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
                 ModsText.outcome(this, stOf(m),
                         m.settingsKnown, m.willFailJavaLoad(), m.failed, mScan.skipModLoading)));
         int fail = 0;
-        for (Mods.Gate g : Mods.gates(this, m, mTarget.build, mTarget.revision, mScan)) {
+        for (Mods.Gate g : gatesOf(m)) {
             if (!g.pass) fail++;
         }
         sb.append('\n').append(fail == 0 ? Trans.get(ModsActivity.this, R.string.mods_detail_allok)
@@ -1633,7 +1657,7 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
             sb.append(Trans.get(ModsActivity.this, R.string.mods_detail_gate_note_fmt,
                     mTarget.label.isEmpty() ? Trans.get(ModsActivity.this, R.string.mods_detail_gate_nogame)
                             : mTarget.label)).append('\n');
-            for (Mods.Gate g : Mods.gates(this, m, mTarget.build, mTarget.revision, mScan)) {
+            for (Mods.Gate g : gatesOf(m)) {
                 // ★ 通过 + 无补充说明 ⇒ **只画一行**（note == null 就是"没什么好说的"，
                 //   约定见 Mods.gates 的注释）；失败才把原因摊在第二行。
                 if (g.pass) {

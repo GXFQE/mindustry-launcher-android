@@ -60,7 +60,7 @@ final class PluginAnalysis {
      */
     static List<Finding> analyzePage(Context ctx, String page, String slot,
                                      File selected, ItemInfo item) {
-        return analyzePage(ctx, page, slot, selected, item, null);
+        return analyzePage(ctx, page, slot, selected, item, null, null);
     }
 
     /**
@@ -72,7 +72,8 @@ final class PluginAnalysis {
      */
     static List<Finding> analyzePage(Context ctx, String page, String slot,
                                      File selected, ItemInfo item,
-                                     java.util.Map<String, String> verdicts) {
+                                     java.util.Map<String, String> verdicts,
+                                     java.util.Map<String, java.util.List<io.mdt.launcher.api.Gate>> gates) {
         List<Finding> out = new ArrayList<Finding>();
         if (ctx == null || page == null) return out;
         List<ItemInfo> items = PluginData.pageItems(ctx, page, slot, selected);
@@ -86,7 +87,7 @@ final class PluginAnalysis {
                 for (Extensions.Item it : Extensions.forSlot(
                         Extensions.of(apk), Extensions.SLOT_ANALYZER)) {
                     if (!page.equals(it.page)) continue;
-                    runOne(ctx, apk, it, page, slot, selected, item, items, out, verdicts);
+                    runOne(ctx, apk, it, page, slot, selected, item, items, out, verdicts, gates);
                 }
             }
         } catch (Throwable ignored) {
@@ -97,7 +98,8 @@ final class PluginAnalysis {
     private static void runOne(Context ctx, File apk, Extensions.Item it, String page,
                                String slot, File selected, ItemInfo item,
                                List<ItemInfo> items, List<Finding> out,
-                               java.util.Map<String, String> verdicts) {
+                               java.util.Map<String, String> verdicts,
+                               java.util.Map<String, java.util.List<io.mdt.launcher.api.Gate>> gates) {
         PluginHost.Loaded loaded = null;
         try {
             loaded = PluginHost.load(ctx, apk, it.entry, page, slot, selected, item);
@@ -114,6 +116,12 @@ final class PluginAnalysis {
                 st = loaded.entry.getMethod("state", ItemInfo.class, PluginApi.class);
             } catch (Throwable ignored) {
             }
+            // v27：可选 `gates(ItemInfo, PluginApi)` —— 详情页六道门的结论
+            java.lang.reflect.Method gt = null;
+            try {
+                gt = loaded.entry.getMethod("gates", ItemInfo.class, PluginApi.class);
+            } catch (Throwable ignored) {
+            }
             int n = 0;
             for (ItemInfo one : items) {
                 if (n++ >= MAX_ITEMS) break;
@@ -123,6 +131,22 @@ final class PluginAnalysis {
                             Object v = st.invoke(null, one, loaded.env);
                             if (v instanceof String && !((String) v).isEmpty()) {
                                 verdicts.put(one.path, (String) v);
+                            }
+                        } catch (Throwable ignored) {
+                        }
+                    }
+                    if (gt != null && gates != null && one.path != null) {
+                        try {
+                            Object g = gt.invoke(null, one, loaded.env);
+                            if (g instanceof java.util.List) {
+                                java.util.List<io.mdt.launcher.api.Gate> gs =
+                                        new java.util.ArrayList<io.mdt.launcher.api.Gate>();
+                                for (Object o : (java.util.List<?>) g) {
+                                    if (o instanceof io.mdt.launcher.api.Gate) {
+                                        gs.add((io.mdt.launcher.api.Gate) o);
+                                    }
+                                }
+                                if (!gs.isEmpty()) gates.put(one.path, gs);
                             }
                         } catch (Throwable ignored) {
                         }
