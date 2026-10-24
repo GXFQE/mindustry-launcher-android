@@ -63,7 +63,7 @@
     会抛 `SecurityException: Writable dex file ... is not allowed`；而且只读副本**不能原地覆盖**
     （先 `delete` 再复制）——与插件注入的 S0 规则同源。
   - 骨架已进仓库：`ProbeService`（`:probe`）、`ProbeLab`（dev 验证台，产品版空壳）、
-    夹具 `ProbeFixture`；正式 `Probe` 接口与调度器还没做。
+    夹具 `ProbeFixture`；**正式 `Probe` 接口与调度器已于第 223 轮实现**（`ProbeRunner`，见 `next/45`）。
 - **官方 / 第三方的区别 = 是否给提示，不是能不能用**（2026-10-23 用户订正）：
   - 第三方**同样可以**声明进程内探针（能力不设门槛）
   - **官方**：不额外提示；**第三方**：启用时弹风险告知 + 崩溃报告里标"第三方，进程内"
@@ -75,13 +75,9 @@
   推断（`probe.state=RUN`）+ `thirdparty=0|1`。
 - 确认框不是安全边界（插件本来就能改文件）⇒ 动作**直接执行**，结果返回 `{ok, needsRestart, reason}`。
 
-### B3. 插件动作注册表（替代"一功能一接口"）
-```java
-String[] actions();
-Result perform(String action, Bundle args);   // Result = ok / needsRestart / reason
-```
-首批：`item.open` / `version.launch`（⚠️ **`mod.enable` / `mod.disable` 不再开**，2026-10-23 晚：设置面已能安全写，见 B0；再开一道门就是同一件事两份实现）。加动作 = 宿主注册一行，接口不变。
-保留硬约束（游戏在跑时拒绝写 `settings.bin`），但**不强制**宿主确认框。
+### B3. 插件动作注册表 —— ❌ 决定不做（2026-10-24 用户：「目前来看没啥用」）
+原设计 `actions()` / `perform()` 首批只剩 `item.open` / `version.launch`；现有具体方法已覆盖，
+`Bundle` + 字符串动作名还没有编译期检查 ⇒ 不开这张表。以后真有零散动作，加具体方法即可。
 
 ### B4. 崩溃归因 / 模组冲突检查插件化 —— ✅ 已实现（v24，第 224 轮）
 - **UI 留宿主**（插件没有宿主的卡片/徽标/主题，硬画必然不像）⇒ 插件只给结构化结论：
@@ -89,9 +85,9 @@ Result perform(String action, Bundle args);   // Result = ok / needsRestart / re
   public static List<Finding> analyze(ItemInfo item, PluginApi api);
   // Finding = { title, detail, severity, evidence[] }
   ```
-  扩展类型 `slot: "analyzer"` + `page: "mods"`，宿主把结论画成模组列表顶上的卡片。
-- 先行试水：**模组页**（每条模组调用一次，宿主最多显示 6 条）；
-  ⚠️ 崩溃页还没接（`page` 只认 `mods`）。
+  扩展类型 `slot: "analyzer"` + `page`，宿主把结论画成「插件」卡里的一段文字。
+- 2026-10-24（第 227 轮）：**所有页面通用**（数据源 = `pageItems()`）；mods 页不再单独画卡。
+  ⚠️ 严重度（INFO/WARN/ERROR）还没在渲染上区分。
 
 ## 已否决
 
@@ -103,7 +99,7 @@ Result perform(String action, Bundle args);   // Result = ok / needsRestart / re
 
 ## 待推送
 
-截至 2026-10-23 晚：本地有未推送的文档提交（`9cdf607` + `a815863` + 本轮设计变更）；具体领先几笔**现查** `git status -sb`。S302 不通时 `git push` 会挂起 / 被 reset，下次一并推。
+截至 2026-10-24：全部已推送（`git status -sb` 应为 `[ahead 0]`）。
 
 ---
 
@@ -129,8 +125,7 @@ Result perform(String action, Bundle args);   // Result = ok / needsRestart / re
    ```
    - 宿主用现有归因卡 / 模组行样式渲染 ⇒ 保住"和原来一样"
 3. **崩溃报告的读取入口**：✅ 已实现（v22，`crashReportsDir()`）
-4. **插入点**
-   - 崩溃页、模组页要能挂 `analyzer`（现在的 `section` 能否挂到这两页要现场确认）
+4. **插入点**：✅ analyzer 现在所有页面通用（第 227 轮，宿主画进「插件」卡）
 6. **变更通知**
    - ✅ 不需要新接口：`ModsActivity.onResume` → `rescan()` 每次回来都重读设置
      （插件写完设置、用户返回模组页即生效）
@@ -148,9 +143,9 @@ Result perform(String action, Bundle args);   // Result = ok / needsRestart / re
 
 1. ~~B0 设置面~~ ✅ 已实现（v21）
 2. ~~任务接口 + 游戏事件（含 boot / app-foreground / 补报）~~ ✅ 已实现（v22）
-3. `analyzer` + 崩溃页/模组页插入点；动作注册表只剩 `item.open` / `version.launch`
-4. 迁移冲突检测（简单）→ 再迁移崩溃归因
-5. `:game` 探针（**待再定**，用户 2026-10-23：先不碰）
+3. ~~`analyzer` + 各页插入点~~ ✅ 已实现（v24，第 227 轮全页面通用）；动作注册表 ❌ 决定不做
+4. 迁移冲突检测（简单）→ 再迁移崩溃归因（**接口已就绪，插件本体还没写**）
+5. ~~`:game` 探针~~ ✅ 已实现（v23，`ProbeRunner`）
 
 
 ### 总原则（2026-10-23 定）

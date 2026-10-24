@@ -57,7 +57,7 @@
     <string name="probe_note_third_fmt">%1$s (third-party%2$s)</string>
     <string name="probe_note_where_in">, in-process</string>
     <string name="probe_note_where_iso">, isolated</string>
-    <string name="mods_analysis_title">Plugin analysis</string>
+    <string name="plugin_analysis_title">Plugin analysis</string>
     <string name="work_export">Exporting</string>
     <string name="work_import">Importing</string>
     <string name="work_backup">Backing up</string>

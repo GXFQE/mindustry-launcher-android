@@ -266,10 +266,52 @@ final class PluginEntries {
         boolean any = (body != null && body.getChildCount() > 0) || box.getChildCount() > 0;
         if (!any) {
             section.setVisibility(View.GONE);
-            return;
+        } else {
+            TextView title = (TextView) section.findViewById(R.id.plugin_section_title);
+            if (title != null) title.setText(Trans.get(a, R.string.plugin_section_title));
+            section.setVisibility(View.VISIBLE);
         }
-        TextView title = (TextView) section.findViewById(R.id.plugin_section_title);
-        if (title != null) title.setText(Trans.get(a, R.string.plugin_section_title));
+
+        // ④ 分析器（v24 / 第 227 轮起所有页面通用）：后台跑，回来时 token 没变才贴
+        if (PluginAnalysis.has(a, page)) {
+            final View sec = section;
+            final int token = 1 + (sec.getTag() instanceof Integer ? (Integer) sec.getTag() : 0);
+            sec.setTag(token);
+            final String fp = page;
+            final String fslot = slot;
+            final File fsel = selected;
+            final io.mdt.launcher.api.ItemInfo fitem = item;
+            new Thread(new Runnable() {
+                @Override public void run() {
+                    final java.util.List<io.mdt.launcher.api.Finding> fs =
+                            PluginAnalysis.analyzePage(a, fp, fslot, fsel, fitem);
+                    a.runOnUiThread(new Runnable() {
+                        @Override public void run() {
+                            if (!(sec.getTag() instanceof Integer) || (Integer) sec.getTag() != token) return;
+                            showFindings(a, sec, body, fs);
+                        }
+                    });
+                }
+            }, "mdt-analysis").start();
+        }
+    }
+
+    /** 把插件给的结论画成「插件」卡里的一段文字（最多 6 条）。 */
+    private static void showFindings(Activity a, View section, ViewGroup body,
+                                     java.util.List<io.mdt.launcher.api.Finding> fs) {
+        if (a == null || section == null || body == null || fs == null || fs.isEmpty()) return;
+        StringBuilder sb = new StringBuilder(Trans.get(a, R.string.plugin_analysis_title));
+        int n = 0;
+        for (io.mdt.launcher.api.Finding f : fs) {
+            if (n++ >= 6) break;
+            sb.append('\n').append(f.title);
+            if (!f.detail.isEmpty()) sb.append(": ").append(f.detail);
+        }
+        TextView tv = new TextView(a);
+        tv.setText(sb.toString());
+        int pad = (int) (10 * a.getResources().getDisplayMetrics().density);
+        tv.setPadding(pad, pad, pad, pad);
+        body.addView(tv);
         section.setVisibility(View.VISIBLE);
     }
 
