@@ -18,15 +18,17 @@ import java.util.zip.ZipFile;
 /**
  * 模组间冲突体检的**判据本体**（第 229 轮从宿主 {@code Mods.findConflicts} 搬出来）。
  *
- * <p>三层，从硬到软：
+ * <p>两层，从硬到软：
  * <ol>
  *   <li><b>内置检测（判决）</b>：把每个模组的主类名（{@code main} → {@code pkg/Main}）当**字节串**，
  *       在**别的模组**的 {@code classes.dex} 里找 ⇒ 命中就是"A 把 B 的代码打包进去了"；</li>
- *   <li><b>共同全局钩子（提示）</b>：两个模组都引用同一处**全局唯一引用**（如逻辑画布
- *       {@code mindustry/logic/LCanvas}）—— 那类钩子只能有一个接管者；</li>
  *   <li><b>简介提及（线索）</b>：A 的简介里出现 B 的名字 —— 免费信号，可能只是配套说明。</li>
  * </ol>
  * 另外把**游戏日志里提到这些模组的行**摘出来（那才是"谁真的接管了"的判据）。
+ *
+ * <p>🔴 第 229 轮删掉了原来那层「共同全局钩子」：它靠一张**写死的类名表**（{@code mindustry/logic/LCanvas}
+ * ↔「逻辑编辑器」）去猜"两个模组想接管同一个全局对象"。用户 2026-10-24 的判断是「硬编码还是半成品」——
+ * 确实：引用一个类 ≠ 接管它，改了全局对象也不一定打架。**宁可少说**：这一层不做了。
  *
  * <p>★ 本类**纯 Java**：不碰 Android、不碰宿主的任何类 ⇒ 插件工程能独立编译、
  * PC 侧自检（{@code tools/Check.java}）能直接喂夹具验它。
@@ -56,23 +58,6 @@ public final class Conflicts {
         public long dexBytes = -1;
     }
 
-    /**
-     * 一处**全局唯一引用**：{@code name} 是给用户看的名字（资源串），{@code descriptor} 是
-     * dex 里的类描述符。
-     *
-     * <p>★ 这张表刻意很保守（宁可少说，绝不瞎说）：{@code LCanvas} 是实测能分辨
-     * "接管逻辑编辑器"的标记 —— 只加语句卡的模组不碰它。
-     */
-    public static final class Hook {
-        public final String name;
-        public final String descriptor;
-
-        public Hook(String name, String descriptor) {
-            this.name = name == null ? "" : name;
-            this.descriptor = descriptor == null ? "" : descriptor;
-        }
-    }
-
     /** 两个模组下标（{@code a} 是"谁在说"：容器 / 提到别人的那个）。 */
     public static final class Pair {
         public final int a, b;
@@ -83,22 +68,10 @@ public final class Conflicts {
         }
     }
 
-    /** 一组"都引用同一个钩子"的模组。 */
-    public static final class HookHit {
-        public final int hook;
-        public final List<Integer> mods = new ArrayList<Integer>();
-
-        public HookHit(int hook) {
-            this.hook = hook;
-        }
-    }
-
-    /** 三层判据的结果（纯数据；文案由调用方拼）。 */
+    /** 两层判据的结果（纯数据；文案由调用方拼）。 */
     public static final class Result {
         /** A 的 dex 里含 B 的主类。 */
         public final List<Pair> contained = new ArrayList<Pair>();
-        /** 两个以上模组都引用同一个钩子。 */
-        public final List<HookHit> sharedHooks = new ArrayList<HookHit>();
         /** A 的简介里提到 B。 */
         public final List<Pair> mentioned = new ArrayList<Pair>();
         /** 读不出来的 dex（模组下标）。 */
@@ -109,16 +82,12 @@ public final class Conflicts {
         public int scannedDex;
         /** 扫过的 dex 字节数。 */
         public long scannedBytes;
-
-        public boolean any() {
-            return !contained.isEmpty() || !sharedHooks.isEmpty() || !mentioned.isEmpty();
-        }
     }
 
     /**
      * 游戏日志里提到这些模组的行。
      *
-     * <p>★ 与 {@link #scan} **分开**：三层判据要打开每个 dex（几百毫秒），缓存得住；
+     * <p>★ 与 {@link #scan} **分开**：两层判据要打开每个 dex（几百毫秒），缓存得住；
      * 日志每次启动游戏都会变（读一遍文本文件很便宜），不该让一份会变的输入把整份缓存作废。
      */
     public static final class Log {
@@ -131,15 +100,13 @@ public final class Conflicts {
     private Conflicts() { }
 
     /**
-     * 跑一遍三层判据（不读日志 —— 那份输入会变，见 {@link Log}）。
+     * 跑一遍两层判据（不读日志 —— 那份输入会变，见 {@link Log}）。
      *
-     * @param mods  这个槽的模组（顺序与界面一致）
-     * @param hooks 全局钩子表（名字由调用方从资源取）
+     * @param mods 这个槽的模组（顺序与界面一致）
      */
-    public static Result scan(List<Mod> mods, List<Hook> hooks) {
+    public static Result scan(List<Mod> mods) {
         Result c = new Result();
         if (mods == null) mods = new ArrayList<Mod>();
-        if (hooks == null) hooks = new ArrayList<Hook>();
 
         // ① 主类模式：meta.main → dex 里的描述符形态（pkg/Main）
         List<Integer> javaIdx = new ArrayList<Integer>();
@@ -150,29 +117,17 @@ public final class Conflicts {
         }
         c.javaMods = javaIdx.size();
 
-        List<List<Integer>> hitOthers = new ArrayList<List<Integer>>();
-        List<List<Integer>> hitHooks = new ArrayList<List<Integer>>();
-        for (int p = 0; p < javaIdx.size(); p++) {
-            hitOthers.add(new ArrayList<Integer>());
-            hitHooks.add(new ArrayList<Integer>());
-        }
-
         for (int p = 0; p < javaIdx.size(); p++) {
             Mod m = mods.get(javaIdx.get(p).intValue());
             List<String> pats = new ArrayList<String>();
-            List<Integer> owner = new ArrayList<Integer>();   // 与 pats 对齐：java 下标，或 -1 = 钩子
+            List<Integer> who = new ArrayList<Integer>();   // 与 pats 对齐：java 下标
             for (int q = 0; q < javaIdx.size(); q++) {
                 if (q == p) continue;                        // 自己含自己的主类不算冲突
                 Mod other = mods.get(javaIdx.get(q).intValue());
                 pats.add(other.main.trim().replace('.', '/'));
-                owner.add(Integer.valueOf(q));
+                who.add(Integer.valueOf(q));
             }
-            int hookBase = pats.size();
-            for (int h = 0; h < hooks.size(); h++) {
-                pats.add(hooks.get(h).descriptor);
-                owner.add(Integer.valueOf(-1));
-            }
-            if (pats.isEmpty()) continue;                    // 只有一个 Java 模组、也没有钩子
+            if (pats.isEmpty()) continue;                    // 只有一个 Java 模组 ⇒ 没得比
             Set<Integer> found;
             try {
                 found = scanDex(m, pats);
@@ -183,35 +138,13 @@ public final class Conflicts {
             c.scannedDex++;
             if (m.dexBytes > 0) c.scannedBytes += m.dexBytes;
             for (Integer idxObj : found) {
-                int idx = idxObj.intValue();
-                int who = owner.get(idx).intValue();
-                if (who >= 0) {
-                    hitOthers.get(p).add(Integer.valueOf(who));
-                } else {
-                    hitHooks.get(p).add(Integer.valueOf(idx - hookBase));
-                }
+                int q = who.get(idxObj.intValue()).intValue();
+                c.contained.add(new Pair(javaIdx.get(p).intValue(),
+                        javaIdx.get(q).intValue()));
             }
         }
 
-        // 汇总 ①：A 内置了 B（每一对一次）
-        for (int p = 0; p < javaIdx.size(); p++) {
-            for (Integer qObj : hitOthers.get(p)) {
-                int q = qObj.intValue();
-                c.contained.add(new Pair(javaIdx.get(p).intValue(), javaIdx.get(q).intValue()));
-            }
-        }
-        // 汇总 ②：同一个钩子 ≥2 个模组引用
-        for (int h = 0; h < hooks.size(); h++) {
-            HookHit hit = new HookHit(h);
-            for (int p = 0; p < javaIdx.size(); p++) {
-                if (hitHooks.get(p).contains(Integer.valueOf(h))) {
-                    int mi = javaIdx.get(p).intValue();
-                    if (!hit.mods.contains(Integer.valueOf(mi))) hit.mods.add(Integer.valueOf(mi));
-                }
-            }
-            if (hit.mods.size() >= 2) c.sharedHooks.add(hit);
-        }
-        // 汇总 ③：简介提及（免费信号）
+        // ② 简介提及（免费信号）
         for (int i = 0; i < mods.size(); i++) {
             Mod a = mods.get(i);
             if (a == null || a.description == null || a.description.trim().isEmpty()) continue;

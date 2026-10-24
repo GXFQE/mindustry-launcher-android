@@ -9,7 +9,6 @@
 <resources>
     <string name="cf_contained_title_fmt">\"%1$s\" already bundles \"%2$s\"</string>
     <string name="cf_contained_detail">turning both on makes them fight; keep one.</string>
-    <string name="cf_shared_title_fmt">%1$s all try to take over %2$s</string>
     <string name="cf_mentioned_title_fmt">the description of \"%1$s\" mentions \"%2$s\"</string>
     <string name="cf_log_title_fmt">the last game log mentions these mods on %1$d lines</string>
 
@@ -19,8 +18,4 @@
 
     <string name="cf_note_dex_title_fmt">could not read the classes.dex inside \"%1$s\"</string>
     <string name="cf_note_log">could not read the game log</string>
-
-    <string name="cf_name_fmt">\"%1$s\"</string>
-    <string name="cf_join_and">\u0020and\u0020</string>
-    <string name="cf_hook_logic">the logic editor</string>
 </resources>

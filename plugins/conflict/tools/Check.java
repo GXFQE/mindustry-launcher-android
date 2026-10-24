@@ -12,9 +12,11 @@ import java.util.zip.ZipOutputStream;
 /**
  * 插件侧自检（PC 上跑，`bash plugins/conflict/build.sh check`）。
  *
- * <p>★ 为什么必须有它：三层判据第 229 轮从宿主搬到了这里，宿主 SelfTest 从此**看不到**它们；
+ * <p>★ 为什么必须有它：判据第 229 轮从宿主搬到了这里，宿主 SelfTest 从此**看不到**它们；
  * 而真机上只有一份现成的模组组合 —— 判不出"反方向"（不该报的有没有误报）。
  * 这个类在夹具上把**两个方向**都钉住。
+ *
+ * <p>★ 第 229 轮删掉「共同全局钩子」那层后，这里也删掉了它的三条断言（写死的类名表不再存在）。
  */
 public final class Check {
 
@@ -38,15 +40,14 @@ public final class Check {
         File aDir = new File(work, "a-neon-like");
         File bDir = new File(work, "b-logicsugar-like");
         File cDir = new File(work, "c-unrelated");
-        dex(aDir, "FAKE-DEX-HEADER big/BigMod ... also contains small/SmallMod "
-                + "and mindustry/logic/LCanvas references");
-        dex(bDir, "FAKE-DEX small/SmallMod mindustry/logic/LCanvas");
+        dex(aDir, "FAKE-DEX-HEADER big/BigMod ... also contains small/SmallMod");
+        dex(bDir, "FAKE-DEX small/SmallMod");
         dex(cDir, "FAKE-DEX unrelated only");
 
         List<Conflicts.Mod> mods = new ArrayList<Conflicts.Mod>();
         Conflicts.Mod a = mod(aDir, "Big Mod", "big.BigMod", "内置了 Small Mod 的功能");
         Conflicts.Mod b = mod(bDir, "Small Mod", "small.SmallMod", "");
-        Conflicts.Mod c = mod(cDir, "Unrelated", "un.UnRelated", "");
+        Conflicts.Mod c = mod(cDir, "Unrelated", "un.unRelated", "");
         Conflicts.Mod d = new Conflicts.Mod();
         d.path = new File(work, "d-nomain.zip").getAbsolutePath();
         d.title = "Data Only";
@@ -55,10 +56,7 @@ public final class Check {
         mods.add(c);
         mods.add(d);
 
-        List<Conflicts.Hook> hooks = new ArrayList<Conflicts.Hook>();
-        hooks.add(new Conflicts.Hook("logic editor", "mindustry/logic/LCanvas"));
-
-        Conflicts.Result r = Conflicts.scan(mods, hooks);
+        Conflicts.Result r = Conflicts.scan(mods);
 
         check(r.javaMods == 3, "javaMods = 带 main 的模组数（3，纯数据模组不算）");
         check(r.scannedDex == 3, "scannedDex = 真的扫了 3 个 dex");
@@ -71,26 +69,17 @@ public final class Check {
         check(!hasPair(r.contained, 0, 2) && !hasPair(r.contained, 2, 0),
                 "★反向：无关模组 C 与 A 之间不报「内置」");
 
-        check(r.sharedHooks.size() == 1, "共同钩子：恰好一组（A 与 B 都引用 LCanvas）");
-        boolean hookAB = !r.sharedHooks.isEmpty()
-                && r.sharedHooks.get(0).mods.contains(Integer.valueOf(0))
-                && r.sharedHooks.get(0).mods.contains(Integer.valueOf(1));
-        check(hookAB, "共同钩子：组里是 A 与 B");
-        check(!r.sharedHooks.isEmpty() && !r.sharedHooks.get(0).mods.contains(Integer.valueOf(2)),
-                "★反向：不引用该钩子的 C **不许**被算进这一组");
-
         check(hasPair(r.mentioned, 0, 1), "简介提及：A 的简介里写了 Small Mod ⇒ 线索里有 A→B");
         check(!hasPair(r.mentioned, 1, 0), "★反向：B 的简介没提 A ⇒ 不报 B→A");
 
         // ★ 元断言：把 B 的主类从 A 的 dex 里删掉 ⇒ 必须不再报「内置」（证明上一条不是恒真）
         File a2Dir = new File(work, "a2-big-only");
-        dex(a2Dir, "FAKE-DEX big/BigMod mindustry/logic/LCanvas only");
+        dex(a2Dir, "FAKE-DEX big/BigMod only");
         List<Conflicts.Mod> mods2 = new ArrayList<Conflicts.Mod>();
         mods2.add(mod(a2Dir, "Big Mod", "big.BigMod", ""));
         mods2.add(b);
-        Conflicts.Result r2 = Conflicts.scan(mods2, hooks);
+        Conflicts.Result r2 = Conflicts.scan(mods2);
         check(r2.contained.isEmpty(), "★元断言：拿掉 B 的主类 ⇒ 不再报「内置」");
-        check(!r2.sharedHooks.isEmpty(), "★元断言（反面）：共同钩子仍在 —— 两层判据互不牵连");
 
         // ── zip 形态：根前缀（下潜一层）里的 classes.dex 也要找得到 ────────────────
         File z = new File(work, "z-nested.zip");
@@ -103,7 +92,7 @@ public final class Check {
         zm.rootPrefix = "top/";
         mods3.add(zm);
         mods3.add(a);
-        Conflicts.Result r3 = Conflicts.scan(mods3, hooks);
+        Conflicts.Result r3 = Conflicts.scan(mods3);
         check(hasPair(r3.contained, 0, 1),
                 "zip 形态：按 rootPrefix 找到 top/classes.dex，判出「Nested Pack 内置了 Big Mod」");
         check(r3.scannedBytes > 0, "zip 形态：dex 字节数真的读到了（" + r3.scannedBytes + "）");
@@ -118,7 +107,7 @@ public final class Check {
         jm.main = "broken.Main";
         mods4.add(jm);
         mods4.add(a);
-        Conflicts.Result r4 = Conflicts.scan(mods4, hooks);
+        Conflicts.Result r4 = Conflicts.scan(mods4);
         check(r4.dexErrors.contains(Integer.valueOf(0)), "读不了的包 ⇒ 进 dexErrors（界面会点名它）");
         check(!hasPair(r4.contained, 0, 1), "读不了的包 ⇒ 不瞎报内置");
 

@@ -7,7 +7,6 @@
 <resources>
     <string name="cf_contained_title_fmt">「%1$s」里已经带了「%2$s」</string>
     <string name="cf_contained_detail">两个一起开会互相抢，建议只留一个。</string>
-    <string name="cf_shared_title_fmt">%1$s都想接管%2$s</string>
     <string name="cf_mentioned_title_fmt">「%1$s」的简介里提到了「%2$s」</string>
     <string name="cf_log_title_fmt">上次启动的日志里有 %1$d 行提到这些模组</string>
 
@@ -17,8 +16,4 @@
 
     <string name="cf_note_dex_title_fmt">读不了「%1$s」的 classes.dex</string>
     <string name="cf_note_log">读不了游戏日志</string>
-
-    <string name="cf_name_fmt">「%1$s」</string>
-    <string name="cf_join_and">\u0020与\u0020</string>
-    <string name="cf_hook_logic">逻辑编辑器</string>
 </resources>

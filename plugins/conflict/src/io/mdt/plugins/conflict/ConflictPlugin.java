@@ -26,7 +26,7 @@ import io.mdt.plugins.conflict.core.Conflicts;
  * item 字段，宿主把结论画成**一张卡**）。第一项 = 宿主的 {@code pageItems()} 第一项，
  * 与本插件 {@code api.contents(mods).get(0)} 同源同序 —— 判据不是"回调顺序"。
  *
- * <p>★ 三层判据在 {@link Conflicts}（纯 Java、可 PC 侧自检）；这里只做三件事：
+ * <p>★ 判据在 {@link Conflicts}（纯 Java、可 PC 侧自检）；这里只做三件事：
  * 把 {@link ItemInfo} 映射成判据要的事实、把结果拼成资源文案、把结果**按 mods/ 签名缓存**
  * （原来那行是"按需"跑的，搬成 analyzer 后每次进页面都会跑 ⇒ 不缓存就每次重扫几 MB 的 dex）。
  *
@@ -68,14 +68,13 @@ public final class ConflictPlugin {
 
     private static List<Finding> analyze0(ItemInfo item, PluginApi api) {
         Context c = api.context();
-        List<Conflicts.Hook> hooks = hooks(c);
         String sig = signature(api, c);
         synchronized (LOCK) {
             if (cResult == null || !sig.equals(cSig)) {
                 List<ItemInfo> all = api.contents(ItemInfo.KIND_MODS);
                 long t0 = System.currentTimeMillis();
                 cMods = toMods(all);
-                cResult = Conflicts.scan(cMods, hooks);
+                cResult = Conflicts.scan(cMods);
                 cOwner = all.isEmpty() ? null : all.get(0).path;
                 cSig = sig;
                 api.log("conflict: " + cResult.javaMods + " java mods, "
@@ -89,7 +88,7 @@ public final class ConflictPlugin {
                 }
                 return Collections.emptyList();
             }
-            List<Finding> fs = findings(c, api, cResult, cMods, hooks);
+            List<Finding> fs = findings(c, api, cResult, cMods);
             api.log("conflict: emit " + fs.size() + " findings (item=" + item.path + ")");
             return fs;
         }
@@ -117,7 +116,8 @@ public final class ConflictPlugin {
         return sb.toString();
     }
 
-    private static List<Conflicts.Mod> toMods(List<ItemInfo> items) {        List<Conflicts.Mod> out = new ArrayList<Conflicts.Mod>();
+    private static List<Conflicts.Mod> toMods(List<ItemInfo> items) {
+        List<Conflicts.Mod> out = new ArrayList<Conflicts.Mod>();
         if (items == null) return out;
         for (ItemInfo it : items) {
             if (it == null) continue;
@@ -148,16 +148,6 @@ public final class ConflictPlugin {
         return list == null || list.isEmpty() ? Locale.getDefault() : list.get(0);
     }
 
-    /**
-     * 全局钩子表（**只有一条**，与宿主原来那张表同源：宁可少说，绝不瞎说）。
-     * 名字走资源（用户语言包 / 英文界面都能用），类描述符是 dex 里的形态。
-     */
-    private static List<Conflicts.Hook> hooks(Context c) {
-        List<Conflicts.Hook> out = new ArrayList<Conflicts.Hook>();
-        out.add(new Conflicts.Hook(c.getString(R.string.cf_hook_logic), "mindustry/logic/LCanvas"));
-        return out;
-    }
-
     // ---- 结论 → 文案 -----------------------------------------------------------
 
     /**
@@ -170,7 +160,7 @@ public final class ConflictPlugin {
      * （长的依据归运行日志，卡片只给结论 —— 与 §85.16.2 同一条）。
      */
     private static List<Finding> findings(Context c, PluginApi api, Conflicts.Result r,
-                                          List<Conflicts.Mod> mods, List<Conflicts.Hook> hooks) {
+                                          List<Conflicts.Mod> mods) {
         List<Finding> out = new ArrayList<Finding>();
         // 日志每次进页面都重读（很便宜）：它每次启动游戏都会变，不该被 dex 扫描那份缓存冻住
         Conflicts.Log log = Conflicts.readLog(new File(api.slotDir(), "last_log.txt"), mods);
@@ -180,12 +170,6 @@ public final class ConflictPlugin {
                     c.getString(R.string.cf_contained_title_fmt, title(mods, p.a), title(mods, p.b)),
                     c.getString(R.string.cf_contained_detail), Finding.ERROR,
                     mods.get(p.a).path, mods.get(p.b).path));
-        }
-        for (Conflicts.HookHit h : r.sharedHooks) {
-            String hook = h.hook >= 0 && h.hook < hooks.size() ? hooks.get(h.hook).name : "";
-            out.add(new Finding(
-                    c.getString(R.string.cf_shared_title_fmt, joinNames(c, mods, h.mods), hook),
-                    "", Finding.WARN));
         }
         for (Conflicts.Pair p : r.mentioned) {
             out.add(new Finding(
@@ -214,15 +198,6 @@ public final class ConflictPlugin {
             out.add(new Finding(c.getString(R.string.cf_note_log), "", Finding.INFO));
         }
         return out;
-    }
-
-    private static String joinNames(Context c, List<Conflicts.Mod> mods, List<Integer> idx) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < idx.size(); i++) {
-            if (i > 0) sb.append(c.getString(R.string.cf_join_and));
-            sb.append(c.getString(R.string.cf_name_fmt, title(mods, idx.get(i).intValue())));
-        }
-        return sb.toString();
     }
 
     private static String title(List<Conflicts.Mod> mods, int i) {
