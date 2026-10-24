@@ -104,7 +104,7 @@ public final class Conflicts {
      * <p>`build.revision` 形态（`"159.7"`）比到小版本；纯整数形态比 build；
      * 目标版本未知（{@code build <= 0}）或没写 ⇒ **算通过**（不许把"不知道"当"不兼容"）。
      */
-    static boolean isAtLeast(int build, int revision, String str) {
+    public static boolean isAtLeast(int build, int revision, String str) {
         if (build <= 0 || str == null || str.trim().isEmpty()) return true;
         String v = str.trim();
         int dot = v.indexOf('.');
@@ -127,7 +127,7 @@ public final class Conflicts {
     }
 
     /** `ModMeta.getMinMajor()`：`.` 前那一段，取不出数字 ⇒ 0。 */
-    static int minMajorOf(String minGameVersion) {
+    public static int minMajorOf(String minGameVersion) {
         if (minGameVersion == null) return 0;
         String v = minGameVersion.trim();
         if (v.isEmpty()) return 0;

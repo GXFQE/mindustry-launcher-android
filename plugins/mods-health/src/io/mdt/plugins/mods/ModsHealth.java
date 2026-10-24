@@ -62,6 +62,46 @@ public final class ModsHealth {
         }
     }
 
+    /**
+     * **v26**：这一行"是什么状态"（宿主拿它画徽标 / 筛选 / 详情 —— 与结论同源）。
+     *
+     * <p>返回**固定词表**里的一个 token，宿主只做映射、不解释语义：
+     * {@code enabled} / {@code disabled} / {@code unsupported}（版本或黑名单）/ {@code missing-dep} /
+     * {@code incomplete-dep} / {@code circular-dep} / {@code content-error}。返回 {@code null} ⇒
+     * 宿主回落到它自己的判定（读不出说明文件的坏包就走这条路 —— 那是宿主的文件级错误）。
+     *
+     * <p>★ 判定顺序**照抄**宿主的 {@code Mods.stateOf}：依赖优先、其次版本/黑名单、最后才是"关着"。
+     * 顺序一变，同一个包在两边就会给出不同状态（真机上就是"徽标说 A、行上写 B"）。
+     */
+    public static String state(ItemInfo item, PluginApi api) {
+        if (item == null || api == null) return null;
+        if (!ItemInfo.KIND_MODS.equals(item.kind)) return null;
+        try {
+            if (extra(item, "internalName").isEmpty()) return null;    // 坏包 ⇒ 宿主管
+            String dep = extra(item, "depState");
+            if ("MISSING_DEPENDENCIES".equals(dep)) return "missing-dep";
+            if ("INCOMPLETE_DEPENDENCIES".equals(dep)) return "incomplete-dep";
+            if ("CIRCULAR_DEPENDENCIES".equals(dep)) return "circular-dep";
+            if (dep.startsWith("CONTENT")) return "content-error";
+            String v = extra(item, "minGameVersion");
+            if (!Conflicts.isAtLeast(intExtra(item, "targetBuild"),
+                    intExtra(item, "targetRevision"), v)) {
+                return "unsupported";
+            }
+            int need = "true".equals(extra(item, "java"))
+                    ? intExtra(item, "minJavaMajor") : intExtra(item, "minModMajor");
+            if (need > 0 && Conflicts.minMajorOf(v) < need
+                    && !"true".equals(extra(item, "legacyCompatible"))) {
+                return "unsupported";
+            }
+            if ("true".equals(extra(item, "blacklisted"))) return "unsupported";
+            if ("false".equals(extra(item, "enabled"))) return "disabled";
+            return "enabled";
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
     /** 一次扫描的快照（筛选 / 排序按 path 查，不依赖回调顺序）。 */
     static final class Snapshot {
         final List<Conflicts.Mod> mods;

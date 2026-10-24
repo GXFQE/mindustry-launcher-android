@@ -113,6 +113,11 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
      */
     private final Map<String, List<Finding>> mIssues = new HashMap<>();
     /**
+     * v26：插件对每一项的判定（path → token）。**有就以它为准**（徽标/筛选/详情共用同一个判定），
+     * 没有就回落到宿主自己的 {@code Mods.stateOf}（插件没装 / 崩了 / 旧版插件）。
+     */
+    private final Map<String, String> mVerdicts = new HashMap<>();
+    /**
      * v25：插件注入的**筛选**结果（item path 集合；null = 没选）。只在选中那一刻算一次，
      * 之后每次 `rebuildList()` 直接用它 —— 别在打字搜索时反复调插件。
      */
@@ -1001,7 +1006,7 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
         List<Mods.State> sts = new ArrayList<>(all.size() + 1);
         for (Mods.Info m : mScan.mods) {
             all.add(m);
-            sts.add(Mods.stateOf(m, mResolved, mTarget.build, mTarget.revision));
+            sts.add(stOf(m));
         }
         for (Mods.Info m : mScan.broken) {
             all.add(m);
@@ -1067,6 +1072,40 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
      * <p>分析器在**列表渲染之后**才回来（后台线程，见 {@code PluginEntries.attachPage}），
      * 所以要重画；只重画列表，不重扫、不动设置。
      */
+    /** v26：插件判定回来了 —— 收下并重画（徽标 / 筛选 / 详情都读它）。 */
+    @Override public void onPluginStates(Map<String, String> verdicts) {
+        mVerdicts.clear();
+        if (verdicts != null) mVerdicts.putAll(verdicts);
+        android.util.Log.i("MDTLauncher", "plugin verdicts: " + mVerdicts.size());
+        if (mContainer != null) rebuildList();
+    }
+
+    /**
+     * 这一行的"状态"：插件判定优先，没有才用宿主自己算的。
+     *
+     * <p>token 是**固定词表**（见 `docs/PLUGIN-API.md`），宿主只做映射、不解释语义：
+     * 这样"插件说不支持"和"徽标写不支持"永远指向同一个判定。
+     */
+    private Mods.State stOf(Mods.Info m) {
+        String tok = mVerdicts.get(pathOf(m));
+        Mods.State fromPlugin = stateOfToken(tok);
+        if (fromPlugin != null) return fromPlugin;
+        return Mods.stateOf(m, mResolved, mTarget.build, mTarget.revision);
+    }
+
+    /** 把插件给的 token 映射回 {@link Mods.State}；不认识 / 为空 ⇒ null（回落宿主）。 */
+    private static Mods.State stateOfToken(String tok) {
+        if (tok == null) return null;
+        if ("enabled".equals(tok)) return Mods.State.ENABLED;
+        if ("disabled".equals(tok)) return Mods.State.DISABLED;
+        if ("unsupported".equals(tok)) return Mods.State.UNSUPPORTED;
+        if ("missing-dep".equals(tok)) return Mods.State.MISSING_DEPENDENCIES;
+        if ("incomplete-dep".equals(tok)) return Mods.State.INCOMPLETE_DEPENDENCIES;
+        if ("circular-dep".equals(tok)) return Mods.State.CIRCULAR_DEPENDENCIES;
+        if ("content-error".equals(tok)) return Mods.State.CONTENT_ERRORS;
+        return null;
+    }
+
     @Override public void onPluginFindings(List<Finding> fs) {
         mIssues.clear();
         if (fs != null) {
@@ -1231,8 +1270,7 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
         TextView badge = (TextView) v.findViewById(R.id.mod_badge);
         TextView warn = (TextView) v.findViewById(R.id.mod_warn);
 
-        Mods.State st = broken ? Mods.State.UNSUPPORTED
-                : Mods.stateOf(m, mResolved, mTarget.build, mTarget.revision);
+        Mods.State st = broken ? Mods.State.UNSUPPORTED : stOf(m);
         // ★ 徽标优先级：游戏自己的状态 > "安卓上会加载失败"（我们推出来的）> 启用。
         //   ★★ 2026-10-08：判据整体搬进 `ModsText.badge`（**可被自检钉住**）—— 两条要点：
         //     ① 没读到设置文件时**不许说「启用」**（那只是默认值，用户分辨不出"真开着"与"我们不知道"）；
@@ -1466,8 +1504,7 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
         sb.append(Trans.get(ModsActivity.this, R.string.mods_detail_size_fmt,
                 Util.formatSize(m.bytes), formOf(m))).append('\n');
         sb.append('\n').append(Trans.get(ModsActivity.this, R.string.mods_detail_state_fmt,
-                ModsText.outcome(this,
-                        Mods.stateOf(m, mResolved, mTarget.build, mTarget.revision),
+                ModsText.outcome(this, stOf(m),
                         m.settingsKnown, m.willFailJavaLoad(), m.failed, mScan.skipModLoading)));
         int fail = 0;
         for (Mods.Gate g : Mods.gates(this, m, mTarget.build, mTarget.revision, mScan)) {

@@ -40,7 +40,8 @@
 
 ## 接口
 
-- `api() = 25`（v24 的 analyzer + v25 的 `Finding.anchor` 与 filter/sort 插槽）。
+- `api() = 25`（v24 的 analyzer + v25 的 `Finding.anchor` 与 filter/sort 插槽）；另外实现了 v26 的
+  可选 `state()`（**逐项判定**：宿主拿它画行徽标 / 筛选 / 详情，词表见 `docs/PLUGIN-API.md`）。
 - 声明：analyzer 一条 + `slot: filter` / `slot: sort` 各一条（见 `assets/plugin.json`）。
 - 入口类实现 `analyze(ItemInfo, PluginApi)` / `accept(...)` / `compare(...)`，
   **全部挂在同一个类上**（宿主 `PluginHost.open` 只认声明了 `api()` 的那个类 ——

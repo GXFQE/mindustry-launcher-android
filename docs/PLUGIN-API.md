@@ -242,6 +242,30 @@ new Finding(title, detail, severity, evidence).anchor(item.path);
 - 键是 `ItemInfo.path`（与 `contents()` 里的那一项**逐字相同**）；
 - 分析器在**列表渲染之后**才回来 ⇒ 宿主拿到后会重画一次列表（模组页就是这么做的）。
 
+### 逐项判定（v26，可选）
+
+```java
+public static String state(ItemInfo item, PluginApi api);   // 返回下面词表里的一个 token
+```
+
+返回**固定词表**（宿主只做映射，不解释语义）：
+
+| token | 宿主把它当成 |
+|---|---|
+| `enabled` | 会加载 |
+| `disabled` | 已关闭 |
+| `unsupported` | 不支持（版本不够 / 门槛太低 / 黑名单） |
+| `missing-dep` | 缺依赖 |
+| `incomplete-dep` | 依赖被关着 |
+| `circular-dep` | 循环依赖 |
+| `content-error` | 内容有错 |
+
+- 宿主用它画**行徽标**、决定「只看有问题的」、写详情那句"结果" —— **三处同一个判定**，不会出现
+  "徽标说 A、行上写 B"；
+- 返回 `null`（或没实现这个方法）⇒ 宿主回落到它自己的判定。读不出说明文件的坏包就该走这条：
+  那是**文件级错误**，归宿主；
+- 词表是**闭集**：多写一个不认识的 token 等于没给（宿主回落）。要加新状态，先改宿主。
+
 ### 筛选 / 排序注入（v25）
 
 插件可以往页面的「筛选与排序」菜单里加自己的一项（与 `extensions` 同一个数组）：
@@ -438,6 +462,8 @@ v23（2026-10-23 第 223 轮）：`Probe` / `ProbeEnv` + `telemetry.probes`（`:
 v24（2026-10-23 第 224 轮）：`Finding` + `slot: analyzer`（`page: mods`）—— 插件给结论、宿主渲染；`API_MIN` 仍不动。
 v25（2026-10-24 第 229 轮）：`Finding.anchor`（结论挂到某一行）+ `slot: filter` / `slot: sort`
 （插件注入自己的筛选与排序）+ `parseHjson(File)`（宿主解析、插件用）；`API_MIN` 仍不动。
+v26（同日）：可选 `state(ItemInfo, PluginApi)` —— 插件给**逐项判定**（固定词表），宿主拿它画徽标 /
+筛选 / 详情，并回落到自己的判定。
 
 **第一个「纯 analyzer」插件**：`plugins/conflict`（第 229 轮，模组冲突检查）。宿主管了四年
 （第 229 轮之前）的那行「查模组冲突」整块删掉，判据搬进插件的 `core/Conflicts.java`；

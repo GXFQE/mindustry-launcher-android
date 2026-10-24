@@ -221,6 +221,12 @@ final class PluginEntries {
      */
     interface FindingsSink {
         void onPluginFindings(java.util.List<io.mdt.launcher.api.Finding> fs);
+
+        /**
+         * v26：插件对每一项的**判定**（path → token）。空表也算一次回调 —— 页面据此决定
+         * "用插件的判定"还是"回落到宿主自己的判定"。
+         */
+        void onPluginStates(java.util.Map<String, String> verdicts);
     }
 
     /**
@@ -293,8 +299,10 @@ final class PluginEntries {
             final io.mdt.launcher.api.ItemInfo fitem = item;
             new Thread(new Runnable() {
                 @Override public void run() {
+                    final java.util.Map<String, String> verdicts =
+                            new java.util.HashMap<String, String>();
                     final java.util.List<io.mdt.launcher.api.Finding> all =
-                            PluginAnalysis.analyzePage(a, fp, fslot, fsel, fitem);
+                            PluginAnalysis.analyzePage(a, fp, fslot, fsel, fitem, verdicts);
                     a.runOnUiThread(new Runnable() {
                         @Override public void run() {
                             if (!(sec.getTag() instanceof Integer) || (Integer) sec.getTag() != token) return;
@@ -307,8 +315,11 @@ final class PluginEntries {
                                 if (f == null) continue;
                                 if (f.anchorPath == null) card.add(f); else anchored.add(f);
                             }
-                            if (!anchored.isEmpty() && a instanceof FindingsSink) {
-                                ((FindingsSink) a).onPluginFindings(anchored);
+                            if (a instanceof FindingsSink) {
+                                if (!anchored.isEmpty()) {
+                                    ((FindingsSink) a).onPluginFindings(anchored);
+                                }
+                                ((FindingsSink) a).onPluginStates(verdicts);
                             }
                             showFindings(a, sec, body, card);
                         }

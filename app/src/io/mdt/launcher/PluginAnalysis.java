@@ -60,6 +60,19 @@ final class PluginAnalysis {
      */
     static List<Finding> analyzePage(Context ctx, String page, String slot,
                                      File selected, ItemInfo item) {
+        return analyzePage(ctx, page, slot, selected, item, null);
+    }
+
+    /**
+     * 同上，但顺手把插件的**逐项判定**收进 {@code verdicts}（path → token，v26）。
+     *
+     * <p>token 由插件给（{@code enabled} / {@code disabled} / {@code unsupported} /
+     * {@code missing-dep} / {@code incomplete-dep} / {@code circular-dep} / {@code content-error}），
+     * 宿主把它映射回自己的 {@code Mods.State} —— 这样徽标、筛选、详情用的是**同一个判定**。
+     */
+    static List<Finding> analyzePage(Context ctx, String page, String slot,
+                                     File selected, ItemInfo item,
+                                     java.util.Map<String, String> verdicts) {
         List<Finding> out = new ArrayList<Finding>();
         if (ctx == null || page == null) return out;
         List<ItemInfo> items = PluginData.pageItems(ctx, page, slot, selected);
@@ -73,7 +86,7 @@ final class PluginAnalysis {
                 for (Extensions.Item it : Extensions.forSlot(
                         Extensions.of(apk), Extensions.SLOT_ANALYZER)) {
                     if (!page.equals(it.page)) continue;
-                    runOne(ctx, apk, it, page, slot, selected, item, items, out);
+                    runOne(ctx, apk, it, page, slot, selected, item, items, out, verdicts);
                 }
             }
         } catch (Throwable ignored) {
@@ -83,7 +96,8 @@ final class PluginAnalysis {
 
     private static void runOne(Context ctx, File apk, Extensions.Item it, String page,
                                String slot, File selected, ItemInfo item,
-                               List<ItemInfo> items, List<Finding> out) {
+                               List<ItemInfo> items, List<Finding> out,
+                               java.util.Map<String, String> verdicts) {
         PluginHost.Loaded loaded = null;
         try {
             loaded = PluginHost.load(ctx, apk, it.entry, page, slot, selected, item);
@@ -94,10 +108,25 @@ final class PluginAnalysis {
         try {
             java.lang.reflect.Method m = loaded.entry.getMethod("analyze",
                     ItemInfo.class, PluginApi.class);
+            // v26：可选 `state(ItemInfo, PluginApi)` —— 不实现就当没有（宿主的判定兜底）
+            java.lang.reflect.Method st = null;
+            try {
+                st = loaded.entry.getMethod("state", ItemInfo.class, PluginApi.class);
+            } catch (Throwable ignored) {
+            }
             int n = 0;
             for (ItemInfo one : items) {
                 if (n++ >= MAX_ITEMS) break;
                 try {
+                    if (st != null && verdicts != null && one.path != null) {
+                        try {
+                            Object v = st.invoke(null, one, loaded.env);
+                            if (v instanceof String && !((String) v).isEmpty()) {
+                                verdicts.put(one.path, (String) v);
+                            }
+                        } catch (Throwable ignored) {
+                        }
+                    }
                     Object r = m.invoke(null, one, loaded.env);
                     if (r instanceof List) {
                         for (Object o : (List<?>) r) {
