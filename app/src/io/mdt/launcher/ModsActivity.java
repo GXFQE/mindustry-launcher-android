@@ -1411,7 +1411,7 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
     }
 
     /**
-     * v27：详情页那六道门——**插件算过就用插件的**，没有才用宿主自己的。
+     * v27：详情页那六道门——**插件算过就用插件的**；插件没给 ⇒ 不显示（只有一个来源）。
      */
     private java.util.List<io.mdt.launcher.api.Gate> gatesOf(Mods.Info m) {
         java.util.List<io.mdt.launcher.api.Gate> pg = mGates.get(pathOf(m));
@@ -1659,8 +1659,8 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
                     mTarget.label.isEmpty() ? Trans.get(ModsActivity.this, R.string.mods_detail_gate_nogame)
                             : mTarget.label)).append('\n');
             for (io.mdt.launcher.api.Gate g : gatesOf(m)) {
-                // ★ 通过 + 无补充说明 ⇒ **只画一行**（note == null 就是"没什么好说的"，
-                //   约定见 Mods.gates 的注释）；失败才把原因摊在第二行。
+                // ★ 通过 + 无补充说明 ⇒ **只画一行**（note 为空就是"没什么好说的"，
+                //   约定见 api.Gate 的注释）；失败才把原因摊在第二行。
                 if (g.pass) {
                     sb.append(g.note.isEmpty()
                             ? Trans.get(ModsActivity.this, R.string.mods_detail_gate_ok_fmt, g.label)
@@ -1927,10 +1927,6 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
             }
             if (!m.softDependencies.isEmpty()) {
                 sb.append("    软依赖 = ").append(m.softDependencies).append('\n');
-            }
-            for (Mods.Gate g : Mods.gates(ctx, m, build, rev)) {
-                sb.append("      ").append(g.pass ? "[OK] " : "[NG] ").append(g.label)
-                  .append("  —— ").append(g.note).append('\n');
             }
         }
         for (Mods.Info m : scan.broken) {

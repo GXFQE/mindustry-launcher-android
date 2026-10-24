@@ -5023,7 +5023,7 @@ public final class SelfTest {
             ok(stat, L, Mods.stateOf(steel, r, 160, 1) == Mods.State.DISABLED,
                     "版本够了但开关是 false ⇒ DISABLED");
 
-            // ★★ 第 85 轮补的一条**漏判据**（真机上用同一份 JS 探针做对照抓到的，见 Mods.gates 注释）：
+            // ★★ 第 85 轮补的一条**漏判据**（真机上用同一份 JS 探针做对照抓到的）：
             //    非 Java（脚本 / 数据）模组的过期门槛是 **136**（`Vars.java:53`），
             //    而这里原来是 `m.isJava() && …` ⇒ **脚本模组整类漏判**：
             //    没写 `minGameVersion` 的 JS 模组被游戏判 unsupported（脚本永远不跑、
@@ -5045,11 +5045,6 @@ public final class SelfTest {
             ok(stat, L, Mods.stateOf(scriptMod, none, 159, 7) == Mods.State.ENABLED,
                     "★legacyCompatible ⇒ 豁免这一条（照游戏那个 `&& !meta.legacyCompatible`）");
             scriptMod.legacyCompatible = false;
-            ok(stat, L, !allGatesPass(ctx, scriptMod, 159, 7),
-                    "★门禁那一关必须跟着判死 —— 否则徽标写「不支持」而正文一行依据都没有");
-            scriptMod.minGameVersion = "136";
-            ok(stat, L, allGatesPass(ctx, scriptMod, 159, 7),
-                    "★元断言：写上 136 之后门禁**全过**（判据有分辨力，不是恒判死）");
 
             // 依赖：steel 被关闭 ⇒ 依赖它的 dirmod 连坐（游戏 Mods.java:1064 的 && !getBool）
             ok(stat, L, r.stateOf("dir-mod") == Mods.State.INCOMPLETE_DEPENDENCIES,
@@ -6447,14 +6442,7 @@ public final class SelfTest {
                             + ModsText.crashStillLive(scClean, false) + "（最后一格必须是 false）");
             ok(stat, L, failNote.contains("关掉") && failNoteNo.contains("还会加载"),
                     "★术语统一：摘要卡（下次启动会把整槽模组关掉 / 都被关了）/ 关了跳过那支"
-                            + "（「还会加载」）/ 门标签（两支）都用「整槽跳过」");
-            ok(stat, L, ctx.getString(R.string.mods_gate_last_crash).contains("整槽跳过")
-                            && ctx.getString(R.string.mods_gate_last_crash_bad).contains("整槽跳过"),
-                    "★门标签两支都用「整槽跳过」（这个是我们自己的机制术语，游戏里没有对应的词）");
-            ok(stat, L, !ctx.getString(R.string.mods_gate_last_crash_bad).contains("跳过全部模组")
-                            && !ctx.getString(R.string.mods_gate_last_crash_skip_again)
-                                    .contains("跳过全部模组"),
-                    "★元断言：门那两支里都不再出现第二种说法（「跳过全部模组」）");
+                            + "（「还会加载」）都用「整槽跳过」");
 
             // 🔴 真机抓到的那条：便宜层（L1b）命中时**也要把名字跟模组表对上** ——
             //    报告里只有 internalName（`Error loading mod depuser`），界面该显示 displayName。
@@ -8460,7 +8448,7 @@ public final class SelfTest {
             ok(stat, L, noLead,
                     "★P3：报告行资源里**没有前导空格**（缩进是 Java 侧排版 —— aapt2 剥不动它）");
 
-            // ★★ P3 第八批：`Mods.State` 的显示文案（原来**枚举自己带文案**）+ 六道加载门。
+            // ★★ P3 第八批：`Mods.State` 的显示文案（原来**枚举自己带文案**）。
             //    ① **遍历所有状态**：label 与 badge 都必须非空 —— `switch` 有 `default` 兜底，
             //       漏映射**不崩不报错**、界面只是**静默空白**，只有遍历抓得住；顺带验两套语言不同；
             //    ② 徽标必须**不比句子长**（真机实测过：太长会把列表标题挤到折行）——
@@ -8479,36 +8467,10 @@ public final class SelfTest {
                             + missMd + "］");
             ok(stat, L, mdDiff && badgeShorter,
                     "★P3：状态文案两套语言不同；且**徽标不比句子长**（长了会把列表标题挤到折行）");
-            // ② 六道加载门：标签六条都要有；**没通过的**那几关必须给原因（通过的可以只画一行 ✅）
-            Mods.Info gm = mkMod("gate-probe", null, null, true);
-            StringBuilder gateMiss = new StringBuilder();
-            int gateCount = 0;
-            for (Mods.Gate g : Mods.gates(ctx, gm, 0, 0)) {
-                gateCount++;
-                if (g.label == null || g.label.isEmpty()) gateMiss.append("标签 ");
-                if (!g.pass && (g.note == null || g.note.isEmpty())) gateMiss.append("原因 ");
-            }
-            ok(stat, L, gateCount == 6 && gateMiss.length() == 0,
-                    "★P3：六道加载门的标签齐全；**没通过的**那几关必须给原因（通过了可只画一行）；"
-                            + "门数=" + gateCount + "，缺=" + gateMiss);
-            // ★★ 2026-10-08 用户：「**怎么还有❌游戏里是启用状态这种说法**」——
-            //    门的标签必须是**谓词/状态句**，不能是**名词陈述**（「游戏里**是**启用**状态**」+ ❌ = 读不通，
-            //    与 §85.16.3「叉号配正面词」同源）。机械判据：**标签里不许出现「状态」**。
-            //    ★ 2026-10-21 再往前一步（用户：「**怎么还有叉号后面跟肯定词**」）：光"谓词"还不够，
-            //      「❌ 游戏里启用着」照样读成"没有启用着" ⇒ **每道门都有 pass/fail 两版标签**，
-            //      尺子在下面「六道门逐一」那段（这条只保留"不许出现状态"这一半）。
-            StringBuilder labelBad = new StringBuilder();
-            for (Mods.Gate g : Mods.gates(ctx, gm, 0, 0, null)) {
-                if (g.label != null && g.label.contains("状态")) labelBad.append(g.label).append(" ");
-            }
-            ok(stat, L, labelBad.length() == 0,
-                    "★★门标签不许用「状态」这种名词陈述（前面配 ❌ 读不通）—— 违规："
-                            + (labelBad.length() == 0 ? "无" : labelBad.toString())
-                            + "；那道门现在是「" + ctx.getString(R.string.mods_gate_enabled) + "」");
             // ★★ 2026-10-08（用户真机澄清：「是游戏崩溃自己关的啊」）：状态行**不许把它归到用户头上** ——
             //   整槽跳过时是**游戏**写 `-enabled=false`（见 Mods.failedKey 的 Javadoc），而我们
-            //   **分不出**是谁关的（跳过 / 用户手动都可能）⇒ 只说状态。要归因的位置是下面那道门
-            //   （那里有 `-failed` 这个真证据）。原来写的是「被用户关闭」= 甩锅给用户。
+            //   **分不出**是谁关的（跳过 / 用户手动都可能）⇒ 只说状态。
+            //   原来写的是「被用户关闭」= 甩锅给用户。
             String stOff = ctx.getString(R.string.mods_state_disabled);
             String stOffEn = enCtx.getString(R.string.mods_state_disabled);
             ok(stat, L, !stOff.contains("用户") && !stOff.contains("你")
@@ -8591,187 +8553,6 @@ public final class SelfTest {
                             && !headNoFile.contains("settings.bin"),
                     "★★「游戏里的开关」表头交代来源与时刻：「" + head + "」；文件不在 ⇒ 退回不带时刻那句「"
                             + headNoFile + "」");
-            // 🔴 2026-10-08：上面那把尺子**只喂了"启用中"的夹具** ⇒ 漏掉一整类：
-            //   模组被关掉时那道「游戏里启用着它」不通过，而它的原因只在"设置没读到"时才给
-            //   ⇒ 详情页那行（❌ 标签 + 换行 + 原因）**直接印出 null**（用户截图抓到的）。
-            //   ⇒ 夹具扩到六种状态，并且**明文禁止 note 里出现"null"**。
-            java.util.List<Object[]> gateCases = new java.util.ArrayList<>();
-            Mods.Info gcOn = mkMod("gate-on", null, null, true);
-            Mods.Info gcOff = mkMod("gate-off", null, null, false);
-            Mods.Info gcFailed = mkMod("gate-failed", null, null, true);
-            gcFailed.failed = true;
-            Mods.Info gcUnknown = mkMod("gate-unknown", null, null, true);
-            gcUnknown.settingsKnown = false;
-            Mods.Info gcWorst = mkMod("gate-worst", null, null, false);   // 用户那一屏：关闭 + 记录 + 还会再跳
-            gcWorst.failed = true;
-            Mods.Scan gcSkipScan = new Mods.Scan("m3-gate", null);
-            gcSkipScan.launchIdExists = true;
-            gcSkipScan.skipModLoading = true;
-            gateCases.add(new Object[]{"启用中", gcOn, null});
-            gateCases.add(new Object[]{"被关掉", gcOff, null});
-            gateCases.add(new Object[]{"有失败记录", gcFailed, null});
-            gateCases.add(new Object[]{"设置没读到", gcUnknown, null});
-            gateCases.add(new Object[]{"还会整槽跳过", gcOn, gcSkipScan});
-            gateCases.add(new Object[]{"关闭+记录+还会跳", gcWorst, gcSkipScan});
-            StringBuilder gateBad = new StringBuilder();
-            for (Object[] c : gateCases) {
-                String name = (String) c[0];
-                java.util.List<Mods.Gate> gs = Mods.gates(ctx, (Mods.Info) c[1], 0, 0, (Mods.Scan) c[2]);
-                if (gs.size() != 6) gateBad.append(name).append(":门数 ").append(gs.size()).append(" ");
-                for (Mods.Gate g : gs) {
-                    if (g.label == null || g.label.isEmpty()) gateBad.append(name).append(":缺标签 ");
-                    if (!g.pass && (g.note == null || g.note.isEmpty())) gateBad.append(name).append(":缺原因 ");
-                    if (g.note != null && (g.note.contains("null") || g.note.trim().isEmpty())) {
-                        gateBad.append(name).append(":注意有 null ");
-                    }
-                    // ★ 字数预算（2026-10-08 用户："还是乱的"）：门的说明会**折行**，
-                    //   40 字以内基本是两行；再长就把六道门挤成一整屏（真正的解释放弹窗/日志）。
-                    if (g.note != null && g.note.length() > 40) {
-                        gateBad.append(name).append(":说明太长(").append(g.note.length()).append(") ");
-                    }
-                }
-            }
-            ok(stat, L, gateBad.length() == 0,
-                    "★★元断言：**六种状态**下（启用/关掉/有记录/设置没读到/还会跳/最坏组合）"
-                            + "每道门都有标签、**不通过必有原因、且原因里不许出现 null** —— "
-                            + (gateBad.length() == 0 ? "全过" : "问题：" + gateBad));
-            ok(stat, L, !ctx.getString(R.string.mods_gate_enabled_off).isEmpty()
-                            && Mods.gates(ctx, gcOff, 0, 0, null).get(1).note != null
-                            && Mods.gates(ctx, gcOff, 0, 0, null).get(1).note.contains("「启用」"),
-                    "★「游戏里启用着它」不通过时：原因在、并且给出「启用」这个动作（改前是 null）");
-            // ── ★★ 2026-10-08 修（用户真机反馈：「上次启动没崩到跳过」这句有问题）──
-            //    原来最后那道门的 `pass` **写死 true**，判据一行没算 ⇒ 详情页会同时写着
-            //    「❌ 已被标记为失败：是」和「✅ 上次启动没崩到跳过全部模组」两句互相打脸。
-            //    现在按真证据判（`m.failed` / `scan.skipModLoading` / `scan.launchIdExists`），
-            //    这里把**四种组合**逐一点出来当判据。
-            Mods.Info gFail = mkMod("gate-crash-probe", null, null, true);
-            gFail.failed = true;                     // ← 判据就是它（忘了这一行 = 测试自己写错了）
-            Mods.Scan gScan = new Mods.Scan("m3-gate", null);
-            String gLabel = ctx.getString(R.string.mods_gate_last_crash);
-            ok(stat, L, !lastGateOf(ctx, gFail, gScan).pass && lastGateOf(ctx, gFail, gScan).note != null,
-                    "★★修：游戏把这个模组标成失败（`failed=true`）⇒ 那道门**必须不通过**且给原因"
-                            + "（改前是写死通过的 —— 用户真机看出来的）");
-            Mods.Info gOk = mkMod("gate-crash-probe", null, null, true);
-            ok(stat, L, lastGateOf(ctx, gOk, gScan).pass,
-                    "★元断言：没被标失败、也没崩过 ⇒ 通过（判据有分辨力，不是恒不通过）");
-            Mods.Scan gLid = new Mods.Scan("m3-gate", null);
-            gLid.launchIdExists = true;
-            gLid.skipModLoading = false;                       // launchid 在，但用户关了 modcrashdisable
-            ok(stat, L, lastGateOf(ctx, gOk, gLid).pass && lastGateOf(ctx, gOk, gLid).note != null,
-                    "★launchid.dat 在、但关掉了「启动崩溃后禁用模组」⇒ **通过**（附一句说明）—— "
-                            + "不然会把「关了开关」的人吓一跳");
-            Mods.Scan gSkip = new Mods.Scan("m3-gate", null);
-            gSkip.launchIdExists = true;
-            gSkip.skipModLoading = true;
-            ok(stat, L, !lastGateOf(ctx, gOk, gSkip).pass,
-                    "★launchid.dat 在 **且** modcrashdisable 开着 ⇒ 不通过（下次启动整槽跳过）");
-            // ★★ 2026-10-08：**叉号后面不许再说"正常…"** —— 用户原话
-            //    「前面打个叉号后面说正常结束谁知道到底是正不正常啊」。
-            //    ✓/❌ 那套（`❌ 满足最低版本要求`）只适用于**要求/状态**式判据；
-            //    "过去时的叙述"必须**跟着状态换措辞**（不通过时直接说发生了什么）。
-            String okLabel = ctx.getString(R.string.mods_gate_last_crash);
-            String badLabel = ctx.getString(R.string.mods_gate_last_crash_bad);
-            ok(stat, L, !badLabel.equals(okLabel)
-                            && !badLabel.contains("正常") && !badLabel.contains("没触发"),
-                    "★★不通过时那道门的标签是「" + badLabel + "」—— 与通过时的「" + okLabel
-                            + "」**不同**，且不含「正常 / 没触发」（叉号配正面词 = 自相矛盾）");
-            ok(stat, L, lastGateOf(ctx, gFail, gScan).label.equals(badLabel)
-                            && lastGateOf(ctx, gOk, gScan).label.equals(okLabel),
-                    "★元断言：界面真的按状态取了不同标签（不是只写了两条文案没人用）");
-            // ★★ 2026-10-21（用户：「**怎么还有叉号后面跟肯定词**」＋「**什么叫做启用但是没有被禁用啊**」）：
-            //    ① 门的标签是**肯定句**（「游戏里启用着」）配 ❌ 就会被读成"没有启用着" ⇒ 六道门
-            //       **每一道**在不通过时都必须换成"坏了什么"的那一版；
-            //    ② 那两句"打架"（❌ 游戏里启用着 / ✅ 没有被游戏禁用）的根是**两个机制用了同一对词**：
-            //       「启用」是 `settings.bin` 里模组自己的开关，「禁用」原来是游戏**写死的黑名单**
-            //       （`Mods.BLACKLISTED`）⇒ 黑名单那一关只说「黑名单」。
-            //    尺子：**每道门单独不通过一次**，断言 (a) 那一道真的不通过、(b) 其余五道都通过
-            //    （夹具要有分辨力，§45）、(c) 它的标签与通过时**不同**。
-            Mods.Info okAll = mkMod("gate-all-ok", null, null, true);
-            okAll.java = true;
-            okAll.hasClassesDex = true;                 // 声明 java + 有 dex ⇒ 第一关过
-            okAll.minGameVersion = "160";               // = 槽里的版本 ⇒ 第二关过；≥154 ⇒ 第三关过
-            Mods.Info badLoad = mkMod("gate-no-dex", null, null, true);
-            badLoad.java = true;                        // 声明 java、包里没有 dex ⇒ 第一关不过
-            badLoad.minGameVersion = "160";
-            Mods.Info badOn = mkMod("gate-off", null, null, false);
-            badOn.java = true; badOn.hasClassesDex = true; badOn.minGameVersion = "160";
-            Mods.Info badVer = mkMod("gate-newer", null, null, true);
-            badVer.java = true; badVer.hasClassesDex = true; badVer.minGameVersion = "161";
-            Mods.Info badMin = mkMod("gate-min-old", null, null, true);
-            badMin.java = true; badMin.hasClassesDex = true; badMin.minGameVersion = "140";
-            Mods.Info badBl = mkMod("braindustry", null, null, true);   // 游戏写死的黑名单里就有它
-            badBl.java = true; badBl.hasClassesDex = true; badBl.minGameVersion = "160";
-            Mods.Info badLast = mkMod("gate-failed", null, null, true);
-            badLast.java = true; badLast.hasClassesDex = true; badLast.minGameVersion = "160";
-            badLast.failed = true;
-            Mods.Info[] oneBad = {badLoad, badOn, badVer, badMin, badBl, badLast};
-            String[] gateNm = {"安卓", "启用", "游戏版本", "加载门槛", "黑名单", "上次启动"};
-            java.util.List<Mods.Gate> gsAll = Mods.gates(ctx, okAll, 160, 0, null);
-            StringBuilder gsBad = new StringBuilder();
-            if (gsAll.size() != 6) {
-                gsBad.append("门数=").append(gsAll.size()).append(" ");
-            } else {
-                for (int i = 0; i < oneBad.length; i++) {
-                    java.util.List<Mods.Gate> gs = Mods.gates(ctx, oneBad[i], 160, 0, null);
-                    if (gs.size() != gsAll.size()) { gsBad.append(gateNm[i]).append(":门数 "); continue; }
-                    if (gs.get(i).pass) gsBad.append(gateNm[i]).append(":夹具没把它判死 ");
-                    for (int j = 0; j < gs.size(); j++) {
-                        if (j != i && !gs.get(j).pass) {
-                            gsBad.append(gateNm[i]).append(":连带第").append(j + 1).append("关 ");
-                        }
-                    }
-                    if (gs.get(i).label.equals(gsAll.get(i).label)) {
-                        gsBad.append(gateNm[i]).append(":叉号后面还是「")
-                                .append(gs.get(i).label).append("」 ");
-                    }
-                }
-            }
-            ok(stat, L, gsBad.length() == 0,
-                    "★★六道门**逐一**不通过时，标签都换成「坏了什么」了（❌ + 肯定句 = 用户说的"
-                            + "「怎么还有叉号后面跟肯定词」）—— "
-                            + (gsBad.length() == 0 ? "六关都换了" : "问题：" + gsBad));
-            // ★ 术语只留一个：「黑名单」那关**不许**出现「禁用」（用户会把它读成"开关"的另一头）
-            String blOkLab = ctx.getString(R.string.mods_gate_blacklist);
-            String blBadLab = ctx.getString(R.string.mods_gate_blacklist_bad);
-            ok(stat, L, gsAll.size() == 6
-                            && blOkLab.contains("黑名单") && blBadLab.contains("黑名单")
-                            && !blOkLab.contains("禁用") && !blBadLab.contains("禁用")
-                            && gsAll.get(4).label.equals(blOkLab)
-                            && Mods.gates(ctx, badBl, 160, 0, null).get(4).label.equals(blBadLab),
-                    "★★「启用」与「禁用」不再指同一件事：黑名单那关通过时说「" + blOkLab
-                            + "」、不通过时说「" + blBadLab + "」（改前那句带「禁用」，与"
-                            + "「❌ 游戏里启用着」摆在一起就像自相矛盾）");
-            // ⚠️ 两支"不通过"的**建议**必须不同 —— 比 note 时**先转字符串**（通过那支的 note 是 null，
-            //    直接 `.equals` 会 NPE：第一版就这么把自己绊倒了）
-            String noteFail = String.valueOf(lastGateOf(ctx, gFail, gScan).note);
-            String noteSkip = String.valueOf(lastGateOf(ctx, gOk, gSkip).note);
-            ok(stat, L, !gLabel.isEmpty() && !noteFail.equals(noteSkip)
-                            && !"null".equals(noteFail) && !"null".equals(noteSkip),
-                    "★元断言：两支不通过的**建议不同** ⇒ 文案真的分开了，不是一句万金油");
-            // ★★ 2026-10-08：**建议必须跟着当前状态走** —— 用户原话
-            //    「想再试就点启用，但现在状态就是启用（这矛盾啊）」。
-            //    ★ 本批（第十五批）机制定案后口径**再收紧**：那个动作**只许出现在
-            //      `mods_gate_enabled` 那道门**（它才是"这个模组开没开"的判据）；
-            //      「上次启动」那道门**任何状态下都不许**说"点启用" —— 两处都说就是同一屏重复
-            //      （用户说的"乱"有一部分就是它）。
-            Mods.Info gOn = mkMod("gate-crash-probe", null, null, true);      // 启用中
-            gOn.failed = true;
-            Mods.Info gOff = mkMod("gate-crash-probe", null, null, false);    // 已关掉
-            gOff.failed = true;
-            String noteOn = String.valueOf(lastGateOf(ctx, gOn, gScan).note);
-            String noteOff = String.valueOf(lastGateOf(ctx, gOff, gScan).note);
-            ok(stat, L, !noteOn.contains("「启用」") && !noteOff.contains("「启用」"),
-                    "★★「上次启动」那道门**任何状态下**都不说「点启用」（动作归"
-                            + "开关那道门）—— 实得开着「" + noteOn
-                            + "」/ 关着「" + noteOff + "」");
-            ok(stat, L, Mods.gates(ctx, gOn, 0, 0, gScan).get(1).pass
-                            && Mods.gates(ctx, gOff, 0, 0, gScan).get(1).note != null
-                            && Mods.gates(ctx, gOff, 0, 0, gScan).get(1).note.contains("「启用」"),
-                    "★动作落在**对的门**上：关掉的模组在开关那道门拿到「启用」；"
-                            + "开着的那道门通过（不再有第二条门重复给同一个动作）");
-            ok(stat, L, !noteOn.contains("标成失败") && !noteFail.contains("标成失败"),
-                    "★元断言：门的说明里不再写「把它标成失败」—— 那是**全槽级**标记"
-                            + "（一崩 12 个模组全有），搁在按模组的门里就是 §85.16 那类错");
             // ★★ P3 第九批：模组页那几条（导入失败 + 详情弹窗补充说明）按真参数实拼。
             //    ★ 其中两条的占位符是"整句 + %1$s/%2$s"（原来是 Java 里拼的**碎片**）。
             String mdTarget = ctx.getString(R.string.mods_detail_target_fmt, "A / B", "1.2");
@@ -12545,27 +12326,6 @@ public final class SelfTest {
         } catch (Throwable t) {
             return false;
         }
-    }
-
-    /**
-     * ⑮ 用：门禁是否**全过**（判据就是 {@link Mods#gates} 的 `pass`）。
-     * ★ 存在的意义：`stateOf` 与 `gates` 是**两处入口**，徽标写"不支持"而门禁里没有一关判死，
-     *   用户就看不到依据（F4①d 那条纪律：判据要能看见依据）。
-     */
-    /**
-     * ⑮ 用：六道门里的**最后一道**（"上次启动"那道）。
-     * ⚠️ 按**位置**取，不按文案找 —— 它的标签**跟着状态换措辞**（见 `Mods.gates` 的注释），
-     * 按文案找在不通过时会静默落空（然后断言就"恰好"通过了，等于把尺子弄丢）。
-     */
-    private static Mods.Gate lastGateOf(Context ctx, Mods.Info m, Mods.Scan scan) {
-        java.util.List<Mods.Gate> gs = Mods.gates(ctx, m, 0, 0, scan);
-        return gs.isEmpty() ? new Mods.Gate("(空)", false, "(空)") : gs.get(gs.size() - 1);
-    }
-
-    private static boolean allGatesPass(Context ctx, Mods.Info m, int build, int rev) {        for (Mods.Gate g : Mods.gates(ctx, m, build, rev)) {
-            if (!g.pass) return false;
-        }
-        return true;
     }
 
     /** ⑮ 用：造一个只填内部名/依赖/开关的模组（`resolveDependencies` 只看这几项） */

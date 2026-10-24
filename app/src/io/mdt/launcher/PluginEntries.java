@@ -236,7 +236,7 @@ final class PluginEntries {
 
         /**
          * **v27**：插件给的「六道加载门」结论（path → 门）。
-         * 空表 = 没有插件能算 ⇒ 详情页回落到宿主自己的 {@code Mods.gates}。
+         * 空表 = 没有插件能算 ⇒ 详情页那一节不显示（六道门只有插件这一个来源）。
          */
         void onPluginGates(java.util.Map<String, java.util.List<io.mdt.launcher.api.Gate>> gates);
     }

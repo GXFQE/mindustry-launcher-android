@@ -34,7 +34,6 @@ import java.util.zip.ZipFile;
  * | {@link #isAtLeast} | `Version.java:64` | `minGameVersion` 的门 |
  * | {@link #BLACKLISTED} | `Mods.java:37~41` | 硬编码黑名单（`name` 或 `name:version`） |
  * | {@link #resolveDependencies} | `Mods.java:1025~1078` | 依赖排序 + 四种失效状态 |
- * | {@link #gates} | `Mods.java:1156~1165` | 加载门的**逐条**判定 |
  * | {@link #skipModLoading} | `Mods.java:508` + `Vars.java:398` | 上次崩了 + `modcrashdisable`（缺省 true） |
  *
  * ── 三条"看起来该做其实不能做"的事（都写在注释里免得后人踩）────────────────
@@ -1837,162 +1836,6 @@ public final class Mods {
         return s.length() > 120 ? s.substring(0, 120) + "…" : s;
     }
 
-    // ══ 加载门：逐条说出"为什么它没生效" ═══════════════════════════════════
-
-    /** 一条门条件 */
-    public static final class Gate {
-        public final String label;
-        public final boolean pass;
-        /** 补充说明（含"这一条要运行期才知道"这类免责） */
-        public final String note;
-
-        Gate(String label, boolean pass, String note) {
-            this.label = label;
-            this.pass = pass;
-            this.note = note;
-        }
-    }
-
-    /**
-     * ★★ 复刻 `Mods.java:1156~1165` 的那条链 —— **逐条**报，别只说"未生效"。
-     *
-     * 这条链决定的是「**模组类**（`classes.dex`）加不加载」，不是"模组在不在列表里"：
-     * 链断了 `mod.main` 就是 null，但 `LoadedMod` 照样进列表（`:1214` 的 return 在 if 之外）
-     * ⇒ 纯 JS 模组（只有 `scripts/`）**本来就不需要**这条链，别对它们误报。
-     *
-     * ⚠️ 有两条**只能运行期知道**（写在这里是因为漏掉它们会让人以为"门都过了却还是没生效"）：
-     *   `!skipModCode`（载入过程中的崩溃旗标）与 `initialize`（= 依赖链判定为 enabled）。
-     *   前者扫描期恒为 false，后者由 {@link #resolveDependencies} 给出。
-     *
-     * @param gameBuild    目标游戏 build（如 159）；`<=0` ⇒ 按游戏的边界一律放行
-     * @param gameRevision 目标游戏 revision（如 7）
-     */
-    public static List<Gate> gates(Context ctx, Info m, int gameBuild, int gameRevision) {
-        return gates(ctx, m, gameBuild, gameRevision, null);
-    }
-
-    /**
-     * 六道加载门。{@code scan} = 这个槽的扫描结果（可以为 null = "没扫过"）。
-     *
-     * <p>🔴 **2026-10-21（用户：「怎么还有叉号后面跟肯定词」/「什么叫做启用但是没有被禁用啊」）**：
-     * 每道门的 `label` 都**按状态取**（通过一条、不通过一条 `*_bad`），因为「❌ + 肯定句」读不通；
-     * 而「启用/禁用」这对词原来同时指**两件不相干的事**（模组开关 vs 游戏写死的黑名单）——
-     * 黑名单那道门现在只说「黑名单」。两件事的自检判据见 `SelfTest` 的六关逐一那段。
-     *
-     * <p>🔴 **2026-10-08 修（用户真机反馈）**：最后那道门原来写的是
-     * {@code new Gate(..., true, ...)} —— `pass` **写死 true**，判据一行没算 ⇒
-     * 详情页会同时出现「❌ 已被标记为失败：是」和「✅ 上次启动没崩到「跳过全部模组」」**两句互相打脸**。
-     * 现在按**真证据**判：
-     * <ul>
-     *   <li>{@code m.failed}（游戏自己写的 `mod-&lt;名字&gt;-failed`）⇒ 上次它就没加载起来；</li>
-     *   <li>{@code scan.launchIdExists} + {@code scan.skipModLoading}
-     *       （= `launchid.dat` 在 **且** `modcrashdisable` 开着）⇒ **下次**启动会整槽跳过；</li>
-     *   <li>`launchid.dat` 在、但用户关掉了 `modcrashdisable` ⇒ **通过**（附一句说明：
-     *       上次没跑完但不会被跳过）。</li>
-     * </ul>
-     * ⚠️ 这三条都是**全槽级**事实，不是"这个模组的错"（按行标记的规矩见 §85.16）。
-     */
-    public static List<Gate> gates(Context ctx, Info m, int gameBuild, int gameRevision, Scan scan) {
-        List<Gate> out = new ArrayList<>();
-        if (m == null) return out;
-
-        // ★★ 六道门的 `label` **一律跟着状态取**（每道都有一条 `*_bad`）：✅ 后面是"这一关的样子"，
-        //   ❌ 后面必须是"**坏了什么**"。2026-10-21 用户原话「**怎么还有叉号后面跟肯定词**」——
-        //   「❌ 游戏里启用着」会被读成"没有启用着"；更早一次是「❌ 上次启动正常结束」（§85.16.3）。
-        //   ⇒ 别再写"肯定句 + 叉号"，那是同一类错的第 N 次复发。
-        //   自检里有一把尺子对六道门逐一验这件事（`SelfTest` 的「六种状态」那段后面）。
-
-        // ★ 这一关的判据就是"安卓到底能不能加载它" —— 必须与行内徽标一致：
-        //   只声明了 java、包里却没有 classes.dex 时，游戏会尝试加载然后失败跳过（见 willFailJavaLoad），
-        //   所以这时这一关要判**不通过**（早先写成"门通过 ⇒ 绿勾"，与「加载会失败」徽标自相矛盾）。
-        boolean canLoad = !m.willFailJavaLoad();
-        // ★★ note = **null 表示"通过了、没什么好补充的"** ⇒ 显示层只画一行 ✅。
-        //   为什么这么定（2026-10-03 用户：「这个页面也改下」）：原来每关都两行，而第二行
-        //   多半是在**复述标题**（`不在游戏的黑名单里` / `不在`）⇒ 六关白占十二行。
-        //   label 也不再把数据塞进去（原来是「游戏版本够（它要 160.1，当前 0）」，
-        //   没指定版本时那个「当前 0」很怪）—— 数据一律进 note，且只在**失败**时给。
-        out.add(new Gate(Trans.get(ctx, canLoad
-                        ? R.string.mods_gate_android_load : R.string.mods_gate_android_load_bad),
-                canLoad, canLoad ? null : Trans.get(ctx, R.string.mods_gate_android_load_note)));
-
-        // 🔴 2026-10-08 修：原来这句是 `m.settingsKnown ? null : …note` —— **说明只跟着"设置读没读到"**，
-        //   于是"模组被关掉"时这一关不通过、原因却是 null ⇒ 详情页那行（❌ 标签 + 换行 + 原因）
-        //   直接印出 **null**（用户截图抓到的）。现在按**通过与不通过**给原因，并且把「点启用」
-        //   这个动作**收在这一关**（它才是"这个模组开没开"的判据；下面"上次启动"那一关只讲机制）。
-        // 🔴 2026-10-21 用户：「**怎么还有叉号后面跟肯定词**」＋「**什么叫做启用但是没有被禁用啊**」：
-        //   ① 标签按状态取（不通过时说「游戏里已关闭」，不再说「游戏里启用着」）；
-        //   ② `settingsKnown == false` 时**不能**说"已关闭"（那只是默认值）⇒ 单独一条"没读到"。
-        //      ⚠️ 那条分支实际不可达（`enabled` 只在读到设置后才可能为 false，见 `scan` 的 ④），
-        //      留着是为了将来改读侧时不印出假话。
-        boolean on = m.enabled;
-        out.add(new Gate(Trans.get(ctx, on ? R.string.mods_gate_enabled
-                        : (m.settingsKnown ? R.string.mods_gate_enabled_bad
-                                           : R.string.mods_gate_enabled_unknown_label)),
-                on,
-                on ? (m.settingsKnown ? null : Trans.get(ctx, R.string.mods_gate_enabled_note))
-                   : Trans.get(ctx, m.settingsKnown ? R.string.mods_gate_enabled_off
-                                                     : R.string.mods_gate_enabled_unknown)));
-
-        boolean verOk = isAtLeast(gameBuild, gameRevision, m.minGameVersion);
-        final String curVer = gameBuild == 0 ? Trans.get(ctx, R.string.mods_gate_no_version)
-                : (gameBuild + (gameRevision == 0 ? "" : "." + gameRevision));
-        out.add(new Gate(Trans.get(ctx, verOk
-                        ? R.string.mods_gate_version : R.string.mods_gate_version_bad),
-                verOk, verOk ? null : Trans.get(ctx, R.string.mods_gate_version_note_fmt,
-                        m.minGameVersion, curVer)));
-
-        // ★ 两个门槛是**两个数**（`Vars.java:53/55`）：Java 模组 154、**脚本 / 数据模组 136**。
-        //   都拿"它自己写的 `minGameVersion` 主版本"去比 —— **没写 = 0 = 太老** ⇒ 游戏判 unsupported
-        //   （`LoadedMod.enabled()` 为 false ⇒ `loadScripts` / `loadContent` 都不进它），
-        //   而日志里**照样**打 `Loading mod: X` ⇒ 症状是"模组明明列出来了，脚本一行没跑"。
-        //   🔴 这条原来是 `if(m.isJava() && …)` —— **只判了 Java 那一半**，脚本模组整类漏判。
-        //   真机对照（同一份 JS 探针，只改 `minGameVersion` 一个字段，各自在干净槽里跑）：
-        //     缺省  ⇒ 日志只有 `Loading mod:`，无脚本输出、无崩溃文件（**静默跳过**）
-        //     "140" ⇒ 脚本跑起来、崩溃文件出现
-        int minMajor = m.minMajor();
-        // v8 才有这个门槛（v146 的 `Vars.java` 里没有它）⇒ 目标是 v7/v6 时这一关直接算过
-        int need = gameBuild >= MIN_JAVA_MOD_GAME_VERSION
-                ? (m.isJava() ? MIN_JAVA_MOD_GAME_VERSION : MIN_MOD_GAME_VERSION) : 0;
-        boolean majorOk = need <= 0 || minMajor >= need || m.legacyCompatible;
-        out.add(new Gate(Trans.get(ctx, majorOk
-                        ? R.string.mods_gate_minver : R.string.mods_gate_minver_bad),
-                majorOk,
-                majorOk ? null
-                        : (minMajor <= 0
-                            ? Trans.get(ctx, R.string.mods_gate_minver_none)
-                            : Trans.get(ctx, R.string.mods_gate_minver_old_fmt, minMajor, need))));
-
-        // 🔴 2026-10-21 用户：「什么叫做**启用**但是没有被**禁用**啊」——
-        //   这两关说的是**两个不相干的机制**：上一关是模组自己的开关（settings.bin 里的
-        //   `mod-<名字>-enabled`），这一关是游戏**写死在代码里**的黑名单（`Mods.BLACKLISTED`，
-        //   见本文件顶部那张表）。用户会把「禁用」读成"同一个开关的另一头" ⇒
-        //   这一关改成只说「黑名单」（游戏界面上它同样是"不加载"，没有第二种说法）。
-        boolean blOk = !isBlacklisted(m.name, m.version);
-        out.add(new Gate(Trans.get(ctx, blOk
-                        ? R.string.mods_gate_blacklist : R.string.mods_gate_blacklist_bad),
-                blOk, blOk ? null : Trans.get(ctx, R.string.mods_gate_blacklist_note_fmt,
-                        m.name + ":" + m.version)));
-
-        // ★ 六道门的最后一道：**上次启动到底崩到没崩到"整槽跳过"**（判据见本方法的 Javadoc）
-        boolean lid = scan != null && scan.launchIdExists;
-        boolean skipping = scan != null && scan.skipModLoading;
-        boolean lastCrashOk = !m.failed && !skipping;
-        // 🔴 标签**跟着状态换措辞**（现在是**六道门全都这样**，见本方法开头那段）：
-        //   这句是**过去时的叙述** —— 配 ❌ 会变成"❌ 上次启动正常结束"，用户原话
-        //   「前面打个叉号后面说正常结束谁知道到底是正不正常啊」。不通过时直接说发生了什么。
-        out.add(new Gate(Trans.get(ctx, lastCrashOk
-                ? R.string.mods_gate_last_crash : R.string.mods_gate_last_crash_bad), lastCrashOk,
-                lastCrashOk
-                        // 通过但"上次没跑完"（用户关了 modcrashdisable）⇒ 值得说一句
-                        ? (lid ? Trans.get(ctx, R.string.mods_gate_last_crash_note) : null)
-                        // 🔴 不通过时只讲**机制与槽级动作**（"点启用"归上面那道`mods_gate_enabled`——
-                        //   两处都说就成了同一屏重复，用户说的"乱"有一部分就是它）：
-                        //   `-enabled` / `-failed` 的真义见 failedKey 的 Javadoc（字节码级定案）。
-                        : Trans.get(ctx, skipping ? R.string.mods_gate_last_crash_skip_again
-                                                  : R.string.mods_gate_last_crash_retry)));
-        return out;
-    }
-
     // ══ 依赖解析（`Mods.java:1025~1078` 的复刻） ════════════════════════════
 
     /** 与游戏 `Mods.ModState` 同名同序（`Mods.java:1472`） */
@@ -2104,7 +1947,7 @@ public final class Mods {
         // ★ 门槛分两档（`Vars.java:53/55`）：Java 模组 154、脚本 / 数据模组 136。
         //   ⚠️ 原来这里写的是 `m.isJava() && …` ⇒ **脚本模组整类漏判**：没写 `minGameVersion`
         //      的 JS 模组被游戏判 unsupported（脚本永远不跑），我们这边却显示"启用"。
-        //      真机对照见 {@link #gates} 里那段注释。
+        //      真机对照的细节随六道门一起搬进了 `plugins/mods-health`。
         // 🔴 2026-10-24（第 229 轮 P3b）：这两个常量是 **v8 才有的**（v146 的 `Vars.java`
         //   里根本没有它们，已对比）⇒ 目标游戏是 v7/v6 时**不能套这个门槛**，
         //   否则 v146 的 Java 模组（写 146）在 v146 上会被误报成"版本不对"。
