@@ -455,6 +455,7 @@ final class PluginData {
             if (byPath.containsKey(path)) continue;
             Map<String, String> ex = new LinkedHashMap<String, String>();
             put(ex, "internalName", m.internalName);
+            put(ex, "name", m.name);
             put(ex, "version", m.version);
             put(ex, "author", m.author);
             put(ex, "description", m.description);
@@ -471,6 +472,9 @@ final class PluginData {
             ex.put("enabled", String.valueOf(m.enabled));
             ex.put("willFailJavaLoad", String.valueOf(m.willFailJavaLoad()));
             put(ex, "rootPrefix", m.rootPrefix);
+            // 目录形态的"根"（`resolveRoot` 下潜一层之后那一层）：插件找 classes.dex 要用它，
+            // 别让插件自己再推一遍这条规则（第 229 轮，conflict 插件）。
+            if (m.directory && m.rootDir != null) put(ex, "rootDir", m.rootDir.getAbsolutePath());
             String title = m.displayName == null || m.displayName.trim().isEmpty()
                     ? m.fileName : m.displayName.trim();
             String sub = modSubtitle(m);

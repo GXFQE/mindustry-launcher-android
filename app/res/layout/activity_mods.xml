@@ -195,23 +195,6 @@
                     android:layout_marginStart="62dp"
                     android:background="@color/divider" />
 
-                <!--
-                  模组间冲突体检（用户问：「能检查到 logicsugar 和 neon 同时加载吗」）。
-                  ★ 放在**按需**一行里：它要读每个 Java 模组的 classes.dex（可能十几 MB），
-                    不适合每次进页面都跑。
-                -->
-                <include
-                    android:id="@+id/row_mod_conflict"
-                    layout="@layout/row_action"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content" />
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="62dp"
-                    android:background="@color/divider" />
-
                 <include
                     android:id="@+id/row_mod_batch"
                     layout="@layout/row_action"

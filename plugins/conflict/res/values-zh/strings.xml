@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  conflict 插件的文案（中文）。
+  ★ 与 values/strings.xml 一一对应；`cf_join_and` 两侧的空格是**排版**（`\u0020`），别删。
+-->
+<resources>
+    <string name="cf_scanned_fmt">检查了 %1$d 个带代码的模组（%2$s）</string>
+    <string name="cf_no_code">这个槽里没有带代码的模组</string>
+    <string name="cf_no_code_detail">这里只有资源或脚本模组，不会出现「同一套功能装两遍」这种冲突。</string>
+    <string name="cf_none">没发现明显冲突</string>
+    <string name="cf_none_hint">有些冲突要游戏跑起来才知道 —— 跑一次游戏，再回这里看看。</string>
+
+    <string name="cf_contained_title_fmt">「%1$s」里已经带了「%2$s」</string>
+    <string name="cf_contained_detail">两个一起开就是同一套功能装两遍，会互相抢；建议只留一个。</string>
+    <string name="cf_shared_title_fmt">%1$s都想接管游戏里的%2$s</string>
+    <string name="cf_shared_detail">那一处只能有一个生效，两个都开时只有一个真的起作用。</string>
+    <string name="cf_mentioned_title_fmt">「%1$s」的简介里提到了「%2$s」</string>
+    <string name="cf_mentioned_detail">可能只是配套说明或依赖，不一定是冲突。</string>
+    <string name="cf_log_title_fmt">游戏上次启动的日志里有 %1$d 行提到这些模组</string>
+    <string name="cf_log_more_fmt">……另有 %1$d 行</string>
+    <string name="cf_note_dex_title_fmt">读不了「%1$s」的 classes.dex</string>
+    <string name="cf_note_dex_detail">这个模组有没有内置别人，这次没查出来。</string>
+    <string name="cf_note_log">读不了游戏日志</string>
+
+    <string name="cf_name_fmt">「%1$s」</string>
+    <string name="cf_join_and">\u0020与\u0020</string>
+    <string name="cf_hook_logic">逻辑编辑器</string>
+</resources>

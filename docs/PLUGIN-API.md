@@ -393,3 +393,11 @@ v22（2026-10-23 第 221 轮）：`submit()` / `Task`（后台任务，完成/�
 v23（2026-10-23 第 223 轮）：`Probe` / `ProbeEnv` + `telemetry.probes`（`:game` 进程内 /
 `:probe` 隔离进程两种探针）；数据由插件自己写，宿主只调度与隔离。
 v24（2026-10-23 第 224 轮）：`Finding` + `slot: analyzer`（`page: mods`）—— 插件给结论、宿主渲染；`API_MIN` 仍不动。
+
+**第一个「纯 analyzer」插件**：`plugins/conflict`（第 229 轮，模组冲突检查）。宿主管了四年
+（第 229 轮之前）的那行「查模组冲突」整块删掉，判据搬进插件的 `core/Conflicts.java`；
+界面只剩宿主的 analyzer 卡片。两个注意点（都在那个工程里踩过）：
+- `analyzer` 是**逐项**回调，而 `Finding` 没有 item 字段 ⇒ 整槽结论只在「页面第一项」那一次给，
+  否则同一份结论会在卡片里重复 N 遍（插件按 `contents(mods).get(0)` 判，**不是**按回调顺序）；
+- analyzer 每次进页面都会跑 ⇒ 重活要按 `mods/` 签名缓存（那个插件按「名字:大小:mtime」缓存三层判据，
+  日志摘录不缓存 —— 它每次启动游戏都会变）。

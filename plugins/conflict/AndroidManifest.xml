@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  官方插件 conflict（第 229 轮）：把宿主的「查模组冲突」搬出来。
+  ★ 与 mapstats 同一条：**只声明包名**、不声明任何组件 —— 插件是宿主动态加载的代码 + 资源，
+    不是独立应用（aapt2 只要求有个 manifest）。
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="io.mdt.plugins.conflict">
+
+    <application android:label="MDT Conflict Check"/>
+</manifest>

@@ -202,7 +202,10 @@ final class Extensions {
     /** 这一版认得的插槽（别的名字 ⇒ 跳过；启动报告里会记）。 */
     static boolean knownSlot(String slot) {
         return SLOT_PLUGINS.equals(slot) || SLOT_CONTENT.equals(slot)
-                || SLOT_SECTION.equals(slot) || SLOT_ACTION.equals(slot);
+                || SLOT_SECTION.equals(slot) || SLOT_ACTION.equals(slot)
+                // ★ v24 加了 analyzer 却漏了这一行 ⇒ 只声明 analyzer 的插件会被插件页
+                //   说成「这一版还不支持」（第 229 轮：conflict 插件第一次撞上）。
+                || SLOT_ANALYZER.equals(slot);
     }
 
     /** 这一版认得的内容页 / 功能页（只有 content 插槽的条目用得上）。 */

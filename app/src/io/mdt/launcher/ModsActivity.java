@@ -201,10 +201,6 @@ public class ModsActivity extends BaseActivity {
                     @Override public void run() { pickCopyTarget(); }
                 });
         mCopySub = (TextView) copyRow.findViewById(R.id.act_sub);
-        Util.bindAction(root, R.id.row_mod_conflict, R.drawable.ic_health,
-                R.string.mods_act_conflict_title, R.string.mods_act_conflict_sub, new Runnable() {
-                    @Override public void run() { runConflictScan(); }
-                });
         Util.bindAction(root, R.id.row_mod_filter, R.drawable.ic_settings,
                 R.string.mods_act_filter_title, R.string.mods_act_filter_sub, new Runnable() {
                     @Override public void run() { pickFilter(); }
@@ -728,47 +724,6 @@ public class ModsActivity extends BaseActivity {
                 .setMessage(msg)
                 .setPositiveButton(R.string.mods_close, null)
                 .show();
-    }
-
-    /**
-     * ★★ **模组间冲突体检**（2026-10-02 用户问：「有办法检查到 logicsugar 和 neon 同时加载吗」）。
-     *
-     * 判据三层（硬 → 软）：**内置检测**（A 的 dex 里含 B 的主类）/ **共同全局钩子** /
-     * **简介提及**；再加上**游戏日志里提到这些模组的行**（那才是"谁真的接管了"的判据）。
-     * ⚠️ 要读几 MB 的 dex ⇒ **按需**跑（后台线程 + ProgressDialog），不是每次刷新都跑。
-     */
-    private void runConflictScan() {
-        final ProgressDialog pd = ProgressDialog.show(this,
-                Trans.get(ModsActivity.this, R.string.mods_act_conflict_title),
-                Trans.get(ModsActivity.this, R.string.mods_conflict_progress), true, false);
-        new Thread(new Runnable() {
-            @Override public void run() {
-                String text;
-                try {
-                    Mods.Conflict c = Mods.findConflicts(ModsActivity.this, mScan.mods,
-                            new File(Data.dirOf(ModsActivity.this, mSlot), "last_log.txt"));
-                    text = c.report(ModsActivity.this);
-                    try {
-                        Util.atomicWriteText(new File(Data.hubDir(ModsActivity.this),
-                                "report-mods-conflict.txt"), text);
-                    } catch (Throwable ignored) {
-                    }
-                } catch (Throwable t) {
-                    // ★ 2026-10-04：原来这里把异常直接拼进用户可见的正文
-                    //   （`text = "冲突体检失败：" + t`）—— 异常原文归 logcat，
-                    //   界面只给白话（文案纪律 ③：别把类名甩给用户）。
-                    android.util.Log.w("MDTLauncher", "conflict scan failed", t);
-                    text = Trans.get(ModsActivity.this, R.string.mods_conflict_failed);
-                }
-                final String ft = text;
-                runOnUiThread(new Runnable() {
-                    @Override public void run() {
-                        pd.dismiss();
-                        alert(Trans.get(ModsActivity.this, R.string.mods_conflict_title), ft);
-                    }
-                });
-            }
-        }, "mod-conflict").start();
     }
 
     /** 槽切换（只读视图；不改任何分配） */

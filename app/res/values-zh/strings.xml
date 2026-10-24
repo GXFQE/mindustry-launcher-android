@@ -512,7 +512,6 @@
     <string name="msav_bad_list_title_fmt">读不出来的存档（%1$d 份）</string>
     <string name="msav_all_ok">这个槽的存档现在都读得出来</string>
     <!-- 冲突体检没做成时的白话提示（2026-10-04 补）：原来是把异常对象直接拼进正文。 -->
-    <string name="mods_conflict_failed">冲突体检没做成。返回上一页再进一次试试。</string>
     <string name="slot_page_saves">存档</string>
     <string name="slot_page_saves_sub">看每份是什么图 / 导入 / 导出</string>
     <string name="slot_page_maps">地图</string>
@@ -762,30 +761,11 @@
     <string name="mods_detail_depchain">依赖链判定：</string>
     <string name="mods_detail_repo_override_fmt">%1$s（settings 覆盖）</string>
     <string name="mods_detail_settings_unreadable">⚠ 设置文件读不到：上面是默认值，不是磁盘状态\n</string>
-    <!-- ══ 模组页的说明行 + 冲突体检报告（P3）══════════ -->
+    <!-- ══ 模组页的说明行（P3）══════════ -->
     <string name="mods_scan_settings_fmt">已读到游戏的设置（%1$d 项）</string>
     <string name="mods_scan_settings_unreadable">⚠ 游戏的设置读不出来 —— 下面所有模组都按「没关过」显示，不代表磁盘上就是这样</string>
     <string name="mods_scan_settings_none">这个槽还没跑过游戏，没有设置文件 —— 下面所有模组都按「没关过」显示</string>
     <string name="mods_scan_no_mods_dir">（没有 mods/ 目录）</string>
-    <string name="conflict_scanned_fmt">检查了 %1$d 个带代码的模组（%2$s）\n</string>
-    <string name="conflict_head_contained">【重复实现】</string>
-    <string name="conflict_head_shared">【可能互相抢】</string>
-    <string name="conflict_head_mentioned">【简介里提到对方】</string>
-    <string name="conflict_head_log">【游戏上次启动时的记录】</string>
-    <string name="conflict_none">没发现明显冲突。</string>
-    <string name="conflict_none_hint">⚠ 有些冲突要游戏跑起来才知道 —— 跑一次游戏，再回这里看看。</string>
-    <string name="conflict_note_fmt">注：%1$s</string>
-    <!-- ══ 冲突体检的**逐条明细** + 依赖行 + 重复包（P3）════
-         ⚠ 这些是弹窗正文里的**整句**（原来在 Java 里拼）；
-         `conflict_join_and` 是**列表连接词**（中文「与」/英文 and，
-         两侧都要空格 ⇒ 写 `\u0020` 并进白名单）。 -->
-    <string name="conflict_name_fmt">「%1$s」</string>
-    <string name="conflict_join_and">\u0020与\u0020</string>
-    <string name="conflict_note_dex_fmt">读不了「%1$s」的 classes.dex</string>
-    <string name="conflict_note_log">读不了游戏日志</string>
-    <string name="conflict_contained_fmt">「%1$s」里已经带了「%2$s」：两个一起开就是同一套功能装两遍，会互相抢；建议只留一个</string>
-    <string name="conflict_shared_fmt">%1$s 都想接管游戏里的%2$s —— 只能有一个生效（是谁，看下面的游戏记录）</string>
-    <string name="conflict_mentioned_fmt">「%1$s」的简介里提到了「%2$s」</string>
     <string name="mods_dep_required_fmt">必需：%1$s</string>
     <string name="mods_dep_soft_fmt">软依赖：%1$s</string>
     <string name="mods_scan_dup_fmt">%1$s 和 %2$s 是同一个模组的两份，游戏里只认一个（后放进去的那个）。</string>
@@ -1672,7 +1652,6 @@
       同时加载这种情况吗」）。★ 判据与实测分辨力见 REF §53：内置检测（判决）/ 共同全局钩子（提示）/
       简介提及（线索）/ 游戏日志归因（决定性）。
     -->
-    <string name="mods_act_conflict_title">查模组冲突</string>
     <!-- 列表的搜索/筛选/排序（用户点单第②项） -->
     <string name="mods_search_hint">搜索模组名或文件名</string>
     <string name="mods_act_filter_title">筛选与排序</string>
@@ -1708,9 +1687,6 @@
     <string name="mods_filter_reset">清空筛选</string>
     <string name="mods_filtered_fmt">显示 %1$d / %2$d 个模组（已筛选）</string>
     <string name="mods_empty_filtered">没有符合条件的模组</string>
-    <string name="mods_act_conflict_sub">看哪些模组会互相覆盖</string>
-    <string name="mods_conflict_title">模组冲突检查</string>
-    <string name="mods_conflict_progress">正在检查各模组的代码…</string>
     <string name="mods_dup_fmt">%1$s · 重名</string>
     <string name="mods_badge_broken">读不出说明文件</string>
 

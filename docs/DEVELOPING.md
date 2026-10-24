@@ -81,6 +81,8 @@ GBK 编码、批量删除）已固化在 build.sh 注释里。
 - dev 变体跑自检 **1052 通过 / 0 失败**；
 - 5 个只读 dev 口（`dev_maps_slot` / `dev_mods_scan` / `dev_crash_analyze` / `dev_mods_conflict` /
   `dev_cas_stats`）重构前后**报告逐行相同**（归一化掉时间戳后 diff 为空；`dev_cas_stats` 那次差异
+  —— ⚠️ 这是 2026-10-10 的**历史测量**；`dev_mods_conflict` 已在第 229 轮随冲突体检搬进
+  `plugins/conflict` 而删除，现在那份判据由插件自带的自检验（`build.sh check`）钉着。
   经**两次采样**确认是"中间跑过自检、池子被清过"的状态变化，不是代码变化）；
 - 产品版界面正常，且用 `dev_m3_selftest` / `dev_maps_slot` 触发时 `hub/report-m3.txt`
   **一个字节都没被改写**、也**没写出** `report-devtool.txt`；

@@ -532,7 +532,6 @@
     <string name="msav_bad_list_title_fmt">Unreadable saves (%1$d)</string>
     <string name="msav_all_ok">All saves in this slot are readable right now</string>
     <!-- 冲突体检没做成时的白话提示（2026-10-04 补）：原来是把异常对象直接拼进正文。 -->
-    <string name="mods_conflict_failed">The conflict check did not finish. Go back and enter again.</string>
     <string name="slot_page_saves">Saves</string>
     <string name="slot_page_saves_sub">See each save / import / export</string>
     <string name="slot_page_maps">Maps</string>
@@ -922,30 +921,11 @@
     <string name="mods_detail_depchain">dependency chain verdict:</string>
     <string name="mods_detail_repo_override_fmt">%1$s (overridden by settings)</string>
     <string name="mods_detail_settings_unreadable">⚠ the settings file cannot be read: the values above are defaults, not what is on disk\n</string>
-    <!-- ══ 模组页的说明行 + 冲突体检报告（P3）══════════ -->
+    <!-- ══ 模组页的说明行（P3）══════════ -->
     <string name="mods_scan_settings_fmt">read the game settings (%1$d entries)</string>
     <string name="mods_scan_settings_unreadable">⚠ the game settings cannot be read — every mod below is shown as if it had never been turned off, which may not match the disk</string>
     <string name="mods_scan_settings_none">this slot has never run the game, so there is no settings file — every mod below is shown as if it had never been turned off</string>
     <string name="mods_scan_no_mods_dir">(there is no mods/ folder)</string>
-    <string name="conflict_scanned_fmt">checked %1$d mods that carry code (%2$s)\n</string>
-    <string name="conflict_head_contained">[duplicate implementation]</string>
-    <string name="conflict_head_shared">[may fight over the same hook]</string>
-    <string name="conflict_head_mentioned">[the description mentions the other one]</string>
-    <string name="conflict_head_log">[what the game logged on its last launch]</string>
-    <string name="conflict_none">no obvious conflicts found.</string>
-    <string name="conflict_none_hint">⚠ some conflicts only show up once the game runs — play once, then come back here.</string>
-    <string name="conflict_note_fmt">note: %1$s</string>
-    <!-- ══ 冲突体检的**逐条明细** + 依赖行 + 重复包（P3）════
-         ⚠ 这些是弹窗正文里的**整句**（原来在 Java 里拼）；
-         `conflict_join_and` 是**列表连接词**（中文「与」/英文 and，
-         两侧都要空格 ⇒ 写 `\u0020` 并进白名单）。 -->
-    <string name="conflict_name_fmt">\"%1$s\"</string>
-    <string name="conflict_join_and">\u0020and\u0020</string>
-    <string name="conflict_note_dex_fmt">could not read the classes.dex inside \"%1$s\"</string>
-    <string name="conflict_note_log">could not read the game log</string>
-    <string name="conflict_contained_fmt">\"%1$s\" already bundles \"%2$s\" - turning both on installs the same feature twice and they fight; keep only one</string>
-    <string name="conflict_shared_fmt">%1$s all try to take over %2$s in the game — only one can win (see the game log below)</string>
-    <string name="conflict_mentioned_fmt">the description of \"%1$s\" mentions \"%2$s\"</string>
     <string name="mods_dep_required_fmt">required: %1$s</string>
     <string name="mods_dep_soft_fmt">soft dependency: %1$s</string>
     <string name="mods_scan_dup_fmt">%1$s and %2$s are two copies of the same mod, so the game only uses one (whichever was placed later).</string>
@@ -1735,7 +1715,6 @@
       同时加载这种情况吗」）。★ 判据与实测分辨力见 REF §53：内置检测（判决）/ 共同全局钩子（提示）/
       简介提及（线索）/ 游戏日志归因（决定性）。
     -->
-    <string name="mods_act_conflict_title">Check mod conflicts</string>
     <!-- 列表的搜索/筛选/排序（用户点单第②项） -->
     <string name="mods_search_hint">Search mod name or file name</string>
     <string name="mods_act_filter_title">Filter and sort</string>
@@ -1772,9 +1751,6 @@
     <string name="mods_filter_reset">Clear filters</string>
     <string name="mods_filtered_fmt">Showing %1$d / %2$d mods (filtered)</string>
     <string name="mods_empty_filtered">No mods match the filter</string>
-    <string name="mods_act_conflict_sub">Which mods overlap each other</string>
-    <string name="mods_conflict_title">Mod conflict check</string>
-    <string name="mods_conflict_progress">Checking the code of each mod…</string>
     <string name="mods_dup_fmt">%1$s · duplicate name</string>
     <string name="mods_badge_broken">Cannot read description file</string>
 

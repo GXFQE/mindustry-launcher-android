@@ -103,7 +103,6 @@ final class DevTools {
                 || intent.hasExtra("dev_mods_toggle")
                 || intent.hasExtra("dev_mods_import")
                 || intent.hasExtra("dev_mods_copy")
-                || intent.hasExtra("dev_mods_conflict")
                 || intent.hasExtra("dev_maps_slot")
                 || intent.hasExtra("dev_map_import")
                 || intent.hasExtra("dev_maps_page")
@@ -614,28 +613,6 @@ final class DevTools {
             return;
         }
 
-        // ── F13 第四阶段：模组间冲突体检 ────────────────────────────────────
-        // 用法：`--es dev_mods_conflict <槽名>`（空/true = 当前槽）→ `hub/report-devtool.txt`
-        String cfl = intent.getStringExtra("dev_mods_conflict");
-        if (cfl != null && !cfl.isEmpty()) {
-            final String useSlot = ("true".equals(cfl.trim()) || cfl.trim().isEmpty())
-                    ? Data.currentSlot(a) : cfl.trim();
-            new Thread(new Runnable() {
-                @Override public void run() {
-                    String rep;
-                    try {
-                        Mods.Scan s = Mods.scan(a, useSlot);
-                        Mods.Conflict c = Mods.findConflicts(a, s.mods,
-                                new File(Data.dirOf(a, useSlot), "last_log.txt"));
-                        rep = "槽 = " + useSlot + "\n\n" + c.report(a);
-                    } catch (Throwable t) {
-                        rep = "dev_mods_conflict 失败：" + t;
-                    }
-                    reportDev(rep, "dev_mods_conflict · 槽 " + useSlot);
-                }
-            }, "dev-mods-conflict").start();
-            return;
-        }
         // ── F23：崩溃分析（把当前槽每一份崩溃报告的结论 + 证据 + 耗时落到报告）──────
         // 用法：`--es dev_crash_analyze 1`（或槽名）→ `hub/report-devtool.txt`
         // ★ 为什么要这个口：归因的判据要在**真机上的真报告**上过一遍（ART 的异常措辞

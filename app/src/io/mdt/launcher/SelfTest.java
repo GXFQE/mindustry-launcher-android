@@ -240,8 +240,6 @@ public final class SelfTest {
             settingsWrite(ctx, L, stat);
             // ★ ⑰ F13 第三阶段：模组包导入 / 跨槽复制（五个负例 + 一条元断言）
             modsPack(ctx, L, stat);
-            // ★ ⑱ F13 第四阶段：模组间冲突体检（内置检测 / 共同全局钩子 / 简介提及 + 元断言）
-            modsConflict(ctx, L, stat);
             // ★ ⑲ F13 第二批：搜索/筛选/排序（纯函数，可单独喂断言）
             modsFilter(L, stat);
             // ★ 第 122 轮：「搜索 / 排序」推广到地图 / 蓝图 / 存档三个列表（判据收进 ListQuery）
@@ -4492,6 +4490,18 @@ public final class SelfTest {
                     "★元断言：`allUnknown` 只在「声明非空 + 本插槽一条都没有」时为真 —— "
                             + "声明了别家插槽 ⇒ 真；混着认得的 ⇒ 假；**什么都没声明 ⇒ 假**"
                             + "（纯后台插件不该被提示）；空表 / 空插槽名 ⇒ 假");
+            // ★ 第 229 轮：v24 加了 analyzer 插槽，`knownSlot` 漏了它 ⇒ 只声明 analyzer 的插件
+            //   （官方 conflict 插件就是这种）会被插件页说成「这一版还不支持」。
+            java.util.List<Extensions.Item> onlyAnalyzer = Extensions.parse(
+                    "{\"extensions\":[{\"id\":\"a\",\"entry\":\"com.x.A\","
+                            + "\"slot\":\"analyzer\",\"page\":\"mods\"}]}");
+            ok(stat, L, Extensions.knownSlot(Extensions.SLOT_ANALYZER)
+                            && onlyAnalyzer.size() == 1
+                            && Extensions.forSlot(onlyAnalyzer, Extensions.SLOT_ANALYZER).size() == 1
+                            && Extensions.knownPage(onlyAnalyzer.get(0).page)
+                            && !Extensions.allUnknown(onlyAnalyzer, Extensions.SLOT_PLUGINS),
+                    "★analyzer 插槽要进「认得」名单（漏了 ⇒ 只声明分析器的插件被说成"
+                            + "「这一版还不支持」—— 第 229 轮真机撞到）");
             String extNote = ctx.getString(R.string.plugin_ext_unsupported);
             ok(stat, L, extNote.length() > 0 && extNote.length() <= 32
                             && !extNote.contains("%"),
@@ -6667,97 +6677,6 @@ public final class SelfTest {
                     "⑧ ★元断言：同一个包把 meta 拿掉 ⇒ 必须判非法（否则 ① 的 ok 只是恒真）");
         } catch (Throwable t) {
             ok(stat, L, false, "导入/复制用例自身异常：" + t);
-        } finally {
-            deleteTree(work);
-        }
-        L.add("");
-    }
-
-    // ══ ⑱ F13 第四阶段：模组间冲突体检 ═════════════════════════════════════
-
-    /**
-     * ⑱ 冲突体检：**内置检测**（A 的 dex 里含 B 的主类）必须判死，**反向**（不含）必须判活；
-     * 共同全局钩子（`mindustry/logic/LCanvas`）命中才报；简介提及只作线索；
-     * 再加一条**元断言**（把主类从 dex 里拿掉 ⇒ 必须不再报"内置"）。
-     */
-    private static void modsConflict(Context ctx, List<String> L, int[] stat) {
-        L.add("── ⑱ F13 模组间冲突体检 ──");
-        File work = new File(Paths.privateDir(ctx), "selftest-conflict");
-        deleteTree(work);
-        work.mkdirs();
-        try {
-            // A 内置了 B：A 的"dex"里塞进 B 的主类描述符；C 是无关模组
-            File a = new File(work, "a-neon-like.zip");
-            zipMany(a, new String[]{"mod.json", "classes.dex"},
-                    new String[]{"name: Big Mod\nmain: big.BigMod\njava: true\n",
-                            "FAKE-DEX-HEADER big/BigMod ... also contains small/SmallMod "
-                                    + "and mindustry/logic/LCanvas references"});
-            File b = new File(work, "b-logicsugar-like.zip");
-            zipMany(b, new String[]{"mod.json", "classes.dex"},
-                    new String[]{"name: Small Mod\nmain: small/SmallMod\njava: true\n",
-                            "FAKE-DEX small/SmallMod mindustry/logic/LCanvas"});
-            File c = new File(work, "c-unrelated.zip");
-            zipMany(c, new String[]{"mod.json", "classes.dex"},
-                    new String[]{"name: Unrelated\nmain: un.Un Mod\njava: true\n",
-                            "FAKE-DEX unrelated only"});
-            File bd = new File(work, "bdir");
-            write(new File(bd, "mod.json"), "name: Fake Small\nmain: small/SmallMod\njava: true\n"
-                    .getBytes("UTF-8"));
-            File d = new File(work, "d-nomain.zip");
-            zipMany(d, new String[]{"mod.json"}, new String[]{"name: Data Only\n"});
-
-            List<Mods.Info> mods = new ArrayList<>();
-            Mods.Info ia = Mods.readOne(a);
-            Mods.Info ib = Mods.readOne(b);
-            Mods.Info ic = Mods.readOne(c);
-            Mods.Info id = Mods.readOne(d);
-            mods.add(ia);
-            mods.add(ib);
-            mods.add(ic);
-            mods.add(id);
-            // 简介提及：让 A 的简介里出现 B 的名字
-            ia.description = "内置了 Small Mod 的功能";
-
-            Mods.Conflict cf = Mods.findConflicts(ctx, mods, null);
-            boolean containsAB = false;
-            for (String s : cf.contained) {
-                if (s.contains("Big Mod") && s.contains("Small Mod")) containsAB = true;
-            }
-            ok(stat, L, containsAB && cf.javaMods == 3 && cf.scannedDex >= 3,
-                    "★内置检测：A 的 classes.dex 里含 B 的主类 ⇒ 判为「A 内置了 B」"
-                            + "（扫了 " + cf.javaMods + " 个 Java 模组 / " + cf.scannedDex + " 个 dex）");
-            boolean bContainsA = false;
-            for (String s : cf.contained) {
-                if (s.contains("「Small Mod」的 classes.dex")) bContainsA = true;
-            }
-            ok(stat, L, !bContainsA,
-                    "★反向：B 的 dex 里没有 A 的主类 ⇒ **不许**反过来说「B 内置了 A」"
-                            + "（⚠️ 判**方向**要看「谁在说」那一句，不能只看两个名字都出现过 —— "
-                            + "第一版就是这么写错的，两个名字在同一句里当然都出现）");
-            boolean hookAB = false;
-            for (String s : cf.sharedHooks) {
-                if (s.contains("Big Mod") && s.contains("Small Mod")) hookAB = true;
-            }
-            ok(stat, L, hookAB,
-                    "★共同全局钩子：两个模组的 dex 都引用 mindustry/logic/LCanvas ⇒ 报「可能抢逻辑编辑器」");
-            ok(stat, L, !hasPair(cf.sharedHooks, "Unrelated", "Big Mod"),
-                    "★反向：无关模组不引用该钩子 ⇒ **不许**把它算进来");
-            ok(stat, L, hasPair(cf.mentioned, "Big Mod", "Small Mod"),
-                    "★简介提及只作线索（A 的简介里写了 Small Mod ⇒ 出现在线索里）");
-            // ★ 元断言：把 B 的主类从 A 的 dex 里删掉 ⇒ 必须不再报内置
-            File a2 = new File(work, "a2.zip");
-            zipMany(a2, new String[]{"mod.json", "classes.dex"},
-                    new String[]{"name: Big Mod\nmain: big.BigMod\njava: true\n",
-                            "FAKE-DEX big/BigMod mindustry/logic/LCanvas only"});
-            List<Mods.Info> mods2 = new ArrayList<>();
-            mods2.add(Mods.readOne(a2));
-            mods2.add(ib);
-            Mods.Conflict cf2 = Mods.findConflicts(ctx, mods2, null);
-            ok(stat, L, cf2.contained.isEmpty(),
-                    "★元断言：把 B 的主类从 A 的 dex 里拿掉 ⇒ **不再**报「内置」"
-                            + "（证明上一条不是恒真）");
-        } catch (Throwable t) {
-            ok(stat, L, false, "冲突体检用例自身异常：" + t);
         } finally {
             deleteTree(work);
         }
@@ -8958,44 +8877,22 @@ public final class SelfTest {
                             && !ModsText.infoMetaReason(ctx, miTech).contains("Exception"),
                     "★P3 反向：**没有码**时仍走老逻辑（异常形态⇒白话 / 自身中文⇒原样透传）");
 
-            // ★★ P3 第十九批：**冲突体检报告 + 模组页说明行**（都被用户直接看到）。
-            //    三条带占位符的按真参数实拼；另验四个小标题与两句结论都在（漏一条资源就是空白）。
-            String cfScan = ctx.getString(R.string.conflict_scanned_fmt, 7, "1.2 MB");
-            String cfNote = enCtx.getString(R.string.conflict_note_fmt, "x");
+            // ★★ P3 第十九批：**模组页说明行**（都被用户直接看到）。
+            //    带占位符的按真参数实拼；另验三句整句都在（漏一条资源就是空白）。
             String scSet = ctx.getString(R.string.mods_scan_settings_fmt, 12);
-            ok(stat, L, cfScan.contains("7") && cfScan.contains("1.2 MB") && cfNote.contains("x")
-                            && scSet.contains("12")
-                            && !ctx.getString(R.string.conflict_head_contained).isEmpty()
-                            && !ctx.getString(R.string.conflict_head_shared).isEmpty()
-                            && !ctx.getString(R.string.conflict_head_mentioned).isEmpty()
-                            && !ctx.getString(R.string.conflict_head_log).isEmpty()
-                            && !ctx.getString(R.string.conflict_none).isEmpty()
-                            && !ctx.getString(R.string.conflict_none_hint).isEmpty()
+            ok(stat, L, scSet.contains("12")
                             && !ctx.getString(R.string.mods_scan_settings_unreadable).isEmpty()
                             && !ctx.getString(R.string.mods_scan_settings_none).isEmpty()
                             && !ctx.getString(R.string.mods_scan_no_mods_dir).isEmpty(),
-                    "★P3：冲突体检/模组页那三条带占位符的按真参数实拼，小标题与两句结论都在");
+                    "★P3：模组页那三条说明行都在，带占位符的按真参数实拼");
 
-            // ★★ P3 第二十批：冲突体检的**逐条明细** + 依赖行 + 重复包（都是弹窗/详情里的整句）。
-            String cName = ctx.getString(R.string.conflict_name_fmt, "A");
-            String cCont = enCtx.getString(R.string.conflict_contained_fmt, "A", "B");
-            String cShared = ctx.getString(R.string.conflict_shared_fmt, "A 与 B", "设置界面");
-            String cMent = ctx.getString(R.string.conflict_mentioned_fmt, "A", "B");
-            String cDex = ctx.getString(R.string.conflict_note_dex_fmt, "x.jar");
+            // ★★ P3 第二十批：依赖行 + 重复包（都是详情里的整句）。
             String dReq = ctx.getString(R.string.mods_dep_required_fmt, "M");
             String dSoft = enCtx.getString(R.string.mods_dep_soft_fmt, "M");
             String dup = ctx.getString(R.string.mods_scan_dup_fmt, "a.jar", "b.jar");
-            ok(stat, L, cName.contains("A") && cCont.contains("A") && cCont.contains("B")
-                            && cShared.contains("A 与 B") && cShared.contains("设置界面")
-                            && cMent.contains("A") && cMent.contains("B") && cDex.contains("x.jar")
-                            && dReq.contains("M") && dSoft.contains("M")
-                            && dup.contains("a.jar") && dup.contains("b.jar")
-                            && !ctx.getString(R.string.conflict_note_log).isEmpty(),
-                    "★P3：冲突明细/依赖行/重复包那 9 条按真参数实拼（含 3 条两个参数）");
-            // ★ **列表连接词两侧都要有空格**（`\u0020`，白名单里那一类 —— 与 list_join_sep 同族）
-            String cJoin = ctx.getString(R.string.conflict_join_and);
-            ok(stat, L, cJoin.startsWith(" ") && cJoin.endsWith(" "),
-                    "★P3：冲突明细的连接词两侧都有空格（写的是 \\u0020）：「" + cJoin + "」");
+            ok(stat, L, dReq.contains("M") && dSoft.contains("M")
+                            && dup.contains("a.jar") && dup.contains("b.jar"),
+                    "★P3：依赖行/重复包那 3 条按真参数实拼（含 1 条两个参数）");
 
             // ★★ P3 第六批：启动管线各步 + 失败原因（`Injector.LaunchError` → 启动失败弹窗）。
             //    ★ 这里只需验两件事：① 两条带占位符的按真参数实拼；② 6 个步骤名**两套语言都有字**
@@ -12648,13 +12545,6 @@ public final class SelfTest {
         } catch (Throwable t) {
             return false;
         }
-    }
-
-    private static boolean hasPair(List<String> xs, String a, String b) {
-        for (String s : xs) {
-            if (s.contains(a) && s.contains(b)) return true;
-        }
-        return false;
     }
 
     /**
