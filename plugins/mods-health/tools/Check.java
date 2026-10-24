@@ -265,6 +265,255 @@ public final class Check {
 
         Conflicts.Log l3 = Conflicts.readLog(new File(work, "no-such-log.txt"), onlyB);
         check(l3.lines.isEmpty() && !l3.unreadable, "日志不存在 ⇒ 空表、不算读不了");
+
+        // ── v27 P4（第 230 轮）：六道加载门 —— 判据搬进 core/Gates 后，这里逐道钉住 ──
+        //    ★ 为什么补这一批：宿主那 20 条门禁断言第 229 轮随宿主判据一起删了，
+        //      而门原来写在入口类里（要 Context 取文案）⇒ 本 check 编不到 ⇒ 一条自动判据都没有。
+        checkGates();
+    }
+
+    // ══ 六道加载门（v27 P4 / 第 230 轮）══════════════════════════════════════════
+
+    /** 干净夹具：六道全过（目标 160.1 / 包要求 159 / Java 门槛 154）。 */
+    private static Gates.Facts cleanFacts() {
+        Gates.Facts f = new Gates.Facts();
+        f.name = "Demo Mod";
+        f.version = "1.2";
+        f.minGameVersion = "159";
+        f.java = true;
+        f.targetBuild = 160;
+        f.targetRevision = 1;
+        return f;
+    }
+
+    private static void checkGates() {
+        // ① 事实映射：宿主 extra 的 key 名只出现在 Gates.facts 里（宿主 SelfTest 那边钉"这些 key 真的存在"）
+        java.util.Map<String, String> extra = new java.util.HashMap<String, String>();
+        extra.put("name", "Demo Mod");
+        extra.put("version", "1.2");
+        extra.put("minGameVersion", "159");
+        extra.put("java", "true");
+        extra.put("enabled", "false");
+        extra.put("settingsKnown", "false");
+        extra.put("failed", "true");
+        extra.put("launchIdExists", "true");
+        extra.put("targetBuild", "160");
+        extra.put("targetRevision", "1");
+        extra.put("minJavaMajor", "154");
+        extra.put("minModMajor", "136");
+        Gates.Facts mapped = Gates.facts(extra, true);
+        check(mapped.targetBuild == 160 && mapped.targetRevision == 1
+                        && !mapped.settingsKnown && !mapped.enabled && mapped.failed
+                        && mapped.launchIdExists && mapped.slotSkipping && mapped.java,
+                "事实映射：settingsKnown / enabled / failed / launchIdExists / slotSkipping 都读到了");
+        Gates.Facts dflt = Gates.facts(new java.util.HashMap<String, String>(), false);
+        check(dflt.settingsKnown && dflt.enabled && dflt.minJavaMajor == 154
+                        && dflt.minModMajor == 136 && !dflt.launchIdExists,
+                "事实映射：缺省值（缺 settingsKnown 的老宿主 ⇒ 不显示「默认值」补丁句；门槛 154/136）");
+
+        Gates.Facts clean = cleanFacts();
+        java.util.Map<String, Integer> used = new java.util.LinkedHashMap<String, Integer>();
+        java.util.List<java.util.List<Gates.Decision>> all =
+                new java.util.ArrayList<java.util.List<Gates.Decision>>();
+
+        java.util.List<Gates.Decision> base = Gates.decide(clean);
+        all.add(base);
+        check(base.size() == Gates.COUNT, "六道门一次给全（" + base.size() + "）");
+        boolean allPass = true;
+        for (Gates.Decision d : base) allPass &= d.pass;
+        check(allPass, "★干净夹具：六道全过");
+        check("cf_gate_last".equals(labelOf(base, Gates.LAST)),
+                "干净夹具：最后一道用「正常结束」那条（不是 ❌ 的）");
+
+        // ② 每道门单独不通过一次：其余五道必须仍然通过、标签必须换、原因必须非空
+        Gates.Facts fLoad = cleanFacts();
+        fLoad.willFailJavaLoad = true;
+        all.add(expectOnly(clean, fLoad, Gates.LOAD, "安卓加载不了"));
+
+        Gates.Facts fOff = cleanFacts();
+        fOff.enabled = false;
+        all.add(expectOnly(clean, fOff, Gates.ON, "游戏里关着"));
+
+        Gates.Facts fVer = cleanFacts();
+        fVer.minGameVersion = "170";
+        all.add(expectOnly(clean, fVer, Gates.VERSION, "要求 170 而槽是 160.1"));
+
+        Gates.Facts fMajor = cleanFacts();
+        fMajor.minGameVersion = "146";                 // 160 >= 146 ⇒ 版本那道过，只有门槛这道该坏
+        all.add(expectOnly(clean, fMajor, Gates.MINVER, "门槛 146 < Java 的 154"));
+
+        Gates.Facts fNoMajor = cleanFacts();
+        fNoMajor.minGameVersion = "";                  // 没写 = 太老（游戏会静默跳过）
+        all.add(expectOnly(clean, fNoMajor, Gates.MINVER, "没写最低版本"));
+
+        Gates.Facts fBl = cleanFacts();
+        fBl.blacklisted = true;
+        all.add(expectOnly(clean, fBl, Gates.BLACKLIST, "在黑名单里"));
+
+        Gates.Facts fFailed = cleanFacts();
+        fFailed.failed = true;
+        all.add(expectOnly(clean, fFailed, Gates.LAST, "游戏写下了 -failed"));
+        check("cf_gate_last_failed".equals(labelOf(all.get(all.size() - 1), Gates.LAST)),
+                "★按项事实：有 -failed 才说「它被标成失败」");
+
+        // ③ 槽级事实用槽级措辞（§85.16 / §86.7）——这是第 229 轮搬丢的那条
+        Gates.Facts fSkip = cleanFacts();
+        fSkip.slotSkipping = true;
+        java.util.List<Gates.Decision> skipDs = Gates.decide(fSkip);
+        all.add(skipDs);
+        check("cf_gate_last_skip".equals(labelOf(skipDs, Gates.LAST)),
+                "★槽级事实：整槽跳过用槽级措辞（不是「它崩了」）");
+        Gates.Facts fBoth = cleanFacts();
+        fBoth.slotSkipping = true;
+        fBoth.failed = true;
+        all.add(Gates.decide(fBoth));
+        check("cf_gate_last_skip".equals(labelOf(Gates.decide(fBoth), Gates.LAST)),
+                "★槽级优先：槽级跳过与 -failed 同时成立时说槽级那句");
+
+        // ④ 通过时允许的两处补充说明
+        Gates.Facts fUnknown = cleanFacts();
+        fUnknown.settingsKnown = false;
+        java.util.List<Gates.Decision> unknownDs = Gates.decide(fUnknown);
+        all.add(unknownDs);
+        Gates.Decision onD = byId(unknownDs, Gates.ON);
+        check(onD.pass && "cf_gate_on_unknown".equals(onD.noteKey),
+                "★没读到设置 ⇒ 第②道门通过也要补一句「这是默认值」（默认值不许当事实说）");
+
+        Gates.Facts fPending = cleanFacts();
+        fPending.launchIdExists = true;
+        java.util.List<Gates.Decision> pendingDs = Gates.decide(fPending);
+        all.add(pendingDs);
+        Gates.Decision lastD = byId(pendingDs, Gates.LAST);
+        check(lastD.pass && "cf_gate_last_pending".equals(lastD.noteKey),
+                "★launchid.dat 还在但不会跳过 ⇒ 通过 + 一句机制说明");
+
+        // ⑤ 反向：老包豁免不要再报门槛
+        Gates.Facts fLegacy = cleanFacts();
+        fLegacy.minGameVersion = "146";
+        fLegacy.legacyCompatible = true;
+        java.util.List<Gates.Decision> legacyDs = Gates.decide(fLegacy);
+        all.add(legacyDs);
+        check(allPass(legacyDs), "★反向：legacyCompatible 的包不报门槛");
+
+        // ⑥ 元断言：pass/fail 的说明规则 + 文案 key 真的存在（两种语言、占位符个数对）
+        for (java.util.List<Gates.Decision> ds : all) record(used, ds);
+        checkRes(used);
+    }
+
+    /** 只有一个事实变坏 ⇒ 只有那一道门不通过、标签必须换、原因必须非空。 */
+    private static java.util.List<Gates.Decision> expectOnly(Gates.Facts clean, Gates.Facts broken,
+                                                             int id, String what) {
+        java.util.List<Gates.Decision> ds = Gates.decide(broken);
+        String baseLabel = labelOf(Gates.decide(clean), id);
+        int fails = 0;
+        String label = "", note = "";
+        for (Gates.Decision d : ds) {
+            if (!d.pass) fails++;
+            if (d.id == id) {
+                label = d.labelKey;
+                note = d.noteKey;
+            }
+        }
+        check(fails == 1 && !label.equals(baseLabel) && !note.isEmpty(),
+                "★" + what + " ⇒ 只有第 " + (id + 1) + " 道不通过、标签换了、原因非空（"
+                        + label + " / " + note + "）");
+        check(id == Gates.LAST ? label.startsWith("cf_gate_last")
+                        : label.equals(baseLabel + "_bad"),
+                "★" + what + " ⇒ 用的是 *_bad 那条标签（❌ 后面不许跟肯定句）");
+        return ds;
+    }
+
+    /** 每个 decision：文案 key + 参数个数；顺带钉住 pass/fail 的说明规则。 */
+    private static void record(java.util.Map<String, Integer> used, java.util.List<Gates.Decision> ds) {
+        for (Gates.Decision d : ds) {
+            putUsed(used, d.labelKey, 0);
+            if (d.noteKey.isEmpty()) {
+                if (!d.pass) check(false, "★不通过却没有原因（" + d.labelKey + "）");
+                continue;
+            }
+            putUsed(used, d.noteKey, d.noteArgs.length);
+            if (d.pass) {
+                boolean allowed = (d.id == Gates.ON && "cf_gate_on_unknown".equals(d.noteKey))
+                        || (d.id == Gates.LAST && "cf_gate_last_pending".equals(d.noteKey));
+                check(allowed, "★通过时只有两处允许带补充说明（" + d.labelKey + " / " + d.noteKey + "）");
+            }
+        }
+    }
+
+    private static void putUsed(java.util.Map<String, Integer> used, String key, int args) {
+        Integer old = used.get(key);
+        if (old != null && old.intValue() != args) {
+            check(false, "★同一个 key 的占位符参数个数前后不一致（" + key + "：" + old + " vs " + args + "）");
+        }
+        used.put(key, args);
+    }
+
+    /** 判据用到的 key 必须在**两种语言**里都存在，且 `%n$` 的最大序号 == 参数个数。 */
+    private static void checkRes(java.util.Map<String, Integer> used) {
+        File root = resRoot();
+        java.util.Map<String, String> zh = readStrings(new File(root, "values-zh/strings.xml"));
+        java.util.Map<String, String> en = readStrings(new File(root, "values/strings.xml"));
+        if (zh.isEmpty() || en.isEmpty()) {
+            check(false, "★找不到插件 res/（用 build.sh check 跑，或 -Dmh.root=<插件目录>）：" + root);
+            return;
+        }
+        StringBuilder bad = new StringBuilder();
+        for (java.util.Map.Entry<String, Integer> e : used.entrySet()) {
+            String k = e.getKey();
+            String z = zh.get(k), s = en.get(k);
+            if (z == null || s == null) {
+                bad.append(k).append(z == null ? "(zh缺)" : "(en缺)").append(' ');
+            } else if (!phOk(z, e.getValue().intValue()) || !phOk(s, e.getValue().intValue())) {
+                bad.append(k).append("(占位符) ");
+            }
+        }
+        check(bad.length() == 0, "★文案：六道门用到的 " + used.size()
+                + " 条 key 两种语言都在、%n$ 序号与参数个数一致" + (bad.length() == 0 ? "" : "：" + bad));
+    }
+
+    /** 值里的 `%n$` 最大序号必须等于参数个数；裸 `%s` / `%d` 一律算错（同宿主 RES-03）。 */
+    private static boolean phOk(String v, int args) {
+        if (v == null) return false;
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("%(\\d)\\$").matcher(v);
+        int max = 0;
+        while (m.find()) max = Math.max(max, Integer.parseInt(m.group(1)));
+        if (v.replaceAll("%\\d\\$", "").indexOf('%') >= 0) return false;
+        return max == args;
+    }
+
+    private static File resRoot() {
+        String p = System.getProperty("mh.root");
+        File dir = p == null || p.trim().isEmpty() ? new File("plugins/mods-health") : new File(p);
+        return new File(dir, "res");
+    }
+
+    private static java.util.Map<String, String> readStrings(File f) {
+        java.util.Map<String, String> out = new java.util.LinkedHashMap<String, String>();
+        if (f == null || !f.isFile()) return out;
+        try {
+            String text = new String(java.nio.file.Files.readAllBytes(f.toPath()), "UTF-8");
+            java.util.regex.Matcher m = java.util.regex.Pattern
+                    .compile("<string\\s+name=\"([^\"]+)\"[^>]*>(.*?)</string>",
+                            java.util.regex.Pattern.DOTALL).matcher(text);
+            while (m.find()) out.put(m.group(1), m.group(2));
+        } catch (Throwable t) {
+            // 读不了就返回空表 ⇒ 上层那条断言会红（不会假通过）
+        }
+        return out;
+    }
+
+    private static Gates.Decision byId(java.util.List<Gates.Decision> ds, int id) {
+        for (Gates.Decision d : ds) if (d.id == id) return d;
+        return new Gates.Decision(id, "", false, "", null);
+    }
+
+    private static String labelOf(java.util.List<Gates.Decision> ds, int id) {
+        return byId(ds, id).labelKey;
+    }
+
+    private static boolean allPass(java.util.List<Gates.Decision> ds) {
+        for (Gates.Decision d : ds) if (!d.pass) return false;
+        return true;
     }
 
     // ---- 小工具 ---------------------------------------------------------------

@@ -32,8 +32,9 @@ import java.util.Map;
  *  2. **游戏自己那个开关现在是开还是关？**（`settings.bin` 的 `mod-<内部名>-enabled`）
  *     —— ⚠️ **键不存在 = 启用**，不是禁用；读不到 `settings.bin` 时必须**说出来**，
  *     否则会把"读失败"显示成"全部启用"（最误导人的一种失败）。
- *  3. **为什么它没生效？** —— 照抄 `Mods.java:1156~1165` 的加载门**逐条**报，
- *     外加"元数据解析失败"和"依赖缺失/循环"这两条会**静默**吞掉模组的路径。
+ *  3. **为什么它没生效？** —— 加载门**逐条**报（v27 起判据与文案都在 `mods-health` 插件里，
+ *     本页只把插件给的六个门画出来）；外加"元数据解析失败"和"依赖缺失/循环"这两条会
+ *     **静默**吞掉模组的路径。
  *
  * ── 为什么跨槽视图做成"换个槽看"而不是另开一页 ──────────────────────────
  *  模组住在**槽内部**（`<数据根>/mods/`，M3 白送按槽隔离）⇒ "跨槽视图"就是
@@ -123,7 +124,8 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
      */
     private final java.util.List<String> mSlotNotes = new java.util.ArrayList<String>();
     /**
-     * v27：插件给的「六道加载门」结论（path → 门）。空表 = 没插件能算 ⇒ 用宿主自己的。
+     * v27：插件给的「六道加载门」结论（path → 门）。空表 = 没有插件给结论 ⇒
+     * **详情页那一段不显示**（宿主自己那份判据 v27 已删，只有插件这一个来源）。
      */
     private final java.util.Map<String, java.util.List<io.mdt.launcher.api.Gate>> mGates =
             new java.util.HashMap<String, java.util.List<io.mdt.launcher.api.Gate>>();
@@ -1639,8 +1641,7 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
         }
         if (m.metaError == null) {
             sb.append(Trans.get(ModsActivity.this, R.string.mods_detail_state_fmt,
-                    ModsText.outcome(this,
-                            Mods.stateOf(m, mResolved, mTarget.build, mTarget.revision),
+                    ModsText.outcome(this, stOf(m),
                             m.settingsKnown, m.willFailJavaLoad(), m.failed, mScan.skipModLoading))).append('\n');
         }
         // ★ 只给**相对位置**：整条 `/storage/emulated/0/Android/data/io.mdt.launcher/slot-xxx/mods/...`
@@ -1654,21 +1655,26 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
         sb.append('\n').append(Trans.get(ModsActivity.this, R.string.mods_detail_path_fmt, rel)).append('\n');
 
         if (m.metaError == null) {
-            sb.append('\n').append(Trans.get(ModsActivity.this, R.string.mods_detail_gate_head)).append('\n');
-            sb.append(Trans.get(ModsActivity.this, R.string.mods_detail_gate_note_fmt,
-                    mTarget.label.isEmpty() ? Trans.get(ModsActivity.this, R.string.mods_detail_gate_nogame)
-                            : mTarget.label)).append('\n');
-            for (io.mdt.launcher.api.Gate g : gatesOf(m)) {
-                // ★ 通过 + 无补充说明 ⇒ **只画一行**（note 为空就是"没什么好说的"，
-                //   约定见 api.Gate 的注释）；失败才把原因摊在第二行。
-                if (g.pass) {
-                    sb.append(g.note.isEmpty()
-                            ? Trans.get(ModsActivity.this, R.string.mods_detail_gate_ok_fmt, g.label)
-                            : Trans.get(ModsActivity.this, R.string.mods_detail_gate_ok_note_fmt, g.label, g.note));
-                } else {
-                    sb.append(Trans.get(ModsActivity.this, R.string.mods_detail_gate_fail_fmt, g.label, g.note));
+            // ★ 第 230 轮：这一段**只在插件给了门时**才画 —— 宿主那份判据 v27 已删，
+            //   没装插件 / 插件没给结论时不能留一个「它要过这几关」的空标题（也不替插件编结论）。
+            java.util.List<io.mdt.launcher.api.Gate> gates = gatesOf(m);
+            if (!gates.isEmpty()) {
+                sb.append('\n').append(Trans.get(ModsActivity.this, R.string.mods_detail_gate_head)).append('\n');
+                sb.append(Trans.get(ModsActivity.this, R.string.mods_detail_gate_note_fmt,
+                        mTarget.label.isEmpty() ? Trans.get(ModsActivity.this, R.string.mods_detail_gate_nogame)
+                                : mTarget.label)).append('\n');
+                for (io.mdt.launcher.api.Gate g : gates) {
+                    // ★ 通过 + 无补充说明 ⇒ **只画一行**（note 为空就是"没什么好说的"，
+                    //   约定见 api.Gate 的注释）；失败才把原因摊在第二行。
+                    if (g.pass) {
+                        sb.append(g.note.isEmpty()
+                                ? Trans.get(ModsActivity.this, R.string.mods_detail_gate_ok_fmt, g.label)
+                                : Trans.get(ModsActivity.this, R.string.mods_detail_gate_ok_note_fmt, g.label, g.note));
+                    } else {
+                        sb.append(Trans.get(ModsActivity.this, R.string.mods_detail_gate_fail_fmt, g.label, g.note));
+                    }
+                    sb.append('\n');
                 }
-                sb.append('\n');
             }
             // ★★ 2026-10-08：表头带上"读自哪个文件、几点的值" —— 模组的开关**只有游戏会写**，
             //   不写清时间戳，用户没法判断它是不是刚才那次游戏跑完留下的（用户原话：

@@ -440,8 +440,8 @@ final class PluginData {
         // "这些事实意味着什么"归插件。⚠️ 只调一次：两批条目共用同一份。
         Mods.Resolved resolved = Mods.resolveDependencies(scan.mods);
         Mods.Target target = Mods.targetsFor(ctx, slot);
-        addMods(byPath, scan.mods, ctx, resolved, target);
-        addMods(byPath, scan.broken, ctx, resolved, target);
+        addMods(byPath, scan.mods, ctx, resolved, target, scan);
+        addMods(byPath, scan.broken, ctx, resolved, target, scan);
         List<ItemInfo> list = new ArrayList<ItemInfo>(byPath.values());
         Collections.sort(list, new Comparator<ItemInfo>() {
             @Override public int compare(ItemInfo a, ItemInfo b) {
@@ -452,7 +452,7 @@ final class PluginData {
     }
 
     private static void addMods(Map<String, ItemInfo> byPath, List<Mods.Info> infos, Context ctx,
-                                Mods.Resolved resolved, Mods.Target target) {
+                                Mods.Resolved resolved, Mods.Target target, Mods.Scan scan) {
         if (infos == null) return;
         for (Mods.Info m : infos) {
             if (m == null || m.file == null) continue;
@@ -505,8 +505,13 @@ final class PluginData {
             ex.put("hasMainJs", String.valueOf(m.hasMainJs));
             // v8：内容表要用到的三条事实（判据都在宿主 Mods 里，插件照抄数字就行）
             ex.put("enabled", String.valueOf(m.enabled));
-            ex.put("willFailJavaLoad", String.valueOf(m.willFailJavaLoad()));
             put(ex, "rootPrefix", m.rootPrefix);
+            // 第 230 轮：六道门要的两条事实 —— 只给事实（"意味着什么"在插件里）：
+            //   settingsKnown：没读到 settings.bin 时 `enabled` 只是默认值 true，插件要说清"这是默认值"；
+            //   launchIdExists：`launchid.dat` 在但用户关了 modcrashdisable ⇒ 不会整槽跳过，
+            //   插件那关要通过并补一句机制说明（判据仍在宿主 `Mods.scan.skipModLoading`）。
+            put(ex, "settingsKnown", String.valueOf(m.settingsKnown));
+            put(ex, "launchIdExists", String.valueOf(scan != null && scan.launchIdExists));
             // 目录形态的"根"（`resolveRoot` 下潜一层之后那一层）：插件找 classes.dex 要用它，
             // 别让插件自己再推一遍这条规则（第 229 轮，conflict 插件）。
             if (m.directory && m.rootDir != null) put(ex, "rootDir", m.rootDir.getAbsolutePath());

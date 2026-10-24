@@ -14,6 +14,7 @@ import io.mdt.launcher.api.Finding;
 import io.mdt.launcher.api.ItemInfo;
 import io.mdt.launcher.api.PluginApi;
 import io.mdt.plugins.mods.core.Conflicts;
+import io.mdt.plugins.mods.core.Gates;
 
 /**
  * 模组体检插件（官方，第 229 轮；v25 起叫 mods-health）。
@@ -63,11 +64,15 @@ public final class ModsHealth {
     }
 
     /**
-     * **v27 P4**：详情页那「六道加载门」。判据全在这边，宿主只负责画。
+     * **v27 P4**：详情页那「六道加载门」。
+     *
+     * <p>判据在 {@link Gates}（core、纯 Java ⇒ `build.sh check` 能逐道验）；这里只做两件事：
+     * 把 {@link ItemInfo} 摊成事实、把判据给的 key 翻成本插件的资源。
      *
      * <p>★ 每条的 `label` 都**跟着状态取**（通过 / 不通过两条文案）——
      * 「❌ + 肯定句」读不通（用户 2026-10-21：「怎么还有叉号后面跟肯定词」）。
-     * 通过时 {@code note} 一律为空（只画一行 ✅），不通过时必须给原因。
+     * 通过时 {@code note} 一般留空；只有两处例外（第 230 轮补）：没读到设置文件时
+     * 第②道门补一句"这是默认值"、`launchid.dat` 还在但不会跳过时第⑥道门补一句机制说明。
      */
     public static java.util.List<io.mdt.launcher.api.Gate> gates(ItemInfo item, PluginApi api) {
         java.util.List<io.mdt.launcher.api.Gate> out = new java.util.ArrayList<io.mdt.launcher.api.Gate>();
@@ -75,63 +80,63 @@ public final class ModsHealth {
         if (!ItemInfo.KIND_MODS.equals(item.kind)) return out;
         if (extra(item, "internalName").isEmpty()) return out;      // 坏包 ⇒ 宿主自己的
         try {
+            boolean skipping;
+            try {
+                skipping = api.modsSkipped();          // 槽级事实（宿主判据只有一处）
+            } catch (Throwable t) {
+                skipping = false;
+            }
+            Gates.Facts facts = Gates.facts(item.extra, skipping);
             Context c = api.context();
-            // ① 安卓到底能不能加载它
-            boolean canLoad = !"true".equals(extra(item, "willFailJavaLoad"));
-            out.add(new io.mdt.launcher.api.Gate(
-                    c.getString(canLoad ? R.string.cf_gate_load : R.string.cf_gate_load_bad),
-                    canLoad, canLoad ? "" : c.getString(R.string.cf_gate_load_note)));
-
-            // ② 游戏里开没开
-            boolean on = !"false".equals(extra(item, "enabled"));
-            out.add(new io.mdt.launcher.api.Gate(
-                    c.getString(on ? R.string.cf_gate_on : R.string.cf_gate_on_bad),
-                    on, on ? "" : c.getString(R.string.cf_gate_on_off)));
-
-            // ③ 游戏版本够不够
-            String v = extra(item, "minGameVersion");
-            int build = intExtra(item, "targetBuild");
-            int rev = intExtra(item, "targetRevision");
-            boolean verOk = Conflicts.isAtLeast(build, rev, v);
-            String cur = build == 0 ? c.getString(R.string.cf_gate_no_version)
-                    : (build + (rev == 0 ? "" : "." + rev));
-            out.add(new io.mdt.launcher.api.Gate(
-                    c.getString(verOk ? R.string.cf_gate_ver : R.string.cf_gate_ver_bad),
-                    verOk, verOk ? "" : c.getString(R.string.cf_gate_ver_note_fmt, v, cur)));
-
-            // ④ 门槛（v8 起才有）
-            int need = build >= intExtra(item, "minJavaMajor")
-                    ? ("true".equals(extra(item, "java"))
-                        ? intExtra(item, "minJavaMajor") : intExtra(item, "minModMajor")) : 0;
-            int minMajor = Conflicts.minMajorOf(v);
-            boolean majorOk = need <= 0 || minMajor >= need
-                    || "true".equals(extra(item, "legacyCompatible"));
-            out.add(new io.mdt.launcher.api.Gate(
-                    c.getString(majorOk ? R.string.cf_gate_minver : R.string.cf_gate_minver_bad),
-                    majorOk, majorOk ? "" : (minMajor <= 0
-                            ? c.getString(R.string.cf_gate_minver_none)
-                            : c.getString(R.string.cf_gate_minver_old_fmt,
-                                    String.valueOf(minMajor), String.valueOf(need)))));
-
-            // ⑤ 黑名单
-            boolean blOk = !"true".equals(extra(item, "blacklisted"));
-            out.add(new io.mdt.launcher.api.Gate(
-                    c.getString(blOk ? R.string.cf_gate_blacklist : R.string.cf_gate_blacklist_bad),
-                    blOk, blOk ? "" : c.getString(R.string.cf_gate_blacklist_note_fmt,
-                            extra(item, "name") + ":" + extra(item, "version"))));
-
-            // ⑥ 上次启动崩到没崩到整槽跳过
-            boolean skipping = api.modsSkipped();
-            boolean failed = "true".equals(extra(item, "failed"));
-            boolean lastOk = !failed && !skipping;
-            out.add(new io.mdt.launcher.api.Gate(
-                    c.getString(lastOk ? R.string.cf_gate_last : R.string.cf_gate_last_bad),
-                    lastOk, lastOk ? "" : c.getString(skipping
-                            ? R.string.cf_gate_last_skip_again : R.string.cf_gate_last_retry)));
+            for (Gates.Decision d : Gates.decide(facts)) {
+                int label = res(d.labelKey);
+                if (label == 0) {
+                    api.log("mods-health: gate label key unknown: " + d.labelKey);
+                    continue;
+                }
+                String note = "";
+                if (!d.noteKey.isEmpty()) {
+                    int noteId = res(d.noteKey);
+                    if (noteId == 0) {
+                        api.log("mods-health: gate note key unknown: " + d.noteKey);
+                    } else {
+                        note = c.getString(noteId, (Object[]) d.noteArgs);
+                    }
+                }
+                out.add(new io.mdt.launcher.api.Gate(c.getString(label), d.pass, note));
+            }
             return out;
         } catch (Throwable t) {
             return new java.util.ArrayList<io.mdt.launcher.api.Gate>();
         }
+    }
+
+    /** 判据给的 key → 资源 id；0 = 不认识（PC 自检先把 key 名钉住，这里只是映射）。 */
+    private static int res(String key) {
+        if ("cf_gate_load".equals(key)) return R.string.cf_gate_load;
+        if ("cf_gate_load_bad".equals(key)) return R.string.cf_gate_load_bad;
+        if ("cf_gate_load_note".equals(key)) return R.string.cf_gate_load_note;
+        if ("cf_gate_on".equals(key)) return R.string.cf_gate_on;
+        if ("cf_gate_on_bad".equals(key)) return R.string.cf_gate_on_bad;
+        if ("cf_gate_on_off".equals(key)) return R.string.cf_gate_on_off;
+        if ("cf_gate_on_unknown".equals(key)) return R.string.cf_gate_on_unknown;
+        if ("cf_gate_ver".equals(key)) return R.string.cf_gate_ver;
+        if ("cf_gate_ver_bad".equals(key)) return R.string.cf_gate_ver_bad;
+        if ("cf_gate_ver_note_fmt".equals(key)) return R.string.cf_gate_ver_note_fmt;
+        if ("cf_gate_minver".equals(key)) return R.string.cf_gate_minver;
+        if ("cf_gate_minver_bad".equals(key)) return R.string.cf_gate_minver_bad;
+        if ("cf_gate_minver_none".equals(key)) return R.string.cf_gate_minver_none;
+        if ("cf_gate_minver_old_fmt".equals(key)) return R.string.cf_gate_minver_old_fmt;
+        if ("cf_gate_blacklist".equals(key)) return R.string.cf_gate_blacklist;
+        if ("cf_gate_blacklist_bad".equals(key)) return R.string.cf_gate_blacklist_bad;
+        if ("cf_gate_blacklist_note_fmt".equals(key)) return R.string.cf_gate_blacklist_note_fmt;
+        if ("cf_gate_last".equals(key)) return R.string.cf_gate_last;
+        if ("cf_gate_last_skip".equals(key)) return R.string.cf_gate_last_skip;
+        if ("cf_gate_last_failed".equals(key)) return R.string.cf_gate_last_failed;
+        if ("cf_gate_last_pending".equals(key)) return R.string.cf_gate_last_pending;
+        if ("cf_gate_last_skip_again".equals(key)) return R.string.cf_gate_last_skip_again;
+        if ("cf_gate_last_retry".equals(key)) return R.string.cf_gate_last_retry;
+        return 0;
     }
 
     /**

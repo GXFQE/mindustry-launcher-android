@@ -1,4 +1,4 @@
-﻿# mods-health —— 官方插件（模组体检）
+# mods-health —— 官方插件（模组体检）
 
 第 229 轮从宿主搬出来的**第二个官方插件**（第一个是 `mapstats`）。宿主原来那行
 「查模组冲突」整块删掉，判据搬到这里；界面由宿主的 **analyzer** 扩展点渲染
@@ -19,6 +19,8 @@
 | 缺依赖 / 依赖被关 / 循环依赖 | 问题 | 状态来自宿主 `Mods.resolveDependencies`（`ItemInfo.extra.depState`）——插件只说"缺哪一条"，**不重写解析** |
 | 同一个模组装了两份 | 警告 | `duplicated`（宿主按 internalName 判）——两份都标，说得出另一份是谁 |
 | 在游戏的黑名单里 | 问题 | `blacklisted`（宿主查它那张表） |
+| 整槽跳过（**槽级**） | 警告 | `api.modsSkipped()` ⇒ 摘要卡一行「上次启动没跑完，下次会整槽跳过模组」 |
+| 孤儿开关（**槽级**） | 警告 | `Conflicts.orphanKeys(api.gameSettings(), 槽内模组)` ⇒ 摘要卡一行 |
 | 游戏日志 | 信息 | 上次启动的 `last_log.txt` 里提到这些模组的行（"谁真的接管了"） |
 
 再加一条「检查了 N 个带代码的模组（X MB）」—— **只在没发现冲突时**出现
@@ -34,6 +36,21 @@
 
 ★ 与卡片里的结论**同源**（同一份按签名缓存的快照）—— 别另写一套，否则会漂。
 
+### 详情页六道门（v27）
+
+模组详情「技术细节」里的六道加载门由本插件给（宿主只画）：安卓能否加载 / 游戏里开没开 /
+游戏版本够不够 / 版本门槛 / 黑名单 / 上次启动。**判据在 `core/Gates.java`**（纯 Java），
+入口类只把判据给的 key 翻成资源。
+
+- **每道门单独坏一次**，其余五道必须仍然通过（PC 自检逐道验）；
+- `pass == false` ⇒ 原因必须非空；`pass == true` 只允许两处补一句
+  （没读到设置文件时的「这是默认值」、`launchid.dat` 在但不会跳过时的机制说明）；
+- **槽级事实用槽级措辞**：整槽跳过是槽级事实（"上次启动崩到了整槽跳过"），
+  `-failed` 才是这个模组自己的记录（"游戏上次把它标成了「加载失败」"）。
+
+⚠️ `api()` 仍报 25（v26 `state()` / v27 `gates()`、`Finding.summary()` 都是加法，老宿主会静默少掉它们）——
+下一轮把它抬到 27 并同步 `PluginHost.API`（见 `next/47` §十八 的待办）。
+
 > 🔴 第 229 轮删掉了原来那层「共同全局钩子」（`mindustry/logic/LCanvas` ⇒ 都想接管逻辑编辑器）：
 > 它靠一张**写死的类名表**，而"引用一个类"≠"接管它"。用户 2026-10-24：「建议把这种硬编码还是
 > 半成品的东西删掉」⇒ 整层撤掉。**宁可少说**。
@@ -41,13 +58,14 @@
 ## 接口
 
 - `api() = 25`（v24 的 analyzer + v25 的 `Finding.anchor` 与 filter/sort 插槽）；另外实现了 v26 的
-  可选 `state()`（**逐项判定**：宿主拿它画行徽标 / 筛选 / 详情，词表见 `docs/PLUGIN-API.md`）。
+  可选 `state()`（**逐项判定**：宿主拿它画行徽标 / 筛选 / 详情，词表见 `docs/PLUGIN-API.md`）
+  与 v27 的 `gates()` / `Finding.summary()`。
 - 声明：analyzer 一条 + `slot: filter` / `slot: sort` 各一条（见 `assets/plugin.json`）。
-- 入口类实现 `analyze(ItemInfo, PluginApi)` / `accept(...)` / `compare(...)`，
+- 入口类实现 `analyze(ItemInfo, PluginApi)` / `accept(...)` / `compare(...)` / `state(...)` / `gates(...)`，
   **全部挂在同一个类上**（宿主 `PluginHost.open` 只认声明了 `api()` 的那个类 ——
   第 229 轮踩过：把 `accept` 放单独的 `Views` 类 ⇒ `NoSuchMethodException: Views.api`）。
-- 只用 `contents(mods)` / `modsDir()` / `slotDir()` / `context()` / `log()`；**不碰宿主的类**
-  （判据在 `core/Conflicts.java`，纯 Java）。
+- 只用 `contents(mods)` / `modsDir()` / `slotDir()` / `context()` / `log()` / `modsSkipped()` /
+  `gameSettings()`；**不碰宿主的类**（判据在 `core/Conflicts.java` 与 `core/Gates.java`，纯 Java）。
 
 ### ⚠️ analyzer 是逐项回调，结论是整槽的
 

@@ -47,28 +47,30 @@
     <string name="cf_slot_skip_title">last launch did not finish, so the next one will skip every mod here</string>
     <string name="cf_slot_skip_detail">the game believes these mods crashed it, and will turn them all off on startup.</string>
 
-    <!-- v27 P4: the six loading gates (judgment here, rendering in the host) -->
+    <!-- v27 P4: the six loading gates (judgment in core/Gates; the host only renders; rulers added in round 230) -->
     <string name="cf_gate_load">Android can load it</string>
     <string name="cf_gate_load_bad">Android cannot load it</string>
-    <string name="cf_gate_load_note">it declares Java but ships no code, so the entry class is missing.</string>
+    <string name="cf_gate_load_note">it declares Java but ships no code -- the game will try it and skip it.</string>
     <string name="cf_gate_on">enabled in the game</string>
     <string name="cf_gate_on_bad">turned off in the game</string>
-    <string name="cf_gate_on_off">it is off right now.</string>
-    <string name="cf_gate_no_version">no version selected</string>
+    <string name="cf_gate_on_off">tap \"Enable it\" to turn it on.</string>
+    <string name="cf_gate_on_unknown">the game settings file was not read yet; this is the default (missing = enabled).</string>
     <string name="cf_gate_ver">game version is new enough</string>
     <string name="cf_gate_ver_bad">game version is too old</string>
     <string name="cf_gate_ver_note_fmt">it needs %1$s, but this slot runs %2$s.</string>
     <string name="cf_gate_minver">version threshold is fine</string>
     <string name="cf_gate_minver_bad">version threshold is too low</string>
     <string name="cf_gate_minver_none">no minimum version declared, so the game skips it silently.</string>
-    <string name="cf_gate_minver_old_fmt">it declares %1$s, but Android needs at least %2$s.</string>
+    <string name="cf_gate_minver_old_fmt">it declares %1$s, which is too old (needs %2$s or newer); the game will skip it.</string>
     <string name="cf_gate_blacklist">not on the game blacklist</string>
     <string name="cf_gate_blacklist_bad">on the game blacklist</string>
     <string name="cf_gate_blacklist_note_fmt">the game refuses to load %1$s.</string>
-    <string name="cf_gate_last">last launch was not broken by it</string>
-    <string name="cf_gate_last_bad">last launch marked it as failed</string>
+    <string name="cf_gate_last">last launch finished (no slot-wide skip)</string>
+    <string name="cf_gate_last_skip">last launch crashed into a slot-wide skip</string>
+    <string name="cf_gate_last_failed">the game marked it as failed last time</string>
+    <string name="cf_gate_last_pending">last launch did not finish, but you turned off crash-disabling, so there will be no slot-wide skip.</string>
     <string name="cf_gate_last_skip_again">the next launch will still turn off every mod here; turn off the blamed mod, or turn off crash-disabling.</string>
-    <string name="cf_gate_last_retry">it did not finish last time; try again with it turned off.</string>
+    <string name="cf_gate_last_retry">try again with it turned off.</string>
 
     <string name="cf_note_dex_title_fmt">could not read the classes.dex inside \"%1$s\"</string>
     <string name="cf_note_log">could not read the game log</string>

@@ -47,28 +47,30 @@
     <string name="cf_slot_skip_title">上次启动没跑完，下次会整槽跳过模组</string>
     <string name="cf_slot_skip_detail">游戏会认为这个槽的模组把它弄崩了，开机时把它们全部关掉。</string>
 
-    <!-- v27 P4：六道加载门（判据在插件，宿主只画） -->
+    <!-- v27 P4：六道加载门（判据在 core/Gates，宿主只画；第 230 轮补的尺子也在那边） -->
     <string name="cf_gate_load">安卓能加载它</string>
     <string name="cf_gate_load_bad">安卓加载不了它</string>
-    <string name="cf_gate_load_note">它声明了 Java，包里却没有代码 —— 找不到入口类。</string>
+    <string name="cf_gate_load_note">它声明了 Java，包里却没有代码 —— 游戏会试着加载、然后跳过。</string>
     <string name="cf_gate_on">游戏里启用着</string>
     <string name="cf_gate_on_bad">游戏里已关闭</string>
-    <string name="cf_gate_on_off">它现在是关着的。</string>
-    <string name="cf_gate_no_version">没指定版本</string>
+    <string name="cf_gate_on_off">点「启用它」就能打开。</string>
+    <string name="cf_gate_on_unknown">还没读到游戏的设置文件，这里显示的是默认值（没写过 = 启用）。</string>
     <string name="cf_gate_ver">游戏版本够</string>
     <string name="cf_gate_ver_bad">游戏版本不够</string>
     <string name="cf_gate_ver_note_fmt">它要 %1$s，当前是 %2$s。</string>
     <string name="cf_gate_minver">版本门槛合格</string>
     <string name="cf_gate_minver_bad">版本门槛太低</string>
     <string name="cf_gate_minver_none">没写最低版本，游戏会静默跳过它。</string>
-    <string name="cf_gate_minver_old_fmt">写的是 %1$s，安卓上至少要 %2$s。</string>
+    <string name="cf_gate_minver_old_fmt">它写的最低版本是 %1$s，太老了（要 %2$s 以上）—— 游戏会跳过它。</string>
     <string name="cf_gate_blacklist">不在游戏的黑名单里</string>
     <string name="cf_gate_blacklist_bad">在游戏的黑名单里</string>
     <string name="cf_gate_blacklist_note_fmt">游戏自己拒绝加载 %1$s。</string>
-    <string name="cf_gate_last">上次启动没有因它出事</string>
-    <string name="cf_gate_last_bad">上次启动把它标成了失败</string>
+    <string name="cf_gate_last">上次启动正常结束（没触发整槽跳过）</string>
+    <string name="cf_gate_last_skip">上次启动崩到了整槽跳过</string>
+    <string name="cf_gate_last_failed">游戏上次把它标成了「加载失败」</string>
+    <string name="cf_gate_last_pending">上次启动没跑完，但你关掉了「启动崩溃后禁用模组」，所以不会整槽跳过。</string>
     <string name="cf_gate_last_skip_again">下次启动还会关掉整槽模组 —— 先关掉点名那个模组，或关掉「启动崩溃后禁用模组」。</string>
-    <string name="cf_gate_last_retry">它上次没跑完 —— 可以先把它关掉再试一次。</string>
+    <string name="cf_gate_last_retry">可以先把它关掉再试一次。</string>
 
     <string name="cf_note_dex_title_fmt">读不了「%1$s」的 classes.dex</string>
     <string name="cf_note_log">读不了游戏日志</string>

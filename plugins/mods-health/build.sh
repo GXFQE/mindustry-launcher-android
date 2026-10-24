@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env bash
+#!/usr/bin/env bash
 # =============================================================================
 # 官方插件 mods-health 的构建（第 229 轮）—— 与主构建同一条手工链：
 #   aapt2 compile/link -> javac(8) -> d8 -> 注入 classes.dex + assets/plugin.json
@@ -47,7 +47,8 @@ if [ "${1:-}" = "check" ]; then
     echo "!! check 编译失败" >&2
     exit 1
   fi
-  "$JDK8/bin/java" -cp "$(wpath "$CHK")" io.mdt.plugins.mods.core.Check
+  # -Dmh.root：文案门（六道门的 key 必须两种语言都在）要读插件 res/ —— 别让它按 cwd 猜。
+  "$JDK8/bin/java" -Dmh.root="$(wpath "$SRC_DIR")" -cp "$(wpath "$CHK")" io.mdt.plugins.mods.core.Check
   exit $?
 fi
 

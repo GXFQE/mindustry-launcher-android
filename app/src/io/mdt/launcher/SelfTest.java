@@ -3962,6 +3962,7 @@ public final class SelfTest {
             List<ItemInfo> modItems = PluginData.contents(ctx, curSlot, ItemInfo.KIND_MODS);
             boolean keysOk = modExtrasOk(modItems);
             int checkedMods = modItems.size();
+            List<ItemInfo> gateFactsSample = modItems;      // 第 230 轮：新事实的尺子用同一批条目
             if (checkedMods == 0) {
                 // 当前槽没有模组时，去**别的槽**找一个（本机有「冲突演示 / 模组演示」这类演示槽）
                 for (SlotInfo si : PluginData.slots(ctx)) {
@@ -3970,11 +3971,14 @@ public final class SelfTest {
                     if (mi.isEmpty()) continue;
                     keysOk = modExtrasOk(mi);
                     checkedMods = mi.size();
+                    gateFactsSample = mi;
                     break;
                 }
             }
             ok(stat, L, keysOk, "mods items carry enabled/willFailJavaLoad/rootPrefix ("
                     + checkedMods + ")");
+            ok(stat, L, gateFactsOk(gateFactsSample),
+                    "★六道门要的事实：settingsKnown / launchIdExists 都在（" + checkedMods + "）");
             ok(stat, L, PluginData.modsSkipped(ctx, curSlot)
                             == Mods.scan(ctx, curSlot).skipModLoading,
                     "modsSkipped mirrors Mods.scan.skipModLoading");
@@ -14313,6 +14317,22 @@ public final class SelfTest {
             if (mi.extra.get("enabled") == null) return false;
             if (mi.extra.get("willFailJavaLoad") == null) return false;
             if (mi.extra.get("rootPrefix") == null) return false;
+        }
+        return true;
+    }
+
+    /**
+     * 第 230 轮：六道门要的两条事实 —— `settingsKnown`（没读到设置时「启用」只是默认值）与
+     * `launchIdExists`（`launchid.dat` 在但不会整槽跳过时要补一句说明）；空表算通过。
+     */
+    private static boolean gateFactsOk(List<ItemInfo> mods) {
+        if (mods == null) return true;
+        for (ItemInfo mi : mods) {
+            if (mi == null) continue;
+            String known = mi.extra.get("settingsKnown");
+            String lid = mi.extra.get("launchIdExists");
+            if (!"true".equals(known) && !"false".equals(known)) return false;
+            if (!"true".equals(lid) && !"false".equals(lid)) return false;
         }
         return true;
     }
