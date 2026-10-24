@@ -63,6 +63,78 @@ public final class ModsHealth {
     }
 
     /**
+     * **v27 P4**：详情页那「六道加载门」。判据全在这边，宿主只负责画。
+     *
+     * <p>★ 每条的 `label` 都**跟着状态取**（通过 / 不通过两条文案）——
+     * 「❌ + 肯定句」读不通（用户 2026-10-21：「怎么还有叉号后面跟肯定词」）。
+     * 通过时 {@code note} 一律为空（只画一行 ✅），不通过时必须给原因。
+     */
+    public static java.util.List<io.mdt.launcher.api.Gate> gates(ItemInfo item, PluginApi api) {
+        java.util.List<io.mdt.launcher.api.Gate> out = new java.util.ArrayList<io.mdt.launcher.api.Gate>();
+        if (item == null || api == null) return out;
+        if (!ItemInfo.KIND_MODS.equals(item.kind)) return out;
+        if (extra(item, "internalName").isEmpty()) return out;      // 坏包 ⇒ 宿主自己的
+        try {
+            Context c = api.context();
+            // ① 安卓到底能不能加载它
+            boolean canLoad = !"true".equals(extra(item, "willFailJavaLoad"));
+            out.add(new io.mdt.launcher.api.Gate(
+                    c.getString(canLoad ? R.string.cf_gate_load : R.string.cf_gate_load_bad),
+                    canLoad, canLoad ? "" : c.getString(R.string.cf_gate_load_note)));
+
+            // ② 游戏里开没开
+            boolean on = !"false".equals(extra(item, "enabled"));
+            out.add(new io.mdt.launcher.api.Gate(
+                    c.getString(on ? R.string.cf_gate_on : R.string.cf_gate_on_bad),
+                    on, on ? "" : c.getString(R.string.cf_gate_on_off)));
+
+            // ③ 游戏版本够不够
+            String v = extra(item, "minGameVersion");
+            int build = intExtra(item, "targetBuild");
+            int rev = intExtra(item, "targetRevision");
+            boolean verOk = Conflicts.isAtLeast(build, rev, v);
+            String cur = build == 0 ? c.getString(R.string.cf_gate_no_version)
+                    : (build + (rev == 0 ? "" : "." + rev));
+            out.add(new io.mdt.launcher.api.Gate(
+                    c.getString(verOk ? R.string.cf_gate_ver : R.string.cf_gate_ver_bad),
+                    verOk, verOk ? "" : c.getString(R.string.cf_gate_ver_note_fmt, v, cur)));
+
+            // ④ 门槛（v8 起才有）
+            int need = build >= intExtra(item, "minJavaMajor")
+                    ? ("true".equals(extra(item, "java"))
+                        ? intExtra(item, "minJavaMajor") : intExtra(item, "minModMajor")) : 0;
+            int minMajor = Conflicts.minMajorOf(v);
+            boolean majorOk = need <= 0 || minMajor >= need
+                    || "true".equals(extra(item, "legacyCompatible"));
+            out.add(new io.mdt.launcher.api.Gate(
+                    c.getString(majorOk ? R.string.cf_gate_minver : R.string.cf_gate_minver_bad),
+                    majorOk, majorOk ? "" : (minMajor <= 0
+                            ? c.getString(R.string.cf_gate_minver_none)
+                            : c.getString(R.string.cf_gate_minver_old_fmt,
+                                    String.valueOf(minMajor), String.valueOf(need)))));
+
+            // ⑤ 黑名单
+            boolean blOk = !"true".equals(extra(item, "blacklisted"));
+            out.add(new io.mdt.launcher.api.Gate(
+                    c.getString(blOk ? R.string.cf_gate_blacklist : R.string.cf_gate_blacklist_bad),
+                    blOk, blOk ? "" : c.getString(R.string.cf_gate_blacklist_note_fmt,
+                            extra(item, "name") + ":" + extra(item, "version"))));
+
+            // ⑥ 上次启动崩到没崩到整槽跳过
+            boolean skipping = api.modsSkipped();
+            boolean failed = "true".equals(extra(item, "failed"));
+            boolean lastOk = !failed && !skipping;
+            out.add(new io.mdt.launcher.api.Gate(
+                    c.getString(lastOk ? R.string.cf_gate_last : R.string.cf_gate_last_bad),
+                    lastOk, lastOk ? "" : c.getString(skipping
+                            ? R.string.cf_gate_last_skip_again : R.string.cf_gate_last_retry)));
+            return out;
+        } catch (Throwable t) {
+            return new java.util.ArrayList<io.mdt.launcher.api.Gate>();
+        }
+    }
+
+    /**
      * **v26**：这一行"是什么状态"（宿主拿它画徽标 / 筛选 / 详情 —— 与结论同源）。
      *
      * <p>返回**固定词表**里的一个 token，宿主只做映射、不解释语义：
