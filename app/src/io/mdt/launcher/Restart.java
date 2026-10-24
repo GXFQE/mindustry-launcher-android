@@ -119,6 +119,22 @@ final class Restart {
      * <p>顺手把冷却时间戳也删掉 —— 否则下次点重启会被 {@link #THROTTLED} 拦住。
      */
     static void cancel(Context ctx) {
+        cancelPending(ctx);
+        try {
+            new java.io.File(Paths.privateDir(ctx), "restart-at.txt").delete();
+        } catch (Throwable ignored) {
+        }
+    }
+
+    /**
+     * **只撤闹钟**，不碰冷却时间戳。
+     *
+     * <p>🔴 为什么启动时要调它：上一程挂的闹钟如果**晚到**（非精确路径差几十秒），
+     * 用户可能已经手动重开并操作到了别的页面 —— 这时间“启动主页”的
+     * PendingIntent（带 {@code CLEAR_TOP}）落下来，会把栈上面全清掉 ⇒ 用户看到的就是
+     * “突然跳回主页面”。启动时把它撞掉就没这个事了。
+     */
+    static void cancelPending(Context ctx) {
         try {
             Intent i = ctx.getPackageManager().getLaunchIntentForPackage(ctx.getPackageName());
             if (i == null) return;
@@ -128,7 +144,6 @@ final class Restart {
             AlarmManager am = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
             if (am != null) am.cancel(pi);
             pi.cancel();
-            new java.io.File(Paths.privateDir(ctx), "restart-at.txt").delete();
         } catch (Throwable ignored) {
         }
     }

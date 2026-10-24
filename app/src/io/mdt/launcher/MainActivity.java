@@ -110,6 +110,10 @@ public class MainActivity extends BaseActivity {
         //   而 `BaseActivity.applyLocalizedTitle()` 会拿清单那份 label 当标题 ⇒ 不顶这一下，
         //   顶栏也会跟着变成短名（这条跑在基类之后，照样覆盖得了）。
         setTitle(Trans.get(this, R.string.app_name));
+        // 🔴 上一程挂的重启闹钟可能**晚到**：用户已经手动重开并操作到别处了，
+        //   它才把带 CLEAR_TOP 的启动 Intent 落下来 ⇒ 栈被清、界面“突然跳回主页面”。
+        //   进来就把它撞掉（已经响过的撞不撞都无所谓）。
+        Restart.cancelPending(this);
         android.util.Log.i("MDTLauncher", "MainActivity onCreate");
         buildUi();
         checkDevIntent(getIntent());
