@@ -55,6 +55,11 @@ final class Restart {
     static final int FAILED = 1;
     /** 刚重开过 ⇒ 这是恢复重放，**什么都别做**（也别弹窗）。 */
     static final int THROTTLED = 2;
+    /**
+     * 挂上了，但是**不精确**（没有「闹钟与提醒」权限 ⇒ 走了 {\code am.set()}）。
+     * <p>系统会把它批处理，实测可能差几秒到几十秒 —— 调用方**必须先告诉用户**，
+     * 否则就是“点了重启，进程死了，界面一直黑着”。 */
+    static final int INEXACT = 3;
 
     private Restart() {}
 
@@ -86,20 +91,45 @@ final class Restart {
             // API 31+ 起"精确闹钟"要单独授权；没授权就退化成不精确的 set()（差几秒可接受，
             // 而抛 SecurityException 直接不挂 = 用户以为重启了其实没重开，那才是坏结果）
             boolean exact = Build.VERSION.SDK_INT < 31 || am.canScheduleExactAlarms();
-            if (exact) am.setExact(AlarmManager.RTC, at, pi);
-            else am.set(AlarmManager.RTC, at, pi);
+            boolean inexact = false;
+            if (exact) {
+                am.setExact(AlarmManager.RTC, at, pi);
+            } else {
+                am.set(AlarmManager.RTC, at, pi);
+                inexact = true;
+            }
             // ★ 时间戳**只在真的挂上之后**才写：挂失败不留冷却，用户重试还能成
             try {
                 Util.atomicWriteText(stamp, String.valueOf(now));
             } catch (Throwable ignored) {
             }
-            return OK;
+            return inexact ? INEXACT : OK;
         } catch (Throwable t) {
             try {
                 Log.w(TAG, "restart alarm failed: " + t);
             } catch (Throwable ignored) {
             }
             return FAILED;
+        }
+    }
+
+    /**
+     * 取消已经挂上的重启闹钟（用户在“非精确”确认框里选了取消）。
+     *
+     * <p>顺手把冷却时间戳也删掉 —— 否则下次点重启会被 {@link #THROTTLED} 拦住。
+     */
+    static void cancel(Context ctx) {
+        try {
+            Intent i = ctx.getPackageManager().getLaunchIntentForPackage(ctx.getPackageName());
+            if (i == null) return;
+            int flags = PendingIntent.FLAG_UPDATE_CURRENT;
+            if (Build.VERSION.SDK_INT >= 23) flags |= PendingIntent.FLAG_IMMUTABLE;
+            PendingIntent pi = PendingIntent.getActivity(ctx, REQ, i, flags);
+            AlarmManager am = (AlarmManager) ctx.getSystemService(Context.ALARM_SERVICE);
+            if (am != null) am.cancel(pi);
+            pi.cancel();
+            new java.io.File(Paths.privateDir(ctx), "restart-at.txt").delete();
+        } catch (Throwable ignored) {
         }
     }
 

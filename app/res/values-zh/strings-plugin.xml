@@ -47,6 +47,9 @@
     <string name="plugin_restart_now">现在重启</string>
     <string name="plugin_restart_later">稍后</string>
     <string name="plugin_ext_unsupported">这个插件声明的入口，这一版还不支持（插件本身照常工作）</string>
+    <string name="plugin_pending_cancelled">已取消待生效的那一版 —— 下次启动不会加载它，不用重启</string>
+    <string name="plugin_restart_throttled">刚刚已经安排过一次重启了，这次不重复</string>
+    <string name="plugin_restart_inexact">系统没给「闹钟与提醒」权限，重启可能要等几秒到几十秒。现在重启吗？</string>
     <string name="plugin_restart_failed">这台设备不允许应用自己重启，请手动退出再打开。</string>
     <string name="plugin_back">返回</string>
     <string name="plugin_skip_title">上次带插件启动没成功</string>

@@ -471,8 +471,15 @@ public class PluginsActivity extends BaseActivity {
                             String done = Trans.get(PluginsActivity.this, R.string.plugin_disabled_fmt,
                                     Plugins.displayNameOf(PluginsActivity.this, id));
                             rebuild();
-                            if (wasActive) askRestart(done);
-                            else Toast.makeText(PluginsActivity.this, done, Toast.LENGTH_SHORT).show();
+                            if (wasActive) {
+                                askRestart(done);
+                            } else {
+                                // v27：不影响下次启动的改动，不弹重启对话框 ——
+                                //   但**必须把"不用重启"说出来**，否则用户只感觉“时弹时不弹”。
+                                Toast.makeText(PluginsActivity.this,
+                                        Trans.get(PluginsActivity.this, R.string.plugin_pending_cancelled),
+                                        Toast.LENGTH_LONG).show();
+                            }
                         } else if ("uninstall".equals(a)) {
                             // ★ 搬不动时 uninstall 返回 false、插件**还在**（数据没丢）⇒ 界面必须说一句，
                             //   否则用户以为已经删掉了（第 148 轮 C1-b）
@@ -846,7 +853,28 @@ public class PluginsActivity extends BaseActivity {
             Restart.killSelf();
             return;
         }
-        if (r == Restart.THROTTLED) return;   // 刚刚已经重开过（这是恢复重放）⇒ 静默
+        if (r == Restart.THROTTLED) {
+            // 刚刚已经重开过（这是恢复重放）⇒ 不再重开，但**不能静默**：
+            //   静默就是用户口中的“点了重启像卡了一样”。
+            Toast.makeText(this, Trans.get(this, R.string.plugin_restart_throttled),
+                    Toast.LENGTH_LONG).show();
+            return;
+        }
+        if (r == Restart.INEXACT) {
+            // 没有「闹钟与提醒」权限 ⇒ 闹钟不精确，可能差几秒到几十秒。
+            // 先告诉用户；他不想等就取消（把闹钟也撞掉）。
+            new AlertDialog.Builder(this)
+                    .setTitle(R.string.plugin_restart)
+                    .setMessage(R.string.plugin_restart_inexact)
+                    .setPositiveButton(R.string.plugin_restart_now, new DialogInterface.OnClickListener() {
+                        @Override public void onClick(DialogInterface d, int w) { Restart.killSelf(); }
+                    })
+                    .setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
+                        @Override public void onClick(DialogInterface d, int w) { Restart.cancel(PluginsActivity.this); }
+                    })
+                    .show();
+            return;
+        }
         Toast.makeText(this, Trans.get(this, R.string.plugin_restart_failed), Toast.LENGTH_LONG).show();
     }
 
