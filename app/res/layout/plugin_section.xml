@@ -25,6 +25,13 @@
         android:textColor="@color/fg_muted"
         android:textSize="12sp" />
 
+    <!-- v24（第 225 轮）：段落（`slot: section`）画在这里；没条目时随整块 GONE -->
+    <LinearLayout
+        android:id="@+id/plugin_section_body"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical" />
+
     <LinearLayout
         android:id="@+id/plugin_section_rows"
         android:layout_width="match_parent"

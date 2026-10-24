@@ -210,24 +210,66 @@ final class PluginEntries {
      * 放的位置由各页布局决定（主界面在首卡下面、设置页在底部……）。
      */
     static void attachPage(Activity a, String page, String slot, File selected) {
+        attachPage(a, page, slot, selected, null);
+    }
+
+    /**
+     * 通用页面的「插件」卡：**三种插入一次挂齐**（v24 第 226 轮统一）。
+     *
+     * <ul>
+     *   <li>`section` → 插件自己的 View，画在卡片上半部分（{@code plugin_section_body}）；</li>
+     *   <li>`content` → 一行，点开插件页；</li>
+     *   <li>`action` → 一行，点了在当前页跑 {@code run()}。</li>
+     * </ul>
+     * 哪一种都没有 ⇒ 整块 {@code GONE}。没挂载点的页面静默跳过。
+     */
+    static void attachPage(Activity a, String page, String slot, File selected,
+                           io.mdt.launcher.api.ItemInfo item) {
         if (a == null || page == null) return;
         View section = a.findViewById(R.id.plugin_section);
         if (section == null) return;                     // 这一页没有挂载点 ⇒ 静默跳过
+        ViewGroup body = (ViewGroup) section.findViewById(R.id.plugin_section_body);
         ViewGroup box = (ViewGroup) section.findViewById(R.id.plugin_section_rows);
         if (box == null) return;
-
-        List<Entry> rows = collect(a, page);
+        if (body != null) body.removeAllViews();
         box.removeAllViews();
-        if (rows.isEmpty()) {
+
+        // ① 段落（section）：插件自己的 View
+        for (Entry e : collectSections(a, page)) {
+            try {
+                File apk = Plugins.apkOf(a, e.id, e.ver);
+                if (apk == null || !apk.isFile()) continue;
+                PluginHost.Loaded l = Plugins.isInjected(a, e.id, e.ver)
+                        ? PluginHost.openInjected(a, apk, e.item.entry, page, slot, selected, item)
+                        : PluginHost.load(a, apk, e.item.entry, page, slot, selected, item);
+                View v = PluginHost.createView(l);
+                if (v != null && body != null) body.addView(v);
+            } catch (Throwable ignored) {
+                // 一份坏的插件不该把宿主页弄白
+            }
+        }
+
+        // ② 内容行（content）：点开插件页
+        List<Entry> rows = collect(a, page);
+        for (int i = 0; i < rows.size(); i++) {
+            if (i > 0) box.addView(divider(a));
+            box.addView(row(a, rows.get(i), page, slot, selected));
+        }
+
+        // ③ 动作行（action）：原页跑 run()
+        List<Entry> acts = collectActions(a, page);
+        for (int i = 0; i < acts.size(); i++) {
+            if (box.getChildCount() > 0) box.addView(divider(a));
+            box.addView(actionRow(a, acts.get(i), page, slot));
+        }
+
+        boolean any = (body != null && body.getChildCount() > 0) || box.getChildCount() > 0;
+        if (!any) {
             section.setVisibility(View.GONE);
             return;
         }
         TextView title = (TextView) section.findViewById(R.id.plugin_section_title);
         if (title != null) title.setText(Trans.get(a, R.string.plugin_section_title));
-        for (int i = 0; i < rows.size(); i++) {
-            if (i > 0) box.addView(divider(a));
-            box.addView(row(a, rows.get(i), page, slot, selected));
-        }
         section.setVisibility(View.VISIBLE);
     }
 

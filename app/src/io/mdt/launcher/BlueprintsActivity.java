@@ -33,6 +33,11 @@ import java.util.List;
  *   · 后台任务收尾一律先 `Util.dead(this)`（转屏时 `isFinishing()` 是 false，只判它挡不住）。
  */
 public class BlueprintsActivity extends BaseActivity {
+
+    /** v24（第 226 轮）：本页的插件挂载点（content / action / section 统一由 BaseActivity 挂）。 */
+    @Override protected String pluginPageId() { return Extensions.PAGE_BLUEPRINTS; }
+
+    @Override protected String pluginSlot() { return mSlot; }
     /** 目标槽（本页一切以它为准，**绝不回落当前槽**） */
     public static final String EXTRA_SLOT = "slot";
     /** SAF：选一份 .msch 导进来 */
@@ -168,9 +173,7 @@ public class BlueprintsActivity extends BaseActivity {
                     @Override public void run() { pickFilter(); }
                 });
 
-        // ★ 第 159 轮（扩展点 v2）：插件声明的**蓝图页动作**插在「删除」上面
-        PluginEntries.attach(this, (android.view.ViewGroup) root.findViewById(R.id.bp_actions),
-                Extensions.PAGE_BLUEPRINTS, mSlot, R.id.row_bp_del);
+        // v24（第 226 轮）：插件卡由 BaseActivity → PluginEntries.attachPage 统一挂
 
         scan();
 

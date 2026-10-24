@@ -35,6 +35,11 @@ import java.util.List;
  */
 public class SavesActivity extends BaseActivity {
 
+    /** v24（第 226 轮）：本页的插件挂载点（content / action / section 统一由 BaseActivity 挂）。 */
+    @Override protected String pluginPageId() { return Extensions.PAGE_SAVES; }
+
+    @Override protected String pluginSlot() { return mSlot; }
+
     /** 进来的槽名。没有 ⇒ 直接退出，**不猜**（与模组页 / 地图页 / 蓝图页同一条） */
     public static final String EXTRA_SLOT = "slot";
 
@@ -169,10 +174,7 @@ public class SavesActivity extends BaseActivity {
                     @Override public void run() { pickFilter(); }
                 });
 
-        // ★ 第 159 轮（扩展点 v2）：插件声明的**存档页动作**插在「删除」上面
-        //   （只读声明、不加载插件代码；没插件就一个像素都不动）
-        PluginEntries.attach(this, (android.view.ViewGroup) root.findViewById(R.id.save_actions),
-                Extensions.PAGE_SAVES, mSlot, R.id.row_save_del);
+        // v24（第 226 轮）：插件卡由 BaseActivity → PluginEntries.attachPage 统一挂
 
         // F9 深链：本页是被外部"打开方式"（浏览器 / 文件管理器）叫起来的。
         //   ★ 先过与「导入存档」那一行**同一个**写槽门禁（`SlotIo.blockedByGame`：只有

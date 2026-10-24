@@ -74,11 +74,8 @@ public class MapDetailActivity extends BaseActivity {
         }
         loadPreview(root);
 
-        // 第 193 轮（v9）：插件可以把一段界面画在详情页里（地图统计就长在这 —— 与搬家前同一个位置）
-        android.view.ViewGroup section = (android.view.ViewGroup)
-                root.findViewById(R.id.plugin_section_body);
-        PluginEntries.attachSection(this, section, Extensions.PAGE_MAP_DETAIL, mSlot,
-                mItem.file, pluginSelectedItem());
+        // v24（第 226 轮）：section 改由 BaseActivity → PluginEntries.attachPage 统一挂
+        //   （卡片里 plugin_section_body；本页旧的独立 body 不再使用）
     }
 
     /** 大图 + 版本 APK：两件事都要开 zip，**一起在后台做** */

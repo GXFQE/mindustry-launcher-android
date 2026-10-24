@@ -54,13 +54,13 @@
 
 `page` 取值：`main` / `slots` / `slot` / `saves` / `maps` / `mods` / `blueprints` / `map-detail` / `blueprint-detail` / `settings` / `logs` / `trash`。
 
-⚠️ 不是每个 slot 都在所有 page 上挂了钩子（声明了但宿主没接 = 不显示，不报错）：
+⚠️ 三类插槽现在**所有页面都挂齐了**（2026-10-24 第 226 轮统一）：
 
-| slot | 当前已接的 page |
+| slot | 已接的 page |
 |---|---|
-| `content` | 全部（四内容页的动作区、主页面等） |
-| `section` | `map-detail`、`mods`（v225 接上） |
-| `action` | `maps`、`mods`（v225 接上） |
+| `content` | 全部 |
+| `section` | 全部（画在「插件」卡里） |
+| `action` | 全部（同一张卡里，点了在原页跑） |
 
 ## 3. 入口类约定
 

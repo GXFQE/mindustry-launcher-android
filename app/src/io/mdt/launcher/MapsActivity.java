@@ -36,6 +36,11 @@ import java.util.Map;
  *   本页仍按系统配色（症状：同一应用两套配色，但不报错）。见 {@link SlotActivity} 类注释。
  */
 public class MapsActivity extends BaseActivity {
+
+    /** v24（第 226 轮）：本页的插件挂载点（content / action / section 统一由 BaseActivity 挂）。 */
+    @Override protected String pluginPageId() { return Extensions.PAGE_MAPS; }
+
+    @Override protected String pluginSlot() { return mSlot; }
     /** 目标槽（**本页一切以它为准**，不许回落到当前槽） */
     public static final String EXTRA_SLOT = "slot";
     private static final int REQ_MAP = 61;
@@ -181,12 +186,8 @@ public class MapsActivity extends BaseActivity {
                     @Override public void run() { pickFilter(); }
                 });
 
-        // ★ 第 159 轮（扩展点 v2）：插件声明的**地图页动作**插在「删除」上面
-        PluginEntries.attach(this, (ViewGroup) root.findViewById(R.id.maps_actions),
-                Extensions.PAGE_MAPS, mSlot, R.id.row_maps_del);
-        // ★ 第 197 轮（v12）：**动作**行（点了在当前页跑插件，不换页）—— 导出统计走这条
-        PluginEntries.attachAction(this, (ViewGroup) root.findViewById(R.id.maps_actions),
-                Extensions.PAGE_MAPS, mSlot, R.id.row_maps_del);
+        // v24（第 226 轮）：插件卡由 BaseActivity → PluginEntries.attachPage 统一挂
+        //   （content 行 + action 行都在那张卡里，不再插到动作卡里）
 
         // ★★ 2026-10-16（第 151b 轮）：列表不再是 `ListView`，而是整页 `ScrollView` 里手工挂载的
         //   容器（理由见 `activity_maps.xml` 头：横屏可用高不够时 `weight` 子视图会归零 ⇒

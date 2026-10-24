@@ -75,7 +75,8 @@ public abstract class BaseActivity extends Activity {
         super.onPostCreate(savedInstanceState);
         String page = pluginPageId();
         if (page == null || isFinishing()) return;
-        PluginEntries.attachPage(this, page, pluginSlot(), pluginSelectedFile());
+        PluginEntries.attachPage(this, page, pluginSlot(), pluginSelectedFile(),
+                pluginSelectedItem());
     }
 
     /** 这一页的插件 page id；null = 本页不挂通用插件区（内容页 / 插件页 / 游戏页）。 */

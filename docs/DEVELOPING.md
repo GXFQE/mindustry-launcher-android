@@ -553,6 +553,7 @@ SelfTest        见上（现在含 ㉑~㊹ 等成组断言；`dev_m3_selftest` �
 | [README.md](../README.md) | **给使用者看的**：是什么 / 怎么用 / 能做什么 / 还没有什么 —— ★ **默认是英文** |
 | [README.zh.md](../README.zh.md) | 上面那份的**简体中文版**（两份结构一一对应，改一份记得改另一份） |
 | `DEVELOPING.md`（本文） | 构建、`dev_*` 直通口、模块边界、文档地图 |
+| [`RELEASING.md`](RELEASING.md) | **版本号与发布规则**（2026-10-24 定）：三段式 / preview·rc·稳定 / `versionCode` 算法 / tag 与说明格式 / 发版前清单 |
 | `BACKLOG.md`（**索引**） | 功能池：**是什么 / 为什么 / 已核实了什么**（正文在 `docs/backlog/`，8 片） |
 | [`i18n-feasibility.md`](i18n-feasibility.md) | 2026-10-04 那次国际化的**可行性研究**（默认语言翻英 / 应用内切语言 / 门禁 15 规则）；已落地 |
 | [`i18n-user-bundles.md`](i18n-user-bundles.md) | ★ **用户自带翻译文件**的设计稿与成本定案：为什么没有捷径（`resources.arsc` vs properties）、1452 处改动面的实测、方案 A/B 对照、游戏侧外部语言包实测（`<槽根>/bundle`）、4 条待复核 |

@@ -72,16 +72,9 @@
                     android:layout_height="wrap_content" />
             </LinearLayout>
 
-            <!-- 第 160 轮：插件动作区（没有条目整块 GONE）；selectedFile = 这一张图 -->
+            <!-- 第 160 轮：插件动作区（没有条目整块 GONE）；selectedFile = 这一张图。
+                 v24（第 226 轮）：section 段落画在卡片内的 plugin_section_body 里。 -->
             <include layout="@layout/plugin_section" />
-
-            <!-- 第 193 轮（v9 段落插槽）：插件自己的一段界面画在这里（地图统计的卡片） -->
-            <LinearLayout
-                android:id="@+id/plugin_section_body"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:visibility="gone" />
         </LinearLayout>
     </ScrollView>
 </LinearLayout>

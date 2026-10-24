@@ -42,6 +42,11 @@ import java.util.List;
  */
 public class ModsActivity extends BaseActivity {
 
+    /** v24（第 226 轮）：本页的插件挂载点（content / action / section 统一由 BaseActivity 挂）。 */
+    @Override protected String pluginPageId() { return Extensions.PAGE_MODS; }
+
+    @Override protected String pluginSlot() { return mSlot; }
+
     /** 从哪个槽进来（不传 = 当前槽）。跨槽视图就靠它 */
     public static final String EXTRA_SLOT = "slot";
     /** 旋转重建时保住"用户选了哪个槽"（见 {@link #onCreate} 的注释） */
@@ -217,20 +222,8 @@ public class ModsActivity extends BaseActivity {
                     @Override public void run() { promptDeleteMods(); }
                 });
 
-        // ★ 第 159 轮（扩展点 v2）：插件声明的**模组页动作**插在「删除」上面
-        PluginEntries.attach(this, (android.view.ViewGroup) root.findViewById(R.id.mods_actions),
-                Extensions.PAGE_MODS, mSlot, R.id.row_mod_del);
-        // v24（第 225 轮）：动作行（slot: action）也接到模组页（与地图页同款）
-        PluginEntries.attachAction(this, (android.view.ViewGroup) root.findViewById(R.id.mods_actions),
-                Extensions.PAGE_MODS, mSlot, R.id.row_mod_del);
-        // v24（第 225 轮）：段落（slot: section）内嵌到模组页；没条目时整块 GONE
-        android.view.ViewGroup psec = (android.view.ViewGroup) root.findViewById(R.id.plugin_section);
-        android.view.ViewGroup psecRows = (android.view.ViewGroup) root.findViewById(R.id.plugin_section_rows);
-        PluginEntries.attachSection(this, psecRows, Extensions.PAGE_MODS, mSlot, null, null);
-        if (psec != null) {
-            psec.setVisibility(psecRows != null && psecRows.getChildCount() > 0
-                    ? android.view.View.VISIBLE : android.view.View.GONE);
-        }
+        // v24（第 226 轮）：插件卡由 BaseActivity → PluginEntries.attachPage 统一挂
+        //   （content 行 / action 行 / section 段落都在那张卡里；模组页不再单独 attach）
 
         mContainer = (LinearLayout) root.findViewById(R.id.mod_container);
         mEmpty = (TextView) root.findViewById(R.id.mod_empty);

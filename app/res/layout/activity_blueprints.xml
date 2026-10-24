@@ -113,6 +113,17 @@
             android:layout_height="wrap_content" />
     </LinearLayout>
 
+    <!-- v24（第 226 轮）：插件卡（content 行 / action 行 / section 段落都由 PluginEntries.attachPage 挂） -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="14dp"
+        android:layout_marginEnd="14dp"
+        android:orientation="vertical">
+
+        <include layout="@layout/plugin_section" />
+    </LinearLayout>
+
     <!--
       搜索框（第 122 轮）：与模组 / 地图页同一个形状 —— 就在列表正上方。
       ⚠️ 提示语在 Java 里绑（`Trans.bind`）：布局够不到用户语言包。
