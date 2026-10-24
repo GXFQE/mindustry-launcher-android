@@ -141,6 +141,23 @@ public final class Check {
         List<Conflicts.Mod> modsB = new ArrayList<Conflicts.Mod>();
         modsB.add(brokenMeta);
         Conflicts.Result rB = Conflicts.scan(modsB);
+        // ── v27：孤儿开关（槽级判据，纯函数）────────────────────
+        java.util.List<String> allKeys = java.util.Arrays.asList(
+                "mod-alpha-enabled", "mod-root-enabled", "mod-gone-enabled",
+                "mod-gone-failed", "mod-gone-repo", "modcrashdisable", "other-key");
+        java.util.List<String> liveNames = java.util.Arrays.asList("alpha", "root");
+        java.util.List<String> orphans = Conflicts.orphanKeys(allKeys, liveNames);
+        check(orphans.size() == 3, "孤儿开关：只报三个残留键（实际 " + orphans.size() + "）");
+        check(orphans.contains("mod-gone-enabled") && orphans.contains("mod-gone-failed")
+                && orphans.contains("mod-gone-repo"), "孤儿开关：-enabled/-failed/-repo 三种后缀都要认");
+        check(!orphans.contains("mod-alpha-enabled") && !orphans.contains("mod-root-enabled"),
+                "★反向：还在槽里的模组不能被报成孤儿");
+        check(!orphans.contains("modcrashdisable") && !orphans.contains("other-key"),
+                "★反向：modcrashdisable 这种全局键不是孤儿");
+        check(Conflicts.orphanKeys(null, liveNames).isEmpty()
+                && Conflicts.orphanKeys(allKeys, null).size() == 5,
+                "孤儿开关：空输入不许抛；槽里一个模组都没有时全都是孤儿");
+
         check(rB.issues.isEmpty(),
                 "★反向：读不出说明文件的包不许报版本门槛（它连 internalName 都没有）");
         // ── v25（P3b）：版本判断（旧的包 / 门槛）—— 照拄游戏自己的判法 ────────────

@@ -99,6 +99,39 @@ public final class Conflicts {
     }
 
     /**
+     * **孤儿开关**：`settings.bin` 里还有 `mod-<internalName>-enabled/failed/repo`，
+     * 而那个模组已经不在槽里了。
+     *
+     * <p>判据照拄宿主（`Mods.modNameOfKey`）：前缀 `mod-`、后缀三种，中间那段就是 internalName。
+     * ⚠️ 必须**小写化**后比 —— 游戏写键时就是这么小写的。
+     *
+     * @param keys          {@code settings} 的键（可为 null）
+     * @param internalNames 这个槽里实际有的模组（可为 null）
+     * @return 孤儿键，**保序**（按传入顺序）
+     */
+    public static List<String> orphanKeys(List<String> keys, List<String> internalNames) {
+        List<String> out = new ArrayList<String>();
+        if (keys == null) return out;
+        Set<String> have = new HashSet<String>();
+        if (internalNames != null) {
+            for (String n : internalNames) {
+                if (n != null && !n.trim().isEmpty()) have.add(n.trim().toLowerCase(Locale.ROOT));
+            }
+        }
+        String[] suffixes = {"-enabled", "-failed", "-repo"};
+        for (String k : keys) {
+            if (k == null || !k.startsWith("mod-")) continue;
+            for (String suf : suffixes) {
+                if (k.length() <= ("mod-" + suf).length() || !k.endsWith(suf)) continue;
+                String nm = k.substring(4, k.length() - suf.length()).trim().toLowerCase(Locale.ROOT);
+                if (!nm.isEmpty() && !have.contains(nm)) out.add(k);
+                break;
+            }
+        }
+        return out;
+    }
+
+    /**
      * 游戏自己的版本比较（`Mods.isAtLeast` 的**逐行照抄**，第 229 轮 P3b 搬进来）。
      *
      * <p>`build.revision` 形态（`"159.7"`）比到小版本；纯整数形态比 build；

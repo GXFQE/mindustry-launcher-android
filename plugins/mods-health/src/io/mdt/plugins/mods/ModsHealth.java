@@ -336,6 +336,24 @@ public final class ModsHealth {
             out.add(new Finding(c.getString(R.string.cf_log_title_fmt, log.lines.size()),
                     "", Finding.INFO));
         }
+        // v27：**孤儿开关**（槽级）—— settings 里还有 `mod-<名字>-enabled`，模组已经不在槽里了。
+        // 判据在 core（`Conflicts.orphanKeys`，PC 自检盯着）；这里只负责取事实 + 拼文案。
+        try {
+            java.util.List<String> keys = new ArrayList<String>();
+            java.util.Map<String, Object> gs = api.gameSettings();
+            if (gs != null) for (String k : gs.keySet()) keys.add(k);
+            java.util.List<String> names = new ArrayList<String>();
+            for (ItemInfo it : api.contents(ItemInfo.KIND_MODS)) {
+                String nm = extra(it, "internalName");
+                if (!nm.isEmpty()) names.add(nm);
+            }
+            java.util.List<String> orphans = Conflicts.orphanKeys(keys, names);
+            if (!orphans.isEmpty()) {
+                out.add(new Finding(c.getString(R.string.cf_orphan_title_fmt, orphans.size()),
+                        c.getString(R.string.cf_orphan_detail), Finding.WARN));
+            }
+        } catch (Throwable ignored) {
+        }
         if (out.isEmpty()) {
             // 一条**冲突/日志**结论都没有时才说"没冲突" —— 顺便把"扫了多少"只在这里说一次
             if (r.javaMods > 0) {

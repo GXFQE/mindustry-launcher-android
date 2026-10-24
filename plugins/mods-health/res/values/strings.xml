@@ -39,6 +39,10 @@
     <string name="cf_minmajor_title_fmt">minGameVersion is too low (%1$s &lt; %2$s)</string>
     <string name="cf_minmajor_detail_fmt">Android mods need at least %1$s; a missing value counts as 0, so the game skips it.</string>
 
+    <!-- v27: orphan switches (slot level) -->
+    <string name="cf_orphan_title_fmt">settings still hold %1$d switches for mods that are gone</string>
+    <string name="cf_orphan_detail">those mods were removed from this slot; the game will never look at them again.</string>
+
     <string name="cf_note_dex_title_fmt">could not read the classes.dex inside \"%1$s\"</string>
     <string name="cf_note_log">could not read the game log</string>
 </resources>

@@ -966,10 +966,7 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
                 sb.append("\n\n").append(Trans.get(ModsActivity.this, R.string.mods_ignored_fmt, mScan.ignored.size()));
                 sb.append("：").append(join(mScan.ignored));
             }
-            if (!mScan.orphanKeys.isEmpty()) {
-                sb.append("\n\n").append(Trans.get(ModsActivity.this, R.string.mods_orphan_fmt, mScan.orphanKeys.size()));
-                sb.append("：").append(join(mScan.orphanKeys));
-            }
+            // v27：孤儿开关的文案搬进 mods-health 插件了（槽级结论，跟其他插件结论一起说）
             if (!mScan.problems.isEmpty()) {
                 sb.append("\n\n").append(Trans.get(ModsActivity.this, R.string.mods_problem_head));
                 for (String p : mScan.problems) sb.append("\n· ").append(p);

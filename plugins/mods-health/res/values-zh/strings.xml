@@ -39,6 +39,10 @@
     <string name="cf_minmajor_title_fmt">版本门槛写得太低了（%1$s &lt; %2$s）</string>
     <string name="cf_minmajor_detail_fmt">安卓上的模组至少要 %1$s；没写的按 0 算 —— 游戏会跳过它。</string>
 
+    <!-- v27：孤儿开关（槽级） -->
+    <string name="cf_orphan_title_fmt">设置里有 %1$d 个开关指向已经不在的模组</string>
+    <string name="cf_orphan_detail">那些模组已经从槽里删了，游戏不会再看它们。</string>
+
     <string name="cf_note_dex_title_fmt">读不了「%1$s」的 classes.dex</string>
     <string name="cf_note_log">读不了游戏日志</string>
 </resources>
