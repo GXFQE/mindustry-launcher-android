@@ -1,8 +1,9 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <!--
-  conflict 插件的文案（中文）。
-  ★ 与 values/strings.xml 一一对应；`cf_join_and` 两侧的空格是**排版**（`\u0020`），别删。
+  mods-health 插件的文案（中文）。
+  ★ 与 values/strings.xml 一一对应（键集合必须相同）。
   ★ 第 229 轮（用户「感觉有点占地方啊」）：一行一条；解释只留"要动手"的那条。
+  ★ 第 229 轮 P2：「会不会加载 / 脚本跑不跑」从宿主搬到这里（宿主只留徽标状态）。
 -->
 <resources>
     <string name="cf_contained_title_fmt">「%1$s」里已经带了「%2$s」</string>
@@ -12,6 +13,12 @@
     <string name="cf_none">没发现明显冲突</string>
     <string name="cf_none_detail_fmt">检查了 %1$d 个带代码的模组（%2$s）；有些冲突要跑起来才知道。</string>
     <string name="cf_no_code">这个槽里没有带代码的模组</string>
+
+    <!-- v25（P2）：结构类结论 —— 行上只给短标签，detail 进详情 -->
+    <string name="cf_willfail_title">声明了 Java，但包里没有代码</string>
+    <string name="cf_willfail_detail">游戏会跳过它 —— 安卓找不到入口类，整个包都不加载。</string>
+    <string name="cf_nomainjs_title_fmt">有 %1$d 个脚本，却没有 main.js</string>
+    <string name="cf_nomainjs_detail">多个脚本时游戏只认 main.js，这些脚本不会跑。</string>
 
     <string name="cf_note_dex_title_fmt">读不了「%1$s」的 classes.dex</string>
     <string name="cf_note_log">读不了游戏日志</string>

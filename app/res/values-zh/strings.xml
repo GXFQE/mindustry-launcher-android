@@ -1650,8 +1650,6 @@
     <string name="mods_mp_need_long">服务器要有同款同版本</string>
     <string name="mods_detail_mp_fmt">联机：%1$s</string>
     <string name="mods_badge_willfail">加载会失败</string>
-    <string name="mods_warn_no_mainjs_fmt">⚠ 有 %1$d 个脚本，却没有入口脚本 —— 游戏不会跑它</string>
-    <string name="mods_warn_willfail">⚠ 它写明要 Java，但包里没有安卓能用的代码，游戏会跳过它</string>
 
     <!--
       F13 第四阶段：模组间冲突体检（用户：「话说有办法检查到如果有人会把 logicsugar 和 neon

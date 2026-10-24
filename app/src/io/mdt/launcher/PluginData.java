@@ -482,6 +482,8 @@ final class PluginData {
             ex.put("hasClassesDex", String.valueOf(m.hasClassesDex));
             ex.put("hasScripts", String.valueOf(m.hasScripts));
             ex.put("jsCount", String.valueOf(m.jsCount));
+            // v25（P2）：多脚本"只认 main.js"的判据在插件那边，这条是它要的事实
+            ex.put("hasMainJs", String.valueOf(m.hasMainJs));
             // v8：内容表要用到的三条事实（判据都在宿主 Mods 里，插件照抄数字就行）
             ex.put("enabled", String.valueOf(m.enabled));
             ex.put("willFailJavaLoad", String.valueOf(m.willFailJavaLoad()));

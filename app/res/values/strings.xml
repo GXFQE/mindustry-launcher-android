@@ -1713,8 +1713,6 @@
     <string name="mods_mp_need_long">The server must have the same mod, same version</string>
     <string name="mods_detail_mp_fmt">Multiplayer: %1$s</string>
     <string name="mods_badge_willfail">Will fail to load</string>
-    <string name="mods_warn_no_mainjs_fmt">⚠ %1$d scripts but no entry script — the game will not run it</string>
-    <string name="mods_warn_willfail">⚠ It declares Java, but the package has no code Android can use — the game skips it</string>
 
     <!--
       F13 第四阶段：模组间冲突体检（用户：「话说有办法检查到如果有人会把 logicsugar 和 neon

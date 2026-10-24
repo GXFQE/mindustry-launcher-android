@@ -55,6 +55,17 @@ public final class Conflicts {
         public boolean directory;
         /** 读到的 classes.dex 字节数（-1 = 没读到）。 */
         public long dexBytes = -1;
+
+        // ---- v25（P2）：宿主给的"结构事实"，判据在插件这边 ----
+        /** 声明了 {@code java: true}。 */
+        public boolean java;
+        /** 包里真的有 {@code classes.dex}（安卓能加载的形态）。 */
+        public boolean hasClassesDex;
+        public boolean hasScripts;
+        /** {@code scripts/} 下的 .js 个数。 */
+        public int jsCount;
+        /** {@code scripts/main.js} 在（多个脚本时游戏**只认**它）。 */
+        public boolean hasMainJs;
     }
 
     /** 两个模组下标（{@code a} 是"谁在说"：容器 / 提到别人的那个）。 */
@@ -67,10 +78,33 @@ public final class Conflicts {
         }
     }
 
+    /** 一条结构结论（第 229 轮 P2 从宿主搬来的两条判据）。 */
+    public static final class Issue {
+        /** 声明了 Java，包里却没有 {@code classes.dex} ⇒ 游戏会跳过整个包。 */
+        public static final int WILL_FAIL_JAVA_LOAD = 1;
+        /** 多个脚本却没有 {@code scripts/main.js} ⇒ 游戏不会跑它们。 */
+        public static final int NO_MAIN_SCRIPT = 2;
+
+        /** 哪个模组（下标）。 */
+        public final int index;
+        /** {@link #WILL_FAIL_JAVA_LOAD} / {@link #NO_MAIN_SCRIPT}。 */
+        public final int kind;
+        /** 只有 {@link #NO_MAIN_SCRIPT} 用得上（脚本个数）。 */
+        public final int jsCount;
+
+        public Issue(int index, int kind, int jsCount) {
+            this.index = index;
+            this.kind = kind;
+            this.jsCount = jsCount;
+        }
+    }
+
     /** 两层判据的结果（纯数据；文案由调用方拼）。 */
     public static final class Result {
         /** A 的 dex 里含 B 的主类。 */
         public final List<Pair> contained = new ArrayList<Pair>();
+        /** 结构问题（每个模组一条，可多条）。 */
+        public final List<Issue> issues = new ArrayList<Issue>();
         /** 读不出来的 dex（模组下标）。 */
         public final List<Integer> dexErrors = new ArrayList<Integer>();
         /** 带 {@code main} 的模组数。 */
@@ -105,7 +139,21 @@ public final class Conflicts {
         Result c = new Result();
         if (mods == null) mods = new ArrayList<Mod>();
 
-        // ① 主类模式：meta.main → dex 里的描述符形态（pkg/Main）
+        // ① 结构（第 229 轮 P2 从宿主搬来的两条判据；纯数据，文案由调用方拼）
+        for (int i = 0; i < mods.size(); i++) {
+            Mod m = mods.get(i);
+            if (m == null) continue;
+            if (m.java && !m.hasClassesDex) {
+                c.issues.add(new Issue(i, Issue.WILL_FAIL_JAVA_LOAD, 0));
+            }
+            // ⚠️ 必须带 jsCount >= 2 —— 只看 !hasMainJs 会把"单脚本模组"整片误报
+            //   （游戏自己的规则：只有一个 js 时它叫什么名字都行）
+            if (m.hasScripts && m.jsCount >= 2 && !m.hasMainJs) {
+                c.issues.add(new Issue(i, Issue.NO_MAIN_SCRIPT, m.jsCount));
+            }
+        }
+
+        // ② 主类模式：meta.main → dex 里的描述符形态（pkg/Main）
         List<Integer> javaIdx = new ArrayList<Integer>();
         for (int i = 0; i < mods.size(); i++) {
             Mod m = mods.get(i);

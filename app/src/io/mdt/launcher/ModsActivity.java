@@ -1288,8 +1288,9 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
             if (m.failed && isBlamed(m)) {
                 warns.add(Trans.get(ModsActivity.this, R.string.mods_warn_blamed));
             }
-            if (m.willFailJavaLoad()) warns.add(Trans.get(ModsActivity.this, R.string.mods_warn_willfail));
-            if (m.noMainScript()) warns.add(Trans.get(ModsActivity.this, R.string.mods_warn_no_mainjs_fmt, m.jsCount));
+            // v25（P2）：「会不会加载 / 脚本跑不跑」这两句的**文案**搬到 mods-health 插件了
+            //   （它挂在这一行上，见 `mIssues`）；宿主这边只留徽标那个**结果** ——
+            //   徽标报结果、插件给原因，别在一行里把同一件事说两遍。
             if (m.backslashEntries > 0) {
                 warns.add(Trans.get(ModsActivity.this, R.string.mods_warn_backslash_fmt, m.backslashEntries));
             }

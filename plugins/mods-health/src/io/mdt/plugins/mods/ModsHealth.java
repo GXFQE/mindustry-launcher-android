@@ -131,7 +131,8 @@ public final class ModsHealth {
             return Collections.emptyList();
         }
         List<Finding> fs = findings(c, api, s.r, s.mods);
-        api.log("mods-health: emit " + fs.size() + " findings (item=" + item.path + ")");
+        api.log("mods-health: emit " + fs.size() + " findings (item=" + item.path
+                + ", issues=" + s.r.issues.size() + ")");
         return fs;
     }
 
@@ -172,6 +173,12 @@ public final class ModsHealth {
             m.rootPrefix = extra(it, "rootPrefix");
             m.rootDir = extra(it, "rootDir");
             m.directory = it.directory;
+            // v25：结构事实（宿主只给"是什么"，"有没有问题"由本插件判）
+            m.java = "true".equals(extra(it, "java"));
+            m.hasClassesDex = "true".equals(extra(it, "hasClassesDex"));
+            m.hasScripts = "true".equals(extra(it, "hasScripts"));
+            m.hasMainJs = "true".equals(extra(it, "hasMainJs"));
+            m.jsCount = intExtra(it, "jsCount");
             out.add(m);
         }
         return out;
@@ -180,6 +187,14 @@ public final class ModsHealth {
     private static String extra(ItemInfo it, String key) {
         String v = it.extra == null ? null : it.extra.get(key);
         return v == null ? "" : v;
+    }
+
+    private static int intExtra(ItemInfo it, String key) {
+        try {
+            return Integer.parseInt(extra(it, key).trim());
+        } catch (Throwable t) {
+            return 0;
+        }
     }
 
     /** 当前界面语言（缓存的结论里有文案，换语言要重算）。minSdk 26 ⇒ 走 {@code getLocales()}。 */
@@ -262,13 +277,26 @@ public final class ModsHealth {
                     "", Finding.INFO));
         }
         if (out.isEmpty()) {
-            // 一条结论都没有时才说"没冲突" —— 顺便把"扫了多少"只在这里说一次
+            // 一条**冲突/日志**结论都没有时才说"没冲突" —— 顺便把"扫了多少"只在这里说一次
             if (r.javaMods > 0) {
                 out.add(new Finding(c.getString(R.string.cf_none),
                         c.getString(R.string.cf_none_detail_fmt, r.javaMods, size(r.scannedBytes)),
                         Finding.INFO));
             } else {
                 out.add(new Finding(c.getString(R.string.cf_no_code), "", Finding.INFO));
+            }
+        }
+        // ② 结构（P2 从宿主搬来的两条：会不会加载 / 脚本会不会跑）—— 判据在 core，这里只拼文案
+        for (Conflicts.Issue is : r.issues) {
+            if (is == null || is.index < 0 || is.index >= mods.size()) continue;
+            String path = mods.get(is.index).path;
+            if (path == null || path.isEmpty()) continue;
+            if (is.kind == Conflicts.Issue.WILL_FAIL_JAVA_LOAD) {
+                out.add(new Finding(c.getString(R.string.cf_willfail_title),
+                        c.getString(R.string.cf_willfail_detail), Finding.ERROR).anchor(path));
+            } else if (is.kind == Conflicts.Issue.NO_MAIN_SCRIPT) {
+                out.add(new Finding(c.getString(R.string.cf_nomainjs_title_fmt, is.jsCount),
+                        c.getString(R.string.cf_nomainjs_detail), Finding.WARN).anchor(path));
             }
         }
         for (Integer idx : r.dexErrors) {

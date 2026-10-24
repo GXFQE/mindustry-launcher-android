@@ -66,8 +66,7 @@ public final class Check {
         check(hasPair(r.contained, 0, 1), "★内置检测：A 的 classes.dex 里含 B 的主类 ⇒ A 内置了 B");
         check(!hasPair(r.contained, 1, 0),
                 "★反向：B 的 dex 里没有 A 的主类 ⇒ **不许**说「B 内置了 A」（方向别写错）");
-        check(!hasPair(r.contained, 0, 2) && !hasPair(r.contained, 2, 0),
-                "★反向：无关模组 C 与 A 之间不报「内置」");
+        check(!hasPair(r.contained, 0, 2) && !hasPair(r.contained, 2, 0),                "★反向：无关模组 C 与 A 之间不报「内置」");
 
         // ★ 元断言：把 B 的主类从 A 的 dex 里删掉 ⇒ 必须不再报「内置」（证明上一条不是恒真）
         File a2Dir = new File(work, "a2-big-only");
@@ -77,6 +76,41 @@ public final class Check {
         mods2.add(b);
         Conflicts.Result r2 = Conflicts.scan(mods2);
         check(r2.contained.isEmpty(), "★元断言：拿掉 B 的主类 ⇒ 不再报「内置」");
+
+        // ── v25（P2）：结构判据（会不会加载 / 脚本跑不跑）—— 从宿主搬来的两条 ──────────
+        List<Conflicts.Mod> modsS = new ArrayList<Conflicts.Mod>();
+        Conflicts.Mod noDex = new Conflicts.Mod();
+        noDex.path = "/x/nodex.jar"; noDex.title = "No Dex";
+        noDex.java = true; noDex.hasClassesDex = false;
+        Conflicts.Mod okDex = new Conflicts.Mod();
+        okDex.path = "/x/ok.jar"; okDex.title = "Ok Dex";
+        okDex.java = true; okDex.hasClassesDex = true;
+        Conflicts.Mod oneJs = new Conflicts.Mod();
+        oneJs.path = "/x/one.zip"; oneJs.title = "One Js";
+        oneJs.hasScripts = true; oneJs.jsCount = 1; oneJs.hasMainJs = false;
+        Conflicts.Mod twoJs = new Conflicts.Mod();
+        twoJs.path = "/x/two.zip"; twoJs.title = "Two Js";
+        twoJs.hasScripts = true; twoJs.jsCount = 2; twoJs.hasMainJs = false;
+        Conflicts.Mod twoJsOk = new Conflicts.Mod();
+        twoJsOk.path = "/x/twook.zip"; twoJsOk.title = "Two Js Ok";
+        twoJsOk.hasScripts = true; twoJsOk.jsCount = 2; twoJsOk.hasMainJs = true;
+        modsS.add(noDex);
+        modsS.add(okDex);
+        modsS.add(oneJs);
+        modsS.add(twoJs);
+        modsS.add(twoJsOk);
+        Conflicts.Result rS = Conflicts.scan(modsS);
+        check(hasIssue(rS.issues, 0, Conflicts.Issue.WILL_FAIL_JAVA_LOAD),
+                "结构：声明了 Java 却没有 classes.dex ⇒ 报「会加载失败」");
+        check(!hasIssue(rS.issues, 1, Conflicts.Issue.WILL_FAIL_JAVA_LOAD),
+                "★反向：有 classes.dex 的不许报");
+        check(!hasIssue(rS.issues, 2, Conflicts.Issue.NO_MAIN_SCRIPT),
+                "★反向：只有 1 个脚本（没有 main.js）不算问题 —— 单脚本叫什么名字都行");
+        check(hasIssue(rS.issues, 3, Conflicts.Issue.NO_MAIN_SCRIPT),
+                "结构：2 个脚本却没有 main.js ⇒ 报「脚本不会跑」");
+        check(!hasIssue(rS.issues, 4, Conflicts.Issue.NO_MAIN_SCRIPT),
+                "★反向：2 个脚本且有 main.js ⇒ 不报");
+
 
         // ── zip 形态：根前缀（下潜一层）里的 classes.dex 也要找得到 ────────────────
         File z = new File(work, "z-nested.zip");
@@ -176,6 +210,13 @@ public final class Check {
         } finally {
             w.close();
         }
+    }
+
+    private static boolean hasIssue(List<Conflicts.Issue> xs, int index, int kind) {
+        for (Conflicts.Issue it : xs) {
+            if (it.index == index && it.kind == kind) return true;
+        }
+        return false;
     }
 
     private static boolean hasPair(List<Conflicts.Pair> ps, int a, int b) {
