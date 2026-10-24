@@ -1413,14 +1413,12 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
     /**
      * v27：详情页那六道门——**插件算过就用插件的**，没有才用宿主自己的。
      */
-    private List<Mods.Gate> gatesOf(Mods.Info m) {
+    private java.util.List<io.mdt.launcher.api.Gate> gatesOf(Mods.Info m) {
         java.util.List<io.mdt.launcher.api.Gate> pg = mGates.get(pathOf(m));
-        if (pg != null && !pg.isEmpty()) {
-            List<Mods.Gate> out = new ArrayList<Mods.Gate>();
-            for (io.mdt.launcher.api.Gate g : pg) out.add(new Mods.Gate(g.label, g.pass, g.note));
-            return out;
-        }
-        return Mods.gates(this, m, mTarget.build, mTarget.revision, mScan);
+        // 🔴 v27（用户 2026-10-24「删了吧」）：**不再回落到宿主自己那份判据** ——
+        //   六道门只有一个来源（插件）。插件没给 ⇒ **一句不说**（宁可少说），
+        //   不能拿宿主那份凑数（那就是同一段判据写两处）。
+        return pg == null ? new ArrayList<io.mdt.launcher.api.Gate>() : pg;
     }
 
     /**
@@ -1567,12 +1565,15 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
         sb.append('\n').append(Trans.get(ModsActivity.this, R.string.mods_detail_state_fmt,
                 ModsText.outcome(this, stOf(m),
                         m.settingsKnown, m.willFailJavaLoad(), m.failed, mScan.skipModLoading)));
-        int fail = 0;
-        for (Mods.Gate g : gatesOf(m)) {
-            if (!g.pass) fail++;
+        java.util.List<io.mdt.launcher.api.Gate> gates = gatesOf(m);
+        if (!gates.isEmpty()) {
+            int fail = 0;
+            for (io.mdt.launcher.api.Gate g : gates) {
+                if (!g.pass) fail++;
+            }
+            sb.append('\n').append(fail == 0 ? Trans.get(ModsActivity.this, R.string.mods_detail_allok)
+                    : Trans.get(ModsActivity.this, R.string.mods_detail_somefail_fmt, fail));
         }
-        sb.append('\n').append(fail == 0 ? Trans.get(ModsActivity.this, R.string.mods_detail_allok)
-                : Trans.get(ModsActivity.this, R.string.mods_detail_somefail_fmt, fail));
         // v25：插件挂在这一项上的结论（行上只给短标签，这里给 detail）
         List<Finding> issues = mIssues.get(pathOf(m));
         if (issues != null && !issues.isEmpty()) {
@@ -1657,11 +1658,11 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
             sb.append(Trans.get(ModsActivity.this, R.string.mods_detail_gate_note_fmt,
                     mTarget.label.isEmpty() ? Trans.get(ModsActivity.this, R.string.mods_detail_gate_nogame)
                             : mTarget.label)).append('\n');
-            for (Mods.Gate g : gatesOf(m)) {
+            for (io.mdt.launcher.api.Gate g : gatesOf(m)) {
                 // ★ 通过 + 无补充说明 ⇒ **只画一行**（note == null 就是"没什么好说的"，
                 //   约定见 Mods.gates 的注释）；失败才把原因摊在第二行。
                 if (g.pass) {
-                    sb.append(g.note == null
+                    sb.append(g.note.isEmpty()
                             ? Trans.get(ModsActivity.this, R.string.mods_detail_gate_ok_fmt, g.label)
                             : Trans.get(ModsActivity.this, R.string.mods_detail_gate_ok_note_fmt, g.label, g.note));
                 } else {
