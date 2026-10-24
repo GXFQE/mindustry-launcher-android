@@ -91,6 +91,13 @@ public final class Conflicts {
         /** 安卓上两类模组的最低门槛（游戏自己的 `Vars`：Java / 脚本·数据）。 */
         public int minJavaMajor = 154;
         public int minModMajor = 136;
+
+        // ---- 第 234 轮：覆盖原版的两个通道（由 {@link Overrides#read} 从包/目录里读）----
+        /** `sprites-override/**` 的相对路径（覆盖原版贴图；名字不加模组前缀）。 */
+        public final Set<String> overrideSprites = new java.util.LinkedHashSet<String>();
+        /** `bundles/<文件名>.properties` → 里面声明的键（覆盖原版文案的通道）。 */
+        public final Map<String, Set<String>> bundleKeys =
+                new java.util.LinkedHashMap<String, Set<String>>();
     }
 
     /** 这个包读得到说明文件吗（没有 internalName 就是读不出 meta 的坏包）。 */
@@ -199,6 +206,24 @@ public final class Conflicts {
         }
     }
 
+    /**
+     * 第 234 轮：两个**不同**的模组都在覆盖同一份原版内容（贴图 / 文案）。
+     *
+     * <p>只会给"真的撞上"的通道建表；两个表都空的一对不会进 {@link Result#overlaps}。
+     */
+    public static final class Overlap {
+        public final int a, b;
+        /** 两边都在覆盖的贴图（`sprites-override/` 内的相对路径，已排序）。 */
+        public final List<String> sprites = new ArrayList<String>();
+        /** 两边都声明、且**原版真的有的**文案键（已排序）。 */
+        public final List<String> keys = new ArrayList<String>();
+
+        public Overlap(int a, int b) {
+            this.a = a;
+            this.b = b;
+        }
+    }
+
     /** 一条结构结论（第 229 轮 P2 从宿主搬来的两条判据）。 */
     public static final class Issue {
         /** 声明了 Java，包里却没有 {@code classes.dex} ⇒ 游戏会跳过整个包。 */
@@ -245,6 +270,8 @@ public final class Conflicts {
     public static final class Result {
         /** A 的 dex 里含 B 的主类。 */
         public final List<Pair> contained = new ArrayList<Pair>();
+        /** 第 234 轮：两个不同模组都覆盖同一份原版内容（贴图 / 文案）。 */
+        public final List<Overlap> overlaps = new ArrayList<Overlap>();
         /** 结构问题（每个模组一条，可多条）。 */
         public final List<Issue> issues = new ArrayList<Issue>();
         /** 读不出来的 dex（模组下标）。 */
@@ -278,6 +305,17 @@ public final class Conflicts {
      * @param mods 这个槽的模组（顺序与界面一致）
      */
     public static Result scan(List<Mod> mods) {
+        return scan(mods, java.util.Collections.<String>emptySet());
+    }
+
+    /**
+     * 同上，但知道**原版有哪些文案键**（第 234 轮，v28 由宿主给）。
+     *
+     * <p>★ 只认这些键：模组自己的键（`logicsugar.*` 之类）不算"覆盖原版"，不报 ——
+     * 否则一份翻译包就能把整页刷满。{@code vanillaKeys} 为空（读不到版本包）⇒ **文案这条不报**，
+     * 不猜。
+     */
+    public static Result scan(List<Mod> mods, Set<String> vanillaKeys) {
         Result c = new Result();
         if (mods == null) mods = new ArrayList<Mod>();
 
@@ -382,6 +420,25 @@ public final class Conflicts {
                 int q = who.get(idxObj.intValue()).intValue();
                 c.contained.add(new Pair(javaIdx.get(p).intValue(),
                         javaIdx.get(q).intValue()));
+            }
+        }
+        // ④ 覆盖原版（第 234 轮）：只报**两个不同模组**都在覆盖同一份原版内容。
+        //    先排掉"同一份代码两份壳"（重名 / A 里带了 B）—— 那是别的结论，不是覆盖冲突。
+        Set<String> cont = new HashSet<String>();
+        for (Pair p : c.contained) cont.add(p.a + ":" + p.b);
+        for (int i = 0; i < mods.size(); i++) Overrides.read(mods.get(i));
+        for (int i = 0; i < mods.size(); i++) {
+            Mod a = mods.get(i);
+            if (!hasMeta(a)) continue;
+            for (int j = i + 1; j < mods.size(); j++) {
+                Mod b = mods.get(j);
+                if (!hasMeta(b)) continue;
+                // 同名两个包 = "重名"，由上面的 DUPLICATED 说；不是两份不同的模组
+                if (a.internalName != null && a.internalName.equalsIgnoreCase(b.internalName)) continue;
+                if (cont.contains(i + ":" + j) || cont.contains(j + ":" + i)) continue;
+                Overlap o = new Overlap(i, j);
+                Overrides.merge(a, b, vanillaKeys, o.sprites, o.keys);
+                if (!o.sprites.isEmpty() || !o.keys.isEmpty()) c.overlaps.add(o);
             }
         }
         // 🔴 第 229 轮删掉了「简介提及」这一层（用户 2026-10-24：「简介中提到其他模组可以收起来

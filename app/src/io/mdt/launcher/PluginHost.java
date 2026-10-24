@@ -66,11 +66,14 @@ public final class PluginHost {
      * 结论挂行 + 筛选/排序注入 + `parseHjson`（v25）、逐项判定 `state()`（v26）、
      * 详情页的门 `gates()` + 槽级结论进摘要卡 `Finding.summary()`（v27）—— 逐版见 `docs/PLUGIN-API.md`。
      *
+     * <p>**v28（2026-10-24 第 234 轮）= 加法**：`baseBundleKeys()` —— 目标版本基础语言包的键集合，
+     * 给"两个模组是不是都在改同一句**原版**文案"用（判据在插件，宿主只给事实）。
+     *
      * <p>v1~v19 的逐版记录留在 `docs/PLUGIN-API.md` 与 git 历史里；**从 v20 起**：
      * 加法变更只抬 {@link #API}（{@link #API_MIN} 不动，老插件照样装得进），
      * 破坏性变更才抬 {@link #API_MIN}。
      */
-    public static final int API = 27;
+    public static final int API = 28;
     /**
      * 还认的**最老**契约版本。
      *
@@ -463,6 +466,10 @@ public final class PluginHost {
 
         @Override public boolean modsSkipped() {
             return PluginData.modsSkipped(getBaseContext(), slot);
+        }
+
+        @Override public java.util.Set<String> baseBundleKeys() {
+            return BaseBundles.keys(getBaseContext(), slot);
         }
 
         @Override public InputStream open(ItemInfo item) throws IOException {

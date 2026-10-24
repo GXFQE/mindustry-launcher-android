@@ -31,9 +31,10 @@ import io.mdt.plugins.mods.core.Gates;
  */
 public final class ModsHealth {
 
-    /** v24 的 analyzer + v25 的 `Finding.anchor` / 筛选排序 + v26 的 `state()` + v27 的门与摘要卡。 */
+    /** v24 的 analyzer + v25 的 `Finding.anchor` / 筛选排序 + v26 的 `state()` + v27 的门与摘要卡
+     *  + v28 的原版文案键（覆盖检测要判断"改的是不是原版那句"）。 */
     public static int api() {
-        return 27;
+        return 28;
     }
 
     private static final Object LOCK = new Object();
@@ -227,11 +228,19 @@ public final class ModsHealth {
                 List<ItemInfo> all = api.contents(ItemInfo.KIND_MODS);
                 long t0 = System.currentTimeMillis();
                 cMods = toMods(all);
-                cResult = Conflicts.scan(cMods);
+                // v28：原版文案键（宿主给事实；读不到就是空集 ⇒ 文案这条不报，不猜）
+                java.util.Set<String> vanilla;
+                try {
+                    vanilla = api.baseBundleKeys();
+                } catch (Throwable t) {
+                    vanilla = java.util.Collections.emptySet();
+                }
+                cResult = Conflicts.scan(cMods, vanilla);
                 cOwner = all.isEmpty() ? null : all.get(0).path;
                 cSig = sig;
                 api.log("mods-health: " + cResult.javaMods + " java mods, "
                         + cResult.scannedBytes + " dex bytes, "
+                        + (vanilla == null ? 0 : vanilla.size()) + " vanilla keys, "
                         + (System.currentTimeMillis() - t0) + " ms");
             }
             return new Snapshot(cMods, cResult, cOwner);
@@ -409,6 +418,37 @@ public final class ModsHealth {
                     c.getString(R.string.cf_contained_detail), Finding.ERROR,
                     mods.get(p.a).path, mods.get(p.b).path).anchor(mods.get(p.a).path));
         }
+        // 第 234 轮：两个不同模组都在覆盖同一份原版内容（贴图 / 文案）—— 两边各说一次
+        if (!r.overlaps.isEmpty()) {
+            String sep = c.getString(R.string.cf_ovr_sep);
+            String more = c.getString(R.string.cf_ovr_more);
+            for (Conflicts.Overlap o : r.overlaps) {
+                String an = title(mods, o.a), bn = title(mods, o.b);
+                String ap = mods.get(o.a).path, bp = mods.get(o.b).path;
+                if (!o.sprites.isEmpty()) {
+                    String ex = examples(o.sprites, sep, more);
+                    out.add(new Finding(
+                            c.getString(R.string.cf_ovr_sprite_title_fmt, bn, o.sprites.size()),
+                            c.getString(R.string.cf_ovr_sprite_detail_fmt, ex),
+                            Finding.WARN, ap, bp).anchor(ap));
+                    out.add(new Finding(
+                            c.getString(R.string.cf_ovr_sprite_title_fmt, an, o.sprites.size()),
+                            c.getString(R.string.cf_ovr_sprite_detail_fmt, ex),
+                            Finding.WARN, bp, ap).anchor(bp));
+                }
+                if (!o.keys.isEmpty()) {
+                    String ex = examples(o.keys, sep, more);
+                    out.add(new Finding(
+                            c.getString(R.string.cf_ovr_key_title_fmt, bn, o.keys.size()),
+                            c.getString(R.string.cf_ovr_key_detail_fmt, ex),
+                            Finding.WARN, ap, bp).anchor(ap));
+                    out.add(new Finding(
+                            c.getString(R.string.cf_ovr_key_title_fmt, an, o.keys.size()),
+                            c.getString(R.string.cf_ovr_key_detail_fmt, ex),
+                            Finding.WARN, bp, ap).anchor(bp));
+                }
+            }
+        }
         if (!log.lines.isEmpty()) {
             out.add(new Finding(c.getString(R.string.cf_log_title_fmt, log.lines.size()),
                     "", Finding.INFO));
@@ -504,6 +544,18 @@ public final class ModsHealth {
         if (p == null || p.isEmpty()) return "";
         int slash = Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\'));
         return slash >= 0 ? p.substring(slash + 1) : p;
+    }
+
+    /** 前 3 个例子（多了用「…」收尾）；分隔符与省略号都走资源，别在 Java 里写中文。 */
+    private static String examples(java.util.List<String> list, String sep, String more) {
+        StringBuilder sb = new StringBuilder();
+        int n = Math.min(3, list == null ? 0 : list.size());
+        for (int i = 0; i < n; i++) {
+            if (sb.length() > 0) sb.append(sep);
+            sb.append(list.get(i));
+        }
+        if (list != null && list.size() > n) sb.append(more);
+        return sb.toString();
     }
 
     /** 与宿主 {@code Util.formatSize} 同一个口径（1.2 KB / 7.5 MB），别在插件里另造一套。 */

@@ -3704,6 +3704,24 @@ public final class SelfTest {
         } catch (Throwable t) {
             ok(stat, L, false, "v27 Gate / summary missing: " + t);
         }
+        // ★ v28：原版基础包的键集合（"两个模组是不是都在改同一句原版文案"要的事实）
+        ok(stat, L, PluginHost.API >= 28, "host plugin api >= 28 (baseBundleKeys)");
+        try {
+            File fakeApk = new File(ctx.getCacheDir(), "selftest-bundle.apk");
+            if (fakeApk.exists() && !fakeApk.delete()) {
+                ok(stat, L, false, "v28 夹具删不掉：" + fakeApk);
+            }
+            zipMany(fakeApk, new String[]{"assets/bundles/bundle.properties"},
+                    new String[]{"misc.help = Help\nmisc.cancel = Cancel\n"});
+            java.util.Set<String> bk = BaseBundles.keysOf(fakeApk);
+            ok(stat, L, bk.contains("misc.help") && bk.contains("misc.cancel") && bk.size() == 2,
+                    "★v28：BaseBundles 从合成 APK 读出原版键（2 条）");
+            ok(stat, L, !bk.contains("no.such.key"),
+                    "★v28 反向：没写在包里的键不在表里（不是「什么都收」）");
+            fakeApk.delete();
+        } catch (Throwable t) {
+            ok(stat, L, false, "v28 BaseBundles failed: " + t);
+        }
         List<io.mdt.launcher.api.Finding> dummy =
                 new java.util.ArrayList<io.mdt.launcher.api.Finding>();
         List<Extensions.Item> an = Extensions.parse(

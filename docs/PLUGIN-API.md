@@ -5,9 +5,10 @@
 
 ## 1. 版本与兼容（v20 冻结基线）
 
-- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..27**。
+- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..28**。
   （v20 是冻结基线；v21 = 游戏设置面；v22 = 后台任务 + 游戏事件；v23 = 探针；v24 = 分析器；
-  v25 = 结论挂行 + 筛选/排序注入 + HJSON；v26 = 逐项判定；v27 = 详情页的门 + 槽级结论进摘要卡。）
+  v25 = 结论挂行 + 筛选/排序注入 + HJSON；v26 = 逐项判定；v27 = 详情页的门 + 槽级结论进摘要卡；
+  v28 = 原版文案键。）
 - 插件 `api()` 报的是「我需要的最低宿主接口版本」。用不到的新能力**不要**报高 ——
   报高了只会在老宿主上被拒，换不来任何东西。
 - **不要用 try/catch 去兼容老宿主**：报什么版本就只会跑在什么版本上。`api()` 报 20，
@@ -66,7 +67,7 @@
 ## 3. 入口类约定
 
 ```java
-public static int api();                        // 必需：你需要的接口版本（当前 27；用不到新能力就报 20）
+public static int api();                        // 必需：你需要的接口版本（当前 28；用不到新能力就报 20）
 public static View createView(PluginApi api);   // content / section 用
 public static void run(PluginApi api);          // action 用（在原页跑，不换页）
 public static void unload();                    // 可选：收尾（也认 unload(Context)）
@@ -86,7 +87,7 @@ public static void unload();                    // 可选：收尾（也认 unlo
 
 | 方法 | 说明 |
 |---|---|
-| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 27） |
+| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 28） |
 | `context()` | 插件上下文（**只用来取资源 / 主题 / 建 View**） |
 | `page()` / `slot()` | 从哪一页来 / 当前槽名 |
 | `theme()` | 主题色与 dp/sp（别自己写死颜色，见 `PluginTheme`） |
@@ -102,6 +103,7 @@ public static void unload();                    // 可选：收尾（也认 unlo
 | `logs()` / `trash()` / `versions()` | 日志与崩溃报告 / 中转站 / 已装版本 |
 | `open(item)` | 打开条目的字节流（文件或容器条目统一） |
 | `modsSkipped()` / `gameRunning()` | 这一轮会不会加载模组 / 游戏在不在跑 |
+| `baseBundleKeys()`（v28） | 目标版本**基础语言包**的键集合（判"是不是原版文案"用；空集 = 读不到，不是"没有"） |
 | `usageDir()` | 会话记录目录（见第 9 节） |
 | `crashReportsDir()`（v22） | 当前槽的崩溃报告目录（只读；可能不存在） |
 
@@ -299,6 +301,18 @@ new Finding(title, detail, severity, evidence).summary();
 - 只对**不挂行**的结论有效；`anchor()` 优先（挂行的仍画在那一行）；
 - 落点是页面的**摘要卡**（"这个槽怎么了"），不是底部的「插件」卡 —— 用于整槽跳过这类槽级事实；
 - 同一件事只说一次：槽级结论进了摘要卡，就不要再按行重复。
+
+### 原版文案键（v28）
+
+```java
+Set<String> keys = api.baseBundleKeys();   // 目标版本 assets/bundles/bundle.properties 的键
+```
+
+- 用途：判断"两个模组是不是都在改同一句**原版**文案"。模组的 `bundles/*.properties` 与版本 APK 的
+  进**同一个 map**，后加载的覆盖先加载的；但**只有原版键**才算覆盖原版 —— 模组自己的键（`xxx.*`）
+  被别的包也写一份，往往是翻译包 / fork（真机上 13 个模组有 4,437 条同名键，多数是这种）。
+- **空集 = 没有目标版本 / 读不出来**（不是"原版没有这些键"）⇒ 别据此下结论。
+- 第一次调用会打开版本 APK 读一份文本，之后按 APK 路径 + mtime 缓存（插件页每次重扫都会问）。
 
 ### 筛选 / 排序注入（v25）
 
@@ -500,6 +514,8 @@ v26（同日）：可选 `state(ItemInfo, PluginApi)` —— 插件给**逐项�
 筛选 / 详情，并回落到自己的判定。
 v27（同日第 229 轮 P4；第 232 轮抬版本）：`api/Gate` + 可选 `gates(ItemInfo, PluginApi)`（详情页六道加载门）+
 `Finding.summary()`（不挂行的槽级结论进摘要卡）；`API_MIN` 仍不动（区间 20..27）。
+v28（同日第 234 轮）：`baseBundleKeys()` —— 目标版本基础语言包的键集合（"两个模组是不是都在改同一句
+原版文案"的事实来源；判据仍在插件）；`API_MIN` 仍不动（区间 20..28）。
 
 **官方体检插件**：`plugins/mods-health`（第 229 轮，前身叫 `conflict`）。宿主原来的那行
 「查模组冲突」整块删掉，判据搬进插件的 `core/Conflicts.java` 与 `core/Gates.java`；

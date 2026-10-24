@@ -7,6 +7,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * 插件能用的**全部宿主能力**（唯一入口）。宿主实现、插件调用。
@@ -57,7 +58,7 @@ public interface PluginApi {
      * <p>为什么要有这个常量：注释里的「当前 = N」运行期读不到，一个写 17、一个写 20 也没人发现；
      * 常量 + 断言才拦得住。</p>
      */
-    int DOC_VERSION = 27;
+    int DOC_VERSION = 28;
 
     // ══ 环境 ═══════════════════════════════════════════════════════════════
 
@@ -167,6 +168,19 @@ public interface PluginApi {
      * {@code skipModLoading}），插件别自己拼 {@code launchid.dat} + 设置的组合。
      */
     boolean modsSkipped();
+
+    /**
+     * **v28**：这个槽的目标游戏版本里**基础语言包**（{@code assets/bundles/bundle.properties}）
+     * 的键集合 —— 也就是"哪些文案键是原版真的有的"。
+     *
+     * <p>为什么要它：模组的 {@code bundles/*.properties} 与版本 APK 的进**同一个 map**，
+     * 两个模组写同一个键时后加载的会盖掉先加载的。可这只有"原版键"才算冲突；
+     * 模组自己的键（`logicsugar.*` 之类）被别的包也写一份，往往是翻译包 / fork，不是覆盖原版。
+     *
+     * <p>★ **空集 = 没有目标版本 / 读不出来**（不是"原版没有这些键"）—— 插件别据此下结论。
+     * 第一次调用要打开版本 APK 读一份文本，之后按 APK 路径 + mtime 缓存。
+     */
+    Set<String> baseBundleKeys();
 
     /** 游戏现在在跑吗（跑着时别去动存档 / 模组文件）。 */
     boolean gameRunning();

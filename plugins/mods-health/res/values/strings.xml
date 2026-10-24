@@ -9,6 +9,13 @@
 <resources>
     <string name="cf_contained_title_fmt">\"%1$s\" already bundles \"%2$s\"</string>
     <string name="cf_contained_detail">turning both on makes them fight; keep one.</string>
+    <!-- round 234: two different mods override the same vanilla content -->
+    <string name="cf_ovr_sep">, </string>
+    <string name="cf_ovr_more">…</string>
+    <string name="cf_ovr_sprite_title_fmt">covers the same %2$d sprite(s) as \"%1$s\"</string>
+    <string name="cf_ovr_sprite_detail_fmt">e.g. %1$s - only one copy in sprites-override can win (the later mod loads last).</string>
+    <string name="cf_ovr_key_title_fmt">changes the same %2$d vanilla string(s) as \"%1$s\"</string>
+    <string name="cf_ovr_key_detail_fmt">e.g. %1$s - mod bundles merge in load order, so the later mod wins.</string>
     <string name="cf_log_title_fmt">the last game log mentions these mods on %1$d lines</string>
 
     <string name="cf_none">no obvious conflicts found</string>

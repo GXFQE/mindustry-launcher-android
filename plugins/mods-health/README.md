@@ -21,6 +21,7 @@
 | 在游戏的黑名单里 | 问题 | `blacklisted`（宿主查它那张表） |
 | 整槽跳过（**槽级**） | 警告 | `api.modsSkipped()` ⇒ 摘要卡一行「上次启动没跑完，下次会整槽跳过模组」 |
 | 孤儿开关（**槽级**） | 警告 | `Conflicts.orphanKeys(api.gameSettings(), 槽内模组)` ⇒ 摘要卡一行 |
+| **两个模组都覆盖原版**（第 234 轮） | 警告 | 见下节「覆盖原版检测」：`sprites-override/` 同名路径 + `bundles/*.properties` 里**原版真的有的**键 |
 | 游戏日志 | 信息 | 上次启动的 `last_log.txt` 里提到这些模组的行（"谁真的接管了"） |
 
 再加一条「检查了 N 个带代码的模组（X MB）」—— **只在没发现冲突时**出现
@@ -35,6 +36,19 @@
 | 按冲突风险（排序） | 参与的排前面，同档按标题 |
 
 ★ 与卡片里的结论**同源**（同一份按签名缓存的快照）—— 别另写一套，否则会漂。
+
+### 覆盖原版检测（第 234 轮）
+
+两个**不同**的模组都在覆盖同一份原版内容时，两边各出一条（"和「X」都…"）：
+
+| 通道 | 判据 | 说明 |
+|---|---|---|
+| 贴图 | 两边 `sprites-override/` 里有**同一个相对路径** | 该目录的名字不加模组前缀、游戏打包时最后写入 ⇒ 同名贴图只有一份能生效 |
+| 文案 | 两边同名 `bundles/<文件>.properties` 里都有**同一个键**，且该键在**原版基础包**里 | 宿主 v28 `baseBundleKeys()` 给原版键集；模组自己的键不算（否则翻译包就刷满整页） |
+
+**排除**：同一个 internalName（那是"重名"）、A 的 dex 里带了 B 的主类（那是"内置"，同一份代码两份壳）。
+读不出原版键集（没有目标版本）⇒ **文案这条不报**，不猜；贴图照报。判据在 `core/Overrides.java`，
+PC 自检有 9 条（含反向：只撞自己的键不报、没有原版键时不报文案、zip / 目录两种形态都读得到）。
 
 ### 详情页六道门（v27）
 
@@ -54,8 +68,8 @@
 
 ## 接口
 
-- `api() = 27`（v24 analyzer + v25 `Finding.anchor` / filter-sort 注入 + v26 `state()` +
-  v27 `gates()` / `Finding.summary()`；区间 20..27）。
+- `api() = 28`（v24 analyzer + v25 `Finding.anchor` / filter-sort 注入 + v26 `state()` +
+  v27 `gates()` / `Finding.summary()` + v28 `baseBundleKeys()`；区间 20..28）。
 - 声明：analyzer 一条 + `slot: filter` / `slot: sort` 各一条（见 `assets/plugin.json`）。
 - 入口类实现 `analyze(ItemInfo, PluginApi)` / `accept(...)` / `compare(...)` / `state(...)` / `gates(...)`，
   **全部挂在同一个类上**（宿主 `PluginHost.open` 只认声明了 `api()` 的那个类 ——

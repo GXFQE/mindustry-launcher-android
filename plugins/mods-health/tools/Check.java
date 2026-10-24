@@ -5,7 +5,9 @@ import java.io.FileOutputStream;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
@@ -270,6 +272,8 @@ public final class Check {
         //    ★ 为什么补这一批：宿主那 20 条门禁断言第 229 轮随宿主判据一起删了，
         //      而门原来写在入口类里（要 Context 取文案）⇒ 本 check 编不到 ⇒ 一条自动判据都没有。
         checkGates();
+        // ── 第 234 轮：覆盖原版（贴图 / 文案）─────────────────────────────────
+        overrides(work);
     }
 
     // ══ 六道加载门（v27 P4 / 第 230 轮）══════════════════════════════════════════
@@ -397,7 +401,152 @@ public final class Check {
 
         // ⑥ 元断言：pass/fail 的说明规则 + 文案 key 真的存在（两种语言、占位符个数对）
         for (java.util.List<Gates.Decision> ds : all) record(used, ds);
+        // 第 234 轮：覆盖检测的文案（不经过六道门，单独登记；两种语言、占位符个数照验）
+        used.put("cf_ovr_sep", 0);
+        used.put("cf_ovr_more", 0);
+        used.put("cf_ovr_sprite_title_fmt", 2);
+        used.put("cf_ovr_sprite_detail_fmt", 1);
+        used.put("cf_ovr_key_title_fmt", 2);
+        used.put("cf_ovr_key_detail_fmt", 1);
         checkRes(used);
+    }
+
+    // ── 第 234 轮：覆盖原版（贴图 / 文案）─────────────────────────────────────
+
+    /**
+     * 判据：**两个不同的模组**都在覆盖同一份原版内容才报。
+     *
+     * <p>★ 文案只认原版键（`vanillaKeys`）—— 模组自己的键不算，否则一份翻译包就刷满整页。
+     * ★ 贴图没有"原版清单"可查（版本 APK 里是打好的图集），所以按 `sprites-override/` 的
+     * **同一路径**判：同名贴图只有一份能生效，这就是覆盖冲突。
+     */
+    private static void overrides(File work) throws Exception {
+        File a = new File(work, "ovr-a");
+        File b = new File(work, "ovr-b");
+        File c = new File(work, "ovr-c");
+        String zh = "bundle_zh_CN.properties";
+        override(a, new String[]{"zz-shared.png", "only-a.png"}, zh,
+                "misc.help=帮助甲\nzz.own=自己的甲\n");
+        override(b, new String[]{"zz-shared.png", "only-b.png"}, zh,
+                "misc.help=帮助乙\nzz.own=自己的乙\n");
+        // C 只和 A 撞**模组自己的键**（zz.own），不撞贴图 ⇒ 整条都不许报
+        override(c, new String[0], zh, "zz.own=自己的丙\n");
+        List<Conflicts.Mod> mods = new ArrayList<Conflicts.Mod>();
+        mods.add(mod(a, "Ovr A", "", ""));
+        mods.add(mod(b, "Ovr B", "", ""));
+        mods.add(mod(c, "Ovr C", "", ""));
+
+        // 先证明读得出来（读不出来时，下面的"没撞"会白过）
+        for (Conflicts.Mod m : mods) Overrides.read(m);
+        check(mods.get(0).overrideSprites.contains("zz-shared.png")
+                        && mods.get(0).bundleKeys.containsKey(zh),
+                "★读覆盖通道：目录形态的 sprites-override / bundles 都读到了");
+
+        Set<String> van = new HashSet<String>();
+        van.add("misc.help");
+        Conflicts.Result r = Conflicts.scan(mods, van);
+        check(overlapSprites(r, 0, 1).contains("zz-shared.png")
+                        && !overlapSprites(r, 0, 1).contains("only-a.png"),
+                "★两个模组都覆盖同一张贴图 ⇒ 报（且只报**撞上**的那张）");
+        check(overlapKeys(r, 0, 1).contains("misc.help") && !overlapKeys(r, 0, 1).contains("zz.own"),
+                "★两个模组都改同一句**原版**文案 ⇒ 报；模组自己的键（zz.own）不报");
+        check(!hasOverlap(r, 0, 2), "★只撞模组自己的键（zz.own）⇒ 整条不报（那不是覆盖原版）");
+        check(!hasOverlap(r, 1, 2), "★反向：B 与 C 没有任何共同覆盖 ⇒ 不报");
+
+        // 反方向：没有原版键清单 ⇒ 文案这条整条不报（不猜），贴图照报
+        Conflicts.Result noVan = Conflicts.scan(mods, java.util.Collections.<String>emptySet());
+        check(overlapKeys(noVan, 0, 1).isEmpty() && !overlapSprites(noVan, 0, 1).isEmpty(),
+                "★读不到原版键清单 ⇒ 文案不报（贴图不受影响）");
+
+        // 排除项：同名（重名由 DUPLICATED 说）与「A 里带了 B」（同一份代码两份壳）
+        List<Conflicts.Mod> same = new ArrayList<Conflicts.Mod>();
+        same.add(mod(a, "Same Title", "", ""));
+        same.add(mod(b, "Same Title", "", ""));
+        check(!hasOverlap(Conflicts.scan(same, van), 0, 1), "★同名两个包 ⇒ 不报覆盖（那是重名那条）");
+
+        File parent = new File(work, "ovr-parent");
+        File child = new File(work, "ovr-child");
+        dex(parent, "FAKE-DEX contains em/Child here");
+        dex(child, "FAKE-DEX em/Child");
+        override(parent, new String[]{"zz-shared.png"}, zh, "misc.help=x\n");
+        override(child, new String[]{"zz-shared.png"}, zh, "misc.help=y\n");
+        List<Conflicts.Mod> cont = new ArrayList<Conflicts.Mod>();
+        cont.add(mod(parent, "Parent", "pa/Parent", ""));
+        cont.add(mod(child, "Child", "em/Child", ""));
+        check(!hasOverlap(Conflicts.scan(cont, van), 0, 1),
+                "★「Parent 里带了 Child」⇒ 不报覆盖（同一份代码两份壳，不是覆盖冲突）");
+
+        // zip 形态：读条目名 + bundle 键（与目录形态同一套判据）
+        File z = new File(work, "ovr-z.zip");
+        zipOverride(z, "sprites-override/zip-shared.png", "bundle.properties", "misc.help=z\n");
+        Conflicts.Mod zm = new Conflicts.Mod();
+        zm.path = z.getAbsolutePath();
+        zm.title = "Zip Mod";
+        zm.internalName = "zip-mod";
+        Overrides.read(zm);
+        check(zm.overrideSprites.contains("zip-shared.png")
+                        && zm.bundleKeys.get("bundle.properties") != null
+                        && zm.bundleKeys.get("bundle.properties").contains("misc.help"),
+                "★读覆盖通道：zip 形态也读得到（sprites-override 路径 / bundle 键）");
+    }
+
+    private static void override(File dir, String[] sprites, String bundleName,
+                                 String bundleBody) throws Exception {
+        if (!dir.mkdirs() && !dir.isDirectory()) {
+            throw new IllegalStateException("cannot mkdir " + dir);
+        }
+        for (String s : sprites) {
+            File f = new File(dir, "sprites-override/" + s);
+            File p = f.getParentFile();
+            if (p != null) p.mkdirs();
+            writeText(f, "png");
+        }
+        File bd = new File(dir, "bundles");
+        bd.mkdirs();
+        writeText(new File(bd, bundleName), bundleBody);
+    }
+
+    private static void zipOverride(File file, String sprite, String bundleName,
+                                    String bundleBody) throws Exception {
+        ZipOutputStream z = new ZipOutputStream(new FileOutputStream(file));
+        try {
+            z.putNextEntry(new ZipEntry("mod.json"));
+            z.write("name: zip-mod\n".getBytes("UTF-8"));
+            z.closeEntry();
+            if (sprite != null) {
+                z.putNextEntry(new ZipEntry(sprite));
+                z.write(new byte[]{1});
+                z.closeEntry();
+            }
+            if (bundleName != null) {
+                z.putNextEntry(new ZipEntry("bundles/" + bundleName));
+                z.write(bundleBody.getBytes("UTF-8"));
+                z.closeEntry();
+            }
+        } finally {
+            z.close();
+        }
+    }
+
+    private static boolean hasOverlap(Conflicts.Result r, int a, int b) {
+        for (Conflicts.Overlap o : r.overlaps) {
+            if ((o.a == a && o.b == b) || (o.a == b && o.b == a)) return true;
+        }
+        return false;
+    }
+
+    private static java.util.List<String> overlapSprites(Conflicts.Result r, int a, int b) {
+        for (Conflicts.Overlap o : r.overlaps) {
+            if ((o.a == a && o.b == b) || (o.a == b && o.b == a)) return o.sprites;
+        }
+        return new ArrayList<String>();
+    }
+
+    private static java.util.List<String> overlapKeys(Conflicts.Result r, int a, int b) {
+        for (Conflicts.Overlap o : r.overlaps) {
+            if ((o.a == a && o.b == b) || (o.a == b && o.b == a)) return o.keys;
+        }
+        return new ArrayList<String>();
     }
 
     /** 只有一个事实变坏 ⇒ 只有那一道门不通过、标签必须换、原因必须非空。 */

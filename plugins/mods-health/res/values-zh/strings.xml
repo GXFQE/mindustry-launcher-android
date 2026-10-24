@@ -9,6 +9,13 @@
 <resources>
     <string name="cf_contained_title_fmt">「%1$s」里已经带了「%2$s」</string>
     <string name="cf_contained_detail">两个一起开会互相抢，建议只留一个。</string>
+    <!-- 第 234 轮：两个不同的模组都覆盖同一份原版内容 -->
+    <string name="cf_ovr_sep">、</string>
+    <string name="cf_ovr_more">…</string>
+    <string name="cf_ovr_sprite_title_fmt">和「%1$s」都覆盖了 %2$d 张同名贴图</string>
+    <string name="cf_ovr_sprite_detail_fmt">例：%1$s —— sprites-override 里的同名贴图只有一份能生效（后加载的赢）。</string>
+    <string name="cf_ovr_key_title_fmt">和「%1$s」都改了 %2$d 句原版文案</string>
+    <string name="cf_ovr_key_detail_fmt">例：%1$s —— 模组文案按加载顺序合并，后加载的盖掉先加载的。</string>
     <string name="cf_log_title_fmt">上次启动的日志里有 %1$d 行提到这些模组</string>
 
     <string name="cf_none">没发现明显冲突</string>
