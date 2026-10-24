@@ -28,19 +28,35 @@ public final class Finding {
     public final int severity;
     /** 证据（可为空数组，不许 null）。 */
     public final String[] evidence;
-    /** 挂到哪一项上（{@link ItemInfo#path}）；{@code null} = 进「插件」卡。 */
+    /** 挂到哪一项上（{@link ItemInfo#path}）；{@code null} = 不挂行。 */
     public final String anchorPath;
 
+    /**
+     * **v27**：不挂行的结论放哪儿。
+     *
+     * <p>默认 {@link #SURFACE_CARD} = 页面底部那张「插件」卡；{@link #SURFACE_SUMMARY} =
+     * **摘要卡**（“这个槽怎么了”那一块）。
+     * 用于“结论归插件、但展示位置在摘要”的槽级事实（例：整槽跳过）。
+     */
+    public final int surface;
+
+    /** 不挂行的结论 ⇒ 进页面底部的「插件」卡（默认）。 */
+    public static final int SURFACE_CARD = 0;
+    /** 不挂行的结论 ⇒ 进**摘要卡**（槽级事实；宿主对应位置）。 */
+    public static final int SURFACE_SUMMARY = 1;
+
     public Finding(String title, String detail, int severity, String... evidence) {
-        this(title, detail, severity, null, evidence);
+        this(title, detail, severity, null, SURFACE_CARD, evidence);
     }
 
-    private Finding(String title, String detail, int severity, String anchorPath, String... evidence) {
+    private Finding(String title, String detail, int severity, String anchorPath,
+                    int surface, String... evidence) {
         this.title = title == null ? "" : title;
         this.detail = detail == null ? "" : detail;
         this.severity = severity;
         this.evidence = evidence == null ? new String[0] : evidence;
         this.anchorPath = anchorPath;
+        this.surface = surface;
     }
 
     /**
@@ -49,11 +65,20 @@ public final class Finding {
      */
     public Finding anchor(String itemPath) {
         if (itemPath == null || itemPath.isEmpty()) return this;
-        return new Finding(title, detail, severity, itemPath, evidence);
+        return new Finding(title, detail, severity, itemPath, surface, evidence);
+    }
+
+    /**
+     * **v27**：让这条**不挂行**的结论进摘要卡（而不是底部的「插件」卡）。
+     * 对已经 {@link #anchor(String)} 过的结论无效（挂行优先）。
+     */
+    public Finding summary() {
+        return new Finding(title, detail, severity, anchorPath, SURFACE_SUMMARY, evidence);
     }
 
     @Override public String toString() {
         return title + (detail.isEmpty() ? "" : " - " + detail)
-                + (anchorPath == null ? "" : " @" + anchorPath);
+                + (anchorPath == null ? "" : " @" + anchorPath)
+                + (surface == SURFACE_SUMMARY ? " [summary]" : "");
     }
 }

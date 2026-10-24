@@ -227,6 +227,12 @@ final class PluginEntries {
          * "用插件的判定"还是"回落到宿主自己的判定"。
          */
         void onPluginStates(java.util.Map<String, String> verdicts);
+
+        /**
+         * v27：插件要放在**摘要卡**里的槽级结论（{@code SURFACE_SUMMARY}）。
+         * 结论归插件，位置在摘要卡 —— 两件事分开。
+         */
+        void onPluginSummary(java.util.List<io.mdt.launcher.api.Finding> fs);
     }
 
     /**
@@ -311,15 +317,21 @@ final class PluginEntries {
                                     new java.util.ArrayList<io.mdt.launcher.api.Finding>();
                             java.util.List<io.mdt.launcher.api.Finding> anchored =
                                     new java.util.ArrayList<io.mdt.launcher.api.Finding>();
+                            // v27：不挂行但要求进摘要卡的（槽级结论）
+                            java.util.List<io.mdt.launcher.api.Finding> summary =
+                                    new java.util.ArrayList<io.mdt.launcher.api.Finding>();
                             for (io.mdt.launcher.api.Finding f : all) {
                                 if (f == null) continue;
-                                if (f.anchorPath == null) card.add(f); else anchored.add(f);
+                                if (f.anchorPath != null) anchored.add(f);
+                                else if (f.surface == io.mdt.launcher.api.Finding.SURFACE_SUMMARY) summary.add(f);
+                                else card.add(f);
                             }
                             if (a instanceof FindingsSink) {
                                 if (!anchored.isEmpty()) {
                                     ((FindingsSink) a).onPluginFindings(anchored);
                                 }
                                 ((FindingsSink) a).onPluginStates(verdicts);
+                                ((FindingsSink) a).onPluginSummary(summary);
                             }
                             showFindings(a, sec, body, card);
                         }

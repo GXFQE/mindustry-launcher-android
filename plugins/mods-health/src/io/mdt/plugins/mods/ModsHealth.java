@@ -336,6 +336,15 @@ public final class ModsHealth {
             out.add(new Finding(c.getString(R.string.cf_log_title_fmt, log.lines.size()),
                     "", Finding.INFO));
         }
+        // v27：**整槽跳过**（槽级，落点 = 摘要卡）—— 上次启动没跑完，游戏下次会把整槽模组关掉。
+        try {
+            if (api.modsSkipped()) {
+                out.add(new Finding(c.getString(R.string.cf_slot_skip_title),
+                        c.getString(R.string.cf_slot_skip_detail), Finding.WARN).summary());
+            }
+        } catch (Throwable ignored) {
+        }
+
         // v27：**孤儿开关**（槽级）—— settings 里还有 `mod-<名字>-enabled`，模组已经不在槽里了。
         // 判据在 core（`Conflicts.orphanKeys`，PC 自检盯着）；这里只负责取事实 + 拼文案。
         try {

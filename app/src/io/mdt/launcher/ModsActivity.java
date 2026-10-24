@@ -118,6 +118,11 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
      */
     private final Map<String, String> mVerdicts = new HashMap<>();
     /**
+     * v27：插件给的**槽级结论**（`SURFACE_SUMMARY`）—— 非空时摘要卡用它，
+     * 空时回落到宿主自己的 {@code ModsText.cardNote}（插件没装 / 旧版）。
+     */
+    private final java.util.List<String> mSlotNotes = new java.util.ArrayList<String>();
+    /**
      * v25：插件注入的**筛选**结果（item path 集合；null = 没选）。只在选中那一刻算一次，
      * 之后每次 `rebuildList()` 直接用它 —— 别在打字搜索时反复调插件。
      */
@@ -792,6 +797,7 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
         //   再重挂一次插件卡（重跑分析，回来时再刷一次）。
         mVerdicts.clear();
         mIssues.clear();
+        mSlotNotes.clear();
         rebuildList();
         fillHeader();
         refreshCrashVerdict();
@@ -938,12 +944,24 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
             //    **"下次启动会整槽跳过"不再挂在 `anyFailed` 上** —— 那是两件独立的事：
             //    用户在游戏里点过恢复（`-failed` 被清掉）之后 `launchid.dat` 还在，
             //    下次启动游戏照样会把整槽模组关掉；原来那种写法这时**一句警告都不显示**。
-            int noteRes = ModsText.cardNote(mScan, anyFailed);
-            if (noteRes != 0) {
-                mFailNote.setText(Trans.get(ModsActivity.this, noteRes));
+            // v27：**插件说了就用插件的**（结论归插件，位置在摘要卡）；
+            //   没说才回落到宿主自己的判据（插件没装 / 旧版 / 隐私模式下被关）。
+            if (!mSlotNotes.isEmpty()) {
+                StringBuilder nb = new StringBuilder();
+                for (String line : mSlotNotes) {
+                    if (nb.length() > 0) nb.append("\n\n");
+                    nb.append(line);
+                }
+                mFailNote.setText(nb.toString());
                 mFailNote.setVisibility(View.VISIBLE);
             } else {
-                mFailNote.setVisibility(View.GONE);
+                int noteRes = ModsText.cardNote(mScan, anyFailed);
+                if (noteRes != 0) {
+                    mFailNote.setText(Trans.get(ModsActivity.this, noteRes));
+                    mFailNote.setVisibility(View.VISIBLE);
+                } else {
+                    mFailNote.setVisibility(View.GONE);
+                }
             }
         }
         if (mCopySub != null) {
@@ -1077,6 +1095,20 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
      * <p>分析器在**列表渲染之后**才回来（后台线程，见 {@code PluginEntries.attachPage}），
      * 所以要重画；只重画列表，不重扫、不动设置。
      */
+    /** v27：插件要放在**摘要卡**里的槽级结论到了 —— 收下并重画摘要卡。 */
+    @Override public void onPluginSummary(java.util.List<Finding> fs) {
+        mSlotNotes.clear();
+        if (fs != null) {
+            for (Finding f : fs) {
+                if (f == null) continue;
+                StringBuilder sb = new StringBuilder(f.title);
+                if (f.detail != null && !f.detail.isEmpty()) sb.append("\n").append(f.detail);
+                mSlotNotes.add(sb.toString());
+            }
+        }
+        if (mFailNote != null) fillHeader();
+    }
+
     /** v26：插件判定回来了 —— 收下并重画（徽标 / 筛选 / 详情都读它）。 */
     @Override public void onPluginStates(Map<String, String> verdicts) {
         mVerdicts.clear();

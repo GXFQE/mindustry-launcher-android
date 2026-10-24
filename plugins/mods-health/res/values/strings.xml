@@ -43,6 +43,10 @@
     <string name="cf_orphan_title_fmt">settings still hold %1$d switches for mods that are gone</string>
     <string name="cf_orphan_detail">those mods were removed from this slot; the game will never look at them again.</string>
 
+    <!-- v27: whole slot skipped (slot level, shown on the summary card) -->
+    <string name="cf_slot_skip_title">last launch did not finish, so the next one will skip every mod here</string>
+    <string name="cf_slot_skip_detail">the game believes these mods crashed it, and will turn them all off on startup.</string>
+
     <string name="cf_note_dex_title_fmt">could not read the classes.dex inside \"%1$s\"</string>
     <string name="cf_note_log">could not read the game log</string>
 </resources>

@@ -43,6 +43,10 @@
     <string name="cf_orphan_title_fmt">设置里有 %1$d 个开关指向已经不在的模组</string>
     <string name="cf_orphan_detail">那些模组已经从槽里删了，游戏不会再看它们。</string>
 
+    <!-- v27：整槽跳过（槽级，显示在摘要卡） -->
+    <string name="cf_slot_skip_title">上次启动没跑完，下次会整槽跳过模组</string>
+    <string name="cf_slot_skip_detail">游戏会认为这个槽的模组把它弄崩了，开机时把它们全部关掉。</string>
+
     <string name="cf_note_dex_title_fmt">读不了「%1$s」的 classes.dex</string>
     <string name="cf_note_log">读不了游戏日志</string>
 </resources>

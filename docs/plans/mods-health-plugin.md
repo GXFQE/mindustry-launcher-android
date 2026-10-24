@@ -108,7 +108,7 @@ P1 要把插件调用提到"扫描后、绑定前"，一份结果给三处（行
 | P1 ✅ | v25 接口：`Finding.anchor` + filter/sort 注入 + `parseHjson` + extra 补字段；宿主渲染（行徽标 / 详情 / 筛选 / 排序） | 真机：Neon 行出现「⚠ 里已经带了 Logic Sugar」；筛选「有冲突的模组」= 2/13；排序「按冲突风险」把它俩排到最前；自检 1548/0 |
 | P2 ✅ | 搬"能不能加载 / 脚本不生效"两条（**解析失败归宿主** —— 用户定的"文件级错误纯宿主也会报"） | 判据进 `Conflicts.scan`（PC 自检 19 条）；文案进插件、挂行上；宿主删掉那两句；真机两例都对 |
 | P3a ✅ | 搬**依赖三态 / 重复包 / 黑名单**：宿主把 `depState`／`duplicated`／`blacklisted` 当**事实**给插件，文案与"缺哪一条/重的是哪份"在插件 | PC 自检 25/0；真机三例（重名两份、缺依赖、黑名单）都对 |
-| P3b-版本 ✅ | 版本判断搬进插件：宿主只给 `targetBuild/Revision`、`legacyCompatible`、`minJavaMajor/minModMajor`；`isAtLeast/minMajorOf` 照抄进 core | PC 自检 35/0（含"目标未知算通过"与"坏包不判"）；真机徽标「版本不符」+ 行上「门槛写得太低了（0 < 136）」 |
+| P3b-槽级 ✅ | **孤儿开关**搬进插件（Conflicts.orphanKeys）；**整槽跳过也归插件**（v27 Finding.summary()，结论归插件、**位置在摘要卡**），宿主保留回落 | 插件 check 41/0；宿主摘要卡优先用插件结论、空才用 ModsText.cardNote。**崩溃记录不归这个插件**（归因需要独立插件 + 插件间接口） |
 | P3b-槽级 ✅(1/2) | **孤儿开关已搬**（判据 `Conflicts.orphanKeys`，事实来自 `gameSettings()` + `contents`）。**整槽跳过按用户 2026-10-24 的决定留在摘要卡**（它是"这个槽怎么了"，跟"哪个模组有问题"是两件事） | 插件 check 41/0；宿主摘要卡那两行与文案删掉。**崩溃记录不归这个插件**（归因需要独立插件 + 插件间接口，用户 2026-10-24 定） |
 | P3c-徽标 ✅ | 行徽标也交给插件（v26 `state()`：固定词表 token），宿主映射回 `Mods.State`；插件缺省才回落到宿主自己的判定 | 真机 `plugin verdicts: 13`；no-version 夹具徽标仍「版本不符」 |
 | P4 | 详情页六道门结构化（插件给 `List<Gate{ok,label,detail}>`） | 六道门逐条与今天一致（报告对照） |
