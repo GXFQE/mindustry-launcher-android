@@ -433,7 +433,13 @@ public final class Mods {
         public boolean launchIdExists;
         /** `launchid.dat` 存在 **且** `modcrashdisable`（缺省 true）⇒ 游戏会跳过**全部**模组 */
         public boolean skipModLoading;
-        /** 设置里有 `mod-*` 键、但对应的包已经不在 `mods/` 里（历史残留，REF §17.4 实测有） */
+        /**
+         * 设置里有 `mod-*` 键、但对应的包已经不在 `mods/` 里（历史残留，REF §17.4 实测有）。
+         *
+         * <p>⚠️ v27 起：**用户可见的结论已经归 mods-health 插件**（`Conflicts.orphanKeys`）。
+         * 这份只供**诊断报告**用（“把扫到了什么原样打出来”）；畮面与插件一致，
+         * 别在界面上再用它（否则同一件事两处判据）。
+         */
         public final List<String> orphanKeys = new ArrayList<>();
 
         Scan(String slot, File modsDir) {
