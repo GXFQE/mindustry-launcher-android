@@ -86,6 +86,11 @@ public final class Trash {
     static final String DIR_SCHEMS = "schematics-trash";
     /** 插件（整个 `<id>/` 目录，含 APK 与它的数据，第 148 轮）—— 新目录，没有历史包袱 */
     static final String DIR_PLUGINS = "plugins-trash";
+    /**
+     * 被删掉的**导入版本**（2026-10-25）：每个条目是一个目录，里面是 `base.apk` + 登记 + 名字/槽绑定。
+     * ★ 与"整个槽"一样是几十 MB 级 ⇒ 单独一套保留份数（默认同整槽 3 份），别按普通条目算 20。
+     */
+    static final String DIR_VERSIONS = "versions-trash";
 
     /** 槽容器里的两半（整槽进站时把"槽本体"与"它的备份"装在一起，恢复时一起回去） */
     static final String INNER_SLOT = "slot";
@@ -142,9 +147,17 @@ public final class Trash {
         return new File(Data.hubDir(ctx), DIR_SCHEMS);
     }
 
-    /** 五个目录（清空 / 统计 / 列表要一起看 —— 用户眼里中转站只有一个） */
+    /** 删掉的导入版本：`<hub>/versions-trash/`（每项一个目录：APK + 登记 + 名字/槽绑定） */
+    public static File versionsDir(Context ctx) {
+        File d = new File(Data.hubDir(ctx), DIR_VERSIONS);
+        if (!d.isDirectory()) d.mkdirs();
+        return d;
+    }
+
+    /** 全部中转站目录（清空 / 统计 / 列表要一起看 —— 用户眼里中转站只有一个） */
     public static File[] allDirs(Context ctx) {
-        return new File[]{mapsDir(ctx), modsDir(ctx), savesDir(ctx), slotsDir(ctx), schemsDir(ctx), pluginsDir(ctx)};
+        return new File[]{mapsDir(ctx), modsDir(ctx), savesDir(ctx), slotsDir(ctx), schemsDir(ctx),
+                pluginsDir(ctx), versionsDir(ctx)};
     }
 
     // ── 名字：编码 / 解码 ─────────────────────────────────────────────────
@@ -226,7 +239,7 @@ public final class Trash {
     // ── 条目 ──────────────────────────────────────────────────────────────
 
     /** 认得出是什么：地图 / 模组 / 存档 / 整个槽 / 蓝图 / 其它（其它**不能恢复** —— 没有地方放回去） */
-    public enum Kind { MAP, MOD, SAVE, SLOT, SCHEM, PLUGIN, OTHER }
+    public enum Kind { MAP, MOD, SAVE, SLOT, SCHEM, PLUGIN, VERSION, OTHER }
 
     /** 中转站里的一项 */
     public static final class Item {
@@ -268,6 +281,7 @@ public final class Trash {
         if (DIR_SLOTS.equals(p)) return Kind.SLOT;
         if (DIR_SCHEMS.equals(p)) return Kind.SCHEM;
         if (DIR_PLUGINS.equals(p)) return Kind.PLUGIN;   // 插件整包（第 148 轮 C1-b：可一键放回）
+        if (DIR_VERSIONS.equals(p)) return Kind.VERSION;  // 删掉的导入版本（目录形态，可放回）
         if (dirForm) return Kind.MOD;                     // 手工丢进来的目录：多半是目录形态的模组
         String n = name == null ? "" : name.toLowerCase(java.util.Locale.ROOT);
         if (n.endsWith(".msav")) return Kind.MAP;
@@ -288,7 +302,8 @@ public final class Trash {
 
     /** 这一类留几份（只有"整个槽"另有一套 —— 见 {@link #keepSlots()}）。 */
     public static int keepFor(Kind k) {
-        return k == Kind.SLOT ? keepSlots() : keep();
+        // 整槽与整个版本都是几十 MB 级 ⇒ 共用"整槽"那套份数（默认 3）
+        return (k == Kind.SLOT || k == Kind.VERSION) ? keepSlots() : keep();
     }
 
     /** 按**目录自己的类型**修剪（`maps-trash` 用普通份数、`slots-trash` 用整槽份数） */
@@ -457,6 +472,11 @@ public final class Trash {
     /** 造一个"只带错误码"的结果：**给自检遍历所有码用** */
     static Result withCode(int code, String s1) {
         return new Result().fail(code, "code " + code, s1);
+    }
+
+    /** 造一个失败结果（同包给 {@link Importer} 的"删版本 / 放回版本"用） */
+    static Result fail(int code, String ascii, String s1) {
+        return new Result().fail(code, ascii, s1);
     }
 
     // ── 单条彻底删除 / 清空 ───────────────────────────────────────────────

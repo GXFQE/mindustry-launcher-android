@@ -167,6 +167,11 @@ public class TrashActivity extends BaseActivity {
             d.setPositiveButton(R.string.trash_restore, new DialogInterface.OnClickListener() {
                 @Override public void onClick(DialogInterface dlg, int w) { confirmRestorePlugin(it); }
             });
+        } else if (it.kind == Trash.Kind.VERSION) {
+            // 删掉的导入版本（2026-10-25）：放回去 = APK 回 app_hub/import + 登记重加 + 名字/槽绑定恢复
+            d.setPositiveButton(R.string.trash_restore, new DialogInterface.OnClickListener() {
+                @Override public void onClick(DialogInterface dlg, int w) { confirmRestoreVersion(it); }
+            });
         } else if (it.kind != Trash.Kind.OTHER) {
             d.setPositiveButton(R.string.trash_restore, new DialogInterface.OnClickListener() {
                 @Override public void onClick(DialogInterface dlg, int w) { askSlot(it); }
@@ -338,6 +343,45 @@ public class TrashActivity extends BaseActivity {
                 });
             }
         }, "trash-restore-plugin").start();
+    }
+
+    /** 整个版本：确认「放回去」（说清"名字与槽绑定会一起回来、存档没动过"） */
+    private void confirmRestoreVersion(final Trash.Item it) {
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.trash_restore_confirm_title)
+                .setMessage(Trans.get(TrashActivity.this, R.string.trash_restore_version_fmt,
+                        TrashText.title(it)))
+                .setPositiveButton(R.string.trash_restore, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int w) { doRestoreVersion(it); }
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    /** 几十 MB 的跨分区搬运 ⇒ 后台线程 + 前台服务（`Work`），与删版本那条对称 */
+    private void doRestoreVersion(final Trash.Item it) {
+        Work.begin(this, R.string.trash_restore);
+        new Thread(new Runnable() {
+            @Override public void run() {
+                final Trash.Result r = Importer.restoreVersion(TrashActivity.this, it);
+                Work.end(TrashActivity.this);
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        if (Util.dead(TrashActivity.this)) return;
+                        if (r.ok) {
+                            Toast.makeText(TrashActivity.this,
+                                    Trans.get(TrashActivity.this, R.string.trash_restore_version_ok_fmt,
+                                            TrashText.title(it)),
+                                    Toast.LENGTH_LONG).show();
+                            scan();
+                            return;
+                        }
+                        alert(Trans.get(TrashActivity.this, R.string.trash_restore_confirm_title),
+                                TrashText.reason(TrashActivity.this, r));
+                    }
+                });
+            }
+        }, "trash-restore-version").start();
     }
 
     private int dp(int v) {

@@ -84,6 +84,12 @@
                 android:background="@drawable/card_bg">
 
                 <include
+                    android:id="@+id/row_ver_detail"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <include
                     android:id="@+id/row_ver_slot"
                     layout="@layout/row_action"
                     android:layout_width="match_parent"
@@ -91,12 +97,6 @@
 
                 <include
                     android:id="@+id/row_ver_clone"
-                    layout="@layout/row_action"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content" />
-
-                <include
-                    android:id="@+id/row_ver_detail"
                     layout="@layout/row_action"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />

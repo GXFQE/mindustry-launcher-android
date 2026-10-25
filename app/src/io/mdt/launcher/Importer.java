@@ -190,6 +190,131 @@ public final class Importer {
         Log.i(TAG, "import removed: " + file);
     }
 
+    // ── 删掉整个导入版本：本体进中转站（可放回）────────────────────────────
+
+    /** 中转站里一个"版本"目录里的三件东西 */
+    static final String V_APK = "base.apk";
+    static final String V_ENTRY = "entry.json";
+    static final String V_STATE = "state.json";
+
+    /**
+     * 删掉**整个导入版本**，但先把本体挪进中转站（2026-10-25 用户：「导入版删掉最后一行时，
+     * 本体进中转站，这个删除时要给个提示」）。
+     *
+     * <p>落点是一个目录：`base.apk` + `entry.json`（config 里那条登记，放回来时重建用）
+     * + `state.json`（显示名与槽绑定）。**存档不在里面** —— 存档住在槽里，删版本不动它。
+     *
+     * <p>⚠️ 几十 MB 的跨分区搬运（内部存储 → 外部 hub）⇒ 调用方**必须**放在后台线程里，
+     *   并配 {@link Work} 的前台服务（否则切走就可能被杀在半路）。
+     */
+    public static Trash.Result trashVersion(Context ctx, Versions.Entry e) {
+        if (ctx == null || e == null || !e.imported || e.importFile == null || e.importFile.isEmpty()) {
+            return Trash.fail(Trash.Result.T_NO_KIND, "not an imported version", "");
+        }
+        File src = new File(importDir(ctx), e.importFile);
+        if (!src.isFile()) return Trash.fail(Trash.Result.T_NOT_IN_TRASH, "missing: " + src, e.importFile);
+        // ★ 标签只用**名字**（`displayLabel`），不要带"类型 + 版本号"的完整显示名：
+        //   那串里有 `  ` 分隔、还会随版本号变化，进目录名既难看又容易在解析时踩到分隔符。
+        File dir = new File(Trash.versionsDir(ctx), Trash.nameFor(e.displayLabel(), e.importFile));
+        if (!dir.isDirectory() && !dir.mkdirs()) {
+            return Trash.fail(Trash.Result.T_MKDIR, "mkdir: " + dir, dir.getName());
+        }
+        File apk = new File(dir, V_APK);
+        if (!Trash.move(src, apk)) {
+            Data.deleteTree(dir);
+            return Trash.fail(Trash.Result.T_MOVE_FAILED, "move failed: " + src, e.importFile);
+        }
+        // 先写登记与状态，再清 config —— 顺序反了就会在两步之间被杀成"登记没了、东西还在站里"
+        String key = e.key();
+        writeJson(new File(dir, V_ENTRY), Config.get().importEntry(e.importFile));
+        org.json.JSONObject state = new org.json.JSONObject();
+        try {
+            state.put("name", Config.get().nameOf(key));
+            state.put("slot", Config.get().slotOf(key));
+            org.json.JSONArray ex = new org.json.JSONArray();
+            for (String s : Config.get().extraSlotsOf(key)) ex.put(s);
+            state.put("extras", ex);
+        } catch (Throwable t) {
+            Log.w(TAG, "version state failed: " + t);
+        }
+        writeJson(new File(dir, V_STATE), state);
+        Config.get().removeImport(e.importFile);
+        Log.i(TAG, "import version trashed: " + e.importFile + " -> " + dir);
+        Trash.Result r = new Trash.Result();
+        r.ok = true;
+        r.dest = dir;
+        r.bytes = apk.length();
+        r.count = 1;
+        return r;
+    }
+
+    /**
+     * 把中转站里的一个"版本"放回去：APK 回 `app_hub/import`，登记重加，名字与槽绑定一起恢复。
+     *
+     * <p>槽已经不存在的那条绑定**跳过**（别让版本落进一个不存在的槽）；那几条由用户自己重绑。
+     */
+    public static Trash.Result restoreVersion(Context ctx, Trash.Item it) {
+        if (ctx == null || it == null || it.path == null || it.kind != Trash.Kind.VERSION) {
+            return Trash.fail(Trash.Result.T_NO_KIND, "not a version item", "");
+        }
+        File dir = it.path;
+        File apk = new File(dir, V_APK);
+        if (!apk.isFile()) return Trash.fail(Trash.Result.T_NOT_IN_TRASH, "no apk: " + apk, dir.getName());
+        org.json.JSONObject entry = readJson(new File(dir, V_ENTRY));
+        final String file = entry == null ? "" : entry.optString("file", "");
+        if (file.isEmpty()) return Trash.fail(Trash.Result.T_BAD_NAME, "entry without file", dir.getName());
+        File dest = new File(importDir(ctx), file);
+        if (dest.exists()) return Trash.fail(Trash.Result.T_NAME_TAKEN, "exists: " + dest, file);
+        if (!Trash.move(apk, dest)) return Trash.fail(Trash.Result.T_MOVE_FAILED, "move back failed", file);
+        Config.get().addImport(entry);
+        String key = "import:" + file;
+        org.json.JSONObject state = readJson(new File(dir, V_STATE));
+        if (state != null) {
+            String name = state.optString("name", "");
+            if (!name.isEmpty()) Config.get().setNameOf(key, name);
+            String slot = state.optString("slot", "");
+            if (slotExists(ctx, slot)) Config.get().setSlotOf(key, slot);
+            org.json.JSONArray ex = state.optJSONArray("extras");
+            if (ex != null) {
+                for (int i = 0; i < ex.length(); i++) {
+                    String s = ex.optString(i, "");
+                    if (slotExists(ctx, s)) Config.get().addExtraSlot(key, s);
+                }
+            }
+        }
+        Data.deleteTree(dir);
+        Log.i(TAG, "import version restored: " + file + " <- " + dir);
+        Trash.Result r = new Trash.Result();
+        r.ok = true;
+        r.dest = dest;
+        r.bytes = dest.length();
+        r.count = 1;
+        return r;
+    }
+
+    private static boolean slotExists(Context ctx, String slot) {
+        if (slot == null || slot.isEmpty()) return false;
+        return Data.dirOf(ctx, slot).isDirectory();
+    }
+
+    private static void writeJson(File f, org.json.JSONObject o) {
+        try {
+            java.io.FileOutputStream fo = new java.io.FileOutputStream(f);
+            fo.write((o == null ? "{}" : o.toString()).getBytes("UTF-8"));
+            fo.close();
+        } catch (Throwable t) {
+            Log.w(TAG, "write " + f + ": " + t);
+        }
+    }
+
+    private static org.json.JSONObject readJson(File f) {
+        try {
+            return new org.json.JSONObject(Util.readText(f));
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
     /**
      * 启动时的**导入目录自愈**（第 177 轮，杀后台 P0）。
      *

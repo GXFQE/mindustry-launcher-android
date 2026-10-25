@@ -283,6 +283,22 @@ public final class Config {
         return a == null ? new org.json.JSONArray() : a;
     }
 
+    /**
+     * 某一项导入登记（按文件名）。没有 ⇒ null。
+     * ★ 2026-10-25：删版本时要把这条登记**原样存进中转站**（放回来时靠它重建），
+     *   所以读入口只留这一处 —— 别在 Importer 里自己遍历 `imports()` 再拼一份。
+     */
+    public synchronized org.json.JSONObject importEntry(String file) {
+        if (file == null || file.isEmpty()) return null;
+        org.json.JSONArray a = mRoot.optJSONArray(K_IMPORTS);
+        if (a == null) return null;
+        for (int i = 0; i < a.length(); i++) {
+            org.json.JSONObject o = a.optJSONObject(i);
+            if (o != null && file.equals(o.optString("file", ""))) return o;
+        }
+        return null;
+    }
+
     /** 同 file 视为重导（替换），否则追加。 */
     public synchronized void addImport(org.json.JSONObject entry) {
         if (entry == null) return;

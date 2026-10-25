@@ -28,13 +28,16 @@ import java.util.List;
  *
  * <p>★ 删除的语义只有一条（2026-10-25 用户定案）：
  *   「除了来自已安装的版本中的最后一个实例不能删除外，其他功能完全同步（不管来源）」——
- *   行数 &gt; 1 ⇒ 只删这一行（主行也能删，自动把另一行提上来）；只剩这一行 ⇒ 删整个版本；
+ *   行数 &gt; 1 ⇒ 只删这一项（主行也能删，自动把另一项提上来）；只剩这一项 ⇒ 删整个版本；
  *   已装的版本**不允许**删到 0（那份在系统里，删了就成"删版本"了）。
  */
 final class VersionOps {
 
     /** 改完之后通知调用方（版本页通常直接 finish，主界面自己重扫） */
     interface Done { void changed(); }
+
+    /** 选了一个槽（可能是刚新建的） */
+    interface SlotPick { void onPicked(String slot); }
 
     private VersionOps() {}
 
@@ -69,105 +72,61 @@ final class VersionOps {
         return n;
     }
 
-    // ── 换槽（只换这一行）────────────────────────────────────────────────
+    // ── 选槽（换槽与克隆共用同一份列表）──────────────────────────────────
 
     /**
-     * 给**这一行**换一个槽。
+     * 列一个槽清单；末项永远是「新建一个槽…」。
      *
-     * <p>★ 主行的实际槽可能**从来没有显式分配过**（一直用默认槽）：此时拿 (key, 旧槽名) 去
-     *   `replaceSlotBinding` 会返回"找不到" ⇒ 界面报"改不动"。所以主行一律 `setSlotOf`
-     *   （写成显式分配），附加行才走替换。这个分岔在真机前抓过一次，别合并回去。
-     */
-    static void pickSlot(final Activity a, final Versions.Entry e, final Done done) {
-        final List<Data.Slot> slots = Data.allSlots(a);
-        final String[] names = new String[slots.size()];
-        final String cur = Versions.slotFor(e);
-        int checked = 0;
-        for (int i = 0; i < slots.size(); i++) {
-            Data.Slot s = slots.get(i);
-            // ⚠️ 中间那个 "  " 是 Java 字面量（不受 aapt2 影响）；中间三项靠它分开。
-            names[i] = s.name + (s.active ? Trans.get(a, R.string.slot_current_suffix) : "")
-                    + "  " + Trans.get(a, R.string.slot_entry_fmt, s.files, Util.formatSize(s.bytes));
-            if (s.name.equals(cur)) checked = i;
-        }
-        new AlertDialog.Builder(a)
-                .setTitle(Trans.get(a, R.string.slot_pick_title_fmt, e.label))
-                .setSingleChoiceItems(names, checked, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) {
-                        d.dismiss();
-                        String want = slots.get(w).name;
-                        // 这个版本已经绑着目标槽（尤其是另一行）⇒ 不动，并说清原因：
-                        // 允许的话会得到两行**一模一样**的启动项，点哪行都一样 —— 那是骗人的。
-                        if (!want.equals(cur) && Config.get().hasSlotBinding(e.key(), want)) {
-                            Toast.makeText(a, Trans.get(a, R.string.binding_taken_fmt, want),
-                                    Toast.LENGTH_SHORT).show();
-                            return;
-                        }
-                        int r;
-                        if (e.boundSlot == null) {
-                            Config.get().setSlotOf(e.key(), want);
-                            r = Config.BIND_OK;
-                        } else {
-                            r = Config.get().replaceSlotBinding(e.key(), e.boundSlot, want);
-                        }
-                        if (r == Config.BIND_TARGET_TAKEN) {
-                            Toast.makeText(a, Trans.get(a, R.string.binding_taken_fmt, want),
-                                    Toast.LENGTH_SHORT).show();
-                            return;
-                        }
-                        if (r != Config.BIND_OK) {
-                            Toast.makeText(a, Trans.get(a, R.string.binding_failed),
-                                    Toast.LENGTH_LONG).show();
-                            return;
-                        }
-                        Toast.makeText(a, Trans.get(a, R.string.slot_set_fmt, want),
-                                Toast.LENGTH_SHORT).show();
-                        if (done != null) done.changed();
-                    }
-                })
-                .setNegativeButton(R.string.cancel, null)
-                .show();
-    }
-
-    // ── 克隆 / 再加一项 ───────────────────────────────────────────────────
-
-    /**
-     * 「克隆」：同一个版本再绑一个槽（列表里多一行）。
+     * <p>★ 2026-10-25 用户：「两个相同实例不能用一个槽，不能光在创建时拦截啊，切换页面也要删掉已有」
+     *   ⇒ 列表里**不放**这个版本已经绑着的槽（除了"当前这一行的槽"，换槽时它要标 [当前]）。
+     *   以前是"全列出来、点了再拒绝"—— 用户点了才被告知"已经在用"，等于让他在错误的列表里挑。
      *
-     * <p>★ 为什么不复制任何东西：游戏本体（APK / dex / 资产）**共用同一份**，新的一行只是绑到
-     *   另一个槽。需求原文：「复制一份又占地方」。存档也**不复制**（要连存档一起复制用「克隆此槽」）。
+     * @param includeCurrent true = 换槽（当前槽要留在表里并打勾）；false = 克隆（当前槽也不许选）
      */
-    static void promptAddBinding(final Activity a, final Versions.Entry e, final Done done) {
+    private static void slotList(final Activity a, final Versions.Entry e, boolean includeCurrent,
+                                 String title, final SlotPick pick) {
         final List<Data.Slot> all = Data.allSlots(a);
-        final List<Data.Slot> free = new ArrayList<>();
+        final List<Data.Slot> out = new ArrayList<>();
+        final String cur = Versions.slotFor(e);
+        final int curIndex;
         for (Data.Slot s : all) {
-            // ★ 判据用 Config.hasSlotBinding（**版本级**：实际主槽 + 全部附加绑定）——
-            //   按行算会漏掉主行那个槽（第 236 轮真机：附加行上打开列表时，主槽还在列表里）。
-            if (!Config.get().hasSlotBinding(e.key(), s.name)) free.add(s);
+            if (includeCurrent && s.name.equals(cur)) out.add(s);
+            else if (!Config.get().hasSlotBinding(e.key(), s.name)) out.add(s);
         }
-        final String[] names = new String[free.size() + 1];
-        for (int i = 0; i < free.size(); i++) {
-            Data.Slot s = free.get(i);
+        curIndex = includeCurrent ? indexOf(out, cur) : -1;
+        final String[] names = new String[out.size() + 1];
+        for (int i = 0; i < out.size(); i++) {
+            Data.Slot s = out.get(i);
             names[i] = s.name + (s.active ? Trans.get(a, R.string.slot_current_suffix) : "")
                     + "  " + Trans.get(a, R.string.slot_entry_fmt, s.files, Util.formatSize(s.bytes));
         }
-        names[free.size()] = Trans.get(a, R.string.binding_new_slot);
+        names[out.size()] = Trans.get(a, R.string.binding_new_slot);
         // ⚠️ 这里**不能**同时 setMessage：本机（HONOR / Android 16）上"正文 + 列表"并存时
         //   列表**整块不渲染**（真机 dump 里连 ListView 都没有，只剩正文和取消）。
         new AlertDialog.Builder(a)
-                .setTitle(Trans.get(a, R.string.binding_add_title_fmt, e.displayName(a, false)))
-                .setItems(names, new DialogInterface.OnClickListener() {
+                .setTitle(title)
+                .setSingleChoiceItems(names, curIndex, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int w) {
-                        if (w == free.size()) { promptNewSlotFor(a, e, done); return; }
-                        addBinding(a, e, free.get(w).name, done);
+                        d.dismiss();
+                        if (w == out.size()) { newSlot(a, pick); return; }
+                        pick.onPicked(out.get(w).name);
                     }
                 })
                 .setNegativeButton(R.string.cancel, null)
                 .show();
     }
 
-    /** 当场新建一个空槽，然后把它绑成这一版的新启动项（省得先跑去存档页建槽） */
-    private static void promptNewSlotFor(final Activity a, final Versions.Entry e, final Done done) {
+    private static int indexOf(List<Data.Slot> list, String name) {
+        for (int i = 0; i < list.size(); i++) if (list.get(i).name.equals(name)) return i;
+        return -1;
+    }
+
+    /**
+     * 当场新建一个空槽，然后交给调用方（换槽 = 把这一行换过去；克隆 = 加一项）。
+     *
+     * ★ 2026-10-25 用户：「换槽可以和克隆一样的（也加新建）」—— 两条路共用这一个对话框。
+     */
+    private static void newSlot(final Activity a, final SlotPick pick) {
         final EditText input = new EditText(a);
         input.setInputType(InputType.TYPE_CLASS_TEXT);
         input.setHint(R.string.new_slot_hint);
@@ -190,21 +149,72 @@ final class VersionOps {
                             return;
                         }
                         String name = Data.sanitizeSlot(raw);
-                        addBinding(a, e, name == null ? raw.trim() : name, done);
+                        pick.onPicked(name == null ? raw.trim() : name);
                     }
                 })
                 .setNegativeButton(R.string.cancel, null)
                 .show();
     }
 
-    /** 落一个附加绑定 + 报数（成功/失败都说话 —— 静默失败会让用户以为点空了） */
-    private static void addBinding(final Activity a, final Versions.Entry e, String slot, final Done done) {
-        boolean ok = Config.get().addExtraSlot(e.key(), slot);
-        // ⚠️ Toast 只给一行：带 \n 的第二行会被系统截成「…」（真机抓过），写了等于没写。
-        Toast.makeText(a, ok ? Trans.get(a, R.string.binding_added_fmt, slot)
-                        : Trans.get(a, R.string.binding_taken_fmt, slot),
-                Toast.LENGTH_SHORT).show();
-        if (ok && done != null) done.changed();
+    // ── 换槽（只换这一行）────────────────────────────────────────────────
+
+    /**
+     * 给**这一行**换一个槽。
+     *
+     * <p>★ 主行的实际槽可能**从来没有显式分配过**（一直用默认槽）：此时拿 (key, 旧槽名) 去
+     *   `replaceSlotBinding` 会返回"找不到" ⇒ 界面报"改不动"。所以主行一律 `setSlotOf`
+     *   （写成显式分配），附加行才走替换。这个分岔在真机前抓过一次，别合并回去。
+     */
+    static void pickSlot(final Activity a, final Versions.Entry e, final Done done) {
+        final String cur = Versions.slotFor(e);
+        slotList(a, e, true, Trans.get(a, R.string.slot_pick_title_fmt, e.displayName(a, false)),
+                new SlotPick() {
+                    @Override public void onPicked(String want) {
+                        if (want.equals(cur)) return;         // 选的就是当前槽：什么都不做
+                        int r;
+                        if (e.boundSlot == null) {
+                            Config.get().setSlotOf(e.key(), want);
+                            r = Config.BIND_OK;
+                        } else {
+                            r = Config.get().replaceSlotBinding(e.key(), e.boundSlot, want);
+                        }
+                        if (r == Config.BIND_TARGET_TAKEN) {
+                            Toast.makeText(a, Trans.get(a, R.string.binding_taken_fmt, want),
+                                    Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        if (r != Config.BIND_OK) {
+                            Toast.makeText(a, Trans.get(a, R.string.binding_failed),
+                                    Toast.LENGTH_LONG).show();
+                            return;
+                        }
+                        Toast.makeText(a, Trans.get(a, R.string.slot_set_fmt, want),
+                                Toast.LENGTH_SHORT).show();
+                        if (done != null) done.changed();
+                    }
+                });
+    }
+
+    // ── 克隆 / 再加一项 ───────────────────────────────────────────────────
+
+    /**
+     * 「克隆」：同一个版本再绑一个槽（列表里多一项）。
+     *
+     * <p>★ 为什么不复制任何东西：游戏本体（APK / dex / 资产）**共用同一份**，新的一项只是绑到
+     *   另一个槽。需求原文：「复制一份又占地方」。存档也**不复制**（要连存档一起复制用「克隆此槽」）。
+     */
+    static void promptAddBinding(final Activity a, final Versions.Entry e, final Done done) {
+        slotList(a, e, false, Trans.get(a, R.string.binding_add_title_fmt, e.displayName(a, false)),
+                new SlotPick() {
+                    @Override public void onPicked(String slot) {
+                        boolean ok = Config.get().addExtraSlot(e.key(), slot);
+                        // ⚠️ Toast 只给一行：带 \n 的第二行会被系统截成「…」（真机抓过），写了等于没写。
+                        Toast.makeText(a, ok ? Trans.get(a, R.string.binding_added_fmt, slot)
+                                        : Trans.get(a, R.string.binding_taken_fmt, slot),
+                                Toast.LENGTH_SHORT).show();
+                        if (ok && done != null) done.changed();
+                    }
+                });
     }
 
     // ── 命名 ──────────────────────────────────────────────────────────────
@@ -356,15 +366,15 @@ final class VersionOps {
     /**
      * 删除（唯一入口）。范围由**行数**决定，不按来源分岔：
      * <ul>
-     *   <li>还有别的行 ⇒ 只删这一行（确认框说清"其他行与存档都不动"）；</li>
-     *   <li>这是最后一行、且是**导入**版 ⇒ 删整个版本（应用内的副本；原文件不受影响）；</li>
-     *   <li>这是最后一行、且是**已装**版 ⇒ **不许删**（这份在系统里）—— 说明原因，不给动作。</li>
+     *   <li>还有别的项 ⇒ 只删这一项（确认框说清"其他项与存档都不动"）；</li>
+     *   <li>这是最后一项、且是**导入**版 ⇒ 删整个版本：本体进**中转站**（能放回）；</li>
+     *   <li>这是最后一项、且是**已装**版 ⇒ **不许删**（这份在系统里）—— 说明原因，不给动作。</li>
      * </ul>
      */
     static void delete(final Activity a, final Versions.Entry e, final Done done) {
         final int rows = Versions.rowCount(e.key());
         if (rows > 1) {
-            // ★ 槽名先抓下来：删完这一行之后 `slotFor` 可能已经变了（主行被删 ⇒ 另一行提上来）
+            // ★ 槽名先抓下来：删完这一项之后 `slotFor` 可能已经变了（主行被删 ⇒ 另一项提上来）
             final String slot = Versions.slotFor(e);
             new AlertDialog.Builder(a)
                     .setTitle(R.string.delete_row_title)
@@ -388,16 +398,39 @@ final class VersionOps {
             alert(a, R.string.delete_installed_last_title, a.getString(R.string.delete_installed_last_msg));
             return;
         }
+        // 最后一项 + 导入版 = 删整个版本：本体进中转站（确认框里必须说清，用户 2026-10-25 要求）
         new AlertDialog.Builder(a)
-                .setTitle(R.string.delete_import_title)
-                .setMessage(Trans.get(a, R.string.delete_import_msg_fmt, e.displayName(a)))
+                .setTitle(R.string.delete_version_title)
+                .setMessage(Trans.get(a, R.string.delete_version_msg_fmt, e.displayName(a)))
                 .setPositiveButton(R.string.delete, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int w) {
-                        Importer.removeImport(a, e.importFile);
-                        if (done != null) done.changed();
+                        trashVersionAsync(a, e, done);
                     }
                 })
                 .setNegativeButton(R.string.cancel, null)
                 .show();
+    }
+
+    /** 本体是几十 MB 的跨分区搬运 ⇒ 后台线程 + 前台服务；回来再报结果 */
+    private static void trashVersionAsync(final Activity a, final Versions.Entry e, final Done done) {
+        Work.begin(a, R.string.delete_version_title);
+        new Thread(new Runnable() {
+            @Override public void run() {
+                final Trash.Result r = Importer.trashVersion(a, e);
+                Work.end(a);
+                a.runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        if (Util.dead(a)) return;
+                        if (r == null || !r.ok) {
+                            Toast.makeText(a, R.string.version_delete_failed, Toast.LENGTH_LONG).show();
+                            return;
+                        }
+                        Toast.makeText(a, Trans.get(a, R.string.version_deleted_fmt, e.displayName(a)),
+                                Toast.LENGTH_LONG).show();
+                        if (done != null) done.changed();
+                    }
+                });
+            }
+        }, "version-trash").start();
     }
 }

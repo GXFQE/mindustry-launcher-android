@@ -224,6 +224,8 @@ public final class SelfTest {
             conflictGroup(ctx, L, stat);
             // ★ 2026-10-24：一个版本绑多个槽（多存档 / 不复制 APK）—— 绑定表 + 展开 + 行身份
             versionBindings(ctx, L, stat);
+            // ★ 2026-10-25：删掉导入版本 = 本体进中转站；放回来 = 登记 / 名字 / 槽绑定一起回来
+            versionTrash(ctx, L, stat);
             upstreamCompat(ctx, L, stat);
             slotLineSpacing(ctx, L, stat);
             logExport(ctx, L, stat);
@@ -2406,6 +2408,89 @@ public final class SelfTest {
      * ⚠️ 全程用**假 key**（`selftest:` 前缀，与包名 / `import:` 都不可能撞），收尾清干净；
      *   不碰用户真实的版本绑定。
      */
+    // ── ㊱ 删掉导入版本：本体进中转站、放回来时登记 / 名字 / 绑定一起回来（2026-10-25）──
+
+    private static final String TRASH_FILE = "selftest-trash.apk";
+    private static final String TRASH_KEY = "import:" + TRASH_FILE;
+    private static final String TRASH_SLOT = "m3-trash-slot";
+
+    /**
+     * 用户原话：「导入版删掉最后一行时，本体进中转站……删除时要给个提示」。
+     *
+     * <p>这一段钉住整条链：删 → 副本离开 import 目录、登记与名字/绑定清掉、中转站里多一项
+     * **被认成「游戏版本」**（按目录判类型，不看扩展名）、且标题带着版本显示名；
+     * 放回来 → 副本与登记回来、名字与附加绑定一起回来、中转站里那份收掉。
+     * 最后一条是反方向：只复制不搬走的话"放回来"会留下两份。
+     */
+    private static void versionTrash(Context ctx, List<String> L, int[] stat) {
+        L.add("── ㊱ 版本进中转站 / 放回来 ──");
+        Config cfg = Config.get();
+        File apk = new File(Importer.importDir(ctx), TRASH_FILE);
+        File trashDir = Trash.versionsDir(ctx);
+        File trashed = null;
+        try {
+            java.io.FileOutputStream fo = new java.io.FileOutputStream(apk);
+            fo.write(new byte[]{1, 2, 3, 4, 5});
+            fo.close();
+            org.json.JSONObject entry = new org.json.JSONObject();
+            entry.put("file", TRASH_FILE);
+            entry.put("label", "selftest-trash");
+            entry.put("version", "159.7");
+            entry.put("size", 5);
+            entry.put("md5", "0123456789abcdef");
+            entry.put("added", System.currentTimeMillis());
+            cfg.addImport(entry);
+            cfg.setNameOf(TRASH_KEY, "自检版本");
+            // 用一个**自建的**槽：别的用例会删掉 m3-share，而默认槽又会被判成"已经是主槽"
+            Data.createSlot(ctx, TRASH_SLOT);
+            cfg.addExtraSlot(TRASH_KEY, TRASH_SLOT);
+
+            Versions.Entry e = new Versions.Entry();
+            e.imported = true;
+            e.importFile = TRASH_FILE;
+            e.label = "selftest-trash";
+            e.pkg = "imported";
+            e.apkPath = apk.getAbsolutePath();
+            e.apkSize = 5;
+            e.customName = "自检版本";   // 真机上由 scanImported 从 config 填，这里手工给
+
+            Trash.Result r = Importer.trashVersion(ctx, e);
+            ok(stat, L, r != null && r.ok && !apk.exists(), "删整个版本 ⇒ 副本离开 import 目录");
+            ok(stat, L, cfg.importEntry(TRASH_FILE) == null, "登记已清（备份在中转站里）");
+            ok(stat, L, !cfg.extraSlotsOf(TRASH_KEY).contains(TRASH_SLOT)
+                            && cfg.nameOf(TRASH_KEY).isEmpty(),
+                    "名字与槽绑定也清了");
+
+            for (Trash.Item it : Trash.list(trashDir)) {
+                if (TRASH_FILE.equals(it.name)) { trashed = it.path; break; }
+            }
+            ok(stat, L, trashed != null, "中转站里出现了这一项");
+            if (trashed == null) return;
+            Trash.Item item = Trash.parse(trashed);
+            ok(stat, L, item.kind == Trash.Kind.VERSION,
+                    "★ 它被认成「游戏版本」（按目录判类型，不看扩展名）");
+            ok(stat, L, item.slot.equals("自检版本"),
+                    "★ 中转站里带着版本显示名（列表标题不是文件名）");
+
+            Trash.Result rr = Importer.restoreVersion(ctx, item);
+            ok(stat, L, rr != null && rr.ok && apk.isFile(), "放回来 ⇒ 副本回到 import 目录");
+            ok(stat, L, cfg.importEntry(TRASH_FILE) != null, "登记重建（列表里又能看到它）");
+            ok(stat, L, "自检版本".equals(cfg.nameOf(TRASH_KEY)), "★ 名字一起回来");
+            ok(stat, L, cfg.extraSlotsOf(TRASH_KEY).contains(TRASH_SLOT), "★ 槽绑定一起回来");
+            ok(stat, L, !trashed.exists(), "中转站里那份已收掉（不是复制品）");
+        } catch (Throwable t) {
+            ok(stat, L, false, "版本中转站用例抛异常：" + t);
+        } finally {
+            cfg.removeImport(TRASH_FILE);
+            if (apk.exists()) apk.delete();
+            if (trashed != null && trashed.exists()) Data.deleteTree(trashed);
+            cfg.clearBindings(TRASH_KEY);
+            cfg.setNameOf(TRASH_KEY, "");
+            Data.deleteTree(Data.dirOf(ctx, TRASH_SLOT));
+        }
+        L.add("");
+    }
+
     private static final String BIND_KEY = "selftest:bind";
     private static final String BIND_A = "m3-bind-a";
     private static final String BIND_B = "m3-bind-b";

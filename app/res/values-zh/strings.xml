@@ -135,58 +135,63 @@
     -->
     <string name="slot_current_suffix">\u0020\u0020[当前]</string>
     <string name="slot_set_fmt">已设为槽「%1$s」</string>
-    <string name="slot_label">存档槽</string>
     <!--
-      2026-10-24：一个版本绑多个槽（每绑一个 = 列表里多一行启动项）。
+      2026-10-24：一个版本绑多个槽（每绑一个 = 列表里多一个启动项）。
       需求原文：「同一个版本有可能有玩家需要两个不同存档，每次启动换槽很麻烦，
-      但是复制一份又占地方」⇒ 新行与主行**共用同一份游戏本体**，只换槽，存档不复制。
-      ★ 2026-10-25：入口收进「版本页」，「克隆」按用户的说法用（副标题写清"共用本体、不复制"）。
+      但是复制一份又占地方」⇒ 新启动项与原来的**共用同一份游戏本体**，只换槽，存档不复制。
+      ★ 2026-10-25 起用户明确叫它「克隆」，副标题写清"共用本体、不复制"。
     -->
-    <string name="binding_add_btn">再加一个槽…</string>
     <string name="binding_add_title_fmt">给「%1$s」再加一个槽</string>
     <!--
       ⚠️ 为什么这句说明放在"加完之后"的 Toast 里、而不是列表弹窗的正文里：
         本机（HONOR / Android 16）`setMessage` + `setItems` 并存时**列表整块不渲染**
-        （真机 dump 里连 ListView 都没有，只剩正文与取消按钮）—— 见 VersionOps.promptAddBinding。
+        （真机 dump 里连 ListView 都没有，只剩正文与取消按钮）—— 见 VersionOps.slotList。
     -->
     <string name="binding_new_slot">新建一个槽…</string>
     <!--
       ★ Toast **只能一行**（真机实测：带 \n 的第二行会被系统截成「…」，等于没说）。
-        ⇒ 这里只说"加了哪一行"，"共用游戏本体、不占空间"那件事交给副标题/文档说。
+        ⇒ 这里只说"加了哪个启动项"，"共用游戏本体、不占空间"那件事交给副标题/文档说。
     -->
-    <string name="binding_added_fmt">已加一行：用槽「%1$s」</string>
+    <string name="binding_added_fmt">已加一个启动项：用槽「%1$s」</string>
     <string name="binding_taken_fmt">这个版本已经在用槽「%1$s」了</string>
-    <string name="binding_failed">这一行没能改动（配置可能被别处改过）。</string>
+    <string name="binding_failed">这一项没能改动（配置可能被别处改过）。</string>
     <string name="slot_deleted_extras_fmt">（%1$d 个只绑了这个槽的启动项已移除）</string>
 
     <!--
       2026-10-25：版本页（一个版本的全部动作都在一页里）。
       用户：「把槽这个接口改成二级页面，里面可选各种功能（换槽 克隆 资源 删除 详情 命名）」。
+      ★ 术语：用户原话「行又是啥」⇒ 界面上一律说「启动项」，不再出现"行"。
     -->
     <string name="version_page_title">版本</string>
-    <string name="version_page_slot_fmt">这一项用槽「%1$s」 · %2$d 份存档</string>
+    <string name="version_page_slot_fmt">这个启动项用槽「%1$s」 · %2$d 份存档</string>
     <string name="version_row_slot">换槽…</string>
-    <string name="version_row_slot_sub">给这一行换一个槽</string>
-    <string name="version_row_slot_sub_fmt">这一项现在用「%1$s」</string>
+    <string name="version_row_slot_sub">给这个启动项换一个槽</string>
+    <string name="version_row_slot_sub_fmt">现在用「%1$s」</string>
     <string name="version_row_clone">克隆…</string>
-    <string name="version_row_clone_sub">用另一个槽再加一项（共用本体，不复制）</string>
+    <string name="version_row_clone_sub">用另一个槽再加一个启动项（共用本体）</string>
     <string name="version_row_detail">详情…</string>
     <string name="version_row_detail_sub">来源、大小、校验值、ABI</string>
     <string name="version_row_rename">命名…</string>
     <string name="version_row_rename_sub">给这个版本起个名字</string>
     <string name="version_row_res">资源…</string>
     <string name="version_row_res_sub">导出游戏包里的贴图、音效、地图…</string>
-    <string name="version_row_delete">删除…</string>
-    <string name="version_row_delete_sub">删除这一行或整个版本</string>
-    <string name="version_row_delete_sub_row_fmt">只删这一行（还有 %1$d 行）</string>
-    <string name="version_row_delete_sub_version">删整个版本（应用内的副本）</string>
+    <string name="version_row_delete">删除这一项…</string>
+    <string name="version_row_delete_version">删除整个版本…</string>
+    <string name="version_row_delete_sub">删除这个启动项或整个版本</string>
+    <string name="version_row_delete_sub_row">只删这个启动项，其他还在</string>
+    <string name="version_row_delete_sub_version">整个版本；本体会进中转站</string>
     <string name="version_row_delete_sub_blocked">已装版本至少留一项，不能删</string>
-    <string name="delete_row_title">删除这一行？</string>
-    <string name="delete_row_msg_fmt">只从列表移除这一行（槽「%1$s」）。版本、其他行、槽里的存档都不动。</string>
+    <string name="delete_row_title">删掉这个启动项？</string>
+    <string name="delete_row_msg_fmt">只从列表移除这个启动项（槽「%1$s」）；版本本身、其他启动项和槽里的存档都不动。</string>
     <!-- ★ Toast 只能一行（同上） -->
-    <string name="delete_row_done_fmt">已移除这一行（槽「%1$s」）</string>
+    <string name="delete_row_done_fmt">已删掉这个启动项（槽「%1$s」）</string>
     <string name="delete_installed_last_title">不能删除</string>
-    <string name="delete_installed_last_msg">这个版本是从系统里扫出来的，至少保留一项。要删请到系统里卸载它。</string>
+    <string name="delete_installed_last_msg">这个版本是从系统里扫出来的，至少保留一个启动项。要删请到系统里卸载它。</string>
+    <!-- 删整个导入版本：本体进中转站（2026-10-25 用户要求"删除时要给个提示"） -->
+    <string name="delete_version_title">删除整个版本？</string>
+    <string name="delete_version_msg_fmt">「%1$s」只剩这一个启动项了。删除后应用内的副本会进中转站（之后能放回来），槽里的存档不动。</string>
+    <string name="version_deleted_fmt">已把「%1$s」挪进中转站</string>
+    <string name="version_delete_failed">没能删除（原件还在，什么都没动）</string>
     <!--
       ★ 2026-10-06（第 115 轮第四批）：**系统异常**翻成白话的那几句（`Util.ioReason` 用）。
       ⚠️ 只翻**认识的 errno**；我们自己抛的资源文案**原样透传**（见 Util.ioReason 的注释）。
@@ -238,8 +243,6 @@
     <string name="detail_abi_fmt">\n架构：%1$s</string>
     <string name="detail_abi_unknown">读不出来</string>
     <string name="detail_build_fmt">\n构建号：%1$d</string>
-    <string name="delete_import_title">删除导入版本？</string>
-    <string name="delete_import_msg_fmt">将删除应用内的副本：%1$s\n（不影响导入时的原文件）</string>
     <!--
       ★★ 版本行副标题：**整句都在这两个资源里**，调用点只贴结果。
       🔴 别再回头写成"前缀串 + 拼接"：aapt2 会**剥掉字符串两端的空白**，
@@ -1356,11 +1359,15 @@
     <string name="trash_kind_mod">模组</string>
     <string name="trash_kind_save">存档</string>
     <string name="trash_kind_slot">整个槽</string>
+    <string name="trash_kind_version">游戏版本</string>
     <string name="trash_kind_other">其他文件</string>
     <string name="trash_kind_schem">蓝图</string>
     <string name="trash_from_slot_fmt">来自槽「%1$s」</string>
     <string name="trash_source_unknown">来源不清楚</string>
     <string name="trash_files_fmt">%1$d 个文件</string>
+    <!-- 整个版本放回去（2026-10-25）：名字与槽绑定会一起回来 -->
+    <string name="trash_restore_version_fmt">把「%1$s」放回列表？名字和槽绑定会一起回来；槽里的存档一直没动过。</string>
+    <string name="trash_restore_version_ok_fmt">已把「%1$s」放回来</string>
 
     <string name="trash_actions_msg_fmt">%1$s\n\n放回去游戏里就又能看到它；彻底删除就找不回来了。</string>
     <string name="trash_restore">放回去…</string>

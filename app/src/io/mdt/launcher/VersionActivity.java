@@ -129,14 +129,20 @@ public class VersionActivity extends BaseActivity {
         ((TextView) findViewById(R.id.row_ver_slot).findViewById(R.id.act_sub)).setText(
                 Trans.get(this, R.string.version_row_slot_sub_fmt, slot));
 
-        // 删除的范围随**行数**变（判据只有 Versions.rowCount 一处）
+        // 删除的范围随**行数**变（判据只有 Versions.rowCount 一处）。
+        // ★ 标题也跟着变：用户 2026-10-25 说「还有两行才奇怪了，到底是删完还是没删完有歧义」
+        //   ⇒ 不写数量，直接说清"删什么"（这一项 / 整个版本）。
+        TextView delTitle = (TextView) findViewById(R.id.row_ver_delete).findViewById(R.id.act_title);
         TextView delSub = (TextView) findViewById(R.id.row_ver_delete).findViewById(R.id.act_sub);
         int rows = Versions.rowCount(mKey);
         if (rows > 1) {
-            delSub.setText(Trans.get(this, R.string.version_row_delete_sub_row_fmt, rows));
+            delTitle.setText(R.string.version_row_delete);
+            delSub.setText(R.string.version_row_delete_sub_row);
         } else if (found.imported) {
+            delTitle.setText(R.string.version_row_delete_version);
             delSub.setText(R.string.version_row_delete_sub_version);
         } else {
+            delTitle.setText(R.string.version_row_delete);
             delSub.setText(R.string.version_row_delete_sub_blocked);
         }
     }

@@ -99,7 +99,10 @@
                     android:paddingTop="2dp"
                     android:paddingBottom="2dp"
                     android:textSize="11sp"
-                    android:textColor="@color/chip_fg" />
+                    android:textColor="@color/chip_fg"
+                    android:maxWidth="64dp"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
             </LinearLayout>
 
             <!--
