@@ -543,7 +543,18 @@ Msch / MschConfigTable / MschText
                 蓝图 `.msch` 解析内核 / `ver 0` 的 `mapConfig` 分支表（生成物，勿手改）/ 文案
 Blueprints / BlueprintFiles / BlueprintsActivity / BlueprintDetailActivity
                 蓝图清点 / 写侧（导入·删除）/ 列表页 / 详情页
-SelfTest        见上（现在含 ㉑~㊹ 等成组断言；`dev_m3_selftest` 触发）
+VersionActivity / VersionOps
+                ★ 版本页（换槽 / 克隆 / 详情 / 命名 / 资源 / 删除）与六个动作的唯一实现
+PluginHost / PluginData / Extensions
+                插件宿主：扫描 / dex 注入 / 接口面 / 插件数据目录 / 页面动作扩展
+PluginAnalysis / ProbeRunner
+                体检结论（analyzer）与探针任务（probe）+ 结果缓存
+PluginsActivity 插件页（装 / 卸 / 启用 / 隔离 / 技术细节）
+ShareOut / SharePack / CrashScrub
+                分享出口（唯一）/ 分享包脱敏 / 崩溃报告脱敏
+BatchIo / Storage
+                批量导入导出 / 存储占用口径（内部 + 外部 + 各槽）
+SelfTest        见上（现在含 ㊾ 等成组断言；`dev_m3_selftest` 触发）
 ```
 
 依赖方向单向：`Paths/Util/Reflect → Config → Data/Versions → Importer/Backup/Msav/Injector → UI/GameSlot`，不许反向。
@@ -560,10 +571,10 @@ SelfTest        见上（现在含 ㉑~㊹ 等成组断言；`dev_m3_selftest` �
 | [README.zh.md](../README.zh.md) | 上面那份的**简体中文版**（两份结构一一对应，改一份记得改另一份） |
 | `DEVELOPING.md`（本文） | 构建、`dev_*` 直通口、模块边界、文档地图 |
 | [`RELEASING.md`](RELEASING.md) | **版本号与发布规则**（2026-10-24 定）：三段式 / preview·rc·稳定 / `versionCode` 算法 / tag 与说明格式 / 发版前清单 |
-| `BACKLOG.md`（**索引**） | 功能池：**是什么 / 为什么 / 已核实了什么**（正文在 `docs/backlog/`，8 片） |
+| `BACKLOG.md`（**索引**） | 功能池：**是什么 / 为什么 / 已核实了什么**（正文在 `docs/backlog/`，9 片） |
 | [`i18n-feasibility.md`](i18n-feasibility.md) | 2026-10-04 那次国际化的**可行性研究**（默认语言翻英 / 应用内切语言 / 门禁 15 规则）；已落地 |
 | [`i18n-user-bundles.md`](i18n-user-bundles.md) | ★ **用户自带翻译文件**的设计稿与成本定案：为什么没有捷径（`resources.arsc` vs properties）、1452 处改动面的实测、方案 A/B 对照、游戏侧外部语言包实测（`<槽根>/bundle`）、4 条待复核 |
-| **`FLOWS.md`**（**索引**） | ★ **怎么动手**：逐个功能的「改动面 → 步骤 → 验收 → 坑」（正文在 `docs/flows/`，**15 片**；第 15 片是 F22 蓝图） |
+| **`FLOWS.md`**（**索引**） | ★ **怎么动手**：逐个功能的「改动面 → 步骤 → 验收 → 坑」（正文在 `docs/flows/`，**20 片**；第 15~20 片 = F22 蓝图 / F23 崩溃分析 / F24 批量导入导出 / F25 分享包 / F26 脱敏日志 / 阶段 14 版本多槽） |
 | `docs/history/README.md`（**索引**） | 逐轮的**实现与真机验证记录**（2026-10-04 从 README 整节搬出，内容一字未改；正文 23 片）—— ⚠️ **它停在搬出那一刻（F21 / 第 43 轮）**，此后轮次看下一条 |
 | 2026-10-04 之后的新轮次 | 实现与验证记录写在 **`docs/flows/` 对应的 F 分片**里（如 F22 = 第 108~113 轮），本机开发笔记（`.dsh/memory/NEXT.md` + `ref/`）另有一份带判据的流水 —— **两者都不随本仓发布的部分只作来源标注** |
 | `spike/spike-datadir/RESULT.md` | `mindustry.data.dir` 注入 spike 的完整实验证据（✅ 成立）与实施清单 |

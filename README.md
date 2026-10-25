@@ -63,7 +63,7 @@ yourself — even just a few lines — see **Translation file** below.
 
 ### Versions
 - Scan games **already installed**, or **import** a copy of an APK
-- One row per launch entry: tap to launch, **Slot** to change its slot, long-press for details
+- One row per launch entry: tap to launch; **Manage** opens the version page (slot / clone / details / rename / assets / delete), and long-press does the same
 - **One version can be bound to several slots**: open **Manage** on a row (or long-press it) → **Clone…** adds
   another row that shares the same game files (no APK copy, no extra space) while saves / settings / mods live in
   their own slots — for two save sets without duplicating ~75 MB. The same page has details, change-slot, name,
@@ -71,7 +71,7 @@ yourself — even just a few lines — see **Translation file** below.
   last one (an imported package first moves to the transfer station, so you can put it back) — versions installed
   on the system always keep one entry (uninstall those in the system)
 - Details: source, size, checksum, raw version name, ABI, build number, save count
-- Long-press a version → **Assets**: export the game package resources by type (sprites / sounds / music / maps / text / fonts and more); only the checked types go into the zip
+- Version page → **Assets**: export the game package resources by type (sprites / sounds / music / maps / text / fonts and more); only the checked types go into the zip
 - Two versions sharing a slot get a warning that their saves will overwrite each other
 - **Packages that will not run are refused** — checked at import and again before launch
 - **Continue** resumes the row you launched last (when one version has several slots, it comes back to the slot it used)
@@ -130,7 +130,7 @@ yourself — even just a few lines — see **Translation file** below.
 - Deleted things land here instead of disappearing
 - Shows what it is, which slot it came from, and its size
 - Put it back (source slot preselected), or delete / empty it for good
-- Keeps at most 20 items (3 whole slots)
+- Ordinary items: at most 20; whole slots / whole versions: 3 each (configurable in Settings)
 
 ### Logs and settings
 - Export logs unchanged, or scrubbed (paths / device / account details removed)
