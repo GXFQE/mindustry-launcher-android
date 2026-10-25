@@ -7615,7 +7615,15 @@ public final class SelfTest {
         android.view.View row = android.view.LayoutInflater.from(ctx)
                 .inflate(R.layout.item_version, null, false);
         ok(stat, L, row != null && row.findViewById(R.id.ver_slot_btn) != null,
-                "版本行：可见的动作入口在（「槽」按钮 —— 换槽与看详情都从它进）");
+                "版本行：可见的动作入口在（「管理」按钮 —— 版本页的唯一入口）");
+        // ★ 2026-10-25 结构变了（用户「槽名字太长会遮挡信息」）：徽标**不许**再和标题同处一行，
+        //   它住右边的竖列（按钮上方）。挪回标题行 ⇒ 长槽名会把标题里的版本号挤成省略号，
+        //   而省略只有截图能看出来（uiautomator 的 text 是全文）⇒ 只能用结构钉。
+        android.view.View ttl = row == null ? null : row.findViewById(R.id.ver_title);
+        ok(stat, L, ttl != null && ttl.getParent() instanceof android.view.ViewGroup
+                        && ((android.view.ViewGroup) ttl.getParent())
+                        .findViewById(R.id.ver_slot_badge) == null,
+                "★元断言：槽徽标**不在**标题那一行里（否则长槽名会吃掉版本号）");
         // ★ 元断言：那一行**右侧的宽度已经用满**（徽标 + 槽按钮 ≈ 460px / 1224px）。
         //   2026-10-06 我在卡片里插过一个 22dp 箭头 ⇒ `MindustryX` 的第二行当场被挤成
         //   `2026.09.X37（基于 16…`（版本号又被切掉 = F7 修掉的老毛病）。
@@ -7629,7 +7637,7 @@ public final class SelfTest {
             }
         }
         ok(stat, L, cardKids == 3,
-                "★元断言：版本行卡片里**只有 3 个**横向元素（图标 / 文字列 / 动作按钮）——"
+                "★元断言：版本行卡片里**只有 3 个**横向元素（图标 / 文字列 / 右侧列）——"
                         + " 再加一个右侧控件就会把版本号挤成省略号，实际 " + cardKids);
         L.add("");
     }
