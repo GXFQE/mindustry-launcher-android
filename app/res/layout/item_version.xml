@@ -40,36 +40,63 @@
             android:orientation="vertical">
 
             <!--
-              ★ F7 修正：这里**不能**用 singleLine。
-              实测（竖屏 1224px @520dpi）：右边「槽徽标 + 槽按钮」吃掉约 460px，
-              留给标题的只有 569px，而 `MindustryX  8-official-2026.09.X37` 约需 700px
-              ⇒ 被 ellipsize 成 `MindustryX  8-official-…`，**版本号正好是被切掉的那截**。
-              需求原文：「游戏的版本号被折叠了」。
-              改成最多两行：有空间就是一行（观感不变），放不下就从空格处折行，
-              保证 label 与版本号**都能看全**。ellipsize 保留，防极端长 label。
+              ★★ 2026-10-25 用户两轮反馈后的定案（「槽名字太长会遮挡信息」「这样真的好丑（）」
+                「要不然我们自己控制断行吧」）：**标题拆成两行，断行由我们自己定**。
 
-              ★ 2026-10-25（用户：「槽名字太长会遮挡信息」）：徽标**从这一行挪走了** ——
-              它原先和标题挤在同一个横向 LinearLayout 里，长槽名会把标题的宽度吃掉一截，
-              于是版本号尾巴又被折叠（`2026.09.X37（基于 160…`）。
-              现在徽标住右边那一列（按钮上方），标题独占整行；徽标宽度上限也就不必压到 64dp 了。
+              第一行 = 名称 + 类型词（`ver_title`，最多一行，超了省略名字）+ 槽徽标；
+              第二行 = 版本号（`ver_ver`，独占整宽，不跟徽标抢）  ← 关键：徽标只影响第一行。
+              第三行 = 副标题（来源 · 大小 · 存档份数）。
+
+              ⚠️ 别再合并回一个 TextView：那样子系统会在任意空格处断行，而徽标的宽度
+                 是**每一行**都要付的 ⇒ 长槽名把版本号那行挤窄 ⇒ 又变成「版本号被折叠」
+                 （F7 在 2026-10-06 就修过这个，2026-10-25 又踩了两次）。
+              ⚠️ 也别把徽标塞到按钮上方（用户：「这样真的好丑」）或副标题行（会把来源挤掉）。
             -->
-            <TextView
-                android:id="@+id/ver_title"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:maxLines="2"
-                android:ellipsize="end"
-                android:lineSpacingExtra="1dp"
-                android:textSize="15sp"
-                android:fontFamily="sans-serif-medium"
-                android:textColor="@color/fg" />
+                android:orientation="horizontal"
+                android:gravity="center_vertical">
 
-            <!--
-              ★ F7：副标题同样从 singleLine 放开到两行。
-                同因（横向只有 764px，被「槽徽标 + 槽按钮」挤掉一截）：
-                `com.github.tinylake.mindustryX · 75.7 MB` 原来会显示成 `... 75.7 …`。
-                标题与副标题用同一条规则，卡片高度才可预测（最多 2+2+2 行）。
-            -->
+                <TextView
+                    android:id="@+id/ver_title"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    android:textSize="15sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:textColor="@color/fg" />
+
+                <TextView
+                    android:id="@+id/ver_slot_badge"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="8dp"
+                    android:background="@drawable/badge_slot"
+                    android:paddingStart="8dp"
+                    android:paddingEnd="8dp"
+                    android:paddingTop="2dp"
+                    android:paddingBottom="2dp"
+                    android:textSize="10sp"
+                    android:textColor="@color/chip_fg"
+                    android:maxWidth="64dp"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
+            </LinearLayout>
+
+            <!-- 版本号：独占一行 ⇒ 长槽名挤不到它（`buildTitleVersion` 填这里） -->
+            <TextView
+                android:id="@+id/ver_ver"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:paddingTop="1dp"
+                android:textSize="13sp"
+                android:textColor="@color/fg_muted" />
+
             <TextView
                 android:id="@+id/ver_sub"
                 android:layout_width="match_parent"
@@ -91,44 +118,20 @@
                 android:visibility="gone" />
         </LinearLayout>
 
-        <!-- 右列：槽徽标在上、入口按钮在下（徽标不再和标题抢宽度） -->
-        <LinearLayout
+        <TextView
+            android:id="@+id/ver_slot_btn"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginStart="10dp"
-            android:orientation="vertical"
-            android:gravity="end">
-
-            <TextView
-                android:id="@+id/ver_slot_badge"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="@drawable/badge_slot"
-                android:paddingStart="8dp"
-                android:paddingEnd="8dp"
-                android:paddingTop="2dp"
-                android:paddingBottom="2dp"
-                android:textSize="11sp"
-                android:textColor="@color/chip_fg"
-                android:maxWidth="120dp"
-                android:maxLines="1"
-                android:ellipsize="end" />
-
-            <TextView
-                android:id="@+id/ver_slot_btn"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:background="@drawable/btn_ghost"
-                android:clickable="true"
-                android:focusable="false"
-                android:paddingStart="14dp"
-                android:paddingEnd="14dp"
-                android:paddingTop="6dp"
-                android:paddingBottom="6dp"
-                android:textSize="13sp"
-                android:fontFamily="sans-serif-medium"
-                android:textColor="@color/accent" />
-        </LinearLayout>
+            android:background="@drawable/btn_ghost"
+            android:clickable="true"
+            android:focusable="false"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
+            android:paddingTop="6dp"
+            android:paddingBottom="6dp"
+            android:textSize="13sp"
+            android:fontFamily="sans-serif-medium"
+            android:textColor="@color/accent" />
     </LinearLayout>
 </LinearLayout>
