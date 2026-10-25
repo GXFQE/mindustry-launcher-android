@@ -109,7 +109,6 @@
         再加一个中缀分隔符会让"哪部分是版本号"变模糊；括号能一眼框出"这是注解"。
       ⚠️ 由 `Entry.upstreamNote()` 决定何时返回 null（不显示），两处调用点共用那一份判断。
     -->
-    <string name="row_upstream_fmt">\u0020(based on %1$s)</string>
     <string name="main_continue_fmt">Continue · %1$s</string>
 
     <!-- F4①：启动前的同槽冲突预检（0 IO，纯用列表里已算好的结论） -->

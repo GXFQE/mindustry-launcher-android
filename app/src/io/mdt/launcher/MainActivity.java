@@ -647,19 +647,14 @@ public class MainActivity extends BaseActivity {
     /** 把一行「版本」填上数据并接上交互（原 Adapter.getView 的逻辑，一字未改）。 */
     private void bindVersionRow(View v, final Versions.Entry e) {
         TextView title = (TextView) v.findViewById(R.id.ver_title);
-        TextView ver = (TextView) v.findViewById(R.id.ver_ver);
         TextView sub = (TextView) v.findViewById(R.id.ver_sub);
         TextView badge = (TextView) v.findViewById(R.id.ver_slot_badge);
         TextView conflict = (TextView) v.findViewById(R.id.ver_conflict);
         View slotBtn = v.findViewById(R.id.ver_slot_btn);
 
-        // ★ 2026-10-25：标题拆两行 —— 名称/类型一行（和徽标同行），版本号**独占一行**。
-        //   见 `buildTitleHead` 的长注释：徽标只许和名字行抢宽度，不许挤版本号。
-        title.setText(buildTitleHead(e));
-        String verText = buildTitleVersion(e);
-        boolean hasVer = verText != null && !verText.trim().isEmpty();
-        ver.setVisibility(hasVer ? View.VISIBLE : View.GONE);
-        if (hasVer) ver.setText(verText);
+        // ★ 2026-10-25：标题回到一个 TextView，但**断行点由我们自己定**（见 `buildTitle`）：
+        //   放得下就是一行，放不下只断在「类型词 ↔ 版本号」之间。
+        title.setText(buildTitle(e));
         // ★ 副标题**整句走资源**（`row_sub_fmt` / `row_imported_sub_fmt`）——
         //   原来导入项是 `已导入 · ` 前缀串拼出来的，而 aapt2 会剥掉尾随空白
         //   ⇒ 真机上渲染成 `已导入 ·imported · 74.7 MB`（2026-10-04 真机 dump 抓到）。
@@ -750,46 +745,41 @@ public class MainActivity extends BaseActivity {
      *   ⚠️ 全工程显示版本号的代码只有这两条入口，别再写第三处 substring。
      */
     /**
-     * 列表行标题的**上半**：`名称  原端|改端`（类型词弱化）。
+     * 列表行标题：`名称  原端|改端  版本号`，名称之后整段弱化。
      *
-     * <p>★★ 2026-10-25 用户两轮反馈后的定案（「槽名字太长会遮挡信息」「这样真的好丑（）」
-     *   「要不然我们自己控制断行吧」）：**断行由我们自己定** —— 标题拆成两个 TextView：
-     *   上半 = 名称 + 类型词（和槽徽标同一行），下半 = 版本号（独占一行、拿满整宽）。
+     * <p>★★ 2026-10-25 用户第四轮定案（「先把那个基于删了，然后按屏幕宽度，如果一行能放下就放一行，
+     *   否则断成两行，槽名称限制最大宽度」）：
+     * <ul>
+     *   <li>**不再显示「（基于 X）」** —— 它是详情页/版本页的事（那里还有 `detail_upstream_fmt`）。
+     *       行里没有这段，版本号才短到能在一行或两行里放下。</li>
+     *   <li>**断行点由我们自己定**：名称 ↔ 类型词之间用**不换行空格**（U+00A0）粘住，
+     *       全串只剩「类型词 ↔ 版本号」一处可断 ⇒ 放得下就是一行，放不下就断成
+     *       「名称 + 类型」/「版本号」两行，绝不会从类型词中间劈开（真机出现过
+     *       `MindustryX 改` / `端 2026.09.X37（基于 1…`）。</li>
+     *   <li>槽徽标是同一行的兄弟控件，**相对整个标题块垂直居中**（布局里 `gravity=center_vertical`），
+     *       它的宽度上限在 `item_version.xml`（`maxWidth=64dp`）。</li>
+     * </ul>
      *
-     * <p>为什么不交给系统自动折行：一个 TextView 里"名称  类型  版本号"只在空格处断，
-     *   而徽标占掉的宽度是**每一行**都要付的 ⇒ 长槽名会把版本号那一行也挤窄，
-     *   于是又回到「版本号被折叠」（F7 修过一次的老毛病）。拆行之后版本号独占整宽，
-     *   徽标只和短的名字行抢宽度，抢不到也只是名字省略（名字本来就有 {@link Versions#NAME_MAX_UNITS} 预算）。
+     * <p>★ 2026-10-16：弱化区间是**名称之后的所有内容**（类型词 + 版本号）——用户要的是
+     *   "名称 + 类型 + 版本"三层，不是一坨。起点用 `displayLabel().length()`（名称本身的长度），
+     *   比 `indexOf(ver)` 稳：名称里可能含数字，甚至恰好含版本号那样的子串。
      */
-    private CharSequence buildTitleHead(Versions.Entry e) {
-        // 名字超预算自己省略（类型词在末尾，必须保住 —— 见 NAME_MAX_UNITS）
-        String nm = Versions.clipName(e.displayLabel(), Versions.NAME_MAX_UNITS);
-        String type = e.typeWord(this);
-        String head = nm + "  " + type;
-        SpannableString ss = new SpannableString(head);
+    private CharSequence buildTitle(Versions.Entry e) {
+        // 名字超预算自己省略（类型 + 版本号在末尾，必须保住 —— 见 NAME_MAX_UNITS）
+        String plain = e.displayName(this, true, true);
+        // ★ 两个字符 1:1 替换（不换行空格）⇒ 长度不变，下面的 `labelEnd` 下标照样成立
+        int sep = plain.indexOf("  ");
+        if (sep > 0) plain = plain.substring(0, sep) + "\u00A0\u00A0" + plain.substring(sep + 2);
+        int labelEnd = Versions.clipName(e.displayLabel(), Versions.NAME_MAX_UNITS).length();
+        if (labelEnd < 0 || labelEnd >= plain.length()) return plain;   // 定位失败：退回纯文本，绝不崩
+        SpannableString ss = new SpannableString(plain);
         int muted = getResources().getColor(R.color.fg_muted, getTheme());
-        // ★ 2026-10-16：类型词弱化（用户要的是"名称 + 类型 + 版本"三层，不是一坨）。
-        ss.setSpan(new ForegroundColorSpan(muted), nm.length(), head.length(),
+        ss.setSpan(new ForegroundColorSpan(muted), labelEnd, plain.length(),
                 Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-        ss.setSpan(new RelativeSizeSpan(0.87f), nm.length(), head.length(),
+        ss.setSpan(new RelativeSizeSpan(0.87f), labelEnd, plain.length(),
                 Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
         return ss;
     }
-
-    /**
-     * 列表行标题的**下半**：`版本号（基于 X）`。
-     *
-     * <p>★ 第 41 轮：fork 的**基座版本**在这里备注（用户：「可以在MDTX显示中备注对应MDT版本」）——
-     *   它是"这个版本为什么和官方某一版不互相提示"的唯一依据，而列表行是用户会主动看的地方。
-     *   ⚠️ "要不要显示"的判据在 `Entry.upstreamNote()`，与详情弹窗**共用**同一份；官方本体返回 null
-     *   ⇒ 整串与从前逐字相同。弱化（字色 / 字号）由布局里的 `ver_ver` 自己带，不再套 span。
-     */
-    private String buildTitleVersion(Versions.Entry e) {
-        String note = e.upstreamNote();
-        String ver = e.displayVersion();
-        return (note == null) ? ver : ver + Trans.get(MainActivity.this, R.string.row_upstream_fmt, note);
-    }
-
     /**
      * 同槽冲突：只看**当前能看见的版本**（mEntries）之间的分配。
      * 已卸载版本残留在配置里的分配不算冲突 —— 界面上看不到它，报了用户也无从处理。

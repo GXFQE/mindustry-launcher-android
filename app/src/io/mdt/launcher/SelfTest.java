@@ -2895,11 +2895,12 @@ public final class SelfTest {
         Config.get().removeImport("selftest-fake.apk");
         ok(stat, L, "".equals(Config.get().nameOf("import:selftest-fake.apk")),
                 "★删掉导入副本后，它的名字也被清掉（同槽分配那条口径）");
-        // ⑪ 列表行实拼：尾注真的接在主标题后面，且**不该显示时逐字等于 displayName()**。
-        String withNote = installed.displayName(ctx)
-                + ctx.getString(R.string.row_upstream_fmt, installed.upstreamNote());
-        ok(stat, L, withNote.equals("MindustryX  改端  2026.09.X37（基于 160.1）"),
-                "★ 列表行实拼 ⇒ `" + withNote + "`");
+        // ⑪ 列表行实拼：**只到版本号**（2026-10-25 用户「先把那个基于删了」）——
+        //    基座版本尾注**只**出现在详情页 / 版本页（`detail_upstream_fmt`），列表行不放。
+        ok(stat, L, installed.displayName(ctx).equals("MindustryX  改端  2026.09.X37"),
+                "★ 列表行实拼（不含「基于 X」）⇒ `" + installed.displayName(ctx) + "`");
+        ok(stat, L, installed.upstreamNote() != null && !installed.upstreamNote().isEmpty(),
+                "★ 基座版本仍然拿得到（详情页要用，只是行里不显示）：" + installed.upstreamNote());
         ok(stat, L, noDecl.displayName(ctx).equals("Mindustry  原端  159.7"),
                 "★ 官方行实拼 ⇒ 名称 + 原端 + 版本号，无尾注");
         L.add("");

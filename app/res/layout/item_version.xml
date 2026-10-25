@@ -1,18 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  一行「版本」（主界面列表用）。
+  F1b：主界面「版本」列表行（卡片风重做）。
+  结构：┌──────────────────────────────────────────┐
+        │ [图标]  标题 ................ [槽徽标]  │
+        │         副标题                          │  [ 槽 ]
+        │         ⚠ 同槽冲突警告                  │
+        └──────────────────────────────────────────┘
 
   ★ 两层结构（外层 padding 提供行距 + 内层卡片）是 F1b 为了绕开
-    "RecyclerView + ItemDecoration" 那套；这里不是 RecyclerView，别被 padding 迷惑：
+    "AbsListView 的 item 根 layout_margin 被忽略"而定的；F3b 换成 LinearLayout
+    之后 margin 其实可用了，但结构保持不变（少改一处是一处），
     含义只是"行距由外层 padding 给，卡片本体在里层"。
     横向间距不在这里做 —— 由列表容器的 paddingStart/End 统一给。
+
+  ★ F3b：原先这里挂的 descendantFocusability="blocksDescendants" 已移除。
+    它当年的唯一用途是阻止行内「槽」按钮抢焦点、以保住 ListView 的
+    onItemClick（点击整行启动）。现在整行的点击由 MainActivity 直接
+    setOnClickListener 到本布局的根上，不再经过 AdapterView 的 item 机制，
+    该属性纯属冗余。真机已复测「点整行启动」「点槽按钮弹窗」两条路径。
+
+  🔴 **宽度预算（2026-10-06 踩过一次，别再犯）**：行右侧**只能有**「槽徽标 + 「槽」按钮」
+    这两样（合计约 460px / 1224px）。那天为了让"详情"看得见，在这里插了一个 22dp 箭头
+    （+68px）⇒ `MindustryX` 那一行的**第二行**立刻被挤成 `2026.09.X37（基于 16…`
+    —— **版本号又被切掉了**（正是 F7 修掉的那个毛病）。
+    ⚠️ 同一天还试过第二版（把「槽」按钮改成"换槽 / 看详情"的动作表）⇒ 用户：
+    「**换槽要二级页面是不是有点不太方便**」⇒ 也回退了。
+    ★ **最终形状**：按钮 = **直接弹槽列表**；**详情 = 长按整行**（`MainActivity.showDetail`）。
+    ⇒ 想给详情加看得见的入口，只能花**高度**（多一行）或并进别的弹窗，
+      **不要再动这一行的宽度**。
+    ⚠️ 而且那次自检**没抓到**：`uiautomator dump` 的 `text=` 是**全文**，
+    省略号只存在于渲染里 ⇒ **这类判据只能看截图**（见 AGENTS §五）。
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
-    android:paddingStart="14dp"
-    android:paddingEnd="14dp"
     android:paddingBottom="@dimen/card_gap">
 
     <LinearLayout
@@ -39,32 +61,29 @@
             android:layout_marginStart="12dp"
             android:orientation="vertical">
 
-            <!--
-              ★★ 2026-10-25 用户两轮反馈后的定案（「槽名字太长会遮挡信息」「这样真的好丑（）」
-                「要不然我们自己控制断行吧」）：**标题拆成两行，断行由我们自己定**。
-
-              第一行 = 名称 + 类型词（`ver_title`，最多一行，超了省略名字）+ 槽徽标；
-              第二行 = 版本号（`ver_ver`，独占整宽，不跟徽标抢）  ← 关键：徽标只影响第一行。
-              第三行 = 副标题（来源 · 大小 · 存档份数）。
-
-              ⚠️ 别再合并回一个 TextView：那样子系统会在任意空格处断行，而徽标的宽度
-                 是**每一行**都要付的 ⇒ 长槽名把版本号那行挤窄 ⇒ 又变成「版本号被折叠」
-                 （F7 在 2026-10-06 就修过这个，2026-10-25 又踩了两次）。
-              ⚠️ 也别把徽标塞到按钮上方（用户：「这样真的好丑」）或副标题行（会把来源挤掉）。
-            -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical">
 
+                <!--
+                  ★ F7 修正：这里**不能**用 singleLine。
+                  实测（竖屏 1224px @520dpi）：右边「槽徽标 + 槽按钮」吃掉约 460px，
+                  留给标题的只有 569px，而 `MindustryX  8-official-2026.09.X37` 约需 700px
+                  ⇒ 被 ellipsize 成 `MindustryX  8-official-…`，**版本号正好是被切掉的那截**。
+                  需求原文：「游戏的版本号被折叠了」。
+                  改成最多两行：有空间就是一行（观感不变），放不下就从空格处折行，
+                  保证 label 与版本号**都能看全**。ellipsize 保留，防极端长 label。
+                -->
                 <TextView
                     android:id="@+id/ver_title"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:maxLines="1"
+                    android:maxLines="2"
                     android:ellipsize="end"
+                    android:lineSpacingExtra="1dp"
                     android:textSize="15sp"
                     android:fontFamily="sans-serif-medium"
                     android:textColor="@color/fg" />
@@ -79,24 +98,19 @@
                     android:paddingEnd="8dp"
                     android:paddingTop="2dp"
                     android:paddingBottom="2dp"
-                    android:textSize="10sp"
+                    android:textSize="11sp"
                     android:textColor="@color/chip_fg"
                     android:maxWidth="64dp"
                     android:maxLines="1"
                     android:ellipsize="end" />
             </LinearLayout>
 
-            <!-- 版本号：独占一行 ⇒ 长槽名挤不到它（`buildTitleVersion` 填这里） -->
-            <TextView
-                android:id="@+id/ver_ver"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:maxLines="1"
-                android:ellipsize="end"
-                android:paddingTop="1dp"
-                android:textSize="13sp"
-                android:textColor="@color/fg_muted" />
-
+            <!--
+              ★ F7：副标题同样从 singleLine 放开到两行。
+                同因（横向只有 764px，被「槽徽标 + 槽按钮」挤掉一截）：
+                `com.github.tinylake.mindustryX · 75.7 MB` 原来会显示成 `... 75.7 …`。
+                标题与副标题用同一条规则，卡片高度才可预测（最多 2+2+2 行）。
+            -->
             <TextView
                 android:id="@+id/ver_sub"
                 android:layout_width="match_parent"
