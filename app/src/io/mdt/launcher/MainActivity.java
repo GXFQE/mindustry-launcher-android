@@ -767,6 +767,10 @@ public class MainActivity extends BaseActivity {
     private CharSequence buildTitle(Versions.Entry e) {
         // 名字超预算自己省略（类型 + 版本号在末尾，必须保住 —— 见 NAME_MAX_UNITS）
         String plain = e.displayName(this, true, true);
+        // ★★ 2026-10-25 用户：「是把基于两个字去掉不是都去掉」⇒ 基座版本**保留**，
+        //   只去掉「基于」两个字：显示成 `2026.09.X37（160.1）`（`row_upstream_fmt` = 「（%1$s）」）。
+        String note = e.upstreamNote();
+        if (note != null) plain = plain + Trans.get(MainActivity.this, R.string.row_upstream_fmt, note);
         // ★ 两个字符 1:1 替换（不换行空格）⇒ 长度不变，下面的 `labelEnd` 下标照样成立
         int sep = plain.indexOf("  ");
         if (sep > 0) plain = plain.substring(0, sep) + "\u00A0\u00A0" + plain.substring(sep + 2);

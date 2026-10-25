@@ -173,6 +173,8 @@
       (change slot / clone / resources / delete / details / rename)".
       ★ Wording: the user asked what a "row" is ⇒ the UI says "launch entry", never "row".
     -->
+    <!-- The base version of a fork, in the list row: user 2026-10-25 asked to drop the words only -->
+    <string name="row_upstream_fmt">\u0020(%1$s)</string>
     <string name="version_page_title">Version</string>
     <string name="version_page_slot_fmt">This launch entry uses slot \"%1$s\" · %2$d saves</string>
     <string name="version_row_slot">Change slot…</string>

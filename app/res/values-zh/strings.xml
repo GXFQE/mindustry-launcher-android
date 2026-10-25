@@ -161,6 +161,8 @@
       用户：「把槽这个接口改成二级页面，里面可选各种功能（换槽 克隆 资源 删除 详情 命名）」。
       ★ 术语：用户原话「行又是啥」⇒ 界面上一律说「启动项」，不再出现"行"。
     -->
+    <!-- 列表行里 fork 的基座版本：「（160.1）」—— 用户 2026-10-25：「是把基于两个字去掉不是都去掉」 -->
+    <string name="row_upstream_fmt">（%1$s）</string>
     <string name="version_page_title">版本</string>
     <string name="version_page_slot_fmt">这个启动项用槽「%1$s」 · %2$d 份存档</string>
     <string name="version_row_slot">换槽…</string>
