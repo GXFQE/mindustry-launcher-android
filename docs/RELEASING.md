@@ -115,7 +115,8 @@ git tag -l 'v*' | wc -l    # 现在是 6 ⇒ 下一个 vc = 7
 1. 工作树干净，HEAD 就是要发的那个提交；
 2. 自检全绿；**真机基础功能过一遍**（启动游戏 / 切槽 / 导入导出这几条）；
    ★ **至少两个 API 段各跑一遍**（2026-10-25 起是硬要求：老系统上真出过"只有用户能复现"的启动崩溃）
-   —— 手边没有真机就用模拟器（`system-images;android-26/27/28/29/30/31/32/33/34/35`），
+   —— 手边没有真机就用模拟器（**本机常备 `system-images;android-26/29/34/35`**，AVD 同号；
+   其他版本 `sdkmanager --install "system-images;android-NN;default;x86_64"` 现下，约 3~4 GB 一个），
    判据是「发布签名的那个 APK」能进游戏主菜单，**不是** debug 版能跑；
    2026-10-25 的完整矩阵（API 26~36）见 `.dsh/memory/next/57` 与 `.dsh/evidence/round245/matrix.txt`；
 3. `vc` == `git tag -l 'v*' | wc -l` + 1；
