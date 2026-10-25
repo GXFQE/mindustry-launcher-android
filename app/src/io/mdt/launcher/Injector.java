@@ -3,7 +3,6 @@ package io.mdt.launcher;
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
-import android.os.Build;
 import android.util.Log;
 import dalvik.system.DexClassLoader;
 import java.io.File;
@@ -23,8 +22,19 @@ import java.util.zip.ZipFile;
  *   ⓪ 预热（抛弃式 dex 加载）———— 跳过 = 用户导入的私有副本 100% 启动失败
  *   ① 注入游戏 dex 到**本进程** framework CL
  *   ② 解出 libarc.so + System.load   —— 库挂在「调用方类的 CL」上
- *   ③ 给同一份 CL 的 ArcNativesLoader.loaded 置 true
+ *   ③ 给同一份 CL 的 ArcNativesLoader.loaded 置 true，
+ *      **并给 SharedLibraryLoader 记上账**（`setLoaded("arc")` / `("arc-freetype")`）
  *      ①②③ 必须同源，否则 UnsatisfiedLinkError
+ *
+ * ⚠️ ③ 的后半段是 2026-10-25 补的（v0.6 用户报告，Android 10 上必崩）：
+ *   游戏侧 `FreeType.initFreeType()` **无条件** `load("arc-freetype")` → `System.loadLibrary(name)`；
+ *   我们的 .so 在私有目录、只被 `System.load(路径)` 加载过，**不在**进程的原生库搜索路径里。
+ *   老 libcore（Android 10 等）在 `findLibrary()` 为 null 时**直接抛** ⇒
+ *   `Couldn't load shared library 'arc-freetype' for target: Linux, 32-bit`
+ *   （那句 32-bit 是 arc 在 Android 上把 `OS.is64Bit` 强制置 false 的标签，与进程位数无关）。
+ *   新 libcore（Android 16 实测）会再按名字回退、命中已加载的同名 so ⇒ 只在老系统上炸。
+ *   框架自己留了钩子：`SharedLibraryLoader.setLoaded(name)`
+ *   —— 注释原文 "for when application code wants to handle library loading itself"。
  *   ④ 双 AssetManager 挂资产链（后挂覆盖先挂）
  *   ⑤ startActivity(官方 AndroidLauncher)
  *
@@ -210,6 +220,13 @@ public final class Injector {
         log.append("大小   = ").append(plan.apk.length()).append(" B\n");
         log.append("进程 pid = ").append(android.os.Process.myPid()).append('\n');
 
+        // 🔴 Android 14+：动态加载的 dex 载体必须**只读**，否则 DexClassLoader 直接
+        //    `SecurityException: Writable dex file ... is not allowed`（预热会连失败三次、启动不了）。
+        //    导入时 Importer 已经置过只读；但"中转站放回来 / 手工拷 / 旧版本导入"这些路径可能留下
+        //    可写文件 —— 真机实测（2026-10-25）：`official-159.apk` 是 0600，一启动就三次 SecurityException。
+        //    这里兜一道：只动我们自己的私有副本（`/data/app` 下的本来就不可写，canWrite=false）。
+        if (plan.apk.canWrite()) ensureDexReadOnly(plan.apk, log);
+
         // ⓪ 预热
         if (!prewarm(app, plan.apk, log)) {
             t.mark("prewarm");
@@ -288,6 +305,24 @@ public final class Injector {
     // ── ⓪ 预热 ────────────────────────────────────────────────────────────
 
     /**
+     * dex 载体必须是**只读**的（Android 14+ 的硬要求，否则 `DexClassLoader` 抛
+     * `SecurityException: Writable dex file ... is not allowed`）。
+     *
+     * ★ 为什么在建 CL 之前还要再兜一次：导入路径（{@link Importer}）确实置了只读，但
+     *   "中转站放回来 / 手工拷进来 / 更早版本导入的包"都可能留下可写文件 ——
+     *   真机实测（2026-10-25）：`official-159.apk` 是 0600 ⇒ 预热连失败三次、整个版本启动不了。
+     *   这里只动**我们自己的私有副本**；`/data/app` 下的 APK 不可写（`canWrite()` 为 false）。
+     *
+     * @return 真的动过（= 之前可写）才返回 true
+     */
+    static boolean ensureDexReadOnly(File apk, StringBuilder log) {
+        if (apk == null || !apk.canWrite()) return false;
+        boolean ro = apk.setReadOnly();
+        log.append("APK was writable -> setReadOnly: ").append(ro).append('\n');
+        return true;
+    }
+
+    /**
      * 抛弃式 dex 加载：把一个**未安装** APK 在冷状态下的首次加载失败先消耗掉。
      *
      * 机理未定案（探针已排除压缩方式、optimizedDirectory 取值两个猜想），
@@ -341,14 +376,14 @@ public final class Injector {
         ZipFile zf = new ZipFile(apk);
         int loaded = 0;
         try {
-            // ★ ABI 不能写死 Build.SUPPORTED_ABIS[0]：只提供 armeabi-v7a 的包在 arm64 设备上
-            //   照样能跑，写死 [0] 会找不到库。按设备优先级找第一个交集，且**与 Compat
+            // ★ ABI 不能写死 Build.SUPPORTED_ABIS[0]：只提供 armeabi-v7a 的包在 32 位进程里
+            //   照样能跑，写死 [0] 会找不到库。按**进程**优先级找第一个交集，且**与 Compat
             //   的判据同一实现**（Compat.pickAbi）——否则会出现"探测说能跑、加载就失败"。
             String abi = Compat.pickAbi(zf);
             if (abi == null) {
                 log.append("APK 里没有任何匹配本机 ABI 的 native 目录\n");
                 throw new IllegalStateException(Trans.get(ctx, R.string.launch_err_no_abi_fmt,
-                        joinAbis()));
+                        Compat.join(Compat.deviceAbis())));
             }
             log.append("选用 ABI = ").append(abi).append('\n');
             File dir = new File(new File(Paths.privateDir(ctx), "natives"), abi);
@@ -392,16 +427,6 @@ public final class Injector {
         if (loaded == 0) throw new IllegalStateException(Trans.get(ctx, R.string.launch_err_no_native_loaded));
     }
 
-    /** 设备 ABI 列表，仅供错误文案（`[arm64-v8a, armeabi-v7a]`） */
-    private static String joinAbis() {
-        StringBuilder sb = new StringBuilder();
-        for (String a : Build.SUPPORTED_ABIS) {
-            if (sb.length() > 0) sb.append(", ");
-            sb.append(a);
-        }
-        return sb.toString();
-    }
-
     // ── ③ 置 loaded 标志 ──────────────────────────────────────────────────
 
     /**
@@ -410,6 +435,10 @@ public final class Injector {
      * 所以必须在任何代码触碰 AndroidApplication 之前把标志置上。
      *
      * ★ 必须是「真正会定义游戏类的那个 CL」—— 类按 CL 隔离，给别的副本置 true 没用。
+     *
+     * ★★ 还要给 `SharedLibraryLoader` 记上账：`ArcNativesLoader.loaded` 只挡得住 `load("arc")`，
+     *    挡不住 `FreeType.initFreeType()` 里那句 `load("arc-freetype")`（它不看那个标志）。
+     *    不记账的后果见类注释 ③：老系统上游戏起不来。
      */
     private static void flagNativesLoaded(ClassLoader baseCl, StringBuilder log) throws Exception {
         Class<?> anl = Class.forName("arc.util.ArcNativesLoader", true, baseCl);
@@ -424,6 +453,59 @@ public final class Injector {
             // 该字段在新版 arc 里可能不存在，不是错误
         }
         log.append("ArcNativesLoader.loaded = ").append(loaded.getBoolean(null)).append('\n');
+
+        // 记账失败**不拦启动**：新系统上不记也能跑（会按名字回退），老系统上不记会崩在游戏里。
+        // 这里只把它写进启动报告 —— 不把一个"可能没用"的钩子升级成启动阻塞项。
+        try {
+            int marked = markArcLibrariesLoaded(baseCl, NATIVE_LIBS, log);
+            if (marked != NATIVE_LIBS.length) {
+                log.append("WARN SharedLibraryLoader marked ").append(marked).append('/')
+                        .append(NATIVE_LIBS.length).append('\n');
+            }
+        } catch (Throwable t) {
+            log.append("WARN SharedLibraryLoader setLoaded failed: ").append(t).append('\n');
+        }
+    }
+
+    /**
+     * 把 arc 的 `SharedLibraryLoader.loadedLibraries` 记上账 —— **逻辑名**（`arc` / `arc-freetype`），
+     * 不是文件名。它和 {@link #NATIVE_LIBS} 必须同源（{@link #arcLibName(String)} 是唯一推导处）。
+     *
+     * @return 记账成功的个数（`isLoaded` 回读为 true 才算）
+     */
+    static int markArcLibrariesLoaded(ClassLoader cl, String[] libs, StringBuilder log) throws Exception {
+        Class<?> sll = Class.forName("arc.util.SharedLibraryLoader", true, cl);
+        if (sll.getClassLoader() != cl) {
+            throw new IllegalStateException("SharedLibraryLoader from unexpected CL: " + sll.getClassLoader());
+        }
+        return markArcLibrariesLoaded(sll, libs, log);
+    }
+
+    /**
+     * 可测的那一半：类由调用方给（自检喂替身类，钉住"调的是 setLoaded 且用逻辑名"这条契约）。
+     * ⚠️ 真实 `arc.util.SharedLibraryLoader` 那条路只能在真机 / 模拟器启动时验 —— 启动报告里会打
+     * `SharedLibraryLoader.isLoaded(arc-freetype) = true`。
+     */
+    static int markArcLibrariesLoaded(Class<?> sll, String[] libs, StringBuilder log) throws Exception {
+        java.lang.reflect.Method setLoaded = sll.getMethod("setLoaded", String.class);
+        java.lang.reflect.Method isLoaded = sll.getMethod("isLoaded", String.class);
+        int marked = 0;
+        for (String file : libs) {
+            String name = arcLibName(file);
+            setLoaded.invoke(null, name);
+            boolean now = Boolean.TRUE.equals(isLoaded.invoke(null, name));
+            if (now) marked++;
+            log.append("SharedLibraryLoader.isLoaded(").append(name).append(") = ").append(now).append('\n');
+        }
+        return marked;
+    }
+
+    /** `libarc-freetype.so` → `arc-freetype`（SharedLibraryLoader 用的逻辑名，**唯一推导处**） */
+    static String arcLibName(String fileName) {
+        String n = fileName;
+        if (n.startsWith("lib")) n = n.substring(3);
+        if (n.endsWith(".so")) n = n.substring(0, n.length() - 3);
+        return n;
     }
 
     // ── ④ 资产挂链 ────────────────────────────────────────────────────────

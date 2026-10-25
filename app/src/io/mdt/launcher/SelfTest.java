@@ -3446,6 +3446,74 @@ public final class SelfTest {
         long ps = Compat.pageSize();
         ok(stat, L, ps > 0 && (ps & (ps - 1)) == 0, "设备页大小 = " + ps + " B（2 的幂）");
 
+        // ⑧b ★★ ABI 判据必须按**进程**位数（2026-10-25 补，v0.6 用户报告牵出的相邻隐患）
+        //     背景：`Build.SUPPORTED_ABIS` 是"设备支持"（64 位机上带 armeabi-v7a），
+        //     而 `System.load` 受**进程**位数约束 ⇒ 按设备列表选会"探测说能跑、启动才炸"。
+        //     ⚠️ 本机 abilist 只有 arm64-v8a，旧写法在这里**恰好**看不出问题 ⇒ 这条只能靠概念判据。
+        java.util.TreeSet<String> only32 = new java.util.TreeSet<>();
+        only32.add("armeabi-v7a");
+        String picked32 = Compat.pickAbiFrom(only32);
+        boolean p64 = android.os.Process.is64Bit();
+        if (p64) {
+            ok(stat, L, picked32 == null,
+                    "64 位进程：只提供 armeabi-v7a 的包选不出 ABI（实得 " + picked32 + "）");
+        } else {
+            ok(stat, L, "armeabi-v7a".equals(picked32),
+                    "32 位进程：选得动 armeabi-v7a（实得 " + picked32 + "）");
+        }
+        String[] own = Compat.deviceAbis();
+        java.util.TreeSet<String> ownSet = new java.util.TreeSet<>(java.util.Arrays.asList(own));
+        ok(stat, L, own.length > 0 && own[0].equals(Compat.pickAbiFrom(ownSet)),
+                "进程自己的第一个 ABI 一定选得动（" + Compat.join(own) + "）");
+        // ★ 元断言：可用列表里绝不能混进**另一种位数**的项 —— 否则上一条可能因为"列表没过滤"也过
+        boolean mixedBits = false;
+        for (String a : own) {
+            if (a.equals("armeabi") || a.equals("armeabi-v7a") || a.equals("x86")) mixedBits = true;
+        }
+        ok(stat, L, p64 != mixedBits,
+                "元断言：可用 ABI 列表的位数与进程一致（进程 64 位=" + p64 + "，列表=" + Compat.join(own) + "）");
+
+        // ⑧c ★★ SharedLibraryLoader 记账（2026-10-25 主修，v0.6 用户报告的那次崩溃）
+        //     真 .so 那条路只能在真机 / 模拟器**启动时**验（启动报告里会打 isLoaded(...) = true）；
+        //     这里用替身类钉住反射契约：调的是 setLoaded(String)，传的是**逻辑名**，回读才算数。
+        FakeLibLoader.loaded.clear();
+        try {
+            StringBuilder lb = new StringBuilder();
+            int marked = Injector.markArcLibrariesLoaded(
+                    FakeLibLoader.class, Injector.NATIVE_LIBS, lb);
+            ok(stat, L, marked == Injector.NATIVE_LIBS.length,
+                    "替身记账 " + marked + "/" + Injector.NATIVE_LIBS.length
+                            + "（" + lb.toString().replace('\n', ' ') + "）");
+            ok(stat, L, FakeLibLoader.isLoaded("arc") && FakeLibLoader.isLoaded("arc-freetype"),
+                    "记的是逻辑名 arc / arc-freetype");
+            // 反方向：文件名**不是**记账键 —— 没有这条，上一条在"键写错但恰好 true"时也能过
+            ok(stat, L, !FakeLibLoader.isLoaded("libarc.so") && !FakeLibLoader.isLoaded("libarc-freetype.so"),
+                    "文件名不是记账键（libarc.so / libarc-freetype.so 仍为 false）");
+            ok(stat, L, "arc-freetype".equals(Injector.arcLibName("libarc-freetype.so"))
+                            && "arc".equals(Injector.arcLibName("libarc.so")),
+                    "文件名 → 逻辑名 只有一处推导（" + Injector.arcLibName("libarc-freetype.so") + "）");
+        } catch (Throwable t) {
+            ok(stat, L, false, "记账替身异常：" + t);
+        }
+
+        // ⑧d ★ dex 载体只读兜底（2026-10-25 真机实测：可写的导入包 ⇒ 预热连失败三次）
+        File roFile = new File(ctx.getCacheDir(), "zz-selftest-dexro.apk");
+        StringBuilder roLog = new StringBuilder();
+        try {
+            writeTmp(ctx.getCacheDir(), roFile.getName(), "NOT-A-REAL-DEX");
+            ok(stat, L, roFile.canWrite(), "夹具可写（这条是前置条件）");
+            ok(stat, L, Injector.ensureDexReadOnly(roFile, roLog),
+                    "可写的 dex 载体 ⇒ 被置只读");
+            ok(stat, L, !roFile.canWrite(), "置完之后 canWrite=false（" + roLog.toString().trim() + "）");
+            ok(stat, L, !Injector.ensureDexReadOnly(roFile, roLog),
+                    "已经是只读 ⇒ 第二次不再动（幂等）");
+        } catch (Throwable t) {
+            ok(stat, L, false, "只读兜底测试异常：" + t);
+        } finally {
+            roFile.setWritable(true);
+            roFile.delete();
+        }
+
         // ⑨ ★ 真实样本：拿**本应用自己的 APK** 当被试 —— 它既没有游戏入口类、也没有 lib/，
         //    必须被判为"不可进管线"。这条证明探测在**真实的大 APK** 上跑得通
         //    （不抛异常、不因体积放弃），而不是只在手工拼的字节上成立。
@@ -3465,6 +3533,23 @@ public final class SelfTest {
             ok(stat, L, false, "真实样本探测异常：" + t);
         }
         L.add("");
+    }
+
+    /**
+     * 替身：形状与 `arc.util.SharedLibraryLoader` 的两个静态方法一致，专供 ⑧c 钉住反射契约。
+     * ⚠️ **绝不能**在 `app/src` 里真建一个 `arc.util.SharedLibraryLoader` —— 那会排在游戏 dex 之前、
+     *    把游戏自己的类顶掉（同名类谁先谁赢）。
+     */
+    public static class FakeLibLoader {
+        static final java.util.Set<String> loaded = new java.util.HashSet<>();
+
+        public static synchronized void setLoaded(String name) {
+            loaded.add(name);
+        }
+
+        public static synchronized boolean isLoaded(String name) {
+            return loaded.contains(name);
+        }
     }
 
     /**

@@ -2,6 +2,7 @@ package io.mdt.launcher;
 
 import android.content.Context;
 import android.os.Build;
+import android.os.Process;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -29,7 +30,11 @@ import java.util.zip.ZipFile;
  *      —— v104.10 及更早只有 `libgdx.so`；我们的管线只解 arc 系。
  *      🔴 这条正是"静默出错"的来源：v104.10 **能通过导入预检**（入口类在），
  *      却在启动时卡在 native 步；若同进程先跑过别的版本还会被掩盖（见 Injector.loadNatives）。
- *   ③ ABI：包内 ABI 与设备 {@link Build#SUPPORTED_ABIS} 有无交集。
+ *   ③ ABI：包内 ABI 与本**进程**能加载的 ABI 有无交集（{@link #deviceAbis()}）。
+ *      ⚠️ 不能直接用 {@link Build#SUPPORTED_ABIS} —— 那是**设备**支持的列表，64 位机上它
+ *      带着 32 位 ABI；可 64 位进程 dlopen 32 位 .so 必失败（`is 32-bit instead of 64-bit`）。
+ *      用错这一步的症状：探测与导入全都放行，最后死在 `System.load` 的原生错误上
+ *      （2026-10-25 补：本机是纯 64 位，旧写法在这里**恰好**看不出问题）。
  *   ④ 页对齐：`libarc.so` 的 `PT_LOAD` 对齐 ≥ 设备页大小
  *      —— Android 15+ 在 **16 KB 页**设备上会拒载 4 KB 对齐的库；我们是 `System.load(路径)`，
  *      同样受约束（跟"装不装这个 APK"无关）。实测危险窗口恰是 arc 早期 `v105~v146`。
@@ -188,7 +193,7 @@ public final class Compat {
         }
         if (p.abi == null) {
             return Trans.get(ctx, R.string.compat_reject_abi,
-                    join(Build.SUPPORTED_ABIS), join(p.apkAbis));
+                    join(deviceAbis()), join(p.apkAbis));
         }
         if (p.coreLib == null) {
             return Trans.get(ctx, R.string.compat_reject_gdx);
@@ -203,7 +208,7 @@ public final class Compat {
         sb.append("  1 入口类 ").append(ENTRY_DESC).append(" : ").append(p.hasEntry ? "有" : "无").append('\n');
         sb.append("  2 native 库  : ").append(p.coreLib == null ? "无（缺 " + join(Injector.NATIVE_LIBS) + "）" : p.coreLib).append('\n');
         sb.append("  3 匹配 ABI   : ").append(p.abi == null ? "无交集" : p.abi).append('\n');
-        sb.append("    设备 ABI   : ").append(join(Build.SUPPORTED_ABIS)).append('\n');
+        sb.append("    进程 ABI   : ").append(join(deviceAbis())).append('\n');
         sb.append("    包内 ABI   : ").append(join(p.apkAbis)).append('\n');
         sb.append("    包内 so    : ").append(join(p.apkLibs)).append('\n');
         sb.append("  4 页对齐     : ").append(p.maxAlign == 0 ? "?" : (p.maxAlign / 1024) + " KB")
@@ -235,12 +240,29 @@ public final class Compat {
         return pickAbiFrom(abis);
     }
 
-    /** 从已收集的 ABI 集合里按设备优先级挑一个 */
+    /** 从已收集的 ABI 集合里按**进程**优先级挑一个 */
     static String pickAbiFrom(TreeSet<String> abis) {
-        for (String a : Build.SUPPORTED_ABIS) {
+        for (String a : deviceAbis()) {
             if (abis.contains(a)) return a;
         }
         return null;
+    }
+
+    /**
+     * 本**进程**能加载的 ABI 列表（按优先级）。
+     *
+     * ★ 为什么不用 {@link Build#SUPPORTED_ABIS}：那是"设备支持"的列表 —— 64 位机上
+     *   `SUPPORTED_ABIS = [arm64-v8a, armeabi-v7a, armeabi]`（2026-10-25 用户日志里就是这样），
+     *   可**进程**是 64 位，`System.load` 一个 32 位 .so 会抛
+     *   `dlopen failed: ... is 32-bit instead of 64-bit`。
+     *   ⇒ 按设备列表选，会出现"探测说能跑、导入也放行、启动才炸"的最坏形态。
+     * ⚠️ 本机（HONOR，`abilist` 只有 `arm64-v8a`）两种写法结果相同，**测不出**这个错 ——
+     *    判据只能靠设备列表与进程位数这两个概念本身的区别。
+     */
+    public static String[] deviceAbis() {
+        String[] list = Process.is64Bit() ? Build.SUPPORTED_64_BIT_ABIS : Build.SUPPORTED_32_BIT_ABIS;
+        // 理论上不会空；真碰上（ROM 畸形）就退回设备列表 —— 宁可多试一次，不要误判"无交集"
+        return (list != null && list.length > 0) ? list : Build.SUPPORTED_ABIS;
     }
 
     // ── 设备页大小 ─────────────────────────────────────────────────────────
@@ -342,7 +364,7 @@ public final class Compat {
         return false;
     }
 
-    static String join(String[] a) {
+    public static String join(String[] a) {
         if (a == null || a.length == 0) return "(无)";
         StringBuilder sb = new StringBuilder();
         for (String s : a) {
