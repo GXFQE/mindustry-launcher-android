@@ -186,16 +186,14 @@ public interface PluginApi {
     boolean gameRunning();
 
     /**
-     * 会话记录的**目录**（只读），里面两条流分开：
+     * 插件自己的**数据目录**（`<hub>/usage/`）—— **宿主只给目录，不写任何流水、不聚合、不展示**。
      *
-     * <ul>
-     *   <li>{@code launch.tsv} —— 启动那一刻的事实（{@code L ts ver slot apk}），写在起游戏之前，**永远完整**</li>
-     *   <li>{@code run.tsv} —— 运行期事实（{@code S ts} / {@code B ts} 30 秒心跳 / {@code E ts} /
-     *       {@code C ts 异常类} / {@code SC off|on ts}），进程被杀就会断</li>
-     * </ul>
+     * <p>2026-10-26 定案：注入的数据完全由插件自己写（探针写 {@code ProbeEnv.dir()}），
+     * 宿主只负责注入与调度。旧版本（v18~v28 期间）宿主写过 {@code launch.tsv} / {@code run.tsv}，
+     * **现在不再产生**，别依赖它们存在。
      *
-     * <p>没有 E 的会话按 {@code min(now, lastB + 30s)} 收口（只少不多），单条上限 12 小时。
-     * 字段与读取约定见 {@code docs/PLUGIN-API.md} 第 9 节。
+     * <p>目录里有什么、格式如何，都由插件自己定；宿主不解析。
+     * 详见 {@code docs/PLUGIN-API.md} 第 9 节。
      */
     File usageDir();
 

@@ -104,7 +104,7 @@ public static void unload();                    // 可选：收尾（也认 unlo
 | `open(item)` | 打开条目的字节流（文件或容器条目统一） |
 | `modsSkipped()` / `gameRunning()` | 这一轮会不会加载模组 / 游戏在不在跑 |
 | `baseBundleKeys()`（v28） | 目标版本**基础语言包**的键集合（判"是不是原版文案"用；空集 = 读不到，不是"没有"） |
-| `usageDir()` | 会话记录目录（见第 9 节） |
+| `usageDir()` | 插件数据目录（见第 9 节） |
 | `crashReportsDir()`（v22） | 当前槽的崩溃报告目录（只读；可能不存在） |
 
 ### 目录
