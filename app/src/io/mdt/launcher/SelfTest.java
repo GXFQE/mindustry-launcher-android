@@ -5630,6 +5630,24 @@ public final class SelfTest {
         }
         ok(stat, L, missBp.length() == 0,
                 "★P3：蓝图解析那 14 个错误码**每一个**都有白话映射，漏的是［" + missBp + "］");
+
+        // ★★ P3 批 2（2026-10-25）：`Mods.PackResult`（导入 / 跨槽复制）的 16 个码也要遍历。
+        //   界面走 `ModsText.packReason`；`error` 是给报告/自检的原文 ⇒ 断言它**不原样进第一层**。
+        //   中性参数（路径 / 文件名，`errS1`）允许进。
+        StringBuilder missPack = new StringBuilder();
+        boolean packLeak = false;
+        for (int code : Mods.PackResult.ALL_CODES) {
+            Mods.PackResult pr = new Mods.PackResult();
+            pr.errCode = code;
+            pr.error = "WHY-RAW-BOOM";
+            pr.errS1 = "/S1";
+            String rz = ModsText.packReason(ctx, pr);
+            if (rz == null || rz.isEmpty()) missPack.append(code).append(' ');
+            if (rz != null && rz.contains("WHY-RAW-BOOM")) packLeak = true;
+        }
+        ok(stat, L, missPack.length() == 0 && !packLeak,
+                "★P3：模组包导入/复制的 16 个错误码**每一个**都有白话映射、且不透传原始诊断，漏的是［"
+                        + missPack + "］");
         // ★ 自检失败那条是**嵌套**的（外面一句 + 里面一句"具体原因"）⇒ 两个分支都要过一遍，
         //   否则"另一个分支永远显示同一句"这种错看不出来。
         SettingsBin.Result mSub = SettingsBin.Result.withCode(
