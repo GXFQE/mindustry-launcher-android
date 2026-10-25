@@ -2478,6 +2478,24 @@ public final class SelfTest {
             ok(stat, L, "自检版本".equals(cfg.nameOf(TRASH_KEY)), "★ 名字一起回来");
             ok(stat, L, cfg.extraSlotsOf(TRASH_KEY).contains(TRASH_SLOT), "★ 槽绑定一起回来");
             ok(stat, L, !trashed.exists(), "中转站里那份已收掉（不是复制品）");
+
+            // ★ 2026-10-25 用户：「游戏本体保留个数按照整个槽算」⇒ 版本走 keepSlots（默认 3），
+            //   而且 `Importer.trashVersion` 里真的会 prune（以前漏了 ⇒ 站里无限堆积、每个几十 MB）。
+            ok(stat, L, Trash.keepFor(Trash.Kind.VERSION) == Trash.keepSlots(),
+                    "★ 游戏版本按「整个槽」的份数保留（不是普通条目的 20 份）");
+            File pruneBase = new File(ctx.getCacheDir(), "selftest-versions-prune");
+            File vdir = new File(pruneBase, "versions-trash");
+            vdir.mkdirs();
+            int keepN = Trash.keepSlots();
+            for (int i = 0; i <= keepN; i++) {
+                File d = new File(vdir, Trash.stamp() + "__自检__v" + i + ".apk");
+                d.mkdirs();
+                try { Thread.sleep(2); } catch (InterruptedException ignored) { }
+            }
+            int removedN = Trash.pruneIn(vdir);
+            ok(stat, L, removedN == 1 && Trash.list(vdir).size() == keepN,
+                    "★ 版本中转站按 keepSlots 修剪（造 " + (keepN + 1) + " 个 ⇒ 删 1 个，剩 " + keepN + "）");
+            Data.deleteTree(pruneBase);
         } catch (Throwable t) {
             ok(stat, L, false, "版本中转站用例抛异常：" + t);
         } finally {

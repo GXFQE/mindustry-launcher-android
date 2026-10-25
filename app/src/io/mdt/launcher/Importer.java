@@ -239,6 +239,11 @@ public final class Importer {
         }
         writeJson(new File(dir, V_STATE), state);
         Config.get().removeImport(e.importFile);
+        // ★ 2026-10-25 用户：「游戏本体保留个数按照整个槽算」⇒ `keepFor(VERSION)` 走整槽那一套（默认 3），
+        //   而且**必须在这里真的执行**：别的种类都是在各自的删除动作里顺手 prune，这里以前漏了 ⇒
+        //   站里的旧版本会无限堆积（每个几十 MB，比什么都伤）。
+        int pruned = Trash.pruneIn(Trash.versionsDir(ctx));
+        if (pruned > 0) Log.i(TAG, "versions-trash pruned: " + pruned);
         Log.i(TAG, "import version trashed: " + e.importFile + " -> " + dir);
         Trash.Result r = new Trash.Result();
         r.ok = true;

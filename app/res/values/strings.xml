@@ -1503,10 +1503,10 @@
     <string name="set_logs_bad">Enter an integer from 1 to 999</string>
 
     <string name="set_trash_title">Trash retention</string>
-    <string name="set_trash_sub_fmt">Items %1$d · whole slots %2$d</string>
+    <string name="set_trash_sub_fmt">Items %1$d · slots / versions %2$d</string>
     <string name="set_trash_dialog_title">Trash retention (1 ~ 999)</string>
     <string name="set_trash_items_label">Items: maps, saves, schematics, mods, plugins</string>
-    <string name="set_trash_slots_label">Whole slots</string>
+    <string name="set_trash_slots_label">Whole slots / game versions</string>
     <string name="set_trash_hint">20</string>
     <string name="set_trash_slots_hint">3</string>
     <string name="set_trash_bad">Enter integers from 1 to 999</string>
