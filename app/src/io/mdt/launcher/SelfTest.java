@@ -5733,6 +5733,34 @@ public final class SelfTest {
         ok(stat, L, missPack.length() == 0 && !packLeak,
                 "★P3：模组包导入/复制的 16 个错误码**每一个**都有白话映射、且不透传原始诊断，漏的是［"
                         + missPack + "］");
+
+        // ★★ 7.3f（2026-10-25）：模组 × 已装版本 兼容矩阵 —— 三态 + 行文案。
+        Mods.Info cmOk = new Mods.Info();
+        cmOk.name = "cm-ok";
+        cmOk.minGameVersion = "154";
+        Mods.Info cmOld = new Mods.Info();
+        cmOld.name = "cm-old";
+        cmOld.minGameVersion = "160.1";
+        Mods.Info cmNone = new Mods.Info();
+        cmNone.name = "cm-none";
+        cmNone.minGameVersion = "0";
+        java.util.List<Mods.CompatRow> cm = Mods.compatMatrix(
+                java.util.Arrays.asList(cmOk, cmOld, cmNone),
+                java.util.Arrays.asList("154.0", "160.1"));
+        ok(stat, L, cm.size() == 3 && cm.get(0).cells.size() == 2 && cm.get(2).cells.size() == 2,
+                "★7.3f 兼容矩阵：3 个模组 × 2 个已装版本 ⇒ 3 行、每行 2 格");
+        ok(stat, L,
+                cm.get(0).cells.get(0).state == Mods.COMPAT_OK
+                        && cm.get(0).cells.get(1).state == Mods.COMPAT_OK
+                        && cm.get(1).cells.get(0).state == Mods.COMPAT_TOO_OLD
+                        && cm.get(1).cells.get(1).state == Mods.COMPAT_OK
+                        && cm.get(2).cells.get(0).state == Mods.COMPAT_UNKNOWN,
+                "★7.3f 三态：声明 154 在 154/160 都可；声明 160.1 在 154 太低、在 160 可；"
+                        + "没声明（0）记「未声明」——不拿 isAtLeast 的放行当「支持」");
+        String cmLine = ModsText.compatRow(ctx, cm.get(0));
+        ok(stat, L, cmLine.contains("154.0") && cmLine.contains("160.1")
+                        && cmLine.contains(ctx.getString(R.string.mods_compat_ok)),
+                "★7.3f 行文案：带两个版本号 + 「可加载」（" + cmLine + "）");
         // ★ 自检失败那条是**嵌套**的（外面一句 + 里面一句"具体原因"）⇒ 两个分支都要过一遍，
         //   否则"另一个分支永远显示同一句"这种错看不出来。
         SettingsBin.Result mSub = SettingsBin.Result.withCode(

@@ -1832,6 +1832,13 @@
     <string name="mods_import_nogame">还没有版本指向这个槽。先给某个版本分配它，否则装了也不会加载</string>
     <string name="mods_import_health_head">体检（插件）：</string>
     <string name="mods_import_health_ok">✅ 插件没发现会让它加载失败的问题（依赖 / 结构 / 版本 / 黑名单）。</string>
+    <string name="mods_compat_menu">兼容矩阵…</string>
+    <string name="mods_compat_title">兼容矩阵</string>
+    <string name="mods_compat_ok">可加载</string>
+    <string name="mods_compat_too_old">版本过低</string>
+    <string name="mods_compat_unknown">未声明</string>
+    <string name="mods_compat_note">按模组自己声明的 minGameVersion；声明写错这里也会错。</string>
+    <string name="mods_compat_empty">没有可比的模组或版本。</string>
     <string name="batch_import_health_fmt">体检 · %1$s · %2$s</string>
     <string name="mods_copy_pick_title">复制到哪个槽？</string>
     <string name="mods_copy_no_target">只有这一个槽，没有可复制的目标</string>

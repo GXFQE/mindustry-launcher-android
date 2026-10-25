@@ -191,6 +191,74 @@ public final class Mods {
         return false;
     }
 
+    // ══ 模组 × 已装版本 兼容矩阵（7.3f，2026-10-25）════════════════════════════
+    //
+    // 用户要回答的问题：「这个模组换成 160.4 还行不行」——模组页原来只回答「本槽会不会加载」。
+    // 判据**只读声明**（`mod.hjson` 的 minGameVersion + 版本的 build 号），不做静态分析；
+    // ⚠️ 声明本身可能写错 ⇒ 每格只能写「按声明」，界面上要带这句。
+
+    /** 这一格：按声明**可加载** */
+    public static final int COMPAT_OK = 0;
+    /** 这一格：版本**过低**（模组要求更高） */
+    public static final int COMPAT_TOO_OLD = 1;
+    /** 这一格：**未声明 / 写不出数字** ⇒ 我们不知道（不许当成"可加载"） */
+    public static final int COMPAT_UNKNOWN = 2;
+
+    /** 矩阵的一格 */
+    public static final class CompatCell {
+        public final String version;
+        public final int state;
+
+        CompatCell(String version, int state) {
+            this.version = version;
+            this.state = state;
+        }
+    }
+
+    /** 矩阵的一行 = 一个模组 */
+    public static final class CompatRow {
+        public final Info mod;
+        public final List<CompatCell> cells = new ArrayList<CompatCell>();
+
+        CompatRow(Info mod) {
+            this.mod = mod;
+        }
+    }
+
+    /**
+     * **纯函数**：模组 × 已装版本 的三态矩阵（只读声明，不改任何文件）。
+     *
+     * @param mods     扫描出来的模组（{@link Scan#mods}）
+     * @param versions 已装版本的**格式版本**串（`Versions.Entry#formatVersion()`，去重；顺序由调用方定）
+     */
+    public static List<CompatRow> compatMatrix(List<Info> mods, List<String> versions) {
+        List<CompatRow> out = new ArrayList<CompatRow>();
+        if (mods == null || versions == null) return out;
+        for (Info m : mods) {
+            if (m == null) continue;
+            CompatRow row = new CompatRow(m);
+            for (String v : versions) {
+                int[] br = parseBuild(v);
+                row.cells.add(new CompatCell(v, compatOf(br[0], br[1], m.minGameVersion)));
+            }
+            out.add(row);
+        }
+        return out;
+    }
+
+    /**
+     * 一格的三态。
+     *
+     * ★ **与 {@link #isAtLeast} 同源**（那条是游戏的判据，别再写一份版本比较）。
+     * ⚠️ 但"没声明"要单独记：`isAtLeast` 对空/`0` 一律放行（游戏边界），
+     *   我们不能因此说"支持"——那是把"没写"当成"写了"。
+     */
+    static int compatOf(int build, int revision, String minGameVersion) {
+        String s = minGameVersion == null ? "" : minGameVersion.trim();
+        if (s.isEmpty() || "0".equals(s) || parseBuild(s)[0] <= 0) return COMPAT_UNKNOWN;
+        return isAtLeast(build, revision, s) ? COMPAT_OK : COMPAT_TOO_OLD;
+    }
+
     // ══ 扫描 ═══════════════════════════════════════════════════════════════
 
     /** 一个模组条目（对齐游戏 `LoadedMod` + `ModMeta` 里**扫描阶段能知道**的那些） */

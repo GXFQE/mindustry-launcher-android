@@ -831,6 +831,87 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
 
     // ── 扫描与刷新 ────────────────────────────────────────────────────────
 
+    // ══ 7.3f 兼容矩阵（2026-10-25）════════════════════════════════════════════
+
+    @Override
+    public boolean onCreateOptionsMenu(android.view.Menu menu) {
+        getMenuInflater().inflate(R.menu.mods, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(android.view.MenuItem item) {
+        if (item.getItemId() == R.id.menu_mods_compat) {
+            showCompatMatrix();
+            return true;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+    /**
+     * 「这个模组换成 160.4 还行不行」—— 对所有**已装版本**算一遍。
+     *
+     * ★ 判据只读声明（`minGameVersion` + 版本 build 号），不改任何文件；
+     *   每格只能写「按声明」⇒ 弹窗最后一行带脚注。
+     */
+    private void showCompatMatrix() {
+        final Mods.Scan scan = mScan;
+        if (scan == null) {
+            alert(Trans.get(this, R.string.mods_compat_title), Trans.get(this, R.string.mods_compat_empty));
+            return;
+        }
+        new Thread(new Runnable() {
+            @Override public void run() {
+                final List<String> items = compatRows(scan);
+                runOnUiThread(new Runnable() {
+                    @Override public void run() { showCompatDialog(items); }
+                });
+            }
+        }, "mods-compat").start();
+    }
+
+    /** 后台线程：每个模组一行（+ 最后一行脚注）；没有可比的东西 ⇒ 空表 */
+    private List<String> compatRows(Mods.Scan scan) {
+        List<String> items = new ArrayList<String>();
+        List<String> versions = compatVersions();
+        if (versions.isEmpty() || scan.mods.isEmpty()) return items;
+        for (Mods.CompatRow row : Mods.compatMatrix(scan.mods, versions)) {
+            items.add(ModsText.compatRow(this, row));
+        }
+        items.add(Trans.get(this, R.string.mods_compat_note));
+        return items;
+    }
+
+    /** 已装版本的**格式版本**串（去重、按 build 升序；`?` 跳过） */
+    private List<String> compatVersions() {
+        List<String> out = new ArrayList<String>();
+        for (Versions.Entry e : Versions.scanAll(this)) {
+            String v = e == null ? null : e.formatVersion();
+            if (v == null || v.isEmpty() || "?".equals(v) || out.contains(v)) continue;
+            out.add(v);
+        }
+        Collections.sort(out, new Comparator<String>() {
+            @Override public int compare(String a, String b) {
+                int[] x = Mods.parseBuild(a), y = Mods.parseBuild(b);
+                if (x[0] != y[0]) return x[0] < y[0] ? -1 : 1;
+                return x[1] < y[1] ? -1 : (x[1] == y[1] ? 0 : 1);
+            }
+        });
+        return out;
+    }
+
+    private void showCompatDialog(List<String> items) {
+        if (items.isEmpty()) {
+            alert(Trans.get(this, R.string.mods_compat_title), Trans.get(this, R.string.mods_compat_empty));
+            return;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.mods_compat_title)
+                .setItems(items.toArray(new String[0]), null)
+                .setNegativeButton(R.string.mods_close, null)
+                .show();
+    }
+
     private void rescan() {
         mScan = Mods.scan(this, mSlot);
         mResolved = Mods.resolveDependencies(mScan.mods);

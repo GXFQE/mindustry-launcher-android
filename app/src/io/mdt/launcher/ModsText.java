@@ -297,6 +297,32 @@ final class ModsText {
     }
 
     /**
+     * 7.3f 兼容矩阵的一行：`名字 · 160.1 可加载 · 159.7 版本过低`。
+     *
+     * ★ 版本条数是**动态的**（已装几个版本就有几条）⇒ 不写成一句资源模板，逐格拼；
+     *   每格的三态文案仍走资源（{@link #compatWord}）。
+     */
+    static String compatRow(Context c, Mods.CompatRow r) {
+        if (r == null || r.mod == null) return "";
+        String n = r.mod.displayName == null || r.mod.displayName.isEmpty()
+                ? (r.mod.name == null ? "" : r.mod.name) : r.mod.displayName;
+        StringBuilder sb = new StringBuilder(n);
+        for (Mods.CompatCell cell : r.cells) {
+            sb.append("  ·  ").append(cell.version).append(' ').append(compatWord(c, cell.state));
+        }
+        return sb.toString();
+    }
+
+    /** 一格的三态文案（加态就要在这加一条分支 + 一条资源；漏了会静默退化） */
+    static String compatWord(Context c, int state) {
+        switch (state) {
+            case Mods.COMPAT_OK: return Trans.get(c, R.string.mods_compat_ok);
+            case Mods.COMPAT_TOO_OLD: return Trans.get(c, R.string.mods_compat_too_old);
+            default: return Trans.get(c, R.string.mods_compat_unknown);
+        }
+    }
+
+    /**
      * 第 233 轮（P5，导入体检）：导入结果弹窗里「体检」那一段的正文。
      *
      * <p>★ **文案本体是插件给的**（{@code Finding.title/detail}）—— 宿主只加"没发现问题"这句空态，

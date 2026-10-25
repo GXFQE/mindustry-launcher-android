@@ -1880,6 +1880,13 @@
     <string name="mods_import_nogame">No version points at this slot yet. Assign one first, or it will not load even if installed</string>
     <string name="mods_import_health_head">Health check (plug-in):</string>
     <string name="mods_import_health_ok">✅ The plug-in found nothing that would stop it from loading (dependencies / structure / version / blacklist).</string>
+    <string name="mods_compat_menu">Compatibility matrix…</string>
+    <string name="mods_compat_title">Compatibility matrix</string>
+    <string name="mods_compat_ok">OK</string>
+    <string name="mods_compat_too_old">Too old</string>
+    <string name="mods_compat_unknown">Undeclared</string>
+    <string name="mods_compat_note">Based on the minGameVersion each mod declares; a wrong declaration shows up here too.</string>
+    <string name="mods_compat_empty">Nothing to compare — no mods or no installed versions.</string>
     <string name="batch_import_health_fmt">Health · %1$s · %2$s</string>
     <string name="mods_copy_pick_title">Copy to which slot?</string>
     <string name="mods_copy_no_target">There is only this one slot, so there is nowhere to copy to</string>
