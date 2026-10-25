@@ -6649,6 +6649,14 @@ public final class SelfTest {
             ok(stat, L, CrashAnalysis.blamedInternals(bTwo).size() == 2,
                     "★并列（报告指向多个模组）⇒ 名单里**都在**（不随便挑一个）："
                             + CrashAnalysis.blamedInternals(bTwo));
+            // ★ 2026-10-25：日志页「停用这个模组」只在**单一嫌疑人**时出现。
+            ok(stat, L, "crashtest".equals(CrashAnalysis.soleSuspect(bOne)),
+                    "★「停用」按钮判据：单一嫌疑人 ⇒ 给内部名（bOne ⇒ crashtest）");
+            ok(stat, L, CrashAnalysis.soleSuspect(bTwo).isEmpty()
+                            && CrashAnalysis.soleSuspect(bNone).isEmpty()
+                            && CrashAnalysis.soleSuspect(bLauncher).isEmpty()
+                            && CrashAnalysis.soleSuspect(null).isEmpty(),
+                    "★「停用」按钮判据：并列 / 认不出 / 启动器报告 / null ⇒ 空（一个都不许停用）");
             ok(stat, L, !ctx.getString(R.string.mods_warn_blamed).isEmpty()
                             && !ctx.getString(R.string.mods_warn_failed).isEmpty(),
                     "★两条文案都在：按行那句「" + ctx.getString(R.string.mods_warn_blamed)
@@ -7652,6 +7660,16 @@ public final class SelfTest {
         ok(stat, L, cardKids == 3,
                 "★元断言：版本行卡片里**只有 3 个**横向元素（图标 / 文字列 / 动作按钮）——"
                         + " 再加一个右侧控件就会把版本号挤成省略号，实际 " + cardKids);
+
+        // ★ 2026-10-25：删除范围的**唯一判据**（版本页画按钮 / 灰掉 与 VersionOps.delete 共用）。
+        //   以前两处各判一次（页面 `rows > 1` / delete `!imported`）—— 真机反馈「到底能不能删」。
+        ok(stat, L, VersionOps.deleteScope(2, false) == VersionOps.DELETE_ROW
+                        && VersionOps.deleteScope(3, true) == VersionOps.DELETE_ROW,
+                "★删除范围：还有别的启动项 ⇒ 只删这一项（导入 / 已装都一样）");
+        ok(stat, L, VersionOps.deleteScope(1, true) == VersionOps.DELETE_VERSION,
+                "★删除范围：最后一项 + 导入 ⇒ 删整个版本（本体进中转站）");
+        ok(stat, L, VersionOps.deleteScope(1, false) == VersionOps.DELETE_BLOCKED,
+                "★删除范围：最后一项 + 已装 ⇒ 不许删（版本页把那一行灰掉，不用点一次才知道）");
         L.add("");
     }
 

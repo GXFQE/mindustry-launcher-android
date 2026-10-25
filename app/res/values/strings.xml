@@ -1800,6 +1800,12 @@
     <string name="crash_alert_ignored_fmt">ignored %1$s - just launch again (the rest of the mods will load this time)</string>
     <string name="crash_alert_ignore_missing">it is not in the mod list anymore (maybe deleted)</string>
     <string name="crash_alert_open">Open the log</string>
+    <!-- 2026-10-25: disable the sole suspect right from the crash verdict (log page) -->
+    <string name="crash_disable_btn_fmt">Disable %1$s</string>
+    <string name="crash_disable_title">Disable this mod?</string>
+    <string name="crash_disable_msg_fmt">This only changes the game setting for the current slot — saves are not touched. %1$s will not load on the next launch.</string>
+    <string name="crash_disable_ok">Disable</string>
+    <string name="crash_disable_done_fmt">Disabled %1$s</string>
     <string name="mods_warn_backslash_fmt">⚠ This package is packed incorrectly and the game cannot find its scripts — just repack it</string>
     <string name="mods_warn_state_fmt">⚠ %1$s</string>
     <string name="mods_warn_disabled">⚠ it is switched off right now</string>

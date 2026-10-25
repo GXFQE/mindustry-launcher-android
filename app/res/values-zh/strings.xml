@@ -1739,6 +1739,12 @@
     <string name="crash_alert_ignored_fmt">已忽略「%1$s」—— 直接启动试试（这次会加载其余的模组）</string>
     <string name="crash_alert_ignore_missing">没在模组列表里找到它（可能已经删了）</string>
     <string name="crash_alert_open">看运行日志</string>
+    <!-- 2026-10-25：崩溃结论里顺手停用唯一嫌疑人（只在单一嫌疑人时出现） -->
+    <string name="crash_disable_btn_fmt">停用「%1$s」</string>
+    <string name="crash_disable_title">停用这个模组？</string>
+    <string name="crash_disable_msg_fmt">只改当前槽的游戏设置，不动存档。「%1$s」下次启动不会再被加载。</string>
+    <string name="crash_disable_ok">停用</string>
+    <string name="crash_disable_done_fmt">已停用「%1$s」</string>
     <string name="mods_warn_backslash_fmt">⚠ 这个包压得不太对，游戏会找不到里面的脚本 —— 重新压一次就好</string>
     <string name="mods_warn_state_fmt">⚠ %1$s</string>
     <string name="mods_warn_disabled">⚠ 它现在是关着的</string>

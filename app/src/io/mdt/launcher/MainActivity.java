@@ -63,6 +63,11 @@ public class MainActivity extends BaseActivity {
     private View mBtnContinue;
     private TextView mContinueText;
 
+    // ★ 2026-10-25：从版本页 / 游戏回来时保持列表位置。
+    //   真机两次误点：列表回顶后拿旧坐标点「管理」点到了行本体 ⇒ 直接启动游戏。
+    private android.widget.ScrollView mMainScroll;
+    private int mKeepScrollY = -1;
+
     /**
      * 一个版本的「同槽共用」情况。由 `rescan()` → {@link #computeConflicts()} 重算。
      *
@@ -423,6 +428,37 @@ public class MainActivity extends BaseActivity {
         //   ⚠️ 都放在 rescan/AutoBackup 之后：提示是"锦上添花"，不许挡住主界面自己的刷新。
         CrashAlert.start(this);
         CrashAlert.catchUp(this);
+        // ★ 列表重建之后再把滚动位置放回去（版本页 / 游戏回来都走这里）。
+        restoreScroll();
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        // 离开主界面时记下位置；不在这里做任何重建（重建在 onResume）。
+        if (mMainScroll != null) mKeepScrollY = mMainScroll.getScrollY();
+    }
+
+    /**
+     * 恢复主界面滚动位置（2026-10-25）。
+     *
+     * <p>★ 为什么需要：主界面是「ScrollView + LinearLayout 全展开」，`onResume` 会
+     *   `rescan()` → `rebuildList()` 重建整列；而版本页的动作改完是 `finish()` 回来的
+     *   （{@link VersionActivity} 头部注释写了这条路径）⇒ 重建后滚动位置回到顶部。
+     *   真机上用户拿旧坐标去点「管理」，结果点到行本体，**直接启动了游戏**（两次）。
+     *
+     * <p>⚠️ 必须 `post`：`rebuildList()` 只是挂 View，高度要等这一帧布局完才定；
+     *   立刻 `scrollTo` 会被 ScrollView 按旧高度 clamp 掉。
+     *   列表变短时 ScrollView 自己会夹到最大范围，不会越界。
+     */
+    private void restoreScroll() {
+        final int y = mKeepScrollY;
+        if (y <= 0 || mMainScroll == null) return;
+        mMainScroll.post(new Runnable() {
+            @Override public void run() {
+                if (mMainScroll != null) mMainScroll.scrollTo(0, y);
+            }
+        });
     }
 
     /**
@@ -431,6 +467,7 @@ public class MainActivity extends BaseActivity {
      */
     private void buildUi() {
         View root = getLayoutInflater().inflate(R.layout.activity_main, null);
+        mMainScroll = (android.widget.ScrollView) root;
 
         // 顶部状态卡：整卡可点，展开完整路径 —— 长路径不该一上来就糊满屏
         mStatusSummary = (TextView) root.findViewById(R.id.status_summary);

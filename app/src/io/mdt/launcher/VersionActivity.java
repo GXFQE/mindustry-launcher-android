@@ -134,16 +134,22 @@ public class VersionActivity extends BaseActivity {
         //   ⇒ 不写数量，直接说清"删什么"（这一项 / 整个版本）。
         TextView delTitle = (TextView) findViewById(R.id.row_ver_delete).findViewById(R.id.act_title);
         TextView delSub = (TextView) findViewById(R.id.row_ver_delete).findViewById(R.id.act_sub);
-        int rows = Versions.rowCount(mKey);
-        if (rows > 1) {
+        int scope = VersionOps.deleteScope(Versions.rowCount(mKey), found.imported);
+        if (scope == VersionOps.DELETE_ROW) {
             delTitle.setText(R.string.version_row_delete);
             delSub.setText(R.string.version_row_delete_sub_row);
-        } else if (found.imported) {
+        } else if (scope == VersionOps.DELETE_VERSION) {
             delTitle.setText(R.string.version_row_delete_version);
             delSub.setText(R.string.version_row_delete_sub_version);
         } else {
             delTitle.setText(R.string.version_row_delete);
             delSub.setText(R.string.version_row_delete_sub_blocked);
         }
+        // ★ 2026-10-25：已装版最后一项**灰掉**（原来还能点，点开只是一句说明 —— 真机反馈
+        //   「到底能不能删」；现在按钮本身就说"不能"，不用点一次才知道）。
+        View del = findViewById(R.id.row_ver_delete);
+        boolean blocked = scope == VersionOps.DELETE_BLOCKED;
+        del.setEnabled(!blocked);
+        del.setAlpha(blocked ? 0.45f : 1f);
     }
 }

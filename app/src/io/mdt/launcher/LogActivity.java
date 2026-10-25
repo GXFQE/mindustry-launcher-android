@@ -130,6 +130,13 @@ public class LogActivity extends BaseActivity {
     private TextView mCrashBody;
     /** F23：崩溃分析结论（正文之前的一行；没有结论时 GONE） */
     private TextView mCrashVerdict;
+    /** 2026-10-25：结论里唯一的嫌疑人 ⇒ 显示「停用」按钮；并列 / 认不出 ⇒ GONE */
+    private TextView mCrashDisable;
+    /** 当前显示的那份结论（同步「停用」按钮用；换 chip / 重读时跟着换） */
+    private CrashAnalysis.Verdict mShownVerdict;
+    /** 「停用」按钮指向的内部名与显示名（没有单一嫌疑人时都是空串） */
+    private String mDisableInternal = "";
+    private String mDisableName = "";
     private TextView mCrashClean;
     private LinearLayout mCrashChips;
     private View mCrashChipScroll;
@@ -201,6 +208,10 @@ public class LogActivity extends BaseActivity {
         mCrashMeta = (TextView) root.findViewById(R.id.log_crash_meta);
         mCrashBody = (TextView) root.findViewById(R.id.log_crash_body);
         mCrashVerdict = (TextView) root.findViewById(R.id.log_crash_verdict);
+        mCrashDisable = (TextView) root.findViewById(R.id.log_crash_disable);
+        mCrashDisable.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) { promptDisableSuspect(); }
+        });
         mCrashClean = (TextView) root.findViewById(R.id.log_crash_clean);
         mCrashChips = (LinearLayout) root.findViewById(R.id.log_crash_chips);
         mCrashChipScroll = root.findViewById(R.id.log_crash_chip_scroll);
@@ -478,8 +489,10 @@ public class LogActivity extends BaseActivity {
 
     private void hideVerdict() {
         mAnalyzeStamp++;          // 让在途的分析结果作废
+        mShownVerdict = null;
         mCrashVerdict.setText("");
         mCrashVerdict.setVisibility(View.GONE);
+        syncDisableButton();
     }
 
     private void showVerdict(String text) {
@@ -489,6 +502,52 @@ public class LogActivity extends BaseActivity {
         }
         mCrashVerdict.setText(text);
         mCrashVerdict.setVisibility(View.VISIBLE);
+        syncDisableButton();
+    }
+
+    /**
+     * 「停用」按钮只在**单一嫌疑人**时出现 —— 判据复用 {@link CrashAnalysis#blamedInternals}。
+     * ★ 并列时点哪一个都不对（与崩溃弹窗的「忽略它并再试」同一条口径）；认不出 / 原版崩 ⇒ GONE。
+     */
+    private void syncDisableButton() {
+        if (mCrashDisable == null) return;
+        java.util.List<String> names = CrashAnalysis.blamedNames(mShownVerdict);
+        mDisableInternal = CrashAnalysis.soleSuspect(mShownVerdict);
+        mDisableName = names.size() == 1 && names.get(0) != null ? names.get(0) : "";
+        if (mDisableInternal.isEmpty()) {
+            mCrashDisable.setVisibility(View.GONE);
+            return;
+        }
+        mCrashDisable.setText(Trans.get(this, R.string.crash_disable_btn_fmt,
+                mDisableName.isEmpty() ? mDisableInternal : mDisableName));
+        mCrashDisable.setVisibility(View.VISIBLE);
+    }
+
+    /**
+     * 「停用这个模组」：只改游戏设置（{@link Mods#setEnabled}），**不动存档**。
+     * ⚠️ 游戏还在跑 ⇒ 那一层自己拒绝（E_GAME_RUNNING），失败原因走
+     *   {@link SettingsText#userReason}（与模组页 / 崩溃弹窗同一套话术）。
+     */
+    private void promptDisableSuspect() {
+        final String internal = mDisableInternal;
+        if (internal.isEmpty()) return;
+        final String name = mDisableName.isEmpty() ? internal : mDisableName;
+        final String slot = Data.currentSlot(this);
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.crash_disable_title)
+                .setMessage(Trans.get(this, R.string.crash_disable_msg_fmt, name))
+                .setPositiveButton(R.string.crash_disable_ok, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int w) {
+                        SettingsBin.Result r = Mods.setEnabled(LogActivity.this, slot, internal, false);
+                        Toast.makeText(LogActivity.this,
+                                r.ok ? Trans.get(LogActivity.this, R.string.crash_disable_done_fmt, name)
+                                        : SettingsText.userReason(LogActivity.this, r),
+                                Toast.LENGTH_LONG).show();
+                        if (r.ok) mCrashDisable.setVisibility(View.GONE);
+                    }
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
     }
 
     /**
@@ -529,10 +588,12 @@ public class LogActivity extends BaseActivity {
         final String key = verdictKey(d);
         CrashAnalysis.Verdict cached = mVerdicts.get(key);
         if (cached != null) {
+            mShownVerdict = cached;
             showVerdict(verdictText(d, cached));
             return;
         }
         final int stamp = ++mAnalyzeStamp;
+        mShownVerdict = null;
         showVerdict(Trans.get(this, R.string.crash_verdict_pending));
         new Thread(new Runnable() {
             @Override public void run() {
@@ -546,6 +607,7 @@ public class LogActivity extends BaseActivity {
                     @Override public void run() {
                         if (stamp != mAnalyzeStamp || mShownCrash != d) return;
                         mVerdicts.put(key, full);
+                        mShownVerdict = full;
                         showVerdict(verdictText(d, full));
                     }
                 });

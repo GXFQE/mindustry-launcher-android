@@ -41,6 +41,24 @@ final class VersionOps {
 
     private VersionOps() {}
 
+    // ── 删除的范围（**唯一判据**）─────────────────────────────────────────
+
+    /** 还有别的启动项 ⇒ 只删这一项 */
+    static final int DELETE_ROW = 0;
+    /** 最后一项 + 导入版 ⇒ 删整个版本（本体进中转站） */
+    static final int DELETE_VERSION = 1;
+    /** 最后一项 + 已装版 ⇒ 不许删（那份在系统里） */
+    static final int DELETE_BLOCKED = 2;
+
+    /**
+     * 这一行点「删除」会做什么 —— 版本页（画按钮 / 灰掉）与 {@link #delete} 共用这一份。
+     * ★ 两处各判一次必然漂：用户 2026-10-25 说过「除了已装版最后一个实例不能删，其他完全同步」。
+     */
+    static int deleteScope(int rows, boolean imported) {
+        if (rows > 1) return DELETE_ROW;
+        return imported ? DELETE_VERSION : DELETE_BLOCKED;
+    }
+
     // ── 小工具 ────────────────────────────────────────────────────────────
 
     static int dp(Activity a, int v) {
@@ -372,8 +390,8 @@ final class VersionOps {
      * </ul>
      */
     static void delete(final Activity a, final Versions.Entry e, final Done done) {
-        final int rows = Versions.rowCount(e.key());
-        if (rows > 1) {
+        final int scope = deleteScope(Versions.rowCount(e.key()), e.imported);
+        if (scope == DELETE_ROW) {
             // ★ 槽名先抓下来：删完这一项之后 `slotFor` 可能已经变了（主行被删 ⇒ 另一项提上来）
             final String slot = Versions.slotFor(e);
             new AlertDialog.Builder(a)
@@ -394,7 +412,7 @@ final class VersionOps {
                     .show();
             return;
         }
-        if (!e.imported) {
+        if (scope == DELETE_BLOCKED) {
             alert(a, R.string.delete_installed_last_title, a.getString(R.string.delete_installed_last_msg));
             return;
         }

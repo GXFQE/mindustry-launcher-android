@@ -289,6 +289,27 @@
                     android:textColor="@color/fg"
                     android:visibility="gone" />
 
+                <!-- ★ 2026-10-25：单一嫌疑人时才出现 —— 「停用这个模组」。
+                     放在结论下面、正文上面：看结论 → 顺手处理 → 原文仍可复核。
+                     ⚠️ 只有**一个**嫌疑人时才给：并列时点哪一个都不对（与 CrashAlert 的
+                     `ignoreAndRetry` 同一条判据，见 CrashAnalysis.blamedInternals）。 -->
+                <TextView
+                    android:id="@+id/log_crash_disable"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:background="@drawable/btn_ghost"
+                    android:clickable="true"
+                    android:focusable="false"
+                    android:paddingStart="14dp"
+                    android:paddingEnd="14dp"
+                    android:paddingTop="7dp"
+                    android:paddingBottom="7dp"
+                    android:textSize="13sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:textColor="@color/accent"
+                    android:visibility="gone" />
+
                 <HorizontalScrollView
                     android:id="@+id/log_crash_chip_scroll"
                     android:layout_width="match_parent"
