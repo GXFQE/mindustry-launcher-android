@@ -285,6 +285,21 @@ final class ProbeRunner {
         }
     }
 
+    /**
+     * v29：游戏 activity 的前后台变化（只对 `inProcess` 的探针有意义 —— 隔离进程看不到）。
+     * 由 {@link GameSlot} 从 {@link GameActivityWatcher} 的 lifecycle 事件转发；异常全吞。
+     */
+    void foreground(boolean fg) {
+        for (Job j : jobs) {
+            if (j.disabled || j.spec == null || !j.spec.inProcess) continue;
+            try {
+                j.probe.onForeground(fg);
+            } catch (Throwable t) {
+                Log.w("MDTPlugin", "probe " + j.spec.pluginId + " onForeground: " + t);
+            }
+        }
+    }
+
     /** 停掉定时器；给还活着的探针一次 summary()（异常全吞）。 */
     void stop() {
         if (stopped) return;

@@ -197,6 +197,8 @@ public interface Probe {
 - `inProcess: false` ⇒ 跑在 `:probe` 隔离进程（只能读 `/proc/<游戏 pid>`，崩了不连带游戏）
 - `ProbeEnv`：`dir()`（本会话给这个插件的目录）/ `pid()` / `inProcess()` / `slot()`
 - **数据由插件自己写**（格式自定）；宿主不解析、不聚合、不展示
+- **v29 新增**：`Probe.onForeground(boolean)` —— 游戏 activity 进/出台时回调（只对 `inProcess`；默认空实现）。
+  宿主只报事件，记不记、怎么记由插件自己定（`usagestats` 就是拿它算前台时长）
 - 调度：每 `sec` 秒一次（1..3600，缺省 5）；`sample()` 在后台线程，单次 >200 ms 记失败；
   连续 3 次失败 ⇒ 停用该探针并写 `probe-fail.txt`
 - 目录：`<hub>/usage/telemetry/<会话>/<插件 id>/`

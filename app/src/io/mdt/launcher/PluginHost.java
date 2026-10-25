@@ -73,7 +73,7 @@ public final class PluginHost {
      * 加法变更只抬 {@link #API}（{@link #API_MIN} 不动，老插件照样装得进），
      * 破坏性变更才抬 {@link #API_MIN}。
      */
-    public static final int API = 28;
+    public static final int API = 29;
     /**
      * 还认的**最老**契约版本。
      *

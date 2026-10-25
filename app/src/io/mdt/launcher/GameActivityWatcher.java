@@ -60,8 +60,40 @@ final class GameActivityWatcher implements Application.ActivityLifecycleCallback
     }
 
     @Override public void onActivityStarted(Activity activity) {}
-    @Override public void onActivityResumed(Activity activity) {}
-    @Override public void onActivityPaused(Activity activity) {}
+
+    /** v29：谁在听「游戏 activity 的前后台」（由 `GameSlot` 挂上探针调度器）。 */
+    interface Foreground {
+        void onGameForeground(boolean foreground);
+    }
+
+    private static volatile Foreground fgListener;
+
+    static void setForegroundListener(Foreground l) {
+        fgListener = l;
+    }
+
+    @Override public void onActivityResumed(Activity activity) {
+        if (isGame(activity)) notifyFg(true);
+    }
+
+    @Override public void onActivityPaused(Activity activity) {
+        if (isGame(activity)) notifyFg(false);
+    }
+
+    private static void notifyFg(boolean fg) {
+        Foreground l = fgListener;
+        if (l == null) return;
+        try {
+            l.onGameForeground(fg);
+        } catch (Throwable ignored) {
+        }
+    }
+
+    /** 游戏 activity = 住在 `:game` 进程里、又不是我们自己的页。 */
+    private static boolean isGame(Activity a) {
+        return a != null && !a.getClass().getName().startsWith("io.mdt.");
+    }
+
     @Override public void onActivityStopped(Activity activity) {}
     @Override public void onActivitySaveInstanceState(Activity activity, Bundle state) {}
     @Override public void onActivityDestroyed(Activity activity) {}

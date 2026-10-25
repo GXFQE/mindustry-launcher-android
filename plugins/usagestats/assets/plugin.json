@@ -1,0 +1,22 @@
+{
+  "entry": "io.mdt.plugins.usagestats.UsageStats",
+  "name": "usagestats",
+  "version": "1",
+  "author": "mdt",
+  "description": "foreground play time (the probe writes its own numbers)",
+  "access": [],
+  "telemetry": {
+    "probes": [
+      { "class": "io.mdt.plugins.usagestats.PlaytimeProbe", "sec": 20, "inProcess": true }
+    ]
+  },
+  "extensions": [
+    {
+      "id": "usagestats-page",
+      "title": "使用时长",
+      "subtitle": "前台累计（探针自己记）",
+      "entry": "io.mdt.plugins.usagestats.UsageStats",
+      "slot": "plugins"
+    }
+  ]
+}

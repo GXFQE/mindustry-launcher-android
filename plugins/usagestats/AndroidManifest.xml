@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  官方插件 usagestats（第 254 轮）：游戏前台时长（探针自己记账）。
+  ★ 与 mapstats / mods-health 同一条：**只声明包名**、不声明任何组件 —— 插件是宿主动态加载的代码 + 资源，
+    不是独立应用（aapt2 只要求有个 manifest）。
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="io.mdt.plugins.usagestats">
+
+    <application android:label="MDT Usage Stats"/>
+</manifest>

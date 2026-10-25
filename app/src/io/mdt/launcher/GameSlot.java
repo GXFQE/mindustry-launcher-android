@@ -181,6 +181,13 @@ public class GameSlot extends BaseActivity {
             svc.putExtra(ProbeService.EXTRA_RUN, true);
             svc.putExtra(ProbeService.EXTRA_SESSION, session);
             startService(svc);
+            // v29：把游戏 activity 的前后台变化转给探针（宿主只报事件，记不记由插件定）
+            GameActivityWatcher.setForegroundListener(new GameActivityWatcher.Foreground() {
+                @Override public void onGameForeground(boolean fg) {
+                    ProbeRunner r = mProbes;
+                    if (r != null) r.foreground(fg);
+                }
+            });
         } catch (Throwable t) {
             android.util.Log.w("MDTPlugin", "probe start failed", t);
         }

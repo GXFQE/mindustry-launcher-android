@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="us_title">使用时长</string>
+    <string name="us_body_fmt">前台累计：%1$s\n本会话：%2$s</string>
+    <string name="us_hm_fmt">%1$d 小时 %2$d 分</string>
+    <string name="us_min_fmt">%1$d 分</string>
+    <string name="us_sec">不到 1 分钟</string>
+    <string name="us_none">还没有记录，先启动游戏一次。</string>
+    <string name="us_note">由本插件自己的探针记账（游戏在前台的时间）；宿主只负责报事件。</string>
+</resources>

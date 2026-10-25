@@ -37,6 +37,15 @@ public interface Probe {
     /** 采样一次（后台线程）。 */
     void sample();
 
+    /**
+     * v29：游戏 activity 进了前台（true）/ 离开前台（false）。
+     *
+     * <p>只对 `inProcess=true` 的探针调用（隔离进程看不到）。默认空实现 —— 不需要的探针别覆写。
+     * ★ 这是**机制**：宿主只报事件，怎么记（前台秒数 / 只记下界 / 根本不记）由插件自己定。
+     */
+    default void onForeground(boolean foreground) {
+    }
+
     /** 会话结束前收尾（可选）。 */
     default void summary() {
     }
