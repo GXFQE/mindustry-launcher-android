@@ -366,6 +366,19 @@
             android:parentActivityName=".MainActivity"/>
 
         <!--
+          版本页（2026-10-25）：一个版本的全部动作（换槽 / 克隆 / 详情 / 命名 / 资源 / 删除）。
+          入口 = 行上的「管理」按钮与长按那一行（同一条路）。
+          ⚠️ **必须注册**：aapt2 不检查引用，漏了照样 BUILD OK，真机一点就崩（自检 ㉙ 盯着）。
+          ⚠️ 标题由 Activity 自己 `setTitle(版本名)` 覆盖，清单里这个 label 只是兜底。
+        -->
+        <activity
+            android:name=".VersionActivity"
+            android:exported="false"
+            android:theme="@style/AppTheme"
+            android:label="@string/version_page_title"
+            android:parentActivityName=".MainActivity"/>
+
+        <!--
           游戏坑位：加载流程（存档槽交换 / 预热 / dex 注入 / load native / 挂资产链）
           必须跑在游戏所在的 :game 进程里，否则系统在干净进程里找不到游戏类。
           exported=true 便于 adb 驱动验证 —— M5 发布前评估是否收回。

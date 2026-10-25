@@ -84,10 +84,9 @@
     <string name="empty_versions">No versions yet.\nUse \"Add game\" above to import an APK file, or to scan the ones already installed.</string>
 
     <!-- F2：版本列表行（槽徽标 / 可见槽按钮 / 同槽冲突 / 继续上次） -->
-    <string name="row_slot_btn">Slot</string>
+    <string name="row_slot_btn">Manage</string>
     <!-- Action inside the version row's slot picker: open this version's details
          (path / checksum / ABI / saves in the slot / delete an imported copy) -->
-    <string name="row_detail_btn">See details…</string>
     <!--
       ★ 2026-10-06: this row has **no** "details" button — details are on **long-press**
       (`MainActivity.showDetail`). Reason = width: badge + "Slot" button ≈ 460px of 1224px,
@@ -159,18 +158,47 @@
       The user's words: "the same version may need two different saves; switching slots on every
       launch is a pain, but making a copy takes space" ⇒ an extra row SHARES the same game files
       (no copy, no extra space) and only points at another slot. Saves are not copied.
-      ⚠️ Say "add a row / remove this row" — never "clone": clone implies the saves were copied too.
+      ★ 2026-10-25: the entry moved into the version page; "clone" is the user's own word, and the
+      subtitle says the game files are shared (nothing is copied).
     -->
     <string name="binding_add_btn">Another slot…</string>
-    <string name="binding_remove_btn">Remove…</string>
     <string name="binding_add_title_fmt">Add a slot for \"%1$s\"</string>
     <string name="binding_new_slot">New slot…</string>
     <!-- ★ One line only: a second line (after \n) is cut to "…" by the system on real devices. -->
     <string name="binding_added_fmt">Added a row using slot \"%1$s\"</string>
-    <string name="binding_removed">Removed this row (saves untouched)</string>
     <string name="binding_taken_fmt">This version already uses slot \"%1$s\"</string>
     <string name="binding_failed">Could not change this row (the config may have been changed elsewhere).</string>
     <string name="slot_deleted_extras_fmt">(%1$d rows that only used this slot were removed)</string>
+
+    <!--
+      2026-10-25: the version page — every action that belongs to a version lives on one page.
+      The user's words: "turn the slot entry into a secondary page with all the functions
+      (change slot / clone / resources / delete / details / rename)".
+    -->
+    <string name="version_page_title">Version</string>
+    <string name="version_page_slot_fmt">This row uses slot \"%1$s\" · %2$d saves</string>
+    <string name="version_row_slot">Change slot…</string>
+    <string name="version_row_slot_sub">Pick another slot for this row</string>
+    <string name="version_row_slot_sub_fmt">This row now uses \"%1$s\"</string>
+    <string name="version_row_clone">Clone…</string>
+    <string name="version_row_clone_sub">Add another row on another slot (game files are shared)</string>
+    <string name="version_row_detail">Details…</string>
+    <string name="version_row_detail_sub">Source, size, checksum, ABI</string>
+    <string name="version_row_rename">Name…</string>
+    <string name="version_row_rename_sub">Give this version your own name</string>
+    <string name="version_row_res">Resources…</string>
+    <string name="version_row_res_sub">Export sprites, sounds, maps from the package</string>
+    <string name="version_row_delete">Delete…</string>
+    <string name="version_row_delete_sub">Delete this row or the whole version</string>
+    <string name="version_row_delete_sub_row_fmt">This row only (still %1$d rows)</string>
+    <string name="version_row_delete_sub_version">The whole version (in-app copy)</string>
+    <string name="version_row_delete_sub_blocked">An installed version must keep one row</string>
+    <string name="delete_row_title">Delete this row?</string>
+    <string name="delete_row_msg_fmt">Removes this row (slot \"%1$s\") from the list. The version, its other rows and the saves in the slot stay put.</string>
+    <!-- ★ One line only (see above). -->
+    <string name="delete_row_done_fmt">Row removed (slot \"%1$s\")</string>
+    <string name="delete_installed_last_title">Cannot delete</string>
+    <string name="delete_installed_last_msg">This version comes from the system and must keep at least one row. To remove it, uninstall it in the system.</string>
     <!--
       ★ 2026-10-06 (round 115, batch 4): plain-language versions of **system** failures,
       used by `Util.ioReason`. Only known errnos are translated; our own resource
@@ -2048,7 +2076,6 @@
     <string name="trash_restore_plugin_ok_fmt">\"%1$s\" is back in the plugin list - still disabled, enable it yourself.</string>
     <!-- round 149: the item is an uninstalled plugin (it used to fall into "Other files") -->
     <string name="trash_kind_plugin">Uninstalled plugin</string>
-    <string name="version_name_btn">Name</string>
     <string name="save">Save</string>
     <string name="version_type_official">Vanilla</string>
     <string name="version_type_modded">Modded</string>

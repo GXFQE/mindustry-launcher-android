@@ -151,7 +151,7 @@ public final class SelfTest {
             MapsActivity.class, MapDetailActivity.class, SettingsActivity.class,
             AboutActivity.class, LogActivity.class, TrashActivity.class, BlueprintsActivity.class,
             BlueprintDetailActivity.class, GameSlot.class, SavesActivity.class, PluginsActivity.class,
-            ResourcesActivity.class};
+            ResourcesActivity.class, VersionActivity.class};
 
     /**
      * ★★ 有「向上」箭头的页面 = 清单里**声明了父级的**（2026-10-16 用户报的：模组页回主页面、
@@ -174,7 +174,8 @@ public final class SelfTest {
             {LogActivity.class, "SettingsActivity"},
             {TrashActivity.class, "MainActivity"},
             {PluginsActivity.class, "MainActivity"},
-            {ResourcesActivity.class, "MainActivity"}};
+            {ResourcesActivity.class, "MainActivity"},
+            {VersionActivity.class, "MainActivity"}};
 
     /** 主页面与游戏页：**不许**有父级（有的话主页面会平白多出一个返回箭头） */
     private static final Class<?>[] PAGES_WITHOUT_UP = {MainActivity.class, GameSlot.class};
@@ -10655,7 +10656,7 @@ public final class SelfTest {
                 "io.mdt.launcher.BlueprintsActivity", "io.mdt.launcher.BlueprintDetailActivity",
                 "io.mdt.launcher.TrashActivity", "io.mdt.launcher.SavesActivity",
                 "io.mdt.launcher.PluginsActivity", "io.mdt.launcher.ResourcesActivity",
-                "io.mdt.launcher.AboutActivity"};
+                "io.mdt.launcher.AboutActivity", "io.mdt.launcher.VersionActivity"};
         int found = 0;
         for (String n : want) {
             if (canResolve(ctx, n)) found++;

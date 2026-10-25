@@ -461,6 +461,35 @@ public final class Config {
         save();
     }
 
+    /**
+     * 去掉**这一行**的绑定；主行被去掉时把第一条附加绑定提升成主行。
+     *
+     * <p>★ 为什么主行也允许"去掉"（2026-10-25 用户定案：行就是实例，删掉最后一行 = 删版本）：
+     *   主行只是"这一版的主分配存在 {@link #K_VSLOTS} 里"的实现细节，不该是一种特权 ——
+     *   否则"删掉 default 那一行、只留存档B"这件事永远做不到。
+     * <p>★ 提升之后**必须**把被提升的那条从附加里删掉，否则它同时是主槽又是附加槽
+     *   ⇒ 列表里两行一模一样。
+     *
+     * @return true = 确实动过；调用方自己去判断"这个版本还有没有别的行"
+     */
+    public synchronized boolean removeBinding(String key, String slot) {
+        if (key == null || key.isEmpty() || slot == null || slot.isEmpty()) return false;
+        JSONObject vs = mRoot.optJSONObject(K_VSLOTS);
+        String prim = vs == null ? "" : vs.optString(key, "");
+        boolean isPrimaryRow = slot.equals(prim)
+                || (prim.isEmpty() && slot.equals(effectivePrimaryOf(key)));
+        if (!isPrimaryRow) return removeExtraSlot(key, slot);
+        List<String> ex = extraSlotsOf(key);
+        if (!ex.isEmpty()) {
+            String up = ex.get(0);
+            removeExtraSlot(key, up);   // 先摘附加（它会 save）
+            setSlotOf(key, up);         // 再写成主分配
+            return true;
+        }
+        setSlotOf(key, "");
+        return true;
+    }
+
     /** {@link #replaceSlotBinding} 的返回值（都是"用户能看懂"的原因，不是异常） */
     public static final int BIND_OK = 0;
     public static final int BIND_TARGET_TAKEN = 1;   // 目标槽这个版本已经绑着

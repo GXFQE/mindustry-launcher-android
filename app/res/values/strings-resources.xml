@@ -8,7 +8,6 @@
     英文值里不写撇号（aapt2 / 语言包校验的边界）。
 -->
 <resources>
-    <string name="resources_btn">Assets</string>
     <string name="resources_title">Game assets</string>
     <string name="resources_head_fmt">%1$s · %2$d files · %3$s</string>
     <string name="resources_note">Only checked types go into the zip. Sprites are whole atlas pages, not individual images.</string>

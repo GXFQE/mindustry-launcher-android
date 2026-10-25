@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  版本页（2026-10-25）：一个版本的全部动作都在这里 —— 换槽 / 克隆 / 详情 / 命名 / 资源 / 删除。
+
+  入口只有两个：主界面行上的「管理」按钮、以及长按那一行（同一条路）。
+  ★ 为什么不再用弹窗：用户说「槽操作和长按后的版本操作有点乱」—— 一个弹窗里塞不下
+    "读信息 + 改绑定 + 删除 + 资源" 四类动作，而 3 个按钮的预算怎么排版都会让某一类动作
+    找不到家。页面和已有的槽页 / 地图详情 / 蓝图详情一个模式。
+
+  ⚠️ 根节点必须有 @+id/root，Activity 里必须 Util.applySystemInsets(root)：
+    targetSdk 36 强制 edge-to-edge，缺这一步整页内容会从 y=0 开始画、被状态栏盖住。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bg">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingTop="12dp"
+            android:paddingBottom="16dp">
+
+            <!-- 身份卡（点一下 = 只读详情：校验值 / ABI / 路径） -->
+            <LinearLayout
+                android:id="@+id/version_card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="14dp"
+                android:layout_marginEnd="14dp"
+                android:orientation="vertical"
+                android:background="@drawable/card_bg"
+                android:clickable="true"
+                android:focusable="false"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:paddingTop="14dp"
+                android:paddingBottom="14dp">
+
+                <TextView
+                    android:id="@+id/version_title"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="2"
+                    android:textColor="@color/fg"
+                    android:textSize="17sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/version_sub"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:lineSpacingExtra="2dp"
+                    android:textColor="@color/fg_muted"
+                    android:textSize="12sp" />
+
+                <TextView
+                    android:id="@+id/version_slot"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:textColor="@color/accent"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <!-- 六个动作 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="14dp"
+                android:layout_marginEnd="14dp"
+                android:layout_marginTop="12dp"
+                android:orientation="vertical"
+                android:background="@drawable/card_bg">
+
+                <include
+                    android:id="@+id/row_ver_slot"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <include
+                    android:id="@+id/row_ver_clone"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <include
+                    android:id="@+id/row_ver_detail"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <include
+                    android:id="@+id/row_ver_rename"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <include
+                    android:id="@+id/row_ver_res"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <include
+                    android:id="@+id/row_ver_delete"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

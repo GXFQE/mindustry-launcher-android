@@ -703,6 +703,17 @@ public final class Versions {
     }
 
     /**
+     * 这个版本现在在列表里有**几行**（主行永远算一行，附加绑定各算一行）。
+     *
+     * <p>★ 删除的语义按它分岔（2026-10-25 用户定案）：还有别的行 ⇒ 只删这一行；
+     *   这是最后一行 ⇒ 删整个版本（导入的连本体，已装的**不许删** —— 那份在系统里）。
+     *   判据只有这一处：行数 = 1 + 附加绑定数，别在界面里各数各的。
+     */
+    public static int rowCount(String key) {
+        return 1 + Config.get().extraSlotsOf(key).size();
+    }
+
+    /**
      * 读一个 APK 文件里声明的**包名**（不安装它）。
      * ⚠️ 读不到（坏包 / 缺权限）返回空串 —— 调用方按"未知"处理，**不抛**。
      */
@@ -815,6 +826,28 @@ public final class Versions {
         Set<String> keys = new LinkedHashSet<>();
         for (Entry e : entries) if (e != null) keys.add(e.key());
         return keys.size();
+    }
+
+    /**
+     * 版本行的**副标题**（紧凑形态）：`来源 · 大小` 或 `来源 · 大小 · 存档 N 份`。
+     *
+     * <p>★ 列表行与「版本页」的标题卡共用这一份（2026-10-25 从 `MainActivity.rowSubtitle` 收口）——
+     *   版本页原先直接印 {@link Entry#subtitle} 的长形态（带 `/data/app/~~…/base.apk` 整条路径），
+     *   三行都是路径，真机截图一眼就看出该用紧凑的那份。
+     */
+    public static String subtitleLine(android.content.Context ctx, Entry e, int saves) {
+        if (e == null) return "";
+        String size = Util.formatSize(e.apkSize);
+        if (saves > 0) {
+            return e.imported
+                    ? Trans.get(ctx, R.string.row_imported_sub_saves_fmt,
+                            e.importFile == null ? "" : e.importFile, size, saves)
+                    : Trans.get(ctx, R.string.row_sub_saves_fmt, e.pkg, size, saves);
+        }
+        return e.imported
+                ? Trans.get(ctx, R.string.row_imported_sub_fmt,
+                        e.importFile == null ? "" : e.importFile, size)
+                : Trans.get(ctx, R.string.row_sub_fmt, e.pkg, size);
     }
 
     static List<Entry> scanInstalled(Context ctx) {
