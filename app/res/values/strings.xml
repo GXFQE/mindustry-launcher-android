@@ -1629,6 +1629,13 @@
     <string name="log_export_fail_fmt">Export failed: %1$s</string>
     <string name="log_export_empty">No logs to export yet</string>
     <string name="log_export_no_picker">No app on this system can save files</string>
+    <string name="log_open">Analyze an external log…</string>
+    <string name="log_open_sub">Pick a .txt file — a crash log from someone else works too</string>
+    <string name="log_open_title">Analysis</string>
+    <string name="log_open_fail">Could not read that file.</string>
+    <string name="log_open_too_big">File too large (over 4 MB).</string>
+    <string name="log_open_empty">That log is empty — nothing to analyze.</string>
+    <string name="log_open_no_picker">No app on this system can pick files</string>
 
     <!--
       ══ 第 142 轮：脱敏日志（分享用）══════════════════════════════════════

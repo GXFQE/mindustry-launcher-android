@@ -89,6 +89,8 @@ public class LogActivity extends BaseActivity {
     private static final int EXPORT_MAX_BYTES = 8 * 1024 * 1024;
     /** SAF 导出请求码 */
     private static final int REQ_EXPORT = 4711;
+    /** 第 250 轮（7.3g）：分析外部日志 —— 选一个 .txt 回来 */
+    private static final int REQ_OPEN = 4712;
 
     /**
      * 待导出模式的磁盘日志名（第 177 轮，杀后台 P0）。
@@ -238,6 +240,12 @@ public class LogActivity extends BaseActivity {
         Util.bindAction(root, R.id.log_row_export, R.drawable.ic_download,
                 R.string.log_export, R.string.log_export_sub, new Runnable() {
                     @Override public void run() { promptExport(); }
+                });
+
+        // 第 250 轮（7.3g）：外部日志分析（别人发来的 .txt / 存档里的崩溃报告）
+        Util.bindAction(root, R.id.log_row_open, R.drawable.ic_folder,
+                R.string.log_open, R.string.log_open_sub, new Runnable() {
+                    @Override public void run() { promptOpen(); }
                 });
 
         Util.applySystemInsets(root);
@@ -755,6 +763,81 @@ public class LogActivity extends BaseActivity {
      *   —— 见 {@link CrashScrub} 的类注释。但**自己留档**时那些信息恰恰有用
      *   ⇒ 不做成"一律脱敏"，而是让用户在动手前就知道自己在导出哪一种。
      */
+    // ── 第 250 轮（7.3g）：分析**外部**日志 ──────────────────────────────
+
+    /** 选一个 .txt（别人的崩溃日志也行）—— 只读，不改任何东西 */
+    private void promptOpen() {
+        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT)
+                .addCategory(Intent.CATEGORY_OPENABLE)
+                .setType("*/*");
+        try {
+            startActivityForResult(i, REQ_OPEN);
+        } catch (Throwable t) {
+            Toast.makeText(this, R.string.log_open_no_picker, Toast.LENGTH_LONG).show();
+        }
+    }
+
+    /** 读回来（后台）→ {@link CrashAnalysis#analyzeText}（没有槽上下文，最多到 L2）→ 弹结论 */
+    private void analyzeExternal(final android.net.Uri uri) {
+        new Thread(new Runnable() {
+            @Override public void run() {
+                String text = null;
+                String err = null;
+                try {
+                    text = readUriText(uri, 4L * 1024 * 1024);
+                } catch (Throwable t) {
+                    err = t.getMessage();
+                }
+                final String fText = text;
+                final String fErr = err;
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        if (fText == null) {
+                            alert(Trans.get(LogActivity.this, R.string.log_open_title),
+                                    "too-big".equals(fErr)
+                                            ? Trans.get(LogActivity.this, R.string.log_open_too_big)
+                                            : Trans.get(LogActivity.this, R.string.log_open_fail));
+                            return;
+                        }
+                        CrashAnalysis.Verdict v = CrashAnalysis.analyzeText(fText);
+                        if (v == null) {
+                            alert(Trans.get(LogActivity.this, R.string.log_open_title),
+                                    Trans.get(LogActivity.this, R.string.log_open_empty));
+                            return;
+                        }
+                        alert(Trans.get(LogActivity.this, R.string.log_open_title),
+                                CrashAnalysis.text(LogActivity.this, v));
+                    }
+                });
+            }
+        }, "log-open").start();
+    }
+
+    /** 读文本（最多 `max` 字节；超限抛 `too-big`，由调用方翻成人话） */
+    private String readUriText(android.net.Uri uri, long max) throws Exception {
+        java.io.InputStream in = getContentResolver().openInputStream(uri);
+        if (in == null) throw new java.io.IOException("open");
+        try {
+            java.io.ByteArrayOutputStream bos = new java.io.ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            long total = 0;
+            int n;
+            while ((n = in.read(buf)) > 0) {
+                total += n;
+                if (total > max) throw new java.io.IOException("too-big");
+                bos.write(buf, 0, n);
+            }
+            return new String(bos.toByteArray(), "UTF-8");
+        } finally {
+            try { in.close(); } catch (Throwable ignored) {}
+        }
+    }
+
+    private void alert(String title, String msg) {
+        new AlertDialog.Builder(this).setTitle(title).setMessage(msg)
+                .setNegativeButton(R.string.close, null).show();
+    }
+
     private void promptExport() {
         if (mSnap == null || !hasAnyLog(mSnap)) {
             Toast.makeText(this, R.string.log_export_empty, Toast.LENGTH_SHORT).show();
@@ -828,6 +911,12 @@ public class LogActivity extends BaseActivity {
     @Override
     protected void onActivityResult(int req, int res, Intent data) {
         super.onActivityResult(req, res, data);
+        if (req == REQ_OPEN) {
+            if (res == RESULT_OK && data != null && data.getData() != null) {
+                analyzeExternal(data.getData());
+            }
+            return;
+        }
         if (req != REQ_EXPORT) return;
         // ★ 第 177 轮：**无论成败先取走磁盘待办**（与 SlotIo/BatchIo 同一条纪律）。
         final JSONObject pend = Pending.take(this, PEND_EXPORT);

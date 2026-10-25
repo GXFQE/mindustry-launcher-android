@@ -1562,6 +1562,13 @@
     <string name="log_export_fail_fmt">导出失败：%1$s</string>
     <string name="log_export_empty">还没有任何日志可导出</string>
     <string name="log_export_no_picker">系统里没有可以「保存文件」的应用</string>
+    <string name="log_open">分析外部日志…</string>
+    <string name="log_open_sub">选一个 .txt；别人发来的崩溃日志也能看</string>
+    <string name="log_open_title">分析结果</string>
+    <string name="log_open_fail">读不出这份文件。</string>
+    <string name="log_open_too_big">文件太大（超过 4 MB）。</string>
+    <string name="log_open_empty">这份日志是空的，没什么可分析。</string>
+    <string name="log_open_no_picker">系统里没有可以「选文件」的应用</string>
 
     <!--
       ══ 第 142 轮：脱敏日志（分享用）══════════════════════════════════════

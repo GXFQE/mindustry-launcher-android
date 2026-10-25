@@ -997,6 +997,21 @@ final class CrashAnalysis {
     }
 
     /**
+     * 分析**外部**的一份崩溃日志（用户从 SAF 选的 `.txt`）—— 第 250 轮（7.3g）。
+     *
+     * ★ 与 {@link #analyzeReport} 的差别只有一条：**没有槽上下文** ⇒ 走 {@link #judge} 的
+     *   便宜层（`null` 模组表 / 不扫 dex），结论最多到 L2。
+     *   没有 `Mods:` 行 / 没有 `Likely Cause:` 的文件只会给「弱线索 / 说不清」，
+     *   **不会点名**（现有判据保证）；调用方负责 4 MB 上限与"空文件"提示。
+     *
+     * @return 解析不出内容返回 null（空文本）
+     */
+    static Verdict analyzeText(String text) {
+        if (text == null || text.trim().isEmpty()) return null;
+        return judge(parse(text), null, null);
+    }
+
+    /**
      * 结论的**一行版**（Toast / 标题这类"只给一句"的地方用）：取 {@link #text} 的第一行。
      * ★ 与 {@link #text} 同一个来源 ⇒ 不会出现"弹窗说 A、日志页说 B"。
      */

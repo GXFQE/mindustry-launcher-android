@@ -5960,6 +5960,19 @@ public final class SelfTest {
         ok(stat, L, r2.mods.size() == 5 && r2.mods.contains("kotlin") && r2.mods.contains("mindustryx"),
                 "★`Mods:` 里的**伪条目**（kotlin / mindustryx）照样进表 —— 不能假设都能对上我们的模组表："
                         + r2.mods);
+        // ★★ 7.3g（2026-10-25）：外部日志分析（`analyzeText`）—— 没有槽上下文，走便宜层。
+        CrashAnalysis.Verdict extL1 = CrashAnalysis.analyzeText(fxL1);
+        CrashAnalysis.Verdict extL1Low = CrashAnalysis.judge(r2, null, null);
+        ok(stat, L, extL1 != null && extL1.kind == extL1Low.kind
+                        && CrashAnalysis.brief(ctx, extL1).equals(CrashAnalysis.brief(ctx, extL1Low)),
+                "★7.3g 外部日志：`analyzeText` == `judge(parse(text), null, null)`（同一份语料同结论）");
+        ok(stat, L, CrashAnalysis.analyzeText("") == null
+                        && CrashAnalysis.analyzeText("  \n ") == null,
+                "★7.3g 外部日志：空文本 ⇒ 没有结论（不冒充「原版崩」）");
+        CrashAnalysis.Verdict extNoise = CrashAnalysis.analyzeText("hello\nworld\n");
+        ok(stat, L, extNoise != null && extNoise.hits.isEmpty()
+                        && CrashAnalysis.blamedInternals(extNoise).isEmpty(),
+                "★7.3g 外部日志：没有模组行 / 没有针 ⇒ 不点名（弱线索不许当结论）");
         List<Mods.Info> mods2 = new ArrayList<Mods.Info>();
         mods2.add(info("stealth-path", "Stealth Path / 偷袭小道", "stealthpath.StealthPathMod"));
         CrashAnalysis.Verdict v5 = CrashAnalysis.judge(r2, mods2, null);

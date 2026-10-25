@@ -68,6 +68,18 @@
                     layout="@layout/row_action"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="@color/divider" />
+
+                <!-- 第 250 轮（7.3g）：分析**外部**日志 —— 别人发来的 .txt 也能看 -->
+                <include
+                    android:id="@+id/log_row_open"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
             </LinearLayout>
 
             <!-- 第 160 轮：插件动作区（没有条目整块 GONE） -->
