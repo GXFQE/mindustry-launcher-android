@@ -9,9 +9,6 @@
     <string name="plugin_import">装一个插件 APK</string>
     <string name="plugin_chooser_title">选一个插件 APK</string>
     <string name="plugin_state_active_fmt">%1$s · 生效中（%2$s 装的那份）</string>
-    <string name="plugin_state_pending_fmt">%1$s · 退出重开生效（%2$s 装的那份）</string>
-    <string name="plugin_state_off_fmt">%1$s · 已停用（上次生效的是 %2$s 那份）</string>
-    <string name="plugin_state_off_never">%1$s · 已停用</string>
     <!-- 第 180 轮：列表卡上的**短**状态徽标（句子形式留给弹窗 / Toast）；
          中文三到四个字，英文也尽量短 —— 徽标是拿来扫的，不是拿来讲道理的。 -->
     <string name="plugin_section_installed">已安装</string>
@@ -87,10 +84,8 @@
     <string name="plugin_level_l1">失败后先留着它，下次启动再试</string>
     <string name="plugin_level_l2">失败后换回它上一份能用的版本</string>
     <string name="plugin_level_l3">失败后停用它，并把这一版隔离</string>
-    <string name="plugin_info_fmt">%1$s\n来源：%2$s\n处置：%3$s</string>
     <string name="plugin_action_level_fmt">改成「%1$s」</string>
     <string name="plugin_action_restore_fmt">把隔离的那份放回来</string>
-    <string name="plugin_row_quarantined_fmt">%1$s · 已隔离（%2$s 装的那份）</string>
     <string name="plugin_skip_retry_fmt">%1$s：%2$s没起来，先留着，下次启动再试</string>
     <string name="plugin_skip_rollback_q_fmt">%1$s：%2$s没起来，已换回 %3$s，并把坏的那份隔离</string>
     <string name="plugin_skip_quarantine_fmt">%1$s：%2$s没起来，已停用并隔离</string>

@@ -18,9 +18,6 @@
     <string name="plugin_import">Install a plugin APK</string>
     <string name="plugin_chooser_title">Pick a plugin APK</string>
     <string name="plugin_state_active_fmt">%1$s · active (the copy installed %2$s)</string>
-    <string name="plugin_state_pending_fmt">%1$s · takes effect after a restart (the copy installed %2$s)</string>
-    <string name="plugin_state_off_fmt">%1$s · off (last active was the copy from %2$s)</string>
-    <string name="plugin_state_off_never">%1$s · off</string>
     <!-- 第 180 轮：列表卡上的**短**状态徽标（句子形式留给弹窗 / Toast）；
          中文三到四个字，英文也尽量短 —— 徽标是拿来扫的，不是拿来讲道理的。 -->
     <string name="plugin_section_installed">Installed</string>
@@ -96,10 +93,8 @@
     <string name="plugin_level_l1">After a failure: keep it, try again next launch</string>
     <string name="plugin_level_l2">After a failure: switch back to the last version that worked</string>
     <string name="plugin_level_l3">After a failure: turn it off and quarantine this version</string>
-    <string name="plugin_info_fmt">%1$s\nSource: %2$s\nHandling: %3$s</string>
     <string name="plugin_action_level_fmt">Change to %1$s</string>
     <string name="plugin_action_restore_fmt">Put the quarantined copy back</string>
-    <string name="plugin_row_quarantined_fmt">%1$s · quarantined (the copy installed %2$s)</string>
     <string name="plugin_skip_retry_fmt">%1$s: %2$s did not work - kept, will be tried again</string>
     <string name="plugin_skip_rollback_q_fmt">%1$s: %2$s did not work - switched back to %3$s and quarantined the bad one</string>
     <string name="plugin_skip_quarantine_fmt">%1$s: %2$s did not work - turned off and quarantined</string>

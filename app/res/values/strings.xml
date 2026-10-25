@@ -326,7 +326,6 @@
          那正是本工程反复栽的形态（同一显示规则两处实现 ⇒ 改一边另一边静默不跟），已合并。 -->
     <string name="slot_entry_fmt">%1$d files · %2$s</string>
     <!-- 槽操作菜单的标题：槽名 + 元信息。元信息本来走 setMessage，但那个坑见 SlotsActivity.slotOps() -->
-    <string name="slot_ops_title_fmt">%1$s (%2$s)</string>
 
     <string name="slot_op_backup">Back up this slot…</string>
     <string name="slot_op_clone">Clone this slot…</string>
@@ -416,7 +415,6 @@
 
     <string name="no_backup_title">No backups available</string>
     <string name="no_backup_msg_fmt">Slot \"%1$s\" has no backups yet.</string>
-    <string name="restore_head_fmt">%1$d backups · pick one to restore</string>
     <string name="snapshot_entry_fmt">%1$d files · %2$s</string>
     <!--
       ══ Backup list: the list itself + the actions for one chosen backup ══════
@@ -442,10 +440,7 @@
     <string name="chooser_pick_msav">Pick a .msav save</string>
     <string name="msav_import_progress_title">Import save</string>
     <string name="msav_import_progress_msg_fmt">%1$s\nwriting into slot \"%2$s\"…</string>
-    <string name="not_msav_title">This file does not look like .msav</string>
-    <string name="not_msav_msg">This file does not look like a save and the game may not read it.\n\nImport anyway?</string>
     <string name="import_anyway">Import anyway</string>
-    <string name="discard">Discard</string>
     <string name="msav_imported_fmt">Imported into slot \"%1$s\": %2$s</string>
 
     <!-- ══ F6 导出到共享存储（SAF 出口，不需要任何存储权限） ══════════════ -->
@@ -462,7 +457,6 @@
         "导出的是不是同一个东西"。文案不对称 = 让人怀疑功能不对称。
     -->
     <!-- 地图入口（F10 后半）：三个来源一起看 -->
-    <string name="slot_op_maps">Maps (this slot / game / mods)…</string>
     <!-- 地图增删（F10）-->
     <string name="maps_import">Import map…</string>
     <!-- ★ 第 155 轮：一行两路（从文件 / 从本槽存档）—— 副标题把两条路都说出来 -->
@@ -475,7 +469,6 @@
         ⇒ 走「导入地图…」那条路，得先把存档导出到 Download 再选回来。
     -->
     <string name="maps_from_save">Save → map…</string>
-    <string name="maps_from_save_sub">Pick one from this slot (no file picker)</string>
     <string name="maps_from_save_pick_title">Turn which save into a map?</string>
     <string name="maps_from_save_head_fmt">This slot has %1$d saves · tap one</string>
     <string name="maps_from_save_none">No saves in this slot yet</string>
@@ -547,7 +540,6 @@
     <string name="maps_export">Export map…</string>
     <string name="maps_export_sub">Save to the phone; several become one zip</string>
     <string name="maps_export_none">No maps to export yet</string>
-    <string name="maps_export_head_fmt">%1$d maps · tap one to export</string>
     <string name="maps_export_working">Writing…</string>
     <string name="maps_export_nosrc">Cannot find the content of this map</string>
     <string name="map_export_ok_fmt">Exported %1$s (%2$s)</string>
@@ -582,7 +574,6 @@
     <string name="msav_all_ok">All saves in this slot are readable right now</string>
     <!-- 冲突体检没做成时的白话提示（2026-10-04 补）：原来是把异常对象直接拼进正文。 -->
     <string name="slot_page_saves">Saves</string>
-    <string name="slot_page_saves_sub">See each save / import / export</string>
     <string name="slot_page_maps">Maps</string>
     <string name="slot_page_maps_sub">this slot / game / mods; many at once, or one zip</string>
     <string name="slot_page_gone_fmt">This slot is gone: %1$s</string>
@@ -666,8 +657,6 @@
     <string name="slot_op_export_slot">Export the whole slot (zip)…</string>
     <string name="export_no_save_fmt">Slot \"%1$s\" has no saves yet.</string>
     <string name="export_pick_title_fmt">Export save</string>
-    <string name="export_pick_head_fmt">Slot \"%1$s\" · %2$d saves</string>
-    <string name="export_item_fmt">%1$s  ·  %2$s</string>
     <!-- F10：.msav 元数据那一行（白话、短、无 markdown） -->
 
 
@@ -835,7 +824,6 @@
     <string name="bp_export">Export blueprint…</string>
     <string name="bp_export_sub">Save to the phone; several become one zip</string>
     <string name="bp_export_none">This slot has no blueprints yet</string>
-    <string name="bp_export_head_fmt">%1$d in total, tap one to export it</string>
     <string name="bp_export_working">Writing the file…</string>
     <string name="bp_export_ok_fmt">Exported %1$s (%2$s)</string>
     <string name="bp_export_nosrc">The source of this blueprint cannot be found</string>
@@ -1026,15 +1014,6 @@
         **不要**为"分号 + 空格"再做一个分隔符资源（尾随空格会被 aapt2 剥掉，
         写成 `"; "` 更会把引号变成字面内容 —— 我第一版就是这么错的）。
     -->
-    <string name="stats_note_skip_mods">The game is not loading mods this run (it crashed last time), so this counts vanilla only</string>
-    <string name="stats_note_mods_failed">Mods could not be read, so this counts vanilla only</string>
-    <string name="stats_note_mods_fmt">%1$d mods (%2$d entries added, %3$d overridden)</string>
-    <string name="stats_note_bundles_fmt">%1$d of the packs ship translations, %2$d entries in all</string>
-    <string name="stats_note_names_apk_fmt">%1$s: %2$d entries</string>
-    <string name="stats_note_names_no_apk">The version APK has no translation for this language</string>
-    <string name="stats_note_names_mod_fmt">mods add %1$d entries</string>
-    <string name="stats_note_names_apk_base_fmt">base bundle: %1$d entries</string>
-    <string name="stats_note_names_mod_base_fmt">mod base bundle: %1$d entries</string>
     <string name="stats_wall_name_fmt">%1$s (wall)</string>
 
     <!--
@@ -1261,10 +1240,6 @@
 
 
 
-    <string name="clean">Clean up</string>
-    <string name="clean_progress_title">Cleaning</string>
-    <string name="clean_progress_msg">Deleting redundant copies…</string>
-    <string name="clean_result">Cleanup result</string>
 
 
 
@@ -1536,7 +1511,6 @@
     <string name="storage_clear_none">No temporary share files.</string>
     <string name="storage_clear_fail">Could not clear the cache.</string>
 
-    <string name="about_fmt">version %1$s (build %2$d)\npackage %3$s\n\nCurrent slot data\n%4$s\n\nManager data\n%5$s</string>
 
     <!-- 第 175 轮：「关于」从设置页搬成独立二级页 -->
     <string name="about_summary_fmt">Version %1$s (build %2$d)\nPackage %3$s</string>
@@ -1571,7 +1545,6 @@
     <string name="policy_save">Save</string>
     <!-- F5b：表单里的实时摘要（改数字立刻变，省得用户心算） -->
     <string name="policy_live_fmt">Backs up automatically after %1$d minutes of play, keeping at most %2$d</string>
-    <string name="policy_live_short_fmt">%1$d min of play · keeps at most %2$d</string>
     <string name="policy_live_off">This slot: automatic backup is off</string>
     <string name="policy_summary_fmt">\nAuto backup: after %1$d minutes of play · keeps at most %2$d</string>
     <string name="policy_off_suffix">\nAuto backup: off</string>
@@ -1688,8 +1661,6 @@
         ② **资源里要留空白时必须写 U+0020 转义**（aapt2 会剥掉 string 资源的前导空白，REF §43），
            本块刻意不依赖前后导空白，全部靠 `·` 与换行分隔。
     -->
-    <string name="act_mods_title">Mods</string>
-    <string name="act_mods_sub">Version requirements · dependencies · toggles</string>
     <string name="mods_title">Mods</string>
 
     <string name="mods_summary_fmt">In this slot %1$d · target game %2$s</string>
@@ -1704,7 +1675,6 @@
 
     <string name="mods_empty_fmt">Slot \"%1$s\" has no mods yet.\nImport .jar / .zip from this device and they show up here.</string>
     <string name="mods_ignored_fmt">%1$d more folders will not be loaded (they are not mod packages)</string>
-    <string name="mods_broken_head">Packages whose description file cannot be read (the game skips them outright)</string>
     <string name="mods_problem_head">Conflicts and problems</string>
 
     <string name="mods_sub_fmt">%1$s · %2$s</string>
@@ -1757,7 +1727,6 @@
     <string name="mods_dep_warn_tail">They will be missing a dependency on the next launch (may stop working or throw errors)</string>
     <string name="mods_batch_confirm_on_fmt">Enable all %1$d mods in this slot?\n\nThe settings file is backed up first; this is refused while the game is running.</string>
     <string name="mods_batch_confirm_off_fmt">Turn off all %1$d mods in this slot?\n\nThe settings file is backed up first.</string>
-    <string name="mods_filter_sort_head">Sort by</string>
     <string name="mods_filter_sort_name">Name</string>
     <string name="mods_filter_sort_state">Problems first</string>
     <string name="mods_filter_sort_size">Size (largest first)</string>
@@ -1818,10 +1787,8 @@
     <string name="mods_detail_desc_fmt">About: %1$s</string>
     <string name="mods_detail_author_fmt">Author: %1$s</string>
     <string name="mods_detail_repo_fmt">Update URL: %1$s</string>
-    <string name="mods_detail_main_fmt">Code entry: %1$s</string>
     <string name="mods_detail_deps_fmt">Required dependencies: %1$s</string>
     <string name="mods_detail_softdeps_fmt">Soft dependencies: %1$s</string>
-    <string name="mods_detail_none">none</string>
     <string name="mods_detail_state_fmt">next launch: %1$s</string>
     <string name="mods_badge_load">loads</string>
     <string name="mods_badge_noload">will not load</string>
@@ -1835,7 +1802,6 @@
     <string name="mods_detail_gate_ok_fmt">✅ %1$s</string>
     <string name="mods_detail_gate_fail_fmt">❌ %1$s\n   %2$s</string>
     <string name="mods_detail_settings_head">In-game toggles</string>
-    <string name="mods_detail_setting_fmt">%1$s = %2$s</string>
     <string name="mods_detail_meta_head">Description file as written (first %1$d characters)</string>
     <string name="mods_detail_size_fmt">Size: %1$s · %2$s</string>
     <string name="mods_detail_allok">✅ Nothing here blocks it</string>
@@ -1849,7 +1815,6 @@
     <string name="mods_detail_gate_ok_note_fmt">✅ %1$s\n   %2$s</string>
     <string name="mods_detail_setting2_fmt">%1$s: %2$s</string>
     <string name="mods_setting_enabled">Enabled</string>
-    <string name="mods_setting_failed">Failed to load before</string>
     <string name="mods_setting_repo">Update URL</string>
     <string name="mods_setting_repo_default">(use the one in the description file)</string>
     <string name="mods_setting_yes">Yes</string>
@@ -1861,8 +1826,6 @@
       ★ 文案纪律同前：中文串接不留多余空格、资源里要空白就写 U+0020 转义、**不许出现字面星号**
         （setMessage 是纯文本，`**加粗**` 会原样显示星号 —— 本工程已有纪律）。
     -->
-    <string name="mods_toggle_enable">Enable this mod</string>
-    <string name="mods_toggle_disable">Disable this mod</string>
     <string name="mods_toggle_do">Apply it</string>
     <string name="mods_toggle_done">Changed</string>
     <string name="mods_toggle_noop">Already like that</string>
@@ -1925,7 +1888,6 @@
     <string name="mods_copy_progress_fmt">Copying %1$d items into \"%2$s\"…</string>
     <string name="mods_copy_progress_title">Copying mods</string>
     <string name="mods_copy_result_title">Copy result</string>
-    <string name="mods_copy_done">Copy complete</string>
     <string name="mods_copy_title_ok">Start copying</string>
     <string name="mods_copy_blocked">The game is running and would interfere with the copy. Exit the game first.</string>
 
@@ -2103,7 +2065,6 @@
     <string name="version_type_modded">Modded</string>
     <string name="version_name_title">Name this version</string>
     <string name="version_name_msg">Only changes the name shown in the manager (list row, here, and Continue). The APK itself is untouched. Leave empty to restore the original name.</string>
-    <string name="version_name_hint">For example: My MindustryX</string>
     <string name="version_name_reset">Restore original</string>
     <string name="version_name_saved_fmt">Named it \"%1$s\"</string>
     <string name="version_name_reset_done">Original name restored</string>

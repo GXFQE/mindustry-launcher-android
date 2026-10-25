@@ -317,7 +317,6 @@
          那正是本工程反复栽的形态（同一显示规则两处实现 ⇒ 改一边另一边静默不跟），已合并。 -->
     <string name="slot_entry_fmt">%1$d 个文件 · %2$s</string>
     <!-- 槽操作菜单的标题：槽名 + 元信息。元信息本来走 setMessage，但那个坑见 SlotsActivity.slotOps() -->
-    <string name="slot_ops_title_fmt">%1$s（%2$s）</string>
 
     <string name="slot_op_backup">备份此槽…</string>
     <string name="slot_op_clone">克隆此槽…</string>
@@ -404,7 +403,6 @@
 
     <string name="no_backup_title">没有可用备份</string>
     <string name="no_backup_msg_fmt">槽「%1$s」还没有备份。</string>
-    <string name="restore_head_fmt">共 %1$d 份备份，选一份恢复</string>
     <string name="snapshot_entry_fmt">%1$d 个文件 · %2$s</string>
     <!--
       ══ 备份列表（一档②）：列表本身 + 选中一份之后的动作 ══════════════════════
@@ -430,10 +428,7 @@
     <string name="chooser_pick_msav">选择 .msav 存档</string>
     <string name="msav_import_progress_title">导入存档</string>
     <string name="msav_import_progress_msg_fmt">%1$s\n写入槽「%2$s」…</string>
-    <string name="not_msav_title">这个文件不像 .msav</string>
-    <string name="not_msav_msg">这个文件不像存档，游戏可能读不出来。\n\n仍要导入吗？</string>
     <string name="import_anyway">仍要导入</string>
-    <string name="discard">放弃</string>
     <string name="msav_imported_fmt">已导入到槽「%1$s」：%2$s</string>
 
     <!-- ══ F6 导出到共享存储（SAF 出口，不需要任何存储权限） ══════════════ -->
@@ -450,7 +445,6 @@
         "导出的是不是同一个东西"。文案不对称 = 让人怀疑功能不对称。
     -->
     <!-- 地图入口（F10 后半）：三个来源一起看 -->
-    <string name="slot_op_maps">地图（本槽 / 游戏 / 模组）…</string>
     <!-- 地图增删（F10）-->
     <string name="maps_import">导入地图…</string>
     <!-- ★ 第 155 轮：一行两路（从文件 / 从本槽存档）—— 副标题把两条路都说出来 -->
@@ -459,7 +453,6 @@
     <string name="maps_import_from_file">从文件…</string>
     <!-- ★★ 2026-10-05「本槽存档 → 地图」（REF §72.10）：不过系统文件选择器，直接从本槽的存档里挑 -->
     <string name="maps_from_save">本槽存档 → 地图…</string>
-    <string name="maps_from_save_sub">从本槽的存档里挑一份（不用文件选择器）</string>
     <string name="maps_from_save_pick_title">把哪一份存档转成地图？</string>
     <string name="maps_from_save_head_fmt">本槽有 %1$d 份存档 · 点一份</string>
     <string name="maps_from_save_none">这个槽里还没有存档</string>
@@ -532,7 +525,6 @@
     <string name="maps_export">导出地图…</string>
     <string name="maps_export_sub">存到手机；多选时打成一个 zip</string>
     <string name="maps_export_none">还没有可导出的地图</string>
-    <string name="maps_export_head_fmt">共 %1$d 张 · 点一张导出</string>
     <string name="maps_export_working">正在写入…</string>
     <string name="maps_export_nosrc">找不到这张图的内容</string>
     <string name="map_export_ok_fmt">已导出 %1$s（%2$s）</string>
@@ -567,7 +559,6 @@
     <string name="msav_all_ok">这个槽的存档现在都读得出来</string>
     <!-- 冲突体检没做成时的白话提示（2026-10-04 补）：原来是把异常对象直接拼进正文。 -->
     <string name="slot_page_saves">存档</string>
-    <string name="slot_page_saves_sub">看每份是什么图 / 导入 / 导出</string>
     <string name="slot_page_maps">地图</string>
     <string name="slot_page_maps_sub">本槽 / 游戏 / 模组自带；可多选，也可选一个 zip 整包导入</string>
     <string name="slot_page_gone_fmt">这个槽已经不在了：%1$s</string>
@@ -650,8 +641,6 @@
     <string name="slot_op_export_slot">导出整槽（zip）…</string>
     <string name="export_no_save_fmt">槽「%1$s」里还没有存档。</string>
     <string name="export_pick_title_fmt">导出存档</string>
-    <string name="export_pick_head_fmt">槽「%1$s」 · 共 %2$d 份</string>
-    <string name="export_item_fmt">%1$s  ·  %2$s</string>
     <!-- F10：.msav 元数据那一行（白话、短、无 markdown） -->
 
 
@@ -952,7 +941,6 @@
     <string name="bp_export">导出蓝图…</string>
     <string name="bp_export_sub">存到手机；多选时打成一个 zip</string>
     <string name="bp_export_none">这个槽还没有蓝图</string>
-    <string name="bp_export_head_fmt">共 %1$d 份，点一份导出</string>
     <string name="bp_export_working">正在写文件…</string>
     <string name="bp_export_ok_fmt">已导出 %1$s（%2$s）</string>
     <string name="bp_export_nosrc">找不到这份蓝图的来源</string>
@@ -1001,15 +989,6 @@
       ★ 每条都是**整句**；几句话之间由显示侧用 ` · ` 连起来（不为"分号+空格"再做一个分隔符资源 ——
         尾随空格会被 aapt2 剥掉）。
     -->
-    <string name="stats_note_skip_mods">游戏这次不加载模组（上次崩过），按原版算</string>
-    <string name="stats_note_mods_failed">模组读不动，只按原版算</string>
-    <string name="stats_note_mods_fmt">%1$d 个模组（新增 %2$d 条，覆盖 %3$d 条）</string>
-    <string name="stats_note_bundles_fmt">%1$d 个带译文，共 %2$d 条</string>
-    <string name="stats_note_names_apk_fmt">%1$s 语言包 %2$d 条</string>
-    <string name="stats_note_names_no_apk">版本里没有这门语言的译文</string>
-    <string name="stats_note_names_mod_fmt">模组语言包 %1$d 条</string>
-    <string name="stats_note_names_apk_base_fmt">版本基础包 %1$d 条</string>
-    <string name="stats_note_names_mod_base_fmt">模组基础包 %1$d 条</string>
     <string name="stats_wall_name_fmt">%1$s（墙）</string>
 
     <!--
@@ -1234,10 +1213,6 @@
 
 
 
-    <string name="clean">清理</string>
-    <string name="clean_progress_title">清理中</string>
-    <string name="clean_progress_msg">删除冗余副本…</string>
-    <string name="clean_result">清理结果</string>
 
 
 
@@ -1477,7 +1452,6 @@
     <string name="storage_clear_none">没有临时分享文件。</string>
     <string name="storage_clear_fail">清理失败。</string>
 
-    <string name="about_fmt">版本 %1$s（内部编号 %2$d）\n包名 %3$s\n\n当前槽数据\n%4$s\n\n管理器数据\n%5$s</string>
 
     <!-- 第 175 轮：「关于」从设置页搬成独立二级页 -->
     <string name="about_summary_fmt">版本 %1$s（构建 %2$d）\n包名 %3$s</string>
@@ -1509,7 +1483,6 @@
     <string name="policy_save">保存</string>
     <!-- F5b：表单里的实时摘要（改数字立刻变，省得用户心算） -->
     <string name="policy_live_fmt">玩满 %1$d 分钟自动备份，最多留 %2$d 份</string>
-    <string name="policy_live_short_fmt">玩满 %1$d 分钟 · 最多留 %2$d 份</string>
     <string name="policy_live_off">这一槽：自动备份已关</string>
     <string name="policy_summary_fmt">\n自动备份：玩满 %1$d 分钟 · 最多留 %2$d 份</string>
     <string name="policy_off_suffix">\n自动备份：已关闭</string>
@@ -1621,8 +1594,6 @@
         ② **资源里要留空白时必须写 U+0020 转义**（aapt2 会剥掉 string 资源的前导空白，REF §43），
            本块刻意不依赖前后导空白，全部靠 `·` 与换行分隔。
     -->
-    <string name="act_mods_title">模组</string>
-    <string name="act_mods_sub">版本要求 · 依赖 · 启停</string>
     <string name="mods_title">模组</string>
 
     <string name="mods_summary_fmt">本槽 %1$d 个 · 目标游戏 %2$s</string>
@@ -1637,7 +1608,6 @@
 
     <string name="mods_empty_fmt">槽「%1$s」里还没有模组。\n从本机导入 .jar / .zip 就会出现在这里。</string>
     <string name="mods_ignored_fmt">另有 %1$d 个文件夹不会被加载（它们不是模组包）</string>
-    <string name="mods_broken_head">读不出说明文件的包（游戏会直接跳过）</string>
     <string name="mods_problem_head">冲突与问题</string>
 
     <string name="mods_sub_fmt">%1$s · %2$s</string>
@@ -1690,7 +1660,6 @@
     <string name="mods_dep_warn_tail">它们下次启动会缺依赖（可能不生效或报错）</string>
     <string name="mods_batch_confirm_on_fmt">把这一槽的 %1$d 个模组全部启用？\n\n改前会自动备份设置文件；游戏正在运行时不允许改。</string>
     <string name="mods_batch_confirm_off_fmt">把这一槽的 %1$d 个模组全部关掉？\n\n改前会自动备份设置。</string>
-    <string name="mods_filter_sort_head">排序方式</string>
     <string name="mods_filter_sort_name">按名称</string>
     <string name="mods_filter_sort_state">有问题的在前</string>
     <string name="mods_filter_sort_size">按大小（大的在前）</string>
@@ -1757,10 +1726,8 @@
     <string name="mods_detail_desc_fmt">简介：%1$s</string>
     <string name="mods_detail_author_fmt">作者：%1$s</string>
     <string name="mods_detail_repo_fmt">更新地址：%1$s</string>
-    <string name="mods_detail_main_fmt">代码入口：%1$s</string>
     <string name="mods_detail_deps_fmt">必需依赖：%1$s</string>
     <string name="mods_detail_softdeps_fmt">软依赖：%1$s</string>
-    <string name="mods_detail_none">无</string>
     <!-- ★★ 2026-10-08 用户：「**你不需要告诉用户在游戏关闭时模组到底启没启用啊**」
          —— `-enabled` 是**游戏自己的记账**（只有游戏会写，每次启动都可能被整槽跳过改写），
          把它当"状态"报给用户既没意义、又和"下次启动会被关掉"打架。
@@ -1782,7 +1749,6 @@
     <string name="mods_detail_gate_ok_fmt">✅ %1$s</string>
     <string name="mods_detail_gate_fail_fmt">❌ %1$s\n　　 %2$s</string>
     <string name="mods_detail_settings_head">游戏里的开关</string>
-    <string name="mods_detail_setting_fmt">%1$s = %2$s</string>
     <string name="mods_detail_meta_head">说明文件原文（最多显示前 %1$d 字）</string>
     <string name="mods_detail_size_fmt">大小：%1$s · %2$s</string>
     <string name="mods_detail_allok">✅ 没有过不了的关</string>
@@ -1799,7 +1765,6 @@
     <!-- ⚠️ 2026-10-08 起**没有调用点**了：详情页那行原始值删了（它与六道门里那道「上次启动…」
          说的是同一件事 —— 同一屏说两遍就是"乱"）。**键保留**：v0.3 已发出去过，
          用户语言包里可能有它，删了会让那些包报"未知键"。 -->
-    <string name="mods_setting_failed">加载失败过</string>
     <string name="mods_setting_repo">更新地址</string>
     <string name="mods_setting_repo_default">（用说明文件里的）</string>
     <string name="mods_setting_yes">是</string>
@@ -1811,8 +1776,6 @@
       ★ 文案纪律同前：中文串接不留多余空格、资源里要空白就写 U+0020 转义、**不许出现字面星号**
         （setMessage 是纯文本，`**加粗**` 会原样显示星号 —— 本工程已有纪律）。
     -->
-    <string name="mods_toggle_enable">启用此模组</string>
-    <string name="mods_toggle_disable">关闭此模组</string>
     <string name="mods_toggle_do">就这样改</string>
     <string name="mods_toggle_done">已改动</string>
     <string name="mods_toggle_noop">本来就是这样的</string>
@@ -1877,7 +1840,6 @@
     <string name="mods_copy_progress_fmt">正在把 %1$d 项复制到「%2$s」…</string>
     <string name="mods_copy_progress_title">正在复制模组</string>
     <string name="mods_copy_result_title">复制结果</string>
-    <string name="mods_copy_done">复制完成</string>
     <string name="mods_copy_title_ok">开始复制</string>
     <string name="mods_copy_blocked">游戏正在运行，现在复制会被它干扰。请先退出游戏。</string>
 
@@ -2056,7 +2018,6 @@
     <string name="version_type_modded">改端</string>
     <string name="version_name_title">给这个版本命名</string>
     <string name="version_name_msg">只改管理器里显示的名字（列表行、这里、继续上次都用它），不动 APK 本身。留空 = 恢复原名。</string>
-    <string name="version_name_hint">例如：我的 MindustryX</string>
     <string name="version_name_reset">恢复原名</string>
     <string name="version_name_saved_fmt">已命名为「%1$s」</string>
     <string name="version_name_reset_done">已恢复原名</string>
