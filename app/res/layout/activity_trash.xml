@@ -58,6 +58,14 @@
             layout="@layout/row_action"
             android:layout_width="match_parent"
             android:layout_height="wrap_content" />
+
+        <!-- 2026-10-25 用户「能不能给中转站加一个分类」：按类型筛选（副标题由代码填当前分类与份数）。
+             ★ 排在"清空"之后：下面那条是不可逆动作，筛选是看的动作，别让它先占最上面一格。 -->
+        <include
+            android:id="@+id/row_trash_filter"
+            layout="@layout/row_action"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
     </LinearLayout>
 
     <!-- 第 160 轮：插件动作区（没有条目整块 GONE）；与 trash_actions 一样再留 14dp -->

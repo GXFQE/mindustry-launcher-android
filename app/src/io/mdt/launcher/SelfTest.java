@@ -10004,6 +10004,23 @@ public final class SelfTest {
             } catch (Throwable t) {
                 ok(stat, L, false, "⑥ 文案实拼抛异常：" + t);
             }
+            // ⑦ 分类筛选（2026-10-25 用户「能不能给中转站加一个分类」）：清单必须**覆盖且不重不漏**
+            //   每一种 Kind —— 以后再加一种中转站内容，忘了进 filterOrder() 就在这里红。
+            Trash.Kind[] order = TrashText.filterOrder();
+            java.util.Set<Trash.Kind> seen = new java.util.HashSet<Trash.Kind>();
+            boolean allLabeled = true;
+            StringBuilder labels = new StringBuilder();
+            for (Trash.Kind k : order) {
+                if (k == null || !seen.add(k)) continue;
+                String lab = TrashText.kindLabel(ctx, k);
+                if (lab.isEmpty()) allLabeled = false;
+                if (labels.length() > 0) labels.append(" / ");
+                labels.append(lab);
+            }
+            ok(stat, L, seen.size() == Trash.Kind.values().length && order.length == seen.size(),
+                    "⑦ ★分类清单覆盖每一种中转站内容、且不重复（" + seen.size() + " 种）：" + labels);
+            ok(stat, L, allLabeled && !TrashText.kindLabel(ctx, (Trash.Kind) null).isEmpty(),
+                    "⑦ ★每种都有名字（含「全部」）：「" + TrashText.kindLabel(ctx, (Trash.Kind) null) + "」");
         } catch (Throwable t) {
             ok(stat, L, false, "㊳ 自身异常：" + t);
         } finally {

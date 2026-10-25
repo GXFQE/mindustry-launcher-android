@@ -1349,6 +1349,11 @@
     <string name="trash_empty">还没有东西挪进来。\n删地图、删槽，或者替换模组和存档时，旧的那份会挪到这里。</string>
     <string name="trash_scanning">正在清点…</string>
     <string name="trash_scan_failed">中转站没清点出来。返回上一页再进一次试试。</string>
+    <string name="trash_filter_title">按类型筛选</string>
+    <string name="trash_filter_all">全部</string>
+    <string name="trash_filter_item_fmt">%1$s · %2$d 份</string>
+    <string name="trash_filter_empty">这一类里没有东西了。换回「全部」还能看到别的。</string>
+    <string name="trash_filter_nothing">站里还没有东西，不用筛。</string>
     <string name="trash_empty_all">清空中转站</string>
     <string name="trash_empty_all_sub">把这里的东西全部彻底删掉</string>
     <string name="trash_empty_confirm_title">全部永久删除？</string>

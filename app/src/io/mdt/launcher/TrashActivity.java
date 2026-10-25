@@ -54,6 +54,12 @@ public class TrashActivity extends BaseActivity {
     private MsavListAdapter.RowClick mRowClick;
     /** 当前列表（点第几项 ⇒ 拿哪一份） */
     private List<Trash.Item> mItems;
+    /** 全部条目（筛选前的底稿；筛选只改显示，不动数据） */
+    private List<Trash.Item> mAll;
+    /** 「按类型筛选」那一行的副标题（显示当前选了哪一类） */
+    private TextView mFilterSub;
+    /** 当前分类；null = 全部 */
+    private Trash.Kind mKind;
 
     @Override protected void onCreate(Bundle b) {
         super.onCreate(b);
@@ -76,6 +82,15 @@ public class TrashActivity extends BaseActivity {
                     @Override public void run() { confirmEmptyAll(); }
                 });
 
+        // ★ 2026-10-25 用户：「能不能给中转站加一个分类」⇒ 按类型筛选。
+        //   形态照抄模组页的「筛选」行（动作卡里一行 + 单选弹窗），不另造控件：
+        //   副标题动态显示当前分类与份数，所以用 `bindActionValue`。
+        View rowFilter = Util.bindActionValue(root, R.id.row_trash_filter, R.drawable.ic_select_all,
+                R.string.trash_filter_title, new Runnable() {
+                    @Override public void run() { pickFilter(); }
+                });
+        mFilterSub = (TextView) rowFilter.findViewById(R.id.act_sub);
+
         mRowClick = new MsavListAdapter.RowClick() {
             @Override public void onRow(int pos) {
                 if (mItems != null && pos >= 0 && pos < mItems.size()) showActions(mItems.get(pos));
@@ -96,10 +111,10 @@ public class TrashActivity extends BaseActivity {
         new Thread(new Runnable() {
             @Override public void run() {
                 final List<Trash.Item> items;
-                final long bytes;
                 try {
+                    // ★ 不再单独算 totalBytes：表头的份数与体积按**当前分类**从每项的 `bytes` 求和
+                    //   （`render()` 里），两处各算一次必然会漂。
                     items = Trash.listAll(TrashActivity.this);
-                    bytes = Trash.totalBytes(TrashActivity.this);
                 } catch (Throwable ex) {
                     android.util.Log.w("MDTLauncher", "trash scan failed", ex);
                     runOnUiThread(new Runnable() {
@@ -110,30 +125,108 @@ public class TrashActivity extends BaseActivity {
                     });
                     return;
                 }
-                final String[] titles = new String[items.size()];
-                final String[] subs = new String[items.size()];
-                for (int i = 0; i < items.size(); i++) {
-                    Trash.Item it = items.get(i);
-                    titles[i] = TrashText.title(it);
-                    subs[i] = TrashText.line(TrashActivity.this, it);
-                }
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
                         if (Util.dead(TrashActivity.this)) return;
-                        mItems = items;
-                        mHead.setText(TrashText.head(TrashActivity.this, items.size(), bytes));
-                        mAdapter = new MsavListAdapter(TrashActivity.this, titles, subs);
-                        mAdapter.fillInto(mList, mRowClick);
-                        // ★ 空态：整块**收掉**不放空框（用户 2026-10-04 的口径），
-                        //   而且这句要说清"为什么会空"与"什么动作会把东西挪进来"。
-                        if (mEmpty != null) {
-                            mEmpty.setVisibility(items.isEmpty() ? View.VISIBLE : View.GONE);
-                            if (items.isEmpty()) mEmpty.setText(Trans.get(TrashActivity.this, R.string.trash_empty));
-                        }
+                        mAll = items;
+                        // 表头 / 列表 / 空态 / 筛选行统一由 render() 刷（份数按当前分类算）
+                        render();
                     }
                 });
             }
         }, "trash-page").start();
+    }
+
+    /**
+     * 主线程：按当前分类**只改显示**，重画表头 / 列表 / 空态 / 筛选行副标题。
+     *
+     * <p>★ 分类是纯显示层（`mAll` 才是底稿）：切分类不走后台、不重扫、不改变任何一项的状态。
+     *   份数与体积跟着**筛出来的那几份**走（表头说"共 3 份 · 4.2 MB"就得是这 3 份的 4.2 MB）。
+     */
+    private void render() {
+        List<Trash.Item> all = (mAll == null) ? new java.util.ArrayList<Trash.Item>() : mAll;
+        List<Trash.Item> shown = new java.util.ArrayList<Trash.Item>();
+        long bytes = 0;
+        for (Trash.Item it : all) {
+            if (mKind == null || it.kind == mKind) {
+                shown.add(it);
+                bytes += it.bytes;
+            }
+        }
+        mItems = shown;
+
+        String[] titles = new String[shown.size()];
+        String[] subs = new String[shown.size()];
+        for (int i = 0; i < shown.size(); i++) {
+            Trash.Item it = shown.get(i);
+            titles[i] = TrashText.title(it);
+            subs[i] = TrashText.line(TrashActivity.this, it);
+        }
+        mHead.setText(TrashText.head(TrashActivity.this, shown.size(), bytes));
+        mAdapter = new MsavListAdapter(TrashActivity.this, titles, subs);
+        mAdapter.fillInto(mList, mRowClick);
+
+        // ★ 空态：整块**收掉**不放空框（用户 2026-10-04 的口径）。
+        //   两种空要说清是哪种：站里本来就没东西 / 这一类里没东西（换个分类还能看到）。
+        if (mEmpty != null) {
+            boolean empty = shown.isEmpty();
+            mEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
+            if (empty) {
+                mEmpty.setText(Trans.get(TrashActivity.this,
+                        all.isEmpty() ? R.string.trash_empty : R.string.trash_filter_empty));
+            }
+        }
+        if (mFilterSub != null) {
+            mFilterSub.setText(Trans.get(TrashActivity.this, R.string.trash_filter_item_fmt,
+                    TrashText.kindLabel(TrashActivity.this, mKind), shown.size()));
+        }
+    }
+
+    /**
+     * 选分类（2026-10-25 用户：「能不能给中转站加一个分类」）。
+     *
+     * <p>只列**真有东西**的那几类（外加「全部」）—— 列一个点进去空的分类等于骗人；
+     * 顺序由 {@link TrashText#filterOrder()} 定（内容类在前、认不出的垫底）。
+     * ★ 弹窗只用 `setSingleChoiceItems`、**不配正文**（HONOR 上 `setMessage` + 列表同现
+     *   会让列表整块不渲染，`docs/flows/20` §20.5）。
+     */
+    private void pickFilter() {
+        final List<Trash.Item> all = (mAll == null) ? new java.util.ArrayList<Trash.Item>() : mAll;
+        final java.util.List<Trash.Kind> kinds = new java.util.ArrayList<Trash.Kind>();
+        final java.util.List<String> labels = new java.util.ArrayList<String>();
+        labels.add(Trans.get(TrashActivity.this, R.string.trash_filter_item_fmt,
+                Trans.get(TrashActivity.this, R.string.trash_filter_all), all.size()));
+        kinds.add(null);
+        for (Trash.Kind k : TrashText.filterOrder()) {
+            int n = 0;
+            for (Trash.Item it : all) if (it.kind == k) n++;
+            if (n == 0) continue;
+            labels.add(Trans.get(TrashActivity.this, R.string.trash_filter_item_fmt,
+                    TrashText.kindLabel(TrashActivity.this, k), n));
+            kinds.add(k);
+        }
+        if (labels.size() <= 1) {
+            // 站里没东西：不给一个只有「全部」的弹窗
+            Toast.makeText(TrashActivity.this, Trans.get(TrashActivity.this, R.string.trash_filter_nothing),
+                    Toast.LENGTH_SHORT).show();
+            return;
+        }
+        int checked = 0;
+        for (int i = 0; i < kinds.size(); i++) {
+            if (kinds.get(i) == mKind) { checked = i; break; }
+        }
+        new AlertDialog.Builder(TrashActivity.this)
+                .setTitle(R.string.trash_filter_title)
+                .setSingleChoiceItems(labels.toArray(new CharSequence[0]), checked,
+                        new DialogInterface.OnClickListener() {
+                            @Override public void onClick(DialogInterface d, int which) {
+                                mKind = kinds.get(which);
+                                d.dismiss();
+                                render();
+                            }
+                        })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
     }
 
     // ── 一项的动作 ────────────────────────────────────────────────────────
@@ -435,7 +528,10 @@ public class TrashActivity extends BaseActivity {
      * ★ 份数与体积取**当前列表**（不再扫一遍盘：用户看到的数字与确认框里的必须一致）。
      */
     private void confirmEmptyAll() {
-        final List<Trash.Item> items = mItems;
+        // ★★ 2026-10-25：**必须用 `mAll` 而不是 `mItems`** —— 「清空」清的是整个中转站
+        //   （`Trash.empty(allDirs)`），而 `mItems` 现在是**筛过**的那几份 ⇒ 拿它算份数会出现
+        //   "对话框说 2 份、实际删 10 份"。分类只改显示，不改这个动作的范围。
+        final List<Trash.Item> items = mAll;
         int n = items == null ? 0 : items.size();
         long bytes = 0;
         for (int i = 0; i < n; i++) bytes += items.get(i).bytes;
@@ -457,7 +553,8 @@ public class TrashActivity extends BaseActivity {
     private void doEmptyAll() {
         // 清空里如果**有整槽**，那些快照引用的对象池对象同样失去了最后的引用 ⇒ 清完叫一次 GC
         // （理由与 doDeleteOne 里那段相同）
-        final boolean hadSlot = mItems != null && hasSlot(mItems);
+        // ★ 同上：判据用全量（清空清的是整个站）
+        final boolean hadSlot = mAll != null && hasSlot(mAll);
         new Thread(new Runnable() {
             @Override public void run() {
                 final Trash.Result r = Trash.empty(Trash.allDirs(TrashActivity.this));

@@ -1382,6 +1382,11 @@
     <string name="trash_empty">Nothing here yet.\nDeleting a map or a slot, or replacing a mod or a save, moves the old one here.</string>
     <string name="trash_scanning">Listing…</string>
     <string name="trash_scan_failed">Could not list the transfer station. Go back and enter again.</string>
+    <string name="trash_filter_title">Filter by type</string>
+    <string name="trash_filter_all">All</string>
+    <string name="trash_filter_item_fmt">%1$s · %2$d</string>
+    <string name="trash_filter_empty">Nothing in this category. Switch back to All to see the rest.</string>
+    <string name="trash_filter_nothing">Nothing in the trash yet, no need to filter.</string>
     <string name="trash_empty_all">Empty the transfer station</string>
     <string name="trash_empty_all_sub">Deletes everything here for good</string>
     <string name="trash_empty_confirm_title">Delete all permanently?</string>

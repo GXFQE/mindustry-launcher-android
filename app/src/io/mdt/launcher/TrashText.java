@@ -22,8 +22,18 @@ public final class TrashText {
 
     /** 这是什么：地图 / 模组 / 存档 / 整个槽 / 蓝图 / 其他文件 */
     static String kindLabel(Context c, Trash.Item it) {
-        if (it == null) return "";
-        switch (it.kind) {
+        return it == null ? "" : kindLabel(c, it.kind);
+    }
+
+    /**
+     * 同上，直接按种类取（筛选清单用 —— 它要的是"这一类叫什么"，不指向任何一项）。
+     *
+     * <p>★ 只此一处映射（`switch` 在下面）：条目行、来源说明、筛选弹窗都走它，
+     *   否则加一种新的中转站内容时会出现"列表里叫游戏版本、筛选里叫别的"。
+     */
+    static String kindLabel(Context c, Trash.Kind kind) {
+        if (kind == null) return Trans.get(c, R.string.trash_filter_all);
+        switch (kind) {
             case MAP: return Trans.get(c, R.string.trash_kind_map);
             case MOD: return Trans.get(c, R.string.trash_kind_mod);
             case SAVE: return Trans.get(c, R.string.trash_kind_save);
@@ -33,6 +43,19 @@ public final class TrashText {
             case VERSION: return Trans.get(c, R.string.trash_kind_version); // 删掉的导入版本（2026-10-25）
             default: return Trans.get(c, R.string.trash_kind_other);
         }
+    }
+
+    /**
+     * 筛选清单的**显示顺序**（2026-10-25 用户：「能不能给中转站加一个分类」）。
+     *
+     * <p>不按 `Trash.Kind` 的声明顺序：那四个"内容类"（存档 / 地图 / 蓝图 / 模组）排前面、
+     *   整块的（整个槽 / 游戏版本）其次、插件与认不出的垫底 —— 用户找的多半是内容类。
+     */
+    static Trash.Kind[] filterOrder() {
+        return new Trash.Kind[] {
+                Trash.Kind.SAVE, Trash.Kind.MAP, Trash.Kind.SCHEM, Trash.Kind.MOD,
+                Trash.Kind.SLOT, Trash.Kind.VERSION, Trash.Kind.PLUGIN, Trash.Kind.OTHER
+        };
     }
 
     /**
