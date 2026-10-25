@@ -5601,6 +5601,35 @@ public final class SelfTest {
                                 SettingsBin.Result.E_NO_SLOT_DIR, "SLOT", null)).contains("SLOT"),
                 "★P3：第一层只带**中性参数**（备份目录/槽名那两条进去了），"
                         + "**原始原因一个字都没进**（依据在 report() 里），且两套语言文案不同");
+
+        // ★★ P3 批 1（2026-10-25）：两个**解析器**的错误码也要**遍历**。
+        // 🔴 为什么补这条：`MsavText.userReason` / `MschText.reason` 的注释都写着"自检里遍历所有码"，
+        //   但实际只有 SettingsBin 那段在遍历 —— 注释声称的尺子并不存在（ref/29 第 43 条）。
+        //   漏映射的症状同样是**界面静默空白**（default 兜底成"原因不明"）。
+        //   ⚠️ 中文 `error` 只是报告 / 异常兜底，不进第一层 ⇒ 这几条断言只钉"码 → 白话"，不钉原文。
+        StringBuilder missSav = new StringBuilder();
+        String savFallback = ctx.getString(R.string.msav_unknown_reason);
+        String savFirst = null;
+        boolean savDiff = false;
+        for (int code : MsavMeta.ALL_CODES) {
+            String rz = MsavText.userReason(ctx, MsavMeta.withCode(code, 3, 2));
+            if (rz == null || rz.isEmpty() || savFallback.equals(rz)) missSav.append(code).append(' ');
+            if (savFirst == null) savFirst = rz;
+            else if (!rz.equals(savFirst)) savDiff = true;
+        }
+        ok(stat, L, missSav.length() == 0,
+                "★P3：存档解析那 8 个错误码**每一个**都有白话映射（漏映射=界面静默空白），漏的是［"
+                        + missSav + "］");
+        ok(stat, L, savDiff,
+                "★元断言：存档解析的不同错误码给的是**不同的话**（不是同一条兜底冒充）");
+
+        StringBuilder missBp = new StringBuilder();
+        for (int code : Msch.ALL_CODES) {
+            String rz = MschText.reason(ctx, code, 3, 2);
+            if (rz == null || rz.isEmpty() || savFallback.equals(rz)) missBp.append(code).append(' ');
+        }
+        ok(stat, L, missBp.length() == 0,
+                "★P3：蓝图解析那 14 个错误码**每一个**都有白话映射，漏的是［" + missBp + "］");
         // ★ 自检失败那条是**嵌套**的（外面一句 + 里面一句"具体原因"）⇒ 两个分支都要过一遍，
         //   否则"另一个分支永远显示同一句"这种错看不出来。
         SettingsBin.Result mSub = SettingsBin.Result.withCode(
