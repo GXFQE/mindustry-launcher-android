@@ -946,7 +946,9 @@ public final class PluginHost {
         }
 
         @Override public File usageDir() {
-            return UsageLog.dir(getBaseContext());
+            // 第 252 轮：宿主不再写 usage 流水（注入脚本的数据全由插件自己写）—— 这里只给目录。
+            // 旧版本写过 launch.tsv / run.tsv，别依赖它们存在。
+            return new File(Data.hubDir(getBaseContext()), "usage");
         }
 
         @Override public File crashReportsDir() {

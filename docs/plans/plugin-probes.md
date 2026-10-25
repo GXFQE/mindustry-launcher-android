@@ -5,10 +5,11 @@
 
 ## 前置：已经能用的部分
 
-- `UsageLog` 在 **`:game` 进程**记录启动 / 心跳 / 结束 / 崩溃 / 熄屏，只记"下界"；
-- 两条流：`hub/usage/launch.tsv`（启动事实，写完不可变）与 `run.tsv`（运行期事实）；
-- `PluginApi` v18 = `File usageDir()`；**v20（2026-10-23）= 整理后的冻结基线**（见 `docs/PLUGIN-API.md`）。
-  字段、真机产物与读取约定见 `docs/PLUGIN-API.md` 第 9 节。
+- **注入机制**：`ProbeRunner` 加载 `plugin.json` 里 `telemetry.probes` 声明的类（v23），
+  定时 `sample()`、会话结束前 `summary()`，异常/超时隔离 + 连续失败停用；
+- **环境**：`ProbeEnv` = `dir()` / `pid()` / `inProcess()` / `slot()` —— 别的都没有；
+- 🔴 **数据全由插件自己写**：宿主不记会话流水、不写 `launch.tsv` / `run.tsv`、不聚合、不展示
+  （2026-10-26 定案；`UsageLog` 已删）。`PluginApi.usageDir()` 只是给插件的目录。
 
 ## 已定、未实现
 
@@ -18,8 +19,10 @@
 宿主只给 `settings.bin` 的解析结果 + 带护栏的写（游戏在跑拒绝、备份、原子写、读回自检还原），
 键的含义 / 缺省值 / 成对写归插件。契约与真机验证见 `docs/PLUGIN-API.md` §4「游戏设置」与 `next/42`。
 
-### B1. 统计插件 `usagestats`
-宿主只"记"，插件只"看"：读 `usageDir()` → 启动次数 / 版本分布 / 会话时长 / 崩溃 / 熄屏 → 柱状图 + CSV/PNG 导出。
+### B1. 统计插件 `usagestats` —— ⛔ 原设计作废（2026-10-26）
+
+原写"宿主只记、插件只读 `usageDir()` 的流水"。宿主流水已删（注入数据全由插件写）⇒
+若还要做，做成**探针**（`telemetry.probes`，`inProcess` 或 `:probe`），自己记账、自己聚合/绘图。
 
 ### B2. 探针（性能数据）—— ✅ 已实现（v23，第 223 轮）
 
@@ -191,23 +194,21 @@
    - 地图编辑器**没有自动存档**，且地图文件的 `playtime` 恒为 0 ⇒ 编辑器时间完全不算
    - ⇒ 只能叫"存档内已保存时长"
 
-### 采用：宿主在 `:game` 进程记录（已实现）
+### 采用：**插件探针自己写**（2026-10-26 定案；宿主的 `UsageLog` 已删）
 
-- 为什么在 `:game`：插件只在页面打开时运行；宿主进程在用户玩游戏时在后台、会被系统回收
-- 观察方式：我们自己 Application 注册 `ActivityLifecycleCallbacks`（不改游戏代码）
-  - `resumed` ⇒ `S`；`paused` ⇒ `E`；每 30 秒 `B` 心跳
-- **只记下界**：宿主/游戏被杀 ⇒ 少算（最多丢 30 秒），**绝不多算**
-- 单条会话上限 12 小时（防"忘了关"）
-- 崩溃写 `C`、熄屏写 `SC`；启动事实（版本/槽/APK）单独写 `launch.tsv`，**写完不可变**
+- 宿主**只提供注入与调度**：`ProbeRunner` 加载 `plugin.json` 的 `telemetry.probes`、定时 `sample()`；
+  `ProbeEnv` 只给 `dir()` / `pid()` / `inProcess()` / `slot()`；
+- **会话事实（前台 / 暂停 / 崩溃 / 熄屏）由插件探针自己采**（`sample()` 被周期调用，自己记账），
+  写进 `ProbeEnv.dir()`，格式插件定；
+- 宿主**不写** `launch.tsv` / `run.tsv`、不聚合、不展示；
+- 「只记下界、绝不多算」仍是**插件的实现约定**（宿主不再保证）。
 
 ### 数据
 
-```
-hub/usage/launch.tsv   L <ts> <版本> <槽> <apk>
-hub/usage/run.tsv      S <ts> / B <ts> / E <ts> / C <ts> <异常类> / SC off|on <ts>
-```
+宿主不定义格式：插件自己写 `hub/usage/telemetry/<会话>/<插件 id>/`（`ProbeEnv.dir()`），
+或 `usageDir()` 下的自有文件。
 
-接口：`PluginApi.usageDir()`（v18，只读）。展示/聚合/绘图全部由插件做。
+接口：`PluginApi.usageDir()`（v18，只是目录；宿主不再往里写流水）。
 
 ### 曾讨论但否掉的其它方案
 
