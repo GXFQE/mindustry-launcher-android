@@ -1992,6 +1992,9 @@
     <string name="lang_pack_read_failed">this file cannot be read — try another one</string>
     <string name="lang_pack_install_failed">could not install this translation file</string>
     <string name="lang_pack_remove_failed">could not remove the translation file</string>
+    <string name="lang_pack_share">Share this translation</string>
+    <string name="lang_pack_share_missing">No translation file is installed</string>
+    <string name="lang_pack_share_failed">Could not share it</string>
     <string name="lang_chooser_title">Pick a .properties file</string>
     <string name="lang_pack_pick">Pick a file</string>
     <string name="lang_pack_ok">Install</string>

@@ -509,16 +509,62 @@ public class SettingsActivity extends BaseActivity {
                         new DialogInterface.OnClickListener() {
                             @Override public void onClick(DialogInterface d, int w) { removeLangPack(); }
                         })
-                .setNegativeButton(Trans.get(SettingsActivity.this, R.string.lang_tpl_export),
+                .setNegativeButton(Trans.get(SettingsActivity.this, R.string.lang_pack_share),
                         new DialogInterface.OnClickListener() {
                             @Override public void onClick(DialogInterface d, int w) {
-                                exportLangTemplate();
+                                shareLangPack();
                             }
                         })
                 .show();
     }
 
     // ── 导出翻译模板（给译者一份带全部键名 + 英文原文的底稿）──────────────────
+
+    /**
+     * 分享**当前正在用的**翻译文件（第 239 轮）—— 译者可以直接把自己的译文发出去，
+     * 不用先导出到文件、再自己去聊天软件里发。
+     *
+     * <p>★ 为什么放在「已装」弹窗的第三个按钮：`AlertDialog` 最多三个按钮，
+     *   而「重选 / 移除」必须留着；模板导出仍可在**未装**那一屏用（译者拿到模板才去翻）。
+     *   走 {@link ShareOut} —— 与四个内容页、分享包**同一个**出口。
+     */
+    private void shareLangPack() {
+        final File f = Trans.file(this);
+        if (f == null || !f.isFile()) {
+            android.widget.Toast.makeText(this,
+                    Trans.get(this, R.string.lang_pack_share_missing),
+                    android.widget.Toast.LENGTH_LONG).show();
+            return;
+        }
+        new Thread(new Runnable() {
+            @Override public void run() {
+                android.net.Uri uri = null;
+                String err = null;
+                try {
+                    uri = ShareOut.stageCopy(SettingsActivity.this, "lang.properties", f);
+                } catch (Throwable t) {
+                    err = Util.ioReason(SettingsActivity.this, t);
+                    android.util.Log.w("MDTLauncher", "lang share failed", t);
+                }
+                final android.net.Uri fu = uri;
+                final String fe = err;
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        if (Util.dead(SettingsActivity.this)) return;
+                        if (fe != null) {
+                            new AlertDialog.Builder(SettingsActivity.this)
+                                    .setTitle(R.string.lang_pack_share_failed)
+                                    .setMessage(fe)
+                                    .setPositiveButton(R.string.close, null)
+                                    .show();
+                            return;
+                        }
+                        ShareOut.launch(SettingsActivity.this, fu);
+                    }
+                });
+            }
+        }, "lang-share").start();
+    }
 
     private void exportLangTemplate() {
         new Thread(new Runnable() {

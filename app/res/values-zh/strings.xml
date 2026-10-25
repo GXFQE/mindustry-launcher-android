@@ -1949,6 +1949,9 @@
     <string name="lang_pack_read_failed">这份文件读不出来 —— 换一份再试</string>
     <string name="lang_pack_install_failed">没能装上这份翻译文件</string>
     <string name="lang_pack_remove_failed">没能移除翻译文件</string>
+    <string name="lang_pack_share">分享这份译文</string>
+    <string name="lang_pack_share_missing">还没装翻译文件</string>
+    <string name="lang_pack_share_failed">没能分享出去</string>
     <string name="lang_chooser_title">选择 .properties 文件</string>
     <string name="lang_pack_pick">选择文件</string>
     <string name="lang_pack_ok">装上</string>
