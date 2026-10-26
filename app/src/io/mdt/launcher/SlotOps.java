@@ -637,26 +637,31 @@ final class SlotOps {
      * @param prefer   默认勾选哪个槽（传空 = 不勾）
      */
     static void pickSlot(final Activity a, int titleRes, final String prefer, final SlotPick cb) {
+        pickSlot(null, a, titleRes, prefer, cb);
+    }
+
+    /** 卡片里有栈就推一页；没有就自己开一张（第 263 轮：不再"关一个框再开一个框"）。 */
+    static void pickSlot(final CardStack parent, final Activity a, int titleRes, final String prefer,
+                         final SlotPick cb) {
         final List<Data.Slot> slots = Data.allSlots(a);
         if (slots.isEmpty()) return;
         final String[] names = new String[slots.size()];
-        int checked = -1;
         for (int i = 0; i < slots.size(); i++) {
             Data.Slot s = slots.get(i);
+            // ⚠️ 原来用单选按钮的 checked 态标出"上次用的那个槽"，卡片列表没有单选态 ⇒ 不再标
             names[i] = s.name + (s.active ? Trans.get(a, R.string.slot_current_suffix) : "");
-            if (s.name.equals(prefer)) checked = i;
         }
-        new AlertDialog.Builder(a)
-                .setTitle(titleRes)
-                .setSingleChoiceItems(names, checked, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) {
+        final CardStack[] ref = new CardStack[1];
+        ref[0] = CardStack.show(parent, a, Trans.get(a, titleRes),
+                CardStack.list(a, names, new CardStack.ItemClick() {
+                    @Override public void onClick(int w) {
                         if (w < 0 || w >= slots.size()) return;
-                        d.dismiss();
                         cb.onPicked(slots.get(w).name);
                     }
-                })
-                .setNegativeButton(R.string.cancel, null)
-                .show();
+                }),
+                new CardStack.Btn(Trans.get(a, R.string.cancel), new Runnable() {
+                    @Override public void run() { ref[0].dismiss(); }
+                }));
     }
 
     // ── 小工具 ────────────────────────────────────────────────────────────

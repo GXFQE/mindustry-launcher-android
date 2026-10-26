@@ -240,6 +240,20 @@ public class TrashActivity extends BaseActivity {
      * ★ **整槽不走"选槽"那一步**（`askSlot`）：回到哪个槽是它自己带着的，
      *   多问一层只会让人以为"要把这个槽塞进另一个槽"。
      */
+    /** 当前那张中转站卡片（第 263 轮）：一趟"看一项 → 确认 → 结果"都在这张卡里换页。 */
+    private CardStack mCard;
+
+    /** 拿"当前这张卡"：没有就新开一张（并记下来），有就往里推一页。 */
+    private CardStack open(CharSequence title, android.view.View body, CardStack.Btn... btns) {
+        if (mCard == null || !mCard.isShowing()) {
+            mCard = new CardStack(this);
+            mCard.root(title, body, btns);
+            mCard.show();
+            return mCard;
+        }
+        return CardStack.show(mCard, this, title, body, btns);
+    }
+
     private void showActions(final Trash.Item it) {
         String body = TrashText.line(this, it);
         if (it.kind == Trash.Kind.OTHER) {
@@ -247,69 +261,70 @@ public class TrashActivity extends BaseActivity {
         } else {
             body = Trans.get(TrashActivity.this, R.string.trash_actions_msg_fmt, body);
         }
-        AlertDialog.Builder d = new AlertDialog.Builder(this)
-                .setTitle(TrashText.title(it))
-                .setMessage(body)
-                .setNegativeButton(R.string.cancel, null);
-        if (it.kind == Trash.Kind.SLOT) {
-            d.setPositiveButton(R.string.trash_restore, new DialogInterface.OnClickListener() {
-                @Override public void onClick(DialogInterface dlg, int w) { confirmRestoreSlot(it); }
-            });
-        } else if (it.kind == Trash.Kind.PLUGIN) {
-            // 插件：放回去 = 回到 app_hub/plugins/<id>（**未启用**，用户自己按启用）—— 第 148 轮
-            d.setPositiveButton(R.string.trash_restore, new DialogInterface.OnClickListener() {
-                @Override public void onClick(DialogInterface dlg, int w) { confirmRestorePlugin(it); }
-            });
-        } else if (it.kind == Trash.Kind.VERSION) {
-            // 删掉的导入版本（2026-10-25）：放回去 = APK 回 app_hub/import + 登记重加 + 名字/槽绑定恢复
-            d.setPositiveButton(R.string.trash_restore, new DialogInterface.OnClickListener() {
-                @Override public void onClick(DialogInterface dlg, int w) { confirmRestoreVersion(it); }
-            });
-        } else if (it.kind != Trash.Kind.OTHER) {
-            d.setPositiveButton(R.string.trash_restore, new DialogInterface.OnClickListener() {
-                @Override public void onClick(DialogInterface dlg, int w) { askSlot(it); }
-            });
+        // ★ 第 263 轮：动作框 → 确认框 → （同名）改名框原来是三张窗，每换一次 dim 都重播一遍。
+        //   现在同一张卡里推页；按钮顺序与原来一致（取消 / 彻底删除 / 放回去）。
+        final CardStack[] ref = new CardStack[1];
+        java.util.List<CardStack.Btn> btns = new java.util.ArrayList<CardStack.Btn>();
+        btns.add(new CardStack.Btn(Trans.get(this, R.string.cancel), new Runnable() {
+            @Override public void run() { ref[0].dismiss(); }
+        }));
+        btns.add(new CardStack.Btn(Trans.get(this, R.string.trash_delete_one), new Runnable() {
+            @Override public void run() { confirmDeleteOne(it); }
+        }));
+        if (it.kind != Trash.Kind.OTHER) {
+            btns.add(new CardStack.Btn(Trans.get(this, R.string.trash_restore), new Runnable() {
+                @Override public void run() {
+                    if (it.kind == Trash.Kind.SLOT) confirmRestoreSlot(it);
+                    // 插件：放回去 = 回到 app_hub/plugins/<id>（**未启用**，用户自己按启用） —— 第 148 轮
+                    else if (it.kind == Trash.Kind.PLUGIN) confirmRestorePlugin(it);
+                    // 删掉的导入版本（2026-10-25）：APK 回 app_hub/import + 登记重加 + 名字/槽绑定恢复
+                    else if (it.kind == Trash.Kind.VERSION) confirmRestoreVersion(it);
+                    else askSlot(it);
+                }
+            }));
         }
-        d.setNeutralButton(R.string.trash_delete_one, new DialogInterface.OnClickListener() {
-            @Override public void onClick(DialogInterface dlg, int w) { confirmDeleteOne(it); }
-        });
-        d.show();
+        ref[0] = open(TrashText.title(it), CardStack.text(this, body),
+                btns.toArray(new CardStack.Btn[0]));
     }
 
     /** 放回哪个槽：默认勾**来源槽**（旧条目认不出槽 ⇒ 不勾，让用户自己选） */
     private void askSlot(final Trash.Item it) {
-        SlotOps.pickSlot(this, R.string.trash_restore_pick_title, it.slot, new SlotOps.SlotPick() {
+        SlotOps.pickSlot(mCard, this, R.string.trash_restore_pick_title, it.slot, new SlotOps.SlotPick() {
             @Override public void onPicked(String slot) { confirmRestore(it, slot); }
         });
     }
 
     private void confirmRestore(final Trash.Item it, final String slot) {
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.trash_restore_confirm_title)
-                .setMessage(Trans.get(TrashActivity.this, R.string.trash_restore_confirm_fmt,
-                        TrashText.title(it), slot))
-                .setPositiveButton(R.string.trash_restore, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) {
+        final CardStack[] ref = new CardStack[1];
+        ref[0] = open(Trans.get(this, R.string.trash_restore_confirm_title),
+                CardStack.text(this, Trans.get(this, R.string.trash_restore_confirm_fmt,
+                        TrashText.title(it), slot)),
+                new CardStack.Btn(Trans.get(this, R.string.cancel), new Runnable() {
+                    @Override public void run() { ref[0].dismiss(); }
+                }),
+                new CardStack.Btn(Trans.get(this, R.string.trash_restore), new Runnable() {
+                    @Override public void run() {
+                        ref[0].dismiss();
                         doRestore(it, slot, false);
                     }
-                })
-                .setNegativeButton(R.string.cancel, null)
-                .show();
+                }));
     }
 
     /** 整槽：放回去 = 回到**它自己那个槽名**（不选槽；名字被占时下一步会问"换个名字"） */
     private void confirmRestoreSlot(final Trash.Item it) {
         final String name = TrashText.title(it);
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.trash_restore_confirm_title)
-                .setMessage(Trans.get(TrashActivity.this, R.string.trash_slot_restore_confirm_fmt, name))
-                .setPositiveButton(R.string.trash_restore, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) {
+        final CardStack[] ref = new CardStack[1];
+        ref[0] = open(Trans.get(this, R.string.trash_restore_confirm_title),
+                CardStack.text(this, Trans.get(this, R.string.trash_slot_restore_confirm_fmt, name)),
+                new CardStack.Btn(Trans.get(this, R.string.cancel), new Runnable() {
+                    @Override public void run() { ref[0].dismiss(); }
+                }),
+                new CardStack.Btn(Trans.get(this, R.string.trash_restore), new Runnable() {
+                    @Override public void run() {
+                        ref[0].dismiss();
                         doRestore(it, name, false);
                     }
-                })
-                .setNegativeButton(R.string.cancel, null)
-                .show();
+                }));
     }
 
     /**
@@ -319,17 +334,19 @@ public class TrashActivity extends BaseActivity {
      * ⚠️ 按钮文案复用 `map_overwrite_ok`（「替换」/ "Replace"）：同一个词，不另写一条重复资源。
      */
     private void askOverwrite(final Trash.Item it, final String slot) {
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.trash_restore_overwrite_title)
-                .setMessage(Trans.get(TrashActivity.this, R.string.trash_restore_overwrite_fmt,
-                        TrashText.title(it), slot))
-                .setPositiveButton(R.string.map_overwrite_ok, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) {
+        final CardStack[] ref = new CardStack[1];
+        ref[0] = open(Trans.get(this, R.string.trash_restore_overwrite_title),
+                CardStack.text(this, Trans.get(this, R.string.trash_restore_overwrite_fmt,
+                        TrashText.title(it), slot)),
+                new CardStack.Btn(Trans.get(this, R.string.cancel), new Runnable() {
+                    @Override public void run() { ref[0].dismiss(); }
+                }),
+                new CardStack.Btn(Trans.get(this, R.string.map_overwrite_ok), new Runnable() {
+                    @Override public void run() {
+                        ref[0].dismiss();
                         doRestore(it, slot, true);
                     }
-                })
-                .setNegativeButton(R.string.cancel, null)
-                .show();
+                }));
     }
 
     /**
@@ -351,24 +368,37 @@ public class TrashActivity extends BaseActivity {
         box.addView(input, new android.widget.LinearLayout.LayoutParams(
                 android.view.ViewGroup.LayoutParams.MATCH_PARENT,
                 android.view.ViewGroup.LayoutParams.WRAP_CONTENT));
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.trash_slot_rename_title)
-                .setMessage(Trans.get(TrashActivity.this, R.string.trash_slot_taken_fmt, taken))
-                .setView(box)
-                .setPositiveButton(R.string.trash_restore, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) {
+        // 正文 + 输入框合成一页（原来是一个 setView 弹窗）
+        android.widget.TextView msg = new android.widget.TextView(this);
+        msg.setText(Trans.get(this, R.string.trash_slot_taken_fmt, taken));
+        msg.setTextSize(15);
+        msg.setTextColor(getResources().getColor(R.color.fg));
+        android.widget.LinearLayout page = new android.widget.LinearLayout(this);
+        page.setOrientation(android.widget.LinearLayout.VERTICAL);
+        page.addView(msg);
+        android.widget.LinearLayout.LayoutParams lp = new android.widget.LinearLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.MATCH_PARENT,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = dp(12);
+        page.addView(box, lp);
+        final CardStack[] ref = new CardStack[1];
+        ref[0] = open(Trans.get(this, R.string.trash_slot_rename_title), CardStack.wrap(this, page),
+                new CardStack.Btn(Trans.get(this, R.string.cancel), new Runnable() {
+                    @Override public void run() { ref[0].dismiss(); }
+                }),
+                new CardStack.Btn(Trans.get(this, R.string.trash_restore), new Runnable() {
+                    @Override public void run() {
                         String raw = input.getText().toString();
                         String clean = Data.sanitizeSlot(raw);
                         if (clean == null) {
                             Toast.makeText(TrashActivity.this, R.string.trash_slot_bad_name,
                                     Toast.LENGTH_SHORT).show();
-                            return;
+                            return;                    // 名字不合法就留在这一页
                         }
+                        ref[0].dismiss();
                         doRestore(it, clean, false);
                     }
-                })
-                .setNegativeButton(R.string.cancel, null)
-                .show();
+                }));
     }
 
     private void doRestore(final Trash.Item it, final String slot, final boolean overwrite) {
@@ -405,14 +435,18 @@ public class TrashActivity extends BaseActivity {
 
     /** 插件：确认「放回插件列表」（说清"放回去是未启用状态"） */
     private void confirmRestorePlugin(final Trash.Item it) {
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.trash_restore_confirm_title)
-                .setMessage(Trans.get(TrashActivity.this, R.string.trash_restore_plugin_fmt, TrashText.title(it)))
-                .setPositiveButton(R.string.trash_restore, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) { doRestorePlugin(it); }
-                })
-                .setNegativeButton(R.string.cancel, null)
-                .show();
+        final CardStack[] ref = new CardStack[1];
+        ref[0] = open(Trans.get(this, R.string.trash_restore_confirm_title),
+                CardStack.text(this, Trans.get(this, R.string.trash_restore_plugin_fmt, TrashText.title(it))),
+                new CardStack.Btn(Trans.get(this, R.string.cancel), new Runnable() {
+                    @Override public void run() { ref[0].dismiss(); }
+                }),
+                new CardStack.Btn(Trans.get(this, R.string.trash_restore), new Runnable() {
+                    @Override public void run() {
+                        ref[0].dismiss();
+                        doRestorePlugin(it);
+                    }
+                }));
     }
 
     private void doRestorePlugin(final Trash.Item it) {
@@ -440,15 +474,19 @@ public class TrashActivity extends BaseActivity {
 
     /** 整个版本：确认「放回去」（说清"名字与槽绑定会一起回来、存档没动过"） */
     private void confirmRestoreVersion(final Trash.Item it) {
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.trash_restore_confirm_title)
-                .setMessage(Trans.get(TrashActivity.this, R.string.trash_restore_version_fmt,
-                        TrashText.title(it)))
-                .setPositiveButton(R.string.trash_restore, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) { doRestoreVersion(it); }
-                })
-                .setNegativeButton(R.string.cancel, null)
-                .show();
+        final CardStack[] ref = new CardStack[1];
+        ref[0] = open(Trans.get(this, R.string.trash_restore_confirm_title),
+                CardStack.text(this, Trans.get(this, R.string.trash_restore_version_fmt,
+                        TrashText.title(it))),
+                new CardStack.Btn(Trans.get(this, R.string.cancel), new Runnable() {
+                    @Override public void run() { ref[0].dismiss(); }
+                }),
+                new CardStack.Btn(Trans.get(this, R.string.trash_restore), new Runnable() {
+                    @Override public void run() {
+                        ref[0].dismiss();
+                        doRestoreVersion(it);
+                    }
+                }));
     }
 
     /** 几十 MB 的跨分区搬运 ⇒ 后台线程 + 前台服务（`Work`），与删版本那条对称 */
@@ -484,15 +522,19 @@ public class TrashActivity extends BaseActivity {
     // ── 删除 / 清空（都不可逆） ────────────────────────────────────────────
 
     private void confirmDeleteOne(final Trash.Item it) {
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.trash_delete_one)
-                .setMessage(Trans.get(TrashActivity.this, R.string.trash_delete_one_confirm_fmt,
-                        TrashText.title(it)))
-                .setPositiveButton(R.string.delete_forever, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) { doDeleteOne(it); }
-                })
-                .setNegativeButton(R.string.cancel, null)
-                .show();
+        final CardStack[] ref = new CardStack[1];
+        ref[0] = open(Trans.get(this, R.string.trash_delete_one),
+                CardStack.text(this, Trans.get(this, R.string.trash_delete_one_confirm_fmt,
+                        TrashText.title(it))),
+                new CardStack.Btn(Trans.get(this, R.string.cancel), new Runnable() {
+                    @Override public void run() { ref[0].dismiss(); }
+                }),
+                new CardStack.Btn(Trans.get(this, R.string.delete_forever), new Runnable() {
+                    @Override public void run() {
+                        ref[0].dismiss();
+                        doDeleteOne(it);
+                    }
+                }));
     }
 
     private void doDeleteOne(final Trash.Item it) {

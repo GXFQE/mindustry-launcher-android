@@ -700,16 +700,18 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
             names[i] = s.name + (s.active ? Trans.get(ModsActivity.this, R.string.slot_current_suffix) : "")
                     + "  " + Trans.get(ModsActivity.this, R.string.slot_entry_fmt, s.files, Util.formatSize(s.bytes));
         }
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.mods_copy_pick_title)
-                .setSingleChoiceItems(names, -1, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) {
-                        d.dismiss();
-                        confirmCopy(targets.get(w).name);
+        // ★ 第 263 轮：选槽 → 确认框原来是两个弹窗（换窗会闪），现在同一张卡里推页
+        final CardStack stack = new CardStack(this);
+        stack.root(Trans.get(this, R.string.mods_copy_pick_title),
+                CardStack.list(this, names, new CardStack.ItemClick() {
+                    @Override public void onClick(int w) {
+                        confirmCopy(stack, targets.get(w).name);
                     }
-                })
-                .setNegativeButton(R.string.cancel, null)
-                .show();
+                }),
+                new CardStack.Btn(Trans.get(this, R.string.cancel), new Runnable() {
+                    @Override public void run() { stack.dismiss(); }
+                }));
+        stack.show();
     }
 
     /**
@@ -719,7 +721,7 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
      *   覆盖意味着一次可能替换掉目标槽里十几个模组 —— 那是"批量破坏"，不该做成一个顺手勾的框。
      *   要替换单个模组走「导入模组包」那条路（它会逐个确认）。**故意的不对称。**
      */
-    private void confirmCopy(final String toSlot) {
+    private void confirmCopy(final CardStack stack, final String toSlot) {
         final File from = new File(Data.dirOf(this, mSlot), "mods");
         final File to = new File(Data.dirOf(this, toSlot), "mods");
         int count = 0;
@@ -734,17 +736,15 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
                 if (new File(to, f.getName()).exists()) clash++;
             }
         }
-        new AlertDialog.Builder(this)
-                .setTitle(Trans.get(ModsActivity.this, R.string.mods_copy_confirm_title_fmt, toSlot))
-                .setMessage(Trans.get(ModsActivity.this, R.string.mods_copy_confirm_msg_fmt,
-                        mSlot, toSlot, count, Util.formatSize(bytes), clash))
-                .setPositiveButton(R.string.mods_copy_title_ok, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) {
+        stack.pushMessage(Trans.get(ModsActivity.this, R.string.mods_copy_confirm_title_fmt, toSlot),
+                Trans.get(ModsActivity.this, R.string.mods_copy_confirm_msg_fmt,
+                        mSlot, toSlot, count, Util.formatSize(bytes), clash),
+                Trans.get(ModsActivity.this, R.string.mods_copy_title_ok), new Runnable() {
+                    @Override public void run() {
+                        stack.dismiss();
                         doCopy(from, to, toSlot);
                     }
-                })
-                .setNegativeButton(R.string.cancel, null)
-                .show();
+                });
     }
 
     private void doCopy(final File from, final File to, final String toSlot) {
@@ -1863,6 +1863,11 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
      *      键名/路径仍在**结果弹窗的「技术细节」**里可查（见 {@link #showToggleResult}）。
      */
     private void confirmToggle(final Mods.Info m) {
+        confirmToggle(null, m);
+    }
+
+    /** 卡片里有栈就推一页确认；没有就自己开一张（第 263 轮：不再"关详情再开弹窗"）。 */
+    private void confirmToggle(final CardStack parent, final Mods.Info m) {
         final boolean on = !m.enabled;
         String msg = Trans.get(ModsActivity.this, R.string.mods_toggle_msg_fmt,
                 getString(Data.gameAlive(this)
@@ -1884,18 +1889,18 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
         if (!on && mScan != null && mScan.skipModLoading) {
             msg = msg + "\n\n" + Trans.get(ModsActivity.this, R.string.mods_ignore_retry_note);
         }
-        new AlertDialog.Builder(this)
-                // 标题带上模组名：原来只有「关闭此模组」，看不出关的是哪一个
-                .setTitle(getString(on ? R.string.mods_toggle_ask_on_fmt
-                                        : R.string.mods_toggle_ask_off_fmt, m.title()))
-                .setMessage(msg)
-                .setPositiveButton(R.string.mods_toggle_do, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) {
-                        doToggle(m.internalName, on, m.title());
+        final CardStack[] ref = new CardStack[1];
+        final String title = getString(on ? R.string.mods_toggle_ask_on_fmt
+                                          : R.string.mods_toggle_ask_off_fmt, m.title());
+        ref[0] = CardStack.show(parent, this, title, CardStack.text(this, msg),
+                new CardStack.Btn(Trans.get(this, R.string.cancel), new Runnable() {
+                    @Override public void run() { ref[0].dismiss(); }
+                }),
+                new CardStack.Btn(Trans.get(this, R.string.mods_toggle_do), new Runnable() {
+                    @Override public void run() {
+                        doToggle(ref[0], m.internalName, on, m.title());
                     }
-                })
-                .setNegativeButton(R.string.cancel, null)
-                .show();
+                }));
     }
 
     /**
@@ -1903,49 +1908,47 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
      *   改多少个、改前会备份、游戏在跑就不许改（门禁在 {@link Mods#setEnabledAll} 里）。
      */
     private void pickBatch() {
-        final String[] items = {Trans.get(ModsActivity.this, R.string.mods_batch_on), Trans.get(ModsActivity.this, R.string.mods_batch_off)};
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.mods_batch_title)
-                .setItems(items, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int which) {
-                        confirmBatch(which == 0);
+        final String[] items = {Trans.get(ModsActivity.this, R.string.mods_batch_on),
+                                Trans.get(ModsActivity.this, R.string.mods_batch_off)};
+        final CardStack stack = new CardStack(this);
+        stack.root(Trans.get(this, R.string.mods_batch_title),
+                CardStack.list(this, items, new CardStack.ItemClick() {
+                    @Override public void onClick(int which) {
+                        confirmBatch(stack, which == 0);
                     }
-                })
-                .setNegativeButton(R.string.close, null)
-                .show();
+                }),
+                new CardStack.Btn(Trans.get(this, R.string.close), new Runnable() {
+                    @Override public void run() { stack.dismiss(); }
+                }));
+        stack.show();
     }
 
-    private void confirmBatch(final boolean on) {
+    private void confirmBatch(final CardStack stack, final boolean on) {
         int n = mScan.mods.size();
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.mods_batch_title)
-                .setMessage(getString(on ? R.string.mods_batch_confirm_on_fmt
-                        : R.string.mods_batch_confirm_off_fmt, n))
-                .setPositiveButton(R.string.mods_toggle_do, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) {
-                        doBatch(on);
-                    }
-                })
-                .setNegativeButton(R.string.cancel, null)
-                .show();
+        stack.pushMessage(Trans.get(this, R.string.mods_batch_title),
+                getString(on ? R.string.mods_batch_confirm_on_fmt
+                        : R.string.mods_batch_confirm_off_fmt, n),
+                Trans.get(this, R.string.mods_toggle_do), new Runnable() {
+                    @Override public void run() { doBatch(stack, on); }
+                });
     }
 
     /** 真正落盘：{@link Mods#setEnabledAll} —— **一次读写**改完整槽，然后摊开结果 */
-    private void doBatch(boolean on) {
+    private void doBatch(final CardStack stack, boolean on) {
         SettingsBin.Result r = Mods.setEnabledAll(this, mSlot, on, mScan.mods);
-        showToggleResult(r, null, on, mScan.mods.size());
         rescan();
+        showToggleResult(stack, r, null, on, mScan.mods.size());
     }
 
     /** 真正落盘：{@link Mods#setEnabled}（门禁 + 备份 + 原子写 + 读回自检），然后把结果摊开 */
-    private void doToggle(String internalName, boolean on, String shownName) {
+    private void doToggle(final CardStack stack, String internalName, boolean on, String shownName) {
         // ★★ 「忽略它试试」（2026-10-08）：在“下次启动会整槽跳过”的状态下，
         //    关掉这个模组**必须连 `launchid.dat` 一起清** —— 否则下次启动连它带别的一起被跳过。
         SettingsBin.Result r = (!on && mScan != null && mScan.skipModLoading)
                 ? Mods.ignoreAndRetry(this, mSlot, internalName)
                 : Mods.setEnabled(this, mSlot, internalName, on);
-        showToggleResult(r, shownName, on, 0);
         rescan();
+        showToggleResult(stack, r, shownName, on, 0);
     }
 
     /**
@@ -1960,7 +1963,7 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
      * @param shownName 单个模组的显示名（批量传 null）
      * @param count     批量改的个数（单个传 0）
      */
-    private void showToggleResult(final SettingsBin.Result r, String shownName,
+    private void showToggleResult(final CardStack parent, final SettingsBin.Result r, String shownName,
                                   boolean on, int count) {
         final String title;
         final String msg;
@@ -1989,19 +1992,21 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
                                      shownName == null ? "" : shownName))
                     + note;
         }
-        AlertDialog.Builder b = new AlertDialog.Builder(this)
-                .setTitle(title)
-                .setMessage(msg)
-                .setPositiveButton(R.string.mods_close, null);
-        if (!r.noop) {
-            // ★ 依据不能删：原始报告（体积 / 键数 / 写后自检 / 备份路径）留在第二层
-            b.setNeutralButton(R.string.mods_toggle_detail, new DialogInterface.OnClickListener() {
-                @Override public void onClick(DialogInterface d, int w) {
-                    alert(Trans.get(ModsActivity.this, R.string.mods_toggle_detail_title), r.report());
-                }
-            });
-        }
-        b.show();
+        // ★ 结果也是一页（第 263 轮）：原来"点确定 → 关确认框 → 开结果框"又换一次窗。
+        final CardStack[] ref = new CardStack[1];
+        // ★ 依据不能删：原始报告（体积 / 键数 / 写后自检 / 备份路径）留在第二层
+        CardStack.Btn detail = r.noop ? null : new CardStack.Btn(Trans.get(this, R.string.mods_toggle_detail),
+                new Runnable() {
+                    @Override public void run() {
+                        ref[0].push(Trans.get(ModsActivity.this, R.string.mods_toggle_detail_title),
+                                CardStack.text(ModsActivity.this, r.report()));
+                    }
+                });
+        ref[0] = CardStack.show(parent, this, title, CardStack.text(this, msg),
+                detail,
+                new CardStack.Btn(Trans.get(this, R.string.mods_close), new Runnable() {
+                    @Override public void run() { ref[0].dismiss(); }
+                }));
     }
 
     /** 启停的"开 / 关"用词（唯一实现：结果弹窗的整句资源靠它填 `%2$s`） */

@@ -937,15 +937,23 @@ public class MapsActivity extends BaseActivity {
         String[] items = new String[]{
                 Trans.get(this, R.string.maps_import_from_file),
                 Trans.get(this, R.string.maps_from_save)};
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.maps_import_pick)
-                .setItems(items, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int which) {
-                        if (which == 0) importFromFile(); else pickSlotSave();
+        // ★ 第 263 轮：二选一 → 存档列表 → 命名页，三段原来各是一张窗；现在同一张卡里推页
+        final CardStack stack = new CardStack(this);
+        stack.root(Trans.get(this, R.string.maps_import_pick),
+                CardStack.list(this, items, new CardStack.ItemClick() {
+                    @Override public void onClick(int which) {
+                        if (which == 0) {
+                            stack.dismiss();      // 接着走系统文件选择器（那是另一个 Activity）
+                            importFromFile();
+                        } else {
+                            pickSlotSave(stack);
+                        }
                     }
-                })
-                .setNegativeButton(R.string.cancel, null)
-                .show();
+                }),
+                new CardStack.Btn(Trans.get(this, R.string.cancel), new Runnable() {
+                    @Override public void run() { stack.dismiss(); }
+                }));
+        stack.show();
     }
 
     /**
@@ -972,6 +980,10 @@ public class MapsActivity extends BaseActivity {
      *   元数据**后台渐进填**（几十份存档不许在 UI 线程读完才弹窗）。
      */
     private void pickSlotSave() {
+        pickSlotSave(null);
+    }
+
+    private void pickSlotSave(final CardStack parent) {
         final File dir = new File(Data.dirOf(this, mSlot), "saves");
         File[] all = dir.listFiles();
         final java.util.List<File> keep = new java.util.ArrayList<>();
@@ -1009,7 +1021,7 @@ public class MapsActivity extends BaseActivity {
         lv.setAdapter(adapter);
         // ★ 第 262 轮：列表与"命名页"原来是两个窗口（列表弹窗 → 命名弹窗），换窗时 dim 重播会闪；
         //   现在整条链在同一张卡里（列表 = 根页，命名 = push 一页）。
-        final CardStack stack = new CardStack(this);
+        final CardStack[] ref = new CardStack[1];
         final boolean[] alive = {true};
         lv.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener() {
             @Override public void onItemClick(android.widget.AdapterView<?> p, View v, int pos, long id) {
@@ -1017,18 +1029,17 @@ public class MapsActivity extends BaseActivity {
                 MsavMeta m = MsavMeta.read(fs[pos], false);
                 String base = Msav.baseName(fs[pos].getName());
                 // ⚠️ 最后那个 false = "这不是我们的待办 .part，是用户的存档原件" ⇒ 谁都不许删它
-                pushSaveAsMapName(stack, fs[pos], m, base, false);
+                pushSaveAsMapName(ref[0], fs[pos], m, base, false);
             }
         });
-        stack.root(Trans.get(this, R.string.maps_from_save_pick_title),
+        ref[0] = CardStack.show(parent, this, Trans.get(this, R.string.maps_from_save_pick_title),
                 CardStack.wrap(this, box),
                 new CardStack.Btn(Trans.get(this, R.string.cancel), new Runnable() {
                     @Override public void run() {
                         alive[0] = false;
-                        stack.dismiss();
+                        ref[0].dismiss();
                     }
                 }));
-        stack.show();
         new Thread(new Runnable() {
             @Override public void run() {
                 for (int i = 0; i < fs.length && alive[0]; i++) {
