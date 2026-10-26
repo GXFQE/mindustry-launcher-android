@@ -111,27 +111,35 @@ public class SlotActivity extends BaseActivity {
         Util.bindAction(root, R.id.row_slot_export, R.drawable.ic_zip,
                 R.string.slot_page_export, R.string.slot_page_export_sub, new Runnable() {
                     @Override public void run() {
-                        new android.app.AlertDialog.Builder(SlotActivity.this)
-                                .setTitle(R.string.slot_page_export)
-                                .setItems(new String[]{
+                        // ★ 第 265 轮：三选一 → 导出/分享确认原来是两层窗（每换一次 dim 就重播）。
+                        //   现在同一张卡：菜单是根页，后面的确认页都往里 push。
+                        final CardStack stack = new CardStack(SlotActivity.this);
+                        stack.root(Trans.get(SlotActivity.this, R.string.slot_page_export),
+                                CardStack.list(SlotActivity.this, new CharSequence[]{
                                         Trans.get(SlotActivity.this, R.string.slot_op_import_slot),
                                         Trans.get(SlotActivity.this, R.string.slot_op_export_slot),
                                         // ★ 第 141 轮：分享用整槽包（脱敏导出）。
                                         //   ⚠️ 新项**加在最后** —— 前两项的下标（0/1）一个都没动，
                                         //     所以任何"按下标点第几项"的老断言/肌肉记忆都不受影响。
                                         Trans.get(SlotActivity.this, R.string.slot_op_share_slot)},
-                                        new android.content.DialogInterface.OnClickListener() {
-                                            @Override
-                                            public void onClick(android.content.DialogInterface d, int w) {
+                                        new CardStack.ItemClick() {
+                                            @Override public void onClick(int w) {
                                                 Data.Slot s = findSlot();
-                                                if (s == null) { gone(); return; }
-                                                if (w == 0) SlotIo.importSlot(SlotActivity.this, s);
-                                                else if (w == 1) SlotIo.exportSlot(SlotActivity.this, s);
-                                                else if (w == 2) SlotIo.shareSlot(SlotActivity.this, s);
+                                                if (s == null) { stack.dismiss(); gone(); return; }
+                                                if (w == 0) {
+                                                    stack.dismiss();        // 接着走系统文件选择器
+                                                    SlotIo.importSlot(SlotActivity.this, s);
+                                                } else if (w == 1) {
+                                                    SlotIo.exportSlot(stack, SlotActivity.this, s);
+                                                } else if (w == 2) {
+                                                    SlotIo.shareSlot(stack, SlotActivity.this, s);
+                                                }
                                             }
-                                        })
-                                .setNegativeButton(R.string.cancel, null)
-                                .show();
+                                        }),
+                                new CardStack.Btn(Trans.get(SlotActivity.this, R.string.cancel), new Runnable() {
+                                    @Override public void run() { stack.dismiss(); }
+                                }));
+                        stack.show();
                     }
                 });
     }

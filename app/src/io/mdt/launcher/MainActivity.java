@@ -1259,7 +1259,7 @@ public class MainActivity extends BaseActivity {
     /**
      * 第 123 轮（2026-10-08，用户点单）：主界面「添加游戏」那一行的二选一。
      *
-     * ★ 为什么合成一行：{@link #promptAddPackage()} 与 {@link #pickApkViaSaf()}
+     * ★ 为什么合成一行：{@link #promptAddPackage(CardStack)} 与 {@link #pickApkViaSaf()}
      *   是**同一件事的两条路**（把一个游戏版本交给启动器）—— 一条是"手机上已经装了，去扫出来"，
      *   一条是"手上有个 APK 文件，导进来"。并排占两行会被读成"要分两步走"，
      *   而主界面每一行都该是一件独立的事。
@@ -1273,45 +1273,58 @@ public class MainActivity extends BaseActivity {
      * ⚠️ 两个回调都要先 `dismiss()` 再干活：弹窗自己不会因为启动了下一个界面就关掉。
      */
     private void promptAddGame() {
+        // ★ 第 265 轮：两行菜单 → 「从已安装应用加」的输入框，原来是两层窗（换窗会闪）。
+        //   现在同一张卡：菜单是根页，加包那一页往里 push。
         View box = getLayoutInflater().inflate(R.layout.dialog_add_game, null);
-        final AlertDialog dlg = new AlertDialog.Builder(this)
-                .setTitle(R.string.act_add_game_title)
-                .setView(box)
-                .setNegativeButton(R.string.cancel, null)
-                .create();
+        final CardStack[] ref = new CardStack[1];
+        ref[0] = CardStack.show(null, this, Trans.get(this, R.string.act_add_game_title),
+                CardStack.wrap(this, box),
+                new CardStack.Btn(Trans.get(this, R.string.cancel), new Runnable() {
+                    @Override public void run() { ref[0].dismiss(); }
+                }));
         Util.bindAction(box, R.id.row_pick_apk, R.drawable.ic_download,
                 R.string.act_import_title, R.string.act_import_sub, new Runnable() {
-                    @Override public void run() { dlg.dismiss(); pickApkViaSaf(); }
+                    @Override public void run() { ref[0].dismiss(); pickApkViaSaf(); }
                 });
         Util.bindAction(box, R.id.row_add_pkg, R.drawable.ic_add,
                 R.string.act_add_title, R.string.act_add_sub, new Runnable() {
-                    @Override public void run() { dlg.dismiss(); promptAddPackage(); }
+                    @Override public void run() { promptAddPackage(ref[0]); }
                 });
-        dlg.show();
     }
 
-    private void promptAddPackage() {
+    private void promptAddPackage(final CardStack stack) {
         final EditText input = new EditText(this);
         input.setInputType(InputType.TYPE_CLASS_TEXT);
         input.setHint(R.string.add_package_hint);
-        int pad = dp(20);
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(pad, 0, pad, 0);
         box.addView(input, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.add_package_title)
-                .setMessage(R.string.add_package_msg)
-                .setView(box)
-                .setPositiveButton(R.string.add, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) {
+        // 正文 + 输入框合成一页
+        TextView msg = new TextView(this);
+        msg.setText(Trans.get(this, R.string.add_package_msg));
+        msg.setTextSize(15);
+        msg.setTextColor(getResources().getColor(R.color.fg));
+        LinearLayout page = new LinearLayout(this);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.addView(msg);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = dp(12);
+        page.addView(box, lp);
+        final CardStack[] ref = new CardStack[1];
+        ref[0] = CardStack.show(stack, this, Trans.get(this, R.string.add_package_title),
+                CardStack.wrap(this, page),
+                new CardStack.Btn(Trans.get(this, R.string.cancel), new Runnable() {
+                    @Override public void run() { ref[0].dismiss(); }
+                }),
+                new CardStack.Btn(Trans.get(this, R.string.add), new Runnable() {
+                    @Override public void run() {
+                        ref[0].dismiss();
                         Config.get().addKnownPackage(input.getText().toString());
                         rescan();
                     }
-                })
-                .setNegativeButton(R.string.cancel, null)
-                .show();
+                }));
     }
 
     private int dp(int v) {

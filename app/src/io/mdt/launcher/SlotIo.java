@@ -610,6 +610,11 @@ final class SlotIo {
      *    （对比：备份 / 恢复是**写**操作，必须拦，那条纪律见类头注释。）
      */
     static void exportSlot(Activity a, final Data.Slot s) {
+        exportSlot(null, a, s);
+    }
+
+    /** 卡片里有栈就推一页；没有就自己开一张（第 265 轮）。 */
+    static void exportSlot(final CardStack parent, final Activity a, final Data.Slot s) {
         final List<File> roots = Data.contentRoots(a, s.name);
         if (roots.isEmpty()) {
             // ★ 拦在 SAF **之前**。放到后面的话用户已经点了"保存"，
@@ -618,12 +623,16 @@ final class SlotIo {
             toast(a, Trans.get(a, R.string.export_slot_empty_fmt));
             return;
         }
-        new AlertDialog.Builder(a)
-                .setTitle(Trans.get(a, R.string.export_slot_title_fmt, s.name))
-                .setMessage(Trans.get(a, R.string.export_slot_msg_fmt,
-                        Data.gameAlive(a) ? Trans.get(a, R.string.export_slot_playing) : ""))
-                .setPositiveButton(R.string.export_ok, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) {
+        final CardStack[] ref = new CardStack[1];
+        ref[0] = CardStack.show(parent, a, Trans.get(a, R.string.export_slot_title_fmt, s.name),
+                CardStack.text(a, Trans.get(a, R.string.export_slot_msg_fmt,
+                        Data.gameAlive(a) ? Trans.get(a, R.string.export_slot_playing) : "")),
+                new CardStack.Btn(Trans.get(a, R.string.cancel), new Runnable() {
+                    @Override public void run() { ref[0].dismiss(); }
+                }),
+                new CardStack.Btn(Trans.get(a, R.string.export_ok), new Runnable() {
+                    @Override public void run() {
+                        ref[0].dismiss();
                         sExportKind = EXPORT_SLOT;
                         sExportSlot = s.name;
                         sExportRoots = roots;
@@ -634,9 +643,7 @@ final class SlotIo {
                                 Exporter.createDoc(suggestZipName(s.name, null), "application/zip"),
                                 Trans.get(a, R.string.chooser_export)), REQ_EXPORT);
                     }
-                })
-                .setNegativeButton(R.string.cancel, null)
-                .show();
+                }));
     }
 
     // ── ★ 第 141 轮：分享用整槽包（脱敏导出） ─────────────────────────────────
@@ -663,6 +670,11 @@ final class SlotIo {
      * 最坏是拿到一份半写状态的存档；"必须先退游戏"会让只想备份一下的人平白多一步）。
      */
     static void shareSlot(Activity a, final Data.Slot s) {
+        shareSlot(null, a, s);
+    }
+
+    /** 卡片里有栈就推一页；没有就自己开一张（第 265 轮）。 */
+    static void shareSlot(final CardStack parent, final Activity a, final Data.Slot s) {
         final List<File> roots = Data.contentRoots(a, s.name);
         if (roots.isEmpty()) {
             // 与整槽导出共用同一句：这里拦下来，用户还没点"保存"，不会白留一个 0 字节文件
@@ -686,7 +698,7 @@ final class SlotIo {
                                     Trans.get(a, R.string.share_slot_err_settings));
                             return;
                         }
-                        promptShare(a, s, roots, plan);
+                        promptShare(parent, a, s, roots, plan);
                     }
                 });
             }
@@ -694,8 +706,8 @@ final class SlotIo {
     }
 
     /** 分享包的确认框：**把这次会去掉什么说在脸上**，然后才让用户去选落点 */
-    private static void promptShare(final Activity a, final Data.Slot s, final List<File> roots,
-                                    final SharePack.Plan plan) {
+    private static void promptShare(final CardStack parent, final Activity a, final Data.Slot s,
+                                    final List<File> roots, final SharePack.Plan plan) {
         StringBuilder extra = new StringBuilder();
         if (plan.removedKeys > 0) {
             extra.append(Trans.get(a, R.string.share_slot_found_fmt,
@@ -713,12 +725,25 @@ final class SlotIo {
         //   而类别句（`share_slot_msg_fmt`）里已经说过一遍 ⇒ 真机上那一屏**同一件事说两遍**
         //   （用户 2026-10-13：「怎么存在两遍啊」）。⇒ 类别由静态句统一说，**不再有第二句**；
         //   自检里补了一条"同一屏只许出现一次"的断言钉住它。
-        new AlertDialog.Builder(a)
-                .setTitle(Trans.get(a, R.string.share_slot_title_fmt, s.name))
-                .setMessage(Trans.get(a, R.string.share_slot_msg_fmt, extra.toString(),
-                        Data.gameAlive(a) ? Trans.get(a, R.string.export_slot_playing) : ""))
-                .setPositiveButton(R.string.export_ok, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) {
+        // ★ 第 265 轮：三个动作改成卡片里的三个按钮，顺序与原来一致（取消 / 直接分享 / 导出）
+        final CardStack[] ref = new CardStack[1];
+        ref[0] = CardStack.show(parent, a, Trans.get(a, R.string.share_slot_title_fmt, s.name),
+                CardStack.text(a, Trans.get(a, R.string.share_slot_msg_fmt, extra.toString(),
+                        Data.gameAlive(a) ? Trans.get(a, R.string.export_slot_playing) : "")),
+                new CardStack.Btn(Trans.get(a, R.string.cancel), new Runnable() {
+                    @Override public void run() { ref[0].dismiss(); }
+                }),
+                // ★ 第 156 轮：「直接分享」—— 与「导出」打的是**同一个包**（同一个 plan、
+                //   同一个 zipToOut、同一个压缩级别），只是落点是缓存而不是 SAF。
+                new CardStack.Btn(Trans.get(a, R.string.share_pack_btn), new Runnable() {
+                    @Override public void run() {
+                        ref[0].dismiss();
+                        doSharePackCached(a, s.name, roots, plan);
+                    }
+                }),
+                new CardStack.Btn(Trans.get(a, R.string.export_ok), new Runnable() {
+                    @Override public void run() {
+                        ref[0].dismiss();
                         sExportKind = EXPORT_SHARE;
                         sExportSlot = s.name;
                         sExportRoots = roots;
@@ -729,19 +754,7 @@ final class SlotIo {
                                 Exporter.createDoc(suggestZipName(s.name, "share"), "application/zip"),
                                 Trans.get(a, R.string.chooser_export)), REQ_EXPORT);
                     }
-                })
-                // ★ 2026-10-17 用户：「分享包取消放中间也很奇怪」—— 本机三按钮的排列是
-                //   **neutral | negative | positive** ⇒ 要让「取消」在最左，它就得是 neutral，
-                //   「直接分享」退回 negative。三个动作的**语义**没变（取消 = 什么都不做）。
-                .setNeutralButton(R.string.cancel, null)
-                .setNegativeButton(R.string.share_pack_btn, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) {
-                        // ★ 第 156 轮：「直接分享」—— 与上面那条打的是**同一个包**（同一个 plan、
-                        //   同一个 zipToOut、同一个压缩级别），只是落点是缓存而不是 SAF。
-                        doSharePackCached(a, s.name, roots, plan);
-                    }
-                })
-                .show();
+                }));
     }
 
     private static void doExportShare(final Activity a, final Uri uri, final String slot,
@@ -1113,6 +1126,12 @@ final class SlotIo {
      * ★ 取消（含返回键）要 `Msav.discard` 掉那个 `.part`，不然槽里留下垃圾。
      */
     private static void showMsavNameDialog(final Activity a, final Msav.Stage st, final String slot, final SlotOps.Host h) {
+        showMsavNameDialog(null, a, st, slot, h);
+    }
+
+    /** 卡片里有栈就推一页；没有就自己开一张（第 265 轮：改名框 ↔ 同名确认原来两个窗）。 */
+    private static void showMsavNameDialog(final CardStack parent, final Activity a, final Msav.Stage st,
+                                           final String slot, final SlotOps.Host h) {
         View form = a.getLayoutInflater().inflate(R.layout.dialog_msav_name, null);
         final EditText name = (EditText) form.findViewById(R.id.msav_name);
         name.setText(Msav.baseName(st.base));
@@ -1122,91 +1141,72 @@ final class SlotIo {
         Trans.bind(form, R.id.msav_warn, R.string.msav_not_zlib_warn);
         if (!st.zlib) form.findViewById(R.id.msav_warn).setVisibility(View.VISIBLE);
 
-        final AlertDialog dlg = new AlertDialog.Builder(a)
-                .setTitle(Trans.get(a, R.string.msav_name_title_fmt, slot))
-                .setView(form)
-                .setPositiveButton(st.zlib ? R.string.import_btn : R.string.import_anyway, null)
-                .setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) { Msav.discard(st); }
-                })
-                .create();
-        dlg.setOnCancelListener(new DialogInterface.OnCancelListener() {
-            @Override public void onCancel(DialogInterface d) { Msav.discard(st); }
-        });
-        dlg.setOnShowListener(new DialogInterface.OnShowListener() {
-            @Override public void onShow(DialogInterface d) {
-                dlg.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener(
-                        new View.OnClickListener() {
-                    @Override public void onClick(View v) {
+        final CardStack[] ref = new CardStack[1];
+        ref[0] = CardStack.show(parent, a, Trans.get(a, R.string.msav_name_title_fmt, slot),
+                CardStack.wrap(a, form),
+                new CardStack.Btn(Trans.get(a, R.string.cancel), new Runnable() {
+                    @Override public void run() {
+                        Msav.discard(st);
+                        ref[0].dismiss();
+                    }
+                }),
+                new CardStack.Btn(Trans.get(a, st.zlib ? R.string.import_btn : R.string.import_anyway),
+                        new Runnable() {
+                    @Override public void run() {
                         String raw = name.getText().toString().trim();
                         if (raw.isEmpty()) {
+                            // 名字为空**不关页**（旧版靠接管正按钮做到）
                             toast(a, Trans.get(a, R.string.msav_name_empty));
                             return;
                         }
                         st.base = Msav.safeName(raw);
                         // ★★ 同名覆盖**必须先问**（2026-10-04 修，P0）：`Msav.commit` 对同名是
                         //    "先 `delete()` 旧的、再改名"，而 `.msav` 既没有中转站也没有备份
-                        //    ⇒ 不确认就是**静默删掉用户一份存档**（哪怕玩了几百小时），
-                        //    而界面只报"已导入"。原来这里一个字的判断都没有。
-                        //    ⚠️ 判据与地图导入那条对齐（`MapsActivity` 的 `map_overwrite_*`）：
-                        //      同一个"同名要不要替换"的问题，两个入口只能有一种答法。
+                        //    ⇒ 不确认就是**静默删掉用户一份存档**。
+                        //    ⚠️ 判据与地图导入那条对齐（`MapsActivity` 的 `map_overwrite_*`）。
                         File dest = new File(st.savesDir, st.base);
                         if (dest.exists()) {
-                            // 先收掉改名框再问（`dismiss()` 不触发 onCancel ⇒ 不会误 discard）；
-                            // 留下来的 `.part` 由下面那个框的三个出口各自处置。
-                            dlg.dismiss();
-                            confirmMsavOverwrite(a, st, slot, h, dest.getName());
+                            // 推到确认页（不关窗）：「换个名字」= pop 回这一页，框里的字还在
+                            confirmMsavOverwrite(ref[0], a, st, slot, h, dest.getName());
                             return;
                         }
-                        dlg.dismiss();     // dismiss 不触发 onCancel ⇒ 上面的 discard 不会误跑
+                        ref[0].dismiss();
                         commitMsav(a, st, slot, h);
                     }
-                });
-            }
-        });
-        dlg.show();
+                }));
     }
 
     /**
-     * 「槽里已经有同名存档」的确认框（2026-10-04 修，P0）。
+     * 「槽里已经有同名存档」的确认页（2026-10-04 修，P0；第 265 轮改成卡片的一页）。
      *
      * ★ 为什么必须补：{@link Msav#commit} 对同名是**先 `delete()` 旧的、再改名**，
      *   而存档既没有中转站也没有备份 ⇒ 少这一问就是**静默丢一份存档**。
-     *   地图导入早就有对应的一道（`MapsActivity` 的 `map_overwrite_*`），存档这条是漏做的。
-     *
-     * ★ 三个出口都要处置那个 `.part`（否则槽里留下垃圾，只能靠下一次
-     *   {@link Msav#sweepParts} 收）：
-     *   · 替换 —— 进 {@link #commitMsav}（改名成 `.msav`）；
-     *   · 换个名字 —— 回到改名框（`st` 还活着，`.part` 还在，不会重下一次文件）；
-     *   · 取消 / 返回键 —— {@link Msav#discard}。
+     * ★ 三个出口：替换 → {@link #commitMsav}；换个名字 → `pop()` 回改名页（`st` 还活着，`.part` 还在）；
+     *   取消 → {@link Msav#discard}。
+     * ⚠️ 用返回键 / 点外面关掉这张卡时**不会** discard（旧版靠 `setOnCancelListener`）——
+     *   留下的 `.part` 由下一次 {@link Msav#sweepParts} 收，不会进存档列表。
      */
-    private static void confirmMsavOverwrite(final Activity a, final Msav.Stage st,
+    private static void confirmMsavOverwrite(final CardStack stack, final Activity a, final Msav.Stage st,
                                              final String slot, final SlotOps.Host h,
                                              final String fileName) {
-        new AlertDialog.Builder(a)
-                .setTitle(Trans.get(a, R.string.msav_overwrite_title))
-                .setMessage(Trans.get(a, R.string.msav_overwrite_msg_fmt, slot, fileName))
-                .setPositiveButton(R.string.msav_overwrite_ok,
-                        new DialogInterface.OnClickListener() {
-                            @Override public void onClick(DialogInterface d, int w) {
-                                commitMsav(a, st, slot, h);
-                            }
-                        })
-                .setNeutralButton(R.string.msav_overwrite_rename,
-                        new DialogInterface.OnClickListener() {
-                            @Override public void onClick(DialogInterface d, int w) {
-                                showMsavNameDialog(a, st, slot, h);
-                            }
-                        })
-                .setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) { Msav.discard(st); }
-                })
-                .setOnCancelListener(new DialogInterface.OnCancelListener() {
-                    @Override public void onCancel(DialogInterface d) { Msav.discard(st); }
-                })
-                .show();
+        stack.push(Trans.get(a, R.string.msav_overwrite_title),
+                CardStack.text(a, Trans.get(a, R.string.msav_overwrite_msg_fmt, slot, fileName)),
+                new CardStack.Btn(Trans.get(a, R.string.cancel), new Runnable() {
+                    @Override public void run() {
+                        Msav.discard(st);
+                        stack.dismiss();
+                    }
+                }),
+                new CardStack.Btn(Trans.get(a, R.string.msav_overwrite_rename), new Runnable() {
+                    @Override public void run() { stack.pop(); }
+                }),
+                new CardStack.Btn(Trans.get(a, R.string.msav_overwrite_ok), new Runnable() {
+                    @Override public void run() {
+                        stack.dismiss();
+                        commitMsav(a, st, slot, h);
+                    }
+                }));
     }
-
     private static void commitMsav(final Activity a, Msav.Stage st, String slot, final SlotOps.Host h) {
         try {
             File dest = Msav.commit(a, st);
