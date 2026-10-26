@@ -427,14 +427,22 @@ public class PluginsActivity extends BaseActivity {
         items.add(Trans.get(this, R.string.plugin_action_info));
         actions.add("info");
 
-        new AlertDialog.Builder(this)
-                .setTitle(Plugins.displayNameOf(this, id))
-                // ⚠️ 别在这里加 `.setMessage(...)`：框架的 AlertController 在"有 message"时会**把 items 吞掉**
-                //    （真机实测：同一段代码去掉 message 就正常显示 6 项，加上就只剩一个「取消」）。
-                //    ⇒ 来源 / 等级的信息放在**列表行下面那行小字**里，弹窗只负责动作。
-                .setItems(items.toArray(new CharSequence[0]), new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int which) {
+        // ★ 第 259 轮：改成**同一个窗里换页**（`CardStack`）—— 「插件信息」原来是再开一个 Dialog，
+        //   叠窗那一下旧窗的 dim 跟着窗口一起消失、新窗的 dim 要重新渐入 ⇒ 整屏亮一下（用户：「还是闪」）。
+        //   同窗换页时窗口与 dim 都不变，只有卡片里的内容交叉淡入。
+        final CardStack stack = new CardStack(this);
+        final CharSequence rowTitle = Plugins.displayNameOf(this, id);
+        stack.root(rowTitle,
+                CardStack.list(this, items.toArray(new CharSequence[0]), new CardStack.ItemClick() {
+                    @Override public void onClick(int which) {
                         String a = actions.get(which);
+                        if ("info".equals(a)) {
+                            stack.push(rowTitle, CardStack.text(PluginsActivity.this,
+                                    infoText(id, newest, trust, lv)));
+                            return;
+                        }
+                        // 其余动作都会自己弹窗 / 出 Toast ⇒ 先把这张卡收掉，别让两个窗口叠着
+                        stack.dismiss();
                         if ("open".equals(a)) {
                             open(id, act);
                         } else if ("enable".equals(a)) {
@@ -513,23 +521,25 @@ public class PluginsActivity extends BaseActivity {
                                     Trans.get(PluginsActivity.this, R.string.plugin_level_set_fmt,
                                             id, Trans.get(PluginsActivity.this, levelRes(nextLv))), Toast.LENGTH_LONG).show();
                             rebuild();
-                        } else if ("info".equals(a)) {
-                            infoDialog(id, newest, trust, lv);
                         }
                     }
-                })
-                .setNegativeButton(Trans.get(this, R.string.cancel), null)
-                .show();
+                }),
+                Trans.get(this, R.string.cancel),
+                new Runnable() {
+                    @Override public void run() { stack.dismiss(); }
+                });
+        stack.show();
     }
 
     /**
-     * 「插件信息」：自述里那些**说明性**的字段（名称 / 自述版本 / 作者 / 说明）+ 入口类 + 来源 / 处置 / 文件版本。
+     * 「插件信息」那一页的正文：自述里那些**说明性**的字段（名称 / 自述版本 / 作者 / 说明）+ 入口类 + 来源 / 处置 / 文件版本。
      *
-     * <p>★ 为什么单独开一个弹窗：框架那个"`setMessage` 与 `setItems` 同用会把 items 吞掉"的坑
-     * （第 133 轮真机踩的）⇒ **只有 message、没有 items 的弹窗**是安全的，所以信息单独一屏。
+     * <p>★ 第 259 轮起它**只是一段文字**（`CharSequence`），由调用方推进 {@link CardStack} 的下一页 ——
+     * 以前这里是再开一个 `AlertDialog`（框架那个"`setMessage` 与 `setItems` 同用会把 items 吞掉"的坑，
+     * 第 133 轮真机踩的，所以信息只能单独一屏）⇒ 但**换窗**会让 dim 重播、整屏闪一下，改成同窗换页。
      * ★ 空字段整条不印（{@link Plugins#dropEmptyPairs}）—— 不许出现「作者：null」或空行。
      */
-    private void infoDialog(String id, String fileVer, String trust, String lv) {
+    private CharSequence infoText(String id, String fileVer, String trust, String lv) {
         File apk = fileVer == null ? null : Plugins.apkOf(this, id, fileVer);
         PluginMeta.Info meta = apk == null ? null : PluginMeta.read(this, apk);
         // ★ 第 182 轮：内置插件的"文件版本"是 sha 前 8 位，不是装进来的时间 ⇒ 这行只在真的是时间戳时才印
@@ -568,11 +578,7 @@ public class PluginsActivity extends BaseActivity {
             // （⚠️ 别用"标签末尾带空格"当分隔符：aapt2 会把首尾空白剥掉，装到机器上标签与值会连体 —— 门禁 RES-04 抓过）
             sb.append(String.format(pair[0], pair[1]));
         }
-        new AlertDialog.Builder(this)
-                .setTitle(Plugins.displayNameOf(this, id))
-                .setMessage(sb.toString())
-                .setPositiveButton(Trans.get(this, R.string.cancel), null)
-                .show();
+        return sb;
     }
 
     /** 来源 → 界面上那个短名（唯一映射处：列表行与信息弹窗共用）。 */

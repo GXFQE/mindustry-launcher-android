@@ -18,6 +18,7 @@
     <!-- 通用 -->
     <string name="close">关闭</string>
     <string name="cancel">取消</string>
+    <string name="back">返回</string>
     <string name="add">添加</string>
     <string name="delete">删除</string>
     <string name="saves_title">存档与备份</string>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  第 258 轮（试验 D）：**只为让 dim 立刻到位**的 1ms 空动画。
+
+  背景：叠窗时实测到「旧窗连同它的 dim 一起消失 ⇒ 页面亮一帧 ⇒ 新窗的 dim 用约 0.5 s 才渐入」
+  （`.dsh/evidence/round258/` 的 09~16 帧序列）。这一版验证"dim 的渐入是不是跟着窗口入场动画的时长走"：
+  给一个 1ms、alpha 恒为 1 的动画 —— 画面本身不该有任何可见变化，如果 dim 因此变成瞬间到位，
+  说明这条路可行（把时长调到 ~60ms 就能兼顾手感）。
+-->
+<alpha xmlns:android="http://schemas.android.com/apk/res/android"
+    android:duration="1"
+    android:fromAlpha="1.0"
+    android:toAlpha="1.0" />

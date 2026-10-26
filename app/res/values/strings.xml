@@ -33,6 +33,8 @@
     <!-- 通用 -->
     <string name="close">Close</string>
     <string name="cancel">Cancel</string>
+    <!-- 第 259 轮：CardStack 里"回上一页"的按钮（与系统返回键同义） -->
+    <string name="back">Back</string>
     <string name="add">Add</string>
     <string name="delete">Delete</string>
     <string name="saves_title">Saves &amp; Backups</string>

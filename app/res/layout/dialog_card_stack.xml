@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  第 259 轮：`CardStack` 的卡片骨架（一个 Dialog 里换页用的那个壳）。
+
+  ★ 为什么要有这个东西：叠两个 Dialog 时，旧窗一关，它那层 dim 跟着没；新窗是另一个窗口，
+    dim 要由系统的窗口动画重新渐入（本机实测 **0.5 s**；给 1ms 空动画后仍会亮 2~3 帧）
+    ⇒ 换页那一下整屏亮一下 = 用户说的"闪"。**同一个窗里换内容**时层与 dim 都没变，亮度一个像素都不跳。
+
+  ★ 这里只搭骨架（标题 / 内容槽 / 按钮条）；换页的交叉淡入与高度过渡在 `CardStack.render()` 里。
+  ★ 卡片底色用 `card_bg`（与页面卡片同一份圆角 + 描边）；**别**用 `dlg_bg` —— 那份是带 16dp inset 的
+    窗口背景，拿来当 View 背景会把内容整体缩进 16dp。
+-->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:padding="16dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="@drawable/card_bg"
+        android:padding="20dp">
+
+        <TextView
+            android:id="@+id/card_stack_title"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/fg"
+            android:textSize="19sp"
+            android:fontFamily="sans-serif-medium" />
+
+        <FrameLayout
+            android:id="@+id/card_stack_body"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="10dp" />
+
+        <LinearLayout
+            android:id="@+id/card_stack_buttons"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
+            android:orientation="horizontal"
+            android:gravity="end|center_vertical" />
+    </LinearLayout>
+</FrameLayout>

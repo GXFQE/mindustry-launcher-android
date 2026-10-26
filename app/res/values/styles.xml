@@ -45,6 +45,8 @@
       ★ 想补"极轻一点点"的手感，才把 `windowEnterAnimation` 加回来，且必须**从高 alpha 起步**
         （例如 fromAlpha=0.9 / 60ms）—— **绝不能从 0 起步**，那就又是这一闪。
     -->
-    <style name="AppDialogAnim" />
+    <style name="AppDialogAnim">
+        <item name="android:windowEnterAnimation">@anim/dialog_instant</item>
+    </style>
 
 </resources>
