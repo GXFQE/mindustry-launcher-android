@@ -81,6 +81,8 @@ public final class CardStack {
     private final LinearLayout buttonBar;
     private final ArrayList<Page> pages = new ArrayList<Page>();
     private Runnable onDismiss;
+    /** 	extPage() 建的那个 TextView（updateText 用）。 */
+    private TextView lastText;
     /** 正文槽的高度上限（屏高减去卡片上下留白 + 标题 + 按钮 + 边距，留够余量）。 */
     private final int maxBody;
 
@@ -220,6 +222,43 @@ public final class CardStack {
         }
         stack.push(title, body, buttons);
         return stack;
+    }
+
+    /**
+     * 用一页正文**顶替当前页**（确认页 → "正在…" → 结果页，三段在同一张卡里换内容）。
+     * 没有卡片（或卡片已经关了）就自己开一张；按钮为空 = 这一页不可点（进度页）。
+     */
+    public void replace(CharSequence title, CharSequence message, Btn... buttons) {
+        Page p = new Page();
+        p.title = title;
+        p.body = textPage(dlg.getContext(), message);
+        for (Btn b : buttons) if (b != null) p.buttons.add(b);
+        if (!dlg.isShowing()) {
+            pages.clear();
+            pages.add(p);
+            render(p, false);
+            dlg.show();
+            return;
+        }
+        if (pages.isEmpty()) pages.add(p); else pages.set(pages.size() - 1, p);
+        render(p, true);
+    }
+
+    /** 只改这一页的正文（进度数字这种高频刷新）—— 不换页、不播动画。 */
+    public void updateText(CharSequence message) {
+        if (lastText == null) return;
+        lastText.setText(message);
+        remeasure();
+    }
+
+    private View textPage(Context c, CharSequence body) {
+        TextView t = new TextView(c);
+        t.setText(body);
+        t.setTextSize(15);
+        t.setTextColor(c.getResources().getColor(R.color.fg));
+        t.setLineSpacing(dp(c, 4), 1f);
+        lastText = t;
+        return scroller(c, t);
     }
 
     /**

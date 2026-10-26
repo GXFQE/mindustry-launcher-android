@@ -553,9 +553,10 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
      */
     private void doImport(final String slot, final Uri uri, final String displayName,
                           final boolean overwrite) {
-        final ProgressDialog pd = ProgressDialog.show(this,
-                Trans.get(ModsActivity.this, R.string.mods_import_progress_title),
-                Trans.get(ModsActivity.this, R.string.mods_import_progress_fmt, displayName, slot), true, false);
+        // ★ 第 266 轮：进度与结果都画在同一张卡片里（原来 ProgressDialog + 结果 AlertDialog = 两次换窗）
+        final CardStack stack = new CardStack(this);
+        stack.replace(Trans.get(this, R.string.mods_import_progress_title),
+                Trans.get(this, R.string.mods_import_progress_fmt, displayName, slot));
         new Thread(new Runnable() {
             @Override public void run() {
                 Mods.PackResult pr = null;
@@ -590,9 +591,9 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
                 final File fdir = destDir;
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
-                        pd.dismiss();
                         if (fe != null) {
-                            alert(Trans.get(ModsActivity.this, R.string.mods_import_failed), fe);
+                            stack.replace(Trans.get(ModsActivity.this, R.string.mods_import_failed), fe,
+                                    closeBtn(stack));
                             return;
                         }
                         // ★ 下面两条出口弹的都是 inline 窗口（同名替换框 / 导入结果框）⇒
@@ -603,24 +604,27 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
                             // 「同名已存在」⇒ 给一次**显式**替换的机会（别让用户以为"点了没反应"）
                             File dest = fdir == null ? null : new File(fdir, displayName);
                             if (dest != null && dest.exists()) {
-                                new AlertDialog.Builder(ModsActivity.this)
-                                        .setTitle(R.string.mods_import_exists_title)
-                                        .setMessage(Trans.get(ModsActivity.this, R.string.mods_import_exists_msg_fmt,
-                                                displayName))
-                                        .setPositiveButton(R.string.mods_import_replace,
-                                                new DialogInterface.OnClickListener() {
-                                                    @Override public void onClick(DialogInterface d, int w) {
+                                // 同名 ⇒ 同一张卡里换成一页确认（不再另开窗）
+                                stack.replace(Trans.get(ModsActivity.this, R.string.mods_import_exists_title),
+                                        Trans.get(ModsActivity.this, R.string.mods_import_exists_msg_fmt, displayName),
+                                        new CardStack.Btn(Trans.get(ModsActivity.this, R.string.cancel),
+                                                new Runnable() {
+                                                    @Override public void run() { stack.dismiss(); }
+                                                }),
+                                        new CardStack.Btn(Trans.get(ModsActivity.this, R.string.mods_import_replace),
+                                                new Runnable() {
+                                                    @Override public void run() {
+                                                        stack.dismiss();
                                                         doImport(slot, uri, displayName, true);
                                                     }
-                                                })
-                                        .setNegativeButton(R.string.cancel, null)
-                                        .show();
+                                                }));
                                 return;
                             }
-                            alert(Trans.get(ModsActivity.this, R.string.mods_import_failed), fpr.report(ModsActivity.this));
+                            stack.replace(Trans.get(ModsActivity.this, R.string.mods_import_failed),
+                                    fpr.report(ModsActivity.this), closeBtn(stack));
                             return;
                         }
-                        showImportResult(fpr, fhealth);
+                        showImportResult(stack, fpr, fhealth);
                         rescan();
                     }
                 });
@@ -647,7 +651,7 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
     }
 
     /** 导入结果 + **版本兼容性提示**（F13 的头号卖点，在"刚装进去"这一刻就该说） */
-    private void showImportResult(Mods.PackResult pr,
+    private void showImportResult(final CardStack stack, Mods.PackResult pr,
                                   java.util.Map<String, java.util.List<Finding>> health) {
         StringBuilder sb = new StringBuilder(pr.report(this));
         Mods.Target t = Mods.targetsFor(this, mSlot);
@@ -677,11 +681,14 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
                 sb.append(ModsText.importHealth(this, health.get(path))).append('\n');
             }
         }
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.mods_import_ok)
-                .setMessage(sb.toString())
-                .setPositiveButton(R.string.mods_close, null)
-                .show();
+        stack.replace(Trans.get(this, R.string.mods_import_ok), sb.toString(), closeBtn(stack));
+    }
+
+    /** 结果页的「关闭」（唯一实现；`stack` 必须 final 才能被匿名类用）。 */
+    private CardStack.Btn closeBtn(final CardStack stack) {
+        return new CardStack.Btn(Trans.get(this, R.string.mods_close), new Runnable() {
+            @Override public void run() { stack.dismiss(); }
+        });
     }
 
     /** 挑复制目标槽（排除源槽本身） */

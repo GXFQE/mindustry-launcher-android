@@ -855,40 +855,38 @@ final class BatchIo {
                             cleanup(work);
                             return;
                         }
+                        final CardStack[] ref = new CardStack[1];
                         if (todo.isEmpty()) {
                             if (onDone != null) onDone.run();
-                            alert(a, Trans.get(a, R.string.batch_report_title), rep.text(a));
+                            // ★ 第 266 轮："一份都没导"的报告也画在卡片里（原来是一个 AlertDialog）
+                            ref[0] = new CardStack(a);
+                            ref[0].replace(Trans.get(a, R.string.batch_report_title), rep.text(a),
+                                    new CardStack.Btn(Trans.get(a, R.string.close), new Runnable() {
+                                        @Override public void run() { ref[0].dismiss(); }
+                                    }));
                             cleanup(work);
                             return;
                         }
                         if (conflicts == 0) {
-                            phaseB(a, todo, imp, rep, work, true, slot, kind, onDone);
+                            phaseB(null, a, todo, imp, rep, work, true, slot, kind, onDone);
                             return;
                         }
-                        // ★ 有同名 ⇒ **只问一次**（这一批里撞了多少份、一共多少份都说清楚）
-                        AlertDialog.Builder b = new AlertDialog.Builder(a)
-                                .setTitle(R.string.batch_overwrite_title)
-                                .setMessage(Trans.get(a, R.string.batch_overwrite_msg_fmt,
-                                        conflicts, todo.size()))
-                                .setPositiveButton(R.string.batch_overwrite_ok,
-                                        new DialogInterface.OnClickListener() {
-                                            @Override public void onClick(DialogInterface d, int w) {
-                                                phaseB(a, todo, imp, rep, work, true, slot, kind, onDone);
-                                            }
-                                        })
-                                .setNegativeButton(R.string.cancel,
-                                        new DialogInterface.OnClickListener() {
-                                            @Override public void onClick(DialogInterface d, int w) {
-                                                phaseB(a, todo, imp, rep, work, false, slot, kind, onDone);
-                                            }
-                                        });
-                        // ⚠️ 返回键 = 与"取消"同一条路（**不能**只是关窗：不导入的话要收尾 + 报数）
-                        b.setOnCancelListener(new DialogInterface.OnCancelListener() {
-                            @Override public void onCancel(DialogInterface d) {
-                                phaseB(a, todo, imp, rep, work, false, slot, kind, onDone);
-                            }
-                        });
-                        b.show();
+                        // ★ 有同名 ⇒ **只问一次**（这一批里撞了多少份、一共多少份都说清楚）。
+                        // ★ 第 266 轮：确认页 → 进度 → 报告 全在同一张卡里换内容（原来三段各一个窗口）。
+                        final CardStack stack = new CardStack(a);
+                        stack.replace(Trans.get(a, R.string.batch_overwrite_title),
+                                Trans.get(a, R.string.batch_overwrite_msg_fmt, conflicts, todo.size()),
+                                new CardStack.Btn(Trans.get(a, R.string.cancel), new Runnable() {
+                                    @Override public void run() {
+                                        // ⚠️ 取消 ≠ 什么都不做：不导入的那批也要收尾 + 报数
+                                        phaseB(stack, a, todo, imp, rep, work, false, slot, kind, onDone);
+                                    }
+                                }),
+                                new CardStack.Btn(Trans.get(a, R.string.batch_overwrite_ok), new Runnable() {
+                                    @Override public void run() {
+                                        phaseB(stack, a, todo, imp, rep, work, true, slot, kind, onDone);
+                                    }
+                                }));
                     }
                 });
             }
@@ -896,29 +894,22 @@ final class BatchIo {
     }
 
     /** 第二阶段：逐份导（`replace` = 用户对"同名"那个问题的回答） */
-    private static void phaseB(final Activity a, final List<Entry> todo, final Importer imp,
+    private static void phaseB(final CardStack parent, final Activity a, final List<Entry> todo, final Importer imp,
                                final Report rep, final File work, final boolean replace,
                                final String slot, final int kind, final Runnable onDone) {
-        // ★ 2026-10-11：改成**确定进度**（原来是转圈的）—— 份数这一刻就已知（`todo.size()`），
-        //   而"模组几十 MB 时要盯几秒"正是用户抱怨的那种"看着像卡死"。
-        final ProgressDialog pd = new ProgressDialog(a);
-        pd.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
-        pd.setTitle(Trans.get(a, R.string.batch_import_progress_title));
-        pd.setMessage(Trans.get(a, R.string.batch_import_pct_fmt, 0, todo.size()));
-        pd.setMax(todo.size());
-        pd.setProgress(0);
-        pd.setCancelable(false);
-        pd.show();
+        // ★ 第 266 轮：进度**直接画在卡片里**（不再弹 ProgressDialog），跑完把这一页换成报告。
+        //   份数这一刻就已知 ⇒ 用确定进度的文案（同旧版：模组几十 MB 时要盯几秒）。
+        final CardStack stack = (parent != null) ? parent : new CardStack(a);
+        stack.replace(Trans.get(a, R.string.batch_import_progress_title),
+                Trans.get(a, R.string.batch_import_pct_fmt, 0, todo.size()));
         new Thread(new Runnable() {
             @Override public void run() {
                 applyAll(a, todo, imp, rep, replace, new Step() {
                     @Override public void onStep(final int done, final int total) {
                         a.runOnUiThread(new Runnable() {
                             @Override public void run() {
-                                if (Util.dead(a)) return;       // 页面没了就别再碰那个 dialog
-                                pd.setMax(total);
-                                pd.setProgress(done);
-                                pd.setMessage(Trans.get(a, R.string.batch_import_pct_fmt, done, total));
+                                if (Util.dead(a)) return;
+                                stack.updateText(Trans.get(a, R.string.batch_import_pct_fmt, done, total));
                             }
                         });
                     }
@@ -928,10 +919,12 @@ final class BatchIo {
                 cleanup(work);
                 a.runOnUiThread(new Runnable() {
                     @Override public void run() {
-                        pd.dismiss();
                         if (Util.dead(a)) return;
-                        if (onDone != null) onDone.run();     // 先让列表页重扫，再弹报告
-                        alert(a, Trans.get(a, R.string.batch_report_title), rep.text(a));
+                        if (onDone != null) onDone.run();     // 先让列表页重扫，再给报告
+                        stack.replace(Trans.get(a, R.string.batch_report_title), rep.text(a),
+                                new CardStack.Btn(Trans.get(a, R.string.close), new Runnable() {
+                                    @Override public void run() { stack.dismiss(); }
+                                }));
                     }
                 });
             }
