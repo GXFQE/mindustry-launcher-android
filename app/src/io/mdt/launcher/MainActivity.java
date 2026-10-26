@@ -2,7 +2,6 @@ package io.mdt.launcher;
 
 import android.app.Activity;
 import android.app.AlertDialog;
-import android.app.ProgressDialog;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
@@ -326,8 +325,10 @@ public class MainActivity extends BaseActivity {
 
     /** 开发路径：走与界面完全相同的 .msav 落盘逻辑（Msav.stage/commit） */
     void runMsavPipeline(final File src, final String slot) {
-        final ProgressDialog pd = ProgressDialog.show(this, Trans.get(MainActivity.this, R.string.dev_msav_title),
-                Trans.get(MainActivity.this, R.string.dev_msav_running_fmt, src.getName(), slot), true, false);
+        // ★ 第 272 轮：dev 路径也走卡片（产品路径原本就已经清零了）
+        final CardStack stack = new CardStack(this);
+        stack.replace(Trans.get(this, R.string.dev_msav_title),
+                Trans.get(this, R.string.dev_msav_running_fmt, src.getName(), slot));
         new Thread(new Runnable() {
             @Override public void run() {
                 String err = null;
@@ -346,13 +347,13 @@ public class MainActivity extends BaseActivity {
                 final long bytes = st == null ? 0 : st.bytes;
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
-                        pd.dismiss();
-                        alert(fe == null ? Trans.get(MainActivity.this, R.string.dev_msav_done)
-                                          : Trans.get(MainActivity.this, R.string.dev_msav_failed),
+                        stack.replace(fe == null ? Trans.get(MainActivity.this, R.string.dev_msav_done)
+                                                : Trans.get(MainActivity.this, R.string.dev_msav_failed),
                                 fe == null
                                         ? Trans.get(MainActivity.this, R.string.dev_msav_done_fmt, fd,
                                                 Util.formatSize(bytes), String.valueOf(gz))
-                                        : fe);
+                                        : fe,
+                                closeBtn(stack));
                         rescan();
                     }
                 });
@@ -361,15 +362,16 @@ public class MainActivity extends BaseActivity {
     }
 
     void runHealth(final boolean clean) {
-        final ProgressDialog pd = ProgressDialog.show(this, Trans.get(MainActivity.this, R.string.health_title),
-                getString(clean ? R.string.health_cleaning : R.string.health_scanning), true, false);
+        final CardStack stack = new CardStack(this);
+        stack.replace(Trans.get(this, R.string.health_title),
+                Trans.get(this, clean ? R.string.health_cleaning : R.string.health_scanning));
         new Thread(new Runnable() {
             @Override public void run() {
                 final String r = SelfTest.runHealthReport(MainActivity.this, clean);
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
-                        pd.dismiss();
-                        alert(Trans.get(MainActivity.this, R.string.health_title), r);
+                        stack.replace(Trans.get(MainActivity.this, R.string.health_title), r,
+                                closeBtn(stack));
                         rescan();
                     }
                 });
