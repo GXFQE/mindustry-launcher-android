@@ -576,8 +576,8 @@
       ⚠️ 五个 `·` 两侧都留了空格（aapt2 会剥首尾空白，靠拼串留不出空白）。
     -->
     <string name="slot_page_info_missing_fmt">读不到槽「%1$s」的数据</string>
-    <string name="slot_page_info_cur_fmt">这是当前槽（游戏启动就进它） · 目标游戏 %1$s</string>
-    <string name="slot_page_info_cur_nogame">这是当前槽（游戏启动就进它） · 还没指定版本</string>
+    <string name="slot_page_info_cur_fmt">当前槽 · 目标游戏 %1$s</string>
+    <string name="slot_page_info_cur_nogame">当前槽 · 还没指定版本</string>
     <string name="slot_page_info_other_fmt">不是当前槽 · 目标游戏 %1$s</string>
     <string name="slot_page_info_other_nogame">不是当前槽 · 还没指定版本</string>
     <string name="slot_page_ops">备份与恢复</string>

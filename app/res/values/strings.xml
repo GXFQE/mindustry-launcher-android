@@ -591,8 +591,8 @@
       ⚠️ 五个 `·` 两侧都留了空格（aapt2 会剥首尾空白，靠拼串留不出空白）。
     -->
     <string name="slot_page_info_missing_fmt">Cannot read data for slot \"%1$s\"</string>
-    <string name="slot_page_info_cur_fmt">This is the current slot (the game starts into it) · target game %1$s</string>
-    <string name="slot_page_info_cur_nogame">This is the current slot (the game starts into it) · no version assigned yet</string>
+    <string name="slot_page_info_cur_fmt">Current slot · target game %1$s</string>
+    <string name="slot_page_info_cur_nogame">Current slot · no version assigned yet</string>
     <string name="slot_page_info_other_fmt">Not the current slot · target game %1$s</string>
     <string name="slot_page_info_other_nogame">Not the current slot · no version assigned yet</string>
     <string name="slot_page_ops">Backup &amp; restore</string>

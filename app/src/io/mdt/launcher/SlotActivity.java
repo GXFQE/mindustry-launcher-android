@@ -53,7 +53,6 @@ public class SlotActivity extends BaseActivity {
         setTitle(Trans.get(SlotActivity.this, R.string.slot_page_title_fmt, mSlot));
 
         mInfo = (TextView) root.findViewById(R.id.slot_info);
-        mPaths = (TextView) root.findViewById(R.id.slot_paths);
 
         View modsRow = Util.bindActionValue(root, R.id.row_slot_mods, R.drawable.ic_mod,
                 R.string.slot_page_mods, new Runnable() {
@@ -255,7 +254,7 @@ public class SlotActivity extends BaseActivity {
     //   六项对话框操作已搬进 {@link SlotOps}、四条 SAF 链路已搬进 {@link SlotIo}，
     //   槽页面现在**全部就地执行** ⇒ 不再有任何派发（`EXTRA_SLOT_OP` 也没人发了）。
 
-    private TextView mInfo, mPaths;
+    private TextView mInfo;
     /** 模组行的副标题（后台扫完把条数写上去） */
     private TextView mModsSub;
     /** 存档 / 地图 / 蓝图三行的副标题（同样后台填） */
@@ -303,10 +302,6 @@ public class SlotActivity extends BaseActivity {
                               : Trans.get(SlotActivity.this, R.string.slot_page_info_other_nogame));
         }
         if (mInfo != null) mInfo.setText(sb.toString());
-        if (mPaths != null) {
-            java.io.File dir = Data.dirOf(this, mSlot);
-            mPaths.setText(dir == null ? "" : dir.getAbsolutePath());
-        }
         // 三段的条数/摘要都在**后台**算好再写（扫模组要读包、扫地图要开 APK，别放 UI 线程）
         new Thread(new Runnable() {
             @Override public void run() {
