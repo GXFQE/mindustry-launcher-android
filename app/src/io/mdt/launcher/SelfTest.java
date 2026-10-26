@@ -4088,6 +4088,27 @@ public final class SelfTest {
         } catch (Throwable t) {
             ok(stat, L, false, "v30 ProbeEnv missing: " + t);
         }
+        // ★ v31：宿主把这一局的**完整版本信息**给探针 —— 已装游戏会原地更新（包名不变、版本号变），
+        //   只给 key 的话插件没法把更新前后分开记。
+        ok(stat, L, PluginHost.API >= 31, "host plugin api >= 31 (ProbeEnv.versionInfo)");
+        try {
+            java.lang.reflect.Method vi = io.mdt.launcher.api.ProbeEnv.class.getMethod("versionInfo");
+            java.lang.reflect.Method dv = io.mdt.launcher.api.ProbeEnv.class.getMethod("displayVersion");
+            java.util.Map<String, String> info = new java.util.HashMap<String, String>();
+            info.put("displayVersion", "2026.09.X37");
+            info.put("versionName", "8-official-159.7");
+            info.put("title", "MindustryX  改端  2026.09.X37");
+            io.mdt.launcher.api.ProbeEnv env = new io.mdt.launcher.api.ProbeEnv(
+                    ctx.getCacheDir(), null, 1, true, "slot-a", "com.example", info);
+            ok(stat, L, vi.getReturnType() == java.util.Map.class
+                            && dv.getReturnType() == String.class
+                            && "2026.09.X37".equals(env.displayVersion())
+                            && "8-official-159.7".equals(env.versionInfo().get("versionName"))
+                            && "com.example".equals(env.version()),
+                    "★v31：版本信息整包进 ProbeEnv（key / displayVersion / versionName 都对）");
+        } catch (Throwable t) {
+            ok(stat, L, false, "v31 ProbeEnv failed: " + t);
+        }
         ok(stat, L, "total.txt".equals(PluginMeta.playtimeTotalFromJson(
                         "{\"playtimeTotal\":\"total.txt\",\"telemetry\":{\"probes\":[]}}")),
                 "★v30 playtimeTotal 声明：顶层键能读到（嵌套对象不干扰）");

@@ -6,7 +6,9 @@ import android.util.Log;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -41,19 +43,23 @@ final class ProbeRunner {
     private final boolean inProcess;
     private final String slot;
     private final String version;
+    /** v31：这一局的版本信息快照（key / title / versionName / displayVersion / …） */
+    private final Map<String, String> versionInfo;
     private final List<Job> jobs = new ArrayList<Job>();
     private final ScheduledExecutorService timer = Executors.newSingleThreadScheduledExecutor();
     private final ExecutorService work = Executors.newCachedThreadPool();
     private volatile boolean stopped;
 
     private ProbeRunner(Context ctx, File sessionDir, int pid, boolean inProcess, String slot,
-                        String version) {
+                        String version, Map<String, String> versionInfo) {
         this.ctx = ctx;
         this.sessionDir = sessionDir;
         this.pid = pid;
         this.inProcess = inProcess;
         this.slot = slot;
         this.version = version == null ? "" : version;
+        this.versionInfo = versionInfo == null
+                ? Collections.<String, String>emptyMap() : versionInfo;
     }
 
     /**
@@ -64,12 +70,13 @@ final class ProbeRunner {
      * @param session  本会话的目录名（调用方给，通常是 `yyyyMMdd-HHmmss-<槽>`）
      * @param slot     这一局用的槽（空 ⇒ 当前槽）
      * @param version  这一局的版本 key（v30；已装 = 包名 / 导入 = `import:<文件名>`，拿不到给空）
+     * @param info     这一局的**版本信息快照**（v31；与 `versions()` 的 extra + `title` 同名；可空）
      */
     static ProbeRunner start(Context ctx, int pid, boolean inProcess, String session,
-                             String slot, String version) {
+                             String slot, String version, Map<String, String> info) {
         File base = new File(new File(Data.hubDir(ctx), "usage/telemetry"), session);
         String useSlot = (slot == null || slot.trim().isEmpty()) ? Data.currentSlot(ctx) : slot.trim();
-        ProbeRunner r = new ProbeRunner(ctx, base, pid, inProcess, useSlot, version);
+        ProbeRunner r = new ProbeRunner(ctx, base, pid, inProcess, useSlot, version, info);
         r.boot();
         return r;
     }
@@ -105,7 +112,7 @@ final class ProbeRunner {
                 // v30：插件自己的数据目录（`<插件>/data`，与 PluginApi.dataDir 同一个）
                 File home = apk.getParentFile();
                 File dataDir = home == null ? null : new File(home, "data");
-                p.reset(new ProbeEnv(dir, dataDir, pid, inProcess, slot, version));
+                p.reset(new ProbeEnv(dir, dataDir, pid, inProcess, slot, version, versionInfo));
                 Job j = new Job(s, p);
                 jobs.add(j);
                 timer.scheduleAtFixedRate(new Runnable() {

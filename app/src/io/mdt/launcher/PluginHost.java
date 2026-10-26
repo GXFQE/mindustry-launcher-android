@@ -76,11 +76,15 @@ public final class PluginHost {
      * 探针知道"这一局是哪个版本"，并能把跨会话的账本写进插件自己的数据目录；
      * 另加 `playtimeTotal`（plugin.json 声明一个整数文件，宿主把它排版进主界面摘要卡）。
      *
+     * <p>**v31（2026-10-26）= 加法**：`ProbeEnv.displayVersion()` —— 这一局的**人读版本号**
+     * （已剥构建前缀，如 `159.7` / `2026.09.X37`）；`version()` 仍是身份（包名 / 文件名），
+     * 两者一个是 key、一个是给人看的号，插件可把号一起写进自己的账本。
+     *
      * <p>v1~v19 的逐版记录留在 `docs/PLUGIN-API.md` 与 git 历史里；**从 v20 起**：
      * 加法变更只抬 {@link #API}（{@link #API_MIN} 不动，老插件照样装得进），
      * 破坏性变更才抬 {@link #API_MIN}。
      */
-    public static final int API = 30;
+    public static final int API = 31;
     /**
      * 还认的**最老**契约版本。
      *

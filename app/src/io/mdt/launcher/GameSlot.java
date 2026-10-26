@@ -10,6 +10,8 @@ import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import java.io.File;
+import java.util.Map;
+import java.util.TreeMap;
 
 /**
  * 游戏坑位（`android:process=":game"`）—— 加载流程必须跑在**游戏将要落地的那个进程**里，
@@ -75,6 +77,8 @@ public class GameSlot extends BaseActivity {
         String pkg = it == null ? null : it.getStringExtra("pkg");
         String apkPath = it == null ? null : it.getStringExtra("apk");
         String slot = it == null ? null : it.getStringExtra("slot");
+        // v31：这一局的版本信息快照（探针写账本用；身份仍是下面的 vkey）
+        Bundle vinfo = it == null ? null : it.getBundleExtra(ProbeService.EXTRA_VINFO);
 
         // ① 解析目标
         File target = null;
@@ -96,6 +100,7 @@ public class GameSlot extends BaseActivity {
         // ★ 不另加 extra：这两条分支本来就把"是哪个版本"带齐了，再从 intent 塞一份只会多一个漂移源。
         final String vkey = (pkg != null && !pkg.isEmpty())
                 ? pkg.trim() : "import:" + target.getName();
+        final Map<String, String> vmap = mapOf(vinfo);
 
         // ② 存档槽：必须在游戏起来之前定下来
         boolean legacy = needsLegacySlot(target, it);
@@ -120,7 +125,7 @@ public class GameSlot extends BaseActivity {
             Injector.Timing t = Injector.launch(this, plan);
             // dev：探针验证台（产品版 ProbeLab 是空壳，见 app/src-release）
             ProbeLab.runIfArmed(this);
-            startProbes(vkey);
+            startProbes(vkey, vmap, vinfo);
             // ⚠️ 这句写在 **:game 进程**自己的 Config 实例上并落盘；主进程内存里那份看不到，
             //   必须靠 MainActivity.onResume → Config.reload 才能读到
             //   （否则「继续上次」要重启启动器才更新，2026-10-01 复现）。
@@ -175,19 +180,21 @@ public class GameSlot extends BaseActivity {
      * 插件事后按目录读就行（宿主不聚合）。
      *
      * <p>v30：把这一局的**版本 key** 一起给探针 —— 插件要按版本分账（见 {@code ProbeEnv#version()}）。
+     * <p>v31：再把**版本信息快照**一起给（见 {@code ProbeEnv#versionInfo()}），插件写账本时连版本号一起存。
      */
-    private void startProbes(String versionKey) {
+    private void startProbes(String versionKey, Map<String, String> info, Bundle infoBundle) {
         try {
             String session = new java.text.SimpleDateFormat("yyyyMMdd-HHmmss",
                     java.util.Locale.US).format(new java.util.Date())
                     + "-" + Data.currentSlot(this);
             mProbes = ProbeRunner.start(this, android.os.Process.myPid(), true, session,
-                    Data.currentSlot(this), versionKey);
+                    Data.currentSlot(this), versionKey, info);
             Intent svc = new Intent(this, ProbeService.class);
             svc.putExtra(ProbeService.EXTRA_PID, android.os.Process.myPid());
             svc.putExtra(ProbeService.EXTRA_RUN, true);
             svc.putExtra(ProbeService.EXTRA_SESSION, session);
             svc.putExtra(ProbeService.EXTRA_VERSION, versionKey);
+            if (infoBundle != null) svc.putExtra(ProbeService.EXTRA_VINFO, infoBundle);
             startService(svc);
             // v29：把游戏 activity 的前后台变化转给探针（宿主只报事件，记不记由插件定）
             GameActivityWatcher.setForegroundListener(new GameActivityWatcher.Foreground() {
@@ -199,6 +206,18 @@ public class GameSlot extends BaseActivity {
         } catch (Throwable t) {
             android.util.Log.w("MDTPlugin", "probe start failed", t);
         }
+    }
+
+    /** Bundle → 字符串 map（探针只认字符串；空值 / 缺键就不放）。排序只为日志稳定。 */
+    private static Map<String, String> mapOf(Bundle b) {
+        Map<String, String> m = new TreeMap<String, String>();
+        if (b != null) {
+            for (String k : b.keySet()) {
+                Object v = b.get(k);
+                if (v != null) m.put(k, String.valueOf(v));
+            }
+        }
+        return m;
     }
 
     private void fail(String step, String msg, Throwable cause) {

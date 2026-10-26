@@ -4,11 +4,14 @@ import android.app.ActivityManager;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
+import android.os.Bundle;
 import android.os.IBinder;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.util.Map;
+import java.util.TreeMap;
 
 /**
  * `:probe` 隔离进程的**骨架 + 可读性验证**（2026-10-23 第 222 轮）。
@@ -31,9 +34,23 @@ public class ProbeService extends Service {
     static final String EXTRA_SESSION = "session";
     /** v30：这一局的版本 key（探针按版本分账；拿不到就不放这个 extra）。 */
     static final String EXTRA_VERSION = "version";
+    /** v31：这一局的版本信息快照（Bundle；探针写账本用；拿不到就不放）。 */
+    static final String EXTRA_VINFO = "vinfo";
 
     @Override public IBinder onBind(Intent intent) {
         return null;
+    }
+
+    /** Bundle → 字符串 map（与 GameSlot 那份同构；探针只认字符串）。 */
+    private static Map<String, String> mapOf(Bundle b) {
+        Map<String, String> m = new TreeMap<String, String>();
+        if (b != null) {
+            for (String k : b.keySet()) {
+                Object v = b.get(k);
+                if (v != null) m.put(k, String.valueOf(v));
+            }
+        }
+        return m;
     }
 
     @Override public int onStartCommand(Intent intent, int flags, int startId) {
@@ -41,8 +58,10 @@ public class ProbeService extends Service {
         final boolean run = intent != null && intent.getBooleanExtra(EXTRA_RUN, false);
         final String session = intent == null ? null : intent.getStringExtra(EXTRA_SESSION);
         final String version = intent == null ? null : intent.getStringExtra(EXTRA_VERSION);
+        final Bundle vinfo = intent == null ? null : intent.getBundleExtra(EXTRA_VINFO);
         if (run) {
-            final ProbeRunner runner = ProbeRunner.start(this, pid, false, session, null, version);
+            final ProbeRunner runner = ProbeRunner.start(this, pid, false, session, null, version,
+                    mapOf(vinfo));
             new Thread(new Runnable() {
                 @Override public void run() {
                     // 游戏进程没了就收尾（上限 12 小时，防御性）

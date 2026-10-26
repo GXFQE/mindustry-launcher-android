@@ -32,6 +32,8 @@ public final class PlaytimeProbe implements Probe {
     private File dataDir;
     private String slot = "";
     private String version = "";
+    /** 版本快照（v31：tag / title / 原始版本名 / 上游版本；缺的字段写账本时保留旧值） */
+    private Playtime.Snap snap = new Playtime.Snap("", "", "", "");
     /** 内存里的账本（reset 时读入；每次 flush 覆盖写回） */
     private String ledger = "";
     /** reset 时这个 (槽, 版本) 已经累计的毫秒 */
@@ -50,8 +52,9 @@ public final class PlaytimeProbe implements Probe {
         slot = env == null || env.slot() == null ? "" : env.slot().trim();
         String v = env == null || env.version() == null ? "" : env.version().trim();
         version = v.isEmpty() ? Playtime.UNKNOWN_VERSION : v;
+        snap = Playtime.Snap.of(env == null ? null : env.versionInfo());
         ledger = dataDir == null ? "" : read(new File(dataDir, "ledger.tsv"));
-        baseMs = Playtime.valueFor(ledger, slot, version);
+        baseMs = Playtime.valueFor(ledger, slot, version, snap.tag);
         accMs = 0;
         fgSince = 0;
     }
@@ -86,7 +89,7 @@ public final class PlaytimeProbe implements Probe {
         try {
             long ms = baseMs + sessionMs();
             if (ms <= 0) return;
-            ledger = Playtime.put(ledger, slot, version, ms, System.currentTimeMillis());
+            ledger = Playtime.put(ledger, slot, version, snap, ms, System.currentTimeMillis());
             if (!dataDir.isDirectory() && !dataDir.mkdirs()) return;
             writeAtomic(new File(dataDir, "ledger.tsv"), ledger);
             writeAtomic(new File(dataDir, "total.txt"), String.valueOf(Playtime.total(ledger)));

@@ -19,11 +19,12 @@ import io.mdt.launcher.api.PluginTheme;
 import io.mdt.plugins.usagestats.core.Playtime;
 
 /**
- * 游玩时长（官方插件，v30）。
+ * 游玩时长（官方插件，v31）。
  *
  * <p>两个落点，**都在宿主自己的页面里**（插件页不再放入口）：
  * <ul>
- *   <li>`slot: section` + `page: slot` ⇒ 槽页底部一张卡：本槽合计 + 按游戏版本分列；</li>
+ *   <li>`slot: section` + `page: slot` ⇒ 槽页信息卡下面一张卡：本槽合计 + 按游戏版本分列
+ *       （已装游戏原地更新后，更新前后是**两行**）；</li>
  *   <li>`playtimeTotal`（plugin.json）⇒ 探针写的 `total.txt`，宿主把它排版进**主界面摘要卡**。</li>
  * </ul>
  * 这个类同时是插件自述里的默认入口：从插件页长按「打开」时，页面显示总计 + 按槽分列。
@@ -31,7 +32,7 @@ import io.mdt.plugins.usagestats.core.Playtime;
 public final class UsageStats {
 
     public static int api() {
-        return 30;
+        return 31;
     }
 
     public static View createView(PluginApi api) {
@@ -60,9 +61,9 @@ public final class UsageStats {
         List<Playtime.Entry> rows = slotPage
                 ? Playtime.forSlot(ledger, slot)
                 : Playtime.bySlot(ledger);
-        Map<String, String> names = slotPage ? versionNames(api) : null;
+        Map<String, ItemInfo> items = slotPage ? versionItems(api) : null;
         for (Playtime.Entry e : rows) {
-            String name = slotPage ? versionLabel(c, names, e.version) : e.slot;
+            String name = slotPage ? versionLabel(c, items, e) : e.slot;
             box.addView(row(c, th, name, duration(c, e.ms)));
         }
 
@@ -101,28 +102,46 @@ public final class UsageStats {
         return row;
     }
 
-    /** 版本 key → 主界面那份显示名（含自定义名）。拿不到就回落 key / 文件名。 */
-    private static Map<String, String> versionNames(PluginApi api) {
-        Map<String, String> out = new HashMap<String, String>();
+    /** 版本 key → 宿主当前的版本条目（含自定义名 / 版本号）。 */
+    private static Map<String, ItemInfo> versionItems(PluginApi api) {
+        Map<String, ItemInfo> out = new HashMap<String, ItemInfo>();
         try {
             for (ItemInfo it : api.versions()) {
                 if (it == null) continue;
                 String key = it.extra == null ? null : it.extra.get("key");
                 if (key == null || key.isEmpty() || out.containsKey(key)) continue;
-                out.put(key, it.title);
+                out.put(key, it);
             }
         } catch (Throwable ignored) {
         }
         return out;
     }
 
-    private static String versionLabel(Context c, Map<String, String> names, String key) {
+    /**
+     * 一行的显示名：**当前版本**用现查的显示名；**老版本行**用账本里的快照。
+     *
+     * <p>已装游戏原地更新后，同一个 key 会有两行（旧版本 / 新版本）—— 只有 tag 与当前
+     * displayVersion 相同（或旧数据没有 tag）时才用现查的 title，否则用写账本时记下的 title，
+     * 这样"更新前"那一行不会顶着新版本的名字。再退一步：tag → key / 文件名。
+     */
+    private static String versionLabel(Context c, Map<String, ItemInfo> items, Playtime.Entry e) {
+        String key = e.key;
         if (key == null || key.isEmpty() || Playtime.UNKNOWN_VERSION.equals(key)) {
             return c.getString(R.string.us_unknown_version);
         }
-        String name = names == null ? null : names.get(key);
-        if (name != null && !name.trim().isEmpty()) return name;
+        ItemInfo it = items == null ? null : items.get(key);
+        if (it != null && (e.tag.isEmpty() || e.tag.equals(tagOf(it)))) {
+            if (it.title != null && !it.title.trim().isEmpty()) return it.title;
+        }
+        if (e.title != null && !e.title.trim().isEmpty()) return e.title.trim();
+        if (!e.tag.isEmpty()) return e.tag;
         return key.startsWith("import:") ? key.substring("import:".length()) : key;
+    }
+
+    /** 宿主当前条目的版本号（拿不到 ⇒ 空；旧宿主没有这个 extra）。 */
+    private static String tagOf(ItemInfo it) {
+        String t = it == null || it.extra == null ? null : it.extra.get("displayVersion");
+        return t == null ? "" : t;
     }
 
     private static String duration(Context c, long ms) {

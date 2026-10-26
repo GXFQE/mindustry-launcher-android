@@ -19,10 +19,11 @@
 宿主只给 `settings.bin` 的解析结果 + 带护栏的写（游戏在跑拒绝、备份、原子写、读回自检还原），
 键的含义 / 缺省值 / 成对写归插件。契约与真机验证见 `docs/PLUGIN-API.md` §4「游戏设置」与 `next/42`。
 
-### B1. 统计插件 `usagestats` —— ✅ 已实现（v30，第 254/255 轮）
+### B1. 统计插件 `usagestats` —— ✅ 已实现（v31，第 254~256 轮）
 
 探针自己记账（v29 的 `Probe.onForeground(boolean)` + 20 秒采样），把 **按「槽 + 版本」累计的账本**
-写进插件自己的 `data/`（v30 的 `ProbeEnv.version()` / `dataDir()`）；
+写进插件自己的 `data/`（v30 的 `ProbeEnv.version()` / `dataDir()`；v31 再拿完整版本信息，
+行身份 = 槽 + key + displayVersion —— 已装游戏原地更新后是两行）；
 宿主不写流水、不解析账本。展示也搬出了插件页（2026-10-26 用户：「尽量不要放插件页」）：
 **槽页**里一张「游玩时长」卡（本槽合计 + 按版本分列）+ **主界面摘要卡**一行总时长
 （插件自述 `playtimeTotal` 声明一个整数文件，宿主只排版）。见 `plugins/usagestats/`。
@@ -201,7 +202,8 @@
 
 - 宿主**只提供注入与调度**：`ProbeRunner` 加载 `plugin.json` 的 `telemetry.probes`、定时 `sample()`；
   `ProbeEnv` 给 `dir()` / `pid()` / `inProcess()` / `slot()`，v30 再加 **`version()`**（这一局的版本 key）
-  与 **`dataDir()`**（跨会话账本写这里）；
+  与 **`dataDir()`**（跨会话账本写这里），v31 再加 **`versionInfo()`**（title / versionName / displayVersion /
+  upstreamVersion / label / pkg / imported / … 的整包快照，`displayVersion()` 是便利方法）；
 - **会话事实（前台 / 暂停 / 崩溃 / 熄屏）由插件探针自己采**（`sample()` 被周期调用，自己记账），
   格式插件定；
 - 宿主**不写** `launch.tsv` / `run.tsv`、不解析账本；**唯一的展示口**是插件在自述里显式声明的
@@ -217,12 +219,16 @@
   ★ 用词：用户 2026-10-26 明确说「游玩时长」（与存档里的 `playtime` 区分靠那句说明，不靠改名）。
 - ⚠️ 已知边界：**槽改名**后账本里的旧槽名不会跟着改（总数仍对，那个槽的分项会断）；
   槽删除后其数字仍在总数里（"总游玩时长"不因删档回落）。
+- ★ **版本更新不混行**（2026-10-26 第 256 轮，用户：「已安装版游戏可能更新」）：已装游戏的
+  **包名不变**、版本号会变 ⇒ 账本行身份 = **槽 + key + displayVersion**，老版本的时间留在老行
+  （title / versionName / upstream 都是写账本时的快照），槽页把更新前后显示成两行。
 
 ### 数据
 
 插件自己写 `ProbeEnv.dir()`（`<hub>/usage/telemetry/<会话>/<插件 id>/`，本会话）
 与 `ProbeEnv.dataDir()`（`<插件>/data`，跨会话账本），格式插件定；
-`PluginApi.usageDir()`（v18）只是目录，宿主不再往里写流水。
+`usagestats` 的账本是 8 列 TSV（slot / key / tag / ms / updated / title / rawName / upstream），
+`total.txt` 另存一个整数；`PluginApi.usageDir()`（v18）只是目录，宿主不再往里写流水。
 
 ### 曾讨论但否掉的其它方案
 

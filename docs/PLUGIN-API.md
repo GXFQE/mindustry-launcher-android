@@ -5,10 +5,11 @@
 
 ## 1. 版本与兼容（v20 冻结基线）
 
-- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..30**。
+- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..31**。
   （v20 是冻结基线；v21 = 游戏设置面；v22 = 后台任务 + 游戏事件；v23 = 探针；v24 = 分析器；
   v25 = 结论挂行 + 筛选/排序注入 + HJSON；v26 = 逐项判定；v27 = 详情页的门 + 槽级结论进摘要卡；
-  v28 = 原版文案键；v29 = 游戏前后台事件；v30 = 探针知道版本 / 跨会话数据目录 + 摘要卡总时长。）
+  v28 = 原版文案键；v29 = 游戏前后台事件；v30 = 探针知道版本 / 跨会话数据目录 + 摘要卡总时长；
+  v31 = 探针拿到完整版本信息（包名会原地更新，光有 key 不够）。）
 - 插件 `api()` 报的是「我需要的最低宿主接口版本」。用不到的新能力**不要**报高 ——
   报高了只会在老宿主上被拒，换不来任何东西。
 - **不要用 try/catch 去兼容老宿主**：报什么版本就只会跑在什么版本上。`api()` 报 20，
@@ -67,7 +68,7 @@
 ## 3. 入口类约定
 
 ```java
-public static int api();                        // 必需：你需要的接口版本（当前 30；用不到新能力就报 20）
+public static int api();                        // 必需：你需要的接口版本（当前 31；用不到新能力就报 20）
 public static View createView(PluginApi api);   // content / section 用
 public static void run(PluginApi api);          // action 用（在原页跑，不换页）
 public static void unload();                    // 可选：收尾（也认 unload(Context)）
@@ -87,7 +88,7 @@ public static void unload();                    // 可选：收尾（也认 unlo
 
 | 方法 | 说明 |
 |---|---|
-| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 30） |
+| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 31） |
 | `context()` | 插件上下文（**只用来取资源 / 主题 / 建 View**） |
 | `page()` / `slot()` | 从哪一页来 / 当前槽名 |
 | `theme()` | 主题色与 dp/sp（别自己写死颜色，见 `PluginTheme`） |
@@ -197,7 +198,8 @@ public interface Probe {
 - `inProcess: false` ⇒ 跑在 `:probe` 隔离进程（只能读 `/proc/<游戏 pid>`，崩了不连带游戏）
 - `ProbeEnv`：`dir()`（本会话给这个插件的目录）/ `pid()` / `inProcess()` / `slot()` /
   **`version()`**（v30：这一局的版本 key）/ **`dataDir()`**（v30：插件自己的数据目录，与
-  `PluginApi.dataDir()` 同一个 —— 要写跨会话账本就写这里）
+  `PluginApi.dataDir()` 同一个 —— 要写跨会话账本就写这里）/ **`versionInfo()`**（v31：完整版本信息 map，
+  见下）/ `displayVersion()`（v31 便利方法）
 - **数据由插件自己写**（格式自定）；宿主不解析账本、不聚合。唯一的展示口是下面那条
   **显式声明**的 `playtimeTotal`（主界面摘要卡一行）。
 - **v29 新增**：`Probe.onForeground(boolean)` —— 游戏 activity 进/出台时回调（只对 `inProcess`；默认空实现）。
@@ -222,6 +224,32 @@ env.dataDir();   // <插件>/data（懒创建）
   `Versions.Entry.key()`）⇒ 探针按它分账、页面就能把数字挂到版本行上。
 - `dataDir()` 让探针能写**跨会话**的累计（账本 / 总数）。同一份文件的多方写入由**插件自己**
   保证原子性：宿主既不知道格式，也不参与合并。
+
+#### v31：`ProbeEnv.versionInfo()` —— 完整版本信息
+
+```java
+Map<String,String> info = env.versionInfo();
+info.get("key");             // 同 version()：已装 = 包名；导入 = "import:<文件名>"
+info.get("title");           // 显示名（含自定义名 / 类型 / 版本号）
+info.get("versionName");     // 原始 versionName（数据层保真，如 8-official-2026.09.X37）
+info.get("displayVersion");  // 人读版本号（如 2026.09.X37 / 159.7）
+info.get("upstreamVersion"); // 上游版本号（fork 才有；官方可能没有这个键）
+info.get("label");           // 游戏名（如 MindustryX）
+info.get("pkg");             // 包名
+info.get("realPkg");         // 导入包的真实包名
+info.get("imported");        // "true" / "false"
+info.get("importFile");      // 导入文件名
+info.get("md5");             // 导入包 md5（已装通常为空）
+info.get("customName");      // 用户自定义名（没改过 = 空）
+info.get("slot");            // 这一局的槽
+```
+
+- **为什么**：已安装的游戏会**原地更新**（包名不变、版本号变）。只记 `version()` 的话，
+  更新前后的时间会混进同一行，而且旧行会被新版本号覆盖。⇒ 插件应把 **key 当身份、
+  版本号 + `title` / `versionName` / `upstreamVersion` 当快照**一起记进自己的账本
+  （`plugins/usagestats/` 就是这么做的：行身份 = 槽 + key + displayVersion）。
+- 宿主以后可能**继续加键**（方法签名不变）；插件按"缺键 = 空"处理，别假设某个键一定在。
+- `displayVersion()` 是 `versionInfo().get("displayVersion")` 的便利写法。
 
 #### v30：`playtimeTotal` —— 主界面摘要卡那一行
 
@@ -526,6 +554,9 @@ v29（2026-10-26 第 254 轮）：`Probe.onForeground(boolean)` —— 游戏 ac
 v30（2026-10-26 第 255 轮）：`ProbeEnv.version()`（这一局的版本 key）+ `ProbeEnv.dataDir()`（跨会话数据目录）+
 `playtimeTotal`（自述里声明一个整数文件，宿主把它排版进主界面摘要卡）—— 游玩时长搬出插件页，
 落到**槽页**（按版本分列）与**主界面摘要卡**（总时长）；`API_MIN` 仍不动（区间 20..30）。
+v31（2026-10-26 第 256 轮）：`ProbeEnv.versionInfo()`（完整版本信息 map：title / versionName /
+displayVersion / upstreamVersion / label / pkg / imported / md5 / …）+ `displayVersion()` 便利方法；
+已安装游戏会原地更新，插件据此把"更新前后"分成两行；`API_MIN` 仍不动（区间 20..31）。
 
 **官方体检插件**：`plugins/mods-health`（第 229 轮，前身叫 `conflict`）。宿主原来的那行
 「查模组冲突」整块删掉，判据搬进插件的 `core/Conflicts.java` 与 `core/Gates.java`；

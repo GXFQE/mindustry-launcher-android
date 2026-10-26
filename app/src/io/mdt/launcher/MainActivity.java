@@ -1095,6 +1095,34 @@ public class MainActivity extends BaseActivity {
      *   而且拆开之后"弹过窗的那条路"与"没弹窗的那条路"汇进**同一个**实际启动体，
      *   不会出现两份启动逻辑。
      */
+    /**
+     * v31：把版本条目摊成探针能带走的字符串 Bundle（键与 {@code versions()} 的 extra 同名，另加 `title`）。
+     *
+     * <p>为什么在**这里**取：{@code Versions.Entry} 在这一刻是权威的（自定义名 / 导入版本号 /
+     * 上游版本都齐），而探针进程没有扫描结果，自己重算要重新读包与配置。空值不放（探针按缺键处理）。
+     */
+    private static Bundle versionInfoBundle(Context c, Versions.Entry e, String slot) {
+        Bundle b = new Bundle();
+        putInfo(b, "key", e.key());
+        putInfo(b, "title", e.displayName(c));
+        putInfo(b, "pkg", e.pkg);
+        putInfo(b, "realPkg", e.realPkg);
+        putInfo(b, "versionName", e.versionName);
+        putInfo(b, "displayVersion", e.displayVersion());
+        putInfo(b, "upstreamVersion", e.upstreamVersion);
+        putInfo(b, "label", e.label);
+        putInfo(b, "imported", String.valueOf(e.imported));
+        putInfo(b, "importFile", e.importFile);
+        putInfo(b, "md5", e.md5);
+        putInfo(b, "customName", e.customName);
+        putInfo(b, "slot", slot);
+        return b;
+    }
+
+    private static void putInfo(Bundle b, String k, String v) {
+        if (v != null && !v.isEmpty()) b.putString(k, v);
+    }
+
     void startVersion(final Versions.Entry e) {
         // ★ F4①：**毫秒级**同槽冲突预检 —— 0 次 IO、0 个线程。
         //   结论就在 `mConflict` 里（`rescan()` → `computeConflicts()` 早算好了，这里只是查表）。
@@ -1177,6 +1205,10 @@ public class MainActivity extends BaseActivity {
                 final String slot = Versions.slotFor(e);
 
                 i.putExtra("slot", slot);
+                // v31：把这一局的**完整版本信息**透传给探针 —— 已装游戏会原地更新（包名不变、
+                // 版本号变），探针要拿版本号 + 原始版本名才能把"更新前后"分开记。
+                // ★ 身份仍是 pkg / apk；这里只是给插件记账 / 显示的快照。
+                i.putExtra(ProbeService.EXTRA_VINFO, versionInfoBundle(MainActivity.this, e, slot));
                 // ★ F0：顺带把上面那次探测的结论透传下去（该包支不支持属性注入），
                 //   :game 就不必把同一个 APK 的 dex 再读一遍。
                 //   ⚠️ 探不出来时**不要**放这个 extra —— 让 :game 自己探，
