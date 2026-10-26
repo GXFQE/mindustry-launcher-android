@@ -7,6 +7,6 @@
     <string name="us_total_fmt">Total: %1$s</string>
     <string name="us_unknown_version">Unknown version</string>
     <string name="us_note">Game foreground time only; up to 20 s can be lost when the game is killed.</string>
-    <string name="us_more_fmt">%1$d more versions · show all</string>
+    <string name="us_more_fmt">Show %1$d versions</string>
     <string name="us_collapse">Show less</string>
 </resources>

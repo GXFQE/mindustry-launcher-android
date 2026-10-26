@@ -32,9 +32,6 @@ import io.mdt.plugins.usagestats.core.Playtime;
  */
 public final class UsageStats {
 
-    /** 收起时最多显示几行（再多的版本要展开）。 */
-    private static final int COLLAPSED = 3;
-
     public static int api() {
         return 31;
     }
@@ -91,24 +88,25 @@ public final class UsageStats {
         paint[0] = new Runnable() {
             @Override public void run() {
                 list.removeAllViews();
-                int show = expanded[0] ? merged.size() : Math.min(COLLAPSED, merged.size());
+                // 默认**全折叠**：只留合计，点「展开（N 个版本）」才画版本行（版本多了页面太高）。
+                int show = expanded[0] ? merged.size() : 0;
                 for (int i = 0; i < show; i++) {
                     Playtime.Slice s = merged.get(i);
                     list.addView(row(c, th, s.name, duration(c, s.ms)));
                 }
-                if (merged.size() > COLLAPSED) {
+                if (merged.isEmpty()) {
+                    more.setVisibility(View.GONE);
+                    more.setOnClickListener(null);
+                } else {
                     more.setVisibility(View.VISIBLE);
                     more.setText(expanded[0] ? c.getString(R.string.us_collapse)
-                            : c.getString(R.string.us_more_fmt, merged.size() - COLLAPSED));
+                            : c.getString(R.string.us_more_fmt, merged.size()));
                     more.setOnClickListener(new View.OnClickListener() {
                         @Override public void onClick(View v) {
                             expanded[0] = !expanded[0];
                             paint[0].run();
                         }
                     });
-                } else {
-                    more.setVisibility(View.GONE);
-                    more.setOnClickListener(null);
                 }
             }
         };
