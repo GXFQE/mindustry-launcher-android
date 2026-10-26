@@ -10,6 +10,7 @@ import android.text.TextUtils;
 import android.view.ViewGroup;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import java.io.File;
@@ -121,17 +122,22 @@ final class VersionOps {
         names[out.size()] = Trans.get(a, R.string.binding_new_slot);
         // ⚠️ 这里**不能**同时 setMessage：本机（HONOR / Android 16）上"正文 + 列表"并存时
         //   列表**整块不渲染**（真机 dump 里连 ListView 都没有，只剩正文和取消）。
-        new AlertDialog.Builder(a)
-                .setTitle(title)
-                .setSingleChoiceItems(names, curIndex, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) {
-                        d.dismiss();
-                        if (w == out.size()) { newSlot(a, pick); return; }
+        // ★ 第 263 轮：选槽 → 「新建一个槽…」原来是两张窗（点末项要先关窗再弹输入框），现在同一张卡里推页
+        final CardStack[] ref = new CardStack[1];
+        ref[0] = CardStack.show(null, a, title,
+                CardStack.list(a, names, new CardStack.ItemClick() {
+                    @Override public void onClick(int w) {
+                        if (w == out.size()) {
+                            newSlot(ref[0], a, pick);
+                            return;
+                        }
+                        ref[0].dismiss();
                         pick.onPicked(out.get(w).name);
                     }
-                })
-                .setNegativeButton(R.string.cancel, null)
-                .show();
+                }),
+                new CardStack.Btn(Trans.get(a, R.string.cancel), new Runnable() {
+                    @Override public void run() { ref[0].dismiss(); }
+                }));
     }
 
     private static int indexOf(List<Data.Slot> list, String name) {
@@ -144,7 +150,7 @@ final class VersionOps {
      *
      * ★ 2026-10-25 用户：「换槽可以和克隆一样的（也加新建）」—— 两条路共用这一个对话框。
      */
-    private static void newSlot(final Activity a, final SlotPick pick) {
+    private static void newSlot(final CardStack parent, final Activity a, final SlotPick pick) {
         final EditText input = new EditText(a);
         input.setInputType(InputType.TYPE_CLASS_TEXT);
         input.setHint(R.string.new_slot_hint);
@@ -154,24 +160,37 @@ final class VersionOps {
         box.setPadding(pad, 0, pad, 0);
         box.addView(input, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        new AlertDialog.Builder(a)
-                .setTitle(R.string.new_slot_title)
-                .setMessage(R.string.new_slot_msg)
-                .setView(box)
-                .setPositiveButton(R.string.create, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) {
+        // 正文 + 输入框合成一页
+        TextView msg = new TextView(a);
+        msg.setText(Trans.get(a, R.string.new_slot_msg));
+        msg.setTextSize(15);
+        msg.setTextColor(a.getResources().getColor(R.color.fg));
+        LinearLayout page = new LinearLayout(a);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.addView(msg);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = dp(a, 12);
+        page.addView(box, lp);
+        final CardStack[] ref = new CardStack[1];
+        ref[0] = CardStack.show(parent, a, Trans.get(a, R.string.new_slot_title),
+                CardStack.wrap(a, page),
+                new CardStack.Btn(Trans.get(a, R.string.cancel), new Runnable() {
+                    @Override public void run() { ref[0].dismiss(); }
+                }),
+                new CardStack.Btn(Trans.get(a, R.string.create), new Runnable() {
+                    @Override public void run() {
                         String raw = input.getText().toString();
                         String err = Data.createSlot(a, raw);
                         if (err != null) {
                             alert(a, R.string.create_failed, err);
-                            return;
+                            return;              // 建失败就留在这一页
                         }
                         String name = Data.sanitizeSlot(raw);
+                        ref[0].dismiss();
                         pick.onPicked(name == null ? raw.trim() : name);
                     }
-                })
-                .setNegativeButton(R.string.cancel, null)
-                .show();
+                }));
     }
 
     // ── 换槽（只换这一行）────────────────────────────────────────────────
