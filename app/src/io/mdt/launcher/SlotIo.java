@@ -1341,9 +1341,7 @@ final class SlotIo {
             sb.append(Trans.get(a, R.string.zip_confirm_strip_fmt,
                     inf.strip.substring(0, inf.strip.length() - 1)));
         }
-        // ★ 第 169 轮：这里原来自己判 `nativeFormat ? native : custom`，警告又按 `known` 判
-        //   ⇒ 一个"根级零散存档"的包会**同时**说「像是本启动器导出的包」和
-        //   「看不出这是 Mindustry 的数据包」（用户截图）。三态收进 `SlotZip.Info.tagRes()`。
+        // ★ 第 169 轮：三态收进 `SlotZip.Info.tagRes()`（见那条注释）
         int tagRes = inf.tagRes();
         if (tagRes != 0) sb.append(Trans.get(a, tagRes));
         list.setText(sb.toString());
@@ -1359,33 +1357,48 @@ final class SlotIo {
             warn.setVisibility(View.VISIBLE);
         }
 
-        new AlertDialog.Builder(a)
-                .setTitle(Trans.get(a, R.string.zip_confirm_title_fmt, slot))
-                .setView(form)
-                .setPositiveButton(R.string.import_btn, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) {
-                        doZipExtract(a, slot, modes == null ? SlotWrite.UPDATE : modes.mode(), h);
+        // ★ 第 268 轮：确认 → 解包进度 → 结果 都在同一张卡里（原来三个窗口）
+        final CardStack[] ref = new CardStack[1];
+        ref[0] = CardStack.show(null, a, Trans.get(a, R.string.zip_confirm_title_fmt, slot),
+                CardStack.wrap(a, form),
+                new CardStack.Btn(Trans.get(a, R.string.cancel), new Runnable() {
+                    @Override public void run() {
+                        dropZipTemp();
+                        ref[0].dismiss();
                     }
-                })
-                .setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) { dropZipTemp(); }
-                })
-                .setOnCancelListener(new DialogInterface.OnCancelListener() {
-                    @Override public void onCancel(DialogInterface d) { dropZipTemp(); }
-                })
-                .show();
+                }),
+                new CardStack.Btn(Trans.get(a, R.string.import_btn), new Runnable() {
+                    @Override public void run() {
+                        // 进度页直接顶替这一页（不关窗）
+                        doZipExtract(ref[0], a, slot, modes == null ? SlotWrite.UPDATE : modes.mode(), h);
+                    }
+                }));
+    }
+
+    /** 卡片结果页的「关闭」（唯一实现）。 */
+    private static CardStack.Btn closeBtn(final Activity a, final CardStack stack) {
+        return new CardStack.Btn(Trans.get(a, R.string.close), new Runnable() {
+            @Override public void run() { stack.dismiss(); }
+        });
     }
 
     private static void doZipExtract(final Activity a, final String slot, final int mode, final SlotOps.Host h) {
+        doZipExtract(null, a, slot, mode, h);
+    }
+
+    /** 卡片版（第 268 轮）：解包进度 → 结果，同一张卡；没有卡片就自己开一张。 */
+    private static void doZipExtract(final CardStack card, final Activity a, final String slot,
+                                     final int mode, final SlotOps.Host h) {
         final File zip = sZipTmp;
         final SlotZip.Info inf = sZipInfo;
         if (zip == null) {
+            if (card != null) card.dismiss();
             toast(a, Trans.get(a, R.string.zip_import_failed));
             return;
         }
-        final ProgressDialog pd = ProgressDialog.show(a,
-                Trans.get(a, R.string.zip_extract_progress_title),
-                Trans.get(a, R.string.zip_extract_progress_msg_fmt, slot), true, false);
+        final CardStack stack = (card != null) ? card : new CardStack(a);
+        stack.replace(Trans.get(a, R.string.zip_extract_progress_title),
+                Trans.get(a, R.string.zip_extract_progress_msg_fmt, slot));
         new Thread(new Runnable() {
             @Override public void run() {
                 String err = null;
@@ -1408,11 +1421,11 @@ final class SlotIo {
                 final Backup.Snapshot fauto = auto;
                 a.runOnUiThread(new Runnable() {
                     @Override public void run() {
-                        pd.dismiss();
                         sZipTmp = null;
                         sZipInfo = null;
+                        if (Util.dead(a)) return;
                         if (fe != null) {
-                            alert(a, Trans.get(a, R.string.zip_import_failed), fe);
+                            stack.replace(Trans.get(a, R.string.zip_import_failed), fe, closeBtn(a, stack));
                             h.onSlotChanged();
                             return;
                         }
@@ -1429,9 +1442,10 @@ final class SlotIo {
                         if (fauto != null) {
                             ex.append(Trans.get(a, R.string.slot_autobak_done_fmt, fauto.title()));
                         }
-                        alert(a, Trans.get(a, R.string.zip_import_done),
+                        stack.replace(Trans.get(a, R.string.zip_import_done),
                                 Trans.get(a, R.string.zip_import_ok_fmt, slot, fr.files,
-                                        Util.formatSize(fr.bytes), ex.toString()));
+                                        Util.formatSize(fr.bytes), ex.toString()),
+                                closeBtn(a, stack));
                         h.onSlotChanged();
                     }
                 });

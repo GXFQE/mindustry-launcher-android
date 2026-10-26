@@ -1157,9 +1157,9 @@ public class MapsActivity extends BaseActivity {
                             Toast.makeText(MapsActivity.this, err, Toast.LENGTH_SHORT).show();
                             return;
                         }
-                        ref[0].dismiss();
                         // resolved=false（还在查找）⇒ 交给 MapFiles 自动匹配；否则用用户选的
-                        commitSaveAsMap(src, raw, mSlot, false, chosen[0], !resolved[0]);
+                        // ★ 第 268 轮：**不关卡片**，进度页直接顶替这一页
+                        commitSaveAsMap(ref[0], src, raw, mSlot, false, chosen[0], !resolved[0]);
                     }
                 }));
     }
@@ -1273,8 +1273,19 @@ public class MapsActivity extends BaseActivity {
     private void commitSaveAsMap(final File src, final String metaName, final String slot,
                                  final boolean overwrite, final Maps.Item sourceItem,
                                  final boolean autoSource) {
-        final ProgressDialog pd = ProgressDialog.show(this, Trans.get(MapsActivity.this, R.string.map_save_name_title),
-                Trans.get(MapsActivity.this, R.string.maps_scanning), true, false);
+        commitSaveAsMap(null, src, metaName, slot, overwrite, sourceItem, autoSource);
+    }
+
+    /**
+     * 卡片版（第 268 轮）：进度 → 同名确认 → 结果 全在同一张卡里 `replace`。
+     * 没有卡片就自己开一张（dev 口 / 旧调用点）。
+     */
+    private void commitSaveAsMap(final CardStack card, final File src, final String metaName,
+                                 final String slot, final boolean overwrite,
+                                 final Maps.Item sourceItem, final boolean autoSource) {
+        final CardStack stack = (card != null) ? card : new CardStack(this);
+        stack.replace(Trans.get(this, R.string.map_save_name_title),
+                Trans.get(this, R.string.maps_scanning));
         new Thread(new Runnable() {
             @Override public void run() {
                 final MapFiles.Result r;
@@ -1301,84 +1312,84 @@ public class MapsActivity extends BaseActivity {
                 } catch (Throwable t) {
                     runOnUiThread(new Runnable() {
                         @Override public void run() {
-                            pd.dismiss();
                             // ★ 2026-10-15：原来是 `t.toString()`（异常原文 + 绝对路径当弹窗正文）
                             android.util.Log.w("MDTLauncher", "save-as-map failed", t);
-                            alert(Trans.get(MapsActivity.this, R.string.map_save_name_title),
+                            stack.replace(Trans.get(MapsActivity.this, R.string.map_save_name_title),
                                     Util.ioReason(MapsActivity.this, t,
-                                            Trans.get(MapsActivity.this, R.string.map_save_failed_why)));
+                                            Trans.get(MapsActivity.this, R.string.map_save_failed_why)),
+                                    closeBtn(stack));
                         }
                     });
                     return;
                 }
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
-                        pd.dismiss();
-                        // ★ 这些框都是 inline 的，可能属于已被转屏销毁的实例 ⇒ 先判死
+                        // ★ 这些页都属于可能已被转屏销毁的实例 ⇒ 先判死
                         if (Util.dead(MapsActivity.this)) return;
                         if (r.ok) {
-                            showSaveAsMapResult(r, metaName);
+                            showSaveAsMapResult(stack, r, metaName);
                             return;
                         }
                         if (!overwrite && r.nameTaken) {
-                            new AlertDialog.Builder(MapsActivity.this)
-                                    .setTitle(R.string.map_overwrite_title)
-                                    .setMessage(Trans.get(MapsActivity.this, R.string.map_overwrite_msg_fmt,
-                                            MapFiles.safeName(metaName)))
-                                    .setPositiveButton(R.string.map_overwrite_ok,
-                                            new DialogInterface.OnClickListener() {
-                                                @Override public void onClick(DialogInterface d, int w) {
-                                                    commitSaveAsMap(src, metaName, slot, true, sourceItem, autoSource);
-                                                }
-                                            })
-                                    .setNegativeButton(R.string.cancel,
-                                            new DialogInterface.OnClickListener() {
-                                                @Override public void onClick(DialogInterface d, int w) {
+                            stack.replace(Trans.get(MapsActivity.this, R.string.map_overwrite_title),
+                                    Trans.get(MapsActivity.this, R.string.map_overwrite_msg_fmt,
+                                            MapFiles.safeName(metaName)),
+                                    new CardStack.Btn(Trans.get(MapsActivity.this, R.string.cancel),
+                                            new Runnable() {
+                                                @Override public void run() {
                                                     MapFiles.discard(src);
+                                                    stack.dismiss();
                                                 }
-                                            })
-                                    .setOnCancelListener(new DialogInterface.OnCancelListener() {
-                                        @Override public void onCancel(DialogInterface d) {
-                                            MapFiles.discard(src);
-                                        }
-                                    })
-                                    .show();
+                                            }),
+                                    new CardStack.Btn(Trans.get(MapsActivity.this, R.string.map_overwrite_ok),
+                                            new Runnable() {
+                                                @Override public void run() {
+                                                    commitSaveAsMap(stack, src, metaName, slot, true,
+                                                            sourceItem, autoSource);
+                                                }
+                                            }));
                             return;
                         }
                         // 失败：用户文案走 MsavText（内核只给「码 + 参数」）
                         String why = r.conv != null
                                 ? MsavText.convertReason(MapsActivity.this, r.conv)
                                 : String.valueOf(r.error);
-                        alert(Trans.get(MapsActivity.this, R.string.map_save_name_title),
-                                Trans.get(MapsActivity.this, R.string.map_import_fail_fmt, why));
+                        stack.replace(Trans.get(MapsActivity.this, R.string.map_save_name_title),
+                                Trans.get(MapsActivity.this, R.string.map_import_fail_fmt, why),
+                                closeBtn(stack));
                     }
                 });
             }
         }, "map-save2map").start();
     }
 
+    /** 卡片结果页的「关闭」（唯一实现）。 */
+    private CardStack.Btn closeBtn(final CardStack stack) {
+        return new CardStack.Btn(Trans.get(this, R.string.close), new Runnable() {
+            @Override public void run() { stack.dismiss(); }
+        });
+    }
+
     /** 成功：第一层只说"转好了"，依据（删了哪些键 / 体积 / 源存档没动）走「技术细节」第二层 */
-    private void showSaveAsMapResult(final MapFiles.Result r, String metaName) {
+    private void showSaveAsMapResult(final CardStack stack, final MapFiles.Result r, String metaName) {
         if (Util.dead(this)) return;
-        // ★ **先刷新列表、再弹结果**（用户要求"导入之后要自动刷新页面"）——
-        //   弹窗还开着的时候，后面的表头/列表就已经是新数据了；「关闭」只负责收掉弹窗。
+        // ★ **先刷新列表、再出结果页**（用户要求"导入之后要自动刷新页面"）——
+        //   卡片还开着的时候，后面的表头/列表就已经是新数据了；「关闭」只负责收掉它。
         refreshList();
         String inName = r.meta == null ? null : r.meta.get("name", null);
         String shown = inName == null ? metaName : Mods.stripColors(inName);
-        AlertDialog.Builder b = new AlertDialog.Builder(this)
-                .setTitle(R.string.map_save_name_title)
-                .setMessage(Trans.get(MapsActivity.this, R.string.map_save_ok_fmt, shown)
-                        + Trans.get(MapsActivity.this, R.string.map_save_ok_note))
-                .setPositiveButton(R.string.close, null);
-        if (r.conv != null) {
-            // ★ 依据不能删（F4①d）：原始报告留在第二层
-            b.setNeutralButton(R.string.map_save_detail, new DialogInterface.OnClickListener() {
-                @Override public void onClick(DialogInterface d, int w) {
-                    alert(Trans.get(MapsActivity.this, R.string.map_save_detail_title), r.conv.report());
-                }
-            });
-        }
-        b.show();
+        // ★ 依据不能删（F4①d）：原始报告留在第二层
+        CardStack.Btn detail = r.conv == null ? null : new CardStack.Btn(
+                Trans.get(this, R.string.map_save_detail), new Runnable() {
+            @Override public void run() {
+                stack.push(Trans.get(MapsActivity.this, R.string.map_save_detail_title),
+                        CardStack.text(MapsActivity.this, r.conv.report()));
+            }
+        });
+        stack.replace(Trans.get(this, R.string.map_save_name_title),
+                Trans.get(MapsActivity.this, R.string.map_save_ok_fmt, shown)
+                        + Trans.get(MapsActivity.this, R.string.map_save_ok_note),
+                detail, closeBtn(stack));
     }
 
     /**

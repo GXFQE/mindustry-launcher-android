@@ -1029,9 +1029,10 @@ public class MainActivity extends BaseActivity {
     }
 
     void startImport(final Uri uri, final String name) {
-        final android.app.ProgressDialog pd = android.app.ProgressDialog.show(
-                this, Trans.get(MainActivity.this, R.string.import_progress_title),
-                name + Trans.get(MainActivity.this, R.string.import_progress_suffix), true, false);
+        // ★ 第 268 轮：进度与失败都在同一张卡片里（原来 ProgressDialog + 失败 AlertDialog = 两次换窗）
+        final CardStack stack = new CardStack(this);
+        stack.replace(Trans.get(this, R.string.import_progress_title),
+                name + Trans.get(this, R.string.import_progress_suffix));
         new Thread() {
             @Override public void run() {
                 String err = null;
@@ -1050,7 +1051,6 @@ public class MainActivity extends BaseActivity {
                 final org.json.JSONObject fentry = entry;
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
-                        pd.dismiss();
                         if (ferr == null) {
                             // ⚠️ version 字段是 Importer 从 APK 里读出来的**原文**
                             //    （形如 8-official-159.7）—— 这里只有裸 JSONObject，
@@ -1058,6 +1058,7 @@ public class MainActivity extends BaseActivity {
                             //    🔴 曾经写成 fentry.optString("version")，导致导入完成的那一刻
                             //    Toast 报「8-official-159.7」、而同一秒列表行报「159.7」，
                             //    同一个版本两种叫法（用户：「导入的这个版本号也处理下」）。
+                            stack.dismiss();
                             Toast.makeText(MainActivity.this,
                                     Trans.get(MainActivity.this, R.string.import_done_fmt,
                                             fentry.optString("label"),
@@ -1068,11 +1069,8 @@ public class MainActivity extends BaseActivity {
                             //   导入一个几十 MB 的包时转屏，回调会落到已销毁的实例上
                             //   （见 {@link Util#dead}）。成功那条只出 Toast，不会崩。
                             if (Util.dead(MainActivity.this)) return;
-                            new AlertDialog.Builder(MainActivity.this)
-                                    .setTitle(R.string.import_failed)
-                                    .setMessage(ferr)
-                                    .setPositiveButton(R.string.close, null)
-                                    .show();
+                            stack.replace(Trans.get(MainActivity.this, R.string.import_failed), ferr,
+                                    closeBtn(stack));
                         }
                         rescan();
                     }
@@ -1139,18 +1137,17 @@ public class MainActivity extends BaseActivity {
             startVersionConfirmed(e);
             return;
         }
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.launch_conflict_title)
-                .setMessage(Trans.get(MainActivity.this, R.string.launch_conflict_msg_fmt,
-                        e.displayName(this), share.peer, Versions.slotFor(e)))
-                .setPositiveButton(R.string.launch_conflict_go,
-                        new DialogInterface.OnClickListener() {
-                            @Override public void onClick(DialogInterface d, int w) {
-                                startVersionConfirmed(e);
-                            }
-                        })
-                .setNegativeButton(R.string.cancel, null)
-                .show();
+        // ★ 第 268 轮：冲突确认 → 启动进度 在同一张卡里（原来"关确认框 → 再开进度框"）
+        final CardStack[] ref = new CardStack[1];
+        ref[0] = CardStack.show(null, this, Trans.get(this, R.string.launch_conflict_title),
+                CardStack.text(this, Trans.get(MainActivity.this, R.string.launch_conflict_msg_fmt,
+                        e.displayName(this), share.peer, Versions.slotFor(e))),
+                new CardStack.Btn(Trans.get(this, R.string.cancel), new Runnable() {
+                    @Override public void run() { ref[0].dismiss(); }
+                }),
+                new CardStack.Btn(Trans.get(this, R.string.launch_conflict_go), new Runnable() {
+                    @Override public void run() { startVersionConfirmed(e, ref[0]); }
+                }));
     }
 
     /**
@@ -1162,15 +1159,21 @@ public class MainActivity extends BaseActivity {
      *   System.exit(0) 带走整个 :game 进程，所以这里只在"游戏还在跑"时才需要动手。
      */
     private void startVersionConfirmed(final Versions.Entry e) {
+        startVersionConfirmed(e, null);
+    }
+
+    /** 卡片版（第 268 轮）：进度页顶替调用方那一页（冲突确认页 / 或自己开一张）。 */
+    private void startVersionConfirmed(final Versions.Entry e, final CardStack card) {
         // ★★ 防连点 + 即时反馈（2026-10-04 补，理由见 sLaunching 的注释）：
         //   先挡住第二次点击，再立刻把"正在准备"显示出来 —— 这段最长可能等 8 s。
-        //   ⚠️ `ProgressDialog.show(..., true, false)` 的 `false` 是**故意**的：
-        //      modal + 不可取消 ⇒ 用户点不到列表行，与 sLaunching 双保险。
+        //   ⚠️ 进度页**没有按钮、点不动**（旧版是 `ProgressDialog.show(..., true, false)`）：
+        //      modal + 不可取消 ⇒ 与 sLaunching 双保险。
         if (sLaunching) return;
         sLaunching = true;
-        final ProgressDialog pd = ProgressDialog.show(this,
-                Trans.get(MainActivity.this, R.string.launch_progress_title),
-                Trans.get(MainActivity.this, R.string.launch_progress_msg_fmt, e.displayName(this)), true, false);
+        // ★ 第 268 轮：「正在准备启动」也画在卡片里（有卡片就顶替它那一页）
+        final CardStack stack = (card != null) ? card : new CardStack(this);
+        stack.replace(Trans.get(this, R.string.launch_progress_title),
+                Trans.get(this, R.string.launch_progress_msg_fmt, e.displayName(this)));
         new Thread(new Runnable() {
             @Override public void run() {
                 // F5：先等自动备份收尾 —— 否则"备份正在读槽"会和"游戏起来在写槽"打架。
@@ -1186,10 +1189,10 @@ public class MainActivity extends BaseActivity {
                     final String msg = e.displayName(MainActivity.this) + "\n\n" + Compat.rejectReason(MainActivity.this, cp);
                     runOnUiThread(new Runnable() {
                         @Override public void run() {
-                            // 这条出口也要收掉进度框 + 清标志，否则用户被永久挡住（点不动了）
-                            pd.dismiss();
+                            // 这条出口也要收掉进度页 + 清标志，否则用户被永久挡住（点不动了）
                             sLaunching = false;
-                            alert(Trans.get(MainActivity.this, R.string.compat_reject_title), msg);
+                            stack.replace(Trans.get(MainActivity.this, R.string.compat_reject_title), msg,
+                                    closeBtn(stack));
                         }
                     });
                     return;
@@ -1225,9 +1228,9 @@ public class MainActivity extends BaseActivity {
                 }
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
-                        // 收起进度框再拉起游戏（不在这里清 sLaunching：这一局还在跑，
+                        // 收起进度卡片再拉起游戏（不在这里清 sLaunching：这一局还在跑，
                         // 回到主界面时由 onResume 统一清 —— 见 sLaunching 的注释）
-                        pd.dismiss();
+                        stack.dismiss();
                         // ★ v22：游戏**即将**启动（兼容性复检已过、备份已收尾）⇒ 派发 game-start。
                         //   放在 startActivity 之前：插件可能要先做准备（切配置 / 记一笔）。
                         final String label = e.displayName(MainActivity.this);
@@ -1272,6 +1275,13 @@ public class MainActivity extends BaseActivity {
      * ⚠️ 顺序 = 常用度：导入 APK 在前。⚠️ 与 `dialog_add_game.xml` 里的顺序必须一致。
      * ⚠️ 两个回调都要先 `dismiss()` 再干活：弹窗自己不会因为启动了下一个界面就关掉。
      */
+    /** 卡片结果页的「关闭」（唯一实现）。 */
+    private CardStack.Btn closeBtn(final CardStack stack) {
+        return new CardStack.Btn(Trans.get(this, R.string.close), new Runnable() {
+            @Override public void run() { stack.dismiss(); }
+        });
+    }
+
     private void promptAddGame() {
         // ★ 第 265 轮：两行菜单 → 「从已安装应用加」的输入框，原来是两层窗（换窗会闪）。
         //   现在同一张卡：菜单是根页，加包那一页往里 push。
