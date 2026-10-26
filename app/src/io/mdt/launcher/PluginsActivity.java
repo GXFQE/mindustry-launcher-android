@@ -441,9 +441,8 @@ public class PluginsActivity extends BaseActivity {
                                     infoText(id, newest, trust, lv)));
                             return;
                         }
-                        // 其余动作都会自己弹窗 / 出 Toast ⇒ 先把这张卡收掉，别让两个窗口叠着
-                        stack.dismiss();
                         if ("open".equals(a)) {
+                            stack.dismiss();
                             open(id, act);
                         } else if ("enable".equals(a)) {
                             // ★ v23：第三方 + 进程内探针 ⇒ 启用前弹一次风险告知（官方 / 隔离进程不弹）
@@ -453,22 +452,19 @@ public class PluginsActivity extends BaseActivity {
                                             Extensions.ASSET));
                             if (PluginProbes.needsRiskPrompt(
                                     Plugins.trustOf(PluginsActivity.this, id, want), specs)) {
-                                new AlertDialog.Builder(PluginsActivity.this)
-                                        .setTitle(Trans.get(PluginsActivity.this,
-                                                R.string.plugin_probe_risk_title))
-                                        .setMessage(Trans.get(PluginsActivity.this,
-                                                R.string.plugin_probe_risk_msg))
-                                        .setPositiveButton(Trans.get(PluginsActivity.this,
-                                                        R.string.plugin_action_enable),
-                                                new DialogInterface.OnClickListener() {
-                                                    @Override public void onClick(DialogInterface d2, int w2) {
-                                                        doEnable(id, want);
-                                                    }
-                                                })
-                                        .setNegativeButton(Trans.get(PluginsActivity.this,
-                                                R.string.cancel), null)
-                                        .show();
+                                // 第 262 轮：风险告知**推进同一张卡**（原来是再开一个 Dialog ⇒ 换窗会闪）
+                                stack.pushMessage(Trans.get(PluginsActivity.this,
+                                                R.string.plugin_probe_risk_title),
+                                        Trans.get(PluginsActivity.this, R.string.plugin_probe_risk_msg),
+                                        Trans.get(PluginsActivity.this, R.string.plugin_action_enable),
+                                        new Runnable() {
+                                            @Override public void run() {
+                                                stack.dismiss();
+                                                doEnable(id, want);
+                                            }
+                                        });
                             } else {
+                                stack.dismiss();
                                 doEnable(id, want);
                             }
                         } else if ("disable".equals(a)) {
@@ -480,8 +476,9 @@ public class PluginsActivity extends BaseActivity {
                                     Plugins.displayNameOf(PluginsActivity.this, id));
                             rebuild();
                             if (wasActive) {
-                                askRestart(done);
+                                askRestart(stack, done);
                             } else {
+                                stack.dismiss();
                                 // v27：不影响下次启动的改动，不弹重启对话框 ——
                                 //   但**必须把"不用重启"说出来**，否则用户只感觉“时弹时不弹”。
                                 Toast.makeText(PluginsActivity.this,
@@ -500,15 +497,20 @@ public class PluginsActivity extends BaseActivity {
                                 String done = Trans.get(PluginsActivity.this, R.string.plugin_uninstalled_fmt,
                                         Plugins.displayNameOf(PluginsActivity.this, id));
                                 rebuild();
-                                if (wasActive) askRestart(done);
-                                else Toast.makeText(PluginsActivity.this, done, Toast.LENGTH_SHORT).show();
+                                if (wasActive) askRestart(stack, done);
+                                else {
+                                    stack.dismiss();
+                                    Toast.makeText(PluginsActivity.this, done, Toast.LENGTH_SHORT).show();
+                                }
                             } else {
+                                stack.dismiss();
                                 Toast.makeText(PluginsActivity.this,
                                         Trans.get(PluginsActivity.this, R.string.plugin_uninstall_failed),
                                         Toast.LENGTH_LONG).show();
                                 rebuild();
                             }
                         } else if ("restore".equals(a)) {
+                            stack.dismiss();
                             boolean ok = Plugins.restoreQuarantined(PluginsActivity.this, id, qv);
                             Toast.makeText(PluginsActivity.this,
                                     Trans.get(PluginsActivity.this, ok ? R.string.plugin_restored_fmt
@@ -516,6 +518,7 @@ public class PluginsActivity extends BaseActivity {
                                     Toast.LENGTH_LONG).show();
                             rebuild();
                         } else if ("level".equals(a)) {
+                            stack.dismiss();
                             Plugins.setLevel(PluginsActivity.this, id, nextLv);
                             Toast.makeText(PluginsActivity.this,
                                     Trans.get(PluginsActivity.this, R.string.plugin_level_set_fmt,
@@ -912,6 +915,17 @@ public class PluginsActivity extends BaseActivity {
      * 「稍后」= 关掉弹窗，页面上的「待重启」徽标与底部那张「立即重启管理器」卡照样在。
      * ★ 只有真的需要退出重开时才调它（安装 / 启用 / 停用或卸载了**正在跑**的那一份 / 重新启用）。
      */
+    /** 卡片里用：同一张卡推一页「现在重启吗」（换窗才闪，所以别在卡片里再 `new AlertDialog`）。 */
+    private void askRestart(final CardStack stack, CharSequence message) {
+        stack.pushMessage(Trans.get(this, R.string.plugin_restart_ask_title), message,
+                Trans.get(this, R.string.plugin_restart_now), new Runnable() {
+                    @Override public void run() {
+                        stack.dismiss();
+                        restartNow();
+                    }
+                });
+    }
+
     private void askRestart(CharSequence message) {
         if (isFinishing()) return;
         new AlertDialog.Builder(this)

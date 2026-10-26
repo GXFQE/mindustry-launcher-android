@@ -545,28 +545,49 @@ public class BlueprintsActivity extends BaseActivity {
                         // ★ 判"要不要弹同名替换框"**只认 r.nameTaken**（权威判据字段），
                         //   不许去看 r.error 的字面内容（i18n P0.1；门禁规则 SRC-01）。
                         if (!overwrite && r.nameTaken) {
-                            new android.app.AlertDialog.Builder(BlueprintsActivity.this)
-                                    .setTitle(R.string.bp_overwrite_title)
-                                    .setMessage(Trans.get(BlueprintsActivity.this, R.string.bp_overwrite_msg_fmt,
-                                            BlueprintFiles.safeName(displayName)))
-                                    .setPositiveButton(R.string.bp_overwrite_ok,
-                                            new android.content.DialogInterface.OnClickListener() {
-                                                @Override public void onClick(android.content.DialogInterface d, int w) {
+                            // ★ 第 262 轮：撞名确认 + 「换个名字」原来是两个弹窗（确认框 → 命名框），
+                            //   换窗时 dim 重播会闪；改成同一张卡的两页（确认页 → 输入页）。
+                            final CardStack stack = new CardStack(BlueprintsActivity.this);
+                            final String base = BlueprintFiles.safeName(displayName);
+                            final String title = Trans.get(BlueprintsActivity.this, R.string.bp_import);
+                            stack.root(Trans.get(BlueprintsActivity.this, R.string.bp_overwrite_title),
+                                    CardStack.text(BlueprintsActivity.this,
+                                            Trans.get(BlueprintsActivity.this, R.string.bp_overwrite_msg_fmt, base)),
+                                    new CardStack.Btn(Trans.get(BlueprintsActivity.this, R.string.cancel),
+                                            new Runnable() {
+                                                @Override public void run() { stack.dismiss(); }
+                                            }),
+                                    // ★ 2026-10-11（用户：「蓝图改名」）：想留两份就得能改名再导。
+                                    //   ⚠️ 与存档那条（`SlotIo.confirmMsavOverwrite` 的中性按钮）**同一句词**
+                                    new CardStack.Btn(Trans.get(BlueprintsActivity.this, R.string.msav_overwrite_rename),
+                                            new Runnable() {
+                                                @Override public void run() {
+                                                    stack.pushInput(title, base, null,
+                                                            Trans.get(BlueprintsActivity.this, R.string.bp_import),
+                                                            new CardStack.OnText() {
+                                                                @Override public void run(String raw) {
+                                                                    String name = raw == null ? "" : raw.trim();
+                                                                    if (name.isEmpty()) {
+                                                                        android.widget.Toast.makeText(BlueprintsActivity.this,
+                                                                                Trans.get(BlueprintsActivity.this,
+                                                                                        R.string.msav_name_empty),
+                                                                                android.widget.Toast.LENGTH_SHORT).show();
+                                                                        return;
+                                                                    }
+                                                                    stack.dismiss();
+                                                                    importFile(uri, name, slot, false);
+                                                                }
+                                                            });
+                                                }
+                                            }),
+                                    new CardStack.Btn(Trans.get(BlueprintsActivity.this, R.string.bp_overwrite_ok),
+                                            new Runnable() {
+                                                @Override public void run() {
+                                                    stack.dismiss();
                                                     importFile(uri, displayName, slot, true);
                                                 }
-                                            })
-                                    // ★ 2026-10-11（用户：「蓝图改名」）：原来只有"替换 / 取消"两条路
-                                    //   ⇒ 用户想留两份只能自己去文件管理器改名再导。现在给第三条路。
-                                    //   ⚠️ 与存档那条（`SlotIo.confirmMsavOverwrite` 的中性按钮）**同一句词**
-                                    //      （`msav_overwrite_rename`）：同一个问题，两种入口只能有一种答法。
-                                    .setNeutralButton(R.string.msav_overwrite_rename,
-                                            new android.content.DialogInterface.OnClickListener() {
-                                                @Override public void onClick(android.content.DialogInterface d, int w) {
-                                                    showBpNameDialog(uri, displayName, slot);
-                                                }
-                                            })
-                                    .setNegativeButton(R.string.cancel, null)
-                                    .show();
+                                            }));
+                            stack.show();
                             return;
                         }
                         // ⚠️ 失败原因走**码 → 文案**（`Msch` 只给码；`error` 原文是给报告与自检的）
@@ -596,53 +617,6 @@ public class BlueprintsActivity extends BaseActivity {
             return Trans.get(this, R.string.bp_import_read_failed);
         }
         return e;
-    }
-
-    /**
-     * 「换个名字」框 —— 蓝图撞名时那条中性出口（2026-10-11，用户点单「蓝图改名」）。
-     *
-     * <p>语义：换上来的名字**只决定槽里的文件名**（蓝图显示名是文件内部那个 `name`）——
-     * 这正是"想留两份"需要的：两份同名蓝图靠文件名区分（与存档那条同构，见 `SlotIo.showMsavNameDialog`）。
-     *
-     * <p>★ 复用 `dialog_msav_name.xml`（一个标签 + 一个输入框）：把提示换成蓝图那句、
-     * 把"不是 zlib"那行**藏掉** —— 为一件只差两行文案的事再抄一份 layout，就是又一处分叉。
-     * ★ 走的是**同一条导入路**（`importFile(uri, 新名字, slot, false)`）：不另造写入实现，
-     * 名字撞了还会回到同一个确认框。
-     */
-    private void showBpNameDialog(final android.net.Uri uri, final String displayName, final String slot) {
-        android.view.View form = getLayoutInflater().inflate(R.layout.dialog_msav_name, null);
-        final android.widget.EditText name =
-                (android.widget.EditText) form.findViewById(R.id.msav_name);
-        name.setText(BlueprintFiles.safeName(displayName));
-        name.setSelection(name.getText().length());
-        Trans.bind(form, R.id.tx_msav_name_hint, R.string.bp_name_hint);
-        form.findViewById(R.id.msav_warn).setVisibility(android.view.View.GONE);
-
-        final android.app.AlertDialog dlg = new android.app.AlertDialog.Builder(this)
-                .setTitle(Trans.get(BlueprintsActivity.this, R.string.bp_import))
-                .setView(form)
-                .setPositiveButton(R.string.bp_import, null)
-                .setNegativeButton(R.string.cancel, null)
-                .create();
-        dlg.setOnShowListener(new android.content.DialogInterface.OnShowListener() {
-            @Override public void onShow(android.content.DialogInterface d) {
-                dlg.getButton(android.content.DialogInterface.BUTTON_POSITIVE)
-                        .setOnClickListener(new android.view.View.OnClickListener() {
-                            @Override public void onClick(android.view.View v) {
-                                String raw = name.getText().toString().trim();
-                                if (raw.isEmpty()) {
-                                    android.widget.Toast.makeText(BlueprintsActivity.this,
-                                            Trans.get(BlueprintsActivity.this, R.string.msav_name_empty),
-                                            android.widget.Toast.LENGTH_SHORT).show();
-                                    return;
-                                }
-                                dlg.dismiss();
-                                importFile(uri, raw, slot, false);
-                            }
-                        });
-            }
-        });
-        dlg.show();
     }
 
     // ── 导出 ──────────────────────────────────────────────────────────────

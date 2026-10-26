@@ -527,67 +527,69 @@ final class BatchIo {
             shareLabel.setText(Trans.get(a, shareLabelRes));
         }
 
-        final AlertDialog dlg = new AlertDialog.Builder(a)
-                .setTitle(titleRes)
-                .setView(box)
-                .setPositiveButton(okFmtRes, null)
-                .setNeutralButton(R.string.batch_export_all, null)
-                .setNegativeButton(R.string.cancel, null)
-                .create();
-
+        // ★ 第 262 轮：这一步原来是框架弹窗（勾选 + 全选 + 去处），按确定后还要再弹确认框 = 换窗会闪。
+        //   现在整页在卡片里，按钮文案跟着勾选变（`setButtonLabel`）。
+        final CardStack stack = new CardStack(a);
+        final Runnable sync = new Runnable() {
+            @Override public void run() {
+                boolean share = canShare && shareBox.isChecked();
+                stack.setButtonLabel(2, Trans.get(a,
+                        share ? R.string.batch_share_btn_fmt : okFmtRes, ad.checkedCount()));
+                stack.setButtonLabel(1, Trans.get(a,
+                        ad.checkedCount() == ad.getCount() ? R.string.batch_export_none
+                                                           : R.string.batch_export_all));
+            }
+        };
         lv.setOnItemClickListener(new AdapterView.OnItemClickListener() {
             @Override public void onItemClick(AdapterView<?> p, View v, int pos, long id) {
                 ad.setChecked(pos, !ad.isChecked(pos));
                 ad.refreshCheck(lv, pos);
-                syncPickButtons(dlg, a, ad, okFmtRes, shareBox);
+                sync.run();
             }
         });
-        dlg.setOnShowListener(new DialogInterface.OnShowListener() {
-            @Override public void onShow(DialogInterface d) {
-                syncPickButtons(dlg, a, ad, okFmtRes, shareBox);
-                if (canShare) {
-                    // ★ 整行可点（方框本身 `clickable=false`，触摸归这一行）——
-                    //   用户点字也算勾；勾了正按钮跟着换词。
-                    shareRow.setOnClickListener(new View.OnClickListener() {
-                        @Override public void onClick(View v) {
-                            shareBox.setChecked(!shareBox.isChecked());
-                            syncPickButtons(dlg, a, ad, okFmtRes, shareBox);
-                        }
-                    });
+        if (canShare) {
+            // ★ 整行可点（方框本身 `clickable=false`，触摸归这一行）—— 用户点字也算勾
+            shareRow.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) {
+                    shareBox.setChecked(!shareBox.isChecked());
+                    sync.run();
                 }
-                if (filler != null) {
-                    // ★ 异步补内容的那条路（存档列表）：关了窗就让后台线程自己停
-                    dlg.setOnDismissListener(new DialogInterface.OnDismissListener() {
-                        @Override public void onDismiss(DialogInterface d) {
-                            alive[0] = false;
+            });
+        }
+        stack.root(Trans.get(a, titleRes), CardStack.wrap(a, box),
+                new CardStack.Btn(Trans.get(a, R.string.cancel), new Runnable() {
+                    @Override public void run() { stack.dismiss(); }
+                }),
+                // 全选 / 全不选（文案由 sync 填）
+                new CardStack.Btn("", new Runnable() {
+                    @Override public void run() {
+                        boolean all = ad.checkedCount() == ad.getCount();
+                        ad.setAll(!all);
+                        lv.invalidateViews();   // 只重画可见行（够用：状态在适配器里）
+                        sync.run();
+                    }
+                }),
+                // 确定（文案由 sync 填；一份都没勾就留在这一页）
+                new CardStack.Btn("", new Runnable() {
+                    @Override public void run() {
+                        List<Integer> idx = ad.checkedIndexes();
+                        if (idx.isEmpty()) {
+                            toast(a, Trans.get(a, R.string.batch_export_nothing));
+                            return;
                         }
-                    });
-                    filler.fill(ad, lv, alive);
-                }
-                dlg.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener(
-                        new View.OnClickListener() {
-                            @Override public void onClick(View v) {
-                                List<Integer> idx = ad.checkedIndexes();
-                                if (idx.isEmpty()) {
-                                    toast(a, Trans.get(a, R.string.batch_export_nothing));
-                                    return;                 // 不关窗：勾选还留着
-                                }
-                                dlg.dismiss();
-                                cb.onPick(idx, canShare && shareBox.isChecked());
-                            }
-                        });
-                dlg.getButton(DialogInterface.BUTTON_NEUTRAL).setOnClickListener(
-                        new View.OnClickListener() {
-                            @Override public void onClick(View v) {
-                                boolean all = ad.checkedCount() == ad.getCount();
-                                ad.setAll(!all);
-                                lv.invalidateViews();   // 只重画可见行（够用：状态在适配器里）
-                                syncPickButtons(dlg, a, ad, okFmtRes, shareBox);
-                            }
-                        });
-            }
+                        stack.dismiss();
+                        cb.onPick(idx, canShare && shareBox.isChecked());
+                    }
+                }));
+        stack.setOnDismiss(new Runnable() {
+            @Override public void run() { alive[0] = false; }
         });
-        dlg.show();
+        sync.run();
+        stack.show();
+        if (filler != null) {
+            // ★ 异步补内容的那条路（存档列表）：关了窗就让后台线程自己停（见 setOnDismiss）
+            filler.fill(ad, lv, alive);
+        }
     }
 
     /** 正按钮报份数（**跟着去处换词**）、中按钮报"下一步会做什么"（见 {@link #pickMulti} 的三条） */

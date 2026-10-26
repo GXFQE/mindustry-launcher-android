@@ -1007,28 +1007,28 @@ public class MapsActivity extends BaseActivity {
         android.widget.ListView lv = (android.widget.ListView) box.findViewById(R.id.msav_list);
         final MsavListAdapter adapter = new MsavListAdapter(this, titles, subs);
         lv.setAdapter(adapter);
-        final AlertDialog dlg = new AlertDialog.Builder(this)
-                .setTitle(R.string.maps_from_save_pick_title)
-                .setView(box)
-                .setNegativeButton(R.string.cancel, null)
-                .create();
+        // ★ 第 262 轮：列表与"命名页"原来是两个窗口（列表弹窗 → 命名弹窗），换窗时 dim 重播会闪；
+        //   现在整条链在同一张卡里（列表 = 根页，命名 = push 一页）。
+        final CardStack stack = new CardStack(this);
+        final boolean[] alive = {true};
         lv.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener() {
             @Override public void onItemClick(android.widget.AdapterView<?> p, View v, int pos, long id) {
                 if (pos < 0 || pos >= fs.length) return;
-                dlg.dismiss();
                 MsavMeta m = MsavMeta.read(fs[pos], false);
                 String base = Msav.baseName(fs[pos].getName());
                 // ⚠️ 最后那个 false = "这不是我们的待办 .part，是用户的存档原件" ⇒ 谁都不许删它
-                showSaveAsMapNameDialog(fs[pos], m, base, false);
+                pushSaveAsMapName(stack, fs[pos], m, base, false);
             }
         });
-        dlg.show();
-        final boolean[] alive = {true};
-        dlg.setOnDismissListener(new DialogInterface.OnDismissListener() {
-            @Override public void onDismiss(DialogInterface d) {
-                alive[0] = false;
-            }
-        });
+        stack.root(Trans.get(this, R.string.maps_from_save_pick_title),
+                CardStack.wrap(this, box),
+                new CardStack.Btn(Trans.get(this, R.string.cancel), new Runnable() {
+                    @Override public void run() {
+                        alive[0] = false;
+                        stack.dismiss();
+                    }
+                }));
+        stack.show();
         new Thread(new Runnable() {
             @Override public void run() {
                 for (int i = 0; i < fs.length && alive[0]; i++) {
@@ -1064,6 +1064,12 @@ public class MapsActivity extends BaseActivity {
      */
     private void showSaveAsMapNameDialog(final File src, final MsavMeta meta,
                                          final String fallbackBase, final boolean pendingPart) {
+        pushSaveAsMapName(null, src, meta, fallbackBase, pendingPart);
+    }
+
+    /** 同 {@link #showSaveAsMapNameDialog}，但**推到给定卡片里**（有卡片就不另开窗，dim 不重播）。 */
+    private void pushSaveAsMapName(final CardStack parent, final File src, final MsavMeta meta,
+                                   final String fallbackBase, final boolean pendingPart) {
         if (Util.dead(this)) return;
         if (src == null || !src.isFile()) {
             alert(Trans.get(MapsActivity.this, R.string.map_save_name_title), Trans.get(MapsActivity.this, R.string.mapfile_err_part_gone));
@@ -1086,9 +1092,10 @@ public class MapsActivity extends BaseActivity {
         final Maps.Item[] chosen = {null};            // null = 不用源图
         final boolean[] resolved = {false};           // 还没解析完就点「导入」⇒ 退回"自动"
         final File mapsDir = new File(Data.dirOf(this, mSlot), "maps");
+        final CardStack[] ref = new CardStack[1];
         srcRow.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
-                showSourcePicker(srcRow, mapsDir, chosen, resolved);
+                pushSourcePicker(ref[0], srcRow, mapsDir, chosen, resolved);
             }
         });
         // ★ 自动匹配：**在已经扫描出来的三来源清单里找**（本槽 / 游戏自带 / 模组自带）。
@@ -1123,41 +1130,28 @@ public class MapsActivity extends BaseActivity {
                 }
             }, "s2m-source").start();
         }
-        final AlertDialog dlg = new AlertDialog.Builder(this)
-                .setTitle(R.string.map_save_name_title)
-                .setView(form)
-                // ★ 接管确定键：名字为空时**不关窗**（否则等于静默丢弃，用户只觉得"点了没反应"）
-                .setPositiveButton(R.string.import_btn, null)
-                .setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) {
+        // ★ 名字为空 / 非法时**不许关页**（旧版靠接管正按钮做到；卡片里就是"校验不过直接 return"）
+        ref[0] = CardStack.show(parent, this, Trans.get(this, R.string.map_save_name_title),
+                CardStack.wrap(this, form),
+                new CardStack.Btn(Trans.get(this, R.string.cancel), new Runnable() {
+                    @Override public void run() {
                         if (pendingPart) MapFiles.discard(src);
+                        ref[0].dismiss();
                     }
-                })
-                .create();
-        dlg.setOnCancelListener(new DialogInterface.OnCancelListener() {
-            @Override public void onCancel(DialogInterface d) {
-                if (pendingPart) MapFiles.discard(src);
-            }
-        });
-        dlg.setOnShowListener(new DialogInterface.OnShowListener() {
-            @Override public void onShow(DialogInterface d) {
-                dlg.getButton(DialogInterface.BUTTON_POSITIVE)
-                        .setOnClickListener(new View.OnClickListener() {
-                            @Override public void onClick(View v) {
-                                String raw = name.getText().toString().trim();
-                                String err = MapFiles.checkMapName(MapsActivity.this, raw);
-                                if (err != null) {
-                                    Toast.makeText(MapsActivity.this, err, Toast.LENGTH_SHORT).show();
-                                    return;
-                                }
-                                dlg.dismiss();      // dismiss 不触发 onCancel ⇒ 不会误 discard
-                                // resolved=false（还在查找）⇒ 交给 MapFiles 自动匹配；否则用用户选的
-                                commitSaveAsMap(src, raw, mSlot, false, chosen[0], !resolved[0]);
-                            }
-                        });
-            }
-        });
-        dlg.show();
+                }),
+                new CardStack.Btn(Trans.get(this, R.string.import_btn), new Runnable() {
+                    @Override public void run() {
+                        String raw = name.getText().toString().trim();
+                        String err = MapFiles.checkMapName(MapsActivity.this, raw);
+                        if (err != null) {
+                            Toast.makeText(MapsActivity.this, err, Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        ref[0].dismiss();
+                        // resolved=false（还在查找）⇒ 交给 MapFiles 自动匹配；否则用用户选的
+                        commitSaveAsMap(src, raw, mSlot, false, chosen[0], !resolved[0]);
+                    }
+                }));
     }
 
     /**
@@ -1200,9 +1194,9 @@ public class MapsActivity extends BaseActivity {
      * ⚠️ 直接复用页面**已经扫描出来的清单**（`mItems`）—— 里面每张图的 meta 都读好了，
      *   选中之后就不用再打开一次 APK/模组包。
      */
-    private void showSourcePicker(final TextView row, final File mapsDir,
+    private void pushSourcePicker(final CardStack stack, final TextView row, final File mapsDir,
                                   final Maps.Item[] chosen, final boolean[] resolved) {
-        if (Util.dead(this)) return;
+        if (Util.dead(this) || stack == null) return;
         final List<Maps.Item> all = new java.util.ArrayList<>();
         if (mItems != null) {
             all.addAll(mItems);
@@ -1234,33 +1228,25 @@ public class MapsActivity extends BaseActivity {
             // 副标题：来源 + 文件名/条目名（撞名时靠它区分）
             subs[i + 1] = it.sourceLabel(this) + " · " + it.name();
         }
-        View box = getLayoutInflater().inflate(R.layout.dialog_msav_list, null);
-        TextView head = (TextView) box.findViewById(R.id.msav_head);
-        head.setVisibility(View.VISIBLE);
-        head.setText(Trans.get(MapsActivity.this, R.string.map_save_source_head3_fmt, nSlot, nGame, nMod));
-        android.widget.ListView lv = (android.widget.ListView) box.findViewById(R.id.msav_list);
-        lv.setAdapter(new MsavListAdapter(this, titles, subs));
-        final AlertDialog dlg = new AlertDialog.Builder(this)
-                .setTitle(R.string.map_save_source_title)
-                .setView(box)
-                .setNegativeButton(R.string.cancel, null)
-                .create();
-        lv.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener() {
-            @Override public void onItemClick(android.widget.AdapterView<?> p, View v, int pos, long id) {
-                dlg.dismiss();
-                if (Util.dead(MapsActivity.this)) return;
-                resolved[0] = true;
-                if (pos == 0) {
-                    chosen[0] = null;
-                    row.setText(Trans.get(MapsActivity.this, R.string.map_save_source_off));
-                    return;
-                }
-                Maps.Item it = all.get(pos - 1);
-                chosen[0] = it;
-                row.setText(sourceRowText(it, 1));
-            }
-        });
-        dlg.show();
+        // ★ 第 262 轮：这张"源图"清单原来是命名框上再叠一个弹窗 ⇒ 换窗会闪。
+        //   现在推到同一张卡里（两行列表，选完 pop 回命名页）。
+        // ⚠️ 表头那句「本槽 N / 游戏自带 N / 模组自带 N」放不下了 —— 每一行的副标题本来就写着来源。
+        stack.push(Trans.get(this, R.string.map_save_source_title),
+                CardStack.list2(this, titles, subs, new CardStack.ItemClick() {
+                    @Override public void onClick(int pos) {
+                        if (Util.dead(MapsActivity.this)) return;
+                        resolved[0] = true;
+                        if (pos == 0) {
+                            chosen[0] = null;
+                            row.setText(Trans.get(MapsActivity.this, R.string.map_save_source_off));
+                        } else {
+                            Maps.Item it = all.get(pos - 1);
+                            chosen[0] = it;
+                            row.setText(sourceRowText(it, 1));
+                        }
+                        stack.pop();
+                    }
+                }));
     }
 
     /**

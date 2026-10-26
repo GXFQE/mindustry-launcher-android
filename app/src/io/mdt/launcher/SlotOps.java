@@ -64,25 +64,37 @@ final class SlotOps {
     // ── 备份 ──────────────────────────────────────────────────────────────
 
     static void backup(final Activity a, final Data.Slot s, final Host h) {
+        backup(null, a, s, h);
+    }
+
+    /** 卡片里有栈就推页；没有就自己开一张。 */
+    static void backup(final CardStack parent, final Activity a, final Data.Slot s, final Host h) {
         final EditText input = new EditText(a);
         input.setInputType(InputType.TYPE_CLASS_TEXT);
         input.setHint(R.string.backup_label_hint);
         LinearLayout box = new LinearLayout(a);
         box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(a, 20), 0, dp(a, 20), 0);
-        box.addView(input, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        new AlertDialog.Builder(a)
-                .setTitle(Trans.get(a, R.string.backup_title_fmt, s.name))
-                .setMessage(Trans.get(a, R.string.backup_msg_fmt, excludedNames()))
-                .setView(box)
-                .setPositiveButton(R.string.backup, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) {
+        TextView msg = new TextView(a);
+        msg.setText(Trans.get(a, R.string.backup_msg_fmt, excludedNames()));
+        msg.setTextSize(15);
+        msg.setTextColor(a.getResources().getColor(R.color.fg));
+        box.addView(msg);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = dp(a, 12);
+        box.addView(input, lp);
+        final CardStack[] ref = new CardStack[1];
+        ref[0] = CardStack.show(parent, a, Trans.get(a, R.string.backup_title_fmt, s.name),
+                CardStack.wrap(a, box),
+                new CardStack.Btn(Trans.get(a, R.string.cancel), new Runnable() {
+                    @Override public void run() { ref[0].dismiss(); }
+                }),
+                new CardStack.Btn(Trans.get(a, R.string.backup), new Runnable() {
+                    @Override public void run() {
+                        ref[0].dismiss();
                         doBackup(a, s, h, input.getText().toString());
                     }
-                })
-                .setNegativeButton(R.string.cancel, null)
-                .show();
+                }));
     }
 
     private static void doBackup(final Activity a, final Data.Slot s, final Host h,
@@ -135,8 +147,21 @@ final class SlotOps {
      *   同一件事只留一份显示实现（`Backup.msavLine` + `snapshot_entry_fmt`）。
      */
     static void backups(final Activity a, final Data.Slot s, final Host h) {
+        backups(null, a, s, h);
+    }
+
+    /** 卡片里有栈就推页；没有就自己开一张（槽页「备份与恢复」菜单点进来就是有栈的那条）。 */
+    static void backups(final CardStack parent, final Activity a, final Data.Slot s, final Host h) {
         final List<Backup.Snapshot> snaps = Backup.list(a, s.name);
         if (snaps.isEmpty()) {
+            if (parent != null) {
+                parent.pushMessage(Trans.get(a, R.string.no_backup_title),
+                        Trans.get(a, R.string.no_backup_msg_fmt, s.name),
+                        Trans.get(a, R.string.close), new Runnable() {
+                            @Override public void run() { parent.dismiss(); }
+                        });
+                return;
+            }
             alert(a, Trans.get(a, R.string.no_backup_title),
                     Trans.get(a, R.string.no_backup_msg_fmt, s.name));
             return;
@@ -152,29 +177,19 @@ final class SlotOps {
             String msav = Backup.msavLine(a, ss);
             subs[i] = msav.isEmpty() ? base : (base + " · " + msav);
         }
-        View listView = a.getLayoutInflater().inflate(R.layout.dialog_msav_list, null);
-        TextView head = (TextView) listView.findViewById(R.id.msav_head);
-        if (head != null) {
-            // ★ 表头说清"点一份能干什么" —— 标题是单行的，放不下第二句（见该布局的注释）
-            head.setVisibility(View.VISIBLE);
-            head.setText(Trans.get(a, R.string.backup_list_head_fmt, snaps.size()));
-        }
-        final android.widget.ListView lv =
-                (android.widget.ListView) listView.findViewById(R.id.msav_list);
-        lv.setAdapter(new MsavListAdapter(a, titles, subs));
-        final AlertDialog rdlg = new AlertDialog.Builder(a)
-                .setTitle(Trans.get(a, R.string.backup_list_title_fmt, s.name))
-                .setView(listView)
-                .setNegativeButton(R.string.close, null)
-                .create();
-        lv.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener() {
-            @Override public void onItemClick(android.widget.AdapterView<?> p, View v, int pos, long id) {
+        // ★ 第 262 轮：列表本身也搬进卡片（原来列表弹窗点一行 → 再开一张卡 = 又换了一次窗）。
+        //   同一份列表只画一次：`CardStack.show` 决定"新开一张"还是"推进父卡"。
+        final CardStack[] ref = new CardStack[1];
+        View body = CardStack.list2(a, titles, subs, new CardStack.ItemClick() {
+            @Override public void onClick(int pos) {
                 if (pos < 0 || pos >= snaps.size()) return;
-                rdlg.dismiss();
-                promptBackupActions(a, s, snaps.get(pos), h);
+                promptBackupActions(ref[0], a, s, snaps.get(pos), h);
             }
         });
-        rdlg.show();
+        ref[0] = CardStack.show(parent, a, Trans.get(a, R.string.backup_list_title_fmt, s.name), body,
+                new CardStack.Btn(Trans.get(a, R.string.close), new Runnable() {
+                    @Override public void run() { ref[0].dismiss(); }
+                }));
     }
 
     /**
@@ -182,25 +197,24 @@ final class SlotOps {
      * ⚠️ 标题用那份备份自己的 `title()`（时间戳 + 备注）—— 用户刚点的是哪一行，
      *   这里就得是哪一行，别换成另一句话。
      */
-    private static void promptBackupActions(final Activity a, final Data.Slot s,
+    private static void promptBackupActions(final CardStack parent, final Activity a, final Data.Slot s,
                                             final Backup.Snapshot ss, final Host h) {
         // ★ 第 261 轮：原来这一层是框架弹窗，点「恢复 / 删除」再弹一个确认框 = 两个窗口，
         //   旧窗一关 dim 就重来一遍 ⇒ 整屏闪。改成同一张卡里推页（`CardStack`）。
-        final CardStack stack = new CardStack(a);
-        stack.root(ss.title(),
+        final CardStack[] ref = new CardStack[1];
+        ref[0] = CardStack.show(parent, a, ss.title(),
                 CardStack.list(a, new CharSequence[]{
                         Trans.get(a, R.string.slot_op_restore),
                         Trans.get(a, R.string.slot_op_backup_delete)},
                         new CardStack.ItemClick() {
                             @Override public void onClick(int w) {
-                                if (w == 0) confirmRestore(stack, a, s, ss, h);
-                                else confirmDelete(stack, a, s, ss, h);
+                                if (w == 0) confirmRestore(ref[0], a, s, ss, h);
+                                else confirmDelete(ref[0], a, s, ss, h);
                             }
                         }),
                 new CardStack.Btn(Trans.get(a, R.string.cancel), new Runnable() {
-                    @Override public void run() { stack.dismiss(); }
+                    @Override public void run() { ref[0].dismiss(); }
                 }));
-        stack.show();
     }
 
     /**
@@ -428,6 +442,11 @@ final class SlotOps {
     // ── 备份策略（F5） ────────────────────────────────────────────────────
 
     static void backupPolicy(final Activity a, final Data.Slot s, final Host h) {
+        backupPolicy(null, a, s, h);
+    }
+
+    /** 卡片里有栈就推页；没有就自己开一张。 */
+    static void backupPolicy(final CardStack parent, final Activity a, final Data.Slot s, final Host h) {
         final Config.BackupPolicy cur = Config.get().backupPolicy(s.name);
 
         // F5b：表单走 XML（res/layout/dialog_policy.xml），不再是"代码拼一堆裸控件"。
@@ -476,32 +495,25 @@ final class SlotOps {
         max.addTextChangedListener(tw);
         sync.run();
 
-        final AlertDialog dlg = new AlertDialog.Builder(a)
-                .setTitle(Trans.get(a, R.string.policy_title_fmt, s.name))
-                .setView(form)
-                .setPositiveButton(R.string.policy_save, null)
-                .setNegativeButton(R.string.cancel, null)
-                .create();
-        // ★ 保存按钮的默认行为是"点了就关窗"，那样填错值会**静默丢弃**（旧版就是这样）。
-        //   这里接管它的点击：校验不过就留窗 + 提示，过了才写盘并关闭。
-        dlg.setOnShowListener(new DialogInterface.OnShowListener() {
-            @Override public void onShow(DialogInterface d) {
-                dlg.getButton(DialogInterface.BUTTON_POSITIVE).setOnClickListener(
-                        new View.OnClickListener() {
-                    @Override public void onClick(View v) {
+        // ★ 校验不过就**留在这一页** + 提示（旧对话框也是这个语义：不许"点了就关、错值静默丢弃"）
+        final CardStack[] ref = new CardStack[1];
+        ref[0] = CardStack.show(parent, a, Trans.get(a, R.string.policy_title_fmt, s.name),
+                CardStack.wrap(a, form),
+                new CardStack.Btn(Trans.get(a, R.string.cancel), new Runnable() {
+                    @Override public void run() { ref[0].dismiss(); }
+                }),
+                new CardStack.Btn(Trans.get(a, R.string.policy_save), new Runnable() {
+                    @Override public void run() {
                         int mn = parseIntOr(min, -1);
                         int mx = parseIntOr(max, -1);
                         if (mn < 0 || mn > 100000) { toast(a, Trans.get(a, R.string.policy_bad_min)); return; }
                         if (mx < 1 || mx > 1000) { toast(a, Trans.get(a, R.string.policy_bad_max)); return; }
                         Config.get().setBackupPolicy(s.name, on.isChecked(), mn, mx);
                         toast(a, Trans.get(a, R.string.policy_saved));
-                        dlg.dismiss();
+                        ref[0].dismiss();
                         h.onSlotChanged();
                     }
-                });
-            }
-        });
-        dlg.show();
+                }));
     }
 
     private static int parseIntOr(EditText in, int def) {

@@ -80,6 +80,7 @@ public final class CardStack {
     private final FrameLayout bodyView;
     private final LinearLayout buttonBar;
     private final ArrayList<Page> pages = new ArrayList<Page>();
+    private Runnable onDismiss;
     /** 正文槽的高度上限（屏高减去卡片上下留白 + 标题 + 按钮 + 边距，留够余量）。 */
     private final int maxBody;
 
@@ -116,6 +117,11 @@ public final class CardStack {
             });
         }
         maxBody = a.getResources().getDisplayMetrics().heightPixels - dp(150);
+        dlg.setOnDismissListener(new android.content.DialogInterface.OnDismissListener() {
+            @Override public void onDismiss(android.content.DialogInterface d) {
+                if (onDismiss != null) onDismiss.run();
+            }
+        });
         dlg.setOnKeyListener(new android.content.DialogInterface.OnKeyListener() {
             @Override public boolean onKey(android.content.DialogInterface d, int code, KeyEvent e) {
                 if (code == KeyEvent.KEYCODE_BACK) {
@@ -201,6 +207,21 @@ public final class CardStack {
         });
     }
 
+    /**
+     * "既能从页面直接调、也能从卡片里调"的入口用：没有卡片就新开一张（root 这页），
+     * 已经有卡片就往里推一页。返回真正承载这一页的那张卡（调用方拿它 dismiss / push）。
+     */
+    public static CardStack show(CardStack stack, Activity a, CharSequence title, View body, Btn... buttons) {
+        if (stack == null) {
+            CardStack s = new CardStack(a);
+            s.root(title, body, buttons);
+            s.show();
+            return s;
+        }
+        stack.push(title, body, buttons);
+        return stack;
+    }
+
     /** 回上一页；已经在第一页就关掉。 */
     public void pop() {
         if (pages.size() <= 1) {
@@ -209,6 +230,21 @@ public final class CardStack {
         }
         pages.remove(pages.size() - 1);
         render(pages.get(pages.size() - 1), true);
+    }
+
+    /** 关窗时跑一次的钩子（后台补内容的线程靠它停手）。 */
+    public void setOnDismiss(Runnable r) {
+        onDismiss = r;
+    }
+
+    /**
+     * 改第 `index` 个按钮的文案（勾选数变化这类"按钮文案跟着状态变"的页面用）。
+     * 下标从 0 开始、按渲染顺序（左 → 右）。
+     */
+    public boolean setButtonLabel(int index, CharSequence label) {
+        if (index < 0 || index >= buttonBar.getChildCount()) return false;
+        ((TextView) buttonBar.getChildAt(index)).setText(label);
+        return true;
     }
 
     public void show() {
@@ -343,6 +379,46 @@ public final class CardStack {
             row.setPadding(dp(c, 4), dp(c, 12), dp(c, 4), dp(c, 12));
             int bg = selectableBg(c);
             if (bg != 0) row.setBackgroundResource(bg);
+            row.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) { click.onClick(idx); }
+            });
+            box.addView(row);
+        }
+        return scroller(c, box);
+    }
+
+    /**
+     * 两行的可点列表（标题 + 副标题）。给"时间戳 + 份数/大小"这类须分两行才看得清的列表用；
+     * 单行的那种仍用 {@link #list}。
+     */
+    public static View list2(Context c, CharSequence[] labels, CharSequence[] subs, final ItemClick click) {
+        LinearLayout box = new LinearLayout(c);
+        box.setOrientation(LinearLayout.VERTICAL);
+        for (int i = 0; i < labels.length; i++) {
+            if (i > 0) {
+                View line = new View(c);
+                line.setBackgroundColor(c.getResources().getColor(R.color.card_stroke));
+                box.addView(line, new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, dp(c, 1)));
+            }
+            final int idx = i;
+            LinearLayout row = new LinearLayout(c);
+            row.setOrientation(LinearLayout.VERTICAL);
+            row.setPadding(dp(c, 4), dp(c, 10), dp(c, 4), dp(c, 10));
+            int bg = selectableBg(c);
+            if (bg != 0) row.setBackgroundResource(bg);
+            TextView t = new TextView(c);
+            t.setText(labels[i]);
+            t.setTextSize(16);
+            t.setTextColor(c.getResources().getColor(R.color.fg));
+            row.addView(t);
+            if (subs != null && i < subs.length && subs[i] != null && subs[i].length() > 0) {
+                TextView sub = new TextView(c);
+                sub.setText(subs[i]);
+                sub.setTextSize(12);
+                sub.setTextColor(c.getResources().getColor(R.color.fg_muted));
+                row.addView(sub);
+            }
             row.setOnClickListener(new View.OnClickListener() {
                 @Override public void onClick(View v) { click.onClick(idx); }
             });

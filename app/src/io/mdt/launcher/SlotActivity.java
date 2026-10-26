@@ -192,21 +192,24 @@ public class SlotActivity extends BaseActivity {
         final Data.Slot s = findSlot();
         if (s == null) { gone(); return; }
         final String[] labels = SlotOps.opsMenuLabels(this);
-        new android.app.AlertDialog.Builder(this)
-                .setTitle(R.string.slot_page_ops)
-                .setItems(labels,
-                        new android.content.DialogInterface.OnClickListener() {
-                            @Override public void onClick(android.content.DialogInterface d, int w) {
-                                switch (w) {
-                                    case 0: SlotOps.backup(SlotActivity.this, s, mHost); break;
-                                    case 1: SlotOps.backups(SlotActivity.this, s, mHost); break;
-                                    case 2: SlotOps.backupPolicy(SlotActivity.this, s, mHost); break;
-                                    default: break;
-                                }
-                            }
-                        })
-                .setNegativeButton(R.string.cancel, null)
-                .show();
+        // ★ 第 262 轮：这三级原来层层换窗（菜单弹窗 → 备份列表 → 动作/确认），每换一次 dim 就重播一遍。
+        //   现在整条链在同一张卡里：菜单是根页，后面全是 push。
+        final CardStack stack = new CardStack(this);
+        stack.root(Trans.get(this, R.string.slot_page_ops),
+                CardStack.list(this, labels, new CardStack.ItemClick() {
+                    @Override public void onClick(int w) {
+                        switch (w) {
+                            case 0: SlotOps.backup(stack, SlotActivity.this, s, mHost); break;
+                            case 1: SlotOps.backups(stack, SlotActivity.this, s, mHost); break;
+                            case 2: SlotOps.backupPolicy(stack, SlotActivity.this, s, mHost); break;
+                            default: break;
+                        }
+                    }
+                }),
+                new CardStack.Btn(Trans.get(SlotActivity.this, R.string.cancel), new Runnable() {
+                    @Override public void run() { stack.dismiss(); }
+                }));
+        stack.show();
     }
 
     /**
