@@ -32,6 +32,8 @@
          （颜色走 @color/card，由 values-night/colors.xml 决定）。详见 values/themes.xml 的注释。 -->
     <style name="AppDialogTheme" parent="android:Theme.Material.Dialog.Alert">
         <item name="android:windowBackground">@drawable/dlg_bg</item>
+        <!-- 第 258 轮：入场只做淡入（不缩放）；与 values/themes.xml 同一份样式，见那里的注释。 -->
+        <item name="android:windowAnimationStyle">@style/AppDialogAnim</item>
         <item name="android:colorAccent">@color/accent</item>
         <item name="android:textColorPrimary">@color/fg</item>
         <item name="android:textColorSecondary">@color/fg_muted</item>

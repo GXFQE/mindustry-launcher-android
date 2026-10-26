@@ -14,6 +14,22 @@
         四页就一定是**同一个盒子**（自检口径见 `ref/29` 第 64 条）。
       ⚠️ 改这里会同时改四页 —— 要单独调某一页，先想清楚它凭什么跟别人不一样。
     -->
+    <!--
+      第 258 轮：所有 AlertDialog / ProgressDialog 的窗口动画（挂在 AppDialogTheme 的
+      `android:windowAnimationStyle` 上）。
+
+      ★ 这是「叠弹窗动画怪」的**唯一改动点** —— 全 App 八十来个弹窗调用点一个字都不用改：
+        点按钮开第二个弹窗时，旧窗瞬间消失、新窗从屏幕中心放大、背景再压暗一层，
+        三件事挤在一帧里 ⇒ 看着像"卡片打架"。换成原地淡入之后只剩一次"换卡"。
+
+      ★ 只给入场：Dialog 的退场走 `removeViewImmediate`，`windowExitAnimation` 不会播。
+      ★ 别在这儿调 dim：`backgroundDimAmount` 改的是**所有**弹窗的压暗（单层的观感也变），
+        要动就单独量一轮再说。
+    -->
+    <style name="AppDialogAnim">
+        <item name="android:windowEnterAnimation">@anim/dialog_fade_in</item>
+    </style>
+
     <style name="PageEmpty">
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>

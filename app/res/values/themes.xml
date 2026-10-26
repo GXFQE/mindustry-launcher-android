@@ -87,6 +87,8 @@
     -->
     <style name="AppDialogTheme" parent="android:Theme.Material.Light.Dialog.Alert">
         <item name="android:windowBackground">@drawable/dlg_bg</item>
+        <!-- 第 258 轮：入场只做淡入（不缩放）⇒ 叠窗时不再"旧卡闪掉 + 新卡从中间长大"。 -->
+        <item name="android:windowAnimationStyle">@style/AppDialogAnim</item>
         <item name="android:colorAccent">@color/accent</item>
         <item name="android:textColorPrimary">@color/fg</item>
         <item name="android:textColorSecondary">@color/fg_muted</item>
