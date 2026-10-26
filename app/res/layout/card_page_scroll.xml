@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  第 259 轮：`CardStack` 里每一页的滚动容器。
+
+  ★ 为什么单独搞一个 XML（而不是在代码里 new ScrollView）：
+    「滚动条不占宽度」这件事只有一个入口 —— `android:scrollbarStyle="insideOverlay"`。
+    框架**没有**公开的 setter（`View.getScrollBarStyle()` 是公开的，setter 是 @hide，编译期就报错），
+    所以只能在 XML/主题里写这个属性。滚动条一旦占宽度，内容在"够高 / 不够高"的临界点附近切换时
+    文字会重排、卡片高度跟着跳 —— 用户 2026-10-26 说的「高度有时候还会闪」就是这一类。
+-->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:fillViewport="false"
+    android:fadeScrollbars="true"
+    android:scrollbarStyle="insideOverlay"
+    android:scrollbars="vertical">
+
+    <FrameLayout
+        android:id="@+id/card_page_slot"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content" />
+</ScrollView>

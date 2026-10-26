@@ -27,16 +27,22 @@ import java.util.ArrayList;
  * 给了 1 ms 空动画后仍会亮 1 帧 —— 用户读作"闪"。同窗换页时窗口、层、dim 全是同一份，
  * 亮度一个像素都不跳（只有卡片里的内容在变）。这条是 `ref/42`「叠弹窗的入场动画」那条规矩的落地。
  *
+ * <h3>两条"别再踩"的实现细节（都是真机抓出来的）</h3>
+ * 1. **窗口固定整屏、只让卡片变高**：如果窗口按 wrap_content 跟着内容长，换页时窗口每帧都在 resize，
+ *    真机上会闪（用户：「高度有时候还会闪」）。窗口钉死 MATCH_PARENT×MATCH_PARENT 后，
+ *    "点外面关闭"改成根 View 的点击（`card_stack_root`），卡片自己吃掉点击。
+ * 2. **高度是量出来的确定值，不靠 wrap_content 事后重排**：`measurePage()` 用「EXACT 宽 + AT_MOST 高」
+ *    量一次，把页与 body 槽都钉成这个高度；滚动条用 `SCROLLBARS_INSIDE_OVERLAY`
+ *    （盖在内容上、不占宽度）⇒ 有没有滚动条都不会把文字挤得重排、也不会在动画末尾"啪"一下换高度。
+ *
  * <h3>用法</h3>
  * <pre>
  * CardStack s = new CardStack(activity);
  * s.root(title, CardStack.list(this, labels, cb), cancelLabel, cancelAction).show();
- * // 某一项要"钻进去"时：
  * s.push(title, CardStack.text(this, body));      // 交叉淡入；返回键 / 「返回」按钮回到上一页
  * </pre>
  *
  * <p>★ 别在 push 出来的页里再 `new AlertDialog`（那就又叠窗口了）—— 要弹就 `push` 一页。
- * <p>★ 尺寸：第一页与后续页高度不同时走 170 ms 的高度过渡（`pumpHeight`），否则卡片会"啪"地跳一下。
  */
 public final class CardStack {
 
@@ -60,24 +66,42 @@ public final class CardStack {
     private final FrameLayout bodyView;
     private final LinearLayout buttonBar;
     private final ArrayList<Page> pages = new ArrayList<Page>();
+    /** 正文槽的高度上限（屏高减去卡片上下留白 + 标题 + 按钮 + 边距，留够余量）。 */
+    private final int maxBody;
 
     public CardStack(Activity a) {
         dlg = new Dialog(a);
         dlg.requestWindowFeature(Window.FEATURE_NO_TITLE);
         dlg.setContentView(R.layout.dialog_card_stack);
+        dlg.setCanceledOnTouchOutside(false);
         Window w = dlg.getWindow();
         if (w != null) {
             w.setBackgroundDrawable(new ColorDrawable(Color.TRANSPARENT));
             w.addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND);
             w.setDimAmount(0.6f);
-            w.setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.WRAP_CONTENT);
-            // ★ 这个动画只影响"窗口第一次出现"那一瞬（之后换页根本不换窗）。
-            //   给 1 ms 空动画是为了让 dim 立刻到位：完全不给动画时，系统会花约 0.5 s 渐入 dim（实测）。
+            // ★ 窗口尺寸钉死：换页时变的是**卡片**高度，窗口一动不动（见类注释 1）。
+            w.setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT);
+            // 这个动画只影响"窗口第一次出现"那一瞬；给 1 ms 空动画是为了让 dim 立刻到位
+            // （完全不给动画时，系统会花约 0.5 s 渐入 dim，实测）。
             w.setWindowAnimations(R.style.AppDialogAnim);
         }
         titleView = (TextView) dlg.findViewById(R.id.card_stack_title);
         bodyView = (FrameLayout) dlg.findViewById(R.id.card_stack_body);
         buttonBar = (LinearLayout) dlg.findViewById(R.id.card_stack_buttons);
+        View root = dlg.findViewById(R.id.card_stack_root);
+        if (root != null) {
+            root.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) { dlg.dismiss(); }
+            });
+        }
+        View card = dlg.findViewById(R.id.card_stack_card);
+        if (card != null) {
+            // 窗口是整屏 ⇒ "点外面"落在根 View 上；卡片自己吃掉点击，免得点卡片空白处把窗关了
+            card.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) { }
+            });
+        }
+        maxBody = a.getResources().getDisplayMetrics().heightPixels - dp(150);
         dlg.setOnKeyListener(new android.content.DialogInterface.OnKeyListener() {
             @Override public boolean onKey(android.content.DialogInterface d, int code, KeyEvent e) {
                 if (code == KeyEvent.KEYCODE_BACK) {
@@ -149,10 +173,14 @@ public final class CardStack {
 
     private void render(final Page p, boolean animate) {
         final CharSequence newTitle = p.title == null ? "" : p.title;
+        final int h = measurePage(p.body);
+        p.body.setLayoutParams(new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, h));
         if (!animate) {
             titleView.setText(newTitle);
             bodyView.removeAllViews();
             bodyView.addView(p.body);
+            setBodyHeight(h, false);
             setButtons(p);
             return;
         }
@@ -166,35 +194,42 @@ public final class CardStack {
         final View old = bodyView.getChildCount() == 0 ? null : bodyView.getChildAt(0);
         p.body.setAlpha(0f);
         bodyView.addView(p.body);
-        pumpHeight(p.body);
         p.body.animate().alpha(1f).setDuration(150).start();
         if (old != null) old.animate().alpha(0f).setDuration(120).start();
+        setBodyHeight(h, true);
         setButtons(p);
         bodyView.postDelayed(new Runnable() {
             @Override public void run() {
                 if (old != null) bodyView.removeView(old);
-                resetHeight();
             }
         }, 200);
     }
 
     /**
-     * 高度过渡：新页比旧页高/矮时，卡片不能"啪"一下换尺寸。
-     * 做法 = 把 body 槽临时钉成固定高度，从当前值动到新内容的测量高度，动画结束再恢复 wrap_content。
+     * 量出这一页**确定**的高度：宽用 EXACT（和最终布局一致）、高用 AT_MOST（超过上限就封顶，内部滚动）。
+     * ★ 别用 UNSPECIFIED 量完就当目标高度 —— 那样量出来的是"内容自然高"，与真实布局对不上，
+     *   动画结束换回 wrap_content 时会"啪"地跳几像素（用户说的"高度还会闪"就是这个）。
      */
-    private void pumpHeight(View added) {
-        final ViewGroup.LayoutParams lp = bodyView.getLayoutParams();
-        final int start = bodyView.getHeight();
+    private int measurePage(View page) {
         int w = bodyView.getWidth() - bodyView.getPaddingLeft() - bodyView.getPaddingRight();
         if (w <= 0) {
             int screen = dlg.getContext().getResources().getDisplayMetrics().widthPixels;
             w = screen - dp(16) * 2 - dp(20) * 2;
         }
-        added.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.AT_MOST),
-                View.MeasureSpec.makeMeasureSpec(0, View.MeasureSpec.UNSPECIFIED));
-        int end = added.getMeasuredHeight();
-        if (start <= 0 || end <= 0 || start == end) return;
-        android.animation.ValueAnimator v = android.animation.ValueAnimator.ofInt(start, end);
+        page.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(maxBody, View.MeasureSpec.AT_MOST));
+        return Math.min(page.getMeasuredHeight(), maxBody);
+    }
+
+    private void setBodyHeight(final int target, boolean animate) {
+        final ViewGroup.LayoutParams lp = bodyView.getLayoutParams();
+        int start = bodyView.getHeight();
+        if (!animate || start <= 0 || start == target) {
+            lp.height = target;
+            bodyView.setLayoutParams(lp);
+            return;
+        }
+        android.animation.ValueAnimator v = android.animation.ValueAnimator.ofInt(start, target);
         v.setDuration(170);
         v.addUpdateListener(new android.animation.ValueAnimator.AnimatorUpdateListener() {
             @Override public void onAnimationUpdate(android.animation.ValueAnimator a) {
@@ -202,21 +237,7 @@ public final class CardStack {
                 bodyView.setLayoutParams(lp);
             }
         });
-        v.addListener(new android.animation.AnimatorListenerAdapter() {
-            @Override public void onAnimationEnd(android.animation.Animator a) {
-                lp.height = ViewGroup.LayoutParams.WRAP_CONTENT;
-                bodyView.setLayoutParams(lp);
-            }
-        });
         v.start();
-    }
-
-    private void resetHeight() {
-        ViewGroup.LayoutParams lp = bodyView.getLayoutParams();
-        if (lp.height != ViewGroup.LayoutParams.WRAP_CONTENT) {
-            lp.height = ViewGroup.LayoutParams.WRAP_CONTENT;
-            bodyView.setLayoutParams(lp);
-        }
     }
 
     private void setButtons(Page p) {
@@ -269,10 +290,7 @@ public final class CardStack {
             });
             box.addView(row);
         }
-        ScrollView sc = new ScrollView(c);
-        sc.setFillViewport(false);
-        sc.addView(box);
-        return sc;
+        return scroller(c, box);
     }
 
     /** 一段正文（信息类的"只读一屏"）。 */
@@ -282,9 +300,20 @@ public final class CardStack {
         t.setTextSize(15);
         t.setTextColor(c.getResources().getColor(R.color.fg));
         t.setLineSpacing(dp(c, 4), 1f);
-        ScrollView sc = new ScrollView(c);
-        sc.setFillViewport(false);
-        sc.addView(t);
+        return scroller(c, t);
+    }
+
+    /**
+     * 统一的滚动容器（`res/layout/card_page_scroll.xml`）：**滚动条盖在内容上**。
+     * ★ 为什么走 XML：`android:scrollbarStyle` 在框架里**没有公开 setter**（`View.getScrollBarStyle()`
+     *   公开、setter 是 @hide，代码里调编译不过）；而滚动条一旦占宽度，内容在"够高/不够高"的临界点
+     *   附近切换时文字会重排、卡片高度跟着跳（用户：「高度有时候还会闪」）。
+     */
+    private static ScrollView scroller(Context c, View child) {
+        ScrollView sc = (ScrollView) android.view.LayoutInflater.from(c)
+                .inflate(R.layout.card_page_scroll, null, false);
+        ViewGroup slot = (ViewGroup) sc.findViewById(R.id.card_page_slot);
+        slot.addView(child);
         return sc;
     }
 
