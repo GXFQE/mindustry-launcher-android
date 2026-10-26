@@ -1845,6 +1845,7 @@ final class BatchIo {
     }
 
     private static void alert(Activity a, String title, String msg) {
+        if (CardStack.leaf(title, msg)) return;      // 第 271 轮：有卡片就画在卡片里
         if (Util.dead(a)) return;
         new AlertDialog.Builder(a)
                 .setTitle(title)

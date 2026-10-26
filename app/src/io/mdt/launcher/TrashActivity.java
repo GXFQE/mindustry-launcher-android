@@ -629,6 +629,7 @@ public class TrashActivity extends BaseActivity {
 
     /** 全类弹窗的唯一入口 —— 先挡"已销毁的 Activity"（后台任务收尾时旧的实例可能已经没了） */
     private void alert(String title, String msg) {
+        if (CardStack.leaf(title, msg)) return;
         if (Util.dead(this)) return;
         new AlertDialog.Builder(this)
                 .setTitle(title)

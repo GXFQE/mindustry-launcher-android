@@ -302,6 +302,7 @@ public final class CardStack {
     }
 
     public void show() {
+        sLastShown = new java.lang.ref.WeakReference<CardStack>(this);
         if (!dlg.isShowing()) dlg.show();
     }
 
@@ -311,6 +312,34 @@ public final class CardStack {
 
     public boolean isShowing() {
         return dlg.isShowing();
+    }
+
+    // ---- 叶子提示（第 271 轮）--------------------------------------------------
+    //
+    // 目的：**只要当前有卡片开着，就别再开一个新窗口**。`alert()` 那类"只有关闭"的叶子提示
+    // 原来一律新开一个 AlertDialog ⇒ 旧卡片立刻消失、dim 重播一遍，用户看到的就是"闪"。
+    // 这里把"谁现在开着"记成弱引用，叶子提示直接 `replace` 成卡片的一页。
+
+    private static java.lang.ref.WeakReference<CardStack> sLastShown;
+
+    private static CardStack showing() {
+        CardStack c = sLastShown == null ? null : sLastShown.get();
+        if (c == null || !c.isShowing()) return null;
+        return c;
+    }
+
+    /**
+     * 有卡片开着就把这条提示画在**那张卡里**（一页 + 关闭），返回 true；
+     * 没有卡片返回 false，调用方走它自己的弹窗老路。
+     */
+    public static boolean leaf(CharSequence title, CharSequence message) {
+        final CardStack card = showing();
+        if (card == null) return false;
+        card.replace(title, message, new Btn(Trans.get(card.dlg.getContext(), R.string.close),
+                new Runnable() {
+                    @Override public void run() { card.dismiss(); }
+                }));
+        return true;
     }
 
     // ---- 渲染 ------------------------------------------------------------------
@@ -372,9 +401,29 @@ public final class CardStack {
             int screen = dlg.getContext().getResources().getDisplayMetrics().widthPixels;
             w = screen - dp(16) * 2 - dp(20) * 2;
         }
+        // ★ 第 271 轮：正文上限还要**扣掉这一刻真实的标题 + 按钮栏**——只按固定 150dp 留余量时，
+        //   长报告（存储占用、导入报告）会把按钮顶出屏幕（真机截图抓到：卡片下沿被切掉）。
+        final int cap = Math.min(maxBody, liveCap());
         page.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY),
-                View.MeasureSpec.makeMeasureSpec(maxBody, View.MeasureSpec.AT_MOST));
-        return Math.min(page.getMeasuredHeight(), maxBody);
+                View.MeasureSpec.makeMeasureSpec(cap, View.MeasureSpec.AT_MOST));
+        return Math.min(page.getMeasuredHeight(), cap);
+    }
+
+    /** 这一刻正文最多能有多高：窗口高 − 卡片留白 − 标题 − 按钮栏（都不够就退回一个最小值）。 */
+    private int liveCap() {
+        int screen = 0;
+        try {
+            View d = dlg.getWindow() == null ? null : dlg.getWindow().getDecorView();
+            if (d != null) screen = d.getHeight();
+        } catch (Throwable ignored) { }
+        if (screen <= 0) screen = dlg.getContext().getResources().getDisplayMetrics().heightPixels;
+        int chrome = dp(56)                       // 窗口上下留白
+                + titleView.getMeasuredHeight()
+                + buttonBar.getMeasuredHeight()
+                + dp(44);                         // 卡片内边距 + 间隙
+        int h = screen - chrome;
+        int floor = dp(120);
+        return h > floor ? h : floor;
     }
 
     private void setBodyHeight(final int target, boolean animate) {

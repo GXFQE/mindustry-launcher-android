@@ -67,6 +67,7 @@ final class VersionOps {
     }
 
     static void alert(Activity a, int titleRes, String msg) {
+        if (CardStack.leaf(Trans.get(a, titleRes), msg)) return;
         if (Util.dead(a)) return;
         new AlertDialog.Builder(a)
                 .setTitle(titleRes)

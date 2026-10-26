@@ -802,6 +802,7 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
      *  ★ 2026-10-04 起在这里挡"已销毁的 Activity"：导入模组是几十秒的后台任务，
      *    失败弹窗落在转屏销毁的实例上会 BadTokenException 闪退（见 {@link Util#dead}）。 */
     private void alert(String title, String msg) {
+        if (CardStack.leaf(title, msg)) return;
         if (Util.dead(this)) return;
         new AlertDialog.Builder(this)
                 .setTitle(title)

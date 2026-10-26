@@ -145,6 +145,7 @@ public class MapDetailActivity extends BaseActivity {
      * 弹窗入口 —— ★ 在这里挡"已销毁的 Activity"（理由见 {@link Util#dead}）。
      */
     private void alert(String title, String msg) {
+        if (CardStack.leaf(title, msg)) return;
         if (Util.dead(this)) return;
         new AlertDialog.Builder(this)
                 .setTitle(title)

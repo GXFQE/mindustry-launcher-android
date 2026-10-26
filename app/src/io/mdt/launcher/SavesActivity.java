@@ -476,6 +476,7 @@ public class SavesActivity extends BaseActivity {
     }
     /** 一句话提示（与地图 / 蓝图 / 模组页**同名同形**；本页原来没有它，第 157 轮补） */
     private void alert(String title, String msg) {
+        if (CardStack.leaf(title, msg)) return;
         if (Util.dead(this)) return;
         new AlertDialog.Builder(this)
                 .setTitle(title)

@@ -834,6 +834,7 @@ public class LogActivity extends BaseActivity {
     }
 
     private void alert(String title, String msg) {
+        if (CardStack.leaf(title, msg)) return;
         new AlertDialog.Builder(this).setTitle(title).setMessage(msg)
                 .setNegativeButton(R.string.close, null).show();
     }

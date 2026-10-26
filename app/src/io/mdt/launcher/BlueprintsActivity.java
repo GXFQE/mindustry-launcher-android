@@ -919,6 +919,7 @@ public class BlueprintsActivity extends BaseActivity {
 
     /** 全类弹窗的唯一入口（挡"已销毁的 Activity"：导入/导出是后台任务收尾时弹的） */
     private void alert(String title, String msg) {
+        if (CardStack.leaf(title, msg)) return;
         if (Util.dead(this)) return;
         new android.app.AlertDialog.Builder(this)
                 .setTitle(title)

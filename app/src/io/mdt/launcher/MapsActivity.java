@@ -1413,6 +1413,7 @@ public class MapsActivity extends BaseActivity {
     /** 全类弹窗的唯一入口 —— ★ 2026-10-04 起在这里挡"已销毁的 Activity"：
      *  地图导入/导出是后台任务收尾时弹的（见 {@link Util#dead}）。 */
     private void alert(String title, String msg) {
+        if (CardStack.leaf(title, msg)) return;
         if (Util.dead(this)) return;
         new AlertDialog.Builder(this)
                 .setTitle(title)

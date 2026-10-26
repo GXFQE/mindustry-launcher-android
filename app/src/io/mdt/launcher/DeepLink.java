@@ -224,6 +224,7 @@ final class DeepLink {
 
     /** 标题 = 文件名，正文 = 资源里的整句（**不在调用点拼文案**，也不重复印一遍名字） */
     private static void alert(final Activity a, String title, int msgRes) {
+        if (CardStack.leaf(title, Trans.get(a, msgRes))) return;
         new AlertDialog.Builder(a)
                 .setTitle(title)
                 .setMessage(msgRes)

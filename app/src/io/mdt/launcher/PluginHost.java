@@ -634,35 +634,32 @@ public final class PluginHost {
 
         @Override public boolean gameRunning() { return Data.gameAlive(this); }
 
+        /** ★ 第 271 轮：插件要的确认框也走 `CardStack`（插件页里的二次确认不再换窗）。 */
         @Override public void confirm(final String title, final String message,
                                       final String okText, final Confirm callback) {
-            final Context base = getBaseContext();
-            if (!(base instanceof Activity)) {
+            final Activity a = activityOrNull();
+            if (a == null) {
                 if (callback != null) callback.onConfirm(false);
                 return;
             }
-            final Activity a = (Activity) base;
             a.runOnUiThread(new Runnable() {
                 @Override public void run() {
                     try {
-                        new android.app.AlertDialog.Builder(a)
-                                .setTitle(title)
-                                .setMessage(message)
-                                .setPositiveButton(okText,
-                                        new android.content.DialogInterface.OnClickListener() {
-                                            @Override public void onClick(
-                                                    android.content.DialogInterface d, int w) {
-                                                if (callback != null) callback.onConfirm(true);
-                                            }
-                                        })
-                                .setNegativeButton(android.R.string.cancel,
-                                        new android.content.DialogInterface.OnClickListener() {
-                                            @Override public void onClick(
-                                                    android.content.DialogInterface d, int w) {
+                        final CardStack[] ref = new CardStack[1];
+                        ref[0] = CardStack.show(null, a, title, CardStack.text(a, message),
+                                new CardStack.Btn(Trans.get(a, android.R.string.cancel),
+                                        new Runnable() {
+                                            @Override public void run() {
+                                                ref[0].dismiss();
                                                 if (callback != null) callback.onConfirm(false);
                                             }
-                                        })
-                                .show();
+                                        }),
+                                new CardStack.Btn(okText, new Runnable() {
+                                    @Override public void run() {
+                                        ref[0].dismiss();
+                                        if (callback != null) callback.onConfirm(true);
+                                    }
+                                }));
                     } catch (Throwable t) {
                         if (callback != null) callback.onConfirm(false);
                     }
@@ -670,41 +667,36 @@ public final class PluginHost {
             });
         }
 
+        /** ★ 第 271 轮：插件要的输入框也走 `CardStack`。 */
         @Override public void prompt(final String title, final String hint, final String initial,
                                      final String okText, final Prompt callback) {
-            final Context base = getBaseContext();
-            if (!(base instanceof Activity)) {
+            final Activity a = activityOrNull();
+            if (a == null) {
                 if (callback != null) callback.onPrompt(null);
                 return;
             }
-            final Activity a = (Activity) base;
             a.runOnUiThread(new Runnable() {
                 @Override public void run() {
                     try {
                         final android.widget.EditText input = new android.widget.EditText(a);
                         input.setHint(hint == null ? "" : hint);
                         if (initial != null) input.setText(initial);
-                        new android.app.AlertDialog.Builder(a)
-                                .setTitle(title)
-                                .setView(input)
-                                .setPositiveButton(okText,
-                                        new android.content.DialogInterface.OnClickListener() {
-                                            @Override public void onClick(
-                                                    android.content.DialogInterface d, int w) {
-                                                if (callback != null) {
-                                                    callback.onPrompt(
-                                                            input.getText().toString().trim());
-                                                }
-                                            }
-                                        })
-                                .setNegativeButton(android.R.string.cancel,
-                                        new android.content.DialogInterface.OnClickListener() {
-                                            @Override public void onClick(
-                                                    android.content.DialogInterface d, int w) {
+                        final CardStack[] ref = new CardStack[1];
+                        ref[0] = CardStack.show(null, a, title, CardStack.wrap(a, input),
+                                new CardStack.Btn(Trans.get(a, android.R.string.cancel),
+                                        new Runnable() {
+                                            @Override public void run() {
+                                                ref[0].dismiss();
                                                 if (callback != null) callback.onPrompt(null);
                                             }
-                                        })
-                                .show();
+                                        }),
+                                new CardStack.Btn(okText, new Runnable() {
+                                    @Override public void run() {
+                                        String v = input.getText().toString().trim();
+                                        ref[0].dismiss();
+                                        if (callback != null) callback.onPrompt(v);
+                                    }
+                                }));
                     } catch (Throwable t) {
                         if (callback != null) callback.onPrompt(null);
                     }

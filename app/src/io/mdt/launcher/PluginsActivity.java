@@ -459,13 +459,11 @@ public class PluginsActivity extends BaseActivity {
                                         Trans.get(PluginsActivity.this, R.string.plugin_action_enable),
                                         new Runnable() {
                                             @Override public void run() {
-                                                stack.dismiss();
-                                                doEnable(id, want);
+                                                doEnable(stack, id, want);
                                             }
                                         });
                             } else {
-                                stack.dismiss();
-                                doEnable(id, want);
+                                doEnable(stack, id, want);
                             }
                         } else if ("disable".equals(a)) {
                             // ★ 只有"这一程本来在跑的那一份"被拿掉才需要重启；
@@ -892,11 +890,17 @@ public class PluginsActivity extends BaseActivity {
      */
     /** 启用一版并问要不要重启（v23 抽出来：探针风险告知确认后走同一个出口）。 */
     private void doEnable(String id, String ver) {
+        doEnable(null, id, ver);
+    }
+
+    /** 有卡片就接着在同一张卡里问"要不要重启"（第 271 轮）。 */
+    private void doEnable(final CardStack card, String id, String ver) {
         Plugins.enable(this, id, ver);
         String done = Trans.get(this, R.string.plugin_enabled_fmt,
                 Plugins.displayNameOf(this, id), verLabel(id, ver));
         rebuild();
-        askRestart(done);
+        if (card != null && card.isShowing()) askRestart(card, done);
+        else askRestart(done);
     }
 
     private String verLabel(String id, String ver) {
@@ -916,29 +920,35 @@ public class PluginsActivity extends BaseActivity {
      * ★ 只有真的需要退出重开时才调它（安装 / 启用 / 停用或卸载了**正在跑**的那一份 / 重新启用）。
      */
     /** 卡片里用：同一张卡推一页「现在重启吗」（换窗才闪，所以别在卡片里再 `new AlertDialog`）。 */
+    /** 有卡片就**原地换成**这一页（第 271 轮：原来 push 一页，返回能退回"刚做完的动作页"）。 */
     private void askRestart(final CardStack stack, CharSequence message) {
-        stack.pushMessage(Trans.get(this, R.string.plugin_restart_ask_title), message,
-                Trans.get(this, R.string.plugin_restart_now), new Runnable() {
+        stack.replace(Trans.get(this, R.string.plugin_restart_ask_title), message,
+                new CardStack.Btn(Trans.get(this, R.string.plugin_restart_later), new Runnable() {
+                    @Override public void run() { stack.dismiss(); }
+                }),
+                new CardStack.Btn(Trans.get(this, R.string.plugin_restart_now), new Runnable() {
                     @Override public void run() {
                         stack.dismiss();
                         restartNow();
                     }
-                });
+                }));
     }
 
+    /** 没有卡片可用时：自己开一张（也不再是"关一个窗再开一个窗"）。 */
     private void askRestart(CharSequence message) {
         if (isFinishing()) return;
-        new AlertDialog.Builder(this)
-                .setTitle(Trans.get(this, R.string.plugin_restart_ask_title))
-                .setMessage(message)
-                .setPositiveButton(Trans.get(this, R.string.plugin_restart_now),
-                        new DialogInterface.OnClickListener() {
-                            @Override public void onClick(DialogInterface d, int which) {
-                                restartNow();
-                            }
-                        })
-                .setNegativeButton(Trans.get(this, R.string.plugin_restart_later), null)
-                .show();
+        final CardStack[] ref = new CardStack[1];
+        ref[0] = CardStack.show(null, this,
+                Trans.get(this, R.string.plugin_restart_ask_title), CardStack.text(this, message),
+                new CardStack.Btn(Trans.get(this, R.string.plugin_restart_later), new Runnable() {
+                    @Override public void run() { ref[0].dismiss(); }
+                }),
+                new CardStack.Btn(Trans.get(this, R.string.plugin_restart_now), new Runnable() {
+                    @Override public void run() {
+                        ref[0].dismiss();
+                        restartNow();
+                    }
+                }));
     }
 
     // ---- 小工具 ----------------------------------------------------------------

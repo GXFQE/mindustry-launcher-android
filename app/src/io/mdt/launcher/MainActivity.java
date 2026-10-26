@@ -381,6 +381,7 @@ public class MainActivity extends BaseActivity {
      *  导入 APK / 兼容性复检 / 启动失败都是**后台任务收尾**时弹的，落在转屏销毁的实例上
      *  会抛 `WindowManager$BadTokenException` 直接闪退（见 {@link Util#dead}）。 */
     void alert(String title, String msg) {
+        if (CardStack.leaf(title, msg)) return;
         if (Util.dead(this)) return;
         new AlertDialog.Builder(this)
                 .setTitle(title)

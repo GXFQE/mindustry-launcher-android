@@ -727,6 +727,7 @@ final class SlotOps {
     /** 全类弹窗的唯一入口 —— ★ 2026-10-04 起在这里挡"已销毁的 Activity"（理由见 {@link Util#dead}：
      *  备份/恢复/克隆都是几十秒的后台任务，收尾弹窗落在转屏销毁的实例上会 BadTokenException 闪退）。 */
     private static void alert(Activity a, String title, String msg) {
+        if (CardStack.leaf(title, msg)) return;
         if (Util.dead(a)) return;
         new AlertDialog.Builder(a)
                 .setTitle(title)

@@ -353,6 +353,7 @@ public class BlueprintDetailActivity extends BaseActivity {
      * 本页的弹窗既可能来自用户点击，也可能来自后台清点任务收尾（统计失败那条）。
      */
     private void alert(String title, String msg) {
+        if (CardStack.leaf(title, msg)) return;      // 第 271 轮：有卡片就画在卡片里
         if (Util.dead(this)) return;
         new android.app.AlertDialog.Builder(this)
                 .setTitle(title)

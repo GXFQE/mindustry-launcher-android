@@ -1505,6 +1505,7 @@ final class SlotIo {
      * 收口在这一处 ⇒ 以后新增的 alert 调用自动受保护，不必记得补判据。
      */
     private static void alert(Activity a, String title, String msg) {
+        if (CardStack.leaf(title, msg)) return;
         if (Util.dead(a)) return;
         new AlertDialog.Builder(a)
                 .setTitle(title)
