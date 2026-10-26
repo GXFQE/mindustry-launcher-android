@@ -492,12 +492,26 @@ public class BlueprintsActivity extends BaseActivity {
         importDocs(BatchIo.docsOf(this, data), slot);
     }
 
+    /** 卡片结果页的「关闭」（唯一实现）。 */
+    private CardStack.Btn closeBtn(final CardStack stack) {
+        return new CardStack.Btn(Trans.get(this, R.string.close), new Runnable() {
+            @Override public void run() { stack.dismiss(); }
+        });
+    }
+
     // ── 导入 ──────────────────────────────────────────────────────────────
 
     private void importFile(final android.net.Uri uri, final String displayName,
                             final String slot, final boolean overwrite) {
-        final android.app.ProgressDialog pd = android.app.ProgressDialog.show(this,
-                Trans.get(BlueprintsActivity.this, R.string.bp_import), Trans.get(BlueprintsActivity.this, R.string.bp_reading), true, false);
+        importFile(null, uri, displayName, slot, overwrite);
+    }
+
+    /** 卡片版（第 270 轮）：进度 → 同名确认 / 命名页 / 结果 全在同一张卡里。 */
+    private void importFile(final CardStack card, final android.net.Uri uri, final String displayName,
+                            final String slot, final boolean overwrite) {
+        final CardStack stack = (card != null) ? card : new CardStack(this);
+        stack.replace(Trans.get(this, R.string.bp_import),
+                Trans.get(this, R.string.bp_reading));
         new Thread(new Runnable() {
             @Override public void run() {
                 final BlueprintFiles.Result r;
@@ -511,14 +525,14 @@ public class BlueprintsActivity extends BaseActivity {
                 } catch (Throwable t) {
                     runOnUiThread(new Runnable() {
                         @Override public void run() {
-                            pd.dismiss();
                             // ★ 2026-10-15：原来是 `String.valueOf(t)`（异常原文当弹窗正文）
                             //   ⇒ 与同页导出那条一致走 `Util.ioReason`，原文进日志。
                             android.util.Log.w("MDTLauncher", "bp import failed", t);
-                            alert(Trans.get(BlueprintsActivity.this, R.string.bp_import),
+                            stack.replace(Trans.get(BlueprintsActivity.this, R.string.bp_import),
                                     Util.ioReason(BlueprintsActivity.this, t,
                                             Trans.get(BlueprintsActivity.this,
-                                                    R.string.bp_import_read_failed)));
+                                                    R.string.bp_import_read_failed)),
+                                    closeBtn(stack));
                         }
                     });
                     return;
@@ -532,10 +546,10 @@ public class BlueprintsActivity extends BaseActivity {
                 }
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
-                        pd.dismiss();
-                        // ★ 下面会弹 inline 的同名替换框 ⇒ 转屏销毁后必须停在这里（见 Util.dead）
+                        // ★ 下面这些页都属于可能被销毁的实例 ⇒ 先判死（见 Util.dead）
                         if (Util.dead(BlueprintsActivity.this)) return;
                         if (r.ok) {
+                            stack.dismiss();
                             Toast.makeText(BlueprintsActivity.this,
                                     Trans.get(BlueprintsActivity.this, R.string.bp_import_ok_fmt, r.finalName),
                                     Toast.LENGTH_SHORT).show();
@@ -547,7 +561,7 @@ public class BlueprintsActivity extends BaseActivity {
                         if (!overwrite && r.nameTaken) {
                             // ★ 第 262 轮：撞名确认 + 「换个名字」原来是两个弹窗（确认框 → 命名框），
                             //   换窗时 dim 重播会闪；改成同一张卡的两页（确认页 → 输入页）。
-                            final CardStack stack = new CardStack(BlueprintsActivity.this);
+
                             final String base = BlueprintFiles.safeName(displayName);
                             final String title = Trans.get(BlueprintsActivity.this, R.string.bp_import);
                             stack.root(Trans.get(BlueprintsActivity.this, R.string.bp_overwrite_title),
@@ -765,9 +779,9 @@ public class BlueprintsActivity extends BaseActivity {
 
     /** 单份蓝图的**分享**出口（第 156 轮）：同地图那条，落缓存再交给系统面板 */
     private void exportItemShared(final Blueprints.Item it) {
-        final android.app.ProgressDialog pd = android.app.ProgressDialog.show(this,
-                Trans.get(BlueprintsActivity.this, R.string.bp_export),
-                Trans.get(BlueprintsActivity.this, R.string.bp_export_working), true, false);
+        final CardStack stack = new CardStack(this);
+        stack.replace(Trans.get(this, R.string.bp_export),
+                Trans.get(this, R.string.bp_export_working));
         new Thread(new Runnable() {
             @Override public void run() {
                 android.net.Uri uri = null;
@@ -795,12 +809,13 @@ public class BlueprintsActivity extends BaseActivity {
                 final String fe = err;
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
-                        pd.dismiss();
                         if (Util.dead(BlueprintsActivity.this)) return;
                         if (fe != null) {
-                            alert(Trans.get(BlueprintsActivity.this, R.string.export_failed), fe);
+                            stack.replace(Trans.get(BlueprintsActivity.this, R.string.export_failed), fe,
+                                    closeBtn(stack));
                             return;
                         }
+                        stack.dismiss();          // 交给系统分享面板
                         ShareOut.launch(BlueprintsActivity.this, fu);
                     }
                 });
@@ -857,8 +872,9 @@ public class BlueprintsActivity extends BaseActivity {
 
     /** 把选中的那份写进 SAF 目标：本槽是真文件、模组自带要从 zip 条目流式拷 */
     private void exportItem(final Blueprints.Item it, final android.net.Uri uri) {
-        final android.app.ProgressDialog pd = android.app.ProgressDialog.show(this,
-                Trans.get(BlueprintsActivity.this, R.string.bp_export), Trans.get(BlueprintsActivity.this, R.string.bp_export_working), true, false);
+        final CardStack stack = new CardStack(this);
+        stack.replace(Trans.get(this, R.string.bp_export),
+                Trans.get(this, R.string.bp_export_working));
         new Thread(new Runnable() {
             @Override public void run() {
                 final long n;
@@ -873,19 +889,19 @@ public class BlueprintsActivity extends BaseActivity {
                 } catch (final Throwable t) {
                     runOnUiThread(new Runnable() {
                         @Override public void run() {
-                            pd.dismiss();
                             // 同 `MapsActivity` 的导出失败：`ioReason` 只翻认识的系统 errno，
                             // 我们自己的文案原样透传（没 message 时用资源兜底，不甩类名）
-                            alert(Trans.get(BlueprintsActivity.this, R.string.export_failed),
+                            stack.replace(Trans.get(BlueprintsActivity.this, R.string.export_failed),
                                     Util.ioReason(BlueprintsActivity.this, t,
-                                            Trans.get(BlueprintsActivity.this, R.string.bp_export_nosrc)));
+                                            Trans.get(BlueprintsActivity.this, R.string.bp_export_nosrc)),
+                                    closeBtn(stack));
                         }
                     });
                     return;
                 }
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
-                        pd.dismiss();
+                        stack.dismiss();
                         Toast.makeText(BlueprintsActivity.this,
                                 Trans.get(BlueprintsActivity.this, R.string.bp_export_ok_fmt, it.name(),
                                         Util.formatSize(n)), Toast.LENGTH_SHORT).show();

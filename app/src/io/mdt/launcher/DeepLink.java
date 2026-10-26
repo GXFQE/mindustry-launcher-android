@@ -93,14 +93,15 @@ final class DeepLink {
             return true;
         }
         // 压缩包：装的是模组 / 地图 / 存档 / 蓝图，只有读过内容才知道 ⇒ 后台读一遍再问
-        final ProgressDialog pd = ProgressDialog.show(a,
-                Trans.get(a, R.string.deeplink_reading), doc.name, true, false);
+        // ★ 第 270 轮：读包这段用卡片（原来一个 ProgressDialog）
+        final CardStack stack = new CardStack(a);
+        stack.replace(Trans.get(a, R.string.deeplink_reading), doc.name);
         new Thread(new Runnable() {
             @Override public void run() {
                 final int k = BatchIo.guessKind(a, doc);
                 a.runOnUiThread(new Runnable() {
                     @Override public void run() {
-                        pd.dismiss();
+                        stack.dismiss();
                         if (Util.dead(a)) return;
                         if (k < 0) alert(a, doc.name, R.string.deeplink_zip_empty);
                         else open(a, k, doc);

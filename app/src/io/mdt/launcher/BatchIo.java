@@ -399,14 +399,10 @@ final class BatchIo {
         final List<Exporter.Src> fsrcs = srcs;
         final Uri uri = data.getData();
         // ★ 2026-10-11：导出侧也改成**确定进度**（份数已知；目录形态的模组可能几十 MB）
-        final ProgressDialog pd = new ProgressDialog(a);
-        pd.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
-        pd.setTitle(Trans.get(a, R.string.batch_export_progress_title));
-        pd.setMessage(Trans.get(a, R.string.batch_export_pct_fmt, 0, srcs.size()));
-        pd.setMax(srcs.size());
-        pd.setProgress(0);
-        pd.setCancelable(false);
-        pd.show();
+        // ★ 第 270 轮：进度画在卡片里（`replace` + `updateText`），不再弹 ProgressDialog
+        final CardStack stack = new CardStack(a);
+        stack.replace(Trans.get(a, R.string.batch_export_progress_title),
+                Trans.get(a, R.string.batch_export_pct_fmt, 0, srcs.size()));
         new Thread(new Runnable() {
             @Override public void run() {
                 String err = null;
@@ -417,9 +413,7 @@ final class BatchIo {
                             a.runOnUiThread(new Runnable() {
                                 @Override public void run() {
                                     if (Util.dead(a)) return;
-                                    pd.setMax(total);
-                                    pd.setProgress(done);
-                                    pd.setMessage(Trans.get(a, R.string.batch_export_pct_fmt,
+                                    stack.updateText(Trans.get(a, R.string.batch_export_pct_fmt,
                                             done, total));
                                 }
                             });
@@ -436,12 +430,12 @@ final class BatchIo {
                 final boolean tree = toTree;
                 a.runOnUiThread(new Runnable() {
                     @Override public void run() {
-                        pd.dismiss();
                         if (Util.dead(a)) return;
                         if (fe != null) {
-                            alert(a, Trans.get(a, R.string.export_failed), fe);
+                            stack.replace(Trans.get(a, R.string.export_failed), fe, closeBtn(a, stack));
                             return;
                         }
+                        stack.dismiss();
                         toast(a, Trans.get(a, tree ? R.string.batch_export_tree_done_fmt
                                                   : R.string.batch_export_zip_done_fmt,
                                 fr.files, Util.formatSize(fr.outBytes)));
@@ -848,9 +842,10 @@ final class BatchIo {
             toast(a, Trans.get(a, R.string.batch_import_nothing));
             return;
         }
-        final ProgressDialog pd = ProgressDialog.show(a,
-                Trans.get(a, R.string.batch_import_progress_title),
-                Trans.get(a, R.string.batch_import_progress_fmt, docs.size(), slotLabel), true, false);
+        // ★ 第 270 轮：展开包的进度也画在卡片里，后面确认页 / 报告页继续用这一张
+        final CardStack stack = new CardStack(a);
+        stack.replace(Trans.get(a, R.string.batch_import_progress_title),
+                Trans.get(a, R.string.batch_import_progress_fmt, docs.size(), slotLabel));
         new Thread(new Runnable() {
             @Override public void run() {
                 final File work = workDir(a);
@@ -873,30 +868,24 @@ final class BatchIo {
 
                 a.runOnUiThread(new Runnable() {
                     @Override public void run() {
-                        pd.dismiss();
                         if (Util.dead(a)) {
                             cleanup(work);
                             return;
                         }
-                        final CardStack[] ref = new CardStack[1];
                         if (todo.isEmpty()) {
                             if (onDone != null) onDone.run();
                             // ★ 第 266 轮："一份都没导"的报告也画在卡片里（原来是一个 AlertDialog）
-                            ref[0] = new CardStack(a);
-                            ref[0].replace(Trans.get(a, R.string.batch_report_title), rep.text(a),
-                                    new CardStack.Btn(Trans.get(a, R.string.close), new Runnable() {
-                                        @Override public void run() { ref[0].dismiss(); }
-                                    }));
+                            stack.replace(Trans.get(a, R.string.batch_report_title), rep.text(a),
+                                    closeBtn(a, stack));
                             cleanup(work);
                             return;
                         }
                         if (conflicts == 0) {
-                            phaseB(null, a, todo, imp, rep, work, true, slot, kind, onDone);
+                            phaseB(stack, a, todo, imp, rep, work, true, slot, kind, onDone);
                             return;
                         }
                         // ★ 有同名 ⇒ **只问一次**（这一批里撞了多少份、一共多少份都说清楚）。
                         // ★ 第 266 轮：确认页 → 进度 → 报告 全在同一张卡里换内容（原来三段各一个窗口）。
-                        final CardStack stack = new CardStack(a);
                         stack.replace(Trans.get(a, R.string.batch_overwrite_title),
                                 Trans.get(a, R.string.batch_overwrite_msg_fmt, conflicts, todo.size()),
                                 new CardStack.Btn(Trans.get(a, R.string.cancel), new Runnable() {

@@ -769,9 +769,10 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
         if (kids != null) {
             for (File f : kids) if (!Data.contentSkipped(f)) count++;
         }
-        final ProgressDialog pd = ProgressDialog.show(this,
-                Trans.get(ModsActivity.this, R.string.mods_copy_progress_title),
-                Trans.get(ModsActivity.this, R.string.mods_copy_progress_fmt, count, toSlot), true, false);
+        // ★ 第 270 轮：复制进度 → 结果 同一张卡
+        final CardStack stack = new CardStack(this);
+        stack.replace(Trans.get(this, R.string.mods_copy_progress_title),
+                Trans.get(this, R.string.mods_copy_progress_fmt, count, toSlot));
         new Thread(new Runnable() {
             @Override public void run() {
                 Mods.PackResult pr = null;
@@ -787,10 +788,9 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
                 final String fe = err;
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
-                        pd.dismiss();
                         // ★ 标题按结局给：这里是**结果**（可能成功、也可能整批失败）
-                        alert(Trans.get(ModsActivity.this, R.string.mods_copy_result_title),
-                                fe != null ? fe : fpr.report(ModsActivity.this));
+                        stack.replace(Trans.get(ModsActivity.this, R.string.mods_copy_result_title),
+                                fe != null ? fe : fpr.report(ModsActivity.this), closeBtn(stack));
                         rescan();
                     }
                 });
@@ -1388,8 +1388,8 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
 
     /** v25：选中一个插件排序 ⇒ 后台算一遍顺序，缓存下来再重画。 */
     private void pickPluginSort(final PluginViews.View v) {
-        final ProgressDialog pd = ProgressDialog.show(this, null,
-                Trans.get(ModsActivity.this, R.string.mods_filter_plugin_wait), true, false);
+        final CardStack stack = new CardStack(this);
+        stack.replace(Trans.get(this, R.string.mods_filter_plugin_wait), "");
         new Thread(new Runnable() {
             @Override public void run() {
                 final List<String> paths = new ArrayList<>();
@@ -1403,7 +1403,7 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
                 }
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
-                        pd.dismiss();
+                        stack.dismiss();
                         mPluginSortPaths = paths.isEmpty() ? null : paths;
                         mPluginSortKey = paths.isEmpty() ? null : v.key();
                         rebuildList();
@@ -1415,8 +1415,8 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
 
     /** v25：选中一个插件筛选 ⇒ 后台问一遍"这一项算不算"，缓存通过的 path 集合。 */
     private void pickPluginFilter(final PluginViews.View v) {
-        final ProgressDialog pd = ProgressDialog.show(this, null,
-                Trans.get(ModsActivity.this, R.string.mods_filter_plugin_wait), true, false);
+        final CardStack stack = new CardStack(this);
+        stack.replace(Trans.get(this, R.string.mods_filter_plugin_wait), "");
         new Thread(new Runnable() {
             @Override public void run() {
                 java.util.Set<String> ok = null;
@@ -1429,7 +1429,7 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
                 final java.util.Set<String> fok = ok;
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
-                        pd.dismiss();
+                        stack.dismiss();
                         mPluginFilterPaths = fok;
                         mPluginFilterKey = fok == null ? null : v.key();
                         rebuildList();

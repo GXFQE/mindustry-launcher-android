@@ -583,8 +583,12 @@ public final class PluginHost {
             PluginActions.shareText(a, name, text);
         }
 
-        /** v13：一个宿主进度弹窗（同一时刻只有一个）；v15 起可取消。 */
-        private android.app.ProgressDialog card;
+        /**
+         * v13：一个宿主进度卡（同一时刻只有一个）；v15 起可取消；
+         * ★ 第 270 轮：`ProgressDialog` → `CardStack`（同窗换页，插件那条链也不再叠窗）。
+         * ⚠️ 进度数字拼进正文（卡片没有进度条）；取消 = 关掉卡片（返回键/点外面都算）。
+         */
+        private CardStack card;
         private boolean cardCancelable;
         private Cancel cardCancel;
 
@@ -595,26 +599,24 @@ public final class PluginHost {
             a.runOnUiThread(new Runnable() {
                 @Override public void run() {
                     try {
-                        if (card == null) {
-                            card = new android.app.ProgressDialog(a);
-                            card.setProgressStyle(android.app.ProgressDialog.STYLE_HORIZONTAL);
-                            card.setCancelable(cardCancelable);
-                            card.setOnCancelListener(
-                                    new android.content.DialogInterface.OnCancelListener() {
-                                        @Override public void onCancel(
-                                                android.content.DialogInterface d) {
-                                            final Cancel cb = cardCancel;
-                                            card = null;
-                                            if (cb != null) cb.onCancel();
-                                        }
-                                    });
-                            card.setTitle(title);
-                            card.show();
-                        }
-                        card.setMessage(message);
+                        StringBuilder sb = new StringBuilder(message);
                         if (total > 0) {
-                            card.setMax(total);
-                            card.setProgress(Math.max(0, Math.min(done, total)));
+                            sb.append("  ·  ").append(Math.max(0, Math.min(done, total)))
+                                    .append('/').append(total);
+                        }
+                        String text = sb.toString();
+                        if (card == null || !card.isShowing()) {
+                            card = new CardStack(a);
+                            card.replace(title, text);
+                            card.setOnDismiss(new Runnable() {
+                                @Override public void run() {
+                                    final Cancel cb = cardCancel;
+                                    card = null;
+                                    if (cb != null) cb.onCancel();
+                                }
+                            });
+                        } else {
+                            card.updateText(text);
                         }
                     } catch (Throwable ignored) {
                         // 页面在销毁 / 没窗口 ⇒ 不显示而已，别把导出弄挂

@@ -348,9 +348,10 @@ public final class ResourcesActivity extends BaseActivity {
         final Uri uri = data.getData();
         final File apk = mApk;
         final List<String> fnames = names;
-        final ProgressDialog pd = ProgressDialog.show(this,
-                Trans.get(this, R.string.resources_export),
-                Trans.get(this, R.string.resources_exporting), true, false);
+        // ★ 第 270 轮：导出进度与结果都在卡片里
+        final CardStack stack = new CardStack(this);
+        stack.replace(Trans.get(this, R.string.resources_export),
+                Trans.get(this, R.string.resources_exporting));
         new Thread(new Runnable() {
             @Override public void run() {
                 Exporter.Result r = null;
@@ -362,10 +363,8 @@ public final class ResourcesActivity extends BaseActivity {
                                     if (done != total && done % 10 != 0) return;
                                     runOnUiThread(new Runnable() {
                                         @Override public void run() {
-                                            if (pd.isShowing()) {
-                                                pd.setMessage(Trans.get(ResourcesActivity.this,
-                                                        R.string.resources_progress_fmt, done, total));
-                                            }
+                                            stack.updateText(Trans.get(ResourcesActivity.this,
+                                                    R.string.resources_progress_fmt, done, total));
                                         }
                                     });
                                 }
@@ -378,19 +377,21 @@ public final class ResourcesActivity extends BaseActivity {
                 final Throwable fe = err;
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
-                        if (pd.isShowing()) pd.dismiss();
                         mExporting = false;
                         updateSummary();
                         if (isFinishing()) return;
                         if (fe != null || fr == null) {
-                            new AlertDialog.Builder(ResourcesActivity.this)
-                                    .setTitle(R.string.export_failed)
-                                    .setMessage(Util.ioReason(ResourcesActivity.this, fe,
-                                            Trans.get(ResourcesActivity.this, R.string.resources_export_error)))
-                                    .setPositiveButton(R.string.close, null)
-                                    .show();
+                            stack.replace(Trans.get(ResourcesActivity.this, R.string.export_failed),
+                                    Util.ioReason(ResourcesActivity.this, fe,
+                                            Trans.get(ResourcesActivity.this,
+                                                    R.string.resources_export_error)),
+                                    new CardStack.Btn(Trans.get(ResourcesActivity.this, R.string.close),
+                                            new Runnable() {
+                                                @Override public void run() { stack.dismiss(); }
+                                            }));
                             return;
                         }
+                        stack.dismiss();
                         Toast.makeText(ResourcesActivity.this,
                                 Trans.get(ResourcesActivity.this, R.string.resources_export_ok_fmt,
                                         fr.files, Util.formatSize(fr.rawBytes)),

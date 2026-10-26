@@ -700,8 +700,10 @@ public class MapsActivity extends BaseActivity {
      * <p>⚠️ 失败就明说失败，**不许**悄悄退回"保存到文件"（用户勾的是分享）。</p>
      */
     private void exportItemShared(final Maps.Item it) {
-        final ProgressDialog pd = ProgressDialog.show(this, Trans.get(MapsActivity.this, R.string.maps_export),
-                Trans.get(MapsActivity.this, R.string.maps_export_working), true, false);
+        // ★ 第 270 轮：进度 → 分享 都在卡片里
+        final CardStack stack = new CardStack(this);
+        stack.replace(Trans.get(this, R.string.maps_export),
+                Trans.get(this, R.string.maps_export_working));
         new Thread(new Runnable() {
             @Override public void run() {
                 Uri uri = null;
@@ -728,12 +730,13 @@ public class MapsActivity extends BaseActivity {
                 final String fe = err;
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
-                        pd.dismiss();
                         if (Util.dead(MapsActivity.this)) return;
                         if (fe != null) {
-                            alert(Trans.get(MapsActivity.this, R.string.export_failed), fe);
+                            stack.replace(Trans.get(MapsActivity.this, R.string.export_failed), fe,
+                                    closeBtn(stack));
                             return;
                         }
+                        stack.dismiss();          // 交给系统分享面板
                         ShareOut.launch(MapsActivity.this, fu);
                     }
                 });
@@ -793,8 +796,9 @@ public class MapsActivity extends BaseActivity {
      * 把选中的那张图写进 SAF 目标。     * 两条路：本槽（以及目录形态模组）里的是**真文件**；游戏 APK / 模组包里的要**从 zip 条目流式拷**。
      */
     private void exportItem(final Maps.Item it, final Uri uri) {
-        final ProgressDialog pd = ProgressDialog.show(this, Trans.get(MapsActivity.this, R.string.maps_export),
-                Trans.get(MapsActivity.this, R.string.maps_export_working), true, false);
+        final CardStack stack = new CardStack(this);
+        stack.replace(Trans.get(this, R.string.maps_export),
+                Trans.get(this, R.string.maps_export_working));
         new Thread(new Runnable() {
             @Override public void run() {
                 final long n;
@@ -809,19 +813,19 @@ public class MapsActivity extends BaseActivity {
                 } catch (final Throwable t) {
                     runOnUiThread(new Runnable() {
                         @Override public void run() {
-                            pd.dismiss();
                             // 异常消息多半就是我们自己抛的那几句人话（见 Exporter）⇒ `ioReason`
                             // **认识的系统 errno 才翻**、我们的文案原样透传；没有 message 时也不把类名甩给用户
-                            alert(Trans.get(MapsActivity.this, R.string.export_failed),
+                            stack.replace(Trans.get(MapsActivity.this, R.string.export_failed),
                                     Util.ioReason(MapsActivity.this, t,
-                                            Trans.get(MapsActivity.this, R.string.maps_export_nosrc)));
+                                            Trans.get(MapsActivity.this, R.string.maps_export_nosrc)),
+                                    closeBtn(stack));
                         }
                     });
                     return;
                 }
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
-                        pd.dismiss();
+                        stack.dismiss();
                         Toast.makeText(MapsActivity.this,
                                 Trans.get(MapsActivity.this, R.string.map_export_ok_fmt, it.name(),
                                         Util.formatSize(n)), Toast.LENGTH_SHORT).show();
@@ -833,8 +837,15 @@ public class MapsActivity extends BaseActivity {
 
     private void importFile(final Uri uri, final String displayName, final String slot,
                             final boolean overwrite) {
-        final ProgressDialog pd = ProgressDialog.show(this, Trans.get(MapsActivity.this, R.string.maps_import),
-                Trans.get(MapsActivity.this, R.string.maps_scanning), true, false);
+        importFile(null, uri, displayName, slot, overwrite);
+    }
+
+    /** 卡片版（第 270 轮）：进度 → 同名确认 / 命名页 / 结果 全在同一张卡里。 */
+    private void importFile(final CardStack card, final Uri uri, final String displayName,
+                            final String slot, final boolean overwrite) {
+        final CardStack stack = (card != null) ? card : new CardStack(this);
+        stack.replace(Trans.get(this, R.string.maps_import),
+                Trans.get(this, R.string.maps_scanning));
         new Thread(new Runnable() {
             @Override public void run() {
                 final MapFiles.Result r;
@@ -847,15 +858,15 @@ public class MapsActivity extends BaseActivity {
                 } catch (Throwable t) {
                     runOnUiThread(new Runnable() {
                         @Override public void run() {
-                            pd.dismiss();
                             // ★ 2026-10-15：这里原来是 `t.toString()`（全工程最后一处把
                             //   `java.io.FileNotFoundException: /data/user/0/…` 当弹窗正文的地方）
                             //   ⇒ 与同页导出那条一致，走 `Util.ioReason`（认识的 errno 才翻，
                             //   我们的中文原样透传，原文进日志）。
                             android.util.Log.w("MDTLauncher", "map import failed", t);
-                            alert(Trans.get(MapsActivity.this, R.string.maps_import),
+                            stack.replace(Trans.get(MapsActivity.this, R.string.maps_import),
                                     Util.ioReason(MapsActivity.this, t,
-                                            Trans.get(MapsActivity.this, R.string.map_import_read_failed)));
+                                            Trans.get(MapsActivity.this, R.string.map_import_read_failed)),
+                                    closeBtn(stack));
                         }
                     });
                     return;
@@ -869,10 +880,7 @@ public class MapsActivity extends BaseActivity {
                 }
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
-                        pd.dismiss();
-                        // ★ 本分支下面会弹 inline 的同名替换框 ⇒ 发起它的实例若已被转屏销毁，
-                        //   必须停在这里（否则 BadTokenException 闪退，见 {@link Util#dead}）。
-                        //   ⚠️ 成功/失败那两条出口走 alert()/Toast，已由它们各自挡住。
+                        // ★ 下面这些页都属于可能已被转屏销毁的实例 ⇒ 先判死（见 {@link Util#dead}）。
                         if (Util.dead(MapsActivity.this)) return;
                         // ★★ 「这份其实是存档」⇒ 先问名字（2026-10-05，REF §72）。
                         //   判据字段 = r.saveNoName（meta 里没有 `name`，与游戏自己的
@@ -880,10 +888,11 @@ public class MapsActivity extends BaseActivity {
                         //   问完名字再 commitSaveAsMap，**不必重下那份文件**。
                         if (r.saveNoName) {
                             // ⚠️ 最后那个 true = "这是我们自己的待办 `.part`"（取消时可以删它）
-                            showSaveAsMapNameDialog(r.part, r.meta, Msav.baseName(r.base), true);
+                            pushSaveAsMapName(stack, r.part, r.meta, Msav.baseName(r.base), true);
                             return;
                         }
                         if (r.ok) {
+                            stack.dismiss();
                             Toast.makeText(MapsActivity.this,
                                     Trans.get(MapsActivity.this, R.string.map_import_ok_fmt, r.finalName),
                                     Toast.LENGTH_SHORT).show();
@@ -894,22 +903,25 @@ public class MapsActivity extends BaseActivity {
                         //   不许去看 r.error 的字面内容 —— 那是给人看的话，一改措辞/一翻译就判错
                         //   （2026-10-04 i18n P0.1；门禁规则 SRC-01）。
                         if (!overwrite && r.nameTaken) {
-                            new AlertDialog.Builder(MapsActivity.this)
-                                    .setTitle(R.string.map_overwrite_title)
-                                    .setMessage(Trans.get(MapsActivity.this, R.string.map_overwrite_msg_fmt,
-                                            MapFiles.safeName(displayName)))
-                                    .setPositiveButton(R.string.map_overwrite_ok,
-                                            new DialogInterface.OnClickListener() {
-                                                @Override public void onClick(DialogInterface d, int w) {
-                                                    importFile(uri, displayName, slot, true);
+                            // ★ 同一张卡里换成确认页（原来"关进度框 → 开确认框"）
+                            stack.replace(Trans.get(MapsActivity.this, R.string.map_overwrite_title),
+                                    Trans.get(MapsActivity.this, R.string.map_overwrite_msg_fmt,
+                                            MapFiles.safeName(displayName)),
+                                    new CardStack.Btn(Trans.get(MapsActivity.this, R.string.cancel),
+                                            new Runnable() {
+                                                @Override public void run() { stack.dismiss(); }
+                                            }),
+                                    new CardStack.Btn(Trans.get(MapsActivity.this, R.string.map_overwrite_ok),
+                                            new Runnable() {
+                                                @Override public void run() {
+                                                    importFile(stack, uri, displayName, slot, true);
                                                 }
-                                            })
-                                    .setNegativeButton(R.string.cancel, null)
-                                    .show();
+                                            }));
                             return;
                         }
-                        alert(Trans.get(MapsActivity.this, R.string.maps_import),
-                                Trans.get(MapsActivity.this, R.string.map_import_fail_fmt, r.error));
+                        stack.replace(Trans.get(MapsActivity.this, R.string.maps_import),
+                                Trans.get(MapsActivity.this, R.string.map_import_fail_fmt, r.error),
+                                closeBtn(stack));
                     }
                 });
             }
