@@ -16,8 +16,10 @@ import android.widget.TextView;
  *   （{@link Versions#scanAll}）找回 {@link Versions.Entry} —— 不在 intent 里搬一整个 Entry，
  *   否则页面里的状态会和列表里的真值悄悄分叉。
  *
- * <p>★ 动作改完一律 `finish()`：主界面在 `onResume` 里会重新扫描并重画（{@code MainActivity.onResume}
+ * <p>★ 动作改完**默认** `finish()`：主界面在 `onResume` 里会重新扫描并重画（{@code MainActivity.onResume}
  *   → {@code rescan()}），回到列表就能看到结果。页面自己不留一份可能与盘上不一致的缓存。
+ *   **唯一例外 = 命名**（2026-10-26 用户：「命名完后不要回到主页」）：它只改"这一项叫什么"，
+ *   不改变列表的项集合 ⇒ 就地 {@code refresh()}，留在这一页接着改 / 看结果。
  */
 public class VersionActivity extends BaseActivity {
 
@@ -42,6 +44,13 @@ public class VersionActivity extends BaseActivity {
 
         final VersionOps.Done done = new VersionOps.Done() {
             @Override public void changed() { finish(); }
+        };
+        // ★ 命名**不离开这一页**（2026-10-26 用户：「命名完后不要回到主页」）：
+        //   改完就地重画（`refresh()` 会按 (key, 槽) 把这一行重新找回来 ⇒ 标题 / 卡片立刻是新名字），
+        //   用户可以接着改另一项、也能看见结果。别的动作（换槽 / 克隆 / 删除）仍然 `finish()`：
+        //   它们改变的是"列表里有哪些项"，留在这一页只会看到旧状态。
+        final VersionOps.Done renamed = new VersionOps.Done() {
+            @Override public void changed() { refresh(); }
         };
 
         findViewById(R.id.version_card).setOnClickListener(new View.OnClickListener() {
@@ -75,7 +84,7 @@ public class VersionActivity extends BaseActivity {
                 R.string.version_row_rename, R.string.version_row_rename_sub,
                 new Runnable() {
                     @Override public void run() {
-                        if (mEntry != null) VersionOps.promptRename(VersionActivity.this, mEntry, done);
+                        if (mEntry != null) VersionOps.promptRename(VersionActivity.this, mEntry, renamed);
                     }
                 });
         Util.bindAction(findViewById(R.id.root), R.id.row_ver_res, R.drawable.ic_zip,
