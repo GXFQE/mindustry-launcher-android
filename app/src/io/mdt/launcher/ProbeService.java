@@ -29,6 +29,8 @@ public class ProbeService extends Service {
     static final String EXTRA_RUN = "run";
     /** 会话目录名（两边共用）。 */
     static final String EXTRA_SESSION = "session";
+    /** v30：这一局的版本 key（探针按版本分账；拿不到就不放这个 extra）。 */
+    static final String EXTRA_VERSION = "version";
 
     @Override public IBinder onBind(Intent intent) {
         return null;
@@ -38,8 +40,9 @@ public class ProbeService extends Service {
         final int pid = intent == null ? 0 : intent.getIntExtra(EXTRA_PID, 0);
         final boolean run = intent != null && intent.getBooleanExtra(EXTRA_RUN, false);
         final String session = intent == null ? null : intent.getStringExtra(EXTRA_SESSION);
+        final String version = intent == null ? null : intent.getStringExtra(EXTRA_VERSION);
         if (run) {
-            final ProbeRunner runner = ProbeRunner.start(this, pid, false, session);
+            final ProbeRunner runner = ProbeRunner.start(this, pid, false, session, null, version);
             new Thread(new Runnable() {
                 @Override public void run() {
                     // 游戏进程没了就收尾（上限 12 小时，防御性）

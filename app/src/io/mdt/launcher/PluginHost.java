@@ -69,11 +69,18 @@ public final class PluginHost {
      * <p>**v28（2026-10-24 第 234 轮）= 加法**：`baseBundleKeys()` —— 目标版本基础语言包的键集合，
      * 给"两个模组是不是都在改同一句**原版**文案"用（判据在插件，宿主只给事实）。
      *
+     * <p>**v29（2026-10-26 第 254 轮）= 加法**：`Probe.onForeground(boolean)` —— 游戏 activity
+     * 进/出台事件（只对进程内探针）；宿主只报事件，记不记由插件定。
+     *
+     * <p>**v30（2026-10-26 第 255 轮）= 加法**：`ProbeEnv.version()` / `ProbeEnv.dataDir()` ——
+     * 探针知道"这一局是哪个版本"，并能把跨会话的账本写进插件自己的数据目录；
+     * 另加 `playtimeTotal`（plugin.json 声明一个整数文件，宿主把它排版进主界面摘要卡）。
+     *
      * <p>v1~v19 的逐版记录留在 `docs/PLUGIN-API.md` 与 git 历史里；**从 v20 起**：
      * 加法变更只抬 {@link #API}（{@link #API_MIN} 不动，老插件照样装得进），
      * 破坏性变更才抬 {@link #API_MIN}。
      */
-    public static final int API = 29;
+    public static final int API = 30;
     /**
      * 还认的**最老**契约版本。
      *

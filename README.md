@@ -80,6 +80,8 @@ yourself — even just a few lines — see **Translation file** below.
 - A slot is one complete set of data: saves / maps / blueprints / mods / settings
 - Create it from the row; rename / clone / delete live in the **⋮** menu
 - Cloning backs up the source first; a deleted slot takes its backups to the transfer station and can be put back
+- Playtime (**official plug-in `usagestats`**): per-game-version breakdown on the slot page, total on
+  the main summary card (game foreground time only; no plug-in, no line / card)
 
 ### Saves
 - Thumbnails in the list; an unreadable file gets its own row with the reason
@@ -146,7 +148,7 @@ yourself — even just a few lines — see **Translation file** below.
   local-only (scan what is installed, import your own). The game itself is unaffected: multiplayer,
   the server list and in-game downloads work as usual
 - **Plug-in distribution**: install an APK by hand; no store, no downloads, no update checks
-- **Plug-in data**: computed stats and the in-game side are not exposed yet
+- **Plug-in data**: the in-game side is not exposed yet (computed stats can already be shown on host pages — see playtime under Slots)
 
 ## What is not planned
 

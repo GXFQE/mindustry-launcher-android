@@ -5,10 +5,10 @@
 
 ## 1. 版本与兼容（v20 冻结基线）
 
-- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..28**。
+- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..30**。
   （v20 是冻结基线；v21 = 游戏设置面；v22 = 后台任务 + 游戏事件；v23 = 探针；v24 = 分析器；
   v25 = 结论挂行 + 筛选/排序注入 + HJSON；v26 = 逐项判定；v27 = 详情页的门 + 槽级结论进摘要卡；
-  v28 = 原版文案键。）
+  v28 = 原版文案键；v29 = 游戏前后台事件；v30 = 探针知道版本 / 跨会话数据目录 + 摘要卡总时长。）
 - 插件 `api()` 报的是「我需要的最低宿主接口版本」。用不到的新能力**不要**报高 ——
   报高了只会在老宿主上被拒，换不来任何东西。
 - **不要用 try/catch 去兼容老宿主**：报什么版本就只会跑在什么版本上。`api()` 报 20，
@@ -67,7 +67,7 @@
 ## 3. 入口类约定
 
 ```java
-public static int api();                        // 必需：你需要的接口版本（当前 28；用不到新能力就报 20）
+public static int api();                        // 必需：你需要的接口版本（当前 30；用不到新能力就报 20）
 public static View createView(PluginApi api);   // content / section 用
 public static void run(PluginApi api);          // action 用（在原页跑，不换页）
 public static void unload();                    // 可选：收尾（也认 unload(Context)）
@@ -87,7 +87,7 @@ public static void unload();                    // 可选：收尾（也认 unlo
 
 | 方法 | 说明 |
 |---|---|
-| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 28） |
+| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 30） |
 | `context()` | 插件上下文（**只用来取资源 / 主题 / 建 View**） |
 | `page()` / `slot()` | 从哪一页来 / 当前槽名 |
 | `theme()` | 主题色与 dp/sp（别自己写死颜色，见 `PluginTheme`） |
@@ -195,18 +195,48 @@ public interface Probe {
 
 - `inProcess: true` ⇒ 跑在 `:game`（能反射游戏类、拿 Java 堆 / GC / 帧时间；崩了是游戏崩）
 - `inProcess: false` ⇒ 跑在 `:probe` 隔离进程（只能读 `/proc/<游戏 pid>`，崩了不连带游戏）
-- `ProbeEnv`：`dir()`（本会话给这个插件的目录）/ `pid()` / `inProcess()` / `slot()`
-- **数据由插件自己写**（格式自定）；宿主不解析、不聚合、不展示
+- `ProbeEnv`：`dir()`（本会话给这个插件的目录）/ `pid()` / `inProcess()` / `slot()` /
+  **`version()`**（v30：这一局的版本 key）/ **`dataDir()`**（v30：插件自己的数据目录，与
+  `PluginApi.dataDir()` 同一个 —— 要写跨会话账本就写这里）
+- **数据由插件自己写**（格式自定）；宿主不解析账本、不聚合。唯一的展示口是下面那条
+  **显式声明**的 `playtimeTotal`（主界面摘要卡一行）。
 - **v29 新增**：`Probe.onForeground(boolean)` —— 游戏 activity 进/出台时回调（只对 `inProcess`；默认空实现）。
   宿主只报事件，记不记、怎么记由插件自己定（`usagestats` 就是拿它算前台时长）
 - 调度：每 `sec` 秒一次（1..3600，缺省 5）；`sample()` 在后台线程，单次 >200 ms 记失败；
   连续 3 次失败 ⇒ 停用该探针并写 `probe-fail.txt`
-- 目录：`<hub>/usage/telemetry/<会话>/<插件 id>/`
+- 目录：`<hub>/usage/telemetry/<会话>/<插件 id>/`；跨会话的写 `dataDir()`
 - ⚠️ 探针 APK 必须住在**内部存储且只读**（Android 14+ 拒绝加载可写 dex）——宿主按这条存插件
 - `summary()` 只在进程正常收尾时调用（进程被杀不会）
 - ⚠️ **第三方 + `inProcess`**：在插件页启用时会弹一次风险告知（官方 / 纯隔离进程不弹）
 - 崩溃弹窗**和日志页的崩溃报告**都会加一句「本次会话有插件参与：…」（标官方/第三方、进程内/隔离进程）；
   报告页按**这份报告的时间**挑会话（12 小时内才算，昨天的崩溃不贴今天的探针）
+
+#### v30：`ProbeEnv.version()` / `dataDir()`
+
+```java
+env.version();   // 已装 = 包名；导入 = "import:<文件名>"；拿不到 = ""
+env.dataDir();   // <插件>/data（懒创建）
+```
+
+- `version()` 与 `PluginApi.versions()` 里 `ItemInfo.extra["key"]` **同一个值**（唯一来源
+  `Versions.Entry.key()`）⇒ 探针按它分账、页面就能把数字挂到版本行上。
+- `dataDir()` 让探针能写**跨会话**的累计（账本 / 总数）。同一份文件的多方写入由**插件自己**
+  保证原子性：宿主既不知道格式，也不参与合并。
+
+#### v30：`playtimeTotal` —— 主界面摘要卡那一行
+
+`plugin.json` 顶层**显式声明**一个简单文件名：
+
+```json
+"playtimeTotal": "total.txt"
+```
+
+- 宿主读 `<插件>/data/total.txt`，**只认一个整数毫秒总数**（≤ 13 位、0 < ms ≤ 100 年），
+  用它排版主界面摘要卡那行「游玩时长：…」；措辞归宿主（与存档行同一个时长资源）。
+- 文件不存在 / 坏值 / 没声明 ⇒ **整行不显示**（不留「游玩时长：」空壳）。
+- 为什么不给宿主一份账本：这一行在 `MainActivity.rescan()` 的 UI 线程上读，必须 O(1)；
+  账本格式归插件，宿主一解析就会跟插件漂。**多台插件都声明时只认第一台**（没有"加起来"的语义）。
+- 参考实现：`plugins/usagestats/`（探针把账本与 `total.txt` 一起原子写，页面读账本按槽/版本分列）。
 
 ### 分析器（v24）
 
@@ -460,12 +490,14 @@ bash tools/sample-smoke.sh --dev-install
 java.io.File usageDir();   // <hub>/usage/
 ```
 
-**这个目录归插件**：宿主只给目录，**不写任何会话流水、不聚合、不展示**
-（2026-10-26 定案：注入的数据完全由插件自己写；旧的 `launch.tsv` / `run.tsv` 写入已删）。
+**这个目录归插件**：宿主只给目录，**不写任何会话流水、不聚合**；旧实现（v18~v28 期间宿主写的
+`launch.tsv` / `run.tsv`）已删，**现在不再产生**（2026-10-26 定案）。
 
 - 探针自己的样本写 `ProbeEnv.dir()`（`<hub>/usage/telemetry/<会话>/<插件 id>/`，见第 8 节）；
+  跨会话的账本写 `ProbeEnv.dataDir()`（= `<插件>/data`）；
 - `usageDir()` 留给"跨会话、跨插件"的数据，格式插件自定，宿主不解析；
-- ⚠️ 早期版本（v18~v28 期间）宿主写过 `launch.tsv` / `run.tsv`，**现在不再产生** —— 别依赖它们存在。
+- ⚠️ **唯一的例外**是 `plugin.json` 里显式声明的 `playtimeTotal`（v30，见第 8 节）：宿主只读
+  那**一个整数**并排版进主界面摘要卡，不读账本、不按槽/版本算；插件不声明就一行都不出现。
 
 ## 10. 历史
 
@@ -489,6 +521,11 @@ v27（同日第 229 轮 P4；第 232 轮抬版本）：`api/Gate` + 可选 `gate
 `Finding.summary()`（不挂行的槽级结论进摘要卡）；`API_MIN` 仍不动（区间 20..27）。
 v28（同日第 234 轮）：`baseBundleKeys()` —— 目标版本基础语言包的键集合（"两个模组是不是都在改同一句
 原版文案"的事实来源；判据仍在插件）；`API_MIN` 仍不动（区间 20..28）。
+v29（2026-10-26 第 254 轮）：`Probe.onForeground(boolean)` —— 游戏 activity 进/出台事件（只对进程内探针）；
+官方 `usagestats` 插件的时长统计靠它（宿主不写流水）；`API_MIN` 仍不动。
+v30（2026-10-26 第 255 轮）：`ProbeEnv.version()`（这一局的版本 key）+ `ProbeEnv.dataDir()`（跨会话数据目录）+
+`playtimeTotal`（自述里声明一个整数文件，宿主把它排版进主界面摘要卡）—— 游玩时长搬出插件页，
+落到**槽页**（按版本分列）与**主界面摘要卡**（总时长）；`API_MIN` 仍不动（区间 20..30）。
 
 **官方体检插件**：`plugins/mods-health`（第 229 轮，前身叫 `conflict`）。宿主原来的那行
 「查模组冲突」整块删掉，判据搬进插件的 `core/Conflicts.java` 与 `core/Gates.java`；

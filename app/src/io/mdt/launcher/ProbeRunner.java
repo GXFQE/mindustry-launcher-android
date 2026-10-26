@@ -40,17 +40,20 @@ final class ProbeRunner {
     private final int pid;
     private final boolean inProcess;
     private final String slot;
+    private final String version;
     private final List<Job> jobs = new ArrayList<Job>();
     private final ScheduledExecutorService timer = Executors.newSingleThreadScheduledExecutor();
     private final ExecutorService work = Executors.newCachedThreadPool();
     private volatile boolean stopped;
 
-    private ProbeRunner(Context ctx, File sessionDir, int pid, boolean inProcess, String slot) {
+    private ProbeRunner(Context ctx, File sessionDir, int pid, boolean inProcess, String slot,
+                        String version) {
         this.ctx = ctx;
         this.sessionDir = sessionDir;
         this.pid = pid;
         this.inProcess = inProcess;
         this.slot = slot;
+        this.version = version == null ? "" : version;
     }
 
     /**
@@ -59,10 +62,14 @@ final class ProbeRunner {
      * @param pid      要观察的进程（进程内 = 自己；隔离进程 = 游戏进程）
      * @param inProcess true = 住在 `:game`；false = 住在 `:probe`
      * @param session  本会话的目录名（调用方给，通常是 `yyyyMMdd-HHmmss-<槽>`）
+     * @param slot     这一局用的槽（空 ⇒ 当前槽）
+     * @param version  这一局的版本 key（v30；已装 = 包名 / 导入 = `import:<文件名>`，拿不到给空）
      */
-    static ProbeRunner start(Context ctx, int pid, boolean inProcess, String session) {
+    static ProbeRunner start(Context ctx, int pid, boolean inProcess, String session,
+                             String slot, String version) {
         File base = new File(new File(Data.hubDir(ctx), "usage/telemetry"), session);
-        ProbeRunner r = new ProbeRunner(ctx, base, pid, inProcess, Data.currentSlot(ctx));
+        String useSlot = (slot == null || slot.trim().isEmpty()) ? Data.currentSlot(ctx) : slot.trim();
+        ProbeRunner r = new ProbeRunner(ctx, base, pid, inProcess, useSlot, version);
         r.boot();
         return r;
     }
@@ -95,7 +102,10 @@ final class ProbeRunner {
                 if (!dir.isDirectory() && !dir.mkdirs()) {
                     throw new java.io.IOException("mkdirs: " + dir);
                 }
-                p.reset(new ProbeEnv(dir, pid, inProcess, slot));
+                // v30：插件自己的数据目录（`<插件>/data`，与 PluginApi.dataDir 同一个）
+                File home = apk.getParentFile();
+                File dataDir = home == null ? null : new File(home, "data");
+                p.reset(new ProbeEnv(dir, dataDir, pid, inProcess, slot, version));
                 Job j = new Job(s, p);
                 jobs.add(j);
                 timer.scheduleAtFixedRate(new Runnable() {

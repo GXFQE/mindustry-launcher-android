@@ -72,6 +72,8 @@
 
     <!-- 主界面（F1b 卡片化：操作行拆「主标题 + 副标题」；顶部信息改「摘要 + 可展开详情」） -->
     <string name="main_summary_fmt">%1$d versions · current slot %2$s</string>
+    <!-- v30：插件（自述里声明 playtimeTotal 的那台）写的累计前台时长；没有声明 ⇒ 整行不显示 -->
+    <string name="main_playtime_fmt">Playtime: %1$s</string>
     <string name="main_detail_fmt">Save data\n%1$s\n\nManager data\n%2$s</string>
     <string name="act_add_game_title">Add game</string>
     <string name="act_add_game_sub">Import an APK file · Scan installed games</string>

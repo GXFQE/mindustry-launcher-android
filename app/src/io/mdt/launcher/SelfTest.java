@@ -4078,6 +4078,55 @@ public final class SelfTest {
         } catch (Throwable t) {
             ok(stat, L, false, "v28 BaseBundles failed: " + t);
         }
+        // ★ v30：探针知道"这一局是哪个版本"、能写插件自己的数据目录；主界面摘要卡只读一个声明整数
+        ok(stat, L, PluginHost.API >= 30, "host plugin api >= 30 (ProbeEnv.version / dataDir)");
+        try {
+            java.lang.reflect.Method ver = io.mdt.launcher.api.ProbeEnv.class.getMethod("version");
+            java.lang.reflect.Method dd = io.mdt.launcher.api.ProbeEnv.class.getMethod("dataDir");
+            ok(stat, L, ver.getReturnType() == String.class && dd.getReturnType() == File.class,
+                    "★v30：ProbeEnv.version() = String / dataDir() = File");
+        } catch (Throwable t) {
+            ok(stat, L, false, "v30 ProbeEnv missing: " + t);
+        }
+        ok(stat, L, "total.txt".equals(PluginMeta.playtimeTotalFromJson(
+                        "{\"playtimeTotal\":\"total.txt\",\"telemetry\":{\"probes\":[]}}")),
+                "★v30 playtimeTotal 声明：顶层键能读到（嵌套对象不干扰）");
+        ok(stat, L, PluginMeta.playtimeTotalFromJson("{\"playtimeTotal\":\"../x\"}") == null
+                        && PluginMeta.playtimeTotalFromJson("{\"playtimeTotal\":\"a/b\"}") == null
+                        && PluginMeta.playtimeTotalFromJson("{\"playtimeTotal\":\"\"}") == null
+                        && PluginMeta.playtimeTotalFromJson("{\"x\":\"total.txt\"}") == null,
+                "★v30 反向：路径分隔符 / `..` / 空 / 没声明 ⇒ null（宿主不去读任意路径）");
+        ok(stat, L, PluginEntries.parsePlaytimeTotal("3600000") == 3600000L
+                        && PluginEntries.parsePlaytimeTotal(" 42 ") == 42L
+                        && PluginEntries.parsePlaytimeTotal("-5") == -1
+                        && PluginEntries.parsePlaytimeTotal("12x") == -1
+                        && PluginEntries.parsePlaytimeTotal("") == -1
+                        && PluginEntries.parsePlaytimeTotal("0") == -1
+                        && PluginEntries.parsePlaytimeTotal("9999999999999") == -1,
+                "★v30 摘要总毫秒：正整数收、0 / 负数 / 脏字符 / 超 100 年 ⇒ -1");
+        {
+            List<Extensions.Item> secs = Extensions.forSlot(Extensions.parse(
+                    "{\"extensions\":["
+                            + "{\"id\":\"s1\",\"title\":\"游玩时长\",\"entry\":\"E\","
+                            + "\"slot\":\"section\",\"page\":\"slot\"},"
+                            + "{\"id\":\"s2\",\"title\":\"统计\",\"entry\":\"E\","
+                            + "\"slot\":\"section\",\"page\":\"slot\"}]}"), Extensions.SLOT_SECTION);
+            List<PluginEntries.Entry> secRows = new ArrayList<PluginEntries.Entry>();
+            ok(stat, L, secs.size() == 2, "v30 夹具：两条 section 声明");
+            if (secs.size() == 2) {
+                secRows.add(new PluginEntries.Entry("p", "1", "P", secs.get(0)));
+                ok(stat, L, "游玩时长".equals(PluginEntries.sectionHeading(secRows)),
+                        "★v30 单段 section ⇒ 卡片标题用那一段自己的名字");
+                secRows.add(new PluginEntries.Entry("p", "1", "P", secs.get(1)));
+                ok(stat, L, PluginEntries.sectionHeading(secRows) == null
+                                && PluginEntries.sectionHeading(null) == null,
+                        "★v30 多段 / 空 ⇒ 回落到通用「插件」标题");
+            }
+        }
+        ok(stat, L, MsavText.durationText(ctx, 3_600_000L + 12 * 60_000L)
+                        .equals(Trans.get(ctx, R.string.msav_playtime_hm_fmt, 1, 12))
+                        && MsavText.durationText(ctx, 0).isEmpty(),
+                "★v30 时长文案只有一份实现（主界面摘要与存档行同一套资源）");
         List<io.mdt.launcher.api.Finding> dummy =
                 new java.util.ArrayList<io.mdt.launcher.api.Finding>();
         List<Extensions.Item> an = Extensions.parse(

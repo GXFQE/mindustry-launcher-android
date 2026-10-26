@@ -45,6 +45,15 @@ final class PluginMeta {
     static final String K_ENTRY = "entry", K_NAME = "name", K_VERSION = "version",
             K_AUTHOR = "author", K_DESC = "description";
 
+    /**
+     * **v30**：`playtimeTotal` = 一个**简单文件名**（相对插件自己的 `data/`），里面只有一个整数
+     * （毫秒总数）⇒ 宿主把它排版进主界面摘要卡。
+     *
+     * <p>为什么走"声明 + 一个整数"而不是给宿主一份账本：宿主在 UI 线程上读它，必须是 O(1)
+     * （见 {@code docs/DEVELOPING.md} 的性能纪律）；账本的格式归插件，宿主一旦解析就会跟插件漂。
+     */
+    static final String K_PLAYTIME_TOTAL = "playtimeTotal";
+
     /** 清单里认这些 meta-data 名（与 json 的键一一对应）。 */
     static final String M_ENTRY = "io.mdt.plugin.entry", M_NAME = "io.mdt.plugin.name",
             M_VERSION = "io.mdt.plugin.version", M_AUTHOR = "io.mdt.plugin.author",
@@ -102,6 +111,37 @@ final class PluginMeta {
         } catch (Throwable t) {
             return fallback;
         }
+    }
+
+    /**
+     * v30：自述里声明的 `playtimeTotal` 文件名（**纯解析**，不碰文件系统）。
+     *
+     * <p>只收**简单文件名**：不许路径分隔符 / 控制字符 / `.`、`..`，最长 40。别的写法一律当
+     * "没有声明"（宁可少一行数字，也不能让宿主去读任意路径）。
+     */
+    static String playtimeTotalFromJson(String jsonText) {
+        try {
+            Map<String, String> m = flatJson(jsonText);
+            String s = m == null ? null : m.get(K_PLAYTIME_TOTAL);
+            if (s == null) return null;
+            s = s.trim();
+            if (s.length() < 1 || s.length() > 40) return null;
+            if (".".equals(s) || "..".equals(s)) return null;
+            for (int i = 0; i < s.length(); i++) {
+                char c = s.charAt(i);
+                boolean ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                        || (c >= '0' && c <= '9') || c == '.' || c == '_' || c == '-';
+                if (!ok) return null;
+            }
+            return s;
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /** 同一个声明，直接从 APK 的自述里取（几 KB，不装包、不挂资源）。 */
+    static String playtimeTotalOf(File apk) {
+        return playtimeTotalFromJson(zipText(apk, ASSET_JSON));
     }
 
     // ---- 读 zip 里的一个小文件 -------------------------------------------------

@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="us_title">Playtime</string>
-    <string name="us_body_fmt">Total foreground: %1$s\nThis session: %2$s</string>
     <string name="us_hm_fmt">%1$d h %2$d min</string>
     <string name="us_min_fmt">%1$d min</string>
     <string name="us_sec">under a minute</string>
-    <string name="us_none">No records yet — launch the game once.</string>
-    <string name="us_note">Counted by this plugin probe (game in foreground); the host only reports the event.</string>
+    <string name="us_slot_total_fmt">This slot: %1$s</string>
+    <string name="us_total_fmt">Total: %1$s</string>
+    <string name="us_unknown_version">Unknown version</string>
+    <string name="us_note">Game foreground time only; up to 20 s can be lost when the game is killed.</string>
 </resources>

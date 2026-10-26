@@ -105,6 +105,21 @@
                         android:tint="@color/fg_muted" />
                 </LinearLayout>
 
+                <!--
+                  v30：插件声明的「累计游玩」——单独一行（摘要行是 singleLine，往后接一定会被截）。
+                  没有声明 / 没有数据 ⇒ GONE（MainActivity.bindPlaytime）。
+                -->
+                <TextView
+                    android:id="@+id/status_playtime"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingTop="6dp"
+                    android:textSize="12sp"
+                    android:singleLine="true"
+                    android:ellipsize="end"
+                    android:textColor="@color/fg_muted"
+                    android:visibility="gone" />
+
                 <TextView
                     android:id="@+id/status_detail"
                     android:layout_width="match_parent"

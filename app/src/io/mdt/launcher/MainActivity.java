@@ -59,6 +59,8 @@ public class MainActivity extends BaseActivity {
 
     // F1b：顶部状态卡（摘要行 + 可展开的完整路径）与主按钮「继续上次」
     private TextView mStatusSummary;
+    /** v30：插件声明的累计游玩（没有插件声明 / 没有数据 ⇒ 整行 GONE） */
+    private TextView mStatusPlaytime;
     private TextView mStatusDetail;
     private View mBtnContinue;
     private TextView mContinueText;
@@ -471,6 +473,7 @@ public class MainActivity extends BaseActivity {
 
         // 顶部状态卡：整卡可点，展开完整路径 —— 长路径不该一上来就糊满屏
         mStatusSummary = (TextView) root.findViewById(R.id.status_summary);
+        mStatusPlaytime = (TextView) root.findViewById(R.id.status_playtime);
         mStatusDetail = (TextView) root.findViewById(R.id.status_detail);
         Util.bindExpandableCard(root, R.id.status_box, R.id.status_detail, R.id.status_chevron);
 
@@ -576,8 +579,28 @@ public class MainActivity extends BaseActivity {
             mStatusDetail.setText(Trans.get(MainActivity.this, R.string.main_detail_fmt,
                     dataRoot == null ? "?" : dataRoot.getAbsolutePath(),
                     Data.hubDir(this).getAbsolutePath()));
+            bindPlaytime();
         }
         updateContinue();
+    }
+
+    /**
+     * v30：摘要卡第三行「游玩时长」——**只显示插件显式声明的那个数**。
+     *
+     * <p>判据两段：插件在自述里声明 `playtimeTotal`（{@link PluginEntries#playtimeTotalMs}），
+     * 且文件里是一个合理整数；没有 / 坏文件 ⇒ 整行 GONE（不留「游玩时长：」空壳）。
+     * 措辞归宿主（同一个时长资源与存档行一致），插件只给毫秒。
+     */
+    private void bindPlaytime() {
+        if (mStatusPlaytime == null) return;
+        long ms = PluginEntries.playtimeTotalMs(this);
+        String text = ms > 0 ? MsavText.durationText(this, ms) : "";
+        if (text.isEmpty()) {
+            mStatusPlaytime.setVisibility(View.GONE);
+            return;
+        }
+        mStatusPlaytime.setText(Trans.get(this, R.string.main_playtime_fmt, text));
+        mStatusPlaytime.setVisibility(View.VISIBLE);
     }
 
     /**

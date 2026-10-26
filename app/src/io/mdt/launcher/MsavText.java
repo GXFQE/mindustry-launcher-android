@@ -42,8 +42,18 @@ public final class MsavText {
 
     /** 游玩时长文案（毫秒 ⇒ `3 小时 12 分`；<1 分钟说"不到 1 分钟"；无时长 ⇒ 空串） */
     public static String playtimeText(Context c, MsavMeta m) {
-        if (m == null || m.playtime <= 0) return "";
-        long sec = m.playtime / 1000L;
+        return m == null ? "" : durationText(c, m.playtime);
+    }
+
+    /**
+     * **毫秒 ⇒ 人读时长**的唯一实现（`3 小时 12 分` / `12 分钟` / `不到 1 分钟`；≤0 ⇒ 空串）。
+     *
+     * <p>存档行用它，主界面摘要卡里"累计游玩"那一行也用它 —— 同一个数字在界面上两处出现
+     * 必须长得一样（同一个资源键，用户语言包一改就都改）。
+     */
+    public static String durationText(Context c, long ms) {
+        if (ms <= 0) return "";
+        long sec = ms / 1000L;
         long h = sec / 3600L, min = (sec % 3600L) / 60L;
         if (h > 0) return Trans.get(c, R.string.msav_playtime_hm_fmt, h, min);
         if (min > 0) return Trans.get(c, R.string.msav_playtime_min_fmt, min);

@@ -75,8 +75,9 @@ final class ProbeLab {
                 sb.append("telemetry dir = FAIL (mkdirs)\n");
             } else {
                 c.getMethod("reset", io.mdt.launcher.api.ProbeEnv.class).invoke(p,
-                        new io.mdt.launcher.api.ProbeEnv(dir, android.os.Process.myPid(),
-                                true, Data.currentSlot(ctx)));
+                        new io.mdt.launcher.api.ProbeEnv(dir,
+                                new File(Data.hubDir(ctx), "usage/lab-data"),
+                                android.os.Process.myPid(), true, Data.currentSlot(ctx), "lab"));
                 c.getMethod("sample").invoke(p);
                 File out = new File(dir, "probe.tsv");
                 sb.append("probe = OK ").append(c.getName()).append('\n');

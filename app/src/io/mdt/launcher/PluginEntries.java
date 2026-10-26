@@ -21,7 +21,8 @@ import java.util.List;
  *   <li>取**生效中**的插件（{@link Plugins#active}）—— 待重启生效 / 已停用的不出现，
  *       否则用户会看到"停用了还在"；</li>
  *   <li>读每个 APK 的自述（{@link Extensions#of}，**几 KB，不加载插件代码**）⇒ 只要这一页的条目；</li>
- *   <li>四个内容页插到「删除」之前；其余页面插到统一那块「插件」卡里（没有条目整块 GONE）。</li>
+ *   <li>四个内容页插到「删除」之前；其余页面插到统一那块「插件」卡里（没有条目整块 GONE；
+ *       只有一段 section 时卡标题用那一段自己的名字，见 {@link #sectionHeading}）。</li>
  * </ol>
  *
  * <p>★ 只读声明、不加载插件代码：某台插件坏了最多是它那一行不出现，页面照常打开；
@@ -157,6 +158,88 @@ final class PluginEntries {
     }
 
     /**
+     * 卡片标题：**只有一段**时用那一段自己的名字（"游玩时长"），多段 / 没有段才用通用「插件」。
+     *
+     * <p>为什么：`slot: section` 原来一律顶着「插件」，而它的用途一直就是"插件往宿主页面塞一段
+     * 自己的内容"（统计、体检结论）；一段的时候再套一层「插件」只是让人多读一个标签。
+     *
+     * @return null ⇒ 调用方用通用标题
+     */
+    static String sectionHeading(List<Entry> rows) {
+        if (rows == null || rows.size() != 1) return null;
+        String t = rows.get(0).item == null ? null : rows.get(0).item.label();
+        return t == null || t.trim().isEmpty() ? null : t.trim();
+    }
+
+    // ---- v30：主界面摘要卡的「累计游玩」 ---------------------------------------
+
+    /** 100 年（毫秒）—— 脏文件不许把界面写成天文数字。 */
+    static final long MAX_TOTAL_MS = 100L * 365 * 24 * 3600 * 1000;
+
+    /**
+     * 有没有插件声明了 `playtimeTotal`：有就返回它写的**毫秒总数**（只认第一台有声明的），没有 ⇒ -1。
+     *
+     * <p>★ 为什么是"读一个整数"而不是让宿主加载插件来算：这一段在 {@code MainActivity.rescan()}
+     * 里、UI 线程上跑（每次回主界面都跑）⇒ 必须 O(1)。插件代码只在用户点进它的页面时才加载。
+     * ★ 也不读账本：账本格式归插件，宿主只认这一个**显式声明**的整数。
+     */
+    static long playtimeTotalMs(Context ctx) {
+        if (ctx == null) return -1;
+        try {
+            String active = Plugins.active(ctx);
+            for (String id : Plugins.stateIds(active)) {
+                String ver = Plugins.stateGet(active, id);
+                if (ver == null || ver.isEmpty()) continue;
+                File apk = Plugins.apkOf(ctx, id, ver);
+                String name = PluginMeta.playtimeTotalOf(apk);
+                if (name == null) continue;
+                File home = apk == null ? null : apk.getParentFile();
+                if (home == null) continue;
+                long ms = readPlaytimeTotal(new File(new File(home, "data"), name));
+                if (ms > 0) return ms;              // 只认第一台（多台声明也没有加起来的语义）
+            }
+        } catch (Throwable ignored) {
+        }
+        return -1;
+    }
+
+    /** 一个整数毫秒（纯函数）：空 / 负数 / 非数字 / 超过 100 年 ⇒ -1。 */
+    static long parsePlaytimeTotal(String text) {
+        if (text == null) return -1;
+        String s = text.trim();
+        if (s.isEmpty() || s.length() > 13) return -1;
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c < '0' || c > '9') return -1;
+        }
+        try {
+            long v = Long.parseLong(s);
+            return v > 0 && v <= MAX_TOTAL_MS ? v : -1;
+        } catch (Throwable t) {
+            return -1;
+        }
+    }
+
+    /** 读声明文件（≤32 B；坏文件当没有）。 */
+    private static long readPlaytimeTotal(File f) {
+        if (f == null || !f.isFile() || f.length() <= 0 || f.length() > 32) return -1;
+        java.io.FileInputStream in = null;
+        try {
+            in = new java.io.FileInputStream(f);
+            byte[] buf = new byte[32];
+            int n = 0, r;
+            while (n < buf.length && (r = in.read(buf, n, buf.length - n)) > 0) n += r;
+            return parsePlaytimeTotal(new String(buf, 0, n, "UTF-8"));
+        } catch (Throwable t) {
+            return -1;
+        } finally {
+            if (in != null) {
+                try { in.close(); } catch (Throwable ignored) { }
+            }
+        }
+    }
+
+    /**
      * 把插件声明的**段落**画进宿主页里（第 193 轮 v9）。
      *
      * <p>某一份插件坏掉 ⇒ 跳过它、其余照画（页面绝不变白）。没有段落 ⇒ 容器整块 {@code GONE}。
@@ -263,7 +346,8 @@ final class PluginEntries {
         box.removeAllViews();
 
         // ① 段落（section）：插件自己的 View
-        for (Entry e : collectSections(a, page)) {
+        List<Entry> sections = collectSections(a, page);
+        for (Entry e : sections) {
             try {
                 File apk = Plugins.apkOf(a, e.id, e.ver);
                 if (apk == null || !apk.isFile()) continue;
@@ -296,7 +380,14 @@ final class PluginEntries {
             section.setVisibility(View.GONE);
         } else {
             TextView title = (TextView) section.findViewById(R.id.plugin_section_title);
-            if (title != null) title.setText(Trans.get(a, R.string.plugin_section_title));
+            if (title != null) {
+                // 只有"这一卡里除了那一整段什么都没有"时才用段落自己的名字；混了内容行 / 动作行
+                // 就还是通用「插件」（否则卡里明明有两件事，标题却只报一件）
+                String heading = (rows.isEmpty() && acts.isEmpty())
+                        ? sectionHeading(sections) : null;
+                title.setText(heading == null
+                        ? Trans.get(a, R.string.plugin_section_title) : heading);
+            }
             section.setVisibility(View.VISIBLE);
         }
 

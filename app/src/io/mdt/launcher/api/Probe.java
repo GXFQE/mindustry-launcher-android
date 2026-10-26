@@ -16,7 +16,10 @@ package io.mdt.launcher.api;
  * `inProcess=false` ⇒ 住在 `:probe` 隔离进程（只能读 `/proc/<游戏 pid>`，风险低）。
  *
  * <p>**数据由插件自己写**：{@link #reset(ProbeEnv)} 给的 {@link ProbeEnv#dir()} 是本会话的
- * 插件专属目录；宿主不解析文件、不聚合、不展示。宿主只负责调度、异常/超时隔离与失败停用。
+ * 插件专属目录，{@link ProbeEnv#dataDir()} 才是**跨会话**的插件数据目录（v30）；宿主不解析
+ * 插件的账本、不聚合、不替插件算。唯一的展示口是插件在自述里**显式声明**的
+ * {@code playtimeTotal} 那一个整数（主界面摘要卡，见 {@code docs/PLUGIN-API.md}）。
+ * 宿主只负责调度、异常/超时隔离与失败停用。
  *
  * <p>约定：
  * <ul>

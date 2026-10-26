@@ -69,6 +69,21 @@
                     android:textSize="12sp" />
             </LinearLayout>
 
+            <!--
+              v30：插件段落区挪到**信息卡下面**（原来在整页最底部）。
+              理由：`slot: section` 塞的是"这个槽的事实"（游玩时长 / 统计），属于信息卡那一类；
+              底部那块是"动作"的位置，事实放那里要滚到底才看得见。
+              本页父容器没有横向 padding ⇒ 自己留 14dp。
+            -->
+            <include
+                layout="@layout/plugin_section"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="14dp"
+                android:layout_marginEnd="14dp"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="8dp" />
+
             <!-- 四段入口 -->
             <LinearLayout
                 android:layout_width="match_parent"
@@ -119,16 +134,6 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
             </LinearLayout>
-
-            <!-- 第 160 轮：插件动作区（没有条目整块 GONE）；本页父容器没有横向 padding ⇒ 自己留 14dp -->
-            <include
-                layout="@layout/plugin_section"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="14dp"
-                android:layout_marginEnd="14dp"
-                android:layout_marginTop="8dp"
-                android:layout_marginBottom="8dp" />
         </LinearLayout>
     </ScrollView>
 </LinearLayout>

@@ -57,6 +57,8 @@
 
     <!-- 主界面（F1b 卡片化：操作行拆「主标题 + 副标题」；顶部信息改「摘要 + 可展开详情」） -->
     <string name="main_summary_fmt">%1$d 个版本 · 当前槽 %2$s</string>
+    <!-- v30：插件（自述里声明 playtimeTotal 的那台）写的累计前台时长；没有声明 ⇒ 整行不显示 -->
+    <string name="main_playtime_fmt">游玩时长：%1$s</string>
     <string name="main_detail_fmt">存档数据\n%1$s\n\n管理器数据\n%2$s</string>
     <string name="act_add_game_title">添加游戏</string>
     <string name="act_add_game_sub">导入 APK 文件 · 扫描已安装的游戏</string>

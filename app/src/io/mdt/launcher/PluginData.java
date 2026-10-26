@@ -253,6 +253,9 @@ final class PluginData {
             put(ex, "pkg", e.pkg);
             put(ex, "realPkg", e.realPkg);
             put(ex, "versionName", e.versionName);
+            // v30：版本 key（已装 = 包名 / 导入 = import:文件名）—— 与 ProbeEnv.version() 同一个值，
+            //       插件按它把探针记的数字挂到版本上。
+            put(ex, "key", e.key());
             put(ex, "displayVersion", e.displayVersion());
             put(ex, "imported", String.valueOf(e.imported));
             put(ex, "importFile", e.importFile);
