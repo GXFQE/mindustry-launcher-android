@@ -90,7 +90,7 @@ public final class ProbeEnv {
      * imported       "true" / "false"
      * importFile     导入文件名（已装 = 缺键或空串）
      * md5            导入包的 md5（已装通常为空）
-     * customName     用户自定义名（没改过 = 缺键或空串）
+     * customName     用户给**这一项**（启动项）起的名字（没改过 = 缺键或空串）
      * slot           这一局的槽
      * </pre>
      *

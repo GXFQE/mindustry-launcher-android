@@ -433,9 +433,13 @@ public final class Versions {
         public String md5 = "";
 
         /**
-         * ★ 用户给这个版本起的名字（2026-10-16 用户：「加个允许给自己导入的游戏命名」）。
-         * 空串 = 没起名 ⇒ 显示时回落到 APK 自己的 {@link #label}。
-         * 存哪：{@link Config#nameOf(String)}（key 与"版本 → 槽"分配**同一套**）。
+         * ★ 用户给**这一项（启动项）**起的名字（2026-10-16 用户：「加个允许给自己导入的游戏命名」；
+         *   2026-10-26 用户：「让游戏命名跟随实例而不是跟随文件」⇒ 从"按版本"改成"按项"）。
+         * 空串 = 这一项没起名 ⇒ 显示时回落到 APK 自己的 {@link #label}。
+         * 存哪：{@link Config#rowNameOf}（主项 / 附加项的存法不同，那里是唯一入口）。
+         *
+         * <p>⚠️ 一个版本的两项**各叫各的**：附加行的名字来自**它自己那一项**（按它绑的槽存），
+         *   不是照抄主行的。别在别处写 `e.customName = 主行的名字` —— 那正好是这次要去掉的旧行为。
          */
         public String customName = "";
 
@@ -743,11 +747,29 @@ public final class Versions {
     public static List<Entry> scanAll(Context ctx) {
         List<Entry> bases = new ArrayList<>(scanInstalled(ctx));
         bases.addAll(scanImported(ctx));
-        return expandBindings(bases, new ExtraLookup() {
+        List<Entry> rows = expandBindings(bases, new ExtraLookup() {
             @Override public List<String> extraSlotsOf(String key) {
                 return Config.get().extraSlotsOf(key);
             }
         });
+        // ★ 名字按**这一项**取（主项 / 附加项的存法不同，见 `Config.rowNameOf`）——
+        //   整个工程只有这一处把 config 的名字映射到行上。放在展开之后：
+        //   附加行这时才知道自己绑的是哪个槽（= 名字的 key）。
+        fillRowNames(rows);
+        return rows;
+    }
+
+    /**
+     * 把"这一项叫什么"填进行上 —— {@link #scanAll} 里唯一的那一步，抽出来只为让自检能钉住它
+     * （扫描要真机装了游戏才跑得起来，而"附加行拿到的是**自己**的名字、不是主行那份"正是本段的判据）。
+     *
+     * <p>⚠️ `expandBindings` 之后才调：附加行必须先用 {@code slotFor} 定下槽，名字的 key 才是它自己的。
+     */
+    static void fillRowNames(List<Entry> rows) {
+        if (rows == null) return;
+        for (Entry e : rows) {
+            if (e != null) e.customName = Config.get().rowNameOf(e.key(), e.boundSlot);
+        }
     }
 
     /**
@@ -768,6 +790,9 @@ public final class Versions {
      *
      * <p>⚠️ 附加行与主槽相同的槽会被跳过（不展开）—— 界面上不该出现两行**一模一样**的启动项。
      *   正常情况下 Config 那一层已经挡住了，这里是第二道：config.json 可能被手改 / 也可能来自旧版本。
+     *
+     * <p>⚠️ 本方法**不碰名字**（2026-10-26 起）：「这一项叫什么」要等展开之后才知道附加行绑的是哪个槽，
+     *   由 {@link #scanAll} 统一填 `Entry#customName`。直接调本方法的（只有自检）拿到的名字都是空串。
      */
     public static List<Entry> expandBindings(List<Entry> bases, ExtraLookup extras) {
         List<Entry> out = new ArrayList<>();
@@ -808,7 +833,8 @@ public final class Versions {
         e.imported = b.imported;
         e.importFile = b.importFile;
         e.md5 = b.md5;
-        e.customName = b.customName;
+        // ⚠️ **不抄名字**（2026-10-26）：附加项与主项各叫各的，名字由 `scanAll` 在展开之后
+        //   按"这一项"取（见 `Config.rowNameOf`）。以前这里抄一份 ⇒ 给第二项改名会把第一项也改掉。
         e.realPkg = b.realPkg;
         e.upstreamVersion = b.upstreamVersion;
         e.upstreamChecked = b.upstreamChecked;
@@ -866,7 +892,6 @@ public final class Versions {
                 e.versionName = pi.versionName == null ? "?" : pi.versionName;
                 e.apkPath = ai.sourceDir;
                 e.apkSize = new File(ai.sourceDir).length();
-                e.customName = Config.get().nameOf(e.key());
                 out.add(e);
             } catch (PackageManager.NameNotFoundException nn) {
                 // 未安装：跳过
@@ -896,7 +921,6 @@ public final class Versions {
             e.apkSize = f.length();
             e.md5 = o.optString("md5", "");
             e.realPkg = o.optString("pkg", "");   // 导入时若记过真包名就直接用（老记录没有 ⇒ 扫描时补读）
-            e.customName = Config.get().nameOf(e.key());
             out.add(e);
         }
         return out;

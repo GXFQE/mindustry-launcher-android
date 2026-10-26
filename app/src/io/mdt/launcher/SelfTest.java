@@ -2444,6 +2444,8 @@ public final class SelfTest {
             // 用一个**自建的**槽：别的用例会删掉 m3-share，而默认槽又会被判成"已经是主槽"
             Data.createSlot(ctx, TRASH_SLOT);
             cfg.addExtraSlot(TRASH_KEY, TRASH_SLOT);
+            // ★ 附加项也有自己的名字（2026-10-26 起名字按项存）—— 一起进站、一起回来
+            cfg.setRowNameOf(TRASH_KEY, TRASH_SLOT, "自检附加项");
 
             Versions.Entry e = new Versions.Entry();
             e.imported = true;
@@ -2458,8 +2460,9 @@ public final class SelfTest {
             ok(stat, L, r != null && r.ok && !apk.exists(), "删整个版本 ⇒ 副本离开 import 目录");
             ok(stat, L, cfg.importEntry(TRASH_FILE) == null, "登记已清（备份在中转站里）");
             ok(stat, L, !cfg.extraSlotsOf(TRASH_KEY).contains(TRASH_SLOT)
-                            && cfg.nameOf(TRASH_KEY).isEmpty(),
-                    "名字与槽绑定也清了");
+                            && cfg.nameOf(TRASH_KEY).isEmpty()
+                            && cfg.rowNameOf(TRASH_KEY, TRASH_SLOT).isEmpty(),
+                    "名字（主项与附加项）与槽绑定都清了");
 
             for (Trash.Item it : Trash.list(trashDir)) {
                 if (TRASH_FILE.equals(it.name)) { trashed = it.path; break; }
@@ -2476,6 +2479,8 @@ public final class SelfTest {
             ok(stat, L, rr != null && rr.ok && apk.isFile(), "放回来 ⇒ 副本回到 import 目录");
             ok(stat, L, cfg.importEntry(TRASH_FILE) != null, "登记重建（列表里又能看到它）");
             ok(stat, L, "自检版本".equals(cfg.nameOf(TRASH_KEY)), "★ 名字一起回来");
+            ok(stat, L, "自检附加项".equals(cfg.rowNameOf(TRASH_KEY, TRASH_SLOT)),
+                    "★ 附加项的名字也各回各的（不串到主项）");
             ok(stat, L, cfg.extraSlotsOf(TRASH_KEY).contains(TRASH_SLOT), "★ 槽绑定一起回来");
             ok(stat, L, !trashed.exists(), "中转站里那份已收掉（不是复制品）");
 
@@ -2591,7 +2596,6 @@ public final class SelfTest {
             base.apkPath = "/nonexistent/selftest.apk";
             base.apkSize = 1234;
             base.md5 = "deadbeef";
-            base.customName = "我给的名字";
             cfg.setSlotOf(base.key(), BIND_A);
             final java.util.Map<String, List<String>> fake = new java.util.HashMap<>();
             List<String> ex = new ArrayList<>();
@@ -2617,9 +2621,21 @@ public final class SelfTest {
                             && base.versionName.equals(extra.versionName)
                             && base.apkPath.equals(extra.apkPath)
                             && base.apkSize == extra.apkSize
-                            && base.md5.equals(extra.md5)
-                            && base.customName.equals(extra.customName),
+                            && base.md5.equals(extra.md5),
                     "★ 附加行**照抄**主行的包信息 ⇒ 同一份 APK（零额外空间，也不复制存档）");
+            // ★★ 名字**不抄**（2026-10-26）——「让游戏命名跟随实例而不是跟随文件」：
+            //   展开这一步只认绑定，名字由 `Versions.fillRowNames` 按"这一项"填。
+            ok(stat, L, extra != null && extra.customName.isEmpty(),
+                    "★ 附加行的名字**不是**照抄主行的（展开阶段还没有名字）");
+            cfg.setRowNameOf(base.key(), null, "主行名");
+            cfg.setRowNameOf(base.key(), BIND_B, "附加行名");
+            Versions.fillRowNames(rows);
+            ok(stat, L, "主行名".equals(rows.get(0).customName)
+                            && extra != null && "附加行名".equals(extra.customName),
+                    "★ 名字按项填（主项 / 附加项各是各的）：" + rows.get(0).customName + " / "
+                            + (extra == null ? "?" : extra.customName));
+            ok(stat, L, extra != null && !extra.customName.equals(rows.get(0).customName),
+                    "★元断言：两项的名字**真的能不同**（证明不是共用一个）");
             ok(stat, L, extra != null && !Versions.rowKey(base).equals(Versions.rowKey(extra)),
                     "★ 行身份 (版本,槽) 两行不同（同槽冲突表就靠它）");
             ok(stat, L, Versions.explicitSlot(extra) && Versions.explicitSlot(base),
@@ -2913,6 +2929,129 @@ public final class SelfTest {
         Config.get().removeImport("selftest-fake.apk");
         ok(stat, L, "".equals(Config.get().nameOf("import:selftest-fake.apk")),
                 "★删掉导入副本后，它的名字也被清掉（同槽分配那条口径）");
+
+        // ★★ 2026-10-26 用户：「让游戏命名跟随实例而不是跟随文件」
+        //    ⇒ 名字跟着**启动项**走：同一版本的两项可以各叫各的；换槽 / 槽改名时名字跟着那一项；
+        //      删行 / 删槽 / 删版本时名字一起消失；主项被删时**提上来的那一项带自己的名字上来**。
+        //    ⚠️ 全程用假 key（`selftest:` / `m3-name-*`），最后清干净，绝不碰用户真实的命名。
+        final String NAME_KEY = "selftest:rowname";
+        final String NAME_A = "m3-name-a";
+        final String NAME_B = "m3-name-b";
+        final String NAME_C = "m3-name-c";
+        final String NAME_UP = "m3-name-up";
+        final String NAME_P = "m3-name-p";
+        try {
+            Config c = Config.get();
+            c.clearBindings(NAME_KEY);
+            ok(stat, L, c.rowNameOf(NAME_KEY, null).isEmpty() && c.rowNameOf(NAME_KEY, NAME_A).isEmpty(),
+                    "起始：主项与附加项都没有名字");
+            c.setRowNameOf(NAME_KEY, null, "主项名");
+            c.setRowNameOf(NAME_KEY, NAME_A, "存档A");
+            c.setRowNameOf(NAME_KEY, NAME_B, "存档B");
+            ok(stat, L, "主项名".equals(c.rowNameOf(NAME_KEY, null))
+                            && "存档A".equals(c.rowNameOf(NAME_KEY, NAME_A))
+                            && "存档B".equals(c.rowNameOf(NAME_KEY, NAME_B)),
+                    "★ 三项各叫各的（主项 / 两个附加项）");
+            // ★ 元断言：附加项**不会**回落到主项的名字（否则就是旧的"共用一个名字"）
+            c.setRowNameOf(NAME_KEY, NAME_C, "");
+            ok(stat, L, c.rowNameOf(NAME_KEY, NAME_C).isEmpty(),
+                    "★元断言：没起名的附加项是空串，**不继承**主项的名字");
+            // ★ 元断言：附加项的名字**不进**主项那一格（两套存储位是分开的）
+            c.setRowNameOf("selftest:rowname2", NAME_A, "只有附加项");
+            ok(stat, L, c.nameOf("selftest:rowname2").isEmpty()
+                            && "只有附加项".equals(c.rowNameOf("selftest:rowname2", NAME_A)),
+                    "★元断言：附加项的名字写进 `version_row_names`，主项那一格（`version_names`）仍是空的");
+            c.clearBindings("selftest:rowname2");
+
+            // ① 换槽：名字跟着这一项走（附加项按槽存 ⇒ 必须搬）
+            c.addExtraSlot(NAME_KEY, NAME_A);
+            c.addExtraSlot(NAME_KEY, NAME_B);
+            ok(stat, L, c.replaceSlotBinding(NAME_KEY, NAME_A, NAME_C) == Config.BIND_OK
+                            && "存档A".equals(c.rowNameOf(NAME_KEY, NAME_C))
+                            && c.rowNameOf(NAME_KEY, NAME_A).isEmpty(),
+                    "★ 换槽 ⇒ 名字跟着这一项搬到新槽（旧槽上不留影子）");
+            // 主项换槽：名字按版本 key 存 ⇒ 一个字都不动
+            c.setSlotOf(NAME_KEY, NAME_P);
+            ok(stat, L, "主项名".equals(c.rowNameOf(NAME_KEY, null)),
+                    "★ 主项换槽 ⇒ 名字不受影响（它不按槽存）");
+
+            // ② 槽改名 / 删槽
+            Config.Retarget rt = c.retargetSlots(NAME_C, NAME_C + "x");
+            ok(stat, L, rt.extras == 1 && "存档A".equals(c.rowNameOf(NAME_KEY, NAME_C + "x")),
+                    "★ 槽改名 ⇒ 那一项的名字跟过去");
+            Config.Retarget rd = c.retargetSlots(NAME_C + "x", "");
+            ok(stat, L, rd.extras == 1 && c.rowNameOf(NAME_KEY, NAME_C + "x").isEmpty(),
+                    "★ 槽被删 ⇒ 那一项的名字一起消失（不留给别的项）");
+
+            // ③ 删附加项：只清它自己的名字
+            ok(stat, L, c.removeBinding(NAME_KEY, NAME_B) && c.rowNameOf(NAME_KEY, NAME_B).isEmpty(),
+                    "★ 删掉一个附加项 ⇒ 它的名字也没了");
+            ok(stat, L, "主项名".equals(c.rowNameOf(NAME_KEY, null)),
+                    "★元断言：删附加项**不动**主项的名字");
+
+            // ④ 主项被删 ⇒ 提上来的那一项带**自己的**名字上来（旧主项的名字随旧主项消失）
+            c.addExtraSlot(NAME_KEY, NAME_UP);
+            c.setRowNameOf(NAME_KEY, NAME_UP, "提升项");
+            ok(stat, L, c.removeBinding(NAME_KEY, NAME_P),
+                    "删掉主项（槽 " + NAME_P + "）");
+            ok(stat, L, NAME_UP.equals(c.slotOf(NAME_KEY)) && "提升项".equals(c.rowNameOf(NAME_KEY, null)),
+                    "★ 主项被删 ⇒ 提上来的那一项**带自己的名字**上来（实得「"
+                            + c.rowNameOf(NAME_KEY, null) + "」）");
+            ok(stat, L, !"主项名".equals(c.rowNameOf(NAME_KEY, null)),
+                    "★元断言：旧主项的名字没有白送给新主项（名字是「这一项」的，不是「这个版本」的）");
+            ok(stat, L, c.rowNameOf(NAME_KEY, NAME_UP).isEmpty(),
+                    "★ 它已经不在附加表里了 ⇒ 附加那一格不留影子");
+
+            // ⑤ 删版本 / 删导入副本 ⇒ 全部项的名字一起清
+            c.addExtraSlot(NAME_KEY, NAME_A);
+            c.setRowNameOf(NAME_KEY, NAME_A, "x");
+            c.clearBindings(NAME_KEY);
+            ok(stat, L, c.rowNameOf(NAME_KEY, null).isEmpty()
+                            && c.rowNameOf(NAME_KEY, NAME_A).isEmpty()
+                            && c.rowNameOf(NAME_KEY, NAME_UP).isEmpty(),
+                    "★ 删版本 ⇒ 主项与附加项的名字全清（不留悬空引用）");
+
+            // ⑥ 落盘往返：名字真的在 config.json 里（reload 之后还在）
+            c.setRowNameOf(NAME_KEY, null, "主项名");
+            c.addExtraSlot(NAME_KEY, NAME_A);
+            c.setRowNameOf(NAME_KEY, NAME_A, "存档A");
+            c.reload(ctx);
+            ok(stat, L, "主项名".equals(c.rowNameOf(NAME_KEY, null))
+                            && "存档A".equals(c.rowNameOf(NAME_KEY, NAME_A)),
+                    "★ 落盘往返：reload 之后两项的名字都还在");
+
+            // ⑦ 第 1→2 代迁移（名字从"按版本"改成"按项"）：老名字**抄给每一行**，且幂等
+            final String MIG_KEY = "selftest:rownames-migrate";
+            try {
+                c.clearBindings(MIG_KEY);
+                c.setNameOf(MIG_KEY, "老名字");
+                c.addExtraSlot(MIG_KEY, NAME_A);
+                c.addExtraSlot(MIG_KEY, NAME_B);
+                c.migrateRowNames();
+                ok(stat, L, "老名字".equals(c.rowNameOf(MIG_KEY, NAME_A))
+                                && "老名字".equals(c.rowNameOf(MIG_KEY, NAME_B)),
+                        "★ 迁移：老名字抄给这个版本的每一行（升级后不会像「名字丢了」）");
+                c.setRowNameOf(MIG_KEY, NAME_A, "改过的");
+                c.migrateRowNames();
+                ok(stat, L, "改过的".equals(c.rowNameOf(MIG_KEY, NAME_A))
+                                && "老名字".equals(c.rowNameOf(MIG_KEY, NAME_B)),
+                        "★ 迁移幂等：不覆盖用户已经改过的名字");
+                c.clearBindings(MIG_KEY);
+                ok(stat, L, c.rowNameOf(MIG_KEY, NAME_A).isEmpty()
+                                && c.rowNameOf(MIG_KEY, null).isEmpty(),
+                        "★ 迁移抄出来的名字也是行状态：删版本时一起清");
+            } finally {
+                Config.get().clearBindings(MIG_KEY);
+            }
+        } catch (Throwable t) {
+            ok(stat, L, false, "按项命名用例异常：" + t);
+        } finally {
+            try {
+                Config.get().clearBindings(NAME_KEY);
+                Config.get().clearBindings("selftest:rowname2");
+            } catch (Throwable ignored) {
+            }
+        }
         // ⑪ 列表行实拼：基座版本**保留**、只去掉「基于」两个字（2026-10-25 用户：
         //    「是把基于两个字去掉不是都去掉」）⇒ 行里是 `… 2026.09.X37（160.1）`。
         String withBase = installed.displayName(ctx)

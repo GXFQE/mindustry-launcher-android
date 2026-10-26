@@ -229,7 +229,18 @@ public final class Importer {
         writeJson(new File(dir, V_ENTRY), Config.get().importEntry(e.importFile));
         org.json.JSONObject state = new org.json.JSONObject();
         try {
-            state.put("name", Config.get().nameOf(key));
+            // ★ 名字按**项**存（2026-10-26：「让游戏命名跟随实例而不是跟随文件」）：
+            //   主项用空键，附加项用它绑的槽名 —— 所以放回来时每一项的名字都回它自己那一项。
+            org.json.JSONObject names = new org.json.JSONObject();
+            String primaryName = Config.get().rowNameOf(key, null);
+            if (!primaryName.isEmpty()) names.put("", primaryName);
+            for (String s : Config.get().extraSlotsOf(key)) {
+                String n = Config.get().rowNameOf(key, s);
+                if (!n.isEmpty()) names.put(s, n);
+            }
+            state.put("names", names);
+            // ⚠️ 同时留一份老格式（单个 name）：只认识一个名字的老版本读到它时不会"名字丢了"。
+            state.put("name", primaryName);
             state.put("slot", Config.get().slotOf(key));
             org.json.JSONArray ex = new org.json.JSONArray();
             for (String s : Config.get().extraSlotsOf(key)) ex.put(s);
@@ -275,8 +286,24 @@ public final class Importer {
         String key = "import:" + file;
         org.json.JSONObject state = readJson(new File(dir, V_STATE));
         if (state != null) {
-            String name = state.optString("name", "");
-            if (!name.isEmpty()) Config.get().setNameOf(key, name);
+            // ★ 名字按项还原（2026-10-26）：`names` = { "" 主项, "<槽>" 附加项 }；
+            //   站里还可能有**老格式**（只有单个 `name`）⇒ 那份算主项的名字，别假装没有。
+            org.json.JSONObject names = state.optJSONObject("names");
+            if (names != null) {
+                String pn = names.optString("", "");
+                if (!pn.isEmpty()) Config.get().setRowNameOf(key, null, pn);
+                java.util.Iterator<String> nit = names.keys();
+                while (nit.hasNext()) {
+                    String s = nit.next();
+                    if (s.isEmpty()) continue;
+                    String n = names.optString(s, "");
+                    // 槽已经没了 ⇒ 那一项也回不来，名字别落进一个不存在的项
+                    if (!n.isEmpty() && slotExists(ctx, s)) Config.get().setRowNameOf(key, s, n);
+                }
+            } else {
+                String name = state.optString("name", "");
+                if (!name.isEmpty()) Config.get().setRowNameOf(key, null, name);
+            }
             String slot = state.optString("slot", "");
             if (slotExists(ctx, slot)) Config.get().setSlotOf(key, slot);
             org.json.JSONArray ex = state.optJSONArray("extras");

@@ -187,7 +187,7 @@
     <string name="version_row_detail">Details…</string>
     <string name="version_row_detail_sub">Source, size, checksum, ABI</string>
     <string name="version_row_rename">Name…</string>
-    <string name="version_row_rename_sub">Give this version your own name</string>
+    <string name="version_row_rename_sub">Give this launch entry your own name</string>
     <string name="version_row_res">Resources…</string>
     <string name="version_row_res_sub">Export sprites, sounds, maps from the package</string>
     <string name="version_row_delete">Delete this entry…</string>
@@ -2079,8 +2079,8 @@
     <string name="save">Save</string>
     <string name="version_type_official">Vanilla</string>
     <string name="version_type_modded">Modded</string>
-    <string name="version_name_title">Name this version</string>
-    <string name="version_name_msg">Only changes the name shown in the manager (list row, here, and Continue). The APK itself is untouched. Leave empty to restore the original name.</string>
+    <string name="version_name_title">Name this launch entry</string>
+    <string name="version_name_msg">Only renames this launch entry (its list row, this page, and Continue). Other entries of the same version keep their own names, and the APK itself is untouched. Leave empty to restore the original name.</string>
     <string name="version_name_reset">Restore original</string>
     <string name="version_name_saved_fmt">Named it \"%1$s\"</string>
     <string name="version_name_reset_done">Original name restored</string>

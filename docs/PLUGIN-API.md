@@ -240,7 +240,7 @@ info.get("realPkg");         // 导入包的真实包名
 info.get("imported");        // "true" / "false"
 info.get("importFile");      // 导入文件名
 info.get("md5");             // 导入包 md5（已装通常为空）
-info.get("customName");      // 用户自定义名（没改过 = 空）
+info.get("customName");      // 用户给**这一项**（启动项）起的名字（没改过 = 空）
 info.get("slot");            // 这一局的槽
 ```
 

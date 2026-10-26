@@ -238,11 +238,14 @@ final class VersionOps {
     // ── 命名 ──────────────────────────────────────────────────────────────
 
     /**
-     * 给这个版本起名。落点只有一处：`Config.setNameOf(key, 名字)` —— 名字进列表行标题、
-     * 版本页标题；**不动 APK 本身**。留空 / 点「恢复原名」都等于清除。
+     * 给**这一项**（启动项）起名。落点只有一处：`Config.setRowNameOf(这一项的 key, 它绑的槽, 名字)`
+     * —— 名字进列表行标题、版本页标题；**不动 APK 本身**。留空 / 点「恢复原名」都等于清除。
      *
      * <p>★ 2026-10-25 起**已装版本也能命名**（用户：「其他功能完全同步（不管来源）」）——
      *   改的只是我们的显示名，系统里那个包一个字都不动。
+     * <p>★★ 2026-10-26 用户：「让游戏命名跟随实例而不是跟随文件」⇒ 名字跟着**这一项**走：
+     *   同一个版本的另一项（另一个槽）一个字不变。所以 `boundSlot` 必须原样传下去 ——
+     *   主项的名字按版本 key 存（它的槽会变），附加项按它绑的槽存，规则在 `Config.rowNameOf` 里。
      */
     static void promptRename(final Activity a, final Versions.Entry e, final Done done) {
         final EditText input = new EditText(a);
@@ -276,7 +279,7 @@ final class VersionOps {
 
     private static void applyName(Activity a, Versions.Entry e, String name, Done done) {
         boolean clear = name == null || name.trim().isEmpty();
-        Config.get().setNameOf(e.key(), clear ? "" : name.trim());
+        Config.get().setRowNameOf(e.key(), e.boundSlot, clear ? "" : name.trim());
         Toast.makeText(a, clear ? a.getString(R.string.version_name_reset_done)
                         : Trans.get(a, R.string.version_name_saved_fmt, name.trim()),
                 Toast.LENGTH_SHORT).show();

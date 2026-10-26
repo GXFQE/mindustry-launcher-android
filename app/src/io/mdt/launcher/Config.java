@@ -29,8 +29,15 @@ import java.util.List;
 public final class Config {
     private static final String TAG = "MDTLauncher";
 
-    /** 当前配置格式代际。改结构时 +1 并在 load() 里挂迁移。 */
-    public static final int CONFIG_VERSION = 1;
+    /**
+     * 当前配置格式代际。改结构时 +1 并在 load() 里挂迁移。
+     * <ul>
+     *   <li>第 1 代：M3 的槽分配（`version_slots`）；</li>
+     *   <li>第 2 代（2026-10-26）：名字从"按版本"改成"按项"（{@link #K_VROWNAMES}）——
+     *       迁移见 {@link #migrateRowNames()}：老名字**抄给每一行**，别让用户升级后少一个名字。</li>
+     * </ul>
+     */
+    public static final int CONFIG_VERSION = 2;
 
     /** 内置已知包名白名单（枚举被系统限制只返回自己，只能按精确包名查） */
     static final String[] BUILTIN_PACKAGES = {
@@ -55,8 +62,35 @@ public final class Config {
      *   别在别处直接碰这两个键 —— 两处各写一遍必漂，而症状只会是"某个槽的绑定莫名不见了"。
      */
     private static final String K_VEXTRA = "version_extra_slots";
-    /** 用户给版本起的名字 { "&lt;版本key&gt;": "&lt;名字&gt;" }（与 K_VSLOTS 同 key 规则） */
+    /**
+     * **主项**（这个版本的第一项启动项）的名字 { "&lt;版本key&gt;": "&lt;名字&gt;" }。
+     *
+     * <p>★★ 2026-10-26 用户：「让游戏命名跟随实例而不是跟随文件」—— 名字要跟着**启动项**走，
+     *   不是跟着 APK 文件走。于是一个版本绑两个槽时，两项可以各叫各的名字。
+     *
+     * <p>★ 主项的名字**留在本键**（而不是和附加项一样按槽存），因为主项的槽会变
+     *   （显式换槽 / 默认槽改了 / 槽改名），按槽存的名字会跟着槽"丢"掉；而主项在绑定表里的
+     *   位置本来就不变 ⇒ 按**版本 key** 存才真的是"跟着这一项走"。
+     *   附加项的身份**就是它绑的那个槽**（它存在的理由）⇒ 见 {@link #K_VROWNAMES}。
+     *
+     * <p>⚠️ 读写的唯一入口是 {@link #rowNameOf} / {@link #setRowNameOf}（`boundSlot == null` = 主项），
+     *   别在别处直接碰这两个键 —— 两处各判一次必漂，症状只会是"某一项的名字莫名变成另一项的"。
+     */
     private static final String K_VNAMES = "version_names";
+    /**
+     * **附加项**（绑在额外槽上的启动项）的名字
+     * { "&lt;版本key&gt;": { "&lt;槽名&gt;": "&lt;名字&gt;" } }。
+     *
+     * <p>与 {@link #K_VEXTRA} **同一套口径**（一项附加绑定 = 一个启动项 = 可以有自己的名字）。
+     * 所以凡是会动附加绑定的地方都必须**把名字一起搬**：换槽（{@link #replaceSlotBinding}）、
+     * 槽改名 / 删槽（{@link #retargetSlots}）、删行 / 主项被删后提升（{@link #removeBinding}）。
+     * 否则"给这一项改个名，换个槽回来名字就没了"—— 静默、只有用户自己会发现。
+     *
+     * <p>★ 为什么另起一个键：{@link #K_VNAMES} 的值是一根字符串，老版本启动器用 `optString` 读；
+     *   改成嵌套对象后老版本读到的是 `{"…"}` 这种**非法名字**（会原样显示在列表里）。
+     *   新键对老版本是**未知键**（原样保留、不解析）⇒ 降级安全。
+     */
+    private static final String K_VROWNAMES = "version_row_names";
     /** F3：新发现的版本缺省用哪个槽（空串 = 由调用方回落到 Data.SLOT_DEFAULT） */
     private static final String K_DEF_SLOT = "default_slot";
     /** F7：日志保留份数（日志页用） */
@@ -163,9 +197,43 @@ public final class Config {
                     + " (newer config on older app?) — fields fall back to defaults");
         }
         if (v < CONFIG_VERSION) {
-            // 迁移挂点：第 0 代 -> 第 1 代 无结构变化，只补版本号；升级立即落盘
+            // 迁移挂点（逐代往上补）：
+            //   第 0 代 -> 第 1 代：无结构变化，只补版本号；
+            //   第 1 代 -> 第 2 代：名字改成"按项"存，老名字抄给每一行（见 migrateRowNames）。
+            if (v < 2) migrateRowNames();
             put(K_VER, CONFIG_VERSION);
             save();
+        }
+    }
+
+    /**
+     * 第 2 代迁移（2026-10-26，名从"按版本"改成"按项"）—— **把老名字抄给这个版本的每一行**。
+     *
+     * <p>★ 为什么必须抄、不能"附加行从空开始"：老数据里一个名字是全版本共用的，只保留在主项上，
+     *   就等于用户升级后**悄悄少了一个名字**（他会读成"名字丢了"；而这个功能本来就是他要求加的）。
+     *   抄完之后每一行各有自己的名字，从此各改各的 —— 这正是本轮要的行为。
+     *
+     * <p>幂等：只补**还没有自己名字**的行；重复跑不会覆盖用户后来改过的名字。
+     *
+     * <p>⚠️ 包级可见（不是 private）：自检要直接钉住"抄给每一行 / 不覆盖改过的名字"这两条
+     *   —— 迁移只跑在 `load()` / `reload()` 里（进程内只跑一次），自检没法重放那一步。
+     */
+    void migrateRowNames() {
+        JSONObject names = mRoot.optJSONObject(K_VNAMES);
+        JSONObject extras = mRoot.optJSONObject(K_VEXTRA);
+        if (names == null || extras == null) return;
+        java.util.Iterator<String> it = names.keys();
+        while (it.hasNext()) {
+            String key = it.next();
+            String n = names.optString(key, "");
+            if (n.isEmpty()) continue;
+            JSONArray a = extras.optJSONArray(key);
+            if (a == null) continue;
+            for (int i = 0; i < a.length(); i++) {
+                String slot = a.optString(i, "");
+                if (slot.isEmpty()) continue;
+                if (rowNameOf(key, slot).isEmpty()) setRowNameOf(key, slot, n);
+            }
         }
     }
 
@@ -204,7 +272,9 @@ public final class Config {
         mRoot = fresh;
         int v = mRoot.optInt(K_VER, 0);
         if (v < CONFIG_VERSION) {
-            // 别的进程可能写回了更老的配置：补版本号，但**绝不动它的其它字段**
+            // 别的进程可能写回了更老的配置：补版本号 + 补这一代的迁移，
+            //   但**绝不动它的其它字段**（迁移只往空位里补，见 migrateRowNames 的幂等性）。
+            if (v < 2) migrateRowNames();
             put(K_VER, CONFIG_VERSION);
             save();
         }
@@ -335,9 +405,9 @@ public final class Config {
         }
         put(K_IMPORTS, out);
         // 导入副本没了，它的槽分配也一并清掉（不留悬空引用）——
-        // ★ 包括**这一版新增的附加绑定**（否则列表里会留下一行"指向不存在的版本"的启动项）
+        // ★ 包括**这一版新增的附加绑定**（否则列表里会留下一行"指向不存在的版本"的启动项），
+        //   以及**每一项的名字**（否则会留给下一次同文件名的导入）
         clearBindings("import:" + file);
-        setNameOf("import:" + file, "");   // ★ 版本没了，名字也一起清（否则会留给下一次同文件名的导入）
         save();
     }
 
@@ -485,6 +555,9 @@ public final class Config {
      *   否则"删掉 default 那一行、只留存档B"这件事永远做不到。
      * <p>★ 提升之后**必须**把被提升的那条从附加里删掉，否则它同时是主槽又是附加槽
      *   ⇒ 列表里两行一模一样。
+     * <p>★★ 名字要跟着**项**走（2026-10-26）：删附加项 ⇒ 它自己的名字一起清；删主项、提升附加项 ⇒
+     *   被提升那一项带**它自己的名字**上来（旧主项的名字随旧主项消失 —— 名字是"这一项"的，
+     *   不是"这个版本"的，白送给新主项就是张冠李戴）。
      *
      * @return true = 确实动过；调用方自己去判断"这个版本还有没有别的行"
      */
@@ -494,15 +567,23 @@ public final class Config {
         String prim = vs == null ? "" : vs.optString(key, "");
         boolean isPrimaryRow = slot.equals(prim)
                 || (prim.isEmpty() && slot.equals(effectivePrimaryOf(key)));
-        if (!isPrimaryRow) return removeExtraSlot(key, slot);
+        if (!isPrimaryRow) {
+            if (!removeExtraSlot(key, slot)) return false;
+            setRowNameOf(key, slot, "");     // 这一项没了，它的名字也一起走
+            return true;
+        }
         List<String> ex = extraSlotsOf(key);
         if (!ex.isEmpty()) {
             String up = ex.get(0);
+            String upName = rowNameOf(key, up);   // 提上来的那一项叫什么 —— 摘附加之前先读
             removeExtraSlot(key, up);   // 先摘附加（它会 save）
             setSlotOf(key, up);         // 再写成主分配
+            setNameOf(key, upName);     // 名字跟着"这一项"走到主项那一格（旧主项的名字到此为止）
+            setRowNameOf(key, up, "");  // 它已经不在附加表里了，别留一份影子
             return true;
         }
         setSlotOf(key, "");
+        setNameOf(key, "");
         return true;
     }
 
@@ -556,27 +637,45 @@ public final class Config {
         }
         put(K_VEXTRA, ex);
         save();
+        // ★ 这一项的名字跟着它一起换槽（名字按槽存，见 K_VROWNAMES）——
+        //   漏了这一步的症状是"换个槽回来名字没了"，静默且只有用户自己会发现。
+        //   主项不在这里：它的名字按版本 key 存，换槽压根不动那一格。
+        String nm = rowNameOf(key, oldSlot);
+        if (!nm.isEmpty()) {
+            setRowNameOf(key, newSlot, nm);
+            setRowNameOf(key, oldSlot, "");
+        }
         return BIND_OK;
     }
 
-    /** 去掉一个版本的**全部**绑定（删导入版本 / 自检清理）—— 主槽与附加槽一起清 */
+    /**
+     * 去掉一个版本的**全部行状态**（删导入版本 / 自检清理）：主槽、附加槽、以及**每一项的名字**。
+     *
+     * <p>★ 名字也算"行状态"（2026-10-26）：版本没了还留着它的名字 ⇒ 下一次同文件名的导入会
+     *   顶着一个它没起过的名字出现。所以这里一次清干净，别让调用方自己补 —— 补一处漏一处。
+     */
     public synchronized void clearBindings(String key) {
+        if (key == null || key.isEmpty()) return;
         setSlotOf(key, "");
+        setNameOf(key, "");
+        clearRowNames(key);
         JSONObject ex = mRoot.optJSONObject(K_VEXTRA);
         if (ex == null || !ex.has(key)) return;
         ex.remove(key);
         storeExtra(ex);
     }
 
-    // ── 给版本起的名字（2026-10-16 用户：「加个允许给自己导入的游戏命名」）──────
+    // ── 给**启动项**起的名字（2026-10-16 起给版本命名 → 2026-10-26 起按项命名）──
+    //
+    // 需求原文（2026-10-26）：「让游戏命名跟随实例而不是跟随文件」。
+    // 一个版本绑两个槽 = 两个**实例**（各自的存档 / 设置 / 模组），以前共用一个名字 ⇒
+    // 给第二项改名会把第一项也改掉，两项永远同名、只能靠槽徽标区分。现在名字跟着"这一项"走。
 
     /**
-     * 用户给某个版本起的名字。key 规则与 {@link #slotOf} **完全一样**
-     * （{@link Versions.Entry#key()}：已装 = 包名；已导入 = `import:` + 文件名）。
+     * **主项**（这个版本的第一项启动项）的名字。没起名返回空串（调用方回落到 APK 自己的 label）。
      *
-     * <p>没起名返回空串（调用方回落到 APK 自己的 label）。
-     * ★ 为什么和槽分配**同一套 key**：两者都是"按版本 key 存一条用户数据"，
-     * 再来一套 key 规则就是第三次实现同一件事（`ref/29` 第 32 条同族）。
+     * <p>⚠️ 它**只代表主项**（2026-10-26 起）。要问"某一项叫什么"一律走 {@link #rowNameOf} ——
+     *   直接调本方法去拼界面的，都会在"这个版本有第二项"时把两项叫成同一个名字。
      */
     public synchronized String nameOf(String key) {
         if (key == null || key.isEmpty()) return "";
@@ -584,7 +683,7 @@ public final class Config {
         return m == null ? "" : m.optString(key, "");
     }
 
-    /** 名字传空串 = 清除（回落到 APK 自己的 label） */
+    /** 主项的名字；传空串 = 清除（回落到 APK 自己的 label）。附加项见 {@link #setRowNameOf} */
     public synchronized void setNameOf(String key, String name) {
         if (key == null || key.isEmpty()) return;
         JSONObject m = mRoot.optJSONObject(K_VNAMES);
@@ -597,6 +696,70 @@ public final class Config {
             return;
         }
         put(K_VNAMES, m);
+        save();
+    }
+
+    /**
+     * **这一项**（启动项）的名字 —— 界面上问"这一项叫什么"的**唯一入口**。
+     *
+     * @param boundSlot 这一项的 {@code Entry.boundSlot}：`null`（或空）= **主项**（它的槽会变，
+     *                  名字按版本 key 存，见 {@link #K_VNAMES}）；非空 = 附加项，名字按**它绑的那个槽**
+     *                  存（见 {@link #K_VROWNAMES}）
+     * @return 没起名 = 空串（调用方回落到 APK 自己的 label）；**绝不**因为另一项起过名就给一个默认
+     */
+    public synchronized String rowNameOf(String key, String boundSlot) {
+        if (key == null || key.isEmpty()) return "";
+        if (boundSlot == null || boundSlot.isEmpty()) return nameOf(key);
+        JSONObject all = mRoot.optJSONObject(K_VROWNAMES);
+        JSONObject one = all == null ? null : all.optJSONObject(key);
+        return one == null ? "" : one.optString(boundSlot, "");
+    }
+
+    /**
+     * 给**这一项**起名；空串 = 清除（回落到 APK 自己的 label）。只动这一项，别的启动项一个字不变。
+     *
+     * @param boundSlot 同 {@link #rowNameOf}（`null`/空 = 主项）
+     */
+    public synchronized void setRowNameOf(String key, String boundSlot, String name) {
+        if (key == null || key.isEmpty()) return;
+        String n = name == null ? "" : name.trim();
+        if (boundSlot == null || boundSlot.isEmpty()) {
+            setNameOf(key, n);                 // 主项：与老数据同一格，天然不需要迁移
+            return;
+        }
+        JSONObject all = mRoot.optJSONObject(K_VROWNAMES);
+        if (all == null) {
+            if (n.isEmpty()) return;           // 没起过名 ⇒ 清除是空操作（不留空对象）
+            all = new JSONObject();
+        }
+        JSONObject one = all.optJSONObject(key);
+        if (one == null) {
+            if (n.isEmpty()) return;
+            one = new JSONObject();
+        }
+        try {
+            if (n.isEmpty()) one.remove(boundSlot);
+            else one.put(boundSlot, n);
+            // ★ 新建的那一份必须挂回 `all`（漏了这一步：读到的永远是 null，名字写进去就没了 ——
+            //   真机自检当场抓到的 8 条红，全是"附加项的名字读不回来"）
+            if (one.length() == 0) all.remove(key);
+            else all.put(key, one);
+        } catch (Exception e) {
+            Log.w(TAG, "setRowNameOf failed for '" + key + "'/'" + boundSlot + "': " + e);
+            return;
+        }
+        if (all.length() == 0) mRoot.remove(K_VROWNAMES);   // 空对象不留（同 storeExtra）
+        else put(K_VROWNAMES, all);
+        save();
+    }
+
+    /** 清掉这个版本**全部附加项**的名字（主项名字走 {@link #setNameOf}） */
+    private void clearRowNames(String key) {
+        JSONObject all = mRoot.optJSONObject(K_VROWNAMES);
+        if (all == null || !all.has(key)) return;
+        all.remove(key);
+        if (all.length() == 0) mRoot.remove(K_VROWNAMES);
+        else put(K_VROWNAMES, all);
         save();
     }
 
@@ -664,16 +827,31 @@ public final class Config {
                 for (int i = 0; i < a.length(); i++) {
                     String s = a.optString(i, "");
                     if (s.isEmpty()) continue;
-                    if (oldName.equals(s)) {
+                    boolean renamed = oldName.equals(s);
+                    if (renamed) {
                         changed = true;
                         // ★ 改名与删槽**都要计数**：界面上"跟着改了 N 行" / "消失了 N 行"都靠这个数
                         //   （第 236 轮自检当场抓到：只在删槽那条分支里 ++，改名时 extras 恒为 0）。
                         r.extras++;
-                        if (drop) continue;                      // 这一行没了
+                        if (drop) {
+                            // 这一行没了 ⇒ 它自己的名字也清掉（名字是按槽存的，见 K_VROWNAMES）
+                            setRowNameOf(k, s, "");
+                            continue;
+                        }
                         s = newName;
                     }
                     // 改名时可能撞上同一版本已有的绑定（极少见，但撞了就必须去重，否则两行一模一样）
-                    if (!kept.contains(s)) kept.add(s);
+                    if (kept.contains(s)) {
+                        // 被并掉的那一行：名字随它一起消失（不覆盖活下来那一项的名字）
+                        if (renamed) setRowNameOf(k, oldName, "");
+                        continue;
+                    }
+                    if (renamed) {
+                        String nm = rowNameOf(k, oldName);
+                        if (!nm.isEmpty() && rowNameOf(k, s).isEmpty()) setRowNameOf(k, s, nm);
+                        setRowNameOf(k, oldName, "");
+                    }
+                    kept.add(s);
                 }
                 if (!changed) continue;
                 touched = true;

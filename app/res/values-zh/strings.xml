@@ -175,7 +175,7 @@
     <string name="version_row_detail">详情…</string>
     <string name="version_row_detail_sub">来源、大小、校验值、ABI</string>
     <string name="version_row_rename">命名…</string>
-    <string name="version_row_rename_sub">给这个版本起个名字</string>
+    <string name="version_row_rename_sub">给这个启动项起个名字</string>
     <string name="version_row_res">资源…</string>
     <string name="version_row_res_sub">导出游戏包里的贴图、音效、地图…</string>
     <string name="version_row_delete">删除这一项…</string>
@@ -2032,8 +2032,8 @@
     <string name="save">保存</string>
     <string name="version_type_official">原端</string>
     <string name="version_type_modded">改端</string>
-    <string name="version_name_title">给这个版本命名</string>
-    <string name="version_name_msg">只改管理器里显示的名字（列表行、这里、继续上次都用它），不动 APK 本身。留空 = 恢复原名。</string>
+    <string name="version_name_title">给这个启动项命名</string>
+    <string name="version_name_msg">只改这一项的名字（列表里这一行、这里、继续上次都用它），同一个版本的其他启动项不受影响，也不动 APK 本身。留空 = 恢复原名。</string>
     <string name="version_name_reset">恢复原名</string>
     <string name="version_name_saved_fmt">已命名为「%1$s」</string>
     <string name="version_name_reset_done">已恢复原名</string>
