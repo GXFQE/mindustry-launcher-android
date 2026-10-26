@@ -184,19 +184,23 @@ final class SlotOps {
      */
     private static void promptBackupActions(final Activity a, final Data.Slot s,
                                             final Backup.Snapshot ss, final Host h) {
-        new AlertDialog.Builder(a)
-                .setTitle(ss.title())
-                .setItems(new String[]{
+        // ★ 第 261 轮：原来这一层是框架弹窗，点「恢复 / 删除」再弹一个确认框 = 两个窗口，
+        //   旧窗一关 dim 就重来一遍 ⇒ 整屏闪。改成同一张卡里推页（`CardStack`）。
+        final CardStack stack = new CardStack(a);
+        stack.root(ss.title(),
+                CardStack.list(a, new CharSequence[]{
                         Trans.get(a, R.string.slot_op_restore),
                         Trans.get(a, R.string.slot_op_backup_delete)},
-                        new DialogInterface.OnClickListener() {
-                            @Override public void onClick(DialogInterface d, int w) {
-                                if (w == 0) confirmRestore(a, s, ss, h);
-                                else confirmDelete(a, s, ss, h);
+                        new CardStack.ItemClick() {
+                            @Override public void onClick(int w) {
+                                if (w == 0) confirmRestore(stack, a, s, ss, h);
+                                else confirmDelete(stack, a, s, ss, h);
                             }
-                        })
-                .setNegativeButton(R.string.cancel, null)
-                .show();
+                        }),
+                new CardStack.Btn(Trans.get(a, R.string.cancel), new Runnable() {
+                    @Override public void run() { stack.dismiss(); }
+                }));
+        stack.show();
     }
 
     /**
@@ -207,19 +211,17 @@ final class SlotOps {
      * ★ 与恢复**刻意不同**：删备份不加"游戏没在跑"那道门禁（它不碰游戏的数据根），
      *   问一次就动手；而恢复要先留一份自动备份（见 {@link #doRestore}）。
      */
-    private static void confirmDelete(final Activity a, final Data.Slot s,
+    private static void confirmDelete(final CardStack stack, final Activity a, final Data.Slot s,
                                       final Backup.Snapshot ss, final Host h) {
-        new AlertDialog.Builder(a)
-                .setTitle(R.string.backup_delete_title)
-                .setMessage(Trans.get(a, R.string.backup_delete_msg_fmt, ss.title(), ss.count,
-                        Util.formatSize(ss.bytes)))
-                .setPositiveButton(R.string.delete, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) {
+        stack.pushMessage(Trans.get(a, R.string.backup_delete_title),
+                Trans.get(a, R.string.backup_delete_msg_fmt, ss.title(), ss.count,
+                        Util.formatSize(ss.bytes)),
+                Trans.get(a, R.string.delete), new Runnable() {
+                    @Override public void run() {
+                        stack.dismiss();
                         doDelete(a, ss, h);
                     }
-                })
-                .setNegativeButton(R.string.cancel, null)
-                .show();
+                });
     }
 
     private static void doDelete(final Activity a, final Backup.Snapshot ss, final Host h) {
@@ -252,26 +254,35 @@ final class SlotOps {
      * ★ 布局与判据都与**整槽 zip 导入**共用（`dialog_slot_mode` + {@link SlotModes}）：
      *   同一个问题在两个入口下必须只有一种问法与一种答法。
      */
-    private static void confirmRestore(final Activity a, final Data.Slot s,
+    private static void confirmRestore(final CardStack stack, final Activity a, final Data.Slot s,
                                        final Backup.Snapshot ss, final Host h) {
         View form = a.getLayoutInflater().inflate(R.layout.dialog_slot_mode, null);
         // 布局里那些静态文案已搬到 Java（见 Trans）：布局够不到用户语言包。
         // ★ 第 169 轮：这五处绑定搬进 `SlotModes.bindTexts`（由 `SlotModes.bind` 统一调用）——
         //   原先只写在**这一条路**上，整槽 zip 导入那条路整块没有字。
         final SlotModes modes = SlotModes.bind(a, form);
-        new AlertDialog.Builder(a)
-                .setTitle(R.string.restore_confirm_title)
-                .setMessage(Trans.get(a, R.string.restore_confirm_msg_fmt, ss.title(), ss.count,
-                        Util.formatSize(ss.bytes),
-                        s.dir == null ? "?" : s.dir.getAbsolutePath()))
-                .setView(form)
-                .setPositiveButton(R.string.restore, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) {
+        // 正文（这份备份多大 / 从哪来）+ 模式表单，合成卡片里的一页
+        LinearLayout box = new LinearLayout(a);
+        box.setOrientation(LinearLayout.VERTICAL);
+        TextView msg = new TextView(a);
+        msg.setText(Trans.get(a, R.string.restore_confirm_msg_fmt, ss.title(), ss.count,
+                Util.formatSize(ss.bytes), s.dir == null ? "?" : s.dir.getAbsolutePath()));
+        msg.setTextSize(15);
+        msg.setTextColor(a.getResources().getColor(R.color.fg));
+        msg.setLineSpacing(Math.round(4 * a.getResources().getDisplayMetrics().density), 1f);
+        box.addView(msg);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = Math.round(12 * a.getResources().getDisplayMetrics().density);
+        box.addView(form, lp);
+        stack.push(Trans.get(a, R.string.restore_confirm_title), CardStack.wrap(a, box),
+                stack.back(),
+                new CardStack.Btn(Trans.get(a, R.string.restore), new Runnable() {
+                    @Override public void run() {
+                        stack.dismiss();
                         doRestore(a, s, ss, modes == null ? SlotWrite.UPDATE : modes.mode(), h);
                     }
-                })
-                .setNegativeButton(R.string.cancel, null)
-                .show();
+                }));
     }
 
     /** 一次整槽恢复的结果：恢复结果 + 动手前那份快照（可能为 null） */

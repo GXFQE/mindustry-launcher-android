@@ -11,6 +11,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.view.Window;
 import android.view.WindowManager;
+import android.widget.EditText;
 import android.widget.FrameLayout;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -49,6 +50,11 @@ public final class CardStack {
     /** 列表类页面点第几项。 */
     public interface ItemClick {
         void onClick(int index);
+    }
+
+    /** 输入页的"确定"：拿到框里的文本。 */
+    public interface OnText {
+        void run(String text);
     }
 
     /** 一个按钮 = 文案 + 点下去做什么（顺序即渲染顺序：左 → 右）。 */
@@ -158,6 +164,27 @@ public final class CardStack {
      */
     public void pushMessage(CharSequence title, CharSequence message, CharSequence okLabel, Runnable ok) {
         push(title, text(dlg.getContext(), message), back(), new Btn(okLabel, ok));
+    }
+
+    /**
+     * 输入页：一个单行输入框 + 「返回」 + 动作按钮（动作拿到当前文本）。
+     * ★ 用于"另存为 / 命名"这类原来是 `setView(EditText)` 的弹窗 —— 它们同样会换窗、同样会闪。
+     */
+    public void pushInput(CharSequence title, CharSequence initial, CharSequence hint,
+                          CharSequence okLabel, final OnText ok) {
+        Context c = dlg.getContext();
+        EditText e = new EditText(c);
+        e.setSingleLine(true);
+        e.setText(initial == null ? "" : initial);
+        if (hint != null) e.setHint(hint);
+        e.setTextSize(16);
+        e.setTextColor(c.getResources().getColor(R.color.fg));
+        e.setHintTextColor(c.getResources().getColor(R.color.fg_muted));
+        if (initial != null) e.setSelection(e.getText().length());
+        final EditText input = e;
+        push(title, wrap(c, input), back(), new Btn(okLabel, new Runnable() {
+            @Override public void run() { ok.run(input.getText().toString()); }
+        }));
     }
 
     /** 「返回」按钮（回上一页）。 */
@@ -291,6 +318,11 @@ public final class CardStack {
     }
 
     // ---- 页面素材 ----------------------------------------------------------------
+
+    /** 把任意 View 包成可滚动的一页（自定义表单类页面用）。 */
+    public static View wrap(Context c, View child) {
+        return scroller(c, child);
+    }
 
     /** 一列可点的行（替代框架的 `setItems` 列表）。行间有 1dp 分隔线，与卡片描边同色。 */
     public static View list(Context c, CharSequence[] labels, final ItemClick click) {
