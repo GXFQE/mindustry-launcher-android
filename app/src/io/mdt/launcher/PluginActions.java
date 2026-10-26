@@ -432,7 +432,8 @@ final class PluginActions {
                         BatchIo.pickMulti(a, R.string.plugin_pick_title,
                                 Trans.get(a, R.string.plugin_pick_head), titles, subs, null, null,
                                 R.string.plugin_pick_ok_fmt, new BatchIo.OnPick() {
-                                    @Override public void onPick(List<Integer> indexes) {
+                                    @Override public void onPick(List<Integer> indexes, CardStack card) {
+                                          if (card != null) card.dismiss();
                                         List<ItemInfo> out = new ArrayList<ItemInfo>();
                                         if (indexes != null) {
                                             for (Integer i : indexes) {

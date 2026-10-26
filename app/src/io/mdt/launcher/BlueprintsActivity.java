@@ -645,7 +645,7 @@ public class BlueprintsActivity extends BaseActivity {
                 Trans.get(BlueprintsActivity.this, R.string.batch_export_head_fmt, items.size()),
                 titles, subs, null, null, R.string.batch_export_btn_fmt,
                 R.string.pick_share_toggle, new BatchIo.OnPickShare() {
-                    @Override public void onPick(List<Integer> idx, boolean share) {
+                    @Override public void onPick(List<Integer> idx, boolean share, CardStack card) {
                         if (idx.size() == 1) {
                             // ★ 文件名用**原始名**：那才是游戏里认的名字（同地图/存档导出那条纪律）
                             Blueprints.Item it = items.get(idx.get(0).intValue());
@@ -671,10 +671,10 @@ public class BlueprintsActivity extends BaseActivity {
                             }
                         }
                         if (share) {
-                            BatchIo.startShare(BlueprintsActivity.this, srcs,
+                            BatchIo.startShare(card, BlueprintsActivity.this, srcs,
                                     BatchIo.suggestZipName("blueprints"));
                         } else {
-                            BatchIo.startExport(BlueprintsActivity.this, srcs,
+                            BatchIo.startExport(card, BlueprintsActivity.this, srcs,
                                     BatchIo.suggestZipName("blueprints"));
                         }
                     }
@@ -709,7 +709,7 @@ public class BlueprintsActivity extends BaseActivity {
         BatchIo.pickMulti(this, R.string.batch_del_row,
                 Trans.get(BlueprintsActivity.this, R.string.batch_del_head_fmt, items.size()),
                 titles, subs, null, null, R.string.batch_del_btn_fmt, new BatchIo.OnPick() {
-                    @Override public void onPick(List<Integer> idx) {
+                    @Override public void onPick(List<Integer> idx, CardStack card) {
                         final File kindDir = BlueprintFiles.dirOf(BlueprintsActivity.this, mSlot);
                         final List<File> files = new java.util.ArrayList<>();
                         for (Integer i : idx) files.add(items.get(i.intValue()).file);
@@ -718,6 +718,7 @@ public class BlueprintsActivity extends BaseActivity {
                             if (BatchIo.deletable(f, kindDir)) can++; else cant++;
                         }
                         if (can == 0) {
+                            card.dismiss();
                             alert(Trans.get(BlueprintsActivity.this, R.string.batch_del_row),
                                     Trans.get(BlueprintsActivity.this, R.string.batch_del_skipped_fmt, cant));
                             return;
@@ -727,13 +728,12 @@ public class BlueprintsActivity extends BaseActivity {
                             msg = msg + "\n\n"
                                     + Trans.get(BlueprintsActivity.this, R.string.batch_del_skipped_fmt, cant);
                         }
-                        new android.app.AlertDialog.Builder(BlueprintsActivity.this)
-                                .setTitle(R.string.batch_del_title)
-                                .setMessage(msg)
-                                .setPositiveButton(R.string.batch_del_ok,
-                                        new android.content.DialogInterface.OnClickListener() {
-                                            @Override public void onClick(
-                                                    android.content.DialogInterface d, int w) {
+                        card.replace(Trans.get(BlueprintsActivity.this, R.string.batch_del_title), msg,
+                                new CardStack.Btn(Trans.get(BlueprintsActivity.this, R.string.cancel), new Runnable() {
+                                    @Override public void run() { card.dismiss(); }
+                                }),
+                                new CardStack.Btn(Trans.get(BlueprintsActivity.this, R.string.batch_del_ok), new Runnable() {
+                                    @Override public void run() {
                                                 BatchIo.DelReport rep = BatchIo.deleteAll(
                                                         BlueprintsActivity.this, files, kindDir,
                                                         BlueprintFiles.trashDirOf(BlueprintsActivity.this),
@@ -757,10 +757,8 @@ public class BlueprintsActivity extends BaseActivity {
                                                                     + "\n"
                                                                     + Trans.get(BlueprintsActivity.this, R.string.batch_del_none_fmt, rep.failed));
                                                 }
-                                            }
-                                        })
-                                .setNegativeButton(R.string.cancel, null)
-                                .show();
+                                    }
+                                }));
                     }
                 });
     }

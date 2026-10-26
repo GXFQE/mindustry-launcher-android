@@ -368,7 +368,7 @@ public class SavesActivity extends BaseActivity {
         BatchIo.pickMulti(this, R.string.batch_del_row,
                 Trans.get(this, R.string.batch_del_head_fmt, all.length),
                 titles, subs, null, null, R.string.batch_del_btn_fmt, new BatchIo.OnPick() {
-                    @Override public void onPick(List<Integer> idx) {
+                    @Override public void onPick(List<Integer> idx, CardStack card) {
                         final File kindDir = new File(Data.dirOf(SavesActivity.this, mSlot), "saves");
                         final java.util.List<File> files = new java.util.ArrayList<>();
                         for (Integer i : idx) files.add(all[i.intValue()]);
@@ -377,6 +377,7 @@ public class SavesActivity extends BaseActivity {
                             if (BatchIo.deletable(f, kindDir)) can++; else cant++;
                         }
                         if (can == 0) {
+                            card.dismiss();
                             alert(Trans.get(SavesActivity.this, R.string.batch_del_row),
                                     Trans.get(SavesActivity.this, R.string.batch_del_skipped_fmt, cant));
                             return;
@@ -386,12 +387,12 @@ public class SavesActivity extends BaseActivity {
                             msg = msg + "\n\n" + Trans.get(SavesActivity.this,
                                     R.string.batch_del_skipped_fmt, cant);
                         }
-                        new AlertDialog.Builder(SavesActivity.this)
-                                .setTitle(R.string.batch_del_title)
-                                .setMessage(msg)
-                                .setPositiveButton(R.string.batch_del_ok,
-                                        new DialogInterface.OnClickListener() {
-                                            @Override public void onClick(DialogInterface d, int w) {
+                        card.replace(Trans.get(SavesActivity.this, R.string.batch_del_title), msg,
+                                new CardStack.Btn(Trans.get(SavesActivity.this, R.string.cancel), new Runnable() {
+                                    @Override public void run() { card.dismiss(); }
+                                }),
+                                new CardStack.Btn(Trans.get(SavesActivity.this, R.string.batch_del_ok), new Runnable() {
+                                    @Override public void run() {
                                                 BatchIo.DelReport rep = BatchIo.deleteAll(
                                                         SavesActivity.this, files, kindDir,
                                                         Trash.savesDir(SavesActivity.this),
@@ -415,10 +416,8 @@ public class SavesActivity extends BaseActivity {
                                                                     + "\n"
                                                                     + Trans.get(SavesActivity.this, R.string.batch_del_none_fmt, rep.failed));
                                                 }
-                                            }
-                                        })
-                                .setNegativeButton(R.string.cancel, null)
-                                .show();
+                                    }
+                                }));
                     }
                 });
     }

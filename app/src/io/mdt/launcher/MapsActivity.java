@@ -573,7 +573,7 @@ public class MapsActivity extends BaseActivity {
                 Trans.get(MapsActivity.this, R.string.batch_export_head_fmt, items.size()),
                 mTitles, mSubs, mThumbs, null, R.string.batch_export_btn_fmt,
                 R.string.pick_share_toggle, new BatchIo.OnPickShare() {
-                    @Override public void onPick(List<Integer> idx, boolean share) {
+                    @Override public void onPick(List<Integer> idx, boolean share, CardStack card) {
                         if (idx.size() == 1) {
                             // ★ 文件名用**原始名**：`0.msav` 这种就是游戏里认的名字，
                             //   "安全化"成 ASCII 之后用户在文件管理器里认不出来（同存档导出那条纪律）
@@ -601,10 +601,10 @@ public class MapsActivity extends BaseActivity {
                             }
                         }
                         if (share) {
-                            BatchIo.startShare(MapsActivity.this, srcs,
+                            BatchIo.startShare(card, MapsActivity.this, srcs,
                                     BatchIo.suggestZipName("maps"));
                         } else {
-                            BatchIo.startExport(MapsActivity.this, srcs,
+                            BatchIo.startExport(card, MapsActivity.this, srcs,
                                     BatchIo.suggestZipName("maps"));
                         }
                     }
@@ -636,7 +636,7 @@ public class MapsActivity extends BaseActivity {
         BatchIo.pickMulti(this, R.string.batch_del_row,
                 Trans.get(MapsActivity.this, R.string.batch_del_head_fmt, items.size()),
                 mTitles, mSubs, mThumbs, null, R.string.batch_del_btn_fmt, new BatchIo.OnPick() {
-                    @Override public void onPick(List<Integer> idx) {
+                    @Override public void onPick(List<Integer> idx, CardStack card) {
                         final File kindDir = new File(Data.dirOf(MapsActivity.this, mSlot), "maps");
                         final List<File> files = new java.util.ArrayList<>();
                         for (Integer i : idx) files.add(items.get(i.intValue()).file);
@@ -645,6 +645,7 @@ public class MapsActivity extends BaseActivity {
                             if (BatchIo.deletable(f, kindDir)) can++; else cant++;
                         }
                         if (can == 0) {
+                            card.dismiss();
                             alert(Trans.get(MapsActivity.this, R.string.batch_del_row),
                                     Trans.get(MapsActivity.this, R.string.batch_del_skipped_fmt, cant));
                             return;
@@ -654,12 +655,12 @@ public class MapsActivity extends BaseActivity {
                             msg = msg + "\n\n"
                                     + Trans.get(MapsActivity.this, R.string.batch_del_skipped_fmt, cant);
                         }
-                        new AlertDialog.Builder(MapsActivity.this)
-                                .setTitle(R.string.batch_del_title)
-                                .setMessage(msg)
-                                .setPositiveButton(R.string.batch_del_ok,
-                                        new DialogInterface.OnClickListener() {
-                                            @Override public void onClick(DialogInterface d, int w) {
+                        card.replace(Trans.get(MapsActivity.this, R.string.batch_del_title), msg,
+                                new CardStack.Btn(Trans.get(MapsActivity.this, R.string.cancel), new Runnable() {
+                                    @Override public void run() { card.dismiss(); }
+                                }),
+                                new CardStack.Btn(Trans.get(MapsActivity.this, R.string.batch_del_ok), new Runnable() {
+                                    @Override public void run() {
                                                 BatchIo.DelReport rep = BatchIo.deleteAll(
                                                         MapsActivity.this, files, kindDir,
                                                         MapFiles.trashDirOf(MapsActivity.this),
@@ -683,10 +684,8 @@ public class MapsActivity extends BaseActivity {
                                                                     + "\n"
                                                                     + Trans.get(MapsActivity.this, R.string.batch_del_none_fmt, rep.failed));
                                                 }
-                                            }
-                                        })
-                                .setNegativeButton(R.string.cancel, null)
-                                .show();
+                                    }
+                                }));
                     }
                 });
     }

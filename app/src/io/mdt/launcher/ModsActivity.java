@@ -425,7 +425,7 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
         BatchIo.pickMulti(this, R.string.batch_del_row,
                 Trans.get(ModsActivity.this, R.string.batch_del_head_fmt, shown.size()),
                 titles, subs, null, null, R.string.batch_del_btn_fmt, new BatchIo.OnPick() {
-                    @Override public void onPick(List<Integer> idx) {
+                    @Override public void onPick(List<Integer> idx, CardStack card) {
                         final File kindDir = mScan == null ? null : mScan.modsDir;
                         if (kindDir == null) return;
                         final List<File> files = new ArrayList<>();
@@ -435,6 +435,7 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
                             if (BatchIo.deletableItem(f, kindDir, true)) can++; else cant++;
                         }
                         if (can == 0) {
+                            card.dismiss();
                             alert(Trans.get(ModsActivity.this, R.string.batch_del_row),
                                     Trans.get(ModsActivity.this, R.string.batch_del_skipped_fmt, cant));
                             return;
@@ -444,12 +445,12 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
                             msg = msg + "\n\n" + Trans.get(ModsActivity.this,
                                     R.string.batch_del_skipped_fmt, cant);
                         }
-                        new AlertDialog.Builder(ModsActivity.this)
-                                .setTitle(R.string.batch_del_title)
-                                .setMessage(msg)
-                                .setPositiveButton(R.string.batch_del_ok,
-                                        new DialogInterface.OnClickListener() {
-                                            @Override public void onClick(DialogInterface d, int w) {
+                        card.replace(Trans.get(ModsActivity.this, R.string.batch_del_title), msg,
+                                new CardStack.Btn(Trans.get(ModsActivity.this, R.string.cancel), new Runnable() {
+                                    @Override public void run() { card.dismiss(); }
+                                }),
+                                new CardStack.Btn(Trans.get(ModsActivity.this, R.string.batch_del_ok), new Runnable() {
+                                    @Override public void run() {
                                                 BatchIo.DelReport rep = BatchIo.deleteAll(
                                                         ModsActivity.this, files, kindDir,
                                                         Trash.modsDir(ModsActivity.this),
@@ -473,10 +474,8 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
                                                                     + "\n"
                                                                     + Trans.get(ModsActivity.this, R.string.batch_del_none_fmt, rep.failed));
                                                 }
-                                            }
-                                        })
-                                .setNegativeButton(R.string.cancel, null)
-                                .show();
+                                    }
+                                }));
                     }
                 });
     }
@@ -520,7 +519,7 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
                 Trans.get(ModsActivity.this, R.string.batch_export_head_fmt, all.size()),
                 titles, subs, null, null, R.string.batch_export_btn_fmt,
                 R.string.pick_share_toggle, new BatchIo.OnPickShare() {
-                    @Override public void onPick(List<Integer> idx, boolean share) {
+                    @Override public void onPick(List<Integer> idx, boolean share, CardStack card) {
                         List<Exporter.Src> srcs = new ArrayList<>();
                         for (Integer i : idx) {
                             Mods.Info m = all.get(i.intValue());
@@ -532,10 +531,10 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
                             }
                         }
                         if (share) {
-                            BatchIo.startShare(ModsActivity.this, srcs,
+                            BatchIo.startShare(card, ModsActivity.this, srcs,
                                     BatchIo.suggestZipName("mods"));
                         } else {
-                            BatchIo.startExport(ModsActivity.this, srcs,
+                            BatchIo.startExport(card, ModsActivity.this, srcs,
                                     BatchIo.suggestZipName("mods"));
                         }
                     }

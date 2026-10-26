@@ -394,13 +394,14 @@ final class SlotIo {
                     }
                 }, R.string.batch_export_btn_fmt, R.string.pick_share_toggle,
                 new BatchIo.OnPickShare() {
-                    @Override public void onPick(List<Integer> idx, boolean share) {
+                    @Override public void onPick(List<Integer> idx, boolean share, CardStack card) {
                         if (idx.size() == 1) {
                             File f = ordered[idx.get(0).intValue()];
                             if (share) {
                                 shareSave(a, f);
                                 return;
                             }
+                            card.dismiss();
                             startExportSave(a, f);
                             return;
                         }
@@ -410,9 +411,9 @@ final class SlotIo {
                             srcs.add(Exporter.Src.ofFile(f, f.getName()));
                         }
                         if (share) {
-                            BatchIo.startShare(a, srcs, BatchIo.suggestZipName("saves"));
+                            BatchIo.startShare(card, a, srcs, BatchIo.suggestZipName("saves"));
                         } else {
-                            BatchIo.startExport(a, srcs, BatchIo.suggestZipName("saves"));
+                            BatchIo.startExport(card, a, srcs, BatchIo.suggestZipName("saves"));
                         }
                     }
                 });

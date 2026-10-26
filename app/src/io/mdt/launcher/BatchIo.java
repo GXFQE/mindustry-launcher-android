@@ -188,29 +188,44 @@ final class BatchIo {
 
     /** 发起"存到哪"（一个 zip）—— 真正的写在 {@link #handleExportResult} 里 */
     static void startExport(final Activity a, final List<Exporter.Src> srcs, final String zipName) {
+        startExport(null, a, srcs, zipName);
+    }
+
+    /**
+     * 卡片版：勾选框那张卡还开着就**在同一张卡里**问落点（第 267 轮）；
+     * 没有卡片（旧调用点 / dev 口）就自己开一张。
+     */
+    static void startExport(final CardStack card, final Activity a, final List<Exporter.Src> srcs,
+                            final String zipName) {
         if (srcs == null || srcs.isEmpty()) {
+            if (card != null) card.dismiss();
             toast(a, Trans.get(a, R.string.batch_export_nothing));
             return;
         }
         // ★ ⑥c（2026-10-11）：**≥2 份**时先问"存成一个 zip 还是存到目录"——
         //   一份时两条路等价（zip 就是那个文件本身）⇒ **不问**，老样子直接走 createDoc（不打扰）。
         if (srcs.size() < 2) {
+            if (card != null) card.dismiss();
             startExportZip(a, srcs, zipName);
             return;
         }
-        new AlertDialog.Builder(a)
-                .setTitle(R.string.batch_export_dest_title)
-                .setItems(new CharSequence[] {
-                                Trans.get(a, R.string.batch_export_dest_zip),
-                                Trans.get(a, R.string.batch_export_dest_tree) },
-                        new DialogInterface.OnClickListener() {
-                            @Override public void onClick(DialogInterface d, int which) {
-                                if (which == 0) startExportZip(a, srcs, zipName);
-                                else startExportTree(a, srcs);
-                            }
-                        })
-                .setNegativeButton(android.R.string.cancel, null)
-                .show();
+        final CardStack stack = (card != null) ? card : new CardStack(a);
+        stack.replace(Trans.get(a, R.string.batch_export_dest_title), "",
+                new CardStack.Btn(Trans.get(a, R.string.cancel), new Runnable() {
+                    @Override public void run() { stack.dismiss(); }
+                }),
+                new CardStack.Btn(Trans.get(a, R.string.batch_export_dest_zip), new Runnable() {
+                    @Override public void run() {
+                        stack.dismiss();          // 接着弹系统"存到哪"
+                        startExportZip(a, srcs, zipName);
+                    }
+                }),
+                new CardStack.Btn(Trans.get(a, R.string.batch_export_dest_tree), new Runnable() {
+                    @Override public void run() {
+                        stack.dismiss();
+                        startExportTree(a, srcs);
+                    }
+                }));
     }
 
     /** 一个 zip 那条路（老样子） */
@@ -297,18 +312,20 @@ final class BatchIo {
      * <p>⚠️ 失败**不许**退回保存：用户勾的是"直接分享"，落回 SAF 会让人以为分享面板正在弹。</p>
      */
     static void startShare(final Activity a, final List<Exporter.Src> srcs, final String zipName) {
+        startShare(null, a, srcs, zipName);
+    }
+
+    /** 卡片版：进度画在同一张卡里（第 267 轮），打完包就关卡片、交给系统分享面板。 */
+    static void startShare(final CardStack card, final Activity a, final List<Exporter.Src> srcs,
+                           final String zipName) {
         if (srcs == null || srcs.isEmpty()) {
+            if (card != null) card.dismiss();
             toast(a, Trans.get(a, R.string.batch_export_nothing));
             return;
         }
-        final ProgressDialog pd = new ProgressDialog(a);
-        pd.setProgressStyle(ProgressDialog.STYLE_HORIZONTAL);
-        pd.setTitle(Trans.get(a, R.string.batch_export_progress_title));
-        pd.setMessage(Trans.get(a, R.string.batch_export_pct_fmt, 0, srcs.size()));
-        pd.setMax(srcs.size());
-        pd.setProgress(0);
-        pd.setCancelable(false);
-        pd.show();
+        final CardStack stack = (card != null) ? card : new CardStack(a);
+        stack.replace(Trans.get(a, R.string.batch_export_progress_title),
+                Trans.get(a, R.string.batch_export_pct_fmt, 0, srcs.size()));
         new Thread(new Runnable() {
             @Override public void run() {
                 Uri uri = null;
@@ -321,9 +338,7 @@ final class BatchIo {
                                     a.runOnUiThread(new Runnable() {
                                         @Override public void run() {
                                             if (Util.dead(a)) return;
-                                            pd.setMax(total);
-                                            pd.setProgress(done);
-                                            pd.setMessage(Trans.get(a,
+                                            stack.updateText(Trans.get(a,
                                                     R.string.batch_export_pct_fmt, done, total));
                                         }
                                     });
@@ -340,17 +355,24 @@ final class BatchIo {
                 final String fe = err;
                 a.runOnUiThread(new Runnable() {
                     @Override public void run() {
-                        pd.dismiss();
                         if (Util.dead(a)) return;
                         if (fe != null) {
-                            alert(a, Trans.get(a, R.string.export_failed), fe);
+                            stack.replace(Trans.get(a, R.string.export_failed), fe, closeBtn(a, stack));
                             return;
                         }
+                        stack.dismiss();          // 交给系统分享面板
                         ShareOut.launch(a, fu);
                     }
                 });
             }
         }, "batch-share").start();
+    }
+
+    /** 卡片结果页的「关闭」（唯一实现）。 */
+    private static CardStack.Btn closeBtn(final Activity a, final CardStack stack) {
+        return new CardStack.Btn(Trans.get(a, R.string.close), new Runnable() {
+            @Override public void run() { stack.dismiss(); }
+        });
     }
 
     /**
@@ -434,12 +456,13 @@ final class BatchIo {
 
     /** 勾选回调：给的是**下标**（调用方自己按下标取条目 —— 与列表同一次扫描，不重扫） */
     interface OnPick {
-        void onPick(List<Integer> indexes);
+        /** @param card 勾选框那张卡片（**还开着**）：下一屏用 `card.replace(...)` 接着画，别另开弹窗 */
+        void onPick(List<Integer> indexes, CardStack card);
     }
 
     /** 勾选回调 + **去处**（第 156 轮）：`share == true` ⇒ 不去 SAF，直接落缓存分享 */
     interface OnPickShare {
-        void onPick(List<Integer> indexes, boolean share);
+        void onPick(List<Integer> indexes, boolean share, CardStack card);
     }
 
     /**
@@ -487,8 +510,8 @@ final class BatchIo {
                           final int okFmtRes, final OnPick cb) {
         pickMulti(a, titleRes, head, titles, subs, thumbs, filler, okFmtRes, 0,
                 new OnPickShare() {
-                    @Override public void onPick(List<Integer> indexes, boolean share) {
-                        cb.onPick(indexes);
+                    @Override public void onPick(List<Integer> indexes, boolean share, CardStack card) {
+                        cb.onPick(indexes, card);
                     }
                 });
     }
@@ -577,8 +600,8 @@ final class BatchIo {
                             toast(a, Trans.get(a, R.string.batch_export_nothing));
                             return;
                         }
-                        stack.dismiss();
-                        cb.onPick(idx, canShare && shareBox.isChecked());
+                        // ★ 第 267 轮：**不关卡片**，交给调用方在同一张卡里换下一页
+                        cb.onPick(idx, canShare && shareBox.isChecked(), stack);
                     }
                 }));
         stack.setOnDismiss(new Runnable() {
