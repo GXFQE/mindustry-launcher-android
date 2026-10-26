@@ -287,18 +287,23 @@ public class SettingsActivity extends BaseActivity {
      * ⚠️ 本方法**只读**：不回收、不迁移、不清理（那些各有各的安排与门禁）。
      */
     private void showStorage() {
-        final AlertDialog dlg = new AlertDialog.Builder(this)
-                .setTitle(R.string.set_storage_title)
-                .setMessage(R.string.storage_loading)
-                // 第 174 轮：临时分享缓存的手动清理。文案短（三按钮排版），细节在确认框里。
-                .setNeutralButton(R.string.storage_clear_cache, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) {
-                        confirmClearShareCache();
-                    }
-                })
-                .setPositiveButton(R.string.close, null)
-                .create();
-        dlg.show();
+        // ★ 第 264 轮：先出壳、后台算完补正文（原来是 `dlg.setMessage`），
+        //   "清理分享缓存"的确认框也推进同一张卡 —— 原来是卡上再叠一个弹窗。
+        final android.widget.TextView bodyView = new android.widget.TextView(this);
+        bodyView.setTextSize(15);
+        bodyView.setTextColor(getResources().getColor(R.color.fg));
+        bodyView.setLineSpacing(Math.round(4 * getResources().getDisplayMetrics().density), 1f);
+        bodyView.setText(Trans.get(this, R.string.storage_loading));
+        final CardStack[] ref = new CardStack[1];
+        ref[0] = CardStack.show(null, this, Trans.get(this, R.string.set_storage_title),
+                CardStack.wrap(this, bodyView),
+                new CardStack.Btn(Trans.get(this, R.string.storage_clear_cache), new Runnable() {
+                    @Override public void run() { confirmClearShareCache(ref[0]); }
+                }),
+                new CardStack.Btn(Trans.get(this, R.string.close), new Runnable() {
+                    @Override public void run() { ref[0].dismiss(); }
+                }));
+        final CardStack card = ref[0];
         final android.content.Context app = getApplicationContext();
         new Thread(new Runnable() {
             @Override public void run() {
@@ -317,9 +322,10 @@ public class SettingsActivity extends BaseActivity {
                 final String fErr = err;
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
-                        if (Util.dead(SettingsActivity.this) || !dlg.isShowing()) return;
-                        dlg.setMessage(fErr == null ? fBody
+                        if (Util.dead(SettingsActivity.this) || !card.isShowing()) return;
+                        bodyView.setText(fErr == null ? fBody
                                 : Trans.get(SettingsActivity.this, R.string.storage_failed));
+                        card.remeasure();       // 正文换了 ⇒ 让卡片跟着长（否则挤在小窗里滚动）
                     }
                 });
             }
@@ -333,17 +339,15 @@ public class SettingsActivity extends BaseActivity {
      * 那些删了会重新生成、也可能正在被用；这里只动「直接分享」留下的那一份。
      * 正在被接收方读取的文件可能失效，所以先确认。
      */
-    private void confirmClearShareCache() {
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.storage_clear_title)
-                .setMessage(R.string.storage_clear_msg)
-                .setPositiveButton(R.string.storage_clear_btn, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) {
+    private void confirmClearShareCache(final CardStack stack) {
+        stack.pushMessage(Trans.get(this, R.string.storage_clear_title),
+                Trans.get(this, R.string.storage_clear_msg),
+                Trans.get(this, R.string.storage_clear_btn), new Runnable() {
+                    @Override public void run() {
+                        stack.dismiss();
                         clearShareCache();
                     }
-                })
-                .setNegativeButton(R.string.cancel, null)
-                .show();
+                });
     }
 
     private void clearShareCache() {

@@ -222,6 +222,19 @@ public final class CardStack {
         return stack;
     }
 
+    /**
+     * 正文换了以后**重新量一次高度**（"先出壳、后台算完再补正文"这类页面用：存储占用、耗时统计…）。
+     * 不调用的话卡片会停在出壳时那个高度上（内容只能在小窗口里滚动）。
+     */
+    public void remeasure() {
+        if (pages.isEmpty()) return;
+        Page p = pages.get(pages.size() - 1);
+        int h = measurePage(p.body);
+        p.body.setLayoutParams(new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT, h));
+        setBodyHeight(h, true);
+    }
+
     /** 回上一页；已经在第一页就关掉。 */
     public void pop() {
         if (pages.size() <= 1) {
