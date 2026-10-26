@@ -116,6 +116,20 @@ public final class Check {
                         && Playtime.parse(t6).get(0).upstream.equals("u y"),
                 "clean: 控制字符 -> 空格，仍是一行");
 
+        // ── 显示层合并：同一游戏版本（同名）合成一行 ─────────────────────────
+        List<Playtime.Slice> sl = new java.util.ArrayList<Playtime.Slice>();
+        sl.add(new Playtime.Slice("A  159.7", 100));
+        sl.add(new Playtime.Slice("A  159.7", 300));
+        sl.add(new Playtime.Slice("B  159.7", 50));
+        sl.add(new Playtime.Slice("", 10));
+        sl.add(new Playtime.Slice("", 20));
+        List<Playtime.Slice> mg = Playtime.mergeNamed(sl);
+        fail += ok(mg.size() == 3 && mg.get(0).name.equals("A  159.7") && mg.get(0).ms == 400
+                        && mg.get(1).name.equals("B  159.7") && mg.get(1).ms == 50
+                        && mg.get(2).name.isEmpty() && mg.get(2).ms == 30,
+                "mergeNamed: 同名合并 / 不同名分开 / 空名也合并 / 按时长降序");
+        fail += ok(Playtime.mergeNamed(null).isEmpty(), "mergeNamed: null -> 空");
+
         // ── 时长换算 ─────────────────────────────────────────────────────────
         int[] hm = Playtime.hm(3_600_000L + 12 * 60_000L);
         fail += ok(hm[0] == 1 && hm[1] == 12, "hm: 1h12");

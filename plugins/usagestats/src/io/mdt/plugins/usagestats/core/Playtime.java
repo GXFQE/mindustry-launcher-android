@@ -251,6 +251,47 @@ public final class Playtime {
         return out;
     }
 
+    /** 显示层的一行：名字 + 毫秒（槽页 / 插件页排版前先用 {@link #mergeNamed} 合并同名项）。 */
+    public static final class Slice {
+        public final String name;
+        public final long ms;
+
+        public Slice(String name, long ms) {
+            this.name = name == null ? "" : name.trim();
+            this.ms = ms;
+        }
+    }
+
+    /**
+     * 按**显示名**合并（名字里已含版本号；官方 / fork 同号但名字不同 ⇒ 不会误合）。
+     *
+     * <p>为什么在显示层合并：账本的行身份是「槽 + key + 版本号」，同一个游戏版本可能因为
+     * 「已装包 + 导入的同版本 APK / 换过包名」出现两行；槽页只想让用户看到一个版本一行。
+     * 账本保持原样（原始记录不丢）。
+     */
+    public static List<Slice> mergeNamed(List<Slice> rows) {
+        Map<String, Long> sums = new LinkedHashMap<String, Long>();
+        if (rows != null) {
+            for (Slice s : rows) {
+                if (s == null) continue;
+                String n = clean(s.name);
+                Long old = sums.get(n);
+                sums.put(n, (old == null ? 0 : old.longValue()) + s.ms);
+            }
+        }
+        List<Slice> out = new ArrayList<Slice>();
+        for (Map.Entry<String, Long> e : sums.entrySet()) {
+            out.add(new Slice(e.getKey(), e.getValue().longValue()));
+        }
+        Collections.sort(out, new Comparator<Slice>() {
+            @Override public int compare(Slice a, Slice b) {
+                if (a.ms != b.ms) return a.ms > b.ms ? -1 : 1;
+                return a.name.compareTo(b.name);
+            }
+        });
+        return out;
+    }
+
     /** ms ⇒ `{小时, 分}`（负值按 0）。 */
     public static int[] hm(long ms) {
         long sec = Math.max(0, ms) / 1000L;

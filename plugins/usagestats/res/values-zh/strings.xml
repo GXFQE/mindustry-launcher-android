@@ -7,4 +7,6 @@
     <string name="us_total_fmt">累计：%1$s</string>
     <string name="us_unknown_version">未知版本</string>
     <string name="us_note">只算游戏在前台的时间；进程被杀最多丢 20 秒。</string>
+    <string name="us_more_fmt">还有 %1$d 个版本 · 展开</string>
+    <string name="us_collapse">收起</string>
 </resources>

@@ -9,6 +9,7 @@ import android.widget.TextView;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +31,9 @@ import io.mdt.plugins.usagestats.core.Playtime;
  * 这个类同时是插件自述里的默认入口：从插件页长按「打开」时，页面显示总计 + 按槽分列。
  */
 public final class UsageStats {
+
+    /** 收起时最多显示几行（再多的版本要展开）。 */
+    private static final int COLLAPSED = 3;
 
     public static int api() {
         return 31;
@@ -62,10 +66,53 @@ public final class UsageStats {
                 ? Playtime.forSlot(ledger, slot)
                 : Playtime.bySlot(ledger);
         Map<String, ItemInfo> items = slotPage ? versionItems(api) : null;
+        List<Playtime.Slice> slices = new ArrayList<Playtime.Slice>();
         for (Playtime.Entry e : rows) {
             String name = slotPage ? versionLabel(c, items, e) : e.slot;
-            box.addView(row(c, th, name, duration(c, e.ms)));
+            slices.add(new Playtime.Slice(name, e.ms));
         }
+        // 同一槽里「同一个游戏版本」可能有多行（已装包 + 导入的同版本 APK、换过包名等）：
+        // 显示名里已含版本号，同名就合成一行（官方 / fork 同号但名字不同 ⇒ 不会误合）。
+        final List<Playtime.Slice> merged = Playtime.mergeNamed(slices);
+        final LinearLayout list = new LinearLayout(c);
+        list.setOrientation(LinearLayout.VERTICAL);
+        box.addView(list);
+
+        final TextView more = new TextView(c);
+        more.setTextSize(12f);
+        more.setTextColor(th.textMuted);
+        more.setPadding(0, th.dp(8), 0, 0);
+        more.setVisibility(View.GONE);
+        box.addView(more);
+
+        // 版本多了页面会被顶得很高：默认只看前几个，点一下展开 / 收起。
+        final boolean[] expanded = {false};
+        final Runnable[] paint = new Runnable[1];
+        paint[0] = new Runnable() {
+            @Override public void run() {
+                list.removeAllViews();
+                int show = expanded[0] ? merged.size() : Math.min(COLLAPSED, merged.size());
+                for (int i = 0; i < show; i++) {
+                    Playtime.Slice s = merged.get(i);
+                    list.addView(row(c, th, s.name, duration(c, s.ms)));
+                }
+                if (merged.size() > COLLAPSED) {
+                    more.setVisibility(View.VISIBLE);
+                    more.setText(expanded[0] ? c.getString(R.string.us_collapse)
+                            : c.getString(R.string.us_more_fmt, merged.size() - COLLAPSED));
+                    more.setOnClickListener(new View.OnClickListener() {
+                        @Override public void onClick(View v) {
+                            expanded[0] = !expanded[0];
+                            paint[0].run();
+                        }
+                    });
+                } else {
+                    more.setVisibility(View.GONE);
+                    more.setOnClickListener(null);
+                }
+            }
+        };
+        paint[0].run();
 
         TextView note = new TextView(c);
         note.setTextSize(11f);
