@@ -241,7 +241,9 @@ public final class CardStack {
             return;
         }
         if (pages.isEmpty()) pages.add(p); else pages.set(pages.size() - 1, p);
-        render(p, true);
+        // ⚠️ 这里**不做交叉淡入**：`replace` 是"同一件事的下一屏"（确认 → 正在 → 结果），
+        //   淡入淡出会让两段文字短暂叠在一起；直接换 + 直接定量高度最稳（真机踩过两次）。
+        render(p, false);
     }
 
     /** 只改这一页的正文（进度数字这种高频刷新）—— 不换页、不播动画。 */
@@ -333,16 +335,28 @@ public final class CardStack {
             }
         }).start();
 
-        final View old = bodyView.getChildCount() == 0 ? null : bodyView.getChildAt(0);
+        // ⚠️ 旧实现只认 `getChildAt(0)`：连续两次 `replace` 时（进度 → 结果）会把**上一页**
+        //   当成要删的那个，真正该走的那个留在底下 ⇒ 两段文字叠在一起（真机 `备份完成` 抓到的）。
+        //   现在按身份清：除了这一页，bodyView 里的其它子视图全淡出并移除。
+        final java.util.List<View> olds = new java.util.ArrayList<View>();
+        for (int i = 0; i < bodyView.getChildCount(); i++) {
+            View c = bodyView.getChildAt(i);
+            if (c != p.body) olds.add(c);
+        }
         p.body.setAlpha(0f);
         bodyView.addView(p.body);
         p.body.animate().alpha(1f).setDuration(150).start();
-        if (old != null) old.animate().alpha(0f).setDuration(120).start();
+        for (View o : olds) {
+            o.animate().alpha(0f).setDuration(120).start();
+        }
         setBodyHeight(h, true);
         setButtons(p);
         bodyView.postDelayed(new Runnable() {
             @Override public void run() {
-                if (old != null) bodyView.removeView(old);
+                for (int i = bodyView.getChildCount() - 1; i >= 0; i--) {
+                    View c = bodyView.getChildAt(i);
+                    if (c != p.body) bodyView.removeView(c);
+                }
             }
         }, 200);
     }

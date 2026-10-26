@@ -91,16 +91,23 @@ final class SlotOps {
                 }),
                 new CardStack.Btn(Trans.get(a, R.string.backup), new Runnable() {
                     @Override public void run() {
-                        ref[0].dismiss();
-                        doBackup(a, s, h, input.getText().toString());
+                        // ★ 第 269 轮：进度页顶替这一页（不关窗）
+                        doBackup(ref[0], a, s, h, input.getText().toString());
                     }
                 }));
     }
 
     private static void doBackup(final Activity a, final Data.Slot s, final Host h,
                                  final String label) {
-        final ProgressDialog pd = ProgressDialog.show(a, Trans.get(a, R.string.backup_progress_title),
-                Trans.get(a, R.string.backup_progress_msg_fmt, s.name), true, false);
+        doBackup(null, a, s, h, label);
+    }
+
+    /** 卡片版（第 269 轮）：进度 → 结果 同一张卡；没有卡片就自己开一张。 */
+    private static void doBackup(final CardStack card, final Activity a, final Data.Slot s,
+                                 final Host h, final String label) {
+        final CardStack stack = (card != null) ? card : new CardStack(a);
+        stack.replace(Trans.get(a, R.string.backup_progress_title),
+                Trans.get(a, R.string.backup_progress_msg_fmt, s.name));
         new Thread(new Runnable() {
             @Override public void run() {
                 String err = null;
@@ -116,21 +123,30 @@ final class SlotOps {
                 final Backup.Snapshot fss = ss;
                 a.runOnUiThread(new Runnable() {
                     @Override public void run() {
-                        pd.dismiss();
+                        if (Util.dead(a)) return;
                         if (fe == null) {
-                            alert(a, Trans.get(a, R.string.backup_done),
+                            stack.replace(Trans.get(a, R.string.backup_done),
                                     Trans.get(a, R.string.backup_done_msg_fmt, fss.title(),
                                             fss.count, Util.formatSize(fss.bytes),
                                             Util.formatSize(fss.storedNew),
-                                            fss.dir.getAbsolutePath()));
+                                            fss.dir.getAbsolutePath()),
+                                    closeBtn(a, stack));
                         } else {
-                            alert(a, Trans.get(a, R.string.backup_failed), fe);
+                            stack.replace(Trans.get(a, R.string.backup_failed), fe,
+                                    closeBtn(a, stack));
                         }
                         h.onSlotChanged();
                     }
                 });
             }
         }).start();
+    }
+
+    /** 卡片结果页的「关闭」（唯一实现）。 */
+    private static CardStack.Btn closeBtn(final Activity a, final CardStack stack) {
+        return new CardStack.Btn(Trans.get(a, R.string.close), new Runnable() {
+            @Override public void run() { stack.dismiss(); }
+        });
     }
 
     // ── 备份列表（看 / 恢复 / 删掉） ───────────────────────────────────────
@@ -293,8 +309,8 @@ final class SlotOps {
                 stack.back(),
                 new CardStack.Btn(Trans.get(a, R.string.restore), new Runnable() {
                     @Override public void run() {
-                        stack.dismiss();
-                        doRestore(a, s, ss, modes == null ? SlotWrite.UPDATE : modes.mode(), h);
+                        // ★ 第 269 轮：进度页顶替确认页（不关窗）
+                        doRestore(stack, a, s, ss, modes == null ? SlotWrite.UPDATE : modes.mode(), h);
                     }
                 }));
     }
@@ -326,8 +342,15 @@ final class SlotOps {
 
     private static void doRestore(final Activity a, final Data.Slot s,
                                   final Backup.Snapshot ss, final int mode, final Host h) {
-        final ProgressDialog pd = ProgressDialog.show(a, Trans.get(a, R.string.restore_progress_title),
-                Trans.get(a, R.string.restore_progress_msg), true, false);
+        doRestore(null, a, s, ss, mode, h);
+    }
+
+    /** 卡片版（第 269 轮）：进度 → 恢复报告 同一张卡。 */
+    private static void doRestore(final CardStack card, final Activity a, final Data.Slot s,
+                                  final Backup.Snapshot ss, final int mode, final Host h) {
+        final CardStack stack = (card != null) ? card : new CardStack(a);
+        stack.replace(Trans.get(a, R.string.restore_progress_title),
+                Trans.get(a, R.string.restore_progress_msg));
         new Thread(new Runnable() {
             @Override public void run() {
                 // ★★ 第 178 轮：pre-op 与恢复是**同一个入口**（UI/dev 共用）。
@@ -339,9 +362,9 @@ final class SlotOps {
                         : Trans.get(a, R.string.slot_autobak_done_fmt, auto.title()));
                 a.runOnUiThread(new Runnable() {
                     @Override public void run() {
-                        pd.dismiss();
-                        alert(a, a.getString(rr.ok ? R.string.restore_done
-                                : R.string.restore_not_run), report);
+                        if (Util.dead(a)) return;
+                        stack.replace(Trans.get(a, rr.ok ? R.string.restore_done
+                                : R.string.restore_not_run), report, closeBtn(a, stack));
                         h.onSlotChanged();
                     }
                 });
@@ -384,18 +407,31 @@ final class SlotOps {
         box.setPadding(dp(a, 20), 0, dp(a, 20), 0);
         box.addView(input, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        new AlertDialog.Builder(a)
-                .setTitle(Trans.get(a, R.string.clone_title_fmt, s.name))
-                .setMessage(Trans.get(a, R.string.clone_msg_fmt, s.name, s.files,
-                        Util.formatSize(s.bytes), excludedNames()))
-                .setView(box)
-                .setPositiveButton(R.string.clone, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) {
-                        doClone(a, s, input.getText().toString(), h);
+        // ★ 第 269 轮：输入页 → 进度页 → 结果页 同一张卡（原来是"输入框 → 进度框 → 结果框"三个窗）
+        android.widget.TextView msg = new android.widget.TextView(a);
+        msg.setText(Trans.get(a, R.string.clone_msg_fmt, s.name, s.files,
+                Util.formatSize(s.bytes), excludedNames()));
+        msg.setTextSize(15);
+        msg.setTextColor(a.getResources().getColor(R.color.fg));
+        msg.setLineSpacing(Math.round(4 * a.getResources().getDisplayMetrics().density), 1f);
+        LinearLayout page = new LinearLayout(a);
+        page.setOrientation(LinearLayout.VERTICAL);
+        page.addView(msg);
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        lp.topMargin = dp(a, 12);
+        page.addView(box, lp);
+        final CardStack[] ref = new CardStack[1];
+        ref[0] = CardStack.show(null, a, Trans.get(a, R.string.clone_title_fmt, s.name),
+                CardStack.wrap(a, page),
+                new CardStack.Btn(Trans.get(a, R.string.cancel), new Runnable() {
+                    @Override public void run() { ref[0].dismiss(); }
+                }),
+                new CardStack.Btn(Trans.get(a, R.string.clone), new Runnable() {
+                    @Override public void run() {
+                        doClone(ref[0], a, s, input.getText().toString(), h);
                     }
-                })
-                .setNegativeButton(R.string.cancel, null)
-                .show();
+                }));
     }
 
     /**
@@ -408,29 +444,36 @@ final class SlotOps {
      */
     private static void doClone(final Activity a, final Data.Slot s, final String rawName,
                                 final Host h) {
-        // 仅用于**进度框文案与快照标题**；合法性判定不在这里（见上面第 3 条）。
+        doClone(null, a, s, rawName, h);
+    }
+
+    /** 卡片版（第 269 轮）：进度 → 结果 同一张卡。 */
+    private static void doClone(final CardStack card, final Activity a, final Data.Slot s,
+                                final String rawName, final Host h) {
+        // 仅用于**进度页文案与快照标题**；合法性判定不在这里（见上面第 3 条）。
         final String to = Data.sanitizeSlot(rawName);
         final String shown = (to == null) ? rawName : to;
         final String title = Trans.get(a, R.string.clone_title_fmt, shown);
 
-        final ProgressDialog pd = ProgressDialog.show(a,
-                Trans.get(a, R.string.clone_progress_title),
-                Trans.get(a, R.string.clone_progress_msg_fmt, s.name, shown), true, false);
+        final CardStack stack = (card != null) ? card : new CardStack(a);
+        stack.replace(Trans.get(a, R.string.clone_progress_title),
+                Trans.get(a, R.string.clone_progress_msg_fmt, s.name, shown));
         new Thread(new Runnable() {
             @Override public void run() {
                 final String fail = Backup.cloneSlot(a, s.name, rawName, title);
                 a.runOnUiThread(new Runnable() {
                     @Override public void run() {
-                        pd.dismiss();
+                        if (Util.dead(a)) return;
                         if (fail != null) {
-                            alert(a, Trans.get(a, R.string.clone_failed), fail);
+                            stack.replace(Trans.get(a, R.string.clone_failed), fail, closeBtn(a, stack));
                         } else {
                             // ⚠️ 直接问盘（`Data.slotInfo`），**不要**从列表快照里找 ——
                             //   它此刻还是克隆前的，新槽压根不在里面（会报 0 个文件）。
                             Data.Slot now = Data.slotInfo(a, to);
-                            alert(a, Trans.get(a, R.string.clone_done),
+                            stack.replace(Trans.get(a, R.string.clone_done),
                                     Trans.get(a, R.string.clone_done_msg_fmt, to,
-                                            now.files, Util.formatSize(now.bytes)));
+                                            now.files, Util.formatSize(now.bytes)),
+                                    closeBtn(a, stack));
                         }
                         h.onSlotChanged();
                     }

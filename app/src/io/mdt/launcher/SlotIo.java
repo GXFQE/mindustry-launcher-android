@@ -765,9 +765,10 @@ final class SlotIo {
                     Trans.get(a, R.string.export_slot_empty_fmt));
             return;
         }
-        final ProgressDialog pd = ProgressDialog.show(a,
-                Trans.get(a, R.string.export_progress_title),
-                Trans.get(a, R.string.share_progress_msg_fmt, slot), true, false);
+        // ★ 第 269 轮：进度画在卡片里（原来 ProgressDialog）
+        final CardStack stack = new CardStack(a);
+        stack.replace(Trans.get(a, R.string.export_progress_title),
+                Trans.get(a, R.string.share_progress_msg_fmt, slot));
         new Thread(new Runnable() {
             @Override public void run() {
                 String err = null;
@@ -794,14 +795,14 @@ final class SlotIo {
                 final SharePack.Plan fp = p;
                 a.runOnUiThread(new Runnable() {
                     @Override public void run() {
-                        pd.dismiss();
                         if (fe != null) {
-                            alert(a, Trans.get(a, R.string.export_failed), fe);
+                            stack.replace(Trans.get(a, R.string.export_failed), fe, closeBtn(a, stack));
                             return;
                         }
                         // ★ 两个出口分开说：**本来就没有身份信息**（"包和整槽导出一样"）
                         //   与"去掉了 N 项"是两件事，混成一句会让前者看着像漏剥了
                         //   （报告里那句 `untouched()` 也是同一个判据）。
+                        stack.dismiss();
                         toast(a, fp != null && fp.removedKeys > 0
                                 ? Trans.get(a, R.string.share_slot_done_fmt,
                                         fr.files, Util.formatSize(fr.outBytes), fp.removedKeys)
@@ -828,9 +829,10 @@ final class SlotIo {
                     Trans.get(a, R.string.export_slot_empty_fmt));
             return;
         }
-        final ProgressDialog pd = ProgressDialog.show(a,
-                Trans.get(a, R.string.export_progress_title),
-                Trans.get(a, R.string.share_progress_msg_fmt, slot), true, false);
+        // ★ 第 269 轮：进度画在卡片里（原来 ProgressDialog）
+        final CardStack stack = new CardStack(a);
+        stack.replace(Trans.get(a, R.string.export_progress_title),
+                Trans.get(a, R.string.share_progress_msg_fmt, slot));
         final String name = suggestZipName(slot, "share");
         new Thread(new Runnable() {
             @Override public void run() {
@@ -852,12 +854,12 @@ final class SlotIo {
                 final String fe = err;
                 a.runOnUiThread(new Runnable() {
                     @Override public void run() {
-                        pd.dismiss();
                         if (a.isFinishing()) return;
                         if (fe != null) {
-                            alert(a, Trans.get(a, R.string.export_failed), fe);
+                            stack.replace(Trans.get(a, R.string.export_failed), fe, closeBtn(a, stack));
                             return;
                         }
+                        stack.dismiss();          // 交给系统分享面板
                         ShareOut.launch(a, fu);
                     }
                 });
@@ -971,9 +973,9 @@ final class SlotIo {
                     Trans.get(a, R.string.export_slot_empty_fmt));
             return;
         }
-        final ProgressDialog pd = ProgressDialog.show(a,
-                Trans.get(a, R.string.export_progress_title),
-                Trans.get(a, R.string.export_progress_msg_fmt, slot), true, false);
+        final CardStack stack = new CardStack(a);
+        stack.replace(Trans.get(a, R.string.export_progress_title),
+                Trans.get(a, R.string.export_progress_msg_fmt, slot));
         new Thread(new Runnable() {
             @Override public void run() {
                 String err = null;
@@ -989,11 +991,11 @@ final class SlotIo {
                 final Exporter.Result fr = r;
                 a.runOnUiThread(new Runnable() {
                     @Override public void run() {
-                        pd.dismiss();
                         if (fe != null) {
-                            alert(a, Trans.get(a, R.string.export_failed), fe);
+                            stack.replace(Trans.get(a, R.string.export_failed), fe, closeBtn(a, stack));
                             return;
                         }
+                        stack.dismiss();
                         toast(a, Trans.get(a, R.string.export_slot_done_fmt,
                                 fr.files, Util.formatSize(fr.outBytes)));
                     }
@@ -1082,9 +1084,9 @@ final class SlotIo {
      * 而且用户看到警告时手边就是输入框和取消）。
      */
     private static void importMsav(final Activity a, final Uri uri, final String displayName, final String slot, final SlotOps.Host h) {
-        final ProgressDialog pd = ProgressDialog.show(a,
-                Trans.get(a, R.string.msav_import_progress_title),
-                Trans.get(a, R.string.msav_import_progress_msg_fmt, displayName, slot), true, false);
+        final CardStack stack = new CardStack(a);
+        stack.replace(Trans.get(a, R.string.msav_import_progress_title),
+                Trans.get(a, R.string.msav_import_progress_msg_fmt, displayName, slot));
         new Thread(new Runnable() {
             @Override public void run() {
                 String err = null;
@@ -1100,9 +1102,8 @@ final class SlotIo {
                 final Msav.Stage fst = st;
                 a.runOnUiThread(new Runnable() {
                     @Override public void run() {
-                        pd.dismiss();
                         if (fe != null) {
-                            alert(a, Trans.get(a, R.string.import_failed), fe);
+                            stack.replace(Trans.get(a, R.string.import_failed), fe, closeBtn(a, stack));
                             return;
                         }
                         // ★ 接下来弹的是**改名框**（inline AlertDialog）⇒ 实例死了就必须停在这里，
@@ -1111,7 +1112,7 @@ final class SlotIo {
                             Msav.discard(fst);
                             return;
                         }
-                        showMsavNameDialog(a, fst, slot, h);
+                        showMsavNameDialog(stack, a, fst, slot, h);
                     }
                 });
             }
@@ -1274,9 +1275,9 @@ final class SlotIo {
      *   临时文件用完必删（成功、失败、取消三条路都删，见 {@link #dropZipTemp}）。
      */
     private static void readZipThenConfirm(final Activity a, final Uri uri, final String zipName, final String slot, final SlotOps.Host h) {
-        final ProgressDialog pd = ProgressDialog.show(a,
-                Trans.get(a, R.string.zip_read_progress_title),
-                Trans.get(a, R.string.zip_read_progress_msg_fmt, zipName), true, false);
+        final CardStack stack = new CardStack(a);
+        stack.replace(Trans.get(a, R.string.zip_read_progress_title),
+                Trans.get(a, R.string.zip_read_progress_msg_fmt, zipName));
         new Thread(new Runnable() {
             @Override public void run() {
                 String err = null;
@@ -1297,9 +1298,8 @@ final class SlotIo {
                 final SlotZip.Info finf = inf;
                 a.runOnUiThread(new Runnable() {
                     @Override public void run() {
-                        pd.dismiss();
                         if (fe != null) {
-                            alert(a, Trans.get(a, R.string.zip_read_failed), fe);
+                            stack.replace(Trans.get(a, R.string.zip_read_failed), fe, closeBtn(a, stack));
                             return;
                         }
                         // ★ 下面弹的是 inline 确认框 ⇒ 实例死了必须停，并**把临时包清掉**
@@ -1310,7 +1310,7 @@ final class SlotIo {
                         }
                         sZipTmp = ftmp;
                         sZipInfo = finf;
-                        confirmZipImport(a, slot, finf, h);
+                        confirmZipImport(stack, a, slot, finf, h);
                     }
                 });
             }
@@ -1326,6 +1326,12 @@ final class SlotIo {
      *   判据与清空实现都在 {@link SlotWrite}，与快照恢复**共用一份**。
      */
     private static void confirmZipImport(final Activity a, final String slot, final SlotZip.Info inf, final SlotOps.Host h) {
+        confirmZipImport(null, a, slot, inf, h);
+    }
+
+    /** 卡片里有栈就顶替当前页（读 zip 的进度页 → 确认页），没有就自己开一张（第 269 轮）。 */
+    private static void confirmZipImport(final CardStack parent, final Activity a, final String slot,
+                                         final SlotZip.Info inf, final SlotOps.Host h) {
         View form = a.getLayoutInflater().inflate(R.layout.dialog_zip_import, null);
         TextView list = (TextView) form.findViewById(R.id.zip_list);
         TextView warn = (TextView) form.findViewById(R.id.zip_warn);
@@ -1359,7 +1365,7 @@ final class SlotIo {
 
         // ★ 第 268 轮：确认 → 解包进度 → 结果 都在同一张卡里（原来三个窗口）
         final CardStack[] ref = new CardStack[1];
-        ref[0] = CardStack.show(null, a, Trans.get(a, R.string.zip_confirm_title_fmt, slot),
+        ref[0] = CardStack.show(parent, a, Trans.get(a, R.string.zip_confirm_title_fmt, slot),
                 CardStack.wrap(a, form),
                 new CardStack.Btn(Trans.get(a, R.string.cancel), new Runnable() {
                     @Override public void run() {
