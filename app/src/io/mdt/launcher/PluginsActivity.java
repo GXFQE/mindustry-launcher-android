@@ -869,16 +869,22 @@ public class PluginsActivity extends BaseActivity {
         if (r == Restart.INEXACT) {
             // 没有「闹钟与提醒」权限 ⇒ 闹钟不精确，可能差几秒到几十秒。
             // 先告诉用户；他不想等就取消（把闹钟也撞掉）。
-            new AlertDialog.Builder(this)
-                    .setTitle(R.string.plugin_restart)
-                    .setMessage(R.string.plugin_restart_inexact)
-                    .setPositiveButton(R.string.plugin_restart_now, new DialogInterface.OnClickListener() {
-                        @Override public void onClick(DialogInterface d, int w) { Restart.killSelf(); }
-                    })
-                    .setNegativeButton(R.string.cancel, new DialogInterface.OnClickListener() {
-                        @Override public void onClick(DialogInterface d, int w) { Restart.cancel(PluginsActivity.this); }
-                    })
-                    .show();
+            // ★ 第 272 轮：这条"没有精确闹钟权限"的提示也画在卡片里（原来关掉卡片再开一个弹窗）
+            final CardStack[] ref = new CardStack[1];
+            ref[0] = CardStack.show(null, this, Trans.get(this, R.string.plugin_restart),
+                    CardStack.text(this, Trans.get(this, R.string.plugin_restart_inexact)),
+                    new CardStack.Btn(Trans.get(this, R.string.cancel), new Runnable() {
+                        @Override public void run() {
+                            ref[0].dismiss();
+                            Restart.cancel(PluginsActivity.this);
+                        }
+                    }),
+                    new CardStack.Btn(Trans.get(this, R.string.plugin_restart_now), new Runnable() {
+                        @Override public void run() {
+                            ref[0].dismiss();
+                            Restart.killSelf();
+                        }
+                    }));
             return;
         }
         Toast.makeText(this, Trans.get(this, R.string.plugin_restart_failed), Toast.LENGTH_LONG).show();
