@@ -524,10 +524,9 @@ public class PluginsActivity extends BaseActivity {
                         }
                     }
                 }),
-                Trans.get(this, R.string.cancel),
-                new Runnable() {
+                new CardStack.Btn(Trans.get(this, R.string.cancel), new Runnable() {
                     @Override public void run() { stack.dismiss(); }
-                });
+                }));
         stack.show();
     }
 

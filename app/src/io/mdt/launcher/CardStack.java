@@ -51,14 +51,22 @@ public final class CardStack {
         void onClick(int index);
     }
 
-    /** 一页 = 标题 + 内容 + 最多两个按钮（都可空；按钮顺序 = 左 neg / 右 pos，与框架对话框一致）。 */
+    /** 一个按钮 = 文案 + 点下去做什么（顺序即渲染顺序：左 → 右）。 */
+    public static final class Btn {
+        final CharSequence label;
+        final Runnable action;
+
+        public Btn(CharSequence label, Runnable action) {
+            this.label = label;
+            this.action = action;
+        }
+    }
+
+    /** 一页 = 标题 + 内容 + 0~3 个按钮。 */
     private static final class Page {
         CharSequence title;
         View body;
-        CharSequence negLabel;
-        Runnable negAction;
-        CharSequence posLabel;
-        Runnable posAction;
+        final ArrayList<Btn> buttons = new ArrayList<Btn>();
     }
 
     private final Dialog dlg;
@@ -117,34 +125,53 @@ public final class CardStack {
         });
     }
 
-    /** 第一页（必须是第一页；重复调用会清空栈）。 */
-    public CardStack root(CharSequence title, View body, CharSequence cancelLabel, Runnable cancelAction) {
+    /** 第一页（必须是第一页；重复调用会清空栈）。按钮顺序即渲染顺序（左 → 右）。 */
+    public CardStack root(CharSequence title, View body, Btn... buttons) {
         Page p = new Page();
         p.title = title;
         p.body = body;
-        p.negLabel = cancelLabel;
-        p.negAction = cancelAction;
+        for (Btn b : buttons) if (b != null) p.buttons.add(b);
         pages.clear();
         pages.add(p);
         render(p, false);
         return this;
     }
 
-    /** 钻进下一页（交叉淡入；自动带一个「返回」）。 */
+    /** 钻进下一页（交叉淡入；不给按钮时自动带一个「返回」）。 */
     public void push(CharSequence title, View body) {
-        push(title, body, Trans.get(dlg.getContext(), R.string.back));
+        push(title, body, back());
     }
 
-    public void push(CharSequence title, View body, CharSequence backLabel) {
-        final Page p = new Page();
+    public void push(CharSequence title, View body, Btn... buttons) {
+        Page p = new Page();
         p.title = title;
         p.body = body;
-        p.negLabel = backLabel;
-        p.negAction = new Runnable() {
-            @Override public void run() { pop(); }
-        };
+        for (Btn b : buttons) if (b != null) p.buttons.add(b);
+        if (p.buttons.isEmpty()) p.buttons.add(back());
         pages.add(p);
         render(p, true);
+    }
+
+    /**
+     * 「确认」类的一页：正文 + 「返回」 + 一个动作按钮。
+     * ★ 动作按钮点完**不自动关窗** —— 关不关由 `ok` 自己决定（例如先跑动作、再 `dismiss()`）。
+     */
+    public void pushMessage(CharSequence title, CharSequence message, CharSequence okLabel, Runnable ok) {
+        push(title, text(dlg.getContext(), message), back(), new Btn(okLabel, ok));
+    }
+
+    /** 「返回」按钮（回上一页）。 */
+    public Btn back() {
+        return new Btn(Trans.get(dlg.getContext(), R.string.back), new Runnable() {
+            @Override public void run() { pop(); }
+        });
+    }
+
+    /** 「关闭」按钮（关掉整张卡）。 */
+    public Btn close() {
+        return new Btn(Trans.get(dlg.getContext(), R.string.close), new Runnable() {
+            @Override public void run() { dlg.dismiss(); }
+        });
     }
 
     /** 回上一页；已经在第一页就关掉。 */
@@ -242,8 +269,7 @@ public final class CardStack {
 
     private void setButtons(Page p) {
         buttonBar.removeAllViews();
-        if (p.negLabel != null) buttonBar.addView(button(p.negLabel, p.negAction));
-        if (p.posLabel != null) buttonBar.addView(button(p.posLabel, p.posAction));
+        for (Btn b : p.buttons) buttonBar.addView(button(b.label, b.action));
         buttonBar.setVisibility(buttonBar.getChildCount() == 0 ? View.GONE : View.VISIBLE);
     }
 

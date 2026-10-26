@@ -1637,22 +1637,31 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
      *   第一层只留用户真正要判断的那几样 + **一句话结论**。
      */
     private void showDetail(final Mods.Info m) {
-        new AlertDialog.Builder(this)
-                .setTitle(m.title())
-                .setMessage(userPart(m))
-                .setPositiveButton(R.string.mods_close, null)
-                .setNeutralButton(R.string.mods_detail_tech, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) { showTech(m); }
-                })
-                .setNegativeButton(m.enabled ? R.string.mods_toggle_btn_off : R.string.mods_toggle_btn_on,
-                        m.metaError == null && m.internalName != null
-                                ? new DialogInterface.OnClickListener() {
-                                    @Override public void onClick(DialogInterface d, int w) {
-                                        confirmToggle(m);
-                                    }
-                                }
-                                : null)
-                .show();
+        // ★ 第 259 轮：原来是「详情弹窗里再弹技术细节」= 两个窗口 ⇒ 旧窗一关 dim 就重来一遍、整屏闪。
+        //   现在同一个卡片里 push 一页（`CardStack`）：窗口与 dim 全程不变，只有内容交叉淡入。
+        final CardStack stack = new CardStack(this);
+        final CardStack.Btn toggle = m.metaError == null && m.internalName != null
+                ? new CardStack.Btn(getString(m.enabled ? R.string.mods_toggle_btn_off
+                                                         : R.string.mods_toggle_btn_on),
+                        new Runnable() {
+                            @Override public void run() {
+                                // 开关是"动作型"（还会再弹确认框）⇒ 先把卡片收掉，别让两个窗口叠着
+                                stack.dismiss();
+                                confirmToggle(m);
+                            }
+                        })
+                : null;
+        stack.root(m.title(), CardStack.text(this, userPart(m)),
+                toggle,
+                new CardStack.Btn(getString(R.string.mods_detail_tech), new Runnable() {
+                    @Override public void run() {
+                        stack.push(m.title(), CardStack.text(ModsActivity.this, techText(m)));
+                    }
+                }),
+                new CardStack.Btn(getString(R.string.mods_close), new Runnable() {
+                    @Override public void run() { stack.dismiss(); }
+                }));
+        stack.show();
     }
 
     /** 第一层：正常模组 7 行以内 —— 类型 / 简介 / 联机 / 作者 / 大小 · 开关状态 · 一句话结论 */
@@ -1733,7 +1742,7 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
      * 文件名 / 游戏里的名字 / 更新地址 / 代码入口 / 依赖 / 位置 / 逐关明细 / 设置里那几个键 / 原始内容。
      * ⚠️ 这一层是**给排查用的**，允许长；但**空的项不显示**（原来「必需依赖：无」白占一行）。
      */
-    private void showTech(final Mods.Info m) {
+    private CharSequence techText(final Mods.Info m) {
         StringBuilder sb = new StringBuilder();
         sb.append(Trans.get(ModsActivity.this, R.string.mods_detail_file_fmt, m.fileName,
                 Util.formatSize(m.bytes), formOf(m))).append('\n');
@@ -1827,11 +1836,7 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
                     Integer.valueOf(cap))).append('\n').append(body);
         }
 
-        new AlertDialog.Builder(this)
-                .setTitle(m.title())
-                .setMessage(sb.toString())
-                .setPositiveButton(R.string.mods_close, null)
-                .show();
+        return sb;
     }
 
     /** 按**显示名**在扫描结果里找那个模组（归因器给的就是显示名）。 */
