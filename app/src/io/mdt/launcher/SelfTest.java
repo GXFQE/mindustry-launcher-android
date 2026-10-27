@@ -4491,6 +4491,117 @@ public final class SelfTest {
             ok(stat, L, false, "PluginData.open threw: " + t);
         }
 
+        // ── 第 280 轮：插件筛选 / 排序的**结果层**（四个列表页共用 PluginPicks）──────────
+        {
+            File dir = ctx.getCacheDir();
+            File slotMap = new File(dir, "plug-id-slot.msav");
+            Maps.Item si = new Maps.Item();
+            si.file = slotMap;
+            ItemInfo sInfo = new ItemInfo(ItemInfo.KIND_MAPS, "m", "", slotMap.getAbsolutePath(),
+                    null, null, 0L, 0L, "", null, false, true, null);
+            String sid = PluginPicks.idOf(sInfo);
+            ok(stat, L, sid.equals(slotMap.getAbsolutePath())
+                            && sid.equals(PluginPicks.idOf(si.file, si.container, si.entry)),
+                    "★身份：槽内文件 = 绝对路径（ItemInfo 与 Maps.Item 两处算出来逐字相同）");
+
+            File apk = new File(dir, "plug-id.apk");
+            Maps.Item zi = new Maps.Item();
+            zi.container = apk;
+            zi.entry = "assets/maps/onset.msav";
+            ItemInfo zInfo = new ItemInfo(ItemInfo.KIND_MAPS, "onset.msav", "", null,
+                    apk.getAbsolutePath(), zi.entry, 1L, 0L, "", null, false, true, null);
+            String zid = PluginPicks.idOf(zInfo);
+            ok(stat, L, !zid.isEmpty()
+                            && zid.equals(apk.getAbsolutePath() + "!/" + zi.entry)
+                            && zid.equals(PluginPicks.idOf(zi.file, zi.container, zi.entry)),
+                    "★★包内条目也有身份（容器!/条目）—— 原来只收 path ⇒ 游戏自带 / 模组自带的图会被静默丢掉");
+            ok(stat, L, PluginPicks.idOf((ItemInfo) null).isEmpty()
+                            && PluginPicks.idOf(null, null, null).isEmpty()
+                            && PluginPicks.idOf(null, apk, "").isEmpty()
+                            && PluginPicks.idOf(null, null, zi.entry).isEmpty(),
+                    "身份：三样都没有 ⇒ 空串（不 NPE；空身份不进匹配）");
+
+            // 应用层：过滤只留点名的 / 保序；排序按插件给的顺序，没点到名的垫底
+            final String A = "/tmp/pick-a", B = "/tmp/pick-b", C = "/tmp/pick-c";
+            List<File> three = new ArrayList<File>();
+            three.add(new File(A));
+            three.add(new File(B));
+            three.add(new File(C));
+            PluginPicks.IdOf<File> idf = new PluginPicks.IdOf<File>() {
+                @Override public String idOf(File f) {
+                    return f == null ? "" : f.getAbsolutePath();
+                }
+            };
+            java.util.Set<String> keep = new java.util.HashSet<String>();
+            keep.add(C);
+            List<File> kept = PluginPicks.applyFilter(three, keep, idf);
+            ok(stat, L, kept.size() == 1 && kept.get(0).getAbsolutePath().equals(C)
+                            && three.size() == 3,
+                    "applyFilter：只留点名的、保序，且不改入参");
+
+            List<String> order = new ArrayList<String>();
+            order.add(C);
+            order.add(A);
+            List<File> byPlugin = PluginPicks.applySort(three, order, idf);
+            ok(stat, L, byPlugin.size() == 3
+                            && byPlugin.get(0).getAbsolutePath().equals(C)
+                            && byPlugin.get(1).getAbsolutePath().equals(A)
+                            && byPlugin.get(2).getAbsolutePath().equals(B),
+                    "applySort：按插件顺序（C → A），没点到名的排最后（B），一个都不丢");
+
+            List<String> rev = new ArrayList<String>();
+            rev.add(A);
+            rev.add(C);
+            List<File> byPlugin2 = PluginPicks.applySort(three, rev, idf);
+            ok(stat, L, byPlugin2.get(0).getAbsolutePath().equals(A)
+                            && !byPlugin2.get(0).getAbsolutePath()
+                                    .equals(byPlugin.get(0).getAbsolutePath()),
+                    "★元断言：换一份顺序结果必须真的变（否则\"排序没生效\"也全绿）");
+
+            ok(stat, L, PluginPicks.applySort(three, null, idf).get(0) == three.get(0)
+                            && PluginPicks.applySort(three, new ArrayList<String>(), idf).get(0)
+                                    == three.get(0)
+                            && PluginPicks.applyFilter(three, null, idf).size() == 3,
+                    "没选插件（order/keep = null 或空）⇒ 原表 / 全留（不能把\"没选\"当成\"筛空\"）");
+
+            // 真数据交叉核对：页面扫描那份 `Maps.Item` 与插件拿到的 `ItemInfo` 必须同 id
+            try {
+                Mods.Target t = Mods.targetsFor(ctx, curSlot);
+                List<Maps.Item> real = Maps.scan(ctx, curSlot, t == null ? null : t.apkPath);
+                int bad = 0;
+                int container = 0;
+                for (Maps.Item it : real) {
+                    ItemInfo ii = PluginData.mapItem(ctx, it);
+                    String one = PluginPicks.idOf(it.file, it.container, it.entry);
+                    String two = PluginPicks.idOf(ii);
+                    if (it.file == null) container++;
+                    if (one.isEmpty() || !one.equals(two)) bad++;
+                }
+                ok(stat, L, bad == 0,
+                        "★★两侧身份一致（真数据 " + real.size() + " 张，其中包内 " + container
+                                + " 张）：页面 scan 与 PluginData.mapItem 算出来逐字相同"
+                                + (bad == 0 ? "" : "；不一致 " + bad + " 张"));
+            } catch (Throwable t2) {
+                ok(stat, L, false, "地图身份交叉核对抛了: " + t2);
+            }
+
+            // 四个列表页都必须挂着这一份 sink（漏接线的页面在这里红）
+            String[] pages = { "MapsActivity", "SavesActivity", "BlueprintsActivity", "ModsActivity" };
+            StringBuilder miss = new StringBuilder();
+            for (String p : pages) {
+                try {
+                    Class<?> c = Class.forName("io.mdt.launcher." + p);
+                    java.lang.reflect.Field f = c.getDeclaredField("mPluginSink");
+                    if (f.getType() != PluginPicks.Sink.class) miss.append(p).append(' ');
+                } catch (Throwable t3) {
+                    miss.append(p).append(' ');
+                }
+            }
+            ok(stat, L, miss.length() == 0,
+                    "★★四个列表页共用同一个结果层（各自持有 PluginPicks.Sink）"
+                            + (miss.length() == 0 ? "" : "；没接上：" + miss));
+        }
+
         // ── round 162: v6 = settings / logs / trash / versions / selectedItems ──
         ok(stat, L, PluginHost.API >= 6,
                 "host plugin api >= 6 (settings/logs/trash/versions)");

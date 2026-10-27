@@ -80,6 +80,37 @@ public class BlueprintsActivity extends BaseActivity {
     private boolean mOnlyProblems;
     /** 来源筛：`FROM_ANY` / `FROM_SLOT` / `FROM_MOD`（纯前端，一个文件都不碰） */
     private int mSrc = Blueprints.FROM_ANY;
+    /**
+     * v25（第 280 轮统一）：插件注入的**筛选**结果（条目身份集合；null = 没选）。
+     * ★ 身份见 {@link PluginPicks#idOf} —— 模组自带的蓝图在 zip 里，没有 `path`。
+     */
+    private java.util.Set<String> mPluginFilterIds;
+    private String mPluginFilterKey;
+    /** v25：插件注入的**排序**结果（按顺序的条目身份；null = 没选） */
+    private java.util.List<String> mPluginSortIds;
+    private String mPluginSortKey;
+
+    /** 插件筛选 / 排序算完那一下（四个列表页各一份，形状相同）：结果缓存下来再重画。 */
+    private final PluginPicks.Sink mPluginSink = new PluginPicks.Sink() {
+        @Override public void onPluginFilter(String key, java.util.Set<String> ids) {
+            mPluginFilterIds = ids;
+            mPluginFilterKey = key;
+            rebuildList();
+        }
+
+        @Override public void onPluginSort(String key, java.util.List<String> ids) {
+            mPluginSortIds = ids;
+            mPluginSortKey = key;
+            rebuildList();
+        }
+    };
+
+    /** 蓝图条目的身份：槽内文件 = 路径；包内条目 = `容器!/条目`（与 {@code ItemInfo} 同一口径）。 */
+    private static final PluginPicks.IdOf<Blueprints.Item> BP_ID = new PluginPicks.IdOf<Blueprints.Item>() {
+        @Override public String idOf(Blueprints.Item it) {
+            return it == null ? "" : PluginPicks.idOf(it.file, it.container, it.entry);
+        }
+    };
     private android.widget.EditText mSearch;
     private TextView mFiltered;
     /** 当前**显示**的那一批（筛过 / 排过）；`mItems` 仍是全部（导出对话框按它列） */
@@ -330,8 +361,11 @@ public class BlueprintsActivity extends BaseActivity {
     private void rebuildList() {
         if (mList == null || mItems == null) return;
         mShown = Blueprints.filterAndSort(mItems, mQuery, mSort, mOnlyProblems, mSrc);
+        // v25（第 280 轮）：插件注入的筛选 / 排序（结果已缓存成身份集合 / 顺序，纯内存应用）
+        mShown = PluginPicks.applyFilter(mShown, mPluginFilterIds, BP_ID);
+        mShown = PluginPicks.applySort(mShown, mPluginSortIds, BP_ID);
         boolean filtering = ListQuery.filtering(mQuery, mSort, mOnlyProblems,
-                ListQuery.SORT_NAME, mSrc != Blueprints.FROM_ANY);
+                ListQuery.SORT_NAME, mSrc != Blueprints.FROM_ANY) || mPluginFilterIds != null;
         String[] titles = new String[mShown.size()];
         String[] subs = new String[mShown.size()];
         android.graphics.Bitmap[] thumbs = new android.graphics.Bitmap[mShown.size()];
@@ -400,53 +434,78 @@ public class BlueprintsActivity extends BaseActivity {
      */
     private void pickFilter() {
         final String tick = "✓ ";
-        final String[] items = {
-                (mSort == ListQuery.SORT_NAME ? tick : "")
-                        + Trans.get(BlueprintsActivity.this, R.string.mods_filter_sort_name),
-                (mSort == ListQuery.SORT_PROBLEM ? tick : "")
-                        + Trans.get(BlueprintsActivity.this, R.string.mods_filter_sort_state),
-                (mSort == ListQuery.SORT_SIZE ? tick : "")
-                        + Trans.get(BlueprintsActivity.this, R.string.mods_filter_sort_size),
-                (mOnlyProblems ? tick : "")
-                        + Trans.get(BlueprintsActivity.this, R.string.mods_filter_only),
-                (mSrc == Blueprints.FROM_ANY ? tick : "")
-                        + Trans.get(BlueprintsActivity.this, R.string.list_src_any),
-                (mSrc == Blueprints.FROM_SLOT ? tick : "")
-                        + Trans.get(BlueprintsActivity.this, R.string.list_src_slot),
-                (mSrc == Blueprints.FROM_MOD ? tick : "")
-                        + Trans.get(BlueprintsActivity.this, R.string.list_src_mod),
-                Trans.get(BlueprintsActivity.this, R.string.mods_filter_reset)};
+        final java.util.List<String> labels = new java.util.ArrayList<String>();
+        final java.util.List<Runnable> acts = new java.util.ArrayList<Runnable>();
+        labels.add((mSort == ListQuery.SORT_NAME ? tick : "")
+                + Trans.get(BlueprintsActivity.this, R.string.mods_filter_sort_name));
+        acts.add(new Runnable() { @Override public void run() {
+            mSort = ListQuery.SORT_NAME; rebuildList();
+        } });
+        labels.add((mSort == ListQuery.SORT_PROBLEM ? tick : "")
+                + Trans.get(BlueprintsActivity.this, R.string.mods_filter_sort_state));
+        acts.add(new Runnable() { @Override public void run() {
+            mSort = ListQuery.SORT_PROBLEM; rebuildList();
+        } });
+        labels.add((mSort == ListQuery.SORT_SIZE ? tick : "")
+                + Trans.get(BlueprintsActivity.this, R.string.mods_filter_sort_size));
+        acts.add(new Runnable() { @Override public void run() {
+            mSort = ListQuery.SORT_SIZE; rebuildList();
+        } });
+        labels.add((mOnlyProblems ? tick : "")
+                + Trans.get(BlueprintsActivity.this, R.string.mods_filter_only));
+        acts.add(new Runnable() { @Override public void run() {
+            mOnlyProblems = !mOnlyProblems; rebuildList();
+        } });
+        addSrcChoice(labels, acts, Blueprints.FROM_ANY, R.string.list_src_any, tick);
+        addSrcChoice(labels, acts, Blueprints.FROM_SLOT, R.string.list_src_slot, tick);
+        addSrcChoice(labels, acts, Blueprints.FROM_MOD, R.string.list_src_mod, tick);
+        // v25（第 280 轮）：插件注入的排序 / 筛选（四个列表页同一套；本页原来一行都没有）
+        for (PluginPicks.Choice c : PluginPicks.choices(this, Extensions.PAGE_BLUEPRINTS, mSlot,
+                true, mPluginSortKey, mPluginSink)) {
+            labels.add(c.label);
+            acts.add(c.run);
+        }
+        for (PluginPicks.Choice c : PluginPicks.choices(this, Extensions.PAGE_BLUEPRINTS, mSlot,
+                false, mPluginFilterKey, mPluginSink)) {
+            labels.add(c.label);
+            acts.add(c.run);
+        }
+        labels.add(Trans.get(BlueprintsActivity.this, R.string.mods_filter_reset));
+        acts.add(new Runnable() {
+            @Override public void run() {
+                mSort = ListQuery.SORT_NAME;
+                mOnlyProblems = false;
+                mSrc = Blueprints.FROM_ANY;
+                mPluginFilterIds = null;
+                mPluginFilterKey = null;
+                mPluginSortIds = null;
+                mPluginSortKey = null;
+                mQuery = "";
+                // 清框会经 TextWatcher 走一趟 rebuildList，这里再走一趟也无害（同模组页）
+                if (mSearch != null) mSearch.setText("");
+                rebuildList();
+            }
+        });
         new android.app.AlertDialog.Builder(this)
                 .setTitle(R.string.mods_filter_title)
-                .setItems(items, new android.content.DialogInterface.OnClickListener() {
+                .setItems(labels.toArray(new String[0]),
+                        new android.content.DialogInterface.OnClickListener() {
                     @Override public void onClick(android.content.DialogInterface d, int which) {
-                        if (which == 0) {
-                            mSort = ListQuery.SORT_NAME;
-                        } else if (which == 1) {
-                            mSort = ListQuery.SORT_PROBLEM;
-                        } else if (which == 2) {
-                            mSort = ListQuery.SORT_SIZE;
-                        } else if (which == 3) {
-                            mOnlyProblems = !mOnlyProblems;
-                        } else if (which == 4) {
-                            mSrc = Blueprints.FROM_ANY;
-                        } else if (which == 5) {
-                            mSrc = Blueprints.FROM_SLOT;
-                        } else if (which == 6) {
-                            mSrc = Blueprints.FROM_MOD;
-                        } else {
-                            mSort = ListQuery.SORT_NAME;
-                            mOnlyProblems = false;
-                            mSrc = Blueprints.FROM_ANY;
-                            mQuery = "";
-                            // 清框会经 TextWatcher 走一趟 rebuildList，这里再走一趟也无害（同模组页）
-                            if (mSearch != null) mSearch.setText("");
-                        }
-                        rebuildList();
+                        Runnable r = acts.get(which);
+                        if (r != null) r.run();
                     }
                 })
                 .setNegativeButton(R.string.close, null)
                 .show();
+    }
+
+    /** 来源那一行（勾当前那个）。 */
+    private void addSrcChoice(java.util.List<String> labels, java.util.List<Runnable> acts,
+                              final int src, int textRes, String tick) {
+        labels.add((mSrc == src ? tick : "") + Trans.get(BlueprintsActivity.this, textRes));
+        acts.add(new Runnable() {
+            @Override public void run() { mSrc = src; rebuildList(); }
+        });
     }
 
     private void showDetail(Blueprints.Item it) {

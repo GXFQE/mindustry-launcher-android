@@ -76,6 +76,37 @@ public class SavesActivity extends BaseActivity {
     private String mQuery = "";
     /** 默认按名称（与 `SlotIo.listSaves` 那个口径一致）；可选：大小 / 最新在前 */
     private int mSort = ListQuery.SORT_NAME;
+    /**
+     * v25（第 280 轮统一）：插件注入的**筛选**结果（条目身份集合；null = 没选）。
+     * ★ 身份见 {@link PluginPicks#idOf} —— 存档都是槽里的文件，所以就是绝对路径。
+     */
+    private java.util.Set<String> mPluginFilterIds;
+    private String mPluginFilterKey;
+    /** v25：插件注入的**排序**结果（按顺序的条目身份；null = 没选） */
+    private java.util.List<String> mPluginSortIds;
+    private String mPluginSortKey;
+
+    /** 插件筛选 / 排序算完那一下（四个列表页各一份，形状相同）：结果缓存下来再重画。 */
+    private final PluginPicks.Sink mPluginSink = new PluginPicks.Sink() {
+        @Override public void onPluginFilter(String key, java.util.Set<String> ids) {
+            mPluginFilterIds = ids;
+            mPluginFilterKey = key;
+            rebuildList();
+        }
+
+        @Override public void onPluginSort(String key, java.util.List<String> ids) {
+            mPluginSortIds = ids;
+            mPluginSortKey = key;
+            rebuildList();
+        }
+    };
+
+    /** 存档条目的身份：绝对路径（与 {@code ItemInfo.path} 同一口径）。 */
+    private static final PluginPicks.IdOf<File> SAVE_ID = new PluginPicks.IdOf<File>() {
+        @Override public String idOf(File f) {
+            return f == null ? "" : f.getAbsolutePath();
+        }
+    };
     private android.widget.EditText mSearch;
     private TextView mFiltered;
     /**
@@ -256,12 +287,16 @@ public class SavesActivity extends BaseActivity {
         if (mList == null) return;
         java.util.List<File> shown = ListQuery.apply(java.util.Arrays.asList(mAll), mQuery, mSort,
                 false, ListQuery.fileKey(mNames));
+        // v25（第 280 轮）：插件注入的筛选 / 排序（结果已缓存成身份集合 / 顺序，纯内存应用）
+        shown = PluginPicks.applyFilter(shown, mPluginFilterIds, SAVE_ID);
+        shown = PluginPicks.applySort(shown, mPluginSortIds, SAVE_ID);
         mFiles = shown.toArray(new File[0]);
         if (mFillToken != null) mFillToken[0] = false;
         mFillToken = new boolean[]{true};
         SlotIo.fillSaves(this, mSlot, mList, mFillToken, mFiles, mRowClick);
 
-        boolean filtering = ListQuery.filtering(mQuery, mSort, false, ListQuery.SORT_NAME);
+        boolean filtering = ListQuery.filtering(mQuery, mSort, false, ListQuery.SORT_NAME)
+                || mPluginFilterIds != null;
         // 表头那句同时承担"有几份"（标题里放不下多行，见 dialog_msav_list.xml 的实测）。
         // ★ 第 165 轮：第二段改成**计数**（「其中备份 N 份」），与另外三页同一个模板
         //   （「本槽 N <量词> · 一条事实」）—— 原来那里是一句操作提示「点一份看它是什么图」，
@@ -429,31 +464,55 @@ public class SavesActivity extends BaseActivity {
      */
     private void pickFilter() {
         final String tick = "✓ ";
-        final String[] items = {
-                (mSort == ListQuery.SORT_NAME ? tick : "")
-                        + Trans.get(SavesActivity.this, R.string.mods_filter_sort_name),
-                (mSort == ListQuery.SORT_TIME ? tick : "")
-                        + Trans.get(SavesActivity.this, R.string.save_filter_sort_time),
-                (mSort == ListQuery.SORT_SIZE ? tick : "")
-                        + Trans.get(SavesActivity.this, R.string.mods_filter_sort_size),
-                Trans.get(SavesActivity.this, R.string.mods_filter_reset)};
+        final java.util.List<String> labels = new java.util.ArrayList<String>();
+        final java.util.List<Runnable> acts = new java.util.ArrayList<Runnable>();
+        labels.add((mSort == ListQuery.SORT_NAME ? tick : "")
+                + Trans.get(SavesActivity.this, R.string.mods_filter_sort_name));
+        acts.add(new Runnable() { @Override public void run() {
+            mSort = ListQuery.SORT_NAME; rebuildList();
+        } });
+        labels.add((mSort == ListQuery.SORT_TIME ? tick : "")
+                + Trans.get(SavesActivity.this, R.string.save_filter_sort_time));
+        acts.add(new Runnable() { @Override public void run() {
+            mSort = ListQuery.SORT_TIME; rebuildList();
+        } });
+        labels.add((mSort == ListQuery.SORT_SIZE ? tick : "")
+                + Trans.get(SavesActivity.this, R.string.mods_filter_sort_size));
+        acts.add(new Runnable() { @Override public void run() {
+            mSort = ListQuery.SORT_SIZE; rebuildList();
+        } });
+        // v25（第 280 轮）：插件注入的排序 / 筛选（四个列表页同一套；本页原来一行都没有）
+        for (PluginPicks.Choice c : PluginPicks.choices(this, Extensions.PAGE_SAVES, mSlot,
+                true, mPluginSortKey, mPluginSink)) {
+            labels.add(c.label);
+            acts.add(c.run);
+        }
+        for (PluginPicks.Choice c : PluginPicks.choices(this, Extensions.PAGE_SAVES, mSlot,
+                false, mPluginFilterKey, mPluginSink)) {
+            labels.add(c.label);
+            acts.add(c.run);
+        }
+        labels.add(Trans.get(SavesActivity.this, R.string.mods_filter_reset));
+        acts.add(new Runnable() {
+            @Override public void run() {
+                mSort = ListQuery.SORT_NAME;
+                mPluginFilterIds = null;
+                mPluginFilterKey = null;
+                mPluginSortIds = null;
+                mPluginSortKey = null;
+                mQuery = "";
+                // 清框会经 TextWatcher 走一趟 rebuildList，这里再走一趟也无害（同模组页）
+                if (mSearch != null) mSearch.setText("");
+                rebuildList();
+            }
+        });
         new android.app.AlertDialog.Builder(this)
                 .setTitle(R.string.mods_filter_title)
-                .setItems(items, new android.content.DialogInterface.OnClickListener() {
+                .setItems(labels.toArray(new String[0]),
+                        new android.content.DialogInterface.OnClickListener() {
                     @Override public void onClick(android.content.DialogInterface d, int which) {
-                        if (which == 0) {
-                            mSort = ListQuery.SORT_NAME;
-                        } else if (which == 1) {
-                            mSort = ListQuery.SORT_TIME;
-                        } else if (which == 2) {
-                            mSort = ListQuery.SORT_SIZE;
-                        } else {
-                            mSort = ListQuery.SORT_NAME;
-                            mQuery = "";
-                            // 清框会经 TextWatcher 走一趟 rebuildList，这里再走一趟也无害（同模组页）
-                            if (mSearch != null) mSearch.setText("");
-                        }
-                        rebuildList();
+                        Runnable r = acts.get(which);
+                        if (r != null) r.run();
                     }
                 })
                 .setNegativeButton(R.string.close, null)

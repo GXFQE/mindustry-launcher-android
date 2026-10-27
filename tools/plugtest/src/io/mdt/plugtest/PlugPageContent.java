@@ -296,4 +296,33 @@ public final class PlugPage {
         }
         return out;
     }
+
+    // ── v25（第 280 轮）：筛选 / 排序注入的夹具 ────────────────────────────────
+    //
+    // 两件事都要能一眼验证：
+    //   ① **四个列表页**都接上了（对话框里各自出现这两行）；
+    //   ② 包内条目（游戏自带图 / 模组自带图）**没有被丢掉** —— 旧实现只认 `path`，
+    //      那批条目 `path == null` 会被静默筛掉。所以这里的筛选故意**全收**：
+    //      选中之后「显示 N / 共 M」必须 **N == M**（旧实现会只剩槽内那几张）。
+
+    private static int accepts;
+
+    /** 宿主每问一项就调一次；顺手记一条日志（真机上能数到"包内条目也被问过"）。 */
+    public static boolean accept(ItemInfo item, io.mdt.launcher.api.PluginApi api) {
+        if (item == null) return false;
+        accepts++;
+        if (accepts <= 3) {
+            api.log("fixture accept #" + accepts + ": " + item.title
+                    + " path=" + item.path + " container=" + item.container
+                    + " entry=" + item.entry);
+        }
+        return true;
+    }
+
+    /** 标题倒序（与各页默认的名称升序刚好相反）—— 切一下顺序就该翻过来。 */
+    public static int compare(ItemInfo a, ItemInfo b, io.mdt.launcher.api.PluginApi api) {
+        String x = a == null || a.title == null ? "" : a.title;
+        String y = b == null || b.title == null ? "" : b.title;
+        return y.compareToIgnoreCase(x);
+    }
 }

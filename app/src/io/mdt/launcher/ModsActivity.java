@@ -129,15 +129,34 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
     private final java.util.Map<String, java.util.List<io.mdt.launcher.api.Gate>> mGates =
             new java.util.HashMap<String, java.util.List<io.mdt.launcher.api.Gate>>();
     /**
-     * v25：插件注入的**筛选**结果（item path 集合；null = 没选）。只在选中那一刻算一次，
+     * v25：插件注入的**筛选**结果（条目身份集合；null = 没选）。只在选中那一刻算一次，
      * 之后每次 `rebuildList()` 直接用它 —— 别在打字搜索时反复调插件。
+     * ★ 身份见 {@link PluginPicks#idOf}（模组都是文件 ⇒ 就是绝对路径）。
      */
-    private java.util.Set<String> mPluginFilterPaths;
+    private java.util.Set<String> mPluginFilterIds;
     /** 当前选中的插件筛选（`pluginId/itemId`，界面打勾用） */
     private String mPluginFilterKey;
-    /** v25：插件注入的**排序**结果（按顺序的 item path；null = 没选） */
-    private List<String> mPluginSortPaths;
+    /** v25：插件注入的**排序**结果（按顺序的条目身份；null = 没选） */
+    private List<String> mPluginSortIds;
     private String mPluginSortKey;
+
+    /**
+     * 插件筛选 / 排序算完那一下（四个列表页各一份，形状相同）：结果缓存下来再重画。
+     * ★ 取数与"正在问插件"的进度卡在 {@link PluginPicks#pick}，本页只管存。
+     */
+    private final PluginPicks.Sink mPluginSink = new PluginPicks.Sink() {
+        @Override public void onPluginFilter(String key, java.util.Set<String> ids) {
+            mPluginFilterIds = ids;
+            mPluginFilterKey = key;
+            rebuildList();
+        }
+
+        @Override public void onPluginSort(String key, List<String> ids) {
+            mPluginSortIds = ids;
+            mPluginSortKey = key;
+            rebuildList();
+        }
+    };
     private TextView mSlotSub;
     private TextView mCopySub;
 
@@ -1171,32 +1190,12 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
                 sts.toArray(new Mods.State[0]));
         // v25：插件注入的筛选 / 排序 —— 结果在「筛选与排序」里选中那一刻就算好了（缓存在字段里），
         // 这里只做纯内存的过滤与排名，别把插件调用塞进每次 rebuild（打字搜索会卡）。
-        if (mPluginFilterPaths != null) {
-            List<Mods.Info> keep = new ArrayList<>();
-            for (Mods.Info m : shown) {
-                if (mPluginFilterPaths.contains(pathOf(m))) keep.add(m);
-            }
-            shown = keep;
-        }
-        if (mPluginSortPaths != null && !mPluginSortPaths.isEmpty()) {
-            final Map<String, Integer> rank = new HashMap<>();
-            for (int i = 0; i < mPluginSortPaths.size(); i++) {
-                rank.put(mPluginSortPaths.get(i), Integer.valueOf(i));
-            }
-            final int missing = mPluginSortPaths.size();
-            Collections.sort(shown, new Comparator<Mods.Info>() {
-                @Override public int compare(Mods.Info a, Mods.Info b) {
-                    Integer ra = rank.get(pathOf(a));
-                    Integer rb = rank.get(pathOf(b));
-                    int va = ra == null ? missing : ra.intValue();
-                    int vb = rb == null ? missing : rb.intValue();
-                    return va < vb ? -1 : (va > vb ? 1 : 0);
-                }
-            });
-        }
+        // ★ 判据与应用只有一处（`PluginPicks`，四个列表页共用）；本页只回答"一条模组是什么身份"。
+        shown = PluginPicks.applyFilter(shown, mPluginFilterIds, MOD_ID);
+        shown = PluginPicks.applySort(shown, mPluginSortIds, MOD_ID);
         mShown = shown;
         boolean filtering = mOnlyProblems || mType != Mods.TYPE_ANY || !mQuery.trim().isEmpty()
-                || mSort != Mods.SORT_NAME || mPluginFilterPaths != null;
+                || mSort != Mods.SORT_NAME || mPluginFilterIds != null;
         if (mFiltered != null) {
             mFiltered.setVisibility(filtering ? View.VISIBLE : View.GONE);
             mFiltered.setText(Trans.get(ModsActivity.this, R.string.mods_filtered_fmt, shown.size(), all.size()));
@@ -1330,17 +1329,13 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
         addTypeChoice(labels, acts, Mods.TYPE_DATA, R.string.mods_filter_type_data);
 
         // v25：插件注入的排序 / 筛选（**选中才算**：算的时候要加载插件，走后台线程）
-        for (final PluginViews.View v : PluginViews.of(this, Extensions.PAGE_MODS, Extensions.SLOT_SORT)) {
-            addChoice(labels, acts, (v.key().equals(mPluginSortKey) ? tick : "") + v.title(),
-                    new Runnable() {
-                        @Override public void run() { pickPluginSort(v); }
-                    });
+        for (PluginPicks.Choice c : PluginPicks.choices(this, Extensions.PAGE_MODS, mSlot,
+                true, mPluginSortKey, mPluginSink)) {
+            addChoice(labels, acts, c.label, c.run);
         }
-        for (final PluginViews.View v : PluginViews.of(this, Extensions.PAGE_MODS, Extensions.SLOT_FILTER)) {
-            addChoice(labels, acts, (v.key().equals(mPluginFilterKey) ? tick : "") + v.title(),
-                    new Runnable() {
-                        @Override public void run() { pickPluginFilter(v); }
-                    });
+        for (PluginPicks.Choice c : PluginPicks.choices(this, Extensions.PAGE_MODS, mSlot,
+                false, mPluginFilterKey, mPluginSink)) {
+            addChoice(labels, acts, c.label, c.run);
         }
 
         addChoice(labels, acts, Trans.get(ModsActivity.this, R.string.mods_filter_reset),
@@ -1350,9 +1345,9 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
                         mOnlyProblems = false;
                         mType = Mods.TYPE_ANY;
                         mQuery = "";
-                        mPluginFilterPaths = null;
+                        mPluginFilterIds = null;
                         mPluginFilterKey = null;
-                        mPluginSortPaths = null;
+                        mPluginSortIds = null;
                         mPluginSortKey = null;
                         if (mSearch != null) mSearch.setText("");
                         rebuildList();
@@ -1386,58 +1381,12 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
         });
     }
 
-    /** v25：选中一个插件排序 ⇒ 后台算一遍顺序，缓存下来再重画。 */
-    private void pickPluginSort(final PluginViews.View v) {
-        final CardStack stack = new CardStack(this);
-        stack.replace(Trans.get(this, R.string.mods_filter_plugin_wait), "");
-        new Thread(new Runnable() {
-            @Override public void run() {
-                final List<String> paths = new ArrayList<>();
-                try {
-                    List<io.mdt.launcher.api.ItemInfo> items = PluginData.pageItems(
-                            ModsActivity.this, Extensions.PAGE_MODS, mSlot, (File) null);
-                    for (io.mdt.launcher.api.ItemInfo it : PluginViews.sorted(ModsActivity.this, v, items, mSlot)) {
-                        if (it.path != null) paths.add(it.path);
-                    }
-                } catch (Throwable ignored) {
-                }
-                runOnUiThread(new Runnable() {
-                    @Override public void run() {
-                        stack.dismiss();
-                        mPluginSortPaths = paths.isEmpty() ? null : paths;
-                        mPluginSortKey = paths.isEmpty() ? null : v.key();
-                        rebuildList();
-                    }
-                });
-            }
-        }, "plugin-sort").start();
-    }
-
-    /** v25：选中一个插件筛选 ⇒ 后台问一遍"这一项算不算"，缓存通过的 path 集合。 */
-    private void pickPluginFilter(final PluginViews.View v) {
-        final CardStack stack = new CardStack(this);
-        stack.replace(Trans.get(this, R.string.mods_filter_plugin_wait), "");
-        new Thread(new Runnable() {
-            @Override public void run() {
-                java.util.Set<String> ok = null;
-                try {
-                    List<io.mdt.launcher.api.ItemInfo> items = PluginData.pageItems(
-                            ModsActivity.this, Extensions.PAGE_MODS, mSlot, (File) null);
-                    ok = PluginViews.accepted(ModsActivity.this, v, items, mSlot);
-                } catch (Throwable ignored) {
-                }
-                final java.util.Set<String> fok = ok;
-                runOnUiThread(new Runnable() {
-                    @Override public void run() {
-                        stack.dismiss();
-                        mPluginFilterPaths = fok;
-                        mPluginFilterKey = fok == null ? null : v.key();
-                        rebuildList();
-                    }
-                });
-            }
-        }, "plugin-filter").start();
-    }
+    /** 模组条目的身份（= {@code Mods.Info.file} 的绝对路径；与 {@code ItemInfo.path} 同一口径）。 */
+    private static final PluginPicks.IdOf<Mods.Info> MOD_ID = new PluginPicks.IdOf<Mods.Info>() {
+        @Override public String idOf(Mods.Info m) {
+            return pathOf(m);
+        }
+    };
 
     private void bindRow(View v, final Mods.Info m, boolean broken) {
         TextView title = (TextView) v.findViewById(R.id.mod_title);

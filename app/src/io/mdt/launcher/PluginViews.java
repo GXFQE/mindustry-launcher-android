@@ -17,7 +17,8 @@ import io.mdt.launcher.api.PluginApi;
 /**
  * **v25**：插件注入的筛选 / 排序（`slot: "filter"` / `"sort"`）。
  *
- * <p>声明写在插件自述里（与 `extensions` 同一个数组）：
+ * <p>声明写在插件自述里（与 `extensions` 同一个数组），`page` 可以是**四个列表页**
+ * （`mods` / `saves` / `maps` / `blueprints`）中的任意一个：
  * <pre>
  * {"id":"conflict","title":"有冲突","slot":"filter","page":"mods","entry":"com.x.Filters"}
  * {"id":"risk","title":"按风险","slot":"sort","page":"mods","entry":"com.x.Sorts"}
@@ -29,8 +30,10 @@ import io.mdt.launcher.api.PluginApi;
  * </ul>
  *
  * <p>★ **只在用户选中那一项时才算**（不选不跑）：算一遍可能加载插件类、也可能对每一项跑一次判据
- * —— 放进每次 `rebuildList()` 就会在打字搜索时卡。调用方把结果**缓存**下来（模组页就是这么做的）。
+ * —— 放进每次 `rebuildList()` 就会在打字搜索时卡。调用方把结果**缓存**下来。
  * ★ 插件坏了 / 被删了 ⇒ 返回"什么都没筛 / 原顺序"，不把页面弄崩。
+ * ★ 本类只回答"哪些条目 / 什么顺序"（身份见 {@link PluginPicks#idOf}）；**应用结果与取数**
+ *   在 {@link PluginPicks}（四个列表页共用那一份，别再各写一遍）。
  */
 final class PluginViews {
 
@@ -77,10 +80,13 @@ final class PluginViews {
     }
 
     /**
-     * 跑一遍插件的筛选，返回**通过的** item path 集合。
+     * 跑一遍插件的筛选，返回**通过的身份**集合（见 {@link PluginPicks#idOf}）。
      * 插件不在 / 方法缺失 / 抛异常 ⇒ 空集（调用方据此提示"没筛出东西"）。
+     *
+     * <p>★ 页名与槽必须**照调用方那一页**传下来（原来写死 `"mods"`：别的页面用会把
+     * {@code api.page()} 报成模组页，插件里"是不是详情页"的判据全走错）。
      */
-    static Set<String> accepted(Context ctx, View v, List<ItemInfo> items, String slot) {
+    static Set<String> accepted(Context ctx, View v, List<ItemInfo> items, String page, String slot) {
         Set<String> out = new LinkedHashSet<String>();
         if (v == null || items == null || items.isEmpty()) return out;
         PluginHost.Loaded l = null;
@@ -88,8 +94,8 @@ final class PluginViews {
             File apk = Plugins.apkOf(ctx, v.pluginId, v.pluginVer);
             if (apk == null || !apk.isFile()) return out;
             l = Plugins.isInjected(ctx, v.pluginId, v.pluginVer)
-                    ? PluginHost.openInjected(ctx, apk, v.item.entry, "mods", slot, null, null)
-                    : PluginHost.load(ctx, apk, v.item.entry, "mods", slot, null, null);
+                    ? PluginHost.openInjected(ctx, apk, v.item.entry, page, slot, null, null)
+                    : PluginHost.load(ctx, apk, v.item.entry, page, slot, null, null);
             Method m = l.entry.getMethod("accept", ItemInfo.class, PluginApi.class);
             for (ItemInfo it : items) {
                 if (it == null) continue;
@@ -99,11 +105,12 @@ final class PluginViews {
                 } catch (Throwable one) {
                     continue;                   // 单项失败不影响别的
                 }
-                if (r instanceof Boolean && ((Boolean) r).booleanValue() && it.path != null) {
-                    out.add(it.path);
+                if (r instanceof Boolean && ((Boolean) r).booleanValue()) {
+                    String id = PluginPicks.idOf(it);
+                    if (!id.isEmpty()) out.add(id);
                 }
             }
-            android.util.Log.i("MDTLauncher", "plugin filter " + v.key() + ": "
+            android.util.Log.i("MDTLauncher", "plugin filter " + v.key() + " @" + page + ": "
                     + out.size() + "/" + items.size());
         } catch (Throwable t) {
             android.util.Log.w("MDTLauncher", "plugin filter failed: " + v.key(), t);
@@ -114,19 +121,20 @@ final class PluginViews {
     }
 
     /**
-     * 按插件的比较函数排序（返回**新表**）。
+     * 按插件的比较函数排序，返回**身份顺序**（见 {@link PluginPicks#idOf}）。
      * 插件不在 / 方法缺失 / 抛异常 ⇒ 原顺序。
      */
-    static List<ItemInfo> sorted(Context ctx, final View v, List<ItemInfo> items, String slot) {
+    static List<String> sorted(Context ctx, final View v, List<ItemInfo> items,
+                               String page, String slot) {
         List<ItemInfo> out = new ArrayList<ItemInfo>(items == null ? Collections.<ItemInfo>emptyList() : items);
-        if (v == null || out.size() < 2) return out;
         PluginHost.Loaded l = null;
         try {
+            if (v == null || out.size() < 2) return ids(out);
             File apk = Plugins.apkOf(ctx, v.pluginId, v.pluginVer);
-            if (apk == null || !apk.isFile()) return out;
+            if (apk == null || !apk.isFile()) return ids(out);
             l = Plugins.isInjected(ctx, v.pluginId, v.pluginVer)
-                    ? PluginHost.openInjected(ctx, apk, v.item.entry, "mods", slot, null, null)
-                    : PluginHost.load(ctx, apk, v.item.entry, "mods", slot, null, null);
+                    ? PluginHost.openInjected(ctx, apk, v.item.entry, page, slot, null, null)
+                    : PluginHost.load(ctx, apk, v.item.entry, page, slot, null, null);
             final Method m = l.entry.getMethod("compare", ItemInfo.class, ItemInfo.class, PluginApi.class);
             final PluginApi env = l.env;
             Collections.sort(out, new Comparator<ItemInfo>() {
@@ -142,6 +150,20 @@ final class PluginViews {
         } catch (Throwable ignored) {
         } finally {
             try { PluginHost.unload(l); } catch (Throwable ignored) { }
+        }
+        List<String> idsOut = ids(out);
+        android.util.Log.i("MDTLauncher", "plugin sort " + (v == null ? "?" : v.key())
+                + " @" + page + ": " + idsOut.size() + " ids");
+        return idsOut;
+    }
+
+    /** `ItemInfo` 表 ⇒ 身份顺序（空身份跳过）。 */
+    private static List<String> ids(List<ItemInfo> items) {
+        List<String> out = new ArrayList<String>();
+        if (items == null) return out;
+        for (ItemInfo it : items) {
+            String id = PluginPicks.idOf(it);
+            if (!id.isEmpty()) out.add(id);
         }
         return out;
     }
