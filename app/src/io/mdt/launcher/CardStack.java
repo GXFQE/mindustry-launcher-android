@@ -409,6 +409,13 @@ public final class CardStack {
         return Math.min(page.getMeasuredHeight(), cap);
     }
 
+    /**
+     * 把页面里的 `ListView` 撑到「这一页最多能有多高 − 其它内容」，返回是否改过。
+     *
+     * <p>⚠️ 前提是列表高度是**定值**（由 {@link #stretchLists} 设过）——只有那样
+     * `page.getMeasuredHeight() - 列表高度` 才等于"其它内容"的高度。</p>
+     */
+
     /** 这一刻正文最多能有多高：窗口高 − 卡片留白 − 标题 − 按钮栏（都不够就退回一个最小值）。 */
     private int liveCap() {
         int screen = 0;
@@ -417,9 +424,14 @@ public final class CardStack {
             if (d != null) screen = d.getHeight();
         } catch (Throwable ignored) { }
         if (screen <= 0) screen = dlg.getContext().getResources().getDisplayMetrics().heightPixels;
+        // ⚠️ 第一次量正文时标题/按钮栏**还没量过**（高度 0）⇒ 不能直接采信实测值，
+        //   否则 cap 被算大、按钮被顶出屏幕（真机：勾选列表撑满后「删除/取消」看不见了）。
+        //   两者各取「实测」与「至少这么高」的较大值。
+        int title = Math.max(titleView.getMeasuredHeight(), dp(50));
+        int buttons = Math.max(buttonBar.getMeasuredHeight(), dp(56));
         int chrome = dp(56)                       // 窗口上下留白
-                + titleView.getMeasuredHeight()
-                + buttonBar.getMeasuredHeight()
+                + title
+                + buttons
                 + dp(44);                         // 卡片内边距 + 间隙
         int h = screen - chrome;
         int floor = dp(120);
@@ -472,7 +484,42 @@ public final class CardStack {
 
     /** 把任意 View 包成可滚动的一页（自定义表单类页面用）。 */
     public static View wrap(Context c, View child) {
+        stretchLists(c, child);
         return scroller(c, child);
+    }
+
+    /**
+     * ★ 2026-10-27 用户：「那种有选择框的高度拉大点，要不然一屏只能看到一个选项，总是要滑动」。
+     *
+     * <p>根因不是我们给的高度太小，而是 **`ListView` 套进 `ScrollView` 只会画一行**（Android 老坑：
+     * ScrollView 用 UNSPECIFIED 量孩子，ListView 在这种测量下退回"一条的高度"）。这些选择列表
+     * （更早是 `AlertDialog` 的自定义 View，框架给的是 AT_MOST ⇒ 正常显示很多行）搬进 `CardStack`
+     * 之后全被压成了一行。</p>
+     *
+     * <p>⇒ 进卡片前给子树里的每个 `ListView` 一个**够高的定值**：目标 420dp（与布局里原本写的
+     * `maxHeight` 同一个意图，那个属性对 ListView 本来就不生效），但不超过屏幕的 55%，
+     * 也不低于 240dp。这样一屏能看 6~8 条，列表自己滚动，标题/表头/勾选框仍然固定在卡片里。</p>
+     */
+    private static void stretchLists(Context c, View root) {
+        if (root instanceof android.widget.ListView) {
+            int screen = c.getResources().getDisplayMetrics().heightPixels;
+            int h = Math.min(dp(c, 460), Math.round(screen * 0.60f));
+            if (h < dp(c, 260)) h = dp(c, 260);
+            android.view.ViewGroup.LayoutParams lp = root.getLayoutParams();
+            if (lp == null) {
+                lp = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, h);
+            } else {
+                lp.height = h;
+                lp.width = LinearLayout.LayoutParams.MATCH_PARENT;
+            }
+            root.setLayoutParams(lp);
+            return;
+        }
+        if (root instanceof android.view.ViewGroup) {
+            android.view.ViewGroup g = (android.view.ViewGroup) root;
+            for (int i = 0; i < g.getChildCount(); i++) stretchLists(c, g.getChildAt(i));
+        }
     }
 
     /** 一列可点的行（替代框架的 `setItems` 列表）。行间有 1dp 分隔线，与卡片描边同色。 */
