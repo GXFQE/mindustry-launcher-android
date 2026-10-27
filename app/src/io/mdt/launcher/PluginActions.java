@@ -401,13 +401,20 @@ final class PluginActions {
      * 弹宿主那套多选框，把勾中的条目回调给插件。
      *
      * <p>取数在后台（扫描会读文件头 / 开包），弹窗与回调在主线程；取消 / 空表都回调空表。
+     *
+     * @param title 插件给的标题（v32）；null / 空 ⇒ 宿主默认「选择条目」
+     * @param head  插件给的说明（v32）；null / 空 ⇒ 宿主默认「选中后交给插件」
      */
     static void pick(final Activity a, final Context ctx, final String slot, final String kind,
+                     final String title, final String head,
                      final PluginApi.PickContent callback) {
         if (a == null) {
             if (callback != null) callback.onPicked(new ArrayList<ItemInfo>());
             return;
         }
+        // ★ 插件给的文案**一定过这一层**：截长 / 压成一行 / 去空白（见 pickText 的注释）
+        final String useTitle = pickText(title, PICK_TITLE_MAX);
+        final String useHead = pickText(head, PICK_HEAD_MAX);
         new Thread(new Runnable() {
             @Override public void run() {
                 final List<ItemInfo> items = PluginData.pickItems(ctx, slot, kind);
@@ -429,9 +436,10 @@ final class PluginActions {
                             titles[i] = it == null ? "" : it.title;
                             subs[i] = it == null ? "" : it.subtitle;
                         }
-                        BatchIo.pickMulti(a, R.string.plugin_pick_title,
-                                Trans.get(a, R.string.plugin_pick_head), titles, subs, null, null,
-                                R.string.plugin_pick_ok_fmt, new BatchIo.OnPick() {
+                        BatchIo.pickMulti(a, R.string.plugin_pick_title, useTitle,
+                                useHead.isEmpty() ? Trans.get(a, R.string.plugin_pick_head) : useHead,
+                                titles, subs, null, null, R.string.plugin_pick_ok_fmt,
+                                new BatchIo.OnPick() {
                                     @Override public void onPick(List<Integer> indexes, CardStack card) {
                                           if (card != null) card.dismiss();
                                         List<ItemInfo> out = new ArrayList<ItemInfo>();
@@ -449,6 +457,28 @@ final class PluginActions {
                 });
             }
         }, "mdt-plugin-pick").start();
+    }
+
+    /** 勾选那一屏的标题上限（插件给的）—— 两行塞不下就截断，别让它把列表挤走。 */
+    static final int PICK_TITLE_MAX = 24;
+    /** 勾选那一屏的说明上限。 */
+    static final int PICK_HEAD_MAX = 80;
+
+    /**
+     * 插件给的文案过一遍闸门：**压成一行**（换行 / 连续空白 ⇒ 一个空格）、去首尾空白、按**码点**截长。
+     *
+     * <p>★ 为什么必须限长：这段文字会进 {@code CardStack} 的标题区，超长会把列表和按钮顶出屏幕
+     * （ref/42「长正文的上限要按真实标题 + 按钮栏算」）。★ 按码点而不是字符截：截在代理对中间
+     * 会留一个半个 emoji（显示成方框）。
+     */
+    static String pickText(String s, int max) {
+        if (s == null) return "";
+        String t = s.replace('\n', ' ').replace('\r', ' ').trim();
+        t = t.replaceAll("\\s{2,}", " ");
+        if (max <= 0 || t.isEmpty()) return t;
+        int n = t.codePointCount(0, t.length());
+        if (n <= max) return t;
+        return t.substring(0, t.offsetByCodePoints(0, max)).trim();
     }
 
     // ── 小工具 ────────────────────────────────────────────────────────────

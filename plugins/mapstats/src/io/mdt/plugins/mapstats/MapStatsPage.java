@@ -51,7 +51,10 @@ public final class MapStatsPage {
      * 报 20 表示它用到了 v20 的接口面（真要用新方法再抬这个数）。
      */
     public static int api() {
-        return 20;
+        // v32（2026-10-27 第 277 轮）：勾选那一屏的标题 / 说明由插件自己给
+        // （`pickContent(kind, title, head, cb)`）⇒ 老宿主没有这个方法，必须报 32 让它拒掉，
+        // 而不是等到用户点下去才 NoSuchMethodError。
+        return 32;
     }
 
     /** 当前这一页的统计产物（页面重建就重新算）。 */
@@ -123,7 +126,11 @@ public final class MapStatsPage {
         // ★ 动作放**最上面**（§79）：选 20 张地图时按钮不会被结果卡片顶出屏幕
         if (!inline) addButton(root, c, th, c.getString(R.string.ms_pick), new View.OnClickListener() {
             @Override public void onClick(View v) {
-                api.pickContent(ItemInfo.KIND_MAPS, new PluginApi.PickContent() {
+                // ★ 第 277 轮：文案由自己给（v32）—— 宿主那句「选中后交给插件」是给"不知道谁在要"兜底的，
+                //   这里明说干什么（用户：「改成插件可以自行设置文本」）。
+                api.pickContent(ItemInfo.KIND_MAPS,
+                        c.getString(R.string.ms_pick_title), c.getString(R.string.ms_pick_head),
+                        new PluginApi.PickContent() {
                     @Override public void onPicked(List<ItemInfo> items) {
                         if (items == null || items.isEmpty()) {
                             api.toast(c.getString(R.string.ms_pick_empty));
@@ -236,7 +243,10 @@ public final class MapStatsPage {
      */
     public static void run(final PluginApi api) {
         final Context c = api.context();
-        api.pickContent(ItemInfo.KIND_MAPS, new PluginApi.PickContent() {
+        // 第 277 轮：地图页那一行进来的这条路也用插件自己的文案（同一条判据，不写两套话术）
+        api.pickContent(ItemInfo.KIND_MAPS,
+                c.getString(R.string.ms_pick_title), c.getString(R.string.ms_pick_head),
+                new PluginApi.PickContent() {
             @Override public void onPicked(final List<ItemInfo> items) {
                 if (items == null || items.isEmpty()) return;
                 api.choose(c.getString(R.string.ms_export_ask), new String[]{

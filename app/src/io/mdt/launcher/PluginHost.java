@@ -83,8 +83,11 @@ public final class PluginHost {
      * <p>v1~v19 的逐版记录留在 `docs/PLUGIN-API.md` 与 git 历史里；**从 v20 起**：
      * 加法变更只抬 {@link #API}（{@link #API_MIN} 不动，老插件照样装得进），
      * 破坏性变更才抬 {@link #API_MIN}。
+     *
+     * <p>v32（2026-10-27 第 277 轮）：`pickContent(kind, title, head, cb)` —— 勾选那一屏的
+     * 标题 / 说明由插件自己给（用户：「改成插件可以自行设置文本」）。
      */
-    public static final int API = 31;
+    public static final int API = 32;
     /**
      * 还认的**最老**契约版本。
      *
@@ -986,7 +989,13 @@ public final class PluginHost {
 
         @Override public void pickContent(String kind, PickContent callback) {
             Activity a = activityOrNull();
-            PluginActions.pick(a, getBaseContext(), slot, kind, callback);
+            PluginActions.pick(a, getBaseContext(), slot, kind, null, null, callback);
+        }
+
+        @Override public void pickContent(String kind, String title, String head,
+                                         PickContent callback) {
+            Activity a = activityOrNull();
+            PluginActions.pick(a, getBaseContext(), slot, kind, title, head, callback);
         }
 
         /** 这些动作要一个真的 Activity（分享面板 / SAF / 对话框）；dev 页里也成立。 */

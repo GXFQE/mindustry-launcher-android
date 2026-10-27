@@ -3,6 +3,8 @@
     <string name="ms_title">地图资源统计</string>
     <string name="ms_hint">选一张或多张地图；计数在后台跑。</string>
     <string name="ms_pick">选择地图…</string>
+    <string name="ms_pick_title">选择地图</string>
+    <string name="ms_pick_head">勾选要统计的地图，选好后点完成。</string>
     <string name="ms_pick_empty">没有选中地图。</string>
     <string name="ms_busy_fmt">正在统计 %1$d / %2$d…</string>
     <string name="ms_failed_fmt">统计失败：%1$s</string>

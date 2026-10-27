@@ -4822,6 +4822,31 @@ public final class SelfTest {
         ok(stat, L, !Restart.shouldThrottle(0L, tRestart, false),
                 "没记录过重启（时间戳 0）⇒ 谁都不拦");
 
+        // ── 第 277 轮：勾选那一屏的文案由插件给（v32）──
+        //   用户：「这个页面标题能不能不是『选中后交给插件』啊」⇒「改成插件可以自行设置文本」。
+        //   插件给的字符串**一定过闸门**（压一行 / 去空白 / 按码点截长），否则长文案会把列表顶出屏幕。
+        L.add("  · 勾选文案闸门（第 277 轮：插件给标题 / 说明）");
+        ok(stat, L, "选择地图".equals(PluginActions.pickText("  选择地图  ", 24)),
+                "★插件给的文案去首尾空白");
+        ok(stat, L, "勾选 要统计的地图".equals(PluginActions.pickText("勾选\n要统计的地图", 80)),
+                "★换行压成一个空格（那段文字只能占一行位置）");
+        ok(stat, L, "a b".equals(PluginActions.pickText("a \t  b", 80)),
+                "★连续空白也压成一个空格");
+        ok(stat, L, "".equals(PluginActions.pickText(null, 24))
+                        && "".equals(PluginActions.pickText("   ", 24)),
+                "null / 全空白 ⇒ 空串（调用方据此回落到宿主那句默认文案）");
+        String longTitle = "一二三四五六七八九十一二三四五六七八九十一二三四五六七八九十";
+        ok(stat, L, longTitle.codePointCount(0, PluginActions.pickText(longTitle, 24).length()) == 24,
+                "★超长按 24 个字截断（实得 " + PluginActions.pickText(longTitle, 24) + "）");
+        StringBuilder emoji = new StringBuilder();
+        for (int i = 0; i < 30; i++) emoji.append("\uD83D\uDE00");
+        String cut = PluginActions.pickText(emoji.toString(), 24);
+        ok(stat, L, cut.codePointCount(0, cut.length()) == 24 && cut.length() == 48,
+                "★按码点截：不会截出半个 emoji（长度 " + cut.length() + " / 码点 "
+                        + cut.codePointCount(0, cut.length()) + "）");
+        ok(stat, L, PluginHost.API >= 32,
+                "★宿主接口版本 ≥ 32（pickContent 的标题/说明重载是 v32 加法，实得 " + PluginHost.API + "）");
+
         String[] sl = Plugins.parseSkipLine("probe\t2\t1\trollback");
         ok(stat, L, sl != null && "probe".equals(sl[0]) && "2".equals(sl[1])
                 && "1".equals(sl[2]) && "rollback".equals(sl[3]), "跳过记录：回滚那一行解析得出来");

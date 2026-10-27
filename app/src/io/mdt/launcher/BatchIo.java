@@ -501,7 +501,18 @@ final class BatchIo {
     static void pickMulti(final Activity a, int titleRes, String head, String[] titles,
                           String[] subs, android.graphics.Bitmap[] thumbs, final Filler filler,
                           final int okFmtRes, final OnPick cb) {
-        pickMulti(a, titleRes, head, titles, subs, thumbs, filler, okFmtRes, 0,
+        pickMulti(a, titleRes, null, head, titles, subs, thumbs, filler, okFmtRes, cb);
+    }
+
+    /**
+     * 同上，但**标题那句话也可以由调用方给**（第 277 轮，插件自己的文案）。
+     *
+     * @param titleText 非空 ⇒ 用它当标题（已经过插件那道闸门）；null / 空 ⇒ 用 `titleRes`
+     */
+    static void pickMulti(final Activity a, int titleRes, String titleText, String head,
+                          String[] titles, String[] subs, android.graphics.Bitmap[] thumbs,
+                          final Filler filler, final int okFmtRes, final OnPick cb) {
+        pickMulti(a, titleRes, titleText, head, titles, subs, thumbs, filler, okFmtRes, 0,
                 new OnPickShare() {
                     @Override public void onPick(List<Integer> indexes, boolean share, CardStack card) {
                         cb.onPick(indexes, card);
@@ -521,7 +532,21 @@ final class BatchIo {
     static void pickMulti(final Activity a, int titleRes, String head, String[] titles,
                           String[] subs, android.graphics.Bitmap[] thumbs, final Filler filler,
                           final int okFmtRes, int shareLabelRes, final OnPickShare cb) {
+        pickMulti(a, titleRes, null, head, titles, subs, thumbs, filler, okFmtRes, shareLabelRes, cb);
+    }
+
+    /**
+     * 同上，但**标题那句话也可以由调用方给**（第 277 轮：插件自己的文案，见 `PluginApi.pickContent`）。
+     *
+     * @param titleText 非空 ⇒ 用它当标题（已经过插件那道闸门）；null / 空 ⇒ 用 `titleRes`
+     */
+    static void pickMulti(final Activity a, int titleRes, String titleText, String head,
+                          String[] titles, String[] subs, android.graphics.Bitmap[] thumbs,
+                          final Filler filler, final int okFmtRes, int shareLabelRes,
+                          final OnPickShare cb) {
         if (titles == null || titles.length == 0) return;
+        final CharSequence title = (titleText == null || titleText.trim().isEmpty())
+                ? Trans.get(a, titleRes) : titleText.trim();
         View box = a.getLayoutInflater().inflate(R.layout.dialog_msav_list, null);
         TextView h = (TextView) box.findViewById(R.id.msav_head);
         h.setVisibility(View.VISIBLE);
@@ -572,7 +597,7 @@ final class BatchIo {
                 }
             });
         }
-        stack.root(Trans.get(a, titleRes), CardStack.wrap(a, box),
+        stack.root(title, CardStack.wrap(a, box),
                 new CardStack.Btn(Trans.get(a, R.string.cancel), new Runnable() {
                     @Override public void run() { stack.dismiss(); }
                 }),

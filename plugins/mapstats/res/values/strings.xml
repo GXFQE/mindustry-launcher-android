@@ -3,6 +3,8 @@
     <string name="ms_title">Map resources</string>
     <string name="ms_hint">Pick one or more maps; counts run in the background.</string>
     <string name="ms_pick">Pick maps…</string>
+    <string name="ms_pick_title">Pick maps</string>
+    <string name="ms_pick_head">Tick the maps to analyze, then tap Done.</string>
     <string name="ms_pick_empty">Nothing selected.</string>
     <string name="ms_busy_fmt">Counting %1$d / %2$d…</string>
     <string name="ms_failed_fmt">Failed: %1$s</string>

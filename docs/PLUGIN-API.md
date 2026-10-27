@@ -5,11 +5,12 @@
 
 ## 1. 版本与兼容（v20 冻结基线）
 
-- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..31**。
+- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..32**。
   （v20 是冻结基线；v21 = 游戏设置面；v22 = 后台任务 + 游戏事件；v23 = 探针；v24 = 分析器；
   v25 = 结论挂行 + 筛选/排序注入 + HJSON；v26 = 逐项判定；v27 = 详情页的门 + 槽级结论进摘要卡；
   v28 = 原版文案键；v29 = 游戏前后台事件；v30 = 探针知道版本 / 跨会话数据目录 + 摘要卡总时长；
-  v31 = 探针拿到完整版本信息（包名会原地更新，光有 key 不够）。）
+  v31 = 探针拿到完整版本信息（包名会原地更新，光有 key 不够）；
+  **v32 = `pickContent(kind, title, head, cb)`：勾选那一屏的标题 / 说明由插件自己给**。）
 - 插件 `api()` 报的是「我需要的最低宿主接口版本」。用不到的新能力**不要**报高 ——
   报高了只会在老宿主上被拒，换不来任何东西。
 - **不要用 try/catch 去兼容老宿主**：报什么版本就只会跑在什么版本上。`api()` 报 20，
@@ -68,7 +69,7 @@
 ## 3. 入口类约定
 
 ```java
-public static int api();                        // 必需：你需要的接口版本（当前 31；用不到新能力就报 20）
+public static int api();                        // 必需：你需要的接口版本（当前 32；用不到新能力就报 20）
 public static View createView(PluginApi api);   // content / section 用
 public static void run(PluginApi api);          // action 用（在原页跑，不换页）
 public static void unload();                    // 可选：收尾（也认 unload(Context)）
@@ -88,7 +89,7 @@ public static void unload();                    // 可选：收尾（也认 unlo
 
 | 方法 | 说明 |
 |---|---|
-| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 31） |
+| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 32） |
 | `context()` | 插件上下文（**只用来取资源 / 主题 / 建 View**） |
 | `page()` / `slot()` | 从哪一页来 / 当前槽名 |
 | `theme()` | 主题色与 dp/sp（别自己写死颜色，见 `PluginTheme`） |
@@ -121,7 +122,8 @@ public static void unload();                    // 可选：收尾（也认 unlo
 | `toast(text)` / `log(text)` | 提示 / 调试日志（logcat tag `MDTPlugin`） |
 | `choose(title, options, cb)` | 宿主原生多选一弹窗 |
 | `confirm(title, msg, okText, cb)` / `prompt(...)` | 是/否 / 输入弹窗 |
-| `pickContent(kind, cb)` | 用宿主那套勾选框选内容（**不是**选任意文件） |
+| `pickContent(kind, cb)` | 用宿主那套勾选框选内容（**不是**选任意文件）；标题 / 说明用宿主默认那两句 |
+| `pickContent(kind, title, head, cb)` | **v32**：同上，但那两句话由你给（null / 空 ⇒ 回落宿主默认；标题 ≤ 24 字、说明 ≤ 80 字，超长会截断，换行会压成一个空格） |
 | `pickFile(mime, cb)` | 系统选择器挑任意文件，宿主复制到你的 `cache/` 再给 `(name, File)` |
 | `progressCard(title, msg, done, total[, cancelable, cb])` / `progressCardClose()` | 宿主进度框（4 参 = 不可取消） |
 
@@ -557,6 +559,11 @@ v30（2026-10-26 第 255 轮）：`ProbeEnv.version()`（这一局的版本 key�
 v31（2026-10-26 第 256 轮）：`ProbeEnv.versionInfo()`（完整版本信息 map：title / versionName /
 displayVersion / upstreamVersion / label / pkg / imported / md5 / …）+ `displayVersion()` 便利方法；
 已安装游戏会原地更新，插件据此把"更新前后"分成两行；`API_MIN` 仍不动（区间 20..31）。
+v32（2026-10-27 第 277 轮）：`pickContent(kind, title, head, cb)` —— 勾选那一屏的标题 / 说明由插件给。
+宿主原来硬编码「选择条目 / 选中后交给插件」，用户看不出"选了之后会怎样"（用户原话：
+「这个页面标题能不能不是『选中后交给插件』啊」⇒「改成插件可以自行设置文本」）。
+null / 空串 ⇒ 回落宿主默认那两句；标题 ≤ 24 字、说明 ≤ 80 字，换行压成空格、按码点截断；
+正按钮仍是宿主的「完成（N）」；`API_MIN` 仍不动（区间 20..32）。
 
 **官方体检插件**：`plugins/mods-health`（第 229 轮，前身叫 `conflict`）。宿主原来的那行
 「查模组冲突」整块删掉，判据搬进插件的 `core/Conflicts.java` 与 `core/Gates.java`；
