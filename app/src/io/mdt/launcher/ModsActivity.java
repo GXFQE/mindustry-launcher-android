@@ -1319,6 +1319,13 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
                 + Trans.get(ModsActivity.this, R.string.mods_filter_sort_size), new Runnable() {
             @Override public void run() { mSort = Mods.SORT_SIZE; rebuildList(); }
         });
+        // ★ 第 283 轮：插件注入的排序**并进排序这一组**（用户：「按照排序和筛选分开，
+        //   而不是按照宿主和插件分开」）—— 原来它排在类型筛选下面，把排序切成了两截。
+        for (PluginPicks.Choice c : PluginPicks.choices(this, Extensions.PAGE_MODS, mSlot,
+                true, mPluginSortKey, mPluginSink)) {
+            addChoice(labels, acts, c.label, c.run);
+        }
+        // ── 排序到此为止，以下是筛选 ──
         addChoice(labels, acts, (mOnlyProblems ? tick : "")
                 + Trans.get(ModsActivity.this, R.string.mods_filter_only), new Runnable() {
             @Override public void run() { mOnlyProblems = !mOnlyProblems; rebuildList(); }
@@ -1328,11 +1335,6 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
         addTypeChoice(labels, acts, Mods.TYPE_JS, R.string.mods_filter_type_js);
         addTypeChoice(labels, acts, Mods.TYPE_DATA, R.string.mods_filter_type_data);
 
-        // v25：插件注入的排序 / 筛选（**选中才算**：算的时候要加载插件，走后台线程）
-        for (PluginPicks.Choice c : PluginPicks.choices(this, Extensions.PAGE_MODS, mSlot,
-                true, mPluginSortKey, mPluginSink)) {
-            addChoice(labels, acts, c.label, c.run);
-        }
         for (PluginPicks.Choice c : PluginPicks.choices(this, Extensions.PAGE_MODS, mSlot,
                 false, mPluginFilterKey, mPluginSink)) {
             addChoice(labels, acts, c.label, c.run);

@@ -451,6 +451,14 @@ public class BlueprintsActivity extends BaseActivity {
         acts.add(new Runnable() { @Override public void run() {
             mSort = ListQuery.SORT_SIZE; rebuildList();
         } });
+        // ★ 第 283 轮：插件行**按功能**并入（排序紧跟在宿主排序后、筛选跟在本页筛选后），
+        //   不再按"宿主 / 插件"分（用户：「按照排序和筛选分开，而不是按照宿主和插件分开」）。
+        for (PluginPicks.Choice c : PluginPicks.choices(this, Extensions.PAGE_BLUEPRINTS, mSlot,
+                true, mPluginSortKey, mPluginSink)) {
+            labels.add(c.label);
+            acts.add(c.run);
+        }
+        // ── 排序到此为止，以下是筛选 ──
         labels.add((mOnlyProblems ? tick : "")
                 + Trans.get(BlueprintsActivity.this, R.string.mods_filter_only));
         acts.add(new Runnable() { @Override public void run() {
@@ -459,12 +467,6 @@ public class BlueprintsActivity extends BaseActivity {
         addSrcChoice(labels, acts, Blueprints.FROM_ANY, R.string.list_src_any, tick);
         addSrcChoice(labels, acts, Blueprints.FROM_SLOT, R.string.list_src_slot, tick);
         addSrcChoice(labels, acts, Blueprints.FROM_MOD, R.string.list_src_mod, tick);
-        // v25（第 280 轮）：插件注入的排序 / 筛选（四个列表页同一套；本页原来一行都没有）
-        for (PluginPicks.Choice c : PluginPicks.choices(this, Extensions.PAGE_BLUEPRINTS, mSlot,
-                true, mPluginSortKey, mPluginSink)) {
-            labels.add(c.label);
-            acts.add(c.run);
-        }
         for (PluginPicks.Choice c : PluginPicks.choices(this, Extensions.PAGE_BLUEPRINTS, mSlot,
                 false, mPluginFilterKey, mPluginSink)) {
             labels.add(c.label);
