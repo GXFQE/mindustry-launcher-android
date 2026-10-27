@@ -91,6 +91,7 @@
         android:layout_height="wrap_content"
         android:maxHeight="420dp"
         android:divider="@null"
+        android:scrollbarStyle="insideInset"
         android:dividerHeight="0dp"
         android:paddingTop="4dp"
         android:paddingBottom="4dp"
