@@ -454,7 +454,7 @@ public final class MapStatsPage {
     }
 
     /** 一次统计的"前置事实"：内容表 + 译名 + 这一轮游戏会不会加载模组（进声明）。 */
-    private static final class Prepped {
+    static final class Prepped {
         MapStats.Table table;
         MapStats.Names names;
         boolean modsSkipped;
@@ -474,9 +474,12 @@ public final class MapStatsPage {
      *
      * <p>模组那层**只用宿主给的数字**（`ItemInfo.extra` 的 `enabled` / `willFailJavaLoad` /
      * `rootPrefix`）与 `api.modsSkipped()`，判据仍只有宿主那一处 —— 插件不重算"哪些模组是活的"。
-     * 译名与宿主 {@code MapStatsMods} + {@code BundleNames} 同源（同一份 `MapStats.readBundles`）。
+     * 译名与宿主 {@code MapStatsMods} + {@code BundleNames} 同源（同一份 `MapStats.readBundles`）。</p>
+     *
+     * <p>★ 第 281 轮：`sort` / `filter` 那几条（{@link StatsIndex}）也调这一处 —— 与导出 / 详情页
+     * **同一个内容表**，否则"排序用的数"和"点开看到的数"会差一截。</p>
      */
-    private static Prepped prepare(PluginApi api, Context c) {
+    static Prepped prepare(PluginApi api, Context c) {
         Prepped out = new Prepped();
         out.table = MapStats.copyOf(MapStats.vanilla());
         File apk = versionApkOf(api);
@@ -1101,7 +1104,16 @@ public final class MapStatsPage {
         }
     }
 
-    /** 没有译名表时的兜底：内部名 → 可读（`dark-metal` → `Dark Metal`）。 */
+    /**
+     * 没有译名表时的兜底：内部名 → 可读（`dark-metal` → `Dark Metal`）。
+     *
+     * <p>第 281 轮：排序 / 筛选那几条（{@link StatsIndex}）备不出译名时也用它 ——
+     * 它们只用"格数"，名字只影响行标签。</p>
+     */
+    static MapStats.Names rawNames() {
+        return new RawNames();
+    }
+
     private static final class RawNames implements MapStats.Names {
         @Override public String block(String internal) {
             return MapStats.pretty(internal);

@@ -38,9 +38,73 @@ public final class Check {
         exportBatch();
         overlay();
         names();
+        picks();
         System.out.println("== mapstats check: " + pass + " passed, " + fails.size() + " failed ==");
         for (String f : fails) System.out.println("  FAIL  " + f);
         if (!fails.isEmpty()) System.exit(1);
+    }
+
+    // ---- ⑧ 按统计排序 / 筛选（第 281 轮） ------------------------------------------
+
+    private static void picks() {
+        MapStats.Result r = new MapStats.Result();
+        r.ok = true;
+        MapStats.Row ore = new MapStats.Row();
+        ore.internals.add("ore-thorium");
+        ore.open = 10;
+        ore.loose = 2;
+        r.ores.add(ore);
+        MapStats.Row wall = new MapStats.Row();
+        wall.internals.add("ore-wall-tungsten");
+        wall.open = 3;
+        r.oreWalls.add(wall);
+        MapStats.Row floor = new MapStats.Row();
+        floor.open = 100;
+        r.floors.add(floor);
+        MapStats.Row bonus = new MapStats.Row();
+        bonus.open = 999;
+        r.bonuses.add(bonus);
+        r.buildable.free = 60;
+        r.buildable.cleared = 5;
+        r.core.zone = 12;
+
+        ok(StatsPick.reachTotal(r) == 115,
+                "可采资源 = 矿石 12 + 矿墙 3 + 可采地板 100 = 115（加成地板 999 不算；实际 "
+                        + StatsPick.reachTotal(r) + "）");
+        ok(StatsPick.hasOre(r, "thorium") && StatsPick.hasOre(r, "tungsten")
+                        && !StatsPick.hasOre(r, "copper"),
+                "含某矿按内部名匹配（ore-thorium / ore-wall-tungsten 都算；没有的矿不算）");
+        ok(StatsPick.hasCore(r), "有核心区：zone > 0");
+        MapStats.Result skip = new MapStats.Result();
+        skip.ok = true;
+        skip.core.zone = 99;
+        skip.core.skip = true;
+        ok(!StatsPick.hasCore(skip), "核心区统计不适用（skip）⇒ 不算「有核心区」");
+
+        StatsPick.Snap a = StatsPick.snap(r);
+        MapStats.Result r2 = new MapStats.Result();
+        r2.ok = true;
+        r2.buildable.free = 70;
+        StatsPick.Snap b = StatsPick.snap(r2);
+        ok(a.ok && a.build == 65 && b.build == 70,
+                "能建格数 = Buildable.count()（65 / 70，实际 " + a.build + " / " + b.build + "）");
+        ok(StatsPick.compare(StatsPick.SORT_REACH, a, "a", b, "b") < 0,
+                "按可采资源：115 那张排在 0 那张前面");
+        ok(StatsPick.compare(StatsPick.SORT_BUILD, a, "a", b, "b") > 0,
+                "按能建格数：70 那张排在 65 那张前面（两个模式结论相反 = 尺子有分辨力）");
+        StatsPick.Snap bad = new StatsPick.Snap();
+        ok(StatsPick.compare(StatsPick.SORT_REACH, a, "a", bad, "z") < 0
+                        && StatsPick.compare(StatsPick.SORT_REACH, bad, "a", a, "z") > 0,
+                "读不出来的图：排序时垫底（两侧都比它靠前）");
+        ok(StatsPick.compare(StatsPick.SORT_REACH, a, "same", StatsPick.snap(r), "same") == 0,
+                "同分同标题 ⇒ 0（顺序稳定）");
+
+        ok(StatsPick.oreIn(StatsPick.oreList(r), "thorium")
+                        && StatsPick.oreIn(StatsPick.oreList(r), "tungsten")
+                        && !StatsPick.oreIn(StatsPick.oreList(r), "copper"),
+                "oreList / oreIn 同一把尺子（落盘缓存读回来也能判「含某矿」）");
+        ok(",".equals(StatsPick.snap(null).ores) && ",".equals(StatsPick.oreList(null)),
+                "读不出来 ⇒ 空矿表（不是 null，也不会误命中）");
     }
 
     // ---- ① 原版内容表 ------------------------------------------------------------

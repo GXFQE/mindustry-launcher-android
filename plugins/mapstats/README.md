@@ -67,3 +67,31 @@ adb shell am start -n io.mdt.launcher/io.mdt.launcher.MainActivity \
 - 判据：槽内地图（`Editor Playtesting.msav`，586×586 · erekir）与游戏自带地图（`111.msav`，
   600×600）都在详情页里直接出「地矿 / 墙矿 / 加成地板 / 可建造 / 核心区 / 技术细节」六张卡，
   用时 310 ms / 10 ms；宿主自检 **1530 / 0**（新增 v9 段落插槽一条）。
+
+## 第 281 轮：按统计结果**排序 / 筛选**（地图页，v25 注入）
+
+用户最初的问题：「地图排序和筛选能不能按照统计结果排」。宿主那边第 280 轮已经把 `filter` / `sort`
+的结果层统一（`PluginPicks`，四个列表页一套），这一轮插件侧接上：
+
+| 声明 id | 类型 | 做什么 |
+|---|---|---|
+| `mapstats-sort-reach` | sort | 按**可采资源**（矿石 + 矿墙 + 可采地板三段的"拿得到"格数）多 → 少 |
+| `mapstats-sort-build` | sort | 按**能建格数**（`Buildable.count()`，与详情页同一个数）多 → 少 |
+| `mapstats-filter-core` | filter | 只看**有核心区**的图（`core-zone` 地板格数 > 0；`Core.skip` 不算） |
+| `mapstats-filter-thorium` | filter | 只看**采得到钍**的图（内部名匹配 `thorium` / `ore-thorium` / `ore-wall-thorium`） |
+| `mapstats-filter-tungsten` | filter | 只看**采得到钨**的图（埃里克尔顶级矿） |
+
+- 入口类一插件一份（`SortReach` / `SortBuild` / `FilterCore` / `FilterThorium` / `FilterTungsten`），
+  每个都 `api()` 报 32（宿主在被加载的那个类上判版本）；判据在 `core/StatsPick`（纯 Java，PC 可测）。
+- 🔴 **必须自己缓存**：宿主排序会调 `compare()` O(n log n) 次、筛选每项一次 —— 每次重解一张图
+  会被解上千遍。`StatsIndex` 按身份缓存，并写盘：真机 114 张图 **冷 2.8 s / 热 0.7-1.1 s**。
+- 🔴 **缓存键**：槽 + 「这次加载不加载模组」+ 每个模组的路径/大小/修改时间/**启用状态** + `FMT`；
+  每条再带图的 `size` + `mtime` ⇒ 换槽 / 开关模组 / 换图都自然失效。
+- 统计口径**复用** `MapStatsPage.prepare` + `MapStats.analyze`（与导出、详情页同一份内容表与同一条算法）
+  —— 排序用的数与点开看到的数不会差。
+- 真机（槽「预览验收」，本槽 0 张 + 游戏自带 114 张）：
+  `plugin filter …-core @maps: 45/114`、`…-thorium: 70/114`、`…-tungsten: 16/114`；
+  按可采资源排第一的是 **13.msav**，详情页 2,602（地矿）+ 25,261（可采地板）= 27,863 格。
+  截图 `evidence/round281/`。
+- 插件侧自检：`build.sh check` **20 → 31 条**（新增 11 条：可采资源口径 / 含某矿 / 核心区 /
+  两个排序模式结论相反 / 读不出来的垫底 / 缓存里的短名反查）。
