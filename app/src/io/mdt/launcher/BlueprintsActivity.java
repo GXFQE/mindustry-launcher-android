@@ -366,6 +366,12 @@ public class BlueprintsActivity extends BaseActivity {
         mShown = PluginPicks.applySort(mShown, mPluginSortIds, BP_ID);
         boolean filtering = ListQuery.filtering(mQuery, mSort, mOnlyProblems,
                 ListQuery.SORT_NAME, mSrc != Blueprints.FROM_ANY) || mPluginFilterIds != null;
+        // 第 286 轮：登记"这一屏看得见的"（插件的勾选页拿它当默认勾选；只认筛选，排序不算）
+        boolean narrowed = !mQuery.trim().isEmpty() || mOnlyProblems
+                || mSrc != Blueprints.FROM_ANY || mPluginFilterIds != null;
+        java.util.List<String> viewIds = new java.util.ArrayList<String>(mShown.size());
+        for (Blueprints.Item one : mShown) viewIds.add(BP_ID.idOf(one));
+        PluginPicks.noteView(Extensions.PAGE_BLUEPRINTS, mSlot, viewIds, narrowed);
         String[] titles = new String[mShown.size()];
         String[] subs = new String[mShown.size()];
         android.graphics.Bitmap[] thumbs = new android.graphics.Bitmap[mShown.size()];

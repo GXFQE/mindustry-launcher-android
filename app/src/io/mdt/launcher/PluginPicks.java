@@ -68,6 +68,37 @@ final class PluginPicks {
         String idOf(T item);
     }
 
+    /**
+     * 第 286 轮：**这一页现在看得见哪几项**（身份 + 有没有开筛选）。
+     *
+     * <p>用途：插件调 {@code pickContent} 让用户勾选时，宿主把"当前筛选结果"当**默认勾选** ——
+     * 用户刚筛出 16 张、点「导出统计…」，不该再让它从 114 张里重新挑一遍
+     * （用户 2026-10-28：「筛选是不是可以作用于导出统计」）。</p>
+     *
+     * <p>没开筛选时**不预勾**（原来是"一个都不勾"，保持原样）；换页 / 退出不管 —— 身份对不上的
+     * id 在勾选那一步自然被忽略。</p>
+     */
+    private static final Map<String, List<String>> VIEW_IDS = new HashMap<String, List<String>>();
+    private static final Map<String, Boolean> VIEW_FILTERED = new HashMap<String, Boolean>();
+
+    /** 页面重画完调一次：把当前可见那几项的身份登记下来（`filtered` = 这一屏是不是筛过的）。 */
+    static void noteView(String page, String slot, List<String> ids, boolean filtered) {
+        if (page == null || slot == null) return;
+        String k = page + "/" + slot;
+        VIEW_IDS.put(k, ids == null ? new ArrayList<String>() : new ArrayList<String>(ids));
+        VIEW_FILTERED.put(k, Boolean.valueOf(filtered));
+    }
+
+    /** 这一页**筛过且看得见**的那几项（没筛过 / 没登记 ⇒ 空表 = 不预勾）。 */
+    static List<String> viewIds(String page, String slot) {
+        if (page == null || slot == null) return Collections.emptyList();
+        String k = page + "/" + slot;
+        Boolean f = VIEW_FILTERED.get(k);
+        if (f == null || !f.booleanValue()) return Collections.emptyList();
+        List<String> ids = VIEW_IDS.get(k);
+        return ids == null ? Collections.<String>emptyList() : ids;
+    }
+
     /** 结果回给页面的那一边（在 UI 线程调用）。{@code key} = 选中的那一条 `pluginId/itemId`。 */
     interface Sink {
         /** 插件筛选通过的条目身份（空集 = 一条都不通过）。 */

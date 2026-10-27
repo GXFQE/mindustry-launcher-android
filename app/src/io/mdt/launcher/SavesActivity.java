@@ -296,6 +296,11 @@ public class SavesActivity extends BaseActivity {
 
         boolean filtering = ListQuery.filtering(mQuery, mSort, false, ListQuery.SORT_NAME)
                 || mPluginFilterIds != null;
+        // 第 286 轮：登记"这一屏看得见的"（插件的勾选页拿它当默认勾选；只认筛选，排序不算）
+        boolean narrowed = !mQuery.trim().isEmpty() || mPluginFilterIds != null;
+        java.util.List<String> viewIds = new java.util.ArrayList<String>(shown.size());
+        for (File one : shown) viewIds.add(SAVE_ID.idOf(one));
+        PluginPicks.noteView(Extensions.PAGE_SAVES, mSlot, viewIds, narrowed);
         // 表头那句同时承担"有几份"（标题里放不下多行，见 dialog_msav_list.xml 的实测）。
         // ★ 第 165 轮：第二段改成**计数**（「其中备份 N 份」），与另外三页同一个模板
         //   （「本槽 N <量词> · 一条事实」）—— 原来那里是一句操作提示「点一份看它是什么图」，

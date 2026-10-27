@@ -544,6 +544,19 @@ final class BatchIo {
                           String[] titles, String[] subs, android.graphics.Bitmap[] thumbs,
                           final Filler filler, final int okFmtRes, int shareLabelRes,
                           final OnPickShare cb) {
+        pickMulti(a, titleRes, titleText, head, titles, subs, thumbs, filler, okFmtRes,
+                shareLabelRes, null, cb);
+    }
+
+    /**
+     * 同上，但可以**预勾**若干项（第 286 轮：列表页筛过之后，插件的「导出统计…」默认勾上这一屏）。
+     *
+     * @param preset 长度须与 `titles` 一致；null / 长度不符 ⇒ 一个都不勾（老行为）
+     */
+    static void pickMulti(final Activity a, int titleRes, String titleText, String head,
+                          String[] titles, String[] subs, android.graphics.Bitmap[] thumbs,
+                          final Filler filler, final int okFmtRes, int shareLabelRes,
+                          final boolean[] preset, final OnPickShare cb) {
         if (titles == null || titles.length == 0) return;
         final CharSequence title = (titleText == null || titleText.trim().isEmpty())
                 ? Trans.get(a, titleRes) : titleText.trim();
@@ -553,7 +566,9 @@ final class BatchIo {
         h.setText(head == null ? "" : head);
         final ListView lv = (ListView) box.findViewById(R.id.msav_list);
         final MsavListAdapter ad =
-                new MsavListAdapter(a, titles, subs, thumbs, new boolean[titles.length]);
+                new MsavListAdapter(a, titles, subs, thumbs,
+                        preset != null && preset.length == titles.length
+                                ? preset.clone() : new boolean[titles.length]);
         lv.setAdapter(ad);
         final boolean[] alive = {true};
         final View shareRow = box.findViewById(R.id.pick_share_row);

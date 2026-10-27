@@ -4615,6 +4615,19 @@ public final class SelfTest {
             ok(stat, L, noClear.length() == 0,
                     "★★排序只能有一个：四个列表页都能在选宿主排序时清掉插件排序（clearPluginSort）"
                             + (noClear.length() == 0 ? "" : "；缺：" + noClear));
+
+            // 第 286 轮：筛过之后，插件的勾选页默认勾上"这一屏看得见的"
+            java.util.List<String> ids = java.util.Arrays.asList("a", "b");
+            PluginPicks.noteView("maps", "__selftest__", ids, true);
+            java.util.List<String> got = PluginPicks.viewIds("maps", "__selftest__");
+            ok(stat, L, got.size() == 2 && got.contains("a") && got.contains("b"),
+                    "★筛选结果登记给宿主（插件勾选页拿它当默认勾选）：筛过 ⇒ 拿到这一屏的身份");
+            PluginPicks.noteView("maps", "__selftest__", ids, false);
+            ok(stat, L, PluginPicks.viewIds("maps", "__selftest__").isEmpty(),
+                    "★没筛过 ⇒ 不预勾（保持「一个都不勾」的老行为）");
+            PluginPicks.noteView("maps", "__selftest__", null, true);
+            ok(stat, L, PluginPicks.viewIds("maps", "__selftest__").isEmpty(),
+                    "空身份表 ⇒ 不预勾（不 NPE）");
         }
 
         // ── 第 282 轮（v33）：插件"先选一项"的选项过闸门 ────────────────────────────

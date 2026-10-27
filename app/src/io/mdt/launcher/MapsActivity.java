@@ -403,6 +403,13 @@ public class MapsActivity extends BaseActivity {
         mShown = PluginPicks.applySort(mShown, mPluginSortIds, MAP_ID);
         boolean filtering = ListQuery.filtering(mQuery, mSort, mOnlyProblems,
                 ListQuery.SORT_NAME, mSrc != Maps.FROM_ANY) || mPluginFilterIds != null;
+        // 第 286 轮：把"这一屏看得见的"登记给宿主 —— 插件点「导出统计…」时，勾选页拿它当默认勾选
+        // （筛出 16 张就不该再从 114 张里重挑一遍）。只认**筛选**，排序不算。
+        boolean narrowed = !mQuery.trim().isEmpty() || mOnlyProblems
+                || mSrc != Maps.FROM_ANY || mPluginFilterIds != null;
+        java.util.List<String> viewIds = new java.util.ArrayList<String>(mShown.size());
+        for (Maps.Item one : mShown) viewIds.add(MAP_ID.idOf(one));
+        PluginPicks.noteView(Extensions.PAGE_MAPS, mSlot, viewIds, narrowed);
         String[] titles = new String[mShown.size()];
         String[] subs = new String[mShown.size()];
         android.graphics.Bitmap[] thumbs = new android.graphics.Bitmap[mShown.size()];

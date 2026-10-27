@@ -406,7 +406,7 @@ final class PluginActions {
      * @param head  插件给的说明（v32）；null / 空 ⇒ 宿主默认「选中后交给插件」
      */
     static void pick(final Activity a, final Context ctx, final String slot, final String kind,
-                     final String title, final String head,
+                     final String page, final String title, final String head,
                      final PluginApi.PickContent callback) {
         if (a == null) {
             if (callback != null) callback.onPicked(new ArrayList<ItemInfo>());
@@ -418,6 +418,7 @@ final class PluginActions {
         new Thread(new Runnable() {
             @Override public void run() {
                 final List<ItemInfo> items = PluginData.pickItems(ctx, slot, kind);
+                final boolean[] preset = presetFor(page, slot, items);
                 a.runOnUiThread(new Runnable() {
                     @Override public void run() {
                         if (items.isEmpty()) {
@@ -438,10 +439,11 @@ final class PluginActions {
                         }
                         BatchIo.pickMulti(a, R.string.plugin_pick_title, useTitle,
                                 useHead.isEmpty() ? Trans.get(a, R.string.plugin_pick_head) : useHead,
-                                titles, subs, null, null, R.string.plugin_pick_ok_fmt,
-                                new BatchIo.OnPick() {
-                                    @Override public void onPick(List<Integer> indexes, CardStack card) {
-                                          if (card != null) card.dismiss();
+                                titles, subs, null, null, R.string.plugin_pick_ok_fmt, 0, preset,
+                                new BatchIo.OnPickShare() {
+                                    @Override public void onPick(List<Integer> indexes, boolean share,
+                                                                 CardStack card) {
+                                        if (card != null) card.dismiss();
                                         List<ItemInfo> out = new ArrayList<ItemInfo>();
                                         if (indexes != null) {
                                             for (Integer i : indexes) {
@@ -463,6 +465,30 @@ final class PluginActions {
     static final int PICK_TITLE_MAX = 24;
     /** 勾选那一屏的说明上限。 */
     static final int PICK_HEAD_MAX = 80;
+
+    /**
+     * 第 286 轮：这一页**筛过之后**看得见的那几项 ⇒ 勾选页的默认勾选。
+     *
+     * <p>用户刚筛出 16 张、点「导出统计…」，不该再从 114 张里重挑一遍（用户 2026-10-28
+     * 「筛选是不是可以作用于导出统计」）。只认**筛选**：页面登记时自己排除"只是改了排序"。</p>
+     *
+     * @return 与 {@code items} 等长；没有筛选 / 一条都对不上 ⇒ null（老行为：一个都不勾）
+     */
+    private static boolean[] presetFor(String page, String slot, List<ItemInfo> items) {
+        List<String> view = PluginPicks.viewIds(page, slot);
+        if (view.isEmpty() || items == null || items.isEmpty()) return null;
+        java.util.Set<String> keep = new java.util.HashSet<String>(view);
+        boolean[] out = new boolean[items.size()];
+        int hit = 0;
+        for (int i = 0; i < items.size(); i++) {
+            String id = PluginPicks.idOf(items.get(i));
+            if (id != null && !id.isEmpty() && keep.contains(id)) {
+                out[i] = true;
+                hit++;
+            }
+        }
+        return hit == 0 ? null : out;
+    }
 
     /**
      * 插件给的文案过一遍闸门：**压成一行**（换行 / 连续空白 ⇒ 一个空格）、去首尾空白、按**码点**截长。

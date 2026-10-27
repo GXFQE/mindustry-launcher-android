@@ -993,13 +993,13 @@ public final class PluginHost {
 
         @Override public void pickContent(String kind, PickContent callback) {
             Activity a = activityOrNull();
-            PluginActions.pick(a, getBaseContext(), slot, kind, null, null, callback);
+            PluginActions.pick(a, getBaseContext(), slot, kind, page, null, null, callback);
         }
 
         @Override public void pickContent(String kind, String title, String head,
                                          PickContent callback) {
             Activity a = activityOrNull();
-            PluginActions.pick(a, getBaseContext(), slot, kind, title, head, callback);
+            PluginActions.pick(a, getBaseContext(), slot, kind, page, title, head, callback);
         }
 
         /** 这些动作要一个真的 Activity（分享面板 / SAF / 对话框）；dev 页里也成立。 */

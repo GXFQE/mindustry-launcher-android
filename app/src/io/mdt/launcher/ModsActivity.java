@@ -1196,6 +1196,12 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
         mShown = shown;
         boolean filtering = mOnlyProblems || mType != Mods.TYPE_ANY || !mQuery.trim().isEmpty()
                 || mSort != Mods.SORT_NAME || mPluginFilterIds != null;
+        // 第 286 轮：登记"这一屏看得见的"（插件的勾选页拿它当默认勾选；只认筛选，排序不算）
+        boolean narrowed = mOnlyProblems || mType != Mods.TYPE_ANY
+                || !mQuery.trim().isEmpty() || mPluginFilterIds != null;
+        java.util.List<String> viewIds = new java.util.ArrayList<String>(shown.size());
+        for (Mods.Info one : shown) viewIds.add(MOD_ID.idOf(one));
+        PluginPicks.noteView(Extensions.PAGE_MODS, mSlot, viewIds, narrowed);
         if (mFiltered != null) {
             mFiltered.setVisibility(filtering ? View.VISIBLE : View.GONE);
             mFiltered.setText(Trans.get(ModsActivity.this, R.string.mods_filtered_fmt, shown.size(), all.size()));
