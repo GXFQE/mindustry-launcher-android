@@ -42,10 +42,15 @@ adb shell am start -n io.mdt.launcher/io.mdt.launcher.MainActivity \
 - ✅ **导出**：单张 = `.json`（`jsonDoc`）、多张 = `.jsonl`（`jsonlBatch`，一行一张图）、
   文件名 `mdt-stats-<名>-<时间>.json[l]`、mime 跟着走、声明里有槽 / 图名 / sha256 / 星球 /
   版本 APK / 模组数 / 内容表行数；真机两张导出 = 恰好 2 行。
+  ★ **简洁模式**的 `buildable` 写 **`{"count": N}` = 能放一般建筑的格数**（与界面上「能放一般建筑 N 格」
+  同一个数，`0.msav` 真机 = **31,083**）；**不是**六桶之和（那个数 == 整张图的格数，350×350 ⇒ 122,500，
+  只在**详细**模式里当 `sum` 写）。2026-10-27 用户抓到过这个错：「简洁的可建造面积数据是不是导出成了总面积」。
 - ✅ **宿主那份 F21 已删**（第 192 轮）：详情页统计段、地图页「导出统计…」、`StatsExporter`、
   `MapStatsExport` 全没了；`MapStats*` 与三张表**留在宿主**（蓝图那条线在用，不是 F21 专属）。
-- ✅ **插件侧自检**：`bash plugins/mapstats/build.sh check`（纯 Java / PC 跑，19 条：内容表 / 遮挡口径 /
+- ✅ **插件侧自检**：`bash plugins/mapstats/build.sh check`（纯 Java / PC 跑，20 条：内容表 / 遮挡口径 /
   核心区+星球 / 单张·多张·简洁导出 / 模组叠加 / pretty）。
+  ★ 其中一条是「简洁模式的可建造 = 60（不是总面积 96）」—— 夹具刻意选 12×8 但只有 60 格能建，
+  **两个数不同才有分辨力**（旧断言写的是 `sum == cells`，等于把 bug 钉成了预期）。
 
 
 ## 第 193 轮：把「点开地图就看见数字」还回来

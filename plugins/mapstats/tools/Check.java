@@ -186,25 +186,42 @@ public final class Check {
                 "简洁模式 = 瘦身声明（9 个键）+ records，且不写 total");
         ok(!bdoc.contains("采不到的那种"),
                 "简洁模式：reachable==0 的行不写（「采不到的那种」不出现）");
+        // 🔴 2026-10-27 用户：「简洁的可建造面积数据是不是导出成了总面积」——
+        //   这一条**专门用"两个数不同"的夹具**（12×8 = 96 格，其中能放 60 格）：
+        //   旧实现写的是六桶之和 = 96（总面积），新实现写 count = 60。60 ≠ 96 ⇒ 这条有分辨力。
+        int bdCount = Integer.MIN_VALUE;
+        for (Object oo : bd != null && bd.get("records") instanceof List
+                ? (List<?>) bd.get("records") : new ArrayList<Object>()) {
+            Map<?, ?> o = (Map<?, ?>) oo;
+            if ("buildable".equals(String.valueOf(o.get("kind")))) bdCount = intOf(o, "count");
+        }
+        ok(bdCount == 60 && br.cells == 96,
+                "★简洁模式的可建造 = 能放一般建筑的格数（60），**不是**总面积（96）—— 旧实现正是写 96");
         // 反方向：有真数（可建造 / 核心区）⇒ brief 里那两条必须在，且数与 Result 同源
         Map<String, Object> brd = MapStats.jsonOf(MapStatsExport.jsonDoc(xr,
                 statsMeta("d.msav", "dd", MapStatsExport.MODE_BRIEF)));
         List<?> brs = brd != null && brd.get("records") instanceof List
                 ? (List<?>) brd.get("records") : null;
-        int bSum = Integer.MIN_VALUE, cZone = Integer.MIN_VALUE, cMax = Integer.MIN_VALUE;
+        int bCount = Integer.MIN_VALUE, cZone = Integer.MIN_VALUE, cMax = Integer.MIN_VALUE;
         boolean bTotal = false;
         for (Object oo : brs == null ? new ArrayList<Object>() : brs) {
             Map<?, ?> o = (Map<?, ?>) oo;
             if (o.get("total") != null) bTotal = true;
             String k = String.valueOf(o.get("kind"));
-            if ("buildable".equals(k)) bSum = intOf(o, "sum");
+            if ("buildable".equals(k)) bCount = intOf(o, "count");
             if ("core".equals(k)) {
                 cZone = intOf(o, "zone");
                 cMax = intOf(o, "max");
             }
         }
-        ok(!bTotal && bSum == xr.cells && cZone == xr.core.zone && cMax == xr.core.max,
-                "简洁模式的反方向：可建造 sum == 总格数、核心区 zone/max 与 Result 同源");
+        // 🔴 2026-10-27 用户：「简洁的可建造面积数据是不是导出成了总面积」——
+        //   旧断言钉的正是**错的**那个口径（`bSum == xr.cells`）⇒ 尺子跟着 bug 一起错，一直全绿。
+        //   现在改成与 `count()` 对齐；**分辨力**由上面那条"60 vs 96"的夹具负责
+        //   （这张 6×6 夹具整张都可建，count == cells 是**正常**的，不能拿它当判据）。
+        ok(!bTotal && bCount == xr.buildable.count()
+                        && cZone == xr.core.zone && cMax == xr.core.max,
+                "简洁模式的反方向：可建造 count == 能放一般建筑 " + xr.buildable.count()
+                        + " 格、核心区 zone/max 与 Result 同源");
     }
 
     // ---- ④ 导出：多张 = JSONL（一行一张图） -----------------------------------------

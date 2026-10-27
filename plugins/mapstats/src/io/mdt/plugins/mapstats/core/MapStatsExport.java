@@ -92,6 +92,11 @@ public final class MapStatsExport {
      * `kind` / `name` / `reachable`；另外**两种口径都带** `buildable`（可建造区域）与
      * `core`（核心区域）—— 用户 2026-10-17：「我们统计的可建造区域以及核心区域也算」。
      *
+     * <p>🔴 简洁里的 `buildable` 写的是 **`{"count": N}` = 能放一般建筑的格数**
+     * （与界面上「能放一般建筑 N 格」同一个数，见 {@link MapStats.Buildable#count()}）。
+     * **不是**六桶之和（那个数 == 整张图的格数，属于"分账合计"，只在详细模式里当 `sum` 写）。
+     * 2026-10-27 用户抓到过一次：「简洁的可建造面积数据是不是导出成了总面积」。</p>
+     *
      * <p>用户 2026-10-17：「可以加个详细模式（全部数据）和简洁模式（仅含可采的）」→
      * 「**简洁模式只要可采数据**」→「**把 total 删了啊**」→「**简洁模式只有真实数据的啊**」——
      * `total` 是"这层一共多少格"，不是可采数据；核心区没数（`zone == 0` / `skip`）时那一串 0
@@ -181,9 +186,14 @@ public final class MapStatsExport {
         briefRows(sb, r.oreWalls, "oreWall");
         briefRows(sb, r.floors, "floor");
         briefRows(sb, r.bonuses, "bonus");
-        // 可建造区域：只有**真数**才写（六桶全 0 = 没有结论，别写个 0 冒充数据）
-        int bs = buildableSum(r.buildable);
-        if (bs > 0) appendJson(sb, new Obj("buildable").num("sum", bs).end());
+        // 可建造区域：写的是**能放一般建筑**的格数（= 界面上那行「能放一般建筑 N 格」）
+        // 🔴 2026-10-27 用户：「简洁的可建造面积数据是不是导出成了总面积」—— **是**：
+        //   原来这里写 `buildableSum()`，而六桶是**整张图的一个划分**（自检钉着 sum == cells）
+        //   ⇒ 350×350 的图导出成 `{"sum":122500}`，界面上却是 31083。两处对不上，用户一眼看出来。
+        //   ⇒ 简洁模式改用 `count()`（自由 + 拆掉后能建），键名也从 `sum` 改成 `count`：
+        //   **同一个键名在两种模式里指两个数**是最容易再犯的错（详细模式那个 `sum` 是六桶之和，语义不同）。
+        int bc = r.buildable == null ? 0 : r.buildable.count();
+        if (bc > 0) appendJson(sb, new Obj("buildable").num("count", bc).end());
         if (r.core != null && !r.core.skip && r.core.zone > 0) {
             appendJson(sb, new Obj("core").num("zone", r.core.zone).num("max", r.core.max).end());
         }
@@ -296,7 +306,14 @@ public final class MapStatsExport {
         }
     }
 
-    /** 可建造六桶之和（**只有这一处**实现 —— 简洁模式只用这个数，别在别处再抄一遍） */
+    /**
+     * 可建造**六桶之和**（**只有这一处**实现）—— ⚠️ 它 == 整张图的格数（六桶是这张图的一个划分），
+     * 是"分账合计"，**不是**能建的格数。
+     *
+     * <p>🔴 2026-10-27：简洁模式曾把这个数当成"可建造面积"写出去（`sum`）⇒ 用户看到的是总面积
+     * （350×350 ⇒ 122500，而界面上是 31083）。现在简洁模式改用 {@link MapStats.Buildable#count()}
+     * （键名 `count`），这个函数只剩**详细**模式的六桶对账用。
+     */
     static int buildableSum(MapStats.Buildable b) {
         if (b == null) return 0;
         return b.free + b.cleared + b.walled + b.deep + b.floorBlocked + b.unknown;
