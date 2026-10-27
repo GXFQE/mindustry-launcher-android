@@ -383,8 +383,12 @@ public final class MapStatsPage {
                 if (t == null || !t.ok()) {
                     b.error = "unreadable";
                 } else {
-                    b.result = MapStats.analyze(t, table, names,
-                            b.planet.isEmpty() ? null : b.planet);
+                    // ★ 第 285 轮：**空串要原样传下去**，别折成 null。
+                    //   `analyze` 的口径（见 MapStats 里那段注释）："" = 存档没写 planet = **塞普罗**；
+                    //   null = 调用方压根没线索（才算"这条统计不适用"）。原来这里把 "" 折成 null ⇒
+                    //   塞普罗（星球键为空）的图在详情页**整张「核心区」卡都不出现**，而列表排序那条路
+                    //   （StatsIndex 传的正是 ""）算得出数 —— 同一张图两处对不上，用户 2026-10-28 抓的就是这个。
+                    b.result = MapStats.analyze(t, table, names, b.planet);
                     b.millis = b.result.millis;
                 }
             } catch (Throwable e) {

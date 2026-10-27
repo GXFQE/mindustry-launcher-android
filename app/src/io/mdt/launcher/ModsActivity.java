@@ -1303,21 +1303,32 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
      * ★ 一档⑤（2026-10-06）：加了"类型"四行。判据是 `Mods.matchesType`（"包含"语义）——
      *   混合模组会在两类里都出现，那是事实；这一行**只是纯前端过滤**，一个文件都不碰。
      */
+    /**
+     * 排序只能有一个：选了宿主这几档就清掉插件注入的排序。
+     * ★ 第 285 轮用户：「为什么宿主排序和插件排序可以同时勾选」—— `mSort` 与 `mPluginSortKey`
+     *   原来各管各的，界面上两个 ✓ 同时亮；而实际生效的只有插件那份（`applySort` 在
+     *   `ListQuery` 排完之后整体重排）⇒ 宿主那个勾是假的，必须一起去掉。
+     */
+    private void clearPluginSort() {
+        mPluginSortIds = null;
+        mPluginSortKey = null;
+    }
+
     private void pickFilter() {
         final String tick = "✓ ";
         final List<String> labels = new ArrayList<>();
         final List<Runnable> acts = new ArrayList<>();
-        addChoice(labels, acts, (mSort == Mods.SORT_NAME ? tick : "")
+        addChoice(labels, acts, (mSort == Mods.SORT_NAME && mPluginSortKey == null ? tick : "")
                 + Trans.get(ModsActivity.this, R.string.mods_filter_sort_name), new Runnable() {
-            @Override public void run() { mSort = Mods.SORT_NAME; rebuildList(); }
+            @Override public void run() { mSort = Mods.SORT_NAME; clearPluginSort(); rebuildList(); }
         });
-        addChoice(labels, acts, (mSort == Mods.SORT_STATE ? tick : "")
+        addChoice(labels, acts, (mSort == Mods.SORT_STATE && mPluginSortKey == null ? tick : "")
                 + Trans.get(ModsActivity.this, R.string.mods_filter_sort_state), new Runnable() {
-            @Override public void run() { mSort = Mods.SORT_STATE; rebuildList(); }
+            @Override public void run() { mSort = Mods.SORT_STATE; clearPluginSort(); rebuildList(); }
         });
-        addChoice(labels, acts, (mSort == Mods.SORT_SIZE ? tick : "")
+        addChoice(labels, acts, (mSort == Mods.SORT_SIZE && mPluginSortKey == null ? tick : "")
                 + Trans.get(ModsActivity.this, R.string.mods_filter_sort_size), new Runnable() {
-            @Override public void run() { mSort = Mods.SORT_SIZE; rebuildList(); }
+            @Override public void run() { mSort = Mods.SORT_SIZE; clearPluginSort(); rebuildList(); }
         });
         // ★ 第 283 轮：插件注入的排序**并进排序这一组**（用户：「按照排序和筛选分开，
         //   而不是按照宿主和插件分开」）—— 原来它排在类型筛选下面，把排序切成了两截。

@@ -4600,6 +4600,21 @@ public final class SelfTest {
             ok(stat, L, miss.length() == 0,
                     "★★四个列表页共用同一个结果层（各自持有 PluginPicks.Sink）"
                             + (miss.length() == 0 ? "" : "；没接上：" + miss));
+
+            // 第 285 轮：排序只能有一个 —— 选中宿主那几档时必须能清掉插件排序（四页都要有那一个方法，
+            // 否则就出现「两个 ✓ 同时亮」，而实际生效的只有插件那份）
+            StringBuilder noClear = new StringBuilder();
+            for (String p : pages) {
+                try {
+                    Class<?> c = Class.forName("io.mdt.launcher." + p);
+                    c.getDeclaredMethod("clearPluginSort");
+                } catch (Throwable t4) {
+                    noClear.append(p).append(' ');
+                }
+            }
+            ok(stat, L, noClear.length() == 0,
+                    "★★排序只能有一个：四个列表页都能在选宿主排序时清掉插件排序（clearPluginSort）"
+                            + (noClear.length() == 0 ? "" : "；缺：" + noClear));
         }
 
         // ── 第 282 轮（v33）：插件"先选一项"的选项过闸门 ────────────────────────────

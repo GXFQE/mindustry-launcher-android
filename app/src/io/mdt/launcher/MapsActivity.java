@@ -474,24 +474,35 @@ public class MapsActivity extends BaseActivity {
      * ★ 2026-10-11 补上**来源**四行（判据 `Maps.matchesSource`）：那三个来源原来是混在一张表里
      *   靠 ` · ` 区分的，用户没法只看"游戏自带"或"某个模组带的"。**纯前端过滤，一个文件都不碰**。
      */
+    /**
+     * 排序只能有一个：选了宿主这几档就清掉插件注入的排序。
+     * ★ 第 285 轮用户：「为什么宿主排序和插件排序可以同时勾选」—— `mSort` 与 `mPluginSortKey`
+     *   原来各管各的，界面上两个 ✓ 同时亮；而实际生效的只有插件那份（`applySort` 在
+     *   `ListQuery` 排完之后整体重排）⇒ 宿主那个勾是假的，必须一起去掉。
+     */
+    private void clearPluginSort() {
+        mPluginSortIds = null;
+        mPluginSortKey = null;
+    }
+
     private void pickFilter() {
         final String tick = "✓ ";
         final java.util.List<String> labels = new java.util.ArrayList<String>();
         final java.util.List<Runnable> acts = new java.util.ArrayList<Runnable>();
-        labels.add((mSort == ListQuery.SORT_NAME ? tick : "")
+        labels.add((mSort == ListQuery.SORT_NAME && mPluginSortKey == null ? tick : "")
                 + Trans.get(MapsActivity.this, R.string.mods_filter_sort_name));
         acts.add(new Runnable() { @Override public void run() {
-            mSort = ListQuery.SORT_NAME; rebuildList();
+            mSort = ListQuery.SORT_NAME; clearPluginSort(); rebuildList();
         } });
-        labels.add((mSort == ListQuery.SORT_PROBLEM ? tick : "")
+        labels.add((mSort == ListQuery.SORT_PROBLEM && mPluginSortKey == null ? tick : "")
                 + Trans.get(MapsActivity.this, R.string.mods_filter_sort_state));
         acts.add(new Runnable() { @Override public void run() {
-            mSort = ListQuery.SORT_PROBLEM; rebuildList();
+            mSort = ListQuery.SORT_PROBLEM; clearPluginSort(); rebuildList();
         } });
-        labels.add((mSort == ListQuery.SORT_SIZE ? tick : "")
+        labels.add((mSort == ListQuery.SORT_SIZE && mPluginSortKey == null ? tick : "")
                 + Trans.get(MapsActivity.this, R.string.mods_filter_sort_size));
         acts.add(new Runnable() { @Override public void run() {
-            mSort = ListQuery.SORT_SIZE; rebuildList();
+            mSort = ListQuery.SORT_SIZE; clearPluginSort(); rebuildList();
         } });
         // ★ 第 283 轮（用户：「按照排序和筛选分开，而不是按照宿主和插件分开」）：
         //   插件那些行**按功能**并进同一组 —— 排序紧跟在宿主的三档排序之后，

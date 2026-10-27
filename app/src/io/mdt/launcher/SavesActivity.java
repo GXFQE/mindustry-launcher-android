@@ -461,24 +461,35 @@ public class SavesActivity extends BaseActivity {
      * ★ 排序三档：名称（默认）/ 最新在前 / 大小（大的在前）——
      *   "最新在前"是这一页独有的（槽里的存档是真文件，有修改时间）。
      */
+    /**
+     * 排序只能有一个：选了宿主这几档就清掉插件注入的排序。
+     * ★ 第 285 轮用户：「为什么宿主排序和插件排序可以同时勾选」—— `mSort` 与 `mPluginSortKey`
+     *   原来各管各的，界面上两个 ✓ 同时亮；而实际生效的只有插件那份（`applySort` 在
+     *   `ListQuery` 排完之后整体重排）⇒ 宿主那个勾是假的，必须一起去掉。
+     */
+    private void clearPluginSort() {
+        mPluginSortIds = null;
+        mPluginSortKey = null;
+    }
+
     private void pickFilter() {
         final String tick = "✓ ";
         final java.util.List<String> labels = new java.util.ArrayList<String>();
         final java.util.List<Runnable> acts = new java.util.ArrayList<Runnable>();
-        labels.add((mSort == ListQuery.SORT_NAME ? tick : "")
+        labels.add((mSort == ListQuery.SORT_NAME && mPluginSortKey == null ? tick : "")
                 + Trans.get(SavesActivity.this, R.string.mods_filter_sort_name));
         acts.add(new Runnable() { @Override public void run() {
-            mSort = ListQuery.SORT_NAME; rebuildList();
+            mSort = ListQuery.SORT_NAME; clearPluginSort(); rebuildList();
         } });
-        labels.add((mSort == ListQuery.SORT_TIME ? tick : "")
+        labels.add((mSort == ListQuery.SORT_TIME && mPluginSortKey == null ? tick : "")
                 + Trans.get(SavesActivity.this, R.string.save_filter_sort_time));
         acts.add(new Runnable() { @Override public void run() {
-            mSort = ListQuery.SORT_TIME; rebuildList();
+            mSort = ListQuery.SORT_TIME; clearPluginSort(); rebuildList();
         } });
-        labels.add((mSort == ListQuery.SORT_SIZE ? tick : "")
+        labels.add((mSort == ListQuery.SORT_SIZE && mPluginSortKey == null ? tick : "")
                 + Trans.get(SavesActivity.this, R.string.mods_filter_sort_size));
         acts.add(new Runnable() { @Override public void run() {
-            mSort = ListQuery.SORT_SIZE; rebuildList();
+            mSort = ListQuery.SORT_SIZE; clearPluginSort(); rebuildList();
         } });
         // v25（第 280 轮）：插件注入的排序 / 筛选（四个列表页同一套；本页原来一行都没有）
         for (PluginPicks.Choice c : PluginPicks.choices(this, Extensions.PAGE_SAVES, mSlot,

@@ -39,8 +39,9 @@ import io.mdt.plugins.mapstats.core.StatsPick;
 final class StatsIndex {
 
     /** 缓存格式：改了统计口径（或 {@link StatsPick.Snap} 的字段）就抬这个数 ⇒ 老缓存整份作废。
-     *  ★ 第 282 轮 1 → 2：`ores` 从"有没有"改成"每种矿各自多少格"。 */
-    private static final int FMT = 2;
+     *  ★ 第 282 轮 1 → 2：`ores` 从"有没有"改成"每种矿各自多少格"。
+     *  ★ 第 285 轮 2 → 3：多一列 `cores`（可建核心数），`ores` 挪到最后一列。 */
+    private static final int FMT = 3;
     private static final String PREFIX = "pick-";
     private static final Charset UTF8 = Charset.forName("UTF-8");
 
@@ -155,6 +156,7 @@ final class StatsIndex {
             MsavTiles.Tiles t = MsavTiles.read(in, false);
             if (t == null || !t.ok()) return new StatsPick.Snap();
             String planet = it.extra.get("planet");
+            if (planet == null) planet = "";     // 没有这个键 = 塞普罗（同详情页口径，见 MapStats.analyze）
             MapStats.Result r = MapStats.analyze(t, table, names, planet);
             return StatsPick.snap(r);
         } catch (Throwable t) {
@@ -175,14 +177,15 @@ final class StatsIndex {
             while ((line = r.readLine()) != null) {
                 if (line.isEmpty() || line.charAt(0) == '#') continue;
                 String[] p = line.split("\t");
-                if (p.length < 8) continue;
+                if (p.length < 9) continue;
                 try {
                     StatsPick.Snap s = new StatsPick.Snap();
                     s.ok = "1".equals(p[3]);
                     s.reach = Integer.parseInt(p[4]);
                     s.build = Integer.parseInt(p[5]);
                     s.zone = Integer.parseInt(p[6]);
-                    s.ores = p[7];
+                    s.cores = Integer.parseInt(p[7]);
+                    s.ores = p[8];
                     MEM.put(p[0], s);
                     KEYS.put(p[0], new long[]{ Long.parseLong(p[1]), Long.parseLong(p[2]) });
                 } catch (Throwable ignored) {
@@ -216,6 +219,8 @@ final class StatsIndex {
             w.write(Integer.toString(s.build));
             w.write('\t');
             w.write(Integer.toString(s.zone));
+            w.write('\t');
+            w.write(Integer.toString(s.cores));
             w.write('\t');
             w.write(s.ores == null ? "," : s.ores);
             w.write('\n');

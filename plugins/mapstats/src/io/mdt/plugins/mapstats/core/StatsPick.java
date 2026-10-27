@@ -29,6 +29,8 @@ public final class StatsPick {
     public static final int SORT_REACH = 1;
     /** 排序：能建格数（多 → 少） */
     public static final int SORT_BUILD = 2;
+    /** 排序：可建**核心**数（多 → 少；按该星球**最小**的那种核心算，即 {@code MapStats.Core#max}） */
+    public static final int SORT_CORES = 3;
 
     private StatsPick() { }
 
@@ -41,6 +43,11 @@ public final class StatsPick {
         public int reach;
         public int build;
         public int zone;
+        /**
+         * 核心区里**最多能摆几个**该星球最小的核心（3×3 / 4×4；`Core.skip` ⇒ 0）。
+         * 与详情页「核心区 32 格 · 最多能摆 2 个核心（4×4）」是同一个数。
+         */
+        public int cores;
         /** `ore-thorium:413;ore-wall-thorium:74;…`（只记 &gt; 0 的；见 {@link #oreCount}） */
         public String ores = "";
 
@@ -85,6 +92,7 @@ public final class StatsPick {
         s.reach = reachTotal(r);
         s.build = r.buildable == null ? 0 : r.buildable.count();
         s.zone = r.core == null || r.core.skip ? 0 : r.core.zone;
+        s.cores = r.core == null || r.core.skip ? 0 : r.core.max;
         s.ores = oreCounts(r);
         return s;
     }
@@ -150,7 +158,10 @@ public final class StatsPick {
         Snap y = b == null ? new Snap() : b;
         if (x.ok != y.ok) return x.ok ? -1 : 1;
         int c;
-        if (mode == SORT_BUILD) {
+        if (mode == SORT_CORES) {
+            c = Integer.compare(y.cores, x.cores);
+            if (c == 0) c = Integer.compare(y.reach, x.reach);
+        } else if (mode == SORT_BUILD) {
             c = Integer.compare(y.build, x.build);
             if (c == 0) c = Integer.compare(y.reach, x.reach);
         } else {

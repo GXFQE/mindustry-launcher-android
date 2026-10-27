@@ -1,7 +1,7 @@
 {
   "entry": "io.mdt.plugins.mapstats.MapStatsPage",
   "name": "mapstats",
-  "version": "3",
+  "version": "4",
   "author": "mdt",
   "description": "map resource statistics (ores / walls / floors / buildable / core zone)",
   "access": [
@@ -35,6 +35,13 @@
       "id": "mapstats-sort-build",
       "title": "按能建格数（多的在前）",
       "entry": "io.mdt.plugins.mapstats.SortBuild",
+      "slot": "sort",
+      "page": "maps"
+    },
+    {
+      "id": "mapstats-sort-cores",
+      "title": "按可建核心数（多的在前）",
+      "entry": "io.mdt.plugins.mapstats.SortCores",
       "slot": "sort",
       "page": "maps"
     },

@@ -130,6 +130,30 @@ public final class Check {
                         + " 种，含钍/钨；标签与短名一一对应）");
         ok(StatsPick.oreOptions(null, null).labels.length == 0,
                 "没有内容表 ⇒ 空选项（不 NPE）");
+
+        // ── 第 285 轮：按可建核心数排（与详情页「最多能摆 N 个核心」同一个数）──
+        MapStats.Result few = new MapStats.Result();
+        few.ok = true;
+        few.core.zone = 40;
+        few.core.max = 2;
+        few.buildable.free = 10;
+        MapStats.Result many = new MapStats.Result();
+        many.ok = true;
+        many.core.zone = 90;
+        many.core.max = 6;
+        StatsPick.Snap sf = StatsPick.snap(few);
+        StatsPick.Snap sm = StatsPick.snap(many);
+        ok(sf.cores == 2 && sm.cores == 6,
+                "核心数快照 = Core.max（2 / 6，实际 " + sf.cores + " / " + sm.cores + "）");
+        ok(StatsPick.compare(StatsPick.SORT_CORES, sm, "m", sf, "f") < 0
+                        && StatsPick.compare(StatsPick.SORT_REACH, sm, "m", sf, "f") > 0,
+                "按核心数：6 个的在 2 个前面；同样两张图按可采资源则反过来（两个模式有分辨力）");
+        MapStats.Result noCore = new MapStats.Result();
+        noCore.ok = true;
+        noCore.buildable.free = 500;
+        StatsPick.Snap sn = StatsPick.snap(noCore);
+        ok(sn.cores == 0 && StatsPick.compare(StatsPick.SORT_CORES, sm, "m", sn, "n") < 0,
+                "没有核心区（或这条统计不适用）⇒ 0，排在最后");
     }
 
     // ---- ① 原版内容表 ------------------------------------------------------------
@@ -173,6 +197,14 @@ public final class Check {
         ok(crS.core.size == 3 && crS.core.max == 4
                         && crS.core.basis == MapStats.Core.BASIS_PLANET,
                 "planet:serpulo ⇒ 边长 3、最多 4 个");
+        // ── 第 285 轮："" 与 null 是两件事（详情页那张卡消失就是这么来的）──
+        MapStats.Result crEmpty = MapStats.analyze(coreZoneGrid(), v, nm, "");
+        ok(!crEmpty.core.skip && crEmpty.core.size == 3 && crEmpty.core.max == 4
+                        && crEmpty.core.basis == MapStats.Core.BASIS_PLANET,
+                "planet 空串（存档没写这个键）= 塞普罗 ⇒ 照样统计（边长 3 / 4 个），"
+                        + "不是「不适用」（实际 skip=" + crEmpty.core.skip + " size=" + crEmpty.core.size + "）");
+        MapStats.Result crNull = MapStats.analyze(coreZoneGrid(), v, nm, null);
+        ok(crNull.core.skip, "planet = null（调用方压根没线索）⇒ 才是「不适用」");
     }
 
     // ---- ③ 导出：单张 = 一份 JSON 文档 ---------------------------------------------
