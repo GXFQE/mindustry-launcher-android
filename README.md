@@ -2,6 +2,8 @@ English · [简体中文](README.zh.md)
 
 # MDT Manager — a multi-version manager for Mindustry on Android
 
+> **Looking for the desktop build?** That is a separate project → **[Mindustry Launcher (Windows)](https://github.com/GXFQE/mindustry-launcher)**.
+
 The official Android build of Mindustry **only lets you keep one version installed** — install a
 second one and it overwrites the first. There is a single set of saves too, so switching versions
 pushes the old progress aside. This manager gives every version its own **save slot**: several
@@ -159,12 +161,15 @@ yourself — even just a few lines — see **Translation file** below.
   not a permission wall — only install what you trust
 - **Bundling the game**: copyright stays with its authors — bring your own APK
 
----
+## More detail
 
-To **build or change the code**, see **[docs/DEVELOPING.md](docs/DEVELOPING.md)** (that document is
-currently in Chinese: the build chain, the `dev_*` direct entries, module boundaries and a map of
-the documentation). The per-round implementation and on-device verification records live in
-[`docs/history/`](docs/history/README.md).
+- **[FEATURE.md](FEATURE.md)** — how this manager compares with the three other Android launchers of
+  the period (22 items, judged from source rather than their READMEs)
+- **[docs/DEVELOPING.md](docs/DEVELOPING.md)** — build chain, `dev_*` direct entries, module
+  boundaries and a map of the documentation (in Chinese for now)
+- **[docs/history/](docs/history/README.md)** — per-round implementation and on-device verification records
+
+---
 
 ## Licence
 

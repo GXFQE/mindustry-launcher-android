@@ -2,6 +2,8 @@
 
 # MDT 管理器 —— Mindustry（像素工厂）安卓多版本管理器
 
+> **找的是桌面版？** 那是另一个项目 → **[Mindustry 启动器（Windows）](https://github.com/GXFQE/mindustry-launcher)**。
+
 官方的 Mindustry 安卓版**一次只能装一个版本**，装第二个就把第一个覆盖掉；存档也只有一份，
 换版本玩就等于把旧存档顶掉。这个管理器给每个版本一个**独立的「存档槽」** —— 多个版本同时装着，
 各自的**存档 / 地图 / 蓝图 / 模组**互不干扰。
@@ -144,10 +146,13 @@
 - **插件沙箱**：插件与管理器同一个进程，「要碰什么」只是告知，不是权限墙 —— 只装信得过的
 - **打包游戏本体**：版权归各自作者，请自行准备 APK
 
----
+## 更细的说明
 
-要**构建 / 改代码**请看 **[docs/DEVELOPING.md](docs/DEVELOPING.md)**（构建链、`dev_*` 直通口、
-模块边界、文档地图）。逐轮的实现与真机验证记录在 [`docs/history/`](docs/history/README.md)。
+- **[FEATURE.md](FEATURE.md)** —— 和同期另外三个安卓启动器的横向对照（22 项，判据是源码不是 README）
+- **[docs/DEVELOPING.md](docs/DEVELOPING.md)** —— 构建链、`dev_*` 直通口、模块边界、文档地图
+- **[docs/history/](docs/history/README.md)** —— 逐轮的实现与真机验证记录
+
+---
 
 ## 许可证
 
