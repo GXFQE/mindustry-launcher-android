@@ -88,13 +88,13 @@
     <string name="mss_tech_names_value_fmt">%1$s · %2$d mods · %3$d content rows</string>
     <string name="mss_detail_hint">The numbers for this map are below; you can also pick another.</string>
     <string name="ms_busy_inline">Counting…</string>
-    <string name="ms_mode_detail">Full</string>
+    <string name="ms_mode_detail">Full (all data)</string>
     <string name="ms_mode_brief">Brief (reachable only)</string>
     <string name="ms_export_ask">How should it be exported?</string>
-    <string name="ms_opt_save_detail">Save (full)</string>
+    <string name="ms_opt_save_detail">Save (full, all data)</string>
     <string name="ms_opt_save_brief">Save (brief, reachable only)</string>
-    <string name="ms_opt_share_detail">Share (full)</string>
-    <string name="ms_opt_share_brief">Share (brief)</string>
+    <string name="ms_opt_share_detail">Share (full, all data)</string>
+    <string name="ms_opt_share_brief">Share (brief, reachable only)</string>
     <string name="ms_export_title">Export stats</string>
     <string name="ms_exporting">Exporting…</string>
     <string name="ms_save_done">Saved: %1$s</string>

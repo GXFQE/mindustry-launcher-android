@@ -88,13 +88,15 @@
     <string name="mss_tech_names_value_fmt">%1$s · 模组 %2$d 个 · 内容表 %3$d 行</string>
     <string name="mss_detail_hint">这张图的统计在下面；也可以换一张。</string>
     <string name="ms_busy_inline">正在统计…</string>
-    <string name="ms_mode_detail">详细</string>
+    <string name="ms_mode_detail">详细（全部数据）</string>
     <string name="ms_mode_brief">简洁（只列能采的）</string>
     <string name="ms_export_ask">怎么导出？</string>
-    <string name="ms_opt_save_detail">保存（详细）</string>
+    <!-- ★ 四个选项的说法要**一样长同构**：要么都带括号，要么都不带。2026-10-27 用户：
+         「下面的那个简洁又没写，详细也没解释」—— 原来只有"保存·简洁"那一行带说明。 -->
+    <string name="ms_opt_save_detail">保存（详细，全部数据）</string>
     <string name="ms_opt_save_brief">保存（简洁，只列能采的）</string>
-    <string name="ms_opt_share_detail">分享（详细）</string>
-    <string name="ms_opt_share_brief">分享（简洁）</string>
+    <string name="ms_opt_share_detail">分享（详细，全部数据）</string>
+    <string name="ms_opt_share_brief">分享（简洁，只列能采的）</string>
     <string name="ms_export_title">导出统计</string>
     <string name="ms_exporting">正在导出…</string>
     <string name="ms_save_done">已保存：%1$s</string>
