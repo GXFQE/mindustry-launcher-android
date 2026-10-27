@@ -1,7 +1,6 @@
 package io.mdt.launcher;
 
 import android.app.AlertDialog;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.os.Bundle;
 import android.view.View;
@@ -487,6 +486,8 @@ public class SavesActivity extends BaseActivity {
             labels.add(c.label);
             acts.add(c.run);
         }
+        // ── 排序到此为止，以下是筛选（Sheet 在这里画一条横向分割线）──
+        final int gapAt = labels.size();
         for (PluginPicks.Choice c : PluginPicks.choices(this, Extensions.PAGE_SAVES, mSlot,
                 false, mPluginFilterKey, mPluginSink)) {
             labels.add(c.label);
@@ -506,17 +507,7 @@ public class SavesActivity extends BaseActivity {
                 rebuildList();
             }
         });
-        new android.app.AlertDialog.Builder(this)
-                .setTitle(R.string.mods_filter_title)
-                .setItems(labels.toArray(new String[0]),
-                        new android.content.DialogInterface.OnClickListener() {
-                    @Override public void onClick(android.content.DialogInterface d, int which) {
-                        Runnable r = acts.get(which);
-                        if (r != null) r.run();
-                    }
-                })
-                .setNegativeButton(R.string.close, null)
-                .show();
+        Sheet.show(this, R.string.mods_filter_title, labels, acts, gapAt);
     }
 
     /** 这个槽已经不在了（被删 / 改名）：提示一句就退出去（文案与槽页那句同一条） */

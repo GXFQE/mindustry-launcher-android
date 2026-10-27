@@ -1,7 +1,6 @@
 package io.mdt.launcher;
 
 import android.app.AlertDialog;
-import android.content.DialogInterface;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -502,7 +501,8 @@ public class MapsActivity extends BaseActivity {
             labels.add(c.label);
             acts.add(c.run);
         }
-        // ── 排序到此为止，以下是筛选 ──
+        // ── 排序到此为止，以下是筛选（Sheet 在这里画一条横向分割线）──
+        final int gapAt = labels.size();
         labels.add((mOnlyProblems ? tick : "")
                 + Trans.get(MapsActivity.this, R.string.mods_filter_only));
         acts.add(new Runnable() { @Override public void run() {
@@ -533,16 +533,7 @@ public class MapsActivity extends BaseActivity {
                 rebuildList();
             }
         });
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.mods_filter_title)
-                .setItems(labels.toArray(new String[0]), new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int which) {
-                        Runnable r = acts.get(which);
-                        if (r != null) r.run();
-                    }
-                })
-                .setNegativeButton(R.string.close, null)
-                .show();
+        Sheet.show(this, R.string.mods_filter_title, labels, acts, gapAt);
     }
 
     /** 来源那一行（四选一，勾当前那个）。 */

@@ -458,7 +458,8 @@ public class BlueprintsActivity extends BaseActivity {
             labels.add(c.label);
             acts.add(c.run);
         }
-        // ── 排序到此为止，以下是筛选 ──
+        // ── 排序到此为止，以下是筛选（Sheet 在这里画一条横向分割线）──
+        final int gapAt = labels.size();
         labels.add((mOnlyProblems ? tick : "")
                 + Trans.get(BlueprintsActivity.this, R.string.mods_filter_only));
         acts.add(new Runnable() { @Override public void run() {
@@ -488,17 +489,7 @@ public class BlueprintsActivity extends BaseActivity {
                 rebuildList();
             }
         });
-        new android.app.AlertDialog.Builder(this)
-                .setTitle(R.string.mods_filter_title)
-                .setItems(labels.toArray(new String[0]),
-                        new android.content.DialogInterface.OnClickListener() {
-                    @Override public void onClick(android.content.DialogInterface d, int which) {
-                        Runnable r = acts.get(which);
-                        if (r != null) r.run();
-                    }
-                })
-                .setNegativeButton(R.string.close, null)
-                .show();
+        Sheet.show(this, R.string.mods_filter_title, labels, acts, gapAt);
     }
 
     /** 来源那一行（勾当前那个）。 */

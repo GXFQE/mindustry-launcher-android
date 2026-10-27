@@ -1325,7 +1325,8 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
                 true, mPluginSortKey, mPluginSink)) {
             addChoice(labels, acts, c.label, c.run);
         }
-        // ── 排序到此为止，以下是筛选 ──
+        // ── 排序到此为止，以下是筛选（Sheet 在这里画一条横向分割线）──
+        final int gapAt = labels.size();
         addChoice(labels, acts, (mOnlyProblems ? tick : "")
                 + Trans.get(ModsActivity.this, R.string.mods_filter_only), new Runnable() {
             @Override public void run() { mOnlyProblems = !mOnlyProblems; rebuildList(); }
@@ -1356,16 +1357,7 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
                     }
                 });
 
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.mods_filter_title)
-                .setItems(labels.toArray(new String[0]), new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int which) {
-                        Runnable r = acts.get(which);
-                        if (r != null) r.run();
-                    }
-                })
-                .setNegativeButton(R.string.close, null)
-                .show();
+        Sheet.show(this, R.string.mods_filter_title, labels, acts, gapAt);
     }
 
     /** v25：给「筛选与排序」列表加一行（label + 点下去做什么）。 */
