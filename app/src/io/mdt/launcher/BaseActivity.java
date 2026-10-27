@@ -48,6 +48,8 @@ public abstract class BaseActivity extends Activity {
     private int mAppliedTheme = ThemeMode.SYSTEM;
     /** 建这个实例时用的界面语言（快照，同上） */
     private String mAppliedLang = LocaleMode.SYSTEM;
+    /** 建这个实例时用的屏幕方向（快照，同上；0 = 跟随系统） */
+    private int mAppliedOrientation = OrientationMode.SYSTEM;
 
     @Override
     protected void attachBaseContext(Context base) {
@@ -55,6 +57,7 @@ public abstract class BaseActivity extends Activity {
         String lang = LocaleMode.of(base);
         mAppliedTheme = theme;
         mAppliedLang = lang;
+        mAppliedOrientation = OrientationMode.of(base);
         Configuration cfg = new Configuration(base.getResources().getConfiguration());
         // ⚠️ 用 `|` 而不是 `||`：两个 apply 都必须执行（`||` 会短路，语言就白设了）
         boolean changed = ThemeMode.apply(cfg, theme) | LocaleMode.apply(cfg, lang);
@@ -104,6 +107,20 @@ public abstract class BaseActivity extends Activity {
         return true;
     }
 
+    /**
+     * 这一页要不要跟随「屏幕方向」设置（第 275 轮）。
+     *
+     * <p>★ 只有 {@link GameSlot} 返回 false：它跑完六步启动管线就被**游戏自己的 Activity**
+     * 盖住，方向该由游戏那张清单（`screenOrientation="user"`）决定 —— 在这里强制一下只会
+     * 让启动画面多翻一次，而用户看到的还是游戏的方向。
+     *
+     * <p>其余页面一律跟随：设置项只写一处（{@code Config.orientationMode}），
+     * 应用也只写一处（本类建页面时 `setRequestedOrientation`）。
+     */
+    protected boolean honorsOrientation() {
+        return true;
+    }
+
     @Override
     protected void onActivityResult(int requestCode, int resultCode, android.content.Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
@@ -115,6 +132,11 @@ public abstract class BaseActivity extends Activity {
     @Override
     protected void onCreate(android.os.Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // ★ 第 275 轮：屏幕方向要在**子类 setContentView 之前**定下来（本类是子类 onCreate
+        //   的第一句）—— 定晚了会先按旧方向铺一帧再翻过去。
+        if (honorsOrientation()) {
+            setRequestedOrientation(OrientationMode.screenOrientation(mAppliedOrientation));
+        }
         applyLocalizedTitle();
         applyUpAffordance();
     }
@@ -212,7 +234,8 @@ public abstract class BaseActivity extends Activity {
         //   （同一条坑：REF §28 的跨进程配置同步、Config.reload 的头注释。）
         Config.get().reload(this);
         if (ThemeMode.of(this) != mAppliedTheme
-                || !LocaleMode.of(this).equals(mAppliedLang)) recreate();
+                || !LocaleMode.of(this).equals(mAppliedLang)
+                || OrientationMode.of(this) != mAppliedOrientation) recreate();
     }
 
     @Override

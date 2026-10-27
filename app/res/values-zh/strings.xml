@@ -1405,6 +1405,19 @@
     <string name="theme_dark">深色</string>
 
     <!--
+      ══ 第 275 轮 屏幕方向 ══════════════════════════════════════════════
+      只作用于**管理器自己的页面**（游戏那一页仍按它自己的清单 `screenOrientation="user"`）。
+      ★ 三个选项就是「跟随系统 / 强制竖屏 / 强制横屏」—— 界面上一律说"强制"，
+        因为它们就是要把系统那条自动旋转/旋转锁盖掉；不要写成"横屏 / 竖屏"（会被读成"建议"）。
+    -->
+    <string name="set_orientation_title">屏幕方向</string>
+    <string name="set_orientation_sub_fmt">当前：%1$s</string>
+    <string name="set_orientation_pick_title">管理器用哪个屏幕方向？</string>
+    <string name="orientation_system">跟随系统</string>
+    <string name="orientation_portrait">强制竖屏</string>
+    <string name="orientation_landscape">强制横屏</string>
+
+    <!--
       ══ P2 界面语言 ══════════════════════════════════════════════════════
       ★ 这里**只放要翻译的那一条**（「跟随系统」）。
         语言自己的名字（English / 简体中文）与语言名单住在默认目录 values/ 的

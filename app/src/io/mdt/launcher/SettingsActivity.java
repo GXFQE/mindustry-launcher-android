@@ -67,6 +67,8 @@ public class SettingsActivity extends BaseActivity {
 
     private TextView mThemeSub;
     private TextView mLangSub;
+    /** 第 275 轮：屏幕方向那一行的副标题（当前：跟随系统 / 强制竖屏 / 强制横屏） */
+    private TextView mOrientSub;
     private TextView mSlotSub;
     private TextView mLogsSub;
     /** 第 174 轮：崩溃提示开关那一行的副标题（已开启 / 已关闭） */
@@ -116,6 +118,14 @@ public class SettingsActivity extends BaseActivity {
                     @Override public void run() { pickLangPack(); }
                 });
         mLangPackSub = (TextView) rowLangPack.findViewById(R.id.act_sub);
+
+        // 第 275 轮：屏幕方向（跟随系统 / 强制竖屏 / 强制横屏）。放在外观卡末尾 ——
+        // 它和深浅色、语言一样是"界面长什么样"的一类；只管管理器自己的页面（游戏不受影响）。
+        View rowOrient = Util.bindActionValue(root, R.id.row_orientation, R.drawable.ic_orientation,
+                R.string.set_orientation_title, new Runnable() {
+                    @Override public void run() { pickOrientation(); }
+                });
+        mOrientSub = (TextView) rowOrient.findViewById(R.id.act_sub);
 
         View rowSlot = Util.bindActionValue(root, R.id.row_def_slot, R.drawable.ic_folder,
                 R.string.set_slot_title, new Runnable() {
@@ -200,6 +210,10 @@ public class SettingsActivity extends BaseActivity {
         if (mThemeSub != null) {
             mThemeSub.setText(Trans.get(SettingsActivity.this, R.string.set_theme_sub_fmt,
                     getString(ThemeMode.labelRes(Config.get().themeMode()))));
+        }
+        if (mOrientSub != null) {
+            mOrientSub.setText(Trans.get(SettingsActivity.this, R.string.set_orientation_sub_fmt,
+                    getString(OrientationMode.labelRes(OrientationMode.of(this)))));
         }
         if (mLangSub != null) {
             // ★ 语言名用它自己的语言写（English / 简体中文）—— 所以这里传的是**当前上下文的
@@ -449,6 +463,36 @@ public class SettingsActivity extends BaseActivity {
                     @Override public void onClick(DialogInterface d, int w) {
                         d.dismiss();
                         Config.get().setThemeMode(modes[w]);
+                        recreate();
+                    }
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    /**
+     * 第 275 轮：屏幕方向（用户：「我觉得需要加个页面强制横屏和强制竖屏」——
+     * 真机自动旋转关着，想看一眼横屏效果只能去系统设置里开自动旋转）。
+     *
+     * <p>★ 与深浅色 / 语言同一套交互：**选完立刻生效**（`recreate()`），没有"保存"。
+     * 新实例在 `BaseActivity.onCreate` 里把方向 `setRequestedOrientation` 下去。
+     * ★ 只作用于管理器自己的页面（`GameSlot` 除外），游戏那一页仍按它自己的清单。
+     */
+    private void pickOrientation() {
+        final int[] modes = {OrientationMode.SYSTEM, OrientationMode.PORTRAIT, OrientationMode.LANDSCAPE};
+        String[] names = new String[modes.length];
+        final int cur = OrientationMode.of(this);
+        int checked = -1;
+        for (int i = 0; i < modes.length; i++) {
+            names[i] = getString(OrientationMode.labelRes(modes[i]));
+            if (modes[i] == cur) checked = i;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.set_orientation_pick_title)
+                .setSingleChoiceItems(names, checked, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int w) {
+                        d.dismiss();
+                        Config.get().setOrientationMode(modes[w]);
                         recreate();
                     }
                 })

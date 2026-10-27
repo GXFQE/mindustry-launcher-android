@@ -97,6 +97,11 @@ public final class Config {
     private static final String K_LOGS = "max_log_files";
     /** F15：界面深浅色（0=跟随系统 1=浅色 2=深色） */
     private static final String K_THEME = "theme_mode";
+    /**
+     * 第 275 轮：**管理器界面**的屏幕方向（0=跟随系统 1=强制竖屏 2=强制横屏）—— 见 {@link OrientationMode}。
+     * 只作用于管理器自己的页面；游戏那一页仍按它自己的清单（`screenOrientation="user"`）。
+     */
+    private static final String K_ORIENT = "orientation_mode";
     /** 界面语言（空串=跟随系统；否则 BCP47 标签，如 en / zh / zh-TW）—— 见 {@link LocaleMode} */
     private static final String K_LANG = "app_language";
     /** F5：每槽的自动备份策略 { "&lt;槽名&gt;": {enabled, min_minutes, max_backups} } */
@@ -1002,6 +1007,38 @@ public final class Config {
 
     public synchronized void setThemeMode(int v) {
         put(K_THEME, Math.max(ThemeMode.SYSTEM, Math.min(ThemeMode.DARK, v)));
+        save();
+    }
+
+    // ── 管理器界面的屏幕方向（2026-10-27 第 275 轮）─────────────────────────
+
+    /**
+     * 管理器界面用哪个屏幕方向（{@link OrientationMode} 的 SYSTEM / PORTRAIT / LANDSCAPE）。
+     *
+     * <p>需求原文：「我觉得需要加个页面强制横屏和强制竖屏」—— 真机上自动旋转是关的，
+     * 想看一眼横屏效果就得先去系统设置里开自动旋转，验完再关。
+     *
+     * <p>★ 只作用于**管理器自己的页面**（`BaseActivity` 统一 `setRequestedOrientation`），
+     * 游戏那一页仍按它自己的清单走（`screenOrientation="user"`）。
+     * ★ 坏值退默认 + WARNING 点名键名（与 themeMode / maxLogFiles 同一套纪律）。
+     */
+    public synchronized int orientationMode() {
+        if (!mRoot.has(K_ORIENT)) return OrientationMode.SYSTEM;
+        Object v = mRoot.opt(K_ORIENT);
+        if (v instanceof Number) {
+            int n = ((Number) v).intValue();
+            if (n >= OrientationMode.SYSTEM && n <= OrientationMode.LANDSCAPE) return n;
+            Log.w(TAG, "config key '" + K_ORIENT + "' out of range (" + n
+                    + "), falling back to default " + OrientationMode.SYSTEM);
+        } else {
+            Log.w(TAG, "config key '" + K_ORIENT + "' is not a number (" + v
+                    + "), falling back to default " + OrientationMode.SYSTEM);
+        }
+        return OrientationMode.SYSTEM;
+    }
+
+    public synchronized void setOrientationMode(int v) {
+        put(K_ORIENT, Math.max(OrientationMode.SYSTEM, Math.min(OrientationMode.LANDSCAPE, v)));
         save();
     }
 

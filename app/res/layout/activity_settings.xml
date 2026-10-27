@@ -3,7 +3,7 @@
   F3：全局设置页骨架（与 activity_main / activity_saves 同款卡片风）。
 
   第 174 轮：**按类别拆成三张卡**（用户：「设置真的应该分个类，后面数量多了可能非常难找」）：
-    外观与语言  —— 深浅色 / 语言 / 翻译文件
+    外观与语言  —— 深浅色 / 语言 / 翻译文件 / **屏幕方向**（第 275 轮）
     启动与存储  —— 默认槽 / 自动清理 / 中转站保留份数 / 存储占用
     通知与日志  —— 崩溃提示 / 日志保留份数
     关于        —— 只读信息
@@ -80,6 +80,21 @@
 
                 <include
                     android:id="@+id/row_lang_pack"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <!-- 第 275 轮：屏幕方向（跟随系统 / 强制竖屏 / 强制横屏）。
+                     放在外观卡末尾 —— 它和深浅色、语言一样是"界面长什么样"的一类；
+                     只作用于管理器自己的页面（游戏那一页仍按它自己的清单）。 -->
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="62dp"
+                    android:background="@color/divider" />
+
+                <include
+                    android:id="@+id/row_orientation"
                     layout="@layout/row_action"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />

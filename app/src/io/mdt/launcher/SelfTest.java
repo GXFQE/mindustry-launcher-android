@@ -4497,8 +4497,9 @@ public final class SelfTest {
         try {
             Map<String, String> st = PluginData.settings(ctx);
             ok(stat, L, st.containsKey("theme_mode") && st.containsKey("app_language")
+                            && st.containsKey("orientation_mode")
                             && st.containsKey("default_slot") && st.containsKey("max_log_files"),
-                    "PluginData.settings() exposes the public keys");
+                    "PluginData.settings() exposes the public keys (含 v275 的 orientation_mode)");
             ok(stat, L, !st.containsKey("session") && !st.containsKey("crash_alert_last")
                             && !st.containsKey("known_packages"),
                     "PluginData.settings() excludes internal keys");
@@ -11710,6 +11711,98 @@ public final class SelfTest {
             }
         } catch (Throwable t) {
             ok(stat, L, false, "设置页末行检查自身异常：" + t);
+        }
+        // ★ 2026-10-27（第 275 轮）：设置页新增「屏幕方向」（用户：「我觉得需要加个页面强制横屏
+        //   和强制竖屏」——真机自动旋转关着，想看一眼横屏效果只能去系统设置里开自动旋转）。
+        //   两件事都要钉，而且都属于"错了也不报错"的那一类：
+        //   ① 这一行**真的在布局里**：少一个 `@+id` ⇒ findViewById 返回 null，Util.bindAction 静默跳过，
+        //      界面上只是少了一行，编译 / 门禁全绿；
+        //   ② 设置值 → setRequestedOrientation 的映射三个方向**互不相同**（都返回同一个值时
+        //      "强制"了却看不出区别，同样不报错）。
+        try {
+            android.view.View v = inf.inflate(R.layout.activity_settings, null);
+            android.view.View row = v.findViewById(R.id.row_orientation);
+            android.view.ViewGroup card = row == null ? null
+                    : (android.view.ViewGroup) row.getParent();
+            int rows = 0;
+            for (int i = 0; card != null && i < card.getChildCount(); i++) {
+                if (card.getChildAt(i).findViewById(R.id.act_title) != null) rows++;
+            }
+            ok(stat, L, row != null && row.findViewById(R.id.act_title) != null,
+                    "★设置页有「屏幕方向」那一行（外观卡末尾）");
+            ok(stat, L, rows == 4,
+                    "★外观卡是四行（深浅色 / 语言 / 翻译文件 / 屏幕方向）—— 实得 " + rows);
+        } catch (Throwable t) {
+            ok(stat, L, false, "屏幕方向那一行检查自身异常：" + t);
+        }
+        //    元断言：把那一行从卡里摘掉 ⇒ 行数必须变成 3（证明上面那条数的是"行"、不是恒 4）
+        try {
+            android.view.View v = inf.inflate(R.layout.activity_settings, null);
+            android.view.View row = v.findViewById(R.id.row_orientation);
+            android.view.ViewGroup card = row == null ? null
+                    : (android.view.ViewGroup) row.getParent();
+            if (card != null) {
+                card.removeView(row);
+                int rows = 0;
+                for (int i = 0; i < card.getChildCount(); i++) {
+                    if (card.getChildAt(i).findViewById(R.id.act_title) != null) rows++;
+                }
+                ok(stat, L, rows == 3,
+                        "★元断言：摘掉「屏幕方向」后外观卡只剩 3 行（实得 " + rows + "）");
+            } else {
+                ok(stat, L, false, "★元断言：外观卡找不到（row_orientation 不在树里）");
+            }
+        } catch (Throwable t) {
+            ok(stat, L, false, "屏幕方向元断言自身异常：" + t);
+        }
+        //    设置值 → 方向常量：三个值必须互不相同；跟随系统必须回到 UNSPECIFIED（交回系统）
+        try {
+            int sys = OrientationMode.screenOrientation(OrientationMode.SYSTEM);
+            int por = OrientationMode.screenOrientation(OrientationMode.PORTRAIT);
+            int lan = OrientationMode.screenOrientation(OrientationMode.LANDSCAPE);
+            // ★ 「跟随系统」= USER（用户当前倾向），**不是** UNSPECIFIED：后者只是"没偏好"，
+            //   从强制横屏切回来时屏幕会停在横屏不动（2026-10-27 真机实测，见 OrientationMode 类注释）。
+            ok(stat, L, sys == android.content.pm.ActivityInfo.SCREEN_ORIENTATION_USER,
+                    "★「跟随系统」映射成 USER（用户当前倾向；UNSPECIFIED 切回来不会转正）");
+            ok(stat, L, sys != por && sys != lan && por != lan,
+                    "★三个方向映射互不相同（实得 " + sys + " / " + por + " / " + lan + "）");
+            ok(stat, L, por == android.content.pm.ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+                            && lan == android.content.pm.ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE,
+                    "★竖屏 = PORTRAIT · 横屏 = SENSOR_LANDSCAPE（横屏两种握法都认，别把界面倒过来）");
+            ok(stat, L, OrientationMode.labelRes(OrientationMode.SYSTEM) != 0
+                            && OrientationMode.labelRes(OrientationMode.PORTRAIT) != 0
+                            && OrientationMode.labelRes(OrientationMode.LANDSCAPE) != 0
+                            && OrientationMode.labelRes(OrientationMode.SYSTEM)
+                               != OrientationMode.labelRes(OrientationMode.PORTRAIT),
+                    "★三个选项都有文案（且「跟随系统」与「强制竖屏」不是同一条资源）");
+        } catch (Throwable t) {
+            ok(stat, L, false, "方向映射检查自身异常：" + t);
+        }
+        //    Config 往返：写进去读得出来 / reload 之后还在 / 超范围被夹住；**用完恢复原值**
+        try {
+            Config cfg = Config.get();
+            int before = cfg.orientationMode();
+            try {
+                cfg.setOrientationMode(OrientationMode.LANDSCAPE);
+                ok(stat, L, cfg.orientationMode() == OrientationMode.LANDSCAPE
+                                && OrientationMode.of(ctx) == OrientationMode.LANDSCAPE,
+                        "★方向设置写进去读得出来（setOrientationMode → orientationMode）");
+                cfg.reload(ctx);
+                ok(stat, L, cfg.orientationMode() == OrientationMode.LANDSCAPE,
+                        "★落盘往返：reload 之后仍是强制横屏");
+                cfg.setOrientationMode(99);
+                ok(stat, L, cfg.orientationMode() == OrientationMode.LANDSCAPE,
+                        "★超范围值被夹到合法档（99 ⇒ 强制横屏）");
+                cfg.setOrientationMode(-5);
+                ok(stat, L, cfg.orientationMode() == OrientationMode.SYSTEM,
+                        "★负数被夹到 0（跟随系统）");
+            } finally {
+                cfg.setOrientationMode(before);
+            }
+            ok(stat, L, cfg.orientationMode() == before,
+                    "★自检收尾把方向恢复成进这一段之前的值（不污染用户的选择）：" + before);
+        } catch (Throwable t) {
+            ok(stat, L, false, "方向 Config 往返自身异常：" + t);
         }
         // ★「添加游戏」的二选一弹窗：两条路都在（少一条 = 少一个入口，且不报错）
         try {

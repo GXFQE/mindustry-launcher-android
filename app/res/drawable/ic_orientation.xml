@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  第 275 轮：设置页「屏幕方向」那一行的图标（手机 + 旋转箭头）。
+  ★ pathData 取自 Material 图标集 screen_rotation（24dp 网格，与其它图标同源），
+    只是把 SVG 里的四个子路径按**绝对坐标**拼成一条 path —— 相对 `m`/`z` 的起点
+    （z 之后当前点回到该子路径起点）已经逐段算过，别照着网页源码再手抄一遍。
+  ★ 纯 fill、没有描边（与 ic_restart 同款：描边带会和挖空互相覆盖，见 ref/42「图标 / 矢量几何」）。
+  ★ fillColor 取 icon_tint；这一行不是顶栏菜单项，不需要另带一份颜色（那条例外只针对 ActionBar）。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@color/icon_tint"
+        android:pathData="M16.48,2.52c3.27,1.55 5.61,4.72 5.97,8.48h1.5C23.44,4.84 18.29,0 12,0l-0.66,0.03 3.81,3.81 1.33,-1.32zM10.23,1.75c-0.59,-0.59 -1.54,-0.59 -2.12,0L1.75,8.11c-0.59,0.59 -0.59,1.54 0,2.12l12.02,12.02c0.59,0.59 1.54,0.59 2.12,0l6.36,-6.36c0.59,-0.59 0.59,-1.54 0,-2.12L10.23,1.75zM14.83,21.19L2.81,9.17l6.36,-6.36 12.02,12.02 -6.36,6.36zM7.52,21.48C4.25,19.94 1.91,16.76 1.55,13H0.05C0.56,19.16 5.71,24 12,24l0.66,-0.03 -3.81,-3.81 -1.33,1.32z" />
+</vector>

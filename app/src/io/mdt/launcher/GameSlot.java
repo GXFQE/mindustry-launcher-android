@@ -59,6 +59,16 @@ public class GameSlot extends BaseActivity {
         return false;
     }
 
+    /**
+     * 第 275 轮：**不吃**「屏幕方向」设置。
+     * 这一页只闪一下就被游戏自己的 Activity 盖住，方向该由游戏那张清单
+     * （`screenOrientation="user"`）决定；在这里强制一次只会让启动画面多翻一次。
+     */
+    @Override
+    protected boolean honorsOrientation() {
+        return false;
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);

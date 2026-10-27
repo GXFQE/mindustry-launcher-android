@@ -178,6 +178,9 @@ final class PluginData {
         }
         out.put("config_version", String.valueOf(Config.CONFIG_VERSION));
         out.put("theme_mode", String.valueOf(c.themeMode()));
+        // 第 275 轮：管理器界面的屏幕方向（0 跟随系统 / 1 强制竖屏 / 2 强制横屏）——
+        // 与 theme_mode 同一种"界面偏好"，插件要按它判断自己画的页面落在横屏还是竖屏。
+        out.put("orientation_mode", String.valueOf(c.orientationMode()));
         out.put("app_language", safe(c.appLanguage()));
         out.put("default_slot", safe(c.defaultSlot()));
         out.put("max_log_files", String.valueOf(c.maxLogFiles()));

@@ -1439,6 +1439,17 @@
     <string name="theme_dark">Dark</string>
 
     <!--
+      Round 275: screen orientation of the manager itself
+      (the game page keeps its own manifest: screenOrientation="user")
+    -->
+    <string name="set_orientation_title">Screen orientation</string>
+    <string name="set_orientation_sub_fmt">Current: %1$s</string>
+    <string name="set_orientation_pick_title">Which screen orientation should the manager use?</string>
+    <string name="orientation_system">Follow system</string>
+    <string name="orientation_portrait">Force portrait</string>
+    <string name="orientation_landscape">Force landscape</string>
+
+    <!--
       ══ P2 界面语言 ══════════════════════════════════════════════════════
       ★ `lang_system` 是**要翻译**的（它是在说"跟随系统"这件事）；
         语言自己的名字（English / 简体中文）**不翻译** —— 用户在一个看不懂的界面里，
