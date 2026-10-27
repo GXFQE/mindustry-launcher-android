@@ -4807,6 +4807,21 @@ public final class SelfTest {
         ok(stat, L, "active".equals(row2[0]) && "1".equals(row2[1]), "没有待生效 ⇒ 报生效中");
         ok(stat, L, "off".equals(Plugins.rowState("", "", "probe")[0]), "两边都没有 ⇒ 已停用");
 
+        // ── 第 276 轮：重启去重窗口 **只挡重放、不挡用户** ──
+        //   用户原话：「我需要关闭或开启多个插件，第一个重启后第二个不让重启了」。
+        //   真机症状：第二次点「立即重启」只弹一句「刚刚已经安排过一次重启了」⇒ 那个插件的改动永远不生效。
+        //   判据就是这条纯函数（`Restart.shouldThrottle`）—— 别在界面里各判一遍。
+        L.add("  · 重启去重窗口（第 276 轮：用户按的必须放行）");
+        long tRestart = 1700000000000L;
+        ok(stat, L, Restart.shouldThrottle(tRestart, tRestart + 1_000L, false),
+                "★ 15 秒窗口内、**不是用户按的**（dev 口被系统重放）⇒ 拦住");
+        ok(stat, L, !Restart.shouldThrottle(tRestart, tRestart + 1_000L, true),
+                "★★ 同一时刻、**用户按的**「立即重启」⇒ 不许拦（第 276 轮那个 bug 的尺子）");
+        ok(stat, L, !Restart.shouldThrottle(tRestart, tRestart + 60_000L, false),
+                "★ 窗口之外的重放 ⇒ 放行（窗口不是永久的）");
+        ok(stat, L, !Restart.shouldThrottle(0L, tRestart, false),
+                "没记录过重启（时间戳 0）⇒ 谁都不拦");
+
         String[] sl = Plugins.parseSkipLine("probe\t2\t1\trollback");
         ok(stat, L, sl != null && "probe".equals(sl[0]) && "2".equals(sl[1])
                 && "1".equals(sl[2]) && "rollback".equals(sl[3]), "跳过记录：回滚那一行解析得出来");

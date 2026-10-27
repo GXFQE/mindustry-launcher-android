@@ -852,42 +852,50 @@ public class PluginsActivity extends BaseActivity {
         return Trans.get(this, R.string.plugin_install_unknown);
     }
 
-    /** 「立即重启」：挂闹钟 + 自杀；**挂不上就如实说**（不许假装重启成功）。 */
+    /**
+     * 「立即重启」：挂闹钟 + 自杀；**挂不上就如实说**（不许假装重启成功）。
+     *
+     * <p>★ 第 276 轮两条修正（都是用户「第一个重启后第二个不让重启了」那条线上一路查出来的）：
+     * <ol>
+     *   <li>走 {@link Restart#scheduleUser}：用户按的按钮**不撞** 15 秒去重窗口（那个窗口只该挡
+     *       "dev 口重启后被系统用同一个 Intent 重放"）。</li>
+     *   <li>没有「闹钟与提醒」权限时**先问、再挂闹钟**（原来先挂再问）：闹钟 900 ms 后就响了，
+     *       用户稍慢一点，它就先把 MainActivity 拉到前台（进程还活着）——界面看着"回到主页"，
+     *       其实什么都没重启；更糟的是随后 killSelf 把进程杀了，而闹钟**已经响过** ⇒ 没人再拉起应用。
+     *       ⇒ 顺序改成"确认之后才挂闹钟 + 立刻自杀"，那条竞态就不存在了。</li>
+     * </ol>
+     */
     private void restartNow() {
-        int r = Restart.schedule(this);
-        if (r == Restart.OK) {
-            Restart.killSelf();
-            return;
-        }
-        if (r == Restart.THROTTLED) {
-            // 刚刚已经重开过（这是恢复重放）⇒ 不再重开，但**不能静默**：
-            //   静默就是用户口中的“点了重启像卡了一样”。
-            Toast.makeText(this, Trans.get(this, R.string.plugin_restart_throttled),
-                    Toast.LENGTH_LONG).show();
-            return;
-        }
-        if (r == Restart.INEXACT) {
-            // 没有「闹钟与提醒」权限 ⇒ 闹钟不精确，可能差几秒到几十秒。
-            // 先告诉用户；他不想等就取消（把闹钟也撞掉）。
-            // ★ 第 272 轮：这条"没有精确闹钟权限"的提示也画在卡片里（原来关掉卡片再开一个弹窗）
+        if (!Restart.exactAllowed(this)) {
             final CardStack[] ref = new CardStack[1];
             ref[0] = CardStack.show(null, this, Trans.get(this, R.string.plugin_restart),
                     CardStack.text(this, Trans.get(this, R.string.plugin_restart_inexact)),
                     new CardStack.Btn(Trans.get(this, R.string.cancel), new Runnable() {
                         @Override public void run() {
-                            ref[0].dismiss();
-                            Restart.cancel(PluginsActivity.this);
+                            ref[0].dismiss();                       // 还没挂闹钟 ⇒ 不用撤
                         }
                     }),
                     new CardStack.Btn(Trans.get(this, R.string.plugin_restart_now), new Runnable() {
                         @Override public void run() {
                             ref[0].dismiss();
-                            Restart.killSelf();
+                            armAndDie();
                         }
                     }));
             return;
         }
-        Toast.makeText(this, Trans.get(this, R.string.plugin_restart_failed), Toast.LENGTH_LONG).show();
+        if (!armAndDie()) {
+            Toast.makeText(this, Trans.get(this, R.string.plugin_restart_failed), Toast.LENGTH_LONG).show();
+        }
+    }
+
+    /** 挂闹钟 + 立刻自杀（闹钟负责把应用拉回来）；挂不上返回 false，**绝不**先杀再说。 */
+    private boolean armAndDie() {
+        int r = Restart.scheduleUser(this);
+        if (r == Restart.OK || r == Restart.INEXACT) {
+            Restart.killSelf();
+            return true;
+        }
+        return false;
     }
 
     /**
