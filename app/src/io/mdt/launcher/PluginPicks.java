@@ -6,8 +6,10 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import io.mdt.launcher.api.ItemInfo;
@@ -25,7 +27,8 @@ import io.mdt.launcher.api.ItemInfo;
  *       之类）各算各的，差一个字就会"筛完一条不剩"。</li>
  *   <li><b>应用</b>（{@link #applyFilter} / {@link #applySort}）：纯函数，不改入参。
  *       排序里**没点到名的条目排最后**（插件只认识一部分条目时不能把它们弄丢）。</li>
- *   <li><b>取数</b>（{@link #pick}）：弹一张「正在问插件…」的卡，后台问一遍，回来在 UI 线程交结果。</li>
+ *   <li><b>取数</b>（{@link #pick}）：打开插件会话 →（v33）插件要的话先弹**第二级选择卡** → 弹进度卡、
+ *       后台跑一遍 → 回 UI 线程交结果。（四页同一份）</li>
  *   <li><b>菜单行</b>（{@link #choices}）：把这一页声明的插件筛选 / 排序变成"标签 + 点下去做什么"。</li>
  * </ol>
  *
@@ -130,6 +133,9 @@ final class PluginPicks {
     /**
      * 这一页在「筛选与排序」里该多出哪几行（插件排序 → 插件筛选，与模组页原来的顺序一致）。
      *
+     * <p>★ 第 282 轮：选中且**选过第二级**的那一条会把选中的名字缀在标题后面
+     * （「只看含某矿的图…（钨）」）—— 不然打勾只说明"筛过"，看不出筛的是哪一矿。</p>
+     *
      * @param sort       true = 排序那一类，false = 筛选那一类
      * @param currentKey 当前选中的 `pluginId/itemId`（打勾用；null = 没选）
      */
@@ -141,7 +147,10 @@ final class PluginPicks {
         for (final PluginViews.View v : PluginViews.of(a, page,
                 sort ? Extensions.SLOT_SORT : Extensions.SLOT_FILTER)) {
             boolean on = v.key().equals(currentKey);
-            out.add(new Choice((on ? tick : "") + v.title(), new Runnable() {
+            String chosen = on ? chosenLabel(page, v.key()) : null;
+            String label = (on ? tick : "") + v.title();
+            if (chosen != null && !chosen.isEmpty()) label += "（" + chosen + "）";
+            out.add(new Choice(label, new Runnable() {
                 @Override public void run() {
                     pick(a, page, slot, v, sort, sink);
                 }
@@ -150,40 +159,112 @@ final class PluginPicks {
         return out;
     }
 
+    /** 上次在第二级卡里选的名字（按"页 + 插件条目"记；进程内有效，选一次更新一次）。 */
+    private static final Map<String, String> CHOSEN = new HashMap<String, String>();
+
+    private static String chosenLabel(String page, String key) {
+        return CHOSEN.get(page + "/" + key);
+    }
+
     /**
-     * 弹「正在问插件…」→ 后台问一遍 → 回 UI 线程把结果交给 {@code sink}。
+     * 跑一次注入：取清单 → 打开插件会话 →（插件要的话）先让用户选一项 → 跑到进度卡 → 回 UI 交结果。
+     *
+     * <p>★ 第 282 轮（v33）：插件可以声明 `options()` / `choose(int)`，宿主就用**第二级卡片**问用户
+     * （例如"要看哪一矿"）。取消 / 返回键 ⇒ 插件会话直接关掉，页面一个字节都不动。</p>
      *
      * <p>页面不在 / 插件不在 / 插件抛异常都**不崩**：插件那边返回空集或原顺序，页面照常重画
-     * （与 {@link PluginViews} 的约定一致）。
+     * （与 {@link PluginViews} 的约定一致）。</p>
      */
     static void pick(final Activity a, final String page, final String slot,
                      final PluginViews.View v, final boolean sort, final Sink sink) {
         if (a == null || v == null || sink == null) return;
+        final String key = v.key();
+        final String title = v.title();
+        // ① 后台：清单（可能要扫 APK）+ 打开会话（加载 dex）+ 问它"要不要先选一项"
+        new Thread(new Runnable() {
+            @Override public void run() {
+                final List<ItemInfo> items;
+                final PluginViews.Session s;
+                final String[] opts;
+                try {
+                    items = PluginData.pageItems(a, page, slot, null);
+                    s = PluginViews.Session.open(a, v, items, page, slot);
+                    opts = s == null ? null : s.options();
+                } catch (Throwable t) {
+                    return;
+                }
+                if (s == null) return;
+                a.runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        if (Util.dead(a)) { s.close(); return; }
+                        if (opts != null && opts.length > 0) {
+                            ask(a, page, title, opts, s, items, sort, key, sink);
+                        } else {
+                            compute(a, s, items, -1, sort, key, sink);
+                        }
+                    }
+                });
+            }
+        }, "plugin-pick-open").start();
+    }
+
+    /** 第二级：插件给的选项（比如"哪一矿"）。取消 / 返回键 ⇒ 关会话、什么都不动。 */
+    private static void ask(final Activity a, final String page, String title, String[] opts,
+                            final PluginViews.Session s, final List<ItemInfo> items,
+                            final boolean sort, final String key, final Sink sink) {
         final CardStack stack = new CardStack(a);
-        stack.replace(Trans.get(a, R.string.mods_filter_plugin_wait), "");
+        final boolean[] picked = {false};
+        stack.setOnDismiss(new Runnable() {
+            @Override public void run() {
+                if (!picked[0]) s.close();      // 用户返回/点了取消 ⇒ 别让插件会话一直挂着
+            }
+        });
+        stack.root(title, CardStack.list(a, opts, new CardStack.ItemClick() {
+            @Override public void onClick(int which) {
+                picked[0] = true;
+                if (which >= 0 && which < opts.length) {
+                    CHOSEN.put(page + "/" + key, opts[which]);
+                }
+                stack.dismiss();
+                compute(a, s, items, which, sort, key, sink);
+            }
+        }), new CardStack.Btn(Trans.get(a, R.string.cancel), new Runnable() {
+            @Override public void run() { stack.dismiss(); }
+        }));
+        stack.show();
+    }
+
+    /** 进度卡 + 后台跑一遍 + 回 UI 交结果。{@code which >= 0} = 先把用户的选择交给插件。 */
+    private static void compute(final Activity a, final PluginViews.Session s,
+                            final List<ItemInfo> items, final int which,
+                            final boolean sort, final String key, final Sink sink) {
+        final CardStack progress = new CardStack(a);
+        progress.replace(Trans.get(a, R.string.mods_filter_plugin_wait), "");
         new Thread(new Runnable() {
             @Override public void run() {
                 final Set<String> keep = new LinkedHashSet<String>();
                 final List<String> order = new ArrayList<String>();
                 try {
-                    List<ItemInfo> items = PluginData.pageItems(a, page, slot, null);
-                    if (sort) order.addAll(PluginViews.sorted(a, v, items, page, slot));
-                    else keep.addAll(PluginViews.accepted(a, v, items, page, slot));
+                    if (which >= 0) s.choose(which);
+                    if (sort) order.addAll(s.sorted());
+                    else keep.addAll(s.accepted());
                 } catch (Throwable ignored) {
                     // 插件坏了 ⇒ 当没选（排序 = 原顺序；筛选 = 空集，页面会显示"筛完一条不剩"）
+                } finally {
+                    s.close();
                 }
                 a.runOnUiThread(new Runnable() {
                     @Override public void run() {
                         try {
-                            stack.dismiss();
+                            progress.dismiss();
                         } catch (Throwable ignored) { }
                         if (Util.dead(a)) return;
-                        if (sort) sink.onPluginSort(v.key(), order);
-                        else sink.onPluginFilter(v.key(), keep);
+                        if (sort) sink.onPluginSort(key, order);
+                        else sink.onPluginFilter(key, keep);
                     }
                 });
             }
-        }, "plugin-pick").start();
+        }, "plugin-pick-run").start();
     }
 
 }

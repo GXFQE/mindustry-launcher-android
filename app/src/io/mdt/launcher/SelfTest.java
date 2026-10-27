@@ -4602,6 +4602,34 @@ public final class SelfTest {
                             + (miss.length() == 0 ? "" : "；没接上：" + miss));
         }
 
+        // ── 第 282 轮（v33）：插件"先选一项"的选项过闸门 ────────────────────────────
+        {
+            ok(stat, L, PluginHost.API >= 33,
+                    "host plugin api >= 33（filter/sort 的 options + choose）");
+            String[] g = PluginViews.gateOptions(new String[]{ "  钨  ", "", null, "钍" });
+            ok(stat, L, g != null && g.length == 2 && "钨".equals(g[0]) && "钍".equals(g[1]),
+                    "★选项闸门：去首尾空白 / 丢空条 / 保序（实得 "
+                            + (g == null ? "null" : java.util.Arrays.toString(g)) + "）");
+            ok(stat, L, PluginViews.gateOptions(null) == null
+                            && PluginViews.gateOptions(new String[0]) == null
+                            && PluginViews.gateOptions(new String[]{ " ", null }) == null,
+                    "选项闸门：没有有效项 ⇒ null（宿主据此不弹第二级卡）");
+            StringBuilder longLabel = new StringBuilder();
+            for (int i = 0; i < 40; i++) longLabel.append('a');
+            String[] cut = PluginViews.gateOptions(new String[]{ longLabel.toString() });
+            ok(stat, L, cut != null && cut.length == 1
+                            && cut[0].codePointCount(0, cut[0].length()) == 24,
+                    "★选项闸门：超长标签按**码点**截 24 字（实得 "
+                            + (cut == null || cut.length == 0 ? "-"
+                                    : String.valueOf(cut[0].codePointCount(0, cut[0].length()))) + "）");
+            String[] many = new String[30];
+            for (int i = 0; i < many.length; i++) many[i] = "ore-" + i;
+            String[] capped = PluginViews.gateOptions(many);
+            ok(stat, L, capped != null && capped.length == 24,
+                    "★选项闸门：最多 24 项（给 30 项 ⇒ 24 项；实得 "
+                            + (capped == null ? "null" : capped.length) + "）");
+        }
+
         // ── round 162: v6 = settings / logs / trash / versions / selectedItems ──
         ok(stat, L, PluginHost.API >= 6,
                 "host plugin api >= 6 (settings/logs/trash/versions)");

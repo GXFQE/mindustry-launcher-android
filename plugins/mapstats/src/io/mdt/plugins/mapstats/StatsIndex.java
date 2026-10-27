@@ -38,8 +38,9 @@ import io.mdt.plugins.mapstats.core.StatsPick;
  */
 final class StatsIndex {
 
-    /** 缓存格式：改了统计口径（或 {@link StatsPick.Snap} 的字段）就抬这个数 ⇒ 老缓存整份作废。 */
-    private static final int FMT = 1;
+    /** 缓存格式：改了统计口径（或 {@link StatsPick.Snap} 的字段）就抬这个数 ⇒ 老缓存整份作废。
+     *  ★ 第 282 轮 1 → 2：`ores` 从"有没有"改成"每种矿各自多少格"。 */
+    private static final int FMT = 2;
     private static final String PREFIX = "pick-";
     private static final Charset UTF8 = Charset.forName("UTF-8");
 
@@ -78,6 +79,15 @@ final class StatsIndex {
             return it.container + "!/" + it.entry;
         }
         return "";
+    }
+
+    /**
+     * 第 282 轮：给宿主那张"先选矿"的卡备选项（走有效内容表 ⇒ 模组加的矿自然出现，
+     * 不写死清单；名字用物品名，与统计四处同一个口径）。
+     */
+    static StatsPick.OreOptions oreOptions(PluginApi api) {
+        if (!inited) init(api);
+        return StatsPick.oreOptions(table, names);
     }
 
     // ---- 初始化 ------------------------------------------------------------------

@@ -54,7 +54,8 @@ public final class MapStatsPage {
         // v32（2026-10-27 第 277 轮）：勾选那一屏的标题 / 说明由插件自己给
         // （`pickContent(kind, title, head, cb)`）⇒ 老宿主没有这个方法，必须报 32 让它拒掉，
         // 而不是等到用户点下去才 NoSuchMethodError。
-        return 32;
+        // v33（第 282 轮）：排序 / 筛选的 `options()` + `choose(int)` —— "先选某矿"那一步。
+        return 33;
     }
 
     /** 当前这一页的统计产物（页面重建就重新算）。 */

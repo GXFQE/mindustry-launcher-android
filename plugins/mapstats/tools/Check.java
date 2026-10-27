@@ -71,8 +71,9 @@ public final class Check {
         ok(StatsPick.reachTotal(r) == 115,
                 "可采资源 = 矿石 12 + 矿墙 3 + 可采地板 100 = 115（加成地板 999 不算；实际 "
                         + StatsPick.reachTotal(r) + "）");
-        ok(StatsPick.hasOre(r, "thorium") && StatsPick.hasOre(r, "tungsten")
-                        && !StatsPick.hasOre(r, "copper"),
+        ok(StatsPick.snap(r).oreCount("thorium") == 12
+                        && StatsPick.snap(r).oreCount("tungsten") == 3
+                        && StatsPick.snap(r).oreCount("copper") == 0,
                 "含某矿按内部名匹配（ore-thorium / ore-wall-tungsten 都算；没有的矿不算）");
         ok(StatsPick.hasCore(r), "有核心区：zone > 0");
         MapStats.Result skip = new MapStats.Result();
@@ -99,12 +100,36 @@ public final class Check {
         ok(StatsPick.compare(StatsPick.SORT_REACH, a, "same", StatsPick.snap(r), "same") == 0,
                 "同分同标题 ⇒ 0（顺序稳定）");
 
-        ok(StatsPick.oreIn(StatsPick.oreList(r), "thorium")
-                        && StatsPick.oreIn(StatsPick.oreList(r), "tungsten")
-                        && !StatsPick.oreIn(StatsPick.oreList(r), "copper"),
-                "oreList / oreIn 同一把尺子（落盘缓存读回来也能判「含某矿」）");
-        ok(",".equals(StatsPick.snap(null).ores) && ",".equals(StatsPick.oreList(null)),
-                "读不出来 ⇒ 空矿表（不是 null，也不会误命中）");
+        // ── 第 282 轮：每种矿各自多少格 + 按某矿排 + 选项列表 ──
+        ok(a.oreCount("thorium") == 12 && a.oreCount("tungsten") == 3
+                        && a.oreCount("copper") == 0 && bad.oreCount("thorium") == 0,
+                "每种矿的可采格数：thorium 12 / tungsten 3（矿墙也算）/ 没有的 0 / 读不出来 0；"
+                        + "实得 " + a.oreCount("thorium") + " / " + a.oreCount("tungsten"));
+        ok(a.ores.indexOf("ore-thorium:12") >= 0 && a.ores.indexOf("ore-wall-tungsten:3") >= 0,
+                "缓存字段写成 `内部名:格数;…`（实际 " + a.ores + "）");
+        MapStats.Row rich = new MapStats.Row();
+        rich.internals.add("ore-thorium");
+        rich.open = 500;
+        MapStats.Result r3 = new MapStats.Result();
+        r3.ok = true;
+        r3.ores.add(rich);
+        StatsPick.Snap c = StatsPick.snap(r3);
+        ok(StatsPick.compareOre(a, "a", c, "c", "thorium") > 0
+                        && StatsPick.compareOre(c, "c", a, "a", "tungsten") > 0,
+                "按某矿排：钍 500 张在 12 张前面；换成钨则反过来（同一个选择器两种结论）");
+
+        StatsPick.OreOptions opts = StatsPick.oreOptions(MapStats.vanilla(), fakeNames());
+        boolean hasThorium = false, hasTungsten = false, labelsOk = opts.labels.length == opts.ids.length;
+        for (int i = 0; i < opts.labels.length; i++) {
+            if (opts.labels[i] == null || opts.labels[i].trim().isEmpty()) labelsOk = false;
+            if ("thorium".equals(opts.ids[i])) hasThorium = true;
+            if ("tungsten".equals(opts.ids[i])) hasTungsten = true;
+        }
+        ok(opts.labels.length > 0 && labelsOk && hasThorium && hasTungsten,
+                "选项列表：从内容表推出「矿」的标签 + 短名（" + opts.labels.length
+                        + " 种，含钍/钨；标签与短名一一对应）");
+        ok(StatsPick.oreOptions(null, null).labels.length == 0,
+                "没有内容表 ⇒ 空选项（不 NPE）");
     }
 
     // ---- ① 原版内容表 ------------------------------------------------------------

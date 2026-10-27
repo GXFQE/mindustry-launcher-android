@@ -1,7 +1,7 @@
 {
   "entry": "io.mdt.plugins.mapstats.MapStatsPage",
   "name": "mapstats",
-  "version": "2",
+  "version": "3",
   "author": "mdt",
   "description": "map resource statistics (ores / walls / floors / buildable / core zone)",
   "access": [
@@ -39,6 +39,13 @@
       "page": "maps"
     },
     {
+      "id": "mapstats-sort-ore",
+      "title": "按某矿含量（多的在前）…",
+      "entry": "io.mdt.plugins.mapstats.SortOre",
+      "slot": "sort",
+      "page": "maps"
+    },
+    {
       "id": "mapstats-filter-core",
       "title": "只看有核心区的图",
       "entry": "io.mdt.plugins.mapstats.FilterCore",
@@ -46,16 +53,9 @@
       "page": "maps"
     },
     {
-      "id": "mapstats-filter-thorium",
-      "title": "只看含钍的图",
-      "entry": "io.mdt.plugins.mapstats.FilterThorium",
-      "slot": "filter",
-      "page": "maps"
-    },
-    {
-      "id": "mapstats-filter-tungsten",
-      "title": "只看含钨的图",
-      "entry": "io.mdt.plugins.mapstats.FilterTungsten",
+      "id": "mapstats-filter-ore",
+      "title": "只看含某矿的图…",
+      "entry": "io.mdt.plugins.mapstats.FilterOre",
       "slot": "filter",
       "page": "maps"
     }

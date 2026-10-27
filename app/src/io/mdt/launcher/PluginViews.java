@@ -29,11 +29,14 @@ import io.mdt.launcher.api.PluginApi;
  *   <li>sort：{@code public static int compare(ItemInfo a, ItemInfo b, PluginApi api)}（&lt;0 靠前）</li>
  * </ul>
  *
- * <p>★ **只在用户选中那一项时才算**（不选不跑）：算一遍可能加载插件类、也可能对每一项跑一次判据
- * —— 放进每次 `rebuildList()` 就会在打字搜索时卡。调用方把结果**缓存**下来。
- * ★ 插件坏了 / 被删了 ⇒ 返回"什么都没筛 / 原顺序"，不把页面弄崩。
- * ★ 本类只回答"哪些条目 / 什么顺序"（身份见 {@link PluginPicks#idOf}）；**应用结果与取数**
- *   在 {@link PluginPicks}（四个列表页共用那一份，别再各写一遍）。
+ * <p>★ **v33（第 282 轮）加一步可选的"先问用户"**：入口类还可以给
+ * {@code static String[] options(PluginApi)} + {@code static void choose(int, PluginApi)} ——
+ * 宿主先把 options 显示成一张选择卡，用户点完调 `choose(index)`，**同一个已加载实例**上再跑
+ * accept / compare（插件把选择记进静态字段）。没有 options（或没有 choose）就照旧一步跑完。</p>
+ *
+ * <p>★ **只在用户选中那一项时才算**（不选不跑）。插件坏了 / 被删了 ⇒ 返回"什么都没筛 / 原顺序"，
+ * 不把页面弄崩。★ 本类只回答"哪些条目 / 什么顺序"（身份见 {@link PluginPicks#idOf}）；
+ * **应用结果与取数**在 {@link PluginPicks}（四个列表页共用那一份）。
  */
 final class PluginViews {
 
@@ -80,81 +83,126 @@ final class PluginViews {
     }
 
     /**
-     * 跑一遍插件的筛选，返回**通过的身份**集合（见 {@link PluginPicks#idOf}）。
-     * 插件不在 / 方法缺失 / 抛异常 ⇒ 空集（调用方据此提示"没筛出东西"）。
+     * 一次注入跑批的会话：**加载一次 →（可选）问选项 → 跑 accept / compare → 卸载**。
      *
-     * <p>★ 页名与槽必须**照调用方那一页**传下来（原来写死 `"mods"`：别的页面用会把
-     * {@code api.page()} 报成模组页，插件里"是不是详情页"的判据全走错）。
+     * <p>🔴 必须是同一份已加载实例：插件的 `options()` / `choose()` / `accept()` 之间靠静态字段传值，
+     * 分两次加载会把选择丢掉（症状：选了矿，结果还是"全部"）。</p>
      */
-    static Set<String> accepted(Context ctx, View v, List<ItemInfo> items, String page, String slot) {
-        Set<String> out = new LinkedHashSet<String>();
-        if (v == null || items == null || items.isEmpty()) return out;
-        PluginHost.Loaded l = null;
-        try {
-            File apk = Plugins.apkOf(ctx, v.pluginId, v.pluginVer);
-            if (apk == null || !apk.isFile()) return out;
-            l = Plugins.isInjected(ctx, v.pluginId, v.pluginVer)
-                    ? PluginHost.openInjected(ctx, apk, v.item.entry, page, slot, null, null)
-                    : PluginHost.load(ctx, apk, v.item.entry, page, slot, null, null);
-            Method m = l.entry.getMethod("accept", ItemInfo.class, PluginApi.class);
-            for (ItemInfo it : items) {
-                if (it == null) continue;
-                Object r;
-                try {
-                    r = m.invoke(null, it, l.env);
-                } catch (Throwable one) {
-                    continue;                   // 单项失败不影响别的
-                }
-                if (r instanceof Boolean && ((Boolean) r).booleanValue()) {
-                    String id = PluginPicks.idOf(it);
-                    if (!id.isEmpty()) out.add(id);
-                }
-            }
-            android.util.Log.i("MDTLauncher", "plugin filter " + v.key() + " @" + page + ": "
-                    + out.size() + "/" + items.size());
-        } catch (Throwable t) {
-            android.util.Log.w("MDTLauncher", "plugin filter failed: " + v.key(), t);
-        } finally {
-            try { PluginHost.unload(l); } catch (Throwable ignored) { }
-        }
-        return out;
-    }
+    static final class Session {
+        private final View view;
+        private final String page;
+        private final List<ItemInfo> items;
+        private final PluginHost.Loaded loaded;
 
-    /**
-     * 按插件的比较函数排序，返回**身份顺序**（见 {@link PluginPicks#idOf}）。
-     * 插件不在 / 方法缺失 / 抛异常 ⇒ 原顺序。
-     */
-    static List<String> sorted(Context ctx, final View v, List<ItemInfo> items,
-                               String page, String slot) {
-        List<ItemInfo> out = new ArrayList<ItemInfo>(items == null ? Collections.<ItemInfo>emptyList() : items);
-        PluginHost.Loaded l = null;
-        try {
-            if (v == null || out.size() < 2) return ids(out);
-            File apk = Plugins.apkOf(ctx, v.pluginId, v.pluginVer);
-            if (apk == null || !apk.isFile()) return ids(out);
-            l = Plugins.isInjected(ctx, v.pluginId, v.pluginVer)
-                    ? PluginHost.openInjected(ctx, apk, v.item.entry, page, slot, null, null)
-                    : PluginHost.load(ctx, apk, v.item.entry, page, slot, null, null);
-            final Method m = l.entry.getMethod("compare", ItemInfo.class, ItemInfo.class, PluginApi.class);
-            final PluginApi env = l.env;
-            Collections.sort(out, new Comparator<ItemInfo>() {
-                @Override public int compare(ItemInfo a, ItemInfo b) {
+        private Session(View view, String page, List<ItemInfo> items, PluginHost.Loaded loaded) {
+            this.view = view;
+            this.page = page;
+            this.items = items;
+            this.loaded = loaded;
+        }
+
+        /** 打不开（插件不在 / 加载失败 / 类缺失）⇒ null。 */
+        static Session open(Context ctx, View v, List<ItemInfo> items, String page, String slot) {
+            if (ctx == null || v == null) return null;
+            PluginHost.Loaded l = null;
+            try {
+                File apk = Plugins.apkOf(ctx, v.pluginId, v.pluginVer);
+                if (apk == null || !apk.isFile()) return null;
+                l = Plugins.isInjected(ctx, v.pluginId, v.pluginVer)
+                        ? PluginHost.openInjected(ctx, apk, v.item.entry, page, slot, null, null)
+                        : PluginHost.load(ctx, apk, v.item.entry, page, slot, null, null);
+            } catch (Throwable t) {
+                android.util.Log.w("MDTLauncher", "plugin session failed: " + v.key(), t);
+                return null;
+            }
+            if (l == null) return null;
+            return new Session(v, page, items == null ? new ArrayList<ItemInfo>() : items, l);
+        }
+
+        /**
+         * 这一插件**是否要用户先选一项**：返回选项标签（已过闸门）；null = 不用选
+         * （没实现 `options` / 返回空 / 没有配 `choose` / 抛异常）。
+         */
+        String[] options() {
+            try {
+                Method m = loaded.entry.getMethod("options", PluginApi.class);
+                Object r = m.invoke(null, loaded.env);
+                if (!(r instanceof String[])) return null;
+                String[] gated = gateOptions((String[]) r);
+                if (gated == null) return null;
+                // 有选项却没有 choose ⇒ 选了也传不回去，宁可不要这一步
+                loaded.entry.getMethod("choose", int.class, PluginApi.class);
+                return gated;
+            } catch (Throwable ignored) {
+                return null;
+            }
+        }
+
+        /** 把用户选的序号告诉插件（**同一个已加载实例**上的静态字段）。 */
+        void choose(int index) {
+            try {
+                Method m = loaded.entry.getMethod("choose", int.class, PluginApi.class);
+                m.invoke(null, Integer.valueOf(index), loaded.env);
+            } catch (Throwable ignored) {
+            }
+        }
+
+        /** 跑一遍筛选：返回**通过的身份**集合（{@link PluginPicks#idOf}）。 */
+        Set<String> accepted() {
+            Set<String> out = new LinkedHashSet<String>();
+            try {
+                Method m = loaded.entry.getMethod("accept", ItemInfo.class, PluginApi.class);
+                for (ItemInfo it : items) {
+                    if (it == null) continue;
+                    Object r;
                     try {
-                        Object r = m.invoke(null, a, b, env);
-                        return r instanceof Integer ? ((Integer) r).intValue() : 0;
-                    } catch (Throwable t) {
-                        return 0;               // 比不动就维持原序，别崩
+                        r = m.invoke(null, it, loaded.env);
+                    } catch (Throwable one) {
+                        continue;                   // 单项失败不影响别的
+                    }
+                    if (r instanceof Boolean && ((Boolean) r).booleanValue()) {
+                        String id = PluginPicks.idOf(it);
+                        if (!id.isEmpty()) out.add(id);
                     }
                 }
-            });
-        } catch (Throwable ignored) {
-        } finally {
-            try { PluginHost.unload(l); } catch (Throwable ignored) { }
+                android.util.Log.i("MDTLauncher", "plugin filter " + view.key() + " @" + page + ": "
+                        + out.size() + "/" + items.size());
+            } catch (Throwable t) {
+                android.util.Log.w("MDTLauncher", "plugin filter failed: " + view.key(), t);
+            }
+            return out;
         }
-        List<String> idsOut = ids(out);
-        android.util.Log.i("MDTLauncher", "plugin sort " + (v == null ? "?" : v.key())
-                + " @" + page + ": " + idsOut.size() + " ids");
-        return idsOut;
+
+        /** 按插件的比较函数排序：返回**身份顺序**。 */
+        List<String> sorted() {
+            List<ItemInfo> out = new ArrayList<ItemInfo>(items);
+            try {
+                if (out.size() < 2) return ids(out);
+                final Method m = loaded.entry.getMethod("compare",
+                        ItemInfo.class, ItemInfo.class, PluginApi.class);
+                final PluginApi env = loaded.env;
+                Collections.sort(out, new Comparator<ItemInfo>() {
+                    @Override public int compare(ItemInfo a, ItemInfo b) {
+                        try {
+                            Object r = m.invoke(null, a, b, env);
+                            return r instanceof Integer ? ((Integer) r).intValue() : 0;
+                        } catch (Throwable t) {
+                            return 0;               // 比不动就维持原序，别崩
+                        }
+                    }
+                });
+            } catch (Throwable t) {
+                android.util.Log.w("MDTLauncher", "plugin sort failed: " + view.key(), t);
+            }
+            List<String> idsOut = ids(out);
+            android.util.Log.i("MDTLauncher", "plugin sort " + view.key() + " @" + page + ": "
+                    + idsOut.size() + " ids");
+            return idsOut;
+        }
+
+        void close() {
+            try { PluginHost.unload(loaded); } catch (Throwable ignored) { }
+        }
     }
 
     /** `ItemInfo` 表 ⇒ 身份顺序（空身份跳过）。 */
@@ -166,5 +214,29 @@ final class PluginViews {
             if (!id.isEmpty()) out.add(id);
         }
         return out;
+    }
+
+    /**
+     * 插件给的选项过闸门（与"插件给的文字"同一条纪律，见 {@code PluginActions.pickText}）：
+     * 去首尾空白、丢空条、**按码点**截长 24、最多 **24 项**。
+     *
+     * <p>为什么要限：这些标签进 `CardStack` 的列表，一个插件给 500 条或一行一万字会把卡片撑爆。</p>
+     *
+     * @return 过完闸门的数组；一条都不剩 ⇒ null
+     */
+    static String[] gateOptions(String[] raw) {
+        if (raw == null) return null;
+        List<String> out = new ArrayList<String>();
+        for (String s : raw) {
+            if (out.size() >= 24) break;
+            if (s == null) continue;
+            String one = s.trim().replace('\n', ' ').replace('\r', ' ');
+            if (one.isEmpty()) continue;
+            if (one.codePointCount(0, one.length()) > 24) {
+                one = one.substring(0, one.offsetByCodePoints(0, 24));
+            }
+            out.add(one);
+        }
+        return out.isEmpty() ? null : out.toArray(new String[0]);
     }
 }

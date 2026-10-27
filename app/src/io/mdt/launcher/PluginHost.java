@@ -86,8 +86,12 @@ public final class PluginHost {
      *
      * <p>v32（2026-10-27 第 277 轮）：`pickContent(kind, title, head, cb)` —— 勾选那一屏的
      * 标题 / 说明由插件自己给（用户：「改成插件可以自行设置文本」）。
+     *
+     * <p>v33（2026-10-27 第 282 轮）：**筛选 / 排序可以先问用户** —— 入口类可选实现
+     * `options(PluginApi)` + `choose(int, PluginApi)`，宿主把它们显示成第二级选择卡
+     * （用户：「先选类型…然后选择具体的矿」）。同一份已加载实例上跑，插件用静态字段记选择。
      */
-    public static final int API = 32;
+    public static final int API = 33;
     /**
      * 还认的**最老**契约版本。
      *
