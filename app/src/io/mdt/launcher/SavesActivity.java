@@ -76,20 +76,37 @@ public class SavesActivity extends BaseActivity {
     /** 默认按名称（与 `SlotIo.listSaves` 那个口径一致）；可选：大小 / 最新在前 */
     private int mSort = ListQuery.SORT_NAME;
     /**
-     * v25（第 280 轮统一）：插件注入的**筛选**结果（条目身份集合；null = 没选）。
-     * ★ 身份见 {@link PluginPicks#idOf} —— 存档都是槽里的文件，所以就是绝对路径。
+     * 第 292 轮：插件注入的**筛选**（key → 它放行的身份，**可以多条同时生效**，「且」的关系）。
+     *
+     * <p>用户 2026-10-28：「要不全随便选…要不只能选择一个」—— 选了"全随便选"：每条筛选各管一个
+     * 身份集合，逐条取交集；冲突不用特判（交集为空就是「没有符合条件的地图」）。</p>
+     *
+     * <p>★ 身份见 {@link PluginPicks#idOf} —— 游戏自带 / 模组自带的图在 APK、zip 里，
+     *   没有 `path`，所以不能用路径当唯一键（这是原来的漏洞）。</p>
      */
-    private java.util.Set<String> mPluginFilterIds;
-    private String mPluginFilterKey;
+    private final java.util.LinkedHashMap<String, java.util.Set<String>> mPluginFilters =
+            new java.util.LinkedHashMap<String, java.util.Set<String>>();
     /** v25：插件注入的**排序**结果（按顺序的条目身份；null = 没选） */
     private java.util.List<String> mPluginSortIds;
     private String mPluginSortKey;
 
+    /** 第 292 轮：再点一次**已生效**的插件条目 = 取消它（排序取消后回到宿主排序）。 */
+    private final PluginPicks.Off mPluginOff = new PluginPicks.Off() {
+        @Override public void off(String key, boolean sort) {
+            if (sort) {
+                mPluginSortIds = null;
+                mPluginSortKey = null;
+            } else {
+                mPluginFilters.remove(key);
+            }
+            rebuildList();
+        }
+    };
+
     /** 插件筛选 / 排序算完那一下（四个列表页各一份，形状相同）：结果缓存下来再重画。 */
     private final PluginPicks.Sink mPluginSink = new PluginPicks.Sink() {
         @Override public void onPluginFilter(String key, java.util.Set<String> ids) {
-            mPluginFilterIds = ids;
-            mPluginFilterKey = key;
+            mPluginFilters.put(key, ids);
             rebuildList();
         }
 
@@ -287,7 +304,7 @@ public class SavesActivity extends BaseActivity {
         java.util.List<File> shown = ListQuery.apply(java.util.Arrays.asList(mAll), mQuery, mSort,
                 false, ListQuery.fileKey(mNames));
         // v25（第 280 轮）：插件注入的筛选 / 排序（结果已缓存成身份集合 / 顺序，纯内存应用）
-        shown = PluginPicks.applyFilter(shown, mPluginFilterIds, SAVE_ID);
+        shown = PluginPicks.applyFilters(shown, mPluginFilters, SAVE_ID);
         shown = PluginPicks.applySort(shown, mPluginSortIds, SAVE_ID);
         mFiles = shown.toArray(new File[0]);
         if (mFillToken != null) mFillToken[0] = false;
@@ -295,9 +312,9 @@ public class SavesActivity extends BaseActivity {
         SlotIo.fillSaves(this, mSlot, mList, mFillToken, mFiles, mRowClick);
 
         boolean filtering = ListQuery.filtering(mQuery, mSort, false, ListQuery.SORT_NAME)
-                || mPluginFilterIds != null;
+                || !mPluginFilters.isEmpty();
         // 第 286 轮：登记"这一屏看得见的"（插件的勾选页拿它当默认勾选；只认筛选，排序不算）
-        boolean narrowed = !mQuery.trim().isEmpty() || mPluginFilterIds != null;
+        boolean narrowed = !mQuery.trim().isEmpty() || !mPluginFilters.isEmpty();
         java.util.List<String> viewIds = new java.util.ArrayList<String>(shown.size());
         for (File one : shown) viewIds.add(SAVE_ID.idOf(one));
         PluginPicks.noteView(Extensions.PAGE_SAVES, mSlot, viewIds, narrowed);
@@ -498,14 +515,14 @@ public class SavesActivity extends BaseActivity {
         } });
         // v25（第 280 轮）：插件注入的排序 / 筛选（四个列表页同一套；本页原来一行都没有）
         for (PluginPicks.Choice c : PluginPicks.choices(this, Extensions.PAGE_SAVES, mSlot,
-                true, mPluginSortKey, mPluginSink)) {
+                true, mPluginSortKey, null, mPluginOff, mPluginSink)) {
             labels.add(c.label);
             acts.add(c.run);
         }
         // ── 排序到此为止，以下是筛选（Sheet 在这里画一条横向分割线）──
         final int gapAt = labels.size();
         for (PluginPicks.Choice c : PluginPicks.choices(this, Extensions.PAGE_SAVES, mSlot,
-                false, mPluginFilterKey, mPluginSink)) {
+                false, null, mPluginFilters.keySet(), mPluginOff, mPluginSink)) {
             labels.add(c.label);
             acts.add(c.run);
         }
@@ -513,8 +530,7 @@ public class SavesActivity extends BaseActivity {
         acts.add(new Runnable() {
             @Override public void run() {
                 mSort = ListQuery.SORT_NAME;
-                mPluginFilterIds = null;
-                mPluginFilterKey = null;
+                mPluginFilters.clear();
                 mPluginSortIds = null;
                 mPluginSortKey = null;
                 mQuery = "";

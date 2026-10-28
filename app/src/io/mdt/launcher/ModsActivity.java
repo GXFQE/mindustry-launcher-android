@@ -129,16 +129,28 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
     private final java.util.Map<String, java.util.List<io.mdt.launcher.api.Gate>> mGates =
             new java.util.HashMap<String, java.util.List<io.mdt.launcher.api.Gate>>();
     /**
-     * v25：插件注入的**筛选**结果（条目身份集合；null = 没选）。只在选中那一刻算一次，
-     * 之后每次 `rebuildList()` 直接用它 —— 别在打字搜索时反复调插件。
+     * 第 292 轮：插件注入的**筛选**（key → 它放行的身份，**可以多条同时生效**，「且」的关系）。
+     * 只在选中那一刻算一次，之后每次 `rebuildList()` 直接用它 —— 别在打字搜索时反复调插件。
      * ★ 身份见 {@link PluginPicks#idOf}（模组都是文件 ⇒ 就是绝对路径）。
      */
-    private java.util.Set<String> mPluginFilterIds;
-    /** 当前选中的插件筛选（`pluginId/itemId`，界面打勾用） */
-    private String mPluginFilterKey;
+    private final java.util.LinkedHashMap<String, java.util.Set<String>> mPluginFilters =
+            new java.util.LinkedHashMap<String, java.util.Set<String>>();
     /** v25：插件注入的**排序**结果（按顺序的条目身份；null = 没选） */
     private List<String> mPluginSortIds;
     private String mPluginSortKey;
+
+    /** 第 292 轮：再点一次**已生效**的插件条目 = 取消它（排序取消后回到宿主排序）。 */
+    private final PluginPicks.Off mPluginOff = new PluginPicks.Off() {
+        @Override public void off(String key, boolean sort) {
+            if (sort) {
+                mPluginSortIds = null;
+                mPluginSortKey = null;
+            } else {
+                mPluginFilters.remove(key);
+            }
+            rebuildList();
+        }
+    };
 
     /**
      * 插件筛选 / 排序算完那一下（四个列表页各一份，形状相同）：结果缓存下来再重画。
@@ -146,8 +158,7 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
      */
     private final PluginPicks.Sink mPluginSink = new PluginPicks.Sink() {
         @Override public void onPluginFilter(String key, java.util.Set<String> ids) {
-            mPluginFilterIds = ids;
-            mPluginFilterKey = key;
+            mPluginFilters.put(key, ids);
             rebuildList();
         }
 
@@ -1191,14 +1202,14 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
         // v25：插件注入的筛选 / 排序 —— 结果在「筛选与排序」里选中那一刻就算好了（缓存在字段里），
         // 这里只做纯内存的过滤与排名，别把插件调用塞进每次 rebuild（打字搜索会卡）。
         // ★ 判据与应用只有一处（`PluginPicks`，四个列表页共用）；本页只回答"一条模组是什么身份"。
-        shown = PluginPicks.applyFilter(shown, mPluginFilterIds, MOD_ID);
+        shown = PluginPicks.applyFilters(shown, mPluginFilters, MOD_ID);
         shown = PluginPicks.applySort(shown, mPluginSortIds, MOD_ID);
         mShown = shown;
         boolean filtering = mOnlyProblems || mType != Mods.TYPE_ANY || !mQuery.trim().isEmpty()
-                || mSort != Mods.SORT_NAME || mPluginFilterIds != null;
+                || mSort != Mods.SORT_NAME || !mPluginFilters.isEmpty();
         // 第 286 轮：登记"这一屏看得见的"（插件的勾选页拿它当默认勾选；只认筛选，排序不算）
         boolean narrowed = mOnlyProblems || mType != Mods.TYPE_ANY
-                || !mQuery.trim().isEmpty() || mPluginFilterIds != null;
+                || !mQuery.trim().isEmpty() || !mPluginFilters.isEmpty();
         java.util.List<String> viewIds = new java.util.ArrayList<String>(shown.size());
         for (Mods.Info one : shown) viewIds.add(MOD_ID.idOf(one));
         PluginPicks.noteView(Extensions.PAGE_MODS, mSlot, viewIds, narrowed);
@@ -1339,7 +1350,7 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
         // ★ 第 283 轮：插件注入的排序**并进排序这一组**（用户：「按照排序和筛选分开，
         //   而不是按照宿主和插件分开」）—— 原来它排在类型筛选下面，把排序切成了两截。
         for (PluginPicks.Choice c : PluginPicks.choices(this, Extensions.PAGE_MODS, mSlot,
-                true, mPluginSortKey, mPluginSink)) {
+                true, mPluginSortKey, null, mPluginOff, mPluginSink)) {
             addChoice(labels, acts, c.label, c.run);
         }
         // ── 排序到此为止，以下是筛选（Sheet 在这里画一条横向分割线）──
@@ -1354,7 +1365,7 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
         addTypeChoice(labels, acts, Mods.TYPE_DATA, R.string.mods_filter_type_data);
 
         for (PluginPicks.Choice c : PluginPicks.choices(this, Extensions.PAGE_MODS, mSlot,
-                false, mPluginFilterKey, mPluginSink)) {
+                false, null, mPluginFilters.keySet(), mPluginOff, mPluginSink)) {
             addChoice(labels, acts, c.label, c.run);
         }
 
@@ -1365,8 +1376,7 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
                         mOnlyProblems = false;
                         mType = Mods.TYPE_ANY;
                         mQuery = "";
-                        mPluginFilterIds = null;
-                        mPluginFilterKey = null;
+                        mPluginFilters.clear();
                         mPluginSortIds = null;
                         mPluginSortKey = null;
                         if (mSearch != null) mSearch.setText("");

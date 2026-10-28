@@ -4635,6 +4635,48 @@ public final class SelfTest {
                     "★★排序只能有一个：四个列表页都能在选宿主排序时清掉插件排序（clearPluginSort）"
                             + (noClear.length() == 0 ? "" : "；缺：" + noClear));
 
+            // 第 292 轮：插件筛选**可以多条同时生效**（「且」取交集）
+            StringBuilder noMulti = new StringBuilder();
+            for (String p : pages) {
+                try {
+                    Class<?> c = Class.forName("io.mdt.launcher." + p);
+                    if (c.getDeclaredField("mPluginFilters").getType()
+                            != java.util.LinkedHashMap.class) {
+                        noMulti.append(p).append(' ');
+                    }
+                    if (c.getDeclaredField("mPluginOff").getType() != PluginPicks.Off.class) {
+                        noMulti.append(p).append(' ');
+                    }
+                } catch (Throwable t5) {
+                    noMulti.append(p).append(' ');
+                }
+            }
+            ok(stat, L, noMulti.length() == 0,
+                    "★★四个列表页都能叠加多条插件筛选（mPluginFilters + mPluginOff）"
+                            + (noMulti.length() == 0 ? "" : "；缺：" + noMulti));
+            {
+                PluginPicks.IdOf<String> self = new PluginPicks.IdOf<String>() {
+                    @Override public String idOf(String item) { return item; }
+                };
+                java.util.List<String> all = java.util.Arrays.asList("a", "b", "c", "d");
+                java.util.Map<String, java.util.Set<String>> kmap =
+                        new java.util.LinkedHashMap<String, java.util.Set<String>>();
+                kmap.put("k1", new java.util.LinkedHashSet<String>(
+                        java.util.Arrays.asList("a", "b", "c")));
+                kmap.put("k2", new java.util.LinkedHashSet<String>(
+                        java.util.Arrays.asList("b", "c", "d")));
+                java.util.List<String> both = PluginPicks.applyFilters(all, kmap, self);
+                ok(stat, L, both.size() == 2 && both.contains("b") && both.contains("c"),
+                        "★多条插件筛选取**交集**（{a,b,c} ∩ {b,c,d} = {b,c}，实得 " + both + "）");
+                kmap.put("k3", new java.util.LinkedHashSet<String>(java.util.Arrays.asList("a")));
+                ok(stat, L, PluginPicks.applyFilters(all, kmap, self).isEmpty(),
+                        "★交集为空 ⇒ 空表（页面说「没有符合条件的…」，不是崩）");
+                ok(stat, L, PluginPicks.applyFilters(all,
+                                new java.util.LinkedHashMap<String, java.util.Set<String>>(),
+                                self).size() == 4,
+                        "没开插件筛选 ⇒ 原表返回");
+            }
+
             // 第 286 轮：筛过之后，插件的勾选页默认勾上"这一屏看得见的"
             java.util.List<String> ids = java.util.Arrays.asList("a", "b");
             PluginPicks.noteView("maps", "__selftest__", ids, true);

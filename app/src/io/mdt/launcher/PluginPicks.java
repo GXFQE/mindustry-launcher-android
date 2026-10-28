@@ -122,6 +122,25 @@ final class PluginPicks {
     }
 
     /**
+     * 第 292 轮：**多个插件筛选同时生效**（「且」的关系）。
+     *
+     * <p>用户 2026-10-28：「要不全随便选（可以加个冲突机制），要不只能选择一个」—— 选了"全随便选"：
+     * 每条插件筛选各自管一个身份集合，逐条取交集。冲突不需要另外处理：交集为空就是
+     * 「没有符合条件的地图」，页面本来就会那么说。</p>
+     *
+     * @param keep 插件条目 key → 它放行的身份；空表 ⇒ 没开插件筛选
+     */
+    static <T> List<T> applyFilters(List<T> items, Map<String, Set<String>> keep, IdOf<T> idOf) {
+        List<T> out = new ArrayList<T>(items == null ? Collections.<T>emptyList() : items);
+        if (keep == null || keep.isEmpty()) return out;
+        for (Set<String> one : keep.values()) {
+            out = applyFilter(out, one, idOf);
+            if (out.isEmpty()) return out;
+        }
+        return out;
+    }
+
+    /**
      * 按插件给的顺序重排（**稳定**：同名次保持原顺序；没点到名的排最后）。
      *
      * <p>{@code order == null} / 空表 / 只有一个元素 ⇒ 原表返回（插件没给顺序 = 不动，
@@ -167,27 +186,46 @@ final class PluginPicks {
      * <p>★ 第 282 轮：选中且**选过第二级**的那一条会把选中的名字缀在标题后面
      * （「只看含某矿的图…（钨）」）—— 不然打勾只说明"筛过"，看不出筛的是哪一矿。</p>
      *
-     * @param sort       true = 排序那一类，false = 筛选那一类
-     * @param currentKey 当前选中的 `pluginId/itemId`（打勾用；null = 没选）
+     * <p>★ 第 292 轮：**插件筛选可以多条同时生效**（「且」）。点一条已经生效的 = **取消它**
+     * （{@code off} 回调让页面把那条从表里删掉），点没生效的 = 跑一遍加进来。
+     * 排序仍是单选：点已生效的那条同样取消（回到宿主排序）。</p>
+     *
+     * @param sort         true = 排序那一类，false = 筛选那一类
+     * @param currentKey   排序当前选中的 `pluginId/itemId`（打勾用；null = 没选）
+     * @param activeFilter 筛选当前生效的 keys（可以多个）
+     * @param off          点"已经生效"那一条时做什么（传 null = 不许取消）
      */
     static List<Choice> choices(final Activity a, String page, String slot, boolean sort,
-                                String currentKey, final Sink sink) {
+                                String currentKey, final Set<String> activeFilter,
+                                final Off off, final Sink sink) {
         List<Choice> out = new ArrayList<Choice>();
         if (a == null || page == null) return out;
         final String tick = "✓ ";
         for (final PluginViews.View v : PluginViews.of(a, page,
                 sort ? Extensions.SLOT_SORT : Extensions.SLOT_FILTER)) {
-            boolean on = v.key().equals(currentKey);
+            boolean on = sort ? v.key().equals(currentKey)
+                    : (activeFilter != null && activeFilter.contains(v.key()));
             String chosen = on ? chosenLabel(page, v.key()) : null;
             String label = (on ? tick : "") + v.title();
             if (chosen != null && !chosen.isEmpty()) label += "（" + chosen + "）";
             out.add(new Choice(label, new Runnable() {
                 @Override public void run() {
+                    if ((sort ? v.key().equals(currentKey)
+                            : (activeFilter != null && activeFilter.contains(v.key())))
+                            && off != null) {
+                        off.off(v.key(), sort);      // 已经生效 ⇒ 这一点是"取消"
+                        return;
+                    }
                     pick(a, page, slot, v, sort, sink);
                 }
             }));
         }
         return out;
+    }
+
+    /** 点了一条**已经生效**的插件条目（第 292 轮：再点一次 = 取消）。 */
+    interface Off {
+        void off(String key, boolean sort);
     }
 
     /** 上次在第二级卡里选的名字（按"页 + 插件条目"记；进程内有效，选一次更新一次）。 */

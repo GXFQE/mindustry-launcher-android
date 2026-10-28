@@ -81,20 +81,37 @@ public class BlueprintsActivity extends BaseActivity {
     /** 来源筛：`FROM_ANY` / `FROM_SLOT` / `FROM_MOD`（纯前端，一个文件都不碰） */
     private int mSrc = Blueprints.FROM_ANY;
     /**
-     * v25（第 280 轮统一）：插件注入的**筛选**结果（条目身份集合；null = 没选）。
-     * ★ 身份见 {@link PluginPicks#idOf} —— 模组自带的蓝图在 zip 里，没有 `path`。
+     * 第 292 轮：插件注入的**筛选**（key → 它放行的身份，**可以多条同时生效**，「且」的关系）。
+     *
+     * <p>用户 2026-10-28：「要不全随便选…要不只能选择一个」—— 选了"全随便选"：每条筛选各管一个
+     * 身份集合，逐条取交集；冲突不用特判（交集为空就是「没有符合条件的地图」）。</p>
+     *
+     * <p>★ 身份见 {@link PluginPicks#idOf} —— 游戏自带 / 模组自带的图在 APK、zip 里，
+     *   没有 `path`，所以不能用路径当唯一键（这是原来的漏洞）。</p>
      */
-    private java.util.Set<String> mPluginFilterIds;
-    private String mPluginFilterKey;
+    private final java.util.LinkedHashMap<String, java.util.Set<String>> mPluginFilters =
+            new java.util.LinkedHashMap<String, java.util.Set<String>>();
     /** v25：插件注入的**排序**结果（按顺序的条目身份；null = 没选） */
     private java.util.List<String> mPluginSortIds;
     private String mPluginSortKey;
 
+    /** 第 292 轮：再点一次**已生效**的插件条目 = 取消它（排序取消后回到宿主排序）。 */
+    private final PluginPicks.Off mPluginOff = new PluginPicks.Off() {
+        @Override public void off(String key, boolean sort) {
+            if (sort) {
+                mPluginSortIds = null;
+                mPluginSortKey = null;
+            } else {
+                mPluginFilters.remove(key);
+            }
+            rebuildList();
+        }
+    };
+
     /** 插件筛选 / 排序算完那一下（四个列表页各一份，形状相同）：结果缓存下来再重画。 */
     private final PluginPicks.Sink mPluginSink = new PluginPicks.Sink() {
         @Override public void onPluginFilter(String key, java.util.Set<String> ids) {
-            mPluginFilterIds = ids;
-            mPluginFilterKey = key;
+            mPluginFilters.put(key, ids);
             rebuildList();
         }
 
@@ -362,13 +379,13 @@ public class BlueprintsActivity extends BaseActivity {
         if (mList == null || mItems == null) return;
         mShown = Blueprints.filterAndSort(mItems, mQuery, mSort, mOnlyProblems, mSrc);
         // v25（第 280 轮）：插件注入的筛选 / 排序（结果已缓存成身份集合 / 顺序，纯内存应用）
-        mShown = PluginPicks.applyFilter(mShown, mPluginFilterIds, BP_ID);
+        mShown = PluginPicks.applyFilters(mShown, mPluginFilters, BP_ID);
         mShown = PluginPicks.applySort(mShown, mPluginSortIds, BP_ID);
         boolean filtering = ListQuery.filtering(mQuery, mSort, mOnlyProblems,
-                ListQuery.SORT_NAME, mSrc != Blueprints.FROM_ANY) || mPluginFilterIds != null;
+                ListQuery.SORT_NAME, mSrc != Blueprints.FROM_ANY) || !mPluginFilters.isEmpty();
         // 第 286 轮：登记"这一屏看得见的"（插件的勾选页拿它当默认勾选；只认筛选，排序不算）
         boolean narrowed = !mQuery.trim().isEmpty() || mOnlyProblems
-                || mSrc != Blueprints.FROM_ANY || mPluginFilterIds != null;
+                || mSrc != Blueprints.FROM_ANY || !mPluginFilters.isEmpty();
         java.util.List<String> viewIds = new java.util.ArrayList<String>(mShown.size());
         for (Blueprints.Item one : mShown) viewIds.add(BP_ID.idOf(one));
         PluginPicks.noteView(Extensions.PAGE_BLUEPRINTS, mSlot, viewIds, narrowed);
@@ -471,7 +488,7 @@ public class BlueprintsActivity extends BaseActivity {
         // ★ 第 283 轮：插件行**按功能**并入（排序紧跟在宿主排序后、筛选跟在本页筛选后），
         //   不再按"宿主 / 插件"分（用户：「按照排序和筛选分开，而不是按照宿主和插件分开」）。
         for (PluginPicks.Choice c : PluginPicks.choices(this, Extensions.PAGE_BLUEPRINTS, mSlot,
-                true, mPluginSortKey, mPluginSink)) {
+                true, mPluginSortKey, null, mPluginOff, mPluginSink)) {
             labels.add(c.label);
             acts.add(c.run);
         }
@@ -486,7 +503,7 @@ public class BlueprintsActivity extends BaseActivity {
         addSrcChoice(labels, acts, Blueprints.FROM_SLOT, R.string.list_src_slot, tick);
         addSrcChoice(labels, acts, Blueprints.FROM_MOD, R.string.list_src_mod, tick);
         for (PluginPicks.Choice c : PluginPicks.choices(this, Extensions.PAGE_BLUEPRINTS, mSlot,
-                false, mPluginFilterKey, mPluginSink)) {
+                false, null, mPluginFilters.keySet(), mPluginOff, mPluginSink)) {
             labels.add(c.label);
             acts.add(c.run);
         }
@@ -496,8 +513,7 @@ public class BlueprintsActivity extends BaseActivity {
                 mSort = ListQuery.SORT_NAME;
                 mOnlyProblems = false;
                 mSrc = Blueprints.FROM_ANY;
-                mPluginFilterIds = null;
-                mPluginFilterKey = null;
+                mPluginFilters.clear();
                 mPluginSortIds = null;
                 mPluginSortKey = null;
                 mQuery = "";
