@@ -1563,6 +1563,23 @@
     <string name="about_data_fmt">Current slot\n%1$s\n\nManager data\n%2$s</string>
     <string name="about_footer">Copyright (C) 2026 GXFQE · GPL-3.0</string>
     <string name="about_link_failed">No app can open this link.</string>
+    <!-- 第 296 轮：开发者模式 —— 「关于」页连点版本摘要 7 次解锁的那张卡片。
+         只读事实（版本 / 包名 / ABI / 插件接口 / 进程 / 系统 / 签名指纹）+ 一个"变回普通人"。 -->
+    <string name="devmode_taps_left_fmt">Taps left: %1$d</string>
+    <string name="devmode_unlocked">You are now a developer.</string>
+    <string name="devmode_already">You are already a developer.</string>
+    <string name="devmode_snark">Your finger must be tired by now.</string>
+    <string name="devmode_trivia_fmt">Fun fact: this launcher was installed on %1$s.</string>
+    <string name="devmode_title">Developer options</string>
+    <string name="devmode_app_fmt">Launcher %1$s (build %2$d)\nPackage %3$s</string>
+    <string name="devmode_env_fmt">ABI %1$s · %2$s\nPlugin API %3$d · PID %4$d</string>
+    <string name="devmode_sys_fmt">Android %1$s (SDK %2$d)\nDevice %3$s</string>
+    <string name="devmode_sig_fmt">Signing certificate %1$s</string>
+    <string name="devmode_abi64">64-bit</string>
+    <string name="devmode_abi32">32-bit</string>
+    <string name="devmode_relock_title">Back to a normal user</string>
+    <string name="devmode_relock_sub">Hides this card; tap the version 7 times to come back</string>
+    <string name="devmode_relock_done">Developer options hidden.</string>
     <string name="about_repo_url" translatable="false">https://github.com/GXFQE/mindustry-launcher-android</string>
     <string name="about_issues_url" translatable="false">https://github.com/GXFQE/mindustry-launcher-android/issues</string>
     <string name="about_license_url" translatable="false">https://github.com/GXFQE/mindustry-launcher-android/blob/main/LICENSE</string>

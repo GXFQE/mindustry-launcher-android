@@ -109,6 +109,7 @@ final class DevTools {
                 || intent.hasExtra("dev_mods_page")
                 || intent.hasExtra("dev_bp_page")
                 || intent.hasExtra("dev_saves_page")
+                || intent.hasExtra("dev_about")
                 || intent.hasExtra(BlueprintsActivity.EXTRA_DEV_IMPORT)
                 || intent.hasExtra("dev_crash_analyze")
                 || intent.hasExtra("dev_crash_corpus")
@@ -473,6 +474,17 @@ final class DevTools {
         }
 
         // ── 「存档视为地图」：直接打开某个槽的地图页 ──────────────────────────
+        // ── 第 296 轮：直接打开「关于」页 ──────────────────────────────────────
+        // 用法：`--es dev_about 1`
+        // ★ 理由与 dev_maps_page 同一族：About 是设置页的子页面（且 exported=false），
+        //   自动化点进去要穿"主界面 → 溢出菜单 → 设置 → 关于"三层；而这一页现在挂着
+        //   开发者模式的彩蛋（连点版本摘要 7 次），验收必须**真点那一下**。
+        if (intent.hasExtra("dev_about")) {
+            a.startActivity(new Intent(a, AboutActivity.class));
+            a.finish();
+            return;
+        }
+
         // 用法：`--es dev_maps_page <槽>`
         // ★ 为什么要它：地图页是槽页的子页面（点槽 → 地图），自动化点进去要穿两三层；
         //   而"本槽存档 → 地图"这条路的验收全靠那一页上的行（SAF 那条另有 dev_map_import）。

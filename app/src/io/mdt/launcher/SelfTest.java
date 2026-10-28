@@ -345,6 +345,8 @@ public final class SelfTest {
             wholeSlotPreOp(ctx, L, stat);
             // ★ 第 179 轮：杀后台 P2 —— CAS 暂存件启动清扫 + launchid.dat 自愈/熔断
             p2SelfHeal(ctx, L, stat);
+            // ★ 第 296 轮：开发者模式（连点版本摘要 7 次）—— 两态阈值 + 卡片 7 行事实
+            devMode(ctx, L, stat);
             // ★ 篡改对象池的用例放**最后**：它会在池里留下一个内容坏掉的对象，
             //   之后任何"再备份一次"都会因为 `has()` 命中而复用坏对象（CAS 的固有
             //   假设是"池内不可变"）。放在最后就不影响别的用例。
@@ -15519,6 +15521,85 @@ public final class SelfTest {
         } finally {
             in.close();
         }
+    }
+
+    /**
+     * 第 296 轮：开发者模式（「关于」页连点版本摘要 7 次解锁）。
+     *
+     * <p>★ 尺子钉的是 {@link DevMode#tapKind(int, boolean)} 这个纯函数，而且**两态都遍历**：
+     *   只喂"未解锁"会漏掉"已解锁时前 6 次必须安静"那一整类（症状是每次进关于页都被数一遍）；
+     *   卡片则钉**7 行一行不少**、且每行该有的值真的在 —— 这一页存在的意义就是给人看。
+     */
+    private static void devMode(Context ctx, List<String> L, int[] stat) {
+        L.add("── 第 296 轮：开发者模式（7 击解锁）──");
+        // ① 未解锁：1..6 给「还差 N 次」（N = 6..1），第 7 次解锁
+        boolean remainOk = true;
+        for (int n = 1; n < DevMode.UNLOCK_AT; n++) {
+            if (DevMode.tapKind(n, false) != DevMode.TAP_REMAINING) remainOk = false;
+            if (DevMode.tapsLeft(n) != DevMode.UNLOCK_AT - n) remainOk = false;
+        }
+        ok(stat, L, remainOk, "★未解锁：第 1~6 次都给「还差 N 次」，N 逐次减 1");
+        ok(stat, L, DevMode.tapKind(DevMode.UNLOCK_AT, false) == DevMode.TAP_UNLOCK,
+                "★未解锁：第 " + DevMode.UNLOCK_AT + " 次 = 解锁");
+        // ② 已解锁：前 6 次**安静**，第 7 次只说「已经是了」
+        boolean quietOk = true;
+        for (int n = 1; n < DevMode.UNLOCK_AT; n++) {
+            if (DevMode.tapKind(n, true) != DevMode.TAP_NONE) quietOk = false;
+        }
+        ok(stat, L, quietOk, "★已解锁：前 6 次安静（否则每次进关于页都被数一遍）");
+        ok(stat, L, DevMode.tapKind(DevMode.UNLOCK_AT, true) == DevMode.TAP_ALREADY,
+                "★已解锁：第 7 次 = 「已经是开发者了」（不是再解锁一次）");
+        // ③ 段子尾巴两态都认；中间那段与 50 之后安静
+        ok(stat, L, DevMode.tapKind(DevMode.SNARK_AT, false) == DevMode.TAP_SNARK
+                        && DevMode.tapKind(DevMode.SNARK_AT, true) == DevMode.TAP_SNARK
+                        && DevMode.tapKind(DevMode.TRIVIA_AT, false) == DevMode.TAP_TRIVIA
+                        && DevMode.tapKind(DevMode.TRIVIA_AT, true) == DevMode.TAP_TRIVIA,
+                "★第 20 / 50 次那两句段子：解锁前后都能触发");
+        boolean gapOk = true;
+        for (int n = DevMode.UNLOCK_AT + 1; n < DevMode.SNARK_AT; n++) {
+            if (DevMode.tapKind(n, true) != DevMode.TAP_NONE) gapOk = false;
+        }
+        ok(stat, L, gapOk && DevMode.tapKind(DevMode.TRIVIA_AT + 1, true) == DevMode.TAP_NONE,
+                "★第 8~19 次、以及 50 次之后：安静（照 Android，不刷屏）");
+        ok(stat, L, DevMode.tapKind(0, false) == DevMode.TAP_NONE
+                        && DevMode.tapKind(-3, true) == DevMode.TAP_NONE,
+                "★元断言：0 / 负数次不许落进「还差几次」");
+        // ④ 设备名拼法（纯函数；本机 MODEL 已带厂商名 ⇒ "重复拼"是真实风险，不是假想）
+        ok(stat, L, "HONOR ELP-AN00".equals(DevMode.deviceLabel("HONOR", "ELP-AN00"))
+                        && "HONOR ELP-AN00".equals(DevMode.deviceLabel("HONOR", "HONOR ELP-AN00"))
+                        && "X".equals(DevMode.deviceLabel("", "X"))
+                        && "".equals(DevMode.deviceLabel(null, null)),
+                "★设备名：厂商 + 型号；型号已带厂商就不重复拼；两边都空 = 空串");
+        // ⑤ 卡片：7 行、行行有值，且关键值真的是现场读出来的
+        String info = DevMode.buildInfo(ctx);
+        String[] lines = info.split("\n", -1);
+        ok(stat, L, lines.length == 7, "★卡片是 7 行（实际 " + lines.length + " 行）");
+        boolean filled = true;
+        for (String s : lines) {
+            if (s == null || s.trim().length() == 0) filled = false;
+        }
+        ok(stat, L, filled, "★7 行都不为空（哪一行取不到都得退成 ?，不许空着）");
+        String[] abis = Compat.deviceAbis();
+        String abi = (abis != null && abis.length > 0) ? abis[0] : "?";
+        String verName = "?";
+        try {
+            android.content.pm.PackageInfo pi = ctx.getPackageManager()
+                    .getPackageInfo(ctx.getPackageName(), 0);
+            if (pi.versionName != null && pi.versionName.length() > 0) verName = pi.versionName;
+        } catch (Throwable ignored) {
+        }
+        ok(stat, L, info.contains(verName) && info.contains(ctx.getPackageName())
+                        && info.contains(abi),
+                "★卡片里真的是本包：版本名 / 包名 / ABI 都在");
+        ok(stat, L, info.contains("API " + PluginHost.API)
+                        && info.contains(String.valueOf(android.os.Process.myPid())),
+                "★插件接口版本与当前进程号在（现场读的，不是写死的常量）");
+        String fp = DevMode.fingerprint(ctx);
+        ok(stat, L, fp.length() == DevMode.FINGERPRINT_CHARS && info.contains(fp),
+                "★签名指纹显示 " + DevMode.FINGERPRINT_CHARS + " 位（全长 64 位，一屏放不下）");
+        ok(stat, L, DevMode.installedOn(ctx).length() >= 8,
+                "★第 50 击那句冷知识要的安装日期拿得到（" + DevMode.installedOn(ctx) + "）");
+        L.add("");
     }
 
     // ── 小工具 ────────────────────────────────────────────────────────────

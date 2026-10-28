@@ -127,6 +127,60 @@
                     android:textSize="12sp" />
             </LinearLayout>
 
+            <!-- 第 296 轮：连点版本摘要 7 次解锁的「开发者选项」卡片。
+                 默认 GONE；整块（含分割线与「变回普通人」那一行）一起显隐 ——
+                 分割线不许留在外面自己亮着。 -->
+            <LinearLayout
+                android:id="@+id/devmode_box"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/devmode_section_title"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingStart="4dp"
+                    android:paddingEnd="4dp"
+                    android:paddingTop="18dp"
+                    android:paddingBottom="6dp"
+                    android:textColor="@color/fg_muted"
+                    android:textSize="12sp" />
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/card_bg"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/devmode_info"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:paddingStart="14dp"
+                        android:paddingEnd="14dp"
+                        android:paddingTop="12dp"
+                        android:paddingBottom="12dp"
+                        android:lineSpacingExtra="3dp"
+                        android:textColor="@color/fg_muted"
+                        android:textIsSelectable="true"
+                        android:textSize="12sp" />
+
+                    <View
+                        android:layout_width="match_parent"
+                        android:layout_height="1dp"
+                        android:layout_marginStart="62dp"
+                        android:background="@color/divider" />
+
+                    <include
+                        android:id="@+id/row_devmode_relock"
+                        layout="@layout/row_action"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+                </LinearLayout>
+            </LinearLayout>
+
             <TextView
                 android:id="@+id/about_footer"
                 android:layout_width="match_parent"

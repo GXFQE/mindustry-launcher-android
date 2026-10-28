@@ -111,6 +111,13 @@ public final class Config {
     /** F20：进存档页时自动清理数据根残留（默认开；关掉后只能手动清） */
     private static final String K_AUTO_CLEAN = "auto_clean_redundant";
     /**
+     * 第 296 轮：开发者模式**是否已解锁**（默认关）—— 「关于」页连点版本摘要 7 次打开。
+     *
+     * <p>★ 只存"解锁状态"：点击计数每次进页面都从 0 开始（见 {@link DevMode}）。
+     *   本键只影响 About 页那张卡片显不显示，**不改变任何功能行为**。
+     */
+    private static final String K_DEV_MODE = "developer_mode";
+    /**
      * 第 173 轮：中转站保留份数。
      *
      * <p>普通条目（地图 / 存档 / 蓝图 / 模组 / 插件）与**整个槽**分开：一个槽可能几十 MB，
@@ -1090,6 +1097,28 @@ public final class Config {
 
     public synchronized void setAutoCleanRedundant(boolean on) {
         put(K_AUTO_CLEAN, Boolean.valueOf(on));
+        save();
+    }
+
+    // ── 第 296 轮：开发者模式（连点版本摘要解锁）─────────────────────────
+
+    /**
+     * 开发者模式是否已解锁（默认关）。
+     *
+     * <p>★ 与 {@link #autoCleanRedundant()} 同纪律：坏值退默认 + WARNING **点名键名** ——
+     *   用户要拿这句话去 `config.json` 里找。
+     */
+    public synchronized boolean devMode() {
+        if (!mRoot.has(K_DEV_MODE)) return false;
+        Object v = mRoot.opt(K_DEV_MODE);
+        if (v instanceof Boolean) return ((Boolean) v).booleanValue();
+        Log.w(TAG, "config key '" + K_DEV_MODE + "' is not a boolean (" + v
+                + "), falling back to default false");
+        return false;
+    }
+
+    public synchronized void setDevMode(boolean on) {
+        put(K_DEV_MODE, Boolean.valueOf(on));
         save();
     }
 
