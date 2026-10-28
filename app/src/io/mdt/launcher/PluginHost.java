@@ -94,8 +94,11 @@ public final class PluginHost {
      * <p>v34（2026-10-28 第 290 轮）：**跨槽设置读写** —— `gameSettings(String slot)` /
      * `writeGameSettings(String slot, …)`；`writeItem` 也放开到任意槽四类目录里的已存在文件。
      * 宿主仍负责槽名合法性、游戏运行门禁、备份 / 原子写 / 读回自检。
+     *
+     * <p>v35（2026-10-28 第 291 轮）：**新建内容文件** —— `addItem(slot, kind, name, stream, done)`；
+     * 只做槽名 / 后缀 / 原子写，内容校验归插件；同名已存在失败 {@code exists}。
      */
-    public static final int API = 34;
+    public static final int API = 35;
     /**
      * 还认的**最老**契约版本。
      *
@@ -960,6 +963,111 @@ public final class PluginHost {
             }
             if (callback != null) callback.onDone(r);
         }
+
+        @Override public void addItem(String useSlot, String kind, String name,
+                                       InputStream content, final Done done) {
+            final Context c = getBaseContext();
+            final String s = resolveSlot(useSlot);
+            final String dirName = addItemDir(kind);
+            final String nameErr = addItemNameError(kind, name);
+            if (s == null || dirName == null || nameErr != null || content == null) {
+                try { if (content != null) content.close(); } catch (Throwable ignored) { }
+                postFail(done, s == null ? "not-found" : "invalid");
+                return;
+            }
+            final String fixedName = name;
+            new Thread(new Runnable() {
+                @Override public void run() {
+                    final Result r = addItemNow(c, s, dirName, fixedName, content);
+                    new android.os.Handler(android.os.Looper.getMainLooper()).post(new Runnable() {
+                        @Override public void run() {
+                            if (done != null) done.onDone(r);
+                        }
+                    });
+                }
+            }, "mdt-plugin-add-item").start();
+        }
+
+        /** 新文件落盘：只做路径 / 后缀 / 原子写；内容是不是合法存档 / mod 由插件负责。 */
+        private Result addItemNow(Context c, String useSlot, String dirName,
+                                  String name, InputStream content) {
+            try {
+                if (Data.gameAlive(c)) return Result.fail("game-running");
+                File root = Data.dirOf(c, useSlot);
+                if (root == null || !root.isDirectory()) return Result.fail("not-found");
+                File dir = new File(root, dirName);
+                if (!dir.isDirectory() && !dir.mkdirs()) return Result.fail("io");
+                File target = new File(dir, name);
+                if (target.exists()) return Result.fail("exists");
+                File tmp = new File(dir, "." + name + "." + Long.toHexString(System.nanoTime()) + ".part");
+                java.io.FileOutputStream os = new java.io.FileOutputStream(tmp);
+                try {
+                    PluginActions.copy(content, os);
+                    os.flush();
+                    os.getFD().sync();
+                } finally {
+                    os.close();
+                    content.close();
+                }
+                if (target.exists()) {
+                    tmp.delete();
+                    return Result.fail("exists");
+                }
+                boolean ok = tmp.renameTo(target);
+                if (!ok) {
+                    tmp.delete();
+                    return Result.fail("io");
+                }
+                return Result.ok();
+            } catch (Throwable t) {
+                android.util.Log.i("MDTLauncher", "addItem err=" + t);
+                return Result.fail("io");
+            } finally {
+                try { content.close(); } catch (Throwable ignored) { }
+            }
+        }
+
+        private void postFail(final Done done, final String reason) {
+            new android.os.Handler(android.os.Looper.getMainLooper()).post(new Runnable() {
+                @Override public void run() {
+                    if (done != null) done.onDone(Result.fail(reason));
+                }
+            });
+        }
+
+        /** kind → 目标目录名；不认识的 kind 返回 null。 */
+        private String addItemDir(String kind) {
+            if (ItemInfo.KIND_SAVES.equals(kind)) return "saves";
+            if (ItemInfo.KIND_MAPS.equals(kind)) return "maps";
+            if (ItemInfo.KIND_MODS.equals(kind)) return "mods";
+            if (ItemInfo.KIND_BLUEPRINTS.equals(kind)) return "schematics";
+            return null;
+        }
+
+        /** 文件名闸门：裸文件名 + 合法后缀；不做内容校验。返回 null = 合法。 */
+        private String addItemNameError(String kind, String name) {
+            if (name == null || name.isEmpty() || name.length() > 80) return "bad";
+            if (!name.equals(name.trim()) || ".".equals(name) || "..".equals(name)
+                    || name.startsWith(".")) return "bad";
+            for (int i = 0; i < name.length(); i++) {
+                char ch = name.charAt(i);
+                if (ch < 0x20 || ch == 0x7f) return "bad";
+                if (ch == '/' || ch == '\\' || ch == ':' || ch == '*' || ch == '?'
+                        || ch == '"' || ch == '<' || ch == '>' || ch == '|') return "bad";
+            }
+            String lower = name.toLowerCase(java.util.Locale.ROOT);
+            if (ItemInfo.KIND_SAVES.equals(kind) || ItemInfo.KIND_MAPS.equals(kind)) {
+                return lower.endsWith(".msav") ? null : "bad";
+            }
+            if (ItemInfo.KIND_MODS.equals(kind)) {
+                return (lower.endsWith(".jar") || lower.endsWith(".zip")) ? null : "bad";
+            }
+            if (ItemInfo.KIND_BLUEPRINTS.equals(kind)) {
+                return lower.endsWith(".msch") ? null : "bad";
+            }
+            return "bad";
+        }
+
 
         /** 条目种类 → 它该住的那个目录。 */
         private File dirForKind(String kind) {

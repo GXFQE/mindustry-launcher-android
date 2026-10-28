@@ -4240,6 +4240,15 @@ public final class SelfTest {
         }
         ok(stat, L, PluginHost.API >= 34 && crossSlotApi,
                 "host plugin api >= 34（跨槽 settings 读写：gameSettings(slot) / writeGameSettings(slot, …)）");
+        boolean addItemApi = false;
+        try {
+            PluginApi.class.getMethod("addItem", String.class, String.class, String.class,
+                    InputStream.class, PluginApi.Done.class);
+            addItemApi = true;
+        } catch (Throwable ignored) {
+        }
+        ok(stat, L, PluginHost.API >= 35 && addItemApi,
+                "host plugin api >= 35（新建内容文件：addItem(slot, kind, name, stream, done)）");
         try {
             java.lang.reflect.Method vi = io.mdt.launcher.api.ProbeEnv.class.getMethod("versionInfo");
             java.lang.reflect.Method dv = io.mdt.launcher.api.ProbeEnv.class.getMethod("displayVersion");

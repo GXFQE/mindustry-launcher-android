@@ -58,7 +58,7 @@ public interface PluginApi {
      * <p>为什么要有这个常量：注释里的「当前 = N」运行期读不到，一个写 17、一个写 20 也没人发现；
      * 常量 + 断言才拦得住。</p>
      */
-    int DOC_VERSION = 34;
+    int DOC_VERSION = 35;
 
     // ══ 环境 ═══════════════════════════════════════════════════════════════
 
@@ -506,6 +506,27 @@ public interface PluginApi {
      * **目标槽由插件负责确认**（宿主只做槽名合法性与写安全，不判断插件语义）。
      */
     void writeGameSettings(String slot, Map<String, Object> changes, Done done);
+
+    /**
+     * **v35**：往任意槽**新建**一个内容文件（不是替换；同名已存在会失败 {@code exists}）。
+     *
+     * @param slot 槽名；{@code null} / 空 ⇒ 当前槽；不存在 / 非法 ⇒ {@code not-found}
+     * @param kind {@code saves} / {@code maps} / {@code mods} / {@code blueprints}；
+     *             分别落在 {@code saves/} / {@code maps/} / {@code mods/} / {@code schematics/}
+     * @param name 完整文件名（**必须自带合法后缀**）：saves / maps = {@code .msav}，
+     *             mods = {@code .jar} / {@code .zip}，blueprints = {@code .msch}；
+     *             不允许路径分隔符、控制字符、隐藏名或 {@code .} / {@code ..}
+     * @param content 文件字节；宿主读完负责关闭
+     * @param done 后台写完后回主线程；失败 reason = {@code exists} / {@code game-running} /
+     *             {@code not-found} / {@code invalid} / {@code io}
+     *
+     * <p>🔴 **宿主只做路径 / 后缀 / 槽名 / 原子写，不做内容校验**：`.msav` 是不是合法存档、
+     * mod zip 里有没有 `mod.hjson`、`.msch` 能不能解析，全部归插件。写进去的坏文件游戏可能不认，
+     * 宿主不会替插件回滚（新文件没有旧版本可还原）。
+     *
+     * <p>游戏在跑 ⇒ 拒绝。新文件不备份；要替换已有文件，用 {@link #writeItem(ItemInfo, InputStream, Done)}。
+     */
+    void addItem(String slot, String kind, String name, InputStream content, Done done);
 
     /**
      * 把一个条目的内容**换掉**（仅限**任意槽** maps / saves / mods / blueprints 里的**已存在**文件，
