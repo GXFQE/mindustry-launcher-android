@@ -22,11 +22,13 @@ final class SlotModes {
     private final Activity a;
     private final RadioGroup group;
     private final TextView hint;
+    private final boolean settings;
 
-    private SlotModes(Activity a, RadioGroup group, TextView hint) {
+    private SlotModes(Activity a, RadioGroup group, TextView hint, boolean settings) {
         this.a = a;
         this.group = group;
         this.hint = hint;
+        this.settings = settings;
     }
 
     /**
@@ -42,8 +44,16 @@ final class SlotModes {
      *   ⇒ 绑定搬到这里、由 {@link #bind} 统一调用：**同一个控件的接线只有一份**。
      */
     static void bindTexts(android.content.Context c, View form) {
+        bindTexts(c, form, false);
+    }
+
+    /**
+     * @param settings true = 7.3c 的“复制设置”（标题 / 三条 hint 说“键”，不说“文件”）
+     */
+    static void bindTexts(android.content.Context c, View form, boolean settings) {
         if (c == null || form == null) return;
-        Trans.bind(form, R.id.tx_slot_mode_title, R.string.slot_mode_title);
+        Trans.bind(form, R.id.tx_slot_mode_title,
+                settings ? R.string.settings_copy_mode_title : R.string.slot_mode_title);
         Trans.bind(form, R.id.slot_mode_update, R.string.slot_mode_update);
         Trans.bind(form, R.id.slot_mode_keep, R.string.slot_mode_keep);
         Trans.bind(form, R.id.slot_mode_replace, R.string.slot_mode_replace);
@@ -51,12 +61,16 @@ final class SlotModes {
     }
 
     static SlotModes bind(Activity a, View form) {
+        return bind(a, form, false);
+    }
+
+    static SlotModes bind(Activity a, View form, boolean settings) {
         if (a == null || form == null) return null;
-        bindTexts(a, form);
+        bindTexts(a, form, settings);
         RadioGroup g = (RadioGroup) form.findViewById(R.id.slot_mode_group);
         TextView h = (TextView) form.findViewById(R.id.slot_mode_hint);
         if (g == null) return null;
-        SlotModes m = new SlotModes(a, g, h);
+        SlotModes m = new SlotModes(a, g, h, settings);
         g.check(R.id.slot_mode_update);
         g.setOnCheckedChangeListener(new RadioGroup.OnCheckedChangeListener() {
             @Override public void onCheckedChanged(RadioGroup rg, int id) { m.refresh(); }
@@ -72,6 +86,13 @@ final class SlotModes {
     }
 
     private int hintRes() {
+        if (settings) {
+            switch (mode()) {
+                case SlotWrite.KEEP_OLD: return R.string.settings_mode_keep_hint;
+                case SlotWrite.REPLACE: return R.string.settings_mode_replace_hint;
+                default: return R.string.settings_mode_update_hint;
+            }
+        }
         switch (mode()) {
             case SlotWrite.KEEP_OLD: return R.string.slot_mode_keep_hint;
             case SlotWrite.REPLACE: return R.string.slot_mode_replace_hint;

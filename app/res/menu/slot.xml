@@ -7,7 +7,7 @@
     于是"给这个槽改名""删掉这个槽"被读成了备份功能的一部分。判据很清楚：
     它们动的是**槽本身**（身份 / 生死 / 副本），不是备份。
   ★ 为什么搬到顶栏而不是再加一行：`ref/29` §84 那条 —— 全局 / 低频入口放顶栏右上角；
-    页面每多一行，下面的列表就再往下推一格。
+    页面每多一行，下面的列表就再往下推一格。7.3c 的「复制设置」也放这里（不动槽内容，只动 settings.bin）。
 
   ⚠️ 与 main.xml 同一套规矩：
     a) 用 **framework 的** `android:showAsAction`（本工程零 AndroidX，没有 app: 命名空间）；
@@ -27,6 +27,11 @@
         android:id="@+id/action_slot_clone"
         android:showAsAction="never"
         android:title="@string/slot_op_clone" />
+
+    <item
+        android:id="@+id/action_slot_copy_settings"
+        android:showAsAction="never"
+        android:title="@string/slot_op_copy_settings" />
 
     <item
         android:id="@+id/action_slot_delete"

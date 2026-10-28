@@ -343,7 +343,29 @@
     <string name="slot_op_restore">Restore this one…</string>
     <string name="slot_op_backup_delete">Delete this one…</string>
     <string name="slot_op_rename">Rename this slot…</string>
+    <string name="slot_op_copy_settings">Copy settings from another slot…</string>
     <string name="slot_op_delete">Delete this slot…</string>
+
+    <!-- 7.3c：跨槽设置复制（全黑名单 + 槽导入三档） -->
+    <string name="settings_copy_pick_source">Copy settings from which slot?</string>
+    <string name="settings_copy_title_fmt">Copy settings into “%1$s”</string>
+    <string name="settings_copy_mode_title">What should this do to the settings?</string>
+    <string name="settings_mode_update_hint">Keys in both slots get the source value. Keys only in this slot stay.</string>
+    <string name="settings_mode_keep_hint">Keys in both slots keep the value already in this slot. Only missing keys are added.</string>
+    <string name="settings_mode_replace_hint">Settings keys only in this slot are removed, then source keys are written. Progress and identity keys are kept.</string>
+    <string name="settings_copy_continue">Continue</string>
+    <string name="settings_copy_confirm">Copy settings</string>
+    <string name="settings_copy_preview_title">Review settings copy</string>
+    <string name="settings_copy_preview_fmt">Write %1$d keys, remove %2$d, skip %3$d (progress / identity).</string>
+    <string name="settings_copy_version_unknown">The game version of these slots could not be confirmed. Continue only if both slots use the same version.</string>
+    <string name="settings_copy_version_mismatch">These slots use different game versions. Nothing was copied.</string>
+    <string name="settings_copy_no_changes">Nothing to copy.</string>
+    <string name="settings_copy_done_title">Settings copied</string>
+    <string name="settings_copy_done_fmt">Wrote %1$d keys, removed %2$d.</string>
+    <string name="settings_copy_failed_title">Could not copy settings</string>
+    <string name="settings_copy_failed_fmt">%1$s</string>
+    <string name="settings_copy_game_running">Quit the game before copying settings.</string>
+    <string name="settings_copy_same_slot">Pick a different slot.</string>
 
     <string name="new_slot_title">New slot</string>
     <string name="new_slot_msg">A slot is a separate set of game data. Give different versions different slots and their saves never overwrite each other.</string>

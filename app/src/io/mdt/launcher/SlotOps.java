@@ -667,6 +667,11 @@ final class SlotOps {
         void onPicked(String slot);
     }
 
+    /** 选完槽的回调（带承载它的卡片，调用方要接着 push 下一页时用）。 */
+    interface SlotPick2 {
+        void onPicked(CardStack stack, String slot);
+    }
+
     /**
      * 弹一个"用哪个槽"的单选列表（当前槽带「[当前]」后缀，与设置页「默认槽」同一套文案）。
      *
@@ -685,6 +690,16 @@ final class SlotOps {
     /** 卡片里有栈就推一页；没有就自己开一张（第 263 轮：不再"关一个框再开一个框"）。 */
     static void pickSlot(final CardStack parent, final Activity a, int titleRes, final String prefer,
                          final SlotPick cb) {
+        pickSlot(parent, a, titleRes, prefer, new SlotPick2() {
+            @Override public void onPicked(CardStack stack, String slot) {
+                cb.onPicked(slot);
+            }
+        });
+    }
+
+    /** 带卡片版：回调拿到真正承载这一页的那张卡，调用方可以继续 push 下一页。 */
+    static void pickSlot(final CardStack parent, final Activity a, int titleRes, final String prefer,
+                         final SlotPick2 cb) {
         final List<Data.Slot> slots = Data.allSlots(a);
         if (slots.isEmpty()) return;
         final String[] names = new String[slots.size()];
@@ -694,16 +709,22 @@ final class SlotOps {
             names[i] = s.name + (s.active ? Trans.get(a, R.string.slot_current_suffix) : "");
         }
         final CardStack[] ref = new CardStack[1];
-        ref[0] = CardStack.show(parent, a, Trans.get(a, titleRes),
-                CardStack.list(a, names, new CardStack.ItemClick() {
-                    @Override public void onClick(int w) {
-                        if (w < 0 || w >= slots.size()) return;
-                        cb.onPicked(slots.get(w).name);
-                    }
-                }),
-                new CardStack.Btn(Trans.get(a, R.string.cancel), new Runnable() {
-                    @Override public void run() { ref[0].dismiss(); }
-                }));
+        View body = CardStack.list(a, names, new CardStack.ItemClick() {
+            @Override public void onClick(int w) {
+                if (w < 0 || w >= slots.size()) return;
+                cb.onPicked(ref[0], slots.get(w).name);
+            }
+        });
+        CardStack.Btn cancel = new CardStack.Btn(Trans.get(a, R.string.cancel), new Runnable() {
+            @Override public void run() { ref[0].dismiss(); }
+        });
+        if (parent == null || !parent.isShowing()) {
+            ref[0] = new CardStack(a);
+            ref[0].root(Trans.get(a, titleRes), body, cancel).show();
+        } else {
+            parent.push(Trans.get(a, titleRes), body, cancel);
+            ref[0] = parent;
+        }
     }
 
     // ── 小工具 ────────────────────────────────────────────────────────────

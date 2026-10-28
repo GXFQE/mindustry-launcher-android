@@ -235,6 +235,7 @@ public class SlotActivity extends BaseActivity {
         getMenuInflater().inflate(R.menu.slot, menu);
         setMenuTitle(menu, R.id.action_slot_rename, R.string.slot_op_rename);
         setMenuTitle(menu, R.id.action_slot_clone, R.string.slot_op_clone);
+        setMenuTitle(menu, R.id.action_slot_copy_settings, R.string.slot_op_copy_settings);
         setMenuTitle(menu, R.id.action_slot_delete, R.string.slot_op_delete);
         return true;
     }
@@ -248,7 +249,7 @@ public class SlotActivity extends BaseActivity {
     public boolean onOptionsItemSelected(android.view.MenuItem item) {
         int id = item.getItemId();
         if (id != R.id.action_slot_rename && id != R.id.action_slot_clone
-                && id != R.id.action_slot_delete) {
+                && id != R.id.action_slot_copy_settings && id != R.id.action_slot_delete) {
             return super.onOptionsItemSelected(item);
         }
         // 槽可能已经不在（别处删了 / 改了名）⇒ 与点行时同一条判据
@@ -256,6 +257,7 @@ public class SlotActivity extends BaseActivity {
         if (s == null) { gone(); return true; }
         if (id == R.id.action_slot_rename) SlotOps.renameSlot(this, s, mHost);
         else if (id == R.id.action_slot_clone) SlotOps.cloneSlot(this, s, mHost);
+        else if (id == R.id.action_slot_copy_settings) SettingsCopyUi.open(this, s, mHost);
         else SlotOps.deleteSlot(this, s, mHost);
         return true;
     }

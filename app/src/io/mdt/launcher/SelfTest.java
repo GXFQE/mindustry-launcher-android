@@ -13,6 +13,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.zip.GZIPOutputStream;
@@ -12771,11 +12772,86 @@ public final class SelfTest {
                 new android.view.View(ctx));
         pm158.getMenuInflater().inflate(R.menu.slot, pm158.getMenu());
         android.view.Menu m158 = pm158.getMenu();
-        ok(stat, L, m158.size() == 3
+        ok(stat, L, m158.size() == 4
                         && m158.findItem(R.id.action_slot_rename) != null
                         && m158.findItem(R.id.action_slot_clone) != null
+                        && m158.findItem(R.id.action_slot_copy_settings) != null
                         && m158.findItem(R.id.action_slot_delete) != null,
-                "★★槽页顶栏 ⋮ = 重命名 / 克隆 / 删除三件（" + m158.size() + " 项）");
+                "★★槽页顶栏 ⋮ = 重命名 / 克隆 / 复制设置 / 删除四件（" + m158.size() + " 项）");
+
+        // ── 7.3c：全黑名单 + 三档（纯计划；不碰真实 settings.bin）────────────────
+        LinkedHashMap<String, Object> sm = new LinkedHashMap<>();
+        sm.put("a", Integer.valueOf(1));
+        sm.put("b", Integer.valueOf(2));
+        sm.put("lastBuild", Integer.valueOf(9));
+        sm.put("mod-x-failed", Boolean.TRUE);
+        sm.put("mod-x-enabled", Boolean.FALSE);
+        sm.put("rbm-wheel-next-id", Integer.valueOf(7));
+        LinkedHashMap<String, Object> tm = new LinkedHashMap<>();
+        tm.put("a", Integer.valueOf(9));
+        tm.put("b", Integer.valueOf(2));
+        tm.put("c", Integer.valueOf(3));
+        tm.put("lastBuild", Integer.valueOf(1));
+        tm.put("mod-x-failed", Boolean.TRUE);
+        tm.put("mod-x-enabled", Boolean.TRUE);
+        SettingsBin.Values sv = new SettingsBin.Values(sm, false, 0);
+        SettingsBin.Values tv = new SettingsBin.Values(tm, false, 0);
+        SettingsCopy.Plan up = SettingsCopy.plan(sv, tv, SlotWrite.UPDATE);
+        SettingsCopy.Plan keep = SettingsCopy.plan(sv, tv, SlotWrite.KEEP_OLD);
+        SettingsCopy.Plan rep = SettingsCopy.plan(sv, tv, SlotWrite.REPLACE);
+        ok(stat, L,
+                SettingsCopy.denied("lastBuild")
+                        && SettingsCopy.denied("mod-x-failed")
+                        && !SettingsCopy.denied("mod-x-enabled")
+                        && !SettingsCopy.denied("rbm-wheel-next-id")
+                        && !SettingsCopy.denied("posthog-id")
+                        && !SettingsCopy.denied("uiscalechanged"),
+                "★7.3c 黑名单只认已核实键：lastBuild / mod-*-failed 拦，模组 ID / 状态键不猜（照搬）");
+        ok(stat, L,
+                up.writeCount == 4 && up.deleteCount == 0
+                        && Integer.valueOf(1).equals(up.changes.get("a"))
+                        && Boolean.FALSE.equals(up.changes.get("mod-x-enabled"))
+                        && Integer.valueOf(7).equals(up.changes.get("rbm-wheel-next-id"))
+                        && !up.changes.containsKey("lastBuild")
+                        && !up.changes.containsKey("mod-x-failed")
+                        && !up.changes.containsKey("c"),
+                "★7.3c 更新：源覆盖 a、补模组键；进度/失败标记不碰；目标独有 c 留着");
+        ok(stat, L,
+                keep.writeCount == 1 && Integer.valueOf(7).equals(keep.changes.get("rbm-wheel-next-id"))
+                        && !keep.changes.containsKey("a") && !keep.changes.containsKey("mod-x-enabled"),
+                "★7.3c 补齐：两边都有的保留目标（a / mod-enabled），只补目标缺的 rbm-wheel-next-id");
+        ok(stat, L,
+                rep.writeCount == 4 && rep.deleteCount == 1
+                        && Integer.valueOf(1).equals(rep.changes.get("a"))
+                        && rep.changes.containsKey("c") && rep.changes.get("c") == null
+                        && !rep.changes.containsKey("lastBuild")
+                        && !rep.changes.containsKey("mod-x-failed"),
+                "★7.3c 覆盖：清目标独有 c，写源；目标 lastBuild / mod-failed 保留");
+
+        // 覆盖真的能删键（applyValues 的 null 分支）+ 备份/读回自检同一条流水线
+        File scDir = new File(ctx.getCacheDir(), "selftest-settings-copy");
+        try {
+            deleteTree(scDir);
+            scDir.mkdirs();
+            File scTarget = new File(scDir, "settings.bin");
+            SettingsBin.writeAtomic(scTarget, tv);
+            SettingsBin.Result scResult = SettingsBin.applyValues(scTarget,
+                    new File(scDir, "bk"), rep.changes);
+            SettingsBin.Values scAfter = SettingsBin.read(scTarget);
+            ok(stat, L,
+                    scResult.ok && scResult.verified
+                            && !scAfter.all().containsKey("c")
+                            && Integer.valueOf(1).equals(scAfter.all().get("a"))
+                            && Boolean.FALSE.equals(scAfter.all().get("mod-x-enabled"))
+                            && Integer.valueOf(1).equals(scAfter.all().get("lastBuild"))
+                            && Boolean.TRUE.equals(scAfter.all().get("mod-x-failed")),
+                    "★7.3c 覆盖落盘：c 真被删、a / mod-enabled 写入、lastBuild / mod-failed 保留（verified）");
+        } catch (Throwable scErr) {
+            ok(stat, L, false, "7.3c 覆盖落盘抛了：" + scErr);
+        } finally {
+            deleteTree(scDir);
+        }
+
 
         // ── 第 158b 轮：⋮ 溢出菜单的弹窗也有圆角（与对话框同一套皮肤）─────────────
         //  用户：「能加个圆角吗（和其他弹出窗同步）」。判据不在像素上，而在**主题链**上：

@@ -334,7 +334,29 @@
     <string name="slot_op_restore">恢复这一份…</string>
     <string name="slot_op_backup_delete">删掉这一份…</string>
     <string name="slot_op_rename">重命名此槽…</string>
+    <string name="slot_op_copy_settings">从其他槽复制设置…</string>
     <string name="slot_op_delete">删除此槽…</string>
+
+    <!-- 7.3c：跨槽设置复制（全黑名单 + 槽导入三档） -->
+    <string name="settings_copy_pick_source">从哪个槽复制设置？</string>
+    <string name="settings_copy_title_fmt">把设置复制到「%1$s」</string>
+    <string name="settings_copy_mode_title">设置要怎么合？</string>
+    <string name="settings_mode_update_hint">两边都有的键用源槽的值；只在这个槽里的键留着。</string>
+    <string name="settings_mode_keep_hint">两边都有的键保留这个槽现在的值；只补源槽有、这个槽没有的键。</string>
+    <string name="settings_mode_replace_hint">只在这个槽里的设置键先删掉，再写源槽的键；进度 / 身份键保留。</string>
+    <string name="settings_copy_continue">继续</string>
+    <string name="settings_copy_confirm">复制设置</string>
+    <string name="settings_copy_preview_title">确认设置复制</string>
+    <string name="settings_copy_preview_fmt">将写入 %1$d 个键，删除 %2$d 个，跳过 %3$d 个（进度 / 身份）。</string>
+    <string name="settings_copy_version_unknown">无法确认两个槽的游戏版本；只有确认同版本时才继续。</string>
+    <string name="settings_copy_version_mismatch">两个槽的游戏版本不同，没有复制。</string>
+    <string name="settings_copy_no_changes">没有可复制的键。</string>
+    <string name="settings_copy_done_title">设置已复制</string>
+    <string name="settings_copy_done_fmt">已写入 %1$d 个键，删除 %2$d 个。</string>
+    <string name="settings_copy_failed_title">复制设置失败</string>
+    <string name="settings_copy_failed_fmt">%1$s</string>
+    <string name="settings_copy_game_running">请先退出游戏再复制设置。</string>
+    <string name="settings_copy_same_slot">请选一个不同的槽。</string>
 
     <string name="new_slot_title">新建槽</string>
     <string name="new_slot_msg">槽是一套独立的游戏数据。给不同版本分配不同的槽，存档就不会互相覆盖。</string>
