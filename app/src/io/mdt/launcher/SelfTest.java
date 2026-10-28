@@ -4231,6 +4231,15 @@ public final class SelfTest {
         // ★ v31：宿主把这一局的**完整版本信息**给探针 —— 已装游戏会原地更新（包名不变、版本号变），
         //   只给 key 的话插件没法把更新前后分开记。
         ok(stat, L, PluginHost.API >= 31, "host plugin api >= 31 (ProbeEnv.versionInfo)");
+        boolean crossSlotApi = false;
+        try {
+            PluginApi.class.getMethod("gameSettings", String.class);
+            PluginApi.class.getMethod("writeGameSettings", String.class, Map.class, PluginApi.Done.class);
+            crossSlotApi = true;
+        } catch (Throwable ignored) {
+        }
+        ok(stat, L, PluginHost.API >= 34 && crossSlotApi,
+                "host plugin api >= 34（跨槽 settings 读写：gameSettings(slot) / writeGameSettings(slot, …)）");
         try {
             java.lang.reflect.Method vi = io.mdt.launcher.api.ProbeEnv.class.getMethod("versionInfo");
             java.lang.reflect.Method dv = io.mdt.launcher.api.ProbeEnv.class.getMethod("displayVersion");

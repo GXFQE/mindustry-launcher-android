@@ -90,8 +90,12 @@ public final class PluginHost {
      * <p>v33（2026-10-27 第 282 轮）：**筛选 / 排序可以先问用户** —— 入口类可选实现
      * `options(PluginApi)` + `choose(int, PluginApi)`，宿主把它们显示成第二级选择卡
      * （用户：「先选类型…然后选择具体的矿」）。同一份已加载实例上跑，插件用静态字段记选择。
+     *
+     * <p>v34（2026-10-28 第 290 轮）：**跨槽设置读写** —— `gameSettings(String slot)` /
+     * `writeGameSettings(String slot, …)`；`writeItem` 也放开到任意槽四类目录里的已存在文件。
+     * 宿主仍负责槽名合法性、游戏运行门禁、备份 / 原子写 / 读回自检。
      */
-    public static final int API = 33;
+    public static final int API = 34;
     /**
      * 还认的**最老**契约版本。
      *
@@ -805,7 +809,13 @@ public final class PluginHost {
         }
 
         @Override public Map<String, Object> gameSettings() {
-            File file = Mods.settingsFileOf(getBaseContext(), slot);
+            return gameSettings(slot);
+        }
+
+        @Override public Map<String, Object> gameSettings(String useSlot) {
+            String s = resolveSlot(useSlot);
+            if (s == null) return null;
+            File file = Mods.settingsFileOf(getBaseContext(), s);
             if (file == null || !file.isFile()) return new java.util.LinkedHashMap<String, Object>();
             String[] why = new String[1];
             SettingsBin.Values v = SettingsBin.readSafe(file, why);
@@ -822,8 +832,20 @@ public final class PluginHost {
         }
 
         @Override public void writeGameSettings(Map<String, Object> changes, final Done done) {
+            writeGameSettings(slot, changes, done);
+        }
+
+        @Override public void writeGameSettings(String useSlot, Map<String, Object> changes, final Done done) {
             final Context c = getBaseContext();
-            final String useSlot = slot;
+            final String s = resolveSlot(useSlot);
+            if (s == null) {
+                new android.os.Handler(android.os.Looper.getMainLooper()).post(new Runnable() {
+                    @Override public void run() {
+                        if (done != null) done.onDone(Result.fail("not-found"));
+                    }
+                });
+                return;
+            }
             final java.util.LinkedHashMap<String, Object> copy =
                     new java.util.LinkedHashMap<String, Object>();
             if (changes != null) {
@@ -834,7 +856,7 @@ public final class PluginHost {
             }
             new Thread(new Runnable() {
                 @Override public void run() {
-                    final Result r = writeSettingsNow(c, useSlot, copy);
+                    final Result r = writeSettingsNow(c, s, copy);
                     new android.os.Handler(android.os.Looper.getMainLooper()).post(new Runnable() {
                         @Override public void run() {
                             if (done != null) done.onDone(r);
@@ -842,6 +864,18 @@ public final class PluginHost {
                     });
                 }
             }, "mdt-plugin-settings").start();
+        }
+
+        /** `null` / 空 = 当前槽；只接受真实存在的槽名，防插件拿 `../` 之类去拼路径。 */
+        private String resolveSlot(String raw) {
+            String s = (raw == null || raw.isEmpty()) ? slot : raw;
+            if (s == null || s.isEmpty()) return null;
+            if (s.equals(slot)) return s;
+            if (Data.sanitizeSlot(s) == null) return null;
+            for (String n : Data.slotNames(getBaseContext())) {
+                if (n.equals(s)) return s;
+            }
+            return null;
         }
 
         /** 设置写的门禁与调用（后台线程；把 `SettingsBin.Result` 翻成给插件的 reason）。 */
@@ -888,7 +922,7 @@ public final class PluginHost {
                     } else {
                         File f = new File(it.path);
                         File dir = f.getParentFile();
-                        if (f.isFile() && dir != null && insideSlot(dir, f)) {
+                        if (f.isFile() && dir != null && insideKnownSlot(f)) {
                             String key = f.getCanonicalPath();
                             Object lock = writeLocks.get(key);
                             if (lock == null) {
@@ -945,13 +979,25 @@ public final class PluginHost {
         }
 
         /** 只许写在槽内那四个内容目录里（写入面唯一的口子）。 */
-        private boolean insideSlot(File dir, File f) {
+        /**
+         * 目标文件是否在**任意槽**的四类目录里（v34：写不再是"只有当前槽"）。
+         *
+         * <p>只服务于内部判断；插件只能从 {@code contents(slot, kind)} 拿到 ItemInfo，
+         * 这里再用 canonical 路径确认它没有跑出槽根（防 `../` / 符号链接）。
+         */
+        private boolean insideKnownSlot(File f) {
             try {
-                String d = dir.getCanonicalPath();
-                String[] roots = {mapsDir().getCanonicalPath(), savesDir().getCanonicalPath(),
-                        modsDir().getCanonicalPath(), blueprintsDir().getCanonicalPath()};
-                for (String r : roots) {
-                    if (d.equals(r) || d.startsWith(r + File.separator)) return true;
+                String p = f.getCanonicalPath();
+                java.util.List<String> names = new java.util.ArrayList<String>(Data.slotNames(getBaseContext()));
+                if (slot != null && !names.contains(slot)) names.add(slot);
+                for (String n : names) {
+                    File root = Data.dirOf(getBaseContext(), n);
+                    if (root == null) continue;
+                    String[] subs = {"maps", "saves", "mods", "schematics"};
+                    for (String sub : subs) {
+                        String r = new File(root, sub).getCanonicalPath();
+                        if (p.startsWith(r + File.separator)) return true;
+                    }
                 }
             } catch (Throwable ignored) { }
             return false;

@@ -5,13 +5,15 @@
 
 ## 1. 版本与兼容（v20 冻结基线）
 
-- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..33**。
+- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..34**。
   （v20 是冻结基线；v21 = 游戏设置面；v22 = 后台任务 + 游戏事件；v23 = 探针；v24 = 分析器；
   v25 = 结论挂行 + 筛选/排序注入 + HJSON；v26 = 逐项判定；v27 = 详情页的门 + 槽级结论进摘要卡；
   v28 = 原版文案键；v29 = 游戏前后台事件；v30 = 探针知道版本 / 跨会话数据目录 + 摘要卡总时长；
   v31 = 探针拿到完整版本信息（包名会原地更新，光有 key 不够）；
   v32 = `pickContent(kind, title, head, cb)`：勾选那一屏的标题 / 说明由插件自己给；
-  **v33 = 筛选 / 排序的 `options()` + `choose(int)`：宿主先弹第二级选择卡，再把选中项交给插件**。）
+  v33 = 筛选 / 排序的 `options()` + `choose(int)`：宿主先弹第二级选择卡，再把选中项交给插件；
+  **v34 = 跨槽设置读写 `gameSettings(slot)` / `writeGameSettings(slot, …)`，
+  以及 `writeItem` 可写任意槽四类目录里的已存在文件**。）
 - 插件 `api()` 报的是「我需要的最低宿主接口版本」。用不到的新能力**不要**报高 ——
   报高了只会在老宿主上被拒，换不来任何东西。
 - **不要用 try/catch 去兼容老宿主**：报什么版本就只会跑在什么版本上。`api()` 报 20，
@@ -70,7 +72,7 @@
 ## 3. 入口类约定
 
 ```java
-public static int api();                        // 必需：你需要的接口版本（当前 32；用不到新能力就报 20）
+public static int api();                        // 必需：你需要的接口版本（当前 34；用不到新能力就报 20）
 public static View createView(PluginApi api);   // content / section 用
 public static void run(PluginApi api);          // action 用（在原页跑，不换页）
 public static void unload();                    // 可选：收尾（也认 unload(Context)）
@@ -90,7 +92,7 @@ public static void unload();                    // 可选：收尾（也认 unlo
 
 | 方法 | 说明 |
 |---|---|
-| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 32） |
+| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 34） |
 | `context()` | 插件上下文（**只用来取资源 / 主题 / 建 View**） |
 | `page()` / `slot()` | 从哪一页来 / 当前槽名 |
 | `theme()` | 主题色与 dp/sp（别自己写死颜色，见 `PluginTheme`） |
@@ -441,7 +443,7 @@ String json = api.parseHjson(file);   // 标准 JSON 文本；失败/读不了 �
 
 | 方法 | 说明 |
 |---|---|
-| `writeItem(item, stream, cb)` | 换掉**槽内四类目录里已存在**文件的字节（原子替换；游戏在跑时拒绝） |
+| `writeItem(item, stream, cb)` | 换掉**任意槽**四类目录里**已存在**文件的字节（v34 起跨槽；原子替换；游戏在跑时拒绝；**无备份**） |
 | `trashItem(item, cb)` | 挪进中转站（不是真删，规则与界面删除同一套） |
 | `openItem(item)` | 跳详情页（地图/存档 → 地图详情；蓝图 → 蓝图详情；模组 → 模组页） |
 
@@ -450,21 +452,26 @@ String json = api.parseHjson(file);   // 标准 JSON 文本；失败/读不了 �
 `settings.bin` 的**解析结果**与**安全写**：键的含义归你，格式与安全归宿主。
 
 ```java
-Map<String, Object> gameSettings();                               // 只读快照（保序）
-void writeGameSettings(Map<String, Object> changes, Done done);   // 只改给定键；null = 删键
+Map<String, Object> gameSettings();                               // 当前槽（v21）
+Map<String, Object> gameSettings(String slot);                    // 任意槽（v34；null/空 = 当前槽）
+void writeGameSettings(Map<String, Object> changes, Done done);   // 当前槽（v21）
+void writeGameSettings(String slot, Map<String, Object> changes, Done done); // 任意槽（v34）
 ```
 
 - 值域 = 文件里的六种：`Boolean` / `Integer` / `Long` / `Float` / `String` / `byte[]`。
-- `gameSettings()`：文件不存在 ⇒ **空表**；读不出来 ⇒ **`null`**（别当"空设置"处理）。
+- `gameSettings(slot)`：槽不存在 / 名字非法 ⇒ **`null`**；文件不存在 ⇒ **空表**；
+  读不出来 ⇒ **`null`**（别当"空设置"处理）。
   真实文件 5900+ 键 / ~500 KB ⇒ **别在主线程调**。
-- `writeGameSettings()`：后台线程读写，`Done.onDone(Result)` 回主线程；
-  失败 reason = `game-running` / `unreadable` / `invalid` / `io`。
+- `writeGameSettings(slot, …)`：后台线程读写，`Done.onDone(Result)` 回主线程；
+  失败 reason = `not-found` / `game-running` / `unreadable` / `invalid` / `io`。
 - **宿主保证的机制**（不是语义）：游戏在跑 ⇒ 拒绝 · 写前备份到
   `<hub>/settings-backups/slot-<槽>/`（留 20 份）· 原子写 · 写后读回自检、不过自动还原 ·
-  未知键与键顺序原样保留。
-- **插件负责的语义**：键名含义、缺省值、成对写。例如 `mod-<名>-enabled` **不存在 = 启用**；
+  未知键与键顺序原样保留。备份落点是**目标槽**，不是当前槽。
+- **插件负责的语义**：键名含义、缺省值、成对写、目标槽选择。例如 `mod-<名>-enabled` **不存在 = 启用**；
   改 `-enabled` 时要同时清 `-failed`，否则留下永远清不掉的陈旧记录。
 - 写是**合并**：没给的键一个都不动；删键用 `changes.put(key, null)`。
+- **v34 起跨槽是公开能力**：插件可以读源槽、写目标槽，自己实现"复制 / 批量改 / 三档合并"；
+  宿主只保证路径合法、写安全与备份，不替插件判断"这个键该不该搬"。
 
 ### 页面
 
@@ -584,6 +591,11 @@ v32（2026-10-27 第 277 轮）：`pickContent(kind, title, head, cb)` —— �
 「这个页面标题能不能不是『选中后交给插件』啊」⇒「改成插件可以自行设置文本」）。
 null / 空串 ⇒ 回落宿主默认那两句；标题 ≤ 24 字、说明 ≤ 80 字，换行压成空格、按码点截断；
 正按钮仍是宿主的「完成（N）」；`API_MIN` 仍不动（区间 20..32）。
+v33（2026-10-27 第 282 轮）：`options(PluginApi)` + `choose(int, PluginApi)` —— 筛选 / 排序可先问用户
+（例如"按某矿含量排序"先选矿）；`API_MIN` 仍不动（区间 20..33）。
+v34（2026-10-28 第 290 轮）：`gameSettings(String slot)` / `writeGameSettings(String slot, …)` ——
+跨槽设置读写；`writeItem` 也放开到**任意槽**四类目录里的已存在文件。宿主仍负责槽名合法性、
+游戏运行门禁、备份 / 原子写 / 读回自检；`API_MIN` 仍不动（区间 20..34）。
 
 **官方体检插件**：`plugins/mods-health`（第 229 轮，前身叫 `conflict`）。宿主原来的那行
 「查模组冲突」整块删掉，判据搬进插件的 `core/Conflicts.java` 与 `core/Gates.java`；

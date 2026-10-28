@@ -43,7 +43,7 @@ import java.util.Set;
  * <h3>边界（先看这几条再动手）</h3>
  * <ul>
  *   <li>**没有沙箱**：靠"约定 + 告知"，不是权限门。能读宿主能读的，写只能写自己声明的地方。</li>
- *   <li>{@link #writeItem} 只许改槽内 maps / saves / mods / blueprints 里**已存在**的文件。</li>
+ *   <li>{@link #writeItem} 只许改**任意槽** maps / saves / mods / blueprints 里**已存在**的文件（v34）。</li>
  *   <li>插件的数据住 {@link #dataDir()}，缓存住插件自己的 {@code cache/}。</li>
  *   <li>界面文案走 {@code api.context().getString(...)} 或插件自带资源；宿主的 {@code Trans} 只服务宿主。</li>
  * </ul>
@@ -58,7 +58,7 @@ public interface PluginApi {
      * <p>为什么要有这个常量：注释里的「当前 = N」运行期读不到，一个写 17、一个写 20 也没人发现；
      * 常量 + 断言才拦得住。</p>
      */
-    int DOC_VERSION = 33;
+    int DOC_VERSION = 34;
 
     // ══ 环境 ═══════════════════════════════════════════════════════════════
 
@@ -471,6 +471,16 @@ public interface PluginApi {
     Map<String, Object> gameSettings();
 
     /**
+     * **v34**：任意槽的 {@code settings.bin} 只读快照（与 {@link #gameSettings()} 同一套解析）。
+     *
+     * @param slot 槽名；{@code null} / 空 ⇒ 当前槽。槽不存在 / 名字非法 ⇒ {@code null}；
+     *             文件不存在 ⇒ 空表；坏文件 ⇒ {@code null}。
+     *
+     * <p>⚠️ 跨槽读是**只读**，宿主不检查游戏进程；真实文件很大 ⇒ 别在主线程调。
+     */
+    Map<String, Object> gameSettings(String slot);
+
+    /**
      * **v21**：改当前槽的游戏设置（**只改给定键**；值为 {@code null} ⇒ 删掉这个键）。
      *
      * <p>宿主负责的四条机制（是安全，不是语义）：
@@ -487,7 +497,19 @@ public interface PluginApi {
     void writeGameSettings(Map<String, Object> changes, Done done);
 
     /**
-     * 把一个条目的内容**换掉**（仅限槽内 maps / saves / mods / blueprints 里的**已存在**文件）。
+     * **v34**：改任意槽的游戏设置（合并写入；值为 {@code null} ⇒ 删键）。
+     *
+     * @param slot 槽名；{@code null} / 空 ⇒ 当前槽；不存在 / 非法 ⇒ {@code not-found}。
+     *
+     * <p>安全机制与 {@link #writeGameSettings(Map, Done)} 完全相同，备份也落在**目标槽**的
+     * {@code settings-backups/slot-<槽>/}。跨槽写让插件能实现"复制设置 / 批量改"这类功能；
+     * **目标槽由插件负责确认**（宿主只做槽名合法性与写安全，不判断插件语义）。
+     */
+    void writeGameSettings(String slot, Map<String, Object> changes, Done done);
+
+    /**
+     * 把一个条目的内容**换掉**（仅限**任意槽** maps / saves / mods / blueprints 里的**已存在**文件，
+     * v34 起跨槽：用 {@code contents(slot, kind)} 取到的 {@link ItemInfo} 即可）。
      *
      * <p>同目录写临时文件再原子替换；游戏在跑时拒绝（reason = {@code game-running}）。
      * 内容读完后宿主负责关闭。
