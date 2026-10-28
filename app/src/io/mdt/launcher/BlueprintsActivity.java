@@ -79,7 +79,11 @@ public class BlueprintsActivity extends BaseActivity {
     private int mSort = ListQuery.SORT_NAME;
     private boolean mOnlyProblems;
     /** 来源筛：`FROM_ANY` / `FROM_SLOT` / `FROM_MOD`（纯前端，一个文件都不碰） */
-    private int mSrc = Blueprints.FROM_ANY;
+    /**
+     * 来源筛（**可多选**，第 293 轮）：空 = 全部来源；勾了几个就只看那几个（任一命中）。
+     * 用户 2026-10-28：「宿主三个选项其实应该也能多选」。
+     */
+    private final java.util.LinkedHashSet<Integer> mSrcs = new java.util.LinkedHashSet<Integer>();
     /**
      * 第 292 轮：插件注入的**筛选**（key → 它放行的身份，**可以多条同时生效**，「且」的关系）。
      *
@@ -149,7 +153,11 @@ public class BlueprintsActivity extends BaseActivity {
             if (q != null) mQuery = q;
             mSort = b.getInt(STATE_SORT, ListQuery.SORT_NAME);
             mOnlyProblems = b.getBoolean(STATE_ONLY, false);
-            mSrc = b.getInt(STATE_SRC, Blueprints.FROM_ANY);
+            mSrcs.clear();
+            int srcMask = b.getInt(STATE_SRC, 0);
+            for (int s = Blueprints.FROM_SLOT; s <= Blueprints.FROM_MOD; s++) {
+                if ((srcMask & (1 << s)) != 0) mSrcs.add(Integer.valueOf(s));
+            }
         }
 
         View root = getLayoutInflater().inflate(R.layout.activity_blueprints, null);
@@ -364,7 +372,7 @@ public class BlueprintsActivity extends BaseActivity {
         out.putString(STATE_QUERY, mQuery);
         out.putInt(STATE_SORT, mSort);
         out.putBoolean(STATE_ONLY, mOnlyProblems);
-        out.putInt(STATE_SRC, mSrc);
+        out.putInt(STATE_SRC, srcMask());
     }
 
     /**
@@ -377,15 +385,23 @@ public class BlueprintsActivity extends BaseActivity {
      */
     private void rebuildList() {
         if (mList == null || mItems == null) return;
-        mShown = Blueprints.filterAndSort(mItems, mQuery, mSort, mOnlyProblems, mSrc);
+        mShown = Blueprints.filterAndSort(mItems, mQuery, mSort, mOnlyProblems, Blueprints.FROM_ANY);
+        // 第 293 轮：来源**可多选**（任一命中）；空 = 全部来源。排在搜索/排序之后，只收窄不改次序。
+        if (!mSrcs.isEmpty()) {
+            java.util.List<Blueprints.Item> kept = new java.util.ArrayList<Blueprints.Item>(mShown.size());
+            for (Blueprints.Item one : mShown) {
+                if (ListQuery.sourceKept(one.from, mSrcs)) kept.add(one);
+            }
+            mShown = kept;
+        }
         // v25（第 280 轮）：插件注入的筛选 / 排序（结果已缓存成身份集合 / 顺序，纯内存应用）
         mShown = PluginPicks.applyFilters(mShown, mPluginFilters, BP_ID);
         mShown = PluginPicks.applySort(mShown, mPluginSortIds, BP_ID);
         boolean filtering = ListQuery.filtering(mQuery, mSort, mOnlyProblems,
-                ListQuery.SORT_NAME, mSrc != Blueprints.FROM_ANY) || !mPluginFilters.isEmpty();
+                ListQuery.SORT_NAME, !mSrcs.isEmpty()) || !mPluginFilters.isEmpty();
         // 第 286 轮：登记"这一屏看得见的"（插件的勾选页拿它当默认勾选；只认筛选，排序不算）
         boolean narrowed = !mQuery.trim().isEmpty() || mOnlyProblems
-                || mSrc != Blueprints.FROM_ANY || !mPluginFilters.isEmpty();
+                || !mSrcs.isEmpty() || !mPluginFilters.isEmpty();
         java.util.List<String> viewIds = new java.util.ArrayList<String>(mShown.size());
         for (Blueprints.Item one : mShown) viewIds.add(BP_ID.idOf(one));
         PluginPicks.noteView(Extensions.PAGE_BLUEPRINTS, mSlot, viewIds, narrowed);
@@ -512,7 +528,7 @@ public class BlueprintsActivity extends BaseActivity {
             @Override public void run() {
                 mSort = ListQuery.SORT_NAME;
                 mOnlyProblems = false;
-                mSrc = Blueprints.FROM_ANY;
+                mSrcs.clear();
                 mPluginFilters.clear();
                 mPluginSortIds = null;
                 mPluginSortKey = null;
@@ -525,13 +541,30 @@ public class BlueprintsActivity extends BaseActivity {
         Sheet.show(this, R.string.mods_filter_title, labels, acts, gapAt);
     }
 
-    /** 来源那一行（勾当前那个）。 */
+    /** 来源那一行（**可多选**）：`全部来源` = 一个都不选；点某一来源 = 加上 / 去掉它（第 293 轮）。 */
     private void addSrcChoice(java.util.List<String> labels, java.util.List<Runnable> acts,
                               final int src, int textRes, String tick) {
-        labels.add((mSrc == src ? tick : "") + Trans.get(BlueprintsActivity.this, textRes));
+        boolean on = src == Blueprints.FROM_ANY
+                ? mSrcs.isEmpty() : mSrcs.contains(Integer.valueOf(src));
+        labels.add((on ? tick : "") + Trans.get(BlueprintsActivity.this, textRes));
         acts.add(new Runnable() {
-            @Override public void run() { mSrc = src; rebuildList(); }
+            @Override public void run() {
+                if (src == Blueprints.FROM_ANY) {
+                    mSrcs.clear();
+                } else {
+                    Integer key = Integer.valueOf(src);
+                    if (!mSrcs.remove(key)) mSrcs.add(key);
+                }
+                rebuildList();
+            }
         });
+    }
+
+    /** 存进 `Bundle` 的位掩码（来源可多选，第 293 轮）。 */
+    private int srcMask() {
+        int mask = 0;
+        for (Integer s : mSrcs) mask |= 1 << s.intValue();
+        return mask;
     }
 
     private void showDetail(Blueprints.Item it) {

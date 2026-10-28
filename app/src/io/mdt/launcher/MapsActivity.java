@@ -108,7 +108,11 @@ public class MapsActivity extends BaseActivity {
     private int mSort = ListQuery.SORT_NAME;
     private boolean mOnlyProblems;
     /** 来源筛：`Maps.FROM_ANY` / `FROM_SLOT` / `FROM_GAME` / `FROM_MOD`（纯前端，一个文件都不碰） */
-    private int mSrc = Maps.FROM_ANY;
+    /**
+     * 来源筛（**可多选**，第 293 轮）：空 = 全部来源；勾了几个就只看那几个（任一命中）。
+     * 用户 2026-10-28：「宿主三个选项其实应该也能多选」—— 插件筛选已经能叠，来源也不该只有一个。
+     */
+    private final java.util.LinkedHashSet<Integer> mSrcs = new java.util.LinkedHashSet<Integer>();
     /**
      * 第 292 轮：插件注入的**筛选**（key → 它放行的身份，**可以多条同时生效**，「且」的关系）。
      *
@@ -180,8 +184,11 @@ public class MapsActivity extends BaseActivity {
             if (q != null) mQuery = q;
             mSort = b.getInt(STATE_SORT, ListQuery.SORT_NAME);
             mOnlyProblems = b.getBoolean(STATE_ONLY, false);
-            mSrc = b.getInt(STATE_SRC, Maps.FROM_ANY);
-        }
+            mSrcs.clear();
+            int srcMask = b.getInt(STATE_SRC, 0);
+            for (int s = Maps.FROM_SLOT; s <= Maps.FROM_MOD; s++) {
+                if ((srcMask & (1 << s)) != 0) mSrcs.add(Integer.valueOf(s));
+            }        }
         setTitle(Trans.get(MapsActivity.this, R.string.maps_title_fmt, mSlot));
 
         View root = getLayoutInflater().inflate(R.layout.activity_maps, null);
@@ -396,7 +403,7 @@ public class MapsActivity extends BaseActivity {
         out.putString(STATE_QUERY, mQuery);
         out.putInt(STATE_SORT, mSort);
         out.putBoolean(STATE_ONLY, mOnlyProblems);
-        out.putInt(STATE_SRC, mSrc);
+        out.putInt(STATE_SRC, srcMask());
     }
 
     /**
@@ -412,17 +419,25 @@ public class MapsActivity extends BaseActivity {
      */
     private void rebuildList() {
         if (mList == null || mItems == null) return;
-        mShown = Maps.filterAndSort(mItems, mQuery, mSort, mOnlyProblems, mSrc);
+        mShown = Maps.filterAndSort(mItems, mQuery, mSort, mOnlyProblems, Maps.FROM_ANY);
+        // 第 293 轮：来源**可多选**（任一命中）；空 = 全部来源。排在搜索/排序之后，只收窄不改次序。
+        if (!mSrcs.isEmpty()) {
+            java.util.List<Maps.Item> kept = new java.util.ArrayList<Maps.Item>(mShown.size());
+            for (Maps.Item one : mShown) {
+                if (ListQuery.sourceKept(one.from, mSrcs)) kept.add(one);
+            }
+            mShown = kept;
+        }
         // v25（第 280 轮）：插件注入的筛选 / 排序 —— 结果在选中那一刻就算好并缓存（身份集合 / 顺序），
         // 这里只做纯内存应用。判据与应用只有一处（`PluginPicks`），四个列表页共用。
         mShown = PluginPicks.applyFilters(mShown, mPluginFilters, MAP_ID);
         mShown = PluginPicks.applySort(mShown, mPluginSortIds, MAP_ID);
         boolean filtering = ListQuery.filtering(mQuery, mSort, mOnlyProblems,
-                ListQuery.SORT_NAME, mSrc != Maps.FROM_ANY) || !mPluginFilters.isEmpty();
+                ListQuery.SORT_NAME, !mSrcs.isEmpty()) || !mPluginFilters.isEmpty();
         // 第 286 轮：把"这一屏看得见的"登记给宿主 —— 插件点「导出统计…」时，勾选页拿它当默认勾选
         // （筛出 16 张就不该再从 114 张里重挑一遍）。只认**筛选**，排序不算。
         boolean narrowed = !mQuery.trim().isEmpty() || mOnlyProblems
-                || mSrc != Maps.FROM_ANY || !mPluginFilters.isEmpty();
+                || !mSrcs.isEmpty() || !mPluginFilters.isEmpty();
         java.util.List<String> viewIds = new java.util.ArrayList<String>(mShown.size());
         for (Maps.Item one : mShown) viewIds.add(MAP_ID.idOf(one));
         PluginPicks.noteView(Extensions.PAGE_MAPS, mSlot, viewIds, narrowed);
@@ -556,7 +571,7 @@ public class MapsActivity extends BaseActivity {
             @Override public void run() {
                 mSort = ListQuery.SORT_NAME;
                 mOnlyProblems = false;
-                mSrc = Maps.FROM_ANY;
+                mSrcs.clear();
                 mPluginFilters.clear();
                 mPluginSortIds = null;
                 mPluginSortKey = null;
@@ -569,13 +584,30 @@ public class MapsActivity extends BaseActivity {
         Sheet.show(this, R.string.mods_filter_title, labels, acts, gapAt);
     }
 
-    /** 来源那一行（四选一，勾当前那个）。 */
+    /** 来源那一行（**可多选**）：`全部来源` = 一个都不选；点某一来源 = 加上 / 去掉它（第 293 轮）。 */
     private void addSrcChoice(java.util.List<String> labels, java.util.List<Runnable> acts,
                               final int src, int textRes, String tick) {
-        labels.add((mSrc == src ? tick : "") + Trans.get(MapsActivity.this, textRes));
+        boolean on = src == Maps.FROM_ANY
+                ? mSrcs.isEmpty() : mSrcs.contains(Integer.valueOf(src));
+        labels.add((on ? tick : "") + Trans.get(MapsActivity.this, textRes));
         acts.add(new Runnable() {
-            @Override public void run() { mSrc = src; rebuildList(); }
+            @Override public void run() {
+                if (src == Maps.FROM_ANY) {
+                    mSrcs.clear();                      // 「全部来源」= 一个都不选
+                } else {
+                    Integer key = Integer.valueOf(src);
+                    if (!mSrcs.remove(key)) mSrcs.add(key);   // 再点一次 = 取消
+                }
+                rebuildList();
+            }
         });
+    }
+
+    /** 存进 `Bundle` 的位掩码（来源可多选，第 293 轮）。 */
+    private int srcMask() {
+        int mask = 0;
+        for (Integer s : mSrcs) mask |= 1 << s.intValue();
+        return mask;
     }
 
     /**

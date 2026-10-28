@@ -85,7 +85,11 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
     private String mQuery = "";
     private int mSort = Mods.SORT_NAME;
     private boolean mOnlyProblems;
-    /** 一档⑤：类型筛选（{@link Mods#TYPE_ANY} = 不筛）。判据 = `Mods.matchesType` */
+    /**
+     * 类型筛（第 293 轮起**可多选**）：0 = 全部类型；否则是 {@link Mods#TYPE_JAVA} 这类掩码的**并集**。
+     * 用户 2026-10-28：「宿主三个选项其实应该也能多选」——`Mods.matchesType` 本来就是"包含"语义。
+     * 判据 = `Mods.matchesType`。
+     */
     private int mType = Mods.TYPE_ANY;
     private EditText mSearch;
     private TextView mFiltered;
@@ -1393,13 +1397,27 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
         acts.add(act);
     }
 
+    /**
+     * 类型那一行（**可多选**，第 293 轮）：`全部类型` = 一个都不选；点某一类 = 加上 / 去掉它。
+     * 判据仍是 {@link Mods#matchesType}（"包含"语义 ⇒ 混合模组在两类里都会出现）。
+     */
     private void addTypeChoice(List<String> labels, List<Runnable> acts,
                                final int type, int textRes) {
         String tick = "✓ ";
-        addChoice(labels, acts, (mType == type ? tick : "")
-                + Trans.get(ModsActivity.this, textRes), new Runnable() {
-            @Override public void run() { mType = type; rebuildList(); }
-        });
+        boolean on = type == Mods.TYPE_ANY
+                ? mType == Mods.TYPE_ANY
+                : (mType & type) == type;
+        addChoice(labels, acts, (on ? tick : "") + Trans.get(ModsActivity.this, textRes),
+                new Runnable() {
+                    @Override public void run() {
+                        if (type == Mods.TYPE_ANY) {
+                            mType = Mods.TYPE_ANY;
+                        } else {
+                            mType ^= type;              // 再点一次 = 取消这一类
+                        }
+                        rebuildList();
+                    }
+                });
     }
 
     /** 模组条目的身份（= {@code Mods.Info.file} 的绝对路径；与 {@code ItemInfo.path} 同一口径）。 */

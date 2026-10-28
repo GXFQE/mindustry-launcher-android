@@ -4657,8 +4657,7 @@ public final class SelfTest {
             {
                 PluginPicks.IdOf<String> self = new PluginPicks.IdOf<String>() {
                     @Override public String idOf(String item) { return item; }
-                };
-                java.util.List<String> all = java.util.Arrays.asList("a", "b", "c", "d");
+                };                java.util.List<String> all = java.util.Arrays.asList("a", "b", "c", "d");
                 java.util.Map<String, java.util.Set<String>> kmap =
                         new java.util.LinkedHashMap<String, java.util.Set<String>>();
                 kmap.put("k1", new java.util.LinkedHashSet<String>(
@@ -4675,6 +4674,23 @@ public final class SelfTest {
                                 new java.util.LinkedHashMap<String, java.util.Set<String>>(),
                                 self).size() == 4,
                         "没开插件筛选 ⇒ 原表返回");
+            }
+
+            // 第 293 轮：宿主"来源"也能多选（空集 = 全部；勾几个 = 任一命中）
+            {
+                java.util.LinkedHashSet<Integer> srcs = new java.util.LinkedHashSet<Integer>();
+                ok(stat, L, ListQuery.sourceKept(Maps.FROM_SLOT, srcs)
+                                && ListQuery.sourceKept(Maps.FROM_MOD, srcs),
+                        "★来源筛：一个都不勾 ⇒ 全部都要（空集不拦）");
+                srcs.add(Integer.valueOf(Maps.FROM_SLOT));
+                ok(stat, L, ListQuery.sourceKept(Maps.FROM_SLOT, srcs)
+                                && !ListQuery.sourceKept(Maps.FROM_GAME, srcs),
+                        "★来源筛：只勾「本槽」⇒ 本槽留、游戏自带不留");
+                srcs.add(Integer.valueOf(Maps.FROM_GAME));
+                ok(stat, L, ListQuery.sourceKept(Maps.FROM_SLOT, srcs)
+                                && ListQuery.sourceKept(Maps.FROM_GAME, srcs)
+                                && !ListQuery.sourceKept(Maps.FROM_MOD, srcs),
+                        "★来源筛：勾两个 ⇒ 两个都留、没勾的不留（多选 = 任一命中）");
             }
 
             // 第 286 轮：筛过之后，插件的勾选页默认勾上"这一屏看得见的"

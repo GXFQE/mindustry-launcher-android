@@ -233,4 +233,15 @@ public final class ListQuery {
         return extraFilter || onlyProblems || sort != defaultSort
                 || (query != null && !query.trim().isEmpty());
     }
+
+    /**
+     * 来源筛的判据（第 293 轮：**可多选**）—— 空集 = 全部来源，否则**任一命中**即可。
+     *
+     * <p>用户 2026-10-28：「宿主三个选项其实应该也能多选」：来源原来是四选一（FROM_ANY + 三个来源），
+     * 现在三个来源各是一个开关，勾几个就留几种；一个都不勾 = 全部。</p>
+     */
+    public static boolean sourceKept(int from, java.util.Set<Integer> srcs) {
+        if (srcs == null || srcs.isEmpty()) return true;
+        return srcs.contains(Integer.valueOf(from));
+    }
 }
