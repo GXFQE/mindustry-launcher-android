@@ -1505,7 +1505,7 @@
     <!-- 第 298 轮：致谢（**可见**，不进彩蛋）。四条并列 ⇒ 写法同构：名称（作者）· 许可 —— 一句说明。
          ★ 许可必须写对：arc 是 Apache-2.0（不是 GPL），`Hjson.java` 是 arc Jval 的手工移植。 -->
     <string name="about_section_credits">致谢</string>
-    <string name="about_credits">Mindustry（Anuke）—— GPL-3.0；游戏本体，加载的是你自备的官方 APK\narc（Anuke）—— Apache-2.0；HJSON 解析器是 arc Jval 的手工移植\nlibGDX（libGDX contributors）—— Apache-2.0；arc 底下的图形层\nMaterial Design Icons（Google）—— Apache-2.0；界面图标的 path 数据</string>
+    <string name="about_credits">Mindustry（Anuke）—— GPL-3.0；游戏本体，加载的是你自备的官方 APK\narc（Anuke）—— Apache-2.0；HJSON 解析器是 arc Jval 的手工移植\nlibGDX（libGDX contributors）—— Apache-2.0；arc 底下的图形层\nMaterial Design Icons（Google）—— Apache-2.0；界面图标的 path 数据\n\n行为对照（未取用其代码）：MindustryX</string>
     <string name="about_data_fmt">当前槽数据\n%1$s\n\n管理器数据\n%2$s</string>
     <string name="about_footer">版权所有 (C) 2026 GXFQE · GPL-3.0</string>
     <string name="about_link_failed">没有能打开这个链接的应用。</string>

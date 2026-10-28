@@ -163,6 +163,14 @@
 
 由游戏数据生成的表（`BlockTable` / `ClassRotateTable` / `MschConfigTable`）按 Mindustry 的许可使用；生成器与生成时的版本记在对应源码注释里。
 
+## 参考与对照
+
+与 Credits 分开列的只有一个：**[MindustryX](https://github.com/TinyLake/MindustryX)** —— 同一个游戏的社区 fork，
+在实现「模组诊断」与「蓝图解析」时被当作**行为神谕**（未取用其代码）。
+
+**只做过可行性、功能还没做的项目不写在这里**：等它真的进了产品再补。
+收录标准与细节见 [docs/REFERENCES.md](docs/REFERENCES.md)。
+
 ---
 
 ## 许可证

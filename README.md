@@ -187,6 +187,15 @@ Tables generated from the game data (`BlockTable`, `ClassRotateTable`, `MschConf
 Mindustry's licence; the generators and the versions they were built from are recorded in the
 source comments.
 
+## References
+
+One project is named separately from Credits: **[MindustryX](https://github.com/TinyLake/MindustryX)** —
+a community fork of the game used as a **behaviour oracle** while implementing mod diagnostics and
+blueprint parsing (no code taken).
+
+Projects that were only studied during feasibility work are **not** listed: they go here once a
+feature actually ships. Selection rule and details: [docs/REFERENCES.md](docs/REFERENCES.md).
+
 ---
 
 ## Licence

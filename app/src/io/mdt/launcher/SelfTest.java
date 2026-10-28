@@ -15678,10 +15678,18 @@ public final class SelfTest {
         L.add("── 第 298 轮：关于页「致谢」（可见，不是彩蛋）──");
         String t = Trans.get(ctx, R.string.about_credits);
         String[] lines = t.split("\n", -1);
-        ok(stat, L, lines.length == 4, "★四条并列（实际 " + lines.length + " 行）");
+        ok(stat, L, lines.length == 6,
+                "★四条「用到的」+ 一个空行 + 一条「对照的」（实际 " + lines.length + " 行）");
+        ok(stat, L, lines.length > 4 && lines[4].trim().isEmpty(),
+                "★第 5 行是空行 —— 两组不许连成一片（「用了谁的东西」与「看过谁」是两件事）");
         ok(stat, L, t.contains("Mindustry") && t.contains("libGDX")
                         && t.contains("Material Design Icons") && t.contains("arc"),
-                "★四个项目名都在（Mindustry / arc / libGDX / Material Design Icons）");
+                "★四个「用到的」项目名都在（Mindustry / arc / libGDX / Material Design Icons）");
+        ok(stat, L, t.contains("MindustryX"),
+                "★「行为对照」那行只有 MindustryX（**只收进了产品的**：模组诊断与蓝图解析拿它当过判据）");
+        ok(stat, L, !t.contains("Copper") && !t.contains("PojavLauncher") && !t.contains("FCL")
+                        && !t.contains("Xenon"),
+                "★元断言：只做过可行性 / 还没实现的项目**不在**名单里（等做了再写，别先占位）");
         int apache = countOf(t, "Apache-2.0");
         ok(stat, L, t.contains("GPL-3.0") && apache == 3,
                 "★许可写对：GPL-3.0 一处、Apache-2.0 三处（arc / libGDX / Material）—— 实际 "
