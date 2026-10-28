@@ -118,6 +118,13 @@ public final class Config {
      */
     private static final String K_DEV_MODE = "developer_mode";
     /**
+     * 第 297 轮：「关于」页版本摘要被连点的**累计**次数（跨会话）—— 只给彩蛋用。
+     *
+     * <p>★ 与 {@link #K_DEV_MODE} 分开：解锁状态是"开关"，计数是"记账"。合成一个键的话，
+     *   想统计"点了多少下"就得把开关也当数字读，而 bool 与 int 混在一个键里迟早出现"true = 1 下"。
+     */
+    private static final String K_TAPS = "tap_count";
+    /**
      * 第 173 轮：中转站保留份数。
      *
      * <p>普通条目（地图 / 存档 / 蓝图 / 模组 / 插件）与**整个槽**分开：一个槽可能几十 MB，
@@ -1120,6 +1127,28 @@ public final class Config {
     public synchronized void setDevMode(boolean on) {
         put(K_DEV_MODE, Boolean.valueOf(on));
         save();
+    }
+
+    /**
+     * 版本摘要被连点的**累计**次数（跨会话；没记录 = 0）。
+     * 坏值 / 负数退 0 + WARNING 点名键名（与 {@link #trashKeep()} 同一套读数纪律）。
+     */
+    public synchronized int tapCount() {
+        return intKey(K_TAPS, 0, 0, Integer.MAX_VALUE);
+    }
+
+    /**
+     * 记账并落盘，返回记完之后的累计值。界面上只有 `+1` 一种调用。
+     *
+     * <p>★ 收 delta 而不是另给一个 setter：自检要能"加一再加回来"，不污染用户真实的计数；
+     *   而且负数天然夹到 0（{@link #tapCount()} 的下界），不会把计数记成负的。
+     */
+    public synchronized int bumpTapCount(int delta) {
+        long next = (long) tapCount() + delta;
+        int v = (int) Math.max(0L, Math.min((long) Integer.MAX_VALUE, next));
+        put(K_TAPS, Integer.valueOf(v));
+        save();
+        return v;
     }
 
     // ── F5：自动备份（每槽策略 + 启动记账） ────────────────────────────────

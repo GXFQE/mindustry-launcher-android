@@ -34,6 +34,10 @@ final class DevMode {
     static final int SNARK_AT = 20;
     /** 第几次点击给一条「冷知识」。 */
     static final int TRIVIA_AT = 50;
+    /** 第 297 轮往下加的三档：100 / 200 各一句，500 给一句正经的。 */
+    static final int CURIOUS_AT = 100;
+    static final int SUSPICIOUS_AT = 200;
+    static final int GRATEFUL_AT = 500;
 
     /** 这里没有反应（没到阈值 / 已经过了 / 未解锁时的前 19 次之外的空档）。 */
     static final int TAP_NONE = 0;
@@ -47,6 +51,12 @@ final class DevMode {
     static final int TAP_SNARK = 4;
     /** 第 50 次 ⇒ 冷知识。 */
     static final int TAP_TRIVIA = 5;
+    /** 第 100 次 ⇒ 「你到底想干嘛」。 */
+    static final int TAP_CURIOUS = 6;
+    /** 第 200 次 ⇒ 「我开始怀疑你在测试我」。 */
+    static final int TAP_SUSPICIOUS = 7;
+    /** 第 500 次 ⇒ 正经的谢谢（反差）。 */
+    static final int TAP_GRATEFUL = 8;
 
     /** 卡片里那枚签名指纹显示几位（完整的是 64 位十六进制，一屏放不下）。 */
     static final int FINGERPRINT_CHARS = 16;
@@ -60,13 +70,16 @@ final class DevMode {
      *
      * <p>★ 两态都要遍历：**未解锁**时 1..6 次给「还差 N 次」，第 7 次解锁；
      * <b>已解锁</b>时前 6 次**必须安静**（不然用户每次进关于页都被数一遍），第 7 次只说一句
-     * 「已经是了」。20 / 50 次两条段子尾巴**两态都认**（它们只是彩蛋，与解锁状态无关）。
+     * 「已经是了」。20 / 50 / 100 / 200 / 500 五档段子**两态都认**（它们只是彩蛋，与解锁状态无关）。
      */
     static int tapKind(int taps, boolean unlocked) {
         if (taps <= 0) return TAP_NONE;
         if (taps == UNLOCK_AT) return unlocked ? TAP_ALREADY : TAP_UNLOCK;
         if (taps == SNARK_AT) return TAP_SNARK;
         if (taps == TRIVIA_AT) return TAP_TRIVIA;
+        if (taps == CURIOUS_AT) return TAP_CURIOUS;
+        if (taps == SUSPICIOUS_AT) return TAP_SUSPICIOUS;
+        if (taps == GRATEFUL_AT) return TAP_GRATEFUL;
         if (!unlocked && taps < UNLOCK_AT) return TAP_REMAINING;
         return TAP_NONE;
     }
@@ -109,6 +122,28 @@ final class DevMode {
                 Integer.valueOf(Build.VERSION.SDK_INT), deviceName()));
         sb.append('\n').append(Trans.get(c, R.string.devmode_sig_fmt, fingerprint(c)));
         return sb.toString();
+    }
+
+    /**
+     * 卡片里的**第 8 行**：版本摘要被连点的**累计**次数（跨会话，见 {@link Config#tapCount()}）。
+     *
+     * <p>★ 单独成行、单独一个函数：这一行**每次点击都会变**，而上面 7 行是"这个进程的事实"。
+     *   混在一起的话，50 次连点就得重读 50 遍包信息、重算 50 遍签名指纹（两次 binder 调用/次）。
+     */
+    static String tapLine(Context c, int total) {
+        if (c == null) return "";
+        return Trans.get(c, R.string.devmode_taps_fmt, Integer.valueOf(total));
+    }
+
+    /**
+     * 卡片全文 = 7 行事实 + 第 8 行连点计数。**组合规则只写在这一处**（自检钉的就是它）。
+     *
+     * @param base {@link #buildInfo(Context)} 的结果 —— 调用方缓存它（见 {@link #tapLine} 的理由）
+     */
+    static String cardText(Context c, String base, int total) {
+        String line = tapLine(c, total);
+        if (base == null || base.length() == 0) return line;
+        return base + "\n" + line;
     }
 
     /** 本包签名证书的 SHA-256 前 {@link #FINGERPRINT_CHARS} 位（拿不到 ⇒ "?"）。 */

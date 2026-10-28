@@ -34,6 +34,24 @@ public final class ListQuery {
     public static final int SORT_NAME = 0, SORT_PROBLEM = 1, SORT_SIZE = 2, SORT_TIME = 3;
 
     /**
+     * 第 297 轮：搜索框彩蛋的关键词（**唯一真源**）。
+     *
+     * <p>「关于」页的彩蛋清单用 `%1$s` 把它拼进句子里，{@link Util#bindSearch} 也只认它 ——
+     * 两处各写一遍字面量，迟早只改一处（那时清单说 42、搜索框却认别的）。
+     */
+    public static final String EGG_QUERY = "42";
+
+    /**
+     * 搜索框里这一串算不算"那个词"。
+     *
+     * <p>只认**整串**（去首尾空白）：`420` / `42 张图` 都不算 —— 否则用户正常搜"42 号图"
+     * 之类会被彩蛋打扰，而彩蛋的价值就在"几乎不会误撞"。
+     */
+    public static boolean isEggQuery(CharSequence q) {
+        return q != null && EGG_QUERY.equals(q.toString().trim());
+    }
+
+    /**
      * 一条列表记录要回答的四个问题（**页面判据的唯一落点**）。
      *
      * 只有 {@link #text} 与 {@link #bytes} 是必须实现的；其余三个都有默认值 ——

@@ -1,5 +1,6 @@
 package io.mdt.launcher;
 
+import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.PackageInfo;
 import android.net.Uri;
@@ -30,9 +31,13 @@ public final class AboutActivity extends BaseActivity {
 
     /** 本次进页面点了多少下（离开即归零，见类注释）。 */
     private int mTaps;
+    /** 累计点击数（跨会话，落 `config.json` 的 `tap_count`）—— 卡片第 8 行显示它。 */
+    private int mTotalTaps;
     /** 开发者模式是否已解锁（= 卡片该不该显示）。 */
     private boolean mDev;
     private View mDevBox;
+    /** 卡片前 7 行（进程事实）—— 只算一次；每次点击只重算第 8 行（见 {@link DevMode#tapLine}）。 */
+    private String mInfoBase;
     /** 复用的那条 Toast：连点时要**原地换字**，不是排队（见 {@link #toast(String)}）。 */
     private Toast mToast;
 
@@ -82,6 +87,7 @@ public final class AboutActivity extends BaseActivity {
         // ── 第 296 轮：开发者模式的彩蛋入口 ──────────────────────────────
         //   挂点选「版本摘要」这一行：版本列表里那几行的长按已经用来打开版本页了，别抢。
         mDev = Config.get().devMode();
+        mTotalTaps = Config.get().tapCount();
         mDevBox = findViewById(R.id.devmode_box);
         Trans.bind(root, R.id.devmode_section_title, R.string.devmode_title);
         Util.bindAction(root, R.id.row_devmode_relock, R.drawable.ic_restart,
@@ -91,16 +97,27 @@ public final class AboutActivity extends BaseActivity {
         findViewById(R.id.about_summary).setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { onSummaryTap(v); }
         });
+        findViewById(R.id.about_summary).setOnLongClickListener(new View.OnLongClickListener() {
+            @Override public boolean onLongClick(View v) {
+                // 第二个彩蛋：**解锁之后**长按版本摘要 = 彩蛋清单（未解锁时不给反应，照 Android）。
+                if (mDev) showEggs();
+                return true;
+            }
+        });
         applyDevCard();
     }
 
     /**
      * 连点版本摘要：计数 → {@link DevMode#tapKind(int, boolean)} 给反应。
      *
-     * <p>★ 每次点（含没反应的那些）都计数：20 / 50 两条段子尾巴靠它。
+     * <p>★ 每次点（含没反应的那些）都计数：20 / 50 / 100 / 200 / 500 五档段子靠它。
      */
     private void onSummaryTap(View v) {
         mTaps++;
+        // ★ 累计数先记（跨会话），再判这次该给什么反应：卡片第 8 行与段子里的数字都读它。
+        mTotalTaps = Config.get().bumpTapCount(1);
+        // 已解锁 ⇒ 第 8 行跟着涨（只是拼字符串 + 一次 setText，连点几十下也扛得住）。
+        if (mDev) applyDevCard();
         switch (DevMode.tapKind(mTaps, mDev)) {
             case DevMode.TAP_REMAINING:
                 toast(Trans.get(this, R.string.devmode_taps_left_fmt,
@@ -122,20 +139,49 @@ public final class AboutActivity extends BaseActivity {
             case DevMode.TAP_TRIVIA:
                 toast(Trans.get(this, R.string.devmode_trivia_fmt, DevMode.installedOn(this)));
                 break;
+            case DevMode.TAP_CURIOUS:
+                toast(Trans.get(this, R.string.devmode_curious));
+                break;
+            case DevMode.TAP_SUSPICIOUS:
+                toast(Trans.get(this, R.string.devmode_suspicious));
+                break;
+            case DevMode.TAP_GRATEFUL:
+                toast(Trans.get(this, R.string.devmode_grateful));
+                break;
             default:
                 break;      // 空档（第 8~19 次、以及已解锁后的前 6 次）—— 照 Android，安静
         }
     }
 
     /**
-     * 按解锁状态显隐卡片；**首次显示时才去算那 7 行**（读包信息 + 算指纹，没必要每次进页面都付）。
-     * 已解锁的用户每次进页面照样要看到内容 ⇒ 这里用"文本还空着"当缓存判据。
+     * 按解锁状态显隐卡片；**首次显示时才去算那 7 行**（读包信息 + 算指纹，没必要每次点击都付）。
+     * 第 8 行（累计点击数）每次调用都重排 —— 它只是拼字符串。
      */
     private void applyDevCard() {
         mDevBox.setVisibility(mDev ? View.VISIBLE : View.GONE);
         if (!mDev) return;
+        if (mInfoBase == null) mInfoBase = DevMode.buildInfo(this);
         TextView info = (TextView) findViewById(R.id.devmode_info);
-        if (info.getText().length() == 0) info.setText(DevMode.buildInfo(this));
+        info.setText(DevMode.cardText(this, mInfoBase, mTotalTaps));
+    }
+
+    /**
+     * 第二个彩蛋：**解锁之后**长按版本摘要 ⇒ 一张「彩蛋清单」。
+     *
+     * <p>★ 它同时是这套彩蛋的**自文档**：以后加/删彩蛋往这里补一行（四个数字全部读
+     * {@link DevMode} 的常量、关键词读 {@code ListQuery.EGG_QUERY}），别让清单与代码各说各话。
+     */
+    private void showEggs() {
+        String body = Trans.get(this, R.string.egg_line_unlock_fmt,
+                        Integer.valueOf(DevMode.UNLOCK_AT))
+                + "\n\n" + Trans.get(this, R.string.egg_line_milestones_fmt,
+                        Integer.valueOf(DevMode.SNARK_AT), Integer.valueOf(DevMode.TRIVIA_AT),
+                        Integer.valueOf(DevMode.CURIOUS_AT),
+                        Integer.valueOf(DevMode.SUSPICIOUS_AT),
+                        Integer.valueOf(DevMode.GRATEFUL_AT))
+                + "\n\n" + Trans.get(this, R.string.egg_line_longpress)
+                + "\n\n" + Trans.get(this, R.string.egg_line_search_fmt, ListQuery.EGG_QUERY);
+        alert(Trans.get(this, R.string.egg_list_title), body);
     }
 
     /** 「重新变回普通人」：关掉开关、清计数、收起卡片（下次还要再连点 7 次）。 */
@@ -145,6 +191,17 @@ public final class AboutActivity extends BaseActivity {
         Config.get().setDevMode(false);
         applyDevCard();
         toast(Trans.get(this, R.string.devmode_relock_done));
+    }
+
+    /** 页面里弹一条只读提示（与地图 / 存档 / 模组页**同名同形**：先让位给同窗换页，再挡死页面）。 */
+    private void alert(String title, String msg) {
+        if (CardStack.leaf(title, msg)) return;
+        if (Util.dead(this)) return;
+        new AlertDialog.Builder(this)
+                .setTitle(title)
+                .setMessage(msg)
+                .setPositiveButton(R.string.close, null)
+                .show();
     }
 
     private void toast(String s) {

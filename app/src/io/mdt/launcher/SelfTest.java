@@ -347,6 +347,8 @@ public final class SelfTest {
             p2SelfHeal(ctx, L, stat);
             // ★ 第 296 轮：开发者模式（连点版本摘要 7 次）—— 两态阈值 + 卡片 7 行事实
             devMode(ctx, L, stat);
+            // ★ 第 297 轮：段子链拉到 100/200/500 + 连点记账（卡片第 8 行）+ 搜索框彩蛋
+            easterEggs(ctx, L, stat);
             // ★ 篡改对象池的用例放**最后**：它会在池里留下一个内容坏掉的对象，
             //   之后任何"再备份一次"都会因为 `has()` 命中而复用坏对象（CAS 的固有
             //   假设是"池内不可变"）。放在最后就不影响别的用例。
@@ -15599,6 +15601,66 @@ public final class SelfTest {
                 "★签名指纹显示 " + DevMode.FINGERPRINT_CHARS + " 位（全长 64 位，一屏放不下）");
         ok(stat, L, DevMode.installedOn(ctx).length() >= 8,
                 "★第 50 击那句冷知识要的安装日期拿得到（" + DevMode.installedOn(ctx) + "）");
+        L.add("");
+    }
+
+    /**
+     * 第 297 轮：彩蛋三件 —— 段子链拉到 100/200/500、连点记账（卡片第 8 行）、搜索框彩蛋。
+     *
+     * <p>★ 断言要**连空档一起遍历**：只喂阈值点，会漏掉"本该安静的位置响了"（51~99、101~199、
+     *   201~499 次）。这类错在真机上只能靠"点到第 70 下发现弹了一句"才看得出来。
+     */
+    private static void easterEggs(Context ctx, List<String> L, int[] stat) {
+        L.add("── 第 297 轮：彩蛋（段子链 / 记账 / 搜索框）──");
+        // ① 三个新档位：解锁前后都认
+        ok(stat, L, DevMode.tapKind(DevMode.CURIOUS_AT, false) == DevMode.TAP_CURIOUS
+                        && DevMode.tapKind(DevMode.CURIOUS_AT, true) == DevMode.TAP_CURIOUS
+                        && DevMode.tapKind(DevMode.SUSPICIOUS_AT, false) == DevMode.TAP_SUSPICIOUS
+                        && DevMode.tapKind(DevMode.SUSPICIOUS_AT, true) == DevMode.TAP_SUSPICIOUS
+                        && DevMode.tapKind(DevMode.GRATEFUL_AT, false) == DevMode.TAP_GRATEFUL
+                        && DevMode.tapKind(DevMode.GRATEFUL_AT, true) == DevMode.TAP_GRATEFUL,
+                "★第 100 / 200 / 500 次：解锁前后都触发");
+        // ② 空档：51~99、101~199、201~499 与 500 之后必须安静
+        boolean gapOk = true;
+        int[] quietFrom = {DevMode.TRIVIA_AT + 1, DevMode.CURIOUS_AT + 1, DevMode.SUSPICIOUS_AT + 1};
+        int[] quietTo = {DevMode.CURIOUS_AT, DevMode.SUSPICIOUS_AT, DevMode.GRATEFUL_AT};
+        for (int i = 0; i < quietFrom.length; i++) {
+            for (int n = quietFrom[i]; n < quietTo[i]; n++) {
+                if (DevMode.tapKind(n, true) != DevMode.TAP_NONE) gapOk = false;
+            }
+        }
+        ok(stat, L, gapOk && DevMode.tapKind(DevMode.GRATEFUL_AT + 1, true) == DevMode.TAP_NONE,
+                "★第 51~99、101~199、201~499 次与 500 之后：安静（不刷屏）");
+        // ③ 卡片第 8 行：7 行事实 + 1 行记账 = 8 行，且数字真的在里面
+        String base = DevMode.buildInfo(ctx);
+        String card = DevMode.cardText(ctx, base, 1234);
+        ok(stat, L, card.split("\n", -1).length == 8,
+                "★卡片 = 7 行事实 + 第 8 行记账（实际 " + card.split("\n", -1).length + " 行）");
+        ok(stat, L, card.contains("1234") && DevMode.tapLine(ctx, 1234).contains("1234"),
+                "★第 8 行真的带着累计数（1234）");
+        ok(stat, L, DevMode.cardText(ctx, "", 7).equals(DevMode.tapLine(ctx, 7)),
+                "★元断言：没有事实行时只剩记账那一行（不许拼出开头一个空行）");
+        // ④ 累计计数往返：+1 再 -1（★ 自检不许改掉用户真实的计数）
+        int before = Config.get().tapCount();
+        int plus = Config.get().bumpTapCount(1);
+        int back = Config.get().bumpTapCount(-1);
+        ok(stat, L, before >= 0 && plus == before + 1 && back == before,
+                "★tap_count 往返：" + before + " → " + plus + " → " + back);
+        // ⑤ 搜索框彩蛋：只认整串 42；清单那行与判据共用一个关键词
+        ok(stat, L, ListQuery.isEggQuery("42") && ListQuery.isEggQuery(" 42 ")
+                        && !ListQuery.isEggQuery("420") && !ListQuery.isEggQuery("42 号")
+                        && !ListQuery.isEggQuery("") && !ListQuery.isEggQuery(null),
+                "★搜索框彩蛋只认整串 42（空格容忍；420 / 42 号 / 空 / null 都不算）");
+        ok(stat, L, Trans.get(ctx, R.string.egg_line_search_fmt, ListQuery.EGG_QUERY)
+                        .contains(ListQuery.EGG_QUERY),
+                "★彩蛋清单里那行带的就是同一个关键词（不是另写一个 42）");
+        // ⑥ 三句新段子各不相同（复制粘贴会让"100/200/500"变成同一句话）
+        String c100 = Trans.get(ctx, R.string.devmode_curious);
+        String c200 = Trans.get(ctx, R.string.devmode_suspicious);
+        String c500 = Trans.get(ctx, R.string.devmode_grateful);
+        ok(stat, L, c100.length() > 0 && c200.length() > 0 && c500.length() > 0
+                        && !c100.equals(c200) && !c200.equals(c500) && !c100.equals(c500),
+                "★100 / 200 / 500 三句文案非空且互不相同");
         L.add("");
     }
 
