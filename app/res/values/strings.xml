@@ -1560,6 +1560,10 @@
     <string name="about_license_title">Licence</string>
     <string name="about_license_sub">GNU General Public License v3.0</string>
     <string name="about_section_data">Data locations</string>
+    <!-- 第 298 轮：致谢（**可见**，不进彩蛋）。四条并列 ⇒ 写法同构：名称（作者）· 许可 —— 一句说明。
+         ★ 许可必须写对：arc 是 Apache-2.0（不是 GPL），`Hjson.java` 是 arc Jval 的手工移植。 -->
+    <string name="about_section_credits">Credits</string>
+    <string name="about_credits">Mindustry (Anuke) — GPL-3.0; the game itself, loaded from the official APK you provide\narc (Anuke) — Apache-2.0; the HJSON parser is a hand port of arc Jval\nlibGDX (libGDX contributors) — Apache-2.0; the graphics layer under arc\nMaterial Design Icons (Google) — Apache-2.0; path data of the UI icons</string>
     <string name="about_data_fmt">Current slot\n%1$s\n\nManager data\n%2$s</string>
     <string name="about_footer">Copyright (C) 2026 GXFQE · GPL-3.0</string>
     <string name="about_link_failed">No app can open this link.</string>

@@ -142,7 +142,7 @@ yourself — even just a few lines — see **Translation file** below.
 - Crash analysis: names the mod with its evidence, and says so when it cannot tell
 - Theme, language, translation file
 - Settings: default slot, crash alerts, crash reports to keep, trash retention, automatic cleanup, storage used
-- About page: version / data locations / GitHub repository, issues, GPL-3.0
+- About page: version / credits / data locations / GitHub repository, issues, GPL-3.0
 
 ## What is not there yet
 
@@ -168,6 +168,24 @@ yourself — even just a few lines — see **Translation file** below.
 - **[docs/DEVELOPING.md](docs/DEVELOPING.md)** — build chain, `dev_*` direct entries, module
   boundaries and a map of the documentation (in Chinese for now)
 - **[docs/history/](docs/history/README.md)** — per-round implementation and on-device verification records
+
+## Credits
+
+This launcher builds on other people's work:
+
+- **[Mindustry](https://github.com/Anuke/Mindustry)** by Anuke — GPL-3.0. The manager loads the
+  official APK you provide; it does not bundle or redistribute the game.
+- **[arc](https://github.com/Anuke/Arc)** by Anuke — Apache-2.0. Reference for asset injection, ABI
+  and FreeType behaviour. `Hjson.java` is a hand port of `arc.util.serialization.Jval` (the HJSON
+  read branch and the plain writer only; the two upstream versions and the changes are documented
+  in that file).
+- **[libGDX](https://libgdx.com/)** — Apache-2.0. The graphics layer under arc.
+- **[Material Design Icons](https://github.com/google/material-design-icons)** by Google —
+  Apache-2.0. Path data of the UI icons.
+
+Tables generated from the game data (`BlockTable`, `ClassRotateTable`, `MschConfigTable`) follow
+Mindustry's licence; the generators and the versions they were built from are recorded in the
+source comments.
 
 ---
 

@@ -51,8 +51,11 @@ public final class AboutActivity extends BaseActivity {
         android.view.View root = findViewById(R.id.root);
         Trans.bind(root, R.id.about_app_name, R.string.app_name);
         Trans.bind(root, R.id.about_section_links, R.string.about_section_links);
+        Trans.bind(root, R.id.about_section_credits, R.string.about_section_credits);
         Trans.bind(root, R.id.about_section_data, R.string.about_section_data);
         Trans.bind(root, R.id.about_footer, R.string.about_footer);
+        ((TextView) findViewById(R.id.about_credits)).setText(Trans.get(this,
+                R.string.about_credits));
 
         String verName = "?";
         int verCode = 0;

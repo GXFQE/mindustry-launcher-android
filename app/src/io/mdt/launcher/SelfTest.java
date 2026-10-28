@@ -349,6 +349,8 @@ public final class SelfTest {
             devMode(ctx, L, stat);
             // ★ 第 297 轮：段子链拉到 100/200/500 + 连点记账（卡片第 8 行）+ 搜索框彩蛋
             easterEggs(ctx, L, stat);
+            // ★ 第 298 轮：关于页「致谢」必须**可见**（用户：致谢不该做成隐藏的）
+            aboutCredits(ctx, L, stat);
             // ★ 篡改对象池的用例放**最后**：它会在池里留下一个内容坏掉的对象，
             //   之后任何"再备份一次"都会因为 `has()` 命中而复用坏对象（CAS 的固有
             //   假设是"池内不可变"）。放在最后就不影响别的用例。
@@ -15661,6 +15663,39 @@ public final class SelfTest {
         ok(stat, L, c100.length() > 0 && c200.length() > 0 && c500.length() > 0
                         && !c100.equals(c200) && !c200.equals(c500) && !c100.equals(c500),
                 "★100 / 200 / 500 三句文案非空且互不相同");
+        L.add("");
+    }
+
+    /**
+     * 第 298 轮：关于页「致谢」**必须可见**（用户 2026-10-29：「致谢其实不应该做成隐藏的」）。
+     *
+     * <p>★ 这条同时钉住两件容易烂掉的事：
+     *   ① 清单里的**许可要写对** —— arc 是 Apache-2.0，不是 GPL（写错的那一版在 `Hjson.java` 里
+     *      躺过很久，直到这轮做致谢才发现）；
+     *   ② 四条并列项**都在** —— 少一条不会有任何报错，清单类内容缺项是最典型的静默漏。
+     */
+    private static void aboutCredits(Context ctx, List<String> L, int[] stat) {
+        L.add("── 第 298 轮：关于页「致谢」（可见，不是彩蛋）──");
+        String t = Trans.get(ctx, R.string.about_credits);
+        String[] lines = t.split("\n", -1);
+        ok(stat, L, lines.length == 4, "★四条并列（实际 " + lines.length + " 行）");
+        ok(stat, L, t.contains("Mindustry") && t.contains("libGDX")
+                        && t.contains("Material Design Icons") && t.contains("arc"),
+                "★四个项目名都在（Mindustry / arc / libGDX / Material Design Icons）");
+        int apache = countOf(t, "Apache-2.0");
+        ok(stat, L, t.contains("GPL-3.0") && apache == 3,
+                "★许可写对：GPL-3.0 一处、Apache-2.0 三处（arc / libGDX / Material）—— 实际 "
+                        + apache + " 处 Apache");
+        boolean ids;
+        try {
+            android.view.View v = android.view.LayoutInflater.from(ctx)
+                    .inflate(R.layout.activity_about, null);
+            ids = v.findViewById(R.id.about_section_credits) != null
+                    && v.findViewById(R.id.about_credits) != null;
+        } catch (Throwable t2) {
+            ids = false;
+        }
+        ok(stat, L, ids, "★关于页布局里真的挂着这两个 id（区块被删会静默少一屏）");
         L.add("");
     }
 

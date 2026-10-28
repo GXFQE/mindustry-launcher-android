@@ -8,7 +8,8 @@ import java.util.Map;
 /**
  * 自带的宽容 HJSON 解析器：把 HJSON（同时吃严格 JSON）转成**标准紧凑 JSON 文本**。
  *
- * <p>出处与移植范围（GPL-3.0，与本工程许可一致）：
+ * <p>出处与移植范围（**上游 arc 是 Apache-2.0**，本工程整体是 GPL-3.0 —— 两许可相容，
+ * 按 Apache-2.0 的要求**保留出处与改动说明**即可）：
  * 本文件是 <b>arc 的 {@code arc.util.serialization.Jval}</b> 的手工移植，不是官方 hjson 库。
  * 只移植两段：{@code read(String)} 的 HJSON 分支（{@code Jval.Hparser}）与
  * {@code toString(Jformat.plain)}（{@code Jval.Jwriter}/{@code Jval.Hwriter} 中 plain 那一支）。

@@ -130,7 +130,7 @@
 - 崩溃分析：点名模组并给依据；认不出就说认不出
 - 深浅色、界面语言、翻译文件
 - 设置：默认槽、崩溃提示、崩溃报告份数、中转站保留份数、自动清理、存储占用
-- 关于页：版本 / 数据位置 / GitHub 仓库、Issues、GPL-3.0
+- 关于页：版本 / 致谢 / 数据位置 / GitHub 仓库、Issues、GPL-3.0
 
 ## 现在还没有的
 
@@ -151,6 +151,17 @@
 - **[FEATURE.md](FEATURE.md)** —— 和同期另外三个安卓启动器的横向对照（22 项，判据是源码不是 README）
 - **[docs/DEVELOPING.md](docs/DEVELOPING.md)** —— 构建链、`dev_*` 直通口、模块边界、文档地图
 - **[docs/history/](docs/history/README.md)** —— 逐轮的实现与真机验证记录
+
+## 致谢
+
+这个启动器用到了这些开源项目：
+
+- **[Mindustry](https://github.com/Anuke/Mindustry)**（Anuke）—— GPL-3.0。启动器加载的是**你自备的官方 APK**，不打包、不再分发游戏本体。
+- **[arc](https://github.com/Anuke/Arc)**（Anuke）—— Apache-2.0。资产注入 / ABI / FreeType 的行为以它为准；`Hjson.java` 是 `arc.util.serialization.Jval` 的手工移植（只取 HJSON 读取与 plain 写出两段，两版正本与改动都记在该文件头部）。
+- **[libGDX](https://libgdx.com/)** —— Apache-2.0。arc 底下的图形层。
+- **[Material Design Icons](https://github.com/google/material-design-icons)**（Google）—— Apache-2.0。界面图标的 path 数据。
+
+由游戏数据生成的表（`BlockTable` / `ClassRotateTable` / `MschConfigTable`）按 Mindustry 的许可使用；生成器与生成时的版本记在对应源码注释里。
 
 ---
 
