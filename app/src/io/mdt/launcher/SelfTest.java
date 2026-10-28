@@ -4249,6 +4249,10 @@ public final class SelfTest {
         }
         ok(stat, L, PluginHost.API >= 35 && addItemApi,
                 "host plugin api >= 35（新建内容文件：addItem(slot, kind, name, stream, done)）");
+        // 第 295 轮（v36）：选项可以多选 —— 宿主侧只认两个**静态约定**（不需要接口方法）：
+        // `multi(PluginApi)` + `choose(int[], PluginApi)`；这里钉住版本号与那条约定在文档里的位置。
+        ok(stat, L, PluginHost.API >= 36 && PluginApi.DOC_VERSION >= 36,
+                "host plugin api >= 36（选项多选：multi + choose(int[])）");
         try {
             java.lang.reflect.Method vi = io.mdt.launcher.api.ProbeEnv.class.getMethod("versionInfo");
             java.lang.reflect.Method dv = io.mdt.launcher.api.ProbeEnv.class.getMethod("displayVersion");

@@ -269,7 +269,7 @@ final class PluginPicks {
                         if (opts != null && opts.length > 0) {
                             ask(a, page, title, opts, s, items, sort, key, sink);
                         } else {
-                            compute(a, s, items, -1, sort, key, sink);
+                            compute(a, s, items, null, sort, key, sink);
                         }
                     }
                 });
@@ -277,10 +277,19 @@ final class PluginPicks {
         }, "plugin-pick-open").start();
     }
 
-    /** 第二级：插件给的选项（比如"哪一矿"）。取消 / 返回键 ⇒ 关会话、什么都不动。 */
-    private static void ask(final Activity a, final String page, String title, String[] opts,
+    /**
+     * 第二级：插件给的选项（比如"哪一矿"）。取消 / 返回键 ⇒ 关会话、什么都不动。
+     *
+     * <p>第 295 轮（v36）：插件声明 `multi()` ⇒ 走**勾选框**（与「来源 / 类型」同一套控件），
+     * 勾几个回传几个；否则仍是单选列表（点一下就走）。</p>
+     */
+    private static void ask(final Activity a, final String page, String title, final String[] opts,
                             final PluginViews.Session s, final List<ItemInfo> items,
                             final boolean sort, final String key, final Sink sink) {
+        if (s.multi()) {
+            askMulti(a, page, title, opts, s, items, sort, key, sink);
+            return;
+        }
         final CardStack stack = new CardStack(a);
         final boolean[] picked = {false};
         stack.setOnDismiss(new Runnable() {
@@ -295,7 +304,7 @@ final class PluginPicks {
                     CHOSEN.put(page + "/" + key, opts[which]);
                 }
                 stack.dismiss();
-                compute(a, s, items, which, sort, key, sink);
+                compute(a, s, items, new int[]{ which }, sort, key, sink);
             }
         }), new CardStack.Btn(Trans.get(a, R.string.cancel), new Runnable() {
             @Override public void run() { stack.dismiss(); }
@@ -303,9 +312,33 @@ final class PluginPicks {
         stack.show();
     }
 
-    /** 进度卡 + 后台跑一遍 + 回 UI 交结果。{@code which >= 0} = 先把用户的选择交给插件。 */
+    /** 多选那一版（第 295 轮）：勾选框列表，确定（N）；取消 ⇒ 关会话、什么都不动。 */
+    private static void askMulti(final Activity a, final String page, String title,
+                                 final String[] opts, final PluginViews.Session s,
+                                 final List<ItemInfo> items, final boolean sort,
+                                 final String key, final Sink sink) {
+        BatchIo.pickFilter(a, 0, title, opts, new boolean[opts.length],
+                R.string.list_filter_ok_fmt, false, new BatchIo.OnPick() {
+                    @Override public void onPick(java.util.List<Integer> idx, CardStack card) {
+                        if (card != null) card.dismiss();
+                        int[] which = new int[idx == null ? 0 : idx.size()];
+                        for (int i = 0; i < which.length; i++) {
+                            which[i] = idx.get(i).intValue();
+                        }
+                        java.util.List<String> names = new java.util.ArrayList<String>();
+                        for (int i : which) {
+                            if (i >= 0 && i < opts.length) names.add(opts[i]);
+                        }
+                        CHOSEN.put(page + "/" + key, ListQuery.joinFmt(names,
+                                Trans.get(a, R.string.list_filter_pair_fmt)));
+                        compute(a, s, items, which, sort, key, sink);
+                    }
+                });
+    }
+
+    /** 进度卡 + 后台跑一遍 + 回 UI 交结果。{@code which != null} = 先把用户的选择交给插件。 */
     private static void compute(final Activity a, final PluginViews.Session s,
-                            final List<ItemInfo> items, final int which,
+                            final List<ItemInfo> items, final int[] which,
                             final boolean sort, final String key, final Sink sink) {
         final CardStack progress = new CardStack(a);
         progress.replace(Trans.get(a, R.string.mods_filter_plugin_wait), "");
@@ -314,7 +347,7 @@ final class PluginPicks {
                 final Set<String> keep = new LinkedHashSet<String>();
                 final List<String> order = new ArrayList<String>();
                 try {
-                    if (which >= 0) s.choose(which);
+                    if (which != null) s.choose(which);
                     if (sort) order.addAll(s.sorted());
                     else keep.addAll(s.accepted());
                 } catch (Throwable ignored) {

@@ -54,6 +54,19 @@ public final class StatsPick {
         private Map<String, Integer> parsed;
 
         /**
+         * 第 295 轮（v36 多选）：勾了几种矿 ⇒ **任一种采得到**就算通过（几种之间是"或"）。
+         *
+         * <p>空集合 = 没过任何矿 ⇒ false（调用方不会走到这种情形：宿主那边至少要勾一个）。</p>
+         */
+        public boolean anyOre(java.util.Collection<String> ores) {
+            if (ores == null || ores.isEmpty()) return false;
+            for (String one : ores) {
+                if (oreCount(one) > 0) return true;
+            }
+            return false;
+        }
+
+        /**
          * 这种矿**采得到**多少格（内部名短名匹配：`thorium` 命中 `ore-thorium` /
          * `ore-wall-thorium`，模组前缀同理）。读不出来 / 没有 ⇒ 0。
          */

@@ -16,6 +16,9 @@ public final class FilterOre {
 
     private static StatsPick.OreOptions opts;
     private static String ore = "";
+    /** v36（第 295 轮）：用户可以勾**好几种矿**（几种之间是"或"）。 */
+    private static final java.util.LinkedHashSet<String> ores =
+            new java.util.LinkedHashSet<String>();
 
     private FilterOre() { }
 
@@ -26,7 +29,25 @@ public final class FilterOre {
     public static String[] options(PluginApi api) {
         opts = StatsIndex.oreOptions(api);
         ore = "";
+        ores.clear();
         return opts == null ? new String[0] : opts.labels;
+    }
+
+    /** v36：这一项可以多选（宿主会显示勾选框，勾几个回传几个）。 */
+    public static boolean multi(PluginApi api) {
+        return true;
+    }
+
+    /** v36：多选回传（升序）。 */
+    public static void choose(int[] idx, PluginApi api) {
+        ores.clear();
+        String[] ids = opts == null ? null : opts.ids;
+        if (idx == null || ids == null) return;
+        for (int i : idx) {
+            if (i >= 0 && i < ids.length && ids[i] != null && !ids[i].isEmpty()) {
+                ores.add(ids[i]);
+            }
+        }
     }
 
     public static void choose(int index, PluginApi api) {
@@ -36,6 +57,7 @@ public final class FilterOre {
     }
 
     public static boolean accept(ItemInfo it, PluginApi api) {
+        if (!ores.isEmpty()) return StatsIndex.of(it, api).anyOre(ores);
         return StatsIndex.of(it, api).oreCount(ore) > 0;
     }
 }

@@ -5,7 +5,7 @@
 
 ## 1. 版本与兼容（v20 冻结基线）
 
-- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..35**。
+- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..36**。
   （v20 是冻结基线；v21 = 游戏设置面；v22 = 后台任务 + 游戏事件；v23 = 探针；v24 = 分析器；
   v25 = 结论挂行 + 筛选/排序注入 + HJSON；v26 = 逐项判定；v27 = 详情页的门 + 槽级结论进摘要卡；
   v28 = 原版文案键；v29 = 游戏前后台事件；v30 = 探针知道版本 / 跨会话数据目录 + 摘要卡总时长；
@@ -15,7 +15,10 @@
   v34 = 跨槽设置读写 `gameSettings(slot)` / `writeGameSettings(slot, …)`，
   以及 `writeItem` 可写任意槽四类目录里的已存在文件；
   **v35 = `addItem(slot, kind, name, stream, done)`：新建存档 / 地图 / 模组 / 蓝图文件
-  （只校验槽名 / 后缀 / 原子写，内容归插件；不覆盖同名）。**）
+  （只校验槽名 / 后缀 / 原子写，内容归插件；不覆盖同名）；**
+  **v36 = 选项可以多选**：`static boolean multi(PluginApi)` + `static void choose(int[], PluginApi)`
+  —— 宿主把第二级选择卡换成**勾选框列表**（与「来源 / 类型」同一套控件），勾几个就回传 `int[]`
+  （升序、去重）；几个选项之间是"且"还是"或"由插件自己定。**）
 - 插件 `api()` 报的是「我需要的最低宿主接口版本」。用不到的新能力**不要**报高 ——
   报高了只会在老宿主上被拒，换不来任何东西。
 - **不要用 try/catch 去兼容老宿主**：报什么版本就只会跑在什么版本上。`api()` 报 20，
@@ -424,6 +427,23 @@ public static void choose(int index, PluginApi api);  // 可选：用户点了�
   用户点了 → `choose(i)` → 再跑 `accept` / `compare`。**插件用静态字段记住选择**。
 - 用户取消 / 返回键 ⇒ 宿主关掉插件会话，`accept`/`compare` **一次都不跑**，页面不动。
 - 标签过闸门：去空白、按码点截 24 字、最多 24 项（防插件给 500 条或一行一万字撑爆卡片）。
+
+#### 先选一项：`options()` + `choose(int)`（v33）；勾多项：`multi()` + `choose(int[])`（v36）
+
+```java
+public static String[] options(PluginApi api);          // 二级列表的标签（≤24 条，每条 ≤24 字）
+public static void choose(int index, PluginApi api);    // v33：单选时回传
+
+public static boolean multi(PluginApi api);             // v36：这一项允许勾多个 ⇒ 返回 true
+public static void choose(int[] index, PluginApi api);  // v36：多选时回传（升序、去重）
+```
+
+- 宿主先显示 `options()`，用户点完再调 `choose(...)`，**同一个已加载实例**上继续跑 `accept` / `compare`
+  （插件把选择记进静态字段）。
+- **v36 多选**：声明 `multi()` 返回 true **且**有 `choose(int[])` ⇒ 宿主把那一屏换成**勾选框列表**
+  （与界面里「来源 / 类型」同一套控件），勾几个就回传几个；**几个选项之间是"或"还是"且"由插件自己定**
+  （mapstats 的「只看含某矿的图…」是"或"：含钨**或**含钍）。
+- 多选那屏至少勾一个（取消 = 什么都不做）；单选那屏点一下就走。
 
 ### HJSON 解析（v25）
 

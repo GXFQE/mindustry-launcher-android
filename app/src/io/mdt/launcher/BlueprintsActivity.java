@@ -567,7 +567,7 @@ public class BlueprintsActivity extends BaseActivity {
             preset[i] = mSrcs.contains(Integer.valueOf(values[i]));
         }
         BatchIo.pickFilter(this, R.string.list_src_title, titles, preset,
-                R.string.list_filter_ok_fmt, new BatchIo.OnPick() {
+                R.string.list_filter_ok_fmt, true, new BatchIo.OnPick() {
                     @Override public void onPick(java.util.List<Integer> idx, CardStack card) {
                         mSrcs.clear();
                         if (idx != null) {

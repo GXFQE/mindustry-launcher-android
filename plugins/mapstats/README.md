@@ -137,3 +137,18 @@ adb shell am start -n io.mdt.launcher/io.mdt.launcher.MainActivity \
   **空串 = 塞普罗**、`null` = 调用方没线索（才是不适用）。插件自检加了正反两条钉子。
 - 插件自检 **37 → 39 / 0**（多一条 `cores` 排序；`""` 与 `null` 各一条）。
 - 宿主侧同一轮修的是**两个勾同时亮**（见 `next/82`）。
+
+## 第 295 轮（插件 v5）：含某矿筛选支持**勾好几种**
+
+- 用户要求：「让插件也用这种形式（或者改一下原来那个机制允许多选）」。
+- 插件声明了 v36 的两个静态约定：
+  ```java
+  public static boolean multi(PluginApi api) { return true; }
+  public static void choose(int[] idx, PluginApi api) { ... }   // 升序、去重
+  ```
+  宿主就把那一屏换成**勾选框列表**（与界面里「来源 / 类型」同一套控件），勾几个回传几个。
+- 判据放在 core：`StatsPick.Snap#anyOre(Collection<String>)` —— **任一种采得到就算通过**（几种之间是"或"）。
+  插件自检加了两条（`{copper,tungsten}` 有钨就过；空集合不通过），共 **41 / 0**。
+- 真机（槽「预览验收」114 张）：勾「钍」+「钨」⇒ `plugin filter … 79/114`，与缓存离线算的
+  `tungsten 16 ∪ thorium 70 = 79` **逐个吻合**；行上显示「只看含某矿的图…（钍、钨）」。
+- `version` 4 → 5。

@@ -105,6 +105,12 @@ public final class Check {
                         && a.oreCount("copper") == 0 && bad.oreCount("thorium") == 0,
                 "每种矿的可采格数：thorium 12 / tungsten 3（矿墙也算）/ 没有的 0 / 读不出来 0；"
                         + "实得 " + a.oreCount("thorium") + " / " + a.oreCount("tungsten"));
+        // ── 第 295 轮（v36）：勾好几种矿 ⇒ 任一种采得到就算通过（"或"）──
+        java.util.List<String> two = java.util.Arrays.asList("copper", "tungsten");
+        ok(a.anyOre(two) && bad.anyOre(two) == false && a.anyOre(java.util.Arrays.asList("copper")) == false,
+                "多选矿：{copper, tungsten} ⇒ 有钨就算通过；只有 copper 的（都没有）不算；读不出来不算");
+        ok(!a.anyOre(new java.util.ArrayList<String>()),
+                "多选矿：一个都没勾 ⇒ 不通过（宿主那边至少要求勾一个）");
         ok(a.ores.indexOf("ore-thorium:12") >= 0 && a.ores.indexOf("ore-wall-tungsten:3") >= 0,
                 "缓存字段写成 `内部名:格数;…`（实际 " + a.ores + "）");
         MapStats.Row rich = new MapStats.Row();

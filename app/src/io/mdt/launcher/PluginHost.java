@@ -98,7 +98,7 @@ public final class PluginHost {
      * <p>v35（2026-10-28 第 291 轮）：**新建内容文件** —— `addItem(slot, kind, name, stream, done)`；
      * 只做槽名 / 后缀 / 原子写，内容校验归插件；同名已存在失败 {@code exists}。
      */
-    public static final int API = 35;
+    public static final int API = 36;
     /**
      * 还认的**最老**契约版本。
      *

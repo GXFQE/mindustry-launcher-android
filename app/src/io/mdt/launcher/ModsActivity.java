@@ -1428,7 +1428,7 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
             preset[i] = (mType & values[i]) == values[i];
         }
         BatchIo.pickFilter(this, R.string.list_type_title, titles, preset,
-                R.string.list_filter_ok_fmt, new BatchIo.OnPick() {
+                R.string.list_filter_ok_fmt, true, new BatchIo.OnPick() {
                     @Override public void onPick(java.util.List<Integer> idx, CardStack card) {
                         int mask = Mods.TYPE_ANY;
                         if (idx != null) {

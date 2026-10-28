@@ -130,11 +130,43 @@ final class PluginViews {
                 if (!(r instanceof String[])) return null;
                 String[] gated = gateOptions((String[]) r);
                 if (gated == null) return null;
-                // 有选项却没有 choose ⇒ 选了也传不回去，宁可不要这一步
-                loaded.entry.getMethod("choose", int.class, PluginApi.class);
+                // 有选项却没有回传的路 ⇒ 选了也传不回去，宁可不要这一步
+                if (!multi() && !hasChoose()) return null;
                 return gated;
             } catch (Throwable ignored) {
                 return null;
+            }
+        }
+
+        private boolean hasChoose() {
+            try {
+                loaded.entry.getMethod("choose", int.class, PluginApi.class);
+                return true;
+            } catch (Throwable ignored) {
+                return false;
+            }
+        }
+
+        /**
+         * 第 295 轮（v36）：这一项**允许多选**吗 —— 插件声明 `static boolean multi(PluginApi)` 返回 true，
+         * **并且**有 `static void choose(int[], PluginApi)`。
+         *
+         * <p>选了"多选"之后，宿主显示的是**勾选框列表**（同「来源 / 类型」那一套），用户勾几个
+         * 就回传 `int[]`（升序）；插件自己决定这些选项之间是"且"还是"或"（例如"含钨 **或** 含钍"）。</p>
+         */
+        boolean multi() {
+            try {
+                Method m = loaded.entry.getMethod("multi", PluginApi.class);
+                Object r = m.invoke(null, loaded.env);
+                if (!(r instanceof Boolean) || !((Boolean) r).booleanValue()) return false;
+            } catch (Throwable ignored) {
+                return false;
+            }
+            try {
+                loaded.entry.getMethod("choose", int[].class, PluginApi.class);
+                return true;
+            } catch (Throwable ignored) {
+                return false;
             }
         }
 
@@ -143,6 +175,15 @@ final class PluginViews {
             try {
                 Method m = loaded.entry.getMethod("choose", int.class, PluginApi.class);
                 m.invoke(null, Integer.valueOf(index), loaded.env);
+            } catch (Throwable ignored) {
+            }
+        }
+
+        /** 多选版（v36）：回传用户勾的那几个（升序，去重）。 */
+        void choose(int[] index) {
+            try {
+                Method m = loaded.entry.getMethod("choose", int[].class, PluginApi.class);
+                m.invoke(null, index == null ? new int[0] : index, loaded.env);
             } catch (Throwable ignored) {
             }
         }

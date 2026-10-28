@@ -674,9 +674,16 @@ final class BatchIo {
      * 收成一行点开二级之后规则只剩一条：**同一个列表里勾多个 = 或；行与行之间 = 且**。</p>
      */
     static void pickFilter(final Activity a, int titleRes, String[] titles, boolean[] preset,
-                           int okFmtRes, final OnPick cb) {
-        pickMulti(a, titleRes, null, "", titles, null, null, null, okFmtRes, 0, preset, true,
-                new OnPickShare() {
+                           int okFmtRes, boolean allowEmpty, final OnPick cb) {
+        pickFilter(a, titleRes, null, titles, preset, okFmtRes, allowEmpty, cb);
+    }
+
+    /** 同上，但标题那句话由调用方给（第 295 轮：插件自己的选项标题）。 */
+    static void pickFilter(final Activity a, int titleRes, String titleText, String[] titles,
+                           boolean[] preset, int okFmtRes, boolean allowEmpty,
+                           final OnPick cb) {
+        pickMulti(a, titleRes, titleText, "", titles, null, null, null, okFmtRes, 0, preset,
+                allowEmpty, new OnPickShare() {
                     @Override public void onPick(List<Integer> indexes, boolean share,
                                                  CardStack card) {
                         if (card != null) card.dismiss();
