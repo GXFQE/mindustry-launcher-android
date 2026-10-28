@@ -2092,6 +2092,12 @@
     <string name="list_src_slot">This slot</string>
     <string name="list_src_game">Built into the game</string>
     <string name="list_src_mod">From a mod</string>
+    <string name="list_filter_row_fmt">%1$s: %2$s</string>
+    <string name="list_filter_pair_fmt">%1$s · %2$s</string>
+    <string name="list_filter_all">All</string>
+    <string name="list_filter_ok_fmt">OK (%1$d)</string>
+    <string name="list_src_title">Source</string>
+    <string name="list_type_title">Type</string>
     <string name="bp_name_hint">This name becomes the file name in this slot, so two copies can live side by side. The extension is added automatically.</string>
     <string name="batch_del_btn_fmt">Delete (%1$d)</string>
     <string name="batch_del_title">Delete these?</string>

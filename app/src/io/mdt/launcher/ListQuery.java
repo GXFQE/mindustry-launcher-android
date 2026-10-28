@@ -244,4 +244,22 @@ public final class ListQuery {
         if (srcs == null || srcs.isEmpty()) return true;
         return srcs.contains(Integer.valueOf(from));
     }
+
+    /**
+     * 把几个标签接成一句话（第 294 轮：「来源：本槽、游戏自带」）。空表 ⇒ 空串。
+     *
+     * <p>分隔符**夹在调用方给的格式里**（`%1$s、%2$s` / `%1$s · %2$s`）—— 不单独出一个分隔符资源：
+     * 那种资源的"两侧空格"会被 aapt2 剥掉（RES-04），而 `·` 不留空格又被 RES-09 拦。</p>
+     */
+    public static String joinFmt(java.util.List<String> parts, String pairFmt) {
+        if (parts == null || parts.isEmpty()) return "";
+        String acc = null;
+        for (String p : parts) {
+            if (p == null || p.isEmpty()) continue;
+            acc = acc == null ? p
+                    : String.format(java.util.Locale.ROOT, pairFmt == null ? "%1$s %2$s" : pairFmt,
+                            acc, p);
+        }
+        return acc == null ? "" : acc;
+    }
 }

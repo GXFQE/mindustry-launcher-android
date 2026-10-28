@@ -2046,6 +2046,12 @@
     <string name="list_src_slot">本槽</string>
     <string name="list_src_game">游戏自带</string>
     <string name="list_src_mod">模组自带</string>
+    <string name="list_filter_row_fmt">%1$s：%2$s</string>
+    <string name="list_filter_pair_fmt">%1$s、%2$s</string>
+    <string name="list_filter_all">全部</string>
+    <string name="list_filter_ok_fmt">确定（%1$d）</string>
+    <string name="list_src_title">来源</string>
+    <string name="list_type_title">类型</string>
     <string name="bp_name_hint">这个名字会成为槽里的文件名，两份同名蓝图就能各留一份；后缀会自动补上。</string>
     <string name="batch_del_btn_fmt">删除（%1$d 份）</string>
     <string name="batch_del_title">要删除这些吗？</string>

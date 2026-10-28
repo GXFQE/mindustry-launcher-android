@@ -484,7 +484,13 @@ public final class CardStack {
 
     /** 把任意 View 包成可滚动的一页（自定义表单类页面用）。 */
     public static View wrap(Context c, View child) {
-        stretchLists(c, child);
+        stretchLists(c, child, 0);
+        return scroller(c, child);
+    }
+
+    /** 同上，但给列表高度一个上限（第 294 轮：短列表别撑那么高）。`cap <= 0` = 不限。 */
+    public static View wrap(Context c, View child, int cap) {
+        stretchLists(c, child, cap);
         return scroller(c, child);
     }
 
@@ -501,10 +507,19 @@ public final class CardStack {
      * 也不低于 240dp。这样一屏能看 6~8 条，列表自己滚动，标题/表头/勾选框仍然固定在卡片里。</p>
      */
     private static void stretchLists(Context c, View root) {
+        stretchLists(c, root, 0);
+    }
+
+    /**
+     * 同上，但可以给一个**上限**（第 294 轮：筛选的二级列表只有 2~4 行 —— 撑到 460dp
+     * 会在下面留一大片空白，`cap <= 0` = 不设上限，与原来一样）。
+     */
+    private static void stretchLists(Context c, View root, int cap) {
         if (root instanceof android.widget.ListView) {
             int screen = c.getResources().getDisplayMetrics().heightPixels;
             int h = Math.min(dp(c, 460), Math.round(screen * 0.60f));
-            if (h < dp(c, 260)) h = dp(c, 260);
+            if (cap > 0 && cap < h) h = cap;
+            else if (h < dp(c, 260)) h = dp(c, 260);
             android.view.ViewGroup.LayoutParams lp = root.getLayoutParams();
             if (lp == null) {
                 lp = new LinearLayout.LayoutParams(
@@ -517,8 +532,11 @@ public final class CardStack {
             return;
         }
         if (root instanceof android.view.ViewGroup) {
+            // 递归时把上限一起带下去（见上）
             android.view.ViewGroup g = (android.view.ViewGroup) root;
-            for (int i = 0; i < g.getChildCount(); i++) stretchLists(c, g.getChildAt(i));
+            for (int i = 0; i < g.getChildCount(); i++) {
+                stretchLists(c, g.getChildAt(i), cap);
+            }
         }
     }
 

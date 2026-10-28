@@ -557,6 +557,20 @@ final class BatchIo {
                           String[] titles, String[] subs, android.graphics.Bitmap[] thumbs,
                           final Filler filler, final int okFmtRes, int shareLabelRes,
                           final boolean[] preset, final OnPickShare cb) {
+        pickMulti(a, titleRes, titleText, head, titles, subs, thumbs, filler, okFmtRes,
+                shareLabelRes, preset, false, cb);
+    }
+
+    /**
+     * 同上，但**允许一个都不勾**（第 294 轮：筛选的二级列表 —— "一个都不勾" = 这一维不筛）。
+     *
+     * <p>导出 / 删除那几条路仍用上面那个（一份都没勾 = 没意义，留在这一页提示）。</p>
+     */
+    static void pickMulti(final Activity a, int titleRes, String titleText, String head,
+                          String[] titles, String[] subs, android.graphics.Bitmap[] thumbs,
+                          final Filler filler, final int okFmtRes, int shareLabelRes,
+                          final boolean[] preset, final boolean allowEmpty,
+                          final OnPickShare cb) {
         if (titles == null || titles.length == 0) return;
         final CharSequence title = (titleText == null || titleText.trim().isEmpty())
                 ? Trans.get(a, titleRes) : titleText.trim();
@@ -612,7 +626,11 @@ final class BatchIo {
                 }
             });
         }
-        stack.root(title, CardStack.wrap(a, box),
+        // 第 294 轮：2~4 行的短列表给个高度上限（撑到 460dp 会留一大片空白）
+        int listCap = titles.length <= 4
+                ? (int) (titles.length * 70 * a.getResources().getDisplayMetrics().density)
+                : 0;
+        stack.root(title, CardStack.wrap(a, box, listCap),
                 new CardStack.Btn(Trans.get(a, R.string.cancel), new Runnable() {
                     @Override public void run() { stack.dismiss(); }
                 }),
@@ -629,7 +647,7 @@ final class BatchIo {
                 new CardStack.Btn("", new Runnable() {
                     @Override public void run() {
                         List<Integer> idx = ad.checkedIndexes();
-                        if (idx.isEmpty()) {
+                        if (idx.isEmpty() && !allowEmpty) {
                             toast(a, Trans.get(a, R.string.batch_export_nothing));
                             return;
                         }
@@ -646,6 +664,25 @@ final class BatchIo {
             // ★ 异步补内容的那条路（存档列表）：关了窗就让后台线程自己停（见 setOnDismiss）
             filler.fill(ad, lv, alive);
         }
+    }
+
+    /**
+     * 第 294 轮：**筛选的二级列表** —— 一个维度里的多值（取并集），一个都不勾 = 这一维不筛。
+     *
+     * <p>为什么要有它：来源 / 类型原来是四行平铺，和插件筛选那种"一条一个维度"的行摆在一起，
+     * 用户看不出"什么时候是并集、什么时候是交集"（2026-10-28 用户：「会让用户很迷惑」）。
+     * 收成一行点开二级之后规则只剩一条：**同一个列表里勾多个 = 或；行与行之间 = 且**。</p>
+     */
+    static void pickFilter(final Activity a, int titleRes, String[] titles, boolean[] preset,
+                           int okFmtRes, final OnPick cb) {
+        pickMulti(a, titleRes, null, "", titles, null, null, null, okFmtRes, 0, preset, true,
+                new OnPickShare() {
+                    @Override public void onPick(List<Integer> indexes, boolean share,
+                                                 CardStack card) {
+                        if (card != null) card.dismiss();
+                        if (cb != null) cb.onPick(indexes, card);
+                    }
+                });
     }
 
     /** 正按钮报份数（**跟着去处换词**）、中按钮报"下一步会做什么"（见 {@link #pickMulti} 的三条） */

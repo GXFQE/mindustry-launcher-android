@@ -173,7 +173,7 @@ final class MsavListAdapter extends BaseAdapter {
      * ⚠️ 不在可见区就**什么都不做**：滚回来时 {@link #getView} 自然会用新值渲染。
      */
     void refreshSub(android.view.ViewGroup list, int i) {
-        if (i < 0 || i >= subs.length) return;
+        if (subs == null || i < 0 || i >= subs.length) return;
         View row = rowAt(list, i);
         if (row == null) return;
         TextView s = (TextView) row.findViewById(R.id.msav_sub);
@@ -182,7 +182,9 @@ final class MsavListAdapter extends BaseAdapter {
 
     /** 副标题的**唯一渲染实现**（`getView` 与 `refreshSub` 共用，免得两处各判一次可见性而分叉） */
     private void bindSub(TextView s, int i) {
-        String sub = subs[i];
+        // ★ 第 294 轮：`subs` 可以是 null（只给标题的那几条路，比如筛选的二级列表 —— 这里原来是直接
+        //   `subs[i]`，null 时 NPE，弹窗还没画出来进程就没了）。
+        String sub = (subs == null || i < 0 || i >= subs.length) ? null : subs[i];
         s.setText(sub == null ? "" : sub);
         s.setVisibility(sub == null || sub.isEmpty() ? View.GONE : View.VISIBLE);
     }

@@ -1363,10 +1363,12 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
                 + Trans.get(ModsActivity.this, R.string.mods_filter_only), new Runnable() {
             @Override public void run() { mOnlyProblems = !mOnlyProblems; rebuildList(); }
         });
-        addTypeChoice(labels, acts, Mods.TYPE_ANY, R.string.mods_filter_type_all);
-        addTypeChoice(labels, acts, Mods.TYPE_JAVA, R.string.mods_filter_type_java);
-        addTypeChoice(labels, acts, Mods.TYPE_JS, R.string.mods_filter_type_js);
-        addTypeChoice(labels, acts, Mods.TYPE_DATA, R.string.mods_filter_type_data);
+        // 第 294 轮：类型**收成一行**（点开二级再勾）—— 一行 = 一个维度；同一列表里勾多个 = 或
+        addChoice(labels, acts, Trans.get(ModsActivity.this, R.string.list_filter_row_fmt,
+                Trans.get(ModsActivity.this, R.string.list_type_title), typeLabel()),
+                new Runnable() {
+                    @Override public void run() { pickTypes(); }
+                });
 
         for (PluginPicks.Choice c : PluginPicks.choices(this, Extensions.PAGE_MODS, mSlot,
                 false, null, mPluginFilters.keySet(), mPluginOff, mPluginSink)) {
@@ -1397,24 +1399,44 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
         acts.add(act);
     }
 
-    /**
-     * 类型那一行（**可多选**，第 293 轮）：`全部类型` = 一个都不选；点某一类 = 加上 / 去掉它。
-     * 判据仍是 {@link Mods#matchesType}（"包含"语义 ⇒ 混合模组在两类里都会出现）。
-     */
-    private void addTypeChoice(List<String> labels, List<Runnable> acts,
-                               final int type, int textRes) {
-        String tick = "✓ ";
-        boolean on = type == Mods.TYPE_ANY
-                ? mType == Mods.TYPE_ANY
-                : (mType & type) == type;
-        addChoice(labels, acts, (on ? tick : "") + Trans.get(ModsActivity.this, textRes),
-                new Runnable() {
-                    @Override public void run() {
-                        if (type == Mods.TYPE_ANY) {
-                            mType = Mods.TYPE_ANY;
-                        } else {
-                            mType ^= type;              // 再点一次 = 取消这一类
+    /** 类型那一行现在显示什么（第 294 轮：「全部」/「有 Java 代码、有脚本」）。 */
+    private String typeLabel() {
+        if (mType == Mods.TYPE_ANY) return Trans.get(ModsActivity.this, R.string.list_filter_all);
+        java.util.List<String> parts = new java.util.ArrayList<String>();
+        if ((mType & Mods.TYPE_JAVA) == Mods.TYPE_JAVA) {
+            parts.add(Trans.get(ModsActivity.this, R.string.mods_filter_type_java));
+        }
+        if ((mType & Mods.TYPE_JS) != 0) {
+            parts.add(Trans.get(ModsActivity.this, R.string.mods_filter_type_js));
+        }
+        if ((mType & Mods.TYPE_DATA) != 0) {
+            parts.add(Trans.get(ModsActivity.this, R.string.mods_filter_type_data));
+        }
+        return ListQuery.joinFmt(parts,
+                Trans.get(ModsActivity.this, R.string.list_filter_pair_fmt));
+    }
+
+    /** 二级：勾几个类型（同一个列表里勾多个 = 或）。一个都不勾 = 全部类型。 */
+    private void pickTypes() {
+        final int[] values = { Mods.TYPE_JAVA, Mods.TYPE_JS, Mods.TYPE_DATA };
+        final int[] textRes = { R.string.mods_filter_type_java, R.string.mods_filter_type_js,
+                R.string.mods_filter_type_data };
+        String[] titles = new String[values.length];
+        boolean[] preset = new boolean[values.length];
+        for (int i = 0; i < values.length; i++) {
+            titles[i] = Trans.get(ModsActivity.this, textRes[i]);
+            preset[i] = (mType & values[i]) == values[i];
+        }
+        BatchIo.pickFilter(this, R.string.list_type_title, titles, preset,
+                R.string.list_filter_ok_fmt, new BatchIo.OnPick() {
+                    @Override public void onPick(java.util.List<Integer> idx, CardStack card) {
+                        int mask = Mods.TYPE_ANY;
+                        if (idx != null) {
+                            for (Integer i : idx) {
+                                if (i != null && i >= 0 && i < values.length) mask |= values[i];
+                            }
                         }
+                        mType = mask;
                         rebuildList();
                     }
                 });

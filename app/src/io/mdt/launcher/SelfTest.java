@@ -4693,6 +4693,26 @@ public final class SelfTest {
                         "★来源筛：勾两个 ⇒ 两个都留、没勾的不留（多选 = 任一命中）");
             }
 
+            // 第 294 轮：筛选行「来源：本槽、游戏自带」—— 多值接成一句话（分隔符夹在格式里）
+            {
+                ok(stat, L, ListQuery.joinFmt(
+                                java.util.Arrays.asList("本槽", "游戏自带"), "%1$s、%2$s")
+                                .equals("本槽、游戏自带"),
+                        "★筛选行拼接：两个值用顿号接起来（实得 "
+                                + ListQuery.joinFmt(java.util.Arrays.asList("本槽", "游戏自带"),
+                                "%1$s、%2$s") + "）");
+                ok(stat, L, ListQuery.joinFmt(java.util.Arrays.asList("本槽"), "%1$s、%2$s")
+                                .equals("本槽"),
+                        "只有一个值 ⇒ 不出现分隔符");
+                ok(stat, L, ListQuery.joinFmt(new java.util.ArrayList<String>(), "%1$s、%2$s")
+                                .isEmpty(),
+                        "空表（一个都不勾 = 全部）⇒ 空串，调用方自己回落到「全部」");
+                ok(stat, L, ListQuery.joinFmt(
+                                java.util.Arrays.asList("A", "B", "C"), "%1$s · %2$s")
+                                .equals("A · B · C"),
+                        "三个值也能折叠（英文那种「 · 」）");
+            }
+
             // 第 286 轮：筛过之后，插件的勾选页默认勾上"这一屏看得见的"
             java.util.List<String> ids = java.util.Arrays.asList("a", "b");
             PluginPicks.noteView("maps", "__selftest__", ids, true);

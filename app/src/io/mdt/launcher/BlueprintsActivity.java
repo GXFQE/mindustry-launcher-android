@@ -515,9 +515,10 @@ public class BlueprintsActivity extends BaseActivity {
         acts.add(new Runnable() { @Override public void run() {
             mOnlyProblems = !mOnlyProblems; rebuildList();
         } });
-        addSrcChoice(labels, acts, Blueprints.FROM_ANY, R.string.list_src_any, tick);
-        addSrcChoice(labels, acts, Blueprints.FROM_SLOT, R.string.list_src_slot, tick);
-        addSrcChoice(labels, acts, Blueprints.FROM_MOD, R.string.list_src_mod, tick);
+        // 第 294 轮：来源**收成一行**（点开二级再勾）—— 一行 = 一个维度；同一列表里勾多个 = 或
+        labels.add(Trans.get(BlueprintsActivity.this, R.string.list_filter_row_fmt,
+                Trans.get(BlueprintsActivity.this, R.string.list_src_title), srcLabel()));
+        acts.add(new Runnable() { @Override public void run() { pickSources(); } });
         for (PluginPicks.Choice c : PluginPicks.choices(this, Extensions.PAGE_BLUEPRINTS, mSlot,
                 false, null, mPluginFilters.keySet(), mPluginOff, mPluginSink)) {
             labels.add(c.label);
@@ -541,23 +542,44 @@ public class BlueprintsActivity extends BaseActivity {
         Sheet.show(this, R.string.mods_filter_title, labels, acts, gapAt);
     }
 
-    /** 来源那一行（**可多选**）：`全部来源` = 一个都不选；点某一来源 = 加上 / 去掉它（第 293 轮）。 */
-    private void addSrcChoice(java.util.List<String> labels, java.util.List<Runnable> acts,
-                              final int src, int textRes, String tick) {
-        boolean on = src == Blueprints.FROM_ANY
-                ? mSrcs.isEmpty() : mSrcs.contains(Integer.valueOf(src));
-        labels.add((on ? tick : "") + Trans.get(BlueprintsActivity.this, textRes));
-        acts.add(new Runnable() {
-            @Override public void run() {
-                if (src == Blueprints.FROM_ANY) {
-                    mSrcs.clear();
-                } else {
-                    Integer key = Integer.valueOf(src);
-                    if (!mSrcs.remove(key)) mSrcs.add(key);
-                }
-                rebuildList();
-            }
-        });
+    /** 来源那一行现在显示什么（第 294 轮：「全部」/「本槽、模组自带」）。 */
+    private String srcLabel() {
+        if (mSrcs.isEmpty()) return Trans.get(BlueprintsActivity.this, R.string.list_filter_all);
+        java.util.List<String> parts = new java.util.ArrayList<String>();
+        if (mSrcs.contains(Integer.valueOf(Blueprints.FROM_SLOT))) {
+            parts.add(Trans.get(BlueprintsActivity.this, R.string.list_src_slot));
+        }
+        if (mSrcs.contains(Integer.valueOf(Blueprints.FROM_MOD))) {
+            parts.add(Trans.get(BlueprintsActivity.this, R.string.list_src_mod));
+        }
+        return ListQuery.joinFmt(parts,
+                Trans.get(BlueprintsActivity.this, R.string.list_filter_pair_fmt));
+    }
+
+    /** 二级：勾几个来源（同一个列表里勾多个 = 或）。一个都不勾 = 全部来源。 */
+    private void pickSources() {
+        final int[] values = { Blueprints.FROM_SLOT, Blueprints.FROM_MOD };
+        String[] titles = new String[values.length];
+        boolean[] preset = new boolean[values.length];
+        for (int i = 0; i < values.length; i++) {
+            titles[i] = Trans.get(BlueprintsActivity.this,
+                    i == 0 ? R.string.list_src_slot : R.string.list_src_mod);
+            preset[i] = mSrcs.contains(Integer.valueOf(values[i]));
+        }
+        BatchIo.pickFilter(this, R.string.list_src_title, titles, preset,
+                R.string.list_filter_ok_fmt, new BatchIo.OnPick() {
+                    @Override public void onPick(java.util.List<Integer> idx, CardStack card) {
+                        mSrcs.clear();
+                        if (idx != null) {
+                            for (Integer i : idx) {
+                                if (i != null && i >= 0 && i < values.length) {
+                                    mSrcs.add(Integer.valueOf(values[i]));
+                                }
+                            }
+                        }
+                        rebuildList();
+                    }
+                });
     }
 
     /** 存进 `Bundle` 的位掩码（来源可多选，第 293 轮）。 */
