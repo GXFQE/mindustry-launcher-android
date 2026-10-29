@@ -81,10 +81,8 @@ public class SettingsActivity extends BaseActivity {
     private TextView mLangPackSub;
     /** 第 309 轮：检查更新的副标题（当前版本号，动态）。 */
     private TextView mUpdateSub;
-    /** 第 311 轮：接收预览版那个开关的副标题。 */
-    private TextView mUpdatePreviewSub;
-    /** 第 312 轮：自动检查更新那个开关的副标题。 */
-    private TextView mUpdateAutoSub;
+    /** 第 313 轮：更新模式（三档）的副标题 —— 它同时回答"要不要自动查"和"查哪个通道"。 */
+    private TextView mUpdateModeSub;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -199,26 +197,13 @@ public class SettingsActivity extends BaseActivity {
                 });
         mUpdateSub = (TextView) rowUpdate.findViewById(R.id.act_sub);
 
-        // 第 312 轮：自动检查更新（开关）。分工：上面那行是"现在查一次"，这行是"以后要不要自己查"。
-        View rowAuto = Util.bindActionValue(root, R.id.row_update_auto, R.drawable.ic_download,
-                R.string.set_update_auto_title, new Runnable() {
-                    @Override public void run() {
-                        Config.get().setUpdateAutoCheck(!Config.get().updateAutoCheck());
-                        fillValues();
-                    }
+        // 第 313 轮：**更新模式**（三档合并）。它同时回答两个问题：
+        //   "要不要自动查" 与 "查哪个通道" —— 三选一，天然不会出现自相矛盾的组合。
+        View rowMode = Util.bindActionValue(root, R.id.row_update_mode, R.drawable.ic_download,
+                R.string.set_update_mode_title, new Runnable() {
+                    @Override public void run() { pickUpdateMode(); }
                 });
-        mUpdateAutoSub = (TextView) rowAuto.findViewById(R.id.act_sub);
-
-        // 第 311 轮：接收预览版（开关）。点一下就地翻转 —— 这一行是**设置值**，
-        // 不是"带你走"，所以它不走弹窗（ref/42 §84 的判据）。
-        View rowPreview = Util.bindActionValue(root, R.id.row_update_preview, R.drawable.ic_download,
-                R.string.set_update_preview_title, new Runnable() {
-                    @Override public void run() {
-                        Config.get().setUpdatePreview(!Config.get().updatePreview());
-                        fillValues();
-                    }
-                });
-        mUpdatePreviewSub = (TextView) rowPreview.findViewById(R.id.act_sub);
+        mUpdateModeSub = (TextView) rowMode.findViewById(R.id.act_sub);
 
         // 第 175 轮：「关于」搬成独立二级页（版本 / 包名 / 数据路径 / 开源地址 / 许可证）。
         // 页面只读；入口是设置页底部单独一行（不混进三类设置）。
@@ -304,13 +289,10 @@ public class SettingsActivity extends BaseActivity {
             mUpdateSub.setText(Trans.get(SettingsActivity.this,
                     R.string.update_check_sub_fmt, UpdateUi.versionName(this)));
         }
-        if (mUpdatePreviewSub != null) {
-            mUpdatePreviewSub.setText(Config.get().updatePreview()
-                    ? R.string.set_update_preview_on : R.string.set_update_preview_off);
-        }
-        if (mUpdateAutoSub != null) {
-            mUpdateAutoSub.setText(Config.get().updateAutoCheck()
-                    ? R.string.set_update_auto_on : R.string.set_update_auto_off);
+        if (mUpdateModeSub != null) {
+            // 这副标题就是"现在的模式"：已关闭 · 只手动检查 / 自动 · 只收稳定版 / 自动 · 也收预览版
+            mUpdateModeSub.setText(Trans.get(SettingsActivity.this,
+                    UpdateMode.labelRes(UpdateMode.of(this))));
         }
     }
 
@@ -500,6 +482,37 @@ public class SettingsActivity extends BaseActivity {
      *    见 {@link SlotsActivity#slotOps} 的注释）；先 `dismiss()` 再重建，
      *    免得对话框的窗口在 Activity 被销毁后还挂着。
      */
+    /**
+     * 第 313 轮：**更新模式**（三档单选）—— 把原来两个开关合并成一个。
+     *
+     * <p>为什么合并：见 {@link UpdateMode} 的类注释。一句话 —— 那两个维度天然有序，
+     * 三选一比两个独立开关更难出现自相矛盾的组合。
+     *
+     * <p>⚠️ 单选列表只能配 `setTitle`、**不能**配 `setMessage`（两者并存列表项不渲染，
+     * 见 {@link SlotsActivity#slotOps}）。
+     */
+    private void pickUpdateMode() {
+        final int[] modes = UpdateMode.ALL;
+        String[] names = new String[modes.length];
+        final int cur = UpdateMode.of(this);
+        int checked = -1;
+        for (int i = 0; i < modes.length; i++) {
+            names[i] = getString(UpdateMode.labelRes(modes[i]));
+            if (modes[i] == cur) checked = i;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.set_update_mode_title)
+                .setSingleChoiceItems(names, checked, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int w) {
+                        d.dismiss();
+                        UpdateMode.set(SettingsActivity.this, modes[w]);
+                        fillValues();
+                    }
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
     private void pickTheme() {
         final int[] modes = {ThemeMode.SYSTEM, ThemeMode.LIGHT, ThemeMode.DARK};
         String[] names = new String[modes.length];

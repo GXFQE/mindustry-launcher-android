@@ -235,29 +235,13 @@
                     android:background="@color/divider" />
 
                 <!--
-                  第 312 轮：自动检查更新（开关）。
-                  ★ 与「检查更新」的分工：那个是"现在查一次"，这个是"以后要不要自己查"。
-                  ★ 关掉 = **一次请求都不发**（见 UpdateUi.checkSilentIfDue 的第一句）。
+                  第 313 轮：更新模式（三档单选）。
+                  ★ 它合并了原来那两行开关（自动检查 / 接收预览版）—— 那两个维度天然有序：
+                    不自动查 &lt; 只查稳定版 &lt; 连预览版也查。三选一不会出现自相矛盾的组合。
+                  ★ 一行 = 一件事（ref/42 §84），所以这里只留这一行。
                 -->
                 <include
-                    android:id="@+id/row_update_auto"
-                    layout="@layout/row_action"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content" />
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="62dp"
-                    android:background="@color/divider" />
-
-                <!--
-                  第 311 轮：接收预览版（开关）。
-                  ★ 与「检查更新」相邻：一个管"去不去问"，一个管"问哪个通道"。
-                  ★ 默认 **开** —— 1.0 之前每个版本都是 prerelease，默认关等于谁都收不到更新。
-                -->
-                <include
-                    android:id="@+id/row_update_preview"
+                    android:id="@+id/row_update_mode"
                     layout="@layout/row_action"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />

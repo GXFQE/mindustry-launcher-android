@@ -151,24 +151,14 @@ public final class Config {
     /** 第 174 轮：崩溃提示总开关（默认开；关掉只影响提示，不影响报告落盘 / 分析）。 */
     private static final String K_CRASH_ALERT_ENABLED = "crash_alert_enabled";
     /**
-     * 第 311 轮：**接收预览版**（默认开 —— 1.0 之前每个版本都是 prerelease，
-     * 默认关等于谁都收不到更新）。
+     * 第 313 轮：**更新模式**（三档，见 {@link UpdateMode}）。
      *
-     * <p>两个通道的语义（见 {@link UpdateUi}）：
-     * <ul>
-     *   <li>开 ⇒ 读固定通道 `update-channel-preview`（覆盖 preview / rc / 正式）；</li>
-     *   <li>关 ⇒ 读 `releases/latest`（GitHub 只把它指向**非 prerelease**，正好就是"稳定版"）。</li>
-     * </ul>
-     * ★ 1.0 发布时把默认改成 false（正式版用户不该被预览版打扰）。
-     */
-    private static final String K_UPDATE_PREVIEW = "update_preview";
-    /**
-     * 第 312 轮：**启动时自动检查更新**（默认开）。
+     * <p>它取代了第 311/312 轮那两个独立开关（`update_preview` / `update_auto_check`）——
+     * 那两个键**从未发布过**，所以直接弃用、不做迁移。
      *
-     * <p>关掉 = 只在用户点「检查更新」时联网。判据在 {@link UpdateUi#checkSilentIfDue}：
-     * 关着的时候**一次请求都不发**（不是"查了但不提示" —— 那已经联网了，用户关它就是为了不联网）。
+     * <p>存 int；坏值 / 越界一律退 {@link UpdateMode#DEFAULT} 并 WARNING 点名键名。
      */
-    private static final String K_UPDATE_AUTO_CHECK = "update_auto_check";
+    private static final String K_UPDATE_MODE = "update_mode";
 
     /**
      * 一档④（2026-10-06）：每个版本**上次启动的时刻** { "&lt;版本key&gt;": 毫秒 }。
@@ -203,18 +193,6 @@ public final class Config {
     public static final boolean DEF_AUTO_CLEAN = true;
     /** 崩溃提示的出厂默认 = **开**（第 174 轮加的开关；关掉不影响报告本身）。 */
     public static final boolean DEF_CRASH_ALERT = true;
-    /**
-     * 接收预览版的出厂默认 = **开**（第 311 轮）。
-     * ⚠️ 1.0 之前每个版本都是 prerelease —— 默认 false 等于谁都收不到更新，所以这里必须是 true。
-     *    1.0 发布时改成 false。
-     */
-    public static final boolean DEF_UPDATE_PREVIEW = true;
-    /**
-     * 自动检查更新的出厂默认 = **开**。
-     * ⚠️ 默认关等于"绝大多数用户永远不知道有新版本"—— 自更新的意义就没了。
-     *    给开关是为了尊重"不想让我联网"的那部分人，不是给默认关找理由。
-     */
-    public static final boolean DEF_UPDATE_AUTO_CHECK = true;
 
     private static volatile Config sInstance;
 
@@ -407,40 +385,30 @@ public final class Config {
     }
 
     /**
-     * 第 311 轮：是否接收**预览版**（默认开；坏值退默认 + WARNING 点名键名 —— 同上一族纪律）。
+     * 第 313 轮：**更新模式**（{@link UpdateMode#OFF} / {@link UpdateMode#STABLE} /
+     * {@link UpdateMode#PREVIEW}）。
      *
-     * <p>★ 它决定更新器读哪个通道（见 {@link UpdateUi}），不影响已经装上的版本。
+     * <p>它取代了第 311/312 轮那两个独立开关 —— 那两个键从未发布过，所以没有迁移代码。
+     * 坏值 / 越界一律退 {@link UpdateMode#DEFAULT} 并 WARNING 点名键名（同上一族纪律）。
      */
-    public synchronized boolean updatePreview() {
-        if (!mRoot.has(K_UPDATE_PREVIEW)) return DEF_UPDATE_PREVIEW;
-        Object v = mRoot.opt(K_UPDATE_PREVIEW);
-        if (v instanceof Boolean) return ((Boolean) v).booleanValue();
-        Log.w(TAG, "config key '" + K_UPDATE_PREVIEW + "' is not a boolean (" + v
-                + "), falling back to default " + DEF_UPDATE_PREVIEW);
-        return DEF_UPDATE_PREVIEW;
+    public synchronized int updateMode() {
+        Object v = mRoot.opt(K_UPDATE_MODE);
+        if (v instanceof Integer) {
+            int m = ((Integer) v).intValue();
+            if (UpdateMode.valid(m)) return m;
+            Log.w(TAG, "config key '" + K_UPDATE_MODE + "' has unknown value " + m
+                    + ", falling back to default " + UpdateMode.DEFAULT);
+            return UpdateMode.DEFAULT;
+        }
+        if (v != null) {
+            Log.w(TAG, "config key '" + K_UPDATE_MODE + "' is not an int (" + v
+                    + "), falling back to default " + UpdateMode.DEFAULT);
+        }
+        return UpdateMode.DEFAULT;
     }
 
-    public synchronized void setUpdatePreview(boolean on) {
-        put(K_UPDATE_PREVIEW, Boolean.valueOf(on));
-        save();
-    }
-
-    /**
-     * 第 312 轮：启动时是否自动检查更新（默认开；坏值退默认 + WARNING 点名键名）。
-     *
-     * <p>★ 关掉之后**真的不联网**：{@link UpdateUi#checkSilentIfDue} 第一句就判它。
-     */
-    public synchronized boolean updateAutoCheck() {
-        if (!mRoot.has(K_UPDATE_AUTO_CHECK)) return DEF_UPDATE_AUTO_CHECK;
-        Object v = mRoot.opt(K_UPDATE_AUTO_CHECK);
-        if (v instanceof Boolean) return ((Boolean) v).booleanValue();
-        Log.w(TAG, "config key '" + K_UPDATE_AUTO_CHECK + "' is not a boolean (" + v
-                + "), falling back to default " + DEF_UPDATE_AUTO_CHECK);
-        return DEF_UPDATE_AUTO_CHECK;
-    }
-
-    public synchronized void setUpdateAutoCheck(boolean on) {
-        put(K_UPDATE_AUTO_CHECK, Boolean.valueOf(on));
+    public synchronized void setUpdateMode(int m) {
+        put(K_UPDATE_MODE, Integer.valueOf(UpdateMode.valid(m) ? m : UpdateMode.DEFAULT));
         save();
     }
 

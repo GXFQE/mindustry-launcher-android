@@ -1414,12 +1414,10 @@
     <string name="trash_reason_unknown">原因不明</string>
     <!-- 第 309 轮：自更新（只做 APK 更新；文案随版本走） -->
     <string name="set_update_title">检查更新</string>
-    <string name="set_update_auto_title">自动检查更新</string>
-    <string name="set_update_auto_on">已开启 · 启动时检查</string>
-    <string name="set_update_auto_off">已关闭 · 只手动检查</string>
-    <string name="set_update_preview_title">接收预览版</string>
-    <string name="set_update_preview_on">已开启 · 也收预览版</string>
-    <string name="set_update_preview_off">已关闭 · 只收稳定版</string>
+    <string name="set_update_mode_title">更新方式</string>
+    <string name="update_mode_off">已关闭 · 只手动检查</string>
+    <string name="update_mode_stable">自动 · 只收稳定版</string>
+    <string name="update_mode_preview">自动 · 也收预览版</string>
     <string name="update_check_sub_fmt">当前 %1$s</string>
     <string name="update_checking">正在检查更新</string>
     <string name="update_latest">已是最新版本</string>

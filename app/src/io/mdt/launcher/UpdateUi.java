@@ -57,10 +57,10 @@ final class UpdateUi {
 
     static void setManifestUrlForDev(String url) { sOverride = url; }
 
-    /** 当前该读哪个通道（dev 覆盖优先；否则看"接收预览版"那个开关）。 */
+    /** 当前该读哪个通道（dev 覆盖优先；否则看更新模式）。 */
     static String manifestUrl(android.content.Context ctx) {
         if (sOverride != null && !sOverride.isEmpty()) return sOverride;
-        return Config.get().updatePreview() ? MANIFEST_PREVIEW : MANIFEST_STABLE;
+        return UpdateMode.usesPreview(UpdateMode.of(ctx)) ? MANIFEST_PREVIEW : MANIFEST_STABLE;
     }
 
     /** 用户看得见的版本号（不是 versionCode —— 那个不上屏）。 */
@@ -87,9 +87,9 @@ final class UpdateUi {
      * 前者防"频繁"，后者防"永远不查"。
      */
     static void checkSilentIfDue(Activity a) {
-        // ★ 关掉自动检查 ⇒ **一次请求都不发**（不是"查了但不提示" —— 那已经联网了）。
+        // ★ 模式 = OFF ⇒ **一次请求都不发**（不是"查了但不提示" —— 那已经联网了）。
         //   放在最前面，连"本进程已查"那个标记都不能先占。
-        if (!Config.get().updateAutoCheck()) return;
+        if (!UpdateMode.autoChecks(UpdateMode.of(a))) return;
         if (sCheckedThisProcess) return;
         sCheckedThisProcess = true;
         long now = System.currentTimeMillis() / 1000L;
