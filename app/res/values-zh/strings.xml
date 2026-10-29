@@ -1502,22 +1502,12 @@
     <string name="about_license_title">开源许可证</string>
     <string name="about_license_sub">GNU General Public License v3.0</string>
     <string name="about_section_data">数据位置</string>
-    <!-- 第 298 轮：致谢（**可见**，不进彩蛋）。四条并列 ⇒ 写法同构：名称（作者）· 许可 —— 一句说明。
-         ★ 许可必须写对：arc 是 Apache-2.0（不是 GPL），`Hjson.java` 是 arc Jval 的手工移植。 -->
-    <string name="about_section_credits">致谢</string>
-    <string name="about_credits">Mindustry（Anuke）—— GPL-3.0；游戏本体，加载的是你自备的官方 APK\narc（Anuke）—— Apache-2.0；HJSON 解析器是 arc Jval 的手工移植\nlibGDX（libGDX contributors）—— Apache-2.0；arc 底下的图形层\nMaterial Design Icons（Google）—— Apache-2.0；界面图标的 path 数据\n\n行为对照（未取用其代码）：MindustryX</string>
     <string name="about_data_fmt">当前槽数据\n%1$s\n\n管理器数据\n%2$s</string>
     <string name="about_footer">版权所有 (C) 2026 GXFQE · GPL-3.0</string>
     <string name="about_link_failed">没有能打开这个链接的应用。</string>
 
-    <!-- 第 296 轮：开发者模式 —— 「关于」页连点版本摘要 7 次解锁的那张卡片。
-         只读事实（版本 / 包名 / ABI / 插件接口 / 进程 / 系统 / 签名指纹）+ 一个「变回普通人」。 -->
-    <string name="devmode_taps_left_fmt">还差 %1$d 次</string>
-    <string name="devmode_unlocked">你现在是开发者了。</string>
-    <string name="devmode_already">你已经是开发者了。</string>
-    <string name="devmode_snark">手指不累吗。</string>
-    <string name="devmode_trivia_fmt">冷知识：这个启动器是 %1$s 装到这台手机上的。</string>
-    <string name="devmode_title">开发者选项</string>
+    <!-- 第 296 轮：开发者模式那张卡片的**7 行进程事实**（这些是代码算出来的值，不是"内容"）。
+         ★ 标题 / 段子 / 阈值 / 致谢 都在 `app/assets/content.json`（第 300 轮），别再往这里加。 -->
     <string name="devmode_app_fmt">启动器 %1$s（构建 %2$d）\n包名 %3$s</string>
     <string name="devmode_env_fmt">ABI %1$s · %2$s\n插件 API %3$d · 进程 %4$d</string>
     <string name="devmode_sys_fmt">Android %1$s（SDK %2$d）\n设备 %3$s</string>
@@ -1527,18 +1517,6 @@
     <string name="devmode_relock_title">重新变回普通人</string>
     <string name="devmode_relock_sub">隐藏这张卡片；想再看就再连点版本摘要 7 次</string>
     <string name="devmode_relock_done">开发者选项已隐藏。</string>
-    <!-- 第 297 轮：段子链拉到 100/200/500 + 连点记账（卡片第 8 行）+ 二级彩蛋（长按版本摘要
-         弹「彩蛋清单」）+ 搜索框彩蛋（`ListQuery.EGG_QUERY`，清单里用 %1$s 拼这个关键词）。 -->
-    <string name="devmode_taps_fmt">版本号被点了 %1$d 下</string>
-    <string name="devmode_curious">100 下了，你到底想干嘛。</string>
-    <string name="devmode_suspicious">200 下了，我开始怀疑你在测试我。</string>
-    <string name="devmode_grateful">500 下。谢谢，真的。</string>
-    <string name="egg_list_title">彩蛋清单</string>
-    <string name="egg_line_unlock_fmt">连点版本摘要 %1$d 次 —— 开发者选项</string>
-    <string name="egg_line_milestones_fmt">第 %1$d / %2$d / %3$d / %4$d / %5$d 次 —— 几句闲话</string>
-    <string name="egg_line_longpress">解锁后长按版本摘要 —— 这张清单</string>
-    <string name="egg_line_search_fmt">列表页搜索框输入 %1$s —— 生命、宇宙以及一切的答案</string>
-    <string name="egg_search_42">42 —— 生命、宇宙以及一切的答案。</string>
 
     <!-- ══ F5 自动备份（每槽一套策略，对齐桌面版的「存档分类设置」） ══════ -->
     <string name="slot_op_policy">自动备份设置…</string>

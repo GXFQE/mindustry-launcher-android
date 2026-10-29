@@ -197,6 +197,26 @@ else
 fi
 
 
+# ---- [0/4] content gate ------------------------------------------------------
+# `app/assets/content.json` = 致谢 + 彩蛋的**文案与阈值**（第 300 轮从 Java / strings.xml
+# 搬出来的）。它随 APK 发放，坏掉的表现是"关于页那块静默消失 / 彩蛋不响" —— 编译器、
+# aapt2、i18n 门禁**全都不报**。所以这里再放一把尺子（先 --selftest 证明它有牙）。
+CONTENT_CHECK="$(jpath "$ROOT/tools/content-check.py")"
+if [ -f "$CONTENT_CHECK" ]; then
+  echo "== [0/4] content gate =="
+  if ! "$PYTHON" "$CONTENT_CHECK" --selftest; then
+    echo "FAIL: tools/content-check.py failed its own meta-assertions." >&2
+    echo "      The ruler is broken -- fix tools/content-check.py first." >&2
+    exit 1
+  fi
+  if ! "$PYTHON" "$CONTENT_CHECK"; then
+    echo "FAIL: app/assets/content.json is invalid (see above)." >&2
+    exit 1
+  fi
+  echo
+fi
+
+
 # ⚠️ 归档改名而不是 rm -rf（一次删太多会被环境拦掉）。
 #    .build-trash/ 攒着不大，但记得偶尔整个删掉。
 if [ -d "$OUT" ]; then

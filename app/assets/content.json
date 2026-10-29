@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "credits": {
+    "title": { "zh": "致谢", "en": "Credits" },
+    "lines": {
+      "zh": [
+        "Mindustry（Anuke）—— GPL-3.0；游戏本体，加载的是你自备的官方 APK",
+        "arc（Anuke）—— Apache-2.0；HJSON 解析器是 arc Jval 的手工移植",
+        "libGDX（libGDX contributors）—— Apache-2.0；arc 底下的图形层",
+        "Material Design Icons（Google）—— Apache-2.0；界面图标的 path 数据",
+        "",
+        "行为对照（未取用其代码）：MindustryX"
+      ],
+      "en": [
+        "Mindustry (Anuke) — GPL-3.0; the game itself, loaded from the official APK you provide",
+        "arc (Anuke) — Apache-2.0; the HJSON parser is a hand port of arc Jval",
+        "libGDX (libGDX contributors) — Apache-2.0; the graphics layer under arc",
+        "Material Design Icons (Google) — Apache-2.0; path data of the UI icons",
+        "",
+        "Behaviour reference (no code taken): MindustryX"
+      ]
+    }
+  },
+  "eggs": {
+    "unlockAt": 7,
+    "searchToken": "42",
+    "title": { "zh": "开发者选项", "en": "Developer options" },
+    "tapsLeft": { "zh": "还差 %1$d 次", "en": "Taps left: %1$d" },
+    "unlocked": { "zh": "你现在是开发者了。", "en": "You are now a developer." },
+    "already": { "zh": "你已经是开发者了。", "en": "You are already a developer." },
+    "tapsLine": { "zh": "版本号被点了 %1$d 下", "en": "The version summary has been tapped %1$d times" },
+    "searchToast": {
+      "zh": "%1$s —— 生命、宇宙以及一切的答案。",
+      "en": "%1$s: the answer to life, the universe and everything."
+    },
+    "milestones": [
+      {
+        "at": 20,
+        "text": { "zh": "手指不累吗。", "en": "Your finger must be tired by now." }
+      },
+      {
+        "at": 50,
+        "arg": "date",
+        "text": {
+          "zh": "冷知识：这个启动器是 %1$s 装到这台手机上的。",
+          "en": "Fun fact: this launcher was installed on %1$s."
+        }
+      },
+      {
+        "at": 100,
+        "arg": "count",
+        "text": { "zh": "%1$d 下了，你到底想干嘛。", "en": "%1$d taps. What are you even doing." }
+      },
+      {
+        "at": 200,
+        "arg": "count",
+        "text": {
+          "zh": "%1$d 下了，我开始怀疑你在测试我。",
+          "en": "%1$d taps. I am starting to think you are testing me."
+        }
+      },
+      {
+        "at": 500,
+        "arg": "count",
+        "text": { "zh": "%1$d 下。谢谢，真的。", "en": "%1$d taps. Thank you, really." }
+      }
+    ],
+    "list": {
+      "title": { "zh": "彩蛋清单", "en": "Easter eggs" },
+      "unlock": { "zh": "连点版本摘要 %1$d 次 —— 开发者选项", "en": "Tap the version summary %1$d times: developer options" },
+      "milestones": { "zh": "第 %1$s 次 —— 几句闲话", "en": "Taps %1$s: a few remarks" },
+      "longPress": { "zh": "解锁后长按版本摘要 —— 这张清单", "en": "Long-press the version summary once unlocked: this list" },
+      "search": {
+        "zh": "列表页搜索框输入 %1$s —— 生命、宇宙以及一切的答案",
+        "en": "Type %1$s in a list search box: the answer to life, the universe and everything"
+      }
+    }
+  }
+}

@@ -377,6 +377,55 @@ SKIP_I18N_CHECK=1 ./build.sh             # 应急关掉（会打一行很响的 
 "门禁真的会拦住东西"的手段。完整的国际化研究（现状、路线、分期、判据）见
 **`docs/i18n-feasibility.md`**。
 
+### 内容文件：致谢与彩蛋（2026-10-29）
+
+**致谢清单**与**彩蛋的文案 / 阈值**不在 Java、也不在 `strings.xml` —— 它们在
+**`app/assets/content.json`**（随 APK 发放）。加一条致敬、改一句段子、加一档连点彩蛋，
+只改这个文件：**不动代码、不加资源键、不用过 i18n 门禁**。
+
+```json
+{ "version": 1,
+  "credits": { "title": {"zh": "致谢", "en": "Credits"},
+               "lines":  {"zh": ["…", ""], "en": ["…", ""]} },
+  "eggs": {
+    "unlockAt": 7,               // 连点几次解锁（≥1）
+    "searchToken": "42",         // 列表页搜索框的关键词（整串匹配）
+    "milestones": [              // 段子档位：at 必须 > unlockAt、严格递增
+      { "at": 20,  "text": {"zh": "…", "en": "…"} },
+      { "at": 50,  "arg": "date",  "text": {"zh": "…%1$s…", "en": "…%1$s…"} },
+      { "at": 100, "arg": "count", "text": {"zh": "…%1$d…", "en": "…%1$d…"} }
+    ],
+    "list": { "title": {}, "unlock": {}, "milestones": {}, "longPress": {}, "search": {} }
+  } }
+```
+
+三条规矩：
+
+1. **双语**：每条文案都是 `{"zh": "...", "en": "..."}`，两边都要有；缺一边会退回另一边
+   （不会崩，但那种语言的用户会看到另一种语言）。
+2. **占位符**：`%1$d` / `%1$s` 在 zh 与 en 里**必须一致**；带 `arg` 的档位按其类型必须出现。
+   运行期 format 失败会**退回原文**（不会为一句话崩页面）。
+3. **上限**：≤ 50 档、单条 ≤ 500 字、致谢 zh/en **行数相同**（空行是排版：一组"用到的"与
+   一组"对照的"分开）。
+
+**改完不重新打包也能看效果**（覆盖文件，进程内只读一次 ⇒ 改完要重启）：
+
+```bash
+adb push content.json /sdcard/Android/data/io.mdt.launcher/hub/content.json
+adb shell am force-stop io.mdt.launcher
+```
+
+读取顺序：`hub/content.json` **优先** → APK 自带的 `assets/content.json` **兜底**。
+覆盖文件坏了（不是 JSON / 字段缺失 / 占位符不对）⇒ 一行 WARNING + **回退到出厂那份**；
+删掉覆盖文件即回到出厂值。
+
+**门禁**：`build.sh` 的 `[0/4] content gate`（`tools/content-check.py`，同样先 `--selftest`）。
+它抓的是"编译器 / aapt2 / i18n 门禁都不会报"的那类错（版本号、双语缺边、占位符不一致、档位乱序、
+致谢行数不一致…），不过就构建失败。
+
+⚠️ 这两块**不走 `Trans`、也不进用户语言包**（它们是"内容"不是"界面文案"；语言包只覆盖 `res/values*`）。
+要换这两块的语言，改 `content.json` 本身。
+
 ## 开发直通口（仅 debuggable 构建生效）
 
 adb 无法驱动弹窗与系统文件选择器，所以留了一组 `dev_*` extras 走**与界面完全相同的代码路径**：

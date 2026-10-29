@@ -15528,45 +15528,67 @@ public final class SelfTest {
     }
 
     /**
-     * 第 296 轮：开发者模式（「关于」页连点版本摘要 7 次解锁）。
+     * 第 296 轮：开发者模式（「关于」页连点版本摘要解锁）—— 第 300 轮起**阈值与段子都来自
+     * `assets/content.json`**，这里钉的是 {@link DevMode#resolve} 的行为。
      *
-     * <p>★ 尺子钉的是 {@link DevMode#tapKind(int, boolean)} 这个纯函数，而且**两态都遍历**：
-     *   只喂"未解锁"会漏掉"已解锁时前 6 次必须安静"那一整类（症状是每次进关于页都被数一遍）；
-     *   卡片则钉**7 行一行不少**、且每行该有的值真的在 —— 这一页存在的意义就是给人看。
+     * <p>★ 断言全部从**内容文件**读阈值（不再有 `UNLOCK_AT` 之类的常量）：数据一改，尺子跟着改，
+     *   不会出现"代码改了、断言还钉着旧数字"。
      */
     private static void devMode(Context ctx, List<String> L, int[] stat) {
-        L.add("── 第 296 轮：开发者模式（7 击解锁）──");
-        // ① 未解锁：1..6 给「还差 N 次」（N = 6..1），第 7 次解锁
-        boolean remainOk = true;
-        for (int n = 1; n < DevMode.UNLOCK_AT; n++) {
-            if (DevMode.tapKind(n, false) != DevMode.TAP_REMAINING) remainOk = false;
-            if (DevMode.tapsLeft(n) != DevMode.UNLOCK_AT - n) remainOk = false;
+        L.add("── 第 296 轮：开发者模式（内容驱动的连点）──");
+        Content ct = Content.get(ctx);
+        boolean parsed = ct != null && ct.eggs != null;
+        ok(stat, L, parsed, "★content.json 读得出来（assets 或 hub 覆盖）");
+        if (!parsed) {
+            L.add("");
+            return;
         }
-        ok(stat, L, remainOk, "★未解锁：第 1~6 次都给「还差 N 次」，N 逐次减 1");
-        ok(stat, L, DevMode.tapKind(DevMode.UNLOCK_AT, false) == DevMode.TAP_UNLOCK,
-                "★未解锁：第 " + DevMode.UNLOCK_AT + " 次 = 解锁");
-        // ② 已解锁：前 6 次**安静**，第 7 次只说「已经是了」
+        Content.Eggs e = ct.eggs;
+        final int unlockAt = e.unlockAt;
+        // ① 未解锁：1..unlockAt-1 都给「还差 N 次」
+        boolean leftOk = true;
+        for (int n = 1; n < unlockAt; n++) {
+            DevMode.Tap t = DevMode.resolve(ctx, n, false);
+            if (t.kind != DevMode.TAP_LEFT || t.text.isEmpty()) leftOk = false;
+        }
+        ok(stat, L, leftOk, "★未解锁：第 1~" + (unlockAt - 1) + " 次都给「还差 N 次」且文案非空");
+        ok(stat, L, DevMode.resolve(ctx, unlockAt, false).kind == DevMode.TAP_UNLOCK,
+                "★未解锁：第 " + unlockAt + " 次 = 解锁");
+        // ② 已解锁：前 unlockAt-1 次**安静**，第 unlockAt 次只说「已经是了」
         boolean quietOk = true;
-        for (int n = 1; n < DevMode.UNLOCK_AT; n++) {
-            if (DevMode.tapKind(n, true) != DevMode.TAP_NONE) quietOk = false;
+        for (int n = 1; n < unlockAt; n++) {
+            if (DevMode.resolve(ctx, n, true).kind != DevMode.TAP_NONE) quietOk = false;
         }
-        ok(stat, L, quietOk, "★已解锁：前 6 次安静（否则每次进关于页都被数一遍）");
-        ok(stat, L, DevMode.tapKind(DevMode.UNLOCK_AT, true) == DevMode.TAP_ALREADY,
-                "★已解锁：第 7 次 = 「已经是开发者了」（不是再解锁一次）");
-        // ③ 段子尾巴两态都认；中间那段与 50 之后安静
-        ok(stat, L, DevMode.tapKind(DevMode.SNARK_AT, false) == DevMode.TAP_SNARK
-                        && DevMode.tapKind(DevMode.SNARK_AT, true) == DevMode.TAP_SNARK
-                        && DevMode.tapKind(DevMode.TRIVIA_AT, false) == DevMode.TAP_TRIVIA
-                        && DevMode.tapKind(DevMode.TRIVIA_AT, true) == DevMode.TAP_TRIVIA,
-                "★第 20 / 50 次那两句段子：解锁前后都能触发");
+        ok(stat, L, quietOk, "★已解锁：前 " + (unlockAt - 1) + " 次安静（否则每次进关于页都被数一遍）");
+        ok(stat, L, DevMode.resolve(ctx, unlockAt, true).kind == DevMode.TAP_ALREADY,
+                "★已解锁：第 " + unlockAt + " 次 = 「已经是了」（不是再解锁一次）");
+        // ③ 空档：解锁后到第一档之间、两档之间、最后一档之后都必须安静
         boolean gapOk = true;
-        for (int n = DevMode.UNLOCK_AT + 1; n < DevMode.SNARK_AT; n++) {
-            if (DevMode.tapKind(n, true) != DevMode.TAP_NONE) gapOk = false;
+        int prev = unlockAt;
+        for (Content.Milestone m : e.milestones) {
+            for (int n = prev + 1; n < m.at; n++) {
+                if (DevMode.resolve(ctx, n, true).kind != DevMode.TAP_NONE) gapOk = false;
+            }
+            prev = m.at;
         }
-        ok(stat, L, gapOk && DevMode.tapKind(DevMode.TRIVIA_AT + 1, true) == DevMode.TAP_NONE,
-                "★第 8~19 次、以及 50 次之后：安静（照 Android，不刷屏）");
-        ok(stat, L, DevMode.tapKind(0, false) == DevMode.TAP_NONE
-                        && DevMode.tapKind(-3, true) == DevMode.TAP_NONE,
+        for (int n = 1; n <= 3; n++) {
+            if (DevMode.resolve(ctx, prev + n, true).kind != DevMode.TAP_NONE) gapOk = false;
+        }
+        ok(stat, L, gapOk, "★空档（解锁后到第一档、两档之间、最后一档之后）：安静");
+        // ④ 每一档都命中；带 count 的文案真的展开了次数；带 date 的真的填了安装日期
+        boolean hitOk = true;
+        boolean dateOk = true;
+        String date = DevMode.installedOn(ctx);
+        for (Content.Milestone m : e.milestones) {
+            DevMode.Tap t = DevMode.resolve(ctx, m.at, true);
+            if (t.kind != DevMode.TAP_MILESTONE || t.text.isEmpty()) hitOk = false;
+            if ("count".equals(m.arg) && !t.text.contains(String.valueOf(m.at))) hitOk = false;
+            if ("date".equals(m.arg) && (date.length() == 0 || !t.text.contains(date))) dateOk = false;
+        }
+        ok(stat, L, hitOk, "★每档都命中（" + e.milestones.length + " 档）且带 count 的展开了次数");
+        ok(stat, L, dateOk, "★带 date 的那档真的填了安装日期（" + date + "）");
+        ok(stat, L, DevMode.resolve(ctx, 0, false).kind == DevMode.TAP_NONE
+                        && DevMode.resolve(ctx, -3, true).kind == DevMode.TAP_NONE,
                 "★元断言：0 / 负数次不许落进「还差几次」");
         // ④ 设备名拼法（纯函数；本机 MODEL 已带厂商名 ⇒ "重复拼"是真实风险，不是假想）
         ok(stat, L, "HONOR ELP-AN00".equals(DevMode.deviceLabel("HONOR", "ELP-AN00"))
@@ -15607,40 +15629,50 @@ public final class SelfTest {
     }
 
     /**
-     * 第 297 轮：彩蛋三件 —— 段子链拉到 100/200/500、连点记账（卡片第 8 行）、搜索框彩蛋。
+     * 第 297/300 轮：彩蛋的内容面 —— 清单正文、搜索框判据、连点记账、语言/格式回退，
+     * 以及**内容文件校验器**（坏文件必须拒，而不是读进来一半）。
      *
-     * <p>★ 断言要**连空档一起遍历**：只喂阈值点，会漏掉"本该安静的位置响了"（51~99、101~199、
-     *   201~499 次）。这类错在真机上只能靠"点到第 70 下发现弹了一句"才看得出来。
+     * <p>★ 阈值、关键词、段子全部来自 `assets/content.json`：断言也从文件读，
+     *   改数据不用改断言（"代码改了、断言钉着旧数字"那类错在这里不可能出现）。
      */
     private static void easterEggs(Context ctx, List<String> L, int[] stat) {
-        L.add("── 第 297 轮：彩蛋（段子链 / 记账 / 搜索框）──");
-        // ① 三个新档位：解锁前后都认
-        ok(stat, L, DevMode.tapKind(DevMode.CURIOUS_AT, false) == DevMode.TAP_CURIOUS
-                        && DevMode.tapKind(DevMode.CURIOUS_AT, true) == DevMode.TAP_CURIOUS
-                        && DevMode.tapKind(DevMode.SUSPICIOUS_AT, false) == DevMode.TAP_SUSPICIOUS
-                        && DevMode.tapKind(DevMode.SUSPICIOUS_AT, true) == DevMode.TAP_SUSPICIOUS
-                        && DevMode.tapKind(DevMode.GRATEFUL_AT, false) == DevMode.TAP_GRATEFUL
-                        && DevMode.tapKind(DevMode.GRATEFUL_AT, true) == DevMode.TAP_GRATEFUL,
-                "★第 100 / 200 / 500 次：解锁前后都触发");
-        // ② 空档：51~99、101~199、201~499 与 500 之后必须安静
-        boolean gapOk = true;
-        int[] quietFrom = {DevMode.TRIVIA_AT + 1, DevMode.CURIOUS_AT + 1, DevMode.SUSPICIOUS_AT + 1};
-        int[] quietTo = {DevMode.CURIOUS_AT, DevMode.SUSPICIOUS_AT, DevMode.GRATEFUL_AT};
-        for (int i = 0; i < quietFrom.length; i++) {
-            for (int n = quietFrom[i]; n < quietTo[i]; n++) {
-                if (DevMode.tapKind(n, true) != DevMode.TAP_NONE) gapOk = false;
-            }
+        L.add("── 第 297/300 轮：彩蛋（内容文件 / 记账 / 搜索框）──");
+        Content ct = Content.get(ctx);
+        boolean parsed = ct != null && ct.eggs != null;
+        ok(stat, L, parsed, "★content.json 读得出来");
+        if (!parsed) {
+            L.add("");
+            return;
         }
-        ok(stat, L, gapOk && DevMode.tapKind(DevMode.GRATEFUL_AT + 1, true) == DevMode.TAP_NONE,
-                "★第 51~99、101~199、201~499 次与 500 之后：安静（不刷屏）");
+        Content.Eggs e = ct.eggs;
+        // ① 清单正文：四段；关键词与每一档数字都在（加档只改数据，清单自动跟上）
+        String body = ct.eggListBody(ctx);
+        ok(stat, L, body.split("\n\n", -1).length == 4,
+                "★清单正文是四段（实际 " + body.split("\n\n", -1).length + " 段）");
+        ok(stat, L, body.contains(e.searchToken),
+                "★清单里带的就是当前关键词（" + e.searchToken + "）");
+        boolean atsOk = true;
+        for (Content.Milestone m : e.milestones) {
+            if (!body.contains(String.valueOf(m.at))) atsOk = false;
+        }
+        ok(stat, L, atsOk, "★清单里每一档的数字都在（" + e.milestones.length + " 档）");
+        // ② 搜索判据：整串
+        String token = e.searchToken;
+        ok(stat, L, ListQuery.isEggQuery(token, token)
+                        && ListQuery.isEggQuery(" " + token + " ", token)
+                        && !ListQuery.isEggQuery(token + "0", token)
+                        && !ListQuery.isEggQuery("", token)
+                        && !ListQuery.isEggQuery(null, token)
+                        && !ListQuery.isEggQuery(token, ""),
+                "★搜索框彩蛋只认整串（空格容忍；加后缀 / 空 / null / 空关键词都不算）");
         // ③ 卡片第 8 行：7 行事实 + 1 行记账 = 8 行，且数字真的在里面
         String base = DevMode.buildInfo(ctx);
         String card = DevMode.cardText(ctx, base, 1234);
         ok(stat, L, card.split("\n", -1).length == 8,
                 "★卡片 = 7 行事实 + 第 8 行记账（实际 " + card.split("\n", -1).length + " 行）");
-        ok(stat, L, card.contains("1234") && DevMode.tapLine(ctx, 1234).contains("1234"),
+        ok(stat, L, card.contains("1234") && DevMode.tapsLine(ctx, 1234).contains("1234"),
                 "★第 8 行真的带着累计数（1234）");
-        ok(stat, L, DevMode.cardText(ctx, "", 7).equals(DevMode.tapLine(ctx, 7)),
+        ok(stat, L, DevMode.cardText(ctx, "", 7).equals(DevMode.tapsLine(ctx, 7)),
                 "★元断言：没有事实行时只剩记账那一行（不许拼出开头一个空行）");
         // ④ 累计计数往返：+1 再 -1（★ 自检不许改掉用户真实的计数）
         int before = Config.get().tapCount();
@@ -15648,22 +15680,59 @@ public final class SelfTest {
         int back = Config.get().bumpTapCount(-1);
         ok(stat, L, before >= 0 && plus == before + 1 && back == before,
                 "★tap_count 往返：" + before + " → " + plus + " → " + back);
-        // ⑤ 搜索框彩蛋：只认整串 42；清单那行与判据共用一个关键词
-        ok(stat, L, ListQuery.isEggQuery("42") && ListQuery.isEggQuery(" 42 ")
-                        && !ListQuery.isEggQuery("420") && !ListQuery.isEggQuery("42 号")
-                        && !ListQuery.isEggQuery("") && !ListQuery.isEggQuery(null),
-                "★搜索框彩蛋只认整串 42（空格容忍；420 / 42 号 / 空 / null 都不算）");
-        ok(stat, L, Trans.get(ctx, R.string.egg_line_search_fmt, ListQuery.EGG_QUERY)
-                        .contains(ListQuery.EGG_QUERY),
-                "★彩蛋清单里那行带的就是同一个关键词（不是另写一个 42）");
-        // ⑥ 三句新段子各不相同（复制粘贴会让"100/200/500"变成同一句话）
-        String c100 = Trans.get(ctx, R.string.devmode_curious);
-        String c200 = Trans.get(ctx, R.string.devmode_suspicious);
-        String c500 = Trans.get(ctx, R.string.devmode_grateful);
-        ok(stat, L, c100.length() > 0 && c200.length() > 0 && c500.length() > 0
-                        && !c100.equals(c200) && !c200.equals(c500) && !c100.equals(c500),
-                "★100 / 200 / 500 三句文案非空且互不相同");
+        // ⑤ 语言与格式回退
+        Content.Text both = new Content.Text("中文", "english");
+        Content.Text onlyEn = new Content.Text("", "english");
+        Content.Text onlyZh = new Content.Text("中文", "");
+        ok(stat, L, "english".equals(both.pick("fr")) && "中文".equals(both.pick("zh"))
+                        && "english".equals(onlyEn.pick("zh")) && "中文".equals(onlyZh.pick("fr")),
+                "★语言回退：没这一门就退回另一门（不是空串）");
+        // ★ 用 `%1$d` 喂一个字符串：那才会真抛（`%1$s` 吃任何对象，构造不出失败）
+        ok(stat, L, ct.format(ctx, new Content.Text("%1$d", "%1$d"), "abc").contains("%1$d"),
+                "★format 失败退回原文（不为一条文案崩页面）");
+        // ⑥ 内容文件校验器：好文件过；坏版本 / 缺占位符 / 档位不高于解锁值 都拒
+        boolean goodOk;
+        try {
+            Content.parse(MINI_CONTENT, "selftest");
+            goodOk = true;
+        } catch (Throwable t2) {
+            goodOk = false;
+        }
+        ok(stat, L, goodOk && rejects(MINI_CONTENT.replace("\"version\":1", "\"version\":9"))
+                        && rejects(MINI_CONTENT.replace("还差 %1$d 次", "还差 次"))
+                        && rejects(MINI_CONTENT.replace("\"at\":9", "\"at\":7")),
+                "★解析器：好文件过；坏版本 / 缺占位符 / 档位不高于解锁值 都拒");
         L.add("");
+    }
+
+    /** 自检用的最小内容文件（覆盖所有必填字段；改动要同步上面那三条"必须拒"的变异）。 */
+    private static final String MINI_CONTENT =
+            "{\"version\":1,"
+            + "\"credits\":{\"title\":{\"zh\":\"T\",\"en\":\"T\"},"
+            + "\"lines\":{\"zh\":[\"c\"],\"en\":[\"c\"]}},"
+            + "\"eggs\":{\"unlockAt\":7,\"searchToken\":\"42\","
+            + "\"title\":{\"zh\":\"G\",\"en\":\"G\"},"
+            + "\"tapsLeft\":{\"zh\":\"还差 %1$d 次\",\"en\":\"%1$d\"},"
+            + "\"unlocked\":{\"zh\":\"u\",\"en\":\"u\"},"
+            + "\"already\":{\"zh\":\"a\",\"en\":\"a\"},"
+            + "\"tapsLine\":{\"zh\":\"%1$d\",\"en\":\"%1$d\"},"
+            + "\"searchToast\":{\"zh\":\"%1$s\",\"en\":\"%1$s\"},"
+            + "\"milestones\":[{\"at\":9,\"arg\":\"count\","
+            + "\"text\":{\"zh\":\"%1$d!\",\"en\":\"%1$d!\"}}],"
+            + "\"list\":{\"title\":{\"zh\":\"L\",\"en\":\"L\"},"
+            + "\"unlock\":{\"zh\":\"%1$d\",\"en\":\"%1$d\"},"
+            + "\"milestones\":{\"zh\":\"%1$s\",\"en\":\"%1$s\"},"
+            + "\"longPress\":{\"zh\":\"p\",\"en\":\"p\"},"
+            + "\"search\":{\"zh\":\"%1$s\",\"en\":\"%1$s\"}}}}";
+
+    /** 这段 JSON 必须被拒（解析器自检用）。 */
+    private static boolean rejects(String json) {
+        try {
+            Content.parse(json, "selftest");
+            return false;
+        } catch (Throwable t) {
+            return true;
+        }
     }
 
     /**
@@ -15675,8 +15744,15 @@ public final class SelfTest {
      *   ② 四条并列项**都在** —— 少一条不会有任何报错，清单类内容缺项是最典型的静默漏。
      */
     private static void aboutCredits(Context ctx, List<String> L, int[] stat) {
-        L.add("── 第 298 轮：关于页「致谢」（可见，不是彩蛋）──");
-        String t = Trans.get(ctx, R.string.about_credits);
+        L.add("── 第 298/300 轮：关于页「致谢」（可见，不是彩蛋；内容来自 content.json）──");
+        Content ct = Content.get(ctx);
+        boolean parsed = ct != null;
+        ok(stat, L, parsed, "★content.json 读得出来");
+        if (!parsed) {
+            L.add("");
+            return;
+        }
+        String t = ct.credits(ctx);
         String[] lines = t.split("\n", -1);
         ok(stat, L, lines.length == 6,
                 "★四条「用到的」+ 一个空行 + 一条「对照的」（实际 " + lines.length + " 行）");
@@ -15694,16 +15770,18 @@ public final class SelfTest {
         ok(stat, L, t.contains("GPL-3.0") && apache == 3,
                 "★许可写对：GPL-3.0 一处、Apache-2.0 三处（arc / libGDX / Material）—— 实际 "
                         + apache + " 处 Apache");
+        ok(stat, L, ct.creditsTitle(ctx).length() > 0, "★致谢的分区标题来自内容文件（不是空串）");
         boolean ids;
         try {
             android.view.View v = android.view.LayoutInflater.from(ctx)
                     .inflate(R.layout.activity_about, null);
             ids = v.findViewById(R.id.about_section_credits) != null
-                    && v.findViewById(R.id.about_credits) != null;
+                    && v.findViewById(R.id.about_credits) != null
+                    && v.findViewById(R.id.credits_box) != null;
         } catch (Throwable t2) {
             ids = false;
         }
-        ok(stat, L, ids, "★关于页布局里真的挂着这两个 id（区块被删会静默少一屏）");
+        ok(stat, L, ids, "★关于页布局里真的挂着这三个 id（区块被删会静默少一屏）");
         L.add("");
     }
 

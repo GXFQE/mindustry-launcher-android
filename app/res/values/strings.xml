@@ -1560,21 +1560,11 @@
     <string name="about_license_title">Licence</string>
     <string name="about_license_sub">GNU General Public License v3.0</string>
     <string name="about_section_data">Data locations</string>
-    <!-- 第 298 轮：致谢（**可见**，不进彩蛋）。四条并列 ⇒ 写法同构：名称（作者）· 许可 —— 一句说明。
-         ★ 许可必须写对：arc 是 Apache-2.0（不是 GPL），`Hjson.java` 是 arc Jval 的手工移植。 -->
-    <string name="about_section_credits">Credits</string>
-    <string name="about_credits">Mindustry (Anuke) — GPL-3.0; the game itself, loaded from the official APK you provide\narc (Anuke) — Apache-2.0; the HJSON parser is a hand port of arc Jval\nlibGDX (libGDX contributors) — Apache-2.0; the graphics layer under arc\nMaterial Design Icons (Google) — Apache-2.0; path data of the UI icons\n\nBehaviour reference (no code taken): MindustryX</string>
     <string name="about_data_fmt">Current slot\n%1$s\n\nManager data\n%2$s</string>
     <string name="about_footer">Copyright (C) 2026 GXFQE · GPL-3.0</string>
     <string name="about_link_failed">No app can open this link.</string>
-    <!-- 第 296 轮：开发者模式 —— 「关于」页连点版本摘要 7 次解锁的那张卡片。
-         只读事实（版本 / 包名 / ABI / 插件接口 / 进程 / 系统 / 签名指纹）+ 一个"变回普通人"。 -->
-    <string name="devmode_taps_left_fmt">Taps left: %1$d</string>
-    <string name="devmode_unlocked">You are now a developer.</string>
-    <string name="devmode_already">You are already a developer.</string>
-    <string name="devmode_snark">Your finger must be tired by now.</string>
-    <string name="devmode_trivia_fmt">Fun fact: this launcher was installed on %1$s.</string>
-    <string name="devmode_title">Developer options</string>
+    <!-- 第 296 轮：开发者模式那张卡片的**7 行进程事实**（这些是代码算出来的值，不是"内容"）。
+         ★ 标题 / 段子 / 阈值 / 致谢 都在 `app/assets/content.json`（第 300 轮），别再往这里加。 -->
     <string name="devmode_app_fmt">Launcher %1$s (build %2$d)\nPackage %3$s</string>
     <string name="devmode_env_fmt">ABI %1$s · %2$s\nPlugin API %3$d · PID %4$d</string>
     <string name="devmode_sys_fmt">Android %1$s (SDK %2$d)\nDevice %3$s</string>
@@ -1584,18 +1574,6 @@
     <string name="devmode_relock_title">Back to a normal user</string>
     <string name="devmode_relock_sub">Hides this card; tap the version 7 times to come back</string>
     <string name="devmode_relock_done">Developer options hidden.</string>
-    <!-- 第 297 轮：段子链拉到 100/200/500 + 连点记账（卡片第 8 行）+ 二级彩蛋（长按版本摘要
-         弹「彩蛋清单」）+ 搜索框彩蛋（`ListQuery.EGG_QUERY`，清单里用 %1$s 拼这个关键词）。 -->
-    <string name="devmode_taps_fmt">The version summary has been tapped %1$d times</string>
-    <string name="devmode_curious">100 taps. What are you even doing.</string>
-    <string name="devmode_suspicious">200 taps. I am starting to think you are testing me.</string>
-    <string name="devmode_grateful">500 taps. Thank you, really.</string>
-    <string name="egg_list_title">Easter eggs</string>
-    <string name="egg_line_unlock_fmt">Tap the version summary %1$d times: developer options</string>
-    <string name="egg_line_milestones_fmt">Taps %1$d / %2$d / %3$d / %4$d / %5$d: a few remarks</string>
-    <string name="egg_line_longpress">Long-press the version summary once unlocked: this list</string>
-    <string name="egg_line_search_fmt">Type %1$s in a list search box: the answer to life, the universe and everything</string>
-    <string name="egg_search_42">42: the answer to life, the universe and everything.</string>
     <string name="about_repo_url" translatable="false">https://github.com/GXFQE/mindustry-launcher-android</string>
     <string name="about_issues_url" translatable="false">https://github.com/GXFQE/mindustry-launcher-android/issues</string>
     <string name="about_license_url" translatable="false">https://github.com/GXFQE/mindustry-launcher-android/blob/main/LICENSE</string>

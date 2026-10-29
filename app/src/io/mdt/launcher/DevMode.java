@@ -10,7 +10,7 @@ import java.util.Date;
 import java.util.Locale;
 
 /**
- * 「开发者模式」——「关于」页连点版本摘要 7 次解锁的那张卡片（第 296 轮）。
+ * 「开发者模式」——「关于」页连点版本摘要解锁的那张卡片（第 296 轮）。
  *
  * <h3>为什么是这一套</h3>
  * <ol>
@@ -22,74 +22,110 @@ import java.util.Locale;
  *   <li><b>只读</b>：卡片不写配置、不碰槽、不碰游戏数据 —— 这个功能唯一的持久化就是「是否已解锁」。</li>
  * </ol>
  *
- * <p>★ 点击计数**不落盘**（离开页面就归零），只有「已解锁」进 {@code config.json}。
- *   反应判据全在 {@link #tapKind(int, boolean)} 这一个纯函数里 —— 页面只管 switch，
- *   自检直接喂数列；别在 {@code AboutActivity} 里另写一套阈值（改一处忘一处 = 真机行为与断言分家）。
+ * <p>★ 第 300 轮起：**阈值与段子都搬到 {@code assets/content.json}**（见 {@link Content}）——
+ *   这个类只负责"点第 N 下该给什么反应"的**判定**，一个字面量文案都不留。
+ *   点击计数**不落盘**（离开页面归零），只有「已解锁」进 {@code config.json}。
  */
 final class DevMode {
 
-    /** 第几次点击解锁（Android 的 7 次）。 */
-    static final int UNLOCK_AT = 7;
-    /** 第几次点击吐槽一句（解锁之后的段子尾巴）。 */
-    static final int SNARK_AT = 20;
-    /** 第几次点击给一条「冷知识」。 */
-    static final int TRIVIA_AT = 50;
-    /** 第 297 轮往下加的三档：100 / 200 各一句，500 给一句正经的。 */
-    static final int CURIOUS_AT = 100;
-    static final int SUSPICIOUS_AT = 200;
-    static final int GRATEFUL_AT = 500;
-
-    /** 这里没有反应（没到阈值 / 已经过了 / 未解锁时的前 19 次之外的空档）。 */
+    /** 这里没有反应（空档 / 没内容文件）。 */
     static final int TAP_NONE = 0;
-    /** 还差几次（只在**未解锁**且 1..6 次时）。 */
-    static final int TAP_REMAINING = 1;
-    /** 正好第 7 次且**未解锁** ⇒ 解锁。 */
+    /** 还差几次（只在**未解锁**且没到阈值时）。 */
+    static final int TAP_LEFT = 1;
+    /** 正好解锁那一下，且**未解锁** ⇒ 解锁。 */
     static final int TAP_UNLOCK = 2;
-    /** 正好第 7 次但**已解锁** ⇒ 给一句「已经是了」（Android 同款）。 */
+    /** 正好解锁那一下，但**已解锁** ⇒ 一句「已经是了」（Android 同款）。 */
     static final int TAP_ALREADY = 3;
-    /** 第 20 次 ⇒ 吐槽。 */
-    static final int TAP_SNARK = 4;
-    /** 第 50 次 ⇒ 冷知识。 */
-    static final int TAP_TRIVIA = 5;
-    /** 第 100 次 ⇒ 「你到底想干嘛」。 */
-    static final int TAP_CURIOUS = 6;
-    /** 第 200 次 ⇒ 「我开始怀疑你在测试我」。 */
-    static final int TAP_SUSPICIOUS = 7;
-    /** 第 500 次 ⇒ 正经的谢谢（反差）。 */
-    static final int TAP_GRATEFUL = 8;
+    /** 命中了某一档段子。 */
+    static final int TAP_MILESTONE = 4;
+
+    /** 一次点击的判定结果：干什么 + 要显示的那句话（可能为空串）。 */
+    static final class Tap {
+        final int kind;
+        final String text;
+
+        Tap(int kind, String text) {
+            this.kind = kind;
+            this.text = text == null ? "" : text;
+        }
+    }
+
+    private static final Tap NONE = new Tap(TAP_NONE, "");
 
     /** 卡片里那枚签名指纹显示几位（完整的是 64 位十六进制，一屏放不下）。 */
     static final int FINGERPRINT_CHARS = 16;
 
     private DevMode() {}
 
-    // ── 点击判据（纯函数，自检直接喂数列）─────────────────────────────────
+    // ── 点击判据（内容驱动；自检直接喂 content.json 的副本或自造内容）───────────
 
     /**
      * 第 {@code taps} 次点击该做什么（taps 从 1 起）。
      *
-     * <p>★ 两态都要遍历：**未解锁**时 1..6 次给「还差 N 次」，第 7 次解锁；
-     * <b>已解锁</b>时前 6 次**必须安静**（不然用户每次进关于页都被数一遍），第 7 次只说一句
-     * 「已经是了」。20 / 50 / 100 / 200 / 500 五档段子**两态都认**（它们只是彩蛋，与解锁状态无关）。
+     * <p>★ 两态都要遍历：**未解锁**时没到阈值给「还差 N 次」，正好解锁那一下解锁；
+     * <b>已解锁</b>时前几下**必须安静**（不然用户每次进关于页都被数一遍），到解锁那一下只说
+     * 「已经是了」。段子档位**两态都认**（它们只是彩蛋，与解锁状态无关）。
+     *
+     * <p>内容文件缺失 / 坏掉 ⇒ 一直返回 {@link #TAP_NONE}（不崩、也不假装有彩蛋）。
      */
-    static int tapKind(int taps, boolean unlocked) {
-        if (taps <= 0) return TAP_NONE;
-        if (taps == UNLOCK_AT) return unlocked ? TAP_ALREADY : TAP_UNLOCK;
-        if (taps == SNARK_AT) return TAP_SNARK;
-        if (taps == TRIVIA_AT) return TAP_TRIVIA;
-        if (taps == CURIOUS_AT) return TAP_CURIOUS;
-        if (taps == SUSPICIOUS_AT) return TAP_SUSPICIOUS;
-        if (taps == GRATEFUL_AT) return TAP_GRATEFUL;
-        if (!unlocked && taps < UNLOCK_AT) return TAP_REMAINING;
-        return TAP_NONE;
+    static Tap resolve(Context c, int taps, boolean unlocked) {
+        Content ct = Content.get(c);
+        if (ct == null || ct.eggs == null || taps <= 0) return NONE;
+        Content.Eggs e = ct.eggs;
+        if (taps == e.unlockAt) {
+            return new Tap(unlocked ? TAP_ALREADY : TAP_UNLOCK,
+                    ct.text(c, unlocked ? e.already : e.unlocked));
+        }
+        Content.Milestone m = e.at(taps);
+        if (m != null) {
+            String s;
+            if ("count".equals(m.arg)) {
+                s = ct.format(c, m.text, Integer.valueOf(m.at));
+            } else if ("date".equals(m.arg)) {
+                s = ct.format(c, m.text, installedOn(c));
+            } else {
+                s = ct.text(c, m.text);
+            }
+            return new Tap(TAP_MILESTONE, s);
+        }
+        if (!unlocked && taps < e.unlockAt) {
+            return new Tap(TAP_LEFT, ct.format(c, e.tapsLeft,
+                    Integer.valueOf(e.unlockAt - taps)));
+        }
+        return NONE;
     }
 
-    /** 还差几次（只在 {@link #TAP_REMAINING} 时有意义，结果 6..1）。 */
-    static int tapsLeft(int taps) {
-        return UNLOCK_AT - taps;
+    /** 卡片的分区标题（"开发者选项"）；没有内容文件 ⇒ 空串。 */
+    static String title(Context c) {
+        Content ct = Content.get(c);
+        return ct == null || ct.eggs == null ? "" : ct.text(c, ct.eggs.title);
     }
 
-    // ── 卡片内容 ───────────────────────────────────────────────────────────
+    /**
+     * 卡片里的**记账行**：版本摘要被连点的累计次数。
+     *
+     * <p>★ 单独一行、单独一个函数：这一行**每次点击都会变**，而上面 7 行是"这个进程的事实"。
+     *   混在一起的话，50 次连点就得重读 50 遍包信息、重算 50 遍签名指纹（两次 binder 调用/次）。
+     */
+    static String tapsLine(Context c, int total) {
+        Content ct = Content.get(c);
+        if (ct == null || ct.eggs == null) return "";
+        return ct.format(c, ct.eggs.tapsLine, Integer.valueOf(total));
+    }
+
+    /**
+     * 卡片全文 = 7 行事实 + 记账行。**组合规则只写在这一处**（自检钉的就是它）。
+     *
+     * @param base {@link #buildInfo(Context)} 的结果 —— 调用方缓存它（见 {@link #tapsLine} 的理由）
+     */
+    static String cardText(Context c, String base, int total) {
+        String line = tapsLine(c, total);
+        if (base == null || base.length() == 0) return line;
+        if (line.length() == 0) return base;
+        return base + "\n" + line;
+    }
+
+    // ── 卡片前 7 行（进程事实）─────────────────────────────────────────────
 
     /**
      * 那张卡片里的 7 行事实。**取不到的任何一项都退成 "?"**，绝不整块消失：
@@ -124,28 +160,6 @@ final class DevMode {
         return sb.toString();
     }
 
-    /**
-     * 卡片里的**第 8 行**：版本摘要被连点的**累计**次数（跨会话，见 {@link Config#tapCount()}）。
-     *
-     * <p>★ 单独成行、单独一个函数：这一行**每次点击都会变**，而上面 7 行是"这个进程的事实"。
-     *   混在一起的话，50 次连点就得重读 50 遍包信息、重算 50 遍签名指纹（两次 binder 调用/次）。
-     */
-    static String tapLine(Context c, int total) {
-        if (c == null) return "";
-        return Trans.get(c, R.string.devmode_taps_fmt, Integer.valueOf(total));
-    }
-
-    /**
-     * 卡片全文 = 7 行事实 + 第 8 行连点计数。**组合规则只写在这一处**（自检钉的就是它）。
-     *
-     * @param base {@link #buildInfo(Context)} 的结果 —— 调用方缓存它（见 {@link #tapLine} 的理由）
-     */
-    static String cardText(Context c, String base, int total) {
-        String line = tapLine(c, total);
-        if (base == null || base.length() == 0) return line;
-        return base + "\n" + line;
-    }
-
     /** 本包签名证书的 SHA-256 前 {@link #FINGERPRINT_CHARS} 位（拿不到 ⇒ "?"）。 */
     static String fingerprint(Context c) {
         String full = c == null ? null : PluginTrust.selfFingerprint(c);
@@ -173,7 +187,7 @@ final class DevMode {
                 ? d : m + " " + d;
     }
 
-    /** 这个包第一次装到本机的日期（`yyyy-MM-dd`；拿不到 ⇒ "?"）—— 第 50 击那句冷知识用。 */
+    /** 这个包第一次装到本机的日期（`yyyy-MM-dd`；拿不到 ⇒ "?"）—— 内容文件里带 `date` 的段子用。 */
     static String installedOn(Context c) {
         if (c == null) return "?";
         try {

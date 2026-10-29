@@ -248,13 +248,18 @@ public final class Util {
             }
 
             @Override public void afterTextChanged(android.text.Editable s) {
-                // ★ 第 297 轮：搜索框彩蛋 —— 整串正好是 ListQuery.EGG_QUERY 时弹一句。
-                //   判据只认整串（见 ListQuery.isEggQuery），所以"42 号图"这种正常搜索不会被打扰；
-                //   转屏恢复时 bindSearch 是**先 setText 再挂 watcher**，不会补弹一次。
-                if (ListQuery.isEggQuery(s)) {
-                    android.widget.Toast.makeText(e.getContext(),
-                            Trans.get(e.getContext(), R.string.egg_search_42),
-                            android.widget.Toast.LENGTH_SHORT).show();
+                // ★ 第 297 轮：搜索框彩蛋 —— 整串正好是关键词时弹一句；第 300 轮起关键词与文案
+                //   都来自 content.json（这里不再有字面量）。判据只认整串（见 ListQuery.isEggQuery），
+                //   所以"42 号图"这种正常搜索不会被打扰；转屏恢复是"先 setText 再挂 watcher"，不补弹。
+                Content content = Content.get(e.getContext());
+                if (content != null && content.eggs != null
+                        && ListQuery.isEggQuery(s, content.eggs.searchToken)) {
+                    String msg = content.format(e.getContext(), content.eggs.searchToast,
+                            content.eggs.searchToken);
+                    if (msg.length() > 0) {
+                        android.widget.Toast.makeText(e.getContext(), msg,
+                                android.widget.Toast.LENGTH_SHORT).show();
+                    }
                 }
                 if (onChange != null) onChange.run();
             }
