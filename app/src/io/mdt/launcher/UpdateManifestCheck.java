@@ -34,6 +34,7 @@ final class UpdateManifestCheck {
         List<Line> out = new ArrayList<Line>();
         parseOk(out);
         parseBad(out);
+        urlAllowed(out);
         compare(out);
         gate(out);
         flatJson(out);
@@ -82,6 +83,25 @@ final class UpdateManifestCheck {
 
         UpdateManifest extra = p("{\"versionCode\":8,\"sha256\":\"" + SHA + "\",\"future\":\"x\"}");
         ok(L, extra.ok(), "不认识的键不该影响解析");
+
+        UpdateManifest withUrl = p("{\"versionCode\":9,\"sha256\":\"" + SHA
+                + "\",\"url\":\"https://github.com/x/y.apk\"}");
+        ok(L, withUrl.ok() && "https://github.com/x/y.apk".equals(withUrl.url),
+                "url 应原样保留（下载地址由清单给）");
+    }
+
+    // ── 下载地址的准入 ────────────────────────────────────────────────────
+    private static void urlAllowed(List<Line> L) {
+        ok(L, UpdateManifest.allowedUrl("https://github.com/x/y.apk"), "https 应放行");
+        ok(L, !UpdateManifest.allowedUrl("http://evil.example/x.apk"),
+                "http 明文必须拒（否则链路上谁都能把包换掉）");
+        ok(L, UpdateManifest.allowedUrl("http://127.0.0.1:8080/x.apk"), "回环明文放行（本地夹具）");
+        ok(L, UpdateManifest.allowedUrl("http://localhost:8080/x.apk"), "localhost 明文放行");
+        ok(L, !UpdateManifest.allowedUrl(null), "null 应拒");
+        ok(L, !UpdateManifest.allowedUrl(""), "空串应拒");
+        ok(L, !UpdateManifest.allowedUrl("ftp://x/y"), "非 http(s) 应拒");
+        ok(L, !UpdateManifest.allowedUrl("http://127.0.0.1.evil.com/x"),
+                "别被前缀骗了：127.0.0.1.evil.com 不是回环");
     }
 
     // ── 坏数据：一律不许抛异常，只许给原因码 ─────────────────────────────

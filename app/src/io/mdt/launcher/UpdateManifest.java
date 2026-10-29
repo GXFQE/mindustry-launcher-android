@@ -15,8 +15,9 @@ import java.util.Map;
  *       —— 将来改格式时，老客户端不能因此失去更新能力（这是"壳冻结"问题的迷你版）。</li>
  *   <li>{@code versionCode} 必须是正整数、{@code sha256} 必须是 64 位小写十六进制，
  *       否则整份视为坏数据 —— **宁可这一次不更新，也不装一个来历不明的包**。</li>
- *   <li>{@code notes} / {@code versionName} 来自网络，是**不可信输入**：
- *       上屏前必须过 {@link #gate}（压空白 + 按码点截断），否则一张卡片能被撑爆。</li>
+ *   <li>{@code notes} / {@code versionName} / {@code url} 来自网络，是**不可信输入**：
+ *       上屏前必须过 {@link #gate}（压空白 + 按码点截断）；{@code url} 还要过
+ *       {@link #allowedUrl}（只认 https，外加本地夹具的回环明文）。</li>
  * </ul>
  */
 final class UpdateManifest {
@@ -28,6 +29,8 @@ final class UpdateManifest {
     static final int NOTES_MAX = 200;
     /** 版本名上屏上限。 */
     static final int NAME_MAX = 40;
+    /** 下载地址上限（URL 不该比这长）。 */
+    static final int URL_MAX = 512;
 
     /** 整份文件的大小上限：超过就当垃圾（防止一个 10 MB 的"清单"把内存吃掉）。 */
     static final int MAX_BYTES = 65536;
@@ -46,16 +49,19 @@ final class UpdateManifest {
     final String versionName;
     final long size;
     final String sha256;
+    /** APK 的下载地址（可空 —— 空的时候由调用方按 release 约定拼）。 */
+    final String url;
     final String notes;
     final String publishedAt;
 
     private UpdateManifest(String error, int versionCode, String versionName, long size,
-                           String sha256, String notes, String publishedAt) {
+                           String sha256, String url, String notes, String publishedAt) {
         this.error = error;
         this.versionCode = versionCode;
         this.versionName = versionName;
         this.size = size;
         this.sha256 = sha256;
+        this.url = url;
         this.notes = notes;
         this.publishedAt = publishedAt;
     }
@@ -63,7 +69,7 @@ final class UpdateManifest {
     boolean ok() { return error == null; }
 
     private static UpdateManifest bad(String why) {
-        return new UpdateManifest(why, 0, null, 0, null, null, null);
+        return new UpdateManifest(why, 0, null, 0, null, null, null, null);
     }
 
     /**
@@ -113,6 +119,7 @@ final class UpdateManifest {
                 gate(m.get("versionName"), NAME_MAX),
                 size,
                 sha,
+                gate(m.get("url"), URL_MAX),
                 gate(m.get("notes"), NOTES_MAX),
                 gate(m.get("publishedAt"), NAME_MAX));
     }
@@ -120,6 +127,19 @@ final class UpdateManifest {
     /** 远端比本机新吗。{@code remote <= 0} 一律不算（坏数据不许触发更新）。 */
     static boolean isNewer(int localCode, int remoteCode) {
         return remoteCode > 0 && remoteCode > localCode;
+    }
+
+    /**
+     * 下载地址准不准。
+     *
+     * <p>**只认 https** —— 更新包的下载被降级成明文，等于把"换成谁的包"交给链路上的任何人。
+     * 例外只有回环（`127.0.0.1` / `localhost`）：那是本地夹具，dev 口才用。
+     * ⚠️ 别为了"方便测试"放开成 `http://` 通配 —— 那就等于没有这条判据。
+     */
+    static boolean allowedUrl(String url) {
+        if (url == null || url.isEmpty()) return false;
+        if (url.startsWith("https://")) return true;
+        return url.startsWith("http://127.0.0.1:") || url.startsWith("http://localhost:");
     }
 
     /** 64 位小写十六进制。大 wrote 前先 {@code toLowerCase} —— 有的工具会写成大写。 */

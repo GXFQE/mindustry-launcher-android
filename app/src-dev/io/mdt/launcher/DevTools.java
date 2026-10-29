@@ -123,7 +123,9 @@ final class DevTools {
                 || intent.hasExtra("dev_pluginclear")
                 || intent.hasExtra("dev_plugintrust")
                 // 第 305 轮：更新器的 HTTP 探针（配合 PC 假服务 + adb reverse 验网络栈）
-                || intent.hasExtra("dev_update_fetch");
+                || intent.hasExtra("dev_update_fetch")
+                // 第 307 轮：更新器完整链路（拉清单 → 下载 → sha256 → 证书），不装包
+                || intent.hasExtra("dev_update_run");
         if (!isDev) return;
         if ((a.getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) == 0) {
             Toast.makeText(a, R.string.dev_blocked_toast, Toast.LENGTH_SHORT).show();
@@ -209,6 +211,14 @@ final class DevTools {
         String updateUrl = intent.getStringExtra("dev_update_fetch");
         if (updateUrl != null && !updateUrl.isEmpty()) {
             devUpdateFetch(updateUrl);
+            return;
+        }
+
+        // ★ 第 307 轮：整条链路（不装包）—— 拉清单 → 判 URL → 下载 → sha256 → 证书。
+        //   失败时顺带报"目录里还剩几个文件"，用来钉"半截包不许留下"。
+        String updateRun = intent.getStringExtra("dev_update_run");
+        if (updateRun != null && !updateRun.isEmpty()) {
+            devUpdateRun(updateRun);
             return;
         }
 
@@ -1347,6 +1357,51 @@ final class DevTools {
         }).start();
     }
 
+
+    /**
+     * 第 307 轮：更新器的**完整链路**（第 4 轮的安装不在这里）。
+     *
+     * <p>判据全在报告里：`step = ok` + `apkBytes` 是成功；失败时 `step` 指出卡在哪
+     * （network / parse / url / size / sha / sign / io），`leftovers` 必须为 0
+     * —— 半截包留在目录里是最容易被忽略的那种"看起来成功了"。
+     */
+    private void devUpdateRun(final String manifestUrl) {
+        new Thread(new Runnable() {
+            @Override public void run() {
+                UpdateFetcher.Outcome o = UpdateFetcher.run(a, manifestUrl);
+                StringBuilder sb = new StringBuilder();
+                sb.append("manifest = ").append(manifestUrl).append('\n');
+                sb.append("step   = ").append(o.step).append('\n');
+                sb.append("ms     = ").append(o.ms).append('\n');
+                if (o.detail != null) sb.append("detail = ").append(o.detail).append('\n');
+                if (o.manifest != null && o.manifest.ok()) {
+                    sb.append("versionCode = ").append(o.manifest.versionCode).append('\n');
+                    sb.append("size        = ").append(o.manifest.size).append('\n');
+                    sb.append("sha256      = ").append(o.manifest.sha256).append('\n');
+                    sb.append("url         = ").append(o.manifest.url).append('\n');
+                }
+                if (o.apk != null) {
+                    sb.append("apk      = ").append(o.apk.getAbsolutePath()).append('\n');
+                    sb.append("apkBytes = ").append(o.apk.length()).append('\n');
+                }
+                File dir = UpdateFetcher.dir(a);
+                sb.append("dir      = ").append(dir.getAbsolutePath()).append('\n');
+                File[] left = dir.listFiles();
+                sb.append("leftovers = ").append(left == null ? 0 : left.length).append('\n');
+                if (left != null) {
+                    for (File f : left) sb.append("  - ").append(f.getName()).append('\n');
+                }
+                final String text = sb.toString();
+                try {
+                    Util.atomicWriteText(new File(Data.hubDir(a), "report-update.txt"), text);
+                } catch (Throwable ignored) {
+                }
+                a.runOnUiThread(new Runnable() {
+                    @Override public void run() { a.alert("dev_update_run", text); }
+                });
+            }
+        }, "mdt-dev-update-run").start();
+    }
 
     /**
      * 第 305 轮：更新器 HTTP 探针。
