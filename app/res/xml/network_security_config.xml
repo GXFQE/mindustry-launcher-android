@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  只为**本地夹具**放行明文（2026-10-29 第 305 轮）。
+
+  背景：更新器的网络那一层不能用"手机能不能上外网"来验（不可复现、还依赖代理）。
+  做法是在 PC 上起一个假 GitHub 服务，用 `adb reverse tcp:8080 tcp:8080` 把它映射到
+  手机的 `127.0.0.1:8080` —— 让手机真的走一遍 Android 网络栈（含明文策略）。
+  而 Android 9+ 默认禁止明文 HTTP，所以这里要放行**回环地址**。
+
+  ⚠️ 只放行 127.0.0.1 / localhost；其它域名仍然是禁止明文（base-config）——
+     这不是"全局开明文"，是"给本机回环开一个口"。
+  ⚠️ 没有代码会去连 127.0.0.1（除非用 dev 口 dev_update_fetch），所以产品版带着它
+     等于一份没被用到的白名单。真要收紧，就按 DEBUGGABLE 切这份资源（构建参数已有）。
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+</network-security-config>

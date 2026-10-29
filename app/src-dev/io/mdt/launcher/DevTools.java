@@ -121,7 +121,9 @@ final class DevTools {
                 || intent.hasExtra("dev_pluginstatus")
                 || intent.hasExtra("dev_pluginrestart")
                 || intent.hasExtra("dev_pluginclear")
-                || intent.hasExtra("dev_plugintrust");
+                || intent.hasExtra("dev_plugintrust")
+                // 第 305 轮：更新器的 HTTP 探针（配合 PC 假服务 + adb reverse 验网络栈）
+                || intent.hasExtra("dev_update_fetch");
         if (!isDev) return;
         if ((a.getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) == 0) {
             Toast.makeText(a, R.string.dev_blocked_toast, Toast.LENGTH_SHORT).show();
@@ -197,6 +199,16 @@ final class DevTools {
 
         if (intent.hasExtra("dev_m3_selftest")) {
             runSelftest();
+            return;
+        }
+
+        // ★ 第 305 轮：更新器的 HTTP 探针 —— 只回答"这台设备 + 这条网络栈能不能拉到这个 URL"。
+        //   配合 PC 上的假 GitHub 服务 + `adb reverse tcp:8080 tcp:8080`：
+        //     am start -n io.mdt.launcher/.MainActivity --es dev_update_fetch http://127.0.0.1:8080/...
+        //   结果同时写 `hub/report-update.txt`（真机没界面也能取证）与弹出。
+        String updateUrl = intent.getStringExtra("dev_update_fetch");
+        if (updateUrl != null && !updateUrl.isEmpty()) {
+            devUpdateFetch(updateUrl);
             return;
         }
 
@@ -1335,6 +1347,46 @@ final class DevTools {
         }).start();
     }
 
+
+    /**
+     * 第 305 轮：更新器 HTTP 探针。
+     *
+     * <p>它存在的理由：网络那一层**不能用"手机能不能上外网"来验**（不可复现、还依赖代理）。
+     * 做法与桌面版当年一致 —— 在 PC 上起一个假服务，用 `adb reverse` 把它映射到手机的
+     * `127.0.0.1:<port>`，让手机真的走一遍 Android 网络栈（含**明文策略**）。
+     *
+     * <p>判据落在 `hub/report-update.txt`：`ok = true` + 字节数 + 耗时是成功；
+     * `ok = false` 后面跟异常原文（那是"原始诊断"那一层，可以带类名）。
+     */
+    private void devUpdateFetch(final String url) {
+        new Thread(new Runnable() {
+            @Override public void run() {
+                StringBuilder sb = new StringBuilder();
+                sb.append("url   = ").append(url).append('\n');
+                long t0 = System.currentTimeMillis();
+                try {
+                    String body = UpdateClient.fetchText(url, UpdateManifest.MAX_BYTES);
+                    sb.append("ok    = true\n");
+                    sb.append("chars = ").append(body.length()).append('\n');
+                    sb.append("ms    = ").append(System.currentTimeMillis() - t0).append('\n');
+                    sb.append("--- body (first 2000) ---\n");
+                    sb.append(body.length() > 2000 ? body.substring(0, 2000) : body).append('\n');
+                } catch (Throwable t) {
+                    sb.append("ok    = false\n");
+                    sb.append("ms    = ").append(System.currentTimeMillis() - t0).append('\n');
+                    sb.append("error = ").append(t).append('\n');
+                }
+                final String text = sb.toString();
+                try {
+                    Util.atomicWriteText(new File(Data.hubDir(a), "report-update.txt"), text);
+                } catch (Throwable ignored) {
+                }
+                a.runOnUiThread(new Runnable() {
+                    @Override public void run() { a.alert("dev_update_fetch", text); }
+                });
+            }
+        }, "mdt-dev-update").start();
+    }
 
     private void runSelftest() {
         final ProgressDialog pd = ProgressDialog.show(a, Trans.get(a, R.string.selftest_title),
