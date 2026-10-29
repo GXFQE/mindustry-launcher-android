@@ -87,6 +87,9 @@ final class UpdateUi {
      * 前者防"频繁"，后者防"永远不查"。
      */
     static void checkSilentIfDue(Activity a) {
+        // ★ 关掉自动检查 ⇒ **一次请求都不发**（不是"查了但不提示" —— 那已经联网了）。
+        //   放在最前面，连"本进程已查"那个标记都不能先占。
+        if (!Config.get().updateAutoCheck()) return;
         if (sCheckedThisProcess) return;
         sCheckedThisProcess = true;
         long now = System.currentTimeMillis() / 1000L;

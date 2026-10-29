@@ -162,6 +162,13 @@ public final class Config {
      * ★ 1.0 发布时把默认改成 false（正式版用户不该被预览版打扰）。
      */
     private static final String K_UPDATE_PREVIEW = "update_preview";
+    /**
+     * 第 312 轮：**启动时自动检查更新**（默认开）。
+     *
+     * <p>关掉 = 只在用户点「检查更新」时联网。判据在 {@link UpdateUi#checkSilentIfDue}：
+     * 关着的时候**一次请求都不发**（不是"查了但不提示" —— 那已经联网了，用户关它就是为了不联网）。
+     */
+    private static final String K_UPDATE_AUTO_CHECK = "update_auto_check";
 
     /**
      * 一档④（2026-10-06）：每个版本**上次启动的时刻** { "&lt;版本key&gt;": 毫秒 }。
@@ -202,6 +209,12 @@ public final class Config {
      *    1.0 发布时改成 false。
      */
     public static final boolean DEF_UPDATE_PREVIEW = true;
+    /**
+     * 自动检查更新的出厂默认 = **开**。
+     * ⚠️ 默认关等于"绝大多数用户永远不知道有新版本"—— 自更新的意义就没了。
+     *    给开关是为了尊重"不想让我联网"的那部分人，不是给默认关找理由。
+     */
+    public static final boolean DEF_UPDATE_AUTO_CHECK = true;
 
     private static volatile Config sInstance;
 
@@ -409,6 +422,25 @@ public final class Config {
 
     public synchronized void setUpdatePreview(boolean on) {
         put(K_UPDATE_PREVIEW, Boolean.valueOf(on));
+        save();
+    }
+
+    /**
+     * 第 312 轮：启动时是否自动检查更新（默认开；坏值退默认 + WARNING 点名键名）。
+     *
+     * <p>★ 关掉之后**真的不联网**：{@link UpdateUi#checkSilentIfDue} 第一句就判它。
+     */
+    public synchronized boolean updateAutoCheck() {
+        if (!mRoot.has(K_UPDATE_AUTO_CHECK)) return DEF_UPDATE_AUTO_CHECK;
+        Object v = mRoot.opt(K_UPDATE_AUTO_CHECK);
+        if (v instanceof Boolean) return ((Boolean) v).booleanValue();
+        Log.w(TAG, "config key '" + K_UPDATE_AUTO_CHECK + "' is not a boolean (" + v
+                + "), falling back to default " + DEF_UPDATE_AUTO_CHECK);
+        return DEF_UPDATE_AUTO_CHECK;
+    }
+
+    public synchronized void setUpdateAutoCheck(boolean on) {
+        put(K_UPDATE_AUTO_CHECK, Boolean.valueOf(on));
         save();
     }
 

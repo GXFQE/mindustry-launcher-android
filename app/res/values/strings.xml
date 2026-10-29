@@ -1453,6 +1453,9 @@
       ⚠️ 按钮文案要短（动作词），依据放正文 —— AlertDialog 三按钮一长就竖排。
     -->
     <string name="set_update_title">Check for updates</string>
+    <string name="set_update_auto_title">Check automatically</string>
+    <string name="set_update_auto_on">On · at startup</string>
+    <string name="set_update_auto_off">Off · manual only</string>
     <string name="set_update_preview_title">Preview builds</string>
     <string name="set_update_preview_on">On · previews too</string>
     <string name="set_update_preview_off">Off · stable only</string>

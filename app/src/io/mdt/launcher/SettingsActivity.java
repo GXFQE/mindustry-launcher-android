@@ -83,6 +83,8 @@ public class SettingsActivity extends BaseActivity {
     private TextView mUpdateSub;
     /** 第 311 轮：接收预览版那个开关的副标题。 */
     private TextView mUpdatePreviewSub;
+    /** 第 312 轮：自动检查更新那个开关的副标题。 */
+    private TextView mUpdateAutoSub;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -197,6 +199,16 @@ public class SettingsActivity extends BaseActivity {
                 });
         mUpdateSub = (TextView) rowUpdate.findViewById(R.id.act_sub);
 
+        // 第 312 轮：自动检查更新（开关）。分工：上面那行是"现在查一次"，这行是"以后要不要自己查"。
+        View rowAuto = Util.bindActionValue(root, R.id.row_update_auto, R.drawable.ic_download,
+                R.string.set_update_auto_title, new Runnable() {
+                    @Override public void run() {
+                        Config.get().setUpdateAutoCheck(!Config.get().updateAutoCheck());
+                        fillValues();
+                    }
+                });
+        mUpdateAutoSub = (TextView) rowAuto.findViewById(R.id.act_sub);
+
         // 第 311 轮：接收预览版（开关）。点一下就地翻转 —— 这一行是**设置值**，
         // 不是"带你走"，所以它不走弹窗（ref/42 §84 的判据）。
         View rowPreview = Util.bindActionValue(root, R.id.row_update_preview, R.drawable.ic_download,
@@ -295,6 +307,10 @@ public class SettingsActivity extends BaseActivity {
         if (mUpdatePreviewSub != null) {
             mUpdatePreviewSub.setText(Config.get().updatePreview()
                     ? R.string.set_update_preview_on : R.string.set_update_preview_off);
+        }
+        if (mUpdateAutoSub != null) {
+            mUpdateAutoSub.setText(Config.get().updateAutoCheck()
+                    ? R.string.set_update_auto_on : R.string.set_update_auto_off);
         }
     }
 
