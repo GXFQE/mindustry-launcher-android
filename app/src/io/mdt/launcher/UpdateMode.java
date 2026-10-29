@@ -18,7 +18,7 @@ final class UpdateMode {
     static final int OFF = 0;
     /** 自动检查，只收稳定版（走 `releases/latest`，GitHub 只指非 prerelease）。 */
     static final int STABLE = 1;
-    /** 自动检查，连预览版也收（走固定通道 `update-channel-preview`）。 */
+    /** 自动检查，**连预览版也收**（选择列表里连 prerelease 一起挑）。 */
     static final int PREVIEW = 2;
 
     /**

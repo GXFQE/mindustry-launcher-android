@@ -7,23 +7,18 @@
 用法：
 
     # 1) 发布构建（必须用正式密钥；`--allow-debug` 只给自测用）
-    python tools/make-update-json.py --apk mdt-launcher.apk --tag v0.8.0-preview \\
+    python tools/make-update-json.py --apk mdt-launcher.apk --tag v0.8.0 \\
            --notes "修了三个崩溃" --out update.json
 
-    # 2) 传到**固定通道**那个 release（URL 永远不变，见 UpdateUi.MANIFEST_URL）
-    gh release upload update-channel update.json --clobber
+    # 2) 跟 APK 一起传到**这一版自己的** release（没有单独的"通道 release"）
+    gh release upload v0.8.0 mdt-launcher.apk update.json
 
     # 3) 校验一份已有的清单（CI / 发版前）
     python tools/make-update-json.py --check update.json
 
-为什么用固定 tag `update-channel` 而不是 `releases/latest`：
-    GitHub 的 `releases/latest` **只指向非 prerelease**，而 1.0 之前每个版本都勾
-    `--prerelease` ⇒ `latest/download/update.json` 直接 404（`docs/RELEASING.md` §5 记过这条）。
-
-第一次需要先建那个通道 release：
-
-    gh release create update-channel --title "Update channel" \\
-       --notes "自动更新用的固定通道，不是给用户点的版本" --prerelease
+客户端读的是 `/repos/…/releases` 列表（见 `GitHubReleases`）：取最新一版、按 `prerelease`
+筛、再从它的 assets 里找这个 `update.json`。所以**每一版都必须带它** ——
+缺了这份清单的 release，对更新器等于不存在。
 """
 import argparse
 import datetime
@@ -115,16 +110,8 @@ def gen(args):
     print("  sha256      = %s" % sha)
     print("  url         = %s" % url)
     print()
-    if args.channel == "stable":
-        print("下一步（稳定版：update.json 跟这一版自己的 release 一起传）")
-        print("  gh release upload %s %s" % (args.tag, args.out))
-        print("  # 之后 releases/latest/download/update.json 会自动指过来，不需要额外维护")
-    else:
-        print("下一步（预览通道，URL 永远不变）：")
-        print("  gh release upload update-channel-preview %s --clobber" % args.out)
-        print("  # 第一次要先建通道：")
-        print("  #   gh release create update-channel-preview --prerelease \\")
-        print("  #     --title \"Preview channel\" --notes \"自动更新用的固定通道，不是给用户点的版本\"")
+    print("下一步（两个资产一起传，缺 update.json 的 release 对更新器等于不存在）：")
+    print("  gh release upload %s mdt-launcher.apk %s" % (args.tag, args.out))
     return 0
 
 
@@ -169,9 +156,6 @@ def main():
     ap.add_argument("--tag")
     ap.add_argument("--notes", default="")
     ap.add_argument("--repo", default="GXFQE/mindustry-launcher-android")
-    ap.add_argument("--channel", default="preview", choices=["preview", "stable"],
-                    help="preview = 传到固定通道 update-channel-preview；"
-                         "stable = 跟这一版 release 一起传（latest 会自动指过去）")
     ap.add_argument("--out", default="update.json")
     ap.add_argument("--sdk", default=DEFAULT_SDK)
     ap.add_argument("--allow-debug", action="store_true")

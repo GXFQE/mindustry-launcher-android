@@ -102,26 +102,22 @@ git tag -l 'v*' | wc -l    # 现在是 6 ⇒ 下一个 vc = 7
   - rc：`v1.0.0-rc1 —— 第一个候选版（功能冻结，只修问题）`
   - 稳定：`v1.0.0 —— 正式版`
 - **资产名固定** `mdt-launcher.apk`：不要把版本写进文件名，下载链接才稳定。
-- **自更新清单 `update.json`**（第 310 轮起，客户端见 `UpdateUi`）：
+- **自更新清单 `update.json`**（第 310 轮起，客户端见 `UpdateUi` / `GitHubReleases`）：
   - 由 `python tools/make-update-json.py --apk mdt-launcher.apk --tag <tag> --notes "…"` **现算生成**
     （`versionCode` / `versionName` / `size` / `sha256` 全从产物读，`url` 指向这一版自己的 tag）；
-  - **两个通道**（客户端按设置里的「接收预览版」选）：
-    | 通道 | URL | 怎么发布 |
-    |---|---|---|
-    | **预览**（默认） | `…/releases/download/update-channel-preview/update.json` | `gh release upload update-channel-preview update.json --clobber`（固定 tag，URL 永远不变） |
-    | **稳定** | `…/releases/latest/download/update.json` | 跟**这一版自己的** release 一起传（`gh release upload <tag> update.json`），`latest` 会自动指过去 |
-  - 🔴 **预览版不能走 `latest`**：GitHub 的 `latest` 只指向**非 prerelease**，而 preview / rc
-    都勾 `--prerelease` ⇒ 那个路径是 404（§5 早年记过，第 310 轮才真正踩到）；
-  - 预览通道 release 首次要建：
-    `gh release create update-channel-preview --prerelease --title "Preview channel" --notes "自动更新用的固定通道，不是给用户点的版本"`；
-  - 通道里**只有一个 `update.json`**（APK 仍跟着各版本自己的 release 走），所以它不占版本号、不进历史。
+  - **跟 APK 一起传到这一版自己的 release**：`gh release upload <tag> mdt-launcher.apk update.json`
+    —— 只有一个地方要传，没有"通道 release"这种东西（见下面两条）；
+  - ★ 客户端读的是 **`/repos/…/releases` 列表**（`GitHubReleases`）：拿最新的一版、
+    按 `prerelease` 筛（设置里「自动检查」= 稳定版和预览版 / 只查稳定版）、
+    再从它的 assets 里找 `update.json`。所以**每一版都必须带这个资产**，否则客户端报
+    "no update.json in release v…"（那正是 §5 早年只有 APK、没有清单的那些版本的样子）；
+  - ⚠️ **预览版也在同一个列表里**，不需要额外通道，也不需要 `--clobber` 覆盖任何东西。
 - **发布说明以 GitHub 为唯一正文**，仓库里不复制第二份（复制必漂）；
   本地底稿放 `.dsh/release-notes-<版本>.md`。
   - 结构：这是什么 / 这一版（相对上一版）/ 装之前先看 / 文件与校验。
   - 只写用户看得见、做得到的变化；内部词（接口号、路径、白名单…）先 grep 再发；
     **上一版就有的不算新增**。
-- preview / rc 勾 `--prerelease`；稳定版不勾。稳定版出来之前 `releases/latest` 是 404 ——
-  以后做「检查更新」不能只读 `latest`，要读 releases 列表并按上面的比较顺序排。
+- preview / rc 勾 `--prerelease`；稳定版不勾。客户端**两种都读得到**，靠 `prerelease` 字段区分。
 
 ## 6. 发版前检查清单
 
@@ -140,9 +136,8 @@ git tag -l 'v*' | wc -l    # 现在是 6 ⇒ 下一个 vc = 7
    `python tools/make-update-json.py --apk mdt-launcher.apk --tag <tag> --notes "…"` 一次算出并写成
    `update.json`（手抄必错，而错了的后果是"所有用户都下载失败"，不是"少个功能"）；
 7. tag → push → `gh release create`（preview / rc 加 `--prerelease`）；
-8. **再更新自更新通道**（漏了这一步，用户那边永远看不到这一版）：
-   - preview / rc ⇒ `gh release upload update-channel-preview update.json --clobber`
-   - 稳定版 ⇒ `gh release upload <tag> update.json`（跟 APK 同一个 release，`latest` 自动指过去）
+8. **把两个资产都传上去**：`gh release upload <tag> mdt-launcher.apk update.json`
+   —— 漏了 `update.json`，客户端会报 "no update.json in release v…"（那份 release 对更新器等于不存在）；
 9. 发完在 `next/40` 记一行内部批次（对外历史就是 GitHub Releases）。
 
 > ⚠️ **第一次带自更新的发布**：用户手里那个版本还没有更新器（v0.7.0 及更早），
