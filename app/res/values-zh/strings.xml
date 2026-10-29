@@ -73,6 +73,10 @@
 
     <!-- F2：版本列表行（槽徽标 / 可见槽按钮 / 同槽冲突 / 继续上次） -->
     <string name="row_slot_btn">管理</string>
+    <!-- 第 319 轮：这一行最左侧的图标是拖动把手（长按拖动排序）—— 给无障碍读的那句话 -->
+    <string name="row_drag_desc">长按左侧图标拖动排序</string>
+    <string name="main_order_saved">顺序已保存</string>
+    <string name="main_order_single">只有一个启动项，暂时不用排序</string>
     <!-- 版本行「槽」列表弹窗里的动作：打开这个版本的详情（路径 / 校验码 / 架构 / 存档数 / 删除导入项） -->
     <!--
       ★ 2026-10-06：这一行**没有**"详情"按钮 —— 详情走**长按整行**（`MainActivity.showDetail`）。

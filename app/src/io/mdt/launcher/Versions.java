@@ -707,6 +707,66 @@ public final class Versions {
     }
 
     /**
+     * ★★ 第 319 轮：**手工顺序用的行键** —— 主行只认版本 key，附加行带它绑的槽。
+     *
+     * <p>为什么不直接用 {@link #rowKey}（版本 key + **当前**槽）：那个键会跟着"主行换槽 / 默认槽改了"
+     * 一起变。而用户拖动的是"这一项在列表里的位置"——主项换到另一个槽之后仍然是同一个启动项
+     * （存档换了一套，但它就是列表里那一行）；默认槽改了更是所有未分配行**集体**换槽。
+     * 拿 rowKey 存顺序的话，这些时刻整份手工顺序会静默失效、所有行一起掉到末尾。
+     *
+     * <p>附加行的身份**本来就是它绑的那个槽**（它存在的理由），所以那边把槽写进键里：
+     * 绑定换了槽 = 换了一项，位置跟着丢是合理的。
+     *
+     * @return 主行 = {@link Entry#key()}；附加行 = 版本 key + NUL + {@link Entry#boundSlot}
+     */
+    public static String orderKey(Entry e) {
+        if (e == null) return "";
+        String k = e.key();
+        return (e.boundSlot == null || e.boundSlot.isEmpty()) ? k : (k + "\u0000" + e.boundSlot);
+    }
+
+    /**
+     * ★★ 按用户手工排的顺序重排启动项（**纯函数**：不改入参、不碰文件 ⇒ 自检直接喂）。
+     *
+     * <p>规则（每条都由自检 ㉟ 钉着）：
+     * <ol>
+     *   <li>先按 {@code saved} 里出现的次序取行 —— 认不出的键**跳过**（版本删了 / 绑定换了槽）；</li>
+     *   <li>其余行按**扫描顺序**补在后面 ⇒ 新导入的版本仍然出现在末尾（与加这个功能之前一致，
+     *       用户不会"导入完找不到它在哪"）；</li>
+     *   <li>**一行都不许丢**（哪怕 saved 里有重复键 / 全是垃圾）；</li>
+     *   <li>空 / null 的 saved ⇒ 原样返回顺序（功能没开时行为完全不变）。</li>
+     * </ol>
+     *
+     * <p>★ 为什么主行还允许用 {@link #rowKey} 兜一层：附加行被提升成主行时（删掉主项），
+     *   它的 {@link #orderKey} 会从「key + 槽」变成「key」—— 而提升操作同时会把它的槽写成主槽，
+     *   所以旧的 rowKey 仍然对得上 ⇒ 位置不丢。这一条不写的话，"删掉主行"会让被提升的那行跳到末尾。
+     */
+    public static List<Entry> orderRows(List<Entry> rows, List<String> saved) {
+        List<Entry> out = new ArrayList<>();
+        if (rows == null || rows.isEmpty()) return out;
+        boolean[] used = new boolean[rows.size()];
+        if (saved != null) {
+            for (String want : saved) {
+                if (want == null || want.isEmpty()) continue;
+                for (int i = 0; i < rows.size(); i++) {
+                    Entry e = rows.get(i);
+                    if (e == null || used[i]) continue;
+                    boolean primary = e.boundSlot == null || e.boundSlot.isEmpty();
+                    if (want.equals(orderKey(e)) || (primary && want.equals(rowKey(e)))) {
+                        used[i] = true;
+                        out.add(e);
+                        break;
+                    }
+                }
+            }
+        }
+        for (int i = 0; i < rows.size(); i++) {
+            if (!used[i] && rows.get(i) != null) out.add(rows.get(i));
+        }
+        return out;
+    }
+
+    /**
      * 这个版本现在在列表里有**几行**（主行永远算一行，附加绑定各算一行）。
      *
      * <p>★ 删除的语义按它分岔（2026-10-25 用户定案）：还有别的行 ⇒ 只删这一行；

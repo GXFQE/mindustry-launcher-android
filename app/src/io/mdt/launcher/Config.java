@@ -174,6 +174,21 @@ public final class Config {
     private static final int PLAYED_KEEP = 64;
 
     /**
+     * 第 319 轮：**主界面启动项的手工顺序**（长按行最左侧图标拖动）。
+     *
+     * <p>值是 {@link Versions#orderKey} 的数组（主行 = 版本 key；附加行 = 版本 key + NUL + 它绑的槽）。
+     * 空 / 缺键 = 从没手工排过 ⇒ **完全按扫描顺序**（与加这个功能之前一模一样）。
+     *
+     * <p>★ 为什么用 {@link Versions#orderKey} 而不是 {@link Versions#rowKey}（版本 + **当前**槽）：
+     *   rowKey 会跟着"主行换槽 / 默认槽改了"变 ⇒ 用户改一次默认槽，所有没显式指定槽的行都会从
+     *   顺序表里"消失"、一起掉到列表末尾。主行的位置不该因为它落在哪个槽、或者默认槽指向哪而丢。
+     *
+     * <p>⚠️ 表里允许有**已经不存在**的行（删版本 / 附加绑定换了槽）：读取方按"认不出来就跳过"处理，
+     *   写回时只写当前还在的行 ⇒ 会自然清理，不需要在删除路径上各补一遍。
+     */
+    private static final String K_MAIN_ORDER = "main_order";
+
+    /**
      * 自动备份的出厂默认，逐条对齐桌面版 config.py 的 PROFILE_DEFAULTS
      * （auto_backup=True / min_playtime=20 / max_backups=20）。
      */
@@ -1334,6 +1349,39 @@ public final class Config {
         if (key == null) return 0L;
         JSONObject all = mRoot.optJSONObject(K_PLAYED);
         return all == null ? 0L : all.optLong(key, 0L);
+    }
+
+    // ── 主界面启动项的手工顺序（第 319 轮：长按最左图标拖动）─────────────────
+
+    /**
+     * 用户手工排出来的启动项顺序（见 {@link #K_MAIN_ORDER}）。空表 = 没排过 / 已清空。
+     *
+     * <p>⚠️ 这只是"用户希望的前 N 项"：**认不出来的行键直接跳过**（版本删了 / 附加绑定换了槽），
+     *   其余行由 {@link Versions#orderRows} 按扫描顺序补在后面 —— 所以这里**不许**在删除路径上
+     *   再维护一遍，否则"顺序表"与"实际列表"又成了两套判据。
+     */
+    public synchronized List<String> mainOrder() {
+        ArrayList<String> out = new ArrayList<>();
+        JSONArray a = mRoot.optJSONArray(K_MAIN_ORDER);
+        if (a == null) return out;
+        for (int i = 0; i < a.length(); i++) {
+            String s = a.optString(i, "");
+            if (!s.isEmpty()) out.add(s);
+        }
+        return out;
+    }
+
+    /** 覆盖整份手工顺序。空表 ⇒ **把键删掉**（config.json 里不留 `"main_order": []` 这种空壳）。 */
+    public synchronized void setMainOrder(List<String> rows) {
+        JSONArray a = new JSONArray();
+        if (rows != null) {
+            for (String s : rows) {
+                if (s != null && !s.isEmpty()) a.put(s);
+            }
+        }
+        if (a.length() == 0) mRoot.remove(K_MAIN_ORDER);
+        else put(K_MAIN_ORDER, a);
+        save();
     }
 
     /** 上次记账的槽名（无记账 = 空串）。 */

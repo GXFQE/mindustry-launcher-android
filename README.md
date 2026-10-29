@@ -65,7 +65,9 @@ yourself — even just a few lines — see **Translation file** below.
 
 ### Versions
 - Scan games **already installed**, or **import** a copy of an APK
-- One row per launch entry: tap to launch; **Manage** opens the version page (slot / clone / details / rename / assets / delete), and long-press does the same
+- One row per launch entry: tap to launch; **Manage** opens the version page (slot / clone / details / rename / assets / delete), and long-pressing anywhere else on the row does the same
+- **To reorder**: long-press the icon at the left of a row and drag the row where you want it; the order is
+  saved on release (rows you never moved, and newly imported versions, stay in their usual order at the end)
 - **One version can be bound to several slots**: open **Manage** on a row (or long-press it) → **Clone…** adds
   another row that shares the same game files (no APK copy, no extra space) while saves / settings / mods live in
   their own slots — for two save sets without duplicating ~75 MB. The same page has details, change-slot, name,

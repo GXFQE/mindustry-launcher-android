@@ -43,16 +43,42 @@
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:background="@drawable/card_bg_press"
-        android:paddingStart="14dp"
+        android:paddingStart="0dp"
         android:paddingEnd="8dp"
         android:paddingTop="12dp"
         android:paddingBottom="12dp">
 
-        <ImageView
-            android:layout_width="24dp"
-            android:layout_height="24dp"
-            android:src="@drawable/ic_app"
-            android:tint="@color/accent" />
+        <!--
+          ★ 2026-10-29（第 319 轮）：最左侧的图标兼任**拖动把手** —— 长按它可以把这一行拖到新位置，
+            松手落盘（`Config.main_order`），下次打开照旧。
+
+          ★ 为什么把手就是原来的图标：这一行右侧的宽度**一点余量都没有**（见本文件头注释的宽度预算），
+            再插一个「≡」会把版本号挤成省略号；而这个图标对每一行都是同一个 `ic_app`，
+            本来就不承担"区分是哪个游戏"的职责 ⇒ 让它兼任把手，**一个像素都不多占**。
+
+          ★ 触摸区比图标大：原来的卡片 `paddingStart=14dp` 挪进把手内部（所以卡片现在是 0dp），
+            把手 = 14dp + 24dp 图标 = 38dp 宽、`minHeight=44dp` 高。
+            ⇒ 文字列仍从 `38 + 12 = 50dp` 开始，与改动前的 `14 + 24 + 12` **完全相同**；
+              标题宽度预算不受影响（这是这条布局最不能动的东西）。
+          ★ `ver_handle` 必须是横向卡片的**第 1 个子控件**（贴着最左侧）—— 自检㊻④钉着这一条。
+            ⚠️ 点击 / 长按由 `MainActivity.bindVersionRow` 挂（XML 里不写 clickable：
+               控件的 `setOnClickListener` 自己会把 clickable 打开）。
+        -->
+        <FrameLayout
+            android:id="@+id/ver_handle"
+            android:layout_width="38dp"
+            android:layout_height="wrap_content"
+            android:minHeight="44dp"
+            android:focusable="false"
+            android:paddingStart="14dp">
+
+            <ImageView
+                android:layout_width="24dp"
+                android:layout_height="24dp"
+                android:layout_gravity="start|center_vertical"
+                android:src="@drawable/ic_app"
+                android:tint="@color/accent" />
+        </FrameLayout>
 
         <LinearLayout
             android:layout_width="0dp"

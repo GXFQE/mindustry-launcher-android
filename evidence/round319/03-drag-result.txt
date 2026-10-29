@@ -1,0 +1,36 @@
+第 319 轮：主界面启动项的手工顺序（长按最左图标拖动）—— 真机记录
+设备：HONOR ELP-AN00 / Android 16（API 36）· 开发版（DEBUGGABLE=true SUFFIX=-dev）
+
+【拖之前的 config.json】没有 main_order 这个键（功能没开 ⇒ 与以前完全同一份配置）。
+
+【把第 3 行「用于测试克隆功能」拖到最顶之后】
+  adb shell input draganddrop 114 2414 114 1740 1500
+  config.json 里出现（原样摘录）：
+    "main_order": [
+      "com.github.tinylake.mindustryX\u0000用于测试克隆功能",
+      "io.anuke.mindustry",
+      "com.github.tinylake.mindustryX",
+      "import:official-159.apk",
+      "import:official-159.apk\u0000test"
+    ]
+  ★ 键的形状：主行 = 版本 key（没有 \u0000）；附加行 = 版本 key + \u0000 + 它绑的槽。
+    这正是 Versions.orderKey —— 不是 rowKey（rowKey 跟着当前槽走）。
+
+【force-stop 再启动（判据 = 新进程重新扫、重新读 config）】
+  uiautomator dump 的行顺序（只摘可见的三行）：
+    用于测试克隆功能  改端  2026.09.X37（160.1）
+    Mindustry  原端  159.7
+    MindustryX  改端  2026.09.X37（160.1）
+  ⇒ 顺序确实从 config 恢复，不是内存里那一份。
+
+【拖到屏幕下边缘（自动滚动）】
+  adb shell input draganddrop 114 1817 114 2640 5000
+  ⇒ 页面自己往下滚（拖完停在列表末尾），被拖的行落到 main_order 的最后一个；
+     再 force-stop/启动，最后一行仍是它。
+
+【长按行内非把手区域】仍然进 VersionActivity（真机 dumpsys：topResumedActivity=.VersionActivity）。
+【只有一行时】beginRowDrag 直接给一句 Toast「只有一个启动项，暂时不用排序」，不启动拖动。
+
+【收尾】测试造出来的 main_order 已从 config.json 删掉（run-as + 一次性脚本 head/sed 重建，
+判据 = grep -c main_order == 0，列表回到扫描顺序）；删除前先备份过 config.json.bak-319，
+确认无误后连备份一起清掉。设备上的临时 xml / png / 脚本也已删除。

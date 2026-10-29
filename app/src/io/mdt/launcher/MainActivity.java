@@ -69,6 +69,44 @@ public class MainActivity extends BaseActivity {
     private android.widget.ScrollView mMainScroll;
     private int mKeepScrollY = -1;
 
+    // ── 第 319 轮：长按行最左侧图标拖动排序（顺序落 config.json 的 `main_order`）──────────
+    //
+    // 手势：长按**把手**（行首那个图标，见 item_version.xml）→ 整行跟着手指走 → 松手落盘。
+    // ★ 为什么是"长按把手"而不是在顶栏加「排序」菜单：用户原话「能不能试试长按最左侧拖住」
+    //   —— 这是启动器的常见手势（长按图标移动），而且主界面**没有任何列表页共用的筛选栏**，
+    //   加一个只会用在主界面的排序菜单反而多一个入口。
+    // ★ 为什么不用 RecyclerView 的 ItemTouchHelper：本页的列表是 ScrollView + LinearLayout
+    //   全展开（见 activity_main.xml 的根因注释），没有 Adapter / ViewHolder 可挂。
+    //   系统拖放（startDragAndDrop）正好只需要"一个跟随手指的影子 + 容器的坐标"。
+
+    /** 正在拖的那一行（null = 没在拖） */
+    private View mDragRow;
+    /**
+     * 最近一次拖动事件在 ScrollView 里的 y。
+     * ★ 自动滚动时没有新的 ACTION_DRAG_LOCATION，要靠它继续算插入位置 —— 否则滚到边缘后
+     *   手指不动、列表在滚，但行不会跟着换位（用户会以为卡住了）。
+     */
+    private float mDragY = -1f;
+    /** 自动滚动方向：-1 向上 / 0 停 / +1 向下 */
+    private int mDragScrollDir;
+    /**
+     * 最近一次按在把手上的**屏幕**坐标。
+     * ★ 系统默认的拖影以行**中心**为锚点 —— 抓左边的图标时，一行一千多像素的影子会整体甩到屏幕外，
+     *   手指下面只剩标题的右半截（真机截图里就是这副样子）。记下按下的那一点，
+     *   再用 {@link RowShadow} 把它当锚点，影子才会"从手指下面长出来"。
+     */
+    private float mDragDownRawX, mDragDownRawY;
+    private final android.os.Handler mDragHandler =
+            new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable mDragScrollTask = new Runnable() {
+        @Override public void run() {
+            if (mDragRow == null || mDragScrollDir == 0 || mMainScroll == null) return;
+            mMainScroll.scrollBy(0, mDragScrollDir * dp(7));
+            if (mDragY >= 0) moveDragRowTo(mDragY);
+            mDragHandler.postDelayed(this, 16);
+        }
+    };
+
     /**
      * 一个版本的「同槽共用」情况。由 `rescan()` → {@link #computeConflicts()} 重算。
      *
@@ -444,8 +482,19 @@ public class MainActivity extends BaseActivity {
     @Override
     protected void onPause() {
         super.onPause();
+        // 第 319 轮：拖动中切走（Home / 别的 Activity）⇒ 放弃这次拖动（不落盘）。
+        // ★ 不 commit：用户没松手就离开了，把"半路的位置"当成他的选择是越权的；
+        //   回到前台会 rescan → 按上次保存的顺序重建。
+        if (mDragRow != null) finishRowDrag(false);
         // 离开主界面时记下位置；不在这里做任何重建（重建在 onResume）。
         if (mMainScroll != null) mKeepScrollY = mMainScroll.getScrollY();
+    }
+
+    @Override
+    protected void onDestroy() {
+        // 自动滚动的 runnable 持有 Activity ⇒ 销毁时必须摘掉，否则它会在已销毁的页面上继续滚
+        mDragHandler.removeCallbacks(mDragScrollTask);
+        super.onDestroy();
     }
 
     /**
@@ -477,6 +526,13 @@ public class MainActivity extends BaseActivity {
     private void buildUi() {
         View root = getLayoutInflater().inflate(R.layout.activity_main, null);
         mMainScroll = (android.widget.ScrollView) root;
+        // 第 319 轮：拖动排序的落点由整页（ScrollView）接 —— 手指拖到顶部区 / 屏幕边缘时
+        // 也要收得到 ACTION_DRAG_LOCATION（容器自己接的话，一出列表就会断）。
+        mMainScroll.setOnDragListener(new View.OnDragListener() {
+            @Override public boolean onDrag(View v, android.view.DragEvent event) {
+                return onMainDrag(event);
+            }
+        });
 
         // 顶部状态卡：整卡可点，展开完整路径 —— 长路径不该一上来就糊满屏
         mStatusSummary = (TextView) root.findViewById(R.id.status_summary);
@@ -573,7 +629,9 @@ public class MainActivity extends BaseActivity {
     }
 
     void rescan() {
-        mEntries = Versions.scanAll(this);
+        // ★ 第 319 轮：手工顺序只在**主界面**应用（`scanAll` 保持扫描顺序 —— 版本页 / 模组页 /
+        //   插件拿到的版本清单都不该因为主界面的排序而变）。判据本体在 `Versions.orderRows`。
+        mEntries = Versions.orderRows(Versions.scanAll(this), Config.get().mainOrder());
         computeConflicts();
         rebuildList();
         if (mStatusSummary != null) {
@@ -719,6 +777,32 @@ public class MainActivity extends BaseActivity {
         TextView conflict = (TextView) v.findViewById(R.id.ver_conflict);
         View slotBtn = v.findViewById(R.id.ver_slot_btn);
 
+        // ★ 第 319 轮：行首图标 = 拖动把手（长按拖动排序，见 beginRowDrag）。
+        //   点它仍然是"启动这一行" —— 它现在是可点击的子控件，事件不再冒泡到行根，
+        //   所以两条路要在这里各挂一次（行为与改动前一致）。
+        View handle = v.findViewById(R.id.ver_handle);
+        if (handle != null) {
+            handle.setContentDescription(Trans.get(MainActivity.this, R.string.row_drag_desc));
+            handle.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View x) { startVersion(e); }
+            });
+            handle.setOnLongClickListener(new View.OnLongClickListener() {
+                @Override public boolean onLongClick(View x) { return beginRowDrag(v); }
+            });
+            // 只**记录**按下的位置（拖影要拿它当锚点），不消费事件 —— 点击 / 长按照旧
+            handle.setOnTouchListener(new View.OnTouchListener() {
+                @Override public boolean onTouch(View x, android.view.MotionEvent ev) {
+                    if (ev.getActionMasked() == android.view.MotionEvent.ACTION_DOWN) {
+                        mDragDownRawX = ev.getRawX();
+                        mDragDownRawY = ev.getRawY();
+                    }
+                    return false;
+                }
+            });
+        }
+        // 落盘顺序时要能从 View 找回"这一行是哪一项"（视图顺序 ≠ mEntries 下标，拖完会错位）
+        v.setTag(e);
+
         // ★ 2026-10-25：标题回到一个 TextView，但**断行点由我们自己定**（见 `buildTitle`）：
         //   放得下就是一行，放不下只断在「类型词 ↔ 版本号」之间。
         title.setText(buildTitle(e));
@@ -768,6 +852,210 @@ public class MainActivity extends BaseActivity {
         v.setOnLongClickListener(new View.OnLongClickListener() {
             @Override public boolean onLongClick(View x) { openVersion(e); return true; }
         });
+    }
+
+    // ── 第 319 轮：长按最左图标拖动排序 ───────────────────────────────────────
+
+    /**
+     * 长按行首图标 → 进入拖动。
+     *
+     * <p>★ 为什么在**图标**上而不是整行：整行的长按已经是"进版本页"（2026-10-25 定案）。
+     *   图标是这一行唯一"不承载信息"的地方（每一行都是同一个 `ic_app`），把它变成把手
+     *   **不改变任何宽度**（原来的 14dp 卡片左内边距挪进了把手，见 item_version.xml）。
+     *
+     * @return true = 消费了这次长按（父行的长按不再触发）
+     */
+    private boolean beginRowDrag(View row) {
+        if (row == null || mListContainer == null) return false;
+        if (mListContainer.getChildCount() < 2) {
+            // 只有一行时拖不出任何变化 —— 给一句话，别让用户以为手势失灵
+            Toast.makeText(this, Trans.get(this, R.string.main_order_single), Toast.LENGTH_SHORT).show();
+            return true;
+        }
+        mDragRow = row;
+        mDragY = -1f;
+        mDragScrollDir = 0;
+        row.performHapticFeedback(android.view.HapticFeedbackConstants.LONG_PRESS);
+        // 影子锚点 = 手指按下那一点在行内的坐标（见 mDragDownRawX 的注释）
+        int[] loc = new int[2];
+        row.getLocationOnScreen(loc);
+        int anchorX = Math.round(mDragDownRawX - loc[0]);
+        int anchorY = Math.round(mDragDownRawY - loc[1]);
+        anchorX = Math.max(0, Math.min(row.getWidth() - 1, anchorX));
+        anchorY = Math.max(0, Math.min(row.getHeight() - 1, anchorY));
+        boolean ok;
+        try {
+            ok = row.startDragAndDrop(
+                    android.content.ClipData.newPlainText("", ""),
+                    new RowShadow(row, anchorX, anchorY), row, 0);
+        } catch (Throwable t) {
+            ok = false;             // 极旧 / 特殊 ROM 上拖放被禁：不崩，退回原状
+            android.util.Log.w("MDTLauncher", "startDragAndDrop failed: " + t);
+        }
+        if (!ok) {
+            mDragRow = null;
+            row.setAlpha(1f);
+            return true;
+        }
+        // ★ 淡影必须在 startDragAndDrop **之后**再设：系统在那一调用里就把这一行画进拖影位图，
+        //   先设 alpha 会把影子也画成半透明（跟着手指的那一份反而看不清）。
+        row.setAlpha(0.3f);         // 原行留个"被拎起来"的淡影（影子本身由系统画）
+        return true;
+    }
+
+    /**
+     * 拖动影子：尺寸 = 整行，**锚点 = 手指按下的那一点**（不是行中心）。
+     *
+     * <p>系统默认实现（{@code new DragShadowBuilder(v)}）把锚点放在行中心 ⇒ 从最左侧图标起手时，
+     * 一行一千多像素的影子会整体往左甩、大半在屏幕外，手指下面只看得到标题右半截
+     * （2026-10-29 真机截图里就是这副样子，用户会以为"抓歪了"）。
+     */
+    private static final class RowShadow extends View.DragShadowBuilder {
+        private final int mAnchorX, mAnchorY;
+
+        RowShadow(View row, int x, int y) {
+            super(row);
+            mAnchorX = x;
+            mAnchorY = y;
+        }
+
+        @Override public void onProvideShadowMetrics(android.graphics.Point size,
+                                                     android.graphics.Point touch) {
+            View v = getView();
+            if (v == null) {                       // 理论上不会；真为 null 就退回系统默认口径
+                super.onProvideShadowMetrics(size, touch);
+                return;
+            }
+            size.set(v.getWidth(), v.getHeight());
+            touch.set(mAnchorX, mAnchorY);
+        }
+    }
+
+    /**
+     * 拖放的四个事件（监听挂在整页 ScrollView 上，见 {@link #buildUi()}）。
+     *
+     * ★ 只在 `ACTION_DRAG_STARTED` 里用**对象身份**认领自己那一次拖放 —— 别用
+     *   `event.getLocalState() != null` 一把全收：那会把别的页面 / 别的拖放也算进来。
+     * ★ `ACTION_DROP` **不做任何事**：顺序在拖动过程中已经实时排好了（见 moveDragRowTo），
+     *   落点只决定"最后停在哪一行之间"，而这个结果已经在视图顺序里。
+     * ★ 提交放在 `ACTION_DRAG_ENDED`：它一定会来（drop / 取消 / 被系统打断都算），
+     *   而 DROP 在拖到窗口外时不会来 —— 只在 DROP 里保存会漏掉"拖出去放手"。
+     */
+    private boolean onMainDrag(android.view.DragEvent event) {
+        switch (event.getAction()) {
+            case android.view.DragEvent.ACTION_DRAG_STARTED:
+                return mDragRow != null && event.getLocalState() == mDragRow;
+            case android.view.DragEvent.ACTION_DRAG_LOCATION:
+                if (mDragRow == null) return false;
+                mDragY = event.getY();
+                updateDragScroll(event.getY());
+                moveDragRowTo(event.getY());
+                return true;
+            case android.view.DragEvent.ACTION_DROP:
+                return mDragRow != null;
+            case android.view.DragEvent.ACTION_DRAG_ENDED:
+                finishRowDrag(true);
+                return true;
+            default:
+                return mDragRow != null;
+        }
+    }
+
+    /**
+     * 手指靠近屏幕上下边缘时自动滚动（拖动时系统只管影子，列表不会自己滚）。
+     * ★ 只有在方向**变了**才重排 Runnable：每个 DRAG_LOCATION 都 post 一次的话，
+     *   快速移动会叠出一串 runnable，松手后列表还在自己滚。
+     */
+    private void updateDragScroll(float y) {
+        if (mMainScroll == null) return;
+        int edge = dp(64);
+        int top = mMainScroll.getPaddingTop();
+        int bottom = mMainScroll.getHeight() - mMainScroll.getPaddingBottom();
+        int dir = y < top + edge ? -1 : (y > bottom - edge ? 1 : 0);
+        if (dir == mDragScrollDir) return;
+        mDragScrollDir = dir;
+        mDragHandler.removeCallbacks(mDragScrollTask);
+        if (dir != 0) mDragHandler.post(mDragScrollTask);
+    }
+
+    /**
+     * 按当前手指位置把被拖的那一行插到正确的**视图**下标上（实时重排）。
+     *
+     * @param yInScroll 拖动事件里那个 y（相对 ScrollView 视口，不是相对内容）
+     */
+    private void moveDragRowTo(float yInScroll) {
+        if (mDragRow == null || mListContainer == null || mMainScroll == null) return;
+        // 视口坐标 → 列表容器坐标（要补上滚动量与两个 padding / 顶部的偏移）
+        float y = yInScroll - mMainScroll.getPaddingTop() + mMainScroll.getScrollY()
+                - mListContainer.getTop();
+        int target = mListContainer.getChildCount();
+        for (int i = 0; i < mListContainer.getChildCount(); i++) {
+            View c = mListContainer.getChildAt(i);
+            if (c == null || c == mDragRow) continue;
+            if (y < (c.getTop() + c.getBottom()) / 2f) { target = i; break; }
+        }
+        int cur = mListContainer.indexOfChild(mDragRow);
+        if (cur < 0) return;
+        // ★ target 是"在**含自己**的那份列表里、插到第 target 个之前"。先把它从列表里摘掉时，
+        //   排在它后面的下标都会减 1 ⇒ 插回去时要减回来（不减的症状：永远差一位，往下一格拖不动）。
+        int insert = target > cur ? target - 1 : target;
+        if (insert == cur) return;
+        mListContainer.removeView(mDragRow);
+        mListContainer.addView(mDragRow, Math.min(insert, mListContainer.getChildCount()));
+    }
+
+    /**
+     * 结束拖动（无论 drop 还是取消）。
+     *
+     * @param commit true = 把现在的视图顺序落盘 + 提示；false = 只把界面恢复（页面被切走时用）
+     */
+    private void finishRowDrag(boolean commit) {
+        View row = mDragRow;
+        if (row == null) return;
+        mDragRow = null;
+        mDragY = -1f;
+        mDragScrollDir = 0;
+        mDragHandler.removeCallbacks(mDragScrollTask);
+        row.setAlpha(1f);
+        if (commit && commitRowOrder()) {
+            Toast.makeText(this, Trans.get(this, R.string.main_order_saved), Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    /**
+     * 把**视图顺序**变成正确性：更新 `mEntries` 的次序 + 写 `Config.main_order`。
+     *
+     * @return true = 顺序确实变了（调用方据此决定要不要弹「已保存」）
+     */
+    private boolean commitRowOrder() {
+        if (mListContainer == null) return false;
+        List<Versions.Entry> ordered = new ArrayList<>();
+        List<String> keys = new ArrayList<>();
+        for (int i = 0; i < mListContainer.getChildCount(); i++) {
+            View v = mListContainer.getChildAt(i);
+            Object tag = (v == null) ? null : v.getTag();
+            if (!(tag instanceof Versions.Entry)) continue;
+            Versions.Entry e = (Versions.Entry) tag;
+            ordered.add(e);
+            keys.add(Versions.orderKey(e));
+        }
+        if (ordered.size() < 2) return false;
+        boolean changed = (mEntries == null || mEntries.size() != ordered.size());
+        if (!changed) {
+            for (int i = 0; i < ordered.size(); i++) {
+                if (mEntries.get(i) != ordered.get(i)) { changed = true; break; }
+            }
+        }
+        if (!changed) return false;
+        // ★ 换一份**新列表**，不原地改：后台补"存档 N 份"的线程正握着旧的 mEntries 在遍历
+        //   （原地改会撞 ConcurrentModificationException）；换新列表后它在 UI 收尾时按身份判死
+        //   （见 fillSlotSaveCounts 的 `mEntries != entries`）。
+        mEntries = ordered;
+        Config.get().setMainOrder(keys);
+        // 顺序变了 ⇒ 行上的下标也变了；后台补的那趟可能已经按旧列表跑完 / 判死，
+        // 这里按新顺序再补一次（纯 IO，几毫秒），否则刚拖过的行会缺「存档 N 份」那一段。
+        fillSlotSaveCounts(mEntries);
+        return true;
     }
 
     /**

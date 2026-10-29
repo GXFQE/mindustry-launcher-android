@@ -2665,6 +2665,56 @@ public final class SelfTest {
             two.add(other);
             ok(stat, L, Versions.distinctVersions(two) == 2,
                     "★元断言：两个不同版本 ⇒ 2（证明 distinctVersions 不是恒 1）");
+
+            // ⑦ 手工排序（第 319 轮：长按行最左图标拖动）—— 纯合并规则，不碰盘
+            List<Versions.Entry> three = new ArrayList<>();
+            three.add(base);
+            three.add(extra);
+            three.add(other);
+            String kBase = Versions.orderKey(base);
+            String kExtra = Versions.orderKey(extra);
+            ok(stat, L, kBase.equals(base.key()) && extra != null
+                            && kExtra.equals(base.key() + "\u0000" + BIND_B),
+                    "★手工排序的行键：主行只认版本 key（换槽不丢位置），附加行带自己绑的槽");
+
+            List<String> want = new ArrayList<>();
+            want.add(kExtra);
+            want.add("这一行已经不存在了");
+            want.add(kBase);
+            List<Versions.Entry> sorted = Versions.orderRows(three, want);
+            ok(stat, L, sorted.size() == 3, "手工排序：一行都不丢（认不出的键跳过）");
+            ok(stat, L, sorted.get(0) == extra && sorted.get(1) == base,
+                    "手工排序：按存下的次序（附加行在前、主行在后）");
+            ok(stat, L, sorted.get(2) == other, "手工排序：没写进顺序的行按扫描顺序补在末尾");
+            ok(stat, L, three.get(0) == base && three.size() == 3,
+                    "★手工排序：入参列表一个字节都没动（纯函数）");
+            ok(stat, L, Versions.orderRows(three, null).get(0) == base,
+                    "★元断言：没有保存顺序 ⇒ 原样（证明上面的重排不是恒真）");
+            ok(stat, L, Versions.orderRows(three, new ArrayList<String>()).size() == 3,
+                    "★空顺序表 ⇒ 三行都在（没排过时行为与以前一模一样）");
+            List<String> dupKey = new ArrayList<>();
+            dupKey.add(kBase);
+            dupKey.add(kBase);
+            ok(stat, L, Versions.orderRows(three, dupKey).size() == 3,
+                    "★顺序表里重复的键不会把一行复制成两行（仍然三行）");
+
+            // ★ 附加行被提升成主行（删掉主项那条路）：orderKey 从「key + 槽」变成「key」，
+            //   而提升操作会把它的槽写成主槽 ⇒ 旧的 rowKey 仍对得上，位置不许掉到末尾。
+            cfg.setSlotOf(base.key(), BIND_B);
+            Versions.Entry promoted = new Versions.Entry();
+            promoted.pkg = base.pkg;
+            promoted.label = base.label;
+            promoted.versionName = base.versionName;
+            promoted.boundSlot = null;
+            List<Versions.Entry> twoRows = new ArrayList<>();
+            twoRows.add(other);          // 排在前面 = 若认不出 promoted，它会被追加在末尾
+            twoRows.add(promoted);
+            List<String> oldKey = new ArrayList<>();
+            oldKey.add(kExtra);          // 它当附加行时存下的键
+            List<Versions.Entry> promotedOrder = Versions.orderRows(twoRows, oldKey);
+            ok(stat, L, promotedOrder.get(0) == promoted,
+                    "★附加行被提升成主行后，旧的顺序键仍能认出它（rowKey 兜底，位置不掉队）");
+            cfg.setSlotOf(base.key(), BIND_A);   // 复原，别影响后面的用例
         } catch (Throwable t) {
             ok(stat, L, false, "版本多槽用例异常：" + t);
         } finally {
@@ -8359,6 +8409,22 @@ public final class SelfTest {
         ok(stat, L, cardKids == 3,
                 "★元断言：版本行卡片里**只有 3 个**横向元素（图标 / 文字列 / 动作按钮）——"
                         + " 再加一个右侧控件就会把版本号挤成省略号，实际 " + cardKids);
+
+        // ★ 第 319 轮：最左侧是拖动把手（长按拖动排序），而且**必须是卡片第 1 个子控件**
+        //   —— 它靠吃掉原来的 14dp 卡片左内边距换触摸区，所以文字列位置不变；
+        //   把把手挪到后面就不再是"最左侧"，用户按他记住的位置会按空。
+        android.view.View handle = (row == null) ? null : row.findViewById(R.id.ver_handle);
+        ok(stat, L, handle != null, "版本行：最左侧有拖动把手（长按它拖动排序）");
+        int firstKidId = -1;
+        if (row instanceof android.view.ViewGroup) {
+            android.view.ViewGroup outer = (android.view.ViewGroup) row;
+            if (outer.getChildCount() > 0 && outer.getChildAt(0) instanceof android.view.ViewGroup) {
+                android.view.ViewGroup card = (android.view.ViewGroup) outer.getChildAt(0);
+                if (card.getChildCount() > 0) firstKidId = card.getChildAt(0).getId();
+            }
+        }
+        ok(stat, L, firstKidId == R.id.ver_handle,
+                "★把手必须贴着最左侧（卡片第 1 个子控件），实际 id=" + firstKidId);
 
         // ★ 2026-10-25：删除范围的**唯一判据**（版本页画按钮 / 灰掉 与 VersionOps.delete 共用）。
         //   以前两处各判一次（页面 `rows > 1` / delete `!imported`）—— 真机反馈「到底能不能删」。
