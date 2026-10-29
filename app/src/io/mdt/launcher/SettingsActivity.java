@@ -79,6 +79,8 @@ public class SettingsActivity extends BaseActivity {
     private TextView mAutoCleanSub;
     /** 用户语言包那一行的副标题（当前状态） */
     private TextView mLangPackSub;
+    /** 第 309 轮：检查更新的副标题（当前版本号，动态）。 */
+    private TextView mUpdateSub;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -182,6 +184,17 @@ public class SettingsActivity extends BaseActivity {
         //   （用户点单）。它仍然不属于任何一个槽（所以没进槽页），只是不再住"设置"里。
         //   副标题历史上是固定一句、不显示份数/体积（那要递归扫盘），这一点没变。
 
+        // 第 309 轮：检查更新。与「关于」同卡相邻 —— 两者都属于"版本相关"。
+        // ★ 判据：点下去发一个动作（查 → 弹卡片），不改变任何设置值；副标题给"当前版本"，
+        //   它是**唯一**会被这个动作更新的东西（fillValues 每次回来重取）。
+        View rowUpdate = Util.bindActionValue(root, R.id.row_update, R.drawable.ic_download,
+                R.string.set_update_title, new Runnable() {
+                    @Override public void run() {
+                        UpdateUi.checkManual(SettingsActivity.this);
+                    }
+                });
+        mUpdateSub = (TextView) rowUpdate.findViewById(R.id.act_sub);
+
         // 第 175 轮：「关于」搬成独立二级页（版本 / 包名 / 数据路径 / 开源地址 / 许可证）。
         // 页面只读；入口是设置页底部单独一行（不混进三类设置）。
         Util.bindAction(root, R.id.row_about, R.drawable.ic_app,
@@ -259,6 +272,12 @@ public class SettingsActivity extends BaseActivity {
                 }
                 mLangPackSub.setText(s);
             }
+        }
+        if (mUpdateSub != null) {
+            // 副标题只说"现在是什么版本"—— 不报"有没有新版"（那要在启动时才发现，
+            // 而这一行是"点下去查"，不是"结论位"）。
+            mUpdateSub.setText(Trans.get(SettingsActivity.this,
+                    R.string.update_check_sub_fmt, UpdateUi.versionName(this)));
         }
     }
 

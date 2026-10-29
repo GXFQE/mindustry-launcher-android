@@ -127,7 +127,9 @@ final class DevTools {
                 // 第 307 轮：更新器完整链路（拉清单 → 下载 → sha256 → 证书），不装包
                 || intent.hasExtra("dev_update_run")
                 // 第 308 轮：再往前一步 —— 过四道门后提交 PackageInstaller 会话
-                || intent.hasExtra("dev_update_install");
+                || intent.hasExtra("dev_update_install")
+                // 第 309 轮：界面链路（设置页那一行走的同一条路，只是把清单地址换成夹具）
+                || intent.hasExtra("dev_update_ui");
         if (!isDev) return;
         if ((a.getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) == 0) {
             Toast.makeText(a, R.string.dev_blocked_toast, Toast.LENGTH_SHORT).show();
@@ -228,6 +230,15 @@ final class DevTools {
         String updateInstall = intent.getStringExtra("dev_update_install");
         if (updateInstall != null && !updateInstall.isEmpty()) {
             devUpdateInstall(updateInstall);
+            return;
+        }
+
+        // ★ 第 309 轮：**界面那条路**（设置页「检查更新」走的就是它，只是清单地址换成夹具）。
+        //   与 `dev_update_run` 的区别：那个只写报告，这个真的弹卡片。
+        String updateUi = intent.getStringExtra("dev_update_ui");
+        if (updateUi != null && !updateUi.isEmpty()) {
+            UpdateUi.setManifestUrlForDev(updateUi);
+            UpdateUi.checkManual(a);
             return;
         }
 

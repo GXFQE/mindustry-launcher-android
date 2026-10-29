@@ -435,6 +435,10 @@ public class MainActivity extends BaseActivity {
         CrashAlert.catchUp(this);
         // ★ 列表重建之后再把滚动位置放回去（版本页 / 游戏回来都走这里）。
         restoreScroll();
+        // ★ 第 309 轮：启动时静默检查更新（24 h 去重在本进程内也去重一次）。
+        //   放在最后：它是"锦上添花"，不许挡住主界面自己的刷新。
+        //   ⚠️ 只治"有新版"这一种情况 —— 没网/数据坏一律不出声，否则每次启动都被打扰。
+        UpdateUi.checkSilentIfDue(this);
     }
 
     @Override

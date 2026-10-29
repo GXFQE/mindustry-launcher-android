@@ -1446,6 +1446,33 @@
     <string name="trash_reason_current_slot">That slot is in use right now. Switch to another slot first.</string>
     <string name="trash_reason_bad_name">That slot name cannot be used</string>
     <string name="trash_reason_unknown">Unknown reason</string>
+    <!--
+      第 309 轮：自更新（只做 APK 更新；不做 core 热更）。
+      ★ 这一组**只在 APK 内**用：文案随版本走，所以热更包带不来新文案 —— 这也正是
+        "只做 APK 更新"的必然结果（第 303 轮定案）。
+      ⚠️ 按钮文案要短（动作词），依据放正文 —— AlertDialog 三按钮一长就竖排。
+    -->
+    <string name="set_update_title">Check for updates</string>
+    <string name="update_check_sub_fmt">Current %1$s</string>
+    <string name="update_checking">Checking for updates</string>
+    <string name="update_latest">Already up to date</string>
+    <string name="update_err_network">Could not reach the update server</string>
+    <string name="update_err_data">The update info looks broken</string>
+    <string name="update_found_title_fmt">Version %1$s is available</string>
+    <string name="update_size_fmt">%1$s MB</string>
+    <string name="update_download">Download</string>
+    <string name="update_later">Later</string>
+    <string name="update_downloading">Downloading update</string>
+    <string name="update_download_failed">Download failed</string>
+    <string name="update_downloaded_title">Update downloaded</string>
+    <string name="update_install">Install</string>
+    <string name="update_delete">Delete</string>
+    <string name="update_no_permission">Allow installs from this app first</string>
+    <string name="update_go_settings">Open settings</string>
+    <string name="update_bad_package">That file is not for this app</string>
+    <string name="update_bad_sign">Signature does not match</string>
+    <string name="update_downgrade">That version is older than what you have</string>
+
 <string name="about_card_title">About</string>
 
     <!--

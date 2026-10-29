@@ -1412,6 +1412,28 @@
     <string name="trash_reason_current_slot">那个槽正在用着，先换到别的槽再试</string>
     <string name="trash_reason_bad_name">那个槽名不能用</string>
     <string name="trash_reason_unknown">原因不明</string>
+    <!-- 第 309 轮：自更新（只做 APK 更新；文案随版本走） -->
+    <string name="set_update_title">检查更新</string>
+    <string name="update_check_sub_fmt">当前 %1$s</string>
+    <string name="update_checking">正在检查更新</string>
+    <string name="update_latest">已是最新版本</string>
+    <string name="update_err_network">连不上更新服务器</string>
+    <string name="update_err_data">更新信息有问题</string>
+    <string name="update_found_title_fmt">有新版 %1$s</string>
+    <string name="update_size_fmt">%1$s MB</string>
+    <string name="update_download">下载</string>
+    <string name="update_later">稍后</string>
+    <string name="update_downloading">正在下载更新</string>
+    <string name="update_download_failed">下载失败</string>
+    <string name="update_downloaded_title">更新已下载</string>
+    <string name="update_install">安装</string>
+    <string name="update_delete">删除</string>
+    <string name="update_no_permission">先允许本应用安装应用</string>
+    <string name="update_go_settings">去设置</string>
+    <string name="update_bad_package">这个包不是本应用的</string>
+    <string name="update_bad_sign">签名对不上</string>
+    <string name="update_downgrade">这个版本比你现在的旧</string>
+
 <string name="about_card_title">关于</string>
 
     <!--

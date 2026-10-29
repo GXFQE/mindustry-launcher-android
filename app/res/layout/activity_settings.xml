@@ -216,6 +216,24 @@
                 android:background="@drawable/card_bg"
                 android:orientation="vertical">
 
+                <!--
+                  第 309 轮：检查更新。
+                  ★ 这是一个**动作行**（点了就查），不是设置值 —— 与「关于」同卡、相邻：
+                    两者都属于"版本相关"。设置页只放"能被改的项"那条规矩（ref/42 §84）
+                    的例外只有"点开是另一个页面/动作"的入口，这里和「关于」是同一类。
+                -->
+                <include
+                    android:id="@+id/row_update"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="62dp"
+                    android:background="@color/divider" />
+
                 <include
                     android:id="@+id/row_about"
                     layout="@layout/row_action"
