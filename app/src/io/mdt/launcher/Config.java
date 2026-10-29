@@ -125,6 +125,14 @@ public final class Config {
      */
     private static final String K_TAPS = "tap_count";
     /**
+     * 第 300 轮：**出厂 `content.json` 的指纹**（见 {@link Content}）。
+     *
+     * <p>用来判断 hub 里那份 `content.json` 还是不是"上次原样拷贝的那份"：
+     * 没改过 ⇒ 升级时换成新出厂值；改过 ⇒ 一个字都不动（用户的编辑优先）。
+     * 存的是出厂内容的 SHA-256，不是文件路径 —— 路径会变，内容不会。
+     */
+    private static final String K_CONTENT_HASH = "content_hash";
+    /**
      * 第 173 轮：中转站保留份数。
      *
      * <p>普通条目（地图 / 存档 / 蓝图 / 模组 / 插件）与**整个槽**分开：一个槽可能几十 MB，
@@ -1149,6 +1157,30 @@ public final class Config {
         put(K_TAPS, Integer.valueOf(v));
         save();
         return v;
+    }
+
+    /**
+     * 把连点计数清零（「重新变回普通人」时调用）。
+     *
+     * <p>用户 2026-10-29：「应该给一个重置版本号计数的方式（比如关开发者模式？）」——
+     * 关掉开发者模式就等于"从头再来"，累计数也该跟着归零，否则那个数只增不减、还会跨版本留着。
+     *
+     * <p>★ 只清计数、**不动「是否解锁」**（那是 {@link #setDevMode} 的事）：两件事分开写，
+     *   自检才能单独验证"计数能归零"而不必真的切换开关。
+     */
+    public synchronized void resetTapCount() {
+        put(K_TAPS, Integer.valueOf(0));
+        save();
+    }
+
+    /** 出厂 `content.json` 的指纹（空串 = 还没记过，见 {@link #K_CONTENT_HASH}）。 */
+    public synchronized String contentHash() {
+        return mRoot.optString(K_CONTENT_HASH, "");
+    }
+
+    public synchronized void setContentHash(String hash) {
+        put(K_CONTENT_HASH, hash == null ? "" : hash);
+        save();
     }
 
     // ── F5：自动备份（每槽策略 + 启动记账） ────────────────────────────────

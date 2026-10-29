@@ -172,11 +172,18 @@ public final class AboutActivity extends BaseActivity {
         alert(content.text(this, content.eggs.listTitle), body);
     }
 
-    /** 「重新变回普通人」：关掉开关、清计数、收起卡片（下次还要再连点 7 次）。 */
+    /**
+     * 「重新变回普通人」：关掉开关、**把累计计数清零**、收起卡片（下次还要再连点 7 次）。
+     *
+     * <p>★ 计数归零是用户 2026-10-29 明确要的：「应该给一个重置版本号计数的方式（比如关开发者模式？）」
+     *   —— 那个数只增不减、还会跨版本留着，关掉开发者模式就该是"从头再来"。
+     */
     private void relock() {
         mDev = false;
         mTaps = 0;
+        mTotalTaps = 0;
         Config.get().setDevMode(false);
+        Config.get().resetTapCount();
         applyDevCard();
         toast(Trans.get(this, R.string.devmode_relock_done));
     }

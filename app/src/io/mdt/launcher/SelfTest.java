@@ -15680,6 +15680,16 @@ public final class SelfTest {
         int back = Config.get().bumpTapCount(-1);
         ok(stat, L, before >= 0 && plus == before + 1 && back == before,
                 "★tap_count 往返：" + before + " → " + plus + " → " + back);
+        // ④b 重置（用户 2026-10-29：「应该给一个重置版本号计数的方式」—— 关开发者模式时清零）
+        Config.get().resetTapCount();
+        int zero = Config.get().tapCount();
+        Config.get().bumpTapCount(before);          // 原值加回来，自检不污染
+        int restored = Config.get().tapCount();
+        ok(stat, L, zero == 0 && restored == before,
+                "★重置计数：resetTapCount 归零（" + zero + "），原值能加回来（" + restored + "）");
+        // ④c 出厂内容"落到 hub"：用户可以直接编辑，不必自己准备一份 adb push
+        java.io.File hubCopy = new java.io.File(Data.hubDir(ctx), "content.json");
+        ok(stat, L, hubCopy.isFile(), "★出厂 content.json 已落到 hub（" + hubCopy.getAbsolutePath() + "）");
         // ⑤ 语言与格式回退
         Content.Text both = new Content.Text("中文", "english");
         Content.Text onlyEn = new Content.Text("", "english");
@@ -15702,6 +15712,16 @@ public final class SelfTest {
                         && rejects(MINI_CONTENT.replace("还差 %1$d 次", "还差 次"))
                         && rejects(MINI_CONTENT.replace("\"at\":9", "\"at\":7")),
                 "★解析器：好文件过；坏版本 / 缺占位符 / 档位不高于解锁值 都拒");
+        // ⑦ 出厂内容升级判据 + 指纹
+        ok(stat, L, Content.isStaleCopy("h1", "h1", "h2")
+                        && !Content.isStaleCopy("h1", "h2", "h3")
+                        && !Content.isStaleCopy("h1", "h2", "h2")
+                        && !Content.isStaleCopy("", "h2", "h3"),
+                "★升级判据：没改过的旧拷贝才刷新；改过的 / 已最新的 / 没记过的都不动");
+        String h1 = Content.sha256("abc");
+        ok(stat, L, h1.length() == 64 && h1.equals(Content.sha256("abc"))
+                        && !h1.equals(Content.sha256("abd")),
+                "★内容指纹：64 位十六进制、同输入同值、改一个字符就变");
         L.add("");
     }
 

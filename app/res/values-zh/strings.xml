@@ -1515,8 +1515,8 @@
     <string name="devmode_abi64">64 位</string>
     <string name="devmode_abi32">32 位</string>
     <string name="devmode_relock_title">重新变回普通人</string>
-    <string name="devmode_relock_sub">隐藏这张卡片；想再看就再连点版本摘要 7 次</string>
-    <string name="devmode_relock_done">开发者选项已隐藏。</string>
+    <string name="devmode_relock_sub">隐藏这张卡片并把连点计数清零；想再看就再连点版本摘要 7 次</string>
+    <string name="devmode_relock_done">开发者选项已隐藏，连点计数已清零。</string>
 
     <!-- ══ F5 自动备份（每槽一套策略，对齐桌面版的「存档分类设置」） ══════ -->
     <string name="slot_op_policy">自动备份设置…</string>

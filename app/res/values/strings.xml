@@ -1572,8 +1572,8 @@
     <string name="devmode_abi64">64-bit</string>
     <string name="devmode_abi32">32-bit</string>
     <string name="devmode_relock_title">Back to a normal user</string>
-    <string name="devmode_relock_sub">Hides this card; tap the version 7 times to come back</string>
-    <string name="devmode_relock_done">Developer options hidden.</string>
+    <string name="devmode_relock_sub">Hides this card and resets the tap count; tap the version 7 times to come back</string>
+    <string name="devmode_relock_done">Developer options hidden. The tap count is back to zero.</string>
     <string name="about_repo_url" translatable="false">https://github.com/GXFQE/mindustry-launcher-android</string>
     <string name="about_issues_url" translatable="false">https://github.com/GXFQE/mindustry-launcher-android/issues</string>
     <string name="about_license_url" translatable="false">https://github.com/GXFQE/mindustry-launcher-android/blob/main/LICENSE</string>

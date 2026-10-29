@@ -9,7 +9,9 @@ import org.json.JSONObject;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.InputStream;
+import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -188,45 +190,132 @@ final class Content {
 
     private static Content load(Context c) {
         if (c == null) return null;
+        Config.get().load(c);
+
+        String assetText = null;
+        try {
+            assetText = read(c.getAssets().open(ASSET));
+        } catch (Throwable t) {
+            Log.w(TAG, "read assets " + ASSET + " failed: " + t);
+        }
+        String assetHash = assetText == null ? "" : sha256(assetText);
+
+        File hubFile = hubFile(c);
         String raw = null;
         String source = null;
-        // ① 覆盖文件（外部 hub）
-        try {
-            File hub = Data.hubDir(c);
-            File f = hub == null ? null : new File(hub, OVERRIDE);
-            if (f != null && f.isFile()) {
-                String s = read(f);
-                if (s != null) {
-                    raw = s;
-                    source = f.getAbsolutePath();
-                }
-            }
-        } catch (Throwable t) {
-            Log.w(TAG, "read hub " + OVERRIDE + " failed: " + t);
-        }
-        // ② 自带 assets
-        if (raw == null) {
+        if (hubFile != null) {
             try {
-                raw = read(c.getAssets().open(ASSET));
-                source = "assets/" + ASSET;
+                if (hubFile.isFile()) {
+                    String text = read(hubFile);
+                    String hash = sha256(text);
+                    // ① 出厂内容升级：hub 那份还是上次**原样拷贝**（没人改过）⇒ 换成新出厂值。
+                    //    改过的（hash != 记录的指纹）一个字都不动 —— 用户的编辑优先。
+                    if (assetText != null && isStaleCopy(Config.get().contentHash(), hash, assetHash)) {
+                        if (write(hubFile, assetText)) {
+                            text = assetText;
+                            Log.i(TAG, "content.json refreshed to the shipped defaults");
+                        }
+                    }
+                    raw = text;
+                    source = hubFile.getAbsolutePath();
+                } else if (assetText != null) {
+                    // ② 第一次运行：把出厂内容**落到 hub**（用户 2026-10-29：「内置也打包一个 json」）——
+                    //    之后直接改这个文件就行，不用 adb push 自己准备一份，也不用重新打包。
+                    if (write(hubFile, assetText)) {
+                        Log.i(TAG, "content.json seeded at " + hubFile.getAbsolutePath());
+                    }
+                    raw = assetText;
+                    source = "assets/" + ASSET;
+                }
             } catch (Throwable t) {
-                Log.w(TAG, "read assets " + ASSET + " failed: " + t);
-                return null;
+                Log.w(TAG, "handle hub " + OVERRIDE + " failed: " + t);
             }
         }
+        if (raw == null) {
+            if (assetText == null) return null;
+            raw = assetText;
+            source = "assets/" + ASSET;
+        }
+
+        Content out;
         try {
-            return parse(raw, source);
+            out = parse(raw, source);
         } catch (Throwable t) {
             Log.w(TAG, "content.json invalid (" + source + "): " + t);
             // ★ 覆盖文件坏掉 ⇒ 回退自带那份（"改坏了"不该把致谢弄没）
-            if (source != null && !source.startsWith("assets/")) {
+            if (source != null && !source.startsWith("assets/") && assetText != null) {
                 try {
-                    return parse(read(c.getAssets().open(ASSET)), "assets/" + ASSET);
+                    out = parse(assetText, "assets/" + ASSET);
                 } catch (Throwable t2) {
                     Log.w(TAG, "fallback assets " + ASSET + " also failed: " + t2);
+                    return null;
+                }
+            } else {
+                return null;
+            }
+        }
+        if (assetText != null && !assetHash.equals(Config.get().contentHash())) {
+            Config.get().setContentHash(assetHash);
+        }
+        return out;
+    }
+
+    /** hub 里的 `content.json`（目录不存在就建；拿不到目录 ⇒ null）。 */
+    private static File hubFile(Context c) {
+        try {
+            File dir = Data.hubDir(c);
+            if (dir == null) return null;
+            if (!dir.isDirectory() && !dir.mkdirs()) return null;
+            return new File(dir, OVERRIDE);
+        } catch (Throwable t) {
+            Log.w(TAG, "resolve hub dir failed: " + t);
+            return null;
+        }
+    }
+
+    /**
+     * hub 里那份是不是"上次原样拷贝的出厂内容"（纯函数，自检喂三种情形）。
+     *
+     * @param known     config 里记的出厂指纹（空 = 没记过 ⇒ 一律不碰用户的文件）
+     * @param hubHash   hub 那份的指纹
+     * @param assetHash 这次出厂内容的指纹
+     */
+    static boolean isStaleCopy(String known, String hubHash, String assetHash) {
+        return known != null && known.length() > 0 && known.equals(hubHash)
+                && assetHash != null && assetHash.length() > 0 && !assetHash.equals(hubHash);
+    }
+
+    /** 内容指纹（SHA-256 十六进制；算不出来 ⇒ 空串，调用方按"没记过"处理）。 */
+    static String sha256(String s) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] d = md.digest(s.getBytes("UTF-8"));
+            StringBuilder sb = new StringBuilder(d.length * 2);
+            for (byte b : d) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (Throwable t) {
+            return "";
+        }
+    }
+
+    /** 写文件（UTF-8）；失败只打日志、返回 false —— 内容文件写不进去不该影响打开页面。 */
+    private static boolean write(File f, String text) {
+        try {
+            FileOutputStream out = new FileOutputStream(f);
+            try {
+                out.write(text.getBytes("UTF-8"));
+            } finally {
+                try {
+                    out.close();
+                } catch (Throwable ignored) {
                 }
             }
-            return null;
+            return true;
+        } catch (Throwable t) {
+            Log.w(TAG, "write " + f + " failed: " + t);
+            return false;
         }
     }
 

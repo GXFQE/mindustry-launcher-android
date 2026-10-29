@@ -408,16 +408,25 @@ SKIP_I18N_CHECK=1 ./build.sh             # 应急关掉（会打一行很响的 
 3. **上限**：≤ 50 档、单条 ≤ 500 字、致谢 zh/en **行数相同**（空行是排版：一组"用到的"与
    一组"对照的"分开）。
 
-**改完不重新打包也能看效果**（覆盖文件，进程内只读一次 ⇒ 改完要重启）：
+**改文案不用重新打包**：第一次打开「关于」页时，出厂内容会**自动落到**
 
-```bash
-adb push content.json /sdcard/Android/data/io.mdt.launcher/hub/content.json
-adb shell am force-stop io.mdt.launcher
+```
+/sdcard/Android/data/io.mdt.launcher/hub/content.json
 ```
 
+直接编辑这个文件（手机上用文本编辑器，或 `adb pull` / `adb push`），
+再 `adb shell am force-stop io.mdt.launcher` 重新打开即可生效（进程内只读一次）。
+**删掉它会自动从 APK 里重新生成一份**。
+
 读取顺序：`hub/content.json` **优先** → APK 自带的 `assets/content.json` **兜底**。
-覆盖文件坏了（不是 JSON / 字段缺失 / 占位符不对）⇒ 一行 WARNING + **回退到出厂那份**；
+覆盖文件坏了（不是 JSON / 字段缺失 / 占位符不对）⇒ 一行 WARNING + **回退到出厂那份**，
 删掉覆盖文件即回到出厂值。
+
+**升级不会吃掉你的修改**：`config.json` 里的 `content_hash` 记着出厂内容的指纹 ——
+
+- hub 那份**没改过**（指纹 == 记的值）且出厂内容变了 ⇒ 换成新出厂值；
+- **改过**（指纹对不上）⇒ 一个字都不动；
+- 老版本升上来（还没记过指纹）⇒ 也不动。
 
 **门禁**：`build.sh` 的 `[0/4] content gate`（`tools/content-check.py`，同样先 `--selftest`）。
 它抓的是"编译器 / aapt2 / i18n 门禁都不会报"的那类错（版本号、双语缺边、占位符不一致、档位乱序、
@@ -425,6 +434,12 @@ adb shell am force-stop io.mdt.launcher
 
 ⚠️ 这两块**不走 `Trans`、也不进用户语言包**（它们是"内容"不是"界面文案"；语言包只覆盖 `res/values*`）。
 要换这两块的语言，改 `content.json` 本身。
+
+### 开发者模式（彩蛋）的计数
+
+「关于」页连点版本摘要的计数**跨会话累计**；点「重新变回普通人」会把它**归零**
+（`Config.resetTapCount()`，与"是否解锁"分开）。门槛与各档段子都在 `content.json` 的
+`eggs.unlockAt` / `eggs.milestones` —— 改门槛、加档都不用改代码。
 
 ## 开发直通口（仅 debuggable 构建生效）
 
