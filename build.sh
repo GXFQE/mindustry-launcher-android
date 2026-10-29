@@ -316,7 +316,7 @@ echo "== [2/4] javac =="
 #    ⇒ 产品版带着它们纯属白占一份 dex，还把一个"能对测试槽做破坏性验证"的类送到用户机器上。
 #    ⇒ 按**与运行时那道门同一个谓词**裁剪：
 #         dev 版 = app/src（全部）      + app/src-dev（真实现）
-#         产品版 = app/src（去掉 SelfTest.java） + app/src-release（同名空壳）
+#         产品版 = app/src（去掉 SelfTest.java 与 UpdateManifestCheck.java） + app/src-release（同名空壳）
 #    ⚠️ 空壳与真实现的**公开面必须逐字一致**（MainActivity 直接静态调用它们）⇒ 两种构建都得过。
 DEV_SRC_DIR="$ROOT/app/src-dev"
 PRODUCT_SRC_DIR="$ROOT/app/src-release"
@@ -327,7 +327,9 @@ if [ "$DEBUGGABLE" = "true" ]; then
   echo "   dev-only sources: included (debuggable build)"
 else
   [ -d "$PRODUCT_SRC_DIR" ] || { echo "FAIL: missing product stub dir: $PRODUCT_SRC_DIR" >&2; exit 1; }
-  SELFTEST_ARGS=( ! -name 'SelfTest.java' )
+  # ★ UpdateManifestCheck 只服务自检（PC 侧 PcCheck 也用它）—— 与 SelfTest 同一条排除规则。
+  #   它不 import android，所以产品版少它一个不丢任何运行时能力。
+  SELFTEST_ARGS=( ! -name 'SelfTest.java' ! -name 'UpdateManifestCheck.java' )
   EXTRA_SRC="$PRODUCT_SRC_DIR"
   echo "   dev-only sources: EXCLUDED (product build -> stubs from app/src-release)"
 fi

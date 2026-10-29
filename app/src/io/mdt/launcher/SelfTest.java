@@ -351,6 +351,8 @@ public final class SelfTest {
             easterEggs(ctx, L, stat);
             // ★ 第 298 轮：关于页「致谢」必须**可见**（用户：致谢不该做成隐藏的）
             aboutCredits(ctx, L, stat);
+            // ★ 第 305 轮：更新清单（纯逻辑 —— 与 PC 侧 PcCheck 跑的是同一份判据）
+            updateManifest(L, stat);
             // ★ 篡改对象池的用例放**最后**：它会在池里留下一个内容坏掉的对象，
             //   之后任何"再备份一次"都会因为 `has()` 命中而复用坏对象（CAS 的固有
             //   假设是"池内不可变"）。放在最后就不影响别的用例。
@@ -5208,21 +5210,21 @@ public final class SelfTest {
 
         // ── 第 135 轮：插件自述（入口类名一插件一份）+ 注入顺序（官方先、第三方后）──
         L.add("  · 插件自述元数据（entry 一插件一份）与注入顺序（第 135 轮）");
-        java.util.Map<String, String> jm = PluginMeta.flatJson(
+        java.util.Map<String, String> jm = FlatJson.parse(
                 "{\"entry\":\"io.mdt.plugtest.v1.PlugPage\",\"name\":\"probe\",\"version\":\"1\"}");
         ok(stat, L, jm != null && "io.mdt.plugtest.v1.PlugPage".equals(jm.get("entry"))
                         && "probe".equals(jm.get("name")) && "1".equals(jm.get("version")),
                 "自述 json 的扁平键值读得出来（entry / name / version）");
-        ok(stat, L, "d.E".equals(PluginMeta.flatJson("{\"a\":{\"b\":\"c\"},\"entry\":\"d.E\"}").get("entry"))
-                        && PluginMeta.flatJson("{\"a\":{\"b\":\"c\"},\"entry\":\"d.E\"}").size() == 1
-                        && !PluginMeta.flatJson("{\"a\":{\"b\":\"c\"},\"entry\":\"d.E\"}").containsKey("a"),
+        ok(stat, L, "d.E".equals(FlatJson.parse("{\"a\":{\"b\":\"c\"},\"entry\":\"d.E\"}").get("entry"))
+                        && FlatJson.parse("{\"a\":{\"b\":\"c\"},\"entry\":\"d.E\"}").size() == 1
+                        && !FlatJson.parse("{\"a\":{\"b\":\"c\"},\"entry\":\"d.E\"}").containsKey("a"),
                 "★嵌套对象的**键与内容都不许**混进来（那个键的值是容器 ⇒ 整个丢掉；"
                         + "否则它会跟嵌套后面第一个串配成一对，entry 反而丢了）");
-        ok(stat, L, "3".equals(PluginMeta.flatJson("{\"version\":3}").get("version"))
-                        && "true".equals(PluginMeta.flatJson("{\"x\":true}").get("x")),
+        ok(stat, L, "3".equals(FlatJson.parse("{\"version\":3}").get("version"))
+                        && "true".equals(FlatJson.parse("{\"x\":true}").get("x")),
                 "裸值（数字 / true）也收得下来（自述里版本号很可能是数字）");
-        ok(stat, L, PluginMeta.flatJson("不是 json") == null
-                        && PluginMeta.flatJson("{\"a\":\"没闭合") != null,
+        ok(stat, L, FlatJson.parse("不是 json") == null
+                        && FlatJson.parse("{\"a\":\"没闭合") != null,
                 "不是对象 ⇒ null；引号没闭合 ⇒ 收下已认出来的那部分（**不许抛异常**）");
         PluginMeta.Info mi = new PluginMeta.Info(null, null, null, null, null);
         ok(stat, L, PluginHost.DEFAULT_ENTRY.equals(mi.entryOr(PluginHost.DEFAULT_ENTRY))
@@ -15988,5 +15990,22 @@ public final class SelfTest {
             }
         }
         return out;
+    }
+
+    // ── 第 305 轮：更新清单（纯逻辑）────────────────────────────────────
+
+    /**
+     * 更新清单（`update.json`）的解析与判定。
+     *
+     * <p>★ 判据住在 {@link UpdateManifestCheck}（纯逻辑、不 import android）——
+     * **同一份断言在 PC 侧（`PcCheck`）也跑**：那边用普通 JDK 直接编跑，不装设备。
+     * 写两遍必漂，所以这里只做"把结果并进总报告"这一件事。
+     */
+    private static void updateManifest(List<String> L, int[] stat) {
+        L.add("");
+        L.add("【更新清单】");
+        for (UpdateManifestCheck.Line line : UpdateManifestCheck.run()) {
+            ok(stat, L, line.ok, line.msg);
+        }
     }
 }

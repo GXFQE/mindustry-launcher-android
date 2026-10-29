@@ -89,7 +89,9 @@ BUDGET_FILE = os.path.join("tools", "i18n-java-budget.txt")
 #   `SelfTest.java` = **自检**：它的中文是**断言期望值**（自检语言钉死在 zh、那些中文本来就不该搬），
 #   而且每加一条断言就会变 ⇒ 计入预算只会"天天红"，最后大家闭着眼把数字改大 ——
 #   那正是台账变消音器的路。**排除它比"每次加断言都改数字"诚实**。
-BUDGET_SKIP = {"SelfTest.java"}
+#   `UpdateManifestCheck.java` = 同上（2026-10-29 第 305 轮）：它是自检的**判据本体**
+#   （SelfTest 只把结果并进报告，PC 侧 PcCheck 跑同一份），中文全是断言消息。
+BUDGET_SKIP = {"SelfTest.java", "UpdateManifestCheck.java"}
 # 一个字符串字面量的内容（不跨行；Java 里跨行是相邻字面量相加 ⇒ 每个片段各算一条）
 LITERAL_RE = re.compile(r'"((?:[^"\\]|\\.)*)"')
 
