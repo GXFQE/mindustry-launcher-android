@@ -151,6 +151,19 @@ public final class Config {
     /** 第 174 轮：崩溃提示总开关（默认开；关掉只影响提示，不影响报告落盘 / 分析）。 */
     private static final String K_CRASH_ALERT_ENABLED = "crash_alert_enabled";
     /**
+     * 第 311 轮：**接收预览版**（默认开 —— 1.0 之前每个版本都是 prerelease，
+     * 默认关等于谁都收不到更新）。
+     *
+     * <p>两个通道的语义（见 {@link UpdateUi}）：
+     * <ul>
+     *   <li>开 ⇒ 读固定通道 `update-channel-preview`（覆盖 preview / rc / 正式）；</li>
+     *   <li>关 ⇒ 读 `releases/latest`（GitHub 只把它指向**非 prerelease**，正好就是"稳定版"）。</li>
+     * </ul>
+     * ★ 1.0 发布时把默认改成 false（正式版用户不该被预览版打扰）。
+     */
+    private static final String K_UPDATE_PREVIEW = "update_preview";
+
+    /**
      * 一档④（2026-10-06）：每个版本**上次启动的时刻** { "&lt;版本key&gt;": 毫秒 }。
      *
      * ★ 为什么需要它：{@link #sessionStartedAt()} 记的是"**正在进行**的那一次"，
@@ -183,6 +196,12 @@ public final class Config {
     public static final boolean DEF_AUTO_CLEAN = true;
     /** 崩溃提示的出厂默认 = **开**（第 174 轮加的开关；关掉不影响报告本身）。 */
     public static final boolean DEF_CRASH_ALERT = true;
+    /**
+     * 接收预览版的出厂默认 = **开**（第 311 轮）。
+     * ⚠️ 1.0 之前每个版本都是 prerelease —— 默认 false 等于谁都收不到更新，所以这里必须是 true。
+     *    1.0 发布时改成 false。
+     */
+    public static final boolean DEF_UPDATE_PREVIEW = true;
 
     private static volatile Config sInstance;
 
@@ -371,6 +390,25 @@ public final class Config {
 
     public synchronized void setCrashAlertEnabled(boolean on) {
         put(K_CRASH_ALERT_ENABLED, Boolean.valueOf(on));
+        save();
+    }
+
+    /**
+     * 第 311 轮：是否接收**预览版**（默认开；坏值退默认 + WARNING 点名键名 —— 同上一族纪律）。
+     *
+     * <p>★ 它决定更新器读哪个通道（见 {@link UpdateUi}），不影响已经装上的版本。
+     */
+    public synchronized boolean updatePreview() {
+        if (!mRoot.has(K_UPDATE_PREVIEW)) return DEF_UPDATE_PREVIEW;
+        Object v = mRoot.opt(K_UPDATE_PREVIEW);
+        if (v instanceof Boolean) return ((Boolean) v).booleanValue();
+        Log.w(TAG, "config key '" + K_UPDATE_PREVIEW + "' is not a boolean (" + v
+                + "), falling back to default " + DEF_UPDATE_PREVIEW);
+        return DEF_UPDATE_PREVIEW;
+    }
+
+    public synchronized void setUpdatePreview(boolean on) {
+        put(K_UPDATE_PREVIEW, Boolean.valueOf(on));
         save();
     }
 

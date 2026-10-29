@@ -144,8 +144,9 @@ APP_NAME="mdt-launcher${SUFFIX}"
 #   理由：任何"要发出去的包"都必然 VER_CODE > 1，而它必须用正式密钥 —— 否则
 #   ① 装不上已发布用户（签名不同 ⇒ 只能卸载重装 ⇒ 连槽一起丢）；
 #   ② 自更新会被自己的证书校验拒掉，现象是"下载完了却说签名对不上"（很难往签名上想）。
-#   自测包保持 VER_CODE=1 不受影响。
-if [ "$VER_CODE" != "1" ] && [ "$KEYSTORE" = "$HOME/.android/debug.keystore" ]; then
+#   ⚠️ **只卡产品版**：dev 构建（DEBUGGABLE=true）本来就用 debug 签名，
+#      而且它需要用 VER_CODE=2 去测"升级流程" —— 卡它等于把自测路堵死（第 311 轮踩过）。
+if [ "$VER_CODE" != "1" ] && [ "$DEBUGGABLE" != "true" ] && [ "$KEYSTORE" = "$HOME/.android/debug.keystore" ]; then
   echo "FAIL: VER_CODE=$VER_CODE but KEYSTORE is still the debug one." >&2
   echo "      A build with VER_CODE > 1 is a release build; sign it with the release key:" >&2
   echo "        KEYSTORE=\$HOME/.android/mdt-launcher-release.jks KS_ALIAS=mdt KS_PASS=... KEY_PASS=... \\" >&2

@@ -234,6 +234,23 @@
                     android:layout_marginStart="62dp"
                     android:background="@color/divider" />
 
+                <!--
+                  第 311 轮：接收预览版（开关）。
+                  ★ 与「检查更新」相邻：一个管"去不去问"，一个管"问哪个通道"。
+                  ★ 默认 **开** —— 1.0 之前每个版本都是 prerelease，默认关等于谁都收不到更新。
+                -->
+                <include
+                    android:id="@+id/row_update_preview"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="62dp"
+                    android:background="@color/divider" />
+
                 <include
                     android:id="@+id/row_about"
                     layout="@layout/row_action"

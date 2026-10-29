@@ -28,17 +28,24 @@ import java.util.Locale;
 final class UpdateUi {
 
     /**
-     * 更新清单的地址：**固定 tag 的 release 资产**，不是 `releases/latest`。
+     * **预览通道**：固定 tag 的 release 资产。
      *
-     * <p>⚠️ 为什么不能用 `latest`：GitHub 的 `releases/latest` **只指向非 prerelease**，
-     * 而 1.0 之前每个版本都是 `--prerelease` ⇒ `latest/download/…` 直接 404
-     * （`docs/RELEASING.md` §5 早就记了这一条，只是当时还没有更新器）。
-     *
-     * <p>⇒ 用一条**固定通道**：发版时把 `update.json` 传到 tag `update-channel` 的那个
-     * release（`gh release upload update-channel update.json --clobber`），URL 永远不变。
+     * <p>⚠️ 为什么预览不能走 `releases/latest`：GitHub 的 `latest` **只指向非 prerelease**，
+     * 而 1.0 之前每个版本都勾 `--prerelease` ⇒ `latest/download/…` 直接 404
+     * （`docs/RELEASING.md` §5 记过这条）。
      */
-    static final String MANIFEST_URL =
-            "https://github.com/GXFQE/mindustry-launcher-android/releases/download/update-channel/update.json";
+    static final String MANIFEST_PREVIEW =
+            "https://github.com/GXFQE/mindustry-launcher-android/releases/download/update-channel-preview/update.json";
+
+    /**
+     * **稳定通道**：`releases/latest` —— GitHub 只把它指向非 prerelease，正好就是"稳定版"，
+     * 因此**不需要额外维护**（发一个正式版，这个 URL 自动指过去）。
+     *
+     * <p>⚠️ 稳定版还没发布时它是 404：调用方要把 404 当"这个通道还没有版本"，
+     * 不能当成"网络坏了"（否则用户会一直看到一个错误）。
+     */
+    static final String MANIFEST_STABLE =
+            "https://github.com/GXFQE/mindustry-launcher-android/releases/latest/download/update.json";
 
     /** dev 夹具用：`dev_update_ui <url>` 覆盖掉上面那个。 */
     private static volatile String sOverride = null;
@@ -50,8 +57,10 @@ final class UpdateUi {
 
     static void setManifestUrlForDev(String url) { sOverride = url; }
 
-    static String manifestUrl() {
-        return (sOverride != null && !sOverride.isEmpty()) ? sOverride : MANIFEST_URL;
+    /** 当前该读哪个通道（dev 覆盖优先；否则看"接收预览版"那个开关）。 */
+    static String manifestUrl(android.content.Context ctx) {
+        if (sOverride != null && !sOverride.isEmpty()) return sOverride;
+        return Config.get().updatePreview() ? MANIFEST_PREVIEW : MANIFEST_STABLE;
     }
 
     /** 用户看得见的版本号（不是 versionCode —— 那个不上屏）。 */
@@ -111,7 +120,7 @@ final class UpdateUi {
                 UpdateManifest m = null;
                 String err = null;
                 try {
-                    String json = UpdateClient.fetchText(manifestUrl(), UpdateManifest.MAX_BYTES);
+                    String json = UpdateClient.fetchText(manifestUrl(a), UpdateManifest.MAX_BYTES);
                     m = UpdateManifest.parse(json);
                     if (!m.ok()) err = m.error;
                 } catch (Throwable t) {
@@ -125,11 +134,21 @@ final class UpdateUi {
                     @Override public void run() {
                         if (a.isFinishing()) return;
                         if (fm == null || !fm.ok()) {
-                            if (manual) {
-                                boolean net = ferr != null && ferr.contains("http") || ferr != null
-                                        && (ferr.contains("IOException") || ferr.contains("timeout"));
-                                showError(a, ui[0], net ? R.string.update_err_network : R.string.update_err_data);
+                            // ★ 404 = **这个通道还没有版本**（稳定版还没发过；或者通道 release 还没建）。
+                            //   那不是错误 —— 说"还没有"会更好，但一句"已是最新"也不会误导
+                            //   （用户此刻确实没有可装的东西）。**绝不能报"连不上服务器"**。
+                            boolean noRelease = ferr != null && ferr.contains("404");
+                            if (!manual) return;
+                            if (noRelease) {
+                                if (ui[0] != null && ui[0].isShowing()) {
+                                    ui[0].replace(Trans.get(a, R.string.set_update_title),
+                                            Trans.get(a, R.string.update_latest), closeBtn(a, ui[0]));
+                                }
+                                return;
                             }
+                            boolean net = ferr != null && (ferr.contains("http")
+                                    || ferr.contains("IOException") || ferr.contains("timeout"));
+                            showError(a, ui[0], net ? R.string.update_err_network : R.string.update_err_data);
                             return;
                         }
                         int cur = UpdateInstall.currentVersionCode(a);

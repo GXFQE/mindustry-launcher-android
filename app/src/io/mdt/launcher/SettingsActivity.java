@@ -81,6 +81,8 @@ public class SettingsActivity extends BaseActivity {
     private TextView mLangPackSub;
     /** 第 309 轮：检查更新的副标题（当前版本号，动态）。 */
     private TextView mUpdateSub;
+    /** 第 311 轮：接收预览版那个开关的副标题。 */
+    private TextView mUpdatePreviewSub;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -195,6 +197,17 @@ public class SettingsActivity extends BaseActivity {
                 });
         mUpdateSub = (TextView) rowUpdate.findViewById(R.id.act_sub);
 
+        // 第 311 轮：接收预览版（开关）。点一下就地翻转 —— 这一行是**设置值**，
+        // 不是"带你走"，所以它不走弹窗（ref/42 §84 的判据）。
+        View rowPreview = Util.bindActionValue(root, R.id.row_update_preview, R.drawable.ic_download,
+                R.string.set_update_preview_title, new Runnable() {
+                    @Override public void run() {
+                        Config.get().setUpdatePreview(!Config.get().updatePreview());
+                        fillValues();
+                    }
+                });
+        mUpdatePreviewSub = (TextView) rowPreview.findViewById(R.id.act_sub);
+
         // 第 175 轮：「关于」搬成独立二级页（版本 / 包名 / 数据路径 / 开源地址 / 许可证）。
         // 页面只读；入口是设置页底部单独一行（不混进三类设置）。
         Util.bindAction(root, R.id.row_about, R.drawable.ic_app,
@@ -278,6 +291,10 @@ public class SettingsActivity extends BaseActivity {
             // 而这一行是"点下去查"，不是"结论位"）。
             mUpdateSub.setText(Trans.get(SettingsActivity.this,
                     R.string.update_check_sub_fmt, UpdateUi.versionName(this)));
+        }
+        if (mUpdatePreviewSub != null) {
+            mUpdatePreviewSub.setText(Config.get().updatePreview()
+                    ? R.string.set_update_preview_on : R.string.set_update_preview_off);
         }
     }
 

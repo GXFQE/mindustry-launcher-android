@@ -115,10 +115,16 @@ def gen(args):
     print("  sha256      = %s" % sha)
     print("  url         = %s" % url)
     print()
-    print("下一步（固定通道，URL 永远不变）：")
-    print("  gh release upload %s %s --clobber" % (args.channel, args.out))
-    print("  # 第一次要先建通道：gh release create %s --title \"Update channel\" --notes \"…\" --prerelease"
-          % args.channel)
+    if args.channel == "stable":
+        print("下一步（稳定版：update.json 跟这一版自己的 release 一起传）")
+        print("  gh release upload %s %s" % (args.tag, args.out))
+        print("  # 之后 releases/latest/download/update.json 会自动指过来，不需要额外维护")
+    else:
+        print("下一步（预览通道，URL 永远不变）：")
+        print("  gh release upload update-channel-preview %s --clobber" % args.out)
+        print("  # 第一次要先建通道：")
+        print("  #   gh release create update-channel-preview --prerelease \\")
+        print("  #     --title \"Preview channel\" --notes \"自动更新用的固定通道，不是给用户点的版本\"")
     return 0
 
 
@@ -163,7 +169,9 @@ def main():
     ap.add_argument("--tag")
     ap.add_argument("--notes", default="")
     ap.add_argument("--repo", default="GXFQE/mindustry-launcher-android")
-    ap.add_argument("--channel", default="update-channel")
+    ap.add_argument("--channel", default="preview", choices=["preview", "stable"],
+                    help="preview = 传到固定通道 update-channel-preview；"
+                         "stable = 跟这一版 release 一起传（latest 会自动指过去）")
     ap.add_argument("--out", default="update.json")
     ap.add_argument("--sdk", default=DEFAULT_SDK)
     ap.add_argument("--allow-debug", action="store_true")

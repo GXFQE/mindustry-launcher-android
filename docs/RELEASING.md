@@ -102,14 +102,18 @@ git tag -l 'v*' | wc -l    # 现在是 6 ⇒ 下一个 vc = 7
   - rc：`v1.0.0-rc1 —— 第一个候选版（功能冻结，只修问题）`
   - 稳定：`v1.0.0 —— 正式版`
 - **资产名固定** `mdt-launcher.apk`：不要把版本写进文件名，下载链接才稳定。
-- **自更新清单 `update.json`**（第 310 轮起，客户端见 `UpdateUi.MANIFEST_URL`）：
+- **自更新清单 `update.json`**（第 310 轮起，客户端见 `UpdateUi`）：
   - 由 `python tools/make-update-json.py --apk mdt-launcher.apk --tag <tag> --notes "…"` **现算生成**
     （`versionCode` / `versionName` / `size` / `sha256` 全从产物读，`url` 指向这一版自己的 tag）；
-  - 传到**固定通道** tag `update-channel` 的那个 release：
-    `gh release upload update-channel update.json --clobber`；
-  - 🔴 **不要用 `releases/latest/download/…`**：`latest` 只指向**非 prerelease**，而 preview / rc
-    都勾 `--prerelease` ⇒ 那个路径是 404（这一条 §5 早年就记着，第 310 轮才真正踩到）；
-  - 通道 release 首次要建：`gh release create update-channel --prerelease --title "Update channel" --notes "自动更新用的固定通道，不是给用户点的版本"`；
+  - **两个通道**（客户端按设置里的「接收预览版」选）：
+    | 通道 | URL | 怎么发布 |
+    |---|---|---|
+    | **预览**（默认） | `…/releases/download/update-channel-preview/update.json` | `gh release upload update-channel-preview update.json --clobber`（固定 tag，URL 永远不变） |
+    | **稳定** | `…/releases/latest/download/update.json` | 跟**这一版自己的** release 一起传（`gh release upload <tag> update.json`），`latest` 会自动指过去 |
+  - 🔴 **预览版不能走 `latest`**：GitHub 的 `latest` 只指向**非 prerelease**，而 preview / rc
+    都勾 `--prerelease` ⇒ 那个路径是 404（§5 早年记过，第 310 轮才真正踩到）；
+  - 预览通道 release 首次要建：
+    `gh release create update-channel-preview --prerelease --title "Preview channel" --notes "自动更新用的固定通道，不是给用户点的版本"`；
   - 通道里**只有一个 `update.json`**（APK 仍跟着各版本自己的 release 走），所以它不占版本号、不进历史。
 - **发布说明以 GitHub 为唯一正文**，仓库里不复制第二份（复制必漂）；
   本地底稿放 `.dsh/release-notes-<版本>.md`。
@@ -136,8 +140,9 @@ git tag -l 'v*' | wc -l    # 现在是 6 ⇒ 下一个 vc = 7
    `python tools/make-update-json.py --apk mdt-launcher.apk --tag <tag> --notes "…"` 一次算出并写成
    `update.json`（手抄必错，而错了的后果是"所有用户都下载失败"，不是"少个功能"）；
 7. tag → push → `gh release create`（preview / rc 加 `--prerelease`）；
-8. **再更新自更新通道**：`gh release upload update-channel update.json --clobber`
-   —— 漏了这一步，用户那边永远看不到这一版（客户端读的是通道，不是 latest）；
+8. **再更新自更新通道**（漏了这一步，用户那边永远看不到这一版）：
+   - preview / rc ⇒ `gh release upload update-channel-preview update.json --clobber`
+   - 稳定版 ⇒ `gh release upload <tag> update.json`（跟 APK 同一个 release，`latest` 自动指过去）
 9. 发完在 `next/40` 记一行内部批次（对外历史就是 GitHub Releases）。
 
 > ⚠️ **第一次带自更新的发布**：用户手里那个版本还没有更新器（v0.7.0 及更早），
