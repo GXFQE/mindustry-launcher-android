@@ -47,20 +47,47 @@ final class UpdateUi {
     static final String MANIFEST_STABLE =
             "https://github.com/GXFQE/mindustry-launcher-android/releases/latest/download/update.json";
 
-    /** dev 夹具用：`dev_update_ui <url>` 覆盖掉上面那个。 */
+    /** dev 夹具用的两个通道覆盖（null = 用真地址）。 */
     private static volatile String sOverride = null;
+    private static volatile String sOverrideStable = null;
+
+    /**
+     * dev 夹具用：`dev_update_ui <preview-url>#<stable-url>` 覆盖两个通道（只有一个就两边同值）。
+     *
+     * <p>⚠️ 分隔符用 `#` 而不是 `|`：`|` 会被 `adb shell` 当管道吃掉，
+     * 传进来的值会在那里被截断（第 316 轮实测：回退日志打的是同一个 404 URL）。
+     * URL 里本来就不会有 `#`，所以它是安全的。
+     */
+    static void setManifestUrlForDev(String spec) {
+        if (spec == null || spec.isEmpty()) {
+            sOverride = null;
+            sOverrideStable = null;
+            return;
+        }
+        int i = spec.indexOf('#');
+        if (i < 0) {
+            sOverride = spec;
+            sOverrideStable = spec;
+        } else {
+            sOverride = spec.substring(0, i);
+            sOverrideStable = spec.substring(i + 1);
+        }
+    }
 
     /** 本进程是否已经静默查过（避免每次回主界面都读一次文件）。 */
     private static boolean sCheckedThisProcess = false;
 
     private UpdateUi() {}
 
-    static void setManifestUrlForDev(String url) { sOverride = url; }
-
     /** 当前该读哪个通道（dev 覆盖优先；否则看更新模式）。 */
     static String manifestUrl(android.content.Context ctx) {
         if (sOverride != null && !sOverride.isEmpty()) return sOverride;
         return UpdateMode.usesPreview(UpdateMode.of(ctx)) ? MANIFEST_PREVIEW : MANIFEST_STABLE;
+    }
+
+    /** 回退用的稳定通道（与 {@link #manifestUrl} 分开，因为回退时**不一定**是稳定模式）。 */
+    static String stableUrl() {
+        return (sOverrideStable != null && !sOverrideStable.isEmpty()) ? sOverrideStable : MANIFEST_STABLE;
     }
 
     /** 用户看得见的版本号（不是 versionCode —— 那个不上屏）。 */
@@ -120,19 +147,24 @@ final class UpdateUi {
 
         new Thread(new Runnable() {
             @Override public void run() {
-                UpdateManifest m = null;
-                String err = null;
-                try {
-                    String json = UpdateClient.fetchText(manifestUrl(a), UpdateManifest.MAX_BYTES);
-                    m = UpdateManifest.parse(json);
-                    if (!m.ok()) err = m.error;
-                } catch (Throwable t) {
-                    err = String.valueOf(t);
-                    android.util.Log.i("MDTLauncher", "update check failed: " + err);
+                final boolean preview = UpdateMode.usesPreview(UpdateMode.of(a));
+                final String[] err = new String[1];
+                UpdateManifest m = load(manifestUrl(a), err);
+                // ★ 预览通道 404 ⇒ **退回稳定通道再试一次**。
+                //   "稳定版和预览版"的语义是**两个都要**：预览那边还没有，不等于没有更新。
+                //   ⚠️ 2026-10-29 补：下个版本就是正式 release，而通道 release 还没建 ——
+                //      不回退的话，默认模式的用户会看到"已是最新"却装不上新版（最坏那种 bug：
+                //      界面说没事，实际有更新）。
+                if (m == null && preview && err[0] != null && err[0].contains("404")) {
+                    android.util.Log.i("MDTLauncher", "preview channel empty, falling back to stable");
+                    m = load(stableUrl(), err);
+                }
+                if (m == null) {
+                    android.util.Log.i("MDTLauncher", "update check failed: " + err[0]);
                 }
 
                 final UpdateManifest fm = m;
-                final String ferr = err;
+                final String ferr = err[0];
                 a.runOnUiThread(new Runnable() {
                     @Override public void run() {
                         if (a.isFinishing()) return;
@@ -169,6 +201,25 @@ final class UpdateUi {
                 });
             }
         }, "mdt-update-check").start();
+    }
+
+    /**
+     * 拉一次清单。失败（网络 / 解析 / 数据坏）一律把原因放进 {@code err[0]} 并返回 null
+     * —— 调用方只关心"拿到没拿到"，不关心失败在哪一层。
+     */
+    private static UpdateManifest load(String url, String[] err) {
+        try {
+            String json = UpdateClient.fetchText(url, UpdateManifest.MAX_BYTES);
+            UpdateManifest m = UpdateManifest.parse(json);
+            if (!m.ok()) {
+                err[0] = m.error;
+                return null;
+            }
+            return m;
+        } catch (Throwable t) {
+            err[0] = String.valueOf(t);
+            return null;
+        }
     }
 
     private static CardStack.Btn closeBtn(final Activity a, final CardStack stack) {
