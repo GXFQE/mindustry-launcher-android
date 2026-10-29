@@ -141,6 +141,23 @@
             android:grantUriPermissions="true"/>
 
         <!--
+          ★ 第 308 轮：PackageInstaller 的**结果广播**。
+          ⚠️ **必须静态注册**：提交会话之后进程随时可能被杀，系统要能在新进程里把它拉起来
+             收结果（动态注册的 receiver 随进程一起没了 ⇒ 永远不知道装成没成）。
+          ⚠️ **必须用广播、不能用 Activity**：`ref/01` §11 实测 —— 指向 MainActivity 时
+             系统会把界面拉到前台、顶掉安装确认，会话被放弃，表象是"提交成功却装不上"。
+          ⚠️ `exported=false`：只有本应用（以及系统按包名投递）能触发；
+             action 与 `UpdateInstall.ACTION_RESULT` 逐字相同，漏了就是"点了安装没反应"。
+        -->
+        <receiver
+            android:name=".InstallResultReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="io.mdt.launcher.INSTALL_RESULT"/>
+            </intent-filter>
+        </receiver>
+
+        <!--
           ★ 第 177 轮（杀后台 P0）：长操作期间的前台服务（只挂通知，不执行任务）。
           exported=false：只由本应用 startForegroundService；`dataSync` 与上面两条权限成对。
           ⚠️ 漏注册的症状 = startForegroundService 抛 ActivityNotFoundException（被 Work 吞掉，

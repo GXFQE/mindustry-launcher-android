@@ -125,7 +125,9 @@ final class DevTools {
                 // 第 305 轮：更新器的 HTTP 探针（配合 PC 假服务 + adb reverse 验网络栈）
                 || intent.hasExtra("dev_update_fetch")
                 // 第 307 轮：更新器完整链路（拉清单 → 下载 → sha256 → 证书），不装包
-                || intent.hasExtra("dev_update_run");
+                || intent.hasExtra("dev_update_run")
+                // 第 308 轮：再往前一步 —— 过四道门后提交 PackageInstaller 会话
+                || intent.hasExtra("dev_update_install");
         if (!isDev) return;
         if ((a.getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) == 0) {
             Toast.makeText(a, R.string.dev_blocked_toast, Toast.LENGTH_SHORT).show();
@@ -219,6 +221,13 @@ final class DevTools {
         String updateRun = intent.getStringExtra("dev_update_run");
         if (updateRun != null && !updateRun.isEmpty()) {
             devUpdateRun(updateRun);
+            return;
+        }
+
+        // ★ 第 308 轮：下载 + 两道校验之后**提交安装会话**（四道门不过就不提交）。
+        String updateInstall = intent.getStringExtra("dev_update_install");
+        if (updateInstall != null && !updateInstall.isEmpty()) {
+            devUpdateInstall(updateInstall);
             return;
         }
 
@@ -1401,6 +1410,66 @@ final class DevTools {
                 });
             }
         }, "mdt-dev-update-run").start();
+    }
+
+    /**
+     * 第 308 轮：下载 → 四道门 → **提交安装会话**。
+     *
+     * <p>**这个口不会自己装着**：提交之后系统会弹确认界面，用户点了才真的装。
+     * 进程在这期间可能被杀 ⇒ "已提交"必须先落盘（`report-install-submit.txt`），
+     * 最终结果由 {@link InstallResultReceiver} 写 `report-install.txt`。
+     *
+     * <p>判据：`precheck = ok` + `submit = ok` ⇒ 会话已交出去；
+     * `result = not submitted` ⇒ 四道门里有一道没过（哪一道看 `precheck`）。
+     */
+    private void devUpdateInstall(final String manifestUrl) {
+        new Thread(new Runnable() {
+            @Override public void run() {
+                StringBuilder sb = new StringBuilder();
+                sb.append("manifest = ").append(manifestUrl).append('\n');
+
+                UpdateFetcher.Outcome o = UpdateFetcher.run(a, manifestUrl);
+                sb.append("fetch    = ").append(o.step).append('\n');
+                if (o.detail != null) sb.append("fetchDetail = ").append(o.detail).append('\n');
+                if (o.apk == null) {
+                    sb.append("result   = aborted (fetch failed)\n");
+                    writeInstallSubmit(sb.toString());
+                    return;
+                }
+
+                UpdateInstall.Precheck p = UpdateInstall.precheck(a, o.apk);
+                sb.append("precheck = ").append(p.ok ? "ok" : p.why).append('\n');
+                if (p.detail != null) sb.append("precheckDetail = ").append(p.detail).append('\n');
+                sb.append("apkVersionCode = ").append(p.versionCode).append('\n');
+                sb.append("curVersionCode = ").append(UpdateInstall.currentVersionCode(a)).append('\n');
+                sb.append("apkBytes       = ").append(o.apk.length()).append('\n');
+
+                if (!p.ok) {
+                    sb.append("result   = not submitted\n");
+                    writeInstallSubmit(sb.toString());
+                    return;
+                }
+
+                // ★ 先落盘再说：提交之后进程随时可能被杀
+                sb.append("result   = submitting\n");
+                writeInstallSubmit(sb.toString());
+                try {
+                    UpdateInstall.submit(a, o.apk);
+                    sb.append("submit   = ok (waiting for system confirm)\n");
+                } catch (Throwable t) {
+                    sb.append("submit   = FAIL ").append(t).append('\n');
+                }
+                writeInstallSubmit(sb.toString());
+            }
+        }, "mdt-dev-update-install").start();
+    }
+
+    /** 提交侧的报告（与 receiver 那份 `report-install.txt` 分开写，免得互相覆盖）。 */
+    private void writeInstallSubmit(String text) {
+        try {
+            Util.atomicWriteText(new File(Data.hubDir(a), "report-install-submit.txt"), text);
+        } catch (Throwable ignored) {
+        }
     }
 
     /**
