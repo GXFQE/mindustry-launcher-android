@@ -27,9 +27,18 @@ import java.util.Locale;
  */
 final class UpdateUi {
 
-    /** 产品版走 GitHub 的"最新 release 资产"固定路径（302 由 UpdateClient 跟随）。 */
+    /**
+     * 更新清单的地址：**固定 tag 的 release 资产**，不是 `releases/latest`。
+     *
+     * <p>⚠️ 为什么不能用 `latest`：GitHub 的 `releases/latest` **只指向非 prerelease**，
+     * 而 1.0 之前每个版本都是 `--prerelease` ⇒ `latest/download/…` 直接 404
+     * （`docs/RELEASING.md` §5 早就记了这一条，只是当时还没有更新器）。
+     *
+     * <p>⇒ 用一条**固定通道**：发版时把 `update.json` 传到 tag `update-channel` 的那个
+     * release（`gh release upload update-channel update.json --clobber`），URL 永远不变。
+     */
     static final String MANIFEST_URL =
-            "https://github.com/GXFQE/mindustry-launcher-android/releases/latest/download/update.json";
+            "https://github.com/GXFQE/mindustry-launcher-android/releases/download/update-channel/update.json";
 
     /** dev 夹具用：`dev_update_ui <url>` 覆盖掉上面那个。 */
     private static volatile String sOverride = null;

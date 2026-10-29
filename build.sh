@@ -139,6 +139,20 @@ VER_CODE="${VER_CODE:-1}"
 VER_NAME="${VER_NAME:-0.1}"
 SUFFIX="${SUFFIX:-}"
 APP_NAME="mdt-launcher${SUFFIX}"
+
+# 🔴 发布防呆（第 310 轮）：VER_CODE != 1 却还在用 debug 签名 ⇒ 直接报错。
+#   理由：任何"要发出去的包"都必然 VER_CODE > 1，而它必须用正式密钥 —— 否则
+#   ① 装不上已发布用户（签名不同 ⇒ 只能卸载重装 ⇒ 连槽一起丢）；
+#   ② 自更新会被自己的证书校验拒掉，现象是"下载完了却说签名对不上"（很难往签名上想）。
+#   自测包保持 VER_CODE=1 不受影响。
+if [ "$VER_CODE" != "1" ] && [ "$KEYSTORE" = "$HOME/.android/debug.keystore" ]; then
+  echo "FAIL: VER_CODE=$VER_CODE but KEYSTORE is still the debug one." >&2
+  echo "      A build with VER_CODE > 1 is a release build; sign it with the release key:" >&2
+  echo "        KEYSTORE=\$HOME/.android/mdt-launcher-release.jks KS_ALIAS=mdt KS_PASS=... KEY_PASS=... \\" >&2
+  echo "          VER_CODE=$VER_CODE VER_NAME=$VER_NAME bash ./build.sh" >&2
+  echo "      For local experiments keep VER_CODE=1." >&2
+  exit 1
+fi
 OUT="$ROOT/build"
 
 wpath() { "$CYGPATH" -w "$1"; }   # -> D:\a\b    for native tools
