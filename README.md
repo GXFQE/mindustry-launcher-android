@@ -182,19 +182,16 @@ This launcher builds on other people's work:
 - **[libGDX](https://libgdx.com/)** — Apache-2.0. The graphics layer under arc.
 - **[Material Design Icons](https://github.com/google/material-design-icons)** by Google —
   Apache-2.0. Path data of the UI icons.
+- **[MindustryX](https://github.com/TinyLake/MindustryX)** by TinyLake and contributors — GPL-3.0.
+  A community fork of the game; this manager supports it and uses it as a behaviour reference
+  (no code from it is bundled).
 
 Tables generated from the game data (`BlockTable`, `ClassRotateTable`, `MschConfigTable`) follow
 Mindustry's licence; the generators and the versions they were built from are recorded in the
 source comments.
 
-## References
-
-One project is named separately from Credits: **[MindustryX](https://github.com/TinyLake/MindustryX)** —
-a community fork of the game used as a **behaviour oracle** while implementing mod diagnostics and
-blueprint parsing (no code taken).
-
-Projects that were only studied during feasibility work are **not** listed: they go here once a
-feature actually ships. Selection rule and details: [docs/REFERENCES.md](docs/REFERENCES.md).
+Projects that were only studied during feasibility work are **not** listed — they go in once a
+feature actually ships. Rule and history: [docs/REFERENCES.md](docs/REFERENCES.md).
 
 ---
 

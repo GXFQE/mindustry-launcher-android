@@ -8,16 +8,14 @@
         "arc（Anuke）—— Apache-2.0；HJSON 解析器是 arc Jval 的手工移植",
         "libGDX（libGDX contributors）—— Apache-2.0；arc 底下的图形层",
         "Material Design Icons（Google）—— Apache-2.0；界面图标的 path 数据",
-        "",
-        "行为对照（未取用其代码）：MindustryX"
+        "MindustryX（TinyLake 及贡献者）—— GPL-3.0；游戏的社区分支，本启动器支持它，也拿它当行为对照"
       ],
       "en": [
         "Mindustry (Anuke) — GPL-3.0; the game itself, loaded from the official APK you provide",
         "arc (Anuke) — Apache-2.0; the HJSON parser is a hand port of arc Jval",
         "libGDX (libGDX contributors) — Apache-2.0; the graphics layer under arc",
         "Material Design Icons (Google) — Apache-2.0; path data of the UI icons",
-        "",
-        "Behaviour reference (no code taken): MindustryX"
+        "MindustryX (TinyLake and contributors) — GPL-3.0; community fork of the game; this manager supports it and uses it as a behaviour reference"
       ]
     }
   },

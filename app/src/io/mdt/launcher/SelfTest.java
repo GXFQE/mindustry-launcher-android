@@ -15756,6 +15756,24 @@ public final class SelfTest {
     }
 
     /**
+     * 找到含 {@code who} 的那一行，并确认它写着 {@code license}。
+     *
+     * <p>★ 为什么不用"数 `Apache-2.0` 出现几次"：许可写错是**改错某一行**，计数只能证明"总数没变"，
+     *   把 arc 的 Apache 与 Mindustry 的 GPL 对调，计数照样是 3 —— 逐行对才抓得住（第 302 轮改的）。
+     */
+    private static boolean lineHas(String[] lines, String who, String license) {
+        return lineHas(lines, who, null, license);
+    }
+
+    /** 同 {@link #lineHas(String[], String, String)}，但排掉含 {@code not} 的行（"Mindustry" 是 "MindustryX" 的子串）。 */
+    private static boolean lineHas(String[] lines, String who, String not, String license) {
+        for (String s : lines) {
+            if (s.contains(who) && (not == null || !s.contains(not))) return s.contains(license);
+        }
+        return false;
+    }
+
+    /**
      * 第 298 轮：关于页「致谢」**必须可见**（用户 2026-10-29：「致谢其实不应该做成隐藏的」）。
      *
      * <p>★ 这条同时钉住两件容易烂掉的事：
@@ -15774,22 +15792,27 @@ public final class SelfTest {
         }
         String t = ct.credits(ctx);
         String[] lines = t.split("\n", -1);
-        ok(stat, L, lines.length == 6,
-                "★四条「用到的」+ 一个空行 + 一条「对照的」（实际 " + lines.length + " 行）");
-        ok(stat, L, lines.length > 4 && lines[4].trim().isEmpty(),
-                "★第 5 行是空行 —— 两组不许连成一片（「用了谁的东西」与「看过谁」是两件事）");
+        ok(stat, L, lines.length == 5,
+                "★五条并列：四条「用到的」+ MindustryX（实际 " + lines.length + " 行）");
+        boolean filled = true;
+        for (String s : lines) {
+            if (s.trim().length() == 0) filled = false;
+        }
+        ok(stat, L, filled, "★五行都不为空（空行只用于分组；现在没有第二组了）");
         ok(stat, L, t.contains("Mindustry") && t.contains("libGDX")
-                        && t.contains("Material Design Icons") && t.contains("arc"),
-                "★四个「用到的」项目名都在（Mindustry / arc / libGDX / Material Design Icons）");
-        ok(stat, L, t.contains("MindustryX"),
-                "★「行为对照」那行只有 MindustryX（**只收进了产品的**：模组诊断与蓝图解析拿它当过判据）");
+                        && t.contains("Material Design Icons") && t.contains("arc")
+                        && t.contains("MindustryX"),
+                "★五个项目名都在（Mindustry / arc / libGDX / Material Design Icons / MindustryX）");
         ok(stat, L, !t.contains("Copper") && !t.contains("PojavLauncher") && !t.contains("FCL")
                         && !t.contains("Xenon"),
                 "★元断言：只做过可行性 / 还没实现的项目**不在**名单里（等做了再写，别先占位）");
-        int apache = countOf(t, "Apache-2.0");
-        ok(stat, L, t.contains("GPL-3.0") && apache == 3,
-                "★许可写对：GPL-3.0 一处、Apache-2.0 三处（arc / libGDX / Material）—— 实际 "
-                        + apache + " 处 Apache");
+        // ★ 逐行验许可（不是数个数）：arc 那条曾把 Apache-2.0 写成 GPL，计数式断言抓不住"改错行"
+        ok(stat, L, lineHas(lines, "arc", "Apache-2.0")
+                        && lineHas(lines, "Mindustry", "MindustryX", "GPL-3.0")
+                        && lineHas(lines, "libGDX", "Apache-2.0")
+                        && lineHas(lines, "Material Design Icons", "Apache-2.0")
+                        && lineHas(lines, "MindustryX", "GPL-3.0"),
+                "★许可逐行对：arc / libGDX / Material 是 Apache-2.0，Mindustry 与 MindustryX 是 GPL-3.0");
         ok(stat, L, ct.creditsTitle(ctx).length() > 0, "★致谢的分区标题来自内容文件（不是空串）");
         boolean ids;
         try {

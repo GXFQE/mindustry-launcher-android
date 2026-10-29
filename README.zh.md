@@ -160,16 +160,11 @@
 - **[arc](https://github.com/Anuke/Arc)**（Anuke）—— Apache-2.0。资产注入 / ABI / FreeType 的行为以它为准；`Hjson.java` 是 `arc.util.serialization.Jval` 的手工移植（只取 HJSON 读取与 plain 写出两段，两版正本与改动都记在该文件头部）。
 - **[libGDX](https://libgdx.com/)** —— Apache-2.0。arc 底下的图形层。
 - **[Material Design Icons](https://github.com/google/material-design-icons)**（Google）—— Apache-2.0。界面图标的 path 数据。
+- **[MindustryX](https://github.com/TinyLake/MindustryX)**（TinyLake 及贡献者）—— GPL-3.0。游戏的社区分支，本启动器支持它，也拿它当行为对照（没有打包它的代码）。
 
 由游戏数据生成的表（`BlockTable` / `ClassRotateTable` / `MschConfigTable`）按 Mindustry 的许可使用；生成器与生成时的版本记在对应源码注释里。
 
-## 参考与对照
-
-与 Credits 分开列的只有一个：**[MindustryX](https://github.com/TinyLake/MindustryX)** —— 同一个游戏的社区 fork，
-在实现「模组诊断」与「蓝图解析」时被当作**行为神谕**（未取用其代码）。
-
-**只做过可行性、功能还没做的项目不写在这里**：等它真的进了产品再补。
-收录标准与细节见 [docs/REFERENCES.md](docs/REFERENCES.md)。
+**只做过可行性、功能还没做的项目不写在这里** —— 等它真的进了产品再补（规则与沿革见 [docs/REFERENCES.md](docs/REFERENCES.md)）。
 
 ---
 
