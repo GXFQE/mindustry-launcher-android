@@ -44,8 +44,18 @@ final class UpdateClient {
      * @throws IOException 网络失败 / 非 200 / 超限
      */
     static String fetchText(String url, int maxBytes) throws IOException {
+        return fetchText(url, maxBytes, "application/json");
+    }
+
+    /**
+     * 同上，但可指定 `Accept`。
+     *
+     * <p>★ 拉 release 的 **asset**（`/releases/assets/<id>`）必须传
+     * {@code "application/octet-stream"}，否则拿到的是元数据 JSON。
+     */
+    static String fetchText(String url, int maxBytes, String accept) throws IOException {
         int cap = maxBytes > 0 ? maxBytes : UpdateManifest.MAX_BYTES;
-        HttpURLConnection c = open(url);
+        HttpURLConnection c = open(url, accept);
         try {
             int code = c.getResponseCode();
             if (code != HttpURLConnection.HTTP_OK) {
@@ -79,7 +89,7 @@ final class UpdateClient {
      * @throws IOException 网络失败 / 非 200 / 长度不符
      */
     static void download(String url, File dest, long expectSize, Progress cb) throws IOException {
-        HttpURLConnection c = open(url);
+        HttpURLConnection c = open(url, "application/octet-stream");
         try {
             int code = c.getResponseCode();
             if (code != HttpURLConnection.HTTP_OK) {
@@ -117,15 +127,18 @@ final class UpdateClient {
         }
     }
 
-    private static HttpURLConnection open(String url) throws IOException {
+    private static HttpURLConnection open(String url, String accept) throws IOException {
         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
         c.setConnectTimeout(CONNECT_TIMEOUT_MS);
         c.setReadTimeout(READ_TIMEOUT_MS);
         c.setInstanceFollowRedirects(true);
         c.setRequestProperty("User-Agent", "mdt-launcher-updater");
-        // GitHub 的 asset API：不带这个头会返回"元数据 JSON"而不是文件本身。
-        // 对普通文本接口无副作用（服务端会忽略）。
-        c.setRequestProperty("Accept", "application/octet-stream");
+        // ★ `Accept` **必须按接口给**，不能一刀切（2026-10-29 真机踩的）：
+        //   · `/repos/…/releases`（列表）只认 `application/json` —— 发 octet-stream 会得到
+        //     **415 Unsupported Media Type**（症状是"连不上服务器"，很容易误判成网络问题）；
+        //   · release 的 asset API（`/releases/assets/<id>`）反过来：不带 octet-stream
+        //     拿到的是**元数据 JSON**而不是文件本身。
+        c.setRequestProperty("Accept", accept);
         return c;
     }
 

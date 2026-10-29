@@ -237,7 +237,7 @@ final class DevTools {
         //   与 `dev_update_run` 的区别：那个只写报告，这个真的弹卡片。
         String updateUi = intent.getStringExtra("dev_update_ui");
         if (updateUi != null && !updateUi.isEmpty()) {
-            UpdateUi.setManifestUrlForDev(updateUi);
+            UpdateUi.setReleasesUrlForDev(updateUi);
             UpdateUi.checkManual(a);
             return;
         }

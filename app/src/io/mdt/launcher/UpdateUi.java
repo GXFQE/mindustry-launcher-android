@@ -7,6 +7,7 @@ import android.provider.Settings;
 import android.widget.Toast;
 
 import java.io.File;
+import java.util.List;
 import java.util.Locale;
 
 /**
@@ -28,67 +29,40 @@ import java.util.Locale;
 final class UpdateUi {
 
     /**
-     * **预览通道**：固定 tag 的 release 资产。
+     * GitHub Releases **列表**：一次拿到全部版本（含 prerelease），按创建时间倒序。
      *
-     * <p>⚠️ 为什么预览不能走 `releases/latest`：GitHub 的 `latest` **只指向非 prerelease**，
-     * 而 1.0 之前每个版本都勾 `--prerelease` ⇒ `latest/download/…` 直接 404
-     * （`docs/RELEASING.md` §5 记过这条）。
-     */
-    static final String MANIFEST_PREVIEW =
-            "https://github.com/GXFQE/mindustry-launcher-android/releases/download/update-channel-preview/update.json";
-
-    /**
-     * **稳定通道**：`releases/latest` —— GitHub 只把它指向非 prerelease，正好就是"稳定版"，
-     * 因此**不需要额外维护**（发一个正式版，这个 URL 自动指过去）。
+     * <p>★ 为什么不用 `releases/latest`：那个接口**明确跳过** prerelease，而 1.0 之前每版
+     * 都是 prerelease ⇒ 它永远拿不到东西。`/releases` 全都有。
      *
-     * <p>⚠️ 稳定版还没发布时它是 404：调用方要把 404 当"这个通道还没有版本"，
-     * 不能当成"网络坏了"（否则用户会一直看到一个错误）。
+     * <p>★ 为什么把"固定通道"删了（第 310~316 轮那套）：那是为了绕开**嵌套 JSON 解析**而造
+     * 出来的额外概念 —— 多一个 release 要维护、还要一条 404 回退。现在直接用 `org.json` 解
+     * 列表，这两个东西一起没了（2026-10-29 用户拍板「直接用安卓测试」）。
      */
-    static final String MANIFEST_STABLE =
-            "https://github.com/GXFQE/mindustry-launcher-android/releases/latest/download/update.json";
+    static final String RELEASES_URL =
+            "https://api.github.com/repos/GXFQE/mindustry-launcher-android/releases?per_page=10";
 
-    /** dev 夹具用的两个通道覆盖（null = 用真地址）。 */
+    /** 清单资产在 release 里的名字（发版脚本按这个名字传）。 */
+    static final String MANIFEST_ASSET = "update.json";
+
+    /** "这个通道还没有可装的版本" —— **不是错误**（调用方据此显示"已是最新"）。 */
+    static final String NO_RELEASE = "no-release";
+
+    /** dev 夹具用：覆盖 {@link #RELEASES_URL}（null = 用真地址）。 */
     private static volatile String sOverride = null;
-    private static volatile String sOverrideStable = null;
 
-    /**
-     * dev 夹具用：`dev_update_ui <preview-url>#<stable-url>` 覆盖两个通道（只有一个就两边同值）。
-     *
-     * <p>⚠️ 分隔符用 `#` 而不是 `|`：`|` 会被 `adb shell` 当管道吃掉，
-     * 传进来的值会在那里被截断（第 316 轮实测：回退日志打的是同一个 404 URL）。
-     * URL 里本来就不会有 `#`，所以它是安全的。
-     */
-    static void setManifestUrlForDev(String spec) {
-        if (spec == null || spec.isEmpty()) {
-            sOverride = null;
-            sOverrideStable = null;
-            return;
-        }
-        int i = spec.indexOf('#');
-        if (i < 0) {
-            sOverride = spec;
-            sOverrideStable = spec;
-        } else {
-            sOverride = spec.substring(0, i);
-            sOverrideStable = spec.substring(i + 1);
-        }
+    static void setReleasesUrlForDev(String url) {
+        sOverride = (url == null || url.isEmpty()) ? null : url;
+    }
+
+    /** dev 覆盖优先；否则用真地址。 */
+    static String releasesUrl() {
+        return (sOverride != null && !sOverride.isEmpty()) ? sOverride : RELEASES_URL;
     }
 
     /** 本进程是否已经静默查过（避免每次回主界面都读一次文件）。 */
     private static boolean sCheckedThisProcess = false;
 
     private UpdateUi() {}
-
-    /** 当前该读哪个通道（dev 覆盖优先；否则看更新模式）。 */
-    static String manifestUrl(android.content.Context ctx) {
-        if (sOverride != null && !sOverride.isEmpty()) return sOverride;
-        return UpdateMode.usesPreview(UpdateMode.of(ctx)) ? MANIFEST_PREVIEW : MANIFEST_STABLE;
-    }
-
-    /** 回退用的稳定通道（与 {@link #manifestUrl} 分开，因为回退时**不一定**是稳定模式）。 */
-    static String stableUrl() {
-        return (sOverrideStable != null && !sOverrideStable.isEmpty()) ? sOverrideStable : MANIFEST_STABLE;
-    }
 
     /** 用户看得见的版本号（不是 versionCode —— 那个不上屏）。 */
     static String versionName(Activity a) {
@@ -149,16 +123,7 @@ final class UpdateUi {
             @Override public void run() {
                 final boolean preview = UpdateMode.usesPreview(UpdateMode.of(a));
                 final String[] err = new String[1];
-                UpdateManifest m = load(manifestUrl(a), err);
-                // ★ 预览通道 404 ⇒ **退回稳定通道再试一次**。
-                //   "稳定版和预览版"的语义是**两个都要**：预览那边还没有，不等于没有更新。
-                //   ⚠️ 2026-10-29 补：下个版本就是正式 release，而通道 release 还没建 ——
-                //      不回退的话，默认模式的用户会看到"已是最新"却装不上新版（最坏那种 bug：
-                //      界面说没事，实际有更新）。
-                if (m == null && preview && err[0] != null && err[0].contains("404")) {
-                    android.util.Log.i("MDTLauncher", "preview channel empty, falling back to stable");
-                    m = load(stableUrl(), err);
-                }
+                UpdateManifest m = loadLatest(preview, err);
                 if (m == null) {
                     android.util.Log.i("MDTLauncher", "update check failed: " + err[0]);
                 }
@@ -168,13 +133,12 @@ final class UpdateUi {
                 a.runOnUiThread(new Runnable() {
                     @Override public void run() {
                         if (a.isFinishing()) return;
-                        if (fm == null || !fm.ok()) {
-                            // ★ 404 = **这个通道还没有版本**（稳定版还没发过；或者通道 release 还没建）。
-                            //   那不是错误 —— 说"还没有"会更好，但一句"已是最新"也不会误导
-                            //   （用户此刻确实没有可装的东西）。**绝不能报"连不上服务器"**。
-                            boolean noRelease = ferr != null && ferr.contains("404");
+                        if (fm == null) {
+                            // ★ 两种"没有"要分开（否则用户会把"还没发版"读成"网坏了"）：
+                            //   · NO_RELEASE ⇒ 这个通道确实没有可装的版本
+                            //   · 其它       ⇒ 网络 / 数据坏
                             if (!manual) return;
-                            if (noRelease) {
+                            if (NO_RELEASE.equals(ferr)) {
                                 if (ui[0] != null && ui[0].isShowing()) {
                                     ui[0].replace(Trans.get(a, R.string.set_update_title),
                                             Trans.get(a, R.string.update_latest), closeBtn(a, ui[0]));
@@ -188,11 +152,9 @@ final class UpdateUi {
                         }
                         int cur = UpdateInstall.currentVersionCode(a);
                         if (!UpdateManifest.isNewer(cur, fm.versionCode)) {
-                            if (manual) {
-                                if (ui[0] != null && ui[0].isShowing()) {
-                                    ui[0].replace(Trans.get(a, R.string.set_update_title),
-                                            Trans.get(a, R.string.update_latest), closeBtn(a, ui[0]));
-                                }
+                            if (manual && ui[0] != null && ui[0].isShowing()) {
+                                ui[0].replace(Trans.get(a, R.string.set_update_title),
+                                        Trans.get(a, R.string.update_latest), closeBtn(a, ui[0]));
                             }
                             return;
                         }
@@ -204,12 +166,39 @@ final class UpdateUi {
     }
 
     /**
-     * 拉一次清单。失败（网络 / 解析 / 数据坏）一律把原因放进 {@code err[0]} 并返回 null
-     * —— 调用方只关心"拿到没拿到"，不关心失败在哪一层。
+     * 拉 release 列表 → 挑一个 → 拉它的 `update.json` → 解析。
+     *
+     * @param allowPreview 「稳定版和预览版」模式（否则只认非 prerelease）
+     * @return 失败时 null，原因放 {@code err[0]}；{@link #NO_RELEASE} 表示"确实没有可装的版本"
      */
-    private static UpdateManifest load(String url, String[] err) {
+    private static UpdateManifest loadLatest(boolean allowPreview, String[] err) {
+        String listJson;
         try {
-            String json = UpdateClient.fetchText(url, UpdateManifest.MAX_BYTES);
+            // 10 条 release 的 JSON（含 body）大概几十 KB；给 512 KB 足够宽松
+            listJson = UpdateClient.fetchText(releasesUrl(), 512 * 1024);
+        } catch (Throwable t) {
+            err[0] = String.valueOf(t);
+            return null;
+        }
+
+        List<GitHubReleases.Release> list = GitHubReleases.parse(listJson);
+        GitHubReleases.Release r = GitHubReleases.pick(list, allowPreview);
+        if (r == null) {
+            err[0] = NO_RELEASE;
+            return null;
+        }
+        GitHubReleases.Asset asset = GitHubReleases.asset(r, MANIFEST_ASSET);
+        if (asset == null) {
+            err[0] = "no " + MANIFEST_ASSET + " in release " + r.tag;
+            return null;
+        }
+        // ★ 优先走 API 的 asset url（`api.github.com/.../assets/<id>`，实测能通）；
+        //   `browser_download_url` 走 github.com 主站，国内可能超时。
+        String url = (asset.apiUrl != null && !asset.apiUrl.isEmpty()) ? asset.apiUrl : asset.browserUrl;
+        try {
+            // asset API 必须点名 octet-stream，否则拿回来的是元数据 JSON（见 UpdateClient.open 的注释）
+            String json = UpdateClient.fetchText(url, UpdateManifest.MAX_BYTES,
+                    "application/octet-stream");
             UpdateManifest m = UpdateManifest.parse(json);
             if (!m.ok()) {
                 err[0] = m.error;
