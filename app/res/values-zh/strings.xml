@@ -1418,7 +1418,7 @@
     <string name="update_mode_off">关</string>
     <string name="update_mode_stable">只查稳定版</string>
     <string name="update_mode_preview">稳定版和预览版</string>
-    <string name="update_check_sub_fmt">当前 %1$s</string>
+    <string name="update_check_sub_fmt">已装 %1$s</string>
     <string name="update_checking">正在检查更新</string>
     <string name="update_latest">已是最新版本</string>
     <string name="update_err_network">连不上更新服务器</string>

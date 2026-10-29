@@ -1457,7 +1457,7 @@
     <string name="update_mode_off">Off</string>
     <string name="update_mode_stable">Stable only</string>
     <string name="update_mode_preview">Stable and preview</string>
-    <string name="update_check_sub_fmt">Current %1$s</string>
+    <string name="update_check_sub_fmt">Installed %1$s</string>
     <string name="update_checking">Checking for updates</string>
     <string name="update_latest">Already up to date</string>
     <string name="update_err_network">Could not reach the update server</string>
