@@ -63,17 +63,32 @@ final class GitHubReleases {
     /**
      * 解析 `/releases` 的响应。**绝不抛异常** —— 坏输入返回空表（调用方按"没有版本"处理）。
      *
+     * <p>⚠️ 这是**老的宽容口径**，只留给不关心"坏 JSON vs 真的没版本"的调用方。
+     * 更新器自己必须用 {@link #parseStrict}：一个镜像/代理返回 HTML 错误页时，
+     * 空表会被读成"确实没有可装版本"，界面就永远显示"已是最新"。
+     *
      * <p>缺 `tag_name` 的条目直接跳过：那不是我们发的东西（GitHub 上可能有草稿/异常条目）。
      */
     static List<Release> parse(String json) {
-        List<Release> out = new ArrayList<Release>();
-        if (json == null || json.trim().isEmpty()) return out;
+        List<Release> out = parseStrict(json);
+        return out == null ? new ArrayList<Release>() : out;
+    }
+
+    /**
+     * 严格解析：**不是 JSON 数组就返回 null**（网络错误页 / 限流对象 / 空正文），
+     * 合法空数组 `[]` 仍然返回空表（"真的没有版本"）。
+     *
+     * <p>调用方据此把"查不了"与"没版本"分开：前者提示网络/数据错误，后者才说"已是最新"。
+     */
+    static List<Release> parseStrict(String json) {
+        if (json == null || json.trim().isEmpty()) return null;
         JSONArray arr;
         try {
             arr = new JSONArray(json);
         } catch (Throwable t) {
-            return out;
+            return null;
         }
+        List<Release> out = new ArrayList<Release>();
         for (int i = 0; i < arr.length(); i++) {
             JSONObject o = arr.optJSONObject(i);
             if (o == null) continue;

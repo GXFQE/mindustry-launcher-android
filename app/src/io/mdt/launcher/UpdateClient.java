@@ -44,7 +44,7 @@ final class UpdateClient {
      * @throws IOException 网络失败 / 非 200 / 超限
      */
     static String fetchText(String url, int maxBytes) throws IOException {
-        return fetchText(url, maxBytes, "application/json");
+        return fetchText(url, maxBytes, "application/json", CONNECT_TIMEOUT_MS, READ_TIMEOUT_MS);
     }
 
     /**
@@ -54,8 +54,19 @@ final class UpdateClient {
      * {@code "application/octet-stream"}，否则拿到的是元数据 JSON。
      */
     static String fetchText(String url, int maxBytes, String accept) throws IOException {
+        return fetchText(url, maxBytes, accept, CONNECT_TIMEOUT_MS, READ_TIMEOUT_MS);
+    }
+
+    /**
+     * 同 {@link #fetchText(String, int, String)}，但**每次尝试**可以给不同的超时。
+     *
+     * <p>这是给更新线路兜底用的：镜像只值 4~5 秒的等待，直连才值得 15 秒；
+     * 一刀切用默认值会让一个死镜像把整次检查拖到 60 秒。
+     */
+    static String fetchText(String url, int maxBytes, String accept,
+                            int connectMs, int readMs) throws IOException {
         int cap = maxBytes > 0 ? maxBytes : UpdateManifest.MAX_BYTES;
-        HttpURLConnection c = open(url, accept);
+        HttpURLConnection c = open(url, accept, connectMs, readMs);
         try {
             int code = c.getResponseCode();
             if (code != HttpURLConnection.HTTP_OK) {
@@ -89,7 +100,25 @@ final class UpdateClient {
      * @throws IOException 网络失败 / 非 200 / 长度不符
      */
     static void download(String url, File dest, long expectSize, Progress cb) throws IOException {
-        HttpURLConnection c = open(url, "application/octet-stream");
+        download(url, dest, expectSize, cb, CONNECT_TIMEOUT_MS, READ_TIMEOUT_MS);
+    }
+
+    /** 同 {@link #download(String, File, long, Progress)}，但可给每次尝试单独的超时。 */
+    static void download(String url, File dest, long expectSize, Progress cb,
+                         int connectMs, int readMs) throws IOException {
+        download(url, dest, expectSize, cb, connectMs, readMs, 0L);
+    }
+
+    /**
+     * 同上，外加一个**整次尝试**的总预算。
+     *
+     * <p>为什么光有 readMs 不够：readMs 是"单次 read 最长等多久"，一个半小时才吐
+     * 1 KB 的服务端可以每次都卡在 readMs 边缘、总时长无限长。镜像只值 12 秒，
+     * 到点就换下一个；直连可以给 120 秒。
+     */
+    static void download(String url, File dest, long expectSize, Progress cb,
+                         int connectMs, int readMs, long maxTotalMs) throws IOException {
+        HttpURLConnection c = open(url, "application/octet-stream", connectMs, readMs);
         try {
             int code = c.getResponseCode();
             if (code != HttpURLConnection.HTTP_OK) {
@@ -100,10 +129,14 @@ final class UpdateClient {
             InputStream in = c.getInputStream();
             OutputStream os = new FileOutputStream(dest);
             long done = 0;
+            long started = System.currentTimeMillis();
             try {
                 byte[] buf = new byte[65536];
                 int n;
                 while ((n = in.read(buf)) > 0) {
+                    if (maxTotalMs > 0 && System.currentTimeMillis() - started > maxTotalMs) {
+                        throw new IOException("too slow (> " + maxTotalMs + " ms) @ " + url);
+                    }
                     os.write(buf, 0, n);
                     done += n;
                     if (cb != null) cb.onProgress(done, total);
@@ -127,10 +160,11 @@ final class UpdateClient {
         }
     }
 
-    private static HttpURLConnection open(String url, String accept) throws IOException {
+    private static HttpURLConnection open(String url, String accept,
+                                          int connectMs, int readMs) throws IOException {
         HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
-        c.setConnectTimeout(CONNECT_TIMEOUT_MS);
-        c.setReadTimeout(READ_TIMEOUT_MS);
+        c.setConnectTimeout(connectMs > 0 ? connectMs : CONNECT_TIMEOUT_MS);
+        c.setReadTimeout(readMs > 0 ? readMs : READ_TIMEOUT_MS);
         c.setInstanceFollowRedirects(true);
         c.setRequestProperty("User-Agent", "mdt-launcher-updater");
         // ★ `Accept` **必须按接口给**，不能一刀切（2026-10-29 真机踩的）：

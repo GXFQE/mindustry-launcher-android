@@ -44,6 +44,9 @@ final class UpdateUi {
     /** 清单资产在 release 里的名字（发版脚本按这个名字传）。 */
     static final String MANIFEST_ASSET = "update.json";
 
+    /** APK 资产在 release 里的名字（测速要拿它当目标文件）。 */
+    static final String APK_ASSET = "mdt-launcher.apk";
+
     /** "这个通道还没有可装的版本" —— **不是错误**（调用方据此显示"已是最新"）。 */
     static final String NO_RELEASE = "no-release";
 
@@ -181,7 +184,13 @@ final class UpdateUi {
             return null;
         }
 
-        List<GitHubReleases.Release> list = GitHubReleases.parse(listJson);
+        // ★ 第 336 轮：严格解析 —— 坏 JSON（镜像/代理的 HTML 错误页、限流对象）
+        //   必须与"合法空数组"分开，否则会显示成"已是最新"。
+        List<GitHubReleases.Release> list = GitHubReleases.parseStrict(listJson);
+        if (list == null) {
+            err[0] = "bad-release-json";
+            return null;
+        }
         GitHubReleases.Release r = GitHubReleases.pick(list, allowPreview);
         if (r == null) {
             err[0] = NO_RELEASE;
@@ -192,23 +201,41 @@ final class UpdateUi {
             err[0] = "no " + MANIFEST_ASSET + " in release " + r.tag;
             return null;
         }
-        // ★ 优先走 API 的 asset url（`api.github.com/.../assets/<id>`，实测能通）；
-        //   `browser_download_url` 走 github.com 主站，国内可能超时。
-        String url = (asset.apiUrl != null && !asset.apiUrl.isEmpty()) ? asset.apiUrl : asset.browserUrl;
-        try {
-            // asset API 必须点名 octet-stream，否则拿回来的是元数据 JSON（见 UpdateClient.open 的注释）
-            String json = UpdateClient.fetchText(url, UpdateManifest.MAX_BYTES,
-                    "application/octet-stream");
-            UpdateManifest m = UpdateManifest.parse(json);
-            if (!m.ok()) {
-                err[0] = m.error;
-                return null;
-            }
-            return m;
-        } catch (Throwable t) {
-            err[0] = String.valueOf(t);
+        // ★ 第 336 轮：**优先走 `browser_download_url`**（github.com 主站，302 到
+        //   release-assets），不再优先 `api.github.com/.../assets/<id>` —— 后者会
+        //   302 到 objects.githubusercontent.com，在本机运营商网络上实测 2 KB range
+        //   12 秒超时、773 KB 只下 108 KB/69 秒。旧清单里的 apiUrl 只当兜底。
+        String url = (asset.browserUrl != null && !asset.browserUrl.isEmpty())
+                ? asset.browserUrl : asset.apiUrl;
+        if (url == null || url.isEmpty()) {
+            err[0] = "manifest has no url";
             return null;
         }
+        List<String> urls = Mirrors.assetUrls(url, Config.get().updateMirror());
+        String last = "manifest fetch failed";
+        long started = System.currentTimeMillis();
+        for (String u : urls) {
+            // 清单只有几百字节：给整段一个 20 秒预算，别让 5 个死候选把检查拖到一分多钟。
+            if (System.currentTimeMillis() - started > 20000L) {
+                last = "timeout";
+                break;
+            }
+            boolean mirror = Mirrors.isMirrorUrl(u);
+            try {
+                // asset API 必须点名 octet-stream，否则拿回来的是元数据 JSON（见 UpdateClient.open 的注释）
+                String json = UpdateClient.fetchText(u, UpdateManifest.MAX_BYTES,
+                        "application/octet-stream",
+                        mirror ? 4000 : UpdateClient.CONNECT_TIMEOUT_MS,
+                        mirror ? 6000 : 30000);
+                UpdateManifest m = UpdateManifest.parse(json);
+                if (m.ok()) return m;
+                last = m.error;
+            } catch (Throwable t) {
+                last = String.valueOf(t);
+            }
+        }
+        err[0] = last;
+        return null;
     }
 
     private static CardStack.Btn closeBtn(final Activity a, final CardStack stack) {
@@ -278,8 +305,11 @@ final class UpdateUi {
 
         new Thread(new Runnable() {
             @Override public void run() {
+                // 第 336 轮：按「选中线路 → 其余预设 → 直连」的顺序试；
+                // 正常路径不测速（测速只在设置页手动触发）。
+                final List<String> urls = Mirrors.assetUrls(m.url, Config.get().updateMirror());
                 final UpdateDownload.Result r = UpdateDownload.run(
-                        m.url, UpdateFetcher.dir(a), m.versionCode, m.size, m.sha256,
+                        urls, UpdateFetcher.dir(a), m.versionCode, m.size, m.sha256,
                         new UpdateClient.Progress() {
                             @Override public void onProgress(final long done, final long total) {
                                 try { Work.progress(a, (int) done, (int) total); } catch (Throwable ignored) { }

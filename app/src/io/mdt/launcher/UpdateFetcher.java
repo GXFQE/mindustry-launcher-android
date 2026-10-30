@@ -80,7 +80,8 @@ final class UpdateFetcher {
         }
 
         UpdateDownload.Result d = UpdateDownload.run(
-                m.url, dir(ctx), m.versionCode, m.size, m.sha256, null);
+                Mirrors.assetUrls(m.url, Config.get().updateMirror()),
+                dir(ctx), m.versionCode, m.size, m.sha256, null);
         if (d == null || !d.status.ok()) {
             String step = d == null ? S_IO : d.status.name().toLowerCase(java.util.Locale.US);
             return new Outcome(step, d == null ? "null result" : d.detail, m, null,

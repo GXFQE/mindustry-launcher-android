@@ -161,6 +161,18 @@ public final class Config {
     private static final String K_UPDATE_MODE = "update_mode";
 
     /**
+     * 第 336 轮：**更新线路**（下载启动器 APK 时先试哪个镜像）。
+     *
+     * <p>取值：空串 = 自动（四个预设 → 直连）；{@code "direct"} = 只走直连；
+     * 四个预设之一 = 它排第一、其余兜底。认不出来的值一律退回自动并 WARNING
+     * 点名键名 —— 打错的地址绝不能被拼进下载 URL。
+     *
+     * <p>★ 它只影响**资产下载**（`update.json` / APK）；版本列表仍然直连
+     * `api.github.com`，不参加镜像轮换（API 很少被墙，60/h 是自己 IP 的额度）。
+     */
+    private static final String K_UPDATE_MIRROR = "update_mirror";
+
+    /**
      * 一档④（2026-10-06）：每个版本**上次启动的时刻** { "&lt;版本key&gt;": 毫秒 }。
      *
      * ★ 为什么需要它：{@link #sessionStartedAt()} 记的是"**正在进行**的那一次"，
@@ -424,6 +436,35 @@ public final class Config {
 
     public synchronized void setUpdateMode(int m) {
         put(K_UPDATE_MODE, Integer.valueOf(UpdateMode.valid(m) ? m : UpdateMode.DEFAULT));
+        save();
+    }
+
+    /**
+     * 第 336 轮：更新线路（见 {@link #K_UPDATE_MIRROR}）。
+     *
+     * <p>坏值 / 认不出来的地址一律退 {@link Mirrors#AUTO} 并 WARNING 点名键名 ——
+     * 与 {@link #updateMode()} 同一族纪律。
+     */
+    public synchronized String updateMirror() {
+        Object v = mRoot.opt(K_UPDATE_MIRROR);
+        if (v instanceof String) {
+            String raw = (String) v;
+            String n = Mirrors.normalize(raw);
+            if (n != null) return n;
+            Log.w(TAG, "config key '" + K_UPDATE_MIRROR + "' has unknown value '" + raw
+                    + "', falling back to auto");
+            return Mirrors.AUTO;
+        }
+        if (v != null) {
+            Log.w(TAG, "config key '" + K_UPDATE_MIRROR + "' is not a string (" + v
+                    + "), falling back to auto");
+        }
+        return Mirrors.AUTO;
+    }
+
+    public synchronized void setUpdateMirror(String prefix) {
+        String n = Mirrors.normalize(prefix);
+        put(K_UPDATE_MIRROR, n == null ? Mirrors.AUTO : n);
         save();
     }
 

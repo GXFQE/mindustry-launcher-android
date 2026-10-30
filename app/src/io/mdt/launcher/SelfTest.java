@@ -353,6 +353,8 @@ public final class SelfTest {
             aboutCredits(ctx, L, stat);
             // ★ 第 305 轮：更新清单（纯逻辑 —— 与 PC 侧 PcCheck 跑的是同一份判据）
             updateManifest(L, stat);
+            // ★ 第 336 轮：更新线路（预设顺序 / 不重复前缀 / 严格解析 / 启动清扫）
+            updateMirrors(ctx, L, stat);
             // ★ 篡改对象池的用例放**最后**：它会在池里留下一个内容坏掉的对象，
             //   之后任何"再备份一次"都会因为 `has()` 命中而复用坏对象（CAS 的固有
             //   假设是"池内不可变"）。放在最后就不影响别的用例。
@@ -16237,6 +16239,112 @@ public final class SelfTest {
         L.add("【更新清单】");
         for (UpdateManifestCheck.Line line : UpdateManifestCheck.run()) {
             ok(stat, L, line.ok, line.msg);
+        }
+    }
+
+    // ── 第 336 轮：更新线路（预设 / 严格解析 / 启动清扫）─────────────────
+
+    /**
+     * 更新线路的纯逻辑 + 启动清扫。
+     *
+     * <p>★ 这里**不测网速**（测速要真下 16 KB，不该进自检）；只钉：
+     * 四个预设的顺序、选中线路排第一、直连排在最后、已带前缀不二次拼接、
+     * 本地回环不拼、坏 JSON 返回 null、清扫只删临时件不删成品。
+     */
+    private static void updateMirrors(android.content.Context ctx, List<String> L, int[] stat) {
+        L.add("");
+        L.add("【更新线路】");
+
+        List<String> auto = Mirrors.downloadCandidates(Mirrors.AUTO);
+        ok(stat, L, auto.size() == 5
+                        && Mirrors.TINYLAKE.equals(auto.get(0))
+                        && Mirrors.GHFAST.equals(auto.get(1))
+                        && Mirrors.GH_PROXY.equals(auto.get(2))
+                        && Mirrors.GH_PROXY_NET.equals(auto.get(3))
+                        && auto.get(4).isEmpty(),
+                "自动 = 四个预设（桌面版顺序）+ 直连最后");
+
+        List<String> selected = Mirrors.downloadCandidates(Mirrors.GH_PROXY);
+        ok(stat, L, selected.size() == 5
+                        && Mirrors.GH_PROXY.equals(selected.get(0))
+                        && selected.get(4).isEmpty(),
+                "选中线路排第一、其余预设与直连兜底");
+
+        List<String> direct = Mirrors.downloadCandidates(Mirrors.DIRECT);
+        ok(stat, L, direct.size() == 1 && direct.get(0).isEmpty(),
+                "「直连」= 只走直连，不偷偷回镜像");
+
+        ok(stat, L, Mirrors.TINYLAKE.equals(Mirrors.normalize("gh.tinylake.top")),
+                "只写主机名也能认（补 https / 斜杠）");
+        ok(stat, L, Mirrors.TINYLAKE.equals(Mirrors.normalize("https://gh.tinylake.top")),
+                "缺结尾斜杠也能认");
+        ok(stat, L, Mirrors.AUTO.equals(Mirrors.normalize("")),
+                "空串 = 自动");
+        ok(stat, L, Mirrors.DIRECT.equals(Mirrors.normalize("DIRECT")),
+                "direct 大小写不敏感");
+        ok(stat, L, Mirrors.normalize("https://example.com/") == null,
+                "认不出来的地址一律拒绝（不许拼进下载 URL）");
+
+        String gh = "https://github.com/x/y/releases/download/v1/a.apk";
+        List<String> urls = Mirrors.assetUrls(gh, Mirrors.AUTO);
+        ok(stat, L, urls.size() == 5
+                        && (Mirrors.TINYLAKE + gh).equals(urls.get(0))
+                        && gh.equals(urls.get(4)),
+                "GitHub 资产 = 四个镜像前缀 + 原地址");
+        List<String> directUrls = Mirrors.assetUrls(gh, Mirrors.DIRECT);
+        ok(stat, L, directUrls.size() == 1 && gh.equals(directUrls.get(0)),
+                "直连模式不拼前缀");
+        List<String> loop = Mirrors.assetUrls("http://127.0.0.1:8080/x.json", Mirrors.AUTO);
+        ok(stat, L, loop.size() == 1 && loop.get(0).startsWith("http://127.0.0.1:"),
+                "本地回环不拼前缀");
+        String already = Mirrors.TINYLAKE + gh;
+        List<String> prefixed = Mirrors.assetUrls(already, Mirrors.AUTO);
+        ok(stat, L, prefixed.size() == 1 && already.equals(prefixed.get(0)),
+                "已经带前缀的地址不二次拼接");
+
+        ok(stat, L, GitHubReleases.parseStrict("{}") == null,
+                "坏 JSON（对象）⇒ null，不是空表");
+        ok(stat, L, GitHubReleases.parseStrict("<html>") == null,
+                "坏 JSON（HTML）⇒ null");
+        List<GitHubReleases.Release> empty = GitHubReleases.parseStrict("[]");
+        ok(stat, L, empty != null && empty.isEmpty(),
+                "合法空数组 ⇒ 空表（真的没有版本）");
+
+        List<MirrorTest.Result> rs = new ArrayList<MirrorTest.Result>();
+        rs.add(new MirrorTest.Result("slow", MirrorTest.Status.OK, 1000, 16000, 16000, 206, null));
+        rs.add(new MirrorTest.Result("dead", MirrorTest.Status.NET, 100, 0, 0, 0, "x"));
+        rs.add(new MirrorTest.Result("fast", MirrorTest.Status.OK, 500, 16000, 32000, 206, null));
+        List<MirrorTest.Result> sorted = MirrorTest.sorted(rs);
+        ok(stat, L, sorted.size() == 3
+                        && "fast".equals(sorted.get(0).prefix)
+                        && "slow".equals(sorted.get(1).prefix)
+                        && "dead".equals(sorted.get(2).prefix),
+                "测速排序：能用的按耗时升序，失败的垫底");
+
+        // 启动清扫：只删 .part / .tmp / 测速锁，已完成的 .apk 必须留着。
+        File appHub = Paths.privateDir(ctx);
+        File updateDir = new File(Data.hubDir(ctx), "update");
+        File lock = new File(appHub, "mirror-test.lock");
+        File part = new File(updateDir, "selftest-336.part");
+        File tmp = new File(updateDir, "selftest-336.tmp");
+        File apk = new File(updateDir, "selftest-336.apk");
+        try {
+            updateDir.mkdirs();
+            Util.atomicWriteText(lock, "1");
+            Util.atomicWriteText(part, "x");
+            Util.atomicWriteText(tmp, "x");
+            Util.atomicWriteText(apk, "keep");
+            int n = UpdateCleanup.sweep(ctx);
+            ok(stat, L, n >= 3 && !lock.exists() && !part.exists() && !tmp.exists()
+                            && apk.exists(),
+                    "启动清扫：删锁 / .part / .tmp，保留已完成的 .apk");
+        } catch (Throwable t) {
+            ok(stat, L, false, "启动清扫夹具异常: " + t);
+        } finally {
+            apk.delete();
+            lock.delete();
+            part.delete();
+            tmp.delete();
         }
     }
 }

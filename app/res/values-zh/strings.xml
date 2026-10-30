@@ -1446,6 +1446,30 @@
     <string name="update_bad_sign">签名对不上</string>
     <string name="update_downgrade">这个版本比你现在的旧</string>
 
+    <!-- 第 336 轮：更新线路（手动测速；正常下载不测） -->
+    <string name="set_update_line_title">更新线路</string>
+    <string name="set_update_line_sub_fmt">当前：%1$s</string>
+    <string name="update_line_auto">自动（按默认顺序）</string>
+    <string name="update_line_direct">直连</string>
+    <string name="update_line_intro">用最新 APK 的一小段实测四个镜像和直连，约 160 KB。</string>
+    <string name="update_line_test">测速</string>
+    <string name="update_line_pick">选一条线路</string>
+    <string name="update_line_checking">正在获取测速文件…</string>
+    <string name="update_line_testing_fmt">正在测速 %1$d/%2$d…</string>
+    <string name="update_line_canceling">正在取消…</string>
+    <string name="update_line_no_test_file">拿不到测速文件</string>
+    <string name="update_line_result_title">测速结果</string>
+    <string name="update_line_result_hint">点「选一条线路」使用测速结果。</string>
+    <string name="update_line_none">这次没有测通的线路</string>
+    <string name="update_line_canceled">已取消</string>
+    <string name="update_line_pick_title">用哪条线路？</string>
+    <string name="update_line_retest">重新测速</string>
+    <string name="update_line_timeout">超时</string>
+    <string name="update_line_http_fmt">HTTP %1$d</string>
+    <string name="update_line_short">不是 APK / 数据太短</string>
+    <string name="update_line_net">连不上</string>
+    <string name="update_line_busy">正在测速，请稍候</string>
+
 <string name="about_card_title">关于</string>
 
     <!--

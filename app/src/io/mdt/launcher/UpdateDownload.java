@@ -5,6 +5,8 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.security.MessageDigest;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * 下载 + sha256 校验 + 落盘。
@@ -48,58 +50,91 @@ final class UpdateDownload {
     private UpdateDownload() {}
 
     /**
-     * 下载到 {@code <dir>/<key>.apk} 并校验 sha256。
+     * 下载到 {@code <dir>/<key>.apk} 并校验 sha256（单地址入口，保留给 dev 夹具）。
      *
      * @param key       文件名前缀（用 versionCode —— 同一版本重复下载直接覆盖）
      * @param expectSize 清单里的大小；{@code <= 0} 表示不知道（只校 sha256）
      */
     static Result run(String url, File dir, int key, long expectSize, String sha256,
                       UpdateClient.Progress cb) {
+        return run(Collections.singletonList(url), dir, key, expectSize, sha256, cb);
+    }
+
+    /**
+     * 按候选顺序下载：镜像失败换下一个，直连通常最后。
+     *
+     * <p>★ 每个候选都从零写 `.part`（本工程的下载不做断点续传；773 KB 的包重下一次
+     * 比维护断点状态更简单）。**只有 sha256 + 长度都过的成品才会 rename 成 `.apk`**。
+     *
+     * <p>★ 镜像用短超时（4 s / 30 s），直连用默认（15 s / 60 s）—— 一个死镜像
+     * 不该把整次下载拖到一分钟。
+     */
+    static Result run(List<String> urls, File dir, int key, long expectSize, String sha256,
+                      UpdateClient.Progress cb) {
+        if (urls == null || urls.isEmpty()) {
+            return new Result(Status.IO, "no url", null);
+        }
         if (!dir.isDirectory() && !dir.mkdirs()) {
             return new Result(Status.IO, "mkdirs failed: " + dir, null);
         }
         File part = new File(dir, key + ".part");
         File out = new File(dir, key + ".apk");
-        // 清掉上一次的残留（失败的 .part / 旧版本的同名成品）
-        part.delete();
-        out.delete();
+        Result last = null;
 
-        try {
-            UpdateClient.download(url, part, expectSize, cb);
-        } catch (IOException e) {
-            long got = part.length();
+        for (String url : urls) {
+            if (url == null || url.isEmpty()) continue;
+            // 清掉上一次的残留（失败尝试的 .part / 旧版本的同名成品）
             part.delete();
-            // 长度已经明显不对 ⇒ SIZE（"下到一半断了"与"网络不通"要分开，文案不同）
-            if (expectSize > 0 && got > 0 && got != expectSize) {
-                return new Result(Status.SIZE, "got " + got + " / want " + expectSize, null);
+            out.delete();
+
+            boolean mirror = Mirrors.isMirrorUrl(url);
+            int connectMs = mirror ? 4000 : UpdateClient.CONNECT_TIMEOUT_MS;
+            int readMs = mirror ? 10000 : UpdateClient.READ_TIMEOUT_MS;
+            long totalMs = mirror ? 15000L : 120000L;
+            try {
+                UpdateClient.download(url, part, expectSize, cb, connectMs, readMs, totalMs);
+            } catch (IOException e) {
+                long got = part.length();
+                part.delete();
+                // 长度已经明显不对 ⇒ SIZE（"下到一半断了"与"网络不通"要分开，文案不同）
+                if (expectSize > 0 && got > 0 && got != expectSize) {
+                    last = new Result(Status.SIZE, "got " + got + " / want " + expectSize
+                            + " @ " + url, null);
+                } else {
+                    last = new Result(Status.NETWORK, String.valueOf(e), null);
+                }
+                continue;
             }
-            return new Result(Status.NETWORK, String.valueOf(e), null);
-        }
 
-        // UpdateClient 已经按 expectSize 校过一次；这里再按实际长度兜一道（防服务端不给 Content-Length）
-        if (expectSize > 0 && part.length() != expectSize) {
-            long got = part.length();
-            part.delete();
-            return new Result(Status.SIZE, "got " + got + " / want " + expectSize, null);
-        }
+            // UpdateClient 已经按 expectSize 校过一次；这里再按实际长度兜一道（防服务端不给 Content-Length）
+            if (expectSize > 0 && part.length() != expectSize) {
+                long got = part.length();
+                part.delete();
+                last = new Result(Status.SIZE, "got " + got + " / want " + expectSize
+                        + " @ " + url, null);
+                continue;
+            }
 
-        String got;
-        try {
-            got = sha256(part);
-        } catch (IOException e) {
-            part.delete();
-            return new Result(Status.IO, String.valueOf(e), null);
-        }
-        if (sha256 == null || !got.equalsIgnoreCase(sha256)) {
-            part.delete();
-            return new Result(Status.SHA, "got " + got, null);
-        }
+            String got;
+            try {
+                got = sha256(part);
+            } catch (IOException e) {
+                part.delete();
+                return new Result(Status.IO, String.valueOf(e), null);
+            }
+            if (sha256 == null || !got.equalsIgnoreCase(sha256)) {
+                part.delete();
+                last = new Result(Status.SHA, "got " + got + " @ " + url, null);
+                continue;
+            }
 
-        if (!part.renameTo(out)) {
-            part.delete();
-            return new Result(Status.IO, "rename failed", null);
+            if (!part.renameTo(out)) {
+                part.delete();
+                return new Result(Status.IO, "rename failed", null);
+            }
+            return new Result(Status.OK, null, out);
         }
-        return new Result(Status.OK, null, out);
+        return last != null ? last : new Result(Status.IO, "no usable url", null);
     }
 
     /** 文件的 sha256（小写十六进制）。 */

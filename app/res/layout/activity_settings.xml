@@ -252,6 +252,19 @@
                     android:layout_marginStart="62dp"
                     android:background="@color/divider" />
 
+                <!-- 第 336 轮：更新线路（手动测速 / 选中线路）。 -->
+                <include
+                    android:id="@+id/row_update_line"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="62dp"
+                    android:background="@color/divider" />
+
                 <include
                     android:id="@+id/row_about"
                     layout="@layout/row_action"

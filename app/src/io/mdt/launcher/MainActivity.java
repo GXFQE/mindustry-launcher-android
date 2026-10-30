@@ -159,6 +159,10 @@ public class MainActivity extends BaseActivity {
         //   进来就把它撞掉（已经响过的撞不撞都无所谓）。
         Restart.cancelPending(this);
         android.util.Log.i("MDTLauncher", "MainActivity onCreate");
+        // 第 336 轮：清掉上一次更新/测速留下的半成品（.part / .tmp / 测速锁）。
+        // 必须在启动时做：force-stop / 划掉后台都不会走 finally。
+        // ★ 每个进程只做一次 —— 转屏重建 Activity 时不能删正在写的 .part。
+        UpdateCleanup.sweepOnce(this);
         buildUi();
         checkDevIntent(getIntent());
         // F9 深链：外部（浏览器 / 文件管理器）递进来的那一份 —— 冷启动走这里，

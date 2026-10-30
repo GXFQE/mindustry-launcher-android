@@ -1484,6 +1484,30 @@
     <string name="update_bad_sign">Signature does not match</string>
     <string name="update_downgrade">That version is older than what you have</string>
 
+    <!-- 第 336 轮：更新线路（手动测速；正常下载不测） -->
+    <string name="set_update_line_title">Update line</string>
+    <string name="set_update_line_sub_fmt">Current: %1$s</string>
+    <string name="update_line_auto">Auto (default order)</string>
+    <string name="update_line_direct">Direct</string>
+    <string name="update_line_intro">Tests the four mirrors and direct with a small sample of the latest APK. About 160 KB.</string>
+    <string name="update_line_test">Speed test</string>
+    <string name="update_line_pick">Choose a line</string>
+    <string name="update_line_checking">Getting the test file…</string>
+    <string name="update_line_testing_fmt">Testing %1$d/%2$d…</string>
+    <string name="update_line_canceling">Canceling…</string>
+    <string name="update_line_no_test_file">Could not get the test file</string>
+    <string name="update_line_result_title">Speed test</string>
+    <string name="update_line_result_hint">Tap a working line to use it.</string>
+    <string name="update_line_none">No line works right now</string>
+    <string name="update_line_canceled">Canceled</string>
+    <string name="update_line_pick_title">Use which line?</string>
+    <string name="update_line_retest">Test again</string>
+    <string name="update_line_timeout">Timeout</string>
+    <string name="update_line_http_fmt">HTTP %1$d</string>
+    <string name="update_line_short">Not an APK / too short</string>
+    <string name="update_line_net">Connection failed</string>
+    <string name="update_line_busy">A speed test is already running</string>
+
 <string name="about_card_title">About</string>
 
     <!--

@@ -83,6 +83,8 @@ public class SettingsActivity extends BaseActivity {
     private TextView mUpdateSub;
     /** 第 313 轮：更新模式（三档）的副标题 —— 它同时回答"要不要自动查"和"查哪个通道"。 */
     private TextView mUpdateModeSub;
+    /** 第 336 轮：更新线路（自动 / 直连 / 四个镜像）的副标题。 */
+    private TextView mUpdateLineSub;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -205,6 +207,18 @@ public class SettingsActivity extends BaseActivity {
                 });
         mUpdateModeSub = (TextView) rowMode.findViewById(R.id.act_sub);
 
+        // 第 336 轮：更新线路（自动 / 直连 / 四个预设）。点进去是「测速 / 选一条 / 关闭」卡；
+        // 正常下载不测速，只有点「测速」才在后台跑。
+        View rowLine = Util.bindActionValue(root, R.id.row_update_line, R.drawable.ic_download,
+                R.string.set_update_line_title, new Runnable() {
+                    @Override public void run() {
+                        UpdateLineUi.show(SettingsActivity.this, new Runnable() {
+                            @Override public void run() { fillValues(); }
+                        });
+                    }
+                });
+        mUpdateLineSub = (TextView) rowLine.findViewById(R.id.act_sub);
+
         // 第 175 轮：「关于」搬成独立二级页（版本 / 包名 / 数据路径 / 开源地址 / 许可证）。
         // 页面只读；入口是设置页底部单独一行（不混进三类设置）。
         Util.bindAction(root, R.id.row_about, R.drawable.ic_app,
@@ -293,6 +307,11 @@ public class SettingsActivity extends BaseActivity {
             // 这副标题就是"现在的模式"：已关闭 · 只手动检查 / 自动 · 只收稳定版 / 自动 · 也收预览版
             mUpdateModeSub.setText(Trans.get(SettingsActivity.this,
                     UpdateMode.labelRes(UpdateMode.of(this))));
+        }
+        if (mUpdateLineSub != null) {
+            mUpdateLineSub.setText(Trans.get(SettingsActivity.this,
+                    R.string.set_update_line_sub_fmt,
+                    UpdateLineUi.label(this, Config.get().updateMirror())));
         }
     }
 
