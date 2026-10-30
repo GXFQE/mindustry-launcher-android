@@ -18,9 +18,9 @@ import java.util.List;
  * 跟 RTT 基本没关系（桌面版 `mirrortest.py` 的实测结论）。这里真发 GET、
  * 读 16 KB，读多少算多少。
  *
- * <p>★ 采样是**交错**的：第 1 轮把所有候选各测一次，再回来测第 2 轮 ——
- * 不是「把 A 测完两次再测 B」。顺序测量在抖动链路上量到的是「当时网络好不好」，
- * 不是「谁更快」。最后每个候选取平均（2 个样本的中位就是平均；本工程只跑 2 轮）。
+ * <p>★ 采样是**交错**的：第 1 轮把所有候选各测一次，再回来测第 2、3 轮 ——
+ * 不是「把 A 测完三次再测 B」。顺序测量在抖动链路上量到的是「当时网络好不好」，
+ * 不是「谁更快」。3 个样本取中位，抗单次尖峰。
  *
  * <p>★ 判据只有一条：**前两个字节是 `PK`**（APK 的 zip 头）。镜像返回 HTML
  * 错误页 / 健康页时状态码可能也是 200，光看状态码会把坏节点当成可用。
@@ -33,10 +33,10 @@ final class MirrorTest {
     static final int READ_MS = 2000;
     static final int DIRECT_READ_MS = 5000;
     static final int CONNECT_MS = 3000;
-    /** 交错轮数：2 轮取平均（2 个样本的中位就是平均，没必要再写一套中位逻辑）。 */
-    static final int ROUNDS = 2;
+    /** 交错轮数：3 轮取中位，抗单次尖峰。 */
+    static final int ROUNDS = 3;
     /** 整轮测速的总预算；超了就用手上已有的样本出结果。 */
-    static final long BUDGET_MS = 25000L;
+    static final long BUDGET_MS = 45000L;
     /** 低于这个字节数不算“下到了 APK”（多半是错误页/被掐断）。 */
     static final int MIN_OK_BYTES = 8 * 1024;
 
@@ -51,7 +51,7 @@ final class MirrorTest {
         CANCELED
     }
 
-    /** 一个候选的聚合结果（多轮取平均）。 */
+    /** 一个候选的聚合结果（多轮取中位）。 */
     static final class Result {
         final String prefix;
         final Status status;
@@ -218,10 +218,10 @@ final class MirrorTest {
     }
 
     /**
-     * 多轮聚合：平均速度 / 平均耗时；没有可用样本时返回最后一次采样。
+     * 多轮聚合：中位速度 / 中位耗时；没有可用样本时返回最后一次采样。
      *
-     * <p>★ 只有 2 轮时，中位数（偶数个样本取中间两个的平均）就是平均，所以这里直接平均。
-     * 以前写成 `(n-1)/2` 取的是**较小那次**，不是中位 —— 用户 2026-10-30 当场指出。
+     * <p>3 轮取中位；若因超时只剩 2 个可用样本，真中位 = 中间两个的平均。
+     * 以前写成 `(n-1)/2` 取的是**较小的那个**，用户 2026-10-30 当场指出过。
      */
     static Result aggregate(String prefix, List<Result> samples) {
         List<Result> usable = new ArrayList<Result>();
@@ -229,16 +229,25 @@ final class MirrorTest {
             if (r.ok()) usable.add(r);
         }
         if (usable.isEmpty()) return samples.get(samples.size() - 1);
-        long speedSum = 0;
-        long msSum = 0;
+        List<Long> speeds = new ArrayList<Long>();
+        List<Long> times = new ArrayList<Long>();
         int bytes = 0;
         for (Result r : usable) {
-            speedSum += r.speedBps;
-            msSum += r.ms;
+            speeds.add(Long.valueOf(r.speedBps));
+            times.add(Long.valueOf(r.ms));
             bytes += r.bytes;
         }
-        int n = usable.size();
-        return new Result(prefix, Status.OK, msSum / n, bytes, speedSum / n, 0, null);
+        Collections.sort(speeds);
+        Collections.sort(times);
+        return new Result(prefix, Status.OK, median(times), bytes, median(speeds), 0, null);
+    }
+
+    /** 真中位：奇数取中间；偶数取中间两个的平均（不是取较小那个）。 */
+    private static long median(List<Long> sorted) {
+        int n = sorted.size();
+        if (n == 0) return 0;
+        if ((n & 1) == 1) return sorted.get(n / 2).longValue();
+        return (sorted.get(n / 2 - 1).longValue() + sorted.get(n / 2).longValue()) / 2L;
     }
 
     /** 排序：能用的在前、按耗时升序；失败按 超时 → 短包 → HTTP → 网络。 */

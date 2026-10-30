@@ -1489,7 +1489,7 @@
     <string name="set_update_line_sub_fmt">Current: %1$s</string>
     <string name="update_line_auto">Auto (default order)</string>
     <string name="update_line_direct">Direct</string>
-    <string name="update_line_intro">Tests the four mirrors and direct with a small sample of the latest APK. About 160 KB.</string>
+    <string name="update_line_intro">Tests the four mirrors and direct with a small sample of the latest APK. About 240 KB.</string>
     <string name="update_line_test">Speed test</string>
     <string name="update_line_pick">Choose a line</string>
     <string name="update_line_checking">Getting the test file…</string>

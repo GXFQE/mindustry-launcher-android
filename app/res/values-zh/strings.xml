@@ -1451,7 +1451,7 @@
     <string name="set_update_line_sub_fmt">当前：%1$s</string>
     <string name="update_line_auto">自动（按默认顺序）</string>
     <string name="update_line_direct">直连</string>
-    <string name="update_line_intro">用最新 APK 的一小段实测四个镜像和直连，约 160 KB。</string>
+    <string name="update_line_intro">用最新 APK 的一小段实测四个镜像和直连，约 240 KB。</string>
     <string name="update_line_test">测速</string>
     <string name="update_line_pick">选一条线路</string>
     <string name="update_line_checking">正在获取测速文件…</string>

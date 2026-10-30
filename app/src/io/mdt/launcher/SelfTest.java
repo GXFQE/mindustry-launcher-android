@@ -16321,12 +16321,20 @@ public final class SelfTest {
                         && "dead".equals(sorted.get(2).prefix),
                 "测速排序：能用的按耗时升序，失败的垫底");
 
+        List<MirrorTest.Result> three = new ArrayList<MirrorTest.Result>();
+        three.add(new MirrorTest.Result("med", MirrorTest.Status.OK, 1000, 16000, 10000, 206, null));
+        three.add(new MirrorTest.Result("med", MirrorTest.Status.OK, 3000, 16000, 30000, 206, null));
+        three.add(new MirrorTest.Result("med", MirrorTest.Status.OK, 2000, 16000, 20000, 206, null));
+        MirrorTest.Result med = MirrorTest.aggregate("med", three);
+        ok(stat, L, med.ok() && med.ms == 2000 && med.speedBps == 20000,
+                "3 个 OK 样本取中位（1000/2000/3000 ms ⇒ 2000）");
+
         List<MirrorTest.Result> two = new ArrayList<MirrorTest.Result>();
         two.add(new MirrorTest.Result("avg", MirrorTest.Status.OK, 1000, 16000, 10000, 206, null));
         two.add(new MirrorTest.Result("avg", MirrorTest.Status.OK, 3000, 16000, 30000, 206, null));
         MirrorTest.Result avg = MirrorTest.aggregate("avg", two);
         ok(stat, L, avg.ok() && avg.ms == 2000 && avg.speedBps == 20000,
-                "2 个 OK 样本取平均（2 个样本的中位就是平均）");
+                "只剩 2 个可用样本时，真中位 = 中间两个的平均");
 
         // 启动清扫：只删 .part / .tmp / 测速锁，已完成的 .apk 必须留着。
         File appHub = Paths.privateDir(ctx);
