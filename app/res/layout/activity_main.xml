@@ -100,25 +100,27 @@
                       第 328 轮（用户点单）：「就地」的「?」—— 这一行里「当前槽」是最容易看不懂的词
                       （词表在顶栏，但用户不会想到去那儿找）。
 
-                      ★★ 第 333 轮（用户：「是那个 4 个版本那行」+「有点太高了」）：从**文字**改成**图标**。
-                        文字那版是个 15sp 粗体的「?」，字形只占上半行 ⇒ 视觉重心比旁边的 13sp 中文高一头
-                        （实测文字 ink 420~465、问号 ink 400~450，差 ~15px），而且 36dp 的盒子把这一行撑高了。
-                        改成 32dp 盒 + 9dp padding（图形 14dp）的 `ic_help_bar`，用 `center_vertical` 跟
-                        13sp 的文字**同一中线**；图标是"图形"，不再受字形上下留白的影响。
+                      ★★ 第 333/334 轮（用户：「有点太高了」「还是不对称」「我说整体」「是那个 4 个版本那行」）：
+                        这一行的**整体**以前是"文字旁边挂两个大小不一的图标"：
+                        · 文字版「?」是 15sp 粗体，字形只占上半行 ⇒ 重心比 13sp 中文高一头；
+                        · 36dp 的盒子比这一行的文字还高 ⇒ 整行被它撑高，卡片跟着"太高"；
+                        · 图标和右边那颗箭头之间留白也不等（30px vs 55px）= 看着"不对称"。
+                        现在：跟**箭头同尺寸**（18dp）、同 `center_vertical`、**同一档间距 6dp**，
+                        居中对齐成一组；行高回到由文字决定 ⇒ 卡片高度也回落。
                       ★ 它挂在**可点卡片**里，所以必须自己吃事件（`clickable=true` + 监听器）——
                         否则点它会把整卡展开（§86.19：可点 ≠ 点得动，真机点过）。
                       ★ 颜色用 `android:tint="@color/accent"`（深浅两套主题都看得见）。
                     -->
                     <ImageView
                         android:id="@+id/status_help"
-                        android:layout_width="32dp"
-                        android:layout_height="32dp"
+                        android:layout_width="@dimen/row_chevron"
+                        android:layout_height="@dimen/row_chevron"
                         android:layout_gravity="center_vertical"
+                        android:layout_marginStart="6dp"
                         android:background="?android:attr/selectableItemBackgroundBorderless"
                         android:clickable="true"
                         android:contentDescription="@string/glossary_open"
                         android:focusable="false"
-                        android:padding="9dp"
                         android:src="@drawable/ic_help_bar"
                         android:tint="@color/accent" />
 
@@ -126,7 +128,7 @@
                         android:id="@+id/status_chevron"
                         android:layout_width="@dimen/row_chevron"
                         android:layout_height="@dimen/row_chevron"
-                        android:layout_marginStart="8dp"
+                        android:layout_marginStart="6dp"
                         android:src="@drawable/ic_chevron"
                         android:tint="@color/fg_muted" />
                 </LinearLayout>
