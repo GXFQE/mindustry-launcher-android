@@ -124,6 +124,7 @@ yourself — even just a few lines — see **Translation file** below.
 
 ### Plug-ins
 - The entry is the icon at the top right (right of the gear); install an APK to add abilities
+- **Three built in** (shipped with the app, no install needed, cannot be deleted, can be disabled): `mapstats` resource statistics, `mods-health` mod health, `usagestats` play time
 - Takes effect after a restart; the page offers **Restart the manager now**
 - One row each: name · state · origin · what happens if it crashes
 - Open its page, enable / disable, delete, read its info
