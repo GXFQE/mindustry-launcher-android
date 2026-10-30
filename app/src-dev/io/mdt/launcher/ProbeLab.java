@@ -153,6 +153,15 @@ final class ProbeLab {
                     sb.append("target = ").append(target).append(" = FAIL ").append(t).append('\n');
                 }
             }
+
+            // 方法行为：直接反射调用 buildString()，看返回的是补丁值还是原版
+            try {
+                Class<?> v = Class.forName("mindustry.core.Version", false, cl);
+                Object bs = v.getMethod("buildString").invoke(null);
+                sb.append("Version.buildString() = ").append(bs).append('\n');
+            } catch (Throwable t) {
+                sb.append("Version.buildString() = FAIL ").append(t).append('\n');
+            }
         } catch (Throwable t) {
             sb.append("patch lab = FAIL ").append(t).append('\n');
         }
