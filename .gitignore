@@ -5,6 +5,11 @@ build/
 .build-trash/
 *.apk
 *.idsig
+# ★ 例外（第 326 轮）：`app/assets/plugins/*.apk` 是**内置插件**（随本体发放），
+#   不是可重生成的构建产物 —— 它们由 `plugins/<id>/build.sh` 单独构建后拷进来，
+#   漏提交就等于"产品版静默少一个内置插件"（清单仍能生成、只是少一行，编译和门禁都不响）。
+!app/assets/plugins/*.apk
+!app/assets-dev/plugins/*.apk
 
 # ─── 临时工作区（脚本/人工的暂存，随时可清）──────────────────────────────
 # .tmp/ .tmp-ui/ 是脚本用的；.tmp-* 是手工排查时留下的一次性文件/目录
