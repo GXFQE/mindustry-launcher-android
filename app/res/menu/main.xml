@@ -35,4 +35,17 @@
         android:icon="@drawable/ic_plugins_bar"
         android:showAsAction="always"
         android:title="@string/plugin_page_title" />
+
+    <!--
+      第 327 轮（2026-10-30）：**词表**（「?」）。用户：「需要找个地方给用户解释一下槽和实例等词的含义」。
+      ★ 放顶栏的理由与上面两条一样：全局、低频、且"带你走"（不是设置项，点下去不改任何值）。
+      ★ 它也**必须**是自带 `@color/on_appbar` 的那份图标（`ic_help_bar`）。
+      ⚠️ 排在最右：它频率最低，顶栏放不下时系统先把它收进溢出菜单（⋮ 里仍然点得到）。
+    -->
+    <item
+        android:id="@+id/action_glossary"
+        android:icon="@drawable/ic_help_bar"
+        android:showAsAction="always"
+        android:title="@string/glossary_title" />
+
 </menu>

@@ -612,6 +612,9 @@ public class MainActivity extends BaseActivity {
         // ★ 第 132 轮：「插件」也走顶栏（低频但成页的入口，与「设置」同一套规矩）
         MenuItem pl = menu.findItem(R.id.action_plugins);
         if (pl != null) pl.setTitle(Trans.get(MainActivity.this, R.string.plugin_page_title));
+        // ★ 第 327 轮：「?」= 词表（同一套规矩：标题也走 Trans）
+        MenuItem he = menu.findItem(R.id.action_glossary);
+        if (he != null) he.setTitle(Trans.get(MainActivity.this, R.string.glossary_title));
         return true;
     }
 
@@ -625,8 +628,47 @@ public class MainActivity extends BaseActivity {
             startActivity(new Intent(MainActivity.this, PluginsActivity.class));
             return true;
         }
+        if (item.getItemId() == R.id.action_glossary) {
+            showGlossary();
+            return true;
+        }
         return super.onOptionsItemSelected(item);
     }
+
+    /** ★ 第 327 轮：词表卡片（顶栏「?」）—— 只解释**词**，不讲实现。 */
+    void showGlossary() {
+        final CardStack[] ref = new CardStack[1];
+        ref[0] = CardStack.show(null, this, Trans.get(this, R.string.glossary_title),
+                CardStack.text(this, glossaryText(this)),
+                new CardStack.Btn(Trans.get(this, R.string.close), new Runnable() {
+                    @Override public void run() { ref[0].dismiss(); }
+                }));
+    }
+
+    /**
+     * 词表正文（**纯装配**，自检直接拼它）。
+     *
+     * <p>五条术语 + 一句"去哪儿看"：每条都是资源里的一整句「词 —— 解释」，
+     * 所以用户语言包能整条替换；条数由 {@link #GLOSSARY_KEYS} 一处决定。
+     */
+    static CharSequence glossaryText(Context c) {
+        StringBuilder sb = new StringBuilder();
+        for (int k : GLOSSARY_KEYS) {
+            if (sb.length() > 0) sb.append("\n\n");
+            sb.append(Trans.get(c, k));
+        }
+        sb.append("\n\n").append(Trans.get(c, R.string.glossary_hint));
+        return sb.toString();
+    }
+
+    /** 词表的条目（**唯一一处**：改这里就是改条数；顺序 = 阅读顺序）。 */
+    static final int[] GLOSSARY_KEYS = {
+            R.string.glossary_version,
+            R.string.glossary_slot,
+            R.string.glossary_entry,
+            R.string.glossary_current_slot,
+            R.string.glossary_default_slot,
+    };
 
     void rescan() {
         // ★ 第 319 轮：手工顺序只在**主界面**应用（`scanAll` 保持扫描顺序 —— 版本页 / 模组页 /

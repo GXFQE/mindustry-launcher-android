@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  第 327 轮（2026-10-30）：词表（顶栏「?」打开）。用户：「需要找个地方给用户解释一下槽和实例等词的含义」。
+
+  ★ 每条一行「词 —— 解释」，分隔符统一用**全角破折号 `—`**（两种语言都用它）：
+    自检按它数条数（少一条就红），所以别换成 `-` / `:` / `：`。
+  ★ 用词纪律：界面上说「启动项」，用户嘴里说「实例」—— 这一条要**两个都写**，
+    否则用户搜不到他心里的那个词。
+  ★ 别在这里讲实现（路径 / 目录 / 清单）：那是「运行日志」和诊断报告的事。
+-->
+<resources>
+
+    <string name="glossary_title">Glossary</string>
+
+    <string name="glossary_version">Version — one game build (an APK). The same build can back several launch entries; the files are not copied.</string>
+    <string name="glossary_slot">Slot — one isolated set of game data (saves / settings / mods). One slot is one data folder; two entries on the same slot overwrite each other\'s saves.</string>
+    <string name="glossary_entry">Launch entry (instance) — a version plus a slot; one row on the main page. Changing its slot or name affects that row only.</string>
+    <string name="glossary_current_slot">Current slot — the slot the next game launch will read; it is shown at the top of the main page.</string>
+    <string name="glossary_default_slot">Default slot — the slot that newly imported versions, and any version without a slot of its own, follow.</string>
+
+    <string name="glossary_hint">Everything inside a slot (mods / saves / maps / blueprints / backups) lives under \"Saves and backups\".</string>
+
+</resources>

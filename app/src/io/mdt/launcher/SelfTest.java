@@ -12284,8 +12284,38 @@ public final class SelfTest {
                     "★顶栏菜单：res/menu/main.xml 里有 action_plugins **且带图标**（图标必须是 ic_plugins_bar）");
             ok(stat, L, pl != null && pl.getTitle() != null && pl.getTitle().length() > 0,
                     "★插件菜单项有无障碍/溢出用的标题");
+            // ★ 第 327 轮：「?」= 词表（同一套判据：图标必须自带 on_appbar 色、标题非空）
+            android.view.MenuItem gl = pm.getMenu().findItem(R.id.action_glossary);
+            ok(stat, L, gl != null && gl.getIcon() != null,
+                    "★顶栏菜单：res/menu/main.xml 里有 action_glossary **且带图标**（图标必须是 ic_help_bar）");
+            ok(stat, L, gl != null && gl.getTitle() != null && gl.getTitle().length() > 0,
+                    "★词表菜单项有无障碍/溢出用的标题");
         } catch (Throwable t) {
             ok(stat, L, false, "顶栏菜单检查自身异常：" + t);
+        }
+        // ★★ 第 327 轮（用户：「需要找个地方给用户解释一下槽和实例等词的含义」）：
+        //   词表是**文案**，判据只能靠断言 —— 但它不该是"三条有没有少一条"那种常量门禁：
+        //   ① 条目数 = `GLOSSARY_KEYS` 一处决定，正文按它拼（少一条文案就红）；
+        //   ② 每条都必须是「词 —— 解释」（分隔符是全角破折号，`——` 出现次数 == 条数）；
+        //   ③ 「实例」这个词**必须**出现在正文里 —— 用户嘴里是"实例"，界面写"启动项"，
+        //      少了它用户按自己的词根本搜不到。
+        try {
+            CharSequence body = MainActivity.glossaryText(ctx);
+            String s = body == null ? "" : body.toString();
+            int dashes = 0;
+            for (int i = 0; i + 1 < s.length(); i++) {
+                if (s.charAt(i) == '—' && s.charAt(i + 1) == '—') dashes++;
+            }
+            L.add("    词表正文 = " + s.length() + " 字符 / " + dashes + " 条");
+            ok(stat, L, MainActivity.GLOSSARY_KEYS.length >= 5 && dashes == MainActivity.GLOSSARY_KEYS.length,
+                    "★词表：每条都是「词 —— 解释」（实得 " + dashes + " 条，应为 "
+                            + MainActivity.GLOSSARY_KEYS.length + "）");
+            ok(stat, L, s.contains("实例") && s.contains("槽") && s.contains("启动项"),
+                    "★★词表必须同时出现「实例」「槽」「启动项」（用户嘴里的词与界面上的词都要能搜到）");
+            ok(stat, L, s.contains(Trans.get(ctx, R.string.glossary_hint)),
+                    "★词表末尾那句「去哪儿看」真的拼进正文了（不是只写在资源里）");
+        } catch (Throwable t) {
+            ok(stat, L, false, "词表检查自身异常：" + t);
         }
         try {
             MainActivity.class.getDeclaredMethod("onCreateOptionsMenu", android.view.Menu.class);

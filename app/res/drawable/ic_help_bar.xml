@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  第 327 轮（2026-10-30）：「?」= 词表（用户：「需要找个地方给用户解释一下槽和实例等词的含义」）。
+
+  ★ 为什么是顶栏第三个图标：词表是**全局、低频、且"带你走"**的那种入口 ——
+    按 §84 的判据它不能进设置页（设置页只放"能被改的项"），惯例位置就是顶栏右上角。
+  ★ 图标同样必须自带 `@color/on_appbar`（ActionBar 不会替菜单图标上色，见 ic_settings_bar 的头注释）。
+  ★ 图形是 Material 的 `help_outline`（问号 + 外圈），24dp 视口，与其它顶栏图标同一套规格。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@color/on_appbar"
+        android:pathData="M11,18h2v-2h-2v2zM12,2C6.48,2 2,6.48 2,12s4.48,10 10,10 10,-4.48 10,-10S17.52,2 12,2zM12,20c-4.41,0 -8,-3.59 -8,-8s3.59,-8 8,-8 8,3.59 8,8 -3.59,8 -8,8zM12,6c-2.21,0 -4,1.79 -4,4h2c0,-1.1 0.9,-2 2,-2s2,0.9 2,2c0,2 -3,1.75 -3,5h2c0,-1.25 3,-1.75 3,-5 0,-2.21 -1.79,-4 -4,-4z" />
+</vector>

@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  第 327 轮（2026-10-30）：词表（顶栏「?」打开）。用户：「需要找个地方给用户解释一下槽和实例等词的含义」。
+
+  ★ 每条一行「词 —— 解释」，分隔符统一用**全角破折号 `—`**（两种语言都用它）：
+    自检按它数条数（少一条就红），所以别换成 `-` / `:` / `：`。
+  ★ 用词纪律：界面上说「启动项」，用户嘴里说「实例」—— 这一条要**两个都写**，
+    否则用户搜不到他心里的那个词。
+  ★ 别在这里讲实现（路径 / 目录 / 清单）：那是「运行日志」和诊断报告的事。
+-->
+<resources>
+
+    <string name="glossary_title">词表</string>
+
+    <string name="glossary_version">版本 —— 一个游戏本体（一份 APK）。同一份本体可以给多个启动项用，文件不复制。</string>
+    <string name="glossary_slot">槽 —— 一套互相隔离的游戏数据（存档 / 设置 / 模组）。一个槽就是一个数据目录；两个启动项用同一个槽，存档会互相覆盖。</string>
+    <string name="glossary_entry">启动项（实例） —— 版本 + 槽 的组合，主界面一行就是它。换槽 / 改名只影响这一项。</string>
+    <string name="glossary_current_slot">当前槽 —— 游戏下次启动会读的那个槽，写在主界面顶部。</string>
+    <string name="glossary_default_slot">默认槽 —— 新导入的版本、以及没单独指定槽的版本，跟随的那个槽。</string>
+
+    <string name="glossary_hint">槽里的东西（模组 / 存档 / 地图 / 蓝图 / 备份）都从「存档与备份」进去看。</string>
+
+</resources>
