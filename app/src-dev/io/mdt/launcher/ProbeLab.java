@@ -8,17 +8,20 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 
 /**
- * `:game` 进程里的**探针验证台**（dev 专用，产品版是空壳 {@code app/src-release}）。
+ * `:game` 进程里的**验证台**（dev 专用，产品版是空壳 {@code app/src-release}）。
  *
- * <p>验证三件事（用户 2026-10-23：「先把要验证的都验证下」）：
+ * <p>验证四件事：
  * <ol>
  *   <li>游戏 dex 注入后，探针类能不能用 `:game` 的 CL 解析到**游戏类**（`mindustry.Vars`）；</li>
  *   <li>插件的探针 APK 能不能用 `DexClassLoader`（parent = 进程 CL）加载并实例化；</li>
- *   <li>探针能不能往宿主给的 telemetry 目录写文件。</li>
+ *   <li>探针能不能往宿主给的 telemetry 目录写文件；</li>
+ *   <li><b>补丁实验</b>（2026-10-30）：把一份"同名类的完整替代类"dex **prepend** 到 base CL，
+ *       验证它能不能顶掉游戏类、且游戏还能起来（{@code hub/patch-lab.txt} 触发）。</li>
  * </ol>
  *
  * <p>触发：`hub/probe-lab.txt` 里写探针 APK 的路径（adb push 即可），启动游戏，
- * 跑完写 `hub/report-probe-lab.txt` 并删掉标记。
+ * 跑完写 `hub/report-probe-lab.txt` 并删掉标记；补丁实验同理，标记是 `hub/patch-lab.txt`，
+ * 报告是 `hub/report-patch-lab.txt`。
  */
 final class ProbeLab {
 
@@ -26,7 +29,13 @@ final class ProbeLab {
 
     static void runIfArmed(Context ctx) {
         File armed = new File(Data.hubDir(ctx), "probe-lab.txt");
-        if (!armed.isFile()) return;
+        if (armed.isFile()) runProbeLab(ctx, armed);
+        File patchArmed = new File(Data.hubDir(ctx), "patch-lab.txt");
+        if (patchArmed.isFile()) runPatchLab(ctx, patchArmed);
+    }
+
+    /** 原探针验证台（①②③）。 */
+    private static void runProbeLab(Context ctx, File armed) {
         String apk = readText(armed);
         armed.delete();
         StringBuilder sb = new StringBuilder("== probe lab (:game) ==\n");
@@ -89,6 +98,65 @@ final class ProbeLab {
             sb.append("probe = FAIL ").append(t).append('\n');
         }
         writeText(new File(Data.hubDir(ctx), "report-probe-lab.txt"), sb.toString());
+    }
+
+    /**
+     * 补丁实验（④，2026-10-30）：**同名类覆盖**的实机判据。
+     *
+     * <p>补丁 APK 只含一个「完整类 + 一个标记字段」；prepend 到 `:game` 的 base CL 之后，
+     * `Class.forName(目标类, false, cl)` 拿到的如果是补丁版本，`PATCH_MARKER` 就反射得到；
+     * 如果目标类已经被提前加载，拿到的还是原版（没有标记）——这一条正是「覆盖只在类加载前有效」的判据。
+     *
+     * <p>报告写 `hub/report-patch-lab.txt`；写完之后游戏继续启动（崩不崩看 logcat）。
+     */
+    private static void runPatchLab(Context ctx, File armed) {
+        String patch = readText(armed);
+        armed.delete();
+        StringBuilder sb = new StringBuilder("== patch lab (:game) ==\n");
+        sb.append("pid = ").append(android.os.Process.myPid()).append('\n');
+        sb.append("patch = ").append(patch).append('\n');
+        ClassLoader cl = ProbeLab.class.getClassLoader();
+        try {
+            File internal = new File(ctx.getFilesDir(), "patch-lab");
+            if (!internal.isDirectory() && !internal.mkdirs()) {
+                throw new java.io.IOException("mkdirs failed: " + internal);
+            }
+            File copy = new File(internal, "patch.apk");
+            if (copy.exists() && !copy.delete()) sb.append("old copy delete = FAIL\n");
+            copyFile(new File(patch), copy);
+            copy.setReadOnly();
+            sb.append("internal copy = ").append(copy.length()).append(" B\n");
+
+            java.util.List<String> notes = new java.util.ArrayList<String>();
+            int n = Reflect.injectDex(cl, copy, ctx.getCodeCacheDir(), true, notes);
+            sb.append("injectDex(prepend) = ").append(n).append(" elements\n");
+            for (String s : notes) sb.append("  ").append(s).append('\n');
+
+            // 目标类 = 补丁类；标记字段只在补丁版本里有。用两个类互为对照：
+            // 一个偏门（主菜单不该加载）、一个可能被启动流程碰过。
+            String[] targets = {"mindustry.game.Objectives", "mindustry.core.Version"};
+            for (String target : targets) {
+                try {
+                    Class<?> c = Class.forName(target, false, cl);
+                    boolean marker = false;
+                    try {
+                        c.getDeclaredField("PATCH_MARKER");
+                        marker = true;
+                    } catch (Throwable ignored) { }
+                    sb.append("target = ").append(target).append(", marker = ").append(marker);
+                    if (marker) {
+                        Object v = c.getDeclaredField("PATCH_MARKER").get(null);
+                        sb.append(", value = ").append(v);
+                    }
+                    sb.append('\n');
+                } catch (Throwable t) {
+                    sb.append("target = ").append(target).append(" = FAIL ").append(t).append('\n');
+                }
+            }
+        } catch (Throwable t) {
+            sb.append("patch lab = FAIL ").append(t).append('\n');
+        }
+        writeText(new File(Data.hubDir(ctx), "report-patch-lab.txt"), sb.toString());
     }
 
     private static void copyFile(File src, File dst) throws java.io.IOException {
