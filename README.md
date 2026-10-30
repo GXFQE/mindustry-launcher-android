@@ -79,6 +79,8 @@ yourself — even just a few lines — see **Translation file** below.
 - Two versions sharing a slot get a warning that their saves will overwrite each other
 - **Packages that will not run are refused** — checked at import and again before launch
 - **Continue** resumes the row you launched last (when one version has several slots, it comes back to the slot it used)
+- The **?** at the top right (and the one next to the summary row) opens a short glossary: version,
+  slot, launch entry, current / default slot, backup, transfer station, whole-slot import / export
 
 ### Slots
 - A slot is one complete set of data: saves / maps / blueprints / mods / settings
@@ -143,14 +145,17 @@ yourself — even just a few lines — see **Translation file** below.
 - Export logs unchanged, or scrubbed (paths / device / account details removed)
 - Runtime log page: manager log, game log and crash reports in sections
 - Crash analysis: names the mod with its evidence, and says so when it cannot tell
-- Theme, language, translation file
+- Theme, language, translation file, **screen orientation** (follow system / force landscape / force portrait)
+- **Check for updates**: the manager downloads and installs its own update; **Auto-check** picks
+  what it accepts (off / stable only / stable and preview). Builds up to 0.7.0 have no updater, so
+  that one step is still a manual install
 - Settings: default slot, crash alerts, crash reports to keep, trash retention, automatic cleanup, storage used
 - About page: version / credits / data locations / GitHub repository, issues, GPL-3.0
 
 ## What is not there yet
 
-- **Networking**: map downloads, a forum panel, update checks, manager self-updates — v1 is
-  local-only (scan what is installed, import your own). The game itself is unaffected: multiplayer,
+- **Networking other than updates**: map downloads and a forum panel — v1 otherwise stays local
+  (scan what is installed, import your own). The game itself is unaffected: multiplayer,
   the server list and in-game downloads work as usual
 - **Plug-in distribution**: install an APK by hand; no store, no downloads, no update checks
 - **Plug-in data**: the in-game side is not exposed yet (computed stats can already be shown on host pages — see playtime under Slots)
