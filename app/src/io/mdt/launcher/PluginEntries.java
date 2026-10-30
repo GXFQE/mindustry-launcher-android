@@ -379,6 +379,26 @@ final class PluginEntries {
         if (!any) {
             section.setVisibility(View.GONE);
         } else {
+            // ★★ 第 335 轮（用户：「资源统计页面…怎么有个一半的框」）：**别把卡片套进卡片**。
+            //   插件声明 `section` 时画的是它**自己的卡片**（圆角 + 描边，见 mapstats 的 `card()`）；
+            //   宿主要是再套一层 `card_bg`，那层外卡就只剩标题下面一条边露在外面 ——
+            //   真机看到的就是"一个半截的框"（`plugin_section` 1083..2570，被里面那张 地矿 卡整个盖住）。
+            //   ⇒ 有插件 View 时，外框让给插件：标题退化成小标签，内容行 / 动作行自己再成一张卡。
+            //   （没有插件 View、只有内容行的页面照旧：整块还是那张卡。）
+            boolean hasSectionView = body != null && body.getChildCount() > 0;
+            if (hasSectionView) {
+                section.setBackground(null);
+                section.setPadding(0, 0, 0, 0);
+                if (box.getChildCount() > 0) {
+                    box.setBackgroundResource(R.drawable.card_bg);
+                    int v = dp(a, 6);
+                    box.setPadding(0, v, 0, v);
+                    ViewGroup.LayoutParams lp = box.getLayoutParams();
+                    if (lp instanceof LinearLayout.LayoutParams) {
+                        ((LinearLayout.LayoutParams) lp).topMargin = dp(a, 8);
+                    }
+                }
+            }
             TextView title = (TextView) section.findViewById(R.id.plugin_section_title);
             if (title != null) {
                 // 只有"这一卡里除了那一整段什么都没有"时才用段落自己的名字；混了内容行 / 动作行
@@ -478,6 +498,15 @@ final class PluginEntries {
             col.addView(more);
         }
         body.addView(col);
+        // ★ 第 335 轮：这段结论是画进 `body` 的（跟插件自己的 View 同一层）。外卡在"有插件 View"
+        //   时已经让出去了（见 attachPage），所以这里自己补一张卡底，否则它会像光秃秃的一段文字。
+        try {
+            col.setBackgroundResource(R.drawable.card_bg);
+            LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+            clp.topMargin = dp(a, 8);
+            col.setLayoutParams(clp);
+        } catch (Throwable ignored) { }
         section.setVisibility(View.VISIBLE);
     }
 
