@@ -349,6 +349,14 @@ public final class CardStack {
         final int h = measurePage(p.body);
         p.body.setLayoutParams(new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT, h));
+        // ★ 第 329 轮（用户：「关闭被遮挡了」）：**第一帧之后再按实测高度兜一次**。
+        //   原因：渲染第一页时窗口还没 inset 完（`decorView.getHeight()` 拿到的是整屏高），
+        //   `liveCap()` 只能按猜的 chrome 算 ⇒ 正文给多了 ~128px ⇒ 卡片顶到上限、
+        //   按钮栏被挤掉半截（「关闭」只剩上半截字）。后续翻页时 root 已有真实高度，
+        //   `liveCap()` 就准了 —— 这里补的是"第一页"那一类。
+        bodyView.post(new Runnable() {
+            @Override public void run() { clampBodyToCard(); }
+        });
         if (!animate) {
             titleView.setText(newTitle);
             bodyView.removeAllViews();
@@ -424,18 +432,64 @@ public final class CardStack {
             if (d != null) screen = d.getHeight();
         } catch (Throwable ignored) { }
         if (screen <= 0) screen = dlg.getContext().getResources().getDisplayMetrics().heightPixels;
-        // ⚠️ 第一次量正文时标题/按钮栏**还没量过**（高度 0）⇒ 不能直接采信实测值，
-        //   否则 cap 被算大、按钮被顶出屏幕（真机：勾选列表撑满后「删除/取消」看不见了）。
-        //   两者各取「实测」与「至少这么高」的较大值。
-        int title = Math.max(titleView.getMeasuredHeight(), dp(50));
-        int buttons = Math.max(buttonBar.getMeasuredHeight(), dp(56));
-        int chrome = dp(56)                       // 窗口上下留白
-                + title
-                + buttons
-                + dp(44);                         // 卡片内边距 + 间隙
-        int h = screen - chrome;
+        // ★★ 第 329 轮（用户：「关闭被遮挡了」）：chrome 必须**量出来**，不能拍脑袋算。
+        //   原来的 `dp(56)+dp(44)` 是猜的；真实结构是 root 16dp×2 + card 20dp×2 + 标题
+        //   + 正文 marginTop 10dp + 按钮栏 marginTop 6dp + 按钮栏。一旦窗口还没 inset 完
+        //   （`decorView.getHeight()` 还是整屏高），正文就多给了一截 ⇒ 卡片顶到上限、
+        //   按钮栏被裁掉半截（只有上半截字）。
+        View root = dlg.findViewById(R.id.card_stack_root);
+        View card = dlg.findViewById(R.id.card_stack_card);
+        int avail = root != null && root.getHeight() > 0 ? root.getHeight() : screen;
+        if (root != null) avail -= root.getPaddingTop() + root.getPaddingBottom();
+        int chrome = measureChrome(card, avail);
+        int h = avail - chrome;
         int floor = dp(120);
         return h > floor ? h : floor;
+    }
+
+    /**
+     * 量「除正文以外」那一截的真实高度：**把正文临时按 0 高量一遍整卡**。
+     *
+     * <p>为什么不能只看已布局的高度：一旦卡片顶到上限，`LinearLayout` 会把最后一个孩子
+     * （按钮栏）裁掉 —— 这时读 `buttonBar.getHeight()` 得到的是**被裁过的**高度，越算越错。
+     * 把正文当 0 高再量，按钮栏就能拿到它自然的高度。
+     */
+    private int measureChrome(View card, int avail) {
+        if (card == null) return dp(200);
+        int w = card.getWidth();
+        if (w <= 0) {
+            int screen = dlg.getContext().getResources().getDisplayMetrics().widthPixels;
+            w = screen - dp(16) * 2;
+        }
+        ViewGroup.LayoutParams lp = bodyView.getLayoutParams();
+        int old = lp.height;
+        try {
+            lp.height = 0;
+            bodyView.setLayoutParams(lp);
+            card.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY),
+                    View.MeasureSpec.makeMeasureSpec(Math.max(avail, dp(120)), View.MeasureSpec.AT_MOST));
+            return card.getMeasuredHeight();
+        } catch (Throwable t) {
+            return dp(200);
+        } finally {
+            lp.height = old;
+            bodyView.setLayoutParams(lp);
+        }
+    }
+
+    /**
+     * ★ 第 329 轮：**按实测高度兜底** —— 正文比 {@link #liveCap()} 还高就收小（非动画、一次到位）。
+     *
+     * <p>为什么还要这一道：渲染第一页时窗口还没 inset 完（root 高度是 0 或整屏高），
+     * 那时 `liveCap()` 只能按整屏高算；等真正布局完再校一次，卡片就绝不会把按钮栏挤掉。
+     */
+    private void clampBodyToCard() {
+        try {
+            View root = dlg.findViewById(R.id.card_stack_root);
+            if (root == null || root.getHeight() <= 0) return;
+            int cap = liveCap();
+            if (bodyView.getHeight() > cap) setBodyHeight(cap, false);
+        } catch (Throwable ignored) { }
     }
 
     private void setBodyHeight(final int target, boolean animate) {
