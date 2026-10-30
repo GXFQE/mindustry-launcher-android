@@ -119,7 +119,8 @@ yourself — even just a few lines — see **Translation file** below.
 ### Mods
 - Enable / disable one by one or in bulk (writes the game's own switch; backed up first)
 - Every mod says whether it will load and why
-- Mod health (**plug-in**, `plugins/mods-health`): who bundles whom, structure problems (declared Java without code, several scripts without `main.js`), missing / disabled / circular dependencies, duplicate packages, blacklist, version thresholds, **two mods overriding the same vanilla sprite or string**, and what the last game log said
+- Mod health (**plug-in**, `plugins/mods-health`): bundles, structure, dependencies, duplicates,
+  blacklist, version thresholds, two mods overriding the same vanilla content, and what the last log said
 - Its verdicts drive the row badges and the extra **filter / sort** entries on this page
 - Health is checked **at import time** (single and batch): the result dialog / batch report says whether the package will load - warnings only, never blocks
 - Search, filter and sort; import / export; delete; copy to another slot
