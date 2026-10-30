@@ -135,6 +135,9 @@ yourself — even just a few lines — see **Translation file** below.
 - Takes effect after a restart; the page offers **Restart the manager now**
 - One row each: name · state · origin · what happens if it crashes
 - Open its page, enable / disable, read its info; ones you installed can be deleted (built-in three cannot)
+- **Plug-ins can update themselves**: the address sits in the plug-in's `plugin.json`; checked once a day
+  (or on demand) and compared by sha256 (not version numbers); same signing key installs as pending
+  (restart), a different one asks first
 - Can add an entry row, a card or an action to almost every page (the plug-ins page itself is the exception)
 - Can put its conclusions on rows and cards (severity-coloured), offer its own filter / sort entries, and supply the pass / fail checks in a mod's technical details
 - Can read slots and content, settings, logs, the transfer station and the version list, and open files
@@ -151,15 +154,16 @@ yourself — even just a few lines — see **Translation file** below.
 - Runtime log page: manager log, game log and crash reports in sections
 - Crash analysis: names the mod with its evidence, and says so when it cannot tell
 - Theme, language, translation file (import / remove / share), **screen orientation** (follow system / force landscape / force portrait)
-- **Check for updates**: the manager downloads and installs its own update; **Auto-check** picks
-  what it accepts (off / stable only / stable and preview). Builds up to 0.7.0 have no updater, so
-  that one step is still a manual install
+- **Check for updates**: downloads and installs its own update; **Auto-check** picks what it accepts
+  (off / stable only / stable and preview), **Update line** picks the mirror and can speed-test it.
+  Builds up to 0.7.0 have no updater, so that one step is still manual
 - Settings: default slot, crash alerts, crash reports to keep, trash retention, automatic cleanup, storage used
 - About page: version / credits / data locations / GitHub repository, issues, GPL-3.0
 
 ## What is not there yet
 
-- **Plug-in distribution**: install an APK by hand; no store, no downloads, no update checks
+- **A plug-in store**: no browsing, no one-click install. A plug-in that declares its own update address
+  can update itself; everything else is still install by hand
 - **Plug-in data**: the in-game side is not exposed yet (computed stats can already be shown on host pages — see playtime under Slots)
 
 ## What is not planned
