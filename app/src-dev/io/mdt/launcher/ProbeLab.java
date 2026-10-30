@@ -141,7 +141,7 @@ final class ProbeLab {
 
             // 目标类 = 补丁类；标记字段只在补丁版本里有。用两个类互为对照：
             // 一个偏门（主菜单不该加载）、一个可能被启动流程碰过。
-            String[] targets = {"mindustry.game.Objectives", "mindustry.core.Version"};
+            String[] targets = {"mindustry.Vars", "mindustry.game.Objectives", "mindustry.core.Version"};
             for (String target : targets) {
                 try {
                     Class<?> c = Class.forName(target, false, cl);
