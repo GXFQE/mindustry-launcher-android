@@ -95,6 +95,17 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
 
+                <!--
+                  ★ 第 320 轮（用户：「在实例管理页面加一个进入当前槽的管理页面的机制」）：
+                  从这个启动项**直接进它的槽**（`SlotActivity`，标题里带槽名）。
+                  放在「换槽」后面：两条都讲"这个启动项用哪个槽"，一条是换、一条是进去管内容。
+                -->
+                <include
+                    android:id="@+id/row_ver_manslot"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
                 <include
                     android:id="@+id/row_ver_clone"
                     layout="@layout/row_action"

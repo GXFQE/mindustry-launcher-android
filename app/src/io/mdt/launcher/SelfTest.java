@@ -12186,6 +12186,43 @@ public final class SelfTest {
         } catch (Throwable t) {
             ok(stat, L, false, "方向 Config 往返自身异常：" + t);
         }
+        // ★ 第 320 轮：实例管理页（版本页）新增「管理这个槽」—— 从这里进**这一行的槽**的槽页。
+        //   用户原话：「在实例管理页面加一个进入当前槽的管理页面的机制」。
+        //   三件事都属"错了不报错"，必须钉：① 行在布局里（少 `@+id` ⇒ 静默跳过）
+        //   ② Intent 带的是**槽名**（写错 extra 的键 ⇒ 真机点进去看到的是当前槽，静默错位）
+        //   ③ 文案（导航行不带「…」：带省略号是"还要再问一句"的意思）。
+        try {
+            android.view.View v = inf.inflate(R.layout.activity_version, null);
+            android.view.View row = v.findViewById(R.id.row_ver_manslot);
+            ok(stat, L, row != null && row.findViewById(R.id.act_title) != null
+                            && row.findViewById(R.id.act_icon) != null,
+                    "★版本页有「管理这个槽」那一行（标题 / 图标都在树里）");
+        } catch (Throwable t) {
+            ok(stat, L, false, "版本页「管理这个槽」行检查自身异常：" + t);
+        }
+        try {
+            android.content.Intent it = VersionActivity.slotIntent(ctx, "槽甲");
+            ok(stat, L, it != null && it.getComponent() != null
+                            && SlotActivity.class.getName().equals(it.getComponent().getClassName())
+                            && "槽甲".equals(it.getStringExtra(SlotActivity.EXTRA_SLOT)),
+                    "★★那一行点下去会带**槽名**进槽页（写错 extra 的键只会静默进当前槽）");
+            // 反方向：换个槽名，extra 跟着变（否则可能只是硬编码了一个常量）
+            ok(stat, L, "槽乙".equals(VersionActivity.slotIntent(ctx, "槽乙")
+                            .getStringExtra(SlotActivity.EXTRA_SLOT)),
+                    "★换一个槽名，Intent 里的 extra 跟着变（不是写死的常量）");
+        } catch (Throwable t) {
+            ok(stat, L, false, "槽页跳转 Intent 检查自身异常：" + t);
+        }
+        try {
+            String t1 = Trans.get(ctx, R.string.version_row_manslot);
+            String s1 = Trans.get(ctx, R.string.version_row_manslot_sub_fmt, "槽甲");
+            ok(stat, L, t1 != null && !t1.trim().isEmpty() && !t1.trim().endsWith("…"),
+                    "★「管理这个槽」有文案、且**不带省略号**（它是直接进页面，不是再问一句）：" + t1);
+            ok(stat, L, s1 != null && s1.contains("槽甲"),
+                    "★副标题把槽名拼进去了（否则两个槽的副标题一模一样）：" + s1);
+        } catch (Throwable t) {
+            ok(stat, L, false, "「管理这个槽」文案检查自身异常：" + t);
+        }
         // ★「添加游戏」的二选一弹窗：两条路都在（少一条 = 少一个入口，且不报错）
         try {
             android.view.View v = inf.inflate(R.layout.dialog_add_game, null);

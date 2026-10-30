@@ -1,5 +1,6 @@
 package io.mdt.launcher;
 
+import android.content.Context;
 import android.os.Bundle;
 import android.view.View;
 import android.widget.TextView;
@@ -64,6 +65,17 @@ public class VersionActivity extends BaseActivity {
                 new Runnable() {
                     @Override public void run() {
                         if (mEntry != null) VersionOps.pickSlot(VersionActivity.this, mEntry, done);
+                    }
+                });
+        // ★ 第 320 轮：**进这一行的槽**（用户：「在实例管理页面加一个进入当前槽的管理页面的机制」）。
+        //   槽名在点下去的那一刻从 mEntry 取（不在 onCreate 里缓存）：这一页的图标/文字都是 refresh() 重算的，
+        //   缓存一份就有"换过槽、这里还指着旧槽"的可能。
+        Util.bindAction(findViewById(R.id.root), R.id.row_ver_manslot, R.drawable.ic_storage,
+                R.string.version_row_manslot, R.string.version_row_manslot_sub,
+                new Runnable() {
+                    @Override public void run() {
+                        if (mEntry == null) return;
+                        startActivity(slotIntent(VersionActivity.this, Versions.slotFor(mEntry)));
                     }
                 });
         Util.bindAction(findViewById(R.id.root), R.id.row_ver_clone, R.drawable.ic_add,
@@ -137,6 +149,9 @@ public class VersionActivity extends BaseActivity {
         // 「换槽」的副标题写清这一行现在用的是哪个槽（页面标题是版本名，不是槽名）
         ((TextView) findViewById(R.id.row_ver_slot).findViewById(R.id.act_sub)).setText(
                 Trans.get(this, R.string.version_row_slot_sub_fmt, slot));
+        // 「管理这个槽」的副标题同样带槽名：它讲的是"进去管的内容"，不带名字就分不清是哪一份数据
+        ((TextView) findViewById(R.id.row_ver_manslot).findViewById(R.id.act_sub)).setText(
+                Trans.get(this, R.string.version_row_manslot_sub_fmt, slot));
 
         // 删除的范围随**行数**变（判据只有 Versions.rowCount 一处）。
         // ★ 标题也跟着变：用户 2026-10-25 说「还有两行才奇怪了，到底是删完还是没删完有歧义」
@@ -160,5 +175,17 @@ public class VersionActivity extends BaseActivity {
         boolean blocked = scope == VersionOps.DELETE_BLOCKED;
         del.setEnabled(!blocked);
         del.setAlpha(blocked ? 0.45f : 1f);
+    }
+
+    /**
+     * 进某个槽的**管理页**（`SlotActivity`）的 Intent —— 槽名随 extra 带过去。
+     *
+     * <p>★ 第 320 轮抽成一个函数只为一件事：**让自检能钉住"槽名真的带过去了"**。
+     * 直接写在点击回调里时，写错 extra 的键（`SlotActivity` 读的是 `EXTRA_SLOT`）编译器不响、
+     * 真机上只会表现为"点进去看的是当前槽"—— 那是**静默错**（与「少一个 `@+id` 是静默跳过」同族）。
+     */
+    static android.content.Intent slotIntent(Context c, String slot) {
+        return new android.content.Intent(c, SlotActivity.class)
+                .putExtra(SlotActivity.EXTRA_SLOT, slot == null ? "" : slot);
     }
 }

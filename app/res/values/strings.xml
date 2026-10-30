@@ -188,6 +188,9 @@
     <string name="version_row_slot">Change slot…</string>
     <string name="version_row_slot_sub">Pick another slot for this launch entry</string>
     <string name="version_row_slot_sub_fmt">Now using \"%1$s\"</string>
+    <string name="version_row_manslot">Manage this slot</string>
+    <string name="version_row_manslot_sub">Mods / saves / maps / blueprints</string>
+    <string name="version_row_manslot_sub_fmt">Mods / saves / maps / blueprints · slot \"%1$s\"</string>
     <string name="version_row_clone">Clone…</string>
     <string name="version_row_clone_sub">Add another launch entry on another slot (same game files)</string>
     <string name="version_row_detail">Details…</string>

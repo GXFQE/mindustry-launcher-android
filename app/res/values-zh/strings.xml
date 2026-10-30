@@ -175,6 +175,10 @@
     <string name="version_row_slot">换槽…</string>
     <string name="version_row_slot_sub">给这个启动项换一个槽</string>
     <string name="version_row_slot_sub_fmt">现在用「%1$s」</string>
+    <!-- 第 320 轮：从这个启动项进它的槽（SlotActivity）—— 导航，不是"还要再问一句"，所以标题不带 … -->
+    <string name="version_row_manslot">管理这个槽</string>
+    <string name="version_row_manslot_sub">模组 / 存档 / 地图 / 蓝图</string>
+    <string name="version_row_manslot_sub_fmt">模组 / 存档 / 地图 / 蓝图 · 槽「%1$s」</string>
     <string name="version_row_clone">克隆…</string>
     <string name="version_row_clone_sub">用另一个槽再加一个启动项（共用本体）</string>
     <string name="version_row_detail">详情…</string>
