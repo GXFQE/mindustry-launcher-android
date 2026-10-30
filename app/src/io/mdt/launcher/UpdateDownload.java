@@ -71,8 +71,20 @@ final class UpdateDownload {
      */
     static Result run(List<String> urls, File dir, int key, long expectSize, String sha256,
                       UpdateClient.Progress cb) {
+        return run(urls, dir, String.valueOf(key), expectSize, sha256, cb);
+    }
+
+    /**
+     * 同上，但落点名字用**字符串键**（第 338 轮：插件更新的键是 `id-<sha8>`，
+     * 插件 id 不是数字，版本号也不可靠 —— 只能拿内容哈希当键）。
+     */
+    static Result run(List<String> urls, File dir, String key, long expectSize, String sha256,
+                      UpdateClient.Progress cb) {
         if (urls == null || urls.isEmpty()) {
             return new Result(Status.IO, "no url", null);
+        }
+        if (key == null || key.isEmpty()) {
+            return new Result(Status.IO, "blank key", null);
         }
         if (!dir.isDirectory() && !dir.mkdirs()) {
             return new Result(Status.IO, "mkdirs failed: " + dir, null);

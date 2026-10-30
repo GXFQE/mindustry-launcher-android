@@ -46,6 +46,13 @@ final class PluginMeta {
             K_AUTHOR = "author", K_DESC = "description";
 
     /**
+     * 第 338 轮：**更新清单地址**（可选）。见 {@link #updateUrlOf(File)}。
+     * ★ 只有 {@code assets/plugin.json} 这一处声明 —— 不给 meta-data 开第二个口子
+     * （"同一件事两种写法"最后一定会漂）。
+     */
+    static final String K_UPDATE = "update";
+
+    /**
      * **v30**：`playtimeTotal` = 一个**简单文件名**（相对插件自己的 `data/`），里面只有一个整数
      * （毫秒总数）⇒ 宿主把它排版进主界面摘要卡。
      *
@@ -142,6 +149,31 @@ final class PluginMeta {
     /** 同一个声明，直接从 APK 的自述里取（几 KB，不装包、不挂资源）。 */
     static String playtimeTotalOf(File apk) {
         return playtimeTotalFromJson(zipText(apk, ASSET_JSON));
+    }
+
+    /**
+     * 第 338 轮：插件自己声明的**更新清单地址**（`"update": "https://…/x.json"`）。
+     *
+     * <p>为什么由插件提供而不是宿主内置一张表：用户 2026-10-30 定 ——
+     * 「由插件负责提供对应的更新地址」。第三方插件不必进我们的仓库，官方插件也不必
+     * 把地址硬编码进宿主；谁发的插件，谁负责告诉宿主去哪儿看新版。
+     *
+     * <p>⚠️ 这是**声明**不是权限：宿主只拿它去发一次 HTTP（只认 https / 本机回环），
+     * 不把它当路径、不拼进别的东西。地址写坏了 ⇒ 当没声明（那个插件就不参与自动更新）。
+     *
+     * @return 合法的清单地址；没有 / 非法 ⇒ null
+     */
+    static String updateUrlOf(File apk) {
+        try {
+            Map<String, String> m = FlatJson.parse(zipText(apk, ASSET_JSON));
+            String s = m == null ? null : m.get(K_UPDATE);
+            if (s == null) return null;
+            s = s.trim();
+            if (s.isEmpty() || s.length() > PluginUpdateManifest.URL_MAX) return null;
+            return PluginUpdateManifest.allowedUrl(s) ? s : null;
+        } catch (Throwable t) {
+            return null;
+        }
     }
 
     // ---- 读 zip 里的一个小文件 -------------------------------------------------

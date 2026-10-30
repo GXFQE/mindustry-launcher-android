@@ -112,6 +112,13 @@ git tag -l 'v*' | wc -l    # 现在是 7 ⇒ 下一个 vc = 8
     再从它的 assets 里找 `update.json`。所以**每一版都必须带这个资产**，否则客户端报
     "no update.json in release v…"（那正是 §5 早年只有 APK、没有清单的那些版本的样子）；
   - ⚠️ **预览版也在同一个列表里**，不需要额外通道，也不需要 `--clobber` 覆盖任何东西。
+- **插件更新走另一条滚动通道 `plugins-latest`**（2026-10-30 第 338 轮，见 `PLUGIN-API.md` §10）：
+  三份内置插件的 `plugin.json` 里声明了
+  `…/releases/download/plugins-latest/<id>.json`；换插件只往那个 release 覆盖资产
+  （`gh release upload plugins-latest <id>.apk <id>.json --clobber`），**不需要发启动器版本**。
+  ⚠️ 它不是当年那条"通道 release"老弯路（那是给启动器用的、已经删掉）：`plugins-latest`
+  **只放插件**、不在 `v*` 命名空间里、不参与 `versionCode = v* tag 数 + 1` 的计数。
+  ★ 插件包的"版本"由**内容哈希**决定（`sha256` 前 8 位当落点键），作者不用维护版本号序列。
 - **发布说明以 GitHub 为唯一正文**，仓库里不复制第二份（复制必漂）；
   本地底稿放 `.dsh/release-notes-<版本>.md`。
   - 结构：这是什么 / 这一版（相对上一版）/ 装之前先看 / 文件与校验。

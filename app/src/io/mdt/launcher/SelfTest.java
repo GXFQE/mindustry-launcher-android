@@ -355,6 +355,8 @@ public final class SelfTest {
             updateManifest(L, stat);
             // ★ 第 336 轮：更新线路（预设顺序 / 不重复前缀 / 严格解析 / 启动清扫）
             updateMirrors(ctx, L, stat);
+            // ★ 第 338 轮：插件更新（清单解析 / 内容哈希比对 / 状态表）—— 纯逻辑
+            pluginUpdates(ctx, L, stat);
             // ★ 篡改对象池的用例放**最后**：它会在池里留下一个内容坏掉的对象，
             //   之后任何"再备份一次"都会因为 `has()` 命中而复用坏对象（CAS 的固有
             //   假设是"池内不可变"）。放在最后就不影响别的用例。
@@ -16242,6 +16244,57 @@ public final class SelfTest {
         }
     }
 
+    // ── 第 338 轮：插件自动更新（清单 / 哈希比对 / 状态表 / 内置在线升级登记）──────
+
+    /**
+     * 插件更新的判据。
+     *
+     * <p>★ 两层：
+     * <ol>
+     *   <li>清单解析 / 内容哈希比对 / 状态表 —— 住在 {@link PluginUpdateCheck}
+     *       （纯逻辑，PC 侧 `PcCheck` 跑的是同一份）；这里只把结果并进总报告；</li>
+     *   <li>内置插件的**在线升级登记**（{@link Plugins#onlinePut} 那一族）是纯文本函数，
+     *       直接喂字符串 —— 它决定"在线升级过的内置插件会不会被本体那份顶掉"，
+     *       而这条**只有重启后才会暴露**，必须在这里钉住。</li>
+     * </ol>
+     */
+    private static void pluginUpdates(android.content.Context ctx, List<String> L, int[] stat) {
+        L.add("");
+        L.add("【插件更新】");
+        for (PluginUpdateCheck.Line line : PluginUpdateCheck.run()) {
+            ok(stat, L, line.ok, line.msg);
+        }
+
+        String shaA = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        String shaB = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+        String t = Plugins.onlinePut("", "mapstats", "11111111", shaA, shaB);
+        String[] o = Plugins.onlineOf(t, "mapstats");
+        ok(stat, L, o != null && "11111111".equals(o[0]) && shaA.equals(o[1]) && shaB.equals(o[2]),
+                "在线升级登记：{版本, 该版哈希, 升级时的内置基线} 三个字段都要在");
+        ok(stat, L, Plugins.onlineOf(t, "other") == null, "别的 id ⇒ 没有登记");
+        String t2 = Plugins.onlinePut(t, "usagestats", "22222222", shaA, shaB);
+        ok(stat, L, Plugins.onlineOf(t2, "mapstats") != null
+                        && Plugins.onlineOf(t2, "usagestats") != null,
+                "★ 写第二条没碰掉第一条");
+        ok(stat, L, Plugins.onlineOf(Plugins.onlinePut(t, "mapstats", "33333333", shaB, shaA),
+                        "mapstats")[0].equals("33333333"),
+                "同 id 覆盖成新的一行（不是追加）");
+        ok(stat, L, Plugins.onlineOf(Plugins.onlineRemove(t2, "mapstats"), "mapstats") == null,
+                "onlineRemove 删掉目标");
+        ok(stat, L, Plugins.onlineOf(Plugins.onlineRemove(t2, "mapstats"), "usagestats") != null,
+                "onlineRemove 没碰别人");
+        ok(stat, L, Plugins.onlineOf(null, "mapstats") == null
+                        && Plugins.onlineOf("garbage\nmapstats\t1", "mapstats") == null,
+                "脏行 / 段数不对 ⇒ 当没有登记（不能拿半条去动文件）");
+
+        // 内置插件确实存在时：它的"内置版本键"必须是内容哈希前 8 位（与在线登记同一套口径）
+        for (String[] b : Plugins.builtins(ctx)) {
+            String ver = Plugins.builtinVersion(b[2]);
+            ok(stat, L, ver != null && ver.length() == 8 && b[2].startsWith(ver),
+                    "内置版本键必须是 sha256 前 8 位（" + b[0] + "）");
+        }
+    }
+
     // ── 第 336 轮：更新线路（预设 / 严格解析 / 启动清扫）─────────────────
 
     /**
@@ -16309,6 +16362,18 @@ public final class SelfTest {
         List<GitHubReleases.Release> empty = GitHubReleases.parseStrict("[]");
         ok(stat, L, empty != null && empty.isEmpty(),
                 "合法空数组 ⇒ 空表（真的没有版本）");
+
+        // ★ 第 338 轮：插件更新通道也是本仓库的一个 release（`plugins-latest`），
+        //   它**不能**被启动器自更新当成"最新的一版"挑走（否则会报 no update.json）。
+        List<GitHubReleases.Release> mixed = GitHubReleases.parseStrict(
+                "[{\"tag_name\":\"plugins-latest\",\"prerelease\":true,\"assets\":[]},"
+                        + "{\"tag_name\":\"v0.7.0-preview\",\"prerelease\":true,\"assets\":[]}]");
+        ok(stat, L, mixed != null && mixed.size() == 2, "两个 release 都解析出来");
+        GitHubReleases.Release picked = GitHubReleases.pick(mixed, true);
+        ok(stat, L, picked != null && "v0.7.0-preview".equals(picked.tag),
+                "★ 非 v* 的 release（插件通道）必须跳过：只有 v* 是启动器版本");
+        ok(stat, L, GitHubReleases.pick(mixed, false) == null,
+                "只收稳定版时，跳过的结论不变（列表里没有非 prerelease 的 v*）");
 
         List<MirrorTest.Result> rs = new ArrayList<MirrorTest.Result>();
         rs.add(new MirrorTest.Result("slow", MirrorTest.Status.OK, 1000, 16000, 16000, 206, null));

@@ -481,6 +481,10 @@ public class MainActivity extends BaseActivity {
         //   放在最后：它是"锦上添花"，不许挡住主界面自己的刷新。
         //   ⚠️ 只治"有新版"这一种情况 —— 没网/数据坏一律不出声，否则每次启动都被打扰。
         UpdateUi.checkSilentIfDue(this);
+        // ★ 第 338 轮：插件自动更新也在这个时机（同一个"锦上添花"位置）。
+        //   ⚠️ 它**不跟着**启动器的「更新模式」走：那是两个开关（见 Config.DEF_PLUGIN_UPDATE）。
+        //   有插件被自动更新 / 需要确认时会给一条 Toast；其余情况（没声明地址 / 没网）完全安静。
+        PluginUpdates.checkDue(this);
     }
 
     @Override

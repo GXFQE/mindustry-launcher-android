@@ -613,7 +613,9 @@ PluginHost / PluginData / Extensions
                 插件宿主：扫描 / dex 注入 / 接口面 / 插件数据目录 / 页面动作扩展
 PluginAnalysis / ProbeRunner
                 体检结论（analyzer）与探针任务（probe）+ 结果缓存
-PluginsActivity 插件页（装 / 卸 / 启用 / 隔离 / 技术细节）
+PluginUpdates / PluginUpdateManifest / PluginUpdateState
+                插件自动更新（清单拉取 / 内容哈希比对 / 签名确认 / 状态表；见 PLUGIN-API §10）
+PluginsActivity 插件页（装 / 卸 / 启用 / 隔离 / 检查更新 / 技术细节）
 ShareOut / SharePack / CrashScrub
                 分享出口（唯一）/ 分享包脱敏 / 崩溃报告脱敏
 BatchIo / Storage

@@ -1,9 +1,10 @@
 {
   "entry": "io.mdt.plugins.usagestats.UsageStats",
   "name": "usagestats",
-  "version": "5",
+  "version": "6",
   "author": "mdt",
   "description": "foreground play time (the probe writes its own ledger)",
+  "update": "https://github.com/GXFQE/mindustry-launcher-android/releases/download/plugins-latest/usagestats.json",
   "playtimeTotal": "total.txt",
   "access": [],
   "telemetry": {

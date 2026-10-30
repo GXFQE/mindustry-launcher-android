@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  插件页顶栏菜单（第 338 轮）：**检查插件更新**。
+
+  ★ 为什么放顶栏而不是再加一张页内卡：它是**低频全局动作**（正常路径是启动时自动检查），
+    页里已经有「装一个插件」「立即重启」两张卡，再加一张会把列表往下顶
+    —— 与 `ref/29` §84「全局 / 低频入口放顶栏右上角」同一条规矩。
+  ★ `showAsAction="never"` ⇒ 系统自己画 **⋮**，我们不出图标：
+    既不用为"菜单图标必须自带 @color/on_appbar"再造一份 drawable，也不会踩没上色的坑。
+  ★ `android:title` 只是无障碍 / 溢出菜单的标签；真标题在
+    `PluginsActivity.onCreateOptionsMenu` 里用 `Trans` 覆盖（文案唯一入口那条纪律）。
+-->
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <item
+        android:id="@+id/action_plugin_update"
+        android:showAsAction="never"
+        android:title="@string/plugin_update_check" />
+</menu>

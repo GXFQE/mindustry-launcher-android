@@ -49,6 +49,7 @@
   "author": "you",
   "description": "一句话说明",
   "access": ["slots"],                   // 声明用途（给人看，不是权限门）
+  "update": "https://…/myplugin.json",   // 可选：插件更新清单（第 338 轮，见第 10 节）
   "extensions": [
     { "id": "my-row", "title": "做点什么…", "subtitle": "副标题",
       "entry": "com.example.MyPlugin", "slot": "content", "page": "maps" }
@@ -587,7 +588,106 @@ java.io.File usageDir();   // <hub>/usage/
 - ⚠️ **唯一的例外**是 `plugin.json` 里显式声明的 `playtimeTotal`（v30，见第 8 节）：宿主只读
   那**一个整数**并排版进主界面摘要卡，不读账本、不按槽/版本算；插件不声明就一行都不出现。
 
-## 10. 历史
+## 10. 插件自动更新（第 338 轮，2026-10-30）
+
+> **地址由插件自己提供**（用户 2026-10-30 定：「由插件负责提供对应的更新地址」）——
+> 宿主不内置插件名单、不做商店；谁发的插件，谁告诉宿主去哪儿看新版。
+
+### 10.1 插件这边要做两件事
+
+1. 在 `assets/plugin.json` 里加一行**更新清单地址**（可空；空 = 不参与自动更新）：
+
+   ```json
+   "update": "https://example.com/mdt/myplugin.json"
+   ```
+
+   ⚠️ **只认 https**（回环 `http://127.0.0.1:…` 只给本地夹具）。明文 http 一律当没声明。
+
+2. 在该地址放一份清单（**几百字节**）：
+
+   ```json
+   {
+     "schema": 1,
+     "plugin": "myplugin",
+     "version": "1.2",
+     "size": 61234,
+     "sha256": "…64 位小写十六进制…",
+     "url": "https://example.com/mdt/myplugin-1.2.apk",
+     "notes": "这一版改了什么"
+   }
+   ```
+
+| 字段 | 必需 | 说明 |
+|---|---|---|
+| `schema` | 否 | 缺省按 1；**别的值整份不认**（将来改格式，老宿主不能因此失去更新能力） |
+| `sha256` | **是** | 远端 APK 的**内容哈希**；宿主的唯一比对依据 |
+| `url` | **是** | APK 的下载地址（https / 回环） |
+| `size` | 否 | 字节数；给了就边下边校（早失败），不给就下完按实际长度校 sha256 |
+| `version` | 否 | **只用于显示**（"有新版 1.2"）。不参与任何比较 |
+| `notes` | 否 | 一行说明（≤160 字符，换行会压成空格） |
+| `plugin` | 否 | 清单自称的插件 id；**填了就必须和装的那个 id 一致**（防串包），不填不拦 |
+| `minHostApi` | 否 | 宿主接口版本低于它就不提示（新插件需要新 API，装了也用不了） |
+
+生成清单别手抄：
+
+```bash
+python tools/make-plugin-update.py --apk myplugin.apk --version 1.2 --out myplugin.json
+python tools/make-plugin-update.py --check myplugin.json     # 发之前先验一遍
+```
+
+### 10.2 宿主怎么判"有新版"：**只比内容，不比版本号**
+
+用户原话：「插件这东西鬼知道版本号咋写的」。所以：
+
+```
+本机那一份 APK 的 sha256  !=  清单里的 sha256   ⇒  有更新
+```
+
+- 不比 semver、不解析版本号、不依赖作者写没写 `version`；
+- 作者**回滚**也能用：把清单指回旧包，那也是一次"更新"（内容不同）；
+- 清单里的 `version` 只在界面上显示；没有就显示 sha 前 8 位。
+
+### 10.3 宿主会做什么（自动化程度）
+
+| 步骤 | 行为 |
+|---|---|
+| 何时查 | **启动时**静默查一次，24 h 内不重复；设置页「插件自动更新」关掉后**一次请求都不发** |
+| 落后了怎么办 | 手动「检查插件更新」（插件页顶栏 ⋮）随时可查 |
+| 下载 | 只在真发现新版时下；镜像/直连按「更新线路」那条设置走 |
+| 校验 | ① 长度（有 `size` 时）② **sha256** ③ 至少是个能解析的 APK（有清单 + classes.dex） |
+| 装不装 | **签名和当前那一份相同 ⇒ 自动装**（同一个作者的更新，不打扰）；**不同 ⇒ 不装**，插件页标「新版待确认」，用户点一下才装 |
+| 生效 | 与手动安装完全一样：**装成"待生效"，退出重开才加载**（S0 硬事实：已加载的类换不掉） |
+| 失败 | 只写日志与 `report-plugin-update.txt`，界面不弹窗（下次启动再试） |
+
+### 10.4 三条给作者的红线
+
+1. **清单地址要稳定**：宿主是拿**当前装着的那一份**的 `plugin.json` 去读地址的；
+   地址变了要等新版装上之后才生效（第一版必须走手动安装）。
+2. **URL 指向的必须真的是那个 APK**：sha256 对不上 ⇒ 这次更新放弃（不会装半截或不匹配的东西）。
+3. **换签名 = 用户要确认一次**：如果你换了签名钥匙（或换了作者），自动更新不会静默生效 ——
+   这是有意的（防"插件被换包"）。
+
+### 10.5 内置插件也在线更新（官方三件套）
+
+`mapstats` / `mods-health` / `usagestats` 三份内置插件同样在自己的 `plugin.json` 里声明了
+`plugins-latest` 通道的清单地址。它们被在线升级之后：
+
+- 下一次启动**不会被本体 `assets/plugins/` 里那份顶掉**（`Plugins.online.txt` 记着"在线版是
+  在内置版 X 的基础上升的"；本体内容一变 ⇒ 以本体为准）；
+- 仍然算"内置"（界面显示内置、不给删除入口、失败处置封顶 L2）。
+
+发一次插件更新（**不是启动器发版**）：
+
+```bash
+bash plugins/mapstats/build.sh
+python tools/make-plugin-update.py --apk "$TEMP/mdt-mapstats/mapstats.apk" --version 6 --out mapstats.json
+gh release upload plugins-latest "$TEMP/mdt-mapstats/mapstats.apk" mapstats.json --clobber
+```
+
+> ⚠️ `plugins-latest` 是**滚动更新通道**，不是版本发布：它不在 `v*` 命名空间里，
+> 不影响 `versionCode = v* tag 数 + 1`；**永远不要**往里传启动器 APK。
+
+## 11. 历史
 
 v1~v19 的逐版记录留在 git 历史与 `.dsh/memory/next/` 的轮次记录里（37/38/39 等分片）。
 v20（2026-10-23）把逐年长出来的接口整理了一遍：删掉 `selectedFile` / `settings` / `hostIcon`、

@@ -342,9 +342,9 @@ if [ "$DEBUGGABLE" = "true" ]; then
   echo "   dev-only sources: included (debuggable build)"
 else
   [ -d "$PRODUCT_SRC_DIR" ] || { echo "FAIL: missing product stub dir: $PRODUCT_SRC_DIR" >&2; exit 1; }
-  # ★ UpdateManifestCheck 只服务自检（PC 侧 PcCheck 也用它）—— 与 SelfTest 同一条排除规则。
-  #   它不 import android，所以产品版少它一个不丢任何运行时能力。
-  SELFTEST_ARGS=( ! -name 'SelfTest.java' ! -name 'UpdateManifestCheck.java' )
+  # ★ UpdateManifestCheck / PluginUpdateCheck 只服务自检（PC 侧 PcCheck 也用它）—— 与 SelfTest 同一条排除规则。
+  #   它们不 import android，所以产品版少它们不丢任何运行时能力。
+  SELFTEST_ARGS=( ! -name 'SelfTest.java' ! -name 'UpdateManifestCheck.java' ! -name 'PluginUpdateCheck.java' )
   EXTRA_SRC="$PRODUCT_SRC_DIR"
   echo "   dev-only sources: EXCLUDED (product build -> stubs from app/src-release)"
 fi

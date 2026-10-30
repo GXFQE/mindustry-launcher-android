@@ -265,6 +265,24 @@
                     android:layout_marginStart="62dp"
                     android:background="@color/divider" />
 
+                <!--
+                  第 338 轮：**插件自动更新**（开关）。
+                  ★ 它与上面那行「更新模式」是两件事：那个管**启动器自己**，这个管**插件**。
+                    不合并的理由：一行一件事；而且关掉启动器自更新的人未必想停掉插件更新。
+                  ★ 副标题写"开 / 关 + 多久查一次"，点一下切换（与「自动清理」那行同一个交互）。
+                -->
+                <include
+                    android:id="@+id/row_plugin_update"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="62dp"
+                    android:background="@color/divider" />
+
                 <include
                     android:id="@+id/row_about"
                     layout="@layout/row_action"

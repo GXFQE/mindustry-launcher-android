@@ -129,7 +129,10 @@ final class DevTools {
                 // 第 308 轮：再往前一步 —— 过四道门后提交 PackageInstaller 会话
                 || intent.hasExtra("dev_update_install")
                 // 第 309 轮：界面链路（设置页那一行走的同一条路，只是把清单地址换成夹具）
-                || intent.hasExtra("dev_update_ui");
+                || intent.hasExtra("dev_update_ui")
+                // 第 338 轮：插件自动更新（拉清单 → 比对内容哈希 → 下载 → 签名比对 → 装成待生效）
+                //   用法：`--es dev_plugupdate 1` ⇒ 立刻跑一遍，报告写 hub/report-devtool.txt
+                || intent.hasExtra("dev_plugupdate");
         if (!isDev) return;
         if ((a.getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) == 0) {
             Toast.makeText(a, R.string.dev_blocked_toast, Toast.LENGTH_SHORT).show();
@@ -764,6 +767,25 @@ final class DevTools {
         String pTrust = intent.getStringExtra("dev_plugintrust");
         if (pTrust != null && !pTrust.isEmpty()) {
             reportDev(PluginProbeDev.trustReport(a, new File(pTrust)), "dev_plugintrust");
+            return;
+        }
+
+        // ── 第 338 轮：插件自动更新 ───────────────────────────────────────────
+        // 用法：`--es dev_plugupdate 1` ⇒ 立刻跑一遍（不看 24 h 去重，也不看"自动"开关的
+        //       "要不要跑"——它模拟的是"检查"，装不装仍按 autoOn 判）。
+        // 报告：`hub/report-devtool.txt`（每行一个插件的结论 + summary 那行）。
+        String pUpdate = intent.getStringExtra("dev_plugupdate");
+        if (pUpdate != null && !pUpdate.isEmpty()) {
+            final String upId = intent.getStringExtra("dev_plugupdate_id");
+            final String upUrl = intent.getStringExtra("dev_plugupdate_url");
+            new Thread(new Runnable() {
+                @Override public void run() {
+                    final PluginUpdates.Summary sum = PluginUpdates.checkAll(a, upId, upUrl);
+                    a.runOnUiThread(new Runnable() {
+                        @Override public void run() { reportDev(sum.report, "dev_plugupdate"); }
+                    });
+                }
+            }, "dev-plugupdate").start();
             return;
         }
 

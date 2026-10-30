@@ -132,4 +132,45 @@
     <string name="plugin_pick_ok_fmt">Done (%1$d)</string>
     <string name="plugin_pick_empty">Nothing to pick here.</string>
     <string name="plugin_err_page_fmt">The plugin \"%1$s\" failed while drawing its page. You can disable it or install a newer version.</string>
+
+    <!--
+      第 338 轮：**插件自动更新**。
+      ★ 判据是**内容哈希**，不是版本号（用户 2026-10-30：「插件这东西鬼知道版本号咋写的」）——
+        所以文案里不要出现"版本号更大 / 更新"这类比较，只说"有新版 / 已更新到 X"。
+      ★ 更新地址由**插件自己**在 assets/plugin.json 里声明，宿主不内置一张表。
+      ★ 自动那一步只对"签到同一把钥匙"的更新不打扰；换签名必须问（下面那三句）。
+    -->
+    <string name="plugin_update_check">Check for updates</string>
+    <string name="plugin_update_checking">Checking plugin updates…</string>
+    <string name="plugin_update_title">Plugin updates</string>
+    <string name="plugin_update_latest">All plugins are up to date.</string>
+    <string name="plugin_update_none">No installed plugin declares an update address.</string>
+    <string name="plugin_update_busy">A check is already running - try again in a moment.</string>
+    <string name="plugin_update_sum_installed_fmt">updated %1$s</string>
+    <string name="plugin_update_sum_confirm_fmt">%1$s to confirm</string>
+    <string name="plugin_update_sum_available_fmt">%1$s available</string>
+    <string name="plugin_update_sum_failed_fmt">%1$s failed</string>
+    <string name="plugin_update_row_available_fmt">New version %1$s available</string>
+    <string name="plugin_update_row_confirm_fmt">New version %1$s needs confirmation</string>
+    <string name="plugin_update_row_installed_fmt">Updated to %1$s · restart to apply</string>
+    <string name="plugin_update_action_fmt">Update to %1$s</string>
+    <string name="plugin_update_action">Update it</string>
+    <string name="plugin_update_confirm_title">This update is signed by a different key</string>
+    <string name="plugin_update_confirm_msg">The downloaded copy was signed by a different key than the installed one. That could mean a new author or a new signing key. Update anyway?</string>
+    <string name="plugin_update_confirm_yes">Update anyway</string>
+    <string name="plugin_update_done_fmt">Updated %1$s · restart to apply</string>
+    <string name="plugin_update_failed">The update did not go through. Try again later.</string>
+    <string name="plugin_update_toast_installed">Updated %1$s plugin(s). Restart to apply.</string>
+    <string name="plugin_update_toast_confirm">%1$s plugin update(s) need your confirmation.</string>
+    <string name="plugin_info_update">Update: %1$s</string>
+    <string name="plugin_update_info_latest">up to date</string>
+    <string name="plugin_update_info_available_fmt">new version %1$s available</string>
+    <string name="plugin_update_info_confirm_fmt">new version %1$s needs confirmation</string>
+    <string name="plugin_update_info_installed_fmt">updated to %1$s · restart to apply</string>
+    <string name="plugin_update_info_failed">last check failed</string>
+    <string name="plugin_update_info_unchecked">not checked yet</string>
+    <string name="plugin_update_info_none">no update address declared</string>
+    <string name="plugin_update_auto_title">Plugin auto-update</string>
+    <string name="plugin_update_auto_on">On · checked once a day</string>
+    <string name="plugin_update_auto_off">Off · only when you check</string>
 </resources>

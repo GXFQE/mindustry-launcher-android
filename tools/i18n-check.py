@@ -91,7 +91,8 @@ BUDGET_FILE = os.path.join("tools", "i18n-java-budget.txt")
 #   那正是台账变消音器的路。**排除它比"每次加断言都改数字"诚实**。
 #   `UpdateManifestCheck.java` = 同上（2026-10-29 第 305 轮）：它是自检的**判据本体**
 #   （SelfTest 只把结果并进报告，PC 侧 PcCheck 跑同一份），中文全是断言消息。
-BUDGET_SKIP = {"SelfTest.java", "UpdateManifestCheck.java"}
+#   `PluginUpdateCheck.java` = 同上（2026-10-30 第 338 轮）：插件更新清单 / 状态表的判据本体。
+BUDGET_SKIP = {"SelfTest.java", "UpdateManifestCheck.java", "PluginUpdateCheck.java"}
 # 一个字符串字面量的内容（不跨行；Java 里跨行是相邻字面量相加 ⇒ 每个片段各算一条）
 LITERAL_RE = re.compile(r'"((?:[^"\\]|\\.)*)"')
 

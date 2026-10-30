@@ -96,6 +96,22 @@
                     android:ellipsize="end"
                     android:textSize="12sp"
                     android:textColor="@color/fg_muted" />
+
+                <!--
+                  第 338 轮：**这一行只在真的有更新时出现**（没有就 GONE，卡片保持两行）。
+                  ★ 用 accent 色把它跟上面那行"来源 · 处置"分开 —— 它是"有事要做"，不是静态信息。
+                  ★ 文案由 PluginsActivity.updateLine 统一决定（已经生效的版本不会再显示"重启生效"）。
+                -->
+                <TextView
+                    android:id="@+id/plugin_update"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingTop="3dp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    android:textSize="12sp"
+                    android:textColor="@color/accent"
+                    android:visibility="gone" />
             </LinearLayout>
 
             <ImageView

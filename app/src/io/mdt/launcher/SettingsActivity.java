@@ -85,6 +85,8 @@ public class SettingsActivity extends BaseActivity {
     private TextView mUpdateModeSub;
     /** 第 336 轮：更新线路（自动 / 直连 / 四个镜像）的副标题。 */
     private TextView mUpdateLineSub;
+    /** 第 338 轮：插件自动更新的副标题（已开启 / 已关闭）。 */
+    private TextView mPluginUpdateSub;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -219,6 +221,14 @@ public class SettingsActivity extends BaseActivity {
                 });
         mUpdateLineSub = (TextView) rowLine.findViewById(R.id.act_sub);
 
+        // 第 338 轮：**插件自动更新**（开关）。它与上一行「更新模式」是两件事 ——
+        //   那个管启动器自己，这个管插件；点一下切换，副标题报"现在是什么"。
+        View rowPluginUp = Util.bindActionValue(root, R.id.row_plugin_update,
+                R.drawable.ic_plugins_bar, R.string.plugin_update_auto_title, new Runnable() {
+                    @Override public void run() { togglePluginUpdate(); }
+                });
+        mPluginUpdateSub = (TextView) rowPluginUp.findViewById(R.id.act_sub);
+
         // 第 175 轮：「关于」搬成独立二级页（版本 / 包名 / 数据路径 / 开源地址 / 许可证）。
         // 页面只读；入口是设置页底部单独一行（不混进三类设置）。
         Util.bindAction(root, R.id.row_about, R.drawable.ic_app,
@@ -312,6 +322,11 @@ public class SettingsActivity extends BaseActivity {
             mUpdateLineSub.setText(Trans.get(SettingsActivity.this,
                     R.string.set_update_line_sub_fmt,
                     UpdateLineUi.label(this, Config.get().updateMirror())));
+        }
+        if (mPluginUpdateSub != null) {
+            mPluginUpdateSub.setText(Trans.get(SettingsActivity.this,
+                    Config.get().pluginAutoUpdate() ? R.string.plugin_update_auto_on
+                                                    : R.string.plugin_update_auto_off));
         }
     }
 
@@ -530,6 +545,21 @@ public class SettingsActivity extends BaseActivity {
                 })
                 .setNegativeButton(R.string.cancel, null)
                 .show();
+    }
+
+    /**
+     * 第 338 轮：「插件自动更新」点一下切换。
+     *
+     * <p>为什么不弹选择框：它只有开 / 关两个值，再弹一层只是多一次点击
+     * （「自动清理」那边弹窗是因为它同时提供"立即清理一次"这个动作，这里没有）。
+     * 切完立刻重取副标题 + Toast 说一声 —— 开关类控件没有别的可见反馈。
+     */
+    private void togglePluginUpdate() {
+        boolean on = !Config.get().pluginAutoUpdate();
+        Config.get().setPluginAutoUpdate(on);
+        fillValues();
+        Toast.makeText(this, on ? R.string.plugin_update_auto_on : R.string.plugin_update_auto_off,
+                Toast.LENGTH_SHORT).show();
     }
 
     private void pickTheme() {

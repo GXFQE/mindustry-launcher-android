@@ -131,7 +131,25 @@ public class PluginsActivity extends BaseActivity {
             rebuild();
             return true;
         }
+        // 第 338 轮：顶栏「检查插件更新」（低频全局动作；正常路径是启动时自动查一次）
+        if (item.getItemId() == R.id.action_plugin_update) {
+            checkUpdates();
+            return true;
+        }
         return super.onOptionsItemSelected(item);
+    }
+
+    /**
+     * 顶栏菜单（第 338 轮）：只有一项「检查插件更新」。
+     * ★ 标题必须在这里用 {@link Trans} 再写一遍 —— 清单里的 `android:title` 是框架按
+     *   **系统语言**取的，会绕过用户语言包（{@code menu/main.xml} 那一族早就踩过）。
+     */
+    @Override
+    public boolean onCreateOptionsMenu(android.view.Menu menu) {
+        getMenuInflater().inflate(R.menu.plugins, menu);
+        android.view.MenuItem it = menu.findItem(R.id.action_plugin_update);
+        if (it != null) it.setTitle(Trans.get(this, R.string.plugin_update_check));
+        return true;
     }
 
     /**
@@ -194,6 +212,7 @@ public class PluginsActivity extends BaseActivity {
 
         String act = Plugins.active(this), pend = Plugins.pending(this);
         String levels = Plugins.levels(this);
+        String upState = PluginUpdates.stateText(this);
         for (final String id : ids) {
             String[] st = Plugins.rowState(act, pend, id);
             String[] vs = Plugins.versionsOf(this, id);
@@ -202,8 +221,9 @@ public class PluginsActivity extends BaseActivity {
             String probeVer = st[1].isEmpty() ? (vs.length > 0 ? vs[vs.length - 1] : null) : st[1];
             String trust = probeVer == null ? PluginTrust.THIRD : Plugins.trustOf(this, id, probeVer);
             String level = Plugins.levelOf(levels, trust, id);
+            // ★ 第 338 轮：更新那行也在循环外把 act/pend 传进去 —— 别每行再读三次小文件
             addPluginCard(id, Plugins.displayNameOf(this, id), st[0], quar.length > 0,
-                    trust, level, probeVer);
+                    trust, level, probeVer, updateLine(id, act, pend, upState));
         }
     }
 
@@ -245,7 +265,7 @@ public class PluginsActivity extends BaseActivity {
      * @param ver         这一行在说的那一份（null = 只剩隔离件、没有候选）
      */
     private void addPluginCard(final String id, String name, String state, boolean quarantined,
-                               String trust, String level, final String ver) {
+                               String trust, String level, final String ver, CharSequence upText) {
         View card = getLayoutInflater().inflate(R.layout.item_plugin, mBody, false);
         ((TextView) card.findViewById(R.id.plugin_name)).setText(name);
         bindBadge((TextView) card.findViewById(R.id.plugin_badge), state, quarantined);
@@ -254,6 +274,14 @@ public class PluginsActivity extends BaseActivity {
                 Trans.get(this, R.string.plugin_trust_short_fmt,
                         Trans.get(this, trustShortRes(trust)),
                         Trans.get(this, levelShortRes(level))));
+        // 第三行（可选，第 338 轮）：有更新才出现 —— 判据在 updateLine（同一个 id 只算一次）
+        TextView up = (TextView) card.findViewById(R.id.plugin_update);
+        if (upText == null) {
+            up.setVisibility(View.GONE);
+        } else {
+            up.setText(upText);
+            up.setVisibility(View.VISIBLE);
+        }
         // ★ 监听挂在**卡片本体**上（不是外层的行距容器）：`card_bg_press` 的按下态画在卡片上，
         //   挂错层的话点下去没有任何反馈（外层没有背景），uiautomator 里还会多出一个可点节点。
         card.findViewById(R.id.plugin_card).setOnClickListener(new View.OnClickListener() {
@@ -404,6 +432,13 @@ public class PluginsActivity extends BaseActivity {
         List<String> items = new ArrayList<String>();
         final List<String> actions = new ArrayList<String>();
         final String cur = pend != null ? pend : act;   // 这一程"打算用"的那一版（待生效优先）
+        // ★ 第 338 轮：「更新」放**第一条**（最该做的事排最前）—— 只在"有新版待处理"时出现
+        if (canUpdate(id)) {
+            PluginUpdateState.Item upIt = PluginUpdates.itemOf(this, id);
+            items.add(Trans.get(this, R.string.plugin_update_action_fmt,
+                    PluginUpdates.labelOf(upIt)));
+            actions.add("update");
+        }
         if (act != null) { items.add(Trans.get(this, R.string.plugin_action_open)); actions.add("open"); }
         if (newest != null && !newest.equals(cur)) {
             items.add(Trans.get(this, R.string.plugin_action_enable)); actions.add("enable");
@@ -439,6 +474,12 @@ public class PluginsActivity extends BaseActivity {
                         if ("info".equals(a)) {
                             stack.push(rowTitle, CardStack.text(PluginsActivity.this,
                                     infoText(id, newest, trust, lv)));
+                            return;
+                        }
+                        if ("update".equals(a)) {
+                            // 卡片是"这一行的动作"，更新换一屏结果 —— 先关掉它再开进度卡
+                            stack.dismiss();
+                            runUpdate(id, false, null);
                             return;
                         }
                         if ("open".equals(a)) {
@@ -555,6 +596,8 @@ public class PluginsActivity extends BaseActivity {
                 Trans.get(this, R.string.plugin_info_level),
                 timeVer ? Trans.get(this, R.string.plugin_info_filever) : "",
                 Trans.get(this, R.string.plugin_info_access),
+                // 第 338 轮：更新状态（没声明地址、也从没查过的插件整条不印 —— dropEmptyPairs 负责）
+                Trans.get(this, R.string.plugin_info_update),
         };
         String entry = apk == null ? null : PluginMeta.entryOf(this, apk, PluginHost.DEFAULT_ENTRY);
         String[] values = {
@@ -570,6 +613,8 @@ public class PluginsActivity extends BaseActivity {
                 // ★ 第 148 轮 C2：「它要碰什么」**永远显示一行**（哪怕是"没有声明"）——
                 //   安全相关的字段留白 = 用户分不清"没声明"和"我们没看见"。声明是**告知**，不是沙箱。
                 accessText(apk),
+                // 第 338 轮：更新状态；没声明地址、也没查过 ⇒ null ⇒ 整行不印
+                updateInfoText(id, fileVer),
         };
         StringBuilder sb = new StringBuilder();
         for (String[] pair : Plugins.dropEmptyPairs(labels, values)) {
@@ -850,6 +895,236 @@ public class PluginsActivity extends BaseActivity {
         if (s.contains("mkdirs")) return Trans.get(this, R.string.plugin_install_no_dir);
         if (s.contains("cannot replace")) return Trans.get(this, R.string.plugin_install_stuck_old);
         return Trans.get(this, R.string.plugin_install_unknown);
+    }
+
+    // ---- 插件自动更新（第 338 轮）------------------------------------------------
+    //
+    // 判据全在 PluginUpdates / PluginUpdateState 里；这里只负责"把状态画出来 + 接到动作"。
+    // ★ 三条界面纪律：
+    //   ① 列表上那行"有新版"**跟着状态走**：已经生效的版本不再显示（否则重启之后还写着"重启生效"）；
+    //   ② 换签名才问（用户 2026-10-30 定）—— 同一个作者的更新不打扰；
+    //   ③ 更新完跟别的插件动作一样：同一句里说"重启后生效"，并给一个真能重启的按钮。
+
+    /**
+     * 列表卡上那行更新提示；不需要显示 ⇒ null（调用方把 TextView 设 GONE）。
+     *
+     * <p>★ 判据里**必须**比一次"这一版是不是已经在跑"：状态表是上一次检查留下的，
+     * 重启之后 active 已经换成新版，而那行还写着"已更新到 X · 重启生效"的话就是自相矛盾。
+     */
+    private CharSequence updateLine(String id) {
+        return updateLine(id, Plugins.active(this), Plugins.pending(this),
+                PluginUpdates.stateText(this));
+    }
+
+    /**
+     * 同上，但三份登记文本由调用方给（列表一屏十几行，别每行再读四次小文件）。
+     *
+     * @param actText  {@code active.txt} 全文
+     * @param pendText {@code pending.txt} 全文
+     * @param upText   {@code update-state.txt} 全文
+     */
+    private CharSequence updateLine(String id, String actText, String pendText, String upText) {
+        PluginUpdateState.Item it = PluginUpdateState.get(upText, id);
+        if (it == null) return null;
+        String s8 = PluginUpdateManifest.sha8(it.sha);
+        String act = Plugins.stateGet(actText, id);
+        if (s8 != null && s8.equals(act)) return null;
+        String label = PluginUpdates.labelOf(it);
+        if (PluginUpdateState.AVAILABLE.equals(it.state)) {
+            return Trans.get(this, R.string.plugin_update_row_available_fmt, label);
+        }
+        if (PluginUpdateState.CONFIRM.equals(it.state)) {
+            return Trans.get(this, R.string.plugin_update_row_confirm_fmt, label);
+        }
+        if (PluginUpdateState.INSTALLED.equals(it.state)) {
+            String pend = Plugins.stateGet(pendText, id);
+            // 只有"等着重启的那一份"才说重启生效；否则这行没有信息量
+            if (s8 != null && s8.equals(pend)) {
+                return Trans.get(this, R.string.plugin_update_row_installed_fmt, label);
+            }
+        }
+        return null;
+    }
+
+    /** 这一条结果值不值得给一个「更新」动作（待确认 / 自动更新关着时查到的新版）。 */
+    private boolean canUpdate(String id) {
+        PluginUpdateState.Item it = PluginUpdates.itemOf(this, id);
+        if (it == null) return false;
+        return updateLine(id) != null
+                && (PluginUpdateState.AVAILABLE.equals(it.state)
+                    || PluginUpdateState.CONFIRM.equals(it.state));
+    }
+
+    /**
+     * 顶栏「检查插件更新」：手动跑一遍。
+     * 自动检查每天最多一次；这个是"我现在就要看"，所以**不受 24 h 去重限制**，
+     * 但受 {@link PluginUpdates} 的"同时只跑一次"闸门保护。
+     */
+    private void checkUpdates() {
+        final CardStack ui = CardStack.show(null, this,
+                Trans.get(this, R.string.plugin_update_title),
+                CardStack.text(this, Trans.get(this, R.string.plugin_update_checking)));
+        new Thread(new Runnable() {
+            @Override public void run() {
+                final PluginUpdates.Summary sum = PluginUpdates.checkAll(PluginsActivity.this);
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        rebuild();
+                        if (isFinishing() || ui == null || !ui.isShowing()) return;
+                        ui.replace(Trans.get(PluginsActivity.this, R.string.plugin_update_title),
+                                resultText(sum), resultButtons(ui, sum));
+                    }
+                });
+            }
+        }, "plugin-update-manual").start();
+    }
+
+    /** 结果卡正文：只报"用户看得见的那几个数"，0 的不出现。 */
+    private CharSequence resultText(PluginUpdates.Summary sum) {
+        if (sum == null) return Trans.get(this, R.string.plugin_update_failed);
+        if (sum.busy) return Trans.get(this, R.string.plugin_update_busy);
+        if (sum.total == 0) return Trans.get(this, R.string.plugin_update_none);
+        if (sum.allOk()) return Trans.get(this, R.string.plugin_update_latest);
+        StringBuilder sb = new StringBuilder();
+        appendCount(sb, R.string.plugin_update_sum_installed_fmt, sum.installed);
+        appendCount(sb, R.string.plugin_update_sum_confirm_fmt, sum.confirm);
+        appendCount(sb, R.string.plugin_update_sum_available_fmt, sum.available);
+        appendCount(sb, R.string.plugin_update_sum_failed_fmt, sum.failed);
+        return sb.length() == 0 ? Trans.get(this, R.string.plugin_update_latest) : sb;
+    }
+
+    private void appendCount(StringBuilder sb, int res, int n) {
+        if (n <= 0) return;
+        if (sb.length() > 0) sb.append(" · ");
+        sb.append(Trans.get(this, res, String.valueOf(n)));
+    }
+
+    /** 结果卡的按钮：装好了就问"现在重启吗"（与其他插件动作同一个出口）；否则只给「关闭」。 */
+    private CardStack.Btn[] resultButtons(final CardStack ui, PluginUpdates.Summary sum) {
+        CardStack.Btn close = new CardStack.Btn(Trans.get(this, R.string.close), new Runnable() {
+            @Override public void run() { if (ui != null && ui.isShowing()) ui.dismiss(); }
+        });
+        if (sum != null && sum.installed > 0) {
+            return new CardStack.Btn[] {
+                    new CardStack.Btn(Trans.get(this, R.string.plugin_restart_later), close.action),
+                    new CardStack.Btn(Trans.get(this, R.string.plugin_restart_now), new Runnable() {
+                        @Override public void run() {
+                            if (ui != null && ui.isShowing()) ui.dismiss();
+                            restartNow();
+                        }
+                    }),
+            };
+        }
+        return new CardStack.Btn[] { close };
+    }
+
+    /**
+     * 用户点「更新」（行弹窗里那条）：下载 → 签名比对 → 装。
+     *
+     * @param force true = 用户已经在上一步确认过"签名不同也照装"
+     * @param reuse 复用已有卡片（确认页 → 仍然更新时不新开一个窗；换窗会闪一下）
+     */
+    private void runUpdate(final String id, final boolean force, CardStack reuse) {
+        final CardStack ui = reuse != null ? reuse : CardStack.show(null, this,
+                Trans.get(this, R.string.plugin_update_title),
+                CardStack.text(this, Trans.get(this, R.string.plugin_update_checking)));
+        if (ui == null) return;
+        ui.replace(Trans.get(this, R.string.plugin_update_title),
+                Trans.get(this, R.string.plugin_update_checking));
+        new Thread(new Runnable() {
+            @Override public void run() {
+                final String r = PluginUpdates.updateNow(PluginsActivity.this, id, force);
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        rebuild();
+                        if (isFinishing() || !ui.isShowing()) return;
+                        final String label = PluginUpdates.labelOf(
+                                PluginUpdates.itemOf(PluginsActivity.this, id));
+                        if ("ok".equals(r)) {
+                            ui.replace(Trans.get(PluginsActivity.this, R.string.plugin_update_title),
+                                    Trans.get(PluginsActivity.this, R.string.plugin_update_done_fmt,
+                                            label),
+                                    new CardStack.Btn(Trans.get(PluginsActivity.this,
+                                            R.string.plugin_restart_later), new Runnable() {
+                                        @Override public void run() { ui.dismiss(); }
+                                    }),
+                                    new CardStack.Btn(Trans.get(PluginsActivity.this,
+                                            R.string.plugin_restart_now), new Runnable() {
+                                        @Override public void run() {
+                                            ui.dismiss();
+                                            restartNow();
+                                        }
+                                    }));
+                            return;
+                        }
+                        if ("confirm".equals(r)) {
+                            ui.replace(Trans.get(PluginsActivity.this,
+                                            R.string.plugin_update_confirm_title),
+                                    Trans.get(PluginsActivity.this, R.string.plugin_update_confirm_msg),
+                                    new CardStack.Btn(Trans.get(PluginsActivity.this,
+                                            R.string.cancel), new Runnable() {
+                                        @Override public void run() { ui.dismiss(); }
+                                    }),
+                                    new CardStack.Btn(Trans.get(PluginsActivity.this,
+                                            R.string.plugin_update_confirm_yes), new Runnable() {
+                                        @Override public void run() { runUpdate(id, true, ui); }
+                                    }));
+                            return;
+                        }
+                        if ("uptodate".equals(r)) {
+                            ui.replace(Trans.get(PluginsActivity.this, R.string.plugin_update_title),
+                                    Trans.get(PluginsActivity.this, R.string.plugin_update_info_latest),
+                                    new CardStack.Btn(Trans.get(PluginsActivity.this,
+                                            R.string.close), new Runnable() {
+                                        @Override public void run() { ui.dismiss(); }
+                                    }));
+                            return;
+                        }
+                        ui.replace(Trans.get(PluginsActivity.this, R.string.plugin_update_title),
+                                Trans.get(PluginsActivity.this, R.string.plugin_update_failed),
+                                new CardStack.Btn(Trans.get(PluginsActivity.this, R.string.close),
+                                        new Runnable() {
+                                            @Override public void run() { ui.dismiss(); }
+                                        }));
+                    }
+                });
+            }
+        }, "plugin-update-run").start();
+    }
+
+    /**
+     * 信息页里那行「更新」。
+     *
+     * <p>★ 三种"没有更新"要分开，否则用户分不清是"没查"还是"不用更新"：
+     * 没声明地址 / 还没查过 / 已是最新。没有声明、也没有任何记录的插件**不占这一行**
+     * （老插件全都属于这一类，占一行只是噪音）。
+     */
+    private String updateInfoText(String id, String fileVer) {
+        File apk = fileVer == null ? null : Plugins.apkOf(this, id, fileVer);
+        String url = apk == null ? null : PluginMeta.updateUrlOf(apk);
+        PluginUpdateState.Item it = PluginUpdates.itemOf(this, id);
+        if (url == null && it == null) return null;
+        if (url == null) return Trans.get(this, R.string.plugin_update_info_none);
+        if (it == null) return Trans.get(this, R.string.plugin_update_info_unchecked);
+        String label = PluginUpdates.labelOf(it);
+        if (PluginUpdateState.OK.equals(it.state)) {
+            return Trans.get(this, R.string.plugin_update_info_latest);
+        }
+        if (PluginUpdateState.AVAILABLE.equals(it.state)) {
+            return Trans.get(this, R.string.plugin_update_info_available_fmt, label);
+        }
+        if (PluginUpdateState.CONFIRM.equals(it.state)) {
+            return Trans.get(this, R.string.plugin_update_info_confirm_fmt, label);
+        }
+        if (PluginUpdateState.INSTALLED.equals(it.state)) {
+            String s8 = PluginUpdateManifest.sha8(it.sha);
+            String act = Plugins.stateGet(Plugins.active(this), id);
+            if (s8 != null && s8.equals(act)) {
+                return Trans.get(this, R.string.plugin_update_info_latest);   // 重启后已经生效
+            }
+            return Trans.get(this, R.string.plugin_update_info_installed_fmt, label);
+        }
+        return Trans.get(this, R.string.plugin_update_info_failed);
     }
 
     /**

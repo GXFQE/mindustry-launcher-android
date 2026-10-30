@@ -173,6 +173,16 @@ public final class Config {
     private static final String K_UPDATE_MIRROR = "update_mirror";
 
     /**
+     * 第 338 轮：**插件自动更新**开关（默认开，见 {@link #DEF_PLUGIN_UPDATE}）。
+     *
+     * <p>与 {@link #K_UPDATE_MODE} 分开：那个管启动器自己的更新，这个管插件。
+     * 关掉之后：不自动查、也不自动装 —— 手动「检查插件更新」仍然可用，结果是
+     * `available`（界面显示"有新版"，用户点一下才下载）。
+     * 坏值退默认 + WARNING 点名键名（与前面几个布尔开关同一族纪律）。
+     */
+    private static final String K_PLUGIN_UPDATE = "plugin_update";
+
+    /**
      * 一档④（2026-10-06）：每个版本**上次启动的时刻** { "&lt;版本key&gt;": 毫秒 }。
      *
      * ★ 为什么需要它：{@link #sessionStartedAt()} 记的是"**正在进行**的那一次"，
@@ -220,6 +230,15 @@ public final class Config {
     public static final boolean DEF_AUTO_CLEAN = true;
     /** 崩溃提示的出厂默认 = **开**（第 174 轮加的开关；关掉不影响报告本身）。 */
     public static final boolean DEF_CRASH_ALERT = true;
+    /**
+     * 第 338 轮：**插件自动更新**的出厂默认 = **开**。
+     *
+     * <p>用户 2026-10-30 定：「自动下载并装好，下次启动生效；只有签名换了才问」。
+     * 关掉只影响**自动**那一步：手动检查仍然可用，查到新版会落 {@code available} 等用户点。
+     * ⚠️ 它与启动器的「更新模式」是**两个开关**：那个管启动器自己，这个管插件 ——
+     * 一行一件事（不要因为关掉启动器自更新就悄悄停掉插件更新）。
+     */
+    public static final boolean DEF_PLUGIN_UPDATE = true;
 
     private static volatile Config sInstance;
 
@@ -408,6 +427,24 @@ public final class Config {
 
     public synchronized void setCrashAlertEnabled(boolean on) {
         put(K_CRASH_ALERT_ENABLED, Boolean.valueOf(on));
+        save();
+    }
+
+    /**
+     * 插件自动更新（默认开，见 {@link #DEF_PLUGIN_UPDATE}）。
+     * 坏值退默认 + WARNING 点名键名（与 crashAlertEnabled 同一条纪律）。
+     */
+    public synchronized boolean pluginAutoUpdate() {
+        if (!mRoot.has(K_PLUGIN_UPDATE)) return DEF_PLUGIN_UPDATE;
+        Object v = mRoot.opt(K_PLUGIN_UPDATE);
+        if (v instanceof Boolean) return ((Boolean) v).booleanValue();
+        Log.w(TAG, "config key '" + K_PLUGIN_UPDATE + "' is not a boolean (" + v
+                + "), falling back to default " + DEF_PLUGIN_UPDATE);
+        return DEF_PLUGIN_UPDATE;
+    }
+
+    public synchronized void setPluginAutoUpdate(boolean on) {
+        put(K_PLUGIN_UPDATE, Boolean.valueOf(on));
         save();
     }
 

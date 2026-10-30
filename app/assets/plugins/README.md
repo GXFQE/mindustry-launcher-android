@@ -32,3 +32,26 @@ bash ./build.sh install             # 构建会自动重算 manifest.txt
 ⚠️ **文件名 = 插件 id**（`builtin-manifest.py` 的规则），别改名。
 ⚠️ 三份都按 `debug.keystore` 签名 —— 与本地宿主的签名一致（判「官方」用）；发版宿主用的是另一把钥匙，
 但内置那一路**不看签名**（清单 + 哈希定来源），所以不影响。
+
+## 它们还能**在线更新**（第 338 轮）
+
+三份 `plugin.json` 里都声明了同一个滚动通道：
+
+```
+"update": "https://github.com/GXFQE/mindustry-launcher-android/releases/download/plugins-latest/<id>.json"
+```
+
+**只改插件、不发启动器版本**时：
+
+```bash
+bash plugins/mapstats/build.sh
+python tools/make-plugin-update.py --apk "$TEMP/mdt-mapstats/mapstats.apk" \
+       --version 7 --out mapstats.json
+gh release upload plugins-latest "$TEMP/mdt-mapstats/mapstats.apk" mapstats.json --clobber
+```
+
+- 宿主按 **内容哈希**（清单里的 `sha256`）判断有没有新版，`version` 只用于显示（见 `docs/PLUGIN-API.md` §10）；
+- 在线升级之后，**下一次启动不会被这里的内置那份顶掉**（`plugins/online.txt` 记着升级时的内置基线）；
+  但**本体换了插件内容**（这里那三份 APK 变了）⇒ 以本体为准；
+- ⚠️ `plugins-latest` 只放插件，**永远不要**往里传启动器 APK（它不在 `v*` 命名空间、不是发版）。
+

@@ -76,6 +76,20 @@ final class Plugins {
     /** 用户**改过**的处置等级（`id=L1|L2|L3`）；没改过的按来源取默认值（见 {@link PluginTrust}）。 */
     static final String LEVELS = "levels.txt";
 
+    /**
+     * **内置插件被在线更新过**的登记（第 338 轮）：每行 `id \t 在线版本 \t 该版 sha256 \t 装上它时内置那份的 sha256`。
+     *
+     * <p>为什么必须单独记一笔：内置插件每次启动都会按本体 `assets/plugins/` 里那份"补放"，
+     * 而在线更新换掉了内容 ⇒ 哈希对不上 ⇒ 按老逻辑会被当成"本体带了新版"**升回去**
+     * （= 在线更新活不过一次重启）。记下"它是在内置版 X 的基础上升的"，下一次启动就能判断：
+     * <ul>
+     *   <li>本体还是 X ⇒ 在线版更新，**别碰**；</li>
+     *   <li>本体变了（换成了 X'）⇒ 以本体为准，清掉这条登记、照常升级（发版的人本来就把插件一起换新了）。</li>
+     * </ul>
+     * ★ 它同时是"这个版本仍算内置"的判据（{@link #isBuiltin}）：不能因为在线升级就变成"可卸载的第三方"。
+     */
+    static final String ONLINE = "online.txt";
+
     /** L1 的重试计数（制表符 `id \t ver \t 次数`）—— 连败到预算就升档，否则"再试一次"会变成循环。 */
     static final String RETRY = "retry.txt";
 
@@ -140,16 +154,103 @@ final class Plugins {
     /**
      * 这个 id+版本是不是**原生那份内置插件**（清单里有、且文件 sha 逐字相同）。
      * 哈希对不上 ⇒ 不是内置（被换过/写坏），回落签名判据 —— 反正下次启动会被放回原生那份。
+     *
+     * <p>★ 第 338 轮补上第二种"算内置"的情况：**在线升级过、且升级时的内置基线还是本体当前这份**
+     * （见 {@link #ONLINE}）。不补这一条，在线升级过的内置插件会立刻变成"第三方 + 可卸载"，
+     * 而它下一次启动又会被本体放回 —— 界面与实际对不上。
      */
     static boolean isBuiltin(Context ctx, String id, String ver) {
         if (id == null || ver == null) return false;
-        for (String[] b : builtins(ctx)) {
+        List<String[]> bs = builtins(ctx);
+        for (String[] b : bs) {
             if (!b[0].equals(id)) continue;
-            if (!ver.equals(builtinVersion(b[2]))) return false;
-            return b[2].equalsIgnoreCase(PluginTrust.sha256File(apkOf(ctx, id, ver)));
+            if (ver.equals(builtinVersion(b[2]))) {
+                return b[2].equalsIgnoreCase(PluginTrust.sha256File(apkOf(ctx, id, ver)));
+            }
+            break;
+        }
+        String[] o = onlineOf(onlineText(ctx), id);
+        if (o != null && o[0] != null && ver.equals(o[0])) {
+            for (String[] b : bs) {
+                if (!b[0].equals(id)) continue;
+                return o[2] != null && o[2].equalsIgnoreCase(b[2]);
+            }
         }
         return false;
     }
+
+    /** 本体这一版给某个 id 的内置内容哈希（清单里没有这个 id ⇒ null）。 */
+    static String bundledShaOf(Context ctx, String id) {
+        if (id == null) return null;
+        for (String[] b : builtins(ctx)) if (b[0].equals(id)) return b[2];
+        return null;
+    }
+
+    // ---- 内置插件被在线更新过的登记（纯文本函数，自检直接喂字符串）------------------
+
+    static String onlineText(Context ctx) {
+        String s = readOrNull(new File(dirNoCreate(ctx), ONLINE));
+        return s == null ? "" : s;
+    }
+
+    /** 某个 id 的在线升级登记：{@code {版本, 该版 sha256, 升级时的内置基线}}；没有 ⇒ null。 */
+    static String[] onlineOf(String text, String id) {
+        if (text == null || id == null || id.isEmpty()) return null;
+        for (String line : lines(text)) {
+            String s = line.trim();
+            if (s.isEmpty() || s.startsWith("#")) continue;
+            String[] p = line.split("\t", -1);
+            if (p.length != 4) continue;
+            if (!p[0].trim().equals(id)) continue;
+            return new String[] { emptyOrNull(p[1]), emptyOrNull(p[2]), emptyOrNull(p[3]) };
+        }
+        return null;
+    }
+
+    /** 写一条（同 id 只留一行、保序；其余行原样保留）。 */
+    static String onlinePut(String text, String id, String ver, String sha, String baseSha) {
+        if (id == null || id.isEmpty()) return text == null ? "" : text;
+        String line = id + "\t" + nz(ver) + "\t" + nz(sha) + "\t" + nz(baseSha);
+        StringBuilder sb = new StringBuilder();
+        boolean replaced = false;
+        for (String l : lines(text)) {
+            if (l.trim().isEmpty()) continue;
+            String[] p = l.split("\t", -1);
+            if (p.length == 4 && p[0].trim().equals(id)) {
+                if (!replaced) { if (sb.length() > 0) sb.append('\n'); sb.append(line); replaced = true; }
+                continue;
+            }
+            if (sb.length() > 0) sb.append('\n');
+            sb.append(l);
+        }
+        if (!replaced) {
+            if (sb.length() > 0) sb.append('\n');
+            sb.append(line);
+        }
+        return sb.length() == 0 ? "" : sb.append('\n').toString();
+    }
+
+    /** 删一条（不存在 ⇒ 内容等价）。 */
+    static String onlineRemove(String text, String id) {
+        if (text == null) return "";
+        StringBuilder sb = new StringBuilder();
+        for (String l : lines(text)) {
+            if (l.trim().isEmpty()) continue;
+            String[] p = l.split("\t", -1);
+            if (p.length == 4 && id != null && p[0].trim().equals(id)) continue;
+            if (sb.length() > 0) sb.append('\n');
+            sb.append(l);
+        }
+        return sb.length() == 0 ? "" : sb.append('\n').toString();
+    }
+
+    private static String emptyOrNull(String s) {
+        if (s == null) return null;
+        String t = s.trim();
+        return t.isEmpty() ? null : t;
+    }
+
+    private static String nz(String s) { return s == null ? "" : s; }
 
     /** 清单里有这个 id 吗（不管哈希）—— 界面"给不给删除按钮"用它（哈希对不上时会放回，用户也删不掉）。 */
     static boolean isBuiltinId(Context ctx, String id) {
@@ -174,6 +275,26 @@ final class Plugins {
             String id = b[0], file = b[1], sha = b[2];
             String ver = builtinVersion(sha);
             if (ver == null) continue;
+
+            // ★ 第 338 轮：**在线升级过的那一份优先** —— 本体这一份没变（基线还是它）就一个字节都别动。
+            File onlineFile = new File(dir(ctx), ONLINE);
+            String onlineText = readOrNull(onlineFile);
+            String[] online = onlineOf(onlineText, id);
+            if (online != null) {
+                boolean baseSame = sha.equalsIgnoreCase(online[2]);
+                boolean onlineHere = online[0] != null && apkOf(ctx, id, online[0]).isFile();
+                if (baseSame && onlineHere) {
+                    // 登记还在 + 那一份文件还在 ⇒ 保持现状（用在线版），只补一次来源登记
+                    File tf0 = new File(dir(ctx), TRUST);
+                    write(tf0, trustPut(readOrNull(tf0), id, online[0], PluginTrust.BUILTIN));
+                    sb.append(id).append(":online=").append(online[0]).append(' ');
+                    continue;
+                }
+                // 本体换了内容（发版的人把插件一起换新了）/ 在线那份没了 ⇒ 清掉登记，走正常补放
+                write(onlineFile, onlineRemove(onlineText, id));
+                sb.append(id).append(':').append(baseSame ? "online-missing " : "base-changed ");
+            }
+
             File dst = apkOf(ctx, id, ver);
             boolean native_ = sha.equalsIgnoreCase(PluginTrust.sha256File(dst));
             if (!native_) {
@@ -434,6 +555,24 @@ final class Plugins {
      * @return 给报告看的一句话（失败时以 `FAILED ` 开头）
      */
     static String install(Context ctx, File src, String id, String ver, boolean now) {
+        String r = place(ctx, src, id, ver);
+        if (r.startsWith("FAILED")) return r;
+        String key = now ? ACTIVE : PENDING;
+        File f = new File(dir(ctx), key);
+        write(f, statePut(readOrNull(f), id, ver));
+        return r + " -> " + key;
+    }
+
+    /**
+     * **只把文件放进** `plugins/<id>/<ver>.apk`（拷贝 + 置只读 + 记来源），一个登记都不动。
+     *
+     * <p>为什么要把这件事抽出来（第 338 轮）：在线更新要能"给一个**已停用**的插件换文件"，
+     * 而 {@link #install} 总会写 {@code pending} ⇒ 下次启动 {@code promotePending} 会把它
+     * **悄悄启用**（用户明明关着）。所以"放文件"与"什么时候生效"必须是两个动作。
+     *
+     * @return 给报告看的一句话（失败时以 `FAILED ` 开头）
+     */
+    private static String place(Context ctx, File src, String id, String ver) {
         if (src == null || !src.isFile()) return "FAILED missing src " + src;
         if (id == null || id.isEmpty() || ver == null || ver.isEmpty()) return "FAILED bad id/ver";
         try {
@@ -445,19 +584,49 @@ final class Plugins {
             if (dst.exists() && !dst.delete()) return "FAILED cannot replace " + dst.getName();
             Util.copyFile(src, dst);
             boolean ro = dst.setReadOnly();
-            String key = now ? ACTIVE : PENDING;
-            File f = new File(dir(ctx), key);
-            write(f, statePut(readOrNull(f), id, ver));
             // ★ 信任模型（第 133 轮）：装进来这一刻判一次来源，记进 trust.txt（启动路径不再解析签名块）
             String trust = PluginTrust.classify(ctx, dst);
             File tf = new File(dir(ctx), TRUST);
             write(tf, trustPut(readOrNull(tf), id, ver, trust));
-            return "installed id=" + id + " ver=" + ver + " -> " + key
+            return "installed id=" + id + " ver=" + ver
                     + " bytes=" + dst.length() + " readOnly=" + ro + " stillWritable=" + dst.canWrite()
                     + " trust=" + trust;
         } catch (Throwable t) {
             return "FAILED " + brief(t);
         }
+    }
+
+    /**
+     * **在线更新**的落点：放文件（{@link #place}）＋ 按需写 {@code pending}。
+     *
+     * <p>三条与手动安装不同的地方，每条都是真机上会出问题的：
+     * <ol>
+     *   <li>{@code pending=false} 时**不写待生效登记** —— 插件本来就停着，不能因为更新文件把它开回来；</li>
+     *   <li>版本键 = **新内容的 sha256 前 8 位**（与内置插件同一套内容寻址）：同内容不会重复落盘，
+     *       也不依赖作者写没写版本号；</li>
+     *   <li>内置插件的 id 记一笔 {@link #ONLINE}，并把来源写成 {@code builtin} ——
+     *       否则下次启动本体那一份会把它顶掉 / 界面上变成"可卸载的第三方"。</li>
+     * </ol>
+     *
+     * @return 给报告看的一句话（失败时以 `FAILED ` 开头）
+     */
+    static String placeUpdate(Context ctx, File src, String id, String ver, boolean pending) {
+        String r = place(ctx, src, id, ver);
+        if (r.startsWith("FAILED")) return r;
+        File df = new File(dir(ctx), ONLINE);
+        String onlineText = readOrNull(df);
+        if (isBuiltinId(ctx, id)) {
+            String sha = PluginTrust.sha256File(apkOf(ctx, id, ver));
+            String base = bundledShaOf(ctx, id);
+            write(df, onlinePut(onlineText, id, ver, sha, base));
+            File tf = new File(dir(ctx), TRUST);
+            write(tf, trustPut(readOrNull(tf), id, ver, PluginTrust.BUILTIN));
+        }
+        if (pending) {
+            File f = new File(dir(ctx), PENDING);
+            write(f, statePut(readOrNull(f), id, ver));
+        }
+        return r + " online=true pending=" + pending;
     }
 
     // ---- 来源与处置等级（第 133 轮） -------------------------------------------

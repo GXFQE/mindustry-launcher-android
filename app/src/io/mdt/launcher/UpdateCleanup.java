@@ -50,6 +50,8 @@ final class UpdateCleanup {
         if (ctx == null) return 0;
         File appHub = Paths.privateDir(ctx);
         File updateDir = new File(Data.hubDir(ctx), "update");
+        // 第 338 轮：插件更新的下载目录（外部 hub）—— 只清半成品，成品留给下一次检查复用
+        File pluginDir = new File(Data.hubDir(ctx), "plugins-update");
 
         int n = 0;
         n += deleteFile(new File(appHub, "mirror-test.lock"));
@@ -57,6 +59,7 @@ final class UpdateCleanup {
         n += deleteFile(new File(appHub, "mirror-rank.json.tmp"));
         n += deleteSuffix(updateDir, ".part");
         n += deleteSuffix(updateDir, ".tmp");
+        n += deleteSuffix(pluginDir, ".part");
         if (n > 0) {
             Log.i(TAG, "update cleanup: removed " + n + " leftover(s)");
         }

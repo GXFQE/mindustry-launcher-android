@@ -115,6 +115,12 @@ final class GitHubReleases {
     /**
      * 挑一个版本。列表本身已按"最新在前"排好，所以**第一个匹配的就是最新的**。
      *
+     * <p>🔴 第 338 轮：**只认 `v*` tag**。本仓库的 release 列表里现在还有一条
+     * {@code plugins-latest}（插件更新通道，见 `PLUGIN-API.md` §10）—— 它不是启动器版本，
+     * 没有 `update.json`；不跳过的话，默认的"预览通道"会把它当成最新一版，
+     * 然后每台机器都报 "no update.json in release plugins-latest"，**自更新等于停摆**。
+     * ★ 依据本来就有：`docs/RELEASING.md` 写死"只在 `v*` 命名空间里给发布打 tag"。
+     *
      * @param allowPreview 允许预览版吗（= 设置里「稳定版和预览版」）。
      *                     {@code false} 时只认非 prerelease（= 「只查稳定版」）。
      * @return 没有匹配 ⇒ null（"还没有可装的版本"，不是错误）
@@ -123,9 +129,16 @@ final class GitHubReleases {
         if (list == null) return null;
         for (Release r : list) {
             if (r == null) continue;
+            if (!isLauncherTag(r.tag)) continue;
             if (allowPreview || !r.prerelease) return r;
         }
         return null;
+    }
+
+    /** 启动器版本的 tag 一律 `v…`（插件通道 / 实验 release 都不算）。 */
+    static boolean isLauncherTag(String tag) {
+        return tag != null && tag.length() > 1 && tag.charAt(0) == 'v'
+                && Character.isDigit(tag.charAt(1));
     }
 
     /** 按名字找一个资产；没有 ⇒ null。 */
