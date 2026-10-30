@@ -34,8 +34,9 @@ import java.util.Locale;
  * <h3>安全面（`exported` + VIEW/BROWSABLE 的代价）</h3>
  * 挂上 filter 之后**任何 App 都能给我们塞数据**。收口三条：
  * ① 只认 **content / file** 两种 scheme（http 之类要联网，不接）；
- * ② 落点**只有当前槽** —— 槽名不从 Intent 里读（外部塞 `slot` extra 也不认），
- *    所以"能塞数据"不等于"能往任意槽写"；
+ * ② 落点槽**只由界面上的那次选择决定**（第 321 轮起是先问「导入到哪个槽？」；只有一个槽就不问）——
+ *    **不从 Intent 里读槽名**：外部塞 `slot` extra **不认**，所以"能塞数据"不等于"能往任意槽写"，
+ *    用户看见的永远是"我选的哪个槽"；
  * ③ 导入本身走的还是各页那条既有路径（zlib 魔数校验 / 大小闸 / 同名走中转站），
  *    不假设数据可信（真正的校验在 `MapFiles` / `BlueprintFiles` / `Mods` 里）。
  */
@@ -156,18 +157,82 @@ final class DeepLink {
         return out;
     }
 
-    /** 分派到**拥有那一类内容**的页面（落点 = 当前槽；页面自己那道 `gameAlive` 门禁照旧生效） */
-    private static void open(Activity a, int kind, BatchIo.Doc doc) {
+    /**
+     * 分派到**拥有那一类内容**的页面。
+     *
+     * <p>★ 第 321 轮（用户：「再加一个从深链进入的文件可以选择导入到那个槽」）：落点槽先问一句
+     * 「导入到哪个槽？」—— 但**只有一个槽就不问**（问一句没有别的选项的话只是多一次点击）。
+     * 选中的槽仍然走各页原来的 `EXTRA_SLOT`（页面自己那道 `gameAlive` 门禁照旧生效）。
+     */
+    private static void open(final Activity a, final int kind, final BatchIo.Doc doc) {
+        final List<Data.Slot> all = Data.allSlots(a);
+        if (!shouldAsk(all)) {
+            // 0 个槽（理论上不会有）⇒ 回落到当前槽；1 个 ⇒ 就是它
+            route(a, kind, doc, all.isEmpty() ? Data.currentSlot(a) : all.get(0).name);
+            return;
+        }
+        askSlot(a, kind, doc, all);
+    }
+
+    /**
+     * 要不要问"导入到哪个槽"—— **只有一个槽时不问**（§77：「只在真需要时问」）。
+     *
+     * <p>纯函数，自检直接喂 0/1/2 个槽。
+     */
+    static boolean shouldAsk(List<Data.Slot> all) {
+        return all != null && all.size() > 1;
+    }
+
+    /**
+     * 选槽那一屏（第 321 轮）：名字 + 「（当前）」 + 「N 个文件 · 大小」，与换槽/克隆那两处**同一个形状**
+     * （同一件事在两处长得不一样，用户会以为是两件事）。取消 = 这次不导（**什么都不做**）。
+     */
+    private static void askSlot(final Activity a, final int kind, final BatchIo.Doc doc,
+                                List<Data.Slot> all) {
+        final String[] labels = new String[all.size()];
+        final String[] names = new String[all.size()];
+        for (int i = 0; i < all.size(); i++) {
+            Data.Slot s = all.get(i);
+            names[i] = s.name;
+            labels[i] = s.name + (s.active ? Trans.get(a, R.string.slot_current_suffix) : "")
+                    + "  " + Trans.get(a, R.string.slot_entry_fmt, s.files, Util.formatSize(s.bytes));
+        }
+        final CardStack[] ref = new CardStack[1];
+        ref[0] = CardStack.show(null, a, Trans.get(a, R.string.deeplink_slot_title),
+                CardStack.list(a, labels, new CardStack.ItemClick() {
+                    @Override public void onClick(int w) {
+                        if (w < 0 || w >= names.length) return;
+                        ref[0].dismiss();
+                        route(a, kind, doc, names[w]);
+                    }
+                }),
+                new CardStack.Btn(Trans.get(a, R.string.cancel), new Runnable() {
+                    @Override public void run() { ref[0].dismiss(); }
+                }));
+    }
+
+    private static void route(Activity a, int kind, BatchIo.Doc doc, String slot) {
+        a.startActivity(openIntent(a, kind, doc, slot));
+    }
+
+    /**
+     * 分派用的 Intent（**纯装配**）。抽出来只为一件事：让自检能钉住"去哪一页 + 槽名带对了"。
+     *
+     * <p>四个页面的 `EXTRA_SLOT` 都是 `"slot"`（见各自类的常量）—— 写错哪个键编译器不响，
+     * 真机只表现为"导进当前槽了"（**静默错位**，与第 320 轮那条同族）。
+     */
+    static Intent openIntent(Context c, int kind, BatchIo.Doc doc, String slot) {
         Intent i;
-        if (kind == BatchIo.KIND_BLUEPRINTS) i = new Intent(a, BlueprintsActivity.class);
-        else if (kind == BatchIo.KIND_SAVES) i = new Intent(a, SavesActivity.class);
-        else if (kind == BatchIo.KIND_MODS) i = new Intent(a, ModsActivity.class);
-        else i = new Intent(a, MapsActivity.class);
-        // 四个页面的 EXTRA_SLOT 都是 "slot"（见各自类的常量）
-        i.putExtra(MapsActivity.EXTRA_SLOT, Data.currentSlot(a));
-        i.putExtra(EXTRA_URI, doc.uri.toString());
-        i.putExtra(EXTRA_NAME, doc.name);
-        a.startActivity(i);
+        if (kind == BatchIo.KIND_BLUEPRINTS) i = new Intent(c, BlueprintsActivity.class);
+        else if (kind == BatchIo.KIND_SAVES) i = new Intent(c, SavesActivity.class);
+        else if (kind == BatchIo.KIND_MODS) i = new Intent(c, ModsActivity.class);
+        else i = new Intent(c, MapsActivity.class);
+        i.putExtra(MapsActivity.EXTRA_SLOT, slot == null ? "" : slot);
+        if (doc != null) {
+            i.putExtra(EXTRA_URI, doc.uri == null ? "" : doc.uri.toString());
+            i.putExtra(EXTRA_NAME, doc.name == null ? "" : doc.name);
+        }
+        return i;
     }
 
     // ── 认容器用的四个魔数（纯函数，自检直接喂字节）────────────────────────

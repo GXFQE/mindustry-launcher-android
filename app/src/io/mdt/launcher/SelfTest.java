@@ -15366,6 +15366,39 @@ public final class SelfTest {
                         && !DeepLink.isZipHead(new byte[0]),
                 "① 短输入 / null 不许抛 —— 深链那条路拿到的是**外人给的数据**");
 
+        // ── ①b 第 321 轮：深链文件**可以选导入到哪个槽**（用户：「再加一个从深链进入的文件
+        //   可以选择导入到那个槽」）──
+        //   两件事都要钉，都属"错了不报错"：① 只有一个槽时**不该问**（§77：只在真需要时问）；
+        //   ② 分派 Intent 必须带**用户选的那个槽**（键写错 ⇒ 静默导进当前槽）。
+        ok(stat, L, !DeepLink.shouldAsk(null)
+                        && !DeepLink.shouldAsk(new java.util.ArrayList<Data.Slot>())
+                        && !DeepLink.shouldAsk(oneSlot())
+                        && DeepLink.shouldAsk(twoSlots()),
+                "★只有一个槽时**不问**「导入到哪个槽」；两个以上才问");
+        try {
+            BatchIo.Doc d = doc("图.msav");
+            android.content.Intent i1 = DeepLink.openIntent(ctx, BatchIo.KIND_MAPS, d, "槽甲");
+            android.content.Intent i2 = DeepLink.openIntent(ctx, BatchIo.KIND_MAPS, d, "槽乙");
+            ok(stat, L, i1.getComponent() != null
+                            && MapsActivity.class.getName().equals(i1.getComponent().getClassName())
+                            && "槽甲".equals(i1.getStringExtra(MapsActivity.EXTRA_SLOT))
+                            && "槽乙".equals(i2.getStringExtra(MapsActivity.EXTRA_SLOT)),
+                    "★★深链分派带上**用户选的槽**（不是当前槽）：换名字 extra 跟着变");
+            ok(stat, L, DeepLink.EXTRA_URI.equals("mdt_deeplink_uri")
+                            && d.uri.toString().equals(i1.getStringExtra(DeepLink.EXTRA_URI))
+                            && "图.msav".equals(i1.getStringExtra(DeepLink.EXTRA_NAME)),
+                    "★文件本身那两项（uri / name）也带过去了");
+            ok(stat, L, MapsActivity.class.getName().equals(activityNameOf(ctx, BatchIo.KIND_MAPS))
+                            && BlueprintsActivity.class.getName()
+                               .equals(activityNameOf(ctx, BatchIo.KIND_BLUEPRINTS))
+                            && SavesActivity.class.getName()
+                               .equals(activityNameOf(ctx, BatchIo.KIND_SAVES))
+                            && ModsActivity.class.getName().equals(activityNameOf(ctx, BatchIo.KIND_MODS)),
+                    "★四类内容各进自己那一页（地图 / 蓝图 / 存档 / 模组）");
+        } catch (Throwable t) {
+            ok(stat, L, false, "深链选槽 Intent 检查自身异常：" + t);
+        }
+
         // ── ② 「一份还是一批」的唯一判据 ──────────────────────────────────
         List<BatchIo.Doc> one = new java.util.ArrayList<>();
         one.add(doc("图.msav"));
@@ -15507,6 +15540,25 @@ public final class SelfTest {
     /** 自检用：只带名字的一条（这些判据都用不到真 Uri） */
     private static BatchIo.Doc doc(String name) {
         return new BatchIo.Doc(android.net.Uri.parse("content://selftest/" + name), name);
+    }
+
+    /** 自检用：0 / 1 / 2 个槽（`shouldAsk` 的三个输入；槽的构造器是包内可见） */
+    private static List<Data.Slot> oneSlot() {
+        List<Data.Slot> out = new java.util.ArrayList<>();
+        out.add(new Data.Slot("s1", null, true, 0, 0L));
+        return out;
+    }
+
+    private static List<Data.Slot> twoSlots() {
+        List<Data.Slot> out = oneSlot();
+        out.add(new Data.Slot("s2", null, false, 0, 0L));
+        return out;
+    }
+
+    /** 深链分派到哪一个 Activity（按类名比：不反射加载类） */
+    private static String activityNameOf(Context ctx, int kind) {
+        android.content.Intent i = DeepLink.openIntent(ctx, kind, null, "s");
+        return i.getComponent() == null ? "" : i.getComponent().getClassName();
     }
 
     /** 自检用：把真文件包成 `docsFromFiles` 要的清单 */
