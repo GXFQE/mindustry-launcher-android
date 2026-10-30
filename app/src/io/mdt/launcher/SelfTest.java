@@ -12312,8 +12312,22 @@ public final class SelfTest {
                             + MainActivity.GLOSSARY_KEYS.length + "）");
             ok(stat, L, s.contains("实例") && s.contains("槽") && s.contains("启动项"),
                     "★★词表必须同时出现「实例」「槽」「启动项」（用户嘴里的词与界面上的词都要能搜到）");
+            ok(stat, L, s.contains("备份") && s.contains("中转站") && s.contains("整槽"),
+                    "★第 328 轮补的三条（备份 / 中转站 / 整槽导入导出）真的拼进正文了");
             ok(stat, L, s.contains(Trans.get(ctx, R.string.glossary_hint)),
                     "★词表末尾那句「去哪儿看」真的拼进正文了（不是只写在资源里）");
+            // ★ 第 328 轮：摘要行上那个**就地**「?」—— 少一个 `@+id` 就是"看不见但能点"的空洞，
+            //   或者更糟：点它把整卡展开（冒泡到卡片根），两种都不报错。
+            try {
+                android.view.View m = inf.inflate(R.layout.activity_main, null);
+                android.view.View h = m.findViewById(R.id.status_help);
+                ok(stat, L, h != null && h.isClickable()
+                                && Trans.get(ctx, R.string.glossary_mark).contentEquals(
+                                        ((android.widget.TextView) h).getText()),
+                        "★摘要行上有**就地**的「?」（可点、字形是资源里那个 mark）");
+            } catch (Throwable t) {
+                ok(stat, L, false, "摘要行「?」检查自身异常：" + t);
+            }
         } catch (Throwable t) {
             ok(stat, L, false, "词表检查自身异常：" + t);
         }

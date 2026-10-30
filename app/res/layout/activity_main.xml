@@ -96,6 +96,28 @@
                         android:textSize="13sp"
                         android:textColor="@color/fg_muted" />
 
+                    <!--
+                      第 328 轮（用户点单）：「就地」的「?」—— 这一行里「当前槽」是最容易看不懂的词
+                      （词表在顶栏，但用户不会想到去那儿找）。
+                      ★ 它挂在**可点卡片**里，所以必须自己吃事件（`clickable=true` + 监听器返回 void 的
+                        `setOnClickListener`）—— 否则点它会把整卡展开（§86.19：可点 ≠ 点得动，真机验过）。
+                      ★ 颜色用 `@color/accent`（不写死白色）：深浅两套主题都看得见。
+                    -->
+                    <TextView
+                        android:id="@+id/status_help"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:layout_gravity="center_vertical"
+                        android:background="?android:attr/selectableItemBackgroundBorderless"
+                        android:clickable="true"
+                        android:contentDescription="@string/glossary_open"
+                        android:focusable="false"
+                        android:gravity="center"
+                        android:text="@string/glossary_mark"
+                        android:textColor="@color/accent"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+
                     <ImageView
                         android:id="@+id/status_chevron"
                         android:layout_width="@dimen/row_chevron"

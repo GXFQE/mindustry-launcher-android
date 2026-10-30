@@ -18,6 +18,13 @@
     <string name="glossary_current_slot">Current slot — the slot the next game launch will read; it is shown at the top of the main page.</string>
     <string name="glossary_default_slot">Default slot — the slot that newly imported versions, and any version without a slot of its own, follow.</string>
 
+    <string name="glossary_backup">Backup — a snapshot of what is in a slot, restorable at any time; backups share content, so they take little space.</string>
+    <string name="glossary_trash">Transfer station — deleted or replaced files move here first and can be put back (old ones are trimmed by policy).</string>
+    <string name="glossary_bundle">Whole-slot export / import — pack a whole slot into one zip (for moving devices), or import one back into a slot.</string>
+
+    <string name="glossary_mark" translatable="false">?</string>
+    <string name="glossary_open">Glossary</string>
+
     <string name="glossary_hint">Everything inside a slot (mods / saves / maps / blueprints / backups) lives under \"Saves and backups\".</string>
 
 </resources>

@@ -540,8 +540,20 @@ public class MainActivity extends BaseActivity {
         mStatusDetail = (TextView) root.findViewById(R.id.status_detail);
         Util.bindExpandableCard(root, R.id.status_box, R.id.status_detail, R.id.status_chevron);
 
+        // ★ 第 328 轮（用户点单）：「就地」的「?」—— 摘要行里「当前槽」是最容易看不懂的词。
+        //   ⚠️ 它挂在**可点卡片**里：自己 `clickable` 且挂了监听器才会吃掉这一下，
+        //     否则点它会冒泡到卡片根 ⇒ 变成"展开路径详情"（§86.19，真机点过才算验过）。
+        View statusHelp = root.findViewById(R.id.status_help);
+        if (statusHelp != null) {
+            statusHelp.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) {
+                    showGlossary();
+                }
+            });
+        }
+
         mBtnContinue = root.findViewById(R.id.btn_continue);
-        mContinueText = (TextView) root.findViewById(R.id.continue_text);
+        mContinueText = root.findViewById(R.id.continue_text);
 
         // ★ 2026-10-08（第 123 轮，用户点单）：原来这里是**两行**（添加包名 / 导入 APK）。
         //   它们是同一件事的两条路 ⇒ 合成一行「添加游戏」，点开二选一（见 promptAddGame）。
@@ -668,6 +680,9 @@ public class MainActivity extends BaseActivity {
             R.string.glossary_entry,
             R.string.glossary_current_slot,
             R.string.glossary_default_slot,
+            R.string.glossary_backup,
+            R.string.glossary_trash,
+            R.string.glossary_bundle,
     };
 
     void rescan() {
