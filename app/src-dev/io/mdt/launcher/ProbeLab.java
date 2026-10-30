@@ -110,27 +110,34 @@ final class ProbeLab {
      * <p>报告写 `hub/report-patch-lab.txt`；写完之后游戏继续启动（崩不崩看 logcat）。
      */
     private static void runPatchLab(Context ctx, File armed) {
-        String patch = readText(armed);
+        String text = readText(armed);
         armed.delete();
         StringBuilder sb = new StringBuilder("== patch lab (:game) ==\n");
         sb.append("pid = ").append(android.os.Process.myPid()).append('\n');
-        sb.append("patch = ").append(patch).append('\n');
         ClassLoader cl = ProbeLab.class.getClassLoader();
         try {
             File internal = new File(ctx.getFilesDir(), "patch-lab");
             if (!internal.isDirectory() && !internal.mkdirs()) {
                 throw new java.io.IOException("mkdirs failed: " + internal);
             }
-            File copy = new File(internal, "patch.apk");
-            if (copy.exists() && !copy.delete()) sb.append("old copy delete = FAIL\n");
-            copyFile(new File(patch), copy);
-            copy.setReadOnly();
-            sb.append("internal copy = ").append(copy.length()).append(" B\n");
-
-            java.util.List<String> notes = new java.util.ArrayList<String>();
-            int n = Reflect.injectDex(cl, copy, ctx.getCodeCacheDir(), true, notes);
-            sb.append("injectDex(prepend) = ").append(n).append(" elements\n");
-            for (String s : notes) sb.append("  ").append(s).append('\n');
+            // 一行一个补丁；后 inject 的排最前（prepend）⇒ 用它验证「两个补丁改同一个类谁赢」
+            String[] lines = text.split("\\r?\\n");
+            int idx = 0;
+            for (String line : lines) {
+                String patch = line.trim();
+                if (patch.isEmpty()) continue;
+                sb.append("patch[").append(idx).append("] = ").append(patch).append('\n');
+                File copy = new File(internal, "patch-" + idx + ".apk");
+                if (copy.exists() && !copy.delete()) sb.append("old copy delete = FAIL\n");
+                copyFile(new File(patch), copy);
+                copy.setReadOnly();
+                java.util.List<String> notes = new java.util.ArrayList<String>();
+                int n = Reflect.injectDex(cl, copy, ctx.getCodeCacheDir(), true, notes);
+                sb.append("inject[").append(idx).append("] = ").append(n).append(" elements");
+                for (String s : notes) sb.append(" | ").append(s);
+                sb.append('\n');
+                idx++;
+            }
 
             // 目标类 = 补丁类；标记字段只在补丁版本里有。用两个类互为对照：
             // 一个偏门（主菜单不该加载）、一个可能被启动流程碰过。
@@ -154,11 +161,13 @@ final class ProbeLab {
                 }
             }
 
-            // 方法行为：直接反射调用 buildString()，看返回的是补丁值还是原版
+            // 方法行为：直接反射调用 buildString()/combined()，看返回的是哪个补丁的值
             try {
                 Class<?> v = Class.forName("mindustry.core.Version", false, cl);
                 Object bs = v.getMethod("buildString").invoke(null);
                 sb.append("Version.buildString() = ").append(bs).append('\n');
+                Object cb = v.getMethod("combined").invoke(null);
+                sb.append("Version.combined() = ").append(cb).append('\n');
             } catch (Throwable t) {
                 sb.append("Version.buildString() = FAIL ").append(t).append('\n');
             }
