@@ -160,10 +160,11 @@ yourself — even just a few lines — see **Translation file** below.
 ## What is not planned
 
 - **Downloading game content from inside the app**: a built-in map / blueprint / mod browser, a map
-  download source or a forum panel — not planned for now. In October 2026 third-party launchers in
-  China had to drop game downloads for compliance reasons (PCL2 first, others followed), and the
-  international build has no domestic licence; this manager only imports files you already have.
-  The game itself is unaffected: multiplayer, the server list and in-game downloads work as usual
+  download source or a forum panel — not planned for now. In October 2026, third-party launchers in
+  China had to drop their game downloads for compliance reasons (PCL2 first, others followed);
+  downloads of this kind of international build sit in the same regulatory grey zone. **This manager
+  ships no download source at all** — it only imports files you already have. Multiplayer, the
+  server list and in-game downloads inside the game are not affected.
 - **Google Play**: loading another APK as a plug-in does not fit its policies; sideload only
 - **A built-in file manager**: imports and exports go through the system file picker (and this is not
   a general-purpose save manager)
