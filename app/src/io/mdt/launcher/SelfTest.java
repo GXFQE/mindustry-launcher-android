@@ -5232,13 +5232,23 @@ public final class SelfTest {
                         && Plugins.crashedSince(new long[] {4000L}, 4000L),
                 "★元断言：把同一份报告挪到 guard 之前 / 之后，结论必须翻转（不是恒真）");
         // ★★ 来源判据只能有一处（resolve）：第 137 轮真机踩的正是"两处各写一遍 ⇒ 漂了"
-        ok(stat, L, PluginTrust.BUILTIN.equals(PluginTrust.resolve("builtin", false, PluginTrust.OFFICIAL))
+        ok(stat, L, PluginTrust.BUILTIN.equals(PluginTrust.resolve("builtin", true, PluginTrust.OFFICIAL))
                         && PluginTrust.BUILTIN.equals(PluginTrust.resolve(null, true, PluginTrust.OFFICIAL))
                         && PluginTrust.OFFICIAL.equals(PluginTrust.resolve("official", false, PluginTrust.THIRD))
                         && PluginTrust.THIRD.equals(PluginTrust.resolve(null, false, PluginTrust.THIRD))
                         && PluginTrust.THIRD.equals(PluginTrust.resolve("脏值", false, PluginTrust.THIRD)),
                 "★来源判据的唯一入口 resolve：记录优先 → 清单命中（内置）→ 签名兜底");
-        ok(stat, L, "L2".equals(PluginTrust.capLevel(PluginTrust.resolve("builtin", false, PluginTrust.OFFICIAL),
+        // ★★ 第 325 轮（用户：「你就非要把 plugtest-v1 留着吗」）：**记录里的 builtin 只是历史** ——
+        //   构建不再发那个内置（产品版一个都不发）之后，若照旧认 builtin ⇒ 界面永远不给卸载、
+        //   每次启动又被放回来。这条就是"用户能不能摆脱它"的判据。
+        ok(stat, L, PluginTrust.OFFICIAL.equals(PluginTrust.resolve("builtin", false, PluginTrust.OFFICIAL))
+                        && PluginTrust.THIRD.equals(PluginTrust.resolve("builtin", false, PluginTrust.THIRD)),
+                "★★内置清单里已经没有了 ⇒ 记录里的 builtin 必须降级成按签名判（否则永远不能卸载）");
+        ok(stat, L, PluginTrust.BUILTIN.equals(PluginTrust.resolve("builtin", true, PluginTrust.THIRD))
+                        && !PluginTrust.BUILTIN.equals(
+                                PluginTrust.resolve("builtin", false, PluginTrust.THIRD)),
+                "★元断言：同一份记录，内置「现在还在」与「已经不在了」结论必须不同（不是恒真）");
+        ok(stat, L, "L2".equals(PluginTrust.capLevel(PluginTrust.resolve("builtin", true, PluginTrust.OFFICIAL),
                         PluginTrust.L3)),
                 "★★元断言：**内置经安全阀那条路也要被夹到 L2** —— 反例就是漏认 builtin 时"
                         + "回落成 official、L3 不夹、内置被真隔离（真机 lastskip 抓到过）");

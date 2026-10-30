@@ -1417,6 +1417,12 @@ public class MainActivity extends BaseActivity {
     }
 
     void startVersion(final Versions.Entry e) {
+        // ★★ 第 324 轮（用户：「我没点过启动，重启以后它自己弹了共用槽」）：
+        //   **启动请求一律留证据**。这条路径只有三处 click 监听会进来（整行 / 行首把手 / 继续上次），
+        //   所以「没人点也弹了」这种报告只能靠现场翻案 —— 落盘的栈第一行就能分出
+        //   **真触摸**（`ViewRootImpl…processPointerEvent`）与**代码合成**（`performClick` 的调用者）。
+        //   ⚠️ 只在**真的走到这一步**时写，不进任何热路径（一次游戏启动最多写一次，< 2 KB）。
+        recordStartTrace(e);
         // ★ F4①：**毫秒级**同槽冲突预检 —— 0 次 IO、0 个线程。
         //   结论就在 `mConflict` 里（`rescan()` → `computeConflicts()` 早算好了，这里只是查表）。
         //   所以它天然满足 FLOWS 对这条的三条要求（毫秒级 / 只读元数据 / 不卡启动路径）——
@@ -1443,6 +1449,71 @@ public class MainActivity extends BaseActivity {
                 new CardStack.Btn(Trans.get(this, R.string.launch_conflict_go), new Runnable() {
                     @Override public void run() { startVersionConfirmed(e, ref[0]); }
                 }));
+    }
+
+    /**
+     * ★ 第 324 轮：「启动请求」留现场（`hub/report-starttap.txt`，追加、封顶 8 KB）。
+     *
+     * <p>为什么值得留：这条路径**只有三处 click 监听**会进来（整行 / 行首把手 / 继续上次），
+     * 所以"我没点过启动，它自己弹了共用槽"这类报告只有现场能翻案 ——
+     * 记录里的栈第一行直接分得出：
+     * <ul>
+     *   <li>真触摸 ⇒ `…ViewRootImpl…processPointerEvent` 那几个帧；</li>
+     *   <li>代码合成 ⇒ `performClick` 的**调用者**（我们自己某个 Runnable）。</li>
+     * </ul>
+     * 另记 `restartAgo`（距 `restart-at.txt` 的毫秒）—— 重启后多久点的，一眼能看出来。
+     *
+     * <p>⚠️ 不进热路径：一次启动最多写一次，正常情况一个文件几 KB；
+     * 写盘失败一律吞掉（这条路径**不许**因为留证据而影响启动）。
+     */
+    private void recordStartTrace(Versions.Entry e) {
+        try {
+            StringBuilder sb = new StringBuilder();
+            sb.append("=== start request ")
+                    .append(new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", java.util.Locale.US)
+                            .format(new java.util.Date()))
+                    .append(" ===\n");
+            sb.append("entry    = ").append(e == null ? "null" : e.key())
+                    .append(e == null ? "" : "  (" + e.displayName(this) + ")").append('\n');
+            sb.append("slot     = ").append(e == null ? "?" : Versions.slotFor(e)).append('\n');
+            Share sh = e == null ? null : mConflict.get(Versions.rowKey(e));
+            sb.append("conflict = ").append(sh == null ? "no" : "yes")
+                    .append(sh == null ? "" : "  block=" + sh.block + "  peer=" + sh.peer).append('\n');
+            long ago = -1L;
+            try {
+                java.io.File f = new java.io.File(Paths.privateDir(this), "restart-at.txt");
+                if (f.isFile()) ago = System.currentTimeMillis() - Long.parseLong(Util.readText(f).trim());
+            } catch (Throwable ignored) {
+            }
+            sb.append("restartAgo = ").append(ago < 0 ? "(no restart record)" : ago + " ms").append('\n');
+            sb.append("thread   = ").append(Thread.currentThread().getName()).append('\n');
+            sb.append("frames   =\n");
+            StackTraceElement[] st = Thread.currentThread().getStackTrace();
+            int shown = 0;
+            for (StackTraceElement s : st) {
+                if (shown >= 14) break;
+                if (s.getMethodName().equals("recordStartTrace")) continue;
+                sb.append("  ").append(s).append('\n');
+                shown++;
+            }
+            android.util.Log.i("MDTLauncher", "start request: "
+                    + (e == null ? "null" : e.key()) + " slot=" + (e == null ? "?" : Versions.slotFor(e)));
+            java.io.File out = new java.io.File(Data.hubDir(this), "report-starttap.txt");
+            if (out.isFile() && out.length() > 8192) {
+                // 只留最近几段，别无限长
+                String old = Util.readText(out);
+                int cut = old.length() > 4096 ? old.length() - 4096 : 0;
+                int at = old.indexOf("=== start request", cut);
+                Util.atomicWriteText(out, at > 0 ? old.substring(at) : old.substring(cut));
+            }
+            java.io.FileOutputStream fo = new java.io.FileOutputStream(out, true);
+            try {
+                fo.write((sb + "\n").getBytes("UTF-8"));
+            } finally {
+                fo.close();
+            }
+        } catch (Throwable ignored) {
+        }
     }
 
     /**

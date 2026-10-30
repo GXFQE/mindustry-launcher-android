@@ -95,7 +95,12 @@ final class PluginTrust {
      * @param signature   按签名判出来的（{@link #classify}）
      */
     static String resolve(String recorded, boolean builtinHit, String signature) {
-        if (BUILTIN.equals(recorded) || OFFICIAL.equals(recorded) || THIRD.equals(recorded)) return recorded;
+        // ★★ 第 325 轮（用户：「你就非要把 plugtest-v1 留着吗」）：**记录里的 builtin 只是历史**。
+        //   内置登记是"随本体发的那一份"留下的；换了构建（产品版一个内置插件都不发）或夹具挪走之后，
+        //   照旧认 builtin 就等于：**永远不能卸载 + 每次启动又被放回来** —— 用户在界面上根本摆脱不掉。
+        //   ⇒ 只有"这一版现在确实还是内置"（清单里有 + 哈希对得上）才认 builtin，否则按签名判。
+        if (BUILTIN.equals(recorded)) return builtinHit ? BUILTIN : signature;
+        if (OFFICIAL.equals(recorded) || THIRD.equals(recorded)) return recorded;
         if (builtinHit) return BUILTIN;     // 记录丢了也认得出内置（清单 + 哈希）
         return signature;
     }
