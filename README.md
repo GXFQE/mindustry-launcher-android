@@ -154,14 +154,16 @@ yourself — even just a few lines — see **Translation file** below.
 
 ## What is not there yet
 
-- **Networking other than updates**: map downloads and a forum panel — v1 otherwise stays local
-  (scan what is installed, import your own). The game itself is unaffected: multiplayer,
-  the server list and in-game downloads work as usual
 - **Plug-in distribution**: install an APK by hand; no store, no downloads, no update checks
 - **Plug-in data**: the in-game side is not exposed yet (computed stats can already be shown on host pages — see playtime under Slots)
 
 ## What is not planned
 
+- **Downloading game content from inside the app**: a built-in map / blueprint / mod browser, a map
+  download source or a forum panel — not planned for now. In October 2026 third-party launchers in
+  China had to drop game downloads for compliance reasons (PCL2 first, others followed), and the
+  international build has no domestic licence; this manager only imports files you already have.
+  The game itself is unaffected: multiplayer, the server list and in-game downloads work as usual
 - **Google Play**: loading another APK as a plug-in does not fit its policies; sideload only
 - **A built-in file manager**: imports and exports go through the system file picker (and this is not
   a general-purpose save manager)
