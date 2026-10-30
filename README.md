@@ -9,14 +9,13 @@ second one and it overwrites the first. There is a single set of saves too, so s
 pushes the old progress aside. This manager gives every version its own **save slot**: several
 versions installed side by side, each with separate **saves / maps / blueprints / mods**.
 
-> ⚠️ **Pre-release only — the feature set is not finished.** The APK is on
+> ⚠️ **Release candidate (1.0.0-rc1) — the feature set is frozen.** The APK is on
 > [Releases](https://github.com/GXFQE/mindustry-launcher-android/releases) (the one marked
 > Pre-release); you can also build it yourself — see [Building](docs/DEVELOPING.md#构建)
-> *(in Chinese for now)*. Pre-release means the interface, the data format and
-> the features can all still change — **do not treat it as a stable release.**
+> *(in Chinese for now)*. "Candidate" means no new features go in: only fixes, until a full RC
+> cycle passes with no blocking bugs — **until then it is not a stable release.**
 >
-> The feature list below describes the **current source code**; the newest pre-release APK can lag
-> a little behind it.
+> The feature list below describes the **current source code**; the RC APK can lag a little behind it.
 
 ## What it solves
 
