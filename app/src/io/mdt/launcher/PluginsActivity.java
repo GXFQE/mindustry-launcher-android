@@ -937,9 +937,12 @@ public class PluginsActivity extends BaseActivity {
             return Trans.get(this, R.string.plugin_update_row_confirm_fmt, label);
         }
         if (PluginUpdateState.INSTALLED.equals(it.state)) {
+            // ★ 状态表可能是旧的（用户后来又手动装/删过那一版）：那一份**文件还在**才算数，
+            //   否则"已更新到 X · 重启生效"会指向一个根本不存在的版本。
+            if (s8 == null || !Plugins.apkOf(this, id, s8).isFile()) return null;
             String pend = Plugins.stateGet(pendText, id);
             // 只有"等着重启的那一份"才说重启生效；否则这行没有信息量
-            if (s8 != null && s8.equals(pend)) {
+            if (s8.equals(pend)) {
                 return Trans.get(this, R.string.plugin_update_row_installed_fmt, label);
             }
         }
@@ -1118,8 +1121,11 @@ public class PluginsActivity extends BaseActivity {
         }
         if (PluginUpdateState.INSTALLED.equals(it.state)) {
             String s8 = PluginUpdateManifest.sha8(it.sha);
+            if (s8 == null || !Plugins.apkOf(this, id, s8).isFile()) {
+                return null;   // 状态表是旧的（那一版的文件已经不在）⇒ 这行不印
+            }
             String act = Plugins.stateGet(Plugins.active(this), id);
-            if (s8 != null && s8.equals(act)) {
+            if (s8.equals(act)) {
                 return Trans.get(this, R.string.plugin_update_info_latest);   // 重启后已经生效
             }
             return Trans.get(this, R.string.plugin_update_info_installed_fmt, label);

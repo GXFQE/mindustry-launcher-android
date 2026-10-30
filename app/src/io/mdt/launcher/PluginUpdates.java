@@ -340,6 +340,11 @@ final class PluginUpdates {
                 }
             }
 
+            // ★ 清掉**已经卸载**的插件的旧记录：既让信息页不再翻旧账，也让
+            //   cleanupDownloads 不再为一个不存在的插件永远保留下载件（第 338 轮补）。
+            for (PluginUpdateState.Item old : PluginUpdateState.all(state)) {
+                if (!ids.contains(old.id)) state = PluginUpdateState.remove(state, old.id);
+            }
             saveState(ctx, state);
             cleanupDownloads(ctx, state);
             rep.append("summary: total=").append(sum.total).append(" checked=").append(sum.checked)
