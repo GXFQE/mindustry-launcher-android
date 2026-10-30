@@ -1,6 +1,6 @@
 [English](README.md) · 简体中文
 
-# MDT 管理器 —— Mindustry（像素工厂）安卓多版本管理器
+# Mindustry 管理器 —— Mindustry（像素工厂）安卓多版本管理器
 
 > **找的是桌面版？** 那是另一个项目 → **[Mindustry 启动器（Windows）](https://github.com/GXFQE/mindustry-launcher)**。
 

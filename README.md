@@ -1,6 +1,6 @@
 English · [简体中文](README.zh.md)
 
-# MDT Manager — a multi-version manager for Mindustry on Android
+# Mindustry Manager — a multi-version manager for Mindustry on Android
 
 > **Looking for the desktop build?** That is a separate project → **[Mindustry Launcher (Windows)](https://github.com/GXFQE/mindustry-launcher)**.
 
