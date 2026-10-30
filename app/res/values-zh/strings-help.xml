@@ -22,7 +22,7 @@
     <string name="glossary_trash">中转站 —— 删掉 / 替换掉的文件先挪到这里，可以再放回去（放太久会按策略清掉）。</string>
     <string name="glossary_bundle">整槽导入导出 —— 把一整个槽打成一个 zip（换机迁移用），也能反向导进某个槽。</string>
 
-    <string name="glossary_hint">槽里的东西（模组 / 存档 / 地图 / 蓝图 / 备份）都从「存档与备份」进去看。</string>
+    <string name="glossary_hint">槽里的东西都从「存档与备份」进去看。</string>
 
     <!-- 「?」那个字符本身不翻译（只有无障碍标签翻译） -->
     <string name="glossary_mark" translatable="false">?</string>

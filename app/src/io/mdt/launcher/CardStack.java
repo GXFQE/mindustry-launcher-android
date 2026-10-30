@@ -258,7 +258,11 @@ public final class CardStack {
         t.setText(body);
         t.setTextSize(15);
         t.setTextColor(c.getResources().getColor(R.color.fg));
-        t.setLineSpacing(dp(c, 4), 1f);
+        // ★ 第 330 轮（用户：「现在变成文字截断」）：行距 4dp → 3dp。
+        //   目的**只是腾地方**：长文案卡片上一行 4dp 的额外行距，19 行就是 247px ——
+        //   正好是"差一点点就能整页显示、结果最后一行被切一半"的那种溢出量。
+        //   3dp 仍然好读，而且一行都不省 ⇒ 用户看到的还是完整的段落。
+        t.setLineSpacing(dp(c, 3), 1f);
         lastText = t;
         return scroller(c, t);
     }
@@ -414,7 +418,47 @@ public final class CardStack {
         final int cap = Math.min(maxBody, liveCap());
         page.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY),
                 View.MeasureSpec.makeMeasureSpec(cap, View.MeasureSpec.AT_MOST));
-        return Math.min(page.getMeasuredHeight(), cap);
+        int full = page.getMeasuredHeight();
+        int h = Math.min(full, cap);
+        // ★ 第 330 轮（用户：「现在变成文字截断」）：真被截的时候**别把一行切一半** ——
+        //   往下取整到整行（宁可少显示一整行，也不要半截字）。见 snapTextHeight。
+        if (h < full) h = snapTextHeight(page, h);
+        return h;
+    }
+
+    /** 这一页的正文 TextView（不是文案页就返回 null；`wrap(...)` 那种列表页不做取整）。 */
+    private TextView textViewIn(View page) {
+        if (!(page instanceof ViewGroup) || lastText == null) return null;
+        ViewGroup g = (ViewGroup) page;
+        if (g.getChildCount() == 0) return null;
+        View slot = g.getChildAt(0);
+        if (slot instanceof ViewGroup) {
+            ViewGroup s = (ViewGroup) slot;
+            for (int i = 0; i < s.getChildCount(); i++) {
+                if (s.getChildAt(i) == lastText) return lastText;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * ★★ 第 330 轮：把「被截断的文案」的高度**往下取整到整行**。
+     *
+     * <p>为什么：`ScrollView` 在离上限差半行的时候会把最后一行切一半 —— 用户读到的就是
+     * 「文字截断」（同一个毛病在"按钮被挤掉"修好之后才露出来）。取整后最后一行是完整的一行，
+     * 往下还能滑出剩下的内容，看起来是"还有"，不是"坏了"。
+     */
+    private int snapTextHeight(View page, int h) {
+        TextView t = textViewIn(page);
+        if (t == null) return h;
+        int lh = t.getLineHeight();
+        if (lh <= 0) return h;
+        int pad = t.getPaddingTop() + t.getPaddingBottom();
+        View slot = ((ViewGroup) page).getChildAt(0);
+        if (slot != null) pad += slot.getPaddingTop() + slot.getPaddingBottom();
+        int lines = (h - pad) / lh;
+        if (lines < 1) return h;
+        return pad + lines * lh;
     }
 
     /**
@@ -488,7 +532,12 @@ public final class CardStack {
             View root = dlg.findViewById(R.id.card_stack_root);
             if (root == null || root.getHeight() <= 0) return;
             int cap = liveCap();
-            if (bodyView.getHeight() > cap) setBodyHeight(cap, false);
+            if (bodyView.getHeight() > cap) {
+                // ★ 第 330 轮：兜底收小的时候**也要整行取整**（否则又变成"半截字"）
+                int h = cap;
+                if (bodyView.getChildCount() > 0) h = snapTextHeight(bodyView.getChildAt(0), cap);
+                setBodyHeight(h, false);
+            }
         } catch (Throwable ignored) { }
     }
 
