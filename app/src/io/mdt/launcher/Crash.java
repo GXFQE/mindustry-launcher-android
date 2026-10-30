@@ -88,6 +88,40 @@ final class Crash {
         }
     }
 
+    /**
+     * ★ 第 323 轮：**启动器自己**那些崩溃报告的毫秒时间戳（从文件名里取，不读内容）。
+     *
+     * <p>给 {@link Plugins#skipOnce} 判"上一程是崩了、还是只是没走完"用：
+     * 有报告 ⇒ 是插件的账；没有 ⇒ 多半是用户按了重启 / 系统回收，不该停用插件。
+     * 取不到（没权限 / 目录不在）一律返回空数组 ⇒ 判"没崩"（宁可下次再试，也不冤枉插件）。
+     *
+     * ⚠️ 只认 `_launcher` 后缀那一类：`crash_<毫秒>.txt` 是**游戏**写的，跟启动器启动无关。
+     */
+    static long[] launcherCrashStamps(Context ctx) {
+        File d = null;
+        try {
+            d = crashDir(ctx);
+        } catch (Throwable ignored) {
+        }
+        File[] fs = d == null ? null : d.listFiles();
+        if (fs == null) return new long[0];
+        long[] out = new long[fs.length];
+        int n = 0;
+        for (File f : fs) {
+            String name = f.getName();
+            if (!name.startsWith("crash_") || !name.endsWith("_launcher.txt")) continue;
+            String mid = name.substring("crash_".length(), name.length() - "_launcher.txt".length());
+            try {
+                out[n++] = Long.parseLong(mid);
+            } catch (Throwable ignored) {
+            }
+        }
+        long[] cut = new long[n];
+        System.arraycopy(out, 0, cut, 0, n);
+        return cut;
+    }
+
+
     /** 真正落盘：原子写（先 .tmp 再改名），失败返回 false */
     private static boolean dump(Context ctx, File out, Thread t, Throwable e) {
         File tmp = new File(out.getParentFile(), out.getName() + ".tmp");

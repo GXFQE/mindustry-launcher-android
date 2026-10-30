@@ -5210,6 +5210,27 @@ public final class SelfTest {
                         && "L1".equals(Plugins.nextLevelAfterFail("L1", 1))
                         && "L3".equals(Plugins.nextLevelAfterFail("L3", 99)),
                 "★L1 用完重试预算 ⇒ 升到 L2（否则「宽容」会变成「每隔一次启动就死一次」）；别的档不升");
+        // ★★ 第 323 轮（用户：「重启以后随机关闭插件」）：**"没走完" ≠ "崩了"**。
+        //   原来安全阀一看到 guard 就按档处置，而官方默认 L2 + known==was ⇒ 直接**停用**；
+        //   用户自己按「立即重启」/ 系统回收都会留下 guard ⇒ 插件"随机"消失。
+        ok(stat, L, "fail".equals(Plugins.killAction(true, 1)),
+                "★有崩溃报告 ⇒ 第 1 次就按原档处置（插件的账照认）");
+        ok(stat, L, "retry".equals(Plugins.killAction(false, 1))
+                        && "retry".equals(Plugins.killAction(false, Plugins.KILL_BUDGET - 1))
+                        && "fail".equals(Plugins.killAction(false, Plugins.KILL_BUDGET)),
+                "★★没崩（重启 / 被系统回收）⇒ 前 " + (Plugins.KILL_BUDGET - 1)
+                        + " 次只记着、不动登记；连到 " + Plugins.KILL_BUDGET + " 次才算");
+        ok(stat, L, Plugins.KILL_BUDGET >= 2,
+                "★预算至少 2（只给一次机会的话，用户点两次重启插件就没了）");
+        ok(stat, L, Plugins.crashedSince(new long[] {1000L, 5000L}, 4000L)
+                        && !Plugins.crashedSince(new long[] {1000L, 3000L}, 4000L)
+                        && !Plugins.crashedSince(new long[0], 4000L)
+                        && !Plugins.crashedSince(null, 4000L)
+                        && !Plugins.crashedSince(new long[] {9000L}, 0L),
+                "★崩溃判据：报告的毫秒 **≥** guard 时刻才算这一程崩了；空 / null / 无 guard 时刻 ⇒ 不算");
+        ok(stat, L, !Plugins.crashedSince(new long[] {3000L}, 4000L)
+                        && Plugins.crashedSince(new long[] {4000L}, 4000L),
+                "★元断言：把同一份报告挪到 guard 之前 / 之后，结论必须翻转（不是恒真）");
         // ★★ 来源判据只能有一处（resolve）：第 137 轮真机踩的正是"两处各写一遍 ⇒ 漂了"
         ok(stat, L, PluginTrust.BUILTIN.equals(PluginTrust.resolve("builtin", false, PluginTrust.OFFICIAL))
                         && PluginTrust.BUILTIN.equals(PluginTrust.resolve(null, true, PluginTrust.OFFICIAL))

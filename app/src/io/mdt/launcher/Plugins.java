@@ -260,6 +260,16 @@ final class Plugins {
     /** 上次被安全阀拦下时的现场（给界面说"上次没起来，这次已跳过"）。 */
     static final String LASTFAIL = "lastfail.txt";
 
+    /**
+     * ★ 第 323 轮：连续几次"**没崩、但没走完**"才把账算到插件头上（`id=ver:次数`）。
+     *
+     * <p>存在的理由：用户按「立即重启」/ 系统回收都会让 guard 留下来，一次就停用插件
+     * （官方默认 = {@code L2}，而 {@code known == was} ⇒ L2 只能退化成**停用**）太容易误伤。
+     * 真正的"插件把进程拖死"会在预算用完之后照样处置。
+     */
+    static final String KILLS = "kills.txt";
+    static final int KILL_BUDGET = 3;
+
     /** 启动注入报告（有插件时才写；内部存储，dev 口会把它抄进 hub 的报告里）。 */
     static final String BOOT_REPORT = "report-plugin-boot.txt";
 
@@ -487,6 +497,50 @@ final class Plugins {
         } catch (Throwable t) {
             return 0;
         }
+    }
+
+    /**
+     * ★ 第 323 轮：「上一程没走完」的**第二条**计数 —— 只数"没崩、但进程没了"的那些。
+     *
+     * <p>为什么要和 {@link #retryCount} 分开：那是"崩了、再试一次"的预算；这是"被杀/被重启"
+     * 的预算。混在一起会让**用户自己按重启**也吃掉插件的重试预算。
+     */
+    static int killCount(String killsText, String id, String ver) {
+        return retryCount(killsText, id, ver);
+    }
+
+    /**
+     * ★★ 第 323 轮（用户：「重启以后随机关闭插件」）：**上一程没走完，要不要算插件的账？**
+     *
+     * <p>安全阀（{@link #GUARD}）原来是一个二值事实："没走完" ⇒ 按信任档处置。而"没走完"有**两种**
+     * 完全不同的原因：
+     * <ol>
+     *   <li><b>崩了</b> —— 启动器自己的崩溃报告里有这一程的痕迹（{@code crash_<毫秒>_launcher.txt}），
+     *       时间在 guard 之后 ⇒ **是插件的账**，按原档处置（回滚 / 停用）；</li>
+     *   <li><b>没崩，进程就是没了</b> —— 用户按了「立即重启」、系统回收、或强杀 ⇒ **不是插件的账**。
+     *       这时停用插件只会让用户莫名其妙（真机反馈：「重启以后随机关闭插件」）；
+     *       连败到 {@link #KILL_BUDGET} 才算（插件把进程拖死也可能是"没有崩溃报告"的那种）。</li>
+     * </ol>
+     *
+     * @param crashed          这一程有没有启动器崩溃报告（见 {@link #crashedSince}）
+     * @param consecutiveKills 连续第几次"没崩却没走完"（含这一次）
+     * @return {@code "fail"}（按原档回滚/停用）或 {@code "retry"}（留着，下次再试）
+     */
+    static String killAction(boolean crashed, int consecutiveKills) {
+        if (crashed) return "fail";
+        return consecutiveKills >= KILL_BUDGET ? "fail" : "retry";
+    }
+
+    /**
+     * 有没有**启动器自己**的崩溃报告落在这个时间点之后（**纯函数**，自检直接喂时间戳）。
+     *
+     * <p>判据用"报告文件名里的毫秒"而不是文件 mtime：mtime 会被拷贝 / 恢复改写，
+     * 而文件名就是崩溃那一刻（{@link Crash} 的命名约定）。
+     */
+    static boolean crashedSince(long[] crashStamps, long guardTime) {
+        if (crashStamps == null || guardTime <= 0) return false;
+        for (long t : crashStamps) if (t >= guardTime) return true;
+        return false;
     }
 
     /** 用户**改过**的等级登记全文。 */
@@ -882,6 +936,10 @@ final class Plugins {
                 nl.delete();
                 return;
             }
+            // ★ 第 323 轮：这一程**真的带着插件起来了** ⇒ 把"没崩却没走完"的连败计数清零
+            //   （连着的几次都是"用户按重启 / 系统回收"，不该越攒越多把人吓停用）
+            File kills = new File(d, KILLS);
+            if (kills.isFile()) kills.delete();
             // ★ 启动带着这些插件活下来了 ⇒ 它们就是"已知可用"的那一份（回滚的目标）
             String act = readOrNull(new File(d, ACTIVE));
             if (stateIds(act).isEmpty()) return;
@@ -955,7 +1013,12 @@ final class Plugins {
         String levelsText = readOrNull(new File(d, LEVELS));
         String trustText = readOrNull(new File(d, TRUST));
         String retryText = readOrNull(new File(d, RETRY));
+        String killsText = readOrNull(new File(d, KILLS));
         java.util.Set<String> have = availableKeys(d);
+        // ★★ 第 323 轮：先判"这一程到底是不是**崩**了"（见 killAction 的注释）。
+        //   guard 的 mtime = 那一程写下安全阀的时刻；对比启动器自己的崩溃报告文件名。
+        boolean crashed = crashedSince(Crash.launcherCrashStamps(base), guard.lastModified());
+        boolean changed = false;          // 有任何一项的登记被改（回滚 / 停用）⇒ 才值得挂横幅
 
         StringBuilder nextActive = new StringBuilder();
         StringBuilder skip = new StringBuilder();
@@ -963,28 +1026,39 @@ final class Plugins {
             String was = stateGet(activeText, id);
             String trust = trustFrom(trustText, base, d, id, was);
             String lv = levelOf(levelsText, trust, id);
-            int fails = retryCount(retryText, id, was) + 1;
-            retryText = pairPut(retryText, id, was, String.valueOf(fails));
-            String eff = nextLevelAfterFail(lv, fails);
-
+            int kills = killCount(killsText, id, was) + 1;
             String now = null;
             String action;
+            String eff = "";
             boolean quarantined = false;
-            if (PluginTrust.L1.equals(eff)) {
-                now = was;                       // 留着：下次启动再试一次
-                action = "retry";
+            if ("retry".equals(killAction(crashed, kills))) {
+                // 没崩（或还没到预算）⇒ **不动登记**，只把这一次记下来。用户的插件不该因为
+                // "他自己按了重启 / 系统回收"而消失。
+                killsText = pairPut(killsText, id, was, String.valueOf(kills));
+                now = was;
+                action = "retry-nofault";
             } else {
-                // L2 / L3 都要"退回已知可用那一版"（退不了就停用）
-                if (knownText != null && !was.equals(stateGet(knownText, id))
-                        && have.contains(id + "=" + stateGet(knownText, id))) {
-                    now = stateGet(knownText, id);
-                    action = "rollback";
+                killsText = pairRemove(killsText, id, was);
+                int fails = retryCount(retryText, id, was) + 1;
+                retryText = pairPut(retryText, id, was, String.valueOf(fails));
+                eff = nextLevelAfterFail(lv, fails);
+                if (PluginTrust.L1.equals(eff)) {
+                    now = was;                       // 留着：下次启动再试一次
+                    action = "retry";
                 } else {
-                    action = "disable";
+                    // L2 / L3 都要"退回已知可用那一版"（退不了就停用）
+                    if (knownText != null && !was.equals(stateGet(knownText, id))
+                            && have.contains(id + "=" + stateGet(knownText, id))) {
+                        now = stateGet(knownText, id);
+                        action = "rollback";
+                    } else {
+                        action = "disable";
+                    }
+                    if (PluginTrust.L3.equals(eff)) {
+                        quarantined = quarantine(d, id, was);
+                    }
                 }
-                if (PluginTrust.L3.equals(eff)) {
-                    quarantined = quarantine(d, id, was);
-                }
+                if (now == null || !now.equals(was)) changed = true;
             }
             if (now != null) nextActive.append(id).append('=').append(now).append('\n');
             skip.append(id).append('\t').append(was == null ? "" : was).append('\t')
@@ -996,6 +1070,7 @@ final class Plugins {
             write(new File(d, LASTFAIL),
                     "== plugin skip (previous launch did not finish) ==\n"
                             + "time      = " + new java.util.Date() + "\n"
+                            + "crashed   = " + crashed + "\n"
                             + "guard     = " + oneLine(g) + "\n"
                             + "active    = " + oneLine(activeText) + "\n"
                             + "known     = " + oneLine(knownText) + "\n"
@@ -1007,8 +1082,11 @@ final class Plugins {
         }
         if (guard.isFile()) guard.delete();
         write(new File(d, ACTIVE), rolled);
-        write(new File(d, LASTSKIP), skip.toString());
+        // ★ 第 323 轮：**只有真的动了登记**（回滚 / 停用）才挂那条"上次带插件启动没成功"的横幅。
+        //   "没崩、只是没走完"那一类登记一个字都没改，横幅只会让用户以为自己又坏了。
+        if (changed) write(new File(d, LASTSKIP), skip.toString());
         write(new File(d, RETRY), retryText);
+        write(new File(d, KILLS), killsText);
         write(new File(d, INJECTED), "");
         // 🔴 给这一程留个"没注入过"的标记：markBootOk 看到它就不写 known（见 NOLATCH 的注释）
         write(new File(d, NOLATCH), oneLine(activeText) + "\n");
@@ -1016,14 +1094,16 @@ final class Plugins {
         write(new File(Data.hubDir(base), BOOT_REPORT),
                 "== plugin early inject ==\n"
                         + "time     = " + new java.util.Date() + "\n"
-                        + "SKIPPED: previous launch with plugins did not finish\n"
+                        + "SKIPPED: previous launch with plugins did not finish"
+                        + " (crashed=" + crashed + ", changed=" + changed + ")\n"
                         + "active was = " + oneLine(activeText) + "\n"
                         + "skip     = " + oneLine(skip.toString()) + "\n"
                         + "next     = " + oneLine(rolled) + "\n");
         write(new File(d, BOOT_REPORT),
                 "== plugin early inject ==\n"
                         + "time     = " + new java.util.Date() + "\n"
-                        + "SKIPPED: previous launch with plugins did not finish\n"
+                        + "SKIPPED: previous launch with plugins did not finish"
+                        + " (crashed=" + crashed + ", changed=" + changed + ")\n"
                         + "active was = " + oneLine(activeText) + "\n"
                         + "per plugin = " + oneLine(skip.toString()) + "\n"
                         + "-> " + (stateIds(rolled).isEmpty()
