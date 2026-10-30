@@ -25,8 +25,6 @@
     <string name="glossary_hint">槽里的东西都从「存档与备份」进去看。</string>
 
     <!-- 「?」那个字符本身不翻译（只有无障碍标签翻译） -->
-    <string name="glossary_mark" translatable="false">?</string>
     <string name="glossary_open">词表</string>
-
 
 </resources>

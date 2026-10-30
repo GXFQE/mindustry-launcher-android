@@ -22,7 +22,6 @@
     <string name="glossary_trash">Transfer station — deleted or replaced files move here first and can be put back (old ones are trimmed by policy).</string>
     <string name="glossary_bundle">Whole-slot export / import — pack a whole slot into one zip (for moving devices), or import one back into a slot.</string>
 
-    <string name="glossary_mark" translatable="false">?</string>
     <string name="glossary_open">Glossary</string>
 
     <string name="glossary_hint">Everything inside a slot lives under \"Saves and backups\".</string>

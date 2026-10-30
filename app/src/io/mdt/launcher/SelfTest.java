@@ -12318,13 +12318,14 @@ public final class SelfTest {
                     "★词表末尾那句「去哪儿看」真的拼进正文了（不是只写在资源里）");
             // ★ 第 328 轮：摘要行上那个**就地**「?」—— 少一个 `@+id` 就是"看不见但能点"的空洞，
             //   或者更糟：点它把整卡展开（冒泡到卡片根），两种都不报错。
+            // ★★ 第 333 轮：它从**文字**改成了**图标**（用户：「是那个 4 个版本那行」+「太高了」）——
+            //   判据跟着改：必须是 ImageView、带图（= 图形不会像字形那样只占上半行）、并且可点。
             try {
                 android.view.View m = inf.inflate(R.layout.activity_main, null);
                 android.view.View h = m.findViewById(R.id.status_help);
-                ok(stat, L, h != null && h.isClickable()
-                                && Trans.get(ctx, R.string.glossary_mark).contentEquals(
-                                        ((android.widget.TextView) h).getText()),
-                        "★摘要行上有**就地**的「?」（可点、字形是资源里那个 mark）");
+                ok(stat, L, h instanceof android.widget.ImageView && h.isClickable()
+                                && ((android.widget.ImageView) h).getDrawable() != null,
+                        "★摘要行上有**就地**的「?」图标（可点 + 带图；文字版会比重心偏高）");
             } catch (Throwable t) {
                 ok(stat, L, false, "摘要行「?」检查自身异常：" + t);
             }
