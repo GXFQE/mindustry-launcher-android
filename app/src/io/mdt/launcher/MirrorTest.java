@@ -20,7 +20,7 @@ import java.util.List;
  *
  * <p>★ 采样是**交错**的：第 1 轮把所有候选各测一次，再回来测第 2 轮 ——
  * 不是「把 A 测完两次再测 B」。顺序测量在抖动链路上量到的是「当时网络好不好」，
- * 不是「谁更快」。最后每个候选取中位。
+ * 不是「谁更快」。最后每个候选取平均（2 个样本的中位就是平均；本工程只跑 2 轮）。
  *
  * <p>★ 判据只有一条：**前两个字节是 `PK`**（APK 的 zip 头）。镜像返回 HTML
  * 错误页 / 健康页时状态码可能也是 200，光看状态码会把坏节点当成可用。
@@ -33,7 +33,7 @@ final class MirrorTest {
     static final int READ_MS = 2000;
     static final int DIRECT_READ_MS = 5000;
     static final int CONNECT_MS = 3000;
-    /** 交错轮数：2 轮取中位，抗单次尖峰。 */
+    /** 交错轮数：2 轮取平均（2 个样本的中位就是平均，没必要再写一套中位逻辑）。 */
     static final int ROUNDS = 2;
     /** 整轮测速的总预算；超了就用手上已有的样本出结果。 */
     static final long BUDGET_MS = 25000L;
@@ -51,7 +51,7 @@ final class MirrorTest {
         CANCELED
     }
 
-    /** 一个候选的聚合结果（多轮取中位）。 */
+    /** 一个候选的聚合结果（多轮取平均）。 */
     static final class Result {
         final String prefix;
         final Status status;
@@ -217,26 +217,28 @@ final class MirrorTest {
         }
     }
 
-    /** 多轮聚合：中位速度 / 中位耗时；没有可用样本时返回最后一次采样。 */
-    private static Result aggregate(String prefix, List<Result> samples) {
+    /**
+     * 多轮聚合：平均速度 / 平均耗时；没有可用样本时返回最后一次采样。
+     *
+     * <p>★ 只有 2 轮时，中位数（偶数个样本取中间两个的平均）就是平均，所以这里直接平均。
+     * 以前写成 `(n-1)/2` 取的是**较小那次**，不是中位 —— 用户 2026-10-30 当场指出。
+     */
+    static Result aggregate(String prefix, List<Result> samples) {
         List<Result> usable = new ArrayList<Result>();
         for (Result r : samples) {
             if (r.ok()) usable.add(r);
         }
         if (usable.isEmpty()) return samples.get(samples.size() - 1);
-        List<Long> speeds = new ArrayList<Long>();
-        List<Long> times = new ArrayList<Long>();
+        long speedSum = 0;
+        long msSum = 0;
         int bytes = 0;
         for (Result r : usable) {
-            speeds.add(Long.valueOf(r.speedBps));
-            times.add(Long.valueOf(r.ms));
+            speedSum += r.speedBps;
+            msSum += r.ms;
             bytes += r.bytes;
         }
-        Collections.sort(speeds);
-        Collections.sort(times);
-        long medianSpeed = speeds.get((speeds.size() - 1) / 2).longValue();
-        long medianMs = times.get((times.size() - 1) / 2).longValue();
-        return new Result(prefix, Status.OK, medianMs, bytes, medianSpeed, 0, null);
+        int n = usable.size();
+        return new Result(prefix, Status.OK, msSum / n, bytes, speedSum / n, 0, null);
     }
 
     /** 排序：能用的在前、按耗时升序；失败按 超时 → 短包 → HTTP → 网络。 */
