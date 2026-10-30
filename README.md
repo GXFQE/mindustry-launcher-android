@@ -68,12 +68,11 @@ yourself — even just a few lines — see **Translation file** below.
 - One row per launch entry: tap to launch; **Manage** opens the version page (slot / clone / details / rename / assets / delete), and long-pressing anywhere else on the row does the same
 - **To reorder**: long-press the icon at the left of a row and drag the row where you want it; the order is
   saved on release (rows you never moved, and newly imported versions, stay in their usual order at the end)
-- **One version can be bound to several slots**: open **Manage** on a row (or long-press it) → **Clone…** adds
-  another row that shares the same game files (no APK copy, no extra space) while saves / settings / mods live in
-  their own slots — for two save sets without duplicating ~75 MB. The same page has details, change-slot, name,
-  assets and delete; **delete** drops one launch entry while others exist, and deletes the whole version on the
-  last one (an imported package first moves to the transfer station, so you can put it back) — versions installed
-  on the system always keep one entry (uninstall those in the system)
+- **One version can be bound to several slots**: **Clone…** on its page adds a row that shares the same game
+  files (no APK copy), while saves / settings / mods live in their own slots
+- That page also has details, change-slot, name, assets and delete. Delete drops one entry at a time, and the
+  whole version only on the last one (an imported package first goes to the transfer station); a version
+  installed on the system keeps its last entry — uninstall it there
 - Details: source, size, checksum, raw version name, ABI, build number, save count
 - Version page → **Assets**: export the game package resources by type (sprites / sounds / music / maps / text / fonts and more); only the checked types go into the zip
 - Two versions sharing a slot get a warning that their saves will overwrite each other
