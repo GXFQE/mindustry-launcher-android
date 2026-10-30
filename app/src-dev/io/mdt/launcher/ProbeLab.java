@@ -132,8 +132,11 @@ final class ProbeLab {
                 copyFile(new File(patch), copy);
                 copy.setReadOnly();
                 java.util.List<String> notes = new java.util.ArrayList<String>();
+                long t0 = System.nanoTime();
                 int n = Reflect.injectDex(cl, copy, ctx.getCodeCacheDir(), true, notes);
-                sb.append("inject[").append(idx).append("] = ").append(n).append(" elements");
+                long ms = (System.nanoTime() - t0) / 1000000L;
+                sb.append("inject[").append(idx).append("] = ").append(n).append(" elements, ")
+                        .append(ms).append(" ms");
                 for (String s : notes) sb.append(" | ").append(s);
                 sb.append('\n');
                 idx++;
@@ -170,6 +173,15 @@ final class ProbeLab {
                 sb.append("Version.combined() = ").append(cb).append('\n');
             } catch (Throwable t) {
                 sb.append("Version.buildString() = FAIL ").append(t).append('\n');
+            }
+
+            // d8 产物校验：类不在宿主里，只可能在补丁 dex 里
+            try {
+                Class<?> pc = Class.forName("io.mdt.launcher.PatchProbe", false, cl);
+                Object pv = pc.getMethod("probe").invoke(null);
+                sb.append("PatchProbe.probe() = ").append(pv).append('\n');
+            } catch (Throwable t) {
+                sb.append("PatchProbe = FAIL ").append(t).append('\n');
             }
         } catch (Throwable t) {
             sb.append("patch lab = FAIL ").append(t).append('\n');
