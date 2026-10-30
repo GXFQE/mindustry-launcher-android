@@ -31,7 +31,7 @@ versions installed side by side, each with separate **saves / maps / blueprints 
 | How much ore a map holds and where you can build can only be counted inside the game | The map page reports **ore / wall ore / buildable tiles / core zone**, and can export it as JSON / JSONL |
 | A blueprint only reports its size and block count; which blocks are missing you find out by building it | The list names the **missing blocks** (and where it is unsure) |
 | Exporting the whole data set takes the settings and login identities with it (the game does not separate them) | The **shareable package** strips login identities, server records and everything only useful to you |
-| New features only arrive when the official build ships them | Plug-ins can add abilities to the manager (young: for now you install an APK by hand) |
+| New features only arrive when the official build ships them | Plug-ins add abilities: three ship built in, others install by hand |
 
 **How it works**: the official APK is loaded **as-is, as a plug-in** — no repacking, no
 re-signing, no change to the game's package name. The game's own signature checks, save format and
@@ -55,6 +55,9 @@ point the game at that directory when it starts.
    - assign it a **slot** (use a different slot per version and the saves will not overwrite each
      other);
    - tap that version to launch. **Continue** goes straight back to the version you launched last.
+
+Files from other apps come in too: opening a `.msav` / `.msch` / slot or mod zip from a file manager
+or a chat hands it to the manager — with more than one slot it asks where to import.
 
 The interface **follows your system language**: 简体中文 on a phone set to Chinese, English otherwise
 (English and Simplified Chinese are the only translations so far). **Settings → Language** (the gear at
@@ -85,6 +88,8 @@ yourself — even just a few lines — see **Translation file** below.
 - A slot is one complete set of data: saves / maps / blueprints / mods / settings
 - Create it from the row; rename / clone / delete live in the **⋮** menu
 - Cloning backs up the source first; a deleted slot takes its backups to the transfer station and can be put back
+- **Copy settings from another slot** (⋮ → Copy settings…): progress and identity keys are skipped, and
+  slots on different game versions are refused
 - Playtime (**official plug-in `usagestats`**): per-game-version breakdown on the slot page, total on
   the main summary card (game foreground time only; no plug-in, no line / card)
 
@@ -129,8 +134,8 @@ yourself — even just a few lines — see **Translation file** below.
 - **Three built in** (shipped with the app, no install needed, cannot be deleted, can be disabled): `mapstats` resource statistics, `mods-health` mod health, `usagestats` play time
 - Takes effect after a restart; the page offers **Restart the manager now**
 - One row each: name · state · origin · what happens if it crashes
-- Open its page, enable / disable, delete, read its info
-- Can add an entry row, a card or an action to almost every page (not the launch page or the plug-ins page)
+- Open its page, enable / disable, read its info; ones you installed can be deleted (built-in three cannot)
+- Can add an entry row, a card or an action to almost every page (the plug-ins page itself is the exception)
 - Can put its conclusions on rows and cards (severity-coloured), offer its own filter / sort entries, and supply the pass / fail checks in a mod's technical details
 - Can read slots and content, settings, logs, the transfer station and the version list, and open files
 - A crash does not take the manager down: retry / roll back / quarantine, and the page explains it
@@ -145,7 +150,7 @@ yourself — even just a few lines — see **Translation file** below.
 - Export logs unchanged, or scrubbed (paths / device / account details removed)
 - Runtime log page: manager log, game log and crash reports in sections
 - Crash analysis: names the mod with its evidence, and says so when it cannot tell
-- Theme, language, translation file, **screen orientation** (follow system / force landscape / force portrait)
+- Theme, language, translation file (import / remove / share), **screen orientation** (follow system / force landscape / force portrait)
 - **Check for updates**: the manager downloads and installs its own update; **Auto-check** picks
   what it accepts (off / stable only / stable and preview). Builds up to 0.7.0 have no updater, so
   that one step is still a manual install
