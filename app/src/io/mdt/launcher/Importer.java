@@ -18,7 +18,7 @@ import java.util.zip.ZipFile;
 /**
  * APK 导入（M1）。模块边界：依赖 Util/Config，被 UI 调用。
  *
- * 流程（每一步都是探针实测出的硬约束，见 MDT-Android-Dev README §1.6 / §六.7/8）：
+ * 流程（每一步都是探针实测出的硬约束，见 归档/MDT-Android-Dev README §1.6 / §六.7/8）：
  *   1. ContentResolver 流式拷贝 —— 全程不碰文件路径、不碰 SELinux 标签
  *      （SAF 的 content:// 是唯一不受 Android 14 「动态代码须内部+只读」限制影响的输入通道）；
  *   2. zip 合法性 + version.properties 读取；

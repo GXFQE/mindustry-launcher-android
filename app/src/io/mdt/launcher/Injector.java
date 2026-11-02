@@ -17,7 +17,7 @@ import java.util.zip.ZipFile;
 /**
  * 游戏加载管线（六步配方）—— M2 核心。
  *
- * ⚠️ **顺序是铁律**，每一步的"为什么"都来自探针实测（MDT-Android-Dev README §二）：
+ * ⚠️ **顺序是铁律**，每一步的"为什么"都来自探针实测（归档/MDT-Android-Dev README §二）：
  *
  *   ⓪ 预热（抛弃式 dex 加载）———— 跳过 = 用户导入的私有副本 100% 启动失败
  *   ① 注入游戏 dex 到**本进程** framework CL

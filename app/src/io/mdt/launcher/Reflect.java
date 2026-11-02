@@ -10,7 +10,7 @@ import java.lang.reflect.Method;
  * 非 SDK 接口访问（模块边界：最底层，与 Util 同级）。
  *
  * 本工程需要的反射只有这几处（探针已在 targetSdk 36 + debuggable=false 下全部实测放行，
- * 见 MDT-Android-Dev README §六.5）：
+ * 见 归档/MDT-Android-Dev README §六.5）：
  *   BaseDexClassLoader.pathList / DexPathList.dexElements   —— dex 注入
  *   AssetManager.addAssetPath                               —— 资产挂载
  *   arc.util.ArcNativesLoader.loaded                        —— 阻止重复加载（是 public static，普通字段访问）

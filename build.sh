@@ -3,7 +3,7 @@
 # MDT Android Launcher -- manual APK build (aapt2 + javac + d8 + zipalign + apksigner)
 #
 # No Gradle: pure-framework app, zero dependencies. 平移自探针工程
-# MDT-Android-Dev/build.sh（四个坑全在实测中踩过，详见注释）。
+# 归档/MDT-Android-Dev/build.sh（四个坑全在实测中踩过，详见注释）。
 #
 # *** VERIFIED PITFALLS ON THIS MACHINE (keep them, they cost real time) ***
 #

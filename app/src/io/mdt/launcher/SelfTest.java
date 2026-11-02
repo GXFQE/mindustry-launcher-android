@@ -8492,7 +8492,7 @@ public final class SelfTest {
      *   <li><b>认不出 ⇒ 中性色**不是**空格</b>（拿假表喂进去，要求颜色是 {@link MschPreview#UNKNOWN}）；</li>
      *   <li><b>负例</b>：null / 解不出来 / 没瓦片 / maxSide≤0 / 坐标炸出上限 ⇒ 一律 null，不崩、不留空框。</li>
      * </ol>
-     * ⚠️ 真语料那条**更硬的证据在 PC 侧**（`MDT-Android-Dev/_lab/msch/CheckGeom.java`，2026-10-06 实跑）：
+     * ⚠️ 真语料那条**更硬的证据在 PC 侧**（`归档/MDT-Android-Dev/_lab/msch/CheckGeom.java`，2026-10-06 实跑）：
      *   5369 份 `.msch` 里解得出来 5321 份；**「方块全认识」的 5009 份中 4911 份的包围盒
      *   与文件声明的宽高逐格相同**（对不上的 98 份全是自检/实验室造的夹具，或含**尺寸未知的
      *   模组方块**——后者本来就会算小，属预期）。自检这边不复现那个规模，只钉口径。

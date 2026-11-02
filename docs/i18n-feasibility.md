@@ -425,7 +425,7 @@ nl nl_BE pl pt_BR pt_PT ro ru sr sv th tk tr uk_UA vi zh_CN zh_TW`。
 ```
 
 障碍在于：**这些文案的产出地是"没有 Context 的静态层"**，这是刻意的设计
-（能在 PC 上用产品代码跑验收 —— PC 侧 lab 在**探针工程** `MDT-Android-Dev/_lab/msav/f21/`，
+（能在 PC 上用产品代码跑验收 —— PC 侧 lab 在**探针工程** `归档/MDT-Android-Dev/_lab/msav/f21/`，
 如 `NameAudit.java`，**不在本仓库里**）。⇒ 它们**拿不到 `Context` / `Resources`，不能 `getString()`**。
 
 | 无 Context 的产出地 | A+A′ 处数 | 备注 |
@@ -829,7 +829,7 @@ i18n 时**必须明确选一种**并统一 —— 否则同一个界面上会出
 | **P1-B 自检语言无关化** 🔜 **下一步** | 修 §7.3 实测的 **15 条红**（改成与资源同源 / 结构判据 + 补元断言）；给自检加 **zh/en 双跑** | 两套语言下自检都有意义 | **两遍都要求全绿**；并断言"两遍通过数不同 ⇒ 确实有事发生"（防某一遍真空跑） | 1~2 天 |
 | **P2 应用内语言切换** ✅ **已落地 2026-10-04** | `LocaleMode` + `Config.app_language` + 设置页一行（三项：跟随系统 / English / 简体中文）；`BaseActivity` **合成一次** Configuration 包装 + 快照扩到 (深浅色, 语言)；`SelfTest` 把自检语言**钉死**在 zh | 可切换 | 真机逐条走过 UI：选中即整页切换 / 杀进程重启仍生效 / **英文界面下自检仍 514-0** / 切回跟随系统回中文；`grep Locale.setDefault` 只命中注释 | 1 天（实际约 3 小时） |
 | **P3 硬编码迁资源** | ① **A 305 条 + A′ 40 条**进资源，并**重写成约 200 条整句 + `%1$s`**（§5.4）② `Mods`/`MsavMeta`/`SettingsBin`/`Cas`/`Versions` 改成"错误码 + 参数"（§5.3）③ **修掉 §5.2 那 4 处"中文当判据"**（换成枚举/布尔标志）④ 决定 `report()` 与 B 类那 268 处要不要翻 ⑤ `SelfTest` 的 14 条红 + 7 条变恒真一起改（§7.7 的做法 ②+⑤） | 完全可翻译 | 自检两遍（zh / en）**都全绿** + 新增"两份资源 key 集合相等""结构判据""禁止用中文串做判据"的元断言 | 5~8 天 |
-| **P4 内容译名跟上** | `BundleNames` / `MapStats` 的语言层文件名不再写死 `zh_CN`；从槽的 `settings.bin` 读 `locale`；`（墙）` 进资源 | 地图页跟着语言走 | PC 侧 `MDT-Android-Dev/_lab/msav/f21/NameAudit.java` 回归 + `SelfTest` 那 8 条 fixture 一起改名（§7.6）+ 真机中/英地图页对照 | 1 天 |
+| **P4 内容译名跟上** | `BundleNames` / `MapStats` 的语言层文件名不再写死 `zh_CN`；从槽的 `settings.bin` 读 `locale`；`（墙）` 进资源 | 地图页跟着语言走 | PC 侧 `归档/MDT-Android-Dev/_lab/msav/f21/NameAudit.java` 回归 + `SelfTest` 那 8 条 fixture 一起改名（§7.6）+ 真机中/英地图页对照 | 1 天 |
 | **P5 仓库/发布国际化** | 英文 `README.md`（中文挪 `README.zh-CN.md`）、`app_name` 英文、Release notes | 面向国际用户 | —— | 0.5 天 |
 
 **最小可用路径 = P0 + P1 + P2 ≈ 2.5~4 人天 + 翻译**。

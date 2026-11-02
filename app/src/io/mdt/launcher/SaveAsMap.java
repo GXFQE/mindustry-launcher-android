@@ -28,7 +28,7 @@ import java.util.zip.InflaterInputStream;
  *
  * ★ 纯 Java（**无 Android 依赖**）—— 与 {@link MsavMeta} / {@link SettingsBin} / {@link Hjson}
  *   同一条路子：能在 PC 上单独编译，并**拿游戏自己的类当对照组**逐项比对
- *   （对照与判据程序见探针工程 `MDT-Android-Dev/_lab/msav/save-as-map/`：`SaveAsMap.java`(同源) /
+ *   （对照与判据程序见探针工程 `归档/MDT-Android-Dev/_lab/msav/save-as-map/`：`SaveAsMap.java`(同源) /
  *   `LabCheck.java` / `RulesKeys.java`）。**产品里这份就是从那边的分析稿逐字搬过来的。**
  *
  * ── 改写口径（每一条都对着**游戏自己的源码**，别自由发挥；细则 REF §72.3） ──

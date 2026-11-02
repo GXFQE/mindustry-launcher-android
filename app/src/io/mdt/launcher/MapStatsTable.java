@@ -2,7 +2,7 @@ package io.mdt.launcher;
 
 /**
  * 自动生成的「方块内容定义表」（勿手改）。
- * 生成器：MDT-Android-Dev/_lab/msav/f21/GenTable.java
+ * 生成器：归档/MDT-Android-Dev/_lab/msav/f21/GenTable.java
  * 生成于 2026-10-17；原版 447 行；类默认值 153 行。
  * 列（name 之后 19 个，Tab 分隔）：isFloor isOverlay isOre isStatic synthetic solid wallOre
  *   itemDrop playerUnmineable speed damage liquidDrop attributes breakable destructible

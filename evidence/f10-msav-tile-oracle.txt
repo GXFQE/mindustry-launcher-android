@@ -16,4 +16,4 @@
 · 66.msav-backup.msav：v13 200x200（区域 #3，方块名 446 条）瓦片 40000 ✔ 逐格完全一致
 
 合计：完全一致 13 ；不一致 0 ；异常 0
-程序：MDT-Android-Dev\_lab\msav\OracleTiles2.java（配 OracleDiag.java 做内容表诊断）
+程序：归档/MDT-Android-Dev\_lab\msav\OracleTiles2.java（配 OracleDiag.java 做内容表诊断）

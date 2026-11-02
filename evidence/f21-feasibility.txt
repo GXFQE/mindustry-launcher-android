@@ -139,7 +139,7 @@ VE 实测（vanilla-expansion2119.zip，129 个环境 JSON）：
 5. 补丁区与模组表的**叠加顺序**（游戏里 patches 相对 content 的先后）需要真机对照一次。
 
 --------------------------------------------------------------------------------
-十、怎么复现（全部在 MDT-Android-Dev/_lab/msav/）
+十、怎么复现（全部在 归档/MDT-Android-Dev/_lab/msav/）
 --------------------------------------------------------------------------------
 # 1) 导出基础表（18 列）
 javac -encoding UTF-8 -cp "<Mindustry.jar>" -d out ContentTable2.java

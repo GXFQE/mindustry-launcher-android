@@ -2,7 +2,7 @@
 <!--
   MDT Android 启动器 —— 正式产品工程。
 
-  架构判定与全部机制证据在探针工程 MDT-Android-Dev（README §一~§三），本工程
+  架构判定与全部机制证据在探针工程 归档/MDT-Android-Dev（README §一~§三），本工程
   只做产品化，不复现实验。清单形态直接沿用探针已验证的「known good」形状：
 
     - :game 子进程承载 GameSlot（坑位）+ 官方 AndroidLauncher
