@@ -20,9 +20,11 @@ DEBUGGABLE=true ./build.sh   # 调试形态（反射已验证不需要它，只�
 ```
 
 > `build.sh` 每次构建会把上一轮 `build/` **归档改名**到 `.build-trash/<时间戳>/`
-> （脚本刻意不 `rm -rf`：一次性删除大量文件在部分环境下会被整条拦掉，所以只做改名归档）。
-> 攒太多时 `clean-trash` 要跑好几轮 —— 更省事的是整个 mv 出去：
-> `mv .build-trash "/d/某处/.build-trash-$(date +%s)"`。
+> （脚本刻意不 `rm -rf` 整棵构建树：一次性删除大量文件在部分环境下会被整条拦掉，所以只做改名归档）。
+> **归档会自动修剪**：只保留最近 `KEEP_TRASH` 份（默认 20），更早的整份删掉 ——
+> 不修剪它会一直涨（2026-11-02 实测攒到 1,781 份 / 9.0 GB / 109 万文件，实际占盘 11.5 GB）。
+> 想再少就 `KEEP_TRASH=3 ./build.sh`，或跑 `./build.sh clean-trash`（每次最多 45 个，可重复跑），
+> 或整个 mv 出去：`mv .build-trash "/d/某处/.build-trash-$(date +%s)"`。
 
 依赖：**Android SDK**（由 `ANDROID_HOME` 指定，需 build-tools 36.0.0 + platforms/android-36）、
 JDK 8、`python`（打包 + clean-trash 用；PATH 里那个 WindowsApps 的 `python.exe` 是空壳，build.sh 会自己筛掉，也可用 `PYTHON=` 指定）。四个常见坑（MSYS 路径、cygpath 锁定、

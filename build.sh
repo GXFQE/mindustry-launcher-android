@@ -233,11 +233,29 @@ fi
 
 
 # ⚠️ 归档改名而不是 rm -rf（一次删太多会被环境拦掉）。
-#    .build-trash/ 攒着不大，但记得偶尔整个删掉。
+#    但**只进不出会一直涨**：2026-11-02 实测攒到 1,781 份 / 9.0 GB / 109 万文件
+#    （实际占盘 11.5 GB），把 git / 资源管理器 / 杀毒 / 索引全拖慢。
+#    ⇒ 每次构建顺带剪一次，只留最近 KEEP_TRASH 份（默认 20）。
+#    目录名 = epoch 秒（等长 10 位 ⇒ 字典序 == 时间序）；非时间戳文件（探针产物）不碰。
 if [ -d "$OUT" ]; then
   TRASH="$ROOT/.build-trash/$(date +%s)"
   mkdir -p "$(dirname "$TRASH")" 2>/dev/null || true
   mv "$OUT" "$TRASH" 2>/dev/null || rm -rf "$OUT"
+fi
+
+KEEP_TRASH="${KEEP_TRASH:-20}"
+if [ -d "$ROOT/.build-trash" ]; then
+  OLD_TRASH="$(ls -1 "$ROOT/.build-trash" 2>/dev/null | grep -E '^[0-9]{10}$' | sort \
+    | awk -v k="$KEEP_TRASH" '{ a[NR] = $0 } END { for (i = 1; i <= NR - k; i++) print a[i] }')" || true
+  if [ -n "$OLD_TRASH" ]; then
+    PRUNED=0
+    while IFS= read -r d; do
+      [ -n "$d" ] || continue
+      # 变量都带上 "?": 空值就别删（set -u 之外再兜一层）
+      if rm -rf "${ROOT:?}/.build-trash/${d:?}" 2>/dev/null; then PRUNED=$((PRUNED + 1)); fi
+    done <<< "$OLD_TRASH"
+    echo "  trash: pruned $PRUNED old archive(s), KEEP_TRASH=$KEEP_TRASH"
+  fi
 fi
 mkdir -p "$OUT/classes" "$OUT/dex" "$OUT/gen"
 
