@@ -8,7 +8,7 @@
 它本来是开着的**」——槽级事件的副产品；真正发生的事是 `mod-<名字>-enabled` 被写成 **false**
 （模组被关掉），用户得重新启用。
 
-■ 证据 ①（源码）`素材\Mindustry本体\Mindustry-master.zip` → core/src/mindustry/Vars.java
+■ 证据 ①（源码）`素材\01-游戏本体\Mindustry\源码\Mindustry-master.zip` → core/src/mindustry/Vars.java
     public static void checkLaunch(){                        // 启动最早调用
         launchIDFile = settings.getDataDirectory().child("launchid.dat");
         if(launchIDFile.exists()) failedToLaunch = true;     // 上次没删掉 ⇒ 上次没跑完

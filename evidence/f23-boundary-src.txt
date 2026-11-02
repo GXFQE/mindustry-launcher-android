@@ -4,7 +4,7 @@ F23 收尾批（2026-10-08，第七批）—— 三条尾巴的定案证据
 设备：HONOR ELP-AN00 / Android 16 (API 36)
 产物：本地构建的 **dev 变体**（`DEBUGGABLE=true SUFFIX=-dev`），自检 1022 通过 / 0 失败
 实验槽：新建的 `datalab2`（**不碰用户槽**；收尾已删、配置与槽指针已还原 —— 见 §4）
-源码：`Mindustry-master.zip`（`素材/Mindustry本体/`）、`Arc-159.7.zip`（`素材/Arc/`）
+源码：`Mindustry-master.zip`（`素材/01-游戏本体/Mindustry/源码/`）、`Arc-159.7.zip`（`素材/05-其他加载器/Arc/`）
 
 本文件回答三件事：
   ① 行星 / 渲染 / 环境类崩溃 —— 要不要做归因？

@@ -242,7 +242,7 @@ public class Boom extends Mod {
 
 ```powershell
 $lab   = "<仓库>/.tmp-artlab/mod"
-$game  = "<素材>\Mindustry本体\Mindustry-160.4.jar"   # 只为 mindustry.mod.Mod / arc.util.Log
+$game  = "<素材>\01-游戏本体\Mindustry\桌面版\Mindustry-160.4.jar"   # 只为 mindustry.mod.Mod / arc.util.Log
 $sdk   = "D:\AndroidSDK"
 # ① 编译期假类（带一个游戏真类里**没有**的字段）——它**不进 dex**
 javac --release 8 -d "$lab/out/stubs" "$lab/stubs/mindustry/core/GameState.java"

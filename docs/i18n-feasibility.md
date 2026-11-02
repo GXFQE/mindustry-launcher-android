@@ -1048,9 +1048,9 @@ aapt2 dump resources out.apk    # 同一 resource id 下的多份 config
 aapt2 link ... --java gen ...   # 只会打印一行 warn，rc=0，R.java 里没有该 id
 
 # 3) 游戏侧语言链路（源码级定案）
-python -c "import zipfile;z=zipfile.ZipFile(r'素材/Mindustry本体/Mindustry-master.zip');\
+python -c "import zipfile;z=zipfile.ZipFile(r'素材/01-游戏本体/Mindustry/源码/Mindustry-master.zip');\
 print(z.read('Mindustry-master/core/src/mindustry/Vars.java').decode())" | sed -n '500,560p'
-python -c "import zipfile;z=zipfile.ZipFile(r'素材/Mindustry本体/[Android][v160]Mindustry.apk');\
+python -c "import zipfile;z=zipfile.ZipFile(r'素材/01-游戏本体/Mindustry/安卓版/[Android][v160]Mindustry.apk');\
 print('\n'.join(n for n in z.namelist() if n.startswith('assets/bundles/')))"
 ```
 
