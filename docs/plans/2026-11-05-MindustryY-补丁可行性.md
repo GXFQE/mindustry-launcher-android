@@ -120,3 +120,52 @@ AndroidSharedHostClient.install(this);
 - 证据：`evidence/round344-mindustryy-patch/`；产物在 `C:\mdt-build\artifacts\`。
 - **加测**：共享战役**创建 + 战略层可用**（建出「好友战役」、邀请码、塞普罗战略地图），
   不依赖 `:sharedhost`；「发射」点了无可见反应，权威 Sector 动作 / 本机托管边界仍未钉死。
+
+## 第二进程：有没有办法解决？（2026-11-05 讨论，暂不做）
+
+约束：**清单组件只能来自已安装的启动器 APK**；运行时补丁加不了。
+启动器已经在清单里预声明 `:game` 的 `mindustry.android.AndroidLauncher`，同一招可以预声明
+`:sharedhost` 的 Service。完整的 host 方案要三件一起：
+
+1. 启动器清单加 Service；
+2. `:sharedhost` 进程 bootstrap（注入补丁 dex + 挂 assets + 加载 native + 传 slot/APK 描述）；
+3. 补丁里带 fork 的 `android/**` 类，并让 `:game` 执行 `AndroidSharedHostClient.install(this)`
+   （现在补丁用官方 `AndroidLauncher`，**这一行没有**，所以就算 Service 存在也不会去 bind）。
+
+### 路线 A：同进程绕过（最快，半天内可验）
+
+`:game` 初始化前设 `mindustry.runtime.androidHostDaemon=true`，并跳过 `install`，
+让 `SharedCampaignService` 回到默认 `jvmProcess()`。守卫能过，但把权威世界 tick / GC 放回 GL 进程，
+违背 fork 的显式设计；只适合“先看看能不能玩”。
+
+### 路线 B：定制启动器 + 预声明 fork 的 Service（单 fork，1–3 天）
+
+- 清单加
+  `<service android:name="mindustry.android.shared.AndroidSharedCampaignHostService"
+  android:process=":sharedhost" android:exported="false" android:stopWithTask="false" />`；
+- `LauncherApp` 按进程名分流：`:sharedhost` 读 `:game` 写下的描述文件（apk / patchDex / assets / slot），
+  `Reflect.injectDex` 注入游戏 dex + 补丁 dex，`addAssetPath` 挂 assets，`System.load` 加载
+  `libarc.so` / `libarc-freetype.so`，再让系统实例化 Service；
+- 补丁 dex 补 fork 的 `android/src` 8 个类 + 改过的 `AndroidLauncher`（桌面 jar 没有这些，
+  可用 `javac` 对 `android.jar` 编译再 d8）；
+- 测试：`adb logcat | grep :sharedhost`，确认 headless `Vars` 初始化，再点「发射」。
+- 代价：清单绑死 fork 类名，换 fork/版本要重新构建启动器。
+
+### 路线 C：通用 `PatchHostService`（产品化，1–2 周）
+
+启动器声明自己的 `io.mdt.launcher.PatchHostService`（`:sharedhost`），补丁元数据给 `hostClass`；
+Service 负责 bootstrap 后反射实例化 fork 的 Service 并转发生命周期；补丁里把
+`AndroidSharedHostClient` 改成 bind 到通用 Service，并带 `apk/slot/patchId` extras。
+可复用于其它 fork，但要设计进程生命周期 / Binder 死亡 / 版本匹配。
+
+### 路线 D：独立 helper APK（不推荐）
+
+把 host 部分单独装一个 App；清单问题解决，但跨 UID 读不到启动器内部 APK/存档，
+签名/导出/资源复制都比 B/C 脏。
+
+### 建议
+
+先试 A（半天）判断同进程是否可接受；要可靠托管再做 B；只有准备长期维护多个 fork 才做 C。
+这个 fork 已停维护，当前**不做**；GPL-3.0 允许改代码重编译，真要修可以顺手把 R8 的 record 问题、
+版本号、Android 类一起处理。
+
