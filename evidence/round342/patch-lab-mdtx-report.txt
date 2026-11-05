@@ -1,0 +1,11 @@
+== patch lab (:game) ==
+pid = 20320
+patch[0] = /sdcard/Android/data/io.mdt.launcher/hub/asset-lab/mdtx-loader.dex
+inject[0] = 3 elements, 19 ms | makeDexElements(4 args) -> 1 elements, suppressed=0
+target = mindustry.Vars, marker = false
+target = mindustry.game.Objectives, marker = false
+target = mindustry.core.Version, marker = false
+Version.buildString() = 0
+Version.combined() = unknown build 0
+MindustryX custom-dev
+PatchProbe = FAIL java.lang.ClassNotFoundException: io.mdt.launcher.PatchProbe

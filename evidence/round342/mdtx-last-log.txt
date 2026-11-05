@@ -1,0 +1,13 @@
+[I] [GL] Version: GLES 3.2.0 / Qualcomm / Adreno (TM) 735 / OpenGL ES 3.2 V@0762.46 (GIT@6275e17561, If3c5f88bad, 1769153819) (Date:01/23/26)
+[I] [GL] Max texture size: 16384
+[I] [GL] Using OpenGL 3 API.
+[I] [JAVA] Version: 0
+[I] [ANDROID] API level: 36
+[I] [RAM] Available: 536.9 MB
+[I] [MindustryX] Hooks.beforeInit
+[I] MDTX: bundle has been loaded.
+[I] [Mindustry] Version: 160.7
+[I] [MindustryX] Hooks.init
+[I] [MetricCollector] Skip posting metrics.
+[I] Total time to load: 5186ms
+[I] Fetched 272 community servers.

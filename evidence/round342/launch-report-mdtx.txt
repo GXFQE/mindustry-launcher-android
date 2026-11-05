@@ -1,0 +1,32 @@
+=== 启动管线 Thu Nov 05 15:55:24 GMT+08:00 2026 ===
+目标   = /data/user/0/io.mdt.launcher/app_hub/import/v1607.apk
+大小   = 78237736 B
+进程 pid = 20320
+预热成功（第 1 次）
+dexElements 合并后 = 2
+base CL 已能看到 mindustry.android.AndroidLauncher
+选用 ABI = arm64-v8a
+System.load(libarc.so) OK  753520 B
+System.load(libarc-freetype.so) OK  471592 B
+ArcNativesLoader.loaded = true
+SharedLibraryLoader.isLoaded(arc) = true
+SharedLibraryLoader.isLoaded(arc-freetype) = true
+资产链 = v1607.apk mdtx-assets-diff.zip 
+两份 AssetManager 同源 = false
+  addAssetPath(app)  v1607.apk cookie=10
+  addAssetPath(act)  v1607.apk cookie=10
+  addAssetPath(app)  mdtx-assets-diff.zip cookie=11
+  addAssetPath(act)  mdtx-assets-diff.zip cookie=11
+  probe(app) = ok(336B)
+  probe(act) = ok(336B)
+已从 base CL 解析到 mindustry.android.AndroidLauncher
+startActivity 已返回，坑位 finish
+
+--- 前置段耗时 ---
+prewarm          3 ms
+dexInject        2 ms
+nativeLoad       8 ms
+nativeFlag       0 ms
+assetMount       1 ms
+startActivity    15 ms
+合计              29 ms
