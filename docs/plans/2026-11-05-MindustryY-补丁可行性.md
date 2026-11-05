@@ -3,8 +3,9 @@
 > 结论先说：**类 + 素材这一半能；它的核心功能（Shared Campaign 本机托管）不能**，
 > 因为那条路依赖一个**新的 Android Service + 独立进程**，而补丁机制只做
 > `prepend dex` + `AssetManager.addAssetPath`，改不了安装包的清单 / 组件 / 第二进程。
-> 若只做「客户端形态」（进游戏、单机、连别人的 Shared Campaign），理论上可行，
-> 但需要自己构建 fork APK 再做差分——项目没有 release、没有 loader jar、没有 CI 产物。
+> 若只做「客户端形态」（进游戏、单机、连别人的 Shared Campaign），**2026-11-05 深夜已实测跑通**：
+> 官方 v160.4 基座（自建）+ 桌面 jar 全量类覆盖 + 素材差量，能进 fork 主菜单；本机托管仍不可用（见文末实测）。
+> 项目没有 release / loader jar / CI 产物，但用户提供的桌面 jar 可以绕过 Gradle/R8 直接当类源。
 
 ## 这个项目是什么
 
@@ -92,7 +93,7 @@ AndroidSharedHostClient.install(this);
 
 | 目标 | 结论 |
 |---|---|
-| 原版 160.4 + 补丁 = MindustryY 的**界面 / 单机 / 客户端** | **理论可行**（类 + 两个 bundle；需构建 fork APK 与官方 160.4 基座，未实测） |
+| 原版 160.4 + 补丁 = MindustryY 的**界面 / 单机 / 客户端** | **已实测跑通**（第 344 轮：自建官方 160.4 + 全量类覆盖 + 素材差量；见文末） |
 | 原版 + 补丁 = **完整 Shared Campaign（本机托管）** | **现机制不行**：缺 `:sharedhost` 清单组件与第二进程注入；硬绕同进程违背 fork 的显式守卫 |
 | 作为一个普通完整 APK 导入启动器 | 可行（前提是构建出 APK；启动器本来就支持整包），只是没有"补丁省体积"的意义 |
 
@@ -101,3 +102,19 @@ AndroidSharedHostClient.install(this);
 - MDTX 提供**官方 per-version loader jar**（本身就是按版本做的类差分），且功能全在 dex + assets 里；
 - MindustryY 是**源码 fork**：没有 loader、没有 release、必须自己构建 + 差分；
 - 更关键：它把核心功能做进了 **Android 组件/进程模型**，这不在补丁的能力范围内。
+
+## 2026-11-05 深夜实测（第 344 轮）
+
+- **官方 160.4 APK 已自建**：上游源码逐文件重建 + 上游 Arc `68a04fab6e`，AGP 8.2.2 + Gradle 9.3.1 + JDK 17，
+  R8 开启；产物 `8-official-160.4` / 80,492,750 B。两个构建夹具：
+  `core/assets/version.properties` 种子、`merged_java_res/debug/base.jar` 补空 jar。
+- **补丁已跑通**：桌面 jar 的 **全量 `mindustry/**` + `arc/**`**（4211 class → 8.5 MB dex）+
+  素材差量（29 新增 / 86 改，4.7 MB），在官方 160.4 上进入 fork 主菜单
+  （`custom build` + 「共享战役」），无 FATAL。
+- **最小差量不可行**：fork 桌面 jar 与官方 APK 的 synthetic lambda 编号撞车
+  （`UI$$ExternalSyntheticLambda7` 构造签名不同），只覆盖改动类会 `NoSuchMethodError`；
+  全量覆盖后还需要补 `arc.Events$EventBus`（ArcY 新增）⇒ `arc/**` 也全量。
+- **本机托管仍不可用**：桌面 jar 没有 `android/**`（`AndroidSharedCampaignHostService` /
+  `AndroidLauncher` 的 install 行），补丁仍缺 `:sharedhost` 清单组件与第二进程注入。
+  当前只能做客户端形态。
+- 证据：`evidence/round344-mindustryy-patch/`；产物在 `C:\mdt-build\artifacts\`。

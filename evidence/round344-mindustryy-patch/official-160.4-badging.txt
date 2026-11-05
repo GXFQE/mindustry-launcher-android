@@ -1,0 +1,1 @@
+﻿package: name='io.anuke.mindustry' versionCode='1' versionName='8-official-160.4' platformBuildVersionName='16' platformBuildVersionCode='36' compileSdkVersion='36' compileSdkVersionCodename='16'
