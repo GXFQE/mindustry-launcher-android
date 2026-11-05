@@ -58,3 +58,16 @@
 - fork APK 本身（Gradle + R8）仍构建失败：R8 8.2/8.9/8.13 都报
   `Cannot ensure java.lang.Record as a synthetic program class`；官方 160.4 没有 record，R8 正常。
   这也是本轮改走「桌面 jar 全量覆盖」的原因。
+
+## 加测：共享战役实际比预期能走（2026-11-05 22:24）
+
+- 点「共享战役」→ 对话框（创建战役 / 打开本地战役 / 邀请码加入 / 导入主机迁移 / 恢复备份）。
+- 点「创建战役」→ 表单（名称、房主名、星球、策略、端口 6567…）→ 底部「创建战役」。
+- 结果：**真的创建出「好友战役」**（1 名成员，0/2 实时行动，serpulo），弹出邀请码并复制，
+  进入管理页（战略 / 成员 / 设置 / 复制邀请码 / 迁移主机 / 关闭战役）；无 FATAL。
+- 点「战略」→ 塞普罗战略地图 + 扇区「零号地区」，底部「战略行动：发射 / 区块详情」。
+- 「发射」点了没可见反应（界面不变、日志无异常）；可能是 GL 坐标没点中（本机 UI 是 GL 画的，
+  uiautomator 抓不到），也可能是动作被静默拒绝——**实时行动这一步还没钉死**。
+- 落盘：`slot-patchlab/shared-campaigns/<uuid>/`（journal / credentials / actions / campaign.mycp）。
+- 结论修正：共享战役的**创建 + 战略层**不依赖 `:sharedhost`，能跑；真正的权威 Sector 动作
+  （`InProcessSectorRuntime.start()` 的守卫）才是边界。

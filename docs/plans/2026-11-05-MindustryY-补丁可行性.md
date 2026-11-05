@@ -118,3 +118,5 @@ AndroidSharedHostClient.install(this);
   `AndroidLauncher` 的 install 行），补丁仍缺 `:sharedhost` 清单组件与第二进程注入。
   当前只能做客户端形态。
 - 证据：`evidence/round344-mindustryy-patch/`；产物在 `C:\mdt-build\artifacts\`。
+- **加测**：共享战役**创建 + 战略层可用**（建出「好友战役」、邀请码、塞普罗战略地图），
+  不依赖 `:sharedhost`；「发射」点了无可见反应，权威 Sector 动作 / 本机托管边界仍未钉死。
