@@ -1,11 +1,15 @@
 package io.mdt.launcher;
 
 import android.content.Context;
+import android.content.res.AssetManager;
 import android.util.Log;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipFile;
 
 /**
  * `:game` 进程里的**验证台**（dev 专用，产品版是空壳 {@code app/src-release}）。
@@ -32,6 +36,185 @@ final class ProbeLab {
         if (armed.isFile()) runProbeLab(ctx, armed);
         File patchArmed = new File(Data.hubDir(ctx), "patch-lab.txt");
         if (patchArmed.isFile()) runPatchLab(ctx, patchArmed);
+        if (sAssetLab) runAssetLab(ctx);
+    }
+
+    // ── 素材（资源补丁）实验 · 2026-11-05 ────────────────────────────────
+
+    private static boolean sAssetLab;
+    private static File sAssetLabApk;
+    private static final java.util.List<File> sAssetLabFiles = new java.util.ArrayList<File>();
+    private static final StringBuilder sAssetLabNotes = new StringBuilder();
+
+    /** 资源实验要看的键（文本 + 二进制各一个；`patch-lab-root/` 是不带 `assets/` 前缀的对照组）。 */
+    private static final String[] ASSET_KEYS = {
+            "version.properties", "patch-lab/hello.txt", "patch-lab/from-apk.txt",
+            "patch-lab/stored.txt", "patch-lab-root/hello.txt", "cursors/cursor.png"
+    };
+
+    /**
+     * 素材实验的**装填**阶段：在 {@code Injector.launch} 之前把增量资产包塞进 plan。
+     *
+     * <p>为什么必须早于 launch：{@code addAssetPath} 只对**之后**创建 / 之后补挂的
+     * AssetManager 生效（游戏那个 activity 的链由 {@code LauncherApp.preCreated} 再挂一遍）；
+     * 等 {@link #runIfArmed} 再挂就晚了 —— 那时游戏 activity 已经带着旧链建好了。
+     *
+     * <p>触发文件：{@code hub/asset-lab.txt}，一行一个 zip / APK 路径（`#` 开头当注释）。
+     * 读一次即删；报告写 {@code hub/report-asset-lab.txt}。
+     */
+    static void decorate(Context ctx, Injector.Plan plan) {
+        // 每次都清一遍：:game 进程被复用时（同一进程连拉两次 GameSlot）不会拿上一轮的数据重写报告
+        sAssetLab = false;
+        sAssetLabApk = null;
+        sAssetLabFiles.clear();
+        sAssetLabNotes.setLength(0);
+        try {
+            File armed = new File(Data.hubDir(ctx), "asset-lab.txt");
+            if (!armed.isFile()) return;
+            String text = readText(armed);
+            armed.delete();
+            sAssetLab = true;
+            sAssetLabApk = plan.apk;
+            for (String line : text.split("\\r?\\n")) {
+                String p = line.trim();
+                if (p.isEmpty() || p.startsWith("#")) continue;
+                File f = new File(p);
+                if (f.isFile()) {
+                    plan.assetDeltas.add(f);
+                    sAssetLabFiles.add(f);
+                } else {
+                    sAssetLabNotes.append("missing = ").append(p).append('\n');
+                }
+            }
+        } catch (Throwable t) {
+            sAssetLab = true;
+            sAssetLabNotes.append("decorate FAILED: ").append(t).append('\n');
+        }
+    }
+
+    /**
+     * 素材实验的**读数**阶段（launch 之后）：直接问 AssetManager 要那几个键，
+     * 对照游戏 APK 里的原值，看「增量包是否覆盖同名 / 新文件是否可见 / 布局要求」。
+     *
+     * <p>⚠️ 这里量的是 AM 层；「游戏是否真的按它读」还要看主菜单版本号那条端到端判据
+     * （被覆盖的 {@code version.properties} 会让主菜单那行变掉）。
+     */
+    private static void runAssetLab(Context ctx) {
+        StringBuilder sb = new StringBuilder("== asset lab (:game) ==\n");
+        sb.append("pid = ").append(android.os.Process.myPid()).append('\n');
+        sb.append("apk = ").append(sAssetLabApk == null ? "(null)" : sAssetLabApk.getAbsolutePath()).append('\n');
+        sb.append(sAssetLabNotes);
+
+        AssetManager amAct = ctx.getAssets();
+        AssetManager amApp = ctx.getApplicationContext().getAssets();
+        sb.append("amAct == amApp = ").append(amAct == amApp).append('\n');
+
+        sb.append("deltas (").append(sAssetLabFiles.size()).append("):\n");
+        for (File f : sAssetLabFiles) {
+            sb.append("  ").append(f.getName()).append(' ').append(f.length()).append(" B\n");
+        }
+
+        sb.append("baseline (game apk zip):\n");
+        sb.append("  ").append(zipProbe(sAssetLabApk, "assets/version.properties")).append('\n');
+        sb.append("  ").append(zipProbe(sAssetLabApk, "assets/patch-lab/hello.txt")).append('\n');
+
+        sb.append("served (activity AM):\n");
+        for (String key : ASSET_KEYS) sb.append("  ").append(serveProbe(amAct, key)).append('\n');
+        sb.append("served (application AM):\n");
+        for (String key : ASSET_KEYS) sb.append("  ").append(serveProbe(amApp, key)).append('\n');
+
+        // openFd 只对 zip 里**不压缩**的条目有效；补丁包如果要被 Fi.length()/map() 用到就得存成 stored
+        sb.append("openFd(activity AM):\n");
+        sb.append("  ").append(fdProbe(amAct, "version.properties")).append('\n');
+        sb.append("  ").append(fdProbe(amAct, "patch-lab/stored.txt")).append('\n');
+
+        try {
+            sb.append("list(\"\") = ")
+                    .append(java.util.Arrays.toString(amAct.list(""))).append('\n');
+        } catch (Throwable t) {
+            sb.append("list(\"\") = FAIL ").append(t).append('\n');
+        }
+        writeText(new File(Data.hubDir(ctx), "report-asset-lab.txt"), sb.toString());
+    }
+
+    /** 通过 AssetManager 读一个键（游戏读内部资产的同一条路），返回 `key = 长度 B [首行]`。 */
+    private static String serveProbe(AssetManager am, String key) {
+        if (am == null) return key + " = no-am";
+        InputStream in = null;
+        try {
+            in = am.open(key);
+            byte[] buf = new byte[8192];
+            int n = 0, r;
+            while (n < buf.length && (r = in.read(buf, n, buf.length - n)) > 0) n += r;
+            return key + " = " + n + " B" + snippet(buf, n);
+        } catch (Throwable t) {
+            return key + " = MISSING / " + t.getClass().getSimpleName();
+        } finally {
+            try {
+                if (in != null) in.close();
+            } catch (Throwable ignored) {
+            }
+        }
+    }
+
+    /** 直接按 zip 条目读游戏 APK 里的原值（对照组，不经 AssetManager）。 */
+    private static String zipProbe(File apk, String entry) {
+        if (apk == null || !apk.isFile()) return entry + " = (no apk)";
+        ZipFile z = null;
+        try {
+            z = new ZipFile(apk);
+            ZipEntry e = z.getEntry(entry);
+            if (e == null) return entry + " = ABSENT";
+            InputStream in = z.getInputStream(e);
+            byte[] buf = new byte[8192];
+            int n = 0, r;
+            try {
+                while (n < buf.length && (r = in.read(buf, n, buf.length - n)) > 0) n += r;
+            } finally {
+                in.close();
+            }
+            return entry + " = " + n + " B" + snippet(buf, n);
+        } catch (Throwable t) {
+            return entry + " = FAIL " + t;
+        } finally {
+            try {
+                if (z != null) z.close();
+            } catch (Throwable ignored) {
+            }
+        }
+    }
+
+    /**
+     * `openFd` 探测：只有 zip 里**不压缩**（stored）的条目才能拿到 fd。
+     * 补丁包如果要被 `Fi.length()` / `Fi.map()` 用到（素材加载里少数路径），就必须存成 stored。
+     */
+    private static String fdProbe(AssetManager am, String key) {
+        if (am == null) return key + " = no-am";
+        android.content.res.AssetFileDescriptor fd = null;
+        try {
+            fd = am.openFd(key);
+            return key + " = OK length=" + fd.getLength() + " declared=" + fd.getDeclaredLength();
+        } catch (Throwable t) {
+            return key + " = FAIL / " + t.getClass().getSimpleName();
+        } finally {
+            try {
+                if (fd != null) fd.close();
+            } catch (Throwable ignored) {
+            }
+        }
+    }
+
+    /** 文本给首行（去 CR、按 `|` 拼行）；二进制或非文本只给长度，别把 png 打进报告。 */
+    private static String snippet(byte[] buf, int n) {
+        for (int i = 0; i < n; i++) {
+            int c = buf[i] & 0xff;
+            if (c < 0x20 && c != '\n' && c != '\r' && c != '\t') return "";
+        }
+        String s = new String(buf, 0, n, java.nio.charset.Charset.forName("UTF-8"));
+        s = s.replace("\r", "").trim();
+        if (s.isEmpty()) return "";
+        if (s.length() > 240) s = s.substring(0, 240) + "…";
+        return " [" + s.replace("\n", " | ") + "]";
     }
 
     /** 原探针验证台（①②③）。 */

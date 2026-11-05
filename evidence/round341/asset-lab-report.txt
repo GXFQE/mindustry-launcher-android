@@ -1,0 +1,31 @@
+== asset lab (:game) ==
+pid = 13980
+apk = /data/user/0/io.mdt.launcher/app_hub/import/v160.apk
+amAct == amApp = false
+deltas (5):
+  assets-lab.zip 411 B
+  assets-root.zip 166 B
+  assets-lab.apk 756 B
+  assets-bundle.zip 117590 B
+  assets-lab2.zip 269 B
+baseline (game apk zip):
+  assets/version.properties = 161 B [#Thu Sep 10 21:11:10 EDT 2026 | number=8 | build=160 | modifier=release | androidBuildCode=30567 | buildDate=September 10, 2026 21\:11 PM | type=official | commitHash=unknown]
+  assets/patch-lab/hello.txt = ABSENT
+served (activity AM):
+  version.properties = 121 B [type=official | number=8 | build=160 | modifier=release | commitHash=assetlab2 | buildDate=November 5, 2026 | androidBuildCode=30567]
+  patch-lab/hello.txt = 24 B [hello from patch assets]
+  patch-lab/from-apk.txt = 15 B [from aapt2 apk]
+  patch-lab/stored.txt = 19 B [stored entry probe]
+  patch-lab-root/hello.txt = MISSING / FileNotFoundException
+  cursors/cursor.png = 336 B
+served (application AM):
+  version.properties = 121 B [type=official | number=8 | build=160 | modifier=release | commitHash=assetlab2 | buildDate=November 5, 2026 | androidBuildCode=30567]
+  patch-lab/hello.txt = 24 B [hello from patch assets]
+  patch-lab/from-apk.txt = 15 B [from aapt2 apk]
+  patch-lab/stored.txt = 19 B [stored entry probe]
+  patch-lab-root/hello.txt = MISSING / FileNotFoundException
+  cursors/cursor.png = 336 B
+openFd(activity AM):
+  version.properties = OK length=121 declared=121
+  patch-lab/stored.txt = OK length=19 declared=19
+list("") = [basepartnames, baseparts, bloomshaders, bundles, content.json, contributors, cubemaps, cursors, dialects.xml, fonts, geoid_map, grs_networkprobe_server_config.json, grs_sdk_server_config.json, icons, images, locales, logicids.dat, maps, multi_window_special_list.xml, music, patch-lab, pfw, planets, plugins, scripts, sfpconfig.json, shaders, softap_channels_policy.xml, sounds, sprites, transition_0, transition_1, transition_2, ukeyapp.xml, version.properties, water.frag, water.vert, webkit, wifi_policy.xml]

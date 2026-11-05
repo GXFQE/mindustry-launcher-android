@@ -131,6 +131,8 @@ public class GameSlot extends BaseActivity {
         // ③ 六步管线（同步执行，与探针一致；前置段 ~200-500 ms，游戏自身加载另有 4~5 s）
         Injector.Plan plan = new Injector.Plan();
         plan.apk = target;
+        // dev：素材（资源补丁）实验的增量资产包必须在 launch 之前装填（产品版是空壳）
+        ProbeLab.decorate(this, plan);
         try {
             Injector.Timing t = Injector.launch(this, plan);
             // dev：探针验证台（产品版 ProbeLab 是空壳，见 app/src-release）
