@@ -125,6 +125,32 @@ final class Patches {
             return dex.isFile() && dex.length() > 0 && (assets == null || assets.isFile());
         }
 
+        /**
+         * 这个 dex 定义了**多少个类**（只读文件头的 `class_defs_size`，不解析字符串表）。
+         *
+         * <p>给列表 / 详情卡出"内容量"用；冲突检测仍走 {@link #classes()}（那个真要类名）。
+         */
+        int classCount() throws IOException {
+            if (classes != null) return classes.size();
+            if (parseError != null) throw new IOException(parseError);
+            return PatchDex.classCount(readAll(dex, MAX_DEX));
+        }
+
+        /** 素材包里改了几个 `assets` 路径（剥前缀后的键数；没有素材包 = 0）。 */
+        int assetCount() {
+            try {
+                return assetKeys().size();
+            } catch (IOException e) {
+                return 0;
+            }
+        }
+
+        /** dex 文件（详情卡读大小用；记录可能已经缺文件，所以只返回引用、不保证存在）。 */
+        File dexFile() { return dex; }
+
+        /** 素材包文件（没有素材包时返回 null）。 */
+        File assetsFile() { return assets; }
+
         /** dex 里定义的类（点分名）；读不出来抛 IOException（调用方翻成"补丁文件坏了"）。 */
         List<String> classes() throws IOException {
             if (classes != null) return classes;

@@ -51,8 +51,6 @@ public final class PatchesActivity extends BaseActivity {
 
     private static final String TAG = "MDTLauncher";
     private static final int REQ_PICK = 6101;
-    /** 补丁类名 / 素材路径的预览条数（MindustryY 全量补丁有 1.2 万个类，全列出来没人看）。 */
-    private static final int PREVIEW = 12;
 
     private String mKey = "";
     private String mApkSha = "";
@@ -68,25 +66,40 @@ public final class PatchesActivity extends BaseActivity {
     private LinearLayout mList;
     private LinearLayout mProblemsCard;
 
-    /** 一行的全部渲染数据（**后台线程算好**，UI 线程只负责画 —— 解析 1.2 万个类不能卡界面）。 */
+    /**
+     * 一行的全部渲染数据（**后台线程算好**，UI 线程只负责画 —— 解析大 dex 不能卡界面）。
+     *
+     * <p>详情卡只展示**元信息**（标识 / 作者 / 目标版本 / 数量 / 体积 / 工具 / 导入时间 / 说明），
+     * **不列类名**：那是给生成器 / 排错看的，对使用者既读不懂也判断不了什么
+     * （2026-11-10 用户反馈：「详情页面不建议写替换哪些类，应该是补丁的元信息」）。
+     */
     private static final class Row {
         final Patches.Record record;
         final boolean enabled;
         final int state;
+        /** 与当前 APK 匹配的 target；没有匹配时回落到包里第一个（仅用于展示元信息）。 */
+        final Patches.TargetFile target;
+        /** target 是否匹配当前 APK（行副标题里的类数只对匹配的 target 有意义）。 */
+        final boolean targetMatches;
         final int classCount;
         final int assetCount;
-        final List<String> classesPreview;
-        final List<String> assetsPreview;
+        final long dexBytes;
+        final long assetsBytes;
+        final long importedAt;
 
-        Row(Patches.Record record, boolean enabled, int state, int classCount, int assetCount,
-            List<String> classesPreview, List<String> assetsPreview) {
+        Row(Patches.Record record, boolean enabled, int state, Patches.TargetFile target,
+            boolean targetMatches, int classCount, int assetCount, long dexBytes, long assetsBytes,
+            long importedAt) {
             this.record = record;
             this.enabled = enabled;
             this.state = state;
+            this.target = target;
+            this.targetMatches = targetMatches;
             this.classCount = classCount;
             this.assetCount = assetCount;
-            this.classesPreview = classesPreview;
-            this.assetsPreview = assetsPreview;
+            this.dexBytes = dexBytes;
+            this.assetsBytes = assetsBytes;
+            this.importedAt = importedAt;
         }
     }
 
@@ -168,25 +181,28 @@ public final class PatchesActivity extends BaseActivity {
                 for (Patches.Record r : records) {
                     boolean on = enabled.contains(r.ref());
                     int state = stateOf(r, sha, on);
+                    Patches.TargetFile match = r.targetFor(sha);
+                    Patches.TargetFile show = match != null ? match
+                            : (r.targets.isEmpty() ? null : r.targets.get(0));
                     int classes = 0, assets = 0;
-                    List<String> classPreview = new ArrayList<String>();
-                    List<String> assetPreview = new ArrayList<String>();
-                    Patches.TargetFile t = r.targetFor(sha);
-                    if (t != null && r.filesOk) {
-                        try {
-                            List<String> all = t.classes();
-                            classes = all.size();
-                            classPreview = head(all, PREVIEW);
-                        } catch (Throwable ignored) {
-                        }
-                        try {
-                            List<String> all = t.assetKeys();
-                            assets = all.size();
-                            assetPreview = head(all, PREVIEW);
-                        } catch (Throwable ignored) {
+                    long dexBytes = 0, assetsBytes = 0;
+                    if (show != null) {
+                        File dex = show.dexFile();
+                        File as = show.assetsFile();
+                        if (dex != null && dex.isFile()) dexBytes = dex.length();
+                        if (as != null && as.isFile()) assetsBytes = as.length();
+                        if (r.filesOk) {
+                            try {
+                                classes = show.classCount();
+                            } catch (Throwable ignored) {
+                            }
+                            assets = show.assetCount();
                         }
                     }
-                    rows.add(new Row(r, on, state, classes, assets, classPreview, assetPreview));
+                    File mf = new File(r.dir, PatchManifest.FILE);
+                    long importedAt = mf.lastModified();
+                    rows.add(new Row(r, on, state, show, match != null,
+                            classes, assets, dexBytes, assetsBytes, importedAt));
                 }
                 List<Patches.Problem> problems = Patches.launchProblems(PatchesActivity.this);
                 ui(gen, entry, sha, rows, problems);
@@ -232,7 +248,8 @@ public final class PatchesActivity extends BaseActivity {
                                     row.record.label(), row.record.version()));
                     ((TextView) item.findViewById(R.id.patch_item_sub)).setText(
                             Trans.get(PatchesActivity.this, R.string.patch_row_sub_fmt,
-                                    row.classCount, PatchText.state(PatchesActivity.this, row.state)));
+                                    row.targetMatches ? row.classCount : 0,
+                                    PatchText.state(PatchesActivity.this, row.state)));
                     item.setOnClickListener(new View.OnClickListener() {
                         @Override public void onClick(View v) {
                             showDetail(row);
@@ -270,22 +287,45 @@ public final class PatchesActivity extends BaseActivity {
 
     // ══ 详情卡（启用 / 停用 / 删除 / 类清单）══════════════════════════════════
 
+    /**
+     * 详情卡：**补丁的元信息**（不列类名 —— 2026-11-10 用户反馈）。
+     *
+     * <p>使用者要回答的问题依次是"这是什么 / 谁做的 / 给哪个版本 / 多大 / 什么时候导入的"，
+     * 而不是"它替换了哪些类"（那既读不懂、也判断不了；真要排查看运行日志里的注入行）。
+     */
     private void showDetail(final Row row) {
         final CardStack stack = new CardStack(this);
+        final Patches.Record rec = row.record;
+        final PatchManifest m = rec.manifest;
         StringBuilder body = new StringBuilder();
-        body.append(Trans.get(this, R.string.patch_detail_classes_fmt,
-                row.classCount, joinPreview(row.classesPreview, row.classCount)));
-        if (row.assetCount > 0) {
-            body.append('\n').append(Trans.get(this, R.string.patch_detail_assets_fmt,
-                    row.assetCount, joinPreview(row.assetsPreview, row.assetCount)));
+        body.append(Trans.get(this, R.string.patch_detail_id_fmt, m.id));
+        if (m.author != null && !m.author.isEmpty()) {
+            body.append('\n').append(Trans.get(this, R.string.patch_detail_author_fmt, m.author));
         }
-        String note = row.record.manifest.note;
-        if (note != null && !note.isEmpty()) {
-            body.append(Trans.get(this, R.string.patch_detail_note_fmt, note));
+        if (row.target != null) {
+            String gv = row.target.spec.gameVersion;
+            body.append('\n').append(Trans.get(this, R.string.patch_detail_target_fmt,
+                    gv == null || gv.isEmpty() ? "-" : gv,
+                    Patches.shortHash(row.target.spec.apkSha256)));
+        }
+        body.append('\n').append(Trans.get(this, R.string.patch_detail_content_fmt,
+                row.classCount, row.assetCount));
+        body.append('\n').append(Trans.get(this, R.string.patch_detail_size_fmt,
+                humanBytes(row.dexBytes + row.assetsBytes)));
+        if (m.tool != null && !m.tool.isEmpty()) {
+            body.append('\n').append(Trans.get(this, R.string.patch_detail_tool_fmt, m.tool));
+        }
+        if (row.importedAt > 0) {
+            body.append('\n').append(Trans.get(this, R.string.patch_detail_imported_fmt,
+                    formatTime(row.importedAt)));
+        }
+        if (m.note != null && !m.note.isEmpty()) {
+            body.append(Trans.get(this, R.string.patch_detail_note_fmt, m.note));
         }
         if (row.state == STATE_BROKEN) {
-            body.append('\n').append(PatchText.reason(this, PatchException.C_MISSING,
-                    row.record.label()));
+            body.append('\n').append(PatchText.reason(this, PatchException.C_MISSING, rec.label()));
+        } else if (row.state == STATE_NA) {
+            body.append('\n').append(PatchText.reason(this, PatchException.C_NO_MATCH, rec.label()));
         }
         CardStack.Btn close = new CardStack.Btn(Trans.get(this, R.string.patch_close), new Runnable() {
             @Override public void run() { stack.dismiss(); }
@@ -302,7 +342,7 @@ public final class PatchesActivity extends BaseActivity {
                     }
                 });
         stack.root(Trans.get(this, R.string.patch_detail_title_fmt,
-                        row.record.label(), row.record.version()),
+                        rec.label(), rec.version()),
                 CardStack.text(this, body.toString()), close, del, toggle);
         stack.show();
     }
@@ -519,27 +559,18 @@ public final class PatchesActivity extends BaseActivity {
 
     // ══ 小工具 ══════════════════════════════════════════════════════════════
 
-    private static List<String> head(List<String> all, int max) {
-        List<String> out = new ArrayList<String>(Math.min(max, all.size()));
-        for (int i = 0; i < all.size() && i < max; i++) out.add(all.get(i));
-        return out;
+    /** 人类可读的体积（只用于详情卡元信息；不参与任何判据）。 */
+    private static String humanBytes(long bytes) {
+        java.util.Locale loc = java.util.Locale.getDefault();
+        if (bytes < 1024) return bytes + " B";
+        if (bytes < 1024L * 1024L) return String.format(loc, "%.0f KB", bytes / 1024.0);
+        return String.format(loc, "%.1f MB", bytes / (1024.0 * 1024.0));
     }
 
-    /**
-     * 预览用的多行文本：每行 `· 名字`；**只有真的被截断时**才在末尾加省略号（B8：
-     * 恰好等于预览条数时旧实现也会打「…」，看着像还有没显示的）。
-     *
-     * @param total 这一类一共有多少条（真值；预览列表最多 {@link #PREVIEW} 条）
-     */
-    private static String joinPreview(List<String> names, int total) {
-        if (names == null || names.isEmpty()) return "-";
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < names.size(); i++) {
-            if (i > 0) sb.append('\n');
-            sb.append("· ").append(names.get(i));
-        }
-        if (total > names.size()) sb.append("\n…");
-        return sb.toString();
+    /** 导入时间（读 `patch.json` 的 mtime = 落盘时刻；格式化给详情卡）。 */
+    private static String formatTime(long ms) {
+        return new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm",
+                java.util.Locale.getDefault()).format(new java.util.Date(ms));
     }
 
     /** 进补丁页的 Intent —— 抽出来只为让自检能钉住"版本 key 带过去了"（写错键编译器不响）。 */

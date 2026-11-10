@@ -2241,8 +2241,13 @@
     <string name="patch_state_na">not for this APK</string>
     <string name="patch_state_broken">files missing</string>
     <string name="patch_detail_title_fmt">%1$s %2$s</string>
-    <string name="patch_detail_classes_fmt">Replaces %1$d classes:\n%2$s</string>
-    <string name="patch_detail_assets_fmt">Assets: %1$d files\n%2$s</string>
+    <string name="patch_detail_id_fmt">ID: %1$s</string>
+    <string name="patch_detail_author_fmt">Author: %1$s</string>
+    <string name="patch_detail_target_fmt">For: %1$s · APK %2$s</string>
+    <string name="patch_detail_content_fmt">%1$d classes · %2$d asset files</string>
+    <string name="patch_detail_size_fmt">Size: %1$s</string>
+    <string name="patch_detail_tool_fmt">Tool: %1$s</string>
+    <string name="patch_detail_imported_fmt">Imported: %1$s</string>
     <string name="patch_detail_note_fmt">\nNote: %1$s</string>
     <string name="patch_enable">Enable</string>
     <string name="patch_disable">Disable</string>

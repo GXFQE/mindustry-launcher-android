@@ -2191,8 +2191,13 @@
     <string name="patch_state_na">不适用这个 APK</string>
     <string name="patch_state_broken">文件缺失</string>
     <string name="patch_detail_title_fmt">%1$s %2$s</string>
-    <string name="patch_detail_classes_fmt">替换 %1$d 个类：\n%2$s</string>
-    <string name="patch_detail_assets_fmt">素材：%1$d 个文件\n%2$s</string>
+    <string name="patch_detail_id_fmt">标识：%1$s</string>
+    <string name="patch_detail_author_fmt">作者：%1$s</string>
+    <string name="patch_detail_target_fmt">适用于：%1$s · APK %2$s</string>
+    <string name="patch_detail_content_fmt">%1$d 个类 · 素材 %2$d 个</string>
+    <string name="patch_detail_size_fmt">大小：%1$s</string>
+    <string name="patch_detail_tool_fmt">制作工具：%1$s</string>
+    <string name="patch_detail_imported_fmt">导入时间：%1$s</string>
     <string name="patch_detail_note_fmt">\n说明：%1$s</string>
     <string name="patch_enable">启用</string>
     <string name="patch_disable">停用</string>
