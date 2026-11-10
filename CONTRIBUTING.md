@@ -1,435 +1,557 @@
-简体中文 · [English](CONTRIBUTING.en.md)
+English · [简体中文](CONTRIBUTING.zh.md)
 
-# 参与贡献（Contributing）
+# Contributing
 
-> 这份是**简体中文原始版本**（有歧义时以它为准）；英文翻译见 [CONTRIBUTING.en.md](CONTRIBUTING.en.md)。
+> This is the default English version. A Chinese translation is available at
+> [CONTRIBUTING.zh.md](CONTRIBUTING.zh.md).
 
-本工程是 **Mindustry Manager**（`io.mdt.launcher`）：把官方 Mindustry APK **原样当作插件加载**，
-给每个游戏版本一套独立的存档槽。项目以 **GPL-3.0** 发布，不打包游戏本体。
+This project is **Mindustry Manager** (`io.mdt.launcher`): it loads the official Mindustry APK
+**as-is, as a plug-in**, and gives every game version its own save slot. It is released under
+**GPL-3.0** and does not bundle the game.
 
-你可以贡献代码、修 Bug、翻译、写插件、补文档，或者只是提交一份带复现步骤的问题报告。
-
----
-
-## 0. 为什么有这份文档
-
-GitHub 上出现过拿 AI **批量刷贡献**的 PR：用一套对任何项目都通用的提示词、全自动跑完流程，
-提交者自己并不知道改了什么。结果不只是新功能用不了，严重的还会让应用在启动时直接崩。
-这类 PR 对双方都是负担，对用户更是。
-
-所以这里把两件事写成硬规则：**提交者要知道自己在交什么**，**改动必须被验证过**。
-
-AI 的意义是**让不懂代码的人也能把想法实现出来，而不是代替人思考**。你可以不是程序员，
-但你要知道自己在做什么、要解决什么问题，并能判断结果对不对。本工程自己也大量使用 AI 开发；
-我们拒绝的不是 AI，而是**没人负责、也没人验证**的改动。
+You can contribute code, bug fixes, translations, plug-ins, documentation, or just a bug report
+with reliable reproduction steps.
 
 ---
 
-## 1. 基本要求
+## 0. Why this document exists
 
-**人负责。** 每个 PR 都要有一个能解释改动的提交者：说清改了哪些文件、每一处为什么改、
-影响哪些已有功能 / 数据 / 接口；review 时**不看 AI 对话记录**也能解释关键逻辑；
-合并后出问题，至少在 Issue / review 里参与定位（不要求无限期维护）。
+GitHub has seen PRs that **farm contributions with AI**: a generic prompt that works on any
+project, a fully automated pipeline, and a submitter who has no idea what changed. The results
+range from features that do not work to apps that crash on startup. Such PRs are a burden for
+everyone, especially users.
 
-**可验证。** 行为改动必须同时带两样东西：
+So two things are hard rules here: **the submitter must know what they are submitting**, and
+**the change must have been verified**.
 
-1. **自检**：新增或修改断言，把「这次改动应该成立什么」钉住；
-2. **人工手点**：由提交者本人在真机或模拟器上把**改动涉及的所有相关功能**走一遍，并留下证据。
-
-「编译通过」「自检全绿」不能替代人工验证；「我手点过了」也不能替代自检。
-
-**不破坏。** 不破坏已有用户的数据（槽 / 存档 / 备份 / 配置 / 补丁）；不破坏已发布的兼容性
-（老版本能读、老插件能装、老入口还能用）；不破坏启动链；不无理由让安装包明显变大。
-
-**先讨论。** 新功能、新页面、新插件接口、新依赖、数据格式改动、大范围重构——先开 Issue
-说明动机、影响面和验证计划，维护者确认方向后再写。不要闷头写完一个大 PR 再问「能不能合」，
-也不要拿「某个版本冻结了」当理由跳过讨论；当前发布状态以 README 顶部和 Releases 页为准。
-
-小修复、翻译、文档修正、独立插件可以直接提 PR。
+AI is meant to **let people who do not write code turn their ideas into reality, not to think for
+them.** You do not have to be a programmer, but you must know what you are doing, what problem
+you are solving, and whether the result is right. This project itself uses AI heavily; what we
+reject is not AI, but changes with **no accountable person and no verification**.
 
 ---
 
-## 2. AI 参与规则
+## 1. Basic requirements
 
-### 2.1 允许
+**A human is accountable.** Every PR needs a submitter who can explain it: which files changed
+and why each part changed; which existing features, data or interfaces are affected; they can
+explain the key logic **without looking at the AI chat history**; and if problems appear after
+merge, they take part in triage in the issue or review (not indefinite maintenance).
 
-用 AI 写代码、写测试、整理日志、做翻译初稿，都可以。**你可以不是程序员**：AI 是帮你把想法
-实现出来的工具，不是替你思考的替身。
+**Verifiable.** A behaviour change needs both:
 
-PR 描述里**建议说明** AI 参与情况（用了什么工具、哪些部分由 AI 生成、你是否逐行读过）。
-不说本身不构成拒绝理由；**说不清改动**才是问题。
+1. **Self-tests**: add or update assertions that pin down what this change must make true;
+2. **Manual click-through**: the submitter personally exercises **all affected features** on a
+   real device or emulator and leaves reviewable evidence.
 
-### 2.2 必须满足
+“It compiles” and “the self-tests are green” cannot replace manual verification; “I clicked
+through it” cannot replace self-tests.
 
-- **逐行理解**：AI 生成的部分，能解释它做了什么、为什么这样做、边界条件是什么；
-- **自行验证**：AI 说「测试通过」不算数，必须自己跑过、点过；
-- **自己取舍**：AI 容易过度设计、顺手重构、编造 API，提交者有责任删掉多余部分；
-- **能复现**：review 里被要求「解释这段」「再验一次」时，能独立完成。
+**Do not break things.** Do not break existing user data (slots, saves, backups, settings,
+patches); do not break published compatibility (old data still readable, old plug-ins still
+loadable, old entry points still working); do not break the launch chain; do not make the app
+noticeably bigger without a reason.
 
-### 2.3 不接受
+**Discuss first.** New features, new pages, new plug-in APIs, new dependencies, data-format
+changes, large refactors: open an Issue first explaining the motivation, impact and verification
+plan, and wait for the maintainers to agree on the direction. Do not write a large PR and then ask
+whether it can be merged; do not use “some release line is frozen” as an excuse to skip
+discussion. The current release status is whatever the top of the README and the Releases page
+say.
 
-- AI 全权生成、提交者无法解释的 PR；
-- 用通用提示词 + 全自动流程批量产出、提交者没有逐项读过的 PR；
-- 编造或伪造验证证据（截图、日志、自检结果、设备信息）；
-- 未经阅读就整段粘贴的代码；
-- 让 AI 生成超出 PR 范围的重构、重命名、格式化；
-- 来源不明、或与 GPL-3.0 不兼容的 AI 输出（见第 9 节）。
-
-提 PR 前先自查：有没有编造 API、有没有批量格式化、是不是只测了正常路径、
-是不是只改了一个入口、有没有把「我认为应该没问题」写成「已验证」。
-
----
-
-## 3. 验证要求
-
-### 3.1 自检
-
-**行为改动必须带自检断言**；纯文档、纯翻译、纯注释可以不带。
-
-- 新行为要有**能失败**的断言：把实现改错时它必须变红；`pass = true` 这种常量门禁不算；
-- 断言钉**用户看得见的结果**（界面上的数字、文件是否生成、启动是否成功），
-  不要只钉实现内部算出来的中间量；
-- 边界与失败路径也要断言（空值 / 文件不存在 / 游戏运行中 / 版本不匹配 / 插件抛异常）；
-- 涉及破坏性操作的断言只能在专用测试槽上跑，不许碰真实槽；
-- **不要为了让自检变绿而删除 / 弱化已有断言**；确实要改的，在 PR 里逐条说明原因；
-- 产品构建与 dev 构建都要能过；实际行为再用产品形态（`debuggable=false`）验一遍。
-
-构建 dev 变体、触发自检、取报告的方法见 [docs/DEVELOPING.md](docs/DEVELOPING.md)；
-判据是自检报告 **0 失败**。
-
-### 3.2 人工手点
-
-**为什么必须人工**：系统文件选择器、权限弹窗、部分系统界面，adb 自动化驱动不了；
-而且「点到了」和「功能真的对了」是两回事。AI 可以帮忙准备夹具、整理证据，
-但**手点必须是人做的**。
-
-**点哪些**：不是只点新入口，而是**改动涉及的所有相关功能**：
-
-- 新功能本身的正常路径 + 失败路径；
-- 与它共用数据 / 代码的旧功能（回归）；
-- 上游入口（从哪进）和下游结果（点完数据 / 界面变成什么样）；
-- 改了启动链：**游戏能正常启动到主菜单**，不是只看启动器界面能开；
-- 改了数据格式 / 槽操作：老数据还能读、备份还能恢复、删除仍走中转站；
-- 改了插件：插件启用 / 停用 / 崩溃 / 卸载后宿主仍正常；让插件在入口方法抛异常或返回坏数据，
-  确认宿主能启动、能停用 / 隔离；插件全部停用后宿主也应完整可用。
-
-**在哪点**：
-
-- 优先真机；没有真机就用模拟器，但要说明；
-- 涉及 Android 版本差异的改动（启动、注入、权限、文件访问等），至少覆盖**最低支持版本**
-  和一个较新的 API 段；
-- 涉及游戏侧行为的改动，至少覆盖一个官方版本；影响 MindustryX 等分支时也要说明，或写明「未验证」；
-- 界面改动在中英文、深浅色、受支持的屏幕方向下各看一眼；
-- 用测试槽，别在真实存档上做破坏性操作；
-- 不要在自己日常使用的安装上直接装 debug 构建：签名不同只能卸载重装，而卸载会连带删存档槽。
-
-**留什么证据**（截图 / 大文件贴在 PR 里，不要直接提交进仓库）：
-
-- 手点步骤与结果：设备型号 / Android 版本 / 游戏版本 / 构建类型；
-- 关键界面截图（脱敏：去掉账号、路径、存档名等个人信息）；
-- 自检报告的关键行；启动改动附游戏主菜单截图 / 启动日志；
-- 性能 / 耗时改动：受控 A/B 数据（同设备、同夹具、各至少 3 次，改前改后各一次构建），
-  不接受单次测量或「感觉快了」。
-
-> 小体积文本证据（报告、转储）按维护者要求可以入库，前提是先脱敏；截图与 APK 默认不入库。
-> 报告 / 夹具不要放 `build/`，构建会清掉它。
-
-### 3.3 不算验证
-
-编译通过、自检全绿、一张正常路径截图、单设备单版本宣称「全版本没问题」、AI 生成的结论、
-「请维护者测试 / TODO: 验证」——这些都不能替代提交者本人的验证。
-
-### 3.4 翻译与文档
-
-翻译的验证方式见 5.3；文档改动要自己跑一遍涉及的链接、命令、路径，README 中英文两份要同步。
+Small fixes, translations, documentation fixes and standalone plug-ins can go straight to a PR.
 
 ---
 
-## 4. 哪些改动可能不予合并
+## 2. AI participation rules
 
-维护者会直接关闭或要求重做的主要是下面几类。判断标准不是「改得多不多」，而是
-「有没有必要、有没有验证、有没有更好的落点」。
+### 2.1 Allowed
 
-### 4.1 无意义改动或破坏性改动
+Using AI for code, tests, log cleanup or translation drafts is fine. **You do not have to be a
+programmer**: AI is a tool that helps you realise your ideas, not a replacement for your brain.
 
-无意义：批量替换换行符（LF/CRLF）、行尾空格、缩进、引号风格、import 排序；
-整个文件 / 整个仓库的格式化、重命名、加删 license header；只改文案标点、注释措辞却声称修了 bug；
-手改生成物（表、清单、构建期生成的文件）。
+It is **recommended** to describe the AI involvement in the PR (what tools were used, which parts
+were AI-generated, whether you read them line by line). Not saying so is not by itself a reason
+for rejection; **being unable to explain the change** is.
 
-破坏性：删除或覆盖用户数据且没有迁移 / 备份 / 中转站兜底；改配置、槽、备份、补丁的数据格式
-却没有迁移方案与回滚说明；删除已有功能 / 入口不提前讨论；破坏插件接口兼容（无理由抬高最低接口版本、
-改语义、删方法）；更换签名密钥、重打已发布的 tag / release；改包名 / 启动 Activity / 签名配置 /
-最低支持版本 / 目标版本 / ABI 范围却没有事先讨论和迁移说明；覆盖别人的分支、强推已进入 review 的提交。
+### 2.2 Required
 
-> 仓库已用 [.gitattributes](.gitattributes) 统一行尾。如果 diff 显示整个文件都变了，
-> 先检查行尾与编码，不要把这个 diff 提上来。
+- **Line-by-line understanding**: you can explain what the AI-generated part does, why it does it,
+  and what its edge cases are;
+- **Verify it yourself**: “the AI says the tests pass” does not count; you must run and click
+  through it yourself;
+- **Make your own choices**: AI tends to over-engineer, refactor unrelated code and invent APIs;
+  the submitter is responsible for removing the extra parts;
+- **Be reproducible**: when asked in review to “explain this part” or “verify it again”, you can
+  do so independently.
 
-### 4.2 让安装包明显变大，或新增依赖
+### 2.3 Not accepted
 
-本工程**没有 Gradle、没有依赖管理体系**：加一个 jar / so / 大资源，就是直接加进 APK、
-加一份许可证义务、加一份长期维护成本。
+- PRs fully generated by AI that the submitter cannot explain;
+- Mass-produced PRs from a generic prompt plus a fully automated pipeline, not read item by item
+  by the submitter;
+- Fabricated or forged verification evidence (screenshots, logs, self-test results, device info);
+- Code pasted in bulk without reading it;
+- Refactors, renames or reformatting that AI produced beyond the scope of the PR;
+- AI output of unknown origin or incompatible with GPL-3.0 (see section 9).
 
-- 默认不新增第三方依赖；确有必要的，先在 Issue 说明用途、许可证、体积增量、能否自己实现；
-- 新增 `.jar` / `.aar` / `.so` 默认不做，确需引入必须事前同意；
-- 新增功能如果只有少数人用，优先做成插件，不要塞进本体；
-- 体积用**产品构建**的 dex 大小为基线（口径见 [docs/DEVELOPING.md](docs/DEVELOPING.md)）——
-  不要用 dev 构建，更不要用 APK 总大小，压缩 / 对齐会让它失真；
-- 明显增长又说明不了必要性的，不合并。
-
-### 4.3 低频功能应做成插件；接口可以加，但不能乱加
-
-判断顺序：① 所有人 / 核心流程都需要吗？不是 → 做成插件；② 插件缺接口吗？可以提 PR；
-③ 接口是通用能力吗？不是 → 重新设计，或留在插件里自己实现。
-
-**新增接口的 PR 必须满足**：通用（服务一类插件，不为某一个插件 / 页面写死）；加法（只加方法 /
-回调 / 字段，不改已有语义，不无理由抬高最低接口版本）；不绑架宿主（没有任何插件或插件全部
-停用 / 崩溃时，宿主必须能完整启动和使用）；失败隔离（插件抛异常、卡死、返回坏数据，不能让宿主
-无法启动或界面卡死）；不暴露内部实现；文档与版本一起改（见 [docs/PLUGIN-API.md](docs/PLUGIN-API.md)）；
-老插件不被破坏。
-
-**明确不接受**：让宿主依赖某个插件才能运行；插件故障导致宿主无法启动；过于特化只能服务一个插件；
-为了一个插件去改宿主的加载顺序 / 安全阀 / 签名策略。
-
-### 4.4 未经验证、可能影响游戏启动的改动
-
-启动链是这项目最脆弱的部分：注入、dex、native 库、资源链、游戏进程、补丁、深链、ABI……
-任何一处改动都可能让某些 Android 版本（或某些游戏版本）起不来，而且在开发机上看不出来。
-
-- 触及启动链时，必须在至少两个 API 段验证（最低支持版本 + 一个较新版本），
-  并说明设备 / 模拟器与游戏版本；
-- 启动到主菜单的证据必须来自**产品形态**（`debuggable=false`）的包，dev 变体只用于自检；
-- 已知有差异的行为（新版 Android 的动态 dex 只读、不同 ROM 的权限 / 文件访问）要专门测；
-- 不能验证的，先在 Issue 里说明，不要用「理论上没问题」直接提 PR；
-- 维护者有权因为无法确认安全性而不合并。
-
-### 4.5 需要按游戏版本内置大量表
-
-大量按游戏版本硬编码的表（方块、职业、配置键、翻译映射……）会带来：安装包膨胀、每次游戏更新
-都要跟、数据陈旧、无法验证所有版本、许可与来源问题。
-
-优先方案：运行时从已加载的游戏里探测 / 反射取数；构建期用生成器生成并记录版本；放到插件或补丁里；
-取不到时优雅降级。少量表如果要进本体，必须是生成的、有生成器与版本记录、有自检、有兜底；
-手抄的大表不接受。
-
-### 4.6 与项目边界冲突
-
-以下方向不做（README 有完整列表）：重打包 / 重签名 / 改包名后加载游戏，或打包、分发游戏本体；
-改写、重签用户导入的游戏 APK；在应用内下载游戏内容（地图 / 蓝图 / 模组 / 论坛等）；上架 Google Play；
-声称提供「插件沙箱」而实际没有隔离；应用内的补丁生成器 / 补丁在线库；内置通用文件管理器。
-
-依赖 root / 特殊权限才能用的功能，默认只能作为插件，并且要在插件说明里写清楚。
-
-### 4.7 安全与隐私红线
-
-不引入遥测、统计、广告、静默联网、后台自启；不引入不必要的后台服务、唤醒锁、常驻通知；
-不收集 / 上传个人数据（账号、设备标识、存档内容、使用记录）；不申请与功能不相称的权限；
-不静默安装 / 下载可执行代码；不在代码、日志、截图、PR 里留下密钥、口令、token、个人路径；
-插件与宿主同进程、**没有沙箱**，插件作者有义务告知用户它要访问什么。
+Before opening a PR, check yourself: did you invent APIs, mass-reformat files, test only the happy
+path, change just one entry point, or write “I think it should be fine” as “verified”?
 
 ---
 
-## 5. 翻译贡献
+## 3. Verification requirements
 
-翻译非常欢迎，不需要会写 Java。
+### 3.1 Self-tests
 
-### 5.1 两种方式
+**A behaviour change must come with self-test assertions.** Documentation-only, translation-only
+and comment-only changes do not have to.
 
-| 方式 | 适合谁 | 怎么做 |
+- New behaviour needs an assertion **that can fail**: break the implementation and it must go red;
+  a constant gate such as `pass = true` does not count;
+- Pin **user-visible results** (numbers on screen, whether a file is created, whether startup
+  succeeds), not only intermediate values computed inside the implementation;
+- Cover edge cases and failure paths too (empty values, missing files, game running, version
+  mismatch, plug-in throwing);
+- Assertions that touch destructive operations must run only on a dedicated test slot, never on a
+  real slot;
+- **Do not delete or weaken existing assertions just to make the self-tests green.** If an
+  assertion really must change, explain each change in the PR;
+- Both the product build and the dev build must pass; verify actual behaviour again with the
+  product build (`debuggable=false`).
+
+See [docs/DEVELOPING.md](docs/DEVELOPING.md) for how to build the dev variant, trigger the
+self-tests and collect the report. The criterion is **0 failures**.
+
+### 3.2 Manual click-through
+
+**Why it must be manual**: the system file picker, permission dialogs and some system UI cannot be
+driven by adb; and “the tap landed” is not the same as “the feature is actually correct”. AI can
+help prepare fixtures and organise evidence, but **the clicking must be done by a human**.
+
+**What to click**: not only the new entry point, but **all affected features**:
+
+- The new feature's happy path and failure paths;
+- Old features that share data or code with it (regression);
+- The upstream entry points (where users come from) and downstream results (what the data or UI
+  looks like afterwards);
+- If the launch chain changed: **the game must start and reach the main menu**, not just the
+  manager UI opening;
+- If the data format or slot operations changed: old data is still readable, backups are still
+  restorable, deletion still goes to the transfer station;
+- If plug-ins changed: the host still works after a plug-in is enabled, disabled, crashed or
+  uninstalled; make a plug-in throw from its entry methods or return bad data and confirm the host
+  still starts and can disable or quarantine it; with all plug-ins disabled the host must still be
+  fully usable.
+
+**Where to click**:
+
+- A real device first; if unavailable, an emulator, but say so;
+- For changes involving Android version differences (startup, injection, permissions, file
+  access), cover at least the **minimum supported version** and one newer API level;
+- For changes involving game-side behaviour, cover at least one official version; if MindustryX
+  or other forks are affected, say what was tested or state “not verified”;
+- For UI changes, check Chinese and English, light and dark themes, and supported screen
+  orientations;
+- Use a test slot; do not run destructive tests on real saves;
+- Do not install a debug build over the installation you use daily: signatures differ, the system
+  only allows uninstall-and-reinstall, and uninstalling also deletes save slots.
+
+**What evidence to leave** (attach screenshots and large files to the PR; do not commit them):
+
+- Steps and results: device model, Android version, game version, build type;
+- Key screenshots (redact account names, paths, save names and other personal data);
+- The key lines of the self-test report; for startup changes, a screenshot of the game main menu
+  or the startup log;
+- For performance and timing changes: controlled A/B data (same device, same fixtures, at least 3
+  runs per side, one build before and one after). Single measurements or “it feels faster” are not
+  accepted.
+
+> Small text evidence (reports, dumps) can be committed if a maintainer asks, after redaction;
+> screenshots and APKs are not committed by default. Do not put reports or fixtures under `build/`;
+> the build wipes it.
+
+### 3.3 What does not count as verification
+
+Compiling, green self-tests, one screenshot of the happy path, one device and one version claiming
+“all versions are fine”, AI-generated conclusions, or “the maintainer can test it / TODO: verify”:
+none of these replace the submitter's own verification.
+
+### 3.4 Translations and documentation
+
+For translation verification see 5.3. For documentation, run every link, command and path you
+touch yourself; keep the English and Chinese READMEs in sync.
+
+---
+
+## 4. Changes that may not be merged
+
+Maintainers may close or ask for rework mainly in the following cases. The criterion is not “how
+much changed” but “is it necessary, is it verified, is there a better place for it”.
+
+### 4.1 Meaningless or destructive changes
+
+Meaningless: mass line-ending replacement (LF/CRLF), trailing whitespace, indentation, quote
+style, import sorting; formatting, renaming or licence-header churn across a whole file or
+repository; fixing punctuation or comment wording while claiming a bug fix; hand-editing generated
+artefacts (tables, manifests, build-time files).
+
+Destructive: deleting or overwriting user data without migration, backup or a transfer-station
+fallback; changing the format of settings, slots, backups or patches without migration and
+rollback; removing existing features or entry points without prior discussion; breaking plug-in
+interface compatibility (raising the minimum interface version without reason, changing
+semantics, deleting methods); changing signing keys or re-tagging / re-releasing a published
+tag / release; changing the package name, launcher Activity, signing configuration, minimum
+supported version, target version or ABI range without prior discussion and a migration plan;
+force-pushing over someone else's branch or a PR already under review.
+
+> The repository uses [.gitattributes](.gitattributes) to normalise line endings. If a diff shows
+> that a whole file changed, check line endings and encoding first; do not submit that diff.
+
+### 4.2 Noticeably bigger app, or new dependencies
+
+This project has **no Gradle and no dependency management**: adding a jar, a native library or a
+large asset means adding it to the APK, plus a licence obligation and long-term maintenance cost.
+
+- Do not add third-party dependencies by default. If one is truly necessary, explain in an Issue
+  what it is for, its licence, the size increase and why you cannot implement it yourself;
+- New `.jar` / `.aar` / `.so` files are not accepted by default; introducing one requires prior
+  agreement;
+- If a feature is used by only a few people, make it a plug-in instead of putting it in the host;
+- Measure size against the **product build**'s dex (see [docs/DEVELOPING.md](docs/DEVELOPING.md)):
+  do not use the dev build, and do not use total APK size, which is distorted by compression and
+  alignment;
+- A noticeable increase without a stated necessity is not merged.
+
+### 4.3 Low-frequency features should be plug-ins; APIs can be added, carefully
+
+Decision order: (1) is it needed by everyone / the core flow? If not, make it a plug-in;
+(2) does the plug-in need an API? A PR can add one; (3) is it a general capability? If not,
+redesign it or keep it inside the plug-in.
+
+**A PR that adds an API must**: be general (serve a class of plug-ins, not one plug-in or one
+page); be additive (only add methods, callbacks or fields, do not change existing semantics, do
+not raise the minimum interface version without a reason); not hold the host hostage (the host
+must start and be fully usable with no plug-ins, or with all of them disabled or crashing); keep
+failures isolated (a plug-in throwing, hanging or returning bad data must not prevent the host
+from starting or freeze the UI); not expose internal implementation; update the documentation and
+version together (see [docs/PLUGIN-API.md](docs/PLUGIN-API.md)); and not break old plug-ins.
+
+**Not accepted**: the host needs a specific plug-in to run; a plug-in failure prevents the host
+from starting; an API that is too specific to one plug-in; changing the host's load order, safety
+valve or signing policy for one plug-in.
+
+### 4.4 Unverified changes that may affect game startup
+
+The launch chain is the most fragile part of this project: injection, dex, native libraries, the
+asset chain, the game process, patches, deep links, ABI, and so on. Any change there can make game
+startup fail on some Android versions (or some game versions), and it will not show up on the
+development machine.
+
+- When touching the launch chain, verify on at least two API levels (minimum supported version plus
+  a newer one), and state the device/emulator and game version;
+- Evidence that the game reaches the main menu must come from the **product build**
+  (`debuggable=false`); the dev variant is only for self-tests;
+- Test known differences specifically (for example dynamic dex read-only on newer Android
+  versions, permission and file-access differences between ROMs);
+- If you cannot verify it, explain that in an Issue first; do not submit a PR claiming “it should
+  be fine”;
+- Maintainers may refuse to merge when safety cannot be confirmed.
+
+### 4.5 Large per-game-version built-in tables
+
+Large tables hard-coded per game version (blocks, classes, config keys, translation mappings and
+so on) cause APK bloat, must be updated with every game release, go stale, cannot be verified
+across all versions, and raise licensing and provenance problems.
+
+Preferred approaches: probe or reflect the data from the loaded game at runtime; generate the
+table at build time and record the input version; put it in a plug-in or a patch; degrade
+gracefully when the data is unavailable. A small table may go into the host only if it is
+generated, has a generator and a recorded version, has self-tests and has a fallback. Large
+hand-copied tables are not accepted.
+
+### 4.6 Conflicts with the project's boundaries
+
+These directions are out of scope (the README has the full list): repacking, re-signing or
+renaming the game before loading it, or bundling and distributing the game itself; modifying or
+re-signing the game APK the user imported; downloading game content inside the app (maps,
+blueprints, mods, forums and so on); publishing on Google Play; claiming a plug-in sandbox that
+does not exist; an in-app patch generator or online patch library; a built-in general-purpose file
+manager.
+
+Features that require root or special permissions are plug-in-only by default, and the plug-in
+must document what it accesses.
+
+### 4.7 Security and privacy red lines
+
+No telemetry, analytics, advertising, silent networking or auto-start. No unnecessary background
+services, wake locks or persistent notifications. Do not collect or upload personal data (account,
+device identifiers, save contents, usage history). Do not request permissions unrelated to the
+feature. Do not silently install or download executable code; plug-ins and patches must load
+through the existing user-visible mechanisms. Do not leave keys, passwords, tokens or personal
+paths in code, logs, screenshots or PRs. Plug-ins share the host process and there is **no
+sandbox**; plug-in authors must tell users what they access.
+
+---
+
+## 5. Translation contributions
+
+Translations are very welcome; you do not need to know Java.
+
+### 5.1 Two ways
+
+| Way | Who it suits | How |
 |---|---|---|
-| **用户语言包** | 只想改几句 / 不想动仓库 | 设置页 → 翻译文件 → 导出模板，按 `键=值` 填写并导入；也可以作为 Issue 附件分享 |
-| **仓库内翻译** | 希望成为内置语言 | 提 PR；新增语言要按 [docs/DEVELOPING.md](docs/DEVELOPING.md) 的约定登记 |
+| **User language pack** | Just a few lines / do not want to touch the repo | Settings → Translation file → export the template, fill in `key=value`, import it; you can also attach it to an Issue |
+| **In-repository translation** | Want it to become a built-in language | Open a PR; a new language must be registered as described in [docs/DEVELOPING.md](docs/DEVELOPING.md) |
 
-用户语言包只覆盖界面文案；致谢 / 彩蛋、游戏内容译名不走这一套。
+A user language pack only covers UI strings; credits, easter eggs and game content names do not go
+through it.
 
-### 5.2 规则
+### 5.2 Rules
 
-- **默认英文是唯一真源**；新 key 先写英文；
-- 占位符的个数、序号、类型都要与英文一致；不许加裸 `%s` / `%d`；不许翻译占位符本身。
-  注意：门禁对类型不一致可能只告警，`%1$d` 收到字符串会在运行期崩 —— 类型要自己核对；
-- 不许改 key 名、不许把注释写进值里；
-- 引号、撇号、空白等资源格式规则由构建门禁检查，细则见 [docs/DEVELOPING.md](docs/DEVELOPING.md)；
-- **部分翻译可以接受**（缺的 key 回落英文），但请说明覆盖范围；要进语言选择器，最好先覆盖主要界面；
-- 术语统一，沿用现有译文里的说法，不要自己另造一套；
-- 机器翻译可以当草稿，但必须人工校对；不要提交「AI 直出、未读」的整篇翻译；
-- 注意长度与换行：按钮 / 行的文案有宽度预算，太长会挤坏布局；
-- 翻译的著作权与代码一样按 **GPL-3.0** 授权。
+- **Default English is the single source of truth**; new keys are written in English first;
+- The number, index and type of placeholders must match English; no bare `%s` / `%d`; do not
+  translate the placeholders themselves. Note: the gate may only warn on a type mismatch, and
+  `%1$d` receiving a string crashes at runtime, so check types yourself;
+- Do not rename keys or put comments inside values;
+- Quote, apostrophe and whitespace rules are checked by the build gates; details are in
+  [docs/DEVELOPING.md](docs/DEVELOPING.md);
+- **Partial translations are acceptable** (missing keys fall back to English), but state the
+  coverage; to appear in the language picker, cover the main UI first;
+- Keep terminology consistent with the existing translation; do not invent your own terms;
+- Machine translation is fine as a draft, but it must be proofread; do not submit a whole
+  “AI output, never read” translation;
+- Watch length and line breaks: buttons and rows have width budgets, and overly long strings break
+  layouts;
+- Translations are licensed under **GPL-3.0**, the same as code.
 
-### 5.3 怎么自证
+### 5.3 Prove it yourself
 
-- **用户语言包**：导入后看状态行 —— `used` 是生效条数，`missing` 是未覆盖条数，
-  `rejected` 应为 0，`unknown` 应为 0；再打开几个主要页面确认文案真的变了、布局没坏。
-- **仓库内翻译**：安装后把语言切过去，逐页看主要界面（这才是编译进 APK 的那份），
-  再切回中文 / 英文确认没有串语言。
+- **User language pack**: after importing it, check the status line: `used` is how many entries
+  take effect, `missing` is how many are not covered, `rejected` should be 0 and `unknown` should
+  be 0; then open a few main pages and confirm the strings really changed and the layout is not
+  broken.
+- **In-repository translation**: install the build, switch the language, go through the main pages
+  (this is the copy compiled into the APK), then switch back to Chinese / English and confirm
+  nothing is mixed up.
 
-### 5.4 文档与非界面内容
+### 5.4 Documentation and non-UI content
 
-README 有中英文两份（[README.md](README.md) / [README.zh.md](README.zh.md)），结构一一对应；
-只改一份会被要求补另一份；其他文档目前以中文为主。致谢 / 彩蛋等非界面内容按项目的内容文件规则改：
-双语齐全、占位符一致，构建会检查。
-
----
-
-## 6. 插件贡献与「设为内置」请求
-
-### 6.1 普通插件
-
-- 插件可以放在独立仓库，也可以放在本仓库的 `plugins/<id>/`（仓库内要带构建脚本与说明）；
-- 必须按 [docs/PLUGIN-API.md](docs/PLUGIN-API.md) 编写：入口类、接口版本、`plugin.json`、扩展声明；
-- 不要复制一份接口定义，编译时直接用宿主那份；
-- `api()` 只报你真正需要的最低版本，报高只会在老宿主上被拒；
-- 体积小、无新依赖、纯逻辑部分能在 PC 上编译验证的插件更容易被接受；
-- 插件必须自己处理失败：入口方法抛异常、数据损坏、权限缺失时，不能拖垮宿主；
-- 只用公开接口，不要反射宿主内部类 / 字段 / 资源 id；界面文案用插件自己的资源；
-- 联网 / 更新要在 `plugin.json` 与说明里写清楚地址与用途；更新地址只认 https；
-- 卸载 / 停用时清理自己的数据与缓存，不要写宿主目录。
-
-### 6.2 请求设为内置插件
-
-**可以正常提**——开一个 Issue（建议标题「内置插件请求：<id>」），并附：
-
-- 插件 id、显示名、一句话功能说明、源码地址与构建方式；
-- 许可证（必须与 GPL-3.0 兼容）；
-- 构建好的 APK / 大小 / sha256，以及它依赖的宿主接口版本；
-- 为什么它应该内置（面向所有用户？核心流程？而不是「我做的所以想内置」）；
-- 真机验证证据（设备、Android 版本、游戏版本、主要流程截图）；
-- 维护承诺：出问题谁修、能不能接受仓库内构建、更新由谁发布；
-- 是否已在 `plugin.json` 里声明更新清单地址。
-
-维护者会按这些标准判断（**不保证接受**）：通用、轻量、稳定；停用 / 崩溃 / 卸载后宿主完全正常；
-源码可构建、有自检或冒烟、作者愿意长期维护；代码 / 资源 / 图标来源与许可清楚；不要求为它特化宿主接口。
-
-内置的含义：随本体发放、用户不能卸载（可以停用）、随本体一起计入安装包体积，
-构建 / 签名 / 更新由维护者按项目流程处理。因此「内置」只给核心且长期的插件；小而美的插件
-作为可选安装更合适。接受前要约定好谁构建、谁签名、谁发更新。
-
-### 6.3 新增宿主接口
-
-先开 Issue 说明用途、现有接口为什么不够、至少两个使用场景、对老插件的影响；
-维护者确认后，按 4.3 的要求和 [docs/PLUGIN-API.md](docs/PLUGIN-API.md) 实现。
+The README exists in English and Chinese ([README.md](README.md) / [README.zh.md](README.zh.md))
+with matching structure; changing one means updating the other. Other documentation is currently
+Chinese-first. Credits, easter eggs and other non-UI content follow the project's content-file
+rules: both languages present, placeholders consistent, and the build checks them.
 
 ---
 
-## 7. 代码与构建约定
+## 6. Plug-in contributions and built-in requests
 
-这一节只列**长期稳定**的约束；构建命令、模块边界、文案与资源规则等以
-[docs/DEVELOPING.md](docs/DEVELOPING.md) 为准（那份文档会随代码更新）。
+### 6.1 Regular plug-ins
 
-- **没有 Gradle**，构建入口是 `./build.sh`；源码目标 Java 8；默认不新增依赖；
-- 改完至少跑**产品形态**与 **dev 形态**两种构建，判据是日志末尾 `== BUILD OK ==`；
-- 构建自带 i18n / 内容门禁，失败就修，不要用跳过开关绕过；
-- 界面文案走项目统一的文案层，默认英文；**不许用文案当判据**（一翻译就静默改行为）；
-- 纯逻辑内核尽量不依赖 Android 类，方便在 PC 上单独验证；
-- **数据兼容**：配置保留未知键；槽 / 备份 / 补丁 / 中转站格式改动必须带迁移与回滚；
-  删除先走中转站，不要裸删；
-- **生成物不要手改**：改生成器并记录输入版本；
-- 不提交构建产物、密钥、口令、个人存档与未脱敏日志；内置插件 APK 是产品资源，按维护者流程更新；
-- **版本号、tag、release 由维护者在发布时处理**，PR 不要改；
-- 一个 PR 只做一件事；同类逻辑只保留一份实现，不要复制到多个入口；
-- 与现有代码风格保持一致；不夹带无关的格式化 / 重命名；大范围重命名先讨论；死代码直接删。
+- A plug-in can live in its own repository, or in this repository under `plugins/<id>/` (with a
+  build script and documentation);
+- Follow [docs/PLUGIN-API.md](docs/PLUGIN-API.md): entry class, API version, `plugin.json`,
+  extension declarations;
+- Do not copy the interface definitions; compile against the host's copy;
+- `api()` should report only the minimum version you actually need; reporting higher only gets
+  you rejected on older hosts;
+- Small plug-ins with no new dependencies whose pure logic can be compiled and tested on a PC are
+  easier to accept;
+- A plug-in must handle its own failures: if an entry method throws, data is corrupted or a
+  permission is missing, it must not take the host down;
+- Use only public APIs; do not reflect into host internals, fields or resource ids; UI strings
+  come from the plug-in's own resources;
+- For networking or updates, document the address and purpose in `plugin.json` and the README;
+  update URLs must be https;
+- Clean up your own data and cache when uninstalled or disabled; do not write into host
+  directories.
 
----
+### 6.2 Requesting a built-in plug-in
 
-## 8. PR 与 Issue
+**You can ask** — open an Issue (suggested title: “Built-in plug-in request: <id>”) with:
 
-### 8.1 流程
+- Plug-in id, display name, one-line description, source URL and build instructions;
+- Licence (must be GPL-3.0 compatible);
+- The built APK, its size and sha256, and the host API version it requires;
+- Why it should be built in (used by everyone? core flow? not just “I made it and want it
+  bundled”);
+- Real-device verification evidence (device, Android version, game version, screenshots of the
+  main flows);
+- Maintenance commitment: who fixes issues, whether in-repository builds are acceptable, who
+  publishes updates;
+- Whether the update manifest is already declared in `plugin.json`.
 
-1. 先搜 Issue / 现有 PR，避免重复；
-2. 大改动先开 Issue；
-3. fork → 分支 → 小步提交；PR 基于 `main`，不回补旧版本；
-4. 本地跑两种构建 + 自检 + 人工手点 + 门禁；
-5. 按仓库自带的 PR 模板写描述（`.github/pull_request_template.md`，新建 PR 时自动出现），附证据；
-6. 回应 review；需要补验证就补，不要只回「应该没问题」。
+Maintainers judge it against these criteria (**acceptance is not guaranteed**): general, light and
+stable; the host remains fully functional after the plug-in is disabled, crashes or is removed;
+buildable source, self-tests or a smoke test, and a maintainer willing to keep it alive; clear
+provenance and licences for code, assets and icons; no host special-casing.
 
-PR 标题与 commit 用中文或英文都可以，写清「改了什么」即可。单个 PR 尽量小；
-改动很大时，先拆成能独立验证的几步。
+Built-in means: shipped with the app, users cannot uninstall it (they can disable it), it counts
+towards the app's installed size, and building, signing and updating are handled by the
+maintainers' process. Therefore “built-in” is only for core, long-term plug-ins; small nice-to-have
+plug-ins are better installed optionally. Agree before acceptance on who builds, who signs and who
+publishes updates.
 
-### 8.2 PR 模板
+### 6.3 Adding a host API
 
-模板只有一份：`.github/pull_request_template.md`，按它填即可。这里不再抄一遍——抄两份一定会漂。
-
-### 8.3 提交前 Checklist
-
-- [ ] 改动范围单一，没有夹带无关格式化 / 重命名 / 重构
-- [ ] 产品构建与 dev 构建都通过，日志末尾是 `== BUILD OK ==`
-- [ ] 新增 / 修改的行为有自检断言，且断言能失败
-- [ ] 在真机 / 模拟器上手动点过**所有相关功能**，证据已附；**手点是本人做的**
-- [ ] 涉及启动链的改动覆盖至少两个 API 段，并说明游戏版本；启动证据来自产品形态
-- [ ] 没有让安装包 / dex 无理由变大；新增依赖 / 大资源已说明
-- [ ] 没有破坏数据兼容、插件兼容、老入口
-- [ ] 文案与资源门禁通过
-- [ ] 文档已同步（README 中英文、插件接口文档、开发文档中相关的）
-- [ ] 没有提交构建产物、密钥、个人数据
-- [ ] 新增代码 / 资源来源清楚，许可证兼容
-
-### 8.4 Review 预期
-
-维护者可能要求补自检、补手点证据、拆小 PR，或要求改成插件实现；维护者不一定有你的设备 /
-游戏版本，所以证据必须自包含。允许讨论，但不接受反复催更、刷屏、重复开同一 PR；
-长时间（例如超过 30 天）无回应且无法验证的 PR 可能被关闭，补充信息后可以重开。
-被拒绝不等于否定你，多数时候只是「现在不合适 / 应该做成插件 / 无法验证」。
-
-### 8.5 Issue 也是贡献
-
-Bug 报告 / 功能请求同样欢迎，建议带上：启动器版本（设置 → 关于）与构建类型；设备型号、
-Android 版本；游戏包名、版本号与来源（官方 / MindustryX / 其他分支）；复现步骤、期望结果、
-实际结果；相关日志 / 崩溃报告（**先脱敏**，去掉路径、账号、设备标识）；是否装了插件 / 补丁、
-是否改过设置（这几项经常是原因）。
-
-功能请求请先看 README 的「不打算做的」列表，并说明使用场景，而不只是「想要这个功能」。
+Open an Issue first explaining the purpose, why the existing APIs are insufficient, at least two
+use cases, and the impact on old plug-ins. After the maintainers agree on the direction, implement
+it according to 4.3 and [docs/PLUGIN-API.md](docs/PLUGIN-API.md).
 
 ---
 
-## 9. 许可与原创性
+## 7. Code and build conventions
 
-- 本工程以 **GPL-3.0** 发布；提交 PR 即表示你同意你的贡献以 **GPL-3.0** 授权；
-- 你保留自己代码的著作权；本工程目前没有 CLA 流程（以后若引入会在这份文档里说明）；
-- **只提交你有权提交的内容**：不要提交反编译、破解、来源不明的代码；
-- 引用 / 移植第三方代码必须：许可证兼容、注明来源与改动、必要时更新 README 与应用内致谢；
-- 新引入的图标、字体、音效、数据表同样要有明确许可；游戏数据的生成表按 Mindustry 的许可使用；
-- AI 生成的代码也要过这一关：AI 可能复现不兼容许可的代码，提交者负责检查。
+This section lists only **long-term stable** constraints. Build commands, module boundaries and
+text/resource rules are defined in [docs/DEVELOPING.md](docs/DEVELOPING.md) (that document follows
+the code).
 
----
-
-## 10. 行为准则（简短版）
-
-- 对事不对人；可以尖锐地讨论技术，但不要人身攻击、歧视、骚扰；
-- 中文、英文都可以；维护者是志愿者，没有义务在某个时间内回复或接受你的改动；
-- 不要提交低质量 / 重复 PR、刷 commit、开小号重复提；
-- 发现安全问题，**不要**在公开 PR / Issue 里贴出可利用细节或用户数据；先通过私密渠道
-  （如仓库已开启的 GitHub private vulnerability reporting）联系维护者；如果只能用 Issue，
-  只说「有安全问题，需要私下联系」，不要写复现步骤。
-
----
-
-## 11. 常见问题
-
-**Q：我只想改一句翻译，也要自检 + 手点吗？**
-A：不用跑自检；但要过 i18n 检查，并导入语言包（或切换语言）确认 `rejected` / `unknown` 为 0。
-要进仓库内置语言，还要按开发文档登记。
-
-**Q：AI 写的代码能提吗？**
-A：能。但你要能解释、要自己验证。说不清改动的会被拒。
-
-**Q：我的功能该做成插件还是进本体？**
-A：只有所有人都需要、且属于核心流程的才进本体；可选 / 低频 / 体积大的做成插件。
-缺接口可以提 PR 加通用接口，但不能让宿主依赖插件才能正常启动。
-
-**Q：我能把自己做的插件设为内置吗？**
-A：可以提 Issue（见 6.2），但内置有体积、维护、许可、通用性要求，不保证接受。
-
-**Q：为什么我的 PR 没被合？**
-A：先对照第 4 节。最常见的原因是：无法验证、应该做成插件、体积 / 依赖代价、
-或者与项目「不打算做」的方向冲突。
-
-**Q：我不会写代码，能贡献什么？**
-A：翻译、文档、Bug 复现步骤、真机测试报告、插件使用反馈都很有价值。
-Issue 里写清楚设备 / 版本 / 复现步骤即可。
+- **No Gradle**: the build entry point is `./build.sh`; source level is Java 8; no new dependencies
+  by default;
+- Run both the **product** and **dev** builds after a change; the criterion is `== BUILD OK ==` at
+  the end of the log;
+- The build includes i18n and content gates; fix them instead of bypassing them;
+- UI strings go through the project's shared text layer and are English by default; **never use
+  text as a condition** (translation would silently change behaviour);
+- Pure-logic cores should avoid Android classes so they can be verified on a PC;
+- **Data compatibility**: keep unknown settings keys; changes to slot / backup / patch / transfer
+  station formats need migration and rollback; deletes go to the transfer station, not straight
+  away;
+- **Do not hand-edit generated files**; change the generator and record the input version;
+- Do not commit build artefacts, keys, passwords, personal saves or unredacted logs; built-in
+  plug-in APKs are product assets and are updated through the maintainers' process;
+- **Version numbers, tags and releases are handled by maintainers**; do not change them in a PR;
+- One PR does one thing; shared logic has one implementation, not copies in several entry points;
+- Match the existing style; do not mix in unrelated formatting or renames; discuss large renames
+  first; delete dead code instead of commenting it out.
 
 ---
 
-## 最后
+## 8. PRs and Issues
 
-这个项目的目标是：让每个 Mindustry 版本都能在一台安卓设备上安稳地玩自己的存档。
-所有规则都是围绕这一条：不破坏数据、不牺牲启动可靠性、不把可选功能塞进每个人的安装包。
+### 8.1 Process
 
-谢谢你的贡献。
+1. Search existing Issues and PRs first to avoid duplicates;
+2. Open an Issue first for large changes;
+3. Fork, branch, commit in small steps; base PRs on `main`, no backports to old versions;
+4. Run both builds, self-tests, manual click-through and gates locally;
+5. Write the PR description with the repository's PR template
+   (`.github/pull_request_template.md`, filled in automatically for new PRs) and attach evidence;
+6. Respond to review; add the requested verification instead of replying “it should be fine”.
+
+PR titles and commits can be in Chinese or English; write clearly what changed. Keep PRs small;
+split large changes into independently verifiable steps.
+
+### 8.2 PR template
+
+There is exactly one template: `.github/pull_request_template.md`. Fill it in; it is not copied
+here because two copies will drift.
+
+### 8.3 Checklist before submitting
+
+- [ ] The change is focused, with no unrelated formatting, renaming or refactoring
+- [ ] Both the product and dev builds pass, ending with `== BUILD OK ==`
+- [ ] New or changed behaviour has self-test assertions, and those assertions can fail
+- [ ] All affected features were clicked through on a real device or emulator, with evidence; the
+      clicking was done by the submitter
+- [ ] Launch-chain changes were verified on at least two API levels, with the game version stated;
+      startup evidence comes from the product build
+- [ ] The app / dex did not grow without a reason; new dependencies or large assets are explained
+- [ ] Data compatibility, plug-in compatibility and old entry points are intact
+- [ ] Text and resource gates pass
+- [ ] Documentation is updated (both READMEs, plug-in API docs, developer docs as relevant)
+- [ ] No build artefacts, keys or personal data are committed
+- [ ] The origin and licence of new code and assets are clear
+
+### 8.4 Review expectations
+
+Maintainers may ask for more self-tests, more manual evidence, a smaller PR, or a plug-in
+implementation instead. They may not have your device or game version, so the evidence must be
+self-contained. Discussion is welcome; repeated bumping, flooding and duplicate PRs are not. A PR
+with no response for a long time (for example more than 30 days) and no way to verify it may be
+closed; it can be reopened after more information is added. Rejection is not a judgement of you;
+usually it is just “not now / should be a plug-in / cannot be verified”.
+
+### 8.5 Issues are contributions too
+
+Bug reports and feature requests are welcome. Please include: the manager version (Settings → About)
+and build type; device model and Android version; game package name, version and origin (official /
+MindustryX / other fork); reproduction steps, expected result and actual result; relevant logs or
+crash reports (**redacted first**: remove paths, accounts, device identifiers); and whether any
+plug-ins or patches are installed, plus any settings you changed (these are often the cause).
+
+For feature requests, read the README's “not planned” list first and explain the use case, not
+just “I want this feature”.
+
+---
+
+## 9. Licensing and originality
+
+- This project is released under **GPL-3.0**; by submitting a PR you agree to license your
+  contribution under **GPL-3.0**;
+- You keep the copyright to your own code; there is currently no CLA process (this document will
+  say so if one is introduced later);
+- **Only submit what you have the right to submit**: no decompiled, cracked or unattributed code;
+- Borrowed or ported third-party code must be licence-compatible, note its origin and changes in
+  the file header, and update the README and in-app credits when necessary;
+- New icons, fonts, sounds and data tables also need a clear licence; tables generated from game
+  data follow Mindustry's licence;
+- AI-generated code has to pass this check too: AI may reproduce code under an incompatible
+  licence, and the submitter is responsible for checking.
+
+---
+
+## 10. Code of conduct (short version)
+
+- Criticise ideas, not people: sharp technical discussion is fine; personal attacks,
+  discrimination and harassment are not;
+- Chinese and English are both fine; maintainers are volunteers and are not obliged to reply or
+  accept a change within any particular time;
+- Do not submit low-quality or duplicate PRs, pad commit counts or open sock-puppet accounts to
+  repeat the same submission;
+- For security issues, **do not** post exploitable details or user data publicly. Contact the
+  maintainers through a private channel (for example GitHub private vulnerability reporting if the
+  repository has it enabled); if only an Issue is possible, say only “security issue, please
+  contact me privately” and do not include reproduction steps.
+
+---
+
+## 11. FAQ
+
+**Q: I only want to change one translation line. Do I still need self-tests and manual clicking?**
+A: You do not need the self-tests, but the i18n checks must pass, and you should import the
+language pack (or switch the language) and confirm `rejected` / `unknown` are 0. To make it a
+built-in language in the repository, register it as described in the developer documentation.
+
+**Q: Can I submit AI-written code?**
+A: Yes, but you must be able to explain it and verify it yourself. Changes you cannot explain will
+be rejected.
+
+**Q: Should my feature be a plug-in or part of the host?**
+A: Only features that everyone needs and that belong to the core flow go into the host; optional,
+low-frequency or large features become plug-ins. If an API is missing, you can PR a general one,
+but the host must never depend on a plug-in to start normally.
+
+**Q: Can I request that my plug-in be built in?**
+A: Yes, open an Issue (see 6.2). Built-in has size, maintenance, licensing and generality
+requirements, so acceptance is not guaranteed.
+
+**Q: Why was my PR not merged?**
+A: Compare it with section 4. The most common reasons are: it cannot be verified, it should be a
+plug-in, the size or dependency cost is too high, or it conflicts with something in the README's
+“not planned” list.
+
+**Q: I do not write code. What can I contribute?**
+A: Translations, documentation, reproduction steps, real-device test reports and plug-in feedback
+are all valuable. In an Issue, describe the device, version and reproduction steps.
+
+---
+
+## Final note
+
+The goal of this project is simple: **let every Mindustry version run stably on an Android device
+with its own saves**. Every rule above serves that goal: do not break data, do not sacrifice
+startup reliability, and do not put optional features into everyone's install.
+
+Thank you for contributing.

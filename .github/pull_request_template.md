@@ -1,4 +1,4 @@
-<!-- 提 PR 前请先读 CONTRIBUTING.md（English: CONTRIBUTING.en.md）。下面每一项都请如实填写；不适用的写 N/A。 -->
+<!-- 提 PR 前请先读 CONTRIBUTING.md（中文版: CONTRIBUTING.zh.md）。下面每一项都请如实填写；不适用的写 N/A。 -->
 <!-- English is fine. If you prefer English, fill in the same fields in English. -->
 
 ## 改了什么
