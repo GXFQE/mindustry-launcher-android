@@ -3133,16 +3133,18 @@ public final class SelfTest {
             } catch (Throwable ignored) {
             }
         }
-        // ⑪ 列表行实拼：基座版本**保留**、只去掉「基于」两个字（2026-10-25 用户：
-        //    「是把基于两个字去掉不是都去掉」）⇒ 行里是 `… 2026.09.X37（160.1）`。
-        String withBase = installed.displayName(ctx)
-                + ctx.getString(R.string.row_upstream_fmt, installed.upstreamNote());
-        ok(stat, L, withBase.equals("MindustryX  改端  2026.09.X37（160.1）"),
-                "★ 列表行实拼（没有「基于」）⇒ `" + withBase + "`");
-        ok(stat, L, !withBase.contains("基于"),
-                "★元断言：这串里真的没有「基于」两个字（否则上面那条等于没改）");
-        ok(stat, L, noDecl.displayName(ctx).equals("Mindustry  原端  159.7"),
-                "★ 官方行实拼 ⇒ 名称 + 原端 + 版本号，无尾注");
+        // ⑪ 列表行实拼（2026-11-10 用户订正：「版本号被折叠的问题又出现了，算了，基于原版的
+        //    版本号放下面那层吧」）⇒ 标题 = 名称 + 类型 + 版本号（**不带**基座尾注）；
+        //    基座版本进副标题（`… · 基于 160.1`），因为标题宽度预算保不住它。
+        String withBase = installed.displayName(ctx);
+        ok(stat, L, withBase.equals("MindustryX  改端  2026.09.X37"),
+                "★ 标题实拼：只到版本号为止（不再带基座尾注，防折叠）⇒ `" + withBase + "`");
+        String subFork = Versions.subtitleLine(ctx, installed, 0, 0);
+        ok(stat, L, subFork.contains("基于 160.1") && !withBase.contains("基于"),
+                "★ 基座版本改到副标题那层 ⇒ `" + subFork + "`");
+        ok(stat, L, noDecl.displayName(ctx).equals("Mindustry  原端  159.7")
+                        && !Versions.subtitleLine(ctx, noDecl, 0, 0).contains("基于"),
+                "★ 官方行：标题与副标题都不带基座");
         L.add("");
     }
 

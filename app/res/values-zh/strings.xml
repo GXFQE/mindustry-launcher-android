@@ -262,6 +262,7 @@
          （2026-10-04 真机 dump 抓到的现行；同理还有 3 条以空格开头的尾巴串，一并改掉了）。
     -->
     <string name="row_sub_fmt">%1$s · %2$s</string>
+    <string name="sub_with_upstream_fmt">%1$s · 基于 %2$s</string>
     <string name="row_imported_sub_fmt">导入 · %1$s · %2$s</string>
     <!--
       ★ 2026-10-06（一档④）：版本行补"这个槽里有几份存档"那一段。

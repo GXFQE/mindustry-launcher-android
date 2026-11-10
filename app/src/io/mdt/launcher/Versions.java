@@ -998,8 +998,25 @@ public final class Versions {
                             e.importFile == null ? "" : e.importFile, size)
                     : Trans.get(ctx, R.string.row_sub_fmt, e.pkg, size);
         }
-        if (patches <= 0) return base;
-        return Trans.get(ctx, R.string.subtitle_patch_fmt, patches, base);
+        if (patches <= 0) return appendUpstream(ctx, e, base);
+        return appendUpstream(ctx, e,
+                Trans.get(ctx, R.string.subtitle_patch_fmt, patches, base));
+    }
+
+    /**
+     * 把「基座版本」接在**副标题**末尾（`… · 基于 160.1`）。
+     *
+     * <p>★ 2026-11-10 用户订正：「版本号被折叠的问题又出现了，算了，基于原版的版本号放下面那层吧」——
+     * 之前它缀在**标题**里（`2026.10.10.B509（160.7）`），标题宽度预算本来就紧，一长就被 ellipsize
+     * 切掉版本号。副标题允许两行、且是弱化色，放这里既读得到也不挤标题。
+     *
+     * <p>判据：只对**声明了基座**的条目（{@link Entry#upstreamNote()} 非 null）显示；
+     * 官方包没有这段。
+     */
+    private static String appendUpstream(Context ctx, Entry e, String base) {
+        String up = e == null ? null : e.upstreamNote();
+        if (up == null || up.isEmpty()) return base;
+        return Trans.get(ctx, R.string.sub_with_upstream_fmt, base, up);
     }
 
     static List<Entry> scanInstalled(Context ctx) {
