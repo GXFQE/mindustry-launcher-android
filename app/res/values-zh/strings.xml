@@ -2180,7 +2180,6 @@
     <string name="patch_page_title">补丁</string>
     <string name="patch_badge_fmt">补丁 %1$d</string>
     <string name="subtitle_patch_fmt">补丁 %1$d · %2$s</string>
-    <string name="main_continue_patch_fmt">继续上次 · %1$s（补丁 %2$d）</string>
     <string name="patch_head_fmt">游戏：%1$s</string>
     <string name="patch_head_sub_fmt">APK %1$s · 已导入 %2$d 个</string>
     <string name="patch_empty">还没有导入补丁。</string>

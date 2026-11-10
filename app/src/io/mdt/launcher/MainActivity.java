@@ -1352,14 +1352,10 @@ public class MainActivity extends BaseActivity {
         mBtnContinue.setVisibility(View.VISIBLE);
         // ★ 2026-10-16 用户：「继续上次不要显示那个类型」—— 这行是纯文本按钮，没有列表行那种
         //   弱化层次，类型词在这里只是把"叫什么、哪一版"往后挤（见 Entry#displayName(ctx, boolean)）。
-        // ★ 第 345 轮：补丁状态补在最后（版本号仍在前面，ellipsize 不会先切掉版本号）。
-        //   两种形态各用一条整句资源，避免在代码里拼空格/括号（RES-04/RES-05 的坑）。
-        int patches = patchCountFor(e);
-        mContinueText.setText(patches > 0
-                ? Trans.get(MainActivity.this, R.string.main_continue_patch_fmt,
-                        e.displayName(this, false), patches)
-                : Trans.get(MainActivity.this, R.string.main_continue_fmt,
-                        e.displayName(this, false)));
+        // ★ 2026-11-10 用户：「要么那个继续上次不显示补丁吧」—— 补丁状态**只留在列表行**，
+        //   按钮回到「继续上次 · 名称 版本号」的一行短文本（加了补丁后缀它又会挤/折）。
+        mContinueText.setText(Trans.get(MainActivity.this, R.string.main_continue_fmt,
+                e.displayName(this, false)));
         mBtnContinue.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { startVersion(e); }
         });
