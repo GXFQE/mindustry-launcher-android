@@ -316,10 +316,15 @@ public final class Versions {
             if (e == null || e.upstreamChecked) continue;
             e.upstreamChecked = true;
             e.upstreamVersion = readUpstreamVersion(e.apkPath == null ? null : new File(e.apkPath));
-            // ★ 同一个"已检查过"的闸门里顺带补**真包名**（只对导入条目、且还没值）——
-            //   原端/改端判据要用它（见 `Entry.modded()`）；已装条目本来就有 pkg。
-            if (e.imported && (e.realPkg == null || e.realPkg.isEmpty())) {
-                e.realPkg = readArchivePkg(ctx, e.apkPath);
+            // ★ 同一个"已检查过"的闸门里顺带补**真包名** + **APK 清单里的发布版本名**
+            //   （只对导入条目，各读一次，不落 config）：
+            //   · realPkg —— 原端/改端判据要用它（见 `Entry.modded()`）；已装条目本来就有 pkg；
+            //   · archiveVersion —— 显示版本号要用它：导入的 fork 在 version.properties 里记的是
+            //     基座官方构建号，清单里才是它自己的发布版本（见 Entry#archiveVersion）。
+            if (e.imported && ctx != null) {
+                ArchiveMeta meta = readArchiveMeta(ctx, e.apkPath);
+                if (e.realPkg == null || e.realPkg.isEmpty()) e.realPkg = meta.pkg;
+                e.archiveVersion = meta.versionName;
             }
         }
     }
@@ -444,6 +449,25 @@ public final class Versions {
         public String customName = "";
 
         /**
+         * ★ **APK 清单里的发布版本名**（`android:versionName`）—— 只有导入条目才会由
+         * {@link #resolveUpstreamVersions} 补上。
+         *
+         * <p>为什么需要它：导入条目原来的 `versionName` 来自 `assets/version.properties`
+         * （**官方构建号**）。对官方包两者相同；但对 fork，version.properties 记的是它**基于哪个
+         * 官方版本**，而清单里才是 fork 自己的发布版本：
+         * <pre>
+         *   b509.apk     version.properties = 7-official-160.7        ← 基座
+         *                android:versionName = 8-official-2026.10.10.B509  ← 它自己
+         * </pre>
+         * 主界面要显示**后者**（与已装 MindustryX 显示 `2026.09.X37` 一致）；
+         * 基座由 {@link #upstreamVersion}（mod.hjson 的 minGameVersion）承担。
+         *
+         * <p>空串 = 没读到 / 不是导入条目 / 旧数据还没补 ⇒ 显示回落到 {@code versionName}。
+         * ⚠️ **数据格式判定（{@link #formatVersion()}）不看这里** —— 那个必须用基座。
+         */
+        public String archiveVersion = "";
+
+        /**
          * ★ **这一行绑的附加槽**（`null` = 主行，槽由「版本 → 槽」分配 + 默认槽算出来）。
          *
          * <p>一个版本可以绑多个槽，每绑一个槽列表里就多一行（见 {@link #expandBindings}）——
@@ -482,16 +506,28 @@ public final class Versions {
          *   ⚠️ 别在这儿重写一遍正则 —— 实现只能有一处。
          */
 
-        /** 原始 versionName（详情弹窗用它做"界面值从哪来"的对照） */
+        /**
+         * 原始版本串（详情弹窗用它做"界面值从哪来"的对照）。
+         *
+         * <p>★ 有 {@link #archiveVersion} 时用它 —— 详情里"原始版本名"该显示**这个 APK 自己的**
+         * 发布版本（`8-official-2026.10.10.B509`），基座版本另有 `detail_upstream_fmt` 一行。
+         */
         public String rawVersion() {
-            return versionName == null ? "" : versionName.trim();
+            String v = archiveVersion == null || archiveVersion.trim().isEmpty()
+                    ? versionName : archiveVersion;
+            return v == null ? "" : v.trim();
         }
 
         /**
          * 显示用版本号 —— **薄包装**，实现见 {@link Versions#displayVersionOf}。
+         *
+         * <p>★ 导入条目优先用 APK 清单里的发布版本（{@link #archiveVersion}）；没有再回落到
+         * config 里记的版本串（官方构建号）。判据示例：b509.apk ⇒ `2026.10.10.B509`（不是基座 160.7）。
          */
         public String displayVersion() {
-            return displayVersionOf(versionName);
+            String v = archiveVersion == null || archiveVersion.trim().isEmpty()
+                    ? versionName : archiveVersion;
+            return displayVersionOf(v);
         }
 
         /** 是否剥过前缀 —— 薄包装，见 {@link Versions#versionTrimmedOf}。 */
@@ -518,7 +554,9 @@ public final class Versions {
          */
         public String formatVersion() {
             String u = upstreamVersion == null ? "" : upstreamVersion.trim();
-            return u.isEmpty() ? displayVersion() : u;
+            // ★ 回落**不能**用 displayVersion()：那可能取到 fork 自己的发布版本（archiveVersion），
+            //   而"存档数据格式"要的是基座官方版本 ⇒ 显式用 config 里记的那份（官方构建号）。
+            return u.isEmpty() ? displayVersionOf(versionName) : u;
         }
 
         /**
@@ -777,19 +815,33 @@ public final class Versions {
         return 1 + Config.get().extraSlotsOf(key).size();
     }
 
+    /** 一个 APK 文件里声明的包名 + 发布版本名（不安装它）。 */
+    static final class ArchiveMeta {
+        final String pkg;
+        final String versionName;
+        ArchiveMeta(String pkg, String versionName) {
+            this.pkg = pkg == null ? "" : pkg;
+            this.versionName = versionName == null ? "" : versionName;
+        }
+    }
+
     /**
-     * 读一个 APK 文件里声明的**包名**（不安装它）。
-     * ⚠️ 读不到（坏包 / 缺权限）返回空串 —— 调用方按"未知"处理，**不抛**。
+     * 读一个 APK 文件里声明的**包名**与**发布版本名**（`android:versionName`，带 `8-official-` 前缀原文）。
+     *
+     * <p>⚠️ 读不到（坏包 / 缺权限 / ctx 为空）返回空串 —— 调用方按"未知"处理，**不抛**。
+     * 版本名的用途见 {@link Entry#archiveVersion}：导入的 fork 在 version.properties 里记的是基座，
+     * 清单里才是自己的发布版本。
      */
-    static String readArchivePkg(Context ctx, String apkPath) {
-        if (ctx == null || apkPath == null || apkPath.isEmpty()) return "";
+    static ArchiveMeta readArchiveMeta(Context ctx, String apkPath) {
+        if (ctx == null || apkPath == null || apkPath.isEmpty()) return new ArchiveMeta("", "");
         try {
             android.content.pm.PackageInfo pi = ctx.getPackageManager()
                     .getPackageArchiveInfo(apkPath, 0);
-            return pi == null || pi.packageName == null ? "" : pi.packageName;
+            if (pi == null) return new ArchiveMeta("", "");
+            return new ArchiveMeta(pi.packageName, pi.versionName);
         } catch (Throwable t) {
-            Log.w(TAG, "readArchivePkg failed for " + apkPath + ": " + t);
-            return "";
+            Log.w(TAG, "readArchiveMeta failed for " + apkPath + ": " + t);
+            return new ArchiveMeta("", "");
         }
     }
     /** 按精确包名取 base.apk（未安装返回 null） */

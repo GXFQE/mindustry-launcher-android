@@ -2906,13 +2906,28 @@ public final class SelfTest {
         Versions.Entry noDecl = mkEntry("Mindustry", "8-official-159.7", null);
         ok(stat, L, noDecl.upstreamNote() == null,
                 "官方本体没声明 ⇒ 不备注（整串与从前逐字相同）");
-        //   ★★ 这条是**导入的 fork**，也是上一轮报告里那个"看着像两个不同东西"的现象：
-        //      它的显示版本本来就取自 `version.properties` 的上游 build（`Importer.readVersion`），
+        //   ★★ 这条是**导入的 fork**（旧数据形态：没有 archiveVersion）。
+        //      它的显示版本取自 `version.properties` 的上游 build（`Importer.readVersion`），
         //      与 `minGameVersion` **同源同值** ⇒ 行首已经是 `160.1`，再缀"基于 160.1"是同义反复。
+        //      ⚠️ 2026-11-10 起新读到的导入条目会用 APK 清单里的发布版本（见下面 impForkReal），
+        //      这条只覆盖"读不到清单版本名"时的回落。
         Versions.Entry impFork = mkEntry("tmp-import-test", "8-official-160.1", "160.1");
         ok(stat, L, "160.1".equals(impFork.displayVersion()) && "160.1".equals(impFork.upstreamNote()),
-                "★ 导入的 fork：显示版本恰等于基座也**照样备注**（2026-10-16 用户要标题带「基于 X」；"
-                        + "标题另有「改端」二字，不再同义反复）");
+                "★ 导入的 fork（清单版本名读不到时）：显示版本回落到基座也**照样备注**"
+                        + "（2026-10-16 用户要标题带「基于 X」）");
+        //   ★★ 2026-11-10 用户反馈：「最后那个 b509 有点奇怪，怎么不是改端的版本号？」
+        //      ⇒ 导入的 fork 显示 **APK 清单里的发布版本**（b509.apk ⇒ 8-official-2026.10.10.B509），
+        //      数据格式（同槽冲突判据）**仍按基座** 160.7 —— 两者不能混。
+        Versions.Entry impForkReal = mkEntry("MindustryX", "7-official-160.7", "160.7");
+        impForkReal.imported = true;
+        impForkReal.archiveVersion = "8-official-2026.10.10.B509";
+        ok(stat, L, "2026.10.10.B509".equals(impForkReal.displayVersion())
+                        && "8-official-2026.10.10.B509".equals(impForkReal.rawVersion())
+                        && "160.7".equals(impForkReal.formatVersion())
+                        && "160.7".equals(impForkReal.upstreamNote()),
+                "★ 导入的 fork：显示 APK 自己的发布版本（b509 ⇒ 2026.10.10.B509），"
+                        + "数据格式仍按基座（实得 显示 " + impForkReal.displayVersion()
+                        + " / 格式 " + impForkReal.formatVersion() + "）");
         //   ★ 元断言：证明上一条不是"恒 null"——同一个方法对已装 fork 必须给值。
         ok(stat, L, installed.upstreamNote() != null && impFork.upstreamNote() != null && noDecl.upstreamNote() == null,
                 "★元断言：upstreamNote 只对**没声明基座**的返回 null（声明过的都显示 —— 用户 2026-10-16 要标题里带「基于 X」）");
@@ -16289,6 +16304,19 @@ public final class SelfTest {
                         "④ 版本行副标题：没补丁不带徽标；有补丁 = `" + badge
                                 + " · 原副标题`（原信息一字不少）");
             }
+            // ★ 2026-11-10 用户反馈「b509 怎么不是改端的版本号？」⇒ 真机数据上验一次
+            //   「导入的 fork 能读到自己的清单版本名」（读不到就会退回基座，正是用户看到的怪象）。
+            java.util.List<Versions.Entry> rowsAll = Versions.scanAll(ctx);
+            Versions.resolveUpstreamVersions(rowsAll, ctx);
+            boolean sawImportedFork = false, importedForkOk = true;
+            for (Versions.Entry e2 : rowsAll) {
+                if (e2 == null || !e2.imported) continue;
+                if (Versions.OFFICIAL_PKG.equals(e2.realPkg)) continue;   // 官方包不属于这条
+                sawImportedFork = true;
+                if (e2.archiveVersion == null || e2.archiveVersion.trim().isEmpty()) importedForkOk = false;
+            }
+            ok(stat, L, !sawImportedFork || importedForkOk,
+                    "④ 真机导入的 fork 都能读到 APK 清单版本名（archiveVersion 非空 ⇒ 显示自己的版本号）");
             ok(stat, L, Patches.conflicts(ctx, VKEY, recB, apkSha).size() == 1,
                     "④ 同类冲突：B 与已启用的 A 冲突（同改 io.mdt.launcher.PatchProbe）");
             boolean conflictRejected;
