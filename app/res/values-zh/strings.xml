@@ -171,7 +171,7 @@
     <!-- 列表行里 fork 的基座版本：「（160.1）」—— 用户 2026-10-25：「是把基于两个字去掉不是都去掉」 -->
     <string name="row_upstream_fmt">（%1$s）</string>
     <string name="version_page_title">版本</string>
-    <string name="version_page_slot_fmt">这个启动项用槽「%1$s」 · %2$d 份存档</string>
+    <string name="version_page_slot_fmt">这个启动项用槽「%1$s」 · %2$d 份备份</string>
     <string name="version_row_slot">换槽…</string>
     <string name="version_row_slot_sub">给这个启动项换一个槽</string>
     <string name="version_row_slot_sub_fmt">现在用「%1$s」</string>
@@ -219,14 +219,16 @@
     <string name="add_package_msg">按精确包名查已装的游戏版本</string>
     <string name="add_package_hint">如 io.anuke.mindustry</string>
     <string name="detail_slot_line_fmt">\n\n存档槽：%1$s</string>
-    <!-- ★ 2026-10-06（一档④）：这个版本指向的槽里有多少份存档 / 上次什么时候启动的（只在详情弹窗里）
+    <!-- ★ 2026-10-06（一档④）：这个版本指向的槽里有多少份**备份** / 上次什么时候启动的（只在详情弹窗里）
+         ★ 2026-11-10 用户：「我管他有多少存档干嘛」⇒ 口径从"槽里的 .msav 存档数"改成"备份份数"
+            （`VersionOps.backupCountIn` → `Backup.list`）；三处（行副标题 / 版本页 / 详情）共用。
          🔴 措辞两处都刻意保守：
             ① 说「上次**启动**」不说「上次玩」—— 记账写在**点启动的那一刻**（`Config.sessionStart`），
                启动失败也会留下这条记录；
             ② 没记录时写「还没有记录」而不是「还没玩过」—— 这个字段**从本版才开始记**，
                老用户的游戏历史我们根本不知道（拿不准的判断不许说成结论，见 REF §77.5）。 -->
-    <string name="detail_saves_fmt">\n这个槽里有 %1$d 份存档</string>
-    <string name="detail_saves_none">\n这个槽里还没有存档</string>
+    <string name="detail_saves_fmt">\n这个槽里有 %1$d 份备份</string>
+    <string name="detail_saves_none">\n这个槽里还没有备份</string>
     <string name="detail_played_fmt">\n上次启动：%1$s</string>
     <string name="detail_played_none">\n上次启动：还没有记录</string>
     <string name="detail_slot_hint">\n（不同版本用不同的槽，存档就不会互相覆盖）</string>
@@ -265,14 +267,16 @@
     <string name="sub_with_upstream_fmt">%1$s · 基于 %2$s</string>
     <string name="row_imported_sub_fmt">导入 · %1$s · %2$s</string>
     <!--
-      ★ 2026-10-06（一档④）：版本行补"这个槽里有几份存档"那一段。
+      ★ 2026-10-06（一档④）：版本行补"这个槽里有几份**备份**"那一段。
+      ★ 2026-11-10 用户：「我管他有多少存档干嘛」⇒ 改数**备份份数**（`Backup.list`），
+        不再数槽里的 `.msav` 存档文件；0 份时不加这一段。
       ⚠️ **这两条曾经只加在默认目录（英文）里** —— 于是中文界面下这一行渲染成
         `io.anuke.mindustry · 74.7 MB · 8 save(s)`（中英混排，真机 dump 抓到的）。
         门禁 RES-02 只比"两边都有的 key 的参数集合"，**抓不到只在一边存在的 key**
         （回落到默认语言是合法行为）⇒ 这类漏加只能靠"改完文案 dump 回读"。
     -->
-    <string name="row_sub_saves_fmt">%1$s · %2$s · 存档 %3$d 份</string>
-    <string name="row_imported_sub_saves_fmt">导入 · %1$s · %2$s · 存档 %3$d 份</string>
+    <string name="row_sub_saves_fmt">%1$s · %2$s · 备份 %3$d 份</string>
+    <string name="row_imported_sub_saves_fmt">导入 · %1$s · %2$s · 备份 %3$d 份</string>
 
     <!-- dev 直通口（仅 debuggable 构建可见） -->
     <string name="dev_blocked_toast">发布构建不接受 dev_* 直通口</string>

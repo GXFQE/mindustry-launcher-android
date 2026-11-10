@@ -184,7 +184,7 @@
     <!-- The base version of a fork, in the list row: user 2026-10-25 asked to drop the words only -->
     <string name="row_upstream_fmt">\u0020(%1$s)</string>
     <string name="version_page_title">Version</string>
-    <string name="version_page_slot_fmt">This launch entry uses slot \"%1$s\" · %2$d saves</string>
+    <string name="version_page_slot_fmt">This launch entry uses slot \"%1$s\" · %2$d backup(s)</string>
     <string name="version_row_slot">Change slot…</string>
     <string name="version_row_slot_sub">Pick another slot for this launch entry</string>
     <string name="version_row_slot_sub_fmt">Now using \"%1$s\"</string>
@@ -235,8 +235,8 @@
          The wording is deliberately conservative: "last launch" (the record is written when the
          launch starts, so a failed launch still leaves one) and "no record yet" (the field only
          starts recording with this build — we do not know the player's older history). -->
-    <string name="detail_saves_fmt">\nThis slot has %1$d save(s)</string>
-    <string name="detail_saves_none">\nThis slot has no saves yet</string>
+    <string name="detail_saves_fmt">\nThis slot has %1$d backup(s)</string>
+    <string name="detail_saves_none">\nThis slot has no backups yet</string>
     <string name="detail_played_fmt">\nLast launch: %1$s</string>
     <string name="detail_played_none">\nLast launch: no record yet</string>
     <string name="detail_slot_hint">\n(different versions in different slots never overwrite each other)</string>
@@ -275,13 +275,15 @@
     <string name="sub_with_upstream_fmt">%1$s · based on %2$s</string>
     <string name="row_imported_sub_fmt">Imported · %1$s · %2$s</string>
     <!--
-      ★ 2026-10-06: the version row also says how many saves its slot holds.
+      ★ 2026-10-06: the version row also says how many **backups** its slot holds.
+      2026-11-10 user: "why would I care how many saves there are" — the count now comes
+      from `Backup.list` (VersionOps.backupCountIn), not from the `.msav` files in the slot.
       Same shape as the two above (whole sentence + positional args), just one more
       trailing segment — it must stay short, the row is capped at two lines.
       Filled in **later**, from a background count (0 = the segment is not added at all).
     -->
-    <string name="row_sub_saves_fmt">%1$s · %2$s · %3$d save(s)</string>
-    <string name="row_imported_sub_saves_fmt">Imported · %1$s · %2$s · %3$d save(s)</string>
+    <string name="row_sub_saves_fmt">%1$s · %2$s · %3$d backup(s)</string>
+    <string name="row_imported_sub_saves_fmt">Imported · %1$s · %2$s · %3$d backup(s)</string>
 
     <!-- dev 直通口（仅 debuggable 构建可见） -->
     <string name="dev_blocked_toast">Release builds do not accept dev_* entry points</string>

@@ -76,20 +76,21 @@ final class VersionOps {
                 .show();
     }
 
-    /** 这个槽里有几份存档 —— 与列表行、详情同一口径（`.msav`、跳过隐藏文件） */
-    static int saveCountIn(Context c, String slot) {
-        File dir = new File(Data.dirOf(c, slot), "saves");
-        File[] fs = dir.listFiles();
-        if (fs == null) return 0;
-        int n = 0;
-        for (File f : fs) {
-            if (f == null || !f.isFile()) continue;
-            String name = f.getName();
-            if (name.startsWith(".")) continue;
-            if (!name.toLowerCase(java.util.Locale.ROOT).endsWith(".msav")) continue;
-            n++;
+    /**
+     * 这个槽在备份池里有几份**备份**（列表行 / 版本页 / 详情共用这一处口径）。
+     *
+     * <p>★ 2026-11-10 用户：「我管他有多少存档干嘛」⇒ 原来数的是槽里 `.msav` 存档文件数，
+     * 现在改成数备份（与槽页「看看有哪些备份…」同一个数据源 `Backup.list`）。
+     * 读不到就当 0（备份目录还没建 / 槽不存在），**不抛**。
+     */
+    static int backupCountIn(Context c, String slot) {
+        if (c == null || slot == null || slot.isEmpty()) return 0;
+        try {
+            List<Backup.Snapshot> list = Backup.list(c, slot);
+            return list == null ? 0 : list.size();
+        } catch (Throwable t) {
+            return 0;
         }
-        return n;
     }
 
     // ── 选槽（换槽与克隆共用同一份列表）──────────────────────────────────
@@ -350,7 +351,8 @@ final class VersionOps {
 
     /** 详情里"这个槽"那两行（后台线程）：存档份数 + 上次玩（读 config 那笔记账） */
     private static String slotFacts(Activity a, Versions.Entry e) {
-        int n = saveCountIn(a, Versions.slotFor(e));
+        // ★ 2026-11-10：口径从"槽里有几份存档"改成"有几份备份"（用户：「我管他有多少存档干嘛」）
+        int n = backupCountIn(a, Versions.slotFor(e));
         StringBuilder sb = new StringBuilder();
         sb.append(n > 0 ? Trans.get(a, R.string.detail_saves_fmt, n)
                 : Trans.get(a, R.string.detail_saves_none));

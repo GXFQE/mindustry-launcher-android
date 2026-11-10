@@ -973,8 +973,8 @@ public final class Versions {
      *   版本页原先直接印 {@link Entry#subtitle} 的长形态（带 `/data/app/~~…/base.apk` 整条路径），
      *   三行都是路径，真机截图一眼就看出该用紧凑的那份。
      */
-    public static String subtitleLine(android.content.Context ctx, Entry e, int saves) {
-        return subtitleLine(ctx, e, saves, 0);
+    public static String subtitleLine(android.content.Context ctx, Entry e, int backups) {
+        return subtitleLine(ctx, e, backups, 0);
     }
 
     /**
@@ -982,16 +982,19 @@ public final class Versions {
      * "这一版其实被补丁改成 fork 了"）⇒ 有启用补丁时前缀显示 `补丁 N · …`。
      *
      * @param patches 这个版本 key 上启用了几条补丁（0 = 没打补丁，维持原样）
+     * @param backups 这个槽在备份池里有几份**备份**（0 = 没备份，不加那一段）
+     *                —— 2026-11-10 用户：「我管他有多少存档干嘛」⇒ 原来数 `.msav` 存档文件数，
+     *                改成数备份（`VersionOps.backupCountIn`，与槽页「看看有哪些备份…」同源）。
      */
-    public static String subtitleLine(android.content.Context ctx, Entry e, int saves, int patches) {
+    public static String subtitleLine(android.content.Context ctx, Entry e, int backups, int patches) {
         String base;
         if (e == null) return "";
         String size = Util.formatSize(e.apkSize);
-        if (saves > 0) {
+        if (backups > 0) {
             base = e.imported
                     ? Trans.get(ctx, R.string.row_imported_sub_saves_fmt,
-                            e.importFile == null ? "" : e.importFile, size, saves)
-                    : Trans.get(ctx, R.string.row_sub_saves_fmt, e.pkg, size, saves);
+                            e.importFile == null ? "" : e.importFile, size, backups)
+                    : Trans.get(ctx, R.string.row_sub_saves_fmt, e.pkg, size, backups);
         } else {
             base = e.imported
                     ? Trans.get(ctx, R.string.row_imported_sub_fmt,

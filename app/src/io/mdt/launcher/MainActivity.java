@@ -773,8 +773,8 @@ public class MainActivity extends BaseActivity {
             bindVersionRow(v, e);
             mListContainer.addView(v);
         }
-        // ★ 一档④：副标题里"这个槽有几份存档"那一段**后台补**（见 fillSlotSaveCounts）
-        fillSlotSaveCounts(mEntries);
+        // ★ 一档④：副标题里"这个槽有几份备份"那一段**后台补**（见 fillSlotBackupCounts）
+        fillSlotBackupCounts(mEntries);
     }
 
     /**
@@ -786,7 +786,19 @@ public class MainActivity extends BaseActivity {
      * ⚠️ 收尾要比 `mEntries` 的**对象身份**：用户可能已经 re-scan 过（列表换了一批对象），
      *   拿旧的下标去写新列表就是"张冠李戴"。
      */
-    private void fillSlotSaveCounts(final List<Versions.Entry> entries) {
+    /**
+     * ★ 2026-10-06（一档④）：把"这个版本的槽里有几份**备份**"补到行上。
+     *
+     * <p>★ 2026-11-10 用户订正：「我管他有多少存档干嘛」——这里原来数的是槽里的 `.msav` 存档文件数，
+     * 对用户没有行动价值；改成数**备份份数**（`Backup.list(slot)`，与槽页「看看有哪些备份…」同源）。
+     *
+     * ★ 为什么后台 + 按槽去重：`bindVersionRow` 跑在 UI 线程上，而这里要**列目录**；
+     *   版本一多就是 N 次遍历。同槽的版本共用一次结果（`map` 去重），整段在后台线程。
+     * ★ 为什么只刷那一行：与存档列表那条同一个教训 —— 整片重排会让正在滚动的手感变差。
+     * ⚠️ 收尾要比 `mEntries` 的**对象身份**：用户可能已经 re-scan 过（列表换了一批对象），
+     *   拿旧的下标去写新列表就是"张冠李戴"。
+     */
+    private void fillSlotBackupCounts(final List<Versions.Entry> entries) {
         if (entries == null || entries.isEmpty() || mListContainer == null) return;
         new Thread(new Runnable() {
             @Override public void run() {
@@ -794,7 +806,7 @@ public class MainActivity extends BaseActivity {
                 for (Versions.Entry e : entries) {
                     String s = Versions.slotFor(e);
                     if (s == null || s.isEmpty() || counts.containsKey(s)) continue;
-                    counts.put(s, saveCountIn(s));
+                    counts.put(s, VersionOps.backupCountIn(MainActivity.this, s));
                 }
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
@@ -811,37 +823,17 @@ public class MainActivity extends BaseActivity {
                     }
                 });
             }
-        }, "slot-save-count").start();
+        }, "slot-backup-count").start();
     }
 
     /**
-     * 一个槽里有几份存档 —— **只数文件**（不读 meta）。
-     * ★ 与槽页那条"读每一份存档的元数据"刻意不同：槽页只需算一次、可以慢；
-     *   这里要按版本行算，只数文件名就够了（".msav" 且不是隐藏文件）。
-     */
-    private int saveCountIn(String slot) {
-        File dir = new File(Data.dirOf(this, slot), "saves");
-        File[] fs = dir.listFiles();
-        if (fs == null) return 0;
-        int n = 0;
-        for (File f : fs) {
-            if (f == null || !f.isFile()) continue;
-            String name = f.getName();
-            if (name.startsWith(".")) continue;
-            if (!name.toLowerCase(java.util.Locale.ROOT).endsWith(".msav")) continue;
-            n++;
-        }
-        return n;
-    }
-
-    /**
-     * 版本行副标题（**唯一实现**：绑定那一行与后台补"存档 N 份"都走它）。
-     * ★ 零份时**不加那一段**（"存档 0 份"没有信息量，还会把行撑到两行）。
+     * 版本行副标题（**唯一实现**：绑定那一行与后台补"备份 N 份"都走它）。
+     * ★ 零份时**不加那一段**（"备份 0 份"没有信息量，还会把行撑到两行）。
      * ★ 第 345 轮：带上这个版本 key 上启用的补丁数（>0 时前缀 `补丁 N`）。
      */
-    private String rowSubtitle(Versions.Entry e, int saves) {
+    private String rowSubtitle(Versions.Entry e, int backups) {
         // 实现在 Versions（版本页的标题卡用同一份，2026-10-25 收口）
-        return Versions.subtitleLine(this, e, saves, patchCountFor(e));
+        return Versions.subtitleLine(this, e, backups, patchCountFor(e));
     }
 
     /** 这个版本 key 上启用了几条补丁（0 = 没打补丁）。 */
@@ -1129,14 +1121,14 @@ public class MainActivity extends BaseActivity {
             }
         }
         if (!changed) return false;
-        // ★ 换一份**新列表**，不原地改：后台补"存档 N 份"的线程正握着旧的 mEntries 在遍历
+        // ★ 换一份**新列表**，不原地改：后台补"备份 N 份"的线程正握着旧的 mEntries 在遍历
         //   （原地改会撞 ConcurrentModificationException）；换新列表后它在 UI 收尾时按身份判死
-        //   （见 fillSlotSaveCounts 的 `mEntries != entries`）。
+        //   （见 fillSlotBackupCounts 的 `mEntries != entries`）。
         mEntries = ordered;
         Config.get().setMainOrder(keys);
         // 顺序变了 ⇒ 行上的下标也变了；后台补的那趟可能已经按旧列表跑完 / 判死，
-        // 这里按新顺序再补一次（纯 IO，几毫秒），否则刚拖过的行会缺「存档 N 份」那一段。
-        fillSlotSaveCounts(mEntries);
+        // 这里按新顺序再补一次（纯 IO，几毫秒），否则刚拖过的行会缺「备份 N 份」那一段。
+        fillSlotBackupCounts(mEntries);
         return true;
     }
 

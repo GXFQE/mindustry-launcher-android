@@ -8368,16 +8368,22 @@ public final class SelfTest {
         }
 
         // ④ 版本行 / 详情：带条数与不带条数**必须真的是两句话**
+        //   ★ 2026-11-10 用户：「我管他有多少存档干嘛」⇒ 这一段改数**备份份数**，
+        //     文案必须说「备份」而不是「存档」（设备语言在这条用例里被 force 成中文）。
         String withSaves = ctx.getString(R.string.row_sub_saves_fmt, "com.x", "74.7 MB", 7);
         String plain = ctx.getString(R.string.row_sub_fmt, "com.x", "74.7 MB");
         ok(stat, L, withSaves.contains("7") && !withSaves.equals(plain),
-                "版本行：带存档条数的那句与不带的那句不同（且填进了 7）");
+                "版本行：带备份条数的那句与不带的那句不同（且填进了 7）");
+        ok(stat, L, withSaves.contains("备份") && !withSaves.contains("存档"),
+                "★版本的这一段说的是**备份份数**，不是存档份数：" + withSaves);
         String impSaves = ctx.getString(R.string.row_imported_sub_saves_fmt, "a.apk", "74.7 MB", 7);
-        ok(stat, L, impSaves.contains("a.apk") && impSaves.contains("7"),
-                "版本行：导入项那条同样带文件名与条数");
-        ok(stat, L, !ctx.getString(R.string.detail_saves_fmt, 7)
-                        .equals(ctx.getString(R.string.detail_saves_none)),
-                "版本详情：有存档 / 没存档是两句不同的话");
+        ok(stat, L, impSaves.contains("a.apk") && impSaves.contains("7") && impSaves.contains("备份"),
+                "版本行：导入项那条同样带文件名、条数与「备份」");
+        String detailHas = ctx.getString(R.string.detail_saves_fmt, 7);
+        String detailNone = ctx.getString(R.string.detail_saves_none);
+        ok(stat, L, !detailHas.equals(detailNone) && detailHas.contains("备份")
+                        && detailNone.contains("备份") && !detailHas.contains("存档"),
+                "版本详情：有备份 / 没备份是两句不同的话，且都说「备份」");
         ok(stat, L, Trash.timeText(0).isEmpty(),
                 "★元断言：timeText(0) 必须是空串（否则「上次玩：」后面会跟一片空白）");
         ok(stat, L, !Trash.timeText(System.currentTimeMillis()).isEmpty(),

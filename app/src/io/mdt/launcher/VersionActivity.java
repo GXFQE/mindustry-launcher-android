@@ -146,18 +146,19 @@ public class VersionActivity extends BaseActivity {
 
         String name = found.displayName(this);
         String slot = Versions.slotFor(found);
-        int saves = VersionOps.saveCountIn(this, slot);
+        // ★ 2026-11-10 用户：「我管他有多少存档干嘛」⇒ 这里数的是**备份份数**（不是 .msav 文件数）。
+        int backups = VersionOps.backupCountIn(this, slot);
         // ★ 第 345 轮：这一页的标题卡也带补丁状态（与主界面行同一份文案 / 同一判据），
         //   下面「补丁」行动作行复用这个数（不再重复算）。
         int patchCount = Patches.enabledCount(this, mKey);
         setTitle(name);
         ((TextView) findViewById(R.id.version_title)).setText(name);
-        // 副标题用**列表行那份紧凑文案**（来源 · 大小 · 存档 N 份）——
+        // 副标题用**列表行那份紧凑文案**（来源 · 大小 · 备份 N 份）——
         // 别用 Entry.subtitle() 的长形态：它带整条 `/data/app/~~…/base.apk` 路径，真机上占三行。
         ((TextView) findViewById(R.id.version_sub)).setText(
-                Versions.subtitleLine(this, found, saves, patchCount));
+                Versions.subtitleLine(this, found, backups, patchCount));
         ((TextView) findViewById(R.id.version_slot)).setText(Trans.get(this,
-                R.string.version_page_slot_fmt, slot, saves));
+                R.string.version_page_slot_fmt, slot, backups));
 
         // 「换槽」的副标题写清这一行现在用的是哪个槽（页面标题是版本名，不是槽名）
         ((TextView) findViewById(R.id.row_ver_slot).findViewById(R.id.act_sub)).setText(
