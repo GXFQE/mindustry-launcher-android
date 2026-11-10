@@ -52,6 +52,12 @@ public class MainActivity extends BaseActivity {
 
     List<Versions.Entry> mEntries;
 
+    /**
+     * 每个版本 key 上启用了几条补丁（第 345 轮用户反馈：行上要能看到"这版打了补丁"）。
+     * 由 {@link #rescan()} 一次算好（连同列表一起重建，避免每行各扫一遍补丁库）。
+     */
+    private java.util.Map<String, Integer> mPatchCounts = java.util.Collections.emptyMap();
+
     // F3b：版本列表容器（LinearLayout，条目代码挂载）+ 空态
     private ViewGroup mListContainer;
     private TextView mEmpty;
@@ -697,6 +703,9 @@ public class MainActivity extends BaseActivity {
         // ★ 第 319 轮：手工顺序只在**主界面**应用（`scanAll` 保持扫描顺序 —— 版本页 / 模组页 /
         //   插件拿到的版本清单都不该因为主界面的排序而变）。判据本体在 `Versions.orderRows`。
         mEntries = Versions.orderRows(Versions.scanAll(this), Config.get().mainOrder());
+        // ★ 第 345 轮用户反馈：行上只写"原端/改端"看不出"这版其实打了补丁" ⇒ 副标题前缀 `补丁 N`。
+        //   口径与补丁页「已启用 N 个」同一份（只数记录还在的引用，见 Patches.enabledCounts）。
+        mPatchCounts = Patches.enabledCounts(this);
         computeConflicts();
         rebuildList();
         if (mStatusSummary != null) {
@@ -828,10 +837,18 @@ public class MainActivity extends BaseActivity {
     /**
      * 版本行副标题（**唯一实现**：绑定那一行与后台补"存档 N 份"都走它）。
      * ★ 零份时**不加那一段**（"存档 0 份"没有信息量，还会把行撑到两行）。
+     * ★ 第 345 轮：带上这个版本 key 上启用的补丁数（>0 时前缀 `补丁 N`）。
      */
     private String rowSubtitle(Versions.Entry e, int saves) {
         // 实现在 Versions（版本页的标题卡用同一份，2026-10-25 收口）
-        return Versions.subtitleLine(this, e, saves);
+        return Versions.subtitleLine(this, e, saves, patchCountFor(e));
+    }
+
+    /** 这个版本 key 上启用了几条补丁（0 = 没打补丁）。 */
+    private int patchCountFor(Versions.Entry e) {
+        if (e == null || mPatchCounts == null || mPatchCounts.isEmpty()) return 0;
+        Integer n = mPatchCounts.get(e.key());
+        return n == null ? 0 : n;
     }
 
     /** 把一行「版本」填上数据并接上交互（原 Adapter.getView 的逻辑，一字未改）。 */
@@ -1343,8 +1360,14 @@ public class MainActivity extends BaseActivity {
         mBtnContinue.setVisibility(View.VISIBLE);
         // ★ 2026-10-16 用户：「继续上次不要显示那个类型」—— 这行是纯文本按钮，没有列表行那种
         //   弱化层次，类型词在这里只是把"叫什么、哪一版"往后挤（见 Entry#displayName(ctx, boolean)）。
-        mContinueText.setText(Trans.get(MainActivity.this, R.string.main_continue_fmt,
-                e.displayName(this, false)));
+        // ★ 第 345 轮：补丁状态补在最后（版本号仍在前面，ellipsize 不会先切掉版本号）。
+        //   两种形态各用一条整句资源，避免在代码里拼空格/括号（RES-04/RES-05 的坑）。
+        int patches = patchCountFor(e);
+        mContinueText.setText(patches > 0
+                ? Trans.get(MainActivity.this, R.string.main_continue_patch_fmt,
+                        e.displayName(this, false), patches)
+                : Trans.get(MainActivity.this, R.string.main_continue_fmt,
+                        e.displayName(this, false)));
         mBtnContinue.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) { startVersion(e); }
         });

@@ -922,18 +922,32 @@ public final class Versions {
      *   三行都是路径，真机截图一眼就看出该用紧凑的那份。
      */
     public static String subtitleLine(android.content.Context ctx, Entry e, int saves) {
+        return subtitleLine(ctx, e, saves, 0);
+    }
+
+    /**
+     * 同上，另带**补丁状态**（第 345 轮用户反馈：列表上只写"原端/改端"不足以说明
+     * "这一版其实被补丁改成 fork 了"）⇒ 有启用补丁时前缀显示 `补丁 N · …`。
+     *
+     * @param patches 这个版本 key 上启用了几条补丁（0 = 没打补丁，维持原样）
+     */
+    public static String subtitleLine(android.content.Context ctx, Entry e, int saves, int patches) {
+        String base;
         if (e == null) return "";
         String size = Util.formatSize(e.apkSize);
         if (saves > 0) {
-            return e.imported
+            base = e.imported
                     ? Trans.get(ctx, R.string.row_imported_sub_saves_fmt,
                             e.importFile == null ? "" : e.importFile, size, saves)
                     : Trans.get(ctx, R.string.row_sub_saves_fmt, e.pkg, size, saves);
+        } else {
+            base = e.imported
+                    ? Trans.get(ctx, R.string.row_imported_sub_fmt,
+                            e.importFile == null ? "" : e.importFile, size)
+                    : Trans.get(ctx, R.string.row_sub_fmt, e.pkg, size);
         }
-        return e.imported
-                ? Trans.get(ctx, R.string.row_imported_sub_fmt,
-                        e.importFile == null ? "" : e.importFile, size)
-                : Trans.get(ctx, R.string.row_sub_fmt, e.pkg, size);
+        if (patches <= 0) return base;
+        return Trans.get(ctx, R.string.subtitle_patch_fmt, patches, base);
     }
 
     static List<Entry> scanInstalled(Context ctx) {

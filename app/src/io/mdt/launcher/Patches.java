@@ -14,10 +14,12 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
@@ -505,6 +507,27 @@ final class Patches {
 
     static int enabledCount(Context ctx, String vkey) {
         return enabledRecords(ctx, vkey).size();
+    }
+
+    /**
+     * 每个版本 key 上**启用了几条记录还在的补丁**（主界面列表一次算完，空的不进 map）。
+     *
+     * <p>为什么不直接数 config 里的 refs：那是"配置说启用了几条"，
+     * 手工清过盘 / 删除失败时会留下指向不存在记录的孤儿引用（B10 同一个坑）。
+     * 这里先扫一遍补丁库、只数**记录还在**的 —— 与补丁页显示的"已启用 N 个"同一口径。
+     */
+    static Map<String, Integer> enabledCounts(Context ctx) {
+        Map<String, Integer> out = new HashMap<String, Integer>();
+        Set<String> refs = new HashSet<String>();
+        for (Record r : scan(ctx)) refs.add(r.ref());
+        for (String vkey : Config.get().patchRefVkeys()) {
+            int n = 0;
+            for (String ref : Config.get().patchRefs(vkey)) {
+                if (refs.contains(ref)) n++;
+            }
+            if (n > 0) out.put(vkey, n);
+        }
+        return out;
     }
 
     // ══ 启动解析 ════════════════════════════════════════════════════════════

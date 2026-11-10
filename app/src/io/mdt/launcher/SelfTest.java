@@ -16271,6 +16271,24 @@ public final class SelfTest {
                 enabledRejected = PatchException.C_ENABLED.equals(e.code);
             }
             ok(stat, L, enabledRejected, "④ 重复启用同一条 ⇒ enabled（不是 conflict）");
+            // ★ 第 345 轮用户反馈：列表行「原端/改端」说明不了"这版被补丁改成 fork 了"
+            //   ⇒ 副标题前缀 `补丁 N`；口径必须与补丁页「已启用 N 个」同源（enabledCounts）。
+            java.util.Map<String, Integer> counts = Patches.enabledCounts(ctx);
+            ok(stat, L, counts.get(VKEY) != null && counts.get(VKEY) == 1,
+                    "④ enabledCounts 按版本 key 数出启用条数（主界面补丁状态的唯一来源）");
+            java.util.List<Versions.Entry> all = Versions.scanAll(ctx);
+            if (all.isEmpty()) {
+                L.add("  ⚠ 设备上没有版本，跳过副标题补丁状态断言");
+            } else {
+                Versions.Entry any = all.get(0);
+                String plain = Versions.subtitleLine(ctx, any, 0, 0);
+                String badge = Trans.get(ctx, R.string.patch_badge_fmt, 1);
+                String patched = Versions.subtitleLine(ctx, any, 0, 1);
+                ok(stat, L, !plain.contains(badge) && patched.startsWith(badge)
+                                && patched.endsWith(plain),
+                        "④ 版本行副标题：没补丁不带徽标；有补丁 = `" + badge
+                                + " · 原副标题`（原信息一字不少）");
+            }
             ok(stat, L, Patches.conflicts(ctx, VKEY, recB, apkSha).size() == 1,
                     "④ 同类冲突：B 与已启用的 A 冲突（同改 io.mdt.launcher.PatchProbe）");
             boolean conflictRejected;

@@ -147,11 +147,15 @@ public class VersionActivity extends BaseActivity {
         String name = found.displayName(this);
         String slot = Versions.slotFor(found);
         int saves = VersionOps.saveCountIn(this, slot);
+        // ★ 第 345 轮：这一页的标题卡也带补丁状态（与主界面行同一份文案 / 同一判据），
+        //   下面「补丁」行动作行复用这个数（不再重复算）。
+        int patchCount = Patches.enabledCount(this, mKey);
         setTitle(name);
         ((TextView) findViewById(R.id.version_title)).setText(name);
         // 副标题用**列表行那份紧凑文案**（来源 · 大小 · 存档 N 份）——
         // 别用 Entry.subtitle() 的长形态：它带整条 `/data/app/~~…/base.apk` 路径，真机上占三行。
-        ((TextView) findViewById(R.id.version_sub)).setText(Versions.subtitleLine(this, found, saves));
+        ((TextView) findViewById(R.id.version_sub)).setText(
+                Versions.subtitleLine(this, found, saves, patchCount));
         ((TextView) findViewById(R.id.version_slot)).setText(Trans.get(this,
                 R.string.version_page_slot_fmt, slot, saves));
 
@@ -166,7 +170,6 @@ public class VersionActivity extends BaseActivity {
         //   0 条回落到无数字的静态句（"已启用 0 个"读起来像坏了）。
         //   ⚠️ 用 enabledRecords（会跳过"记录已不存在"的孤儿引用）而不是裸 refs 数 ——
         //   否则手工清过盘 / 删除失败时会显示一个永远停不掉的计数（独立校验 B10）。
-        int patchCount = Patches.enabledCount(this, mKey);
         ((TextView) findViewById(R.id.row_ver_patch).findViewById(R.id.act_sub)).setText(
                 patchCount == 0
                         ? Trans.get(this, R.string.version_row_patch_sub)
