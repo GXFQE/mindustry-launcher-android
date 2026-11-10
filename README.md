@@ -188,6 +188,9 @@ yourself — even just a few lines — see **Translation file** below.
 
 ## More detail
 
+- **[CONTRIBUTING.en.md](CONTRIBUTING.en.md)** — the rules for pull requests: AI-assisted changes,
+  self-test + on-device verification, what may be rejected, translations and plug-ins
+  ([简体中文](CONTRIBUTING.md))
 - **[FEATURE.md](FEATURE.md)** — how this manager compares with the three other Android launchers of
   the period (22 items, judged from source rather than their READMEs)
 - **[docs/DEVELOPING.md](docs/DEVELOPING.md)** — build chain, `dev_*` direct entries, module

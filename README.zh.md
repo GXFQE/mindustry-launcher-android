@@ -171,6 +171,8 @@
 
 ## 更细的说明
 
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** —— 提 PR / 翻译 / 插件的规则：AI 使用、自检与真机手点、
+  哪些改动可能不合并（[English](CONTRIBUTING.en.md)）
 - **[FEATURE.md](FEATURE.md)** —— 和同期另外三个安卓启动器的横向对照（22 项，判据是源码不是 README）
 - **[docs/DEVELOPING.md](docs/DEVELOPING.md)** —— 构建链、`dev_*` 直通口、模块边界、文档地图
 - **[docs/history/](docs/history/README.md)** —— 逐轮的实现与真机验证记录
