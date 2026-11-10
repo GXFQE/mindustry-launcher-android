@@ -132,7 +132,12 @@ final class DevTools {
                 || intent.hasExtra("dev_update_ui")
                 // 第 338 轮：插件自动更新（拉清单 → 比对内容哈希 → 下载 → 签名比对 → 装成待生效）
                 //   用法：`--es dev_plugupdate 1` ⇒ 立刻跑一遍，报告写 hub/report-devtool.txt
-                || intent.hasExtra("dev_plugupdate");
+                || intent.hasExtra("dev_plugupdate")
+                // 第 345 轮：补丁机制 v1（导入 / 启用 / 停用 / 状态）—— 与界面共用同一批函数
+                || intent.hasExtra("dev_patch_import")
+                || intent.hasExtra("dev_patch_enable")
+                || intent.hasExtra("dev_patch_disable")
+                || intent.hasExtra("dev_patch_status");
         if (!isDev) return;
         if ((a.getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) == 0) {
             Toast.makeText(a, R.string.dev_blocked_toast, Toast.LENGTH_SHORT).show();
@@ -786,6 +791,141 @@ final class DevTools {
                     });
                 }
             }, "dev-plugupdate").start();
+            return;
+        }
+
+        // ── 第 345 轮：补丁机制 v1 ────────────────────────────────────────────
+        // 用法：
+        //   --es dev_patch_import /sdcard/.../x.mdp          导入一个补丁包（与界面同一个 importPackage）
+        //   --es dev_patch_enable  "vkey|id@version"         启用（与界面同一个 enable）
+        //   --es dev_patch_disable "vkey|id@version"         停用
+        //   --es dev_patch_status 1                          打印补丁库 / 启用表 / 启动报告
+        // 报告：hub/report-devtool.txt
+        // ★ 这三个口**不另写一套**：判据全在 Patches —— 界面与 dev 口走同一条实现（"同一件事两条路"纪律）。
+        final String pImp = intent.getStringExtra("dev_patch_import");
+        if (pImp != null && !pImp.isEmpty()) {
+            final File f = new File(pImp);
+            new Thread(new Runnable() {
+                @Override public void run() {
+                    StringBuilder sb = new StringBuilder();
+                    sb.append("file  = ").append(f.getAbsolutePath()).append('\n');
+                    sb.append("exists= ").append(f.isFile()).append('\n');
+                    sb.append("bytes = ").append(f.length()).append('\n');
+                    try {
+                        Patches.Record r = Patches.importPackage(a, f);
+                        sb.append("result= ok\n");
+                        sb.append("ref   = ").append(r.ref()).append('\n');
+                        sb.append("targets = ").append(r.targets.size()).append('\n');
+                        for (Patches.TargetFile t : r.targets) {
+                            sb.append("  target ").append(t.spec.apkSha256)
+                              .append(" assets=").append(t.spec.hasAssets()).append('\n');
+                        }
+                    } catch (PatchException e) {
+                        sb.append("result= fail\n");
+                        sb.append("code  = ").append(e.code).append('\n');
+                        sb.append("detail= ").append(e.detail).append('\n');
+                        sb.append("reason= ").append(PatchText.reason(a, e)).append('\n');
+                    } catch (Throwable t) {
+                        sb.append("result= crash ").append(t).append('\n');
+                    }
+                    reportDev(sb.toString(), "dev_patch_import");
+                }
+            }, "dev-patch-import").start();
+            return;
+        }
+
+        final String pEnable = intent.getStringExtra("dev_patch_enable");
+        final String pDisable = intent.getStringExtra("dev_patch_disable");
+        if ((pEnable != null && !pEnable.isEmpty()) || (pDisable != null && !pDisable.isEmpty())) {
+            final boolean enable = pEnable != null && !pEnable.isEmpty();
+            final String arg = enable ? pEnable : pDisable;
+            new Thread(new Runnable() {
+                @Override public void run() {
+                    StringBuilder sb = new StringBuilder();
+                    sb.append("action= ").append(enable ? "enable" : "disable").append('\n');
+                    sb.append("arg   = ").append(arg).append('\n');
+                    String[] parts = arg.split("\\|", 2);
+                    if (parts.length != 2 || parts[0].isEmpty() || parts[1].isEmpty()) {
+                        sb.append("result= fail (want vkey|id@version)\n");
+                        reportDev(sb.toString(), "dev_patch_toggle");
+                        return;
+                    }
+                    String vkey = parts[0];
+                    Patches.Record r = Patches.findByRef(a, parts[1]);
+                    sb.append("record= ").append(r == null ? "(missing)" : r.ref()).append('\n');
+                    if (r == null) {
+                        sb.append("result= fail ").append(PatchException.C_RECORD_GONE).append('\n');
+                        reportDev(sb.toString(), "dev_patch_toggle");
+                        return;
+                    }
+                    try {
+                        if (enable) {
+                            String sha = "";
+                            Versions.Entry entry = null;
+                            for (Versions.Entry e : Versions.scanAll(a)) {
+                                if (e.key().equals(vkey)) { entry = e; break; }
+                            }
+                            sb.append("entry = ").append(entry == null ? "(missing)" : entry.apkPath).append('\n');
+                            if (entry != null && entry.apkPath != null) {
+                                sha = Patches.sha256Of(new File(entry.apkPath));
+                            }
+                            sb.append("apkSha= ").append(sha).append('\n');
+                            sb.append("match = ").append(r.applicable(sha)).append('\n');
+                            Patches.enable(a, vkey, r, sha);
+                        } else {
+                            Patches.disable(a, vkey, r);
+                        }
+                        sb.append("result= ok\n");
+                    } catch (PatchException e) {
+                        sb.append("result= fail\n");
+                        sb.append("code  = ").append(e.code).append('\n');
+                        sb.append("detail= ").append(e.detail).append('\n');
+                        sb.append("reason= ").append(PatchText.reason(a, e)).append('\n');
+                    } catch (Throwable t) {
+                        sb.append("result= crash ").append(t).append('\n');
+                    }
+                    reportDev(sb.toString(), "dev_patch_toggle");
+                }
+            }, "dev-patch-toggle").start();
+            return;
+        }
+
+        if (intent.hasExtra("dev_patch_status")) {
+            new Thread(new Runnable() {
+                @Override public void run() {
+                    StringBuilder sb = new StringBuilder();
+                    sb.append("store = ").append(Patches.storeDir(a).getAbsolutePath()).append('\n');
+                    List<Patches.Record> recs = Patches.scan(a);
+                    sb.append("records = ").append(recs.size()).append('\n');
+                    for (Patches.Record r : recs) {
+                        sb.append("  ").append(r.ref())
+                          .append(" name=").append(r.label())
+                          .append(" filesOk=").append(r.filesOk)
+                          .append(" targets=").append(r.targets.size()).append('\n');
+                        for (Patches.TargetFile t : r.targets) {
+                            int cc = -1;
+                            try { cc = t.classes().size(); } catch (Throwable ignored) { }
+                            sb.append("    sha=").append(t.spec.apkSha256)
+                              .append(" dex=").append(t.dex.isFile() ? t.dex.length() : "MISSING")
+                              .append(" classes=").append(cc)
+                              .append(" assets=").append(t.spec.hasAssets() ? "yes" : "no")
+                              .append('\n');
+                        }
+                    }
+                    sb.append("enabled:\n");
+                    for (String vkey : Config.get().patchRefVkeys()) {
+                        sb.append("  ").append(vkey).append(" = ")
+                          .append(Config.get().patchRefs(vkey)).append('\n');
+                    }
+                    sb.append("launchProblems:\n");
+                    for (Patches.Problem p : Patches.launchProblems(a)) {
+                        sb.append("  ").append(p.line()).append("  (").append(PatchText.problem(a, p))
+                          .append(")\n");
+                    }
+                    sb.append("warned = ").append(Patches.warned(a)).append('\n');
+                    reportDev(sb.toString(), "dev_patch_status");
+                }
+            }, "dev-patch-status").start();
             return;
         }
 

@@ -124,6 +124,16 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
 
+                <!--
+                  第 345 轮（补丁机制 v1）：这个版本能用的补丁（导入 / 启用 / 停用 / 删除）。
+                  放在「资源」后面、「删除」前面：三个都是"这个版本的东西"，删除永远在最末。
+                -->
+                <include
+                    android:id="@+id/row_ver_patch"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
                 <include
                     android:id="@+id/row_ver_delete"
                     layout="@layout/row_action"

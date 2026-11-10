@@ -209,6 +209,18 @@ public final class Config {
      *   写回时只写当前还在的行 ⇒ 会自然清理，不需要在删除路径上各补一遍。
      */
     private static final String K_MAIN_ORDER = "main_order";
+    /**
+     * 第 345 轮（补丁机制 v1）：**按版本 key 存已启用的补丁引用**（`id@version` 的数组）。
+     *
+     * <p>为什么按版本 key：补丁按**目标 APK 的 sha256** 精确匹配（见 {@link PatchManifest}），
+     * 而 sha256 属于"某一个版本"。把启用状态挂在版本上，换 APK（重装 / 重新导入）时旧 target
+     * 自然不匹配 ⇒ 启动解析会如实报"不适用"，不会拿旧补丁硬上。
+     *
+     * <p>为什么存引用串而不是下标：补丁库是目录扫出来的，顺序会变；`id@version` 是稳定身份。
+     */
+    private static final String K_PATCH = "patch_enabled";
+    /** 补丁：首次启用前那次"这会替换游戏代码"的告知是否已经看过。 */
+    private static final String K_PATCH_WARN = "patch_warned";
 
     /**
      * 自动备份的出厂默认，逐条对齐桌面版 config.py 的 PROFILE_DEFAULTS
@@ -1516,6 +1528,88 @@ public final class Config {
         Log.w(TAG, "config " + scope + ": key '" + key + "' is not a number (" + v
                 + "), falling back to default " + def);
         return def;
+    }
+
+    // ── 补丁（第 345 轮）────────────────────────────────────────────────────
+
+    /**
+     * 某个版本 key 上已启用的补丁引用（`id@version`，有序 = 启用顺序）。
+     * 返回的是**副本**：调用方改完要 {@link #setPatchRefs} 才会落盘。
+     */
+    public synchronized List<String> patchRefs(String vkey) {
+        ArrayList<String> out = new ArrayList<>();
+        if (vkey == null || vkey.isEmpty()) return out;
+        JSONObject all = mRoot.optJSONObject(K_PATCH);
+        JSONArray a = all == null ? null : all.optJSONArray(vkey);
+        if (a == null) return out;
+        for (int i = 0; i < a.length(); i++) {
+            String s = a.optString(i, "");
+            if (!s.isEmpty() && !out.contains(s)) out.add(s);
+        }
+        return out;
+    }
+
+    /** 覆盖某个版本的补丁启用列表；空表 = 删掉这个 key（不留空数组）。 */
+    public synchronized void setPatchRefs(String vkey, List<String> refs) {
+        if (vkey == null || vkey.isEmpty()) return;
+        JSONObject all = mRoot.optJSONObject(K_PATCH);
+        if (all == null) all = new JSONObject();
+        try {
+            if (refs == null || refs.isEmpty()) {
+                all.remove(vkey);
+            } else {
+                JSONArray a = new JSONArray();
+                for (String s : refs) if (s != null && !s.isEmpty()) a.put(s);
+                all.put(vkey, a);
+            }
+            if (all.length() == 0) mRoot.remove(K_PATCH);
+            else mRoot.put(K_PATCH, all);
+        } catch (Exception e) {
+            Log.w(TAG, "setPatchRefs failed: " + e);
+            return;
+        }
+        save();
+    }
+
+    /** 所有出现过补丁引用的版本 key（清理孤儿引用用）。 */
+    public synchronized List<String> patchRefVkeys() {
+        ArrayList<String> out = new ArrayList<>();
+        JSONObject all = mRoot.optJSONObject(K_PATCH);
+        if (all == null) return out;
+        java.util.Iterator<String> it = all.keys();
+        while (it.hasNext()) out.add(it.next());
+        return out;
+    }
+
+    /** 哪些版本 key 引用了这个补丁（删记录前判"还在启用中"）。 */
+    public synchronized List<String> patchRefOwners(String ref) {
+        ArrayList<String> out = new ArrayList<>();
+        if (ref == null || ref.isEmpty()) return out;
+        JSONObject all = mRoot.optJSONObject(K_PATCH);
+        if (all == null) return out;
+        java.util.Iterator<String> it = all.keys();
+        while (it.hasNext()) {
+            String vkey = it.next();
+            JSONArray a = all.optJSONArray(vkey);
+            if (a == null) continue;
+            for (int i = 0; i < a.length(); i++) {
+                if (ref.equals(a.optString(i, ""))) {
+                    out.add(vkey);
+                    break;
+                }
+            }
+        }
+        return out;
+    }
+
+    /** 补丁的"这会替换游戏代码"告知是否已看过（只看一次，不每次启用都烦用户）。 */
+    public synchronized boolean patchWarned() {
+        return boolOf(mRoot, K_PATCH_WARN, false, "patch_warned");
+    }
+
+    public synchronized void setPatchWarned() {
+        put(K_PATCH_WARN, true);
+        save();
     }
 
     public synchronized void save() {

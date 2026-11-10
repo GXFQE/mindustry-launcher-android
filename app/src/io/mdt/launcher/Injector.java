@@ -164,6 +164,33 @@ public final class Injector {
         public File assetBase;
         /** 增量包（只含 assets/ 的 zip），按顺序挂在基线之后 */
         public final List<File> assetDeltas = new ArrayList<>();
+        /** 补丁（按启用顺序注入；同改一个类/素材的组合在启用时就被拒绝，这里只管执行） */
+        public final List<Patch> patches = new ArrayList<>();
+        /**
+         * 本轮**没应用**的补丁（`code|detail` 原文，人话由 {@link PatchText} 翻）。
+         * 注入阶段才发现的问题写这里；{@link GameSlot} 会把它们合进启动报告。
+         */
+        public final List<String> patchProblems = new ArrayList<>();
+    }
+
+    /**
+     * 一个要注入的补丁。
+     *
+     * <p>★ dex 由 {@link Patches} 从**内部存储的只读副本**给过来（ART 只认内部 + 只读，
+     * 见 `ref/48`）；assets 是可选素材包，挂到资产链**最后**（后挂覆盖先挂）。
+     */
+    public static class Patch {
+        public File dex;
+        /** 可选素材包（条目必须在 assets/ 下；null = 这个补丁没有素材） */
+        public File assets;
+        /** 显示名（报告与跳过日志点名用） */
+        public String label = "";
+        /**
+         * 这个补丁**真的注入了**吗（第 345 轮独立校验 B2 之后加的）。
+         * 素材只在 applied=true 时挂链 —— 否则会出现"代码没打上、素材打上了"的半截补丁，
+         * 那是最难排查的形态（界面显示已启用、游戏却一半新一半旧）。
+         */
+        public boolean applied;
     }
 
     /** 带步骤名的启动失败，便于 UI 直接展示"卡在哪一步" */
@@ -237,8 +264,23 @@ public final class Injector {
         t.mark("prewarm");
 
         // ① dex 注入
+        // ★ 补丁要插在**宿主 dex 之后、游戏 dex 之前**（2026-11-10，补丁机制 v1）：
+        //   前插到 0 会让补丁有机会顶掉宿主自己的类（`io.mdt.launcher.*`）—— 那不是补丁该干的事；
+        //   插在游戏 dex 之后则永远赢不了（同名类先到的赢）。所以要**先量出宿主那一段的长度**。
+        int hostDex = 0;
+        try {
+            hostDex = Reflect.dexElementCount(baseCl);
+        } catch (Throwable e) {
+            // ★ 修（第 345 轮独立校验 B3）：量不到宿主段就**不注入补丁** —— 回退到 0 会把补丁
+            //   前插到宿主之前（补丁里若定义 io.mdt.launcher.* 就能顶掉宿主自己的类）。
+            hostDex = -1;
+            log.append("WARN dexElementCount failed (").append(e)
+                    .append(") — patches will be SKIPPED (index unknown)\n");
+        }
+        log.append("宿主 dex elements = ").append(hostDex).append('\n');
         try {
             injectDex(app, baseCl, plan.apk, log);
+            injectPatches(app, baseCl, plan, hostDex, log);
         } catch (Throwable e) {
             t.mark("dexInject");
             logThrowable(log, e);
@@ -360,7 +402,112 @@ public final class Injector {
                 opt.getAbsolutePath(), null, baseCl.getParent());
         int total = Reflect.appendDexElements(baseCl, extra);
         log.append("dexElements 合并后 = ").append(total).append('\n');
-        // 立刻验证：注入的目的是让 base CL 能解析游戏类
+        // 验证挪到 injectPatches 的末尾：补丁要在这句之前插好，否则 if (补丁替换了入口类)
+        // 这里会先把原版加载掉 —— 之后再 prepend 就换不掉了（S0 的「已加载过就换不掉」）。
+    }
+
+    /**
+     * 补丁注入（补丁机制 v1）：按启用顺序插到**宿主 dex 之后、游戏 dex 之前**。
+     *
+     * <p>三条纪律：
+     * <ol>
+     *   <li>每条补丁一个 dex；注入前判文件在不在（不在就**整条跳过**，不阻塞启动）；
+     *   <li>单条注入失败 ⇒ 只跳过这一条（"跳过整个补丁"而不是"跳过某个类"，见设计草案 §11 第 5 问），
+     *       原因记进 {@link Plan#patchProblems}，由启动报告带给界面；
+     *   <li>全部插完之后才做「base CL 能解析游戏入口类」的验证 —— 这样补丁替换入口类也来得及。
+     * </ol>
+     *
+     * <p>🔴 **插入下标是"当前条数"，不是"合并后的总条数"**（第 345 轮独立校验 B1）：下标由
+     * {@link #patchInsertIndex} 一处算，第 n 条 = `hostDex + 已插入元素数`；写成总条数会把第 2 条
+     * 起追加到游戏 dex 之后 ⇒ 同名类永远被原版覆盖、**静默无效**。
+     *
+     * <p>🔴 **成功判据 = 元素确实变多了**（B2）：`DexPathList.makeDexElements` 会把加载失败塞进
+     * suppressed 列表而**不抛异常**；`after == before` 必须算失败，否则"注入完成 N/N"是假的。
+     */
+    private static void injectPatches(Context ctx, ClassLoader baseCl, Plan plan, int hostDex,
+                                      StringBuilder log) throws Exception {
+        File opt = ctx.getCodeCacheDir();
+        if (!opt.exists()) opt.mkdirs();
+        if (plan.patches.isEmpty()) {
+            verifyGameClassLoadable(baseCl, log);
+            return;
+        }
+        log.append("补丁数 = ").append(plan.patches.size()).append('\n');
+        if (hostDex < 0) {
+            // 量不到宿主段 ⇒ 不知道插哪；宁可不注入（原版照常启动）也不把补丁顶到宿主前面
+            for (int i = 0; i < plan.patches.size(); i++) {
+                String label = labelOf(plan.patches.get(i), i);
+                log.append("补丁[").append(i + 1).append("] ").append(label)
+                        .append(" 跳过：宿主 dex 条数未知\n");
+                plan.patchProblems.add(PatchException.C_IO + "|" + label);
+            }
+            verifyGameClassLoadable(baseCl, log);
+            return;
+        }
+        int inserted = 0;
+        int okCount = 0;
+        for (int i = 0; i < plan.patches.size(); i++) {
+            Patch p = plan.patches.get(i);
+            String label = labelOf(p, i);
+            if (p.dex == null || !p.dex.isFile() || p.dex.length() <= 0) {
+                log.append("补丁[").append(i + 1).append("] ").append(label)
+                        .append(" 跳过：dex 不存在\n");
+                plan.patchProblems.add(PatchException.C_MISSING + "|" + label);
+                continue;
+            }
+            int at = patchInsertIndex(hostDex, inserted);
+            try {
+                List<String> notes = new ArrayList<>();
+                int before = Reflect.dexElementCount(baseCl);
+                long t0 = System.nanoTime();
+                int after = Reflect.injectDex(baseCl, p.dex, opt, at, notes);
+                long ms = (System.nanoTime() - t0) / 1000000L;
+                log.append("补丁[").append(i + 1).append("] ").append(label)
+                        .append(" 注入 @").append(at).append(" elements ")
+                        .append(before).append("→").append(after)
+                        .append(" (").append(ms).append(" ms)");
+                for (String n : notes) log.append(" | ").append(n);
+                log.append('\n');
+                if (after <= before) {
+                    // 没多出 element = ART 实际没认这份 dex（suppressed 里是原因）
+                    log.append("补丁[").append(i + 1).append("] ").append(label)
+                            .append(" 判失败：注入 0 个 element\n");
+                    plan.patchProblems.add(PatchException.C_BAD_DEX + "|" + label + " (0 elements)");
+                    continue;
+                }
+                inserted += (after - before);
+                p.applied = true;
+                okCount++;
+            } catch (Throwable e) {
+                log.append("补丁[").append(i + 1).append("] ").append(label)
+                        .append(" 跳过：注入失败 ").append(e).append('\n');
+                plan.patchProblems.add(PatchException.C_BAD_DEX + "|" + label);
+            }
+        }
+        log.append("补丁注入完成 ").append(okCount).append('/').append(plan.patches.size()).append('\n');
+        verifyGameClassLoadable(baseCl, log);
+    }
+
+    private static String labelOf(Patch p, int index) {
+        return (p == null || p.label == null || p.label.isEmpty())
+                ? ("patch#" + (index + 1)) : p.label;
+    }
+
+    /**
+     * 第 n 条补丁的**插入下标**（纯函数，让自检能钉住"下标算成总条数"这类错）。
+     *
+     * <p>语义：`hostDex` = 注入游戏 dex **之前**量到的宿主段长度；`alreadyInserted` = 已经插进去的
+     * 元素数。返回值 = 宿主段之后、游戏段之前。
+     *
+     * @return hostDex &lt; 0（量不到）时返回 -1（调用方据此跳过全部补丁）
+     */
+    static int patchInsertIndex(int hostDex, int alreadyInserted) {
+        if (hostDex < 0) return -1;
+        return hostDex + Math.max(0, alreadyInserted);
+    }
+
+    /** 注入补丁之后再验一次：base CL 必须能解析游戏入口类（否则后面 startActivity 必崩）。 */
+    private static void verifyGameClassLoadable(ClassLoader baseCl, StringBuilder log) throws Exception {
         Class.forName(GAME_ACTIVITY, false, baseCl);
         log.append("base CL 已能看到 ").append(GAME_ACTIVITY).append('\n');
     }
@@ -525,6 +672,12 @@ public final class Injector {
         chain.add(base);
         for (File d : plan.assetDeltas) {
             if (d != null && d.exists()) chain.add(d);
+        }
+        // 补丁的素材包接在**最后**：addAssetPath 的语义是后挂覆盖先挂（真机实测，草案 §5）。
+        // 两个补丁改同一个素材在启用时就被拒绝了 ⇒ 这里的顺序不需要额外裁决。
+        // ★ 只挂**真正注入成功**的补丁（applied）：注入失败还挂素材 = 半截补丁（B2）。
+        for (Patch p : plan.patches) {
+            if (p.applied && p.assets != null && p.assets.isFile()) chain.add(p.assets);
         }
 
         android.content.res.AssetManager amApp = app.getAssets();

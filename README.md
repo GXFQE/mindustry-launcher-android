@@ -142,6 +142,13 @@ yourself — even just a few lines — see **Translation file** below.
 - Can read slots and content, settings, logs, the transfer station and the version list, and open files
 - A crash does not take the manager down: retry / roll back / quarantine, and the page explains it
 
+### Patches
+- Replace game code **for one specific game version** without touching the game APK: a patch is a dex of complete replacement classes (plus an optional asset zip)
+- Import a patch package (zip with `patch.json` and a dex built for that exact APK); it is checked, kept on internal storage and injected on launch
+- Per version: version page -> **Patches** to enable / disable; two patches that replace the same class or the same asset cannot be enabled together
+- If a patch cannot be applied, the launch still proceeds and the Patches page says which one failed and why; a broken patch is skipped, not fatal
+- Patches are **matched by the APK sha256**, never by version number - a patch built for 160 will not be applied to 160.4
+
 ### Transfer station
 - Deleted things land here instead of disappearing
 - Shows what it is, which slot it came from, and its size
@@ -167,6 +174,8 @@ yourself — even just a few lines — see **Translation file** below.
 
 ## What is not planned
 
+- **A patch generator or an online patch library** in the app: patch packages are files you import;
+  building one needs the target game's dex, so the generator stays a desktop tool
 - **Downloading game content in the app** (map / blueprint / mod browser, map sources, forum) —
   not planned for now. Mindustry has no Chinese game licence, and in October 2026 Chinese launchers
   dropped game downloads for compliance. This manager only imports files you already have.

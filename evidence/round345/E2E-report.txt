@@ -1,0 +1,93 @@
+第 345 轮 · 补丁机制 v1 真机 E2E 报告（2026-11-10）
+====================================================
+
+环境
+----
+- 设备：HONOR ELP-AN00 / Android 16（API 36），序列号 AJYMUT4522007370
+- 构建：DEBUGGABLE=true SUFFIX=-dev ./build.sh install（dev 变体）
+- 自检：先正常启动 MainActivity 等约 10 s，再 `--es dev_m3_selftest 1` ⇒ **1992 / 0**
+  （初版 1985/0；独立校验抓到 B1/B2 修复后又补 7 条断言。首跑 1981/4：3 条是自检自身
+  对新夹具的过期期望，已修；1 条是启动期自动备份与 CAS 池断言并发造成的假失败）
+- 基座：官方 160.4（`C:\mdt-build\artifacts\official-160.4-debug.apk`，
+  sha256 = 3500bde3e48fcb025529910b4df1fb1fa033ecf0d5ac67c6e114ae6f5e4c1ece，80,492,750 B）
+- 夹具：`.dsh/research/2026-11-10-patch-v1/pkgs/`（作者独立 verify.py 全绿）
+
+A/B 对照（同一次构建、同一份 APK、同一个槽）
+--------------------------------------------
+A. 启用 MindustryY(12162 类) + 冒烟探针(2 类)
+   report-launch.txt 关键行（修完独立校验 B1 之后复验）：
+     宿主 dex elements = 1
+     dexElements 合并后 = 2
+     补丁数 = 2
+     补丁[1] MindustryY 注入 @1 elements 2→3 (16 ms) | makeDexElements(4 args) -> 1 elements, suppressed=0
+     补丁[2] 冒烟探针 注入 @2 elements 3→4 (0 ms) | makeDexElements(4 args) -> 1 elements, suppressed=0
+     补丁注入完成 2/2
+     资产链 = official-160.4-debug.apk 3500bde3…assets.zip
+     两份 AssetManager 同源 = false
+       addAssetPath(app/act)  base.apk cookie=10
+       addAssetPath(app/act)  <sha>.assets.zip cookie=11
+   截图 01-mindustryy-menu-patched.png：主菜单 **MINDUS T RY custom build** + 「共享战役」按钮
+   hub/report-patch.txt 不存在（没有"没应用"的补丁）
+
+B. 停用两个补丁后再次启动（同一 APK）
+   report-launch.txt：没有任何补丁行；资产链 = base.apk；
+   截图 02-vanilla-160.4-menu.png：**MINDUSTRY release build 160.4**，无「共享战役」
+
+拒绝与失败路径
+--------------
+1) 冲突：再导入同 dex 的 probe-smoke2 并启用 ⇒
+   result= fail code= conflict detail= 冒烟探针 (1.0) reason= 与已启用的补丁冲突：冒烟探针 (1.0)
+2) 目标不匹配：neg-bad-hash 能导入（哈希格式合法），启用时 ⇒
+   result= fail code= no_match detail= Bad Hash Fixture
+   reason= 这个补丁不适用于当前游戏 APK：Bad Hash Fixture
+3) 坏 dex：neg-bad-dex 导入 ⇒ code= bad_dex（reason 带具体条目路径）
+4) 失败不阻塞启动：启用冒烟探针后从盘上删掉它的 dex ⇒ 游戏照常启动；
+   hub/report-patch.txt 内容：
+     # patch launch report Tue Nov 10 20:54:07 GMT+08:00 2026
+     # vkey = import:official-160.4-debug.apk
+     missing|冒烟探针
+   补丁页顶部出现「上次启动：有补丁没应用 · 补丁文件缺失：冒烟探针」；点卡片 = 知道了（消失）
+
+界面（uiautomator 实测）
+------------------------
+- 版本页新增「补丁」行（0 条时副标题 = 替换这个版本的游戏代码；启用后 = 已启用 N 个）
+- 补丁页：身份卡「游戏：official-160.4-debug 原端 160.4 / APK 3500bde3e48f · 已导入 3 个」
+  + 导入补丁包 + 上次启动问题卡 + 三行补丁：
+    MindustryY 1.0 — 12162 个类 · 已启用
+    Bad Hash Fixture 1.0 — 0 个类 · 不适用这个 APK
+    冒烟探针 1.0 — 0 个类 · 文件缺失（dex 被外部删掉后）
+- 详情卡（CardStack）：替换的类清单 + 关闭 / 删除 / 启用；首次启用弹「启用补丁？」告知卡；
+  UI 删除（先停用）成功，记录与目录一起消失
+
+清场
+----
+- 补丁记录、夹具包、测试导入版本（official-160.4-debug）、中转站里的测试版本目录全部删除
+- config.json 的 patch_enabled 清空、last_version 还原为 com.github.tinylake.mindustryX
+- 当前槽由 default 还原为 zzlm455115（用 run-as dd 写回，非 app 内切槽）
+
+独立校验与修复（同日晚，队友 patch-verify，报告 .dsh/research/2026-11-10-patch-v1/VERIFY.md）
+------------------------------------------------------------------------------------
+- ① dex 类名解析器复算 PASS（JDK8 单编 PatchDex + Python 从零实现；三份 dex 类名集合/顺序全等 2/2/12162）
+- ② 静态审查 FAIL：1 高危 + 2 中危 + 9 低危，**全部处理**（详见 docs/flows/21 的 F27.12）
+  · B1（高危）多补丁插入下标算成"合并后总条数" ⇒ 第 2 条起被追加到游戏 dex 之后、静默失效。
+    证据就是上面初版日志的 `@3`。修法：`hostDex + 已插入元素数`，抽成 `Injector.patchInsertIndex`
+    由自检钉住；复验日志 = `@1` / `@2`（本文件 A 段已是修后版本）。
+  · B2/B3（中危）"注入 0 个 element 也算成功"、"量不到宿主条数时回退 0" —— 前者改用
+    `after <= before` 判失败 + 素材只挂 applied 补丁 + dex 增加 Adler-32/file_size 校验；
+    后者改为跳过全部补丁并记 problem。
+  · 9 条低危：重复启用报错顺序、setText 绕过 Trans、启用占用 UI 线程、死资源、预览省略号、
+    报告行注入、版本页孤儿计数、sha256 缓存、zip 同名条目 —— 全部修完并各有自检断言。
+- ③ 夹具独立复核 PASS（目标 APK 哈希现场复算命中；2 正例/4 负例如声明）。
+
+证据文件
+--------
+01-mindustryy-menu-patched.png       A/B 的 A：MindustryY 主菜单
+02-vanilla-160.4-menu.png            A/B 的 B：原版 160.4 主菜单
+03-patches-page.png                  补丁页（刚打开时）
+04-patches-enabled.png               启用 MindustryY 后
+05-patches-problem-and-states.png    三态 + 上次启动问题卡
+launch-report-patched-mindustryy.txt A 的启动报告
+launch-report-vanilla.txt            B 的启动报告
+report-patch-missing-dex.txt         dex 被删后的 problem 报告
+
+注：截图按仓库策略不入库（evidence/*.png 忽略），本目录只入库文本报告。

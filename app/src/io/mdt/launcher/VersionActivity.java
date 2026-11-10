@@ -106,6 +106,15 @@ public class VersionActivity extends BaseActivity {
                         if (mEntry != null) VersionOps.openResources(VersionActivity.this, mEntry);
                     }
                 });
+        // ★ 第 345 轮（补丁机制 v1）：进这个版本的补丁页 —— 只带**版本 key**（定位信息），
+        //   页面自己重扫（与 slotIntent 同一条纪律：不在 intent 里搬一整个 Entry）。
+        Util.bindAction(findViewById(R.id.root), R.id.row_ver_patch, R.drawable.ic_mod,
+                R.string.version_row_patch, R.string.version_row_patch_sub,
+                new Runnable() {
+                    @Override public void run() {
+                        if (mEntry != null) startActivity(patchIntent(VersionActivity.this, mEntry.key()));
+                    }
+                });
         Util.bindAction(findViewById(R.id.root), R.id.row_ver_delete, R.drawable.ic_trash,
                 R.string.version_row_delete, R.string.version_row_delete_sub,
                 new Runnable() {
@@ -153,6 +162,16 @@ public class VersionActivity extends BaseActivity {
         ((TextView) findViewById(R.id.row_ver_manslot).findViewById(R.id.act_sub)).setText(
                 Trans.get(this, R.string.version_row_manslot_sub_fmt, slot));
 
+        // ★ 第 345 轮：补丁行的副标题只说"这个版本上启用了几条"；
+        //   0 条回落到无数字的静态句（"已启用 0 个"读起来像坏了）。
+        //   ⚠️ 用 enabledRecords（会跳过"记录已不存在"的孤儿引用）而不是裸 refs 数 ——
+        //   否则手工清过盘 / 删除失败时会显示一个永远停不掉的计数（独立校验 B10）。
+        int patchCount = Patches.enabledCount(this, mKey);
+        ((TextView) findViewById(R.id.row_ver_patch).findViewById(R.id.act_sub)).setText(
+                patchCount == 0
+                        ? Trans.get(this, R.string.version_row_patch_sub)
+                        : Trans.get(this, R.string.version_row_patch_sub_fmt, patchCount));
+
         // 删除的范围随**行数**变（判据只有 Versions.rowCount 一处）。
         // ★ 标题也跟着变：用户 2026-10-25 说「还有两行才奇怪了，到底是删完还是没删完有歧义」
         //   ⇒ 不写数量，直接说清"删什么"（这一项 / 整个版本）。
@@ -187,5 +206,16 @@ public class VersionActivity extends BaseActivity {
     static android.content.Intent slotIntent(Context c, String slot) {
         return new android.content.Intent(c, SlotActivity.class)
                 .putExtra(SlotActivity.EXTRA_SLOT, slot == null ? "" : slot);
+    }
+
+    /**
+     * 进这个版本的**补丁页**（`PatchesActivity`）的 Intent —— 只带版本 key。
+     *
+     * <p>与 {@link #slotIntent} 同一个理由抽成函数：**让自检能钉住 extra 的键与值**
+     * （写错键编译器不响，真机只表现为"点进去是空的 / 进错版本"）。
+     */
+    static android.content.Intent patchIntent(Context c, String vkey) {
+        return new android.content.Intent(c, PatchesActivity.class)
+                .putExtra(PatchesActivity.EXTRA_KEY, vkey == null ? "" : vkey);
     }
 }

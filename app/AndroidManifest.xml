@@ -397,6 +397,18 @@
             android:parentActivityName=".MainActivity"/>
 
         <!--
+          第 345 轮（补丁机制 v1）：某个版本的补丁页（导入 / 启用 / 停用 / 删除）。
+          入口在版本页那一行「补丁」；补丁按**目标 APK 的 sha256** 精确匹配 ⇒ 页面按版本语境。
+          ⚠️ **必须注册**：aapt2 不检查引用，漏了照样 BUILD OK，真机一点就崩（自检 ㉙ 盯着）。
+        -->
+        <activity
+            android:name=".PatchesActivity"
+            android:exported="false"
+            android:theme="@style/AppTheme"
+            android:label="@string/patch_page_title"
+            android:parentActivityName=".VersionActivity"/>
+
+        <!--
           游戏坑位：加载流程（存档槽交换 / 预热 / dex 注入 / load native / 挂资产链）
           必须跑在游戏所在的 :game 进程里，否则系统在干净进程里找不到游戏类。
           exported=true 便于 adb 驱动验证 —— M5 发布前评估是否收回。

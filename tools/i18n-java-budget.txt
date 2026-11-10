@@ -50,7 +50,13 @@ SettingsBin.java = 59   # ★ 已码化：失败文案走 errCode+参数（Setti
 MsavMeta.java = 32   # ★ 已码化：8 条 error 走 errCode+参数（MsavText 映射）；这些句子只给报告/自检看
 Compat.java = 26   # 只进 report-devtool.txt / 崩溃报告（取证文本）
 ModsActivity.java = 26   # 全部在 `report()` 里（dev 落盘转储，只有 `MainActivity` 的 `dev_*` 口调它） —— 与 `MainActivity` 的 126 条同类；**它没有自己的用户可见文案**
-Injector.java = 23   # 用户可见的已搬完；剩的是启动管线报告（log.append）
+Injector.java = 36   # 用户可见的已搬完；剩的是启动管线报告（log.append）
+                     # ★ 2026-11-10（第 345 轮，补丁机制 v1）：23 → 32。新增的是「宿主 dex 条数 /
+                     #   每条补丁注入到哪个下标 / 注入失败跳过」这几行 —— 与既有 23 条**同族**：
+                     #   只进 `hub/report-launch.txt`（原始诊断层，运行日志页原样展示），
+                     #   不是界面文案；补丁出问题时这几行是唯一能定位"注入到第几条、哪条被跳过"的证据。
+                     #   ★ 32 → 36：独立校验 B1/B2 的修复又加了 4 行（宿主条数量不到 ⇒ 跳过补丁 /
+                     #   "注入 0 个 element"判失败 / 判失败点名）—— 同族，仍只进启动报告。
 MapStats.java = 22   # 已搬完；剩的是 SRC_VANILLA/MOD/PATCH 文案常量与语料诊断（内部，不上界面）
 Backup.java = 17   # 用户可见的已搬完；剩的是 CAS 迁移报告与 Log 诊断
 AutoBackup.java = 11   # 只进 report-autobackup.txt

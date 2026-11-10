@@ -1,0 +1,147 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  补丁页（第 345 轮，补丁机制 v1）：某个版本可用的补丁列表 + 导入 + 启用停用。
+
+  结构（自上而下）：
+    ┌ 身份卡（这一页属于哪个版本 / APK 指纹）
+    ├ 导入卡（row_action：选一个补丁 zip）
+    ├ 上次启动的问题卡（有报告才出现，点一下 = 知道了）
+    ├ 补丁卡列表（每条：名字+版本 / 类数 · 状态）
+    └ 空态卡（一个补丁都没有时）
+
+  ★ 本页不含大标题：顶栏已经在显示「补丁」（同一屏同一件事只说一次）。
+  ★ 根节点必须有 @+id/root，且 Activity 必须调 Util.applySystemInsets(root) ——
+    targetSdk 36 强制 edge-to-edge；没有这一步整页从屏幕 y=0 开始画，被状态栏盖住。
+  ★ 「补丁会替换游戏代码」这句警告只在**首次启用**前弹一次（见 PatchesActivity 的告知卡），
+    不在这里重复成一行静态文字 —— 空态卡里有一句"这是什么"，两处不重复。
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bg">
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scrollbarStyle="outsideOverlay">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingStart="@dimen/page_pad"
+            android:paddingEnd="@dimen/page_pad"
+            android:paddingTop="12dp"
+            android:paddingBottom="@dimen/page_bottom_space">
+
+            <LinearLayout
+                android:id="@+id/patch_head_card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/card_bg"
+                android:orientation="vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:paddingTop="14dp"
+                android:paddingBottom="14dp">
+
+                <TextView
+                    android:id="@+id/patch_head_title"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="2"
+                    android:textColor="@color/fg"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/patch_head_sub"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:lineSpacingExtra="2dp"
+                    android:textColor="@color/fg_muted"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/patch_actions_card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/card_gap"
+                android:background="@drawable/card_bg"
+                android:orientation="vertical">
+
+                <include
+                    android:id="@+id/row_patch_import"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/patch_problems_card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/card_gap"
+                android:background="@drawable/card_warn_bg"
+                android:clickable="true"
+                android:focusable="false"
+                android:orientation="vertical"
+                android:paddingStart="16dp"
+                android:paddingEnd="16dp"
+                android:paddingTop="12dp"
+                android:paddingBottom="12dp"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/patch_problems_title"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/chip_fg_warn"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/patch_problems_body"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:lineSpacingExtra="2dp"
+                    android:textColor="@color/fg_muted"
+                    android:textSize="12sp" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/patch_list"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/card_gap"
+                android:orientation="vertical" />
+
+            <TextView
+                android:id="@+id/patch_empty"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:gravity="center"
+                android:textColor="@color/fg_muted"
+                android:textSize="13sp"
+                android:visibility="gone" />
+
+            <TextView
+                android:id="@+id/patch_empty_sub"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:gravity="center"
+                android:lineSpacingExtra="2dp"
+                android:textColor="@color/fg_muted"
+                android:textSize="12sp"
+                android:visibility="gone" />
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>
