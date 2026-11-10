@@ -9879,7 +9879,7 @@ public final class SelfTest {
         String notGen = ctx.getString(R.string.log_not_generated_fmt, "游戏日志");
         String chipAbsent = ctx.getString(R.string.log_chip_absent_fmt, "游戏日志");
         String dup = ctx.getString(R.string.mods_dup_fmt, "tmi");
-        ok(stat, L, "已导入 · official-159.apk · 74.7 MB".equals(rowImp),
+        ok(stat, L, "导入 · official-159.apk · 74.7 MB".equals(rowImp),
                 "★导入项副标题逐字：" + rowImp);
         ok(stat, L, "io.anuke.mindustry · 74.7 MB".equals(rowPlain),
                 "★已装版本副标题逐字：" + rowPlain);
@@ -9894,7 +9894,7 @@ public final class SelfTest {
         // ★★ 元断言：拿**真机上抓到的那条坏串**喂判据，必须判死 —— 证明它不是在恒真地打勾
         ok(stat, L, !sepsOk("已导入 ·imported · 74.7 MB")
                         && !sepsOk("游戏日志· 无")
-                        && sepsOk("已导入 · official-159.apk · 74.7 MB")
+                        && sepsOk("导入 · official-159.apk · 74.7 MB")
                         && sepsOk("游戏日志 · 无"),
                 "★元断言：真机坏串（`已导入 ·imported`、`游戏日志· 无`）会被判死，"
                         + "而修好的串通过 ⇒ 判据有分辨力");

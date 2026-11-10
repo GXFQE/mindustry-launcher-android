@@ -262,7 +262,7 @@
          （2026-10-04 真机 dump 抓到的现行；同理还有 3 条以空格开头的尾巴串，一并改掉了）。
     -->
     <string name="row_sub_fmt">%1$s · %2$s</string>
-    <string name="row_imported_sub_fmt">已导入 · %1$s · %2$s</string>
+    <string name="row_imported_sub_fmt">导入 · %1$s · %2$s</string>
     <!--
       ★ 2026-10-06（一档④）：版本行补"这个槽里有几份存档"那一段。
       ⚠️ **这两条曾经只加在默认目录（英文）里** —— 于是中文界面下这一行渲染成
@@ -271,7 +271,7 @@
         （回落到默认语言是合法行为）⇒ 这类漏加只能靠"改完文案 dump 回读"。
     -->
     <string name="row_sub_saves_fmt">%1$s · %2$s · 存档 %3$d 份</string>
-    <string name="row_imported_sub_saves_fmt">已导入 · %1$s · %2$s · 存档 %3$d 份</string>
+    <string name="row_imported_sub_saves_fmt">导入 · %1$s · %2$s · 存档 %3$d 份</string>
 
     <!-- dev 直通口（仅 debuggable 构建可见） -->
     <string name="dev_blocked_toast">发布构建不接受 dev_* 直通口</string>
