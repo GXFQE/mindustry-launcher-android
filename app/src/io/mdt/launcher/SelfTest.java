@@ -9898,6 +9898,32 @@ public final class SelfTest {
                         && sepsOk("游戏日志 · 无"),
                 "★元断言：真机坏串（`已导入 ·imported`、`游戏日志· 无`）会被判死，"
                         + "而修好的串通过 ⇒ 判据有分辨力");
+        // ★★ 第 350 轮（2026-11-11 用户：「主页不要显示apk名字和大小啊」）：
+        //    主页行副标题只留 导入 / 备份 N 份 / 补丁 N / 基于 X，**不许**再出现 APK 文件名与大小；
+        //    版本页那份（subtitleLine）仍带来源 + 大小 —— 两处**故意不同**，别合并。
+        Versions.Entry homeRow = new Versions.Entry();
+        homeRow.label = "official-159";
+        homeRow.versionName = "8-official-159.7";
+        homeRow.apkSize = 78L * 1024 * 1024;
+        homeRow.imported = true;
+        homeRow.importFile = "official-159.apk";
+        homeRow.upstreamVersion = "160.1";
+        String homeSub = Versions.mainRowSubtitleLine(ctx, homeRow, 2, 1);
+        ok(stat, L, !homeSub.contains("official-159.apk") && !homeSub.contains("MB")
+                        && homeSub.contains(ctx.getString(R.string.row_imported_tag))
+                        && homeSub.contains(ctx.getString(R.string.row_backups_count_fmt, 2))
+                        && homeSub.contains(ctx.getString(R.string.patch_badge_fmt, 1))
+                        && homeSub.contains(ctx.getString(R.string.row_based_on_fmt, "160.1")),
+                "★主页行副标题不显示 APK 名 / 大小（只留 导入 / 备份 / 补丁 / 基于）：" + homeSub);
+        String pageSub = Versions.subtitleLine(ctx, homeRow, 2, 1);
+        ok(stat, L, pageSub.contains("official-159.apk") && pageSub.contains("MB"),
+                "★版本页副标题仍带来源与大小（与主页故意不同）：" + pageSub);
+        // 元断言：装好的版本、0 备份、0 补丁 ⇒ 主页副标题是空串（调用方把那一行 GONE，不挂空行）
+        Versions.Entry quiet = new Versions.Entry();
+        quiet.pkg = "io.anuke.mindustry";
+        quiet.versionName = "8-official-159.7";
+        ok(stat, L, Versions.mainRowSubtitleLine(ctx, quiet, 0, 0).isEmpty(),
+                "★元断言：没有任何副信息时主页副标题为空串（行里隐藏，不浪费一行高度）");
         // ★★ 2026-10-04（第 86 轮）：**按真参数实拼一遍**本轮新增/改动的每一条带占位符的资源。
         //   为什么值得单独钉：`getString(id, …)` 的参数个数与资源里的 `%n$` 不匹配会抛
         //   `MissingFormatArgumentException` **直接崩**，而它只在走到那一句时才现形。

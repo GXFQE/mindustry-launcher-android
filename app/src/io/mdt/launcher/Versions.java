@@ -1007,6 +1007,42 @@ public final class Versions {
     }
 
     /**
+     * **主页列表行**的副标题（第 350 轮用户：「主页不要显示apk名字和大小啊」）。
+     *
+     * <p>和版本页那份（{@link #subtitleLine}）**故意不同**：主页行是用来"选一个启动"的，
+     * APK 文件名（`official-159.apk`）和大小（`74.7 MB`）对选择没有帮助，还把行撑长；
+     * 这里只留用户会行动的信息，按顺序用 ` · ` 拼：
+     * {@code 导入} · {@code 备份 N 份} · {@code 补丁 N} · {@code 基于 X}（空项不占位）。
+     *
+     * <p>⚠️ 版本页标题卡仍用 {@link #subtitleLine}（来源 / 大小在那里看得到是合理的）。
+     * 两处都是同一份"要不要显示 / 空项跳过"的实现，别在界面里再拼一遍。
+     *
+     * @param backups 这个槽的备份份数（0 = 不显示）
+     * @param patches 这个版本 key 上启用的补丁数（0 = 不显示）
+     * @return 可能为空串（例如"装好的版本、没备份、没补丁"）—— 调用方按空串隐藏那一行
+     */
+    public static String mainRowSubtitleLine(android.content.Context ctx, Entry e,
+                                             int backups, int patches) {
+        if (e == null) return "";
+        StringBuilder sb = new StringBuilder();
+        if (e.imported) appendPart(sb, Trans.get(ctx, R.string.row_imported_tag));
+        if (backups > 0) appendPart(sb, Trans.get(ctx, R.string.row_backups_count_fmt, backups));
+        if (patches > 0) appendPart(sb, Trans.get(ctx, R.string.patch_badge_fmt, patches));
+        String up = e.upstreamNote();
+        if (up != null && !up.isEmpty()) {
+            appendPart(sb, Trans.get(ctx, R.string.row_based_on_fmt, up));
+        }
+        return sb.toString();
+    }
+
+    /** ` · ` 连接：空串 / null 跳过（不产生开头 / 连续分隔符）。 */
+    private static void appendPart(StringBuilder sb, String part) {
+        if (part == null || part.isEmpty()) return;
+        if (sb.length() > 0) sb.append(" · ");
+        sb.append(part);
+    }
+
+    /**
      * 把「基座版本」接在**副标题**末尾（`… · 基于 160.1`）。
      *
      * <p>★ 2026-11-10 用户订正：「版本号被折叠的问题又出现了，算了，基于原版的版本号放下面那层吧」——

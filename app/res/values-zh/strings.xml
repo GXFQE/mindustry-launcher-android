@@ -266,6 +266,11 @@
     <string name="row_sub_fmt">%1$s · %2$s</string>
     <string name="sub_with_upstream_fmt">%1$s · 基于 %2$s</string>
     <string name="row_imported_sub_fmt">导入 · %1$s · %2$s</string>
+    <!-- ★ 第 350 轮（2026-11-11 用户：「主页不要显示apk名字和大小啊」）：主页行只用这三条 + 补丁徽标，
+         不再拼 APK 文件名 / 大小（版本页标题卡仍显示来源与大小） -->
+    <string name="row_imported_tag">导入</string>
+    <string name="row_backups_count_fmt">备份 %1$d 份</string>
+    <string name="row_based_on_fmt">基于 %1$s</string>
     <!--
       ★ 2026-10-06（一档④）：版本行补"这个槽里有几份**备份**"那一段。
       ★ 2026-11-10 用户：「我管他有多少存档干嘛」⇒ 改数**备份份数**（`Backup.list`），

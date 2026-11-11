@@ -818,7 +818,7 @@ public class MainActivity extends BaseActivity {
                             TextView sub = (TextView) v.findViewById(R.id.ver_sub);
                             if (sub == null) continue;
                             Integer c = counts.get(Versions.slotFor(entries.get(i)));
-                            sub.setText(rowSubtitle(entries.get(i), c == null ? 0 : c));
+                            setRowSubtitle(sub, rowSubtitle(entries.get(i), c == null ? 0 : c));
                         }
                     }
                 });
@@ -828,12 +828,19 @@ public class MainActivity extends BaseActivity {
 
     /**
      * 版本行副标题（**唯一实现**：绑定那一行与后台补"备份 N 份"都走它）。
-     * ★ 零份时**不加那一段**（"备份 0 份"没有信息量，还会把行撑到两行）。
-     * ★ 第 345 轮：带上这个版本 key 上启用的补丁数（>0 时前缀 `补丁 N`）。
+     * ★ 零项时可能返回空串 ⇒ 那一行**隐藏**（不留空白高度）。口径在
+     *   {@link Versions#mainRowSubtitleLine}（第 350 轮用户：「主页不要显示apk名字和大小啊」）。
+     * ★ 第 345 轮：带上这个版本 key 上启用的补丁数（>0 时加 `补丁 N`）。
      */
     private String rowSubtitle(Versions.Entry e, int backups) {
-        // 实现在 Versions（版本页的标题卡用同一份，2026-10-25 收口）
-        return Versions.subtitleLine(this, e, backups, patchCountFor(e));
+        return Versions.mainRowSubtitleLine(this, e, backups, patchCountFor(e));
+    }
+
+    /** 把副标题写进行里：空串就 GONE（否则那行会挂一个空白的 13sp 行高）。 */
+    private void setRowSubtitle(TextView sub, String text) {
+        if (sub == null) return;
+        sub.setText(text);
+        sub.setVisibility(text == null || text.isEmpty() ? View.GONE : View.VISIBLE);
     }
 
     /** 这个版本 key 上启用了几条补丁（0 = 没打补丁）。 */
@@ -885,9 +892,9 @@ public class MainActivity extends BaseActivity {
         //   ⇒ 真机上渲染成 `已导入 ·imported · 74.7 MB`（2026-10-04 真机 dump 抓到）。
         // ⚠️ 导入项的 `pkg` 是个**内部占位串**（`Versions` 里写死 "imported"），本来就不该给用户看；
         //   现在导入项显示的是**你导入时的那个文件名**（`importFile`）。
-        // ★ 一档④：这里先按"0 份存档"绑一次（进页面立刻有内容），条数由后台补齐 ——
-        //   口径**只有一处实现**（{@link #rowSubtitle}）。
-        sub.setText(rowSubtitle(e, 0));
+        // ★ 一档④：这里先按"0 份备份"绑一次（进页面立刻有内容），条数由后台补齐 ——
+        //   口径**只有一处实现**（{@link #rowSubtitle}，第 350 轮起不再显示 APK 名 / 大小）。
+        setRowSubtitle(sub, rowSubtitle(e, 0));
 
         // 槽徽标：一眼看出这个版本落在哪个槽（未分配也显式显示默认槽名，不留空白）
         badge.setText(Versions.slotFor(e));
