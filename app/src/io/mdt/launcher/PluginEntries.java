@@ -462,15 +462,12 @@ final class PluginEntries {
         }
     }
 
-    /** 把插件给的结论画成「插件」卡里的一段文字（最多 6 条）。 */
     /** 把插件给的结论画成「插件」卡里的一段（按严重度上色；超过 6 条给「显示全部」）。 */
     private static void showFindings(Activity a, View section, ViewGroup body,
                                      java.util.List<io.mdt.launcher.api.Finding> fs) {
         if (a == null || section == null || body == null || fs == null || fs.isEmpty()) return;
         final LinearLayout col = new LinearLayout(a);
         col.setOrientation(LinearLayout.VERTICAL);
-        int pad = dp(a, 10);
-        col.setPadding(pad, pad, pad, pad);
 
         TextView head = new TextView(a);
         head.setText(Trans.get(a, R.string.plugin_analysis_title));
@@ -498,15 +495,29 @@ final class PluginEntries {
             col.addView(more);
         }
         body.addView(col);
-        // ★ 第 335 轮：这段结论是画进 `body` 的（跟插件自己的 View 同一层）。外卡在"有插件 View"
-        //   时已经让出去了（见 attachPage），所以这里自己补一张卡底，否则它会像光秃秃的一段文字。
-        try {
-            col.setBackgroundResource(R.drawable.card_bg);
-            LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-            clp.topMargin = dp(a, 8);
-            col.setLayoutParams(clp);
-        } catch (Throwable ignored) { }
+
+        // ★★ 2026-11-11 用户：「模组页面的插件分析存在重复框」——
+        //   插件**没有**自己的 View 时，外层 `plugin_section` 本身就是那张卡
+        //   （`plugin_section.xml` 根布局带 `card_bg`）；这里再给 `col` 套一张 `card_bg`
+        //   ⇒ 卡片套卡片，真机上就是两个圆角框叠着。
+        //   判据 = **外层还是不是卡片**：`attachPage` 只在"有插件 View"时把外框让出去
+        //   （`section.setBackground(null)`），所以背景非空 ⇒ 外层已经是卡，这里不再套。
+        boolean outerIsCard = section.getBackground() != null;
+        if (outerIsCard) {
+            // 外层卡里：横向 14dp 跟标题对齐、上下收紧，别再画第二层框
+            col.setPadding(dp(a, 14), dp(a, 0), dp(a, 14), dp(a, 6));
+        } else {
+            // 插件自己画了卡（外框已让出）：这段结论自己补一张卡底，否则像光秃秃一段文字（第 335 轮）
+            int pad = dp(a, 10);
+            col.setPadding(pad, pad, pad, pad);
+            try {
+                col.setBackgroundResource(R.drawable.card_bg);
+                LinearLayout.LayoutParams clp = new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                clp.topMargin = dp(a, 8);
+                col.setLayoutParams(clp);
+            } catch (Throwable ignored) { }
+        }
         section.setVisibility(View.VISIBLE);
     }
 

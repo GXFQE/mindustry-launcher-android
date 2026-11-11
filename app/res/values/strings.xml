@@ -1388,7 +1388,7 @@
     <string name="storage_clean_fmt">%1$d place(s) · %2$s (\"Clean now\" in settings)</string>
 
     <string name="trash_title">Transfer station</string>
-    <string name="trash_sub">Deleted or replaced files wait here first. You can put them back.</string>
+    <string name="trash_sub">Deleted files wait here; you can put them back</string>
     <string name="trash_head_fmt">%1$d items · %2$s</string>
     <string name="trash_empty">Nothing here yet.\nDeleting a map or a slot, or replacing a mod or a save, moves the old one here.</string>
     <string name="trash_scanning">Listing…</string>

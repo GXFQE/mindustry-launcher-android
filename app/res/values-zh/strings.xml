@@ -1357,7 +1357,7 @@
     <string name="storage_clean_fmt">%1$d 处 · %2$s（在设置里「立即清理一次」可清）</string>
 
     <string name="trash_title">中转站</string>
-    <string name="trash_sub">删除或替换掉的旧文件先挪到这里 · 可以再放回去</string>
+    <string name="trash_sub">删掉的旧文件先放这里，能再放回去</string>
     <string name="trash_head_fmt">共 %1$d 份 · %2$s</string>
     <string name="trash_empty">还没有东西挪进来。\n删地图、删槽，或者替换模组和存档时，旧的那份会挪到这里。</string>
     <string name="trash_scanning">正在清点…</string>

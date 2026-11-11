@@ -18,11 +18,21 @@
 -->
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!--
+      第 346 轮（2026-11-11）用户：「右上角那三个按钮顺序颠倒一下」——
+      从「设置 · 插件 · 词表」改成「词表 · 插件 · 设置」（ActionBar 按 XML 顺序从左到右渲染）。
+      ⚠️ 图标 / showAsAction / 注释里的规矩都没变，只换了 item 的先后。
+    -->
+    <!--
+      第 327 轮（2026-10-30）：**词表**（「?」）。用户：「需要找个地方给用户解释一下槽和实例等词的含义」。
+      ★ 放顶栏的理由与下面两条一样：全局、低频、且"带你走"（不是设置项，点下去不改任何值）。
+      ★ 它也**必须**是自带 `@color/on_appbar` 的那份图标（`ic_help_bar`）。
+    -->
     <item
-        android:id="@+id/action_settings"
-        android:icon="@drawable/ic_settings_bar"
+        android:id="@+id/action_glossary"
+        android:icon="@drawable/ic_help_bar"
         android:showAsAction="always"
-        android:title="@string/act_settings_title" />
+        android:title="@string/glossary_title" />
 
     <!--
       第 132 轮（2026-10-12）：**插件**也搬进顶栏菜单。
@@ -36,16 +46,10 @@
         android:showAsAction="always"
         android:title="@string/plugin_page_title" />
 
-    <!--
-      第 327 轮（2026-10-30）：**词表**（「?」）。用户：「需要找个地方给用户解释一下槽和实例等词的含义」。
-      ★ 放顶栏的理由与上面两条一样：全局、低频、且"带你走"（不是设置项，点下去不改任何值）。
-      ★ 它也**必须**是自带 `@color/on_appbar` 的那份图标（`ic_help_bar`）。
-      ⚠️ 排在最右：它频率最低，顶栏放不下时系统先把它收进溢出菜单（⋮ 里仍然点得到）。
-    -->
     <item
-        android:id="@+id/action_glossary"
-        android:icon="@drawable/ic_help_bar"
+        android:id="@+id/action_settings"
+        android:icon="@drawable/ic_settings_bar"
         android:showAsAction="always"
-        android:title="@string/glossary_title" />
+        android:title="@string/act_settings_title" />
 
 </menu>
