@@ -469,11 +469,23 @@ final class PluginEntries {
         final LinearLayout col = new LinearLayout(a);
         col.setOrientation(LinearLayout.VERTICAL);
 
-        TextView head = new TextView(a);
-        head.setText(Trans.get(a, R.string.plugin_analysis_title));
-        head.setTextColor(a.getResources().getColor(R.color.fg_muted));
-        head.setTextSize(12f);
-        col.addView(head);
+        // ★★ 2026-11-11 用户：「插件 / 插件分析 建议删掉一个」——
+        //   这一卡里有两个标题：外层 `plugin_section_title` 写的「插件」+ 这里自己画的「插件分析」。
+        //   判据 = **外层还是不是卡片**（`attachPage` 只在"有插件 View"时把外框让出去）：
+        //   · 外层是卡 ⇒ 这里**不再画小标题**；若这一卡里除了结论什么都没有，把外层标题改成
+        //     「插件分析」（那本来就是这张卡唯一的主题）；混了内容行 / 动作行则外层保持「插件」。
+        //   · 外层已让出（插件自己画了卡）⇒ 这段结论是**一张独立的卡**，仍需要自己的「插件分析」头。
+        boolean outerIsCard = section.getBackground() != null;
+        ViewGroup rowsBox = (ViewGroup) section.findViewById(R.id.plugin_section_rows);
+        boolean onlyFindings = body.getChildCount() == 0
+                && (rowsBox == null || rowsBox.getChildCount() == 0);
+        if (!outerIsCard) {
+            TextView head = new TextView(a);
+            head.setText(Trans.get(a, R.string.plugin_analysis_title));
+            head.setTextColor(a.getResources().getColor(R.color.fg_muted));
+            head.setTextSize(12f);
+            col.addView(head);
+        }
 
         final int LIMIT = 6;
         final int shown = Math.min(fs.size(), LIMIT);
@@ -496,14 +508,19 @@ final class PluginEntries {
         }
         body.addView(col);
 
-        // ★★ 2026-11-11 用户：「模组页面的插件分析存在重复框」——
+        // ★★ 2026-11-11（第 347 轮）用户：「模组页面的插件分析存在重复框」——
         //   插件**没有**自己的 View 时，外层 `plugin_section` 本身就是那张卡
         //   （`plugin_section.xml` 根布局带 `card_bg`）；这里再给 `col` 套一张 `card_bg`
         //   ⇒ 卡片套卡片，真机上就是两个圆角框叠着。
         //   判据 = **外层还是不是卡片**：`attachPage` 只在"有插件 View"时把外框让出去
         //   （`section.setBackground(null)`），所以背景非空 ⇒ 外层已经是卡，这里不再套。
-        boolean outerIsCard = section.getBackground() != null;
         if (outerIsCard) {
+            TextView title = (TextView) section.findViewById(R.id.plugin_section_title);
+            if (title != null) {
+                title.setText(onlyFindings
+                        ? Trans.get(a, R.string.plugin_analysis_title)
+                        : Trans.get(a, R.string.plugin_section_title));
+            }
             // 外层卡里：横向 14dp 跟标题对齐、上下收紧，别再画第二层框
             col.setPadding(dp(a, 14), dp(a, 0), dp(a, 14), dp(a, 6));
         } else {
