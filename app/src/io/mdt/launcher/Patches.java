@@ -369,7 +369,18 @@ final class Patches {
         }
     }
 
-    /** 删一条补丁记录（文件 + 目录）。**启用中的补丁拒绝删**（先停用，避免下回启动找不到）。 */
+    /**
+     * 删一条补丁记录 —— **挪进中转站**（不是直接删；第 357 轮起，与其它删除一致）。
+     *
+     * <p>★ 为什么改：地图 / 存档 / 蓝图 / 模组 / 插件 / 版本 / 整槽 都是"先挪进中转站、能放回来"，
+     *   只有补丁是裸删 —— 用户问「游戏补丁中转站保留个数按照哪个算的啊」，答案是"根本没有中转站"。
+     *   现在删除 = 挪到 `<hub>/patches-trash/`，保留份数走**整槽那一档**（默认 3，
+     *   `Trash.keepFor(Kind.PATCH)`），能从「中转站」放回补丁库（`Trash.restorePatch`）。
+     *
+     * <p>**启用中的补丁拒绝删**（先停用，避免下回启动找不到）。
+     * <p>挪进去时 `origName` 用 `id@version`（恢复时按最后一个 '@' 拆回两级目录）；
+     * 引用串的字符集不含 '@'（见 {@link Record#ref()}），所以能无歧义拆。
+     */
     static void delete(Context ctx, Record r) throws PatchException {
         if (r == null) throw new PatchException(PatchException.C_RECORD_GONE, "");
         if (Data.gameAlive(ctx)) throw new PatchException(PatchException.C_GAME_ALIVE, "");
@@ -381,14 +392,20 @@ final class Patches {
             for (String o : owners) labels.add(instanceLabel(ctx, o));
             throw new PatchException(PatchException.C_IN_USE, join(labels));
         }
-        if (!deleteTree(r.dir)) throw new PatchException(PatchException.C_IO, r.dir.getName());
+        File trash = Trash.patchesDir(ctx);
+        File dst = new File(trash, Trash.nameFor("", r.id() + "@" + r.version()));
+        if (!Trash.move(r.dir, dst)) {
+            // ⚠️ Trash.move 失败时**源还在**（它只在复制校验通过后才删源）⇒ 记录与文件都没丢
+            throw new PatchException(PatchException.C_IO, r.dir.getName());
+        }
+        Trash.pruneIn(trash);          // 保留份数 = 整槽那一档（默认 3）
         // 空 id 目录顺手收掉（只删空目录；失败无害）
         File idDir = r.dir.getParentFile();
         if (idDir != null) {
             String[] left = idDir.list();
             if (left != null && left.length == 0) idDir.delete();
         }
-        Log.i(TAG, "patch deleted: " + r.ref());
+        Log.i(TAG, "patch moved to trash: " + r.ref());
     }
 
     // ══ 启用 / 停用 ═════════════════════════════════════════════════════════

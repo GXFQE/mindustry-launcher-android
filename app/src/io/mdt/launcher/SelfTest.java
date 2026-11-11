@@ -11150,8 +11150,11 @@ public final class SelfTest {
             int keepItems = Trash.keep();
             int keepSlots = Trash.keepSlots();
             ok(stat, L, Trash.keepFor(Trash.Kind.SLOT) == keepSlots
-                            && Trash.keepFor(Trash.Kind.MAP) == keepItems,
-                    "④ 份数上限按类型分开：整槽 " + keepSlots + " / 其余 " + keepItems);
+                            && Trash.keepFor(Trash.Kind.MAP) == keepItems
+                            && Trash.keepFor(Trash.Kind.VERSION) == keepSlots
+                            && Trash.keepFor(Trash.Kind.PATCH) == keepSlots,
+                    "④ 份数上限按类型分开：整槽 / 游戏版本 / 补丁 " + keepSlots
+                            + " / 其余 " + keepItems);
             File fake = new File(root4(ctx), Trash.DIR_SLOTS);
             deleteTree(fake.getParentFile());
             fake.mkdirs();
@@ -16630,6 +16633,28 @@ public final class SelfTest {
             expectImportCode(ctx, L, stat, "dex checksum 不符", PatchException.C_BAD_DEX, badSumPkg);
             ok(stat, L, countPatchRecords(ctx, ID_PREFIX) == 4,
                     "⑦ 所有失败导入都没留下半条记录（当前自检记录数 = 4）");
+            // ★ 第 357 轮用户：「游戏补丁中转站保留个数按照哪个算的啊」—— 原来补丁删除根本不进
+            //   中转站（唯一一个裸删的破坏性操作）。现在：删除 = 挪进 patches-trash，
+            //   保留份数走整槽那一档（默认 3），能从「中转站」放回补丁库。
+            File fakeId = new File(Patches.storeDir(ctx), ID_PREFIX + "trash");
+            File fakeVer = new File(fakeId, "1");
+            fakeVer.mkdirs();
+            write(new File(fakeVer, PatchManifest.FILE), "{}".getBytes("UTF-8"));
+            File patchTrash = Trash.patchesDir(ctx);
+            File stashed = new File(patchTrash, Trash.nameFor("", ID_PREFIX + "trash@1"));
+            ok(stat, L, Trash.move(fakeVer, stashed) && stashed.isDirectory(),
+                    "⑦ 删补丁 = 挪进中转站 patches-trash（不是直接删）");
+            Trash.Item sti = Trash.parse(stashed);
+            ok(stat, L, sti != null && sti.kind == Trash.Kind.PATCH
+                            && Trash.keepFor(Trash.Kind.PATCH) == Trash.keepSlots(),
+                    "⑦ 中转站认成「游戏补丁」，保留份数走整槽那一档（默认 3）");
+            Trash.Result rr = Trash.restorePatch(ctx, sti);
+            ok(stat, L, rr.ok && fakeVer.isDirectory() && !stashed.exists(),
+                    "⑦ 从「中转站」放回补丁库原位置（<id>/<version>）");
+            Data.deleteTree(fakeId);
+            for (Trash.Item ti : Trash.list(patchTrash)) {
+                if (ti != null && ti.name != null && ti.name.contains(ID_PREFIX)) Data.deleteTree(ti.path);
+            }
         } catch (Throwable t) {
             ok(stat, L, false, "补丁组自身异常：" + t);
             android.util.Log.e("MDTLauncher", "patch selftest crashed", t);
@@ -16640,6 +16665,16 @@ public final class SelfTest {
                     if (r.id().startsWith(ID_PREFIX)) {
                         try { Patches.disable(ctx, IKEY, r); } catch (Throwable ignored) { }
                         try { Patches.delete(ctx, r); } catch (Throwable ignored) { }
+                    }
+                }
+            } catch (Throwable ignored) {
+            }
+            // ★ 第 357 轮：删记录现在会挪进 patches-trash —— 夹具不许在中转站里攒垃圾
+            try {
+                File pt = Trash.patchesDir(ctx);
+                for (Trash.Item ti : Trash.list(pt)) {
+                    if (ti != null && ti.name != null && ti.name.contains(ID_PREFIX)) {
+                        Data.deleteTree(ti.path);
                     }
                 }
             } catch (Throwable ignored) {

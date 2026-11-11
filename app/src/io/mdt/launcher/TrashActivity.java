@@ -258,6 +258,9 @@ public class TrashActivity extends BaseActivity {
         String body = TrashText.line(this, it);
         if (it.kind == Trash.Kind.OTHER) {
             body = body + "\n\n" + Trans.get(TrashActivity.this, R.string.trash_reason_no_kind);
+        } else if (it.kind == Trash.Kind.PATCH) {
+            // ★ 第 357 轮：补丁放回的是**补丁库**，不是"游戏里又能看到它"
+            body = Trans.get(TrashActivity.this, R.string.trash_actions_msg_patch_fmt, body);
         } else {
             body = Trans.get(TrashActivity.this, R.string.trash_actions_msg_fmt, body);
         }
@@ -279,6 +282,8 @@ public class TrashActivity extends BaseActivity {
                     else if (it.kind == Trash.Kind.PLUGIN) confirmRestorePlugin(it);
                     // 删掉的导入版本（2026-10-25）：APK 回 app_hub/import + 登记重加 + 名字/槽绑定恢复
                     else if (it.kind == Trash.Kind.VERSION) confirmRestoreVersion(it);
+                    // 删掉的补丁（第 357 轮）：文件回 app_hub/patches/<id>/<version>（未启用）
+                    else if (it.kind == Trash.Kind.PATCH) confirmRestorePatch(it);
                     else askSlot(it);
                 }
             }));
@@ -470,6 +475,45 @@ public class TrashActivity extends BaseActivity {
                 });
             }
         }, "trash-restore-plugin").start();
+    }
+
+    /** 删掉的补丁：确认「放回去」（说清放回去还是未启用状态） */
+    private void confirmRestorePatch(final Trash.Item it) {
+        final CardStack[] ref = new CardStack[1];
+        ref[0] = open(Trans.get(this, R.string.trash_restore_confirm_title),
+                CardStack.text(this, Trans.get(this, R.string.trash_restore_patch_fmt, TrashText.title(it))),
+                new CardStack.Btn(Trans.get(this, R.string.cancel), new Runnable() {
+                    @Override public void run() { ref[0].dismiss(); }
+                }),
+                new CardStack.Btn(Trans.get(this, R.string.trash_restore), new Runnable() {
+                    @Override public void run() {
+                        ref[0].dismiss();
+                        doRestorePatch(it);
+                    }
+                }));
+    }
+
+    private void doRestorePatch(final Trash.Item it) {
+        new Thread(new Runnable() {
+            @Override public void run() {
+                final Trash.Result r = Trash.restorePatch(TrashActivity.this, it);
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        if (Util.dead(TrashActivity.this)) return;
+                        if (r.ok) {
+                            Toast.makeText(TrashActivity.this,
+                                    Trans.get(TrashActivity.this, R.string.trash_restore_patch_ok_fmt,
+                                            TrashText.title(it)),
+                                    Toast.LENGTH_LONG).show();
+                            scan();
+                            return;
+                        }
+                        alert(Trans.get(TrashActivity.this, R.string.trash_restore_confirm_title),
+                                TrashText.reason(TrashActivity.this, r));
+                    }
+                });
+            }
+        }, "trash-restore-patch").start();
     }
 
     /** 整个版本：确认「放回去」（说清"名字与槽绑定会一起回来、存档没动过"） */

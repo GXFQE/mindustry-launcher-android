@@ -91,6 +91,8 @@ public final class Trash {
      * ★ 与"整个槽"一样是几十 MB 级 ⇒ 单独一套保留份数（默认同整槽 3 份），别按普通条目算 20。
      */
     static final String DIR_VERSIONS = "versions-trash";
+    /** 删掉的补丁（第 357 轮；目录形态，可放回） */
+    static final String DIR_PATCHES = "patches-trash";
 
     /** 槽容器里的两半（整槽进站时把"槽本体"与"它的备份"装在一起，恢复时一起回去） */
     static final String INNER_SLOT = "slot";
@@ -154,10 +156,17 @@ public final class Trash {
         return d;
     }
 
+    /** 删掉的**游戏补丁**（第 357 轮）：`<hub>/patches-trash/` */
+    public static File patchesDir(Context ctx) {
+        File d = new File(Data.hubDir(ctx), DIR_PATCHES);
+        if (!d.isDirectory()) d.mkdirs();
+        return d;
+    }
+
     /** 全部中转站目录（清空 / 统计 / 列表要一起看 —— 用户眼里中转站只有一个） */
     public static File[] allDirs(Context ctx) {
         return new File[]{mapsDir(ctx), modsDir(ctx), savesDir(ctx), slotsDir(ctx), schemsDir(ctx),
-                pluginsDir(ctx), versionsDir(ctx)};
+                pluginsDir(ctx), versionsDir(ctx), patchesDir(ctx)};
     }
 
     // ── 名字：编码 / 解码 ─────────────────────────────────────────────────
@@ -239,7 +248,13 @@ public final class Trash {
     // ── 条目 ──────────────────────────────────────────────────────────────
 
     /** 认得出是什么：地图 / 模组 / 存档 / 整个槽 / 蓝图 / 其它（其它**不能恢复** —— 没有地方放回去） */
-    public enum Kind { MAP, MOD, SAVE, SLOT, SCHEM, PLUGIN, VERSION, OTHER }
+    /**
+     * 中转站里的种类。
+     *
+     * <p>★ 第 357 轮：加 `PATCH`（游戏补丁）—— 补丁删除原来**直接删**（唯一一个不进中转站的
+     *   破坏性操作），用户问「游戏补丁中转站保留个数按照哪个算的啊」时才发现这个不一致。
+     */
+    public enum Kind { MAP, MOD, SAVE, SLOT, SCHEM, PLUGIN, VERSION, PATCH, OTHER }
 
     /** 中转站里的一项 */
     public static final class Item {
@@ -282,6 +297,7 @@ public final class Trash {
         if (DIR_SCHEMS.equals(p)) return Kind.SCHEM;
         if (DIR_PLUGINS.equals(p)) return Kind.PLUGIN;   // 插件整包（第 148 轮 C1-b：可一键放回）
         if (DIR_VERSIONS.equals(p)) return Kind.VERSION;  // 删掉的导入版本（目录形态，可放回）
+        if (DIR_PATCHES.equals(p)) return Kind.PATCH;     // 删掉的补丁（第 357 轮）
         if (dirForm) return Kind.MOD;                     // 手工丢进来的目录：多半是目录形态的模组
         String n = name == null ? "" : name.toLowerCase(java.util.Locale.ROOT);
         if (n.endsWith(".msav")) return Kind.MAP;
@@ -302,8 +318,9 @@ public final class Trash {
 
     /** 这一类留几份（只有"整个槽"另有一套 —— 见 {@link #keepSlots()}）。 */
     public static int keepFor(Kind k) {
-        // 整槽与整个版本都是几十 MB 级 ⇒ 共用"整槽"那套份数（默认 3）
-        return (k == Kind.SLOT || k == Kind.VERSION) ? keepSlots() : keep();
+        // 整槽 / 整个版本 / 补丁都是几十 MB 级 ⇒ 共用"整槽"那套份数（默认 3）
+        // ★ 第 357 轮起补丁也进中转站（用户问的就是"补丁保留几个"）⇒ 归这一档
+        return (k == Kind.SLOT || k == Kind.VERSION || k == Kind.PATCH) ? keepSlots() : keep();
     }
 
     /** 按**目录自己的类型**修剪（`maps-trash` 用普通份数、`slots-trash` 用整槽份数） */
@@ -815,6 +832,55 @@ public final class Trash {
         if (!move(it.path, dst)) return r.fail(Result.T_MOVE_FAILED, "move failed: " + it.path, it.name);
         r.ok = true;
         return r;
+    }
+
+    /**
+     * 把中转站里的一份**补丁**放回 `app_hub/patches/<id>/<version>/`（第 357 轮）。
+     *
+     * <p>为什么补丁也要进中转站：其它所有删除（地图 / 存档 / 蓝图 / 模组 / 插件 / 版本 / 整槽）
+     * 都是"先挪进中转站、能放回来"，只有补丁是裸删 —— 用户问「补丁中转站保留个数按哪个算」，
+     * 答案原本是"根本没有中转站"。现在统一：删除 = 挪进 `patches-trash/`，
+     * 保留份数走**整槽那一档**（`Trash.keepFor` / 设置页「整个槽 / 游戏版本 / 补丁」）。
+     *
+     * <p>★ 放回去是**未启用**状态（删除时已经把 config 里的启用引用摘掉了 —— 恢复文件 ≠ 恢复启用），
+     *   要生效得去补丁页自己按。
+     * <p>名字约定：挪进去时 `origName` 就是 `id@version`（见 {@link Patches#delete}），
+     * 这里按**最后一个 `@`** 拆开；id / version 里出现路径分隔符 ⇒ 拒绝（不猜）。
+     */
+    public static Result restorePatch(Context ctx, Item it) {
+        Result r = new Result();
+        if (it == null || it.path == null) return r.fail(Result.T_NO_TARGET, "no item", null);
+        if (it.kind != Kind.PATCH) return r.fail(Result.T_NO_KIND, "not a patch: " + it.name, it.name);
+        if (Data.gameAlive(ctx)) return r.fail(Result.T_GAME_RUNNING, "game is running", null);
+        String raw = it.name == null ? "" : it.name;
+        int at = raw.lastIndexOf('@');
+        String id = at > 0 ? raw.substring(0, at) : "";
+        String ver = at > 0 && at + 1 < raw.length() ? raw.substring(at + 1) : "";
+        if (!safeSeg(id) || !safeSeg(ver)) {
+            return r.fail(Result.T_BAD_NAME, "bad patch name: " + raw, raw);
+        }
+        File dst = new File(new File(Patches.storeDir(ctx), id), ver);
+        if (dst.exists()) {
+            r.fail(Result.T_NAME_TAKEN, "taken: " + dst, raw);
+            r.nameTaken = true;
+            return r;
+        }
+        File parent = dst.getParentFile();
+        if (parent != null && !parent.isDirectory() && !parent.mkdirs() && !parent.isDirectory()) {
+            return r.fail(Result.T_MKDIR, "mkdir failed: " + parent, raw);
+        }
+        if (!move(it.path, dst)) {
+            return r.fail(Result.T_MOVE_FAILED, "could not restore: " + it.path, raw);
+        }
+        r.dest = dst;
+        r.ok = true;
+        return r;
+    }
+
+    /** id / version 只当**文件名的一格**用：不许空 / `.` / `..` / 路径分隔符 */
+    private static boolean safeSeg(String s) {
+        if (s == null || s.isEmpty() || ".".equals(s) || "..".equals(s)) return false;
+        return s.indexOf('/') < 0 && s.indexOf('\\') < 0;
     }
 
     static boolean move(File from, File to) {

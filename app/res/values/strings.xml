@@ -1423,6 +1423,7 @@
     <string name="trash_kind_save">Save</string>
     <string name="trash_kind_slot">Whole slot</string>
     <string name="trash_kind_version">Game version</string>
+    <string name="trash_kind_patch">Game patch</string>
     <string name="trash_kind_other">Other file</string>
     <string name="trash_kind_schem">Blueprint</string>
     <string name="trash_from_slot_fmt">from slot \"%1$s\"</string>
@@ -1433,6 +1434,7 @@
     <string name="trash_restore_version_ok_fmt">Put \"%1$s\" back</string>
 
     <string name="trash_actions_msg_fmt">%1$s\n\nPutting it back makes the game see it again. Deleting for good cannot be undone.</string>
+    <string name="trash_actions_msg_patch_fmt">%1$s\n\nPutting it back returns it to the patch store (disabled; enable it on the patch page). Deleting for good cannot be undone.</string>
     <string name="trash_restore">Put back…</string>
     <string name="trash_restore_pick_title">Put it back into which slot?</string>
     <string name="trash_restore_confirm_title">Put it back</string>
@@ -1602,7 +1604,7 @@
     <string name="set_trash_sub_fmt">Items %1$d · slots / versions %2$d</string>
     <string name="set_trash_dialog_title">Trash retention (1 ~ 999)</string>
     <string name="set_trash_items_label">Items: maps, saves, schematics, mods, plugins</string>
-    <string name="set_trash_slots_label">Whole slots / game versions</string>
+    <string name="set_trash_slots_label">Whole slots / game versions / patches</string>
     <string name="set_trash_hint">20</string>
     <string name="set_trash_slots_hint">3</string>
     <string name="set_trash_bad">Enter integers from 1 to 999</string>
@@ -2197,8 +2199,10 @@
     <string name="batch_del_skipped_fmt">%1$d of them live inside a mod package or a subfolder, so they cannot be deleted</string>
 
     <!-- 第 148 轮：插件也能从中转站一键放回（放回去是未启用状态） -->
+    <string name="trash_restore_patch_fmt">Put \"%1$s\" back into the patch store? It will be disabled.</string>
     <string name="trash_restore_plugin_fmt">Put \"%1$s\" back into the plugin list? It comes back disabled.</string>
     <string name="trash_restore_plugin_ok_fmt">\"%1$s\" is back in the plugin list - still disabled, enable it yourself.</string>
+    <string name="trash_restore_patch_ok_fmt">\"%1$s\" is back in the patch store - still disabled, enable it on the patch page.</string>
     <!-- round 149: the item is an uninstalled plugin (it used to fall into "Other files") -->
     <string name="trash_kind_plugin">Uninstalled plugin</string>
     <string name="save">Save</string>
@@ -2275,9 +2279,9 @@
     <string name="patch_warn_body">A patch replaces game code and can make the game crash. Only enable packages you trust.</string>
     <string name="patch_warn_ok">Enable anyway</string>
     <string name="patch_delete_title">Delete patch?</string>
-    <string name="patch_delete_body_fmt">Delete the local files of %1$s?</string>
+    <string name="patch_delete_body_fmt">Move %1$s to the trash station? (You can restore it from there.)</string>
     <string name="patch_delete_ok">Delete</string>
-    <string name="patch_delete_done_fmt">Deleted %1$s</string>
+    <string name="patch_delete_done_fmt">Moved %1$s to the trash station</string>
     <string name="patch_last_launch_title">Last launch: some patches did not apply</string>
     <string name="patch_problem_line_fmt">· %1$s</string>
     <string name="patch_last_launch_dismiss">Tap to dismiss</string>

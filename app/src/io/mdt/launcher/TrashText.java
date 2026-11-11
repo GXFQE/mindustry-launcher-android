@@ -41,6 +41,7 @@ public final class TrashText {
             case SCHEM: return Trans.get(c, R.string.trash_kind_schem);
             case PLUGIN: return Trans.get(c, R.string.trash_kind_plugin);   // 卸载的插件（第 149 轮补）
             case VERSION: return Trans.get(c, R.string.trash_kind_version); // 删掉的导入版本（2026-10-25）
+            case PATCH: return Trans.get(c, R.string.trash_kind_patch);     // 删掉的游戏补丁（第 357 轮）
             default: return Trans.get(c, R.string.trash_kind_other);
         }
     }
@@ -54,7 +55,8 @@ public final class TrashText {
     static Trash.Kind[] filterOrder() {
         return new Trash.Kind[] {
                 Trash.Kind.SAVE, Trash.Kind.MAP, Trash.Kind.SCHEM, Trash.Kind.MOD,
-                Trash.Kind.SLOT, Trash.Kind.VERSION, Trash.Kind.PLUGIN, Trash.Kind.OTHER
+                Trash.Kind.SLOT, Trash.Kind.VERSION, Trash.Kind.PATCH,
+                Trash.Kind.PLUGIN, Trash.Kind.OTHER
         };
     }
 
@@ -96,8 +98,9 @@ public final class TrashText {
         // ★ 整槽不写"来自槽「x」"：标题**就是**那个槽名（写两遍是废话，还会把这一行挤长）
         // ★ 整槽 / 插件都不写"来自槽「x」"：整槽的标题就是槽名；插件的来源是"被卸载"，
         //   写「来自槽「plugins」」是拿中转站**目录名**当槽名 ⇒ 说错来源（第 149 轮真机看到的）
+        // ★ 补丁也不写来源（第 357 轮）：补丁不属于任何槽 ⇒ 写「来源不清楚」是噪音
         if (it.kind != Trash.Kind.SLOT && it.kind != Trash.Kind.PLUGIN
-                && it.kind != Trash.Kind.VERSION) {
+                && it.kind != Trash.Kind.VERSION && it.kind != Trash.Kind.PATCH) {
             sb.append(" · ").append(fromLabel(c, it));
         }
         sb.append(" · ").append(Util.formatSize(it.bytes));

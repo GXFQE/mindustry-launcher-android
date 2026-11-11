@@ -1396,6 +1396,7 @@
     <string name="trash_kind_save">存档</string>
     <string name="trash_kind_slot">整个槽</string>
     <string name="trash_kind_version">游戏版本</string>
+    <string name="trash_kind_patch">游戏补丁</string>
     <string name="trash_kind_other">其他文件</string>
     <string name="trash_kind_schem">蓝图</string>
     <string name="trash_from_slot_fmt">来自槽「%1$s」</string>
@@ -1406,6 +1407,7 @@
     <string name="trash_restore_version_ok_fmt">已把「%1$s」放回来</string>
 
     <string name="trash_actions_msg_fmt">%1$s\n\n放回去游戏里就又能看到它；彻底删除就找不回来了。</string>
+    <string name="trash_actions_msg_patch_fmt">%1$s\n\n放回去会回到补丁库（未启用，要去补丁页自己启用）；彻底删除就找不回来了。</string>
     <string name="trash_restore">放回去…</string>
     <string name="trash_restore_pick_title">放回哪个槽？</string>
     <string name="trash_restore_confirm_title">放回去</string>
@@ -1546,7 +1548,7 @@
     <string name="set_trash_sub_fmt">普通 %1$d 份 · 整个槽 / 版本 %2$d 份</string>
     <string name="set_trash_dialog_title">中转站保留份数（1 ~ 999）</string>
     <string name="set_trash_items_label">普通条目：地图 / 存档 / 蓝图 / 模组 / 插件</string>
-    <string name="set_trash_slots_label">整个槽 / 游戏版本</string>
+    <string name="set_trash_slots_label">整个槽 / 游戏版本 / 补丁</string>
     <string name="set_trash_hint">20</string>
     <string name="set_trash_slots_hint">3</string>
     <string name="set_trash_bad">只能填 1 ~ 999 的整数</string>
@@ -2155,7 +2157,9 @@
 
     <!-- 第 148 轮：插件也能从中转站一键放回（放回去是未启用状态） -->
     <string name="trash_restore_plugin_fmt">把「%1$s」放回插件列表？放回去是未启用状态。</string>
+    <string name="trash_restore_patch_fmt">把「%1$s」放回补丁库？放回去是未启用状态。</string>
     <string name="trash_restore_plugin_ok_fmt">「%1$s」已放回插件列表 —— 还是未启用，要自己按启用。</string>
+    <string name="trash_restore_patch_ok_fmt">「%1$s」已放回补丁库 —— 还是未启用，要在补丁页自己启用。</string>
     <!-- 第 149 轮：中转站里那件是"卸载掉的插件"（原来掉进"其他文件"） -->
     <string name="trash_kind_plugin">卸载的插件</string>
     <string name="save">保存</string>
@@ -2231,9 +2235,9 @@
     <string name="patch_warn_body">补丁会替换游戏代码，可能让游戏崩溃。只启用你信任的补丁包。</string>
     <string name="patch_warn_ok">仍然启用</string>
     <string name="patch_delete_title">删除补丁？</string>
-    <string name="patch_delete_body_fmt">把 %1$s 从本机删除？</string>
+    <string name="patch_delete_body_fmt">把 %1$s 挪进中转站？（以后能从「中转站」放回来）</string>
     <string name="patch_delete_ok">删除</string>
-    <string name="patch_delete_done_fmt">已删除 %1$s</string>
+    <string name="patch_delete_done_fmt">已把 %1$s 挪进中转站</string>
     <string name="patch_last_launch_title">上次启动：有补丁没应用</string>
     <string name="patch_problem_line_fmt">· %1$s</string>
     <string name="patch_last_launch_dismiss">点一下关掉</string>
