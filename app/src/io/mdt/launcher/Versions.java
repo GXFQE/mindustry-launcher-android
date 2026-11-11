@@ -1012,20 +1012,23 @@ public final class Versions {
      * <p>和版本页那份（{@link #subtitleLine}）**故意不同**：主页行是用来"选一个启动"的，
      * APK 文件名（`official-159.apk`）和大小（`74.7 MB`）对选择没有帮助，还把行撑长；
      * 这里只留用户会行动的信息，按顺序用 ` · ` 拼：
-     * {@code 导入} · {@code 备份 N 份} · {@code 补丁 N} · {@code 基于 X}（空项不占位）。
+     * {@code 导入|已安装} · {@code 备份 N 份} · {@code 补丁 N} · {@code 基于 X}（空项不占位）。
+     *
+     * <p>★ 第 351 轮用户：「那个导入应该对应着什么吧（已安装的应用？）」⇒ 来源标记做成**对称**的：
+     * 导入副本写「导入」、系统里装好的写「已安装」（不再只有导入项带标签）。
      *
      * <p>⚠️ 版本页标题卡仍用 {@link #subtitleLine}（来源 / 大小在那里看得到是合理的）。
-     * 两处都是同一份"要不要显示 / 空项跳过"的实现，别在界面里再拼一遍。
      *
      * @param backups 这个槽的备份份数（0 = 不显示）
      * @param patches 这个版本 key 上启用的补丁数（0 = 不显示）
-     * @return 可能为空串（例如"装好的版本、没备份、没补丁"）—— 调用方按空串隐藏那一行
+     * @return 至少含来源标记（导入 / 已安装），不会是空串
      */
     public static String mainRowSubtitleLine(android.content.Context ctx, Entry e,
                                              int backups, int patches) {
         if (e == null) return "";
         StringBuilder sb = new StringBuilder();
-        if (e.imported) appendPart(sb, Trans.get(ctx, R.string.row_imported_tag));
+        appendPart(sb, Trans.get(ctx, e.imported
+                ? R.string.row_imported_tag : R.string.row_installed_tag));
         if (backups > 0) appendPart(sb, Trans.get(ctx, R.string.row_backups_count_fmt, backups));
         if (patches > 0) appendPart(sb, Trans.get(ctx, R.string.patch_badge_fmt, patches));
         String up = e.upstreamNote();

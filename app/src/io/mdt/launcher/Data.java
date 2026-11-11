@@ -137,6 +137,54 @@ public final class Data {
         return n.startsWith(".") || n.endsWith(".part") || n.endsWith(".tmp");
     }
 
+    /**
+     * 槽里**用户会关心的四类内容**各有多少：模组 / 地图 / 存档 / 蓝图（schematics）。
+     *
+     * <p>★ 第 351 轮用户：「存档与备份那里，写多少个模组/地图/存档/蓝图更合适」——
+     *   「存档与备份」页的槽行原来报 `N 个文件 · 大小`（还有更早的 `slot_entry_fmt`），
+     *   对用户没有行动价值；改成这四项计数（大小/文件总数在选槽对话框与槽页里还能看到）。
+     *
+     * <p>判据与"游戏会看到什么"对齐：
+     * <ul>
+     *   <li>模组：`mods/` 下非隐藏、非 `.part/.tmp`，且是**目录**或 `.jar` / `.zip`
+     *       （游戏只认这两种形态；`readme.txt` 之类不算）；</li>
+     *   <li>地图 / 存档：`maps/`、`saves/` 下非隐藏 `.msav`；</li>
+     *   <li>蓝图：`schematics/` 下非隐藏 `.msch`。</li>
+     * </ul>
+     * ⚠️ **只读**（不 mkdirs、不抛）；槽根为 null / 不存在 ⇒ 全 0。
+     *
+     * @return 长度为 4 的数组：{模组, 地图, 存档, 蓝图}
+     */
+    public static int[] contentCounts(File slotRoot) {
+        int[] out = new int[4];
+        if (slotRoot == null || !slotRoot.isDirectory()) return out;
+        File[] mods = new File(slotRoot, "mods").listFiles();
+        if (mods != null) {
+            for (File f : mods) {
+                if (contentSkipped(f)) continue;
+                String n = f.getName().toLowerCase(Locale.ROOT);
+                if (f.isDirectory() || n.endsWith(".jar") || n.endsWith(".zip")) out[0]++;
+            }
+        }
+        out[1] = countFilesWithExt(new File(slotRoot, "maps"), ".msav");
+        out[2] = countFilesWithExt(new File(slotRoot, "saves"), ".msav");
+        out[3] = countFilesWithExt(new File(slotRoot, "schematics"), ".msch");
+        return out;
+    }
+
+    /** 目录下（**非递归**）扩展名匹配的普通文件数；目录不存在 / 读不了 ⇒ 0 */
+    private static int countFilesWithExt(File dir, String ext) {
+        if (dir == null || !dir.isDirectory()) return 0;
+        File[] fs = dir.listFiles();
+        if (fs == null) return 0;
+        int n = 0;
+        for (File f : fs) {
+            if (f == null || contentSkipped(f) || !f.isFile()) continue;
+            if (f.getName().toLowerCase(Locale.ROOT).endsWith(ext)) n++;
+        }
+        return n;
+    }
+
     // ── 基本位置 ──────────────────────────────────────────────────────────
 
     /** HUB 自己的外部目录 —— 与游戏数据根**平级**，游戏不认识它 */

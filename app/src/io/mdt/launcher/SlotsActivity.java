@@ -204,9 +204,11 @@ public class SlotsActivity extends BaseActivity {
             // 布局里那些静态文案已搬到 Java（见 Trans）：布局够不到用户语言包
             Trans.bind(v, R.id.slot_badge, R.string.slot_current_badge);
             ((TextView) v.findViewById(R.id.slot_name)).setText(s.name);
-            // 槽行的统计段统一走资源（原 Data.Slot.subtitle() 的硬编码串已删，2026-10-02）。
-            // F5：再追加一行自动备份策略摘要 —— 否则用户没法一眼看出"这个槽到底会不会自动备份"。
-            String meta = Trans.get(SlotsActivity.this, R.string.slot_entry_fmt, s.files, Util.formatSize(s.bytes));
+            // ★ 第 351 轮用户：「存档与备份那里，写多少个模组/地图/存档/蓝图更合适」——
+            //   统计段不再报"N 个文件 · 大小"，改报这四类内容的份数（判据见 `Data.contentCounts`）。
+            int[] cc = Data.contentCounts(Data.dirOf(this, s.name));
+            String meta = Trans.get(SlotsActivity.this, R.string.slot_entry_counts_fmt,
+                    cc[0], cc[1], cc[2], cc[3]);
             Config.BackupPolicy bp = Config.get().backupPolicy(s.name);
             meta += bp.enabled
                     ? Trans.get(SlotsActivity.this, R.string.policy_summary_fmt, bp.minMinutes, bp.maxBackups)

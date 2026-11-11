@@ -269,6 +269,8 @@
     <!-- ★ 第 350 轮（2026-11-11 用户：「主页不要显示apk名字和大小啊」）：主页行只用这三条 + 补丁徽标，
          不再拼 APK 文件名 / 大小（版本页标题卡仍显示来源与大小） -->
     <string name="row_imported_tag">导入</string>
+    <!-- ★ 第 351 轮（「那个导入应该对应着什么吧（已安装的应用？）」）：来源标记做成对称的 -->
+    <string name="row_installed_tag">已安装</string>
     <string name="row_backups_count_fmt">备份 %1$d 份</string>
     <string name="row_based_on_fmt">基于 %1$s</string>
     <!--
@@ -337,6 +339,9 @@
          ⚠️ 选槽对话框原先另有一条 `slot_entry_suffix_fmt`，两份内容只差一个前导空格。
          那正是本工程反复栽的形态（同一显示规则两处实现 ⇒ 改一边另一边静默不跟），已合并。 -->
     <string name="slot_entry_fmt">%1$d 个文件 · %2$s</string>
+    <!-- ★ 第 351 轮（用户：「存档与备份那里，写多少个模组/地图/存档/蓝图更合适」）：
+         「存档与备份」页的槽行统计段 —— 只报四类内容的份数；文件总数/大小在选槽对话框与槽页里仍可见 -->
+    <string name="slot_entry_counts_fmt">%1$d 个模组 · %2$d 张地图 · %3$d 份存档 · %4$d 张蓝图</string>
     <!-- 槽操作菜单的标题：槽名 + 元信息。元信息本来走 setMessage，但那个坑见 SlotsActivity.slotOps() -->
 
     <string name="slot_op_backup">备份此槽…</string>

@@ -230,6 +230,8 @@ public final class SelfTest {
             versionTrash(ctx, L, stat);
             upstreamCompat(ctx, L, stat);
             slotLineSpacing(ctx, L, stat);
+            // ★ 第 351 轮：槽内容计数（模组 / 地图 / 存档 / 蓝图）——「存档与备份」页槽行统计段
+            slotContentCounts(ctx, L, stat);
             logExport(ctx, L, stat);
             casGc(ctx, L, stat);
             legacyMigration(ctx, L, stat);
@@ -3200,6 +3202,65 @@ public final class SelfTest {
                 "★元断言：就是用户截图里那个粘连形态，必须判死（判据不是恒真）");
         ok(stat, L, !slotLineSpaced("default  [当前]52 文件 · 208.3 KB"),
                 "★元断言：只补前半段也不放过 —— [当前] 后面缺空白同样判死");
+        L.add("");
+    }
+
+    /**
+     * ⑥g 第 351 轮：**槽内容计数**（模组 / 地图 / 存档 / 蓝图）——「存档与备份」页槽行统计段的判据。
+     *
+     * <p>用户原话：「存档与备份那里，写多少个模组/地图/存档/蓝图更合适」。
+     * 判据住在 {@link Data#contentCounts}，这里用临时目录造夹具验**口径**（哪些算、哪些不算），
+     * 再实拼一次资源句（四个数 + 四个量词都要在）。
+     */
+    private static void slotContentCounts(Context ctx, List<String> L, int[] stat) {
+        L.add("── ⑥g 槽内容计数：模组 / 地图 / 存档 / 蓝图 ──");
+        File root = new File(ctx.getCacheDir(), "selftest-slotcounts");
+        try {
+            Data.deleteTree(root);
+            File mods = new File(root, "mods");
+            File maps = new File(root, "maps");
+            File saves = new File(root, "saves");
+            File sch = new File(root, "schematics");
+            mods.mkdirs();
+            maps.mkdirs();
+            saves.mkdirs();
+            sch.mkdirs();
+            // 算：zip / jar / 目录（游戏认的两种形态 + 目录模组）
+            new File(mods, "a.zip").createNewFile();
+            new File(mods, "b.jar").createNewFile();
+            new File(mods, "dir-mod").mkdirs();
+            // 不算：不是包、隐藏、写一半
+            new File(mods, "readme.txt").createNewFile();
+            new File(mods, ".hidden.zip").createNewFile();
+            new File(mods, "x.part").createNewFile();
+            new File(maps, "m1.msav").createNewFile();
+            new File(maps, "m2.msav").createNewFile();
+            new File(maps, "note.txt").createNewFile();
+            new File(saves, "s1.msav").createNewFile();
+            new File(sch, "bp1.msch").createNewFile();
+            new File(sch, "bp2.msch").createNewFile();
+
+            int[] cc = Data.contentCounts(root);
+            ok(stat, L, cc.length == 4 && cc[0] == 3 && cc[1] == 2 && cc[2] == 1 && cc[3] == 2,
+                    "★计数口径：模组 3（zip/jar/目录；不含 txt/隐藏/.part）· 地图 2 · 存档 1 · 蓝图 2"
+                            + "（实得 " + cc[0] + "/" + cc[1] + "/" + cc[2] + "/" + cc[3] + "）");
+            String line = Trans.get(ctx, R.string.slot_entry_counts_fmt,
+                    cc[0], cc[1], cc[2], cc[3]);
+            ok(stat, L, line.contains("3") && line.contains("2") && line.contains("1")
+                            && line.contains("模组") && line.contains("地图")
+                            && line.contains("存档") && line.contains("蓝图"),
+                    "★槽行统计句实拼（四个数 + 四个量词）：" + line);
+            // 元断言：目录不存在 ⇒ 全 0，而且**不创建**目录（只读口径）
+            File missing = new File(root, "does-not-exist");
+            int[] none = Data.contentCounts(missing);
+            ok(stat, L, none[0] == 0 && none[1] == 0 && none[2] == 0 && none[3] == 0
+                            && !missing.exists(),
+                    "★元断言：槽目录不存在 ⇒ 全 0 且不 mkdirs（只读）");
+        } catch (Throwable t) {
+            ok(stat, L, false, "槽内容计数用例异常：" + t);
+        } finally {
+            Data.deleteTree(root);
+        }
         L.add("");
     }
 
@@ -9918,12 +9979,23 @@ public final class SelfTest {
         String pageSub = Versions.subtitleLine(ctx, homeRow, 2, 1);
         ok(stat, L, pageSub.contains("official-159.apk") && pageSub.contains("MB"),
                 "★版本页副标题仍带来源与大小（与主页故意不同）：" + pageSub);
-        // 元断言：装好的版本、0 备份、0 补丁 ⇒ 主页副标题是空串（调用方把那一行 GONE，不挂空行）
+        // ★ 第 351 轮：来源标记要**对称** —— 用户：「那个导入应该对应着什么吧（已安装的应用？）」
+        //   导入副本写「导入」，系统里装好的写「已安装」；二选一，不同时出现。
         Versions.Entry quiet = new Versions.Entry();
         quiet.pkg = "io.anuke.mindustry";
         quiet.versionName = "8-official-159.7";
-        ok(stat, L, Versions.mainRowSubtitleLine(ctx, quiet, 0, 0).isEmpty(),
-                "★元断言：没有任何副信息时主页副标题为空串（行里隐藏，不浪费一行高度）");
+        String quietSub = Versions.mainRowSubtitleLine(ctx, quiet, 0, 0);
+        ok(stat, L, quietSub.equals(ctx.getString(R.string.row_installed_tag)),
+                "★装好的版本：来源标记写「已安装」（与「导入」对称）：" + quietSub);
+        Versions.Entry quietImp = new Versions.Entry();
+        quietImp.imported = true;
+        quietImp.importFile = "x.apk";
+        quietImp.versionName = "8-official-159.7";
+        ok(stat, L, Versions.mainRowSubtitleLine(ctx, quietImp, 0, 0)
+                        .equals(ctx.getString(R.string.row_imported_tag)),
+                "★导入副本：没有副信息时只剩「导入」标记");
+        ok(stat, L, !homeSub.contains(ctx.getString(R.string.row_installed_tag)),
+                "★元断言：导入项不会同时写「已安装」（来源标记二选一）");
         // ★★ 2026-10-04（第 86 轮）：**按真参数实拼一遍**本轮新增/改动的每一条带占位符的资源。
         //   为什么值得单独钉：`getString(id, …)` 的参数个数与资源里的 `%n$` 不匹配会抛
         //   `MissingFormatArgumentException` **直接崩**，而它只在走到那一句时才现形。

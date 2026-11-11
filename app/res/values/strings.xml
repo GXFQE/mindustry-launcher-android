@@ -277,6 +277,8 @@
     <!-- ★ Round 350 (2026-11-11, user: "don't show APK name and size on the home page"):
          home rows only use these three plus the patch badge; the version page still shows source/size. -->
     <string name="row_imported_tag">Imported</string>
+    <!-- Round 351: the source tag is symmetric — installed copies say "Installed". -->
+    <string name="row_installed_tag">Installed</string>
     <string name="row_backups_count_fmt">%1$d backup(s)</string>
     <string name="row_based_on_fmt">based on %1$s</string>
     <!--
@@ -344,6 +346,8 @@
          ⚠️ 选槽对话框原先另有一条 `slot_entry_suffix_fmt`，两份内容只差一个前导空格。
          那正是本工程反复栽的形态（同一显示规则两处实现 ⇒ 改一边另一边静默不跟），已合并。 -->
     <string name="slot_entry_fmt">%1$d files · %2$s</string>
+    <!-- Round 351: the Saves &amp; Backups page slot row now reports content counts instead of file count/size -->
+    <string name="slot_entry_counts_fmt">%1$d mods · %2$d maps · %3$d saves · %4$d blueprints</string>
     <!-- 槽操作菜单的标题：槽名 + 元信息。元信息本来走 setMessage，但那个坑见 SlotsActivity.slotOps() -->
 
     <string name="slot_op_backup">Back up this slot…</string>
