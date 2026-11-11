@@ -16192,6 +16192,10 @@ public final class SelfTest {
     private static void patches(Context ctx, List<String> L, int[] stat) {
         L.add("── 第 345 轮：补丁机制 v1（清单 / dex 解析 / 导入 / 冲突 / 启动解析）──");
         final String VKEY = "selftest-patch";
+        // ★ 第 353 轮：补丁启用状态按**启动项（实例）**存 ⇒ 自检用两个实例键验隔离
+        final String SLOT = "selftest-slot";
+        final String IKEY = Versions.instanceKey(VKEY, SLOT);
+        final String IKEY2 = Versions.instanceKey(VKEY, "selftest-slot-2");
         final String ID_PREFIX = "selftest-patch-";
         File work = new File(ctx.getCacheDir(), "patch-selftest-" + System.currentTimeMillis());
         if (!work.isDirectory() && !work.mkdirs()) {
@@ -16356,15 +16360,41 @@ public final class SelfTest {
             PatchManifest bMan = patchManifest(ID_PREFIX + "b", apkSha, false, "自检补丁 B");
             Patches.Record recB = Patches.importPackage(ctx,
                     patchPackage(work, "b.mdp", bMan, fixtureDex, null));
-            Patches.enable(ctx, VKEY, recA, apkSha);
-            ok(stat, L, Patches.enabledRefs(ctx, VKEY).contains(recA.ref()),
+            Patches.enable(ctx, IKEY, recA, apkSha);
+            ok(stat, L, Patches.enabledRefs(ctx, IKEY).contains(recA.ref()),
                     "④ 启用 A 后 config 里有它");
+            // ★ 第 353 轮（用户：「游戏补丁的启用状态应该绑定实例吧」）：
+            //   同一个版本的两个启动项（IKEY / IKEY2）必须**互相隔离** —— 否则等于没按实例存。
+            ok(stat, L, Patches.enabledRefs(ctx, IKEY2).isEmpty()
+                            && Patches.enabledCount(ctx, IKEY2) == 0,
+                    "④ 实例隔离：A 只在 IKEY 上启用，另一个启动项（IKEY2）看不到它");
+            // 实例键本身：版本 key + NUL + 槽，可来回拆（配置键 / 报告里都靠这对函数）
+            ok(stat, L, IKEY.indexOf('\u0000') > 0
+                            && Versions.instanceVkey(IKEY).equals(VKEY)
+                            && Versions.instanceSlot(IKEY).equals(SLOT),
+                    "④ 实例键 = 版本 key + NUL + 槽（instanceVkey / instanceSlot 能拆回来）");
+            // ★ 第 353 轮：配置迁移（旧格式只按版本 key ⇒ 老数据搬到这个版本**主行**的实例键）
+            final String LEGACY = "selftest-legacy-patch";
+            Config.get().setPatchRefs(LEGACY, java.util.Arrays.asList(recA.ref()));
+            Config.get().migratePatchKeys();
+            String expSlot = Config.get().slotOf(LEGACY);
+            if (expSlot.isEmpty()) expSlot = Config.get().defaultSlot();
+            if (expSlot.isEmpty()) expSlot = Data.SLOT_DEFAULT;
+            final String expKey = Versions.instanceKey(LEGACY, expSlot);
+            ok(stat, L, Config.get().patchRefs(expKey).contains(recA.ref())
+                            && Config.get().patchRefs(LEGACY).isEmpty(),
+                    "④ 迁移：旧键（按版本）搬到主行的实例键 " + expKey.replace('\u0000', '@'));
+            Config.get().migratePatchKeys();
+            ok(stat, L, Config.get().patchRefs(expKey).size() == 1
+                            && Config.get().patchRefs(LEGACY).isEmpty(),
+                    "④ 迁移幂等：再跑一次不变（不重复、不丢）");
+            Config.get().setPatchRefs(expKey, new java.util.ArrayList<String>());
             // ★ B4：同一条记录不跟自己冲突；重复启用必须报 enabled（不是"冲突并点名自己"）
-            ok(stat, L, Patches.conflicts(ctx, VKEY, recA, apkSha).isEmpty(),
+            ok(stat, L, Patches.conflicts(ctx, IKEY, recA, apkSha).isEmpty(),
                     "④ 同一条记录不跟自己冲突（B4）");
             boolean enabledRejected;
             try {
-                Patches.enable(ctx, VKEY, recA, apkSha);
+                Patches.enable(ctx, IKEY, recA, apkSha);
                 enabledRejected = false;
             } catch (PatchException e) {
                 enabledRejected = PatchException.C_ENABLED.equals(e.code);
@@ -16373,7 +16403,7 @@ public final class SelfTest {
             // ★ 第 345 轮用户反馈：列表行「原端/改端」说明不了"这版被补丁改成 fork 了"
             //   ⇒ 副标题前缀 `补丁 N`；口径必须与补丁页「已启用 N 个」同源（enabledCounts）。
             java.util.Map<String, Integer> counts = Patches.enabledCounts(ctx);
-            ok(stat, L, counts.get(VKEY) != null && counts.get(VKEY) == 1,
+            ok(stat, L, counts.get(IKEY) != null && counts.get(IKEY) == 1,
                     "④ enabledCounts 按版本 key 数出启用条数（主界面补丁状态的唯一来源）");
             java.util.List<Versions.Entry> all = Versions.scanAll(ctx);
             if (all.isEmpty()) {
@@ -16401,11 +16431,11 @@ public final class SelfTest {
             }
             ok(stat, L, !sawImportedFork || importedForkOk,
                     "④ 真机导入的 fork 都能读到 APK 清单版本名（archiveVersion 非空 ⇒ 显示自己的版本号）");
-            ok(stat, L, Patches.conflicts(ctx, VKEY, recB, apkSha).size() == 1,
+            ok(stat, L, Patches.conflicts(ctx, IKEY, recB, apkSha).size() == 1,
                     "④ 同类冲突：B 与已启用的 A 冲突（同改 io.mdt.launcher.PatchProbe）");
             boolean conflictRejected;
             try {
-                Patches.enable(ctx, VKEY, recB, apkSha);
+                Patches.enable(ctx, IKEY, recB, apkSha);
                 conflictRejected = false;
             } catch (PatchException e) {
                 conflictRejected = PatchException.C_CONFLICT.equals(e.code)
@@ -16415,29 +16445,29 @@ public final class SelfTest {
             PatchManifest cMan = patchManifest(ID_PREFIX + "c", apkSha, true, "自检补丁 C");
             Patches.Record recC = Patches.importPackage(ctx,
                     patchPackage(work, "c.mdp", cMan, ownDex, assetShared));
-            ok(stat, L, Patches.conflicts(ctx, VKEY, recC, apkSha).size() == 1,
+            ok(stat, L, Patches.conflicts(ctx, IKEY, recC, apkSha).size() == 1,
                     "④ 素材冲突：C 的类与 A 不相交，但同改 patch-lab/shared.txt ⇒ 冲突");
             PatchManifest dMan = patchManifest(ID_PREFIX + "d", apkSha, true, "自检补丁 D");
             byte[] assetOther = zipBytes(new String[]{"assets/patch-lab/other.txt"},
                     new byte[][]{"other".getBytes("UTF-8")});
             Patches.Record recD = Patches.importPackage(ctx,
                     patchPackage(work, "d.mdp", dMan, ownDex, assetOther));
-            ok(stat, L, Patches.conflicts(ctx, VKEY, recD, apkSha).isEmpty(),
+            ok(stat, L, Patches.conflicts(ctx, IKEY, recD, apkSha).isEmpty(),
                     "④ 反向：类与素材都不相交 ⇒ 不冲突（否则上面两条可能只是恒真）");
 
             // ── ⑤ 启动解析 ─────────────────────────────────────────────────
-            Patches.disable(ctx, VKEY, recA);
-            Patches.Resolved r1 = Patches.resolve(ctx, fakeApk, VKEY);
+            Patches.disable(ctx, IKEY, recA);
+            Patches.Resolved r1 = Patches.resolve(ctx, fakeApk, IKEY);
             ok(stat, L, r1.loaded.isEmpty() && r1.problems.isEmpty(),
                     "⑤ 没启用任何补丁 ⇒ loaded 为空、也不报问题");
-            Patches.enable(ctx, VKEY, recD, apkSha);
-            Patches.Resolved r2 = Patches.resolve(ctx, fakeApk, VKEY);
+            Patches.enable(ctx, IKEY, recD, apkSha);
+            Patches.Resolved r2 = Patches.resolve(ctx, fakeApk, IKEY);
             ok(stat, L, r2.loaded.size() == 1 && r2.loaded.get(0).record.ref().equals(recD.ref())
                             && apkSha.equals(r2.apkSha),
                     "⑤ 启用 D ⇒ 解析出 1 条，APK 哈希一致");
             File otherApk = new File(work, "other.apk");
             write(otherApk, "different-content".getBytes("UTF-8"));
-            Patches.Resolved r3 = Patches.resolve(ctx, otherApk, VKEY);
+            Patches.Resolved r3 = Patches.resolve(ctx, otherApk, IKEY);
             ok(stat, L, r3.loaded.isEmpty() && r3.problems.size() == 1
                             && PatchException.C_NO_MATCH.equals(r3.problems.get(0).code),
                     "⑤ 反方向：换一个 APK ⇒ 不加载，只报 no_match（不硬上）");
@@ -16450,7 +16480,7 @@ public final class SelfTest {
             ok(stat, L, recD2 != null && !recD2.filesOk
                             && PatchesActivity.stateOf(recD2, apkSha, true) == PatchesActivity.STATE_BROKEN,
                     "⑥ dex 被外部删掉 ⇒ 记录仍在、状态 = 文件缺失（看得见也删得掉）");
-            Patches.disable(ctx, VKEY, recD2);
+            Patches.disable(ctx, IKEY, recD2);
             ok(stat, L, PatchesActivity.stateOf(recB, apkSha, false) == PatchesActivity.STATE_OFF
                             && PatchesActivity.stateOf(recA, apkSha, true) == PatchesActivity.STATE_ON
                             && PatchesActivity.stateOf(recA, otherSha, false) == PatchesActivity.STATE_NA,
@@ -16462,12 +16492,14 @@ public final class SelfTest {
             }
             ok(stat, L, reasonsOk,
                     "⑥ 文案映射：PatchText 的 " + PatchText.ALL_CODES.length + " 个码都有人话且不印 null");
-            android.content.Intent jump = VersionActivity.patchIntent(ctx, "k1");
+            android.content.Intent jump = VersionActivity.patchIntent(ctx, "k1", "s1");
             ok(stat, L, jump.getComponent() != null
                             && PatchesActivity.class.getName().equals(jump.getComponent().getClassName())
                             && "k1".equals(jump.getStringExtra(PatchesActivity.EXTRA_KEY))
-                            && "v_key".equals(PatchesActivity.EXTRA_KEY),
-                    "⑥ 版本页 → 补丁页的 Intent：类 + extra 键值都对");
+                            && "s1".equals(jump.getStringExtra(PatchesActivity.EXTRA_SLOT))
+                            && "v_key".equals(PatchesActivity.EXTRA_KEY)
+                            && "v_slot".equals(PatchesActivity.EXTRA_SLOT),
+                    "⑥ 版本页 → 补丁页的 Intent：类 + 两个 extra（版本 key / 槽）都对");
 
             // ── ⑦ 素材包规矩 + 导入负例 ────────────────────────────────────
             boolean assetsRules;
@@ -16550,7 +16582,7 @@ public final class SelfTest {
             try {
                 for (Patches.Record r : Patches.scan(ctx)) {
                     if (r.id().startsWith(ID_PREFIX)) {
-                        try { Patches.disable(ctx, VKEY, r); } catch (Throwable ignored) { }
+                        try { Patches.disable(ctx, IKEY, r); } catch (Throwable ignored) { }
                         try { Patches.delete(ctx, r); } catch (Throwable ignored) { }
                     }
                 }

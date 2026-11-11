@@ -33,7 +33,7 @@ import java.util.zip.ZipFile;
  *       ——ART 只允许加载内部 + 只读的 dex（`ref/48` 的硬约束）；外部 hub 只放证据报告。</li>
  *   <li><b>匹配</b>：按**目标 APK 的 sha256** 精确匹配 target（不是版本号区间，理由见
  *       {@link PatchManifest} 的类注释）。</li>
- *   <li><b>启用状态</b>：按**版本 key**（`Versions.Entry#key()`）存进 `config.json`；
+ *   <li><b>启用状态</b>：按**启动项（实例）**存进 `config.json`（键 = `Versions.instanceKey`，版本 key + 槽；第 353 轮从"按版本"改成"按实例"）；
  *       一个版本可以启用多个补丁，但**改同一个类 / 同一个素材的组合必须被拒绝**。</li>
  *   <li><b>冲突检测</b>：判据 = 补丁 dex 里**实际定义的类**（{@link PatchDex}）+ 素材 zip 里
  *       **实际修改的 assets 路径**；清单里写的不算数（那只是单方面声明）。</li>
@@ -374,7 +374,13 @@ final class Patches {
         if (r == null) throw new PatchException(PatchException.C_RECORD_GONE, "");
         if (Data.gameAlive(ctx)) throw new PatchException(PatchException.C_GAME_ALIVE, "");
         List<String> owners = Config.get().patchRefOwners(r.ref());
-        if (!owners.isEmpty()) throw new PatchException(PatchException.C_IN_USE, join(owners));
+        if (!owners.isEmpty()) {
+            // ★ 第 353 轮：启用状态按**实例**存，owner 键里带 NUL ⇒ 上屏前翻译成人话
+            //   （游戏名 + 槽）；否则 C_IN_USE 的 detail 会出现一个带控制字符的怪串。
+            List<String> labels = new ArrayList<String>();
+            for (String o : owners) labels.add(instanceLabel(ctx, o));
+            throw new PatchException(PatchException.C_IN_USE, join(labels));
+        }
         if (!deleteTree(r.dir)) throw new PatchException(PatchException.C_IO, r.dir.getName());
         // 空 id 目录顺手收掉（只删空目录；失败无害）
         File idDir = r.dir.getParentFile();
@@ -387,13 +393,37 @@ final class Patches {
 
     // ══ 启用 / 停用 ═════════════════════════════════════════════════════════
 
-    static List<String> enabledRefs(Context ctx, String vkey) {
-        return Config.get().patchRefs(vkey);
+    /**
+     * 实例键 → 给人看的一行（`游戏名 · 槽「X」`）。
+     *
+     * <p>第 353 轮：启用状态按 {@link Versions#instanceKey}（版本 key + NUL + 槽）存，
+     * 键里有控制字符、不能直接上屏；「删补丁被占用」那条 detail 需要列出**哪些启动项**在用。
+     * 找不到对应版本时回落成"版本 key · 槽"（不崩、不隐藏）。
+     */
+    static String instanceLabel(Context ctx, String ikey) {
+        String vkey = Versions.instanceVkey(ikey);
+        String slot = Versions.instanceSlot(ikey);
+        String name = vkey;
+        try {
+            for (Versions.Entry e : Versions.scanAll(ctx)) {
+                if (e != null && e.key().equals(vkey) && Versions.slotFor(e).equals(slot)) {
+                    name = e.displayLabel();
+                    break;
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        if (slot.isEmpty()) return name;
+        return Trans.get(ctx, R.string.patch_instance_fmt, name, slot);
     }
 
-    static List<Record> enabledRecords(Context ctx, String vkey) {
+    static List<String> enabledRefs(Context ctx, String ikey) {
+        return Config.get().patchRefs(ikey);
+    }
+
+    static List<Record> enabledRecords(Context ctx, String ikey) {
         List<Record> out = new ArrayList<Record>();
-        for (String ref : Config.get().patchRefs(vkey)) {
+        for (String ref : Config.get().patchRefs(ikey)) {
             Record r = findByRef(ctx, ref);
             if (r != null) out.add(r);
         }
@@ -406,7 +436,7 @@ final class Patches {
      *
      * <p>★ "先查再写"在同一个 synchronized(config) 里完成（Config 的方法是同步的）。
      */
-    static void enable(Context ctx, String vkey, Record r, String apkSha256) throws PatchException {
+    static void enable(Context ctx, String ikey, Record r, String apkSha256) throws PatchException {
         if (r == null) throw new PatchException(PatchException.C_RECORD_GONE, "");
         if (Data.gameAlive(ctx)) throw new PatchException(PatchException.C_GAME_ALIVE, "");
         if (!r.filesOk) throw new PatchException(PatchException.C_MISSING, r.label());
@@ -416,21 +446,21 @@ final class Patches {
         if (!r.applicable(apkSha256)) throw new PatchException(PatchException.C_NO_MATCH, r.label());
         // ★ 顺序（B4）：先判"已经启用"再查冲突 —— 反过来的话同一条记录会被 conflicts 当成
         //   "与已启用的补丁冲突"，用户看到「与已启用的补丁冲突：它自己」。
-        List<String> refs = Config.get().patchRefs(vkey);
+        List<String> refs = Config.get().patchRefs(ikey);
         if (refs.contains(r.ref())) throw new PatchException(PatchException.C_ENABLED, "");
-        List<String> names = conflicts(ctx, vkey, r, apkSha256);
+        List<String> names = conflicts(ctx, ikey, r, apkSha256);
         if (!names.isEmpty()) throw new PatchException(PatchException.C_CONFLICT, join(names));
         refs.add(r.ref());
-        Config.get().setPatchRefs(vkey, refs);
-        Log.i(TAG, "patch enabled: " + r.ref() + " for " + vkey);
+        Config.get().setPatchRefs(ikey, refs);
+        Log.i(TAG, "patch enabled: " + r.ref() + " for " + ikey);
     }
 
-    static void disable(Context ctx, String vkey, Record r) {
+    static void disable(Context ctx, String ikey, Record r) {
         if (r == null) return;
-        List<String> refs = Config.get().patchRefs(vkey);
+        List<String> refs = Config.get().patchRefs(ikey);
         if (!refs.remove(r.ref())) return;
-        Config.get().setPatchRefs(vkey, refs);
-        Log.i(TAG, "patch disabled: " + r.ref() + " for " + vkey);
+        Config.get().setPatchRefs(ikey, refs);
+        Log.i(TAG, "patch disabled: " + r.ref() + " for " + ikey);
     }
 
     /**
@@ -449,7 +479,7 @@ final class Patches {
      * 旧实现返回"自己跟自己冲突"，用户会看到「与已启用的补丁冲突：它自己」。
      * 已启用集合里如果有同一条记录（同 ref），由 {@link #enable} 在前面用 `C_ENABLED` 拦掉。
      */
-    static List<String> conflicts(Context ctx, String vkey, Record cand, String apkSha256)
+    static List<String> conflicts(Context ctx, String ikey, Record cand, String apkSha256)
             throws PatchException {
         List<String> out = new ArrayList<String>();
         TargetFile mine = cand.targetFor(apkSha256);
@@ -462,7 +492,7 @@ final class Patches {
         } catch (IOException e) {
             throw new PatchException(PatchException.C_BAD_DEX, cand.label() + ": " + e.getMessage());
         }
-        for (Record other : enabledRecords(ctx, vkey)) {
+        for (Record other : enabledRecords(ctx, ikey)) {
             if (other.ref().equals(cand.ref())) continue;   // 自己不算冲突（enable 另有 C_ENABLED）
             if (other.id().equals(cand.id())) {
                 out.add(other.label() + " (" + other.version() + ")");
@@ -492,25 +522,25 @@ final class Patches {
     /** 清掉 config 里指向"已不存在的记录"的引用（删过目录 / 手工清过盘）。返回清掉的条数。 */
     static int pruneStale(Context ctx) {
         int removed = 0;
-        for (String vkey : Config.get().patchRefVkeys()) {
+        for (String ikey : Config.get().patchRefVkeys()) {
             List<String> keep = new ArrayList<String>();
-            for (String ref : Config.get().patchRefs(vkey)) {
+            for (String ref : Config.get().patchRefs(ikey)) {
                 if (findByRef(ctx, ref) != null) keep.add(ref);
                 else removed++;
             }
-            if (keep.size() != Config.get().patchRefs(vkey).size()) {
-                Config.get().setPatchRefs(vkey, keep);
+            if (keep.size() != Config.get().patchRefs(ikey).size()) {
+                Config.get().setPatchRefs(ikey, keep);
             }
         }
         return removed;
     }
 
-    static int enabledCount(Context ctx, String vkey) {
-        return enabledRecords(ctx, vkey).size();
+    static int enabledCount(Context ctx, String ikey) {
+        return enabledRecords(ctx, ikey).size();
     }
 
     /**
-     * 每个版本 key 上**启用了几条记录还在的补丁**（主界面列表一次算完，空的不进 map）。
+     * 每个**启动项（实例）键**上**启用了几条记录还在的补丁**（主界面列表一次算完，空的不进 map）。
      *
      * <p>为什么不直接数 config 里的 refs：那是"配置说启用了几条"，
      * 手工清过盘 / 删除失败时会留下指向不存在记录的孤儿引用（B10 同一个坑）。
@@ -520,12 +550,12 @@ final class Patches {
         Map<String, Integer> out = new HashMap<String, Integer>();
         Set<String> refs = new HashSet<String>();
         for (Record r : scan(ctx)) refs.add(r.ref());
-        for (String vkey : Config.get().patchRefVkeys()) {
+        for (String ikey : Config.get().patchRefVkeys()) {
             int n = 0;
-            for (String ref : Config.get().patchRefs(vkey)) {
+            for (String ref : Config.get().patchRefs(ikey)) {
                 if (refs.contains(ref)) n++;
             }
-            if (n > 0) out.put(vkey, n);
+            if (n > 0) out.put(ikey, n);
         }
         return out;
     }
@@ -568,9 +598,9 @@ final class Patches {
      * <p>启动期还会再查一遍冲突（防御性）：配置文件被手工改过 / 旧版本写的数据可能绕过界面那道门。
      * 命中的后一个补丁**整条跳过**（不阻塞启动，按设计草案 §11 第 5 问的"跳过整个补丁"）。
      */
-    static Resolved resolve(Context ctx, File apk, String vkey) {
+    static Resolved resolve(Context ctx, File apk, String ikey) {
         Resolved res = new Resolved();
-        List<String> refs = Config.get().patchRefs(vkey);
+        List<String> refs = Config.get().patchRefs(ikey);
         if (refs.isEmpty() || apk == null || !apk.isFile()) return res;
         try {
             res.apkSha = sha256Of(apk);
@@ -634,7 +664,7 @@ final class Patches {
      * 写/清 `hub/report-patch.txt`：**只记"这次启动有补丁没应用"**，没有问题时把旧文件删掉
      * （否则上次的失败会永远挂在界面上 —— "过期结论"是最容易误导人的那种）。
      */
-    static void writeLaunchReport(Context ctx, String vkey, Resolved res) {
+    static void writeLaunchReport(Context ctx, String ikey, Resolved res) {
         if (res == null || res.problems.isEmpty()) {
             File old = new File(Data.hubDir(ctx), REPORT);
             if (old.isFile()) old.delete();
@@ -642,7 +672,7 @@ final class Patches {
         }
         StringBuilder sb = new StringBuilder();
         sb.append("# patch launch report ").append(new java.util.Date()).append('\n');
-        sb.append("# vkey = ").append(vkey == null ? "" : vkey).append('\n');
+        sb.append("# ikey = ").append(ikey == null ? "" : ikey).append('\n');
         for (Problem p : res.problems) sb.append(p.line()).append('\n');
         try {
             Util.atomicWriteText(new File(Data.hubDir(ctx), REPORT), sb.toString());

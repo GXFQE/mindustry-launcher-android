@@ -37,7 +37,7 @@ public final class Config {
      *       迁移见 {@link #migrateRowNames()}：老名字**抄给每一行**，别让用户升级后少一个名字。</li>
      * </ul>
      */
-    public static final int CONFIG_VERSION = 2;
+    public static final int CONFIG_VERSION = 3;
 
     /** 内置已知包名白名单（枚举被系统限制只返回自己，只能按精确包名查） */
     static final String[] BUILTIN_PACKAGES = {
@@ -210,11 +210,12 @@ public final class Config {
      */
     private static final String K_MAIN_ORDER = "main_order";
     /**
-     * 第 345 轮（补丁机制 v1）：**按版本 key 存已启用的补丁引用**（`id@version` 的数组）。
+     * 第 345 轮（补丁机制 v1）：**按「启动项（实例）」存已启用的补丁引用**（`id@version` 的数组）。
      *
-     * <p>为什么按版本 key：补丁按**目标 APK 的 sha256** 精确匹配（见 {@link PatchManifest}），
-     * 而 sha256 属于"某一个版本"。把启用状态挂在版本上，换 APK（重装 / 重新导入）时旧 target
-     * 自然不匹配 ⇒ 启动解析会如实报"不适用"，不会拿旧补丁硬上。
+     * <p>键 = {@link Versions#instanceKey}（版本 key + NUL + 槽）。为什么按实例而不是按版本：
+     * 同一个版本可以绑多个槽、每绑一个槽多一行（启动项），第 353 轮用户明确要求
+     * 「游戏补丁的启用状态应该绑定实例吧」—— 一个实例开补丁、另一个实例不开。
+     * （补丁本身仍按**目标 APK 的 sha256** 匹配，不是版本号区间。）
      *
      * <p>为什么存引用串而不是下标：补丁库是目录扫出来的，顺序会变；`id@version` 是稳定身份。
      */
@@ -295,7 +296,9 @@ public final class Config {
             // 迁移挂点（逐代往上补）：
             //   第 0 代 -> 第 1 代：无结构变化，只补版本号；
             //   第 1 代 -> 第 2 代：名字改成"按项"存，老名字抄给每一行（见 migrateRowNames）。
+            //   第 2 代 -> 第 3 代：补丁启用状态从"按版本"改成"按启动项（实例）"（见 migratePatchKeys）。
             if (v < 2) migrateRowNames();
+            if (v < 3) migratePatchKeys();
             put(K_VER, CONFIG_VERSION);
             save();
         }
@@ -330,6 +333,63 @@ public final class Config {
                 if (rowNameOf(key, slot).isEmpty()) setRowNameOf(key, slot, n);
             }
         }
+    }
+
+    /**
+     * 第 3 代迁移（2026-11-11，补丁启用状态从"按版本"改成"按启动项 / 实例"）。
+     *
+     * <p>旧格式：{@code patch_enabled: {"<版本key>": ["id@version", ...]}}（没有 NUL）。
+     * 新格式：键换成 {@link Versions#instanceKey}（版本 key + NUL + 槽）。
+     *
+     * <p>迁移策略：老条目落到这个版本的**主行**（`slotOf(key)` → 默认槽 → `default`）——
+     * 老语义就是"整个版本共用"，落到主行是**唯一不猜**的选择；附加行从"没启用"开始，
+     * 用户可以在那行的补丁页里按需再开（那时状态已按实例分开）。
+     *
+     * <p>幂等：已经是实例键的原样保留（把旧键的引用并进去、去重）；没有旧键 ⇒ **整段不写盘**。
+     * 包级可见：自检要直接钉住"旧键搬到主行 / 新键不动 / 重跑不变"（迁移只在 load/reload 跑一次）。
+     */
+    void migratePatchKeys() {
+        JSONObject all = mRoot.optJSONObject(K_PATCH);
+        if (all == null) return;
+        JSONObject out = new JSONObject();
+        boolean changed = false;
+        java.util.Iterator<String> it = all.keys();
+        while (it.hasNext()) {
+            String k = it.next();
+            JSONArray a = all.optJSONArray(k);
+            if (a == null) continue;
+            String ikey = k;
+            if (k.indexOf('\u0000') < 0) {
+                String slot = slotOf(k);
+                if (slot.isEmpty()) slot = defaultSlot();
+                if (slot.isEmpty()) slot = Data.SLOT_DEFAULT;
+                ikey = Versions.instanceKey(k, slot);
+                changed = true;
+            }
+            JSONArray cur = out.optJSONArray(ikey);
+            if (cur == null) {
+                cur = new JSONArray();
+                try { out.put(ikey, cur); } catch (Exception e) { continue; }
+            }
+            for (int i = 0; i < a.length(); i++) {
+                String ref = a.optString(i, "");
+                if (ref.isEmpty() || contains(cur, ref)) continue;
+                cur.put(ref);
+            }
+        }
+        if (changed) {
+            try {
+                if (out.length() == 0) mRoot.remove(K_PATCH);
+                else mRoot.put(K_PATCH, out);
+            } catch (Exception e) {
+                Log.w(TAG, "migratePatchKeys failed: " + e);
+            }
+        }
+    }
+
+    private static boolean contains(JSONArray a, String s) {
+        for (int i = 0; i < a.length(); i++) if (s.equals(a.optString(i, ""))) return true;
+        return false;
     }
 
     /**
@@ -370,6 +430,7 @@ public final class Config {
             // 别的进程可能写回了更老的配置：补版本号 + 补这一代的迁移，
             //   但**绝不动它的其它字段**（迁移只往空位里补，见 migrateRowNames 的幂等性）。
             if (v < 2) migrateRowNames();
+            if (v < 3) migratePatchKeys();
             put(K_VER, CONFIG_VERSION);
             save();
         }
@@ -1533,14 +1594,16 @@ public final class Config {
     // ── 补丁（第 345 轮）────────────────────────────────────────────────────
 
     /**
-     * 某个版本 key 上已启用的补丁引用（`id@version`，有序 = 启用顺序）。
+     * 某个**启动项（实例）**上已启用的补丁引用（`id@version`，有序 = 启用顺序）。
      * 返回的是**副本**：调用方改完要 {@link #setPatchRefs} 才会落盘。
+     *
+     * @param ikey {@link Versions#instanceKey}（**不是**版本 key —— 第 353 轮改成按实例）
      */
-    public synchronized List<String> patchRefs(String vkey) {
+    public synchronized List<String> patchRefs(String ikey) {
         ArrayList<String> out = new ArrayList<>();
-        if (vkey == null || vkey.isEmpty()) return out;
+        if (ikey == null || ikey.isEmpty()) return out;
         JSONObject all = mRoot.optJSONObject(K_PATCH);
-        JSONArray a = all == null ? null : all.optJSONArray(vkey);
+        JSONArray a = all == null ? null : all.optJSONArray(ikey);
         if (a == null) return out;
         for (int i = 0; i < a.length(); i++) {
             String s = a.optString(i, "");
@@ -1549,18 +1612,18 @@ public final class Config {
         return out;
     }
 
-    /** 覆盖某个版本的补丁启用列表；空表 = 删掉这个 key（不留空数组）。 */
-    public synchronized void setPatchRefs(String vkey, List<String> refs) {
-        if (vkey == null || vkey.isEmpty()) return;
+    /** 覆盖某个**启动项（实例）**的补丁启用列表；空表 = 删掉这个 key（不留空数组）。 */
+    public synchronized void setPatchRefs(String ikey, List<String> refs) {
+        if (ikey == null || ikey.isEmpty()) return;
         JSONObject all = mRoot.optJSONObject(K_PATCH);
         if (all == null) all = new JSONObject();
         try {
             if (refs == null || refs.isEmpty()) {
-                all.remove(vkey);
+                all.remove(ikey);
             } else {
                 JSONArray a = new JSONArray();
                 for (String s : refs) if (s != null && !s.isEmpty()) a.put(s);
-                all.put(vkey, a);
+                all.put(ikey, a);
             }
             if (all.length() == 0) mRoot.remove(K_PATCH);
             else mRoot.put(K_PATCH, all);
@@ -1571,7 +1634,7 @@ public final class Config {
         save();
     }
 
-    /** 所有出现过补丁引用的版本 key（清理孤儿引用用）。 */
+    /** 所有出现过补丁引用的**实例键**（清理孤儿引用用；键里含 NUL，见 {@link Versions#instanceKey}）。 */
     public synchronized List<String> patchRefVkeys() {
         ArrayList<String> out = new ArrayList<>();
         JSONObject all = mRoot.optJSONObject(K_PATCH);
@@ -1581,7 +1644,7 @@ public final class Config {
         return out;
     }
 
-    /** 哪些版本 key 引用了这个补丁（删记录前判"还在启用中"）。 */
+    /** 哪些**实例键**引用了这个补丁（删记录前判"还在启用中"）。 */
     public synchronized List<String> patchRefOwners(String ref) {
         ArrayList<String> out = new ArrayList<>();
         if (ref == null || ref.isEmpty()) return out;
@@ -1589,12 +1652,12 @@ public final class Config {
         if (all == null) return out;
         java.util.Iterator<String> it = all.keys();
         while (it.hasNext()) {
-            String vkey = it.next();
-            JSONArray a = all.optJSONArray(vkey);
+            String ikey = it.next();
+            JSONArray a = all.optJSONArray(ikey);
             if (a == null) continue;
             for (int i = 0; i < a.length(); i++) {
                 if (ref.equals(a.optString(i, ""))) {
-                    out.add(vkey);
+                    out.add(ikey);
                     break;
                 }
             }

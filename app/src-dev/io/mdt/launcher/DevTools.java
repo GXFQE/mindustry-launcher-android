@@ -797,8 +797,12 @@ final class DevTools {
         // ── 第 345 轮：补丁机制 v1 ────────────────────────────────────────────
         // 用法：
         //   --es dev_patch_import /sdcard/.../x.mdp          导入一个补丁包（与界面同一个 importPackage）
-        //   --es dev_patch_enable  "vkey|id@version"         启用（与界面同一个 enable）
-        //   --es dev_patch_disable "vkey|id@version"         停用
+        //   --es dev_patch_enable  "vkey|slot|id@version"    启用（与界面同一个 enable）；
+        //     也可 "--es dev_patch_enable "vkey|id@version" --es dev_patch_slot <槽>"
+        //     （设备 shell 会把 `|` 当管道，中文槽名在命令行里容易被拆坏）
+        //   --es dev_patch_disable "vkey|slot|id@version"    停用
+        //     ★ 第 353 轮：启用状态按**启动项（实例）**存 ⇒ 要带槽；
+        //       只写两段 "vkey|id@version" 时自动落到这个版本的**主行**（向后兼容 dev 用法）。
         //   --es dev_patch_status 1                          打印补丁库 / 启用表 / 启动报告
         // 报告：hub/report-devtool.txt
         // ★ 这三个口**不另写一套**：判据全在 Patches —— 界面与 dev 口走同一条实现（"同一件事两条路"纪律）。
@@ -844,14 +848,55 @@ final class DevTools {
                     StringBuilder sb = new StringBuilder();
                     sb.append("action= ").append(enable ? "enable" : "disable").append('\n');
                     sb.append("arg   = ").append(arg).append('\n');
-                    String[] parts = arg.split("\\|", 2);
-                    if (parts.length != 2 || parts[0].isEmpty() || parts[1].isEmpty()) {
-                        sb.append("result= fail (want vkey|id@version)\n");
+                    // ★ 槽也可以单独用 --es dev_patch_slot 给（设备 shell 里 `|` 会被当成管道，
+                    //   而槽名可能是中文 ⇒ 三段式参数在 adb 命令行上很容易被拆坏）。
+                    final String slotExtra = intent.getStringExtra("dev_patch_slot");
+                    final String keyExtra = intent.getStringExtra("dev_patch_key");
+                    final String refExtra = intent.getStringExtra("dev_patch_ref");
+                    String vkey, ref;
+                    String slot = (slotExtra == null || slotExtra.isEmpty()) ? null : slotExtra;
+                    if (keyExtra != null && !keyExtra.isEmpty()
+                            && refExtra != null && !refExtra.isEmpty()) {
+                        // ★ 完全避开 `|`：设备 shell 会把管道符当命令分隔，中文/带空格的槽名极容易被拆坏
+                        vkey = keyExtra;
+                        ref = refExtra;
+                    } else {
+                        String[] parts = arg.split("\\|", 3);
+                        if (parts.length == 3) {
+                            vkey = parts[0];
+                            if (slot == null) slot = parts[1];
+                            ref = parts[2];
+                        } else if (parts.length == 2) {
+                            vkey = parts[0]; ref = parts[1];
+                        } else {
+                            sb.append("result= fail (want vkey|slot|id@version)\n");
+                            reportDev(sb.toString(), "dev_patch_toggle");
+                            return;
+                        }
+                    }
+                    if (vkey.isEmpty() || ref.isEmpty()) {
+                        sb.append("result= fail (empty vkey / ref)\n");
                         reportDev(sb.toString(), "dev_patch_toggle");
                         return;
                     }
-                    String vkey = parts[0];
-                    Patches.Record r = Patches.findByRef(a, parts[1]);
+                    // 没给槽 ⇒ 落到这个版本的**主行**（老用法）；找不到就用槽分配链
+                    if (slot == null || slot.isEmpty()) {
+                        String main = null;
+                        for (Versions.Entry e : Versions.scanAll(a)) {
+                            if (e != null && e.key().equals(vkey) && e.boundSlot == null) {
+                                main = Versions.slotFor(e); break;
+                            }
+                        }
+                        if (main == null) {
+                            main = Config.get().slotOf(vkey);
+                            if (main.isEmpty()) main = Config.get().defaultSlot();
+                            if (main.isEmpty()) main = Data.SLOT_DEFAULT;
+                        }
+                        slot = main;
+                    }
+                    final String ikey = Versions.instanceKey(vkey, slot);
+                    sb.append("ikey  = ").append(ikey.replace('\u0000', '@')).append('\n');
+                    Patches.Record r = Patches.findByRef(a, ref);
                     sb.append("record= ").append(r == null ? "(missing)" : r.ref()).append('\n');
                     if (r == null) {
                         sb.append("result= fail ").append(PatchException.C_RECORD_GONE).append('\n');
@@ -863,7 +908,7 @@ final class DevTools {
                             String sha = "";
                             Versions.Entry entry = null;
                             for (Versions.Entry e : Versions.scanAll(a)) {
-                                if (e.key().equals(vkey)) { entry = e; break; }
+                                if (e.key().equals(vkey) && Versions.slotFor(e).equals(slot)) { entry = e; break; }
                             }
                             sb.append("entry = ").append(entry == null ? "(missing)" : entry.apkPath).append('\n');
                             if (entry != null && entry.apkPath != null) {
@@ -871,9 +916,9 @@ final class DevTools {
                             }
                             sb.append("apkSha= ").append(sha).append('\n');
                             sb.append("match = ").append(r.applicable(sha)).append('\n');
-                            Patches.enable(a, vkey, r, sha);
+                            Patches.enable(a, ikey, r, sha);
                         } else {
-                            Patches.disable(a, vkey, r);
+                            Patches.disable(a, ikey, r);
                         }
                         sb.append("result= ok\n");
                     } catch (PatchException e) {
@@ -913,9 +958,9 @@ final class DevTools {
                         }
                     }
                     sb.append("enabled:\n");
-                    for (String vkey : Config.get().patchRefVkeys()) {
-                        sb.append("  ").append(vkey).append(" = ")
-                          .append(Config.get().patchRefs(vkey)).append('\n');
+                    for (String ikey : Config.get().patchRefVkeys()) {
+                        sb.append("  ").append(ikey.replace('\u0000', '@')).append(" = ")
+                          .append(Config.get().patchRefs(ikey)).append('\n');
                     }
                     sb.append("launchProblems:\n");
                     for (Patches.Problem p : Patches.launchProblems(a)) {

@@ -106,13 +106,16 @@ public class VersionActivity extends BaseActivity {
                         if (mEntry != null) VersionOps.openResources(VersionActivity.this, mEntry);
                     }
                 });
-        // ★ 第 345 轮（补丁机制 v1）：进这个版本的补丁页 —— 只带**版本 key**（定位信息），
+        // ★ 第 345 轮（补丁机制 v1）：进这个版本的补丁页 —— 只带**定位信息**（版本 key + 槽），
         //   页面自己重扫（与 slotIntent 同一条纪律：不在 intent 里搬一整个 Entry）。
+        // ★ 第 353 轮：补丁启用状态按**启动项（实例）**存 ⇒ 必须把这一行的槽也带过去；
+        //   漏带 = 补丁页永远显示"没有启用"，而且开关会写到实例键 `key\0`（空槽）上。
         Util.bindAction(findViewById(R.id.root), R.id.row_ver_patch, R.drawable.ic_mod,
                 R.string.version_row_patch, R.string.version_row_patch_sub,
                 new Runnable() {
                     @Override public void run() {
-                        if (mEntry != null) startActivity(patchIntent(VersionActivity.this, mEntry.key()));
+                        if (mEntry != null) startActivity(patchIntent(VersionActivity.this,
+                                mEntry.key(), Versions.slotFor(mEntry)));
                     }
                 });
         Util.bindAction(findViewById(R.id.root), R.id.row_ver_delete, R.drawable.ic_trash,
@@ -150,7 +153,8 @@ public class VersionActivity extends BaseActivity {
         int backups = VersionOps.backupCountIn(this, slot);
         // ★ 第 345 轮：这一页的标题卡也带补丁状态（与主界面行同一份文案 / 同一判据），
         //   下面「补丁」行动作行复用这个数（不再重复算）。
-        int patchCount = Patches.enabledCount(this, mKey);
+        // ★ 第 353 轮：按**实例键**数（版本 key + 槽）—— 同一版本的两个启动项各开各的
+        int patchCount = Patches.enabledCount(this, Versions.instanceKey(mKey, slot));
         setTitle(name);
         ((TextView) findViewById(R.id.version_title)).setText(name);
         // 副标题用**列表行那份紧凑文案**（来源 · 大小 · 备份 N 份）——
@@ -218,8 +222,9 @@ public class VersionActivity extends BaseActivity {
      * <p>与 {@link #slotIntent} 同一个理由抽成函数：**让自检能钉住 extra 的键与值**
      * （写错键编译器不响，真机只表现为"点进去是空的 / 进错版本"）。
      */
-    static android.content.Intent patchIntent(Context c, String vkey) {
+    static android.content.Intent patchIntent(Context c, String vkey, String slot) {
         return new android.content.Intent(c, PatchesActivity.class)
-                .putExtra(PatchesActivity.EXTRA_KEY, vkey == null ? "" : vkey);
+                .putExtra(PatchesActivity.EXTRA_KEY, vkey == null ? "" : vkey)
+                .putExtra(PatchesActivity.EXTRA_SLOT, slot == null ? "" : slot);
     }
 }

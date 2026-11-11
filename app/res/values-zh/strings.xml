@@ -2188,6 +2188,9 @@
     <string name="subtitle_patch_fmt">补丁 %1$d · %2$s</string>
     <string name="patch_head_fmt">游戏：%1$s</string>
     <string name="patch_head_sub_fmt">APK %1$s · 已导入 %2$d 个</string>
+    <!-- ★ 第 353 轮：补丁启用状态按**启动项（实例）**存，补丁页要说清是哪个实例 -->
+    <string name="patch_head_instance_fmt">启动项：槽「%1$s」</string>
+    <string name="patch_instance_fmt">「%1$s」 · 槽「%2$s」</string>
     <string name="patch_empty">还没有导入补丁。</string>
     <string name="patch_empty_sub">补丁包是一个 zip：里面有 patch.json，以及按这个游戏 APK 生成的 dex。</string>
     <string name="patch_import">导入补丁包</string>

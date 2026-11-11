@@ -703,6 +703,38 @@ public final class Versions {
     }
 
     /**
+     * ★★ **「启动项（实例）」的身份键**：版本 key + NUL + 槽。
+     *
+     * <p>行身份 = `(版本 key, 槽)`（一个版本可以绑多个槽、每绑一个槽多一行，见 {@link #expandBindings}）。
+     * 凡是"按启动项"存的状态都必须用它，而不是版本 key —— 例如**补丁启用状态**
+     * （第 353 轮用户：「游戏补丁的启用状态应该绑定实例吧」）：
+     * 同一个版本的两个启动项（不同槽）可以一个开补丁、一个关。
+     *
+     * <p>⚠️ 用 NUL 而不是 `|`/`#`：版本 key 里可能出现 `|`（包名不会，但 import 文件名是用户可改的），
+     * 而 NUL 在 JSON 里合法（转义成 {@code \u0000}）、在文件名 / 包名 / 槽名里都不会出现。
+     *
+     * @return 版本 key 为空时返回空串（调用方按"没有实例"处理）
+     */
+    public static String instanceKey(String vkey, String slot) {
+        if (vkey == null || vkey.isEmpty()) return "";
+        return vkey + "\u0000" + (slot == null ? "" : slot);
+    }
+
+    /** 实例键 → 版本 key（没有 NUL 的老数据原样返回） */
+    public static String instanceVkey(String ikey) {
+        if (ikey == null) return "";
+        int nul = ikey.indexOf('\u0000');
+        return nul < 0 ? ikey : ikey.substring(0, nul);
+    }
+
+    /** 实例键 → 槽名（没有 NUL 的老数据返回空串 = 未知） */
+    public static String instanceSlot(String ikey) {
+        if (ikey == null) return "";
+        int nul = ikey.indexOf('\u0000');
+        return nul < 0 ? "" : ikey.substring(nul + 1);
+    }
+
+    /**
      * ★★ **"这个版本该用哪个槽"的唯一实现**（F13 从 `MainActivity` 私有方法上收口）。
      *
      * 优先级：显式分配（M3 的「版本 → 槽」）→ F3 的全局默认槽 → 内置 `default`。
@@ -741,7 +773,7 @@ public final class Versions {
      *   于是徽标/拦截会张冠李戴，而且**没有任何报错**。用 `(key, 槽)` 就天然唯一。
      */
     public static String rowKey(Entry e) {
-        return e == null ? "" : (e.key() + "\u0000" + slotFor(e));
+        return e == null ? "" : instanceKey(e.key(), slotFor(e));
     }
 
     /**

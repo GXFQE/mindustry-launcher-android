@@ -128,12 +128,18 @@ public class GameSlot extends BaseActivity {
         android.util.Log.i("MDTLauncher", "slot prepare:\n" + rep);
         mStatus.setText(Trans.get(GameSlot.this, R.string.game_starting_fmt, shown, Data.currentSlot(this)));
 
+        // ★★ 第 353 轮（用户：「游戏补丁的启用状态应该绑定实例吧」）：补丁按**启动项（实例）**解析，
+        //   实例键 = 版本 key + NUL + 这一局实际用的槽。槽名取 `prepareSlot` 之后的值
+        //   （`slot` extra 可能为空 / 远古包会临时改道）：`currentSlot` 才是这一局真正落地的槽。
+        final String launchSlot = Data.currentSlot(this);
+        final String ikey = Versions.instanceKey(vkey, launchSlot);
+
         // ③ 六步管线（同步执行，与探针一致；前置段 ~200-500 ms，游戏自身加载另有 4~5 s）
         Injector.Plan plan = new Injector.Plan();
         plan.apk = target;
-        // 补丁机制 v1（2026-11-10）：按**版本 key** 解析这次要带的补丁。
+        // 补丁机制 v1（2026-11-10）：按**启动项（实例）**解析这次要带的补丁（第 353 轮起）。
         // ★ 只有真有启用记录时才去算 APK 的 sha256（80 MB 一遍）—— 没开补丁的人不付这个代价。
-        Patches.Resolved patchRes = Patches.resolve(this, target, vkey);
+        Patches.Resolved patchRes = Patches.resolve(this, target, ikey);
         for (Patches.Loaded l : patchRes.loaded) {
             Injector.Patch p = new Injector.Patch();
             p.dex = l.target.dex;
@@ -145,7 +151,7 @@ public class GameSlot extends BaseActivity {
         ProbeLab.decorate(this, plan);
         try {
             Injector.Timing t = Injector.launch(this, plan);
-            reportPatches(vkey, patchRes, plan);
+            reportPatches(ikey, patchRes, plan);
             // dev：探针验证台（产品版 ProbeLab 是空壳，见 app/src-release）
             ProbeLab.runIfArmed(this);
             startProbes(vkey, vmap, vinfo);
@@ -155,10 +161,10 @@ public class GameSlot extends BaseActivity {
             Config.get().setLastVersion(shown);
             android.util.Log.i("MDTLauncher", "launch done in " + t.total() + " ms");
         } catch (Injector.LaunchError e) {
-            reportPatches(vkey, patchRes, plan);
+            reportPatches(ikey, patchRes, plan);
             fail(e.step, e.getMessage(), e);
         } catch (Throwable e) {
-            reportPatches(vkey, patchRes, plan);
+            reportPatches(ikey, patchRes, plan);
             fail(Trans.get(GameSlot.this, R.string.step_unknown),
                     Trans.get(GameSlot.this, R.string.launch_err_unknown), e);
         }
@@ -171,13 +177,13 @@ public class GameSlot extends BaseActivity {
      * 解析阶段的问题已经在 {@link Patches.Resolved#problems} 里 ⇒ 这里合并成一份。
      * 没有问题时 {@link Patches#writeLaunchReport} 会把旧报告删掉（不让过期结论留在界面上）。
      */
-    private void reportPatches(String vkey, Patches.Resolved res, Injector.Plan plan) {
+    private void reportPatches(String ikey, Patches.Resolved res, Injector.Plan plan) {
         for (String line : plan.patchProblems) {
             int bar = line.indexOf('|');
             if (bar < 0) res.problems.add(new Patches.Problem(line, ""));
             else res.problems.add(new Patches.Problem(line.substring(0, bar), line.substring(bar + 1)));
         }
-        Patches.writeLaunchReport(this, vkey, res);
+        Patches.writeLaunchReport(this, ikey, res);
     }
 
     /**

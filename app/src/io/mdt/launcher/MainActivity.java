@@ -843,10 +843,16 @@ public class MainActivity extends BaseActivity {
         sub.setVisibility(text == null || text.isEmpty() ? View.GONE : View.VISIBLE);
     }
 
-    /** 这个版本 key 上启用了几条补丁（0 = 没打补丁）。 */
+    /**
+     * 这个**启动项（实例）**上启用了几条补丁（0 = 没打补丁）。
+     *
+     * <p>★ 第 353 轮（用户：「游戏补丁的启用状态应该绑定实例吧」）：键 = 版本 key + NUL + 槽
+     * （{@link Versions#instanceKey}）—— 同一版本绑多个槽时每个启动项各算各的；
+     * 按版本 key 数会让另一行也显示「补丁 N」。
+     */
     private int patchCountFor(Versions.Entry e) {
         if (e == null || mPatchCounts == null || mPatchCounts.isEmpty()) return 0;
-        Integer n = mPatchCounts.get(e.key());
+        Integer n = mPatchCounts.get(Versions.instanceKey(e.key(), Versions.slotFor(e)));
         return n == null ? 0 : n;
     }
 

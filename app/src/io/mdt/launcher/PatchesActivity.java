@@ -42,6 +42,14 @@ public final class PatchesActivity extends BaseActivity {
 
     /** 版本 key（`Versions.Entry#key()`；与版本页传参同一套） */
     static final String EXTRA_KEY = "v_key";
+    /**
+     * ★ 第 353 轮（用户：「游戏补丁的启用状态应该绑定实例吧」）：这个补丁页属于哪个**启动项**。
+     *
+     * <p>启用状态按 {@link Versions#instanceKey}（版本 key + 槽）存 —— 同一个版本绑多个槽时，
+     * 每行（启动项）各开各的补丁。不传 = 空串（旧调用方 / 直达 intent）⇒ 只能看到"没有启用"的视图，
+     * 不会误改到别的实例。
+     */
+    static final String EXTRA_SLOT = "v_slot";
 
     // 行状态（显示用；判据在 stateOf）
     static final int STATE_OFF = 0;
@@ -53,6 +61,10 @@ public final class PatchesActivity extends BaseActivity {
     private static final int REQ_PICK = 6101;
 
     private String mKey = "";
+    /** 这个补丁页对应的实例槽（空 = 未知；见 {@link #EXTRA_SLOT}） */
+    private String mSlot = "";
+    /** 实例键（{@link Versions#instanceKey}）—— 启用状态的真正键 */
+    private String mIkey = "";
     private String mApkSha = "";
     private int mLoadGen = 0;
     private boolean mBusy;
@@ -112,6 +124,9 @@ public final class PatchesActivity extends BaseActivity {
 
         String k = getIntent() == null ? null : getIntent().getStringExtra(EXTRA_KEY);
         mKey = k == null ? "" : k;
+        String sl = getIntent() == null ? null : getIntent().getStringExtra(EXTRA_SLOT);
+        mSlot = sl == null ? "" : sl;
+        mIkey = Versions.instanceKey(mKey, mSlot);
         if (mKey.isEmpty()) {
             finish();
             return;
@@ -154,13 +169,15 @@ public final class PatchesActivity extends BaseActivity {
     private void reload() {
         final int gen = ++mLoadGen;
         final String key = mKey;
+        final String slot = mSlot;
+        final String ikey = mIkey;
         new Thread(new Runnable() {
             @Override public void run() {
                 // 清孤儿引用（手工清过盘 / 旧版本数据）；不动别的东西
                 Patches.pruneStale(PatchesActivity.this);
                 Versions.Entry entry = null;
                 for (Versions.Entry e : Versions.scanAll(PatchesActivity.this)) {
-                    if (e.key().equals(key)) { entry = e; break; }
+                    if (e.key().equals(key) && Versions.slotFor(e).equals(slot)) { entry = e; break; }
                 }
                 if (entry == null) {
                     uiGone(gen);
@@ -176,7 +193,7 @@ public final class PatchesActivity extends BaseActivity {
                     }
                 }
                 List<Patches.Record> records = Patches.scan(PatchesActivity.this);
-                List<String> enabled = Patches.enabledRefs(PatchesActivity.this, key);
+                List<String> enabled = Patches.enabledRefs(PatchesActivity.this, ikey);
                 List<Row> rows = new ArrayList<Row>(records.size());
                 for (Patches.Record r : records) {
                     boolean on = enabled.contains(r.ref());
@@ -237,7 +254,9 @@ public final class PatchesActivity extends BaseActivity {
                         entry.displayName(PatchesActivity.this)));
                 String shortSha = sha.isEmpty() ? "-" : Patches.shortHash(sha);
                 mSub.setText(Trans.get(PatchesActivity.this, R.string.patch_head_sub_fmt,
-                        shortSha, rows.size()));
+                        shortSha, rows.size())
+                        + (mSlot.isEmpty() ? ""
+                        : "\n" + Trans.get(PatchesActivity.this, R.string.patch_head_instance_fmt, mSlot)));
 
                 mList.removeAllViews();
                 LayoutInflater inf = getLayoutInflater();
@@ -378,7 +397,7 @@ public final class PatchesActivity extends BaseActivity {
             @Override public void run() {
                 String err = null;
                 try {
-                    Patches.enable(PatchesActivity.this, mKey, row.record, mApkSha);
+                    Patches.enable(PatchesActivity.this, mIkey, row.record, mApkSha);
                 } catch (PatchException e) {
                     err = PatchText.reason(PatchesActivity.this, e);
                 } catch (Throwable t) {
@@ -413,7 +432,7 @@ public final class PatchesActivity extends BaseActivity {
     }
 
     private void doDisable(final CardStack stack, final Row row) {
-        Patches.disable(this, mKey, row.record);
+        Patches.disable(this, mIkey, row.record);
         stack.dismiss();
         android.widget.Toast.makeText(this,
                 Trans.get(this, R.string.patch_disable_ok_fmt, row.record.label()),
