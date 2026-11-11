@@ -1,6 +1,7 @@
 package io.mdt.launcher;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.provider.Settings;
@@ -68,7 +69,7 @@ final class UpdateUi {
     private UpdateUi() {}
 
     /** 用户看得见的版本号（不是 versionCode —— 那个不上屏）。 */
-    static String versionName(Activity a) {
+    static String versionName(Context a) {
         try {
             return String.valueOf(a.getPackageManager()
                     .getPackageInfo(a.getPackageName(), 0).versionName);
@@ -256,20 +257,47 @@ final class UpdateUi {
 
     // ── 发现新版本 ────────────────────────────────────────────────────────
 
-    private static void showFound(final Activity a, CardStack stack, final UpdateManifest m) {
-        String title = Trans.get(a, R.string.update_found_title_fmt,
-                m.versionName == null ? String.valueOf(m.versionCode) : m.versionName);
+    /** 新版本在界面上的名字（清单没给 versionName 就用 versionCode）。 */
+    private static String labelOf(UpdateManifest m) {
+        return m.versionName == null ? String.valueOf(m.versionCode) : m.versionName;
+    }
 
+    /** 卡片标题：`有新版 X`。 */
+    static String foundTitle(Context c, UpdateManifest m) {
+        return Trans.get(c, R.string.update_found_title_fmt, labelOf(m));
+    }
+
+    /**
+     * 卡片正文：**第一行就说清"已装什么 → 新的是什么"**，再跟大小 / 更新说明。
+     *
+     * <p>★ 2026-11-11 用户：「这个更新提示有点神秘」—— 原正文只有 `12.3 MB · 说明`，
+     * 标题只写"有新版 1.0.0-rc1"，用户看不出**自己现在是什么版本**、这提示是从哪冒出来的。
+     * 第一行补上两边的版本号，其余内容顺延到下面几行（`CardStack.text` 支持换行）。
+     *
+     * <p>抽成 static 是为了自检能直接喂一份解析好的清单（不联网也能钉住这句话）。
+     */
+    static String foundBody(Context c, UpdateManifest m) {
         StringBuilder body = new StringBuilder();
+        body.append(Trans.get(c, R.string.update_from_to_fmt, versionName(c), labelOf(m)));
         if (m.size > 0) {
-            body.append(Trans.get(a, R.string.update_size_fmt,
+            body.append('\n').append(Trans.get(c, R.string.update_size_fmt,
                     String.format(Locale.US, "%.1f", m.size / 1048576.0)));
         }
         if (m.notes != null && !m.notes.isEmpty()) {
-            if (body.length() > 0) body.append("  ·  ");
-            body.append(m.notes);
+            body.append('\n').append(m.notes);
         }
+        return body.toString();
+    }
 
+    private static void showFound(final Activity a, CardStack stack, final UpdateManifest m) {
+        String title = foundTitle(a, m);
+        String body = foundBody(a, m);
+
+        // ★ 两个按钮都要拿得到"当前这张卡"：`CardStack` 的按钮**点完不会自动关窗**
+        //   （见 CardStack.Btn / pushMessage 的注释），所以「稍后」必须自己 dismiss。
+        //   2026-11-11 用户：「怎么点稍后不反应」——旧实现的 Runnable 是空的、注释写着"只关卡片"
+        //   却没关 ⇒ 点了毫无反应。
+        final CardStack[] holder = new CardStack[1];
         CardStack.Btn dl = new CardStack.Btn(Trans.get(a, R.string.update_download), new Runnable() {
             @Override public void run() { startDownload(a, m); }
         });
@@ -277,13 +305,15 @@ final class UpdateUi {
             @Override public void run() {
                 // 「稍后」只关卡片：不记住"这一版不提醒"——那会让用户永远看不到它。
                 // （静默检查的 24 h 去重已经够了）
+                if (holder[0] != null && holder[0].isShowing()) holder[0].dismiss();
             }
         });
 
         if (stack != null && stack.isShowing()) {
-            stack.replace(title, body.toString(), dl, later);
+            holder[0] = stack;
+            stack.replace(title, body, dl, later);
         } else {
-            CardStack.show(null, a, title, CardStack.text(a, body.toString()), dl, later);
+            holder[0] = CardStack.show(null, a, title, CardStack.text(a, body), dl, later);
         }
     }
 

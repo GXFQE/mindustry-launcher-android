@@ -1437,6 +1437,7 @@
     <string name="update_err_network">连不上更新服务器</string>
     <string name="update_err_data">更新信息有问题</string>
     <string name="update_found_title_fmt">有新版 %1$s</string>
+    <string name="update_from_to_fmt">已装 %1$s → 新版 %2$s</string>
     <string name="update_size_fmt">%1$s MB</string>
     <string name="update_download">下载</string>
     <string name="update_later">稍后</string>

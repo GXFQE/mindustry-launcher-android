@@ -1473,6 +1473,7 @@
     <string name="update_err_network">Could not reach the update server</string>
     <string name="update_err_data">The update info looks broken</string>
     <string name="update_found_title_fmt">Version %1$s is available</string>
+    <string name="update_from_to_fmt">Installed %1$s → new %2$s</string>
     <string name="update_size_fmt">%1$s MB</string>
     <string name="update_download">Download</string>
     <string name="update_later">Later</string>

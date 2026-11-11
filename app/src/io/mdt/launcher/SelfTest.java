@@ -354,6 +354,8 @@ public final class SelfTest {
             aboutCredits(ctx, L, stat);
             // ★ 第 305 轮：更新清单（纯逻辑 —— 与 PC 侧 PcCheck 跑的是同一份判据）
             updateManifest(L, stat);
+            // ★ 第 346 轮：更新提示卡片文案（用户：「有点神秘」「点稍后不反应」）
+            updatePromptText(ctx, L, stat);
             // ★ 第 336 轮：更新线路（预设顺序 / 不重复前缀 / 严格解析 / 启动清扫）
             updateMirrors(ctx, L, stat);
             // ★ 第 338 轮：插件更新（清单解析 / 内容哈希比对 / 状态表）—— 纯逻辑
@@ -16761,6 +16763,44 @@ public final class SelfTest {
         for (UpdateManifestCheck.Line line : UpdateManifestCheck.run()) {
             ok(stat, L, line.ok, line.msg);
         }
+    }
+
+    // ── 第 346 轮：更新提示卡片的文案（"有点神秘" / "点稍后不反应"）────────────
+
+    /**
+     * 更新提示：**标题 + 正文第一行必须说清"已装什么 → 新版什么"**，且清单只有
+     * versionCode 时正文也不能是空的。
+     *
+     * <p>★ 2026-11-11 用户两句话：①「这个更新提示有点神秘」（正文只有大小 + 说明，
+     * 看不出自己现在是什么版本）；②「怎么点稍后不反应」（按钮的 Runnable 是空的）。
+     * ② 是按钮行为，只能真机点；① 抽成 {@link UpdateUi#foundBody} 后可以在这里钉住。
+     * 另外用一条**元断言**钉住"旧实现在 size=0、notes 空时正文是空串"这个病。
+     */
+    private static void updatePromptText(Context ctx, List<String> L, int[] stat) {
+        L.add("");
+        L.add("【更新提示文案】");
+        StringBuilder sha = new StringBuilder();
+        for (int i = 0; i < 64; i++) sha.append('a');
+        String json = "{\"versionCode\": 10, \"versionName\": \"1.0.0-rc1\", "
+                + "\"sha256\": \"" + sha + "\", \"size\": 13107200, "
+                + "\"url\": \"https://example.com/mdt.apk\", \"notes\": \"修了三个问题\"}";
+        UpdateManifest m = UpdateManifest.parse(json);
+        ok(stat, L, m.ok(), "夹具清单可解析（ok）");
+        String title = UpdateUi.foundTitle(ctx, m);
+        String body = UpdateUi.foundBody(ctx, m);
+        String installed = UpdateUi.versionName(ctx);
+        String firstLine = body.indexOf('\n') >= 0 ? body.substring(0, body.indexOf('\n')) : body;
+        ok(stat, L, title.contains("1.0.0-rc1"), "★标题带新版本号：" + title);
+        ok(stat, L, firstLine.contains(installed) && firstLine.contains("1.0.0-rc1"),
+                "★正文第一行说清「已装什么 → 新版什么」（不再只有大小/说明）：" + firstLine);
+        ok(stat, L, body.contains("修了三个问题") && body.indexOf('\n') > 0,
+                "★正文还带大小与更新说明（多行）：" + body.replace("\n", " / "));
+        // 元断言：清单只有 versionCode（没有 size / notes）时，旧实现正文 = 空串。
+        UpdateManifest bare = UpdateManifest.parse(
+                "{\"versionCode\": 2, \"sha256\": \"" + sha + "\"}");
+        ok(stat, L, bare.ok() && !UpdateUi.foundBody(ctx, bare).isEmpty()
+                        && UpdateUi.foundBody(ctx, bare).contains(installed),
+                "★元断言：清单只有 versionCode 时正文也不为空（旧实现会只剩空串）");
     }
 
     // ── 第 338 轮：插件自动更新（清单 / 哈希比对 / 状态表 / 内置在线升级登记）──────
