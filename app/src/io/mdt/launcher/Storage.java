@@ -324,18 +324,13 @@ final class Storage {
 
     /**
      * 中转站里那一类的名字。
-     * ★ 与 {@link TrashActivity} 列表上用的**同一批资源**（`trash_kind_*`）——
-     *   同一个东西在两个界面上必须一个叫法。
+     *
+     * <p>★ **唯一映射在 {@link TrashText#kindLabel}**（中转站列表 / 筛选弹窗 / 来源说明都用它）——
+     *   这里以前自己抄了一份 `switch`，少了 `PLUGIN` / `VERSION` 两个分支 ⇒ 两者都落到「其他文件」，
+     *   存储占用里于是出现**两行同名的「其他文件」**（第 355 轮用户：「怎么有两行其他文件」）。
+     *   以后加新的中转站种类只改 `TrashText`，别在这里再抄。
      */
     static String trashKindLabel(Context c, Trash.Kind k) {
-        if (k == null) return Trans.get(c, R.string.trash_kind_other);
-        switch (k) {
-            case MAP: return Trans.get(c, R.string.trash_kind_map);
-            case MOD: return Trans.get(c, R.string.trash_kind_mod);
-            case SAVE: return Trans.get(c, R.string.trash_kind_save);
-            case SLOT: return Trans.get(c, R.string.trash_kind_slot);
-            case SCHEM: return Trans.get(c, R.string.trash_kind_schem);
-            default: return Trans.get(c, R.string.trash_kind_other);
-        }
+        return TrashText.kindLabel(c, k);
     }
 }

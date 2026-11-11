@@ -8354,6 +8354,22 @@ public final class SelfTest {
                 "存储占用：备份那一行给出节省率（3 GB → 240 MB 约 92%）");
         ok(stat, L, txt.contains(Storage.trashKindLabel(ctx, Trash.Kind.MAP)),
                 "存储占用：中转站按类型分行（地图 2 项）");
+        // ★ 第 355 轮用户：「怎么有两行其他文件」—— 存储占用以前自己抄了一份种类映射、漏了
+        //   PLUGIN / VERSION ⇒ 两者都显示成「其他文件」。判据：每一类的叫法必须互不相同，
+        //   而且与中转站列表/筛选用的是同一份（TrashText.kindLabel）。
+        java.util.Set<String> kindLabels = new java.util.HashSet<String>();
+        boolean kindUnique = true;
+        for (Trash.Kind k : Trash.Kind.values()) {
+            String lab = Storage.trashKindLabel(ctx, k);
+            if (!kindLabels.add(lab)) kindUnique = false;
+            if (!lab.equals(TrashText.kindLabel(ctx, k))) kindUnique = false;
+        }
+        ok(stat, L, kindUnique,
+                "★中转站每一类的叫法互不相同，且与列表/筛选同一份映射（否则两行「其他文件」）");
+        // ★ 第 355 轮用户：「最前面的不要两个其中（后面那个其中不知道相对于哪个）」
+        int qz = 0;
+        for (int i = txt.indexOf("其中"); i >= 0; i = txt.indexOf("其中", i + 2)) qz++;
+        ok(stat, L, qz == 1, "★存储占用开头只有一个「其中」（实得 " + qz + " 个）");
         ok(stat, L, txt.contains(ctx.getString(R.string.storage_clean_fmt, 3,
                         Util.formatSize(2048L))),
                 "存储占用：可清理残留那行带处数与体积（原来只在别处显示'已开/已关'）");
