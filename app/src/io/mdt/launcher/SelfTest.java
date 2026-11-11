@@ -9980,13 +9980,14 @@ public final class SelfTest {
         ok(stat, L, pageSub.contains("official-159.apk") && pageSub.contains("MB"),
                 "★版本页副标题仍带来源与大小（与主页故意不同）：" + pageSub);
         // ★ 第 351 轮：来源标记要**对称** —— 用户：「那个导入应该对应着什么吧（已安装的应用？）」
-        //   导入副本写「导入」，系统里装好的写「已安装」；二选一，不同时出现。
+        //   导入副本写「导入」，系统里装好的写「安装」；二选一，不同时出现。
+        //   ★ 第 352 轮：「已安装这个说法总是感觉很奇怪（就和前面的已导入一样）」⇒ 去掉「已」前缀。
         Versions.Entry quiet = new Versions.Entry();
         quiet.pkg = "io.anuke.mindustry";
         quiet.versionName = "8-official-159.7";
         String quietSub = Versions.mainRowSubtitleLine(ctx, quiet, 0, 0);
         ok(stat, L, quietSub.equals(ctx.getString(R.string.row_installed_tag)),
-                "★装好的版本：来源标记写「已安装」（与「导入」对称）：" + quietSub);
+                "★装好的版本：来源标记写「安装」（与「导入」对称、不带「已」）：" + quietSub);
         Versions.Entry quietImp = new Versions.Entry();
         quietImp.imported = true;
         quietImp.importFile = "x.apk";
@@ -9995,7 +9996,7 @@ public final class SelfTest {
                         .equals(ctx.getString(R.string.row_imported_tag)),
                 "★导入副本：没有副信息时只剩「导入」标记");
         ok(stat, L, !homeSub.contains(ctx.getString(R.string.row_installed_tag)),
-                "★元断言：导入项不会同时写「已安装」（来源标记二选一）");
+                "★元断言：导入项不会同时写「安装」（来源标记二选一）");
         // ★★ 2026-10-04（第 86 轮）：**按真参数实拼一遍**本轮新增/改动的每一条带占位符的资源。
         //   为什么值得单独钉：`getString(id, …)` 的参数个数与资源里的 `%n$` 不匹配会抛
         //   `MissingFormatArgumentException` **直接崩**，而它只在走到那一句时才现形。

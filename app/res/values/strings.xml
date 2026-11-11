@@ -277,7 +277,8 @@
     <!-- ★ Round 350 (2026-11-11, user: "don't show APK name and size on the home page"):
          home rows only use these three plus the patch badge; the version page still shows source/size. -->
     <string name="row_imported_tag">Imported</string>
-    <!-- Round 351: the source tag is symmetric — installed copies say "Installed". -->
+    <!-- Round 351: the source tag is symmetric — installed copies say "Installed".
+         Round 352: the Chinese side dropped the "已" prefix (导入 / 安装); English keeps "Installed". -->
     <string name="row_installed_tag">Installed</string>
     <string name="row_backups_count_fmt">%1$d backup(s)</string>
     <string name="row_based_on_fmt">based on %1$s</string>

@@ -270,7 +270,9 @@
          不再拼 APK 文件名 / 大小（版本页标题卡仍显示来源与大小） -->
     <string name="row_imported_tag">导入</string>
     <!-- ★ 第 351 轮（「那个导入应该对应着什么吧（已安装的应用？）」）：来源标记做成对称的 -->
-    <string name="row_installed_tag">已安装</string>
+    <!-- ★ 第 352 轮（「已安装这个说法总是感觉很奇怪（就和前面的已导入一样）」）：
+         跟「已导入 → 导入」同一个处理：去掉「已」前缀，两端统一成短标签「导入 / 安装」 -->
+    <string name="row_installed_tag">安装</string>
     <string name="row_backups_count_fmt">备份 %1$d 份</string>
     <string name="row_based_on_fmt">基于 %1$s</string>
     <!--
