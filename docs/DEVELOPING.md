@@ -621,7 +621,7 @@ PluginsActivity 插件页（装 / 卸 / 启用 / 隔离 / 检查更新 / 技术�
 ShareOut / SharePack / CrashScrub
                 分享出口（唯一）/ 分享包脱敏 / 崩溃报告脱敏
 BatchIo / Storage
-                批量导入导出 / 存储占用口径（内部 + 外部 + 各槽）
+                批量导入导出 / 存储占用口径（内部 app_hub + 外部 hub + 各槽 + 缓存；补丁单列）
 SelfTest        见上（现在含 ㊾ 等成组断言；`dev_m3_selftest` 触发）
 ```
 

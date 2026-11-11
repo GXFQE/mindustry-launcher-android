@@ -1346,8 +1346,13 @@
     <string name="storage_loading">正在统计…</string>
     <string name="storage_failed">统计失败 —— 返回上一页再进一次试试。</string>
     <string name="storage_total_fmt">这些数据合计占 %1$s</string>
+    <!-- ★ 第 354 轮用户「有点不准」：系统设置把数据/缓存分两栏，合计一个数对不上任何一栏 -->
+    <string name="storage_total_split_fmt">其中：数据 %1$s · 缓存 %2$s</string>
+    <string name="storage_total_trash_fmt">其中「中转站」里还有 %1$s（那部分清掉后合计会少这么多）</string>
     <string name="storage_sec_app">管理器自身</string>
     <string name="storage_app_import_fmt">导入的游戏包：%1$d 个 · %2$s</string>
+    <!-- ★ 第 354 轮：补丁也占地方，而且用户会拿各节加总对账 -->
+    <string name="storage_app_patches_fmt">游戏补丁：%1$d 个 · %2$s</string>
     <string name="storage_app_natives_fmt">从游戏包里解出的运行库：%1$s</string>
     <string name="storage_app_plugins_fmt">插件：%1$d 个 · %2$s</string>
     <string name="storage_app_cache_fmt">缓存（运行游戏时产生）：%1$s</string>

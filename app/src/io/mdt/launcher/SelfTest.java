@@ -470,10 +470,12 @@ public final class SelfTest {
         L.add("  冗余副本 " + h.redundant.size() + " 项 / 证据不足 " + h.suspicious.size() + " 项"
                 + "（合计可释放 " + Util.formatSize(h.redundantBytes()) + "）");
         // 有历史残留时，必须至少有一项被正证据命中，否则说明判据太松或太严
+        // ⚠️ 只看**真的会出现冗余副本的那几个名字**（import / natives）；`config.json` 是每个
+        //   玩过的槽都有的正常文件，拿它当判据会让"当前槽恰好有设置文件"时这条假失败
+        //   （2026-11-12 实撞：当前槽 = 冲突演示 ⇒ 体检 0 项也被判死）。
         File root = Data.dataRoot(ctx);
         boolean hasResidue = root != null && (new File(root, "import").exists()
-                || new File(root, "natives").exists()
-                || new File(root, "config.json").exists());
+                || new File(root, "natives").exists());
         if (hasResidue && h.redundant.isEmpty()) {
             okRun = false;
             L.add("  ⚠ 数据根里名字命中的项存在，却没有一项拿到正证据 —— 判据可能过严");
@@ -8294,6 +8296,9 @@ public final class SelfTest {
         r.nativesBytes = 12L * 1024 * 1024;
         r.pluginsBytes = 3L * 1024 * 1024;
         r.pluginCount = 2;
+        // ★ 第 354 轮：补丁也要单独一行（用户：「游戏补丁似乎也没统计」）
+        r.patchBytes = 14L * 1024 * 1024;
+        r.patchCount = 1;
         r.cacheBytes = 36L * 1024 * 1024;
         r.otherBytes = 17L * 1024 * 1024;
         r.slots.add(new Data.Slot("default", null, true, 51, 209L * 1024 * 1024));
@@ -8329,6 +8334,16 @@ public final class SelfTest {
                         && txt.contains(ctx.getString(R.string.storage_app_cache_fmt,
                         Util.formatSize(r.cacheBytes))),
                 "存储占用：运行库 / 插件 / 缓存各一行");
+        ok(stat, L, txt.contains(ctx.getString(R.string.storage_app_patches_fmt,
+                        r.patchCount, Util.formatSize(r.patchBytes))),
+                "存储占用：游戏补丁单独一行（第 354 轮用户「游戏补丁似乎也没统计」）");
+        ok(stat, L, txt.contains(ctx.getString(R.string.storage_total_split_fmt,
+                        Util.formatSize(r.totalBytes() - r.cacheBytes),
+                        Util.formatSize(r.cacheBytes))),
+                "存储占用：合计下面摊开「数据 / 缓存」两个数（与系统设置那一页对得上）");
+        ok(stat, L, txt.contains(ctx.getString(R.string.storage_total_trash_fmt,
+                        Util.formatSize(r.trashTotalBytes))),
+                "存储占用：点明中转站里还有多少（否则各节加起来差一块，用户会说「有点不准」）");
         ok(stat, L, txt.contains(Util.formatSize(r.otherBytes)),
                 "存储占用：外部 hub 里「上面几段都没算到」的那部分也有交代（预览 / 报告）");
         ok(stat, L, txt.contains(ctx.getString(R.string.storage_slot_line_fmt,
@@ -8360,6 +8375,8 @@ public final class SelfTest {
                         && !t2.contains(ctx.getString(R.string.storage_app_import_fmt, 0,
                         Util.formatSize(0)))
                         && !t2.contains(ctx.getString(R.string.storage_app_cache_fmt,
+                        Util.formatSize(0)))
+                        && !t2.contains(ctx.getString(R.string.storage_app_patches_fmt, 0,
                         Util.formatSize(0))),
                 "★反向：内部没东西 ⇒ 说「没有额外数据」，且**不出现**「导入的游戏包：0 个」");
         ok(stat, L, txt.contains(ctx.getString(R.string.storage_app_import_fmt, 1,
@@ -8389,13 +8406,24 @@ public final class SelfTest {
         ok(stat, L, real.importCount == apksOnDisk,
                 "★真机：collect 数出来的导入包个数 == 磁盘上的 .apk 个数（" + apksOnDisk + "）");
         ok(stat, L, real.internalBytes
-                        >= real.importBytes + real.nativesBytes + real.pluginsBytes,
+                        >= real.importBytes + real.nativesBytes + real.pluginsBytes
+                        + real.patchBytes,
                 "★真机：内部总量 ≥ 三项之和（" + Util.formatSize(real.internalBytes) + " ≥ "
-                        + Util.formatSize(real.importBytes + real.nativesBytes + real.pluginsBytes)
+                        + Util.formatSize(real.importBytes + real.nativesBytes
+                        + real.pluginsBytes + real.patchBytes)
                         + "）");
         ok(stat, L, real.totalBytes()
                         == real.hubBytes + real.internalBytes + real.cacheBytes + real.slotBytes,
                 "★真机：总分口径同一处（" + Util.formatSize(real.totalBytes()) + "）");
+        ok(stat, L, real.patchBytes >= 0,
+                "★真机：补丁库体积已纳入统计（" + Util.formatSize(real.patchBytes) + "）");
+        if (real.patchCount > 0) {
+            ok(stat, L, Storage.text(ctx, real).contains(
+                            ctx.getString(R.string.storage_app_patches_fmt,
+                                    real.patchCount, Util.formatSize(real.patchBytes))),
+                    "★★ 真机：装了 " + real.patchCount + " 条补丁（"
+                            + Util.formatSize(real.patchBytes) + "）⇒ 存储占用里必须有这一行");
+        }
         if (apksOnDisk > 0) {
             ok(stat, L, Storage.text(ctx, real).contains(
                             ctx.getString(R.string.storage_app_import_fmt,

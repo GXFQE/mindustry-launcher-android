@@ -65,6 +65,14 @@ final class Storage {
         public long pluginsBytes;
         public int pluginCount;
         /**
+         * 其中：游戏补丁（`app_hub/patches/<id>/<version>/`，含 dex / 素材 / 清单）。
+         *
+         * <p>★ 第 354 轮用户：「游戏补丁似乎也没统计」—— 之前它混在「其它」里，
+         * 用户既看不到补丁占了地方、也没法把各节加起来对账。
+         */
+        public long patchBytes;
+        public int patchCount;
+        /**
          * 缓存（`getCacheDir()` + `getCodeCacheDir()`）—— 游戏运行时的音乐 / 模组 / 临时文件，
          * 加上系统为那些**动态加载**的包生成的 dex 产物。
          * ★ 真机实测：这份缓存有 **73.7 MB**（其中 45 MB 是游戏解出来的模组贴图），
@@ -156,6 +164,14 @@ final class Storage {
         File pl = Plugins.dirNoCreate(ctx);      // ⚠️ 不创建：只读一眼不该多出目录
         r.pluginsBytes = Data.sizeTree(pl);
         r.pluginCount = countApk(pl);
+        // ★ 第 354 轮：补丁库（内部存储，dex 只能住这里 —— ART 硬约束）
+        File pa = new File(priv, "patches");
+        r.patchBytes = Data.sizeTree(pa);
+        try {
+            r.patchCount = Patches.scan(ctx).size();
+        } catch (Throwable ignored) {
+            r.patchCount = 0;
+        }
         // 两个缓存目录一起算（游戏解出来的音乐 / 模组贴图 + 系统给动态加载的包生成的 dex 产物）
         r.cacheBytes = Data.sizeTree(ctx.getCacheDir()) + Data.sizeTree(ctx.getCodeCacheDir());
 
@@ -164,7 +180,7 @@ final class Storage {
         // ⚠️ 用减法算，所以要**夹到 0**：份额取自别处的口径（池 / 中转站），
         //    万一将来有个东西两边都算，负数会在界面上变成一句莫名其妙的"-3 MB"。
         long covered = (r.pool == null ? 0L : r.pool.actual + r.pool.legacyBytes) + r.trashTotalBytes
-                + r.importBytes + r.nativesBytes + r.pluginsBytes;
+                + r.importBytes + r.nativesBytes + r.pluginsBytes + r.patchBytes;
         r.otherBytes = Math.max(0L, r.hubBytes + r.internalBytes - covered);
         return r;
     }
@@ -197,6 +213,20 @@ final class Storage {
         if (r == null) return "";
         sb.append(Trans.get(c, R.string.storage_total_fmt,
                 Util.formatSize(r.totalBytes()))).append('\n');
+        // ★ 第 354 轮用户「有点不准」：系统设置把「数据 / 缓存」分两栏（数据 886 MB + 缓存 67.11 MB），
+        //   合计那一个数对不上任何一栏 ⇒ 这里也把两个数摊开写。
+        //   数据 = 合计 − 缓存（外部 hub + 内部 app_hub + 各槽），与系统「数据」同一口径。
+        long cache = Math.max(0L, r.cacheBytes);
+        if (cache > 0) {
+            sb.append(Trans.get(c, R.string.storage_total_split_fmt,
+                    Util.formatSize(Math.max(0L, r.totalBytes() - cache)),
+                    Util.formatSize(cache))).append('\n');
+        }
+        // 中转站不算进任何一节（它是"删掉的东西先放这儿"）⇒ 不点明的话，各节加起来会差这一块
+        if (r.trashTotalBytes > 0) {
+            sb.append(Trans.get(c, R.string.storage_total_trash_fmt,
+                    Util.formatSize(r.trashTotalBytes))).append('\n');
+        }
 
         // ① 启动器自身 —— ★ 第 140 轮新开的一节：内部 app_hub 从来没有露过面，
         //   而"导入的游戏包"是真机上最大的一块（用户看到总数从 18 MB 变成 200 MB 才知道）。
@@ -215,6 +245,11 @@ final class Storage {
         if (r.pluginCount > 0 || r.pluginsBytes > 0) {
             sb.append(Trans.get(c, R.string.storage_app_plugins_fmt, r.pluginCount,
                     Util.formatSize(r.pluginsBytes))).append('\n');
+            appAny = true;
+        }
+        if (r.patchCount > 0 || r.patchBytes > 0) {
+            sb.append(Trans.get(c, R.string.storage_app_patches_fmt, r.patchCount,
+                    Util.formatSize(r.patchBytes))).append('\n');
             appAny = true;
         }
         if (r.cacheBytes > 0) {

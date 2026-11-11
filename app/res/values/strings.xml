@@ -1375,8 +1375,11 @@
     <string name="storage_loading">Counting…</string>
     <string name="storage_failed">Could not measure storage — go back and open this again.</string>
     <string name="storage_total_fmt">These add up to %1$s</string>
+    <string name="storage_total_split_fmt">Data %1$s · cache %2$s</string>
+    <string name="storage_total_trash_fmt">The trash station holds another %1$s (deleting it lowers the total)</string>
     <string name="storage_sec_app">The manager itself</string>
     <string name="storage_app_import_fmt">Imported game packages: %1$d · %2$s</string>
+    <string name="storage_app_patches_fmt">Game patches: %1$d · %2$s</string>
     <string name="storage_app_natives_fmt">Native libraries unpacked from them: %1$s</string>
     <string name="storage_app_plugins_fmt">Plugins: %1$d · %2$s</string>
     <string name="storage_app_cache_fmt">Cache (made while the game runs): %1$s</string>
