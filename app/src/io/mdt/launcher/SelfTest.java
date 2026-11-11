@@ -8344,6 +8344,18 @@ public final class SelfTest {
         ok(stat, L, txt.contains(ctx.getString(R.string.storage_total_trash_fmt,
                         Util.formatSize(r.trashTotalBytes))),
                 "存储占用：点明中转站里还有多少（否则各节加起来差一块，用户会说「有点不准」）");
+        // ★ 第 356 轮用户：「清理缓存这个说法有点奇怪」「页面上缓存写的运行游戏时产生」
+        //   「清理后合计会少这么多也很奇怪」——
+        //   按钮其实只清「直接分享」那一层（cache/share），标签必须带「分享」；
+        //   缓存行的说明改成「临时文件」（它不是只有游戏在产生）；中转站那句不再解释合计怎么变。
+        String cacheLine = ctx.getString(R.string.storage_app_cache_fmt, "X");
+        String clearBtn = ctx.getString(R.string.storage_clear_cache);
+        String clearTitle = ctx.getString(R.string.storage_clear_title);
+        ok(stat, L, clearBtn.contains("分享") && clearTitle.contains("分享")
+                        && cacheLine.contains("临时文件") && !cacheLine.contains("运行游戏时产生"),
+                "★第 356 轮文案：清理按钮/标题都写「分享」（它只清 cache/share），缓存行说「临时文件」");
+        ok(stat, L, !ctx.getString(R.string.storage_total_trash_fmt, "X").contains("合计"),
+                "★中转站那句不再解释合计（用户：「清理后合计会少这么多也很奇怪」）");
         ok(stat, L, txt.contains(Util.formatSize(r.otherBytes)),
                 "存储占用：外部 hub 里「上面几段都没算到」的那部分也有交代（预览 / 报告）");
         ok(stat, L, txt.contains(ctx.getString(R.string.storage_slot_line_fmt,
