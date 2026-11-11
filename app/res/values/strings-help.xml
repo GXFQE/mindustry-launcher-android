@@ -17,6 +17,8 @@
     <string name="glossary_entry">Launch entry (instance) — a version plus a slot; one row on the main page. Changing its slot or name affects that row only.</string>
     <string name="glossary_current_slot">Current slot — the slot the next game launch will read; it is shown at the top of the main page.</string>
     <string name="glossary_default_slot">Default slot — the slot that newly imported versions, and any version without a slot of its own, follow.</string>
+    <!-- Round 358: user asked to add "game patch" to the glossary -->
+    <string name="glossary_patch">Game patch — code or assets added at launch without touching the original APK, turning it into a fork. Matched by APK hash, enabled per launch entry; deleted patches go to the transfer station.</string>
 
     <string name="glossary_backup">Backup — a snapshot of what is in a slot, restorable at any time; backups share content, so they take little space.</string>
     <string name="glossary_trash">Transfer station — deleted or replaced files move here first and can be put back (old ones are trimmed by policy).</string>

@@ -17,6 +17,8 @@
     <string name="glossary_entry">启动项（实例） —— 版本 + 槽 的组合，主界面一行就是它。换槽 / 改名只影响这一项。</string>
     <string name="glossary_current_slot">当前槽 —— 游戏下次启动会读的那个槽，写在主界面顶部。</string>
     <string name="glossary_default_slot">默认槽 —— 新导入的版本、以及没单独指定槽的版本，跟随的那个槽。</string>
+    <!-- ★ 第 358 轮用户：「词表加上游戏补丁」 -->
+    <string name="glossary_patch">游戏补丁 —— 不改原 APK，启动时给游戏加一段代码 / 素材，让它变成改端。按 APK 哈希匹配，启用状态跟着启动项走；删掉会进中转站。</string>
 
     <string name="glossary_backup">备份 —— 把槽里的东西打一份快照，随时能恢复；备份之间共用内容，所以占得不多。</string>
     <string name="glossary_trash">中转站 —— 删掉 / 替换掉的文件先挪到这里，可以再放回去（放太久会按策略清掉）。</string>

@@ -547,17 +547,43 @@ public final class CardStack {
         if (!animate || start <= 0 || start == target) {
             lp.height = target;
             bodyView.setLayoutParams(lp);
+            applyPageHeight(target);
             return;
         }
         android.animation.ValueAnimator v = android.animation.ValueAnimator.ofInt(start, target);
         v.setDuration(170);
         v.addUpdateListener(new android.animation.ValueAnimator.AnimatorUpdateListener() {
             @Override public void onAnimationUpdate(android.animation.ValueAnimator a) {
-                lp.height = (Integer) a.getAnimatedValue();
+                int h = (Integer) a.getAnimatedValue();
+                lp.height = h;
                 bodyView.setLayoutParams(lp);
+                applyPageHeight(h);
             }
         });
         v.start();
+    }
+
+    /**
+     * ★★ 第 358 轮（用户：「划不到底下的问题又出现了」）：外层正文槽改了高度之后，
+     * **里面那一页（ScrollView）也必须一起改**。
+     *
+     * <p>为什么：`clampBodyToCard()` 在首帧后会把 bodyView 收小（按钮不被挤掉），但原来只改
+     * `bodyView` 的 LayoutParams —— 里面那张 ScrollView 的高度还是旧的（更大）。FrameLayout 会
+     * 把超出的部分**裁掉**，而 ScrollView 仍按旧视口算「已经到底了」⇒ 底部一截永远滑不出来
+     * （词表加了「游戏补丁」一条之后超出一屏，这个 bug 立刻现形）。
+     *
+     * <p>修法：两头一起改高。动画路径也要跟着改（`remeasure()` 走的就是动画）。
+     */
+    private void applyPageHeight(int h) {
+        if (bodyView == null) return;
+        for (int i = 0; i < bodyView.getChildCount(); i++) {
+            View c = bodyView.getChildAt(i);
+            if (c == null) continue;
+            ViewGroup.LayoutParams clp = c.getLayoutParams();
+            if (clp == null || clp.height == h) continue;
+            clp.height = h;
+            c.setLayoutParams(clp);
+        }
     }
 
     private void setButtons(Page p) {

@@ -694,6 +694,8 @@ public class MainActivity extends BaseActivity {
             R.string.glossary_entry,
             R.string.glossary_current_slot,
             R.string.glossary_default_slot,
+            // ★ 第 358 轮用户：「词表加上游戏补丁」
+            R.string.glossary_patch,
             R.string.glossary_backup,
             R.string.glossary_trash,
             R.string.glossary_bundle,
