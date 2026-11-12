@@ -106,7 +106,13 @@ public final class Config {
     private static final String K_LANG = "app_language";
     /** F5：每槽的自动备份策略 { "&lt;槽名&gt;": {enabled, min_minutes, max_backups} } */
     private static final String K_BACKUP = "backup_policy";
-    /** F5：一次启动的记账 {key, slot, at} —— 游戏退出后回来结算自动备份用 */
+    /**
+     * F5：**进行中的每一局**的记账（多开：一槽一局）。
+     *
+     * <p>新格式：{@code {"v":2,"sessions":{"<槽>":{"key":"<版本key>","at":毫秒}}}}。
+     * 旧格式（单对象 {@code {key,slot,at}}）由 {@link #collectSessions} 读侧兼容升级。
+     * 结算按**槽**各算各的（见 {@code AutoBackup.settle}）—— 别的槽还在跑不该拖住这一局。
+     */
     private static final String K_SESSION = "session";
     /** F20：进存档页时自动清理数据根残留（默认开；关掉后只能手动清） */
     private static final String K_AUTO_CLEAN = "auto_clean_redundant";
@@ -185,8 +191,8 @@ public final class Config {
     /**
      * 一档④（2026-10-06）：每个版本**上次启动的时刻** { "&lt;版本key&gt;": 毫秒 }。
      *
-     * ★ 为什么需要它：{@link #sessionStartedAt()} 记的是"**正在进行**的那一次"，
-     *   结算完就 {@link #sessionClear() 清掉} ⇒ 界面问不出"我上次什么时候玩的这个版本"。
+     * ★ 为什么需要它：{@link #sessions()} 记的是"**正在进行**的那几局"，
+     *   结算完就 {@link #sessionClear(String) 清掉} ⇒ 界面问不出"我上次什么时候玩的这个版本"。
      * ★ 与 session **同一次写入**（都在 {@link #sessionStart}）：不额外多一次落盘，
      *   也不会出现"记了 session 却没记历史"的半截状态。
      * ⚠️ 有上限（{@link #PLAYED_KEEP}）：版本列表可能长期累积，别让它无限长大。
@@ -1441,21 +1447,25 @@ public final class Config {
     }
 
     /**
-     * 启动游戏**之前**调用：记下这次的槽与时刻。
+     * 启动游戏**之前**调用：记下这次的版本 key / 槽 / 时刻。
      * 之所以要落盘而不是放内存：游戏会带走 :game 进程，而主进程也可能被系统回收 ——
-     * 回来的那一刻要能知道"上次是几点开始玩的"，否则算不出运行时长。
+     * 回来的那一刻要能知道"每局是几点开始玩的"，否则算不出运行时长。
+     *
+     * <p>第 364 轮（多开）：按**槽**存，一槽一局；同一槽重开覆盖自己那条（同一槽不可能同时跑两局）。
      */
     public synchronized void sessionStart(String key, String slot) {
+        if (slot == null || slot.trim().isEmpty()) return;
+        JSONObject m = sessionStore();
         JSONObject o = new JSONObject();
         try {
             o.put("key", key == null ? "" : key);
-            o.put("slot", slot == null ? "" : slot);
             o.put("at", System.currentTimeMillis());
+            m.put(slot, o);
         } catch (Exception e) {
             Log.w(TAG, "sessionStart failed: " + e);
             return;
         }
-        put(K_SESSION, o);
+        writeSessionStore(m);
         rememberPlayed(key);
         save();
     }
@@ -1535,21 +1545,140 @@ public final class Config {
         save();
     }
 
-    /** 上次记账的槽名（无记账 = 空串）。 */
-    public synchronized String sessionSlot() {
-        JSONObject o = mRoot.optJSONObject(K_SESSION);
-        return o == null ? "" : o.optString("slot", "");
+    /**
+     * **一局的账**（第 364 轮：多开下按槽分账）。
+     *
+     * <p>以前 config 里只有一个 `{key,slot,at}`：第二个实例一启动就把它盖掉，结算时只能结算
+     * "最后一次启动的那一局"，另一局的时长丢了（自动备份直接少一份）。
+     */
+    public static final class Session {
+        public final String slot;
+        public final String key;
+        public final long at;
+
+        Session(String slot, String key, long at) {
+            this.slot = slot;
+            this.key = key;
+            this.at = at;
+        }
     }
 
-    /** 上次记账的时刻（毫秒；无记账 = 0）。 */
-    public synchronized long sessionStartedAt() {
-        JSONObject o = mRoot.optJSONObject(K_SESSION);
-        return o == null ? 0L : o.optLong("at", 0L);
+    private static final String S_V2 = "v";
+    private static final String S_MAP = "sessions";
+
+    /** 进行中的全部局（按开始时刻升序：老的先结算）。读侧兼容 v2 之前的单对象格式。 */
+    public synchronized List<Session> sessions() {
+        ArrayList<Session> out = new ArrayList<>();
+        collectSessions(mRoot, out);
+        return out;
     }
 
-    /** 结算完（含"判定后决定跳过"）就清账 —— 不清的话每次回到启动器都会重判一遍。 */
-    public synchronized void sessionClear() {
+    /**
+     * **纯解析**（自检直接喂 JSON）：新格式按 at 升序；旧单对象格式当一局；
+     * 坏条目（缺槽 / 缺 at / at ≤ 0）跳过 —— 坏账留在盘上只会每次 onResume 重判一遍。
+     */
+    static void collectSessions(JSONObject root, List<Session> out) {
+        if (root == null || out == null) return;
+        JSONObject s = root.optJSONObject(K_SESSION);
+        if (s == null) return;
+        if (s.optInt(S_V2, 0) >= 2) {
+            JSONObject m = s.optJSONObject(S_MAP);
+            if (m == null) return;
+            java.util.Iterator<String> it = m.keys();
+            while (it.hasNext()) {
+                String slot = it.next();
+                JSONObject o = m.optJSONObject(slot);
+                if (o == null) continue;
+                addSession(out, slot, o.optString("key", ""), o.optLong("at", 0L));
+            }
+        } else {
+            // 旧格式：一个对象就是一局（v2 之前所有版本都这么写）
+            addSession(out, s.optString("slot", ""), s.optString("key", ""), s.optLong("at", 0L));
+        }
+        java.util.Collections.sort(out, new java.util.Comparator<Session>() {
+            @Override public int compare(Session a, Session b) {
+                return a.at < b.at ? -1 : (a.at == b.at ? 0 : 1);
+            }
+        });
+    }
+
+    private static void addSession(List<Session> out, String slot, String key, long at) {
+        if (slot == null || slot.isEmpty() || at <= 0L) return;
+        out.add(new Session(slot, key == null ? "" : key, at));
+    }
+
+    /** 取 sessions 映射（内存态；顺手把旧格式升级成新格式 —— 不 save，落盘由调用方决定）。 */
+    private JSONObject sessionStore() {
+        JSONObject s = mRoot.optJSONObject(K_SESSION);
+        if (s != null && s.optInt(S_V2, 0) >= 2) {
+            JSONObject m = s.optJSONObject(S_MAP);
+            if (m != null) return m;
+        }
+        JSONObject m = new JSONObject();
+        ArrayList<Session> old = new ArrayList<>();
+        collectSessions(mRoot, old);
+        for (Session one : old) {
+            JSONObject o = new JSONObject();
+            try {
+                o.put("key", one.key);
+                o.put("at", one.at);
+                m.put(one.slot, o);
+            } catch (Exception ignored) {
+            }
+        }
+        return m;
+    }
+
+    private void writeSessionStore(JSONObject sessions) {
+        if (sessions == null || sessions.length() == 0) {
+            mRoot.remove(K_SESSION);
+            return;
+        }
+        JSONObject w = new JSONObject();
+        try {
+            w.put(S_V2, 2);
+            w.put(S_MAP, sessions);
+        } catch (Exception e) {
+            Log.w(TAG, "session store write failed: " + e);
+            return;
+        }
+        put(K_SESSION, w);
+    }
+
+    /** 结算完（含"判定后决定跳过"）就清**这一局**的账 —— 不清的话每次回到启动器都会重判一遍。 */
+    public synchronized void sessionClear(String slot) {
+        if (slot == null || slot.isEmpty()) return;
+        JSONObject m = sessionStore();
+        m.remove(slot);
+        writeSessionStore(m);
+        save();
+    }
+
+    /** 清掉全部局（自检 / 重置类动作用）。 */
+    public synchronized void sessionClearAll() {
         mRoot.remove(K_SESSION);
+        save();
+    }
+
+    /**
+     * **自检专用**：把会话账本原样还原（含 at / key，不重新计时）。
+     * ⚠️ 业务代码不许用它 —— 正常记账只走 {@link #sessionStart}。
+     */
+    void sessionRestore(List<Session> list) {
+        JSONObject m = new JSONObject();
+        if (list != null) {
+            for (Session one : list) {
+                if (one == null || one.slot == null || one.slot.isEmpty()) continue;
+                JSONObject o = new JSONObject();
+                try {
+                    o.put("key", one.key == null ? "" : one.key);
+                    o.put("at", one.at);
+                    m.put(one.slot, o);
+                } catch (Exception ignored) {
+                }
+            }
+        }
+        writeSessionStore(m);
         save();
     }
 

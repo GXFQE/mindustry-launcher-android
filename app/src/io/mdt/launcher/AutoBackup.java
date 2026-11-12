@@ -23,9 +23,13 @@ import java.util.List;
  *
  * ── Android 的等价实现（进程模型不同，只能等价、不能照抄） ──────────────────
  *
- *   启动游戏前  → Config.sessionStart(key, slot)  落盘记账
- *   回到启动器  → 若 :game 已死，结算：playtime = now - at
- *                 够门槛 → 后台快照 + 超上限清理 → 清账
+ *   启动游戏前  → Config.sessionStart(key, slot)  落盘记账（**一槽一局**）
+ *   回到启动器  → 逐局结算：哪个槽的实例已经退出，就算哪个槽的 playtime
+ *                 够门槛 → 后台快照 + 超上限清理 → 清**那一局**的账
+ *
+ * ★ 第 364 轮（多开）：以前 config 里只有一个 `{key,slot,at}`，第二个实例一启动就把前一局盖掉、
+ *   结算又卡在全局 `gameAlive` 上。现在账按槽存（`Config.sessions()`），结算也按**实例**判
+ *   （{@link #stillRunning}）：A 槽退了、B 槽还在跑 ⇒ A 照常结算，不再等 B。
  *
  * ★ 记账为什么必须落盘：游戏会带走 :game 进程，主进程也可能被系统回收。
  *   下次打开启动器时那次启动可能已经是几小时前的事，账在盘上才结算得了。
@@ -89,19 +93,49 @@ final class AutoBackup {
     }
 
     /**
-     * 回到启动器时结算一次。
-     * ★ 顺序是定死的：**先清账、再干活** —— 否则每次 onResume 都会重判一遍，
+     * 这一局的实例**还在跑**吗（第 364 轮：多开按实例判）。
+     *
+     * <p>多开下"有游戏在跑"不等于"这一局还在跑"：A 槽的游戏退出了、B 槽还在跑，
+     * 以前全局 `gameAlive` 会把 A 也一直挂着（结算拖到 B 也退出）。
+     * 判据 = **这个槽有没有运行实例**（{@link WriteGate#blockedSlot}）。
+     *
+     * <p>兜底：登记表**空**但全局还有游戏（老构建启动的实例 / 登记文件被清）⇒ 退回旧口径，
+     * 只保守跳过"当前槽"那一局；别的槽照常结算 —— 那个看不见的实例只可能是最近启动的那个。
+     * 登记表非空时一律**只信登记表**（否则多开下当前槽永远结算不了）。
+     *
+     * @param registryEmpty 调用方先取一次 `Instances.live(...).isEmpty()`；这里不重复扫盘
+     */
+    static boolean stillRunning(Context ctx, String slot, boolean gameAlive, boolean registryEmpty) {
+        if (WriteGate.blockedSlot(ctx, slot)) return true;
+        return registryEmpty && gameAlive && slot != null && slot.equals(Data.currentSlot(ctx));
+    }
+
+    /**
+     * 回到启动器时结算一次（**逐局**）。
+     * ★ 顺序是定死的：**先清那一局的账、再干活** —— 否则每次 onResume 都会重判一遍，
      *   备份会被反复触发。代价是"失败不重试"，与桌面版一致（那边失败也只记日志）。
      */
     static void settle(final Activity act) {
-        final String slot = Config.get().sessionSlot();
-        final long at = Config.get().sessionStartedAt();
-        if (slot.isEmpty() || at <= 0L) return;
-        if (Data.gameAlive(act)) return;        // 游戏还在跑，这一局还没结束
+        final List<Config.Session> all = Config.get().sessions();
+        if (all.isEmpty()) return;
+        final boolean gameAlive = Data.gameAlive(act);
+        final boolean registryEmpty = Instances.live(act).isEmpty();
+        for (Config.Session s : all) {
+            if (s == null || s.slot == null || s.slot.isEmpty() || s.at <= 0L) {
+                Config.get().sessionClear(s == null ? "" : s.slot);   // 坏账清掉，别每次重判
+                continue;
+            }
+            if (stillRunning(act, s.slot, gameAlive, registryEmpty)) continue;
+            settleOne(act, s);
+        }
+    }
 
+    /** 结算**一局**：算时长 → 清账 → 够门槛就后台备份。 */
+    private static void settleOne(final Activity act, final Config.Session s) {
+        final String slot = s.slot;
         final Config.BackupPolicy p = Config.get().backupPolicy(slot);
-        final long minutes = (System.currentTimeMillis() - at) / 60000L;
-        Config.get().sessionClear();            // 无论是否备份都清账
+        final long minutes = (System.currentTimeMillis() - s.at) / 60000L;
+        Config.get().sessionClear(slot);       // 无论是否备份都清这一局的账
 
         if (!p.enabled) return;
         if (minutes < p.minMinutes) {

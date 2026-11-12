@@ -1520,8 +1520,13 @@ final class DevTools {
             sb.append("max_log_files=").append(Config.get().maxLogFiles()).append('\n');
             // F15：主题（0=跟随系统 1=浅色 2=深色）+ 本次实例实际的 night 位
             sb.append("theme_mode=").append(Config.get().themeMode()).append('\n');
-            sb.append("session.slot=").append(Config.get().sessionSlot())
-              .append("  session.at=").append(Config.get().sessionStartedAt()).append('\n');
+            // 第 364 轮（多开）：记账改成"一槽一局"，报告里逐局列出来
+            List<Config.Session> sessions = Config.get().sessions();
+            sb.append("sessions=").append(sessions.size()).append('\n');
+            for (Config.Session ss : sessions) {
+                sb.append("  session[").append(ss.slot).append("] key=")
+                  .append(ss.key).append(" at=").append(ss.at).append('\n');
+            }
             List<Data.Slot> slots = Data.allSlots(a);
             sb.append("slots=").append(slots.size()).append('\n');
             for (Data.Slot s : slots) {
@@ -1560,9 +1565,12 @@ final class DevTools {
                 final StringBuilder sb = new StringBuilder();
                 sb.append("dev_autobackup_test slot=").append(slot)
                   .append(" min=").append(min).append('\n');
-                sb.append("结算后 session.slot=\"").append(Config.get().sessionSlot())
-                  .append("\"  at=").append(Config.get().sessionStartedAt())
-                  .append("  （应为空串/0 = 已清账）\n");
+                List<Config.Session> left = Config.get().sessions();
+                sb.append("结算后 sessions=").append(left.size())
+                  .append("  （这个槽应为空 = 已清账；别的槽的局不该被它带走）\n");
+                for (Config.Session ss : left) {
+                    sb.append("  · ").append(ss.slot).append("  at=").append(ss.at).append('\n');
+                }
                 List<Backup.Snapshot> list = Backup.list(a, slot);
                 sb.append("现在备份数=").append(list.size()).append('\n');
                 for (Backup.Snapshot ss : list) {

@@ -255,6 +255,8 @@ public final class SelfTest {
             instanceGate(ctx, L, stat);
             // ★ 第 362 轮：core 落盘层门禁（Msav / SlotZip / SlotWrite / 单份导入 / 补丁清扫）
             writeGateCore(ctx, L, stat);
+            // ★ 第 364 轮：实例会话记账（多开：一槽一局，结算按实例）
+            instanceSessions(ctx, L, stat);
             // ★ ⑰ F13 第三阶段：模组包导入 / 跨槽复制（五个负例 + 一条元断言）
             modsPack(ctx, L, stat);
             // ★ ⑲ F13 第二批：搜索/筛选/排序（纯函数，可单独喂断言）
@@ -17252,6 +17254,98 @@ public final class SelfTest {
             } catch (Throwable ignored) {
             }
         }
+    }
+
+    /**
+     * ㊿ 实例会话记账（第 364 轮：多开下**一槽一局**、结算按实例判）。
+     *
+     * <p>为什么需要这把尺子：以前 config 里只有一个 `{key,slot,at}`，第二个实例一启动就盖掉
+     * 第一局；结算又卡在全局 `gameAlive` 上（A 退了、B 还在跑 ⇒ A 永远不结算）。
+     * 尺子分三层：**解析**（新旧格式）、**账本往返**、**结算判据**（按实例 + 登记表空时的保守兜底）。
+     */
+    private static void instanceSessions(Context ctx, List<String> L, int[] stat) {
+        L.add("");
+        L.add("── ㊿ 实例会话记账（一槽一局，结算按实例）──────────────────────");
+
+        // ① 旧单对象格式仍读得出来（升级路径不丢账）
+        java.util.List<Config.Session> legacy = new java.util.ArrayList<Config.Session>();
+        try {
+            org.json.JSONObject old = new org.json.JSONObject();
+            old.put("key", "v-old");
+            old.put("slot", "m3-sess-legacy");
+            old.put("at", 1234L);
+            org.json.JSONObject root = new org.json.JSONObject();
+            root.put("session", old);
+            Config.collectSessions(root, legacy);
+        } catch (Throwable ignored) {
+        }
+        ok(stat, L, legacy.size() == 1 && "m3-sess-legacy".equals(legacy.get(0).slot)
+                        && "v-old".equals(legacy.get(0).key) && legacy.get(0).at == 1234L,
+                "① 旧单对象格式仍能读出（升级路径不丢账）");
+
+        // ② 新格式：一槽一局、按 at 升序；缺 at 的坏条目跳过
+        java.util.List<Config.Session> parsed = new java.util.ArrayList<Config.Session>();
+        try {
+            org.json.JSONObject a = new org.json.JSONObject();
+            a.put("key", "va");
+            a.put("at", 200L);
+            org.json.JSONObject b = new org.json.JSONObject();
+            b.put("key", "vb");
+            b.put("at", 100L);
+            org.json.JSONObject bad = new org.json.JSONObject();
+            bad.put("key", "vbad");                       // 缺 at
+            org.json.JSONObject m = new org.json.JSONObject();
+            m.put("slot-a", a);
+            m.put("slot-b", b);
+            m.put("slot-bad", bad);
+            org.json.JSONObject root = new org.json.JSONObject();
+            root.put("session", new org.json.JSONObject().put("v", 2).put("sessions", m));
+            Config.collectSessions(root, parsed);
+        } catch (Throwable ignored) {
+        }
+        ok(stat, L, parsed.size() == 2
+                        && "slot-b".equals(parsed.get(0).slot) && "slot-a".equals(parsed.get(1).slot),
+                "② 新格式一槽一局、按开始时刻升序；缺 at 的坏条目跳过");
+
+        // ③ 真实配置往返：两局并存 / 清一局不动另一局 / 清全部；最后还原现场
+        java.util.List<Config.Session> before = Config.get().sessions();
+        boolean rt;
+        try {
+            Config.get().sessionClearAll();
+            Config.get().sessionStart("v-a", "m3-session-a");
+            Config.get().sessionStart("v-b", "m3-session-b");
+            java.util.List<Config.Session> two = Config.get().sessions();
+            Config.get().sessionClear("m3-session-a");
+            java.util.List<Config.Session> one = Config.get().sessions();
+            Config.get().sessionClearAll();
+            rt = two.size() == 2 && one.size() == 1
+                    && "m3-session-b".equals(one.get(0).slot)
+                    && Config.get().sessions().isEmpty();
+        } catch (Throwable t) {
+            rt = false;
+        } finally {
+            Config.get().sessionRestore(before);
+        }
+        ok(stat, L, rt, "③ 两局并存；清一局不动另一局；清全部为空（现场已还原）");
+
+        // ④ 结算判据：有实例 ⇒ 还在跑；登记表非空只信登记表；表空时只保守跳过当前槽
+        boolean matrix = !AutoBackup.stillRunning(ctx, SLOT_GATE, false, false)
+                && !AutoBackup.stillRunning(ctx, SLOT_GATE, true, false)
+                && AutoBackup.stillRunning(ctx, Data.currentSlot(ctx), true, true)
+                && !AutoBackup.stillRunning(ctx, "m3-session-other", true, true);
+        boolean running;
+        try {
+            Instances.testSnapshot(java.util.Collections.singletonList(
+                    new Instances.Running(41, "pkg.sess", SLOT_GATE,
+                            System.currentTimeMillis(), "selftest:game")));
+            running = AutoBackup.stillRunning(ctx, SLOT_GATE, true, false);
+        } catch (Throwable ignored) {
+            running = false;
+        } finally {
+            Instances.clearTestSnapshot();
+        }
+        ok(stat, L, matrix && running,
+                "④ 结算按实例：有实例豁免；登记表非空只信它；表空时只保守跳过当前槽");
     }
 
     private static void ok(int[] stat, List<String> L, boolean cond, String msg) {
