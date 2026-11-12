@@ -109,6 +109,22 @@ final class Recovery {
             Log.w(TAG, "recovery: launchid auto-clear failed", t);
         }
 
+        // 3e) 崩溃处理（第 360 轮）：上一局带补丁崩了 ⇒ 与 :game 注入失败同一套处置
+        //     （自动停用 + 写进补丁页的「上次启动」卡；用户可重新启用）
+        try {
+            List<String> pd = Patches.noteGameCrash(ctx, null);
+            if (!pd.isEmpty()) {
+                StringBuilder j = new StringBuilder();
+                for (String x : pd) {
+                    if (j.length() > 0) j.append(", ");
+                    j.append(x);
+                }
+                sb.append("patch auto-disabled after crash: ").append(j).append('\n');
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "recovery: patch crash handling failed", t);
+        }
+
         // 4) 批量导入的临时目录：可能几百个文件，按年龄过滤后放后台删
         final File cache = ctx.getCacheDir();
         new Thread(new Runnable() {

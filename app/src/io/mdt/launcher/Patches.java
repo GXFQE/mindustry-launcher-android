@@ -21,6 +21,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import org.json.JSONArray;
+import org.json.JSONObject;
+
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -59,6 +62,21 @@ final class Patches {
 
     /** 外部 hub 里的启动报告名（adb 可直接读；:game 进程写、主进程读）。 */
     static final String REPORT = "report-patch.txt";
+
+    /**
+     * :game 每次启动后写"这一局**真的**注入了谁"（主进程崩溃处理读它）。
+     *
+     * <p>★ 为什么不能只读 config：config 是"想启用哪些"，而注入阶段可能因缺文件 / dex 坏 /
+     * 冲突整条跳过 —— 崩溃要判断"崩的那一局到底带了谁"，判据只能是**实际注入结果**
+     * （与 {@link Injector#injectPatches} 的 applied 同一份事实）。
+     */
+    static final String LAUNCH = "report-patch-launch.json";
+
+    /**
+     * 崩溃后**自动停用**的说明（主进程写、补丁页读；外部 hub，与 {@link #REPORT} 并列）。
+     * 行格式沿用启动报告：`code|label|ref`（第三个字段只用于"用户重新启用后清掉旧结论"）。
+     */
+    static final String CRASH_REPORT = "report-patch-crash.txt";
 
     // 体积 / 数量上限：补丁是"类替换"，正常产品 1~20 MB；上限只是防坏包把盘写满。
     static final long MAX_DEX = 64L * 1024 * 1024;
@@ -475,6 +493,8 @@ final class Patches {
         if (!names.isEmpty()) throw new PatchException(PatchException.C_CONFLICT, join(names));
         refs.add(r.ref());
         Config.get().setPatchRefs(ikey, refs);
+        // 第 360 轮：用户主动重新启用 ⇒ 把"上次带着它崩了"的旧结论清掉（旧结论不该继续骂它）
+        clearCrashNoticeForRef(ctx, r.ref());
         Log.i(TAG, "patch enabled: " + r.ref() + " for " + ikey);
     }
 
@@ -731,6 +751,268 @@ final class Patches {
     static void clearLaunchReport(Context ctx) {
         File f = new File(Data.hubDir(ctx), REPORT);
         if (f.isFile()) f.delete();
+    }
+
+    // ══ 崩溃处理（与 :game 注入失败同一套处置）═══════════════════════════════
+
+    /** 一局里**真的注入了**的补丁（ref + 显示名）。 */
+    static final class Launched {
+        final String ref;
+        final String label;
+        Launched(String ref, String label) {
+            this.ref = ref;
+            this.label = label;
+        }
+    }
+
+    static File launchRecordFile(Context ctx) {
+        return new File(Data.hubDir(ctx), LAUNCH);
+    }
+
+    static File crashReportFile(Context ctx) {
+        return new File(Data.hubDir(ctx), CRASH_REPORT);
+    }
+
+    /**
+     * :game 拉完注入之后写"这一局真的注入了谁"。
+     *
+     * <p>每次启动都写（没有补丁时写空表）：否则上一局的记录会留在盘上，
+     * 下一次无补丁的启动崩了就会被算到旧补丁头上。
+     */
+    static void writeLaunchRecord(Context ctx, String slot, String ikey, List<Launched> patches) {
+        try {
+            JSONObject o = new JSONObject();
+            o.put("at", System.currentTimeMillis());
+            o.put("slot", slot == null ? "" : slot);
+            o.put("ikey", ikey == null ? "" : ikey);
+            JSONArray a = new JSONArray();
+            if (patches != null) {
+                for (Launched l : patches) {
+                    if (l == null || l.ref == null || l.ref.isEmpty()) continue;
+                    JSONObject p = new JSONObject();
+                    p.put("ref", l.ref);
+                    p.put("label", l.label == null ? "" : l.label);
+                    a.put(p);
+                }
+            }
+            o.put("patches", a);
+            Util.atomicWriteText(launchRecordFile(ctx), o.toString());
+        } catch (Throwable t) {
+            Log.w(TAG, "write patch launch record failed: " + t);
+        }
+    }
+
+    static JSONObject readLaunchRecord(Context ctx) {
+        File f = launchRecordFile(ctx);
+        if (!f.isFile()) return null;
+        try {
+            return new JSONObject(Util.readText(f));
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /**
+     * ★★ 第 360 轮（用户：「在包含游戏补丁的情况下游戏崩溃处理方式和 game 进程注入保持一致」）：
+     * 崩溃处理沿用**注入失败那一套处置** —— 出问题的补丁不再加载，并把结论落到用户看得见的地方。
+     *
+     * <p>具体：上一局真的注入过补丁、之后槽里出现**比那次启动更新**的**游戏**崩溃报告
+     * （`crash_<毫秒>.txt`；`_launcher` 后缀是启动器自己崩的，不算）⇒ 把这些补丁在这个实例上
+     * **自动停用**（从 config 的启用列表里摘掉），并写 {@link #CRASH_REPORT}；
+     * 补丁页的「上次启动」卡会列出来，用户可随时重新启用（重新启用会清掉这条旧结论）。
+     *
+     * <p>为什么是"停用"而不是"跳过一次"：注入失败的补丁**每次启动都会跳过**（文件坏了就坏）；
+     * 崩溃没有"坏文件"这种持久判据，跳过一次 ⇒ 下次照样崩、再跳一次，会变成隔一次崩一次的循环。
+     * 停用 + 明说 + 可重新启用，与 {@link Plugins} 的安全阀（崩溃后自动停用、用户可再打开）同一语义。
+     *
+     * <p>判据只认**真正的崩溃报告**（与插件安全阀同一条）：「没走完」不算
+     * （用户按重启 / 系统回收很常见，一次就停用太容易误伤）。
+     *
+     * <p>幂等：处置成功后删掉启动记录 ⇒ 同一场崩溃不会处置第二次。
+     *
+     * @param slot 槽名；null / 空 ⇒ 用启动记录里那个槽
+     * @return 被自动停用的补丁显示名（没做事返回空表）
+     */
+    static synchronized List<String> noteGameCrash(Context ctx, String slot) {
+        List<String> out = new ArrayList<String>();
+        // ⚠️ 第 360 轮真机踩到：Recovery 在 LauncherApp.onCreate 里跑得**比 Config.load 还早** ⇒
+        //   配置没加载、启用列表读成空 ⇒ 本条判成"用户已经自己停用了"，记录被删却什么都没处置。
+        //   load() 幂等（mFile 已设就 no-op）⇒ 这里补一次，之后 LauncherApp 再 load 不会重复读盘。
+        try {
+            Config.get().load(ctx);
+        } catch (Throwable ignored) {
+        }
+        JSONObject rec = readLaunchRecord(ctx);
+        if (rec == null) return out;
+        String recSlot = rec.optString("slot", "");
+        if (slot != null && !slot.isEmpty() && !slot.equals(recSlot)) return out;
+        String ikey = rec.optString("ikey", "");
+        long at = rec.optLong("at", 0L);
+        JSONArray arr = rec.optJSONArray("patches");
+        if (at <= 0L || ikey.isEmpty() || arr == null || arr.length() == 0) {
+            launchRecordFile(ctx).delete();     // 这一局没带补丁 ⇒ 记录到此为止
+            return out;
+        }
+        String crash = newestGameCrashSince(ctx, recSlot, at);
+        if (crash == null) return out;          // 崩溃报告还没落盘：记录留着，下次再判
+        if (WriteGate.blockedInstance(ctx, ikey)) return out;   // 进程还在/没来得及收尸 ⇒ 下次再判
+        List<String> refs = Config.get().patchRefs(ikey);
+        List<String[]> disabled = new ArrayList<String[]>();
+        for (int i = 0; i < arr.length(); i++) {
+            JSONObject p = arr.optJSONObject(i);
+            if (p == null) continue;
+            String ref = p.optString("ref", "");
+            String label = p.optString("label", "");
+            if (ref.isEmpty() || !refs.remove(ref)) continue;
+            disabled.add(new String[]{ref, label});
+        }
+        if (disabled.isEmpty()) {               // 用户已经自己停用了 ⇒ 没有要处置的东西
+            launchRecordFile(ctx).delete();
+            return out;
+        }
+        Config.get().setPatchRefs(ikey, refs);
+        appendCrashReport(ctx, recSlot, ikey, crash, disabled);
+        for (String[] d : disabled) {
+            out.add(d[1] == null || d[1].isEmpty() ? d[0] : d[1]);
+            Log.i(TAG, "patch disabled after game crash: " + d[0] + " for " + ikey);
+        }
+        launchRecordFile(ctx).delete();
+        return out;
+    }
+
+    /** 槽里比 {@code since} 新的**游戏**崩溃报告（文件名 = 毫秒时间戳）；没有返回 null。 */
+    private static String newestGameCrashSince(Context ctx, String slot, long since) {
+        File root = Data.dirOf(ctx, slot);
+        File dir = root == null ? null : new File(root, "crashes");
+        File[] fs = dir == null || !dir.isDirectory() ? null : dir.listFiles();
+        if (fs == null) return null;
+        String best = null;
+        long bestMs = -1L;
+        for (File f : fs) {
+            if (f == null || !f.isFile()) continue;
+            String n = f.getName();
+            if (!n.startsWith("crash_") || !n.endsWith(".txt") || n.contains("_launcher")) continue;
+            long ms;
+            try {
+                ms = Long.parseLong(n.substring("crash_".length(), n.length() - ".txt".length()));
+            } catch (Throwable t) {
+                continue;
+            }
+            if (ms < since) continue;
+            if (ms > bestMs) {
+                bestMs = ms;
+                best = n;
+            }
+        }
+        return best;
+    }
+
+    /** 把"崩溃后自动停用"追加进 {@link #CRASH_REPORT}（保留旧的数据行，头信息按最后一次重写）。 */
+    private static void appendCrashReport(Context ctx, String slot, String ikey,
+                                          String crash, List<String[]> disabled) {
+        StringBuilder data = new StringBuilder();
+        try {
+            File f = crashReportFile(ctx);
+            if (f.isFile()) {
+                for (String line : Util.readText(f).split("\\r?\\n")) {
+                    if (line.isEmpty() || line.startsWith("#")) continue;
+                    data.append(line).append('\n');
+                }
+            }
+        } catch (Throwable ignored) {
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append("# patch crash report ").append(new java.util.Date()).append('\n');
+        sb.append("# slot = ").append(slot == null ? "" : slot).append('\n');
+        sb.append("# ikey = ").append(ikey == null ? "" : ikey.replace('\u0000', '@')).append('\n');
+        sb.append("# crash = ").append(crash).append('\n');
+        sb.append(data);
+        for (String[] d : disabled) {
+            sb.append(PatchException.C_CRASH_DISABLED).append('|')
+              .append(d[1] == null ? "" : d[1]).append('|')
+              .append(d[0] == null ? "" : d[0]).append('\n');
+        }
+        try {
+            Util.atomicWriteText(crashReportFile(ctx), sb.toString());
+        } catch (Throwable t) {
+            Log.w(TAG, "write patch crash report failed: " + t);
+        }
+    }
+
+    /** 补丁页「上次启动」卡里"崩溃被自动停用"的那几条（没有返回空表）。 */
+    static List<Problem> crashProblems(Context ctx) {
+        List<Problem> out = new ArrayList<Problem>();
+        File f = crashReportFile(ctx);
+        if (!f.isFile()) return out;
+        try {
+            for (String line : Util.readText(f).split("\\r?\\n")) {
+                if (line.isEmpty() || line.startsWith("#")) continue;
+                String[] parts = line.split("\\|", 3);
+                if (parts.length < 2) continue;
+                out.add(new Problem(parts[0], parts[1]));
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "read patch crash report failed: " + t);
+        }
+        return out;
+    }
+
+    /** 该槽有没有"崩溃后自动停用"的结论（崩溃弹窗补一句用）；返回补丁显示名。 */
+    static List<String> crashDisabledLabels(Context ctx, String slot) {
+        List<String> out = new ArrayList<String>();
+        File f = crashReportFile(ctx);
+        if (!f.isFile()) return out;
+        try {
+            String want = slot == null ? "" : slot;
+            String curSlot = null;
+            for (String line : Util.readText(f).split("\\r?\\n")) {
+                if (line.startsWith("# slot = ")) {
+                    curSlot = line.substring("# slot = ".length()).trim();
+                } else if (line.isEmpty() || line.startsWith("#")) {
+                    continue;
+                } else {
+                    if (!want.isEmpty() && !want.equals(curSlot)) continue;
+                    String[] parts = line.split("\\|", 3);
+                    if (parts.length >= 2 && !parts[1].isEmpty()) out.add(parts[1]);
+                }
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "read patch crash report failed: " + t);
+        }
+        return out;
+    }
+
+    /** 清掉崩溃说明（补丁页点了"知道了"）。 */
+    static void clearCrashReport(Context ctx) {
+        File f = crashReportFile(ctx);
+        if (f.isFile()) f.delete();
+    }
+
+    /** 用户重新启用一条补丁 ⇒ 把关于它的旧崩溃结论删掉（旧结论不该继续骂它）。 */
+    static void clearCrashNoticeForRef(Context ctx, String ref) {
+        if (ref == null || ref.isEmpty()) return;
+        File f = crashReportFile(ctx);
+        if (!f.isFile()) return;
+        try {
+            StringBuilder keep = new StringBuilder();
+            boolean data = false;
+            for (String line : Util.readText(f).split("\\r?\\n")) {
+                if (line.isEmpty()) continue;
+                if (!line.startsWith("#")) {
+                    String[] parts = line.split("\\|", 3);
+                    if (parts.length >= 3 && ref.equals(parts[2])) continue;
+                    data = true;
+                }
+                keep.append(line).append('\n');
+            }
+            if (!data) {
+                f.delete();
+            } else {
+                Util.atomicWriteText(f, keep.toString());
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "clear patch crash notice failed: " + t);
+        }
     }
 
     // ══ 首次启用的告知一次 ══════════════════════════════════════════════════

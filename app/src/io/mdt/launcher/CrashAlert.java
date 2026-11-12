@@ -133,13 +133,21 @@ public final class CrashAlert {
                         // 第 174 轮：关掉提示时把 seen 推到最新、清掉待弹那份 ——
                         // 这样重新开启后只报**之后**的新报告，不会把关着期间的旧报告翻出来。
                         if (!Config.get().crashAlertEnabled()) {
-                            seen = newestName(dir);
+                            String newest = newestName(dir);
+                            // ★ 第 360 轮：提示关着也要做**崩溃处理**（自动停用带崩的补丁）——
+                            //   它是安全阀，不属于"弹不弹窗"那个开关。
+                            if (newest.compareTo(seen) > 0) {
+                                seen = newest;
+                                try { Patches.noteGameCrash(app, slot); } catch (Throwable ignored) { }
+                            }
                             sPending = null;
                             continue;
                         }
                         File f = pick(dir, seen, 0);
                         if (f == null) continue;
                         seen = f.getName();
+                        // ★ 第 360 轮：先处置（带补丁崩了 ⇒ 自动停用），再提示
+                        try { Patches.noteGameCrash(app, slot); } catch (Throwable ignored) { }
                         announce(app, slot, f);
                     } catch (Throwable ignored) {
                         // 监视循环绝不能因为一次异常就死掉
@@ -281,6 +289,16 @@ public final class CrashAlert {
         String msg = CrashAnalysis.text(a, v);
         String probeNote = ProbeRunner.sessionNote(a, slot);
         if (probeNote != null) msg = probeNote + "\n\n" + msg;
+        // ★ 第 360 轮：这一局带过补丁崩了 ⇒ 说清已经自动停用（与 :game 注入失败同一套处置）
+        java.util.List<String> pd = Patches.crashDisabledLabels(a, slot);
+        if (pd != null && !pd.isEmpty()) {
+            StringBuilder j = new StringBuilder();
+            for (String x : pd) {
+                if (j.length() > 0) j.append(" / ");
+                j.append(x);
+            }
+            msg = msg + "\n\n" + Trans.get(a, R.string.crash_patch_disabled_fmt, j.toString());
+        }
         android.app.AlertDialog.Builder b = new android.app.AlertDialog.Builder(a)
                 .setTitle(v != null && v.kind == CrashAnalysis.KIND_LAUNCHER
                         ? R.string.crash_alert_title_launcher : R.string.crash_alert_title)

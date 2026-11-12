@@ -157,6 +157,14 @@ public class GameSlot extends BaseActivity {
         ProbeLab.decorate(this, plan);
         try {
             Injector.Timing t = Injector.launch(this, plan);
+            // ★ 第 360 轮（用户：「在包含游戏补丁的情况下游戏崩溃处理方式和 game 进程注入保持一致」）：
+            //   记下这一局**真的注入了谁** —— 崩溃处理要靠它判断"崩的那一局带了哪个补丁"。
+            //   判据用注入结果（`p.applied`），不是 config 里"想启用哪些"。
+            java.util.List<Patches.Launched> applied = new java.util.ArrayList<Patches.Launched>();
+            for (Injector.Patch ap : plan.patches) {
+                if (ap != null && ap.applied) applied.add(new Patches.Launched(ap.ref, ap.label));
+            }
+            Patches.writeLaunchRecord(this, launchSlot, ikey, applied);
             reportPatches(ikey, patchRes, plan);
             // dev：探针验证台（产品版 ProbeLab 是空壳，见 app/src-release）
             ProbeLab.runIfArmed(this);
@@ -167,9 +175,14 @@ public class GameSlot extends BaseActivity {
             Config.get().setLastVersion(shown);
             android.util.Log.i("MDTLauncher", "launch done in " + t.total() + " ms");
         } catch (Injector.LaunchError e) {
+            // 这一局没起来 ⇒ 清掉启动记录（否则上一局带补丁的记录会被算到之后的崩溃上）
+            Patches.writeLaunchRecord(this, launchSlot, ikey,
+                    new java.util.ArrayList<Patches.Launched>());
             reportPatches(ikey, patchRes, plan);
             fail(e.step, e.getMessage(), e);
         } catch (Throwable e) {
+            Patches.writeLaunchRecord(this, launchSlot, ikey,
+                    new java.util.ArrayList<Patches.Launched>());
             reportPatches(ikey, patchRes, plan);
             fail(Trans.get(GameSlot.this, R.string.step_unknown),
                     Trans.get(GameSlot.this, R.string.launch_err_unknown), e);

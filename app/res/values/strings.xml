@@ -1898,6 +1898,7 @@
     <!-- F23 "tell me right away" (2026-10-08, user request) -->
     <string name="crash_alert_title">The game crashed</string>
     <string name="crash_alert_toast_fmt">The game crashed: %1$s</string>
+    <string name="crash_patch_disabled_fmt">The game crashed last launch with patch \"%1$s\" (now disabled). You can re-enable it on the patch page.</string>
     <!-- Launcher's own report (crash_*_launcher.txt) lands in the same folder: do not call it "the game". -->
     <string name="crash_alert_title_launcher">The manager hit an error</string>
     <string name="crash_alert_toast_launcher_fmt">The manager hit an error: %1$s</string>
@@ -2283,7 +2284,7 @@
     <string name="patch_delete_body_fmt">Move %1$s to the trash station? (You can restore it from there.)</string>
     <string name="patch_delete_ok">Delete</string>
     <string name="patch_delete_done_fmt">Moved %1$s to the trash station</string>
-    <string name="patch_last_launch_title">Last launch: some patches did not apply</string>
+    <string name="patch_last_launch_title">Patch issues at last launch</string>
     <string name="patch_problem_line_fmt">· %1$s</string>
     <string name="patch_last_launch_dismiss">Tap to dismiss</string>
     <string name="patch_game_running">Game is running. Exit the game before changing patches.</string>
@@ -2305,6 +2306,7 @@
     <string name="patch_err_enabled">That patch is already enabled.</string>
     <string name="patch_err_in_use_fmt">This patch is still enabled here: %1$s. Disable it first.</string>
     <string name="patch_err_record_gone_fmt">Patch record no longer exists: %1$s</string>
+    <string name="patch_err_crash_disabled_fmt">Crashed last launch with \"%1$s\", so it was disabled. Re-enable it on the patch page to try again.</string>
     <string name="patch_err_missing_fmt">Patch files are missing: %1$s</string>
     <string name="version_row_patch">Patches</string>
     <string name="version_row_patch_sub">Replace game code for this version</string>

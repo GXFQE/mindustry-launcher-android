@@ -16666,6 +16666,8 @@ public final class SelfTest {
             for (Trash.Item ti : Trash.list(patchTrash)) {
                 if (ti != null && ti.name != null && ti.name.contains(ID_PREFIX)) Data.deleteTree(ti.path);
             }
+            // ★ 第 360 轮：崩溃处理与 :game 注入失败同一套处置
+            patchCrash(ctx, L, stat);
         } catch (Throwable t) {
             ok(stat, L, false, "补丁组自身异常：" + t);
             android.util.Log.e("MDTLauncher", "patch selftest crashed", t);
@@ -16692,6 +16694,77 @@ public final class SelfTest {
             }
             deleteTree(work);
             L.add("");
+        }
+    }
+
+    /**
+     * ⑯ 第 360 轮（用户：「在包含游戏补丁的情况下游戏崩溃处理方式和 game 进程注入保持一致」）：
+     * 崩溃处理与 :game 注入失败**同一套处置** —— 带崩的补丁自动停用 + 写进补丁页的「上次启动」卡，
+     * 用户重新启用后旧结论清掉；「没崩」与「启动器自己崩」都不冤枉它。
+     */
+    private static void patchCrash(Context ctx, List<String> L, int[] stat) {
+        L.add("── 第 360 轮 · 崩溃处理（带补丁崩了 ⇒ 自动停用，与注入失败同一套）──");
+        String slot = "selftest-patch-crash";
+        String ikey = Versions.instanceKey("selftest-crash-ver", slot);
+        String ref = "selftest-crash@1";
+        String oldCrashNote = "";
+        File crashTxt = Patches.crashReportFile(ctx);
+        try {
+            if (crashTxt.isFile()) oldCrashNote = Util.readText(crashTxt);
+        } catch (Throwable ignored) {
+        }
+        try {
+            try { Data.deleteSlotForever(ctx, slot); } catch (Throwable ignored) { }
+            String e = Data.createSlot(ctx, slot);
+            ok(stat, L, e == null, "⑯ 造临时槽「" + slot + "」" + (e == null ? "" : "：" + e));
+            final File dir = Data.dirOf(ctx, slot);
+            final File crashes = dir == null ? null : new File(dir, "crashes");
+            ok(stat, L, crashes != null && (crashes.isDirectory() || crashes.mkdirs()),
+                    "⑯ 临时槽的 crashes 目录可用");
+
+            Config.get().setPatchRefs(ikey, new ArrayList<String>());
+            Config.get().setPatchRefs(ikey, new ArrayList<String>(java.util.Arrays.asList(ref)));
+            List<Patches.Launched> launched = new ArrayList<Patches.Launched>();
+            launched.add(new Patches.Launched(ref, "自检补丁"));
+            Patches.writeLaunchRecord(ctx, slot, ikey, launched);
+            ok(stat, L, Patches.readLaunchRecord(ctx) != null,
+                    "⑯ :game 注入完会写下这一局真的注入了谁（report-patch-launch.json）");
+
+            ok(stat, L, Patches.noteGameCrash(ctx, slot).isEmpty()
+                            && Config.get().patchRefs(ikey).contains(ref),
+                    "★没有崩溃报告 ⇒ 不自动停用（与插件安全阀同一条：没走完不算、不冤枉）");
+
+            writeTmp(crashes, "crash_" + (System.currentTimeMillis() + 1000) + "_launcher.txt", "x");
+            ok(stat, L, Patches.noteGameCrash(ctx, slot).isEmpty(),
+                    "★启动器自己崩的报告不算（_launcher 后缀）");
+
+            writeTmp(crashes, "crash_" + (System.currentTimeMillis() + 2000) + ".txt", "x");
+            List<String> dis = Patches.noteGameCrash(ctx, slot);
+            ok(stat, L, dis.size() == 1 && "自检补丁".equals(dis.get(0))
+                            && !Config.get().patchRefs(ikey).contains(ref),
+                    "★★带补丁崩了 ⇒ 与 :game 注入失败同一套处置：自动停用 + 报出来");
+            ok(stat, L, Patches.crashProblems(ctx).size() >= 1,
+                    "★补丁页的「上次启动」卡能读到这条结论（不是只写日志）");
+            ok(stat, L, !PatchText.reason(ctx, PatchException.C_CRASH_DISABLED, "自检补丁")
+                            .contains(PatchException.C_CRASH_DISABLED),
+                    "★新错误码有人话（界面上不出现英文码）");
+
+            ok(stat, L, Patches.noteGameCrash(ctx, slot).isEmpty(),
+                    "★同一场崩溃只处置一次（启动记录已消费）");
+
+            Patches.clearCrashNoticeForRef(ctx, ref);
+            ok(stat, L, Patches.crashProblems(ctx).isEmpty(),
+                    "★用户重新启用后旧结论被清掉（旧结论不该继续骂它）");
+        } catch (Throwable t) {
+            ok(stat, L, false, "⑯ 崩溃处理组异常：" + t);
+        } finally {
+            try { Config.get().setPatchRefs(ikey, new ArrayList<String>()); } catch (Throwable ignored) { }
+            try {
+                Patches.launchRecordFile(ctx).delete();
+                if (oldCrashNote.isEmpty()) Patches.clearCrashReport(ctx);
+                else Util.atomicWriteText(crashTxt, oldCrashNote);
+            } catch (Throwable ignored) { }
+            try { Data.deleteSlotForever(ctx, slot); } catch (Throwable ignored) { }
         }
     }
 

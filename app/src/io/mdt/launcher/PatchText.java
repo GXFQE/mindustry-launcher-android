@@ -37,6 +37,7 @@ final class PatchText {
             PatchException.C_IN_USE,
             PatchException.C_RECORD_GONE,
             PatchException.C_CONFLICT_LAUNCH,
+            PatchException.C_CRASH_DISABLED,   // 崩溃后自动停用（第 360 轮）
     };
 
     private PatchText() {}
@@ -71,6 +72,9 @@ final class PatchText {
         if (PatchException.C_RECORD_GONE.equals(code)) return Trans.get(c, R.string.patch_err_record_gone_fmt, d);
         if (PatchException.C_CONFLICT_LAUNCH.equals(code)) {
             return Trans.get(c, R.string.patch_err_conflict_fmt, d);
+        }
+        if (PatchException.C_CRASH_DISABLED.equals(code)) {
+            return Trans.get(c, R.string.patch_err_crash_disabled_fmt, d);
         }
         return Trans.get(c, R.string.patch_err_io_fmt, d);
     }

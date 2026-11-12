@@ -54,6 +54,11 @@ final class PatchException extends IOException {
     static final String C_RECORD_GONE = "record_gone";
     /** 启动时二次检查发现冲突（防御性，界面本该拦掉）。 */
     static final String C_CONFLICT_LAUNCH = "conflict_launch";
+    /**
+     * 上次启动带着这个补丁，游戏崩了 ⇒ **已自动停用**（第 360 轮；与 :game 注入失败同一套处置）。
+     * 用户重新启用后这条结论会被清掉。
+     */
+    static final String C_CRASH_DISABLED = "crash_disabled";
 
     final String code;
     /** 给"人话模板"填空的定位信息（文件名 / 字段名 / 补丁名）；可为空串。 */

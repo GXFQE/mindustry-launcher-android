@@ -1841,6 +1841,7 @@
     <!-- F23「崩了马上说一声」（2026-10-08 用户点单：有没有办法让他崩溃以后立马弹窗提示啊） -->
     <string name="crash_alert_title">游戏崩了</string>
     <string name="crash_alert_toast_fmt">游戏崩了：%1$s</string>
+    <string name="crash_patch_disabled_fmt">上次启动带着补丁「%1$s」崩了，已自动停用；在补丁页可以重新启用。</string>
     <!-- 启动器自己的报告（crash_*_launcher.txt）落在同一个目录 ⇒ 别叫它"游戏崩了" -->
     <string name="crash_alert_title_launcher">管理器出错了</string>
     <string name="crash_alert_toast_launcher_fmt">管理器出错了：%1$s</string>
@@ -2239,7 +2240,7 @@
     <string name="patch_delete_body_fmt">把 %1$s 挪进中转站？（以后能从「中转站」放回来）</string>
     <string name="patch_delete_ok">删除</string>
     <string name="patch_delete_done_fmt">已把 %1$s 挪进中转站</string>
-    <string name="patch_last_launch_title">上次启动：有补丁没应用</string>
+    <string name="patch_last_launch_title">上次启动的补丁问题</string>
     <string name="patch_problem_line_fmt">· %1$s</string>
     <string name="patch_last_launch_dismiss">点一下关掉</string>
     <string name="patch_game_running">游戏正在运行，先退出游戏再改补丁。</string>
@@ -2261,6 +2262,8 @@
     <string name="patch_err_enabled">这个补丁已经启用了。</string>
     <string name="patch_err_in_use_fmt">这个补丁还在启用中：%1$s。先停用它。</string>
     <string name="patch_err_record_gone_fmt">补丁记录不存在了：%1$s</string>
+    <!-- ★ 第 360 轮：崩溃处理与 :game 注入失败同一套处置（带崩的补丁自动停用） -->
+    <string name="patch_err_crash_disabled_fmt">上次启动带着「%1$s」崩了，已自动停用；确认没问题可以重新启用</string>
     <string name="patch_err_missing_fmt">补丁文件缺失：%1$s</string>
     <string name="version_row_patch">补丁</string>
     <string name="version_row_patch_sub">替换这个版本的游戏代码</string>

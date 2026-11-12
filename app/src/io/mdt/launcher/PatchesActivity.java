@@ -152,6 +152,7 @@ public final class PatchesActivity extends BaseActivity {
         mProblemsCard.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
                 Patches.clearLaunchReport(PatchesActivity.this);
+                Patches.clearCrashReport(PatchesActivity.this);
                 mProblemsCard.setVisibility(View.GONE);
             }
         });
@@ -175,6 +176,8 @@ public final class PatchesActivity extends BaseActivity {
             @Override public void run() {
                 // 清孤儿引用（手工清过盘 / 旧版本数据）；不动别的东西
                 Patches.pruneStale(PatchesActivity.this);
+                // ★ 第 360 轮：先把"上次带补丁崩了"处置掉（与 :game 注入失败同一套处置），再列问题
+                try { Patches.noteGameCrash(PatchesActivity.this, slot); } catch (Throwable ignored) { }
                 Versions.Entry entry = null;
                 for (Versions.Entry e : Versions.scanAll(PatchesActivity.this)) {
                     if (e.key().equals(key) && Versions.slotFor(e).equals(slot)) { entry = e; break; }
@@ -222,6 +225,8 @@ public final class PatchesActivity extends BaseActivity {
                             classes, assets, dexBytes, assetsBytes, importedAt));
                 }
                 List<Patches.Problem> problems = Patches.launchProblems(PatchesActivity.this);
+                // ★ 第 360 轮：崩溃后自动停用的结论也进同一张卡（用户可重新启用）
+                problems.addAll(Patches.crashProblems(PatchesActivity.this));
                 ui(gen, entry, sha, rows, problems);
             }
         }, "patches-load").start();
