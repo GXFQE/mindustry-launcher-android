@@ -97,8 +97,16 @@ public final class PluginHost {
      *
      * <p>v35（2026-10-28 第 291 轮）：**新建内容文件** —— `addItem(slot, kind, name, stream, done)`；
      * 只做槽名 / 后缀 / 原子写，内容校验归插件；同名已存在失败 {@code exists}。
+     *
+     * <p>v36（2026-10-29 第 295 轮）：**选项可以多选** —— 入口类可选实现
+     * `multi(PluginApi)` + `choose(int[], PluginApi)`，宿主把第二级选择卡换成勾选框列表。
+     *
+     * <p>v37（2026-11-12 第 363 轮）：**多实例感知** —— `gameRunning(String slot)` /
+     * `runningSlots()`：能精确回答"**这个槽**在不在跑"；老的 `gameRunning()` 保持全局语义
+     * （兼容，不动）。宿主写门禁从第 359/362 轮起就按运行实例判，这两个方法只是把同一份
+     * 判据（`WriteGate`）暴露给插件。
      */
-    public static final int API = 36;
+    public static final int API = 37;
     /**
      * 还认的**最老**契约版本。
      *
@@ -647,6 +655,22 @@ public final class PluginHost {
         }
 
         @Override public boolean gameRunning() { return Data.gameAlive(this); }
+
+        /** v37：目标槽有没有运行实例（null / 空 = 当前槽）。判据与宿主写门禁**同一份**。 */
+        @Override public boolean gameRunning(String slot) {
+            String s = (slot == null || slot.isEmpty()) ? Data.currentSlot(this) : slot;
+            return WriteGate.blockedSlot(this, s);
+        }
+
+        /** v37：哪些槽有运行实例（快照；按启动顺序、去重）。 */
+        @Override public java.util.List<String> runningSlots() {
+            java.util.List<String> out = new java.util.ArrayList<String>();
+            for (Instances.Running r : Instances.live(this)) {
+                if (r == null || r.slot == null || r.slot.isEmpty()) continue;
+                if (!out.contains(r.slot)) out.add(r.slot);
+            }
+            return out;
+        }
 
         /** ★ 第 271 轮：插件要的确认框也走 `CardStack`（插件页里的二次确认不再换窗）。 */
         @Override public void confirm(final String title, final String message,

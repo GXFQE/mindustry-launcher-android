@@ -4410,6 +4410,19 @@ public final class SelfTest {
         // `multi(PluginApi)` + `choose(int[], PluginApi)`；这里钉住版本号与那条约定在文档里的位置。
         ok(stat, L, PluginHost.API >= 36 && PluginApi.DOC_VERSION >= 36,
                 "host plugin api >= 36（选项多选：multi + choose(int[])）");
+        // 第 363 轮（v37）：多实例感知 —— 插件能问"这个槽在不在跑"，而不是只有全局 gameRunning()
+        ok(stat, L, PluginHost.API >= 37 && PluginApi.DOC_VERSION >= 37,
+                "host plugin api >= 37（多实例感知：gameRunning(slot) / runningSlots()）");
+        try {
+            java.lang.reflect.Method g = PluginApi.class.getMethod("gameRunning", String.class);
+            java.lang.reflect.Method rs = PluginApi.class.getMethod("runningSlots");
+            ok(stat, L, g.getReturnType() == boolean.class
+                            && java.util.List.class.isAssignableFrom(rs.getReturnType())
+                            && rs.getReturnType() == java.util.List.class,
+                    "v37 签名：gameRunning(String) -> boolean / runningSlots() -> List");
+        } catch (Throwable t) {
+            ok(stat, L, false, "v37 API missing: " + t);
+        }
         try {
             java.lang.reflect.Method vi = io.mdt.launcher.api.ProbeEnv.class.getMethod("versionInfo");
             java.lang.reflect.Method dv = io.mdt.launcher.api.ProbeEnv.class.getMethod("displayVersion");

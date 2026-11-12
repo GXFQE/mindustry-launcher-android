@@ -5,7 +5,7 @@
 
 ## 1. 版本与兼容（v20 冻结基线）
 
-- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..36**。
+- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..37**。
   （v20 是冻结基线；v21 = 游戏设置面；v22 = 后台任务 + 游戏事件；v23 = 探针；v24 = 分析器；
   v25 = 结论挂行 + 筛选/排序注入 + HJSON；v26 = 逐项判定；v27 = 详情页的门 + 槽级结论进摘要卡；
   v28 = 原版文案键；v29 = 游戏前后台事件；v30 = 探针知道版本 / 跨会话数据目录 + 摘要卡总时长；
@@ -18,7 +18,10 @@
   （只校验槽名 / 后缀 / 原子写，内容归插件；不覆盖同名）；**
   **v36 = 选项可以多选**：`static boolean multi(PluginApi)` + `static void choose(int[], PluginApi)`
   —— 宿主把第二级选择卡换成**勾选框列表**（与「来源 / 类型」同一套控件），勾几个就回传 `int[]`
-  （升序、去重）；几个选项之间是"且"还是"或"由插件自己定。**）
+  （升序、去重）；几个选项之间是"且"还是"或"由插件自己定；**
+  **v37 = 多实例感知**：`boolean gameRunning(String slot)`（null / 空 = 当前槽）+
+  `List<String> runningSlots()` —— 能精确回答"**这个槽**在不在跑"；老的 `gameRunning()` 保持
+  全局语义不变（兼容）。判据与宿主写门禁同一份（`WriteGate`），只表示调用那一刻的快照。**）
 - 插件 `api()` 报的是「我需要的最低宿主接口版本」。用不到的新能力**不要**报高 ——
   报高了只会在老宿主上被拒，换不来任何东西。
 - **不要用 try/catch 去兼容老宿主**：报什么版本就只会跑在什么版本上。`api()` 报 20，
@@ -78,7 +81,7 @@
 ## 3. 入口类约定
 
 ```java
-public static int api();                        // 必需：你需要的接口版本（当前 35；用不到新能力就报 20）
+public static int api();                        // 必需：你需要的接口版本（当前 37；用不到新能力就报 20）
 public static View createView(PluginApi api);   // content / section 用
 public static void run(PluginApi api);          // action 用（在原页跑，不换页）
 public static void unload();                    // 可选：收尾（也认 unload(Context)）
@@ -98,7 +101,7 @@ public static void unload();                    // 可选：收尾（也认 unlo
 
 | 方法 | 说明 |
 |---|---|
-| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 35） |
+| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 37） |
 | `context()` | 插件上下文（**只用来取资源 / 主题 / 建 View**） |
 | `page()` / `slot()` | 从哪一页来 / 当前槽名 |
 | `theme()` | 主题色与 dp/sp（别自己写死颜色，见 `PluginTheme`） |
@@ -113,7 +116,9 @@ public static void unload();                    // 可选：收尾（也认 unlo
 | `contents(kind)` / `contents(slot, kind)` | 四类内容；`kind` = `saves`/`maps`/`mods`/`blueprints` |
 | `logs()` / `trash()` / `versions()` | 日志与崩溃报告 / 中转站 / 已装版本 |
 | `open(item)` | 打开条目的字节流（文件或容器条目统一） |
-| `modsSkipped()` / `gameRunning()` | 这一轮会不会加载模组 / **有没有**游戏在跑（⚠️ 全局判据，答不了"某个槽在不在跑"，见下） |
+| `modsSkipped()` / `gameRunning()` | 这一轮会不会加载模组 / **有没有任意**游戏在跑（⚠️ 全局判据；判"某个槽"用 v37 的下面两个） |
+| `gameRunning(slot)`（v37） | **这个槽**有没有游戏实例在跑（null / 空 = 当前槽）；判据与宿主写门禁同一份，只表示调用那一刻的快照 |
+| `runningSlots()`（v37） | 现在哪些槽上有实例在跑（快照；按启动顺序去重；空表 = 没有） |
 | `baseBundleKeys()`（v28） | 目标版本**基础语言包**的键集合（判"是不是原版文案"用；空集 = 读不到，不是"没有"） |
 | `usageDir()` | 插件数据目录（见第 9 节） |
 | `crashReportsDir()`（v22） | 当前槽的崩溃报告目录（只读；可能不存在） |
@@ -736,6 +741,11 @@ v34（2026-10-28 第 290 轮）：`gameSettings(String slot)` / `writeGameSettin
 游戏运行门禁、备份 / 原子写 / 读回自检；`API_MIN` 仍不动（区间 20..34）。
 v35（2026-10-28 第 291 轮）：`addItem(slot, kind, name, stream, done)` —— 新建存档 / 地图 / 模组 / 蓝图；
 只做槽名 / 后缀 / 原子写，同名不覆盖，内容校验归插件；`API_MIN` 仍不动（区间 20..35）。
+v36（2026-10-29 第 295 轮）：选项可以多选 —— `multi(PluginApi)` + `choose(int[], PluginApi)`；
+`API_MIN` 仍不动（区间 20..36）。
+v37（2026-11-12 第 363 轮）：多实例感知 —— `gameRunning(String slot)`（null / 空 = 当前槽）+
+`runningSlots()`；老的 `gameRunning()` 保持全局语义（兼容，不改）。判据与宿主写门禁同一份
+（第 359/362 轮的 `WriteGate` + `Instances`），只表示调用那一刻的快照；`API_MIN` 仍不动（区间 20..37）。
 
 **官方体检插件**：`plugins/mods-health`（第 229 轮，前身叫 `conflict`）。宿主原来的那行
 「查模组冲突」整块删掉，判据搬进插件的 `core/Conflicts.java` 与 `core/Gates.java`；
