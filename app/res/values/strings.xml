@@ -2142,6 +2142,14 @@
     <string name="batch_export_dest_tree">Into a folder</string>
     <string name="batch_export_tree_done_fmt">Saved %1$d items into the folder</string>
     <string name="exp_err_no_doc">That folder does not allow writing files</string>
+    <!--
+      ★ 第 369 轮：写后校验（用户要求：宁可报失败，也不许"提示成功、其实是坏文件"）。
+      ★ 这三句是**失败原因**，会出现在弹窗/卡片正文里 ⇒ 必须说清"东西已经删了/没导出"，
+        否则用户会去目标位置找那个不存在的文件。
+    -->
+    <string name="exp_err_verify_failed">The file did not pass the check after writing, so it was removed (a broken file is worse than no file).</string>
+    <string name="exp_err_verify_unreadable">The system would not let us read the file back, so its completeness could not be confirmed; it was removed.</string>
+    <string name="exp_err_source_changed">The source changed while it was being exported. Please try again.</string>
     <string name="batch_import_progress_title">Importing</string>
     <string name="batch_import_progress_fmt">Importing %1$d items into %2$s</string>
     <string name="batch_import_nothing">No file was picked</string>
@@ -2246,6 +2254,7 @@
     -->
     <string name="share_chooser">Share to…</string>
     <string name="share_no_app">No app on this device can receive this file.</string>
+    <string name="share_err_incomplete">The file to share is incomplete or unreadable, so it was not sent.</string>
     <string name="pick_share_toggle">Share right away (no file saved)</string>
     <string name="batch_share_btn_fmt">Share (%1$d)</string>
     <string name="share_pack_btn">Share now</string>

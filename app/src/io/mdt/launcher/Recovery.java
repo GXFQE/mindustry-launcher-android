@@ -91,6 +91,18 @@ final class Recovery {
         }
         // 3b) 语言模板的临时件（设置页"导出翻译模板"在选择器打开时被杀）
         del(sb, new File(ctx.getCacheDir(), "lang.properties.tmp"), "language template temp");
+        // 3b-2) 插件导出暂存件（第 369 轮，审计 R13）：插件给的流先落
+        //       `cache/plugin-export-*.bin`，进程在"选落点"那一步被杀就留在这里（原来没人清）。
+        //       启动时进程刚起来，不可能有正在用的暂存件。
+        File[] ce = ctx.getCacheDir().listFiles();
+        if (ce != null) {
+            for (File f : ce) {
+                if (f.isFile() && f.getName().startsWith("plugin-export-")
+                        && f.getName().endsWith(".bin")) {
+                    del(sb, f, "plugin export temp");
+                }
+            }
+        }
         // 3c) CAS 写入暂存区：自动备份被杀留下的 `objects/tmp/obj-*.part`
         //     （第 179 轮，杀后台 P2 —— 原来要等 1 h 或下一次备份才清）
         try {

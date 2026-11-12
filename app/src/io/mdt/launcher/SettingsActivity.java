@@ -784,17 +784,10 @@ public class SettingsActivity extends BaseActivity {
             @Override public void run() {
                 String err = null;
                 try {
-                    InputStream in = new java.io.FileInputStream(sTemplateTmp);
-                    java.io.OutputStream out = getContentResolver().openOutputStream(uri);
-                    if (out == null) throw new IOException("cannot write " + uri);
-                    try {
-                        byte[] buf = new byte[64 * 1024];
-                        int k;
-                        while ((k = in.read(buf)) > 0) out.write(buf, 0, k);
-                    } finally {
-                        out.close();
-                        in.close();
-                    }
+                    // ★ 第 369 轮：不再自己开裸流 —— 交给 Exporter.writeFile：它先在缓存里做出完整件、
+                    //   拷完再把目标**读回来逐字节比对**，不过就删目标并抛错。
+                    //   裸拷贝那条老路的问题是 close 异常没人管，用户会看到"保存成功"却是坏文件。
+                    Exporter.writeFile(SettingsActivity.this, uri, sTemplateTmp);
                 } catch (Throwable t) {
                     err = Util.ioReason(SettingsActivity.this, t,
                             Trans.get(SettingsActivity.this, R.string.io_reason_failed));

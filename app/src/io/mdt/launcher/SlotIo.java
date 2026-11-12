@@ -788,7 +788,7 @@ final class SlotIo {
                         r = Exporter.zipTo(a, uri, Data.dirOf(a, slot), roots, shareXform(p),
                                 java.util.zip.Deflater.BEST_COMPRESSION);
                     }
-                } catch (Exception e) {
+                } catch (Throwable e) {
                     err = Util.ioReason(a, e);
                     android.util.Log.w("MDTLauncher", "export share pack failed", e);
                 }
@@ -949,7 +949,7 @@ final class SlotIo {
                 long n = 0;
                 try {
                     n = Exporter.writeFile(a, uri, src);
-                } catch (Exception e) {
+                } catch (Throwable e) {
                     err = Util.ioReason(a, e);
                     android.util.Log.w("MDTLauncher", "export file failed", e);
                 }
@@ -985,7 +985,7 @@ final class SlotIo {
                 try {
                     r = Exporter.zipTo(a, uri,
                             Data.dirOf(a, slot), roots);
-                } catch (Exception e) {
+                } catch (Throwable e) {
                     err = Util.ioReason(a, e);
                     android.util.Log.w("MDTLauncher", "export slot failed", e);
                 }

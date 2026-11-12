@@ -36,6 +36,11 @@ import java.util.zip.ZipOutputStream;
  *      zip 里的条目名同理（`saves/困难模式.msav` 不能变成 `saves/______.msav`）；
  *   ③ **拿不到可写流要抛明确异常** —— 个别 ROM 对 `ACTION_CREATE_DOCUMENT` 返回的 uri 不可写，
  *      静默失败会让用户以为"导出成功了"。
+ *
+ * ★ 第 369 轮（用户：「导出或分享东西时一定要保证可以用（不要出现损坏文件）」；原版 Mindustry
+ *   在手机/电脑上都出过「提示成功、实际是坏文件」）：**所有 SAF 出口都走 {@link #copyVerified}** ——
+ *   先在本地做完整件并校验（zip 逐条读通、CRC 过），再整段拷给目标，最后**把目标读回来逐字节比对**；
+ *   任何一步不过就删掉刚创建的目标、抛错。于是"成功"这三个字只会在文件真的可用之后出现。
  */
 public final class Exporter {
 
@@ -74,16 +79,42 @@ public final class Exporter {
     /** 把一个文件流式写进 SAF 目标。返回写入字节数。 */
     public static long writeFile(Context ctx, Uri uri, File src) throws IOException {
         if (src == null || !src.isFile()) throw new IOException(Trans.get(ctx, R.string.exp_err_src_missing_fmt, String.valueOf(src)));
-        OutputStream out = null;
-        long n;
+        // ★ 第 369 轮：先落成缓存完整件（顺手抓"拷贝期间源变了"），再拷给 SAF、读回比对。
+        // ★ 同时补上前台服务（审计 R4：单文件导出原来是唯一没有 Work 的写用户目录路径）。
+        Work.begin(ctx, R.string.work_export);
         try {
-            out = openOut(ctx, uri);
-            n = copyTo(src, out);
+            long expect = src.length();
+            File tmp = newCacheTemp(ctx, "file");
+            try {
+                FileOutputStream fos = new FileOutputStream(tmp);
+                try {
+                    copyTo(src, fos);
+                    fos.flush();
+                } finally {
+                    fos.close();          // ★ 不吞：close 才会把最后一段真写下去
+                }
+                if (tmp.length() != expect) {
+                    // 拷的时候源在变（游戏正在写 / 用户换了源文件）⇒ 这不是一份稳定快照，别装作导出成功
+                    Log.w(TAG, "export file changed while copying: " + src.getName()
+                            + " " + expect + " -> " + tmp.length());
+                    throw new IOException(Trans.get(ctx, R.string.exp_err_source_changed));
+                }
+                ExportCheck.localFile(ctx, tmp, expect);
+                long n = copyVerified(ctx, uri, tmp);
+                Log.i(TAG, "export file ok: " + src.getName() + " -> " + n + " B (verified)");
+                return n;
+            } finally {
+                deleteQuietly(tmp);
+            }
+        } catch (IOException e) {
+            ExportCheck.deleteTarget(ctx, uri);   // 0 字节目标也是坏文件，删掉
+            throw e;
+        } catch (RuntimeException e) {
+            ExportCheck.deleteTarget(ctx, uri);
+            throw e;
         } finally {
-            closeQuietly(out);
+            Work.end(ctx);
         }
-        Log.i(TAG, "export file ok: " + src.getName() + " -> " + n + " B");
-        return n;
     }
 
     /**
@@ -122,18 +153,36 @@ public final class Exporter {
      */
     public static long writeEntry(Context ctx, Uri uri, File container, String entry)
             throws IOException {
-        OutputStream out = null;
-        long n;
+        // ★ 第 369 轮：同 writeFile —— 先本地完整件 + 校验，再拷给 SAF 并读回比对。
+        Work.begin(ctx, R.string.work_export);
         try {
-            out = openOut(ctx, uri);
-            n = copyEntry(ctx, container, entry, out);
-            out.flush();
+            File tmp = newCacheTemp(ctx, "entry");
+            try {
+                FileOutputStream fos = new FileOutputStream(tmp);
+                long n;
+                try {
+                    n = copyEntry(ctx, container, entry, fos);
+                    fos.flush();
+                } finally {
+                    fos.close();
+                }
+                ExportCheck.localFile(ctx, tmp, n);
+                long got = copyVerified(ctx, uri, tmp);
+                Log.i(TAG, "export entry ok: " + (container == null ? "?" : container.getName())
+                        + "!/" + entry + " -> " + got + " B (verified)");
+                return got;
+            } finally {
+                deleteQuietly(tmp);
+            }
+        } catch (IOException e) {
+            ExportCheck.deleteTarget(ctx, uri);
+            throw e;
+        } catch (RuntimeException e) {
+            ExportCheck.deleteTarget(ctx, uri);
+            throw e;
         } finally {
-            closeQuietly(out);
+            Work.end(ctx);
         }
-        Log.i(TAG, "export entry ok: " + (container == null ? "?" : container.getName())
-                + "!/" + entry + " -> " + n + " B");
-        return n;
     }
 
     /**
@@ -202,6 +251,12 @@ public final class Exporter {
             Log.i(TAG, "export assets zip ok: files=" + r.files + " raw=" + r.rawBytes
                     + " out=" + r.outBytes);
             return r;
+        } catch (IOException e) {
+            ExportCheck.deleteTarget(ctx, uri);
+            throw e;
+        } catch (RuntimeException e) {
+            ExportCheck.deleteTarget(ctx, uri);
+            throw e;
         } finally {
             Work.end(ctx);
         }
@@ -261,7 +316,9 @@ public final class Exporter {
             }
             if (r.files == 0) throw new IOException(Trans.get(ctx, R.string.exp_err_no_src));
         } finally {
-            closeQuietly(zos);      // 必须关：zip 的中央目录在 close 时才写
+            // 必须关（中央目录在 close 时写）；★ 第 369 轮起不许吞：close 失败 = 坏包。
+            // zos 可能还没建起来（ZipFile 构造就抛了）⇒ 别让 NPE 盖掉原始异常。
+            if (zos != null) zos.close();
             if (zf != null) {
                 try {
                     zf.close();
@@ -400,6 +457,12 @@ public final class Exporter {
             Log.i(TAG, "export batch zip ok: files=" + r.files + " raw=" + r.rawBytes
                     + " out=" + r.outBytes);
             return r;
+        } catch (IOException e) {
+            ExportCheck.deleteTarget(ctx, uri);
+            throw e;
+        } catch (RuntimeException e) {
+            ExportCheck.deleteTarget(ctx, uri);
+            throw e;
         } finally {
             Work.end(ctx);
         }
@@ -467,7 +530,9 @@ public final class Exporter {
             }
             if (written == 0) throw new IOException(Trans.get(ctx, R.string.exp_err_no_src));
         } finally {
-            closeQuietly(zos);      // 必须关：zip 的中央目录在 close 时才写
+            // 必须关：zip 的中央目录在 close 时才写。★ 第 369 轮起**不许吞**这个异常 ——
+            // close 失败意味着中央目录没写全 = 一个打不开的坏包，绝不能当成功返回。
+            zos.close();
         }
         return r;
     }
@@ -530,26 +595,41 @@ public final class Exporter {
             used.add(name);
             String mime = name.toLowerCase(java.util.Locale.ROOT).endsWith(".zip")
                     ? "application/zip" : "application/octet-stream";
-            Uri doc = android.provider.DocumentsContract.createDocument(cr, dir, mime, name);
-            if (doc == null) throw new IOException(Trans.get(ctx, R.string.exp_err_no_doc));
-            OutputStream out = cr.openOutputStream(doc, "w");
-            if (out == null) throw new IOException(Trans.get(ctx, R.string.exp_err_no_doc));
+            // ★ 第 369 轮：先在缓存里做出完整件、校验通过，**然后才** createDocument ——
+            //   目标文档一旦建出来就存在了；边写边失败会在用户目录里留一个半截文件。
+            File tmp = newCacheTemp(ctx, "tree");
             try {
-                if (s.dir != null) {
-                    // 目录形态：落成**嵌套 zip**（内层文件名数不计进 files，同 zip 侧）
-                    Result inner = new Result();
-                    zipDirFlat(s.dir, out, inner);
-                    r.rawBytes += inner.rawBytes;
-                } else if (s.file != null) {
-                    r.rawBytes += copyInto(s.file, out);
-                } else {
-                    r.rawBytes += copyEntry(ctx, s.container, s.entry, out);
+                long raw;
+                FileOutputStream fos = new FileOutputStream(tmp);
+                try {
+                    if (s.dir != null) {
+                        // 目录形态：落成**嵌套 zip**（内层文件名数不计进 files，同 zip 侧）
+                        Result inner = new Result();
+                        zipDirFlat(s.dir, fos, inner);   // 它自己会 close（中央目录写完）
+                        raw = inner.rawBytes;
+                    } else {
+                        long n;
+                        if (s.file != null) n = copyInto(s.file, fos);
+                        else n = copyEntry(ctx, s.container, s.entry, fos);
+                        fos.flush();
+                        fos.close();        // ★ 不吞：文档的字节这时才落全
+                        fos = null;
+                        raw = n;
+                    }
+                } finally {
+                    closeQuietly(fos);
                 }
+                if (s.dir != null) ExportCheck.localZip(ctx, tmp);
+                else ExportCheck.localFile(ctx, tmp, -1);
+                Uri doc = android.provider.DocumentsContract.createDocument(cr, dir, mime, name);
+                if (doc == null) throw new IOException(Trans.get(ctx, R.string.exp_err_no_doc));
+                copyVerified(ctx, doc, tmp);
+                r.rawBytes += raw;
+                r.files++;
+                written++;
             } finally {
-                closeQuietly(out);      // 必须关：文档的字节这时才落全
+                deleteQuietly(tmp);
             }
-            r.files++;
-            written++;
             if (step != null) step.onStep(seen, total);
         }
         if (written == 0) throw new IOException(Trans.get(ctx, R.string.exp_err_no_src));
@@ -591,7 +671,8 @@ public final class Exporter {
             zos.setLevel(Deflater.BEST_SPEED);
             addTree(dir, dir, zos, r == null ? new Result() : r);
         } finally {
-            closeQuietly(zos);      // 必须关：zip 的中央目录在 close 时才写
+            // 必须关：zip 的中央目录在 close 时才写；★ 第 369 轮起不许吞（close 失败 = 坏包）
+            zos.close();
         }
     }
 
@@ -676,24 +757,34 @@ public final class Exporter {
      */
     public static long writeText(Context ctx, Uri uri, String text) throws IOException {
         Work.begin(ctx, R.string.work_export);
-        OutputStream out = null;
-        long n;
         try {
-            out = openOut(ctx, uri);
-            n = writeTextTo(out, text);
+            byte[] b = (text == null ? "" : text).getBytes("UTF-8");
+            // ★ 第 369 轮：同 writeFile —— 文本也会被 provider 截断/不 truncate，照样要读回比对。
+            File tmp = newCacheTemp(ctx, "text");
+            try {
+                FileOutputStream fos = new FileOutputStream(tmp);
+                try {
+                    fos.write(b);
+                    fos.flush();
+                } finally {
+                    fos.close();
+                }
+                ExportCheck.localFile(ctx, tmp, b.length);
+                long n = copyVerified(ctx, uri, tmp);
+                Log.i(TAG, "export text ok: " + n + " B -> " + uri + " (verified)");
+                return n;
+            } finally {
+                deleteQuietly(tmp);
+            }
+        } catch (IOException e) {
+            ExportCheck.deleteTarget(ctx, uri);
+            throw e;
+        } catch (RuntimeException e) {
+            ExportCheck.deleteTarget(ctx, uri);
+            throw e;
         } finally {
-            closeQuietly(out);
             Work.end(ctx);
         }
-        Log.i(TAG, "export text ok: " + n + " B -> " + uri);
-        return n;
-    }
-
-    /** 文本 → 任意输出流（UTF-8，不带 BOM）；分享缓存那条路用它 */
-    static long writeTextTo(OutputStream out, String text) throws IOException {
-        byte[] b = (text == null ? "" : text).getBytes("UTF-8");
-        out.write(b);
-        return b.length;
     }
 
     // ── 目录打包 ──────────────────────────────────────────────────────────
@@ -736,11 +827,21 @@ public final class Exporter {
             throws IOException {
         Work.begin(ctx, R.string.work_export);
         try {
-            return viaCache(ctx, uri, "slot", new Zipper() {
+            Result r = viaCache(ctx, uri, "slot", new Zipper() {
                 @Override public Result write(OutputStream out) throws IOException {
                     return zipToOut(ctx, out, base, roots, x, level);
                 }
             });
+            // ★ 第 369 轮：0 个条目不算"导出成功"—— 那会生成一个合法但没用的空包，
+            //   用户看到「已导出 0 个文件」还以为拿到东西了（审计 R7）。
+            if (r.files == 0) throw new IOException(Trans.get(ctx, R.string.exp_err_no_src));
+            return r;
+        } catch (IOException e) {
+            ExportCheck.deleteTarget(ctx, uri);
+            throw e;
+        } catch (RuntimeException e) {
+            ExportCheck.deleteTarget(ctx, uri);
+            throw e;
         } finally {
             Work.end(ctx);
         }
@@ -871,8 +972,11 @@ public final class Exporter {
      * 再 rename"（rename 是文件系统语义，DocumentsProvider 不一定给）。真机实测：
      * 整槽导出 600 ms 时 force-stop，用户选中的那个 zip 里是 **15,681,686 B 的坏包**
      * （`BadZipFile`）。现在改成 **先在缓存里把 zip 完整写出来、再整段拷给 SAF** ——
-     * 目标文件只在"包已经完整"之后才被打开/创建，构建阶段的杀法不会在用户目录里
-     * 留下半截 zip（拷贝阶段仍有窗口，但那是几十 MB 的顺序写，且有前台服务兜着）。
+     * 构建阶段（压缩）失败时用户目录里只会留下系统在"用户点保存"时建出的 0 字节文档，
+     * 我们会在失败分支把它删掉（{@link ExportCheck#deleteTarget}）。
+     * ⚠️ 别再写"目标文件只在包完整之后才被创建"：AOSP 的 `CREATE_DOCUMENT` 在用户点下保存的那一刻
+     * 就建了文档，那时我们还没开始打包（审计 R7 的订正）。
+     * 拷贝阶段仍有窗口（force-stop 正好落在顺序写中间），由前台服务兜着。
      *
      * <p>代价是缓存要能放下整包（整槽 34 MB ~ 几百 MB）。放不下时会以 ENOSPC 失败，
      * 用户看到的是"导出失败"而不是一个打不开的坏包 —— 这个方向的错更安全。
@@ -891,14 +995,21 @@ public final class Exporter {
         Result write(OutputStream out) throws IOException;
     }
 
+    /** 导出中转缓存里的一个临时完整件（名字唯一；调用方负责删） */
+    private static File newCacheTemp(Context ctx, String tag) {
+        return new File(exportCacheDir(ctx), "mdt-export-" + tag + "-"
+                + System.currentTimeMillis() + "-" + System.nanoTime() + ".part");
+    }
+
     /**
-     * 「先在缓存里写完整，再整段拷给 SAF」—— 整槽导出 / 批量导出 / 资源导出共用一份。
-     * 见 {@link #exportCacheDir} 里的事故说明。
+     * 「先在缓存里写完整，**校验通过后**再整段拷给 SAF，最后读回比对」—— 整槽导出 / 批量导出 /
+     * 资源导出共用一份。见 {@link #exportCacheDir} 里的事故说明（第 177 轮 force-stop 坏包）。
+     *
+     * ★ 第 369 轮补上两层校验：缓存件先过 {@link ExportCheck#localZip}（中央目录 + 逐条 CRC），
+     *   拷完再 {@link #copyVerified}（读回逐字节比对；不过就删目标 + 抛错）。
      */
     private static Result viaCache(Context ctx, Uri uri, String tag, Zipper z) throws IOException {
-        File dir = exportCacheDir(ctx);
-        File tmp = new File(dir, "mdt-export-" + tag + "-" + System.currentTimeMillis()
-                + "-" + System.nanoTime() + ".zip.part");
+        File tmp = newCacheTemp(ctx, tag);
         try {
             Result r;
             FileOutputStream fos = new FileOutputStream(tmp);
@@ -907,39 +1018,76 @@ public final class Exporter {
             } finally {
                 closeQuietly(fos);       // zip 流自己会关；这里兜"还没建流就抛"的那条
             }
-            OutputStream out = null;
-            try {
-                out = openOut(ctx, uri);
-                copyTo(tmp, out);
-                out.flush();
-            } finally {
-                closeQuietly(out);
-            }
+            ExportCheck.localZip(ctx, tmp);
+            copyVerified(ctx, uri, tmp);
             return r == null ? new Result() : r;
         } finally {
-            if (tmp.exists() && !tmp.delete()) {
-                Log.w(TAG, "export cache temp delete failed: " + tmp);
-            }
+            deleteQuietly(tmp);
         }
     }
+
+    /**
+     * 本地完整件 → SAF 目标：写入、flush、**close（不吞异常）**，再把目标读回来逐字节比对。
+     *
+     * <p>任何一步失败 ⇒ 删掉刚创建的目标（{@link ExportCheck#deleteTarget}）再抛 ——
+     * 用户目录里不留半截文件，界面也不会报"成功"。
+     */
+    private static long copyVerified(Context ctx, Uri uri, File local) throws IOException {
+        OutputStream out = null;
+        try {
+            out = openOut(ctx, uri);
+            long n = copyTo(local, out);
+            out.flush();
+            out.close();           // ★ 不吞：close 才把最后一段真正刷给 provider
+            out = null;
+            if (n != local.length()) {
+                Log.w(TAG, "export short write: " + n + " / " + local.length());
+                throw new IOException(Trans.get(ctx, R.string.exp_err_verify_failed));
+            }
+            ExportCheck.targetMatches(ctx, uri, local);
+            return n;
+        } catch (IOException e) {
+            closeQuietly(out);
+            out = null;
+            ExportCheck.deleteTarget(ctx, uri);
+            throw e;
+        } catch (RuntimeException e) {
+            closeQuietly(out);
+            out = null;
+            ExportCheck.deleteTarget(ctx, uri);
+            throw e;
+        } finally {
+            closeQuietly(out);
+        }
+    }
+
+    private static void deleteQuietly(File f) {
+        if (f != null && f.exists() && !f.delete()) Log.w(TAG, "export temp delete failed: " + f);
+    }
+
 
     /**
      * 拿一个可写流。
      * ⚠️ 先用 `"wt"`（truncate）—— 用户完全可能在 SAF 里**选中一个已存在的文件**，
      *    不 truncate 会把新数据覆盖在旧内容上面、尾巴留着旧的（曾经的经典事故）。
-     *    个别老 provider 不认 `"wt"` 会抛，这时回落默认模式（总比直接失败强）。
+     *    不支持 `"wt"` 的 provider 依次退 `"rwt"` → 默认模式；★ 第 369 轮起**默认模式也不是
+     *    放行了**：写完后会把目标读回来逐字节比对（{@link #copyVerified}），旧尾巴还在 ⇒
+     *    校验失败 ⇒ 删目标 + 报错。安全兜底从"假设 provider 会截断"变成"验证它真的截断了"。
      */
     private static OutputStream openOut(Context ctx, Uri uri) throws IOException {
         if (uri == null) throw new IOException(Trans.get(ctx, R.string.exp_err_no_dest));
-        try {
-            OutputStream o = ctx.getContentResolver().openOutputStream(uri, "wt");
-            if (o != null) return o;
-        } catch (Throwable t) {
-            Log.w(TAG, "openOutputStream(wt) refused, falling back: " + t);
+        String[] modes = {"wt", "rwt", null};
+        for (String m : modes) {
+            try {
+                OutputStream o = (m == null)
+                        ? ctx.getContentResolver().openOutputStream(uri)
+                        : ctx.getContentResolver().openOutputStream(uri, m);
+                if (o != null) return o;
+            } catch (Throwable t) {
+                Log.w(TAG, "openOutputStream(" + m + ") refused, trying next: " + t);
+            }
         }
-        OutputStream o = ctx.getContentResolver().openOutputStream(uri);
-        if (o == null) throw new IOException(Trans.get(ctx, R.string.exp_err_dest_readonly));
-        return o;
+        throw new IOException(Trans.get(ctx, R.string.exp_err_dest_readonly));
     }
 
     private static void closeQuietly(java.io.Closeable c) {

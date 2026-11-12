@@ -304,6 +304,8 @@ public final class SelfTest {
             mapExport(ctx, L, stat);
             // ★ 第 171 轮：游戏资源页的数据层（类型分组 + 只导出勾选类型 + 路径保留）
             gameAssets(ctx, L, stat);
+            // ★ 第 369 轮：导出/分享产物的**写后校验**（用户：一定要能用，不许"提示成功实际是坏的"）
+            exportVerify(ctx, L, stat);
             // ★ ㉛ 页面骨架：根节点必须带 @id/root（补 insets 的落点）+ 地图页两行都在顶上
             pageSkeleton(ctx, L, stat);
             // ★ ㉜ F21 地图资源统计：纯函数 + 现场造的小地图（不碰磁盘、不依赖别的用例）
@@ -18043,6 +18045,339 @@ public final class SelfTest {
             lock.delete();
             part.delete();
             tmp.delete();
+        }
+    }
+
+    /**
+     * ★ 第 369 轮（用户：「导出或分享东西时一定要保证可以用（不要出现损坏文件）」；
+     *   原版 Mindustry 在手机/电脑上都出过「提示成功、实际是坏的」）。
+     *
+     * <p>这组尺子钉三件事，每件都**正反两侧**（只验"好的能过"挡不住"坏的也过"）：
+     * <ol>
+     *   <li>{@link ExportCheck} 的本地判据：合法 zip 能开能读；截断 zip / 0 字节文件必须判死；
+     *       空 zip（0 条目）是合法结构（别把空包误判成坏包）。</li>
+     *   <li>SAF 目标读回比对：一致放行、差一个字节就抛 —— 这就是"提示成功前必须证明文件真在"那一步。</li>
+     *   <li>整条流水线真的接上了：writeText / writeFile / zipTo 写 file:// 目标后内容逐字节可验；
+     *       0 个条目的导出必须报失败且不留空包；zip 关流失败必须冒泡；
+     *       ShareOut.stage 收到一个**截断的 zip** 必须抛，且 cache/share 里**不许留文件**
+     *       （配一条元断言：同一夹具换成合法 zip 必须放行，证明上一条不是恒真）。</li>
+     * </ol>
+     *
+     * <p>⚠️ 用 `Uri.fromFile(...)` 模拟 SAF 目标：`ContentResolver` 对本工程 app 上下文处理
+     *   `file://` 与 `content://` 走同一套 openOutputStream/openInputStream（本文件 917/1182
+     *   等老用例也这么喂）。真实 DocumentProvider 的"close 才提交/截断"那一层自检造不出来，
+     *   只能靠真机点一次导出验收（见本轮 `next/146` 的验收记录）。
+     */
+    private static void exportVerify(Context ctx, List<String> L, int[] stat) {
+        L.add("── 第 369 轮：导出 / 分享产物的写后校验（坏文件不许被当成功）──");
+        final File dir = new File(Paths.privateDir(ctx), "selftest-export369");
+        deleteTree(dir);
+        dir.mkdirs();
+        try {
+            // ① 本地 zip 判据：好的过、截断的必须死、空包放行
+            File good = new File(dir, "good.zip");
+            zipMany(good, new String[]{"a.txt", "b.txt"}, new String[]{"hello", "world"});
+            int n = -1;
+            boolean goodOk = false;
+            try {
+                n = ExportCheck.localZip(ctx, good);
+                goodOk = true;
+            } catch (Throwable ignored) {
+            }
+            ok(stat, L, goodOk && n == 2,
+                    "★ExportCheck.localZip：合法 zip 能完整读通（2 个条目）");
+            File cut = new File(dir, "cut.zip");
+            byte[] whole = readAll(good);
+            write(cut, java.util.Arrays.copyOf(whole, whole.length - 20));   // 截掉中央目录尾部
+            boolean cutRejected = false;
+            try {
+                ExportCheck.localZip(ctx, cut);
+            } catch (Throwable t) {
+                cutRejected = true;
+            }
+            ok(stat, L, cutRejected,
+                    "★★截断 zip（少 20 字节）必须被判死 —— 这就是“包打不开、却报了成功”的形态");
+            File zero = new File(dir, "zero.zip");
+            write(zero, new byte[0]);
+            boolean zeroRejected = false;
+            try {
+                ExportCheck.localZip(ctx, zero);
+            } catch (Throwable t) {
+                zeroRejected = true;
+            }
+            ok(stat, L, zeroRejected, "0 字节 zip 必须被判死");
+            File emptyZip = new File(dir, "empty.zip");
+            ZipOutputStream ez = new ZipOutputStream(new FileOutputStream(emptyZip));
+            ez.close();
+            boolean emptyOk = false;
+            int emptyN = -1;
+            try {
+                emptyN = ExportCheck.localZip(ctx, emptyZip);
+                emptyOk = true;
+            } catch (Throwable ignored) {
+            }
+            ok(stat, L, emptyOk && emptyN == 0,
+                    "★空 zip（0 条目）是合法结构，不许误判成坏包（空槽导出那条判据另算）");
+
+            // ①b CRC 有牙：结构合法但数据被改 1 字节 ⇒ 必须判死
+            //   （第 369 轮实测订正：`ZipFile` 读到 EOF **不校验 CRC**，会校验的是 `ZipInputStream`；
+            //    所以这条专门钉我们自己在 {@link ExportCheck#localZip} 里做的 CRC32 比对。）
+            File crcZip = new File(dir, "crc.zip");
+            byte[] payload = "CRC-PAYLOAD-369".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            boolean crcOk = false;
+            try {
+                ZipOutputStream cz = new ZipOutputStream(new FileOutputStream(crcZip));
+                try {
+                    ZipEntry ce = new ZipEntry("data.bin");
+                    ce.setMethod(ZipEntry.STORED);          // STORED ⇒ 数据在文件里原样可见
+                    ce.setSize(payload.length);
+                    ce.setCompressedSize(payload.length);
+                    java.util.zip.CRC32 cc = new java.util.zip.CRC32();
+                    cc.update(payload);
+                    ce.setCrc(cc.getValue());
+                    cz.putNextEntry(ce);
+                    cz.write(payload);
+                    cz.closeEntry();
+                } finally {
+                    cz.close();
+                }
+                byte[] zb = readAll(crcZip);
+                int at = -1;
+                for (int i = 0; i + payload.length <= zb.length && at < 0; i++) {
+                    boolean hit = true;
+                    for (int j = 0; j < payload.length; j++) {
+                        if (zb[i + j] != payload[j]) {
+                            hit = false;
+                            break;
+                        }
+                    }
+                    if (hit) at = i;
+                }
+                if (at < 0) throw new IOException("payload not found in crc fixture");
+                zb[at] ^= 0x01;                              // 改 1 字节，中央目录不动
+                write(crcZip, zb);
+                boolean crcRejected = false;
+                try {
+                    ExportCheck.localZip(ctx, crcZip);
+                } catch (Throwable t) {
+                    crcRejected = true;
+                }
+                boolean opens;
+                try {
+                    java.util.zip.ZipFile zz = new java.util.zip.ZipFile(crcZip);
+                    try {
+                        opens = zz.size() == 1;
+                    } finally {
+                        zz.close();
+                    }
+                } catch (Throwable t) {
+                    opens = false;
+                }
+                crcOk = crcRejected && opens;
+            } catch (Throwable t) {
+                crcOk = false;
+            }
+            ok(stat, L, crcOk,
+                    "★★zip 条目 CRC：结构仍合法（ZipFile 能开）但数据被改 1 字节 ⇒ 必须判死"
+                            + "（ZipFile 读 EOF 本身不校验 CRC，这条钉的是我们自己的 CRC32 比对）");
+
+            // ② 本地文件判据：非空 + 长度必须对上
+            File f1 = new File(dir, "f1.bin");
+            write(f1, new byte[]{1, 2, 3});
+            boolean f1ok = false;
+            try {
+                ExportCheck.localFile(ctx, f1, 3);
+                f1ok = true;
+            } catch (Throwable ignored) {
+            }
+            boolean f1bad = false;
+            try {
+                ExportCheck.localFile(ctx, f1, 4);
+            } catch (Throwable t) {
+                f1bad = true;
+            }
+            File f0 = new File(dir, "f0.bin");
+            write(f0, new byte[0]);
+            boolean f0bad = false;
+            try {
+                ExportCheck.localFile(ctx, f0, 0);
+            } catch (Throwable t) {
+                f0bad = true;
+            }
+            ok(stat, L, f1ok && f1bad && f0bad,
+                    "★localFile：长度对得上才过；差 1 字节 / 0 字节文件都必须判死");
+
+            // ③ 目标读回比对：一致放行、差 1 字节判死、读不到也判死
+            File ref = new File(dir, "ref.bin");
+            write(ref, new byte[]{9, 8, 7, 6, 5});
+            File same = new File(dir, "same.bin");
+            write(same, new byte[]{9, 8, 7, 6, 5});
+            File diff = new File(dir, "diff.bin");
+            write(diff, new byte[]{9, 8, 7, 6, 4});
+            boolean sameOk = false;
+            try {
+                ExportCheck.targetMatches(ctx, android.net.Uri.fromFile(same), ref);
+                sameOk = true;
+            } catch (Throwable ignored) {
+            }
+            boolean diffBad = false;
+            try {
+                ExportCheck.targetMatches(ctx, android.net.Uri.fromFile(diff), ref);
+            } catch (Throwable t) {
+                diffBad = true;
+            }
+            boolean missingBad = false;
+            try {
+                ExportCheck.targetMatches(ctx, android.net.Uri.fromFile(new File(dir, "nope.bin")), ref);
+            } catch (Throwable t) {
+                missingBad = true;
+            }
+            ok(stat, L, sameOk && diffBad && missingBad,
+                    "★targetMatches：逐字节相同才过（差 1 字节 / 读不到都判死）——"
+                            + "「成功」之前必须先过这一关");
+
+            // ④ 端到端：Exporter 写 file:// 目标，内容与源逐字节一致
+            File txtTarget = new File(dir, "export.txt");
+            String txt = "导出校验 369\nline2\n";
+            boolean txtOk = false;
+            try {
+                Exporter.writeText(ctx, android.net.Uri.fromFile(txtTarget), txt);
+                txtOk = txtTarget.isFile() && java.util.Arrays.equals(
+                        txt.getBytes(java.nio.charset.StandardCharsets.UTF_8), readAll(txtTarget));
+            } catch (Throwable ignored) {
+            }
+            ok(stat, L, txtOk,
+                    "★Exporter.writeText：写 file:// 目标后内容逐字节一致（读回比对已过）");
+
+            File srcBin = new File(dir, "src.bin");
+            byte[] sample = new byte[100000];
+            new java.util.Random(369).nextBytes(sample);
+            write(srcBin, sample);
+            File binTarget = new File(dir, "out.bin");
+            boolean binOk = false;
+            try {
+                long n2 = Exporter.writeFile(ctx, android.net.Uri.fromFile(binTarget), srcBin);
+                binOk = n2 == sample.length && Util.md5(srcBin).equals(Util.md5(binTarget));
+            } catch (Throwable ignored) {
+            }
+            ok(stat, L, binOk,
+                    "★Exporter.writeFile：100 KB 随机字节导出后 md5 相同（含写后读回校验）");
+
+            // ⑤ zipTo：目标 zip 能打开、条目名与份数对得上（不是只数了缓存里的字节）
+            File tree = new File(dir, "tree");
+            File sub = new File(tree, "saves");
+            sub.mkdirs();
+            write(new File(sub, "a.msav"), new byte[]{1, 2, 3});
+            write(new File(sub, "b.msav"), new byte[]{4, 5});
+            File zipTarget = new File(dir, "slot.zip");
+            int zrFiles = -1;
+            boolean zipOk = false;
+            try {
+                java.util.List<File> roots = new ArrayList<File>();
+                roots.add(sub);
+                Exporter.Result zr = Exporter.zipTo(ctx, android.net.Uri.fromFile(zipTarget), tree, roots);
+                zrFiles = zr == null ? -1 : zr.files;
+                java.util.zip.ZipFile zf = new java.util.zip.ZipFile(zipTarget);
+                try {
+                    zipOk = zr != null && zr.files == 2 && zf.size() == 2
+                            && zf.getEntry("saves/a.msav") != null
+                            && zf.getEntry("saves/b.msav") != null;
+                } finally {
+                    zf.close();
+                }
+            } catch (Throwable ignored) {
+            }
+            ok(stat, L, zipOk,
+                    "★Exporter.zipTo：写完后目标 zip 能打开、条目名/份数对得上（Result.files="
+                            + zrFiles + "）");
+
+            // ⑥ 0 个条目 ⇒ 必须报失败，且不许把空包留在用户目录（审计 R7）
+            File emptyRoot = new File(tree, "empty");
+            emptyRoot.mkdirs();
+            File emptyTarget = new File(dir, "empty-slot.zip");
+            boolean zeroFilesRejected = false;
+            try {
+                java.util.List<File> roots = new ArrayList<File>();
+                roots.add(emptyRoot);
+                Exporter.zipTo(ctx, android.net.Uri.fromFile(emptyTarget), tree, roots);
+            } catch (Throwable t) {
+                zeroFilesRejected = true;
+            }
+            ok(stat, L, zeroFilesRejected && !emptyTarget.exists(),
+                    "★0 个条目的导出必须报失败（不是「成功 0 份」），且不许把空包留在用户目录");
+
+            // ⑦ zip 关流异常不许被吞：中央目录没写完 = 坏包，必须冒泡（审计 R1）
+            java.io.ByteArrayOutputStream closeBoom = new java.io.ByteArrayOutputStream() {
+                @Override public void close() throws IOException {
+                    throw new IOException("close-boom-369");
+                }
+            };
+            boolean closeProp = false;
+            try {
+                Exporter.zipDirFlat(sub, closeBoom, new Exporter.Result());
+            } catch (Throwable t) {
+                closeProp = true;
+            }
+            ok(stat, L, closeProp,
+                    "★★zip 关流失败必须抛（被 closeQuietly 吞掉 = 缺中央目录的坏包仍报成功）");
+
+            // ⑧ ShareOut.stage：截断 zip 必须被拒 + 不留半截；合法 zip 必须放行（元断言）
+            final String badName = "selftest-bad-369.zip";
+            final File badStage = new File(ShareProvider.dirOf(ctx), badName);
+            badStage.delete();
+            boolean stageBad = false;
+            try {
+                ShareOut.stage(ctx, badName, new ShareOut.Body() {
+                    @Override public void write(java.io.OutputStream out) throws IOException {
+                        // 半个 zip（只有头、没有中央目录）—— 正是"批量分享把坏包发给微信"的形态
+                        out.write(new byte[]{0x50, 0x4b, 0x03, 0x04, 0, 0, 0, 0});
+                    }
+                });
+            } catch (Throwable t) {
+                stageBad = true;
+            }
+            ok(stat, L, stageBad && !badStage.exists(),
+                    "★★ShareOut.stage：截断 zip 必须抛、且缓存里不许留半截"
+                            + "（分享面板拿不到坏文件）");
+            final File goodZip = new File(dir, "stage-good.zip");
+            zipMany(goodZip, new String[]{"x.txt"}, new String[]{"ok"});
+            final byte[] goodZipBytes = readAll(goodZip);
+            final String goodName = "selftest-good-369.zip";
+            final File goodStage = new File(ShareProvider.dirOf(ctx), goodName);
+            goodStage.delete();
+            boolean stageGood = false;
+            try {
+                android.net.Uri u = ShareOut.stage(ctx, goodName, new ShareOut.Body() {
+                    @Override public void write(java.io.OutputStream out) throws IOException {
+                        out.write(goodZipBytes);
+                    }
+                });
+                File staged = ShareProvider.fileOf(ctx, u.getLastPathSegment());
+                stageGood = staged.isFile() && staged.length() == goodZipBytes.length;
+            } catch (Throwable ignored) {
+            }
+            ok(stat, L, stageGood,
+                    "★元断言：同一夹具换成合法 zip ⇒ stage 放行（上一条不是恒真）");
+            badStage.delete();
+            goodStage.delete();
+        } catch (Throwable t) {
+            ok(stat, L, false, "导出校验用例自身异常: " + t);
+        } finally {
+            deleteTree(dir);
+        }
+    }
+
+    /** 读文件全部字节（自检用；二进制安全）。 */
+    private static byte[] readAll(File f) throws IOException {
+        InputStream in = new java.io.FileInputStream(f);
+        try {
+            ByteArrayOutputStream bo = new ByteArrayOutputStream();
+            byte[] buf = new byte[65536];
+            int n;
+            while ((n = in.read(buf)) > 0) bo.write(buf, 0, n);
+            return bo.toByteArray();
+        } finally {
+            in.close();
         }
     }
 }

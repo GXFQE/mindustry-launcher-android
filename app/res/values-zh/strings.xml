@@ -2104,6 +2104,13 @@
     <string name="batch_export_dest_tree">存到目录…</string>
     <string name="batch_export_tree_done_fmt">已存 %1$d 份到目录</string>
     <string name="exp_err_no_doc">这个位置不让写文件</string>
+    <!--
+      ★ 第 369 轮：写后校验（用户要求：宁可报失败，也不许"提示成功、其实是坏文件"）。
+      ★ 这三句是**失败原因**，会出现在弹窗/卡片正文里 ⇒ 必须说清"东西已经删了/没导出"。
+    -->
+    <string name="exp_err_verify_failed">写完之后校验没通过，已删掉这个文件（留着也是坏文件）。</string>
+    <string name="exp_err_verify_unreadable">系统不让我们把文件读回来，没法确认它是否完整，已删掉。</string>
+    <string name="exp_err_source_changed">导出过程中源文件发生变化，请重试。</string>
     <string name="batch_import_progress_title">正在导入</string>
     <string name="batch_import_progress_fmt">正在把 %1$d 份导入 %2$s</string>
     <string name="batch_import_nothing">没有选中任何文件</string>
@@ -2203,6 +2210,7 @@
     -->
     <string name="share_chooser">分享到…</string>
     <string name="share_no_app">这台设备上没有能接收这个文件的应用。</string>
+    <string name="share_err_incomplete">要分享的文件不完整或读不出来，没有发出去。</string>
     <string name="pick_share_toggle">直接分享（不保存到文件）</string>
     <string name="batch_share_btn_fmt">分享（%1$d 份）</string>
     <string name="share_pack_btn">直接分享</string>

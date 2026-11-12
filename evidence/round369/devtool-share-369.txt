@@ -1,0 +1,5 @@
+dev_share_export 槽="default" -> /sdcard/Android/data/io.mdt.launcher/hub/acc369-share.zip
+roots(9) = crashes/ previews/ selftest-lang/ settings_backups/ files_moved_103 last_log.txt server_list.json settings.bin settings_backup.bin 
+plan: ok=true hasSettings=true removed=0(serverIds=0) dropped=[server_list.json, crashes, last_log.txt, previews, assetCache, settings_backups, settings_backup.bin, selftest-lang, files_moved_103] settingsBytes=原样
+zip: files=1 raw=482 out=436
+落盘大小=436

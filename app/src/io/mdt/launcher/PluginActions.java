@@ -191,11 +191,14 @@ final class PluginActions {
                         "plugin-export-" + System.currentTimeMillis() + ".bin");
                 String err = null;
                 try {
-                    OutputStream out = new FileOutputStream(tmp);
+                    // ★ 第 369 轮：close 不许吞 —— 插件给的那条流先落临时件，最后一段没刷下去
+                    //   就是一份坏文件；后面的 writeFile 会把它当"源"原样拷出去。
+                    FileOutputStream out = new FileOutputStream(tmp);
                     try {
                         copy(content, out);
+                        out.flush();
                     } finally {
-                        closeQuietly(out);
+                        out.close();
                     }
                 } catch (Throwable t) {
                     err = Util.ioReason(a, t);

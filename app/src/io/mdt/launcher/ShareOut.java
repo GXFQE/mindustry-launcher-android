@@ -110,34 +110,66 @@ final class ShareOut {
      * @throws IOException 写失败（半个文件**会被删掉**，不留垃圾）
      */
     static Uri stage(Context ctx, String name, Body body) throws IOException {
+        return stage(ctx, name, body, -1L);
+    }
+
+    /**
+     * 同上，带**预期字节数**（`-1` = 未知）：写完后先核对长度，再按名字做 zip 结构校验。
+     *
+     * <p>★ 第 369 轮（用户：导出/分享一定要能用，别"提示成功实际是坏的"）：分享这一路
+     * 也是**先校验、后给面板** —— 缓存里那份不完整/不是合法 zip 就删掉、报错，
+     * 绝不让系统面板把一个坏文件发给别人。
+     *
+     * @param expected 预期字节数（文件拷贝传 {@code src.length()}；文本传字节长度；未知传 -1）
+     */
+    static Uri stage(Context ctx, String name, Body body, long expected) throws IOException {
         Work.begin(ctx, R.string.work_export);      // 第 177 轮：分享包可能是几十 MB
         try {
-            return stage0(ctx, name, body);
+            return stage0(ctx, name, body, expected);
         } finally {
             Work.end(ctx);
         }
     }
 
-    private static Uri stage0(Context ctx, String name, Body body) throws IOException {
+    private static Uri stage0(Context ctx, String name, Body body, long expected)
+            throws IOException {
         File dir = ShareProvider.dirOf(ctx);
         prune(dir, System.currentTimeMillis() - KEEP_MS);
         File f = unique(dir, fixName(name));
-        OutputStream out = null;
+        FileOutputStream out = null;
+        boolean ok = false;
         try {
             out = new FileOutputStream(f);
             body.write(out);
             out.flush();
-        } catch (IOException e) {
-            closeQuietly(out);
+            out.close();            // ★ 不吞：close 才把最后一段刷给文件系统
             out = null;
-            // 半截文件比没有更糟：分享出去对面会当成完整文件
-            if (f.isFile() && !f.delete()) Log.w(TAG, "share: cannot drop partial " + f.getName());
-            throw e;
+            // 第 369 轮：缓存里这份必须**先证明能用**，再给系统面板。
+            //   zip（批量分享 / 分享包 / 资源包）⇒ 整包结构 + 逐条 CRC；
+            //   其它（存档 / 地图 / 蓝图 / 文本）⇒ 非空 + 长度与预期一致。
+            if (isZipName(f.getName())) ExportCheck.localZip(ctx, f);
+            else ExportCheck.localFile(ctx, f, expected);
+            ok = true;
         } finally {
             closeQuietly(out);
+            // ★ 任何失败（含 Error）都不留半截文件 —— 交给接收方就是"坏文件"
+            if (!ok) dropPartial(f);
         }
-        Log.i(TAG, "share staged: " + f.getName() + " " + f.length() + " B");
+        Log.i(TAG, "share staged (verified): " + f.getName() + " " + f.length() + " B");
         return ShareProvider.uriOf(f.getName());
+    }
+
+    /** 半截文件比没有更糟：分享出去对面会当成完整文件 */
+    private static void dropPartial(File f) {
+        if (f != null && f.isFile() && !f.delete()) {
+            Log.w(TAG, "share: cannot drop partial " + f.getName());
+        }
+    }
+
+    /** 扩展名判 zip（只用于"要不要做结构校验"，不是内容判据） */
+    static boolean isZipName(String name) {
+        String n = name == null ? "" : name.toLowerCase(java.util.Locale.ROOT);
+        return n.endsWith(".zip");
     }
 
     /** 落一份**文本**（统计导出那条路；UTF-8，不带 BOM） */
@@ -147,7 +179,7 @@ final class ShareOut {
             @Override public void write(OutputStream out) throws IOException {
                 out.write(b);
             }
-        });
+        }, b.length);
     }
 
     /** 落一份**已有的文件**（地图/存档/蓝图都是"槽里已经有这个文件"） */
@@ -155,11 +187,24 @@ final class ShareOut {
         if (src == null || !src.isFile()) {
             throw new IOException(Trans.get(ctx, R.string.exp_err_src_missing_fmt, String.valueOf(src)));
         }
-        return stage(ctx, name, new Body() {
+        long expect = src.length();
+        Uri u = stage(ctx, name, new Body() {
             @Override public void write(OutputStream out) throws IOException {
                 Exporter.copyTo(src, out);
             }
-        });
+        }, expect);
+        // 拷的时候源在变（游戏正在写）⇒ 缓存里那份不是稳定快照，别把它发出去
+        File staged;
+        try {
+            staged = ShareProvider.fileOf(ctx, u.getLastPathSegment());
+        } catch (java.io.FileNotFoundException e) {
+            throw new IOException(Trans.get(ctx, R.string.exp_err_verify_failed), e);
+        }
+        if (staged.length() != expect) {
+            dropPartial(staged);
+            throw new IOException(Trans.get(ctx, R.string.exp_err_source_changed));
+        }
+        return u;
     }
 
     // ── 清理 ──────────────────────────────────────────────────────────────
@@ -209,6 +254,19 @@ final class ShareOut {
     static boolean launch(Activity a, Uri uri) {
         if (uri == null) return false;
         String name = uri.getLastPathSegment();
+        // ★ 第 369 轮：给面板之前再核一眼缓存里那份（stage 已经深校验过；这里防"临时件被清掉/被换掉"）。
+        //   过不了就**不发** —— 宁可报失败，也不让对面收到一个坏文件。
+        try {
+            File f = ShareProvider.fileOf(a, name);
+            if (!f.isFile() || f.length() <= 0) {
+                Toast.makeText(a, R.string.share_err_incomplete, Toast.LENGTH_LONG).show();
+                return false;
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "share launch: staged file missing for " + name, t);
+            Toast.makeText(a, R.string.share_err_incomplete, Toast.LENGTH_LONG).show();
+            return false;
+        }
         Intent send = new Intent(Intent.ACTION_SEND);
         send.setType(ShareProvider.mimeOf(name));
         send.putExtra(Intent.EXTRA_STREAM, uri);
