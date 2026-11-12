@@ -1049,15 +1049,20 @@ public final class Exporter {
             out = openOut(ctx, uri);
             long n = copyTo(local, out);
             out.flush();
+            // ★ 第 369 轮：先对**写 fd** 做 fsync（openOutputStream 返回的是
+            //   AutoCloseOutputStream，本身是 FileOutputStream ⇒ getFD() 可用），
+            //   必须在 close 之前；provider 写端是 pipe 时失败，只记日志。
+            boolean durable = ExportCheck.syncWriteFd(out);
             out.close();           // ★ 不吞：close 才把最后一段真正刷给 provider
             out = null;
             if (n != local.length()) {
                 Log.w(TAG, "export short write: " + n + " / " + local.length());
                 throw new IOException(Trans.get(ctx, R.string.exp_err_verify_failed));
             }
-            // ★ 第 369 轮：把"读回来能看到"推进到"已提交到存储"。provider 的 fd 是 pipe 时
-            //   fsync 不支持 ⇒ 返回 false，只记日志（内容本身已验过，掉电持久性交给 provider）。
-            if (!ExportCheck.syncToDisk(ctx, uri)) {
+            // 写端 fsync 失败（pipe provider）⇒ 再用目标文件的读 fd 刷一次兜底；
+            // 两条都失败只记日志（内容本身已通过读回校验，掉电持久性交给 provider）。
+            if (!durable) durable = ExportCheck.syncToDisk(ctx, uri);
+            if (!durable) {
                 Log.w(TAG, "export verified but not fsync-able (provider pipe?): " + uri);
             }
             ExportCheck.targetMatches(ctx, uri, local);

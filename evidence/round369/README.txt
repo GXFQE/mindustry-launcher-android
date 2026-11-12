@@ -16,6 +16,8 @@
       正常档（写/读/逐字节/fsync）通过；close 时少写 10 字节 ⇒ 判死 + 删新建目标；
       close 后 0 字节 ⇒ 判死 + 删新建目标；不 truncate + 目标原本非空 ⇒ 判死但**不删**原有文件；
       读 fd 是 pipe ⇒ 内容照过、fsync 层识别为 false；file:// 真实 fd fsync 返回 true。
+      fsync 首选**写 fd**（`getFD().sync()`；`openOutputStream` 返回的就是 FileOutputStream 子类），
+      pipe provider 再用读 fd 兜底。
 
 二、整槽导出的 dev 口（devtool-export-369.txt，补丁后的最终跑）
   dev_zip_export 槽「预览验收」→ /sdcard/Android/data/io.mdt.launcher/hub/acc369b.zip

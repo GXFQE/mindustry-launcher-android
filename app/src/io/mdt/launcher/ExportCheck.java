@@ -28,9 +28,10 @@ import java.util.zip.ZipFile;
  *       每个条目都能**完整读出来并比对 CRC32** —— 截断包 / 缺中央目录 / 数据损坏都会抛；</li>
  *   <li><b>交给系统之后</b>（SAF）：把目标 {@code content://} **读回来**与本地完整件逐字节比对
  *       —— 这一层专门抓 provider 截断、没 truncate 导致尾部留着旧内容、以及"写成功但只写了一部分"；</li>
- *   <li><b>刷盘（fsync）</b>：{@link #syncToDisk} 打开目标的底层 fd 调 {@code fsync(2)}，
- *       把"读回来能看到"推进到"已经提交到存储"（拔电源 / 掉电那一层）。个别 provider 的 fd 是
- *       pipe（云盘 / 代理），fsync 不支持 ⇒ 返回 false，只记日志、不阻断导出（内容本身已验过）；</li>
+ *   <li><b>刷盘（fsync）</b>：写端 close 前先 {@link #syncWriteFd} 对 provider 的写 fd 调
+ *       {@code fsync(2)}（`openOutputStream` 给的是 `AutoCloseOutputStream`，本身就是
+ *       `FileOutputStream`）；写端是 pipe（云盘 / 代理）时用 {@link #syncToDisk} 对目标文件的读 fd
+ *       再兜一次。两条都不支持 ⇒ 只记日志、不阻断导出（内容本身已验过）；</li>
  *   <li><b>失败处置</b>：任何一层不过 ⇒ 删掉**本次新建**的目标并报失败。
  *       🔴 不能无条件删：MT 管理器 / Solid Explorer 这类第三方 provider 允许"覆盖同名文件"，
  *       覆盖时那个文档是用户原有的 —— 所以写入前用 {@link #existingSize} 记下 SIZE，
@@ -221,16 +222,37 @@ final class ExportCheck {
     // ── 刷盘（掉电那一层）────────────────────────────────────────────────
 
     /**
-     * 尽力把目标**刷到存储**：打开目标的底层 fd 调 {@code FileDescriptor.sync()}（= fsync(2)）。
+     * 对**写**输出流背后的 fd 做 fsync —— 首选路径（用户评审要求的那一层）。
      *
-     * <p>为什么只靠读回不够：读回只证明"provider 愿意把这份内容给你看"，不证明它已从页缓存
-     * 提交到闪存。fsync 之后才真正能说"已落盘"。
+     * <p>`ContentResolver.openOutputStream()` 返回的是 `ParcelFileDescriptor.AutoCloseOutputStream`，
+     * 它**是** `FileOutputStream` 的子类 ⇒ `getFD().sync()` 拿到的就是 provider 写端 fd。
+     * 必须在 `close()` **之前**调：close 会关掉 fd。
      *
-     * <p>为什么在这里用**读** fd 而不用写 fd：写那条路走的是 {@code openOutputStream}
-     * （内部是 `ParcelFileDescriptor.AutoCloseOutputStream`），我们拿不到它的 fd；自己用
-     * `openFileDescriptor(uri,"wt")` 再包一层 `FileOutputStream` 的话，流的 close 与 PFD 的
-     * close 会各自关同一个 fd（fd 复用风险）。fsync(2) 不要求写权限，对同一个文件的读 fd
-     * 调 fsync 就会把该 inode 的脏页刷下去 —— 效果相同且没有 double-close。
+     * @return true = 已 fsync；false = 流不是 FileOutputStream（拿不到 fd），
+     *         或 provider 的写 fd 是 pipe（fsync 返回 EINVAL，云盘 / 代理）
+     */
+    static boolean syncWriteFd(java.io.OutputStream out) {
+        if (!(out instanceof java.io.FileOutputStream)) {
+            Log.w(TAG, "write stream is not a FileOutputStream; cannot fsync it");
+            return false;
+        }
+        try {
+            ((java.io.FileOutputStream) out).getFD().sync();
+            return true;
+        } catch (IOException e) {
+            Log.w(TAG, "write-fd fsync not supported (pipe provider?): " + e);
+            return false;
+        }
+    }
+
+    /**
+     * 兜底/独立校验：把**目标文件**的底层 fd 再刷一次（`openFileDescriptor(uri,"r")` +
+     * `FileDescriptor.sync()`）。写端 fsync 失败（pipe provider）时这里是第二条路；
+     * 写端已经成功时它也顺手覆盖"provider 在 close 时改名/重新落盘"那一小段。
+     *
+     * <p>为什么用**读** fd 当兜底：写那一路的 fd 只能通过 `syncWriteFd` 在 close 前拿；
+     * 关闭后再自己 `openFileDescriptor("wt")` + `FileOutputStream` 会让流与 PFD 各关一次
+     * 同一个 fd（fd 复用风险）。fsync(2) 不要求写权限，对同一个文件的读 fd 调用会刷同一 inode。
      *
      * @return true = 已 fsync；false = provider 的 fd 不支持 fsync（pipe / 云盘），
      *         内容已通过读回校验，但掉电持久性只能交给 provider
