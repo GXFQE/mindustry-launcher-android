@@ -193,12 +193,10 @@ final class PluginActions {
                 try {
                     // ★ 第 369 轮：close 不许吞 —— 插件给的那条流先落临时件，最后一段没刷下去
                     //   就是一份坏文件；后面的 writeFile 会把它当"源"原样拷出去。
-                    FileOutputStream out = new FileOutputStream(tmp);
-                    try {
+                    //   try-with-resources：body 成功时 close 异常照常上抛；body 已抛时挂在它下面。
+                    try (FileOutputStream out = new FileOutputStream(tmp)) {
                         copy(content, out);
                         out.flush();
-                    } finally {
-                        out.close();
                     }
                 } catch (Throwable t) {
                     err = Util.ioReason(a, t);

@@ -279,6 +279,21 @@ for g in "android:debuggable=\"$DEBUGGABLE\"" \
   grep -q "$g" "$MF_DIR/AndroidManifest.xml" \
     || { echo "FAIL: manifest sed did not apply: $g" >&2; exit 1; }
 done
+
+# 第 369 轮：dev 构建注入自检用的假 ContentProvider（产品清单里只留占位注释）。
+# 类在 app/src-dev/io/mdt/launcher/FakeExportProvider.java（只随 DEBUGGABLE 构建参与编译）。
+# 用途见那个类的头注释：给「导出写后校验」造"close 才提交 / 不 truncate / 返回 0 字节 /
+# 读 fd 不支持 fsync"四类真实 provider 故障，让核心场景有自动回归而不是只靠真机手点。
+# ⚠️ 用 `|` 当 sed 分隔符（XML 里全是 `/`）；注入成功必须回验（aapt2 不会替你检查）。
+if [ "$DEBUGGABLE" = "true" ]; then
+  sed -i 's|<!--@DEV_TEST_PROVIDER@-->|<provider android:name=".FakeExportProvider" android:authorities="io.mdt.launcher.devtest" android:exported="false" android:grantUriPermissions="false" />|' "$MF_DIR/AndroidManifest.xml"
+  grep -q 'android:authorities="io.mdt.launcher.devtest"' "$MF_DIR/AndroidManifest.xml" \
+    || { echo "FAIL: dev test provider was not injected into the manifest" >&2; exit 1; }
+  echo "   dev-only provider: FakeExportProvider (io.mdt.launcher.devtest)"
+else
+  grep -q '@DEV_TEST_PROVIDER@' "$MF_DIR/AndroidManifest.xml" \
+    || { echo "FAIL: dev test provider placeholder missing from product manifest" >&2; exit 1; }
+fi
 MANIFEST="$MF_DIR/AndroidManifest.xml"
 echo "   debuggable=$DEBUGGABLE  versionCode=$VER_CODE  versionName=$VER_NAME"
 

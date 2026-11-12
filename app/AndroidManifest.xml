@@ -436,5 +436,14 @@
             android:screenOrientation="user"
             android:configChanges="keyboard|keyboardHidden|orientation|screenLayout|uiMode|screenSize"
             android:resizeableActivity="true"/>
+        <!--
+          第 369 轮：**仅 dev 构建**的假 ContentProvider（自检用）—— 本行是占位符。
+          `build.sh` 在 DEBUGGABLE=true 时把下面那行注释替换成一个真 <provider>；产品清单里
+          只留注释（类也只存在于 app/src-dev，不随产品包编译）。
+          用途：让「导出写后校验」的核心故障（close 才提交 / 不 truncate / 返回 0 字节 /
+          fd 不支持 fsync）能用**真 ContentResolver** 自动回归，而不是只靠 file://。
+          见 app/src-dev/io/mdt/launcher/FakeExportProvider.java 与自检 exportVerify。
+        -->
+        <!--@DEV_TEST_PROVIDER@-->
     </application>
 </manifest>

@@ -1,13 +1,17 @@
 package io.mdt.launcher;
 
 import android.content.Context;
+import android.database.Cursor;
 import android.net.Uri;
+import android.os.ParcelFileDescriptor;
+import android.provider.OpenableColumns;
 import android.util.Log;
 
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.zip.CRC32;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
@@ -18,14 +22,19 @@ import java.util.zip.ZipFile;
  * <h3>为什么要有它（用户 2026-11-12 的原话）</h3>
  * 「导出或分享东西时一定要保证可以用（不要出现损坏文件）」—— 原版 Mindustry 无论手机还是电脑
  * 都出过「提示成功、实际文件是坏的」这类问题，用户要求本工程的出口**不许**重演。
- * 所以「成功」不再等于「write() 没抛异常」，而是三层都过：
+ * 所以「成功」不再等于「write() 没抛异常」，而是四层都过：
  * <ol>
  *   <li><b>本地完整件</b>：非空、长度与预期一致；zip 还必须能被 {@link ZipFile} 打开、
- *       每个条目都能**完整读出来**（读出即校验 CRC —— 截断包 / 缺中央目录 / 数据损坏都会抛）；</li>
+ *       每个条目都能**完整读出来并比对 CRC32** —— 截断包 / 缺中央目录 / 数据损坏都会抛；</li>
  *   <li><b>交给系统之后</b>（SAF）：把目标 {@code content://} **读回来**与本地完整件逐字节比对
  *       —— 这一层专门抓 provider 截断、没 truncate 导致尾部留着旧内容、以及"写成功但只写了一部分"；</li>
- *   <li><b>失败处置</b>：任何一层不过 ⇒ 调用方把刚创建的目标删掉（{@link #deleteTarget}），
- *       把失败报给界面 —— **绝不在没验证过的情况下提示成功**。</li>
+ *   <li><b>刷盘（fsync）</b>：{@link #syncToDisk} 打开目标的底层 fd 调 {@code fsync(2)}，
+ *       把"读回来能看到"推进到"已经提交到存储"（拔电源 / 掉电那一层）。个别 provider 的 fd 是
+ *       pipe（云盘 / 代理），fsync 不支持 ⇒ 返回 false，只记日志、不阻断导出（内容本身已验过）；</li>
+ *   <li><b>失败处置</b>：任何一层不过 ⇒ 删掉**本次新建**的目标并报失败。
+ *       🔴 不能无条件删：MT 管理器 / Solid Explorer 这类第三方 provider 允许"覆盖同名文件"，
+ *       覆盖时那个文档是用户原有的 —— 所以写入前用 {@link #existingSize} 记下 SIZE，
+ *       原本非空（或拿不到 SIZE）就**不删**，只报告失败（{@link #deleteIfNew}）。</li>
  * </ol>
  *
  * <h3>为什么读回比对值得多花一遍 IO</h3>
@@ -34,7 +43,7 @@ import java.util.zip.ZipFile;
  * 第 177 轮 force-stop 事故：用户目录里留下 15 MB 的坏 zip）。
  *
  * <p>⚠️ 本类**只管传输完整性**，不解析业务格式：源文件本身坏（例如游戏正在写）由调用方用
- * 「源长度/时间在拷贝期间没变」这条判据兜（见 {@link Exporter#writeFile}）。
+ * 「源长度在拷贝期间没变」这条判据兜（见 {@link Exporter#writeFile}）。
  */
 final class ExportCheck {
 
@@ -86,7 +95,7 @@ final class ExportCheck {
         try {
             zf = new ZipFile(f);
             int n = 0;
-            java.util.zip.CRC32 crc = new java.util.zip.CRC32();
+            CRC32 crc = new CRC32();
             byte[] buf = new byte[BUF];
             java.util.Enumeration<? extends ZipEntry> en = zf.entries();
             while (en.hasMoreElements()) {
@@ -123,6 +132,49 @@ final class ExportCheck {
                 }
             }
         }
+    }
+
+    // ── 写入前：目标是不是"原本就有东西"（决定失败时敢不敢删）────────────
+
+    /**
+     * 目标文档在**写入之前**的字节数。
+     *
+     * <p>用途：{@link #deleteIfNew} 的判据。第三方 provider（MT 管理器 / Solid Explorer 等）
+     * 允许"保存时覆盖同名文件"，那种情况下这个文档是**用户原有的** —— 校验失败时删掉它
+     * 就是"低概率、高损失"的错误。
+     *
+     * @return ≥0 = 已知大小（新建文档通常是 0）；-1 = 拿不到（provider 不报 SIZE）
+     */
+    static long existingSize(Context ctx, Uri uri) {
+        if (uri == null) return -1;
+        try {
+            if ("file".equals(uri.getScheme())) {
+                File f = new File(uri.getPath() == null ? "" : uri.getPath());
+                return f.isFile() ? f.length() : 0L;     // 不存在 = 本次要新建的，0
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "pre-write size (file) failed: " + uri, t);
+            return -1;
+        }
+        Cursor c = null;
+        try {
+            c = ctx.getContentResolver().query(uri,
+                    new String[]{OpenableColumns.SIZE}, null, null, null);
+            if (c != null && c.moveToFirst()) {
+                int i = c.getColumnIndex(OpenableColumns.SIZE);
+                if (i >= 0 && !c.isNull(i)) return c.getLong(i);
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "pre-write size query failed: " + uri, t);
+        } finally {
+            if (c != null) {
+                try {
+                    c.close();
+                } catch (Throwable ignored) {
+                }
+            }
+        }
+        return -1;
     }
 
     // ── SAF 目标读回比对 ──────────────────────────────────────────────────
@@ -166,14 +218,75 @@ final class ExportCheck {
         }
     }
 
+    // ── 刷盘（掉电那一层）────────────────────────────────────────────────
+
     /**
-     * 删掉**刚创建/刚打开过**的导出目标（best-effort）。
+     * 尽力把目标**刷到存储**：打开目标的底层 fd 调 {@code FileDescriptor.sync()}（= fsync(2)）。
      *
-     * <p>只用于"这次导出自己刚动过的目标"：SAF 的 {@code ACTION_CREATE_DOCUMENT} /
-     * {@code createDocument} 都是**新建**文档，删它不会碰到用户原有的文件。
-     * 删不掉只记日志 —— 第一层文案已经说了"文件已删/没导出"，不在这里再抛一次。
+     * <p>为什么只靠读回不够：读回只证明"provider 愿意把这份内容给你看"，不证明它已从页缓存
+     * 提交到闪存。fsync 之后才真正能说"已落盘"。
+     *
+     * <p>为什么在这里用**读** fd 而不用写 fd：写那条路走的是 {@code openOutputStream}
+     * （内部是 `ParcelFileDescriptor.AutoCloseOutputStream`），我们拿不到它的 fd；自己用
+     * `openFileDescriptor(uri,"wt")` 再包一层 `FileOutputStream` 的话，流的 close 与 PFD 的
+     * close 会各自关同一个 fd（fd 复用风险）。fsync(2) 不要求写权限，对同一个文件的读 fd
+     * 调 fsync 就会把该 inode 的脏页刷下去 —— 效果相同且没有 double-close。
+     *
+     * @return true = 已 fsync；false = provider 的 fd 不支持 fsync（pipe / 云盘），
+     *         内容已通过读回校验，但掉电持久性只能交给 provider
+     * @throws IOException 连 fd 都拿不到（这时读回校验也一定会失败，调用方会删目标 + 报错）
      */
-    static void deleteTarget(Context ctx, Uri uri) {
+    static boolean syncToDisk(Context ctx, Uri uri) throws IOException {
+        if (uri == null) throw new IOException(Trans.get(ctx, R.string.exp_err_no_dest));
+        ParcelFileDescriptor pfd = null;
+        try {
+            pfd = ctx.getContentResolver().openFileDescriptor(uri, "r");
+        } catch (java.io.FileNotFoundException e) {
+            throw new IOException(Trans.get(ctx, R.string.exp_err_verify_unreadable), e);
+        } catch (Throwable t) {
+            Log.w(TAG, "fsync: open fd failed: " + uri, t);
+            throw new IOException(Trans.get(ctx, R.string.exp_err_verify_unreadable), t);
+        }
+        if (pfd == null) throw new IOException(Trans.get(ctx, R.string.exp_err_verify_unreadable));
+        try {
+            pfd.getFileDescriptor().sync();
+            return true;
+        } catch (IOException e) {
+            // pipe / 代理 fd：fsync 返回 EINVAL。这是 provider 的能力边界，不是内容有问题。
+            Log.w(TAG, "fsync not supported by provider fd (pipe?); "
+                    + "content verified but power-loss durability unknown: " + uri, e);
+            return false;
+        } finally {
+            closeQuietly(pfd);
+        }
+    }
+
+    // ── 失败处置 ──────────────────────────────────────────────────────────
+
+    /**
+     * 删除**本次新建**的目标：只在"写入前是空的/不存在"时才删。
+     *
+     * <p>🔴 为什么不能无条件删：`ACTION_CREATE_DOCUMENT` 在第三方 provider 上允许覆盖同名
+     * 文件 —— 覆盖时这份文档是用户原有的，校验失败后 `deleteDocument` 删掉它损失更大。
+     * 判据就是写入前记下的 {@link #existingSize}：只有 **0** 才敢删；非空或拿不到 SIZE
+     * 都保留原文件（只报告失败，见 {@link Exporter} 的失败文案）。
+     */
+    static void deleteIfNew(Context ctx, Uri uri, long preSize) {
+        if (ctx == null || uri == null) return;
+        if (preSize != 0) {
+            Log.w(TAG, "verify failed; target was not created by this export (preSize="
+                    + preSize + "), leaving it in place: " + uri);
+            return;
+        }
+        deleteForced(ctx, uri);
+    }
+
+    /**
+     * 无条件删目标（只给"确定是本次新建"的场合：自检夹具、我们自己的缓存文件）。
+     *
+     * <p>删不掉只记日志 —— 第一层文案已经说了"文件已删/没导出"，不在这里再抛一次。
+     */
+    static void deleteForced(Context ctx, Uri uri) {
         if (ctx == null || uri == null) return;
         try {
             if ("file".equals(uri.getScheme())) {
@@ -189,7 +302,11 @@ final class ExportCheck {
                 }
                 return;
             }
-            Log.w(TAG, "verify: not a deletable document uri: " + uri);
+            // 非 DocumentsProvider 的 content URI（MediaStore / 自检夹具）：
+            // 退回 ContentResolver.delete。只在"本次新建"（preSize==0）时才会走到这里，
+            // 删的是这次导出刚创建的那一行；拿掉它会让校验失败时目标里留半截。
+            int n = ctx.getContentResolver().delete(uri, null, null);
+            if (n <= 0) Log.w(TAG, "verify: cannot delete partial non-document uri " + uri);
         } catch (Throwable t) {
             Log.w(TAG, "verify: delete target failed: " + uri, t);
         }
@@ -214,6 +331,7 @@ final class ExportCheck {
         while (off < buf.length) {
             int n = in.read(buf, off, buf.length - off);
             if (n < 0) break;
+            if (n == 0) break;      // 防御：某些异常流会返回 0，继续循环就是死等
             off += n;
         }
         return off;

@@ -18358,6 +18358,100 @@ public final class SelfTest {
             }
             ok(stat, L, stageGood,
                     "★元断言：同一夹具换成合法 zip ⇒ stage 放行（上一条不是恒真）");
+
+            // ⑨ 真 ContentResolver + 假 ContentProvider（仅 dev 构建；见 build.sh 的
+            //    @DEV_TEST_PROVIDER@ 段）：file:// 模拟不了的四类 provider 故障都在这里回归。
+            //    —— close 才提交 / 不 truncate / close 后 0 字节 / 读 fd 不支持 fsync。
+            FakeExportProvider.reset(ctx);
+            final String pid = "selftest369";
+            final String pText = "provider 写后校验 369\n第二行\n";
+            final byte[] pBytes = pText.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+            boolean provOk = false;
+            try {
+                android.content.pm.ProviderInfo pi = ctx.getPackageManager().getProviderInfo(
+                        new android.content.ComponentName(ctx, FakeExportProvider.class), 0);
+                provOk = pi != null && FakeExportProvider.AUTHORITY.equals(pi.authority)
+                        && !pi.exported;
+            } catch (Throwable ignored) {
+            }
+            ok(stat, L, provOk,
+                    "★dev 清单注入了自检用 ContentProvider（authority="
+                            + FakeExportProvider.AUTHORITY + "，exported=false）"
+                            + "—— 注入失败时下面几条会一起红，别让它们单独成谜");
+            boolean provOkExport = false;
+            String provErr = null;
+            try {
+                long pn = Exporter.writeText(ctx,
+                        FakeExportProvider.uri(FakeExportProvider.MODE_OK, pid + "ok"), pText);
+                provOkExport = pn == pBytes.length
+                        && java.util.Arrays.equals(pBytes,
+                                readAll(FakeExportProvider.backing(ctx, pid + "ok")))
+                        && ExportCheck.syncToDisk(ctx,
+                                FakeExportProvider.uri(FakeExportProvider.MODE_OK, pid + "ok"));
+            } catch (Throwable t) {
+                provErr = String.valueOf(t);
+            }
+            ok(stat, L, provOkExport,
+                    "★真 provider 正常档：writeText 成功 + 内容逐字节一致 + fsync 能成功"
+                            + (provErr == null ? "" : "（异常：" + provErr + "）"));
+            boolean dropCaught = false;
+            try {
+                Exporter.writeText(ctx,
+                        FakeExportProvider.uri(FakeExportProvider.MODE_DROP_TAIL, pid + "drop"), pText);
+            } catch (Throwable t) {
+                dropCaught = true;
+            }
+            ok(stat, L, dropCaught && !FakeExportProvider.backing(ctx, pid + "drop").exists(),
+                    "★★provider「close 时少写 10 字节」：导出必须抛，且新建目标被删（不留坏文件）");
+            boolean zeroCaught = false;
+            try {
+                Exporter.writeText(ctx,
+                        FakeExportProvider.uri(FakeExportProvider.MODE_ZERO, pid + "zero"), pText);
+            } catch (Throwable t) {
+                zeroCaught = true;
+            }
+            ok(stat, L, zeroCaught && !FakeExportProvider.backing(ctx, pid + "zero").exists(),
+                    "★★provider「close 后 0 字节」：导出必须抛，且新建目标被删");
+            boolean noTruncCaught = false;
+            try {
+                FakeExportProvider.seed(ctx, pid + "notrunc",
+                        "这是一份更长的旧内容，模拟用户原本就有的文件".getBytes(
+                                java.nio.charset.StandardCharsets.UTF_8));
+                Exporter.writeText(ctx,
+                        FakeExportProvider.uri(FakeExportProvider.MODE_NO_TRUNCATE, pid + "notrunc"),
+                        "短");
+            } catch (Throwable t) {
+                noTruncCaught = true;
+            }
+            ok(stat, L, noTruncCaught
+                            && FakeExportProvider.backing(ctx, pid + "notrunc").exists(),
+                    "★★provider「不 truncate + 目标原本非空」：必须判死，但**不删**原有文件"
+                            + "（第三方 provider 允许覆盖同名 ⇒ 删了就是用户的损失）");
+            boolean pipeOk = false;
+            String pipeErr = null;
+            try {
+                android.net.Uri pipeUri = FakeExportProvider.uri(
+                        FakeExportProvider.MODE_PIPE_READ, pid + "pipe");
+                long pn = Exporter.writeText(ctx, pipeUri, pText);
+                pipeOk = pn == pBytes.length && !ExportCheck.syncToDisk(ctx, pipeUri);
+            } catch (Throwable t) {
+                pipeErr = String.valueOf(t);
+            }
+            ok(stat, L, pipeOk,
+                    "★provider 读 fd 是 pipe：内容校验照过（导出成功）、fsync 层识别为「不支持」"
+                            + "（不阻断，但不再是静默）"
+                            + (pipeErr == null ? "" : "（异常：" + pipeErr + "）"));
+            // ⑩ fsync（掉电层）：file:// 的真实文件 fd 必须刷盘成功
+            boolean fsyncFile = false;
+            try {
+                File fs = new File(dir, "fsync.bin");
+                write(fs, new byte[]{1, 2, 3});
+                fsyncFile = ExportCheck.syncToDisk(ctx, android.net.Uri.fromFile(fs));
+            } catch (Throwable ignored) {
+            }
+            ok(stat, L, fsyncFile,
+                    "★fsync（掉电层）：file:// 目标的真实 fd 必须刷盘成功（返回 true）");
+            FakeExportProvider.reset(ctx);
             badStage.delete();
             goodStage.delete();
         } catch (Throwable t) {

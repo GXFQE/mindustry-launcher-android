@@ -39,8 +39,10 @@ import java.util.zip.ZipOutputStream;
  *
  * ★ 第 369 轮（用户：「导出或分享东西时一定要保证可以用（不要出现损坏文件）」；原版 Mindustry
  *   在手机/电脑上都出过「提示成功、实际是坏文件」）：**所有 SAF 出口都走 {@link #copyVerified}** ——
- *   先在本地做完整件并校验（zip 逐条读通、CRC 过），再整段拷给目标，最后**把目标读回来逐字节比对**；
- *   任何一步不过就删掉刚创建的目标、抛错。于是"成功"这三个字只会在文件真的可用之后出现。
+ *   先在本地做完整件并校验（zip 逐条读通、CRC32 过），再整段拷给目标，**fsync 刷盘**，最后
+ *   **把目标读回来逐字节比对**；任何一步不过就报失败。失败时的删除**只敢删本次新建的目标**：
+ *   写入前先记目标原有 SIZE，第三方 provider 允许覆盖同名文件，原本非空就保留、只报失败。
+ *   于是"成功"这三个字只会在文件真的可用（且已提交到存储）之后出现。
  */
 public final class Exporter {
 
@@ -81,17 +83,19 @@ public final class Exporter {
         if (src == null || !src.isFile()) throw new IOException(Trans.get(ctx, R.string.exp_err_src_missing_fmt, String.valueOf(src)));
         // ★ 第 369 轮：先落成缓存完整件（顺手抓"拷贝期间源变了"），再拷给 SAF、读回比对。
         // ★ 同时补上前台服务（审计 R4：单文件导出原来是唯一没有 Work 的写用户目录路径）。
+        // ★ 写入前记下目标原有大小：第三方 provider 允许覆盖同名文件，校验失败时只有
+        //   "原本是空的/不存在"才敢删（判据见 ExportCheck.deleteIfNew）。
+        final long pre = ExportCheck.existingSize(ctx, uri);
         Work.begin(ctx, R.string.work_export);
         try {
             long expect = src.length();
             File tmp = newCacheTemp(ctx, "file");
             try {
-                FileOutputStream fos = new FileOutputStream(tmp);
-                try {
+                // try-with-resources：close 失败只在"没有别的异常"时冒泡；
+                // 拷贝本身已抛异常时 close 异常挂到它下面（不覆盖原始原因）。
+                try (FileOutputStream fos = new FileOutputStream(tmp)) {
                     copyTo(src, fos);
                     fos.flush();
-                } finally {
-                    fos.close();          // ★ 不吞：close 才会把最后一段真写下去
                 }
                 if (tmp.length() != expect) {
                     // 拷的时候源在变（游戏正在写 / 用户换了源文件）⇒ 这不是一份稳定快照，别装作导出成功
@@ -100,17 +104,17 @@ public final class Exporter {
                     throw new IOException(Trans.get(ctx, R.string.exp_err_source_changed));
                 }
                 ExportCheck.localFile(ctx, tmp, expect);
-                long n = copyVerified(ctx, uri, tmp);
+                long n = copyVerified(ctx, uri, tmp, pre);
                 Log.i(TAG, "export file ok: " + src.getName() + " -> " + n + " B (verified)");
                 return n;
             } finally {
                 deleteQuietly(tmp);
             }
         } catch (IOException e) {
-            ExportCheck.deleteTarget(ctx, uri);   // 0 字节目标也是坏文件，删掉
+            ExportCheck.deleteIfNew(ctx, uri, pre);   // 0 字节目标也是坏文件，删掉
             throw e;
         } catch (RuntimeException e) {
-            ExportCheck.deleteTarget(ctx, uri);
+            ExportCheck.deleteIfNew(ctx, uri, pre);
             throw e;
         } finally {
             Work.end(ctx);
@@ -154,20 +158,18 @@ public final class Exporter {
     public static long writeEntry(Context ctx, Uri uri, File container, String entry)
             throws IOException {
         // ★ 第 369 轮：同 writeFile —— 先本地完整件 + 校验，再拷给 SAF 并读回比对。
+        final long pre = ExportCheck.existingSize(ctx, uri);
         Work.begin(ctx, R.string.work_export);
         try {
             File tmp = newCacheTemp(ctx, "entry");
             try {
-                FileOutputStream fos = new FileOutputStream(tmp);
-                long n;
-                try {
+                final long n;
+                try (FileOutputStream fos = new FileOutputStream(tmp)) {
                     n = copyEntry(ctx, container, entry, fos);
                     fos.flush();
-                } finally {
-                    fos.close();
                 }
                 ExportCheck.localFile(ctx, tmp, n);
-                long got = copyVerified(ctx, uri, tmp);
+                long got = copyVerified(ctx, uri, tmp, pre);
                 Log.i(TAG, "export entry ok: " + (container == null ? "?" : container.getName())
                         + "!/" + entry + " -> " + got + " B (verified)");
                 return got;
@@ -175,10 +177,10 @@ public final class Exporter {
                 deleteQuietly(tmp);
             }
         } catch (IOException e) {
-            ExportCheck.deleteTarget(ctx, uri);
+            ExportCheck.deleteIfNew(ctx, uri, pre);
             throw e;
         } catch (RuntimeException e) {
-            ExportCheck.deleteTarget(ctx, uri);
+            ExportCheck.deleteIfNew(ctx, uri, pre);
             throw e;
         } finally {
             Work.end(ctx);
@@ -237,10 +239,11 @@ public final class Exporter {
      */
     public static Result zipEntries(final Context ctx, final Uri uri, final File container,
                                     final List<String> entries, final Step step) throws IOException {
+        final long pre = ExportCheck.existingSize(ctx, uri);
         Work.begin(ctx, R.string.work_export);
         try {
             final Result r = new Result();
-            viaCache(ctx, uri, "assets", new Zipper() {
+            viaCache(ctx, uri, "assets", pre, new Zipper() {
                 @Override public Result write(OutputStream out) throws IOException {
                     Counting counter = new Counting(out);
                     zipEntriesTo(ctx, counter, container, entries, r, step);
@@ -252,10 +255,10 @@ public final class Exporter {
                     + " out=" + r.outBytes);
             return r;
         } catch (IOException e) {
-            ExportCheck.deleteTarget(ctx, uri);
+            ExportCheck.deleteIfNew(ctx, uri, pre);
             throw e;
         } catch (RuntimeException e) {
-            ExportCheck.deleteTarget(ctx, uri);
+            ExportCheck.deleteIfNew(ctx, uri, pre);
             throw e;
         } finally {
             Work.end(ctx);
@@ -443,10 +446,11 @@ public final class Exporter {
     /** 同上，带进度回调（`step` 可为 null） */
     public static Result zipSources(final Context ctx, final Uri uri, final List<Src> srcs,
                                     final Step step) throws IOException {
+        final long pre = ExportCheck.existingSize(ctx, uri);
         Work.begin(ctx, R.string.work_export);
         try {
             final Result r = new Result();
-            viaCache(ctx, uri, "batch", new Zipper() {
+            viaCache(ctx, uri, "batch", pre, new Zipper() {
                 @Override public Result write(OutputStream out) throws IOException {
                     Counting counter = new Counting(out);
                     zipSourcesTo(ctx, counter, srcs, r, step);
@@ -458,10 +462,10 @@ public final class Exporter {
                     + " out=" + r.outBytes);
             return r;
         } catch (IOException e) {
-            ExportCheck.deleteTarget(ctx, uri);
+            ExportCheck.deleteIfNew(ctx, uri, pre);
             throw e;
         } catch (RuntimeException e) {
-            ExportCheck.deleteTarget(ctx, uri);
+            ExportCheck.deleteIfNew(ctx, uri, pre);
             throw e;
         } finally {
             Work.end(ctx);
@@ -600,30 +604,32 @@ public final class Exporter {
             File tmp = newCacheTemp(ctx, "tree");
             try {
                 long raw;
-                FileOutputStream fos = new FileOutputStream(tmp);
-                try {
-                    if (s.dir != null) {
-                        // 目录形态：落成**嵌套 zip**（内层文件名数不计进 files，同 zip 侧）
+                if (s.dir != null) {
+                    // 目录形态：落成**嵌套 zip**（内层文件名数不计进 files，同 zip 侧）
+                    FileOutputStream fos = new FileOutputStream(tmp);
+                    try {
                         Result inner = new Result();
                         zipDirFlat(s.dir, fos, inner);   // 它自己会 close（中央目录写完）
                         raw = inner.rawBytes;
-                    } else {
-                        long n;
+                    } finally {
+                        closeQuietly(fos);   // 正常时 zipDirFlat 已关；这条只兜"建流后就抛"
+                    }
+                } else {
+                    // try-with-resources：body 成功时 close 异常照常上抛；body 已抛时它挂到下面
+                    long n;
+                    try (FileOutputStream fos = new FileOutputStream(tmp)) {
                         if (s.file != null) n = copyInto(s.file, fos);
                         else n = copyEntry(ctx, s.container, s.entry, fos);
                         fos.flush();
-                        fos.close();        // ★ 不吞：文档的字节这时才落全
-                        fos = null;
-                        raw = n;
                     }
-                } finally {
-                    closeQuietly(fos);
+                    raw = n;
                 }
                 if (s.dir != null) ExportCheck.localZip(ctx, tmp);
                 else ExportCheck.localFile(ctx, tmp, -1);
                 Uri doc = android.provider.DocumentsContract.createDocument(cr, dir, mime, name);
                 if (doc == null) throw new IOException(Trans.get(ctx, R.string.exp_err_no_doc));
-                copyVerified(ctx, doc, tmp);
+                // 写入前记大小（createDocument 正常是新建 = 0；第三方 provider 覆盖同名时 >0）
+                copyVerified(ctx, doc, tmp, ExportCheck.existingSize(ctx, doc));
                 r.rawBytes += raw;
                 r.files++;
                 written++;
@@ -756,31 +762,29 @@ public final class Exporter {
      *   盖在旧内容上面、尾巴留着旧的，而**看起来是一次正常的导出**。
      */
     public static long writeText(Context ctx, Uri uri, String text) throws IOException {
+        final long pre = ExportCheck.existingSize(ctx, uri);
         Work.begin(ctx, R.string.work_export);
         try {
             byte[] b = (text == null ? "" : text).getBytes("UTF-8");
             // ★ 第 369 轮：同 writeFile —— 文本也会被 provider 截断/不 truncate，照样要读回比对。
             File tmp = newCacheTemp(ctx, "text");
             try {
-                FileOutputStream fos = new FileOutputStream(tmp);
-                try {
+                try (FileOutputStream fos = new FileOutputStream(tmp)) {
                     fos.write(b);
                     fos.flush();
-                } finally {
-                    fos.close();
                 }
                 ExportCheck.localFile(ctx, tmp, b.length);
-                long n = copyVerified(ctx, uri, tmp);
+                long n = copyVerified(ctx, uri, tmp, pre);
                 Log.i(TAG, "export text ok: " + n + " B -> " + uri + " (verified)");
                 return n;
             } finally {
                 deleteQuietly(tmp);
             }
         } catch (IOException e) {
-            ExportCheck.deleteTarget(ctx, uri);
+            ExportCheck.deleteIfNew(ctx, uri, pre);
             throw e;
         } catch (RuntimeException e) {
-            ExportCheck.deleteTarget(ctx, uri);
+            ExportCheck.deleteIfNew(ctx, uri, pre);
             throw e;
         } finally {
             Work.end(ctx);
@@ -825,9 +829,10 @@ public final class Exporter {
     public static Result zipTo(final Context ctx, final Uri uri, final File base,
                                final List<File> roots, final Xform x, final int level)
             throws IOException {
+        final long pre = ExportCheck.existingSize(ctx, uri);
         Work.begin(ctx, R.string.work_export);
         try {
-            Result r = viaCache(ctx, uri, "slot", new Zipper() {
+            Result r = viaCache(ctx, uri, "slot", pre, new Zipper() {
                 @Override public Result write(OutputStream out) throws IOException {
                     return zipToOut(ctx, out, base, roots, x, level);
                 }
@@ -837,10 +842,10 @@ public final class Exporter {
             if (r.files == 0) throw new IOException(Trans.get(ctx, R.string.exp_err_no_src));
             return r;
         } catch (IOException e) {
-            ExportCheck.deleteTarget(ctx, uri);
+            ExportCheck.deleteIfNew(ctx, uri, pre);
             throw e;
         } catch (RuntimeException e) {
-            ExportCheck.deleteTarget(ctx, uri);
+            ExportCheck.deleteIfNew(ctx, uri, pre);
             throw e;
         } finally {
             Work.end(ctx);
@@ -973,7 +978,7 @@ public final class Exporter {
      * 整槽导出 600 ms 时 force-stop，用户选中的那个 zip 里是 **15,681,686 B 的坏包**
      * （`BadZipFile`）。现在改成 **先在缓存里把 zip 完整写出来、再整段拷给 SAF** ——
      * 构建阶段（压缩）失败时用户目录里只会留下系统在"用户点保存"时建出的 0 字节文档，
-     * 我们会在失败分支把它删掉（{@link ExportCheck#deleteTarget}）。
+     * 我们会在失败分支把它删掉（{@link ExportCheck#deleteIfNew}：只有写入前是空的才删）。
      * ⚠️ 别再写"目标文件只在包完整之后才被创建"：AOSP 的 `CREATE_DOCUMENT` 在用户点下保存的那一刻
      * 就建了文档，那时我们还没开始打包（审计 R7 的订正）。
      * 拷贝阶段仍有窗口（force-stop 正好落在顺序写中间），由前台服务兜着。
@@ -1005,21 +1010,24 @@ public final class Exporter {
      * 「先在缓存里写完整，**校验通过后**再整段拷给 SAF，最后读回比对」—— 整槽导出 / 批量导出 /
      * 资源导出共用一份。见 {@link #exportCacheDir} 里的事故说明（第 177 轮 force-stop 坏包）。
      *
-     * ★ 第 369 轮补上两层校验：缓存件先过 {@link ExportCheck#localZip}（中央目录 + 逐条 CRC），
-     *   拷完再 {@link #copyVerified}（读回逐字节比对；不过就删目标 + 抛错）。
+     * ★ 第 369 轮补上三层校验：缓存件先过 {@link ExportCheck#localZip}（中央目录 + 逐条 CRC32），
+     *   拷完 fsync（{@link ExportCheck#syncToDisk}）再 {@link #copyVerified}（读回逐字节比对；
+     *   不过就删目标 + 抛错）。
+     *
+     * @param preSize 写入前目标的大小（{@link ExportCheck#existingSize}）；校验失败时只有 0 才敢删
      */
-    private static Result viaCache(Context ctx, Uri uri, String tag, Zipper z) throws IOException {
+    private static Result viaCache(Context ctx, Uri uri, String tag, long preSize, Zipper z)
+            throws IOException {
         File tmp = newCacheTemp(ctx, tag);
         try {
             Result r;
-            FileOutputStream fos = new FileOutputStream(tmp);
-            try {
+            // try-with-resources：body 成功时 close 异常照常上抛；body 已抛时 close 异常挂到它下面
+            // （不覆盖原始原因）。zip 流自己会 close 底层流，这里的 close 对已关流是 no-op。
+            try (FileOutputStream fos = new FileOutputStream(tmp)) {
                 r = z.write(fos);
-            } finally {
-                closeQuietly(fos);       // zip 流自己会关；这里兜"还没建流就抛"的那条
             }
             ExportCheck.localZip(ctx, tmp);
-            copyVerified(ctx, uri, tmp);
+            copyVerified(ctx, uri, tmp, preSize);
             return r == null ? new Result() : r;
         } finally {
             deleteQuietly(tmp);
@@ -1027,12 +1035,15 @@ public final class Exporter {
     }
 
     /**
-     * 本地完整件 → SAF 目标：写入、flush、**close（不吞异常）**，再把目标读回来逐字节比对。
+     * 本地完整件 → SAF 目标：写入、flush、**close（不吞异常）**、fsync、再把目标读回来逐字节比对。
      *
-     * <p>任何一步失败 ⇒ 删掉刚创建的目标（{@link ExportCheck#deleteTarget}）再抛 ——
+     * <p>任何一步失败 ⇒ 删掉刚创建的目标（{@link ExportCheck#deleteIfNew}）再抛 ——
      * 用户目录里不留半截文件，界面也不会报"成功"。
+     *
+     * @param preSize 写入前目标的大小：只有 0（本次新建/原为空）才允许在失败时删目标
      */
-    private static long copyVerified(Context ctx, Uri uri, File local) throws IOException {
+    private static long copyVerified(Context ctx, Uri uri, File local, long preSize)
+            throws IOException {
         OutputStream out = null;
         try {
             out = openOut(ctx, uri);
@@ -1044,17 +1055,22 @@ public final class Exporter {
                 Log.w(TAG, "export short write: " + n + " / " + local.length());
                 throw new IOException(Trans.get(ctx, R.string.exp_err_verify_failed));
             }
+            // ★ 第 369 轮：把"读回来能看到"推进到"已提交到存储"。provider 的 fd 是 pipe 时
+            //   fsync 不支持 ⇒ 返回 false，只记日志（内容本身已验过，掉电持久性交给 provider）。
+            if (!ExportCheck.syncToDisk(ctx, uri)) {
+                Log.w(TAG, "export verified but not fsync-able (provider pipe?): " + uri);
+            }
             ExportCheck.targetMatches(ctx, uri, local);
             return n;
         } catch (IOException e) {
             closeQuietly(out);
             out = null;
-            ExportCheck.deleteTarget(ctx, uri);
+            ExportCheck.deleteIfNew(ctx, uri, preSize);
             throw e;
         } catch (RuntimeException e) {
             closeQuietly(out);
             out = null;
-            ExportCheck.deleteTarget(ctx, uri);
+            ExportCheck.deleteIfNew(ctx, uri, preSize);
             throw e;
         } finally {
             closeQuietly(out);
