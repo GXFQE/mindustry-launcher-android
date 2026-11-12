@@ -1565,6 +1565,25 @@ public final class SelfTest {
             ok(stat, L, r4 == null && lid.exists(),
                     "★第 4 次不再清（熔断，marker 保留）");
 
+            // ★ 第 365 轮（多开）：熔断计数按槽各记 —— A 槽满了不该影响 B 槽，
+            //   B 的计数也不该把 A 冲掉（以前状态文件只存"当前槽一条"）。
+            String slot2 = slot + "b";
+            File root2 = Data.slotDir(ctx, slot2);
+            if (root2 == null) throw new IOException("null slot2 dir");
+            try {
+                writeTmp(root2, "launchid.dat", "1234567");
+                String b1 = LaunchMarker.maybeClear(ctx, slot2);
+                ok(stat, L, b1 != null && b1.contains("attempt 1/"),
+                        "★熔断按槽各记：A 槽满了，B 槽第一下照常清（attempt 1）");
+                writeTmp(root, "launchid.dat", "1234567");
+                ok(stat, L, LaunchMarker.maybeClear(ctx, slot) == null,
+                        "★…且 A 槽仍满（B 的计数不会把 A 冲掉/重置）");
+            } finally {
+                new File(root2, "launchid.dat").delete();
+                LaunchMarker.maybeClear(ctx, slot2);          // marker 不在 ⇒ 归零 B 的计数
+                Data.deleteSlotForever(ctx, slot2);
+            }
+
             // 正常启动（marker 已不在）⇒ 计数归零；再来一次应重新 attempt 1
             lid.delete();
             LaunchMarker.maybeClear(ctx, slot);
@@ -16847,6 +16866,12 @@ public final class SelfTest {
             if (crashTxt.isFile()) oldCrashNote = Util.readText(crashTxt);
         } catch (Throwable ignored) {
         }
+        String oldLaunch = "";
+        File launchTxt = Patches.launchRecordFile(ctx);
+        try {
+            if (launchTxt.isFile()) oldLaunch = Util.readText(launchTxt);
+        } catch (Throwable ignored) {
+        }
         try {
             try { Data.deleteSlotForever(ctx, slot); } catch (Throwable ignored) { }
             String e = Data.createSlot(ctx, slot);
@@ -16863,6 +16888,33 @@ public final class SelfTest {
             Patches.writeLaunchRecord(ctx, slot, ikey, launched);
             ok(stat, L, Patches.readLaunchRecord(ctx) != null,
                     "⑯ :game 注入完会写下这一局真的注入了谁（report-patch-launch.json）");
+            // ★ 第 365 轮（多开）：启动记录一局一条、按实例键存 —— 后启动的不再盖掉前一个。
+            Patches.LaunchInfo li = Patches.readLaunchInfo(ctx, slot);
+            ok(stat, L, li != null && slot.equals(li.slot) && ikey.equals(li.ikey)
+                            && li.patches.size() == 1,
+                    "⑯ 启动记录按**实例/槽**读得回来（多开一局一条）");
+            ok(stat, L, Patches.readLaunchInfo(ctx, "selftest-not-this-slot") == null,
+                    "⑯ 反方向：按别的槽读不到（A 的启动记录不会被算到 B 的崩溃上）");
+            // 旧单对象格式读侧兼容（升级不丢这一局）
+            org.json.JSONObject legacy = new org.json.JSONObject();
+            legacy.put("at", System.currentTimeMillis());
+            legacy.put("slot", slot);
+            legacy.put("ikey", ikey);
+            legacy.put("handled", false);
+            legacy.put("patches", new org.json.JSONArray());
+            Util.atomicWriteText(launchTxt, legacy.toString());
+            Patches.LaunchInfo oldInfo = Patches.readLaunchInfo(ctx, slot);
+            ok(stat, L, oldInfo != null && slot.equals(oldInfo.slot) && ikey.equals(oldInfo.ikey),
+                    "⑯ 旧单对象格式仍读得回来（升级兼容）");
+            String slot2 = "selftest-patch-crash-2";
+            String ikey2 = Versions.instanceKey("selftest-crash-ver2", slot2);
+            Patches.writeLaunchRecord(ctx, slot2, ikey2, launched);
+            Patches.LaunchInfo a2 = Patches.readLaunchInfo(ctx, slot);
+            Patches.LaunchInfo b2 = Patches.readLaunchInfo(ctx, slot2);
+            ok(stat, L, a2 != null && slot.equals(a2.slot)
+                            && b2 != null && slot2.equals(b2.slot),
+                    "⑯ ★两局的启动记录并存（第 365 轮：后启动的不再盖掉前一个）");
+            Patches.writeLaunchRecord(ctx, slot, ikey, launched);   // 恢复本槽这条（带补丁）
 
             ok(stat, L, Patches.noteGameCrash(ctx, slot).isEmpty()
                             && Config.get().patchRefs(ikey).contains(ref),
@@ -16894,7 +16946,8 @@ public final class SelfTest {
         } finally {
             try { Config.get().setPatchRefs(ikey, new ArrayList<String>()); } catch (Throwable ignored) { }
             try {
-                Patches.launchRecordFile(ctx).delete();
+                if (oldLaunch.isEmpty()) Patches.launchRecordFile(ctx).delete();
+                else Util.atomicWriteText(Patches.launchRecordFile(ctx), oldLaunch);
                 if (oldCrashNote.isEmpty()) Patches.clearCrashReport(ctx);
                 else Util.atomicWriteText(crashTxt, oldCrashNote);
             } catch (Throwable ignored) { }

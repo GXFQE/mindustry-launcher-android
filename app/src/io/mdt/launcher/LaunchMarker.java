@@ -26,12 +26,17 @@ import java.io.File;
  * 会把计数清掉。这样"清了又崩、崩了又清"不会无限循环；真崩时报告会先挡住，
  * 没报告的重复 force-stop 也有上限。
  *
+ * <p>★ 第 365 轮（多开）：熔断计数**按槽分账**（状态文件 `{v:2, slots:{<槽>:{count,at}}}`）。
+ * 以前只记"当前槽一条" —— A/B 两个槽交替 force-stop 会互相冲掉计数，熔断就形同虚设。
+ *
  * <p>⚠️ 只在**主进程启动**、`Data.gameAlive` 为 false 时调用（见
  * {@link Recovery#runNow}）。游戏在跑时绝不碰。
  */
 final class LaunchMarker {
     private static final String TAG = "MDTLauncher";
     private static final String STATE = "launchid-autoclear.json";
+    private static final String S_V2 = "v";
+    private static final String S_SLOTS = "slots";
 
     /** 同一个槽最多自动清几次（正常启动会重置） */
     static final int MAX_CLEARS = 3;
@@ -65,8 +70,8 @@ final class LaunchMarker {
         if (slot == null || slot.trim().isEmpty()) return null;
         File lid = Mods.launchIdFileOf(ctx, slot);
         if (lid == null || !lid.isFile()) {
-            // 上次正常退出（或根本没跑过）⇒ 这一轮结束，把熔断计数归零
-            resetIfSame(ctx, slot);
+            // 上次正常退出（或根本没跑过）⇒ 这一轮结束，把**这个槽**的熔断计数归零
+            resetSlot(ctx, slot);
             return null;
         }
         if (Data.gameAlive(ctx)) return null;      // 游戏在跑：marker 就是它这次启动写的
@@ -100,12 +105,13 @@ final class LaunchMarker {
                 + "/" + MAX_CLEARS + "; no newer crash report)\n";
     }
 
-    // ── 熔断计数（`app_hub/launchid-autoclear.json`，只记当前槽一条） ─────
+    // ── 熔断计数（`app_hub/launchid-autoclear.json`，第 365 轮起**按槽分账**） ──
 
     private static int countOf(Context ctx, String slot) {
-        JSONObject o = readState(ctx);
+        JSONObject slots = readSlots(ctx);
+        if (slots == null) return 0;
+        JSONObject o = slots.optJSONObject(slot);
         if (o == null) return 0;
-        if (!slot.equals(o.optString("slot", ""))) return 0;
         long at = o.optLong("at", 0L);
         if (at > 0L && System.currentTimeMillis() - at > COUNT_TTL_MS) return 0;
         return Math.max(0, o.optInt("count", 0));
@@ -113,21 +119,77 @@ final class LaunchMarker {
 
     private static void saveCount(Context ctx, String slot, int count) {
         try {
+            JSONObject slots = readSlots(ctx);
+            if (slots == null) slots = new JSONObject();
             JSONObject o = new JSONObject();
-            o.put("slot", slot);
             o.put("count", count);
             o.put("at", System.currentTimeMillis());
-            Util.atomicWriteText(new File(Paths.privateDir(ctx), STATE), o.toString());
+            slots.put(slot, o);
+            writeSlots(ctx, slots);
         } catch (Throwable t) {
             Log.w(TAG, "launchid auto-clear state write failed", t);
         }
     }
 
-    private static void resetIfSame(Context ctx, String slot) {
+    /** 这一轮正常结束（marker 不在）⇒ **只清这个槽**的计数，别的槽一个不动。 */
+    private static void resetSlot(Context ctx, String slot) {
+        JSONObject slots = readSlots(ctx);
+        if (slots == null || !slots.has(slot)) return;
+        slots.remove(slot);
+        writeSlots(ctx, slots);
+    }
+
+    /** 读 slots 映射（旧单对象格式 {slot,count,at} 读侧升级成一槽；坏文件当没有）。 */
+    private static JSONObject readSlots(Context ctx) {
         JSONObject o = readState(ctx);
-        if (o == null || !slot.equals(o.optString("slot", ""))) return;
-        File f = new File(Paths.privateDir(ctx), STATE);
-        if (f.isFile() && !f.delete()) Log.w(TAG, "launchid auto-clear state delete failed");
+        if (o == null) return null;
+        if (o.optInt(S_V2, 0) >= 2) {
+            JSONObject slots = o.optJSONObject(S_SLOTS);
+            return slots == null ? new JSONObject() : slots;
+        }
+        // 旧格式：只记一个槽
+        String slot = o.optString("slot", "");
+        if (slot.isEmpty()) return null;
+        JSONObject slots = new JSONObject();
+        try {
+            JSONObject one = new JSONObject();
+            one.put("count", Math.max(0, o.optInt("count", 0)));
+            one.put("at", o.optLong("at", 0L));
+            slots.put(slot, one);
+        } catch (Throwable ignored) {
+        }
+        return slots;
+    }
+
+    /** 写回；顺手清掉过期（超过 TTL）的槽计数 —— 本来就会过期，别让它无限攒。 */
+    private static void writeSlots(Context ctx, JSONObject slots) {
+        try {
+            File f = new File(Paths.privateDir(ctx), STATE);
+            if (slots == null || slots.length() == 0) {
+                if (f.isFile() && !f.delete()) Log.w(TAG, "launchid auto-clear state delete failed");
+                return;
+            }
+            long now = System.currentTimeMillis();
+            java.util.List<String> drop = new java.util.ArrayList<String>();
+            java.util.Iterator<String> it = slots.keys();
+            while (it.hasNext()) {
+                String k = it.next();
+                JSONObject v = slots.optJSONObject(k);
+                long at = v == null ? 0L : v.optLong("at", 0L);
+                if (v == null || (at > 0L && now - at > COUNT_TTL_MS)) drop.add(k);
+            }
+            for (String k : drop) slots.remove(k);
+            if (slots.length() == 0) {
+                if (f.isFile()) f.delete();
+                return;
+            }
+            JSONObject w = new JSONObject();
+            w.put(S_V2, 2);
+            w.put(S_SLOTS, slots);
+            Util.atomicWriteText(f, w.toString());
+        } catch (Throwable t) {
+            Log.w(TAG, "launchid auto-clear state write failed", t);
+        }
     }
 
     private static JSONObject readState(Context ctx) {

@@ -61,7 +61,8 @@ final class InjectionSources {
     private static void collectPatches(Context ctx, String slot, long crashAt,
                                        CrashAnalysis.Sources s) {
         try {
-            Patches.LaunchInfo info = Patches.readLaunchInfo(ctx);
+            // 第 365 轮：一局一条、按实例键存 ⇒ 按**崩的那个槽**取它自己那一局
+            Patches.LaunchInfo info = Patches.readLaunchInfo(ctx, slot);
             if (info == null || info.at <= 0L || info.patches.isEmpty()) return;
             if (slot != null && !slot.isEmpty() && !info.slot.equals(slot)) return;
             if (crashAt > 0L && info.at > crashAt) return;      // 之后又启动过 ⇒ 不是这一局

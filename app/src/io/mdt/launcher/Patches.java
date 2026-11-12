@@ -788,6 +788,11 @@ final class Patches {
         final List<Launched> patches = new ArrayList<Launched>();
     }
 
+    /** 一局一条记录最多保留几局（按写入时刻；崩溃归因只看最近一局，留几局便于事后翻）。 */
+    private static final int LAUNCH_KEEP = 6;
+    private static final String L_V = "v";
+    private static final String L_RECORDS = "records";
+
     static File launchRecordFile(Context ctx) {
         return new File(Data.hubDir(ctx), LAUNCH);
     }
@@ -796,19 +801,31 @@ final class Patches {
         return new File(Data.hubDir(ctx), CRASH_REPORT);
     }
 
+    /** 记录键 = 实例键（版本+NUL+槽）；没有实例键时退回按槽（老记录 / 防御）。 */
+    private static String recordKey(String ikey, String slot) {
+        if (ikey != null && !ikey.isEmpty()) return ikey;
+        return "slot:" + (slot == null ? "" : slot);
+    }
+
     /**
      * :game 拉完注入之后写"这一局真的注入了谁"。
      *
      * <p>每次启动都写（没有补丁时写空表）：否则上一局的记录会留在盘上，
      * 下一次无补丁的启动崩了就会被算到旧补丁头上。
+     *
+     * <p>★ 第 365 轮（多开）：**一局一条、按实例键存**（`{v:2, records:{<实例键>:{…}}}`）——
+     * 两个实例同时跑时，后启动的那个不再把前一个的启动记录盖掉；崩溃归因 / 自动停用
+     * 按槽（{@link #readLaunchInfo(Context, String)}）各取各的那一局。最多留最近
+     * {@link #LAUNCH_KEEP} 局，旧单对象格式读侧兼容。
      */
     static void writeLaunchRecord(Context ctx, String slot, String ikey, List<Launched> patches) {
-        writeLaunchJson(ctx, slot, ikey, System.currentTimeMillis(), false, patches);
+        upsertLaunchRecord(ctx, slot, ikey, System.currentTimeMillis(), false, patches);
     }
 
-    private static void writeLaunchJson(Context ctx, String slot, String ikey, long at,
-                                        boolean handled, List<Launched> patches) {
+    private static void upsertLaunchRecord(Context ctx, String slot, String ikey, long at,
+                                           boolean handled, List<Launched> patches) {
         try {
+            JSONObject records = readRecordMap(ctx);
             JSONObject o = new JSONObject();
             o.put("at", at);
             o.put("slot", slot == null ? "" : slot);
@@ -826,10 +843,66 @@ final class Patches {
                 }
             }
             o.put("patches", a);
-            Util.atomicWriteText(launchRecordFile(ctx), o.toString());
+            records.put(recordKey(ikey, slot), o);
+            pruneRecords(records);
+            writeRecordMap(ctx, records);
         } catch (Throwable t) {
             Log.w(TAG, "write patch launch record failed: " + t);
         }
+    }
+
+    /** 读 `records` 映射（读侧把旧单对象格式升级成一条；**不落盘**）。 */
+    private static JSONObject readRecordMap(Context ctx) {
+        JSONObject raw = readLaunchRecord(ctx);
+        JSONObject records = new JSONObject();
+        if (raw == null) return records;
+        if (raw.optInt(L_V, 0) >= 2) {
+            JSONObject m = raw.optJSONObject(L_RECORDS);
+            return m == null ? records : m;
+        }
+        // 旧格式：整份文件就是一局
+        try {
+            records.put(recordKey(raw.optString("ikey", ""), raw.optString("slot", "")), raw);
+        } catch (Throwable ignored) {
+        }
+        return records;
+    }
+
+    private static void writeRecordMap(Context ctx, JSONObject records) {
+        try {
+            if (records == null || records.length() == 0) {
+                File f = launchRecordFile(ctx);
+                if (f.isFile()) f.delete();
+                return;
+            }
+            JSONObject w = new JSONObject();
+            w.put(L_V, 2);
+            w.put(L_RECORDS, records);
+            Util.atomicWriteText(launchRecordFile(ctx), w.toString());
+        } catch (Throwable t) {
+            Log.w(TAG, "write patch launch record failed: " + t);
+        }
+    }
+
+    /** 只留最近 {@link #LAUNCH_KEEP} 局（按 at 新的优先；at 读不出来的排在最后被丢掉）。 */
+    private static void pruneRecords(JSONObject records) {
+        final JSONObject keep = records;
+        java.util.List<String> keys = new java.util.ArrayList<String>();
+        java.util.Iterator<String> it = records.keys();
+        while (it.hasNext()) keys.add(it.next());
+        java.util.Collections.sort(keys, new java.util.Comparator<String>() {
+            @Override public int compare(String a, String b) {
+                long x = atOf(keep, a);
+                long y = atOf(keep, b);
+                return x < y ? 1 : (x == y ? 0 : -1);      // 新 → 旧
+            }
+        });
+        for (int i = LAUNCH_KEEP; i < keys.size(); i++) records.remove(keys.get(i));
+    }
+
+    private static long atOf(JSONObject records, String key) {
+        JSONObject o = records.optJSONObject(key);
+        return o == null ? 0L : o.optLong("at", 0L);
     }
 
     static JSONObject readLaunchRecord(Context ctx) {
@@ -842,10 +915,40 @@ final class Patches {
         }
     }
 
-    /** 结构化读启动记录（没有 / 坏文件返回 null）。 */
+    /**
+     * 结构化读：{@code slot} 非空 ⇒ 该槽**最新**的一局；空 ⇒ 全部里最新的一局。
+     * 没有 / 坏文件返回 null；旧单对象格式兼容。
+     */
+    static LaunchInfo readLaunchInfo(Context ctx, String slot) {
+        JSONObject raw = readLaunchRecord(ctx);
+        if (raw == null) return null;
+        if (raw.optInt(L_V, 0) >= 2) {
+            JSONObject m = raw.optJSONObject(L_RECORDS);
+            if (m == null) return null;
+            LaunchInfo best = null;
+            java.util.Iterator<String> it = m.keys();
+            while (it.hasNext()) {
+                JSONObject o = m.optJSONObject(it.next());
+                if (o == null) continue;
+                LaunchInfo info = parseLaunchInfo(o);
+                if (info.at <= 0L) continue;
+                if (slot != null && !slot.isEmpty() && !slot.equals(info.slot)) continue;
+                if (best == null || info.at > best.at) best = info;
+            }
+            return best;
+        }
+        LaunchInfo info = parseLaunchInfo(raw);
+        if (info.at <= 0L) return null;
+        if (slot != null && !slot.isEmpty() && !slot.equals(info.slot)) return null;
+        return info;
+    }
+
+    /** 全部实例里最新的一局（不看槽；给不按槽过滤的调用方）。 */
     static LaunchInfo readLaunchInfo(Context ctx) {
-        JSONObject o = readLaunchRecord(ctx);
-        if (o == null) return null;
+        return readLaunchInfo(ctx, null);
+    }
+
+    private static LaunchInfo parseLaunchInfo(JSONObject o) {
         LaunchInfo info = new LaunchInfo();
         info.slot = o.optString("slot", "");
         info.ikey = o.optString("ikey", "");
@@ -867,7 +970,19 @@ final class Patches {
     /** 标成"已按崩溃处置" —— **保留记录**（崩溃归因还要用它反查补丁的类集合）。 */
     private static void markLaunchHandled(Context ctx, LaunchInfo info) {
         if (info == null) return;
-        writeLaunchJson(ctx, info.slot, info.ikey, info.at, true, info.patches);
+        upsertLaunchRecord(ctx, info.slot, info.ikey, info.at, true, info.patches);
+    }
+
+    /** 删掉**这一局**的记录（没带补丁 / 已无意义）；别的实例的记录一个不动。 */
+    private static void removeLaunchRecord(Context ctx, LaunchInfo info) {
+        if (info == null) return;
+        try {
+            JSONObject records = readRecordMap(ctx);
+            records.remove(recordKey(info.ikey, info.slot));
+            writeRecordMap(ctx, records);
+        } catch (Throwable t) {
+            Log.w(TAG, "remove patch launch record failed: " + t);
+        }
     }
 
     /**
@@ -900,14 +1015,13 @@ final class Patches {
             Config.get().load(ctx);
         } catch (Throwable ignored) {
         }
-        LaunchInfo info = readLaunchInfo(ctx);
+        LaunchInfo info = readLaunchInfo(ctx, slot);
         if (info == null) return out;
         String recSlot = info.slot;
-        if (slot != null && !slot.isEmpty() && !slot.equals(recSlot)) return out;
         String ikey = info.ikey;
         long at = info.at;
         if (at <= 0L || ikey.isEmpty() || info.patches.isEmpty()) {
-            launchRecordFile(ctx).delete();     // 这一局没带补丁 ⇒ 记录到此为止
+            removeLaunchRecord(ctx, info);      // 这一局没带补丁 ⇒ 只清这一条（别的实例的记录不动）
             return out;
         }
         if (info.handled) return out;           // 已经处置过（记录保留给崩溃归因用）
