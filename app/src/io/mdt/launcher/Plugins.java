@@ -471,6 +471,19 @@ final class Plugins {
     }
 
     /** 登记表里的全部 id（文件顺序、去重、空行/注释行忽略）。 */
+    /**
+     * 当前**生效中**的插件 id（`active.txt` 的顺序）—— 第 361 轮：崩溃归因用它拿"这一程注入了谁"。
+     * ★ 与 {@link #injectOrder} 同一份登记表；这里只给 id 列表，注入顺序由那边定。
+     */
+    static List<String> activeIds(Context ctx) {
+        return stateIds(readOrNull(new File(dirNoCreate(ctx), ACTIVE)));
+    }
+
+    /** 某个 id 当前**生效**的版本；没有返回 null（崩溃归因读 APK 用）。 */
+    static String activeVersion(Context ctx, String id) {
+        return stateGet(readOrNull(new File(dirNoCreate(ctx), ACTIVE)), id);
+    }
+
     static List<String> stateIds(String text) {
         List<String> out = new ArrayList<String>();
         for (String line : lines(text)) {

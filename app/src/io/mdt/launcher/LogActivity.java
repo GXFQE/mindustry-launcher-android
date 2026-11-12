@@ -609,8 +609,10 @@ public class LogActivity extends BaseActivity {
                 //    而报告头（Version / Mods / Likely Cause）在**最前面**（语料里最长一份 1044 行）
                 final CrashAnalysis.Report parsed = CrashAnalysis.parse(d.fullText());
                 // judgeFull = 便宜层（L1/L1b/L2a，微秒级）+ 只在没结论时才扫 dex
-                final CrashAnalysis.Verdict full =
-                        CrashAnalysis.judgeFull(LogActivity.this, parsed, Data.currentSlot(LogActivity.this));
+                // ★ 第 361 轮：带上崩溃报告的写入时刻 —— 补丁启动记录只在"崩的那一局"才算数
+                final long crashAt = d != null && d.file != null ? d.file.lastModified() : 0L;
+                final CrashAnalysis.Verdict full = CrashAnalysis.judgeFull(
+                        LogActivity.this, parsed, Data.currentSlot(LogActivity.this), crashAt);
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
                         if (stamp != mAnalyzeStamp || mShownCrash != d) return;

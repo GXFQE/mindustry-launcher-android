@@ -755,14 +755,33 @@ final class Patches {
 
     // ══ 崩溃处理（与 :game 注入失败同一套处置）═══════════════════════════════
 
-    /** 一局里**真的注入了**的补丁（ref + 显示名）。 */
+    /** 一局里**真的注入了**的补丁（ref + 显示名 + 注入的那份 dex 路径）。 */
     static final class Launched {
         final String ref;
         final String label;
+        /** 实际注入的 dex 绝对路径（第 361 轮：崩溃归因要读它的 class_defs；可能为空） */
+        final String dex;
         Launched(String ref, String label) {
+            this(ref, label, "");
+        }
+        Launched(String ref, String label, String dex) {
             this.ref = ref;
             this.label = label;
+            this.dex = dex == null ? "" : dex;
         }
+    }
+
+    /**
+     * 启动记录的**结构化**读法（崩溃归因用；比 {@link #readLaunchRecord} 多了 dex 路径与 handled）。
+     * 记录本身第 360 轮起就是"这一局实际注入了谁"，第 361 轮起加 dex 路径供归因反查类集合。
+     */
+    static final class LaunchInfo {
+        String slot = "";
+        String ikey = "";
+        long at;
+        /** 已按崩溃处置过（第 360 轮）；处置后**保留记录**给崩溃归因用，下一次启动会覆盖 */
+        boolean handled;
+        final List<Launched> patches = new ArrayList<Launched>();
     }
 
     static File launchRecordFile(Context ctx) {
@@ -780,11 +799,17 @@ final class Patches {
      * 下一次无补丁的启动崩了就会被算到旧补丁头上。
      */
     static void writeLaunchRecord(Context ctx, String slot, String ikey, List<Launched> patches) {
+        writeLaunchJson(ctx, slot, ikey, System.currentTimeMillis(), false, patches);
+    }
+
+    private static void writeLaunchJson(Context ctx, String slot, String ikey, long at,
+                                        boolean handled, List<Launched> patches) {
         try {
             JSONObject o = new JSONObject();
-            o.put("at", System.currentTimeMillis());
+            o.put("at", at);
             o.put("slot", slot == null ? "" : slot);
             o.put("ikey", ikey == null ? "" : ikey);
+            o.put("handled", handled);
             JSONArray a = new JSONArray();
             if (patches != null) {
                 for (Launched l : patches) {
@@ -792,6 +817,7 @@ final class Patches {
                     JSONObject p = new JSONObject();
                     p.put("ref", l.ref);
                     p.put("label", l.label == null ? "" : l.label);
+                    p.put("dex", l.dex == null ? "" : l.dex);
                     a.put(p);
                 }
             }
@@ -810,6 +836,34 @@ final class Patches {
         } catch (Throwable t) {
             return null;
         }
+    }
+
+    /** 结构化读启动记录（没有 / 坏文件返回 null）。 */
+    static LaunchInfo readLaunchInfo(Context ctx) {
+        JSONObject o = readLaunchRecord(ctx);
+        if (o == null) return null;
+        LaunchInfo info = new LaunchInfo();
+        info.slot = o.optString("slot", "");
+        info.ikey = o.optString("ikey", "");
+        info.at = o.optLong("at", 0L);
+        info.handled = o.optBoolean("handled", false);
+        JSONArray a = o.optJSONArray("patches");
+        if (a != null) {
+            for (int i = 0; i < a.length(); i++) {
+                JSONObject p = a.optJSONObject(i);
+                if (p == null) continue;
+                String ref = p.optString("ref", "");
+                if (ref.isEmpty()) continue;
+                info.patches.add(new Launched(ref, p.optString("label", ""), p.optString("dex", "")));
+            }
+        }
+        return info;
+    }
+
+    /** 标成"已按崩溃处置" —— **保留记录**（崩溃归因还要用它反查补丁的类集合）。 */
+    private static void markLaunchHandled(Context ctx, LaunchInfo info) {
+        if (info == null) return;
+        writeLaunchJson(ctx, info.slot, info.ikey, info.at, true, info.patches);
     }
 
     /**
@@ -842,32 +896,28 @@ final class Patches {
             Config.get().load(ctx);
         } catch (Throwable ignored) {
         }
-        JSONObject rec = readLaunchRecord(ctx);
-        if (rec == null) return out;
-        String recSlot = rec.optString("slot", "");
+        LaunchInfo info = readLaunchInfo(ctx);
+        if (info == null) return out;
+        String recSlot = info.slot;
         if (slot != null && !slot.isEmpty() && !slot.equals(recSlot)) return out;
-        String ikey = rec.optString("ikey", "");
-        long at = rec.optLong("at", 0L);
-        JSONArray arr = rec.optJSONArray("patches");
-        if (at <= 0L || ikey.isEmpty() || arr == null || arr.length() == 0) {
+        String ikey = info.ikey;
+        long at = info.at;
+        if (at <= 0L || ikey.isEmpty() || info.patches.isEmpty()) {
             launchRecordFile(ctx).delete();     // 这一局没带补丁 ⇒ 记录到此为止
             return out;
         }
+        if (info.handled) return out;           // 已经处置过（记录保留给崩溃归因用）
         String crash = newestGameCrashSince(ctx, recSlot, at);
         if (crash == null) return out;          // 崩溃报告还没落盘：记录留着，下次再判
         if (WriteGate.blockedInstance(ctx, ikey)) return out;   // 进程还在/没来得及收尸 ⇒ 下次再判
         List<String> refs = Config.get().patchRefs(ikey);
         List<String[]> disabled = new ArrayList<String[]>();
-        for (int i = 0; i < arr.length(); i++) {
-            JSONObject p = arr.optJSONObject(i);
-            if (p == null) continue;
-            String ref = p.optString("ref", "");
-            String label = p.optString("label", "");
-            if (ref.isEmpty() || !refs.remove(ref)) continue;
-            disabled.add(new String[]{ref, label});
+        for (Launched l : info.patches) {
+            if (l == null || l.ref.isEmpty() || !refs.remove(l.ref)) continue;
+            disabled.add(new String[]{l.ref, l.label});
         }
         if (disabled.isEmpty()) {               // 用户已经自己停用了 ⇒ 没有要处置的东西
-            launchRecordFile(ctx).delete();
+            markLaunchHandled(ctx, info);
             return out;
         }
         Config.get().setPatchRefs(ikey, refs);
@@ -876,7 +926,8 @@ final class Patches {
             out.add(d[1] == null || d[1].isEmpty() ? d[0] : d[1]);
             Log.i(TAG, "patch disabled after game crash: " + d[0] + " for " + ikey);
         }
-        launchRecordFile(ctx).delete();
+        // ★ 第 361 轮：**保留**记录（标记 handled）—— 崩溃归因要读 dex 反查"崩在补丁的类里"
+        markLaunchHandled(ctx, info);
         return out;
     }
 

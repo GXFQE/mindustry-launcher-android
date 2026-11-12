@@ -66,6 +66,22 @@ final class CrashAnalysis {
     static final int KIND_LAUNCHER = 3;
     /** 读不出（空文件 / 根本不是报告） */
     static final int KIND_BROKEN = 4;
+    /**
+     * 崩在**我们注入进 :game 的代码**里（第 361 轮）：启动器宿主 / 插件 / 补丁。
+     * ★ 与模组归因分开：模组是**游戏自己**加载的，插件与补丁是**启动器注入**的。
+     */
+    static final int KIND_INJECTED = 5;
+
+    /** 宿主类名前缀：{@link Injector} 注入 :game 的那段代码（类名不会与游戏/插件撞） */
+    static final String HOST_PKG = "io.mdt.launcher.";
+    /** 依据层：崩在宿主注入代码里 */
+    static final String LAYER_HOST = "HOST";
+    /** 依据层：崩在设计插件「X」的类里 */
+    static final String LAYER_PLUGIN = "PLUG";
+    /** 依据层：崩在补丁「X」替换过的类里（补丁同名替换 ⇒ 跑的是补丁那份代码） */
+    static final String LAYER_PATCH = "PATCH";
+    /** 依据层：补丁替换了某个类，调用方仍按旧接口调用（ABI 冲突，最有说服力） */
+    static final String LAYER_ABI = "ABI";
 
     // ── 「不是模组」的可判原因（只用于 KIND_NONE：给"认不出"补一句方向）─────────
     //
@@ -159,6 +175,10 @@ final class CrashAnalysis {
         boolean vanilla;
         /** `Mods:` 里的 internalName（去版本号，保持报告里的顺序） */
         final List<String> mods = new ArrayList<String>();
+        /** `NoSuchFieldError` / `NoSuchMethodError` 里**缺成员的那个 owner 类**（点号；ABI 判据用） */
+        final List<String> missingOwners = new ArrayList<String>();
+        /** `NoClassDefFoundError` 里**缺失的类**（点号形式） */
+        final List<String> missingClasses = new ArrayList<String>();
 
         /** 异常链（[0] = 顶层，后面每个 `Caused by` 一条；**L4 就是它**） */
         final List<Sec> chain = new ArrayList<Sec>();
@@ -214,6 +234,55 @@ final class CrashAnalysis {
          *   （自检有两条组合夹具钉着：OOM + `Error loading mod` ⇒ 只报模组）。
          */
         int cause = CAUSE_NONE;
+    }
+
+    /**
+     * 这一局注入到 :game 的"我们自己的东西"：显示名 → 它定义的全部类名（点号形式）。
+     *
+     * <p>第 361 轮：插件 / 补丁的类集合由调用方现读（{@code InjectionSources.collect}）后传进来 ——
+     * {@link #judge} 保持纯函数（自检可直接喂表，不造真 dex）。
+     */
+    static final class Sources {
+        /** 补丁：显示名 → 它注入的 dex 里定义的类 */
+        final Map<String, Set<String>> patches = new LinkedHashMap<String, Set<String>>();
+        /** 插件：显示名 → 它 APK 里定义的类 */
+        final Map<String, Set<String>> plugins = new LinkedHashMap<String, Set<String>>();
+
+        void addPatch(String name, Set<String> classes) {
+            if (name != null && classes != null && !classes.isEmpty()) put(patches, name, classes);
+        }
+
+        void addPlugin(String name, Set<String> classes) {
+            if (name != null && classes != null && !classes.isEmpty()) put(plugins, name, classes);
+        }
+
+        private static void put(Map<String, Set<String>> m, String name, Set<String> classes) {
+            Set<String> old = m.get(name);
+            if (old == null) m.put(name, new LinkedHashSet<String>(classes));
+            else old.addAll(classes);
+        }
+
+        /** 这个类由哪个补丁定义（没有返回 null） */
+        String patchOwning(String cls) {
+            return owning(patches, cls);
+        }
+
+        /** 这个类由哪个插件定义（没有返回 null） */
+        String pluginOwning(String cls) {
+            return owning(plugins, cls);
+        }
+
+        private static String owning(Map<String, Set<String>> m, String cls) {
+            if (cls == null || cls.isEmpty()) return null;
+            for (Map.Entry<String, Set<String>> e : m.entrySet()) {
+                if (e.getValue().contains(cls)) return e.getKey();
+            }
+            return null;
+        }
+
+        boolean isEmpty() {
+            return patches.isEmpty() && plugins.isEmpty();
+        }
     }
 
     /**
@@ -477,7 +546,7 @@ final class CrashAnalysis {
      */
     private static void collectNeedles(Report r) {
         Map<String, Needle> byText = new LinkedHashMap<String, Needle>();
-        for (Sec s : r.chain) addNeedles(s.type + ": " + s.message, byText);
+        for (Sec s : r.chain) addNeedles(r, s.type + ": " + s.message, byText);
         // 帧也当针（L2b）：类描述符，权重按"像不像模组自己的东西"
         Set<String> frameCls = new LinkedHashSet<String>();
         for (Sec s : r.chain) {
@@ -492,7 +561,7 @@ final class CrashAnalysis {
         r.needles.addAll(byText.values());
     }
 
-    private static void addNeedles(String msg, Map<String, Needle> byText) {
+    private static void addNeedles(Report r, String msg, Map<String, Needle> byText) {
         if (msg == null || msg.isEmpty()) return;
         boolean any = false;
 
@@ -508,6 +577,7 @@ final class CrashAnalysis {
             String owner = f.group(1);
             if (!owner.isEmpty()) {
                 put(byText, new Needle(owner.replace('.', '/'), owner, weightOfClass(owner)));
+                addMissingOwner(r, owner);
             }
         }
         // `NoSuchMethodError: 'void a.b.C.m(java.lang.String)'` —— 只认**带括号的引号串**
@@ -527,6 +597,7 @@ final class CrashAnalysis {
                     if (dot > 0) {
                         owner = owner.substring(0, dot);
                         put(byText, new Needle(owner.replace('.', '/'), owner, weightOfClass(owner)));
+                        addMissingOwner(r, owner);
                     }
                 }
             }
@@ -538,6 +609,7 @@ final class CrashAnalysis {
             //   捕到 `Failed` 这个词 —— 那不是类名。判据：真类名里必须有 `.` 或大写开头。
             if (!cls.equals("Failed") && (cls.indexOf('.') > 0 || cls.startsWith("L"))) {
                 put(byText, new Needle(cls.replace('.', '/'), cls, weightOfClass(cls)));
+                addMissingClass(r, cls);
                 any = true;
             }
         }
@@ -548,6 +620,7 @@ final class CrashAnalysis {
             put(byText, new Needle(member, member, weightOfMember(member)));
             String owner = af.group(3).replace('/', '.');
             put(byText, new Needle(owner.replace('.', '/'), owner, weightOfClass(owner)));
+            addMissingOwner(r, owner);
             any = true;
         }
         Matcher am = ART_METHOD.matcher(msg);
@@ -556,12 +629,14 @@ final class CrashAnalysis {
             put(byText, new Needle(member, member, weightOfMember(member)));
             String owner = am.group(4).replace('/', '.');
             put(byText, new Needle(owner.replace('.', '/'), owner, weightOfClass(owner)));
+            addMissingOwner(r, owner);
             any = true;
         }
         Matcher an = ART_NOCLASS.matcher(msg);
         while (an.find()) {
             String cls = an.group(1).replace('/', '.');
             put(byText, new Needle(cls.replace('.', '/'), cls, weightOfClass(cls)));
+            addMissingClass(r, cls);
             any = true;
         }
         Matcher ac = ACCESS_MSG.matcher(msg);
@@ -594,7 +669,7 @@ final class CrashAnalysis {
         int at = msg.indexOf(": ");
         if (at > 0) {
             String rest = msg.substring(at + 2);
-            if (rest.length() < msg.length() && looksLikeThrowableText(rest)) addNeedles(rest, byText);
+            if (rest.length() < msg.length() && looksLikeThrowableText(rest)) addNeedles(r, rest, byText);
         }
     }
 
@@ -651,6 +726,22 @@ final class CrashAnalysis {
         return 1;
     }
 
+    /** 记下"缺成员的 owner 类"（ABI 判据用；去重、统一点号形式）。 */
+    private static void addMissingOwner(Report r, String owner) {
+        if (r == null || owner == null) return;
+        String s = owner.trim().replace('/', '.');
+        if (s.isEmpty() || r.missingOwners.contains(s)) return;
+        r.missingOwners.add(s);
+    }
+
+    /** 记下"缺失的类"（`NoClassDefFoundError`；去重、统一点号形式）。 */
+    private static void addMissingClass(Report r, String cls) {
+        if (r == null || cls == null) return;
+        String s = cls.trim().replace('/', '.');
+        if (s.isEmpty() || r.missingClasses.contains(s)) return;
+        r.missingClasses.add(s);
+    }
+
     // ══ 判据 ═══════════════════════════════════════════════════════════════
 
     /**
@@ -658,6 +749,14 @@ final class CrashAnalysis {
      * （不扫 dex）—— 调用方先跑一遍便宜层，没结论再带着模组表与探针跑第二遍（见 LogActivity）。
      */
     static Verdict judge(Report r, List<Mods.Info> mods, DexProbe probe) {
+        return judge(r, mods, probe, null);
+    }
+
+    /**
+     * 同上，外加**注入源**（宿主 / 插件 / 补丁；第 361 轮）。{@code src == null} 时仍会判宿主前缀
+     * （那条判据不需要读文件），插件/补丁要等调用方把类集合传进来。
+     */
+    static Verdict judge(Report r, List<Mods.Info> mods, DexProbe probe, Sources src) {
         Verdict v = new Verdict();
         if (r == null || r.empty) {
             v.kind = KIND_BROKEN;
@@ -696,6 +795,16 @@ final class CrashAnalysis {
             resolve(h, mods, r);
             v.hits.add(h);
             v.kind = KIND_MOD;
+            return v;
+        }
+
+        // ── L0：崩在**我们注入进 :game 的代码**里（宿主 / 插件 / 补丁；第 361 轮）──
+        //   ★ 必须在"报告写着没装模组"之前判：补丁/插件是启动器注入的，游戏报告的 `Mods:` 行
+        //     根本不会提它们（补丁还会同名替换游戏类，报告里看起来就是原版）。
+        List<Hit> injected = injectionHits(r, src);
+        if (!injected.isEmpty()) {
+            v.kind = KIND_INJECTED;
+            v.hits.addAll(injected);
             return v;
         }
 
@@ -759,6 +868,86 @@ final class CrashAnalysis {
         for (Hit h : best.values()) if (h.weight == top) v.hits.add(h);
         if (top >= NAMING_WEIGHT) v.kind = KIND_MOD;   // 否则只当"弱线索"（v.kind 保持 NONE）
         return v;
+    }
+
+    /**
+     * 注入源归属（第 361 轮）：把"栈帧类名 / 缺失符号"与三份类集合对一遍。
+     *
+     * <p>优先级（从"最具体"到"只是参与"）：
+     * <ol>
+     *   <li><b>ABI</b>：`NoSuchField/MethodError` 里缺成员的类**由补丁替换过** ⇒ 补丁改了 ABI，
+     *       而调用方（模组 / 游戏）仍按旧 ABI 调用 —— 这类最有说服力，命中就不再混入别的层；</li>
+     *   <li>栈帧直接落在 <b>宿主注入代码</b>（`io.mdt.launcher.*`）→ 启动器自己的功能；</li>
+     *   <li>栈帧类由 <b>插件</b>定义 → 崩在插件代码里；</li>
+     *   <li>栈帧类由 <b>补丁</b>定义 → 补丁**同名替换**了这个类 ⇒ 跑的是补丁那份代码。</li>
+     * </ol>
+     * 同一个来源只记一条（几十个帧只算一次）。
+     */
+    private static List<Hit> injectionHits(Report r, Sources src) {
+        List<Hit> out = new ArrayList<Hit>();
+        if (r == null) return out;
+        // ① 补丁改了 ABI（缺成员的 owner 类由补丁替换）
+        if (src != null) {
+            for (String owner : r.missingOwners) {
+                String patch = src.patchOwning(owner);
+                if (patch == null) continue;
+                Hit h = new Hit();
+                h.name = patch;
+                h.layer = LAYER_ABI;
+                h.evidence = owner;
+                h.weight = 3;
+                addHit(out, h);
+            }
+            if (!out.isEmpty()) return out;     // ABI 已经是最具体的结论，不再混入别的层
+        }
+        // ② 栈帧落在注入进来的代码里
+        for (Sec s : r.chain) {
+            for (String f : s.frames) {
+                Matcher m = FRAME.matcher(f);
+                if (!m.matches()) continue;
+                String cls = m.group(1);
+                Hit h = null;
+                if (cls.startsWith(HOST_PKG)) {
+                    h = new Hit();
+                    h.name = "";
+                    h.layer = LAYER_HOST;
+                    h.weight = 3;
+                } else if (src != null) {
+                    String plugin = src.pluginOwning(cls);
+                    if (plugin != null) {
+                        h = new Hit();
+                        h.name = plugin;
+                        h.layer = LAYER_PLUGIN;
+                        h.weight = 3;
+                    } else {
+                        String patch = src.patchOwning(cls);
+                        if (patch != null) {
+                            h = new Hit();
+                            h.name = patch;
+                            h.layer = LAYER_PATCH;
+                            h.weight = 3;
+                        }
+                    }
+                }
+                if (h != null) {
+                    h.evidence = cls;
+                    addHit(out, h);
+                }
+            }
+        }
+        return out;
+    }
+
+    /** 同一来源（层 + 名字）只记一条；宿主那条 name 为空也算一个来源。 */
+    private static void addHit(List<Hit> out, Hit h) {
+        for (Hit x : out) {
+            if (x.layer.equals(h.layer) && eq(x.name, h.name)) return;
+        }
+        out.add(h);
+    }
+
+    private static boolean eq(String a, String b) {
+        return a == null ? b == null : a.equals(b);
     }
 
     /** `Error loading mod <internalName>`（在**整条链**里找，不只看顶层） */
@@ -833,6 +1022,8 @@ final class CrashAnalysis {
             }
             case KIND_VANILLA:
                 return Trans.get(ctx, R.string.crash_verdict_vanilla);
+            case KIND_INJECTED:
+                return injectedText(ctx, v);
             case KIND_MOD: {
                 if (v.hits.size() == 1) {
                     Hit h = v.hits.get(0);
@@ -888,6 +1079,50 @@ final class CrashAnalysis {
         return base;
     }
 
+    /** `KIND_INJECTED` 的整串：谁 + 依据 + 怎么办。 */
+    private static String injectedText(Context ctx, Verdict v) {
+        StringBuilder sb = new StringBuilder();
+        if (v.hits.size() == 1) {
+            Hit h = v.hits.get(0);
+            if (LAYER_ABI.equals(h.layer)) {
+                sb.append(Trans.get(ctx, R.string.crash_verdict_patch_abi_fmt, h.name, h.evidence));
+            } else {
+                sb.append(Trans.get(ctx, R.string.crash_verdict_injected_one_fmt,
+                        srcLabel(ctx, h), h.evidence));
+            }
+            String hint = injectionHint(ctx, h.layer);
+            if (!hint.isEmpty()) sb.append('\n').append(hint);
+            return sb.toString();
+        }
+        sb.append(Trans.get(ctx, R.string.crash_verdict_injected_multi_fmt, v.hits.size()));
+        for (Hit h : v.hits) {
+            sb.append('\n').append(Trans.get(ctx, R.string.crash_verdict_injected_line_fmt,
+                    srcLabel(ctx, h), h.evidence));
+        }
+        sb.append('\n').append(Trans.get(ctx, R.string.crash_hint_injected));
+        return sb.toString();
+    }
+
+    /** 来源的人话标签：宿主 / 插件「X」/ 补丁「X」 */
+    private static String srcLabel(Context ctx, Hit h) {
+        if (h == null) return "";
+        if (LAYER_HOST.equals(h.layer)) return Trans.get(ctx, R.string.crash_src_host);
+        if (LAYER_PLUGIN.equals(h.layer)) return Trans.get(ctx, R.string.crash_src_plugin_fmt, h.name);
+        if (LAYER_PATCH.equals(h.layer) || LAYER_ABI.equals(h.layer)) {
+            return Trans.get(ctx, R.string.crash_src_patch_fmt, h.name);
+        }
+        return h.name == null ? "" : h.name;
+    }
+
+    /** 每个来源"怎么办"（先给一个能做的动作，再解释）。 */
+    private static String injectionHint(Context ctx, String layer) {
+        if (LAYER_HOST.equals(layer)) return Trans.get(ctx, R.string.crash_hint_host);
+        if (LAYER_PLUGIN.equals(layer)) return Trans.get(ctx, R.string.crash_hint_plugin);
+        if (LAYER_PATCH.equals(layer)) return Trans.get(ctx, R.string.crash_hint_patch);
+        if (LAYER_ABI.equals(layer)) return Trans.get(ctx, R.string.crash_hint_abi);
+        return "";
+    }
+
     /**
      * 给 dev 口/自检用的**机器可读**一行摘要（不本地化：它是给维护者看的证据）。
      * 例：`kind=MOD hits=stealth-path(L1/w3) needles=14 dex=0`
@@ -927,6 +1162,7 @@ final class CrashAnalysis {
             case KIND_VANILLA: return "VANILLA";
             case KIND_LAUNCHER: return "LAUNCHER";
             case KIND_BROKEN: return "BROKEN";
+            case KIND_INJECTED: return "INJECTED";
             default: return "NONE";
         }
     }
@@ -941,15 +1177,32 @@ final class CrashAnalysis {
      * @param slot 用哪个槽的模组表来对名字（L2a/L3 全靠它）；null ⇒ 当前槽
      */
     static Verdict judgeFull(Context ctx, Report r, String slot) {
+        return judgeFull(ctx, r, slot, 0L);
+    }
+
+    /**
+     * 同上，外加崩溃报告的写入时刻 {@code crashAt}（第 361 轮）：补丁的启动记录只在
+     * "**崩的那一局**"（记录时刻 ≤ 崩溃时刻）才算数，否则会拿"之后又启动的一局"去归因。
+     */
+    static Verdict judgeFull(Context ctx, Report r, String slot, long crashAt) {
         Verdict v = judge(r, null, null);
         if (r == null || r.empty || r.launcherOwn) return v;
+        String useSlot = slot == null ? Data.currentSlot(ctx) : slot;
+        // ★ 第 361 轮：注入源（宿主 / 插件 / 补丁）。宿主前缀在便宜层就能判；
+        //   插件/补丁要读 dex ⇒ 在这里现读一次（读不出就当没有，绝不阻断归因）。
+        Sources src = null;
+        try {
+            src = InjectionSources.collect(ctx, useSlot, crashAt);
+        } catch (Throwable t) {
+            src = null;
+        }
         List<Mods.Info> mods = null;
         try {
-            mods = Mods.scan(ctx, slot == null ? Data.currentSlot(ctx) : slot).mods;
+            mods = Mods.scan(ctx, useSlot).mods;
         } catch (Throwable t) {
             mods = null;
         }
-        if (mods == null) return v;
+        if (mods == null) return judge(r, null, null, src);
         if (v.kind == KIND_MOD) {
             // 🔴 便宜层（L1/L1b）已经点名了，但**名字还没跟模组表对上**：
             //   报告里 `Error loading mod <internalName>` 只有内部名，而界面该显示 `displayName`
@@ -958,7 +1211,7 @@ final class CrashAnalysis {
             for (Hit h : v.hits) resolve(h, mods, r);
             return v;
         }
-        return judge(r, mods, DEX);
+        return judge(r, mods, DEX, src);
     }
 
     /**
@@ -993,7 +1246,8 @@ final class CrashAnalysis {
         } catch (Throwable t) {
             return null;
         }
-        return judgeFull(ctx, parse(body), slot);
+        long crashAt = f.lastModified();
+        return judgeFull(ctx, parse(body), slot, crashAt);
     }
 
     /**
@@ -1127,7 +1381,13 @@ final class CrashAnalysis {
                 body = null;
             }
             Report parsed = parse(body);
-            Verdict v = judge(parsed, mods, DEX);
+            // ★ 第 361 轮：dev 报告也要带上注入源（补丁/插件），否则这里比界面少一层判据
+            Sources src = null;
+            try {
+                src = InjectionSources.collect(ctx, slot, f.lastModified());
+            } catch (Throwable ignored) {
+            }
+            Verdict v = judge(parsed, mods, DEX, src);
             long b = System.currentTimeMillis();
             sb.append("  ").append(debugLine(parsed, v)).append('\n');
             sb.append("  verdict: ").append(text(ctx, v).replace("\n", "\n           ")).append('\n');

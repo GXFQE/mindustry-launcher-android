@@ -162,7 +162,10 @@ public class GameSlot extends BaseActivity {
             //   判据用注入结果（`p.applied`），不是 config 里"想启用哪些"。
             java.util.List<Patches.Launched> applied = new java.util.ArrayList<Patches.Launched>();
             for (Injector.Patch ap : plan.patches) {
-                if (ap != null && ap.applied) applied.add(new Patches.Launched(ap.ref, ap.label));
+                if (ap == null || !ap.applied) continue;
+                // ★ 第 361 轮：连**注入的那份 dex 路径**一起记 —— 崩溃归因要读它的 class_defs
+                applied.add(new Patches.Launched(ap.ref, ap.label,
+                        ap.dex == null ? "" : ap.dex.getAbsolutePath()));
             }
             Patches.writeLaunchRecord(this, launchSlot, ikey, applied);
             reportPatches(ikey, patchRes, plan);

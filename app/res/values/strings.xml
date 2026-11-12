@@ -1739,6 +1739,19 @@
     <string name="crash_ev_frame_fmt">its class %1$s is in the stack trace</string>
     <string name="crash_ev_dex_fmt">its classes.dex contains %1$s</string>
     <string name="crash_ev_not_loaded_fmt">%1$s (it was not loaded in that launch)</string>
+    <string name="crash_verdict_injected_one_fmt">The crash stack contains %1$s: %2$s</string>
+    <string name="crash_verdict_injected_multi_fmt">The crash stack contains %1$d injected sources:</string>
+    <string name="crash_verdict_injected_line_fmt">%1$s — class on the stack: %2$s</string>
+    <string name="crash_verdict_patch_abi_fmt">Patch \"%1$s\" replaced %2$s, but the crashing caller still uses the old interface — the patch is probably incompatible with the mod/game</string>
+    <string name="crash_src_host">the launcher-injected code</string>
+    <string name="crash_src_plugin_fmt">plugin \"%1$s\"</string>
+    <string name="crash_src_patch_fmt">patch \"%1$s\"</string>
+    <string name="crash_ev_injected_fmt">class on the stack: %1$s</string>
+    <string name="crash_hint_host">This is code injected by the launcher (reports, probes) - unrelated to game mods. Send this report to the launcher maintainer.</string>
+    <string name="crash_hint_plugin">Disable this plugin and launch again (you can re-enable it on the plugin page).</string>
+    <string name="crash_hint_patch">Disable this patch and try again (you can re-enable it on the patch page).</string>
+    <string name="crash_hint_abi">This is an interface mismatch between the patch and the mod/game: disable the patch and try again, or use a mod version that matches the current patch.</string>
+    <string name="crash_hint_injected">These are pieces injected by the launcher into the game: disable the plugins/patches and try again; code injected by the launcher can only be fixed by an update.</string>
 
     <!-- F23 第二批：把结论送到"导出文件"与"模组页" —— 结论不能只活在日志页上 -->
     <string name="log_export_verdict">What the manager made of this report:</string>

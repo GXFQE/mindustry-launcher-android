@@ -1676,6 +1676,20 @@
     <string name="crash_ev_frame_fmt">异常栈里有它的类 %1$s</string>
     <string name="crash_ev_dex_fmt">它的 classes.dex 里有 %1$s</string>
     <string name="crash_ev_not_loaded_fmt">%1$s（这次启动没加载它）</string>
+    <!-- ★ 第 361 轮：崩溃归因加「我们注入到 :game 的代码」这一路（宿主 / 插件 / 补丁） -->
+    <string name="crash_verdict_injected_one_fmt">崩溃栈里有 %1$s：%2$s</string>
+    <string name="crash_verdict_injected_multi_fmt">崩溃栈里有 %1$d 个注入来源：</string>
+    <string name="crash_verdict_injected_line_fmt">%1$s —— 栈里的类：%2$s</string>
+    <string name="crash_verdict_patch_abi_fmt">补丁「%1$s」替换了 %2$s，而崩溃的调用方仍按旧接口调用它 —— 疑似补丁与模组 / 游戏不兼容</string>
+    <string name="crash_src_host">启动器注入的代码</string>
+    <string name="crash_src_plugin_fmt">插件「%1$s」</string>
+    <string name="crash_src_patch_fmt">补丁「%1$s」</string>
+    <string name="crash_ev_injected_fmt">栈里的类：%1$s</string>
+    <string name="crash_hint_host">这是启动器自己的功能（报告 / 探针等），与游戏模组无关 —— 把这份报告提给启动器维护者。</string>
+    <string name="crash_hint_plugin">先停用这个插件再启动一次（插件页可以再打开）。</string>
+    <string name="crash_hint_patch">可以停用这个补丁再试（补丁页可以再启用）。</string>
+    <string name="crash_hint_abi">这是补丁与模组 / 游戏之间的接口对不上：先停用这个补丁再试，或换用与当前补丁匹配的模组版本。</string>
+    <string name="crash_hint_injected">上面这些是启动器注入进游戏的代码：插件 / 补丁可以先停用再试，启动器自身的代码只能等更新。</string>
 
     <!-- F23 第二批：把结论送到「导出文件」与「模组页」—— 结论不能只活在日志页上 -->
     <string name="log_export_verdict">管理器对这份报告的判断：</string>

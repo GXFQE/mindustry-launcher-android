@@ -285,6 +285,8 @@ public final class SelfTest {
             // ★ F23 崩溃分析：四层判据（真语料夹具 + 每层的反方向/元断言）—— 紧挨着 ㊲：
             //   一个写报告、一个读报告，放一起读起来是一件事
             crashAnalysis(ctx, L, stat);
+            // ★ 第 361 轮：崩溃归因的注入源层（宿主 / 插件 / 补丁）—— 接在 F23 四层后面
+            crashInjection(ctx, L, stat);
             // ★ ㉘ F10 地图增删：导入（先 part+验）与删除（挪不删）
             mapCrud(ctx, L, stat);
             // ★ ㉚ F10 地图导出：包内条目流式拷出（字节一致 + 两向反向 + 元断言）
@@ -7656,6 +7658,118 @@ public final class SelfTest {
     }
 
     /** F23 用：把若干行拼成一份报告（`\n` 分隔；**不**在末尾加空行） */
+    /**
+     * 第 361 轮：崩溃归因的「注入源」层 —— 宿主 / 插件 / 补丁，以及补丁与模组的 ABI 冲突。
+     * 判据 = 栈帧类名 / 缺失符号 owner 与三份类集合对一遍（宿主看前缀、插件/补丁看 dex class_defs）。
+     */
+    private static void crashInjection(Context ctx, List<String> L, int[] stat) {
+        L.add("── 第 361 轮 · 崩溃归因的注入源（宿主 / 插件 / 补丁 / ABI）──");
+
+        // ① 宿主：栈帧在 io.mdt.launcher.* ⇒ 启动器注入的代码（不需要读任何 dex）
+        CrashAnalysis.Report rHost = CrashAnalysis.parse(fx(new String[]{
+                "Mindustry has crashed.",
+                "Version: unknown build 0",
+                "Mods: none (vanilla)",
+                "java.lang.RuntimeException: probe exploded",
+                "\tat io.mdt.launcher.ProbeRunner.tick(ProbeRunner.java:12)",
+        }));
+        CrashAnalysis.Verdict vHost = CrashAnalysis.judge(rHost, null, null, null);
+        ok(stat, L, vHost.kind == CrashAnalysis.KIND_INJECTED && vHost.hits.size() == 1
+                        && CrashAnalysis.LAYER_HOST.equals(vHost.hits.get(0).layer),
+                "★栈帧在 io.mdt.launcher.* ⇒ 判成启动器注入的代码（不是原版、不是模组）");
+        String tHost = CrashAnalysis.text(ctx, vHost);
+        ok(stat, L, tHost.contains(Trans.get(ctx, R.string.crash_src_host))
+                        && tHost.contains(Trans.get(ctx, R.string.crash_hint_host)),
+                "★结论带来源名 + 一句能做的动作（不是只丢一句「认不出」）");
+
+        // ② 插件：类在插件 APK 的 class_defs 里
+        CrashAnalysis.Sources srcPlugin = new CrashAnalysis.Sources();
+        java.util.Set<String> pl = new java.util.LinkedHashSet<String>();
+        pl.add("com.selftest.plugin.ProbePage");
+        srcPlugin.addPlugin("selftest-plugin", pl);
+        CrashAnalysis.Verdict vPlug = CrashAnalysis.judge(CrashAnalysis.parse(fx(new String[]{
+                "Mindustry has crashed.",
+                "Mods: none (vanilla)",
+                "java.lang.NullPointerException",
+                "\tat com.selftest.plugin.ProbePage.createView(ProbePage.java:7)",
+        })), null, null, srcPlugin);
+        ok(stat, L, vPlug.kind == CrashAnalysis.KIND_INJECTED && vPlug.hits.size() == 1
+                        && CrashAnalysis.LAYER_PLUGIN.equals(vPlug.hits.get(0).layer)
+                        && "selftest-plugin".equals(vPlug.hits.get(0).name),
+                "★栈帧类在插件 dex 里 ⇒ 点名插件（不是「原版」）");
+        ok(stat, L, CrashAnalysis.text(ctx, vPlug).contains(
+                        Trans.get(ctx, R.string.crash_src_plugin_fmt, "selftest-plugin")),
+                "★插件那条结论拼出了插件名");
+
+        // ③ 补丁：同名替换游戏类 —— 栈帧落在补丁替换过的类上，跑的就是补丁那份代码
+        final CrashAnalysis.Report rPatch = CrashAnalysis.parse(fx(new String[]{
+                "Mindustry has crashed.",
+                "Mods: none (vanilla)",
+                "java.lang.IllegalStateException: logic blew up",
+                "\tat mindustry.core.Logic.update(Logic.java:1)",
+        }));
+        CrashAnalysis.Sources srcPatch = new CrashAnalysis.Sources();
+        java.util.Set<String> pc = new java.util.LinkedHashSet<String>();
+        pc.add("mindustry.core.Logic");
+        srcPatch.addPatch("selftest-patch", pc);
+        CrashAnalysis.Verdict vPatch = CrashAnalysis.judge(rPatch, null, null, srcPatch);
+        ok(stat, L, vPatch.kind == CrashAnalysis.KIND_INJECTED && vPatch.hits.size() == 1
+                        && CrashAnalysis.LAYER_PATCH.equals(vPatch.hits.get(0).layer),
+                "★★补丁同名替换过的类出现在栈里 ⇒ 判成补丁（报告写着 Mods: none (vanilla) 也一样）");
+        ok(stat, L, CrashAnalysis.text(ctx, vPatch).contains(
+                        Trans.get(ctx, R.string.crash_src_patch_fmt, "selftest-patch")),
+                "★补丁那条结论拼出了补丁名 + 停用建议");
+        // 反方向：同一条栈、**不给注入源**（≈没开补丁）⇒ 不许判成注入
+        CrashAnalysis.Verdict vPatchNo = CrashAnalysis.judge(rPatch, null, null, null);
+        ok(stat, L, vPatchNo.kind != CrashAnalysis.KIND_INJECTED
+                        && vPatchNo.kind == CrashAnalysis.KIND_VANILLA,
+                "★元断言：同一条栈在没有注入源时**不会**误判成补丁（判据不是恒真）");
+
+        // ④ ABI：缺成员的类由补丁替换过 ⇒ 补丁改了接口、调用方按旧接口调用
+        CrashAnalysis.Sources srcAbi = new CrashAnalysis.Sources();
+        srcAbi.addPatch("selftest-patch", pc);
+        CrashAnalysis.Verdict vAbi = CrashAnalysis.judge(CrashAnalysis.parse(fx(new String[]{
+                "Mindustry has crashed.",
+                "Mods: somemod:1.0",
+                "java.lang.NoSuchFieldError: Class mindustry.core.Logic does not have member field 'int selftestProbe'",
+                "\tat somemod.Thing.run(Thing.java:3)",
+        })), null, null, srcAbi);
+        ok(stat, L, vAbi.kind == CrashAnalysis.KIND_INJECTED && vAbi.hits.size() == 1
+                        && CrashAnalysis.LAYER_ABI.equals(vAbi.hits.get(0).layer)
+                        && "mindustry.core.Logic".equals(vAbi.hits.get(0).evidence),
+                "★★ABI 冲突：缺成员的类由补丁替换过 ⇒ 判成补丁与模组 / 游戏不兼容");
+        String tAbi = CrashAnalysis.text(ctx, vAbi);
+        ok(stat, L, tAbi.contains(Trans.get(ctx, R.string.crash_src_patch_fmt, "selftest-patch"))
+                        && tAbi.contains(Trans.get(ctx, R.string.crash_hint_abi)),
+                "★ABI 那条结论带补丁名 + 不兼容的解释");
+        // 反方向：缺成员的类是**没被补丁替换**的类 ⇒ 不归给补丁
+        CrashAnalysis.Verdict vAbiNo = CrashAnalysis.judge(CrashAnalysis.parse(fx(new String[]{
+                "Mindustry has crashed.",
+                "Mods: somemod:1.0",
+                "java.lang.NoSuchFieldError: Class mindustry.core.Other does not have member field 'int selftestProbe'",
+                "\tat somemod.Thing.run(Thing.java:3)",
+        })), null, null, srcAbi);
+        ok(stat, L, vAbiNo.kind != CrashAnalysis.KIND_INJECTED,
+                "★元断言：缺成员的类没被补丁替换 ⇒ 不许归给补丁（有分辨力）");
+
+        // ⑤ 优先级：游戏自己写的 Likely Cause 仍然优先（注入源不许盖掉游戏的归因）
+        CrashAnalysis.Verdict vMod = CrashAnalysis.judge(CrashAnalysis.parse(fx(new String[]{
+                "Mindustry has crashed.",
+                "Mods: somemod:1.0",
+                "Likely Cause: Some Mod (somemod v1.0)",
+                "java.lang.IllegalStateException: logic blew up",
+                "\tat mindustry.core.Logic.update(Logic.java:1)",
+        })), null, null, srcPatch);
+        ok(stat, L, vMod.kind == CrashAnalysis.KIND_MOD
+                        && CrashAnalysis.LAYER_L1.equals(vMod.hits.get(0).layer),
+                "★游戏自己写明的模组归因仍然优先（注入源不能盖掉 Likely Cause）");
+
+        // ⑥ 机器可读摘要认得新 kind（排障时一眼看得出是哪一路）
+        ok(stat, L, CrashAnalysis.debugLine(null, vPatch).contains("kind=INJECTED")
+                        && CrashAnalysis.debugLine(null, vPatch).contains("PATCH"),
+                "★机器可读摘要给出 kind=INJECTED + 依据层（排障/自检可直接对表）");
+    }
+
     private static String fx(String[] lines) {
         StringBuilder sb = new StringBuilder();
         for (int i = 0; i < lines.length; i++) {
