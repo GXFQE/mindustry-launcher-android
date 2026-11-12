@@ -65,12 +65,21 @@ public final class FakeExportProvider extends ContentProvider {
     static final String MODE_ZERO = "zero";
     /** 提交正常，但读回给的是 pipe（fsync 不支持）。 */
     static final String MODE_PIPE_READ = "pipe-read";
+    /**
+     * 提交正常、`openInputStream` 读得回来，但 `openAssetFile` 返回**带声明长度的 slice**
+     * ⇒ `ContentResolver.openFileDescriptor` 直接抛 "Not a whole file"（拿不到整文件 fd）。
+     * 用来钉「fsync 降级、不判导出失败」。
+     */
+    static final String MODE_SLICED_READ = "sliced-read";
 
     /** read/query 等提交的上限；自检里写入都是几百字节，5 s 足够。 */
     private static final long WAIT_MS = 5000;
 
     /** id → 提交完成 latch（static：provider 实例可能被系统回收重建）。 */
     private static final Map<String, CountDownLatch> COMMITTED = new HashMap<>();
+
+    /** 已删除的 id（query 查不到；与真 provider 一致，避免二次删除时打得像"还有个半截文件"）。 */
+    private static final java.util.Set<String> DELETED = new java.util.HashSet<>();
 
     // ── 自检用的夹具入口 ─────────────────────────────────────────────────
 
@@ -96,6 +105,9 @@ public final class FakeExportProvider extends ContentProvider {
         try (FileOutputStream out = new FileOutputStream(f)) {
             out.write(data);
         }
+        synchronized (FakeExportProvider.class) {
+            DELETED.remove(id);
+        }
         latch(id).countDown();      // 已存在 = 已"提交"，读侧不必等
     }
 
@@ -103,6 +115,7 @@ public final class FakeExportProvider extends ContentProvider {
     static void reset(Context ctx) {
         synchronized (FakeExportProvider.class) {
             COMMITTED.clear();
+            DELETED.clear();
         }
         deleteTree(dirOf(ctx));
     }
@@ -114,6 +127,14 @@ public final class FakeExportProvider extends ContentProvider {
             COMMITTED.put(id, l);
         }
         return l;
+    }
+
+    /** 等这个 id 的写端提交完（EOF 之后 provider 才落盘）。 */
+    private static void waitCommitted(String id) {
+        try {
+            latch(id).await(WAIT_MS, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException ignored) {
+        }
     }
 
     // ── ContentProvider ───────────────────────────────────────────────────
@@ -195,14 +216,38 @@ public final class FakeExportProvider extends ContentProvider {
                 out.write(data);
             }
         }
+        synchronized (FakeExportProvider.class) {
+            DELETED.remove(id);
+        }
+    }
+
+    /**
+     * `sliced-read` 专用：返回**带声明长度**的 {@link android.content.res.AssetFileDescriptor}
+     * ⇒ `openInputStream` 能读（LimitedInputStream），而 `ContentResolver.openFileDescriptor`
+     * 会抛 `FileNotFoundException("Not a whole file")`。别的 mode 走默认实现。
+     */
+    @Override public android.content.res.AssetFileDescriptor openAssetFile(Uri uri, String mode)
+            throws java.io.FileNotFoundException {
+        String[] p = split(uri);
+        if (p != null && MODE_SLICED_READ.equals(p[0])
+                && (mode == null || mode.indexOf('w') < 0)) {
+            waitCommitted(p[1]);
+            File f = backing(getContext(), p[1]);
+            if (!f.isFile()) throw new java.io.FileNotFoundException("no committed file: " + p[1]);
+            try {
+                return new android.content.res.AssetFileDescriptor(
+                        ParcelFileDescriptor.open(f, ParcelFileDescriptor.MODE_READ_ONLY),
+                        0, f.length());
+            } catch (IOException e) {
+                throw new java.io.FileNotFoundException("sliced: " + e);
+            }
+        }
+        return super.openAssetFile(uri, mode);
     }
 
     private ParcelFileDescriptor openRead(final String m, final String id)
             throws java.io.FileNotFoundException {
-        try {
-            latch(id).await(WAIT_MS, TimeUnit.MILLISECONDS);
-        } catch (InterruptedException ignored) {
-        }
+        waitCommitted(id);
         final File f = backing(getContext(), id);
         if (!f.isFile()) throw new java.io.FileNotFoundException("no committed file: " + id);
         if (MODE_PIPE_READ.equals(m)) {
@@ -244,6 +289,11 @@ public final class FakeExportProvider extends ContentProvider {
                                   String[] selectionArgs, String sortOrder) {
         String[] p = split(uri);
         if (p == null) return null;
+        // 已删除的 id 查不到（与真 provider 一致）；否则给一行 SIZE（没写过的 = 0，
+        // 这样"写入前 SIZE==0 ⇒ 本次新建"的判据在假 provider 上也成立）。
+        synchronized (FakeExportProvider.class) {
+            if (DELETED.contains(p[1])) return null;
+        }
         String[] cols = (projection == null || projection.length == 0)
                 ? new String[]{OpenableColumns.DISPLAY_NAME, OpenableColumns.SIZE}
                 : projection;
@@ -275,6 +325,7 @@ public final class FakeExportProvider extends ContentProvider {
         if (ok) {
             synchronized (FakeExportProvider.class) {
                 COMMITTED.remove(p[1]);
+                DELETED.add(p[1]);
             }
         }
         return ok ? 1 : 0;

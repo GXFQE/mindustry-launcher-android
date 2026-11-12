@@ -6,7 +6,7 @@
 当前槽（跑前 / 跑后）：预览验收（跑自检前已确认槽目录存在）
 
 一、自检 selftest-369.txt
-  通过 2102 项，失败 0 项（第 3 行）；「第 369 轮：导出 / 分享产物的写后校验」组 22 条全绿，含：
+  通过 2104 项，失败 0 项（第 3 行）；「第 369 轮：导出 / 分享产物的写后校验」组 24 条全绿，含：
     - 本地：合法 zip 能过 / 截断 zip 判死 / 0 字节判死 / 空 zip 合法 /
       结构仍合法但数据被改 1 字节 ⇒ CRC32 判死（ZipFile 本身仍能打开）
     - 关流：zip 关流失败必须冒泡（closeQuietly 吞掉 = 缺中央目录的坏包仍报成功）；
@@ -15,7 +15,9 @@
     - 真 ContentResolver + 仅 dev 构建的 FakeExportProvider（build.sh 注入清单）：
       正常档（写/读/逐字节/fsync）通过；close 时少写 10 字节 ⇒ 判死 + 删新建目标；
       close 后 0 字节 ⇒ 判死 + 删新建目标；不 truncate + 目标原本非空 ⇒ 判死但**不删**原有文件；
-      读 fd 是 pipe ⇒ 内容照过、fsync 层识别为 false；file:// 真实 fd fsync 返回 true。
+      读 fd 是 pipe ⇒ 内容照过、fsync 层识别为 false；**sliced-read（读得到但拿不到整文件 fd）
+      ⇒ 导出必须成功（fsync 降级不阻断）**；file:// 真实 fd fsync 返回 true；
+      **写流真实 fd 的 syncWriteFd 必须返回 true（fsync 主路径）**。
       fsync 首选**写 fd**（`getFD().sync()`；`openOutputStream` 返回的就是 FileOutputStream 子类），
       pipe provider 再用读 fd 兜底。
 

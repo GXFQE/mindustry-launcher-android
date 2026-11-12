@@ -629,7 +629,16 @@ public final class Exporter {
                 Uri doc = android.provider.DocumentsContract.createDocument(cr, dir, mime, name);
                 if (doc == null) throw new IOException(Trans.get(ctx, R.string.exp_err_no_doc));
                 // 写入前记大小（createDocument 正常是新建 = 0；第三方 provider 覆盖同名时 >0）
-                copyVerified(ctx, doc, tmp, ExportCheck.existingSize(ctx, doc));
+                final long docPre = ExportCheck.existingSize(ctx, doc);
+                try {
+                    copyVerified(ctx, doc, tmp, docPre);
+                } catch (IOException e) {
+                    ExportCheck.deleteIfNew(ctx, doc, docPre);   // 只在这里删，且只删一次
+                    throw e;
+                } catch (RuntimeException e) {
+                    ExportCheck.deleteIfNew(ctx, doc, docPre);
+                    throw e;
+                }
                 r.rawBytes += raw;
                 r.files++;
                 written++;
@@ -1035,10 +1044,12 @@ public final class Exporter {
     }
 
     /**
-     * 本地完整件 → SAF 目标：写入、flush、**close（不吞异常）**、fsync、再把目标读回来逐字节比对。
+     * 本地完整件 → SAF 目标：写入、flush、**写 fd fsync（close 前）**、close（不吞异常），
+     * 再把目标读回来逐字节比对。
      *
-     * <p>任何一步失败 ⇒ 删掉刚创建的目标（{@link ExportCheck#deleteIfNew}）再抛 ——
-     * 用户目录里不留半截文件，界面也不会报"成功"。
+     * <p>⚠️ 本方法**不删目标**：删除只由调用方统一做一次（`deleteIfNew`）—— 否则内外两层 catch
+     * 各删一次，第二次会对已经删掉的 content URI 打出 "cannot delete partial" 的误导日志
+     * （排查导出失败时会被带偏）。
      *
      * @param preSize 写入前目标的大小：只有 0（本次新建/原为空）才允许在失败时删目标
      */
@@ -1059,23 +1070,30 @@ public final class Exporter {
                 Log.w(TAG, "export short write: " + n + " / " + local.length());
                 throw new IOException(Trans.get(ctx, R.string.exp_err_verify_failed));
             }
-            // 写端 fsync 失败（pipe provider）⇒ 再用目标文件的读 fd 刷一次兜底；
-            // 两条都失败只记日志（内容本身已通过读回校验，掉电持久性交给 provider）。
-            if (!durable) durable = ExportCheck.syncToDisk(ctx, uri);
+            // 写端 fsync 失败（pipe provider）⇒ 再用目标文件的读 fd 刷一次兜底。
             if (!durable) {
-                Log.w(TAG, "export verified but not fsync-able (provider pipe?): " + uri);
+                try {
+                    durable = ExportCheck.syncToDisk(ctx, uri);
+                } catch (IOException e) {
+                    // 🔴 降级而不是失败：openInputStream 能走 openTypedAssetFile（压缩/转发流），
+                    //   openFileDescriptor 对"不是整文件"的 AssetFileDescriptor 会直接抛。
+                    //   这类 provider「读得回来、拿不到 fd」—— 内容已由 targetMatches 证明，
+                    //   掉电持久性只能交给 provider，不许因此判导出失败。
+                    Log.w(TAG, "fsync: no target fd (stream-only provider?): " + uri, e);
+                }
+            }
+            if (!durable) {
+                Log.w(TAG, "export verified but not fsync-able (provider pipe/stream?): " + uri);
             }
             ExportCheck.targetMatches(ctx, uri, local);
             return n;
         } catch (IOException e) {
             closeQuietly(out);
             out = null;
-            ExportCheck.deleteIfNew(ctx, uri, preSize);
-            throw e;
+            throw e;               // 目标由调用方删（且只删一次）
         } catch (RuntimeException e) {
             closeQuietly(out);
             out = null;
-            ExportCheck.deleteIfNew(ctx, uri, preSize);
             throw e;
         } finally {
             closeQuietly(out);

@@ -201,8 +201,8 @@ final class ExportCheck {
             byte[] a = new byte[BUF];
             byte[] b = new byte[BUF];
             while (true) {
-                int na = fill(got, a);
-                int nb = fill(expected, b);
+                int na = fill(got, a, ctx);
+                int nb = fill(expected, b, ctx);
                 boolean same = na == nb;
                 for (int i = 0; same && i < na; i++) {
                     if (a[i] != b[i]) same = false;
@@ -347,13 +347,23 @@ final class ExportCheck {
         throw new IOException(Trans.get(ctx, R.string.exp_err_verify_unreadable));
     }
 
-    /** 尽量把 `buf` 填满；返回读到的字节数（0 = EOF）。 */
-    private static int fill(InputStream in, byte[] buf) throws IOException {
+    /**
+     * 尽量把 `buf` 填满；返回读到的字节数（0 = EOF）。
+     *
+     * <p>🔴 `read()` 返回 **0** 不是 EOF：本方法里 `len = buf.length - off > 0`，正常阻塞流
+     * 不可能返回 0。真返回 0 说明流有问题（自旋/坏实现）—— 当成 EOF 会把"流坏了"降级成
+     * "这块读完了"，两边同时坏还可能假通过；`while` 继续又可能死循环。
+     * ⇒ 直接抛"读不回来"，让校验判死（方向与"宁可不导出"一致）。
+     */
+    private static int fill(InputStream in, byte[] buf, Context ctx) throws IOException {
         int off = 0;
         while (off < buf.length) {
             int n = in.read(buf, off, buf.length - off);
             if (n < 0) break;
-            if (n == 0) break;      // 防御：某些异常流会返回 0，继续循环就是死等
+            if (n == 0) {
+                Log.w(TAG, "verify: stream returned 0 bytes (broken provider stream?)");
+                throw new IOException(Trans.get(ctx, R.string.exp_err_verify_unreadable));
+            }
             off += n;
         }
         return off;

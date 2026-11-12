@@ -18441,6 +18441,30 @@ public final class SelfTest {
                     "★provider 读 fd 是 pipe：内容校验照过（导出成功）、fsync 层识别为「不支持」"
                             + "（不阻断，但不再是静默）"
                             + (pipeErr == null ? "" : "（异常：" + pipeErr + "）"));
+            // ⑨g 流式 provider：读得回来、但拿不到整文件 fd（openAssetFile 给带声明长度的 slice）
+            //   ⇒ copyVerified 的 fsync 必须**降级**，不能因此判导出失败。
+            boolean slicedOk = false;
+            String slicedErr = null;
+            try {
+                android.net.Uri su = FakeExportProvider.uri(
+                        FakeExportProvider.MODE_SLICED_READ, pid + "sliced");
+                long sn = Exporter.writeText(ctx, su, pText);
+                boolean fdBlocked = false;
+                try {
+                    ExportCheck.syncToDisk(ctx, su);
+                } catch (Throwable t) {
+                    fdBlocked = true;
+                }
+                slicedOk = sn == pBytes.length && fdBlocked
+                        && java.util.Arrays.equals(
+                                pBytes, readAll(FakeExportProvider.backing(ctx, pid + "sliced")));
+            } catch (Throwable t) {
+                slicedErr = String.valueOf(t);
+            }
+            ok(stat, L, slicedOk,
+                    "★★流式 provider（读得到、拿不到整文件 fd）：导出必须成功"
+                            + "（fsync 降级不阻断，内容已由读回证明），且 fsync 层确认真拿不到 fd"
+                            + (slicedErr == null ? "" : "（异常：" + slicedErr + "）"));
             // ⑩ fsync（掉电层）：file:// 的真实文件 fd 必须刷盘成功
             boolean fsyncFile = false;
             try {
@@ -18451,6 +18475,19 @@ public final class SelfTest {
             }
             ok(stat, L, fsyncFile,
                     "★fsync（掉电层）：file:// 目标的真实 fd 必须刷盘成功（返回 true）");
+            // ⑪ fsync **主路径**：写流本身的真实 fd 必须返回 true（不是靠读 fd 兜底）
+            boolean writeFdOk = false;
+            try {
+                File wf = new File(dir, "write-fd.bin");
+                try (java.io.FileOutputStream fo = new java.io.FileOutputStream(wf)) {
+                    fo.write(new byte[]{1, 2, 3});
+                    fo.flush();
+                    writeFdOk = ExportCheck.syncWriteFd(fo);
+                }
+            } catch (Throwable ignored) {
+            }
+            ok(stat, L, writeFdOk,
+                    "★fsync 主路径：写流的真实 fd 必须返回 true（不是靠读 fd 兜底）");
             FakeExportProvider.reset(ctx);
             badStage.delete();
             goodStage.delete();

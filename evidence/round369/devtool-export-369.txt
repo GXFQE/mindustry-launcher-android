@@ -1,4 +1,4 @@
-dev_zip_export 槽="预览验收" -> /sdcard/Android/data/io.mdt.launcher/hub/acc369c.zip
+dev_zip_export 槽="预览验收" -> /sdcard/Android/data/io.mdt.launcher/hub/acc369d.zip
 roots(10) = crashes/ previews/ saves/ schematics/ selftest-lang/ settings_backups/ last_log.txt server_list.json settings.bin settings_backup.bin 
 zip: files=64 raw=497999 out=383058
 落盘大小=383058
