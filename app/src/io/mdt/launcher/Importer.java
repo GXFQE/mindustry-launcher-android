@@ -291,6 +291,12 @@ public final class Importer {
         org.json.JSONObject entry = readJson(new File(dir, V_ENTRY));
         final String file = entry == null ? "" : entry.optString("file", "");
         if (file.isEmpty()) return Trash.fail(Trash.Result.T_BAD_NAME, "entry without file", dir.getName());
+        // ★ 第 366 轮：**版本级写门禁** —— 这一版正有实例在跑，就不许把它的 APK 放回来。
+        //   放回 = 写版本资产；与 trashVersion（删版本，第 362 轮）同一把门禁，方向对称。
+        if (WriteGate.blockedVersion(ctx, "import:" + file)) {
+            return Trash.fail(Trash.Result.T_GAME_RUNNING,
+                    "version in use: import:" + file, file);
+        }
         File dest = new File(importDir(ctx), file);
         if (dest.exists()) return Trash.fail(Trash.Result.T_NAME_TAKEN, "exists: " + dest, file);
         if (!Trash.move(apk, dest)) return Trash.fail(Trash.Result.T_MOVE_FAILED, "move back failed", file);

@@ -46,6 +46,10 @@ public class GameSlot extends BaseActivity {
      */
     static final String EXTRA_LEGACY_SWAP = "legacy_swap";
 
+    /** 第 366 轮：这一局解析出来的实例身份（启动失败时要按它把主进程的占位销掉） */
+    private String mVkey;
+    private String mLaunchSlot;
+
     private TextView mStatus;
 
     /**
@@ -133,6 +137,8 @@ public class GameSlot extends BaseActivity {
         //   （`slot` extra 可能为空 / 远古包会临时改道）：`currentSlot` 才是这一局真正落地的槽。
         final String launchSlot = Data.currentSlot(this);
         final String ikey = Versions.instanceKey(vkey, launchSlot);
+        mVkey = vkey;
+        mLaunchSlot = launchSlot;
 
         // ★ 2026-11-12（第 359 轮）：登记"这个实例正在跑"（多开前置，见 Instances）。
         //   时机：槽/版本都定下来之后、注入与拉起游戏之前 —— 门禁从这一刻起就按它拒写。
@@ -213,7 +219,7 @@ public class GameSlot extends BaseActivity {
      *
      * 判据来源（唯一性很关键，别在两处各判一次）：
      *   · 有 {@link #EXTRA_LEGACY_SWAP} ⇒ 用入口页那次探测的结果（免重复读 dex）；
-     *   · 没有 ⇒ 自己探一次（dev 直连 `am start -n .GameSlot`、以及将来任何新入口）。
+     *   · 没有 ⇒ 自己探一次（dev：经 MainActivity 的 dev extra 进来，`GameSlot` 已 `exported=false`）。
      *
      * ★★ **探不出来时一律按"要改名交换"处理** —— 这个方向的错**只是慢**（不并行），
      *   反方向的错是**游戏写 files/ 而 HUB 去 slot-<名> 找** ⇒ 用户的存档"看起来没了"。
@@ -290,7 +296,9 @@ public class GameSlot extends BaseActivity {
     }
 
     private void fail(String step, String msg, Throwable cause) {
-        Instances.withdraw(this);          // 这一局没起来 ⇒ 立刻销号（别让写门禁一直拦）
+        // 这一局没起来 ⇒ 立刻销号（别让写门禁一直拦）；同时清掉主进程在 startActivity 前
+        // 留下的启动占位（第 366 轮：否则那个槽要被占位挡到过期）
+        Instances.withdraw(this, mVkey, mLaunchSlot);
         mStatus.setText(Trans.get(GameSlot.this, R.string.game_start_failed_fmt, step));
         StringBuilder sb = new StringBuilder();
         sb.append(Trans.get(GameSlot.this, R.string.game_step_stuck_fmt, step, msg));

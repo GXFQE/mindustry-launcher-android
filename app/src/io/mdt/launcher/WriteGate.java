@@ -29,6 +29,10 @@ import java.util.List;
  *
  * <p>★ 与 {@link Data#gameAlive} 的分工：`gameAlive` 仍是**全局**判据，只留给
  * 迁移 / 回收 / 杀进程这类动全局资源的动作；**写实例数据一律走本类**。
+ *
+ * <p>★ 第 366 轮起登记表还包含**启动占位**（{@link Instances#reserve}：主进程点下启动、
+ * `:game` 尚未 publish 的那几百 ms）—— 所以"门禁从点下启动那一刻就生效"，
+ * 不等游戏进程真正登记。
  */
 final class WriteGate {
 

@@ -255,6 +255,8 @@ public final class SelfTest {
             instanceGate(ctx, L, stat);
             // ★ 第 362 轮：core 落盘层门禁（Msav / SlotZip / SlotWrite / 单份导入 / 补丁清扫）
             writeGateCore(ctx, L, stat);
+            // ★ 第 366 轮：启动占位（补 :game 登记之前的窗口）+ GameSlot 对外收口
+            startReserve(ctx, L, stat);
             // ★ 第 364 轮：实例会话记账（多开：一槽一局，结算按实例）
             instanceSessions(ctx, L, stat);
             // ★ ⑰ F13 第三阶段：模组包导入 / 跨槽复制（五个负例 + 一条元断言）
@@ -2527,6 +2529,24 @@ public final class SelfTest {
                     "★ 它被认成「游戏版本」（按目录判类型，不看扩展名）");
             ok(stat, L, item.slot.equals("自检版本"),
                     "★ 中转站里带着版本显示名（列表标题不是文件名）");
+
+            // ★ 第 366 轮：版本级写门禁 —— 这一版正有实例在跑，就不许把它的 APK 放回来
+            boolean restoreGated;
+            try {
+                Instances.testSnapshot(java.util.Collections.singletonList(
+                        new Instances.Running(42, TRASH_KEY, "m3-gate",
+                                System.currentTimeMillis(), "selftest:game")));
+                Trash.Result blocked = Importer.restoreVersion(ctx, item);
+                restoreGated = blocked != null && !blocked.ok
+                        && blocked.errCode == Trash.Result.T_GAME_RUNNING
+                        && !apk.exists() && trashed.exists();
+            } catch (Throwable t) {
+                restoreGated = false;
+            } finally {
+                Instances.clearTestSnapshot();
+            }
+            ok(stat, L, restoreGated,
+                    "★运行中实例的版本不许放回来（版本级写门禁；什么都没动）");
 
             Trash.Result rr = Importer.restoreVersion(ctx, item);
             ok(stat, L, rr != null && rr.ok && apk.isFile(), "放回来 ⇒ 副本回到 import 目录");
@@ -17399,6 +17419,77 @@ public final class SelfTest {
         }
         ok(stat, L, matrix && running,
                 "④ 结算按实例：有实例豁免；登记表非空只信它；表空时只保守跳过当前槽");
+    }
+
+    /**
+     * 第 366 轮：**启动占位** + `GameSlot` 对外收口。
+     *
+     * <p>启动占位要钉三件事：① 占位期间目标槽 / 版本 / 实例在写门禁上算"被占"（真实 core 入口也拒）；
+     * ② 撤销后立刻放行；③ 过期占位自动失效（不会永久挡住）。
+     * 另外钉住 `GameSlot` 的 `exported=false`（它直接读 Intent 里的 slot / pkg / apk / legacy_swap）。
+     */
+    private static void startReserve(Context ctx, List<String> L, int[] stat) {
+        L.add("");
+        L.add("── 第 366 轮 · 启动占位 + GameSlot 收口 ──");
+
+        String slot = "m3-reserve-gate";
+        String vkey = "reserve:v366";
+        boolean gateOk;
+        try {
+            Data.deleteSlotForever(ctx, slot);
+            Data.createSlot(ctx, slot);
+            Instances.reserve(ctx, vkey, slot);
+            boolean blocked = WriteGate.blockedSlot(ctx, slot)
+                    && WriteGate.blockedVersion(ctx, vkey)
+                    && WriteGate.blockedInstance(ctx, Versions.instanceKey(vkey, slot));
+            // 真实 core 入口也吃这条门禁（删槽：被拒 ⇒ 目录还在、错误串非空）
+            String err = Data.deleteSlotForever(ctx, slot);
+            boolean real = err != null && Data.dirOf(ctx, slot).isDirectory();
+            Instances.unreserve(ctx, vkey, slot);
+            boolean freed = !WriteGate.blockedSlot(ctx, slot)
+                    && !WriteGate.blockedVersion(ctx, vkey);
+            gateOk = blocked && real && freed;
+        } catch (Throwable t) {
+            gateOk = false;
+        } finally {
+            Instances.unreserve(ctx, vkey, slot);
+            Data.deleteSlotForever(ctx, slot);
+        }
+        ok(stat, L, gateOk,
+                "① 启动占位：目标槽/版本/实例立刻被拒写（含真实 core 入口）；撤销后立刻放行");
+
+        // ② 过期占位自动失效（扫描不看 pid，只看 until；过期文件顺手删）
+        File dir = new File(ctx.getCacheDir(), "selftest-reserve");
+        boolean ttlOk;
+        try {
+            Data.deleteTree(dir);
+            dir.mkdirs();
+            long now = System.currentTimeMillis();
+            write(new File(dir, "r-old.json"), ("{\"pid\":1,\"vkey\":\"v\",\"slot\":\"s-old\","
+                    + "\"started\":" + (now - 60000) + ",\"until\":" + (now - 1000) + "}")
+                    .getBytes("UTF-8"));
+            write(new File(dir, "r-new.json"), ("{\"pid\":1,\"vkey\":\"v\",\"slot\":\"s-new\","
+                    + "\"started\":" + now + ",\"until\":" + (now + 60000) + "}")
+                    .getBytes("UTF-8"));
+            List<Instances.Running> got = Instances.scanReserved(dir, now);
+            ttlOk = got.size() == 1 && "s-new".equals(got.get(0).slot)
+                    && !new File(dir, "r-old.json").exists();
+        } catch (Throwable t) {
+            ttlOk = false;
+        } finally {
+            Data.deleteTree(dir);
+        }
+        ok(stat, L, ttlOk, "② 过期占位不再算作在跑、过期文件当场删（不会永久挡住）");
+
+        // ③ GameSlot 不再对外（它直接读 Intent 里的 slot / pkg / apk / legacy_swap）
+        boolean notExported = false;
+        try {
+            android.content.pm.ActivityInfo ai = ctx.getPackageManager().getActivityInfo(
+                    new android.content.ComponentName(ctx.getPackageName(), GameSlot.class.getName()), 0);
+            notExported = ai != null && !ai.exported;
+        } catch (Throwable ignored) {
+        }
+        ok(stat, L, notExported, "③ GameSlot exported=false：外部 Intent 进不了启动链");
     }
 
     private static void ok(int[] stat, List<String> L, boolean cond, String msg) {

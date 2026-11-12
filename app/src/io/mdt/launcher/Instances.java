@@ -49,8 +49,20 @@ final class Instances {
     /** 门禁查询缓存（见类注释；只影响 binder 次数，不影响判据正确性） */
     private static final long CACHE_TTL_MS = 200L;
 
+    /**
+     * 启动占位的有效期（第 366 轮）。publish 一般 <2 s 就发生；给慢机冷启动留足余量，
+     * 又不至于把"点了一次但没起来"的槽挡太久。过期后自动失效 + 回到界面时会被清扫。
+     */
+    static final long RESERVE_TTL_MS = 30000L;
+
+    /** `app_hub/instances/` 下放**启动占位**的子目录（与真实登记分开，扫描互不干扰）。 */
+    private static final String RESERVED = "reserved";
+
     private static volatile List<Running> sCache;
     private static volatile long sCacheAt;
+
+    /** 占位文件名的自增序号（同毫秒连点也不撞名） */
+    private static int sReserveSeq;
 
     /** 自检专用：不为 null 时直接当登记表（见 {@link #testSnapshot}） */
     private static volatile List<Running> sTestSnapshot;
@@ -139,6 +151,8 @@ final class Instances {
                 return;
             }
             Util.atomicWriteText(new File(d, r.pid + ".json"), r.toJson().toString());
+            // 第 366 轮：真实登记接管 ⇒ 主进程那条启动占位立刻收掉（门禁不留双份判据）
+            clearReservations(ctx, vkey, slot);
             sCache = null;
             Log.i(TAG, "instance published: " + r.label() + " pid=" + r.pid);
         } catch (Throwable t) {
@@ -148,10 +162,24 @@ final class Instances {
 
     /** 撤销本进程的登记（启动失败 / 正常退出时兜底；跨进程失效靠存活校验）。 */
     static void withdraw(Context ctx) {
+        withdrawPid(ctx);
+        sCache = null;
+    }
+
+    /**
+     * 撤销**这一局**的登记 + 清掉它对应的启动占位（启动失败时由 `:game` 调，第 366 轮）。
+     * vkey / slot 不知道时传 null / 空 ⇒ 只销号，不动占位（保守，别误清别人的）。
+     */
+    static void withdraw(Context ctx, String vkey, String slot) {
+        withdrawPid(ctx);
+        clearReservations(ctx, vkey, slot);
+        sCache = null;
+    }
+
+    private static void withdrawPid(Context ctx) {
         try {
             File f = new File(dir(ctx), android.os.Process.myPid() + ".json");
             if (f.isFile()) f.delete();
-            sCache = null;
         } catch (Throwable t) {
             Log.w(TAG, "instance withdraw failed: " + t);
         }
@@ -159,7 +187,7 @@ final class Instances {
 
     // ── 读（主进程 / 任何进程） ─────────────────────────────────────────────
 
-    /** 当前所有**还活着**的实例；失效条目顺手删掉。 */
+    /** 当前所有**还活着**的实例（含未过期的启动占位）；失效条目顺手删掉。 */
     static List<Running> live(final Context ctx) {
         List<Running> test = sTestSnapshot;
         if (test != null) return test;
@@ -168,14 +196,30 @@ final class Instances {
         List<Running> cache = sCache;
         if (cache != null && now - sCacheAt <= CACHE_TTL_MS) return cache;
 
-        List<Running> out = scan(dir(ctx), new Live() {
-            @Override public boolean alive(int pid, String proc) {
-                return aliveNow(ctx, pid, proc);
-            }
-        });
+        List<Running> out = scan(dir(ctx), liveAdapter(ctx));
+        // 第 366 轮：占位也算"这个槽被占" —— 补上 :game publish 之前门禁看不见的窗口。
+        out.addAll(scanReserved(reservedDir(ctx), now));
+        sortByStart(out);
         sCache = out;
         sCacheAt = now;
         return out;
+    }
+
+    private static Live liveAdapter(final Context ctx) {
+        return new Live() {
+            @Override public boolean alive(int pid, String proc) {
+                return aliveNow(ctx, pid, proc);
+            }
+        };
+    }
+
+    private static void sortByStart(List<Running> out) {
+        Collections.sort(out, new Comparator<Running>() {
+            @Override public int compare(Running a, Running b) {
+                if (a.started != b.started) return a.started < b.started ? -1 : 1;
+                return a.pid == b.pid ? 0 : (a.pid < b.pid ? -1 : 1);
+            }
+        });
     }
 
     static File dir(Context ctx) {
@@ -213,13 +257,155 @@ final class Instances {
             }
             out.add(r);
         }
-        Collections.sort(out, new Comparator<Running>() {
-            @Override public int compare(Running a, Running b) {
-                if (a.started != b.started) return a.started < b.started ? -1 : 1;
-                return a.pid == b.pid ? 0 : (a.pid < b.pid ? -1 : 1);
-            }
-        });
+        sortByStart(out);
         return out;
+    }
+
+    // ── 启动占位（第 366 轮，主进程 startActivity 之前的"即将被占"） ─────────
+
+    static File reservedDir(Context ctx) {
+        return new File(dir(ctx), RESERVED);
+    }
+
+    /**
+     * **启动占位**：主进程在 `startActivity` 之前先登记"这个槽即将被占"。
+     *
+     * <p>为什么需要：`:game` 的 {@link #publish} 在 `Data.prepareSlot`（那时已经改了全局槽指针）
+     * 之后才发生 —— 从点下启动到 publish 的几百 ms 里，**槽正在被打开、代码正在读它的资产**，
+     * 但登记表里还没有它 ⇒ 只看登记表的写门禁是看不见的。占位让写门禁从点下启动那一刻
+     * 就拒写这个槽；真实登记 publish 成功后立刻把占位清掉。
+     *
+     * <p>不会永久挡住：超过 {@link #RESERVE_TTL_MS} 自动过期；回到界面时
+     * {@link #sweepReservations} 还会清掉"明显起不来"的占位。同一槽只留一条（重试 / 连点幂等）。
+     */
+    static synchronized void reserve(Context ctx, String vkey, String slot) {
+        if (slot == null || slot.trim().isEmpty()) return;
+        try {
+            File d = reservedDir(ctx);
+            if (!d.isDirectory() && !d.mkdirs() && !d.isDirectory()) return;
+            clearReservations(ctx, vkey, slot);           // 同一槽旧的先清（连点 / 重试）
+            long now = System.currentTimeMillis();
+            JSONObject o = new JSONObject();
+            o.put("pid", android.os.Process.myPid());
+            o.put("vkey", vkey == null ? "" : vkey);
+            o.put("slot", slot);
+            o.put("started", now);
+            o.put("until", now + RESERVE_TTL_MS);
+            Util.atomicWriteText(new File(d, "r-" + now + "-" + (sReserveSeq++) + ".json"),
+                    o.toString());
+            sCache = null;
+            Log.i(TAG, "instance reserved: " + slot + " until+" + RESERVE_TTL_MS + "ms");
+        } catch (Throwable t) {
+            Log.w(TAG, "instance reserve failed: " + t);
+        }
+    }
+
+    /** 撤掉这一局的启动占位（Activity 没起来 / 启动失败时）。vkey / slot 至少给一个。 */
+    static void unreserve(Context ctx, String vkey, String slot) {
+        clearReservations(ctx, vkey, slot);
+    }
+
+    /**
+     * 清掉匹配的占位：vkey / slot 非空才参与过滤；**两个都空 = 什么都不做**
+     * （避免"不知道身份时误清别人的占位"）。
+     */
+    static void clearReservations(Context ctx, String vkey, String slot) {
+        boolean byVkey = vkey != null && !vkey.isEmpty();
+        boolean bySlot = slot != null && !slot.isEmpty();
+        if (!byVkey && !bySlot) return;
+        File d = reservedDir(ctx);
+        File[] fs = d.isDirectory() ? d.listFiles() : null;
+        if (fs == null) return;
+        for (File f : fs) {
+            if (f == null || !f.isFile() || !f.getName().endsWith(".json")) continue;
+            JSONObject o = readJson(f);
+            if (o == null) {
+                f.delete();
+                continue;
+            }
+            if (byVkey && !vkey.equals(o.optString("vkey", ""))) continue;
+            if (bySlot && !slot.equals(o.optString("slot", ""))) continue;
+            f.delete();
+        }
+        sCache = null;
+    }
+
+    /**
+     * 扫描占位目录（**不校验 pid**：占位的 pid 是主进程，活不活由 `until` 决定）。
+     * 过期 / 坏条目顺手删；返回仍有效的（当成运行实例参与门禁）。
+     */
+    static List<Running> scanReserved(File dir, long now) {
+        List<Running> out = new ArrayList<Running>();
+        File[] fs = dir == null || !dir.isDirectory() ? null : dir.listFiles();
+        if (fs == null) return out;
+        for (File f : fs) {
+            if (f == null || !f.isFile() || !f.getName().endsWith(".json")) continue;
+            JSONObject o = readJson(f);
+            if (o == null) {
+                f.delete();
+                continue;
+            }
+            long until = o.optLong("until", 0L);
+            String slot = o.optString("slot", "");
+            if (until <= now || slot.isEmpty()) {
+                f.delete();
+                continue;
+            }
+            out.add(new Running(o.optInt("pid", 0), o.optString("vkey", ""), slot,
+                    o.optLong("started", 0L), ""));
+        }
+        sortByStart(out);
+        return out;
+    }
+
+    /**
+     * 回到界面时清扫"明显起不来"的占位：`publish` 成功会自己清，所以剩下超过 10 s
+     * 还没有对应真实实例的，基本就是启动流程半路死了（复检拒绝 / Activity 没起来）。
+     */
+    static void sweepReservations(Context ctx) {
+        File d = reservedDir(ctx);
+        File[] fs = d.isDirectory() ? d.listFiles() : null;
+        if (fs == null) return;
+        long now = System.currentTimeMillis();
+        List<Running> real = scan(dir(ctx), liveAdapter(ctx));
+        boolean changed = false;
+        for (File f : fs) {
+            if (f == null || !f.isFile() || !f.getName().endsWith(".json")) continue;
+            JSONObject o = readJson(f);
+            if (o == null) {
+                f.delete();
+                changed = true;
+                continue;
+            }
+            long until = o.optLong("until", 0L);
+            long started = o.optLong("started", 0L);
+            String slot = o.optString("slot", "");
+            String vkey = o.optString("vkey", "");
+            boolean expired = until <= now;
+            boolean likelyFailed = now - started > 10000L && runningOn(real, vkey, slot) == null;
+            if (expired || likelyFailed) {
+                f.delete();
+                changed = true;
+            }
+        }
+        if (changed) sCache = null;
+    }
+
+    private static Running runningOn(List<Running> list, String vkey, String slot) {
+        if (list == null || slot == null || slot.isEmpty()) return null;
+        for (Running r : list) {
+            if (r == null || !slot.equals(r.slot)) continue;
+            if (vkey == null || vkey.isEmpty() || vkey.equals(r.vkey)) return r;
+        }
+        return null;
+    }
+
+    private static JSONObject readJson(File f) {
+        try {
+            return new JSONObject(Util.readText(f));
+        } catch (Throwable t) {
+            return null;
+        }
     }
 
     /**

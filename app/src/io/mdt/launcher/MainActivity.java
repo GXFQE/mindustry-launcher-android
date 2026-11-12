@@ -468,6 +468,9 @@ public class MainActivity extends BaseActivity {
         //   本进程内存里那份缓存不会自己变 ⇒ 不重读的话，远古包跑完之后这里会把
         //   当前槽算成"空的 slot-<名>"，而本体其实在 files/。
         Data.reloadLegacyOwner();
+        // ★ 第 366 轮：顺手清掉"明显起不来"的启动占位（启动流程半路死的那些）。
+        //   publish 成功的占位在 publish 那一刻就清了，不会走到这里。
+        Instances.sweepReservations(this);
         rescan();
         // F5：回到启动器就结算一次自动备份（内部自己判 :game 是否已退出、这局够不够久）。
         // 放这里而不是放游戏进程：它就是"用户回到启动器"这一刻，天然覆盖
@@ -1678,6 +1681,11 @@ public class MainActivity extends BaseActivity {
                 // F5：落账（**必须落盘**，且必须在 startActivity 之前）——
                 // 游戏会带走 :game 进程、主进程也可能被回收，回来时要能知道这局几点开的。
                 AutoBackup.noteStart(e.key(), slot);
+                // ★ 第 366 轮：**启动占位** —— 主进程先占住这个槽，补上
+                //   「startActivity → :game publish」之间门禁看不见的窗口（:game 要等 prepareSlot
+                //   之后才能 publish，而那时它已经在读这个槽的资产了）。
+                //   publish 成功 / 启动失败都会立刻清掉；30 s 过期兜底（见 Instances）。
+                Instances.reserve(MainActivity.this, e.key(), slot);
 
                 if (killed) {
                     // 给 AMS 一点时间回收，避免新实例与旧进程竞态
@@ -1692,7 +1700,13 @@ public class MainActivity extends BaseActivity {
                         //   放在 startActivity 之前：插件可能要先做准备（切配置 / 记一笔）。
                         final String label = e.displayName(MainActivity.this);
                         PluginEvents.gameStart(MainActivity.this, slot, label);
-                        startActivity(i);
+                        try {
+                            startActivity(i);
+                        } catch (Throwable t) {
+                            // Activity 都没起来 ⇒ 占位立刻撤掉（否则这个槽要被误挡到过期）
+                            Instances.unreserve(MainActivity.this, e.key(), slot);
+                            android.util.Log.w("MDTLauncher", "start GameSlot failed", t);
+                        }
                     }
                 });
             }

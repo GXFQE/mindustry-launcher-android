@@ -411,11 +411,15 @@
         <!--
           游戏坑位：加载流程（存档槽交换 / 预热 / dex 注入 / load native / 挂资产链）
           必须跑在游戏所在的 :game 进程里，否则系统在干净进程里找不到游戏类。
-          exported=true 便于 adb 驱动验证 —— M5 发布前评估是否收回。
+
+          🔴 第 366 轮：`android:exported` 从 true 收回 false。它直接读 Intent 里的
+             `slot` / `pkg` / `apk` / `legacy_swap` ⇒ 外部进程能借此建槽目录、改全局当前槽指针、
+             触发 legacy 改名交换（多实例写门禁管不到"启动前"）。生产入口只有 `MainActivity`，
+             同一应用内 startActivity 不受 exported 影响；dev 验证也走 MainActivity 的 dev extra。
         -->
         <activity
             android:name=".GameSlot"
-            android:exported="true"
+            android:exported="false"
             android:process=":game"
             android:theme="@style/AppTheme"
             android:label="@string/gameslot_title"/>
