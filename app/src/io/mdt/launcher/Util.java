@@ -278,6 +278,20 @@ public final class Util {
      *   `/proc/self/cmdline`；两者都拿不到时**当主进程**处理（宁可多装一次，也别漏装）。
      */
     public static boolean isMainProcess(android.content.Context ctx) {
+        String p = processName();
+        return p.isEmpty() || p.equals(ctx.getPackageName());
+    }
+
+    /**
+     * **当前进程名**（`pkg` / `pkg:game` / `pkg:probe` / 将来的 `pkg:game0`…）。
+     *
+     * <p>实现与 {@link #isMainProcess} 原来那段一字不差，抽出来是给
+     * {@link Instances#publish} 用（登记项要记进程名，读侧靠它防 pid 复用）。
+     *
+     * @return 取不到时返回空串（**不要**当"主进程"—— 那是 isMainProcess 的兜底语义，
+     *         这里只诚实地说"不知道"）
+     */
+    public static String processName() {
         String p = null;
         try {
             if (android.os.Build.VERSION.SDK_INT >= 28) {
@@ -306,7 +320,7 @@ public final class Util {
                 }
             }
         }
-        return p == null || p.isEmpty() || p.equals(ctx.getPackageName());
+        return p == null ? "" : p;
     }
 
     public static String readText(File f) throws IOException {

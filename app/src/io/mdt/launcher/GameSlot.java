@@ -134,6 +134,12 @@ public class GameSlot extends BaseActivity {
         final String launchSlot = Data.currentSlot(this);
         final String ikey = Versions.instanceKey(vkey, launchSlot);
 
+        // ★ 2026-11-12（第 359 轮）：登记"这个实例正在跑"（多开前置，见 Instances）。
+        //   时机：槽/版本都定下来之后、注入与拉起游戏之前 —— 门禁从这一刻起就按它拒写。
+        //   ⚠️ 退出时没有可靠回调（游戏 System.exit / SIGKILL 都没有）⇒ 读侧靠 pid 存活校验，
+        //      这里只负责"报名"，不负责"销号"（启动失败那条路在 fail() 里销）。
+        Instances.publish(this, vkey, launchSlot);
+
         // ③ 六步管线（同步执行，与探针一致；前置段 ~200-500 ms，游戏自身加载另有 4~5 s）
         Injector.Plan plan = new Injector.Plan();
         plan.apk = target;
@@ -268,6 +274,7 @@ public class GameSlot extends BaseActivity {
     }
 
     private void fail(String step, String msg, Throwable cause) {
+        Instances.withdraw(this);          // 这一局没起来 ⇒ 立刻销号（别让写门禁一直拦）
         mStatus.setText(Trans.get(GameSlot.this, R.string.game_start_failed_fmt, step));
         StringBuilder sb = new StringBuilder();
         sb.append(Trans.get(GameSlot.this, R.string.game_step_stuck_fmt, step, msg));

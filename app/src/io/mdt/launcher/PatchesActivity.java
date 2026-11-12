@@ -432,7 +432,18 @@ public final class PatchesActivity extends BaseActivity {
     }
 
     private void doDisable(final CardStack stack, final Row row) {
-        Patches.disable(this, mIkey, row.record);
+        try {
+            Patches.disable(this, mIkey, row.record);
+        } catch (PatchException e) {
+            final CardStack done = new CardStack(this);
+            done.replace(Trans.get(this, R.string.patch_op_failed),
+                    PatchText.reason(this, e),
+                    new CardStack.Btn(Trans.get(this, R.string.patch_close),
+                            new Runnable() {
+                                @Override public void run() { done.dismiss(); }
+                            }));
+            return;
+        }
         stack.dismiss();
         android.widget.Toast.makeText(this,
                 Trans.get(this, R.string.patch_disable_ok_fmt, row.record.label()),

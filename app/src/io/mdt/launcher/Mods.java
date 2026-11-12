@@ -601,9 +601,11 @@ public final class Mods {
                     "拿不到槽「" + slot + "」的目录（外部存储可能没挂载）", slot, null);
             return r;
         }
-        if (Data.gameAlive(ctx)) {
+        if (WriteGate.blockedSlot(ctx, slot)) {
             // ★ 2026-10-04：这句现在会**原样出现在用户弹窗的第一层**（`SettingsText.userReason()`），
             //   所以去掉 `:game` / `settings.bin` 这类术语（文案纪律 ③）。
+            // ★ 2026-11-12（第 359 轮）：判据从"任意 :game 在跑"收窄为"**这个槽**的实例在跑"
+            //   （多开前置，见 WriteGate）—— 别的槽在跑不该挡这个槽的模组开关。
             r.fail(SettingsBin.Result.E_GAME_RUNNING,
                     "游戏正在运行，现在改会被它覆盖 —— 请先退出游戏再改。", null, null);
             return r;
@@ -684,8 +686,9 @@ public final class Mods {
                     "拿不到槽「" + slot + "」的目录（外部存储可能没挂载）", slot, null);
             return r;
         }
-        if (Data.gameAlive(ctx)) {
-            // ★ 同 setEnabledAll：这句会原样进用户弹窗第一层 ⇒ 去术语（2026-10-04）
+        if (WriteGate.blockedSlot(ctx, slot)) {
+            // ★ 同 setEnabledAll：这句会原样进用户弹窗第一层 ⇒ 去术语（2026-10-04）；
+            //   判据 = 这个槽的实例在跑（2026-11-12 多开前置）。
             r.fail(SettingsBin.Result.E_GAME_RUNNING,
                     "游戏正在运行，现在改会被它覆盖 —— 请先退出游戏再改。", null, null);
             return r;
@@ -1073,7 +1076,9 @@ public final class Mods {
      */
     public static File deleteToTrash(Context ctx, File modsDir, File mod, File trashDir) {
         if (modsDir == null || mod == null || trashDir == null) return null;
-        if (Data.gameAlive(ctx)) return null;
+        // 2026-11-12（第 359 轮）：按**运行实例**判（以前是全局 gameAlive：别的槽在跑也删不了）。
+        String slot = Data.slotOfDir(ctx, modsDir.getParentFile());
+        if (WriteGate.blockedSlotOrGlobal(ctx, slot)) return null;
         try {
             if (!modsDir.getCanonicalFile().equals(mod.getParentFile().getCanonicalFile())) {
                 return null;                                        // 不是这个目录的直接子项

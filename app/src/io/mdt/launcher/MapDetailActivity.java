@@ -113,7 +113,9 @@ public class MapDetailActivity extends BaseActivity {
         //   而那句 `map_delete_fail` 还写着"或者这张图属于游戏 / 模组包里的"——
         //   本页的删除入口**只对本槽地图出现**（见 onCreate 里的 FROM_SLOT 判断），
         //   那个原因在任何情况下都不成立，等于把唯一可操作的那句稀释掉了。
-        if (Data.gameAlive(this)) {
+        // 2026-11-12（第 359 轮）：按**这一页的槽**判（多开前置，见 WriteGate）。
+        // 以前是全局 gameAlive：别的槽在跑时连这一页的删除也按不动。
+        if (WriteGate.blockedSlot(this, mSlot)) {
             alert(Trans.get(MapDetailActivity.this, R.string.game_busy_title), Trans.get(MapDetailActivity.this, R.string.map_delete_busy_msg));
             return;
         }

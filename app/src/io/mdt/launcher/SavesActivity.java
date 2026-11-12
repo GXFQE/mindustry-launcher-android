@@ -407,7 +407,7 @@ public class SavesActivity extends BaseActivity {
                     Toast.LENGTH_SHORT).show();
             return;
         }
-        if (Data.gameAlive(this)) {
+        if (WriteGate.blockedSlot(this, mSlot)) {
             alert(Trans.get(this, R.string.game_busy_title),
                     Trans.get(this, R.string.save_del_busy_msg));
             return;

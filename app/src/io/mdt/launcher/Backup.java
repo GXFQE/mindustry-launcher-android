@@ -202,8 +202,10 @@ public final class Backup {
     }
 
     private static Snapshot create0(Context ctx, String slot, String label) throws IOException {
-        boolean live = slot.equals(Data.currentSlot(ctx));
-        if (live && Data.gameAlive(ctx)) {
+        // 2026-11-12（第 359 轮）：按**运行实例**判（多开前置）。以前是
+        // `slot==currentSlot && gameAlive`（只能保护"当前槽"），多开下会漏掉另一个在跑的槽；
+        // 现在"这个槽有没有实例在跑"由登记表回答（见 WriteGate / Instances）。
+        if (WriteGate.blockedSlot(ctx, slot)) {
             throw new IOException(Trans.get(ctx, R.string.backup_err_game_running));
         }
         File src = Data.dirOf(ctx, slot);
@@ -354,7 +356,7 @@ public final class Backup {
         if (ss == null || ss.dir == null || !ss.dir.exists()) {
             return fail(Trans.get(ctx, R.string.backup_restore_err_no_snapshot));
         }
-        if (gameAliveOn(ctx, slot)) {
+        if (WriteGate.blockedSlot(ctx, slot)) {
             return fail(Trans.get(ctx, R.string.backup_restore_err_game_running));
         }
         List<Entry> entries;
@@ -537,7 +539,8 @@ public final class Backup {
      *   附带好处是用户**可以再恢复一次**。别为了"干净"把它删掉 —— 删了就没法复现克隆源。
      *
      * ⚠️ 调用方负责：`src` 此刻不在被写入。{@link #create} 自己就会拦
-     *   "`src` 是当前槽且 `:game` 还活着"，这里**不再重复判**（两处判据迟早分岔）。
+     *   "`src` 这个槽有运行实例"（2026-11-12 起按**运行实例**判，见 `WriteGate`），
+     *   这里**不再重复判**（两处判据迟早分岔）。
      *
      * @param label 中间快照的备注（用户会在源槽的备份列表里看到这一行）
      */
@@ -992,10 +995,6 @@ public final class Backup {
     }
 
     // ── 内部 ──────────────────────────────────────────────────────────────
-
-    private static boolean gameAliveOn(Context ctx, String slot) {
-        return slot.equals(Data.currentSlot(ctx)) && Data.gameAlive(ctx);
-    }
 
     private static void writeManifest(File snapDir, Snapshot ss, List<Entry> entries)
             throws IOException {

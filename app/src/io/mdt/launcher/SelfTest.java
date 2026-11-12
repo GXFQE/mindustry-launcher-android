@@ -247,6 +247,9 @@ public final class SelfTest {
             modsPipeline(ctx, L, stat);
             // ★ ⑯ F13 第二阶段：启停 —— settings.bin 的**安全改写**（备份 / 原子写 / 写后自检 / 还原）
             settingsWrite(ctx, L, stat);
+            // ★ 第 359 轮：运行实例登记 + 按实例写门禁（多开前置）—— 纯函数矩阵 + 登记表扫描
+            //   + 用登记表快照钉住"这个槽在跑 ⇒ 拒 / 别的槽在跑 ⇒ 放行"
+            instanceGate(ctx, L, stat);
             // ★ ⑰ F13 第三阶段：模组包导入 / 跨槽复制（五个负例 + 一条元断言）
             modsPack(ctx, L, stat);
             // ★ ⑲ F13 第二批：搜索/筛选/排序（纯函数，可单独喂断言）
@@ -14502,16 +14505,21 @@ public final class SelfTest {
             write(sub, good);
             File moveIt = new File(schems, "要删的.msch");
             write(moveIt, good);
-            boolean gameAlive = Data.gameAlive(ctx);
-            File moved = BlueprintFiles.deleteToTrash(ctx, schems, moveIt, trash);
-            if (gameAlive) {
-                // 门禁生效的那一支：**什么都没动**（这才是这段代码在游戏跑着时该有的样子）
-                ok(stat, L, moved == null && moveIt.isFile(),
-                        "⑤ 游戏在跑 ⇒ 删除被门禁拦住、文件原样不动");
-            } else {
-                ok(stat, L, moved != null && moved.isFile() && !moveIt.exists(),
-                        "⑤ 删除 = **挪进中转站**（槽里那份没了、站里那份在）");
+            // 2026-11-12（第 359 轮）：门禁按**运行实例**判（以前是全局 gameAlive）⇒ 用登记表
+            // 快照钉住两支：① 这个槽有实例在跑 ⇒ 拒；② 没有（别的槽在跑也一样）⇒ 照常删。
+            try {
+                Instances.testSnapshot(java.util.Collections.singletonList(
+                        new Instances.Running(1, "selftest", SLOT_BP,
+                                System.currentTimeMillis(), "selftest:game")));
+                File blocked = BlueprintFiles.deleteToTrash(ctx, schems, moveIt, trash);
+                ok(stat, L, blocked == null && moveIt.isFile(),
+                        "⑤ 这个槽有实例在跑 ⇒ 删除被门禁拦住、文件原样不动");
+            } finally {
+                Instances.clearTestSnapshot();
             }
+            File moved = BlueprintFiles.deleteToTrash(ctx, schems, moveIt, trash);
+            ok(stat, L, moved != null && moved.isFile() && !moveIt.exists(),
+                    "⑤ 没有实例占这个槽 ⇒ 删除 = **挪进中转站**（槽里那份没了、站里那份在）");
             File nested = BlueprintFiles.deleteToTrash(ctx, schems, sub, trash);
             ok(stat, L, nested == null && sub.isFile(),
                     "⑤ ★元断言：**不是直接子项**的那份（子目录里的）删不动，原件还在");
@@ -16787,6 +16795,116 @@ public final class SelfTest {
     }
 
     // ── 小工具 ────────────────────────────────────────────────────────────
+
+    /**
+     * ㊽ 运行实例登记 + 按实例写门禁（第 359 轮，多开前置）。
+     *
+     * <p>为什么现在就要有尺子：门禁的"三态"（同实例拒 / 别的槽放行 / 读放行）是
+     * 多开的地基；没有断言的话，`gameAlive` 一改进程名就会**静默 fail-open**
+     * （plan §12.6 第 1 条），而自检全绿。
+     */
+    private static void instanceGate(Context ctx, List<String> L, int[] stat) {
+        L.add("");
+        L.add("── ㊽ 运行实例登记 + 按实例写门禁（多开前置）──────────────────────");
+
+        // ① 登记项 JSON 往返（字段一个都不能丢：pid / 版本 / 槽 / 时刻 / 进程名）
+        Instances.Running r = new Instances.Running(4242, "pkg.a", "slotA",
+                123456789L, "io.mdt.launcher:game");
+        Instances.Running back = "".equals(r.toJson().toString())
+                ? null : Instances.Running.parse(r.toJson().toString());
+        ok(stat, L, back != null && back.pid == 4242 && "pkg.a".equals(back.vkey)
+                        && "slotA".equals(back.slot) && back.started == 123456789L
+                        && "io.mdt.launcher:game".equals(back.proc),
+                "① 登记项 JSON 往返（pid/vkey/slot/started/proc 一个不丢）");
+
+        // ② 坏条目 ⇒ 解析 null（扫描侧会删）；缺槽也当坏
+        ok(stat, L, Instances.Running.parse("not json") == null
+                        && Instances.Running.parse("{\"pid\":5}") == null,
+                "② 坏 JSON / 缺槽 ⇒ 解析为 null（读侧会当陈旧条目删掉）");
+
+        // ③ 扫描：失效登记**读到就删**，活着的留下且按启动时间排序
+        File dir = new File(ctx.getCacheDir(), "selftest-instances");
+        boolean scanOk = false;
+        try {
+            Data.deleteTree(dir);
+            dir.mkdirs();
+            write(new File(dir, "11.json"), new Instances.Running(11, "v1", "s1", 100L, "x:game")
+                    .toJson().toString().getBytes("UTF-8"));
+            write(new File(dir, "22.json"), new Instances.Running(22, "v2", "s2", 200L, "x:game")
+                    .toJson().toString().getBytes("UTF-8"));
+            final java.util.Set<Integer> alive = new java.util.HashSet<Integer>();
+            alive.add(Integer.valueOf(22));
+            List<Instances.Running> live = Instances.scan(dir, new Instances.Live() {
+                @Override public boolean alive(int pid, String proc) {
+                    return alive.contains(Integer.valueOf(pid));
+                }
+            });
+            scanOk = live.size() == 1 && live.get(0).pid == 22
+                    && !new File(dir, "11.json").exists();
+        } catch (Throwable t) {
+            scanOk = false;
+        } finally {
+            Data.deleteTree(dir);
+        }
+        ok(stat, L, scanOk, "③ 失效登记读到就删；活着的留下（pid=22）");
+
+        // ④ 门禁三态（纯函数：登记表是外面喂的，不碰 Context/文件）
+        final List<Instances.Running> running = java.util.Collections.singletonList(
+                new Instances.Running(7, "pkg.v1", "slotA", 1L, "x:game"));
+        ok(stat, L, WriteGate.blockedSlot(running, "slotA")
+                        && !WriteGate.blockedSlot(running, "slotB")
+                        && WriteGate.blockedVersion(running, "pkg.v1")
+                        && !WriteGate.blockedVersion(running, "pkg.v2")
+                        && WriteGate.blockedInstance(running, Versions.instanceKey("pkg.v1", "slotA"))
+                        && !WriteGate.blockedInstance(running, Versions.instanceKey("pkg.v1", "slotB"))
+                        && !WriteGate.blockedInstance(running, Versions.instanceKey("pkg.v2", "slotA")),
+                "④ 三态：同槽/同版本/同实例拒，其它槽和其它版本放行");
+
+        // ⑤ 多开命名（:game0/:game1）也要认成游戏进程 —— 否则换进程名当天全局动作 fail-open
+        String pkg = ctx.getPackageName();
+        ok(stat, L, Data.isGameProcessName(ctx, pkg + ":game")
+                        && Data.isGameProcessName(ctx, pkg + ":game0")
+                        && Data.isGameProcessName(ctx, pkg + ":game12")
+                        && !Data.isGameProcessName(ctx, pkg + ":gamex")
+                        && !Data.isGameProcessName(ctx, pkg)
+                        && !Data.isGameProcessName(ctx, pkg + ":probe"),
+                "⑤ 进程名判据认 :game / :gameN，不误认主进程 / :probe / :gamex");
+
+        // ⑥ 反查：目录 → 槽名（core 写函数只拿到 File 时靠它按槽判）
+        ok(stat, L, SLOT_MODS.equals(Data.slotOfDir(ctx, Data.slotDir(ctx, SLOT_MODS)))
+                        && Data.slotOfDir(ctx, new File(ctx.getCacheDir(), "not-a-slot")) == null,
+                "⑥ 目录反查槽名：槽目录认得、随便一个目录返回 null");
+
+        // ⑦ 集成：把"SLOT_MODS 在跑"伪造进登记表 ⇒ 真实的 core 写入口（Mods.setEnabled）被拒
+        //    ⚠️ 用 try/finally 保证快照一定清掉；否则后面的用例全按"某个槽在跑"跑。
+        boolean blockedOnlyThisSlot = false;
+        try {
+            Instances.testSnapshot(java.util.Collections.singletonList(
+                    new Instances.Running(8, "pkg.selftest", SLOT_MODS,
+                            System.currentTimeMillis(), "selftest:game")));
+            SettingsBin.Result blocked = Mods.setEnabled(ctx, SLOT_MODS, "selftest.gate.mod", false);
+            blockedOnlyThisSlot = blocked != null
+                    && blocked.errCode == SettingsBin.Result.E_GAME_RUNNING;
+        } finally {
+            Instances.clearTestSnapshot();
+        }
+        ok(stat, L, blockedOnlyThisSlot,
+                "⑦ 这个槽有运行实例 ⇒ Mods.setEnabled 被拒（core 门禁接上了登记表）");
+
+        // ⑧ 反方向：**别的槽**在跑时，这个槽的写入必须放行（多开的核心诉求，不变式③）
+        boolean otherSlotAllowed;
+        try {
+            Instances.testSnapshot(java.util.Collections.singletonList(
+                    new Instances.Running(9, "pkg.selftest", "selftest-other-slot",
+                            System.currentTimeMillis(), "selftest:game")));
+            SettingsBin.Result r2 = Mods.setEnabled(ctx, SLOT_MODS, "selftest.gate.mod", false);
+            otherSlotAllowed = r2 != null && r2.errCode != SettingsBin.Result.E_GAME_RUNNING;
+        } finally {
+            Instances.clearTestSnapshot();
+        }
+        ok(stat, L, otherSlotAllowed,
+                "⑧ 别的槽在跑 ⇒ 这个槽的写不被门禁误拒（不变式③）");
+    }
 
     private static void ok(int[] stat, List<String> L, boolean cond, String msg) {
         if (cond) stat[0]++;

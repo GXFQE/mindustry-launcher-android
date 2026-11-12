@@ -383,7 +383,9 @@ final class Patches {
      */
     static void delete(Context ctx, Record r) throws PatchException {
         if (r == null) throw new PatchException(PatchException.C_RECORD_GONE, "");
-        if (Data.gameAlive(ctx)) throw new PatchException(PatchException.C_GAME_ALIVE, "");
+        // 2026-11-12（第 359 轮）：补丁库是 hub 全局数据（不变式 ④）—— 删除一份**没被任何实例
+        // 启用**的补丁文件不影响正在跑的游戏（它的 dex 在启动时就加载了）。"被启用"由下面的
+        // C_IN_USE 拦（按实例键的引用）；所以不再用全局 gameAlive 拦（那会误挡无关操作）。
         List<String> owners = Config.get().patchRefOwners(r.ref());
         if (!owners.isEmpty()) {
             // ★ 第 353 轮：启用状态按**实例**存，owner 键里带 NUL ⇒ 上屏前翻译成人话
@@ -455,7 +457,11 @@ final class Patches {
      */
     static void enable(Context ctx, String ikey, Record r, String apkSha256) throws PatchException {
         if (r == null) throw new PatchException(PatchException.C_RECORD_GONE, "");
-        if (Data.gameAlive(ctx)) throw new PatchException(PatchException.C_GAME_ALIVE, "");
+        // 2026-11-12（第 359 轮）：按**实例键 (V,S)** 判（以前是全局 gameAlive：别的实例在跑也拦）。
+        // 启用状态本来就按实例存（第 353 轮）⇒ 门禁维度必须跟它一致。
+        if (WriteGate.blockedInstance(ctx, ikey)) {
+            throw new PatchException(PatchException.C_GAME_ALIVE, "");
+        }
         if (!r.filesOk) throw new PatchException(PatchException.C_MISSING, r.label());
         if (apkSha256 == null || apkSha256.isEmpty()) {
             throw new PatchException(PatchException.C_NO_MATCH, r.label());
@@ -472,8 +478,12 @@ final class Patches {
         Log.i(TAG, "patch enabled: " + r.ref() + " for " + ikey);
     }
 
-    static void disable(Context ctx, String ikey, Record r) {
-        if (r == null) return;
+    static void disable(Context ctx, String ikey, Record r) throws PatchException {
+        if (r == null) throw new PatchException(PatchException.C_RECORD_GONE, "");
+        // 2026-11-12（第 359 轮）：与 enable 对称 —— 这是"写实例级状态"，同一把门禁。
+        if (WriteGate.blockedInstance(ctx, ikey)) {
+            throw new PatchException(PatchException.C_GAME_ALIVE, "");
+        }
         List<String> refs = Config.get().patchRefs(ikey);
         if (!refs.remove(r.ref())) return;
         Config.get().setPatchRefs(ikey, refs);

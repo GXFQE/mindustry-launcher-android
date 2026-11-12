@@ -331,7 +331,7 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
         // ★ 2026-10-04：**先判游戏在不在跑**（拦在 SAF 选择器之前）。导入是往槽的 mods/ 里**写**
         //   （目录形态模组还会把旧件挪去中转站），而工程里凡"写槽"的路径都有这道门禁
         //   （导入存档/整槽、备份、恢复、改设置、跨槽复制）；模组导入原来漏了。
-        if (Data.gameAlive(this)) {
+        if (WriteGate.blockedSlot(this, mSlot)) {
             alert(Trans.get(ModsActivity.this, R.string.game_busy_title), Trans.get(ModsActivity.this, R.string.mods_import_busy_msg));
             return;
         }
@@ -385,7 +385,8 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
      */
     private void importDocs(java.util.List<BatchIo.Doc> docs, final String slot) {
         if (docs == null || docs.isEmpty()) return;
-        if (Data.gameAlive(this)) {
+        // 2026-11-12（第 359 轮）：按目标槽判（多开前置，见 WriteGate）
+        if (WriteGate.blockedSlot(this, slot)) {
             alert(Trans.get(ModsActivity.this, R.string.game_busy_title),
                     Trans.get(ModsActivity.this, R.string.mods_import_busy_msg));
             return;
@@ -440,7 +441,7 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
                     R.string.mods_export_none_fmt, mSlot), Toast.LENGTH_SHORT).show();
             return;
         }
-        if (Data.gameAlive(this)) {
+        if (WriteGate.blockedSlot(this, mSlot)) {
             alert(Trans.get(this, R.string.game_busy_title),
                     Trans.get(this, R.string.mods_del_busy_msg));
             return;
@@ -787,10 +788,10 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
     }
 
     private void doCopy(final File from, final File to, final String toSlot) {
-        // 门禁：**只在动了"当前槽"时才拦** —— 游戏只读当前槽的 mods/，
-        // 两个非当前槽之间互拷与它无关（别用一条过宽的规矩挡掉无害的操作）。
-        final String cur = Data.currentSlot(this);
-        if (Data.gameAlive(this) && (mSlot.equals(cur) || toSlot.equals(cur))) {
+        // 2026-11-12（第 359 轮）：按**写入目标槽**判（多开前置）。源槽只是读（不变式②：读放行）；
+        // 以前是 `gameAlive && (源==当前槽 || 目标==当前槽)` 的近似：多开下会漏"另一个在跑的槽"，
+        // 单实例下又会挡掉"从当前槽拷到别的空槽"这种完全无害的动作。
+        if (WriteGate.blockedSlot(this, toSlot)) {
             // ★ 2026-10-15：这里原来复用 `mods_copy_done`（「复制完成」）当标题 ——
             //   正文却是"游戏正在运行，请先退出游戏"（同一屏自打脸）。拦下就说拦下。
             alert(Trans.get(ModsActivity.this, R.string.game_busy_title),
@@ -1805,7 +1806,7 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
     private void confirmToggle(final CardStack parent, final Mods.Info m) {
         final boolean on = !m.enabled;
         String msg = Trans.get(ModsActivity.this, R.string.mods_toggle_msg_fmt,
-                getString(Data.gameAlive(this)
+                getString(WriteGate.blockedSlot(this, mSlot)
                         ? R.string.mods_toggle_game_alive : R.string.mods_toggle_game_off));
         // ★ 第④项：关之前先算「会连累谁」—— 现在游戏要到下次启动才显示缺依赖，
         //   那时用户早忘了自己关过什么（判据在 Mods.dependents 里，一处实现）。

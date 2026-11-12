@@ -761,6 +761,10 @@ public final class PluginHost {
                     r = Result.fail("not-found");
                 } else if (!insideDir(f, dirForKind(it.kind))) {
                     r = Result.fail("not-in-slot");
+                } else if (WriteGate.blockedSlotOrGlobal(c, Data.slotOfPath(c, f))) {
+                    // 2026-11-12（第 359 轮）：这里以前**没有直接门禁**（靠被调方全局拦，
+                    // 而且失败原因被翻成 io）。现在按文件所属槽判，reason 也正确。
+                    r = Result.fail("game-running");
                 } else {
                     boolean ok;
                     if (ItemInfo.KIND_MODS.equals(it.kind)) {
@@ -768,6 +772,10 @@ public final class PluginHost {
                     } else if (ItemInfo.KIND_BLUEPRINTS.equals(it.kind)) {
                         ok = BlueprintFiles.deleteToTrash(c, blueprintsDir(), f,
                                 BlueprintFiles.trashDirOf(c)) != null;
+                    } else if (ItemInfo.KIND_SAVES.equals(it.kind)) {
+                        // 2026-11-12：修 bug —— 这里原来和 maps 共用 else 分支（拿 mapsDir 校验
+                        // 存档文件），父目录必不匹配 ⇒ 插件的"删存档"永远 io。存档有自己的实现。
+                        ok = SlotIo.deleteSaveToTrash(c, savesDir(), f, Trash.savesDir(c)) != null;
                     } else {
                         ok = MapFiles.deleteToTrash(c, mapsDir(), f,
                                 MapFiles.trashDirOf(c)) != null;
@@ -886,7 +894,9 @@ public final class PluginHost {
                                         java.util.LinkedHashMap<String, Object> changes) {
             File file = Mods.settingsFileOf(c, useSlot);
             if (file == null) return Result.fail("not-found");
-            if (Data.gameAlive(c)) return Result.fail("game-running");
+            // 2026-11-12（第 359 轮）：按**目标槽**判（多开前置）。以前是全局 gameAlive ——
+            // 目标槽已经解析出来了却没用上，写别的槽也会被无关的游戏挡掉。
+            if (WriteGate.blockedSlot(c, useSlot)) return Result.fail("game-running");
             if (changes == null || changes.isEmpty()) return Result.fail("invalid");
             for (Map.Entry<String, Object> e : changes.entrySet()) {
                 if (e.getKey() == null || e.getKey().isEmpty()) return Result.fail("invalid");
@@ -920,10 +930,14 @@ public final class PluginHost {
             Result r = Result.fail("invalid");
             try {
                 if (it != null && it.path != null && content != null) {
-                    if (Data.gameAlive(getBaseContext())) {
+                    // 2026-11-12（第 359 轮）：按**文件所属槽**判（多开前置）。
+                    // 路径反查不出槽（不该发生 —— 下面 insideKnownSlot 会拒）才退回全局判据。
+                    File itemFile = new File(it.path);
+                    String itemSlot = Data.slotOfPath(getBaseContext(), itemFile);
+                    if (WriteGate.blockedSlotOrGlobal(getBaseContext(), itemSlot)) {
                         r = Result.fail("game-running");
                     } else {
-                        File f = new File(it.path);
+                        File f = itemFile;
                         File dir = f.getParentFile();
                         if (f.isFile() && dir != null && insideKnownSlot(f)) {
                             String key = f.getCanonicalPath();
@@ -992,7 +1006,8 @@ public final class PluginHost {
         private Result addItemNow(Context c, String useSlot, String dirName,
                                   String name, InputStream content) {
             try {
-                if (Data.gameAlive(c)) return Result.fail("game-running");
+                // 2026-11-12（第 359 轮）：按**目标槽**判（多开前置；以前是全局 gameAlive）
+                if (WriteGate.blockedSlot(c, useSlot)) return Result.fail("game-running");
                 File root = Data.dirOf(c, useSlot);
                 if (root == null || !root.isDirectory()) return Result.fail("not-found");
                 File dir = new File(root, dirName);

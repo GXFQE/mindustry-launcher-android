@@ -225,7 +225,10 @@ final class SlotIo {
      */
     static File deleteSaveToTrash(android.content.Context ctx, File savesDir, File saveFile, File trashDir) {
         if (savesDir == null || saveFile == null || trashDir == null) return null;
-        if (Data.gameAlive(ctx)) return null;                       // 游戏在跑：不动
+        // 2026-11-12（第 359 轮）：按**运行实例**判（以前是全局 gameAlive：别的槽在跑也删不了）。
+        // 槽名从 saves 目录反查；产品路径一定反查得到，反查不到才退回全局判据（保守）。
+        String slot = Data.slotOfDir(ctx, savesDir.getParentFile());
+        if (WriteGate.blockedSlotOrGlobal(ctx, slot)) return null;   // 这个槽的实例在跑：不动
         try {
             if (!savesDir.getCanonicalFile().equals(saveFile.getParentFile().getCanonicalFile())) {
                 return null;                                        // 不是这个目录的直接子项
@@ -626,7 +629,7 @@ final class SlotIo {
         final CardStack[] ref = new CardStack[1];
         ref[0] = CardStack.show(parent, a, Trans.get(a, R.string.export_slot_title_fmt, s.name),
                 CardStack.text(a, Trans.get(a, R.string.export_slot_msg_fmt,
-                        Data.gameAlive(a) ? Trans.get(a, R.string.export_slot_playing) : "")),
+                        WriteGate.blockedSlot(a, s.name) ? Trans.get(a, R.string.export_slot_playing) : "")),
                 new CardStack.Btn(Trans.get(a, R.string.cancel), new Runnable() {
                     @Override public void run() { ref[0].dismiss(); }
                 }),
@@ -729,7 +732,7 @@ final class SlotIo {
         final CardStack[] ref = new CardStack[1];
         ref[0] = CardStack.show(parent, a, Trans.get(a, R.string.share_slot_title_fmt, s.name),
                 CardStack.text(a, Trans.get(a, R.string.share_slot_msg_fmt, extra.toString(),
-                        Data.gameAlive(a) ? Trans.get(a, R.string.export_slot_playing) : "")),
+                        WriteGate.blockedSlot(a, s.name) ? Trans.get(a, R.string.export_slot_playing) : "")),
                 new CardStack.Btn(Trans.get(a, R.string.cancel), new Runnable() {
                     @Override public void run() { ref[0].dismiss(); }
                 }),
@@ -1012,7 +1015,9 @@ final class SlotIo {
 
     /** 目标槽是否正被游戏占用（占用了就不许往里写，除非是纯读的导出） */
     static boolean blockedByGame(Activity a, Data.Slot s) {
-        if (s.active && Data.gameAlive(a)) {
+        // 2026-11-12（第 359 轮）：按**运行实例**判（多开前置）。以前是
+        // `s.active && gameAlive`（只保护"当前槽"），多开下另一个在跑的槽会漏。
+        if (s != null && WriteGate.blockedSlot(a, s.name)) {
             alert(a, Trans.get(a, R.string.game_busy_title),
                     Trans.get(a, R.string.game_busy_msg_fmt, s.name));
             return true;
@@ -1030,7 +1035,8 @@ final class SlotIo {
      * 一份普通文件 ⇒ 单份那条老路（{@link #importMsav}：含改名框与逐个同名确认）。
      *
      * <p>⚠️ 写槽那道门禁（{@link #blockedByGame}）**没有**收进这里：它要的是 `Data.Slot`
-     * （判"是不是当前槽"），不是槽名 ⇒ 留在两处调用点上各过一遍，用的是同一个实现。
+     * （判"这个槽有没有运行实例"，2026-11-12 起按实例判，见 `WriteGate`）⇒ 留在两处调用点上
+     * 各过一遍，用的是同一个实现。
      */
     static void importDocs(Activity a, String slot, List<BatchIo.Doc> docs, SlotOps.Host h) {
         if (docs == null || docs.isEmpty() || slot == null) return;

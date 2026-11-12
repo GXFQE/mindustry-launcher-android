@@ -388,7 +388,10 @@ final class SlotOps {
      * ★ 空槽直接在这里挡住（用列表里现成的 `s.files`，0 次 IO）。
      */
     static void cloneSlot(final Activity a, final Data.Slot s, final Host h) {
-        if (s.name.equals(Data.currentSlot(a)) && Data.gameAlive(a)) {
+        // 2026-11-12（第 359 轮）：按**运行实例**判（以前是 `slot==currentSlot && gameAlive`）。
+        // 克隆是"读源槽 + 写新槽"—— 源槽有实例在跑时读到的是半写状态，所以仍要拦；
+        // 但它只该拦"源槽在跑"，别的槽在跑不该挡（多开前置，见 WriteGate）。
+        if (WriteGate.blockedSlot(a, s.name)) {
             alert(a, Trans.get(a, R.string.clone_source_live),
                     Trans.get(a, R.string.clone_source_live_msg_fmt, s.name));
             return;
@@ -615,6 +618,13 @@ final class SlotOps {
         if (s.active) {
             alert(a, Trans.get(a, R.string.delete_current_slot_title),
                     Trans.get(a, R.string.delete_current_slot_msg_fmt, s.name));
+            return;
+        }
+        // 2026-11-12（第 359 轮）：按**运行实例**判（以前只有"当前槽身份"这一道，
+        // 多开时另一个正在跑的槽会被直接搬走 —— 见 plan §12.3C）。
+        if (WriteGate.blockedSlot(a, s.name)) {
+            alert(a, Trans.get(a, R.string.game_busy_title),
+                    Trans.get(a, R.string.game_busy_msg_fmt, s.name));
             return;
         }
         final List<Backup.Snapshot> snaps = Backup.list(a, s.name);

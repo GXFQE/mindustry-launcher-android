@@ -16,10 +16,8 @@ final class SettingsCopyUi {
 
     static void open(final Activity a, final Data.Slot target, final SlotOps.Host host) {
         if (a == null || target == null) return;
-        if (Data.gameAlive(a)) {
-            toast(a, R.string.settings_copy_game_running);
-            return;
-        }
+        // 2026-11-12（第 359 轮）：这一步只是**读两个槽的 settings.bin**（不变式②：读一律放行），
+        // 写门禁挪到真正落盘的 doCopy（按目标槽判，见 WriteGate）。
         SlotOps.pickSlot(null, a, R.string.settings_copy_pick_source, target.name,
                 new SlotOps.SlotPick2() {
                     @Override public void onPicked(CardStack stack, String source) {
@@ -106,7 +104,7 @@ final class SettingsCopyUi {
     private static void doCopy(final CardStack stack, final Activity a,
                                final Data.Slot target, final SettingsCopy.Plan plan,
                                final SlotOps.Host host) {
-        if (Data.gameAlive(a)) {
+        if (WriteGate.blockedSlot(a, target.name)) {
             toast(a, R.string.settings_copy_game_running);
             return;
         }

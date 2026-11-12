@@ -661,6 +661,10 @@ public final class Trash {
         if (name.equals(Data.currentSlot(ctx))) {
             return r.fail(Result.T_CURRENT_SLOT, "current slot: " + name, name);
         }
+        // 2026-11-12（第 359 轮）：按**运行实例**判（以前只有"当前槽身份"这一道）
+        if (WriteGate.blockedSlot(ctx, name)) {
+            return r.fail(Result.T_GAME_RUNNING, "slot instance running: " + name, name);
+        }
         File slotDir = Data.slotDir(ctx, name);
         if (slotDir == null || !slotDir.exists()) {
             return r.fail(Result.T_NO_TARGET, "no slot dir: " + slotDir, name);
@@ -771,16 +775,24 @@ public final class Trash {
         if (it == null || it.path == null) {
             return r.fail(Result.T_NOT_IN_TRASH, "no item", null);
         }
-        if (Data.gameAlive(ctx)) {
-            return r.fail(Result.T_GAME_RUNNING, "game is running", null);
-        }
         if (it.kind == Kind.SLOT) {
             String want = slot == null || slot.trim().isEmpty() ? it.slot : slot.trim();
+            // "当前槽"这条身份判据**先于**实例门禁：它更具体（错误码/文案都不同），
+            // 而且两者同时为真时用户该先看到"这是当前槽"（2026-11-12 保持原语义）。
             if (want.equals(Data.currentSlot(ctx))) {
                 return r.fail(Result.T_CURRENT_SLOT, "current slot: " + want, want);
             }
+            // 2026-11-12（第 359 轮）：按**运行实例**判（以前是全局 gameAlive：别的槽在跑也放不回去）
+            if (WriteGate.blockedSlot(ctx, want)) {
+                return r.fail(Result.T_GAME_RUNNING, "game is running", want);
+            }
             return restoreSlot(it.path, want, Paths.slotParent(ctx),
                     new File(Data.hubDir(ctx), DIR_BACKUPS));
+        }
+        // 2026-11-12（第 359 轮）：按**目标槽**判；槽名推不出来（不该发生在产品路径上）
+        // 才退回全局判据（保守）。
+        if (WriteGate.blockedSlotOrGlobal(ctx, slot)) {
+            return r.fail(Result.T_GAME_RUNNING, "game is running", slot);
         }
         File slotDir = Data.dirOf(ctx, slot);
         if (slotDir == null || !slotDir.isDirectory()) {
@@ -851,7 +863,8 @@ public final class Trash {
         Result r = new Result();
         if (it == null || it.path == null) return r.fail(Result.T_NO_TARGET, "no item", null);
         if (it.kind != Kind.PATCH) return r.fail(Result.T_NO_KIND, "not a patch: " + it.name, it.name);
-        if (Data.gameAlive(ctx)) return r.fail(Result.T_GAME_RUNNING, "game is running", null);
+        // 2026-11-12（第 359 轮）：补丁库是 hub 全局数据（不变式 ④）—— 放回一份文件不影响
+        // 正在跑的实例（它的 dex 在启动时就加载了），所以不再用全局 gameAlive 拦。
         String raw = it.name == null ? "" : it.name;
         int at = raw.lastIndexOf('@');
         String id = at > 0 ? raw.substring(0, at) : "";

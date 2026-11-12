@@ -252,6 +252,62 @@ public final class Data {
         return slotDir(ctx, slot);
     }
 
+    // ── 反查：这个目录 / 文件属于哪个槽（写门禁按槽判的桥） ────────────────
+
+    /**
+     * **目录 → 槽名**：`dir` 正好是某个槽的数据根时返回槽名，否则 null。
+     *
+     * <p>为什么需要：一批 core 写函数只拿到 `File dir`（`mapsDir` / `modsDir` /
+     * `savesDir`…）—— {@link WriteGate} 要按**槽**判，必须先反查回槽名。反查规则与
+     * {@link #dirOf} 严格同源（遍历当前槽 / 远古包本体 / 磁盘上的槽，最后才试 `shared`），
+     * 所以不会出现"门禁认错槽"。
+     *
+     * <p>⚠️ 这是**只读**方法：不 mkdirs、不落盘。
+     */
+    public static String slotOfDir(Context ctx, File dir) {
+        if (ctx == null || dir == null) return null;
+        List<String> names = new ArrayList<String>();
+        String cur = currentSlot(ctx);
+        names.add(cur);
+        String legacy = legacyOwner(ctx);
+        if (legacy != null && !legacy.equals(cur)) names.add(legacy);
+        for (String n : slotNames(ctx)) {
+            if (!names.contains(n)) names.add(n);
+        }
+        // shared 放最后：它的 dirOf 与"远古包本体借住 files/"是同一个目录，先让有身份的那位赢。
+        if (!names.contains(SLOT_SHARED)) names.add(SLOT_SHARED);
+        File canon;
+        try {
+            canon = dir.getCanonicalFile();
+        } catch (Throwable t) {
+            return null;
+        }
+        for (String n : names) {
+            File d = dirOf(ctx, n);
+            if (d == null) continue;
+            try {
+                if (canon.equals(d.getCanonicalFile())) return n;
+            } catch (Throwable ignored) {
+            }
+        }
+        return null;
+    }
+
+    /**
+     * **文件 / 目录 → 槽名**：{@link #slotOfDir} 的"向上找"版本（最多 4 层）。
+     * 给插件接口用（它拿到的是内容文件路径：`&lt;槽&gt;/maps/x.msav` 这类）。
+     */
+    public static String slotOfPath(Context ctx, File file) {
+        if (ctx == null || file == null) return null;
+        File d = file.isDirectory() ? file : file.getParentFile();
+        for (int i = 0; i < 4 && d != null; i++) {
+            String s = slotOfDir(ctx, d);
+            if (s != null) return s;
+            d = d.getParentFile();
+        }
+        return null;
+    }
+
     // ── 远古包的"本体临时借住 files/"标记（F0 兜底路径）──────────────────────
 
     /**
@@ -402,7 +458,7 @@ public final class Data {
         return null;
     }
 
-    /** 改名。当前槽在占用中，拒绝（先切走再改）。 */
+    /** 改名。当前槽在占用中、或**这个槽的实例正在跑**，拒绝（先退出再改）。 */
     public static String renameSlot(Context ctx, String name, String rawNewName) {
         String n = sanitizeSlot(rawNewName);
         if (n == null) {
@@ -411,6 +467,10 @@ public final class Data {
         if (n.equals(name)) return null;
         if (name.equals(currentSlot(ctx))) {
             return Trans.get(ctx, R.string.slot_err_rename_current_fmt, name);
+        }
+        // 2026-11-12（第 359 轮）：按**运行实例**判（多开前置；见 WriteGate）
+        if (WriteGate.blockedSlot(ctx, name)) {
+            return Trans.get(ctx, R.string.slot_err_game_running_fmt, name);
         }
         File from = slotDir(ctx, name);
         if (from == null || !from.exists()) return Trans.get(ctx, R.string.slot_err_missing_fmt, name);
@@ -437,6 +497,10 @@ public final class Data {
     public static String deleteSlotForever(Context ctx, String name) {
         if (name.equals(currentSlot(ctx))) {
             return Trans.get(ctx, R.string.slot_err_delete_current_fmt, name);
+        }
+        // 2026-11-12（第 359 轮）：按**运行实例**判（多开前置；见 WriteGate）
+        if (WriteGate.blockedSlot(ctx, name)) {
+            return Trans.get(ctx, R.string.slot_err_game_running_fmt, name);
         }
         File d = slotDir(ctx, name);
         if (d == null || !d.exists()) return Trans.get(ctx, R.string.slot_err_missing_fmt, name);
@@ -515,7 +579,17 @@ public final class Data {
 
     // ── 游戏进程存活（备份/恢复/体检的前置条件） ────────────────────────────
 
-    /** :game 进程是否在跑 */
+    /**
+     * `:game` 进程是否在跑（**全局**判据，不区分槽/版本）。
+     *
+     * <p>⚠️ 2026-11-12（第 359 轮）起：**写实例数据不要用它** —— 门禁一律走
+     * {@link WriteGate}（按运行实例的槽 / 版本 / 实例键判）。本方法只留给
+     * 迁移 / 回收 / 杀进程这类"动全局资源"的动作（见 {@link LauncherApp#onCreate}、
+     * {@link Data#autoCleanRedundant}、{@link MainActivity#ensureGameProcessDead}）。
+     *
+     * <p>判据 = 进程名是 `包名:game` **或** `包名:gameN`（多开方案 §4 的命名；
+     * 这样换进程名时不会静默 fail-open —— 见 plan §12.6 第 1 条）。
+     */
     public static boolean gameAlive(Context ctx) {
         try {
             ActivityManager am =
@@ -523,13 +597,35 @@ public final class Data {
             if (am == null) return false;
             List<ActivityManager.RunningAppProcessInfo> ps = am.getRunningAppProcesses();
             if (ps == null) return false;
-            String want = ctx.getPackageName() + ":game";
+            String pkg = ctx.getPackageName();
             for (ActivityManager.RunningAppProcessInfo p : ps) {
-                if (want.equals(p.processName)) return true;
+                if (p != null && isGameProcessName(pkg, p.processName)) return true;
             }
         } catch (Throwable ignored) {
         }
         return false;
+    }
+
+    /**
+     * 这个进程名是不是**游戏实例进程**：`包名:game`，或 `包名:game` + 纯数字（`:game0/:game1`）。
+     *
+     * <p>为什么现在就把 `:gameN` 认下来：多开方案 §4 计划把实例进程改成 `:game0/:game1`，
+     * 而 {@link #gameAlive} 原来是**精确等于** `pkg:game` ⇒ 换名字那天所有全局动作会
+     * 静默认为"没在跑"（plan §12.6 第 1 条）。先认下前缀，换名字时不会翻车。
+     */
+    public static boolean isGameProcessName(Context ctx, String proc) {
+        return ctx != null && isGameProcessName(ctx.getPackageName(), proc);
+    }
+
+    static boolean isGameProcessName(String pkg, String proc) {
+        if (pkg == null || proc == null) return false;
+        String base = pkg + ":game";
+        if (proc.equals(base)) return true;
+        if (!proc.startsWith(base) || proc.length() <= base.length()) return false;
+        for (int i = base.length(); i < proc.length(); i++) {
+            if (!Character.isDigit(proc.charAt(i))) return false;
+        }
+        return true;
     }
 
     /** 结束 :game 进程（游戏正常退出会自己 System.exit(0)，这个只处理异常残留） */

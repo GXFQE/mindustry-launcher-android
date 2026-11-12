@@ -162,6 +162,15 @@ final class SettingsCopy {
     /** 写目标；空计划返回 null（调用方报“没东西可搬”，不要当成失败）。 */
     static SettingsBin.Result apply(Context ctx, String targetSlot, Plan plan) {
         if (plan == null || plan.empty()) return null;
+        // 2026-11-12（第 359 轮）：门禁落到 core（多开前置）。以前只有 UI 层判"任意游戏在跑"，
+        // 这条 core 路径（包括将来的 dev 口 / 其它调用方）可以直写活槽；现在按**目标槽**判。
+        if (WriteGate.blockedSlot(ctx, targetSlot)) {
+            SettingsBin.Result r = new SettingsBin.Result();
+            // 文案走资源（SRC-02：不要在 Java 里新加中文字面量）
+            r.fail(SettingsBin.Result.E_GAME_RUNNING,
+                    Trans.get(ctx, R.string.settings_err_game_running), targetSlot, null);
+            return r;
+        }
         return SettingsBin.applyValues(plan.targetFile,
                 Mods.settingsBackupDirOf(ctx, targetSlot), plan.changes);
     }

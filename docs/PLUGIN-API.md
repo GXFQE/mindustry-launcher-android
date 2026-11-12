@@ -113,7 +113,7 @@ public static void unload();                    // 可选：收尾（也认 unlo
 | `contents(kind)` / `contents(slot, kind)` | 四类内容；`kind` = `saves`/`maps`/`mods`/`blueprints` |
 | `logs()` / `trash()` / `versions()` | 日志与崩溃报告 / 中转站 / 已装版本 |
 | `open(item)` | 打开条目的字节流（文件或容器条目统一） |
-| `modsSkipped()` / `gameRunning()` | 这一轮会不会加载模组 / 游戏在不在跑 |
+| `modsSkipped()` / `gameRunning()` | 这一轮会不会加载模组 / **有没有**游戏在跑（⚠️ 全局判据，答不了"某个槽在不在跑"，见下） |
 | `baseBundleKeys()`（v28） | 目标版本**基础语言包**的键集合（判"是不是原版文案"用；空集 = 读不到，不是"没有"） |
 | `usageDir()` | 插件数据目录（见第 9 节） |
 | `crashReportsDir()`（v22） | 当前槽的崩溃报告目录（只读；可能不存在） |
@@ -464,18 +464,25 @@ String json = api.parseHjson(file);   // 标准 JSON 文本；失败/读不了 �
 
 ### 写与整理
 
+> **多实例语义（2026-11-12 起）**：`GameSlot` 会把自己登记成一个**运行实例**（版本 + 槽）。
+> 写类方法的 `game-running` 判据是「**目标槽**有实例在跑」，不是"任意游戏在跑" ——
+> 别的槽的游戏不影响你写这个槽。读类方法一律放行。
+> ⚠️ **File 出口不受写门禁保护**：`slotDir()`/`savesDir()`/… 与 `ItemInfo.path` 给的路径
+> 可以直接写（本工程"无沙箱"是既定边界，见 `PluginApi` 头注释）。写门禁只拦
+> `writeItem`/`addItem`/`writeGameSettings`/`trashItem` 这四个 API。
+
 | 方法 | 说明 |
 |---|---|
-| `writeItem(item, stream, cb)` | 换掉**任意槽**四类目录里**已存在**文件的字节（v34 起跨槽；原子替换；游戏在跑时拒绝；**无备份**） |
+| `writeItem(item, stream, cb)` | 换掉**任意槽**四类目录里**已存在**文件的字节（v34 起跨槽；原子替换；**该文件所在槽有实例在跑时**拒绝；**无备份**） |
 | `addItem(slot, kind, name, stream, cb)` | **v35 新建**存档 / 地图 / 模组 / 蓝图；不覆盖同名；只校验槽名 / 后缀 / 原子写，**内容归插件** |
-| `trashItem(item, cb)` | 挪进中转站（不是真删，规则与界面删除同一套） |
+| `trashItem(item, cb)` | 挪进中转站（不是真删，规则与界面删除同一套；目标槽有实例在跑 ⇒ `game-running`） |
 | `openItem(item)` | 跳详情页（地图/存档 → 地图详情；蓝图 → 蓝图详情；模组 → 模组页） |
 
 **v35 `addItem` 的边界**：
 - `kind` = `saves` / `maps` / `mods` / `blueprints`；分别落 `saves/` / `maps/` / `mods/` / `schematics/`。
 - `name` 必须是**完整裸文件名**：`.msav`（saves / maps）、`.jar` / `.zip`（mods）、`.msch`（blueprints）；
   路径分隔符 / 控制字符 / 隐藏名 / `.` / `..` 一律 `invalid`。
-- 同名已存在 ⇒ `exists`（要替换用 `writeItem`）；游戏在跑 ⇒ `game-running`；槽不存在 ⇒ `not-found`。
+- 同名已存在 ⇒ `exists`（要替换用 `writeItem`）；**目标槽有实例在跑** ⇒ `game-running`；槽不存在 ⇒ `not-found`。
 - **宿主不做内容校验 / 不回滚**：写进去的 `.msav` 是否合法、mod zip 有没有 `mod.hjson`、
   `.msch` 能不能解析，全是插件责任；新文件没有旧版本可还原。
 
@@ -496,7 +503,7 @@ void writeGameSettings(String slot, Map<String, Object> changes, Done done); // 
   真实文件 5900+ 键 / ~500 KB ⇒ **别在主线程调**。
 - `writeGameSettings(slot, …)`：后台线程读写，`Done.onDone(Result)` 回主线程；
   失败 reason = `not-found` / `game-running` / `unreadable` / `invalid` / `io`。
-- **宿主保证的机制**（不是语义）：游戏在跑 ⇒ 拒绝 · 写前备份到
+- **宿主保证的机制**（不是语义）：**目标槽有实例在跑** ⇒ 拒绝 · 写前备份到
   `<hub>/settings-backups/slot-<槽>/`（留 20 份）· 原子写 · 写后读回自检、不过自动还原 ·
   未知键与键顺序原样保留。备份落点是**目标槽**，不是当前槽。
 - **插件负责的语义**：键名含义、缺省值、成对写、目标槽选择。例如 `mod-<名>-enabled` **不存在 = 启用**；
@@ -528,7 +535,7 @@ public final String reason;  // 机器码；成功恒为 null，失败恒非空
 
 | `reason` | 含义 |
 |---|---|
-| `game-running` | 游戏在跑，写操作被拒（先退出游戏） |
+| `game-running` | **目标槽**有游戏实例在跑，写操作被拒（先退出那个游戏） |
 | `not-in-slot` | 条目不在槽内那四类目录里 |
 | `not-found` | 条目不存在 / 没有路径 |
 | `canceled` | 用户取消（**不是错误**，别弹红字） |

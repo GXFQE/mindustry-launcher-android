@@ -380,7 +380,7 @@
     <string name="settings_copy_done_fmt">已写入 %1$d 个键，删除 %2$d 个。</string>
     <string name="settings_copy_failed_title">复制设置失败</string>
     <string name="settings_copy_failed_fmt">%1$s</string>
-    <string name="settings_copy_game_running">请先退出游戏再复制设置。</string>
+    <string name="settings_copy_game_running">请先退出目标槽的游戏再复制设置。</string>
     <string name="settings_copy_same_slot">请选一个不同的槽。</string>
 
     <string name="new_slot_title">新建槽</string>
@@ -409,6 +409,7 @@
     <string name="slot_err_target_current_fmt">目标名「%1$s」是当前槽，不能占用</string>
     <string name="slot_err_rename_failed_fmt">改名失败（%1$s → %2$s）</string>
     <string name="slot_err_delete_current_fmt">「%1$s」是当前槽，正被游戏使用，不能删除。</string>
+    <string name="slot_err_game_running_fmt">槽「%1$s」的游戏实例正在运行，现在改会被它覆盖 —— 请先退出那个游戏再改。</string>
     <string name="slot_err_delete_partial_fmt">删除未完全成功（可能有文件被占用）：%1$s\n剩余 %2$d/%3$d 个文件</string>
 
     <string name="delete_current_slot_title">不能删除当前槽</string>
@@ -1099,7 +1100,7 @@
       ⚠️ `list_join_sep` 是**列表分隔符**（中文用顿号；英文那份在默认目录里写成 `,\u0020`）。
     -->
     <string name="list_join_sep">、</string>
-    <string name="backup_err_game_running">游戏进程还在运行（当前槽正被游戏占用）。\n请先退出游戏再备份，否则备份内容可能不一致。</string>
+    <string name="backup_err_game_running">目标槽的游戏实例还在运行。\n请先退出那个游戏再备份，否则备份内容可能不一致。</string>
     <string name="backup_err_no_data_fmt">槽「%1$s」还没有数据目录，没有可备份的内容。</string>
     <string name="backup_err_mkdir_fmt">创建备份目录失败：%1$s</string>
     <string name="backup_err_same_second">同一秒内已经有一份同名的备份了，稍等一下再试</string>
@@ -1109,7 +1110,7 @@
     <string name="backup_err_delete_partial_fmt">删除未完全成功：%1$s</string>
     <!-- 恢复（restore）那一段：失败原因 + 自检报告 + 成功报告 —— 都是弹窗正文 -->
     <string name="backup_restore_err_no_snapshot">⚠ 这份备份已经不在了</string>
-    <string name="backup_restore_err_game_running">⚠ 游戏进程还在运行（当前槽正被游戏占用）——\n请先退出游戏再恢复。未做任何改动。</string>
+    <string name="backup_restore_err_game_running">⚠ 目标槽的游戏实例还在运行 ——\n请先退出那个游戏再恢复。未做任何改动。</string>
     <string name="backup_restore_err_manifest_fmt">⚠ 读不了这份备份的清单：%1$s</string>
     <string name="backup_restore_err_manifest_empty">⚠ 这份备份的清单是空的</string>
     <string name="backup_restore_err_no_dst">⚠ 拿不到目标槽目录</string>

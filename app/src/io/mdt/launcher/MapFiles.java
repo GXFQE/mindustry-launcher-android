@@ -495,7 +495,9 @@ public final class MapFiles {
      */
     public static File deleteToTrash(Context ctx, File mapsDir, File mapFile, File trashDir) {
         if (mapsDir == null || mapFile == null || trashDir == null) return null;
-        if (Data.gameAlive(ctx)) return null;                      // 游戏在跑：不动
+        // 2026-11-12（第 359 轮）：按**运行实例**判（以前是全局 gameAlive：别的槽在跑也删不了）。
+        String slot = Data.slotOfDir(ctx, mapsDir.getParentFile());
+        if (WriteGate.blockedSlotOrGlobal(ctx, slot)) return null;      // 这个槽的实例在跑：不动
         try {
             if (!mapsDir.getCanonicalFile().equals(mapFile.getParentFile().getCanonicalFile())) {
                 return null;                                       // 不是这个目录的直接子项

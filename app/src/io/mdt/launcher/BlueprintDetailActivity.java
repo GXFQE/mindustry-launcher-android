@@ -122,7 +122,8 @@ public class BlueprintDetailActivity extends BaseActivity {
      *   这里只是把它提前到"问用户之前"）—— 免得用户点了确认才被告知不行。
      */
     private void confirmDelete() {
-        if (Data.gameAlive(this)) {
+        // 2026-11-12（第 359 轮）：按**这一页的槽**判（多开前置，见 WriteGate）。
+        if (WriteGate.blockedSlot(this, mSlot)) {
             alert(Trans.get(BlueprintDetailActivity.this, R.string.game_busy_title),
                     Trans.get(BlueprintDetailActivity.this, R.string.bp_delete_busy_msg));
             return;

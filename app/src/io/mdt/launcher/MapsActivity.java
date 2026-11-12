@@ -293,7 +293,8 @@ public class MapsActivity extends BaseActivity {
      */
     private void importDocs(List<BatchIo.Doc> docs, final String slot) {
         if (docs == null || docs.isEmpty()) return;
-        if (Data.gameAlive(this)) {
+        // 2026-11-12（第 359 轮）：按目标槽判（多开前置，见 WriteGate）
+        if (WriteGate.blockedSlot(this, slot)) {
             alert(Trans.get(MapsActivity.this, R.string.game_busy_title),
                     Trans.get(MapsActivity.this, R.string.maps_import_busy_msg));
             return;
@@ -767,7 +768,7 @@ public class MapsActivity extends BaseActivity {
             Toast.makeText(this, R.string.maps_export_none, Toast.LENGTH_SHORT).show();
             return;
         }
-        if (Data.gameAlive(this)) {
+        if (WriteGate.blockedSlot(this, mSlot)) {
             alert(Trans.get(this, R.string.game_busy_title),
                     Trans.get(this, R.string.map_delete_busy_msg));
             return;
@@ -1080,7 +1081,7 @@ public class MapsActivity extends BaseActivity {
         // ★ 2026-10-04：先判游戏在不在跑（拦在 SAF 选择器 / 二选一之前，别让用户白选一次）。
         //   导入是往槽的 maps/ 里**写**，而工程里凡"写槽"的路径都有这道门禁
         //   （导入存档/整槽、备份、恢复、改设置）；地图与模组导入原来漏了。
-        if (Data.gameAlive(this)) {
+        if (WriteGate.blockedSlot(this, mSlot)) {
             alert(Trans.get(this, R.string.game_busy_title),
                     Trans.get(this, R.string.maps_import_busy_msg));
             return;

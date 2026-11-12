@@ -196,7 +196,7 @@ public class BlueprintsActivity extends BaseActivity {
                         // ★ **先判游戏在不在跑**（拦在 SAF 选择器之前，别让用户白选一次）：
                         //   导入是往槽的 schematics/ 里写（同名旧件还会被挪去中转站），
                         //   而游戏本局存下来的蓝图就在那个目录里 —— 与地图导入同一条门禁。
-                        if (Data.gameAlive(BlueprintsActivity.this)) {
+                        if (WriteGate.blockedSlot(BlueprintsActivity.this, mSlot)) {
                             alert(Trans.get(BlueprintsActivity.this, R.string.game_busy_title),
                                     Trans.get(BlueprintsActivity.this, R.string.bp_import_busy_msg));
                             return;
@@ -256,7 +256,8 @@ public class BlueprintsActivity extends BaseActivity {
      */
     private void importDocs(List<BatchIo.Doc> docs, final String slot) {
         if (docs == null || docs.isEmpty()) return;
-        if (Data.gameAlive(this)) {
+        // 2026-11-12（第 359 轮）：按目标槽判（多开前置，见 WriteGate）
+        if (WriteGate.blockedSlot(this, slot)) {
             alert(Trans.get(BlueprintsActivity.this, R.string.game_busy_title),
                     Trans.get(BlueprintsActivity.this, R.string.bp_import_busy_msg));
             return;
@@ -848,7 +849,7 @@ public class BlueprintsActivity extends BaseActivity {
             Toast.makeText(this, R.string.bp_export_none, Toast.LENGTH_SHORT).show();
             return;
         }
-        if (Data.gameAlive(this)) {
+        if (WriteGate.blockedSlot(this, mSlot)) {
             alert(Trans.get(this, R.string.game_busy_title),
                     Trans.get(this, R.string.bp_delete_busy_msg));
             return;
