@@ -102,9 +102,9 @@ final class Recovery {
             Log.w(TAG, "recovery: CAS tmp sweep failed", t);
         }
         // 3d) launchid.dat 自愈：force-stop / 清理器留下的 marker（无崩溃报告才清，带熔断）
+        //     第 367 轮：**逐槽**跑（见 healLaunchMarkers；每个槽只按它自己的实例判）
         try {
-            String lm = LaunchMarker.maybeClear(ctx, Data.currentSlot(ctx));
-            if (lm != null) sb.append(lm);
+            healLaunchMarkers(ctx, sb);
         } catch (Throwable t) {
             Log.w(TAG, "recovery: launchid auto-clear failed", t);
         }
@@ -143,6 +143,42 @@ final class Recovery {
             }
         }
         return sb.toString();
+    }
+
+    /**
+     * `launchid.dat` 自愈：**逐槽**跑（第 367 轮，多开）。{@code sb} 可以为 null。
+     *
+     * <p>以前只治"当前槽"、外面还用全局 `gameAlive` 挡 ⇒ 主进程被系统回收后重建、而另一个实例
+     * 还在跑时，**所有**槽的残留 marker 都不处理。现在每个槽只看**它自己的实例**
+     * （{@link LaunchMarker#maybeClear} 内部用 `WriteGate.blockedSlot`）：没在跑就自愈，
+     * 正在跑的那个槽一个字节都不动。
+     */
+    static void healLaunchMarkers(Context ctx, StringBuilder sb) {
+        List<String> slots = new java.util.ArrayList<String>();
+        String cur = Data.currentSlot(ctx);
+        if (cur != null && !cur.isEmpty()) slots.add(cur);
+        for (String n : Data.slotNames(ctx)) {
+            if (!slots.contains(n)) slots.add(n);
+        }
+        for (String slot : slots) {
+            try {
+                String lm = LaunchMarker.maybeClear(ctx, slot);
+                if (lm != null && sb != null) sb.append(lm);
+            } catch (Throwable t) {
+                Log.w(TAG, "recovery: launchid auto-clear failed for " + slot, t);
+            }
+        }
+    }
+
+    /**
+     * 有实例在跑时也能做的那一小步自愈（第 367 轮，由 {@link LauncherApp} 调用）：
+     * 只做**逐槽 launchid**；其余步骤都动共享目录（private / CAS / 备份），
+     * 仍等"没有任何游戏在跑"才做（见 {@link #runNow}）。
+     */
+    static void healWhileInstanceRunning(Context ctx) {
+        StringBuilder sb = new StringBuilder();
+        healLaunchMarkers(ctx, sb);
+        if (sb.length() > 0) Log.i(TAG, "startup recovery (while a game runs):\n" + sb);
     }
 
     /**

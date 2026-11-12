@@ -68,6 +68,11 @@ final class SlotOps {
 
     /** 卡片里有栈就推页；没有就自己开一张。 */
     static void backup(final CardStack parent, final Activity a, final Data.Slot s, final Host h) {
+        // ★ 第 367 轮（读语义定案，plan §12.17）：备份 = "读整槽 + 写 hub" ⇒ **读不拒绝**，
+        //   正在跑只提示"快照可能包含写了一半的文件"（core 的 `Backup.create` 也同步放开了）。
+        if (WriteGate.blockedSlot(a, s.name)) {
+            toast(a, Trans.get(a, R.string.backup_running_hint));
+        }
         final EditText input = new EditText(a);
         input.setInputType(InputType.TYPE_CLASS_TEXT);
         input.setHint(R.string.backup_label_hint);
@@ -388,13 +393,11 @@ final class SlotOps {
      * ★ 空槽直接在这里挡住（用列表里现成的 `s.files`，0 次 IO）。
      */
     static void cloneSlot(final Activity a, final Data.Slot s, final Host h) {
-        // 2026-11-12（第 359 轮）：按**运行实例**判（以前是 `slot==currentSlot && gameAlive`）。
-        // 克隆是"读源槽 + 写新槽"—— 源槽有实例在跑时读到的是半写状态，所以仍要拦；
-        // 但它只该拦"源槽在跑"，别的槽在跑不该挡（多开前置，见 WriteGate）。
+        // ★ 第 367 轮（读语义定案，plan §12.17）：克隆 = "读源槽 + 写新槽" ⇒ **读不拒绝**。
+        //   源槽有实例在跑时只提示"结果可能包含写了一半的文件"，不再挡（用户不变式②）；
+        //   别的槽在跑与它无关（按源槽判，见 WriteGate）。
         if (WriteGate.blockedSlot(a, s.name)) {
-            alert(a, Trans.get(a, R.string.clone_source_live),
-                    Trans.get(a, R.string.clone_source_live_msg_fmt, s.name));
-            return;
+            toast(a, Trans.get(a, R.string.clone_running_hint));
         }
         if (s.files == 0) {
             toast(a, Trans.get(a, R.string.clone_source_empty_fmt, s.name));

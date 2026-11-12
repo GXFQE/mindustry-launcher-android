@@ -628,7 +628,14 @@ public final class Data {
         return true;
     }
 
-    /** 结束 :game 进程（游戏正常退出会自己 System.exit(0)，这个只处理异常残留） */
+    /**
+     * 结束 :game 进程（游戏正常退出会自己 System.exit(0)，这个只处理异常残留）。
+     *
+     * <p>★ 第 367 轮真机发现：`killBackgroundProcesses` 在"游戏刚转后台、进程还是 previous"时
+     * **可能不杀**（点击确认换版本后 1.5 s 后 :game 仍活着 ⇒ 直接 start 会复用旧进程，
+     * 跑的还是旧版本）。同一 UID 的进程可以直接 `Process.killProcess(pid)` ⇒ 补一条
+     * **pid + 进程名双校验**的直杀；只杀游戏实例，不碰主进程 / `:probe`。
+     */
     public static void killGame(Context ctx) {
         try {
             ActivityManager am =
@@ -636,6 +643,22 @@ public final class Data {
             if (am != null) am.killBackgroundProcesses(ctx.getPackageName());
         } catch (Throwable t) {
             Log.w(TAG, "killGame failed: " + t);
+        }
+        try {
+            ActivityManager am =
+                    (ActivityManager) ctx.getSystemService(Context.ACTIVITY_SERVICE);
+            List<ActivityManager.RunningAppProcessInfo> ps =
+                    am == null ? null : am.getRunningAppProcesses();
+            if (ps == null) return;
+            int self = android.os.Process.myPid();
+            for (ActivityManager.RunningAppProcessInfo p : ps) {
+                if (p == null || p.pid <= 0 || p.pid == self) continue;
+                if (!isGameProcessName(ctx, p.processName)) continue;
+                Log.i(TAG, "killGame: kill pid " + p.pid + " (" + p.processName + ")");
+                android.os.Process.killProcess(p.pid);
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "killGame direct kill failed: " + t);
         }
     }
 

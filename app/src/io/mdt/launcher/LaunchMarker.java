@@ -29,8 +29,8 @@ import java.io.File;
  * <p>★ 第 365 轮（多开）：熔断计数**按槽分账**（状态文件 `{v:2, slots:{<槽>:{count,at}}}`）。
  * 以前只记"当前槽一条" —— A/B 两个槽交替 force-stop 会互相冲掉计数，熔断就形同虚设。
  *
- * <p>⚠️ 只在**主进程启动**、`Data.gameAlive` 为 false 时调用（见
- * {@link Recovery#runNow}）。游戏在跑时绝不碰。
+ * <p>⚠️ 只在**主进程启动**时调用（见 {@link Recovery}）；判据按**这个槽的实例**（第 367 轮起），
+ * 游戏在跑时绝不碰 —— 别的槽在跑不影响本槽自愈。
  */
 final class LaunchMarker {
     private static final String TAG = "MDTLauncher";
@@ -74,7 +74,9 @@ final class LaunchMarker {
             resetSlot(ctx, slot);
             return null;
         }
-        if (Data.gameAlive(ctx)) return null;      // 游戏在跑：marker 就是它这次启动写的
+        // ★ 第 367 轮（plan §12.17）：按**这个槽的实例**判，不再是全局 `gameAlive` ——
+        //   多开下别的槽在跑不该阻止这个槽自愈；本槽在跑时 marker 就是它这次启动写的。
+        if (WriteGate.blockedSlot(ctx, slot)) return null;
 
         long markerAt = lid.lastModified();
         File dir = CrashAlert.crashesDir(ctx, slot);

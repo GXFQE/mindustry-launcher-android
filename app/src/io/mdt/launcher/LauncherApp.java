@@ -69,6 +69,15 @@ public class LauncherApp extends Application {
             } catch (Throwable t) {
                 Log.w(TAG, "startup recovery failed: " + t);
             }
+        } else {
+            // 第 367 轮（多开）：有实例在跑时，其余自愈都动共享目录 ⇒ 仍不动；
+            // 但**逐槽 `launchid.dat` 自愈**照跑 —— 别的槽的残留 marker 不该因为这个
+            // 实例在跑而一直不清（每个槽只按它自己的实例判，见 Recovery.healLaunchMarkers）。
+            try {
+                Recovery.healWhileInstanceRunning(this);
+            } catch (Throwable t) {
+                Log.w(TAG, "startup slot heal failed: " + t);
+            }
         }
         Config.get().load(this);
         Log.i(TAG, "app up, privateDir=" + Paths.privateDir(this)

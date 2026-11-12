@@ -459,8 +459,7 @@
     <string name="clone_done">Clone complete</string>
     <string name="clone_done_msg_fmt">New slot \"%1$s\": %2$d files · %3$s\n\nThe source slot was not touched. Point a version at this slot from the main screen to use it.</string>
     <string name="clone_failed">Clone failed</string>
-    <string name="clone_source_live">The source slot is in use by the game</string>
-    <string name="clone_source_live_msg_fmt">\"%1$s\" is the current slot and the game is still running.\nFiles being written may read back corrupted, so exit the game first.</string>
+    <string name="clone_running_hint">The game for the source slot is running: this clone may include a half-written file.</string>
 
     <string name="no_backup_title">No backups available</string>
     <string name="no_backup_msg_fmt">Slot \"%1$s\" has no backups yet.</string>
@@ -1130,7 +1129,7 @@
         所以写 `,\u0020` 并进了 U0020 白名单 —— 这是"确有必要"的那一类）。
     -->
     <string name="list_join_sep">,\u0020</string>
-    <string name="backup_err_game_running">A game instance is still running for the target slot.\nExit that game before backing up, or the backup may not match what you see.</string>
+    <string name="backup_running_hint">The game is running: this backup may include a half-written file.</string>
     <string name="backup_err_no_data_fmt">Slot \"%1$s\" has no data directory yet, so there is nothing to back up.</string>
     <string name="backup_err_mkdir_fmt">Could not create the backup directory: %1$s</string>
     <string name="backup_err_same_second">A backup with that name already exists in this second — try again in a moment</string>
@@ -1334,6 +1333,10 @@
     <string name="launch_err_assets">could not read the game resources — this package may be incomplete</string>
     <string name="launch_err_start">could not start the game\'s entry point</string>
     <string name="launch_err_unknown">something unexpected went wrong while starting (details are in the runtime log)</string>
+    <string name="launch_err_prev_alive">could not close the game that is still running\nExit that game first, then start again.</string>
+    <string name="switch_running_title">Another game is running</string>
+    <string name="switch_running_msg_fmt">Starting \"%1$s\" will first close the game that is running (only one game can run for now). Continue?</string>
+    <string name="switch_running_go">Continue</string>
 
     <!-- ══ F3 全局设置页（按 Android 语义：这里只放"所有槽共用"的项） ══════ -->
     <string name="act_settings_title">Settings</string>

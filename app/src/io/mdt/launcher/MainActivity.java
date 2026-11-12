@@ -1517,6 +1517,32 @@ public class MainActivity extends BaseActivity {
         //   **真触摸**（`ViewRootImpl…processPointerEvent`）与**代码合成**（`performClick` 的调用者）。
         //   ⚠️ 只在**真的走到这一步**时写，不进任何热路径（一次游戏启动最多写一次，< 2 KB）。
         recordStartTrace(e);
+        // ★ 第 367 轮（plan §12.17）：现在还只能跑一个实例 ⇒ 起新局前**先确认** ——
+        //   原来这里会静默杀掉正在跑的游戏（plan §12.8 第 1 条）。多开本体（§4）落地后，
+        //   这里会收窄成"不同槽直接并行 / 同槽才确认"；现在至少不再偷偷杀。
+        if (Data.gameAlive(this)) {
+            promptSwitchRunning(e);
+            return;
+        }
+        proceedStart(e);
+    }
+
+    /** 「会先退出正在运行的游戏」确认（第 367 轮）。 */
+    private void promptSwitchRunning(final Versions.Entry e) {
+        final CardStack[] ref = new CardStack[1];
+        ref[0] = CardStack.show(null, this, Trans.get(this, R.string.switch_running_title),
+                CardStack.text(this, Trans.get(this, R.string.switch_running_msg_fmt,
+                        e.displayName(this))),
+                new CardStack.Btn(Trans.get(this, R.string.cancel), new Runnable() {
+                    @Override public void run() { ref[0].dismiss(); }
+                }),
+                new CardStack.Btn(Trans.get(this, R.string.switch_running_go), new Runnable() {
+                    @Override public void run() { ref[0].dismiss(); proceedStart(e); }
+                }));
+    }
+
+    /** 预检通过后的启动流程（冲突确认 → 启动进度）。第 367 轮从 `startVersion` 拆出来。 */
+    private void proceedStart(final Versions.Entry e) {
         // ★ F4①：**毫秒级**同槽冲突预检 —— 0 次 IO、0 个线程。
         //   结论就在 `mConflict` 里（`rescan()` → `computeConflicts()` 早算好了，这里只是查表）。
         //   所以它天然满足 FLOWS 对这条的三条要求（毫秒级 / 只读元数据 / 不卡启动路径）——
@@ -1659,6 +1685,21 @@ public class MainActivity extends BaseActivity {
                 }
 
                 boolean killed = ensureGameProcessDead();
+                // ★ 第 367 轮：杀完**要验死**。以前"没杀掉"也照起 —— 旧 `:game` 进程被复用、
+                //   Activity 不重建 ⇒ 跑的还是旧版本（plan §12.8 第 1 条）。现在明确中止。
+                //   占位在这一步之后才建，所以不会误挡这个槽。
+                if (Data.gameAlive(MainActivity.this)) {
+                    runOnUiThread(new Runnable() {
+                        @Override public void run() {
+                            if (Util.dead(MainActivity.this)) return;
+                            sLaunching = false;
+                            stack.replace(Trans.get(MainActivity.this, R.string.game_cannot_start),
+                                    Trans.get(MainActivity.this, R.string.launch_err_prev_alive),
+                                    closeBtn(stack));
+                        }
+                    });
+                    return;
+                }
                 final Intent i = new Intent(MainActivity.this, GameSlot.class);
                 if (e.imported) {
                     i.putExtra("apk", e.apkPath);

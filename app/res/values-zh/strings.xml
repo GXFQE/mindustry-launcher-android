@@ -451,8 +451,7 @@
     <string name="clone_done">克隆完成</string>
     <string name="clone_done_msg_fmt">新槽「%1$s」：%2$d 个文件 · %3$s\n\n源槽没动过。去主界面把某个版本指到这个槽就能用。</string>
     <string name="clone_failed">克隆失败</string>
-    <string name="clone_source_live">源槽正在被游戏使用</string>
-    <string name="clone_source_live_msg_fmt">「%1$s」是当前槽，游戏还在运行。\n正在写的文件读出来可能是坏的，请先退出游戏。</string>
+    <string name="clone_running_hint">源槽的游戏正在运行：克隆结果可能包含写了一半的文件。</string>
 
     <string name="no_backup_title">没有可用备份</string>
     <string name="no_backup_msg_fmt">槽「%1$s」还没有备份。</string>
@@ -1102,7 +1101,7 @@
       ⚠️ `list_join_sep` 是**列表分隔符**（中文用顿号；英文那份在默认目录里写成 `,\u0020`）。
     -->
     <string name="list_join_sep">、</string>
-    <string name="backup_err_game_running">目标槽的游戏实例还在运行。\n请先退出那个游戏再备份，否则备份内容可能不一致。</string>
+    <string name="backup_running_hint">游戏正在运行：这次备份可能包含写了一半的文件。</string>
     <string name="backup_err_no_data_fmt">槽「%1$s」还没有数据目录，没有可备份的内容。</string>
     <string name="backup_err_mkdir_fmt">创建备份目录失败：%1$s</string>
     <string name="backup_err_same_second">同一秒内已经有一份同名的备份了，稍等一下再试</string>
@@ -1308,6 +1307,10 @@
     <string name="launch_err_assets">游戏的资源读不出来 —— 这个包可能不完整。</string>
     <string name="launch_err_start">游戏入口拉不起来。</string>
     <string name="launch_err_unknown">启动过程中出了点意外（具体见运行日志）。</string>
+    <string name="launch_err_prev_alive">没能关掉还在运行的那个游戏\n请先手动退出它，再重新启动。</string>
+    <string name="switch_running_title">另一个游戏正在运行</string>
+    <string name="switch_running_msg_fmt">启动「%1$s」会先退出正在运行的那个游戏（现在还只能跑一个）。继续吗？</string>
+    <string name="switch_running_go">继续</string>
 
     <!-- ══ F3 全局设置页（按 Android 语义：这里只放"所有槽共用"的项） ══════ -->
     <string name="act_settings_title">设置</string>

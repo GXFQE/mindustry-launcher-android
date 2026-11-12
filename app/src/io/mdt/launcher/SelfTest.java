@@ -1580,11 +1580,36 @@ public final class SelfTest {
                 writeTmp(root, "launchid.dat", "1234567");
                 ok(stat, L, LaunchMarker.maybeClear(ctx, slot) == null,
                         "★…且 A 槽仍满（B 的计数不会把 A 冲掉/重置）");
+
+                // ★ 第 367 轮：Recovery 逐槽自愈 —— 非当前槽的残留 marker 也会被清
+                writeTmp(root2, "launchid.dat", "1234567");
+                StringBuilder rsb = new StringBuilder();
+                Recovery.healLaunchMarkers(ctx, rsb);
+                ok(stat, L, rsb.length() > 0 && !new File(root2, "launchid.dat").exists(),
+                        "★Recovery 逐槽自愈：非当前槽的残留 marker 也会被清（不再只看当前槽）");
             } finally {
                 new File(root2, "launchid.dat").delete();
                 LaunchMarker.maybeClear(ctx, slot2);          // marker 不在 ⇒ 归零 B 的计数
                 Data.deleteSlotForever(ctx, slot2);
             }
+
+            // ★ 第 367 轮：marker 判据按**这个槽的实例**（不是全局 gameAlive）——
+            //   本槽有实例在跑 ⇒ 不清；实例消失 ⇒ 照常清；别的槽在跑不影响。
+            lid.delete();
+            LaunchMarker.maybeClear(ctx, slot);          // marker 不在 ⇒ 计数归零
+            boolean perSlotGate;
+            try {
+                writeTmp(root, "launchid.dat", "1234567");
+                Instances.testSnapshot(java.util.Collections.singletonList(
+                        new Instances.Running(12, "pkg.heal", slot,
+                                System.currentTimeMillis(), "selftest:game")));
+                perSlotGate = LaunchMarker.maybeClear(ctx, slot) == null && lid.exists();
+            } finally {
+                Instances.clearTestSnapshot();
+            }
+            String afterGate = LaunchMarker.maybeClear(ctx, slot);
+            ok(stat, L, perSlotGate && afterGate != null && !lid.exists(),
+                    "★按槽判：本槽有实例 ⇒ 不清 marker；实例消失 ⇒ 照常清（别的槽在跑不拦）");
 
             // 正常启动（marker 已不在）⇒ 计数归零；再来一次应重新 attempt 1
             lid.delete();
@@ -17184,6 +17209,45 @@ public final class SelfTest {
         }
         ok(stat, L, otherSlotAllowed,
                 "⑧ 别的槽在跑 ⇒ 这个槽的写不被门禁误拒（不变式③）");
+
+        // ⑨⑩ 第 367 轮（读语义定案，plan §12.17）：备份 = 读整槽 + 写 hub；克隆 = 读源槽 + 写新槽。
+        //      两者都**不该**被"运行实例"拒（用户不变式②读放行），只由界面提示可能不一致。
+        String src = SLOT_GATE + "-read";
+        String dst = SLOT_GATE + "-read-dst";
+        boolean readOk;
+        try {
+            Data.deleteSlotForever(ctx, src);
+            Data.deleteSlotForever(ctx, dst);
+            Data.createSlot(ctx, src);
+            writeTmp(Data.dirOf(ctx, src), "read-gate.msav", "1234");
+            Instances.testSnapshot(java.util.Collections.singletonList(
+                    new Instances.Running(11, "pkg.read", src,
+                            System.currentTimeMillis(), "selftest:game")));
+            Backup.Snapshot ss = null;
+            String be = null;
+            try {
+                ss = Backup.create(ctx, src, "selftest-read-allowed");
+            } catch (Throwable t) {
+                be = String.valueOf(t);
+            }
+            String ce = null;
+            try {
+                ce = Backup.cloneSlot(ctx, src, dst, "selftest-read-clone");
+            } catch (Throwable t) {
+                ce = String.valueOf(t);
+            }
+            readOk = ss != null && be == null && ce == null
+                    && Data.dirOf(ctx, dst).isDirectory();
+        } catch (Throwable t) {
+            readOk = false;
+        } finally {
+            Instances.clearTestSnapshot();
+            try { Backup.deleteSlotBackups(ctx, src); } catch (Throwable ignored) { }
+            Data.deleteSlotForever(ctx, dst);
+            Data.deleteSlotForever(ctx, src);
+        }
+        ok(stat, L, readOk,
+                "⑨⑩ 备份/克隆是读操作：目标槽/源槽有运行实例也放行（只由界面提示可能不一致）");
     }
 
     /**

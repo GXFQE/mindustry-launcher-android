@@ -202,12 +202,10 @@ public final class Backup {
     }
 
     private static Snapshot create0(Context ctx, String slot, String label) throws IOException {
-        // 2026-11-12（第 359 轮）：按**运行实例**判（多开前置）。以前是
-        // `slot==currentSlot && gameAlive`（只能保护"当前槽"），多开下会漏掉另一个在跑的槽；
-        // 现在"这个槽有没有实例在跑"由登记表回答（见 WriteGate / Instances）。
-        if (WriteGate.blockedSlot(ctx, slot)) {
-            throw new IOException(Trans.get(ctx, R.string.backup_err_game_running));
-        }
+        // ★ 第 367 轮（读语义定案，plan §12.17）：**读一律放行** —— 创建备份是"读整槽 + 写 hub"，
+        //   按不变式②不该拒。以前这里按运行实例拒（`backup_err_game_running`），多开下
+        //   还会把"别的槽在跑"也算进来。现在只由界面提示"快照可能包含写了一半的文件"，
+        //   core 不再挡；真正写槽的 `restore0` 仍然有写门禁。
         File src = Data.dirOf(ctx, slot);
         if (src == null || !src.exists()) {
             throw new IOException(Trans.get(ctx, R.string.backup_err_no_data_fmt, slot));
