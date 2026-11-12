@@ -1,0 +1,40 @@
+slot = default
+dataRoot = /storage/emulated/0/Android/data/io.mdt.launcher/slot-default
+crashes  = /storage/emulated/0/Android/data/io.mdt.launcher/slot-default/crashes
+mods = 0 (0 with classes.dex)
+
+-- crash_1794470628884.txt (169 B) --
+  kind=INJECTED version=unknown build 0 mods=vanilla chain=1 frames=1 cause=none needles=2 top=java.lang.RuntimeException: probe exploded hits=(HOST/w3/io.mdt.launcher.ProbeRunner) dex=-1
+  verdict: 崩溃栈里有 启动器注入的代码：io.mdt.launcher.ProbeRunner
+           这是启动器自己的功能（报告 / 探针等），与游戏模组无关 —— 把这份报告提给启动器维护者。
+  took 1421 ms
+
+-- crash_1794470551586.txt (211 B) --
+  kind=INJECTED version=unknown build 0 mods=[somemod] chain=1 frames=1 cause=none needles=3 top=java.lang.NoSuchFieldError: Class mindustry.core.ContentLoader does not have member field 'int selfTestProbe' hits=MindustryX(ABI/w3/mindustry.core.ContentLoader) dex=-1
+  verdict: 补丁「MindustryX」替换了 mindustry.core.ContentLoader，而崩溃的调用方仍按旧接口调用它 —— 疑似补丁与模组 / 游戏不兼容
+           这是补丁与模组 / 游戏之间的接口对不上：先停用这个补丁再试，或换用与当前补丁匹配的模组版本。
+  took 263 ms
+
+-- crash_1794470491586.txt (55 B) --
+  kind=NONE version=? mods=- chain=0 frames=0 cause=none needles=0 hits=- dex=-1
+  verdict: 认不出是哪个模组 —— 这份报告里没有指向模组的证据。
+           可能是游戏本体、环境（内存 / 驱动 / 缺系统文件），也可能是已经被删掉的模组。
+  took 59 ms
+
+-- crash_1794470413509.txt (178 B) --
+  kind=INJECTED version=unknown build 0 mods=vanilla chain=1 frames=1 cause=none needles=2 top=java.lang.RuntimeException: patched code exploded hits=MindustryX(PATCH/w3/mindustry.core.ContentLoader) dex=-1
+  verdict: 崩溃栈里有 补丁「MindustryX」：mindustry.core.ContentLoader
+           可以停用这个补丁再试（补丁页可以再启用）。
+  took 54 ms
+
+-- crash_1791182541626.txt (1532 B) --
+  kind=VANILLA version=unknown build 0 mods=vanilla chain=2 frames=15 cause=none needles=12 top=arc.util.ArcRuntimeException: Error reading file: cursors/cursor.png (internal) hits=- dex=-1
+  verdict: 不是模组的问题 —— 报告里写着这次没有加载任何模组（Mods: none (vanilla)）。
+  took 15 ms
+
+-- crash_1791178571768.txt (1532 B) --
+  kind=VANILLA version=unknown build 0 mods=vanilla chain=2 frames=15 cause=none needles=12 top=arc.util.ArcRuntimeException: Error reading file: cursors/cursor.png (internal) hits=- dex=-1
+  verdict: 不是模组的问题 —— 报告里写着这次没有加载任何模组（Mods: none (vanilla)）。
+  took 15 ms
+
+total 1831 ms

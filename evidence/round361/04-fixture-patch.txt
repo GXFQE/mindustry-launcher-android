@@ -1,0 +1,5 @@
+Mindustry has crashed.
+Version: unknown build 0
+Mods: none (vanilla)
+java.lang.RuntimeException: patched code exploded
+	at mindustry.core.ContentLoader.load(ContentLoader.java:1)

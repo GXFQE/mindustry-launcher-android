@@ -1,0 +1,5 @@
+Mindustry has crashed.
+Version: unknown build 0
+Mods: somemod:1.0
+java.lang.NoSuchFieldError: Class mindustry.core.ContentLoader does not have member field 'int selfTestProbe'
+	at somemod.Thing.run(Thing.java:3)

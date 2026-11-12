@@ -1,0 +1,36 @@
+=== 启动管线 Tue Nov 10 21:31:09 GMT+08:00 2026 ===
+目标   = /data/user/0/io.mdt.launcher/app_hub/import/v1607.apk
+大小   = 78237736 B
+进程 pid = 7806
+预热成功（第 1 次）
+宿主 dex elements = 1
+dexElements 合并后 = 2
+补丁数 = 1
+补丁[1] MindustryX (原版 + 补丁) 注入 @1 elements 2→3 (19 ms) | makeDexElements(4 args) -> 1 elements, suppressed=0
+补丁注入完成 1/1
+base CL 已能看到 mindustry.android.AndroidLauncher
+选用 ABI = arm64-v8a
+System.load(libarc.so) OK  753520 B
+System.load(libarc-freetype.so) OK  471592 B
+ArcNativesLoader.loaded = true
+SharedLibraryLoader.isLoaded(arc) = true
+SharedLibraryLoader.isLoaded(arc-freetype) = true
+资产链 = v1607.apk a298a773aa780ecd366d1da6b46bcfe77df11d3ae0603ce6d82fc8e46e7fa570.assets.zip 
+两份 AssetManager 同源 = false
+  addAssetPath(app)  v1607.apk cookie=10
+  addAssetPath(act)  v1607.apk cookie=10
+  addAssetPath(app)  a298a773aa780ecd366d1da6b46bcfe77df11d3ae0603ce6d82fc8e46e7fa570.assets.zip cookie=11
+  addAssetPath(act)  a298a773aa780ecd366d1da6b46bcfe77df11d3ae0603ce6d82fc8e46e7fa570.assets.zip cookie=11
+  probe(app) = ok(336B)
+  probe(act) = ok(336B)
+已从 base CL 解析到 mindustry.android.AndroidLauncher
+startActivity 已返回，坑位 finish
+
+--- 前置段耗时 ---
+prewarm         13 ms
+dexInject       21 ms
+nativeLoad      27 ms
+nativeFlag       2 ms
+assetMount       1 ms
+startActivity    15 ms
+合计              79 ms

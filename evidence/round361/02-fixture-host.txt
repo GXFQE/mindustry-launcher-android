@@ -1,0 +1,5 @@
+Mindustry has crashed.
+Version: unknown build 0
+Mods: none (vanilla)
+java.lang.RuntimeException: probe exploded
+	at io.mdt.launcher.ProbeRunner.tick(ProbeRunner.java:12)
