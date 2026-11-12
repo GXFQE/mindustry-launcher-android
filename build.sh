@@ -232,6 +232,34 @@ if [ -f "$CONTENT_CHECK" ]; then
 fi
 
 
+# ---- [0/4] write-gate meta assertion ----------------------------------------
+# 元断言（多实例 plan §12.7 第 5 步 / §12.19）：**每个"写实例数据"的入口都必须过
+# WriteGate**。为什么做成构建门禁：行为自检只能证明"今天这几十条路拦了"，证明不了
+# "明天新加的写路也拦"；这把尺子钉住结构（先 --selftest 证明它有牙，再真检查）：
+#   ① 入口表里每个方法体必须出现 `WriteGate.`（方法找不到 = 表过期，也失败）；
+#   ② 全局 `Data.gameAlive(` 调用数冻结（9）—— 新增必须走 WriteGate（全局只留给
+#      迁移 / 回收 / 杀进程）;
+#   ③ `deleteTree(` 的删除面按文件冻结 —— 新文件 / 新删除点必须人工复核后加台账；
+#   ④ `killBackgroundProcesses(` 只许在 Data.java（唯一的"杀游戏进程"实现）。
+# 改入口表 / 冻结数字的姿势：只加"确实写实例数据"的入口；全局/迁移类写入不要加。
+WRITE_GATE_CHECK="$(jpath "$ROOT/tools/write-gate-check.py")"
+if [ -f "$WRITE_GATE_CHECK" ]; then
+  echo "== [0/4] write-gate =="
+  if ! "$PYTHON" "$WRITE_GATE_CHECK" --root "$(jpath "$ROOT")" --selftest; then
+    echo "FAIL: tools/write-gate-check.py failed its own meta-assertions." >&2
+    echo "      The ruler is broken -- fix tools/write-gate-check.py first." >&2
+    exit 1
+  fi
+  if ! "$PYTHON" "$WRITE_GATE_CHECK" --root "$(jpath "$ROOT")"; then
+    echo "FAIL: write-gate meta-assertion did not pass (see above)." >&2
+    echo "  why: docs/plans/2026-10-31-多实例并行可行性.md §12.19" >&2
+    echo "  ruler: $PYTHON tools/write-gate-check.py --selftest" >&2
+    exit 1
+  fi
+  echo
+fi
+
+
 # ⚠️ 归档改名而不是 rm -rf（一次删太多会被环境拦掉）。
 #    但**只进不出会一直涨**：2026-11-02 实测攒到 1,781 份 / 9.0 GB / 109 万文件
 #    （实际占盘 11.5 GB），把 git / 资源管理器 / 杀毒 / 索引全拖慢。
