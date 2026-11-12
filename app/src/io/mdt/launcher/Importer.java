@@ -182,21 +182,6 @@ public final class Importer {
         return e;
     }
 
-    /** 删除导入副本 + 配置登记。只动我们私有目录里的副本。 */
-    public static void removeImport(Context ctx, String file) {
-        File dir = importDir(ctx);
-        File f = new File(dir, file);
-        if (f.exists()) {
-            f.setWritable(true);
-            if (!f.delete()) Log.w(TAG, "import file delete failed: " + f);
-        }
-        // 顺手清同名残留（杀在导入中途的 `.part` / 让位用的 `.old`）
-        deleteQuiet(new File(dir, file + ".part"));
-        deleteQuiet(new File(dir, file + ".old"));
-        Config.get().removeImport(file);
-        Log.i(TAG, "import removed: " + file);
-    }
-
     // ── 删掉整个导入版本：本体进中转站（可放回）────────────────────────────
 
     /** 中转站里一个"版本"目录里的三件东西 */

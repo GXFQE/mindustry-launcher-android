@@ -257,6 +257,8 @@ public final class SelfTest {
             writeGateCore(ctx, L, stat);
             // ★ 第 366 轮：启动占位（补 :game 登记之前的窗口）+ GameSlot 对外收口
             startReserve(ctx, L, stat);
+            // ★ 第 368 轮：插件事件 pending 按槽分账（多开下一局一条）
+            eventPending(ctx, L, stat);
             // ★ 第 364 轮：实例会话记账（多开：一槽一局，结算按实例）
             instanceSessions(ctx, L, stat);
             // ★ ⑰ F13 第三阶段：模组包导入 / 跨槽复制（五个负例 + 一条元断言）
@@ -17248,6 +17250,35 @@ public final class SelfTest {
         }
         ok(stat, L, readOk,
                 "⑨⑩ 备份/克隆是读操作：目标槽/源槽有运行实例也放行（只由界面提示可能不一致）");
+
+        // ⑪ 第 368 轮：冗余清理**逐项**判 —— 属于在跑实例的项跳过，别的照常清（不再整轮不做）
+        String cleanSlot = SLOT_GATE + "-clean";
+        File junk = null;
+        boolean cleanupGated;
+        try {
+            Data.deleteSlotForever(ctx, cleanSlot);
+            Data.createSlot(ctx, cleanSlot);
+            junk = new File(Data.dirOf(ctx, cleanSlot), "z-redundant-fixture.bin");
+            junk.getParentFile().mkdirs();
+            write(junk, "1234".getBytes("UTF-8"));
+            Data.Health h = new Data.Health();
+            h.add(new Data.Finding("槽 " + cleanSlot, junk, true, 1, 4, "selftest"));
+            Instances.testSnapshot(java.util.Collections.singletonList(
+                    new Instances.Running(13, "pkg.clean", cleanSlot,
+                            System.currentTimeMillis(), "selftest:game")));
+            Data.cleanRedundant(ctx, h);              // 这个槽在跑 ⇒ 应跳过
+            boolean kept = junk.isFile();
+            Instances.clearTestSnapshot();
+            Data.cleanRedundant(ctx, h);              // 不跑了 ⇒ 应删
+            cleanupGated = kept && !junk.isFile();
+        } catch (Throwable t) {
+            cleanupGated = false;
+        } finally {
+            Instances.clearTestSnapshot();
+            Data.deleteSlotForever(ctx, cleanSlot);
+        }
+        ok(stat, L, cleanupGated,
+                "⑪ 冗余清理逐项判：在跑实例的项跳过、别的照常清（不再整轮不做）");
     }
 
     /**
@@ -17554,6 +17585,66 @@ public final class SelfTest {
         } catch (Throwable ignored) {
         }
         ok(stat, L, notExported, "③ GameSlot exported=false：外部 Intent 进不了启动链");
+    }
+
+    /**
+     * 第 368 轮：插件事件 pending 按槽分账（多开下一局一条）。
+     *
+     * <p>钉住：两局并存（v2 JSON map）、清一局不动另一局、旧单局格式读侧兼容。
+     * ⚠️ 跑前快照 / 跑后还原真实 pending 文件（别把用户真在等的那条补报弄丢）。
+     */
+    private static void eventPending(Context ctx, List<String> L, int[] stat) {
+        L.add("");
+        L.add("── 第 368 轮 · 插件事件 pending 按槽分账 ──");
+        File f = PluginEvents.pendingFile(ctx);
+        String before = "";
+        try {
+            if (f != null && f.isFile()) before = Util.readText(f);
+        } catch (Throwable ignored) {
+        }
+        boolean mapOk;
+        try {
+            PluginEvents.notePending(ctx, SLOT_GATE + "-ev-a", "v1");
+            PluginEvents.notePending(ctx, SLOT_GATE + "-ev-b", "v2");
+            String text = Util.readText(f);
+            String a = SLOT_GATE + "-ev-a", b = SLOT_GATE + "-ev-b";
+            boolean both = text.contains(a) && text.contains(b)
+                    && text.contains("\"pending\"") && text.contains("\"v\":2");
+            PluginEvents.clearPending(ctx, a);
+            String text2 = Util.readText(f);
+            mapOk = both && !text2.contains(a) && text2.contains(b);
+        } catch (Throwable t) {
+            mapOk = false;
+        } finally {
+            try {
+                if (f != null) {
+                    if (before.isEmpty()) f.delete();
+                    else Util.atomicWriteText(f, before);
+                }
+            } catch (Throwable ignored) { }
+        }
+        ok(stat, L, mapOk, "pending 按槽分账：两局并存、清一局不动另一局");
+
+        // 旧格式（slot= / version= 两行）读侧兼容：写一份旧格式，再 note 一个新槽，两局都要在
+        boolean legacyOk;
+        try {
+            if (f != null) {
+                Util.atomicWriteText(f, "slot=" + SLOT_GATE + "-ev-old\nversion=old-v\n");
+            }
+            PluginEvents.notePending(ctx, SLOT_GATE + "-ev-new", "new-v");
+            String text = Util.readText(f);
+            legacyOk = text.contains(SLOT_GATE + "-ev-old") && text.contains(SLOT_GATE + "-ev-new");
+        } catch (Throwable t) {
+            legacyOk = false;
+        } finally {
+            try {
+                if (f != null) {
+                    if (before.isEmpty()) f.delete();
+                    else Util.atomicWriteText(f, before);
+                }
+            } catch (Throwable ignored) { }
+        }
+        ok(stat, L, legacyOk, "旧单局 pending 格式读侧兼容（升级不丢那一局）");
     }
 
     private static void ok(int[] stat, List<String> L, boolean cond, String msg) {

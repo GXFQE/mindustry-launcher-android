@@ -805,42 +805,54 @@ public final class Data {
         public int cleaned;
         public long freed;
         public int suspicious;
-        /** 游戏在跑 ⇒ 这次什么都没做（下次再说，不是错误） */
+        /** 因为"对应槽的实例在跑"而跳过的项数（第 368 轮：逐项判，不再是整轮一刀切） */
+        public int skipped;
+        /** 一项都没删、且跳过都是因为实例在跑（下次再说，不是错误） */
         public boolean skippedGameRunning;
 
     }
 
     /**
-     * 自动清一遍数据根残留。**只删 redundant**；`suspicious` 一个都不碰；游戏在跑就什么都不做。
+     * 自动清一遍数据根残留。**只删 redundant**；`suspicious` 一个都不碰。
+     *
+     * <p>★ 第 368 轮（多开）：不再"有任何游戏在跑就整轮不做" —— 逐项按路径判
+     * （{@link WriteGate#blockedForDir}）：属于**在跑实例**的项跳过，其余照常清。
+     * 纯 hub 级垃圾推不出槽时仍退回全局 `gameAlive`（保守）。
      * ★ 与手动清理共用 {@link #deleteRedundant} 这一处删除实现（口径只许一份）。
      */
     public static AutoClean autoCleanRedundant(Context ctx) {
         AutoClean a = new AutoClean();
-        if (gameAlive(ctx)) {                      // 与手动清理同一条门禁
-            a.skippedGameRunning = true;
-            return a;
-        }
         Health h = healthScan(ctx);
         a.suspicious = h.suspicious.size();
         if (h.redundant.isEmpty()) return a;
-        long[] r = deleteRedundant(h, null);
+        long[] r = deleteRedundant(ctx, h, null);
         a.cleaned = (int) r[0];
         a.freed = r[2];
+        a.skipped = (int) r[3];
+        a.skippedGameRunning = a.cleaned == 0 && a.skipped > 0;
         Log.i(TAG, "auto health clean: cleaned=" + a.cleaned + " freed=" + a.freed
-                + " suspicious=" + a.suspicious);
+                + " skipped=" + a.skipped + " suspicious=" + a.suspicious);
         return a;
     }
 
     /**
-     * 真正的删除动作（**唯一实现**）：只遍历 `redundant`，返回 `{成功数, 失败数, 释放字节}`。
+     * 真正的删除动作（**唯一实现**）：只遍历 `redundant`，返回
+     * `{成功数, 失败数, 释放字节, 跳过数}`。
+     *
+     * <p>第 368 轮：每项先过 {@link WriteGate#blockedForDir} —— 这个目录属于**在跑实例**就跳过
+     * （多开下别的槽照常清；推不出槽的 hub 级垃圾仍按全局判，保守）。跳过**不算失败**。
      *
      * @param detail 传了就把"逐项删了什么"写进去（手动清理要给人看）；自动清理传 null
      */
-    private static long[] deleteRedundant(Health h, StringBuilder detail) {
-        int ok = 0, fail = 0;
+    private static long[] deleteRedundant(Context ctx, Health h, StringBuilder detail) {
+        int ok = 0, fail = 0, skipped = 0;
         long freed = 0;
         for (Finding f : h.redundant) {
             if (!f.path.exists()) continue;
+            if (WriteGate.blockedForDir(ctx, f.path)) {
+                skipped++;
+                continue;
+            }
             if (deleteTree(f.path)) {
                 ok++;
                 freed += f.bytes;
@@ -855,24 +867,29 @@ public final class Data {
                 }
             }
         }
-        return new long[]{ok, fail, freed};
+        return new long[]{ok, fail, freed, skipped};
     }
 
     /**
      * 清理体检判定的冗余副本（**只删 redundant 列表里的**）。
      * 返回人读报告。★ 界面上的手动入口现在只用来"看详情"——清理本身已经自动做了。
+     *
+     * <p>第 368 轮：逐项门禁（见 {@link #deleteRedundant}）；"全都被在跑的实例挡住"时沿用
+     * 原来那句"请先退出游戏"（别让用户以为删失败）。
      */
     public static String cleanRedundant(Context ctx, Health h) {
-        if (gameAlive(ctx)) {
-            return "游戏进程（:game）还在运行 —— 请先退出游戏再清理。\n未删除任何文件。";
-        }
         StringBuilder sb = new StringBuilder();
-        long[] r = deleteRedundant(h, sb);
+        long[] r = deleteRedundant(ctx, h, sb);
         int ok = (int) r[0], fail = (int) r[1];
         long freed = r[2];
+        int skipped = (int) r[3];
+        if (ok == 0 && fail == 0 && skipped > 0) {
+            return "游戏进程（:game）还在运行 —— 请先退出游戏再清理。\n未删除任何文件。";
+        }
         sb.append('\n').append(ok).append(" 项已清理，释放约 ").append(Util.formatSize(freed));
         if (fail > 0) sb.append("；").append(fail).append(" 项失败");
-        Log.i(TAG, "health clean: ok=" + ok + " fail=" + fail + " freed=" + freed);
+        Log.i(TAG, "health clean: ok=" + ok + " fail=" + fail + " skipped=" + skipped
+                + " freed=" + freed);
         return sb.toString();
     }
 
