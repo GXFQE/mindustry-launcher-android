@@ -45,6 +45,11 @@ public final class Msav {
     public static Stage stage(Context ctx, InputStream in, String displayName, String slot)
             throws IOException {
         if (in == null) throw new IOException(Trans.get(ctx, R.string.msav_err_open_failed));
+        // 2026-11-12（第 362 轮，plan §12.7 第 3 步）：core 落盘门禁 —— 以前只在界面入口判，
+        // SAF 选完文件之后游戏被拉起 / dev 口直接调这里都能绕过去（TOCTOU）。
+        if (WriteGate.blockedSlot(ctx, slot)) {
+            throw new IOException(Trans.get(ctx, R.string.slot_err_game_running));
+        }
         File savesDir = Data.savesDirOf(ctx, slot);
         if (savesDir == null || !savesDir.isDirectory()) {
             throw new IOException(Trans.get(ctx, R.string.msav_err_no_saves_fmt, slot));
@@ -93,6 +98,11 @@ public final class Msav {
      * ★ 挪动成功后改名失败 ⇒ 把旧的那份**搬回来**（宁可回到原状，也不留一个空位）。
      */
     public static File commit(Context ctx, Stage s) throws IOException {
+        // 2026-11-12（第 362 轮）：**再判一次** —— stage 之后弹窗让用户确认名字，这中间游戏
+        // 可能已经被拉起来（stage 写完 .part 也还看得见"什么都没变"，用户不会察觉）。
+        if (WriteGate.blockedForDir(ctx, s.savesDir)) {
+            throw new IOException(Trans.get(ctx, R.string.slot_err_game_running));
+        }
         File dest = new File(s.savesDir, s.base);
         File stash = null;
         if (dest.exists()) {

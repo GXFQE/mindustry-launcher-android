@@ -61,6 +61,13 @@ public final class Importer {
         String base = sanitizeName(displayName);
         if (base.isEmpty()) base = "import-" + System.currentTimeMillis() + ".apk";
         if (!base.toLowerCase(Locale.US).endsWith(".apk")) base = base + ".apk";
+        // 2026-11-12（第 362 轮，plan §12.7 第 3 步）：**版本级资产门禁**。
+        // 同名导入 = 原子替换 `app_hub/import/<名字>.apk`，而运行中的实例正从这个文件加载 dex
+        // （Android 上 dex 已加载完的映射能撑住，但下一次启动/热重启读到的就是另一个版本）。
+        // 判据按版本 key（= "import:" + 文件名）—— 与 `Versions.Entry.key()` 同一口径。
+        if (WriteGate.blockedVersion(ctx, "import:" + base)) {
+            throw new IOException(Trans.get(ctx, R.string.version_err_game_running));
+        }
         File file = new File(dir, base);
         File tmp = new File(dir, base + ".part");
         // 旧副本的"临时让位"名（只在 rename 不能覆盖目标时用；见下面那段）
@@ -210,6 +217,11 @@ public final class Importer {
     public static Trash.Result trashVersion(Context ctx, Versions.Entry e) {
         if (ctx == null || e == null || !e.imported || e.importFile == null || e.importFile.isEmpty()) {
             return Trash.fail(Trash.Result.T_NO_KIND, "not an imported version", "");
+        }
+        // 2026-11-12（第 362 轮，plan §12.7 第 3 步）：**版本级资产门禁** —— 把这个实例正在用的
+        // APK 挪走 = 它下次启动直接找不到本体（比"写坏"更彻底）。按版本 key 判。
+        if (WriteGate.blockedVersion(ctx, e.key())) {
+            return Trash.fail(Trash.Result.T_GAME_RUNNING, "game is running", e.importFile);
         }
         File src = new File(importDir(ctx), e.importFile);
         if (!src.isFile()) return Trash.fail(Trash.Result.T_NOT_IN_TRASH, "missing: " + src, e.importFile);

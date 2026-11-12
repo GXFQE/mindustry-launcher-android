@@ -2,6 +2,7 @@ package io.mdt.launcher;
 
 import android.content.Context;
 
+import java.io.File;
 import java.util.List;
 
 /**
@@ -60,6 +61,16 @@ final class WriteGate {
     static boolean blockedSlotOrGlobal(Context ctx, String slot) {
         if (slot == null || slot.isEmpty()) return Data.gameAlive(ctx);
         return blockedSlot(ctx, slot);
+    }
+
+    /**
+     * **目录 / 文件所属槽**有实例在跑吗 —— core 写函数只拿到 `File`（`maps/` / `saves/` /
+     * `mods/` / 槽根）时的便利重载（2026-11-12 第 362 轮，§12.7 第 3 步）。
+     * 反查不出槽时退回 {@link #blockedSlotOrGlobal} 的保守方向。
+     */
+    static boolean blockedForDir(Context ctx, File dirOrFile) {
+        return blockedSlotOrGlobal(ctx, dirOrFile == null
+                ? null : Data.slotOfPath(ctx, dirOrFile));
     }
 
     // ── 纯判据（自检直接喂；不碰 Context / 文件） ─────────────────────────

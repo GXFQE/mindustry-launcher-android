@@ -318,6 +318,12 @@ public final class SlotZip {
      */
     public static Imported importSlot(Context ctx, File zip, Info info, String slot, int mode)
             throws IOException {
+        // 2026-11-12（第 362 轮，plan §12.7 第 3 步）：整槽导入 = 写槽内容的最重入口。
+        // 先判再快照：游戏在跑时连"操作前自动备份"都不必做（Backup.create 也按槽判，
+        // 但别让用户等完几十 MB 的备份才被告知"不能导"）。
+        if (WriteGate.blockedSlot(ctx, slot)) {
+            throw new IOException(Trans.get(ctx, R.string.slot_err_game_running));
+        }
         Backup.Snapshot pre = AutoBackup.beforeSlotOp(ctx, slot,
                 Trans.get(ctx, R.string.backup_auto_zip));
         JSONObject meta = new JSONObject();
@@ -355,6 +361,11 @@ public final class SlotZip {
 
     private static Result extract0(Context ctx, File zip, Info info, String slot, int mode)
             throws IOException {
+        // 2026-11-12（第 362 轮）：**落盘层再判一次**（直接调 extract 的路径 / importSlot 之后
+        // 用户可能已经把游戏拉起来了 —— 两步之间没有锁）。
+        if (WriteGate.blockedSlot(ctx, slot)) {
+            throw new IOException(Trans.get(ctx, R.string.slot_err_game_running));
+        }
         mode = SlotWrite.sane(mode);
         File root = Data.dirOf(ctx, slot);
         if (root == null) throw new IOException(Trans.get(ctx, R.string.slotzip_err_no_slot_dir_fmt, slot));

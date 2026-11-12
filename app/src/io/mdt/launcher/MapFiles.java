@@ -123,6 +123,12 @@ public final class MapFiles {
             r.error = Trans.get(ctx, R.string.mapfile_err_no_dir);
             return r;
         }
+        // 2026-11-12（第 362 轮，plan §12.7 第 3 步）：core 落盘门禁 —— 界面入口判过也要再判，
+        // 因为 SAF 选完文件、确认框弹着的时候游戏可能被拉起来（TOCTOU）。
+        if (WriteGate.blockedForDir(ctx, mapsDir)) {
+            r.error = Trans.get(ctx, R.string.slot_err_game_running);
+            return r;
+        }
         String nameErr = checkName(ctx, displayName);
         if (nameErr != null) {
             r.error = nameErr;
@@ -317,6 +323,12 @@ public final class MapFiles {
         Result r = new Result();
         if (mapsDir == null) {
             r.error = Trans.get(ctx, R.string.mapfile_err_no_dir);
+            return r;
+        }
+        // 2026-11-12（第 362 轮）：这是「存档 → 地图」的**写**（生成器设置转换后落盘），
+        // 同样在 core 判；三条重载最后都汇到这里。
+        if (WriteGate.blockedForDir(ctx, mapsDir)) {
+            r.error = Trans.get(ctx, R.string.slot_err_game_running);
             return r;
         }
         String nameErr = checkMapName(ctx, metaName);

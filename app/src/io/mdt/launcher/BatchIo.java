@@ -925,6 +925,12 @@ final class BatchIo {
             toast(a, Trans.get(a, R.string.batch_import_nothing));
             return;
         }
+        // 2026-11-12（第 362 轮，plan §12.7 第 3 步）：**core 落盘层**也有门禁（四个单份导入
+        // 实现各自判），这里只是"别让用户白选一遍文件 / 白确认一遍同名"的前置提示。
+        if (WriteGate.blockedSlot(a, slot)) {
+            toast(a, Trans.get(a, R.string.slot_err_game_running));
+            return;
+        }
         // ★ 第 270 轮：展开包的进度也画在卡片里，后面确认页 / 报告页继续用这一张
         final CardStack stack = new CardStack(a);
         stack.replace(Trans.get(a, R.string.batch_import_progress_title),
@@ -1217,6 +1223,12 @@ final class BatchIo {
     static Report importSync(Context ctx, String slot, List<Doc> docs, int kind, boolean replace) {
         Kind k = kindOf(ctx, slot, kind);
         Report rep = new Report();
+        // 2026-11-12（第 362 轮，plan §12.7 第 3 步）：dev 口 / 自检这条同步路的入口门禁。
+        // 单份导入实现本身也会判（`MapFiles.importMap` 等），这里先给一份**能读懂的报告**。
+        if (WriteGate.blockedSlot(ctx, slot)) {
+            rep.failed.add(line(ctx, slot, Trans.get(ctx, R.string.slot_err_game_running)));
+            return rep;
+        }
         File work = workDir(ctx);
         try {
             // ★ 与界面那条路**共用同一份判据**（`expand`）：两条路各写一遍就会漂，

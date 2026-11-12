@@ -105,6 +105,11 @@ public final class BlueprintFiles {
             r.error = Trans.get(ctx, R.string.bpfile_err_no_dir);
             return r;
         }
+        // 2026-11-12（第 362 轮，plan §12.7 第 3 步）：core 落盘门禁（TOCTOU：界面入口判过不算）。
+        if (WriteGate.blockedForDir(ctx, dir)) {
+            r.error = Trans.get(ctx, R.string.slot_err_game_running);
+            return r;
+        }
         String nameErr = checkName(ctx, displayName);
         if (nameErr != null) {
             r.error = nameErr;

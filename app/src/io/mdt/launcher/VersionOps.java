@@ -416,6 +416,20 @@ final class VersionOps {
      */
     static void delete(final Activity a, final Versions.Entry e, final Done done) {
         final int scope = deleteScope(Versions.rowCount(e.key()), e.imported);
+        // 2026-11-12（第 362 轮，plan §12.7 第 3 步）：**实例 / 版本级门禁**。
+        // 以前删行 / 删版本完全不看"它是不是正在跑"：删行会让运行中的实例失去槽绑定
+        // （下次启动落到默认槽），删版本会把正在用的 APK 挪走。核心层也各有门禁（双保险），
+        // 这里提前拦是为了别让用户先点完确认再吃一个失败提示。
+        if (scope == DELETE_ROW) {
+            final String slot = Versions.slotFor(e);
+            if (WriteGate.blockedInstance(a, Versions.instanceKey(e.key(), slot))) {
+                alert(a, R.string.game_busy_title, Trans.get(a, R.string.version_err_game_running));
+                return;
+            }
+        } else if (scope == DELETE_VERSION && WriteGate.blockedVersion(a, e.key())) {
+            alert(a, R.string.game_busy_title, Trans.get(a, R.string.version_err_game_running));
+            return;
+        }
         if (scope == DELETE_ROW) {
             // ★ 槽名先抓下来：删完这一项之后 `slotFor` 可能已经变了（主行被删 ⇒ 另一项提上来）
             final String slot = Versions.slotFor(e);

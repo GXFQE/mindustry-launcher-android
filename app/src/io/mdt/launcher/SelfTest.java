@@ -134,11 +134,14 @@ public final class SelfTest {
     /** ★ 第 169 轮：零散文件（批量导出那种包）解包落点用的槽 */
     public static final String SLOT_LOOSE_DST = "m3-loose-dst";
 
+    /** ★ 第 362 轮：core 写门禁（Msav / SlotZip / SlotWrite / 单份导入）用的一次性槽 */
+    public static final String SLOT_GATE = "m3-gate";
+
     private static final String[] TEST_SLOTS = {
             SLOT, SLOT_RENAMED, CLONE_SRC, CLONE_DST, CLONE_EMPTY, CLONE_EMPTY_DST, SLOT_MODS,
             SLOT_SET, SLOT_PACK, SLOT_PACK_DST, SLOT_SAVE, SLOT_GONE, SLOT_GONE2,
             SLOT_MODE, SLOT_MODE2, SLOT_S2M, SLOT_MSCH, SLOT_BP, SLOT_F23, SLOT_BATCH,
-            SLOT_SHARE, SLOT_SHARE_DST, SLOT_LOOSE_DST};
+            SLOT_SHARE, SLOT_SHARE_DST, SLOT_LOOSE_DST, SLOT_GATE};
 
     /**
      * 本工程**自己的全部页面**（㊱ 基类检查用）。
@@ -250,6 +253,8 @@ public final class SelfTest {
             // ★ 第 359 轮：运行实例登记 + 按实例写门禁（多开前置）—— 纯函数矩阵 + 登记表扫描
             //   + 用登记表快照钉住"这个槽在跑 ⇒ 拒 / 别的槽在跑 ⇒ 放行"
             instanceGate(ctx, L, stat);
+            // ★ 第 362 轮：core 落盘层门禁（Msav / SlotZip / SlotWrite / 单份导入 / 补丁清扫）
+            writeGateCore(ctx, L, stat);
             // ★ ⑰ F13 第三阶段：模组包导入 / 跨槽复制（五个负例 + 一条元断言）
             modsPack(ctx, L, stat);
             // ★ ⑲ F13 第二批：搜索/筛选/排序（纯函数，可单独喂断言）
@@ -17091,6 +17096,149 @@ public final class SelfTest {
         }
         ok(stat, L, otherSlotAllowed,
                 "⑧ 别的槽在跑 ⇒ 这个槽的写不被门禁误拒（不变式③）");
+    }
+
+    /**
+     * ㊾ 写门禁：**core 落盘层**（第 362 轮，plan §12.7 第 3 步）。
+     *
+     * <p>为什么尺子必须落在这一层：§12 审计列出的那批缺口（`Msav` / 整槽 zip / 批量导入 /
+     * 单份导入）当年只在"界面入口"判过 —— 选完文件之后游戏被拉起来就绕过去了（TOCTOU），
+     * dev 口更是完全不过门。门禁写在**真正落盘的那一层**，并且"拒了 ⇒ 一个字节都没写"要能验。
+     */
+    private static void writeGateCore(Context ctx, List<String> L, int[] stat) {
+        L.add("");
+        L.add("── ㊾ 写门禁：core 落盘层（第 362 轮）──────────────────────────");
+        final String blockedMsg = Trans.get(ctx, R.string.slot_err_game_running);
+        final String gateVkey = "import:selftest-gate.apk";
+        try {
+            Data.createSlot(ctx, SLOT_GATE);
+            final File root = Data.slotDir(ctx, SLOT_GATE);
+            final File saves = Data.savesDirOf(ctx, SLOT_GATE);
+            final File maps = new File(root, "maps");
+            maps.mkdirs();
+            final File schems = new File(root, "schematics");
+            schems.mkdirs();
+            final File mods = new File(root, "mods");
+            mods.mkdirs();
+            File marker = new File(root, "marker.txt");
+            write(marker, "keep".getBytes("UTF-8"));
+            File zip = new File(ctx.getCacheDir(), "selftest-gate.zip");
+            write(zip, zipBytes(new String[]{"saves/z.msav"}, new byte[][]{{7, 8, 9}}));
+
+            boolean blocked;
+            boolean untouched;
+            try {
+                Instances.testSnapshot(java.util.Collections.singletonList(
+                        new Instances.Running(31, gateVkey, SLOT_GATE,
+                                System.currentTimeMillis(), "selftest:game")));
+
+                // ① 存档导入的第一步（会写 .part）
+                boolean msavBlocked = false;
+                try {
+                    Msav.stage(ctx, new java.io.ByteArrayInputStream(new byte[]{1, 2, 3}),
+                            "gate.msav", SLOT_GATE);
+                } catch (java.io.IOException e) {
+                    msavBlocked = blockedMsg.equals(e.getMessage());
+                }
+                // ② 整槽"覆盖"模式的第一刀
+                boolean wipeBlocked = false;
+                try {
+                    SlotWrite.wipeSlot(ctx, root);
+                } catch (java.io.IOException e) {
+                    wipeBlocked = blockedMsg.equals(e.getMessage());
+                }
+                // ③ 整槽 zip 导入的落盘层
+                boolean zipBlocked = false;
+                try {
+                    SlotZip.extract(ctx, zip, null, SLOT_GATE, SlotWrite.UPDATE);
+                } catch (java.io.IOException e) {
+                    zipBlocked = blockedMsg.equals(e.getMessage());
+                }
+                // ④⑤⑥ 地图 / 蓝图 / 模组的单份导入（落盘层）
+                MapFiles.Result mr = MapFiles.importMap(ctx, maps, "gate.msav",
+                        new java.io.ByteArrayInputStream(new byte[]{1}), false, null);
+                BlueprintFiles.Result br = BlueprintFiles.importSchem(ctx, schems, "gate.msch",
+                        new java.io.ByteArrayInputStream(new byte[]{1}), false, null);
+                Mods.PackResult pr = Mods.importPackage(ctx, mods, "gate.jar",
+                        new java.io.ByteArrayInputStream(new byte[]{1}), false, null);
+                // ⑦ 批量导入（dev 口 / 界面共用的同步路）
+                File one = new File(ctx.getCacheDir(), "selftest-gate-1.msav");
+                write(one, new byte[]{1});
+                BatchIo.Report rep = BatchIo.importSync(ctx, SLOT_GATE,
+                        BatchIo.docsFromFiles(java.util.Collections.singletonList(one)),
+                        BatchIo.KIND_MAPS, true);
+
+                blocked = msavBlocked && wipeBlocked && zipBlocked
+                        && mr != null && !mr.ok && blockedMsg.equals(mr.error)
+                        && br != null && !br.ok && blockedMsg.equals(br.error)
+                        && pr != null && pr.errCode == Mods.PackResult.P_GAME_RUNNING
+                        && rep != null && !rep.failed.isEmpty()
+                        && rep.failed.get(0).contains(blockedMsg);
+                // ⑧ "拒了 ⇒ 什么都没写"
+                untouched = marker.isFile()
+                        && !new File(maps, "gate.msav").exists()
+                        && !new File(schems, "gate.msch").exists()
+                        && !new File(mods, "gate.jar").exists()
+                        && !new File(saves, "z.msav").exists()
+                        && !new File(saves, "gate.msav.part").exists();
+            } finally {
+                Instances.clearTestSnapshot();
+            }
+            ok(stat, L, blocked,
+                    "①-⑦ 这个槽有运行实例 ⇒ 存档 / 整槽 zip / 清空 / 地图 / 蓝图 / 模组 / 批量 全拒");
+            ok(stat, L, untouched, "⑧ 拒得干净：一个字节都没写（没有 .part / 新文件）");
+
+            // ⑨ 解除登记后同样的调用必须放行（否则上面可能只是"永远失败"）
+            boolean allowed;
+            try {
+                Msav.Stage st = Msav.stage(ctx,
+                        new java.io.ByteArrayInputStream(new byte[]{1, 2, 3}), "ok.msav", SLOT_GATE);
+                Msav.discard(st);
+                boolean staged = st != null && st.part != null && !st.part.exists();
+                SlotZip.Result zr = SlotZip.extract(ctx, zip, null, SLOT_GATE, SlotWrite.UPDATE);
+                java.util.List<String> wiped = SlotWrite.wipeSlot(ctx, root);
+                allowed = staged && zr != null && zr.files == 1 && !wiped.isEmpty();
+            } catch (Throwable t) {
+                allowed = false;
+            }
+            ok(stat, L, allowed, "⑨ 没有实例占这个槽 ⇒ 同样的调用照常放行（清空名单非空）");
+
+            // ⑩ 补丁清扫跳过运行实例（`pruneStale` 以前不分实例，会改正在跑的那一局的状态）
+            String runKey = Versions.instanceKey(gateVkey, SLOT_GATE);
+            String idleKey = Versions.instanceKey(gateVkey, "m3-gate-idle");
+            java.util.List<String> stale1 = new java.util.ArrayList<String>();
+            stale1.add("stale-ref@1");
+            java.util.List<String> stale2 = new java.util.ArrayList<String>();
+            stale2.add("stale-ref@1");
+            Config.get().setPatchRefs(runKey, stale1);
+            Config.get().setPatchRefs(idleKey, stale2);
+            boolean pruneOk;
+            try {
+                Instances.testSnapshot(java.util.Collections.singletonList(
+                        new Instances.Running(32, gateVkey, SLOT_GATE,
+                                System.currentTimeMillis(), "selftest:game")));
+                int removed = Patches.pruneStale(ctx);
+                pruneOk = removed >= 1
+                        && Config.get().patchRefs(runKey).size() == 1
+                        && Config.get().patchRefs(idleKey).isEmpty();
+            } catch (Throwable t) {
+                pruneOk = false;
+            } finally {
+                Instances.clearTestSnapshot();
+                Config.get().setPatchRefs(runKey, new java.util.ArrayList<String>());
+                Config.get().setPatchRefs(idleKey, new java.util.ArrayList<String>());
+            }
+            ok(stat, L, pruneOk, "⑩ 补丁清扫只清空闲实例：运行实例的启用引用原样留着");
+        } catch (Throwable t) {
+            ok(stat, L, false, "㊾ 写门禁 core 用例整体跑了：" + t);
+        } finally {
+            // 槽本身由 runM3 的统一收尾删（TEST_SLOTS）；这里只清临时 zip
+            try {
+                new File(ctx.getCacheDir(), "selftest-gate.zip").delete();
+                new File(ctx.getCacheDir(), "selftest-gate-1.msav").delete();
+            } catch (Throwable ignored) {
+            }
+        }
     }
 
     private static void ok(int[] stat, List<String> L, boolean cond, String msg) {

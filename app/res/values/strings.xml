@@ -418,6 +418,8 @@
     <string name="slot_err_rename_failed_fmt">Rename failed (%1$s → %2$s)</string>
     <string name="slot_err_delete_current_fmt">\"%1$s\" is the current slot and the game is using it, so it cannot be deleted.</string>
     <string name="slot_err_game_running_fmt">Slot \"%1$s\" has a game instance running, so this change would be overwritten. Exit that game first.</string>
+    <string name="slot_err_game_running">A game instance is running for this slot. Exit that game before doing that.</string>
+    <string name="version_err_game_running">A game instance is running this version. Exit that game before doing that.</string>
     <string name="slot_err_delete_partial_fmt">Deletion did not fully succeed (some files may be in use): %1$s\n%2$d of %3$d files left</string>
 
     <string name="delete_current_slot_title">Cannot delete the current slot</string>

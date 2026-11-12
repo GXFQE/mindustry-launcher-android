@@ -78,7 +78,13 @@ public final class SlotWrite {
      */
     public static List<String> wipeSlot(Context ctx, File root) throws IOException {
         List<String> gone = new ArrayList<>();
-        if (root == null || !root.isDirectory()) return gone;
+        if (root == null) return gone;
+        // 2026-11-12（第 362 轮，plan §12.7 第 3 步）：清空是**最重的写** —— 门禁放这里，
+        // 整槽 zip 导入 / 快照恢复 / 以后任何"先清再写"的路都自动带上（别各写一遍）。
+        if (WriteGate.blockedForDir(ctx, root)) {
+            throw new IOException(Trans.get(ctx, R.string.slot_err_game_running));
+        }
+        if (!root.isDirectory()) return gone;
         for (File f : Data.contentRootsOf(root)) {
             if (!Data.deleteTree(f)) {
                 throw new IOException(Trans.get(ctx, R.string.slotwrite_err_wipe_failed_fmt,

@@ -291,6 +291,9 @@ final class ModsText {
                 return Trans.get(c, R.string.pack_err_copy_unreadable);
             case Mods.PackResult.P_COPY_NOTHING:
                 return Trans.get(c, R.string.pack_err_copy_nothing);
+            case Mods.PackResult.P_GAME_RUNNING:
+                // 2026-11-12（第 362 轮）：core 写门禁拒了 —— 与其它入口同一句话（别另写一套）
+                return Trans.get(c, R.string.slot_err_game_running);
             default:
                 return r.error == null ? "" : r.error;
         }

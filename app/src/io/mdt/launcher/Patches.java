@@ -570,6 +570,10 @@ final class Patches {
     static int pruneStale(Context ctx) {
         int removed = 0;
         for (String ikey : Config.get().patchRefVkeys()) {
+            // 2026-11-12（第 362 轮，plan §12.7 第 3 步）：**运行中的实例先别动** ——
+            // 它的启用状态是"这一局正在用的"，清扫留给它退出之后（下次启动 / 下次进补丁页）。
+            // 不这么做就与不变式①（写实例级状态要拒绝）冲突。
+            if (WriteGate.blockedInstance(ctx, ikey)) continue;
             List<String> keep = new ArrayList<String>();
             for (String ref : Config.get().patchRefs(ikey)) {
                 if (findByRef(ctx, ref) != null) keep.add(ref);

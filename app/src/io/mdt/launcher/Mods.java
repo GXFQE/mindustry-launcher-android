@@ -757,6 +757,8 @@ public final class Mods {
         public static final int P_COPY_SAME = 14;
         public static final int P_COPY_UNREADABLE = 15;
         public static final int P_COPY_NOTHING = 16;
+        /** 2026-11-12（第 362 轮）：目标槽有运行实例 ⇒ 拒绝写 mods/ */
+        public static final int P_GAME_RUNNING = 17;
 
         /** **所有**错误码（给自检**遍历**用：漏映射 = 弹窗里静默空白） */
         public static final int[] ALL_CODES = {
@@ -918,6 +920,12 @@ public final class Mods {
             r.fail(PackResult.P_NO_MODS_DIR, "拿不到这个槽的 mods/ 目录", null);
             return r;
         }
+        // 2026-11-12（第 362 轮，plan §12.7 第 3 步）：core 落盘门禁（SAF 之后 / dev 口 / 自检
+        // 都走这里；界面入口判过也要再判一次 —— 弹窗开着时游戏可能被拉起来）。
+        if (WriteGate.blockedForDir(ctx, modsDir)) {
+            r.fail(PackResult.P_GAME_RUNNING, "game-running", null);
+            return r;
+        }
         NameErr nameErr = checkPackName(displayName);
         if (nameErr != null) {
             r.fail(nameErr.code, nameErr.zh, null);
@@ -987,6 +995,11 @@ public final class Mods {
         }
         if (fromDir.getAbsolutePath().equals(toDir.getAbsolutePath())) {
             r.fail(PackResult.P_COPY_SAME, "源槽与目标槽是同一个", null);
+            return r;
+        }
+        // 2026-11-12（第 362 轮）：**只判写入目标**（源槽只是读 —— 不变式②：读放行）。
+        if (WriteGate.blockedForDir(ctx, toDir)) {
+            r.fail(PackResult.P_GAME_RUNNING, "game-running", null);
             return r;
         }
         File[] kids = fromDir.listFiles();
