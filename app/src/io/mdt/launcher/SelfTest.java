@@ -259,6 +259,8 @@ public final class SelfTest {
             startReserve(ctx, L, stat);
             // ★ 第 368 轮：插件事件 pending 按槽分账（多开下一局一条）
             eventPending(ctx, L, stat);
+            // ★ 第 371 轮：探针按实例记账（intent 带槽 / 会话名带槽，:probe 不再猜全局当前槽）
+            probeInstance(ctx, L, stat);
             // ★ 第 364 轮：实例会话记账（多开：一槽一局，结算按实例）
             instanceSessions(ctx, L, stat);
             // ★ ⑰ F13 第三阶段：模组包导入 / 跨槽复制（五个负例 + 一条元断言）
@@ -17647,6 +17649,35 @@ public final class SelfTest {
             } catch (Throwable ignored) { }
         }
         ok(stat, L, legacyOk, "旧单局 pending 格式读侧兼容（升级不丢那一局）");
+    }
+
+    /**
+     * 第 371 轮：探针按实例记账。
+     *
+     * <p>钉住两件事：① 正式路径的启动 Intent 把 pid / 会话名 / **这一局的槽** / 版本都带对了
+     * （`:probe` 不许再靠全局 `currentSlot` 猜）；② 会话目录名 = `yyyyMMdd-HHmmss-<槽>`，
+     * 两个进程写同一个目录。
+     */
+    private static void probeInstance(Context ctx, List<String> L, int[] stat) {
+        L.add("");
+        L.add("── 第 371 轮 · 探针按实例记账 ──");
+        final String slot = SLOT_GATE;
+        android.content.Intent i = ProbeService.runIntent(ctx, 4321,
+                "20260101-000000-" + slot, slot, "pkg.demo", null);
+        String session = i.getStringExtra(ProbeService.EXTRA_SESSION);
+        boolean extras = i.getIntExtra(ProbeService.EXTRA_PID, 0) == 4321
+                && i.getBooleanExtra(ProbeService.EXTRA_RUN, false)
+                && session != null && session.endsWith("-" + slot)
+                && slot.equals(i.getStringExtra(ProbeService.EXTRA_SLOT))
+                && "pkg.demo".equals(i.getStringExtra(ProbeService.EXTRA_VERSION))
+                && i.getComponent() != null
+                && ProbeService.class.getName().equals(i.getComponent().getClassName());
+        ok(stat, L, extras,
+                "探针服务 intent：pid / 会话 / 槽 / 版本 / RUN 都带对（按实例记账）");
+
+        String name = ProbeService.sessionName(ctx, slot);
+        ok(stat, L, name.matches("\\d{8}-\\d{6}-" + java.util.regex.Pattern.quote(slot)),
+                "探针会话名 = yyyyMMdd-HHmmss-<槽>（:game 与 :probe 共用同一目录）");
     }
 
     private static void ok(int[] stat, List<String> L, boolean cond, String msg) {

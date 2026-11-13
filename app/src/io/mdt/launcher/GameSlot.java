@@ -177,7 +177,7 @@ public class GameSlot extends BaseActivity {
             reportPatches(ikey, patchRes, plan);
             // dev：探针验证台（产品版 ProbeLab 是空壳，见 app/src-release）
             ProbeLab.runIfArmed(this);
-            startProbes(vkey, vmap, vinfo);
+            startProbes(vkey, vmap, vinfo, launchSlot);
             // ⚠️ 这句写在 **:game 进程**自己的 Config 实例上并落盘；主进程内存里那份看不到，
             //   必须靠 MainActivity.onResume → Config.reload 才能读到
             //   （否则「继续上次」要重启启动器才更新，2026-10-01 复现）。
@@ -257,20 +257,17 @@ public class GameSlot extends BaseActivity {
      * <p>v30：把这一局的**版本 key** 一起给探针 —— 插件要按版本分账（见 {@code ProbeEnv#version()}）。
      * <p>v31：再把**版本信息快照**一起给（见 {@code ProbeEnv#versionInfo()}），插件写账本时连版本号一起存。
      */
-    private void startProbes(String versionKey, Map<String, String> info, Bundle infoBundle) {
+    private void startProbes(String versionKey, Map<String, String> info, Bundle infoBundle,
+                             String slot) {
         try {
-            String session = new java.text.SimpleDateFormat("yyyyMMdd-HHmmss",
-                    java.util.Locale.US).format(new java.util.Date())
-                    + "-" + Data.currentSlot(this);
+            // ★ 第 371 轮（多开前置）：会话名 / 探针身份一律用**这一局实际落地的槽**
+            //   （`handle` 里 `prepareSlot` 之后的 launchSlot），不再读全局 `currentSlot` ——
+            //   多实例下那是单指针，会让两个实例的探针账目张冠李戴。
+            String session = ProbeService.sessionName(this, slot);
             mProbes = ProbeRunner.start(this, android.os.Process.myPid(), true, session,
-                    Data.currentSlot(this), versionKey, info);
-            Intent svc = new Intent(this, ProbeService.class);
-            svc.putExtra(ProbeService.EXTRA_PID, android.os.Process.myPid());
-            svc.putExtra(ProbeService.EXTRA_RUN, true);
-            svc.putExtra(ProbeService.EXTRA_SESSION, session);
-            svc.putExtra(ProbeService.EXTRA_VERSION, versionKey);
-            if (infoBundle != null) svc.putExtra(ProbeService.EXTRA_VINFO, infoBundle);
-            startService(svc);
+                    slot, versionKey, info);
+            startService(ProbeService.runIntent(this, android.os.Process.myPid(), session,
+                    slot, versionKey, infoBundle));
             // v29：把游戏 activity 的前后台变化转给探针（宿主只报事件，记不记由插件定）
             GameActivityWatcher.setForegroundListener(new GameActivityWatcher.Foreground() {
                 @Override public void onGameForeground(boolean fg) {
