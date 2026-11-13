@@ -432,9 +432,10 @@ List<ItemInfo> patches(String versionKey, String slot);    // 同上 + enabled /
 
 - `ItemInfo` 的固定字段：`kind = KIND_PLUGIN`、`title = 显示名`、`subtitle = id`、`source = "plugins"`、
   `path = null`、`readable = false`；
-- ⚠️ 没有 APK 的条目（只剩隔离件 / 登记指向的文件被删）**没有** `version` / `activeVersion`(若登记里也没有) /
-  `entry` / `selfVersion` / `author` / `description` / `access` / `extCount` / `ext.*` 这些键 ——
-  "没读到"和"声明为空"是两件事，别混；
+- ⚠️ 没有 APK 的条目（只剩隔离件 / 登记指向的文件被删）**没有** `entry` / `selfVersion` / `author` /
+  `description` / `access` / `extCount` / `ext.*` 这些键 —— "没读到"和"声明为空"是两件事，别混；
+  `version` / `activeVersion` / `pendingVersion` 只看"登记表 + 自己装过哪些版本"，与 APK 在不在无关
+  （只剩隔离件时 `version` 没有，`activeVersion` / `pendingVersion` 按登记照给）；
 - ⚠️ `name` / `author` 这些是**插件自己写的**外部数据，别直接当可信 UI 文案（照常做长度/清洗）；
 - ⚠️ 会读每个插件的 APK（自述 / 签名指纹）⇒ **放后台线程**；
 - 想"只列当前生效的"就自己按 `state == "active"` 过滤 —— 宿主给的是**全部**（这正是"所有插件"）。

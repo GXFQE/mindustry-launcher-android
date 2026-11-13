@@ -685,9 +685,10 @@ public final class PluginHost {
             return PluginData.plugins(getBaseContext());
         }
 
-        /** v38：已导入的游戏补丁；给了启动项才判 enabled / applies。 */
+        /** v38：已导入的游戏补丁；给了启动项才判 enabled / applies（槽 null / 空 = 这一页的槽）。 */
         @Override public java.util.List<ItemInfo> patches(String versionKey, String slot) {
-            return PluginData.patches(getBaseContext(), versionKey, slot);
+            String s = (slot == null || slot.trim().isEmpty()) ? this.slot : slot;
+            return PluginData.patches(getBaseContext(), versionKey, s);
         }
 
         /** ★ 第 271 轮：插件要的确认框也走 `CardStack`（插件页里的二次确认不再换窗）。 */

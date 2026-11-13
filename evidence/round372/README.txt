@@ -44,7 +44,9 @@
 三、构建门禁
   产品版 `bash ./build.sh`：== BUILD OK ==（[0/4] content gate OK；write-gate selftest 6/6 +
   36 entries gated / 9 global gameAlive / 12 deletion files frozen / 1 killBackgroundProcesses）。
-  插件侧编译：plugins/sample/build.sh 通过（API 桩直接取宿主那份，v38 编译期无破坏）。
+  插件侧编译：plugins/sample/build.sh 通过（API 桩直接取宿主那份，v38 编译期无破坏）；
+  `bash tools/sample-smoke.sh` = SAMPLE SMOKE OK（装进 dev 宿主、重启进程在、无 FATAL；
+  验收后已把 sample 插件从设备登记与目录里清掉，active.txt 回到 4 条）。
 
 四、未验到（如实记）
   · 插件清单里的"已装版本列表 / 回滚目标"没有进 API（只给 effective version 与 active/pending）。
