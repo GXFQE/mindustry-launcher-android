@@ -207,6 +207,27 @@ final class Patches {
         return d;
     }
 
+    /**
+     * **补丁库的写操作锁（第 373 轮评审 M2）**：`enable` / `disable` / `delete` / `importPackage`
+     * 的"读判据 → 写 config / 移目录"必须是**一个事务**。原来它们各自只靠 `Config` 的方法级
+     * `synchronized`，两个并发 `patchEnable` 会都读到同一份 refs、都过冲突检查、最后互相覆盖
+     * （一条静默丢失）；`patchDelete` 也可能在 owners 检查后、`Trash.move` 前被另一个 `enable`
+     * 写入引用（config 指向已挪进中转站的记录）。⇒ 四个写操作共用这一把进程级锁。
+     */
+    private static final Object OPS = new Object();
+
+    /**
+     * 补丁库根目录**可读**吗（不是"有没有补丁"）。
+     *
+     * <p>`scan()` 在 `listFiles() == null` 时返回空表 —— "读不出来"和"一条都没有"在它那里
+     * 是同一个结果。插件接口要据此决定"给 0"还是"不给这个键 / 报 io"，所以在这里单独判一次。
+     * ⚠️ 目录不存在是正常的（还没导入过补丁）⇒ 只有"目录在、但列不出来"才算不可读。
+     */
+    static boolean storeReadable(Context ctx) {
+        File d = storeDir(ctx);
+        return !d.isDirectory() || d.listFiles() != null;
+    }
+
     static File recordDir(Context ctx, String id, String version) {
         return new File(new File(storeDir(ctx), id), version);
     }
@@ -281,6 +302,12 @@ final class Patches {
      * <p>失败时临时目录被清掉、**已有同名记录一个字节不动**（先见后改）。
      */
     static Record importPackage(Context ctx, File zipFile) throws PatchException {
+        synchronized (OPS) {
+            return importPackage0(ctx, zipFile);
+        }
+    }
+
+    private static Record importPackage0(Context ctx, File zipFile) throws PatchException {
         if (zipFile == null || !zipFile.isFile()) {
             throw new PatchException(PatchException.C_IO, zipFile == null ? "" : zipFile.getName());
         }
@@ -400,6 +427,12 @@ final class Patches {
      * 引用串的字符集不含 '@'（见 {@link Record#ref()}），所以能无歧义拆。
      */
     static void delete(Context ctx, Record r) throws PatchException {
+        synchronized (OPS) {
+            delete0(ctx, r);
+        }
+    }
+
+    private static void delete0(Context ctx, Record r) throws PatchException {
         if (r == null) throw new PatchException(PatchException.C_RECORD_GONE, "");
         // 2026-11-12（第 359 轮）：补丁库是 hub 全局数据（不变式 ④）—— 删除一份**没被任何实例
         // 启用**的补丁文件不影响正在跑的游戏（它的 dex 在启动时就加载了）。"被启用"由下面的
@@ -485,16 +518,20 @@ final class Patches {
             throw new PatchException(PatchException.C_NO_MATCH, r.label());
         }
         if (!r.applicable(apkSha256)) throw new PatchException(PatchException.C_NO_MATCH, r.label());
-        // ★ 顺序（B4）：先判"已经启用"再查冲突 —— 反过来的话同一条记录会被 conflicts 当成
-        //   "与已启用的补丁冲突"，用户看到「与已启用的补丁冲突：它自己」。
-        List<String> refs = Config.get().patchRefs(ikey);
-        if (refs.contains(r.ref())) throw new PatchException(PatchException.C_ENABLED, "");
-        List<String> names = conflicts(ctx, ikey, r, apkSha256);
-        if (!names.isEmpty()) throw new PatchException(PatchException.C_CONFLICT, join(names));
-        refs.add(r.ref());
-        Config.get().setPatchRefs(ikey, refs);
-        // 第 360 轮：用户主动重新启用 ⇒ 把"上次带着它崩了"的旧结论清掉（旧结论不该继续骂它）
-        clearCrashNoticeForRef(ctx, r.ref());
+        // ★ 第 373 轮评审 M2：**判据（已启用 / 冲突）+ 写 config 必须是一个事务** ——
+        //   两个并发 enable 都读到同一份 refs、都过冲突检查 ⇒ 后写的覆盖前写的（一条静默丢失）。
+        synchronized (OPS) {
+            // ★ 顺序（B4）：先判"已经启用"再查冲突 —— 反过来的话同一条记录会被 conflicts 当成
+            //   "与已启用的补丁冲突"，用户看到「与已启用的补丁冲突：它自己」。
+            List<String> refs = Config.get().patchRefs(ikey);
+            if (refs.contains(r.ref())) throw new PatchException(PatchException.C_ENABLED, "");
+            List<String> names = conflicts(ctx, ikey, r, apkSha256);
+            if (!names.isEmpty()) throw new PatchException(PatchException.C_CONFLICT, join(names));
+            refs.add(r.ref());
+            Config.get().setPatchRefs(ikey, refs);
+            // 第 360 轮：用户主动重新启用 ⇒ 把"上次带着它崩了"的旧结论清掉（旧结论不该继续骂它）
+            clearCrashNoticeForRef(ctx, r.ref());
+        }
         Log.i(TAG, "patch enabled: " + r.ref() + " for " + ikey);
     }
 
@@ -504,9 +541,11 @@ final class Patches {
         if (WriteGate.blockedInstance(ctx, ikey)) {
             throw new PatchException(PatchException.C_GAME_ALIVE, "");
         }
-        List<String> refs = Config.get().patchRefs(ikey);
-        if (!refs.remove(r.ref())) return;
-        Config.get().setPatchRefs(ikey, refs);
+        synchronized (OPS) {           // 同上：读 refs → 写回 必须原子（评审 M2）
+            List<String> refs = Config.get().patchRefs(ikey);
+            if (!refs.remove(r.ref())) return;
+            Config.get().setPatchRefs(ikey, refs);
+        }
         Log.i(TAG, "patch disabled: " + r.ref() + " for " + ikey);
     }
 

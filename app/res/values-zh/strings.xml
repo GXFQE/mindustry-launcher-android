@@ -36,6 +36,8 @@
     <string name="plugin_task_failed">失败了</string>
     <string name="plugin_task_canceled">已取消</string>
     <string name="plugin_task_download">下载</string>
+    <string name="plugin_task_import">导入补丁</string>
+    <string name="plugin_task_delete">删除补丁</string>
     <!-- v23：探针的风险告知与崩溃提示 -->
     <string name="plugin_probe_risk_title">在游戏进程里运行探针？</string>
     <string name="plugin_probe_risk_msg">这个第三方插件声明了进程内探针。探针出问题可能把游戏一起带崩。仍然启用吗？</string>

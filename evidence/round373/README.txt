@@ -5,8 +5,8 @@
 补丁流程：docs/flows/21-阶段-15-补丁.md F27.18
 
 一、自检 selftest-373.txt
-  通过 2179 项，失败 0 项（第 3 行，跑于 2026-11-13 19:40:40，dev 变体 / 真机 ELP-AN00）；
-  基线 2135（第 372 轮）→ +44 条。新增/加强的尺子：
+  通过 2193 项，失败 0 项（第 3 行，跑于 2026-11-13 20:03:45，dev 变体 / 真机 ELP-AN00）；
+  基线 2135（第 372 轮）→ +58 条（v39 首版 +44，评审修正 +14）。新增/加强的尺子：
   · v39 签名：instances()/backups() -> List；fetchText/githubReleases；download -> Task；
     patchEnable/Disable/Import/Delete/Conflicts；KIND_INSTANCE / KIND_BACKUP；
     GitHubRelease 快照（tag / prerelease / Asset.name / size / url）；DOC_VERSION == API == 39。
@@ -31,7 +31,36 @@
     patches() 看到 enabled/applies=true）→ 再预检 = enabled（不是"跟自己冲突"）→
     patchDisable（引用消失）→ patchDelete（记录不在补丁库、进 patches-trash）。
     收尾无条件恢复临时槽绑定 / 配置引用 / 补丁记录 / 中转站夹具。
-  基线 2135 → 2179 的数字与 evidence/round372/selftest-372.txt 对得上（+44）。
+  基线 2135 → 2193 的数字与 evidence/round372/selftest-372.txt 对得上（+58 = v39 首版 44 + 评审修正 14）。
+
+一之二、独立评审后的修正（静态评审；无 BLOCKER，MAJOR 按重要性修）
+  · M1 GitHub 配额绕过：`download` 原来不计配额 ⇒ 插件可用下载打光 60/h、把自更新搞停。
+    修：新增 `PluginNet.noteApiRequest`（fetchText 与 download 共用同一份配额）；host 归一化
+    （大小写 / 末尾点），缓存键也按规范化 URL（大写 URL 命中同一份缓存）。自检 +4 条：
+    download 计数、41 次限频、大小写共享缓存、非 API host 不计。
+  · M2 补丁写并发：`enable/disable/delete/importPackage` 的"读判据 → 写 config / 移目录"原来不是
+    事务（并发 enable 会丢一条；delete 与 enable 竞争会留下指向中转站记录的启用表）。
+    修：`Patches.OPS` 进程级写锁（enable/disable 只包"读 refs → 写回"段，WriteGate 判据仍在
+    方法体内 —— 写入口门禁元断言要求）。自检 +1 条：并发启用同一条 ⇒ 恰好一次成功、引用只出现一次。
+  · M3 并发下载同名互踩：`UpdateDownload` 的 .part / 成品名固定 ⇒ 两个 Task 互相删/覆盖。
+    修：每次下载一个**独立子目录** `downloads/<一次性 id>/<文件名>`；失败/取消连空目录一起收。
+  · M4 读失败当 0：`patchCount` / `backupCount` 在库读不出来时会被写成 "0"。
+    修：`Patches.storeReadable` + 备份目录 listFiles 可读性先判，读不出来就不放键；
+    自检新增"加键与宿主计数一致"，并让 `patchCount` 在启用后必须为 1（非零也有分辨力）。
+  · M5 正文超限 code 不对：`fetchText` 把 body too big 折成 network。修：识别后给 `size`；自检 +1。
+  · M6 导入/删除没有前台服务：`patchImport`（最多 256 MB）与 `patchDelete`（跨目录移动）现在
+    `Work.begin/end` 包住；导入开头清上次残留的临时 zip（半路被杀不再攒垃圾）。
+  · M7 读失败折成 not-found / record_gone / no_match：`hasLaunchItem` 改三态（null = 读失败 ⇒ io）；
+    `apkShaOfVersion` 读失败 ⇒ null（空串只表示"没有这个版本"）；补丁库不可读 ⇒ io。
+  · M8 自检假绿：实例清单用 `Instances.testSnapshot` 注入"真实例 + 启动占位"（两态都钉）；
+    删除恒真断言；versions 加键与宿主数据交叉核对；补丁写补 7 条负例
+    （not-found / record_gone / no_match / missing / game_alive / enabled / in_use）+ 并行用例。
+  · M11 trash() 变慢：`Trash.list` 对目录形态条目会递归量体积 ⇒ 新增 `Trash.listLite` /
+    `parseLite`，插件 `trash()` 不再递归量（体积/文件数给 0 = 这次没量，文档已写）。
+  · M13 预检顺序与 enable 不完全一致：改成 gate → filesOk → APK 匹配 → 已启用 → 冲突
+    （与 `Patches.enable` 对齐）。
+  · M10/M16 文档：PLUGIN-API 的失败码表、download 落点与"大小边下边查"、`game_alive` 与旧
+    `game-running` 同义、`backupCount` 读失败缺键、"当前 38"→39、Cancel 延迟说明已同步。
 
 二、构建与冒烟
   · 产品版 `bash ./build.sh` ⇒ `== BUILD OK ==`

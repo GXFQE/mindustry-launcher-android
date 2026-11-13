@@ -716,7 +716,6 @@ public final class PluginHost {
 
         /** v39：拉文本（https-only + 正文上限 + GitHub API 缓存/配额）。 */
         @Override public void fetchText(final String url, final Fetch callback) {
-            final Context c = getBaseContext();
             new Thread(new Runnable() {
                 @Override public void run() {
                     Result r;
@@ -842,16 +841,25 @@ public final class PluginHost {
                 @Override public void run() {
                     Result r;
                     try {
-                        if (!PluginData.hasLaunchItem(c, vk, s)) {
+                        Boolean launch = PluginData.hasLaunchItem(c, vk, s);
+                        if (launch == null) {
+                            r = Result.fail("io");           // 读失败 ≠ 没有这个启动项（评审 M7）
+                        } else if (!launch.booleanValue()) {
                             r = Result.fail("not-found");
+                        } else if (!Patches.storeReadable(c)) {
+                            r = Result.fail("io");           // 补丁库列不出来 ≠ 没有记录
                         } else {
                             Patches.Record rec = Patches.findByRef(c, rf);
                             if (rec == null) {
                                 r = Result.fail("record_gone");
                             } else if (enable) {
-                                Patches.enable(c, Versions.instanceKey(vk, s), rec,
-                                        PluginData.apkShaOfVersion(c, vk));
-                                r = Result.ok();
+                                String sha = PluginData.apkShaOfVersion(c, vk);
+                                if (sha == null) {
+                                    r = Result.fail("io");   // 哈希算不出来 ≠ 补丁不匹配
+                                } else {
+                                    Patches.enable(c, Versions.instanceKey(vk, s), rec, sha);
+                                    r = Result.ok();
+                                }
                             } else {
                                 Patches.disable(c, Versions.instanceKey(vk, s), rec);
                                 r = Result.ok();
@@ -875,12 +883,16 @@ public final class PluginHost {
         /** v39：导入补丁包（先落插件 cache 的临时 zip，再走补丁机制自己的完整校验）。 */
         @Override public void patchImport(final InputStream zip, final Imported callback) {
             final Context c = getBaseContext();
+            final Context app = c.getApplicationContext() == null ? c : c.getApplicationContext();
             new Thread(new Runnable() {
                 @Override public void run() {
                     Result r;
                     String ref = null;
                     File tmp = null;
                     InputStream in = zip;
+                    // 导入最多 256 MB（读 + 解压），要跟着前台服务跑；否则用户切走/系统回收会杀进程，
+                    // 半截临时 zip 留在 cache（评审 M6）。
+                    Work.begin(app, R.string.plugin_task_import);
                     try {
                         if (in == null) {
                             r = Result.fail("invalid");
@@ -888,6 +900,17 @@ public final class PluginHost {
                             File dir = new File(pluginCache(), "patch-import");
                             if (!dir.isDirectory() && !dir.mkdirs()) {
                                 throw new IOException("mkdirs: " + dir.getName());
+                            }
+                            // 上一次被杀留下的临时件：先清（本次新文件还没建）
+                            File[] old = dir.listFiles();
+                            if (old != null) {
+                                for (File f : old) {
+                                    if (f != null && f.isFile()
+                                            && f.getName().startsWith("p-")
+                                            && f.getName().endsWith(".zip")) {
+                                        f.delete();
+                                    }
+                                }
                             }
                             tmp = new File(dir, "p-" + System.nanoTime() + ".zip");
                             copyLimited(in, tmp, Patches.MAX_TOTAL + 4096L);
@@ -908,6 +931,7 @@ public final class PluginHost {
                             try { in.close(); } catch (Throwable ignored) { }
                         }
                         if (tmp != null && tmp.isFile()) tmp.delete();
+                        Work.end(app);
                     }
                     final Result fr = r;
                     final String fref = ref;
@@ -923,6 +947,7 @@ public final class PluginHost {
         /** v39：删除补丁 = 挪进中转站（被启用着 ⇒ in_use）。 */
         @Override public void patchDelete(final String ref, final Done callback) {
             final Context c = getBaseContext();
+            final Context app = c.getApplicationContext() == null ? c : c.getApplicationContext();
             final String rf = ref == null ? "" : ref.trim();
             if (rf.isEmpty()) {
                 postFail(callback, "invalid");
@@ -931,18 +956,26 @@ public final class PluginHost {
             new Thread(new Runnable() {
                 @Override public void run() {
                     Result r;
+                    // 删除 = 跨目录移动（可能跨文件系统复制 + 校验），跟着前台服务跑（评审 M6）
+                    Work.begin(app, R.string.plugin_task_delete);
                     try {
-                        Patches.Record rec = Patches.findByRef(c, rf);
-                        if (rec == null) {
-                            r = Result.fail("record_gone");
+                        if (!Patches.storeReadable(c)) {
+                            r = Result.fail("io");
                         } else {
-                            Patches.delete(c, rec);
-                            r = Result.ok();
+                            Patches.Record rec = Patches.findByRef(c, rf);
+                            if (rec == null) {
+                                r = Result.fail("record_gone");
+                            } else {
+                                Patches.delete(c, rec);
+                                r = Result.ok();
+                            }
                         }
                     } catch (PatchException pe) {
                         r = Result.fail(pe.code);
                     } catch (Throwable t) {
                         r = Result.fail("io");
+                    } finally {
+                        Work.end(app);
                     }
                     final Result fr = r;
                     postMain(new Runnable() {
@@ -970,8 +1003,13 @@ public final class PluginHost {
                     Result r;
                     java.util.List<String> names = null;
                     try {
-                        if (!PluginData.hasLaunchItem(c, vk, s)) {
+                        Boolean launch = PluginData.hasLaunchItem(c, vk, s);
+                        if (launch == null) {
+                            r = Result.fail("io");
+                        } else if (!launch.booleanValue()) {
                             r = Result.fail("not-found");
+                        } else if (!Patches.storeReadable(c)) {
+                            r = Result.fail("io");
                         } else {
                             Patches.Record rec = Patches.findByRef(c, rf);
                             String ikey = Versions.instanceKey(vk, s);
@@ -979,15 +1017,18 @@ public final class PluginHost {
                                 r = Result.fail("record_gone");
                             } else if (WriteGate.blockedInstance(c, ikey)) {
                                 r = Result.fail("game_alive");
-                            } else if (Patches.enabledRefs(c, ikey).contains(rec.ref())) {
-                                // 与 enable 的顺序对齐：已经启用 ⇒ 预检没意义（更不能报"它跟自己冲突"）
-                                r = Result.fail("enabled");
                             } else if (!rec.filesOk) {
+                                // 与 `Patches.enable` 的顺序对齐：gate → filesOk → APK 匹配 → 已启用 → 冲突
                                 r = Result.fail("missing");
                             } else {
                                 String sha = PluginData.apkShaOfVersion(c, vk);
-                                if (sha == null || sha.isEmpty() || !rec.applicable(sha)) {
+                                if (sha == null) {
+                                    r = Result.fail("io");     // 哈希算不出来 ≠ 不匹配
+                                } else if (sha.isEmpty() || !rec.applicable(sha)) {
                                     r = Result.fail("no_match");
+                                } else if (Patches.enabledRefs(c, ikey).contains(rec.ref())) {
+                                    // 已启用 ⇒ 预检没意义（更不能报"它跟自己冲突"）
+                                    r = Result.fail("enabled");
                                 } else {
                                     names = Patches.conflicts(c, ikey, rec, sha);
                                     r = Result.ok();

@@ -228,7 +228,10 @@ final class PluginData {
         File[] dirs = Trash.allDirs(ctx);
         for (File dir : dirs) {
             if (dir == null) continue;
-            for (Trash.Item it : Trash.list(dir)) {
+            // ⚠️ 用 listLite：目录形态的条目（整槽 / 版本）在 parse() 里会递归量体积，
+            //   几十 MB / 上千文件 ⇒ 插件在 UI 线程调 trash() 会卡（评审 M11）。
+            //   体积 / 文件数这两项在插件快照里给 0（不是"没有"，是"这次没量"——文档写明）。
+            for (Trash.Item it : Trash.listLite(dir)) {
                 if (it == null || it.path == null) continue;
                 Map<String, String> ex = new LinkedHashMap<String, String>();
                 String cat = categoryOf(it.kind);
@@ -326,18 +329,18 @@ final class PluginData {
      * <p>补丁写接口用它挡"插件随手传个不存在的槽名"—— 否则会在 config 里留下一条
      * 指向不存在启动项的启用记录（界面上看不见、也删不掉的那种脏数据）。
      */
-    static boolean hasLaunchItem(Context ctx, String versionKey, String slot) {
-        if (ctx == null || versionKey == null || versionKey.isEmpty()) return false;
+    static Boolean hasLaunchItem(Context ctx, String versionKey, String slot) {
+        if (ctx == null || versionKey == null || versionKey.isEmpty()) return Boolean.FALSE;
         String want = slot == null ? "" : slot.trim();
         try {
             for (Versions.Entry e : Versions.scanAll(ctx)) {
                 if (e != null && versionKey.equals(e.key())
-                        && want.equals(Versions.slotFor(e))) return true;
+                        && want.equals(Versions.slotFor(e))) return Boolean.TRUE;
             }
-        } catch (Throwable ignored) {
-            // 扫不出来 ⇒ 当作没有（宁可拒，不留脏记录）
+        } catch (Throwable t) {
+            return null;                   // 读失败——上层要报 io，不能折成 not-found（评审 M7）
         }
-        return false;
+        return Boolean.FALSE;
     }
 
     static List<ItemInfo> versions(Context ctx) {
@@ -351,12 +354,10 @@ final class PluginData {
         }
         // v39：宿主列表行本来就在算的两个数（补丁 N / 备份 N）—— 插件不该为了这两个数
         // 自己去扫 APK 哈希（Patches 那条路要几十 MB 的 sha256）或重读备份清单。
-        Map<String, Integer> patchCounts = null;
-        try {
-            patchCounts = Patches.enabledCounts(ctx);
-        } catch (Throwable ignored) {
-            // 读不出来 ⇒ 不放 patchCount（"缺 = 拿不到"，别用 0 冒充"没启用"）
-        }
+        // ⚠️ 评审 M4：`Patches.scan` / `VersionOps.backupCountIn` 在"读不出来"时都会给空表 / 0，
+        //   与"真的没有"分不开 ⇒ 先用 storeReadable / listFiles 判一次可读性，读不出来就别放这个键。
+        Map<String, Integer> patchCounts = Patches.storeReadable(ctx)
+                ? Patches.enabledCounts(ctx) : null;
         Map<String, Integer> backupCounts = new LinkedHashMap<String, Integer>();
         for (Versions.Entry e : entries) {
             if (e == null) continue;
@@ -384,13 +385,14 @@ final class PluginData {
                 Integer n = patchCounts.get(ikey);
                 ex.put("patchCount", String.valueOf(n == null ? 0 : n.intValue()));
             }
-            try {
+            File bdir = Backup.slotDir(ctx, rowSlot);
+            // 目录不存在 = 这个槽从没备份过 ⇒ 0 是事实；目录在却列不出来 = 读失败 ⇒ 不放键
+            if (!bdir.exists() || bdir.listFiles() != null) {
                 if (!backupCounts.containsKey(rowSlot)) {
-                    backupCounts.put(rowSlot, Integer.valueOf(VersionOps.backupCountIn(ctx, rowSlot)));
+                    backupCounts.put(rowSlot, Integer.valueOf(
+                            VersionOps.backupCountIn(ctx, rowSlot)));
                 }
                 ex.put("backupCount", String.valueOf(backupCounts.get(rowSlot)));
-            } catch (Throwable ignored) {
-                // 备份清单读不出来 ⇒ 不放这个键
             }
             String sub = e.displayVersion();
             if (e.pkg != null && !e.pkg.isEmpty()) sub = sub + " · " + e.pkg;
@@ -560,7 +562,8 @@ final class PluginData {
             } catch (Throwable t) {
                 enabled = null;            // 读不出来 ⇒ **不放 enabled**（别用 false 冒充"没启用"）
             }
-            apkSha = apkShaOfVersion(ctx, vk);
+            String sha = apkShaOfVersion(ctx, vk);
+            apkSha = sha == null ? "" : sha;   // 读失败（null）⇒ 不写 applies，与"没有版本"同一个键语义
         }
         for (Patches.Record r : records) {
             try {
@@ -572,7 +575,13 @@ final class PluginData {
         return out;
     }
 
-    /** 版本 key ⇒ 它那份 APK 的 sha256（找不到 / 读不出来 ⇒ 空串）。 */
+    /**
+     * 版本 key ⇒ 它那份 APK 的 sha256。
+     *
+     * @return 64 位十六进制；**版本不存在 / APK 文件不在 ⇒ 空串**（事实是"没有这个版本"）；
+     *         **扫描或哈希过程出错 ⇒ null**（读失败，不是"没有"——评审 M7：原来两种情况都折成空串，
+     *         插件写接口只能报 `no_match`）。
+     */
     static String apkShaOfVersion(Context ctx, String versionKey) {
         if (ctx == null || versionKey == null || versionKey.trim().isEmpty()) return "";
         String vk = versionKey.trim();
@@ -584,8 +593,8 @@ final class PluginData {
                 if (!apk.isFile()) continue;
                 return Patches.sha256Of(apk);
             }
-        } catch (Throwable ignored) {
-            // 版本扫描坏了 / 哈希算不出来 ⇒ 当"判不了适用性"
+        } catch (Throwable t) {
+            return null;                   // 读失败 ≠ 没有这个版本
         }
         return "";
     }

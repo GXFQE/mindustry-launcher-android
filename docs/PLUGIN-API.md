@@ -93,7 +93,7 @@
 ## 3. 入口类约定
 
 ```java
-public static int api();                        // 必需：你需要的接口版本（当前 38；用不到新能力就报 20）
+public static int api();                        // 必需：你需要的接口版本（当前 39；用不到新能力就报 20）
 public static View createView(PluginApi api);   // content / section 用
 public static void run(PluginApi api);          // action 用（在原页跑，不换页）
 public static void unload();                    // 可选：收尾（也认 unload(Context)）
@@ -143,7 +143,7 @@ public static void unload();                    // 可选：收尾（也认 unlo
 
 | 方法 | 新键 |
 |---|---|
-| `versions()` | `instanceKey`（= 宿主实例键 `版本key + NUL + 槽`，**别自己拼**）/ `bound`（`"true"` = 附加绑定行，不是主行）/ `patchCount`（这个启动项启用的补丁数，读不出来就**没有这个键**）/ `backupCount`（这个槽的备份份数） |
+| `versions()` | `instanceKey`（= 宿主实例键 `版本key + NUL + 槽`，**别自己拼**）/ `bound`（`"true"` = 附加绑定行，不是主行）/ `patchCount`（这个启动项启用的补丁数；补丁库读不出来就**没有这个键**）/ `backupCount`（这个槽的备份份数；备份目录读不出来就**没有这个键**） |
 | `plugins()` | `updateState`（`ok` / `available` / `installed` / `confirm` / `failed`）/ `updateVersion` / `updateNote`（后两个可能是空串 = 更新记录里没写；**记录不存在 ⇒ 三个键都不出现**） |
 | `settings()` | `plugin_auto_update` / `crash_alert` / `trash_keep` / `trash_keep_slots` / `update_mode` / `update_mirror`（都是"设置页里能被改的项"；`update_mirror` 空串 = 自动选线路） |
 
@@ -153,17 +153,21 @@ public static void unload();                    // 可选：收尾（也认 unlo
 |---|---|
 | `fetchText(url, cb)` | 拉一段文本（UTF-8）。**只放行 https**（`http://127.0.0.1` / `localhost` 给本机调试）；正文上限 **512 KB**；连接 15 s / 读 60 s；跟随 302 |
 | `githubReleases(repo, cb)` | 列 `owner/name` 的 release（最新在前，最多 30 条）：`tag` / `prerelease` / `publishedAt` / `assets`（`name` / `size`（没给 = -1）/ `url`，`url` 可直接喂 `download`） |
-| `download(url, expectedSha256, cb)`（返回 `Task`） | 下载到**本插件 cache** 的 `downloads/<URL 文件名>`；先写 `.part`，大小 + sha256 过了才改名；GitHub 地址自动套用户选的**更新线路**（镜像优先、直连兜底）；体积上限 **1 GB**；进度显示在宿主前台服务通知里（**别自己再发**） |
+| `download(url, expectedSha256, cb)`（返回 `Task`） | 下载到**本插件 cache** 的 `downloads/<一次性子目录>/<URL 文件名>`（每个 Task 一个子目录：并发下载同名文件不会互相删/覆盖）；先写 `.part`，sha256 过了才改名；**大小由"边下边查 1 GB 上限"兜底**（下载前不知道长度时不预判）；GitHub 地址自动套用户选的**更新线路**（镜像优先、直连兜底）；进度显示在宿主前台服务通知里（**别自己再发**） |
 
 规则与边界：
 
 - **GitHub API 配额是宿主与插件共用的**（未登录 60 次/小时）⇒ 宿主做了**同一 URL 10 分钟缓存**
   + **每小时 40 次**上限（超了 `rate-limited`）。**不要轮询**：插件打光配额会连带把启动器自更新搞停。
 - 失败码（`Result.reason`）：`bad-url` / `network` / `size` / `sha` / `rate-limited` / `bad-data` /
-  `io` / `canceled`。文案由插件自己出。
+  `invalid`（sha256 不是 64 位十六进制）/ `io` / `canceled`。文案由插件自己出。
 - **不校验 sha256 = 信任中间人**：`expectedSha256` 能给就给（空串 / null = 不校验，回调里回实际值）。
-- 落点只能在插件自己的 `cache/downloads/`；文件名由宿主清洗（只留 `A-Za-z0-9._-`，≤ 80）。
-- 下载任务可 `Task.cancel()`；取消后回调 `canceled` 且通知栏会收掉进度。
+- 落点只能在插件自己的 `cache/downloads/` 下；文件名由宿主清洗（只留 `A-Za-z0-9._-`，≤ 80），
+  每次下载一个**独立子目录**（并发安全）。
+- 下载任务可 `Task.cancel()`；取消后回调 `canceled`，通知栏会收掉进度（正在阻塞的 read 可能要
+  等到读超时才走到回调，但**结果一定不会当成成功**）。
+- ⚠️ **GitHub API 的下载地址（`assets[].url`）也计入 40 次/小时配额**：`download` 与 `fetchText`
+  共用同一份记账，用下载绕配额是绕不过去的。
 
 ### 补丁写（v39）
 
@@ -177,10 +181,13 @@ public static void unload();                    // 可选：收尾（也认 unlo
 | `patchDelete(ref, cb)` | 删补丁 = **挪进中转站**（可由宿主界面放回）；被启用着 ⇒ `in_use` |
 | `patchConflicts(versionKey, slot, ref, cb)` | 启用前**预检**：回调里给冲突的已启用补丁显示名列表（空表 = 没冲突）；已启用 ⇒ `enabled`（不是"跟自己冲突"） |
 
-- 宿主做全部门禁：该启动项实例在跑 ⇒ `game_alive`；文件缺失 ⇒ `missing`；不匹配这个 APK ⇒
-  `no_match`；已启用 ⇒ `enabled`；冲突 ⇒ `conflict`；`(版本key, 槽)` 不是存在的启动项 ⇒ `not-found`。
+- 宿主做全部门禁：该启动项实例在跑 ⇒ `game_alive`（**与旧写入口的 `game-running` 是同一件事**，
+  补丁接口用前者）；文件缺失 ⇒ `missing`；不匹配这个 APK ⇒ `no_match`；已启用 ⇒ `enabled`；
+  冲突 ⇒ `conflict`；`(版本key, 槽)` 不是存在的启动项 ⇒ `not-found`；补丁库 / 版本信息**读不出来**
+  ⇒ `io`（不折成 `not-found` / `record_gone` / `no_match`）。
 - 其余失败码沿用补丁机制：`bad_zip` / `bad_json` / `schema` / `field` / `no_targets` / `bad_hash` /
-  `bad_path` / `missing_entry` / `bad_dex` / `bad_assets` / `dup` / `too_big` / `io` / `record_gone`。
+  `bad_path` / `missing_entry` / `bad_dex` / `bad_assets`（只在导入时出现）/ `dup` / `too_big` /
+  `io` / `record_gone` / `invalid`。
 - **启用只写记录，不碰正在跑的进程**：真正生效在下次启动；同一补丁在两个槽上各开各的（第 353 轮）。
 - 插件自己负责"动手前问用户"（想和宿主风格一致就用宿主的 `confirm` / `choose`）。
 - 这些方法都是异步：回调在 UI 线程；`patchImport` / `patchConflicts` 会读 dex，**别在主线程等结果**。
@@ -700,10 +707,11 @@ public final String reason;  // 机器码；成功恒为 null，失败恒非空
 | `bad-data` | 返回的不是预期格式（镜像错误页 / 限流对象等） |
 
 **v39 补丁写**（`patchEnable` / `patchDisable` / `patchImport` / `patchDelete` / `patchConflicts`）：
-`not-found`（启动项不存在）/ `no_match`（补丁没有匹配这个 APK 的 target）/ `conflict`（与已启用的冲突）/
-`missing`（补丁文件缺失）/ `enabled`（已启用）/ `in_use`（删除时还被启用着）/ `game_alive`（该实例在跑）/
-`record_gone`（记录不存在）/ `bad_zip` / `bad_json` / `schema` / `field` / `no_targets` / `bad_hash` /
-`bad_path` / `missing_entry` / `bad_dex` / `bad_assets` / `dup` / `too_big` / `io`。
+`not-found`（启动项不存在）/ `invalid`（参数空）/ `no_match`（补丁没有匹配这个 APK 的 target）/
+`conflict`（与已启用的冲突）/ `missing`（补丁文件缺失）/ `enabled`（已启用）/ `in_use`（删除时还被启用着）/
+`game_alive`（该实例在跑；**与旧写入口的 `game-running` 是同一件事**）/ `record_gone`（记录不存在）/
+`bad_zip` / `bad_json` / `schema` / `field` / `no_targets` / `bad_hash` / `bad_path` / `missing_entry` /
+`bad_dex` / `bad_assets`（只在导入时）/ `dup` / `too_big` / `io`（含"补丁库 / 版本信息读不出来"）。
 
 ⚠️ `reason` 是**给代码看的**，别直接上屏 —— 文案由插件自己出（每个插件有自己的语言包）。
 

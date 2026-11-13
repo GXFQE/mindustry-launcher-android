@@ -330,13 +330,34 @@ public final class Trash {
 
     /** 解析一项（**永远返回一个 Item**：认不出名字也照样能列出来、能彻底删除） */
     public static Item parse(File f) {
+        return parse(f, true);
+    }
+
+    /**
+     * 同上，但**不递归量体积 / 数文件**（v39 评审 M11）。
+     *
+     * <p>为什么要有它：`parse` 对目录形态的条目会走 `Data.sizeTree` + `Data.countTree`，
+     * `slots-trash` / `versions-trash` 里一项可能就是几十 MB / 上千文件。插件接口
+     * `trash()` 在 UI 线程被调用时会因此卡住；插件要的是"有哪些东西"，体积不是必需的。
+     * 宿主的「中转站」页面仍走 `parse`（那里真的要显示体积）。
+     */
+    public static Item parseLite(File f) {
+        return parse(f, false);
+    }
+
+    private static Item parse(File f, boolean withSize) {
         Item it = new Item();
         it.path = f;
         String raw = f == null ? "" : f.getName();
         it.name = raw;
         it.dirForm = f != null && f.isDirectory();
-        it.bytes = f == null ? 0 : (it.dirForm ? Data.sizeTree(f) : f.length());
-        it.files = f == null ? 0 : (it.dirForm ? Data.countTree(f) : 1);
+        if (withSize) {
+            it.bytes = f == null ? 0 : (it.dirForm ? Data.sizeTree(f) : f.length());
+            it.files = f == null ? 0 : (it.dirForm ? Data.countTree(f) : 1);
+        } else {
+            it.bytes = f == null || it.dirForm ? 0 : f.length();
+            it.files = f == null ? 0 : (it.dirForm ? 0 : 1);
+        }
         String[] p = raw.split(SEP, 3);
         if (p.length == 3 && STAMP_MS.matcher(p[0]).matches()) {
             it.stamp = parseStamp(p[0]);
@@ -372,12 +393,21 @@ public final class Trash {
 
     /** 某个中转站目录里的一项项（★ 跳过 `.nomedia` / `.part` 这类非用户数据，口径与备份一致） */
     public static List<Item> list(File dir) {
+        return list(dir, true);
+    }
+
+    /** 同 {@link #list}，但**不递归量体积 / 数文件**（插件只读快照用；见 {@link #parseLite}）。 */
+    public static List<Item> listLite(File dir) {
+        return list(dir, false);
+    }
+
+    private static List<Item> list(File dir, boolean withSize) {
         List<Item> out = new ArrayList<>();
         File[] fs = dir == null ? null : dir.listFiles();
         if (fs == null) return out;
         for (File f : fs) {
             if (Data.contentSkipped(f)) continue;
-            out.add(parse(f));
+            out.add(withSize ? parse(f) : parseLite(f));
         }
         Collections.sort(out, BY_TIME_DESC);
         return out;

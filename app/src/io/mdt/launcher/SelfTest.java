@@ -5323,8 +5323,7 @@ public final class SelfTest {
         try {
             // 不联网：先清掉可能被别的用例留下的注入点
             PluginNet.resetTestHooks();
-            ok(stat, L, "https://api.github.com/repos/a/b/releases".startsWith("https")
-                            && PluginNet.checkUrl("https://api.github.com/x") == null
+            ok(stat, L, PluginNet.checkUrl("https://api.github.com/x") == null
                             && PluginNet.checkUrl("http://github.com/x") != null
                             && PluginNet.checkUrl("http://127.0.0.1:8080/x") == null
                             && PluginNet.checkUrl("http://localhost:9/x") == null
@@ -5345,8 +5344,10 @@ public final class SelfTest {
                                     .length() <= 80,
                     "① 下载文件名清洗：取最后一段 / 去查询串 / 危险字符换下划线 / 空名兜底 / 限长");
             ok(stat, L, PluginNet.isGithubApi("https://api.github.com/repos/a/b")
+                            && PluginNet.isGithubApi("https://API.GitHub.com/repos/a/b")
+                            && PluginNet.isGithubApi("https://api.github.com./repos/a/b")
                             && !PluginNet.isGithubApi("https://github.com/a/b"),
-                    "① 只有 api.github.com 走宿主 GitHbu 配额记账");
+                    "① ★只有 api.github.com 走宿主配额记账（大小写 / 末尾点归一化后仍认得出）");
 
             // 缓存 + 配额（假 Fetcher：计数 + 可控时钟）
             final int[] calls = {0};
@@ -5389,6 +5390,49 @@ public final class SelfTest {
             }
             ok(stat, L, quotaOk && PluginNet.testQuotaCount() == PluginNet.GITHUB_HOURLY_MAX,
                     "① ★配额上限：" + PluginNet.GITHUB_HOURLY_MAX + " 次后给 rate-limited（不是无限放行）");
+            // ★ M1：download 也要走同一份配额（否则插件用 download 就能绕过 40/h、打光自更新配额）
+            PluginNet.resetTestHooks();
+            boolean dlQuotaOk = true;
+            for (int i = 0; i < PluginNet.GITHUB_HOURLY_MAX; i++) {
+                PluginNet.noteApiRequest("https://api.github.com/repos/a/b/assets/" + i);
+            }
+            try {
+                PluginNet.noteApiRequest("https://api.github.com/repos/a/b/assets/over");
+                dlQuotaOk = false;
+            } catch (PluginNet.Fail f) {
+                dlQuotaOk = "rate-limited".equals(f.reason);
+            }
+            ok(stat, L, dlQuotaOk && PluginNet.testQuotaCount() == PluginNet.GITHUB_HOURLY_MAX,
+                    "① ★download 与 fetchText 共用配额（noteApiRequest 也会被限频）");
+            // ★ 缓存按规范化 URL 存：大小写不同的同一个 API URL 只真请求一次
+            PluginNet.resetTestHooks();
+            final int[] caseCalls = {0};
+            PluginNet.sTestFetcher = new PluginNet.Fetcher() {
+                @Override public String text(String url, int maxBytes, String accept) {
+                    caseCalls[0]++;
+                    return "[]";
+                }
+            };
+            PluginNet.fetchText("https://api.github.com/repos/a/b/releases?per_page=30");
+            PluginNet.fetchText("https://API.GitHub.com/repos/a/b/releases?per_page=30");
+            ok(stat, L, caseCalls[0] == 1 && PluginNet.testCacheSize() == 1,
+                    "① ★大小写只算一次缓存命中（URL 归一化）");
+            // ★ 正文超限 ⇒ size（不是 network）
+            PluginNet.resetTestHooks();
+            PluginNet.sTestFetcher = new PluginNet.Fetcher() {
+                @Override public String text(String url, int maxBytes, String accept)
+                        throws java.io.IOException {
+                    throw new java.io.IOException("body too big (> " + maxBytes + ")");
+                }
+            };
+            boolean sizeMapped = false;
+            try {
+                PluginNet.fetchText("https://example.com/big.json");
+            } catch (PluginNet.Fail f) {
+                sizeMapped = "size".equals(f.reason);
+            }
+            ok(stat, L, sizeMapped, "① ★正文超限 ⇒ reason=size（文档承诺的码，不是 network）");
+            PluginNet.resetTestHooks();
             // release 解析（JSON → 快照；资产 url 优先 apiUrl）
             PluginNet.resetTestHooks();
             PluginNet.sTestFetcher = new PluginNet.Fetcher() {
@@ -5483,10 +5527,10 @@ public final class SelfTest {
                         "http://127.0.0.1:" + port + "/bad.bin",
                         "0000000000000000000000000000000000000000000000000000000000000000", null);
                 ok(stat, L, badDl != null && badDl.status == UpdateDownload.Status.SHA
-                                && !new File(dlCache, "downloads/bad.bin.part").exists()
-                                && !new File(dlCache, "downloads/bad.bin").exists(),
+                                && !hasPartFile(new File(dlCache, "downloads")),
                         "② 反方向：sha 不符 ⇒ status=SHA，且 .part 被清掉（不留半截）");
                 try { fss.close(); } catch (Throwable ignored) { }
+                Data.deleteTree(dlCache);        // 别把测试下载攒在 cache 里（评审 NIT）
             }
         } catch (Throwable t) {
             ok(stat, L, false, "② 下载用例异常：" + t);
@@ -5531,6 +5575,25 @@ public final class SelfTest {
                 ok(stat, L, vkOk, "③ ★versions() 的 instanceKey = 宿主实例键（插件不用自己拼 NUL）");
                 ok(stat, L, keysOk,
                         "③ versions() 的 bound / patchCount / backupCount 是 \"true|false\" / 非负整数");
+                // 加键的值必须与宿主自己那份数据一致（"0"也要能算出来源，不能是编的）
+                Map<String, Integer> hostPatch = Patches.enabledCounts(ctx);
+                boolean countsOk = true;
+                for (ItemInfo it : vers) {
+                    String ikey = it.extra.get("instanceKey");
+                    String slot = it.extra.get("slot");
+                    String pc = it.extra.get("patchCount");
+                    String bc = it.extra.get("backupCount");
+                    if (pc != null) {
+                        Integer n = hostPatch.get(ikey);
+                        if (Integer.parseInt(pc) != (n == null ? 0 : n.intValue())) countsOk = false;
+                    }
+                    if (bc != null) {
+                        int want = Backup.list(ctx, slot).size();
+                        if (Integer.parseInt(bc) != want) countsOk = false;
+                    }
+                }
+                ok(stat, L, countsOk,
+                        "③ ★patchCount / backupCount 与宿主计数一致（不是写死的 0）");
             }
             List<ItemInfo> insts = PluginData.instances(ctx);
             boolean instOk = insts != null;
@@ -5543,6 +5606,34 @@ public final class SelfTest {
                 }
             }
             ok(stat, L, instOk, "③ instances() 结构：kind=instance + pid/vkey/slot/instanceKey/started/starting");
+            // ★ M8：设备通常没有正在跑的实例 ⇒ 上面的循环会空转。用 Instances 的测试快照
+            //   注入"一个真实例 + 一个启动占位"，把 starting 两态和字段来源都钉住。
+            try {
+                List<Instances.Running> fake = new ArrayList<Instances.Running>();
+                fake.add(new Instances.Running(4321, "selftest-v39-live", "selftest-v39-slot",
+                        1111L, "io.mdt.launcher:game"));
+                fake.add(new Instances.Running(9999, "selftest-v39-start", "selftest-v39-slot2",
+                        2222L, ""));
+                Instances.testSnapshot(fake);
+                List<ItemInfo> got = PluginData.instances(ctx);
+                boolean pairOk = got.size() == 2;
+                for (ItemInfo it : got) {
+                    if (!"4321".equals(it.extra.get("pid"))) continue;
+                    pairOk = pairOk && "false".equals(it.extra.get("starting"))
+                            && "selftest-v39-live".equals(it.extra.get("vkey"))
+                            && ("selftest-v39-live\u0000selftest-v39-slot")
+                                    .equals(it.extra.get("instanceKey"));
+                }
+                for (ItemInfo it : got) {
+                    if (!"9999".equals(it.extra.get("pid"))) continue;
+                    pairOk = pairOk && "true".equals(it.extra.get("starting"))
+                            && "selftest-v39-slot2".equals(it.extra.get("slot"));
+                }
+                ok(stat, L, pairOk,
+                        "③ ★instances() 注入快照：真实例 starting=false、启动占位 starting=true、instanceKey 对");
+            } finally {
+                Instances.clearTestSnapshot();
+            }
             List<ItemInfo> bks = PluginData.backups(ctx, Data.currentSlot(ctx));
             boolean bkOk = bks != null;
             for (ItemInfo it : bks) {
@@ -17618,7 +17709,7 @@ public final class SelfTest {
                 if (ti != null && ti.name != null && ti.name.contains(ID_PREFIX)) Data.deleteTree(ti.path);
             }
             // ★ 第 373 轮（v39）：插件的补丁**写**接口（import / 预检 / 启用 / 停用 / 删除）真调一遍
-            pluginPatchWrite(ctx, L, stat, work, fixtureDex, ID_PREFIX);
+            pluginPatchWrite(ctx, L, stat, work, fixtureDex, otherSha, ID_PREFIX);
             // ★ 第 360 轮：崩溃处理与 :game 注入失败同一套处置
             patchCrash(ctx, L, stat);
         } catch (Throwable t) {
@@ -17666,13 +17757,17 @@ public final class SelfTest {
      * 并且会在 config 里临时加一条槽绑定 —— 收尾（finally）无条件恢复。
      */
     private static void pluginPatchWrite(Context ctx, List<String> L, int[] stat,
-                                         File work, byte[] fixtureDex, String idPrefix) {
+                                         File work, byte[] fixtureDex, String fakeSha,
+                                         String idPrefix) {
         L.add("");
         L.add("── 第 373 轮 · 插件补丁写接口（v39）──");
-        final String TMP_SLOT = "selftest-v39-slot";
+        // ★ 随机槽名 + 先清旧绑定：上一次跑到一半被杀留下的固定绑定会让整组静默跳过（评审 M15）
+        final String TMP_SLOT = "selftest-v39-" + Long.toHexString(
+                System.nanoTime() & 0xFFFFFFL);
         String vk = null;
         boolean bound = false;
         String ref = null;
+        final List<String> extraRefs = new ArrayList<String>();
         try {
             Versions.Entry pick = null;
             for (Versions.Entry e : Versions.scanAll(ctx)) {
@@ -17688,12 +17783,13 @@ public final class SelfTest {
                 return;
             }
             vk = pick.key();
+            Config.get().removeExtraSlot(vk, TMP_SLOT);     // 幂等：清掉可能残留的同名绑定
             bound = Config.get().addExtraSlot(vk, TMP_SLOT);
             if (!bound) {
-                L.add("  ⚠ 临时槽绑不上（可能已存在），跳过 v39 补丁写断言");
+                L.add("  ⚠ 临时槽绑不上，跳过 v39 补丁写断言");
                 return;
             }
-            ok(stat, L, PluginData.hasLaunchItem(ctx, vk, TMP_SLOT),
+            ok(stat, L, Boolean.TRUE.equals(PluginData.hasLaunchItem(ctx, vk, TMP_SLOT)),
                     "⑨ 临时绑定出一个真实启动项（夹具前置）");
             String realSha = PluginData.apkShaOfVersion(ctx, vk);
             ok(stat, L, realSha != null && realSha.matches("[0-9a-f]{64}"),
@@ -17725,6 +17821,52 @@ public final class SelfTest {
                     "⑨ patchImport 成功并给 ref（实际 " + ref1[0] + "）");
             ref = ref1[0];
             if (ref == null) return;
+
+            // ★ M8：负例 —— 错误码必须分得开（原来只测了 happy path）
+            ok(stat, L, "not-found".equals(reasonOf(waitPatch(api, true,
+                            "selftest-v39-no-such-ver", TMP_SLOT, ref))),
+                    "⑨ 负例：版本不是启动项 ⇒ not-found");
+            ok(stat, L, "record_gone".equals(reasonOf(waitPatch(api, true, vk, TMP_SLOT,
+                            "selftest-v39-ghost@1.0"))),
+                    "⑨ 负例：补丁记录不存在 ⇒ record_gone");
+            // no_match：target 指向另一份 APK 哈希
+            File pkgNm = patchPackage(work, "v39w-nm.mdp",
+                    patchManifest(idPrefix + "v39wn", fakeSha, false, "自检补丁 W-NM"),
+                    fixtureDex, null);
+            String refNm = importAndWait(api, pkgNm);
+            extraRefs.add(refNm);
+            ok(stat, L, refNm != null && "no_match".equals(
+                            reasonOf(waitPatch(api, true, vk, TMP_SLOT, refNm))),
+                    "⑨ 负例：补丁不适用于这个 APK ⇒ no_match");
+            // missing：导入后把 dex 删掉（filesOk=false）⇒ missing
+            File pkgMiss = patchPackage(work, "v39w-miss.mdp",
+                    patchManifest(idPrefix + "v39wm", realSha, false, "自检补丁 W-MISS"),
+                    fixtureDex, null);
+            String refMiss = importAndWait(api, pkgMiss);
+            extraRefs.add(refMiss);
+            boolean dexGone = false;
+            if (refMiss != null) {
+                Patches.Record rMiss = Patches.findByRef(ctx, refMiss);
+                if (rMiss != null && !rMiss.targets.isEmpty()) {
+                    File dex = rMiss.targets.get(0).dex;
+                    dex.setWritable(true);
+                    dexGone = dex.delete();
+                }
+            }
+            ok(stat, L, dexGone && "missing".equals(
+                            reasonOf(waitPatch(api, true, vk, TMP_SLOT, refMiss))),
+                    "⑨ 负例：补丁文件缺失 ⇒ missing（不是 no_match）");
+            // game_alive：注入"这个实例正在跑"的快照（WriteGate 与 instances() 同一份判据）
+            try {
+                List<Instances.Running> live = new ArrayList<Instances.Running>();
+                live.add(new Instances.Running(4242, vk, TMP_SLOT, 1000L, "io.mdt.launcher:game"));
+                Instances.testSnapshot(live);
+                ok(stat, L, "game_alive".equals(
+                                reasonOf(waitPatch(api, true, vk, TMP_SLOT, ref))),
+                        "⑨ 负例：该实例在跑 ⇒ game_alive");
+            } finally {
+                Instances.clearTestSnapshot();
+            }
 
             // 冲突预检：没启用别人 ⇒ 空表
             final java.util.concurrent.CountDownLatch l2 =
@@ -17761,6 +17903,20 @@ public final class SelfTest {
             ok(stat, L, on != null && "true".equals(on.extra.get("enabled"))
                             && "true".equals(on.extra.get("applies")),
                     "⑨ 启用后 patches() 看到 enabled / applies（给的是真实 APK 哈希）");
+            ok(stat, L, "enabled".equals(reasonOf(waitPatch(api, true, vk, TMP_SLOT, ref))),
+                    "⑨ 负例：已启用再启用 ⇒ enabled（不是静默成功）");
+            ok(stat, L, "in_use".equals(reasonOf(waitDelete(api, ref))),
+                    "⑨ 负例：启用中的补丁删除 ⇒ in_use（先停用）");
+            // versions() 的 patchCount 在启用后必须真的变成 1（不是恒 0，评审 M8）
+            boolean patchCountOne = false;
+            for (ItemInfo it : PluginData.versions(ctx)) {
+                if (it != null && vk.equals(it.extra.get("key"))
+                        && TMP_SLOT.equals(it.extra.get("slot"))
+                        && "1".equals(it.extra.get("patchCount"))) {
+                    patchCountOne = true;
+                }
+            }
+            ok(stat, L, patchCountOne, "⑨ ★versions().patchCount 启用后 = 1（非零也有分辨力）");
 
             // 已启用 ⇒ 预检说 enabled，不许报"自己跟自己冲突"
             final java.util.concurrent.CountDownLatch l4 =
@@ -17790,6 +17946,33 @@ public final class SelfTest {
                             && !Patches.enabledRefs(ctx, ikey).contains(ref),
                     "⑨ patchDisable 成功且引用消失");
 
+            // ★ M2：并发启用同一条 —— Patches 的写锁保证"恰好一次成功"、引用不重复
+            final Patches.Record recForRace = Patches.findByRef(ctx, ref);
+            if (recForRace != null) {
+                final int[] raceOk = {0};
+                final int[] raceEnabled = {0};
+                Thread t1 = new Thread(new Runnable() {
+                    @Override public void run() {
+                        try {
+                            Patches.enable(ctx, ikey, recForRace, realSha);
+                            synchronized (raceOk) { raceOk[0]++; }
+                        } catch (PatchException pe) {
+                            if (PatchException.C_ENABLED.equals(pe.code)) {
+                                synchronized (raceEnabled) { raceEnabled[0]++; }
+                            }
+                        } catch (Throwable ignored) { }
+                    }
+                });
+                Thread t2 = new Thread(t1);
+                t1.start();
+                t2.start();
+                try { t1.join(15000); t2.join(15000); } catch (InterruptedException ignored) { }
+                ok(stat, L, raceOk[0] == 1 && raceEnabled[0] == 1
+                                && occurrences(Patches.enabledRefs(ctx, ikey), ref) == 1,
+                        "⑨ ★并发启用同一条：恰好一次成功、一条 enabled、引用只出现一次（写锁）");
+                try { Patches.disable(ctx, ikey, recForRace); } catch (Throwable ignored) { }
+            }
+
             // delete → 进中转站
             final java.util.concurrent.CountDownLatch l6 =
                     new java.util.concurrent.CountDownLatch(1);
@@ -17812,11 +17995,34 @@ public final class SelfTest {
         } catch (Throwable t) {
             ok(stat, L, false, "⑨ 补丁写用例异常：" + t);
         } finally {
-            // 无条件恢复：配置引用 / 临时槽绑定 / 补丁记录 / 中转站夹具
+            // 无条件恢复：配置引用 / 临时槽绑定 / 补丁记录（含负例夹具） / 中转站夹具 / 实例快照
+            Instances.clearTestSnapshot();
+            try {
+                for (String r0 : extraRefs) {
+                    if (r0 == null) continue;
+                    Patches.Record r = Patches.findByRef(ctx, r0);
+                    if (r != null) {
+                        try { Patches.disable(ctx, Versions.instanceKey(vk, TMP_SLOT), r); }
+                        catch (Throwable ignored) { }
+                        try { Patches.delete(ctx, r); } catch (Throwable ignored) { }
+                    }
+                }
+            } catch (Throwable ignored) { }
             try {
                 if (ref != null) {
                     Patches.Record r = Patches.findByRef(ctx, ref);
                     if (r != null) {
+                        try {
+                            Patches.disable(ctx, Versions.instanceKey(vk, TMP_SLOT), r);
+                        } catch (Throwable ignored) { }
+                        try { Patches.delete(ctx, r); } catch (Throwable ignored) { }
+                    }
+                }
+            } catch (Throwable ignored) { }
+            // 兜底：按 id 前缀扫一遍（覆盖"回调晚到 / 超时后才创建"的记录，评审 M15）
+            try {
+                for (Patches.Record r : Patches.scan(ctx)) {
+                    if (r != null && r.id().startsWith(idPrefix + "v39w")) {
                         try {
                             Patches.disable(ctx, Versions.instanceKey(vk, TMP_SLOT), r);
                         } catch (Throwable ignored) { }
@@ -17835,6 +18041,85 @@ public final class SelfTest {
                 }
             } catch (Throwable ignored) { }
         }
+    }
+
+    /** 一次 patchEnable/patchDisable 的等待封装（负例用；超时 ⇒ null）。 */
+    private static io.mdt.launcher.api.Result waitPatch(final PluginApi api, final boolean enable,
+                                                        final String vk, final String slot,
+                                                        final String ref) {
+        if (api == null || ref == null) return null;
+        final java.util.concurrent.CountDownLatch latch =
+                new java.util.concurrent.CountDownLatch(1);
+        final io.mdt.launcher.api.Result[] out = new io.mdt.launcher.api.Result[1];
+        PluginApi.Done cb = new PluginApi.Done() {
+            @Override public void onDone(io.mdt.launcher.api.Result r) {
+                out[0] = r;
+                latch.countDown();
+            }
+        };
+        if (enable) api.patchEnable(vk, slot, ref, cb);
+        else api.patchDisable(vk, slot, ref, cb);
+        return awaitLatch(latch) ? out[0] : null;
+    }
+
+    /** 一次 patchDelete 的等待封装（负例用；超时 ⇒ null）。 */
+    private static io.mdt.launcher.api.Result waitDelete(final PluginApi api, final String ref) {
+        if (api == null || ref == null) return null;
+        final java.util.concurrent.CountDownLatch latch =
+                new java.util.concurrent.CountDownLatch(1);
+        final io.mdt.launcher.api.Result[] out = new io.mdt.launcher.api.Result[1];
+        api.patchDelete(ref, new PluginApi.Done() {
+            @Override public void onDone(io.mdt.launcher.api.Result r) {
+                out[0] = r;
+                latch.countDown();
+            }
+        });
+        return awaitLatch(latch) ? out[0] : null;
+    }
+
+    /** 一次 patchImport 的等待封装（返回 ref；失败 / 超时 ⇒ null）。 */
+    private static String importAndWait(final PluginApi api, final File pkg) {
+        if (api == null || pkg == null) return null;
+        final java.util.concurrent.CountDownLatch latch =
+                new java.util.concurrent.CountDownLatch(1);
+        final io.mdt.launcher.api.Result[] res = new io.mdt.launcher.api.Result[1];
+        final String[] ref = new String[1];
+        try {
+            api.patchImport(new java.io.FileInputStream(pkg), new PluginApi.Imported() {
+                @Override public void onImported(io.mdt.launcher.api.Result r, String rf) {
+                    res[0] = r;
+                    ref[0] = rf;
+                    latch.countDown();
+                }
+            });
+        } catch (Throwable t) {
+            return null;
+        }
+        return awaitLatch(latch) && res[0] != null && res[0].ok ? ref[0] : null;
+    }
+
+    private static String reasonOf(io.mdt.launcher.api.Result r) {
+        return r == null ? null : r.reason;
+    }
+
+    private static int occurrences(List<String> list, String value) {
+        int n = 0;
+        if (list == null) return 0;
+        for (String s : list) if (value != null && value.equals(s)) n++;
+        return n;
+    }
+
+    /** 下载目录里还有没有 `.part`（递归；评审 M3 的残留检查）。 */
+    private static boolean hasPartFile(File dir) {
+        if (dir == null || !dir.isDirectory()) return false;
+        File[] fs = dir.listFiles();
+        if (fs == null) return false;
+        for (File f : fs) {
+            if (f == null) continue;
+            if (f.isDirectory() && hasPartFile(f)) return true;
+            if (f.isFile() && f.getName().endsWith(".part")) return true;
+        }
+        return false;
     }
 
     /** 等一个异步回调（自检线程不是主线程 ⇒ 主线程会照常执行我们 post 的 Runnable）。 */

@@ -309,7 +309,7 @@ public interface PluginApi {
      * 把启动器自更新的 GitHub 配额一起打光）。
      *
      * <p>失败码见 {@link Result}：{@code bad-url} / {@code network} / {@code size} /
-     * {@code rate-limited} / {@code canceled}。
+     * {@code rate-limited} / {@code io} / {@code canceled}。
      */
     void fetchText(String url, Fetch callback);
 
@@ -320,7 +320,7 @@ public interface PluginApi {
      *
      * <p>成功时回调里是 {@link GitHubRelease} 列表；每个 {@link GitHubRelease.Asset#url} 可以直接
      * 喂给 {@link #download}。失败码：{@code bad-url} / {@code bad-data}（GitHub 返回的不是
-     * JSON 数组，常见于镜像错误页 / 限频）/ {@code network} / {@code rate-limited}。
+     * JSON 数组，常见于镜像错误页 / 限频）/ {@code network} / {@code io} / {@code rate-limited}。
      *
      * <p>⚠️ 与宿主自更新**共用 GitHub 配额**（未登录 60 次/小时）⇒ 别在页面刷新里反复查。
      */
@@ -329,7 +329,7 @@ public interface PluginApi {
     /**
      * **v39**：下载一个文件到**本插件自己的 cache**，异步，返回可取消的 {@link Task}。
      *
-     * <p>落点：`<插件 cache>/downloads/<URL 里的文件名>`（文件名会做安全清洗）；
+     * <p>落点：`<插件 cache>/downloads/<一次性子目录>/<URL 里的文件名>`（文件名会做安全清洗）；
      * 成功回调里给你 {@link File} 与实际 sha256。进度显示在宿主的前台服务通知里
      * （页面关掉也继续），**不要自己再发一条通知**。
      *
@@ -337,10 +337,13 @@ public interface PluginApi {
      * @param expectedSha256  期望的 sha256（64 位小写十六进制）；空串 / null = 不校验，只回报实际值。
      *                        **强烈建议给**：不校验的下载等于信任链路中间人
      *
-     * <p>行为：先写 `.part`，校验过（大小 + sha256）才改名；任何一步失败都删掉半截文件。
+     * <p>行为：先写 `.part`，sha256 校验过才改名；任何一步失败都删掉半截文件。
      * GitHub 的下载地址会自动套用户选择的**更新线路**（镜像优先、直连兜底）。
-     * 体积上限 1 GB；超了返回 {@code size}。失败码：{@code bad-url} / {@code network} /
-     * {@code size} / {@code sha} / {@code io} / {@code canceled}。
+     * 体积上限 1 GB（边下边查）；超了返回 {@code size}。失败码：{@code bad-url} / {@code network} /
+     * {@code size} / {@code sha} / {@code invalid} / {@code io} / {@code canceled}。
+     *
+     * <p>⚠️ 每次下载一个**独立子目录**（两个 Task 并发下载同名文件不会互相删/覆盖）；
+     * GitHub API 资产地址也计入 40 次/小时配额（与 {@link #fetchText} 同一份记账）。
      */
     Task download(String url, String expectedSha256, Download callback);
 
@@ -351,6 +354,10 @@ public interface PluginApi {
      * 补丁文件缺失 ⇒ {@code missing}；不适用于这个版本的 APK ⇒ {@code no_match}；
      * 已经启用 ⇒ {@code enabled}；与这条启动项已启用的补丁冲突 ⇒ {@code conflict}
      * （先用 {@link #patchConflicts} 拿冲突名单，再让用户决定）。
+     *
+     * <p>其余失败码：{@code not-found}（版本 key + 槽不是存在的启动项）/ {@code record_gone}
+     * （补丁记录不存在）/ {@code invalid}（参数空）/ {@code io}（补丁库或版本信息读不出来——
+     * **不会**折成 not-found / record_gone / no_match）。
      *
      * @param versionKey 版本 key（{@link #versions()} 的 {@code extra["key"]}）
      * @param slot       槽；{@code null} / 空 = 当前槽（{@link #slot()}）
@@ -391,8 +398,9 @@ public interface PluginApi {
      * **v39**：启用前的**冲突预检**（只读，但会读 dex / 素材，慢 ⇒ 后台线程，异步回调）。
      *
      * <p>成功时回调里给"已启用且与它冲突"的补丁**显示名列表**（空表 = 没冲突）。
-     * 失败码：{@code record_gone} / {@code no_match} / {@code missing} / {@code bad_dex} /
-     * {@code bad_assets} / {@code game_alive}（实例在跑时连预检也拒，与启用同门禁）。
+     * 失败码（与 {@link #patchEnable} 的门禁顺序一致：实例在跑 → 文件缺失 → APK 匹配 → 已启用 → 冲突）：
+     * {@code not-found} / {@code record_gone} / {@code game_alive} / {@code missing} /
+     * {@code no_match} / {@code enabled} / {@code bad_dex} / {@code invalid} / {@code io}。
      */
     void patchConflicts(String versionKey, String slot, String ref, Conflicts callback);
 

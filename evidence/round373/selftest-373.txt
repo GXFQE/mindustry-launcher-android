@@ -1,6 +1,6 @@
-MDT 自检   Fri Nov 13 19:40:40 GMT+08:00 2026
+MDT 自检   Fri Nov 13 20:03:45 GMT+08:00 2026
 
-===== 通过 2179 项，失败 0 项 =====
+===== 通过 2193 项，失败 0 项 =====
 无失败项。下方依次是环境信息、逐项明细、清理与用时。
 
 数据根 = /storage/emulated/0/Android/data/io.mdt.launcher/slot-预览验收
@@ -24,7 +24,7 @@ HUB 外部 = /storage/emulated/0/Android/data/io.mdt.launcher/hub
   ✅ 改回原名
 
 ── ③④ 槽内容口径（F19：全部 − 排除）+ 破坏→恢复（M3 的核心承诺） ──
-  假数据已铺（带本轮 nonce 1a1d4b5b666）：
+  假数据已铺（带本轮 nonce 1a1d4cad6c5）：
     【该进】saves/a.msav, saves/b.msav, settings.bin, mods/test.jar, logic-tool/history/project-1.json, previews/p.png
     【不该进】cache/junk.bin, config.json（顶层排除名单） ; saves/half.msav.part, .hidden/secret.bin（通用跳过）
   ✅ 快照收了 6 个文件，实为 6
@@ -54,10 +54,10 @@ HUB 外部 = /storage/emulated/0/Android/data/io.mdt.launcher/hub
   ✅ 第二份快照同样没有 files/
   ✅ ★★ 内容没变 ⇒ 第二份**一个新对象都没写**（storedNew=0） ⇒ 增量成本 ≈ 0（这份快照逻辑上有 179 B）
   ✅ ★★ 对象池占用**一个字节都没涨**（41.3 MB → 41.3 MB）—— 这是去重的硬证据
-  ✅ 池里 256 个对象 / 41.3 MB
+  ✅ 池里 266 个对象 / 41.3 MB
   ✅ 此刻没有旧格式快照（都在 CAS 里）
     （信息）全局体检：逻辑 164.8 MB / 池实占 41.3 MB ⇒ 节省 74.9%（含池里未回收的历史遗留对象）
-  ✅ ★ 宽限期（600 s）内的对象一个都没被删：43 / 43（本次共删 0 个，只该是过期孤儿）
+  ✅ ★ 宽限期（600 s）内的对象一个都没被删：6 / 6（本次共删 47 个，只该是过期孤儿）
   ✅ GC 跑完槽里的存档仍在（没被误伤）
 
 ── ⑥ 节省率公式（合成数字，钉死那个写反过的 bug） ──
@@ -207,7 +207,7 @@ HUB 外部 = /storage/emulated/0/Android/data/io.mdt.launcher/hub
   ✅ ★ 官方 160.1 + MindustryX X37（基座 160.1）⇒ 无对手（用户要的就是这条）
   ✅ ★元断言：官方 159.7 + MindustryX X37（基座 160.1）⇒ 仍算冲突（证明上面那条不是恒空）
   ✅ 没声明基座 ⇒ formatVersion 回落到 displayVersion（行为不变）
-  ✅ 能拿到本应用的安装包路径：/data/app/~~R2B_Ps-K2jO0ThZ92BrDEw==/io.mdt.launcher-3YLVSrnapNIc4wq6Es8NuQ==/base.apk
+  ✅ 能拿到本应用的安装包路径：/data/app/~~UxWB1OQF2PFPREPI2Js5dw==/io.mdt.launcher-0qd202nGL_WYqnORfdu2LA==/base.apk
   ✅ ★ 真机样本：已安装的 /data/app/... APK 能被打开并列出 classes.dex（这是「读出已装 fork 的基座版本」的前提；打不开就会静默不生效）
   ✅ ★ 真机样本：本应用没有 mod.hjson ⇒ null（「能打开」与「没这个文件」是两件事）
   ✅ ★ 真样本 prerelease B502（build.yml 的 B 系列）⇒ 基座 160.5，正常识别
@@ -298,7 +298,7 @@ HUB 外部 = /storage/emulated/0/Android/data/io.mdt.launcher/hub
   ✅ 新孤儿仍在宽限期内
   ✅ 此刻池里有 219 个被清单引用的对象
   ✅ ★ GC 删掉了过期孤儿（本次删 1 个）
-  ✅ ★★ 过期孤儿对象文件真的不在了：f3730e80d63c…
+  ✅ ★★ 过期孤儿对象文件真的不在了：286de5121d27…
   ✅ ★ 宽限期内的孤儿被保住（防误删的那道保险）
   ✅ ★★ 全部 219 个被引用对象完好（GC 没误删）
   ✅ 空分片目录被顺手收掉
@@ -689,8 +689,8 @@ HUB 外部 = /storage/emulated/0/Android/data/io.mdt.launcher/hub
 ── ㉓ F10 快照列表的「这是什么存档」──
   ✅ ★v1 快照（目录里是真文件）⇒ 读出「地图名 · 玩了多久 · 存档时间」：「快照地图」 · 玩了 1 小时 2 分 · 存档于 2023-11-15 06:13
   ✅ ★反向：快照里没有存档 ⇒ 返回空串（不是编一行出来）
-  ✅ ★快照行标题 = 人读时间 · 备注（不再是 `20261004-153012` 那种目录名戳）：11-13 19:40:42 · 手动备份
-  ✅ ★反向：没有备注时不留尾随分隔符：11-13 19:40:42
+  ✅ ★快照行标题 = 人读时间 · 备注（不再是 `20261004-153012` 那种目录名戳）：11-13 20:03:47 · 手动备份
+  ✅ ★反向：没有备注时不留尾随分隔符：11-13 20:03:47
   ✅ ★负例：CAS 池里对象缺失 ⇒ 返回空串且**不抛异常**（加分项不该拖垮界面）
 
 ── ㉔ F10 地图清点（本槽 / 游戏 APK / 模组包）──
@@ -769,9 +769,9 @@ HUB 外部 = /storage/emulated/0/Android/data/io.mdt.launcher/hub
   ✅ ★顶层页不许声明父级：GameSlot（对）
 ── ㊲ 主进程崩溃落盘（写 <数据根>/crashes/crash_<毫秒>_launcher.txt）──
   ✅ ★自检自己跑在主进程里（isMainProcess 判据；:game 侧只能在真机另验）
-  ✅ ★探针异常真的落了盘：/storage/emulated/0/Android/data/io.mdt.launcher/slot-预览验收/crashes/crash_1794570043043_launcher.txt
+  ✅ ★探针异常真的落了盘：/storage/emulated/0/Android/data/io.mdt.launcher/slot-预览验收/crashes/crash_1794571427558_launcher.txt
   ✅ ★落点在 <数据根>/crashes/（日志页「崩溃堆栈」读的就是它）
-  ✅ ★文件名与游戏那份同构（不影响「按名倒序 = 时间序」）：crash_1794570043043_launcher.txt
+  ✅ ★文件名与游戏那份同构（不影响「按名倒序 = 时间序」）：crash_1794571427558_launcher.txt
   ✅ ★内容里有异常原文 + 完整栈 + 现场（版本 / 当前槽 / 数据根）
   ✅ ★探针文件已清理（别把它留在用户的崩溃列表里）
 
@@ -1273,7 +1273,7 @@ HUB 外部 = /storage/emulated/0/Android/data/io.mdt.launcher/hub
   ✅ ① ★放回去（确认替换）⇒ 槽里那份的内容回到了覆盖前
   ✅ ① ★元断言：不是 zlib 的假存档**放不回去**（存档按导入时的尺子判），原件仍在站里
   ✅ 建测试槽 m3-gone
-  ✅ ② 删槽 ⇒ 槽本体与它的备份都在**同一个容器**里，且 `backups/＜槽名＞/＜快照＞` 层级与 `allReferencedShas` 的扫描口径逐层对齐（20261113-194044-171__m3-gone__m3-gone）
+  ✅ ② 删槽 ⇒ 槽本体与它的备份都在**同一个容器**里，且 `backups/＜槽名＞/＜快照＞` 层级与 `allReferencedShas` 的扫描口径逐层对齐（20261113-200348-593__m3-gone__m3-gone）
   ✅ ② 槽没了 ⇒ 它的快照也不再列出来（不给用户一个「看得见却打不开」的备份列表）
   ✅ ② ★元断言：整槽进站前后**引用集不变**（225 → 225）⇒ 那些对象不会被 GC 当孤儿删掉（否则恢复回来是坏快照）
   ✅ ③ ★不许把整槽放到**正在用的**那个槽（那等于砸掉当前存档）
@@ -1697,11 +1697,14 @@ HUB 外部 = /storage/emulated/0/Android/data/io.mdt.launcher/hub
 【v39 · 网络 / 信息加键 / 中转站漏项（第 373 轮）】
   ✅ ① URL 闸门：https / 本机回环放行；http(非本机)/file/ftp/空/超长 全拒
   ✅ ① 下载文件名清洗：取最后一段 / 去查询串 / 危险字符换下划线 / 空名兜底 / 限长
-  ✅ ① 只有 api.github.com 走宿主 GitHbu 配额记账
+  ✅ ① ★只有 api.github.com 走宿主配额记账（大小写 / 末尾点归一化后仍认得出）
   ✅ ① ★GitHub API 10 分钟缓存：同一个 URL 只真请求一次（否则插件轮询会打光自更新配额）
   ✅ ① 缓存过期 ⇒ 重新请求一次（TTL 生效）
   ✅ ① 非 GitHub API 不缓存（插件自己的服务端想立刻看到变化就得每次真拉）
   ✅ ① ★配额上限：40 次后给 rate-limited（不是无限放行）
+  ✅ ① ★download 与 fetchText 共用配额（noteApiRequest 也会被限频）
+  ✅ ① ★大小写只算一次缓存命中（URL 归一化）
+  ✅ ① ★正文超限 ⇒ reason=size（文档承诺的码，不是 network）
   ✅ ① releases() 解析：tag / prerelease / asset 名 / size / apiUrl 优先
   ✅ ① 反方向：repo 形状不对 ⇒ bad-url；不是 JSON 数组 ⇒ bad-data（不冒充"没有版本"）
   ✅ ② ★下载真往返：.part → 校验 → 改名成 asset.bin（实际 sha 回报）
@@ -1710,7 +1713,9 @@ HUB 外部 = /storage/emulated/0/Android/data/io.mdt.launcher/hub
   ✅ ③ 新键的值是机器可读的（update_mode 整数 / trash_keep 非负整数），不是文案
   ✅ ③ ★versions() 的 instanceKey = 宿主实例键（插件不用自己拼 NUL）
   ✅ ③ versions() 的 bound / patchCount / backupCount 是 "true|false" / 非负整数
+  ✅ ③ ★patchCount / backupCount 与宿主计数一致（不是写死的 0）
   ✅ ③ instances() 结构：kind=instance + pid/vkey/slot/instanceKey/started/starting
+  ✅ ③ ★instances() 注入快照：真实例 starting=false、启动占位 starting=true、instanceKey 对
   ✅ ③ backups() 结构：kind=backup + created/files/bytes/legacy/slot
   ✅ ③ plugins() 更新键：状态属于五个已知值之一，且与 version/note 同时出现
   ✅ ④ ★Trash.Kind 每个都有唯一类别名（新加 Kind 忘了映射 ⇒ 这里红）
@@ -1853,18 +1858,18 @@ HUB 外部 = /storage/emulated/0/Android/data/io.mdt.launcher/hub
   ✅ ★内置：用户停用过（known 有、active 没）/ 正在 pending / 已经是这一版 ⇒ 一律别插手
 
 ── 用户语言包（lang.properties）──
-  ✅ 枚举到 1688 个 R.string 字段（反射；用于逐键比对）
+  ✅ 枚举到 1690 个 R.string 字段（反射；用于逐键比对）
   ✅ 私有目录可用：/data/user/0/io.mdt.launcher/app_hub（是目录=true，可写=true），ctx=io.mdt.launcher
   ✅ 单键包：rejected=0 unknown=0（都该是 0）
   ✅ 单键包 used=1（应为 1）
   ✅ 装上单键包后**只有 1 个**键的值变了（实得 1）
-  ✅ 变的那个正是 act_saves_title，且值来自用户包（实得「SELFTEST-ONE80bbd6c36564b」）
+  ✅ 变的那个正是 act_saves_title，且值来自用户包（实得「SELFTEST-ONE80cffc157d9b6」）
   ✅ 占位符不符的条目被拒（rejected 含 main_continue_fmt） 原因=Placeholder count differs: original has 1, yours has 0 (original: [1s], yours: [])
   ✅ 同一份包里的另一条**照常生效**（部分可用，不是整包拒绝）
   ✅ 包里的键都认得出（unknown=0）
   ✅ 导出模板 round-trip：unknown=0 rejected=0（都该是 0）
-  ✅ 模板写出 1688 条 ≥ R.string 字段数 1688（多出来的是同一字段被 aapt2 收进多个资源表的重复项）
-  ✅ 模板不是空壳（160271 B）
+  ✅ 模板写出 1690 条 ≥ R.string 字段数 1690（多出来的是同一字段被 aapt2 收进多个资源表的重复项）
+  ✅ 模板不是空壳（160370 B）
   ✅ 模板正文的每一行都是「注释」或「键=值」（实得 0 行不合规）
 ── 第 127 轮：批量导入 / 导出（多份 = 一个 zip；整包解开逐份导回来）──
   ✅ ★ 三种来源（真文件 / 容器条目 / 目录）打成一个 zip：3 条，名字保留非 ASCII
@@ -1957,7 +1962,7 @@ HUB 外部 = /storage/emulated/0/Android/data/io.mdt.launcher/hub
   ✅ ③ 剥掉的键**按原顺序逐条**对得上（[usid-a:1, usid-b:2, uuid, ip, ip-bans, banned-names]），其中服务器身份 2 项
   ✅ ③ ★剩下的键**一个不少、顺序不变、值没动**（[name, musicvol, mod-foo-steamid]）
   ✅ ③ ★剥完再编出来的字节**能被读回**（恰好 EOF + 键表逐条一致）—— 这是「分享包还能被游戏导入」的前提
-  ✅ ★分享包「缓存那条路」与「SAF 那条路」逐字节相同（md5 025e1fcbf03a1ce9d55ec0bdc0a0c4ca，`zipToOut` 与 `zipTo` 共用同一份打包实现）
+  ✅ ★分享包「缓存那条路」与「SAF 那条路」逐字节相同（md5 e4c0a2d693209ba01ff37c810b54c68f，`zipToOut` 与 `zipTo` 共用同一份打包实现）
   ✅ ④ 计划与实际一致：删 6 项（服务器身份 2 项）、丢掉 11 类（**真的有哪几样**才报哪几样）、脱敏后的 settings 有 64 字节
   ✅ ④ ★「大约省下多少」有据可依：droppedBytes = 369 B（含 selftest-lang 那份 4 B）
   ✅ ④ ★分享包比普通包**正好少 plan.dropped 那些条目**：19 → 8 个文件（少 11 条 / 11 类）
@@ -2011,10 +2016,10 @@ HUB 外部 = /storage/emulated/0/Android/data/io.mdt.launcher/hub
   ✅ ★夹具前提：半截名「zzpt」盘上没有目录（有的话它本来就合法，这条判据等于在测空气）
   ✅ 写新槽名后 currentSlot 立刻是它
   ✅ ★.bak 与主文件同值（读侧的第二副本）
-  ✅ ★半截槽名「zzpt」不被采信，回落到 .bak 的「zzptr81757」
+  ✅ ★半截槽名「zzpt」不被采信，回落到 .bak 的「zzptr85031」
   ✅ ★读侧顺手把主文件修好了（下次不必再走 .bak）
   ✅ 主文件合法时优先主文件（备份坏了不影响）
-  ✅ ★悬空槽名「zznope90403」（没有 slot- 目录）⇒ 回落 default
+  ✅ ★悬空槽名「zznope96854」（没有 slot- 目录）⇒ 回落 default
   ✅ ★非法槽名「../evil」⇒ 回落 default（不能拼出槽目录以外的路径）
   ✅ 两份都没有 ⇒ default（与历史行为一致）
   ✅ ★收尾：当前槽已还原为「预览验收」
@@ -2288,7 +2293,7 @@ HUB 外部 = /storage/emulated/0/Android/data/io.mdt.launcher/hub
 ── 第 345 轮：补丁机制 v1（清单 / dex 解析 / 导入 / 冲突 / 启动解析）──
   ✅ ① 夹具 dex magic 认出（2620 B）
   ✅ ① 夹具 dex 恰好 2 个类（PatchProbe + 它的匿名内部类，实际 [io.mdt.launcher.PatchProbe$1, io.mdt.launcher.PatchProbe]）
-  ✅ ① 本 APK 的 classes.dex 认出 Patches / PatchManifest / PatchesActivity（共 1257 个类）
+  ✅ ① 本 APK 的 classes.dex 认出 Patches / PatchManifest / PatchesActivity（共 1263 个类）
   ✅ ① 反向：宿主 dex 里没有游戏类、也没有夹具类（不是把什么名字都收下）
   ✅ ① 反向：垃圾字节解析失败（不是恒真地读出空表）
   ✅ ① dex checksum 不符 ⇒ 拒绝（B2 的根因判据）
@@ -2363,12 +2368,21 @@ HUB 外部 = /storage/emulated/0/Android/data/io.mdt.launcher/hub
   ✅ ⑨ 版本 APK 的 sha256（启用 / applies 的原料）
   ✅ ⑨ patchImport 回调到达（不超时）
   ✅ ⑨ patchImport 成功并给 ref（实际 selftest-patch-v39w@1.0）
+  ✅ ⑨ 负例：版本不是启动项 ⇒ not-found
+  ✅ ⑨ 负例：补丁记录不存在 ⇒ record_gone
+  ✅ ⑨ 负例：补丁不适用于这个 APK ⇒ no_match
+  ✅ ⑨ 负例：补丁文件缺失 ⇒ missing（不是 no_match）
+  ✅ ⑨ 负例：该实例在跑 ⇒ game_alive
   ✅ ⑨ patchConflicts 预检：成功且没有冲突（空表）
   ✅ ⑨ patchEnable 成功
   ✅ ⑨ 启用后 config 里真有这条引用（不是只回了 ok）
   ✅ ⑨ 启用后 patches() 看到 enabled / applies（给的是真实 APK 哈希）
+  ✅ ⑨ 负例：已启用再启用 ⇒ enabled（不是静默成功）
+  ✅ ⑨ 负例：启用中的补丁删除 ⇒ in_use（先停用）
+  ✅ ⑨ ★versions().patchCount 启用后 = 1（非零也有分辨力）
   ✅ ⑨ 已启用再预检 ⇒ enabled（不是「与已启用的补丁冲突：它自己」）
   ✅ ⑨ patchDisable 成功且引用消失
+  ✅ ⑨ ★并发启用同一条：恰好一次成功、一条 enabled、引用只出现一次（写锁）
   ✅ ⑨ patchDelete 成功且记录不在补丁库里
   ✅ ⑨ 删除是挪进 patches-trash（不是裸删）
 ── 第 360 轮 · 崩溃处理（带补丁崩了 ⇒ 自动停用，与注入失败同一套）──
@@ -2390,7 +2404,7 @@ HUB 外部 = /storage/emulated/0/Android/data/io.mdt.launcher/hub
 ── ⑩ 负例：对象池里的内容被破坏 ⇒ 这一项必须拒绝写 ──
   ✅ 篡改前对象内容与地址一致（对象此刻有效）
   ✅ 篡改后长度未变（只翻了一个字节）
-      恢复报告：✅ 已从备份恢复到槽「m3-selftest」     备份：11-13 19:40:41 · cas-dedup     文件：5 / 6 （179 B）     位置：/storage/emulated/0/Android/data/io.mdt.launcher/slot-…
+      恢复报告：✅ 已从备份恢复到槽「m3-selftest」     备份：11-13 20:03:45 · cas-dedup     文件：5 / 6 （179 B）     位置：/storage/emulated/0/Android/data/io.mdt.launcher/slot-…
   ✅ 其余项照常恢复（rr.ok = true，只有坏的那一项失败）
   ✅ 报告点名「这个对象的内容对不上」（按资源本身比，不再挂算法名）
   ✅ ★元断言：报告里**不再**出现 sha256（否则上一条对旧文案也会通过 = 没分辨力）
@@ -2398,4 +2412,4 @@ HUB 外部 = /storage/emulated/0/Android/data/io.mdt.launcher/hub
 
 
 21 个测试槽已清理（含其备份）
-用时 8678 ms
+用时 9162 ms
