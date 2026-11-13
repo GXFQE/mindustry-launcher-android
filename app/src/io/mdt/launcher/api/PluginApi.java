@@ -59,7 +59,7 @@ public interface PluginApi {
      * <p>为什么要有这个常量：注释里的「当前 = N」运行期读不到，一个写 17、一个写 20 也没人发现；
      * 常量 + 断言才拦得住。</p>
      */
-    int DOC_VERSION = 41;
+    int DOC_VERSION = 42;
 
     // ══ 环境 ═══════════════════════════════════════════════════════════════
 
@@ -101,8 +101,38 @@ public interface PluginApi {
      * 所有槽（名称 / 目录 / 是否当前 / 是否远古包本体借住 {@code files/}）。
      *
      * <p>顺序由宿主决定（当前槽在最前，其余按名字）；拿到的是一份快照。
+     * **v42** 起每个槽还带统计：{@link SlotInfo#defaultSlot}（是不是默认槽）、
+     * {@link SlotInfo#files} / {@link SlotInfo#bytes}（递归量）、
+     * {@link SlotInfo#mods} / {@link SlotInfo#maps} / {@link SlotInfo#saves} /
+     * {@link SlotInfo#blueprints}。⚠️ 统计是**当场遍历目录**量出来的，槽很大时别在 UI 线程调。
      */
     List<SlotInfo> slots();
+
+    /**
+     * **v42**：存储占用（各段字节数 + 真实总计）。
+     *
+     * <p>键（值都是字节）：{@code total}（唯一口径 = 下面四段之和）· {@code hub}（外部 hub）·
+     * {@code internal}（内部 app_hub）· {@code import} / {@code natives} / {@code plugins} /
+     * {@code patches}（internal 的明细）· {@code cache} · {@code slots}（各槽合计）·
+     * {@code backups}（备份池实际占用）· {@code trash}（中转站）· {@code other}（都没点到的余额）·
+     * {@code redundant}（可清理的冗余副本）。**宿主可能继续加键**，别写死只有这几个。
+     *
+     * <p>🔴 **重**：走全盘递归（hub 里可能有几万个对象文件）⇒ 只该在后台线程调
+     * （{@code runBackground} / {@code submit}），不要在 {@code createView} 里直接调。
+     * 读失败返回空表（没有失败码 —— 与 {@code instances()} / {@code backups()} 同一条约定）。
+     */
+    Map<String, Long> storage();
+
+    /**
+     * **v42**：补丁问题**事实**（"这次启动没应用" / "崩溃后被自动停用"）。
+     *
+     * <p>返回 {@link ItemInfo#KIND_PATCH_PROBLEM} 快照，事实在 {@code extra}：
+     * {@code source} = {@code launch} / {@code crash}、{@code code}（宿主机器码，见补丁写码表）、
+     * {@code detail}（补丁显示名或原始说明）、{@code ref}（仅 crash 记录带，形如 {@code id@version}）。
+     * ⚠️ **只给事实、不给归因**：是不是补丁害的，由宿主的崩溃分析 / 自动停用机制判断；
+     * 插件别自己下结论（与 {@code backups()} 的"不编造"同一条）。
+     */
+    List<ItemInfo> patchProblems();
 
     /**
      * **当前槽**的某一类内容（只读快照）。
@@ -235,6 +265,21 @@ public interface PluginApi {
      * （可能含换行 / 超长），上屏前自己做长度与字符清洗。
      */
     List<ItemInfo> plugins();
+
+    /**
+     * **v42**：一台插件**已安装的所有版本**（管理 / 回滚用；只读）。
+     *
+     * <p>每一条是 {@link ItemInfo#KIND_PLUGIN_VERSION}，事实在 {@link ItemInfo#extra}：
+     * {@code id} / {@code version}（版本令牌 = 文件名去掉 `.apk`）/ {@code active}（是不是当前生效那份）/
+     * {@code pending}（是不是待生效那份）/ {@code builtin} / {@code trust} / {@code level} /
+     * {@code quarantined} / {@code size} / {@code modified}，以及自述字段
+     * {@code selfVersion} / {@code author} / {@code description}（读不到就没有这个键）。
+     * {@code id} 不存在 / 没装任何版本 ⇒ 空表（不崩）。
+     *
+     * <p>⚠️ **插件停用 / 删除 / 切换版本仍归宿主界面**：这里只给"装过哪些"的事实，
+     * 不要试图通过它回滚（那不是接口面的能力）。
+     */
+    List<ItemInfo> pluginVersions(String pluginId);
 
     /**
      * **v38**：已导入的**游戏补丁**（只读快照；**不判启用状态**）。

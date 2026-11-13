@@ -71,6 +71,27 @@ public final class ItemInfo {
      */
     public static final String KIND_BACKUP = "backup";
 
+    /**
+     * **v42**：一台插件**已安装的某一个版本**（{@link PluginApi#pluginVersions(String)}）。
+     *
+     * <p>不可 open（插件 APK 住在宿主内部存储）；事实在 {@link #extra}
+     * （{@code id} / {@code version} / {@code active} / {@code pending} / {@code builtin} /
+     * {@code trust} / {@code level} / {@code quarantined} / {@code size} / {@code modified}）。
+     * 用于"管理 / 回滚"：插件停用 / 删除 / 切换版本仍归宿主界面，插件只做展示与提醒。
+     */
+    public static final String KIND_PLUGIN_VERSION = "plugin_version";
+
+    /**
+     * **v42**：一条**补丁问题事实**（{@link PluginApi#patchProblems()}）。
+     *
+     * <p>不可 open；事实在 {@link #extra}：{@code source}（{@code launch} = 这次启动没应用 /
+     * {@code crash} = 崩溃后自动停用）、{@code code}（宿主机器码，见 `PLUGIN-API.md` 的补丁写码表）、
+     * {@code detail}（补丁显示名或原始说明）、{@code ref}（仅 crash 记录有）。**只给事实、不给
+     * "是谁的错"的结论** —— 归因是宿主崩溃分析那条线的事。
+     */
+    public static final String KIND_PATCH_PROBLEM = "patch_problem";
+
+
     /** 内容类别：{@code saves} / {@code maps} / {@code mods} / {@code blueprints} / {@code slot}。 */
     public final String kind;
 

@@ -4564,6 +4564,8 @@ public final class SelfTest {
         pluginV40(ctx, L, stat);
         // 第 375 轮（v41）：宿主组件工具箱 / 打开自己的页 / place=summary·detail
         pluginV41(ctx, L, stat);
+        // 第 376 轮（v42）：槽统计 / 存储 / 补丁问题 / 插件逐版本
+        pluginV42(ctx, L, stat);
         try {
             java.lang.reflect.Method vi = io.mdt.launcher.api.ProbeEnv.class.getMethod("versionInfo");
             java.lang.reflect.Method dv = io.mdt.launcher.api.ProbeEnv.class.getMethod("displayVersion");
@@ -6082,6 +6084,193 @@ public final class SelfTest {
                             + (kitBad[0].isEmpty() ? "" : "；异常：" + kitBad[0]));
         } catch (Throwable t) {
             ok(stat, L, false, "v41 ui kit 用例异常：" + t);
+        }
+    }
+
+    /**
+     * 第 376 轮（v42）：**槽统计 / 存储 / 补丁问题 / 插件逐版本**。
+     *
+     * <p>四把尺子各自要有"能算出 false"的判据：
+     * <ul>
+     *   <li>槽统计：与当前槽 / 默认槽 / Data.slotInfo 的同一份事实对得上（不是只看字段在）；</li>
+     *   <li>存储：`total == 四段之和`（唯一口径，别在别处再算一遍）；</li>
+     *   <li>补丁问题：写夹具报告再读（launch 与 crash 两种来源、code/detail/ref 都到）；</li>
+     *   <li>插件逐版本：条数与 `Plugins.versionsOf` 一致、active 标志与登记表一致、不串 id。</li>
+     * </ul>
+     */
+    private static void pluginV42(Context ctx, List<String> L, int[] stat) {
+        L.add("");
+        L.add("【v42 · 槽统计 / 存储 / 补丁问题 / 插件逐版本（第 376 轮）】");
+        ok(stat, L, PluginHost.API >= 42 && PluginApi.DOC_VERSION == PluginHost.API
+                        && PluginApi.DOC_VERSION >= 42,
+                "host plugin api == 42（slots 统计 / storage / patchProblems / pluginVersions）");
+        try {
+            java.lang.reflect.Method st = PluginApi.class.getMethod("storage");
+            java.lang.reflect.Method pp = PluginApi.class.getMethod("patchProblems");
+            java.lang.reflect.Method pv = PluginApi.class.getMethod("pluginVersions", String.class);
+            boolean sigOk = java.util.Map.class.isAssignableFrom(st.getReturnType())
+                    && java.util.List.class.isAssignableFrom(pp.getReturnType())
+                    && java.util.List.class.isAssignableFrom(pv.getReturnType());
+            ok(stat, L, sigOk,
+                    "v42 签名：storage() -> Map<String,Long> / patchProblems() -> List / "
+                            + "pluginVersions(id) -> List");
+        } catch (Throwable t) {
+            ok(stat, L, false, "v42 API missing: " + t);
+        }
+
+        // SlotInfo：老构造器保留（默认槽 false / 统计 0），新构造器字段到位
+        try {
+            io.mdt.launcher.api.SlotInfo old = new io.mdt.launcher.api.SlotInfo("a", "/p", true, false);
+            io.mdt.launcher.api.SlotInfo neu = new io.mdt.launcher.api.SlotInfo(
+                    "b", "/q", false, true, true, 7, 1024L, 1, 2, 3, 4);
+            ok(stat, L, !old.defaultSlot && old.files == 0 && old.bytes == 0L && old.mods == 0
+                            && neu.defaultSlot && neu.files == 7 && neu.bytes == 1024L
+                            && neu.mods == 1 && neu.maps == 2 && neu.saves == 3
+                            && neu.blueprints == 4 && "b".equals(neu.name),
+                    "v42 SlotInfo：老构造器保留（插件可能 new）、统计字段齐全");
+        } catch (Throwable t) {
+            ok(stat, L, false, "v42 SlotInfo 用例异常：" + t);
+        }
+
+        // slots()：统计与宿主同一份事实（当前槽 / 默认槽 / 文件数 / 字节数）
+        try {
+            java.util.List<io.mdt.launcher.api.SlotInfo> ss = PluginData.slots(ctx);
+            String cur = Data.currentSlot(ctx);
+            String def = "";
+            try {
+                def = Config.get().defaultSlot();
+            } catch (Throwable ignored) {
+            }
+            boolean firstCur = !ss.isEmpty() && cur != null && cur.equals(ss.get(0).name)
+                    && ss.get(0).current;
+            boolean statsOk = true;
+            int defCount = 0;
+            StringBuilder bad = new StringBuilder();
+            for (io.mdt.launcher.api.SlotInfo s : ss) {
+                if (s.files < 0 || s.bytes < 0L || s.mods < 0 || s.maps < 0
+                        || s.saves < 0 || s.blueprints < 0) {
+                    statsOk = false;
+                    bad.append(s.name).append(":neg ");
+                }
+                if (s.defaultSlot) {
+                    defCount++;
+                    if (def == null || def.isEmpty() || !def.equals(s.name)) {
+                        statsOk = false;
+                        bad.append(s.name).append(":def ");
+                    }
+                }
+                Data.Slot ds = Data.slotInfo(ctx, s.name);
+                if (ds != null && (ds.files != s.files || ds.bytes != s.bytes)) {
+                    statsOk = false;
+                    bad.append(s.name).append(":drift ");
+                }
+            }
+            boolean defOk = (def == null || def.isEmpty()) ? defCount == 0 : defCount == 1;
+            ok(stat, L, firstCur && statsOk && defOk,
+                    "v42 ★slots() 统计：当前槽在最前 / 文件与字节数跟 Data.slotInfo 同源 / "
+                            + "默认槽恰一个（坏：" + bad + "）");
+        } catch (Throwable t) {
+            ok(stat, L, false, "v42 slots 用例异常：" + t);
+        }
+
+        // storage()：唯一口径 total == hub + internal + cache + slots
+        try {
+            java.util.Map<String, Long> sm = PluginData.storage(ctx);
+            boolean keysOk = sm.containsKey("total") && sm.containsKey("hub")
+                    && sm.containsKey("internal") && sm.containsKey("cache")
+                    && sm.containsKey("slots") && sm.containsKey("trash");
+            boolean valsOk = true;
+            for (java.util.Map.Entry<String, Long> e : sm.entrySet()) {
+                if (e.getKey() == null || e.getValue() == null || e.getValue().longValue() < 0L) {
+                    valsOk = false;
+                }
+            }
+            long total = keysOk ? sm.get("total").longValue() : -1L;
+            long sum = keysOk ? sm.get("hub").longValue() + sm.get("internal").longValue()
+                    + sm.get("cache").longValue() + sm.get("slots").longValue() : -2L;
+            ok(stat, L, keysOk && valsOk && total == sum,
+                    "v42 ★storage()：各段非负 + total == hub+internal+cache+slots（唯一口径；"
+                            + "total=" + total + " sum=" + sum + "）");
+        } catch (Throwable t) {
+            ok(stat, L, false, "v42 storage 用例异常：" + t);
+        }
+
+        // patchProblems()：夹具报告 → launch / crash 两种来源的 code / detail / ref
+        try {
+            File pr = new File(Data.hubDir(ctx), "report-patch.txt");
+            File cr = Patches.crashReportFile(ctx);
+            String prOld = pr.isFile() ? Util.readText(pr) : null;
+            String crOld = cr.isFile() ? Util.readText(cr) : null;
+            boolean probsOk = false;
+            try {
+                Util.atomicWriteText(pr, "missing|Example Patch\n");
+                Util.atomicWriteText(cr, "# fixture\n# slot = selftest-slot\n"
+                        + "crash_disabled|Example Patch|ex@1.0\n");
+                List<ItemInfo> probs = PluginData.patchProblems(ctx);
+                boolean launchHit = false, crashHit = false;
+                for (ItemInfo it : probs) {
+                    if (it == null || !ItemInfo.KIND_PATCH_PROBLEM.equals(it.kind)) continue;
+                    String src = it.extra.get("source");
+                    if ("launch".equals(src) && "missing".equals(it.extra.get("code"))
+                            && "Example Patch".equals(it.extra.get("detail"))) {
+                        launchHit = true;
+                    }
+                    if ("crash".equals(src) && "crash_disabled".equals(it.extra.get("code"))
+                            && "Example Patch".equals(it.extra.get("detail"))
+                            && "ex@1.0".equals(it.extra.get("ref"))) {
+                        crashHit = true;
+                    }
+                }
+                probsOk = launchHit && crashHit;
+            } finally {
+                if (prOld == null) pr.delete();
+                else Util.atomicWriteText(pr, prOld);
+                if (crOld == null) cr.delete();
+                else Util.atomicWriteText(cr, crOld);
+            }
+            ok(stat, L, probsOk,
+                    "v42 ★patchProblems()：夹具报告读出 launch（code+明细）与 crash（code+明细+ref）");
+        } catch (Throwable t) {
+            ok(stat, L, false, "v42 patchProblems 用例异常：" + t);
+        }
+
+        // pluginVersions()：条数 / active 标志 / 不串 id 与宿主登记表一致
+        try {
+            List<ItemInfo> ps = PluginData.plugins(ctx);
+            String id = null;
+            for (ItemInfo it : ps) {
+                if (it != null && it.extra.get("id") != null) {
+                    id = it.extra.get("id");
+                    break;
+                }
+            }
+            if (id == null) {
+                L.add("  ⚠ 这台设备没装插件，跳过 pluginVersions 断言");
+            } else {
+                String[] vers = Plugins.versionsOf(ctx, id);
+                List<ItemInfo> pv = PluginData.pluginVersions(ctx, id);
+                String actVer = Plugins.stateGet(Plugins.active(ctx), id);
+                boolean versOk = pv.size() == vers.length;
+                int activeCount = 0;
+                for (ItemInfo it : pv) {
+                    if (it == null || !ItemInfo.KIND_PLUGIN_VERSION.equals(it.kind)) {
+                        versOk = false;
+                        continue;
+                    }
+                    if (!id.equals(it.extra.get("id"))) versOk = false;
+                    if (!"true".equals(it.extra.get("active"))
+                            && !"false".equals(it.extra.get("active"))) versOk = false;
+                    if ("true".equals(it.extra.get("active"))) activeCount++;
+                }
+                boolean actOk = (actVer == null || actVer.isEmpty())
+                        ? activeCount == 0 : activeCount == 1;
+                boolean emptyOk = PluginData.pluginVersions(ctx, "no-such-plugin-xyz").isEmpty();
+                ok(stat, L, versOk && actOk && emptyOk,
+                        "v42 ★pluginVersions()：条数=" + pv.size() + " / 宿主登记 " + vers.length
+                                + "；active 恰一份；未知 id ⇒ 空表（" + id + "）");
+            }
+        } catch (Throwable t) {
+            ok(stat, L, false, "v42 pluginVersions 用例异常：" + t);
         }
     }
 

@@ -52,13 +52,182 @@ final class PluginData {
         }
         File ext = Paths.externalRoot(ctx);
         String extPath = ext == null ? null : ext.getAbsolutePath();
+        // v42：默认槽（"新建启动项落到哪个槽"）与当前槽不是一回事 —— 两个标志都要给
+        String def = "";
+        try {
+            def = Config.get().defaultSlot();
+        } catch (Throwable ignored) {
+            // 配置没加载 / 坏了 ⇒ 没有默认槽（不给假值）
+        }
         for (String name : names) {
             File dir = Data.dirOf(ctx, name);
             String path = dir == null ? null : dir.getAbsolutePath();
             boolean legacy = path != null && extPath != null && path.equals(extPath);
-            out.add(new SlotInfo(name, path, name.equals(cur), legacy));
+            // v42：统计是"当场量"的（与槽列表页同一套实现：Data.slotInfo + Data.contentCounts）
+            int files = 0;
+            long bytes = 0L;
+            try {
+                Data.Slot si = Data.slotInfo(ctx, name);
+                if (si != null) {
+                    files = si.files;
+                    bytes = si.bytes;
+                }
+            } catch (Throwable ignored) {
+                // 量不出来 ⇒ 0（目录不存在也是 0，两者在接口上分不开，文档已写明）
+            }
+            int[] cc = new int[4];
+            try {
+                cc = Data.contentCounts(dir);
+            } catch (Throwable ignored) {
+                // 同上
+            }
+            out.add(new SlotInfo(name, path, name.equals(cur), legacy,
+                    def != null && !def.isEmpty() && def.equals(name),
+                    files, bytes, cc[0], cc[1], cc[2], cc[3]));
         }
         return out;
+    }
+
+    /**
+     * **v42**：一台插件**已安装的所有版本**（{@link PluginApi#pluginVersions(String)} 的实现）。
+     *
+     * <p>为什么给：管理 / 回滚时界面上的"版本"只是版本令牌（sha 前 8 位或自定义），插件要能
+     * 回答"这台插件装过几份、哪份在生效、哪份是待生效"就得靠宿主 —— 自己去数目录不是契约。
+     */
+    static List<ItemInfo> pluginVersions(Context ctx, String id) {
+        List<ItemInfo> out = new ArrayList<ItemInfo>();
+        if (ctx == null || id == null || id.trim().isEmpty()) return out;
+        String pid = id.trim();
+        String active = Plugins.active(ctx);
+        String pending = Plugins.pending(ctx);
+        String levels = Plugins.levels(ctx);
+        String actVer = Plugins.stateGet(active, pid);
+        String pendVer = Plugins.stateGet(pending, pid);
+        String[] quar = Plugins.quarantinedOf(ctx, pid);
+        String name = Plugins.displayNameOf(ctx, pid);
+        String[] vers;
+        try {
+            vers = Plugins.versionsOf(ctx, pid);
+        } catch (Throwable t) {
+            return out;                        // 目录读不出来 ⇒ 空表（不编造）
+        }
+        for (String ver : vers) {
+            if (ver == null || ver.isEmpty()) continue;
+            try {
+                File apk = Plugins.apkOf(ctx, pid, ver);
+                boolean hasApk = apk != null && apk.isFile();
+                PluginMeta.Info meta = hasApk ? PluginMeta.read(ctx, apk) : null;
+                String trust = Plugins.trustOf(ctx, pid, ver);
+                Map<String, String> ex = new LinkedHashMap<String, String>();
+                put(ex, "id", pid);
+                put(ex, "name", name);
+                put(ex, "version", ver);
+                ex.put("active", String.valueOf(ver.equals(actVer)));
+                ex.put("pending", String.valueOf(ver.equals(pendVer)));
+                ex.put("builtin", String.valueOf(Plugins.isBuiltin(ctx, pid, ver)));
+                put(ex, "trust", trust);
+                put(ex, "level", Plugins.levelOf(levels, trust, pid));
+                ex.put("quarantined", String.valueOf(quar.length > 0));
+                ex.put("size", String.valueOf(hasApk ? apk.length() : 0L));
+                ex.put("modified", String.valueOf(hasApk ? apk.lastModified() : 0L));
+                if (meta != null) {
+                    put(ex, "selfVersion", meta.version);
+                    put(ex, "author", meta.author);
+                    put(ex, "description", meta.description);
+                    ex.put("entry", meta.entryOr(PluginHost.DEFAULT_ENTRY));
+                }
+                String title = meta != null && meta.version != null && !meta.version.isEmpty()
+                        ? meta.version : ver;
+                out.add(new ItemInfo(ItemInfo.KIND_PLUGIN_VERSION, title, ver, null, null, null,
+                        hasApk ? apk.length() : 0L, hasApk ? apk.lastModified() : 0L,
+                        "plugins", null, false, false, ex));
+            } catch (Throwable ignored) {
+                // 一份坏了不影响别的
+            }
+        }
+        return out;
+    }
+
+    /**
+     * **v42**：存储占用（{@link Storage.Report} 的字节数，键见 {@link PluginApi#storage()} 的文档）。
+     *
+     * <p>★ 只该在后台线程调（{@code Storage.collect} 会递归全盘）。
+     */
+    static Map<String, Long> storage(Context ctx) {
+        Map<String, Long> out = new LinkedHashMap<String, Long>();
+        if (ctx == null) return out;
+        try {
+            Storage.Report r = Storage.collect(ctx);
+            if (r == null) return out;
+            out.put("total", Long.valueOf(r.totalBytes()));
+            out.put("hub", Long.valueOf(r.hubBytes));
+            out.put("internal", Long.valueOf(r.internalBytes));
+            out.put("import", Long.valueOf(r.importBytes));
+            out.put("natives", Long.valueOf(r.nativesBytes));
+            out.put("plugins", Long.valueOf(r.pluginsBytes));
+            out.put("patches", Long.valueOf(r.patchBytes));
+            out.put("cache", Long.valueOf(r.cacheBytes));
+            out.put("slots", Long.valueOf(r.slotBytes));
+            out.put("backups", Long.valueOf(r.pool == null ? 0L
+                    : r.pool.actual + r.pool.legacyBytes));
+            out.put("trash", Long.valueOf(r.trashTotalBytes));
+            out.put("other", Long.valueOf(r.otherBytes));
+            out.put("redundant", Long.valueOf(r.redundantBytes));
+        } catch (Throwable t) {
+            // 读不出来 ⇒ 空表（没有失败码，与 instances()/backups() 同一条约定）
+            return new LinkedHashMap<String, Long>();
+        }
+        return out;
+    }
+
+    /**
+     * **v42**：补丁问题**事实**（{@link Patches#launchProblems} + 崩溃后自动停用记录）。
+     *
+     * <p>⚠️ 只给事实：launch = "这次启动没应用"（code + 明细），crash = "崩溃后自动停用"
+     * （code + 显示名 + ref）。崩溃记录的数据行格式是 `code|label|ref`；启动报告是 `code|detail`。
+     * 归因（是不是补丁害的）不在这里下结论。
+     */
+    static List<ItemInfo> patchProblems(Context ctx) {
+        List<ItemInfo> out = new ArrayList<ItemInfo>();
+        if (ctx == null) return out;
+        try {
+            for (Patches.Problem p : Patches.launchProblems(ctx)) {
+                if (p == null) continue;
+                out.add(patchProblemItem("launch", p.code, p.detail, null));
+            }
+        } catch (Throwable ignored) {
+            // 报告读不出来 ⇒ 不加这一批（不编造）
+        }
+        try {
+            File f = Patches.crashReportFile(ctx);
+            if (f.isFile()) {
+                for (String line : Util.readText(f).split("\\r?\\n")) {
+                    if (line.isEmpty() || line.startsWith("#")) continue;
+                    String[] parts = line.split("\\|", 3);
+                    if (parts.length < 2) continue;
+                    String code = parts[0] == null ? "" : parts[0];
+                    String label = parts[1] == null ? "" : parts[1];
+                    String ref = parts.length > 2 ? parts[2] : null;
+                    out.add(patchProblemItem("crash", code, label,
+                            ref == null || ref.isEmpty() ? null : ref));
+                }
+            }
+        } catch (Throwable ignored) {
+            // 同上
+        }
+        return out;
+    }
+
+    private static ItemInfo patchProblemItem(String source, String code, String detail, String ref) {
+        Map<String, String> ex = new LinkedHashMap<String, String>();
+        put(ex, "source", source);
+        put(ex, "code", code);
+        put(ex, "detail", detail);
+        put(ex, "ref", ref);
+        String title = detail == null || detail.trim().isEmpty() ? code : detail;
+        String sub = source + (code == null || code.isEmpty() ? "" : " · " + code);
+        return new ItemInfo(ItemInfo.KIND_PATCH_PROBLEM, title, sub, null, null, null,
+                0L, 0L, null, null, false, false, ex);
     }
 
     static List<ItemInfo> contents(Context ctx, String slot, String kind) {

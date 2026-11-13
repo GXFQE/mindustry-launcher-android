@@ -5,7 +5,7 @@
 
 ## 1. 版本与兼容（v20 冻结基线）
 
-- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..41**。
+- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..42**。
   （v20 是冻结基线；v21 = 游戏设置面；v22 = 后台任务 + 游戏事件；v23 = 探针；v24 = 分析器；
   v25 = 结论挂行 + 筛选/排序注入 + HJSON；v26 = 逐项判定；v27 = 详情页的门 + 槽级结论进摘要卡；
   v28 = 原版文案键；v29 = 游戏前后台事件；v30 = 探针知道版本 / 跨会话数据目录 + 摘要卡总时长；
@@ -41,7 +41,10 @@
   **v41 = 宿主组件工具箱 + 打开自己的页**：`ui()` 返回 `PluginUi`（card / row / rowStatic / button /
   divider / kv / sectionTitle / text，全部用宿主资源与主题色，自绘插件也能长得像宿主）；
   `openPluginPage()` 从 section / action 里打开自己的整页；`place` 扩到 `summary`（页头 / 摘要下）
-  与 `detail`（详情页自己的一张动作卡）。）
+  与 `detail`（详情页自己的一张动作卡）。
+  **v42 = 信息 P1**：`slots()` 带统计（默认槽 / 文件数 / 字节数 / 四类内容数）、`storage()`（各段占用 +
+  唯一总计，重）、`patchProblems()`（启动没应用 / 崩溃自动停用的事实，不给归因）、
+  `pluginVersions(id)`（插件逐版本，管理 / 回滚用）。）
 - 插件 `api()` 报的是「我需要的最低宿主接口版本」。用不到的新能力**不要**报高 ——
   报高了只会在老宿主上被拒，换不来任何东西。
 - **不要用 try/catch 去兼容老宿主**：报什么版本就只会跑在什么版本上。`api()` 报 20，
@@ -129,7 +132,7 @@
 ## 3. 入口类约定
 
 ```java
-public static int api();                        // 必需：你需要的接口版本（当前 41；用不到新能力就报 20）
+public static int api();                        // 必需：你需要的接口版本（当前 42；用不到新能力就报 20）
 public static View createView(PluginApi api);   // content / section 用
 public static void run(PluginApi api);          // action 用（在原页跑，不换页）
 public static void unload();                    // 可选：收尾（也认 unload(Context)）
@@ -149,7 +152,7 @@ public static void unload();                    // 可选：收尾（也认 unlo
 
 | 方法 | 说明 |
 |---|---|
-| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 41） |
+| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 42） |
 | `context()` | 插件上下文（**只用来取资源 / 主题 / 建 View**） |
 | `page()` / `slot()` | 从哪一页来 / 当前槽名 |
 | `theme()` | 主题色与 dp/sp（别自己写死颜色，见 `PluginTheme`） |
@@ -160,7 +163,10 @@ public static void unload();                    // 可选：收尾（也认 unlo
 |---|---|
 | `selectedItem()` / `selectedItems()` | 详情页当前那一项 / 页面选中项快照（**v40 起版本页也有**：这一行对应的版本条目；resources 页仍为 null） |
 | `pageItems()` | 当前页面看到的数据快照（**v40 起 version / resources 页各给"这一份"那一条**） |
-| `slots()` | 全部槽 |
+| `slots()` | 全部槽；**v42 起带统计**：`defaultSlot`（默认槽，与"当前槽"不是一回事）/ `files` / `bytes` / `mods` / `maps` / `saves` / `blueprints`。⚠️ 统计是当场遍历目录量的，大槽别在 UI 线程调 |
+| `storage()`（v42） | 存储占用（`Map<String, Long>`，单位字节）：`total`（唯一总计）/ `hub` / `internal` / `import` / `natives` / `plugins` / `patches` / `cache` / `slots` / `backups` / `trash` / `other` / `redundant`。🔴 **重**（全盘递归）⇒ 只该在后台线程调；读失败返回空表（无失败码） |
+| `patchProblems()`（v42） | 补丁问题**事实**：`source` = `launch`（这次启动没应用）/ `crash`（崩溃后自动停用）+ `code`（宿主机器码）+ `detail`（补丁名或原始说明）+ `ref`（仅 crash）。**只给事实、不给归因** |
+| `pluginVersions(id)`（v42） | 某台插件**已安装的所有版本**（管理 / 回滚用）：`version` / `active` / `pending` / `builtin` / `trust` / `level` / `quarantined` / `size` / `modified` + 自述字段。未知 id ⇒ 空表；**切换版本仍归宿主界面** |
 | `contents(kind)` / `contents(slot, kind)` | 四类内容；`kind` = `saves`/`maps`/`mods`/`blueprints` |
 | `logs()` / `trash()` / `versions()` | 日志与崩溃报告 / 中转站 / 已装版本（v39 起 `trash()` 的 `extra["category"]` 覆盖全部八类 —— 含以前整块漏掉的 `versions` / `patches`；另有 `slot` / `originalName` / `stamp` / `files` 键） |
 | `open(item)` | 打开条目的字节流（文件或容器条目统一） |
@@ -619,6 +625,37 @@ List<ItemInfo> patches(String versionKey, String slot);    // 同上 + enabled /
 - 补丁的启用状态**按启动项存**（版本 key + 槽，第 353 轮）⇒ 同一个补丁在两个槽上可以一开一关；
 - 补丁能不能用是**精确到 APK 哈希**的（见 `PatchManifest`）；用 `applies` 判断，别自己比版本号。
 
+### 槽统计 / 存储 / 补丁问题 / 插件逐版本（v42）
+
+这四项都是"宿主界面已经在显示、插件拿不到"的数据（plan §3.2 P1）：
+
+**`slots()` 的统计**（`SlotInfo` 新字段，老 4 参构造器保留）：
+
+| 字段 | 说明 |
+|---|---|
+| `defaultSlot` | 是不是**默认槽**（新建启动项 / 没指定槽时落到它 —— 与"当前槽" `current` 不是一回事） |
+| `files` / `bytes` | 槽目录递归量出的文件数 / 字节数（量不出来 = 0；目录不存在与读失败在接口上分不开） |
+| `mods` / `maps` / `saves` / `blueprints` | 四类内容数（与槽列表页同一套扫描） |
+
+⚠️ **`slots()` 不再便宜**：每个槽都要遍历目录（文件数 / 字节数 / 四类内容数）⇒ 大槽放后台线程。
+
+**`storage()`** —— `Map<String, Long>`，键见第 4 节「只读数据」表格；口径只有宿主那一个
+（`Storage.Report.totalBytes()` = 外部 hub + 内部 app_hub + 缓存 + 各槽）。🔴 全盘递归，**必须后台**。
+读失败返回**空表**（没有失败码，与 `instances()` / `backups()` 同一条约定）。
+
+**`patchProblems()`** —— 只给事实，不给归因：
+
+| `extra` 键 | 说明 |
+|---|---|
+| `source` | `launch`（这次启动没应用，来自 `hub/report-patch.txt`）/ `crash`（崩溃后自动停用，来自补丁崩溃记录） |
+| `code` | 宿主机器码：launch 用补丁写码表那套（`missing` / `no_match` / `conflict` / `bad_dex`…）；crash 目前是 `crash_disabled` |
+| `detail` | 补丁显示名（或原始说明；可能为空串） |
+| `ref` | 仅 crash 记录有：`id@version` |
+
+**`pluginVersions(id)`** —— 插件逐版本（`ItemInfo.KIND_PLUGIN_VERSION`）：`version`（版本令牌）/
+`active` / `pending` / `builtin` / `trust` / `level` / `quarantined` / `size` / `modified` +
+自述字段。用于展示"装过几份、哪份在生效"；**切版本 / 停用 / 删除仍归宿主界面**。
+
 ### 筛选 / 排序注入（v25）
 
 插件可以往页面的「筛选与排序」菜单里加自己的一项（与 `extensions` 同一个数组）：
@@ -1036,6 +1073,11 @@ kv / sectionTitle / text，全部用宿主布局资源与主题色；自绘插�
 `openPluginPage()`（从 section / action 打开自己的整页）；`place` 扩到 `summary`（主界面 / 槽列表 /
 四个内容页的页头下）与 `detail`（两个详情页自己的一张动作卡 —— 不放进宿主的删除卡，那张卡对
 游戏自带 / 模组自带项是 GONE 的）。`API_MIN` 仍不动（区间 20..41）。
+v42（2026-11-13 第 376 轮）：**信息 P1（plan §3.2）**—— `slots()` 带统计（默认槽 / 文件数 / 字节数 /
+四类内容数；`SlotInfo` 老 4 参构造器保留）、`storage()`（`Map<String,Long>`，各段 + 唯一总计；
+全盘递归 ⇒ 只该在后台调）、`patchProblems()`（启动没应用 / 崩溃自动停用的**事实**，code + detail +
+ref，**不给归因**）、`pluginVersions(id)`（插件逐版本；切换仍归宿主界面）。新增两个
+`ItemInfo` kind：`plugin_version` / `patch_problem`。`API_MIN` 仍不动（区间 20..42）。
 
 **官方体检插件**：`plugins/mods-health`（第 229 轮，前身叫 `conflict`）。宿主原来的那行
 「查模组冲突」整块删掉，判据搬进插件的 `core/Conflicts.java` 与 `core/Gates.java`；

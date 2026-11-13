@@ -131,8 +131,12 @@ public final class PluginHost {
      * <p>v41（2026-11-13 第 375 轮）：**宿主组件工具箱** `PluginApi.ui()`（card / row / button /
      * divider / kv / sectionTitle / text，全部用宿主资源与主题）+ `openPluginPage()`（打开自己的整页）；
      * `place` 扩到 `summary`（摘要 / 页头下面一行）与 `detail`（详情操作卡）。
+     *
+     * <p>v42（2026-11-13 第 376 轮）：槽列表带统计（默认槽 / 文件数 / 字节数 / 四类内容数）、
+     * `storage()`（各段占用 + 唯一总计；重、要走后台）、`patchProblems()`（启动没应用 / 崩溃自动停用的
+     * 事实）、`pluginVersions(id)`（插件逐版本，管理 / 回滚用）。
      */
-    public static final int API = 41;
+    public static final int API = 42;
     /**
      * 还认的**最老**契约版本。
      *
@@ -748,6 +752,23 @@ public final class PluginHost {
         @Override public java.util.List<ItemInfo> patches(String versionKey, String slot) {
             String s = (slot == null || slot.trim().isEmpty()) ? this.slot : slot;
             return PluginData.patches(getBaseContext(), versionKey, s);
+        }
+
+        // ---- v42（第 376 轮）：槽统计 / 存储 / 补丁问题 / 插件逐版本 ---------------
+
+        /** v42：存储占用（重！走全盘；插件应放后台线程）。 */
+        @Override public java.util.Map<String, Long> storage() {
+            return PluginData.storage(getBaseContext());
+        }
+
+        /** v42：补丁问题事实（launch / crash；只给事实不给归因）。 */
+        @Override public java.util.List<ItemInfo> patchProblems() {
+            return PluginData.patchProblems(getBaseContext());
+        }
+
+        /** v42：一台插件已安装的所有版本（管理 / 回滚用；切换版本仍归宿主界面）。 */
+        @Override public java.util.List<ItemInfo> pluginVersions(String pluginId) {
+            return PluginData.pluginVersions(getBaseContext(), pluginId);
         }
 
         // ---- v39（第 373 轮）：实例 / 备份 / 网络 / 补丁写 -----------------------
