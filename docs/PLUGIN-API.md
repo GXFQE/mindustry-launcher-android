@@ -134,8 +134,8 @@ public static void unload();                    // 可选：收尾（也认 unlo
 | `baseBundleKeys()`（v28） | 目标版本**基础语言包**的键集合（判"是不是原版文案"用；空集 = 读不到，不是"没有"） |
 | `plugins()`（v38） | 装着哪些插件（含停用 / 待生效 / 已隔离）—— id / 名字 / 状态 / 来源 / 版本 / 自述字段 / 声明的能力条目，见下文「插件与补丁清单」 |
 | `patches()` / `patches(versionKey, slot)`（v38） | 已导入的游戏补丁；给了启动项才判 `enabled` / `applies`，见下文 |
-| `instances()`（v39） | **正在跑**的游戏实例（含启动占位）—— `pid` / `vkey` / `slot` / `instanceKey` / `started` / `starting`；顺序 = 启动时间升序 |
-| `backups(slot)`（v39） | 某个槽的**备份快照**元信息（`created` / `label` / `source` / `files` / `bytes` / `legacy`）；`slot` 空 = 这一页的槽；恢复 / 删除不给插件做 |
+| `instances()`（v39） | **正在跑**的游戏实例（含启动占位）—— `pid` / `vkey` / `slot` / `instanceKey` / `started` / `starting`；顺序 = 启动时间升序。⚠️ 读失败也返回空表（没有失败码）：空表只说明"这份快照里没有"，别当"一定没在跑"的硬证据 |
+| `backups(slot)`（v39） | 某个槽的**备份快照**元信息（`created` / `label` / `source` / `files` / `bytes` / `legacy`）；`slot` 空 = 这一页的槽；恢复 / 删除不给插件做。⚠️ 清单读不出来也返回空表（同上） |
 | `usageDir()` | 插件数据目录（见第 9 节） |
 | `crashReportsDir()`（v22） | 当前槽的崩溃报告目录（只读；可能不存在） |
 
