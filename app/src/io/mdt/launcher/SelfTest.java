@@ -4495,6 +4495,22 @@ public final class SelfTest {
         } catch (Throwable t) {
             ok(stat, L, false, "v37 API missing: " + t);
         }
+        // 第 372 轮（v38）：插件能读"装了哪些插件 / 有哪些游戏补丁"（数据仍走 ItemInfo 快照）
+        ok(stat, L, PluginHost.API >= 38 && PluginApi.DOC_VERSION >= 38,
+                "host plugin api >= 38（插件清单 + 游戏补丁只读接口）");
+        try {
+            java.lang.reflect.Method pl = PluginApi.class.getMethod("plugins");
+            java.lang.reflect.Method pa = PluginApi.class.getMethod("patches");
+            java.lang.reflect.Method pb = PluginApi.class.getMethod("patches", String.class, String.class);
+            ok(stat, L, pl.getReturnType() == java.util.List.class
+                            && pa.getReturnType() == java.util.List.class
+                            && pb.getReturnType() == java.util.List.class
+                            && "plugin".equals(ItemInfo.KIND_PLUGIN)
+                            && "patch".equals(ItemInfo.KIND_PATCH),
+                    "v38 签名：plugins() / patches() / patches(String,String) -> List；KIND_PLUGIN / KIND_PATCH");
+        } catch (Throwable t) {
+            ok(stat, L, false, "v38 API missing: " + t);
+        }
         try {
             java.lang.reflect.Method vi = io.mdt.launcher.api.ProbeEnv.class.getMethod("versionInfo");
             java.lang.reflect.Method dv = io.mdt.launcher.api.ProbeEnv.class.getMethod("displayVersion");
@@ -5228,6 +5244,187 @@ public final class SelfTest {
         } catch (Throwable t) {
             ok(stat, L, false, "pluginFiles 用例异常：" + t);
         }
+        // ★ v38：插件读"装了哪些插件 / 有哪些游戏补丁"（第 372 轮）
+        pluginInventory(ctx, L, stat);
+    }
+
+    /**
+     * **v38（第 372 轮）**：{@code PluginApi.plugins()} / {@code patches()} 的尺子。
+     *
+     * <p>三半，缺一不可：
+     * <ol>
+     *   <li><b>真表</b>：设备上装了什么就报什么，且与宿主自己的 {@link Plugins#installedIds}
+     *       同源（"所有插件"包含停用的）；</li>
+     *   <li><b>夹具</b>：喂不同的登记文本 ⇒ state / version / activeVersion / pendingVersion 跟着变
+     *       （这四样是插件判断"有没有生效、要不要重启"的唯一依据）；</li>
+     *   <li><b>真 API 对象</b>：反射造一个 {@code PluginHost$PContext}，像插件那样真调一次
+     *       （防"数据层有、接口忘了接"——那在插件侧就是 NoSuchMethodError / 空表）。</li>
+     * </ol>
+     */
+    private static void pluginInventory(Context ctx, List<String> L, int[] stat) {
+        L.add("");
+        L.add("【v38 · 插件清单 / 游戏补丁清单（第 372 轮）】");
+        final String FIX = "selftest-v38";
+        File fixDir = new File(Plugins.dir(ctx), FIX);
+        try {
+            // ── ① 真表 ─────────────────────────────────────────────────────
+            List<String> ids = Plugins.installedIds(ctx);
+            List<ItemInfo> plugs = PluginData.plugins(ctx);
+            ok(stat, L, plugs.size() == ids.size(),
+                    "plugins() 与 installedIds 同源（" + plugs.size() + " / " + ids.size() + " 台）");
+            boolean allSeen = true, keysOk = true, stateOk = true;
+            for (ItemInfo it : plugs) {
+                String id = it.extra.get("id");
+                if (id == null || !ids.contains(id) || !ItemInfo.KIND_PLUGIN.equals(it.kind)) {
+                    allSeen = false;
+                }
+                if (!it.extra.containsKey("id") || !it.extra.containsKey("name")
+                        || !it.extra.containsKey("state") || !it.extra.containsKey("trust")
+                        || !it.extra.containsKey("level") || !it.extra.containsKey("builtin")
+                        || !it.extra.containsKey("size") || it.title == null || it.title.isEmpty()) {
+                    keysOk = false;
+                }
+                String st = it.extra.get("state");
+                if (!("active".equals(st) || "pending".equals(st) || "off".equals(st))) stateOk = false;
+            }
+            ok(stat, L, allSeen, "每一条的 id 都在 installedIds 里、kind = plugin");
+            ok(stat, L, keysOk, "基本键齐全（id / name / state / trust / level / builtin / size）");
+            ok(stat, L, stateOk, "state 只有 active / pending / off 三态");
+            String act = Plugins.active(ctx), pend = Plugins.pending(ctx);
+            boolean verOk = true;
+            for (ItemInfo it : plugs) {
+                String id = it.extra.get("id");
+                String wantAct = Plugins.stateGet(act, id);
+                String wantPend = Plugins.stateGet(pend, id);
+                Object gotAct = it.extra.get("activeVersion");
+                Object gotPend = it.extra.get("pendingVersion");
+                if (wantAct == null ? gotAct != null : !wantAct.equals(gotAct)) verOk = false;
+                if (wantPend == null ? gotPend != null : !wantPend.equals(gotPend)) verOk = false;
+                // 生效 / 待生效都只在登记表里出现；两者都没有 ⇒ off（三态不许互相矛盾）
+                String st = it.extra.get("state");
+                if (wantPend != null && !"pending".equals(st)) verOk = false;
+                if (wantPend == null && wantAct != null && !"active".equals(st)) verOk = false;
+                if (wantPend == null && wantAct == null && !"off".equals(st)) verOk = false;
+            }
+            ok(stat, L, verOk, "activeVersion / pendingVersion / state 与登记表逐字一致（不矛盾）");
+            // 反方向：本体带内置插件时，那几台必须被标成内置（不能把所有人都标成第三方）
+            boolean sawBuiltin = false;
+            for (ItemInfo it : plugs) if ("true".equals(it.extra.get("builtin"))) sawBuiltin = true;
+            if (Plugins.builtins(ctx).isEmpty()) {
+                L.add("  ⚠ 本体没带内置插件，跳过「内置被认出来」断言");
+            } else {
+                ok(stat, L, sawBuiltin, "★内置插件被认出来（不是把所有人都标成第三方）");
+            }
+
+            // ── ② 夹具：装着但没登记 / 待生效 / 生效中 ─────────────────────
+            boolean made = fixDir.isDirectory() || fixDir.mkdirs();
+            ok(stat, L, made, "造一台夹具插件目录（" + FIX + "）");
+            if (made) {
+                write(new File(fixDir, "9.apk"), new byte[]{ 1, 2, 3 });
+                ItemInfo off = PluginData.pluginItem(ctx, FIX, "", "", "");
+                ok(stat, L, "off".equals(off.extra.get("state"))
+                                && "9".equals(off.extra.get("version"))
+                                && !off.extra.containsKey("activeVersion")
+                                && !off.extra.containsKey("pendingVersion")
+                                && "false".equals(off.extra.get("builtin")),
+                        "没登记 ⇒ state=off、version 是机器上那份、没有 active/pending");
+                ItemInfo pendingItem = PluginData.pluginItem(ctx, FIX, "", FIX + "=42\n", "");
+                ok(stat, L, "pending".equals(pendingItem.extra.get("state"))
+                                && "42".equals(pendingItem.extra.get("version"))
+                                && "42".equals(pendingItem.extra.get("pendingVersion"))
+                                && !pendingItem.extra.containsKey("activeVersion"),
+                        "★待重启生效 ⇒ state=pending（version 取待生效那份）");
+                ItemInfo activeItem = PluginData.pluginItem(ctx, FIX, FIX + "=42\n", "", "");
+                ok(stat, L, "active".equals(activeItem.extra.get("state"))
+                                && "42".equals(activeItem.extra.get("version"))
+                                && "42".equals(activeItem.extra.get("activeVersion")),
+                        "生效中 ⇒ state=active（activeVersion 写清楚）");
+                ItemInfo levelItem = PluginData.pluginItem(ctx, FIX, FIX + "=42\n", "",
+                        FIX + "=L1\n");
+                ok(stat, L, "L1".equals(levelItem.extra.get("level")),
+                        "处置等级跟着 levels 登记走（夹具 L1）");
+                List<ItemInfo> withFix = PluginData.plugins(ctx);
+                ok(stat, L, withFix.size() == ids.size() + 1 && pluginItemOf(withFix, FIX) != null,
+                        "★夹具在真表里出现（\"所有插件\"包含没生效的），不是只列生效的");
+            }
+
+            // ── ③ 真 API 对象（插件实际走的路）─────────────────────────────
+            PluginApi api = newPContext(ctx);
+            if (api == null) {
+                ok(stat, L, false, "造不出 PluginHost$PContext（v38 真调路径没验到）");
+            } else {
+                List<ItemInfo> viaApi = api.plugins();
+                ok(stat, L, viaApi != null && viaApi.size() == PluginData.plugins(ctx).size(),
+                        "★PContext.plugins() 与数据层同一份（" + (viaApi == null ? -1 : viaApi.size()) + "）");
+                List<ItemInfo> viaPatches = api.patches();
+                ok(stat, L, viaPatches != null && viaPatches.size() == PluginData.patches(ctx).size(),
+                        "PContext.patches() 可用（" + (viaPatches == null ? -1 : viaPatches.size()) + "）");
+                List<ItemInfo> noVersion = api.patches("selftest-v38-no-such-version", "selftest-v38-slot");
+                boolean allEnabled = true, noneApplies = true;
+                for (ItemInfo it : (noVersion == null ? new ArrayList<ItemInfo>() : noVersion)) {
+                    if (!it.extra.containsKey("enabled")) allEnabled = false;
+                    if (it.extra.containsKey("applies")) noneApplies = false;
+                }
+                ok(stat, L, allEnabled && noneApplies,
+                        "★给启动项 ⇒ 每条都有 enabled；版本不存在 ⇒ 不放 applies（判不了就说判不了）");
+            }
+            // 版本 key ⇒ APK sha256（applies 的原料；不存在 ⇒ 空串，不许瞎给一个哈希）
+            List<Versions.Entry> vers = Versions.scanAll(ctx);
+            if (vers.isEmpty() || vers.get(0) == null || vers.get(0).apkPath == null) {
+                L.add("  ⚠ 设备上没有版本，跳过「版本 key ⇒ APK sha256」断言");
+            } else {
+                String sha = PluginData.apkShaOfVersion(ctx, vers.get(0).key());
+                ok(stat, L, sha != null && sha.matches("[0-9a-f]{64}"),
+                        "版本 key ⇒ APK sha256（64 位小写十六进制）");
+                ok(stat, L, "".equals(PluginData.apkShaOfVersion(ctx, "selftest-v38-no-such-version")),
+                        "反方向：不存在的版本 ⇒ 空串（不是随便给个哈希）");
+            }
+        } catch (Throwable t) {
+            ok(stat, L, false, "v38 插件清单用例异常：" + t);
+        } finally {
+            if (fixDir.exists()) Data.deleteTree(fixDir);
+        }
+        ok(stat, L, !new File(Plugins.dirNoCreate(ctx), FIX).exists(),
+                "夹具清掉（不留一台假的\"已装插件\"在用户机器上）");
+        ok(stat, L, PluginData.plugins(ctx).size() == Plugins.installedIds(ctx).size(),
+                "清场后清单回到与 installedIds 一致");
+    }
+
+    /** 反射造一个真 {@code PluginHost$PContext}（插件拿到的就是它；构造器是私有的）。 */
+    private static PluginApi newPContext(Context ctx) {
+        try {
+            Class<?> pc = Class.forName("io.mdt.launcher.PluginHost$PContext");
+            java.lang.reflect.Constructor<?> c = pc.getDeclaredConstructor(
+                    Context.class, android.content.res.AssetManager.class,
+                    android.content.res.Resources.class, ClassLoader.class,
+                    File.class, File.class, String.class, String.class, File.class,
+                    ItemInfo.class);
+            c.setAccessible(true);
+            return (PluginApi) c.newInstance(ctx, ctx.getAssets(), ctx.getResources(),
+                    ctx.getClassLoader(), ctx.getCacheDir(), ctx.getCacheDir(),
+                    "main", Data.currentSlot(ctx), null, null);
+        } catch (Throwable t) {
+            android.util.Log.w("MDTLauncher", "PContext fixture failed", t);
+            return null;
+        }
+    }
+
+    /** 在插件清单里按 id 找那一条（v38 断言用）。 */
+    private static ItemInfo pluginItemOf(List<ItemInfo> items, String id) {
+        if (items == null || id == null) return null;
+        for (ItemInfo it : items) {
+            if (it != null && id.equals(it.extra.get("id"))) return it;
+        }
+        return null;
+    }
+
+    /** 在补丁清单里按 ref（`id@version`）找那一条（v38 断言用）。 */
+    private static ItemInfo patchItemOf(List<ItemInfo> items, String ref) {
+        if (items == null || ref == null) return null;
+        for (ItemInfo it : items) {
+            if (it != null && ref.equals(it.extra.get("ref"))) return it;
+        }
+        return null;
     }
 
     /**
@@ -16642,6 +16839,39 @@ public final class SelfTest {
             ok(stat, L, Patches.enabledRefs(ctx, IKEY2).isEmpty()
                             && Patches.enabledCount(ctx, IKEY2) == 0,
                     "④ 实例隔离：A 只在 IKEY 上启用，另一个启动项（IKEY2）看不到它");
+            // ★ 第 372 轮（v38）：插件能读补丁清单 —— 数据仍走 ItemInfo 快照，启用状态按启动项算
+            List<ItemInfo> allPatches = PluginData.patches(ctx);
+            ItemInfo patchA = patchItemOf(allPatches, recA.ref());
+            ok(stat, L, patchA != null && ItemInfo.KIND_PATCH.equals(patchA.kind)
+                            && recA.label().equals(patchA.title)
+                            && recA.ref().equals(patchA.subtitle)
+                            && "true".equals(patchA.extra.get("filesOk")),
+                    "⑧ patches() 列出已导入补丁（ref / 名称 / 文件齐全）");
+            ok(stat, L, patchA != null && apkSha.equals(patchA.extra.get("target.0.sha256"))
+                            && "160.4".equals(patchA.extra.get("target.0.gameVersion"))
+                            && "2".equals(patchA.extra.get("target.0.classes"))
+                            && "1".equals(patchA.extra.get("target.0.assets"))
+                            && patchA.extra.containsKey("bytes"),
+                    "⑧ target 事实：哈希 / 游戏版本 / 类数 / 素材数 / 体积");
+            ok(stat, L, patchA != null && !patchA.extra.containsKey("enabled")
+                            && !patchA.extra.containsKey("applies"),
+                    "⑧ ★不带启动项 ⇒ 不写 enabled / applies（默认值不许当事实）");
+            ItemInfo onA = patchItemOf(PluginData.patches(ctx, VKEY, SLOT), recA.ref());
+            ItemInfo offA = patchItemOf(PluginData.patches(ctx, VKEY, "selftest-slot-2"), recA.ref());
+            ok(stat, L, onA != null && "true".equals(onA.extra.get("enabled"))
+                            && offA != null && "false".equals(offA.extra.get("enabled")),
+                    "⑧ enabled 按启动项算（同一个补丁在 IKEY = true、IKEY2 = false）");
+            ok(stat, L, onA != null && !onA.extra.containsKey("applies"),
+                    "⑧ 版本不在已装列表里 ⇒ 不放 applies（判不了就说判不了）");
+            ItemInfo matchA = PluginData.patchItem(recA,
+                    java.util.Arrays.asList(recA.ref()), apkSha);
+            ok(stat, L, "true".equals(matchA.extra.get("applies"))
+                            && "true".equals(matchA.extra.get("target.0.match")),
+                    "⑧ 给了匹配的 APK 哈希 ⇒ applies / target match = true");
+            ItemInfo otherA = PluginData.patchItem(recA, new java.util.ArrayList<String>(), otherSha);
+            ok(stat, L, "false".equals(otherA.extra.get("applies"))
+                            && "false".equals(otherA.extra.get("target.0.match")),
+                    "⑧ 给别的 APK 哈希 ⇒ applies = false（有分辨力）");
             // 实例键本身：版本 key + NUL + 槽，可来回拆（配置键 / 报告里都靠这对函数）
             ok(stat, L, IKEY.indexOf('\u0000') > 0
                             && Versions.instanceVkey(IKEY).equals(VKEY)
@@ -16759,6 +16989,11 @@ public final class SelfTest {
                             && PatchesActivity.stateOf(recA, apkSha, true) == PatchesActivity.STATE_ON
                             && PatchesActivity.stateOf(recA, otherSha, false) == PatchesActivity.STATE_NA,
                     "⑥ 状态判据：未启用 / 已启用 / 不适用（三条各对一次）");
+            // v38：文件缺了的记录仍要列出来（插件据此显示"坏了"，不是静默消失）
+            ItemInfo brokenD = patchItemOf(PluginData.patches(ctx), recD.ref());
+            ok(stat, L, brokenD != null && "false".equals(brokenD.extra.get("filesOk"))
+                            && "missing-files".equals(brokenD.error),
+                    "⑧ 缺文件的补丁仍列出（filesOk=false + error），不是静默消失");
             boolean reasonsOk = true;
             for (String code : PatchText.ALL_CODES) {
                 String s = PatchText.reason(ctx, code, "x");

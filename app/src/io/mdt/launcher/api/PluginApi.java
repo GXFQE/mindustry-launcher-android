@@ -58,7 +58,7 @@ public interface PluginApi {
      * <p>为什么要有这个常量：注释里的「当前 = N」运行期读不到，一个写 17、一个写 20 也没人发现；
      * 常量 + 断言才拦得住。</p>
      */
-    int DOC_VERSION = 37;
+    int DOC_VERSION = 38;
 
     // ══ 环境 ═══════════════════════════════════════════════════════════════
 
@@ -205,6 +205,67 @@ public interface PluginApi {
      * 空表 = 没有实例在跑。与文件读写无关：**读一律放行**。
      */
     List<String> runningSlots();
+
+    /**
+     * **v38**：当前装着的**全部插件**（含停用 / 待生效 / 已隔离），只读快照。
+     *
+     * <p>为什么要给：插件之间没法互相发现 —— {@link #versions()} 是**游戏版本**，不是插件。
+     * 有了它，"检测某台插件在不在、版本够不够、是不是内置"就不用反射或读文件（那些不是契约，
+     * 宿主一改就断）。
+     *
+     * <p>每一条是 {@link ItemInfo}（{@code kind == }{@link ItemInfo#KIND_PLUGIN}），事实在
+     * {@link ItemInfo#extra}：
+     * <ul>
+     *   <li>{@code id} / {@code name} / {@code state}（{@code active} / {@code pending} / {@code off}）；</li>
+     *   <li>{@code version}（这一行代表的那一份）/ {@code activeVersion} / {@code pendingVersion}；</li>
+     *   <li>{@code trust}（{@code builtin} / {@code official} / {@code third}）/ {@code level} /
+     *       {@code builtin} / {@code quarantined}；</li>
+     *   <li>自述：{@code selfVersion} / {@code author} / {@code description} / {@code entry} /
+     *       {@code access}，以及声明的能力条目 {@code extCount} + {@code ext.<i>.*}；</li>
+     *   <li>文件事实：{@code size} / {@code modified}。</li>
+     * </ul>
+     * 键的完整表在 {@code docs/PLUGIN-API.md} 第 4 节。**没装 APK / 只剩隔离件时**某些键不存在，
+     * 按"缺 = 拿不到"处理，别当空值。顺序 = 插件 id 字典序。
+     *
+     * <p>⚠️ 会读每个插件的 APK（自述 / 签名指纹）⇒ **别在主线程调**。
+     */
+    List<ItemInfo> plugins();
+
+    /**
+     * **v38**：已导入的**游戏补丁**（只读快照；**不判启用状态**）。
+     *
+     * <p>等价于 {@code patches(null, null)}。每一条是 {@link ItemInfo}
+     * （{@code kind == }{@link ItemInfo#KIND_PATCH}），事实在 {@link ItemInfo#extra}：
+     * {@code id} / {@code version} / {@code ref}（{@code id@version}）/ {@code name} /
+     * {@code author} / {@code note} / {@code tool} / {@code filesOk} / {@code bytes} /
+     * {@code targetCount}，以及每个 target 的 {@code target.<i>.sha256} / {@code .gameVersion} /
+     * {@code .classes} / {@code .assets} / {@code .dexBytes} / {@code .assetsBytes}
+     * （给了版本 key 时再加 {@code .match}）。
+     *
+     * <p>要说清的是：补丁只对**某份 APK**（按 sha256）生效，"这个补丁对当前版本算不算适用"
+     * 需要启动项（版本 key + 槽）当上下文 —— 用下面的重载。
+     */
+    default List<ItemInfo> patches() {
+        return patches(null, null);
+    }
+
+    /**
+     * **v38**：同上，但**启用状态**按某个启动项（版本 key + 槽）算。
+     *
+     * @param versionKey 版本 key（{@link #versions()} 里 {@code extra["key"]}）；
+     *                   {@code null} / 空 ⇒ **不判启动项**（不写 {@code enabled} / {@code applies} 键）
+     * @param slot 槽名；{@code null} / 空 = 当前槽（{@link #slot()}）
+     *
+     * <p>与无参版的差异只在两个键：
+     * <ul>
+     *   <li>{@code enabled}（{@code true} / {@code false}）= 这个启动项**现在启用**着它；</li>
+     *   <li>{@code applies}（{@code true} / {@code false}）= 它的某个 target 匹配**这个版本 APK**；
+     *       版本找不到 / APK 读不出来 ⇒ **不放这个键**（别当 {@code false}）。</li>
+     * </ul>
+     *
+     * <p>⚠️ 会算一次版本 APK 的 sha256（几十 MB）⇒ **别在主线程调**，结果自己缓存。
+     */
+    List<ItemInfo> patches(String versionKey, String slot);
 
     /**
      * 插件自己的**数据目录**（`<hub>/usage/`）—— **宿主只给目录，不写任何流水、不解析账本**。

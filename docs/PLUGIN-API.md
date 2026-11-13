@@ -5,7 +5,7 @@
 
 ## 1. 版本与兼容（v20 冻结基线）
 
-- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..37**。
+- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..38**。
   （v20 是冻结基线；v21 = 游戏设置面；v22 = 后台任务 + 游戏事件；v23 = 探针；v24 = 分析器；
   v25 = 结论挂行 + 筛选/排序注入 + HJSON；v26 = 逐项判定；v27 = 详情页的门 + 槽级结论进摘要卡；
   v28 = 原版文案键；v29 = 游戏前后台事件；v30 = 探针知道版本 / 跨会话数据目录 + 摘要卡总时长；
@@ -21,7 +21,11 @@
   （升序、去重）；几个选项之间是"且"还是"或"由插件自己定；**
   **v37 = 多实例感知**：`boolean gameRunning(String slot)`（null / 空 = 当前槽）+
   `List<String> runningSlots()` —— 能精确回答"**这个槽**在不在跑"；老的 `gameRunning()` 保持
-  全局语义不变（兼容）。判据与宿主写门禁同一份（`WriteGate`），只表示调用那一刻的快照。**）
+  全局语义不变（兼容）。判据与宿主写门禁同一份（`WriteGate`），只表示调用那一刻的快照。**
+  **v38 = 插件与补丁清单**：`List<ItemInfo> plugins()`（装着哪些插件）+ `List<ItemInfo> patches()`
+  / `patches(versionKey, slot)`（已导入的游戏补丁；给了启动项才判 `enabled` / `applies`）。
+  数据仍走 `ItemInfo` 快照（与 `versions()` / `logs()` / `trash()` 同一套），新增两个 kind；
+  补丁的匹配键仍是**目标 APK 的 sha256**，不是版本号区间。**）
 - 插件 `api()` 报的是「我需要的最低宿主接口版本」。用不到的新能力**不要**报高 ——
   报高了只会在老宿主上被拒，换不来任何东西。
 - **不要用 try/catch 去兼容老宿主**：报什么版本就只会跑在什么版本上。`api()` 报 20，
@@ -81,7 +85,7 @@
 ## 3. 入口类约定
 
 ```java
-public static int api();                        // 必需：你需要的接口版本（当前 37；用不到新能力就报 20）
+public static int api();                        // 必需：你需要的接口版本（当前 38；用不到新能力就报 20）
 public static View createView(PluginApi api);   // content / section 用
 public static void run(PluginApi api);          // action 用（在原页跑，不换页）
 public static void unload();                    // 可选：收尾（也认 unload(Context)）
@@ -101,7 +105,7 @@ public static void unload();                    // 可选：收尾（也认 unlo
 
 | 方法 | 说明 |
 |---|---|
-| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 37） |
+| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 38） |
 | `context()` | 插件上下文（**只用来取资源 / 主题 / 建 View**） |
 | `page()` / `slot()` | 从哪一页来 / 当前槽名 |
 | `theme()` | 主题色与 dp/sp（别自己写死颜色，见 `PluginTheme`） |
@@ -120,6 +124,8 @@ public static void unload();                    // 可选：收尾（也认 unlo
 | `gameRunning(slot)`（v37） | **这个槽**有没有游戏实例在跑（null / 空 = 当前槽）；判据与宿主写门禁同一份，只表示调用那一刻的快照 |
 | `runningSlots()`（v37） | 现在哪些槽上有实例在跑（快照；按启动顺序去重；空表 = 没有） |
 | `baseBundleKeys()`（v28） | 目标版本**基础语言包**的键集合（判"是不是原版文案"用；空集 = 读不到，不是"没有"） |
+| `plugins()`（v38） | 装着哪些插件（含停用 / 待生效 / 已隔离）—— id / 名字 / 状态 / 来源 / 版本 / 自述字段 / 声明的能力条目，见下文「插件与补丁清单」 |
+| `patches()` / `patches(versionKey, slot)`（v38） | 已导入的游戏补丁；给了启动项才判 `enabled` / `applies`，见下文 |
 | `usageDir()` | 插件数据目录（见第 9 节） |
 | `crashReportsDir()`（v22） | 当前槽的崩溃报告目录（只读；可能不存在） |
 
@@ -391,6 +397,70 @@ Set<String> keys = api.baseBundleKeys();   // 目标版本 assets/bundles/bundle
 - 第一次调用会打开版本 APK 读一份文本，之后按 APK 路径 + mtime 缓存（插件页每次重扫都会问）。
 - 同一份键集还能推出**原版内容名**（`block.<name>.name` → block / 名字）：用来判"两个模组是不是都在给
   同一个原版内容改数值"（模组 `content/<类型>/**.json` **不带 `type`** 就是给同名原版内容打补丁）。
+
+### 插件与补丁清单（v38）
+
+> 2026-11-13 第 372 轮（用户：「先给插件加个可以读取当前所有插件及其基本信息的接口，还有读取游戏补丁的接口」）。
+> 目的：插件能**互相发现**、能看见"这台机器装了哪些插件 / 导入了哪些游戏补丁"，不用反射或读文件
+> （那些不是契约，宿主一改就断）。
+
+```java
+List<ItemInfo> plugins();                                  // 全部插件（含停用 / 待生效 / 已隔离）
+List<ItemInfo> patches();                                  // 全部已导入补丁（不判启用状态）
+List<ItemInfo> patches(String versionKey, String slot);    // 同上 + enabled / applies（按某个启动项）
+```
+
+两者都是 **`ItemInfo` 快照**（与 `versions()` / `logs()` / `trash()` 同一套；**不可 `open`**，
+`path` 为 null、`readable` 为 false —— 要的是元信息，不是字节）。事实全在 `extra` 里，
+**表里没有的键 = 拿不到**（别当空 / 当 false）。
+
+`plugins()`：`kind == ItemInfo.KIND_PLUGIN`（`"plugin"`），顺序 = 插件 id 字典序。
+
+| `extra` 键 | 说明 |
+|---|---|
+| `id` / `name` | 插件 id（安装目录名）/ 显示名（自述 name，缺 = id） |
+| `state` | `active`（这一程生效中）/ `pending`（待重启生效）/ `off`（没启用） |
+| `version` | **这一行代表的那一份**：待生效 > 生效 > 最新装的那份；只剩隔离件时没有这个键 |
+| `activeVersion` / `pendingVersion` | 生效中 / 待重启生效的版本令牌；没有就不放这个键 |
+| `builtin` / `trust` / `level` | 是否内置（随本体发的那份）/ `builtin`·`official`·`third` / 安全阀等级 `L1`·`L2`·`L3` |
+| `quarantined` | 手上还有被隔离的那一份（`off` 时界面上显示"已隔离"） |
+| `selfVersion` | 自述里的 `version`（作者自己写的版本号，**不是**上面那个令牌） |
+| `author` / `description` / `entry` | 自述字段 / 入口类名（注入点） |
+| `access` | 自述里声明的用途（逗号分隔；**没声明 = 空串**） |
+| `extCount` + `ext.<i>.id/title/subtitle/slot/page/event` | 声明的能力条目（`extensions`；与插件页那几行同一个来源） |
+| `size` / `modified` | 这一份 APK 的字节数 / 最后修改时间（毫秒）；没有 APK 时为 0 |
+
+- `ItemInfo` 的固定字段：`kind = KIND_PLUGIN`、`title = 显示名`、`subtitle = id`、`source = "plugins"`、
+  `path = null`、`readable = false`；
+- ⚠️ 没有 APK 的条目（只剩隔离件 / 登记指向的文件被删）**没有** `version` / `activeVersion`(若登记里也没有) /
+  `entry` / `selfVersion` / `author` / `description` / `access` / `extCount` / `ext.*` 这些键 ——
+  "没读到"和"声明为空"是两件事，别混；
+- ⚠️ `name` / `author` 这些是**插件自己写的**外部数据，别直接当可信 UI 文案（照常做长度/清洗）；
+- ⚠️ 会读每个插件的 APK（自述 / 签名指纹）⇒ **放后台线程**；
+- 想"只列当前生效的"就自己按 `state == "active"` 过滤 —— 宿主给的是**全部**（这正是"所有插件"）。
+
+`patches()`：`kind == ItemInfo.KIND_PATCH`（`"patch"`），顺序 = 补丁 id、版本字典序。
+补丁只对**某份 APK**（按 sha256）生效 ⇒ "适用不适用"是相对某个版本说的，那一份上下文由
+`patches(versionKey, slot)` 的 `versionKey`（`versions()` 里 `extra["key"]`）给出；`slot` 空 = 当前槽。
+
+| `extra` 键 | 说明 |
+|---|---|
+| `id` / `version` / `ref` | 补丁 id / 补丁版本 / `id@version`（启用表里存的就是它） |
+| `name` / `author` / `note` / `tool` | 清单里的显示名 / 作者 / 说明 / 生成工具（空的不放） |
+| `filesOk` | dex / 素材文件齐全吗（缺了仍列出来，让插件能显示"坏了"） |
+| `bytes` | dex + 素材的实际字节数 |
+| `targetCount` + `target.<i>.*` | 每个 target：`sha256`（目标 APK 哈希）、`gameVersion`、`classes`（dex 里的类数）、`assets`（素材条目数）、`dexBytes` / `assetsBytes`、`match`（见下） |
+| `enabled` | **只在给了 `versionKey` 时出现**：这个启动项现在启用了它吗 |
+| `applies` | **只在给了 `versionKey` 且那个版本的 APK 读得到时出现**：某个 target 匹配这个版本吗；读不到 ⇒ 不放（别当 false） |
+
+- `ItemInfo` 的固定字段：`kind = KIND_PATCH`、`title = 补丁名`、`subtitle = ref`、`size = bytes`、
+  `modified = 导入时间`（清单文件的 mtime）、`source = "patches"`、`path = null`、`readable = false`；
+- 文件缺了的记录**仍会列出来**：`extra["filesOk"] = "false"`、`ItemInfo.error = "missing-files"`；
+- `target.i.match` 也只在 APK 哈希算得出来时出现（`true` / `false`）；
+- `classes` / `assets` 读不出来时**不放这个键**（不是 0）；target 没声明素材包时 `assets = 0` 是事实；
+- ⚠️ `patches(versionKey, slot)` 会算一次版本 APK 的 sha256（几十 MB）⇒ **放后台线程**，结果自己缓存；
+- 补丁的启用状态**按启动项存**（版本 key + 槽，第 353 轮）⇒ 同一个补丁在两个槽上可以一开一关；
+- 补丁能不能用是**精确到 APK 哈希**的（见 `PatchManifest`）；用 `applies` 判断，别自己比版本号。
 
 ### 筛选 / 排序注入（v25）
 
@@ -746,6 +816,11 @@ v36（2026-10-29 第 295 轮）：选项可以多选 —— `multi(PluginApi)` +
 v37（2026-11-12 第 363 轮）：多实例感知 —— `gameRunning(String slot)`（null / 空 = 当前槽）+
 `runningSlots()`；老的 `gameRunning()` 保持全局语义（兼容，不改）。判据与宿主写门禁同一份
 （第 359/362 轮的 `WriteGate` + `Instances`），只表示调用那一刻的快照；`API_MIN` 仍不动（区间 20..37）。
+v38（2026-11-13 第 372 轮）：**插件与补丁清单** —— `plugins()`（装着哪些插件：id / 名字 / 状态 /
+来源 / 版本 / 自述字段 / 声明的能力条目）+ `patches()` / `patches(versionKey, slot)`（已导入的
+游戏补丁；给了启动项才判 `enabled` / `applies`）。两者沿用 `ItemInfo` 快照（新增
+`KIND_PLUGIN` / `KIND_PATCH`），读不到的量**不放键**而不是给默认值；补丁匹配仍是目标 APK 的
+sha256。`API_MIN` 仍不动（区间 20..38）。
 
 **官方体检插件**：`plugins/mods-health`（第 229 轮，前身叫 `conflict`）。宿主原来的那行
 「查模组冲突」整块删掉，判据搬进插件的 `core/Conflicts.java` 与 `core/Gates.java`；

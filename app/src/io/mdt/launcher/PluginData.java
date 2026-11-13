@@ -277,6 +277,238 @@ final class PluginData {
         return out;
     }
 
+    // ---- 插件与补丁清单（v38，第 372 轮）---------------------------------------
+
+    /**
+     * **v38**：装着哪些插件（{@code PluginApi.plugins()} 的唯一实现）。
+     *
+     * <p>为什么要宿主给：插件之间没有共享表，而"装了谁 / 谁是内置 / 这一程谁生效"这些事实只有
+     * {@link Plugins} 的登记表知道 —— 插件自己反射或读文件都不是契约，宿主一改就断。
+     *
+     * <p>包含**停用 / 待生效 / 已隔离**的（"所有插件"），状态在 {@code extra["state"]}。
+     * 一台插件坏了只跳过它自己（与 {@link #contents} 同一条兜底）。
+     */
+    static List<ItemInfo> plugins(Context ctx) {
+        List<ItemInfo> out = new ArrayList<ItemInfo>();
+        if (ctx == null) return out;
+        List<String> ids;
+        try {
+            ids = Plugins.installedIds(ctx);
+        } catch (Throwable t) {
+            return out;
+        }
+        String active = Plugins.active(ctx);
+        String pending = Plugins.pending(ctx);
+        String levels = Plugins.levels(ctx);
+        for (String id : ids) {
+            try {
+                out.add(pluginItem(ctx, id, active, pending, levels));
+            } catch (Throwable ignored) {
+                // 一台坏了不影响别的
+            }
+        }
+        return out;
+    }
+
+    /**
+     * 一台插件 ⇒ {@link ItemInfo}。
+     *
+     * <p>登记文本由调用方给（{@link #plugins(Context)} 读真文件，自检直接喂字符串）：
+     * **组装只有这一份**，状态 / 来源 / 等级全部走 {@link Plugins} 与 {@link PluginTrust}
+     * 的现成纯函数（与插件页同一批判据）。
+     */
+    static ItemInfo pluginItem(Context ctx, String id, String activeText, String pendingText,
+                               String levelsText) {
+        String[] row = Plugins.rowState(activeText, pendingText, id);
+        String state = row[0];
+        String ver = row[1];
+        String actVer = Plugins.stateGet(activeText, id);
+        String pendVer = Plugins.stateGet(pendingText, id);
+        String[] installed = Plugins.versionsOf(ctx, id);
+        // "这一行在说哪一份"：待生效 > 生效 > 最新装的那份（与插件页 rebuild() 同一规则）
+        String probeVer = ver.isEmpty()
+                ? (installed.length == 0 ? null : installed[installed.length - 1]) : ver;
+        File apk = probeVer == null ? null : Plugins.apkOf(ctx, id, probeVer);
+        PluginMeta.Info meta = apk == null ? null : PluginMeta.read(ctx, apk);
+        String trust = probeVer == null ? PluginTrust.THIRD : Plugins.trustOf(ctx, id, probeVer);
+        String level = Plugins.levelOf(levelsText, trust, id);
+        String[] quar = Plugins.quarantinedOf(ctx, id);
+        boolean hasApk = apk != null && apk.isFile();
+        String name = Plugins.displayName(meta == null ? null : meta.name, id);
+        Map<String, String> ex = new LinkedHashMap<String, String>();
+        ex.put("id", id);
+        ex.put("name", name);
+        ex.put("state", state);
+        put(ex, "version", probeVer);
+        put(ex, "activeVersion", actVer);
+        put(ex, "pendingVersion", pendVer);
+        ex.put("builtin", String.valueOf(PluginTrust.BUILTIN.equals(trust)));
+        ex.put("trust", trust);
+        ex.put("level", level);
+        ex.put("quarantined", String.valueOf(quar.length > 0));
+        ex.put("size", String.valueOf(hasApk ? apk.length() : 0L));
+        ex.put("modified", String.valueOf(hasApk ? apk.lastModified() : 0L));
+        if (meta != null) {
+            put(ex, "selfVersion", meta.version);
+            put(ex, "author", meta.author);
+            put(ex, "description", meta.description);
+            ex.put("entry", meta.entryOr(PluginHost.DEFAULT_ENTRY));
+        }
+        if (hasApk) {
+            // access 与 extensions 都在插件自述里：**没声明 = 空串 / 0 条**，不是"读不出来"
+            List<String> access = PluginMeta.accessOf(apk);
+            String joined = join(access);
+            ex.put("access", joined == null ? "" : joined);
+            List<Extensions.Item> exts = Extensions.of(apk);
+            ex.put("extCount", String.valueOf(exts.size()));
+            for (int i = 0; i < exts.size(); i++) {
+                Extensions.Item e = exts.get(i);
+                String p = "ext." + i + ".";
+                ex.put(p + "id", e.id);
+                ex.put(p + "title", e.label());
+                put(ex, p + "subtitle", e.subtitle);
+                ex.put(p + "slot", e.slot);
+                put(ex, p + "page", e.page);
+                put(ex, p + "event", e.event);
+            }
+        }
+        // 没有 APK（只剩隔离件 / 登记指向的文件被删）⇒ access / extCount / entry 这些键**不出现**：
+        // 对插件来说"没读到"和"声明为空"必须分得开（页面上"没声明"那句是界面文案，不是数据）。
+        return new ItemInfo(ItemInfo.KIND_PLUGIN, name, id, null, null, null,
+                hasApk ? apk.length() : 0L, hasApk ? apk.lastModified() : 0L,
+                "plugins", null, false, false, ex);
+    }
+
+    /** **v38**：已导入的游戏补丁（{@code PluginApi.patches()} 的唯一实现；不判启用状态）。 */
+    static List<ItemInfo> patches(Context ctx) {
+        return patches(ctx, null, null);
+    }
+
+    /**
+     * **v38**：已导入的游戏补丁；给了启动项（版本 key + 槽）才判 {@code enabled} / {@code applies}。
+     *
+     * <p>补丁的匹配键是**目标 APK 的 sha256**（不是版本号区间，见 {@link PatchManifest}）⇒
+     * "这个补丁适用不适用"天然是相对某个版本说的 —— 那一份上下文只能由调用方给。
+     *
+     * @param versionKey 版本 key（{@code PluginApi.versions()} 的 {@code extra["key"]}）；
+     *                   null / 空 ⇒ 不判启动项（不写 enabled / applies）
+     * @param slot       槽名；null / 空 = 当前槽
+     */
+    static List<ItemInfo> patches(Context ctx, String versionKey, String slot) {
+        List<ItemInfo> out = new ArrayList<ItemInfo>();
+        if (ctx == null) return out;
+        String vk = versionKey == null ? "" : versionKey.trim();
+        List<String> enabled = null;
+        String apkSha = "";
+        if (!vk.isEmpty()) {
+            String s = slot == null || slot.trim().isEmpty() ? Data.currentSlot(ctx) : slot.trim();
+            try {
+                enabled = Patches.enabledRefs(ctx, Versions.instanceKey(vk, s));
+            } catch (Throwable t) {
+                enabled = new ArrayList<String>();
+            }
+            apkSha = apkShaOfVersion(ctx, vk);
+        }
+        try {
+            for (Patches.Record r : Patches.scan(ctx)) {
+                try {
+                    out.add(patchItem(r, enabled, apkSha));
+                } catch (Throwable ignored) {
+                    // 一条记录坏了不影响别的
+                }
+            }
+        } catch (Throwable ignored) {
+            // 补丁库整个读不出来 ⇒ 空表（插件别据此删东西）
+        }
+        return out;
+    }
+
+    /** 版本 key ⇒ 它那份 APK 的 sha256（找不到 / 读不出来 ⇒ 空串）。 */
+    static String apkShaOfVersion(Context ctx, String versionKey) {
+        if (ctx == null || versionKey == null || versionKey.trim().isEmpty()) return "";
+        String vk = versionKey.trim();
+        try {
+            for (Versions.Entry e : Versions.scanAll(ctx)) {
+                if (e == null || e.apkPath == null || e.apkPath.isEmpty()) continue;
+                if (!vk.equals(e.key())) continue;
+                File apk = new File(e.apkPath);
+                if (!apk.isFile()) continue;
+                return Patches.sha256Of(apk);
+            }
+        } catch (Throwable ignored) {
+            // 版本扫描坏了 / 哈希算不出来 ⇒ 当"判不了适用性"
+        }
+        return "";
+    }
+
+    /**
+     * 一条补丁记录 ⇒ {@link ItemInfo}（**纯组装**：启用列表与 APK 哈希由调用方给，自检直接喂）。
+     *
+     * <p>每个 target 的事实写成 {@code target.<i>.*}（与模组依赖的 {@code dep.<i>} 同一套扁平写法）；
+     * 读不出来的量**不放这个键**，别让插件把"读不出来"当成 0。
+     */
+    static ItemInfo patchItem(Patches.Record r, List<String> enabledRefs, String apkSha) {
+        PatchManifest m = r.manifest;
+        Map<String, String> ex = new LinkedHashMap<String, String>();
+        ex.put("id", m.id);
+        ex.put("version", m.version);
+        ex.put("ref", r.ref());
+        ex.put("name", m.name);
+        put(ex, "author", m.author);
+        put(ex, "note", m.note);
+        put(ex, "tool", m.tool);
+        ex.put("filesOk", String.valueOf(r.filesOk));
+        ex.put("targetCount", String.valueOf(m.targets.size()));
+        boolean hasSha = apkSha != null && !apkSha.isEmpty();
+        boolean applies = false;
+        long bytes = 0L;
+        for (int i = 0; i < r.targets.size(); i++) {
+            Patches.TargetFile t = r.targets.get(i);
+            PatchManifest.Target spec = t.spec;
+            String p = "target." + i + ".";
+            ex.put(p + "sha256", spec.apkSha256);
+            put(ex, p + "gameVersion", spec.gameVersion);
+            File dex = t.dexFile();
+            File as = t.assetsFile();
+            boolean dexOk = dex != null && dex.isFile() && dex.length() > 0;
+            boolean asOk = as != null && as.isFile();
+            long dexBytes = dexOk ? dex.length() : 0L;
+            long asBytes = asOk ? as.length() : 0L;
+            bytes += dexBytes + asBytes;
+            ex.put(p + "dexBytes", String.valueOf(dexBytes));
+            ex.put(p + "assetsBytes", String.valueOf(asBytes));
+            if (dexOk) {
+                try {
+                    ex.put(p + "classes", String.valueOf(t.classCount()));
+                } catch (Throwable ignored) {
+                    // dex 坏了 / 读不出来 ⇒ 不放这个键（别当 0）
+                }
+            }
+            if (!spec.hasAssets()) {
+                ex.put(p + "assets", "0");      // 没声明素材包 = **事实**，不是"读不出来"
+            } else if (asOk) {
+                try {
+                    ex.put(p + "assets", String.valueOf(t.assetKeys().size()));
+                } catch (Throwable ignored) {
+                }
+            }
+            if (hasSha) {
+                boolean match = spec.apkSha256.equalsIgnoreCase(apkSha);
+                ex.put(p + "match", String.valueOf(match));
+                if (match) applies = true;
+            }
+        }
+        ex.put("bytes", String.valueOf(bytes));
+        if (enabledRefs != null) {
+            ex.put("enabled", String.valueOf(enabledRefs.contains(r.ref())));
+            if (hasSha) ex.put("applies", String.valueOf(applies));
+        }
+        File mf = new File(r.dir, PatchManifest.FILE);
+        long importedAt = mf.lastModified();
+        return new ItemInfo(ItemInfo.KIND_PATCH, m.name, r.ref(), null, null, null, bytes,
+                importedAt, "patches", r.filesOk ? null : "missing-files", false, false, ex);
+    }
+
     private static List<ItemInfo> settingItems(Context ctx) {
         List<ItemInfo> out = new ArrayList<ItemInfo>();
         for (Map.Entry<String, String> e : settings(ctx).entrySet()) {

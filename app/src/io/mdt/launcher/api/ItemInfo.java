@@ -36,6 +36,22 @@ public final class ItemInfo {
     /** 第 162 轮：设置项（它不是文件，path 为 null，值在 subtitle / extra）。 */
     public static final String KIND_SETTING = "setting";
 
+    /**
+     * **v38**：一台已安装插件的快照（{@link PluginApi#plugins()}）。
+     *
+     * <p>它**不是内容**：没有可打开的字节流（{@code path} 为 null、{@code readable} 为 false），
+     * 事实全在 {@link #extra} 里（id / state / trust / level / 自述字段…）。
+     */
+    public static final String KIND_PLUGIN = "plugin";
+
+    /**
+     * **v38**：一份已导入游戏补丁的快照（{@link PluginApi#patches()}）。
+     *
+     * <p>同样不可 open（补丁住在宿主内部存储；插件要的是元信息，不是字节）。每个 target 的
+     * 哈希 / 类数 / 素材数在 {@link #extra} 的 {@code target.<i>.*} 键里。
+     */
+    public static final String KIND_PATCH = "patch";
+
     /** 内容类别：{@code saves} / {@code maps} / {@code mods} / {@code blueprints} / {@code slot}。 */
     public final String kind;
 

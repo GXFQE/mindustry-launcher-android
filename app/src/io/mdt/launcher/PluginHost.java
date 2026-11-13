@@ -105,8 +105,14 @@ public final class PluginHost {
      * `runningSlots()`：能精确回答"**这个槽**在不在跑"；老的 `gameRunning()` 保持全局语义
      * （兼容，不动）。宿主写门禁从第 359/362 轮起就按运行实例判，这两个方法只是把同一份
      * 判据（`WriteGate`）暴露给插件。
+     *
+     * <p>v38（2026-11-13 第 372 轮）：**插件与补丁清单** —— `plugins()`（装着哪些插件：
+     * id / 名字 / 是否生效 / 来源 / 版本 / 自述字段 / 声明的能力条目）+ `patches()` /
+     * `patches(versionKey, slot)`（已导入的游戏补丁；给了启动项才判 enabled / applies）。
+     * 数据仍走 {@link ItemInfo} 快照（与 versions / logs / trash 同一套），新增两个 kind。
+     * 补丁的匹配键仍是 APK sha256（见 {@code PatchManifest} 类注释），不是版本号区间。
      */
-    public static final int API = 37;
+    public static final int API = 38;
     /**
      * 还认的**最老**契约版本。
      *
@@ -670,6 +676,18 @@ public final class PluginHost {
                 if (!out.contains(r.slot)) out.add(r.slot);
             }
             return out;
+        }
+
+        // ---- v38（第 372 轮）：插件清单 / 游戏补丁 ------------------------------
+
+        /** v38：装着哪些插件（含停用 / 待生效 / 已隔离；事实在 {@link ItemInfo#extra}）。 */
+        @Override public java.util.List<ItemInfo> plugins() {
+            return PluginData.plugins(getBaseContext());
+        }
+
+        /** v38：已导入的游戏补丁；给了启动项才判 enabled / applies。 */
+        @Override public java.util.List<ItemInfo> patches(String versionKey, String slot) {
+            return PluginData.patches(getBaseContext(), versionKey, slot);
         }
 
         /** ★ 第 271 轮：插件要的确认框也走 `CardStack`（插件页里的二次确认不再换窗）。 */

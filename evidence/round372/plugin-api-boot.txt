@@ -1,0 +1,1 @@
+- v38probe=1 file=1.apk entry=v38probe.V38Probe INJECTED elems=6 [makeDexElements(4 args) -> 1 elements, suppressed=0] entry=OK api=38
