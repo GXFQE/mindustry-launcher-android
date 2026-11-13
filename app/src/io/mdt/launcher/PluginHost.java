@@ -142,6 +142,35 @@ public final class PluginHost {
     public static final int API_MIN = 20;
 
     /**
+     * v40：**同一页当前开着的插件卡片**（Activity → CardStack）。
+     *
+     * <p>插件两次 `showCard` 若不收旧的，就会叠两个对话框（正是这轮要消灭的割裂）。
+     * 关掉旧卡时它自己的 onDismiss 会给旧回调 -1（符合契约）。WeakHashMap：页面销毁不拖住。
+     */
+    private static final java.util.Map<Activity, CardStack> sCards =
+            new java.util.WeakHashMap<Activity, CardStack>();
+
+    /**
+     * **v40**：`showCard` 的按钮归一化（纯函数；自检直接钉）。
+     *
+     * <p>规则：null / 空串跳过、最多 3 个；返回的是**按钮在入参数组里的下标**（回调给插件看到的
+     * 就是原数组下标，不是"第几个有效按钮"）。
+     */
+    static int[] cardButtonIndices(String[] buttons) {
+        if (buttons == null || buttons.length == 0) return new int[0];
+        int cap = Math.min(3, buttons.length);
+        int[] tmp = new int[cap];
+        int n = 0;
+        for (int i = 0; i < buttons.length && n < cap; i++) {
+            String s = buttons[i] == null ? "" : buttons[i].trim();
+            if (!s.isEmpty()) tmp[n++] = i;
+        }
+        int[] out = new int[n];
+        System.arraycopy(tmp, 0, out, 0, n);
+        return out;
+    }
+
+    /**
      * **默认**插件入口类（只在字符串里出现 —— 壳的源码不编译期依赖插件）。
      *
      * <p>🔴 第 134 轮真机定案：入口类**必须一插件一份**，因为宿主 CL 对每个类名只定义一次 ——
@@ -1066,45 +1095,73 @@ public final class PluginHost {
                                        final Card callback) {
             final Activity a = activityOrNull();
             if (a == null || a.isFinishing()) {
-                if (callback != null) callback.onCard(-1);
+                postMain(new Runnable() {
+                    @Override public void run() {
+                        if (callback != null) callback.onCard(-1);
+                    }
+                });
                 return;
             }
             a.runOnUiThread(new Runnable() {
                 @Override public void run() {
+                    if (a.isFinishing() || a.isDestroyed()) {
+                        if (callback != null) callback.onCard(-1);
+                        return;
+                    }
                     final boolean[] picked = {false};
                     final CardStack[] ref = new CardStack[1];
-                    java.util.List<CardStack.Btn> bs = new java.util.ArrayList<CardStack.Btn>();
-                    if (buttons != null) {
-                        for (int i = 0; i < buttons.length && bs.size() < 3; i++) {
-                            String lb = buttons[i] == null ? "" : buttons[i].trim();
-                            if (lb.isEmpty()) continue;          // 空文案 = 没有这个按钮
-                            final int idx = i;
-                            bs.add(new CardStack.Btn(lb, new Runnable() {
+                    try {
+                        int[] idx = cardButtonIndices(buttons);
+                        CardStack.Btn[] bs = new CardStack.Btn[idx.length];
+                        for (int k = 0; k < idx.length; k++) {
+                            final int which = idx[k];
+                            bs[k] = new CardStack.Btn(buttons[which].trim(), new Runnable() {
                                 @Override public void run() {
+                                    if (picked[0]) return;          // 连点两个按钮也只回一次
                                     picked[0] = true;
                                     if (ref[0] != null) ref[0].dismiss();
-                                    if (callback != null) callback.onCard(idx);
+                                    if (callback != null) callback.onCard(which);
                                 }
-                            }));
+                            });
                         }
-                    }
-                    if (bs.isEmpty()) {
-                        bs.add(new CardStack.Btn(Trans.get(a, R.string.close), new Runnable() {
+                        if (bs.length == 0) {
+                            // 没有按钮 ⇒ 只给「关闭」（点它也算"关掉卡片" ⇒ -1）
+                            bs = new CardStack.Btn[] {new CardStack.Btn(
+                                    Trans.get(a, R.string.close), new Runnable() {
+                                @Override public void run() {
+                                    if (ref[0] != null) ref[0].dismiss();
+                                }
+                            })};
+                        }
+                        CardStack s = new CardStack(a);
+                        s.root(title == null ? "" : title,
+                                CardStack.text(a, body == null ? "" : body), bs);
+                        s.setOnDismiss(new Runnable() {
                             @Override public void run() {
-                                if (ref[0] != null) ref[0].dismiss();
+                                synchronized (sCards) {
+                                    if (ref[0] != null && sCards.get(a) == ref[0]) {
+                                        sCards.remove(a);
+                                    }
+                                }
+                                if (!picked[0] && callback != null) callback.onCard(-1);
                             }
-                        }));
-                    }
-                    ref[0] = new CardStack(a);
-                    ref[0].root(title == null ? "" : title,
-                            CardStack.text(a, body == null ? "" : body),
-                            bs.toArray(new CardStack.Btn[0]));
-                    ref[0].setOnDismiss(new Runnable() {
-                        @Override public void run() {
-                            if (!picked[0] && callback != null) callback.onCard(-1);
+                        });
+                        ref[0] = s;
+                        // 同一页已经有插件卡片开着 ⇒ 先收掉旧的（同窗只留一张，别叠两个对话框）
+                        synchronized (sCards) {
+                            CardStack old = sCards.get(a);
+                            if (old != null && old != s) {
+                                try { old.dismiss(); } catch (Throwable ignored) { }
+                            }
+                            sCards.put(a, s);
                         }
-                    });
-                    ref[0].show();
+                        s.show();
+                    } catch (Throwable t) {
+                        // Activity 在 post 之后被销毁（转屏 / 系统回收）⇒ BadTokenException；
+                        // 与 confirm/prompt 同一条：只当"卡没弹出来"，回调 -1，绝不崩宿主。
+                        android.util.Log.w("MDTLauncher", "showCard failed: " + t);
+                        if (callback != null) callback.onCard(-1);
+                    }
                 }
             });
         }

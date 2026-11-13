@@ -129,16 +129,15 @@ final class PluginData {
             return one(ctx, selected, ItemInfo.KIND_MAPS);
         }
         if ("blueprint-detail".equals(page)) return one(ctx, selected, ItemInfo.KIND_BLUEPRINTS);
-        if (Extensions.PAGE_VERSION.equals(page)) {
-            // v40：版本页把"这一份"也放进 pageItems（插件的 section 常常只有 api 没有 item）
+        if (Extensions.PAGE_VERSION.equals(page) || Extensions.PAGE_RESOURCES.equals(page)) {
+            // v40：版本页 / 资源页把"这一份"放进 pageItems（插件的 section 常常只有 api 没有 item）。
+            // 评审 B2/M4：这里必须按 **APK 路径反查**、只组装这一条（不要扫全部版本 + 补丁库 + 备份）。
             if (selected != null) {
-                String ap = selected.getAbsolutePath();
-                for (ItemInfo it : versions(ctx)) {
-                    if (it != null && ap.equals(it.path)) {
-                        List<ItemInfo> hit = new ArrayList<ItemInfo>();
-                        hit.add(it);
-                        return hit;
-                    }
+                ItemInfo one = versionItemByApk(ctx, selected);
+                if (one != null) {
+                    List<ItemInfo> hit = new ArrayList<ItemInfo>();
+                    hit.add(one);
+                    return hit;
                 }
             }
             return new ArrayList<ItemInfo>();
@@ -375,48 +374,110 @@ final class PluginData {
         Map<String, Integer> backupCounts = new LinkedHashMap<String, Integer>();
         for (Versions.Entry e : entries) {
             if (e == null) continue;
-            File apk = e.apkPath == null || e.apkPath.isEmpty() ? null : new File(e.apkPath);
-            String rowSlot = Versions.slotFor(e);
-            String ikey = Versions.instanceKey(e.key(), rowSlot);
-            Map<String, String> ex = new LinkedHashMap<String, String>();
-            put(ex, "pkg", e.pkg);
-            put(ex, "realPkg", e.realPkg);
-            put(ex, "versionName", e.versionName);
-            // v30：版本 key（已装 = 包名 / 导入 = import:文件名）—— 与 ProbeEnv.version() 同一个值，
-            //       插件按它把探针记的数字挂到版本上。
-            put(ex, "key", e.key());
-            put(ex, "displayVersion", e.displayVersion());
-            put(ex, "imported", String.valueOf(e.imported));
-            put(ex, "importFile", e.importFile);
-            put(ex, "md5", e.md5);
-            put(ex, "customName", e.customName);
-            put(ex, "upstreamVersion", e.upstreamVersion);
-            put(ex, "slot", rowSlot);
-            // v39：启动项身份 —— 插件别自己拼 `key + NUL + slot`（那是宿主内部格式）
-            put(ex, "instanceKey", ikey);
-            ex.put("bound", e.boundSlot != null && !e.boundSlot.isEmpty() ? "true" : "false");
-            if (patchCounts != null) {
-                Integer n = patchCounts.get(ikey);
-                ex.put("patchCount", String.valueOf(n == null ? 0 : n.intValue()));
+            try {
+                out.add(versionItem(ctx, e, patchCounts, backupCounts));
+            } catch (Throwable ignored) {
+                // 一行坏了不影响别的
             }
-            File bdir = Backup.slotDir(ctx, rowSlot);
-            // 目录不存在 = 这个槽从没备份过 ⇒ 0 是事实；目录在却列不出来 = 读失败 ⇒ 不放键
-            if (!bdir.exists() || bdir.listFiles() != null) {
-                if (!backupCounts.containsKey(rowSlot)) {
-                    backupCounts.put(rowSlot, Integer.valueOf(
-                            VersionOps.backupCountIn(ctx, rowSlot)));
-                }
-                ex.put("backupCount", String.valueOf(backupCounts.get(rowSlot)));
-            }
-            String sub = e.displayVersion();
-            if (e.pkg != null && !e.pkg.isEmpty()) sub = sub + " · " + e.pkg;
-            out.add(new ItemInfo(ItemInfo.KIND_VERSION, e.displayName(ctx), sub,
-                    apk == null ? null : apk.getAbsolutePath(), null, null,
-                    e.apkSize, apk == null ? 0L : apk.lastModified(),
-                    e.imported ? "import" : "installed", null, false,
-                    apk != null && apk.isFile() && apk.canRead(), ex));
         }
         return out;
+    }
+
+    /**
+     * **v40**：单个启动项（版本页的 `selectedItem()` / `pageItems()` 用）。
+     *
+     * <p>⚠️ 不走 {@link #versions()}：那个会扫全部版本 + 全库补丁 + 每槽备份清单；版本页只需要
+     * "这一行"（第 374 轮评审 B2/m2）。`slot` 空 = 这个版本 key 的第一行。
+     */
+    static ItemInfo versionItem(Context ctx, String versionKey, String slot) {
+        if (ctx == null || versionKey == null || versionKey.trim().isEmpty()) return null;
+        String vk = versionKey.trim();
+        String want = slot == null ? "" : slot.trim();
+        try {
+            for (Versions.Entry e : Versions.scanAll(ctx)) {
+                if (e == null || !vk.equals(e.key())) continue;
+                if (!want.isEmpty() && !want.equals(Versions.slotFor(e))) continue;
+                return versionItem(ctx, e, singlePatchCounts(ctx, e),
+                        new LinkedHashMap<String, Integer>());
+            }
+        } catch (Throwable ignored) {
+            // 读不出来 ⇒ null（调用方把那当作"这一份拿不到"，不编造）
+        }
+        return null;
+    }
+
+    /** **v40**：按 APK 路径反查版本条目（resources 页的 `pageItems()` 用）。 */
+    static ItemInfo versionItemByApk(Context ctx, File apk) {
+        if (ctx == null || apk == null) return null;
+        try {
+            String path = apk.getAbsolutePath();
+            for (Versions.Entry e : Versions.scanAll(ctx)) {
+                if (e == null || e.apkPath == null || !path.equals(e.apkPath)) continue;
+                return versionItem(ctx, e.key(), Versions.slotFor(e));
+            }
+        } catch (Throwable ignored) {
+        }
+        return null;
+    }
+
+    /** 单个启动项的补丁数（只算这一条；读不出来 ⇒ null = 不放键）。 */
+    private static Map<String, Integer> singlePatchCounts(Context ctx, Versions.Entry e) {
+        if (e == null || !Patches.storeReadable(ctx)) return null;
+        try {
+            String ikey = Versions.instanceKey(e.key(), Versions.slotFor(e));
+            int n = Patches.enabledCount(ctx, ikey);
+            Map<String, Integer> m = new LinkedHashMap<String, Integer>();
+            if (n > 0) m.put(ikey, Integer.valueOf(n));
+            return m;
+        } catch (Throwable t) {
+            return null;
+        }
+    }
+
+    /** 一条版本记录 ⇒ {@link ItemInfo}（**纯组装**：两个计数由调用方给，自检可直接喂）。 */
+    private static ItemInfo versionItem(Context ctx, Versions.Entry e,
+                                        Map<String, Integer> patchCounts,
+                                        Map<String, Integer> backupCounts) {
+        File apk = e.apkPath == null || e.apkPath.isEmpty() ? null : new File(e.apkPath);
+        String rowSlot = Versions.slotFor(e);
+        String ikey = Versions.instanceKey(e.key(), rowSlot);
+        Map<String, String> ex = new LinkedHashMap<String, String>();
+        put(ex, "pkg", e.pkg);
+        put(ex, "realPkg", e.realPkg);
+        put(ex, "versionName", e.versionName);
+        // v30：版本 key（已装 = 包名 / 导入 = import:文件名）—— 与 ProbeEnv.version() 同一个值，
+        //       插件按它把探针记的数字挂到版本上。
+        put(ex, "key", e.key());
+        put(ex, "displayVersion", e.displayVersion());
+        put(ex, "imported", String.valueOf(e.imported));
+        put(ex, "importFile", e.importFile);
+        put(ex, "md5", e.md5);
+        put(ex, "customName", e.customName);
+        put(ex, "upstreamVersion", e.upstreamVersion);
+        put(ex, "slot", rowSlot);
+        // v39：启动项身份 —— 插件别自己拼 `key + NUL + slot`（那是宿主内部格式）
+        put(ex, "instanceKey", ikey);
+        ex.put("bound", e.boundSlot != null && !e.boundSlot.isEmpty() ? "true" : "false");
+        if (patchCounts != null) {
+            Integer n = patchCounts.get(ikey);
+            ex.put("patchCount", String.valueOf(n == null ? 0 : n.intValue()));
+        }
+        File bdir = Backup.slotDir(ctx, rowSlot);
+        // 目录不存在 = 这个槽从没备份过 ⇒ 0 是事实；目录在却列不出来 = 读失败 ⇒ 不放键
+        if (!bdir.exists() || bdir.listFiles() != null) {
+            if (!backupCounts.containsKey(rowSlot)) {
+                backupCounts.put(rowSlot, Integer.valueOf(
+                        VersionOps.backupCountIn(ctx, rowSlot)));
+            }
+            ex.put("backupCount", String.valueOf(backupCounts.get(rowSlot)));
+        }
+        String sub = e.displayVersion();
+        if (e.pkg != null && !e.pkg.isEmpty()) sub = sub + " · " + e.pkg;
+        return new ItemInfo(ItemInfo.KIND_VERSION, e.displayName(ctx), sub,
+                apk == null ? null : apk.getAbsolutePath(), null, null,
+                e.apkSize, apk == null ? 0L : apk.lastModified(),
+                e.imported ? "import" : "installed", null, false,
+                apk != null && apk.isFile() && apk.canRead(), ex);
     }
 
     // ---- 插件与补丁清单（v38，第 372 轮）---------------------------------------

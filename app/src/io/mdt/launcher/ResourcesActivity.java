@@ -46,6 +46,8 @@ public final class ResourcesActivity extends BaseActivity {
     static final String EXTRA_APK = "apk";
     static final String EXTRA_NAME = "name";
     static final String EXTRA_VERSION = "version";
+    /** v40：这一份 APK 属于哪个槽（插件页钩子用它给 slot()/savesDir()）。 */
+    static final String EXTRA_SLOT = "slot";
 
     private static final String TAG = "MDTLauncher";
     private static final int REQ_EXPORT = 5001;
@@ -56,6 +58,8 @@ public final class ResourcesActivity extends BaseActivity {
     private File mApk;
     private String mName = "";
     private String mVersion = "";
+    /** v40：这一份 APK 属于哪个槽（空 = 未知 ⇒ 当前槽）。 */
+    private String mSlot = "";
     private GameAssets.Catalog mCatalog;
 
     private TextView mHead;
@@ -76,7 +80,7 @@ public final class ResourcesActivity extends BaseActivity {
     }
 
     @Override protected String pluginSlot() {
-        return Data.currentSlot(this);
+        return mSlot == null || mSlot.trim().isEmpty() ? Data.currentSlot(this) : mSlot.trim();
     }
 
     @Override protected java.io.File pluginSelectedFile() {
@@ -132,6 +136,8 @@ public final class ResourcesActivity extends BaseActivity {
         String apk = getIntent() == null ? null : getIntent().getStringExtra(EXTRA_APK);
         mName = getIntent() == null ? null : getIntent().getStringExtra(EXTRA_NAME);
         mVersion = getIntent() == null ? null : getIntent().getStringExtra(EXTRA_VERSION);
+        mSlot = getIntent() == null ? "" : getIntent().getStringExtra(EXTRA_SLOT);
+        if (mSlot == null) mSlot = "";
         if (mName == null || mName.trim().isEmpty()) {
             mName = apk == null ? "" : new File(apk).getName();
         }

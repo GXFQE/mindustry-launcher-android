@@ -183,6 +183,7 @@ final class DevTools {
                     i.putExtra(ResourcesActivity.EXTRA_APK, apk);
                     i.putExtra(ResourcesActivity.EXTRA_NAME, name);
                     i.putExtra(ResourcesActivity.EXTRA_VERSION, ver);
+                    i.putExtra(ResourcesActivity.EXTRA_SLOT, slot);
                 }
             } else {
                 i = PluginPages.intent(a, p, slot);

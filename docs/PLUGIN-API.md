@@ -33,7 +33,11 @@
   **插件启停仍归宿主**）；`List<ItemInfo> instances()`（运行实例，含启动占位）+
   `List<ItemInfo> backups(slot)`（备份元信息）。另有一批 **`extra` 加键**（不抬版本的增量）：
   `versions()` 的 `instanceKey` / `bound` / `patchCount` / `backupCount`，`plugins()` 的
-  `updateState` / `updateVersion` / `updateNote`，`settings()` 的六个公开设置键。**）
+  `updateState` / `updateVersion` / `updateNote`，`settings()` 的六个公开设置键。**
+  **v40 = 插入能力**：`showCard(title, body, buttons, cb)`（宿主卡片，最多 3 个按钮；回调只来一次，
+  点按钮给下标、关掉给 -1）+ `openPage(page, slot)`（跳宿主页面；slot 空 = 当前槽）；`plugin.json`
+  的扩展条目多一个可选 `"place": "actions"`（把动作插进宿主操作卡，四个内容页有锚点，别的页回落
+  「插件」卡）；三个新页面钩子 `version` / `patches` / `resources`。**不给换主题 / 改布局。**）
 - 插件 `api()` 报的是「我需要的最低宿主接口版本」。用不到的新能力**不要**报高 ——
   报高了只会在老宿主上被拒，换不来任何东西。
 - **不要用 try/catch 去兼容老宿主**：报什么版本就只会跑在什么版本上。`api()` 报 20，
@@ -83,13 +87,16 @@
 
 `page` 取值：`main` / `slots` / `slot` / `saves` / `maps` / `mods` / `blueprints` / `map-detail` / `blueprint-detail` / `settings` / `logs` / `trash` / **v40** `version` / `patches` / `resources`。
 
-⚠️ 三类插槽现在**所有页面都挂齐了**（2026-10-24 第 226 轮统一）：
+⚠️ 三类插槽现在**所有页面都挂齐了**（2026-10-24 第 226 轮统一；v40 起带 `place: "actions"` 的
+`action` / `content` 条目会改插宿主操作卡，见下面「插入位置」）：
 
 | slot | 已接的 page |
 |---|---|
-| `content` | 全部 |
-| `section` | 全部（画在「插件」卡里） |
-| `action` | 全部（同一张卡里，点了在原页跑） |
+| `content` | 全部（默认画在「插件」卡里；`place: "actions"` 时插操作卡） |
+| `section` | 全部（画在「插件」卡里；**不支持** `place`） |
+| `action` | 全部（默认「插件」卡；`place: "actions"` 时插操作卡） |
+
+`place` 对 `plugins` / `analyzer` / `filter` / `sort` 等其它 slot **不生效**（静默按原行为）。
 
 #### 插入位置（v40）
 
@@ -101,8 +108,9 @@
   **回落**「插件」卡（不会消失）—— 没有锚点时放错地方比放回原处更糟。
 - `section` 不支持 `place`（它本来画的就是一整块，不是一行）。
 - **v40 新增三个页面钩子**：`version` / `patches` / `resources` 的布局里有 `plugin_section`，
-  三类插槽都可以声明到它们上面；`version` 页还会把这一份版本的 `ItemInfo` 作为
-  `selectedItem()` / `pageItems()` 给插件（`resources` 页给选中的 APK 文件）。
+  三类插槽都可以声明到它们上面。`version` 页把这一份版本的 `ItemInfo` 作为 `selectedItem()` 并放进
+  `pageItems()`；`resources` 页把"选中的那份 APK 对应哪个版本"放进 `pageItems()`（`selectedItem()`
+  仍是 null —— 这一页不是"某一张地图 / 存档"那种选中项）。
 
 ## 3. 入口类约定
 
@@ -136,8 +144,8 @@ public static void unload();                    // 可选：收尾（也认 unlo
 
 | 方法 | 说明 |
 |---|---|
-| `selectedItem()` / `selectedItems()` | 详情页当前那一项 / 页面选中项快照 |
-| `pageItems()` | 当前页面看到的数据快照 |
+| `selectedItem()` / `selectedItems()` | 详情页当前那一项 / 页面选中项快照（**v40 起版本页也有**：这一行对应的版本条目；resources 页仍为 null） |
+| `pageItems()` | 当前页面看到的数据快照（**v40 起 version / resources 页各给"这一份"那一条**） |
 | `slots()` | 全部槽 |
 | `contents(kind)` / `contents(slot, kind)` | 四类内容；`kind` = `saves`/`maps`/`mods`/`blueprints` |
 | `logs()` / `trash()` / `versions()` | 日志与崩溃报告 / 中转站 / 已装版本（v39 起 `trash()` 的 `extra["category"]` 覆盖全部八类 —— 含以前整块漏掉的 `versions` / `patches`；另有 `slot` / `originalName` / `stamp` / `files` 键） |
@@ -233,7 +241,10 @@ public static void unload();                    // 可选：收尾（也认 unlo
 
 1. **`place: "actions"`**（`plugin.json`，不是接口）：把 `action` / `content` 条目插进宿主操作卡。
 2. **`showCard`**：插件要弹信息时用宿主卡片，别自己 `new AlertDialog`（叠窗 + 主题不一致）。
-   - `buttons` 最多画 3 个（数组里的空串跳过，超过 3 个只取前 3 个）；全是空串 / null ⇒ 只给「关闭」。
+   - `buttons` 最多画 3 个：数组里的空串 / null **跳过**（所以"前 3 个"指前 3 个**非空**的按钮，
+  回调给的仍是它在**原数组里的下标**）；全是空串 / null ⇒ 只给一个「关闭」。
+- 点「关闭」/ 返回 / 点卡片外面 ⇒ `onCard(-1)`。同一页已经开着一张插件卡片时，新卡片会先收掉旧的
+  （同窗只留一张，别叠两个对话框）。
    - 按钮文案要短（两字的动作词），依据放 `body` —— Android 按钮一长就竖排。
    - 回调在 UI 线程；用户点按钮 ⇒ `onCard(按钮在入参数组里的下标)`；返回 / 点卡片外面 ⇒ `onCard(-1)`。
 3. **`openPage(page, slot)`**：认得的 `page`：
@@ -704,11 +715,14 @@ void writeGameSettings(String slot, Map<String, Object> changes, Done done); // 
 - `createView` / `run` 在 UI 线程；**不要**在里面读大文件。
 - `runBackground(label, body)` 的 `body` 在后台线程；**别碰 View**，要更新 UI 用 View 自己的 `post`。
 - 回调（`Choose` / `Confirm` / `Prompt` / `PickFile` / `PickContent` / `After` / `Done` / `Cancel`，
-  v39 起还有 `Fetch` / `Releases` / `Download` / `Imported` / `Conflicts`）**都在 UI 线程**回调。
+  v39 起还有 `Fetch` / `Releases` / `Download` / `Imported` / `Conflicts`，v40 的 `Card`）
+  **都在 UI 线程**回调（`showCard` 没有 Activity 时也会把 `onCard(-1)` 投回 UI 线程）。
 - `export` / `share` / `writeItem` / `patchImport` 传进去的 `InputStream` **由宿主关闭**；
   `pickFile` / `download` 给你的是文件，自己读。
 - v39 的网络 / 补丁写接口都是**异步**的：`fetchText` / `githubReleases` / 五个补丁写方法在后台线程跑、
   回调回 UI 线程；`download` 额外返回 `Task`（可取消，通知栏有进度）。
+- v40 的 `showCard` / `openPage` **不返回 `Result`**：`showCard` 永远给一次 `onCard`（没有界面 ⇒ -1），
+  `openPage` 认不出的页面**静默跳过**（不回调、不弹窗、不崩）。要判断"能不能去这一页"请按文档白名单。
 
 ## 6. 失败语义：`Result`
 

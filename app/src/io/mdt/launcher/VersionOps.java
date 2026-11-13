@@ -401,6 +401,8 @@ final class VersionOps {
         i.putExtra(ResourcesActivity.EXTRA_APK, e.apkPath);
         i.putExtra(ResourcesActivity.EXTRA_NAME, e.displayName(a));
         i.putExtra(ResourcesActivity.EXTRA_VERSION, e.displayVersion());
+        // v40：这一页属于哪个槽（插件的 slot()/savesDir() 要指向对的槽；评审 M4）
+        i.putExtra(ResourcesActivity.EXTRA_SLOT, Versions.slotFor(e));
         a.startActivity(i);
     }
 

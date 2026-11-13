@@ -11,7 +11,10 @@ import android.widget.TextView;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.WeakHashMap;
 
 /**
  * 把插件声明的**页面动作**画成一行（第 159 轮扩展点 v2；第 160 轮扩到全部页面）。
@@ -21,7 +24,8 @@ import java.util.List;
  *   <li>取**生效中**的插件（{@link Plugins#active}）—— 待重启生效 / 已停用的不出现，
  *       否则用户会看到"停用了还在"；</li>
  *   <li>读每个 APK 的自述（{@link Extensions#of}，**几 KB，不加载插件代码**）⇒ 只要这一页的条目；</li>
- *   <li>四个内容页插到「删除」之前；其余页面插到统一那块「插件」卡里（没有条目整块 GONE；
+ *   <li>v40：声明了 `place: "actions"` 的条目插到**宿主那一页的操作卡**（四个内容页有锚点，
+ *       见 {@link #attachPlacedActions}）；其余条目插到统一那块「插件」卡里（没有条目整块 GONE；
  *       只有一段 section 时卡标题用那一段自己的名字，见 {@link #sectionHeading}）。</li>
  * </ol>
  *
@@ -48,6 +52,62 @@ final class PluginEntries {
     private PluginEntries() { }
 
     /**
+     * v40：**这一页已经真的插进操作卡的条目**（Activity → page → 视图/key）。
+     *
+     * <p>为什么要有它（第 374 轮评审 M1）：`place: "actions"` 的条目原本按"这一页有锚点"从
+     * 「插件」卡里删掉 —— 万一运行期没插上（锚点行被改名 / 父容器不是 ViewGroup / 没调这个入口），
+     * 两边都没有 = 条目彻底消失。现在「插件」卡只过滤**确实插上了**的那些 key；
+     * 插不上就回落原处。同时它让 `attachPlacedActions` 幂等（重挂前先摘旧行，见模组页换槽）。
+     */
+    private static final WeakHashMap<Activity, Map<String, Inserted>> INSERTED =
+            new WeakHashMap<Activity, Map<String, Inserted>>();
+
+    private static final class Inserted {
+        final List<View> views = new ArrayList<View>();
+        final List<String> keys = new ArrayList<String>();
+    }
+
+    private static String placedKey(Entry e) {
+        return e.id + "|" + (e.item == null ? "" : e.item.id);
+    }
+
+    /** 这一页已插入的条目 key 集合（没有 ⇒ 空集，调用方据此"回落「插件」卡"）。 */
+    private static java.util.Set<String> insertedKeys(Activity a, String page) {
+        synchronized (INSERTED) {
+            Map<String, Inserted> byPage = INSERTED.get(a);
+            Inserted ins = byPage == null ? null : byPage.get(page);
+            if (ins == null) return java.util.Collections.emptySet();
+            return new java.util.HashSet<String>(ins.keys);
+        }
+    }
+
+    /** 摘掉这一页上一次插进操作卡的行（换槽 / 插件启停后重挂；没插过 ⇒ 什么都不做）。 */
+    private static void clearPlaced(Activity a, String page) {
+        Inserted old = null;
+        synchronized (INSERTED) {
+            Map<String, Inserted> byPage = INSERTED.get(a);
+            if (byPage != null) old = byPage.remove(page);
+        }
+        if (old == null) return;
+        for (View v : old.views) {
+            if (v == null) continue;
+            if (v.getParent() instanceof ViewGroup) {
+                ((ViewGroup) v.getParent()).removeView(v);
+            }
+        }
+    }
+
+    /** 把"已经插进操作卡"的条目从「插件」卡的行列表里去掉。 */
+    private static List<Entry> skipInserted(List<Entry> rows, java.util.Set<String> inserted) {
+        if (rows == null || rows.isEmpty() || inserted == null || inserted.isEmpty()) return rows;
+        List<Entry> out = new ArrayList<Entry>();
+        for (Entry e : rows) {
+            if (!inserted.contains(placedKey(e))) out.add(e);
+        }
+        return out;
+    }
+
+    /**
      * 这一页现在该显示哪些条目（**纯取数**，不碰 View；单元测试 / 报告都能直接调）。
      *
      * <p>顺序 = {@code active.txt} 里的登记顺序（同一份判据给插件页与内容页，别各排各的）。
@@ -62,25 +122,12 @@ final class PluginEntries {
             File apk = Plugins.apkOf(ctx, id, ver);
             List<Extensions.Item> items = Extensions.forPage(Extensions.of(apk), page);
             if (items.isEmpty()) continue;
-            List<Extensions.Item> keep = new ArrayList<Extensions.Item>();
-            for (Extensions.Item it : items) {
-                if (hasActionAnchor(page) && Extensions.PLACE_ACTIONS.equals(it.place)) continue;
-                keep.add(it);
-            }
-            if (keep.isEmpty()) continue;
             String name = Plugins.displayNameOf(ctx, id);
-            for (Extensions.Item it : keep) out.add(new Entry(id, ver, name, it));
+            for (Extensions.Item it : items) out.add(new Entry(id, ver, name, it));
         }
         return out;
     }
 
-    /**
-     * 往内容页的操作卡里挂插件动作行（**没有条目就一个像素都不动**）。
-     *
-     * @param beforeRowId 这一页「删除…」那一行的 id；插件行插在它**上面** ——
-     *                    四个内容页的顺序因此仍是「导入 → 导出 → 专属动作 → 删除 → 筛选」
-     *                    （第 157 轮定下的顺序，插件动作属于"这一个页面专属的事"）
-     */
     /** 这一页该画哪些**动作**（`slot: action`）；与 {#collect} 同一套取数。 */
     static List<Entry> collectActions(Context ctx, String page) {
         List<Entry> out = new ArrayList<Entry>();
@@ -92,33 +139,10 @@ final class PluginEntries {
             File apk = Plugins.apkOf(ctx, id, ver);
             List<Extensions.Item> items = Extensions.forAction(Extensions.of(apk), page);
             if (items.isEmpty()) continue;
-            List<Extensions.Item> keep = new ArrayList<Extensions.Item>();
-            for (Extensions.Item it : items) {
-                if (hasActionAnchor(page) && Extensions.PLACE_ACTIONS.equals(it.place)) continue;
-                keep.add(it);
-            }
-            if (keep.isEmpty()) continue;
             String name = Plugins.displayNameOf(ctx, id);
-            for (Extensions.Item it : keep) out.add(new Entry(id, ver, name, it));
+            for (Extensions.Item it : items) out.add(new Entry(id, ver, name, it));
         }
         return out;
-    }
-
-    /**
-     * 把插件声明的**动作**画成一行（**点了不换页**）：在当前页加载插件并调它的 {@code run(...)}。
-     *
-     * <p>对话框 / 选择器 / SAF / 进度都落在**原来那一页**上 —— 与搬家前宿主自己那条"导出统计…"
-     * 一模一样（用户 2026-10-21：「像原来那样不单开页面能行吗」）。
-     */
-    static void attachAction(Activity a, ViewGroup box, String page, String slot, int beforeRowId) {
-        if (a == null || box == null) return;
-        List<Entry> rows = collectActions(a, page);
-        if (rows.isEmpty()) return;
-        int at = insertIndex(box, beforeRowId);
-        for (Entry e : rows) {
-            box.addView(divider(a), at++);
-            box.addView(actionRow(a, e, page, slot), at++);
-        }
     }
 
     private static View actionRow(final Activity a, final Entry e, final String page,
@@ -252,52 +276,6 @@ final class PluginEntries {
     }
 
     /**
-     * 把插件声明的**段落**画进宿主页里（第 193 轮 v9）。
-     *
-     * <p>某一份插件坏掉 ⇒ 跳过它、其余照画（页面绝不变白）。没有段落 ⇒ 容器整块 {@code GONE}。
-     */
-    static void attachSection(Activity a, ViewGroup box, String page, String slot, File selected,
-                              io.mdt.launcher.api.ItemInfo item) {
-        if (a == null || box == null) return;
-        List<Entry> rows = collectSections(a, page);
-        if (rows.isEmpty()) {
-            box.setVisibility(View.GONE);
-            return;
-        }
-        box.setVisibility(View.VISIBLE);
-        for (Entry e : rows) {
-            try {
-                File apk = Plugins.apkOf(a, e.id, e.ver);
-                if (apk == null || !apk.isFile()) continue;
-                PluginHost.Loaded l = Plugins.isInjected(a, e.id, e.ver)
-                        ? PluginHost.openInjected(a, apk, e.item.entry, page, slot, selected, item)
-                        : PluginHost.load(a, apk, e.item.entry, page, slot, selected, item);
-                View v = PluginHost.createView(l);
-                if (v != null) box.addView(v);
-            } catch (Throwable ignored) {
-                // 一份坏的插件不该把宿主页弄白（与列表那一行同一条规矩）
-            }
-        }
-    }
-
-    static void attach(Activity a, ViewGroup box, String page, String slot, int beforeRowId) {
-        attach(a, box, page, slot, beforeRowId, null);
-    }
-
-    /** 同 {@link #attach(Activity, ViewGroup, String, String, int)}，额外带上详情页选中项。 */
-    static void attach(Activity a, ViewGroup box, String page, String slot, int beforeRowId,
-                       File selected) {
-        if (a == null || box == null) return;
-        List<Entry> rows = collect(a, page);
-        if (rows.isEmpty()) return;
-        int at = insertIndex(box, beforeRowId);
-        for (Entry e : rows) {
-            box.addView(divider(a), at++);
-            box.addView(row(a, e, page, slot, selected), at++);
-        }
-    }
-
-    /**
      * 往通用页面的「插件」卡里挂动作行（第 160 轮）。
      *
      * <p>卡片是布局里一段固定 include（{@code plugin_section} + {@code plugin_section_rows}）；
@@ -373,15 +351,16 @@ final class PluginEntries {
             }
         }
 
-        // ② 内容行（content）：点开插件页
-        List<Entry> rows = collect(a, page);
+        // ② 内容行（content）：点开插件页 —— 已插进操作卡的（v40 place=actions）不再重复画
+        java.util.Set<String> placedHere = insertedKeys(a, page);
+        List<Entry> rows = skipInserted(collect(a, page), placedHere);
         for (int i = 0; i < rows.size(); i++) {
             if (i > 0) box.addView(divider(a));
             box.addView(row(a, rows.get(i), page, slot, selected));
         }
 
         // ③ 动作行（action）：原页跑 run()
-        List<Entry> acts = collectActions(a, page);
+        List<Entry> acts = skipInserted(collectActions(a, page), placedHere);
         for (int i = 0; i < acts.size(); i++) {
             if (box.getChildCount() > 0) box.addView(divider(a));
             box.addView(actionRow(a, acts.get(i), page, slot));
@@ -587,18 +566,6 @@ final class PluginEntries {
         return a.getResources().getColor(r);
     }
 
-    /** 插到目标行**上面那条分割线**之前；找不到目标行就追加到末尾。 */
-    private static int insertIndex(ViewGroup box, int beforeRowId) {
-        if (beforeRowId != 0) {
-            View before = box.findViewById(beforeRowId);
-            if (before != null) {
-                int i = box.indexOfChild(before);
-                if (i > 0) return i - 1;      // 行前面还有一条分割线
-            }
-        }
-        return box.getChildCount();
-    }
-
     private static View divider(Activity a) {
         View v = new View(a);
         v.setBackgroundColor(a.getResources().getColor(R.color.divider));
@@ -671,21 +638,48 @@ final class PluginEntries {
      * 把 `place: "actions"` 的行插进**宿主那一页的操作卡**（"删除…"那一行之前）。
      *
      * <p>没声明 / 没锚点 / 没生效中的插件 ⇒ 一个像素都不动（本方法可以无条件在 onCreate 里调）。
+     * <p>★ 幂等：重挂前先摘掉上一轮插的行（模组页换槽会在 `rescan()` 里再调一次）。
+     * ★ 失败时什么都不记 ⇒ 对应的条目仍由 `attachPage` 画进「插件」卡（不消失，评审 M1）。
      */
     static void attachPlacedActions(Activity a, String page, String slot) {
         if (a == null || page == null) return;
         int rid = anchorRowId(page);
         if (rid == 0) return;
+        clearPlaced(a, page);
+        List<Entry> rows = collectPlaced(a, page);
+        if (rows.isEmpty()) return;
         View anchor = a.findViewById(rid);
         if (anchor == null || !(anchor.getParent() instanceof ViewGroup)) return;
         ViewGroup box = (ViewGroup) anchor.getParent();
-        List<Entry> rows = collectPlaced(a, page);
-        if (rows.isEmpty()) return;
         int at = box.indexOfChild(anchor);
         if (at < 0) return;
-        for (Entry e : rows) {
-            box.addView(placedRow(a, e, page, slot), at++);
-            box.addView(divider(a), at++);      // 让"插件行 → 删除"之间也有那条线
+        Inserted ins = new Inserted();
+        try {
+            for (Entry e : rows) {
+                View row = placedRow(a, e, page, slot);
+                View line = divider(a);          // 让"插件行 → 删除"之间也有那条线
+                box.addView(row, at++);
+                box.addView(line, at++);
+                ins.views.add(row);
+                ins.views.add(line);
+                ins.keys.add(placedKey(e));
+            }
+        } catch (Throwable t) {
+            // 插一半失败 ⇒ 把已经插上的摘掉，别留半截（条目会回落到「插件」卡）
+            for (View v : ins.views) {
+                if (v != null && v.getParent() instanceof ViewGroup) {
+                    ((ViewGroup) v.getParent()).removeView(v);
+                }
+            }
+            return;
+        }
+        synchronized (INSERTED) {
+            Map<String, Inserted> byPage = INSERTED.get(a);
+            if (byPage == null) {
+                byPage = new HashMap<String, Inserted>();
+                INSERTED.put(a, byPage);
+            }
+            byPage.put(page, ins);
         }
     }
 
@@ -702,8 +696,15 @@ final class PluginEntries {
                 ? Trans.get(a, R.string.plugin_ext_from_fmt, e.name) : sub);
         row.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View v) {
+                // ★ 评审 M2：槽要在**点下去那一刻**取 —— 模组页可以在页内换槽（mSlot 变了），
+                //   行创建时捕进来的旧槽会让这一行跑在错的槽上。内容页把 mSlot 通过 pluginSlot() 给出。
+                String useSlot = slot;
+                if (a instanceof BaseActivity) {
+                    String cur = ((BaseActivity) a).pluginSlot();
+                    if (cur != null && !cur.isEmpty()) useSlot = cur;
+                }
                 if (openPage) {
-                    PluginsActivity.start(a, e.id, e.ver, e.item.entry, page, slot,
+                    PluginsActivity.start(a, e.id, e.ver, e.item.entry, page, useSlot,
                             e.item.label(), null);
                     return;
                 }
@@ -711,8 +712,8 @@ final class PluginEntries {
                     File apk = Plugins.apkOf(a, e.id, e.ver);
                     if (apk == null || !apk.isFile()) return;
                     PluginHost.Loaded l = Plugins.isInjected(a, e.id, e.ver)
-                            ? PluginHost.openInjected(a, apk, e.item.entry, page, slot, null, null)
-                            : PluginHost.load(a, apk, e.item.entry, page, slot, null, null);
+                            ? PluginHost.openInjected(a, apk, e.item.entry, page, useSlot, null, null)
+                            : PluginHost.load(a, apk, e.item.entry, page, useSlot, null, null);
                     PluginHost.runEntry(l);
                 } catch (PluginHost.PluginException pe) {
                     android.widget.Toast.makeText(a,

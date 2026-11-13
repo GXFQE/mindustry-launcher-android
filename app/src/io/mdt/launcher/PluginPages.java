@@ -18,12 +18,6 @@ final class PluginPages {
 
     private PluginPages() { }
 
-    /** 认得的页面名（文档 / 自检共用一处）。 */
-    static final String[] PAGES = {
-            "main", "slots", "slot", "saves", "maps", "mods", "blueprints",
-            "settings", "logs", "trash", "plugins",
-    };
-
     /** 这些页面要"哪一份"（槽）；主界面 / 槽列表 / 设置 / 日志 / 中转站 / 插件页不要。 */
     static boolean needsSlot(String page) {
         return "slot".equals(page) || "saves".equals(page) || "maps".equals(page)
@@ -35,11 +29,16 @@ final class PluginPages {
      *
      * <p>槽 extra 统一用 {@code "slot"}（四个内容页与 SlotActivity 的常量都是它，见
      * {@code DeepLink} 里同一条注释）。
+     *
+     * <p>★ 网络/接口文档承诺「slot 空 = 当前槽」⇒ 这里必须补成当前槽（第 374 轮评审 B1）：
+     * 四个内容页与槽页收到空槽会**立刻 finish**，插件看到的是"点了没反应"；
+     * 只有模组页自己回落当前槽 —— 同一个接口不能两种行为。
      */
     static Intent intent(Context c, String page, String slot) {
         if (c == null || page == null) return null;
         String p = page.trim();
-        String s = slot == null ? "" : slot.trim();
+        String s = Data.sanitizeSlot(slot == null ? "" : slot.trim());
+        if (s == null) s = "";
         Class<?> cls;
         if ("main".equals(p)) cls = MainActivity.class;
         else if ("slots".equals(p)) cls = SlotsActivity.class;
@@ -54,7 +53,13 @@ final class PluginPages {
         else if ("plugins".equals(p)) cls = PluginsActivity.class;
         else return null;
         Intent i = new Intent(c, cls);
-        if (needsSlot(p)) i.putExtra("slot", s);
+        if (needsSlot(p)) {
+            if (s.isEmpty()) {
+                String cur = Data.currentSlot(c);
+                s = cur == null ? "" : cur;
+            }
+            i.putExtra("slot", s);
+        }
         return i;
     }
 }

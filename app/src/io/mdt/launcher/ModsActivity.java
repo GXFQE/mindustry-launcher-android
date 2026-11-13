@@ -890,6 +890,8 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
         rebuildList();
         fillHeader();
         refreshCrashVerdict();
+        // v40：页内换槽 / 启停后操作卡里的 placed 行也要重挂（幂等：先摘旧行；槽在点击时取）
+        PluginEntries.attachPlacedActions(this, Extensions.PAGE_MODS, mSlot);
         PluginEntries.attachPage(this, Extensions.PAGE_MODS, mSlot, null);
     }
 

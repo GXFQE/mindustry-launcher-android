@@ -5776,26 +5776,122 @@ public final class SelfTest {
 
         // openPage 的页面名 → Activity 映射（extra 的键写错编译器不响，只能靠这条）
         try {
-            android.content.Intent mapsI = PluginPages.intent(ctx, "maps", "slot-x");
-            android.content.Intent mainI = PluginPages.intent(ctx, "main", "slot-x");
-            android.content.Intent slotI = PluginPages.intent(ctx, "slot", "slot-y");
-            boolean mapOk = mapsI != null && mapsI.getComponent() != null
-                    && MapsActivity.class.getName().equals(mapsI.getComponent().getClassName())
-                    && "slot-x".equals(mapsI.getStringExtra("slot"));
-            boolean mainOk = mainI != null && mainI.getComponent() != null
-                    && MainActivity.class.getName().equals(mainI.getComponent().getClassName())
-                    && !mainI.hasExtra("slot");
-            boolean slotOk = slotI != null && slotI.getComponent() != null
-                    && SlotActivity.class.getName().equals(slotI.getComponent().getClassName())
-                    && "slot-y".equals(slotI.getStringExtra("slot"));
-            ok(stat, L, mapOk && mainOk && slotOk,
-                    "v40 openPage 映射：maps → MapsActivity + slot；main 不带 slot；slot → SlotActivity + slot");
+            String[] pages = {"main", "slots", "slot", "saves", "maps", "mods", "blueprints",
+                    "settings", "logs", "trash", "plugins"};
+            Class<?>[] classes = {MainActivity.class, SlotsActivity.class, SlotActivity.class,
+                    SavesActivity.class, MapsActivity.class, ModsActivity.class,
+                    BlueprintsActivity.class, SettingsActivity.class, LogActivity.class,
+                    TrashActivity.class, PluginsActivity.class};
+            boolean[] slotPage = {false, false, true, true, true, true, true,
+                    false, false, false, false};
+            boolean allMapped = true;
+            StringBuilder bad = new StringBuilder();
+            for (int i = 0; i < pages.length; i++) {
+                android.content.Intent it = PluginPages.intent(ctx, pages[i], "S9");
+                boolean ok = it != null && it.getComponent() != null
+                        && classes[i].getName().equals(it.getComponent().getClassName());
+                if (ok && slotPage[i]) {
+                    ok = "S9".equals(it.getStringExtra("slot"));
+                } else if (ok) {
+                    ok = !it.hasExtra("slot");
+                }
+                if (!ok) {
+                    allMapped = false;
+                    bad.append(pages[i]).append(' ');
+                }
+            }
+            ok(stat, L, allMapped,
+                    "v40 openPage 映射：11 个白名单页各自对到正确的 Activity / slot extra（漏：" + bad + "）");
             ok(stat, L, PluginPages.intent(ctx, "patches", null) == null
                             && PluginPages.intent(ctx, "nope", "") == null
                             && PluginPages.intent(ctx, null, "") == null,
                     "v40 openPage 反方向：版本/补丁页（要更多上下文）与认不出的名字 ⇒ null（静默跳过）");
+            // ★ 评审 B1：slot 空 = 当前槽（文档承诺；四个内容页收到空槽会 finish）
+            String cur = Data.currentSlot(ctx);
+            android.content.Intent emptyMaps = PluginPages.intent(ctx, "maps", null);
+            android.content.Intent blankSaves = PluginPages.intent(ctx, "saves", "  ");
+            boolean emptyOk = cur != null && !cur.isEmpty()
+                    && emptyMaps != null && cur.equals(emptyMaps.getStringExtra("slot"))
+                    && blankSaves != null && cur.equals(blankSaves.getStringExtra("slot"))
+                    && !"S9".equals(PluginPages.intent(ctx, "main", null)
+                            .getStringExtra("slot"));
+            ok(stat, L, emptyOk,
+                    "v40 ★openPage 的 slot 空 / null ⇒ 补成当前槽（否则内容页打开即关；评审 B1）");
         } catch (Throwable t) {
             ok(stat, L, false, "v40 openPage 用例异常：" + t);
+        }
+
+        // showCard 的按钮归一化（纯函数）：空串跳过、最多 3 个、下标仍按原数组
+        try {
+            int[] b1 = PluginHost.cardButtonIndices(null);
+            int[] b2 = PluginHost.cardButtonIndices(new String[]{"", " ", null});
+            int[] b3 = PluginHost.cardButtonIndices(new String[]{"a", "", "b", "c"});
+            int[] b4 = PluginHost.cardButtonIndices(new String[]{"a", "b", "c", "d"});
+            boolean biOk = b1.length == 0 && b2.length == 0
+                    && b3.length == 3 && b3[0] == 0 && b3[1] == 2 && b3[2] == 3
+                    && b4.length == 3 && b4[0] == 0 && b4[1] == 1 && b4[2] == 2;
+            ok(stat, L, biOk,
+                    "v40 ★showCard 按钮归一化：空串跳过 / 最多 3 个 / 回调下标仍按原数组（纯函数钉住）");
+        } catch (Throwable t) {
+            ok(stat, L, false, "v40 showCard 按钮用例异常：" + t);
+        }
+
+        // ★ 评审 B2：版本页 selectedItem / pageItems 必须拿得到"这一份"（不能永远 null）
+        try {
+            List<ItemInfo> vs = PluginData.versions(ctx);
+            if (vs.isEmpty()) {
+                L.add("  ⚠ 这台设备没有版本，跳过 versionItem 断言");
+            } else {
+                ItemInfo v0 = vs.get(0);
+                String k = v0.extra.get("key");
+                String sl = v0.extra.get("slot");
+                String ikey = v0.extra.get("instanceKey");
+                ItemInfo one = PluginData.versionItem(ctx, k, sl);
+                File apk = v0.path == null ? null : new File(v0.path);
+                ItemInfo byApk = PluginData.versionItemByApk(ctx, apk);
+                List<ItemInfo> pv = apk == null ? null
+                        : PluginData.pageItems(ctx, Extensions.PAGE_VERSION, sl, apk);
+                List<ItemInfo> pr = apk == null ? null
+                        : PluginData.pageItems(ctx, Extensions.PAGE_RESOURCES, sl, apk);
+                boolean itemOk = one != null && k.equals(one.extra.get("key"))
+                        && ikey.equals(one.extra.get("instanceKey"))
+                        && byApk != null && ikey.equals(byApk.extra.get("instanceKey"))
+                        && pv != null && pv.size() == 1
+                        && ikey.equals(pv.get(0).extra.get("instanceKey"))
+                        && pr != null && pr.size() == 1
+                        && ikey.equals(pr.get(0).extra.get("instanceKey"));
+                ok(stat, L, itemOk,
+                        "v40 ★版本页 / 资源页的 selectedItem · pageItems 能拿到这一份（评审 B2/M4）");
+            }
+        } catch (Throwable t) {
+            ok(stat, L, false, "v40 版本页 item 用例异常：" + t);
+        }
+
+        // ★ 评审 M1：四个内容页的"删除…"锚点必须真的在布局里（静态表不等于运行期能找到）
+        try {
+            int[] layouts = {R.layout.activity_maps, R.layout.activity_saves,
+                    R.layout.activity_mods, R.layout.activity_blueprints};
+            int[] anchors = {R.id.row_maps_del, R.id.row_save_del,
+                    R.id.row_mod_del, R.id.row_bp_del};
+            boolean anchorsOk = true;
+            StringBuilder missing = new StringBuilder();
+            for (int i = 0; i < layouts.length; i++) {
+                try {
+                    android.view.View root =
+                            android.view.LayoutInflater.from(ctx).inflate(layouts[i], null);
+                    if (root.findViewById(anchors[i]) == null) {
+                        anchorsOk = false;
+                        missing.append(layouts[i]).append(' ');
+                    }
+                } catch (Throwable t) {
+                    anchorsOk = false;
+                    missing.append("inflate:").append(t.getClass().getSimpleName()).append(' ');
+                }
+            }
+            ok(stat, L, anchorsOk,
+                    "v40 ★place=actions 的锚点行真的在四个内容页布局里（漏：" + missing + "）");
+        } catch (Throwable t) {
+            ok(stat, L, false, "v40 锚点布局用例异常：" + t);
         }
 
         // showCard：没有 Activity 的上下文（自检用 application）⇒ 回调 -1，不许吞掉

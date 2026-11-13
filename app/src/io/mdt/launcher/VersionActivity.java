@@ -45,16 +45,17 @@ public class VersionActivity extends BaseActivity {
 
     /** 这一页"选中的那一份" = 这个启动项对应的版本条目（插件不用自己按 key 猜）。 */
     @Override protected io.mdt.launcher.api.ItemInfo pluginSelectedItem() {
-        if (mEntry != null) {
-            String rowSlot = Versions.slotFor(mEntry);
-            for (io.mdt.launcher.api.ItemInfo it : PluginData.versions(this)) {
-                if (it != null && mKey.equals(it.extra.get("key"))
-                        && rowSlot.equals(it.extra.get("slot"))) {
-                    return it;
-                }
-            }
+        // ★ 第 374 轮评审 B2：`BaseActivity.onPostCreate`（挂插件区）**早于 onResume→refresh()**，
+        //   所以不能等 mEntry 被 refresh 赋值；onCreate 里已经先解析过一次（见 findEntry()）。
+        //   这里只组装这一条，不扫全部版本 / 补丁库 / 备份清单（评审 m2）。
+        String key = mEntry != null && mEntry.key() != null ? mEntry.key() : mKey;
+        String slot = mEntry != null ? Versions.slotFor(mEntry) : mSlot;
+        if (key == null || key.isEmpty()) return null;
+        try {
+            return PluginData.versionItem(this, key, slot);
+        } catch (Throwable t) {
+            return null;
         }
-        return null;
     }
 
     @Override protected java.io.File pluginSelectedFile() {
@@ -70,6 +71,9 @@ public class VersionActivity extends BaseActivity {
         String s = getIntent().getStringExtra(EXTRA_SLOT);
         mKey = k == null ? "" : k;
         mSlot = s == null ? "" : s;
+        // ★ 第 374 轮评审 B2：插件区在 onPostCreate 就挂（早于 onResume→refresh），
+        //   这里先把 mEntry 解析出来，否则第一次打开时 selectedItem/pageItems 永远是 null。
+        mEntry = findEntry();
 
         final VersionOps.Done done = new VersionOps.Done() {
             @Override public void changed() { finish(); }
@@ -160,6 +164,19 @@ public class VersionActivity extends BaseActivity {
         refresh();
     }
 
+    /** 按 (key, 槽) 找这一行的 Entry；找不到 / 读失败 ⇒ null（调用方决定 finish 或只当"拿不到"）。 */
+    private Versions.Entry findEntry() {
+        if (mKey.isEmpty()) return null;
+        try {
+            for (Versions.Entry e : Versions.scanAll(this)) {
+                if (e.key().equals(mKey) && Versions.slotFor(e).equals(mSlot)) return e;
+            }
+        } catch (Throwable ignored) {
+            // 读不出来 ⇒ null（refresh 会 finish；插件区只是拿不到 item）
+        }
+        return null;
+    }
+
     /**
      * 按 (key, 槽) 找回这一行的 Entry 并刷新文字。
      *
@@ -168,10 +185,7 @@ public class VersionActivity extends BaseActivity {
      */
     private void refresh() {
         if (mKey.isEmpty()) { finish(); return; }
-        Versions.Entry found = null;
-        for (Versions.Entry e : Versions.scanAll(this)) {
-            if (e.key().equals(mKey) && Versions.slotFor(e).equals(mSlot)) { found = e; break; }
-        }
+        Versions.Entry found = findEntry();
         if (found == null) { finish(); return; }
         mEntry = found;
 

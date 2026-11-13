@@ -143,13 +143,12 @@
                 android:textSize="12sp"
                 android:visibility="gone" />
 
-            <!-- v40：插件页面钩子（这一页的“插件”卡；没有条目时整块 GONE，见 PluginEntries） -->
+            <!-- v40：插件页面钩子（这一页的“插件”卡；没有条目时整块 GONE，见 PluginEntries）
+                 ⚠️ 父容器已有 page_pad 左右内边距 ⇒ 这里**不再加**左右 margin（否则卡片比别的页窄一圈） -->
             <include
                 layout="@layout/plugin_section"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="14dp"
-                android:layout_marginEnd="14dp"
                 android:layout_marginBottom="8dp" />
         </LinearLayout>
     </ScrollView>

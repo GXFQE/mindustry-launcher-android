@@ -129,7 +129,8 @@ public interface PluginApi {
      * 当前页面看到的数据（只读快照）。
      *
      * <p>覆盖：四个内容页（各自那一类）、槽列表（槽条目）、地图 / 蓝图详情（当前那一份）、
-     * 主界面（版本列表）、设置（设置项）、日志（日志 / 崩溃报告文件）、中转站（条目）。
+     * 主界面（版本列表）、设置（设置项）、日志（日志 / 崩溃报告文件）、中转站（条目）；
+     * **v40** 起还有版本页（这一行对应的版本条目）与资源页（选中的那份 APK 对应哪个版本）。
      * 内容页返回的是**该槽的数据源**，不是搜索 / 筛选后的子集。
      */
     List<ItemInfo> pageItems();
@@ -145,6 +146,7 @@ public interface PluginApi {
 
     /**
      * **详情页上当前这一项**（地图详情 / 蓝图详情）；其余页面返回 {@code null}。
+     * **v40** 起版本页也返回这一行对应的版本条目（`ItemInfo.KIND_VERSION`）。
      *
      * <p>返回的东西完整到足以交给 {@link #open(ItemInfo)}（含 {@code container} 与 {@code entry}），
      * 所以插件可以在详情页上直接统计「这一张」—— 用户点开地图就看见数字，不用再去列表里挑一遍。
@@ -409,21 +411,24 @@ public interface PluginApi {
      */
     void patchConflicts(String versionKey, String slot, String ref, Conflicts callback);
 
+    // ---- v40 新增：插入能力（宿主卡片 / 跳页；`plugin.json` 的 place 不在这层接口）-------
+
     /**
      * **v40**：用**宿主的卡片**弹一段信息 + 最多 3 个按钮（宿主风格；**不要自己 `new AlertDialog`**，
      * 那会叠两个窗口、主题也不一样）。异步：回调在 UI 线程。
      *
-     * <p>按钮按数组顺序渲染（左 → 右）；空字符串会被跳过，超过 3 个只画前 3 个。
-     * 用户点某个按钮 ⇒ {@code callback.onCard(那个按钮在入参数组里的下标)}；返回键 / 点卡片外面关掉
-     * ⇒ {@code onCard(-1)}。**回调只来一次**（点了按钮就不再补 -1）。
+     * <p>按钮按数组顺序渲染（左 → 右）；空串 / null **跳过**（所以"最多 3 个"指前 3 个**非空**的，
+     * 回调给的仍是它在原数组里的下标）。用户点某个按钮 ⇒ {@code onCard(原数组下标)}；
+     * 返回键 / 点卡片外面 / 点那颗「关闭」⇒ {@code onCard(-1)}。**回调只来一次**
+     * （点了按钮就不再补 -1）。同一页已经开着一张插件卡片时，新卡片会先收掉旧的。
      *
      * <p>⚠️ 按钮文案要短（两个字的动作词最好）、依据放 {@code body}：
      * Android 的按钮一长就竖排，卡片会变得很难看。
      *
      * @param title   标题（null / 空 ⇒ 不显示标题）
      * @param body    正文（null / 空 ⇒ 只有标题与按钮）
-     * @param buttons 按钮文案；null / 空数组 ⇒ 只给一个「关闭」
-     * @param callback 结果回调（可为 null）
+     * @param buttons 按钮文案；null / 空数组 / 全是空串 ⇒ 只给一个「关闭」
+     * @param callback 结果回调（可为 null；没有可用的界面时也回 -1，调用方不会永远等）
      */
     void showCard(String title, String body, String[] buttons, Card callback);
 
@@ -432,8 +437,9 @@ public interface PluginApi {
      *
      * <p>认得的 {@code page}：{@code main} / {@code slots} / {@code slot} / {@code saves} /
      * {@code maps} / {@code mods} / {@code blueprints} / {@code settings} / {@code logs} /
-     * {@code trash} / {@code plugins}。其余名字 ⇒ **什么也不做**（不崩、不弹窗）。
-     * 需要"哪一份"的页面（四个内容页与槽页）用 {@code slot}；null / 空 = 当前槽。
+     * {@code trash} / {@code plugins}。其余名字 ⇒ **什么也不做**（不崩、不弹窗、不回调）。
+     * 需要"哪一份"的页面（四个内容页与槽页）用 {@code slot}；null / 空 = **当前槽**
+     * （宿主会替你补成当前槽，不会把空槽丢给页面）。
      *
      * <p>⚠️ 版本页 / 补丁页要「哪一份」的版本 key，本接口不带 ⇒ 不开放（插件自己的页面里
      * 想给用户看这些，用 {@link #patches()} 等数据画，不要硬跳）。
