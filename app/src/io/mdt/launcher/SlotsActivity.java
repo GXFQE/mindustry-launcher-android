@@ -166,6 +166,8 @@ public class SlotsActivity extends BaseActivity {
 
         Util.applySystemInsets(root);
         setContentView(root);
+        // v41：`place: "summary"` 的行插在槽列表摘要下面
+        PluginEntries.attachPlacedSummary(this, Extensions.PAGE_SLOTS, Data.currentSlot(this));
     }
 
     private void refresh() {

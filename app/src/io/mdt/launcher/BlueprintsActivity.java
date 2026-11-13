@@ -166,6 +166,8 @@ public class BlueprintsActivity extends BaseActivity {
         // v40：`place: "actions"` 的插件动作插进本页操作卡（删除行之前）
         PluginEntries.attachPlacedActions(this, Extensions.PAGE_BLUEPRINTS,
                 mSlot == null || mSlot.isEmpty() ? Data.currentSlot(this) : mSlot);
+        PluginEntries.attachPlacedSummary(this, Extensions.PAGE_BLUEPRINTS,
+                mSlot == null || mSlot.isEmpty() ? Data.currentSlot(this) : mSlot);
         setTitle(Trans.get(BlueprintsActivity.this, R.string.bp_title_fmt, mSlot));
 
         mHead = (TextView) root.findViewById(R.id.bp_head);

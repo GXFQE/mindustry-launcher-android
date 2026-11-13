@@ -58,6 +58,8 @@ public class MapDetailActivity extends BaseActivity {
         View root = getLayoutInflater().inflate(R.layout.activity_map_detail, null);
         Util.applySystemInsets(root);
         setContentView(root);
+        // v41：`place: "detail"` 的行插进详情操作卡（"删除…"之前）
+        PluginEntries.attachPlacedDetails(this, Extensions.PAGE_MAP_DETAIL, pluginSlot());
 
         ((TextView) root.findViewById(R.id.detail_text)).setText(mItem.detail(this));
 

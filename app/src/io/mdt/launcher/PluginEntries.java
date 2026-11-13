@@ -52,12 +52,12 @@ final class PluginEntries {
     private PluginEntries() { }
 
     /**
-     * v40：**这一页已经真的插进操作卡的条目**（Activity → page → 视图/key）。
+     * v40/v41：**这一页已经真的插进宿主位置的条目**（Activity → 分组 key → 视图/key）。
      *
-     * <p>为什么要有它（第 374 轮评审 M1）：`place: "actions"` 的条目原本按"这一页有锚点"从
-     * 「插件」卡里删掉 —— 万一运行期没插上（锚点行被改名 / 父容器不是 ViewGroup / 没调这个入口），
-     * 两边都没有 = 条目彻底消失。现在「插件」卡只过滤**确实插上了**的那些 key；
-     * 插不上就回落原处。同时它让 `attachPlacedActions` 幂等（重挂前先摘旧行，见模组页换槽）。
+     * <p>分组 key = `page|place`（actions / summary / detail）。为什么要有它（第 374 轮评审 M1）：
+     * 条目原本按"这一页有锚点"从「插件」卡里删掉 —— 万一运行期没插上（锚点行被改名 /
+     * 父容器不是 ViewGroup / 没调这个入口），两边都没有 = 条目彻底消失。现在「插件」卡只过滤
+     * **确实插上了**的那些 key；插不上就回落原处。同时它让插桩幂等（重挂前先摘旧行）。
      */
     private static final WeakHashMap<Activity, Map<String, Inserted>> INSERTED =
             new WeakHashMap<Activity, Map<String, Inserted>>();
@@ -67,26 +67,36 @@ final class PluginEntries {
         final List<String> keys = new ArrayList<String>();
     }
 
+    private static String insertedGroup(String page, String place) {
+        return page + "|" + place;
+    }
+
     private static String placedKey(Entry e) {
         return e.id + "|" + (e.item == null ? "" : e.item.id);
     }
 
-    /** 这一页已插入的条目 key 集合（没有 ⇒ 空集，调用方据此"回落「插件」卡"）。 */
+    /** 这一页**所有插入分组**里的条目 key（没有 ⇒ 空集，调用方据此"回落「插件」卡"）。 */
     private static java.util.Set<String> insertedKeys(Activity a, String page) {
+        java.util.Set<String> out = new java.util.HashSet<String>();
+        if (a == null || page == null) return out;
+        String prefix = page + "|";
         synchronized (INSERTED) {
-            Map<String, Inserted> byPage = INSERTED.get(a);
-            Inserted ins = byPage == null ? null : byPage.get(page);
-            if (ins == null) return java.util.Collections.emptySet();
-            return new java.util.HashSet<String>(ins.keys);
+            Map<String, Inserted> byGroup = INSERTED.get(a);
+            if (byGroup == null) return out;
+            for (Map.Entry<String, Inserted> en : byGroup.entrySet()) {
+                if (en.getKey() == null || !en.getKey().startsWith(prefix)) continue;
+                if (en.getValue() != null) out.addAll(en.getValue().keys);
+            }
         }
+        return out;
     }
 
-    /** 摘掉这一页上一次插进操作卡的行（换槽 / 插件启停后重挂；没插过 ⇒ 什么都不做）。 */
-    private static void clearPlaced(Activity a, String page) {
+    /** 摘掉某页某一组上一次插的行（没插过 ⇒ 什么都不做）。 */
+    private static void clearPlaced(Activity a, String page, String place) {
         Inserted old = null;
         synchronized (INSERTED) {
-            Map<String, Inserted> byPage = INSERTED.get(a);
-            if (byPage != null) old = byPage.remove(page);
+            Map<String, Inserted> byGroup = INSERTED.get(a);
+            if (byGroup != null) old = byGroup.remove(insertedGroup(page, place));
         }
         if (old == null) return;
         for (View v : old.views) {
@@ -97,7 +107,7 @@ final class PluginEntries {
         }
     }
 
-    /** 把"已经插进操作卡"的条目从「插件」卡的行列表里去掉。 */
+    /** 把"已经插进宿主位置"的条目从「插件」卡的行列表里去掉。 */
     private static List<Entry> skipInserted(List<Entry> rows, java.util.Set<String> inserted) {
         if (rows == null || rows.isEmpty() || inserted == null || inserted.isEmpty()) return rows;
         List<Entry> out = new ArrayList<Entry>();
@@ -596,20 +606,24 @@ final class PluginEntries {
         return Math.round(v * a.getResources().getDisplayMetrics().density);
     }
 
-    // ---- v40：把动作插进宿主的操作卡（`place: "actions"`）-----------------------
+    // ---- v40/v41：把行插进宿主的位置（place = actions / summary / detail）---------
 
-    /**
-     * 这一页有没有**稳定的操作卡锚点**（"删除…"那一行）。
-     *
-     * <p>v40 只做四个内容页：它们的操作卡结构是同一套（导入 / 导出 / 删除）。
-     * 其它页写了 {@code place: "actions"} 也**回落**「插件」卡 —— 没有锚点就会"消失"，
-     * 那比放错地方更糟。
-     */
+    /** 这一页有没有**操作卡锚点**（"删除…"那一行）：四个内容页。 */
     static boolean hasActionAnchor(String page) {
-        return anchorRowId(page) != 0;
+        return actionAnchorRowId(page) != 0;
     }
 
-    private static int anchorRowId(String page) {
+    /** 这一页有没有**摘要锚点**（页头 / 摘要卡）：主界面、槽列表、四个内容页。 */
+    static boolean hasSummaryAnchor(String page) {
+        return summaryAnchorId(page) != 0;
+    }
+
+    /** 这一页有没有**详情卡片锚点**：地图 / 蓝图详情。 */
+    static boolean hasDetailAnchor(String page) {
+        return detailAnchorViewId(page) != 0;
+    }
+
+    private static int actionAnchorRowId(String page) {
         if (Extensions.PAGE_MAPS.equals(page)) return R.id.row_maps_del;
         if (Extensions.PAGE_SAVES.equals(page)) return R.id.row_save_del;
         if (Extensions.PAGE_MODS.equals(page)) return R.id.row_mod_del;
@@ -617,16 +631,35 @@ final class PluginEntries {
         return 0;
     }
 
-    /** 取这一页 `place: "actions"` 的条目（与 {@link #collect} 同一套 active 判据）。 */
-    static List<Entry> collectPlaced(Context ctx, String page) {
+    /** 详情页的**卡片锚点** = 插在它**后面**（详情正文之后、宿主的删除卡之前）。 */
+    private static int detailAnchorViewId(String page) {
+        if (Extensions.PAGE_MAP_DETAIL.equals(page)) return R.id.detail_text;
+        if (Extensions.PAGE_BLUEPRINT_DETAIL.equals(page)) return R.id.bp_detail_text;
+        return 0;
+    }
+
+    /** 摘要锚点 = 插在它**后面**的一个已有 View（页头 / 摘要卡）。 */
+    private static int summaryAnchorId(String page) {
+        if (Extensions.PAGE_MAIN.equals(page)) return R.id.status_box;
+        if (Extensions.PAGE_SLOTS.equals(page)) return R.id.saves_summary;
+        if (Extensions.PAGE_MAPS.equals(page)) return R.id.maps_head;
+        if (Extensions.PAGE_SAVES.equals(page)) return R.id.save_head;
+        if (Extensions.PAGE_MODS.equals(page)) return R.id.mods_status_box;
+        if (Extensions.PAGE_BLUEPRINTS.equals(page)) return R.id.bp_head;
+        return 0;
+    }
+
+    /** 取这一页某个 `place` 的条目（与 {@link #collect} 同一套 active 判据）。 */
+    static List<Entry> collectPlaced(Context ctx, String page, String place) {
         List<Entry> out = new ArrayList<Entry>();
-        if (ctx == null || page == null || !hasActionAnchor(page)) return out;
+        if (ctx == null || page == null || place == null) return out;
+        if (!hasPlace(page, place)) return out;
         String active = Plugins.active(ctx);
         for (String id : Plugins.stateIds(active)) {
             String ver = Plugins.stateGet(active, id);
             if (ver == null || ver.isEmpty()) continue;
             File apk = Plugins.apkOf(ctx, id, ver);
-            List<Extensions.Item> items = Extensions.forPlacedActions(Extensions.of(apk), page);
+            List<Extensions.Item> items = Extensions.forPlaced(Extensions.of(apk), page, place);
             if (items.isEmpty()) continue;
             String name = Plugins.displayNameOf(ctx, id);
             for (Extensions.Item it : items) out.add(new Entry(id, ver, name, it));
@@ -634,19 +667,106 @@ final class PluginEntries {
         return out;
     }
 
+    /** v40 的老名字（只认 actions）。 */
+    static List<Entry> collectPlaced(Context ctx, String page) {
+        return collectPlaced(ctx, page, Extensions.PLACE_ACTIONS);
+    }
+
+    static boolean hasPlace(String page, String place) {
+        if (Extensions.PLACE_ACTIONS.equals(place)) return hasActionAnchor(page);
+        if (Extensions.PLACE_SUMMARY.equals(place)) return hasSummaryAnchor(page);
+        if (Extensions.PLACE_DETAIL.equals(place)) return hasDetailAnchor(page);
+        return false;
+    }
+
+    /** v40：把 `place: "actions"` 的行插进操作卡（"删除…"之前）。 */
+    static void attachPlacedActions(Activity a, String page, String slot) {
+        attachPlacedAtRow(a, page, Extensions.PLACE_ACTIONS, actionAnchorRowId(page), slot);
+    }
+
     /**
-     * 把 `place: "actions"` 的行插进**宿主那一页的操作卡**（"删除…"那一行之前）。
+     * v41：把 `place: "detail"` 的行插成**详情页自己的一张卡**（详情正文之后、宿主删除卡之前）。
+     *
+     * <p>⚠️ 为什么不插进宿主那张 `detail_actions` 卡：那张卡在"游戏自带 / 模组自带的地图"上是
+     * **GONE** 的（没有删除入口）⇒ 插件行会跟着一起消失，而且点开它会把空的删除行也带出来。
+     * 单独一张卡对所有详情项都成立。
+     */
+    static void attachPlacedDetails(Activity a, String page, String slot) {
+        attachPlacedCardAfter(a, page, Extensions.PLACE_DETAIL, detailAnchorViewId(page), slot, 0);
+    }
+
+    /**
+     * v41：把 `place: "summary"` 的行插在**摘要 / 页头下面**（一张宿主卡片）。
      *
      * <p>没声明 / 没锚点 / 没生效中的插件 ⇒ 一个像素都不动（本方法可以无条件在 onCreate 里调）。
-     * <p>★ 幂等：重挂前先摘掉上一轮插的行（模组页换槽会在 `rescan()` 里再调一次）。
-     * ★ 失败时什么都不记 ⇒ 对应的条目仍由 `attachPage` 画进「插件」卡（不消失，评审 M1）。
      */
-    static void attachPlacedActions(Activity a, String page, String slot) {
+    static void attachPlacedSummary(Activity a, String page, String slot) {
         if (a == null || page == null) return;
-        int rid = anchorRowId(page);
-        if (rid == 0) return;
-        clearPlaced(a, page);
-        List<Entry> rows = collectPlaced(a, page);
+        attachPlacedCardAfter(a, page, Extensions.PLACE_SUMMARY, summaryAnchorId(page), slot, 8);
+    }
+
+    /**
+     * 通用：在锚点 View **后面**插一张宿主卡片（summary / detail 共用）。
+     *
+     * @param padOwner 这一页的根容器有没有横向内边距（没有 ⇒ 卡片自己留 14dp）
+     */
+    private static void attachPlacedCardAfter(Activity a, String page, String place, int anchorId,
+                                              String slot, int bottomDp) {
+        if (a == null || page == null || anchorId == 0) return;
+        clearPlaced(a, page, place);
+        List<Entry> rows = collectPlaced(a, page, place);
+        if (rows.isEmpty()) return;
+        View anchor = a.findViewById(anchorId);
+        if (anchor == null || !(anchor.getParent() instanceof ViewGroup)) return;
+        ViewGroup parent = (ViewGroup) anchor.getParent();
+        int at = parent.indexOfChild(anchor);
+        if (at < 0) return;
+        Inserted ins = new Inserted();
+        try {
+            LinearLayout card = new LinearLayout(a);
+            card.setOrientation(LinearLayout.VERTICAL);
+            card.setBackgroundResource(R.drawable.card_bg);
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            if (!isPaddedParent(page)) {
+                lp.setMarginStart(dp(a, 14));
+                lp.setMarginEnd(dp(a, 14));
+            }
+            lp.topMargin = dp(a, 8);
+            lp.bottomMargin = dp(a, bottomDp);
+            card.setLayoutParams(lp);
+            for (int i = 0; i < rows.size(); i++) {
+                if (i > 0) card.addView(divider(a));
+                card.addView(placedRow(a, rows.get(i), page, slot));
+            }
+            parent.addView(card, at + 1);
+            ins.views.add(card);
+            for (Entry e : rows) ins.keys.add(placedKey(e));
+        } catch (Throwable t) {
+            for (View v : ins.views) {
+                if (v != null && v.getParent() instanceof ViewGroup) {
+                    ((ViewGroup) v.getParent()).removeView(v);
+                }
+            }
+            return;
+        }
+        remember(a, page, place, ins);
+    }
+
+    /** 主界面 / 槽列表 / 模组页的根容器自己有横向内边距 ⇒ 卡片不再加 14dp。 */
+    private static boolean isPaddedParent(String page) {
+        return Extensions.PAGE_MAIN.equals(page) || Extensions.PAGE_SLOTS.equals(page)
+                || Extensions.PAGE_MODS.equals(page)
+                || Extensions.PAGE_MAP_DETAIL.equals(page)
+                || Extensions.PAGE_BLUEPRINT_DETAIL.equals(page);
+    }
+
+    /** actions / detail 共用：插到锚点行之前，每行自带一条分割线。 */
+    private static void attachPlacedAtRow(Activity a, String page, String place, int rid,
+                                         String slot) {
+        if (a == null || page == null || rid == 0) return;
+        clearPlaced(a, page, place);
+        List<Entry> rows = collectPlaced(a, page, place);
         if (rows.isEmpty()) return;
         View anchor = a.findViewById(rid);
         if (anchor == null || !(anchor.getParent() instanceof ViewGroup)) return;
@@ -665,7 +785,6 @@ final class PluginEntries {
                 ins.keys.add(placedKey(e));
             }
         } catch (Throwable t) {
-            // 插一半失败 ⇒ 把已经插上的摘掉，别留半截（条目会回落到「插件」卡）
             for (View v : ins.views) {
                 if (v != null && v.getParent() instanceof ViewGroup) {
                     ((ViewGroup) v.getParent()).removeView(v);
@@ -673,17 +792,21 @@ final class PluginEntries {
             }
             return;
         }
+        remember(a, page, place, ins);
+    }
+
+    private static void remember(Activity a, String page, String place, Inserted ins) {
         synchronized (INSERTED) {
-            Map<String, Inserted> byPage = INSERTED.get(a);
-            if (byPage == null) {
-                byPage = new HashMap<String, Inserted>();
-                INSERTED.put(a, byPage);
+            Map<String, Inserted> byGroup = INSERTED.get(a);
+            if (byGroup == null) {
+                byGroup = new HashMap<String, Inserted>();
+                INSERTED.put(a, byGroup);
             }
-            byPage.put(page, ins);
+            byGroup.put(insertedGroup(page, place), ins);
         }
     }
 
-    /** 插进宿主操作卡的一行：content 打开插件页；action 在本页跑（与「插件」卡里同一种行为）。 */
+    /** 插进宿主位置的一行：content 打开插件页；action 在本页跑（与「插件」卡里同一种行为）。 */
     private static View placedRow(final Activity a, final Entry e, final String page,
                                   final String slot) {
         final boolean openPage = Extensions.SLOT_CONTENT.equals(e.item.slot);

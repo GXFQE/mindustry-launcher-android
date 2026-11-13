@@ -99,6 +99,22 @@ final class Extensions {
      * 其它页写了也**回落原行为**（进「插件」卡），不会消失。
      */
     static final String PLACE_ACTIONS = "actions";
+
+    /**
+     * **v41**：`place` = `"summary"` —— 插到**页面摘要 / 页头**下面一行（宿主卡片样式）。
+     *
+     * <p>与 `actions` 的区别是"位置更靠前、更显眼"：适合"这个页面最该先看到的那一件事"
+     * （例如地图页的"统计一下当前筛选结果"）。有摘要锚点的页才生效，其余页回落「插件」卡。
+     */
+    static final String PLACE_SUMMARY = "summary";
+
+    /**
+     * **v41**：`place` = `"detail"` —— 插到**详情页操作卡**（地图详情 / 蓝图详情）的「删除…」之前。
+     *
+     * <p>为什么不是计划里写的"键值行"：键值行需要插件返回**动态值**的接口，那是声明式 UI 的一部分，
+     * 本轮没做；先用"一行"（与动作行同款）占住位置，插件点开可以用 `showCard` 给键值。
+     */
+    static final String PLACE_DETAIL = "detail";
     /** v24：分析器 —— 插件给结论（{@link io.mdt.launcher.api.Finding}），宿主渲染。 */
     static final String SLOT_ANALYZER = "analyzer";
     /**
@@ -172,7 +188,10 @@ final class Extensions {
                 String page = trim(o.optString("page", ""));   // 只有 content 插槽用得上
                 String event = trim(o.optString("event", ""));  // v23：事件扩展
                 String place = trim(o.optString("place", "")).toLowerCase(java.util.Locale.ROOT);
-                if (!PLACE_ACTIONS.equals(place)) place = "";   // 认不出的 place ⇒ 原行为
+                if (!PLACE_ACTIONS.equals(place) && !PLACE_SUMMARY.equals(place)
+                        && !PLACE_DETAIL.equals(place)) {
+                    place = "";                                 // 认不出的 place ⇒ 原行为
+                }
                 out.add(new Item(id, trim(o.optString("title", "")), trim(o.optString("subtitle", "")),
                         entry, slot, page, event, place));
             }
@@ -259,21 +278,27 @@ final class Extensions {
     }
 
     /**
-     * **v40**：这一页该"插进宿主操作卡"的条目（`place: "actions"`）。
+     * **v40/v41**：这一页该"插进宿主指定位置"的条目（`place` = actions / summary / detail）。
      *
      * <p>只认 `action` / `content` 两种 slot（section 是画一段自己的 View，没有"一行"的形态）；
-     * 顺序 = 声明顺序。哪一页有操作卡锚点由调用方（{@code PluginEntries}) 判。
+     * 顺序 = 声明顺序。哪一页有对应锚点由调用方（{@code PluginEntries}）判。
      */
-    static List<Item> forPlacedActions(List<Item> all, String page) {
+    static List<Item> forPlaced(List<Item> all, String page, String place) {
         List<Item> out = new ArrayList<Item>();
-        if (all == null || page == null || !knownPage(page)) return out;
+        if (all == null || page == null || place == null || place.isEmpty()
+                || !knownPage(page)) return out;
         for (Item it : all) {
-            if (!PLACE_ACTIONS.equals(it.place)) continue;
+            if (!place.equals(it.place)) continue;
             if (!SLOT_ACTION.equals(it.slot) && !SLOT_CONTENT.equals(it.slot)) continue;
             if (!page.equals(it.page)) continue;
             out.add(it);
         }
         return out;
+    }
+
+    /** v40 的老名字（只认 actions）—— 保留给现有调用点与自检。 */
+    static List<Item> forPlacedActions(List<Item> all, String page) {
+        return forPlaced(all, page, PLACE_ACTIONS);
     }
 
     /** 这一条现在**真的会被渲染**吗（唯一的"用得上"判据，报告 / 提示都走它）。 */

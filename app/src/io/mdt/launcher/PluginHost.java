@@ -20,6 +20,7 @@ import io.mdt.launcher.api.GitHubRelease;
 import io.mdt.launcher.api.ItemInfo;
 import io.mdt.launcher.api.PluginApi;
 import io.mdt.launcher.api.PluginTheme;
+import io.mdt.launcher.api.PluginUi;
 import io.mdt.launcher.api.Result;
 import io.mdt.launcher.api.SlotInfo;
 
@@ -126,8 +127,12 @@ public final class PluginHost {
      * `openPage`（跳到宿主页面；只开放不需要额外上下文的页）；另外 `plugin.json` 的扩展条目多了
      * `place: "actions"`（插进宿主那一页的操作卡，而不是底部「插件」卡），三个新页面钩子
      * （version / patches / resources）也会挂 {@code plugin_section}。
+     *
+     * <p>v41（2026-11-13 第 375 轮）：**宿主组件工具箱** `PluginApi.ui()`（card / row / button /
+     * divider / kv / sectionTitle / text，全部用宿主资源与主题）+ `openPluginPage()`（打开自己的整页）；
+     * `place` 扩到 `summary`（摘要 / 页头下面一行）与 `detail`（详情操作卡）。
      */
-    public static final int API = 40;
+    public static final int API = 41;
     /**
      * 还认的**最老**契约版本。
      *
@@ -385,13 +390,17 @@ public final class PluginHost {
         File home = apk.getParentFile();
         File pdata = home == null ? null : new File(home, "data");
         File pcache = home == null ? null : new File(home, "cache");
+        // v41：插件身份（`openPluginPage()` 要用；目录名 = id、文件名 = 版本）
+        String selfId = home == null ? "" : home.getName();
+        String selfVer = apk.getName();
+        if (selfVer.endsWith(".apk")) selfVer = selfVer.substring(0, selfVer.length() - 4);
         // 第 159 轮：老调用点（插件页 / dev 实验）没有页面信息 ⇒ 一律当"插件页 + 当前槽"
         String usePage = (page == null || page.trim().isEmpty())
                 ? Extensions.SLOT_PLUGINS : page.trim();
         String useSlot = (slot == null || slot.trim().isEmpty())
                 ? Data.currentSlot(host) : slot.trim();
         PContext pc = new PContext(host, am, res, cl, pdata, pcache, usePage, useSlot, selected,
-                item);
+                item, selfId, selfVer, entryName);
         return new Loaded(cl, pc, pc, entry, api, roSet, stillWritable, from, cookie);
     }
 
@@ -461,13 +470,19 @@ public final class PluginHost {
         private final File selected;
         /** v9：详情页上当前这一项（含容器 / 条目）。 */
         private final ItemInfo item;
+        /** v41：插件身份（`openPluginPage()` 用）。 */
+        private final String selfId, selfVer, selfEntry;
 
         PContext(Context base, AssetManager am, Resources res, ClassLoader cl, File files, File cache,
-                 String page, String slot, File selected, ItemInfo item) {
+                 String page, String slot, File selected, ItemInfo item,
+                 String selfId, String selfVer, String selfEntry) {
             super(base);
             this.am = am; this.res = res; this.cl = cl;
             this.files = files; this.cache = cache;
             this.page = page; this.slot = slot; this.selected = selected; this.item = item;
+            this.selfId = selfId == null ? "" : selfId;
+            this.selfVer = selfVer == null ? "" : selfVer;
+            this.selfEntry = selfEntry == null ? "" : selfEntry;
         }
 
         @Override public AssetManager getAssets() { return am; }
@@ -1166,7 +1181,7 @@ public final class PluginHost {
             });
         }
 
-        /** **v40**：跳宿主页面（页面名映射与 extra 只在 {@link PluginPages#intent} 一处）。 */
+        /** **v41**：跳宿主页面（页面名映射与 extra 只在 {@link PluginPages#intent} 一处）。 */
         @Override public void openPage(final String page, final String slot) {
             final Activity a = activityOrNull();
             if (a == null || a.isFinishing()) return;
@@ -1178,6 +1193,29 @@ public final class PluginHost {
                         a.startActivity(i);
                     } catch (Throwable ignored) {
                         // 页面被禁用 / 被 ROM 裁掉：不把插件带崩
+                    }
+                }
+            });
+        }
+
+        /** **v41**：宿主组件工具箱（用宿主 context，不是插件的那个）。 */
+        @Override public PluginUi ui() {
+            Activity a = activityOrNull();
+            return new PluginUiHost(a != null ? a : getBaseContext());
+        }
+
+        /** **v41**：打开插件自己的整页（`content` 槽点进去的那一页）。 */
+        @Override public void openPluginPage() {
+            final Activity a = activityOrNull();
+            if (a == null || a.isFinishing()) return;
+            if (selfId.isEmpty() || selfVer.isEmpty()) return;
+            a.runOnUiThread(new Runnable() {
+                @Override public void run() {
+                    try {
+                        PluginsActivity.start(a, selfId, selfVer, selfEntry, page, slot,
+                                Plugins.displayNameOf(a, selfId), selected);
+                    } catch (Throwable ignored) {
+                        // 同样：页面起不来不把插件带崩
                     }
                 }
             });

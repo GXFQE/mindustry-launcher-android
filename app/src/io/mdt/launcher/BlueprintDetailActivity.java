@@ -60,6 +60,8 @@ public class BlueprintDetailActivity extends BaseActivity {
         View root = getLayoutInflater().inflate(R.layout.activity_blueprint_detail, null);
         Util.applySystemInsets(root);
         setContentView(root);
+        // v41：`place: "detail"` 的行插进详情操作卡（"删除…"之前）
+        PluginEntries.attachPlacedDetails(this, Extensions.PAGE_BLUEPRINT_DETAIL, pluginSlot());
 
         mText = (TextView) root.findViewById(R.id.bp_detail_text);
         mText.setText(mItem.detail(this));

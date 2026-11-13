@@ -200,6 +200,8 @@ public class MapsActivity extends BaseActivity {
         // v40：`place: "actions"` 的插件动作插进本页操作卡（删除行之前）
         PluginEntries.attachPlacedActions(this, Extensions.PAGE_MAPS,
                 mSlot == null || mSlot.isEmpty() ? Data.currentSlot(this) : mSlot);
+        PluginEntries.attachPlacedSummary(this, Extensions.PAGE_MAPS,
+                mSlot == null || mSlot.isEmpty() ? Data.currentSlot(this) : mSlot);
 
         // 布局里那些静态文案已搬到 Java（见 Trans）：布局够不到用户语言包
         Trans.bind(root, R.id.tx_map_save_name_hint, R.string.map_save_name_hint);

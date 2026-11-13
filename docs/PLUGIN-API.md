@@ -5,7 +5,7 @@
 
 ## 1. 版本与兼容（v20 冻结基线）
 
-- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..40**。
+- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..41**。
   （v20 是冻结基线；v21 = 游戏设置面；v22 = 后台任务 + 游戏事件；v23 = 探针；v24 = 分析器；
   v25 = 结论挂行 + 筛选/排序注入 + HJSON；v26 = 逐项判定；v27 = 详情页的门 + 槽级结论进摘要卡；
   v28 = 原版文案键；v29 = 游戏前后台事件；v30 = 探针知道版本 / 跨会话数据目录 + 摘要卡总时长；
@@ -37,7 +37,11 @@
   **v40 = 插入能力**：`showCard(title, body, buttons, cb)`（宿主卡片，最多 3 个按钮；回调只来一次，
   点按钮给下标、关掉给 -1）+ `openPage(page, slot)`（跳宿主页面；slot 空 = 当前槽）；`plugin.json`
   的扩展条目多一个可选 `"place": "actions"`（把动作插进宿主操作卡，四个内容页有锚点，别的页回落
-  「插件」卡）；三个新页面钩子 `version` / `patches` / `resources`。**不给换主题 / 改布局。**）
+  「插件」卡）；三个新页面钩子 `version` / `patches` / `resources`。**不给换主题 / 改布局。**
+  **v41 = 宿主组件工具箱 + 打开自己的页**：`ui()` 返回 `PluginUi`（card / row / rowStatic / button /
+  divider / kv / sectionTitle / text，全部用宿主资源与主题色，自绘插件也能长得像宿主）；
+  `openPluginPage()` 从 section / action 里打开自己的整页；`place` 扩到 `summary`（页头 / 摘要下）
+  与 `detail`（详情页自己的一张动作卡）。）
 - 插件 `api()` 报的是「我需要的最低宿主接口版本」。用不到的新能力**不要**报高 ——
   报高了只会在老宿主上被拒，换不来任何东西。
 - **不要用 try/catch 去兼容老宿主**：报什么版本就只会跑在什么版本上。`api()` 报 20，
@@ -98,6 +102,16 @@
 
 `place` 对 `plugins` / `analyzer` / `filter` / `sort` 等其它 slot **不生效**（静默按原行为）。
 
+`place` 的取值（v41 起）：
+
+| 值 | 插到哪 | 有锚点的页 |
+|---|---|---|
+| `actions` | 宿主**操作卡**（"删除…"之前） | maps / saves / mods / blueprints |
+| `summary` | **页头 / 摘要卡**下面一张宿主卡片 | main / slots / maps / saves / mods / blueprints |
+| `detail` | **详情页自己的一张动作卡**（详情正文之后、宿主删除卡之前） | map-detail / blueprint-detail |
+
+⚠️ 没有锚点的页写了 `place` 会**回落**「插件」卡（不会消失）；`place` 只对 `action` / `content` 生效。
+
 #### 插入位置（v40）
 
 默认三类插槽都画在页面底部的「插件」卡里；`"place": "actions"` 让 `action` / `content` 条目
@@ -115,7 +129,7 @@
 ## 3. 入口类约定
 
 ```java
-public static int api();                        // 必需：你需要的接口版本（当前 40；用不到新能力就报 20）
+public static int api();                        // 必需：你需要的接口版本（当前 41；用不到新能力就报 20）
 public static View createView(PluginApi api);   // content / section 用
 public static void run(PluginApi api);          // action 用（在原页跑，不换页）
 public static void unload();                    // 可选：收尾（也认 unload(Context)）
@@ -135,7 +149,7 @@ public static void unload();                    // 可选：收尾（也认 unlo
 
 | 方法 | 说明 |
 |---|---|
-| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 40） |
+| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 41） |
 | `context()` | 插件上下文（**只用来取资源 / 主题 / 建 View**） |
 | `page()` / `slot()` | 从哪一页来 / 当前槽名 |
 | `theme()` | 主题色与 dp/sp（别自己写死颜色，见 `PluginTheme`） |
@@ -233,20 +247,23 @@ public static void unload();                    // 可选：收尾（也认 unlo
 | `progressCard(title, msg, done, total[, cancelable, cb])` / `progressCardClose()` | 宿主进度框（4 参 = 不可取消） |
 | `showCard(title, body, buttons, cb)`（v40） | 宿主卡片弹一段信息 + 最多 3 个按钮；**回调只来一次**（点了给下标，返回/点外面给 -1） |
 | `openPage(page, slot)`（v40） | 跳到宿主页面（只开放不需要额外上下文的页，见下文「插入能力」） |
+| `openPluginPage()`（v41） | 打开**插件自己的整页**（从 section / action 里用；没有可用页面 ⇒ 静默） |
+| `ui()`（v41） | 宿主组件工具箱（`PluginUi`：card / row / button / divider / kv …，见下文「宿主组件工具箱」） |
 
 ### 插入能力（v40）
 
 **目标：插件做的事和宿主做的事看起来是同一套界面**（用户 2026-11-13：「我们尽可能让用户装了插件以后
 是无感的，而不是明显插件和宿主的割裂感」）。三件东西：
 
-1. **`place: "actions"`**（`plugin.json`，不是接口）：把 `action` / `content` 条目插进宿主操作卡。
+1. **`place`**（`plugin.json`，不是接口）：把 `action` / `content` 条目插进宿主指定位置 ——
+   `actions` 操作卡 / `summary` 页头下 / `detail` 详情页自己的卡；取值与锚点见第 2 节表格。
 2. **`showCard`**：插件要弹信息时用宿主卡片，别自己 `new AlertDialog`（叠窗 + 主题不一致）。
-   - `buttons` 最多画 3 个：数组里的空串 / null **跳过**（所以"前 3 个"指前 3 个**非空**的按钮，
-  回调给的仍是它在**原数组里的下标**）；全是空串 / null ⇒ 只给一个「关闭」。
-- 点「关闭」/ 返回 / 点卡片外面 ⇒ `onCard(-1)`。同一页已经开着一张插件卡片时，新卡片会先收掉旧的
-  （同窗只留一张，别叠两个对话框）。
+   - `buttons` 最多画 3 个：数组里的空串 / null **跳过**（"前 3 个"指前 3 个**非空**的按钮），
+     回调给的仍是它在**原数组里的下标**；全是空串 / null ⇒ 只给一个「关闭」。
+   - 点「关闭」/ 返回 / 点卡片外面 ⇒ `onCard(-1)`。同一页已经开着一张插件卡片时，新卡片会先收掉
+     旧的（同窗只留一张，别叠两个对话框）。
    - 按钮文案要短（两字的动作词），依据放 `body` —— Android 按钮一长就竖排。
-   - 回调在 UI 线程；用户点按钮 ⇒ `onCard(按钮在入参数组里的下标)`；返回 / 点卡片外面 ⇒ `onCard(-1)`。
+   - 回调在 UI 线程；**回调只来一次**。
 3. **`openPage(page, slot)`**：认得的 `page`：
    `main` / `slots` / `slot` / `saves` / `maps` / `mods` / `blueprints` / `settings` / `logs` /
    `trash` / `plugins`。`slot` 只对 `slot` / 四个内容页有效（空 = 当前槽）；其余页面忽略。
@@ -255,8 +272,29 @@ public static void unload();                    // 可选：收尾（也认 unlo
 
 **边界（有意的）**：
 - 不给插件"换宿主主题 / 改宿主布局"的能力 —— 那是割裂的另一种写法。
-- `api.ui()`（宿主组件工具箱）/ 摘要卡与详情页的 `place` 锚点**还没做**，见 `docs/plans/` 的批次表。
+- 声明式 UI（插件返回节点树、宿主统一渲染）与 `rows` 虚拟组行**还没做**，见 `docs/plans/` 的批次表。
 
+### 宿主组件工具箱（v41）
+
+`ui()` 返回 `PluginUi`，给**自绘插件**一套宿主的零件 —— 自己 `new TextView` 画出来的字号 /
+颜色 / 行高跟宿主不一样，用户一眼看出是插件；用这套拼就跟宿主自己的卡片、操作行一样：
+
+| 方法 | 零件 |
+|---|---|
+| `card()` | 竖向卡片容器（宿主卡片底色 / 圆角） |
+| `row(title, subtitle)` | 可点操作行（图标 + 标题 + 副标题 + 右箭头） |
+| `rowStatic(title, subtitle)` | 只读信息行（同款，无箭头、不可点） |
+| `button(text)` | 主按钮（实底 accent、白字、居中） |
+| `divider()` | 1dp 分割线（左侧缩进与操作行对齐） |
+| `kv(label, value)` | 键值行（左标签次要色 + 右值可换行） |
+| `sectionTitle(text)` | 小标题（12sp 次要色） |
+| `text(text, muted)` | 正文（13sp；`muted` = 次要色） |
+
+规则：**主线程调用**；返回的 View 归插件（自己 `addView` / `setOnClickListener`）；不要在外面再套
+自定义背景（零件自带）；文字仍走插件自己的语言包。
+
+`openPluginPage()`：从 `section` / `action` 里打开**插件自己的整页**（`content` 槽点进去的那一页），
+给"摘要里放一段、想看全部"的场景；没有可用页面（后台任务里调）⇒ 静默不动作。
 ### 任务
 
 | 方法 | 说明 |
@@ -723,6 +761,7 @@ void writeGameSettings(String slot, Map<String, Object> changes, Done done); // 
   回调回 UI 线程；`download` 额外返回 `Task`（可取消，通知栏有进度）。
 - v40 的 `showCard` / `openPage` **不返回 `Result`**：`showCard` 永远给一次 `onCard`（没有界面 ⇒ -1），
   `openPage` 认不出的页面**静默跳过**（不回调、不弹窗、不崩）。要判断"能不能去这一页"请按文档白名单。
+- v41 的 `ui()` / `openPluginPage()` 也**没有回调**：零件是同步造出来的 View；打开自己的页失败时静默。
 
 ## 6. 失败语义：`Result`
 
@@ -779,10 +818,14 @@ public final String reason;  // 机器码；成功恒为 null，失败恒非空
 
 ## 8. 配套示例：`plugins/sample/`
 
-仓库里的 `plugins/sample/` 是一个**按本文档从零写出来**的最小完整插件（约 150 行），用来当模板与冒烟测试：
+仓库里的 `plugins/sample/` 是一个**按本文档从零写出来**的最小完整插件，用来当模板与冒烟测试：
 
-- `section` 挂在 `map-detail`：显示当前地图的标题 / 大小，并读**前 8 字节**证明 `open()` 真的能读
-- `action` 挂在 `maps`：勾选地图 → 选 json / csv → `export(..., after)`
+- `section` 挂在 `map-detail`：**v41 起用 `api.ui()` 拼**（sectionTitle + kv "title/size/head" + 一个
+  「Open plugin page」按钮走 `openPluginPage()`），并读**前 8 字节**证明 `open()` 真的能读
+- `action` 挂在 `maps`：勾选地图 → 选 json / csv → `export(..., after)`；同一页还有 `showCard` 示例行
+  （`SampleCard`）与 `place: "summary"` 的摘要行
+- `place: "detail"` 挂在 `map-detail`：详情页自己那张动作卡里一行
+- 三个页面钩子（version / patches / resources）各一个 `section`，用来验 `plugin_section` 挂载
 - `unload()`：关页时写一行 `SAMPLE unload` 日志
 
 构建（与 mapstats 同一条链，**API 桩直接取宿主那份**）：
@@ -986,7 +1029,13 @@ v40（2026-11-13 第 374 轮）：**插入能力**（用户：「插件和宿主
 别的页回落「插件」卡）；三个新页面钩子 `version` / `patches` / `resources`（布局里有
 `plugin_section`，三类插槽都能挂）。`API_MIN` 仍不动（区间 20..40）。
 **有意的边界**：不给插件"换宿主主题 / 改宿主布局"的能力；`api.ui()`（宿主组件工具箱）与
-摘要卡 / 详情页的 `place` 锚点还没做（见 `docs/plans/` 的批次表）。
+摘要卡 / 详情页的 `place` 锚点还没做（见 `docs/plans/` 的批次表；v41 已补）。
+v41（2026-11-13 第 375 轮）：**宿主组件工具箱 + 打开自己的页 + place 扩位**（用户：「尽可能让用户
+装了插件以后是无感的」）—— `ui()` 返回 `PluginUi`（card / row / rowStatic / button / divider /
+kv / sectionTitle / text，全部用宿主布局资源与主题色；自绘插件也能长得像宿主）；
+`openPluginPage()`（从 section / action 打开自己的整页）；`place` 扩到 `summary`（主界面 / 槽列表 /
+四个内容页的页头下）与 `detail`（两个详情页自己的一张动作卡 —— 不放进宿主的删除卡，那张卡对
+游戏自带 / 模组自带项是 GONE 的）。`API_MIN` 仍不动（区间 20..41）。
 
 **官方体检插件**：`plugins/mods-health`（第 229 轮，前身叫 `conflict`）。宿主原来的那行
 「查模组冲突」整块删掉，判据搬进插件的 `core/Conflicts.java` 与 `core/Gates.java`；

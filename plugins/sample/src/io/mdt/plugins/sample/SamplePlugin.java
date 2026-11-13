@@ -28,12 +28,51 @@ import io.mdt.launcher.api.Result;
 public final class SamplePlugin {
 
     public static int api() {
-        return 20;
+        return 41;
     }
 
     public static View createView(PluginApi api) {
         Context c = api.context();
         PluginTheme t = api.theme();
+        if ("map-detail".equals(api.page())) {
+            // v41：用**宿主组件工具箱**拼这一段（字号 / 颜色 / 圆角都跟宿主一样）
+            io.mdt.launcher.api.PluginUi ui = api.ui();
+            LinearLayout card = (LinearLayout) ui.card();
+            card.addView(ui.sectionTitle("Sample plugin"));
+            ItemInfo it = api.selectedItem();
+            if (it == null) {
+                card.addView(ui.text("no selected item", true));
+            } else {
+                card.addView(ui.kv("title", it.title));
+                card.addView(ui.kv("size", it.size + " B"));
+                String head = "";
+                try {
+                    InputStream in = api.open(it);
+                    if (in != null) {
+                        byte[] buf = new byte[8];
+                        int n = in.read(buf);
+                        in.close();
+                        StringBuilder sb = new StringBuilder();
+                        for (int i = 0; i < Math.max(n, 0); i++) {
+                            sb.append(String.format("%02x", buf[i] & 0xff));
+                        }
+                        head = sb.toString();
+                    }
+                } catch (Throwable e) {
+                    head = "err: " + e.getClass().getSimpleName();
+                }
+                card.addView(ui.kv("head", head));
+            }
+            // v41：宿主按钮 + 打开插件自己的整页（openPluginPage）
+            View open = ui.button("Open plugin page");
+            open.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) {
+                    api.openPluginPage();
+                }
+            });
+            card.addView(open);
+            return card;
+        }
         LinearLayout box = new LinearLayout(c);
         box.setOrientation(LinearLayout.VERTICAL);
 

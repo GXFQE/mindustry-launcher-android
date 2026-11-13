@@ -615,6 +615,8 @@ public class MainActivity extends BaseActivity {
 
         Util.applySystemInsets(root);
         setContentView(root);
+        // v41：`place: "summary"` 的行插在摘要卡下面（没声明 ⇒ 一个像素都不动）
+        PluginEntries.attachPlacedSummary(this, Extensions.PAGE_MAIN, Data.currentSlot(this));
     }
 
     // ── 顶栏右上角：设置（第 123 轮第二批）───────────────────────────────────

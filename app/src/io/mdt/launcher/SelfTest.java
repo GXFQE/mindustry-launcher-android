@@ -4562,6 +4562,8 @@ public final class SelfTest {
         }
         // 第 374 轮（v40）：插入能力（宿主卡片 / 跳页 / place=actions / 三个页面钩子）
         pluginV40(ctx, L, stat);
+        // 第 375 轮（v41）：宿主组件工具箱 / 打开自己的页 / place=summary·detail
+        pluginV41(ctx, L, stat);
         try {
             java.lang.reflect.Method vi = io.mdt.launcher.api.ProbeEnv.class.getMethod("versionInfo");
             java.lang.reflect.Method dv = io.mdt.launcher.api.ProbeEnv.class.getMethod("displayVersion");
@@ -5917,6 +5919,172 @@ public final class SelfTest {
         }
     }
 
+    /**
+     * 第 375 轮（v41）：**宿主组件工具箱 / 打开自己的整页 / place=summary·detail**。
+     *
+     * <p>尺子分三半：签名与接口方法全；place 解析与锚点表；`PluginUiHost` 造出来的零件
+     * （在**主线程**造 View，断言文字 / 方向 / 子节点数）—— 造 View 放后台线程在 Android 上不稳。
+     */
+    private static void pluginV41(Context ctx, List<String> L, int[] stat) {
+        L.add("");
+        L.add("【v41 · 宿主组件工具箱 / 打开自己的页 / place=summary·detail（第 375 轮）】");
+        ok(stat, L, PluginHost.API >= 41 && PluginApi.DOC_VERSION == PluginHost.API
+                        && PluginApi.DOC_VERSION >= 41,
+                "host plugin api == 41（ui / openPluginPage / place summary·detail）");
+        try {
+            java.lang.reflect.Method ui = PluginApi.class.getMethod("ui");
+            java.lang.reflect.Method opp = PluginApi.class.getMethod("openPluginPage");
+            Class<?> pui = io.mdt.launcher.api.PluginUi.class;
+            boolean methodsOk = pui.getMethod("card").getReturnType() == android.view.View.class
+                    && pui.getMethod("row", String.class, String.class).getReturnType()
+                            == android.view.View.class
+                    && pui.getMethod("rowStatic", String.class, String.class).getReturnType()
+                            == android.view.View.class
+                    && pui.getMethod("button", String.class).getReturnType()
+                            == android.view.View.class
+                    && pui.getMethod("divider").getReturnType() == android.view.View.class
+                    && pui.getMethod("kv", String.class, String.class).getReturnType()
+                            == android.view.View.class
+                    && pui.getMethod("sectionTitle", String.class).getReturnType()
+                            == android.view.View.class
+                    && pui.getMethod("text", String.class, boolean.class).getReturnType()
+                            == android.view.View.class;
+            ok(stat, L, ui.getReturnType() == pui && opp.getReturnType() == void.class
+                            && methodsOk,
+                    "v41 签名：ui() -> PluginUi（8 个零件）/ openPluginPage()");
+        } catch (Throwable t) {
+            ok(stat, L, false, "v41 API missing: " + t);
+        }
+
+        // place 解析：summary / detail / actions 三种都认，且只进声明的那一页 / 那个位置
+        try {
+            String json = "{\"extensions\":["
+                    + "{\"id\":\"s\",\"entry\":\"E\",\"slot\":\"action\",\"page\":\"maps\","
+                    + "\"place\":\"summary\"},"
+                    + "{\"id\":\"d\",\"entry\":\"E\",\"slot\":\"content\",\"page\":\"map-detail\","
+                    + "\"place\":\"detail\"},"
+                    + "{\"id\":\"a\",\"entry\":\"E\",\"slot\":\"action\",\"page\":\"maps\","
+                    + "\"place\":\"actions\"}]}";
+            List<Extensions.Item> items = Extensions.parse(json);
+            ok(stat, L, items.size() == 3
+                            && Extensions.PLACE_SUMMARY.equals(items.get(0).place)
+                            && Extensions.PLACE_DETAIL.equals(items.get(1).place)
+                            && Extensions.forPlaced(items, Extensions.PAGE_MAPS,
+                                    Extensions.PLACE_SUMMARY).size() == 1
+                            && Extensions.forPlaced(items, Extensions.PAGE_MAP_DETAIL,
+                                    Extensions.PLACE_DETAIL).size() == 1
+                            && Extensions.forPlaced(items, Extensions.PAGE_MAPS,
+                                    Extensions.PLACE_ACTIONS).size() == 1,
+                    "v41 place 解析：summary / detail / actions 各进各的位置（不串页）");
+        } catch (Throwable t) {
+            ok(stat, L, false, "v41 place 用例异常：" + t);
+        }
+
+        // 锚点表：摘要 = 主界面 / 槽列表 / 四个内容页；详情 = 地图 / 蓝图详情
+        ok(stat, L, PluginEntries.hasSummaryAnchor(Extensions.PAGE_MAIN)
+                        && PluginEntries.hasSummaryAnchor(Extensions.PAGE_SLOTS)
+                        && PluginEntries.hasSummaryAnchor(Extensions.PAGE_MAPS)
+                        && PluginEntries.hasSummaryAnchor(Extensions.PAGE_SAVES)
+                        && PluginEntries.hasSummaryAnchor(Extensions.PAGE_MODS)
+                        && PluginEntries.hasSummaryAnchor(Extensions.PAGE_BLUEPRINTS)
+                        && !PluginEntries.hasSummaryAnchor(Extensions.PAGE_VERSION)
+                        && PluginEntries.hasDetailAnchor(Extensions.PAGE_MAP_DETAIL)
+                        && PluginEntries.hasDetailAnchor(Extensions.PAGE_BLUEPRINT_DETAIL)
+                        && !PluginEntries.hasDetailAnchor(Extensions.PAGE_MAPS),
+                "v41 锚点表：summary 六页 / detail 两页；其它页没有锚点回落到「插件」卡");
+
+        // 锚点 View 真的在布局里（静态表不等于运行期能找到；与 v40 的 action 锚点同一条教训）
+        try {
+            int[] layouts = {R.layout.activity_main, R.layout.activity_slots,
+                    R.layout.activity_maps, R.layout.activity_saves,
+                    R.layout.activity_mods, R.layout.activity_blueprints};
+            int[] anchors = {R.id.status_box, R.id.saves_summary, R.id.maps_head,
+                    R.id.save_head, R.id.mods_status_box, R.id.bp_head};
+            boolean anchorsOk = true;
+            StringBuilder missing = new StringBuilder();
+            for (int i = 0; i < layouts.length; i++) {
+                try {
+                    android.view.View root =
+                            android.view.LayoutInflater.from(ctx).inflate(layouts[i], null);
+                    if (root.findViewById(anchors[i]) == null) {
+                        anchorsOk = false;
+                        missing.append(layouts[i]).append(' ');
+                    }
+                } catch (Throwable t) {
+                    anchorsOk = false;
+                    missing.append("inflate:").append(t.getClass().getSimpleName()).append(' ');
+                }
+            }
+            ok(stat, L, anchorsOk,
+                    "v41 ★summary 锚点真的在六个页面布局里（漏：" + missing + "）");
+            android.view.View md = android.view.LayoutInflater.from(ctx)
+                    .inflate(R.layout.activity_map_detail, null);
+            android.view.View bpd = android.view.LayoutInflater.from(ctx)
+                    .inflate(R.layout.activity_blueprint_detail, null);
+            ok(stat, L, md.findViewById(R.id.detail_text) != null
+                            && bpd.findViewById(R.id.bp_detail_text) != null,
+                    "v41 ★detail 锚点（两个详情页的正文）真的在布局里");
+        } catch (Throwable t) {
+            ok(stat, L, false, "v41 锚点布局用例异常：" + t);
+        }
+
+        // PluginUiHost：在主线程造零件，断言文字 / 方向 / 子节点
+        try {
+            final java.util.concurrent.CountDownLatch latch =
+                    new java.util.concurrent.CountDownLatch(1);
+            final boolean[] kitOk = {false};
+            final String[] kitBad = {""};
+            new android.os.Handler(android.os.Looper.getMainLooper()).post(new Runnable() {
+                @Override public void run() {
+                    try {
+                        PluginUiHost h = new PluginUiHost(ctx);
+                        android.view.View card = h.card();
+                        android.view.View row = h.row("T1", "S1");
+                        android.view.View rs = h.rowStatic("T2", "S2");
+                        android.view.View btn = h.button("OK");
+                        android.view.View dv = h.divider();
+                        android.view.View kv = h.kv("K", "V");
+                        android.view.View st = h.sectionTitle("SEC");
+                        android.view.View tx = h.text("TX", true);
+                        boolean ok = card instanceof android.widget.LinearLayout
+                                && ((android.widget.LinearLayout) card).getOrientation()
+                                        == android.widget.LinearLayout.VERTICAL
+                                && row != null && rs != null && btn != null && dv != null
+                                && kv instanceof android.widget.LinearLayout
+                                && ((android.widget.LinearLayout) kv).getChildCount() == 2
+                                && st instanceof android.widget.TextView && "SEC".equals(
+                                        String.valueOf(((android.widget.TextView) st).getText()))
+                                && tx instanceof android.widget.TextView && "TX".equals(
+                                        String.valueOf(((android.widget.TextView) tx).getText()));
+                        if (ok) {
+                            android.widget.TextView rt = (android.widget.TextView)
+                                    row.findViewById(R.id.act_title);
+                            android.widget.TextView rsub = (android.widget.TextView)
+                                    row.findViewById(R.id.act_sub);
+                            ok = "T1".equals(String.valueOf(rt.getText()))
+                                    && "S1".equals(String.valueOf(rsub.getText()));
+                        }
+                        if (ok) {
+                            android.widget.TextView bt = (android.widget.TextView) btn;
+                            ok = "OK".equals(String.valueOf(bt.getText()));
+                        }
+                        kitOk[0] = ok;
+                    } catch (Throwable t) {
+                        kitBad[0] = String.valueOf(t);
+                    } finally {
+                        latch.countDown();
+                    }
+                }
+            });
+            boolean waited = awaitLatch(latch);
+            ok(stat, L, waited && kitOk[0],
+                    "v41 ★PluginUiHost 八个零件都能造（卡片竖排 / 行文字 / 键值两列 / 按钮文字）"
+                            + (kitBad[0].isEmpty() ? "" : "；异常：" + kitBad[0]));
+        } catch (Throwable t) {
+            ok(stat, L, false, "v41 ui kit 用例异常：" + t);
+        }
+    }
+
     /** 下载用例里的小工具：字节数组 → sha256（与 Patches/UpdateDownload 同一套判定）。 */
     private static String sha256Hex(byte[] data) {
         try {
@@ -6157,11 +6325,11 @@ public final class SelfTest {
                     Context.class, android.content.res.AssetManager.class,
                     android.content.res.Resources.class, ClassLoader.class,
                     File.class, File.class, String.class, String.class, File.class,
-                    ItemInfo.class);
+                    ItemInfo.class, String.class, String.class, String.class);
             c.setAccessible(true);
             return (PluginApi) c.newInstance(ctx, ctx.getAssets(), ctx.getResources(),
                     ctx.getClassLoader(), ctx.getCacheDir(), ctx.getCacheDir(),
-                    "main", pageSlot, null, null);
+                    "main", pageSlot, null, null, "selftest-plugin", "1", "SelftestEntry");
         } catch (Throwable t) {
             android.util.Log.w("MDTLauncher", "PContext fixture failed", t);
             return null;
