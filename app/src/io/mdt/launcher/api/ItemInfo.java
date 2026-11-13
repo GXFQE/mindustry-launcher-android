@@ -52,6 +52,25 @@ public final class ItemInfo {
      */
     public static final String KIND_PATCH = "patch";
 
+    /**
+     * **v39**：一个正在跑的游戏实例（{@link PluginApi#instances()}）。
+     *
+     * <p>不可 open；事实在 {@link #extra}（{@code pid} / {@code vkey} / {@code slot} /
+     * {@code instanceKey} / {@code started} / {@code starting}）。
+     * 包含"启动占位"（已经点了启动、`:game` 还没 publish 的几百毫秒）—— 那种条目
+     * {@code pid} 是主进程、{@code starting} = true。
+     */
+    public static final String KIND_INSTANCE = "instance";
+
+    /**
+     * **v39**：一份槽备份（{@link PluginApi#backups}）。
+     *
+     * <p>不可 open（备份是宿主内部 CAS 的快照清单）；事实在 {@link #extra}
+     * （{@code created} / {@code label} / {@code source} / {@code files} / {@code bytes} /
+     * {@code legacy}）。要恢复/删除请走宿主界面，插件只做展示与提醒。
+     */
+    public static final String KIND_BACKUP = "backup";
+
     /** 内容类别：{@code saves} / {@code maps} / {@code mods} / {@code blueprints} / {@code slot}。 */
     public final String kind;
 

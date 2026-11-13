@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Map;
 
 import dalvik.system.DexClassLoader;
+import io.mdt.launcher.api.GitHubRelease;
 import io.mdt.launcher.api.ItemInfo;
 import io.mdt.launcher.api.PluginApi;
 import io.mdt.launcher.api.PluginTheme;
@@ -111,8 +112,17 @@ public final class PluginHost {
      * `patches(versionKey, slot)`（已导入的游戏补丁；给了启动项才判 enabled / applies）。
      * 数据仍走 {@link ItemInfo} 快照（与 versions / logs / trash 同一套），新增两个 kind。
      * 补丁的匹配键仍是 APK sha256（见 {@code PatchManifest} 类注释），不是版本号区间。
+     *
+     * <p>v39（2026-11-13 第 373 轮）：**网络 / 补丁写 / 实例与备份** ——
+     * `fetchText` / `githubReleases` / `download`（复用宿主更新基建：超时 / 302 / Accept /
+     * 镜像线路 / sha256 / 前台服务进度；https-only + 体积上限 + GitHub API 配额缓存）；
+     * `patchEnable` / `patchDisable` / `patchImport` / `patchDelete` / `patchConflicts`
+     * （全部复用 {@code Patches.*} 的判据与原子写；**插件启停仍归宿主**）；
+     * `instances()` / `backups(slot)` 两个只读清单；`versions()` / `plugins()` / `settings()`
+     * 各补了若干 {@code extra} 键（加键不抬版本，见 {@code docs/PLUGIN-API.md}）。
+     * 顺带修了 `trash()` 漏 versions / patches 两个目录的老 bug（改走 {@code Trash.list}）。
      */
-    public static final int API = 38;
+    public static final int API = 39;
     /**
      * 还认的**最老**契约版本。
      *
@@ -691,6 +701,315 @@ public final class PluginHost {
             return PluginData.patches(getBaseContext(), versionKey, s);
         }
 
+        // ---- v39（第 373 轮）：实例 / 备份 / 网络 / 补丁写 -----------------------
+
+        /** v39：正在跑的实例（含启动占位；判据与写门禁同一份）。 */
+        @Override public java.util.List<ItemInfo> instances() {
+            return PluginData.instances(getBaseContext());
+        }
+
+        /** v39：某个槽的备份快照（只读元信息；槽 null / 空 = 这一页的槽）。 */
+        @Override public java.util.List<ItemInfo> backups(String slot) {
+            String s = (slot == null || slot.trim().isEmpty()) ? this.slot : slot.trim();
+            return PluginData.backups(getBaseContext(), s);
+        }
+
+        /** v39：拉文本（https-only + 正文上限 + GitHub API 缓存/配额）。 */
+        @Override public void fetchText(final String url, final Fetch callback) {
+            final Context c = getBaseContext();
+            new Thread(new Runnable() {
+                @Override public void run() {
+                    Result r;
+                    String text = null;
+                    try {
+                        text = PluginNet.fetchText(url);
+                        r = Result.ok();
+                    } catch (PluginNet.Fail f) {
+                        r = Result.fail(f.reason);
+                    } catch (Throwable t) {
+                        r = Result.fail("io");
+                    }
+                    final Result fr = r;
+                    final String ft = text;
+                    postMain(new Runnable() {
+                        @Override public void run() {
+                            if (callback != null) callback.onFetch(fr, ft);
+                        }
+                    });
+                }
+            }, "mdt-plugin-fetch").start();
+        }
+
+        /** v39：列 GitHub release（复用宿主更新链的 JSON 解析；不吃自更新的 v* 规则）。 */
+        @Override public void githubReleases(final String repo, final Releases callback) {
+            new Thread(new Runnable() {
+                @Override public void run() {
+                    Result r;
+                    java.util.List<GitHubRelease> list = null;
+                    try {
+                        list = PluginNet.releases(repo);
+                        r = Result.ok();
+                    } catch (PluginNet.Fail f) {
+                        r = Result.fail(f.reason);
+                    } catch (Throwable t) {
+                        r = Result.fail("io");
+                    }
+                    final Result fr = r;
+                    final java.util.List<GitHubRelease> fl = list;
+                    postMain(new Runnable() {
+                        @Override public void run() {
+                            if (callback != null) callback.onReleases(fr, fl);
+                        }
+                    });
+                }
+            }, "mdt-plugin-releases").start();
+        }
+
+        /** v39：下载到插件 cache（镜像候选 + sha256 + 前台服务进度）；返回可取消的任务。 */
+        @Override public PluginApi.Task download(String url, String expectedSha256,
+                                                 final Download callback) {
+            final Context c = getBaseContext();
+            final Context app = c.getApplicationContext() == null
+                    ? c : c.getApplicationContext();
+            final String u = url;
+            final String sha = expectedSha256;
+            return PluginTasks.start(c, Trans.get(c, R.string.plugin_task_download),
+                    new Runnable() {
+                        @Override public void run() {
+                            Result r;
+                            File file = null;
+                            String got = "";
+                            try {
+                                UpdateDownload.Result d = PluginNet.download(
+                                        pluginCache(), u, sha, new UpdateClient.Progress() {
+                                            @Override public void onProgress(long done, long total) {
+                                                int pct = total > 0
+                                                        ? (int) Math.min(100L, done * 100L / total) : 0;
+                                                Work.progress(app, pct, total > 0 ? 100 : 0);
+                                            }
+                                        });
+                                r = mapDownload(d.status);
+                                if (d.status == UpdateDownload.Status.OK) {
+                                    file = d.file;
+                                    got = d.sha256 == null ? "" : d.sha256;
+                                }
+                            } catch (PluginNet.Fail f) {
+                                r = Result.fail(f.reason);
+                            } catch (Throwable t) {
+                                r = Result.fail("io");
+                            }
+                            final Result fr = r;
+                            final File ff = file;
+                            final String fg = got;
+                            postMain(new Runnable() {
+                                @Override public void run() {
+                                    if (callback != null) callback.onDownload(fr, ff, fg);
+                                }
+                            });
+                        }
+                    }, true);
+        }
+
+        /** v39：启用一条补丁（复用 {@code Patches.enable} 的全部门禁与校验）。 */
+        @Override public void patchEnable(String versionKey, String slot, final String ref,
+                                          final Done callback) {
+            patchOp(versionKey, slot, ref, callback, true);
+        }
+
+        /** v39：停用一条补丁（幂等；实例在跑 ⇒ game_alive）。 */
+        @Override public void patchDisable(String versionKey, String slot, final String ref,
+                                           final Done callback) {
+            patchOp(versionKey, slot, ref, callback, false);
+        }
+
+        /**
+         * 启用 / 停用的公共壳：**同一套参数校验 + 线程 + 结果码**。
+         *
+         * <p>"是不是一个存在的启动项"必须在这里挡：不挡的话插件随手给个槽名，
+         * config 里就会多一条指向不存在启动项的启用记录（界面看不见、删不掉）。
+         */
+        private void patchOp(final String versionKey, String slot, final String ref,
+                             final Done callback, final boolean enable) {
+            final Context c = getBaseContext();
+            final String vk = versionKey == null ? "" : versionKey.trim();
+            final String s = (slot == null || slot.trim().isEmpty()) ? this.slot : slot.trim();
+            final String rf = ref == null ? "" : ref.trim();
+            if (vk.isEmpty() || rf.isEmpty()) {
+                postFail(callback, "invalid");
+                return;
+            }
+            new Thread(new Runnable() {
+                @Override public void run() {
+                    Result r;
+                    try {
+                        if (!PluginData.hasLaunchItem(c, vk, s)) {
+                            r = Result.fail("not-found");
+                        } else {
+                            Patches.Record rec = Patches.findByRef(c, rf);
+                            if (rec == null) {
+                                r = Result.fail("record_gone");
+                            } else if (enable) {
+                                Patches.enable(c, Versions.instanceKey(vk, s), rec,
+                                        PluginData.apkShaOfVersion(c, vk));
+                                r = Result.ok();
+                            } else {
+                                Patches.disable(c, Versions.instanceKey(vk, s), rec);
+                                r = Result.ok();
+                            }
+                        }
+                    } catch (PatchException pe) {
+                        r = Result.fail(pe.code);
+                    } catch (Throwable t) {
+                        r = Result.fail("io");
+                    }
+                    final Result fr = r;
+                    postMain(new Runnable() {
+                        @Override public void run() {
+                            if (callback != null) callback.onDone(fr);
+                        }
+                    });
+                }
+            }, enable ? "mdt-plugin-patch-enable" : "mdt-plugin-patch-disable").start();
+        }
+
+        /** v39：导入补丁包（先落插件 cache 的临时 zip，再走补丁机制自己的完整校验）。 */
+        @Override public void patchImport(final InputStream zip, final Imported callback) {
+            final Context c = getBaseContext();
+            new Thread(new Runnable() {
+                @Override public void run() {
+                    Result r;
+                    String ref = null;
+                    File tmp = null;
+                    InputStream in = zip;
+                    try {
+                        if (in == null) {
+                            r = Result.fail("invalid");
+                        } else {
+                            File dir = new File(pluginCache(), "patch-import");
+                            if (!dir.isDirectory() && !dir.mkdirs()) {
+                                throw new IOException("mkdirs: " + dir.getName());
+                            }
+                            tmp = new File(dir, "p-" + System.nanoTime() + ".zip");
+                            copyLimited(in, tmp, Patches.MAX_TOTAL + 4096L);
+                            try { in.close(); } catch (Throwable ignored) { }
+                            in = null;
+                            Patches.Record rec = Patches.importPackage(c, tmp);
+                            ref = rec.ref();
+                            r = Result.ok();
+                        }
+                    } catch (PatchException pe) {
+                        r = Result.fail(pe.code);
+                    } catch (IOException e) {
+                        r = Result.fail("io");
+                    } catch (Throwable t) {
+                        r = Result.fail("io");
+                    } finally {
+                        if (in != null) {
+                            try { in.close(); } catch (Throwable ignored) { }
+                        }
+                        if (tmp != null && tmp.isFile()) tmp.delete();
+                    }
+                    final Result fr = r;
+                    final String fref = ref;
+                    postMain(new Runnable() {
+                        @Override public void run() {
+                            if (callback != null) callback.onImported(fr, fref);
+                        }
+                    });
+                }
+            }, "mdt-plugin-patch-import").start();
+        }
+
+        /** v39：删除补丁 = 挪进中转站（被启用着 ⇒ in_use）。 */
+        @Override public void patchDelete(final String ref, final Done callback) {
+            final Context c = getBaseContext();
+            final String rf = ref == null ? "" : ref.trim();
+            if (rf.isEmpty()) {
+                postFail(callback, "invalid");
+                return;
+            }
+            new Thread(new Runnable() {
+                @Override public void run() {
+                    Result r;
+                    try {
+                        Patches.Record rec = Patches.findByRef(c, rf);
+                        if (rec == null) {
+                            r = Result.fail("record_gone");
+                        } else {
+                            Patches.delete(c, rec);
+                            r = Result.ok();
+                        }
+                    } catch (PatchException pe) {
+                        r = Result.fail(pe.code);
+                    } catch (Throwable t) {
+                        r = Result.fail("io");
+                    }
+                    final Result fr = r;
+                    postMain(new Runnable() {
+                        @Override public void run() {
+                            if (callback != null) callback.onDone(fr);
+                        }
+                    });
+                }
+            }, "mdt-plugin-patch-delete").start();
+        }
+
+        /** v39：启用前冲突预检（复用 {@code Patches.conflicts}）。 */
+        @Override public void patchConflicts(String versionKey, String slot, String ref,
+                                             final Conflicts callback) {
+            final Context c = getBaseContext();
+            final String vk = versionKey == null ? "" : versionKey.trim();
+            final String s = (slot == null || slot.trim().isEmpty()) ? this.slot : slot.trim();
+            final String rf = ref == null ? "" : ref.trim();
+            if (vk.isEmpty() || rf.isEmpty()) {
+                postConflictsFail(callback, "invalid");
+                return;
+            }
+            new Thread(new Runnable() {
+                @Override public void run() {
+                    Result r;
+                    java.util.List<String> names = null;
+                    try {
+                        if (!PluginData.hasLaunchItem(c, vk, s)) {
+                            r = Result.fail("not-found");
+                        } else {
+                            Patches.Record rec = Patches.findByRef(c, rf);
+                            String ikey = Versions.instanceKey(vk, s);
+                            if (rec == null) {
+                                r = Result.fail("record_gone");
+                            } else if (WriteGate.blockedInstance(c, ikey)) {
+                                r = Result.fail("game_alive");
+                            } else if (Patches.enabledRefs(c, ikey).contains(rec.ref())) {
+                                // 与 enable 的顺序对齐：已经启用 ⇒ 预检没意义（更不能报"它跟自己冲突"）
+                                r = Result.fail("enabled");
+                            } else if (!rec.filesOk) {
+                                r = Result.fail("missing");
+                            } else {
+                                String sha = PluginData.apkShaOfVersion(c, vk);
+                                if (sha == null || sha.isEmpty() || !rec.applicable(sha)) {
+                                    r = Result.fail("no_match");
+                                } else {
+                                    names = Patches.conflicts(c, ikey, rec, sha);
+                                    r = Result.ok();
+                                }
+                            }
+                        }
+                    } catch (PatchException pe) {
+                        r = Result.fail(pe.code);
+                    } catch (Throwable t) {
+                        r = Result.fail("io");
+                    }
+                    final Result fr = r;
+                    final java.util.List<String> fn = names;
+                    postMain(new Runnable() {
+                        @Override public void run() {
+                            if (callback != null) callback.onConflicts(fr, fn);
+                        }
+                    });
+                }
+            }, "mdt-plugin-patch-conflicts").start();
+        }
+
         /** ★ 第 271 轮：插件要的确认框也走 `CardStack`（插件页里的二次确认不再换窗）。 */
         @Override public void confirm(final String title, final String message,
                                       final String okText, final Confirm callback) {
@@ -1091,6 +1410,67 @@ public final class PluginHost {
                     if (done != null) done.onDone(Result.fail(reason));
                 }
             });
+        }
+
+        /** v39：冲突预检的失败回调（参数形状不同，单独一条）。 */
+        private void postConflictsFail(final Conflicts cb, final String reason) {
+            postMain(new Runnable() {
+                @Override public void run() {
+                    if (cb != null) cb.onConflicts(Result.fail(reason), null);
+                }
+            });
+        }
+
+        /** 所有插件回调的统一投递口（主线程）。 */
+        private static void postMain(final Runnable r) {
+            new android.os.Handler(android.os.Looper.getMainLooper()).post(r);
+        }
+
+        /** 插件自己的 cache 目录（构造器里给的是 `<插件>/cache`；极端情况回落）。 */
+        private File pluginCache() {
+            if (cache != null) return cache;
+            if (files != null) return new File(files, "cache");
+            return new File(getBaseContext().getCacheDir(), "plugin-cache");
+        }
+
+        /** 下载状态 → 插件接口的 reason 码（文案归插件）。 */
+        private static Result mapDownload(UpdateDownload.Status st) {
+            if (st == null) return Result.fail("io");
+            switch (st) {
+                case OK: return Result.ok();
+                case NETWORK: return Result.fail("network");
+                case SIZE: return Result.fail("size");
+                case SHA: return Result.fail("sha");
+                default: return Result.fail("io");
+            }
+        }
+
+        /**
+         * 复制流到文件并**限制总字节数**（v39 导入补丁用）。
+         *
+         * <p>为什么要上限：补丁机制自己的体积上限在 `importPackage` 里（读 zip 时校验），
+         * 但插件交过来的是一个**流**，先落临时文件这一步就能被一个大流写满盘。
+         * 上限取 `Patches.MAX_TOTAL + 4 KB`（多给的 4 KB 让超限的包也能走到 importPackage 的
+         * 拒绝路径，而不是在复制阶段就报 io —— 码更准）。
+         */
+        private static void copyLimited(InputStream in, File out, long maxBytes)
+                throws IOException {
+            java.io.FileOutputStream os = new java.io.FileOutputStream(out);
+            try {
+                byte[] buf = new byte[65536];
+                long total = 0L;
+                int n;
+                while ((n = in.read(buf)) > 0) {
+                    total += n;
+                    if (total > maxBytes) {
+                        throw new PatchException(PatchException.C_TOO_BIG, "import stream");
+                    }
+                    os.write(buf, 0, n);
+                }
+                os.flush();
+            } finally {
+                try { os.close(); } catch (Throwable ignored) { }
+            }
         }
 
         /** kind → 目标目录名；不认识的 kind 返回 null。 */

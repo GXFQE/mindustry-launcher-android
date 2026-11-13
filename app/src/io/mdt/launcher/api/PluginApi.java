@@ -35,7 +35,8 @@ import java.util.Set;
  *   <li>{@code createView} / {@code run} 在 UI 线程；**别在里面读大文件**。</li>
  *   <li>{@link #runBackground} 的 body 在后台线程；要更新 UI 用 View 自己的 {@code post}。</li>
  *   <li>回调（{@link Choose} / {@link Confirm} / {@link Prompt} / {@link PickFile} /
- *       {@link PickContent} / {@link After} / {@link Done} / {@link Cancel}）都在 UI 线程。</li>
+ *       {@link PickContent} / {@link After} / {@link Done} / {@link Cancel} / {@link Fetch} /
+ *       {@link Releases} / {@link Download} / {@link Imported} / {@link Conflicts}）都在 UI 线程。</li>
  *   <li>{@code export} / {@code share} / {@code writeItem} 的 {@link InputStream} **由宿主关闭**；
  *       {@link #pickFile} 给你的是插件 cache 里的文件，自己读。</li>
  * </ul>
@@ -58,7 +59,7 @@ public interface PluginApi {
      * <p>为什么要有这个常量：注释里的「当前 = N」运行期读不到，一个写 17、一个写 20 也没人发现；
      * 常量 + 断言才拦得住。</p>
      */
-    int DOC_VERSION = 38;
+    int DOC_VERSION = 39;
 
     // ══ 环境 ═══════════════════════════════════════════════════════════════
 
@@ -271,6 +272,129 @@ public interface PluginApi {
      * 缓存时注意：`sha256` / `applies` 可以缓存（同版本 APK 不变），**`enabled` 是活配置、每次现读**。
      */
     List<ItemInfo> patches(String versionKey, String slot);
+
+    // ══ v39（2026-11-13 第 373 轮）：运行实例 / 备份 / 网络 / 补丁写 ══════════
+
+    /**
+     * **v39**：当前**正在跑**的游戏实例（含启动占位）。每条是 {@link ItemInfo}
+     * （{@code kind == }{@link ItemInfo#KIND_INSTANCE}），事实在 {@link ItemInfo#extra}：
+     * {@code pid} / {@code vkey}（版本 key）/ {@code slot} / {@code instanceKey}（与补丁启用状态同一个键）/
+     * {@code started}（毫秒时间戳）/ {@code starting}（{@code "true"} = 已经点了启动、`:game` 还没起来）。
+     *
+     * <p>顺序 = 启动时间升序（老的在前）。没有实例时返回空表（不是 null）。
+     * 这里说的"在跑"与宿主写门禁用的是**同一份判据**（{@code Instances.live}）——
+     * 别自己解析进程名，多开时 `:game` / `:gameN` 都是实例。
+     */
+    List<ItemInfo> instances();
+
+    /**
+     * **v39**：某个槽的**备份快照**（只读元信息）。每条是 {@link ItemInfo}
+     * （{@code kind == }{@link ItemInfo#KIND_BACKUP}），事实在 {@link ItemInfo#extra}：
+     * {@code created}（毫秒）/ {@code label} / {@code source} / {@code files}（条数）/
+     * {@code bytes} / {@code legacy}（{@code "true"} = 旧格式备份）。
+     *
+     * <p>顺序 = 创建时间倒序（新的在前）。恢复/删除**不给插件做**（会动用户数据）——
+     * 插件只展示、提醒。{@code slot} 空 = 当前槽（{@link #slot()}）。
+     */
+    List<ItemInfo> backups(String slot);
+
+    /**
+     * **v39**：拉一段文本（UTF-8）。异步：回调在 UI 线程。
+     *
+     * <p>只放行 **https**（`http://127.0.0.1` / `http://localhost` 这类本机调试地址除外）；
+     * 正文上限 512 KB（超了返回 {@code size}）；连接 15 s / 读 60 s；
+     * 跟随 302（GitHub 的 asset 会跳到 `objects.githubusercontent.com`）。
+     * GitHub API 的调用由宿主**统一缓存**（同一 URL 10 分钟内只真请求一次），
+     * 并且有每小时上限 —— 不要轮询，超了返回 {@code rate-limited}（这是为了不让插件
+     * 把启动器自更新的 GitHub 配额一起打光）。
+     *
+     * <p>失败码见 {@link Result}：{@code bad-url} / {@code network} / {@code size} /
+     * {@code rate-limited} / {@code canceled}。
+     */
+    void fetchText(String url, Fetch callback);
+
+    /**
+     * **v39**：列一个 GitHub 仓库的 release（最新的在前，最多 30 条）。异步。
+     *
+     * @param repo {@code "owner/name"}（其它形状返回 {@code bad-url}）
+     *
+     * <p>成功时回调里是 {@link GitHubRelease} 列表；每个 {@link GitHubRelease.Asset#url} 可以直接
+     * 喂给 {@link #download}。失败码：{@code bad-url} / {@code bad-data}（GitHub 返回的不是
+     * JSON 数组，常见于镜像错误页 / 限频）/ {@code network} / {@code rate-limited}。
+     *
+     * <p>⚠️ 与宿主自更新**共用 GitHub 配额**（未登录 60 次/小时）⇒ 别在页面刷新里反复查。
+     */
+    void githubReleases(String repo, Releases callback);
+
+    /**
+     * **v39**：下载一个文件到**本插件自己的 cache**，异步，返回可取消的 {@link Task}。
+     *
+     * <p>落点：`<插件 cache>/downloads/<URL 里的文件名>`（文件名会做安全清洗）；
+     * 成功回调里给你 {@link File} 与实际 sha256。进度显示在宿主的前台服务通知里
+     * （页面关掉也继续），**不要自己再发一条通知**。
+     *
+     * @param url             只认 https（本机回环除外）
+     * @param expectedSha256  期望的 sha256（64 位小写十六进制）；空串 / null = 不校验，只回报实际值。
+     *                        **强烈建议给**：不校验的下载等于信任链路中间人
+     *
+     * <p>行为：先写 `.part`，校验过（大小 + sha256）才改名；任何一步失败都删掉半截文件。
+     * GitHub 的下载地址会自动套用户选择的**更新线路**（镜像优先、直连兜底）。
+     * 体积上限 1 GB；超了返回 {@code size}。失败码：{@code bad-url} / {@code network} /
+     * {@code size} / {@code sha} / {@code io} / {@code canceled}。
+     */
+    Task download(String url, String expectedSha256, Download callback);
+
+    /**
+     * **v39**：启用一条游戏补丁（写操作）。
+     *
+     * <p>宿主侧做全部门禁与校验（与补丁页同一份实现）：这个启动项的实例在跑 ⇒ {@code game_alive}；
+     * 补丁文件缺失 ⇒ {@code missing}；不适用于这个版本的 APK ⇒ {@code no_match}；
+     * 已经启用 ⇒ {@code enabled}；与这条启动项已启用的补丁冲突 ⇒ {@code conflict}
+     * （先用 {@link #patchConflicts} 拿冲突名单，再让用户决定）。
+     *
+     * @param versionKey 版本 key（{@link #versions()} 的 {@code extra["key"]}）
+     * @param slot       槽；{@code null} / 空 = 当前槽（{@link #slot()}）
+     * @param ref        补丁引用（{@link #patches()} 的 {@code extra["ref"]}，形如 {@code id@version}）
+     *
+     * <p>⚠️ 这是"改状态"：插件自己负责在动手前问用户（想和宿主风格一致就用 {@code showCard}）。
+     * 补丁能不能真的生效由**启动时**决定；启用只写记录，不会去改正在跑的进程。
+     */
+    void patchEnable(String versionKey, String slot, String ref, Done callback);
+
+    /**
+     * **v39**：停用一条游戏补丁。实例在跑 ⇒ {@code game_alive}；本来就没启用 ⇒ 成功（幂等）。
+     */
+    void patchDisable(String versionKey, String slot, String ref, Done callback);
+
+    /**
+     * **v39**：导入一个补丁包（zip 的 {@link InputStream}，**由宿主关闭**）。
+     *
+     * <p>宿主先落到本插件 cache 的临时文件，再走 {@code Patches.importPackage} 的完整校验
+     * （清单 / dex / 素材 / 体积 / 重复），导入完删临时件。成功回调里给新补丁的 {@code ref}。
+     *
+     * <p>失败码：{@code bad_zip} / {@code bad_json} / {@code schema} / {@code field} /
+     * {@code no_targets} / {@code bad_hash} / {@code bad_path} / {@code missing_entry} /
+     * {@code bad_dex} / {@code bad_assets} / {@code dup} / {@code too_big} / {@code io}。
+     * 体积上限沿用补丁机制自己的 256 MB（不是无限）。
+     */
+    void patchImport(InputStream zip, Imported callback);
+
+    /**
+     * **v39**：删除一条游戏补丁 —— **挪进中转站**（不是裸删），能从宿主的「中转站」放回。
+     *
+     * <p>还被某个启动项启用着 ⇒ {@code in_use}（先 {@link #patchDisable}）；
+     * 记录已不在 ⇒ {@code record_gone}；挪失败 ⇒ {@code io}。
+     */
+    void patchDelete(String ref, Done callback);
+
+    /**
+     * **v39**：启用前的**冲突预检**（只读，但会读 dex / 素材，慢 ⇒ 后台线程，异步回调）。
+     *
+     * <p>成功时回调里给"已启用且与它冲突"的补丁**显示名列表**（空表 = 没冲突）。
+     * 失败码：{@code record_gone} / {@code no_match} / {@code missing} / {@code bad_dex} /
+     * {@code bad_assets} / {@code game_alive}（实例在跑时连预检也拒，与启用同门禁）。
+     */
+    void patchConflicts(String versionKey, String slot, String ref, Conflicts callback);
 
     /**
      * 插件自己的**数据目录**（`<hub>/usage/`）—— **宿主只给目录，不写任何流水、不解析账本**。
@@ -655,4 +779,30 @@ public interface PluginApi {
 
     /** 写 / 挪的结果。 */
     interface Done { void onDone(Result result); }
+
+    // ---- v39 新增的回调 -------------------------------------------------------
+
+    /** {@link #fetchText} 的结果：成功时 {@code text} 非 null，失败时 {@code result.ok == false}。 */
+    interface Fetch { void onFetch(Result result, String text); }
+
+    /** {@link #githubReleases} 的结果：失败时列表为 null。 */
+    interface Releases { void onReleases(Result result, List<GitHubRelease> releases); }
+
+    /**
+     * {@link #download} 的结果：成功时 {@code file} 是 cache 里的成品、{@code sha256} 是实际哈希；
+     * 失败时 {@code file} 为 null、{@code result.reason} 说明原因。
+     */
+    interface Download { void onDownload(Result result, File file, String sha256); }
+
+    /**
+     * {@link #patchImport} 的结果：成功时 {@code ref} 是新补丁的引用（可直接喂给
+     * {@link #patchEnable}）；失败时为 null。
+     */
+    interface Imported { void onImported(Result result, String ref); }
+
+    /**
+     * {@link #patchConflicts} 的结果：成功时 {@code names} 是与它冲突的已启用补丁显示名
+     * （空表 = 没冲突）；失败时为 null。
+     */
+    interface Conflicts { void onConflicts(Result result, List<String> names); }
 }

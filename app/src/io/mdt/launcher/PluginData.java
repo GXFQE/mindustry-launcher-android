@@ -186,6 +186,13 @@ final class PluginData {
         out.put("max_log_files", String.valueOf(c.maxLogFiles()));
         out.put("auto_clean_redundant", String.valueOf(c.autoCleanRedundant()));
         out.put("last_version", safe(c.lastVersion()));
+        // v39：界面「设置」页里能被改的项补齐（插件要按用户设置行事时别再猜默认值）
+        out.put("plugin_auto_update", String.valueOf(c.pluginAutoUpdate()));
+        out.put("crash_alert", String.valueOf(c.crashAlertEnabled()));
+        out.put("trash_keep", String.valueOf(c.trashKeep()));
+        out.put("trash_keep_slots", String.valueOf(c.trashKeepSlots()));
+        out.put("update_mode", String.valueOf(c.updateMode()));
+        out.put("update_mirror", safe(c.updateMirror()));
         List<String> slots = new ArrayList<String>(Data.slotNames(ctx));
         String cur = Data.currentSlot(ctx);
         if (cur != null && !cur.isEmpty() && !slots.contains(cur)) slots.add(cur);
@@ -215,29 +222,122 @@ final class PluginData {
     static List<ItemInfo> trash(Context ctx) {
         List<ItemInfo> out = new ArrayList<ItemInfo>();
         if (ctx == null) return out;
-        String[] cats = {"maps", "mods", "saves", "slots", "schematics", "plugins"};
+        // ★ 第 373 轮（v39）：原来这里维护一份"目录 → 类别名"的平行数组，而 `Trash.allDirs()`
+        //   已经有 8 个目录（第 357 轮加了 patches、更早加了 versions）⇒ 多出来的两种**永远不出现**，
+        //   以后再加 Kind 还会继续静默漏。现在只认 `Trash.Item` 里的 `kind` 一处来源。
         File[] dirs = Trash.allDirs(ctx);
-        for (int i = 0; i < dirs.length && i < cats.length; i++) {
-            File dir = dirs[i];
-            File[] fs = dir == null ? null : dir.listFiles();
-            if (fs == null) continue;
-            List<File> list = new ArrayList<File>();
-            for (File f : fs) list.add(f);
-            Collections.sort(list, new Comparator<File>() {
-                @Override public int compare(File a, File b) {
-                    return b.getName().compareTo(a.getName());
-                }
-            });
-            for (File f : list) {
+        for (File dir : dirs) {
+            if (dir == null) continue;
+            for (Trash.Item it : Trash.list(dir)) {
+                if (it == null || it.path == null) continue;
                 Map<String, String> ex = new LinkedHashMap<String, String>();
-                ex.put("category", cats[i]);
-                out.add(new ItemInfo(ItemInfo.KIND_TRASH, f.getName(), cats[i],
-                        f.getAbsolutePath(), null, null,
-                        f.isDirectory() ? 0L : f.length(), f.lastModified(),
-                        "trash", null, f.isDirectory(), f.isFile() && f.canRead(), ex));
+                String cat = categoryOf(it.kind);
+                ex.put("category", cat);
+                put(ex, "slot", it.slot);
+                put(ex, "originalName", it.name);
+                ex.put("stamp", String.valueOf(it.stamp));
+                ex.put("files", String.valueOf(it.files));
+                out.add(new ItemInfo(ItemInfo.KIND_TRASH, it.path.getName(), cat,
+                        it.path.getAbsolutePath(), null, null, it.bytes,
+                        it.stamp > 0 ? it.stamp : it.path.lastModified(),
+                        "trash", null, it.path.isDirectory(),
+                        it.path.isFile() && it.path.canRead(), ex));
             }
         }
         return out;
+    }
+
+    /**
+     * 中转站类别名（**唯一映射**）：`Trash.Kind` → 给插件的字符串。
+     *
+     * <p>⚠️ 这张表就是 {@code Trash.Kind} 的覆盖检查对象：自检遍历所有 Kind 断言
+     * {@code categoryOf} 不会掉进 `other`（新加 Kind 忘了映射 ⇒ 自检红）。`OTHER` 本身才是 `other`。
+     */
+    static String categoryOf(Trash.Kind k) {
+        if (k == null) return "other";
+        switch (k) {
+            case MAP: return "maps";
+            case MOD: return "mods";
+            case SAVE: return "saves";
+            case SLOT: return "slots";
+            case SCHEM: return "schematics";
+            case PLUGIN: return "plugins";
+            case VERSION: return "versions";
+            case PATCH: return "patches";
+            default: return "other";
+        }
+    }
+
+    /** **v39**：正在跑的实例（含启动占位；判据与写门禁同一份 `Instances.live`）。 */
+    static List<ItemInfo> instances(Context ctx) {
+        List<ItemInfo> out = new ArrayList<ItemInfo>();
+        if (ctx == null) return out;
+        try {
+            for (Instances.Running r : Instances.live(ctx)) {
+                if (r == null) continue;
+                Map<String, String> ex = new LinkedHashMap<String, String>();
+                ex.put("pid", String.valueOf(r.pid));
+                put(ex, "vkey", r.vkey);
+                put(ex, "slot", r.slot);
+                put(ex, "instanceKey", r.instanceKey());
+                ex.put("started", String.valueOf(r.started));
+                // 启动占位（主进程 startActivity 之后、:game publish 之前）没有进程名
+                ex.put("starting", r.proc == null || r.proc.isEmpty() ? "true" : "false");
+                out.add(new ItemInfo(ItemInfo.KIND_INSTANCE, r.label(),
+                        r.proc == null || r.proc.isEmpty() ? "starting" : "pid " + r.pid,
+                        null, null, null, 0L, r.started, "instance", null, false, false, ex));
+            }
+        } catch (Throwable ignored) {
+            // 实例表读不出来 ⇒ 空表（别让插件因为这个崩）
+        }
+        return out;
+    }
+
+    /** **v39**：某个槽的备份快照（只读元信息；恢复/删除不给插件做）。 */
+    static List<ItemInfo> backups(Context ctx, String slot) {
+        List<ItemInfo> out = new ArrayList<ItemInfo>();
+        if (ctx == null) return out;
+        String s = slot == null ? "" : slot.trim();
+        if (s.isEmpty()) s = Data.currentSlot(ctx);
+        try {
+            for (Backup.Snapshot ss : Backup.list(ctx, s)) {
+                if (ss == null) continue;
+                Map<String, String> ex = new LinkedHashMap<String, String>();
+                put(ex, "slot", s);
+                ex.put("created", String.valueOf(ss.created));
+                put(ex, "label", ss.label);
+                put(ex, "source", ss.source);
+                ex.put("files", String.valueOf(ss.count));
+                ex.put("bytes", String.valueOf(ss.bytes));
+                ex.put("legacy", String.valueOf(ss.legacy()));
+                out.add(new ItemInfo(ItemInfo.KIND_BACKUP, ss.title(),
+                        ss.source == null ? "" : ss.source,
+                        null, null, null, ss.bytes, ss.created, "backups", null, false, false, ex));
+            }
+        } catch (Throwable ignored) {
+            // 备份目录还没建 / 清单坏了 ⇒ 空表
+        }
+        return out;
+    }
+
+    /**
+     * 这个 `(版本 key, 槽)` 是不是**存在的一个启动项**（`versions()` 里有一行）。
+     *
+     * <p>补丁写接口用它挡"插件随手传个不存在的槽名"—— 否则会在 config 里留下一条
+     * 指向不存在启动项的启用记录（界面上看不见、也删不掉的那种脏数据）。
+     */
+    static boolean hasLaunchItem(Context ctx, String versionKey, String slot) {
+        if (ctx == null || versionKey == null || versionKey.isEmpty()) return false;
+        String want = slot == null ? "" : slot.trim();
+        try {
+            for (Versions.Entry e : Versions.scanAll(ctx)) {
+                if (e != null && versionKey.equals(e.key())
+                        && want.equals(Versions.slotFor(e))) return true;
+            }
+        } catch (Throwable ignored) {
+            // 扫不出来 ⇒ 当作没有（宁可拒，不留脏记录）
+        }
+        return false;
     }
 
     static List<ItemInfo> versions(Context ctx) {
@@ -249,9 +349,20 @@ final class PluginData {
         } catch (Throwable t) {
             return out;
         }
+        // v39：宿主列表行本来就在算的两个数（补丁 N / 备份 N）—— 插件不该为了这两个数
+        // 自己去扫 APK 哈希（Patches 那条路要几十 MB 的 sha256）或重读备份清单。
+        Map<String, Integer> patchCounts = null;
+        try {
+            patchCounts = Patches.enabledCounts(ctx);
+        } catch (Throwable ignored) {
+            // 读不出来 ⇒ 不放 patchCount（"缺 = 拿不到"，别用 0 冒充"没启用"）
+        }
+        Map<String, Integer> backupCounts = new LinkedHashMap<String, Integer>();
         for (Versions.Entry e : entries) {
             if (e == null) continue;
             File apk = e.apkPath == null || e.apkPath.isEmpty() ? null : new File(e.apkPath);
+            String rowSlot = Versions.slotFor(e);
+            String ikey = Versions.instanceKey(e.key(), rowSlot);
             Map<String, String> ex = new LinkedHashMap<String, String>();
             put(ex, "pkg", e.pkg);
             put(ex, "realPkg", e.realPkg);
@@ -265,7 +376,22 @@ final class PluginData {
             put(ex, "md5", e.md5);
             put(ex, "customName", e.customName);
             put(ex, "upstreamVersion", e.upstreamVersion);
-            put(ex, "slot", Versions.slotFor(e));
+            put(ex, "slot", rowSlot);
+            // v39：启动项身份 —— 插件别自己拼 `key + NUL + slot`（那是宿主内部格式）
+            put(ex, "instanceKey", ikey);
+            ex.put("bound", e.boundSlot != null && !e.boundSlot.isEmpty() ? "true" : "false");
+            if (patchCounts != null) {
+                Integer n = patchCounts.get(ikey);
+                ex.put("patchCount", String.valueOf(n == null ? 0 : n.intValue()));
+            }
+            try {
+                if (!backupCounts.containsKey(rowSlot)) {
+                    backupCounts.put(rowSlot, Integer.valueOf(VersionOps.backupCountIn(ctx, rowSlot)));
+                }
+                ex.put("backupCount", String.valueOf(backupCounts.get(rowSlot)));
+            } catch (Throwable ignored) {
+                // 备份清单读不出来 ⇒ 不放这个键
+            }
             String sub = e.displayVersion();
             if (e.pkg != null && !e.pkg.isEmpty()) sub = sub + " · " + e.pkg;
             out.add(new ItemInfo(ItemInfo.KIND_VERSION, e.displayName(ctx), sub,
@@ -346,6 +472,20 @@ final class PluginData {
         put(ex, "version", probeVer);
         put(ex, "activeVersion", actVer);
         put(ex, "pendingVersion", pendVer);
+        // v39：插件自动更新的状态（「设置」页/插件页里本来就在显示的东西）——
+        // 只有真的有一条更新记录时才放键（"没有"与"读不出来"都不编默认值）。
+        try {
+            PluginUpdateState.Item up = PluginUpdateState.get(PluginUpdates.stateText(ctx), id);
+            if (up != null) {
+                put(ex, "updateState", up.state);
+                // 记录里没有版本号 / 备注时给空串（记录在 = 这三个键在一起；空串不是"读不出来"，
+                // 而是"这条更新记录没写这一项"—— 与其它 extra 键的"缺 = 拿不到"区分开）
+                ex.put("updateVersion", up.ver == null ? "" : up.ver);
+                ex.put("updateNote", up.note == null ? "" : up.note);
+            }
+        } catch (Throwable ignored) {
+            // 更新状态文件坏了 ⇒ 不放这几个键
+        }
         ex.put("builtin", String.valueOf(PluginTrust.BUILTIN.equals(trust)));
         ex.put("trust", trust);
         ex.put("level", level);

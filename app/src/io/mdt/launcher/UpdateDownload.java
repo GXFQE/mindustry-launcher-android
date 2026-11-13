@@ -39,11 +39,18 @@ final class UpdateDownload {
         final String detail;
         /** 成功时 = 校验过的成品文件；失败时 null。 */
         final File file;
+        /** 实际算出来的 sha256（成功时非 null；sha256 == null/空 的调用也会填）。 */
+        final String sha256;
 
-        Result(Status status, String detail, File file) {
+        Result(Status status, String detail, File file, String sha256) {
             this.status = status;
             this.detail = detail;
             this.file = file;
+            this.sha256 = sha256;
+        }
+
+        Result(Status status, String detail, File file) {
+            this(status, detail, file, null);
         }
     }
 
@@ -80,6 +87,19 @@ final class UpdateDownload {
      */
     static Result run(List<String> urls, File dir, String key, long expectSize, String sha256,
                       UpdateClient.Progress cb) {
+        return run(urls, dir, key, expectSize, sha256, cb, ".apk");
+    }
+
+    /**
+     * 同上，但落点后缀可给（v39：插件下载的东西不一定是 `.apk`）。
+     *
+     * <p>★ `suffix == ""` ⇒ 成品文件名就是 {@code key} 本身（插件下载用；
+     *   `.part` 中间名仍是 {@code <key>.part}）。宿主自更新仍走默认的 {@code .apk}。
+     *
+     * @param sha256 期望的 sha256；**空串 / null = 不校验**（v39 起；老调用都带值）
+     */
+    static Result run(List<String> urls, File dir, String key, long expectSize, String sha256,
+                      UpdateClient.Progress cb, String suffix) {
         if (urls == null || urls.isEmpty()) {
             return new Result(Status.IO, "no url", null);
         }
@@ -89,8 +109,9 @@ final class UpdateDownload {
         if (!dir.isDirectory() && !dir.mkdirs()) {
             return new Result(Status.IO, "mkdirs failed: " + dir, null);
         }
+        String useSuffix = suffix == null ? "" : suffix;
         File part = new File(dir, key + ".part");
-        File out = new File(dir, key + ".apk");
+        File out = new File(dir, key + useSuffix);
         Result last = null;
 
         for (String url : urls) {
@@ -134,9 +155,9 @@ final class UpdateDownload {
                 part.delete();
                 return new Result(Status.IO, String.valueOf(e), null);
             }
-            if (sha256 == null || !got.equalsIgnoreCase(sha256)) {
+            if (sha256 != null && !sha256.isEmpty() && !got.equalsIgnoreCase(sha256)) {
                 part.delete();
-                last = new Result(Status.SHA, "got " + got + " @ " + url, null);
+                last = new Result(Status.SHA, "got " + got + " @ " + url, null, got);
                 continue;
             }
 
@@ -144,7 +165,7 @@ final class UpdateDownload {
                 part.delete();
                 return new Result(Status.IO, "rename failed", null);
             }
-            return new Result(Status.OK, null, out);
+            return new Result(Status.OK, null, out, got);
         }
         return last != null ? last : new Result(Status.IO, "no usable url", null);
     }

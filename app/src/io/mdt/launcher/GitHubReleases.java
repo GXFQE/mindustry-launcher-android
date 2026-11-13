@@ -24,9 +24,11 @@ import java.util.List;
  */
 final class GitHubReleases {
 
-    /** 一个 release 资产（只要名字与两个 URL）。 */
+    /** 一个 release 资产（名字 / 大小 / 两个 URL）。 */
     static final class Asset {
         final String name;
+        /** 字节数；GitHub 没给 = -1（v39 起给插件下载当参考，不当作 0）。 */
+        final long size;
         /**
          * `assets[].url` —— 形如 `https://api.github.com/repos/…/releases/assets/<id>`。
          * ★ 下载它要带 `Accept: application/octet-stream`（{@link UpdateClient} 已经带了），
@@ -36,8 +38,9 @@ final class GitHubReleases {
         /** `assets[].browser_download_url` —— 走 `github.com` 主站（慢，但人点得动）。 */
         final String browserUrl;
 
-        Asset(String name, String apiUrl, String browserUrl) {
+        Asset(String name, long size, String apiUrl, String browserUrl) {
             this.name = name;
+            this.size = size;
             this.apiUrl = apiUrl;
             this.browserUrl = browserUrl;
         }
@@ -103,7 +106,7 @@ final class GitHubReleases {
                     if (a == null) continue;
                     String name = a.optString("name", "");
                     if (name.isEmpty()) continue;
-                    r.assets.add(new Asset(name,
+                    r.assets.add(new Asset(name, a.optLong("size", -1L),
                             a.optString("url", ""), a.optString("browser_download_url", "")));
                 }
             }

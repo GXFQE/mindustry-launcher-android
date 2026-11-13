@@ -51,6 +51,7 @@
     <string name="plugin_task_done">Finished</string>
     <string name="plugin_task_failed">Failed</string>
     <string name="plugin_task_canceled">Canceled</string>
+    <string name="plugin_task_download">Downloading</string>
     <!-- v23：探针的风险告知与崩溃提示 -->
     <string name="plugin_probe_risk_title">Run a probe in the game process?</string>
     <string name="plugin_probe_risk_msg">This third-party plugin declares an in-process probe. A faulty probe can take the game down with it. Enable anyway?</string>

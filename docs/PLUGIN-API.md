@@ -5,7 +5,7 @@
 
 ## 1. 版本与兼容（v20 冻结基线）
 
-- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..38**。
+- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..39**。
   （v20 是冻结基线；v21 = 游戏设置面；v22 = 后台任务 + 游戏事件；v23 = 探针；v24 = 分析器；
   v25 = 结论挂行 + 筛选/排序注入 + HJSON；v26 = 逐项判定；v27 = 详情页的门 + 槽级结论进摘要卡；
   v28 = 原版文案键；v29 = 游戏前后台事件；v30 = 探针知道版本 / 跨会话数据目录 + 摘要卡总时长；
@@ -25,7 +25,15 @@
   **v38 = 插件与补丁清单**：`List<ItemInfo> plugins()`（装着哪些插件）+ `List<ItemInfo> patches()`
   / `patches(versionKey, slot)`（已导入的游戏补丁；给了启动项才判 `enabled` / `applies`）。
   数据仍走 `ItemInfo` 快照（与 `versions()` / `logs()` / `trash()` 同一套），新增两个 kind；
-  补丁的匹配键仍是**目标 APK 的 sha256**，不是版本号区间。**）
+  补丁的匹配键仍是**目标 APK 的 sha256**，不是版本号区间。**
+  **v39 = 网络 / 补丁写 / 实例与备份**：`fetchText` / `githubReleases` / `download`（复用宿主更新基建：
+  https-only、正文 512 KB / 下载 1 GB 上限、GitHub API 10 分钟缓存 + 每小时 40 次、
+  走用户选的镜像线路、`.part` + sha256）；`patchEnable` / `patchDisable` / `patchImport` /
+  `patchDelete` / `patchConflicts`（复用补丁机制自己的门禁 / 校验 / 原子写 / 中转站；
+  **插件启停仍归宿主**）；`List<ItemInfo> instances()`（运行实例，含启动占位）+
+  `List<ItemInfo> backups(slot)`（备份元信息）。另有一批 **`extra` 加键**（不抬版本的增量）：
+  `versions()` 的 `instanceKey` / `bound` / `patchCount` / `backupCount`，`plugins()` 的
+  `updateState` / `updateVersion` / `updateNote`，`settings()` 的六个公开设置键。**）
 - 插件 `api()` 报的是「我需要的最低宿主接口版本」。用不到的新能力**不要**报高 ——
   报高了只会在老宿主上被拒，换不来任何东西。
 - **不要用 try/catch 去兼容老宿主**：报什么版本就只会跑在什么版本上。`api()` 报 20，
@@ -105,7 +113,7 @@ public static void unload();                    // 可选：收尾（也认 unlo
 
 | 方法 | 说明 |
 |---|---|
-| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 38） |
+| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 39） |
 | `context()` | 插件上下文（**只用来取资源 / 主题 / 建 View**） |
 | `page()` / `slot()` | 从哪一页来 / 当前槽名 |
 | `theme()` | 主题色与 dp/sp（别自己写死颜色，见 `PluginTheme`） |
@@ -118,7 +126,7 @@ public static void unload();                    // 可选：收尾（也认 unlo
 | `pageItems()` | 当前页面看到的数据快照 |
 | `slots()` | 全部槽 |
 | `contents(kind)` / `contents(slot, kind)` | 四类内容；`kind` = `saves`/`maps`/`mods`/`blueprints` |
-| `logs()` / `trash()` / `versions()` | 日志与崩溃报告 / 中转站 / 已装版本 |
+| `logs()` / `trash()` / `versions()` | 日志与崩溃报告 / 中转站 / 已装版本（v39 起 `trash()` 的 `extra["category"]` 覆盖全部八类 —— 含以前整块漏掉的 `versions` / `patches`；另有 `slot` / `originalName` / `stamp` / `files` 键） |
 | `open(item)` | 打开条目的字节流（文件或容器条目统一） |
 | `modsSkipped()` / `gameRunning()` | 这一轮会不会加载模组 / **有没有任意**游戏在跑（⚠️ 全局判据；判"某个槽"用 v37 的下面两个） |
 | `gameRunning(slot)`（v37） | **这个槽**有没有游戏实例在跑（null / 空 = 当前槽）；判据与宿主写门禁同一份，只表示调用那一刻的快照 |
@@ -126,8 +134,56 @@ public static void unload();                    // 可选：收尾（也认 unlo
 | `baseBundleKeys()`（v28） | 目标版本**基础语言包**的键集合（判"是不是原版文案"用；空集 = 读不到，不是"没有"） |
 | `plugins()`（v38） | 装着哪些插件（含停用 / 待生效 / 已隔离）—— id / 名字 / 状态 / 来源 / 版本 / 自述字段 / 声明的能力条目，见下文「插件与补丁清单」 |
 | `patches()` / `patches(versionKey, slot)`（v38） | 已导入的游戏补丁；给了启动项才判 `enabled` / `applies`，见下文 |
+| `instances()`（v39） | **正在跑**的游戏实例（含启动占位）—— `pid` / `vkey` / `slot` / `instanceKey` / `started` / `starting`；顺序 = 启动时间升序 |
+| `backups(slot)`（v39） | 某个槽的**备份快照**元信息（`created` / `label` / `source` / `files` / `bytes` / `legacy`）；`slot` 空 = 这一页的槽；恢复 / 删除不给插件做 |
 | `usageDir()` | 插件数据目录（见第 9 节） |
 | `crashReportsDir()`（v22） | 当前槽的崩溃报告目录（只读；可能不存在） |
+
+#### v39 给已有清单补的 `extra` 键（加键不抬版本）
+
+| 方法 | 新键 |
+|---|---|
+| `versions()` | `instanceKey`（= 宿主实例键 `版本key + NUL + 槽`，**别自己拼**）/ `bound`（`"true"` = 附加绑定行，不是主行）/ `patchCount`（这个启动项启用的补丁数，读不出来就**没有这个键**）/ `backupCount`（这个槽的备份份数） |
+| `plugins()` | `updateState`（`ok` / `available` / `installed` / `confirm` / `failed`）/ `updateVersion` / `updateNote`（后两个可能是空串 = 更新记录里没写；**记录不存在 ⇒ 三个键都不出现**） |
+| `settings()` | `plugin_auto_update` / `crash_alert` / `trash_keep` / `trash_keep_slots` / `update_mode` / `update_mirror`（都是"设置页里能被改的项"；`update_mirror` 空串 = 自动选线路） |
+
+### 网络与下载（v39）
+
+| 方法 | 说明 |
+|---|---|
+| `fetchText(url, cb)` | 拉一段文本（UTF-8）。**只放行 https**（`http://127.0.0.1` / `localhost` 给本机调试）；正文上限 **512 KB**；连接 15 s / 读 60 s；跟随 302 |
+| `githubReleases(repo, cb)` | 列 `owner/name` 的 release（最新在前，最多 30 条）：`tag` / `prerelease` / `publishedAt` / `assets`（`name` / `size`（没给 = -1）/ `url`，`url` 可直接喂 `download`） |
+| `download(url, expectedSha256, cb)`（返回 `Task`） | 下载到**本插件 cache** 的 `downloads/<URL 文件名>`；先写 `.part`，大小 + sha256 过了才改名；GitHub 地址自动套用户选的**更新线路**（镜像优先、直连兜底）；体积上限 **1 GB**；进度显示在宿主前台服务通知里（**别自己再发**） |
+
+规则与边界：
+
+- **GitHub API 配额是宿主与插件共用的**（未登录 60 次/小时）⇒ 宿主做了**同一 URL 10 分钟缓存**
+  + **每小时 40 次**上限（超了 `rate-limited`）。**不要轮询**：插件打光配额会连带把启动器自更新搞停。
+- 失败码（`Result.reason`）：`bad-url` / `network` / `size` / `sha` / `rate-limited` / `bad-data` /
+  `io` / `canceled`。文案由插件自己出。
+- **不校验 sha256 = 信任中间人**：`expectedSha256` 能给就给（空串 / null = 不校验，回调里回实际值）。
+- 落点只能在插件自己的 `cache/downloads/`；文件名由宿主清洗（只留 `A-Za-z0-9._-`，≤ 80）。
+- 下载任务可 `Task.cancel()`；取消后回调 `canceled` 且通知栏会收掉进度。
+
+### 补丁写（v39）
+
+**定案：补丁可以碰（它只是一个更强的模组），插件启停仍归宿主。**
+
+| 方法 | 说明 |
+|---|---|
+| `patchEnable(versionKey, slot, ref, cb)` | 启用。`slot` 空 = 这一页的槽；`ref` = `patches()` 的 `extra["ref"]`（`id@version`） |
+| `patchDisable(versionKey, slot, ref, cb)` | 停用（幂等：本来没启用 ⇒ 成功） |
+| `patchImport(InputStream, cb)` | 导入补丁包（zip 流，**宿主关闭**）；成功回调给新 `ref`。完整校验沿用补丁机制（清单 / dex / 素材 / 体积 / 重复） |
+| `patchDelete(ref, cb)` | 删补丁 = **挪进中转站**（可由宿主界面放回）；被启用着 ⇒ `in_use` |
+| `patchConflicts(versionKey, slot, ref, cb)` | 启用前**预检**：回调里给冲突的已启用补丁显示名列表（空表 = 没冲突）；已启用 ⇒ `enabled`（不是"跟自己冲突"） |
+
+- 宿主做全部门禁：该启动项实例在跑 ⇒ `game_alive`；文件缺失 ⇒ `missing`；不匹配这个 APK ⇒
+  `no_match`；已启用 ⇒ `enabled`；冲突 ⇒ `conflict`；`(版本key, 槽)` 不是存在的启动项 ⇒ `not-found`。
+- 其余失败码沿用补丁机制：`bad_zip` / `bad_json` / `schema` / `field` / `no_targets` / `bad_hash` /
+  `bad_path` / `missing_entry` / `bad_dex` / `bad_assets` / `dup` / `too_big` / `io` / `record_gone`。
+- **启用只写记录，不碰正在跑的进程**：真正生效在下次启动；同一补丁在两个槽上各开各的（第 353 轮）。
+- 插件自己负责"动手前问用户"（想和宿主风格一致就用宿主的 `confirm` / `choose`）。
+- 这些方法都是异步：回调在 UI 线程；`patchImport` / `patchConflicts` 会读 dex，**别在主线程等结果**。
 
 ### 目录
 
@@ -604,9 +660,12 @@ void writeGameSettings(String slot, Map<String, Object> changes, Done done); // 
 
 - `createView` / `run` 在 UI 线程；**不要**在里面读大文件。
 - `runBackground(label, body)` 的 `body` 在后台线程；**别碰 View**，要更新 UI 用 View 自己的 `post`。
-- 回调（`Choose` / `Confirm` / `Prompt` / `PickFile` / `PickContent` / `After` / `Done` / `Cancel`）
-  **都在 UI 线程**回调。
-- `export` / `share` / `writeItem` 传进去的 `InputStream` **由宿主关闭**；`pickFile` 给你的是文件，自己读。
+- 回调（`Choose` / `Confirm` / `Prompt` / `PickFile` / `PickContent` / `After` / `Done` / `Cancel`，
+  v39 起还有 `Fetch` / `Releases` / `Download` / `Imported` / `Conflicts`）**都在 UI 线程**回调。
+- `export` / `share` / `writeItem` / `patchImport` 传进去的 `InputStream` **由宿主关闭**；
+  `pickFile` / `download` 给你的是文件，自己读。
+- v39 的网络 / 补丁写接口都是**异步**的：`fetchText` / `githubReleases` / 五个补丁写方法在后台线程跑、
+  回调回 UI 线程；`download` 额外返回 `Task`（可取消，通知栏有进度）。
 
 ## 6. 失败语义：`Result`
 
@@ -629,13 +688,35 @@ public final String reason;  // 机器码；成功恒为 null，失败恒非空
 | `invalid` | 参数不合法（null / 类型不对） |
 | `unknown` | 宿主没给具体原因（兜底） |
 
+**v39 网络**（`fetchText` / `githubReleases` / `download`）：
+
+| `reason` | 含义 |
+|---|---|
+| `bad-url` | 不是 https（本机回环除外）/ 空 / 超长 / repo 形状不对 |
+| `network` | 连不上 / 非 200 / 超时 |
+| `size` | 正文或下载超过上限（512 KB / 1 GB） |
+| `sha` | 下载内容的 sha256 与 `expectedSha256` 不符 |
+| `rate-limited` | GitHub API 配额用尽（宿主缓存 + 每小时上限；别轮询） |
+| `bad-data` | 返回的不是预期格式（镜像错误页 / 限流对象等） |
+
+**v39 补丁写**（`patchEnable` / `patchDisable` / `patchImport` / `patchDelete` / `patchConflicts`）：
+`not-found`（启动项不存在）/ `no_match`（补丁没有匹配这个 APK 的 target）/ `conflict`（与已启用的冲突）/
+`missing`（补丁文件缺失）/ `enabled`（已启用）/ `in_use`（删除时还被启用着）/ `game_alive`（该实例在跑）/
+`record_gone`（记录不存在）/ `bad_zip` / `bad_json` / `schema` / `field` / `no_targets` / `bad_hash` /
+`bad_path` / `missing_entry` / `bad_dex` / `bad_assets` / `dup` / `too_big` / `io`。
+
 ⚠️ `reason` 是**给代码看的**，别直接上屏 —— 文案由插件自己出（每个插件有自己的语言包）。
 
 ## 7. 边界（先看这几条再动手）
 
 - **没有沙箱**：能读宿主能读的、能写你声明的地方；靠"约定 + 告知"，不是权限门。
 - `writeItem` 只允许改**槽内四类目录里已存在的文件**（canonical 前缀校验），不能新建、不能写到别处。
-- 插件的数据住在 `<插件>/data`（`dataDir()`），缓存住 `<插件>/cache`（`pickFile` 落点）。
+- 插件的数据住在 `<插件>/data`（`dataDir()`），缓存住 `<插件>/cache`（`pickFile` / `download` 落点）。
+- **网络走宿主这条路，不自己开 socket**（不是不让你开，是不让每个插件各踩一遍 302 / 镜像 / 半截文件）：
+  https-only、体积上限、镜像只对 GitHub、GitHub API 由宿主统一缓存与限频。
+- **补丁可以写，插件不能停用自己/别的插件**：补丁写接口复用补丁机制的全部门禁与原子写；
+  插件启停是宿主的安全锚（信任模型 + 安全阀），永远只归宿主界面。
+- 插件只负责"什么时候让用户点"；`patchEnable` 只写启用记录，**不会**碰正在跑的进程（下次启动才生效）。
 - 界面文案请走 `api.context().getString(...)` 或插件自带资源；宿主的 `Trans` 只服务宿主自己。
 
 ## 8. 配套示例：`plugins/sample/`
@@ -830,6 +911,16 @@ v38（2026-11-13 第 372 轮）：**插件与补丁清单** —— `plugins()`�
 游戏补丁；给了启动项才判 `enabled` / `applies`）。两者沿用 `ItemInfo` 快照（新增
 `KIND_PLUGIN` / `KIND_PATCH`），读不到的量**不放键**而不是给默认值；补丁匹配仍是目标 APK 的
 sha256。`API_MIN` 仍不动（区间 20..38）。
+v39（2026-11-13 第 373 轮）：**网络 / 补丁写 / 实例与备份**（用户：「我们甚至没有 GitHub 下载接口」
+「不能碰插件启停，但补丁可以碰（这东西只是个更强的模组而已）」）——
+`fetchText` / `githubReleases` / `download`：复用宿主更新基建（超时 / 302 / Accept / 镜像线路 /
+`.part` + sha256 / 前台服务进度），https-only、正文 512 KB、下载 1 GB、GitHub API 同 URL 10 分钟
+缓存 + 每小时 40 次（与自更新共用配额）；`patchEnable` / `patchDisable` / `patchImport` /
+`patchDelete` / `patchConflicts`：复用补丁机制自己的门禁 / 清单校验 / 原子写 / 删除进中转站，
+**插件启停仍归宿主**；`instances()`（含启动占位）与 `backups(slot)`（只读元信息）；
+`versions()` / `plugins()` / `settings()` 各补一批 `extra` 键（加键不抬版本）。
+顺带修了 `trash()` 漏 `versions-trash` / `patches-trash` 的老 bug（改走 `Trash.list`，
+类别由 `Trash.Kind` 唯一映射）。`API_MIN` 仍不动（区间 20..39）。
 
 **官方体检插件**：`plugins/mods-health`（第 229 轮，前身叫 `conflict`）。宿主原来的那行
 「查模组冲突」整块删掉，判据搬进插件的 `core/Conflicts.java` 与 `core/Gates.java`；
