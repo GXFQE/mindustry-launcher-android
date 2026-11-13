@@ -9,6 +9,14 @@
     { "id": "sample-detail", "title": "样例：这一份", "subtitle": "读标题/大小与前 8 字节",
       "entry": "io.mdt.plugins.sample.SamplePlugin", "slot": "section", "page": "map-detail" },
     { "id": "sample-export", "title": "样例：导出清单…", "subtitle": "勾选若干净地图 → json / csv",
-      "entry": "io.mdt.plugins.sample.SamplePlugin", "slot": "action", "page": "maps" }
+      "entry": "io.mdt.plugins.sample.SamplePlugin", "slot": "action", "page": "maps", "place": "actions" },
+    { "id": "sample-card", "title": "样例：宿主卡片…", "subtitle": "showCard + openPage（v40）",
+      "entry": "io.mdt.plugins.sample.SampleCard", "slot": "action", "page": "maps", "place": "actions" },
+    { "id": "sample-version", "title": "样例：版本页钩子",
+      "entry": "io.mdt.plugins.sample.SamplePlugin", "slot": "section", "page": "version" },
+    { "id": "sample-patches", "title": "样例：补丁页钩子",
+      "entry": "io.mdt.plugins.sample.SamplePlugin", "slot": "section", "page": "patches" },
+    { "id": "sample-resources", "title": "样例：资源页钩子",
+      "entry": "io.mdt.plugins.sample.SamplePlugin", "slot": "section", "page": "resources" }
   ]
 }

@@ -33,6 +33,34 @@ public class VersionActivity extends BaseActivity {
     private String mSlot = "";
     private Versions.Entry mEntry;
 
+    // ---- v40：插件页面钩子（这一页有 plugin_section，BaseActivity 会挂） --------------
+    @Override protected String pluginPageId() {
+        return Extensions.PAGE_VERSION;
+    }
+
+    @Override protected String pluginSlot() {
+        if (mSlot != null && !mSlot.isEmpty()) return mSlot;
+        return super.pluginSlot();
+    }
+
+    /** 这一页"选中的那一份" = 这个启动项对应的版本条目（插件不用自己按 key 猜）。 */
+    @Override protected io.mdt.launcher.api.ItemInfo pluginSelectedItem() {
+        if (mEntry != null) {
+            String rowSlot = Versions.slotFor(mEntry);
+            for (io.mdt.launcher.api.ItemInfo it : PluginData.versions(this)) {
+                if (it != null && mKey.equals(it.extra.get("key"))
+                        && rowSlot.equals(it.extra.get("slot"))) {
+                    return it;
+                }
+            }
+        }
+        return null;
+    }
+
+    @Override protected java.io.File pluginSelectedFile() {
+        return mEntry == null || mEntry.apkPath == null ? null : new java.io.File(mEntry.apkPath);
+    }
+
     @Override protected void onCreate(Bundle b) {
         super.onCreate(b);
         setContentView(R.layout.activity_version);

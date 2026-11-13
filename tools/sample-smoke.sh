@@ -58,4 +58,6 @@ echo
 echo "== SAMPLE SMOKE OK =="
 echo "再肉眼点两处："
 echo "  1) 地图页「样例：导出清单…」→ 应弹宿主选择器"
-echo "  2) 任一地图详情页底部 → 应有「Sample plugin」+ head 十六进制"
+echo "  2) 地图页「样例：宿主卡片…」→ 应弹宿主卡片（showCard）；点「打开日志页」走 openPage"
+echo "  3) 任一地图详情页底部 → 应有「Sample plugin」+ head 十六进制"
+echo "  4) 版本 / 补丁 / 资源页底部 → 应有「样例：…页钩子」（v40 页面钩子）"

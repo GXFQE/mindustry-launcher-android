@@ -121,8 +121,13 @@ public final class PluginHost {
      * `instances()` / `backups(slot)` 两个只读清单；`versions()` / `plugins()` / `settings()`
      * 各补了若干 {@code extra} 键（加键不抬版本，见 {@code docs/PLUGIN-API.md}）。
      * 顺带修了 `trash()` 漏 versions / patches 两个目录的老 bug（改走 {@code Trash.list}）。
+     *
+     * <p>v40（2026-11-13 第 374 轮）：**插入能力** —— `showCard`（宿主卡片弹信息 + 最多 3 个按钮）/
+     * `openPage`（跳到宿主页面；只开放不需要额外上下文的页）；另外 `plugin.json` 的扩展条目多了
+     * `place: "actions"`（插进宿主那一页的操作卡，而不是底部「插件」卡），三个新页面钩子
+     * （version / patches / resources）也会挂 {@code plugin_section}。
      */
-    public static final int API = 39;
+    public static final int API = 40;
     /**
      * 还认的**最老**契约版本。
      *
@@ -1049,6 +1054,76 @@ public final class PluginHost {
                     });
                 }
             }, "mdt-plugin-patch-conflicts").start();
+        }
+
+        /**
+         * **v40**：宿主卡片弹信息（最多 3 个按钮）。
+         *
+         * <p>与 {@link #confirm} / {@link #choose} 走同一套 `CardStack` —— 插件不该自己 `new AlertDialog`
+         * （叠窗 + 主题不一致）。回调**只来一次**：点了按钮 ⇒ 按钮下标；返回 / 点外面 ⇒ -1。
+         */
+        @Override public void showCard(final String title, final String body, final String[] buttons,
+                                       final Card callback) {
+            final Activity a = activityOrNull();
+            if (a == null || a.isFinishing()) {
+                if (callback != null) callback.onCard(-1);
+                return;
+            }
+            a.runOnUiThread(new Runnable() {
+                @Override public void run() {
+                    final boolean[] picked = {false};
+                    final CardStack[] ref = new CardStack[1];
+                    java.util.List<CardStack.Btn> bs = new java.util.ArrayList<CardStack.Btn>();
+                    if (buttons != null) {
+                        for (int i = 0; i < buttons.length && bs.size() < 3; i++) {
+                            String lb = buttons[i] == null ? "" : buttons[i].trim();
+                            if (lb.isEmpty()) continue;          // 空文案 = 没有这个按钮
+                            final int idx = i;
+                            bs.add(new CardStack.Btn(lb, new Runnable() {
+                                @Override public void run() {
+                                    picked[0] = true;
+                                    if (ref[0] != null) ref[0].dismiss();
+                                    if (callback != null) callback.onCard(idx);
+                                }
+                            }));
+                        }
+                    }
+                    if (bs.isEmpty()) {
+                        bs.add(new CardStack.Btn(Trans.get(a, R.string.close), new Runnable() {
+                            @Override public void run() {
+                                if (ref[0] != null) ref[0].dismiss();
+                            }
+                        }));
+                    }
+                    ref[0] = new CardStack(a);
+                    ref[0].root(title == null ? "" : title,
+                            CardStack.text(a, body == null ? "" : body),
+                            bs.toArray(new CardStack.Btn[0]));
+                    ref[0].setOnDismiss(new Runnable() {
+                        @Override public void run() {
+                            if (!picked[0] && callback != null) callback.onCard(-1);
+                        }
+                    });
+                    ref[0].show();
+                }
+            });
+        }
+
+        /** **v40**：跳宿主页面（页面名映射与 extra 只在 {@link PluginPages#intent} 一处）。 */
+        @Override public void openPage(final String page, final String slot) {
+            final Activity a = activityOrNull();
+            if (a == null || a.isFinishing()) return;
+            final Intent i = PluginPages.intent(a, page, slot);
+            if (i == null) return;                  // 认不出的页面 ⇒ 静默（文档写明）
+            a.runOnUiThread(new Runnable() {
+                @Override public void run() {
+                    try {
+                        a.startActivity(i);
+                    } catch (Throwable ignored) {
+                        // 页面被禁用 / 被 ROM 裁掉：不把插件带崩
+                    }
+                }
+            });
         }
 
         /** ★ 第 271 轮：插件要的确认框也走 `CardStack`（插件页里的二次确认不再换窗）。 */

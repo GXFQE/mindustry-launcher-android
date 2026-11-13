@@ -62,8 +62,14 @@ final class PluginEntries {
             File apk = Plugins.apkOf(ctx, id, ver);
             List<Extensions.Item> items = Extensions.forPage(Extensions.of(apk), page);
             if (items.isEmpty()) continue;
+            List<Extensions.Item> keep = new ArrayList<Extensions.Item>();
+            for (Extensions.Item it : items) {
+                if (hasActionAnchor(page) && Extensions.PLACE_ACTIONS.equals(it.place)) continue;
+                keep.add(it);
+            }
+            if (keep.isEmpty()) continue;
             String name = Plugins.displayNameOf(ctx, id);
-            for (Extensions.Item it : items) out.add(new Entry(id, ver, name, it));
+            for (Extensions.Item it : keep) out.add(new Entry(id, ver, name, it));
         }
         return out;
     }
@@ -86,8 +92,14 @@ final class PluginEntries {
             File apk = Plugins.apkOf(ctx, id, ver);
             List<Extensions.Item> items = Extensions.forAction(Extensions.of(apk), page);
             if (items.isEmpty()) continue;
+            List<Extensions.Item> keep = new ArrayList<Extensions.Item>();
+            for (Extensions.Item it : items) {
+                if (hasActionAnchor(page) && Extensions.PLACE_ACTIONS.equals(it.place)) continue;
+                keep.add(it);
+            }
+            if (keep.isEmpty()) continue;
             String name = Plugins.displayNameOf(ctx, id);
-            for (Extensions.Item it : items) out.add(new Entry(id, ver, name, it));
+            for (Extensions.Item it : keep) out.add(new Entry(id, ver, name, it));
         }
         return out;
     }
@@ -615,5 +627,103 @@ final class PluginEntries {
 
     private static int dp(Activity a, int v) {
         return Math.round(v * a.getResources().getDisplayMetrics().density);
+    }
+
+    // ---- v40：把动作插进宿主的操作卡（`place: "actions"`）-----------------------
+
+    /**
+     * 这一页有没有**稳定的操作卡锚点**（"删除…"那一行）。
+     *
+     * <p>v40 只做四个内容页：它们的操作卡结构是同一套（导入 / 导出 / 删除）。
+     * 其它页写了 {@code place: "actions"} 也**回落**「插件」卡 —— 没有锚点就会"消失"，
+     * 那比放错地方更糟。
+     */
+    static boolean hasActionAnchor(String page) {
+        return anchorRowId(page) != 0;
+    }
+
+    private static int anchorRowId(String page) {
+        if (Extensions.PAGE_MAPS.equals(page)) return R.id.row_maps_del;
+        if (Extensions.PAGE_SAVES.equals(page)) return R.id.row_save_del;
+        if (Extensions.PAGE_MODS.equals(page)) return R.id.row_mod_del;
+        if (Extensions.PAGE_BLUEPRINTS.equals(page)) return R.id.row_bp_del;
+        return 0;
+    }
+
+    /** 取这一页 `place: "actions"` 的条目（与 {@link #collect} 同一套 active 判据）。 */
+    static List<Entry> collectPlaced(Context ctx, String page) {
+        List<Entry> out = new ArrayList<Entry>();
+        if (ctx == null || page == null || !hasActionAnchor(page)) return out;
+        String active = Plugins.active(ctx);
+        for (String id : Plugins.stateIds(active)) {
+            String ver = Plugins.stateGet(active, id);
+            if (ver == null || ver.isEmpty()) continue;
+            File apk = Plugins.apkOf(ctx, id, ver);
+            List<Extensions.Item> items = Extensions.forPlacedActions(Extensions.of(apk), page);
+            if (items.isEmpty()) continue;
+            String name = Plugins.displayNameOf(ctx, id);
+            for (Extensions.Item it : items) out.add(new Entry(id, ver, name, it));
+        }
+        return out;
+    }
+
+    /**
+     * 把 `place: "actions"` 的行插进**宿主那一页的操作卡**（"删除…"那一行之前）。
+     *
+     * <p>没声明 / 没锚点 / 没生效中的插件 ⇒ 一个像素都不动（本方法可以无条件在 onCreate 里调）。
+     */
+    static void attachPlacedActions(Activity a, String page, String slot) {
+        if (a == null || page == null) return;
+        int rid = anchorRowId(page);
+        if (rid == 0) return;
+        View anchor = a.findViewById(rid);
+        if (anchor == null || !(anchor.getParent() instanceof ViewGroup)) return;
+        ViewGroup box = (ViewGroup) anchor.getParent();
+        List<Entry> rows = collectPlaced(a, page);
+        if (rows.isEmpty()) return;
+        int at = box.indexOfChild(anchor);
+        if (at < 0) return;
+        for (Entry e : rows) {
+            box.addView(placedRow(a, e, page, slot), at++);
+            box.addView(divider(a), at++);      // 让"插件行 → 删除"之间也有那条线
+        }
+    }
+
+    /** 插进宿主操作卡的一行：content 打开插件页；action 在本页跑（与「插件」卡里同一种行为）。 */
+    private static View placedRow(final Activity a, final Entry e, final String page,
+                                  final String slot) {
+        final boolean openPage = Extensions.SLOT_CONTENT.equals(e.item.slot);
+        View row = LayoutInflater.from(a).inflate(R.layout.row_action, null, false);
+        ((ImageView) row.findViewById(R.id.act_icon)).setImageResource(openPage
+                ? R.drawable.ic_plugins_bar : R.drawable.ic_stats);
+        ((TextView) row.findViewById(R.id.act_title)).setText(e.item.label());
+        String sub = e.item.subtitle == null ? "" : e.item.subtitle.trim();
+        ((TextView) row.findViewById(R.id.act_sub)).setText(sub.isEmpty()
+                ? Trans.get(a, R.string.plugin_ext_from_fmt, e.name) : sub);
+        row.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                if (openPage) {
+                    PluginsActivity.start(a, e.id, e.ver, e.item.entry, page, slot,
+                            e.item.label(), null);
+                    return;
+                }
+                try {
+                    File apk = Plugins.apkOf(a, e.id, e.ver);
+                    if (apk == null || !apk.isFile()) return;
+                    PluginHost.Loaded l = Plugins.isInjected(a, e.id, e.ver)
+                            ? PluginHost.openInjected(a, apk, e.item.entry, page, slot, null, null)
+                            : PluginHost.load(a, apk, e.item.entry, page, slot, null, null);
+                    PluginHost.runEntry(l);
+                } catch (PluginHost.PluginException pe) {
+                    android.widget.Toast.makeText(a,
+                            a.getString(PluginHost.reasonRes(pe.reason)),
+                            android.widget.Toast.LENGTH_LONG).show();
+                } catch (Throwable t) {
+                    android.widget.Toast.makeText(a, a.getString(R.string.plugin_err_other),
+                            android.widget.Toast.LENGTH_LONG).show();
+                }
+            }
+        });
+        return row;
     }
 }

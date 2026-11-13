@@ -49,6 +49,14 @@ public final class SamplePlugin {
         line.setTextSize(13f);
         line.setTextColor(t.textMuted);
         line.setPadding(0, dp(c, 6), 0, 0);
+        // v40：三个新页面钩子（version / patches / resources）—— 宿主把 section 画进那一页
+        String pg = api.page();
+        if ("version".equals(pg) || "patches".equals(pg) || "resources".equals(pg)) {
+            line.setText("Sample plugin · " + pg + " hook"
+                    + (it == null || it.title == null ? "" : " · " + it.title));
+            box.addView(line);
+            return box;
+        }
         if (it == null) {
             line.setText("no selected item");
         } else {

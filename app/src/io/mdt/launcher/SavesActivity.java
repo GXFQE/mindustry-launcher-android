@@ -157,6 +157,9 @@ public class SavesActivity extends BaseActivity {
         View root = getLayoutInflater().inflate(R.layout.activity_saves, null);
         Util.applySystemInsets(root);
         setContentView(root);
+        // v40：`place: "actions"` 的插件动作插进本页操作卡（删除行之前）
+        PluginEntries.attachPlacedActions(this, Extensions.PAGE_SAVES,
+                mSlot == null || mSlot.isEmpty() ? Data.currentSlot(this) : mSlot);
         setTitle(Trans.get(SavesActivity.this, R.string.saves_list_title_fmt, mSlot));
 
         mHead = (TextView) root.findViewById(R.id.save_head);

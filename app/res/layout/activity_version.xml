@@ -140,6 +140,16 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
             </LinearLayout>
+
+            <!-- v40：插件页面钩子（这一页的“插件”卡；没有条目时整块 GONE，见 PluginEntries） -->
+            <include
+                layout="@layout/plugin_section"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="14dp"
+                android:layout_marginEnd="14dp"
+                android:layout_marginTop="12dp"
+                android:layout_marginBottom="8dp" />
         </LinearLayout>
     </ScrollView>
 </LinearLayout>

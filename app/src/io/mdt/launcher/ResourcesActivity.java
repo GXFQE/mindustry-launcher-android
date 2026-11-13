@@ -70,6 +70,19 @@ public final class ResourcesActivity extends BaseActivity {
     private ArrayList<String> mPendingNames;
     private boolean mExporting;
 
+    // ---- v40：插件页面钩子（这一页有 plugin_section，BaseActivity 会挂） --------------
+    @Override protected String pluginPageId() {
+        return Extensions.PAGE_RESOURCES;
+    }
+
+    @Override protected String pluginSlot() {
+        return Data.currentSlot(this);
+    }
+
+    @Override protected java.io.File pluginSelectedFile() {
+        return mApk;
+    }
+
     private static final class Row {
         final String key;
         final CheckBox check;

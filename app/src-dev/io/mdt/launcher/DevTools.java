@@ -137,10 +137,57 @@ final class DevTools {
                 || intent.hasExtra("dev_patch_import")
                 || intent.hasExtra("dev_patch_enable")
                 || intent.hasExtra("dev_patch_disable")
-                || intent.hasExtra("dev_patch_status");
+                || intent.hasExtra("dev_patch_status")
+                // 第 374 轮（v40）：页面钩子 / openPage 的真机验收口
+                //   `--es dev_open_page maps|version|patches|resources|...`
+                //   版本/补丁/资源页另给 `dev_open_key <版本 key>`，槽给 `dev_open_slot`
+                || intent.hasExtra("dev_open_page");
         if (!isDev) return;
         if ((a.getApplicationInfo().flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) == 0) {
             Toast.makeText(a, R.string.dev_blocked_toast, Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        // v40：直接开某一页（验 plugin_section 钩子 / openPage 映射；与插件接口同一个映射函数）
+        String devOpen = intent.getStringExtra("dev_open_page");
+        if (devOpen != null && !devOpen.isEmpty()) {
+            String p = devOpen.trim();
+            String slot = intent.getStringExtra("dev_open_slot");
+            String key = intent.getStringExtra("dev_open_key");
+            if (slot == null || slot.isEmpty()) {
+                String cur = Data.currentSlot(a);          // 验收时省掉中文 extra
+                slot = cur == null ? "" : cur;
+            }
+            Intent i = null;
+            if ("version".equals(p) && key != null && !key.isEmpty()) {
+                i = new Intent(a, VersionActivity.class);
+                i.putExtra(VersionActivity.EXTRA_KEY, key);
+                i.putExtra(VersionActivity.EXTRA_SLOT, slot);
+            } else if ("patches".equals(p) && key != null && !key.isEmpty()) {
+                i = new Intent(a, PatchesActivity.class);
+                i.putExtra(PatchesActivity.EXTRA_KEY, key);
+                i.putExtra(PatchesActivity.EXTRA_SLOT, slot);
+            } else if ("resources".equals(p) && key != null && !key.isEmpty()) {
+                String apk = "";
+                String name = "";
+                String ver = "";
+                for (Versions.Entry e : Versions.scanAll(a)) {
+                    if (e == null || !key.equals(e.key())) continue;
+                    apk = e.apkPath == null ? "" : e.apkPath;
+                    name = e.displayName(a);
+                    ver = e.displayVersion();
+                    break;
+                }
+                if (!apk.isEmpty()) {
+                    i = new Intent(a, ResourcesActivity.class);
+                    i.putExtra(ResourcesActivity.EXTRA_APK, apk);
+                    i.putExtra(ResourcesActivity.EXTRA_NAME, name);
+                    i.putExtra(ResourcesActivity.EXTRA_VERSION, ver);
+                }
+            } else {
+                i = PluginPages.intent(a, p, slot);
+            }
+            if (i != null) a.startActivity(i);
             return;
         }
 

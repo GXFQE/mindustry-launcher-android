@@ -70,6 +70,12 @@ final class Extensions {
     static final String PAGE_LOGS = "logs";
     static final String PAGE_TRASH = "trash";
     static final String PAGE_MAP_DETAIL = "map-detail";
+    /** v40：版本页（实例 / 版本详情）。 */
+    static final String PAGE_VERSION = "version";
+    /** v40：补丁页。 */
+    static final String PAGE_PATCHES = "patches";
+    /** v40：资源统计页。 */
+    static final String PAGE_RESOURCES = "resources";
     /**
      * 第 193 轮（v9）：**段落插槽** —— 插件把一段界面直接画进宿主页里。
      *
@@ -84,6 +90,15 @@ final class Extensions {
      * 不该先跳一个空页；插件只要实现 {@code run(PluginApi)}，对话框 / SAF / 进度都落在原来的页上。</p>
      */
     static final String SLOT_ACTION = "action";
+
+    /**
+     * **v40**：`place` = `"actions"` 的条目插到**宿主那一页的操作卡**里，而不是底部「插件」卡。
+     *
+     * <p>为什么只支持内容页的 4 个操作卡：用户那句「插件和宿主的 UI 非要分离开就很别扭」——
+     * 插件做的本来就是这一页的动作，混在自己的卡片里像另一个 App。有稳定锚点的页才做；
+     * 其它页写了也**回落原行为**（进「插件」卡），不会消失。
+     */
+    static final String PLACE_ACTIONS = "actions";
     /** v24：分析器 —— 插件给结论（{@link io.mdt.launcher.api.Finding}），宿主渲染。 */
     static final String SLOT_ANALYZER = "analyzer";
     /**
@@ -103,13 +118,20 @@ final class Extensions {
         final String id, title, subtitle, entry, slot, page;
         /** v23：事件名（`game-start` / `game-exit`）；空 = 不是事件条目。 */
         final String event;
+        /** v40：插入位置（`actions` = 宿主那一页的操作卡；空 = 原来的「插件」卡）。 */
+        final String place;
 
         Item(String id, String title, String subtitle, String entry, String slot, String page) {
-            this(id, title, subtitle, entry, slot, page, "");
+            this(id, title, subtitle, entry, slot, page, "", "");
         }
 
         Item(String id, String title, String subtitle, String entry, String slot, String page,
              String event) {
+            this(id, title, subtitle, entry, slot, page, event, "");
+        }
+
+        Item(String id, String title, String subtitle, String entry, String slot, String page,
+             String event, String place) {
             this.id = id;
             this.title = title;
             this.subtitle = subtitle;
@@ -117,6 +139,7 @@ final class Extensions {
             this.slot = slot;
             this.page = page;
             this.event = event == null ? "" : event;
+            this.place = place == null ? "" : place;
         }
 
         /** 界面上那个名字：标题空就回落 id（与插件名同一策略：**不印空白**）。 */
@@ -148,8 +171,10 @@ final class Extensions {
                 if (slot.isEmpty()) slot = SLOT_PLUGINS;
                 String page = trim(o.optString("page", ""));   // 只有 content 插槽用得上
                 String event = trim(o.optString("event", ""));  // v23：事件扩展
+                String place = trim(o.optString("place", "")).toLowerCase(java.util.Locale.ROOT);
+                if (!PLACE_ACTIONS.equals(place)) place = "";   // 认不出的 place ⇒ 原行为
                 out.add(new Item(id, trim(o.optString("title", "")), trim(o.optString("subtitle", "")),
-                        entry, slot, page, event));
+                        entry, slot, page, event, place));
             }
         } catch (Throwable t) {
             return new ArrayList<Item>();                       // 自述坏了 ⇒ 当"没有扩展"，别崩页面
@@ -227,7 +252,28 @@ final class Extensions {
                 || PAGE_MAIN.equals(page) || PAGE_SLOTS.equals(page)
                 || PAGE_SLOT.equals(page) || PAGE_SETTINGS.equals(page)
                 || PAGE_LOGS.equals(page) || PAGE_TRASH.equals(page)
-                || PAGE_MAP_DETAIL.equals(page) || PAGE_BLUEPRINT_DETAIL.equals(page);
+                || PAGE_MAP_DETAIL.equals(page) || PAGE_BLUEPRINT_DETAIL.equals(page)
+                // v40：三个新页面钩子（布局里有 plugin_section，BaseActivity 会挂）
+                || PAGE_VERSION.equals(page) || PAGE_PATCHES.equals(page)
+                || PAGE_RESOURCES.equals(page);
+    }
+
+    /**
+     * **v40**：这一页该"插进宿主操作卡"的条目（`place: "actions"`）。
+     *
+     * <p>只认 `action` / `content` 两种 slot（section 是画一段自己的 View，没有"一行"的形态）；
+     * 顺序 = 声明顺序。哪一页有操作卡锚点由调用方（{@code PluginEntries}) 判。
+     */
+    static List<Item> forPlacedActions(List<Item> all, String page) {
+        List<Item> out = new ArrayList<Item>();
+        if (all == null || page == null || !knownPage(page)) return out;
+        for (Item it : all) {
+            if (!PLACE_ACTIONS.equals(it.place)) continue;
+            if (!SLOT_ACTION.equals(it.slot) && !SLOT_CONTENT.equals(it.slot)) continue;
+            if (!page.equals(it.page)) continue;
+            out.add(it);
+        }
+        return out;
     }
 
     /** 这一条现在**真的会被渲染**吗（唯一的"用得上"判据，报告 / 提示都走它）。 */

@@ -4560,6 +4560,8 @@ public final class SelfTest {
         } catch (Throwable t) {
             ok(stat, L, false, "v39 API missing: " + t);
         }
+        // 第 374 轮（v40）：插入能力（宿主卡片 / 跳页 / place=actions / 三个页面钩子）
+        pluginV40(ctx, L, stat);
         try {
             java.lang.reflect.Method vi = io.mdt.launcher.api.ProbeEnv.class.getMethod("versionInfo");
             java.lang.reflect.Method dv = io.mdt.launcher.api.ProbeEnv.class.getMethod("displayVersion");
@@ -5704,6 +5706,118 @@ public final class SelfTest {
             }
         } catch (Throwable t) {
             ok(stat, L, false, "④ 中转站用例异常：" + t);
+        }
+    }
+
+    /**
+     * 第 374 轮（v40）：**插入能力** —— 宿主卡片 / 跳页 / `place: "actions"` / 三个页面钩子。
+     *
+     * <p>纯函数为主：页面名 → Activity 的映射、place 解析、页面白名单都直接钉；
+     * `showCard` 在"没有 Activity"的上下文里必须回调 -1（不挂、不吞）。
+     */
+    private static void pluginV40(Context ctx, List<String> L, int[] stat) {
+        L.add("");
+        L.add("【v40 · 插入能力：宿主卡片 / 跳页 / place=actions / 三个页面钩子（第 374 轮）】");
+        ok(stat, L, PluginHost.API >= 40 && PluginApi.DOC_VERSION == PluginHost.API
+                        && PluginApi.DOC_VERSION >= 40,
+                "host plugin api == 40（v40：showCard / openPage / place=actions / 页面钩子）");
+        try {
+            java.lang.reflect.Method sc = PluginApi.class.getMethod("showCard", String.class,
+                    String.class, String[].class, PluginApi.Card.class);
+            java.lang.reflect.Method op = PluginApi.class.getMethod("openPage", String.class,
+                    String.class);
+            java.lang.reflect.Method onCard = PluginApi.Card.class.getMethod("onCard", int.class);
+            ok(stat, L, sc.getReturnType() == void.class && op.getReturnType() == void.class
+                            && onCard.getReturnType() == void.class,
+                    "v40 签名：showCard(title, body, buttons, Card) / openPage(page, slot)；Card.onCard(int)");
+        } catch (Throwable t) {
+            ok(stat, L, false, "v40 API missing: " + t);
+        }
+
+        // place 解析：认 actions（大小写归一）、不认的回落空串、section 不参与"插操作卡"
+        try {
+            String json = "{\"extensions\":["
+                    + "{\"id\":\"a\",\"entry\":\"E\",\"slot\":\"action\",\"page\":\"maps\","
+                    + "\"place\":\"actions\"},"
+                    + "{\"id\":\"b\",\"entry\":\"E\",\"slot\":\"content\",\"page\":\"maps\","
+                    + "\"place\":\"Actions\"},"
+                    + "{\"id\":\"c\",\"entry\":\"E\",\"slot\":\"action\",\"page\":\"maps\","
+                    + "\"place\":\"weird\"},"
+                    + "{\"id\":\"d\",\"entry\":\"E\",\"slot\":\"section\",\"page\":\"maps\","
+                    + "\"place\":\"actions\"}]}";
+            List<Extensions.Item> items = Extensions.parse(json);
+            boolean placeOk = items.size() == 4
+                    && Extensions.PLACE_ACTIONS.equals(items.get(0).place)
+                    && Extensions.PLACE_ACTIONS.equals(items.get(1).place)
+                    && items.get(2).place.isEmpty()
+                    && Extensions.PLACE_ACTIONS.equals(items.get(3).place);
+            List<Extensions.Item> placed = Extensions.forPlacedActions(items, Extensions.PAGE_MAPS);
+            ok(stat, L, placeOk && placed.size() == 2
+                            && Extensions.forPlacedActions(items, Extensions.PAGE_SAVES).isEmpty()
+                            && Extensions.forPlacedActions(items, Extensions.PAGE_MAIN).isEmpty(),
+                    "v40 place 解析：actions 生效（大小写归一）/ 认不出的回落 / 只在声明的那一页 / "
+                            + "section 不参与插行");
+        } catch (Throwable t) {
+            ok(stat, L, false, "v40 place 用例异常：" + t);
+        }
+
+        // 页面钩子：三个新 page id 认得了；有操作卡锚点的只有四个内容页
+        ok(stat, L, Extensions.knownPage(Extensions.PAGE_VERSION)
+                        && Extensions.knownPage(Extensions.PAGE_PATCHES)
+                        && Extensions.knownPage(Extensions.PAGE_RESOURCES),
+                "v40 页面钩子：version / patches / resources 都算认得的 page");
+        ok(stat, L, PluginEntries.hasActionAnchor(Extensions.PAGE_MAPS)
+                        && PluginEntries.hasActionAnchor(Extensions.PAGE_SAVES)
+                        && PluginEntries.hasActionAnchor(Extensions.PAGE_MODS)
+                        && PluginEntries.hasActionAnchor(Extensions.PAGE_BLUEPRINTS)
+                        && !PluginEntries.hasActionAnchor(Extensions.PAGE_MAIN)
+                        && !PluginEntries.hasActionAnchor(Extensions.PAGE_VERSION),
+                "v40 place=actions 的锚点只认四个内容页；其它页回落「插件」卡（不消失）");
+
+        // openPage 的页面名 → Activity 映射（extra 的键写错编译器不响，只能靠这条）
+        try {
+            android.content.Intent mapsI = PluginPages.intent(ctx, "maps", "slot-x");
+            android.content.Intent mainI = PluginPages.intent(ctx, "main", "slot-x");
+            android.content.Intent slotI = PluginPages.intent(ctx, "slot", "slot-y");
+            boolean mapOk = mapsI != null && mapsI.getComponent() != null
+                    && MapsActivity.class.getName().equals(mapsI.getComponent().getClassName())
+                    && "slot-x".equals(mapsI.getStringExtra("slot"));
+            boolean mainOk = mainI != null && mainI.getComponent() != null
+                    && MainActivity.class.getName().equals(mainI.getComponent().getClassName())
+                    && !mainI.hasExtra("slot");
+            boolean slotOk = slotI != null && slotI.getComponent() != null
+                    && SlotActivity.class.getName().equals(slotI.getComponent().getClassName())
+                    && "slot-y".equals(slotI.getStringExtra("slot"));
+            ok(stat, L, mapOk && mainOk && slotOk,
+                    "v40 openPage 映射：maps → MapsActivity + slot；main 不带 slot；slot → SlotActivity + slot");
+            ok(stat, L, PluginPages.intent(ctx, "patches", null) == null
+                            && PluginPages.intent(ctx, "nope", "") == null
+                            && PluginPages.intent(ctx, null, "") == null,
+                    "v40 openPage 反方向：版本/补丁页（要更多上下文）与认不出的名字 ⇒ null（静默跳过）");
+        } catch (Throwable t) {
+            ok(stat, L, false, "v40 openPage 用例异常：" + t);
+        }
+
+        // showCard：没有 Activity 的上下文（自检用 application）⇒ 回调 -1，不许吞掉
+        try {
+            PluginApi api = newPContext(ctx, "selftest-v40");
+            if (api == null) {
+                L.add("  ⚠ 造不出 PContext，跳过 showCard 空上下文断言");
+            } else {
+                final java.util.concurrent.CountDownLatch latch =
+                        new java.util.concurrent.CountDownLatch(1);
+                final int[] got = {-2};
+                api.showCard("t", "b", new String[]{"ok"}, new PluginApi.Card() {
+                    @Override public void onCard(int index) {
+                        got[0] = index;
+                        latch.countDown();
+                    }
+                });
+                ok(stat, L, awaitLatch(latch) && got[0] == -1,
+                        "v40 ★showCard 没有 Activity ⇒ 回调 onCard(-1)（插件不会永远等不到结果）");
+            }
+        } catch (Throwable t) {
+            ok(stat, L, false, "v40 showCard 用例异常：" + t);
         }
     }
 

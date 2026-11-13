@@ -59,7 +59,7 @@ public interface PluginApi {
      * <p>为什么要有这个常量：注释里的「当前 = N」运行期读不到，一个写 17、一个写 20 也没人发现；
      * 常量 + 断言才拦得住。</p>
      */
-    int DOC_VERSION = 39;
+    int DOC_VERSION = 40;
 
     // ══ 环境 ═══════════════════════════════════════════════════════════════
 
@@ -408,6 +408,37 @@ public interface PluginApi {
      * {@code no_match} / {@code enabled} / {@code bad_dex} / {@code invalid} / {@code io}。
      */
     void patchConflicts(String versionKey, String slot, String ref, Conflicts callback);
+
+    /**
+     * **v40**：用**宿主的卡片**弹一段信息 + 最多 3 个按钮（宿主风格；**不要自己 `new AlertDialog`**，
+     * 那会叠两个窗口、主题也不一样）。异步：回调在 UI 线程。
+     *
+     * <p>按钮按数组顺序渲染（左 → 右）；空字符串会被跳过，超过 3 个只画前 3 个。
+     * 用户点某个按钮 ⇒ {@code callback.onCard(那个按钮在入参数组里的下标)}；返回键 / 点卡片外面关掉
+     * ⇒ {@code onCard(-1)}。**回调只来一次**（点了按钮就不再补 -1）。
+     *
+     * <p>⚠️ 按钮文案要短（两个字的动作词最好）、依据放 {@code body}：
+     * Android 的按钮一长就竖排，卡片会变得很难看。
+     *
+     * @param title   标题（null / 空 ⇒ 不显示标题）
+     * @param body    正文（null / 空 ⇒ 只有标题与按钮）
+     * @param buttons 按钮文案；null / 空数组 ⇒ 只给一个「关闭」
+     * @param callback 结果回调（可为 null）
+     */
+    void showCard(String title, String body, String[] buttons, Card callback);
+
+    /**
+     * **v40**：跳到宿主的某个页面（插件自己的"入口"点进去后可以接着用宿主界面）。
+     *
+     * <p>认得的 {@code page}：{@code main} / {@code slots} / {@code slot} / {@code saves} /
+     * {@code maps} / {@code mods} / {@code blueprints} / {@code settings} / {@code logs} /
+     * {@code trash} / {@code plugins}。其余名字 ⇒ **什么也不做**（不崩、不弹窗）。
+     * 需要"哪一份"的页面（四个内容页与槽页）用 {@code slot}；null / 空 = 当前槽。
+     *
+     * <p>⚠️ 版本页 / 补丁页要「哪一份」的版本 key，本接口不带 ⇒ 不开放（插件自己的页面里
+     * 想给用户看这些，用 {@link #patches()} 等数据画，不要硬跳）。
+     */
+    void openPage(String page, String slot);
 
     /**
      * 插件自己的**数据目录**（`<hub>/usage/`）—— **宿主只给目录，不写任何流水、不解析账本**。
@@ -818,4 +849,7 @@ public interface PluginApi {
      * （空表 = 没冲突）；失败时为 null。
      */
     interface Conflicts { void onConflicts(Result result, List<String> names); }
+
+    /** **v40**：{@link #showCard} 选了哪个按钮；{@code -1} = 没选（返回 / 点外面关掉）。 */
+    interface Card { void onCard(int index); }
 }

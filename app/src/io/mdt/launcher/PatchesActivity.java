@@ -63,6 +63,16 @@ public final class PatchesActivity extends BaseActivity {
     private String mKey = "";
     /** 这个补丁页对应的实例槽（空 = 未知；见 {@link #EXTRA_SLOT}） */
     private String mSlot = "";
+
+    // ---- v40：插件页面钩子（这一页有 plugin_section，BaseActivity 会挂） --------------
+    @Override protected String pluginPageId() {
+        return Extensions.PAGE_PATCHES;
+    }
+
+    @Override protected String pluginSlot() {
+        if (mSlot != null && !mSlot.isEmpty()) return mSlot;
+        return super.pluginSlot();
+    }
     /** 实例键（{@link Versions#instanceKey}）—— 启用状态的真正键 */
     private String mIkey = "";
     private String mApkSha = "";

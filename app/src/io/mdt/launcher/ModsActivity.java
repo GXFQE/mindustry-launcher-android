@@ -307,6 +307,9 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
 
         Util.applySystemInsets(root);
         setContentView(root);
+        // v40：`place: "actions"` 的插件动作插进本页操作卡（删除行之前）
+        PluginEntries.attachPlacedActions(this, Extensions.PAGE_MODS,
+                mSlot == null || mSlot.isEmpty() ? Data.currentSlot(this) : mSlot);
         // ★ 第 157 轮：四个内容页的标题统一成「槽「X」的X」（原来只有存档 / 地图带槽名）
         setTitle(Trans.get(this, R.string.mods_title_fmt, mSlot));
 

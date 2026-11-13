@@ -129,6 +129,20 @@ final class PluginData {
             return one(ctx, selected, ItemInfo.KIND_MAPS);
         }
         if ("blueprint-detail".equals(page)) return one(ctx, selected, ItemInfo.KIND_BLUEPRINTS);
+        if (Extensions.PAGE_VERSION.equals(page)) {
+            // v40：版本页把"这一份"也放进 pageItems（插件的 section 常常只有 api 没有 item）
+            if (selected != null) {
+                String ap = selected.getAbsolutePath();
+                for (ItemInfo it : versions(ctx)) {
+                    if (it != null && ap.equals(it.path)) {
+                        List<ItemInfo> hit = new ArrayList<ItemInfo>();
+                        hit.add(it);
+                        return hit;
+                    }
+                }
+            }
+            return new ArrayList<ItemInfo>();
+        }
         if ("main".equals(page)) return versions(ctx);
         if ("settings".equals(page)) return settingItems(ctx);
         if ("logs".equals(page)) return logs(ctx);

@@ -5,7 +5,7 @@
 
 ## 1. 版本与兼容（v20 冻结基线）
 
-- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..39**。
+- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..40**。
   （v20 是冻结基线；v21 = 游戏设置面；v22 = 后台任务 + 游戏事件；v23 = 探针；v24 = 分析器；
   v25 = 结论挂行 + 筛选/排序注入 + HJSON；v26 = 逐项判定；v27 = 详情页的门 + 槽级结论进摘要卡；
   v28 = 原版文案键；v29 = 游戏前后台事件；v30 = 探针知道版本 / 跨会话数据目录 + 摘要卡总时长；
@@ -68,6 +68,7 @@
   "extensions": [
     { "id": "my-row", "title": "做点什么…", "subtitle": "副标题",
       "entry": "com.example.MyPlugin", "slot": "content", "page": "maps" }
+    // v40：可选 `"place": "actions"` —— 插进宿主那一页的操作卡（见下面「插入位置」）
   ]
 }
 ```
@@ -80,7 +81,7 @@
 | `section` | 宿主页面里的一块 | 直接画进宿主页（`createView`，`api.page()` 知道在哪） |
 | `action` | 某一页的动作区（一行） | **不换页**，直接调 `run(PluginApi)` |
 
-`page` 取值：`main` / `slots` / `slot` / `saves` / `maps` / `mods` / `blueprints` / `map-detail` / `blueprint-detail` / `settings` / `logs` / `trash`。
+`page` 取值：`main` / `slots` / `slot` / `saves` / `maps` / `mods` / `blueprints` / `map-detail` / `blueprint-detail` / `settings` / `logs` / `trash` / **v40** `version` / `patches` / `resources`。
 
 ⚠️ 三类插槽现在**所有页面都挂齐了**（2026-10-24 第 226 轮统一）：
 
@@ -90,10 +91,23 @@
 | `section` | 全部（画在「插件」卡里） |
 | `action` | 全部（同一张卡里，点了在原页跑） |
 
+#### 插入位置（v40）
+
+默认三类插槽都画在页面底部的「插件」卡里；`"place": "actions"` 让 `action` / `content` 条目
+**插进宿主那一页的操作卡**（"删除…"那一行之前），与宿主自己的动作混排 —— 入口位置、分割线、
+卡片样式都跟宿主一致，用户不用在两个地方找（用户 2026-11-13：「插件和宿主的 UI 非要分离开就很别扭」）。
+
+- 目前有稳定操作卡锚点的页：`maps` / `saves` / `mods` / `blueprints`。别的页写了 `"place": "actions"`
+  **回落**「插件」卡（不会消失）—— 没有锚点时放错地方比放回原处更糟。
+- `section` 不支持 `place`（它本来画的就是一整块，不是一行）。
+- **v40 新增三个页面钩子**：`version` / `patches` / `resources` 的布局里有 `plugin_section`，
+  三类插槽都可以声明到它们上面；`version` 页还会把这一份版本的 `ItemInfo` 作为
+  `selectedItem()` / `pageItems()` 给插件（`resources` 页给选中的 APK 文件）。
+
 ## 3. 入口类约定
 
 ```java
-public static int api();                        // 必需：你需要的接口版本（当前 39；用不到新能力就报 20）
+public static int api();                        // 必需：你需要的接口版本（当前 40；用不到新能力就报 20）
 public static View createView(PluginApi api);   // content / section 用
 public static void run(PluginApi api);          // action 用（在原页跑，不换页）
 public static void unload();                    // 可选：收尾（也认 unload(Context)）
@@ -113,7 +127,7 @@ public static void unload();                    // 可选：收尾（也认 unlo
 
 | 方法 | 说明 |
 |---|---|
-| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 39） |
+| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 40） |
 | `context()` | 插件上下文（**只用来取资源 / 主题 / 建 View**） |
 | `page()` / `slot()` | 从哪一页来 / 当前槽名 |
 | `theme()` | 主题色与 dp/sp（别自己写死颜色，见 `PluginTheme`） |
@@ -209,6 +223,28 @@ public static void unload();                    // 可选：收尾（也认 unlo
 | `pickContent(kind, title, head, cb)` | **v32**：同上，但那两句话由你给（null / 空 ⇒ 回落宿主默认；标题 ≤ 24 字、说明 ≤ 80 字，超长会截断，换行会压成一个空格） |
 | `pickFile(mime, cb)` | 系统选择器挑任意文件，宿主复制到你的 `cache/` 再给 `(name, File)` |
 | `progressCard(title, msg, done, total[, cancelable, cb])` / `progressCardClose()` | 宿主进度框（4 参 = 不可取消） |
+| `showCard(title, body, buttons, cb)`（v40） | 宿主卡片弹一段信息 + 最多 3 个按钮；**回调只来一次**（点了给下标，返回/点外面给 -1） |
+| `openPage(page, slot)`（v40） | 跳到宿主页面（只开放不需要额外上下文的页，见下文「插入能力」） |
+
+### 插入能力（v40）
+
+**目标：插件做的事和宿主做的事看起来是同一套界面**（用户 2026-11-13：「我们尽可能让用户装了插件以后
+是无感的，而不是明显插件和宿主的割裂感」）。三件东西：
+
+1. **`place: "actions"`**（`plugin.json`，不是接口）：把 `action` / `content` 条目插进宿主操作卡。
+2. **`showCard`**：插件要弹信息时用宿主卡片，别自己 `new AlertDialog`（叠窗 + 主题不一致）。
+   - `buttons` 最多画 3 个（数组里的空串跳过，超过 3 个只取前 3 个）；全是空串 / null ⇒ 只给「关闭」。
+   - 按钮文案要短（两字的动作词），依据放 `body` —— Android 按钮一长就竖排。
+   - 回调在 UI 线程；用户点按钮 ⇒ `onCard(按钮在入参数组里的下标)`；返回 / 点卡片外面 ⇒ `onCard(-1)`。
+3. **`openPage(page, slot)`**：认得的 `page`：
+   `main` / `slots` / `slot` / `saves` / `maps` / `mods` / `blueprints` / `settings` / `logs` /
+   `trash` / `plugins`。`slot` 只对 `slot` / 四个内容页有效（空 = 当前槽）；其余页面忽略。
+   - 认不出的名字 / 版本页 / 补丁页 ⇒ **什么也不做**（不崩、不弹窗）—— 那两页要「哪一份」的版本 key，
+     本接口不带。插件自己的页面里要展示同类信息，用 `patches()` / `versions()` 数据自己画。
+
+**边界（有意的）**：
+- 不给插件"换宿主主题 / 改宿主布局"的能力 —— 那是割裂的另一种写法。
+- `api.ui()`（宿主组件工具箱）/ 摘要卡与详情页的 `place` 锚点**还没做**，见 `docs/plans/` 的批次表。
 
 ### 任务
 
@@ -929,6 +965,14 @@ v39（2026-11-13 第 373 轮）：**网络 / 补丁写 / 实例与备份**（用
 `versions()` / `plugins()` / `settings()` 各补一批 `extra` 键（加键不抬版本）。
 顺带修了 `trash()` 漏 `versions-trash` / `patches-trash` 的老 bug（改走 `Trash.list`，
 类别由 `Trash.Kind` 唯一映射）。`API_MIN` 仍不动（区间 20..39）。
+v40（2026-11-13 第 374 轮）：**插入能力**（用户：「插件和宿主的 UI 非要分离开就很别扭」
+「尽可能让用户装了插件以后是无感的」）—— `showCard(title, body, buttons, cb)`（宿主卡片，
+最多 3 个按钮，回调只来一次）+ `openPage(page, slot)`（跳宿主页面；只开放不需要额外上下文的页）；
+`plugin.json` 的条目多一个可选 `"place": "actions"`（把动作插进宿主操作卡，四个内容页有锚点，
+别的页回落「插件」卡）；三个新页面钩子 `version` / `patches` / `resources`（布局里有
+`plugin_section`，三类插槽都能挂）。`API_MIN` 仍不动（区间 20..40）。
+**有意的边界**：不给插件"换宿主主题 / 改宿主布局"的能力；`api.ui()`（宿主组件工具箱）与
+摘要卡 / 详情页的 `place` 锚点还没做（见 `docs/plans/` 的批次表）。
 
 **官方体检插件**：`plugins/mods-health`（第 229 轮，前身叫 `conflict`）。宿主原来的那行
 「查模组冲突」整块删掉，判据搬进插件的 `core/Conflicts.java` 与 `core/Gates.java`；
