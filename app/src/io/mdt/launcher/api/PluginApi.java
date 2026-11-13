@@ -228,6 +228,8 @@ public interface PluginApi {
      * 按"缺 = 拿不到"处理，别当空值。顺序 = 插件 id 字典序。
      *
      * <p>⚠️ 会读每个插件的 APK（自述 / 签名指纹）⇒ **别在主线程调**。
+     * ⚠️ {@code name} / {@code author} / {@code description} 是**插件自己写的**外部数据
+     * （可能含换行 / 超长），上屏前自己做长度与字符清洗。
      */
     List<ItemInfo> plugins();
 
@@ -242,8 +244,8 @@ public interface PluginApi {
      * {@code .classes} / {@code .assets} / {@code .dexBytes} / {@code .assetsBytes}
      * （给了版本 key 时再加 {@code .match}）。
      *
-     * <p>要说清的是：补丁只对**某份 APK**（按 sha256）生效，"这个补丁对当前版本算不算适用"
-     * 需要启动项（版本 key + 槽）当上下文 —— 用下面的重载。
+     * <p>⚠️ **并不便宜**：每条记录都会读每个 target 的 dex 头（校验 + 数类）与素材 zip 目录
+     * ⇒ **别在主线程调**（与下面那个重载同一个纪律）。
      */
     default List<ItemInfo> patches() {
         return patches(null, null);
@@ -254,16 +256,19 @@ public interface PluginApi {
      *
      * @param versionKey 版本 key（{@link #versions()} 里 {@code extra["key"]}）；
      *                   {@code null} / 空 ⇒ **不判启动项**（不写 {@code enabled} / {@code applies} 键）
-     * @param slot 槽名；{@code null} / 空 = 当前槽（{@link #slot()}）
+     * @param slot 槽名；{@code null} / 空 = 当前槽（{@link #slot()}，即**这一页**的槽）
      *
-     * <p>与无参版的差异只在两个键：
+     * <p>与无参版的差异：
      * <ul>
-     *   <li>{@code enabled}（{@code true} / {@code false}）= 这个启动项**现在启用**着它；</li>
+     *   <li>{@code enabled}（{@code true} / {@code false}）= 这个启动项**现在启用**着它
+     *       （读的是启用记录；版本目前装没装不影响这一条）；</li>
      *   <li>{@code applies}（{@code true} / {@code false}）= 它的某个 target 匹配**这个版本 APK**；
-     *       版本找不到 / APK 读不出来 ⇒ **不放这个键**（别当 {@code false}）。</li>
+     *       版本找不到 / APK 读不出来 ⇒ **不放这个键**（别当 {@code false}）；</li>
+     *   <li>每个 target 多一个 {@code match}（同 {@code applies} 的逐 target 版本，哈希算得出时才出现）。</li>
      * </ul>
      *
-     * <p>⚠️ 会算一次版本 APK 的 sha256（几十 MB）⇒ **别在主线程调**，结果自己缓存。
+     * <p>⚠️ 会算一次版本 APK 的 sha256（几十 MB）⇒ **别在主线程调**。
+     * 缓存时注意：`sha256` / `applies` 可以缓存（同版本 APK 不变），**`enabled` 是活配置、每次现读**。
      */
     List<ItemInfo> patches(String versionKey, String slot);
 

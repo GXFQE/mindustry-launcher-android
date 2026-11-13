@@ -5265,7 +5265,13 @@ public final class SelfTest {
         L.add("");
         L.add("【v38 · 插件清单 / 游戏补丁清单（第 372 轮）】");
         final String FIX = "selftest-v38";
+        // 只剩隔离件的夹具（占一个独立 id）：`plugins/<id>/quarantine/<ver>.apk` 是隔离件的落点
+        final String FIXQ = "selftest-v38q";
         File fixDir = new File(Plugins.dir(ctx), FIX);
+        File fixQDir = new File(Plugins.dir(ctx), FIXQ);
+        // 自检若在上一轮中途被杀，这里先清掉残留（否则会作为一台"off 插件"留在用户机器上）
+        if (fixDir.exists()) Data.deleteTree(fixDir);
+        if (fixQDir.exists()) Data.deleteTree(fixQDir);
         try {
             // ── ① 真表 ─────────────────────────────────────────────────────
             List<String> ids = Plugins.installedIds(ctx);
@@ -5290,6 +5296,14 @@ public final class SelfTest {
             ok(stat, L, allSeen, "每一条的 id 都在 installedIds 里、kind = plugin");
             ok(stat, L, keysOk, "基本键齐全（id / name / state / trust / level / builtin / size）");
             ok(stat, L, stateOk, "state 只有 active / pending / off 三态");
+            // 文档承诺的顺序（id 字典序）也要钉住 —— 只查集合内容的话顺序漂了没人发现
+            boolean ordered = true;
+            for (int i = 1; i < plugs.size(); i++) {
+                String prev = plugs.get(i - 1).extra.get("id");
+                String cur = plugs.get(i).extra.get("id");
+                if (prev == null || cur == null || prev.compareTo(cur) > 0) ordered = false;
+            }
+            ok(stat, L, ordered, "★plugins() 顺序 = 插件 id 字典序（文档承诺的那条）");
             String act = Plugins.active(ctx), pend = Plugins.pending(ctx);
             boolean verOk = true;
             for (ItemInfo it : plugs) {
@@ -5334,6 +5348,16 @@ public final class SelfTest {
                                 && "42".equals(pendingItem.extra.get("pendingVersion"))
                                 && !pendingItem.extra.containsKey("activeVersion"),
                         "★待重启生效 ⇒ state=pending（version 取待生效那份）");
+                // ★ 登记指向的 APK 不存在（42.apk 没造）⇒ 自述字段一个都不许出现
+                //   （`PluginMeta.read(缺失文件)` 返回的是全空 Info，不是 null —— 照它写会得到
+                //    DEFAULT_ENTRY，把"没有 APK"说成"默认入口"，与文档相反）
+                ok(stat, L, !pendingItem.extra.containsKey("entry")
+                                && !pendingItem.extra.containsKey("selfVersion")
+                                && !pendingItem.extra.containsKey("author")
+                                && !pendingItem.extra.containsKey("description")
+                                && !pendingItem.extra.containsKey("access")
+                                && !pendingItem.extra.containsKey("extCount"),
+                        "★登记指向的 APK 不在 ⇒ entry / 自述 / access / extCount 都不出现（不造默认值）");
                 ItemInfo activeItem = PluginData.pluginItem(ctx, FIX, FIX + "=42\n", "", "");
                 ok(stat, L, "active".equals(activeItem.extra.get("state"))
                                 && "42".equals(activeItem.extra.get("version"))
@@ -5348,6 +5372,19 @@ public final class SelfTest {
                         "★夹具在真表里出现（\"所有插件\"包含没生效的），不是只列生效的");
             }
 
+            // ── ②b 只剩隔离件（没有任何候选 APK）⇒ version 没有、quarantined=true、自述键没有 ──
+            write(new File(new File(fixQDir, "quarantine"), "7.apk"), new byte[]{ 7 });
+            ok(stat, L, Plugins.installedIds(ctx).contains(FIXQ),
+                    "只剩隔离件也算\"装着\"（否则用户再也看不到、也恢复不了它）");
+            ItemInfo quarItem = PluginData.pluginItem(ctx, FIXQ, "", "", "");
+            ok(stat, L, "off".equals(quarItem.extra.get("state"))
+                            && "true".equals(quarItem.extra.get("quarantined"))
+                            && !quarItem.extra.containsKey("version")
+                            && !quarItem.extra.containsKey("entry")
+                            && !quarItem.extra.containsKey("access")
+                            && !quarItem.extra.containsKey("extCount"),
+                    "★只剩隔离件 ⇒ version / entry / access / extCount 都不出现（quarantined=true）");
+
             // ── ③ 真 API 对象（插件实际走的路）─────────────────────────────
             PluginApi api = newPContext(ctx);
             if (api == null) {
@@ -5356,24 +5393,41 @@ public final class SelfTest {
                 List<ItemInfo> viaApi = api.plugins();
                 ok(stat, L, viaApi != null && viaApi.size() == PluginData.plugins(ctx).size(),
                         "★PContext.plugins() 与数据层同一份（" + (viaApi == null ? -1 : viaApi.size()) + "）");
+                // 这条真正的价值是"运行期不抛"：接口没接上会 NoSuchMethodError（编译期与
+                // pluginPure 的元断言管不到 PContext 的实现体）
                 List<ItemInfo> viaPatches = api.patches();
                 ok(stat, L, viaPatches != null && viaPatches.size() == PluginData.patches(ctx).size(),
                         "PContext.patches() 可用（" + (viaPatches == null ? -1 : viaPatches.size()) + "）");
-                List<ItemInfo> noVersion = api.patches("selftest-v38-no-such-version", "selftest-v38-slot");
-                boolean allEnabled = true, noneApplies = true;
-                for (ItemInfo it : (noVersion == null ? new ArrayList<ItemInfo>() : noVersion)) {
-                    if (!it.extra.containsKey("enabled")) allEnabled = false;
-                    if (it.extra.containsKey("applies")) noneApplies = false;
+                if (viaPatches == null || viaPatches.isEmpty()) {
+                    L.add("  ⚠ 这台设备没导入补丁，跳过「给启动项 ⇒ 每条都有 enabled」断言"
+                            + "（补丁组里用夹具再钉一遍）");
+                } else {
+                    List<ItemInfo> noVersion = api.patches("selftest-v38-no-such-version",
+                            "selftest-v38-slot");
+                    boolean allEnabled = true, noneApplies = true;
+                    for (ItemInfo it : noVersion) {
+                        if (!it.extra.containsKey("enabled")) allEnabled = false;
+                        if (it.extra.containsKey("applies")) noneApplies = false;
+                    }
+                    ok(stat, L, allEnabled && noneApplies,
+                            "★给启动项 ⇒ 每条都有 enabled；版本不存在 ⇒ 不放 applies（判不了就说判不了）");
                 }
-                ok(stat, L, allEnabled && noneApplies,
-                        "★给启动项 ⇒ 每条都有 enabled；版本不存在 ⇒ 不放 applies（判不了就说判不了）");
             }
             // 版本 key ⇒ APK sha256（applies 的原料；不存在 ⇒ 空串，不许瞎给一个哈希）
+            // ⚠️ 找**真的有文件**的那一行：条目存在但 APK 缺失时不该拿它当夹具
             List<Versions.Entry> vers = Versions.scanAll(ctx);
-            if (vers.isEmpty() || vers.get(0) == null || vers.get(0).apkPath == null) {
-                L.add("  ⚠ 设备上没有版本，跳过「版本 key ⇒ APK sha256」断言");
+            Versions.Entry withApk = null;
+            for (Versions.Entry e : vers) {
+                if (e == null || e.apkPath == null || e.apkPath.isEmpty()) continue;
+                if (new File(e.apkPath).isFile()) {
+                    withApk = e;
+                    break;
+                }
+            }
+            if (withApk == null) {
+                L.add("  ⚠ 设备上没有可读的版本 APK，跳过「版本 key ⇒ APK sha256」断言");
             } else {
-                String sha = PluginData.apkShaOfVersion(ctx, vers.get(0).key());
+                String sha = PluginData.apkShaOfVersion(ctx, withApk.key());
                 ok(stat, L, sha != null && sha.matches("[0-9a-f]{64}"),
                         "版本 key ⇒ APK sha256（64 位小写十六进制）");
                 ok(stat, L, "".equals(PluginData.apkShaOfVersion(ctx, "selftest-v38-no-such-version")),
@@ -5383,8 +5437,10 @@ public final class SelfTest {
             ok(stat, L, false, "v38 插件清单用例异常：" + t);
         } finally {
             if (fixDir.exists()) Data.deleteTree(fixDir);
+            if (fixQDir.exists()) Data.deleteTree(fixQDir);
         }
-        ok(stat, L, !new File(Plugins.dirNoCreate(ctx), FIX).exists(),
+        ok(stat, L, !new File(Plugins.dirNoCreate(ctx), FIX).exists()
+                        && !new File(Plugins.dirNoCreate(ctx), FIXQ).exists(),
                 "夹具清掉（不留一台假的\"已装插件\"在用户机器上）");
         ok(stat, L, PluginData.plugins(ctx).size() == Plugins.installedIds(ctx).size(),
                 "清场后清单回到与 installedIds 一致");
@@ -5392,6 +5448,16 @@ public final class SelfTest {
 
     /** 反射造一个真 {@code PluginHost$PContext}（插件拿到的就是它；构造器是私有的）。 */
     private static PluginApi newPContext(Context ctx) {
+        return newPContext(ctx, Data.currentSlot(ctx));
+    }
+
+    /**
+     * 同上，但显式指定**这一页的槽**（`PContext.slot`）。
+     *
+     * <p>为什么要参数：v38 的 `patches(vk, null)` 约定"空 = 这一页的槽（`slot()`）"；
+     * 只有用一个**不等于全局当前槽**的页面槽才测得出这个契约（第 372 轮评审抓到的缺口）。
+     */
+    private static PluginApi newPContext(Context ctx, String pageSlot) {
         try {
             Class<?> pc = Class.forName("io.mdt.launcher.PluginHost$PContext");
             java.lang.reflect.Constructor<?> c = pc.getDeclaredConstructor(
@@ -5402,7 +5468,7 @@ public final class SelfTest {
             c.setAccessible(true);
             return (PluginApi) c.newInstance(ctx, ctx.getAssets(), ctx.getResources(),
                     ctx.getClassLoader(), ctx.getCacheDir(), ctx.getCacheDir(),
-                    "main", Data.currentSlot(ctx), null, null);
+                    "main", pageSlot, null, null);
         } catch (Throwable t) {
             android.util.Log.w("MDTLauncher", "PContext fixture failed", t);
             return null;
@@ -16760,6 +16826,22 @@ public final class SelfTest {
             } catch (Throwable t) {
                 ok(stat, L, false, "② 带换行的 name 不该解析失败：" + t);
             }
+            // ★ 第 372 轮评审：`note` 是唯一允许换行的清单字段 —— 换行要留，其它控制字符（NUL/Tab）
+            //   不许原样进 extra（插件会把它上屏 / 写报告）。解析处清洗一次，所有下游都安全。
+            try {
+                PatchManifest dirtyNote = PatchManifest.parse(("{\"schema\":1,\"id\":\"dirtynote\","
+                        + "\"name\":\"N\",\"version\":\"1\",\"note\":\"line1\\u0001tab\\there\\nfine\","
+                        + "\"targets\":[{\"apkSha256\":\"" + apkSha + "\",\"dex\":\"targets/"
+                        + apkSha + "/patch.dex\"}]}").getBytes("UTF-8"));
+                boolean noCtl = dirtyNote.note.indexOf('\u0001') < 0
+                        && dirtyNote.note.indexOf('\t') < 0
+                        && dirtyNote.note.indexOf('\u0000') < 0;
+                ok(stat, L, noCtl && dirtyNote.note.indexOf('\n') >= 0,
+                        "② note 里控制字符换成空格、换行保留（实际 [" 
+                                + dirtyNote.note.replace("\n", "\\n") + "]）");
+            } catch (Throwable t) {
+                ok(stat, L, false, "② 带控制字符的 note 不该解析失败：" + t);
+            }
 
             String tgt = "{\"apkSha256\":\"%s\",\"gameVersion\":\"160.4\",\"dex\":\"%s\"%s}";
             String otherSha = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
@@ -16872,6 +16954,44 @@ public final class SelfTest {
             ok(stat, L, "false".equals(otherA.extra.get("applies"))
                             && "false".equals(otherA.extra.get("target.0.match")),
                     "⑧ 给别的 APK 哈希 ⇒ applies = false（有分辨力）");
+            // ★ 第 372 轮评审补的钉子：`patches(vk, null)` 的"当前槽" = **这一页的槽**（slot()），
+            //   不是全局 currentSlot —— 用一个明确不等于当前槽的页面槽才有分辨力。
+            PluginApi apiPage = newPContext(ctx, SLOT);
+            PluginApi apiOtherPage = newPContext(ctx, "selftest-slot-2");
+            ItemInfo onPage = apiPage == null ? null
+                    : patchItemOf(apiPage.patches(VKEY, null), recA.ref());
+            ItemInfo offPage = apiOtherPage == null ? null
+                    : patchItemOf(apiOtherPage.patches(VKEY, null), recA.ref());
+            ok(stat, L, onPage != null && "true".equals(onPage.extra.get("enabled"))
+                            && offPage != null && "false".equals(offPage.extra.get("enabled")),
+                    "⑧ ★patches(vk, null) 按**这一页的槽**判（slot() = " + SLOT + "，不是全局当前槽）");
+            // 上面这条在"设备上一条补丁都没有"时会空转 ⇒ 这里用夹具（recA/recB 一定在）再钉一次
+            List<ItemInfo> instList = apiPage == null ? null : apiPage.patches(VKEY, null);
+            boolean everyEnabled = instList != null && !instList.isEmpty();
+            boolean noApplies = true;
+            if (instList != null) {
+                for (ItemInfo it : instList) {
+                    if (!it.extra.containsKey("enabled")) everyEnabled = false;
+                    if (it.extra.containsKey("applies")) noApplies = false;
+                }
+            }
+            ok(stat, L, everyEnabled && noApplies,
+                    "⑧ ★给启动项（版本不在已装列表）⇒ 每条都有 enabled、都不放 applies（夹具非空）");
+            // 文档承诺的顺序（补丁 id、版本字典序）也要钉住
+            boolean patchOrdered = true;
+            for (int i = 1; i < allPatches.size(); i++) {
+                String pid = allPatches.get(i - 1).extra.get("id");
+                String pver = allPatches.get(i - 1).extra.get("version");
+                String cid = allPatches.get(i).extra.get("id");
+                String cver = allPatches.get(i).extra.get("version");
+                if (pid == null || pver == null || cid == null || cver == null) {
+                    patchOrdered = false;
+                    break;
+                }
+                int c = pid.compareTo(cid);
+                if (c > 0 || (c == 0 && pver.compareTo(cver) > 0)) patchOrdered = false;
+            }
+            ok(stat, L, patchOrdered, "★patches() 顺序 = 补丁 id、版本字典序（文档承诺的那条）");
             // 实例键本身：版本 key + NUL + 槽，可来回拆（配置键 / 报告里都靠这对函数）
             ok(stat, L, IKEY.indexOf('\u0000') > 0
                             && Versions.instanceVkey(IKEY).equals(VKEY)

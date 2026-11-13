@@ -6,22 +6,27 @@
 跑前当前槽：预览验收
 
 一、自检 selftest-372.txt
-  通过 2135 项，失败 0 项（第 3 行）；基线 2106（第 371 轮）→ +29 条。新增的 v38 组：
+  通过 2143 项，失败 0 项（第 3 行）；基线 2106（第 371 轮）→ +37 条。新增的 v38 组：
     · 版本：host plugin api >= 38；PluginApi.DOC_VERSION == PluginHost.API == 38；
     · 签名：plugins() / patches() / patches(String,String) → List；KIND_PLUGIN / KIND_PATCH；
     · 【v38 · 插件清单 / 游戏补丁清单】：
-      ① 真表与 Plugins.installedIds 同源（4 / 4 台）、键齐全、state 三态、
+      ① 真表与 Plugins.installedIds 同源（4 / 4 台）、键齐全、state 三态、顺序 = id 字典序、
          activeVersion / pendingVersion / state 与登记表逐字一致；内置被认出来；
       ② 夹具（app/selftest-v38 假 APK）：off / pending / active / L1 四态都对，
-         且它**出现在真表里**（"所有插件"包含没生效的）；
-      ③ 反射造真 PluginHost$PContext 当插件调：plugins() 与数据层同尺寸（5）、patches() 可用（1）、
-         给启动项时每条都有 enabled、版本不存在时不写 applies；
+         且它**出现在真表里**（"所有插件"包含没生效的）；**登记指向的 APK 不在**时
+         entry / 自述 / access / extCount 一个都不出现（不把"没有 APK"造出默认入口）；
+      ②b 只剩隔离件（quarantine/7.apk）⇒ version / entry / access / extCount 不出现、
+         quarantined=true，且它仍算"装着"；
+      ③ 反射造真 PluginHost$PContext 当插件调：plugins() 与数据层同尺寸、patches() 可用；
+         有补丁时：给启动项每条都有 enabled、版本不存在时不写 applies；
       ④ 版本 key ⇒ 真实 APK sha256 = 64 hex；不存在的版本 ⇒ 空串；
       ⑤ 清场后清单回到与 installedIds 一致（夹具不在设备上留下"假的已装插件"）。
-    · 补丁组（⑧）：patches() 里的 ref / 名称 / filesOk；target 事实（sha / gameVersion /
-      classes=2 / assets=1 / bytes）；不带启动项不写 enabled / applies；同一补丁在
-      IKEY=true、IKEY2=false；版本不在已装列表 ⇒ 无 applies；patchItem 直喂匹配哈希 ⇒
-      applies/match=true、喂别的哈希 ⇒ false；缺文件记录仍列出（filesOk=false + error=missing-files）。
+    · 补丁组（⑧）：patches() 里的 ref / 名称 / filesOk / 顺序（id、版本字典序）；target 事实
+      （sha / gameVersion / classes=2 / assets=1 / bytes）；不带启动项不写 enabled / applies；
+      同一补丁在 IKEY=true、IKEY2=false；`patches(vk, null)` 按**这一页的槽**判（两个不同页面槽
+      的 PContext 对照）；版本不在已装列表 ⇒ 无 applies 但每条都有 enabled（夹具非空）；patchItem
+      直喂匹配哈希 ⇒ applies/match=true、喂别的哈希 ⇒ false；缺文件记录仍列出（filesOk=false +
+      error=missing-files）；note 的控制字符清成空格、换行保留。
 
 二、外部插件真调（plugin-api-probe.txt / plugin-api-boot.txt）
   ★ 这条才是"接口"的端到端证据：不是宿主内部调 PluginData，而是**一个外部 APK 插件**

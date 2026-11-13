@@ -420,15 +420,18 @@ List<ItemInfo> patches(String versionKey, String slot);    // 同上 + enabled /
 |---|---|
 | `id` / `name` | 插件 id（安装目录名）/ 显示名（自述 name，缺 = id） |
 | `state` | `active`（这一程生效中）/ `pending`（待重启生效）/ `off`（没启用） |
-| `version` | **这一行代表的那一份**：待生效 > 生效 > 最新装的那份；只剩隔离件时没有这个键 |
+| `version` | **这一行代表的那一份**：待生效 > 生效 > 已装版本里**文件名字典序最后一份**（⚠️ 令牌是内容哈希 / 时间戳，字典序**不代表新旧**）；只剩隔离件时没有这个键 |
 | `activeVersion` / `pendingVersion` | 生效中 / 待重启生效的版本令牌；没有就不放这个键 |
 | `builtin` / `trust` / `level` | 是否内置（随本体发的那份）/ `builtin`·`official`·`third` / 安全阀等级 `L1`·`L2`·`L3` |
 | `quarantined` | 手上还有被隔离的那一份（`off` 时界面上显示"已隔离"） |
-| `selfVersion` | 自述里的 `version`（作者自己写的版本号，**不是**上面那个令牌） |
-| `author` / `description` / `entry` | 自述字段 / 入口类名（注入点） |
+| `selfVersion` | 自述里的 `version`（作者自己写的版本号，**不是**上面那个令牌；自述没写就不放） |
+| `author` / `description` / `entry` | 自述字段 / 入口类名（注入点）；自述里没有的那项**不放这个键** |
 | `access` | 自述里声明的用途（逗号分隔；**没声明 = 空串**） |
 | `extCount` + `ext.<i>.id/title/subtitle/slot/page/event` | 声明的能力条目（`extensions`；与插件页那几行同一个来源） |
 | `size` / `modified` | 这一份 APK 的字节数 / 最后修改时间（毫秒）；没有 APK 时为 0 |
+
+> ⚠️ `access` / `extCount` 分不出"没声明"和"自述读不出来"（两者都是空串 / 0 条）——
+> 宿主没有为这个差别开键；要知道插件"坏没坏"，看 `trust` / 能不能加载它，别拿这两个判断。
 
 - `ItemInfo` 的固定字段：`kind = KIND_PLUGIN`、`title = 显示名`、`subtitle = id`、`source = "plugins"`、
   `path = null`、`readable = false`；
@@ -442,24 +445,29 @@ List<ItemInfo> patches(String versionKey, String slot);    // 同上 + enabled /
 
 `patches()`：`kind == ItemInfo.KIND_PATCH`（`"patch"`），顺序 = 补丁 id、版本字典序。
 补丁只对**某份 APK**（按 sha256）生效 ⇒ "适用不适用"是相对某个版本说的，那一份上下文由
-`patches(versionKey, slot)` 的 `versionKey`（`versions()` 里 `extra["key"]`）给出；`slot` 空 = 当前槽。
+`patches(versionKey, slot)` 的 `versionKey`（`versions()` 里 `extra["key"]`）给出；
+`slot` 空 = 当前槽（`slot()`，即**这一页**的槽 —— 内容页 / 槽页传的就是它们自己那个槽）。
 
 | `extra` 键 | 说明 |
 |---|---|
 | `id` / `version` / `ref` | 补丁 id / 补丁版本 / `id@version`（启用表里存的就是它） |
-| `name` / `author` / `note` / `tool` | 清单里的显示名 / 作者 / 说明 / 生成工具（空的不放） |
+| `name` / `author` / `note` / `tool` | 清单里的显示名 / 作者 / 说明 / 生成工具（**空串 = 清单没写**，键本身总在） |
 | `filesOk` | dex / 素材文件齐全吗（缺了仍列出来，让插件能显示"坏了"） |
 | `bytes` | dex + 素材的实际字节数 |
-| `targetCount` + `target.<i>.*` | 每个 target：`sha256`（目标 APK 哈希）、`gameVersion`、`classes`（dex 里的类数）、`assets`（素材条目数）、`dexBytes` / `assetsBytes`、`match`（见下） |
-| `enabled` | **只在给了 `versionKey` 时出现**：这个启动项现在启用了它吗 |
+| `targetCount` + `target.<i>.*` | 每个 target：`sha256`（目标 APK 哈希）、`gameVersion`（空串 = 清单没写）、`classes`（dex 里的类数）、`assets`（素材条目数）、`dexBytes` / `assetsBytes`、`match`（见下） |
+| `enabled` | **只在给了 `versionKey` 时出现**：这个启动项现在启用了它吗（读启用记录；版本装没装不影响这一条） |
 | `applies` | **只在给了 `versionKey` 且那个版本的 APK 读得到时出现**：某个 target 匹配这个版本吗；读不到 ⇒ 不放（别当 false） |
 
+- ⚠️ **`patches()` 也不便宜**：每条记录都会读每个 target 的 dex 头（校验 + 数类）与素材 zip 目录
+  ⇒ **放后台线程**；
 - `ItemInfo` 的固定字段：`kind = KIND_PATCH`、`title = 补丁名`、`subtitle = ref`、`size = bytes`、
   `modified = 导入时间`（清单文件的 mtime）、`source = "patches"`、`path = null`、`readable = false`；
+- `note` 是**唯一允许换行**的字段（控制字符在解析处已换成空格，换行保留）；
 - 文件缺了的记录**仍会列出来**：`extra["filesOk"] = "false"`、`ItemInfo.error = "missing-files"`；
 - `target.i.match` 也只在 APK 哈希算得出来时出现（`true` / `false`）；
 - `classes` / `assets` 读不出来时**不放这个键**（不是 0）；target 没声明素材包时 `assets = 0` 是事实；
-- ⚠️ `patches(versionKey, slot)` 会算一次版本 APK 的 sha256（几十 MB）⇒ **放后台线程**，结果自己缓存；
+- ⚠️ `patches(versionKey, slot)` 会算一次版本 APK 的 sha256（几十 MB）⇒ **放后台线程**；
+  缓存时注意：哈希 / `applies` 可缓存（同版本 APK 不变），**`enabled` 是活配置、每次现读**；
 - 补丁的启用状态**按启动项存**（版本 key + 槽，第 353 轮）⇒ 同一个补丁在两个槽上可以一开一关；
 - 补丁能不能用是**精确到 APK 哈希**的（见 `PatchManifest`）；用 `applies` 判断，别自己比版本号。
 

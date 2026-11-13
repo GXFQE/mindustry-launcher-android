@@ -325,15 +325,19 @@ final class PluginData {
         String actVer = Plugins.stateGet(activeText, id);
         String pendVer = Plugins.stateGet(pendingText, id);
         String[] installed = Plugins.versionsOf(ctx, id);
-        // "这一行在说哪一份"：待生效 > 生效 > 最新装的那份（与插件页 rebuild() 同一规则）
+        // "这一行在说哪一份"：待生效 > 生效 > 已装版本里**文件名字典序最后一份**
+        // （⚠️ 不是"最新装的"：版本令牌可能是 sha 前 8 位，字典序与新旧无关 —— 第 372 轮评审订正）
         String probeVer = ver.isEmpty()
                 ? (installed.length == 0 ? null : installed[installed.length - 1]) : ver;
         File apk = probeVer == null ? null : Plugins.apkOf(ctx, id, probeVer);
-        PluginMeta.Info meta = apk == null ? null : PluginMeta.read(ctx, apk);
+        boolean hasApk = apk != null && apk.isFile();
+        // 🔴 只在 APK 真的在时才读自述：`PluginMeta.read(缺失文件)` 返回的是**所有字段为 null 的
+        // Info**（不是 null），照它写 entry 会得到 DEFAULT_ENTRY —— "没有 APK"就成了"默认入口"，
+        // 与文档（没有 APK ⇒ 没有 entry/selfVersion/author/description/access/extCount）相反。
+        PluginMeta.Info meta = hasApk ? PluginMeta.read(ctx, apk) : null;
         String trust = probeVer == null ? PluginTrust.THIRD : Plugins.trustOf(ctx, id, probeVer);
         String level = Plugins.levelOf(levelsText, trust, id);
         String[] quar = Plugins.quarantinedOf(ctx, id);
-        boolean hasApk = apk != null && apk.isFile();
         String name = Plugins.displayName(meta == null ? null : meta.name, id);
         Map<String, String> ex = new LinkedHashMap<String, String>();
         ex.put("id", id);
@@ -355,7 +359,8 @@ final class PluginData {
             ex.put("entry", meta.entryOr(PluginHost.DEFAULT_ENTRY));
         }
         if (hasApk) {
-            // access 与 extensions 都在插件自述里：**没声明 = 空串 / 0 条**，不是"读不出来"
+            // access 与 extensions 都在插件自述里；"没声明"与"自述读不出来"**分不开**（都返回空表），
+            // 文档已写明这两个键别拿来判断插件好坏（要判就看能不能加载 / trust）
             List<String> access = PluginMeta.accessOf(apk);
             String joined = join(access);
             ex.put("access", joined == null ? "" : joined);
@@ -397,6 +402,14 @@ final class PluginData {
     static List<ItemInfo> patches(Context ctx, String versionKey, String slot) {
         List<ItemInfo> out = new ArrayList<ItemInfo>();
         if (ctx == null) return out;
+        // 先扫库：**一条补丁都没有时绝不碰版本 APK 的哈希**（几十 MB 的读，白花）
+        List<Patches.Record> records;
+        try {
+            records = Patches.scan(ctx);
+        } catch (Throwable t) {
+            return out;                    // 补丁库整个读不出来 ⇒ 空表（插件别据此删东西）
+        }
+        if (records.isEmpty()) return out;
         String vk = versionKey == null ? "" : versionKey.trim();
         List<String> enabled = null;
         String apkSha = "";
@@ -405,20 +418,16 @@ final class PluginData {
             try {
                 enabled = Patches.enabledRefs(ctx, Versions.instanceKey(vk, s));
             } catch (Throwable t) {
-                enabled = new ArrayList<String>();
+                enabled = null;            // 读不出来 ⇒ **不放 enabled**（别用 false 冒充"没启用"）
             }
             apkSha = apkShaOfVersion(ctx, vk);
         }
-        try {
-            for (Patches.Record r : Patches.scan(ctx)) {
-                try {
-                    out.add(patchItem(r, enabled, apkSha));
-                } catch (Throwable ignored) {
-                    // 一条记录坏了不影响别的
-                }
+        for (Patches.Record r : records) {
+            try {
+                out.add(patchItem(r, enabled, apkSha));
+            } catch (Throwable ignored) {
+                // 一条记录坏了不影响别的
             }
-        } catch (Throwable ignored) {
-            // 补丁库整个读不出来 ⇒ 空表（插件别据此删东西）
         }
         return out;
     }

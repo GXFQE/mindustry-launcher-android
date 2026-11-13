@@ -142,6 +142,7 @@ final class PatchManifest {
         String author = clean(o.optString("author", ""));
         if (author.length() > 128) throw new PatchException(PatchException.C_FIELD, "author");
         String note = o.optString("note", "").trim().replace('\r', '\n');
+        note = cleanNote(note);                 // 控制字符（NUL / Tab / DEL…）换成空格；保留换行
         if (note.length() > 1024) throw new PatchException(PatchException.C_FIELD, "note");
         String tool = clean(o.optString("tool", ""));
         if (tool.length() > 64) throw new PatchException(PatchException.C_FIELD, "tool");
@@ -207,6 +208,27 @@ final class PatchManifest {
             sb.append(c < 0x20 || c == 0x7f ? ' ' : c);
         }
         return sb.toString().replaceAll(" {2,}", " ").trim();
+    }
+
+    /**
+     * **多行**说明（`note`）的清洗：保留换行，其余控制字符（NUL / Tab / DEL…）换成空格。
+     *
+     * <p>为什么 `note` 不能走 {@link #clean(String)}：它是唯一允许换行的清单字段（说明本来就
+     * 可能分几行）；但控制字符一样不能原样进 `extra`（插件最终会把它上屏 / 写报告）。
+     * ★ 第 372 轮评审发现：这是唯一没清洗的清单字段（`name`/`author`/`tool` 都走 clean）。
+     */
+    static String cleanNote(String s) {
+        if (s == null) return "";
+        StringBuilder sb = new StringBuilder(s.length());
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            if (c == '\n') {
+                sb.append('\n');
+            } else {
+                sb.append(c < 0x20 || c == 0x7f ? ' ' : c);
+            }
+        }
+        return sb.toString().trim();
     }
 
     /**
