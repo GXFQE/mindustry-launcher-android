@@ -37,13 +37,33 @@ final class GitHubReleases {
         final String apiUrl;
         /** `assets[].browser_download_url` —— 走 `github.com` 主站（慢，但人点得动）。 */
         final String browserUrl;
+        /** `assets[].digest` 里的 sha256（去 `sha256:` 前缀；没有 / 别的算法 = 空串）。 */
+        final String sha256;
 
         Asset(String name, long size, String apiUrl, String browserUrl) {
+            this(name, size, apiUrl, browserUrl, "");
+        }
+
+        Asset(String name, long size, String apiUrl, String browserUrl, String sha256) {
             this.name = name;
             this.size = size;
             this.apiUrl = apiUrl;
             this.browserUrl = browserUrl;
+            this.sha256 = sha256 == null ? "" : sha256;
         }
+    }
+
+    /**
+     * v43：把 GitHub 的 `digest` 变成能喂给下载的 64 位小写 hex。
+     *
+     * <p>只认 `sha256:<64hex>`；`sha512:…` / 其它形态 / 空 ⇒ 空串（宁可没锚，也不猜）。
+     */
+    static String shaFromDigest(String digest) {
+        if (digest == null) return "";
+        String d = digest.trim().toLowerCase(java.util.Locale.ROOT);
+        if (!d.startsWith("sha256:")) return "";
+        String hex = d.substring(7);
+        return hex.matches("[0-9a-f]{64}") ? hex : "";
     }
 
     /** 一个 release（只要挑版本需要的字段）。 */
@@ -107,7 +127,8 @@ final class GitHubReleases {
                     String name = a.optString("name", "");
                     if (name.isEmpty()) continue;
                     r.assets.add(new Asset(name, a.optLong("size", -1L),
-                            a.optString("url", ""), a.optString("browser_download_url", "")));
+                            a.optString("url", ""), a.optString("browser_download_url", ""),
+                            shaFromDigest(a.optString("digest", ""))));
                 }
             }
             out.add(r);

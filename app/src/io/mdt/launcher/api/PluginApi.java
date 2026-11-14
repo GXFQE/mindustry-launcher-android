@@ -59,7 +59,7 @@ public interface PluginApi {
      * <p>为什么要有这个常量：注释里的「当前 = N」运行期读不到，一个写 17、一个写 20 也没人发现；
      * 常量 + 断言才拦得住。</p>
      */
-    int DOC_VERSION = 42;
+    int DOC_VERSION = 43;
 
     // ══ 环境 ═══════════════════════════════════════════════════════════════
 
@@ -366,6 +366,23 @@ public interface PluginApi {
     void fetchText(String url, Fetch callback);
 
     /**
+     * **v43**：同上，但正文上限由插件给：宿主钳到 **2 MB**；{@code <= 0} ⇒ 默认 512 KB。
+     *
+     * <p>官方模组列表（Anuke/MindustryMods 的 `mods.json`）有 725 KB，必须用这个重载；
+     * 725 KB JSON 别在 UI 线程解析（回调在主线程，插件自己扔后台）。
+     */
+    void fetchText(String url, int maxBytes, Fetch callback);
+
+    /**
+     * **v43**：拉一小段**二进制**（模组图标 / 缩略图）。https only（本机回环除外）、
+     * 上限 **256 KB**（宿主会钳）。
+     *
+     * <p>与 {@link #download} 的区别：不起任务、不发通知、不落盘 —— 列表里一次拉几十张图标
+     * 不该在通知栏刷几十条。失败码：`bad-url` / `network` / `size` / `rate-limited` / `io`。
+     */
+    void fetchBytes(String url, int maxBytes, Bytes callback);
+
+    /**
      * **v39**：列一个 GitHub 仓库的 release（最新的在前，最多 30 条）。异步。
      *
      * @param repo {@code "owner/name"}（其它形状返回 {@code bad-url}）
@@ -398,6 +415,30 @@ public interface PluginApi {
      * GitHub API 资产地址也计入 40 次/小时配额（与 {@link #fetchText} 同一份记账）。
      */
     Task download(String url, String expectedSha256, Download callback);
+
+    /**
+     * **v43**：下载到**稳定的 key 目录**，由插件决定**续不续**（用户 2026-11-14 定案）。
+     *
+     * <p>落点：`&lt;插件 cache&gt;/downloads/&lt;key&gt;/f&lt;后缀&gt;`，`.part` / `.part.meta` 在旁边。
+     * <ul>
+     *   <li>{@code resume=true}：同 key 有半截（sha / 长度对得上）就接着下；成品命中直接回调
+     *       （0 请求）；取消 / 断网**保留**半截；</li>
+     *   <li>{@code resume=false}：忽略已有半截与成品，失败 / 取消删半截（与旧签名同款）。</li>
+     * </ul>
+     *
+     * @param key    `[A-Za-z0-9._-]{1,64}`，不许 `.` 开头；同一 key 同时跑两个任务 ⇒ 第二个 `busy`
+     * @param resume true 时**必须给 sha256**（空 ⇒ `invalid`）；服务端不支持 Range 会自动整包重下
+     *
+     * <p>失败码：`bad-url` / `invalid` / `network` / `size` / `sha` / `canceled` / `busy` / `io`。
+     */
+    Task download(String url, String expectedSha256, String key, boolean resume, Download callback);
+
+    /**
+     * **v43**：某个 key 的下载状态（只读；只 stat + 读小文件，可直接在 UI 线程调）。
+     * 没有记录 ⇒ {@code null}；{@code complete=true} 时 {@link DownloadState#file} 是成品；
+     * {@code total=0} 表示还不知道总长。
+     */
+    DownloadState downloadState(String key);
 
     /**
      * **v39**：启用一条游戏补丁（写操作）。
@@ -856,6 +897,35 @@ public interface PluginApi {
     void addItem(String slot, String kind, String name, InputStream content, Done done);
 
     /**
+     * **v43**：把一个模组包装进某个槽的 `mods/` —— **走宿主自己的导入链**，不另造判据。
+     *
+     * <p>宿主做：目标槽写门禁（有实例在跑 ⇒ `game-running`）→ 文件名规则
+     * （必须 `.jar` / `.zip`）→ {@code Mods.importPackage}（游戏自己的 `readOne` 判据）→
+     * 旧件**挪进中转站** → 原子改名。异步：拷贝 + 校验在后台线程，回调回主线程。
+     *
+     * @param slot      槽；{@code null} / 空 = 当前槽；不存在 ⇒ `not-found`
+     * @param name      完整文件名（规则与宿主 `checkPackName` 同一份）
+     * @param content   包字节；宿主读完负责关闭
+     * @param overwrite false 时同名 ⇒ `exists`；true 时旧件进中转站（不是裸删）
+     *
+     * <p>失败码：`not-found` / `invalid` / `exists` / `not-a-mod` / `game-running` / `io`。
+     */
+    void modsInstall(String slot, String name, InputStream content, boolean overwrite, Done done);
+
+    /**
+     * **v43**：改某个槽里一个模组的启用状态（游戏设置里的 `<internal>-enabled` + `-failed` 成对写）。
+     *
+     * <p>宿主直接转 {@code Mods.setEnabled}（同一份实现、同一份设置备份），**不新增判据**；
+     * 目标槽有实例在跑 ⇒ `game-running`。
+     *
+     * @param slot         槽；{@code null} / 空 = 当前槽
+     * @param internalName 模组自述里的内部名（`mod.hjson` 的 `name`）—— **不是文件名**
+     *
+     * <p>失败码：`game-running` / `unreadable` / `not-found` / `invalid` / `io`。
+     */
+    void modsSetEnabled(String slot, String internalName, boolean on, Done done);
+
+    /**
      * 把一个条目的内容**换掉**（仅限**任意槽** maps / saves / mods / blueprints 里的**已存在**文件，
      * v34 起跨槽：用 {@code contents(slot, kind)} 取到的 {@link ItemInfo} 即可）。
      *
@@ -908,7 +978,18 @@ public interface PluginApi {
      * {@link #download} 的结果：成功时 {@code file} 是 cache 里的成品、{@code sha256} 是实际哈希；
      * 失败时 {@code file} 为 null、{@code result.reason} 说明原因。
      */
-    interface Download { void onDownload(Result result, File file, String sha256); }
+    interface Download {
+        void onDownload(Result result, File file, String sha256);
+
+        /**
+         * **v43**：进度回调（主线程，宿主节流到 ≥250 ms 一次）。
+         * {@code done} 含续传偏移；{@code total=0} 表示不知道；{@code bytesPerSec} 是宿主编好的瞬时速度。
+         */
+        default void onProgress(long done, long total, long bytesPerSec) { }
+    }
+
+    /** {@link #fetchBytes} 的结果：成功时 {@code data} 非 null。 */
+    interface Bytes { void onBytes(Result result, byte[] data); }
 
     /**
      * {@link #patchImport} 的结果：成功时 {@code ref} 是新补丁的引用（可直接喂给

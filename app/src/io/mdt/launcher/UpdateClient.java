@@ -160,9 +160,42 @@ final class UpdateClient {
         }
     }
 
+    /**
+     * 拉一段**二进制**（v43：插件图标等小文件）。
+     *
+     * <p>与 {@link #fetchText} 同一套非 200 / 超限语义，只是不转字符串。
+     *
+     * @param maxBytes 正文上限；{@code <= 0} 用 256 KB
+     * @throws IOException 网络失败 / 非 200 / 超限
+     */
+    static byte[] fetchBytes(String url, int maxBytes, String accept) throws IOException {
+        int cap = maxBytes > 0 ? maxBytes : 256 * 1024;
+        HttpURLConnection c = open(url, accept, CONNECT_TIMEOUT_MS, READ_TIMEOUT_MS);
+        try {
+            int code = c.getResponseCode();
+            if (code != HttpURLConnection.HTTP_OK) {
+                throw new IOException("http " + code + " @ " + url);
+            }
+            InputStream in = c.getInputStream();
+            try {
+                ByteArrayOutputStream out = new ByteArrayOutputStream();
+                byte[] buf = new byte[8192];
+                int n;
+                while ((n = in.read(buf)) > 0) {
+                    out.write(buf, 0, n);
+                    if (out.size() > cap) throw new IOException("body too big (> " + cap + ")");
+                }
+                return out.toByteArray();
+            } finally {
+                closeQuietly(in);
+            }
+        } finally {
+            c.disconnect();
+        }
+    }
+
     private static HttpURLConnection open(String url, String accept,
-                                          int connectMs, int readMs) throws IOException {
-        HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
+                                          int connectMs, int readMs) throws IOException {        HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
         c.setConnectTimeout(connectMs > 0 ? connectMs : CONNECT_TIMEOUT_MS);
         c.setReadTimeout(readMs > 0 ? readMs : READ_TIMEOUT_MS);
         c.setInstanceFollowRedirects(true);

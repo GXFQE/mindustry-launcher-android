@@ -136,7 +136,7 @@ public final class PluginHost {
      * `storage()`（各段占用 + 唯一总计；重、要走后台）、`patchProblems()`（启动没应用 / 崩溃自动停用的
      * 事实）、`pluginVersions(id)`（插件逐版本，管理 / 回滚用）。
      */
-    public static final int API = 42;
+    public static final int API = 43;
     /**
      * 还认的**最老**契约版本。
      *
@@ -476,6 +476,8 @@ public final class PluginHost {
         private final ItemInfo item;
         /** v41：插件身份（`openPluginPage()` 用）。 */
         private final String selfId, selfVer, selfEntry;
+        /** v43：同一个 key 同时只允许一个下载任务（同一插件实例内）。 */
+        private final java.util.HashSet<String> runningKeys = new java.util.HashSet<String>();
 
         PContext(Context base, AssetManager am, Resources res, ClassLoader cl, File files, File cache,
                  String page, String slot, File selected, ItemInfo item,
@@ -877,6 +879,138 @@ public final class PluginHost {
                             });
                         }
                     }, true);
+        }
+
+        /** v43：稳定 key + 续传开关（同一 key 同时只跑一个；参数问题也回调，不抛）。 */
+        @Override public PluginApi.Task download(final String url, final String expectedSha256,
+                                                 final String key, final boolean resume,
+                                                 final Download callback) {
+            final Context c = getBaseContext();
+            final Context app = c.getApplicationContext() == null ? c : c.getApplicationContext();
+            final String k = key == null ? "" : key.trim();
+            if (!PluginNet.keyOk(k)) {
+                postDownloadFail(callback, "invalid");
+                return doneTask("invalid");
+            }
+            if (resume && (expectedSha256 == null || expectedSha256.trim().isEmpty())) {
+                postDownloadFail(callback, "invalid");
+                return doneTask("invalid");
+            }
+            synchronized (runningKeys) {
+                if (runningKeys.contains(k)) {
+                    postDownloadFail(callback, "busy");
+                    return doneTask("busy");
+                }
+                runningKeys.add(k);
+            }
+            return PluginTasks.start(c, Trans.get(c, R.string.plugin_task_download),
+                    new Runnable() {
+                        @Override public void run() {
+                            Result r;
+                            File file = null;
+                            String got = "";
+                            try {
+                                UpdateDownload.Result d = PluginNet.download(pluginCache(), url,
+                                        expectedSha256, k, resume, new UpdateClient.Progress() {
+                                            private long at = System.currentTimeMillis();
+                                            private long done0;
+
+                                            @Override public void onProgress(long done, long total) {
+                                                int pct = total > 0
+                                                        ? (int) Math.min(100L, done * 100L / total) : 0;
+                                                Work.progress(app, pct, total > 0 ? 100 : 0);
+                                                long now = System.currentTimeMillis();
+                                                long bps = now > at
+                                                        ? (done - done0) * 1000L / (now - at) : 0L;
+                                                at = now;
+                                                done0 = done;
+                                                final long fd = done, ft = total, fb = bps;
+                                                postMain(new Runnable() {
+                                                    @Override public void run() {
+                                                        if (callback != null) {
+                                                            callback.onProgress(fd, ft, fb);
+                                                        }
+                                                    }
+                                                });
+                                            }
+                                        });
+                                r = mapDownload(d.status);
+                                if (d.status == UpdateDownload.Status.OK) {
+                                    file = d.file;
+                                    got = d.sha256 == null ? "" : d.sha256;
+                                }
+                            } catch (PluginNet.Fail f) {
+                                r = Result.fail(f.reason);
+                            } catch (Throwable t) {
+                                r = Result.fail("io");
+                            } finally {
+                                synchronized (runningKeys) { runningKeys.remove(k); }
+                            }
+                            final Result fr = r;
+                            final File ff = file;
+                            final String fg = got;
+                            postMain(new Runnable() {
+                                @Override public void run() {
+                                    if (callback != null) callback.onDownload(fr, ff, fg);
+                                }
+                            });
+                        }
+                    }, true);
+        }
+
+        /** v43：下载状态（只读；可在 UI 线程调）。 */
+        @Override public io.mdt.launcher.api.DownloadState downloadState(String key) {
+            return PluginNet.downloadState(pluginCache(), key == null ? "" : key.trim());
+        }
+
+        /** v43：文本重载（上限由插件给，宿主钳到 2 MB）。 */
+        @Override public void fetchText(final String url, final int maxBytes, final Fetch callback) {
+            new Thread(new Runnable() {
+                @Override public void run() {
+                    Result r;
+                    String text = null;
+                    try {
+                        text = PluginNet.fetchText(url, maxBytes);
+                        r = Result.ok();
+                    } catch (PluginNet.Fail f) {
+                        r = Result.fail(f.reason);
+                    } catch (Throwable t) {
+                        r = Result.fail("io");
+                    }
+                    final Result fr = r;
+                    final String ft = text;
+                    postMain(new Runnable() {
+                        @Override public void run() {
+                            if (callback != null) callback.onFetch(fr, ft);
+                        }
+                    });
+                }
+            }, "mdt-plugin-fetch-text").start();
+        }
+
+        /** v43：二进制小块（图标；上限 256 KB，不起任务）。 */
+        @Override public void fetchBytes(final String url, final int maxBytes, final Bytes callback) {
+            new Thread(new Runnable() {
+                @Override public void run() {
+                    Result r;
+                    byte[] data = null;
+                    try {
+                        data = PluginNet.fetchBytes(url, maxBytes);
+                        r = Result.ok();
+                    } catch (PluginNet.Fail f) {
+                        r = Result.fail(f.reason);
+                    } catch (Throwable t) {
+                        r = Result.fail("io");
+                    }
+                    final Result fr = r;
+                    final byte[] fd = data;
+                    postMain(new Runnable() {
+                        @Override public void run() {
+                            if (callback != null) callback.onBytes(fr, fd);
+                        }
+                    });
+                }
+            }, "mdt-plugin-fetch-bytes").start();
         }
 
         /** v39：启用一条补丁（复用 {@code Patches.enable} 的全部门禁与校验）。 */
@@ -1596,6 +1730,68 @@ public final class PluginHost {
             }, "mdt-plugin-add-item").start();
         }
 
+        /** v43：模组导入（走宿主自己的 importPackage：游戏判据 + 旧件进中转站 + 写门禁）。 */
+        @Override public void modsInstall(String useSlot, final String name,
+                                          final InputStream content, final boolean overwrite,
+                                          final Done done) {
+            final Context c = getBaseContext();
+            final String s = resolveSlot(useSlot);
+            if (s == null) {
+                try { if (content != null) content.close(); } catch (Throwable ignored) { }
+                postFail(done, "not-found");
+                return;
+            }
+            new Thread(new Runnable() {
+                @Override public void run() {
+                    Result r;
+                    try {
+                        File modsDir = new File(Data.dirOf(c, s), "mods");
+                        Mods.PackResult p = Mods.importPackage(c, modsDir, name, content,
+                                overwrite, Mods.trashDirOf(c));
+                        String why = p == null || !p.ok ? packReason(p) : null;
+                        r = why == null ? Result.ok() : Result.fail(why);
+                    } catch (Throwable t) {
+                        r = Result.fail("io");
+                    }
+                    final Result fr = r;
+                    postMain(new Runnable() {
+                        @Override public void run() {
+                            if (done != null) done.onDone(fr);
+                        }
+                    });
+                }
+            }, "mdt-plugin-mods-install").start();
+        }
+
+        /** v43：模组启用状态（直接转 Mods.setEnabled，同一份设置备份）。 */
+        @Override public void modsSetEnabled(String useSlot, final String internalName,
+                                             final boolean on, final Done done) {
+            final Context c = getBaseContext();
+            final String s = resolveSlot(useSlot);
+            final String n = internalName == null ? "" : internalName.trim();
+            if (s == null || n.isEmpty()) {
+                postFail(done, s == null ? "not-found" : "invalid");
+                return;
+            }
+            new Thread(new Runnable() {
+                @Override public void run() {
+                    Result r;
+                    try {
+                        String why = settingsReason(Mods.setEnabled(c, s, n, on));
+                        r = why == null ? Result.ok() : Result.fail(why);
+                    } catch (Throwable t) {
+                        r = Result.fail("io");
+                    }
+                    final Result fr = r;
+                    postMain(new Runnable() {
+                        @Override public void run() {
+                            if (done != null) done.onDone(fr);
+                        }
+                    });
+                }
+            }, "mdt-plugin-mods-toggle").start();
+        }
+
         /** 新文件落盘：只做路径 / 后缀 / 原子写；内容是不是合法存档 / mod 由插件负责。 */
         private Result addItemNow(Context c, String useSlot, String dirName,
                                   String name, InputStream content) {
@@ -1644,6 +1840,55 @@ public final class PluginHost {
             });
         }
 
+        /** v43：参数类失败也要回调（插件等的是回调，不是异常）。 */
+        private static void postDownloadFail(final Download cb, final String reason) {
+            postMain(new Runnable() {
+                @Override public void run() {
+                    if (cb != null) cb.onDownload(Result.fail(reason), null, "");
+                }
+            });
+        }
+
+        /** v43：没起任务时的空句柄（插件调用 cancel 不炸）。 */
+        private static PluginApi.Task doneTask(final String id) {
+            return new PluginApi.Task() {
+                @Override public String id() { return "done-" + id; }
+                @Override public boolean running() { return false; }
+                @Override public void cancel() { }
+            };
+        }
+
+        /** v43：模组导入结果 → 插件 reason（与宿主模组页同一套码）。 */
+        private static String packReason(Mods.PackResult p) {
+            if (p == null) return "io";
+            switch (p.errCode) {
+                case Mods.PackResult.P_NAME_TAKEN: return "exists";
+                case Mods.PackResult.P_NOT_A_MOD: return "not-a-mod";
+                case Mods.PackResult.P_GAME_RUNNING: return "game-running";
+                case Mods.PackResult.P_NO_MODS_DIR:
+                case Mods.PackResult.P_SRC_MISSING: return "not-found";
+                case Mods.PackResult.P_NAME_EMPTY:
+                case Mods.PackResult.P_NAME_COLON:
+                case Mods.PackResult.P_NAME_DOT:
+                case Mods.PackResult.P_NAME_EXT: return "invalid";
+                default: return "io";
+            }
+        }
+
+        /** v43：设置写入结果 → 插件 reason；成功返回 null。 */
+        private static String settingsReason(SettingsBin.Result s) {
+            if (s == null) return "io";
+            if (s.ok) return null;
+            switch (s.errCode) {
+                case SettingsBin.Result.E_GAME_RUNNING: return "game-running";
+                case SettingsBin.Result.E_NO_SLOT_DIR:
+                case SettingsBin.Result.E_NO_MODS: return "not-found";
+                case SettingsBin.Result.E_SETTINGS_UNREADABLE: return "unreadable";
+                case SettingsBin.Result.E_NO_INTERNAL_NAME: return "invalid";
+                default: return "io";
+            }
+        }
+
         /** v39：冲突预检的失败回调（参数形状不同，单独一条）。 */
         private void postConflictsFail(final Conflicts cb, final String reason) {
             postMain(new Runnable() {
@@ -1670,6 +1915,7 @@ public final class PluginHost {
             if (st == null) return Result.fail("io");
             switch (st) {
                 case OK: return Result.ok();
+                case CANCELED: return Result.fail("canceled");
                 case NETWORK: return Result.fail("network");
                 case SIZE: return Result.fail("size");
                 case SHA: return Result.fail("sha");

@@ -52,10 +52,28 @@ public final class GitHubRelease {
          */
         public final String url;
 
+        /**
+         * **v43**：`browser_download_url`（`github.com` 主站）。用 {@link #url} 下载 API 资产地址
+         * 会**再花一次 GitHub API 配额**；模组这类批量下载应改用这个（同样支持 Range）。
+         */
+        public final String browserUrl;
+
+        /**
+         * **v43**：GitHub 给的内容 sha256（`digest` 去掉 `sha256:` 前缀）。
+         * 空串 = 没有 / 不是 sha256 —— **别当校验和用**，那种源只能 `resume=false`。
+         */
+        public final String sha256;
+
         public Asset(String name, long size, String url) {
+            this(name, size, url, "", "");
+        }
+
+        public Asset(String name, long size, String url, String browserUrl, String sha256) {
             this.name = name == null ? "" : name;
             this.size = size;
             this.url = url == null ? "" : url;
+            this.browserUrl = browserUrl == null ? "" : browserUrl;
+            this.sha256 = sha256 == null ? "" : sha256;
         }
     }
 }

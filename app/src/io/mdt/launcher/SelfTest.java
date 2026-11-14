@@ -1,6 +1,7 @@
 package io.mdt.launcher;
 
 import android.content.Context;
+import io.mdt.launcher.api.GitHubRelease;
 import io.mdt.launcher.api.ItemInfo;
 import io.mdt.launcher.api.PluginApi;
 import io.mdt.launcher.api.PluginTheme;
@@ -5307,6 +5308,8 @@ public final class SelfTest {
         pluginInventory(ctx, L, stat);
         // ★ v39：网络 / 补丁写 / 实例与备份 / 加键 / trash 漏项（第 373 轮）
         pluginV39(ctx, L, stat);
+        // ★ v43：插件下载 / 模组写 / 网络扩充（第 378 轮）
+        pluginV43(ctx, L, stat);
     }
 
     /**
@@ -5326,6 +5329,94 @@ public final class SelfTest {
      *
      * <p>补丁写的成功 / 失败路径在补丁组（⑨）里 —— 那里有合法的补丁夹具与临时绑定槽。
      */
+    /** 第 378 轮 v43：插件下载 / 模组写 / 网络扩充的**形状与纯逻辑**（不真下载）。 */
+    private static void pluginV43(android.content.Context ctx, List<String> L, int[] stat) {
+        L.add("");
+        L.add("【v43 · 插件下载 / 模组写 / 网络扩充（第 378 轮）】");
+        ok(stat, L, PluginHost.API == 43 && PluginApi.DOC_VERSION == 43,
+                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 43");
+
+        boolean shape = true;
+        try {
+            Class<?> api = PluginApi.class;
+            api.getMethod("download", String.class, String.class, String.class, boolean.class,
+                    PluginApi.Download.class);
+            api.getMethod("downloadState", String.class);
+            api.getMethod("fetchText", String.class, int.class, PluginApi.Fetch.class);
+            api.getMethod("fetchBytes", String.class, int.class, PluginApi.Bytes.class);
+            api.getMethod("modsInstall", String.class, String.class, java.io.InputStream.class,
+                    boolean.class, PluginApi.Done.class);
+            api.getMethod("modsSetEnabled", String.class, String.class, boolean.class,
+                    PluginApi.Done.class);
+        } catch (Throwable t) {
+            shape = false;
+        }
+        ok(stat, L, shape, "形状：v43 六个新方法都在（反射钉签名）");
+
+        boolean def = false;
+        try {
+            def = PluginApi.Download.class.getMethod("onProgress",
+                    long.class, long.class, long.class).isDefault();
+        } catch (Throwable ignored) {
+        }
+        ok(stat, L, def, "Download.onProgress 是 default（老插件只实现 onDownload 也能编）");
+
+        ok(stat, L, PluginNet.keyOk("a") && PluginNet.keyOk("a.b_c-1")
+                        && !PluginNet.keyOk(".x") && !PluginNet.keyOk("../x")
+                        && !PluginNet.keyOk("") && !PluginNet.keyOk("a/b")
+                        && !PluginNet.keyOk(repeat('a', 65)),
+                "key 闸门：字母数字 . _ - / 1~64；`.` 开头、斜杠、超长全拒");
+        ok(stat, L, PluginNet.capText(0) == 512 * 1024
+                        && PluginNet.capText(725 * 1024) == 725 * 1024
+                        && PluginNet.capText(9 * 1024 * 1024) == PluginNet.FETCH_MAX_HARD,
+                "fetchText 上限：默认 512 KB / 725 KB 放行 / 9 MB 钳到 2 MB");
+        ok(stat, L, PluginNet.capBytes(0) == PluginNet.BYTES_MAX
+                        && PluginNet.capBytes(1024 * 1024) == PluginNet.BYTES_MAX
+                        && PluginNet.capBytes(100) == 100,
+                "fetchBytes 上限：默认 / 超大都是 256 KB，小的原样");
+        ok(stat, L, ".jar".equals(PluginNet.suffixOf("https://x/a.jar"))
+                        && ".jar".equals(PluginNet.suffixOf("https://x/a.JAR?x=1"))
+                        && ".bin".equals(PluginNet.suffixOf("https://x/a"))
+                        && ".bin".equals(PluginNet.suffixOf("https://x/a.waytoolongext")),
+                "落点后缀：取最后一段的小写扩展；认不出 / 太长 ⇒ .bin");
+
+        String hex = repeat('a', 64);
+        ok(stat, L, hex.equals(GitHubReleases.shaFromDigest("sha256:" + hex))
+                        && hex.equals(GitHubReleases.shaFromDigest(
+                        "sha256:" + hex.toUpperCase(java.util.Locale.US)))
+                        && GitHubReleases.shaFromDigest("sha512:" + hex).isEmpty()
+                        && GitHubReleases.shaFromDigest("sha256:xyz").isEmpty()
+                        && GitHubReleases.shaFromDigest(null).isEmpty(),
+                "digest：只认 sha256:<64hex>（大小写归一）；别的算法 / 空 ⇒ 空串");
+        ok(stat, L, new GitHubRelease.Asset("a", 1, "u").sha256.isEmpty()
+                        && "b".equals(new GitHubRelease.Asset("a", 1, "u", "b", "s").browserUrl)
+                        && "s".equals(new GitHubRelease.Asset("a", 1, "u", "b", "s").sha256),
+                "GitHubRelease.Asset：老构造器 sha/browser 为空；新构造器带 browserUrl + sha256");
+
+        File root = new File(ctx.getCacheDir(), "v43-state-" + System.currentTimeMillis());
+        try {
+            File dir = new File(new File(root, "downloads"), "k1");
+            if (!dir.isDirectory() && !dir.mkdirs()) {
+                ok(stat, L, false, "downloadState 夹具：建目录失败");
+            } else {
+                writePrefix(new File(dir, "f.part"), new byte[10], 10);
+                io.mdt.launcher.api.DownloadState st = PluginNet.downloadState(root, "k1");
+                ok(stat, L, st != null && st.done == 10 && st.total == 0
+                                && !st.complete && st.file == null,
+                        "downloadState：只有 .part ⇒ done=长度、total=0、complete=false");
+            }
+        } catch (Throwable t) {
+            ok(stat, L, false, "downloadState 夹具异常：" + t);
+        } finally {
+            Data.deleteTree(root);
+        }
+        ok(stat, L, PluginNet.downloadState(ctx.getCacheDir(), "../x") == null,
+                "downloadState：坏 key ⇒ null（不拼路径）");
+        ok(stat, L, String.valueOf(Config.get().downloadLimit())
+                        .equals(PluginData.settings(ctx).get("download_limit")),
+                "settings() 的 download_limit 与用户设置一致（0 = 不限）");
+    }
+
     private static void pluginV39(Context ctx, List<String> L, int[] stat) {
         L.add("");
         L.add("【v39 · 网络 / 信息加键 / 中转站漏项（第 373 轮）】");

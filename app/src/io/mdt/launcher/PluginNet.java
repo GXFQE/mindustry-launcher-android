@@ -37,6 +37,10 @@ final class PluginNet {
     static final int FETCH_MAX = 512 * 1024;
     /** 插件下载的体积上限。 */
     static final long DOWNLOAD_MAX = 1024L * 1024 * 1024;
+    /** v43：文本上限的硬顶（官方模组列表 725 KB 要过这个口）。 */
+    static final int FETCH_MAX_HARD = 2 * 1024 * 1024;
+    /** v43：二进制小块（图标）上限。 */
+    static final int BYTES_MAX = 256 * 1024;
     /** 同一个 GitHub API URL 的缓存时长。 */
     static final long CACHE_TTL_MS = 10L * 60 * 1000;
     /** GitHub API 每小时最多放行多少次**真实请求**（未登录 60/h，给自更新留余量）。 */
@@ -198,8 +202,17 @@ final class PluginNet {
 
     // ---- 文本 ----------------------------------------------------------------
 
-    /** 拉文本（会走缓存 / 配额）。失败抛 {@link Fail}。 */
+    /** 拉文本（默认上限 512 KB）。失败抛 {@link Fail}。 */
     static String fetchText(String url) {
+        return fetchText(url, FETCH_MAX);
+    }
+
+    /**
+     * 拉文本（v43：{@code maxBytes} 由插件给，宿主钳到 {@link #FETCH_MAX_HARD}）。
+     * 会走缓存 / 配额；失败抛 {@link Fail}。
+     */
+    static String fetchText(String url, int maxBytes) {
+        final int cap = capText(maxBytes);
         String bad = checkUrl(url);
         if (bad != null) throw new Fail(bad);
         final String u = url.trim();
@@ -214,8 +227,8 @@ final class PluginNet {
         noteApiRequest(u);
         try {
             Fetcher f = sTestFetcher;
-            text = f != null ? f.text(u, FETCH_MAX, "application/json")
-                    : UpdateClient.fetchText(u, FETCH_MAX);
+            text = f != null ? f.text(u, cap, "application/json")
+                    : UpdateClient.fetchText(u, cap);
         } catch (IOException e) {
             throw new Fail(isRateLimited(e) ? "rate-limited"
                     : (isTooBig(e) ? "size" : "network"));
@@ -231,6 +244,142 @@ final class PluginNet {
 
     private static String cacheKey(String url) {
         return "json|" + normalizeUrl(url);
+    }
+
+    // ---- 大小上限（纯函数，自检直接钉）----------------------------------------
+
+    /** 文本上限：{@code <=0} ⇒ 默认 512 KB；再钳到 2 MB 硬顶。 */
+    static int capText(int maxBytes) {
+        if (maxBytes <= 0) return FETCH_MAX;
+        return Math.min(maxBytes, FETCH_MAX_HARD);
+    }
+
+    /** 二进制上限：{@code <=0} ⇒ 256 KB；再钳到 256 KB 硬顶。 */
+    static int capBytes(int maxBytes) {
+        if (maxBytes <= 0) return BYTES_MAX;
+        return Math.min(maxBytes, BYTES_MAX);
+    }
+
+    /**
+     * v43：拉一小段二进制（图标等）。https only（本机回环除外）、上限 256 KB。
+     * 不起任务、不发通知、不落盘 —— 与 {@code download} 的分工在这里。
+     */
+    static byte[] fetchBytes(String url, int maxBytes) {
+        String bad = checkUrl(url);
+        if (bad != null) throw new Fail(bad);
+        final String u = url.trim();
+        noteApiRequest(u);
+        try {
+            return UpdateClient.fetchBytes(u, capBytes(maxBytes), "application/octet-stream");
+        } catch (IOException e) {
+            throw new Fail(isRateLimited(e) ? "rate-limited"
+                    : (isTooBig(e) ? "size" : "network"));
+        }
+    }
+
+    // ---- key / 续传状态（v43）-------------------------------------------------
+
+    /** key 规则：`[A-Za-z0-9._-]{1,64}`，不许 `.` 开头（防隐藏文件 / 防 `..`）。 */
+    static boolean keyOk(String key) {
+        if (key == null) return false;
+        String k = key.trim();
+        if (k.isEmpty() || k.length() > 64) return false;
+        if (k.startsWith(".")) return false;
+        for (int i = 0; i < k.length(); i++) {
+            char c = k.charAt(i);
+            boolean ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
+                    || (c >= '0' && c <= '9') || c == '.' || c == '_' || c == '-';
+            if (!ok) return false;
+        }
+        return true;
+    }
+
+    /** URL → 落点后缀（`.jar` / `.zip`；认不出/太长 ⇒ `.bin`）。 */
+    static String suffixOf(String url) {
+        String name = safeFileName(url);
+        int dot = name.lastIndexOf('.');
+        if (dot < 0 || dot == name.length() - 1) return ".bin";
+        String ext = name.substring(dot).toLowerCase(java.util.Locale.ROOT);
+        return ext.matches("\\.[a-z0-9]{1,8}") ? ext : ".bin";
+    }
+
+    /**
+     * v43：下载到 `<cache>/downloads/<key>/f<suffix>`，`resume` 由插件给。
+     *
+     * <p>与旧入口的区别：旧入口每次一个一次性子目录、失败即删；这里同一 key 的 `.part` 留着，
+     * 由 {@link io.mdt.launcher.ResumableDownload} 接上。
+     */
+    static UpdateDownload.Result download(File cacheDir, String url, String expectedSha256,
+                                          String key, boolean resume, UpdateClient.Progress cb) {
+        String bad = checkUrl(url);
+        if (bad != null) throw new Fail(bad);
+        if (!keyOk(key)) throw new Fail("invalid");
+        final String sha = expectedSha256 == null ? "" : expectedSha256.trim()
+                .toLowerCase(java.util.Locale.ROOT);
+        if (!sha.isEmpty() && !sha.matches("[0-9a-f]{64}")) throw new Fail("invalid");
+        if (resume && sha.isEmpty()) throw new Fail("invalid");
+        final String u = url.trim();
+        noteApiRequest(u);
+        File dir = new File(new File(cacheDir, "downloads"), key);
+        if (!dir.isDirectory() && !dir.mkdirs()) throw new Fail("io");
+        List<String> urls;
+        try {
+            urls = Mirrors.assetUrls(u, Config.get().updateMirror());
+        } catch (Throwable ignored) {
+            urls = null;
+        }
+        if (urls == null || urls.isEmpty()) {
+            urls = new ArrayList<String>();
+            urls.add(u);
+        }
+        final UpdateClient.Progress inner = new UpdateClient.Progress() {
+            @Override public void onProgress(long done, long total) {
+                if (Thread.currentThread().isInterrupted()) throw new Abort("canceled");
+                if (done > DOWNLOAD_MAX) throw new Abort("size");
+                if (cb != null) cb.onProgress(done, total);
+            }
+        };
+        try {
+            return UpdateDownload.run(urls, dir, "f", -1L, sha, inner, suffixOf(u), resume);
+        } catch (Abort a) {
+            throw new Fail(a.reason);
+        }
+    }
+
+    /**
+     * v43：某个 key 的下载状态（只读）。没有记录 ⇒ null。
+     *
+     * <p>成品在但 sha 对不上 ⇒ 当没有并删掉（自愈）；`.part` 的长度就是 done。
+     */
+    static io.mdt.launcher.api.DownloadState downloadState(File cacheDir, String key) {
+        if (!keyOk(key)) return null;
+        File dir = new File(new File(cacheDir, "downloads"), key);
+        if (!dir.isDirectory()) return null;
+        File part = new File(dir, "f.part");
+        ResumableDownload.Meta m = ResumableDownload.Meta.read(new File(dir, "f.part.meta"));
+        long total = m == null ? 0L : m.total;
+        String sha = m == null ? null : m.sha;
+        File out = null;
+        File[] fs = dir.listFiles();
+        if (fs != null) {
+            for (File f : fs) {
+                if (f == null || !f.isFile()) continue;
+                String n = f.getName();
+                if (!n.startsWith("f.") || n.endsWith(".part") || n.endsWith(".part.meta")) continue;
+                out = f;
+                break;
+            }
+        }
+        if (out != null && sha != null && !sha.isEmpty()) {
+            String got = PluginTrust.sha256File(out);
+            if (got == null || !got.equalsIgnoreCase(sha)) {
+                out.delete();
+                out = null;
+            }
+        }
+        long done = out != null ? out.length() : (part.isFile() ? part.length() : 0L);
+        if (out == null && done == 0L && total == 0L) return null;
+        return new io.mdt.launcher.api.DownloadState(key, done, total, out != null, out);
     }
 
     /** 服务器说"限频"时是 403/429（GitHub 的 message 里也常带 rate limit）。 */
@@ -278,7 +427,7 @@ final class PluginNet {
             for (GitHubReleases.Asset a : rel.assets) {
                 if (a == null) continue;
                 String url = a.apiUrl != null && !a.apiUrl.isEmpty() ? a.apiUrl : a.browserUrl;
-                assets.add(new GitHubRelease.Asset(a.name, a.size, url));
+                assets.add(new GitHubRelease.Asset(a.name, a.size, url, a.browserUrl, a.sha256));
             }
             out.add(new GitHubRelease(rel.tag, rel.prerelease, rel.publishedAt, assets));
         }

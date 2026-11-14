@@ -29,7 +29,9 @@ final class UpdateDownload {
 
     /** 失败分类（给调用方分岔文案用；机器码不上屏）。 */
     enum Status {
-        OK, NETWORK, SIZE, SHA, IO;
+        OK, NETWORK, SIZE, SHA, IO,
+        /** 第 378 轮：取消（插件接口要能区分"取消"与"网络失败"）。 */
+        CANCELED;
 
         boolean ok() { return this == OK; }
     }
@@ -139,6 +141,8 @@ final class UpdateDownload {
                 st = expectSize > 0 ? Status.SIZE : Status.NETWORK;
                 break;
             case CANCELED:
+                st = Status.CANCELED;
+                break;
             case NETWORK:
                 st = Status.NETWORK;
                 break;

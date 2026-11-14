@@ -375,6 +375,9 @@ final class PluginData {
         out.put("trash_keep_slots", String.valueOf(c.trashKeepSlots()));
         out.put("update_mode", String.valueOf(c.updateMode()));
         out.put("update_mirror", safe(c.updateMirror()));
+        // v43：下载限速（字节/秒；0 = 不限）—— 插件自己下载时要按它算"大概多久"，
+        // 但**不能改**：限速是全局用户设置（见 PluginApi 下载一节）。
+        out.put("download_limit", String.valueOf(c.downloadLimit()));
         List<String> slots = new ArrayList<String>(Data.slotNames(ctx));
         String cur = Data.currentSlot(ctx);
         if (cur != null && !cur.isEmpty() && !slots.contains(cur)) slots.add(cur);

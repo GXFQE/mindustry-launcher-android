@@ -5,7 +5,7 @@
 
 ## 1. 版本与兼容（v20 冻结基线）
 
-- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..42**。
+- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..43**。
   （v20 是冻结基线；v21 = 游戏设置面；v22 = 后台任务 + 游戏事件；v23 = 探针；v24 = 分析器；
   v25 = 结论挂行 + 筛选/排序注入 + HJSON；v26 = 逐项判定；v27 = 详情页的门 + 槽级结论进摘要卡；
   v28 = 原版文案键；v29 = 游戏前后台事件；v30 = 探针知道版本 / 跨会话数据目录 + 摘要卡总时长；
@@ -44,7 +44,13 @@
   与 `detail`（详情页自己的一张动作卡）。
   **v42 = 信息 P1**：`slots()` 带统计（默认槽 / 文件数 / 字节数 / 四类内容数）、`storage()`（各段占用 +
   唯一总计，重）、`patchProblems()`（启动没应用 / 崩溃自动停用的事实，不给归因）、
-  `pluginVersions(id)`（插件逐版本，管理 / 回滚用）。）
+  `pluginVersions(id)`（插件逐版本，管理 / 回滚用）。**
+  **v43 = 下载续传 / 模组写 / 网络扩充**：`download(url, sha, key, resume, cb)`（稳定 key 目录 +
+  **由插件决定续不续** + `Download.onProgress`）、`downloadState(key)`（UI 线程可调的快照）、
+  `fetchText(url, maxBytes, cb)`（上限由插件给，钳到 2 MB）、`fetchBytes(url, maxBytes, cb)`
+  （图标等小块，256 KB）、`modsInstall(...)`（走宿主导入链：游戏判据 + 旧件进中转站）+
+  `modsSetEnabled(...)`（转 `Mods.setEnabled`）；`GitHubRelease.Asset` 多 `browserUrl` / `sha256`；
+  `settings()` 多 `download_limit`。）
 - 插件 `api()` 报的是「我需要的最低宿主接口版本」。用不到的新能力**不要**报高 ——
   报高了只会在老宿主上被拒，换不来任何东西。
 - **不要用 try/catch 去兼容老宿主**：报什么版本就只会跑在什么版本上。`api()` 报 20，
@@ -132,7 +138,7 @@
 ## 3. 入口类约定
 
 ```java
-public static int api();                        // 必需：你需要的接口版本（当前 42；用不到新能力就报 20）
+public static int api();                        // 必需：你需要的接口版本（当前 43；用不到新能力就报 20）
 public static View createView(PluginApi api);   // content / section 用
 public static void run(PluginApi api);          // action 用（在原页跑，不换页）
 public static void unload();                    // 可选：收尾（也认 unload(Context)）
@@ -152,7 +158,7 @@ public static void unload();                    // 可选：收尾（也认 unlo
 
 | 方法 | 说明 |
 |---|---|
-| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 42） |
+| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 43） |
 | `context()` | 插件上下文（**只用来取资源 / 主题 / 建 View**） |
 | `page()` / `slot()` | 从哪一页来 / 当前槽名 |
 | `theme()` | 主题色与 dp/sp（别自己写死颜色，见 `PluginTheme`） |
@@ -194,8 +200,12 @@ public static void unload();                    // 可选：收尾（也认 unlo
 | 方法 | 说明 |
 |---|---|
 | `fetchText(url, cb)` | 拉一段文本（UTF-8）。**只放行 https**（`http://127.0.0.1` / `localhost` 给本机调试）；正文上限 **512 KB**；连接 15 s / 读 60 s；跟随 302 |
-| `githubReleases(repo, cb)` | 列 `owner/name` 的 release（最新在前，最多 30 条）：`tag` / `prerelease` / `publishedAt` / `assets`（`name` / `size`（没给 = -1）/ `url`，`url` 可直接喂 `download`） |
-| `download(url, expectedSha256, cb)`（返回 `Task`） | 下载到**本插件 cache** 的 `downloads/<一次性子目录>/<URL 文件名>`（每个 Task 一个子目录：并发下载同名文件不会互相删/覆盖）；先写 `.part`，sha256 过了才改名；**大小由"边下边查 1 GB 上限"兜底**（下载前不知道长度时不预判）；GitHub 地址自动套用户选的**更新线路**（镜像优先、直连兜底）；进度显示在宿主前台服务通知里（**别自己再发**） |
+| `fetchText(url, maxBytes, cb)`（v43） | 同上，**上限由插件给**：宿主钳到 **2 MB**（`<= 0` ⇒ 512 KB）。725 KB 的官方模组列表要用这个 |
+| `fetchBytes(url, maxBytes, cb)`（v43） | 拉**二进制小块**（模组图标 / 缩略图）：https only、上限 **256 KB**（宿主钳）；不落盘、不发通知；失败码 `bad-url` / `network` / `size` / `rate-limited` / `io` |
+| `githubReleases(repo, cb)` | 列 `owner/name` 的 release（最新在前，最多 30 条）：`tag` / `prerelease` / `publishedAt` / `assets`（`name` / `size`（没给 = -1）/ `url` / **v43** `browserUrl` / `sha256`）；`url` 与 `browserUrl` 都能喂 `download` |
+| `download(url, expectedSha256, cb)`（返回 `Task`） | **旧签名（v39）**：下载到**一次性子目录**；先写 `.part`，sha256 过了才改名；大小由"边下边查 1 GB 上限"兜底；GitHub 地址自动套用户选的**更新线路**；失败 / 取消删半截 |
+| `download(url, expectedSha256, key, resume, cb)`（v43） | **稳定 key 目录** `<cache>/downloads/<key>/f<后缀>`。`resume=true`：同 key 有半截就接着下、成品命中直接回调（0 请求）、取消 / 断网**保留**半截；`resume=false`：忽略半截 / 成品，失败 / 取消删半截。**续不续由插件决定**（用户 2026-11-14 定案） |
+| `downloadState(key)`（v43） | 只读快照（只 stat + 读小文件，**UI 线程可调**）：`done` / `total`（0 = 未知）/ `complete` / `file`；没有记录 ⇒ `null`。成品 sha 对不上 ⇒ 当没有并删掉（自愈） |
 
 规则与边界：
 
@@ -210,6 +220,18 @@ public static void unload();                    // 可选：收尾（也认 unlo
   等到读超时才走到回调，但**结果一定不会当成成功**）。
 - ⚠️ **GitHub API 的下载地址（`assets[].url`）也计入 40 次/小时配额**：`download` 与 `fetchText`
   共用同一份记账，用下载绕配额是绕不过去的。
+- **v43 续传的四条**：
+  - `key` 只收 `[A-Za-z0-9._-]{1,64}`、不许 `.` 开头；**同一个 key 同时只跑一个任务**（第二个 ⇒ `busy`），
+    一个 key 只对应**一份内容**（换版本就换 key，比如 `id-sha前8位`）；
+  - `resume=true` **必须给 sha256**（空 / 不是 64 位 hex ⇒ `invalid`）——没有内容锚就不许把两半拼起来；
+    服务端不支持 Range 时宿主会自动整包重下（不会拼错）；
+  - 进度回调 `Download.onProgress(done, total, bps)` 是 **v43 的 `default` 方法**（老插件只实现
+    `onDownload` 照样编译 / 运行）；主线程、宿主已节流到 ≥250 ms 一次；
+  - **限速是全局用户设置，插件不能覆盖**：`settings().download_limit` 只读（字节/秒，0 = 不限）；
+    宿主的所有下载（含插件）都吃同一个额度。
+- **v43 批量取模组**：`githubReleases` 里优先用 **`browserUrl` + `sha256`**（`browser_download_url`
+  **不占 API 配额**、同样支持 Range；`digest` 给的 sha256 直接当续传锚）；官方 Anuke 模组列表
+  （`Anuken/MindustryMods` 的 `mods.json`，725 KB）用 `fetchText(url, 2 * 1024 * 1024, cb)`。
 
 ### 补丁写（v39）
 
@@ -738,12 +760,14 @@ String json = api.parseHjson(file);   // 标准 JSON 文本；失败/读不了 �
 > 别的槽的游戏不影响你写这个槽。读类方法一律放行。
 > ⚠️ **File 出口不受写门禁保护**：`slotDir()`/`savesDir()`/… 与 `ItemInfo.path` 给的路径
 > 可以直接写（本工程"无沙箱"是既定边界，见 `PluginApi` 头注释）。写门禁只拦
-> `writeItem`/`addItem`/`writeGameSettings`/`trashItem` 这四个 API。
+> `writeItem`/`addItem`/`modsInstall`/`modsSetEnabled`/`writeGameSettings`/`trashItem` 这六个 API。
 
 | 方法 | 说明 |
 |---|---|
 | `writeItem(item, stream, cb)` | 换掉**任意槽**四类目录里**已存在**文件的字节（v34 起跨槽；原子替换；**该文件所在槽有实例在跑时**拒绝；**无备份**） |
 | `addItem(slot, kind, name, stream, cb)` | **v35 新建**存档 / 地图 / 模组 / 蓝图；不覆盖同名；只校验槽名 / 后缀 / 原子写，**内容归插件** |
+| `modsInstall(slot, name, stream, overwrite, cb)`（v43） | 模组包装进槽：**走宿主 `Mods.importPackage`**（游戏自己的 `readOne` 判据 + 旧件进中转站 + 原子改名）；`overwrite=false` 同名 ⇒ `exists`；目标槽有实例在跑 ⇒ `game-running` |
+| `modsSetEnabled(slot, internalName, on, cb)`（v43） | 改游戏设置里的 `<internal>-enabled` / `-failed`（同一份 `Mods.setEnabled` + 设置备份）；`internalName` 是 `mod.hjson` 的内部名，**不是文件名** |
 | `trashItem(item, cb)` | 挪进中转站（不是真删，规则与界面删除同一套；目标槽有实例在跑 ⇒ `game-running`） |
 | `openItem(item)` | 跳详情页（地图/存档 → 地图详情；蓝图 → 蓝图详情；模组 → 模组页） |
 
@@ -754,6 +778,13 @@ String json = api.parseHjson(file);   // 标准 JSON 文本；失败/读不了 �
 - 同名已存在 ⇒ `exists`（要替换用 `writeItem`）；**目标槽有实例在跑** ⇒ `game-running`；槽不存在 ⇒ `not-found`。
 - **宿主不做内容校验 / 不回滚**：写进去的 `.msav` 是否合法、mod zip 有没有 `mod.hjson`、
   `.msch` 能不能解析，全是插件责任；新文件没有旧版本可还原。
+
+**v43 `modsInstall` / `modsSetEnabled` 的边界**：
+- 与宿主的模组页**同一份实现**（不另造判据）：`modsInstall` 的"是不是一个模组"由游戏自己的
+  `readOne` 判（不是"是 jar 就算"），同名旧件**进中转站**（不是裸删）；`modsSetEnabled` 写的是
+  游戏设置里的成对键（`-enabled` + `-failed`），与模组页的启停完全同一套。
+- 失败码：`not-found` / `invalid` / `exists` / `not-a-mod` / `game-running` / `unreadable` / `io`。
+- ⚠️ `File` 出口仍能绕过写门禁（见上），但**这两个 API 是推荐路径** —— 插件自己做判据必然与宿主漂。
 
 ### 游戏设置（v21）
 
@@ -1078,6 +1109,13 @@ v42（2026-11-13 第 376 轮）：**信息 P1（plan §3.2）**—— `slots()` 
 全盘递归 ⇒ 只该在后台调）、`patchProblems()`（启动没应用 / 崩溃自动停用的**事实**，code + detail +
 ref，**不给归因**）、`pluginVersions(id)`（插件逐版本；切换仍归宿主界面）。新增两个
 `ItemInfo` kind：`plugin_version` / `patch_problem`。`API_MIN` 仍不动（区间 20..42）。
+v43（2026-11-14 第 378 轮）：**下载续传 / 模组写 / 网络扩充**（用户：「先把下载折腾好再管这个模组吧」
+→ 下载核心与真机验收完成后再开插件口）—— `download(url, sha, key, resume, cb)`（稳定 key 目录 +
+**续不续由插件决定** + 进度 `default` 回调）、`downloadState(key)`（UI 线程可调）、
+`fetchText(url, maxBytes, cb)`（2 MB 硬顶）、`fetchBytes(url, maxBytes, cb)`（图标，256 KB）、
+`modsInstall` / `modsSetEnabled`（走宿主的 `Mods.importPackage` / `Mods.setEnabled`，同一份判据与
+中转站规则）、`GitHubRelease.Asset` 多 `browserUrl` / `sha256`（digest）、`settings()` 多
+`download_limit`。`API_MIN` 仍不动（区间 20..43）。
 
 **官方体检插件**：`plugins/mods-health`（第 229 轮，前身叫 `conflict`）。宿主原来的那行
 「查模组冲突」整块删掉，判据搬进插件的 `core/Conflicts.java` 与 `core/Gates.java`；
