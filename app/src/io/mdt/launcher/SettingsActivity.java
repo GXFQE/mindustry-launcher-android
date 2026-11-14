@@ -255,6 +255,9 @@ public class SettingsActivity extends BaseActivity {
         Trans.bind(root, R.id.settings_section_appearance, R.string.settings_section_appearance);
         Trans.bind(root, R.id.settings_section_startup, R.string.settings_section_startup);
         Trans.bind(root, R.id.settings_section_alerts, R.string.settings_section_alerts);
+        // 第 378 轮：下载单列（更新线路 / 下载限速）—— 不再往"版本与更新"那张卡下面堆。
+        Trans.bind(root, R.id.settings_section_download, R.string.settings_section_download);
+        Trans.bind(root, R.id.settings_section_version, R.string.settings_section_version);
 
     }
 

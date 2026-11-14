@@ -1581,6 +1581,8 @@
     <string name="settings_section_appearance">外观与语言</string>
     <string name="settings_section_startup">启动与存储</string>
     <string name="settings_section_alerts">通知与日志</string>
+    <string name="settings_section_download">下载</string>
+    <string name="settings_section_version">版本与更新</string>
 
     <string name="set_crash_alert_title">崩溃提示</string>
     <string name="set_crash_alert_on">已开启 · 报告仍保存</string>

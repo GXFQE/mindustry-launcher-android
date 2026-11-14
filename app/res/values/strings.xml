@@ -1637,6 +1637,8 @@
     <string name="settings_section_appearance">Appearance and language</string>
     <string name="settings_section_startup">Startup and storage</string>
     <string name="settings_section_alerts">Notifications and logs</string>
+    <string name="settings_section_download">Downloads</string>
+    <string name="settings_section_version">Version and updates</string>
 
     <string name="set_crash_alert_title">Crash alerts</string>
     <string name="set_crash_alert_on">On · reports still saved</string>

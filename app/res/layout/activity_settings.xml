@@ -203,6 +203,57 @@
                     android:layout_height="wrap_content" />
             </LinearLayout>
 
+            <!-- ══ 下载 ══════════════════════════════════════════════════ -->
+            <TextView
+                android:id="@+id/settings_section_download"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:paddingTop="18dp"
+                android:paddingBottom="6dp"
+                android:textColor="@color/fg_muted"
+                android:textSize="12sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/card_bg"
+                android:orientation="vertical">
+
+                <!-- 第 336 轮：更新线路（手动测速 / 选中线路）。 -->
+                <include
+                    android:id="@+id/row_update_line"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="62dp"
+                    android:background="@color/divider" />
+
+                <!-- 第 378 轮：下载限速（0 = 不限）。 -->
+                <include
+                    android:id="@+id/row_download_limit"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
+            <!-- ══ 版本与更新 ══════════════════════════════════════════════ -->
+            <TextView
+                android:id="@+id/settings_section_version"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:paddingTop="18dp"
+                android:paddingBottom="6dp"
+                android:textColor="@color/fg_muted"
+                android:textSize="12sp" />
+
             <!--
               关于：第 175 轮从「设置页内联信息卡」改成**独立二级页入口**。
               ★ 这是设置页唯一一个"点开是另一个页面"的行 —— 理由：版本 / 包名 / 数据路径 /
@@ -242,32 +293,6 @@
                 -->
                 <include
                     android:id="@+id/row_update_mode"
-                    layout="@layout/row_action"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content" />
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="62dp"
-                    android:background="@color/divider" />
-
-                <!-- 第 336 轮：更新线路（手动测速 / 选中线路）。 -->
-                <include
-                    android:id="@+id/row_update_line"
-                    layout="@layout/row_action"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content" />
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="62dp"
-                    android:background="@color/divider" />
-
-                <!-- 第 378 轮：下载限速（0 = 不限）。放在「更新线路」下面 —— 两者都管"下载怎么走"。 -->
-                <include
-                    android:id="@+id/row_download_limit"
                     layout="@layout/row_action"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
