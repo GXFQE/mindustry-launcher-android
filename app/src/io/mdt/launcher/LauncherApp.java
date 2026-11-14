@@ -80,6 +80,8 @@ public class LauncherApp extends Application {
             }
         }
         Config.get().load(this);
+        // 第 378 轮：把用户的下载限速交给全局额度（0 = 不限）。改设置时由设置页再调一次。
+        Bandwidth.set(Config.get().downloadLimit());
         Log.i(TAG, "app up, privateDir=" + Paths.privateDir(this)
                 + " pid=" + android.os.Process.myPid());
     }

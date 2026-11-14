@@ -380,6 +380,8 @@ public final class SelfTest {
             updatePromptText(ctx, L, stat);
             // ★ 第 336 轮：更新线路（预设顺序 / 不重复前缀 / 严格解析 / 启动清扫）
             updateMirrors(ctx, L, stat);
+            // ★ 第 378 轮：下载限速（档位 / 文案 / 全局额度）
+            downloadLimit(ctx, L, stat);
             // ★ 第 338 轮：插件更新（清单解析 / 内容哈希比对 / 状态表）—— 纯逻辑
             pluginUpdates(ctx, L, stat);
             // ★ 第 345 轮：补丁机制 v1（dex 类名解析 / 清单校验 / 导入 / 冲突 / 启动解析）
@@ -19752,6 +19754,37 @@ public final class SelfTest {
      * 四个预设的顺序、选中线路排第一、直连排在最后、已带前缀不二次拼接、
      * 本地回环不拼、坏 JSON 返回 null、清扫只删临时件不删成品。
      */
+    /** 第 378 轮：下载限速的档位 / 文案 / 全局额度（纯函数 + 全局状态，跑完还原）。 */
+    private static void downloadLimit(android.content.Context ctx, List<String> L, int[] stat) {
+        L.add("");
+        L.add("【下载限速】");
+
+        ok(stat, L, DownloadLimit.clamp(-1) == 0L && DownloadLimit.clamp(0) == 0L,
+                "档位：负数 / 0 都归「不限」");
+        ok(stat, L, DownloadLimit.clamp(DownloadLimit.MAX + 1) == DownloadLimit.MAX
+                        && DownloadLimit.clamp(512L * 1024) == 512L * 1024,
+                "档位：超大值钳到上限、正常值原样");
+        ok(stat, L, Trans.get(ctx, R.string.set_download_limit_none)
+                        .equals(DownloadLimit.label(ctx, 0)),
+                "文案：0 ⇒ 不限");
+        ok(stat, L, Trans.get(ctx, R.string.set_download_limit_mb_fmt, 2)
+                        .equals(DownloadLimit.label(ctx, 2L * 1024 * 1024)),
+                "文案：2 MB/s");
+
+        long old = Bandwidth.bps();
+        try {
+            Bandwidth.set(512L * 1024);
+            ok(stat, L, Bandwidth.bps() == 512L * 1024
+                            && Bandwidth.chunkSize() == (int) (512L * 1024 / 20),
+                    "全局额度：设得进、读片 ≈ 50 ms 的量");
+            Bandwidth.set(0);
+            ok(stat, L, Bandwidth.bps() == 0 && Bandwidth.chunkSize() == 65536,
+                    "全局额度：0 = 不限、读片回 64 KB");
+        } finally {
+            Bandwidth.set(old);
+        }
+    }
+
     private static void updateMirrors(android.content.Context ctx, List<String> L, int[] stat) {
         L.add("");
         L.add("【更新线路】");

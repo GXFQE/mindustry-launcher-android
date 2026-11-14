@@ -1483,6 +1483,14 @@
     <!-- 第 336 轮：更新线路（手动测速；正常下载不测） -->
     <string name="set_update_line_title">更新线路</string>
     <string name="set_update_line_sub_fmt">当前：%1$s</string>
+
+    <!-- 第 378 轮：下载限速（全局一份，0 = 不限） -->
+    <string name="set_download_limit_title">下载限速</string>
+    <string name="set_download_limit_sub_fmt">当前：%1$s</string>
+    <string name="set_download_limit_pick_title">下载限速</string>
+    <string name="set_download_limit_none">不限</string>
+    <string name="set_download_limit_kb_fmt">%1$d KB/s</string>
+    <string name="set_download_limit_mb_fmt">%1$d MB/s</string>
     <string name="update_line_auto">自动（按默认顺序）</string>
     <string name="update_line_direct">直连</string>
     <string name="update_line_intro">用最新 APK 的一小段实测四个镜像和直连，约 240 KB。</string>

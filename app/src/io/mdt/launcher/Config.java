@@ -189,6 +189,15 @@ public final class Config {
     private static final String K_PLUGIN_UPDATE = "plugin_update";
 
     /**
+     * 第 378 轮：**下载限速**（字节/秒；0 = 不限）。
+     *
+     * <p>全局一份：宿主自更新 / 插件更新 / 将来的模组下载共用 {@link Bandwidth} 的额度。
+     * 写进设置页的「下载限速」一行；坏值 / 负数一律退 0（不限）并 WARNING 点名键名 ——
+     * 与 {@link #updateMode()} / {@link #updateMirror()} 同一族纪律。
+     */
+    private static final String K_DOWNLOAD_LIMIT = "download_limit";
+
+    /**
      * 一档④（2026-10-06）：每个版本**上次启动的时刻** { "&lt;版本key&gt;": 毫秒 }。
      *
      * ★ 为什么需要它：{@link #sessions()} 记的是"**正在进行**的那几局"，
@@ -581,6 +590,32 @@ public final class Config {
     public synchronized void setUpdateMirror(String prefix) {
         String n = Mirrors.normalize(prefix);
         put(K_UPDATE_MIRROR, n == null ? Mirrors.AUTO : n);
+        save();
+    }
+
+    /**
+     * 第 378 轮：下载限速（字节/秒；0 = 不限）。
+     *
+     * <p>坏值 / 负数一律退 0 并 WARNING 点名键名；超过 {@link DownloadLimit#MAX} 钳到上限。
+     */
+    public synchronized long downloadLimit() {
+        Object v = mRoot.opt(K_DOWNLOAD_LIMIT);
+        if (v instanceof Number) {
+            long n = ((Number) v).longValue();
+            if (n >= 0L) return DownloadLimit.clamp(n);
+            Log.w(TAG, "config key '" + K_DOWNLOAD_LIMIT + "' is negative (" + n
+                    + "), falling back to unlimited");
+            return DownloadLimit.NONE;
+        }
+        if (v != null) {
+            Log.w(TAG, "config key '" + K_DOWNLOAD_LIMIT + "' is not a number (" + v
+                    + "), falling back to unlimited");
+        }
+        return DownloadLimit.NONE;
+    }
+
+    public synchronized void setDownloadLimit(long bytesPerSec) {
+        put(K_DOWNLOAD_LIMIT, Long.valueOf(DownloadLimit.clamp(bytesPerSec)));
         save();
     }
 

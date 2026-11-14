@@ -85,6 +85,8 @@ public class SettingsActivity extends BaseActivity {
     private TextView mUpdateModeSub;
     /** 第 336 轮：更新线路（自动 / 直连 / 四个镜像）的副标题。 */
     private TextView mUpdateLineSub;
+    /** 第 378 轮：下载限速（不限 / 256 KB/s …）的副标题。 */
+    private TextView mDownloadLimitSub;
     /** 第 338 轮：插件自动更新的副标题（已开启 / 已关闭）。 */
     private TextView mPluginUpdateSub;
 
@@ -221,6 +223,13 @@ public class SettingsActivity extends BaseActivity {
                 });
         mUpdateLineSub = (TextView) rowLine.findViewById(R.id.act_sub);
 
+        // 第 378 轮：下载限速（全局一份，0 = 不限）。放在「更新线路」下面 —— 两者都管"下载怎么走"。
+        View rowLimit = Util.bindActionValue(root, R.id.row_download_limit, R.drawable.ic_download,
+                R.string.set_download_limit_title, new Runnable() {
+                    @Override public void run() { pickDownloadLimit(); }
+                });
+        mDownloadLimitSub = (TextView) rowLimit.findViewById(R.id.act_sub);
+
         // 第 338 轮：**插件自动更新**（开关）。它与上一行「更新模式」是两件事 ——
         //   那个管启动器自己，这个管插件；点一下切换，副标题报"现在是什么"。
         View rowPluginUp = Util.bindActionValue(root, R.id.row_plugin_update,
@@ -322,6 +331,11 @@ public class SettingsActivity extends BaseActivity {
             mUpdateLineSub.setText(Trans.get(SettingsActivity.this,
                     R.string.set_update_line_sub_fmt,
                     UpdateLineUi.label(this, Config.get().updateMirror())));
+        }
+        if (mDownloadLimitSub != null) {
+            mDownloadLimitSub.setText(Trans.get(SettingsActivity.this,
+                    R.string.set_download_limit_sub_fmt,
+                    DownloadLimit.label(this, Config.get().downloadLimit())));
         }
         if (mPluginUpdateSub != null) {
             mPluginUpdateSub.setText(Trans.get(SettingsActivity.this,
@@ -592,8 +606,36 @@ public class SettingsActivity extends BaseActivity {
      * 新实例在 `BaseActivity.onCreate` 里把方向 `setRequestedOrientation` 下去。
      * ★ 只作用于管理器自己的页面（`GameSlot` 除外），游戏那一页仍按它自己的清单。
      */
-    private void pickOrientation() {
-        final int[] modes = {OrientationMode.SYSTEM, OrientationMode.PORTRAIT, OrientationMode.LANDSCAPE};
+    /**
+     * 第 378 轮：下载限速（档位单选）。
+     *
+     * <p>改完立刻交给 {@link Bandwidth}：正在跑的下载下一片就按新额度，不用重启。
+     * 副标题跟着 {@link #fillValues()} 刷新成"当前：…"。
+     */
+    private void pickDownloadLimit() {
+        final long[] vals = DownloadLimit.PRESETS;
+        String[] names = new String[vals.length];
+        long cur = Config.get().downloadLimit();
+        int checked = -1;
+        for (int i = 0; i < vals.length; i++) {
+            names[i] = DownloadLimit.label(this, vals[i]);
+            if (vals[i] == cur) checked = i;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.set_download_limit_pick_title)
+                .setSingleChoiceItems(names, checked, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int w) {
+                        d.dismiss();
+                        Config.get().setDownloadLimit(vals[w]);
+                        Bandwidth.set(vals[w]);
+                        fillValues();
+                    }
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    private void pickOrientation() {        final int[] modes = {OrientationMode.SYSTEM, OrientationMode.PORTRAIT, OrientationMode.LANDSCAPE};
         String[] names = new String[modes.length];
         final int cur = OrientationMode.of(this);
         int checked = -1;

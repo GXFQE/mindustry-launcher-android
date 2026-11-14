@@ -265,6 +265,19 @@
                     android:layout_marginStart="62dp"
                     android:background="@color/divider" />
 
+                <!-- 第 378 轮：下载限速（0 = 不限）。放在「更新线路」下面 —— 两者都管"下载怎么走"。 -->
+                <include
+                    android:id="@+id/row_download_limit"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="62dp"
+                    android:background="@color/divider" />
+
                 <!--
                   第 338 轮：**插件自动更新**（开关）。
                   ★ 它与上面那行「更新模式」是两件事：那个管**启动器自己**，这个管**插件**。
