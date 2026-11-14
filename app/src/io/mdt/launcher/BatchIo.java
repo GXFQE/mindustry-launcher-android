@@ -1333,6 +1333,17 @@ final class BatchIo {
         boolean selfPack;
         /** 后缀命中的条目名（原样，含路径）；`zip == true` 时有效，可能为空 */
         final List<String> hits = new ArrayList<>();
+        /**
+         * 一级目录里**直接**放着模组说明文件的那些目录名（`&lt;夹&gt;/mod.hjson`）——
+         * 与 {@link #modFolderNames} 同一条判据，只是顺路在这一次扫描里记下来。
+         *
+         * <p>🔴 这就是**文件夹形态的模组**（第 379 轮）：那个夹子里的东西属于这个模组
+         * （它自带的 `schematics/*.msch` / `maps/*.msav` 都在模组夹里面）⇒ 判"这个 zip 是哪一类"
+         * 时**模组优先**，不能再拿夹子里那张蓝图当整包的条目。
+         * 真机那份：`蓝钢工业3.9（适160.5）.zip` = `蓝钢-欢迎您/mod.json`
+         * + `蓝钢-欢迎您/schematics/泰坦级核心.msch`（2026-11-15 用户报「导入一个模组，识别成蓝图了」）。
+         */
+        final List<String> modFolders = new ArrayList<>();
 
         /** 我们导出的一整包 */
         boolean bundle() {
@@ -1372,6 +1383,16 @@ final class BatchIo {
                         }
                     }
                 }
+                // 顺路认"模组夹"：`<一级目录>/mod.hjson`（判据与 modFolderNames 同一条）
+                if (slash > 0 && flat.indexOf('/') == slash && rootMarkers != null) {
+                    for (String m : rootMarkers) {
+                        if (m != null && m.equalsIgnoreCase(base)) {
+                            String top = flat.substring(0, slash);
+                            if (!p.modFolders.contains(top)) p.modFolders.add(top);
+                            break;
+                        }
+                    }
+                }
                 String lower = flat.toLowerCase(Locale.ROOT);
                 for (String x : exts) {
                     if (x != null && lower.endsWith(x.toLowerCase(Locale.ROOT))) {
@@ -1384,6 +1405,7 @@ final class BatchIo {
             p.zip = false;                          // 不是 zip（存档就是 zlib 流）/ 坏了
             p.selfPack = false;
             p.hits.clear();
+            p.modFolders.clear();
         } finally {
             closeQuietly(zin);
         }
@@ -1422,11 +1444,15 @@ final class BatchIo {
     /**
      * **一个压缩包里装的是哪一类**（F9 深链用）。认不出 ⇒ -1，调用方给"这个包里没有…"那句话。
      *
-     * <p>判据顺序（都是**内容**，不是文件名）：
+     * <p>判据顺序（都是**内容**，不是文件名）—— ★ **模组优先**（第 379 轮用户定案：「感觉模组
+     * 才应该是最优先的」：模组会**带着**它自己的蓝图 / 地图，反过来不成立 ⇒ 包里有模组的迹象
+     * 就该先进模组页）：
      * <ol>
      *   <li>包根上就有 `mod.hjson` ⇒ 它本身就是**一个模组包**（mods）；</li>
-     *   <li>按命中的条目名定类（见 {@link #kindOfHits}）；</li>
-     *   <li>一条都没命中时，模组还有"一堆模组**文件夹**打成 zip"这种（见 {@link #modFolderNames}）。</li>
+     *   <li>一级目录里有 `mod.hjson`（**文件夹形态的模组**，见 {@link Probe#modFolders}）⇒ 模组 ——
+     *       夹子外面的条目这趟**不管**（用户要的是"先把这个模组装上"）；</li>
+     *   <li>否则按命中的条目名定类（见 {@link #kindOfHits}，同样是模组优先）；</li>
+     *   <li>一条都没命中 ⇒ -1。</li>
      * </ol>
      * ⚠️ 必须在**后台线程**调（会把整包读一遍，几十 MB）。
      */
@@ -1434,25 +1460,18 @@ final class BatchIo {
         Probe p = probeDoc(ctx, d, GUESS_EXTS, Mods.META_FILES);
         if (p == null || !p.zip) return -1;
         if (p.selfPack) return KIND_MODS;
-        int k = kindOfHits(p.hits, d.name);
-        if (k >= 0) return k;
-        InputStream in = null;
-        try {
-            in = d.open(ctx);
-            if (!modFolderNames(in, Mods.META_FILES).isEmpty()) return KIND_MODS;
-        } catch (Throwable t) {
-            Log.i(TAG, "mod folders probe skipped: " + d.name + " / " + Util.ioReason(ctx, t));
-        } finally {
-            closeQuietly(in);
-        }
-        return -1;
+        // ★ 第 379 轮：文件夹形态的模组包 —— 它自带的 `schematics/*.msch` 属于这个模组，
+        //   不能拿它当"整包里的蓝图"。反例（真机）：`蓝钢工业3.9（适160.5）.zip` 被判成蓝图整包。
+        if (!p.modFolders.isEmpty()) return KIND_MODS;
+        return kindOfHits(p.hits, d.name);
     }
 
     /**
      * ★ **纯函数**：按命中的条目名定类 —— 自检直接喂字符串钉判据表。
      *
-     * <p>固定优先级（与命中顺序无关，别写成"遇到谁就返回谁"）：
-     * `.msch` ⇒ 蓝图 · `.jar` / 内层 `.zip` ⇒ 模组 · `.msav` ⇒ 地图/存档。
+     * <p>固定优先级（与命中顺序无关，别写成"遇到谁就返回谁"），★ **模组 > 蓝图 > 地图/存档**
+     * （第 379 轮用户定案：模组会带来自己的蓝图、地图；反过来不成立）：
+     * `.jar` / 内层 `.zip` ⇒ 模组 · `.msch` ⇒ 蓝图 · `.msav` ⇒ 地图/存档。
      *
      * <p>★ `.msav` 是**地图与存档同一个容器** ⇒ 光看内容分不开，靠**整包的文件名**分
      * （我们自己的导出器就按 `mdt-<类>-…zip` 命名，见 {@link #kindOfBundleName}）；
@@ -1468,8 +1487,8 @@ final class BatchIo {
                 else if (n.endsWith(".msav")) map = true;
             }
         }
-        if (bp) return KIND_BLUEPRINTS;
         if (mod) return KIND_MODS;
+        if (bp) return KIND_BLUEPRINTS;
         if (!map) return -1;
         return kindOfBundleName(bundleName) == KIND_SAVES ? KIND_SAVES : KIND_MAPS;
     }

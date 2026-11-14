@@ -17307,11 +17307,12 @@ public final class SelfTest {
                         && BatchIo.kindOfHits(hMap, "随便.zip") == BatchIo.KIND_MAPS
                         && BatchIo.kindOfHits(hMap, "mdt-saves-20261010-1930.zip") == BatchIo.KIND_SAVES
                         && BatchIo.kindOfHits(new java.util.ArrayList<String>(), "x.zip") == -1,
-                "★ 按命中条目定类：`.msch` ⇒ 蓝图 · `.jar`/`.zip` ⇒ 模组 · `.msav` ⇒ 地图/存档"
+                "★ 按命中条目定类：`.jar`/`.zip` ⇒ 模组（**最优先**）· `.msch` ⇒ 蓝图 · `.msav` ⇒ 地图/存档"
                         + "（同一个容器 ⇒ 靠整包名 `mdt-saves-…` 分成存档；一条都不命中 ⇒ -1）");
         ok(stat, L, BatchIo.kindOfHits(hMix1, "x.zip") == BatchIo.kindOfHits(hMix2, "x.zip")
-                        && BatchIo.kindOfHits(hMix1, "x.zip") == BatchIo.KIND_BLUEPRINTS,
-                "★ 元断言：优先级固定、**与命中顺序无关**（别写成「遇到谁就返回谁」）");
+                        && BatchIo.kindOfHits(hMix1, "x.zip") == BatchIo.KIND_MODS,
+                "★ 元断言：优先级固定、**与命中顺序无关**（别写成「遇到谁就返回谁」）；"
+                        + "★ 第 379 轮起**模组最优先**（`x.msch` + `y.jar` ⇒ 模组）");
         ok(stat, L, BatchIo.kindOfBundleName("mdt-mods-20261010-1930.zip") == BatchIo.KIND_MODS
                         && BatchIo.kindOfBundleName("MDT-MAPS-20261010-1930.zip") == BatchIo.KIND_MAPS
                         && BatchIo.kindOfBundleName("mdt-blueprints-1.zip") == BatchIo.KIND_BLUEPRINTS
@@ -17353,6 +17354,39 @@ public final class SelfTest {
             zipMany(folderPack, new String[]{"a/mod.hjson", "b/mod.hjson"}, new String[]{"n", "n"});
             ok(stat, L, BatchIo.guessKind(ctx, docsOf(folderPack).get(0)) == BatchIo.KIND_MODS,
                     "★ 一条 .jar/.zip 都没有、但一级目录里放着 `mod.hjson` ⇒ 还是模组整包");
+
+            // ── 第 379 轮（用户：「从深链导入一个模组，识别成蓝图了」）──────────────
+            //   真机那份 = `蓝钢-欢迎您/mod.json` + `蓝钢-欢迎您/schematics/泰坦级核心.msch`：
+            //   **文件夹形态的模组包**，模组自带的蓝图住在模组夹里。原来那张命中表（`.msch`
+            //   优先于一切）把整包判成蓝图 ⇒ 深链把人送到蓝图页、还顺手导了一张蓝图进槽。
+            //   ★ 用户当天又定了总规矩：「感觉模组才应该是最优先的」⇒ 判据 = **模组 > 蓝图 > 地图**。
+            File modWithBp = new File(root, "蓝钢工业.zip");
+            zipMany(modWithBp, new String[]{"蓝钢-欢迎您/mod.json",
+                            "蓝钢-欢迎您/schematics/泰坦级核心.msch"},
+                    new String[]{"{}", "msch-head"});
+            ok(stat, L, BatchIo.guessKind(ctx, docsOf(modWithBp).get(0)) == BatchIo.KIND_MODS,
+                    "★★ **文件夹形态的模组包**：它自带一张 `schematics/*.msch`，整包仍是模组"
+                            + "（真机：蓝钢工业3.9 就是这么被判成蓝图的）");
+
+            File modWithMap = new File(root, "模组夹带地图.zip");
+            zipMany(modWithMap, new String[]{"A/mod.hjson", "A/maps/图.msav"},
+                    new String[]{"n", "x"});
+            ok(stat, L, BatchIo.guessKind(ctx, docsOf(modWithMap).get(0)) == BatchIo.KIND_MODS,
+                    "★★ 同理：模组夹自带的 `maps/*.msav` 也不算整包的地图");
+
+            File mixedPack = new File(root, "模组夹加散蓝图.zip");
+            zipMany(mixedPack, new String[]{"A/mod.json", "散图.msch"},
+                    new String[]{"{}", "msch-head"});
+            ok(stat, L, BatchIo.guessKind(ctx, docsOf(mixedPack).get(0)) == BatchIo.KIND_MODS,
+                    "★★ 模组最优先：哪怕夹子外面还躺着蓝图，也先进**模组页**"
+                            + "（模组会带着它自己的蓝图，反过来不成立）");
+
+            File modBundle = new File(root, "一堆模组包.zip");
+            zipMany(modBundle, new String[]{"mods/a.jar", "schematics/散图.msch"},
+                    new String[]{"jar", "msch-head"});
+            ok(stat, L, BatchIo.guessKind(ctx, docsOf(modBundle).get(0)) == BatchIo.KIND_MODS,
+                    "★★ 纯命中表也一样：`.jar` 比 `.msch` 优先（我们自己的整包不会混着装，"
+                            + "但用户自己压的包会）");
 
             File nothing = new File(root, "没东西.zip");
             zipMany(nothing, new String[]{"readme.txt", "a.bin"}, new String[]{"r", "b"});
