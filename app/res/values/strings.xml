@@ -1528,6 +1528,11 @@
     <string name="set_download_limit_mb_fmt">%1$d MB/s</string>
     <string name="update_line_auto">Auto (default order)</string>
     <string name="update_line_direct">Direct</string>
+    <string name="update_line_custom">Custom…</string>
+    <string name="update_line_custom_title">Custom mirror</string>
+    <string name="update_line_custom_msg">Enter the mirror prefix (https://…/). The GitHub URL is appended to it.</string>
+    <string name="update_line_custom_hint">https://mirror.example.com/</string>
+    <string name="update_line_custom_bad">Invalid prefix: must be https, with no query string or spaces.</string>
     <string name="update_line_intro">Tests the four mirrors and direct with a small sample of the latest APK. About 240 KB.</string>
     <string name="update_line_test">Speed test</string>
     <string name="update_line_pick">Choose a line</string>

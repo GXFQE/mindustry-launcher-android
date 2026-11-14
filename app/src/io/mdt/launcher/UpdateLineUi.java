@@ -4,6 +4,10 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.text.InputType;
+import android.view.ViewGroup;
+import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.Toast;
 
 import java.io.File;
@@ -113,7 +117,8 @@ final class UpdateLineUi {
                     if (testUrl == null) {
                         failure = Trans.get(a, R.string.update_line_no_test_file);
                     } else {
-                        results = MirrorTest.run(testUrl, Mirrors.testCandidates(),
+                        results = MirrorTest.run(testUrl,
+                                Mirrors.testCandidates(Config.get().updateMirror()),
                                 new MirrorTest.Progress() {
                                     @Override public void onProgress(final int done,
                                                                      final int total,
@@ -268,12 +273,23 @@ final class UpdateLineUi {
             values.add(p);
             names.add(label(a, p));
         }
+        // v43：自定义前缀。这个下标只用来分岔，不会把占位值写进配置。
+        final int customIndex = values.size();
+        values.add(Mirrors.AUTO);
+        names.add(Trans.get(a, R.string.update_line_custom));
+        boolean custom = !Mirrors.AUTO.equals(cur) && !Mirrors.DIRECT.equals(cur)
+                && !Mirrors.isPreset(cur);
+        if (custom) checked = customIndex;
         new AlertDialog.Builder(a)
                 .setTitle(R.string.update_line_pick_title)
                 .setSingleChoiceItems(names.toArray(new String[0]), checked,
                         new DialogInterface.OnClickListener() {
                             @Override public void onClick(DialogInterface d, int w) {
                                 d.dismiss();
+                                if (w == customIndex) {
+                                    askCustom(a, card, changed);
+                                    return;
+                                }
                                 String v = w >= 0 && w < values.size() ? values.get(w) : Mirrors.AUTO;
                                 Config.get().setUpdateMirror(v);
                                 sLast = null;
@@ -284,6 +300,49 @@ final class UpdateLineUi {
                         })
                 .setNegativeButton(R.string.cancel, null)
                 .show();
+    }
+
+    /** v43：用户自己填镜像前缀（`https://…/`）；认不出来就提示，不落盘。 */
+    private static void askCustom(final Activity a, final CardStack card,
+                                  final Runnable changed) {
+        final EditText input = new EditText(a);
+        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
+        input.setHint(R.string.update_line_custom_hint);
+        String cur = Config.get().updateMirror();
+        if (!Mirrors.AUTO.equals(cur) && !Mirrors.DIRECT.equals(cur)
+                && !Mirrors.isPreset(cur)) {
+            input.setText(cur);
+        }
+        LinearLayout box = new LinearLayout(a);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(a, 20), 0, dp(a, 20), 0);
+        box.addView(input, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        new AlertDialog.Builder(a)
+                .setTitle(R.string.update_line_custom_title)
+                .setMessage(R.string.update_line_custom_msg)
+                .setView(box)
+                .setPositiveButton(R.string.policy_save, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int w) {
+                        String n = Mirrors.normalize(input.getText().toString());
+                        if (n == null || Mirrors.AUTO.equals(n) || Mirrors.DIRECT.equals(n)) {
+                            Toast.makeText(a, Trans.get(a, R.string.update_line_custom_bad),
+                                    Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        Config.get().setUpdateMirror(n);
+                        sLast = null;
+                        sLastAt = 0;
+                        if (card != null && card.isShowing()) card.dismiss();
+                        if (changed != null) changed.run();
+                    }
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    private static int dp(Activity a, int v) {
+        return Math.round(v * a.getResources().getDisplayMetrics().density);
     }
 
     /** 上屏名：自动 / 直连 / 具体域名（域名不翻译）。 */

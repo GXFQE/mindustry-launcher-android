@@ -193,7 +193,7 @@ public static void unload();                    // 可选：收尾（也认 unlo
 |---|---|
 | `versions()` | `instanceKey`（= 宿主实例键 `版本key + NUL + 槽`，**别自己拼**）/ `bound`（`"true"` = 附加绑定行，不是主行）/ `patchCount`（这个启动项启用的补丁数；补丁库读不出来就**没有这个键**）/ `backupCount`（这个槽的备份份数；备份目录读不出来就**没有这个键**） |
 | `plugins()` | `updateState`（`ok` / `available` / `installed` / `confirm` / `failed`）/ `updateVersion` / `updateNote`（后两个可能是空串 = 更新记录里没写；**记录不存在 ⇒ 三个键都不出现**） |
-| `settings()` | `plugin_auto_update` / `crash_alert` / `trash_keep` / `trash_keep_slots` / `update_mode` / `update_mirror`（都是"设置页里能被改的项"；`update_mirror` 空串 = 自动选线路） |
+| `settings()` | `plugin_auto_update` / `crash_alert` / `trash_keep` / `trash_keep_slots` / `update_mode` / `update_mirror`（都是"设置页里能被改的项"；`update_mirror` 空串 = 自动，`direct` = 直连，预设或**用户自定义的 https 前缀**） |
 
 ### 网络与下载（v39）
 

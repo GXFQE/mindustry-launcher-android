@@ -20174,10 +20174,26 @@ public final class SelfTest {
                 "空串 = 自动");
         ok(stat, L, Mirrors.DIRECT.equals(Mirrors.normalize("DIRECT")),
                 "direct 大小写不敏感");
-        ok(stat, L, Mirrors.normalize("https://example.com/") == null,
-                "认不出来的地址一律拒绝（不许拼进下载 URL）");
+        String custom = "https://mirror.example.com/gh/";
+        ok(stat, L, custom.equals(Mirrors.normalize(custom))
+                        && Mirrors.normalize("http://mirror.example.com/") == null
+                        && Mirrors.normalize("https://mirror.example.com/?x=1") == null
+                        && Mirrors.normalize("https://mirror.example.com/#f") == null
+                        && Mirrors.normalize("https://mirror example.com/") == null,
+                "自定义镜像：https 前缀放行；http / 带查询串 / 片段 / 空格 拒绝");
 
         String gh = "https://github.com/x/y/releases/download/v1/a.apk";
+        List<String> customCand = Mirrors.downloadCandidates(custom);
+        ok(stat, L, customCand.size() == 6 && custom.equals(customCand.get(0))
+                        && customCand.get(5).isEmpty(),
+                "自定义镜像排第一、四个预设与直连兜底");
+        List<String> customUrls = Mirrors.assetUrls(gh, custom);
+        ok(stat, L, customUrls.size() == 6 && (custom + gh).equals(customUrls.get(0)),
+                "自定义镜像参与资产拼接");
+        List<String> customTests = Mirrors.testCandidates(custom);
+        ok(stat, L, customTests.size() == 6 && custom.equals(customTests.get(0))
+                        && customTests.get(5).isEmpty(),
+                "测速候选包含自定义镜像");
         List<String> urls = Mirrors.assetUrls(gh, Mirrors.AUTO);
         ok(stat, L, urls.size() == 5
                         && (Mirrors.TINYLAKE + gh).equals(urls.get(0))

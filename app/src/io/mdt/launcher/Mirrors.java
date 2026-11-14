@@ -19,11 +19,12 @@ import java.util.List;
  * 所以正常下载只按顺序试、失败换下一个、直连永远最后；要挑最快得靠设置页的手动测速
  * （{@link MirrorTest}）。
  *
- * <p>配置里的三个取值：
+ * <p>配置里的取值：
  * <ul>
  *   <li>{@link #AUTO}（空串）—— 四个预设按顺序，最后直连；</li>
  *   <li>{@link #DIRECT} —— 只走直连（用户明确不要镜像时用）；</li>
- *   <li>某个预设前缀 —— 它排第一，其余预设 + 直连兜底。</li>
+ *   <li>某个预设前缀 —— 它排第一，其余预设 + 直连兜底；</li>
+ *   <li>**用户自己填的 https 前缀**（v43）—— 同样排第一，其余预设 + 直连兜底。</li>
  * </ul>
  */
 final class Mirrors {
@@ -42,9 +43,11 @@ final class Mirrors {
     private Mirrors() {}
 
     /**
-     * 把用户/配置里的写法整理成「前缀」：补 scheme、补结尾斜杠、只认四个预设
-     * （外加空串与 {@link #DIRECT}）。认不出来返回 null —— 调用方据此退回默认，
-     * 别把一个打错的地址拼进下载 URL。
+     * 把用户/配置里的写法整理成「前缀」：补 scheme、补结尾斜杠。
+     *
+     * <p>认得：空串（自动）、{@code direct}、四个预设、以及**用户自定义的 https 前缀**
+     * （v43；必须是 https、带 host、不带 query / fragment / 空格，最长 400）。
+     * 认不出来返回 null —— 调用方据此退回默认，别把一个打错的地址拼进下载 URL。
      */
     static String normalize(String raw) {
         if (raw == null) return null;
@@ -56,7 +59,24 @@ final class Mirrors {
         for (String p : PRESETS) {
             if (p.equalsIgnoreCase(s)) return p;
         }
-        return null;
+        return normalizeCustom(s);
+    }
+
+    /** 自定义前缀的闸门：只认干净的 https 前缀（不许 query / fragment / 空格）。 */
+    private static String normalizeCustom(String s) {
+        if (s.length() > 400) return null;
+        if (s.indexOf(' ') >= 0 || s.indexOf('\t') >= 0 || s.indexOf('\n') >= 0) return null;
+        try {
+            java.net.URI u = java.net.URI.create(s);
+            if (!"https".equalsIgnoreCase(u.getScheme())) return null;
+            String host = u.getHost();
+            if (host == null || host.isEmpty()) return null;
+            if (u.getUserInfo() != null) return null;
+            if (u.getQuery() != null || u.getFragment() != null) return null;
+            return s;
+        } catch (Throwable t) {
+            return null;
+        }
     }
 
     /** 配置读写的口径：认不出来一律当 AUTO（坏值不许让下载没路走）。 */
@@ -105,10 +125,14 @@ final class Mirrors {
         return out;
     }
 
-    /** 手动测速的候选：四个预设 + 直连（不跟着“当前选中”变，才能横向比较）。 */
-    static List<String> testCandidates() {
+    /** 手动测速的候选：当前自定义 / 选中项提前，四个预设 + 直连（横向比较）。 */
+    static List<String> testCandidates(String selected) {
         List<String> out = new ArrayList<String>();
-        for (String p : PRESETS) out.add(p);
+        String s = stored(selected);
+        if (!AUTO.equals(s) && !DIRECT.equals(s)) out.add(s);
+        for (String p : PRESETS) {
+            if (!out.contains(p)) out.add(p);
+        }
         out.add("");
         return out;
     }
