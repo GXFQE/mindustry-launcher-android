@@ -382,6 +382,8 @@ public final class SelfTest {
             updateMirrors(ctx, L, stat);
             // ★ 第 378 轮：下载限速（档位 / 文案 / 全局额度）
             downloadLimit(ctx, L, stat);
+            // ★ 第 378 轮：断点续传 / 取消 / 退化（本机 Range 服务真往返）
+            downloadResume(ctx, L, stat);
             // ★ 第 338 轮：插件更新（清单解析 / 内容哈希比对 / 状态表）—— 纯逻辑
             pluginUpdates(ctx, L, stat);
             // ★ 第 345 轮：补丁机制 v1（dex 类名解析 / 清单校验 / 导入 / 冲突 / 启动解析）
@@ -19754,6 +19756,262 @@ public final class SelfTest {
      * 四个预设的顺序、选中线路排第一、直连排在最后、已带前缀不二次拼接、
      * 本地回环不拼、坏 JSON 返回 null、清扫只删临时件不删成品。
      */
+    /**
+     * 第 378 轮：**断点续传 / 取消 / 两种退化**的真往返（本机 Range 服务，不走外网）。
+     *
+     * <p>验：续传只补差额（服务端看得到 `Range` 与 `identity`）、成品命中 0 请求、
+     * 取消两侧（resume=true 留半截 / false 删）、服务端忽略 Range 时整包重下、
+     * 206 但总长不对（撒谎镜像）⇒ WRONG、416 重置、以及 {@link UpdateDownload} 的 SIZE 映射。
+     */
+    private static void downloadResume(android.content.Context ctx, List<String> L, int[] stat) {
+        L.add("");
+        L.add("【下载续传（第 378 轮）】");
+        long oldBps = Bandwidth.bps();
+        Bandwidth.set(0);
+        File dir = new File(ctx.getCacheDir(), "v378-dl-" + System.currentTimeMillis());
+        java.net.ServerSocket ss = null;
+        try {
+            if (!dir.isDirectory() && !dir.mkdirs()) {
+                ok(stat, L, false, "续传：建临时目录失败 " + path(dir));
+                return;
+            }
+            final byte[] body = new byte[256 * 1024];
+            for (int i = 0; i < body.length; i++) body[i] = (byte) (i * 13 + 5);
+            final String sha = sha256Hex(body);
+            final int[] reqs = {0};
+            final String[] lastRange = {null};
+            final String[] lastAe = {null};
+            final Object lock = new Object();
+
+            ss = new java.net.ServerSocket(0, 4, java.net.InetAddress.getByName("127.0.0.1"));
+            final java.net.ServerSocket fss = ss;
+            Thread srv = new Thread(new Runnable() {
+                @Override public void run() {
+                    while (!fss.isClosed()) {
+                        java.net.Socket so = null;
+                        try {
+                            so = fss.accept();
+                            java.io.BufferedReader br = new java.io.BufferedReader(
+                                    new java.io.InputStreamReader(so.getInputStream(), "ISO-8859-1"));
+                            String first = br.readLine();
+                            String range = null, ae = null, line;
+                            while ((line = br.readLine()) != null && !line.isEmpty()) {
+                                String low = line.toLowerCase(java.util.Locale.US);
+                                if (low.startsWith("range:")) range = line.substring(6).trim();
+                                else if (low.startsWith("accept-encoding:")) ae = line.substring(16).trim();
+                            }
+                            if (first == null) continue;
+                            synchronized (lock) {
+                                reqs[0]++;
+                                lastRange[0] = range;
+                                lastAe[0] = ae;
+                            }
+                            String[] parts = first.split(" ");
+                            String reqPath = parts.length > 1 ? parts[1] : "/";
+                            if (reqPath.startsWith("/wrong")) {
+                                byte[] lie = "not a mod".getBytes("UTF-8");
+                                httpWrite(so, 206, "Partial Content",
+                                        "Content-Range: bytes 0-" + (lie.length - 1) + "/1901\r\n",
+                                        lie, 0, lie.length, 65536, 0L);
+                                continue;
+                            }
+                            boolean noRange = reqPath.startsWith("/norange");
+                            boolean slow = reqPath.startsWith("/slow");
+                            long start = 0L, end = body.length - 1L;
+                            boolean partial = false;
+                            if (!noRange && range != null && range.startsWith("bytes=")) {
+                                String spec = range.substring(6).trim();
+                                int dash = spec.indexOf('-');
+                                if (dash >= 0) {
+                                    try {
+                                        String a = spec.substring(0, dash).trim();
+                                        String b = spec.substring(dash + 1).trim();
+                                        start = a.isEmpty() ? 0L : Long.parseLong(a);
+                                        end = b.isEmpty() ? body.length - 1L
+                                                : Math.min(Long.parseLong(b), body.length - 1L);
+                                    } catch (NumberFormatException ignored) {
+                                        start = 0L;
+                                        end = body.length - 1L;
+                                    }
+                                    if (start >= body.length) {
+                                        httpWrite(so, 416, "Range Not Satisfiable",
+                                                "Content-Range: bytes */" + body.length + "\r\n",
+                                                body, 0, 0, 0, 0L);
+                                        continue;
+                                    }
+                                    partial = true;
+                                }
+                            }
+                            int len = (int) (end - start + 1);
+                            String extra = partial
+                                    ? "Content-Range: bytes " + start + "-" + end + "/" + body.length + "\r\n"
+                                    : "";
+                            httpWrite(so, partial ? 206 : 200, partial ? "Partial Content" : "OK",
+                                    extra, body, (int) start, len,
+                                    slow ? 4096 : 65536, slow ? 10L : 0L);
+                        } catch (Throwable t) {
+                            if (fss.isClosed()) return;
+                        } finally {
+                            try { if (so != null) so.close(); } catch (Throwable ignored) { }
+                        }
+                    }
+                }
+            }, "selftest-range");
+            srv.setDaemon(true);
+            srv.start();
+            final String base = "http://127.0.0.1:" + ss.getLocalPort();
+
+            // ① 续传：预置 64 KB，只补差额
+            writePrefix(new File(dir, "k1.part"), body, 64 * 1024);
+            ResumableDownload.Result r1 = ResumableDownload.run(
+                    one(base + "/bin"), dir, "k1", ".bin", true, body.length, sha, null, null);
+            ok(stat, L, r1.status == ResumableDownload.Status.OK
+                            && r1.resumedFrom == 64 * 1024
+                            && r1.bytes == body.length - 64 * 1024
+                            && sha.equals(ResumableDownload.sha256(r1.file))
+                            && ("bytes=" + (64 * 1024) + "-").equals(lastRange[0])
+                            && "identity".equals(lastAe[0]),
+                    "① ★续传：从 64 KB 接着下（服务端看到 Range 与 identity），成品 sha 对");
+
+            // ② 成品命中：0 字节、0 请求
+            int before = reqs[0];
+            ResumableDownload.Result r2 = ResumableDownload.run(
+                    one(base + "/bin"), dir, "k1", ".bin", true, body.length, sha, null, null);
+            ok(stat, L, r2.status == ResumableDownload.Status.OK && r2.bytes == 0
+                            && reqs[0] == before,
+                    "② 成品命中：0 字节，一个请求都不发");
+
+            // ③ 取消：resume=true 留半截，再续上
+            final boolean[] cancel = {false};
+            Thread killer = new Thread(new Runnable() {
+                @Override public void run() {
+                    try { Thread.sleep(120); } catch (InterruptedException ignored) { }
+                    cancel[0] = true;
+                }
+            });
+            killer.setDaemon(true);
+            killer.start();
+            ResumableDownload.Result r3 = ResumableDownload.run(
+                    one(base + "/slow"), dir, "k2", ".bin", true, body.length, sha, null,
+                    new ResumableDownload.Cancel() {
+                        @Override public boolean canceled() { return cancel[0]; }
+                    });
+            long k2len = new File(dir, "k2.part").length();
+            ok(stat, L, r3.status == ResumableDownload.Status.CANCELED
+                            && k2len > 0 && k2len < body.length,
+                    "③ 取消（resume=true）：留半截（" + k2len + " B）");
+            ResumableDownload.Result r4 = ResumableDownload.run(
+                    one(base + "/bin"), dir, "k2", ".bin", true, body.length, sha, null, null);
+            ok(stat, L, r4.status == ResumableDownload.Status.OK && r4.resumedFrom == k2len
+                            && sha.equals(ResumableDownload.sha256(r4.file)),
+                    "③ 续传接上（from=" + k2len + "）");
+
+            // ④ 取消：resume=false 删半截
+            final boolean[] cancel2 = {false};
+            Thread killer2 = new Thread(new Runnable() {
+                @Override public void run() {
+                    try { Thread.sleep(120); } catch (InterruptedException ignored) { }
+                    cancel2[0] = true;
+                }
+            });
+            killer2.setDaemon(true);
+            killer2.start();
+            ResumableDownload.Result r5 = ResumableDownload.run(
+                    one(base + "/slow"), dir, "k3", ".bin", false, body.length, sha, null,
+                    new ResumableDownload.Cancel() {
+                        @Override public boolean canceled() { return cancel2[0]; }
+                    });
+            ok(stat, L, r5.status == ResumableDownload.Status.CANCELED
+                            && !new File(dir, "k3.part").exists(),
+                    "④ 取消（resume=false）：半截被删（老行为）");
+
+            // ⑤ resume=true 必须给 sha
+            ResumableDownload.Result r6 = ResumableDownload.run(
+                    one(base + "/bin"), dir, "k4", ".bin", true, body.length, "", null, null);
+            ok(stat, L, r6.status == ResumableDownload.Status.INVALID,
+                    "⑤ resume=true 没给 sha ⇒ INVALID（没有内容锚不许续）");
+
+            // ⑥ 服务端忽略 Range（200）⇒ 整包重下，不能把两半拼起来
+            writePrefix(new File(dir, "k5.part"), body, 32 * 1024);
+            ResumableDownload.Result r7 = ResumableDownload.run(
+                    one(base + "/norange"), dir, "k5", ".bin", true, body.length, sha, null, null);
+            ok(stat, L, r7.status == ResumableDownload.Status.OK
+                            && r7.bytes == body.length
+                            && sha.equals(ResumableDownload.sha256(r7.file)),
+                    "⑥ 服务端忽略 Range：从头发一遍（没有拼错）");
+
+            // ⑦ 206 但总长不对（撒谎镜像）⇒ WRONG，且不落盘
+            ResumableDownload.Result r8 = ResumableDownload.run(
+                    one(base + "/wrong"), dir, "k6", ".bin", false, body.length, sha, null, null);
+            ok(stat, L, r8.status == ResumableDownload.Status.WRONG
+                            && !new File(dir, "k6.part").exists(),
+                    "⑦ 206 但总长 1901 ⇒ WRONG（2xx 不等于拿到了文件）");
+
+            // ⑧ 416：半截比远端还长 ⇒ 重置后重下
+            byte[] bigger = new byte[body.length + 10];
+            System.arraycopy(body, 0, bigger, 0, body.length);
+            writePrefix(new File(dir, "k7.part"), bigger, bigger.length);
+            ResumableDownload.Result r9 = ResumableDownload.run(
+                    one(base + "/bin"), dir, "k7", ".bin", true, body.length, sha, null, null);
+            ok(stat, L, r9.status == ResumableDownload.Status.OK
+                            && sha.equals(ResumableDownload.sha256(r9.file)),
+                    "⑧ 半截比远端长（416）⇒ 重置后内容正确");
+
+            // ⑨ UpdateDownload 的映射：源总长不对 ⇒ SIZE（界面据此说"包不对"）
+            UpdateDownload.Result u = UpdateDownload.run(
+                    java.util.Collections.singletonList(base + "/wrong"),
+                    dir, "k8", body.length, sha, null, false);
+            ok(stat, L, u != null && u.status == UpdateDownload.Status.SIZE,
+                    "⑨ UpdateDownload 映射：源总长不对 ⇒ SIZE");
+        } catch (Throwable t) {
+            ok(stat, L, false, "续传用例异常：" + t);
+        } finally {
+            Bandwidth.set(oldBps);
+            try { if (ss != null) ss.close(); } catch (Throwable ignored) { }
+            Data.deleteTree(dir);
+        }
+    }
+
+    /** 续传用例：本机一次性 HTTP 服务的应答（Range / 慢速 / 416 都由这里写）。 */
+    private static void httpWrite(java.net.Socket so, int status, String reason, String extra,
+                                  byte[] data, int off, int len, int chunk, long delayMs)
+            throws Exception {
+        java.io.OutputStream os = so.getOutputStream();
+        StringBuilder h = new StringBuilder();
+        h.append("HTTP/1.1 ").append(status).append(' ').append(reason).append("\r\n");
+        h.append("Content-Length: ").append(len).append("\r\n");
+        h.append("Accept-Ranges: bytes\r\n");
+        h.append("ETag: \"selftest-378\"\r\n");
+        h.append(extra);
+        h.append("Connection: close\r\n\r\n");
+        os.write(h.toString().getBytes("ISO-8859-1"));
+        int pos = off, end = off + len;
+        while (pos < end) {
+            int take = Math.min(chunk > 0 ? chunk : 65536, end - pos);
+            os.write(data, pos, take);
+            os.flush();
+            pos += take;
+            if (delayMs > 0) Thread.sleep(delayMs);
+        }
+        os.flush();
+    }
+
+    /** 续传用例：只写文件前缀（模拟"上次下到一半"）。 */
+    private static void writePrefix(File f, byte[] data, int len) throws Exception {
+        java.io.FileOutputStream os = new java.io.FileOutputStream(f);
+        try {
+            os.write(data, 0, len);
+            os.getFD().sync();
+        } finally {
+            os.close();
+        }
+    }
+
+    /** 续传用例：一个候选源。 */
+    private static List<ResumableDownload.Source> one(String url) {
+        return java.util.Collections.singletonList(new ResumableDownload.Source(url));
+    }
+
     /** 第 378 轮：下载限速的档位 / 文案 / 全局额度（纯函数 + 全局状态，跑完还原）。 */
     private static void downloadLimit(android.content.Context ctx, List<String> L, int[] stat) {
         L.add("");
