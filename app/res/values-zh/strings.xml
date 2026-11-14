@@ -1498,7 +1498,6 @@
     <string name="update_line_direct">直连</string>
     <string name="update_line_custom">自定义…</string>
     <string name="update_line_custom_title">自定义镜像</string>
-    <string name="update_line_custom_msg">填镜像前缀（https://…/），GitHub 地址会接在它后面。</string>
     <string name="update_line_custom_hint">https://镜像.example.com/</string>
     <string name="update_line_custom_bad">前缀不合法：必须是 https，且不能带查询串或空格。</string>
     <string name="update_line_intro">用最新 APK 的一小段实测四个镜像和直连，约 240 KB。</string>

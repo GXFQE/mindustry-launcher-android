@@ -4,10 +4,6 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Context;
 import android.content.DialogInterface;
-import android.text.InputType;
-import android.view.ViewGroup;
-import android.widget.EditText;
-import android.widget.LinearLayout;
 import android.widget.Toast;
 
 import java.io.File;
@@ -285,11 +281,14 @@ final class UpdateLineUi {
                 .setSingleChoiceItems(names.toArray(new String[0]), checked,
                         new DialogInterface.OnClickListener() {
                             @Override public void onClick(DialogInterface d, int w) {
-                                d.dismiss();
                                 if (w == customIndex) {
-                                    askCustom(a, card, changed);
+                                    // ★ 不另开一扇窗：在**同一张卡片**里 pushInput。
+                                    //   另开 AlertDialog 会先宽后窄地换窗（2026-11-14 用户反馈"闪一下"）。
+                                    openCustomInput(a, card, changed);
+                                    d.dismiss();
                                     return;
                                 }
+                                d.dismiss();
                                 String v = w >= 0 && w < values.size() ? values.get(w) : Mirrors.AUTO;
                                 Config.get().setUpdateMirror(v);
                                 sLast = null;
@@ -302,29 +301,22 @@ final class UpdateLineUi {
                 .show();
     }
 
-    /** v43：用户自己填镜像前缀（`https://…/`）；认不出来就提示，不落盘。 */
-    private static void askCustom(final Activity a, final CardStack card,
-                                  final Runnable changed) {
-        final EditText input = new EditText(a);
-        input.setInputType(InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_URI);
-        input.setHint(R.string.update_line_custom_hint);
-        String cur = Config.get().updateMirror();
-        if (!Mirrors.AUTO.equals(cur) && !Mirrors.DIRECT.equals(cur)
-                && !Mirrors.isPreset(cur)) {
-            input.setText(cur);
+    /** v43：用户自己填镜像前缀（`https://…/`）—— 在**同一张卡片**里 pushInput，不另开窗。 */
+    private static void openCustomInput(final Activity a, final CardStack card,
+                                        final Runnable changed) {
+        if (card == null || !card.isShowing()) {
+            Toast.makeText(a, Trans.get(a, R.string.update_line_custom_bad),
+                    Toast.LENGTH_SHORT).show();
+            return;
         }
-        LinearLayout box = new LinearLayout(a);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(a, 20), 0, dp(a, 20), 0);
-        box.addView(input, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        new AlertDialog.Builder(a)
-                .setTitle(R.string.update_line_custom_title)
-                .setMessage(R.string.update_line_custom_msg)
-                .setView(box)
-                .setPositiveButton(R.string.policy_save, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) {
-                        String n = Mirrors.normalize(input.getText().toString());
+        String cur = Config.get().updateMirror();
+        boolean custom = !Mirrors.AUTO.equals(cur) && !Mirrors.DIRECT.equals(cur)
+                && !Mirrors.isPreset(cur);
+        card.pushInput(Trans.get(a, R.string.update_line_custom_title),
+                custom ? cur : "", Trans.get(a, R.string.update_line_custom_hint),
+                Trans.get(a, R.string.policy_save), new CardStack.OnText() {
+                    @Override public void run(String text) {
+                        String n = Mirrors.normalize(text);
                         if (n == null || Mirrors.AUTO.equals(n) || Mirrors.DIRECT.equals(n)) {
                             Toast.makeText(a, Trans.get(a, R.string.update_line_custom_bad),
                                     Toast.LENGTH_SHORT).show();
@@ -333,16 +325,10 @@ final class UpdateLineUi {
                         Config.get().setUpdateMirror(n);
                         sLast = null;
                         sLastAt = 0;
-                        if (card != null && card.isShowing()) card.dismiss();
+                        if (card.isShowing()) card.dismiss();
                         if (changed != null) changed.run();
                     }
-                })
-                .setNegativeButton(R.string.cancel, null)
-                .show();
-    }
-
-    private static int dp(Activity a, int v) {
-        return Math.round(v * a.getResources().getDisplayMetrics().density);
+                });
     }
 
     /** 上屏名：自动 / 直连 / 具体域名（域名不翻译）。 */
