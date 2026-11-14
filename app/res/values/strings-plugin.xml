@@ -173,4 +173,6 @@
     <string name="plugin_update_auto_title">Plugin auto-update</string>
     <string name="plugin_update_auto_on">On · checked once a day</string>
     <string name="plugin_update_auto_off">Off · only when you check</string>
+    <string name="plugin_update_auto_enable">Turn on (check once a day)</string>
+    <string name="plugin_update_auto_disable">Turn off (only when I check)</string>
 </resources>

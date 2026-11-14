@@ -234,7 +234,7 @@ public class SettingsActivity extends BaseActivity {
         //   那个管启动器自己，这个管插件；点一下切换，副标题报"现在是什么"。
         View rowPluginUp = Util.bindActionValue(root, R.id.row_plugin_update,
                 R.drawable.ic_plugins_bar, R.string.plugin_update_auto_title, new Runnable() {
-                    @Override public void run() { togglePluginUpdate(); }
+                    @Override public void run() { promptPluginUpdate(); }
                 });
         mPluginUpdateSub = (TextView) rowPluginUp.findViewById(R.id.act_sub);
 
@@ -565,18 +565,28 @@ public class SettingsActivity extends BaseActivity {
     }
 
     /**
-     * 第 338 轮：「插件自动更新」点一下切换。
+     * 第 338 轮：「插件自动更新」开关。
      *
-     * <p>为什么不弹选择框：它只有开 / 关两个值，再弹一层只是多一次点击
-     * （「自动清理」那边弹窗是因为它同时提供"立即清理一次"这个动作，这里没有）。
-     * 切完立刻重取副标题 + Toast 说一声 —— 开关类控件没有别的可见反馈。
+     * <p>★ 2026-11-15（用户）：「崩溃提示两个选项弹窗、插件自动更新却不弹」——本页统一
+     * 「点一下弹选择」，它只有开 / 关也要弹，不再单独造一个"点一下就翻"的例外。
+     * 选项与崩溃提示同款单选；副标题跟着 {@link #fillValues()} 刷新。
      */
-    private void togglePluginUpdate() {
-        boolean on = !Config.get().pluginAutoUpdate();
-        Config.get().setPluginAutoUpdate(on);
-        fillValues();
-        Toast.makeText(this, on ? R.string.plugin_update_auto_on : R.string.plugin_update_auto_off,
-                Toast.LENGTH_SHORT).show();
+    private void promptPluginUpdate() {
+        final boolean on = Config.get().pluginAutoUpdate();
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.plugin_update_auto_title)
+                .setSingleChoiceItems(new String[]{
+                                Trans.get(SettingsActivity.this, R.string.plugin_update_auto_enable),
+                                Trans.get(SettingsActivity.this, R.string.plugin_update_auto_disable)},
+                        on ? 0 : 1, new DialogInterface.OnClickListener() {
+                            @Override public void onClick(DialogInterface d, int w) {
+                                d.dismiss();
+                                Config.get().setPluginAutoUpdate(w == 0);
+                                fillValues();
+                            }
+                        })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
     }
 
     private void pickTheme() {
