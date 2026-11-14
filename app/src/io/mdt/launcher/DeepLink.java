@@ -103,7 +103,9 @@ final class DeepLink {
                     @Override public void run() {
                         stack.dismiss();
                         if (Util.dead(a)) return;
-                        if (k < 0) alert(a, doc.name, R.string.deeplink_zip_empty);
+                        // ★ 第 379 轮：**多个整槽 / 整槽与别的东西混装** = 未定义行为 ⇒ 明说一句、不猜
+                        if (k == BatchIo.KIND_SLOT_AMBIGUOUS) alert(a, doc.name, R.string.deeplink_slot_ambiguous);
+                        else if (k < 0) alert(a, doc.name, R.string.deeplink_zip_empty);
                         else open(a, k, doc);
                     }
                 });

@@ -17052,6 +17052,20 @@ public final class SelfTest {
             ok(stat, L, !rfold.notes.isEmpty(),
                     "★ 报告里记了「从 x.zip 里认出 N 个模组文件夹，各自打成了一个 zip」");
 
+            // ★ 第 379 轮（用户：「检测到 mod.hjson 以后不要继续往深检测了，毕竟**有些模组本身
+            //   就是嵌套的**」）：模组夹里带着 `.jar`（嵌套模组 / 库）⇒ 整个夹子 = **一个**模组，
+            //   不许把夹子里的 jar 当成"整包里的另一个模组"拆出来（旧实现先看命中表，就会拆）。
+            File nestedMod = new File(root, "嵌套模组.zip");
+            zipMany(nestedMod, new String[]{"夹C/mod.hjson", "夹C/libs/inner.jar"},
+                    new String[]{"name: pack-c\n", "jar"});
+            BatchIo.Report rNest = BatchIo.importSync(ctx, SLOT_BATCH,
+                    BatchIo.docsFromFiles(java.util.Arrays.asList(nestedMod)),
+                    BatchIo.KIND_MODS, true);
+            ok(stat, L, rNest.ok == 1 && new File(modsDir, "夹C.zip").isFile()
+                            && !new File(modsDir, "inner.jar").isFile(),
+                    "★★ 模组夹里带 `.jar`（嵌套模组）⇒ 整个夹子当**一个**模组落位（夹C.zip），"
+                            + "**不**把这个 jar 拆出来当第二个模组");
+
             // ★ 地图页那边同一件事：一个没有 .msav 的 zip ⇒ 跳过并说明（不是"不是有效的地图"）
             BatchIo.Report rNo = BatchIo.importSync(ctx, SLOT_BATCH,
                     BatchIo.docsFromFiles(java.util.Arrays.asList(noHit)),
@@ -17422,6 +17436,30 @@ public final class SelfTest {
                     "★★ 反方向（**严格**）：没有 `settings.bin` ⇒ 不是整槽"
                             + "（`mods/` + `saves/` 摆在一起也不够，仍按模组优先）");
 
+            // ★ 第 379 轮追加（用户：「**不允许一个文件里放两个整个槽**（这个行为目前认为是未定义的，
+            //   或者把整个槽和其他东西混一起）」）⇒ 这两种包**不猜**，单独给一句话。
+            File twoSlots = new File(root, "两个整槽.zip");
+            zipMany(twoSlots, new String[]{"A/settings.bin", "A/saves/甲.msav",
+                            "B/settings.bin", "B/saves/乙.msav"},
+                    new String[]{"s", "msav", "s", "msav"});
+            ok(stat, L, BatchIo.guessKind(ctx, docsOf(twoSlots).get(0))
+                            == BatchIo.KIND_SLOT_AMBIGUOUS,
+                    "★★ 一个包里**两个整槽** ⇒ 未定义 ⇒ 不导（界面明说一句，不许猜着往某个槽里写）");
+
+            File slotMixed = new File(root, "整槽混装.zip");
+            zipMany(slotMixed, new String[]{"A/settings.bin", "A/saves/甲.msav", "散图.msav"},
+                    new String[]{"s", "msav", "msav"});
+            ok(stat, L, BatchIo.guessKind(ctx, docsOf(slotMixed).get(0))
+                            == BatchIo.KIND_SLOT_AMBIGUOUS,
+                    "★★ 包裹形态的整槽**外面还有别的东西**（`A/…` + 根级 `散图.msav`）⇒ 混装 ⇒ 未定义");
+
+            File slotPlusMod = new File(root, "整槽加模组夹.zip");
+            zipMany(slotPlusMod, new String[]{"settings.bin", "mods/a.jar", "夹A/mod.json"},
+                    new String[]{"s", "jar", "{}"});
+            ok(stat, L, BatchIo.guessKind(ctx, docsOf(slotPlusMod).get(0))
+                            == BatchIo.KIND_SLOT_AMBIGUOUS,
+                    "★★ 整槽根上又来了一个**一级模组夹** ⇒ 两样东西拼的 ⇒ 未定义");
+
             File nothing = new File(root, "没东西.zip");
             zipMany(nothing, new String[]{"readme.txt", "a.bin"}, new String[]{"r", "b"});
             ok(stat, L, BatchIo.guessKind(ctx, docsOf(nothing).get(0)) == -1,
@@ -17469,11 +17507,13 @@ public final class SelfTest {
         String t2 = Trans.get(ctx, R.string.deeplink_unrecognized);
         String t3 = Trans.get(ctx, R.string.deeplink_zip_empty);
         String t4 = Trans.get(ctx, R.string.deeplink_open_failed);
+        // ★ 第 379 轮：多个整槽 / 混装那句（未定义行为的出口）
+        String t5 = Trans.get(ctx, R.string.deeplink_slot_ambiguous);
         ok(stat, L, !t1.trim().isEmpty() && !t2.trim().isEmpty() && !t3.trim().isEmpty()
-                        && !t4.trim().isEmpty()
+                        && !t4.trim().isEmpty() && !t5.trim().isEmpty()
                         && !t1.contains("%") && !t2.contains("%") && !t3.contains("%")
-                        && !t4.contains("%"),
-                "★ 四句深链文案都能实拼、且没有残留占位符（这四条都没参数）");
+                        && !t4.contains("%") && !t5.contains("%"),
+                "★ 五句深链文案都能实拼、且没有残留占位符（这几条都没参数）");
         ok(stat, L, t2.contains(".msav") && t2.contains(".msch") && t2.contains("zip"),
                 "★ 「认不出」那句要说清**支持什么**（含 .msav / .msch / zip）");
         L.add("");

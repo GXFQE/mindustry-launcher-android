@@ -1094,6 +1094,14 @@ final class BatchIo {
      * {@link SlotZip}（`SlotIo.readZipThenConfirm`），不是 {@link #runImport}。
      */
     static final int KIND_SLOT = 4;
+    /**
+     * ★ 「像是整槽、但形状没有定义」（第 379 轮用户：「**不允许一个文件里放两个整个槽**
+     * （这个行为目前认为是未定义的，或者把整个槽和其他东西混一起）」）：
+     * 判据在 {@link Probe#slotState()} 的 {@link Probe#SLOT_MULTI} / {@link Probe#SLOT_MIXED}。
+     *
+     * <p>⚠️ 它**不是**一个可导入的类型 —— 上层只拿它说一句话（「先分开打包」），绝不许猜着导。
+     */
+    static final int KIND_SLOT_AMBIGUOUS = 5;
 
     /** dev 口的字符串 key（**ASCII，不进资源** —— 它是命令的一部分，不是给用户看的文案） */
     static int kindOfKey(String key) {
@@ -1353,19 +1361,67 @@ final class BatchIo {
          */
         final List<String> modFolders = new ArrayList<>();
         /**
-         * ★ **是不是「整槽包」**（第 379 轮，用户：「整个槽里什么都有，但可能需要严格检查格式」）。
+         * ★ **整槽包的判据**（第 379 轮，用户：「整个槽里什么都有，但可能需要严格检查格式」；
+         * 又补：「**不允许一个文件里放两个整个槽**（这个行为目前认为是未定义的，或者把整个槽和其他
+         * 东西混一起）」）。
          *
-         * <p>判据刻意**只认一个东西**：根上（或唯一一层包裹目录里）有 **`settings.bin`**。
-         * 理由：那是游戏数据根的标志文件 —— 我们自己的「导出整槽」、分享包（脱敏版）、
-         * 以及游戏原生「设置 → 数据 → 导出数据」**三种来源都以它为准**
+         * <p>只认一个东西：**`settings.bin`**。那是游戏数据根的标志文件 —— 我们自己的「导出整槽」、
+         * 分享包（脱敏版）、以及游戏原生「设置 → 数据 → 导出数据」**三种来源都以它为准**
          * （{@link SlotZip} 类注释里那条 `nativeFormat` 用的就是同一个判据）。
          *
          * <p>为什么必须严：整槽包**里面本来就有** `mods/` `saves/` `maps/` `schematics/`
          * ⇒ 拿"有 mods 目录"当判据会把**所有模组整包**都判成整槽（那是灾难：整槽导入是
          * **整槽写入**）。反过来，只有 `settings.bin` 而没有它的包（例如只含 `saves/` 的手打包）
          * **不认**，仍然按内容走原来的四条路 —— 这正是"严格"的意思。
+         *
+         * <p>★ **一个包里只许有一个整槽**：{@link #slotState()} 把"多个整槽"和"整槽跟别的东西混装"
+         * 单独挑出来（{@link #SLOT_MULTI} / {@link #SLOT_MIXED}）—— 那两种包**怎么导还没定义**，
+         * 上层明说一句、不许猜。写在哪些根上出现 `settings.bin`：`""` = 包根。
          */
-        boolean slotPack;
+        final List<String> slotRoots = new ArrayList<>();
+        /**
+         * 文件条目里出现过的一级段（`""` = 根级文件）—— 判"包裹形态干不干净"用：
+         * 有包裹目录以后，**所有**文件都必须在它下面（判据与 {@link SlotZip#detectStrip} 同一条）。
+         */
+        final List<String> fileTops = new ArrayList<>();
+
+        /** 不是整槽 */
+        static final int SLOT_NONE = -1;
+        /** 正好一个整槽，形状干净 */
+        static final int SLOT_ONE = 0;
+        /** **两个以上**整槽（未定义） */
+        static final int SLOT_MULTI = 1;
+        /** 一个整槽与别的东西混装（未定义） */
+        static final int SLOT_MIXED = 2;
+
+        /**
+         * 这个包算不算"一个整槽"（四态，纯读 {@link #slotRoots} / {@link #fileTops} / {@link #modFolders}）。
+         *
+         * <p>规则（都是"宁可不认，也不许猜"）：
+         * <ol>
+         *   <li>没有 `settings.bin` ⇒ {@link #SLOT_NONE}；</li>
+         *   <li>`settings.bin` 出现在 ≥2 个根（比如 `A/settings.bin` + `B/settings.bin`，
+         *       或者包根的 + 一个包裹目录里的）⇒ {@link #SLOT_MULTI}；</li>
+         *   <li>包裹形态（`<X>/settings.bin`）但**还有文件不在 `X/` 下** ⇒ {@link #SLOT_MIXED}
+         *       —— 与 {@link SlotZip#detectStrip} 同一条：那种包它不会剥、会把 `X/` 原样写进槽根；</li>
+         *   <li>包根就是槽根（根级 `settings.bin`）却又带着一个**一级模组夹** ⇒ {@link #SLOT_MIXED}
+         *       （模组住在 `mods/` 里；槽根上出现 `<夹>/mod.json` 说明是两样东西拼的）。</li>
+         * </ol>
+         */
+        int slotState() {
+            if (slotRoots.isEmpty()) return SLOT_NONE;
+            if (slotRoots.size() > 1) return SLOT_MULTI;
+            String root = slotRoots.get(0);
+            if (root == null || root.isEmpty()) {
+                // 包根 = 槽根：其它顶级目录都算这个槽的内容（用户自己的杂项目录也是合法的），
+                // 但**一级模组夹**不是（模组在 `mods/` 下面）。
+                return modFolders.isEmpty() ? SLOT_ONE : SLOT_MIXED;
+            }
+            for (String t : fileTops) {
+                if (!root.equals(t)) return SLOT_MIXED;      // 包裹外面还有东西
+            }
+            return SLOT_ONE;
+        }
 
         /** 我们导出的一整包 */
         boolean bundle() {
@@ -1396,11 +1452,17 @@ final class BatchIo {
                 if (e.isDirectory() || flat.endsWith("/")) continue;
                 int slash = flat.lastIndexOf('/');
                 String base = slash < 0 ? flat : flat.substring(slash + 1);
-                // ★ 整槽包（第 379 轮）：根上 / 唯一一层包裹目录里有 `settings.bin`（见 Probe#slotPack）。
+                int first = flat.indexOf('/');
+                // 文件条目的**一级段**（"" = 根级文件）：判"包裹形态干不干净"用（见 Probe#fileTops）
+                String topSeg = first < 0 ? "" : flat.substring(0, first);
+                if (!p.fileTops.contains(topSeg)) p.fileTops.add(topSeg);
+                // ★ 整槽包（第 379 轮）：根上 / 唯一一层包裹目录里有 `settings.bin`（见 Probe#slotRoots）。
                 //   ⚠️ 这一段**要排在"包根是模组包就提前 return"之前** —— 整槽包里也有 `mods/`，
                 //   但判据只看 `settings.bin`，不能因为先读到别的东西就漏掉它。
-                if ("settings.bin".equalsIgnoreCase(base) && (slash < 0 || flat.indexOf('/') == slash)) {
-                    p.slotPack = true;
+                //   ⚠️ **不再往下看**：`A/B/settings.bin` 这种不算（模组里带一张游戏设置文件也不该改变定类）。
+                if ("settings.bin".equalsIgnoreCase(base) && (slash < 0 || first == slash)) {
+                    String root = slash < 0 ? "" : flat.substring(0, slash);
+                    if (!p.slotRoots.contains(root)) p.slotRoots.add(root);
                 }
                 if (slash < 0 && rootMarkers != null) {
                     for (String m : rootMarkers) {
@@ -1432,7 +1494,8 @@ final class BatchIo {
         } catch (Throwable t) {
             p.zip = false;                          // 不是 zip（存档就是 zlib 流）/ 坏了
             p.selfPack = false;
-            p.slotPack = false;
+            p.slotRoots.clear();
+            p.fileTops.clear();
             p.hits.clear();
             p.modFolders.clear();
         } finally {
@@ -1477,11 +1540,14 @@ final class BatchIo {
      * （第 379 轮用户定案：「整个槽里什么都有」+「模组里面可以有地图蓝图存档甚至嵌套模组，
      * 地图蓝图存档反正不能互相包含」⇒ 从"能包住别人"到"只能自己"排）：
      * <ol>
-     *   <li>根上 / 唯一一层包裹目录里有 **`settings.bin`** ⇒ **整槽包**（判据见 {@link Probe#slotPack}；
-     *       严到只认这一个标志 —— 整槽包里本来就有 `mods/`，松一格就会把模组整包判成整槽写入）；</li>
-     *   <li>包根上就有 `mod.hjson` ⇒ 它本身就是**一个模组包**（mods）；</li>
+     *   <li>根上 / 唯一一层包裹目录里有 **`settings.bin`** 且**只有一个整槽、形状干净** ⇒ **整槽包**
+     *       （判据见 {@link Probe#slotState()}；严到只认这一个标志 —— 整槽包里本来就有 `mods/`，
+     *       松一格就会把模组整包判成整槽写入）；</li>
+     *   <li>**多个整槽 / 整槽与别的东西混装** ⇒ {@link #KIND_SLOT_AMBIGUOUS}（未定义，界面明说一句）；</li>
+     *   <li>包根上就有 `mod.hjson` ⇒ 它本身就是**一个模组包**（mods）—— **到这儿就停**，
+     *       不再往模组里面看（模组可以嵌套别的模组 / 自带蓝图地图）；</li>
      *   <li>一级目录里有 `mod.hjson`（**文件夹形态的模组**，见 {@link Probe#modFolders}）⇒ 模组 ——
-     *       夹子外面的条目这趟**不管**（用户要的是"先把这个模组装上"）；</li>
+     *       同理，夹子里面的东西属于这个模组，不参与定类（用户：「有些模组本身就是嵌套的」）；</li>
      *   <li>否则按命中的条目名定类（见 {@link #kindOfHits}，同样是模组优先）；</li>
      *   <li>一条都没命中 ⇒ -1。</li>
      * </ol>
@@ -1490,8 +1556,10 @@ final class BatchIo {
     static int guessKind(Context ctx, Doc d) {
         Probe p = probeDoc(ctx, d, GUESS_EXTS, Mods.META_FILES);
         if (p == null || !p.zip) return -1;
-        // ★★ 整槽包最优先（第 379 轮）。⚠️ 判据必须严：`settings.bin`（见 Probe#slotPack）。
-        if (p.slotPack) return KIND_SLOT;
+        // ★★ 整槽最优先（第 379 轮）。⚠️ 判据必须严，且"多个整槽 / 混装"要单独挑出来：
+        int ss = p.slotState();
+        if (ss == Probe.SLOT_ONE) return KIND_SLOT;
+        if (ss != Probe.SLOT_NONE) return KIND_SLOT_AMBIGUOUS;
         if (p.selfPack) return KIND_MODS;
         // ★ 第 379 轮：文件夹形态的模组包 —— 它自带的 `schematics/*.msch` 属于这个模组，
         //   不能拿它当"整包里的蓝图"。反例（真机）：`蓝钢工业3.9（适160.5）.zip` 被判成蓝图整包。
@@ -1718,18 +1786,23 @@ final class BatchIo {
     /**
      * 「用户选的那几个文件」⇒「要逐份导入的条目」：**界面那条与 dev / 自检那条共用这一份**。
      *
-     * <p>四条判据（全在这一处，别再各写一遍 —— 第 127 轮就是"少了一条"才漏掉整包里的模组夹）：
+     * <p>五条判据（全在这一处，别再各写一遍 —— 第 127 轮就是"少了一条"才漏掉整包里的模组夹；
+     * 第 379 轮又把"模组夹优先"补进来）：
      * <ol>
      *   <li>不是压缩包（真 `.msav` 存档就是 zlib 流）⇒ 原样当一份；</li>
+     *   <li>是**模组包本身**（根上有 `mod.hjson`）⇒ 原样当一份（用户导的是一个模组）；
+     *       ★ 到这儿就停：模组里面还能有嵌套模组 / 蓝图 / 地图，那不关我们的事；</li>
+     *   <li>一级目录里有 `mod.json`（**文件夹形态的模组**）⇒ **逐个模组夹各自打成 zip**，
+     *       ★ 夹子里的 `.jar` 属于那个模组（用户：「有些模组本身就是嵌套的」）——
+     *       不许当成"整包里的另一个模组"拆出来；</li>
      *   <li>是压缩包且后缀命中的（我们导出的一整包）⇒ 解开，逐条当一份；</li>
-     *   <li>是**模组包本身**（根上有 `mod.hjson`）⇒ 原样当一份（用户导的是一个模组）；</li>
-     *   <li>是 `.zip` 却一条都没命中 ⇒ 模组的"一堆**模组文件夹**"整包先单独试一次；
-     *       仍不是 ⇒ **明说"包里没有 X"**（跳过并记账），别丢给单份导入去报一句看不懂的。</li>
+     *   <li>是 `.zip` 却一条都没命中 ⇒ **明说"包里没有 X"**（跳过并记账），
+     *       别丢给单份导入去报一句看不懂的。</li>
      * </ol>
      * ⚠️ 必须在**后台线程**调（会真的解几 MB~几十 MB）。
      */
-    private static List<Item> expand(Context ctx, List<Doc> docs, String[] exts,
-                                     String[] rootMarkers, File work, Report rep) {
+    static List<Item> expand(Context ctx, List<Doc> docs, String[] exts,
+                             String[] rootMarkers, File work, Report rep) {
         List<Item> items = new ArrayList<>();
         if (docs == null) return items;
         for (Doc d : docs) {
@@ -1745,6 +1818,19 @@ final class BatchIo {
             InputStream in = null;
             if (p == null || !p.zip || p.selfPack) {
                 items.add(Item.ofUri(d.uri, d.name));
+                continue;
+            }
+            // ★ 第 379 轮：**模组夹优先**（用户：「有些模组本身就是嵌套的」）——
+            //   夹子里的 `.jar` / `.zip` 属于那个模组，不许当成整包里的条目拆出来。
+            if (rootMarkers != null && !p.modFolders.isEmpty()) {
+                List<File> inner = modFolderZips(ctx, d, rootMarkers, work);
+                if (inner != null && !inner.isEmpty()) {
+                    for (File f : inner) items.add(Item.ofFile(f));
+                    rep.notes.add(Trans.get(ctx, R.string.batch_note_folders_fmt, inner.size(), d.name));
+                    continue;
+                }
+                // 认出来却打不出来 ⇒ 明说，别静默丢
+                rep.failed.add(line(ctx, d.name, Trans.get(ctx, R.string.batch_fail_unknown)));
                 continue;
             }
             if (!p.hits.isEmpty()) {
@@ -1766,27 +1852,7 @@ final class BatchIo {
                 rep.failed.add(line(ctx, d.name, Trans.get(ctx, R.string.batch_fail_unknown)));
                 continue;
             }
-            // 是 zip、一条都没命中：模组再看是不是"一堆模组文件夹"
-            if (rootMarkers != null) {
-                final Doc fd = d;
-                final Context fc = ctx;
-                List<File> inner = null;
-                try {
-                    // ⚠️ 传**再开一条流**的钩子，不是流本身：`extractModFolders` 要读两遍
-                    inner = extractModFolders(new Reopen() {
-                        @Override public InputStream open() throws IOException {
-                            return fd.open(fc);
-                        }
-                    }, work, rootMarkers);
-                } catch (Throwable t) {
-                    Log.i(TAG, "mod folder extract failed: " + d.name + " / " + Util.ioReason(ctx, t));
-                }
-                if (inner != null && !inner.isEmpty()) {
-                    for (File f : inner) items.add(Item.ofFile(f));
-                    rep.notes.add(Trans.get(ctx, R.string.batch_note_folders_fmt, inner.size(), d.name));
-                    continue;
-                }
-            }
+            // 是 zip、一条都没命中：明说"包里没有 X"
             if (isZipName(d.name)) {
                 // ⚠️ 只传"找的是哪几种后缀"：报告里那一行已经带了文件名（`batch_report_line_fmt`）
                 rep.skipped.add(line(ctx, d.name, Trans.get(ctx,
@@ -1798,6 +1864,29 @@ final class BatchIo {
             items.add(Item.ofUri(d.uri, d.name));
         }
         return items;
+    }
+
+    /**
+     * 「一堆模组文件夹」⇒ 每个夹子各自打成一个 zip（{@link #extractModFolders} 的便捷入口）。
+     *
+     * <p>★ 第 379 轮抽出来只为一件事：让 {@link #expand} 能**先试模组夹、再试命中表**
+     * （用户：「有些模组本身就是嵌套的」）—— 夹子里的 `.jar` 属于那个模组，
+     * 不许被当成"整包里的另一个模组"拆出来。
+     *
+     * @return 打出来的 zip；一个夹子都没认出来 / 打不出来 ⇒ **空表**（调用方自己决定怎么报）
+     */
+    private static List<File> modFolderZips(final Context ctx, final Doc d,
+                                           String[] rootMarkers, File work) {
+        try {
+            return extractModFolders(new Reopen() {
+                @Override public InputStream open() throws IOException {
+                    return d.open(ctx);
+                }
+            }, work, rootMarkers);
+        } catch (Throwable t) {
+            Log.i(TAG, "mod folder extract failed: " + d.name + " / " + Util.ioReason(ctx, t));
+            return new ArrayList<>();
+        }
     }
 
     /** 报告里那句"包里没有 X"的 X：`.msav` / `.jar、.zip`（纯展示，不进资源） */
