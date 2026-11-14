@@ -1,27 +1,28 @@
 package io.mdt.launcher;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.security.MessageDigest;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
 /**
- * 下载 + sha256 校验 + 落盘。
+ * 下载 + sha256 校验 + 落盘（更新 / 插件更新 / dev 夹具的公共入口）。
  *
  * <p>🔴 **纯逻辑：不 import `android.*`** —— `java.io` / `java.security` / {@link UpdateClient}
- * 都是 JDK 的东西，所以整条链能在 PC 上跑（`PcDownloadCheck` 起一个真 HTTP 服务当夹具）。
+ * 都是 JDK 的东西，所以整条链能在 PC 上跑（`.dsh/research/` 里的夹具起真 HTTP 服务）。
  *
- * <p>三条纪律（都是"半截包绝不能进安装流程"的变形）：
+ * <p>★ 第 378 轮（2026-11-14）起，真正的传输 / 校验 / 续传在 {@link ResumableDownload}；
+ * 本类只剩三件事：<b>候选 → Source（带镜像短超时）</b>、<b>状态映射</b>、<b>对外签名保持不动</b>。
+ * 于是老调用点（自检 / dev 口 / 插件）一行不改也能继续用。
+ *
+ * <p>三条老纪律不变（都是"半截包绝不能进安装流程"的变形）：
  * <ol>
  *   <li>**先写 `.part`，校验过了才改名** —— 名字本身就是"这份能用"的凭证；</li>
- *   <li>**任何一步失败都删掉 `.part`**，不留残骸（否则下次启动会看到一个 3 MB 的孤儿文件）；</li>
+ *   <li>**失败默认删掉 `.part`**（{@code resume=false} 的路径），不留残骸；</li>
  *   <li>**sha256 是下载层唯一的根** —— 长度对、名字对都不算数。</li>
  * </ol>
  *
- * <p>⚠️ 证书校验**不在这里**：那要 {@code PackageManager}（`PluginTrust`），需要 Context。
+ * <p>⚠️ 证书校验**不在这里**：那要 {@code PackageManager}（{@code PluginTrust}），需要 Context。
  * 调用方拿到 {@link Result#file} 之后再验一次，两道都过才允许安装。
  */
 final class UpdateDownload {
@@ -56,148 +57,94 @@ final class UpdateDownload {
 
     private UpdateDownload() {}
 
-    /**
-     * 下载到 {@code <dir>/<key>.apk} 并校验 sha256（单地址入口，保留给 dev 夹具）。
-     *
-     * @param key       文件名前缀（用 versionCode —— 同一版本重复下载直接覆盖）
-     * @param expectSize 清单里的大小；{@code <= 0} 表示不知道（只校 sha256）
-     */
+    /** 单地址入口（保留给 dev 夹具）。 */
     static Result run(String url, File dir, int key, long expectSize, String sha256,
                       UpdateClient.Progress cb) {
         return run(Collections.singletonList(url), dir, key, expectSize, sha256, cb);
     }
 
-    /**
-     * 按候选顺序下载：镜像失败换下一个，直连通常最后。
-     *
-     * <p>★ 每个候选都从零写 `.part`（本工程的下载不做断点续传；773 KB 的包重下一次
-     * 比维护断点状态更简单）。**只有 sha256 + 长度都过的成品才会 rename 成 `.apk`**。
-     *
-     * <p>★ 镜像用短超时（4 s / 30 s），直连用默认（15 s / 60 s）—— 一个死镜像
-     * 不该把整次下载拖到一分钟。
-     */
+    /** 按候选顺序下载；{@code resume=false}（老行为：每个候选都从零、失败即删）。 */
     static Result run(List<String> urls, File dir, int key, long expectSize, String sha256,
                       UpdateClient.Progress cb) {
-        return run(urls, dir, String.valueOf(key), expectSize, sha256, cb);
+        return run(urls, dir, String.valueOf(key), expectSize, sha256, cb, ".apk", false);
     }
 
-    /**
-     * 同上，但落点名字用**字符串键**（第 338 轮：插件更新的键是 `id-<sha8>`，
-     * 插件 id 不是数字，版本号也不可靠 —— 只能拿内容哈希当键）。
-     */
+    /** 同上，但落点名字用**字符串键**（插件更新的键是 `id-<sha8>`，不是数字）。 */
     static Result run(List<String> urls, File dir, String key, long expectSize, String sha256,
                       UpdateClient.Progress cb) {
-        return run(urls, dir, key, expectSize, sha256, cb, ".apk");
+        return run(urls, dir, key, expectSize, sha256, cb, ".apk", false);
+    }
+
+    /** 同上，但落点后缀可给（插件下载的东西不一定是 `.apk`）。 */
+    static Result run(List<String> urls, File dir, String key, long expectSize, String sha256,
+                      UpdateClient.Progress cb, String suffix) {
+        return run(urls, dir, key, expectSize, sha256, cb, suffix, false);
+    }
+
+    /** 数字键 + 续传开关（自更新用：同一个 versionCode 的包失败后接着下）。 */
+    static Result run(List<String> urls, File dir, int key, long expectSize, String sha256,
+                      UpdateClient.Progress cb, boolean resume) {
+        return run(urls, dir, String.valueOf(key), expectSize, sha256, cb, ".apk", resume);
+    }
+
+    /** 字符串键 + 续传开关（插件更新用）。 */
+    static Result run(List<String> urls, File dir, String key, long expectSize, String sha256,
+                      UpdateClient.Progress cb, boolean resume) {
+        return run(urls, dir, key, expectSize, sha256, cb, ".apk", resume);
     }
 
     /**
-     * 同上，但落点后缀可给（v39：插件下载的东西不一定是 `.apk`）。
+     * 真正的入口。
      *
-     * <p>★ `suffix == ""` ⇒ 成品文件名就是 {@code key} 本身（插件下载用；
-     *   `.part` 中间名仍是 {@code <key>.part}）。宿主自更新仍走默认的 {@code .apk}。
-     *
-     * @param sha256 期望的 sha256；**空串 / null = 不校验**（v39 起；老调用都带值）
+     * @param resume false = 从零写、失败 / 取消删 `.part`（老行为）；
+     *               true  = 同 key 有半截就接着下、取消 / 断网保留（要求 sha256 非空）
      */
     static Result run(List<String> urls, File dir, String key, long expectSize, String sha256,
-                      UpdateClient.Progress cb, String suffix) {
-        if (urls == null || urls.isEmpty()) {
-            return new Result(Status.IO, "no url", null);
+                      UpdateClient.Progress cb, String suffix, boolean resume) {
+        if (urls == null || urls.isEmpty()) return new Result(Status.IO, "no url", null);
+        List<ResumableDownload.Source> sources = new ArrayList<ResumableDownload.Source>();
+        for (String u : urls) {
+            if (u == null || u.isEmpty()) continue;
+            // 镜像只值 4~15 秒等待；直连给足 15 s / 60 s / 120 s（与第 336 轮同一套口径）
+            boolean mirror = Mirrors.isMirrorUrl(u);
+            sources.add(new ResumableDownload.Source(u,
+                    mirror ? 4000 : UpdateClient.CONNECT_TIMEOUT_MS,
+                    mirror ? 10000 : UpdateClient.READ_TIMEOUT_MS,
+                    mirror ? 15000L : 120000L));
         }
-        if (key == null || key.isEmpty()) {
-            return new Result(Status.IO, "blank key", null);
-        }
-        if (!dir.isDirectory() && !dir.mkdirs()) {
-            return new Result(Status.IO, "mkdirs failed: " + dir, null);
-        }
-        String useSuffix = suffix == null ? "" : suffix;
-        File part = new File(dir, key + ".part");
-        File out = new File(dir, key + useSuffix);
-        Result last = null;
+        if (sources.isEmpty()) return new Result(Status.IO, "no url", null);
 
-        for (String url : urls) {
-            if (url == null || url.isEmpty()) continue;
-            // 清掉上一次的残留（失败尝试的 .part / 旧版本的同名成品）
-            part.delete();
-            out.delete();
-
-            boolean mirror = Mirrors.isMirrorUrl(url);
-            int connectMs = mirror ? 4000 : UpdateClient.CONNECT_TIMEOUT_MS;
-            int readMs = mirror ? 10000 : UpdateClient.READ_TIMEOUT_MS;
-            long totalMs = mirror ? 15000L : 120000L;
-            try {
-                UpdateClient.download(url, part, expectSize, cb, connectMs, readMs, totalMs);
-            } catch (IOException e) {
-                long got = part.length();
-                part.delete();
-                // 长度已经明显不对 ⇒ SIZE（"下到一半断了"与"网络不通"要分开，文案不同）
-                if (expectSize > 0 && got > 0 && got != expectSize) {
-                    last = new Result(Status.SIZE, "got " + got + " / want " + expectSize
-                            + " @ " + url, null);
-                } else {
-                    last = new Result(Status.NETWORK, String.valueOf(e), null);
-                }
-                continue;
+        final UpdateClient.Progress p = cb;
+        ResumableDownload.Progress adapter = p == null ? null : new ResumableDownload.Progress() {
+            @Override public void onProgress(long done, long total) {
+                p.onProgress(done, total);
             }
+        };
+        ResumableDownload.Result r = ResumableDownload.run(sources, dir, key, suffix, resume,
+                expectSize, sha256, adapter, null);
 
-            // UpdateClient 已经按 expectSize 校过一次；这里再按实际长度兜一道（防服务端不给 Content-Length）
-            if (expectSize > 0 && part.length() != expectSize) {
-                long got = part.length();
-                part.delete();
-                last = new Result(Status.SIZE, "got " + got + " / want " + expectSize
-                        + " @ " + url, null);
-                continue;
-            }
-
-            String got;
-            try {
-                got = sha256(part);
-            } catch (IOException e) {
-                part.delete();
-                return new Result(Status.IO, String.valueOf(e), null);
-            }
-            if (sha256 != null && !sha256.isEmpty() && !got.equalsIgnoreCase(sha256)) {
-                part.delete();
-                last = new Result(Status.SHA, "got " + got + " @ " + url, null, got);
-                continue;
-            }
-
-            if (!part.renameTo(out)) {
-                part.delete();
-                return new Result(Status.IO, "rename failed", null);
-            }
-            return new Result(Status.OK, null, out, got);
+        Status st;
+        switch (r.status) {
+            case OK:
+                st = Status.OK;
+                break;
+            case SIZE:
+                st = Status.SIZE;
+                break;
+            case SHA:
+                st = Status.SHA;
+                break;
+            case WRONG:
+                // 所有源给的对象都与清单不符：有清单长度就报 SIZE，否则只能算网络失败
+                st = expectSize > 0 ? Status.SIZE : Status.NETWORK;
+                break;
+            case CANCELED:
+            case NETWORK:
+                st = Status.NETWORK;
+                break;
+            default:                       // IO / INVALID
+                st = Status.IO;
         }
-        return last != null ? last : new Result(Status.IO, "no usable url", null);
-    }
-
-    /** 文件的 sha256（小写十六进制）。 */
-    static String sha256(File f) throws IOException {
-        MessageDigest md;
-        try {
-            md = MessageDigest.getInstance("SHA-256");
-        } catch (java.security.NoSuchAlgorithmException e) {
-            throw new IOException("no sha-256", e);
-        }
-        InputStream in = new FileInputStream(f);
-        try {
-            byte[] buf = new byte[65536];
-            int n;
-            while ((n = in.read(buf)) > 0) md.update(buf, 0, n);
-        } finally {
-            try { in.close(); } catch (IOException ignored) { }
-        }
-        return hex(md.digest());
-    }
-
-    /** 字节 → 小写十六进制（与 {@link UpdateManifest#validSha256} 的格式同一套）。 */
-    static String hex(byte[] data) {
-        if (data == null) return null;
-        StringBuilder sb = new StringBuilder(data.length * 2);
-        for (byte b : data) {
-            int v = b & 0xff;
-            if (v < 16) sb.append('0');
-            sb.append(Integer.toHexString(v));
-        }
-        return sb.toString();
+        return new Result(st, r.detail, r.file, r.sha256);
     }
 }

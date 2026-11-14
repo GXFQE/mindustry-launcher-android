@@ -165,7 +165,8 @@ public class MainActivity extends BaseActivity {
         //   进来就把它撞掉（已经响过的撞不撞都无所谓）。
         Restart.cancelPending(this);
         android.util.Log.i("MDTLauncher", "MainActivity onCreate");
-        // 第 336 轮：清掉上一次更新/测速留下的半成品（.part / .tmp / 测速锁）。
+        // 第 336 轮：清掉上一次更新/测速留下的半成品（.tmp / 测速锁）。
+        // ★ 第 378 轮改口径：`.part` 只清**超过 7 天**的 —— 下载支持续传后，新鲜半截是下一程的料。
         // 必须在启动时做：force-stop / 划掉后台都不会走 finally。
         // ★ 每个进程只做一次 —— 转屏重建 Activity 时不能删正在写的 .part。
         UpdateCleanup.sweepOnce(this);

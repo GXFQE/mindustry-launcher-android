@@ -467,7 +467,7 @@ final class PluginUpdates {
     private static UpdateDownload.Result download(Context ctx, String id, PluginUpdateManifest m) {
         List<String> urls = Mirrors.assetUrls(m.url, Config.get().updateMirror());
         String key = id + "-" + PluginUpdateManifest.sha8(m.sha256);
-        return UpdateDownload.run(urls, downloadDir(ctx), key, m.size, m.sha256, null);
+        return UpdateDownload.run(urls, downloadDir(ctx), key, m.size, m.sha256, null, true);
     }
 
     /** 文件在、且哈希对得上（缓存复用前的检查）。 */

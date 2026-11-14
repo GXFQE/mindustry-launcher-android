@@ -17,7 +17,10 @@ import java.util.Locale;
  * <ul>
  *   <li>`app_hub/mirror-test.lock` —— 测速开始标记；正常结束会自己删；</li>
  *   <li>`app_hub/mirror-*.tmp` —— 测速结果的原子写临时文件；</li>
- *   <li>`hub/update/*.part` / `*.tmp` —— 下载中的半截包。</li>
+ *   <li>`hub/update/*.tmp` —— 原子写的临时文件（每次都清）；</li>
+ *   <li>`hub/update/*.part` / `*.part.meta` 与 `hub/plugins-update/*` —— **只清超过 7 天的**：
+ *       第 378 轮起下载支持续传，启动时把新鲜的半截删了，续传就永远没料（用户 2026-11-14
+ *       定案「先把下载折腾好」）；超过一周的必然是死件。</li>
  * </ul>
  *
  * <p>🔴 **已完成的 `*.apk` 一个都不动**：用户可能正要去装它。
@@ -25,6 +28,9 @@ import java.util.Locale;
 final class UpdateCleanup {
 
     private static final String TAG = "MDTLauncher";
+
+    /** 半截包（`.part` / `.part.meta`）的保留期：一周。到期才清，好让续传有机会接上。 */
+    private static final long PART_TTL_MS = 7L * 24 * 3600 * 1000;
 
     /**
      * 进程内只扫一次。
@@ -57,9 +63,11 @@ final class UpdateCleanup {
         n += deleteFile(new File(appHub, "mirror-test.lock"));
         n += deleteFile(new File(appHub, "mirror-test.tmp"));
         n += deleteFile(new File(appHub, "mirror-rank.json.tmp"));
-        n += deleteSuffix(updateDir, ".part");
         n += deleteSuffix(updateDir, ".tmp");
-        n += deleteSuffix(pluginDir, ".part");
+        n += deleteSuffixOlder(updateDir, ".part", PART_TTL_MS);
+        n += deleteSuffixOlder(updateDir, ".part.meta", PART_TTL_MS);
+        n += deleteSuffixOlder(pluginDir, ".part", PART_TTL_MS);
+        n += deleteSuffixOlder(pluginDir, ".part.meta", PART_TTL_MS);
         if (n > 0) {
             Log.i(TAG, "update cleanup: removed " + n + " leftover(s)");
         }
@@ -75,6 +83,21 @@ final class UpdateCleanup {
             if (f.getName().toLowerCase(Locale.US).endsWith(suffix)) {
                 n += deleteFile(f);
             }
+        }
+        return n;
+    }
+
+    /** 只删"最后修改时间早于 {@code ttlMs} 之前"的同后缀文件（续传要留新鲜的半截）。 */
+    private static int deleteSuffixOlder(File dir, String suffix, long ttlMs) {
+        File[] files = dir.listFiles();
+        if (files == null) return 0;
+        long cutoff = System.currentTimeMillis() - ttlMs;
+        int n = 0;
+        for (File f : files) {
+            if (f == null || !f.isFile()) continue;
+            if (!f.getName().toLowerCase(Locale.US).endsWith(suffix)) continue;
+            if (f.lastModified() > cutoff) continue;
+            n += deleteFile(f);
         }
         return n;
     }

@@ -19849,29 +19849,43 @@ public final class SelfTest {
         ok(stat, L, avg.ok() && avg.ms == 2000 && avg.speedBps == 20000,
                 "只剩 2 个可用样本时，真中位 = 中间两个的平均");
 
-        // 启动清扫：只删 .part / .tmp / 测速锁，已完成的 .apk 必须留着。
+        // 启动清扫（第 378 轮改口径）：只删测速锁 / .tmp / **超过 7 天**的半截；
+        // 新鲜的 .part（续传要接的）与已完成的 .apk 必须留着。两侧都钉。
         File appHub = Paths.privateDir(ctx);
         File updateDir = new File(Data.hubDir(ctx), "update");
         File lock = new File(appHub, "mirror-test.lock");
-        File part = new File(updateDir, "selftest-336.part");
-        File tmp = new File(updateDir, "selftest-336.tmp");
-        File apk = new File(updateDir, "selftest-336.apk");
+        File freshPart = new File(updateDir, "selftest-378-fresh.part");
+        File freshMeta = new File(updateDir, "selftest-378-fresh.part.meta");
+        File stalePart = new File(updateDir, "selftest-378-stale.part");
+        File staleMeta = new File(updateDir, "selftest-378-stale.part.meta");
+        File tmp = new File(updateDir, "selftest-378.tmp");
+        File apk = new File(updateDir, "selftest-378.apk");
         try {
             updateDir.mkdirs();
             Util.atomicWriteText(lock, "1");
-            Util.atomicWriteText(part, "x");
+            Util.atomicWriteText(freshPart, "x");
+            Util.atomicWriteText(freshMeta, "x");
+            Util.atomicWriteText(stalePart, "x");
+            Util.atomicWriteText(staleMeta, "x");
             Util.atomicWriteText(tmp, "x");
             Util.atomicWriteText(apk, "keep");
+            long old = System.currentTimeMillis() - 8L * 24 * 3600 * 1000;
+            stalePart.setLastModified(old);
+            staleMeta.setLastModified(old);
             int n = UpdateCleanup.sweep(ctx);
-            ok(stat, L, n >= 3 && !lock.exists() && !part.exists() && !tmp.exists()
-                            && apk.exists(),
-                    "启动清扫：删锁 / .part / .tmp，保留已完成的 .apk");
+            ok(stat, L, n >= 4 && !lock.exists() && !tmp.exists()
+                            && !stalePart.exists() && !staleMeta.exists()
+                            && freshPart.exists() && freshMeta.exists() && apk.exists(),
+                    "★启动清扫：只删锁 / .tmp / **过期**半截；新鲜 .part（续传）与成品一律留");
         } catch (Throwable t) {
             ok(stat, L, false, "启动清扫夹具异常: " + t);
         } finally {
             apk.delete();
             lock.delete();
-            part.delete();
+            freshPart.delete();
+            freshMeta.delete();
+            stalePart.delete();
+            staleMeta.delete();
             tmp.delete();
         }
     }

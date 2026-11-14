@@ -351,7 +351,7 @@ final class UpdateUi {
                                     }
                                 });
                             }
-                        });
+                        }, true);
                 try { Work.end(a); } catch (Throwable ignored) { }
                 a.runOnUiThread(new Runnable() {
                     @Override public void run() {
