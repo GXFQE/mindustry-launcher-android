@@ -1086,6 +1086,14 @@ final class BatchIo {
     static final int KIND_SAVES = 1;
     static final int KIND_BLUEPRINTS = 2;
     static final int KIND_MODS = 3;
+    /**
+     * ★ 第五类落点：**整槽包**（第 379 轮，用户：「整个槽里什么都有」）。
+     *
+     * <p>⚠️ 它**不进**上面那四个下标（0..3 是"一类内容"的编号，被 {@link #kindOf} /
+     * {@link #keyOf} / {@link #kindOfBundleName} 的循环用着）—— 整槽导入走
+     * {@link SlotZip}（`SlotIo.readZipThenConfirm`），不是 {@link #runImport}。
+     */
+    static final int KIND_SLOT = 4;
 
     /** dev 口的字符串 key（**ASCII，不进资源** —— 它是命令的一部分，不是给用户看的文案） */
     static int kindOfKey(String key) {
@@ -1344,6 +1352,20 @@ final class BatchIo {
          * + `蓝钢-欢迎您/schematics/泰坦级核心.msch`（2026-11-15 用户报「导入一个模组，识别成蓝图了」）。
          */
         final List<String> modFolders = new ArrayList<>();
+        /**
+         * ★ **是不是「整槽包」**（第 379 轮，用户：「整个槽里什么都有，但可能需要严格检查格式」）。
+         *
+         * <p>判据刻意**只认一个东西**：根上（或唯一一层包裹目录里）有 **`settings.bin`**。
+         * 理由：那是游戏数据根的标志文件 —— 我们自己的「导出整槽」、分享包（脱敏版）、
+         * 以及游戏原生「设置 → 数据 → 导出数据」**三种来源都以它为准**
+         * （{@link SlotZip} 类注释里那条 `nativeFormat` 用的就是同一个判据）。
+         *
+         * <p>为什么必须严：整槽包**里面本来就有** `mods/` `saves/` `maps/` `schematics/`
+         * ⇒ 拿"有 mods 目录"当判据会把**所有模组整包**都判成整槽（那是灾难：整槽导入是
+         * **整槽写入**）。反过来，只有 `settings.bin` 而没有它的包（例如只含 `saves/` 的手打包）
+         * **不认**，仍然按内容走原来的四条路 —— 这正是"严格"的意思。
+         */
+        boolean slotPack;
 
         /** 我们导出的一整包 */
         boolean bundle() {
@@ -1374,6 +1396,12 @@ final class BatchIo {
                 if (e.isDirectory() || flat.endsWith("/")) continue;
                 int slash = flat.lastIndexOf('/');
                 String base = slash < 0 ? flat : flat.substring(slash + 1);
+                // ★ 整槽包（第 379 轮）：根上 / 唯一一层包裹目录里有 `settings.bin`（见 Probe#slotPack）。
+                //   ⚠️ 这一段**要排在"包根是模组包就提前 return"之前** —— 整槽包里也有 `mods/`，
+                //   但判据只看 `settings.bin`，不能因为先读到别的东西就漏掉它。
+                if ("settings.bin".equalsIgnoreCase(base) && (slash < 0 || flat.indexOf('/') == slash)) {
+                    p.slotPack = true;
+                }
                 if (slash < 0 && rootMarkers != null) {
                     for (String m : rootMarkers) {
                         if (m != null && m.equalsIgnoreCase(base)) {
@@ -1404,6 +1432,7 @@ final class BatchIo {
         } catch (Throwable t) {
             p.zip = false;                          // 不是 zip（存档就是 zlib 流）/ 坏了
             p.selfPack = false;
+            p.slotPack = false;
             p.hits.clear();
             p.modFolders.clear();
         } finally {
@@ -1444,10 +1473,12 @@ final class BatchIo {
     /**
      * **一个压缩包里装的是哪一类**（F9 深链用）。认不出 ⇒ -1，调用方给"这个包里没有…"那句话。
      *
-     * <p>判据顺序（都是**内容**，不是文件名）—— ★ **模组优先**（第 379 轮用户定案：「感觉模组
-     * 才应该是最优先的」：模组会**带着**它自己的蓝图 / 地图，反过来不成立 ⇒ 包里有模组的迹象
-     * 就该先进模组页）：
+     * <p>判据顺序（都是**内容**，不是文件名）—— ★ **整槽 > 模组 > 蓝图 > 地图/存档**
+     * （第 379 轮用户定案：「整个槽里什么都有」+「模组里面可以有地图蓝图存档甚至嵌套模组，
+     * 地图蓝图存档反正不能互相包含」⇒ 从"能包住别人"到"只能自己"排）：
      * <ol>
+     *   <li>根上 / 唯一一层包裹目录里有 **`settings.bin`** ⇒ **整槽包**（判据见 {@link Probe#slotPack}；
+     *       严到只认这一个标志 —— 整槽包里本来就有 `mods/`，松一格就会把模组整包判成整槽写入）；</li>
      *   <li>包根上就有 `mod.hjson` ⇒ 它本身就是**一个模组包**（mods）；</li>
      *   <li>一级目录里有 `mod.hjson`（**文件夹形态的模组**，见 {@link Probe#modFolders}）⇒ 模组 ——
      *       夹子外面的条目这趟**不管**（用户要的是"先把这个模组装上"）；</li>
@@ -1459,6 +1490,8 @@ final class BatchIo {
     static int guessKind(Context ctx, Doc d) {
         Probe p = probeDoc(ctx, d, GUESS_EXTS, Mods.META_FILES);
         if (p == null || !p.zip) return -1;
+        // ★★ 整槽包最优先（第 379 轮）。⚠️ 判据必须严：`settings.bin`（见 Probe#slotPack）。
+        if (p.slotPack) return KIND_SLOT;
         if (p.selfPack) return KIND_MODS;
         // ★ 第 379 轮：文件夹形态的模组包 —— 它自带的 `schematics/*.msch` 属于这个模组，
         //   不能拿它当"整包里的蓝图"。反例（真机）：`蓝钢工业3.9（适160.5）.zip` 被判成蓝图整包。

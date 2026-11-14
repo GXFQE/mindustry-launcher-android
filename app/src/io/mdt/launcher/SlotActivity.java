@@ -142,6 +142,12 @@ public class SlotActivity extends BaseActivity {
                         stack.show();
                     }
                 });
+
+        // F9 深链（第 379 轮）：外部递进来一个**整槽包**（判据 = `settings.bin`，
+        //   见 `BatchIo.Probe#slotPack`）⇒ 与菜单「导入整槽」走**同一条**流程
+        //   （读包 → 确认框 + 三个模式 → 解包），只是跳过 SAF 选包那一步。
+        final java.util.List<BatchIo.Doc> dl = DeepLink.docsOf(getIntent(), this);
+        if (!dl.isEmpty()) SlotIo.importSlotDoc(this, mSlot, dl.get(0), mHost);
     }
 
     /**

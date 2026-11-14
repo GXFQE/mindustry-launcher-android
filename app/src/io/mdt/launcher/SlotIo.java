@@ -1251,6 +1251,34 @@ final class SlotIo {
     }
 
     /**
+     * ★ F9 深链：外面已经把**整槽包**递进来了（判据 = 包的根上 / 唯一一层包裹目录里有
+     * `settings.bin`，见 {@code BatchIo.Probe#slotPack}）⇒ 跳过 SAF 选包，直接走本页
+     * 那条既有流程：读包 → 确认框（清单 + 三个模式）→ 解包。
+     *
+     * <p>⚠️ 两道既有门禁一个都不能少：① 目标槽在跑游戏 ⇒ 先挡（整槽导入 = **整槽写入**）；
+     * ② 槽已经不在（被删 / 改名）⇒ 明说一句，别对着一个不存在的槽写。
+     * ★ 用户「整个槽里什么都有」：正因为整槽包最"大"（可含模组 / 地图 / 存档 / 蓝图），
+     *   它的判定要**最严**（只认 `settings.bin`），否则一个模组整包就会被当成整槽写入。
+     */
+    static void importSlotDoc(final Activity a, final String slotName, final BatchIo.Doc doc,
+                              final SlotOps.Host h) {
+        if (doc == null || doc.uri == null) return;
+        Data.Slot s = null;
+        for (Data.Slot x : Data.allSlots(a)) {
+            if (x != null && slotName != null && slotName.equals(x.name)) {
+                s = x;
+                break;
+            }
+        }
+        if (s == null) {
+            toast(a, Trans.get(a, R.string.slot_page_gone_fmt, slotName));
+            return;
+        }
+        if (blockedByGame(a, s)) return;
+        readZipThenConfirm(a, doc.uri, doc.name, s.name, h);
+    }
+
+    /**
      * **dev 口专用**：跳过 SAF 选包，直接从设备上的一个 zip 走到"读包 → 确认框"。
      *
      * ★ 为什么需要它：整槽导入的确认框是**弹窗流程**，而它前面那道 SAF 选择器

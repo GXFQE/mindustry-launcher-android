@@ -22,7 +22,7 @@ import java.util.Locale;
  * `ActivityThread` 拿自己那份 `PathClassLoader` 去实例化它 ⇒ `ClassNotFoundException`
  * （"Unable to instantiate activity"）—— 用户看到的是闪退，连"卡在哪一步"都没有。
  * ⇒ 本工程的形状是：**filter 挂我们自己的入口（MainActivity，主进程、已经在 exported=true）**，
- * 由本类分派到四个内容页；游戏那个 Activity 一个 filter 都不加。
+ * 由本类分派到四个内容页（整槽包另算：它进**槽页**、走「导入整槽」那条既有流程）；游戏那个 Activity 一个 filter 都不加。
  *
  * <h3>判据分两层（都能单独钉）</h3>
  * <ol>
@@ -218,7 +218,7 @@ final class DeepLink {
     /**
      * 分派用的 Intent（**纯装配**）。抽出来只为一件事：让自检能钉住"去哪一页 + 槽名带对了"。
      *
-     * <p>四个页面的 `EXTRA_SLOT` 都是 `"slot"`（见各自类的常量）—— 写错哪个键编译器不响，
+     * <p>五个页面的 `EXTRA_SLOT` 都是 `"slot"`（见各自类的常量；槽页也一样）—— 写错哪个键编译器不响，
      * 真机只表现为"导进当前槽了"（**静默错位**，与第 320 轮那条同族）。
      */
     static Intent openIntent(Context c, int kind, BatchIo.Doc doc, String slot) {
@@ -226,6 +226,9 @@ final class DeepLink {
         if (kind == BatchIo.KIND_BLUEPRINTS) i = new Intent(c, BlueprintsActivity.class);
         else if (kind == BatchIo.KIND_SAVES) i = new Intent(c, SavesActivity.class);
         else if (kind == BatchIo.KIND_MODS) i = new Intent(c, ModsActivity.class);
+        // ★ 第 379 轮：**整槽包**（判据 `settings.bin`，见 `BatchIo.Probe#slotPack`）⇒ 槽页，
+        //   由它走「导入整槽」那条既有流程（确认框 + 三个模式 + 写门禁）。
+        else if (kind == BatchIo.KIND_SLOT) i = new Intent(c, SlotActivity.class);
         else i = new Intent(c, MapsActivity.class);
         i.putExtra(MapsActivity.EXTRA_SLOT, slot == null ? "" : slot);
         if (doc != null) {

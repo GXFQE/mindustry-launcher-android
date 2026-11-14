@@ -17269,6 +17269,14 @@ public final class SelfTest {
                                .equals(activityNameOf(ctx, BatchIo.KIND_SAVES))
                             && ModsActivity.class.getName().equals(activityNameOf(ctx, BatchIo.KIND_MODS)),
                     "★四类内容各进自己那一页（地图 / 蓝图 / 存档 / 模组）");
+            // ★ 第 379 轮：**第五类落点** —— 整槽包进槽页（由它走「导入整槽」那条既有流程）
+            android.content.Intent si = DeepLink.openIntent(ctx, BatchIo.KIND_SLOT,
+                    doc("整槽.zip"), "槽甲");
+            ok(stat, L, si.getComponent() != null
+                            && SlotActivity.class.getName().equals(si.getComponent().getClassName())
+                            && "槽甲".equals(si.getStringExtra(SlotActivity.EXTRA_SLOT)),
+                    "★★ 整槽包进**槽页**（不是四个内容页），槽名照样带对了 ——"
+                            + "整槽导入是**整槽写入**，必须落在用户选的那个槽上");
         } catch (Throwable t) {
             ok(stat, L, false, "深链选槽 Intent 检查自身异常：" + t);
         }
@@ -17387,6 +17395,32 @@ public final class SelfTest {
             ok(stat, L, BatchIo.guessKind(ctx, docsOf(modBundle).get(0)) == BatchIo.KIND_MODS,
                     "★★ 纯命中表也一样：`.jar` 比 `.msch` 优先（我们自己的整包不会混着装，"
                             + "但用户自己压的包会）");
+
+            // ── 第 379 轮追加（用户：「整个槽的优先级最高吧，毕竟整个槽里什么都有，
+            //   但是可能需要严格检查格式」）────────────────────────────────────
+            //   整槽包**里面本来就有** mods/ maps/ saves/ ⇒ 判据必须严：
+            //   只认 `settings.bin`（我们「导出整槽」、分享包、游戏原生 exportData 都带它）。
+            //   松一格（"有 mods 目录就算整槽"）就会把任何模组整包当整槽写入 —— 那是破坏性操作。
+            File slotPack = new File(root, "整槽.zip");
+            zipMany(slotPack, new String[]{"settings.bin", "saves/甲.msav",
+                            "mods/a.jar", "schematics/x.msch"},
+                    new String[]{"settings", "msav", "jar", "msch"});
+            ok(stat, L, BatchIo.guessKind(ctx, docsOf(slotPack).get(0)) == BatchIo.KIND_SLOT,
+                    "★★★ 整槽包**最优先**：根上有 `settings.bin` ⇒ 整槽"
+                            + "（哪怕它同时带着 `mods/` `saves/` `schematics/`）");
+
+            File slotWrap = new File(root, "包了一层.zip");
+            zipMany(slotWrap, new String[]{"我的槽/settings.bin", "我的槽/saves/乙.msav"},
+                    new String[]{"settings", "msav"});
+            ok(stat, L, BatchIo.guessKind(ctx, docsOf(slotWrap).get(0)) == BatchIo.KIND_SLOT,
+                    "★★ 单层包裹目录也认（`<目录>/settings.bin`）—— 与 `SlotZip.inspect` 剥包裹同一条");
+
+            File notSlot = new File(root, "只是内容整包.zip");
+            zipMany(notSlot, new String[]{"mods/a.jar", "saves/乙.msav"},
+                    new String[]{"jar", "msav"});
+            ok(stat, L, BatchIo.guessKind(ctx, docsOf(notSlot).get(0)) == BatchIo.KIND_MODS,
+                    "★★ 反方向（**严格**）：没有 `settings.bin` ⇒ 不是整槽"
+                            + "（`mods/` + `saves/` 摆在一起也不够，仍按模组优先）");
 
             File nothing = new File(root, "没东西.zip");
             zipMany(nothing, new String[]{"readme.txt", "a.bin"}, new String[]{"r", "b"});
