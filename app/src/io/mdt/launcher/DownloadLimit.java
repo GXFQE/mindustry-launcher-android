@@ -5,8 +5,9 @@ import android.content.Context;
 /**
  * **下载限速**的档位与文案（第 378 轮，2026-11-14）。
  *
- * <p>为什么单独一个类：档位（{@link #PRESETS}）与"值 → 人话"（{@link #label}）是**两件事**，
- * 但都要能被设置页和自检共用 —— 自检直接喂值断言，界面只负责摆出来。
+ * <p>为什么单独一个类：值域 / 钳位（{@link #clamp}）与"值 → 人话"（{@link #label}）是**两件事**，
+ * 但都要能被设置页和自检共用 —— 自检直接喂值断言，界面只负责摆出来。设置页让用户**自己填 KB/s**
+ * （0 = 不限），所以这里没有档位表。
  *
  * <p>存的是**字节/秒**（{@link Config#downloadLimit()}），0 = 不限；上限 {@link #MAX}
  * 只是防呆（手改配置写个天文数字，不该把下载线程睡死）。
@@ -21,11 +22,6 @@ final class DownloadLimit {
 
     /** 上限：100 MB/s（手机网络到不了，只是防呆）。 */
     static final long MAX = 100L * MB;
-
-    /** 设置页里的档位（顺序即展示顺序）。 */
-    static final long[] PRESETS = {
-            NONE, 256L * KB, 512L * KB, 1L * MB, 2L * MB, 4L * MB
-    };
 
     private DownloadLimit() {}
 

@@ -1520,6 +1520,9 @@
     <string name="set_download_limit_title">Download limit</string>
     <string name="set_download_limit_sub_fmt">Current: %1$s</string>
     <string name="set_download_limit_pick_title">Download limit</string>
+    <string name="set_download_limit_hint">KB/s (0 = unlimited)</string>
+    <string name="set_download_limit_msg">Enter KB/s. 0 = unlimited; max 102400 KB/s.</string>
+    <string name="set_download_limit_bad">Enter an integer between 0 and 102400.</string>
     <string name="set_download_limit_none">Unlimited</string>
     <string name="set_download_limit_kb_fmt">%1$d KB/s</string>
     <string name="set_download_limit_mb_fmt">%1$d MB/s</string>

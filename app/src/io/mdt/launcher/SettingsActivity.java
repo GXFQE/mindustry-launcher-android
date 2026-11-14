@@ -607,27 +607,42 @@ public class SettingsActivity extends BaseActivity {
      * ★ 只作用于管理器自己的页面（`GameSlot` 除外），游戏那一页仍按它自己的清单。
      */
     /**
-     * 第 378 轮：下载限速（档位单选）。
+     * 第 378 轮：下载限速（用户自己填，单位 KB/s；0 = 不限）。
      *
-     * <p>改完立刻交给 {@link Bandwidth}：正在跑的下载下一片就按新额度，不用重启。
-     * 副标题跟着 {@link #fillValues()} 刷新成"当前：…"。
+     * <p>为什么不做档位：不同网络差得远（热点 / 5G / 家里宽带），固定档位总有人选不到合适的；
+     * 一个数字框 + 上限防呆更直接。改完立刻交给 {@link Bandwidth}，正在跑的下载下一片就按新额度。
      */
     private void pickDownloadLimit() {
-        final long[] vals = DownloadLimit.PRESETS;
-        String[] names = new String[vals.length];
+        final EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_NUMBER);
+        input.setHint(R.string.set_download_limit_hint);
         long cur = Config.get().downloadLimit();
-        int checked = -1;
-        for (int i = 0; i < vals.length; i++) {
-            names[i] = DownloadLimit.label(this, vals[i]);
-            if (vals[i] == cur) checked = i;
-        }
+        input.setText(String.valueOf(cur <= 0 ? 0 : Math.max(1L, (cur + DownloadLimit.KB / 2) / DownloadLimit.KB)));
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(20), 0, dp(20), 0);
+        box.addView(input, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         new AlertDialog.Builder(this)
                 .setTitle(R.string.set_download_limit_pick_title)
-                .setSingleChoiceItems(names, checked, new DialogInterface.OnClickListener() {
+                .setMessage(R.string.set_download_limit_msg)
+                .setView(box)
+                .setPositiveButton(R.string.policy_save, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int w) {
-                        d.dismiss();
-                        Config.get().setDownloadLimit(vals[w]);
-                        Bandwidth.set(vals[w]);
+                        long kb;
+                        try {
+                            kb = Long.parseLong(input.getText().toString().trim());
+                        } catch (NumberFormatException e) {
+                            kb = -1L;
+                        }
+                        if (kb < 0L || kb > DownloadLimit.MAX / DownloadLimit.KB) {
+                            Toast.makeText(SettingsActivity.this, R.string.set_download_limit_bad,
+                                    Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        long bps = kb * DownloadLimit.KB;
+                        Config.get().setDownloadLimit(bps);
+                        Bandwidth.set(bps);
                         fillValues();
                     }
                 })

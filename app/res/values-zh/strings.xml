@@ -1488,6 +1488,9 @@
     <string name="set_download_limit_title">下载限速</string>
     <string name="set_download_limit_sub_fmt">当前：%1$s</string>
     <string name="set_download_limit_pick_title">下载限速</string>
+    <string name="set_download_limit_hint">KB/s（0 = 不限）</string>
+    <string name="set_download_limit_msg">填 KB/s；0 表示不限，上限 102400 KB/s。</string>
+    <string name="set_download_limit_bad">请输入 0~102400 的整数。</string>
     <string name="set_download_limit_none">不限</string>
     <string name="set_download_limit_kb_fmt">%1$d KB/s</string>
     <string name="set_download_limit_mb_fmt">%1$d MB/s</string>
