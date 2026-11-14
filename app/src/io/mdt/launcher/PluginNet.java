@@ -378,6 +378,8 @@ final class PluginNet {
             }
         }
         long done = out != null ? out.length() : (part.isFile() ? part.length() : 0L);
+        // 成品落盘后引擎会清掉 .part.meta ⇒ 总长只能从成品本身补（否则完成态报 total=0）
+        if (out != null && total <= 0L) total = out.length();
         if (out == null && done == 0L && total == 0L) return null;
         return new io.mdt.launcher.api.DownloadState(key, done, total, out != null, out);
     }

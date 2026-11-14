@@ -205,7 +205,7 @@ public static void unload();                    // 可选：收尾（也认 unlo
 | `githubReleases(repo, cb)` | 列 `owner/name` 的 release（最新在前，最多 30 条）：`tag` / `prerelease` / `publishedAt` / `assets`（`name` / `size`（没给 = -1）/ `url` / **v43** `browserUrl` / `sha256`）；`url` 与 `browserUrl` 都能喂 `download` |
 | `download(url, expectedSha256, cb)`（返回 `Task`） | **旧签名（v39）**：下载到**一次性子目录**；先写 `.part`，sha256 过了才改名；大小由"边下边查 1 GB 上限"兜底；GitHub 地址自动套用户选的**更新线路**；失败 / 取消删半截 |
 | `download(url, expectedSha256, key, resume, cb)`（v43） | **稳定 key 目录** `<cache>/downloads/<key>/f<后缀>`。`resume=true`：同 key 有半截就接着下、成品命中直接回调（0 请求）、取消 / 断网**保留**半截；`resume=false`：忽略半截 / 成品，失败 / 取消删半截。**续不续由插件决定**（用户 2026-11-14 定案） |
-| `downloadState(key)`（v43） | 只读快照（只 stat + 读小文件，**UI 线程可调**）：`done` / `total`（0 = 未知）/ `complete` / `file`；没有记录 ⇒ `null`。成品 sha 对不上 ⇒ 当没有并删掉（自愈） |
+| `downloadState(key)`（v43） | 只读快照（只 stat + 读小文件，**UI 线程可调**）：`done` / `total`（0 = 未知）/ `complete` / `file`；没有记录 ⇒ `null`。成品 sha 对不上 ⇒ 当没有并删掉（自愈）；完成态若 `.part.meta` 已被清，`total` 用成品长度补 |
 
 规则与边界：
 

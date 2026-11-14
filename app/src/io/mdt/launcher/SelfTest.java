@@ -5404,6 +5404,15 @@ public final class SelfTest {
                 ok(stat, L, st != null && st.done == 10 && st.total == 0
                                 && !st.complete && st.file == null,
                         "downloadState：只有 .part ⇒ done=长度、total=0、complete=false");
+
+                File doneDir = new File(new File(root, "downloads"), "k9");
+                if (doneDir.isDirectory() || doneDir.mkdirs()) {
+                    writePrefix(new File(doneDir, "f.jar"), new byte[10], 10);
+                    io.mdt.launcher.api.DownloadState done = PluginNet.downloadState(root, "k9");
+                    ok(stat, L, done != null && done.complete && done.done == 10
+                                    && done.total == 10,
+                            "downloadState：成品无 meta ⇒ complete，total 用成品长度补（不是 0）");
+                }
             }
         } catch (Throwable t) {
             ok(stat, L, false, "downloadState 夹具异常：" + t);
