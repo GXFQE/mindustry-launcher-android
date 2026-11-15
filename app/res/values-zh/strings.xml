@@ -1319,8 +1319,8 @@
     <string name="act_settings_title">设置</string>
     <string name="settings_title">设置</string>
         <string name="set_autoclean_title">自动清理缓存</string>
-    <string name="set_autoclean_on">自动清理：开</string>
-    <string name="set_autoclean_off">自动清理：关</string>
+    <string name="set_autoclean_on">当前：开</string>
+    <string name="set_autoclean_off">当前：关</string>
     <string name="set_autoclean_disable">关掉自动清理</string>
     <string name="set_autoclean_enable">开启自动清理</string>
     <string name="set_autoclean_none">没有需要清理的</string>
@@ -1349,7 +1349,7 @@
         依据（对象数 / 暂时没用的部分）在同一条里用白话带过。
     -->
     <string name="set_storage_title">存储占用</string>
-    <string name="set_storage_sub">备份省了多少、各类数据各占多少</string>
+    <string name="set_storage_sub">查看备份省了多少、各类数据各占多少</string>
     <string name="storage_loading">正在统计…</string>
     <string name="storage_failed">统计失败 —— 返回上一页再进一次试试。</string>
     <string name="storage_total_fmt">这些数据合计占 %1$s</string>
@@ -1456,7 +1456,7 @@
     <string name="update_mode_off">关</string>
     <string name="update_mode_stable">只查稳定版</string>
     <string name="update_mode_preview">稳定版和预览版</string>
-    <string name="update_check_sub_fmt">已装 %1$s</string>
+    <string name="update_check_sub_fmt">当前：已装 %1$s</string>
     <string name="update_checking">正在检查更新</string>
     <string name="update_latest">已是最新版本</string>
     <string name="update_err_network">连不上更新服务器</string>
@@ -1479,6 +1479,7 @@
 
     <!-- 第 336 轮：更新线路（手动测速；正常下载不测） -->
     <string name="set_update_line_title">更新线路</string>
+    <string name="set_update_mode_sub_fmt">当前：%1$s</string>
     <string name="set_update_line_sub_fmt">当前：%1$s</string>
 
     <!-- 第 378 轮：下载限速（全局一份，0 = 不限） -->
@@ -1556,17 +1557,17 @@
     <string name="lang_system">跟随系统</string>
 
     <string name="set_slot_title">默认槽</string>
-    <string name="set_slot_sub_fmt">新发现的版本默认使用「%1$s」</string>
+    <string name="set_slot_sub_fmt">当前：%1$s</string>
     <string name="set_slot_pick_title">新版本默认用哪个槽？</string>
 
     <string name="set_logs_title">日志保留份数</string>
-    <string name="set_logs_sub_fmt">崩溃报告保留 %1$d 份，超出丢最旧</string>
+    <string name="set_logs_sub_fmt">当前：保留 %1$d 份 · 超出丢最旧</string>
     <string name="set_logs_dialog_title">日志保留份数（1 ~ 999）</string>
     <string name="set_logs_hint">20</string>
     <string name="set_logs_bad">只能填 1 ~ 999 的整数</string>
 
     <string name="set_trash_title">中转站保留份数</string>
-    <string name="set_trash_sub_fmt">普通 %1$d 份 · 整个槽 / 版本 %2$d 份</string>
+    <string name="set_trash_sub_fmt">当前：普通 %1$d 份 · 整槽 / 版本 %2$d 份</string>
     <string name="set_trash_dialog_title">中转站保留份数（1 ~ 999）</string>
     <string name="set_trash_items_label">普通条目：地图 / 存档 / 蓝图 / 模组 / 插件</string>
     <string name="set_trash_slots_label">整个槽 / 游戏版本 / 补丁</string>
@@ -1582,8 +1583,8 @@
     <string name="settings_section_version">版本与更新</string>
 
     <string name="set_crash_alert_title">崩溃提示</string>
-    <string name="set_crash_alert_on">已开启 · 报告仍保存</string>
-    <string name="set_crash_alert_off">已关闭 · 报告仍保存</string>
+    <string name="set_crash_alert_on">当前：开 · 报告仍保存</string>
+    <string name="set_crash_alert_off">当前：关 · 报告仍保存</string>
     <string name="set_crash_alert_pick_title">崩溃提示</string>
     <string name="set_crash_alert_enable">开启崩溃提示</string>
     <string name="set_crash_alert_disable">关闭崩溃提示</string>
@@ -1600,7 +1601,7 @@
 
     <!-- 第 175 轮：「关于」从设置页搬成独立二级页 -->
     <string name="about_summary_fmt">版本 %1$s（构建 %2$d）\n包名 %3$s</string>
-    <string name="about_row_sub">版本、许可证与开源地址</string>
+    <string name="about_row_sub">查看版本、许可证与开源地址</string>
     <string name="about_section_links">开源与反馈</string>
     <string name="about_repo_title">开源仓库</string>
     <string name="about_repo_sub">github.com/GXFQE/mindustry-launcher-android</string>
@@ -2085,7 +2086,10 @@
     <string name="lang_dialog_title">翻译文件</string>
     <string name="lang_dialog_none_msg">还没有导入翻译文件。可以选一份 .properties 装上，也可以先导出模板自己翻译。</string>
     <string name="lang_row_title">翻译文件</string>
-    <string name="lang_row_none">用管理器自带的文字（跟随上面「语言」那一行）</string>
+    <string name="lang_row_none">当前：未使用 · 跟随「语言」</string>
+    <string name="lang_row_used_fmt">当前：已用 %1$d 条</string>
+    <string name="lang_row_rejected_fmt">忽略 %1$d 条</string>
+    <string name="lang_row_unknown_fmt">未识别 %1$d 个</string>
     <!-- 语言包三路失败的**人话**（原文只进日志） -->
     <string name="lang_pack_read_failed">这份文件读不出来 —— 换一份再试</string>
     <string name="lang_pack_install_failed">没能装上这份翻译文件</string>

@@ -155,8 +155,8 @@
     <string name="plugin_update_info_unchecked">还没查过</string>
     <string name="plugin_update_info_none">没有声明更新地址</string>
     <string name="plugin_update_auto_title">插件自动更新</string>
-    <string name="plugin_update_auto_on">已开启 · 每天查一次</string>
-    <string name="plugin_update_auto_off">已关闭 · 只有你点才查</string>
+    <string name="plugin_update_auto_on">当前：开 · 每天查一次</string>
+    <string name="plugin_update_auto_off">当前：关 · 只在手动检查时</string>
     <string name="plugin_update_auto_enable">开启（每天查一次）</string>
     <string name="plugin_update_auto_disable">关闭（只有我点才查）</string>
 </resources>

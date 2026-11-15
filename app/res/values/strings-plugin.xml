@@ -171,8 +171,8 @@
     <string name="plugin_update_info_unchecked">not checked yet</string>
     <string name="plugin_update_info_none">no update address declared</string>
     <string name="plugin_update_auto_title">Plugin auto-update</string>
-    <string name="plugin_update_auto_on">On · checked once a day</string>
-    <string name="plugin_update_auto_off">Off · only when you check</string>
+    <string name="plugin_update_auto_on">Current: On · checked daily</string>
+    <string name="plugin_update_auto_off">Current: Off · only on manual check</string>
     <string name="plugin_update_auto_enable">Turn on (check once a day)</string>
     <string name="plugin_update_auto_disable">Turn off (only when I check)</string>
 </resources>

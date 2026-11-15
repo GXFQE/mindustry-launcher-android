@@ -1351,8 +1351,8 @@
     -->
     <string name="settings_title">Settings</string>
         <string name="set_autoclean_title">Auto-clean caches</string>
-    <string name="set_autoclean_on">Auto cleanup: on</string>
-    <string name="set_autoclean_off">Auto cleanup: off</string>
+    <string name="set_autoclean_on">Current: On</string>
+    <string name="set_autoclean_off">Current: Off</string>
     <string name="set_autoclean_disable">Turn automatic cleanup off</string>
     <string name="set_autoclean_enable">Turn automatic cleanup on</string>
     <string name="set_autoclean_none">Nothing to clean</string>
@@ -1378,7 +1378,7 @@
         UI thread first.
     -->
     <string name="set_storage_title">Storage used</string>
-    <string name="set_storage_sub">What backups save, and where the space goes</string>
+    <string name="set_storage_sub">View what backups save and where the space goes</string>
     <string name="storage_loading">Counting…</string>
     <string name="storage_failed">Could not measure storage — go back and open this again.</string>
     <string name="storage_total_fmt">These add up to %1$s</string>
@@ -1488,7 +1488,7 @@
     <string name="update_mode_off">Off</string>
     <string name="update_mode_stable">Stable only</string>
     <string name="update_mode_preview">Stable and preview</string>
-    <string name="update_check_sub_fmt">Installed %1$s</string>
+    <string name="update_check_sub_fmt">Current: Installed %1$s</string>
     <string name="update_checking">Checking for updates</string>
     <string name="update_latest">Already up to date</string>
     <string name="update_err_network">Could not reach the update server</string>
@@ -1511,6 +1511,7 @@
 
     <!-- 第 336 轮：更新线路（手动测速；正常下载不测） -->
     <string name="set_update_line_title">Update line</string>
+    <string name="set_update_mode_sub_fmt">Current: %1$s</string>
     <string name="set_update_line_sub_fmt">Current: %1$s</string>
 
     <!-- 第 378 轮：下载限速（全局一份，0 = 不限） -->
@@ -1612,17 +1613,17 @@
     </string-array>
 
     <string name="set_slot_title">Default slot</string>
-    <string name="set_slot_sub_fmt">Newly found versions use \"%1$s\" by default</string>
+    <string name="set_slot_sub_fmt">Current: %1$s</string>
     <string name="set_slot_pick_title">Which slot should new versions use by default?</string>
 
     <string name="set_logs_title">Log files kept</string>
-    <string name="set_logs_sub_fmt">Keeps %1$d crash reports, discarding the oldest</string>
+    <string name="set_logs_sub_fmt">Current: Keeps %1$d · oldest discarded</string>
     <string name="set_logs_dialog_title">Log files kept (1 ~ 999)</string>
     <string name="set_logs_hint">20</string>
     <string name="set_logs_bad">Enter an integer from 1 to 999</string>
 
     <string name="set_trash_title">Trash retention</string>
-    <string name="set_trash_sub_fmt">Items %1$d · slots / versions %2$d</string>
+    <string name="set_trash_sub_fmt">Current: %1$d items · %2$d slots / versions</string>
     <string name="set_trash_dialog_title">Trash retention (1 ~ 999)</string>
     <string name="set_trash_items_label">Items: maps, saves, schematics, mods, plugins</string>
     <string name="set_trash_slots_label">Whole slots / game versions / patches</string>
@@ -1638,8 +1639,8 @@
     <string name="settings_section_version">Version and updates</string>
 
     <string name="set_crash_alert_title">Crash alerts</string>
-    <string name="set_crash_alert_on">On · reports still saved</string>
-    <string name="set_crash_alert_off">Off · reports still saved</string>
+    <string name="set_crash_alert_on">Current: On · reports still saved</string>
+    <string name="set_crash_alert_off">Current: Off · reports still saved</string>
     <string name="set_crash_alert_pick_title">Crash alerts</string>
     <string name="set_crash_alert_enable">Show crash alerts</string>
     <string name="set_crash_alert_disable">Do not show crash alerts</string>
@@ -1656,7 +1657,7 @@
 
     <!-- 第 175 轮：「关于」从设置页搬成独立二级页 -->
     <string name="about_summary_fmt">Version %1$s (build %2$d)\nPackage %3$s</string>
-    <string name="about_row_sub">Version, licence and source code</string>
+    <string name="about_row_sub">View version, licence and source code</string>
     <string name="about_section_links">Open source and feedback</string>
     <string name="about_repo_title">Source code</string>
     <string name="about_repo_sub">github.com/GXFQE/mindustry-launcher-android</string>
@@ -2123,7 +2124,10 @@
     <string name="lang_dialog_title">Translation file</string>
     <string name="lang_dialog_none_msg">No translation file yet. Pick a .properties file to install, or export a template to translate yourself.</string>
     <string name="lang_row_title">Translation file</string>
-    <string name="lang_row_none">Use the built-in text (follows the Language row above)</string>
+    <string name="lang_row_none">Current: Not used · follows Language</string>
+    <string name="lang_row_used_fmt">Current: %1$d entries used</string>
+    <string name="lang_row_rejected_fmt">%1$d ignored</string>
+    <string name="lang_row_unknown_fmt">%1$d unknown</string>
     <!-- Plain words for the three lang-pack failures (the raw exception stays in the log). -->
     <string name="lang_pack_read_failed">this file cannot be read — try another one</string>
     <string name="lang_pack_install_failed">could not install this translation file</string>

@@ -265,7 +265,10 @@ public class SettingsActivity extends BaseActivity {
 
     /**
      * 每次回本页重取一次：默认槽可能在别处被删（存档页删槽后这里要跟着回落）。
-     * 副标题就是"当前值"，和桌面版把当前值回填到输入框是同一个意思。
+     *
+     * <p>★ 第 383 轮统一小字口径（用户：「整个设置页面的小字说法都统一」）：
+     * <b>有当前值 / 状态的行一律「当前：&lt;值&gt;」</b>，需要补一句时用「 · &lt;补充&gt;」；
+     * 纯导航行（存储占用、关于）一律「查看&lt;它能做什么&gt;」。</p>
      */
     private void fillValues() {
         if (mThemeSub != null) {
@@ -300,8 +303,10 @@ public class SettingsActivity extends BaseActivity {
                     Config.get().trashKeep(), Config.get().trashKeepSlots()));
         }
         if (mAutoCleanSub != null) {
-            mAutoCleanSub.setText(Config.get().autoCleanRedundant()
-                    ? R.string.set_autoclean_on : R.string.set_autoclean_off);
+            // ★ 走 Trans（别 setText(resId)）：用户语言包要能改这一条。
+            mAutoCleanSub.setText(Trans.get(SettingsActivity.this,
+                    Config.get().autoCleanRedundant() ? R.string.set_autoclean_on
+                            : R.string.set_autoclean_off));
         }
         if (mLangPackSub != null) {
             Trans.Pack p = Trans.installed(SettingsActivity.this)
@@ -309,13 +314,14 @@ public class SettingsActivity extends BaseActivity {
             if (p == null) {
                 mLangPackSub.setText(Trans.get(SettingsActivity.this, R.string.lang_row_none));
             } else {
-                String s = Trans.get(SettingsActivity.this, R.string.lang_stat_used_fmt, p.used());
+                // ★ 第 383 轮：统一「当前：<值> · <补充>」；别再用全角空格拼统计。
+                String s = Trans.get(SettingsActivity.this, R.string.lang_row_used_fmt, p.used());
                 if (!p.ok()) {
-                    s += "　" + Trans.get(SettingsActivity.this, R.string.lang_rejected_fmt,
+                    s += " · " + Trans.get(SettingsActivity.this, R.string.lang_row_rejected_fmt,
                             p.rejected.size());
                 }
                 if (!p.unknown.isEmpty()) {
-                    s += "　" + Trans.get(SettingsActivity.this, R.string.lang_unknown_fmt,
+                    s += " · " + Trans.get(SettingsActivity.this, R.string.lang_row_unknown_fmt,
                             p.unknown.size());
                 }
                 mLangPackSub.setText(s);
@@ -328,9 +334,10 @@ public class SettingsActivity extends BaseActivity {
                     R.string.update_check_sub_fmt, UpdateUi.versionName(this)));
         }
         if (mUpdateModeSub != null) {
-            // 这副标题就是"现在的模式"：已关闭 · 只手动检查 / 自动 · 只收稳定版 / 自动 · 也收预览版
+            // 副标题 = 当前模式，统一带「当前：」（第 383 轮）。
             mUpdateModeSub.setText(Trans.get(SettingsActivity.this,
-                    UpdateMode.labelRes(UpdateMode.of(this))));
+                    R.string.set_update_mode_sub_fmt,
+                    getString(UpdateMode.labelRes(UpdateMode.of(this)))));
         }
         if (mUpdateLineSub != null) {
             mUpdateLineSub.setText(Trans.get(SettingsActivity.this,
