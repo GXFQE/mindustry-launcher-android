@@ -2418,11 +2418,14 @@ final class BatchIo {
         return new File(dir, head + "-" + System.nanoTime() + tail);
     }
 
-    /** 一次批量导入用的临时目录（内部缓存；用完 {@link #cleanup} 删掉） */
+    /**
+     * 一次批量导入用的临时目录（`app_hub/tmp/batch/<pid>-<时刻>-<随机>`；用完 {@link #cleanup} 删掉）。
+     *
+     * <p>★ 第 382 轮（阶段 0.1）：从 `getCacheDir()/batch-*` 搬到 {@link HubTmp} ——
+     * 系统清 cache 正好落在"选完文件、还没导完"的窗口里，用户会看到导入失败 / 少几份。</p>
+     */
     static File workDir(Context ctx) {
-        File d = new File(ctx.getCacheDir(), "batch-" + System.currentTimeMillis());
-        d.mkdirs();
-        return d;
+        return HubTmp.session(ctx, HubTmp.NS_BATCH);
     }
 
     static void cleanup(File work) {

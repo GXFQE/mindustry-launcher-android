@@ -149,6 +149,9 @@ public class GameSlot extends BaseActivity {
         // ③ 六步管线（同步执行，与探针一致；前置段 ~200-500 ms，游戏自身加载另有 4~5 s）
         Injector.Plan plan = new Injector.Plan();
         plan.apk = target;
+        // 第 382 轮（阶段 0.3）：native 按**版本 key** 分目录（旧布局所有版本共用一个 .so 路径，
+        // 真机实测 159.7 / v146 互相覆盖）。tag 的清洗与兜底在 Natives.tagFor。
+        plan.tag = vkey;
         // 补丁机制 v1（2026-11-10）：按**启动项（实例）**解析这次要带的补丁（第 353 轮起）。
         // ★ 只有真有启用记录时才去算 APK 的 sha256（80 MB 一遍）—— 没开补丁的人不付这个代价。
         Patches.Resolved patchRes = Patches.resolve(this, target, ikey);
@@ -161,6 +164,15 @@ public class GameSlot extends BaseActivity {
         }
         // dev：素材（资源补丁）实验的增量资产包必须在 launch 之前装填（产品版是空壳）
         ProbeLab.decorate(this, plan);
+        // ★ 阶段 0.2（第 382 轮）：游戏 cache 的**身份** = APK + 这一局真注入的补丁 + 槽内模组。
+        //   变了就整目录清（换版本 / 补丁启停 / 换模组后不许读旧音乐与旧 V8 jar）；
+        //   有别的实例在跑则跳过（阶段 0 只有单实例，但不给未来挖坑）。
+        try {
+            CacheEpoch.Result ce = CacheEpoch.prepare(this, vkey, launchSlot, plan, patchRes.apkSha);
+            android.util.Log.i("MDTLauncher", "cache epoch: " + ce.brief());
+        } catch (Throwable t) {
+            android.util.Log.w("MDTLauncher", "cache epoch failed", t);
+        }
         try {
             Injector.Timing t = Injector.launch(this, plan);
             // ★ 第 360 轮（用户：「在包含游戏补丁的情况下游戏崩溃处理方式和 game 进程注入保持一致」）：

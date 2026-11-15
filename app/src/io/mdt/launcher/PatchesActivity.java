@@ -546,7 +546,7 @@ public final class PatchesActivity extends BaseActivity {
         importFrom(uri, name);
     }
 
-    /** 导入一段 SAF 流：先落到 cache 的临时文件，再交给 {@link Patches#importPackage}（重 IO 在后台）。 */
+    /** 导入一段 SAF 流：先落到 `app_hub/tmp` 的临时文件，再交给 {@link Patches#importPackage}（重 IO 在后台）。 */
     private void importFrom(final Uri uri, final String name) {
         if (mBusy) return;
         mBusy = true;
@@ -557,7 +557,9 @@ public final class PatchesActivity extends BaseActivity {
             @Override public void run() {
                 String err = null;
                 Patches.Record rec = null;
-                File tmp = new File(getCacheDir(), "patch-import.tmp");
+                // ★ 第 382 轮（阶段 0.1）：临时件住 `app_hub/tmp`，不再放系统 cache
+                final File tmp = new File(
+                        HubTmp.session(PatchesActivity.this, HubTmp.NS_PATCH), "package.mdp");
                 InputStream in = null;
                 try {
                     in = getContentResolver().openInputStream(uri);
@@ -571,7 +573,7 @@ public final class PatchesActivity extends BaseActivity {
                             Trans.get(PatchesActivity.this, R.string.patch_import_failed));
                 } finally {
                     try { if (in != null) in.close(); } catch (Throwable ignored) { }
-                    if (tmp.exists()) tmp.delete();
+                    HubTmp.drop(PatchesActivity.this, tmp);
                     Work.end(PatchesActivity.this);
                 }
                 final String ferr = err;

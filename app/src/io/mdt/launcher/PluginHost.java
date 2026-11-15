@@ -1903,11 +1903,11 @@ public final class PluginHost {
             new android.os.Handler(android.os.Looper.getMainLooper()).post(r);
         }
 
-        /** 插件自己的 cache 目录（构造器里给的是 `<插件>/cache`；极端情况回落）。 */
+        /** 插件自己的 cache 目录（构造器里给的是 `<插件>/cache`；极端情况回落 `app_hub/tmp/plugin-cache/<pid>`）。 */
         private File pluginCache() {
             if (cache != null) return cache;
             if (files != null) return new File(files, "cache");
-            return new File(getBaseContext().getCacheDir(), "plugin-cache");
+            return HubTmp.pidDir(getBaseContext(), HubTmp.NS_PLUGIN_CACHE);
         }
 
         /** 下载状态 → 插件接口的 reason 码（文案归插件）。 */

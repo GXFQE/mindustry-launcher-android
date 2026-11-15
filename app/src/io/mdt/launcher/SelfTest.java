@@ -262,6 +262,11 @@ public final class SelfTest {
             eventPending(ctx, L, stat);
             // ★ 第 371 轮：探针按实例记账（intent 带槽 / 会话名带槽，:probe 不再猜全局当前槽）
             probeInstance(ctx, L, stat);
+            // ★ 第 382 轮（阶段 0.1/0.3）：HUB 临时件搬出系统 cache + native 按版本目录
+            hubTmp(ctx, L, stat);
+            nativeCache(ctx, L, stat);
+            cacheEpoch(ctx, L, stat);
+            cacheClean(ctx, L, stat);
             // ★ 第 364 轮：实例会话记账（多开：一槽一局，结算按实例）
             instanceSessions(ctx, L, stat);
             // ★ ⑰ F13 第三阶段：模组包导入 / 跨槽复制（五个负例 + 一条元断言）
@@ -9924,6 +9929,9 @@ public final class SelfTest {
         r.patchBytes = 14L * 1024 * 1024;
         r.patchCount = 1;
         r.cacheBytes = 36L * 1024 * 1024;
+        // ★ 第 382 轮（阶段 0.5）：HUB 临时件（app_hub/tmp）单独一行 —— 它含在 internalBytes 里，
+        //   但以前只混在「其它」中，用户看不出能不能清。
+        r.tmpBytes = 5L * 1024 * 1024;
         r.otherBytes = 17L * 1024 * 1024;
         r.slots.add(new Data.Slot("default", null, true, 51, 209L * 1024 * 1024));
         // ★ 第 150 轮：各槽**并进总分**了 ⇒ 夹具必须把 slotBytes 也喂上，
@@ -9961,6 +9969,9 @@ public final class SelfTest {
         ok(stat, L, txt.contains(ctx.getString(R.string.storage_app_patches_fmt,
                         r.patchCount, Util.formatSize(r.patchBytes))),
                 "存储占用：游戏补丁单独一行（第 354 轮用户「游戏补丁似乎也没统计」）");
+        ok(stat, L, txt.contains(ctx.getString(R.string.storage_app_tmp_fmt,
+                        Util.formatSize(r.tmpBytes))),
+                "存储占用：HUB 临时文件单独一行（第 382 轮；系统「清除缓存」清不到它）");
         ok(stat, L, txt.contains(ctx.getString(R.string.storage_total_split_fmt,
                         Util.formatSize(r.totalBytes() - r.cacheBytes),
                         Util.formatSize(r.cacheBytes))),
@@ -19833,6 +19844,314 @@ public final class SelfTest {
         String name = ProbeService.sessionName(ctx, slot);
         ok(stat, L, name.matches("\\d{8}-\\d{6}-" + java.util.regex.Pattern.quote(slot)),
                 "探针会话名 = yyyyMMdd-HHmmss-<槽>（:game 与 :probe 共用同一目录）");
+    }
+
+    /**
+     * 第 382 轮（阶段 0.1）：HUB 临时件的**唯一落点** + 启动清扫。
+     *
+     * <p>钉住四件事：① 根在 `app_hub/tmp`（不在 `getCacheDir()`）；② 导出 / 分享 / 批量导入 /
+     * 补丁导入这些调用点真的用了它；③ 会话目录带 pid；④ 清扫只清**无主 / 死 pid**，
+     * 活进程与新鲜件一个不动；⑤ **不跟随符号链接**（模组可以把链接指进槽数据）。</p>
+     */
+    private static void hubTmp(Context ctx, List<String> L, int[] stat) {
+        L.add("");
+        L.add("── 第 382 轮 · HUB 临时件搬出系统 cache（阶段 0.1）──");
+        File root = HubTmp.root(ctx);
+        File cache = ctx.getCacheDir();
+        ok(stat, L, root.isDirectory()
+                        && root.getAbsolutePath().startsWith(
+                                Paths.privateDir(ctx).getAbsolutePath())
+                        && !root.getAbsolutePath().startsWith(cache.getAbsolutePath()),
+                "① 临时根 = app_hub/tmp（不在 getCacheDir）");
+
+        File batch = BatchIo.workDir(ctx);
+        boolean callers = Exporter.exportCacheDir(ctx).getAbsolutePath()
+                        .startsWith(root.getAbsolutePath())
+                && ShareProvider.dirOf(ctx).getAbsolutePath().startsWith(root.getAbsolutePath())
+                && batch.getAbsolutePath().startsWith(root.getAbsolutePath())
+                && new File(HubTmp.session(ctx, HubTmp.NS_PATCH), "package.mdp")
+                        .getAbsolutePath().startsWith(root.getAbsolutePath());
+        ok(stat, L, callers, "② 导出 / 分享 / 批量导入 / 补丁导入都落在 tmp 下面");
+
+        File sess = HubTmp.session(ctx, "selftest-tmp");
+        ok(stat, L, sess.isDirectory()
+                        && new File(sess, HubTmp.OWNER).isFile()
+                        && HubTmp.ownerPid(sess) == android.os.Process.myPid()
+                        && sess.getName().startsWith(android.os.Process.myPid() + "-"),
+                "③ 会话目录带 owner.pid（pid 与目录名同源）");
+
+        // ④ 清扫：死 pid / 无主旧件清掉；活 pid / 新件不动。
+        //    fake 只认 4242 —— 其余 pid 仍走真实 /proc，免得把本机真在跑的 :probe 会话删掉。
+        long now = System.currentTimeMillis();
+        File ns = HubTmp.dir(ctx, "selftest-sweep");
+        File dead = new File(ns, "999999-" + (now - 2L * 3600_000L) + "-a");
+        File live = new File(ns, "4242-" + (now - 2L * 3600_000L) + "-b");
+        File stale = new File(ns, "no-owner-old");
+        File fresh = new File(ns, "no-owner-new");
+        boolean swept;
+        try {
+            dead.mkdirs();
+            writeTmp(dead, HubTmp.OWNER, "999999\n" + (now - 2L * 3600_000L) + "\n");
+            live.mkdirs();
+            writeTmp(live, HubTmp.OWNER, "4242\n" + (now - 2L * 3600_000L) + "\n");
+            stale.mkdirs();
+            stale.setLastModified(now - 2L * 3600_000L);
+            fresh.mkdirs();
+            fresh.setLastModified(now);
+            HubTmp.sweep(ctx, now, new HubTmp.PidAlive() {
+                @Override public boolean alive(int pid) {
+                    return pid == 4242 || new File("/proc/" + pid).exists();
+                }
+            }, 0);
+            swept = !dead.isDirectory() && live.isDirectory()
+                    && !stale.isDirectory() && fresh.isDirectory();
+        } catch (Throwable t) {
+            swept = false;
+        } finally {
+            Data.deleteTree(ns);
+            HubTmp.deleteNoFollow(sess);
+            HubTmp.drop(ctx, batch);
+        }
+        ok(stat, L, swept, "④ 清扫：死 pid / 无主旧件清掉；活 pid / 新件一个不动");
+
+        // ⑤ 不跟随符号链接：链接删掉、它指向的东西一个字节没动
+        File target = new File(cache, "selftest-tmp-target");
+        File keep = null;
+        File linkSession = HubTmp.session(ctx, "selftest-tmp");
+        File link = new File(linkSession, "link-to-slot");
+        boolean linked = false;
+        try {
+            target.mkdirs();
+            keep = writeTmp(target, "keep.txt", "KEEP");
+            android.system.Os.symlink(target.getAbsolutePath(), link.getAbsolutePath());
+            linked = true;
+        } catch (Throwable t) {
+            L.add("  （symlink 造不出来，跳过这一条：" + t + "）");
+        }
+        if (linked) {
+            HubTmp.drop(ctx, linkSession);
+            ok(stat, L, !link.exists() && keep != null && keep.isFile(),
+                    "⑤ 清扫不跟随符号链接（链接删掉、目标一个字节没动）");
+        }
+        Data.deleteTree(target);
+        HubTmp.deleteNoFollow(linkSession);
+
+        // ⑥ drop：文件 + 空会话目录一起收（不留空壳）
+        boolean dropped = false;
+        File s2 = HubTmp.session(ctx, "selftest-tmp");
+        try {
+            File f2 = writeTmp(s2, "one.bin", "X");
+            HubTmp.drop(ctx, f2);
+            dropped = !f2.exists() && !s2.exists();
+        } catch (Throwable t) {
+            dropped = false;
+        } finally {
+            HubTmp.deleteNoFollow(s2);
+        }
+        ok(stat, L, dropped, "⑥ drop：文件 + 空会话目录一起收（不留垃圾）");
+        Data.deleteTree(HubTmp.dir(ctx, "selftest-tmp"));
+        Data.deleteTree(HubTmp.dir(ctx, HubTmp.NS_PATCH));
+    }
+
+    /**
+     * 第 382 轮（阶段 0.3）：native 按版本目录 + 原子发布。
+     *
+     * <p>钉住：tag 稳定 / 区分 / 文件系统安全；发布落点在 `app_hub/natives/<abi>/<tag>/`；
+     * **同内容不重写**（多实例同时启动不会互相换文件）；内容变了才覆盖；发布后只读；
+     * 不留 `.part`；旧布局（ABI 目录下直接放 `.so`）被清掉而版本子目录不动。</p>
+     */
+    private static void nativeCache(Context ctx, List<String> L, int[] stat) {
+        L.add("");
+        L.add("── 第 382 轮 · native 按版本目录 + 原子发布（阶段 0.3）──");
+        String a = Natives.tagOf("official-159.7");
+        String b = Natives.tagOf("official-160");
+        ok(stat, L, a.equals(Natives.tagOf("official-159.7")) && !a.equals(b)
+                        && a.matches("[A-Za-z0-9._-]+"),
+                "① 版本 tag：同 key 稳定、不同 key 不同、只含文件系统安全字符（" + a + "）");
+        String weird = Natives.tagOf("import:蓝钢 1.0.apk");
+        ok(stat, L, !weird.contains(":") && !weird.contains(" ")
+                        && weird.length() <= 64,
+                "② 中文 / 冒号 / 空格被清洗（" + weird + "）");
+
+        final String abi = "selftest-abi";
+        final String tag = Natives.tagOf("selftest-native-" + System.currentTimeMillis());
+        File dir = Natives.dir(ctx, abi, tag);
+        try {
+            File f1 = Natives.publish(ctx, abi, tag, "libarc.so",
+                    new ByteArrayInputStream("AAAA".getBytes("UTF-8")));
+            boolean path = f1.getAbsolutePath()
+                            .equals(new File(dir, "libarc.so").getAbsolutePath())
+                    && dir.getAbsolutePath().startsWith(Natives.base(ctx).getAbsolutePath())
+                    && !dir.getAbsolutePath().startsWith(ctx.getCacheDir().getAbsolutePath());
+            ok(stat, L, path,
+                    "③ 发布落点 = app_hub/natives/<abi>/<tag>/libarc.so（不在 cache）");
+
+            long m1 = f1.lastModified();
+            File f2 = Natives.publish(ctx, abi, tag, "libarc.so",
+                    new ByteArrayInputStream("AAAA".getBytes("UTF-8")));
+            ok(stat, L, f2.equals(f1) && f2.lastModified() == m1,
+                    "④ 同内容第二次发布不重写（多实例同时启动不会互相换文件）");
+
+            Natives.publish(ctx, abi, tag, "libarc.so",
+                    new ByteArrayInputStream("BBBB".getBytes("UTF-8")));
+            ok(stat, L, "BBBB".equals(read(f1)), "⑤ 内容变了 ⇒ 覆盖（读回来的就是新的）");
+            ok(stat, L, !f1.canWrite(), "⑥ 发布后只读（防写一半被 load）");
+
+            boolean junk = true;
+            File[] fs = dir.listFiles();
+            if (fs != null) {
+                for (File f : fs) {
+                    if (f.getName().contains(".part-")) junk = false;
+                }
+            }
+            ok(stat, L, junk, "⑦ 没有 .part 残留（半截文件从不落在最终路径）");
+
+            // ⑧ 旧布局清扫：ABI 目录下直接的 .so 清掉，版本子目录一个不动
+            File abiDir = Natives.abiDir(ctx, abi);
+            File legacy = new File(abiDir, "libarc.so");
+            write(legacy, "OLD".getBytes("UTF-8"));
+            int n = Natives.sweepLegacyIn(abiDir);
+            ok(stat, L, n >= 1 && !legacy.exists() && new File(dir, "libarc.so").isFile(),
+                    "⑧ 旧布局 .so 清掉，版本子目录不动");
+        } catch (Throwable t) {
+            ok(stat, L, false, "native 发布用例异常：" + t);
+        } finally {
+            Data.deleteTree(Natives.abiDir(ctx, abi));
+        }
+    }
+
+    /**
+     * 第 382 轮（阶段 0.2）：游戏 cache 的**身份** + 整目录清。
+     *
+     * <p>钉住：签名对 APK / 补丁 / 模组的变化都有分辨力；身份没变时**一个字节都不清**；
+     * 变了则清空 cache 下所有条目（含子目录）并记账；还有别的实例在跑时**跳过且不记账**；
+     * 清成功才写 epoch（否则下次还会再清）。</p>
+     */
+    private static void cacheEpoch(Context ctx, List<String> L, int[] stat) {
+        L.add("");
+        L.add("── 第 382 轮 · 游戏 cache 身份 + 整目录清（阶段 0.2）──");
+        File work = new File(ctx.getCacheDir(), "selftest-cache-epoch");
+        File epoch = new File(ctx.getCacheDir(), "selftest-cache-epoch.txt");
+        File report = new File(Data.hubDir(ctx), "report-cache.txt");
+        String reportOld = null;
+        try {
+            if (report.isFile()) reportOld = Util.readText(report);
+        } catch (Throwable ignored) {
+        }
+        try {
+            Data.deleteTree(work);
+            work.mkdirs();
+            File apkA = writeTmp(work, "a.bin", "A");
+            File apkB = writeTmp(work, "b.bin", "BB");
+            Injector.Plan planA = new Injector.Plan();
+            planA.apk = apkA;
+            Injector.Plan planB = new Injector.Plan();
+            planB.apk = apkB;
+
+            String sA = CacheEpoch.sig(planA, "");
+            String sB = CacheEpoch.sig(planB, "");
+            String sSha = CacheEpoch.sig(planA, "deadbeef");
+            ok(stat, L, sA.equals(CacheEpoch.sig(planA, "")) && !sA.equals(sB)
+                            && !sA.equals(sSha),
+                    "① 签名：同输入稳定；换 APK / 多一个 sha256 都变");
+
+            File dexA = writeTmp(work, "pa.dex", "D1");
+            Injector.Patch pa = new Injector.Patch();
+            pa.ref = "selftest-patch@1";
+            pa.dex = dexA;
+            planA.patches.add(pa);
+            String sA2 = CacheEpoch.sig(planA, "");
+            ok(stat, L, !sA2.equals(sA), "② 补丁（按注入顺序的文件身份）参与身份");
+            File dexB = writeTmp(work, "pb.dex", "D2");
+            Injector.Patch pb = new Injector.Patch();
+            pb.ref = "selftest-patch@1";
+            pb.dex = dexB;
+            planB.patches.add(pb);
+
+            File mods = new File(work, "mods");
+            File jar = writeTmp(mods, "m.jar", "JAR");
+            String m1 = CacheEpoch.modsSig(mods);
+            jar.setLastModified(System.currentTimeMillis() - 120000L);
+            String m2 = CacheEpoch.modsSig(mods);
+            ok(stat, L, !"none".equals(m1) && !m1.equals(m2),
+                    "③ 模组目录的 name+size+mtime 参与身份");
+
+            // 端到端：第一次清、第二次不清、换身份再清、有别的实例在跑则跳过
+            File cache = new File(work, "cache");
+            File keep = writeTmp(cache, "music.ogg", "MUSIC");
+            File sub = writeTmp(new File(cache, "mods"), "x.jar", "JAR");
+            CacheEpoch.Result r1 = CacheEpoch.prepare(ctx, "v-x", "s-x", planA, "",
+                    cache, epoch, Boolean.FALSE);
+            boolean first = r1.changed && r1.cleared >= 2 && !keep.exists() && !sub.exists()
+                    && epoch.isFile();
+            ok(stat, L, first, "④ 身份变了 ⇒ cache 下所有条目（含子目录）清掉并记账");
+
+            File keep2 = writeTmp(cache, "keep.bin", "K");
+            CacheEpoch.Result r2 = CacheEpoch.prepare(ctx, "v-x", "s-x", planA, "",
+                    cache, epoch, Boolean.FALSE);
+            ok(stat, L, !r2.changed && r2.cleared == 0 && keep2.isFile(),
+                    "⑤ 身份没变 ⇒ 一个字节都不清（不每次启动都重建音乐缓存）");
+
+            CacheEpoch.Result r3 = CacheEpoch.prepare(ctx, "v-x", "s-x", planB, "",
+                    cache, epoch, Boolean.FALSE);
+            ok(stat, L, r3.changed && !keep2.exists(),
+                    "⑥ 换版本 / 换补丁 ⇒ 再清一次（旧音乐 / 旧 V8 jar 不许被读到）");
+
+            File keep3 = writeTmp(cache, "alive.bin", "A");
+            CacheEpoch.Result r4 = CacheEpoch.prepare(ctx, "v-x", "s-x", planB, "",
+                    cache, epoch, Boolean.TRUE);
+            ok(stat, L, r4.skippedOther && !r4.changed && keep3.isFile(),
+                    "⑦ 还有别的实例在跑 ⇒ 跳过且不记账（下次单实例启动再清）");
+        } catch (Throwable t) {
+            ok(stat, L, false, "cache 身份用例异常：" + t);
+        } finally {
+            Data.deleteTree(work);
+            epoch.delete();
+            try {
+                if (reportOld == null) report.delete();
+                else Util.atomicWriteText(report, reportOld);
+            } catch (Throwable ignored) {
+            }
+        }
+    }
+
+    /**
+     * 第 382 轮（阶段 0.4）：清游戏缓存（`getCacheDir()` + `getCodeCacheDir()`）。
+     *
+     * <p>钉住：有实例在跑时**拒绝且一个字节不动**；没跑时两个根都清空、根本身保留；
+     * 只读件也删得掉（先放开写权限）。</p>
+     */
+    private static void cacheClean(Context ctx, List<String> L, int[] stat) {
+        L.add("");
+        L.add("── 第 382 轮 · 清游戏缓存（阶段 0.4）──");
+        File work = new File(ctx.getCacheDir(), "selftest-clean");
+        File cache = new File(work, "cache");
+        File odex = new File(work, "code_cache");
+        try {
+            Data.deleteTree(work);
+            File a = writeTmp(cache, "music.ogg", "MUSIC");
+            writeTmp(new File(cache, "mods"), "x.jar", "JAR");
+            File b = writeTmp(odex, "classes.dex", "DEX");
+
+            CacheClean.Result r1 = CacheClean.gameCache(ctx, cache, odex, Boolean.TRUE);
+            ok(stat, L, r1.skipped && a.isFile() && b.isFile(),
+                    "① 游戏在跑 ⇒ 拒绝清理，两个根下的文件一个不动");
+
+            CacheClean.Result r2 = CacheClean.gameCache(ctx, cache, odex, Boolean.FALSE);
+            ok(stat, L, r2.ok && r2.entries >= 3 && r2.bytes > 0
+                            && !a.exists() && !b.exists()
+                            && cache.isDirectory() && odex.isDirectory(),
+                    "② 正常清：cache 与 dex 产物两个根都清空（含子目录），根本身留着");
+
+            File ro = writeTmp(cache, "readonly.bin", "RO");
+            ro.setReadOnly();
+            CacheClean.Result r3 = CacheClean.gameCache(ctx, cache, odex, Boolean.FALSE);
+            ok(stat, L, r3.ok && !ro.exists(), "③ 只读的缓存件也删得掉（先放开写权限）");
+        } catch (Throwable t) {
+            ok(stat, L, false, "清缓存用例异常：" + t);
+        } finally {
+            Data.deleteTree(work);
+        }
     }
 
     private static void ok(int[] stat, List<String> L, boolean cond, String msg) {

@@ -980,7 +980,7 @@ public final class Exporter {
     // ── 底层 ──────────────────────────────────────────────────────────────
 
     /**
-     * 导出的**中转缓存目录**（第 177 轮，杀后台 P0）：`cache/export/`。
+     * 导出的**中转缓存目录**（第 177 轮，杀后台 P0；第 382 轮搬到 `app_hub/tmp/export`）。
      *
      * <p>★ 为什么要有它：SAF 的 `content://` 只能拿到一个**写句柄**，没法"先写 `.part`
      * 再 rename"（rename 是文件系统语义，DocumentsProvider 不一定给）。真机实测：
@@ -995,13 +995,12 @@ public final class Exporter {
      * <p>代价是缓存要能放下整包（整槽 34 MB ~ 几百 MB）。放不下时会以 ENOSPC 失败，
      * 用户看到的是"导出失败"而不是一个打不开的坏包 —— 这个方向的错更安全。
      * 残留由 {@link Recovery#runNow} 在下次启动时清掉。
+     *
+     * ★ 第 382 轮（阶段 0.1）：落点从 `getCacheDir()/export` 搬到 {@link HubTmp} ——
+     *   系统清 cache / 多实例整目录清 cache 都不许碰正在用的导出中间件（plan §12.28）。
      */
     static File exportCacheDir(Context ctx) {
-        File d = new File(ctx.getCacheDir(), "export");
-        if (!d.isDirectory() && !d.mkdirs() && !d.isDirectory()) {
-            Log.w(TAG, "export cache dir not writable: " + d);
-        }
-        return d;
+        return HubTmp.dir(ctx, HubTmp.NS_EXPORT);
     }
 
     /** 在缓存文件上写一个 zip（{@link #viaCache} 的回调；返回的 {@link Result} 原样带回） */

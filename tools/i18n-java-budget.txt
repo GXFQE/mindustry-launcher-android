@@ -50,7 +50,7 @@ SettingsBin.java = 59   # ★ 已码化：失败文案走 errCode+参数（Setti
 MsavMeta.java = 32   # ★ 已码化：8 条 error 走 errCode+参数（MsavText 映射）；这些句子只给报告/自检看
 Compat.java = 26   # 只进 report-devtool.txt / 崩溃报告（取证文本）
 ModsActivity.java = 26   # 全部在 `report()` 里（dev 落盘转储，只有 `MainActivity` 的 `dev_*` 口调它） —— 与 `MainActivity` 的 126 条同类；**它没有自己的用户可见文案**
-Injector.java = 38   # 用户可见的已搬完；剩的是启动管线报告（log.append）
+Injector.java = 40   # 用户可见的已搬完；剩的是启动管线报告（log.append）
                      # ★ 2026-11-10（第 345 轮，补丁机制 v1）：23 → 32。新增的是「宿主 dex 条数 /
                      #   每条补丁注入到哪个下标 / 注入失败跳过」这几行 —— 与既有 23 条**同族**：
                      #   只进 `hub/report-launch.txt`（原始诊断层，运行日志页原样展示），
@@ -60,6 +60,9 @@ Injector.java = 38   # 用户可见的已搬完；剩的是启动管线报告（
                      #   ★ 36 → 38（2026-11-15 第 381 轮）：补丁 dex 可写兜底那两行（"dex 原本可写 →
                      #   setReadOnly: N" 与 catch 里的 cause 链）—— 同上，只进 report-launch.txt；
                      #   没有它们，真机上只看到一行 `bad_dex`，判不出是"可写 dex 被 ART 拒"。
+                     #   ★ 38 → 40（2026-11-15 第 382 轮，阶段 0.3）：native 目录 / 版本 tag 两行 ——
+                     #   与上面同族：只进 report-launch.txt；"文件解到哪个版本目录"是排查
+                     #   "两个版本互相覆盖 .so"（plan §12.23）的唯一证据。
 MapStats.java = 22   # 已搬完；剩的是 SRC_VANILLA/MOD/PATCH 文案常量与语料诊断（内部，不上界面）
 Backup.java = 17   # 用户可见的已搬完；剩的是 CAS 迁移报告与 Log 诊断
 AutoBackup.java = 11   # 只进 report-autobackup.txt
@@ -72,6 +75,9 @@ MapStatsMods.java = 10  # 内容表 / 语料诊断 / bundle 旁证条数（「�
 Crash.java = 6   # 只进 crashes/*.txt（崩溃转储）
 GameSlot.java = 2   # 启动时 `Data.prepareSlot` 的落盘/日志报告（`rep`）
 LauncherApp.java = 1   # `Log.i` 里的 F0 迁移报告 —— 只进日志
+CacheEpoch.java = 4   # ★ 2026-11-15（第 382 轮，阶段 0.2）：只进 `hub/report-cache.txt` 与 logcat ——
+                      #   "跳过（别的实例在跑）/ 身份未变 / 身份变了清掉 N 项"三句诊断；界面一个字都不读
+                      #   （清缓存这件事还没有设置页入口，0.4 才有）。
 MsavPatches.java = 1   # ★ 纯 Java 解析器守卫（`IllegalArgumentException`），只经异常链向上
 Util.java = 1   # ★ 通用 IO 原语诊断；调用方（`MapFiles`）自己先建目录 ⇒ 此路径实际不可达
 Msch.java = 46   # ★ 2026-10-05 新增（蓝图解析）：**全部是 `error`/`Bad` 的中文诊断**（给落盘报告与自检看）；

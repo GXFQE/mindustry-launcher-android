@@ -17,12 +17,14 @@ import java.io.OutputStream;
 
 /**
  * 分享出口的**唯一实现**（第 155 轮起，第 156 轮扩到全部导出）：把一份内容落到
- * `cache/share/<名字>`，再把 {@link ShareProvider} 供的那个 `content://` 交给系统分享面板。
+ * `app_hub/tmp/share/<名字>`，再把 {@link ShareProvider} 供的那个 `content://` 交给系统分享面板。
  *
- * <h3>为什么是"落缓存再借 URI"</h3>
+ * <h3>为什么是"落临时目录再借 URI"</h3>
  * 导出原本只有一条路：{@link Exporter#createDoc} 拿用户选的 SAF 写句柄，写完就撒手
  * —— 我们**不持有任何能被别的 App 读的 URI**，而 {@code ACTION_SEND} 需要一个。
- * 缓存这一份是"给别人的一份"：**不进用户目录**、不覆盖任何原件、24h 后自己消失。
+ * 这一份是"给别人的一份"：**不进用户目录**、不覆盖任何原件、24h 后自己消失。
+ * ★ 第 382 轮（阶段 0.1）：落点从系统 cache 搬到 {@link HubTmp} —— 系统随时会清 cache，
+ *   而接收方是**异步读**的（微信先发消息、文件稍后上传），缓存一清对面就收到 0 字节。
  *
  * <h3>三条纪律</h3>
  * <ol>
@@ -104,7 +106,7 @@ final class ShareOut {
     }
 
     /**
-     * 把一份内容写进 `cache/share/`，返回可分享的 URI。
+     * 把一份内容写进 `app_hub/tmp/share/`，返回可分享的 URI。
      *
      * @param name 建议文件名（会被 {@link #fixName} 洗；撞名会自动加序号）
      * @throws IOException 写失败（半个文件**会被删掉**，不留垃圾）

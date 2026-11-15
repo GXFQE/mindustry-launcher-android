@@ -823,7 +823,9 @@ public class PluginsActivity extends BaseActivity {
         final Uri uri = data.getData();
         new Thread(new Runnable() {
             @Override public void run() {
-                final File tmp = new File(getCacheDir(), "plugin-import.apk");
+                // ★ 第 382 轮（阶段 0.1）：临时 APK 住 `app_hub/tmp`（系统清 cache 不许打断安装）
+                final File tmp = new File(
+                        HubTmp.session(PluginsActivity.this, HubTmp.NS_PLUGIN), "plugin.apk");
                 String msg;
                 boolean ok = false;
                 try {
@@ -855,7 +857,7 @@ public class PluginsActivity extends BaseActivity {
                     msg = Trans.get(PluginsActivity.this, R.string.plugin_install_failed_fmt,
                             Trans.get(PluginsActivity.this, R.string.plugin_install_unknown));
                 } finally {
-                    tmp.delete();
+                    HubTmp.drop(PluginsActivity.this, tmp);
                 }
                 final String m = msg;
                 final boolean doneOk = ok;

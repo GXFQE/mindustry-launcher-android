@@ -80,9 +80,18 @@ final class Storage {
          */
         public long cacheBytes;
         /**
+         * HUB 的临时件（`app_hub/tmp`：导出 / 分享 / 批量导入 / 补丁导入的中间件）。
+         * ★ 第 382 轮（阶段 0.5）：它们从系统 cache 搬到了内部 `app_hub` ⇒ 必须**单独列一行**，
+         *   否则用户只看到「其它」里一团看不出能不能清的体积（§12.30）。
+         * ⚠️ 这一项包含在 {@link #internalBytes} 里，**不许**再加进 total。
+         */
+        public long tmpBytes;
+        /**
          * 上面各段**都没点到**的部分 —— 外部 hub 里的预览缩略图 / 设置备份 / 报告，
          * 加上内部 `app_hub` 里的零碎（配置 / 槽记录）。
          * 不做这一项的话，"总占用"与下面各节之和会对不上，用户只能自己猜差额去哪了。
+         * ★ 第 382 轮：`tmpBytes` 已作为单独一行露出来，所以这里要把它从"其它"里**减掉**
+         *   （否则同一份体积在界面上出现两次）。
          */
         public long otherBytes;
         /** 各槽（外部存储里的游戏数据） */
@@ -174,13 +183,16 @@ final class Storage {
         }
         // 两个缓存目录一起算（游戏解出来的音乐 / 模组贴图 + 系统给动态加载的包生成的 dex 产物）
         r.cacheBytes = Data.sizeTree(ctx.getCacheDir()) + Data.sizeTree(ctx.getCodeCacheDir());
+        // ★ 第 382 轮（阶段 0.5）：HUB 临时件（app_hub/tmp）单独计量 —— 不跟外部 hub 重复算，
+        //   也不加进 total（它本来就在 internalBytes 里）。
+        r.tmpBytes = HubTmp.sizeNoFollow(HubTmp.rootNoCreate(ctx));
 
         // 外部 hub 里"备份 / 中转站"之外的那些（预览缩略图 / 设置备份 / 报告），
         // 以及内部 app_hub 里除上面三项之外的零碎（config.json / 槽记录…）。
         // ⚠️ 用减法算，所以要**夹到 0**：份额取自别处的口径（池 / 中转站），
         //    万一将来有个东西两边都算，负数会在界面上变成一句莫名其妙的"-3 MB"。
         long covered = (r.pool == null ? 0L : r.pool.actual + r.pool.legacyBytes) + r.trashTotalBytes
-                + r.importBytes + r.nativesBytes + r.pluginsBytes + r.patchBytes;
+                + r.importBytes + r.nativesBytes + r.pluginsBytes + r.patchBytes + r.tmpBytes;
         r.otherBytes = Math.max(0L, r.hubBytes + r.internalBytes - covered);
         return r;
     }
@@ -255,6 +267,12 @@ final class Storage {
         if (r.cacheBytes > 0) {
             sb.append(Trans.get(c, R.string.storage_app_cache_fmt,
                     Util.formatSize(r.cacheBytes))).append('\n');
+            appAny = true;
+        }
+        // ★ 第 382 轮（阶段 0.5）：HUB 临时件单独一行（系统"清除缓存"清不到它们，见 §12.32）
+        if (r.tmpBytes > 0) {
+            sb.append(Trans.get(c, R.string.storage_app_tmp_fmt,
+                    Util.formatSize(r.tmpBytes))).append('\n');
             appAny = true;
         }
         if (r.otherBytes > 0) {

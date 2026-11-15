@@ -1392,6 +1392,7 @@
     <string name="storage_app_natives_fmt">Native libraries unpacked from them: %1$s</string>
     <string name="storage_app_plugins_fmt">Plugins: %1$d · %2$s</string>
     <string name="storage_app_cache_fmt">Cache (temporary files): %1$s</string>
+    <string name="storage_app_tmp_fmt">Temp files (exports, imports): %1$s</string>
     <string name="storage_app_other_fmt">Other (previews, reports, settings backups): %1$s</string>
     <string name="storage_app_none">Nothing extra yet.</string>
     <string name="storage_sec_slots">Slot contents</string>
@@ -1654,6 +1655,13 @@
     <string name="storage_clear_done_fmt">Removed %1$d temporary files.</string>
     <string name="storage_clear_none">No temporary share files.</string>
     <string name="storage_clear_fail">Could not clear the cache.</string>
+    <string name="storage_clear_game_cache">Clear game cache</string>
+    <string name="storage_clear_game_title">Clear game cache</string>
+    <string name="storage_clear_game_msg">Removes music, mod caches and temporary files the game rebuilds on the next launch. Saves, mods and launcher data are untouched. Not available while a game is running.</string>
+    <string name="storage_clear_game_done_fmt">Cleared %1$s.</string>
+    <string name="storage_clear_game_none">Nothing to clear.</string>
+    <string name="storage_clear_game_busy">A game is running. Close it first.</string>
+    <string name="storage_clear_game_fail">Could not clear the game cache.</string>
 
 
     <!-- 第 175 轮：「关于」从设置页搬成独立二级页 -->

@@ -383,11 +383,14 @@ public class SettingsActivity extends BaseActivity {
      * 遍历各槽 + 整个对象池 + 中转站要几百毫秒，放主线程就是 ANR。
      *
      * ⚠️ 收尾必须判 {@link Util#dead}（转屏时 `isFinishing()` 是 false ⇒ 弹窗会炸）。
-     * ⚠️ 本方法**只读**：不回收、不迁移、不清理（那些各有各的安排与门禁）。
+     * ⚠️ 卡片正文本身**只读**；两个清理按钮各有确认框，实际删除由 {@link CacheClean} /
+     *   {@link ShareOut#clear} 完成（运行中的实例一律拒绝，见 CacheClean 的类注释）。
      */
     private void showStorage() {
         // ★ 第 264 轮：先出壳、后台算完补正文（原来是 `dlg.setMessage`），
         //   "清理分享缓存"的确认框也推进同一张卡 —— 原来是卡上再叠一个弹窗。
+        // ★ 第 382 轮（阶段 0.4）：多一个「清理游戏缓存」—— 它清 getCacheDir / getCodeCacheDir
+        //   （HUB 临时件已搬去 app_hub/tmp，不在这里面；见 HubTmp / CacheClean 的类注释）。
         final android.widget.TextView bodyView = new android.widget.TextView(this);
         bodyView.setTextSize(15);
         bodyView.setTextColor(getResources().getColor(R.color.fg));
@@ -396,13 +399,21 @@ public class SettingsActivity extends BaseActivity {
         final CardStack[] ref = new CardStack[1];
         ref[0] = CardStack.show(null, this, Trans.get(this, R.string.set_storage_title),
                 CardStack.wrap(this, bodyView),
+                new CardStack.Btn(Trans.get(this, R.string.storage_clear_game_cache),
+                        new Runnable() {
+                            @Override public void run() { confirmClearGameCache(ref[0]); }
+                        }),
                 new CardStack.Btn(Trans.get(this, R.string.storage_clear_cache), new Runnable() {
                     @Override public void run() { confirmClearShareCache(ref[0]); }
                 }),
                 new CardStack.Btn(Trans.get(this, R.string.close), new Runnable() {
                     @Override public void run() { ref[0].dismiss(); }
                 }));
-        final CardStack card = ref[0];
+        loadStorageText(ref[0], bodyView);
+    }
+
+    /** 后台算「存储占用」并填进那张卡（首次打开 / 清完之后复用这一份） */
+    private void loadStorageText(final CardStack card, final android.widget.TextView bodyView) {
         final android.content.Context app = getApplicationContext();
         new Thread(new Runnable() {
             @Override public void run() {
@@ -432,10 +443,71 @@ public class SettingsActivity extends BaseActivity {
     }
 
     /**
-     * 第 174 轮：清掉 `cache/share/` 里的临时分享 / 统计缓存。
+     * 第 382 轮（阶段 0.4）：清游戏缓存（`getCacheDir()` + `getCodeCacheDir()`）。
      *
-     * <p>为什么只清这一层：`getCacheDir()` 里还有地图缩略图、游戏运行时临时件等，
-     * 那些删了会重新生成、也可能正在被用；这里只动「直接分享」留下的那一份。
+     * <p>为什么单独一个确认框：它删的是**游戏运行时真正在用**的东西（音乐 / 模组 jar / dex 产物），
+     * 而且从这一版起它们不再住在系统 cache 里 ⇒ 系统「清除缓存」清不到，用户只能从这里清。
+     * 文案说清"不动存档 / 模组 / 启动器数据"，以及"游戏运行时不能清"。</p>
+     */
+    private void confirmClearGameCache(final CardStack stack) {
+        stack.pushMessage(Trans.get(this, R.string.storage_clear_game_title),
+                Trans.get(this, R.string.storage_clear_game_msg),
+                Trans.get(this, R.string.storage_clear_btn), new Runnable() {
+                    @Override public void run() {
+                        stack.dismiss();
+                        clearGameCache();
+                    }
+                });
+    }
+
+    private void clearGameCache() {
+        final android.content.Context app = getApplicationContext();
+        new Thread(new Runnable() {
+            @Override public void run() {
+                CacheClean.Result r = null;
+                try {
+                    r = CacheClean.gameCache(app);
+                } catch (Throwable t) {
+                    android.util.Log.w("MDTLauncher", "clear game cache failed: " + t);
+                }
+                final CacheClean.Result rr = r;
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        if (isFinishing()) return;
+                        if (rr == null) {
+                            Toast.makeText(SettingsActivity.this,
+                                    R.string.storage_clear_game_fail, Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        if (rr.skipped) {
+                            Toast.makeText(SettingsActivity.this,
+                                    R.string.storage_clear_game_busy, Toast.LENGTH_LONG).show();
+                            return;
+                        }
+                        if (!rr.ok) {
+                            Toast.makeText(SettingsActivity.this,
+                                    R.string.storage_clear_game_fail, Toast.LENGTH_LONG).show();
+                            return;
+                        }
+                        Toast.makeText(SettingsActivity.this,
+                                rr.bytes > 0
+                                        ? Trans.get(SettingsActivity.this,
+                                                R.string.storage_clear_game_done_fmt,
+                                                Util.formatSize(rr.bytes))
+                                        : Trans.get(SettingsActivity.this,
+                                                R.string.storage_clear_game_none),
+                                Toast.LENGTH_LONG).show();
+                    }
+                });
+            }
+        }, "clear-game-cache").start();
+    }
+
+    /**
+     * 第 174 轮：清掉 `app_hub/tmp/share/` 里的临时分享 / 统计缓存。
+     *
+     * <p>为什么只清这一层：那里是「直接分享」借给别的 App 的那一份（第 382 轮从系统 cache
+     * 搬过来），清掉只会让还没读完的接收方失效；游戏 cache / 缩略图 / 槽数据一个都不动。
      * 正在被接收方读取的文件可能失效，所以先确认。
      */
     private void confirmClearShareCache(final CardStack stack) {
@@ -925,7 +997,9 @@ public class SettingsActivity extends BaseActivity {
         final Uri uri = data.getData();
         new Thread(new Runnable() {
             @Override public void run() {
-                final File tmp = new File(getCacheDir(), "lang.properties.tmp");
+                // ★ 第 382 轮（阶段 0.1）：校验用的临时件住 `app_hub/tmp`（系统清 cache 不许打断导入）
+                final File tmp = new File(
+                        HubTmp.session(SettingsActivity.this, HubTmp.NS_LANG), "lang.properties");
                 try {
                     InputStream in = getContentResolver().openInputStream(uri);
                     if (in == null) throw new IOException("cannot open " + uri);
@@ -996,7 +1070,7 @@ public class SettingsActivity extends BaseActivity {
                 .setNegativeButton(Trans.get(SettingsActivity.this, R.string.cancel),
                         new DialogInterface.OnClickListener() {
                             @Override public void onClick(DialogInterface d, int w) {
-                                tmp.delete();
+                                HubTmp.drop(SettingsActivity.this, tmp);
                             }
                         })
                 .show();
@@ -1004,7 +1078,8 @@ public class SettingsActivity extends BaseActivity {
 
     /**
      * 装上：临时文件 → 私有目录 → {@link Trans#installFromFile}。
-     * ⚠️ 临时文件在 `getCacheDir()`，与私有目录**可能不同文件系统** ⇒ 必须字节流复制（不能 `renameTo`）。
+     * ⚠️ 临时文件在 `app_hub/tmp`（第 382 轮起），与 `app_hub/lang` 同属内部存储，
+     *   但仍然**用字节流复制**（不依赖"同分区"这个隐含前提；`renameTo` 失败时的坑更隐蔽）。
      */
     private void installLangPack(final File tmp) {
         new Thread(new Runnable() {
@@ -1025,7 +1100,7 @@ public class SettingsActivity extends BaseActivity {
                             Trans.get(SettingsActivity.this, R.string.lang_pack_install_failed));
                     android.util.Log.w("MDTLauncher", "lang pack install failed: " + t);
                 }
-                tmp.delete();      // 成功失败都清掉（校验用的临时件没用了）
+                HubTmp.drop(SettingsActivity.this, tmp);   // 成功失败都清掉（校验用的临时件没用了）
                 final String ferr = err;
                 runOnUiThread(new Runnable() {
                     @Override public void run() {

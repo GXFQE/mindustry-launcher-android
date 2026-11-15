@@ -1,0 +1,6 @@
+-r-------- 1 u0_a298 u0_a298 550584 2026-11-15 17:04 app_hub/natives/arm64-v8a/import_mindustry-146.apk-70ef2b34/libarc.so
+-r-------- 1 u0_a298 u0_a298 802496 2026-11-15 17:04 app_hub/natives/arm64-v8a/import_official-159.apk-ce1d53ee/libarc.so
+-r-------- 1 u0_a298 u0_a298 753520 2026-11-15 17:15 app_hub/natives/arm64-v8a/import_v1607.apk-862cfb14/libarc.so
+c0eab82dbb3d9f31486659e33e62f0e3  app_hub/natives/arm64-v8a/import_mindustry-146.apk-70ef2b34/libarc.so
+1fbdf51b00ad4df142eb4639564a613d  app_hub/natives/arm64-v8a/import_official-159.apk-ce1d53ee/libarc.so
+40bd01346b237fdaefd1736044856938  app_hub/natives/arm64-v8a/import_v1607.apk-862cfb14/libarc.so

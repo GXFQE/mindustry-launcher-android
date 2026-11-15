@@ -8,7 +8,6 @@ import dalvik.system.DexClassLoader;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
-import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.zip.ZipEntry;
@@ -160,6 +159,14 @@ public final class Injector {
     public static class Plan {
         /** 代码流 + native 来源（整包 APK，或"基线+裸dex"装配后的容器） */
         public File apk;
+        /**
+         * 这一局的**版本身份**（`Versions.Entry.key()`：已装 = 包名，导入 = `import:文件名.apk`）。
+         *
+         * <p>★ 第 382 轮（阶段 0.3）：native 库按它分目录（`natives/&lt;abi&gt;/&lt;tag&gt;/`）——
+         * 旧布局所有版本共用一个固定 `.so` 路径，真机实测 159.7 与 v146 互相覆盖。
+         * 空 = 不知道（自检 / 旧调用）⇒ 用 {@link Natives#fallbackTag} 的 APK 指纹兜底。</p>
+         */
+        public String tag;
         /** 资产基线容器；null ⇒ 用 apk 自己 */
         public File assetBase;
         /** 增量包（只含 assets/ 的 zip），按顺序挂在基线之后 */
@@ -297,7 +304,7 @@ public final class Injector {
 
         // ② native
         try {
-            loadNatives(app, plan.apk, log);
+            loadNatives(app, plan, log);
         } catch (Throwable e) {
             t.mark("nativeLoad");
             logThrowable(log, e);
@@ -536,8 +543,13 @@ public final class Injector {
      * 从 APK 里解出 arc 的 .so 到私有目录再 System.load。
      * ★ System.load 把库挂在「调用方类的类加载器」上 —— 本类定义在 base CL 里，
      *   所以库归属于 base CL，与 ① 注入的游戏类同源（这是 ①②③ 必须连做且同源的原因）。
+     *
+     * ★ 第 382 轮（阶段 0.3）：落到 `natives/&lt;abi&gt;/&lt;tag&gt;/`（tag = 版本 key），
+     *   发布走 {@link Natives#publish}（`.part → rename` + 同内容不重写 + 只读）。
+     *   旧实现是"所有版本共用一个固定路径、先删后写" ⇒ 两个版本互相覆盖（plan §12.23）。
      */
-    private static void loadNatives(Context ctx, File apk, StringBuilder log) throws Exception {
+    private static void loadNatives(Context ctx, Plan plan, StringBuilder log) throws Exception {
+        File apk = plan.apk;
         ZipFile zf = new ZipFile(apk);
         int loaded = 0;
         try {
@@ -551,8 +563,10 @@ public final class Injector {
                         Compat.join(Compat.deviceAbis())));
             }
             log.append("选用 ABI = ").append(abi).append('\n');
-            File dir = new File(new File(Paths.privateDir(ctx), "natives"), abi);
-            if (!dir.exists()) dir.mkdirs();
+            String tag = Natives.tagFor(plan.tag, apk);
+            File dir = Natives.dir(ctx, abi, tag);
+            log.append("native 目录 = ").append(dir.getAbsolutePath())
+                    .append("（版本 tag = ").append(tag).append("）\n");
 
             for (String name : NATIVE_LIBS) {
                 ZipEntry e = zf.getEntry("lib/" + abi + "/" + name);
@@ -560,22 +574,7 @@ public final class Injector {
                     log.append("APK 里没有 lib/").append(abi).append('/').append(name).append('\n');
                     continue;
                 }
-                File out = new File(dir, name);
-                if (out.exists()) {
-                    out.setWritable(true);   // 上次置过只读，得先放开
-                    out.delete();
-                }
-                InputStream in = zf.getInputStream(e);
-                OutputStream os = new FileOutputStream(out);
-                try {
-                    byte[] buf = new byte[65536];
-                    int n;
-                    while ((n = in.read(buf)) > 0) os.write(buf, 0, n);
-                } finally {
-                    os.close();
-                    in.close();
-                }
-                out.setReadOnly();
+                File out = Natives.publish(ctx, abi, tag, name, zf.getInputStream(e));
                 System.load(out.getAbsolutePath());
                 loaded++;
                 log.append("System.load(").append(name).append(") OK  ")

@@ -187,7 +187,9 @@ final class PluginActions {
         }
         new Thread(new Runnable() {
             @Override public void run() {
-                final File tmp = new File(a.getCacheDir(),
+                // ★ 第 382 轮（阶段 0.1）：插件导出的暂存件住 `app_hub/tmp/plugin-export`
+                //   （系统清 cache 会在"选落点"那一步把这份删掉 ⇒ 用户保存出来是空文件）
+                final File tmp = new File(HubTmp.dir(a, HubTmp.NS_PLUGIN_EXPORT),
                         "plugin-export-" + System.currentTimeMillis() + ".bin");
                 String err = null;
                 try {

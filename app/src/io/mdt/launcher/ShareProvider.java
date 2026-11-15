@@ -21,7 +21,11 @@ import java.util.Locale;
  * 导出原本只有一条路：{@link Exporter#createDoc} 拿用户选的 SAF 写句柄，写完整份字节就撒手
  * —— 我们**不持有任何能被别的 App 读的 URI**。而 {@code ACTION_SEND} 需要一个。
  * 本工程无 androidx（清单里一个第三方库都没有）⇒ **没有 FileProvider 可用**，于是自己写一个
- * 只干一件事的：把 `cache/share/` 下的一个**平铺文件**以只读方式借给收到授权的 App。
+ * 只干一件事的：把 `app_hub/tmp/share/` 下的一个**平铺文件**以只读方式借给收到授权的 App。
+ *
+ * <p>★ 第 382 轮（阶段 0.1）：落点从 `cache/share/` 搬到 {@link HubTmp#NS_SHARE} ——
+ *   「直接分享」的这一份是**接收方异步读**的，系统清 cache 会让对面收到 0 字节
+ *   （见 {@link ShareOut} 的三条纪律）。
  *
  * <h3>三条硬纪律（少一条就是"微信里名字变成一串数字/没有后缀"，而且不报错）</h3>
  * <ol>
@@ -40,19 +44,17 @@ public final class ShareProvider extends ContentProvider {
     /** 清单里那一条必须与它逐字相同（自检按 {@code getProviderInfo} 比对）。 */
     static final String AUTHORITY = "io.mdt.launcher.share";
 
-    /** 缓存下的子目录（与 {@code cache} 其它临时件同一层，Storage 的占用口径已经算到它） */
-    static final String DIR = "share";
+    /** 临时根下的子目录（`app_hub/tmp/share`；Storage 的占用口径已算进 HUB tmp） */
+    static final String DIR = HubTmp.NS_SHARE;
 
     /** 文件名长度上限（超过就不是我们产生的东西了） */
     private static final int MAX_NAME = 120;
 
     // ── 路径判据（纯函数，自检直接调） ─────────────────────────────────────
 
-    /** `cache/share` 目录（懒创建；建不出来就把 File 交回去，调用方自己会失败） */
+    /** `app_hub/tmp/share` 目录（懒创建；建不出来就把 File 交回去，调用方自己会失败） */
     static File dirOf(Context c) {
-        File d = new File(c.getCacheDir(), DIR);
-        if (!d.isDirectory()) d.mkdirs();
-        return d;
+        return HubTmp.dir(c, DIR);
     }
 
     /** 分享 URI：`content://io.mdt.launcher.share/<名字>`（名字按路径段转义） */

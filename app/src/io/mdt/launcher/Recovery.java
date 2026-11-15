@@ -15,8 +15,8 @@ import java.util.List;
  *   <li>{@code app_hub/zip-import.tmp}（整槽导入 stage 完、还没解包，34 MB）；</li>
  *   <li>{@code app_hub/import/*.part}（APK 导入拷到一半，78 MB）；</li>
  *   <li>{@code app_hub/import/*.old}（同名重导的"旧包让位"窗口，必须改回去）；</li>
- *   <li>{@code cache/export/*}（整槽导出先落缓存再拷给 SAF 的中间件）；</li>
- *   <li>{@code cache/batch-*}（批量导入的临时目录）；</li>
+ *   <li>{@code app_hub/tmp/export/*}（整槽导出先落缓存再拷给 SAF 的中间件；第 382 轮起）；</li>
+ *   <li>{@code app_hub/tmp/*} 里主人已经不在的会话目录（第 382 轮：HUB 临时件的唯一落点）；</li>
  *   <li>{@code cas/objects/tmp/obj-*.part}（自动备份被强杀的 90 MB 暂存件，第 179 轮）；</li>
  *   <li>force-stop 留下的 {@code launchid.dat}（无更新的崩溃报告才清，带熔断，第 179 轮）；</li>
  *   <li>原子写的 {@code *.tmp}（`Util.atomicWriteText` 在 rename 前被杀）。</li>
@@ -89,19 +89,22 @@ final class Recovery {
                 del(sb, f, "export cache");
             }
         }
-        // 3b) 语言模板的临时件（设置页"导出翻译模板"在选择器打开时被杀）
-        del(sb, new File(ctx.getCacheDir(), "lang.properties.tmp"), "language template temp");
-        // 3b-2) 插件导出暂存件（第 369 轮，审计 R13）：插件给的流先落
-        //       `cache/plugin-export-*.bin`，进程在"选落点"那一步被杀就留在这里（原来没人清）。
-        //       启动时进程刚起来，不可能有正在用的暂存件。
-        File[] ce = ctx.getCacheDir().listFiles();
-        if (ce != null) {
-            for (File f : ce) {
-                if (f.isFile() && f.getName().startsWith("plugin-export-")
-                        && f.getName().endsWith(".bin")) {
-                    del(sb, f, "plugin export temp");
-                }
-            }
+        // 3b) 旧位置的 HUB 临时件（第 382 轮：全部搬到 app_hub/tmp）—— 老版本留下的清掉。
+        //     ⚠️ `cache/share` 不整目录删：接收方可能还在异步读，只按同一个 24h 判据 prune。
+        legacyTmp(sb, ctx);
+        // 3b-2) 新位置 `app_hub/tmp` 的启动清扫：主人不在的会话 / 过期件 / 超上限（活进程不动）
+        try {
+            HubTmp.Swept sw = HubTmp.sweep(ctx);
+            if (sw.total() > 0) sb.append("tmp sweep: ").append(sw.brief()).append('\n');
+        } catch (Throwable t) {
+            Log.w(TAG, "recovery: tmp sweep failed", t);
+        }
+        // 3b-3) native 旧布局（所有版本共用一个固定 .so 路径，会互相覆盖）—— 版本子目录不动
+        try {
+            int n = Natives.sweepLegacy(ctx);
+            if (n > 0) sb.append("dropped ").append(n).append(" legacy native lib(s)\n");
+        } catch (Throwable t) {
+            Log.w(TAG, "recovery: legacy native sweep failed", t);
         }
         // 3c) CAS 写入暂存区：自动备份被杀留下的 `objects/tmp/obj-*.part`
         //     （第 179 轮，杀后台 P2 —— 原来要等 1 h 或下一次备份才清）
@@ -223,6 +226,38 @@ final class Recovery {
             return;
         }
         if (f.getName().endsWith(".part") && f.delete()) n[0]++;
+    }
+
+    /**
+     * 旧位置（系统 cache）里的 HUB 临时件 —— 第 382 轮搬家后只做一次性清理。
+     *
+     * <p>⚠️ 只认**我们自己的名字**：`mods/` / 音乐缓存 / 缩略图 / 游戏自己写的东西一个都不许碰
+     * （系统 cache 是游戏与 HUB 共用的，按"整目录清"会删到游戏数据）。</p>
+     */
+    private static void legacyTmp(StringBuilder sb, Context ctx) {
+        File cache = ctx.getCacheDir();
+        if (cache == null || !cache.isDirectory()) return;
+        del(sb, new File(cache, "export"), "legacy export cache");
+        del(sb, new File(cache, "plugin-cache"), "legacy plugin cache");
+        del(sb, new File(cache, "patch-import.tmp"), "legacy patch import temp");
+        del(sb, new File(cache, "plugin-import.apk"), "legacy plugin import temp");
+        del(sb, new File(cache, "lang.properties.tmp"), "legacy language temp");
+        // 旧 share 目录：可能还有接收方在异步读 ⇒ 只按同一个 24h 判据 prune，不整目录删
+        try {
+            int n = ShareOut.prune(new File(cache, "share"),
+                    System.currentTimeMillis() - ShareOut.KEEP_MS);
+            if (n > 0) sb.append("pruned ").append(n).append(" legacy shared file(s)\n");
+        } catch (Throwable t) {
+            Log.w(TAG, "recovery: legacy share prune failed", t);
+        }
+        File[] fs = cache.listFiles();
+        if (fs == null) return;
+        for (File f : fs) {
+            String n = f.getName();
+            if (f.isFile() && n.startsWith("plugin-export-") && n.endsWith(".bin")) {
+                del(sb, f, "legacy plugin export temp");
+            }
+        }
     }
 
     private static void sweepBatchDirs(File cache) {
