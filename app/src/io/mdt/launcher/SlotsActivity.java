@@ -100,41 +100,15 @@ public class SlotsActivity extends BaseActivity {
         android.util.Log.i("MDTLauncher", "SlotsActivity onCreate");
         buildUi();
     }
-    /**
-     * 进页面时清一遍数据根残留。
-     *
-     * ★ F20（2026-10-03 用户：「我们是不是应该给一些功能加上开关」）：本方法会**删文件**，
-     *   而它原本既没有开关、也不说一声（第 57 轮把体检的可见入口删掉了）⇒ 给它加了开关。
-     *   关掉后直接返回；想清的时候去「存储占用 → 清理」（第 383 轮起手动入口并进统一清理，
-     *   见 {@link Cleanup}）。
-     *   ⚠️ 它只清 {@link Data#REDUNDANT_NAMES} 那三项**自己的残留副本**（自检 ㉕ 守着这条边界）。
-     */
-    private void autoHealth() {
-        if (!Config.get().autoCleanRedundant()) return;
-        new Thread(new Runnable() {
-            @Override public void run() {
-                final Data.AutoClean a = Data.autoCleanRedundant(SlotsActivity.this);
-                if (a.cleaned > 0 && !isFinishing()) {
-                    runOnUiThread(new Runnable() {
-                        @Override public void run() {
-                            if (!isFinishing()) refresh();
-                        }
-                    });
-                }
-            }
-        }, "auto-health").start();
-    }
-
-
     @Override
     protected void onResume() {
         super.onResume();
         // F0：`:game` 进程可能刚写过 `mdt-legacy-owner.txt`（远古包借住 files/ 或刚收回），
         //   本页 `dirOf` 依赖它 ⇒ 每次回前台先刷一次这个跨进程键，再重建列表。
+        // ★ 第 383 轮：数据根残留 / 缓存不再在进本页时清（见 Cleanup.autoCleanInBackground）。
         Data.reloadLegacyOwner();
         refresh();
-            autoHealth();              // 静默清一遍数据根残留（无可见入口）
-}
+    }
 
     // ── UI ────────────────────────────────────────────────────────────────
 

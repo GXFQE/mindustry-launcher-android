@@ -82,6 +82,15 @@ public class LauncherApp extends Application {
         Config.get().load(this);
         // 第 378 轮：把用户的下载限速交给全局额度（0 = 不限）。改设置时由设置页再调一次。
         Bandwidth.set(Config.get().downloadLimit());
+        // ★ 第 383 轮（用户：「不如把所有缓存类的东西都合并给一个自动清理的开关」）：
+        //   一个开关管三样（游戏 cache / 分享 cache / 旧版本重复文件）。**每 24h 最多一次**、
+        //   只在主进程且游戏没在跑时；自己起后台线程，不阻塞启动。
+        //   手动「存储占用 → 清理」不受这个间隔限制。
+        try {
+            Cleanup.autoCleanInBackground(this);
+        } catch (Throwable t) {
+            Log.w(TAG, "auto cleanup scheduling failed: " + t);
+        }
         Log.i(TAG, "app up, privateDir=" + Paths.privateDir(this)
                 + " pid=" + android.os.Process.myPid());
     }

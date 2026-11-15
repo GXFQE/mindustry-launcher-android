@@ -1318,13 +1318,13 @@
     <!-- ══ F3 全局设置页（按 Android 语义：这里只放"所有槽共用"的项） ══════ -->
     <string name="act_settings_title">设置</string>
     <string name="settings_title">设置</string>
-        <string name="set_autoclean_title">旧版本重复文件</string>
+        <string name="set_autoclean_title">自动清理缓存</string>
     <string name="set_autoclean_on">自动清理：开</string>
     <string name="set_autoclean_off">自动清理：关</string>
     <string name="set_autoclean_disable">关掉自动清理</string>
     <string name="set_autoclean_enable">开启自动清理</string>
     <string name="set_autoclean_none">没有需要清理的</string>
-    <string name="set_autoclean_why">旧版本把启动器自己的文件（config.json、导入的游戏包、运行库）复制进了游戏数据目录。这里是重复副本；清理可释放空间，不会动存档、模组或启动器数据。只删有把握的副本。想现在清，去「存储占用 → 清理」。</string>
+    <string name="set_autoclean_why">开启后，启动器在冷启动时每天最多自动清一次：游戏缓存（音乐 / 模组缓存 / dex 产物）、超过 1 小时的分享缓存、旧版本重复文件。只在游戏没在跑时清；存档、模组、地图、蓝图、导入的游戏包与启动器数据不动。想现在清，去「存储占用 → 清理」。</string>
     <!--
       ══ 中转站（TrashActivity，2026-10-05 第 102 轮）══════════════════════
       起因（用户 2026-10-05）：「这个中转站像是个半成品啊」。此前"中转站"只是数据层的一个

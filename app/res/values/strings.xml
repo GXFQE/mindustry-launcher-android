@@ -1350,13 +1350,13 @@
       发过才需要为用户语言包的兼容留一条死键，没发过就直接删干净。
     -->
     <string name="settings_title">Settings</string>
-        <string name="set_autoclean_title">Old-version duplicates</string>
+        <string name="set_autoclean_title">Auto-clean caches</string>
     <string name="set_autoclean_on">Auto cleanup: on</string>
     <string name="set_autoclean_off">Auto cleanup: off</string>
     <string name="set_autoclean_disable">Turn automatic cleanup off</string>
     <string name="set_autoclean_enable">Turn automatic cleanup on</string>
     <string name="set_autoclean_none">Nothing to clean</string>
-    <string name="set_autoclean_why">Old versions copied launcher files (config.json, imported game packages, native libs) into the game data folder. These are duplicate copies. Cleaning them frees space and does not touch saves, mods or launcher data. Only copies with clear evidence are removed. Clean them now under Storage &gt; Clean.</string>
+    <string name="set_autoclean_why">When on, the launcher cleans up to once a day at startup: game cache (music, mod caches, dex output), share cache older than 1 hour, and old-version duplicates. It only runs while no game is running. Saves, mods, maps, blueprints, imported game packages and launcher data are untouched. To clean now, use Storage &gt; Clean.</string>
     <!--
       ══ 中转站（TrashActivity，2026-10-05 第 102 轮）══════════════════════
       起因（用户 2026-10-05）：「这个中转站像是个半成品啊」。此前"中转站"只是数据层的一个

@@ -75,7 +75,7 @@ public class SettingsActivity extends BaseActivity {
     private TextView mCrashSub;
     /** 第 173 轮：中转站保留份数那一行的副标题（普通 / 整槽） */
     private TextView mTrashSub;
-    /** F20：自动清理残留那一行的副标题（已开 / 已关） */
+    /** F20：自动清理缓存那一行的副标题（已开 / 已关） */
     private TextView mAutoCleanSub;
     /** 用户语言包那一行的副标题（当前状态） */
     private TextView mLangPackSub;
@@ -170,8 +170,9 @@ public class SettingsActivity extends BaseActivity {
         //   不再放"点开是另一个页面"的行。日志份数（下面那行）留在这里 —— 那是一个**设置值**。
 
         // F20（2026-10-03 用户：「我们是不是应该给一些功能加上开关」）：
-        // ★ 全工程**唯一一个"静默删文件"**的动作就是它（进存档页时清旧版本重复文件），
-        //   所以只给它加了开关。第 383 轮改名 + 加解释：「自动清理残留」→「旧版本重复文件」；
+        // ★ 全工程**唯一一个"静默删文件"**的动作就是它，所以只给它加了开关。
+        //   第 383 轮从一个开关管三样：「自动清理缓存」= 游戏缓存 + 分享缓存 + 旧版本重复文件；
+        //   调度在 Cleanup.autoCleanInBackground（冷启动、游戏没在跑、每 24h 最多一次）。
         //   手动清理并进「存储占用 → 清理」，这一行只留自动开关（动作跟着数字走）。
         View rowClean = Util.bindActionValue(root, R.id.row_auto_clean, R.drawable.ic_health,
                 R.string.set_autoclean_title, new Runnable() {
@@ -348,10 +349,11 @@ public class SettingsActivity extends BaseActivity {
     }
 
     /**
-     * F20：「旧版本重复文件」这一行（第 383 轮改名 + 加解释）。
+     * F20：「自动清理缓存」这一行（第 383 轮；一个开关管三样）。
      *
-     * <p>它只控制**自动清理**：进存档页时把旧版本复制进游戏数据目录的启动器文件（有正证据的）
-     * 清掉。手动清理已经并进「存储占用 → 清理」（见 {@link Cleanup}），这里不再放
+     * <p>它只控制**自动清理**：{@link Cleanup#autoCleanInBackground} 在主进程冷启动、
+     * 游戏没在跑、距上次 ≥ 24h 时清游戏缓存 / 分享缓存（超过 1h 的）/ 旧版本重复文件。
+     * 手动清理已经并进「存储占用 → 清理」（见 {@link Cleanup}），这里不再放
      * 「立即清理一次」—— 动作跟着数字走，设置页只留策略。</p>
      *
      * <p>★ 为什么不像别处那样放一个开关控件：本页所有行都是"点一下弹选择"的样式

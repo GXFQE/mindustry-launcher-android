@@ -23,9 +23,9 @@ import java.io.File;
  * HUB 的临时件与游戏 cache 都从"系统 cache"搬进了自管理目录（阶段 0.1 / 1.x）——
  * 代价是**系统"清除缓存"按钮清不到它们**，所以必须由我们自己提供入口（plan §12.30/§12.32）。
  *
- * <p>⚠️ 游戏在跑时**一律拒绝**：清 `getCacheDir()` 会把游戏正在用的音乐 / 模组 jar 抽走
- * （症状是音频静默 / 模组加载失败，而且很难归因）。判据复用
- * {@link CacheEpoch#otherInstanceRunning}（占位不算实例）。</p>
+ * <p>⚠️ 游戏在跑、或主进程刚点下启动（占位还在）时**一律拒绝**：清 `getCacheDir()` 会把游戏
+ * 正在用 / 马上要用的音乐 / 模组 jar 抽走（症状是音频静默 / 模组加载失败，而且很难归因）。
+ * 判据见 {@link #anyGameStarting}（运行实例 + 启动占位；拿不准也拒绝）。</p>
  *
  * <p>⚠️ 只动这两个**根目录的直接子项**，不删根本身：`cache` / `code_cache` 由系统创建，
  * 删了会让下一次 `getCacheDir()` 自己重建（通常没事，但没必要碰）。**不跟符号链接**。</p>
@@ -63,21 +63,42 @@ final class CacheClean {
      *
      * @param cacheDir     null = {@code ctx.getCacheDir()}
      * @param codeCacheDir null = {@code ctx.getCodeCacheDir()}
-     * @param otherRunning null = 现查 {@link CacheEpoch#otherInstanceRunning}
+     * @param otherRunning null = 现查（运行实例 **或** 启动占位，见 {@link #anyGameStarting}）
      */
     static Result gameCache(Context ctx, File cacheDir, File codeCacheDir,
                             Boolean otherRunning) {
         Result r = new Result();
-        if (otherRunning == null) otherRunning = CacheEpoch.otherInstanceRunning(ctx);
+        if (otherRunning == null) otherRunning = Boolean.valueOf(anyGameStarting(ctx));
         if (otherRunning.booleanValue()) {
             r.skipped = true;
-            Log.i(TAG, "cache clean skipped: a game is running");
+            Log.i(TAG, "cache clean skipped: a game is running or starting");
             return r;
         }
         r.ok = clean(cacheDir == null ? ctx.getCacheDir() : cacheDir, r);
         r.ok = clean(codeCacheDir == null ? ctx.getCodeCacheDir() : codeCacheDir, r) && r.ok;
         Log.i(TAG, "cache clean: " + r.brief());
         return r;
+    }
+
+    /**
+     * 有没有游戏**正在跑或马上要跑**。
+     *
+     * <p>为什么比 {@link CacheEpoch#otherInstanceRunning} 更严：那个判据把"启动占位"（proc 为空）
+     * 排除在外（对"启动前清 cache"是对的——占位就是这一局自己）；但**清缓存不能和启动并发**：
+     * 主进程刚点下启动、游戏进程马上起来读 cache，这时删文件会让游戏缺音乐/模组 jar。
+     * ⇒ 这里连占位一起算；拿不准（扫描抛异常）也按"要跑了"处理，宁可不删。</p>
+     */
+    private static boolean anyGameStarting(Context ctx) {
+        if (CacheEpoch.otherInstanceRunning(ctx)) return true;
+        try {
+            for (Instances.Running r : Instances.live(ctx)) {
+                if (r != null && r.proc.isEmpty()) return true;
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "cache clean: cannot check instances", t);
+            return true;
+        }
+        return false;
     }
 
     /** 清一个根目录下的所有条目；返回是否全部删掉 */

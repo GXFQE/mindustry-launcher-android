@@ -20199,6 +20199,29 @@ public final class SelfTest {
                     });
             ok(stat, L, !r3.any() && !r3.cacheSkipped(),
                     "③ 没东西可清时 any()=false（界面说「没有可清理的」）");
+
+            // ④ 自动清理只清超过 1 小时的分享件（接收方可能还在读）
+            File old = writeTmp(share, "old.msav", "OLD");
+            File fresh = writeTmp(share, "fresh.msav", "FRESH");
+            long now = System.currentTimeMillis();
+            old.setLastModified(now - Cleanup.AUTO_SHARE_GRACE_MS - 60_000L);
+            Cleanup.Result r4 = Cleanup.runAt(ctx, cache, odex, Boolean.FALSE, share,
+                    new Cleanup.DupClean() {
+                        @Override public Data.AutoClean clean() { return new Data.AutoClean(); }
+                    }, now - Cleanup.AUTO_SHARE_GRACE_MS);
+            ok(stat, L, r4.shareFiles == 1 && !old.exists() && fresh.isFile(),
+                    "④ 自动清理只清超过 1 小时的分享件（新的那份留着）");
+
+            // ⑤ 24 小时节流：没记录 / 刚记过 / 满 24h / 时钟回拨
+            File stamp = new File(work, "auto-clean.txt");
+            boolean due0 = Cleanup.autoDue(stamp, now);
+            Cleanup.markAuto(stamp, now);
+            boolean due1 = Cleanup.autoDue(stamp, now + 1_000L);
+            boolean due2 = Cleanup.autoDue(stamp, now + Cleanup.AUTO_INTERVAL_MS);
+            Cleanup.markAuto(stamp, now + 120_000L);        // 假装时间戳在未来
+            boolean due3 = Cleanup.autoDue(stamp, now);
+            ok(stat, L, due0 && !due1 && due2 && due3,
+                    "⑤ 自动清理每 24h 最多一次；没记录算到期、时钟回拨也算到期（别把未来当刚清过）");
         } catch (Throwable t) {
             ok(stat, L, false, "统一清理用例异常：" + t);
         } finally {
