@@ -1,0 +1,57 @@
+第 382 轮 0.6 收尾（2026-11-15 17:36~17:38，真机）
+====================================================
+设备：HONOR ELP-AN00 / Android 16（API 36），序列号 AJYMUT4522007370
+构建：DEBUGGABLE=true SUFFIX=-dev（与第 382 轮主证据同一个包）
+
+一、模组改动 ⇒ 清缓存（0.6 第 1 条）
+------------------------------------
+起点：`app_hub/cache-epoch.txt` = official-159 / 预览验收，
+      mods=e3b0c442…（空串 sha256，槽 `预览验收/mods/` 是空的）。
+
+① 往 `slot-预览验收/mods/` 放一个**非模组扩展名**的探针文件（避免游戏把它当模组加载）：
+   `adb shell touch /sdcard/Android/data/io.mdt.launcher/slot-预览验收/mods/zz-epoch-probe.txt`
+   （shell 对自家 Android/data 有写权限；`adb shell ls` 也读得到，不受 run-as 的 SELinux 限制。）
+
+② 启动 official-159（dev_launch_key）：
+   17:36:59  cache epoch: import:official-159.apk / 预览验收  sig=88e4f87e9d06
+             身份变了 ⇒ 清掉 cache 下 16 项 / 27.2 MB
+   epoch 落盘：sig=88e4f87e…，mods=aa35aab0…（≠ e3b0c442…）
+   焦点：mindustry.android.AndroidLauncher（游戏确实起来了）。
+
+③ 删掉探针文件，再启动一次：
+   17:37:18  cache epoch: import:official-159.apk / 预览验收  sig=a8088c9cb33b
+             身份变了 ⇒ 清掉 cache 下 16 项 / 27.2 MB
+   epoch 回到 mods=e3b0c442…（与起点相同），sig=a8088c9cb33b（与起点相同）。
+   焦点：mindustry.android.AndroidLauncher（游戏确实起来了）。
+
+结论：`<槽>/mods/` 的任何变化（增 / 删 / mtime）都会改变 CacheEpoch 的 `mods=`
+⇒ 下一次启动清掉旧音乐 / V8 mod jar 缓存；两个方向都真的清了，不是"只在测试里通过"。
+
+二、系统清 cache 不打断导出 / 分享（0.6 第 2 条）
+-------------------------------------------------
+模拟方式：系统"清除缓存"对应用的效果就是清空 `getCacheDir()` 下的条目
+⇒ 用 app 自己的 uid 执行 `rm -rf cache/*`（不碰别的 App，也不依赖 `pm trim-caches` 的权限）。
+
+起点（app 已 force-stop）：
+  app_hub/tmp/share/zz-closeout-share.txt      14 B   SHARE-SURVIVES
+  app_hub/tmp/export/zz-closeout-export.part   15 B   EXPORT-SURVIVES
+  cache/zz-closeout-cache.txt                  18 B   CACHE-GETS-CLEARED
+
+执行 `run-as io.mdt.launcher sh -c 'rm -rf cache/*'` 之后：
+  ✅ app_hub/tmp/share/zz-closeout-share.txt   仍在，内容 SHARE-SURVIVES
+  ✅ app_hub/tmp/export/zz-closeout-export.part 仍在，内容 EXPORT-SURVIVES
+  ❌ cache/zz-closeout-cache.txt               已不存在（`du -sk cache` = 4 KB）
+  ⇒ HUB 的分享 / 导出中间件确实不在系统 cache 里，清 cache 清不到它们。
+
+再启动一次 App（主进程启动、Recovery 跑）： 
+  ✅ app_hub/tmp/share/zz-closeout-share.txt **仍在**（新鲜件 < 24 h，sweep 不动）
+  ❌ app_hub/tmp/export/zz-closeout-export.part 被 Recovery 删掉 —— **这是设计行为**：
+     `report-recovery.txt` = `dropped export cache: zz-closeout-export.part (15 B)`；
+     进程已经死了，不可能还有导出在跑，导出中间件留着只会占地方（§12.30）。
+  ⇒ 判据要分两类：**正在进行的操作**（分享的接收方可能异步读）靠"不在 cache 里"活下来；
+    **必然随进程死亡的中间件**（export/batch）由启动 sweep 收掉。
+
+三、清理
+--------
+探针文件全部删除；`app_hub/tmp/share/` 只剩用户自己的 `副本.msav`；
+`app_hub/tmp/export/` 空；app 未在运行（收尾时 force-stop）。

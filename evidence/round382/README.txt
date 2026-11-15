@@ -57,9 +57,14 @@ storage-card.png：存储占用卡片
   之后 `du -sk cache` = 4 KB、`du -sk code_cache` = 4 KB（两个根都空，根本身保留）
   （Toast 走 storage_clear_game_done_fmt；文案见 strings.xml / values-zh）
 
-六、没在本轮真机验的（留给 0.6 收尾 / 阶段 1）
-----------------------------------------------
-· 「模组改动 ⇒ 清缓存」只在自检里用 modsSig + prepare 注入验过；真机没有往测试槽加模组。
-· 「还有别的实例在跑 ⇒ 跳过」只在自检注入验过（单实例阶段没有第二个实例可造）。
-· 系统 `pm trim-caches` 没有真跑（担心清到别的 App 的缓存）；0.1 的结构判据
-  （HUB 临时件不在 getCacheDir 下）+ 自检已覆盖。
+六、0.6 收尾（2026-11-15 17:36~17:38，真机；详见 closeout.txt）
+--------------------------------------------------------------
+· 「模组改动 ⇒ 清缓存」：往 `slot-预览验收/mods/` 放一个探针文件再删掉，两次启动都报
+  「身份变了」并清 16 项 / 27.2 MB；`mods=` 从 e3b0c442… → aa35aab0… → e3b0c442…；
+  两次游戏都真的起来了（焦点 = mindustry.android.AndroidLauncher）。
+· 「系统清 cache 不打断导出 / 分享」：清空本 App 的 `cache/` 之后，
+  `app_hub/tmp/share/*` 与 `app_hub/tmp/export/*` 仍在、内容不变；
+  再启动时 export 件按设计被 Recovery 收掉（进程已死，不可能有导出在跑），
+  share 件保留（24 h 内，sweep 不动）。
+· 仍未真跑：`pm trim-caches` 整机链路（担心清到别的 App；用"清空本 App cache"等价模拟）；
+  「有别的实例在跑 ⇒ 跳过」只有自检注入（单实例阶段造不出第二个实例）。
