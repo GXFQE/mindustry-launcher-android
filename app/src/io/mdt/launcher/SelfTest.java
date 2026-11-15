@@ -18599,10 +18599,18 @@ public final class SelfTest {
             File fakeVer = new File(fakeId, "1");
             fakeVer.mkdirs();
             write(new File(fakeVer, PatchManifest.FILE), "{}".getBytes("UTF-8"));
+            // ★ 第 381 轮：真机上"补丁删进中转站再放回来"之后注入失败，报告只有一行 `bad_dex`。
+            //   根因 = 补丁库在内部存储、中转站在外部 hub ⇒ 往返是跨文件系统复制，
+            //   `Util.copyFile` 建出来的文件是 0600 可写，而 ART 拒载可写 dex。
+            //   夹具里放一份**真 dex**，钉住"放回后必须重新落只读"。
+            write(new File(fakeVer, apkSha + ".dex"), fixtureDex);
             File patchTrash = Trash.patchesDir(ctx);
             File stashed = new File(patchTrash, Trash.nameFor("", ID_PREFIX + "trash@1"));
             ok(stat, L, Trash.move(fakeVer, stashed) && stashed.isDirectory(),
                     "⑦ 删补丁 = 挪进中转站 patches-trash（不是直接删）");
+            // 模拟跨文件系统复制的结果（真实路径上 renameTo 失败 ⇒ copyFile ⇒ 0600）
+            File stashedDex = new File(stashed, apkSha + ".dex");
+            stashedDex.setWritable(true);
             Trash.Item sti = Trash.parse(stashed);
             ok(stat, L, sti != null && sti.kind == Trash.Kind.PATCH
                             && Trash.keepFor(Trash.Kind.PATCH) == Trash.keepSlots(),
@@ -18610,6 +18618,17 @@ public final class SelfTest {
             Trash.Result rr = Trash.restorePatch(ctx, sti);
             ok(stat, L, rr.ok && fakeVer.isDirectory() && !stashed.exists(),
                     "⑦ 从「中转站」放回补丁库原位置（<id>/<version>）");
+            File restoredDex = new File(fakeVer, apkSha + ".dex");
+            ok(stat, L, restoredDex.isFile() && !restoredDex.canWrite(),
+                    "★★ 放回来的 dex 重新落成只读（第 381 轮：可写 dex 被 ART 拒 ⇒ 只报一行 bad_dex）");
+            // 直接钉 seal() 本身（不经过中转站，其它入口也走它）
+            File sealDir = new File(work, "seal-" + System.currentTimeMillis());
+            sealDir.mkdirs();
+            File sealDex = new File(sealDir, "x.dex");
+            write(sealDex, new byte[]{1, 2, 3});
+            boolean sealTouched = Patches.seal(sealDir);
+            ok(stat, L, sealTouched && sealDex.isFile() && !sealDex.canWrite(),
+                    "⑦ Patches.seal 把 dex 落成只读（导入 / 中转站放回共用；启动兜底另只修 dex）");
             Data.deleteTree(fakeId);
             for (Trash.Item ti : Trash.list(patchTrash)) {
                 if (ti != null && ti.name != null && ti.name.contains(ID_PREFIX)) Data.deleteTree(ti.path);

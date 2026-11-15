@@ -208,6 +208,38 @@ final class Patches {
     }
 
     /**
+     * 把一条补丁记录里的**载体文件落成只读**（dex / 素材包 / 清单）。返回是否真的动过。
+     *
+     * <p>🔴 为什么需要它（第 381 轮真机排查：用户「补丁机制好像又出问题了啊」）：
+     * 补丁库住在**内部**存储（ART 只认内部 + 只读），而所有中转站都在**外部** hub
+     * （`patches-trash`）。删除 / 放回都是**跨文件系统**：`renameTo` 失败后退化成
+     * {@code Util.copyFile}，新建出来的目标是 **0600 可写** —— 只读位在路上丢了。
+     * 而 Android 14+ 的 {@code DexPathList.makeDexElements} 对可写 dex 直接抛
+     * {@code SecurityException: Writable dex file ... is not allowed} ⇒ 整条补丁被跳过，
+     * 启动报告只剩一行 `bad_dex`（`report-launch.txt` 里也只有一个
+     * `InvocationTargetException`，看不到 cause）。
+     *
+     * <p>只扫一层（记录目录是平的）、只认补丁自己的文件名 —— 不会误动同目录的临时件。
+     * 三处调用：导入收尾 / 从「中转站」放回 / 启动注入前（{@link Injector#injectPatches}
+     * 兜最后一道，任何来源进库都能被纠正）。
+     */
+    static boolean seal(File dir) {
+        if (dir == null || !dir.isDirectory()) return false;
+        File[] fs = dir.listFiles();
+        if (fs == null) return false;
+        boolean touched = false;
+        for (File f : fs) {
+            if (f == null || !f.isFile()) continue;
+            String n = f.getName();
+            boolean carrier = n.endsWith(".dex") || n.endsWith(".assets.zip")
+                    || PatchManifest.FILE.equals(n);
+            if (!carrier || !f.canWrite()) continue;
+            if (f.setReadOnly()) touched = true;
+        }
+        return touched;
+    }
+
+    /**
      * **补丁库的写操作锁（第 373 轮评审 M2）**：`enable` / `disable` / `delete` / `importPackage`
      * 的"读判据 → 写 config / 移目录"必须是**一个事务**。原来它们各自只靠 `Config` 的方法级
      * `synchronized`，两个并发 `patchEnable` 会都读到同一份 refs、都过冲突检查、最后互相覆盖
@@ -372,7 +404,6 @@ final class Patches {
                 } catch (IOException e) {
                     throw new PatchException(PatchException.C_BAD_DEX, t.dex + ": " + e.getMessage());
                 }
-                dexOut.setReadOnly();
 
                 if (t.hasAssets()) {
                     ZipEntry a = zip.getEntry(t.assets);
@@ -384,13 +415,13 @@ final class Patches {
                     } catch (IOException e) {
                         throw new PatchException(PatchException.C_BAD_ASSETS, t.assets + ": " + e.getMessage());
                     }
-                    assetsOut.setReadOnly();
                 }
             }
 
             File mfOut = new File(tmp, PatchManifest.FILE);
             writeBytes(mfOut, manifestBytes);
-            mfOut.setReadOnly();
+            // ★ 第 381 轮：只读统一在 seal() 一处落（导入 / 中转站放回 / 启动前兜底同一实现）
+            seal(tmp);
 
             File parent = dest.getParentFile();
             if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {

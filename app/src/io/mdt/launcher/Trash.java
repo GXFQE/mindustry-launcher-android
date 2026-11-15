@@ -915,6 +915,11 @@ public final class Trash {
         if (!move(it.path, dst)) {
             return r.fail(Result.T_MOVE_FAILED, "could not restore: " + it.path, raw);
         }
+        // 🔴 第 381 轮：中转站在**外部** hub、补丁库在**内部**存储 ⇒ 放回是跨文件系统复制
+        //   （`renameTo` 失败后退化成 `Util.copyFile`，新文件 0600 可写），只读位在路上丢了。
+        //   可写 dex 会被 ART 拒（`SecurityException: Writable dex file ...`）⇒ 启动报告只剩
+        //   一行 `bad_dex`。放回后必须重新落只读（与导入 / 启动前兜底同一个实现）。
+        Patches.seal(dst);
         r.dest = dst;
         r.ok = true;
         return r;

@@ -352,20 +352,21 @@ public final class Injector {
     // ── ⓪ 预热 ────────────────────────────────────────────────────────────
 
     /**
-     * dex 载体必须是**只读**的（Android 14+ 的硬要求，否则 `DexClassLoader` 抛
-     * `SecurityException: Writable dex file ... is not allowed`）。
+     * dex 载体（APK / 补丁 dex）必须是**只读**的（Android 14+ 的硬要求，否则
+     * `DexClassLoader` / `DexPathList.makeDexElements` 抛 `SecurityException: Writable dex file ... is not allowed`）。
      *
-     * ★ 为什么在建 CL 之前还要再兜一次：导入路径（{@link Importer}）确实置了只读，但
-     *   "中转站放回来 / 手工拷进来 / 更早版本导入的包"都可能留下可写文件 ——
-     *   真机实测（2026-10-25）：`official-159.apk` 是 0600 ⇒ 预热连失败三次、整个版本启动不了。
+     * ★ 为什么在建 CL / 注入之前还要再兜一次：导入路径（{@link Importer} / {@link Patches}）确实
+     *   置了只读，但"中转站放回来 / 手工拷进来 / 更早版本导入的包"都可能留下可写文件 ——
+     *   真机实测（2026-10-25）：`official-159.apk` 是 0600 ⇒ 预热连失败三次、整个版本启动不了；
+     *   补丁那条更隐蔽（2026-11-15）：可写 dex 让整条补丁被跳过，报告只有一个 `bad_dex`。
      *   这里只动**我们自己的私有副本**；`/data/app` 下的 APK 不可写（`canWrite()` 为 false）。
      *
      * @return 真的动过（= 之前可写）才返回 true
      */
-    static boolean ensureDexReadOnly(File apk, StringBuilder log) {
-        if (apk == null || !apk.canWrite()) return false;
-        boolean ro = apk.setReadOnly();
-        log.append("APK was writable -> setReadOnly: ").append(ro).append('\n');
+    static boolean ensureDexReadOnly(File carrier, StringBuilder log) {
+        if (carrier == null || !carrier.canWrite()) return false;
+        boolean ro = carrier.setReadOnly();
+        log.append("dex carrier was writable -> setReadOnly: ").append(ro).append('\n');
         return true;
     }
 
@@ -460,6 +461,14 @@ public final class Injector {
                 plan.patchProblems.add(PatchException.C_MISSING + "|" + label);
                 continue;
             }
+            // 🔴 第 381 轮：可写 dex 会被 ART 拒（`Writable dex file ... is not allowed`）——
+            //   中转站往返是跨文件系统复制，会丢掉只读位（见 Patches#seal）。这里兜最后一道，
+            //   否则用户只看到启动报告里一行 `bad_dex`，完全判不出是权限问题。
+            if (p.dex.canWrite()) {
+                boolean ro = p.dex.setReadOnly();
+                log.append("补丁[").append(i + 1).append("] ").append(label)
+                        .append(" 的 dex 原本可写 -> setReadOnly: ").append(ro).append('\n');
+            }
             int at = patchInsertIndex(hostDex, inserted);
             try {
                 List<String> notes = new ArrayList<>();
@@ -486,6 +495,10 @@ public final class Injector {
             } catch (Throwable e) {
                 log.append("补丁[").append(i + 1).append("] ").append(label)
                         .append(" 跳过：注入失败 ").append(e).append('\n');
+                // ★ 第 381 轮：`makeDexElements` 是反射调的，抛出来永远是
+                //   `InvocationTargetException` —— 不把 cause 链写进报告，就看不出真因是
+                //   "可写 dex"（SecurityException）还是别的。用户报"补丁又坏了"时这是唯一线索。
+                logThrowable(log, e);
                 plan.patchProblems.add(PatchException.C_BAD_DEX + "|" + label);
             }
         }
