@@ -169,17 +169,6 @@ public class SettingsActivity extends BaseActivity {
         //   （用户点单：「中转站和运行日志不应该放在设置里」）。本页从此只放"能被改的项"，
         //   不再放"点开是另一个页面"的行。日志份数（下面那行）留在这里 —— 那是一个**设置值**。
 
-        // F20（2026-10-03 用户：「我们是不是应该给一些功能加上开关」）：
-        // ★ 全工程**唯一一个"静默删文件"**的动作就是它，所以只给它加了开关。
-        //   第 383 轮从一个开关管三样：「自动清理缓存」= 游戏缓存 + 分享缓存 + 旧版本重复文件；
-        //   调度在 Cleanup.autoCleanInBackground（冷启动、游戏没在跑、每 24h 最多一次）。
-        //   手动清理并进「存储占用 → 清理」，这一行只留自动开关（动作跟着数字走）。
-        View rowClean = Util.bindActionValue(root, R.id.row_auto_clean, R.drawable.ic_health,
-                R.string.set_autoclean_title, new Runnable() {
-                    @Override public void run() { promptAutoClean(); }
-                });
-        mAutoCleanSub = (TextView) rowClean.findViewById(R.id.act_sub);
-
         // ★ 2026-10-06（一档③+⑦）：存储占用 —— 备份省了多少 + 各类数据各占多少。
         //   只读：一个字节都不写。数字在后台算完再填进弹窗（见 showStorage）。
         Util.bindAction(root, R.id.row_storage, R.drawable.ic_storage,
@@ -188,6 +177,18 @@ public class SettingsActivity extends BaseActivity {
                         showStorage();
                     }
                 });
+
+        // F20（2026-10-03 用户：「我们是不是应该给一些功能加上开关」）：
+        // ★ 全工程**唯一一个"静默删文件"**的动作就是它，所以只给它加了开关。
+        //   第 383 轮从一个开关管三样：「自动清理缓存」= 游戏缓存 + 分享缓存 + 旧版本重复文件；
+        //   调度在 Cleanup.autoCleanInBackground（冷启动、游戏没在跑、每 24h 最多一次）。
+        //   手动清理并进「存储占用 → 清理」，这一行只留自动开关（动作跟着数字走）。
+        //   ★ 用户 2026-11-15：这一行**放在「存储占用」下面**（先看占用，再决定要不要自动清）。
+        View rowClean = Util.bindActionValue(root, R.id.row_auto_clean, R.drawable.ic_health,
+                R.string.set_autoclean_title, new Runnable() {
+                    @Override public void run() { promptAutoClean(); }
+                });
+        mAutoCleanSub = (TextView) rowClean.findViewById(R.id.act_sub);
 
         // 中转站（2026-10-05 第 102 轮）—— ★ 2026-10-08（第 123 轮）**搬去主界面的工具卡**了
         //   （用户点单）。它仍然不属于任何一个槽（所以没进槽页），只是不再住"设置"里。

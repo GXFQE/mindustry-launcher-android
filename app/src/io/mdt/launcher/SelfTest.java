@@ -13905,22 +13905,29 @@ public final class SelfTest {
         //    （否则上面那条可能只是因为"末行"这个判据恒真。）
         try {
             android.view.View v = inf.inflate(R.layout.activity_settings, null);
+            android.view.View clean = v.findViewById(R.id.row_auto_clean);
             android.view.View storage = v.findViewById(R.id.row_storage);
-            android.view.ViewGroup card = storage == null ? null
-                    : (android.view.ViewGroup) storage.getParent();
-            boolean isLast = card != null
-                    && card.getChildAt(card.getChildCount() - 1) == storage;
-            ok(stat, L, isLast,
-                    "★设置页：存储占用是设置卡的**最后一行** —— 中转站 / 运行日志不许再回到设置里");
+            android.view.ViewGroup card = clean == null ? null
+                    : (android.view.ViewGroup) clean.getParent();
+            int ci = card == null ? -1 : card.indexOfChild(clean);
+            boolean isLast = card != null && ci >= 0
+                    && card.getChildAt(card.getChildCount() - 1) == clean;
+            // 用户 2026-11-15：「把自动清理缓存放在存储占用下面」⇒ 存储占用紧挨着它上面
+            // （中间隔一条 1dp 分割线 ⇒ 下标差 2）。
+            boolean storageAbove = card != null && ci >= 2
+                    && card.getChildAt(ci - 2) == storage;
+            ok(stat, L, isLast && storageAbove,
+                    "★设置页：自动清理缓存在最后一行、存储占用紧挨在它上面"
+                            + "（用户 2026-11-15 要求放存储占用下面）");
             if (card != null) {
                 android.view.View extra = new android.view.View(ctx);
                 card.addView(extra);                       // 临时塞一行，模拟"入口又搬回来了"
-                boolean stillLast = card.getChildAt(card.getChildCount() - 1) == storage;
+                boolean stillLast = card.getChildAt(card.getChildCount() - 1) == clean;
                 card.removeView(extra);
                 ok(stat, L, !stillLast,
                         "★元断言：往设置卡末尾塞一行之后，上面那条判据必须变红（判据不是恒真的）");
             } else {
-                ok(stat, L, false, "★元断言：设置卡找不到（row_storage 不在树里）");
+                ok(stat, L, false, "★元断言：设置卡找不到（row_auto_clean 不在树里）");
             }
         } catch (Throwable t) {
             ok(stat, L, false, "设置页末行检查自身异常：" + t);

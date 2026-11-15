@@ -130,19 +130,6 @@
                     android:layout_marginStart="62dp"
                     android:background="@color/divider" />
 
-                <!-- F20：自动清理数据根残留（开关） + 手动清理入口。 -->
-                <include
-                    android:id="@+id/row_auto_clean"
-                    layout="@layout/row_action"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content" />
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="62dp"
-                    android:background="@color/divider" />
-
                 <!-- 第 173 轮：中转站保留份数（普通条目 / 整个槽分开）。 -->
                 <include
                     android:id="@+id/row_trash_keep"
@@ -156,9 +143,23 @@
                     android:layout_marginStart="62dp"
                     android:background="@color/divider" />
 
-                <!-- 存储占用：只读弹窗，但弹窗里带「清理缓存」动作。 -->
+                <!-- 存储占用：只读弹窗，弹窗里带「清理」动作（第 383 轮合并成一个）。 -->
                 <include
                     android:id="@+id/row_storage"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="62dp"
+                    android:background="@color/divider" />
+
+                <!-- F20 / 第 383 轮：自动清理缓存（开关）。用户 2026-11-15 要求放在
+                     「存储占用」下面：先看占用，再决定要不要自动清。 -->
+                <include
+                    android:id="@+id/row_auto_clean"
                     layout="@layout/row_action"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
