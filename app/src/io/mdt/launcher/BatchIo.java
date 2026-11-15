@@ -1102,6 +1102,16 @@ final class BatchIo {
      * <p>⚠️ 它**不是**一个可导入的类型 —— 上层只拿它说一句话（「先分开打包」），绝不许猜着导。
      */
     static final int KIND_SLOT_AMBIGUOUS = 5;
+    /**
+     * ★ **混合包**（第 380 轮，用户：「我想说混合模式是把模组/地图/蓝图/存档混一起放文件里」）：
+     * 一个 zip 里同时装着**两类以上**这些东西（没有整槽、没有"包根本身是模组"）。
+     *
+     * <p>落点：**槽页**（`SlotActivity`）—— 目标槽由用户当场选，四类**各进各的目录**
+     * （`mods/` / `schematics/` / `maps/` / `saves/`），一份一份导、一张报告说清四类各几份。
+     * ⚠️ `.msav` 在混合包里按 **meta 有没有 `name`** 分到 `maps/` 还是 `saves/`
+     * （同一个容器，见 {@link #isMapFile}）。
+     */
+    static final int KIND_MIXED = 6;
 
     /** dev 口的字符串 key（**ASCII，不进资源** —— 它是命令的一部分，不是给用户看的文案） */
     static int kindOfKey(String key) {
@@ -1384,6 +1394,20 @@ final class BatchIo {
          * 有包裹目录以后，**所有**文件都必须在它下面（判据与 {@link SlotZip#detectStrip} 同一条）。
          */
         final List<String> fileTops = new ArrayList<>();
+        /**
+         * 包根上有没有**散落的可导入文件**（`.msav` / `.msch` / `.jar` / `.zip` —— 就是
+         * {@link #GUESS_EXTS} 那四种）。
+         *
+         * <p>用户 2026-11-15 两轮定案：第一轮「整槽 + 根级散图/散蓝图，我们就不应该允许这种东西吧」，
+         * 第二轮「**整槽是个专门的东西，不能和任何东西混在一起**」⇒ 判据放到最宽：
+         * **根上出现任何一个可导入文件**都算混装（不只是 `.msav` / `.msch` —— 根上躺着一个 `.jar` /
+         * `.zip` 同样说明"整槽 + 另一个包"拼一起）。
+         *
+         * <p>⚠️ 只管**根级**：`saves/` / `schematics/` / `mods/` 里面的**不算**（那才是整槽正常的形状）；
+         * 槽自己带的其它文件（`server_list.json` / `last_log.txt` / 用户目录…）也不算
+         * —— 判据是"能不能被当作另一个包导入"，不是"名字认不认识"。
+         */
+        boolean rootLoose;
 
         /** 不是整槽 */
         static final int SLOT_NONE = -1;
@@ -1395,7 +1419,8 @@ final class BatchIo {
         static final int SLOT_MIXED = 2;
 
         /**
-         * 这个包算不算"一个整槽"（四态，纯读 {@link #slotRoots} / {@link #fileTops} / {@link #modFolders}）。
+         * 这个包算不算"一个整槽"（四态，纯读 {@link #slotRoots} / {@link #fileTops} /
+         * {@link #modFolders} / {@link #rootLoose}）。
          *
          * <p>规则（都是"宁可不认，也不许猜"）：
          * <ol>
@@ -1404,8 +1429,9 @@ final class BatchIo {
          *       或者包根的 + 一个包裹目录里的）⇒ {@link #SLOT_MULTI}；</li>
          *   <li>包裹形态（`<X>/settings.bin`）但**还有文件不在 `X/` 下** ⇒ {@link #SLOT_MIXED}
          *       —— 与 {@link SlotZip#detectStrip} 同一条：那种包它不会剥、会把 `X/` 原样写进槽根；</li>
-         *   <li>包根就是槽根（根级 `settings.bin`）却又带着一个**一级模组夹** ⇒ {@link #SLOT_MIXED}
-         *       （模组住在 `mods/` 里；槽根上出现 `<夹>/mod.json` 说明是两样东西拼的）。</li>
+         *   <li>包根就是槽根（根级 `settings.bin`）却又带着一个**一级模组夹**、或者根上散着**任何可导入
+         *       文件**（`rootLoose`：`.msav` / `.msch` / `.jar` / `.zip`）⇒ {@link #SLOT_MIXED}
+         *       —— 用户 2026-11-15：「**整槽是个专门的东西，不能和任何东西混在一起**」。</li>
          * </ol>
          */
         int slotState() {
@@ -1414,8 +1440,9 @@ final class BatchIo {
             String root = slotRoots.get(0);
             if (root == null || root.isEmpty()) {
                 // 包根 = 槽根：其它顶级目录都算这个槽的内容（用户自己的杂项目录也是合法的），
-                // 但**一级模组夹**不是（模组在 `mods/` 下面）。
-                return modFolders.isEmpty() ? SLOT_ONE : SLOT_MIXED;
+                // 但**一级模组夹**、**根级散图/散蓝图**不是。
+                if (rootLoose || !modFolders.isEmpty()) return SLOT_MIXED;
+                return SLOT_ONE;
             }
             for (String t : fileTops) {
                 if (!root.equals(t)) return SLOT_MIXED;      // 包裹外面还有东西
@@ -1456,6 +1483,10 @@ final class BatchIo {
                 // 文件条目的**一级段**（"" = 根级文件）：判"包裹形态干不干净"用（见 Probe#fileTops）
                 String topSeg = first < 0 ? "" : flat.substring(0, first);
                 if (!p.fileTops.contains(topSeg)) p.fileTops.add(topSeg);
+                // ★ 根级**散落的可导入文件**（`0.msav` / `x.msch` / `某个模组.jar` / 另一个 `.zip`）：
+                //   整槽里出现它就说明"整槽 + 别的包"拼一起（见 Probe#rootLoose）——
+                //   用户 2026-11-15：「整槽是个专门的东西，不能和任何东西混在一起」。
+                if (slash < 0 && endsWithAny(base, GUESS_EXTS)) p.rootLoose = true;
                 // ★ 整槽包（第 379 轮）：根上 / 唯一一层包裹目录里有 `settings.bin`（见 Probe#slotRoots）。
                 //   ⚠️ 这一段**要排在"包根是模组包就提前 return"之前** —— 整槽包里也有 `mods/`，
                 //   但判据只看 `settings.bin`，不能因为先读到别的东西就漏掉它。
@@ -1496,6 +1527,7 @@ final class BatchIo {
             p.selfPack = false;
             p.slotRoots.clear();
             p.fileTops.clear();
+            p.rootLoose = false;
             p.hits.clear();
             p.modFolders.clear();
         } finally {
@@ -1548,8 +1580,14 @@ final class BatchIo {
      *       不再往模组里面看（模组可以嵌套别的模组 / 自带蓝图地图）；</li>
      *   <li>一级目录里有 `mod.hjson`（**文件夹形态的模组**，见 {@link Probe#modFolders}）⇒ 模组 ——
      *       同理，夹子里面的东西属于这个模组，不参与定类（用户：「有些模组本身就是嵌套的」）；</li>
-     *   <li>否则按命中的条目名定类（见 {@link #kindOfHits}，同样是模组优先）；</li>
-     *   <li>一条都没命中 ⇒ -1。</li>
+     *   <li>否则数**这个包里有哪几类**（{@link #typesOf}，只数模组夹外面的条目）：
+     *       <ul>
+     *         <li>≥2 类 ⇒ {@link #KIND_MIXED}（**混合包**：模组 / 地图 / 蓝图 / 存档混着装，
+     *             第 380 轮用户：「混合模式是把模组/地图/蓝图/存档混一起放文件里」）；</li>
+     *         <li>正好 1 类 ⇒ {@link #kindOfMask}（`.msav` 再靠整包文件名分地图 / 存档）；</li>
+     *         <li>一类都没有 ⇒ -1。</li>
+     *       </ul>
+     *   </li>
      * </ol>
      * ⚠️ 必须在**后台线程**调（会把整包读一遍，几十 MB）。
      */
@@ -1561,36 +1599,73 @@ final class BatchIo {
         if (ss == Probe.SLOT_ONE) return KIND_SLOT;
         if (ss != Probe.SLOT_NONE) return KIND_SLOT_AMBIGUOUS;
         if (p.selfPack) return KIND_MODS;
-        // ★ 第 379 轮：文件夹形态的模组包 —— 它自带的 `schematics/*.msch` 属于这个模组，
-        //   不能拿它当"整包里的蓝图"。反例（真机）：`蓝钢工业3.9（适160.5）.zip` 被判成蓝图整包。
-        if (!p.modFolders.isEmpty()) return KIND_MODS;
-        return kindOfHits(p.hits, d.name);
+        // ★ 第 380 轮：先数"有几类" —— ≥2 类就是**混合包**（模组夹里的条目不算，它们属于那个模组）
+        int mask = typesOf(p.hits, p.modFolders);
+        if (Integer.bitCount(mask) >= 2) return KIND_MIXED;
+        return kindOfMask(mask, d.name);
+    }
+
+    /** 命中类型的位（{@link #typesOf} 的返回值，也是 {@link #kindOfMask} 的入参） */
+    static final int T_MOD = 1;
+    static final int T_BLUEPRINT = 2;
+    static final int T_MAP = 4;
+
+    /**
+     * ★ **纯函数**：这个包里**有哪几类**（位或 {@link #T_MOD} / {@link #T_BLUEPRINT} / {@link #T_MAP}）。
+     *
+     * <p>🔴 只数**模组夹外面**的条目（`modFolders`）：夹子里的 `.jar` / `.msch` / `.msav` 属于那个模组
+     * （用户 2026-11-15：「检测到 mod.hjson 以后不要继续往深检测，毕竟有些模组本身就是嵌套的」）
+     * ⇒ 一个"只有模组夹、夹子里自带蓝图"的包必须只算**模组**一类，不能算混合。
+     *
+     * <p>⚠️ `.msav` 一律记成 {@link #T_MAP}：**地图与存档是同一个容器**，内容分不出来，
+     * 单类时靠整包文件名分（{@link #kindOfBundleName}），混合包里靠 meta 分（`expandMixed`）。
+     */
+    static int typesOf(List<String> hits, List<String> modFolders) {
+        int mask = (modFolders == null || modFolders.isEmpty()) ? 0 : T_MOD;
+        if (hits == null) return mask;
+        for (String h : hits) {
+            if (insideAny(h, modFolders)) continue;
+            String n = h == null ? "" : h.toLowerCase(Locale.ROOT);
+            if (n.endsWith(".msch")) mask |= T_BLUEPRINT;
+            else if (n.endsWith(".msav")) mask |= T_MAP;
+            else if (n.endsWith(".jar") || n.endsWith(".zip")) mask |= T_MOD;
+        }
+        return mask;
+    }
+
+    /** 这条路径是不是在某个一级模组夹里面（`夹/mod.json` 与 `夹/x` 都算） */
+    static boolean insideAny(String path, List<String> folders) {
+        if (path == null || folders == null) return false;
+        for (String f : folders) {
+            if (f != null && !f.isEmpty() && path.startsWith(f + "/")) return true;
+        }
+        return false;
+    }
+
+    /** 文件名是否以这几个后缀之一结尾（大小写无关；`exts` 里的也照游戏的习惯小写化比） */
+    static boolean endsWithAny(String name, String[] exts) {
+        if (name == null || exts == null) return false;
+        String l = name.toLowerCase(Locale.ROOT);
+        for (String x : exts) {
+            if (x != null && l.endsWith(x.toLowerCase(Locale.ROOT))) return true;
+        }
+        return false;
     }
 
     /**
-     * ★ **纯函数**：按命中的条目名定类 —— 自检直接喂字符串钉判据表。
+     * ★ **纯函数**：**单类**时定类（掩码里只有一位；自检直接喂字符串钉判据表）。
      *
-     * <p>固定优先级（与命中顺序无关，别写成"遇到谁就返回谁"），★ **模组 > 蓝图 > 地图/存档**
-     * （第 379 轮用户定案：模组会带来自己的蓝图、地图；反过来不成立）：
-     * `.jar` / 内层 `.zip` ⇒ 模组 · `.msch` ⇒ 蓝图 · `.msav` ⇒ 地图/存档。
+     * <p>固定优先级（与命中顺序无关）：模组 > 蓝图 > 地图/存档。⚠️ 掩码里有多位时**不该**走这里
+     * —— 那是混合包（{@link #KIND_MIXED}），这里只做"万一"的兜底。
      *
      * <p>★ `.msav` 是**地图与存档同一个容器** ⇒ 光看内容分不开，靠**整包的文件名**分
      * （我们自己的导出器就按 `mdt-<类>-…zip` 命名，见 {@link #kindOfBundleName}）；
      * 分不出来一律按**地图页**处理 —— 那页自己会认出"这其实是一份存档"并说明（`MapFiles`）。
      */
-    static int kindOfHits(List<String> hits, String bundleName) {
-        boolean bp = false, mod = false, map = false;
-        if (hits != null) {
-            for (String h : hits) {
-                String n = h == null ? "" : h.toLowerCase(Locale.ROOT);
-                if (n.endsWith(".msch")) bp = true;
-                else if (n.endsWith(".jar") || n.endsWith(".zip")) mod = true;
-                else if (n.endsWith(".msav")) map = true;
-            }
-        }
-        if (mod) return KIND_MODS;
-        if (bp) return KIND_BLUEPRINTS;
-        if (!map) return -1;
+    static int kindOfMask(int mask, String bundleName) {
+        if ((mask & T_MOD) != 0) return KIND_MODS;
+        if ((mask & T_BLUEPRINT) != 0) return KIND_BLUEPRINTS;
+        if ((mask & T_MAP) == 0) return -1;
         return kindOfBundleName(bundleName) == KIND_SAVES ? KIND_SAVES : KIND_MAPS;
     }
 
@@ -1889,9 +1964,310 @@ final class BatchIo {
         }
     }
 
+    // ══ 混合包（第 380 轮）：模组 / 蓝图 / 地图 / 存档混在一个 zip 里 ═══════════════
+
+    /** 混合包展开出来的四类条目（全部落在 `work` 目录里，用完由调用方 `cleanup`） */
+    static final class Mixed {
+        final List<Item> mods = new ArrayList<>();
+        final List<Item> blueprints = new ArrayList<>();
+        final List<Item> maps = new ArrayList<>();
+        final List<Item> saves = new ArrayList<>();
+
+        boolean empty() {
+            return mods.isEmpty() && blueprints.isEmpty() && maps.isEmpty() && saves.isEmpty();
+        }
+    }
+
+    /**
+     * **混合包的一次"只读规划"**：四类各自的落位清单（含同名判定）。
+     *
+     * <p>为什么分成"规划 / 写盘"两步：与批量导入同一条纪律 —— **同名只问一次**，
+     * 而且必须在**写盘之前**问（写到一半再回滚会变成逐份弹框）。
+     */
+    static final class MixedPlan {
+        final List<Integer> kinds = new ArrayList<>();
+        final List<Plan> plans = new ArrayList<>();
+
+        int total() {
+            int n = 0;
+            for (Plan p : plans) n += p.entries.size();
+            return n;
+        }
+
+        int conflicts() {
+            int n = 0;
+            for (Plan p : plans) n += p.conflicts();
+            return n;
+        }
+
+        int countOf(int kind) {
+            int i = kinds.indexOf(Integer.valueOf(kind));
+            return i < 0 ? 0 : plans.get(i).entries.size();
+        }
+
+        List<String> dups() {
+            List<String> out = new ArrayList<>();
+            for (Plan p : plans) out.addAll(p.dup);
+            return out;
+        }
+    }
+
+    /**
+     * 把一个混合包**解成四类条目**（不写槽）。
+     *
+     * <p>判据：
+     * <ul>
+     *   <li>包根 `mod.json`（整个就是模组）⇒ 只当**一份模组**（不再往里看）；</li>
+     *   <li>一级模组夹 ⇒ 逐个打成 zip 当模组，**夹子里的条目全部跳过**（属于那个模组）；</li>
+     *   <li>其余按后缀：`.msch` ⇒ 蓝图 · `.jar` / `.zip` ⇒ 模组 · `.msav` ⇒ 按 meta 分地图 / 存档。</li>
+     * </ul>
+     */
+    static Mixed expandMixed(Context ctx, Doc d, File work) {
+        Mixed m = new Mixed();
+        if (d == null || work == null) return m;
+        Probe p = probeDoc(ctx, d, GUESS_EXTS, Mods.META_FILES);
+        if (p == null || !p.zip || p.selfPack) {
+            m.mods.add(Item.ofUri(d.uri, d.name));          // 本身就是一个模组包
+            return m;
+        }
+        if (!p.modFolders.isEmpty()) {
+            for (File f : modFolderZips(ctx, d, Mods.META_FILES, work)) m.mods.add(Item.ofFile(f));
+        }
+        InputStream in = null;
+        try {
+            in = d.open(ctx);
+            extractMixed(in, work, p.modFolders, m);
+        } catch (Throwable t) {
+            Log.i(TAG, "mixed expand failed: " + d.name + " / " + Util.ioReason(ctx, t));
+        } finally {
+            closeQuietly(in);
+        }
+        return m;
+    }
+
+    /**
+     * 一次流、按后缀把条目摊到四类里（**模组夹里面的条目跳过**）。
+     * ⚠️ 与 {@link #extractBundle} 同一条安全口径：落盘只取 basename（防路径穿越）。
+     */
+    private static void extractMixed(InputStream in, File work, List<String> modFolders, Mixed out)
+            throws IOException {
+        if (in == null || work == null) return;
+        if (!work.exists() && !work.mkdirs() && !work.isDirectory()) {
+            throw new IOException("mkdir failed: " + work);
+        }
+        java.util.zip.ZipInputStream zin = new java.util.zip.ZipInputStream(in);
+        try {
+            ZipEntry e;
+            while ((e = zin.getNextEntry()) != null) {
+                String raw = e.getName() == null ? "" : e.getName();
+                String flat = raw.replace('\\', '/');
+                if (e.isDirectory() || flat.endsWith("/")) continue;
+                if (insideAny(flat, modFolders)) continue;      // 属于那个模组，不单独导
+                String lower = flat.toLowerCase(Locale.ROOT);
+                boolean bp = lower.endsWith(".msch");
+                boolean mod = lower.endsWith(".jar") || lower.endsWith(".zip");
+                boolean msav = lower.endsWith(".msav");
+                if (!bp && !mod && !msav) continue;
+                int slash = flat.lastIndexOf('/');
+                String base = Exporter.flatName(slash < 0 ? flat : flat.substring(slash + 1));
+                File dst = uniqueIn(work, base);
+                FileOutputStream fo = new FileOutputStream(dst);
+                try {
+                    byte[] buf = new byte[65536];
+                    int n;
+                    while ((n = zin.read(buf)) > 0) fo.write(buf, 0, n);
+                } finally {
+                    fo.close();
+                }
+                if (bp) out.blueprints.add(Item.ofFile(dst));
+                else if (mod) out.mods.add(Item.ofFile(dst));
+                else if (isMapFile(dst)) out.maps.add(Item.ofFile(dst));
+                else out.saves.add(Item.ofFile(dst));
+            }
+        } finally {
+            closeQuietly(zin);
+        }
+    }
+
+    /**
+     * `.msav` 到底是**地图**还是**存档**：判据 = meta 里有没有 `name`
+     * （与 `MapFiles` 那条 `saveNoName` 完全同源，见 REF「地图和存档怎么区分」）。
+     * 读不出来的当**存档**报 —— 存档的报错会点名"不是有效存档"，比误报成地图更好懂。
+     */
+    static boolean isMapFile(File f) {
+        try {
+            MsavMeta meta = MsavMeta.read(f, true);
+            return meta != null && meta.ok && meta.has("name");
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    /** 只读规划：把 `docs`（通常只有一个混合包）展成四类，各自算好落位名与同名冲突 */
+    static MixedPlan prepareMixed(Context ctx, String slot, List<Doc> docs, File work) {
+        MixedPlan mp = new MixedPlan();
+        Mixed all = new Mixed();
+        if (docs != null) {
+            for (Doc d : docs) {
+                Mixed m = expandMixed(ctx, d, work);
+                all.mods.addAll(m.mods);
+                all.blueprints.addAll(m.blueprints);
+                all.maps.addAll(m.maps);
+                all.saves.addAll(m.saves);
+            }
+        }
+        addPlan(ctx, slot, KIND_MODS, all.mods, mp);
+        addPlan(ctx, slot, KIND_BLUEPRINTS, all.blueprints, mp);
+        addPlan(ctx, slot, KIND_MAPS, all.maps, mp);
+        addPlan(ctx, slot, KIND_SAVES, all.saves, mp);
+        return mp;
+    }
+
+    private static void addPlan(Context ctx, String slot, int kind, List<Item> items, MixedPlan mp) {
+        if (items == null || items.isEmpty()) return;
+        Kind k = kindOf(ctx, slot, kind);
+        mp.kinds.add(Integer.valueOf(kind));
+        mp.plans.add(plan(k.dir, items, k.namer));
+    }
+
+    /** 按规划逐类写盘（**四类共用一份报告**；模组那类照样补插件体检） */
+    static void applyMixed(Context ctx, String slot, MixedPlan mp, Report rep, boolean replace) {
+        if (mp == null || rep == null) return;
+        rep.notes.add(Trans.get(ctx, R.string.batch_note_mixed_fmt,
+                mp.countOf(KIND_MODS), mp.countOf(KIND_BLUEPRINTS),
+                mp.countOf(KIND_MAPS), mp.countOf(KIND_SAVES)));
+        for (int i = 0; i < mp.kinds.size(); i++) {
+            int kind = mp.kinds.get(i).intValue();
+            Kind k = kindOf(ctx, slot, kind);
+            applyAll(ctx, mp.plans.get(i).entries, k.imp, rep, replace, null);
+        }
+        if (mp.countOf(KIND_MODS) > 0) appendModHealth(ctx, slot, rep);
+    }
+
+    /**
+     * **同步**导一个混合包（dev / 自检用；界面那条走 {@link #runMixed}）。
+     * 与 {@link #importSync} 同一条纪律：不问（`replace` 由调用方定）、不弹报告。
+     * ⚠️ 后台线程调。
+     */
+    static Report importMixedSync(Context ctx, String slot, List<Doc> docs, boolean replace) {
+        Report rep = new Report();
+        if (WriteGate.blockedSlot(ctx, slot)) {
+            rep.failed.add(line(ctx, slot, Trans.get(ctx, R.string.slot_err_game_running)));
+            return rep;
+        }
+        File work = workDir(ctx);
+        try {
+            MixedPlan mp = prepareMixed(ctx, slot, docs, work);
+            for (String d : mp.dups()) {
+                rep.skipped.add(line(ctx, d, Trans.get(ctx, R.string.batch_skip_dup)));
+            }
+            if (mp.total() == 0) {
+                String name = (docs == null || docs.isEmpty()) ? "" : docs.get(0).name;
+                rep.skipped.add(line(ctx, name, Trans.get(ctx, R.string.batch_fail_unknown)));
+                return rep;
+            }
+            applyMixed(ctx, slot, mp, rep, replace);
+        } finally {
+            cleanup(work);
+        }
+        return rep;
+    }
+
+    /**
+     * **界面**那条路：混合包 ⇒ 进度卡 → （有同名时问一次）→ 逐类导 → 一张报告卡。
+     *
+     * <p>落点是**槽页**（`SlotActivity`）：四类各自进这个槽的 `mods/` `schematics/` `maps/` `saves/`。
+     */
+    static void runMixed(final Activity a, final String slot, final List<Doc> docs,
+                         final Runnable onDone) {
+        if (docs == null || docs.isEmpty()) {
+            toast(a, Trans.get(a, R.string.batch_import_nothing));
+            return;
+        }
+        if (WriteGate.blockedSlot(a, slot)) {
+            toast(a, Trans.get(a, R.string.slot_err_game_running));
+            return;
+        }
+        final CardStack stack = new CardStack(a);
+        stack.replace(Trans.get(a, R.string.batch_import_progress_title),
+                Trans.get(a, R.string.batch_import_progress_fmt, docs.size(), slot));
+        new Thread(new Runnable() {
+            @Override public void run() {
+                final File work = workDir(a);
+                final MixedPlan mp = prepareMixed(a, slot, docs, work);
+                final Report rep = new Report();
+                for (String d : mp.dups()) {
+                    rep.skipped.add(line(a, d, Trans.get(a, R.string.batch_skip_dup)));
+                }
+                final int conflicts = mp.conflicts();
+                a.runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        if (Util.dead(a)) {
+                            cleanup(work);
+                            return;
+                        }
+                        if (mp.total() == 0) {
+                            rep.skipped.add(line(a, docs.get(0).name,
+                                    Trans.get(a, R.string.batch_fail_unknown)));
+                            if (onDone != null) onDone.run();
+                            stack.replace(Trans.get(a, R.string.batch_report_title), rep.text(a),
+                                    closeBtn(a, stack));
+                            cleanup(work);
+                            return;
+                        }
+                        if (conflicts == 0) {
+                            finishMixed(a, stack, slot, mp, rep, work, true, onDone);
+                            return;
+                        }
+                        stack.replace(Trans.get(a, R.string.batch_overwrite_title),
+                                Trans.get(a, R.string.batch_overwrite_msg_fmt, conflicts, mp.total()),
+                                new CardStack.Btn(Trans.get(a, R.string.cancel), new Runnable() {
+                                    @Override public void run() {
+                                        finishMixed(a, stack, slot, mp, rep, work, false, onDone);
+                                    }
+                                }),
+                                new CardStack.Btn(Trans.get(a, R.string.batch_overwrite_ok), new Runnable() {
+                                    @Override public void run() {
+                                        finishMixed(a, stack, slot, mp, rep, work, true, onDone);
+                                    }
+                                }));
+                    }
+                });
+            }
+        }, "batch-import-mixed").start();
+    }
+
+    /** 混合包的收尾：后台写盘 → UI 出报告（`replace` = 用户对"同名"的回答） */
+    private static void finishMixed(final Activity a, final CardStack stack, final String slot,
+                                    final MixedPlan mp, final Report rep, final File work,
+                                    final boolean replace, final Runnable onDone) {
+        new Thread(new Runnable() {
+            @Override public void run() {
+                try {
+                    applyMixed(a, slot, mp, rep, replace);
+                } catch (Throwable t) {
+                    Log.w(TAG, "mixed import failed", t);
+                    rep.failed.add(line(a, "", Util.ioReason(a, t)));
+                } finally {
+                    a.runOnUiThread(new Runnable() {
+                        @Override public void run() {
+                            if (onDone != null) onDone.run();
+                            if (Util.dead(a)) {
+                                cleanup(work);
+                                return;
+                            }
+                            stack.replace(Trans.get(a, R.string.batch_report_title), rep.text(a),
+                                    closeBtn(a, stack));
+                            cleanup(work);
+                        }
+                    });
+                }
+            }
+        }, "batch-import-mixed-run").start();
+    }
+
     /** 报告里那句"包里没有 X"的 X：`.msav` / `.jar、.zip`（纯展示，不进资源） */
-    static String hitText(String[] exts) {
-        StringBuilder sb = new StringBuilder();
+    static String hitText(String[] exts) {        StringBuilder sb = new StringBuilder();
         if (exts != null) {
             for (String x : exts) {
                 if (x == null) continue;

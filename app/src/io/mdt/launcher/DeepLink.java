@@ -49,6 +49,14 @@ final class DeepLink {
      */
     static final String EXTRA_URI = "mdt_deeplink_uri";
     static final String EXTRA_NAME = "mdt_deeplink_name";
+    /**
+     * ★ 第 380 轮：**分派到的是哪一类**（{@code BatchIo.KIND_*}）。
+     *
+     * <p>为什么需要：槽页现在收**两种**深链（整槽包 / 混合包），页内必须知道走哪条流程
+     * —— 两条都是"写这个槽"，但一条是**整槽写入**、一条是"四类各进各的目录"。
+     * ⚠️ 键写错编译器不响，真机只表现为"整槽包被当成混合包拆"（那就是丢数据级别的错）。
+     */
+    static final String EXTRA_KIND = "mdt_deeplink_kind";
 
     /** {@link #kindFor} 的返回值：是压缩包，**读过内容**才知道是哪一类 */
     static final int PROBE = -2;
@@ -228,11 +236,16 @@ final class DeepLink {
         if (kind == BatchIo.KIND_BLUEPRINTS) i = new Intent(c, BlueprintsActivity.class);
         else if (kind == BatchIo.KIND_SAVES) i = new Intent(c, SavesActivity.class);
         else if (kind == BatchIo.KIND_MODS) i = new Intent(c, ModsActivity.class);
-        // ★ 第 379 轮：**整槽包**（判据 `settings.bin`，见 `BatchIo.Probe#slotPack`）⇒ 槽页，
+        // ★ 第 379 轮：**整槽包**（判据 `settings.bin`，见 `BatchIo.Probe#slotState`）⇒ 槽页，
         //   由它走「导入整槽」那条既有流程（确认框 + 三个模式 + 写门禁）。
-        else if (kind == BatchIo.KIND_SLOT) i = new Intent(c, SlotActivity.class);
+        // ★ 第 380 轮：**混合包**（模组 / 地图 / 蓝图 / 存档混装）也进槽页 —— 由它按类型各进各的目录。
+        else if (kind == BatchIo.KIND_SLOT || kind == BatchIo.KIND_MIXED) {
+            i = new Intent(c, SlotActivity.class);
+        }
         else i = new Intent(c, MapsActivity.class);
         i.putExtra(MapsActivity.EXTRA_SLOT, slot == null ? "" : slot);
+        // ★ 槽页收两种深链（整槽包 / 混合包）⇒ 把"是哪一种"带过去（页内据此选哪条流程）
+        i.putExtra(EXTRA_KIND, kind);
         if (doc != null) {
             i.putExtra(EXTRA_URI, doc.uri == null ? "" : doc.uri.toString());
             i.putExtra(EXTRA_NAME, doc.name == null ? "" : doc.name);

@@ -143,11 +143,24 @@ public class SlotActivity extends BaseActivity {
                     }
                 });
 
-        // F9 深链（第 379 轮）：外部递进来一个**整槽包**（判据 = `settings.bin`，
-        //   见 `BatchIo.Probe#slotPack`）⇒ 与菜单「导入整槽」走**同一条**流程
-        //   （读包 → 确认框 + 三个模式 → 解包），只是跳过 SAF 选包那一步。
+        // F9 深链（第 379/380 轮）：外部递进来的包 —— 两种，全走**与本页菜单同一条**流程：
+        //   · **整槽包**（判据 = `settings.bin`，见 `BatchIo.Probe#slotState`）⇒ 读包 → 确认框
+        //     + 三个模式 → 解包；
+        //   · **混合包**（模组 / 地图 / 蓝图 / 存档混装，`BatchIo.KIND_MIXED`）⇒ 四类各进各的目录。
+        //   ⚠️ **靠 `EXTRA_KIND` 分**：两条都是"写这个槽"，但一条是整槽写入、一条是按类型落位，
+        //     搞混是丢数据级别的错（键写错编译器不响）。
         final java.util.List<BatchIo.Doc> dl = DeepLink.docsOf(getIntent(), this);
-        if (!dl.isEmpty()) SlotIo.importSlotDoc(this, mSlot, dl.get(0), mHost);
+        if (!dl.isEmpty()) {
+            final int dk = getIntent() == null
+                    ? -1 : getIntent().getIntExtra(DeepLink.EXTRA_KIND, -1);
+            if (dk == BatchIo.KIND_MIXED) {
+                BatchIo.runMixed(this, mSlot, dl, new Runnable() {
+                    @Override public void run() { mHost.onSlotChanged(); }
+                });
+            } else {
+                SlotIo.importSlotDoc(this, mSlot, dl.get(0), mHost);
+            }
+        }
     }
 
     /**

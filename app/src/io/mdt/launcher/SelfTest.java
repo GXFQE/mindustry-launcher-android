@@ -12845,7 +12845,9 @@ public final class SelfTest {
         L.add("");
     }
 
-    /** 造一份最小合法 .msav：zlib(MSAV + int 版本 + meta 块 + 一块假 region)；cutTail 砍掉最后 2 字节 */
+    /** 造一份最小合法 .msav：zlib(MSAV + int 版本 + meta 块 + 一块假 region)；cutTail 砍掉最后 2 字节。
+     *  ★ 第 380 轮：`name == null` ⇒ meta 里**不写 `name`**（游戏就是这么存"存档"的，见 `MapFiles` 的
+     *  `saveNoName`）—— 混合包按这个键分 `maps/` 与 `saves/`。 */
     private static File tinyMsav(File f, String name, int w, int h, int wave, boolean cutTail)
             throws Exception {
         java.io.ByteArrayOutputStream plain = new java.io.ByteArrayOutputStream();
@@ -12855,7 +12857,7 @@ public final class SelfTest {
         java.io.ByteArrayOutputStream chunk = new java.io.ByteArrayOutputStream();
         java.io.DataOutputStream cd = new java.io.DataOutputStream(chunk);
         java.util.LinkedHashMap<String, String> tags = new java.util.LinkedHashMap<>();
-        tags.put("name", name);
+        if (name != null) tags.put("name", name);
         tags.put("width", String.valueOf(w));
         tags.put("height", String.valueOf(h));
         tags.put("wave", String.valueOf(wave));
@@ -15665,6 +15667,22 @@ public final class SelfTest {
         }
     }
 
+    /** 与 {@link #zipMany} 同一条，但写**二进制**（混合包夹具里要装真 .msav / .msch / zip） */
+    private static void zipBytes(File f, String[] names, byte[][] data) throws IOException {
+        File p = f.getParentFile();
+        if (p != null && !p.exists() && !p.mkdirs()) throw new IOException("mkdir 失败：" + p);
+        java.util.zip.ZipOutputStream z = new java.util.zip.ZipOutputStream(new FileOutputStream(f));
+        try {
+            for (int i = 0; i < names.length; i++) {
+                z.putNextEntry(new java.util.zip.ZipEntry(names[i]));
+                z.write(data[i]);
+                z.closeEntry();
+            }
+        } finally {
+            z.close();
+        }
+    }
+
     /**
      * ㊷ 蓝图（`.msch`）解析（纯 Java 内核 {@link Msch}）。
      *
@@ -17066,6 +17084,35 @@ public final class SelfTest {
                     "★★ 模组夹里带 `.jar`（嵌套模组）⇒ 整个夹子当**一个**模组落位（夹C.zip），"
                             + "**不**把这个 jar 拆出来当第二个模组");
 
+            // ★ 第 380 轮：**混合包**（用户：「混合模式是把模组/地图/蓝图/存档混一起放文件里」）
+            //   ⇒ 四类各进各的目录（`mods/` / `schematics/` / `maps/` / `saves/`），一张报告说清各几份。
+            File mixMod = new File(root, "混模.zip");
+            zipMany(mixMod, new String[]{"mod.hjson"}, new String[]{"name: mixed-mod\n"});
+            File mixBp = new File(root, "混蓝.msch");
+            write(mixBp, new Sch(1, 4, 4).tag("name", "mbp")
+                    .tile("conveyor", 0, 0, 0, new byte[]{0}).bytes());
+            File mixMap = tinyMsav(new File(root, "混图.msav"), "混图", 32, 32, 1, false);
+            // 存档 = 同一个 `.msav` 容器、meta 里**没有 name**（`MapFiles` 的 saveNoName 同一条判据）
+            File mixSave = tinyMsav(new File(root, "混档.msav"), null, 16, 16, 2, false);
+            File mixedZip = new File(root, "混合整包.zip");
+            zipBytes(mixedZip, new String[]{"混模.zip", "混蓝.msch", "混图.msav", "混档.msav"},
+                    new byte[][]{readBytes(mixMod), readBytes(mixBp),
+                            readBytes(mixMap), readBytes(mixSave)});
+            BatchIo.Report rMix = BatchIo.importMixedSync(ctx, SLOT_BATCH,
+                    BatchIo.docsFromFiles(java.util.Arrays.asList(mixedZip)), true);
+            ok(stat, L, rMix.ok == 4
+                            && new File(modsDir, "混模.zip").isFile()
+                            && new File(schDir, "混蓝.msch").isFile()
+                            && new File(mapsDir, "混图.msav").isFile()
+                            && new File(savesDir, "混档.msav").isFile(),
+                    "★★ 混合包：模组 / 蓝图 / 地图 / 存档 **各进各的目录**（ok=" + rMix.ok + "/4）");
+            ok(stat, L, !rMix.notes.isEmpty() && rMix.notes.get(0).contains("混合包"),
+                    "★ 报告里点明这是混合包、四类各几份（" + (rMix.notes.isEmpty() ? "空" : "有") + "）");
+            ok(stat, L, BatchIo.guessKind(ctx, BatchIo.docsFromFiles(
+                            java.util.Arrays.asList(mixedZip)).get(0)) == BatchIo.KIND_MIXED,
+                    "★ 端到端定类：这个包（含模组 + 三类内容）判成**混合包**，"
+                            + "不是「看到 `.jar` 就当模组整包」");
+
             // ★ 地图页那边同一件事：一个没有 .msav 的 zip ⇒ 跳过并说明（不是"不是有效的地图"）
             BatchIo.Report rNo = BatchIo.importSync(ctx, SLOT_BATCH,
                     BatchIo.docsFromFiles(java.util.Arrays.asList(noHit)),
@@ -17324,17 +17371,39 @@ public final class SelfTest {
         List<String> hMix2 = new java.util.ArrayList<>();
         hMix2.add("y.jar");
         hMix2.add("x.msch");
-        ok(stat, L, BatchIo.kindOfHits(hBp, "随便.zip") == BatchIo.KIND_BLUEPRINTS
-                        && BatchIo.kindOfHits(hMod, "随便.zip") == BatchIo.KIND_MODS
-                        && BatchIo.kindOfHits(hMap, "随便.zip") == BatchIo.KIND_MAPS
-                        && BatchIo.kindOfHits(hMap, "mdt-saves-20261010-1930.zip") == BatchIo.KIND_SAVES
-                        && BatchIo.kindOfHits(new java.util.ArrayList<String>(), "x.zip") == -1,
+        ok(stat, L, BatchIo.kindOfMask(BatchIo.typesOf(hBp, null), "随便.zip") == BatchIo.KIND_BLUEPRINTS
+                        && BatchIo.kindOfMask(BatchIo.typesOf(hMod, null), "随便.zip") == BatchIo.KIND_MODS
+                        && BatchIo.kindOfMask(BatchIo.typesOf(hMap, null), "随便.zip") == BatchIo.KIND_MAPS
+                        && BatchIo.kindOfMask(BatchIo.typesOf(hMap, null), "mdt-saves-20261010-1930.zip")
+                           == BatchIo.KIND_SAVES
+                        && BatchIo.kindOfMask(BatchIo.typesOf(new java.util.ArrayList<String>(), null),
+                                              "x.zip") == -1,
                 "★ 按命中条目定类：`.jar`/`.zip` ⇒ 模组（**最优先**）· `.msch` ⇒ 蓝图 · `.msav` ⇒ 地图/存档"
                         + "（同一个容器 ⇒ 靠整包名 `mdt-saves-…` 分成存档；一条都不命中 ⇒ -1）");
-        ok(stat, L, BatchIo.kindOfHits(hMix1, "x.zip") == BatchIo.kindOfHits(hMix2, "x.zip")
-                        && BatchIo.kindOfHits(hMix1, "x.zip") == BatchIo.KIND_MODS,
-                "★ 元断言：优先级固定、**与命中顺序无关**（别写成「遇到谁就返回谁」）；"
-                        + "★ 第 379 轮起**模组最优先**（`x.msch` + `y.jar` ⇒ 模组）");
+        ok(stat, L, BatchIo.kindOfMask(BatchIo.typesOf(hMix1, null), "x.zip")
+                           == BatchIo.kindOfMask(BatchIo.typesOf(hMix2, null), "x.zip")
+                        && BatchIo.kindOfMask(BatchIo.typesOf(hMix1, null), "x.zip") == BatchIo.KIND_MODS,
+                "★ 元断言：单类兜底表**与命中顺序无关**（别写成「遇到谁就返回谁」）；"
+                        + "⚠️ 真正的定类会把它判成**混合包**（下一组），这里只钉那个兜底函数");
+        // ★ 第 380 轮：**混合包**的判据 = "模组夹外面有几类"（≥2 类 ⇒ 混合）
+        List<String> hBoth = new java.util.ArrayList<>();
+        hBoth.add("x.msch");
+        hBoth.add("y.msav");
+        List<String> onlyMod = new java.util.ArrayList<>();
+        onlyMod.add("pack/a.jar");
+        List<String> hInFolder = new java.util.ArrayList<>();
+        hInFolder.add("夹A/schematics/x.msch");
+        hInFolder.add("夹A/maps/y.msav");
+        List<String> folder = new java.util.ArrayList<>();
+        folder.add("夹A");
+        ok(stat, L, BatchIo.typesOf(hBoth, null) == (BatchIo.T_BLUEPRINT | BatchIo.T_MAP)
+                        && BatchIo.typesOf(hMix1, null) == (BatchIo.T_MOD | BatchIo.T_BLUEPRINT)
+                        && BatchIo.typesOf(onlyMod, null) == BatchIo.T_MOD
+                        && BatchIo.typesOf(new java.util.ArrayList<String>(), folder) == BatchIo.T_MOD,
+                "★ 掩码：两类命中 ⇒ 两位；只有模组 ⇒ 一位；**只有模组夹** ⇒ 一位（夹子本身算模组）");
+        ok(stat, L, BatchIo.typesOf(hInFolder, folder) == BatchIo.T_MOD,
+                "★★ 夹子里的 `.msch` / `.msav` **不算**（「有些模组本身就是嵌套的」⇒ 到 mod.hjson 就停），"
+                        + "所以「只有模组夹、夹子自带蓝图地图」的包是一类、不是混合包");
         ok(stat, L, BatchIo.kindOfBundleName("mdt-mods-20261010-1930.zip") == BatchIo.KIND_MODS
                         && BatchIo.kindOfBundleName("MDT-MAPS-20261010-1930.zip") == BatchIo.KIND_MAPS
                         && BatchIo.kindOfBundleName("mdt-blueprints-1.zip") == BatchIo.KIND_BLUEPRINTS
@@ -17399,16 +17468,16 @@ public final class SelfTest {
             File mixedPack = new File(root, "模组夹加散蓝图.zip");
             zipMany(mixedPack, new String[]{"A/mod.json", "散图.msch"},
                     new String[]{"{}", "msch-head"});
-            ok(stat, L, BatchIo.guessKind(ctx, docsOf(mixedPack).get(0)) == BatchIo.KIND_MODS,
-                    "★★ 模组最优先：哪怕夹子外面还躺着蓝图，也先进**模组页**"
-                            + "（模组会带着它自己的蓝图，反过来不成立）");
+            ok(stat, L, BatchIo.guessKind(ctx, docsOf(mixedPack).get(0)) == BatchIo.KIND_MIXED,
+                    "★★ 模组夹**外面**还躺着蓝图 ⇒ **混合包**（第 380 轮）：一个模组 + 一张蓝图，"
+                            + "两样都导 —— 不再「二选一」");
 
             File modBundle = new File(root, "一堆模组包.zip");
             zipMany(modBundle, new String[]{"mods/a.jar", "schematics/散图.msch"},
                     new String[]{"jar", "msch-head"});
-            ok(stat, L, BatchIo.guessKind(ctx, docsOf(modBundle).get(0)) == BatchIo.KIND_MODS,
-                    "★★ 纯命中表也一样：`.jar` 比 `.msch` 优先（我们自己的整包不会混着装，"
-                            + "但用户自己压的包会）");
+            ok(stat, L, BatchIo.guessKind(ctx, docsOf(modBundle).get(0)) == BatchIo.KIND_MIXED,
+                    "★★ 命中表里有两类（`.jar` + `.msch`）⇒ **混合包**（用户自己压的包就是这样；"
+                            + "我们自己的整包不会混着装）");
 
             // ── 第 379 轮追加（用户：「整个槽的优先级最高吧，毕竟整个槽里什么都有，
             //   但是可能需要严格检查格式」）────────────────────────────────────
@@ -17432,9 +17501,9 @@ public final class SelfTest {
             File notSlot = new File(root, "只是内容整包.zip");
             zipMany(notSlot, new String[]{"mods/a.jar", "saves/乙.msav"},
                     new String[]{"jar", "msav"});
-            ok(stat, L, BatchIo.guessKind(ctx, docsOf(notSlot).get(0)) == BatchIo.KIND_MODS,
+            ok(stat, L, BatchIo.guessKind(ctx, docsOf(notSlot).get(0)) == BatchIo.KIND_MIXED,
                     "★★ 反方向（**严格**）：没有 `settings.bin` ⇒ 不是整槽"
-                            + "（`mods/` + `saves/` 摆在一起也不够，仍按模组优先）");
+                            + "（`mods/` + `saves/` 摆在一起 = 两类 ⇒ **混合包**）");
 
             // ★ 第 379 轮追加（用户：「**不允许一个文件里放两个整个槽**（这个行为目前认为是未定义的，
             //   或者把整个槽和其他东西混一起）」）⇒ 这两种包**不猜**，单独给一句话。
@@ -17459,6 +17528,31 @@ public final class SelfTest {
             ok(stat, L, BatchIo.guessKind(ctx, docsOf(slotPlusMod).get(0))
                             == BatchIo.KIND_SLOT_AMBIGUOUS,
                     "★★ 整槽根上又来了一个**一级模组夹** ⇒ 两样东西拼的 ⇒ 未定义");
+
+            // ★ 第 380 轮（用户：「整槽 + 根级散图/散蓝图，我们就不应该允许这种东西吧」
+            //   →「**整槽是个专门的东西，不能和任何东西混在一起**」）
+            File slotLoose = new File(root, "整槽加散图.zip");
+            zipMany(slotLoose, new String[]{"settings.bin", "saves/甲.msav", "散图.msav"},
+                    new String[]{"s", "msav", "msav"});
+            ok(stat, L, BatchIo.guessKind(ctx, docsOf(slotLoose).get(0))
+                            == BatchIo.KIND_SLOT_AMBIGUOUS,
+                    "★★ 整槽 + **根级散图** ⇒ 未定义（槽该有的形状只在 `saves/` / `schematics/` 里，"
+                            + "根上散着 `.msav` 说明是「整槽 + 批量包」拼一起）");
+
+            File slotJar = new File(root, "整槽加一个模组包.zip");
+            zipMany(slotJar, new String[]{"settings.bin", "saves/甲.msav", "某个模组.jar"},
+                    new String[]{"s", "msav", "jar"});
+            ok(stat, L, BatchIo.guessKind(ctx, docsOf(slotJar).get(0))
+                            == BatchIo.KIND_SLOT_AMBIGUOUS,
+                    "★★ 整槽 + 根上**一个 `.jar`** 也算混装（「整槽是个专门的东西，不能和任何东西"
+                            + "混在一起」—— 判据是「能不能被当成另一个包导入」，不是后缀是哪一种）");
+
+            // ★ 第 380 轮：**混合包**（模组 / 地图 / 蓝图 / 存档混在一个 zip 里）
+            File mixedKind = new File(root, "混合包.zip");
+            zipMany(mixedKind, new String[]{"a.msch", "b.msav"},
+                    new String[]{"msch-head", "AAA"});
+            ok(stat, L, BatchIo.guessKind(ctx, docsOf(mixedKind).get(0)) == BatchIo.KIND_MIXED,
+                    "★★ 混合包：`.msch` + `.msav` 两类 ⇒ `KIND_MIXED`（不是「先到先得」挑一类）");
 
             File nothing = new File(root, "没东西.zip");
             zipMany(nothing, new String[]{"readme.txt", "a.bin"}, new String[]{"r", "b"});
