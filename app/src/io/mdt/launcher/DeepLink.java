@@ -97,7 +97,12 @@ final class DeepLink {
             return true;
         }
         if (kind != PROBE) {
-            open(a, kind, doc);
+            // ★ 第 380 轮（用户「导入前对识别情况给个确认」）：后缀就已经定类的这几种，
+            //   也让用户先看一眼"我们认成什么、导到哪个槽"。
+            //   ★ `.msav` 是地图/存档同一个容器 ⇒ 顺手读一下 meta（有 `name` 是地图），
+            //     这样确认卡上说的就是真的，而不是"一律当地图"。
+            if (kind == BatchIo.KIND_MAPS) kind = BatchIo.sniffMsav(a, doc, kind);
+            open(a, kind, doc, detailOf(a, kind, null));
             return true;
         }
         // 压缩包：装的是模组 / 地图 / 存档 / 蓝图，只有读过内容才知道 ⇒ 后台读一遍再问
@@ -106,15 +111,19 @@ final class DeepLink {
         stack.replace(Trans.get(a, R.string.deeplink_reading), doc.name);
         new Thread(new Runnable() {
             @Override public void run() {
-                final int k = BatchIo.guessKind(a, doc);
+                final BatchIo.Summary s = BatchIo.summarize(a, doc);
                 a.runOnUiThread(new Runnable() {
                     @Override public void run() {
                         stack.dismiss();
                         if (Util.dead(a)) return;
                         // ★ 第 379 轮：**多个整槽 / 整槽与别的东西混装** = 未定义行为 ⇒ 明说一句、不猜
-                        if (k == BatchIo.KIND_SLOT_AMBIGUOUS) alert(a, doc.name, R.string.deeplink_slot_ambiguous);
-                        else if (k < 0) alert(a, doc.name, R.string.deeplink_zip_empty);
-                        else open(a, k, doc);
+                        if (s.kind == BatchIo.KIND_SLOT_AMBIGUOUS) {
+                            alert(a, doc.name, R.string.deeplink_slot_ambiguous);
+                        } else if (s.kind < 0) {
+                            alert(a, doc.name, R.string.deeplink_zip_empty);
+                        } else {
+                            open(a, s.kind, doc, detailOf(a, s.kind, s));
+                        }
                     }
                 });
             }
@@ -172,16 +181,58 @@ final class DeepLink {
      *
      * <p>★ 第 321 轮（用户：「再加一个从深链进入的文件可以选择导入到那个槽」）：落点槽先问一句
      * 「导入到哪个槽？」—— 但**只有一个槽就不问**（问一句没有别的选项的话只是多一次点击）。
-     * 选中的槽仍然走各页原来的 `EXTRA_SLOT`（页面自己那道 `gameAlive` 门禁照旧生效）。
+     * ★ 第 380 轮（用户：「导入前对识别情况给个确认」）：槽定了之后再弹一张**确认卡**
+     * （文件 / 识别为哪一类几份 / 导入到哪个槽，按钮「取消」「导入」）——
+     * 除非 `detail == null`（整槽包：槽页自己那张确认框会列出包里的内容 + 三个写入模式，比这里更细，
+     * 再问一遍就成了两道门）。
+     *
+     * @param detail 「识别为…」那句话；`null` ⇒ 不额外确认，直接进页面
      */
-    private static void open(final Activity a, final int kind, final BatchIo.Doc doc) {
+    private static void open(final Activity a, final int kind, final BatchIo.Doc doc,
+                             final String detail) {
         final List<Data.Slot> all = Data.allSlots(a);
         if (!shouldAsk(all)) {
             // 0 个槽（理论上不会有）⇒ 回落到当前槽；1 个 ⇒ 就是它
-            route(a, kind, doc, all.isEmpty() ? Data.currentSlot(a) : all.get(0).name);
+            afterSlot(a, kind, doc, all.isEmpty() ? Data.currentSlot(a) : all.get(0).name, detail);
             return;
         }
-        askSlot(a, kind, doc, all);
+        askSlot(a, kind, doc, all, detail);
+    }
+
+    /** 槽定了之后的最后一步：有识别说明 ⇒ 先确认；没有 ⇒ 直接进页面 */
+    private static void afterSlot(final Activity a, final int kind, final BatchIo.Doc doc,
+                                  final String slot, final String detail) {
+        if (detail == null || detail.trim().isEmpty()) {
+            route(a, kind, doc, slot);
+            return;
+        }
+        confirm(a, kind, doc, slot, detail);
+    }
+
+    /**
+     * 「识别为…」那句话（第 380 轮）。**纯装配**，不进后台：数据来自 `summarize` / 后缀。
+     *
+     * @param s 压缩包那一路的摘要；后缀那一路传 `null`（那就按"1 份"说）
+     */
+    static String detailOf(Context a, int kind, BatchIo.Summary s) {
+        if (kind == BatchIo.KIND_SLOT) return null;       // 整槽包：槽页自己那张确认框更细
+        if (kind == BatchIo.KIND_SLOT_AMBIGUOUS || kind < 0) return null;
+        final int one = 1;
+        if (kind == BatchIo.KIND_MIXED) {
+            return Trans.get(a, R.string.deeplink_confirm_mixed_fmt,
+                    s == null ? 0 : s.mods, s == null ? 0 : s.blueprints, s == null ? 0 : s.maps);
+        }
+        if (kind == BatchIo.KIND_MODS) {
+            return Trans.get(a, R.string.deeplink_confirm_mods_fmt, s == null ? one : s.mods);
+        }
+        if (kind == BatchIo.KIND_BLUEPRINTS) {
+            return Trans.get(a, R.string.deeplink_confirm_blueprints_fmt,
+                    s == null ? one : s.blueprints);
+        }
+        if (kind == BatchIo.KIND_SAVES) {
+            return Trans.get(a, R.string.deeplink_confirm_saves_fmt, s == null ? one : s.maps);
+        }
+        return Trans.get(a, R.string.deeplink_confirm_maps_fmt, s == null ? one : s.maps);
     }
 
     /**
@@ -198,7 +249,7 @@ final class DeepLink {
      * （同一件事在两处长得不一样，用户会以为是两件事）。取消 = 这次不导（**什么都不做**）。
      */
     private static void askSlot(final Activity a, final int kind, final BatchIo.Doc doc,
-                                List<Data.Slot> all) {
+                                List<Data.Slot> all, final String detail) {
         final String[] labels = new String[all.size()];
         final String[] names = new String[all.size()];
         for (int i = 0; i < all.size(); i++) {
@@ -213,11 +264,36 @@ final class DeepLink {
                     @Override public void onClick(int w) {
                         if (w < 0 || w >= names.length) return;
                         ref[0].dismiss();
-                        route(a, kind, doc, names[w]);
+                        afterSlot(a, kind, doc, names[w], detail);
                     }
                 }),
                 new CardStack.Btn(Trans.get(a, R.string.cancel), new Runnable() {
                     @Override public void run() { ref[0].dismiss(); }
+                }));
+    }
+
+    /**
+     * ★ 第 380 轮（用户：「导入前对识别情况给个确认」）：**导入前的确认卡**。
+     *
+     * <p>三行：**文件** / **识别为什么、几份** / **导入到哪个槽**；按钮「取消」「导入」。
+     * 取消 = 这次不导（什么都不写）。⚠️ 按钮的 action **不会自动关窗** ⇒ 两个都要自己 `dismiss()`。
+     */
+    private static void confirm(final Activity a, final int kind, final BatchIo.Doc doc,
+                                final String slot, final String detail) {
+        final CardStack[] ref = new CardStack[1];
+        String body = Trans.get(a, R.string.deeplink_confirm_file_fmt, doc.name) + "\n"
+                + detail + "\n"
+                + Trans.get(a, R.string.deeplink_confirm_slot_fmt, slot);
+        ref[0] = CardStack.show(null, a, Trans.get(a, R.string.deeplink_confirm_title),
+                CardStack.text(a, body),
+                new CardStack.Btn(Trans.get(a, R.string.cancel), new Runnable() {
+                    @Override public void run() { ref[0].dismiss(); }
+                }),
+                new CardStack.Btn(Trans.get(a, R.string.deeplink_confirm_ok), new Runnable() {
+                    @Override public void run() {
+                        ref[0].dismiss();
+                        route(a, kind, doc, slot);
+                    }
                 }));
     }
 

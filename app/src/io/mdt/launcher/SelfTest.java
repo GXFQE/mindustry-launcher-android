@@ -17554,6 +17554,28 @@ public final class SelfTest {
             ok(stat, L, BatchIo.guessKind(ctx, docsOf(mixedKind).get(0)) == BatchIo.KIND_MIXED,
                     "★★ 混合包：`.msch` + `.msav` 两类 ⇒ `KIND_MIXED`（不是「先到先得」挑一类）");
 
+            // ★ 第 380 轮（用户「导入前对识别情况给个确认」）：摘要 + 确认卡那句文案
+            BatchIo.Summary sumMix = BatchIo.summarize(ctx, docsOf(mixedKind).get(0));
+            ok(stat, L, sumMix.kind == BatchIo.KIND_MIXED
+                            && sumMix.blueprints == 1 && sumMix.maps == 1 && sumMix.mods == 0,
+                    "★★ 摘要（确认卡的数据源）：混合包 = 1 蓝图 + 1 地图/存档、模组 0 ——"
+                            + " 与 `guessKind` **同源**（后者就是取它的 kind），不许各判一次");
+            String dMix = DeepLink.detailOf(ctx, BatchIo.KIND_MIXED, sumMix);
+            ok(stat, L, dMix != null && dMix.contains("混合包") && dMix.contains("1"),
+                    "★ 确认卡那句「识别为…」实拼得出来（实际：" + dMix + "）");
+            ok(stat, L, DeepLink.detailOf(ctx, BatchIo.KIND_SLOT, null) == null,
+                    "★ 整槽包**不额外确认**：槽页那张确认框会列内容 + 给出三个写入模式，"
+                            + "再问一遍就是两道门");
+            // `.msav` 两种 meta（有 `name` = 地图 / 没有 = 存档）⇒ 确认卡说的必须是真的
+            File mapMeta = tinyMsav(new File(root, "有名字.msav"), "甲图", 16, 16, 1, false);
+            File saveMeta = tinyMsav(new File(root, "没名字.msav"), null, 16, 16, 2, false);
+            ok(stat, L, BatchIo.sniffMsav(ctx, docsOf(mapMeta).get(0), BatchIo.KIND_MAPS)
+                            == BatchIo.KIND_MAPS
+                            && BatchIo.sniffMsav(ctx, docsOf(saveMeta).get(0), BatchIo.KIND_MAPS)
+                               == BatchIo.KIND_SAVES,
+                    "★★ `.msav` 深链按 **meta 有没有 `name`** 分地图 / 存档（同一个容器）"
+                            + " ⇒ 确认卡不会把存档说成地图");
+
             File nothing = new File(root, "没东西.zip");
             zipMany(nothing, new String[]{"readme.txt", "a.bin"}, new String[]{"r", "b"});
             ok(stat, L, BatchIo.guessKind(ctx, docsOf(nothing).get(0)) == -1,
@@ -17610,6 +17632,17 @@ public final class SelfTest {
                 "★ 五句深链文案都能实拼、且没有残留占位符（这几条都没参数）");
         ok(stat, L, t2.contains(".msav") && t2.contains(".msch") && t2.contains("zip"),
                 "★ 「认不出」那句要说清**支持什么**（含 .msav / .msch / zip）");
+        // ★ 第 380 轮：**导入前确认卡**那几条（带参，必须真拼一遍才知道参数对得上）
+        String c1 = Trans.get(ctx, R.string.deeplink_confirm_title);
+        String c2 = Trans.get(ctx, R.string.deeplink_confirm_file_fmt, "a.zip");
+        String c3 = Trans.get(ctx, R.string.deeplink_confirm_slot_fmt, "槽甲");
+        String c4 = Trans.get(ctx, R.string.deeplink_confirm_mixed_fmt, 1, 2, 3);
+        String c5 = Trans.get(ctx, R.string.deeplink_confirm_mods_fmt, 2);
+        ok(stat, L, !c1.trim().isEmpty() && c2.contains("a.zip") && c3.contains("槽甲")
+                        && c4.contains("混合包") && c4.contains("3") && c5.contains("2")
+                        && !c2.contains("%") && !c3.contains("%")
+                        && !c4.contains("%") && !c5.contains("%"),
+                "★ 确认卡那几条格式串**按真参数实拼**（文件 / 槽 / 混合包三个数 / 单一类的份数）");
         L.add("");
     }
 

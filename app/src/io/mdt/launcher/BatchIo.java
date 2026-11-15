@@ -1592,17 +1592,9 @@ final class BatchIo {
      * ⚠️ 必须在**后台线程**调（会把整包读一遍，几十 MB）。
      */
     static int guessKind(Context ctx, Doc d) {
-        Probe p = probeDoc(ctx, d, GUESS_EXTS, Mods.META_FILES);
-        if (p == null || !p.zip) return -1;
-        // ★★ 整槽最优先（第 379 轮）。⚠️ 判据必须严，且"多个整槽 / 混装"要单独挑出来：
-        int ss = p.slotState();
-        if (ss == Probe.SLOT_ONE) return KIND_SLOT;
-        if (ss != Probe.SLOT_NONE) return KIND_SLOT_AMBIGUOUS;
-        if (p.selfPack) return KIND_MODS;
-        // ★ 第 380 轮：先数"有几类" —— ≥2 类就是**混合包**（模组夹里的条目不算，它们属于那个模组）
-        int mask = typesOf(p.hits, p.modFolders);
-        if (Integer.bitCount(mask) >= 2) return KIND_MIXED;
-        return kindOfMask(mask, d.name);
+        // ★ 第 380 轮：判据与"导入前确认"共用一份实现（{@link #summarize}）——
+        //   确认卡上写的和真正走的路必须是同一次判断，否则用户看到的和发生的不一致。
+        return summarize(ctx, d).kind;
     }
 
     /** 命中类型的位（{@link #typesOf} 的返回值，也是 {@link #kindOfMask} 的入参） */
@@ -1667,6 +1659,93 @@ final class BatchIo {
         if ((mask & T_BLUEPRINT) != 0) return KIND_BLUEPRINTS;
         if ((mask & T_MAP) == 0) return -1;
         return kindOfBundleName(bundleName) == KIND_SAVES ? KIND_SAVES : KIND_MAPS;
+    }
+
+    /**
+     * ★★ **识别结果摘要**（第 380 轮用户：「导入前对识别情况给个确认」）。
+     *
+     * <p>深链读完包之后先把它交给用户看：「识别为：混合包（模组 1 · 蓝图 1 · 地图/存档 1）…
+     * 导入到槽「X」」，点「导入」才真的导。
+     *
+     * <p>⚠️ 它**必须**与 {@link #guessKind} 同源（`guessKind` 就是它取 `kind`）——
+     * 否则"确认卡上说的"与"真正导的"会漂，而那种漂移用户看不出来（只会觉得东西导错地方了）。
+     */
+    static final class Summary {
+        /** 与 {@code guessKind} 同一个取值域（`-1` = 认不出） */
+        int kind = -1;
+        /** 模组夹的个数 + 夹外 `.jar` / `.zip` 的条数 */
+        int mods;
+        int blueprints;
+        /** 夹外的 `.msav`（**地图与存档分不开** ⇒ 导入时再按 meta 分） */
+        int maps;
+
+        int total() {
+            return mods + blueprints + maps;
+        }
+    }
+
+    /**
+     * 读一遍包，得出「识别成哪一类 + 各类几份」。自检 / 深链确认卡 / `guessKind` 共用这一份实现。
+     * ⚠️ 后台线程调（整包读一遍）。
+     */
+    static Summary summarize(Context ctx, Doc d) {
+        Summary s = new Summary();
+        Probe p = probeDoc(ctx, d, GUESS_EXTS, Mods.META_FILES);
+        if (p == null || !p.zip) return s;
+        int ss = p.slotState();
+        if (ss == Probe.SLOT_ONE) {
+            s.kind = KIND_SLOT;
+            return s;
+        }
+        if (ss != Probe.SLOT_NONE) {
+            s.kind = KIND_SLOT_AMBIGUOUS;
+            return s;
+        }
+        if (p.selfPack) {
+            // 包根就是模组说明文件 ⇒ 它本身就是**一个**模组（不再往里看）
+            s.kind = KIND_MODS;
+            s.mods = 1;
+            return s;
+        }
+        s.mods = countHits(p.hits, p.modFolders, T_MOD);
+        s.blueprints = countHits(p.hits, p.modFolders, T_BLUEPRINT);
+        s.maps = countHits(p.hits, p.modFolders, T_MAP);
+        int mask = typesOf(p.hits, p.modFolders);
+        s.kind = Integer.bitCount(mask) >= 2 ? KIND_MIXED : kindOfMask(mask, d.name);
+        return s;
+    }
+
+    /** 数某一类的条目（模组那类额外把"模组夹"算进去；夹子里的条目不算） */
+    static int countHits(List<String> hits, List<String> folders, int type) {
+        int n = (type == T_MOD && folders != null) ? folders.size() : 0;
+        if (hits == null) return n;
+        for (String h : hits) {
+            if (insideAny(h, folders)) continue;
+            String l = h == null ? "" : h.toLowerCase(Locale.ROOT);
+            int t = l.endsWith(".msch") ? T_BLUEPRINT
+                    : l.endsWith(".msav") ? T_MAP : T_MOD;
+            if ((t & type) != 0) n++;
+        }
+        return n;
+    }
+
+    /**
+     * `.msav` 到底是地图还是存档 —— 深链的确认卡要如实说，所以**读一遍 meta**（有 `name` = 地图）。
+     * 读不出来 / 打不开 ⇒ 保持传进来的 `fallback`（地图页会自己再判一次）。
+     */
+    static int sniffMsav(Context ctx, Doc d, int fallback) {
+        if (d == null || d.uri == null) return fallback;
+        InputStream in = null;
+        try {
+            in = d.open(ctx);
+            MsavMeta meta = MsavMeta.read(in);
+            if (meta == null || !meta.ok) return fallback;
+            return meta.has("name") ? KIND_MAPS : KIND_SAVES;
+        } catch (Throwable t) {
+            return fallback;
+        } finally {
+            closeQuietly(in);
+        }
     }
 
     /**

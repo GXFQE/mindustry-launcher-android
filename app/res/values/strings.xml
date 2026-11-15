@@ -2212,6 +2212,15 @@
     <string name="deeplink_zip_empty">Nothing importable inside this zip (mods / maps / saves / blueprints).</string>
     <string name="deeplink_slot_ambiguous">This zip looks like it holds more than one whole slot, or a whole slot mixed with other things. Importing a package like that is not defined yet — please pack them separately.</string>
     <string name="batch_note_mixed_fmt">Mixed bundle: mods %1$d · blueprints %2$d · maps %3$d · saves %4$d</string>
+    <string name="deeplink_confirm_title">Confirm import</string>
+    <string name="deeplink_confirm_file_fmt">File: %1$s</string>
+    <string name="deeplink_confirm_slot_fmt">Target slot: %1$s</string>
+    <string name="deeplink_confirm_mods_fmt">Recognized: mods, %1$d item(s)</string>
+    <string name="deeplink_confirm_maps_fmt">Recognized: maps, %1$d item(s)</string>
+    <string name="deeplink_confirm_saves_fmt">Recognized: saves, %1$d item(s)</string>
+    <string name="deeplink_confirm_blueprints_fmt">Recognized: blueprints, %1$d item(s)</string>
+    <string name="deeplink_confirm_mixed_fmt">Recognized: mixed bundle (mods %1$d · blueprints %2$d · maps/saves %3$d)</string>
+    <string name="deeplink_confirm_ok">Import</string>
     <string name="deeplink_open_failed">Cannot read this file. It may be gone, or this app has no permission to read it (files in shared folders such as Download are not readable by this app on newer Android versions - share them through a file manager instead).</string>
 
     <!--

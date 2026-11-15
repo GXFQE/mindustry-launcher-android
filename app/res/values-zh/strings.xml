@@ -2172,6 +2172,15 @@
     <string name="deeplink_zip_empty">这个压缩包里没有能导入的东西（模组 / 地图 / 存档 / 蓝图）。</string>
     <string name="deeplink_slot_ambiguous">这个压缩包里像是有不止一个整槽，或者整槽和别的东西混在一起。这种包怎么导还没有定义 —— 先把它们分开打包再试。</string>
     <string name="batch_note_mixed_fmt">混合包：模组 %1$d · 蓝图 %2$d · 地图 %3$d · 存档 %4$d</string>
+    <string name="deeplink_confirm_title">导入确认</string>
+    <string name="deeplink_confirm_file_fmt">文件：%1$s</string>
+    <string name="deeplink_confirm_slot_fmt">导入到槽「%1$s」</string>
+    <string name="deeplink_confirm_mods_fmt">识别为：模组，共 %1$d 份</string>
+    <string name="deeplink_confirm_maps_fmt">识别为：地图，共 %1$d 份</string>
+    <string name="deeplink_confirm_saves_fmt">识别为：存档，共 %1$d 份</string>
+    <string name="deeplink_confirm_blueprints_fmt">识别为：蓝图，共 %1$d 份</string>
+    <string name="deeplink_confirm_mixed_fmt">识别为：混合包（模组 %1$d · 蓝图 %2$d · 地图/存档 %3$d）</string>
+    <string name="deeplink_confirm_ok">导入</string>
     <string name="deeplink_open_failed">读不到这个文件：可能已经不在了，或者本应用没有读取它的权限（新版安卓下「下载」这类公共目录里的文件本应用读不了，用文件管理器「分享 / 打开方式」发过来才行）。</string>
 
     <!--
