@@ -1318,15 +1318,13 @@
     <!-- ══ F3 全局设置页（按 Android 语义：这里只放"所有槽共用"的项） ══════ -->
     <string name="act_settings_title">设置</string>
     <string name="settings_title">设置</string>
-        <string name="set_autoclean_title">自动清理残留</string>
-    <string name="set_autoclean_on">已开</string>
-    <string name="set_autoclean_off">已关（仍可手动清理）</string>
-    <string name="set_autoclean_do">立即清理一次</string>
+        <string name="set_autoclean_title">旧版本重复文件</string>
+    <string name="set_autoclean_on">自动清理：开</string>
+    <string name="set_autoclean_off">自动清理：关</string>
     <string name="set_autoclean_disable">关掉自动清理</string>
     <string name="set_autoclean_enable">开启自动清理</string>
-    <string name="set_autoclean_done_fmt">清掉了 %1$d 项</string>
     <string name="set_autoclean_none">没有需要清理的</string>
-    <string name="set_autoclean_fail">清理没成功，稍后再试</string>
+    <string name="set_autoclean_why">旧版本把启动器自己的文件（config.json、导入的游戏包、运行库）复制进了游戏数据目录。这里是重复副本；清理可释放空间，不会动存档、模组或启动器数据。只删有把握的副本。想现在清，去「存储占用 → 清理」。</string>
     <!--
       ══ 中转站（TrashActivity，2026-10-05 第 102 轮）══════════════════════
       起因（用户 2026-10-05）：「这个中转站像是个半成品啊」。此前"中转站"只是数据层的一个
@@ -1380,8 +1378,6 @@
     <string name="storage_sec_trash">中转站</string>
     <string name="storage_trash_line_fmt">%1$s：%2$d 项 · %3$s</string>
     <string name="storage_trash_none">（空的）</string>
-    <string name="storage_sec_clean">可以清理的残留</string>
-    <string name="storage_clean_fmt">%1$d 处 · %2$s（在设置里「立即清理一次」可清）</string>
 
     <string name="trash_title">中转站</string>
     <string name="trash_sub">删掉的旧文件先放这里，能再放回去</string>
@@ -1592,20 +1588,14 @@
     <string name="set_crash_alert_enable">开启崩溃提示</string>
     <string name="set_crash_alert_disable">关闭崩溃提示</string>
 
-    <string name="storage_clear_cache">清理分享缓存</string>
-    <string name="storage_clear_title">清理分享缓存</string>
-    <string name="storage_clear_msg">只清掉「直接分享」留下的临时文件；正在发送的文件可能失败。</string>
-    <string name="storage_clear_btn">清理</string>
-    <string name="storage_clear_done_fmt">已清理 %1$d 份临时文件。</string>
-    <string name="storage_clear_none">没有临时分享文件。</string>
-    <string name="storage_clear_fail">清理失败。</string>
-    <string name="storage_clear_game_cache">清理游戏缓存</string>
-    <string name="storage_clear_game_title">清理游戏缓存</string>
-    <string name="storage_clear_game_msg">清掉游戏下次启动会重建的音乐、模组缓存与临时文件；存档、模组、启动器数据不动。游戏运行时不能清。</string>
-    <string name="storage_clear_game_done_fmt">已清掉 %1$s。</string>
-    <string name="storage_clear_game_none">没有可清的东西。</string>
-    <string name="storage_clear_game_busy">游戏正在运行，先从游戏退出再清。</string>
-    <string name="storage_clear_game_fail">清理游戏缓存失败。</string>
+    <string name="storage_clean_btn">清理</string>
+    <string name="storage_clean_all_title">清理</string>
+    <string name="storage_clean_all_msg">会清掉游戏缓存（音乐 / 模组缓存 / dex 产物）、分享缓存和旧版本重复文件；存档、模组、地图、蓝图、导入的游戏包与启动器数据不动。游戏运行时跳过游戏缓存。</string>
+    <string name="storage_clean_all_done_fmt">已清理，释放约 %1$s（缓存 %2$d 项 · 分享 %3$d 份 · 重复文件 %4$d 处）</string>
+    <string name="storage_clean_all_none">没有可清理的东西。</string>
+    <string name="storage_clean_all_fail">清理没成功，稍后再试。</string>
+    <string name="storage_clean_all_partial">有部分没能清掉。</string>
+    <string name="storage_clean_all_skip">游戏缓存没清：游戏正在运行。</string>
 
 
     <!-- 第 175 轮：「关于」从设置页搬成独立二级页 -->

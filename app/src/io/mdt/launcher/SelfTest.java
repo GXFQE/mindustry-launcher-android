@@ -267,6 +267,7 @@ public final class SelfTest {
             nativeCache(ctx, L, stat);
             cacheEpoch(ctx, L, stat);
             cacheClean(ctx, L, stat);
+            cleanupAll(ctx, L, stat);
             // ★ 第 364 轮：实例会话记账（多开：一槽一局，结算按实例）
             instanceSessions(ctx, L, stat);
             // ★ ⑰ F13 第三阶段：模组包导入 / 跨槽复制（五个负例 + 一条元断言）
@@ -9946,8 +9947,6 @@ public final class SelfTest {
         r.trashBytes[Trash.Kind.MAP.ordinal()] = 1024L * 1024;
         r.trashItems = 2;
         r.trashTotalBytes = 1024L * 1024;
-        r.redundantPlaces = 3;
-        r.redundantBytes = 2048L;
         String txt = Storage.text(ctx, r);
         ok(stat, L, txt.contains(ctx.getString(R.string.storage_total_fmt,
                         Util.formatSize(r.totalBytes()))),
@@ -9983,12 +9982,11 @@ public final class SelfTest {
         //   「清理后合计会少这么多也很奇怪」——
         //   按钮其实只清「直接分享」那一层（cache/share），标签必须带「分享」；
         //   缓存行的说明改成「临时文件」（它不是只有游戏在产生）；中转站那句不再解释合计怎么变。
-        String cacheLine = ctx.getString(R.string.storage_app_cache_fmt, "X");
-        String clearBtn = ctx.getString(R.string.storage_clear_cache);
-        String clearTitle = ctx.getString(R.string.storage_clear_title);
-        ok(stat, L, clearBtn.contains("分享") && clearTitle.contains("分享")
-                        && cacheLine.contains("临时文件") && !cacheLine.contains("运行游戏时产生"),
-                "★第 356 轮文案：清理按钮/标题都写「分享」（它只清 cache/share），缓存行说「临时文件」");
+        // ★ 第 383 轮：两个「清理 XX 缓存」按钮并成一个「清理」（缓存 + 分享 + 旧版本重复文件）。
+        //   判据落在确认文案上：三样都说清、且说清什么不动。
+        String cleanMsg = ctx.getString(R.string.storage_clean_all_msg);
+        ok(stat, L, cleanMsg.contains("缓存") && cleanMsg.contains("分享") && cleanMsg.contains("存档"),
+                "★第 383 轮：一个「清理」的确认文案说清三样 + 不动的数据（不再有单独的分享/游戏缓存按钮）");
         ok(stat, L, !ctx.getString(R.string.storage_total_trash_fmt, "X").contains("合计"),
                 "★中转站那句不再解释合计（用户：「清理后合计会少这么多也很奇怪」）");
         ok(stat, L, txt.contains(Util.formatSize(r.otherBytes)),
@@ -10017,9 +10015,8 @@ public final class SelfTest {
         int qz = 0;
         for (int i = txt.indexOf("其中"); i >= 0; i = txt.indexOf("其中", i + 2)) qz++;
         ok(stat, L, qz == 1, "★存储占用开头只有一个「其中」（实得 " + qz + " 个）");
-        ok(stat, L, txt.contains(ctx.getString(R.string.storage_clean_fmt, 3,
-                        Util.formatSize(2048L))),
-                "存储占用：可清理残留那行带处数与体积（原来只在别处显示'已开/已关'）");
+        // ★ 第 383 轮：存储页不再列「可以清理的残留」—— 它并进卡片上的「清理」动作
+        //   （判据在 cleanupAll：三样一次清完）。
         // ★ 三条"该省的行必须省掉"（反向判据 —— 防止每行都恒真地出现）
         Storage.Report empty = new Storage.Report();
         empty.pool = new Backup.PoolStats();
@@ -20149,6 +20146,61 @@ public final class SelfTest {
             ok(stat, L, r3.ok && !ro.exists(), "③ 只读的缓存件也删得掉（先放开写权限）");
         } catch (Throwable t) {
             ok(stat, L, false, "清缓存用例异常：" + t);
+        } finally {
+            Data.deleteTree(work);
+        }
+    }
+
+    private static void cleanupAll(Context ctx, List<String> L, int[] stat) {
+        L.add("");
+        L.add("── 第 383 轮 · 一个「清理」= 游戏缓存 + 分享缓存 + 旧版本重复文件 ──");
+        File work = new File(ctx.getCacheDir(), "selftest-cleanup-all");
+        File cache = new File(work, "cache");
+        File odex = new File(work, "code_cache");
+        File share = new File(work, "share");
+        try {
+            Data.deleteTree(work);
+            File a = writeTmp(cache, "music.ogg", "MUSIC");
+            File b = writeTmp(odex, "classes.dex", "DEX");
+            File s = writeTmp(share, "a.msav", "SHARE");
+            Cleanup.Result r = Cleanup.run(ctx, cache, odex, Boolean.FALSE, share,
+                    new Cleanup.DupClean() {
+                        @Override public Data.AutoClean clean() {
+                            Data.AutoClean d = new Data.AutoClean();
+                            d.cleaned = 2;
+                            d.freed = 1000L;
+                            return d;
+                        }
+                    });
+            ok(stat, L, r.ok && r.any() && r.shareFiles == 1 && r.cache.entries >= 2
+                            && r.dup.cleaned == 2 && r.totalBytes() >= 1000L
+                            && !a.exists() && !b.exists() && !s.exists(),
+                    "① 一个动作跑完三样（缓存 / 分享 / 重复文件），并合计释放量");
+
+            File a2 = writeTmp(cache, "music2.ogg", "MUSIC2");
+            File s2 = writeTmp(share, "b.msav", "SHARE2");
+            Cleanup.Result r2 = Cleanup.run(ctx, cache, odex, Boolean.TRUE, share,
+                    new Cleanup.DupClean() {
+                        @Override public Data.AutoClean clean() {
+                            Data.AutoClean d = new Data.AutoClean();
+                            d.cleaned = 1;
+                            d.freed = 10L;
+                            return d;
+                        }
+                    });
+            ok(stat, L, r2.cacheSkipped() && a2.isFile() && r2.shareFiles == 1
+                            && !s2.exists() && r2.dup.cleaned == 1,
+                    "② 游戏在跑 ⇒ 只跳过游戏缓存，分享 / 重复文件照清");
+
+            if (!a2.delete()) a2.deleteOnExit();
+            Cleanup.Result r3 = Cleanup.run(ctx, cache, odex, Boolean.FALSE, share,
+                    new Cleanup.DupClean() {
+                        @Override public Data.AutoClean clean() { return new Data.AutoClean(); }
+                    });
+            ok(stat, L, !r3.any() && !r3.cacheSkipped(),
+                    "③ 没东西可清时 any()=false（界面说「没有可清理的」）");
+        } catch (Throwable t) {
+            ok(stat, L, false, "统一清理用例异常：" + t);
         } finally {
             Data.deleteTree(work);
         }

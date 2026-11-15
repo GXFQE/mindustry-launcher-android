@@ -172,7 +172,16 @@ final class PluginData {
                     : r.pool.actual + r.pool.legacyBytes));
             out.put("trash", Long.valueOf(r.trashTotalBytes));
             out.put("other", Long.valueOf(r.otherBytes));
-            out.put("redundant", Long.valueOf(r.redundantBytes));
+            // ★ 第 383 轮：`Storage.Report` 不再自带这一项（存储页不再列残留，统一清理才算它）。
+            //   插件 API 的键不能悄悄消失 ⇒ 这里按需现算一次（storage() 本来就是"重"接口）。
+            long redundant = 0L;
+            try {
+                Data.Health h = Data.healthScan(ctx);
+                if (h != null) redundant = h.redundantBytes();
+            } catch (Throwable ignored) {
+                redundant = 0L;
+            }
+            out.put("redundant", Long.valueOf(redundant));
         } catch (Throwable t) {
             // 读不出来 ⇒ 空表（没有失败码，与 instances()/backups() 同一条约定）
             return new LinkedHashMap<String, Long>();

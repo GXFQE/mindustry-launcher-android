@@ -14,10 +14,10 @@ import java.util.List;
  *   <li><b>备份到底省了多少</b> —— 内容去重的价值。在此之前这件事只有 {@code dev_cas_stats}
  *       那个测试口看得见（`Backup.poolStats` / `gcNow` / `migrateLegacy` 全库只有 dev 与自检在调），
  *       而它是这个工程最能说清"为什么要这么存"的一件事。</li>
- *   <li><b>各类数据各占多少</b> —— 各槽 / 备份池 / 四个中转站目录 / 可以清理的残留。
+ *   <li><b>各类数据各占多少</b> —— 各槽 / 备份池 / 四个中转站目录；HUB 临时件单独一行。
  *       ★ 中转站与备份池原来是**统计盲区**：`Trash.totalBytes` 的注释自己写着
- *       「中转站此前**不参与任何体检数字**」，而 `Data.healthScan` 查的是"数据根里的冗余副本"，
- *       与"谁占了多少空间"根本不是一回事。</li>
+ *       「中转站此前**不参与任何体检数字**」。第 383 轮起不再在这里列"可清理的残留"：
+ *       它并进了卡片上的「清理」动作（见 {@link Cleanup}），本类只回答"空间被什么占了"。</li>
  * </ol>
  *
  * <h3>为什么收成一个类（而不是直接写在设置页里）</h3>
@@ -104,9 +104,6 @@ final class Storage {
         public long[] trashBytes = new long[Trash.Kind.values().length];
         public int trashItems;
         public long trashTotalBytes;
-        /** 数据根里"可以清理的残留"（{@link Data.Health}） */
-        public int redundantPlaces;
-        public long redundantBytes;
 
         /**
          * **真实占用** —— 第一行那句话用的就是它（唯一口径）。
@@ -129,8 +126,7 @@ final class Storage {
      * 收集数字。**只该在后台线程调**（hub 里可能有几万个对象文件，递归很花时间）。
      *
      * ★ 每一块都**复用既有的唯一实现**：各槽走 {@link Data#allSlots}（与存档页同一个口径）、
-     *   备份池走 {@link Backup#poolStats}、中转站走 {@link Trash#listAll}、
-     *   残留走 {@link Data#healthScan} —— 这里一个数都不自己算。
+     *   备份池走 {@link Backup#poolStats}、中转站走 {@link Trash#listAll} —— 这里一个数都不自己算。
      */
     static Report collect(Context ctx) {
         Report r = new Report();
@@ -154,11 +150,6 @@ final class Storage {
                 r.trashTotalBytes += it.bytes;
                 r.trashItems++;
             }
-        }
-        Data.Health h = Data.healthScan(ctx);
-        if (h != null) {
-            r.redundantPlaces = h.redundant.size();
-            r.redundantBytes = h.redundantBytes();
         }
         File hub = Data.hubDir(ctx);
         r.hubBytes = Data.sizeTree(hub);
@@ -216,7 +207,7 @@ final class Storage {
     /**
      * 组装给用户看的正文（**纯函数**：不碰文件、不改入参）。
      *
-     * ★ 分三层说：总占用 → 分项（启动器自身 / 各槽 / 备份 / 中转站）→ 能清理的残留。
+     * ★ 分三层说：总占用 → 分项（启动器自身 / 各槽 / 备份 / 中转站）。
      * ★ 术语纪律：第一层不出现"对象池 / CAS / 去重"这些词，只说"备份之间共用内容"；
      *   依据（对象数、暂时没人用的部分）用白话跟在后面同一段里。
      */
@@ -330,13 +321,9 @@ final class Storage {
                         r.trashCounts[i], Util.formatSize(r.trashBytes[i]))).append('\n');
             }
         }
-
-        // ⑤ 可以清理的残留（体检数字，原来只在设置页那一行里体现"已开/已关"）
-        sb.append('\n').append(Trans.get(c, R.string.storage_sec_clean)).append('\n');
-        sb.append(r.redundantPlaces > 0
-                ? Trans.get(c, R.string.storage_clean_fmt, r.redundantPlaces,
-                        Util.formatSize(r.redundantBytes))
-                : Trans.get(c, R.string.set_autoclean_none)).append('\n');
+        // ★ 第 383 轮：不再单独列「可以清理的残留」—— 它并进了卡片上的「清理」动作
+        //   （用户：「反正这些都是可以自动清理的，不如合并到一起」）。数字进对话框，
+        //   存储页只回答"空间被什么占了"。
         return sb.toString();
     }
 

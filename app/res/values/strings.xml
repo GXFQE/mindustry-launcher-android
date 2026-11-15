@@ -1350,15 +1350,13 @@
       发过才需要为用户语言包的兼容留一条死键，没发过就直接删干净。
     -->
     <string name="settings_title">Settings</string>
-        <string name="set_autoclean_title">Automatic cleanup</string>
-    <string name="set_autoclean_on">On</string>
-    <string name="set_autoclean_off">Off (manual cleanup still available)</string>
-    <string name="set_autoclean_do">Clean up once now</string>
+        <string name="set_autoclean_title">Old-version duplicates</string>
+    <string name="set_autoclean_on">Auto cleanup: on</string>
+    <string name="set_autoclean_off">Auto cleanup: off</string>
     <string name="set_autoclean_disable">Turn automatic cleanup off</string>
     <string name="set_autoclean_enable">Turn automatic cleanup on</string>
-    <string name="set_autoclean_done_fmt">Cleaned %1$d items</string>
     <string name="set_autoclean_none">Nothing to clean</string>
-    <string name="set_autoclean_fail">Cleanup did not succeed, try again later</string>
+    <string name="set_autoclean_why">Old versions copied launcher files (config.json, imported game packages, native libs) into the game data folder. These are duplicate copies. Cleaning them frees space and does not touch saves, mods or launcher data. Only copies with clear evidence are removed. Clean them now under Storage &gt; Clean.</string>
     <!--
       ══ 中转站（TrashActivity，2026-10-05 第 102 轮）══════════════════════
       起因（用户 2026-10-05）：「这个中转站像是个半成品啊」。此前"中转站"只是数据层的一个
@@ -1407,8 +1405,6 @@
     <string name="storage_sec_trash">Transfer station</string>
     <string name="storage_trash_line_fmt">%1$s: %2$d · %3$s</string>
     <string name="storage_trash_none">(empty)</string>
-    <string name="storage_sec_clean">Leftovers you can clean</string>
-    <string name="storage_clean_fmt">%1$d place(s) · %2$s (\"Clean now\" in settings)</string>
 
     <string name="trash_title">Transfer station</string>
     <string name="trash_sub">Deleted files wait here; you can put them back</string>
@@ -1648,20 +1644,14 @@
     <string name="set_crash_alert_enable">Show crash alerts</string>
     <string name="set_crash_alert_disable">Do not show crash alerts</string>
 
-    <string name="storage_clear_cache">Clear share cache</string>
-    <string name="storage_clear_title">Clear share cache</string>
-    <string name="storage_clear_msg">Only temporary files left by direct share are removed. A file still being sent may fail.</string>
-    <string name="storage_clear_btn">Clear</string>
-    <string name="storage_clear_done_fmt">Removed %1$d temporary files.</string>
-    <string name="storage_clear_none">No temporary share files.</string>
-    <string name="storage_clear_fail">Could not clear the cache.</string>
-    <string name="storage_clear_game_cache">Clear game cache</string>
-    <string name="storage_clear_game_title">Clear game cache</string>
-    <string name="storage_clear_game_msg">Removes music, mod caches and temporary files the game rebuilds on the next launch. Saves, mods and launcher data are untouched. Not available while a game is running.</string>
-    <string name="storage_clear_game_done_fmt">Cleared %1$s.</string>
-    <string name="storage_clear_game_none">Nothing to clear.</string>
-    <string name="storage_clear_game_busy">A game is running. Close it first.</string>
-    <string name="storage_clear_game_fail">Could not clear the game cache.</string>
+    <string name="storage_clean_btn">Clean</string>
+    <string name="storage_clean_all_title">Clean up</string>
+    <string name="storage_clean_all_msg">This removes the game cache (music, mod caches, dex output), the share cache and old-version duplicates. Saves, mods, maps, blueprints, imported game packages and launcher data are untouched. The game cache is skipped while a game is running.</string>
+    <string name="storage_clean_all_done_fmt">Cleaned, freed about %1$s (cache %2$d · shares %3$d · duplicates %4$d)</string>
+    <string name="storage_clean_all_none">Nothing to clean.</string>
+    <string name="storage_clean_all_fail">Cleanup did not succeed. Try again later.</string>
+    <string name="storage_clean_all_partial">Some items could not be removed.</string>
+    <string name="storage_clean_all_skip">Game cache skipped: a game is running.</string>
 
 
     <!-- 第 175 轮：「关于」从设置页搬成独立二级页 -->

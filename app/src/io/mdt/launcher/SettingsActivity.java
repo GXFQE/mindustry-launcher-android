@@ -170,9 +170,9 @@ public class SettingsActivity extends BaseActivity {
         //   不再放"点开是另一个页面"的行。日志份数（下面那行）留在这里 —— 那是一个**设置值**。
 
         // F20（2026-10-03 用户：「我们是不是应该给一些功能加上开关」）：
-        // ★ 全工程**唯一一个"静默删文件"**的动作就是它（进存档页时清数据根残留），
-        //   所以只给它加了开关。这一行**同时是手动清理的入口** —— 关掉自动之后还得能清，
-        //   否则用户一关就再没有别的办法（第 57 轮把体检的可见入口删掉了）。
+        // ★ 全工程**唯一一个"静默删文件"**的动作就是它（进存档页时清旧版本重复文件），
+        //   所以只给它加了开关。第 383 轮改名 + 加解释：「自动清理残留」→「旧版本重复文件」；
+        //   手动清理并进「存储占用 → 清理」，这一行只留自动开关（动作跟着数字走）。
         View rowClean = Util.bindActionValue(root, R.id.row_auto_clean, R.drawable.ic_health,
                 R.string.set_autoclean_title, new Runnable() {
                     @Override public void run() { promptAutoClean(); }
@@ -348,30 +348,29 @@ public class SettingsActivity extends BaseActivity {
     }
 
     /**
-     * F20：「自动清理残留」这一行。点击弹两件事 ——
-     *   ① 立即清理一次（**关掉自动之后唯一的清理入口**，所以必须给）
-     *   ② 关掉 / 开启自动清理
+     * F20：「旧版本重复文件」这一行（第 383 轮改名 + 加解释）。
      *
-     * ★ 为什么不像别处那样放一个开关控件：本页所有行都是"点一下弹选择"的样式
-     *   （深浅色 / 默认槽 / 日志份数都这样），中间插一个 Switch 会让这一页看起来像两套交互。
-     * ★ 清完只报**数量**、不报路径：那些是自己的残留副本，用户不必认识它们。
+     * <p>它只控制**自动清理**：进存档页时把旧版本复制进游戏数据目录的启动器文件（有正证据的）
+     * 清掉。手动清理已经并进「存储占用 → 清理」（见 {@link Cleanup}），这里不再放
+     * 「立即清理一次」—— 动作跟着数字走，设置页只留策略。</p>
+     *
+     * <p>★ 为什么不像别处那样放一个开关控件：本页所有行都是"点一下弹选择"的样式
+     *   （深浅色 / 默认槽 / 日志份数都这样），中间插一个 Switch 会让这一页看起来像两套交互。</p>
      */
     private void promptAutoClean() {
         final boolean on = Config.get().autoCleanRedundant();
         new AlertDialog.Builder(this)
                 .setTitle(R.string.set_autoclean_title)
-                .setItems(new String[]{
-                        Trans.get(SettingsActivity.this, R.string.set_autoclean_do),
-                        getString(on ? R.string.set_autoclean_disable
-                                     : R.string.set_autoclean_enable)},
+                .setMessage(Trans.get(this, R.string.set_autoclean_why))
+                .setPositiveButton(on ? R.string.set_autoclean_disable
+                                      : R.string.set_autoclean_enable,
                         new DialogInterface.OnClickListener() {
                             @Override public void onClick(DialogInterface d, int w) {
-                                if (w == 0) { runAutoClean(); return; }
                                 Config.get().setAutoCleanRedundant(!on);
                                 fillValues();
                             }
                         })
-                .setNegativeButton(R.string.cancel, null)
+                .setNegativeButton(R.string.close, null)
                 .show();
     }
 
@@ -388,9 +387,10 @@ public class SettingsActivity extends BaseActivity {
      */
     private void showStorage() {
         // ★ 第 264 轮：先出壳、后台算完补正文（原来是 `dlg.setMessage`），
-        //   "清理分享缓存"的确认框也推进同一张卡 —— 原来是卡上再叠一个弹窗。
-        // ★ 第 382 轮（阶段 0.4）：多一个「清理游戏缓存」—— 它清 getCacheDir / getCodeCacheDir
-        //   （HUB 临时件已搬去 app_hub/tmp，不在这里面；见 HubTmp / CacheClean 的类注释）。
+        //   「清理」的确认页也推进同一张卡 —— 原来是卡上再叠一个弹窗。
+        // ★ 第 383 轮（用户：「反正这些都是可以自动清理的，不如合并到一起」）：
+        //   原来的「清理游戏缓存 / 清理分享缓存」两个按钮 + 底部「可以清理的残留」合成**一个**「清理」，
+        //   实现在 {@link Cleanup}（游戏缓存 + 分享缓存 + 旧版本重复文件）。
         final android.widget.TextView bodyView = new android.widget.TextView(this);
         bodyView.setTextSize(15);
         bodyView.setTextColor(getResources().getColor(R.color.fg));
@@ -399,13 +399,10 @@ public class SettingsActivity extends BaseActivity {
         final CardStack[] ref = new CardStack[1];
         ref[0] = CardStack.show(null, this, Trans.get(this, R.string.set_storage_title),
                 CardStack.wrap(this, bodyView),
-                new CardStack.Btn(Trans.get(this, R.string.storage_clear_game_cache),
+                new CardStack.Btn(Trans.get(this, R.string.storage_clean_btn),
                         new Runnable() {
-                            @Override public void run() { confirmClearGameCache(ref[0]); }
+                            @Override public void run() { confirmCleanAll(ref[0]); }
                         }),
-                new CardStack.Btn(Trans.get(this, R.string.storage_clear_cache), new Runnable() {
-                    @Override public void run() { confirmClearShareCache(ref[0]); }
-                }),
                 new CardStack.Btn(Trans.get(this, R.string.close), new Runnable() {
                     @Override public void run() { ref[0].dismiss(); }
                 }));
@@ -443,148 +440,66 @@ public class SettingsActivity extends BaseActivity {
     }
 
     /**
-     * 第 382 轮（阶段 0.4）：清游戏缓存（`getCacheDir()` + `getCodeCacheDir()`）。
+     * 第 383 轮：**一个**「清理」= 游戏缓存 + 分享缓存 + 旧版本重复文件。
      *
-     * <p>为什么单独一个确认框：它删的是**游戏运行时真正在用**的东西（音乐 / 模组 jar / dex 产物），
-     * 而且从这一版起它们不再住在系统 cache 里 ⇒ 系统「清除缓存」清不到，用户只能从这里清。
-     * 文案说清"不动存档 / 模组 / 启动器数据"，以及"游戏运行时不能清"。</p>
+     * <p>三样都是可再生的 / 有正证据的（见 {@link Cleanup}）；存档、模组、地图、蓝图、导入的
+     * 游戏包、启动器数据一个都不动。游戏在跑时游戏缓存会自动跳过（其余两样照清），
+     * 结果里会明说这一点。</p>
      */
-    private void confirmClearGameCache(final CardStack stack) {
-        stack.pushMessage(Trans.get(this, R.string.storage_clear_game_title),
-                Trans.get(this, R.string.storage_clear_game_msg),
-                Trans.get(this, R.string.storage_clear_btn), new Runnable() {
+    private void confirmCleanAll(final CardStack stack) {
+        stack.pushMessage(Trans.get(this, R.string.storage_clean_all_title),
+                Trans.get(this, R.string.storage_clean_all_msg),
+                Trans.get(this, R.string.storage_clean_btn), new Runnable() {
                     @Override public void run() {
                         stack.dismiss();
-                        clearGameCache();
+                        cleanAll();
                     }
                 });
     }
 
-    private void clearGameCache() {
+    private void cleanAll() {
         final android.content.Context app = getApplicationContext();
         new Thread(new Runnable() {
             @Override public void run() {
-                CacheClean.Result r = null;
+                Cleanup.Result r = null;
                 try {
-                    r = CacheClean.gameCache(app);
+                    r = Cleanup.run(app);
                 } catch (Throwable t) {
-                    android.util.Log.w("MDTLauncher", "clear game cache failed: " + t);
+                    android.util.Log.w("MDTLauncher", "clean all failed: " + t);
                 }
-                final CacheClean.Result rr = r;
+                final Cleanup.Result rr = r;
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
                         if (isFinishing()) return;
-                        if (rr == null) {
+                        if (rr == null || (!rr.ok && !rr.any())) {
                             Toast.makeText(SettingsActivity.this,
-                                    R.string.storage_clear_game_fail, Toast.LENGTH_SHORT).show();
+                                    R.string.storage_clean_all_fail, Toast.LENGTH_LONG).show();
                             return;
                         }
-                        if (rr.skipped) {
+                        if (!rr.any()) {
                             Toast.makeText(SettingsActivity.this,
-                                    R.string.storage_clear_game_busy, Toast.LENGTH_LONG).show();
+                                    R.string.storage_clean_all_none, Toast.LENGTH_SHORT).show();
                             return;
                         }
+                        String msg = Trans.get(SettingsActivity.this,
+                                R.string.storage_clean_all_done_fmt,
+                                Util.formatSize(rr.totalBytes()),
+                                rr.cache == null ? 0 : rr.cache.entries,
+                                rr.shareFiles,
+                                rr.dup == null ? 0 : rr.dup.cleaned);
                         if (!rr.ok) {
-                            Toast.makeText(SettingsActivity.this,
-                                    R.string.storage_clear_game_fail, Toast.LENGTH_LONG).show();
-                            return;
+                            msg += "\n" + Trans.get(SettingsActivity.this,
+                                    R.string.storage_clean_all_partial);
                         }
-                        Toast.makeText(SettingsActivity.this,
-                                rr.bytes > 0
-                                        ? Trans.get(SettingsActivity.this,
-                                                R.string.storage_clear_game_done_fmt,
-                                                Util.formatSize(rr.bytes))
-                                        : Trans.get(SettingsActivity.this,
-                                                R.string.storage_clear_game_none),
-                                Toast.LENGTH_LONG).show();
+                        if (rr.cacheSkipped()) {
+                            msg += "\n" + Trans.get(SettingsActivity.this,
+                                    R.string.storage_clean_all_skip);
+                        }
+                        Toast.makeText(SettingsActivity.this, msg, Toast.LENGTH_LONG).show();
                     }
                 });
             }
-        }, "clear-game-cache").start();
-    }
-
-    /**
-     * 第 174 轮：清掉 `app_hub/tmp/share/` 里的临时分享 / 统计缓存。
-     *
-     * <p>为什么只清这一层：那里是「直接分享」借给别的 App 的那一份（第 382 轮从系统 cache
-     * 搬过来），清掉只会让还没读完的接收方失效；游戏 cache / 缩略图 / 槽数据一个都不动。
-     * 正在被接收方读取的文件可能失效，所以先确认。
-     */
-    private void confirmClearShareCache(final CardStack stack) {
-        stack.pushMessage(Trans.get(this, R.string.storage_clear_title),
-                Trans.get(this, R.string.storage_clear_msg),
-                Trans.get(this, R.string.storage_clear_btn), new Runnable() {
-                    @Override public void run() {
-                        stack.dismiss();
-                        clearShareCache();
-                    }
-                });
-    }
-
-    private void clearShareCache() {
-        final android.content.Context app = getApplicationContext();
-        new Thread(new Runnable() {
-            @Override public void run() {
-                int n = 0;
-                boolean ok = true;
-                try {
-                    n = ShareOut.clear(app);
-                } catch (Throwable t) {
-                    ok = false;
-                    android.util.Log.w("MDTLauncher", "clear share cache failed: " + t);
-                }
-                final int count = n;
-                final boolean good = ok;
-                runOnUiThread(new Runnable() {
-                    @Override public void run() {
-                        if (isFinishing()) return;
-                        if (!good) {
-                            Toast.makeText(SettingsActivity.this,
-                                    R.string.storage_clear_fail, Toast.LENGTH_SHORT).show();
-                            return;
-                        }
-                        Toast.makeText(SettingsActivity.this,
-                                count > 0 ? Trans.get(SettingsActivity.this,
-                                        R.string.storage_clear_done_fmt, count)
-                                        : Trans.get(SettingsActivity.this, R.string.storage_clear_none),
-                                Toast.LENGTH_SHORT).show();
-                    }
-                });
-            }
-        }, "clear-share-cache").start();
-    }
-
-    /** 立即清理一次（后台线程 —— 要扫数据根；清完回主线程报数量） */
-    private void runAutoClean() {
-        final android.content.Context app = getApplicationContext();
-        new Thread(new Runnable() {
-            @Override public void run() {
-                int n = 0;
-                boolean ok = true;
-                try {
-                    n = Data.autoCleanRedundant(app).cleaned;
-                } catch (Throwable e) {
-                    ok = false;
-                    android.util.Log.w("MDTLauncher", "manual auto-clean failed: " + e);
-                }
-                final int count = n;
-                final boolean good = ok;
-                runOnUiThread(new Runnable() {
-                    @Override public void run() {
-                        if (isFinishing()) return;
-                        if (!good) {
-                            Toast.makeText(SettingsActivity.this,
-                                    R.string.set_autoclean_fail, Toast.LENGTH_SHORT).show();
-                            return;
-                        }
-                        Toast.makeText(SettingsActivity.this,
-                                count > 0 ? Trans.get(SettingsActivity.this, R.string.set_autoclean_done_fmt, count)
-                                          : Trans.get(SettingsActivity.this, R.string.set_autoclean_none),
-                                Toast.LENGTH_SHORT).show();
-                    }
-                });
-            }
-        }, "manual-health").start();
+        }, "clean-all").start();
     }
 
     // ── 设置项 ────────────────────────────────────────────────────────────
