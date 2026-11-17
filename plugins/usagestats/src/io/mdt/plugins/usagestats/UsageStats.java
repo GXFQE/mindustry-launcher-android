@@ -77,10 +77,12 @@ public final class UsageStats {
             String name = slotPage ? versionLabel(c, items, e) : e.slot;
             if (!e.patch.isEmpty()) {
                 // ★ 第 388 轮：本体 + 补丁 ≠ 本体（用户：「应该算是半个改端」）——
-                //   账本按补丁身份分行，这里把"带了什么补丁"直接写进行名。
-                String what = e.patchLabel.isEmpty() ? c.getString(R.string.us_patch_half)
-                        : e.patchLabel;
-                name = c.getString(R.string.us_patch_row_fmt, name, what);
+                //   账本按补丁身份分行，行名不能再叠一句「本体+补丁」：宿主标题里已经有
+                //   「原端 / 改端」类型词，把它换成「半改端」，补丁名只用短形式（去掉
+                //   「(原版 + 补丁)」这类解释）。
+                name = patchedLabel(c, name, e);
+            } else if (slotPage) {
+                name = prettyName(name);
             }
             slices.add(new Playtime.Slice(name, e.ms));
         }
@@ -161,6 +163,86 @@ public final class UsageStats {
         row.addView(right);
         right.setText(value);
         return row;
+    }
+
+    /**
+     * 统一行名分隔符：宿主标题是「名称  原端  版本」两个空格，这里换成「名称 · 原端 · 版本」。
+     * 所有行共用，避免标题用空格、补丁后缀用 `·` 的混用。
+     */
+    private static String prettyName(String name) {
+        return joinParts(splitName(name));
+    }
+
+    private static String[] splitName(String name) {
+        String s = name == null ? "" : name.trim();
+        return s.isEmpty() ? new String[0] : s.split(" {2,}");
+    }
+
+    private static String joinParts(String[] parts) {
+        StringBuilder sb = new StringBuilder();
+        for (String p : parts) {
+            if (p == null || p.trim().isEmpty()) continue;
+            if (sb.length() > 0) sb.append(" · ");
+            sb.append(p.trim());
+        }
+        return sb.toString();
+    }
+
+    /**
+     * 带补丁行的显示名：把标题里的「原端 / 改端」换成「半改端」，再缀一个**短**补丁名。
+     *
+     * <p>为什么不直接 `name + " · 本体+补丁（...）"`：宿主标题已经写了类型，再叠一句
+     * 「本体+补丁」既重复又长（真机被 `ellipsize=END` 截断）；这里只留「半改端 + 短补丁名」。
+     */
+    private static String patchedLabel(Context c, String name, Playtime.Entry e) {
+        String half = c.getString(R.string.us_patch_half);
+        String[] parts = splitName(name);
+        String base;
+        if (parts.length >= 3) {
+            parts[1] = half;
+            base = joinParts(parts);
+        } else if (parts.length == 2) {
+            base = parts[0] + " · " + half + " · " + parts[1];
+        } else if (parts.length == 1) {
+            base = parts[0] + " · " + half;
+        } else {
+            base = half;
+        }
+        int count = patchCount(e.patch);
+        String what = shortPatch(c, e, count);
+        if (what.isEmpty()) return base;
+        return c.getString(R.string.us_patch_row_fmt, base, what);
+    }
+
+    private static int patchCount(String refs) {
+        if (refs == null || refs.trim().isEmpty()) return 0;
+        int n = 0;
+        for (String s : refs.split(",")) if (!s.trim().isEmpty()) n++;
+        return n;
+    }
+
+    private static String shortPatch(Context c, Playtime.Entry e, int count) {
+        String label = e.patchLabel == null ? "" : e.patchLabel.trim();
+        // 「MindustryX (原版 + 补丁)」→「MindustryX」；解释性括号不进 13sp 的单行。
+        label = label.replaceAll("\\s*[\\(（][^()（）]*[\\)）]", "").trim();
+        if (count > 1) {
+            String id = refId(firstRef(e.patch));
+            if (id.isEmpty()) id = label;
+            return id.isEmpty() ? "" : c.getString(R.string.us_patch_more_fmt, id, count - 1);
+        }
+        if (!label.isEmpty()) return label;
+        return refId(firstRef(e.patch));
+    }
+
+    private static String firstRef(String refs) {
+        if (refs == null) return "";
+        for (String s : refs.split(",")) if (!s.trim().isEmpty()) return s.trim();
+        return "";
+    }
+
+    private static String refId(String ref) {
+        int at = ref == null ? -1 : ref.indexOf('@');
+        return at > 0 ? ref.substring(0, at) : (ref == null ? "" : ref);
     }
 
     /** 版本 key → 宿主当前的版本条目（含自定义名 / 版本号）。 */

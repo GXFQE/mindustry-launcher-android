@@ -9,6 +9,7 @@
     <string name="us_note">Game foreground time only; up to 20 s can be lost when the game is killed. Base game and patched runs are counted separately.</string>
     <string name="us_more_fmt">Show %1$d versions</string>
     <string name="us_collapse">Show less</string>
-    <string name="us_patch_row_fmt">%1$s · base + patch (%2$s)</string>
+    <string name="us_patch_row_fmt">%1$s · %2$s</string>
+    <string name="us_patch_more_fmt">%1$s +%2$d</string>
     <string name="us_patch_half">half-modified</string>
 </resources>
