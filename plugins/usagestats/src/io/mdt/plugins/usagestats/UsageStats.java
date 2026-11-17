@@ -9,6 +9,7 @@ import android.widget.TextView;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -20,15 +21,20 @@ import io.mdt.launcher.api.PluginTheme;
 import io.mdt.plugins.usagestats.core.Playtime;
 
 /**
- * 游玩时长（官方插件，v31）。
+ * 游玩时长（官方插件，v32）。
  *
  * <p>两个落点，**都在宿主自己的页面里**（插件页不再放入口）：
  * <ul>
  *   <li>`slot: section` + `page: slot` ⇒ 槽页信息卡下面一张卡：本槽合计 + 按游戏版本分列
  *       （已装游戏原地更新后，更新前后是**两行**）；</li>
- *   <li>`playtimeTotal`（plugin.json）⇒ 探针写的 `total.txt`，宿主把它排版进**主界面摘要卡**。</li>
+ *   <li>`playtimeTotal`（plugin.json）⇒ `total.txt`，宿主把它排版进**主界面摘要卡**。</li>
  * </ul>
  * 这个类同时是插件自述里的默认入口：从插件页长按「打开」时，页面显示总计 + 按槽分列。
+ *
+ * <p>★ 2026-11-17（第 384 轮）：**不再用 in-process 探针计时**。宿主在 `:game` 里用
+ * `SessionClock` 记这一局（前台累计 `activeMs`），退出时通过 `game-exit` 事件交一次；
+ * 这里只负责把 `activeMs` 追加进账本。少一层 `:game` 里的插件代码（官方内置插件崩了
+ * 就是游戏崩，崩溃报告还会标「有插件参与」）。
  */
 public final class UsageStats {
 
@@ -215,6 +221,88 @@ public final class UsageStats {
             if (in != null) {
                 try { in.close(); } catch (Throwable ignored) { }
             }
+        }
+    }
+
+    /**
+     * 2026-11-17：`game-exit` 事件（宿主时钟算好的一局）⇒ 追加进账本。
+     *
+     * <p>取数：`activeMs`（本局前台累计）+ `key`（版本身份）；版本号 / 显示名 / 原始版本名
+     * 从宿主 {@link PluginApi#versions()} 的 extra 取 —— 与旧探针写账本时的快照同源。
+     * 没有 `activeMs`（启动即崩 / 宿主没量到）⇒ 什么都不做，别记一笔 0。
+     *
+     * <p>⚠️ 一个 `game-exit` 只加一次：宿主在派发后就把这局从 `sSessions` / `event-pending`
+     * 里清掉了；这里不再做去重（重复派发 = 宿主 bug）。
+     */
+    public static void onEvent(PluginApi api, String event, Map<String, String> data) {
+        if (api == null || data == null || !"game-exit".equals(event)) return;
+        long active = parseLong(data.get("activeMs"));
+        if (active <= 0L) return;
+        String slot = clean(data.get("slot"));
+        if (slot.isEmpty()) slot = clean(api.slot());
+        String key = clean(data.get("key"));
+        File dir = api.dataDir();
+        if (slot.isEmpty() || key.isEmpty() || dir == null) return;
+        try {
+            if (!dir.isDirectory() && !dir.mkdirs()) return;
+            String ledger = read(new File(dir, "ledger.tsv"));
+            Playtime.Snap snap = snapOf(api, key);
+            long base = Playtime.valueFor(ledger, slot, key, snap.tag);
+            String next = Playtime.put(ledger, slot, key, snap, base + active,
+                    System.currentTimeMillis());
+            if (next.equals(ledger)) return;       // 没写进去（坏 key / 空槽）⇒ 别动文件
+            writeAtomic(new File(dir, "ledger.tsv"), next);
+            writeAtomic(new File(dir, "total.txt"), String.valueOf(Playtime.total(next)));
+        } catch (Throwable ignored) {
+            // 插件写失败不许影响宿主 / 游戏：宿主那边也只记日志
+        }
+    }
+
+    /** 版本 key → 账本行要的快照（宿主 `versions()` 的 extra；找不到就只写 key）。 */
+    private static Playtime.Snap snapOf(PluginApi api, String key) {
+        try {
+            for (ItemInfo it : api.versions()) {
+                if (it == null || it.extra == null) continue;
+                if (!key.equals(it.extra.get("key"))) continue;
+                return new Playtime.Snap(it.extra.get("displayVersion"), it.title,
+                        it.extra.get("versionName"), it.extra.get("upstreamVersion"));
+            }
+        } catch (Throwable ignored) {
+        }
+        return new Playtime.Snap("", "", "", "");
+    }
+
+    /** 临时文件 + 改名（读到的永远是完整文件；与旧探针同一套）。 */
+    private static void writeAtomic(File f, String text) {
+        File tmp = new File(f.getParentFile(), f.getName() + ".tmp");
+        FileOutputStream os = null;
+        try {
+            os = new FileOutputStream(tmp);
+            os.write(text.getBytes("UTF-8"));
+            os.flush();
+            os.close();
+            os = null;
+            if (!tmp.renameTo(f)) {
+                f.delete();
+                if (!tmp.renameTo(f)) tmp.delete();
+            }
+        } catch (Throwable t) {
+            if (os != null) {
+                try { os.close(); } catch (Throwable ignored) { }
+            }
+            tmp.delete();
+        }
+    }
+
+    private static String clean(String s) {
+        return s == null ? "" : s.trim();
+    }
+
+    private static long parseLong(String s) {
+        try {
+            return Long.parseLong(s == null ? "" : s.trim());
+        } catch (Throwable t) {
+            return 0L;
         }
     }
 

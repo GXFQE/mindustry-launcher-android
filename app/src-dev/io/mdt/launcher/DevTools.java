@@ -1594,22 +1594,51 @@ final class DevTools {
 
 
     /**
-     * F5 的自动化回归：伪造一次启动记账 → 触发结算 → 读回结果。
+     * F5 的自动化回归：伪造"一局刚结束"的账 + 检查点 → 触发结算 → 读回结果。
      *
-     * 用法：`--es dev_autobackup_test &lt;槽名&gt; [--es dev_ab_min &lt;门槛分钟&gt;]`
-     * 默认把门槛设成 0 ⇒ playtime(≈0) >= 0 恒成立 ⇒ 必定走到快照那一步。
+     * <p>用法：`--es dev_autobackup_test &lt;槽名&gt; [--es dev_ab_min &lt;门槛分钟&gt;]`
+     * 默认把门槛设成 0 ⇒ 判定(≈2 分 20 秒) >= 0 恒成立 ⇒ 必定走到快照那一步。
      * （真实门槛 20 分钟没法在自动化里等，所以这里改的是门槛而不是时钟。）
+     *
+     * <p>★ 2026-11-17：结算改成"读检查点、没有就跳过" ⇒ 这条回归**必须同时造检查点**，
+     * 否则它测的只是"跳过"那条路。检查点的 `at` 往前挪 (min+2) 分钟，模拟"玩够了"。
      */
     private void devAutoBackupTest(final String slot) {
         final int min = a.intExtra(a.getIntent(), "dev_ab_min", 0);
         Config.get().setBackupPolicy(slot, true, min,
                 Config.get().backupPolicy(slot).maxBackups);
-        AutoBackup.noteStart("dev:autobackup", slot);
+        final long now = System.currentTimeMillis();
+        final long at = now - (min + 2L) * 60000L;
+        // 只替换这一槽的账，别的槽的待结算局原样保留（sessionRestore 是整体覆盖）
+        java.util.List<Config.Session> keep = new java.util.ArrayList<Config.Session>();
+        for (Config.Session s : Config.get().sessions()) {
+            if (s != null && !slot.equals(s.slot)) keep.add(s);
+        }
+        keep.add(new Config.Session(slot, "dev:autobackup", at));
+        Config.get().sessionRestore(keep);
+        SessionTime.write(a, android.os.Process.myPid(), Util.processName(),
+                "dev:autobackup", slot, at, now, now - at);
+        final int before = Backup.list(a, slot).size();
         AutoBackup.settle(a);            // 游戏没跑 ⇒ 内部判 :game 已死成立
 
         new Thread(new Runnable() {
             @Override public void run() {
-                AutoBackup.awaitIdle(15000);    // 等后台快照收尾
+                // ★ 2026-11-17：不能只 awaitIdle 一次 —— settle 里的备份线程可能**还没开始**
+                //   beginWork，awaitIdle 会立刻返回（dev 口曾因此报「备份数=0」而快照其实成了）。
+                //   ⇒ 轮询到"备份数真涨了"或超时。
+                int count = before;
+                long end = System.currentTimeMillis() + 15000;
+                while (System.currentTimeMillis() < end) {
+                    AutoBackup.awaitIdle(2000);
+                    count = Backup.list(a, slot).size();
+                    if (count > before) break;
+                    try {
+                        Thread.sleep(200);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        break;
+                    }
+                }
                 final StringBuilder sb = new StringBuilder();
                 sb.append("dev_autobackup_test slot=").append(slot)
                   .append(" min=").append(min).append('\n');
@@ -1620,7 +1649,8 @@ final class DevTools {
                     sb.append("  · ").append(ss.slot).append("  at=").append(ss.at).append('\n');
                 }
                 List<Backup.Snapshot> list = Backup.list(a, slot);
-                sb.append("现在备份数=").append(list.size()).append('\n');
+                sb.append("现在备份数=").append(count)
+                  .append("（结算前 ").append(before).append("）\n");
                 for (Backup.Snapshot ss : list) {
                     sb.append("  · ").append(ss.title()).append("  ")
                       .append(ss.count).append(" 个文件 ")

@@ -65,7 +65,9 @@ Injector.java = 40   # 用户可见的已搬完；剩的是启动管线报告（
                      #   "两个版本互相覆盖 .so"（plan §12.23）的唯一证据。
 MapStats.java = 22   # 已搬完；剩的是 SRC_VANILLA/MOD/PATCH 文案常量与语料诊断（内部，不上界面）
 Backup.java = 17   # 用户可见的已搬完；剩的是 CAS 迁移报告与 Log 诊断
-AutoBackup.java = 11   # 只进 report-autobackup.txt
+AutoBackup.java = 19   # 只进 report-autobackup.txt；★ 2026-11-17（第 384 轮）11 → 19：
+                       #   新增的是「三种跳过原因 / 观测与判定两个时长 / 前台累计」这些报告行 ——
+                       #   给维护者看的取证文本（用户界面走 Trans），不是界面文案。
 BundleNames.java = 10   # ★ 代码注释原文：「`note` 只留给**维护者**（PC 验收台）」⇒ 技术细节层依据
 Cas.java = 8   # 🔴 **已知残留**：纯 Java 对象池，8 条消息经 `Backup` 恢复报告的**每文件行**（`backup_restore_err_line_fmt` 的 `%2$s`）可能露给用户。要彻底解决得给 Cas 上「码 + 参数」（它没有 Context）—— 自检里有一条断言**点名要它**（「报告点名对象内容与地址 sha256 不符」）⇒ 那条信息有用，不许简单删掉。
 MapStatsMods.java = 10  # 内容表 / 语料诊断 / bundle 旁证条数（「技术细节」那几行随 F21 搬进插件了）

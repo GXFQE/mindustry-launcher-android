@@ -66,10 +66,26 @@ final class GameActivityWatcher implements Application.ActivityLifecycleCallback
         void onGameForeground(boolean foreground);
     }
 
+    /**
+     * 2026-11-17：谁在听「游戏 activity **真结束**」（`isFinishing` 的 destroy）。
+     *
+     * <p>给 {@code SessionClock} 停表用：Mindustry 退出多半直接 `System.exit`（收不到回调，
+     * 最多丢一拍），但"只 finish 不退进程"时必须停 —— 否则 `:game` 进程被缓存的那段
+     * 会继续往这一局上记时间。
+     */
+    interface Finished {
+        void onGameFinished();
+    }
+
     private static volatile Foreground fgListener;
+    private static volatile Finished finListener;
 
     static void setForegroundListener(Foreground l) {
         fgListener = l;
+    }
+
+    static void setFinishedListener(Finished l) {
+        finListener = l;
     }
 
     @Override public void onActivityResumed(Activity activity) {
@@ -96,5 +112,18 @@ final class GameActivityWatcher implements Application.ActivityLifecycleCallback
 
     @Override public void onActivityStopped(Activity activity) {}
     @Override public void onActivitySaveInstanceState(Activity activity, Bundle state) {}
-    @Override public void onActivityDestroyed(Activity activity) {}
+    @Override public void onActivityDestroyed(Activity activity) {
+        // 只认"真结束"：配置变更（旋转 / 换语言）也会 destroy，但 isFinishing()=false，
+        // 那种情况游戏还要接着跑，停表就错了。
+        if (isGame(activity) && activity.isFinishing()) notifyFinished();
+    }
+
+    private static void notifyFinished() {
+        Finished l = finListener;
+        if (l == null) return;
+        try {
+            l.onGameFinished();
+        } catch (Throwable ignored) {
+        }
+    }
 }

@@ -1,17 +1,12 @@
 {
   "entry": "io.mdt.plugins.usagestats.UsageStats",
   "name": "usagestats",
-  "version": "6",
+  "version": "7",
   "author": "mdt",
-  "description": "foreground play time (the probe writes its own ledger)",
+  "description": "foreground play time (host clock -> game-exit event; the plugin writes its own ledger)",
   "update": "https://github.com/GXFQE/mindustry-launcher-android/releases/download/plugins-latest/usagestats.json",
   "playtimeTotal": "total.txt",
   "access": [],
-  "telemetry": {
-    "probes": [
-      { "class": "io.mdt.plugins.usagestats.PlaytimeProbe", "sec": 20, "inProcess": true }
-    ]
-  },
   "extensions": [
     {
       "id": "playtime-slot",
@@ -19,6 +14,11 @@
       "entry": "io.mdt.plugins.usagestats.UsageStats",
       "slot": "section",
       "page": "slot"
+    },
+    {
+      "id": "playtime-exit",
+      "entry": "io.mdt.plugins.usagestats.UsageStats",
+      "event": "game-exit"
     }
   ]
 }

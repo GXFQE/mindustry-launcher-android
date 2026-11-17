@@ -270,6 +270,8 @@ public final class SelfTest {
             cleanupAll(ctx, L, stat);
             // ★ 第 364 轮：实例会话记账（多开：一槽一局，结算按实例）
             instanceSessions(ctx, L, stat);
+            // ★ 第 384 轮：会话时长改宿主时钟（检查点 / +20 秒判定 / 用完即删）
+            sessionClock(ctx, L, stat);
             // ★ ⑰ F13 第三阶段：模组包导入 / 跨槽复制（五个负例 + 一条元断言）
             modsPack(ctx, L, stat);
             // ★ ⑲ F13 第二批：搜索/筛选/排序（纯函数，可单独喂断言）
@@ -19688,6 +19690,175 @@ public final class SelfTest {
         }
         ok(stat, L, matrix && running,
                 "④ 结算按实例：有实例豁免；登记表非空只信它；表空时只保守跳过当前槽");
+    }
+
+    /**
+     * 第 384 轮（2026-11-17）：**宿主时钟 / 自动备份判定**。
+     *
+     * <p>钉住五件事：
+     * <ol>
+     *   <li>检查点写 / 读最新 / `since` 过滤 / 别的槽不串；</li>
+     *   <li>判定统一 **+20 秒**（门槛两侧各差 1ms —— 容差只加一次）；</li>
+     *   <li>三种跳过：自动备份已关 / 没有检查点 / 不够门槛；</li>
+     *   <li>`game-exit` 的两条取数路：文件还在（现读）与 settle 先删（内存交接）；</li>
+     *   <li>用完即删 + 孤儿清扫（死 pid 没账 ⇒ 删；有账 / 活 pid ⇒ 留）；`.time` 不被
+     *       {@link Instances#scan} 误删。</li>
+     * </ol>
+     */
+    private static void sessionClock(Context ctx, List<String> L, int[] stat) {
+        L.add("");
+        L.add("── 第 384 轮 · 宿主时钟 / 检查点 / 自动备份判定 ──");
+        final String slotA = "m3-clock-a";
+        final String slotB = "m3-clock-b";
+        final String slotKeep = "m3-clock-keep";
+        final String slotOrphan = "m3-clock-orphan";
+        final String slotLive = "m3-clock-live";
+        final long now = System.currentTimeMillis();
+        try {
+            for (String s : new String[] {slotA, slotB, slotKeep, slotOrphan, slotLive}) {
+                SessionTime.deleteSlot(ctx, s);
+            }
+
+            // ① 同一槽两份（旧 / 新）⇒ 读最新；since 过滤掉旧的；别的槽不串
+            SessionTime.write(ctx, 101, "selftest:game", "k.old", slotA,
+                    now - 60_000L, now - 30_000L, 1_000L);
+            SessionTime.write(ctx, 102, "selftest:game", "k.new", slotA,
+                    now - 10_000L, now, 5_000L);
+            SessionTime.write(ctx, 103, "selftest:game", "k.b", slotB, now, now + 1_000L, 0L);
+            SessionTime.Summary latest = SessionTime.read(ctx, slotA, 0L);
+            SessionTime.Summary filtered = SessionTime.read(ctx, slotA, now - 5_000L);
+            SessionTime.Summary other = SessionTime.read(ctx, slotB, 0L);
+            ok(stat, L, latest != null && "k.new".equals(latest.vkey)
+                            && latest.activeMs == 5_000L
+                            && ((now - 10_000L) + "-102.time").equals(latest.file.getName())
+                            && filtered != null && "k.new".equals(filtered.vkey)
+                            && other != null && slotB.equals(other.slot),
+                    "① 检查点：同槽读最新、since 过滤旧文件、文件名 = <started>-<pid>.time、别的槽不串");
+
+            // ② 判定：统一 +20 秒（门槛下方 1ms / 上方 1ms；容差只加一次）
+            Config.Session s = new Config.Session(slotA, "k.new", now);
+            Config.BackupPolicy p = new Config.BackupPolicy(true, 20, 20);
+            long min20 = 20L * 60_000L;
+            long belowAt = now + min20 - SessionClock.FLUSH_MS - 1L;
+            long passAt = now + min20 - SessionClock.FLUSH_MS + 1L;
+            SessionTime.Summary below = new SessionTime.Summary(null, 1, "", "k.new", slotA,
+                    now, belowAt, 0L);
+            SessionTime.Summary pass = new SessionTime.Summary(null, 1, "", "k.new", slotA,
+                    now, passAt, 0L);
+            AutoBackup.Verdict vb = AutoBackup.judge(s, below, p);
+            AutoBackup.Verdict vp = AutoBackup.judge(s, pass, p);
+            ok(stat, L, !vb.backup && vp.backup
+                            && AutoBackup.judgedMs(now, passAt) == passAt + SessionClock.FLUSH_MS - now
+                            && AutoBackup.judgedMs(now, now) == SessionClock.FLUSH_MS,
+                    "② 判定统一 +20 秒：门槛差 1ms 不过 / 过 1ms 就备（容差只加一次）");
+
+            // ③ 三种跳过：关 / 没检查点 / 不够门槛（原因各一句）
+            AutoBackup.Verdict off = AutoBackup.judge(s, pass,
+                    new Config.BackupPolicy(false, 20, 20));
+            AutoBackup.Verdict none = AutoBackup.judge(s, null, p);
+            ok(stat, L, !off.backup && AutoBackup.SKIP_OFF.equals(off.reason)
+                            && !none.backup && AutoBackup.SKIP_NO_CHECKPOINT.equals(none.reason)
+                            && AutoBackup.SKIP_THRESHOLD.equals(vb.reason),
+                    "③ 三种跳过：自动备份已关 / 没有检查点 / 不够门槛（不回退 now）");
+
+            // ④ game-exit 取数两条路：现读文件 / settle 先删走内存交接
+            java.util.Map<String, String> byFile = new java.util.HashMap<String, String>();
+            PluginEvents.attachExitStats(ctx, slotB, byFile);
+            SessionTime.Summary hand = SessionTime.read(ctx, slotA, 0L);
+            PluginEvents.noteExitStats(slotA, hand);
+            int deletedA = SessionTime.deleteSlot(ctx, slotA);
+            java.util.Map<String, String> byMem = new java.util.HashMap<String, String>();
+            PluginEvents.attachExitStats(ctx, slotA, byMem);
+            ok(stat, L, byFile.containsKey("ended") && "k.b".equals(byFile.get("key"))
+                            && byMem.containsKey("ended")
+                            && hand != null
+                            && String.valueOf(hand.lastSeen).equals(byMem.get("ended"))
+                            && String.valueOf(hand.activeMs).equals(byMem.get("activeMs"))
+                            && "k.new".equals(byMem.get("key")),
+                    "④ game-exit 两条路：文件还在就现读；settle 先删则走内存交接（ended/activeMs/key 都在）");
+
+            // ⑤ 用完即删 + 孤儿清扫（死 pid 没账 ⇒ 删；有账 / 活 pid ⇒ 留）
+            //   ★ 清扫用**临时目录**：生产那版会扫真实 `instances/`，自检不能拿用户数据当夹具。
+            boolean gone = SessionTime.read(ctx, slotA, 0L) == null && deletedA >= 2;
+            final int myPid = android.os.Process.myPid();
+            Instances.Live dead = new Instances.Live() {
+                @Override public boolean alive(int pid, String proc) { return false; }
+            };
+            Instances.Live self = new Instances.Live() {
+                @Override public boolean alive(int pid, String proc) { return pid == myPid; }
+            };
+            File tmpDir = new File(ctx.getCacheDir(), "selftest-clock");
+            boolean sweepOk;
+            boolean scanOk;
+            int swept = -1;
+            int sweptKeep = -1;
+            int sweptLive = -1;
+            boolean orphanGone = false;
+            boolean keepPresent = false;
+            boolean livePresent = false;
+            try {
+                File[] old = tmpDir.listFiles();
+                if (old != null) {
+                    for (File f : old) if (f != null) f.delete();
+                }
+                if (!tmpDir.isDirectory() && !tmpDir.mkdirs()) {
+                    throw new java.io.IOException("mkdirs " + tmpDir);
+                }
+                SessionTime.writeIn(tmpDir, 999001, "selftest:game", "k.o", slotOrphan,
+                        now, now + 1_000L, 0L);
+                swept = SessionTime.sweepOrphansIn(tmpDir,
+                        java.util.Collections.<Config.Session>emptyList(), dead);
+                orphanGone = SessionTime.readIn(tmpDir, slotOrphan, 0L) == null;
+                SessionTime.writeIn(tmpDir, 999002, "selftest:game", "k.p", slotKeep,
+                        now, now + 1_000L, 0L);
+                sweptKeep = SessionTime.sweepOrphansIn(tmpDir,
+                        java.util.Collections.singletonList(
+                                new Config.Session(slotKeep, "k.p", now)), dead);
+                keepPresent = SessionTime.readIn(tmpDir, slotKeep, 0L) != null;
+                // 第三个子用例只看"活 pid 的文件"：先把 keep 那份挪走，否则它会被下一轮当死件删掉
+                SessionTime.deleteSlotIn(tmpDir, slotKeep);
+                SessionTime.writeIn(tmpDir, myPid, Util.processName(), "k.l", slotLive,
+                        now, now + 1_000L, 0L);
+                sweptLive = SessionTime.sweepOrphansIn(tmpDir,
+                        java.util.Collections.<Config.Session>emptyList(), self);
+                livePresent = SessionTime.readIn(tmpDir, slotLive, 0L) != null;
+                sweepOk = swept == 1 && orphanGone
+                        && sweptKeep == 0 && keepPresent
+                        && sweptLive == 0 && livePresent;
+
+                // ⑥ Instances.scan 只认 *.json（同一临时目录；.time 不能被登记表扫描删掉）
+                File probe = new File(tmpDir, "1-2.time");
+                Util.atomicWriteText(probe, "{}");
+                Instances.scan(tmpDir, dead);
+                scanOk = probe.isFile();
+            } catch (Throwable t) {
+                sweepOk = false;
+                scanOk = false;
+            } finally {
+                File[] fs = tmpDir.listFiles();
+                if (fs != null) {
+                    for (File f : fs) if (f != null) f.delete();
+                }
+                tmpDir.delete();
+            }
+            ok(stat, L, gone && sweepOk,
+                    "⑤ 检查点用完即删；孤儿清扫：死 pid 没账才删，有账 / 活 pid 都留"
+                            + "（gone=" + gone + " deletedA=" + deletedA
+                            + " swept=" + swept + " orphanGone=" + orphanGone
+                            + " sweptKeep=" + sweptKeep + " keep=" + keepPresent
+                            + " sweptLive=" + sweptLive + " live=" + livePresent + "）");
+            ok(stat, L, scanOk, "⑥ Instances.scan 只处理 *.json：.time 不会被登记表扫描删掉");
+        } catch (Throwable t) {
+            ok(stat, L, false, "宿主时钟自检异常：" + t);
+        } finally {
+            for (String s : new String[] {slotA, slotB, slotKeep, slotOrphan, slotLive}) {
+                try {
+                    SessionTime.deleteSlot(ctx, s);
+                } catch (Throwable ignored) {
+                }
+            }
+            PluginEvents.noteExitStats(slotA, null);
+        }
     }
 
     /**

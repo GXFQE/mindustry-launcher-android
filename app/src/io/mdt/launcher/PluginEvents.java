@@ -31,6 +31,9 @@ import io.mdt.launcher.api.PluginApi;
  * </pre>
  * {@code data} 目前有 {@code name} / {@code slot} / {@code version}（拿不到就不放这个键）；
  * 补报的退出多一个 {@code backfill=1}。
+ * ★ 2026-11-17：`game-exit` 多四个观测键 —— `started` / `ended` / `activeMs` / `wallMs`
+ *   （毫秒字符串；来自宿主时钟的检查点），外加版本身份 {@code key}（`Versions.Entry.key()`）。
+ *   插件用 `key` + {@code PluginApi.versions()} 的 extra 就能把这一局的时长挂到版本行上。
  *
  * <p>⚠️ 交付边界（写进 `docs/PLUGIN-API.md`）：
  * <ul>
@@ -70,6 +73,12 @@ final class PluginEvents {
      * ★ 第 368 轮：一槽一条（多开下两个实例各自的退出都能报出来）。
      */
     private static final Map<String, String> sSessions = new LinkedHashMap<String, String>();
+    /**
+     * 2026-11-17：settle 先跑时把这一局的观测放这里（**只在内存**，不落文件）。
+     * `game-exit` 派发时消费；进程被杀则这条事件本来也会丢（和现状一致）。
+     */
+    private static final Map<String, SessionTime.Summary> sExitStats =
+            new LinkedHashMap<String, SessionTime.Summary>();
     /** 界面是否在前台（{@link BaseActivity} 的 onStart/onStop 维护）。 */
     private static boolean sForeground;
     private static boolean sBooted;
@@ -80,6 +89,8 @@ final class PluginEvents {
     static void gameStart(Context ctx, String slot, String version) {
         if (slot == null || slot.trim().isEmpty()) return;
         sSessions.put(slot, version == null ? "" : version);
+        // 同槽开新局 ⇒ 上一局的观测已经派发或作废，别留给这一局（键按槽）
+        sExitStats.remove(slot);
         notePending(ctx, slot, version);
         dispatch(ctx, GAME_START, slot, data(GAME_START, slot, version));
     }
@@ -103,7 +114,9 @@ final class PluginEvents {
             if (WriteGate.blockedSlot(ctx, s)) continue;     // 这局还在跑 ⇒ 等它真退
             it.remove();
             clearPending(ctx, s);
-            dispatch(ctx, GAME_EXIT, s, data(GAME_EXIT, s, e.getValue()));
+            Map<String, String> data = data(GAME_EXIT, s, e.getValue());
+            attachExitStats(ctx, s, data);
+            dispatch(ctx, GAME_EXIT, s, data);
         }
         backfillExit(ctx);
         if (!sBooted) {
@@ -142,6 +155,7 @@ final class PluginEvents {
                 String version = m.optString(slot, "");
                 Map<String, String> data = data(GAME_EXIT, slot, version);
                 data.put("backfill", "1");
+                attachExitStats(ctx, slot, data);
                 dispatch(ctx, GAME_EXIT, slot, data);
                 m.remove(slot);
                 changed = true;
@@ -264,6 +278,39 @@ final class PluginEvents {
         if (slot != null && !slot.isEmpty()) m.put("slot", slot);
         if (version != null && !version.isEmpty()) m.put("version", version);
         return m;
+    }
+
+    /**
+     * 结算时把这一局的检查点交给事件层（**只在内存**）。
+     *
+     * <p>为什么需要：`AutoBackup.settle` 与 `game-exit` 的派发时机**不保证先后** ——
+     * 正常是事件先到（还能读文件），但分屏 / 多开下游戏在启动器可见时被杀，settle 会先跑、
+     * 检查点已经删了，事件就拿不到这一局的数。把观测放内存里，谁先谁后都对得上。
+     */
+    static void noteExitStats(String slot, SessionTime.Summary st) {
+        if (slot == null || slot.isEmpty()) return;
+        if (st == null) {
+            sExitStats.remove(slot);      // 自检清理用（生产传 null 没有意义）
+            return;
+        }
+        sExitStats.put(slot, st);
+    }
+
+    /**
+     * 把这一局的 `started / ended / activeMs / wallMs`（+ 版本身份 `key`）补进事件 data。
+     * 优先用内存交接（settle 已经删了文件）；否则现读 `.time`（事件先到，文件还在）。
+     * 两处都没有 ⇒ 不补键（老插件忽略多出来的键；这条路说明这一局没量到）。
+     */
+    static void attachExitStats(Context ctx, String slot, Map<String, String> d) {
+        if (ctx == null || slot == null || slot.isEmpty() || d == null) return;
+        SessionTime.Summary st = sExitStats.remove(slot);
+        if (st == null) st = SessionTime.read(ctx, slot, 0L);
+        if (st == null) return;
+        d.put("started", String.valueOf(st.started));
+        d.put("ended", String.valueOf(st.lastSeen));
+        d.put("activeMs", String.valueOf(st.activeMs));
+        d.put("wallMs", String.valueOf(Math.max(0L, st.lastSeen - st.started)));
+        if (!st.vkey.isEmpty()) d.put("key", st.vkey);
     }
 
     /**

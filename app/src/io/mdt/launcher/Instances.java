@@ -409,6 +409,16 @@ final class Instances {
     }
 
     /**
+     * 进程存活（包级可见：{@link SessionTime#sweepOrphans} 与自检用 —— 那里只需要
+     * "这个 pid 还是不是游戏进程"，不需要整张登记表）。
+     *
+     * @param proc 空 / null = 只要求"仍是游戏进程名"（防 pid 复用成主进程 / `:probe`）
+     */
+    static boolean alive(Context ctx, int pid, String proc) {
+        return aliveNow(ctx, pid, proc);
+    }
+
+    /**
      * 进程还活着吗？判据（按可靠性递减）：
      * <ol>
      *   <li>`ActivityManager.getRunningAppProcesses()` 里能按 **pid + 进程名** 命中

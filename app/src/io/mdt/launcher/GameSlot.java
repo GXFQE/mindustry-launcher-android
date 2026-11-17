@@ -38,6 +38,12 @@ public class GameSlot extends BaseActivity {
     private ProbeRunner mProbes;
 
     /**
+     * 2026-11-17：这一局的宿主时钟（自动备份据此判断"这一局跑到什么时候"）。
+     * null = 没起来（参数不全 / 异常）——**不许**因此挡住游戏启动。
+     */
+    private SessionClock mClock;
+
+    /**
      * 入口页透传的"该包要不要走改名交换"（F0）。
      * ★ 为什么要透传：`MainActivity.startVersion` 为了 F18 的兼容性复检**本来就要**
      *   把 APK 打开探一次；再让本进程探一遍等于白读一遍 dex（几十 MB）。
@@ -88,6 +94,12 @@ public class GameSlot extends BaseActivity {
     }
 
     private void handle(Intent it) {
+        // 同一个 :game 进程被 onNewIntent 再拉一次（坑位重进）⇒ 上一局的时钟先停掉，
+        // 否则它会继续往旧文件里写"还在跑"。
+        if (mClock != null) {
+            mClock.end();
+            mClock = null;
+        }
         String pkg = it == null ? null : it.getStringExtra("pkg");
         String apkPath = it == null ? null : it.getStringExtra("apk");
         String slot = it == null ? null : it.getStringExtra("slot");
@@ -145,6 +157,13 @@ public class GameSlot extends BaseActivity {
         //   ⚠️ 退出时没有可靠回调（游戏 System.exit / SIGKILL 都没有）⇒ 读侧靠 pid 存活校验，
         //      这里只负责"报名"，不负责"销号"（启动失败那条路在 fail() 里销）。
         Instances.publish(this, vkey, launchSlot);
+
+        // ★ 2026-11-17：宿主时钟 —— 这一局"最后跑到什么时候"由本进程自己记检查点。
+        //   起点在这里（槽 / 版本都定了），终点由 {@link GameActivityWatcher} 的
+        //   前后台 / 真结束事件推进；文件活在 `app_hub/instances/<started>-<pid>.time`。
+        //   ⚠️ 失败只进日志：时钟不许挡住游戏启动。
+        mClock = SessionClock.start(this, launchSlot, vkey);
+        installGameListeners();
 
         // ③ 六步管线（同步执行，与探针一致；前置段 ~200-500 ms，游戏自身加载另有 4~5 s）
         Injector.Plan plan = new Injector.Plan();
@@ -280,16 +299,34 @@ public class GameSlot extends BaseActivity {
                     slot, versionKey, info);
             startService(ProbeService.runIntent(this, android.os.Process.myPid(), session,
                     slot, versionKey, infoBundle));
-            // v29：把游戏 activity 的前后台变化转给探针（宿主只报事件，记不记由插件定）
-            GameActivityWatcher.setForegroundListener(new GameActivityWatcher.Foreground() {
-                @Override public void onGameForeground(boolean fg) {
-                    ProbeRunner r = mProbes;
-                    if (r != null) r.foreground(fg);
-                }
-            });
         } catch (Throwable t) {
             android.util.Log.w("MDTPlugin", "probe start failed", t);
         }
+    }
+
+    /**
+     * 2026-11-17：把游戏 activity 的前后台 / 真结束事件**一次挂好**，同时喂探针与时钟。
+     *
+     * <p>为什么必须一处挂：{@link GameActivityWatcher#setForegroundListener} 是**单槽**，
+     * 时钟若自己再挂一次，会把探针那条顶掉。所以挂一个合并回调，两边都判空。
+     *
+     * <p>挂的时机 = `Instances.publish` 之后、`Injector.launch` 之前（游戏 activity 还没创建）。
+     */
+    private void installGameListeners() {
+        GameActivityWatcher.setForegroundListener(new GameActivityWatcher.Foreground() {
+            @Override public void onGameForeground(boolean fg) {
+                ProbeRunner r = mProbes;
+                if (r != null) r.foreground(fg);
+                SessionClock c = mClock;
+                if (c != null) c.foreground(fg);
+            }
+        });
+        GameActivityWatcher.setFinishedListener(new GameActivityWatcher.Finished() {
+            @Override public void onGameFinished() {
+                SessionClock c = mClock;
+                if (c != null) c.end();
+            }
+        });
     }
 
     /** Bundle → 字符串 map（探针只认字符串；空值 / 缺键就不放）。排序只为日志稳定。 */
@@ -308,6 +345,12 @@ public class GameSlot extends BaseActivity {
         // 这一局没起来 ⇒ 立刻销号（别让写门禁一直拦）；同时清掉主进程在 startActivity 前
         // 留下的启动占位（第 366 轮：否则那个槽要被占位挡到过期）
         Instances.withdraw(this, mVkey, mLaunchSlot);
+        // 2026-11-17：时钟停表 —— 失败弹窗可能被用户晾着，不停的话 lastSeen 会一直涨，
+        // 下一轮结算会把"看弹窗的时间"算成玩了多久。
+        if (mClock != null) {
+            mClock.end();
+            mClock = null;
+        }
         mStatus.setText(Trans.get(GameSlot.this, R.string.game_start_failed_fmt, step));
         StringBuilder sb = new StringBuilder();
         sb.append(Trans.get(GameSlot.this, R.string.game_step_stuck_fmt, step, msg));

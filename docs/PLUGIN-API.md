@@ -364,6 +364,14 @@ public static void onEvent(PluginApi api, String name, Map<String, String> data)
 
 - `data` 目前有 `name` / `slot` / `version`（拿不到就不放这个键）；
   `game-exit` 若是启动器被杀后**补报**的，多一个 `backfill=1`。
+- **`game-exit` 的观测键**（2026-11-17 起；宿主时钟给的，**加键不抬版本**）：
+  `started` / `ended` / `activeMs` / `wallMs`（毫秒字符串）+ `key`（版本 key，已装 = 包名 /
+  导入 = `import:<文件名>`）。
+  - `ended` = 最后一拍墙钟（最多早 20 秒）；`wallMs = ended - started`；
+  - `activeMs` = 这一局游戏 activity 在**前台**的累计（切出去的时间不算）；
+  - 插件拿 `key` 去 `versions()` 的 `extra`（`displayVersion` / `versionName` /
+    `upstreamVersion`）取版本快照即可；
+  - 拿不到检查点（启动即崩 / 时钟没起来）时这几个键**整组不出现**，别当"跑了 0 毫秒"处理。
 - 回调在 **UI 线程**（可以用 `confirm` / `toast`）；异常只进 `MDTPlugin` 日志，不影响别的插件。
 - 每次派发会 `load` 一份插件、跑完 `unload`：适合"启动前 / 退出后做一件事"，
   **不适合当常驻监听** —— 常驻请用 `submit()`。
