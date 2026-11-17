@@ -19785,7 +19785,7 @@ public final class SelfTest {
             ok(stat, L, "a@1,b@2".equals(pf.get("patch")) && "2".equals(pf.get("patchCount"))
                             && "补丁 A、补丁 B".equals(pf.get("patchLabel")),
                     "★ game-exit 补丁字段：refs 排序成身份、显示名跟 ref 顺序、count 在");
-            ok(stat, L, PluginEvents.patchFields(launches, 100L, 6000L).isEmpty()
+            ok(stat, L, PluginEvents.patchFields(launches, 100L, 60_000L).isEmpty()
                             && PluginEvents.patchFields(null, 1000L, 900L).isEmpty(),
                     "★ 上一局的补丁记录 / 空表 ⇒ 这一局按本体（不拿旧补丁充数）");
 

@@ -327,6 +327,12 @@ final class PluginEvents {
      * <p>没有补丁 ⇒ 不放这几个键（插件按"本体"记账）；读不到记录也不放（不编"无补丁"）。
      * ⚠️ 记录时间早于这一局开始 ⇒ 是上一局留下的（这一局还没写记录 / 启动即崩），不能拿来充数。
      */
+    /**
+     * 启动记录与游戏会话开始之间的容许差：`:game` 先写补丁注入记录、再 `startActivity`，
+     * 会话时钟在游戏 Activity 里才起；大包解压 / native 发布可能花几十秒 ⇒ 用 30 秒，别把当前局误判成上一局。
+     */
+    private static final long PATCH_RECORD_SLACK_MS = 30_000L;
+
     private static void attachPatches(Context ctx, String slot, Map<String, String> d,
                                       long sessionStarted) {
         try {
@@ -351,7 +357,7 @@ final class PluginEvents {
         Map<String, String> out = new HashMap<String, String>();
         if (patches == null || patches.isEmpty()) return out;
         // 记录早于这一局开始 ⇒ 是上一局留下的（这一局还没写记录 / 启动即崩），不能拿来充数
-        if (at > 0L && sessionStarted > 0L && at + 5000L < sessionStarted) return out;
+        if (at > 0L && sessionStarted > 0L && at + PATCH_RECORD_SLACK_MS < sessionStarted) return out;
         java.util.TreeMap<String, String> byRef = new java.util.TreeMap<String, String>();
         for (Patches.Launched l : patches) {
             if (l == null || l.ref == null || l.ref.isEmpty()) continue;
