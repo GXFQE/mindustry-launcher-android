@@ -173,9 +173,13 @@ public class GameSlot extends BaseActivity {
         plan.tag = vkey;
         // 补丁机制 v1（2026-11-10）：按**启动项（实例）**解析这次要带的补丁（第 353 轮起）。
         // ★ 只有真有启用记录时才去算 APK 的 sha256（80 MB 一遍）—— 没开补丁的人不付这个代价。
+        // ★ 2026-11-17（第 389 轮）：这里必须把补丁引用带进 Injector.Patch ——
+        //   启动记录/崩溃归因/游玩时长的补丁身份都读 `ap.ref`；漏了的话注入明明成功，
+        //   `report-patch-launch.json` 里 patches 却是空的（第 388 轮的补丁统计就这么全落成本体）。
         Patches.Resolved patchRes = Patches.resolve(this, target, ikey);
         for (Patches.Loaded l : patchRes.loaded) {
             Injector.Patch p = new Injector.Patch();
+            p.ref = l.record.ref();
             p.dex = l.target.dex;
             p.assets = l.target.assets;
             p.label = l.record.label();
