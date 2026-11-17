@@ -154,7 +154,7 @@
     <string name="plugin_update_row_available_fmt">New version %1$s available</string>
     <string name="plugin_update_row_confirm_fmt">New version %1$s needs confirmation</string>
     <string name="plugin_update_row_installed_fmt">Updated to %1$s · restart to apply</string>
-    <string name="plugin_update_row_host_old_fmt">New version %1$s needs a newer launcher</string>
+    <string name="plugin_update_row_host_old_fmt">New version %1$s needs a newer launcher · old version kept</string>
     <string name="plugin_update_action_fmt">Update to %1$s</string>
     <string name="plugin_update_action">Update it</string>
     <string name="plugin_update_confirm_title">This update is signed by a different key</string>
@@ -165,9 +165,14 @@
     <string name="plugin_update_host_old">This update needs a newer launcher, so it was not downloaded.</string>
     <string name="plugin_update_toast_installed">Updated %1$s plugin(s). Restart to apply.</string>
     <string name="plugin_update_toast_confirm">%1$s plugin update(s) need your confirmation.</string>
+    <string name="plugin_update_toast_host_old">%1$s plugin update(s) need a newer launcher; the old versions were kept.</string>
+    <string name="plugin_api_old_title">Plugins rolled back for this launcher</string>
+    <string name="plugin_api_old_rollback_fmt">%1$s: %2$s needs launcher API %3$d (this launcher is %4$d) - rolled back to %5$s</string>
+    <string name="plugin_api_old_disable_fmt">%1$s: %2$s needs launcher API %3$d (this launcher is %4$d) - no usable older version, disabled</string>
+    <string name="plugin_api_old_toast">Some plugins need a newer launcher; they were rolled back to their old versions.</string>
     <string name="plugin_info_update">Update: %1$s</string>
     <string name="plugin_update_info_latest">up to date</string>
-    <string name="plugin_update_info_host_old">The new version needs a newer launcher. Update the launcher, then check again.</string>
+    <string name="plugin_update_info_host_old">The new version needs a newer launcher. The installed version was kept; update the launcher, then check again.</string>
     <string name="plugin_update_info_available_fmt">new version %1$s available</string>
     <string name="plugin_update_info_confirm_fmt">new version %1$s needs confirmation</string>
     <string name="plugin_update_info_installed_fmt">updated to %1$s · restart to apply</string>

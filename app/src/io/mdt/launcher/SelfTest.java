@@ -20665,6 +20665,18 @@ public final class SelfTest {
                         && Plugins.onlineOf("garbage\nmapstats\t1", "mapstats") == null,
                 "脏行 / 段数不对 ⇒ 当没有登记（不能拿半条去动文件）");
 
+        // ★ 第 386 轮：接口版本回退记录（api-reject.txt）的纯格式
+        String arLine = Plugins.apiRejectLine("x", "v2", "v1", 44, "rollback");
+        Plugins.ApiReject ar = Plugins.parseApiRejectLine(arLine);
+        ok(stat, L, ar != null && "x".equals(ar.id) && "v2".equals(ar.was)
+                        && "v1".equals(ar.now) && ar.required == 44
+                        && ar.host == PluginHost.API && "rollback".equals(ar.action),
+                "接口回退记录：id / 旧版 / 回退到 / 要求接口 / 宿主 / 动作 都在");
+        ok(stat, L, Plugins.parseApiRejectLine("x\tv2\tv1\t44\t44") == null
+                        && Plugins.parseApiRejectLine("x\tv2\tv1\t44\t44\tnope") == null
+                        && Plugins.parseApiRejectLine("x\tv2\tv1\tabc\t44\tdisable") == null,
+                "★ 脏行（少一段 / 动作不认识 / 接口不是数）⇒ 整行丢掉，不拿半条去回退");
+
         // 内置插件确实存在时：它的"内置版本键"必须是内容哈希前 8 位（与在线登记同一套口径）
         for (String[] b : Plugins.builtins(ctx)) {
             String ver = Plugins.builtinVersion(b[2]);

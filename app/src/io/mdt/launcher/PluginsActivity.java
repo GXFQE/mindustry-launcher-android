@@ -197,6 +197,7 @@ public class PluginsActivity extends BaseActivity {
 
         // 跳过横幅在最上面（已经发生过的事优先于常态动作与列表）
         skipBanner();
+        apiBanner();
 
         List<String> ids = Plugins.installedIds(this);
         if (ids.isEmpty()) {
@@ -386,6 +387,42 @@ public class PluginsActivity extends BaseActivity {
         } else {
             restore.setVisibility(View.GONE);
         }
+        mSkip.addView(card);
+    }
+
+    /**
+     * 第 386 轮：**接口版本不够**导致的回退 / 停用 —— 单独一张警告卡（别混进"上次启动没走完"）。
+     *
+     * <p>这是用户要求的「不许静默」：以前注入路径遇到 API 不匹配只把 active 摘掉、报告里留一行，
+     * 界面上什么也看不到；现在至少在这张卡里说清「谁、要多少、回退到了谁」。
+     */
+    private void apiBanner() {
+        final List<Plugins.ApiReject> list = Plugins.apiRejects(this);
+        if (list.isEmpty()) return;
+        final List<String> ids = Plugins.installedIds(this);
+        StringBuilder sb = new StringBuilder();
+        int live = 0;
+        for (Plugins.ApiReject r : list) {
+            if (!ids.contains(r.id)) continue;   // 已经卸载了就别翻旧账（与 skipBanner 同一条）
+            String name = Plugins.displayNameOf(this, r.id);
+            String line;
+            if (r.now == null || r.now.isEmpty()) {
+                line = Trans.get(this, R.string.plugin_api_old_disable_fmt, name,
+                        verLabel(r.id, r.was), r.required, r.host);
+            } else {
+                line = Trans.get(this, R.string.plugin_api_old_rollback_fmt, name,
+                        verLabel(r.id, r.was), r.required, r.host, verLabel(r.id, r.now));
+            }
+            if (sb.length() > 0) sb.append('\n');
+            sb.append(line);
+            live++;
+        }
+        if (live == 0) return;
+        View card = getLayoutInflater().inflate(R.layout.plugin_skip_card, mSkip, false);
+        ((TextView) card.findViewById(R.id.plugin_skip_title))
+                .setText(Trans.get(this, R.string.plugin_api_old_title));
+        ((TextView) card.findViewById(R.id.plugin_skip_detail)).setText(sb.toString());
+        card.findViewById(R.id.plugin_skip_restore).setVisibility(View.GONE);
         mSkip.addView(card);
     }
 

@@ -65,6 +65,14 @@ final class Plugins {
 
     /** 结构化记录"上次被安全阀拦下后每个插件怎么了"（界面按它说人话；格式见 {@link #parseSkipLine}）。 */
     static final String LASTSKIP = "lastskip.txt";
+    /**
+     * 因**宿主接口版本**不够而被回退 / 停用的插件记录（界面横幅用；每次注入前重算）。
+     *
+     * <p>格式：`id \t 旧版 \t 回退到（空=停用） \t 要求接口 \t 当前宿主 \t 动作`。
+     * ★ 与 {@link #LASTSKIP} 分开：那句话是"上次启动没走完"，这句是"插件要更新的启动器" ——
+     * 两件事，不能共用一张卡（2026-11-17 第 386 轮）。
+     */
+    static final String API_REJECT = "api-reject.txt";
 
     /**
      * 每个版本的**来源**（`id=ver:official|third`，装进来那一刻判一次就记下来）。
@@ -959,6 +967,8 @@ final class Plugins {
             //   onResume 都跑，跳过那一程的第二次 onResume 就会把用户还没看见的横幅清掉。
             //   `lastfail.txt` 是诊断档案（给取证用），留着；横幅只读 `lastskip.txt`。
             clearSkipReport(d);
+            // ★ 第 386 轮：接口版本导致的回退 / 停用每次都是**现算**的（修好 / 换宿主后自然消失）。
+            clearApiRejects(d);
             // ★ 内置插件释放/放回（第 137 轮）：放在**安全阀之后** —— 上一次没走完的那一程
             //   不该顺手改登记（否则刚放回的会被 skipOnce 当成"失败的那个"处理）
             String released = releaseBuiltins(base);
@@ -1017,6 +1027,14 @@ final class Plugins {
                     rep.append(" MISSING\n");
                     continue;
                 }
+                // ★ 2026-11-17（第 386 轮）：`plugin.json` 的 `api` 是**便宜**的硬门 ——
+                //   在 injectDex **之前**就能判，别把"要求更高宿主"的 dex 先塞进宿主命名空间。
+                int metaApi = PluginMeta.apiOf(apk);
+                if (metaApi > PluginHost.API) {
+                    rep.append(" metaApi=").append(metaApi);
+                    activeText = apiRejectOrRollback(base, d, activeText, id, ver, metaApi, rep);
+                    continue;
+                }
                 // 入口类名：插件自述里写的（没有 ⇒ 默认入口，老插件照旧）
                 String entryName = PluginMeta.entryOf(base, apk, PluginHost.DEFAULT_ENTRY);
                 rep.append(" entry=").append(shortEntry(entryName));
@@ -1037,7 +1055,9 @@ final class Plugins {
                     String owner = entryOwner.get(entryName);
                     Class<?> entry = host.loadClass(entryName);
                     int api = ((Integer) entry.getMethod("api").invoke(null)).intValue();
-                    rep.append(" entry=OK api=").append(api);
+                    // ★ 第 386 轮：入口类与 `plugin.json` 取**较高者**（与 PluginHost.load 同一口径）
+                    int required = Math.max(api, PluginMeta.apiOf(apk));
+                    rep.append(" entry=OK api=").append(api).append(" required=").append(required);
                     if (owner != null) {
                         // 🔴 同一个入口 FQN 被第二个插件用上了：宿主 CL 只会定义一份 ⇒
                         //    这一版的自查其实命中的是**别人的**入口类。报告必须说破（否则"entry=OK"会骗人）
@@ -1045,15 +1065,14 @@ final class Plugins {
                     } else {
                         entryOwner.put(entryName, id);
                     }
-                    if (!PluginHost.apiCompatible(api)) {
+                    if (!PluginHost.apiCompatible(required)) {
                         // ★ 拒绝原因要说清"区间"（第 139 轮）：只写"host wants 2"会把"太老"也说成"要 2"
-            int av = PluginHost.apiVerdict(api);
-            rep.append(" -> API REJECTED (plugin ").append(api)
-               .append(av > 0 ? " is newer than " : " is older than ")
-               .append("host range ").append(PluginHost.API_MIN).append("..").append(PluginHost.API).append(")\n");
-                        dropFromActive(d, id, activeText);
-                        activeText = readOrNull(new File(d, ACTIVE));
-                        rep.append("   -> removed from active.txt\n");
+                        int av = PluginHost.apiVerdict(required);
+                        rep.append(" -> API REJECTED (plugin ").append(required)
+                                .append(av > 0 ? " is newer than " : " is older than ")
+                                .append("host range ").append(PluginHost.API_MIN).append("..")
+                                .append(PluginHost.API).append(")\n");
+                        activeText = apiRejectOrRollback(base, d, activeText, id, ver, required, rep);
                         continue;
                     }
                     rep.append('\n');
@@ -1085,6 +1104,69 @@ final class Plugins {
     /** 把某个插件从生效登记里摘掉（注入失败 / 版本不匹配时用）。 */
     private static void dropFromActive(File d, String id, String activeText) {
         write(new File(d, ACTIVE), stateRemove(activeText, id));
+    }
+
+    /**
+     * 第 386 轮：接口版本不匹配时的处置 —— **回退到已知可用版本**（没有就停用），并记一条
+     * `api-reject.txt`（插件页横幅 + 启动 Toast 都读它）。
+     *
+     * <p>为什么不能像原来那样只 `dropFromActive`：那等于**静默卸载**用户刚装上的插件；
+     * 用户既看不到原因，也没有"回到上一版"的路。已知可用版本来自 {@link #KNOWN}（上次带着它
+     * 启动成功过），退不了才是停用。
+     *
+     * @return 新的 active 登记文本
+     */
+    private static String apiRejectOrRollback(Context base, File d, String activeText, String id,
+                                              String was, int required, StringBuilder rep) {
+        String target = rollbackTarget(base, d, id, was);
+        String next = target == null ? stateRemove(activeText, id) : statePut(activeText, id, target);
+        write(new File(d, ACTIVE), next);
+        // 待生效的如果正是这一版，撤掉它 —— 否则下次启动又把它搬上来、再拒一次
+        String pend = readOrNull(new File(d, PENDING));
+        if (was != null && was.equals(stateGet(pend, id))) {
+            write(new File(d, PENDING), stateRemove(pend, id));
+        }
+        appendApiReject(d, id, was, target, required, target == null ? "disable" : "rollback");
+        rep.append("   -> ").append(target == null
+                        ? "disabled (no compatible old version)"
+                        : "rolled back to " + target)
+                .append('\n');
+        return next;
+    }
+
+    /**
+     * 已知可用版本能不能拿来回退：文件在、且**它自己**的 `plugin.json api` 也吃得住当前宿主。
+     * （入口类的 api 要加载才知道；这里只做便宜的一道，退过去仍不兼容时下次启动会再拒 / 停用。）
+     */
+    private static String rollbackTarget(Context base, File d, String id, String was) {
+        String known = stateGet(readOrNull(new File(d, KNOWN)), id);
+        if (known == null || known.isEmpty() || known.equals(was)) return null;
+        File apk = apkOf(base, id, known);
+        if (!apk.isFile()) return null;
+        if (PluginMeta.apiOf(apk) > PluginHost.API) return null;
+        return known;
+    }
+
+    /**
+     * 自动更新发现"待生效版要求更高宿主"时调用：撤掉 pending、记一条回退记录。
+     * （正常路径下新插件在下载前就被拒了；这是给"旧版自动更新已经把它装成待生效"的现场兜底。）
+     *
+     * @return 撤掉了 ⇒ true
+     */
+    static boolean dropIncompatiblePending(Context ctx, String id) {
+        File d = dir(ctx);
+        String pend = readOrNull(new File(d, PENDING));
+        String pv = stateGet(pend, id);
+        if (pv == null) return false;
+        File apk = apkOf(ctx, id, pv);
+        if (!apk.isFile()) return false;
+        int required = PluginMeta.apiOf(apk);
+        if (required <= PluginHost.API) return false;
+        write(new File(d, PENDING), stateRemove(pend, id));
+        String act = readOrNull(new File(d, ACTIVE));
+        String now = stateGet(act, id);
+        appendApiReject(d, id, pv, now, required, now == null ? "disable" : "rollback");
+        return true;
     }
 
     /**
@@ -1423,6 +1505,86 @@ final class Plugins {
         }
         return out;
     }
+
+    /** 一条「接口版本不够」记录（纯数据；界面按它拼人话）。 */
+    static final class ApiReject {
+        final String id, was, now, action;   // now 为空 = 停用
+        final int required, host;
+
+        ApiReject(String id, String was, String now, String action, int required, int host) {
+            this.id = id;
+            this.was = was;
+            this.now = now;
+            this.action = action;
+            this.required = required;
+            this.host = host;
+        }
+    }
+
+    /** 一行 `id \t 旧版 \t 回退到 \t 要求接口 \t 宿主 \t 动作`（参数不合法 ⇒ null）。 */
+    static String apiRejectLine(String id, String was, String now, int required, String action) {
+        if (id == null || id.isEmpty()) return null;
+        if (!("rollback".equals(action) || "disable".equals(action))) return null;
+        return id + "\t" + nz(was) + "\t" + nz(now) + "\t" + required + "\t"
+                + PluginHost.API + "\t" + action;
+    }
+
+    /** 解析一行；脏行 / 段数不对 / 动作不认识 ⇒ null（整行丢掉，别拿半条去动作）。 */
+    static ApiReject parseApiRejectLine(String line) {
+        if (line == null) return null;
+        String[] p = line.split("\t");
+        if (p.length != 6) return null;
+        String id = p[0].trim();
+        String action = p[5].trim();
+        if (id.isEmpty() || !("rollback".equals(action) || "disable".equals(action))) return null;
+        int req, host;
+        try {
+            req = Integer.parseInt(p[3].trim());
+            host = Integer.parseInt(p[4].trim());
+        } catch (Throwable t) {
+            return null;
+        }
+        if (req <= 0 || host <= 0) return null;
+        return new ApiReject(id, p[1].trim(), p[2].trim(), action, req, host);
+    }
+
+    /** 当前进程里被接口版本拒掉、已回退 / 停用的记录。 */
+    static List<ApiReject> apiRejects(Context ctx) {
+        List<ApiReject> out = new ArrayList<ApiReject>();
+        String text = readOrNull(new File(dirNoCreate(ctx), API_REJECT));
+        if (text == null) return out;
+        for (String line : lines(text)) {
+            ApiReject r = parseApiRejectLine(line);
+            if (r != null) out.add(r);
+        }
+        return out;
+    }
+
+    /** 每次正常注入前重算（被拒的会在同一次里重新写；修好之后自然消失）。 */
+    private static void clearApiRejects(File d) {
+        write(new File(d, API_REJECT), "");
+    }
+
+    /** 写一条（同 id 只留一行；保持其它行）。 */
+    private static void appendApiReject(File d, String id, String was, String now, int required,
+                                       String action) {
+        String line = apiRejectLine(id, was, now, required, action);
+        if (line == null) return;
+        String text = readOrNull(new File(d, API_REJECT));
+        StringBuilder sb = new StringBuilder();
+        if (text != null) {
+            for (String l : lines(text)) {
+                ApiReject r = parseApiRejectLine(l);
+                if (r == null || r.id.equals(id)) continue;
+                if (sb.length() > 0) sb.append('\n');
+                sb.append(l);
+            }
+        }
+        if (sb.length() > 0) sb.append('\n');
+        sb.append(line).append('\n');
+        write(new File(d, API_REJECT), sb.toString());
+    }
+
 
     // ---- 给界面 / dev 口读的现场 -----------------------------------------------
 

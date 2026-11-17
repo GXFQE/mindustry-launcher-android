@@ -148,6 +148,8 @@ public class MainActivity extends BaseActivity {
      *   **同时在 {@link #onResume()} 里清**：回到主界面就说明上一次启动流程已经结束了。
      */
     private static boolean sLaunching;
+    /** 第 386 轮：接口版本回退的 Toast 每进程只说一次（插件页另有持久横幅）。 */
+    private static boolean sApiToastShown;
 
     /** 版本 key → 同槽共用情况（没有共用就不在此表）。 */
     private final HashMap<String, Share> mConflict = new HashMap<>();
@@ -495,6 +497,18 @@ public class MainActivity extends BaseActivity {
         //   ⚠️ 它**不跟着**启动器的「更新模式」走：那是两个开关（见 Config.DEF_PLUGIN_UPDATE）。
         //   有插件被自动更新 / 需要确认时会给一条 Toast；其余情况（没声明地址 / 没网）完全安静。
         PluginUpdates.checkDue(this);
+        // ★ 第 386 轮：接口版本不够导致的回退 / 停用**不许静默** —— 每进程主动说一次；
+        //   插件页还有一张持久的警告卡（去那里看具体是谁、要多少、退到了哪一版）。
+        if (!sApiToastShown) {
+            sApiToastShown = true;
+            try {
+                if (!Plugins.apiRejects(this).isEmpty()) {
+                    Toast.makeText(this, Trans.get(this, R.string.plugin_api_old_toast),
+                            Toast.LENGTH_LONG).show();
+                }
+            } catch (Throwable ignored) {
+            }
+        }
     }
 
     @Override

@@ -138,7 +138,7 @@
     <string name="plugin_update_row_available_fmt">有新版 %1$s</string>
     <string name="plugin_update_row_confirm_fmt">新版 %1$s 待确认</string>
     <string name="plugin_update_row_installed_fmt">已更新到 %1$s · 重启生效</string>
-    <string name="plugin_update_row_host_old_fmt">有新版 %1$s · 需要更新的启动器</string>
+    <string name="plugin_update_row_host_old_fmt">有新版 %1$s · 需要更新的启动器（已保持旧版）</string>
     <string name="plugin_update_action_fmt">更新到 %1$s</string>
     <string name="plugin_update_action">更新它</string>
     <string name="plugin_update_confirm_title">这个新版的签名和当前那份不同</string>
@@ -149,9 +149,14 @@
     <string name="plugin_update_host_old">这个新版本需要更新的启动器，没有下载。</string>
     <string name="plugin_update_toast_installed">已自动更新 %1$s 个插件 · 重启后生效</string>
     <string name="plugin_update_toast_confirm">有 %1$s 个插件的新版本需要你确认</string>
+    <string name="plugin_update_toast_host_old">有 %1$s 个插件的新版本需要更新的启动器（已保持旧版）</string>
+    <string name="plugin_api_old_title">有插件被回退到旧版本</string>
+    <string name="plugin_api_old_rollback_fmt">%1$s：%2$s 要求启动器接口 %3$d（当前 %4$d），已回退到 %5$s</string>
+    <string name="plugin_api_old_disable_fmt">%1$s：%2$s 要求启动器接口 %3$d（当前 %4$d），没有可回退的旧版，已停用</string>
+    <string name="plugin_api_old_toast">有插件的新版本需要更新的启动器，已自动回退到旧版</string>
     <string name="plugin_info_update">更新：%1$s</string>
     <string name="plugin_update_info_latest">已是最新</string>
-    <string name="plugin_update_info_host_old">新版本需要更新的启动器；更新启动器后再检查。</string>
+    <string name="plugin_update_info_host_old">新版本需要更新的启动器；已保持当前版本，更新启动器后再检查。</string>
     <string name="plugin_update_info_available_fmt">有新版 %1$s</string>
     <string name="plugin_update_info_confirm_fmt">新版 %1$s 待确认</string>
     <string name="plugin_update_info_installed_fmt">已更新到 %1$s · 重启生效</string>

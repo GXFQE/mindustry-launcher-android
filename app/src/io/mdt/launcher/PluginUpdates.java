@@ -64,7 +64,7 @@ final class PluginUpdates {
 
     /** 一次检查的汇总（给界面的结果卡用）。 */
     static final class Summary {
-        int total, checked, installed, confirm, available, hostOld, failed;
+        int total, checked, installed, confirm, available, hostOld, hostOldNew, failed;
         /** 上一次检查还没跑完（这次什么都没做）。 */
         boolean busy;
         String report = "";
@@ -167,16 +167,25 @@ final class PluginUpdates {
         new Thread(new Runnable() {
             @Override public void run() {
                 final Summary sum = checkAll(a);
-                if (sum.installed + sum.confirm <= 0) return;
+                if (sum.installed + sum.confirm + sum.hostOldNew <= 0) return;
                 try {
                     a.runOnUiThread(new Runnable() {
                         @Override public void run() {
                             if (a.isFinishing()) return;
-                            // 两件事分开说：需要确认的优先（那是要用户动手的），没有才报"已更新"
-                            int res = sum.confirm > 0
-                                    ? R.string.plugin_update_toast_confirm
-                                    : R.string.plugin_update_toast_installed;
-                            int n = sum.confirm > 0 ? sum.confirm : sum.installed;
+                            // 三件事分开说：需要确认的优先（那是要用户动手的），其次已更新，
+                            // 最后"新版要更新的启动器"（用户当下只能去更新启动器，但**不许静默**）。
+                            int res;
+                            int n;
+                            if (sum.confirm > 0) {
+                                res = R.string.plugin_update_toast_confirm;
+                                n = sum.confirm;
+                            } else if (sum.installed > 0) {
+                                res = R.string.plugin_update_toast_installed;
+                                n = sum.installed;
+                            } else {
+                                res = R.string.plugin_update_toast_host_old;
+                                n = sum.hostOldNew;
+                            }
                             Toast.makeText(a, Trans.get(a, res, String.valueOf(n)),
                                     Toast.LENGTH_LONG).show();
                         }
@@ -267,9 +276,16 @@ final class PluginUpdates {
                     if (PluginUpdateManifest.E_HOST_OLD.equals(m.error)) {
                         String lbl = (m.version == null || m.version.isEmpty())
                                 ? PluginUpdateManifest.sha8(m.sha256) : m.version;
+                        PluginUpdateState.Item prev = PluginUpdateState.get(state, id);
                         state = note(ctx, state, id, PluginUpdateState.HOST_OLD, m.sha256, lbl,
                                 "minHostApi=" + m.minHostApi + " host=" + PluginHost.API);
                         sum.hostOld++;
+                        if (prev == null || !PluginUpdateState.HOST_OLD.equals(prev.state)) {
+                            sum.hostOldNew++;
+                        }
+                        if (Plugins.dropIncompatiblePending(ctx, id)) {
+                            rep.append("    pending rolled back (would not load on this host)\n");
+                        }
                         sum.lines.add(id + "=host-old");
                         rep.append(id).append(" => HOST_OLD needs api ").append(m.minHostApi)
                                 .append(" (host ").append(PluginHost.API).append(")\n");
@@ -335,9 +351,16 @@ final class PluginUpdates {
                 int needApi = PluginMeta.apiOf(out);
                 if (needApi > PluginHost.API) {
                     try { out.delete(); } catch (Throwable ignored) { }
+                    PluginUpdateState.Item prev = PluginUpdateState.get(state, id);
                     state = note(ctx, state, id, PluginUpdateState.HOST_OLD, m.sha256, label,
                             "apk api=" + needApi + " host=" + PluginHost.API);
                     sum.hostOld++;
+                    if (prev == null || !PluginUpdateState.HOST_OLD.equals(prev.state)) {
+                        sum.hostOldNew++;
+                    }
+                    if (Plugins.dropIncompatiblePending(ctx, id)) {
+                        rep.append("    pending rolled back (would not load on this host)\n");
+                    }
                     sum.lines.add(id + "=host-old");
                     rep.append("    HOST_OLD apk api=").append(needApi)
                             .append(" (host ").append(PluginHost.API).append(")\n");
@@ -389,6 +412,7 @@ final class PluginUpdates {
                     .append(" installed=").append(sum.installed).append(" confirm=").append(sum.confirm)
                     .append(" available=").append(sum.available)
                     .append(" hostOld=").append(sum.hostOld)
+                    .append(" hostOldNew=").append(sum.hostOldNew)
                     .append(" failed=").append(sum.failed)
                     .append(" ms=").append(System.currentTimeMillis() - started).append('\n');
             sum.report = rep.toString();
@@ -422,6 +446,7 @@ final class PluginUpdates {
             if (PluginUpdateManifest.E_HOST_OLD.equals(m.error)) {
                 String l = (m.version == null || m.version.isEmpty())
                         ? PluginUpdateManifest.sha8(m.sha256) : m.version;
+                Plugins.dropIncompatiblePending(ctx, id);
                 putItem(ctx, id, PluginUpdateState.HOST_OLD, m.sha256, l,
                         "minHostApi=" + m.minHostApi + " host=" + PluginHost.API);
                 return "host-old";

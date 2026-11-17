@@ -1,0 +1,29 @@
+# 冷启动前
+active.txt:
+usagestats=7ddbc1e1
+mods-health=75821f83
+mapstats=50f33cbc
+probe=304ea3e9
+zzapitest=new999
+
+known.txt:
+usagestats=7ddbc1e1
+mods-health=75821f83
+mapstats=50f33cbc
+probe=304ea3e9
+zzapitest=old1
+
+# 冷启动后
+active.txt:
+usagestats=7ddbc1e1
+mods-health=75821f83
+mapstats=50f33cbc
+probe=304ea3e9
+zzapitest=old1
+
+api-reject.txt:
+zzapitest	new999	old1	999	44	rollback
+
+# 插件页顶部（uiautomator 文本）
+有插件被回退到旧版本
+zzapitest：已安装那份 要求启动器接口 999（当前 44），已回退到 已安装那份
