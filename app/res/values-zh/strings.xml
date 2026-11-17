@@ -2226,6 +2226,7 @@
     <string name="save">保存</string>
     <string name="version_type_official">原端</string>
     <string name="version_type_modded">改端</string>
+    <string name="version_type_half">半改端</string>
     <string name="version_name_title">给这个启动项命名</string>
     <string name="version_name_msg">只改这一项的名字（列表里这一行、这里、继续上次都用它），同一个版本的其他启动项不受影响，也不动 APK 本身。留空 = 恢复原名。</string>
     <string name="version_name_reset">恢复原名</string>

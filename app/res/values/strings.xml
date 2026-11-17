@@ -2269,6 +2269,7 @@
     <string name="save">Save</string>
     <string name="version_type_official">Vanilla</string>
     <string name="version_type_modded">Modded</string>
+    <string name="version_type_half">Half-modified</string>
     <string name="version_name_title">Name this launch entry</string>
     <string name="version_name_msg">Only renames this launch entry (its list row, this page, and Continue). Other entries of the same version keep their own names, and the APK itself is untouched. Leave empty to restore the original name.</string>
     <string name="version_name_reset">Restore original</string>

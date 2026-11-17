@@ -3057,6 +3057,15 @@ public final class SelfTest {
         ok(stat, L, "原端".equals(vanilla.typeWord(ctx)) && "改端".equals(forkDecl.typeWord(ctx)),
                 "★类型词走资源：原端 / 改端（自检语言下逐字可比）："
                         + vanilla.typeWord(ctx) + " / " + forkDecl.typeWord(ctx));
+        // ★ 第 392 轮：启用了补丁的启动项类型词 = 半改端（主界面 / 版本页 / 槽页统一）
+        ok(stat, L, "半改端".equals(Versions.typeFor(ctx, vanilla, 1))
+                        && "原端".equals(Versions.typeFor(ctx, vanilla, 0))
+                        && "改端".equals(Versions.typeFor(ctx, forkDecl, 0)),
+                "★typeFor：有补丁 ⇒ 半改端；没补丁才按 APK 的原端 / 改端");
+        String halfRow = vanilla.displayName(ctx, true, true,
+                Versions.typeFor(ctx, vanilla, 1));
+        ok(stat, L, halfRow.contains("  半改端  ") && !halfRow.contains("  原端  "),
+                "★启用补丁的行名逐字换成半改端，不再叠原端：" + halfRow);
         // ★ 名字预算（2026-10-16 用户先自己试了长名字，再定下"名字可以省，类型和版本必须留"）：
         ok(stat, L, "我的整合包".equals(Versions.clipName("我的整合包", 20)),
                 "★短名字不动：" + Versions.clipName("我的整合包", 20));

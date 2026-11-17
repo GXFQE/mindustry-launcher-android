@@ -1230,7 +1230,9 @@ public class MainActivity extends BaseActivity {
      */
     private CharSequence buildTitle(Versions.Entry e) {
         // 名字超预算自己省略（类型 + 版本号在末尾，必须保住 —— 见 NAME_MAX_UNITS）
-        String plain = e.displayName(this, true, true);
+        // ★ 第 392 轮：这个启动项启用了补丁 ⇒ 类型词直接写「半改端」，不再「原端」+「补丁 N」叠着。
+        String plain = e.displayName(this, true, true,
+                Versions.typeFor(this, e, patchCountFor(e)));
         // ★★ 2026-11-10 用户订正：**基座版本不再缀在标题里** ——
         //   「版本号被折叠的问题又出现了，算了，基于原版的版本号放下面那层吧」。
         //   它现在由副标题承担（`… · 基于 160.1`，见 Versions.subtitleLine）；

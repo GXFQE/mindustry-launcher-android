@@ -189,7 +189,6 @@ public class VersionActivity extends BaseActivity {
         if (found == null) { finish(); return; }
         mEntry = found;
 
-        String name = found.displayName(this);
         String slot = Versions.slotFor(found);
         // ★ 2026-11-10 用户：「我管他有多少存档干嘛」⇒ 这里数的是**备份份数**（不是 .msav 文件数）。
         int backups = VersionOps.backupCountIn(this, slot);
@@ -197,6 +196,9 @@ public class VersionActivity extends BaseActivity {
         //   下面「补丁」行动作行复用这个数（不再重复算）。
         // ★ 第 353 轮：按**实例键**数（版本 key + 槽）—— 同一版本的两个启动项各开各的
         int patchCount = Patches.enabledCount(this, Versions.instanceKey(mKey, slot));
+        // ★ 第 392 轮：启用补丁时标题类型直接写「半改端」，与主界面 / 槽页统一。
+        String name = found.displayName(this, true, false,
+                Versions.typeFor(this, found, patchCount));
         setTitle(name);
         ((TextView) findViewById(R.id.version_title)).setText(name);
         // 副标题用**列表行那份紧凑文案**（来源 · 大小 · 备份 N 份）——

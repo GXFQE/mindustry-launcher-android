@@ -427,6 +427,17 @@ public final class Versions {
      */
     public static final String OFFICIAL_PKG = "io.anuke.mindustry";
 
+    /**
+     * 启动项的类型词：**启用了补丁 ⇒ 半改端**，否则按 APK 本身的原端 / 改端。
+     *
+     * <p>第 392 轮统一说法：主界面、版本页、槽页游玩时长都用这一个词，别再出现
+     * 「原端」+「补丁 N」叠着写。
+     */
+    public static String typeFor(Context ctx, Entry e, int patchCount) {
+        if (patchCount > 0) return Trans.get(ctx, R.string.version_type_half);
+        return e == null ? "" : e.typeWord(ctx);
+    }
+
     public static class Entry {
         public String pkg;
         public String label;
@@ -626,9 +637,22 @@ public final class Versions {
          *                 详情弹窗 / 删除确认 / 冲突点名都传 false：那里名字随便换行，不该有损。
          */
         public String displayName(Context ctx, boolean withType, boolean clipName) {
+            return displayName(ctx, withType, clipName, null);
+        }
+
+        /**
+         * 同 {@link #displayName(Context, boolean, boolean)}，但允许覆盖类型词。
+         *
+         * <p>第 392 轮：这个启动项启用了补丁时，主界面 / 版本页的类型应该写「半改端」，
+         * 而不是「原端」再加一句「补丁 N」——同一件事只留一个词。
+         *
+         * @param typeOverride null = 用 {@link #typeWord(Context)}；否则用这一份（本地化后的词）
+         */
+        public String displayName(Context ctx, boolean withType, boolean clipName, String typeOverride) {
             String nm = displayLabel();
             if (clipName) nm = Versions.clipName(nm, Versions.NAME_MAX_UNITS);
-            return nm + "  " + (withType ? typeWord(ctx) + "  " : "") + displayVersion();
+            String tw = typeOverride == null ? typeWord(ctx) : typeOverride;
+            return nm + "  " + (withType ? tw + "  " : "") + displayVersion();
         }
 
         /**
