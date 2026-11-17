@@ -1,0 +1,32 @@
+# 冷启动前
+active.txt:
+usagestats=7ddbc1e1
+mods-health=75821f83
+mapstats=50f33cbc
+probe=304ea3e9
+zzapitest=old1
+
+known.txt:
+usagestats=7ddbc1e1
+mods-health=75821f83
+mapstats=50f33cbc
+probe=304ea3e9
+zzapitest=old1
+
+api-reject.txt:
+zzapitest	new999	old1	44	43	rollback
+
+# 冷启动后
+active.txt:
+usagestats=7ddbc1e1
+mods-health=75821f83
+mapstats=50f33cbc
+probe=304ea3e9
+
+pending.txt: (空)
+api-reject.txt: (空)
+
+report-plugin-boot.txt（节选）:
+active = usagestats=7ddbc1e1 mods-health=75821f83 mapstats=50f33cbc probe=304ea3e9 zzapitest=new999
+- zzapitest=new999 file=new999.apk entry=apitest.Missing ro=true stillWritable=false INJECTED elems=6 ... FAILED ClassNotFoundException: Didn't find class "io.mdt.apitest.Missing"
+injected = 4 / 5

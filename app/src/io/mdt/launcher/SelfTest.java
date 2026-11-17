@@ -20676,6 +20676,11 @@ public final class SelfTest {
                         && Plugins.parseApiRejectLine("x\tv2\tv1\t44\t44\tnope") == null
                         && Plugins.parseApiRejectLine("x\tv2\tv1\tabc\t44\tdisable") == null,
                 "★ 脏行（少一段 / 动作不认识 / 接口不是数）⇒ 整行丢掉，不拿半条去回退");
+        int hApi = PluginHost.API;
+        ok(stat, L, Plugins.apiRejectRetryable(hApi, hApi - 1, hApi)
+                        && !Plugins.apiRejectRetryable(hApi, hApi, hApi)
+                        && !Plugins.apiRejectRetryable(hApi, hApi - 1, hApi + 1),
+                "★ 宿主升级后重试的闸门：确实升级了、且够它要求的最低接口才重试（同版本不每程重试）");
 
         // 内置插件确实存在时：它的"内置版本键"必须是内容哈希前 8 位（与在线登记同一套口径）
         for (String[] b : Plugins.builtins(ctx)) {

@@ -967,8 +967,9 @@ final class Plugins {
             //   onResume 都跑，跳过那一程的第二次 onResume 就会把用户还没看见的横幅清掉。
             //   `lastfail.txt` 是诊断档案（给取证用），留着；横幅只读 `lastskip.txt`。
             clearSkipReport(d);
-            // ★ 第 386 轮：接口版本导致的回退 / 停用每次都是**现算**的（修好 / 换宿主后自然消失）。
-            clearApiRejects(d);
+            // ★ 第 386/387 轮：接口版本导致的回退 / 停用每次都是**现算**的；
+            //   宿主升级后把当初被拒的那一版放回 pending 重试（见 prepareApiRejects）。
+            prepareApiRejects(base, d);
             // ★ 内置插件释放/放回（第 137 轮）：放在**安全阀之后** —— 上一次没走完的那一程
             //   不该顺手改登记（否则刚放回的会被 skipOnce 当成"失败的那个"处理）
             String released = releaseBuiltins(base);
@@ -1140,11 +1141,28 @@ final class Plugins {
      */
     private static String rollbackTarget(Context base, File d, String id, String was) {
         String known = stateGet(readOrNull(new File(d, KNOWN)), id);
-        if (known == null || known.isEmpty() || known.equals(was)) return null;
-        File apk = apkOf(base, id, known);
-        if (!apk.isFile()) return null;
-        if (PluginMeta.apiOf(apk) > PluginHost.API) return null;
-        return known;
+        if (known != null && !known.isEmpty() && !known.equals(was)) {
+            File apk = apkOf(base, id, known);
+            if (apk.isFile() && PluginMeta.apiOf(apk) <= PluginHost.API) return known;
+        }
+        // ★ 第 387 轮：`known.txt` 只有一个"上次成功启动过的版本" —— 如果它正是刚被拒的那版
+        //   （例如用户把宿主降级了），就回退不了。这里再在**已装版本**里找一份吃得住当前宿主的，
+        //   优先取文件最新的那一份（不按版本号猜语义，版本键是 sha8）。
+        String best = null;
+        long bestAt = -1;
+        String[] vs = versionsOf(base, id);
+        for (String v : vs) {
+            if (v == null || v.isEmpty() || v.equals(was)) continue;
+            File apk = apkOf(base, id, v);
+            if (!apk.isFile()) continue;
+            if (PluginMeta.apiOf(apk) > PluginHost.API) continue;
+            long at = apk.lastModified();
+            if (at > bestAt) {
+                bestAt = at;
+                best = v;
+            }
+        }
+        return best;
     }
 
     /**
@@ -1548,6 +1566,11 @@ final class Plugins {
         return new ApiReject(id, p[1].trim(), p[2].trim(), action, req, host);
     }
 
+    /** 宿主升级后这一条值不值得重试（纯函数）：宿主确实升级了，且已经够它要求的最低接口。 */
+    static boolean apiRejectRetryable(int hostApi, int rejectHost, int required) {
+        return hostApi > rejectHost && hostApi >= required;
+    }
+
     /** 当前进程里被接口版本拒掉、已回退 / 停用的记录。 */
     static List<ApiReject> apiRejects(Context ctx) {
         List<ApiReject> out = new ArrayList<ApiReject>();
@@ -1560,9 +1583,46 @@ final class Plugins {
         return out;
     }
 
-    /** 每次正常注入前重算（被拒的会在同一次里重新写；修好之后自然消失）。 */
-    private static void clearApiRejects(File d) {
-        write(new File(d, API_REJECT), "");
+    /**
+     * 第 387 轮：**宿主升级后重置上次的接口拒绝**。
+     *
+     * <p>场景：插件要求接口 44、旧宿主 43 ⇒ 回退 / 停用并记了一条。用户把启动器升到 44 之后，
+     * 那一条不该永远挂着，也不该让插件永远停在旧版 —— 这里把当时被拒的那一版**放回 pending**，
+     * 等本次启动的 `promotePending` 把它搬成 active，再按新宿主重新判一次。
+     *
+     * <p>只重置"现场没被用户改过"的：回退记录要求 active 仍是当初回退到的那版；停用记录要求
+     * active 仍为空。用户后来手动换了版本 / 启用了别的版本 ⇒ 不动。
+     *
+     * <p>宿主没升级（`API <= r.host`）时**保留**原记录（警告卡继续挂着），不会每程重试。
+     */
+    private static void prepareApiRejects(Context base, File d) {
+        List<ApiReject> old = apiRejects(base);
+        if (old.isEmpty()) return;
+        String active = readOrNull(new File(d, ACTIVE));
+        String pending = readOrNull(new File(d, PENDING));
+        StringBuilder keep = new StringBuilder();
+        for (ApiReject r : old) {
+            File apk = apkOf(base, r.id, r.was);
+            if (!apk.isFile()) continue;                 // 那一版文件没了 ⇒ 这条记录过时
+            String cur = stateGet(active, r.id);
+            boolean unchanged = "rollback".equals(r.action)
+                    ? (r.now != null && r.now.equals(cur))
+                    : (cur == null || cur.isEmpty());
+            if (!unchanged) continue;                    // 用户手动换过 ⇒ 不覆盖他的选择
+            String queued = stateGet(pending, r.id);
+            if (queued != null && !queued.equals(r.was)) continue;  // 用户已经排了别的版本
+            if (apiRejectRetryable(PluginHost.API, r.host, r.required)) {
+                // 宿主升级了、而且已经够它要求的最低接口：把当初被拒的那一版放回待生效，本次启动重新试
+                pending = statePut(pending, r.id, r.was);
+                continue;
+            }
+            String line = apiRejectLine(r.id, r.was, r.now, r.required, r.action);
+            if (line == null) continue;
+            if (keep.length() > 0) keep.append('\n');
+            keep.append(line);
+        }
+        write(new File(d, PENDING), pending);
+        write(new File(d, API_REJECT), keep.length() == 0 ? "" : keep.append('\n').toString());
     }
 
     /** 写一条（同 id 只留一行；保持其它行）。 */
