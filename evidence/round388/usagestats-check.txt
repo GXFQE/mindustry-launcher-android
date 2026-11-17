@@ -1,0 +1,32 @@
+== usagestats check (PC) ==
+  ok   parse: 2 good rows / 4 bad
+  ok   parse: 10 列字段全对上（tag / title / rawName / upstream / 空 patch）
+  ok   parse: 空 tag / 空快照照读
+  ok   旧 8 列：没有 patch ? 当本体（老账本照读）
+  ok   旧 4 列：tag 空，带版本号查询也能命中（迁移前的老数据）
+  ok   旧 5 列：末列当 tag（第 255 轮那份账本照读）
+  ok   put: 新行（带版本快照）
+  ok   put: title 落盘
+  ok   ★已装更新：不同版本号 ? 两行（老版本的时间不并到新版本）
+  ok   put: 同版本号覆盖，不重复
+  ok   put: 另一个槽 / key 追加
+  ok   ★同版本带补丁：本体行与「本体+补丁」行分开，互不覆盖
+  ok   同一补丁身份重复玩 ? 只覆盖补丁行，不动本体
+  ok   换了一个补丁 ? 第三条「本体+补丁」行（不同补丁不合并）
+  ok   ★补丁身份不匹配 / 老账本没有 patch ? 不能把补丁时长算进本体
+  ok   宿主没给版本号：只更新第一行，另一个版本行必须保留
+  ok   ★迁移：旧行没有 tag ? 第一次写入补上版本号与快照（时间不丢）
+  ok   宿主这次没给版本信息 ? 保留原 tag / title，只更新毫秒
+  ok   total: 100+300+700
+  ok   totalForSlot: a
+  ok   forSlot: sorted desc
+  ok   bySlot: grouped + sorted desc
+  ok   missing key / 版本号不符 / 槽 -> 0
+  ok   empty/null -> 0
+  ok   坏行：坏毫秒 / 空 key / 段数不够 ? 全跳过
+  ok   clean: 控制字符 -> 空格，仍是一行
+  ok   mergeNamed: 同名合并 / 不同名分开 / 空名也合并 / 按时长降序
+  ok   mergeNamed: null -> 空
+  ok   hm: 1h12
+  ok   hm: negative -> 0/0
+== USAGESTATS CHECK OK ==

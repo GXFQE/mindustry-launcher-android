@@ -19777,6 +19777,18 @@ public final class SelfTest {
                             && "k.new".equals(byMem.get("key")),
                     "④ game-exit 两条路：文件还在就现读；settle 先删则走内存交接（ended/activeMs/key 都在）");
 
+            // ④b 第 388 轮：补丁字段（排序身份 / 显示名 / 上一局记录不能拿来充数）
+            java.util.List<Patches.Launched> launches = new java.util.ArrayList<Patches.Launched>();
+            launches.add(new Patches.Launched("b@2", "补丁 B", ""));
+            launches.add(new Patches.Launched("a@1", "补丁 A", ""));
+            java.util.Map<String, String> pf = PluginEvents.patchFields(launches, 1000L, 900L);
+            ok(stat, L, "a@1,b@2".equals(pf.get("patch")) && "2".equals(pf.get("patchCount"))
+                            && "补丁 A、补丁 B".equals(pf.get("patchLabel")),
+                    "★ game-exit 补丁字段：refs 排序成身份、显示名跟 ref 顺序、count 在");
+            ok(stat, L, PluginEvents.patchFields(launches, 100L, 6000L).isEmpty()
+                            && PluginEvents.patchFields(null, 1000L, 900L).isEmpty(),
+                    "★ 上一局的补丁记录 / 空表 ⇒ 这一局按本体（不拿旧补丁充数）");
+
             // ⑤ 用完即删 + 孤儿清扫（死 pid 没账 ⇒ 删；有账 / 活 pid ⇒ 留）
             //   ★ 清扫用**临时目录**：生产那版会扫真实 `instances/`，自检不能拿用户数据当夹具。
             boolean gone = SessionTime.read(ctx, slotA, 0L) == null && deletedA >= 2;

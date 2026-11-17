@@ -8,12 +8,12 @@ public final class Check {
     public static void main(String[] args) {
         int fail = 0;
 
-        // ── 解析：8 列新格式 ─────────────────────────────────────────────────
-        String text = "default\tpkg\t159.7\t1000\t111\tMindustry  改端  159.7\t8-official-159.7\t160.1\n"
-                + "default\t?\t\t2500\t222\t\t\t\n"
+        // ── 解析：10 列新格式（第 388 轮加 patch / patchLabel） ────────────────
+        String text = "default\tpkg\t159.7\t1000\t111\tMindustry  改端  159.7\t8-official-159.7\t160.1\t\t\n"
+                + "default\t?\t\t2500\t222\t\t\t\t\t\n"
                 + "bad line\n"
-                + "x\ten:2\t159.7\t-5\t333\t\t\t\n"
-                + "\ten:3\t159.7\t9000\t444\t\t\t\n"
+                + "x\ten:2\t159.7\t-5\t333\t\t\t\t\t\n"
+                + "\ten:3\t159.7\t9000\t444\t\t\t\t\t\n"
                 + "slot\t\n";
         List<Playtime.Entry> es = Playtime.parse(text);
         fail += ok(es.size() == 2, "parse: 2 good rows / 4 bad");
@@ -21,11 +21,20 @@ public final class Check {
                         && es.get(0).tag.equals("159.7") && es.get(0).ms == 1000
                         && es.get(0).title.equals("Mindustry  改端  159.7")
                         && es.get(0).rawName.equals("8-official-159.7")
-                        && es.get(0).upstream.equals("160.1"),
-                "parse: 8 列字段全对上（tag / title / rawName / upstream）");
+                        && es.get(0).upstream.equals("160.1")
+                        && es.get(0).patch.isEmpty() && es.get(0).patchLabel.isEmpty(),
+                "parse: 10 列字段全对上（tag / title / rawName / upstream / 空 patch）");
         fail += ok(es.get(1).key.equals("?") && es.get(1).tag.isEmpty()
                         && es.get(1).title.isEmpty(),
                 "parse: 空 tag / 空快照照读");
+
+        // 第 385 轮前的 8 列（没有 patch）照读；patch 为空
+        List<Playtime.Entry> old8 = Playtime.parse(
+                "a\ten:1\t159.7\t100\t1\tt\tr\tu\n");
+        fail += ok(old8.size() == 1 && old8.get(0).patch.isEmpty()
+                        && Playtime.valueFor("a\ten:1\t159.7\t100\t1\tt\tr\tu\n",
+                                "a", "en:1", "159.7") == 100,
+                "旧 8 列：没有 patch ⇒ 当本体（老账本照读）");
 
         // ── 旧格式（只读兼容） ────────────────────────────────────────────────
         List<Playtime.Entry> old4 = Playtime.parse("a\ten:1\t100\t1\n");
@@ -59,6 +68,30 @@ public final class Check {
         String t4 = Playtime.put(t3, "other", "pkg2", v159, 3000, 4);
         fail += ok(Playtime.total(t4) == 17000 && Playtime.parse(t4).size() == 3,
                 "put: 另一个槽 / key 追加");
+
+        // ── 本体 + 补丁 ≠ 本体（第 388 轮） ──────────────────────────────────
+        Playtime.Snap patchA = new Playtime.Snap("159.7", "Mindustry  159.7",
+                "8-official-159.7", "160.1", "a@1,b@2", "补丁 A、补丁 B");
+        String tp1 = Playtime.put(t1, "default", "pkg", patchA, 6000, 2);
+        fail += ok(Playtime.parse(tp1).size() == 2
+                        && Playtime.valueFor(tp1, "default", "pkg", "159.7") == 5000
+                        && Playtime.valueFor(tp1, "default", "pkg", "159.7", "a@1,b@2") == 6000,
+                "★同版本带补丁：本体行与「本体+补丁」行分开，互不覆盖");
+        String tp2 = Playtime.put(tp1, "default", "pkg", patchA, 7000, 3);
+        fail += ok(Playtime.parse(tp2).size() == 2
+                        && Playtime.valueFor(tp2, "default", "pkg", "159.7", "a@1,b@2") == 7000
+                        && Playtime.valueFor(tp2, "default", "pkg", "159.7") == 5000,
+                "同一补丁身份重复玩 ⇒ 只覆盖补丁行，不动本体");
+        Playtime.Snap patchB = new Playtime.Snap("159.7", "Mindustry  159.7",
+                "8-official-159.7", "160.1", "a@1,b@3", "补丁 A、补丁 C");
+        String tp3 = Playtime.put(tp2, "default", "pkg", patchB, 8000, 4);
+        fail += ok(Playtime.parse(tp3).size() == 3
+                        && Playtime.valueFor(tp3, "default", "pkg", "159.7", "a@1,b@2") == 7000
+                        && Playtime.valueFor(tp3, "default", "pkg", "159.7", "a@1,b@3") == 8000,
+                "换了一个补丁 ⇒ 第三条「本体+补丁」行（不同补丁不合并）");
+        fail += ok(Playtime.valueFor(tp3, "default", "pkg", "159.7", "nope") == 0
+                        && Playtime.valueFor("a\ten:1\t100\t1\n", "a", "en:1", "159.7", "a@1") == 0,
+                "★补丁身份不匹配 / 老账本没有 patch ⇒ 不能把补丁时长算进本体");
         String two = "a\tk\t159.7\t100\t1\tt1\tr1\tu1\n"
                 + "a\tk\t160.1\t300\t2\tt2\tr2\tu2\n";
         String noTag = Playtime.put(two, "a", "k", new Playtime.Snap("", "", "", ""), 500, 3);

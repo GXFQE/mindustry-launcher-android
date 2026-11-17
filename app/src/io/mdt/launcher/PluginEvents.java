@@ -34,6 +34,9 @@ import io.mdt.launcher.api.PluginApi;
  * ★ 2026-11-17：`game-exit` 多四个观测键 —— `started` / `ended` / `activeMs` / `wallMs`
  *   （毫秒字符串；来自宿主时钟的检查点），外加版本身份 {@code key}（`Versions.Entry.key()`）。
  *   插件用 `key` + {@code PluginApi.versions()} 的 extra 就能把这一局的时长挂到版本行上。
+ * ★ 第 388 轮：`game-exit` 再补 `patch` / `patchLabel` / `patchCount` —— 这一局**实际注入的补丁**
+ *   （来自 `report-patch-launch.json`；没有补丁就不放这三个键）。统计必须把「本体 + 补丁」和
+ *   纯本体分开（用户：「应该算是半个改端」）。
  *
  * <p>⚠️ 交付边界（写进 `docs/PLUGIN-API.md`）：
  * <ul>
@@ -311,6 +314,76 @@ final class PluginEvents {
         d.put("activeMs", String.valueOf(st.activeMs));
         d.put("wallMs", String.valueOf(Math.max(0L, st.lastSeen - st.started)));
         if (!st.vkey.isEmpty()) d.put("key", st.vkey);
+        attachPatches(ctx, slot, d, st.started);
+    }
+
+    /**
+     * 第 388 轮：把这一局**实际注入的补丁**交给插件（`patch` / `patchLabel` / `patchCount`）。
+     *
+     * <p>为什么不是查"当前启用了哪些补丁"：启用状态可能在游戏运行期间被改；统计要的是
+     * **这一局真的带了什么**。真源 = `:game` 注入完写的 `report-patch-launch.json`
+     * （{@link Patches#readLaunchInfo(Context, String)}，按槽取最近一局）。
+     *
+     * <p>没有补丁 ⇒ 不放这几个键（插件按"本体"记账）；读不到记录也不放（不编"无补丁"）。
+     * ⚠️ 记录时间早于这一局开始 ⇒ 是上一局留下的（这一局还没写记录 / 启动即崩），不能拿来充数。
+     */
+    private static void attachPatches(Context ctx, String slot, Map<String, String> d,
+                                      long sessionStarted) {
+        try {
+            Patches.LaunchInfo li = Patches.readLaunchInfo(ctx, slot);
+            if (li == null) return;
+            Map<String, String> f = patchFields(li.patches, li.at, sessionStarted);
+            if (!f.isEmpty()) d.putAll(f);
+        } catch (Throwable t) {
+            Log.w("MDTPlugin", "patch stats attach failed: " + t);
+        }
+    }
+
+    /**
+     * 纯函数：`game-exit` 的补丁字段（自检直接喂 {@link Patches.Launched}）。
+     *
+     * @param at            启动记录写入时刻（墙钟；0 = 不知道）
+     * @param sessionStarted 这一局开始时刻（墙钟；0 = 不知道）
+     * @return 空表 = 这一局没有补丁 / 记录是上一局的 / 读不到；否则 `patch` / `patchLabel` / `patchCount`
+     */
+    static Map<String, String> patchFields(java.util.List<Patches.Launched> patches, long at,
+                                           long sessionStarted) {
+        Map<String, String> out = new HashMap<String, String>();
+        if (patches == null || patches.isEmpty()) return out;
+        // 记录早于这一局开始 ⇒ 是上一局留下的（这一局还没写记录 / 启动即崩），不能拿来充数
+        if (at > 0L && sessionStarted > 0L && at + 5000L < sessionStarted) return out;
+        java.util.TreeMap<String, String> byRef = new java.util.TreeMap<String, String>();
+        for (Patches.Launched l : patches) {
+            if (l == null || l.ref == null || l.ref.isEmpty()) continue;
+            String name = l.label == null || l.label.trim().isEmpty() ? l.ref : l.label.trim();
+            byRef.put(l.ref, name);
+        }
+        if (byRef.isEmpty()) return out;
+        StringBuilder id = new StringBuilder();
+        StringBuilder labels = new StringBuilder();
+        for (Map.Entry<String, String> e : byRef.entrySet()) {
+            if (id.length() > 0) {
+                id.append(',');
+                labels.append('、');
+            }
+            id.append(e.getKey());
+            labels.append(e.getValue());
+        }
+        out.put("patch", sane(id.toString(), 512));
+        out.put("patchLabel", sane(labels.toString(), 200));
+        out.put("patchCount", String.valueOf(byRef.size()));
+        return out;
+    }
+
+    /** 事件字段卫生：控制字符 / 超长会毁账本 / 撑爆界面。 */
+    private static String sane(String s, int max) {
+        if (s == null) return "";
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < s.length() && sb.length() < max; i++) {
+            char c = s.charAt(i);
+            sb.append(c < 0x20 || c == 0x7f ? ' ' : c);
+        }
+        return sb.toString().trim();
     }
 
     /**

@@ -52,7 +52,8 @@
   `modsSetEnabled(...)`（转 `Mods.setEnabled`）；`GitHubRelease.Asset` 多 `browserUrl` / `sha256`；
   `settings()` 多 `download_limit`。）
   **v44 = `game-exit` 观测键 + 宿主版本需求**：`game-exit` 的 `data` 多
-  `started` / `ended` / `activeMs` / `wallMs` / `key`（第 384 轮的宿主时钟；拿不到检查点就整组不给）；
+  `started` / `ended` / `activeMs` / `wallMs` / `key`（第 384 轮的宿主时钟；拿不到检查点就整组不给），
+  以及 `patch` / `patchLabel` / `patchCount`（第 388 轮：这一局**实际注入的补丁**；没有补丁就不给这三个键）；
   同时 `plugin.json` 的 `"api": N` 开始被**真正读取**（加载时与入口 `api()` 取较高者）；
   插件更新清单的 `minHostApi` 变成**下载前**的硬门（宿主接口不够 ⇒ 不下载、不装，
   落 `host-old` 状态）—— 详见 §10.4。
@@ -377,6 +378,11 @@ public static void onEvent(PluginApi api, String name, Map<String, String> data)
   - 插件拿 `key` 去 `versions()` 的 `extra`（`displayVersion` / `versionName` /
     `upstreamVersion`）取版本快照即可；
   - 拿不到检查点（启动即崩 / 时钟没起来）时这几个键**整组不出现**，别当"跑了 0 毫秒"处理。
+- **`game-exit` 的补丁键**（第 388 轮；同样加键不抬版本）：
+  `patch`（这一局实际注入的补丁 refs，排序后逗号拼接；没有 = 不给）、`patchLabel`（显示名快照，
+  `、` 拼接）、`patchCount`。真源是 `report-patch-launch.json`（`:game` 注入完写的**实际**结果），
+  **不是**"当前启用了哪些补丁" —— 运行期间改启用不影响这一局。
+  统计必须把「本体 + 补丁」与纯本体**分开**（用户 2026-11-17：「应该算是半个改端」）。
 - 回调在 **UI 线程**（可以用 `confirm` / `toast`）；异常只进 `MDTPlugin` 日志，不影响别的插件。
 - 每次派发会 `load` 一份插件、跑完 `unload`：适合"启动前 / 退出后做一件事"，
   **不适合当常驻监听** —— 常驻请用 `submit()`。

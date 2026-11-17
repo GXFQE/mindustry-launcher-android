@@ -75,6 +75,13 @@ public final class UsageStats {
         List<Playtime.Slice> slices = new ArrayList<Playtime.Slice>();
         for (Playtime.Entry e : rows) {
             String name = slotPage ? versionLabel(c, items, e) : e.slot;
+            if (!e.patch.isEmpty()) {
+                // ★ 第 388 轮：本体 + 补丁 ≠ 本体（用户：「应该算是半个改端」）——
+                //   账本按补丁身份分行，这里把"带了什么补丁"直接写进行名。
+                String what = e.patchLabel.isEmpty() ? c.getString(R.string.us_patch_half)
+                        : e.patchLabel;
+                name = c.getString(R.string.us_patch_row_fmt, name, what);
+            }
             slices.add(new Playtime.Slice(name, e.ms));
         }
         // 同一槽里「同一个游戏版本」可能有多行（已装包 + 导入的同版本 APK、换过包名等）：
@@ -250,7 +257,13 @@ public final class UsageStats {
             if (!dir.isDirectory() && !dir.mkdirs()) return;
             String ledger = read(new File(dir, "ledger.tsv"));
             Playtime.Snap snap = snapOf(api, key);
-            long base = Playtime.valueFor(ledger, slot, key, snap.tag);
+            String patch = clean(data.get("patch"));
+            String patchLabel = clean(data.get("patchLabel"));
+            if (!patch.isEmpty()) {
+                snap = new Playtime.Snap(snap.tag, snap.title, snap.rawName, snap.upstream,
+                        patch, patchLabel);
+            }
+            long base = Playtime.valueFor(ledger, slot, key, snap.tag, snap.patch);
             String next = Playtime.put(ledger, slot, key, snap, base + active,
                     System.currentTimeMillis());
             if (next.equals(ledger)) return;       // 没写进去（坏 key / 空槽）⇒ 别动文件

@@ -15,7 +15,7 @@ import java.util.Map;
  * 读一次就够，顺带能按槽 / 按版本切开。
  *
  * <p>格式（制表符分隔，插件私有；宿主**不解析**）：
- * <pre>slot \t key \t tag \t ms \t updated \t title \t rawName \t upstream</pre>
+ * <pre>slot \t key \t tag \t ms \t updated \t title \t rawName \t upstream \t patch \t patchLabel</pre>
  * <ul>
  *   <li>{@code slot} = 槽名（控制字符在写入时被换成空格）；</li>
  *   <li>{@code key} = 版本 key（已装 = 包名；导入 = {@code import:<文件名>}）—— **身份**；</li>
@@ -25,15 +25,20 @@ import java.util.Map;
  *   <li>{@code updated} = 最后一次写入的墙钟毫秒（只为诊断，界面不显示）；</li>
  *   <li>{@code title} = 宿主当时的显示名快照（含自定义名 / 类型 / 版本号）；</li>
  *   <li>{@code rawName} = 原始 versionName（数据层保真，如 8-official-159.7）；</li>
- *   <li>{@code upstream} = 上游版本号（fork 才有，没有 = 空）。</li>
+ *   <li>{@code upstream} = 上游版本号（fork 才有，没有 = 空）；</li>
+ *   <li>{@code patch} = **这一局实际注入的补丁身份**（refs 排序后逗号拼接；没有 = 空）——
+ *       **也参与行身份**：本体 + 补丁 ≠ 本体（2026-11-17 用户：「应该算是半个改端」）；</li>
+ *   <li>{@code patchLabel} = 补丁显示名快照（`、` 拼接；补丁删了也还看得出当时带了什么）。</li>
  * </ul>
  *
  * <p>**旧格式照读**（只读兼容，写回一律新格式）：
  * <ul>
+ *   <li>8 列（第 385 轮前）：没有 patch / patchLabel 两列；</li>
  *   <li>5 列 {@code slot key ms updated label} ⇒ {@code tag = label}，其余快照字段为空；</li>
  *   <li>4 列 {@code slot key ms updated} ⇒ {@code tag} 为空。</li>
  * </ul>
  * {@link #put} 遇到「同槽同 key 且旧行 tag 为空」时视为同一行（老数据在下一次写入时迁移到新格式）。
+ * ⚠️ 但 patch 不同的行**永远不合并**（本体与带补丁的时长必须分开）。
  *
  * <p>坏行一律**跳过**（宁可少一行，也不能拿半条记录算总数）。
  */
@@ -41,17 +46,24 @@ public final class Playtime {
 
     /** 账本里的一行（不可变）。 */
     public static final class Entry {
-        public final String slot, key, tag, title, rawName, upstream;
+        public final String slot, key, tag, title, rawName, upstream, patch, patchLabel;
         public final long ms, updated;
 
         public Entry(String slot, String key, String tag, String title, String rawName,
                      String upstream, long ms, long updated) {
+            this(slot, key, tag, title, rawName, upstream, "", "", ms, updated);
+        }
+
+        public Entry(String slot, String key, String tag, String title, String rawName,
+                     String upstream, String patch, String patchLabel, long ms, long updated) {
             this.slot = slot == null ? "" : slot;
             this.key = key == null ? "" : key;
             this.tag = tag == null ? "" : tag;
             this.title = title == null ? "" : title;
             this.rawName = rawName == null ? "" : rawName;
             this.upstream = upstream == null ? "" : upstream;
+            this.patch = patch == null ? "" : patch;
+            this.patchLabel = patchLabel == null ? "" : patchLabel;
             this.ms = ms;
             this.updated = updated;
         }
@@ -59,20 +71,27 @@ public final class Playtime {
 
     /** 写入时带的版本快照（探针从 {@code ProbeEnv.versionInfo()} 取）。 */
     public static final class Snap {
-        public final String tag, title, rawName, upstream;
+        public final String tag, title, rawName, upstream, patch, patchLabel;
 
         public Snap(String tag, String title, String rawName, String upstream) {
+            this(tag, title, rawName, upstream, "", "");
+        }
+
+        public Snap(String tag, String title, String rawName, String upstream,
+                    String patch, String patchLabel) {
             this.tag = tag == null ? "" : tag;
             this.title = title == null ? "" : title;
             this.rawName = rawName == null ? "" : rawName;
             this.upstream = upstream == null ? "" : upstream;
+            this.patch = patch == null ? "" : patch;
+            this.patchLabel = patchLabel == null ? "" : patchLabel;
         }
 
         /** 从宿主给的版本信息 map 取（缺键 / 空串都当空）。 */
         public static Snap of(Map<String, String> info) {
             if (info == null) return new Snap("", "", "", "");
             return new Snap(tagOf(info), info.get("title"), info.get("versionName"),
-                    info.get("upstreamVersion"));
+                    info.get("upstreamVersion"), info.get("patch"), info.get("patchLabel"));
         }
 
         /** 行身份里的版本号：displayVersion → versionName → 空（`?` 不算号）。 */
@@ -95,11 +114,32 @@ public final class Playtime {
         for (String line : text.split("\n")) {
             String s = line.endsWith("\r") ? line.substring(0, line.length() - 1) : line;
             if (s.trim().isEmpty()) continue;
-            // ★ -1：保留尾部空字段（新格式固定 8 列，空 title/upstream 也占位）
+            // ★ -1：保留尾部空字段（新格式固定 10 列，空 title/patch 也占位）
             String[] p = s.split("\t", -1);
-            String slot, key, tag, title = "", raw = "", up = "";
+            String slot, key, tag, title = "", raw = "", up = "", patch = "", patchLabel = "";
             int mi, ui;
-            if (p.length >= 8) {
+            if (p.length >= 10) {                 // 新格式：... \t patch \t patchLabel
+                slot = p[0].trim();
+                key = p[1].trim();
+                tag = p[2].trim();
+                mi = 3;
+                ui = 4;
+                title = p[5].trim();
+                raw = p[6].trim();
+                up = p[7].trim();
+                patch = p[8].trim();
+                patchLabel = p[9].trim();
+            } else if (p.length >= 9) {           // 只有 patch、没有 label（防御）
+                slot = p[0].trim();
+                key = p[1].trim();
+                tag = p[2].trim();
+                mi = 3;
+                ui = 4;
+                title = p[5].trim();
+                raw = p[6].trim();
+                up = p[7].trim();
+                patch = p[8].trim();
+            } else if (p.length >= 8) {           // 第 385 轮前的 8 列（没有 patch）
                 slot = p[0].trim();
                 key = p[1].trim();
                 tag = p[2].trim();
@@ -132,7 +172,8 @@ public final class Playtime {
                 continue;
             }
             if (ms <= 0) continue;
-            out.add(new Entry(slot, key, tag, title, raw, up, ms, Math.max(0, updated)));
+            out.add(new Entry(slot, key, tag, title, raw, up, patch, patchLabel, ms,
+                    Math.max(0, updated)));
         }
         return out;
     }
@@ -153,6 +194,8 @@ public final class Playtime {
         String title = clean(snap == null ? "" : snap.title);
         String raw = clean(snap == null ? "" : snap.rawName);
         String up = clean(snap == null ? "" : snap.upstream);
+        String patch = clean(snap == null ? "" : snap.patch);
+        String plabel = clean(snap == null ? "" : snap.patchLabel);
         StringBuilder sb = new StringBuilder();
         boolean hit = false;
         for (Entry e : parse(text)) {
@@ -160,10 +203,11 @@ public final class Playtime {
             if (tag.isEmpty()) {
                 // 宿主这次没给版本号：只认「第一行」（与 valueFor 的选行规则一致）——
                 // 多版本行必须各自保留，不能因为新行没 tag 就把它们合并掉。
-                same = !hit && e.slot.equals(sl) && e.key.equals(k);
+                same = !hit && e.slot.equals(sl) && e.key.equals(k) && e.patch.equals(patch);
             } else {
-                // 同一行 = 同槽同 key，且版本号相同 / 旧行没有版本号（允许迁移）
-                same = e.slot.equals(sl) && e.key.equals(k)
+                // 同一行 = 同槽同 key + 同版本号 + **同补丁身份**（本体与带补丁的时长绝不合并）；
+                // 旧行没有版本号时允许迁移。
+                same = e.slot.equals(sl) && e.key.equals(k) && e.patch.equals(patch)
                         && (e.tag.equals(tag) || e.tag.isEmpty());
             }
             if (same) {
@@ -174,23 +218,36 @@ public final class Playtime {
                         ms, updated,
                         title.isEmpty() ? e.title : title,
                         raw.isEmpty() ? e.rawName : raw,
-                        up.isEmpty() ? e.upstream : up));
+                        up.isEmpty() ? e.upstream : up,
+                        patch,
+                        plabel.isEmpty() ? e.patchLabel : plabel));
             } else {
                 sb.append(line(e.slot, e.key, e.tag, e.ms, e.updated,
-                        e.title, e.rawName, e.upstream));
+                        e.title, e.rawName, e.upstream, e.patch, e.patchLabel));
             }
         }
-        if (!hit) sb.append(line(sl, k, tag, ms, updated, title, raw, up));
+        if (!hit) sb.append(line(sl, k, tag, ms, updated, title, raw, up, patch, plabel));
         return sb.toString();
     }
 
     /** 某个 (槽, key, 版本号) 已累计的毫秒（旧行 tag 空也算命中；没有 ⇒ 0）。 */
     public static long valueFor(String text, String slot, String key, String tag) {
+        return valueFor(text, slot, key, tag, "");
+    }
+
+    /**
+     * 某个 (槽, key, 版本号, 补丁身份) 已累计的毫秒。
+     *
+     * <p>补丁身份**必须一起匹配**：本体（patch 空）与带补丁的两行是不同的账，
+     * 不能因为版本号相同就把补丁时长算进本体（2026-11-17 用户：「本体+补丁≠本体」）。
+     */
+    public static long valueFor(String text, String slot, String key, String tag, String patch) {
         String sl = clean(slot);
         String k = clean(key);
         String t = clean(tag);
+        String p = clean(patch);
         for (Entry e : parse(text)) {
-            if (!e.slot.equals(sl) || !e.key.equals(k)) continue;
+            if (!e.slot.equals(sl) || !e.key.equals(k) || !e.patch.equals(p)) continue;
             if (e.tag.equals(t) || e.tag.isEmpty() || t.isEmpty()) return e.ms;
         }
         return 0;
@@ -299,9 +356,11 @@ public final class Playtime {
     }
 
     private static String line(String slot, String key, String tag, long ms, long updated,
-                               String title, String rawName, String upstream) {
+                               String title, String rawName, String upstream, String patch,
+                               String patchLabel) {
         return slot + "\t" + key + "\t" + tag + "\t" + ms + "\t" + updated + "\t"
-                + title + "\t" + rawName + "\t" + upstream + "\n";
+                + title + "\t" + rawName + "\t" + upstream + "\t" + patch + "\t"
+                + patchLabel + "\n";
     }
 
     /** 字段卫生：制表符 / 换行 / 控制字符换成空格（否则一个字段就能把账本写成两行）。 */
