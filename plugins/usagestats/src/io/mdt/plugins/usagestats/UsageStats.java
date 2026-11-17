@@ -222,16 +222,16 @@ public final class UsageStats {
     }
 
     private static String shortPatch(Context c, Playtime.Entry e, int count) {
-        String label = e.patchLabel == null ? "" : e.patchLabel.trim();
-        // 「MindustryX (原版 + 补丁)」→「MindustryX」；解释性括号不进 13sp 的单行。
-        label = label.replaceAll("\\s*[\\(（][^()（）]*[\\)）]", "").trim();
+        // 补丁的名字用 **ref 的 id**（`mdtx-1607`）—— manifest 的 name 是
+        // 「MindustryX (原版 + 补丁)」，那是游戏/改端的描述，不是补丁名；
+        // 直接截成 MindustryX 会被误认成"补丁叫 MindustryX"。
+        String id = refId(firstRef(e.patch));
         if (count > 1) {
-            String id = refId(firstRef(e.patch));
-            if (id.isEmpty()) id = label;
             return id.isEmpty() ? "" : c.getString(R.string.us_patch_more_fmt, id, count - 1);
         }
-        if (!label.isEmpty()) return label;
-        return refId(firstRef(e.patch));
+        if (!id.isEmpty()) return id;
+        String label = e.patchLabel == null ? "" : e.patchLabel.trim();
+        return label.replaceAll("\\s*[\\(（][^()（）]*[\\)）]", "").trim();
     }
 
     private static String firstRef(String refs) {
