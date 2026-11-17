@@ -36,8 +36,8 @@ import io.mdt.launcher.api.SlotInfo;
  *       {@code setReadOnly()} 恒返回 false（实测），而**内部存储**上才生效 ⇒ 判据是"ART 认不认"，
  *       所以这里只**记录**、不拒绝；真正的裁决在下面的 {@link DexClassLoader}。</li>
  *   <li><b>预热预检</b> —— 抛一次性 {@link DexClassLoader} 把入口类解出来：缺类/坏包在这里就该被拒；</li>
- *   <li><b>接口版本</b> —— 入口报的 api 不在 [{@link #API_MIN}, {@link #API}] 区间 ⇒ 拒
- *       （否则后面每个反射调用都是掷骰子）；</li>
+ *   <li><b>接口版本</b> —— 入口报的 api（以及 `plugin.json` 里的 `api`，两者取高）不在
+ *       [{@link #API_MIN}, {@link #API}] 区间 ⇒ 拒（否则后面每个反射调用都是掷骰子）；</li>
  *   <li><b>挂资源</b> —— 优先**新建**一个 {@code AssetManager}（不污染宿主），失败才退回宿主那份。</li>
  * </ol>
  *
@@ -136,7 +136,7 @@ public final class PluginHost {
      * `storage()`（各段占用 + 唯一总计；重、要走后台）、`patchProblems()`（启动没应用 / 崩溃自动停用的
      * 事实）、`pluginVersions(id)`（插件逐版本，管理 / 回滚用）。
      */
-    public static final int API = 43;
+    public static final int API = 44;
     /**
      * 还认的**最老**契约版本。
      *
@@ -362,6 +362,11 @@ public final class PluginHost {
         } catch (Throwable t) {
             throw new PluginException("plugin_err_entry", brief(t));
         }
+        // ★ 2026-11-17（第 385 轮）：`plugin.json` 的 `"api": N` 同样是硬要求，与入口类取**较高者**
+        //   —— 否则"清单写了 44、类里图省事写 20"的插件会绕开加载门，还会让自动更新的
+        //   `minHostApi` 与真实要求脱节。没声明（-1）不影响。
+        int metaApi = PluginMeta.apiOf(apk);
+        if (metaApi > api) api = metaApi;
         if (!apiCompatible(api)) {
             // num1 = 插件报的版本；num2 = 它越过的那个界（界面按 apiVerdict 分岔用不着它，日志/自检要看）
             int v = apiVerdict(api);

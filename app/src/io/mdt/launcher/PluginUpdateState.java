@@ -9,12 +9,14 @@ import java.util.List;
  * <p>每行一条：`id \t 状态 \t 远端哈希 \t 显示的版本 \t 时刻(epoch 秒) \t 备注`。
  * 空行 / `#` 注释行跳过；段数不对、状态不认识的整行丢掉（宁可少一条记录，也不能拿半条去动作）。
  *
- * <p>五个状态（**界面只说人话，代号不上屏**）：
+ * <p>六个状态（**界面只说人话，代号不上屏**）：
  * <ul>
  *   <li>{@link #OK} —— 查过了，本机就是最新的；</li>
  *   <li>{@link #AVAILABLE} —— 有新版，但自动更新关着（等用户点）；</li>
  *   <li>{@link #INSTALLED} —— 已经装成"待生效"（退出重开才加载）；</li>
  *   <li>{@link #CONFIRM} —— 包已经下好、哈希也对，但**签名和当前那一份不同** ⇒ 要用户确认；</li>
+ *   <li>{@link #HOST_OLD} —— 远端新版要求更高的宿主接口（`minHostApi` / `plugin.json` 的
+ *       `api`）⇒ **没下载、没装**，等启动器更新（用户能做的事在"更新启动器"，不在这里）；</li>
  *   <li>{@link #FAILED} —— 这次没查成 / 没下成（原因进备注，界面有它自己的说法）。</li>
  * </ul>
  *
@@ -29,6 +31,8 @@ final class PluginUpdateState {
     static final String AVAILABLE = "available";
     static final String INSTALLED = "installed";
     static final String CONFIRM = "confirm";
+    /** 远端新版要求更高的宿主接口 —— **不是失败**，也不是"等用户点更新插件"。 */
+    static final String HOST_OLD = "host-old";
     static final String FAILED = "failed";
 
     /** 备注（原始诊断）保留长度 —— 只给日志与信息页看，别让它把一行撑爆。 */
@@ -53,7 +57,7 @@ final class PluginUpdateState {
 
     static boolean valid(String state) {
         return OK.equals(state) || AVAILABLE.equals(state) || INSTALLED.equals(state)
-                || CONFIRM.equals(state) || FAILED.equals(state);
+                || CONFIRM.equals(state) || HOST_OLD.equals(state) || FAILED.equals(state);
     }
 
     /** 这个状态是不是"用户还得做点什么"（列表上要显示一行、信息页要说一句）。 */

@@ -5,7 +5,7 @@
 
 ## 1. 版本与兼容（v20 冻结基线）
 
-- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..43**。
+- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..44**。
   （v20 是冻结基线；v21 = 游戏设置面；v22 = 后台任务 + 游戏事件；v23 = 探针；v24 = 分析器；
   v25 = 结论挂行 + 筛选/排序注入 + HJSON；v26 = 逐项判定；v27 = 详情页的门 + 槽级结论进摘要卡；
   v28 = 原版文案键；v29 = 游戏前后台事件；v30 = 探针知道版本 / 跨会话数据目录 + 摘要卡总时长；
@@ -51,6 +51,11 @@
   （图标等小块，256 KB）、`modsInstall(...)`（走宿主导入链：游戏判据 + 旧件进中转站）+
   `modsSetEnabled(...)`（转 `Mods.setEnabled`）；`GitHubRelease.Asset` 多 `browserUrl` / `sha256`；
   `settings()` 多 `download_limit`。）
+  **v44 = `game-exit` 观测键 + 宿主版本需求**：`game-exit` 的 `data` 多
+  `started` / `ended` / `activeMs` / `wallMs` / `key`（第 384 轮的宿主时钟；拿不到检查点就整组不给）；
+  同时 `plugin.json` 的 `"api": N` 开始被**真正读取**（加载时与入口 `api()` 取较高者）；
+  插件更新清单的 `minHostApi` 变成**下载前**的硬门（宿主接口不够 ⇒ 不下载、不装，
+  落 `host-old` 状态）—— 详见 §10.4。
 - 插件 `api()` 报的是「我需要的最低宿主接口版本」。用不到的新能力**不要**报高 ——
   报高了只会在老宿主上被拒，换不来任何东西。
 - **不要用 try/catch 去兼容老宿主**：报什么版本就只会跑在什么版本上。`api()` 报 20，
@@ -138,7 +143,7 @@
 ## 3. 入口类约定
 
 ```java
-public static int api();                        // 必需：你需要的接口版本（当前 43；用不到新能力就报 20）
+public static int api();                        // 必需：你需要的接口版本（当前 44；用不到新能力就报 20）
 public static View createView(PluginApi api);   // content / section 用
 public static void run(PluginApi api);          // action 用（在原页跑，不换页）
 public static void unload();                    // 可选：收尾（也认 unload(Context)）
@@ -158,7 +163,7 @@ public static void unload();                    // 可选：收尾（也认 unlo
 
 | 方法 | 说明 |
 |---|---|
-| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 43） |
+| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 44） |
 | `context()` | 插件上下文（**只用来取资源 / 主题 / 建 View**） |
 | `page()` / `slot()` | 从哪一页来 / 当前槽名 |
 | `theme()` | 主题色与 dp/sp（别自己写死颜色，见 `PluginTheme`） |
@@ -942,9 +947,18 @@ java.io.File usageDir();   // <hub>/usage/
 > **地址由插件自己提供**（用户 2026-10-30 定：「由插件负责提供对应的更新地址」）——
 > 宿主不内置插件名单、不做商店；谁发的插件，谁告诉宿主去哪儿看新版。
 
-### 10.1 插件这边要做两件事
+### 10.1 插件这边要做三件事
 
-1. 在 `assets/plugin.json` 里加一行**更新清单地址**（可空；空 = 不参与自动更新）：
+1. **申报你需要的最低宿主接口**（用了新接口就必须写；和第 1 节入口类里的 `api()` 同义）：
+
+   ```json
+   "api": 44
+   ```
+
+   宿主加载时取「入口 `api()`」与「`plugin.json` 的 `api`」的**较高者**；它也是更新清单里
+   `minHostApi` 的**真源**。不写 = 不做额外要求（老插件不受影响）。
+
+2. 在 `assets/plugin.json` 里加一行**更新清单地址**（可空；空 = 不参与自动更新）：
 
    ```json
    "update": "https://example.com/mdt/myplugin.json"
@@ -952,7 +966,7 @@ java.io.File usageDir();   // <hub>/usage/
 
    ⚠️ **只认 https**（回环 `http://127.0.0.1:…` 只给本地夹具）。明文 http 一律当没声明。
 
-2. 在该地址放一份清单（**几百字节**）：
+3. 在该地址放一份清单（**几百字节**）：
 
    ```json
    {
@@ -962,6 +976,7 @@ java.io.File usageDir();   // <hub>/usage/
      "size": 61234,
      "sha256": "…64 位小写十六进制…",
      "url": "https://example.com/mdt/myplugin-1.2.apk",
+     "minHostApi": 44,
      "notes": "这一版改了什么"
    }
    ```
@@ -975,7 +990,7 @@ java.io.File usageDir();   // <hub>/usage/
 | `version` | 否 | **只用于显示**（"有新版 1.2"）。不参与任何比较 |
 | `notes` | 否 | 一行说明（≤160 字符，换行会压成空格） |
 | `plugin` | 否 | 清单自称的插件 id；**填了就必须和装的那个 id 一致**（防串包），不填不拦 |
-| `minHostApi` | 否 | 宿主接口版本低于它就不提示（新插件需要新 API，装了也用不了） |
+| `minHostApi` | 否 | 宿主接口版本低于它 ⇒ **不下载、不装**，标「需要更新的启动器」；真源是插件 `plugin.json` 的 `api`，发布脚本自动抄 |
 
 生成清单别手抄：
 
@@ -983,6 +998,9 @@ java.io.File usageDir();   // <hub>/usage/
 python tools/make-plugin-update.py --apk myplugin.apk --version 1.2 --out myplugin.json
 python tools/make-plugin-update.py --check myplugin.json     # 发之前先验一遍
 ```
+
+★ 脚本会读 APK 里 `assets/plugin.json` 的 `api` 并写成 `minHostApi`；没写 `api` 时清单里就没有
+这个字段（旧宿主会照常下载、直到加载才被拒），能用 `--min-host-api 44` 临时补。
 
 ### 10.2 宿主怎么判"有新版"：**只比内容，不比版本号**
 
@@ -1003,12 +1021,33 @@ python tools/make-plugin-update.py --check myplugin.json     # 发之前先验�
 | 何时查 | **启动时**静默查一次，24 h 内不重复；设置页「插件自动更新」关掉后**一次请求都不发** |
 | 落后了怎么办 | 手动「检查插件更新」（插件页顶栏 ⋮）随时可查 |
 | 下载 | 只在真发现新版时下；镜像/直连按「更新线路」那条设置走 |
+| 宿主够不够新 | **下载前**看清单 `minHostApi`；宿主接口不够 ⇒ **一个字节都不下**，标「需要更新的启动器」。清单漏写时，下载后再用 APK 自述的 `api` 判一次（够了也不装） |
 | 校验 | ① 长度（有 `size` 时）② **sha256** ③ 至少是个能解析的 APK（有清单 + classes.dex） |
 | 装不装 | **签名和当前那一份相同 ⇒ 自动装**（同一个作者的更新，不打扰）；**不同 ⇒ 不装**，插件页标「新版待确认」，用户点一下才装 |
 | 生效 | 与手动安装完全一样：**装成"待生效"，退出重开才加载**（S0 硬事实：已加载的类换不掉） |
 | 失败 | 只写日志与 `report-plugin-update.txt`，界面不弹窗（下次启动再试） |
 
-### 10.4 三条给作者的红线
+### 10.4 宿主版本要求（2026-11-17，v44）
+
+**为什么要有**：插件与启动器是两条发布线 —— 插件可以先发（`plugins-latest`），启动器后发。
+如果新插件用了新接口，旧宿主把它装进去只会加载失败（甚至静默不工作）；等用户更新启动器
+之后，自动更新又不会主动重试被跳过的这一版。
+
+**宿主怎么判**（三道，口径同一份：`minHostApi > PluginHost.API`）：
+
+1. **清单层**（下载前）：`minHostApi` 比宿主大 ⇒ 不下载；
+2. **APK 层**（下载后、装之前）：读 APK 的 `assets/plugin.json` 的 `api`，比宿主大 ⇒ 删掉下载件、不装；
+3. **落盘前**（`install`）：再判一次（防以后新增调用入口漏判）。
+
+**状态与界面**：落 `host-old`（不是"失败"，也不是"可更新"）—— 插件页那一行显示
+「有新版 X · 需要更新的启动器」，手动检查的结果卡会报「N 个需要更新的启动器」；
+**没有"更新插件"按钮**（用户能做的只有更新启动器）。自动检查不弹 Toast（避免每天提示一次
+用户当下解决不了的事）。启动器更新后，下一次自动检查会重新走正常流程。
+
+**给作者**：用了新接口就在 `plugin.json` 写 `"api": N`，发布脚本会写进清单；不写就等于
+"我不要求新宿主"（旧宿主会下载、到加载时才被 `api()` 拒掉）。
+
+### 10.5 三条给作者的红线
 
 1. **清单地址要稳定**：宿主是拿**当前装着的那一份**的 `plugin.json` 去读地址的；
    地址变了要等新版装上之后才生效（第一版必须走手动安装）。
@@ -1016,7 +1055,7 @@ python tools/make-plugin-update.py --check myplugin.json     # 发之前先验�
 3. **换签名 = 用户要确认一次**：如果你换了签名钥匙（或换了作者），自动更新不会静默生效 ——
    这是有意的（防"插件被换包"）。
 
-### 10.5 内置插件也在线更新（官方三件套）
+### 10.6 内置插件也在线更新（官方三件套）
 
 `mapstats` / `mods-health` / `usagestats` 三份内置插件同样在自己的 `plugin.json` 里声明了
 `plugins-latest` 通道的清单地址。它们被在线升级之后：
@@ -1124,6 +1163,12 @@ v43（2026-11-14 第 378 轮）：**下载续传 / 模组写 / 网络扩充**（
 `modsInstall` / `modsSetEnabled`（走宿主的 `Mods.importPackage` / `Mods.setEnabled`，同一份判据与
 中转站规则）、`GitHubRelease.Asset` 多 `browserUrl` / `sha256`（digest）、`settings()` 多
 `download_limit`。`API_MIN` 仍不动（区间 20..43）。
+v44（2026-11-17 第 385 轮）：**`game-exit` 观测键 + 宿主版本需求**（用户：「插件接口的版本升了吗」
+「非常需要一个插件自动更新检查宿主版本需求的功能」）—— `game-exit` 的 `data` 多
+`started` / `ended` / `activeMs` / `wallMs` / `key`（第 384 轮宿主时钟；没有检查点就整组不给）；
+`plugin.json` 的 `"api": N` 开始被**真正读取**（`PluginHost` 加载时与入口 `api()` 取较高者）；
+插件更新清单的 `minHostApi` 成为**下载前**的硬门（清单层 + APK 自述层 + 落盘前共三道），
+状态落 `host-old`、不进"失败"计数。`API_MIN` 仍不动（区间 20..44）。
 
 **官方体检插件**：`plugins/mods-health`（第 229 轮，前身叫 `conflict`）。宿主原来的那行
 「查模组冲突」整块删掉，判据搬进插件的 `core/Conflicts.java` 与 `core/Gates.java`；

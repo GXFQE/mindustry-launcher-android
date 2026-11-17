@@ -29,6 +29,9 @@ import java.util.Locale;
  *   <li>下载完**校 sha256**（{@link UpdateDownload}，先 `.part` 再改名）＋ 至少是个能解析的 APK；</li>
  *   <li>**签名与当前那一份不同 ⇒ 不自动装**，落 {@code confirm} 让用户点一下
  *       （同一个作者发布的更新不打扰；换作者 / 换钥匙必须问）。</li>
+ *   <li>**新版要求更高的宿主接口 ⇒ 不下载、不装**（`minHostApi` / `plugin.json` 的 `api`
+ *       与 {@link PluginHost#API} 比）—— 落 {@code HOST_OLD}，等启动器更新。
+ *       这是"插件先发、启动器后发"那条时间窗的兜底。</li>
  * </ol>
  *
  * <p>⚠️ 它**不碰界面**（除启动时那一次 Toast）：手动检查的卡片、行内的「有新版」都由
@@ -61,14 +64,16 @@ final class PluginUpdates {
 
     /** 一次检查的汇总（给界面的结果卡用）。 */
     static final class Summary {
-        int total, checked, installed, confirm, available, failed;
+        int total, checked, installed, confirm, available, hostOld, failed;
         /** 上一次检查还没跑完（这次什么都没做）。 */
         boolean busy;
         String report = "";
         final List<String> lines = new ArrayList<String>();
 
-        boolean anyChange() { return installed > 0 || confirm > 0 || available > 0; }
-        boolean allOk() { return failed == 0 && installed == 0 && confirm == 0 && available == 0; }
+        boolean anyChange() { return installed > 0 || confirm > 0 || available > 0 || hostOld > 0; }
+        boolean allOk() {
+            return failed == 0 && installed == 0 && confirm == 0 && available == 0 && hostOld == 0;
+        }
     }
 
     private PluginUpdates() {}
@@ -257,6 +262,19 @@ final class PluginUpdates {
                 }
                 PluginUpdateManifest m = PluginUpdateManifest.parse(json, PluginHost.API);
                 if (!m.ok()) {
+                    // ★ 2026-11-17：宿主接口不够 **不是失败**（网络/格式那种才进 FAILED）。
+                    //   不下载、不提示更新，落 HOST_OLD —— 用户能做的只有更新启动器。
+                    if (PluginUpdateManifest.E_HOST_OLD.equals(m.error)) {
+                        String lbl = (m.version == null || m.version.isEmpty())
+                                ? PluginUpdateManifest.sha8(m.sha256) : m.version;
+                        state = note(ctx, state, id, PluginUpdateState.HOST_OLD, m.sha256, lbl,
+                                "minHostApi=" + m.minHostApi + " host=" + PluginHost.API);
+                        sum.hostOld++;
+                        sum.lines.add(id + "=host-old");
+                        rep.append(id).append(" => HOST_OLD needs api ").append(m.minHostApi)
+                                .append(" (host ").append(PluginHost.API).append(")\n");
+                        continue;
+                    }
                     state = note(ctx, state, id, PluginUpdateState.FAILED, null, null,
                             "manifest: " + m.error);
                     sum.failed++;
@@ -312,6 +330,20 @@ final class PluginUpdates {
                     out = d.file;
                 }
 
+                // ★ 2026-11-17：清单没写 `minHostApi`（老发布脚本 / 第三方手写清单）时，
+                //   用**下载下来的 APK 自述**再判一次 —— 这一道才真正防"清单漏写"。
+                int needApi = PluginMeta.apiOf(out);
+                if (needApi > PluginHost.API) {
+                    try { out.delete(); } catch (Throwable ignored) { }
+                    state = note(ctx, state, id, PluginUpdateState.HOST_OLD, m.sha256, label,
+                            "apk api=" + needApi + " host=" + PluginHost.API);
+                    sum.hostOld++;
+                    sum.lines.add(id + "=host-old");
+                    rep.append("    HOST_OLD apk api=").append(needApi)
+                            .append(" (host ").append(PluginHost.API).append(")\n");
+                    continue;
+                }
+
                 // 签名：同一个作者发的更新**不打扰**；不同 ⇒ 落 confirm（用户点一下才装）
                 String curFp = PluginTrust.apkFingerprint(ctx, apk);
                 String newFp = PluginTrust.apkFingerprint(ctx, out);
@@ -326,7 +358,13 @@ final class PluginUpdates {
                 }
 
                 String r = install(ctx, id, out, m);
-                if (r.startsWith("FAILED")) {
+                if ("HOST_OLD".equals(r)) {
+                    state = note(ctx, state, id, PluginUpdateState.HOST_OLD, m.sha256, label,
+                            "install: host-too-old");
+                    sum.hostOld++;
+                    sum.lines.add(id + "=host-old");
+                    rep.append("    install HOST_OLD\n");
+                } else if (r.startsWith("FAILED")) {
                     state = note(ctx, state, id, PluginUpdateState.FAILED, m.sha256, label, r);
                     sum.failed++;
                     sum.lines.add(id + "=install-failed");
@@ -349,7 +387,9 @@ final class PluginUpdates {
             cleanupDownloads(ctx, state);
             rep.append("summary: total=").append(sum.total).append(" checked=").append(sum.checked)
                     .append(" installed=").append(sum.installed).append(" confirm=").append(sum.confirm)
-                    .append(" available=").append(sum.available).append(" failed=").append(sum.failed)
+                    .append(" available=").append(sum.available)
+                    .append(" hostOld=").append(sum.hostOld)
+                    .append(" failed=").append(sum.failed)
                     .append(" ms=").append(System.currentTimeMillis() - started).append('\n');
             sum.report = rep.toString();
             writeReport(ctx, sum.report);
@@ -378,7 +418,16 @@ final class PluginUpdates {
         String json = fetch(url, err);
         if (json == null) return "failed:" + err[0];
         PluginUpdateManifest m = PluginUpdateManifest.parse(json, PluginHost.API);
-        if (!m.ok()) return "failed:" + m.error;
+        if (!m.ok()) {
+            if (PluginUpdateManifest.E_HOST_OLD.equals(m.error)) {
+                String l = (m.version == null || m.version.isEmpty())
+                        ? PluginUpdateManifest.sha8(m.sha256) : m.version;
+                putItem(ctx, id, PluginUpdateState.HOST_OLD, m.sha256, l,
+                        "minHostApi=" + m.minHostApi + " host=" + PluginHost.API);
+                return "host-old";
+            }
+            return "failed:" + m.error;
+        }
         if (!m.matches(id)) return "failed:plugin-mismatch";
         String label = (m.version == null || m.version.isEmpty())
                 ? PluginUpdateManifest.sha8(m.sha256) : m.version;
@@ -396,6 +445,14 @@ final class PluginUpdates {
             }
             out = d.file;
         }
+        // ★ 清单没写 minHostApi 时，用 APK 自述兜底（见 checkAll 同一道）
+        int needApi = PluginMeta.apiOf(out);
+        if (needApi > PluginHost.API) {
+            try { out.delete(); } catch (Throwable ignored) { }
+            putItem(ctx, id, PluginUpdateState.HOST_OLD, m.sha256, label,
+                    "apk api=" + needApi + " host=" + PluginHost.API);
+            return "host-old";
+        }
         String curFp = PluginTrust.apkFingerprint(ctx, apk);
         String newFp = PluginTrust.apkFingerprint(ctx, out);
         if (!force && (curFp == null || newFp == null || !curFp.equals(newFp))) {
@@ -403,6 +460,10 @@ final class PluginUpdates {
             return "confirm";
         }
         String r = install(ctx, id, out, m);
+        if ("HOST_OLD".equals(r)) {
+            putItem(ctx, id, PluginUpdateState.HOST_OLD, m.sha256, label, "install: host-too-old");
+            return "host-old";
+        }
         if (r.startsWith("FAILED")) {
             putItem(ctx, id, PluginUpdateState.FAILED, m.sha256, label, r);
             return "failed:" + r;
@@ -499,6 +560,8 @@ final class PluginUpdates {
     private static String install(Context ctx, String id, File apk, PluginUpdateManifest m) {
         String ver = PluginUpdateManifest.sha8(m.sha256);
         if (ver == null) return "FAILED bad sha";
+        // 最后一道：真正落盘前再按 APK 自述判一次（调用方已经判过，这里是防以后新增入口漏判）
+        if (PluginMeta.apiOf(apk) > PluginHost.API) return "HOST_OLD";
         boolean enabled = Plugins.stateGet(Plugins.active(ctx), id) != null
                 || Plugins.stateGet(Plugins.pending(ctx), id) != null;
         return Plugins.placeUpdate(ctx, apk, id, ver, enabled);

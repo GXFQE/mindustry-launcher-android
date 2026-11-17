@@ -150,9 +150,11 @@
     <string name="plugin_update_sum_confirm_fmt">%1$s to confirm</string>
     <string name="plugin_update_sum_available_fmt">%1$s available</string>
     <string name="plugin_update_sum_failed_fmt">%1$s failed</string>
+    <string name="plugin_update_sum_host_old_fmt">%1$s need a newer launcher</string>
     <string name="plugin_update_row_available_fmt">New version %1$s available</string>
     <string name="plugin_update_row_confirm_fmt">New version %1$s needs confirmation</string>
     <string name="plugin_update_row_installed_fmt">Updated to %1$s · restart to apply</string>
+    <string name="plugin_update_row_host_old_fmt">New version %1$s needs a newer launcher</string>
     <string name="plugin_update_action_fmt">Update to %1$s</string>
     <string name="plugin_update_action">Update it</string>
     <string name="plugin_update_confirm_title">This update is signed by a different key</string>
@@ -160,10 +162,12 @@
     <string name="plugin_update_confirm_yes">Update anyway</string>
     <string name="plugin_update_done_fmt">Updated %1$s · restart to apply</string>
     <string name="plugin_update_failed">The update did not go through. Try again later.</string>
+    <string name="plugin_update_host_old">This update needs a newer launcher, so it was not downloaded.</string>
     <string name="plugin_update_toast_installed">Updated %1$s plugin(s). Restart to apply.</string>
     <string name="plugin_update_toast_confirm">%1$s plugin update(s) need your confirmation.</string>
     <string name="plugin_info_update">Update: %1$s</string>
     <string name="plugin_update_info_latest">up to date</string>
+    <string name="plugin_update_info_host_old">The new version needs a newer launcher. Update the launcher, then check again.</string>
     <string name="plugin_update_info_available_fmt">new version %1$s available</string>
     <string name="plugin_update_info_confirm_fmt">new version %1$s needs confirmation</string>
     <string name="plugin_update_info_installed_fmt">updated to %1$s · restart to apply</string>

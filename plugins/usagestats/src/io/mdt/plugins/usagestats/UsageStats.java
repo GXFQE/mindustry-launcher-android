@@ -39,7 +39,10 @@ import io.mdt.plugins.usagestats.core.Playtime;
 public final class UsageStats {
 
     public static int api() {
-        return 31;
+        // 2026-11-17（第 385 轮）：本插件依赖宿主 44 的 `game-exit` 观测键
+        // （started / ended / activeMs / wallMs / key）——报 44 让旧宿主明确拒掉，
+        // 而不是收不到键、静默不记时长。
+        return 44;
     }
 
     public static View createView(PluginApi api) {

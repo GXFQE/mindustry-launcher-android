@@ -150,8 +150,11 @@ final class PluginUpdateCheck {
 
     private static void hostApi(List<Line> L) {
         String json = "{\"sha256\":\"" + SHA + "\",\"url\":\"https://x/a.apk\",\"minHostApi\":40}";
-        ok(L, PluginUpdateManifest.E_HOST_OLD.equals(PluginUpdateManifest.parse(json, 36).error),
+        PluginUpdateManifest old = PluginUpdateManifest.parse(json, 36);
+        ok(L, PluginUpdateManifest.E_HOST_OLD.equals(old.error),
                 "minHostApi=40 而宿主 36 ⇒ host-too-old（装了也用不了，别提示）");
+        ok(L, old.minHostApi == 40 && SHA.equals(old.sha256),
+                "★ host-too-old 仍带 minHostApi / sha（报告与状态表要说得清为什么没下）");
         ok(L, PluginUpdateManifest.parse(json, 40).ok(), "minHostApi=40 而宿主 40 ⇒ 可用");
         ok(L, PluginUpdateManifest.parse(json, 41).ok(), "minHostApi=40 而宿主 41 ⇒ 可用");
         ok(L, PluginUpdateManifest.parse(json).ok(), "不判宿主（hostApi<=0）⇒ 可用");
@@ -229,15 +232,24 @@ final class PluginUpdateCheck {
                         && PluginUpdateState.valid(PluginUpdateState.AVAILABLE)
                         && PluginUpdateState.valid(PluginUpdateState.INSTALLED)
                         && PluginUpdateState.valid(PluginUpdateState.CONFIRM)
+                        && PluginUpdateState.valid(PluginUpdateState.HOST_OLD)
                         && PluginUpdateState.valid(PluginUpdateState.FAILED)
                         && !PluginUpdateState.valid("nope"),
-                "valid 只认五个状态");
+                "valid 只认六个状态（含 host-old）");
         ok(L, PluginUpdateState.pending(PluginUpdateState.AVAILABLE)
                         && PluginUpdateState.pending(PluginUpdateState.CONFIRM)
+                        && !PluginUpdateState.pending(PluginUpdateState.HOST_OLD)
                         && !PluginUpdateState.pending(PluginUpdateState.INSTALLED)
                         && !PluginUpdateState.pending(PluginUpdateState.OK)
                         && !PluginUpdateState.pending(PluginUpdateState.FAILED),
-                "pending 只覆盖 available / confirm");
+                "pending 只覆盖 available / confirm（host-old 等的是启动器更新，不是点插件）");
+
+        String old = PluginUpdateState.put("", "a", PluginUpdateState.HOST_OLD, SHA, "2.0", 9L,
+                "minHostApi=" + 44 + " host=" + 43);
+        PluginUpdateState.Item hi = PluginUpdateState.get(old, "a");
+        ok(L, hi != null && PluginUpdateState.HOST_OLD.equals(hi.state) && SHA.equals(hi.sha)
+                        && "2.0".equals(hi.ver) && hi.note != null && hi.note.contains("44"),
+                "host-old 往返：sha / 显示的版本 / 备注（哪个 api）都在");
 
         String note = PluginUpdateState.put("", "a", PluginUpdateState.FAILED, null, null, 1L,
                 "line1\nline2\tx").toString();

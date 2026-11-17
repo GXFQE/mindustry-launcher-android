@@ -5341,8 +5341,8 @@ public final class SelfTest {
     private static void pluginV43(android.content.Context ctx, List<String> L, int[] stat) {
         L.add("");
         L.add("【v43 · 插件下载 / 模组写 / 网络扩充（第 378 轮）】");
-        ok(stat, L, PluginHost.API == 43 && PluginApi.DOC_VERSION == 43,
-                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 43");
+        ok(stat, L, PluginHost.API == 44 && PluginApi.DOC_VERSION == 44,
+                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 44（v44 起）");
 
         boolean shape = true;
         try {

@@ -935,6 +935,9 @@ public class PluginsActivity extends BaseActivity {
         if (PluginUpdateState.AVAILABLE.equals(it.state)) {
             return Trans.get(this, R.string.plugin_update_row_available_fmt, label);
         }
+        if (PluginUpdateState.HOST_OLD.equals(it.state)) {
+            return Trans.get(this, R.string.plugin_update_row_host_old_fmt, label);
+        }
         if (PluginUpdateState.CONFIRM.equals(it.state)) {
             return Trans.get(this, R.string.plugin_update_row_confirm_fmt, label);
         }
@@ -994,6 +997,7 @@ public class PluginsActivity extends BaseActivity {
         appendCount(sb, R.string.plugin_update_sum_installed_fmt, sum.installed);
         appendCount(sb, R.string.plugin_update_sum_confirm_fmt, sum.confirm);
         appendCount(sb, R.string.plugin_update_sum_available_fmt, sum.available);
+        appendCount(sb, R.string.plugin_update_sum_host_old_fmt, sum.hostOld);
         appendCount(sb, R.string.plugin_update_sum_failed_fmt, sum.failed);
         return sb.length() == 0 ? Trans.get(this, R.string.plugin_update_latest) : sb;
     }
@@ -1085,6 +1089,15 @@ public class PluginsActivity extends BaseActivity {
                                     }));
                             return;
                         }
+                        if ("host-old".equals(r)) {
+                            ui.replace(Trans.get(PluginsActivity.this, R.string.plugin_update_title),
+                                    Trans.get(PluginsActivity.this, R.string.plugin_update_host_old),
+                                    new CardStack.Btn(Trans.get(PluginsActivity.this,
+                                            R.string.close), new Runnable() {
+                                        @Override public void run() { ui.dismiss(); }
+                                    }));
+                            return;
+                        }
                         ui.replace(Trans.get(PluginsActivity.this, R.string.plugin_update_title),
                                 Trans.get(PluginsActivity.this, R.string.plugin_update_failed),
                                 new CardStack.Btn(Trans.get(PluginsActivity.this, R.string.close),
@@ -1117,6 +1130,9 @@ public class PluginsActivity extends BaseActivity {
         }
         if (PluginUpdateState.AVAILABLE.equals(it.state)) {
             return Trans.get(this, R.string.plugin_update_info_available_fmt, label);
+        }
+        if (PluginUpdateState.HOST_OLD.equals(it.state)) {
+            return Trans.get(this, R.string.plugin_update_info_host_old);
         }
         if (PluginUpdateState.CONFIRM.equals(it.state)) {
             return Trans.get(this, R.string.plugin_update_info_confirm_fmt, label);

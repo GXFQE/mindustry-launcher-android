@@ -24,12 +24,17 @@ import java.util.Map;
  *   "version": "1.2",                  // 可选：**只用来显示**，不参与任何比较
  *   "notes": "这一版改了什么",          // 可选：卡片里那一行
  *   "plugin": "mapstats",              // 可选：声明这是哪个插件（对不上 ⇒ 不认，防串包）
- *   "minHostApi": 36                   // 可选：宿主接口版本低于它就不提示（装了也用不了）
+ *   "minHostApi": 36                   // 可选：宿主接口版本低于它就不下载 / 不装（装了也用不了）
  * }
  * </pre>
  *
  * <p>⚠️ 清单来自**插件自己声明的地址**，是不可信输入：所有文本上屏前过 {@link #gate}，
  * 下载地址过 {@link #allowedUrl}（只认 https + 本机回环）。
+ *
+ * <p>★ `minHostApi` 的**真源**是插件自己的 `plugin.json` 里的 `"api": N`（插件自己声明"我需要
+ * 哪一版宿主接口"）。发布脚本 {@code tools/make-plugin-update.py} 会把它抄进清单；宿主这边
+ * 在**下载前**就看：`minHostApi > PluginHost.API` ⇒ {@link #E_HOST_OLD}，一个字节都不下。
+ * 这是给"插件先更新、启动器后更新"那条时间窗兜底的 —— 否则新插件装进旧宿主只会加载失败。
  */
 final class PluginUpdateManifest {
 

@@ -255,6 +255,25 @@ final class PluginMeta {
         }
     }
 
+    /**
+     * 从 APK 的 {@code assets/plugin.json} 读 **`"api": N`**（插件自己声明的最低宿主接口）。
+     *
+     * <p>★ 2026-11-17（第 385 轮）：这个值以前**只写文档、没人读** —— 入口类里的 `api()` 才是
+     * 唯一门；而自动更新在下载前根本不知道新包要多新的宿主。现在两个地方用它：
+     * {@link PluginHost} 加载时取 `max(类里的 api(), 这里的 api)`；{@link PluginUpdates} 下载前 /
+     * 装之前拿它跟 {@link PluginHost#API} 比。
+     *
+     * @return 声明值；没有声明 / 读不出来 ⇒ -1（不是"要求 -1"，是"没声明"）
+     */
+    static int apiOf(File apk) {
+        try {
+            Map<String, String> m = FlatJson.parse(zipText(apk, ASSET_JSON));
+            return m == null ? -1 : apiFrom(m.get("api"));
+        } catch (Throwable t) {
+            return -1;
+        }
+    }
+
     /** 设备/版本信息只用来写报告（哪台机器上读的）。 */
     static String env() {
         return "sdk=" + Build.VERSION.SDK_INT;

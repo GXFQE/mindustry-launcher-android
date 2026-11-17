@@ -19,6 +19,12 @@
 ★ 宿主怎么用它：插件自己的 `assets/plugin.json` 里写 `"update": "<这份清单的地址>"`，
   宿主按**内容哈希**（不是版本号）判断有没有新版 —— 见 `app/src/io/mdt/launcher/PluginUpdateManifest.java`。
 
+★ **宿主版本要求**（2026-11-17 第 385 轮）：如果这一版插件用了新的宿主接口，在
+  `plugin.json` 里写 `"api": N`（= 它需要的最低宿主接口，跟入口类里的 `api()` 同一含义）。
+  本脚本会把它抄成清单里的 `minHostApi`；宿主**下载前**就按它跳过 —— 否则新插件会被
+  装进旧宿主，加载时才失败。`plugin.json` 没写 `api` 时清单里就没有这个字段（旧宿主会
+  照常下载、直到加载才被入口类的 `api()` 拒掉），能用 `--min-host-api` 临时补。
+
 ★ 下载地址里的 tag 是 `plugins-latest`（**滚动通道**，可以反复覆盖资产）：
   它不在 `v*` 命名空间里 ⇒ 不影响启动器的 `versionCode = v* tag 数 + 1` 那条算法。
   ⚠️ 那个 release **只放插件**，永远不要往里传启动器 APK。
@@ -57,6 +63,20 @@ def plugin_meta(apk):
         raise SystemExit("不是合法 APK（zip）：%s" % apk)
 
 
+def api_of(meta):
+    """`plugin.json` 的 `api`（插件要求的最低宿主接口）。缺省 / 空 ⇒ 0；写坏 ⇒ 报错。"""
+    raw = meta.get("api")
+    if raw is None or str(raw).strip() == "":
+        return 0
+    try:
+        n = int(str(raw).strip())
+    except ValueError:
+        raise SystemExit("plugin.json 的 api 不是整数：%r" % (raw,))
+    if n <= 0:
+        raise SystemExit("plugin.json 的 api 要正整数（当前 %r）" % (raw,))
+    return n
+
+
 def gen(args):
     apk = args.apk
     if not os.path.isfile(apk):
@@ -69,6 +89,15 @@ def gen(args):
         raise SystemExit("读不到插件 id（assets/plugin.json 里没有 name），请用 --id 指定")
     if pname and args.id and pname != args.id:
         raise SystemExit("--id=%s 与 APK 自述里的 name=%s 不一致（装错包了？）" % (args.id, pname))
+
+    min_api = api_of(meta)
+    if args.min_host_api:
+        try:
+            min_api = int(args.min_host_api)
+        except ValueError:
+            raise SystemExit("--min-host-api 要正整数：%r" % (args.min_host_api,))
+        if min_api <= 0:
+            raise SystemExit("--min-host-api 要正整数：%r" % (args.min_host_api,))
 
     size = os.path.getsize(apk)
     sha = sha256_file(apk)
@@ -84,6 +113,8 @@ def gen(args):
         "url": url,
         "notes": args.notes or "",
     }
+    if min_api > 0:
+        doc["minHostApi"] = min_api
     with open(args.out, "w", encoding="utf-8", newline="\n") as f:
         json.dump(doc, f, ensure_ascii=False, indent=2)
         f.write("\n")
@@ -94,6 +125,7 @@ def gen(args):
     print("  size     = %d" % size)
     print("  sha256   = %s" % sha)
     print("  url      = %s" % url)
+    print("  minHostApi = %s" % (min_api or "(none；建议在 plugin.json 写 api)"))
     print()
     print("下一步（两个资产一起传；缺清单的通道，插件那边的检查会一直失败）：")
     print("  gh release upload %s %s %s --clobber" % (args.tag, apk, args.out))
@@ -124,13 +156,16 @@ def check(path):
     size = doc.get("size")
     if size is not None and (not isinstance(size, int) or size <= 0):
         errs.append("size=%r（要么省略，要么正整数）" % size)
+    min_api = doc.get("minHostApi")
+    if min_api is not None and (not isinstance(min_api, int) or min_api <= 0):
+        errs.append("minHostApi=%r（要么省略，要么正整数）" % min_api)
 
     if errs:
         for e in errs:
             print("FAIL  " + e)
         return 1
-    print("OK    %s  plugin=%s version=%s size=%d"
-          % (path, pid, doc.get("version", ""), size or 0))
+    print("OK    %s  plugin=%s version=%s size=%d minHostApi=%s"
+          % (path, pid, doc.get("version", ""), size or 0, min_api or "(none)"))
     return 0
 
 
@@ -139,6 +174,7 @@ def main():
     ap.add_argument("--apk")
     ap.add_argument("--id", default="")
     ap.add_argument("--version", default="")
+    ap.add_argument("--min-host-api", default="", help="覆盖 plugin.json 的 api（正整数）")
     ap.add_argument("--notes", default="")
     ap.add_argument("--tag", default=DEFAULT_TAG)
     ap.add_argument("--repo", default=DEFAULT_REPO)

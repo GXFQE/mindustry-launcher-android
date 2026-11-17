@@ -51,6 +51,9 @@ gh release upload plugins-latest "$TEMP/mdt-mapstats/mapstats.apk" mapstats.json
 ```
 
 - 宿主按 **内容哈希**（清单里的 `sha256`）判断有没有新版，`version` 只用于显示（见 `docs/PLUGIN-API.md` §10）；
+- **插件用了新宿主接口时**：在它的 `plugin.json` 写 `"api": N`（例：usagestats = 44，依赖 `game-exit`
+  观测键）；`make-plugin-update.py` 会把它写成清单的 `minHostApi`，旧宿主**下载前**就会跳过并标
+  「需要更新的启动器」—— 不会把新插件装进旧宿主再加载失败；
 - 在线升级之后，**下一次启动不会被这里的内置那份顶掉**（`plugins/online.txt` 记着升级时的内置基线）；
   但**本体换了插件内容**（这里那三份 APK 变了）⇒ 以本体为准；
 - ⚠️ `plugins-latest` 只放插件，**永远不要**往里传启动器 APK（它不在 `v*` 命名空间、不是发版）。

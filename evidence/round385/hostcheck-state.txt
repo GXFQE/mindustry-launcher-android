@@ -1,0 +1,8 @@
+# 清单层（minHostApi=999）—— 不下载
+usagestats	host-old	00000000000000000000000000000000000000000000000000000000000000ff	999.0	1794919346	minHostApi=999 host=44
+
+# apk 层（清单没写 minHostApi，APK 自述 api=999）—— 下载后删掉
+usagestats	host-old	f3e7ea45f73ee4b0080fa85b5d031ced161221f6d2e803218cb897f4a773a319	999.1	1794919361	apk api=999 host=44
+
+# report-plugin-update.txt 的 summary（第二遍）
+summary: total=3 checked=3 installed=0 confirm=0 available=0 hostOld=1 failed=0 ms=1509

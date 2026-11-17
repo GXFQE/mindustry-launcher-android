@@ -146,6 +146,11 @@ git tag -l 'v*' | wc -l    # 现在是 8 ⇒ 下一个 vc = 9
 8. **把两个资产都传上去**：`gh release upload <tag> mdt-launcher.apk update.json`
    —— 漏了 `update.json`，客户端会报 "no update.json in release v…"（那份 release 对更新器等于不存在）；
 9. 发完在 `next/40` 记一行内部批次（对外历史就是 GitHub Releases）。
+10. 🔴 **内置插件内容变了（`app/assets/plugins/*.apk`）⇒ 必须把新版插件同时传到 `plugins-latest`**
+    （`<id>.apk` + `<id>.json`，用 `python tools/make-plugin-update.py` 生成；`minHostApi` 从
+    `plugin.json` 的 `api` 自动抄）。漏了这一步：装了新启动器的用户，下一次自动检查会拿**在线旧版**
+    当"更新"（内容哈希不同就算更新）⇒ 插件被**回退**成旧版。旧宿主那一侧由 `minHostApi` 挡住
+    （清单里的 `api` 比它高 ⇒ 不下载、不装），所以先传插件是安全的。
 
 > ⚠️ **第一次带自更新的发布**：用户手里那个版本还没有更新器（v0.7.0 及更早），
 > 所以他们必须**手动装一次**；从那一版起才能自更新。发版说明里要写清楚。
