@@ -5917,26 +5917,29 @@ public final class SelfTest {
 
         // ── exit 四档真值表（纯判据）──
         //   前四格钉"失败记录优先"；中间两格钉"记录不是这一局的就不算"；
-        //   后四格是 launchid + 崩溃报告的组合；最后一格钉"拿不准就不给"。
+        //   然后 launchid + 崩溃报告的组合；★ 最后一格钉"补报时 launchid 已被自愈删掉 ⇒ 不给键"。
         boolean table45 = PluginEvents.EXIT_LAUNCH_FAILED.equals(
-                        PluginEvents.exitOutcome(2000L, 1000L, Boolean.TRUE, true))
+                        PluginEvents.exitOutcome(2000L, 1000L, Boolean.TRUE, true, true))
                 && PluginEvents.EXIT_LAUNCH_FAILED.equals(
-                        PluginEvents.exitOutcome(2000L, 1000L, null, false))
+                        PluginEvents.exitOutcome(2000L, 1000L, null, false, true))
                 && PluginEvents.EXIT_LAUNCH_FAILED.equals(
-                        PluginEvents.exitOutcome(2000L, 500L, Boolean.TRUE, false))
+                        PluginEvents.exitOutcome(2000L, 500L, Boolean.TRUE, false, true))
                 && PluginEvents.EXIT_UNCLEAN.equals(
-                        PluginEvents.exitOutcome(2000L, 0L, Boolean.TRUE, false))
+                        PluginEvents.exitOutcome(2000L, 0L, Boolean.TRUE, false, true))
                 && PluginEvents.EXIT_UNCLEAN.equals(
-                        PluginEvents.exitOutcome(2000L, 3000L, Boolean.TRUE, false))
+                        PluginEvents.exitOutcome(2000L, 3000L, Boolean.TRUE, false, true))
                 && PluginEvents.EXIT_CLEAN.equals(
-                        PluginEvents.exitOutcome(0L, 1000L, Boolean.FALSE, true))
+                        PluginEvents.exitOutcome(0L, 1000L, Boolean.FALSE, true, true))
                 && PluginEvents.EXIT_CRASH.equals(
-                        PluginEvents.exitOutcome(0L, 1000L, Boolean.TRUE, true))
+                        PluginEvents.exitOutcome(0L, 1000L, Boolean.TRUE, true, true))
                 && PluginEvents.EXIT_UNCLEAN.equals(
-                        PluginEvents.exitOutcome(0L, 1000L, Boolean.TRUE, false))
-                && PluginEvents.exitOutcome(0L, 1000L, null, false) == null;
+                        PluginEvents.exitOutcome(0L, 1000L, Boolean.TRUE, false, true))
+                && PluginEvents.exitOutcome(0L, 1000L, null, false, true) == null
+                // ★ 补报（trustClean=false）：launchid 不在也**不许**说 clean
+                && PluginEvents.exitOutcome(0L, 1000L, Boolean.FALSE, true, false) == null;
         ok(stat, L, table45,
-                "★ exit 四档：失败记录优先（且必须是这一局的）/ launchid+报告三态 / 拿不准就不给键");
+                "★ exit 四档：失败记录优先（且必须是这一局的）/ launchid+报告三态 / 拿不准就不给键"
+                        + "（含补报时 launchid 已自愈 ⇒ 不说 clean）");
 
         // ── 失败记录的读写：只认这个槽（遮罩：槽对不上 / 记录早于这一局都不算）──
         File lf = PluginEvents.launchFailedFile(ctx);

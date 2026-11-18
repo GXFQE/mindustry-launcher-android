@@ -272,7 +272,8 @@ final class PluginEvents {
             clearPending(ctx, x.slot);
             Map<String, String> data = data(GAME_EXIT, x.slot, x.version);
             attachExitStats(ctx, x.slot, data);
-            attachOutcome(ctx, x.slot, data, startedOf(x.started, data));
+            // 同一进程看完整局 ⇒ launchid 没被启动自愈动过 ⇒ "不在"可以当正常结束
+            attachOutcome(ctx, x.slot, data, startedOf(x.started, data), true);
             dispatch(ctx, GAME_EXIT, x.slot, data);
         }
         backfillExit(ctx);
@@ -382,7 +383,7 @@ final class PluginEvents {
             Map<String, String> data = data(GAME_EXIT, x.slot, x.version);
             if (backfill) data.put("backfill", "1");
             attachExitStats(ctx, x.slot, data);
-            attachOutcome(ctx, x.slot, data, startedOf(x.started, data));
+            attachOutcome(ctx, x.slot, data, startedOf(x.started, data), !backfill);
             dispatch(ctx, GAME_EXIT, x.slot, data);
         } catch (Throwable t) {
             Log.w("MDTPlugin", "exit dispatch failed: " + x.slot, t);
@@ -420,7 +421,8 @@ final class PluginEvents {
      *
      * <p>拿不准就**不放这个键**（文档惯例）：读不到槽根 ⇒ 不给。
      */
-    private static void attachOutcome(Context ctx, String slot, Map<String, String> d, long started) {
+    private static void attachOutcome(Context ctx, String slot, Map<String, String> d, long started,
+                                      boolean trustClean) {
         try {
             Boolean lid = null;
             File lf = Mods.launchIdFileOf(ctx, slot);
@@ -433,7 +435,7 @@ final class PluginEvents {
                 crashAfter = CrashAlert.pick(dir, "", started) != null;
             }
             long failedAt = readLaunchFailedAt(ctx, slot);
-            String v = exitOutcome(failedAt, started, lid, crashAfter);
+            String v = exitOutcome(failedAt, started, lid, crashAfter, trustClean);
             if (v != null) d.put("exit", v);
         } catch (Throwable t) {
             Log.w("MDTPlugin", "exit outcome failed: " + t);
@@ -447,12 +449,17 @@ final class PluginEvents {
      * @param started    这一局开始时刻（0 = 不知道 ⇒ 不判 launch-failed，避免拿旧记录冒充）
      * @param launchId   `launchid.dat` 在不在（null = 读不到 ⇒ 返回 null，**不放键**）
      * @param crashAfter 这一局之后有没有崩溃报告
+     * @param trustClean "launchid 不在"能不能当"正常结束"：
+     *                   ⚠️ **补报路径必须传 false** —— 启动器重启时 `Recovery` 的自愈会在
+     *                   事件补报**之前**删掉 launchid（没有崩溃报告就删），于是"被杀"和
+     *                   "正常结束"在补报时长得一模一样。那时只能不给键，不能说 clean。
      * @return 四档之一；null = 拿不准
      */
-    static String exitOutcome(long failedAt, long started, Boolean launchId, boolean crashAfter) {
+    static String exitOutcome(long failedAt, long started, Boolean launchId, boolean crashAfter,
+                              boolean trustClean) {
         if (failedAt > 0 && started > 0 && failedAt >= started) return EXIT_LAUNCH_FAILED;
         if (launchId == null) return null;
-        if (!launchId.booleanValue()) return EXIT_CLEAN;
+        if (!launchId.booleanValue()) return trustClean ? EXIT_CLEAN : null;
         return crashAfter ? EXIT_CRASH : EXIT_UNCLEAN;
     }
 
@@ -522,7 +529,7 @@ final class PluginEvents {
                     sSeenAlive.remove(slot);
                     st = s0 == null ? 0L : s0.longValue();
                 }
-                attachOutcome(ctx, slot, data, startedOf(st, data));
+                attachOutcome(ctx, slot, data, startedOf(st, data), false);
                 dispatch(ctx, GAME_EXIT, slot, data);
                 m.remove(slot);
                 changed = true;
