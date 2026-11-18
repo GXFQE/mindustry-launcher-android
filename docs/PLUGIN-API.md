@@ -5,7 +5,7 @@
 
 ## 1. 版本与兼容（v20 冻结基线）
 
-- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..44**。
+- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..45**。
   （v20 是冻结基线；v21 = 游戏设置面；v22 = 后台任务 + 游戏事件；v23 = 探针；v24 = 分析器；
   v25 = 结论挂行 + 筛选/排序注入 + HJSON；v26 = 逐项判定；v27 = 详情页的门 + 槽级结论进摘要卡；
   v28 = 原版文案键；v29 = 游戏前后台事件；v30 = 探针知道版本 / 跨会话数据目录 + 摘要卡总时长；
@@ -57,6 +57,13 @@
   同时 `plugin.json` 的 `"api": N` 开始被**真正读取**（加载时与入口 `api()` 取较高者）；
   插件更新清单的 `minHostApi` 变成**下载前**的硬门（宿主接口不够 ⇒ 不下载、不装，
   落 `host-old` 状态）—— 详见 §10.4。
+  **v45 = 启动否决 + 退出情况 + 晚到也报**：`cancelLaunch(reason)` —— **只在 `game-start` 回调期间有效**；
+  多个插件都调时**第一个**生效；宿主据此**不写启动占位、不拉起游戏**，且**零显示**
+  （只写一行日志 —— 要提示用户请插件自己 `toast` / `showCard`）。
+  `game-start` 的 `data` 补 `key` / `instanceKey` / `pkg` —— 启动占位挪到了派发**之后**，
+  插件在回调里调 `instances()` 已经看不见这次启动，所以身份直接给。
+  `game-exit` 补 `exit` 四档（`clean` / `crash` / `unclean` / `launch-failed`）；并且不再只等
+  "回到界面" —— 启动后每 5 秒轮询游戏进程，不在了就派发。`API_MIN` 仍不动。
 - 插件 `api()` 报的是「我需要的最低宿主接口版本」。用不到的新能力**不要**报高 ——
   报高了只会在老宿主上被拒，换不来任何东西。
 - **不要用 try/catch 去兼容老宿主**：报什么版本就只会跑在什么版本上。`api()` 报 20，
@@ -144,7 +151,7 @@
 ## 3. 入口类约定
 
 ```java
-public static int api();                        // 必需：你需要的接口版本（当前 44；用不到新能力就报 20）
+public static int api();                        // 必需：你需要的接口版本（当前 45；用不到新能力就报 20）
 public static View createView(PluginApi api);   // content / section 用
 public static void run(PluginApi api);          // action 用（在原页跑，不换页）
 public static void unload();                    // 可选：收尾（也认 unload(Context)）
@@ -164,7 +171,7 @@ public static void unload();                    // 可选：收尾（也认 unlo
 
 | 方法 | 说明 |
 |---|---|
-| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 44） |
+| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 45） |
 | `context()` | 插件上下文（**只用来取资源 / 主题 / 建 View**） |
 | `page()` / `slot()` | 从哪一页来 / 当前槽名 |
 | `theme()` | 主题色与 dp/sp（别自己写死颜色，见 `PluginTheme`） |
@@ -359,7 +366,7 @@ public static void unload();                    // 可选：收尾（也认 unlo
 |---|---|
 | `boot` | 本次进程起来后**第一次**回到界面（每个进程一次） |
 | `app-foreground` | 每次从后台回到前台（含 `boot` 那一次） |
-| `game-start` | 点"启动"、兼容性复检通过之后，`startActivity` 之前 |
+| `game-start` | 点"启动"、兼容性复检通过之后 —— **同步等所有插件回调返回**之后才 `startActivity`（v45：这一刻启动占位还没写，回调里改这个槽不会被门禁拒） |
 | `game-exit` | 回到启动器、且上一件事是启动游戏 |
 
 入口方法：
@@ -370,6 +377,11 @@ public static void onEvent(PluginApi api, String name, Map<String, String> data)
 
 - `data` 目前有 `name` / `slot` / `version`（拿不到就不放这个键）；
   `game-exit` 若是启动器被杀后**补报**的，多一个 `backfill=1`。
+- **`game-start` 的身份键**（v45）：`key`（版本 key，已装 = 包名 / 导入 = `import:<文件名>`）、
+  `instanceKey`（`key + slot` 的宿主内部身份，别自己拼）、`pkg`（包名；导入包拿不到就不给）。
+  ⚠️ `version` 是**显示名**不是 key —— 要按版本做事就用这三个键，别拿 `version` 去
+  `versions()` 里做字符串匹配。另外启动占位在派发**之后**才写，所以回调里调 `instances()`
+  **看不见**这次启动 —— 别指望用它反查。
 - **`game-exit` 的观测键**（2026-11-17 起；宿主时钟给的，**加键不抬版本**）：
   `started` / `ended` / `activeMs` / `wallMs`（毫秒字符串）+ `key`（版本 key，已装 = 包名 /
   导入 = `import:<文件名>`）。
@@ -383,6 +395,29 @@ public static void onEvent(PluginApi api, String name, Map<String, String> data)
   `、` 拼接）、`patchCount`。真源是 `report-patch-launch.json`（`:game` 注入完写的**实际**结果），
   **不是**"当前启用了哪些补丁" —— 运行期间改启用不影响这一局。
   统计必须把「本体 + 补丁」与纯本体**分开**（用户 2026-11-17：「应该算是半个改端」）。
+- **`game-exit` 的 `exit` 档**（v45）：这一局**怎么结束的**。拿不准就不放这个键（别当"正常"处理）：
+
+  | 值 | 判据 |
+  |---|---|
+  | `clean` | `launchid.dat` 不在（游戏自己跑完了 `finishLaunch`） |
+  | `crash` | `launchid.dat` 在 **+** 这一局之后有崩溃报告 |
+  | `unclean` | `launchid.dat` 在、但没有报告（被划掉 / 系统回收 / 崩了没留报告 —— **这是事实，不是归因**） |
+  | `launch-failed` | 宿主有"这局没起来"的记录（`:game` 启动失败时写的） |
+
+  ⚠️ `unclean` **不等于"崩溃"**：用户划掉、LMK、force-stop、崩了但没留报告，在现有判据下
+  是同一个样子 —— 别把它当崩溃统计。
+- **`game-exit` 不再只等"回到界面"**（v45）：宿主在启动一局后每 5 秒轮询一次游戏进程，
+  发现它不在了就**立刻派发**（分屏下游戏在另一半退出也能收到）；派发仍在主线程。
+  主进程被系统冻结时轮询会停，那时仍靠回前台补一次 + 落盘标记补报。
+- **否决启动（v45）**：在 `game-start` 回调里调 `api.cancelLaunch(reason)` ⇒ 宿主撤掉这一局的账、
+  **不写启动占位、不拉起游戏**。宿主**不弹任何东西**（只写一行日志）——
+  要让用户知道，请自己 `toast()` / `showCard()`（那是插件行为，不是宿主额外弹的）。
+  - 只在 `game-start` 期间有效；别的时机调用**被忽略**（写日志，不抛异常，不会让插件崩）；
+  - 多个插件都调 ⇒ **第一个**生效（后面的忽略，原因也只用第一个的）；
+  - `reason` 可以为 null / 空 —— 那就只说"谁拦的"；非空时原样给用户看，
+    **别写隐私、别写长段落**（一行到两行为宜）；
+  - ⚠️ 宿主**不设超时**：`onEvent` 不返回，启动就一直不开始 —— 别在里面等网络、等用户。
+    要用户确认请用"先记状态、下一次事件再问"（`dataDir()` 存 `data` 里那三个身份键）。
 - 回调在 **UI 线程**（可以用 `confirm` / `toast`）；异常只进 `MDTPlugin` 日志，不影响别的插件。
 - 每次派发会 `load` 一份插件、跑完 `unload`：适合"启动前 / 退出后做一件事"，
   **不适合当常驻监听** —— 常驻请用 `submit()`。
@@ -1186,6 +1221,15 @@ v44（2026-11-17 第 385 轮）：**`game-exit` 观测键 + 宿主版本需求**
 `plugin.json` 的 `"api": N` 开始被**真正读取**（`PluginHost` 加载时与入口 `api()` 取较高者）；
 插件更新清单的 `minHostApi` 成为**下载前**的硬门（清单层 + APK 自述层 + 落盘前共三道），
 状态落 `host-old`、不进"失败"计数。`API_MIN` 仍不动（区间 20..44）。
+v45（2026-11-18 第 394 轮）：**启动否决 + 退出情况 + 晚到也报**（用户：「不能在启动游戏之前执行一段代码」
+「肯定要等插件干完才启动，而且插件干完后还要通知宿主是否阻止启动」「宿主不要额外弹窗」「晚到也要通知插件」）——
+`cancelLaunch(reason)`：只在 `game-start` 回调期间有效，多个插件第一个生效，宿主撤账、不写占位、
+不拉起游戏、**零显示**（只写日志），要提示用户是插件自己的事；`game-start` 的 `data` 补
+`key` / `instanceKey` / `pkg`（启动占位挪到派发之后，`instances()` 已看不见这次启动）；
+`game-exit` 补 `exit` 四档（`:game` 启动失败时写 `report-launch-failed.txt`，主进程据此判
+`launch-failed`）；启动后每 5 秒轮询游戏进程，**不等用户回界面**就派发退出（主进程被冻结时
+仍靠回前台 + 落盘标记补报）；`startActivity` 失败时撤掉这一局的账（否则会补报一条假的
+`game-exit`，形态与"启动即崩"一样）。`API_MIN` 仍不动（区间 20..45）。
 
 **官方体检插件**：`plugins/mods-health`（第 229 轮，前身叫 `conflict`）。宿主原来的那行
 「查模组冲突」整块删掉，判据搬进插件的 `core/Conflicts.java` 与 `core/Gates.java`；

@@ -49,6 +49,10 @@ import io.mdt.launcher.api.PluginApi;
  *   <li>每次派发都会 {@code load} 一份插件（DexClassLoader）+ 跑完 {@code unload}；
  *       适合"启动前/退出后做一件事"，**不适合**当常驻监听 —— 常驻请用 v22 的
  *       {@code submit()} 任务。</li>
+ *   <li>★ v45：`game-start` 是**同步**派发 —— 宿主等 {@code onEvent} 返回之后才写启动占位
+ *       （{@code Instances.reserve}）、才 {@code startActivity}。所以回调里不但能做事，
+ *       还能用 {@link PluginApi#cancelLaunch(String)} 否决这次启动（多个插件都调时**第一个**生效）。
+ *       ⚠️ 回调**不许**等用户 / 等网络：宿主不设超时，UI 线程会一直卡着。</li>
  * </ul>
  */
 final class PluginEvents {
@@ -77,6 +81,39 @@ final class PluginEvents {
      */
     private static final Map<String, String> sSessions = new LinkedHashMap<String, String>();
     /**
+     * v45：槽 → 这一局的**开始时刻**（毫秒）。`game-exit` 的 `exit` 判定要它
+     * （"这一局之后才有崩溃报告"、"失败记录是不是这一局的"都拿它比）。
+     */
+    private static final Map<String, Long> sStarted = new LinkedHashMap<String, Long>();
+    /**
+     * v45：这一局**曾经看到过真实的 `:game` 进程**。
+     *
+     * <p>为什么必须有：轮询判"退出"不能只看"登记表里没有实例" —— 刚点启动、`:game` 还没
+     * publish 时登记表里也没有它。见过一次才说明"它真的起来过"，之后不见了才是退出；
+     * 从没见过且超过 {@link #LAUNCH_GRACE_MS} ⇒ 判"没起来"。
+     */
+    private static final java.util.Set<String> sSeenAlive = new java.util.HashSet<String>();
+
+    /** v45：退出轮询线程（没有待报的局就自己退出；下一局 `gameStart` 再起）。 */
+    private static Thread sPollThread;
+
+    /** v45：退出轮询间隔（用户 2026-11-18：「晚到也要通知插件」—— 晚几秒可以，不能不报）。 */
+    static final long EXIT_POLL_MS = 5_000L;
+    /**
+     * v45：启动宽限 —— 从没见过游戏进程时，多久之后判"这局没起来"。
+     *
+     * <p>2 分钟：大包解压 / native 发布可能花几十秒（`Patches` 那边也是按 30 秒算容差的），
+     * 给足余量，宁可晚一点也不误报"没起来"。
+     */
+    static final long LAUNCH_GRACE_MS = 120_000L;
+
+    /** v45：`exit` 四档（`docs/PLUGIN-API.md` 与自检共用）。 */
+    static final String EXIT_CLEAN = "clean";
+    static final String EXIT_CRASH = "crash";
+    static final String EXIT_UNCLEAN = "unclean";
+    static final String EXIT_LAUNCH_FAILED = "launch-failed";
+
+    /**
      * 2026-11-17：settle 先跑时把这一局的观测放这里（**只在内存**，不落文件）。
      * `game-exit` 派发时消费；进程被杀则这条事件本来也会丢（和现状一致）。
      */
@@ -86,16 +123,123 @@ final class PluginEvents {
     private static boolean sForeground;
     private static boolean sBooted;
 
+    /**
+     * ★ v45：正在派发 `game-start`。
+     *
+     * <p>{@link #cancelLaunch} 只在这个窗口内生效 —— 别的时候调用会写一条日志后忽略，
+     * 这样插件在 `boot` / `app-foreground` 里误调也伤不到任何东西。
+     */
+    private static boolean sInGameStart;
+    /** 这次启动被谁 / 为什么拦下（null = 放行）。取过就清，不跨局残留。 */
+    private static Blocked sBlock;
+    /** 当前正在派发的那台插件 id（{@link Blocked#by}）。 */
+    private static String sDelivering;
+
     private PluginEvents() { }
 
     /** 游戏**即将**启动（点"启动"、兼容性复检通过之后，`startActivity` 之前）。 */
-    static void gameStart(Context ctx, String slot, String version) {
-        if (slot == null || slot.trim().isEmpty()) return;
-        sSessions.put(slot, version == null ? "" : version);
-        // 同槽开新局 ⇒ 上一局的观测已经派发或作废，别留给这一局（键按槽）
-        sExitStats.remove(slot);
+    static Blocked gameStart(Context ctx, String vkey, String pkg, String slot, String version) {
+        if (slot == null || slot.trim().isEmpty()) return null;
+        synchronized (PluginEvents.class) {
+            sSessions.put(slot, version == null ? "" : version);
+            sStarted.put(slot, Long.valueOf(System.currentTimeMillis()));
+            sSeenAlive.remove(slot);
+            // 同槽开新局 ⇒ 上一局的观测已经派发或作废，别留给这一局（键按槽）
+            sExitStats.remove(slot);
+        }
         notePending(ctx, slot, version);
-        dispatch(ctx, GAME_START, slot, data(GAME_START, slot, version));
+        // v45：这一局开始轮询"游戏进程还在不在" —— 不等用户回界面才报退出
+        ensurePolling(ctx);
+        // ★ v45：派发窗口。只有这段时间里 `cancelLaunch` 才生效 —— 也正因为如此，
+        //   MainActivity 必须**同步**等这里返回，再写启动占位、再 startActivity。
+        sBlock = null;
+        sInGameStart = true;
+        try {
+            dispatch(ctx, GAME_START, slot, startData(vkey, pkg, slot, version));
+        } finally {
+            sInGameStart = false;
+            sDelivering = null;
+        }
+        Blocked b = sBlock;
+        sBlock = null;
+        // 被拦下 ⇒ 这一局根本不开始：把刚记的账撤掉（否则回前台会补报一条假的 game-exit）
+        if (b != null) abortLaunch(ctx, slot);
+        return b;
+    }
+
+    /**
+     * v45：`game-start` 的 data（**包级可见，自检直接钉键集**）。
+     *
+     * <p>为什么身份要直接给：启动占位挪到了派发**之后** ⇒ 插件在这一刻调 {@code instances()}
+     * 看不见这次启动，`versions()` 也只能靠显示名反查。`key` / `instanceKey` 与
+     * {@code game-exit} 的 `key` 同源（{@link Versions#instanceKey}），插件不必自己拼。
+     */
+    static Map<String, String> startData(String vkey, String pkg, String slot, String version) {
+        Map<String, String> m = data(GAME_START, slot, version);
+        if (vkey != null && !vkey.isEmpty()) {
+            m.put("key", vkey);
+            m.put("instanceKey", Versions.instanceKey(vkey, slot));
+        }
+        if (pkg != null && !pkg.isEmpty()) m.put("pkg", pkg);
+        return m;
+    }
+
+    /**
+     * v45：插件否决这次启动（{@link PluginApi#cancelLaunch}）。
+     *
+     * @return true = 这次启动已被拦（无论是不是本次调用拦的）；false = 不在窗口内，忽略
+     */
+    static boolean cancelLaunch(Context ctx, String reason) {
+        if (!acceptCancel(sInGameStart, sBlock != null)) {
+            if (sInGameStart) return true;   // 窗口内、已有人拦过 ⇒ 收下，但先来的原因优先
+            Log.w("MDTPlugin", "cancelLaunch ignored: not inside game-start");
+            return false;
+        }
+        sBlock = new Blocked(sDelivering, sane(reason, 200));
+        return true;
+    }
+
+    /**
+     * v45：这一次 `cancelLaunch` 该不该记下来（纯判据，自检直接喂真值表）。
+     *
+     * <p>两个条件缺一不可：在 `game-start` 窗口内、且还没有人拦过（第一个生效）。
+     * 拆出来是因为"窗口内 / 窗口外 × 已拦 / 未拦"四格必须由尺子钉住 ——
+     * 原来窗口判定藏在静态字段里，自检碰不到。
+     */
+    static boolean acceptCancel(boolean inGameStart, boolean alreadyBlocked) {
+        return inGameStart && !alreadyBlocked;
+    }
+
+    /**
+     * v45：这一局**没开始**（插件拦下 / `startActivity` 抛异常）⇒ 撤掉启动记账。
+     *
+     * <p>不清的话：{@link #sSessions} 里的条目 + {@code event-pending.txt} 会在下一次
+     * 回到前台时被当成"这局玩完了"，派发一条游戏根本没起来的 `game-exit`
+     * （而且没有检查点 ⇒ 时长键整组缺失，形态与"启动即崩"一样）。
+     */
+    static void abortLaunch(Context ctx, String slot) {
+        if (slot == null || slot.isEmpty()) return;
+        synchronized (PluginEvents.class) {
+            sSessions.remove(slot);
+            sStarted.remove(slot);
+            sSeenAlive.remove(slot);
+            sExitStats.remove(slot);
+        }
+        clearPending(ctx, slot);
+    }
+
+    /** 一次"被拦下的启动"：谁拦的（插件 id，可能为空）+ 给用户看的原因（可能为空）。 */
+    static final class Blocked {
+        final String by;
+        final String reason;
+
+        Blocked(String by, String reason) {
+            this.by = by == null ? "" : by;
+            this.reason = reason == null ? "" : reason;
+        }
+
+        /** 有没有插件 id（不知道是谁拦的 ⇒ 日志里写 ?）。 */
+        boolean named() { return !by.isEmpty(); }
     }
 
     /**
@@ -110,16 +254,26 @@ final class PluginEvents {
         if (ctx == null || sForeground) return;
         sForeground = true;
         String slot = Data.currentSlot(ctx);
-        java.util.Iterator<Map.Entry<String, String>> it = sSessions.entrySet().iterator();
-        while (it.hasNext()) {
-            Map.Entry<String, String> e = it.next();
-            String s = e.getKey();
-            if (WriteGate.blockedSlot(ctx, s)) continue;     // 这局还在跑 ⇒ 等它真退
-            it.remove();
-            clearPending(ctx, s);
-            Map<String, String> data = data(GAME_EXIT, s, e.getValue());
-            attachExitStats(ctx, s, data);
-            dispatch(ctx, GAME_EXIT, s, data);
+        // 先在锁里把"该报的局"摘出来（轮询线程也在改这几张表）
+        List<Exited> done = new ArrayList<Exited>();
+        synchronized (PluginEvents.class) {
+            java.util.Iterator<Map.Entry<String, String>> it = sSessions.entrySet().iterator();
+            while (it.hasNext()) {
+                Map.Entry<String, String> e = it.next();
+                String s = e.getKey();
+                if (WriteGate.blockedSlot(ctx, s)) continue;     // 这局还在跑 ⇒ 等它真退
+                it.remove();
+                Long st = sStarted.remove(s);
+                sSeenAlive.remove(s);
+                done.add(new Exited(s, e.getValue(), st == null ? 0L : st.longValue()));
+            }
+        }
+        for (Exited x : done) {
+            clearPending(ctx, x.slot);
+            Map<String, String> data = data(GAME_EXIT, x.slot, x.version);
+            attachExitStats(ctx, x.slot, data);
+            attachOutcome(ctx, x.slot, data, startedOf(x.started, data));
+            dispatch(ctx, GAME_EXIT, x.slot, data);
         }
         backfillExit(ctx);
         if (!sBooted) {
@@ -132,6 +286,209 @@ final class PluginEvents {
     /** 整个应用退到后台（{@link BaseActivity#onStop}）。 */
     static void onBackground() {
         sForeground = false;
+    }
+
+    // ── v45：退出轮询（不等用户回界面） ───────────────────────────────────
+
+    /**
+     * v45：起一个 daemon 线程，每 {@link #EXIT_POLL_MS} 看一次"游戏进程还在不在"。
+     *
+     * <p>为什么需要它：`game-exit` 原来只挂在"任一界面进前台"上。分屏下游戏在另一半退出、
+     * 用户一直停在启动器上 ⇒ 那一刻**没有 onStart 可挂**，事件就一直不报（用户 2026-11-18：
+     * 「晚到也要通知插件」）。轮询把触发点从"用户动作"改成"进程消失"。
+     *
+     * <p>边界：
+     * <ul>
+     *   <li>没有待报的局（{@link #sSessions} 空）⇒ 线程自己退出；下一局 `gameStart` 再起。</li>
+     *   <li>启动器进程被系统冻结 / 杀掉 ⇒ 轮询也停，那时仍靠回前台补一次 + pending 补报。</li>
+     *   <li>判定与派发分离：线程只判 + 摘表，**派发切回主线程**（事件契约：回调在 UI 线程）。</li>
+     * </ul>
+     */
+    private static synchronized void ensurePolling(final Context ctx) {
+        if (sPollThread != null) return;
+        final Context app = ctx.getApplicationContext() == null
+                ? ctx : ctx.getApplicationContext();
+        Thread t = new Thread(new Runnable() {
+            @Override public void run() {
+                try {
+                    while (true) {
+                        try { Thread.sleep(EXIT_POLL_MS); } catch (InterruptedException e) { break; }
+                        boolean has;
+                        synchronized (PluginEvents.class) { has = !sSessions.isEmpty(); }
+                        if (!has) break;
+                        try {
+                            checkExited(app);
+                        } catch (Throwable t) {
+                            Log.w("MDTPlugin", "exit poll failed: " + t);
+                        }
+                    }
+                } finally {
+                    synchronized (PluginEvents.class) {
+                        if (sPollThread == Thread.currentThread()) sPollThread = null;
+                    }
+                }
+            }
+        }, "plugin-exit-poll");
+        t.setDaemon(true);
+        sPollThread = t;
+        t.start();
+    }
+
+    /**
+     * 一次轮询：把"已经结束的局"摘出来，post 到主线程派发。
+     *
+     * <p>判据（顺序即优先级）：
+     * <ol>
+     *   <li>该槽有**真实** `:game` 进程（pid 不是本进程）⇒ 还活着，记 {@link #sSeenAlive}；</li>
+     *   <li>见过它活着、现在不见了 ⇒ 真退出；</li>
+     *   <li>从没见过、且超过 {@link #LAUNCH_GRACE_MS} ⇒ 判"这局没起来"（`launch-failed`）。</li>
+     * </ol>
+     */
+    private static void checkExited(Context ctx) {
+        final List<Exited> done = new ArrayList<Exited>();
+        long now = System.currentTimeMillis();
+        synchronized (PluginEvents.class) {
+            java.util.Iterator<Map.Entry<String, String>> it = sSessions.entrySet().iterator();
+            while (it.hasNext()) {
+                Map.Entry<String, String> e = it.next();
+                String slot = e.getKey();
+                if (gameProcessAlive(ctx, slot)) {
+                    sSeenAlive.add(slot);
+                    continue;
+                }
+                Long st = sStarted.get(slot);
+                boolean seen = sSeenAlive.contains(slot);
+                boolean graceOver = st != null && now - st.longValue() >= LAUNCH_GRACE_MS;
+                if (!seen && !graceOver) continue;      // 可能还在启动
+                it.remove();
+                sStarted.remove(slot);
+                sSeenAlive.remove(slot);
+                done.add(new Exited(slot, e.getValue(), st == null ? 0L : st.longValue()));
+            }
+        }
+        if (done.isEmpty()) return;
+        final Context appCtx = ctx;
+        new android.os.Handler(android.os.Looper.getMainLooper()).post(new Runnable() {
+            @Override public void run() {
+                for (Exited x : done) deliverExited(appCtx, x, false);
+            }
+        });
+    }
+
+    /** 主线程：把一局结束派发出去（轮询与前台补报共用同一套字段）。 */
+    private static void deliverExited(Context ctx, Exited x, boolean backfill) {
+        try {
+            clearPending(ctx, x.slot);
+            Map<String, String> data = data(GAME_EXIT, x.slot, x.version);
+            if (backfill) data.put("backfill", "1");
+            attachExitStats(ctx, x.slot, data);
+            attachOutcome(ctx, x.slot, data, startedOf(x.started, data));
+            dispatch(ctx, GAME_EXIT, x.slot, data);
+        } catch (Throwable t) {
+            Log.w("MDTPlugin", "exit dispatch failed: " + x.slot, t);
+        }
+    }
+
+    /**
+     * 这个槽有**真实**游戏进程吗（启动占位不算）。
+     *
+     * <p>为什么不直接用 {@link WriteGate#blockedSlot}：它把主进程的启动占位也算"被占"，
+     * 而这里问的是"游戏进程还在不在" —— 占位的 pid 是主进程自己，明显不是游戏。
+     */
+    private static boolean gameProcessAlive(Context ctx, String slot) {
+        try {
+            for (Instances.Running r : Instances.live(ctx)) {
+                if (r == null || !slot.equals(r.slot)) continue;
+                if (r.pid != android.os.Process.myPid()) return true;
+            }
+        } catch (Throwable ignored) {
+        }
+        return false;
+    }
+
+    /** 这一局的开始时刻：优先用检查点（更准），没有再退回内存记录。 */
+    private static long startedOf(long recorded, Map<String, String> d) {
+        String v = d == null ? null : d.get("started");
+        if (v != null) {
+            try { return Long.parseLong(v); } catch (Throwable ignored) { }
+        }
+        return recorded;
+    }
+
+    /**
+     * v45：把 `exit` 这一档塞进 data。
+     *
+     * <p>拿不准就**不放这个键**（文档惯例）：读不到槽根 ⇒ 不给。
+     */
+    private static void attachOutcome(Context ctx, String slot, Map<String, String> d, long started) {
+        try {
+            Boolean lid = null;
+            File lf = Mods.launchIdFileOf(ctx, slot);
+            if (lf != null) lid = Boolean.valueOf(lf.isFile());
+            boolean crashAfter = false;
+            // started 不知道（0）⇒ **不判崩溃**：`pick` 的 sinceMs=0 等于"任何报告都算"，
+            // 那会把一份老报告栽到这一局头上。宁可给更保守的 `unclean`。
+            if (Boolean.TRUE.equals(lid) && started > 0) {
+                File dir = CrashAlert.crashesDir(ctx, slot);
+                crashAfter = CrashAlert.pick(dir, "", started) != null;
+            }
+            long failedAt = readLaunchFailedAt(ctx, slot);
+            String v = exitOutcome(failedAt, started, lid, crashAfter);
+            if (v != null) d.put("exit", v);
+        } catch (Throwable t) {
+            Log.w("MDTPlugin", "exit outcome failed: " + t);
+        }
+    }
+
+    /**
+     * v45：`exit` 四档的**纯判据**（自检直接喂真值表）。
+     *
+     * @param failedAt   `:game` 记的"这局没起来"时刻（0 = 没有记录）
+     * @param started    这一局开始时刻（0 = 不知道 ⇒ 不判 launch-failed，避免拿旧记录冒充）
+     * @param launchId   `launchid.dat` 在不在（null = 读不到 ⇒ 返回 null，**不放键**）
+     * @param crashAfter 这一局之后有没有崩溃报告
+     * @return 四档之一；null = 拿不准
+     */
+    static String exitOutcome(long failedAt, long started, Boolean launchId, boolean crashAfter) {
+        if (failedAt > 0 && started > 0 && failedAt >= started) return EXIT_LAUNCH_FAILED;
+        if (launchId == null) return null;
+        if (!launchId.booleanValue()) return EXIT_CLEAN;
+        return crashAfter ? EXIT_CRASH : EXIT_UNCLEAN;
+    }
+
+    /** `:game` 写的"这局没起来"记录（v45）。只认**这个槽**的那条（包级可见：自检要读）。 */
+    static long readLaunchFailedAt(Context ctx, String slot) {
+        File f = launchFailedFile(ctx);
+        if (f == null || !f.isFile()) return 0L;
+        try {
+            String text = readText(f);
+            String s0 = valueOf(text, "slot");
+            String a0 = valueOf(text, "at");
+            if (s0 == null || !s0.trim().equals(slot)) return 0L;
+            if (a0 == null) return 0L;
+            return Long.parseLong(a0.trim());
+        } catch (Throwable t) {
+            return 0L;
+        }
+    }
+
+    /** `<hub>/report-launch-failed.txt`（自检也要用，包级可见）。 */
+    static File launchFailedFile(Context ctx) {
+        File hub = Data.hubDir(ctx);
+        return hub == null ? null : new File(hub, "report-launch-failed.txt");
+    }
+
+    /** 一局结束的搬运包（槽 / 版本 / 开始时刻）—— 后台判定与前台补报共用。 */
+    private static final class Exited {
+        final String slot;
+        final String version;
+        final long started;
+
+        Exited(String slot, String version, long started) {
+            this.slot = slot;
+            this.version = version == null ? "" : version;
+            this.started = started;
+        }
     }
 
     /**
@@ -159,6 +516,13 @@ final class PluginEvents {
                 Map<String, String> data = data(GAME_EXIT, slot, version);
                 data.put("backfill", "1");
                 attachExitStats(ctx, slot, data);
+                long st;
+                synchronized (PluginEvents.class) {
+                    Long s0 = sStarted.remove(slot);
+                    sSeenAlive.remove(slot);
+                    st = s0 == null ? 0L : s0.longValue();
+                }
+                attachOutcome(ctx, slot, data, startedOf(st, data));
                 dispatch(ctx, GAME_EXIT, slot, data);
                 m.remove(slot);
                 changed = true;
@@ -409,7 +773,13 @@ final class PluginEvents {
                 if (apk == null || !apk.isFile()) continue;
                 for (Extensions.Item it : Extensions.of(apk)) {
                     if (!event.equals(it.event)) continue;
-                    deliver(ctx, apk, it.entry, event, slot, data, id);
+                    // v45：让 `cancelLaunch` 知道是谁在拦（只对 game-start 有意义，别的照设无害）
+                    sDelivering = id;
+                    try {
+                        deliver(ctx, apk, it.entry, event, slot, data, id);
+                    } finally {
+                        sDelivering = null;
+                    }
                 }
             }
         } catch (Throwable t) {

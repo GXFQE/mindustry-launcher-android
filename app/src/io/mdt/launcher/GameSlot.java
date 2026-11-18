@@ -349,6 +349,10 @@ public class GameSlot extends BaseActivity {
         // 这一局没起来 ⇒ 立刻销号（别让写门禁一直拦）；同时清掉主进程在 startActivity 前
         // 留下的启动占位（第 366 轮：否则那个槽要被占位挡到过期）
         Instances.withdraw(this, mVkey, mLaunchSlot);
+        // ★ v45：落一条"这局没起来"的持久记录 —— 主进程判 `game-exit` 的 `launch-failed` 档用。
+        //   为什么不能只看"实例没登记过"：:game 可能 publish 成功之后才失败，那时主进程
+        //   已经见过它活着，仅凭观测分不出"起来过又挂了"和"根本没起来"。
+        recordLaunchFailed(step);
         // 2026-11-17：时钟停表 —— 失败弹窗可能被用户晾着，不停的话 lastSeen 会一直涨，
         // 下一轮结算会把"看弹窗的时间"算成玩了多久。
         if (mClock != null) {
@@ -372,6 +376,30 @@ public class GameSlot extends BaseActivity {
                 })
                 .setCancelable(false)
                 .show();
+    }
+
+    /**
+     * v45：写「这一局没起来」的记录（`<hub>/report-launch-failed.txt`）。
+     *
+     * <p>格式刻意是纯文本三行（slot / at / step）：主进程只读 `slot` + `at` 判
+     * `launch-failed`，`step` 只用于人看日志。**按槽匹配 + 时刻不早于这一局**才算命中 ——
+     * 别让上一局留下的记录冒充这一局（同一份判据在主进程 `PluginEvents` 里）。
+     *
+     * <p>⚠️ 单文件只留最后一条：多开下两个槽同时失败，后写的会盖掉前一个 —— 那个槽会
+     * 降级成 `unclean`（"拿不准就不说"）。这是刻意的取舍，不为此引入并发写协议。
+     */
+    private void recordLaunchFailed(String step) {
+        try {
+            File hub = Data.hubDir(this);
+            if (hub == null) return;
+            StringBuilder sb = new StringBuilder();
+            sb.append("slot=").append(mLaunchSlot == null ? "" : mLaunchSlot).append('\n');
+            sb.append("at=").append(System.currentTimeMillis()).append('\n');
+            sb.append("step=").append(step == null ? "" : step).append('\n');
+            Util.atomicWriteText(new File(hub, "report-launch-failed.txt"), sb.toString());
+        } catch (Throwable t) {
+            android.util.Log.w("MDTLauncher", "record launch failed: " + t);
+        }
     }
 
     private LinearLayout buildStatusUi() {

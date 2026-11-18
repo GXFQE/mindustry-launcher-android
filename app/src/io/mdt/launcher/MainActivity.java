@@ -1741,11 +1741,6 @@ public class MainActivity extends BaseActivity {
                 // F5：落账（**必须落盘**，且必须在 startActivity 之前）——
                 // 游戏会带走 :game 进程、主进程也可能被回收，回来时要能知道这局几点开的。
                 AutoBackup.noteStart(e.key(), slot);
-                // ★ 第 366 轮：**启动占位** —— 主进程先占住这个槽，补上
-                //   「startActivity → :game publish」之间门禁看不见的窗口（:game 要等 prepareSlot
-                //   之后才能 publish，而那时它已经在读这个槽的资产了）。
-                //   publish 成功 / 启动失败都会立刻清掉；30 s 过期兜底（见 Instances）。
-                Instances.reserve(MainActivity.this, e.key(), slot);
 
                 if (killed) {
                     // 给 AMS 一点时间回收，避免新实例与旧进程竞态
@@ -1753,18 +1748,46 @@ public class MainActivity extends BaseActivity {
                 }
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
-                        // 收起进度卡片再拉起游戏（不在这里清 sLaunching：这一局还在跑，
+                        // ★ v22 / v45：游戏**即将**启动（兼容性复检已过、备份已收尾）⇒ 派发 game-start。
+                        //   同步等插件跑完：**它返回之后**才写启动占位、才 startActivity。
+                        //   ★ 第 394 轮：占位从"派发之前"挪到"派发之后" —— 原来插件被自己的宿主
+                        //     锁在门外（writeGameSettings / modsInstall 一律 game-running），
+                        //     而 game-start 的用途正是"启动前做准备"。占位仍覆盖
+                        //     「startActivity → :game publish」那段，只是不再挡钩子自己。
+                        //   ⚠️ 这里**不先 dismiss**：被拦时要把进度页就地换成结果页（同一张卡换页，
+                        //     不闪）；放行才收起进度卡（见下）。
+                        final String label = e.displayName(MainActivity.this);
+                        // ⚠️ 导入版的 `e.pkg` 是内部占位字面量 "imported"（`Versions` 里定的），
+                        //   不是包名 ⇒ 别当 pkg 透给插件（文档写的是"导入包拿不到就不给"）。
+                        PluginEvents.Blocked blocked = PluginEvents.gameStart(
+                                MainActivity.this, e.key(), e.imported ? null : e.pkg, slot, label);
+                        if (blocked != null) {
+                            // 插件否决 ⇒ 这一局根本不开始：不写占位、不报退出。
+                            // ★ 宿主**零显示**（用户 2026-11-18「宿主不要额外弹窗」）——
+                            //   只把进度卡收掉 + 写一行日志；要提示用户是插件自己的事。
+                            //   sLaunching 要清，否则主界面点不动（这一局不会再回来清它）。
+                            sLaunching = false;
+                            stack.dismiss();
+                            android.util.Log.w("MDTLauncher", "launch blocked by plugin: "
+                                    + (blocked.named() ? blocked.by : "?") + " / "
+                                    + blocked.reason);
+                            return;
+                        }
+                        // 放行：收起进度卡片再拉起游戏（不在这里清 sLaunching：这一局还在跑，
                         // 回到主界面时由 onResume 统一清 —— 见 sLaunching 的注释）
                         stack.dismiss();
-                        // ★ v22：游戏**即将**启动（兼容性复检已过、备份已收尾）⇒ 派发 game-start。
-                        //   放在 startActivity 之前：插件可能要先做准备（切配置 / 记一笔）。
-                        final String label = e.displayName(MainActivity.this);
-                        PluginEvents.gameStart(MainActivity.this, slot, label);
+                        // ★ 第 366 轮：**启动占位** —— 补上「startActivity → :game publish」之间
+                        //   门禁看不见的窗口（:game 要等 prepareSlot 之后才能 publish，
+                        //   而那时它已经在读这个槽的资产了）。
+                        //   publish 成功 / 启动失败都会立刻清掉；30 s 过期兜底（见 Instances）。
+                        Instances.reserve(MainActivity.this, e.key(), slot);
                         try {
                             startActivity(i);
                         } catch (Throwable t) {
                             // Activity 都没起来 ⇒ 占位立刻撤掉（否则这个槽要被误挡到过期）
                             Instances.unreserve(MainActivity.this, e.key(), slot);
+                            // v45：这一局没开始 ⇒ 撤掉启动记账，否则回前台会补报假的 game-exit
+                            PluginEvents.abortLaunch(MainActivity.this, slot);
                             android.util.Log.w("MDTLauncher", "start GameSlot failed", t);
                         }
                     }

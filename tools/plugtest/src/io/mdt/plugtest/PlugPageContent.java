@@ -259,6 +259,19 @@ public final class PlugPage {
     public static void onEvent(io.mdt.launcher.api.PluginApi api, String name,
                                java.util.Map<String, String> data) {
         api.log("EVENT " + name + " " + data);
+        // ★ v45 端到端夹具：game-start 时若 dataDir 里有 `block-launch` 文件 ⇒ 否决这次启动。
+        //   用文件当开关是为了能在 adb 上直接造/删（不需要再发一版插件）。
+        if ("game-start".equals(name)) {
+            try {
+                java.io.File flag = new java.io.File(api.dataDir(), "block-launch");
+                if (flag.isFile()) {
+                    api.cancelLaunch("plugtest 拦下了这次启动（夹具）");
+                    api.log("EVENT cancelLaunch called");
+                }
+            } catch (Throwable t) {
+                api.log("EVENT cancelLaunch failed " + t);
+            }
+        }
     }
 
     /** 一行"像宿主动作行"的按钮（纯文字 + 强调色，够真机点就行）。 */

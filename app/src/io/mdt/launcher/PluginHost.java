@@ -135,8 +135,13 @@ public final class PluginHost {
      * <p>v42（2026-11-13 第 376 轮）：槽列表带统计（默认槽 / 文件数 / 字节数 / 四类内容数）、
      * `storage()`（各段占用 + 唯一总计；重、要走后台）、`patchProblems()`（启动没应用 / 崩溃自动停用的
      * 事实）、`pluginVersions(id)`（插件逐版本，管理 / 回滚用）。
+     *
+     * <p>v45（2026-11-18 第 394 轮）：`cancelLaunch(reason)` —— **插件能否决一次启动**；
+     * `game-start` 的 data 补 `key` / `instanceKey` / `pkg`（占位挪到派发之后，`instances()`
+     * 在回调里已看不见这次启动，所以身份直接给）；`game-exit` 补 `exit` 四档
+     * （`clean` / `crash` / `unclean` / `launch-failed`）。
      */
-    public static final int API = 44;
+    public static final int API = 45;
     /**
      * 还认的**最老**契约版本。
      *
@@ -1449,6 +1454,22 @@ public final class PluginHost {
                     }
                 }
             });
+        }
+
+        // ---- v45 ---------------------------------------------------------
+
+        /**
+         * v45：`game-start` 期间否决这次启动。
+         *
+         * <p>不在派发期间调用 ⇒ 忽略（{@link PluginEvents#cancelLaunch} 返回 false 并写日志），
+         * 不抛异常、不弹窗 —— 插件在别的时机误调不该让它自己崩掉。
+         */
+        @Override public void cancelLaunch(String reason) {
+            try {
+                PluginEvents.cancelLaunch(getBaseContext(), reason);
+            } catch (Throwable t) {
+                android.util.Log.w("MDTPlugin", "cancelLaunch failed", t);
+            }
         }
 
         // ---- v15 ---------------------------------------------------------

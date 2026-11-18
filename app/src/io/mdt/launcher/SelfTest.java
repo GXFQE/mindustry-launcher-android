@@ -5327,6 +5327,8 @@ public final class SelfTest {
         pluginV39(ctx, L, stat);
         // ★ v43：插件下载 / 模组写 / 网络扩充（第 378 轮）
         pluginV43(ctx, L, stat);
+        // ★ v45：启动否决 + 身份（第 394 轮）
+        pluginV45(ctx, L, stat);
     }
 
     /**
@@ -5350,8 +5352,8 @@ public final class SelfTest {
     private static void pluginV43(android.content.Context ctx, List<String> L, int[] stat) {
         L.add("");
         L.add("【v43 · 插件下载 / 模组写 / 网络扩充（第 378 轮）】");
-        ok(stat, L, PluginHost.API == 44 && PluginApi.DOC_VERSION == 44,
-                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 44（v44 起）");
+        ok(stat, L, PluginHost.API == 45 && PluginApi.DOC_VERSION == 45,
+                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 45（v45 起）");
 
         boolean shape = true;
         try {
@@ -5832,6 +5834,144 @@ public final class SelfTest {
         } catch (Throwable t) {
             ok(stat, L, false, "④ 中转站用例异常：" + t);
         }
+    }
+
+    /**
+     * 第 394 轮（v45）：**启动否决 + 身份**。
+     *
+     * <p>钉住四件事：
+     * <ol>
+     *   <li>接口面：`PluginApi.cancelLaunch(String)` 真的在；</li>
+     *   <li>`game-start` 的 data 带 `key` / `instanceKey` / `pkg`，且 `instanceKey` 与
+     *       {@code Versions.instanceKey} 同源（插件别自己拼）；</li>
+     *   <li>否决判据真值表：窗口内 + 未拦才记；已拦不覆盖、窗口外一律忽略；</li>
+     *   <li>撤账：`abortLaunch` 把 pending 清掉（否则回前台补报一条假的 game-exit）。</li>
+     * </ol>
+     */
+    private static void pluginV45(android.content.Context ctx, List<String> L, int[] stat) {
+        L.add("");
+        L.add("【v45 · 启动否决 + 身份（第 394 轮）】");
+        ok(stat, L, PluginHost.API == 45 && PluginApi.DOC_VERSION == 45,
+                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 45（v45 起）");
+
+        boolean shape = true;
+        try {
+            PluginApi.class.getMethod("cancelLaunch", String.class);
+        } catch (Throwable t) {
+            shape = false;
+        }
+        ok(stat, L, shape, "接口面：PluginApi.cancelLaunch(String) 在");
+
+        // 身份键 —— 与 game-exit 的 key 同源，instanceKey 走 Versions 那一份
+        java.util.Map<String, String> d =
+                PluginEvents.startData("pkg.game", "com.pkg.game", "slot-x", "v160");
+        String ikey = Versions.instanceKey("pkg.game", "slot-x");
+        ok(stat, L, "pkg.game".equals(d.get("key"))
+                        && ikey.equals(d.get("instanceKey"))
+                        && "com.pkg.game".equals(d.get("pkg"))
+                        && "v160".equals(d.get("version"))
+                        && "slot-x".equals(d.get("slot"))
+                        && PluginEvents.GAME_START.equals(d.get("name")),
+                "data：key / instanceKey / pkg 都在，instanceKey 与 Versions.instanceKey 同源");
+
+        // 否决判据四格（纯函数）
+        boolean table = PluginEvents.acceptCancel(true, false)
+                && !PluginEvents.acceptCancel(true, true)
+                && !PluginEvents.acceptCancel(false, false)
+                && !PluginEvents.acceptCancel(false, true);
+        ok(stat, L, table,
+                "★ 否决判据：窗口内 + 未拦才记（已拦不覆盖 / 窗口外一律忽略）");
+
+        // 窗口外调用 ⇒ 返回 false（不抛、不留痕）
+        ok(stat, L, !PluginEvents.cancelLaunch(ctx, "should-be-ignored"),
+                "窗口外 cancelLaunch ⇒ false（忽略，不抛异常）");
+
+        // abortLaunch 清 pending（快照 / 还原真实文件，别把用户真在等的那条补报弄丢）
+        File f = PluginEvents.pendingFile(ctx);
+        String before = "";
+        try {
+            if (f != null && f.isFile()) before = Util.readText(f);
+        } catch (Throwable ignored) {
+        }
+        boolean cleared;
+        try {
+            String slot = SLOT_GATE + "-v45";
+            PluginEvents.notePending(ctx, slot, "v1");
+            boolean had = f != null && f.isFile() && Util.readText(f).contains(slot);
+            PluginEvents.abortLaunch(ctx, slot);
+            // 清空后整个文件会被删掉（writePendingMap 的"空了就删"）⇒ 不能再去 readText 它
+            boolean gone = f == null || !f.isFile() || !Util.readText(f).contains(slot);
+            cleared = had && gone;
+        } catch (Throwable t) {
+            cleared = false;
+        } finally {
+            try {
+                if (f != null) {
+                    if (before.isEmpty()) f.delete();
+                    else Util.atomicWriteText(f, before);
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+        ok(stat, L, cleared, "abortLaunch：撤掉这一局的 pending（否则会补报假的 game-exit）");
+
+        // ── exit 四档真值表（纯判据）──
+        //   前四格钉"失败记录优先"；中间两格钉"记录不是这一局的就不算"；
+        //   后四格是 launchid + 崩溃报告的组合；最后一格钉"拿不准就不给"。
+        boolean table45 = PluginEvents.EXIT_LAUNCH_FAILED.equals(
+                        PluginEvents.exitOutcome(2000L, 1000L, Boolean.TRUE, true))
+                && PluginEvents.EXIT_LAUNCH_FAILED.equals(
+                        PluginEvents.exitOutcome(2000L, 1000L, null, false))
+                && PluginEvents.EXIT_LAUNCH_FAILED.equals(
+                        PluginEvents.exitOutcome(2000L, 500L, Boolean.TRUE, false))
+                && PluginEvents.EXIT_UNCLEAN.equals(
+                        PluginEvents.exitOutcome(2000L, 0L, Boolean.TRUE, false))
+                && PluginEvents.EXIT_UNCLEAN.equals(
+                        PluginEvents.exitOutcome(2000L, 3000L, Boolean.TRUE, false))
+                && PluginEvents.EXIT_CLEAN.equals(
+                        PluginEvents.exitOutcome(0L, 1000L, Boolean.FALSE, true))
+                && PluginEvents.EXIT_CRASH.equals(
+                        PluginEvents.exitOutcome(0L, 1000L, Boolean.TRUE, true))
+                && PluginEvents.EXIT_UNCLEAN.equals(
+                        PluginEvents.exitOutcome(0L, 1000L, Boolean.TRUE, false))
+                && PluginEvents.exitOutcome(0L, 1000L, null, false) == null;
+        ok(stat, L, table45,
+                "★ exit 四档：失败记录优先（且必须是这一局的）/ launchid+报告三态 / 拿不准就不给键");
+
+        // ── 失败记录的读写：只认这个槽（遮罩：槽对不上 / 记录早于这一局都不算）──
+        File lf = PluginEvents.launchFailedFile(ctx);
+        String lfBefore = "";
+        try {
+            if (lf != null && lf.isFile()) lfBefore = Util.readText(lf);
+        } catch (Throwable ignored) {
+        }
+        boolean recordOk;
+        try {
+            if (lf != null) {
+                Util.atomicWriteText(lf, "slot=" + SLOT_GATE + "-v45f\nat=4242\nstep=test\n");
+                recordOk = PluginEvents.readLaunchFailedAt(ctx, SLOT_GATE + "-v45f") == 4242L
+                        && PluginEvents.readLaunchFailedAt(ctx, SLOT_GATE + "-other") == 0L;
+            } else {
+                recordOk = false;
+            }
+        } catch (Throwable t) {
+            recordOk = false;
+        } finally {
+            try {
+                if (lf != null) {
+                    if (lfBefore.isEmpty()) lf.delete();
+                    else Util.atomicWriteText(lf, lfBefore);
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+        ok(stat, L, recordOk,
+                "失败记录：按槽匹配才算（别的槽的同名记录不能冒充这一局）");
+
+        // ── 轮询的判据常量（太密会耗电、太疏会让"晚到"变成"很久以后"）──
+        ok(stat, L, PluginEvents.EXIT_POLL_MS > 0 && PluginEvents.EXIT_POLL_MS <= 30_000L
+                        && PluginEvents.LAUNCH_GRACE_MS >= 60_000L,
+                "轮询间隔 ≤ 30 秒、启动宽限 ≥ 60 秒（别误报「没起来」）");
     }
 
     /**
