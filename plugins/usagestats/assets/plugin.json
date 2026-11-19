@@ -1,7 +1,7 @@
 {
   "entry": "io.mdt.plugins.usagestats.UsageStats",
   "name": "usagestats",
-  "version": "8",
+  "version": "9",
   "api": 44,
   "author": "mdt",
   "description": "foreground play time (host clock -> game-exit event; the plugin writes its own ledger)",

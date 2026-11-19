@@ -10,6 +10,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.RandomAccessFile;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -19,6 +20,7 @@ import io.mdt.launcher.api.ItemInfo;
 import io.mdt.launcher.api.PluginApi;
 import io.mdt.launcher.api.PluginTheme;
 import io.mdt.plugins.usagestats.core.Playtime;
+import io.mdt.plugins.usagestats.core.Sessions;
 
 /**
  * 游玩时长（官方插件，v32）。
@@ -351,8 +353,81 @@ public final class UsageStats {
             if (next.equals(ledger)) return;       // 没写进去（坏 key / 空槽）⇒ 别动文件
             writeAtomic(new File(dir, "ledger.tsv"), next);
             writeAtomic(new File(dir, "total.txt"), String.valueOf(Playtime.total(next)));
+            // 第 396 轮：每局流水（「哪一天」+ 具体时刻；按天 / 单日分析从它现算）。
+            // 单独 try：流水写失败不许影响账本 —— 时长总数是主数据，流水是分析用的副本。
+            try {
+                appendSession(dir, data, slot, key, snap, active);
+            } catch (Throwable ignored) {
+            }
         } catch (Throwable ignored) {
             // 插件写失败不许影响宿主 / 游戏：宿主那边也只记日志
+        }
+    }
+
+    /**
+     * 第 396 轮：把这一局追加进流水（`sessions.tsv`，一行一局）。
+     *
+     * <p>为什么记「一局」而不是「一天一行」：日 / 小时桶都能从起止时刻现算，反过来不行 ——
+     * 只记「每天一把毫秒」就再也算不出单日几点在玩。文件每局一行，一年也就几十 KB。
+     *
+     * <p>去重：**最后一行的核心字段与本次完全一致** ⇒ 视为宿主重复派发，跳过（不记两次）。
+     *
+     * @param active 这一局的前台毫秒（宿主时钟给的）
+     */
+    private static void appendSession(File dir, Map<String, String> data, String slot,
+                                      String key, Playtime.Snap snap, long active) {
+        try {
+            long started = parseLong(data.get("started"));
+            if (started <= 0L) return;            // 没有开始时刻 ⇒ 归不到「哪一天」，别编一个
+            long ended = parseLong(data.get("ended"));
+            if (ended < started) ended = started;
+            Sessions.Entry e = new Sessions.Entry(started, ended, active, ended - started,
+                    clean(data.get("exit")), slot, key, snap.tag, snap.patch);
+            File f = new File(dir, "sessions.tsv");
+            String last = lastLine(f);
+            if (last != null) {
+                List<Sessions.Entry> one = Sessions.parse(last);
+                if (one.size() == 1 && Sessions.sameRun(one.get(0), e)) return;
+            }
+            FileOutputStream os = new FileOutputStream(f, true);
+            try {
+                os.write(Sessions.format(e).getBytes("UTF-8"));
+                os.flush();
+            } finally {
+                try { os.close(); } catch (Throwable ignored) { }
+            }
+        } catch (Throwable ignored) {
+            // 流水是分析用的副本：写失败不影响账本 / 游戏
+        }
+    }
+
+    /** 读文件最后一行（只读尾部 1 KB；文件没有结尾换行也认）。没有 ⇒ null。 */
+    private static String lastLine(File f) {
+        if (f == null || !f.isFile()) return null;
+        RandomAccessFile raf = null;
+        try {
+            raf = new RandomAccessFile(f, "r");
+            long len = raf.length();
+            if (len <= 0L) return null;
+            int take = (int) Math.min(len, 1024L);
+            raf.seek(len - take);
+            byte[] buf = new byte[take];
+            int n = 0;
+            while (n < take) {
+                int r = raf.read(buf, n, take - n);
+                if (r < 0) break;
+                n += r;
+            }
+            String s = new String(buf, 0, n, "UTF-8");
+            while (s.endsWith("\n")) s = s.substring(0, s.length() - 1);
+            int nl = s.lastIndexOf('\n');
+            return nl < 0 ? s : s.substring(nl + 1);
+        } catch (Throwable t) {
+            return null;
+        } finally {
+            if (raf != null) {
+                try { raf.close(); } catch (Throwable ignored) { }
+            }
         }
     }
 

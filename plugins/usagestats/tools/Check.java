@@ -1,6 +1,9 @@
 package io.mdt.plugins.usagestats.core;
 
+import java.util.Calendar;
+import java.util.Collections;
 import java.util.List;
+import java.util.TimeZone;
 
 /** PC 侧判据自检：`bash plugins/usagestats/build.sh check`。 */
 public final class Check {
@@ -169,8 +172,117 @@ public final class Check {
         int[] neg = Playtime.hm(-5);
         fail += ok(neg[0] == 0 && neg[1] == 0, "hm: negative -> 0/0");
 
+        // ── 每局流水（第 396 轮）：「哪一天」+ 具体时刻 ─────────────────────────
+        TimeZone sh = TimeZone.getTimeZone("Asia/Shanghai");
+        TimeZone utc = TimeZone.getTimeZone("UTC");
+        long s23 = at(sh, 2026, 11, 18, 23, 0);
+        long e01 = at(sh, 2026, 11, 19, 1, 0);
+        Sessions.Entry cross = new Sessions.Entry(s23, e01, 7_200_000L, 7_200_000L,
+                "clean", "default", "pkg", "160.1", "");
+        String crossText = Sessions.format(cross);
+        List<Sessions.Entry> sb = Sessions.parse(crossText);
+        fail += ok(sb.size() == 1 && sb.get(0).started == s23 && sb.get(0).ended == e01
+                        && sb.get(0).activeMs == 7_200_000L && sb.get(0).wallMs == 7_200_000L
+                        && sb.get(0).exit.equals("clean") && sb.get(0).slot.equals("default")
+                        && sb.get(0).key.equals("pkg") && sb.get(0).tag.equals("160.1"),
+                "sessions: 一行一局的 format/parse 往返（时刻 / 身份全对上）");
+
+        // 按天：23:00-01:00 跨零点 ⇒ 两天各 1h；会话数按开始日计
+        List<Sessions.Day> d1 = Sessions.byDay(crossText, sh);
+        fail += ok(d1.size() == 2
+                        && d1.get(0).date.equals("2026-11-18") && d1.get(0).ms == 3_600_000L
+                        && d1.get(0).sessions == 1
+                        && d1.get(1).date.equals("2026-11-19") && d1.get(1).ms == 3_600_000L
+                        && d1.get(1).sessions == 0,
+                "★sessions: 跨零点按墙钟切成两天（各 1h；会话数按开始日）");
+
+        // 单日分析：按小时切（23 点 / 次日 0 点各 1h）
+        List<Sessions.Hour> hh = Sessions.byHour(Collections.singletonList(cross), sh);
+        fail += ok(hh.size() == 2
+                        && hh.get(0).day.equals("2026-11-18") && hh.get(0).hour == 23
+                        && hh.get(0).ms == 3_600_000L
+                        && hh.get(1).day.equals("2026-11-19") && hh.get(1).hour == 0
+                        && hh.get(1).ms == 3_600_000L,
+                "★sessions: 单日按小时拆（23 点 / 0 点各 1h）");
+
+        // 时区：同一时刻按本地时区切日（+08 02:00 = UTC 前一天 18:00）
+        long am = at(sh, 2026, 11, 18, 2, 0);
+        Sessions.Entry early = new Sessions.Entry(am, am + 3_600_000L, 3_600_000L,
+                3_600_000L, "", "default", "pkg", "", "");
+        List<Sessions.Day> dz = Sessions.byDay(Collections.singletonList(early), sh);
+        List<Sessions.Day> du = Sessions.byDay(Collections.singletonList(early), utc);
+        fail += ok(dz.size() == 1 && dz.get(0).date.equals("2026-11-18")
+                        && du.size() == 1 && du.get(0).date.equals("2026-11-17"),
+                "★sessions: 按本地时区切日（+08 是 11-18，UTC 是 11-17）");
+
+        // 余数：各段之和恒等于 activeMs（999ms 跨零点）
+        long r0 = at(sh, 2026, 11, 18, 23, 59) + 59_500L;
+        Sessions.Entry odd = new Sessions.Entry(r0, r0 + 1000L, 999L, 1000L,
+                "", "d", "k", "", "");
+        List<Sessions.Day> od = Sessions.byDay(Collections.singletonList(odd), sh);
+        long osum = 0L;
+        for (Sessions.Day x : od) osum += x.ms;
+        fail += ok(od.size() == 2 && osum == 999L,
+                "sessions: 除不尽时余数补到最后一段（各段和 == activeMs）");
+
+        // 改系统时间：ended < started ⇒ 不产生负区间，全落开始那天
+        Sessions.Entry rev = new Sessions.Entry(e01, s23, 3_600_000L, 0L,
+                "", "d", "k", "", "");
+        List<Sessions.Day> rd = Sessions.byDay(Collections.singletonList(rev), sh);
+        fail += ok(rd.size() == 1 && rd.get(0).date.equals("2026-11-19")
+                        && rd.get(0).ms == 3_600_000L,
+                "sessions: ended < started（时钟回拨）⇒ 全落开始那天");
+
+        // 一局跨多天（挂机）：每天各一段
+        long m0 = at(sh, 2026, 11, 17, 22, 0);
+        long m1 = at(sh, 2026, 11, 19, 2, 0);
+        Sessions.Entry multi = new Sessions.Entry(m0, m1, 28 * 3_600_000L, 28 * 3_600_000L,
+                "", "d", "k", "", "");
+        List<Sessions.Day> md = Sessions.byDay(Collections.singletonList(multi), sh);
+        fail += ok(md.size() == 3 && md.get(0).ms == 2 * 3_600_000L
+                        && md.get(1).ms == 24 * 3_600_000L && md.get(2).ms == 2 * 3_600_000L,
+                "sessions: 一局跨多天按墙钟摊开（2h / 24h / 2h）");
+
+        // 排序 + 累加：两天各一局
+        Sessions.Entry e17 = new Sessions.Entry(at(sh, 2026, 11, 17, 9, 0),
+                at(sh, 2026, 11, 17, 10, 0), 3_600_000L, 3_600_000L, "", "d", "k2", "", "");
+        List<Sessions.Day> ds = Sessions.byDay(java.util.Arrays.asList(cross, e17), sh);
+        fail += ok(ds.size() == 3 && ds.get(0).date.equals("2026-11-17")
+                        && ds.get(1).date.equals("2026-11-18")
+                        && ds.get(2).date.equals("2026-11-19"),
+                "sessions: byDay 按日期升序");
+
+        // 坏行：列不够 / 0 时刻 / 0 时长 / 坏数字 ⇒ 全跳过
+        String badS = "1\t2\t3\n"
+                + "0\t0\t100\t0\t\t\tslot\tk\t\n"
+                + "1\t2\t0\t0\t\t\tslot\tk\t\n"
+                + "1\t2\tx\t0\t\t\tslot\tk\t\n";
+        fail += ok(Sessions.parse(badS).isEmpty(),
+                "sessions: 坏行（列不够 / started=0 / active=0 / 坏数字）全跳过");
+
+        // 去重：核心字段相同（exit 不同也算同一局）
+        Sessions.Entry dup = new Sessions.Entry(s23, e01, 7_200_000L, 7_200_000L,
+                "unclean", "default", "pkg", "160.1", "");
+        fail += ok(Sessions.sameRun(cross, dup) && !Sessions.sameRun(cross, early),
+                "sessions: sameRun 只看核心字段（exit 不同也判同一局，防重复派发记两次）");
+
+        // 字段卫生：制表符 / 换行不会把一局写成两行
+        Sessions.Entry dirty = new Sessions.Entry(s23, e01, 1000L, 1000L,
+                "a\tb", "s\nl", "k\t1", "t\tt", "p\nn");
+        List<Sessions.Entry> db = Sessions.parse(Sessions.format(dirty));
+        fail += ok(db.size() == 1 && db.get(0).exit.equals("a b")
+                        && db.get(0).slot.equals("s l") && db.get(0).tag.equals("t t"),
+                "sessions: clean 控制字符 -> 空格，仍是一行");
+
         System.out.println(fail == 0 ? "== USAGESTATS CHECK OK ==" : "!! " + fail + " failed");
         System.exit(fail == 0 ? 0 : 1);
+    }
+
+    private static long at(TimeZone tz, int y, int mo, int d, int h, int mi) {
+        Calendar c = Calendar.getInstance(tz);
+        c.set(y, mo - 1, d, h, mi, 0);
+        c.set(Calendar.MILLISECOND, 0);
+        return c.getTimeInMillis();
     }
 
     private static int ok(boolean cond, String what) {
