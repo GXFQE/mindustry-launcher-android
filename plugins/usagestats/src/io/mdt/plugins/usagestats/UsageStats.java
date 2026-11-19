@@ -187,9 +187,9 @@ public final class UsageStats {
         box.addView(title);
 
         // 第 401 轮：两个分组标题（用户：「上面需要加上标题（统计范围选择 / 精度选择）」）
-        // 实例筛选（用户 2026-11-19：「需要再加一个按照实例筛选」「筛选就不能多选吗」）：
-        // 一行「全部 / 已选 N 个 ▾」按钮，点开在页面里展开勾选列表（可多选；不依赖宿主单选 choose）。
-        final List<String[]> picked = new ArrayList<String[]>();
+        // 实例筛选（用户 2026-11-19：多选；「不选=全选，已选两项≠全选」⇒ 默认全选、记录排除集）：
+        // 一行「全部 / 已选 N 个 ▾」按钮，点开在页面里展开勾选列表（默认全勾，点一下取消该实例）。
+        final List<String[]> excluded = new ArrayList<String[]>();
         final boolean[] instOpen = { false };
         box.addView(sectionLabel(c, th, R.string.us_inst_title));
         final LinearLayout instRow = new LinearLayout(c);
@@ -222,13 +222,14 @@ public final class UsageStats {
             @Override public void run() {
                 title.setText(c.getString(R.string.us_panel_title));
                 List<Sessions.Entry> es = sessions(api);
-                // 实例：一行按钮（全部 / 已选 N 个），点开多选列表
+                // 实例：默认全选（排除集为空 = 全部）；取消勾选 = 排除
                 instRow.removeAllViews();
                 instList.removeAllViews();
                 final List<String[]> insts = instances(es);
-                String curLabel = picked.isEmpty()
+                int selCount = Math.max(0, insts.size() - excluded.size());
+                String curLabel = excluded.isEmpty()
                         ? c.getString(R.string.us_range_all)
-                        : c.getString(R.string.us_inst_picked_fmt, picked.size());
+                        : c.getString(R.string.us_inst_picked_fmt, selCount);
                 instRow.addView(chip(c, th, curLabel + " ▾", true,
                         new View.OnClickListener() {
                             @Override public void onClick(View v) {
@@ -238,21 +239,21 @@ public final class UsageStats {
                         }), chipLp(th));
                 if (instOpen[0]) {
                     for (final String[] ins : insts) {
-                        final boolean on = isPicked(picked, ins[0], ins[1]);
+                        final boolean on = !isExcluded(excluded, ins[0], ins[1]);
                         instList.addView(instPickRow(c, th,
                                 instanceLabel(api, ins[0], ins[1]), on,
                                 new View.OnClickListener() {
                                     @Override public void onClick(View v) {
-                                        togglePicked(picked, ins[0], ins[1]);
+                                        toggleExcluded(excluded, ins[0], ins[1]);
                                         rebuild[0].run();
                                     }
                                 }));
                     }
                 }
-                if (!picked.isEmpty()) {
+                if (!excluded.isEmpty()) {
                     List<Sessions.Entry> one = new ArrayList<Sessions.Entry>();
                     for (Sessions.Entry e : es) {
-                        if (e != null && isPicked(picked, e.key, e.slot)) one.add(e);
+                        if (e != null && !isExcluded(excluded, e.key, e.slot)) one.add(e);
                     }
                     es = one;
                 }
@@ -472,23 +473,23 @@ public final class UsageStats {
         return t;
     }
 
-    static boolean isPicked(List<String[]> picked, String key, String slot) {
-        if (picked == null) return false;
-        for (String[] p : picked) {
+    static boolean isExcluded(List<String[]> excluded, String key, String slot) {
+        if (excluded == null) return false;
+        for (String[] p : excluded) {
             if (p[0].equals(key) && p[1].equals(slot)) return true;
         }
         return false;
     }
 
-    static void togglePicked(List<String[]> picked, String key, String slot) {
-        if (picked == null) return;
-        for (int i = 0; i < picked.size(); i++) {
-            if (picked.get(i)[0].equals(key) && picked.get(i)[1].equals(slot)) {
-                picked.remove(i);
+    static void toggleExcluded(List<String[]> excluded, String key, String slot) {
+        if (excluded == null) return;
+        for (int i = 0; i < excluded.size(); i++) {
+            if (excluded.get(i)[0].equals(key) && excluded.get(i)[1].equals(slot)) {
+                excluded.remove(i);
                 return;
             }
         }
-        picked.add(new String[]{key, slot});
+        excluded.add(new String[]{key, slot});
     }
 
     /** distinct (key, slot)，按出现顺序；key = 版本 key，slot = 槽。 */
