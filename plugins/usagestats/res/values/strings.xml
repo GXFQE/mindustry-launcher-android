@@ -12,10 +12,22 @@
     <string name="us_patch_row_fmt">%1$s · %2$s</string>
     <string name="us_patch_more_fmt">%1$s +%2$d</string>
     <string name="us_patch_half">half-modified</string>
-    <string name="us_heat_show">Show last 52 weeks</string>
-    <string name="us_heat_hide">Hide</string>
-    <string name="us_heat_total_fmt">Last 52 weeks: %1$s</string>
     <string name="us_heat_since_fmt">recorded since %1$s</string>
     <string name="us_heat_less">less</string>
     <string name="us_heat_more">more</string>
+    <string name="us_panel_title">Playtime stats</string>
+    <string name="us_range_days_fmt">%1$d d</string>
+    <string name="us_range_all">All</string>
+    <string name="us_range_custom">Custom</string>
+    <string name="us_grain_hour">Hour</string>
+    <string name="us_grain_day">Day</string>
+    <string name="us_grain_week">Week</string>
+    <string name="us_grain_month">Month</string>
+    <string name="us_panel_total_fmt">Total: %1$s</string>
+    <string name="us_panel_empty">No play sessions recorded yet.</string>
+    <string name="us_panel_too_big">Too large: over 366 rows. Shorten the range or pick a coarser grain.</string>
+    <string name="us_panel_hint">One cell = one period; darker means longer.</string>
+    <string name="us_range_bad">Start is after end.</string>
+    <string name="us_pick_from">Start date</string>
+    <string name="us_pick_to">End date</string>
 </resources>

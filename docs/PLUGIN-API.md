@@ -64,11 +64,14 @@
   插件在回调里调 `instances()` 已经看不见这次启动，所以身份直接给。
   `game-exit` 补 `exit` 四档（`clean` / `crash` / `unclean` / `launch-failed`）；并且不再只等
   "回到界面" —— 启动后每 5 秒轮询游戏进程，不在了就派发。`API_MIN` 仍不动。
-  **v46 = 行内插入 + 「使用统计」页**：`slot: inline` 在宿主**文本行的尾部**插预设小控件
+  **v46 = 行内插入**：`slot: inline` 在宿主**文本行的尾部**插预设小控件
   （`kind: button` / `chip` / `text`；宿主按**百分数**防呆：高度不超行高、宽度不超行宽 40%、
   每锚点最多 2 个、文字 ellipsize、未知 kind 不画）；首批锚点 `main.playtime`（主界面「游戏时长」行尾）；
-  新增 page `usage`（「使用统计」页）。⚠️ 槽页「游玩时长」卡头**不开放**（那张卡是插件自己画的）。
-  `API_MIN` 仍不动。
+  **点击 = 打开该插件的插件页**（`PluginsActivity` 直达，`api.page()` = `"panel"`），不新增宿主页面。
+  ⚠️ 槽页「游玩时长」卡头**不开放**（那张卡是插件自己画的）。`API_MIN` 仍不动。
+  **v47 = 宿主代弹日期选择器**：`pickDate(title, initialMs, DatePick)` —— 插件自己
+  `new DatePickerDialog` 会崩（插件 `Resources` 里没有宿主主题，系统布局 inflate 时
+  `Failed to resolve attribute` → `InflateException`）；宿主用 Activity 弹，回调给本地当天 0 点。
 - 插件 `api()` 报的是「我需要的最低宿主接口版本」。用不到的新能力**不要**报高 ——
   报高了只会在老宿主上被拒，换不来任何东西。
 - **不要用 try/catch 去兼容老宿主**：报什么版本就只会跑在什么版本上。`api()` 报 20，
@@ -1238,13 +1241,20 @@ v45（2026-11-18 第 394 轮）：**启动否决 + 退出情况 + 晚到也报**
 `launch-failed`）；启动后每 5 秒轮询游戏进程，**不等用户回界面**就派发退出（主进程被冻结时
 仍靠回前台 + 落盘标记补报）；`startActivity` 失败时撤掉这一局的账（否则会补报一条假的
 `game-exit`，形态与"启动即崩"一样）。`API_MIN` 仍不动（区间 20..46）。
-v46（2026-11-19 第 399 轮）：**行内插入 inline + 「使用统计」页** ——
+v46（2026-11-19 第 399 轮）：**行内插入 inline** ——
 `slot: inline` 在宿主**文本行的尾部**插预设小控件（`kind: button` / `chip` / `text`；宿主按
 **百分数**防呆：高度不超行高、宽度不超行宽 40%、每锚点最多 2 个、文字 ellipsize、未知 kind 不画）；
-首批锚点 `main.playtime`（主界面「游戏时长」行尾）；新增页面 `usage`（「使用统计」）。
+首批锚点 `main.playtime`（主界面「游戏时长」行尾）；**点击 = 打开该插件的插件页**
+（`PluginsActivity` 直达，`api.page()` = `"panel"`），不新增宿主页面。
 ⚠️ 槽页「游玩时长」卡头**不开放**：那张卡是插件自己画的，宿主插不进去（要加得插件在
 createView 里给容器位）。设计稿与判据见 `docs/plans/2026-11-19-插件行内插入与使用统计页.md`。
-`API_MIN` 仍不动（区间 20..46）。
+`API_MIN` 仍不动（区间 20..47）。
+v47（2026-11-19 第 400 轮）：**宿主代弹日期选择器** —— `pickDate(title, initialMs, DatePick)`。
+★ 为什么必须宿主来弹（真机崩溃）：插件 `new DatePickerDialog(插件上下文)` 时，系统布局
+`android:layout/date_picker_dialog` 是用**插件的 Resources** 解析主题属性的，而插件 Resources
+里没有宿主主题 ⇒ `Failed to resolve attribute at index 6` → `InflateException` → 整个应用崩溃。
+宿主用自己的 Activity 弹框、回调给**本地时区当天 0 点**的毫秒；用户取消不回调。
+`API_MIN` 仍不动（区间 20..47）。
 
 **官方体检插件**：`plugins/mods-health`（第 229 轮，前身叫 `conflict`）。宿主原来的那行
 「查模组冲突」整块删掉，判据搬进插件的 `core/Conflicts.java` 与 `core/Gates.java`；

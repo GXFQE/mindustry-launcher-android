@@ -1,11 +1,13 @@
 package io.mdt.launcher;
 
 import android.app.Activity;
+import android.app.DatePickerDialog;
 import android.content.Context;
 import android.content.ContextWrapper;
 import android.content.Intent;
 import android.content.res.AssetManager;
 import android.content.res.Resources;
+import android.widget.DatePicker;
 import android.view.View;
 
 import java.io.File;
@@ -141,7 +143,7 @@ public final class PluginHost {
      * 在回调里已看不见这次启动，所以身份直接给）；`game-exit` 补 `exit` 四档
      * （`clean` / `crash` / `unclean` / `launch-failed`）。
      */
-    public static final int API = 46;
+    public static final int API = 47;
     /**
      * 还认的**最老**契约版本。
      *
@@ -1381,6 +1383,45 @@ public final class PluginHost {
                                 Plugins.displayNameOf(a, selfId), selected);
                     } catch (Throwable ignored) {
                         // 同样：页面起不来不把插件带崩
+                    }
+                }
+            });
+        }
+
+        /**
+         * **v47**：宿主代弹系统日期选择器 —— 插件自己 `new DatePickerDialog` 会崩
+         * （插件 Resources 里没有宿主主题，系统布局 inflate 时解析不了属性）。
+         */
+        @Override public void pickDate(String title, long initialMs, final DatePick cb) {
+            final Activity a = activityOrNull();
+            if (a == null || a.isFinishing()) return;
+            final long init = initialMs > 0L ? initialMs : System.currentTimeMillis();
+            a.runOnUiThread(new Runnable() {
+                @Override public void run() {
+                    try {
+                        java.util.Calendar c = java.util.Calendar.getInstance();
+                        c.setTimeInMillis(init);
+                        DatePickerDialog d = new DatePickerDialog(a,
+                                new DatePickerDialog.OnDateSetListener() {
+                                    @Override public void onDateSet(DatePicker v, int y, int m, int day) {
+                                        if (cb == null) return;
+                                        java.util.Calendar q = java.util.Calendar.getInstance();
+                                        q.clear();
+                                        q.set(y, m, day);
+                                        try {
+                                            cb.onDate(q.getTimeInMillis());
+                                        } catch (Throwable ignored) {
+                                            // 回调里出错是插件的事，别带崩宿主
+                                        }
+                                    }
+                                },
+                                c.get(java.util.Calendar.YEAR),
+                                c.get(java.util.Calendar.MONTH),
+                                c.get(java.util.Calendar.DAY_OF_MONTH));
+                        if (title != null && !title.isEmpty()) d.setTitle(title);
+                        d.show();
+                    } catch (Throwable ignored) {
+                        // 弹不出来不把插件带崩
                     }
                 }
             });

@@ -5359,8 +5359,8 @@ public final class SelfTest {
     private static void pluginV43(android.content.Context ctx, List<String> L, int[] stat) {
         L.add("");
         L.add("【v43 · 插件下载 / 模组写 / 网络扩充（第 378 轮）】");
-        ok(stat, L, PluginHost.API == 46 && PluginApi.DOC_VERSION == 46,
-                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 46（v46 起）");
+        ok(stat, L, PluginHost.API == 47 && PluginApi.DOC_VERSION == 47,
+                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 47（v47 起）");
 
         boolean shape = true;
         try {
@@ -5858,8 +5858,8 @@ public final class SelfTest {
     private static void pluginV45(android.content.Context ctx, List<String> L, int[] stat) {
         L.add("");
         L.add("【v45 · 启动否决 + 身份（第 394 轮）】");
-        ok(stat, L, PluginHost.API == 46 && PluginApi.DOC_VERSION == 46,
-                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 46（v46 起）");
+        ok(stat, L, PluginHost.API == 47 && PluginApi.DOC_VERSION == 47,
+                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 47（v47 起）");
 
         boolean shape = true;
         try {
@@ -6301,6 +6301,17 @@ public final class SelfTest {
             ok(stat, L, false, "v41 锚点布局用例异常：" + t);
         }
 
+        // v47：pickDate 签名（宿主代弹日期选择器；插件自己 new 会崩）
+        try {
+            java.lang.reflect.Method pd = PluginApi.class.getMethod("pickDate", String.class,
+                    long.class, PluginApi.DatePick.class);
+            java.lang.reflect.Method od = PluginApi.DatePick.class.getMethod("onDate", long.class);
+            ok(stat, L, pd.getReturnType() == void.class && od.getReturnType() == void.class,
+                    "v47 签名：pickDate(title, initialMs, DatePick) / DatePick.onDate(long)");
+        } catch (Throwable t) {
+            ok(stat, L, false, "v47 pickDate 签名断言异常：" + t);
+        }
+
         // v46 inline：解析 / forInline 按页+锚点过滤 / kind 只对 inline 生效
         try {
             String json = "{\"extensions\":["
@@ -6334,10 +6345,11 @@ public final class SelfTest {
             ok(stat, L, false, "v46 inline 用例异常：" + t);
         }
 
-        // v46：usage 页 / inline 插槽认得；page 认不出的 inline 不算可用、不收集
-        ok(stat, L, Extensions.knownPage(Extensions.PAGE_USAGE)
-                        && Extensions.knownSlot(Extensions.SLOT_INLINE),
-                "v46 usage 页与 inline 插槽都算认得的");
+        // v46：inline 插槽认得；panel 是插件页参数（不是 knownPage）
+        ok(stat, L, Extensions.knownSlot(Extensions.SLOT_INLINE)
+                        && !Extensions.PAGE_PANEL.isEmpty()
+                        && !Extensions.knownPage(Extensions.PAGE_PANEL),
+                "v46 inline 插槽认得；panel 是插件页参数、不进 knownPage");
         try {
             List<Extensions.Item> bad = Extensions.parse(
                     "{\"extensions\":[{\"id\":\"x\",\"entry\":\"E\",\"slot\":\"inline\","

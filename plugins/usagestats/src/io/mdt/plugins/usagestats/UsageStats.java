@@ -1,10 +1,14 @@
 package io.mdt.plugins.usagestats;
 
 import android.content.Context;
+import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.GradientDrawable;
+import android.view.Gravity;
 import android.view.View;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
@@ -12,6 +16,7 @@ import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.RandomAccessFile;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -50,6 +55,8 @@ public final class UsageStats {
     }
 
     public static View createView(PluginApi api) {
+        // 第 400 轮：插件页里的「游玩统计」面板（宿主顶栏进来时 page = "panel"）
+        if (api != null && "panel".equals(api.page())) return panel(api);
         Context c = api.context();
         PluginTheme th = api.theme();
         String ledger = api.dataDir() == null ? "" : read(new File(api.dataDir(), "ledger.tsv"));
@@ -134,44 +141,6 @@ public final class UsageStats {
         };
         paint[0].run();
 
-        // ── 第 397 轮：近 52 周热力图（列 = 周，行 = 星期一~日；默认收起） ──────────
-        // 为什么按槽过滤：这张卡在槽页上是「本槽」的（与上面的合计同口径）；
-        // 传 null = 插件页的"总计"，显示所有槽。
-        final Heat.Grid heat = heatOf(api, slotPage ? slot : null);
-        if (heat != null && !heat.firstDay.isEmpty()) {
-            final TextView heatToggle = new TextView(c);
-            heatToggle.setTextSize(12f);
-            heatToggle.setTextColor(th.accent);
-            heatToggle.setPadding(0, th.dp(8), 0, 0);
-            heatToggle.setText(c.getString(R.string.us_heat_show));
-
-            final LinearLayout heatBox = new LinearLayout(c);
-            heatBox.setOrientation(LinearLayout.VERTICAL);
-            heatBox.setVisibility(View.GONE);
-            heatBox.addView(new HeatView(c, th, heat), new LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT));
-            TextView heatSum = new TextView(c);
-            heatSum.setTextSize(12f);
-            heatSum.setTextColor(th.textMuted);
-            heatSum.setPadding(0, th.dp(6), 0, 0);
-            // 图旁的数字与格子同源（Heat.total 只把 known 的格子加起来）；起点单独说，
-            // 别让「近 52 周」和上面的「本槽累计」对撞成"图里怎么少了"。
-            heatSum.setText(c.getString(R.string.us_heat_total_fmt, duration(c, Heat.total(heat)))
-                    + " · " + c.getString(R.string.us_heat_since_fmt, heat.firstDay));
-            heatBox.addView(heatSum);
-
-            heatToggle.setOnClickListener(new View.OnClickListener() {
-                @Override public void onClick(View v) {
-                    boolean show = heatBox.getVisibility() != View.VISIBLE;
-                    heatBox.setVisibility(show ? View.VISIBLE : View.GONE);
-                    heatToggle.setText(c.getString(show ? R.string.us_heat_hide : R.string.us_heat_show));
-                }
-            });
-            box.addView(heatToggle);
-            box.addView(heatBox);
-        }
-
         TextView note = new TextView(c);
         note.setTextSize(11f);
         note.setTextColor(th.textMuted);
@@ -179,6 +148,275 @@ public final class UsageStats {
         note.setText(c.getString(R.string.us_note));
         box.addView(note);
         return box;
+    }
+
+    // ---- 第 400 轮：插件页「游玩统计」面板 ---------------------------------------
+
+    /** 范围预设（天）。 */
+    private static final int[] RANGE_PRESETS = {7, 30, 90, 365};
+
+    /**
+     * 插件页里的统计面板：范围 × 粒度 + 热力图 + 合计。
+     *
+     * <p>宿主插件页（`PluginsActivity` 直达）传 `page = "panel"` 进来；页面本身已经是宿主的
+     * ScrollView，这里**不再套滚动容器**（图高随行数增长、整页滚）。
+     *
+     * <p>范围 / 粒度不持久化：每次进页面回到「近 30 天 · 日」。
+     */
+    private static View panel(PluginApi api) {
+        final Context c = api.context();
+        final PluginTheme th = api.theme();
+        final TimeZone tz = TimeZone.getDefault();
+
+        final LinearLayout box = new LinearLayout(c);
+        box.setOrientation(LinearLayout.VERTICAL);
+        int hpad = th.dp(14);
+        box.setPadding(hpad, th.dp(4), hpad, th.dp(8));
+
+        // 状态：默认近 30 天 / 日粒度
+        final long[] from = { daysAgoStart(29, tz) };
+        final long[] to = { endOfToday(tz) };
+        final Heat.Grain[] grain = { Heat.Grain.DAY };
+        final int[] preset = { 1 };          // 30 天
+        final boolean[] all = { false };
+
+        final TextView title = new TextView(c);
+        title.setTextSize(14f);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        title.setTextColor(th.text);
+        box.addView(title);
+
+        // 范围分两行：6 个胶囊一行放不下（360dp 宽的内容区），「自定义」会被截掉
+        final LinearLayout rangeRow = new LinearLayout(c);
+        rangeRow.setOrientation(LinearLayout.HORIZONTAL);
+        box.addView(rangeRow);
+        final LinearLayout rangeRow2 = new LinearLayout(c);
+        rangeRow2.setOrientation(LinearLayout.HORIZONTAL);
+        box.addView(rangeRow2);
+
+        final LinearLayout grainRow = new LinearLayout(c);
+        grainRow.setOrientation(LinearLayout.HORIZONTAL);
+        box.addView(grainRow);
+
+        final LinearLayout body = new LinearLayout(c);
+        body.setOrientation(LinearLayout.VERTICAL);
+        box.addView(body);
+
+        final Runnable[] rebuild = new Runnable[1];
+        rebuild[0] = new Runnable() {
+            @Override public void run() {
+                title.setText(c.getString(R.string.us_panel_title));
+                rangeRow.removeAllViews();
+                rangeRow2.removeAllViews();
+                for (int i = 0; i < RANGE_PRESETS.length; i++) {
+                    final int idx = i;
+                    rangeRow.addView(chip(c, th,
+                            c.getString(R.string.us_range_days_fmt, RANGE_PRESETS[i]),
+                            !all[0] && preset[0] == i, new View.OnClickListener() {
+                                @Override public void onClick(View v) {
+                                    preset[0] = idx;
+                                    all[0] = false;
+                                    from[0] = daysAgoStart(RANGE_PRESETS[idx] - 1, tz);
+                                    to[0] = endOfToday(tz);
+                                    rebuild[0].run();
+                                }
+                            }), chipLp(th));
+                }
+                rangeRow2.addView(chip(c, th, c.getString(R.string.us_range_all), all[0],
+                        new View.OnClickListener() {
+                            @Override public void onClick(View v) {
+                                List<Sessions.Entry> es = sessions(api);
+                                if (es.isEmpty()) return;
+                                from[0] = earliestDayStart(es, tz);
+                                to[0] = endOfToday(tz);
+                                all[0] = true;
+                                rebuild[0].run();
+                            }
+                        }), chipLp(th));
+                rangeRow2.addView(chip(c, th, c.getString(R.string.us_range_custom), false,
+                        new View.OnClickListener() {
+                            @Override public void onClick(View v) {
+                                pickCustom(api, from, to, rebuild);
+                            }
+                        }), chipLp(th));
+
+                grainRow.removeAllViews();
+                Heat.Grain[] gs = { Heat.Grain.HOUR, Heat.Grain.DAY,
+                        Heat.Grain.WEEK, Heat.Grain.MONTH };
+                int[] gname = { R.string.us_grain_hour, R.string.us_grain_day,
+                        R.string.us_grain_week, R.string.us_grain_month };
+                for (int i = 0; i < gs.length; i++) {
+                    final Heat.Grain g = gs[i];
+                    grainRow.addView(chip(c, th, c.getString(gname[i]), grain[0] == g,
+                            new View.OnClickListener() {
+                                @Override public void onClick(View v) {
+                                    grain[0] = g;
+                                    rebuild[0].run();
+                                }
+                            }), chipLp(th));
+                }
+
+                body.removeAllViews();
+                List<Sessions.Entry> es = sessions(api);
+                if (es.isEmpty()) {
+                    body.addView(hint(c, th, R.string.us_panel_empty));
+                    return;
+                }
+                Heat.Grid grid = Heat.grid(es, System.currentTimeMillis(), tz, grain[0], from[0], to[0]);
+                if (grid.tooBig) {
+                    body.addView(hint(c, th, R.string.us_panel_too_big));
+                    return;
+                }
+                if (grid.firstDay.isEmpty()) {
+                    body.addView(hint(c, th, R.string.us_panel_empty));
+                    return;
+                }
+                TextView sum = new TextView(c);
+                sum.setTextSize(12f);
+                sum.setTextColor(th.text);
+                sum.setPadding(0, th.dp(6), 0, 0);
+                sum.setText(c.getString(R.string.us_panel_total_fmt, duration(c, Heat.total(grid)))
+                        + " · " + c.getString(R.string.us_heat_since_fmt, grid.firstDay));
+                body.addView(sum);
+                body.addView(new HeatView(c, th, grid), new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT));
+                body.addView(hint(c, th, R.string.us_panel_hint));
+            }
+        };
+        rebuild[0].run();
+        return box;
+    }
+
+    /** 读每局流水（宿主不解析；插件自己的数据）。 */
+    private static List<Sessions.Entry> sessions(PluginApi api) {
+        File dir = api == null ? null : api.dataDir();
+        if (dir == null) return new ArrayList<Sessions.Entry>();
+        return Sessions.parse(readText(new File(dir, "sessions.tsv"), 1024 * 1024));
+    }
+
+    /** 今天往前 N 天的本地 0 点。 */
+    private static long daysAgoStart(int daysAgo, TimeZone tz) {
+        Calendar c = Calendar.getInstance(tz);
+        c.setTimeInMillis(System.currentTimeMillis());
+        c.set(Calendar.HOUR_OF_DAY, 0);
+        c.set(Calendar.MINUTE, 0);
+        c.set(Calendar.SECOND, 0);
+        c.set(Calendar.MILLISECOND, 0);
+        c.add(Calendar.DAY_OF_YEAR, -Math.max(0, daysAgo));
+        return c.getTimeInMillis();
+    }
+
+    /** 今天的 23:59:59.999。 */
+    private static long endOfToday(TimeZone tz) {
+        Calendar c = Calendar.getInstance(tz);
+        c.setTimeInMillis(System.currentTimeMillis());
+        c.set(Calendar.HOUR_OF_DAY, 0);
+        c.set(Calendar.MINUTE, 0);
+        c.set(Calendar.SECOND, 0);
+        c.set(Calendar.MILLISECOND, 0);
+        c.add(Calendar.DAY_OF_YEAR, 1);
+        return c.getTimeInMillis() - 1L;
+    }
+
+    /** 最早一条流水的当天 0 点（「全部」范围的起点）。 */
+    private static long earliestDayStart(List<Sessions.Entry> es, TimeZone tz) {
+        long min = Long.MAX_VALUE;
+        for (Sessions.Entry e : es) {
+            if (e != null && e.started > 0L && e.started < min) min = e.started;
+        }
+        if (min == Long.MAX_VALUE) return daysAgoStart(29, tz);
+        Calendar c = Calendar.getInstance(tz);
+        c.setTimeInMillis(min);
+        c.set(Calendar.HOUR_OF_DAY, 0);
+        c.set(Calendar.MINUTE, 0);
+        c.set(Calendar.SECOND, 0);
+        c.set(Calendar.MILLISECOND, 0);
+        return c.getTimeInMillis();
+    }
+
+    /** 一个范围 / 粒度小胶囊（选中 = 淡 accent 底 + accent 字）。 */
+    private static View chip(Context c, PluginTheme th, String text, boolean selected,
+                             View.OnClickListener l) {
+        TextView t = new TextView(c);
+        t.setText(text);
+        t.setTextSize(12f);
+        t.setSingleLine(true);
+        t.setGravity(Gravity.CENTER);
+        int h = th.dp(10);
+        int v = th.dp(4);
+        t.setPadding(h, v, h, v);
+        GradientDrawable bg = new GradientDrawable();
+        bg.setCornerRadius(th.dp(20));
+        if (selected) {
+            bg.setColor(Color.argb(36, Color.red(th.accent), Color.green(th.accent),
+                    Color.blue(th.accent)));
+            t.setTextColor(th.accent);
+        } else {
+            bg.setColor(Color.TRANSPARENT);
+            t.setTextColor(th.textMuted);
+        }
+        t.setBackground(bg);
+        t.setClickable(true);
+        t.setOnClickListener(l);
+        return t;
+    }
+
+    private static LinearLayout.LayoutParams chipLp(PluginTheme th) {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT);
+        lp.rightMargin = th.dp(6);
+        return lp;
+    }
+
+    private static TextView hint(Context c, PluginTheme th, int res) {
+        TextView t = new TextView(c);
+        t.setTextSize(12f);
+        t.setTextColor(th.textMuted);
+        t.setPadding(0, th.dp(8), 0, 0);
+        t.setText(c.getString(res));
+        return t;
+    }
+
+    /**
+     * 自定义范围：**宿主代弹**日期选择器（v47）。
+     *
+     * ★ 插件自己 `new DatePickerDialog` 会崩：插件 `Resources` 里没有宿主主题，系统布局
+     * inflate 时 `Failed to resolve attribute` → `InflateException` → 整个应用崩溃（真机踩过）。
+     */
+    private static void pickCustom(final PluginApi api, final long[] from, final long[] to,
+                                   final Runnable[] rebuild) {
+        final Context c = api.context();
+        api.pickDate(c.getString(R.string.us_pick_from), from[0], new PluginApi.DatePick() {
+            @Override public void onDate(final long first) {
+                api.pickDate(c.getString(R.string.us_pick_to), to[0], new PluginApi.DatePick() {
+                    @Override public void onDate(long second) {
+                        long nt = endOfDay(second, TimeZone.getDefault());
+                        if (nt < first) {
+                            Toast.makeText(c, c.getString(R.string.us_range_bad),
+                                    Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        from[0] = first;
+                        to[0] = nt;
+                        rebuild[0].run();
+                    }
+                });
+            }
+        });
+    }
+
+    /** 某天 0 点 ⇒ 当天 23:59:59.999。 */
+    private static long endOfDay(long dayStart, TimeZone tz) {
+        Calendar c = Calendar.getInstance(tz);
+        c.setTimeInMillis(dayStart);
+        c.set(Calendar.HOUR_OF_DAY, 0);
+        c.set(Calendar.MINUTE, 0);
+        c.set(Calendar.SECOND, 0);
+        c.set(Calendar.MILLISECOND, 0);
+        c.add(Calendar.DAY_OF_YEAR, 1);
+        return c.getTimeInMillis() - 1L;
     }
 
     /** 名字 + 时长（时长靠右；名字让位，别把时长挤没）。 */
@@ -356,27 +594,6 @@ public final class UsageStats {
                 try { in.close(); } catch (Throwable ignored) { }
             }
         }
-    }
-
-    /**
-     * 第 397 轮：每局流水 ⇒ 近 52 周网格。
-     *
-     * @param slot 非空 = 只算这个槽（槽页）；null = 所有槽（插件页总计）
-     * @return null = 还没有流水（不画空图，别让用户以为坏了）
-     */
-    private static Heat.Grid heatOf(PluginApi api, String slot) {
-        File dir = api == null ? null : api.dataDir();
-        if (dir == null) return null;
-        List<Sessions.Entry> all = Sessions.parse(readText(new File(dir, "sessions.tsv"), 1024 * 1024));
-        if (all.isEmpty()) return null;
-        List<Sessions.Entry> mine = new ArrayList<Sessions.Entry>();
-        for (Sessions.Entry e : all) {
-            if (e == null) continue;
-            if (slot == null || e.slot.equals(slot)) mine.add(e);
-        }
-        if (mine.isEmpty()) return null;
-        TimeZone tz = TimeZone.getDefault();
-        return Heat.grid(Sessions.byDay(mine, tz), System.currentTimeMillis(), tz);
     }
 
     /** 读文件（超过 max 字节只读尾部，并丢掉可能被截断的第一行）。 */

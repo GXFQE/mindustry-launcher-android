@@ -900,7 +900,7 @@ final class PluginEntries {
                         + "' (" + e.id + ")");
                 continue;
             }
-            View v = inlineView(a, e, page);
+            View v = inlineView(a, e);
             if (v == null) continue;
             host.addView(v);
             shown++;
@@ -936,7 +936,7 @@ final class PluginEntries {
     }
 
     /** v46：预设小控件（button / chip / text）；样式全部宿主决定，插件只给文字。 */
-    private static View inlineView(final Activity a, final Entry e, final String page) {
+    private static View inlineView(final Activity a, final Entry e) {
         TextView t = new TextView(a);
         t.setText(e.item.label());
         t.setTextSize(10f);
@@ -959,17 +959,11 @@ final class PluginEntries {
         t.setClickable(true);
         t.setOnClickListener(new View.OnClickListener() {
             @Override public void onClick(View unused) {
+                // v46：inline 的点击 = 「打开这个插件的插件页」（宿主已有的通用页），
+                // 不是跑插件的 run()。这样第三方插件零宿主改动也能有整页。
                 try {
-                    File apk = Plugins.apkOf(a, e.id, e.ver);
-                    if (apk == null || !apk.isFile()) return;
-                    PluginHost.Loaded l = Plugins.isInjected(a, e.id, e.ver)
-                            ? PluginHost.openInjected(a, apk, e.item.entry, page, null, null, null)
-                            : PluginHost.load(a, apk, e.item.entry, page, null, null, null);
-                    PluginHost.runEntry(l);
-                } catch (PluginHost.PluginException pe) {
-                    android.widget.Toast.makeText(a,
-                            a.getString(PluginHost.reasonRes(pe.reason)),
-                            android.widget.Toast.LENGTH_LONG).show();
+                    PluginsActivity.start(a, e.id, e.ver, e.item.entry,
+                            Extensions.PAGE_PANEL, inlineSlot(a), e.item.label(), null);
                 } catch (Throwable t2) {
                     android.widget.Toast.makeText(a, a.getString(R.string.plugin_err_other),
                             android.widget.Toast.LENGTH_LONG).show();
@@ -977,6 +971,15 @@ final class PluginEntries {
             }
         });
         return t;
+    }
+
+    /** inline 打开的插件页属于哪个槽：先看页面自己（内容页会换槽），回落当前槽。 */
+    private static String inlineSlot(Activity a) {
+        if (a instanceof BaseActivity) {
+            String s = ((BaseActivity) a).pluginSlot();
+            if (s != null && !s.isEmpty()) return s;
+        }
+        return Data.currentSlot(a);
     }
 
     private static GradientDrawable round(int color, int radius) {

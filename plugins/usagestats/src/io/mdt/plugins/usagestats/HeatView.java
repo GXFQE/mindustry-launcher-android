@@ -11,13 +11,13 @@ import io.mdt.launcher.api.PluginTheme;
 import io.mdt.plugins.usagestats.core.Heat;
 
 /**
- * 年视图热力图（第 397 轮）：**一个方块 = 一周**，52 块排成 13 列 × 4 行。
+ * 游玩时长热力图（第 400 轮）：**范围 × 粒度**，正方形格。
  *
- * <p>为什么用一个自定义 View、不拼 52 个控件：方块要严格按同一套坐标对齐、
- * 并且统一按主题色画深浅；控件树只会让每个方块多一份 layout。
+ * <p>列数由粒度决定（时 24 / 日 7 / 周 13 / 月 12），行数由 {@link Heat.Grid#rows} 给；
+ * 格宽 = 可用宽 / 列数（随屏幕缩放），格高 = 格宽（正方形）。
  *
- * <p>颜色全部来自 {@link PluginTheme#accent}（按档位调透明度）⇒ 深浅色模式自动跟着宿主变；
- * 图例只标「少 / 多」，具体数字交给卡片里的文字合计（图本身不说话）。
+ * <p>三种「空」按 {@link Heat.Grid#draw}：对齐空位 / 范围外 / 记录起点之前都不画；
+ * 画出来的 0 毫秒格 = 最浅色。图例只标「少 / 多」，数字交给旁边的文字合计。
  */
 public final class HeatView extends View {
 
@@ -39,29 +39,31 @@ public final class HeatView extends View {
         this.textPaint.setTextSize(th.sp(8));
     }
 
+    private int cellFor(int width) {
+        int cols = Math.max(1, grid.cols);
+        int avail = width - (cols - 1) * gap;
+        return Math.max(1, avail / cols);
+    }
+
     @Override protected void onMeasure(int widthSpec, int heightSpec) {
         int width = MeasureSpec.getSize(widthSpec);
         if (width <= 0) width = th.dp(280);
         int cell = cellFor(width);
-        setMeasuredDimension(width, Heat.ROWS * (cell + gap) + th.dp(16));
-    }
-
-    private int cellFor(int width) {
-        int avail = width - (Heat.COLS - 1) * gap;
-        return Math.max(1, avail / Heat.COLS);
+        int rows = Math.max(0, grid.rows);
+        setMeasuredDimension(width, rows * (cell + gap) + th.dp(16));
     }
 
     @Override protected void onDraw(Canvas c) {
         int width = getWidth();
         int cell = cellFor(width);
-        int left = (width - (Heat.COLS * cell + (Heat.COLS - 1) * gap)) / 2;
+        int cols = Math.max(1, grid.cols);
+        int left = (width - (cols * cell + (cols - 1) * gap)) / 2;
 
-        // 52 个方块：行 * COLS + 列；weekKnown = false 不画（起点之前 / 今天之后）
-        for (int row = 0; row < Heat.ROWS; row++) {
-            for (int col = 0; col < Heat.COLS; col++) {
-                int idx = row * Heat.COLS + col;
-                if (!grid.weekKnown[idx]) continue;
-                int lv = Heat.level(grid.weekMs[idx]);
+        for (int row = 0; row < grid.rows; row++) {
+            for (int col = 0; col < cols; col++) {
+                int idx = row * cols + col;
+                if (idx >= grid.draw.length || !grid.draw[idx]) continue;
+                int lv = Heat.level(grid.grain, grid.ms[idx]);
                 cellPaint.setColor(fill(lv));
                 float x = left + col * (cell + gap);
                 float y = row * (cell + gap);
@@ -71,7 +73,7 @@ public final class HeatView extends View {
         }
 
         // 图例：少 [■][■][■][■][■] 多
-        int ly = Heat.ROWS * (cell + gap) + th.dp(3);
+        int ly = Math.max(0, grid.rows) * (cell + gap) + th.dp(3);
         String less = getContext().getString(R.string.us_heat_less);
         String more = getContext().getString(R.string.us_heat_more);
         float x = left;
@@ -88,7 +90,7 @@ public final class HeatView extends View {
         c.drawText(more, x + th.dp(2), baseY, textPaint);
     }
 
-    /** 档位 ⇒ 颜色（accent 调透明度；深色下最浅档略亮一点，否则同色）。 */
+    /** 档位 ⇒ 颜色（accent 调透明度；深色下最浅档略亮一点）。 */
     private int fill(int level) {
         double a;
         switch (level) {

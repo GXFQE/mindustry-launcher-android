@@ -76,8 +76,13 @@ final class Extensions {
     static final String PAGE_PATCHES = "patches";
     /** v40：资源统计页。 */
     static final String PAGE_RESOURCES = "resources";
-    /** v46：「使用统计」页（主界面「游戏时长」行尾的 inline 按钮进去）。 */
-    static final String PAGE_USAGE = "usage";
+    /**
+     * **v46**：插件页的页面参数（inline 点击 = 打开该插件的插件页，`api.page()` 收到它）。
+     *
+     * <p>它**不是** `knownPage`：插件页（`PluginsActivity` 直达）不经过 `section` 收集，
+     * 只是把这串参数原样交给插件，插件在 `createView` 里按它分支。
+     */
+    static final String PAGE_PANEL = "panel";
     /**
      * 第 193 轮（v9）：**段落插槽** —— 插件把一段界面直接画进宿主页里。
      *
@@ -310,9 +315,7 @@ final class Extensions {
                 || PAGE_MAP_DETAIL.equals(page) || PAGE_BLUEPRINT_DETAIL.equals(page)
                 // v40：三个新页面钩子（布局里有 plugin_section，BaseActivity 会挂）
                 || PAGE_VERSION.equals(page) || PAGE_PATCHES.equals(page)
-                || PAGE_RESOURCES.equals(page)
-                // v46：「使用统计」页（主界面「游戏时长」行尾按钮进去）
-                || PAGE_USAGE.equals(page);
+                || PAGE_RESOURCES.equals(page);
     }
 
     /**

@@ -59,7 +59,7 @@ public interface PluginApi {
      * <p>为什么要有这个常量：注释里的「当前 = N」运行期读不到，一个写 17、一个写 20 也没人发现；
      * 常量 + 断言才拦得住。</p>
      */
-    int DOC_VERSION = 46;
+    int DOC_VERSION = 47;
 
     // ══ 环境 ═══════════════════════════════════════════════════════════════
 
@@ -552,6 +552,28 @@ public interface PluginApi {
      * 进自己的页，不用绕到「插件」卡里的那一行。没有可用页面（动作跑在后台）⇒ 什么都不做。
      */
     void openPluginPage();
+
+    // ---- v47 新增：宿主代弹系统日期选择器 ------------------------------------------
+
+    /**
+     * **v47**：让宿主弹**系统日期选择器**。
+     *
+     * <p>★ 为什么必须由宿主来弹（2026-11-19 真机崩溃）：插件 `new DatePickerDialog(插件上下文)`
+     * 时，系统布局 `android:layout/date_picker_dialog` 是用**插件的 Resources** 解析主题属性的，
+     * 而插件 Resources 里没有宿主主题 ⇒ `Failed to resolve attribute` → `InflateException` →
+     * 整个应用崩溃。宿主的 Activity 才同时拥有正确的 Resources 与主题。
+     *
+     * <p>回调在 UI 线程给**本地时区当天 0 点**的毫秒；用户取消 ⇒ 不回调（别等）。
+     *
+     * @param title     对话框标题（null / 空 = 不设）
+     * @param initialMs 初始选中的时间（0 / 非法 ⇒ 今天）
+     */
+    void pickDate(String title, long initialMs, DatePick cb);
+
+    /** v47：{@link #pickDate} 的回调。 */
+    interface DatePick {
+        void onDate(long timeMs);
+    }
 
     /**
      * 插件自己的**数据目录**（`<hub>/usage/`）—— **宿主只给目录，不写任何流水、不解析账本**。

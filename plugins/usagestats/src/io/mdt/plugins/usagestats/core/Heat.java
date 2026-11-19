@@ -7,128 +7,420 @@ import java.util.Map;
 import java.util.TimeZone;
 
 /**
- * 年视图热力网格（第 397 轮）：**一个方块 = 一周**，颜色深浅 = 那一周合计的前台时长。
+ * 游玩时长热力图（第 400 轮）：**范围 × 粒度**。
  *
- * <p>为什么是周块、不是日格：用户 2026-11-19 定「按年的可以以周划块的」—— 一年 52 个方块
- * 排成 13×4（每块约 20dp）比 371 个日格（每格 4dp）可读得多；周内细节（哪天玩）留给以后的
- * 单日视图。
+ * <p>粒度四档（用户 2026-11-19 定）：
+ * <ul>
+ *   <li>{@link Grain#HOUR}：24 列（0~23 时），一天一行；</li>
+ *   <li>{@link Grain#DAY}：7 列（周一~周日），一周一行；</li>
+ *   <li>{@link Grain#WEEK}：13 列（一季度 13 周），一行一季度；</li>
+ *   <li>{@link Grain#MONTH}：12 列（1~12 月），一行一年。</li>
+ * </ul>
  *
- * <p>状态分开：**数据起点之前 / 今天之后 ⇒ 不画**（{@link Grid#weekKnown} = false）；
- * **在区间内但 0 毫秒 ⇒ 最浅一格**（{@link #level} = 0）—— 把空周和"还没开始记录"画成
- * 一样，用户会以为那几周在玩。
+ * <p>行数 = ceil(格数 / 列数)，上限 {@link #MAX_ROWS}；超限 ⇒ {@link Grid#tooBig}
+ * （UI 拒绝并提示，**不自动降档** —— 用户 2026-11-19：「建议拒绝提示」）。
+ *
+ * <p>对齐（「第一天不是周一就空着」）：
+ * <ul>
+ *   <li>日档从**起点所在周的周一**开始；</li>
+ *   <li>周档从**起点所在季度的首周**（季度首日所在周的周一）开始；</li>
+ *   <li>月档从**起点所在年的 1 月**开始；</li>
+ *   <li>时档从起点当天的 0 点开始（按日选范围，天然对齐）。</li>
+ * </ul>
+ *
+ * <p>三种「空」必须分开：
+ * <ol>
+ *   <li>对齐空位 / 范围外 ⇒ {@code draw = false}（不画）；</li>
+ *   <li>在范围内、但在**记录起点之前** ⇒ {@code draw = false}（没记录 ≠ 没玩）；</li>
+ *   <li>在范围内、记录起点之后、时长 0 ⇒ {@code draw = true}、{@code level = 0}（最浅一格）。</li>
+ * </ol>
+ *
+ * <p>范围边界按**墙钟比例裁剪**（周档 / 月档的格可能被范围截断）：每条会话先按天 / 小时切，
+ * 再把段裁到范围里、按比例分摊毫秒 —— 合计只含范围内的时间。
  *
  * <p>纯函数（不碰 Android）：PC 侧 `build.sh check` 直接测。
  */
 public final class Heat {
 
-    /** 每行 13 周（≈ 一个季度），4 行 = 52 周。 */
-    public static final int COLS = 13;
-    public static final int ROWS = 4;
-    public static final int WEEKS = COLS * ROWS;
+    /** 粒度。 */
+    public enum Grain { HOUR, DAY, WEEK, MONTH }
+
+    /** 最多画多少行（用户 2026-11-19：「366 差不多」）。 */
+    public static final int MAX_ROWS = 366;
+
+    /** 颜色档位：0 = 有记录但没玩（最浅），1~5 越来越深。 */
     public static final int LEVELS = 5;
 
-    /** 52 个方块；索引 = 行 * COLS + 列，第 0 格 = 最早那一周。 */
+    /** 生成的网格；索引 = `row * cols + col`。 */
     public static final class Grid {
-        /** 每周合计的前台毫秒。 */
-        public final long[] weekMs = new long[WEEKS];
-        /** 这一周与「有记录区间」有交集（false ⇒ 不画）。 */
-        public final boolean[] weekKnown = new boolean[WEEKS];
-        /** 这一周的周一日期（yyyy-MM-dd；诊断 / 自检用）。 */
-        public final String[] weekKey = new String[WEEKS];
-        /** 数据起点（yyyy-MM-dd）；没有任何流水 = 空串。 */
+        public final Grain grain;
+        public final int cols, rows;
+        /** 每格的前台毫秒（只含范围内的部分）。 */
+        public final long[] ms;
+        /** 这一格要不要画（对齐空位 / 范围外 / 记录起点之前 = false）。 */
+        public final boolean[] draw;
+        /** 每格起点的日期键（诊断 / 自检：小时档是 "yyyy-MM-dd HH"，月档是 "yyyy-MM"）。 */
+        public final String[] cellKey;
+        /** 记录起点（yyyy-MM-dd）；没有任何流水 = 空串。 */
         public final String firstDay;
-        /** 今天的日期（yyyy-MM-dd）。 */
-        public final String today;
-        /** 本周一的日期（yyyy-MM-dd）。 */
-        public final String thisMonday;
+        /** 用户选的范围（本地日 0 点 ~ 结束日 23:59:59.999）。 */
+        public final long from, to;
+        /** 行数超过 {@link #MAX_ROWS}（UI 只提示、不画）。 */
+        public final boolean tooBig;
 
-        Grid(String firstDay, String today, String thisMonday) {
+        Grid(Grain grain, int cols, int rows, long from, long to, String firstDay,
+             boolean tooBig) {
+            this.grain = grain;
+            this.cols = cols;
+            this.rows = rows;
+            this.from = from;
+            this.to = to;
             this.firstDay = firstDay == null ? "" : firstDay;
-            this.today = today == null ? "" : today;
-            this.thisMonday = thisMonday == null ? "" : thisMonday;
+            this.tooBig = tooBig;
+            int n = Math.max(0, rows * cols);
+            this.ms = new long[n];
+            this.draw = new boolean[n];
+            this.cellKey = new String[n];
         }
     }
 
     private Heat() {}
 
-    /** 一周合计 ⇒ 颜色档位（0 = 有记录但没玩；1~5 越久越深）。 */
-    public static int level(long ms) {
+    /** 每行的列数。 */
+    public static int colsOf(Grain g) {
+        if (g == Grain.HOUR) return 24;
+        if (g == Grain.DAY) return 7;
+        if (g == Grain.WEEK) return 13;
+        return 12;
+    }
+
+    /**
+     * 一格的前台毫秒 ⇒ 颜色档位（0 = 有记录但没玩）。
+     *
+     * <p>阈值按粒度分别定（一小时的 10 分钟和一整天的 10 分钟不是一回事）。
+     */
+    public static int level(Grain g, long ms) {
         if (ms <= 0L) return 0;
-        if (ms < 3_600_000L) return 1;                 // < 1 小时/周
-        if (ms < 3L * 3_600_000L) return 2;            // < 3 小时
-        if (ms < 7L * 3_600_000L) return 3;            // < 7 小时
-        if (ms < 15L * 3_600_000L) return 4;           // < 15 小时
+        if (g == Grain.HOUR) {
+            if (ms < 10L * 60_000L) return 1;
+            if (ms < 30L * 60_000L) return 2;
+            if (ms < 60L * 60_000L) return 3;
+            if (ms < 2L * 3_600_000L) return 4;
+            return 5;
+        }
+        if (g == Grain.DAY) {
+            if (ms < 30L * 60_000L) return 1;
+            if (ms < 3_600_000L) return 2;
+            if (ms < 2L * 3_600_000L) return 3;
+            if (ms < 4L * 3_600_000L) return 4;
+            return 5;
+        }
+        if (g == Grain.WEEK) {
+            if (ms < 3_600_000L) return 1;
+            if (ms < 3L * 3_600_000L) return 2;
+            if (ms < 7L * 3_600_000L) return 3;
+            if (ms < 14L * 3_600_000L) return 4;
+            return 5;
+        }
+        // MONTH
+        if (ms < 2L * 3_600_000L) return 1;
+        if (ms < 6L * 3_600_000L) return 2;
+        if (ms < 15L * 3_600_000L) return 3;
+        if (ms < 30L * 3_600_000L) return 4;
         return 5;
     }
 
-    /** 网格里所有「在记录区间内」方块之和（与图上同源，别另算一遍）。 */
+    /** 网格里所有「要画」的格子之和（与图上的格子同源）。 */
     public static long total(Grid g) {
         if (g == null) return 0L;
         long sum = 0L;
-        for (int i = 0; i < WEEKS; i++) {
-            if (g.weekKnown[i]) sum += g.weekMs[i];
+        for (int i = 0; i < g.ms.length && i < g.draw.length; i++) {
+            if (g.draw[i]) sum += g.ms[i];
         }
         return sum;
     }
 
     /**
-     * 生成最近 {@link #WEEKS} 周的网格。
+     * 生成网格。
      *
-     * @param days 按天聚合的时长（{@link Sessions#byDay}；调用方已按槽过滤）
-     * @param now  当前时刻（墙钟毫秒；PC 自检传固定值）
+     * @param es    每局流水（调用方已按槽过滤；范围外的会被裁掉）
+     * @param now   当前时刻（PC 自检传固定值；用来判「今天之后」）
+     * @param grain 粒度
+     * @param from  范围起点（本地日 0 点）
+     * @param to    范围终点（本地日 23:59:59.999）
      */
-    public static Grid grid(List<Sessions.Day> days, long now, TimeZone tz) {
+    public static Grid grid(List<Sessions.Entry> es, long now, TimeZone tz, Grain grain,
+                            long from, long to) {
         TimeZone zone = tz == null ? TimeZone.getDefault() : tz;
-        Map<String, Long> byDate = new HashMap<String, Long>();
-        String first = "";
-        if (days != null) {
-            for (Sessions.Day d : days) {
-                if (d == null || d.date == null || d.date.isEmpty()) continue;
-                Long old = byDate.get(d.date);
-                byDate.put(d.date, (old == null ? 0L : old.longValue()) + d.ms);
-                if (first.isEmpty() || d.date.compareTo(first) < 0) first = d.date;
+        if (grain == null) grain = Grain.DAY;
+        if (to < from) to = from;
+        long fromDay = dayStart(from, zone);
+        long toDay = dayStart(to, zone);
+
+        long firstStart = 0L;
+        String firstDay = "";
+        if (es != null) {
+            for (Sessions.Entry e : es) {
+                if (e == null || e.started <= 0L) continue;
+                if (firstStart == 0L || e.started < firstStart) {
+                    firstStart = e.started;
+                    firstDay = Sessions.dayOf(e.started, zone);
+                }
             }
         }
-        String today = Sessions.dayOf(now, zone);
-        long monday = mondayStart(now, zone);
-        Grid g = new Grid(first, today, Sessions.dayOf(monday, zone));
+        long firstDayStart = firstDay.isEmpty() ? 0L : dayStart(dayStartMs(firstDay, zone), zone);
 
-        // 最左 / 最早那一格的周一 = 本周一往前推 (WEEKS-1) 周
-        Calendar c = Calendar.getInstance(zone);
-        c.setTimeInMillis(monday);
-        c.add(Calendar.DAY_OF_YEAR, -(WEEKS - 1) * 7);
-        Calendar day = Calendar.getInstance(zone);
-        for (int w = 0; w < WEEKS; w++) {
-            day.setTimeInMillis(c.getTimeInMillis());
-            long sum = 0L;
-            boolean known = false;
-            for (int k = 0; k < 7; k++) {
-                String key = Sessions.dayOf(day.getTimeInMillis(), zone);
-                Long v = byDate.get(key);
-                if (v != null && v.longValue() > 0L) sum += v.longValue();
-                if (!first.isEmpty() && key.compareTo(first) >= 0 && key.compareTo(today) <= 0) {
-                    known = true;
+        int cols = colsOf(grain);
+        // 先算对齐起点（第一格的起点）与格数
+        long alignedFrom;
+        int cells;
+        if (grain == Grain.HOUR) {
+            alignedFrom = fromDay;
+            cells = (int) (daysBetween(fromDay, toDay, zone) + 1) * 24;
+        } else if (grain == Grain.DAY) {
+            alignedFrom = weekStart(fromDay, zone);
+            cells = (int) daysBetween(alignedFrom, weekEnd(toDay, zone), zone);
+        } else if (grain == Grain.WEEK) {
+            long q = quarterStart(fromDay, zone);
+            alignedFrom = weekStart(q, zone);
+            cells = (int) (weeksBetween(alignedFrom, toDay, zone) + 1);
+        } else {
+            alignedFrom = yearStart(fromDay, zone);
+            cells = (int) (monthsBetween(alignedFrom, toDay, zone) + 1);
+        }
+        int rows = (cells + cols - 1) / cols;
+        boolean tooBig = rows > MAX_ROWS;
+        Grid g = new Grid(grain, cols, rows, from, to, firstDay, tooBig);
+        if (tooBig || rows <= 0) return g;
+
+        // 聚合桶（先裁剪到 [from, to]）
+        Map<String, Long> dayMap = new HashMap<String, Long>();
+        Map<String, Long> hourMap = grain == Grain.HOUR ? new HashMap<String, Long>() : null;
+        if (es != null) {
+            for (Sessions.Entry e : es) {
+                if (e == null || e.activeMs <= 0L || e.started <= 0L) continue;
+                if (hourMap != null) {
+                    addHourClip(hourMap, e, from, to, zone);
                 }
-                day.add(Calendar.DAY_OF_YEAR, 1);
+                addDayClip(dayMap, e, from, to, zone);
             }
-            g.weekMs[w] = sum;
-            g.weekKnown[w] = known;
-            g.weekKey[w] = Sessions.dayOf(c.getTimeInMillis(), zone);
-            c.add(Calendar.DAY_OF_YEAR, 7);        // 周一 → 下周一（Calendar 处理夏令时）
+        }
+
+        // 按粒度生成每格
+        for (int i = 0; i < cells; i++) {
+            int row = i / cols;
+            int col = i % cols;
+            long cellStart, cellEnd;
+            String key;
+            boolean inRange, afterFirst;
+            if (grain == Grain.HOUR) {
+                Calendar c = Calendar.getInstance(zone);
+                c.setTimeInMillis(alignedFrom);
+                c.add(Calendar.HOUR_OF_DAY, i);
+                cellStart = c.getTimeInMillis();
+                c.add(Calendar.HOUR_OF_DAY, 1);
+                cellEnd = c.getTimeInMillis();
+                key = Sessions.dayOf(cellStart, zone) + " " + hourKey(cellStart, zone);
+                inRange = cellStart >= from && cellStart <= to;
+                afterFirst = firstDayStart > 0L && cellEnd > firstDayStart;
+                Long v = hourMap == null ? null : hourMap.get(key);
+                g.ms[i] = v == null ? 0L : v.longValue();
+            } else if (grain == Grain.DAY) {
+                long day = addDays(alignedFrom, i, zone);
+                cellStart = day;
+                cellEnd = nextDay(day, zone);
+                key = Sessions.dayOf(cellStart, zone);
+                inRange = cellStart >= fromDay && cellStart <= toDay;
+                afterFirst = firstDayStart > 0L && cellEnd > firstDayStart;
+                Long v = dayMap.get(key);
+                g.ms[i] = v == null ? 0L : v.longValue();
+            } else if (grain == Grain.WEEK) {
+                long week = addDays(alignedFrom, i * 7, zone);
+                cellStart = week;
+                cellEnd = addDays(week, 7, zone);
+                key = Sessions.dayOf(cellStart, zone);
+                inRange = cellEnd > from && cellStart <= toDay;
+                afterFirst = firstDayStart > 0L && cellEnd > firstDayStart;
+                g.ms[i] = sumDays(dayMap, cellStart, cellEnd, zone);
+            } else {
+                long month = addMonths(alignedFrom, i, zone);
+                cellStart = month;
+                cellEnd = addMonths(month, 1, zone);
+                key = Sessions.dayOf(cellStart, zone).substring(0, 7);
+                inRange = cellEnd > from && cellStart <= toDay;
+                afterFirst = firstDayStart > 0L && cellEnd > firstDayStart;
+                g.ms[i] = sumDays(dayMap, cellStart, cellEnd, zone);
+            }
+            g.cellKey[i] = key;
+            g.draw[i] = inRange && afterFirst;
         }
         return g;
     }
 
-    /** 把某一时刻清到当天 00:00 再回到本周一。 */
-    static long mondayStart(long now, TimeZone tz) {
-        Calendar c = Calendar.getInstance(tz == null ? TimeZone.getDefault() : tz);
-        c.setTimeInMillis(now);
+    // ---- 裁剪 + 聚合 ---------------------------------------------------------
+
+    private static void addDayClip(Map<String, Long> m, Sessions.Entry e, long from, long to,
+                                   TimeZone tz) {
+        for (Sessions.Segment s : Sessions.split(e, tz, Calendar.DAY_OF_YEAR)) {
+            long a = Math.max(s.from, from);
+            long b = Math.min(s.to, to);
+            if (b <= a) continue;
+            long wall = s.to - s.from;
+            long v = wall <= 0L ? s.ms : (long) ((double) s.ms * (b - a) / (double) wall);
+            if (v > 0L) add(m, Sessions.dayOf(a, tz), v);
+        }
+    }
+
+    private static void addHourClip(Map<String, Long> m, Sessions.Entry e, long from, long to,
+                                    TimeZone tz) {
+        for (Sessions.Segment s : Sessions.split(e, tz, Calendar.HOUR_OF_DAY)) {
+            long a = Math.max(s.from, from);
+            long b = Math.min(s.to, to);
+            if (b <= a) continue;
+            long wall = s.to - s.from;
+            long v = wall <= 0L ? s.ms : (long) ((double) s.ms * (b - a) / (double) wall);
+            if (v > 0L) {
+                add(m, Sessions.dayOf(a, tz) + " " + hourKey(a, tz), v);
+            }
+        }
+    }
+
+    private static void add(Map<String, Long> m, String k, long v) {
+        Long old = m.get(k);
+        m.put(k, old == null ? v : old.longValue() + v);
+    }
+
+    /** [start, end) 内所有「天」桶之和。 */
+    private static long sumDays(Map<String, Long> m, long start, long end, TimeZone tz) {
+        long sum = 0L;
+        long d = start;
+        int guard = 0;
+        while (d < end && guard++ < 400) {
+            Long v = m.get(Sessions.dayOf(d, tz));
+            if (v != null) sum += v.longValue();
+            d = nextDay(d, tz);
+        }
+        return sum;
+    }
+
+    // ---- 日历辅助（全部按设备本地时区） --------------------------------------
+
+    static long dayStart(long ms, TimeZone tz) {
+        Calendar c = Calendar.getInstance(tz);
+        c.setTimeInMillis(ms);
         c.set(Calendar.HOUR_OF_DAY, 0);
         c.set(Calendar.MINUTE, 0);
         c.set(Calendar.SECOND, 0);
         c.set(Calendar.MILLISECOND, 0);
-        int dow = c.get(Calendar.DAY_OF_WEEK);   // SUNDAY=1 .. SATURDAY=7
-        c.add(Calendar.DAY_OF_YEAR, -((dow + 5) % 7));   // MONDAY=2 -> 0
         return c.getTimeInMillis();
+    }
+
+    static long nextDay(long day, TimeZone tz) {
+        return addDays(day, 1, tz);
+    }
+
+    static long addDays(long ms, int n, TimeZone tz) {
+        Calendar c = Calendar.getInstance(tz);
+        c.setTimeInMillis(ms);
+        c.add(Calendar.DAY_OF_YEAR, n);
+        return c.getTimeInMillis();
+    }
+
+    static long addMonths(long ms, int n, TimeZone tz) {
+        Calendar c = Calendar.getInstance(tz);
+        c.setTimeInMillis(ms);
+        c.set(Calendar.DAY_OF_MONTH, 1);
+        c.add(Calendar.MONTH, n);
+        return c.getTimeInMillis();
+    }
+
+    /** 某一时刻所在周的周一 00:00。 */
+    static long weekStart(long ms, TimeZone tz) {
+        Calendar c = Calendar.getInstance(tz);
+        c.setTimeInMillis(dayStart(ms, tz));
+        int dow = c.get(Calendar.DAY_OF_WEEK);   // SUNDAY=1 .. SATURDAY=7
+        c.add(Calendar.DAY_OF_YEAR, -((dow + 5) % 7));
+        return c.getTimeInMillis();
+    }
+
+    /** 某一时刻所在周的周日 23:59:59.999 的次日 0 点（= 下周一）。 */
+    static long weekEnd(long day, TimeZone tz) {
+        return addDays(weekStart(day, tz), 7, tz);
+    }
+
+    /** 某一时刻所在季度的首日（1/4/7/10 月 1 日）0 点。 */
+    static long quarterStart(long ms, TimeZone tz) {
+        Calendar c = Calendar.getInstance(tz);
+        c.setTimeInMillis(dayStart(ms, tz));
+        int month = c.get(Calendar.MONTH);       // 0..11
+        c.set(Calendar.DAY_OF_MONTH, 1);
+        c.set(Calendar.MONTH, (month / 3) * 3);
+        return c.getTimeInMillis();
+    }
+
+    /** 某一时刻所在年的 1 月 1 日 0 点。 */
+    static long yearStart(long ms, TimeZone tz) {
+        Calendar c = Calendar.getInstance(tz);
+        c.setTimeInMillis(dayStart(ms, tz));
+        c.set(Calendar.DAY_OF_MONTH, 1);
+        c.set(Calendar.MONTH, 0);
+        return c.getTimeInMillis();
+    }
+
+    /** 两个本地日之间的天数差（含 DST：按日历日算）。 */
+    static long daysBetween(long fromDay, long toDay, TimeZone tz) {
+        long d = dayStart(fromDay, tz);
+        long end = dayStart(toDay, tz);
+        long n = 0L;
+        int guard = 0;
+        while (d < end && guard++ < 4000) {
+            d = addDays(d, 1, tz);
+            n++;
+        }
+        return n;
+    }
+
+    /** 从 startWeek（周一）到 day 所在周之间隔了几周。 */
+    static long weeksBetween(long startWeek, long day, TimeZone tz) {
+        long w = weekStart(day, tz);
+        long n = 0L;
+        long s = startWeek;
+        int guard = 0;
+        while (s < w && guard++ < 4000) {
+            s = addDays(s, 7, tz);
+            n++;
+        }
+        return n;
+    }
+
+    /** 从 startMonth（1 日）到 day 所在月之间隔了几个月。 */
+    static long monthsBetween(long startMonth, long day, TimeZone tz) {
+        Calendar a = Calendar.getInstance(tz);
+        Calendar b = Calendar.getInstance(tz);
+        a.setTimeInMillis(startMonth);
+        b.setTimeInMillis(day);
+        int n = (b.get(Calendar.YEAR) - a.get(Calendar.YEAR)) * 12
+                + (b.get(Calendar.MONTH) - a.get(Calendar.MONTH));
+        return Math.max(0, n);
+    }
+
+    /** "yyyy-MM-dd" ⇒ 该日本地 0 点。 */
+    static long dayStartMs(String date, TimeZone tz) {
+        try {
+            String[] p = date.split("-");
+            Calendar c = Calendar.getInstance(tz);
+            c.clear();
+            c.set(Integer.parseInt(p[0]), Integer.parseInt(p[1]) - 1, Integer.parseInt(p[2]));
+            return c.getTimeInMillis();
+        } catch (Throwable t) {
+            return 0L;
+        }
+    }
+
+    private static String hourKey(long ms, TimeZone tz) {
+        Calendar c = Calendar.getInstance(tz);
+        c.setTimeInMillis(ms);
+        int h = c.get(Calendar.HOUR_OF_DAY);
+        return h < 10 ? "0" + h : String.valueOf(h);
     }
 }

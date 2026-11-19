@@ -274,37 +274,59 @@ public final class Check {
                         && db.get(0).slot.equals("s l") && db.get(0).tag.equals("t t"),
                 "sessions: clean 控制字符 -> 空格，仍是一行");
 
-        // ── 年视图热力网格（第 397 轮）：一个方块 = 一周 ─────────────────────
-        fail += ok(Heat.level(0) == 0 && Heat.level(1) == 1
-                        && Heat.level(60 * 60_000L) == 2
-                        && Heat.level(3 * 60 * 60_000L) == 3
-                        && Heat.level(7 * 60 * 60_000L) == 4
-                        && Heat.level(15 * 60 * 60_000L) == 5,
-                "heat: 周档位边界（0 / 1 时 / 3 时 / 7 时 / 15 时）");
+        // ── 热力图（第 400 轮）：范围 × 粒度 / 对齐 / 裁剪 / 上限 ─────────────────
+        fail += ok(Heat.level(Heat.Grain.DAY, 0) == 0
+                        && Heat.level(Heat.Grain.DAY, 1) == 1
+                        && Heat.level(Heat.Grain.DAY, 30 * 60_000L) == 2
+                        && Heat.level(Heat.Grain.DAY, 60 * 60_000L) == 3
+                        && Heat.level(Heat.Grain.DAY, 2 * 60 * 60_000L) == 4
+                        && Heat.level(Heat.Grain.DAY, 4 * 60 * 60_000L) == 5
+                        && Heat.level(Heat.Grain.HOUR, 10 * 60_000L) == 2
+                        && Heat.level(Heat.Grain.WEEK, 3 * 60 * 60_000L) == 3,
+                "heat: 档位按粒度分（日 / 时 / 周各一套阈值）");
 
-        long now = at(sh, 2026, 11, 19, 12, 0);      // 周四中午（本周一 = 11-16）
-        fail += ok(Sessions.dayOf(Heat.mondayStart(now, sh), sh).equals("2026-11-16"),
-                "heat: mondayStart 回到本周一");
-        List<Sessions.Day> hd = java.util.Arrays.asList(
-                new Sessions.Day("2026-11-17", 3_600_000L, 1),
-                new Sessions.Day("2026-11-19", 7_200_000L, 1));
-        Heat.Grid hg = Heat.grid(hd, now, sh);
-        int last = Heat.WEEKS - 1;
-        fail += ok(hg.firstDay.equals("2026-11-17") && hg.today.equals("2026-11-19")
-                        && hg.thisMonday.equals("2026-11-16")
-                        && hg.weekKey[last].equals("2026-11-16"),
-                "heat: 起点 / 今天 / 本周一的日期");
-        fail += ok(hg.weekMs[last] == 10_800_000L && hg.weekKnown[last],
-                "★heat: 同一周的几天合成一个方块（1h + 2h = 3h）");
-        fail += ok(!hg.weekKnown[last - 1],
-                "★heat: 起点之前的周不画");
-        fail += ok(!hg.weekKnown[0] && hg.weekKey[0].compareTo("2026-11-16") < 0,
-                "heat: 最早的周在 52 周之前");
-        fail += ok(Heat.total(hg) == 10_800_000L,
-                "heat: 合计只加 known 的方块（与图同源）");
-        Heat.Grid he = Heat.grid(Collections.<Sessions.Day>emptyList(), now, sh);
-        fail += ok(he.firstDay.isEmpty() && !he.weekKnown[last],
-                "heat: 没有流水 ⇒ 全不画（不给空图）");
+        long now = at(sh, 2026, 11, 19, 12, 0);   // 周四
+        Sessions.Entry e1 = new Sessions.Entry(at(sh, 2026, 11, 18, 10, 0),
+                at(sh, 2026, 11, 18, 12, 0), 7_200_000L, 7_200_000L, "", "d", "k", "", "");
+        long from = at(sh, 2026, 11, 16, 0, 0);
+        long to = at(sh, 2026, 11, 22, 23, 0) + 3_599_999L;
+        List<Sessions.Entry> one = java.util.Arrays.asList(e1);
+        Heat.Grid gd = Heat.grid(one, now, sh, Heat.Grain.DAY, from, to);
+        fail += ok(gd.cols == 7 && gd.rows == 1
+                        && !gd.draw[0] && !gd.draw[1] && gd.draw[2] && gd.draw[3]
+                        && gd.ms[2] == 7_200_000L && gd.ms[3] == 0L
+                        && Heat.total(gd) == 7_200_000L
+                        && "2026-11-16".equals(gd.cellKey[0])
+                        && "2026-11-18".equals(gd.cellKey[2]),
+                "★heat 日档：周一对齐 / 起点前不画 / 起点后没玩也画 / 合计只算范围内");
+
+        long fromHalf = at(sh, 2026, 11, 18, 10, 0);
+        long toHalf = at(sh, 2026, 11, 18, 11, 0) - 1L;   // 10:00 ~ 10:59:59.999
+        Heat.Grid gc = Heat.grid(one, now, sh, Heat.Grain.DAY, fromHalf, toHalf);
+        fail += ok(Math.abs(gc.ms[2] - 3_600_000L) <= 1L
+                        && Math.abs(Heat.total(gc) - 3_600_000L) <= 1L,
+                "★heat: 范围边界按墙钟裁剪（2h 的一局只算范围内那 1h，误差 ≤1ms）");
+
+        Heat.Grid gw = Heat.grid(one, now, sh, Heat.Grain.WEEK,
+                at(sh, 2026, 11, 18, 0, 0), at(sh, 2026, 11, 18, 23, 0) + 3_599_999L);
+        fail += ok(gw.cols == 13 && gw.rows == 1 && "2026-09-28".equals(gw.cellKey[0]),
+                "heat 周档：从季度首周对齐（10-01 所在周从 09-28 起）");
+
+        Heat.Grid gm = Heat.grid(one, now, sh, Heat.Grain.MONTH,
+                at(sh, 2026, 11, 18, 0, 0), at(sh, 2026, 11, 18, 23, 0) + 3_599_999L);
+        fail += ok(gm.cols == 12 && gm.rows == 1 && "2026-01".equals(gm.cellKey[0])
+                        && gm.ms[10] == 7_200_000L,
+                "heat 月档：从 1 月对齐、11 月格 = 当月时长");
+
+        Heat.Grid gh = Heat.grid(one, now, sh, Heat.Grain.HOUR,
+                at(sh, 2025, 1, 1, 0, 0), at(sh, 2026, 12, 31, 23, 0) + 3_599_999L);
+        fail += ok(gh.tooBig,
+                "heat: 小时档 2 年 ⇒ 行数超 366（拒绝提示，不自动降档）");
+
+        Heat.Grid ge = Heat.grid(Collections.<Sessions.Entry>emptyList(), now, sh,
+                Heat.Grain.DAY, from, to);
+        fail += ok(ge.firstDay.isEmpty() && !ge.draw[2] && Heat.total(ge) == 0L,
+                "heat: 没有流水 ⇒ 不画、合计 0");
 
         System.out.println(fail == 0 ? "== USAGESTATS CHECK OK ==" : "!! " + fail + " failed");
         System.exit(fail == 0 ? 0 : 1);
