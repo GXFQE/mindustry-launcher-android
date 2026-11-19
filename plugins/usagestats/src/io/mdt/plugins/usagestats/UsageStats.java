@@ -186,6 +186,8 @@ public final class UsageStats {
         title.setTextColor(th.text);
         box.addView(title);
 
+        // 第 401 轮：两个分组标题（用户：「上面需要加上标题（统计范围选择 / 精度选择）」）
+        box.addView(sectionLabel(c, th, R.string.us_range_title));
         // 范围分两行：7 个胶囊一行放不下（360dp 宽的内容区），「自定义」会被截掉
         final LinearLayout rangeRow = new LinearLayout(c);
         rangeRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -194,6 +196,7 @@ public final class UsageStats {
         rangeRow2.setOrientation(LinearLayout.HORIZONTAL);
         box.addView(rangeRow2);
 
+        box.addView(sectionLabel(c, th, R.string.us_grain_title));
         final LinearLayout grainRow = new LinearLayout(c);
         grainRow.setOrientation(LinearLayout.HORIZONTAL);
         box.addView(grainRow);
@@ -323,6 +326,16 @@ public final class UsageStats {
         };
         rebuild[0].run();
         return box;
+    }
+
+    /** 分组小标题（统计范围 / 精度）。 */
+    private static TextView sectionLabel(Context c, PluginTheme th, int res) {
+        TextView t = new TextView(c);
+        t.setTextSize(12f);
+        t.setTextColor(th.textMuted);
+        t.setPadding(0, th.dp(6), 0, th.dp(2));
+        t.setText(c.getString(res));
+        return t;
     }
 
     /** 粒度名资源。 */

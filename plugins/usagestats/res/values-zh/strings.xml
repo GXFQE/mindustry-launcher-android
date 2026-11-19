@@ -16,6 +16,8 @@
     <string name="us_heat_less">少</string>
     <string name="us_heat_more">多</string>
     <string name="us_panel_title">游玩统计</string>
+    <string name="us_range_title">统计范围</string>
+    <string name="us_grain_title">精度</string>
     <string name="us_range_days_fmt">%1$d 天</string>
     <string name="us_range_all">全部</string>
     <string name="us_range_custom">自定义</string>
@@ -26,7 +28,7 @@
     <string name="us_panel_total_fmt">合计：%1$s</string>
     <string name="us_panel_empty">还没有游玩记录（插件记下第一局之后才有）。</string>
     <string name="us_panel_too_big">范围太大：超过 366 行。缩短范围，或换更粗的颗粒。</string>
-    <string name="us_panel_hint">一格 = 一个时间段；越深时间越长。范围 / 颗粒可以随时改。</string>
+    <string name="us_panel_hint">一格 = 一个时间段；越深时间越长。</string>
     <string name="us_range_bad">起点不能晚于终点。</string>
     <string name="us_pick_from">选择起点</string>
     <string name="us_pick_to">选择终点</string>
