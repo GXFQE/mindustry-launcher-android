@@ -237,13 +237,6 @@ public final class UsageStats {
                             }
                         }), chipLp(th));
                 if (instOpen[0]) {
-                    instList.addView(instPickRow(c, th, c.getString(R.string.us_range_all),
-                            picked.isEmpty(), new View.OnClickListener() {
-                                @Override public void onClick(View v) {
-                                    picked.clear();
-                                    rebuild[0].run();
-                                }
-                            }));
                     for (final String[] ins : insts) {
                         final boolean on = isPicked(picked, ins[0], ins[1]);
                         instList.addView(instPickRow(c, th,
