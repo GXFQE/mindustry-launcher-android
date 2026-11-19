@@ -142,8 +142,13 @@ public final class PluginHost {
      * `game-start` 的 data 补 `key` / `instanceKey` / `pkg`（占位挪到派发之后，`instances()`
      * 在回调里已看不见这次启动，所以身份直接给）；`game-exit` 补 `exit` 四档
      * （`clean` / `crash` / `unclean` / `launch-failed`）。
+     *
+     * <p>v48（2026-11-19 第 395 轮）：`launch(versionKey, slot, Launch)` —— 插件能**立刻启动一个实例**，
+     * 与点击走**同一条路**（共用槽确认 / 兼容性复检 / `game-start` 否决 / 启动占位全照旧）；
+     * 状态回 `accepted` / `launched` / `blocked` / `failed` / `cancelled`。启动链参数化成
+     * static + Activity ⇒ 插件可以在**任意页面**就地启动，不跳主界面。
      */
-    public static final int API = 47;
+    public static final int API = 48;
     /**
      * 还认的**最老**契约版本。
      *
@@ -1511,6 +1516,84 @@ public final class PluginHost {
             } catch (Throwable t) {
                 android.util.Log.w("MDTPlugin", "cancelLaunch failed", t);
             }
+        }
+
+        // ---- v48 ---------------------------------------------------------
+
+        /**
+         * v48：立刻启动一个实例（与点击走同一条路）。
+         *
+         * <p>找行 + 算共用情况都在**后台线程**（`scanAll` / `conflictsOf` 都读盘），
+         * 真正启动回主线程交给 {@link MainActivity#startVersion}。
+         * 失败也在**主线程**回调（契约：插件回调都在 UI 线程）。
+         */
+        @Override public void launch(final String versionKey, final String slot,
+                                     final PluginApi.Launch cb) {
+            final Context c = getBaseContext();
+            final Activity a = activityOrNull();
+            if (a == null) {
+                failLaunch(cb, "no_activity");
+                return;
+            }
+            if (versionKey == null || versionKey.trim().isEmpty()) {
+                failLaunch(cb, "no_entry");
+                return;
+            }
+            final String wantKey = versionKey.trim();
+            final String wantSlot = slot == null ? "" : slot.trim();
+            new Thread(new Runnable() {
+                @Override public void run() {
+                    try {
+                        java.util.List<Versions.Entry> all = Versions.scanAll(c);
+                        Versions.Entry hit = null;
+                        if (all != null) {
+                            for (Versions.Entry e : all) {
+                                if (!wantKey.equals(e.key())) continue;
+                                if (!wantSlot.isEmpty()
+                                        && !wantSlot.equals(Versions.slotFor(e))) continue;
+                                hit = e;
+                                break;
+                            }
+                        }
+                        if (hit == null) {
+                            failLaunchOnMain(cb, "not_found");
+                            return;
+                        }
+                        final Versions.Entry row = hit;
+                        final Versions.Share sh =
+                                Versions.conflictsOf(c, all).get(Versions.rowKey(row));
+                        a.runOnUiThread(new Runnable() {
+                            @Override public void run() {
+                                MainActivity.startVersion(a, row, sh,
+                                        new MainActivity.LaunchCb(cb));
+                            }
+                        });
+                    } catch (Throwable t) {
+                        android.util.Log.w("MDTPlugin", "launch failed", t);
+                        failLaunchOnMain(cb, "error");
+                    }
+                }
+            }, "plugin-launch").start();
+        }
+
+        /** 失败回调（当前线程；`launch` 的同步失败本来就在主线程）。 */
+        private void failLaunch(PluginApi.Launch cb, String reason) {
+            if (cb == null) return;
+            try {
+                cb.onState(PluginApi.Launch.FAILED, reason);
+            } catch (Throwable ignored) {
+                // 插件自己的回调抛异常不该把宿主带崩
+            }
+        }
+
+        /** 后台线程发现的失败 ⇒ 切回主线程再回调（契约：回调都在 UI 线程）。 */
+        private void failLaunchOnMain(final PluginApi.Launch cb, final String reason) {
+            if (cb == null) return;
+            new android.os.Handler(android.os.Looper.getMainLooper()).post(new Runnable() {
+                @Override public void run() {
+                    failLaunch(cb, reason);
+                }
+            });
         }
 
         // ---- v15 ---------------------------------------------------------

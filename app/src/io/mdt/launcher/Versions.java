@@ -7,8 +7,10 @@ import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import java.io.File;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -798,6 +800,72 @@ public final class Versions {
      */
     public static String rowKey(Entry e) {
         return e == null ? "" : instanceKey(e.key(), slotFor(e));
+    }
+
+    /**
+     * 一个版本的「同槽共用」情况（**列表徽标、启动拦截、插件启动共用同一份**）。
+     *
+     * <p>为什么把"提示"和"拦截"塞进同一个对象：它们是同一件事的两个面
+     * （"有别人和我共用这个槽" ⟹ 要不要拦住启动），拆成两张表就会出现两套判据 ——
+     * 不一致时**没有任何症状**（REF §35.11）。
+     */
+    public static final class Share {
+        /** 对手描述（带书名号 / 组内 3+ 报总数），行内徽标与启动弹窗共用这一份 */
+        public final String peer;
+        /** 启动前是否要拦（见 {@link #conflictsOf} 的口径说明） */
+        public final boolean block;
+
+        public Share(String peer, boolean block) {
+            this.peer = peer;
+            this.block = block;
+        }
+    }
+
+    /**
+     * ★ v48：同槽共用表（**唯一实现**）。原 `MainActivity.computeConflicts` 的搬家 ——
+     * 它是实例方法、依赖 `mEntries`，而插件从别的页面启动时没有那张表；
+     * 各写一份必然漂（徽标亮着但启动不拦，且不会报错）。
+     *
+     * <p>口径（一个字节都不改，只是从界面搬到这里）：
+     * <ol>
+     *   <li>按**实际槽**分组，组内 < 2 跳过；</li>
+     *   <li>版本号不同的才算对手（同版本号副本不计）；</li>
+     *   <li>`block = anyExplicit`：组里有人**显式**指定过槽才拦，全隐式只提示；
+     *       附加行永远算显式。</li>
+     * </ol>
+     *
+     * <p>⚠️ 会读 APK 中央目录（`resolveUpstreamVersions`，~2 ms/个）⇒
+     * 插件调用时在**后台线程**算，别在主线程调。
+     *
+     * @return 行身份（{@link #rowKey}）→ 共用情况；没有共用的行不在表里
+     */
+    public static Map<String, Share> conflictsOf(Context ctx, List<Entry> entries) {
+        Map<String, Share> out = new HashMap<String, Share>();
+        if (ctx == null || entries == null || entries.isEmpty()) return out;
+        resolveUpstreamVersions(entries, ctx);
+        Map<String, List<Entry>> bySlot = new HashMap<String, List<Entry>>();
+        for (Entry e : entries) {
+            String s = slotFor(e);
+            List<Entry> l = bySlot.get(s);
+            if (l == null) { l = new ArrayList<Entry>(); bySlot.put(s, l); }
+            l.add(e);
+        }
+        for (Map.Entry<String, List<Entry>> en : bySlot.entrySet()) {
+            List<Entry> l = en.getValue();
+            if (l.size() < 2) continue;
+            boolean anyExplicit = false;
+            for (Entry e : l) {
+                if (explicitSlot(e)) { anyExplicit = true; break; }
+            }
+            for (Entry e : l) {
+                List<Entry> peers = conflictPeers(e, l);
+                if (peers.isEmpty()) continue;
+                out.put(rowKey(e), new Share(
+                        conflictPeerDesc(ctx, peers.get(0).displayName(ctx), peers.size() + 1),
+                        anyExplicit));
+            }
+        }
+        return out;
     }
 
     /**

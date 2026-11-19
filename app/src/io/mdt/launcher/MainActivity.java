@@ -24,6 +24,9 @@ import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import io.mdt.launcher.api.PluginApi;
+
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.InputStream;
@@ -118,26 +121,6 @@ public class MainActivity extends BaseActivity {
     };
 
     /**
-     * 一个版本的「同槽共用」情况。由 `rescan()` → {@link #computeConflicts()} 重算。
-     *
-     * ★ 为什么把"提示"和"拦截"塞进**同一个对象**、在**同一个循环**里算出来：
-     *   它们是同一件事的两个面（"有别人和我共用这个槽" ⟹ 要不要拦住启动），
-     *   拆成两张表就会出现两套判据 —— 而不一致时**没有任何症状**，
-     *   只会在某天变成"徽标亮着但启动不拦"这种谁都说不清的状态（REF §35.11）。
-     */
-    private static final class Share {
-        /** 对手描述（带书名号 / 组内 3+ 报总数），行内徽标与启动弹窗共用这一份 */
-        final String peer;
-        /** 启动前是否要拦（见 {@link #computeConflicts()} 的口径说明） */
-        final boolean block;
-
-        Share(String peer, boolean block) {
-            this.peer = peer;
-            this.block = block;
-        }
-    }
-
-    /**
      * ★★ **启动流程的互斥标志**（2026-10-04 修）—— 防"连点启动"。
      *
      * 为什么必须有：{@link #startVersionConfirmed} 从按下到真正拉起 `GameSlot` 之间要
@@ -155,8 +138,40 @@ public class MainActivity extends BaseActivity {
     /** 第 386 轮：接口版本回退的 Toast 每进程只说一次（插件页另有持久横幅）。 */
     private static boolean sApiToastShown;
 
-    /** 版本 key → 同槽共用情况（没有共用就不在此表）。 */
-    private final HashMap<String, Share> mConflict = new HashMap<>();
+    /**
+     * ★ v48：启动状态回调的包内包装 —— 保证**终态只回一次**。
+     *
+     * <p>为什么不在各出口直接调 {@link PluginApi.Launch}：同一条流程可能有"失败出口 + 收尾"
+     * 两条路，直接调会让插件收到两次 `failed`。`accepted` 是"开始"不是终态，可以重复发。
+     */
+    static final class LaunchCb {
+        private final PluginApi.Launch cb;
+        private boolean done;
+
+        LaunchCb(PluginApi.Launch cb) { this.cb = cb; }
+
+        void state(String state, String reason) {
+            if (cb == null) return;
+            if (PluginApi.Launch.ACCEPTED.equals(state)) {
+                cb.onState(state, reason);
+                return;
+            }
+            if (done) return;
+            done = true;
+            cb.onState(state, reason);
+        }
+    }
+
+    /**
+     * 任意页面回到前台 ⇒ 上一次启动流程肯定已经结束（v48：插件可以在插件页就地启动，
+     * 那时 `MainActivity.onResume` 不会跑，光靠它清会把界面永久锁死）。
+     */
+    static void clearLaunching() {
+        sLaunching = false;
+    }
+
+    /** 版本 key → 同槽共用情况（没有共用就不在此表）。v48：类型 = {@link Versions.Share}（唯一判据）。 */
+    final HashMap<String, Versions.Share> mConflict = new HashMap<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -347,7 +362,7 @@ public class MainActivity extends BaseActivity {
      *
      * ⚠️ 本方法会读 APK（打开 ZipFile + 扫 dex），**必须在后台线程调用**。
      */
-    private Compat.Probe compatProbeOf(Versions.Entry e) {
+    private static Compat.Probe compatProbeOf(Context c, Versions.Entry e) {
         try {
             if (e == null || e.apkPath == null) return null;
             File apk = new File(e.apkPath);
@@ -408,7 +423,7 @@ public class MainActivity extends BaseActivity {
                                         ? Trans.get(MainActivity.this, R.string.dev_msav_done_fmt, fd,
                                                 Util.formatSize(bytes), String.valueOf(gz))
                                         : fe,
-                                closeBtn(stack));
+                                closeBtn(MainActivity.this, stack));
                         rescan();
                     }
                 });
@@ -426,7 +441,7 @@ public class MainActivity extends BaseActivity {
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
                         stack.replace(Trans.get(MainActivity.this, R.string.health_title), r,
-                                closeBtn(stack));
+                                closeBtn(MainActivity.this, stack));
                         rescan();
                     }
                 });
@@ -904,7 +919,7 @@ public class MainActivity extends BaseActivity {
         if (handle != null) {
             handle.setContentDescription(Trans.get(MainActivity.this, R.string.row_drag_desc));
             handle.setOnClickListener(new View.OnClickListener() {
-                @Override public void onClick(View x) { startVersion(e); }
+                @Override public void onClick(View x) { startVersion(MainActivity.this, e, mConflict.get(Versions.rowKey(e)), null); }
             });
             handle.setOnLongClickListener(new View.OnLongClickListener() {
                 @Override public boolean onLongClick(View x) { return beginRowDrag(v); }
@@ -940,7 +955,7 @@ public class MainActivity extends BaseActivity {
         // ★ 徽标跟着 peer 走（= 只要有共用就提示），**不跟 block** ——
         //   "隐式共用"不拦启动，但仍要让用户看见"这两个会互相覆盖"；
         //   否则提示会随拦截口径一起消失，而它恰恰是唯一能提前告知的地方。
-        Share share = mConflict.get(Versions.rowKey(e));
+        Versions.Share share = mConflict.get(Versions.rowKey(e));
         boolean clash = share != null;
         badge.setBackgroundResource(clash ? R.drawable.badge_slot_warn : R.drawable.badge_slot);
         badge.setTextColor(getResources().getColor(
@@ -967,7 +982,7 @@ public class MainActivity extends BaseActivity {
         // 现在直接挂在行根上（行根变 clickable 后，按下状态会自动播给内部不可点击的子视图，
         // 卡片背景 card_bg_press 的按下高亮照旧生效）。
         v.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View x) { startVersion(e); }
+            @Override public void onClick(View x) { startVersion(MainActivity.this, e, mConflict.get(Versions.rowKey(e)), null); }
         });
         v.setOnLongClickListener(new View.OnLongClickListener() {
             @Override public boolean onLongClick(View x) { openVersion(e); return true; }
@@ -1303,47 +1318,10 @@ public class MainActivity extends BaseActivity {
     private void computeConflicts() {
         mConflict.clear();
         if (mEntries == null) return;
-        // ★★ 第 41 轮改了这里的前提：原先**只在同槽 ≥2 时**才去读 APK 里的基座声明
-        //   （那时这个值只有判据用，没有共用就不必知道）。现在**列表行要逐行备注基座版本**
-        //   （用户：「可以在MDTX显示中备注对应MDT版本」）⇒ 无论有没有共用都得有值。
-        //
-        //   ⚠️ 代价要知道：`ZipFile` 只读中央目录 + 一个 ~170 B 条目，**实测 ~2 ms/个**
-        //      （770 条目的包），所以 3~10 个版本 ≈ 6~20 ms，留在 UI 线程可接受；
-        //      但它**不再是 0 次 IO** 了 —— 这是为"看得见"付的价。
-        //      （对比 `Compat.probe` 要读 9.5 MB dex，那个仍然必须后台线程。）
-        //   ⚠️ 仍然**不能**提到 `scanAll()` 里：那里是"扫描"，这里是"扫描完的加工"，
-        //      而且 `upstreamChecked` 只能防同一批 Entry 内重复读。放这里刚好每次 rescan 一次。
-        Versions.resolveUpstreamVersions(mEntries, this);
-        Map<String, List<Versions.Entry>> bySlot = new HashMap<>();
-        for (Versions.Entry e : mEntries) {
-            String s = Versions.slotFor(e);
-            List<Versions.Entry> l = bySlot.get(s);
-            if (l == null) { l = new ArrayList<>(); bySlot.put(s, l); }
-            l.add(e);
-        }
-        for (Map.Entry<String, List<Versions.Entry>> en : bySlot.entrySet()) {
-            List<Versions.Entry> l = en.getValue();
-            // 单条目组不可能有对手（`conflictPeers` 必然返回空），直接跳过省一次分组遍历。
-            // ⚠️ 它**不再**承担"省一次 IO"的职责了 —— 基座版本已在方法开头为**全部**条目读过。
-            if (l.size() < 2) continue;
-            // 组内是否有人**显式**指定过槽（未分配不算；附加绑定永远算 —— 见 Versions.explicitSlot）
-            boolean anyExplicit = false;
-            for (Versions.Entry e : l) {
-                if (Versions.explicitSlot(e)) { anyExplicit = true; break; }
-            }
-            for (Versions.Entry e : l) {
-                // ★ 版本号不同的才算对手；同版本号的副本一律不计
-                //   ⇒ 不进 mConflict ⇒ 徽标不染色、不提示、启动也不拦（三处同一份判据）
-                List<Versions.Entry> peers = Versions.conflictPeers(e, l);
-                if (peers.isEmpty()) continue;
-                // ★ 键必须是**行身份**（版本 + 槽），不是版本 key：同一个版本绑两个槽时，
-                //   两行可能各自跟不同的版本抢各自的槽 —— 按 key 存会互相覆盖（静默张冠李戴）。
-                mConflict.put(Versions.rowKey(e), new Share(
-                        Versions.conflictPeerDesc(MainActivity.this, peers.get(0).displayName(this),
-                                peers.size() + 1),
-                        anyExplicit));
-            }
-        }
+        // ★ v48：口径与实现整块搬到 `Versions.conflictsOf` —— 插件从别的页面启动时没有
+        //   `mEntries`，必须按当前扫描结果现算同一份；这里只是把表缓下来给界面用。
+        //   （原实现里那条 "ZipFile ~2 ms/个" 的代价说明也一并搬过去了。）
+        mConflict.putAll(Versions.conflictsOf(this, mEntries));
     }
 
     /**
@@ -1405,7 +1383,7 @@ public class MainActivity extends BaseActivity {
         mContinueText.setText(Trans.get(MainActivity.this, R.string.main_continue_fmt,
                 e.displayName(this, false)));
         mBtnContinue.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { startVersion(e); }
+            @Override public void onClick(View v) { startVersion(MainActivity.this, e, mConflict.get(Versions.rowKey(e)), null); }
         });
     }
 
@@ -1489,7 +1467,7 @@ public class MainActivity extends BaseActivity {
                             //   （见 {@link Util#dead}）。成功那条只出 Toast，不会崩。
                             if (Util.dead(MainActivity.this)) return;
                             stack.replace(Trans.get(MainActivity.this, R.string.import_failed), ferr,
-                                    closeBtn(stack));
+                                    closeBtn(MainActivity.this, stack));
                         }
                         rescan();
                     }
@@ -1540,64 +1518,78 @@ public class MainActivity extends BaseActivity {
         if (v != null && !v.isEmpty()) b.putString(k, v);
     }
 
-    void startVersion(final Versions.Entry e) {
-        // ★★ 第 324 轮（用户：「我没点过启动，重启以后它自己弹了共用槽」）：
-        //   **启动请求一律留证据**。这条路径只有三处 click 监听会进来（整行 / 行首把手 / 继续上次），
-        //   所以「没人点也弹了」这种报告只能靠现场翻案 —— 落盘的栈第一行就能分出
-        //   **真触摸**（`ViewRootImpl…processPointerEvent`）与**代码合成**（`performClick` 的调用者）。
-        //   ⚠️ 只在**真的走到这一步**时写，不进任何热路径（一次游戏启动最多写一次，< 2 KB）。
-        recordStartTrace(e);
-        // ★ 第 367 轮（plan §12.17）：现在还只能跑一个实例 ⇒ 起新局前**先确认** ——
-        //   原来这里会静默杀掉正在跑的游戏（plan §12.8 第 1 条）。多开本体（§4）落地后，
-        //   这里会收窄成"不同槽直接并行 / 同槽才确认"；现在至少不再偷偷杀。
-        if (Data.gameAlive(this)) {
-            promptSwitchRunning(e);
+    /**
+     * 启动一个实例 —— **唯一入口**：点击（整行 / 行首把手 / 继续上次）与插件
+     * {@code PluginApi.launch} 都走这里。
+     *
+     * <p>★ v48：从实例方法改成 static + Activity 参数 —— 插件可以在**任意页面**就地启动，
+     * 不再需要跳回主界面。调用方负责把 {@code share}（同槽共用情况）算好：
+     * 点击路径查 `mConflict` 缓存、插件路径 {@link Versions#conflictsOf} 现算，
+     * **判据仍然只有一处**。
+     *
+     * <p>★ 第 324 轮（用户：「我没点过启动，重启以后它自己弹了共用槽」）：
+     * **启动请求一律留证据**，落盘的栈第一行就能分出真触摸与代码合成。
+     */
+    static void startVersion(final Activity a, final Versions.Entry e,
+                             final Versions.Share share, final LaunchCb cb) {
+        if (a == null || e == null) {
+            if (cb != null) cb.state(PluginApi.Launch.FAILED, "no_entry");
             return;
         }
-        proceedStart(e);
+        recordStartTrace(a, e, share);
+        // ★ 第 367 轮（plan §12.17）：起新局前**先确认**（不再静默杀掉正在跑的游戏）。
+        if (Data.gameAlive(a)) {
+            promptSwitchRunning(a, e, share, cb);
+            return;
+        }
+        proceedStart(a, e, share, cb);
     }
 
-    /** 「会先退出正在运行的游戏」确认（第 367 轮）。 */
-    private void promptSwitchRunning(final Versions.Entry e) {
+    /** 「会先退出正在运行的游戏」确认（第 367 轮）。取消 ⇒ 回调 cancelled。 */
+    private static void promptSwitchRunning(final Activity a, final Versions.Entry e,
+                                            final Versions.Share share, final LaunchCb cb) {
         final CardStack[] ref = new CardStack[1];
-        ref[0] = CardStack.show(null, this, Trans.get(this, R.string.switch_running_title),
-                CardStack.text(this, Trans.get(this, R.string.switch_running_msg_fmt,
-                        e.displayName(this))),
-                new CardStack.Btn(Trans.get(this, R.string.cancel), new Runnable() {
-                    @Override public void run() { ref[0].dismiss(); }
+        ref[0] = CardStack.show(null, a, Trans.get(a, R.string.switch_running_title),
+                CardStack.text(a, Trans.get(a, R.string.switch_running_msg_fmt,
+                        e.displayName(a))),
+                new CardStack.Btn(Trans.get(a, R.string.cancel), new Runnable() {
+                    @Override public void run() {
+                        ref[0].dismiss();
+                        if (cb != null) cb.state(PluginApi.Launch.CANCELLED, "switch");
+                    }
                 }),
-                new CardStack.Btn(Trans.get(this, R.string.switch_running_go), new Runnable() {
-                    @Override public void run() { ref[0].dismiss(); proceedStart(e); }
+                new CardStack.Btn(Trans.get(a, R.string.switch_running_go), new Runnable() {
+                    @Override public void run() {
+                        ref[0].dismiss();
+                        proceedStart(a, e, share, cb);
+                    }
                 }));
     }
 
     /** 预检通过后的启动流程（冲突确认 → 启动进度）。第 367 轮从 `startVersion` 拆出来。 */
-    private void proceedStart(final Versions.Entry e) {
-        // ★ F4①：**毫秒级**同槽冲突预检 —— 0 次 IO、0 个线程。
-        //   结论就在 `mConflict` 里（`rescan()` → `computeConflicts()` 早算好了，这里只是查表）。
-        //   所以它天然满足 FLOWS 对这条的三条要求（毫秒级 / 只读元数据 / 不卡启动路径）——
-        //   而且比"起后台线程再弹"更好：按下到弹窗之间不会有空窗，用户看到的就是"立刻拦一下"。
-        //   ⚠️ 也**不要**在这里重算一遍冲突：那会造出第二份判据，与列表行那个徽标
-        //      （同一份 `mConflict`）不一致时**不会有任何症状** —— 本项目已多次栽在
-        //      "同一显示规则两处实现"上（REF §35.11）。
-        //   ⚠️ FLOWS 原步骤里还有一条「当前槽 `saves/` 里有解析失败的 `.msav` → 提示但不阻塞」，
-        //      **本轮不做**：它依赖 F10（`.msav` 解析器），而 F10 还没做。硬用"文件大小是否
-        //      为 0"之类的假判据去顶替，只会把好存档误报成坏的 —— 宁可先不做。
-        final Share share = mConflict.get(Versions.rowKey(e));
+    private static void proceedStart(final Activity a, final Versions.Entry e,
+                                     final Versions.Share share, final LaunchCb cb) {
+        // ★ F4①：同槽共用预检。v48 起**判据只有一处**（`Versions.conflictsOf`）：
+        //   点击路径传缓存表、插件路径传现算结果，不存在第二份实现（REF §35.11）。
+        //   ⚠️ FLOWS 原有的一条「当前槽 saves/ 里有解析失败的 .msav → 提示但不阻塞」
+        //      **仍未做**：它依赖 F10（`.msav` 解析器），硬凑假判据只会误报好存档。
         if (share == null || !share.block) {
-            startVersionConfirmed(e);
+            startVersionConfirmed(a, e, null, cb);
             return;
         }
         // ★ 第 268 轮：冲突确认 → 启动进度 在同一张卡里（原来"关确认框 → 再开进度框"）
         final CardStack[] ref = new CardStack[1];
-        ref[0] = CardStack.show(null, this, Trans.get(this, R.string.launch_conflict_title),
-                CardStack.text(this, Trans.get(MainActivity.this, R.string.launch_conflict_msg_fmt,
-                        e.displayName(this), share.peer, Versions.slotFor(e))),
-                new CardStack.Btn(Trans.get(this, R.string.cancel), new Runnable() {
-                    @Override public void run() { ref[0].dismiss(); }
+        ref[0] = CardStack.show(null, a, Trans.get(a, R.string.launch_conflict_title),
+                CardStack.text(a, Trans.get(a, R.string.launch_conflict_msg_fmt,
+                        e.displayName(a), share.peer, Versions.slotFor(e))),
+                new CardStack.Btn(Trans.get(a, R.string.cancel), new Runnable() {
+                    @Override public void run() {
+                        ref[0].dismiss();
+                        if (cb != null) cb.state(PluginApi.Launch.CANCELLED, "conflict");
+                    }
                 }),
-                new CardStack.Btn(Trans.get(this, R.string.launch_conflict_go), new Runnable() {
-                    @Override public void run() { startVersionConfirmed(e, ref[0]); }
+                new CardStack.Btn(Trans.get(a, R.string.launch_conflict_go), new Runnable() {
+                    @Override public void run() { startVersionConfirmed(a, e, ref[0], cb); }
                 }));
     }
 
@@ -1616,7 +1608,7 @@ public class MainActivity extends BaseActivity {
      * <p>⚠️ 不进热路径：一次启动最多写一次，正常情况一个文件几 KB；
      * 写盘失败一律吞掉（这条路径**不许**因为留证据而影响启动）。
      */
-    private void recordStartTrace(Versions.Entry e) {
+    private static void recordStartTrace(Context c, Versions.Entry e, Versions.Share sh) {
         try {
             StringBuilder sb = new StringBuilder();
             sb.append("=== start request ")
@@ -1624,14 +1616,14 @@ public class MainActivity extends BaseActivity {
                             .format(new java.util.Date()))
                     .append(" ===\n");
             sb.append("entry    = ").append(e == null ? "null" : e.key())
-                    .append(e == null ? "" : "  (" + e.displayName(this) + ")").append('\n');
+                    .append(e == null ? "" : "  (" + e.displayName(c) + ")").append('\n');
             sb.append("slot     = ").append(e == null ? "?" : Versions.slotFor(e)).append('\n');
-            Share sh = e == null ? null : mConflict.get(Versions.rowKey(e));
+            // v48：共用情况由调用方算好传进来（点击路径查缓存表、插件路径现算）
             sb.append("conflict = ").append(sh == null ? "no" : "yes")
                     .append(sh == null ? "" : "  block=" + sh.block + "  peer=" + sh.peer).append('\n');
             long ago = -1L;
             try {
-                java.io.File f = new java.io.File(Paths.privateDir(this), "restart-at.txt");
+                java.io.File f = new java.io.File(Paths.privateDir(c), "restart-at.txt");
                 if (f.isFile()) ago = System.currentTimeMillis() - Long.parseLong(Util.readText(f).trim());
             } catch (Throwable ignored) {
             }
@@ -1648,7 +1640,7 @@ public class MainActivity extends BaseActivity {
             }
             android.util.Log.i("MDTLauncher", "start request: "
                     + (e == null ? "null" : e.key()) + " slot=" + (e == null ? "?" : Versions.slotFor(e)));
-            java.io.File out = new java.io.File(Data.hubDir(this), "report-starttap.txt");
+            java.io.File out = new java.io.File(Data.hubDir(c), "report-starttap.txt");
             if (out.isFile() && out.length() > 8192) {
                 // 只留最近几段，别无限长
                 String old = Util.readText(out);
@@ -1674,22 +1666,27 @@ public class MainActivity extends BaseActivity {
      *   只是白做一次 dex 注入（探针 §1.8 实测）。正常情况下游戏退出会自己
      *   System.exit(0) 带走整个 :game 进程，所以这里只在"游戏还在跑"时才需要动手。
      */
-    private void startVersionConfirmed(final Versions.Entry e) {
-        startVersionConfirmed(e, null);
-    }
-
-    /** 卡片版（第 268 轮）：进度页顶替调用方那一页（冲突确认页 / 或自己开一张）。 */
-    private void startVersionConfirmed(final Versions.Entry e, final CardStack card) {
+    /**
+     * 真正开始准备：进度卡 → 备份收尾 → 兼容性复检 → `game-start` → 占位 → `startActivity`。
+     *
+     * <p>★ v48：static + Activity 参数（插件在任何页面就地启动走同一条）。
+     * 进度卡画在**调用方传进来的 Activity** 上 —— 不再假设一定是主界面。
+     */
+    private static void startVersionConfirmed(final Activity a, final Versions.Entry e,
+                                              final CardStack card, final LaunchCb cb) {
         // ★★ 防连点 + 即时反馈（2026-10-04 补，理由见 sLaunching 的注释）：
         //   先挡住第二次点击，再立刻把"正在准备"显示出来 —— 这段最长可能等 8 s。
-        //   ⚠️ 进度页**没有按钮、点不动**（旧版是 `ProgressDialog.show(..., true, false)`）：
-        //      modal + 不可取消 ⇒ 与 sLaunching 双保险。
-        if (sLaunching) return;
+        //   ⚠️ 进度页**没有按钮、点不动**：modal + 不可取消 ⇒ 与 sLaunching 双保险。
+        if (sLaunching) {
+            if (cb != null) cb.state(PluginApi.Launch.FAILED, "launching");
+            return;
+        }
         sLaunching = true;
+        if (cb != null) cb.state(PluginApi.Launch.ACCEPTED, null);
         // ★ 第 268 轮：「正在准备启动」也画在卡片里（有卡片就顶替它那一页）
-        final CardStack stack = (card != null) ? card : new CardStack(this);
-        stack.replace(Trans.get(this, R.string.launch_progress_title),
-                Trans.get(this, R.string.launch_progress_msg_fmt, e.displayName(this)));
+        final CardStack stack = (card != null) ? card : new CardStack(a);
+        stack.replace(Trans.get(a, R.string.launch_progress_title),
+                Trans.get(a, R.string.launch_progress_msg_fmt, e.displayName(a)));
         new Thread(new Runnable() {
             @Override public void run() {
                 // F5：先等自动备份收尾 —— 否则"备份正在读槽"会和"游戏起来在写槽"打架。
@@ -1700,37 +1697,39 @@ public class MainActivity extends BaseActivity {
                 //   ① 这个版本是在加这道拦截**之前**导入的（存量条目）；
                 //   ② 系统侧变过（页大小 4 KB ↔ 16 KB 不同设备的槽数据迁移、OTA）。
                 //   ⚠️ 复检不过就**不启动** —— 否则用户白等一次 :game 拉起，只看到一个看不懂的错。
-                Compat.Probe cp = compatProbeOf(e);
+                Compat.Probe cp = compatProbeOf(a, e);
                 if (cp != null && !cp.runnable()) {
-                    final String msg = e.displayName(MainActivity.this) + "\n\n" + Compat.rejectReason(MainActivity.this, cp);
-                    runOnUiThread(new Runnable() {
+                    final String msg = e.displayName(a) + "\n\n" + Compat.rejectReason(a, cp);
+                    a.runOnUiThread(new Runnable() {
                         @Override public void run() {
                             // 这条出口也要收掉进度页 + 清标志，否则用户被永久挡住（点不动了）
                             sLaunching = false;
-                            stack.replace(Trans.get(MainActivity.this, R.string.compat_reject_title), msg,
-                                    closeBtn(stack));
+                            if (cb != null) cb.state(PluginApi.Launch.FAILED, "compat");
+                            stack.replace(Trans.get(a, R.string.compat_reject_title), msg,
+                                    closeBtn(a, stack));
                         }
                     });
                     return;
                 }
 
-                boolean killed = ensureGameProcessDead();
+                boolean killed = ensureGameProcessDead(a);
                 // ★ 第 367 轮：杀完**要验死**。以前"没杀掉"也照起 —— 旧 `:game` 进程被复用、
                 //   Activity 不重建 ⇒ 跑的还是旧版本（plan §12.8 第 1 条）。现在明确中止。
                 //   占位在这一步之后才建，所以不会误挡这个槽。
-                if (Data.gameAlive(MainActivity.this)) {
-                    runOnUiThread(new Runnable() {
+                if (Data.gameAlive(a)) {
+                    a.runOnUiThread(new Runnable() {
                         @Override public void run() {
-                            if (Util.dead(MainActivity.this)) return;
+                            if (Util.dead(a)) return;
                             sLaunching = false;
-                            stack.replace(Trans.get(MainActivity.this, R.string.game_cannot_start),
-                                    Trans.get(MainActivity.this, R.string.launch_err_prev_alive),
-                                    closeBtn(stack));
+                            if (cb != null) cb.state(PluginApi.Launch.FAILED, "prev_alive");
+                            stack.replace(Trans.get(a, R.string.game_cannot_start),
+                                    Trans.get(a, R.string.launch_err_prev_alive),
+                                    closeBtn(a, stack));
                         }
                     });
                     return;
                 }
-                final Intent i = new Intent(MainActivity.this, GameSlot.class);
+                final Intent i = new Intent(a, GameSlot.class);
                 if (e.imported) {
                     i.putExtra("apk", e.apkPath);
                 } else {
@@ -1742,7 +1741,7 @@ public class MainActivity extends BaseActivity {
                 // v31：把这一局的**完整版本信息**透传给探针 —— 已装游戏会原地更新（包名不变、
                 // 版本号变），探针要拿版本号 + 原始版本名才能把"更新前后"分开记。
                 // ★ 身份仍是 pkg / apk；这里只是给插件记账 / 显示的快照。
-                i.putExtra(ProbeService.EXTRA_VINFO, versionInfoBundle(MainActivity.this, e, slot));
+                i.putExtra(ProbeService.EXTRA_VINFO, versionInfoBundle(a, e, slot));
                 // ★ F0：顺带把上面那次探测的结论透传下去（该包支不支持属性注入），
                 //   :game 就不必把同一个 APK 的 dex 再读一遍。
                 //   ⚠️ 探不出来时**不要**放这个 extra —— 让 :game 自己探，
@@ -1757,7 +1756,7 @@ public class MainActivity extends BaseActivity {
                     // 给 AMS 一点时间回收，避免新实例与旧进程竞态
                     try { Thread.sleep(250); } catch (InterruptedException ignored) { }
                 }
-                runOnUiThread(new Runnable() {
+                a.runOnUiThread(new Runnable() {
                     @Override public void run() {
                         // ★ v22 / v45：游戏**即将**启动（兼容性复检已过、备份已收尾）⇒ 派发 game-start。
                         //   同步等插件跑完：**它返回之后**才写启动占位、才 startActivity。
@@ -1767,38 +1766,46 @@ public class MainActivity extends BaseActivity {
                         //     「startActivity → :game publish」那段，只是不再挡钩子自己。
                         //   ⚠️ 这里**不先 dismiss**：被拦时要把进度页就地换成结果页（同一张卡换页，
                         //     不闪）；放行才收起进度卡（见下）。
-                        final String label = e.displayName(MainActivity.this);
+                        final String label = e.displayName(a);
                         // ⚠️ 导入版的 `e.pkg` 是内部占位字面量 "imported"（`Versions` 里定的），
                         //   不是包名 ⇒ 别当 pkg 透给插件（文档写的是"导入包拿不到就不给"）。
                         PluginEvents.Blocked blocked = PluginEvents.gameStart(
-                                MainActivity.this, e.key(), e.imported ? null : e.pkg, slot, label);
+                                a, e.key(), e.imported ? null : e.pkg, slot, label);
                         if (blocked != null) {
                             // 插件否决 ⇒ 这一局根本不开始：不写占位、不报退出。
                             // ★ 宿主**零显示**（用户 2026-11-18「宿主不要额外弹窗」）——
                             //   只把进度卡收掉 + 写一行日志；要提示用户是插件自己的事。
-                            //   sLaunching 要清，否则主界面点不动（这一局不会再回来清它）。
+                            //   sLaunching 要清，否则界面点不动（这一局不会再回来清它）。
                             sLaunching = false;
                             stack.dismiss();
+                            if (cb != null) {
+                                cb.state(PluginApi.Launch.BLOCKED,
+                                        (blocked.named() ? blocked.by : "?")
+                                                + (blocked.reason.isEmpty()
+                                                        ? "" : ": " + blocked.reason));
+                            }
                             android.util.Log.w("MDTLauncher", "launch blocked by plugin: "
                                     + (blocked.named() ? blocked.by : "?") + " / "
                                     + blocked.reason);
                             return;
                         }
                         // 放行：收起进度卡片再拉起游戏（不在这里清 sLaunching：这一局还在跑，
-                        // 回到主界面时由 onResume 统一清 —— 见 sLaunching 的注释）
+                        // 回到任意界面时由 BaseActivity.onResume 统一清 —— 见 sLaunching 的注释）
                         stack.dismiss();
                         // ★ 第 366 轮：**启动占位** —— 补上「startActivity → :game publish」之间
                         //   门禁看不见的窗口（:game 要等 prepareSlot 之后才能 publish，
                         //   而那时它已经在读这个槽的资产了）。
                         //   publish 成功 / 启动失败都会立刻清掉；30 s 过期兜底（见 Instances）。
-                        Instances.reserve(MainActivity.this, e.key(), slot);
+                        Instances.reserve(a, e.key(), slot);
                         try {
-                            startActivity(i);
+                            a.startActivity(i);
+                            if (cb != null) cb.state(PluginApi.Launch.LAUNCHED, null);
                         } catch (Throwable t) {
                             // Activity 都没起来 ⇒ 占位立刻撤掉（否则这个槽要被误挡到过期）
-                            Instances.unreserve(MainActivity.this, e.key(), slot);
+                            Instances.unreserve(a, e.key(), slot);
                             // v45：这一局没开始 ⇒ 撤掉启动记账，否则回前台会补报假的 game-exit
-                            PluginEvents.abortLaunch(MainActivity.this, slot);
+                            PluginEvents.abortLaunch(a, slot);
+                            if (cb != null) cb.state(PluginApi.Launch.FAILED, "start");
                             android.util.Log.w("MDTLauncher", "start GameSlot failed", t);
                         }
                     }
@@ -1815,10 +1822,10 @@ public class MainActivity extends BaseActivity {
      */
 
     /** 结束 :game 进程；返回是否确实动过手（用于决定要不要等一下） */
-    private boolean ensureGameProcessDead() {
-        if (!Data.gameAlive(this)) return false;
-        Data.killGame(this);
-        for (int i = 0; i < 30 && Data.gameAlive(this); i++) {
+    private static boolean ensureGameProcessDead(Context c) {
+        if (!Data.gameAlive(c)) return false;
+        Data.killGame(c);
+        for (int i = 0; i < 30 && Data.gameAlive(c); i++) {
             try { Thread.sleep(50); } catch (InterruptedException ignored) { }
         }
         return true;
@@ -1840,9 +1847,9 @@ public class MainActivity extends BaseActivity {
      * ⚠️ 顺序 = 常用度：导入 APK 在前。⚠️ 与 `dialog_add_game.xml` 里的顺序必须一致。
      * ⚠️ 两个回调都要先 `dismiss()` 再干活：弹窗自己不会因为启动了下一个界面就关掉。
      */
-    /** 卡片结果页的「关闭」（唯一实现）。 */
-    private CardStack.Btn closeBtn(final CardStack stack) {
-        return new CardStack.Btn(Trans.get(this, R.string.close), new Runnable() {
+    /** 卡片结果页的「关闭」（唯一实现）。v48：Activity 参数化（插件就地启动也用它）。 */
+    static CardStack.Btn closeBtn(final Activity a, final CardStack stack) {
+        return new CardStack.Btn(Trans.get(a, R.string.close), new Runnable() {
             @Override public void run() { stack.dismiss(); }
         });
     }

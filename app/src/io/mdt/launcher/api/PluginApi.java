@@ -59,7 +59,7 @@ public interface PluginApi {
      * <p>为什么要有这个常量：注释里的「当前 = N」运行期读不到，一个写 17、一个写 20 也没人发现；
      * 常量 + 断言才拦得住。</p>
      */
-    int DOC_VERSION = 47;
+    int DOC_VERSION = 48;
 
     // ══ 环境 ═══════════════════════════════════════════════════════════════
 
@@ -677,6 +677,52 @@ public interface PluginApi {
      * @param reason 给用户看的一句话（可 null）
      */
     void cancelLaunch(String reason);
+
+    /**
+     * **v48**：立刻启动一个实例 —— **与用户在主界面点那一行完全同一条路**。
+     *
+     * <p>宿主做的事和点击一模一样：同槽共用确认 → 兼容性复检 → 等自动备份收尾 →
+     * `game-start` 事件（插件可以在这里 `cancelLaunch`）→ 写启动占位 → 拉起游戏。
+     * **不会**跳回主界面，进度卡画在调用时所在的那一页上。
+     *
+     * @param versionKey {@code versions()} 的 {@code extra.key}
+     * @param slot       {@code versions()} 的 {@code extra.slot}；空 = 用这一行自己的槽
+     * @param cb         状态回调（主线程）；可以为 null（不关心结果）
+     *
+     * <p>⚠️ 只能在**界面里**调（要拿得到 Activity）。从 {@code submit()} 的后台任务里调会拿到
+     * `failed` / `no_activity` —— Android 10+ 后台起 Activity 会被系统拦，硬做只会变成
+     * "有时能启动、有时不能"。
+     *
+     * <p>⚠️ 该弹的确认框**照弹**（共用槽 / 有游戏在跑）—— 这是"路径相同"的一部分：
+     * 用户在确认卡上点取消 ⇒ 回调 {@code cancelled}。
+     */
+    void launch(String versionKey, String slot, Launch cb);
+
+    /**
+     * v48：{@link #launch} 的状态回调（**主线程**）。
+     *
+     * <p>终态（`launched` / `blocked` / `failed` / `cancelled`）只会来**一次**。
+     * 有可能会停在 `accepted` 之后再无下文 —— 用户就停在确认卡上没点，那时不会有回调。
+     */
+    interface Launch {
+        /** 已交给启动流程（不保证游戏真的起来）。 */
+        String ACCEPTED = "accepted";
+        /** 游戏 Activity 已拉起（后面还有 `:game` 的注入，未必进得去）。 */
+        String LAUNCHED = "launched";
+        /** 被 `game-start` 里的插件否决了（见 {@link #cancelLaunch}）。 */
+        String BLOCKED = "blocked";
+        /** 没启动：找不到这一行 / 正在启动 / 复检不过 / 旧进程杀不掉 / 拉起失败。 */
+        String FAILED = "failed";
+        /** 用户在确认卡上点了取消。 */
+        String CANCELLED = "cancelled";
+
+        /**
+         * @param state  {@code accepted} / {@code launched} / {@code blocked} /
+         *               {@code failed} / {@code cancelled}
+         * @param reason 失败 / 拦下的原因（可为空；`blocked` 时是"插件 id: 原因"）
+         */
+        void onState(String state, String reason);
+    }
 
     /**
      * 让用户从**当前槽的某一类内容**里勾选，结果回调给插件。

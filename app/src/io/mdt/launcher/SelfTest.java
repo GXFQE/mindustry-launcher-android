@@ -5336,6 +5336,8 @@ public final class SelfTest {
         pluginV43(ctx, L, stat);
         // ★ v45：启动否决 + 身份（第 394 轮）
         pluginV45(ctx, L, stat);
+        // ★ v48：插件立刻启动实例（第 395 轮）
+        pluginV48(ctx, L, stat);
     }
 
     /**
@@ -5359,8 +5361,8 @@ public final class SelfTest {
     private static void pluginV43(android.content.Context ctx, List<String> L, int[] stat) {
         L.add("");
         L.add("【v43 · 插件下载 / 模组写 / 网络扩充（第 378 轮）】");
-        ok(stat, L, PluginHost.API == 47 && PluginApi.DOC_VERSION == 47,
-                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 47（v47 起）");
+        ok(stat, L, PluginHost.API == 48 && PluginApi.DOC_VERSION == 48,
+                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 48（v48 起）");
 
         boolean shape = true;
         try {
@@ -5858,8 +5860,8 @@ public final class SelfTest {
     private static void pluginV45(android.content.Context ctx, List<String> L, int[] stat) {
         L.add("");
         L.add("【v45 · 启动否决 + 身份（第 394 轮）】");
-        ok(stat, L, PluginHost.API == 47 && PluginApi.DOC_VERSION == 47,
-                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 47（v47 起）");
+        ok(stat, L, PluginHost.API == 48 && PluginApi.DOC_VERSION == 48,
+                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 48（v48 起）");
 
         boolean shape = true;
         try {
@@ -5982,6 +5984,64 @@ public final class SelfTest {
         ok(stat, L, PluginEvents.EXIT_POLL_MS > 0 && PluginEvents.EXIT_POLL_MS <= 30_000L
                         && PluginEvents.LAUNCH_GRACE_MS >= 60_000L,
                 "轮询间隔 ≤ 30 秒、启动宽限 ≥ 60 秒（别误报「没起来」）");
+    }
+
+    /**
+     * 第 395 轮（v48）：**插件能立刻启动一个实例**。
+     *
+     * <p>钉住三件：
+     * <ol>
+     *   <li>接口面：`launch(String, String, Launch)` 在；`Launch` 五个状态常量逐字对得上；</li>
+     *   <li>`LaunchCb` 的**终态只回一次**（`accepted` 不算终态，可以再来；终态之后的忽略）；</li>
+     *   <li>`LaunchCb(null)` 不崩 —— 点击路径就是传 null 的。</li>
+     * </ol>
+     */
+    private static void pluginV48(Context ctx, List<String> L, int[] stat) {
+        L.add("");
+        L.add("【v48 · 插件立刻启动实例（第 395 轮）】");
+        ok(stat, L, PluginHost.API == 48 && PluginApi.DOC_VERSION == 48,
+                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 48（v48 起）");
+
+        boolean shape = true;
+        try {
+            PluginApi.class.getMethod("launch", String.class, String.class,
+                    PluginApi.Launch.class);
+        } catch (Throwable t) {
+            shape = false;
+        }
+        ok(stat, L, shape, "接口面：PluginApi.launch(String, String, Launch) 在");
+
+        boolean names = "accepted".equals(PluginApi.Launch.ACCEPTED)
+                && "launched".equals(PluginApi.Launch.LAUNCHED)
+                && "blocked".equals(PluginApi.Launch.BLOCKED)
+                && "failed".equals(PluginApi.Launch.FAILED)
+                && "cancelled".equals(PluginApi.Launch.CANCELLED);
+        ok(stat, L, names, "状态常量：accepted / launched / blocked / failed / cancelled");
+
+        // 终态只回一次：accepted → failed 之后再来 launched / blocked，都必须被吞掉
+        final List<String> seen = new ArrayList<String>();
+        MainActivity.LaunchCb cb = new MainActivity.LaunchCb(new PluginApi.Launch() {
+            @Override public void onState(String state, String reason) { seen.add(state); }
+        });
+        cb.state(PluginApi.Launch.ACCEPTED, null);
+        cb.state(PluginApi.Launch.FAILED, "compat");
+        cb.state(PluginApi.Launch.LAUNCHED, null);
+        cb.state(PluginApi.Launch.BLOCKED, "x");
+        boolean once = seen.size() == 2
+                && PluginApi.Launch.ACCEPTED.equals(seen.get(0))
+                && PluginApi.Launch.FAILED.equals(seen.get(1));
+        ok(stat, L, once,
+                "★ 终态只回一次：accepted → failed 之后再来 launched / blocked 都被吞掉");
+
+        // null 回调不崩（点击路径传 null）
+        boolean nullOk = true;
+        try {
+            new MainActivity.LaunchCb(null).state(PluginApi.Launch.ACCEPTED, null);
+            new MainActivity.LaunchCb(null).state(PluginApi.Launch.FAILED, "x");
+        } catch (Throwable t) {
+            nullOk = false;
+        }
+        ok(stat, L, nullOk, "回调传 null（点击路径）不崩");
     }
 
     /**

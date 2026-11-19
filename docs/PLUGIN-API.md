@@ -5,7 +5,7 @@
 
 ## 1. 版本与兼容（v20 冻结基线）
 
-- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..45**。
+- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..48**。
   （v20 是冻结基线；v21 = 游戏设置面；v22 = 后台任务 + 游戏事件；v23 = 探针；v24 = 分析器；
   v25 = 结论挂行 + 筛选/排序注入 + HJSON；v26 = 逐项判定；v27 = 详情页的门 + 槽级结论进摘要卡；
   v28 = 原版文案键；v29 = 游戏前后台事件；v30 = 探针知道版本 / 跨会话数据目录 + 摘要卡总时长；
@@ -72,6 +72,10 @@
   **v47 = 宿主代弹日期选择器**：`pickDate(title, initialMs, DatePick)` —— 插件自己
   `new DatePickerDialog` 会崩（插件 `Resources` 里没有宿主主题，系统布局 inflate 时
   `Failed to resolve attribute` → `InflateException`）；宿主用 Activity 弹，回调给本地当天 0 点。
+  **v48 = 插件能立刻启动一个实例**：`launch(versionKey, slot, Launch)` —— 与用户点那一行
+  **同一条路**（共用槽确认 / 兼容性复检 / `game-start` 否决 / 启动占位），但**不跳主界面**
+  （启动链参数化成 static + Activity）；状态回 `accepted` / `launched` / `blocked` / `failed` /
+  `cancelled`，终态只回一次。只能在界面里调（后台 ⇒ `failed` / `no_activity`）。`API_MIN` 仍不动。
 - 插件 `api()` 报的是「我需要的最低宿主接口版本」。用不到的新能力**不要**报高 ——
   报高了只会在老宿主上被拒，换不来任何东西。
 - **不要用 try/catch 去兼容老宿主**：报什么版本就只会跑在什么版本上。`api()` 报 20，
@@ -1255,6 +1259,19 @@ v47（2026-11-19 第 400 轮）：**宿主代弹日期选择器** —— `pickDa
 里没有宿主主题 ⇒ `Failed to resolve attribute at index 6` → `InflateException` → 整个应用崩溃。
 宿主用自己的 Activity 弹框、回调给**本地时区当天 0 点**的毫秒；用户取消不回调。
 `API_MIN` 仍不动（区间 20..47）。
+v48（2026-11-19 第 395 轮）：**插件能立刻启动一个实例**（用户：「再加一个插件调用某个方法可以
+立即启动某个实例（和正常点击启动的触发路径相同）」）—— `launch(versionKey, slot, Launch)`。
+★ 同一条路：宿主**不新增启动逻辑**，最终调的是 `MainActivity.startVersion` ——
+共用槽确认 / 兼容性复检 / 备份收尾 / `game-start` 事件（可 `cancelLaunch` 否决）/ 启动占位全照旧，
+该弹的确认框照弹（用户点取消 ⇒ 回调 `cancelled`）。
+★ 不跳主界面：启动链参数化成 static + Activity（`startVersion` / `proceedStart` /
+`startVersionConfirmed`），进度卡画在**调用时那一页**上；同槽共用表抽成 `Versions.conflictsOf`
+（徽标与启动**同一份判据**），`sLaunching` 的清理挪到 `BaseActivity.onResume`（任何页面回来都清）。
+★ 状态回调（主线程）：`accepted` / `launched` / `blocked` / `failed`（`no_activity` / `no_entry` /
+`not_found` / `launching` / `compat` / `prev_alive` / `start` / `error`）/ `cancelled`；
+终态只回一次（`LaunchCb` 闸门）。
+⚠️ 只能在**界面里**调：从 `submit()` 的后台任务调会拿到 `no_activity` —— Android 10+ 后台起
+Activity 会被系统拦，硬做只会变成"有时能启动、有时不能"。`API_MIN` 仍不动（区间 20..48）。
 
 **官方体检插件**：`plugins/mods-health`（第 229 轮，前身叫 `conflict`）。宿主原来的那行
 「查模组冲突」整块删掉，判据搬进插件的 `core/Conflicts.java` 与 `core/Gates.java`；

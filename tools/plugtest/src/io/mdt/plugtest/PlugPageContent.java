@@ -246,6 +246,37 @@ public final class PlugPage {
             }
         });
 
+        // ★ v48 端到端夹具：就地启动一个实例（不跳主界面）。
+        //   要启动谁由 `dataDir/launch-kv` 给（第一行 key、第二行槽，槽可空）——
+        //   用文件当参数是为了 adb 上直接换，不用重发插件。
+        addButton(box, c, th, "launch instance (v48)", new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                String key = "";
+                String slot = "";
+                try {
+                    java.io.File f = new java.io.File(api.dataDir(), "launch-kv");
+                    if (f.isFile()) {
+                        String[] ln = new String(java.nio.file.Files.readAllBytes(f.toPath()),
+                                "UTF-8").split("\n");
+                        if (ln.length > 0) key = ln[0].trim();
+                        if (ln.length > 1) slot = ln[1].trim();
+                    }
+                } catch (Throwable t) {
+                    api.log("LAUNCH fixture read failed " + t);
+                }
+                if (key.isEmpty()) {
+                    api.toast("no launch-kv");
+                    return;
+                }
+                final String k = key, s = slot;
+                api.launch(k, s, new io.mdt.launcher.api.PluginApi.Launch() {
+                    @Override public void onState(String state, String reason) {
+                        api.log("LAUNCH STATE " + state + " / " + reason + " / " + k);
+                    }
+                });
+            }
+        });
+
         addButton(box, c, th, "close page", new View.OnClickListener() {
             @Override public void onClick(View v) {
                 api.closePage();

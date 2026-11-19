@@ -221,6 +221,10 @@ public abstract class BaseActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        // ★ v48：任意页面回到前台 ⇒ 上一次启动流程已经结束。插件可以在**任意页面**就地
+        //   启动（不跳主界面），那时 `MainActivity.onResume` 不会跑 —— 只靠它清会把界面
+        //   永久锁死（sLaunching 一直为真 ⇒ 下次启动被静默拒绝）。
+        MainActivity.clearLaunching();
         // ★ F23「崩了马上说一声」：记下"谁是当前前台页面"——崩溃提示要按这个决定
         //   "现在弹对话框"还是"只 Toast"（游戏还在前台时弹窗没人看得见）。见 CrashAlert。
         CrashAlert.activityResumed(this);
