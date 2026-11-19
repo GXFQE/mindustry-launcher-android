@@ -1,7 +1,7 @@
 {
   "entry": "io.mdt.plugins.usagestats.UsageStats",
   "name": "usagestats",
-  "version": "21",
+  "version": "22",
   "api": 47,
   "author": "mdt",
   "description": "foreground play time (host clock -> game-exit event; the plugin writes its own ledger) + range/grain heatmap panel",

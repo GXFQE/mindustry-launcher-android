@@ -187,19 +187,14 @@ public final class UsageStats {
         box.addView(title);
 
         // 第 401 轮：两个分组标题（用户：「上面需要加上标题（统计范围选择 / 精度选择）」）
-        // 实例筛选（用户 2026-11-19：「需要再加一个按照实例筛选」）：全部 + 每个 (版本, 槽)
+        // 实例筛选（用户 2026-11-19：「需要再加一个按照实例筛选」）：实例可能很多，
+        // 一行只显示当前选择 + ▾，点开宿主的选择列表（不铺 chips，免得整行很宽）。
         final String[] instKey = { null };
         final String[] instSlot = { null };
         box.addView(sectionLabel(c, th, R.string.us_inst_title));
-        final android.widget.HorizontalScrollView instScroll =
-                new android.widget.HorizontalScrollView(c);
-        instScroll.setHorizontalScrollBarEnabled(false);
         final LinearLayout instRow = new LinearLayout(c);
         instRow.setOrientation(LinearLayout.HORIZONTAL);
-        instScroll.addView(instRow);
-        box.addView(instScroll, new LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                LinearLayout.LayoutParams.WRAP_CONTENT));
+        box.addView(instRow);
 
         box.addView(sectionLabel(c, th, R.string.us_range_title));
         // 范围分两行：7 个胶囊一行放不下（360dp 宽的内容区），「自定义」会被截掉
@@ -224,27 +219,37 @@ public final class UsageStats {
             @Override public void run() {
                 title.setText(c.getString(R.string.us_panel_title));
                 List<Sessions.Entry> es = sessions(api);
-                // 实例 chips（全部 + 每个 版本·槽）；实例列表不在筛选后重算（从全量来）
+                // 实例：一行「当前选择 ▾」，点开宿主的选择列表
                 instRow.removeAllViews();
-                instRow.addView(chip(c, th, c.getString(R.string.us_range_all),
-                        instKey[0] == null, new View.OnClickListener() {
+                final List<String[]> insts = instances(es);
+                String curLabel = instKey[0] == null
+                        ? c.getString(R.string.us_range_all)
+                        : instanceLabel(api, instKey[0], instSlot[0]);
+                instRow.addView(chip(c, th, curLabel + " ▾", true,
+                        new View.OnClickListener() {
                             @Override public void onClick(View v) {
-                                instKey[0] = null;
-                                instSlot[0] = null;
-                                rebuild[0].run();
+                                String[] opts = new String[insts.size() + 1];
+                                opts[0] = c.getString(R.string.us_range_all);
+                                for (int i = 0; i < insts.size(); i++) {
+                                    opts[i + 1] = instanceLabel(api, insts.get(i)[0],
+                                            insts.get(i)[1]);
+                                }
+                                api.choose(c.getString(R.string.us_inst_title), opts,
+                                        new PluginApi.Choose() {
+                                            @Override public void onChoose(int index) {
+                                                if (index < 0) return;
+                                                if (index == 0) {
+                                                    instKey[0] = null;
+                                                    instSlot[0] = null;
+                                                } else {
+                                                    instKey[0] = insts.get(index - 1)[0];
+                                                    instSlot[0] = insts.get(index - 1)[1];
+                                                }
+                                                rebuild[0].run();
+                                            }
+                                        });
                             }
                         }), chipLp(th));
-                for (final String[] ins : instances(es)) {
-                    boolean sel = ins[0].equals(instKey[0]) && ins[1].equals(instSlot[0]);
-                    instRow.addView(chip(c, th, instanceLabel(api, ins[0], ins[1]), sel,
-                            new View.OnClickListener() {
-                                @Override public void onClick(View v) {
-                                    instKey[0] = ins[0];
-                                    instSlot[0] = ins[1];
-                                    rebuild[0].run();
-                                }
-                            }), chipLp(th));
-                }
                 if (instKey[0] != null) {
                     List<Sessions.Entry> one = new ArrayList<Sessions.Entry>();
                     for (Sessions.Entry e : es) {
