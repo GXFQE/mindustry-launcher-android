@@ -18,6 +18,7 @@
     <string name="us_panel_title">Playtime stats</string>
     <string name="us_range_title">Range</string>
     <string name="us_grain_title">Grain</string>
+    <string name="us_inst_title">Instance</string>
     <string name="us_range_days_fmt">%1$d d</string>
     <string name="us_range_all">All</string>
     <string name="us_range_custom">Custom</string>

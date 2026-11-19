@@ -187,6 +187,20 @@ public final class UsageStats {
         box.addView(title);
 
         // 第 401 轮：两个分组标题（用户：「上面需要加上标题（统计范围选择 / 精度选择）」）
+        // 实例筛选（用户 2026-11-19：「需要再加一个按照实例筛选」）：全部 + 每个 (版本, 槽)
+        final String[] instKey = { null };
+        final String[] instSlot = { null };
+        box.addView(sectionLabel(c, th, R.string.us_inst_title));
+        final android.widget.HorizontalScrollView instScroll =
+                new android.widget.HorizontalScrollView(c);
+        instScroll.setHorizontalScrollBarEnabled(false);
+        final LinearLayout instRow = new LinearLayout(c);
+        instRow.setOrientation(LinearLayout.HORIZONTAL);
+        instScroll.addView(instRow);
+        box.addView(instScroll, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT));
+
         box.addView(sectionLabel(c, th, R.string.us_range_title));
         // 范围分两行：7 个胶囊一行放不下（360dp 宽的内容区），「自定义」会被截掉
         final LinearLayout rangeRow = new LinearLayout(c);
@@ -209,6 +223,38 @@ public final class UsageStats {
         rebuild[0] = new Runnable() {
             @Override public void run() {
                 title.setText(c.getString(R.string.us_panel_title));
+                List<Sessions.Entry> es = sessions(api);
+                // 实例 chips（全部 + 每个 版本·槽）；实例列表不在筛选后重算（从全量来）
+                instRow.removeAllViews();
+                instRow.addView(chip(c, th, c.getString(R.string.us_range_all),
+                        instKey[0] == null, new View.OnClickListener() {
+                            @Override public void onClick(View v) {
+                                instKey[0] = null;
+                                instSlot[0] = null;
+                                rebuild[0].run();
+                            }
+                        }), chipLp(th));
+                for (final String[] ins : instances(es)) {
+                    boolean sel = ins[0].equals(instKey[0]) && ins[1].equals(instSlot[0]);
+                    instRow.addView(chip(c, th, instanceLabel(api, ins[0], ins[1]), sel,
+                            new View.OnClickListener() {
+                                @Override public void onClick(View v) {
+                                    instKey[0] = ins[0];
+                                    instSlot[0] = ins[1];
+                                    rebuild[0].run();
+                                }
+                            }), chipLp(th));
+                }
+                if (instKey[0] != null) {
+                    List<Sessions.Entry> one = new ArrayList<Sessions.Entry>();
+                    for (Sessions.Entry e : es) {
+                        if (e != null && e.key.equals(instKey[0])
+                                && e.slot.equals(instSlot[0])) {
+                            one.add(e);
+                        }
+                    }
+                    es = one;
+                }
                 rangeRow.removeAllViews();
                 rangeRow2.removeAllViews();
                 for (int i = 0; i < RANGE_PRESETS.length; i++) {
@@ -258,7 +304,6 @@ public final class UsageStats {
                 }
 
                 body.removeAllViews();
-                List<Sessions.Entry> es = sessions(api);
                 if (es.isEmpty()) {
                     body.addView(hint(c, th, R.string.us_panel_empty));
                     return;
@@ -410,6 +455,43 @@ public final class UsageStats {
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         box.addView(hint(c, th, R.string.us_levels_hint));
         return box;
+    }
+
+    /** distinct (key, slot)，按出现顺序；key = 版本 key，slot = 槽。 */
+    static List<String[]> instances(List<Sessions.Entry> es) {
+        List<String[]> out = new ArrayList<String[]>();
+        if (es == null) return out;
+        for (Sessions.Entry e : es) {
+            if (e == null || e.key.isEmpty() || e.slot.isEmpty()) continue;
+            boolean seen = false;
+            for (String[] o : out) {
+                if (o[0].equals(e.key) && o[1].equals(e.slot)) {
+                    seen = true;
+                    break;
+                }
+            }
+            if (!seen) out.add(new String[]{e.key, e.slot});
+        }
+        return out;
+    }
+
+    /** 实例标签：版本显示名 + 槽；反查不到版本名就只给 key。 */
+    static String instanceLabel(PluginApi api, String key, String slot) {
+        String name = key;
+        try {
+            for (ItemInfo it : api.versions()) {
+                if (it == null || it.extra == null) continue;
+                if (!key.equals(it.extra.get("key"))) continue;
+                name = it.title;
+                String dv = it.extra.get("displayVersion");
+                // title 里常已带版本号（如「滚木 原端 159.7」）⇒ 只在它不含时才补，避免「159.7 159.7」
+                if (dv != null && !dv.isEmpty() && !name.contains(dv)) name = name + " " + dv;
+                break;
+            }
+        } catch (Throwable ignored) {
+            // 版本表读不到就用 key
+        }
+        return name + " · " + slot;
     }
 
     /** 读某粒度的颜色档位（`data/levels.txt`，`GRAIN:a,b,c,d` 一行；坏行 / 缺失 ⇒ 默认）。 */
