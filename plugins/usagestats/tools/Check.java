@@ -313,9 +313,9 @@ public final class Check {
                 "heat: 自定义档位阈值按分钟生效（1/2/3/4 分钟）");
 
         Heat.Grid gh2 = Heat.grid(one, now, sh, Heat.Grain.HOUR,
-                at(sh, 2026, 11, 18, 10, 0), at(sh, 2026, 11, 18, 11, 0) - 1L);
-        fail += ok(gh2.rows == 3 && "2026-11-16 00".equals(gh2.cellKey[0]),
-                "heat 时档：从起点所在周的周一 0 点对齐（行 = 天）");
+                at(sh, 2026, 11, 18, 10, 0), at(sh, 2026, 11, 18, 23, 0) - 1L);
+        fail += ok(gh2.rows == 1 && "2026-11-18 00".equals(gh2.cellKey[0]),
+                "heat 时档：从范围起点当天 0 点开始（1 天 = 1 行，不补周一空行）");
 
         Heat.Grid gm2 = Heat.grid(one, now, sh, Heat.Grain.MONTH,
                 at(sh, 2026, 11, 13, 0, 0), at(sh, 2026, 11, 19, 23, 0) + 3_599_999L);

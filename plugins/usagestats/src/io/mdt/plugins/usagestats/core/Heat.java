@@ -196,10 +196,10 @@ public final class Heat {
         long alignedFrom;
         int cells;
         if (grain == Grain.HOUR) {
-            // 用户 2026-11-19：「按时分割应该和周那样对齐」—— 从起点所在周的周一 0 点开始，
-            // 每天一行；起点不是周一时的空位不画（与日档同一套对齐）。
-            alignedFrom = weekStart(fromDay, zone);
-            cells = (int) (daysBetween(alignedFrom, toDay, zone) + 1) * 24;
+            // 第 401 轮修正：从**范围起点当天** 0 点开始，每天一行（不补周一的空行 ——
+            // 用户看到 1 天范围上面多出几天，否掉了按周对齐的版本）。
+            alignedFrom = fromDay;
+            cells = (int) (daysBetween(fromDay, toDay, zone) + 1) * 24;
         } else if (grain == Grain.DAY) {
             alignedFrom = weekStart(fromDay, zone);
             cells = (int) daysBetween(alignedFrom, weekEnd(toDay, zone), zone);
