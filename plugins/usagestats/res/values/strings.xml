@@ -30,4 +30,18 @@
     <string name="us_range_bad">Start is after end.</string>
     <string name="us_pick_from">Start date</string>
     <string name="us_pick_to">End date</string>
+    <string-array name="us_weekdays">
+        <item>Mon</item>
+        <item>Tue</item>
+        <item>Wed</item>
+        <item>Thu</item>
+        <item>Fri</item>
+        <item>Sat</item>
+        <item>Sun</item>
+    </string-array>
+    <string name="us_panel_too_small">Range is shorter than one cell. Widen the range or pick a finer grain.</string>
+    <string name="us_levels_title">Color levels (min)</string>
+    <string name="us_levels_hint">Lower bounds of levels 2 / 3 / 4 / 5; blank = default.</string>
+    <string name="us_apply">Apply</string>
+    <string name="us_levels_bad">Levels must be increasing numbers.</string>
 </resources>

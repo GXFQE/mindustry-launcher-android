@@ -56,12 +56,10 @@
     <string name="plugin_pending_cancelled">cancelled the pending version; it will not load on the next launch, so no restart is needed</string>
     <string name="plugin_restart_inexact">the system did not grant the exact-alarm permission, so the restart may take a few seconds. Restart now?</string>
     <string name="plugin_restart_failed">This device would not let the app restart itself. Please close it and open it again by hand.</string>
-    <string name="plugin_back">Back</string>
     <string name="plugin_skip_title">The last launch with plugins did not finish</string>
     <string name="plugin_skip_rollback_fmt">%1$s: %2$s did not work - switched back to %3$s</string>
     <string name="plugin_skip_disable_fmt">%1$s: %2$s did not work - turned off</string>
     <string name="plugin_skip_restore">Turn the plugins back on</string>
-    <string name="plugin_loaded_fmt">Loaded %1$s (api %2$d)</string>
     <string name="plugin_fallback_title">The plugin did not load - showing the built-in view instead.</string>
     <string name="plugin_err_missing">The plugin file is gone.</string>
     <string name="plugin_err_dex">This package cannot be read (is it a valid APK?).</string>

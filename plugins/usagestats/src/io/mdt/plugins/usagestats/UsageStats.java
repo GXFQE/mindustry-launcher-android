@@ -152,16 +152,16 @@ public final class UsageStats {
 
     // ---- 第 400 轮：插件页「游玩统计」面板 ---------------------------------------
 
-    /** 范围预设（天）。 */
-    private static final int[] RANGE_PRESETS = {7, 30, 90, 365};
+    /** 范围预设（天）。第 401 轮加「1 天」（用户：「应该加上一天这个选项」）。 */
+    private static final int[] RANGE_PRESETS = {1, 7, 30, 90, 365};
 
     /**
-     * 插件页里的统计面板：范围 × 粒度 + 热力图 + 合计。
+     * 插件页里的统计面板：范围 × 粒度 + 热力图 + 合计 + 颜色档位。
      *
-     * <p>宿主插件页（`PluginsActivity` 直达）传 `page = "panel"` 进来；页面本身已经是宿主的
-     * ScrollView，这里**不再套滚动容器**（图高随行数增长、整页滚）。
+     * <p>宿主插件页（`PluginsActivity` 直达）传 `page = "panel"` 进来；**只有图区滚动**
+     * （用户 2026-11-19：「滚动区域应该只有图的部分」），头部 / 合计 / 档位固定。
      *
-     * <p>范围 / 粒度不持久化：每次进页面回到「近 30 天 · 日」。
+     * <p>范围 / 粒度不持久化：每次进页面回到「近 30 天 · 日」；颜色档位按粒度存 `data/levels.txt`。
      */
     private static View panel(PluginApi api) {
         final Context c = api.context();
@@ -177,7 +177,7 @@ public final class UsageStats {
         final long[] from = { daysAgoStart(29, tz) };
         final long[] to = { endOfToday(tz) };
         final Heat.Grain[] grain = { Heat.Grain.DAY };
-        final int[] preset = { 1 };          // 30 天
+        final int[] preset = { 2 };          // RANGE_PRESETS[2] = 30 天
         final boolean[] all = { false };
 
         final TextView title = new TextView(c);
@@ -186,7 +186,7 @@ public final class UsageStats {
         title.setTextColor(th.text);
         box.addView(title);
 
-        // 范围分两行：6 个胶囊一行放不下（360dp 宽的内容区），「自定义」会被截掉
+        // 范围分两行：7 个胶囊一行放不下（360dp 宽的内容区），「自定义」会被截掉
         final LinearLayout rangeRow = new LinearLayout(c);
         rangeRow.setOrientation(LinearLayout.HORIZONTAL);
         box.addView(rangeRow);
@@ -243,11 +243,9 @@ public final class UsageStats {
                 grainRow.removeAllViews();
                 Heat.Grain[] gs = { Heat.Grain.HOUR, Heat.Grain.DAY,
                         Heat.Grain.WEEK, Heat.Grain.MONTH };
-                int[] gname = { R.string.us_grain_hour, R.string.us_grain_day,
-                        R.string.us_grain_week, R.string.us_grain_month };
                 for (int i = 0; i < gs.length; i++) {
                     final Heat.Grain g = gs[i];
-                    grainRow.addView(chip(c, th, c.getString(gname[i]), grain[0] == g,
+                    grainRow.addView(chip(c, th, c.getString(gnameRes(g)), grain[0] == g,
                             new View.OnClickListener() {
                                 @Override public void onClick(View v) {
                                     grain[0] = g;
@@ -262,9 +260,15 @@ public final class UsageStats {
                     body.addView(hint(c, th, R.string.us_panel_empty));
                     return;
                 }
-                Heat.Grid grid = Heat.grid(es, System.currentTimeMillis(), tz, grain[0], from[0], to[0]);
+                int[] bounds = boundsFor(api, grain[0]);
+                Heat.Grid grid = Heat.grid(es, System.currentTimeMillis(), tz,
+                        grain[0], from[0], to[0], bounds);
                 if (grid.tooBig) {
                     body.addView(hint(c, th, R.string.us_panel_too_big));
+                    return;
+                }
+                if (grid.tooSmall) {
+                    body.addView(hint(c, th, R.string.us_panel_too_small));
                     return;
                 }
                 if (grid.firstDay.isEmpty()) {
@@ -278,14 +282,163 @@ public final class UsageStats {
                 sum.setText(c.getString(R.string.us_panel_total_fmt, duration(c, Heat.total(grid)))
                         + " · " + c.getString(R.string.us_heat_since_fmt, grid.firstDay));
                 body.addView(sum);
-                body.addView(new HeatView(c, th, grid), new LinearLayout.LayoutParams(
+
+                // 图区：固定高度（≤420dp）内部滚（用户 2026-11-19：「滚动区域应该只有图的部分」）。
+                // ★ 用 onMeasure 封顶（onLayoutChange 的时机不稳，真机验过：高度没被收住）。
+                // 列轴固定（不随图滚）；图区固定高度（≤420dp）内部滚（用户 2026-11-19）
+                body.addView(new HeatAxis(c, th, grid), new LinearLayout.LayoutParams(
                         LinearLayout.LayoutParams.MATCH_PARENT,
                         LinearLayout.LayoutParams.WRAP_CONTENT));
+                final int maxH = th.dp(420);
+                final android.widget.ScrollView sc = new android.widget.ScrollView(c) {
+                    @Override protected void onMeasure(int wSpec, int hSpec) {
+                        super.onMeasure(wSpec, hSpec);
+                        if (getMeasuredHeight() > maxH) {
+                            setMeasuredDimension(getMeasuredWidth(), maxH);
+                        }
+                    }
+                };
+                sc.setVerticalScrollBarEnabled(true);
+                final HeatView hv = new HeatView(c, th, grid);
+                sc.addView(hv);
+                sc.setOnTouchListener(new View.OnTouchListener() {
+                    @Override public boolean onTouch(View v, android.view.MotionEvent e) {
+                        if (v.getParent() != null) {
+                            v.getParent().requestDisallowInterceptTouchEvent(true);
+                        }
+                        return false;
+                    }
+                });
+                body.addView(sc, new LinearLayout.LayoutParams(
+                        LinearLayout.LayoutParams.MATCH_PARENT,
+                        LinearLayout.LayoutParams.WRAP_CONTENT));
+                sc.post(new Runnable() {
+                    @Override public void run() {
+                        sc.fullScroll(View.FOCUS_DOWN);
+                    }
+                });
                 body.addView(hint(c, th, R.string.us_panel_hint));
+                body.addView(levelsEditor(api, c, th, grain[0], bounds, rebuild));
             }
         };
         rebuild[0].run();
         return box;
+    }
+
+    /** 粒度名资源。 */
+    private static int gnameRes(Heat.Grain g) {
+        if (g == Heat.Grain.HOUR) return R.string.us_grain_hour;
+        if (g == Heat.Grain.DAY) return R.string.us_grain_day;
+        if (g == Heat.Grain.WEEK) return R.string.us_grain_week;
+        return R.string.us_grain_month;
+    }
+
+    /**
+     * 颜色档位编辑（用户 2026-11-19：「多少的定义应该也可以自定义吧」）。
+     * 4 个分钟输入 = 第 2 / 3 / 4 / 5 档的下界；留空 = 默认；按粒度存 `data/levels.txt`。
+     */
+    private static View levelsEditor(final PluginApi api, final Context c,
+                                     final PluginTheme th, final Heat.Grain g,
+                                     int[] bounds, final Runnable[] rebuild) {
+        LinearLayout box = new LinearLayout(c);
+        box.setOrientation(LinearLayout.VERTICAL);
+        TextView t = new TextView(c);
+        t.setTextSize(12f);
+        t.setTextColor(th.textMuted);
+        t.setText(c.getString(R.string.us_levels_title) + " · " + c.getString(gnameRes(g)));
+        box.addView(t);
+
+        final LinearLayout row = new LinearLayout(c);
+        row.setOrientation(LinearLayout.HORIZONTAL);
+        box.addView(row);
+        final android.widget.EditText[] fields = new android.widget.EditText[4];
+        for (int i = 0; i < 4; i++) {
+            android.widget.EditText e = new android.widget.EditText(c);
+            e.setTextSize(12f);
+            e.setTextColor(th.text);
+            e.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+            e.setSingleLine(true);
+            e.setText(String.valueOf(bounds[i]));
+            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0,
+                    LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
+            lp.rightMargin = th.dp(6);
+            row.addView(e, lp);
+            fields[i] = e;
+        }
+        View apply = chip(c, th, c.getString(R.string.us_apply), true, null);
+        apply.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View v) {
+                int[] def = Heat.defaultBounds(g);
+                int[] b = new int[4];
+                for (int i = 0; i < 4; i++) {
+                    String s = fields[i].getText() == null ? ""
+                            : fields[i].getText().toString().trim();
+                    if (s.isEmpty()) {
+                        b[i] = def[i];
+                        continue;
+                    }
+                    try {
+                        b[i] = Integer.parseInt(s);
+                    } catch (Throwable t2) {
+                        b[i] = -1;
+                    }
+                }
+                boolean ok = b[0] >= 0 && b[0] < b[1] && b[1] < b[2] && b[2] < b[3];
+                if (!ok) {
+                    Toast.makeText(c, c.getString(R.string.us_levels_bad),
+                            Toast.LENGTH_SHORT).show();
+                    return;
+                }
+                saveBounds(api, g, b);
+                rebuild[0].run();
+            }
+        });
+        row.addView(apply, new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        box.addView(hint(c, th, R.string.us_levels_hint));
+        return box;
+    }
+
+    /** 读某粒度的颜色档位（`data/levels.txt`，`GRAIN:a,b,c,d` 一行；坏行 / 缺失 ⇒ 默认）。 */
+    static int[] boundsFor(PluginApi api, Heat.Grain g) {
+        int[] def = Heat.defaultBounds(g);
+        File dir = api == null ? null : api.dataDir();
+        if (dir == null) return def;
+        String txt = readText(new File(dir, "levels.txt"), 4096);
+        for (String line : txt.split("\n")) {
+            String s = line.trim();
+            int p = s.indexOf(':');
+            if (p <= 0 || !s.substring(0, p).equals(g.name())) continue;
+            String[] vs = s.substring(p + 1).split(",");
+            if (vs.length != 4) continue;
+            try {
+                int[] b = new int[4];
+                for (int i = 0; i < 4; i++) b[i] = Integer.parseInt(vs[i].trim());
+                if (b[0] >= 0 && b[0] < b[1] && b[1] < b[2] && b[2] < b[3]) return b;
+            } catch (Throwable ignored) {
+                // 坏行忽略，继续找
+            }
+        }
+        return def;
+    }
+
+    /** 写某粒度的颜色档位（保留其它粒度的行）。 */
+    static void saveBounds(PluginApi api, Heat.Grain g, int[] b) {
+        File dir = api == null ? null : api.dataDir();
+        if (dir == null || b == null || b.length != 4) return;
+        File f = new File(dir, "levels.txt");
+        String txt = readText(f, 4096);
+        StringBuilder sb = new StringBuilder();
+        for (String line : txt.split("\n")) {
+            String s = line.trim();
+            if (s.isEmpty()) continue;
+            int p = s.indexOf(':');
+            if (p > 0 && s.substring(0, p).equals(g.name())) continue;
+            sb.append(s).append('\n');
+        }
+        sb.append(g.name()).append(':').append(b[0]).append(',').append(b[1])
+                .append(',').append(b[2]).append(',').append(b[3]).append('\n');
+        writeAtomic(f, sb.toString());
     }
 
     /** 读每局流水（宿主不解析；插件自己的数据）。 */

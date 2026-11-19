@@ -67,9 +67,13 @@ public final class Heat {
         public final long from, to;
         /** 行数超过 {@link #MAX_ROWS}（UI 只提示、不画）。 */
         public final boolean tooBig;
+        /** 范围比粒度还短（用户 2026-11-19：「拒绝统计时长小于精度」）。 */
+        public final boolean tooSmall;
+        /** 颜色档位阈值（分钟，4 个：第 2 / 3 / 4 / 5 档的下界）。 */
+        public final int[] boundsMin;
 
         Grid(Grain grain, int cols, int rows, long from, long to, String firstDay,
-             boolean tooBig) {
+             boolean tooBig, boolean tooSmall, int[] boundsMin) {
             this.grain = grain;
             this.cols = cols;
             this.rows = rows;
@@ -77,10 +81,23 @@ public final class Heat {
             this.to = to;
             this.firstDay = firstDay == null ? "" : firstDay;
             this.tooBig = tooBig;
+            this.tooSmall = tooSmall;
+            this.boundsMin = boundsMin == null ? defaultBounds(grain) : boundsMin;
             int n = Math.max(0, rows * cols);
             this.ms = new long[n];
             this.draw = new boolean[n];
             this.cellKey = new String[n];
+        }
+
+        /** 第 row 行的左侧标签（"MM-dd" / 年份）；没有 = 空串。 */
+        public String rowLabel(int row) {
+            if (row < 0 || row >= rows || cols <= 0) return "";
+            int idx = row * cols;
+            if (idx >= cellKey.length || cellKey[idx] == null) return "";
+            String k = cellKey[idx];
+            if (grain == Grain.MONTH) return k.length() >= 4 ? k.substring(0, 4) : k;
+            if (grain == Grain.HOUR) return k.length() >= 10 ? k.substring(5, 10) : k;
+            return k.length() >= 10 ? k.substring(5, 10) : k;
         }
     }
 
@@ -94,39 +111,33 @@ public final class Heat {
         return 12;
     }
 
+    /** 默认档位阈值（分钟，4 个：第 2 / 3 / 4 / 5 档的下界）。 */
+    public static int[] defaultBounds(Grain g) {
+        if (g == Grain.HOUR) return new int[]{10, 30, 60, 120};
+        if (g == Grain.DAY) return new int[]{30, 60, 120, 240};
+        if (g == Grain.WEEK) return new int[]{60, 180, 420, 840};
+        return new int[]{120, 360, 900, 1800};
+    }
+
     /**
      * 一格的前台毫秒 ⇒ 颜色档位（0 = 有记录但没玩）。
      *
-     * <p>阈值按粒度分别定（一小时的 10 分钟和一整天的 10 分钟不是一回事）。
+     * <p>阈值按粒度分别定（一小时的 10 分钟和一整天的 10 分钟不是一回事）；
+     * 用户可自定义（{@link Grid#boundsMin}）。
      */
     public static int level(Grain g, long ms) {
+        return level(ms, defaultBounds(g));
+    }
+
+    /** 用给定的 4 个分钟阈值算档位（阈值必须递增；null / 长度不对 ⇒ 用日档默认）。 */
+    public static int level(long ms, int[] boundsMin) {
         if (ms <= 0L) return 0;
-        if (g == Grain.HOUR) {
-            if (ms < 10L * 60_000L) return 1;
-            if (ms < 30L * 60_000L) return 2;
-            if (ms < 60L * 60_000L) return 3;
-            if (ms < 2L * 3_600_000L) return 4;
-            return 5;
-        }
-        if (g == Grain.DAY) {
-            if (ms < 30L * 60_000L) return 1;
-            if (ms < 3_600_000L) return 2;
-            if (ms < 2L * 3_600_000L) return 3;
-            if (ms < 4L * 3_600_000L) return 4;
-            return 5;
-        }
-        if (g == Grain.WEEK) {
-            if (ms < 3_600_000L) return 1;
-            if (ms < 3L * 3_600_000L) return 2;
-            if (ms < 7L * 3_600_000L) return 3;
-            if (ms < 14L * 3_600_000L) return 4;
-            return 5;
-        }
-        // MONTH
-        if (ms < 2L * 3_600_000L) return 1;
-        if (ms < 6L * 3_600_000L) return 2;
-        if (ms < 15L * 3_600_000L) return 3;
-        if (ms < 30L * 3_600_000L) return 4;
+        int[] b = (boundsMin != null && boundsMin.length == 4) ? boundsMin : defaultBounds(Grain.DAY);
+        long min = ms / 60_000L;
+        if (min < b[0]) return 1;
+        if (min < b[1]) return 2;
+        if (min < b[2]) return 3;
+        if (min < b[3]) return 4;
         return 5;
     }
 
@@ -151,6 +162,16 @@ public final class Heat {
      */
     public static Grid grid(List<Sessions.Entry> es, long now, TimeZone tz, Grain grain,
                             long from, long to) {
+        return grid(es, now, tz, grain, from, to, null);
+    }
+
+    /**
+     * 生成网格（可带自定义档位阈值）。
+     *
+     * @param boundsMin 4 个分钟阈值（null = 该粒度的默认值）
+     */
+    public static Grid grid(List<Sessions.Entry> es, long now, TimeZone tz, Grain grain,
+                            long from, long to, int[] boundsMin) {
         TimeZone zone = tz == null ? TimeZone.getDefault() : tz;
         if (grain == null) grain = Grain.DAY;
         if (to < from) to = from;
@@ -175,8 +196,10 @@ public final class Heat {
         long alignedFrom;
         int cells;
         if (grain == Grain.HOUR) {
-            alignedFrom = fromDay;
-            cells = (int) (daysBetween(fromDay, toDay, zone) + 1) * 24;
+            // 用户 2026-11-19：「按时分割应该和周那样对齐」—— 从起点所在周的周一 0 点开始，
+            // 每天一行；起点不是周一时的空位不画（与日档同一套对齐）。
+            alignedFrom = weekStart(fromDay, zone);
+            cells = (int) (daysBetween(alignedFrom, toDay, zone) + 1) * 24;
         } else if (grain == Grain.DAY) {
             alignedFrom = weekStart(fromDay, zone);
             cells = (int) daysBetween(alignedFrom, weekEnd(toDay, zone), zone);
@@ -190,8 +213,10 @@ public final class Heat {
         }
         int rows = (cells + cols - 1) / cols;
         boolean tooBig = rows > MAX_ROWS;
-        Grid g = new Grid(grain, cols, rows, from, to, firstDay, tooBig);
-        if (tooBig || rows <= 0) return g;
+        // 用户 2026-11-19：「拒绝统计时长小于精度」—— 范围比一个格子还短就没意义
+        boolean tooSmall = !tooBig && (to - from + 1L) < grainSpanMs(grain, fromDay, zone);
+        Grid g = new Grid(grain, cols, rows, from, to, firstDay, tooBig, tooSmall, boundsMin);
+        if (tooBig || tooSmall || rows <= 0) return g;
 
         // 聚合桶（先裁剪到 [from, to]）
         Map<String, Long> dayMap = new HashMap<String, Long>();
@@ -304,6 +329,15 @@ public final class Heat {
     }
 
     // ---- 日历辅助（全部按设备本地时区） --------------------------------------
+
+    /** 一个格子的时长（毫秒）：时 1h / 日 1d / 周 7d / 月 = 起点所在月的实际长度。 */
+    static long grainSpanMs(Grain g, long fromDay, TimeZone tz) {
+        if (g == Grain.HOUR) return 3_600_000L;
+        if (g == Grain.DAY) return 86_400_000L;
+        if (g == Grain.WEEK) return 7L * 86_400_000L;
+        long m = addMonths(fromDay, 0, tz);   // 该月 1 日 0 点
+        return addMonths(m, 1, tz) - m;
+    }
 
     static long dayStart(long ms, TimeZone tz) {
         Calendar c = Calendar.getInstance(tz);

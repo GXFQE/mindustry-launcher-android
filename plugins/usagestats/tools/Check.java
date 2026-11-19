@@ -300,20 +300,41 @@ public final class Check {
                         && "2026-11-18".equals(gd.cellKey[2]),
                 "★heat 日档：周一对齐 / 起点前不画 / 起点后没玩也画 / 合计只算范围内");
 
-        long fromHalf = at(sh, 2026, 11, 18, 10, 0);
-        long toHalf = at(sh, 2026, 11, 18, 11, 0) - 1L;   // 10:00 ~ 10:59:59.999
+        long fromHalf = at(sh, 2026, 11, 18, 11, 0);
+        long toHalf = at(sh, 2026, 11, 19, 11, 0) - 1L;   // 11-19 10:59:59.999（范围 = 1 天）
         Heat.Grid gc = Heat.grid(one, now, sh, Heat.Grain.DAY, fromHalf, toHalf);
-        fail += ok(Math.abs(gc.ms[2] - 3_600_000L) <= 1L
+        fail += ok(!gc.tooSmall && Math.abs(gc.ms[2] - 3_600_000L) <= 1L
                         && Math.abs(Heat.total(gc) - 3_600_000L) <= 1L,
-                "★heat: 范围边界按墙钟裁剪（2h 的一局只算范围内那 1h，误差 ≤1ms）");
+                "★heat: 范围边界按墙钟裁剪（2h 的一局只算范围内那 1h）");
+
+        fail += ok(Heat.level(5 * 60_000L, new int[]{1, 2, 3, 4}) == 5
+                        && Heat.level(30_000L, new int[]{1, 2, 3, 4}) == 1
+                        && Heat.level(90_000L, new int[]{1, 2, 3, 4}) == 2,
+                "heat: 自定义档位阈值按分钟生效（1/2/3/4 分钟）");
+
+        Heat.Grid gh2 = Heat.grid(one, now, sh, Heat.Grain.HOUR,
+                at(sh, 2026, 11, 18, 10, 0), at(sh, 2026, 11, 18, 11, 0) - 1L);
+        fail += ok(gh2.rows == 3 && "2026-11-16 00".equals(gh2.cellKey[0]),
+                "heat 时档：从起点所在周的周一 0 点对齐（行 = 天）");
+
+        Heat.Grid gm2 = Heat.grid(one, now, sh, Heat.Grain.MONTH,
+                at(sh, 2026, 11, 13, 0, 0), at(sh, 2026, 11, 19, 23, 0) + 3_599_999L);
+        fail += ok(gm2.tooSmall, "heat: 月档 + 7 天范围 ⇒ 拒绝（范围小于精度）");
+        Heat.Grid gw2 = Heat.grid(one, now, sh, Heat.Grain.WEEK,
+                at(sh, 2026, 11, 14, 0, 0), at(sh, 2026, 11, 19, 23, 0) + 3_599_999L);
+        fail += ok(gw2.tooSmall, "heat: 周档 + 6 天范围 ⇒ 拒绝");
+        Heat.Grid gd2 = Heat.grid(one, now, sh, Heat.Grain.DAY,
+                at(sh, 2026, 11, 19, 0, 0), at(sh, 2026, 11, 19, 23, 0) + 3_599_999L);
+        fail += ok(!gd2.tooSmall && gd2.rows == 1,
+                "heat: 日档 + 1 天 ⇒ 不拒绝（正好一格）");
 
         Heat.Grid gw = Heat.grid(one, now, sh, Heat.Grain.WEEK,
-                at(sh, 2026, 11, 18, 0, 0), at(sh, 2026, 11, 18, 23, 0) + 3_599_999L);
+                at(sh, 2026, 11, 10, 0, 0), at(sh, 2026, 11, 18, 23, 0) + 3_599_999L);
         fail += ok(gw.cols == 13 && gw.rows == 1 && "2026-09-28".equals(gw.cellKey[0]),
                 "heat 周档：从季度首周对齐（10-01 所在周从 09-28 起）");
 
         Heat.Grid gm = Heat.grid(one, now, sh, Heat.Grain.MONTH,
-                at(sh, 2026, 11, 18, 0, 0), at(sh, 2026, 11, 18, 23, 0) + 3_599_999L);
+                at(sh, 2026, 10, 1, 0, 0), at(sh, 2026, 11, 18, 23, 0) + 3_599_999L);
         fail += ok(gm.cols == 12 && gm.rows == 1 && "2026-01".equals(gm.cellKey[0])
                         && gm.ms[10] == 7_200_000L,
                 "heat 月档：从 1 月对齐、11 月格 = 当月时长");

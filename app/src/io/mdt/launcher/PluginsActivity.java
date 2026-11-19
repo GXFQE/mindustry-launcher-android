@@ -153,6 +153,16 @@ public class PluginsActivity extends BaseActivity {
     }
 
     /**
+     * 第 401 轮（用户：「右上角的检查插件更新 … 应该由插件负责控制」）：插件自己的页面里
+     * 没有这项（它属于插件列表页），打开插件页时把菜单项摘掉。
+     */
+    @Override
+    public boolean onPrepareOptionsMenu(android.view.Menu menu) {
+        if (mPluginOpen) menu.removeItem(R.id.action_plugin_update);
+        return super.onPrepareOptionsMenu(menu);
+    }
+
+    /**
      * 「返回」该回哪：从列表点进来的插件页 ⇒ 回列表；直接打开的页 ⇒ 回调用方。
      * 纯函数（自检钉真值表），返回键 / 顶栏箭头 / 页面底部那个「返回」都用它。
      */
@@ -737,16 +747,8 @@ public class PluginsActivity extends BaseActivity {
             View v = PluginHost.createView(l);
             LinearLayout box = new LinearLayout(this);
             box.setOrientation(LinearLayout.VERTICAL);
-            // 「已加载 xxx（接口 N）」是给用户判断"这份到底跑没跑起来"的，字号压小、不抢插件自己的页面
-            // ★ 第 184 轮：原来传的是 `apk.getName()`（内置插件就是 `2ed851ab.apk` —— 又是 sha 前 8 位），
-            //   改成插件的自述名字；"哪一份"由卡片 / 信息弹窗负责，别在这里再漏一次内部令牌。
-            TextView loaded = new TextView(this);
-            loaded.setText(Trans.get(this, R.string.plugin_loaded_fmt,
-                    Plugins.displayNameOf(this, id), l.api));
-            loaded.setTextSize(12f);
-            loaded.setTextColor(getResources().getColor(R.color.fg_muted));
-            loaded.setPadding(0, 0, 0, dp(8));
-            box.addView(loaded);
+            // 第 401 轮（用户：「这些东西本来就应该由插件负责控制」）：插件页 = 插件自己画的内容，
+            // 宿主不再叠「已加载 …」行；返回走顶栏箭头 / 系统返回键（backToPluginList）。
             if (v != null) box.addView(v);
             pageView = box;
         } catch (PluginHost.PluginException e) {
@@ -760,34 +762,17 @@ public class PluginsActivity extends BaseActivity {
             pageView = fallback(Trans.get(this, R.string.plugin_err_page_fmt,
                     Plugins.displayNameOf(this, id)));
         }
-        // 插件自己的页面 + 一个「返回」按钮（直接打开的 ⇒ 回上一页；从列表点的 ⇒ 重建本页）
+        // 插件自己的页面（返回走顶栏箭头 / 系统返回键；内容里的「返回」按钮第 401 轮删掉）
         LinearLayout root = new LinearLayout(this);
         root.setOrientation(LinearLayout.VERTICAL);
         root.setPadding(dp(16), dp(12), dp(16), dp(16));
-        TextView back = new TextView(this);
-        back.setText(Trans.get(this, R.string.plugin_back));
-        back.setTextSize(14f);
-        back.setTextColor(getResources().getColor(R.color.accent));
-        back.setBackgroundResource(R.drawable.btn_ghost);
-        back.setPadding(dp(14), dp(7), dp(14), dp(7));
-        back.setGravity(Gravity.CENTER);
-        back.setClickable(true);
-        back.setFocusable(false);
-        back.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) {
-                closePluginPage();
-            }
-        });
-        LinearLayout.LayoutParams blp = new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        blp.bottomMargin = dp(12);
-        root.addView(back, blp);
         root.addView(pageView, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
         mScroll.removeAllViews();
         mScroll.addView(root);
         // ★ 页面已换成插件页：系统返回 / 顶栏箭头要先回列表（第 184 轮，用户报的正是"直接回主页"）
         mPluginOpen = true;
+        invalidateOptionsMenu();
     }
 
     /**
