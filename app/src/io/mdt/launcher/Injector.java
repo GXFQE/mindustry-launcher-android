@@ -178,6 +178,45 @@ public final class Injector {
          * 注入阶段才发现的问题写这里；{@link GameSlot} 会把它们合进启动报告。
          */
         public final List<String> patchProblems = new ArrayList<>();
+        /**
+         * v49：这一局要带进游戏的**联机地址**（`host:port`，端口可省）。
+         *
+         * <p>拼成 `mindustry://host:port` 后 `setData` 到游戏 Activity 的 Intent 上 ——
+         * 游戏在 `ClientLoadEvent` 里读它并弹自己的「要连接到 xxx 吗」确认框。
+         * null / 空 = 普通启动。
+         *
+         * <p>⚠️ 只收 `host:port`，不收完整 URI：游戏对非 `mindustry` 的 data 会走
+         * "当文件导入"（`openInputStream`）分支。校验见 {@link #deepLinkFor}。
+         */
+        public String hostPort;
+    }
+
+    /**
+     * v49：把 `host:port` 拼成游戏认的 `mindustry://host:port`（**唯一实现**，自检直接喂）。
+     *
+     * <p>校验口径与游戏**同一套**：拼完自己调一次 {@link android.net.Uri#getHost()}，空就拒
+     * —— 游戏那边也是 `uri.getHost()` 判空后静默忽略（`AndroidLauncher.handleIntent`）。
+     * 比写正则准：带下划线的主机名 `Uri.getHost()` 返回 null，正则反而会放过。
+     *
+     * @return 合法 ⇒ `mindustry://host:port`；非法 ⇒ null（调用方当普通启动处理）
+     */
+    public static android.net.Uri deepLinkFor(String hostPort) {
+        if (hostPort == null) return null;
+        String hp = hostPort.trim();
+        if (hp.isEmpty() || hp.length() > 256) return null;
+        // 空白 / 路径 / 查询 / 片段 / userinfo 一律拒 —— 拼进 authority 会变成别的东西
+        for (int i = 0; i < hp.length(); i++) {
+            char c = hp.charAt(i);
+            if (Character.isWhitespace(c) || c == '/' || c == '?' || c == '#' || c == '@') return null;
+        }
+        try {
+            android.net.Uri u = android.net.Uri.parse("mindustry://" + hp);
+            String host = u.getHost();
+            if (host == null || host.isEmpty()) return null;
+            return u;
+        } catch (Throwable t) {
+            return null;
+        }
     }
 
     /**
@@ -340,7 +379,7 @@ public final class Injector {
 
         // ⑤ startActivity
         try {
-            startGame(activity, baseCl, log);
+            startGame(activity, baseCl, log, plan);
         } catch (Throwable e) {
             t.mark("startActivity");
             logThrowable(log, e);
@@ -724,11 +763,19 @@ public final class Injector {
 
     // ── ⑤ 启动游戏 ────────────────────────────────────────────────────────
 
-    private static void startGame(Activity activity, ClassLoader baseCl, StringBuilder log)
-            throws Exception {
+    private static void startGame(Activity activity, ClassLoader baseCl, StringBuilder log,
+                                  Plan plan) throws Exception {
         Class<?> cls = Class.forName(GAME_ACTIVITY, false, baseCl);
         log.append("已从 base CL 解析到 ").append(cls.getName()).append('\n');
         Intent i = new Intent(activity, cls);
+        // ★ v49：联机深链（`mindustry://host:port`）。游戏在 **ClientLoadEvent** 里读它，
+        //   弹它自己的「要连接到 xxx 吗」确认框 —— 冷启动这个时机 `ui` 已就绪（源码
+        //   `AndroidLauncher:226` 注册、`:304` 判断 scheme）；`onNewIntent` 那条热路径我们不走。
+        android.net.Uri link = plan == null ? null : deepLinkFor(plan.hostPort);
+        if (link != null) {
+            i.setData(link);
+            log.append("深链 = ").append(link).append('\n');
+        }
         activity.startActivity(i);
         activity.finish();   // 坑位退场，游戏接管
         log.append("startActivity 已返回，坑位 finish\n");

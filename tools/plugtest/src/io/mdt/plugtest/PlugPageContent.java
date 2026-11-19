@@ -246,13 +246,14 @@ public final class PlugPage {
             }
         });
 
-        // ★ v48 端到端夹具：就地启动一个实例（不跳主界面）。
-        //   要启动谁由 `dataDir/launch-kv` 给（第一行 key、第二行槽，槽可空）——
+        // ★ v48/v49 端到端夹具：就地启动一个实例（不跳主界面），可选带联机地址。
+        //   参数由 `dataDir/launch-kv` 给（第一行 key、第二行槽、第三行 host:port，都可省）——
         //   用文件当参数是为了 adb 上直接换，不用重发插件。
-        addButton(box, c, th, "launch instance (v48)", new View.OnClickListener() {
+        addButton(box, c, th, "launch instance (v49)", new View.OnClickListener() {
             @Override public void onClick(View v) {
                 String key = "";
                 String slot = "";
+                String host = "";
                 try {
                     java.io.File f = new java.io.File(api.dataDir(), "launch-kv");
                     if (f.isFile()) {
@@ -260,6 +261,7 @@ public final class PlugPage {
                                 "UTF-8").split("\n");
                         if (ln.length > 0) key = ln[0].trim();
                         if (ln.length > 1) slot = ln[1].trim();
+                        if (ln.length > 2) host = ln[2].trim();
                     }
                 } catch (Throwable t) {
                     api.log("LAUNCH fixture read failed " + t);
@@ -268,12 +270,19 @@ public final class PlugPage {
                     api.toast("no launch-kv");
                     return;
                 }
-                final String k = key, s = slot;
-                api.launch(k, s, new io.mdt.launcher.api.PluginApi.Launch() {
-                    @Override public void onState(String state, String reason) {
-                        api.log("LAUNCH STATE " + state + " / " + reason + " / " + k);
-                    }
-                });
+                final String k = key, s = slot, h = host;
+                api.log("LAUNCH fixture hostPort=[" + h + "]");
+                io.mdt.launcher.api.PluginApi.Launch cb =
+                        new io.mdt.launcher.api.PluginApi.Launch() {
+                            @Override public void onState(String state, String reason) {
+                                api.log("LAUNCH STATE " + state + " / " + reason + " / " + k);
+                            }
+                        };
+                if (h.isEmpty()) {
+                    api.launch(k, s, cb);
+                } else {
+                    api.launch(k, s, h, cb);
+                }
             }
         });
 

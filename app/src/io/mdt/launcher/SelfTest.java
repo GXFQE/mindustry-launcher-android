@@ -5338,6 +5338,8 @@ public final class SelfTest {
         pluginV45(ctx, L, stat);
         // ★ v48：插件立刻启动实例（第 395 轮）
         pluginV48(ctx, L, stat);
+        // ★ v49：带着联机地址启动（第 396 轮）
+        pluginV49(ctx, L, stat);
     }
 
     /**
@@ -5361,8 +5363,8 @@ public final class SelfTest {
     private static void pluginV43(android.content.Context ctx, List<String> L, int[] stat) {
         L.add("");
         L.add("【v43 · 插件下载 / 模组写 / 网络扩充（第 378 轮）】");
-        ok(stat, L, PluginHost.API == 48 && PluginApi.DOC_VERSION == 48,
-                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 48（v48 起）");
+        ok(stat, L, PluginHost.API == 49 && PluginApi.DOC_VERSION == 49,
+                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 49（v49 起）");
 
         boolean shape = true;
         try {
@@ -5860,8 +5862,8 @@ public final class SelfTest {
     private static void pluginV45(android.content.Context ctx, List<String> L, int[] stat) {
         L.add("");
         L.add("【v45 · 启动否决 + 身份（第 394 轮）】");
-        ok(stat, L, PluginHost.API == 48 && PluginApi.DOC_VERSION == 48,
-                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 48（v48 起）");
+        ok(stat, L, PluginHost.API == 49 && PluginApi.DOC_VERSION == 49,
+                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 49（v49 起）");
 
         boolean shape = true;
         try {
@@ -5999,8 +6001,8 @@ public final class SelfTest {
     private static void pluginV48(Context ctx, List<String> L, int[] stat) {
         L.add("");
         L.add("【v48 · 插件立刻启动实例（第 395 轮）】");
-        ok(stat, L, PluginHost.API == 48 && PluginApi.DOC_VERSION == 48,
-                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 48（v48 起）");
+        ok(stat, L, PluginHost.API == 49 && PluginApi.DOC_VERSION == 49,
+                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 49（v49 起）");
 
         boolean shape = true;
         try {
@@ -6042,6 +6044,54 @@ public final class SelfTest {
             nullOk = false;
         }
         ok(stat, L, nullOk, "回调传 null（点击路径）不崩");
+    }
+
+    /**
+     * 第 396 轮（v49）：**插件带着联机地址启动**。
+     *
+     * <p>钉住两件：
+     * <ol>
+     *   <li>接口面：四参 `launch(String, String, String, Launch)` 在，旧的三参重载也还在；</li>
+     *   <li>`Injector.deepLinkFor` 的格式判据 —— 与游戏同一套（`Uri.getHost()` 非空），
+     *       外加"只收 host:port、不收完整 URI"（否则游戏会把它当文件导入）。</li>
+     * </ol>
+     */
+    private static void pluginV49(Context ctx, List<String> L, int[] stat) {
+        L.add("");
+        L.add("【v49 · 带着联机地址启动（第 396 轮）】");
+        ok(stat, L, PluginHost.API == 49 && PluginApi.DOC_VERSION == 49,
+                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 49（v49 起）");
+
+        boolean shape = true;
+        try {
+            PluginApi.class.getMethod("launch", String.class, String.class, String.class,
+                    PluginApi.Launch.class);
+            PluginApi.class.getMethod("launch", String.class, String.class,
+                    PluginApi.Launch.class);
+        } catch (Throwable t) {
+            shape = false;
+        }
+        ok(stat, L, shape, "接口面：launch 三参与四参重载都在");
+
+        StringBuilder longHost = new StringBuilder();
+        for (int i = 0; i < 300; i++) longHost.append('x');
+
+        boolean links = "mindustry://example.com:6567".equals(
+                        String.valueOf(Injector.deepLinkFor("example.com:6567")))
+                && "mindustry://example.com".equals(
+                        String.valueOf(Injector.deepLinkFor("example.com")))
+                && "mindustry://example.com:6567".equals(
+                        String.valueOf(Injector.deepLinkFor("  example.com:6567  ")))
+                && Injector.deepLinkFor(null) == null
+                && Injector.deepLinkFor("") == null
+                && Injector.deepLinkFor("   ") == null
+                && Injector.deepLinkFor("http://evil") == null
+                && Injector.deepLinkFor("a b") == null
+                && Injector.deepLinkFor("user@host") == null
+                && Injector.deepLinkFor(longHost.toString()) == null;
+        ok(stat, L, links,
+                "★ deepLinkFor：host:port → mindustry://…；空 / 带路径 / 带空白 / 带 @ / 超长 一律拒"
+                        + "（非 mindustry 的 data 会被游戏当文件导入，所以不能放行）");
     }
 
     /**

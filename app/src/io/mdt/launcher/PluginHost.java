@@ -147,8 +147,12 @@ public final class PluginHost {
      * 与点击走**同一条路**（共用槽确认 / 兼容性复检 / `game-start` 否决 / 启动占位全照旧）；
      * 状态回 `accepted` / `launched` / `blocked` / `failed` / `cancelled`。启动链参数化成
      * static + Activity ⇒ 插件可以在**任意页面**就地启动，不跳主界面。
+     *
+     * <p>v49（2026-11-19 第 396 轮）：`launch(versionKey, slot, hostPort, Launch)` —— 顺带把
+     * 联机地址 `host:port` 带进游戏（宿主拼 `mindustry://`，游戏在 `ClientLoadEvent` 弹它自己的
+     * 「要连接到 xxx 吗」确认框）。只接受 `host:port`，不收完整 URI。
      */
-    public static final int API = 48;
+    public static final int API = 49;
     /**
      * 还认的**最老**契约版本。
      *
@@ -1527,8 +1531,12 @@ public final class PluginHost {
          * 真正启动回主线程交给 {@link MainActivity#startVersion}。
          * 失败也在**主线程**回调（契约：插件回调都在 UI 线程）。
          */
+        @Override public void launch(String versionKey, String slot, PluginApi.Launch cb) {
+            launch(versionKey, slot, null, cb);
+        }
+
         @Override public void launch(final String versionKey, final String slot,
-                                     final PluginApi.Launch cb) {
+                                     final String hostPort, final PluginApi.Launch cb) {
             final Context c = getBaseContext();
             final Activity a = activityOrNull();
             if (a == null) {
@@ -1541,6 +1549,19 @@ public final class PluginHost {
             }
             final String wantKey = versionKey.trim();
             final String wantSlot = slot == null ? "" : slot.trim();
+            // v49：联机地址校验 —— 判据与 Injector 拼 URI 那份**同一处**（`deepLinkFor`），
+            //   空 = 普通启动；非法 ⇒ 直接失败，不白跑一遍启动流程。
+            final String hp = hostPort == null ? null : hostPort.trim();
+            final String wantHost;
+            if (hp == null || hp.isEmpty()) {
+                wantHost = null;
+            } else {
+                if (Injector.deepLinkFor(hp) == null) {
+                    failLaunch(cb, "bad_host");
+                    return;
+                }
+                wantHost = hp;
+            }
             new Thread(new Runnable() {
                 @Override public void run() {
                     try {
@@ -1564,7 +1585,7 @@ public final class PluginHost {
                                 Versions.conflictsOf(c, all).get(Versions.rowKey(row));
                         a.runOnUiThread(new Runnable() {
                             @Override public void run() {
-                                MainActivity.startVersion(a, row, sh,
+                                MainActivity.startVersion(a, row, sh, wantHost,
                                         new MainActivity.LaunchCb(cb));
                             }
                         });

@@ -59,7 +59,7 @@ public interface PluginApi {
      * <p>为什么要有这个常量：注释里的「当前 = N」运行期读不到，一个写 17、一个写 20 也没人发现；
      * 常量 + 断言才拦得住。</p>
      */
-    int DOC_VERSION = 48;
+    int DOC_VERSION = 49;
 
     // ══ 环境 ═══════════════════════════════════════════════════════════════
 
@@ -697,6 +697,20 @@ public interface PluginApi {
      * 用户在确认卡上点取消 ⇒ 回调 {@code cancelled}。
      */
     void launch(String versionKey, String slot, Launch cb);
+
+    /**
+     * **v49**：同 {@link #launch(String, String, Launch)}，但**顺带把一个联机地址带进游戏**。
+     *
+     * <p>游戏冷启动时在自己的 `ClientLoadEvent` 里读这个 data，弹它自己的
+     * 「要连接到 xxx 吗」确认框（用户还得点一下「连接」—— 那一步改不了）。
+     *
+     * @param hostPort 只接受 `host:port` 形式（端口可省，省了用游戏的默认 6567）；
+     *                 **别传完整 URI** —— 宿主自己拼 `mindustry://`。这不是懒：
+     *                 游戏对**非** `mindustry` 的 data 会走"当文件导入"分支（`openInputStream`），
+     *                 所以宿主只放行这一种格式。
+     * @param cb       同 {@link #launch(String, String, Launch)}
+     */
+    void launch(String versionKey, String slot, String hostPort, Launch cb);
 
     /**
      * v48：{@link #launch} 的状态回调（**主线程**）。

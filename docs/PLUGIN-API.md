@@ -5,7 +5,7 @@
 
 ## 1. 版本与兼容（v20 冻结基线）
 
-- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..48**。
+- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..49**。
   （v20 是冻结基线；v21 = 游戏设置面；v22 = 后台任务 + 游戏事件；v23 = 探针；v24 = 分析器；
   v25 = 结论挂行 + 筛选/排序注入 + HJSON；v26 = 逐项判定；v27 = 详情页的门 + 槽级结论进摘要卡；
   v28 = 原版文案键；v29 = 游戏前后台事件；v30 = 探针知道版本 / 跨会话数据目录 + 摘要卡总时长；
@@ -76,6 +76,10 @@
   **同一条路**（共用槽确认 / 兼容性复检 / `game-start` 否决 / 启动占位），但**不跳主界面**
   （启动链参数化成 static + Activity）；状态回 `accepted` / `launched` / `blocked` / `failed` /
   `cancelled`，终态只回一次。只能在界面里调（后台 ⇒ `failed` / `no_activity`）。`API_MIN` 仍不动。
+  **v49 = 带着联机地址启动**：`launch(versionKey, slot, hostPort, Launch)` —— 只收 `host:port`
+  （宿主拼 `mindustry://`；游戏在 `ClientLoadEvent` 弹它自己的「要连接到 xxx 吗」确认框，
+  用户还得点一下「连接」）；校验口径 = `Uri.getHost()` 非空（与游戏同一套），
+  非 `host:port` 一律拒（否则游戏会把 data 当文件导入）。`API_MIN` 仍不动。
 - 插件 `api()` 报的是「我需要的最低宿主接口版本」。用不到的新能力**不要**报高 ——
   报高了只会在老宿主上被拒，换不来任何东西。
 - **不要用 try/catch 去兼容老宿主**：报什么版本就只会跑在什么版本上。`api()` 报 20，
@@ -1272,6 +1276,17 @@ v48（2026-11-19 第 395 轮）：**插件能立刻启动一个实例**（用户
 终态只回一次（`LaunchCb` 闸门）。
 ⚠️ 只能在**界面里**调：从 `submit()` 的后台任务调会拿到 `no_activity` —— Android 10+ 后台起
 Activity 会被系统拦，硬做只会变成"有时能启动、有时不能"。`API_MIN` 仍不动（区间 20..48）。
+v49（2026-11-19 第 396 轮）：**插件带着联机地址启动** —— `launch(versionKey, slot, hostPort, Launch)`。
+★ 游戏侧的格式检查（官方 160.4 `AndroidLauncher.handleIntent` 源码）：
+`"mindustry".equalsIgnoreCase(scheme)` · `getHost()` 非空（空 ⇒ **静默忽略**）·
+`getPort() == -1 ⇒ 6567`；**非 `mindustry` 的 data 会走"当文件导入"分支**（`openInputStream` +
+`handleFileImport`）⇒ 宿主绝不能让插件塞任意 data。
+★ 所以宿主**只收 `host:port`**，自己拼 `mindustry://`；校验用同一个 API 预演
+（`Injector.deepLinkFor`：trim、≤256、不含空白/`/`/`?`/`#`/`@`、`Uri.getHost()` 非空），
+非法 ⇒ `failed` / `bad_host`。比正则准 —— 带下划线的主机名 `getHost()` 返回 null，正则反而放过。
+★ 时机：只在**冷启动**时带（游戏在 `ClientLoadEvent` 处理，`ui` 已就绪）；`onNewIntent` 那条热路径不做。
+★ 认知边界：游戏弹的是**它自己的**确认框，用户还要点一下「连接」—— 所以是"一键唤起 + 一次确认"，
+不是真正直连。`API_MIN` 仍不动（区间 20..49）。
 
 **官方体检插件**：`plugins/mods-health`（第 229 轮，前身叫 `conflict`）。宿主原来的那行
 「查模组冲突」整块删掉，判据搬进插件的 `core/Conflicts.java` 与 `core/Gates.java`；

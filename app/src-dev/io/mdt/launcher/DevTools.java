@@ -255,7 +255,7 @@ final class DevTools {
                         Trans.get(a, R.string.dev_launch_miss_fmt, launchKey, a.keysOf()));
                 return;
             }
-            MainActivity.startVersion(a, hit, a.mConflict.get(Versions.rowKey(hit)), null);
+            MainActivity.startVersion(a, hit, a.mConflict.get(Versions.rowKey(hit)), null, null);
             return;
         }
 

@@ -52,6 +52,16 @@ public class GameSlot extends BaseActivity {
      */
     static final String EXTRA_LEGACY_SWAP = "legacy_swap";
 
+    /**
+     * v49：这一局要带进游戏的**联机地址**（`host:port`，端口可省）。
+     *
+     * <p>由主进程从 {@code PluginApi.launch(key, slot, hostPort, cb)} 透传下来；
+     * 本进程原样塞进 {@link Injector.Plan#hostPort}，由 Injector 拼成
+     * `mindustry://host:port` 挂在游戏 Activity 的 Intent data 上。
+     * 没有这个 extra = 普通启动。
+     */
+    static final String EXTRA_HOST_PORT = "host_port";
+
     /** 第 366 轮：这一局解析出来的实例身份（启动失败时要按它把主进程的占位销掉） */
     private String mVkey;
     private String mLaunchSlot;
@@ -168,6 +178,8 @@ public class GameSlot extends BaseActivity {
         // ③ 六步管线（同步执行，与探针一致；前置段 ~200-500 ms，游戏自身加载另有 4~5 s）
         Injector.Plan plan = new Injector.Plan();
         plan.apk = target;
+        // v49：联机深链（可选）。原样透传，拼 URI 与校验都在 Injector.deepLinkFor（判据只一处）。
+        plan.hostPort = it == null ? null : it.getStringExtra(EXTRA_HOST_PORT);
         // 第 382 轮（阶段 0.3）：native 按**版本 key** 分目录（旧布局所有版本共用一个 .so 路径，
         // 真机实测 159.7 / v146 互相覆盖）。tag 的清洗与兜底在 Natives.tagFor。
         plan.tag = vkey;

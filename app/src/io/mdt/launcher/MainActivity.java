@@ -919,7 +919,7 @@ public class MainActivity extends BaseActivity {
         if (handle != null) {
             handle.setContentDescription(Trans.get(MainActivity.this, R.string.row_drag_desc));
             handle.setOnClickListener(new View.OnClickListener() {
-                @Override public void onClick(View x) { startVersion(MainActivity.this, e, mConflict.get(Versions.rowKey(e)), null); }
+                @Override public void onClick(View x) { startVersion(MainActivity.this, e, mConflict.get(Versions.rowKey(e)), null, null); }
             });
             handle.setOnLongClickListener(new View.OnLongClickListener() {
                 @Override public boolean onLongClick(View x) { return beginRowDrag(v); }
@@ -982,7 +982,7 @@ public class MainActivity extends BaseActivity {
         // 现在直接挂在行根上（行根变 clickable 后，按下状态会自动播给内部不可点击的子视图，
         // 卡片背景 card_bg_press 的按下高亮照旧生效）。
         v.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View x) { startVersion(MainActivity.this, e, mConflict.get(Versions.rowKey(e)), null); }
+            @Override public void onClick(View x) { startVersion(MainActivity.this, e, mConflict.get(Versions.rowKey(e)), null, null); }
         });
         v.setOnLongClickListener(new View.OnLongClickListener() {
             @Override public boolean onLongClick(View x) { openVersion(e); return true; }
@@ -1383,7 +1383,7 @@ public class MainActivity extends BaseActivity {
         mContinueText.setText(Trans.get(MainActivity.this, R.string.main_continue_fmt,
                 e.displayName(this, false)));
         mBtnContinue.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View v) { startVersion(MainActivity.this, e, mConflict.get(Versions.rowKey(e)), null); }
+            @Override public void onClick(View v) { startVersion(MainActivity.this, e, mConflict.get(Versions.rowKey(e)), null, null); }
         });
     }
 
@@ -1531,7 +1531,8 @@ public class MainActivity extends BaseActivity {
      * **启动请求一律留证据**，落盘的栈第一行就能分出真触摸与代码合成。
      */
     static void startVersion(final Activity a, final Versions.Entry e,
-                             final Versions.Share share, final LaunchCb cb) {
+                             final Versions.Share share, final String hostPort,
+                             final LaunchCb cb) {
         if (a == null || e == null) {
             if (cb != null) cb.state(PluginApi.Launch.FAILED, "no_entry");
             return;
@@ -1539,15 +1540,16 @@ public class MainActivity extends BaseActivity {
         recordStartTrace(a, e, share);
         // ★ 第 367 轮（plan §12.17）：起新局前**先确认**（不再静默杀掉正在跑的游戏）。
         if (Data.gameAlive(a)) {
-            promptSwitchRunning(a, e, share, cb);
+            promptSwitchRunning(a, e, share, hostPort, cb);
             return;
         }
-        proceedStart(a, e, share, cb);
+        proceedStart(a, e, share, hostPort, cb);
     }
 
     /** 「会先退出正在运行的游戏」确认（第 367 轮）。取消 ⇒ 回调 cancelled。 */
     private static void promptSwitchRunning(final Activity a, final Versions.Entry e,
-                                            final Versions.Share share, final LaunchCb cb) {
+                                            final Versions.Share share, final String hostPort,
+                                            final LaunchCb cb) {
         final CardStack[] ref = new CardStack[1];
         ref[0] = CardStack.show(null, a, Trans.get(a, R.string.switch_running_title),
                 CardStack.text(a, Trans.get(a, R.string.switch_running_msg_fmt,
@@ -1561,20 +1563,21 @@ public class MainActivity extends BaseActivity {
                 new CardStack.Btn(Trans.get(a, R.string.switch_running_go), new Runnable() {
                     @Override public void run() {
                         ref[0].dismiss();
-                        proceedStart(a, e, share, cb);
+                        proceedStart(a, e, share, hostPort, cb);
                     }
                 }));
     }
 
     /** 预检通过后的启动流程（冲突确认 → 启动进度）。第 367 轮从 `startVersion` 拆出来。 */
     private static void proceedStart(final Activity a, final Versions.Entry e,
-                                     final Versions.Share share, final LaunchCb cb) {
+                                     final Versions.Share share, final String hostPort,
+                                     final LaunchCb cb) {
         // ★ F4①：同槽共用预检。v48 起**判据只有一处**（`Versions.conflictsOf`）：
         //   点击路径传缓存表、插件路径传现算结果，不存在第二份实现（REF §35.11）。
         //   ⚠️ FLOWS 原有的一条「当前槽 saves/ 里有解析失败的 .msav → 提示但不阻塞」
         //      **仍未做**：它依赖 F10（`.msav` 解析器），硬凑假判据只会误报好存档。
         if (share == null || !share.block) {
-            startVersionConfirmed(a, e, null, cb);
+            startVersionConfirmed(a, e, null, hostPort, cb);
             return;
         }
         // ★ 第 268 轮：冲突确认 → 启动进度 在同一张卡里（原来"关确认框 → 再开进度框"）
@@ -1589,7 +1592,9 @@ public class MainActivity extends BaseActivity {
                     }
                 }),
                 new CardStack.Btn(Trans.get(a, R.string.launch_conflict_go), new Runnable() {
-                    @Override public void run() { startVersionConfirmed(a, e, ref[0], cb); }
+                    @Override public void run() {
+                        startVersionConfirmed(a, e, ref[0], hostPort, cb);
+                    }
                 }));
     }
 
@@ -1673,7 +1678,8 @@ public class MainActivity extends BaseActivity {
      * 进度卡画在**调用方传进来的 Activity** 上 —— 不再假设一定是主界面。
      */
     private static void startVersionConfirmed(final Activity a, final Versions.Entry e,
-                                              final CardStack card, final LaunchCb cb) {
+                                              final CardStack card, final String hostPort,
+                                              final LaunchCb cb) {
         // ★★ 防连点 + 即时反馈（2026-10-04 补，理由见 sLaunching 的注释）：
         //   先挡住第二次点击，再立刻把"正在准备"显示出来 —— 这段最长可能等 8 s。
         //   ⚠️ 进度页**没有按钮、点不动**：modal + 不可取消 ⇒ 与 sLaunching 双保险。
@@ -1738,6 +1744,8 @@ public class MainActivity extends BaseActivity {
                 final String slot = Versions.slotFor(e);
 
                 i.putExtra("slot", slot);
+                // v49：联机地址（可选）。null = 普通启动；GameSlot 原样转给 Injector。
+                i.putExtra(GameSlot.EXTRA_HOST_PORT, hostPort);
                 // v31：把这一局的**完整版本信息**透传给探针 —— 已装游戏会原地更新（包名不变、
                 // 版本号变），探针要拿版本号 + 原始版本名才能把"更新前后"分开记。
                 // ★ 身份仍是 pkg / apk；这里只是给插件记账 / 显示的快照。
