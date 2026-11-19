@@ -274,6 +274,38 @@ public final class Check {
                         && db.get(0).slot.equals("s l") && db.get(0).tag.equals("t t"),
                 "sessions: clean 控制字符 -> 空格，仍是一行");
 
+        // ── 年视图热力网格（第 397 轮）：一个方块 = 一周 ─────────────────────
+        fail += ok(Heat.level(0) == 0 && Heat.level(1) == 1
+                        && Heat.level(60 * 60_000L) == 2
+                        && Heat.level(3 * 60 * 60_000L) == 3
+                        && Heat.level(7 * 60 * 60_000L) == 4
+                        && Heat.level(15 * 60 * 60_000L) == 5,
+                "heat: 周档位边界（0 / 1 时 / 3 时 / 7 时 / 15 时）");
+
+        long now = at(sh, 2026, 11, 19, 12, 0);      // 周四中午（本周一 = 11-16）
+        fail += ok(Sessions.dayOf(Heat.mondayStart(now, sh), sh).equals("2026-11-16"),
+                "heat: mondayStart 回到本周一");
+        List<Sessions.Day> hd = java.util.Arrays.asList(
+                new Sessions.Day("2026-11-17", 3_600_000L, 1),
+                new Sessions.Day("2026-11-19", 7_200_000L, 1));
+        Heat.Grid hg = Heat.grid(hd, now, sh);
+        int last = Heat.WEEKS - 1;
+        fail += ok(hg.firstDay.equals("2026-11-17") && hg.today.equals("2026-11-19")
+                        && hg.thisMonday.equals("2026-11-16")
+                        && hg.weekKey[last].equals("2026-11-16"),
+                "heat: 起点 / 今天 / 本周一的日期");
+        fail += ok(hg.weekMs[last] == 10_800_000L && hg.weekKnown[last],
+                "★heat: 同一周的几天合成一个方块（1h + 2h = 3h）");
+        fail += ok(!hg.weekKnown[last - 1],
+                "★heat: 起点之前的周不画");
+        fail += ok(!hg.weekKnown[0] && hg.weekKey[0].compareTo("2026-11-16") < 0,
+                "heat: 最早的周在 52 周之前");
+        fail += ok(Heat.total(hg) == 10_800_000L,
+                "heat: 合计只加 known 的方块（与图同源）");
+        Heat.Grid he = Heat.grid(Collections.<Sessions.Day>emptyList(), now, sh);
+        fail += ok(he.firstDay.isEmpty() && !he.weekKnown[last],
+                "heat: 没有流水 ⇒ 全不画（不给空图）");
+
         System.out.println(fail == 0 ? "== USAGESTATS CHECK OK ==" : "!! " + fail + " failed");
         System.exit(fail == 0 ? 0 : 1);
     }

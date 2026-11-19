@@ -15,10 +15,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TimeZone;
 
 import io.mdt.launcher.api.ItemInfo;
 import io.mdt.launcher.api.PluginApi;
 import io.mdt.launcher.api.PluginTheme;
+import io.mdt.plugins.usagestats.core.Heat;
 import io.mdt.plugins.usagestats.core.Playtime;
 import io.mdt.plugins.usagestats.core.Sessions;
 
@@ -131,6 +133,44 @@ public final class UsageStats {
             }
         };
         paint[0].run();
+
+        // ── 第 397 轮：近 52 周热力图（列 = 周，行 = 星期一~日；默认收起） ──────────
+        // 为什么按槽过滤：这张卡在槽页上是「本槽」的（与上面的合计同口径）；
+        // 传 null = 插件页的"总计"，显示所有槽。
+        final Heat.Grid heat = heatOf(api, slotPage ? slot : null);
+        if (heat != null && !heat.firstDay.isEmpty()) {
+            final TextView heatToggle = new TextView(c);
+            heatToggle.setTextSize(12f);
+            heatToggle.setTextColor(th.accent);
+            heatToggle.setPadding(0, th.dp(8), 0, 0);
+            heatToggle.setText(c.getString(R.string.us_heat_show));
+
+            final LinearLayout heatBox = new LinearLayout(c);
+            heatBox.setOrientation(LinearLayout.VERTICAL);
+            heatBox.setVisibility(View.GONE);
+            heatBox.addView(new HeatView(c, th, heat), new LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT));
+            TextView heatSum = new TextView(c);
+            heatSum.setTextSize(12f);
+            heatSum.setTextColor(th.textMuted);
+            heatSum.setPadding(0, th.dp(6), 0, 0);
+            // 图旁的数字与格子同源（Heat.total 只把 known 的格子加起来）；起点单独说，
+            // 别让「近 52 周」和上面的「本槽累计」对撞成"图里怎么少了"。
+            heatSum.setText(c.getString(R.string.us_heat_total_fmt, duration(c, Heat.total(heat)))
+                    + " · " + c.getString(R.string.us_heat_since_fmt, heat.firstDay));
+            heatBox.addView(heatSum);
+
+            heatToggle.setOnClickListener(new View.OnClickListener() {
+                @Override public void onClick(View v) {
+                    boolean show = heatBox.getVisibility() != View.VISIBLE;
+                    heatBox.setVisibility(show ? View.VISIBLE : View.GONE);
+                    heatToggle.setText(c.getString(show ? R.string.us_heat_hide : R.string.us_heat_show));
+                }
+            });
+            box.addView(heatToggle);
+            box.addView(heatBox);
+        }
 
         TextView note = new TextView(c);
         note.setTextSize(11f);
@@ -309,6 +349,60 @@ public final class UsageStats {
                 if (bos.size() > 256 * 1024) break;
             }
             return new String(bos.toByteArray(), "UTF-8");
+        } catch (Throwable t) {
+            return "";
+        } finally {
+            if (in != null) {
+                try { in.close(); } catch (Throwable ignored) { }
+            }
+        }
+    }
+
+    /**
+     * 第 397 轮：每局流水 ⇒ 近 52 周网格。
+     *
+     * @param slot 非空 = 只算这个槽（槽页）；null = 所有槽（插件页总计）
+     * @return null = 还没有流水（不画空图，别让用户以为坏了）
+     */
+    private static Heat.Grid heatOf(PluginApi api, String slot) {
+        File dir = api == null ? null : api.dataDir();
+        if (dir == null) return null;
+        List<Sessions.Entry> all = Sessions.parse(readText(new File(dir, "sessions.tsv"), 1024 * 1024));
+        if (all.isEmpty()) return null;
+        List<Sessions.Entry> mine = new ArrayList<Sessions.Entry>();
+        for (Sessions.Entry e : all) {
+            if (e == null) continue;
+            if (slot == null || e.slot.equals(slot)) mine.add(e);
+        }
+        if (mine.isEmpty()) return null;
+        TimeZone tz = TimeZone.getDefault();
+        return Heat.grid(Sessions.byDay(mine, tz), System.currentTimeMillis(), tz);
+    }
+
+    /** 读文件（超过 max 字节只读尾部，并丢掉可能被截断的第一行）。 */
+    private static String readText(File f, int max) {
+        if (f == null || !f.isFile()) return "";
+        long len = f.length();
+        boolean cut = len > max;
+        long skip = cut ? len - max : 0L;
+        FileInputStream in = null;
+        try {
+            in = new FileInputStream(f);
+            while (skip > 0L) {
+                long n = in.skip(skip);
+                if (n <= 0L) break;
+                skip -= n;
+            }
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) > 0) bos.write(buf, 0, n);
+            String s = new String(bos.toByteArray(), "UTF-8");
+            if (cut) {
+                int nl = s.indexOf('\n');
+                if (nl >= 0) s = s.substring(nl + 1);
+            }
+            return s;
         } catch (Throwable t) {
             return "";
         } finally {

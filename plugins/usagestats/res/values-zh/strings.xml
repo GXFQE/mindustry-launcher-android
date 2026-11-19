@@ -12,4 +12,10 @@
     <string name="us_patch_row_fmt">%1$s · %2$s</string>
     <string name="us_patch_more_fmt">%1$s +%2$d</string>
     <string name="us_patch_half">半改端</string>
+    <string name="us_heat_show">展开近 52 周</string>
+    <string name="us_heat_hide">收起</string>
+    <string name="us_heat_total_fmt">近 52 周：%1$s</string>
+    <string name="us_heat_since_fmt">从 %1$s 开始记录</string>
+    <string name="us_heat_less">少</string>
+    <string name="us_heat_more">多</string>
 </resources>

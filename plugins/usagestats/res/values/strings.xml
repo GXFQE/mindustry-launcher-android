@@ -12,4 +12,10 @@
     <string name="us_patch_row_fmt">%1$s · %2$s</string>
     <string name="us_patch_more_fmt">%1$s +%2$d</string>
     <string name="us_patch_half">half-modified</string>
+    <string name="us_heat_show">Show last 52 weeks</string>
+    <string name="us_heat_hide">Hide</string>
+    <string name="us_heat_total_fmt">Last 52 weeks: %1$s</string>
+    <string name="us_heat_since_fmt">recorded since %1$s</string>
+    <string name="us_heat_less">less</string>
+    <string name="us_heat_more">more</string>
 </resources>
