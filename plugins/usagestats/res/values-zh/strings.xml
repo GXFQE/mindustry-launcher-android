@@ -19,6 +19,7 @@
     <string name="us_range_title">统计范围</string>
     <string name="us_grain_title">精度</string>
     <string name="us_inst_title">实例</string>
+    <string name="us_inst_picked_fmt">已选 %1$d 个</string>
     <string name="us_range_days_fmt">%1$d 天</string>
     <string name="us_range_all">全部</string>
     <string name="us_range_custom">自定义</string>

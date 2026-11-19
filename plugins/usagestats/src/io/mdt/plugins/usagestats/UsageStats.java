@@ -187,14 +187,17 @@ public final class UsageStats {
         box.addView(title);
 
         // 第 401 轮：两个分组标题（用户：「上面需要加上标题（统计范围选择 / 精度选择）」）
-        // 实例筛选（用户 2026-11-19：「需要再加一个按照实例筛选」）：实例可能很多，
-        // 一行只显示当前选择 + ▾，点开宿主的选择列表（不铺 chips，免得整行很宽）。
-        final String[] instKey = { null };
-        final String[] instSlot = { null };
+        // 实例筛选（用户 2026-11-19：「需要再加一个按照实例筛选」「筛选就不能多选吗」）：
+        // 一行「全部 / 已选 N 个 ▾」按钮，点开在页面里展开勾选列表（可多选；不依赖宿主单选 choose）。
+        final List<String[]> picked = new ArrayList<String[]>();
+        final boolean[] instOpen = { false };
         box.addView(sectionLabel(c, th, R.string.us_inst_title));
         final LinearLayout instRow = new LinearLayout(c);
         instRow.setOrientation(LinearLayout.HORIZONTAL);
         box.addView(instRow);
+        final LinearLayout instList = new LinearLayout(c);
+        instList.setOrientation(LinearLayout.VERTICAL);
+        box.addView(instList);
 
         box.addView(sectionLabel(c, th, R.string.us_range_title));
         // 范围分两行：7 个胶囊一行放不下（360dp 宽的内容区），「自定义」会被截掉
@@ -219,44 +222,44 @@ public final class UsageStats {
             @Override public void run() {
                 title.setText(c.getString(R.string.us_panel_title));
                 List<Sessions.Entry> es = sessions(api);
-                // 实例：一行「当前选择 ▾」，点开宿主的选择列表
+                // 实例：一行按钮（全部 / 已选 N 个），点开多选列表
                 instRow.removeAllViews();
+                instList.removeAllViews();
                 final List<String[]> insts = instances(es);
-                String curLabel = instKey[0] == null
+                String curLabel = picked.isEmpty()
                         ? c.getString(R.string.us_range_all)
-                        : instanceLabel(api, instKey[0], instSlot[0]);
+                        : c.getString(R.string.us_inst_picked_fmt, picked.size());
                 instRow.addView(chip(c, th, curLabel + " ▾", true,
                         new View.OnClickListener() {
                             @Override public void onClick(View v) {
-                                String[] opts = new String[insts.size() + 1];
-                                opts[0] = c.getString(R.string.us_range_all);
-                                for (int i = 0; i < insts.size(); i++) {
-                                    opts[i + 1] = instanceLabel(api, insts.get(i)[0],
-                                            insts.get(i)[1]);
-                                }
-                                api.choose(c.getString(R.string.us_inst_title), opts,
-                                        new PluginApi.Choose() {
-                                            @Override public void onChoose(int index) {
-                                                if (index < 0) return;
-                                                if (index == 0) {
-                                                    instKey[0] = null;
-                                                    instSlot[0] = null;
-                                                } else {
-                                                    instKey[0] = insts.get(index - 1)[0];
-                                                    instSlot[0] = insts.get(index - 1)[1];
-                                                }
-                                                rebuild[0].run();
-                                            }
-                                        });
+                                instOpen[0] = !instOpen[0];
+                                rebuild[0].run();
                             }
                         }), chipLp(th));
-                if (instKey[0] != null) {
+                if (instOpen[0]) {
+                    instList.addView(instPickRow(c, th, c.getString(R.string.us_range_all),
+                            picked.isEmpty(), new View.OnClickListener() {
+                                @Override public void onClick(View v) {
+                                    picked.clear();
+                                    rebuild[0].run();
+                                }
+                            }));
+                    for (final String[] ins : insts) {
+                        final boolean on = isPicked(picked, ins[0], ins[1]);
+                        instList.addView(instPickRow(c, th,
+                                instanceLabel(api, ins[0], ins[1]), on,
+                                new View.OnClickListener() {
+                                    @Override public void onClick(View v) {
+                                        togglePicked(picked, ins[0], ins[1]);
+                                        rebuild[0].run();
+                                    }
+                                }));
+                    }
+                }
+                if (!picked.isEmpty()) {
                     List<Sessions.Entry> one = new ArrayList<Sessions.Entry>();
                     for (Sessions.Entry e : es) {
-                        if (e != null && e.key.equals(instKey[0])
-                                && e.slot.equals(instSlot[0])) {
-                            one.add(e);
-                        }
+                        if (e != null && isPicked(picked, e.key, e.slot)) one.add(e);
                     }
                     es = one;
                 }
@@ -460,6 +463,39 @@ public final class UsageStats {
                 LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
         box.addView(hint(c, th, R.string.us_levels_hint));
         return box;
+    }
+
+    /** 实例多选行：✓ + 标签，点一下切换。 */
+    private static View instPickRow(Context c, PluginTheme th, String label, boolean on,
+                                    View.OnClickListener l) {
+        TextView t = new TextView(c);
+        t.setTextSize(13f);
+        t.setText((on ? "✓ " : "   ") + label);
+        t.setTextColor(on ? th.accent : th.text);
+        t.setPadding(th.dp(6), th.dp(7), th.dp(6), th.dp(7));
+        t.setClickable(true);
+        t.setFocusable(false);
+        t.setOnClickListener(l);
+        return t;
+    }
+
+    static boolean isPicked(List<String[]> picked, String key, String slot) {
+        if (picked == null) return false;
+        for (String[] p : picked) {
+            if (p[0].equals(key) && p[1].equals(slot)) return true;
+        }
+        return false;
+    }
+
+    static void togglePicked(List<String[]> picked, String key, String slot) {
+        if (picked == null) return;
+        for (int i = 0; i < picked.size(); i++) {
+            if (picked.get(i)[0].equals(key) && picked.get(i)[1].equals(slot)) {
+                picked.remove(i);
+                return;
+            }
+        }
+        picked.add(new String[]{key, slot});
     }
 
     /** distinct (key, slot)，按出现顺序；key = 版本 key，slot = 槽。 */
