@@ -2,6 +2,9 @@ package io.mdt.launcher;
 
 import android.app.Activity;
 import android.content.Context;
+import android.graphics.drawable.GradientDrawable;
+import android.text.TextUtils;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -849,5 +852,137 @@ final class PluginEntries {
             }
         });
         return row;
+    }
+
+    // ---- v46：行内插入（inline） -------------------------------------------------
+
+    /** v46：每个锚点最多挂几个（用户 2026-11-19：「大小做过防呆限制就行」）。 */
+    static final int MAX_INLINE = 2;
+
+    /** v46：这一页某个锚点上该画哪些 inline 条目（与 collect / collectActions 同一套取数）。 */
+    static List<Entry> collectInline(Context ctx, String page, String anchor) {
+        List<Entry> out = new ArrayList<Entry>();
+        if (ctx == null || page == null || anchor == null || anchor.isEmpty()) return out;
+        if (!Extensions.knownPage(page)) return out;
+        String active = Plugins.active(ctx);
+        for (String id : Plugins.stateIds(active)) {
+            String ver = Plugins.stateGet(active, id);
+            if (ver == null || ver.isEmpty()) continue;
+            File apk = Plugins.apkOf(ctx, id, ver);
+            List<Extensions.Item> items = Extensions.forInline(Extensions.of(apk), page, anchor);
+            if (items.isEmpty()) continue;
+            String name = Plugins.displayNameOf(ctx, id);
+            for (Extensions.Item it : items) out.add(new Entry(id, ver, name, it));
+        }
+        return out;
+    }
+
+    /**
+     * v46：把 inline 小控件挂到宿主文本行的尾部（宿主统一排版，插件只给类型 + 文字）。
+     *
+     * <p>防呆：最多 {@link #MAX_INLINE} 个；认不出的 kind 不画（日志一行）；布局完按实测行高 /
+     * 行宽再收一次（高度不超行高、宽度不超行宽 40%）—— **不能写死 dp**：行高跟字体缩放走。
+     */
+    static void attachInline(Activity a, String page, String anchor, ViewGroup host) {
+        if (a == null || page == null || anchor == null || host == null) return;
+        host.removeAllViews();
+        List<Entry> rows = collectInline(a, page, anchor);
+        if (rows.isEmpty()) return;
+        int shown = 0;
+        for (Entry e : rows) {
+            if (shown >= MAX_INLINE) {
+                android.util.Log.w("MDTPlugin", "inline anchor full: " + anchor
+                        + " (ignored " + e.id + ")");
+                break;
+            }
+            if (!Extensions.knownKind(e.item.kind)) {
+                android.util.Log.w("MDTPlugin", "inline kind unknown: '" + e.item.kind
+                        + "' (" + e.id + ")");
+                continue;
+            }
+            View v = inlineView(a, e, page);
+            if (v == null) continue;
+            host.addView(v);
+            shown++;
+        }
+        clampInline(host);
+    }
+
+    /** 布局后按实测行高 / 行宽收一次（百分比防呆；行高 0 = 还没布局，跳过）。 */
+    private static void clampInline(final ViewGroup host) {
+        host.post(new Runnable() {
+            @Override public void run() {
+                View row = host.getParent() instanceof View ? (View) host.getParent() : null;
+                if (row == null) return;
+                int rowH = row.getHeight();
+                int rowW = row.getWidth();
+                for (int i = 0; i < host.getChildCount(); i++) {
+                    View c = host.getChildAt(i);
+                    if (c == null) continue;
+                    if (rowH > 0 && c.getHeight() > rowH) {
+                        ViewGroup.LayoutParams lp = c.getLayoutParams();
+                        lp.height = rowH;
+                        c.setLayoutParams(lp);
+                    }
+                    if (rowW > 0 && c.getWidth() > rowW * 4 / 10) {
+                        ViewGroup.LayoutParams lp = c.getLayoutParams();
+                        lp.width = rowW * 4 / 10;
+                        c.setLayoutParams(lp);
+                        if (c instanceof TextView) ((TextView) c).setSingleLine(true);
+                    }
+                }
+            }
+        });
+    }
+
+    /** v46：预设小控件（button / chip / text）；样式全部宿主决定，插件只给文字。 */
+    private static View inlineView(final Activity a, final Entry e, final String page) {
+        TextView t = new TextView(a);
+        t.setText(e.item.label());
+        t.setTextSize(10f);
+        t.setSingleLine(true);
+        t.setEllipsize(TextUtils.TruncateAt.END);
+        t.setGravity(Gravity.CENTER);
+        int h = dp(a, 8);
+        int v = dp(a, 2);
+        t.setPadding(h, v, h, v);
+        String kind = e.item.kind;
+        if (Extensions.INLINE_BUTTON.equals(kind)) {
+            t.setTextColor(a.getColor(R.color.on_accent));
+            t.setBackground(round(a.getColor(R.color.accent), dp(a, 4)));
+        } else if (Extensions.INLINE_CHIP.equals(kind)) {
+            t.setTextColor(a.getColor(R.color.accent));
+            t.setBackground(round(a.getColor(R.color.accent_soft), dp(a, 4)));
+        } else {
+            t.setTextColor(a.getColor(R.color.fg_muted));
+        }
+        t.setClickable(true);
+        t.setOnClickListener(new View.OnClickListener() {
+            @Override public void onClick(View unused) {
+                try {
+                    File apk = Plugins.apkOf(a, e.id, e.ver);
+                    if (apk == null || !apk.isFile()) return;
+                    PluginHost.Loaded l = Plugins.isInjected(a, e.id, e.ver)
+                            ? PluginHost.openInjected(a, apk, e.item.entry, page, null, null, null)
+                            : PluginHost.load(a, apk, e.item.entry, page, null, null, null);
+                    PluginHost.runEntry(l);
+                } catch (PluginHost.PluginException pe) {
+                    android.widget.Toast.makeText(a,
+                            a.getString(PluginHost.reasonRes(pe.reason)),
+                            android.widget.Toast.LENGTH_LONG).show();
+                } catch (Throwable t2) {
+                    android.widget.Toast.makeText(a, a.getString(R.string.plugin_err_other),
+                            android.widget.Toast.LENGTH_LONG).show();
+                }
+            }
+        });
+        return t;
+    }
+
+    private static GradientDrawable round(int color, int radius) {
+        GradientDrawable d = new GradientDrawable();
+        d.setColor(color);
+        d.setCornerRadius(radius);
+        return d;
     }
 }

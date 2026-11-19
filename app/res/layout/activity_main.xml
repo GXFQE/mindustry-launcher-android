@@ -135,18 +135,36 @@
 
                 <!--
                   v30：插件声明的「累计游玩」——单独一行（摘要行是 singleLine，往后接一定会被截）。
-                  没有声明 / 没有数据 ⇒ GONE（MainActivity.bindPlaytime）。
+                  v46：行尾可以挂 inline 小控件（例如「统计」按钮）⇒ 包一层横向容器；
+                       没有声明 / 没有数据 ⇒ 整行 GONE（MainActivity.bindPlaytime）。
                 -->
-                <TextView
-                    android:id="@+id/status_playtime"
+                <LinearLayout
+                    android:id="@+id/status_playtime_row"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
                     android:paddingTop="6dp"
-                    android:textSize="12sp"
-                    android:singleLine="true"
-                    android:ellipsize="end"
-                    android:textColor="@color/fg_muted"
-                    android:visibility="gone" />
+                    android:visibility="gone">
+
+                    <TextView
+                        android:id="@+id/status_playtime"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:textSize="12sp"
+                        android:singleLine="true"
+                        android:ellipsize="end"
+                        android:textColor="@color/fg_muted" />
+
+                    <LinearLayout
+                        android:id="@+id/status_playtime_inline"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical" />
+                </LinearLayout>
 
                 <TextView
                     android:id="@+id/status_detail"

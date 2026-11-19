@@ -5359,8 +5359,8 @@ public final class SelfTest {
     private static void pluginV43(android.content.Context ctx, List<String> L, int[] stat) {
         L.add("");
         L.add("【v43 · 插件下载 / 模组写 / 网络扩充（第 378 轮）】");
-        ok(stat, L, PluginHost.API == 45 && PluginApi.DOC_VERSION == 45,
-                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 45（v45 起）");
+        ok(stat, L, PluginHost.API == 46 && PluginApi.DOC_VERSION == 46,
+                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 46（v46 起）");
 
         boolean shape = true;
         try {
@@ -5858,8 +5858,8 @@ public final class SelfTest {
     private static void pluginV45(android.content.Context ctx, List<String> L, int[] stat) {
         L.add("");
         L.add("【v45 · 启动否决 + 身份（第 394 轮）】");
-        ok(stat, L, PluginHost.API == 45 && PluginApi.DOC_VERSION == 45,
-                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 45（v45 起）");
+        ok(stat, L, PluginHost.API == 46 && PluginApi.DOC_VERSION == 46,
+                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 46（v46 起）");
 
         boolean shape = true;
         try {
@@ -6299,6 +6299,68 @@ public final class SelfTest {
                     "v41 ★detail 锚点（两个详情页的正文）真的在布局里");
         } catch (Throwable t) {
             ok(stat, L, false, "v41 锚点布局用例异常：" + t);
+        }
+
+        // v46 inline：解析 / forInline 按页+锚点过滤 / kind 只对 inline 生效
+        try {
+            String json = "{\"extensions\":["
+                    + "{\"id\":\"u1\",\"entry\":\"E\",\"slot\":\"inline\",\"page\":\"main\","
+                    + "\"place\":\"main.playtime\",\"kind\":\"button\",\"title\":\"统计\"},"
+                    + "{\"id\":\"u2\",\"entry\":\"E\",\"slot\":\"inline\",\"page\":\"main\","
+                    + "\"place\":\"main.other\",\"kind\":\"chip\"},"
+                    + "{\"id\":\"u3\",\"entry\":\"E\",\"slot\":\"inline\",\"page\":\"main\","
+                    + "\"place\":\"main.playtime\",\"kind\":\"weird\"},"
+                    + "{\"id\":\"u4\",\"entry\":\"E\",\"slot\":\"action\",\"page\":\"main\","
+                    + "\"kind\":\"button\"}]}";
+            List<Extensions.Item> items = Extensions.parse(json);
+            boolean parsed = items.size() == 4
+                    && Extensions.SLOT_INLINE.equals(items.get(0).slot)
+                    && "button".equals(items.get(0).kind)
+                    && "main.playtime".equals(items.get(0).place)
+                    && "chip".equals(items.get(1).kind)
+                    && "weird".equals(items.get(2).kind)
+                    && items.get(3).kind.isEmpty();
+            boolean filtered = Extensions.forInline(items, Extensions.PAGE_MAIN,
+                            Extensions.ANCHOR_MAIN_PLAYTIME).size() == 2
+                    && Extensions.forInline(items, Extensions.PAGE_MAIN, "main.other").size() == 1
+                    && Extensions.forInline(items, Extensions.PAGE_SLOTS,
+                            Extensions.ANCHOR_MAIN_PLAYTIME).isEmpty();
+            ok(stat, L, parsed && filtered
+                            && Extensions.knownKind("button") && Extensions.knownKind("chip")
+                            && Extensions.knownKind("text") && !Extensions.knownKind("weird")
+                            && !Extensions.knownKind(""),
+                    "v46 inline：kind 只对 inline 生效 / forInline 按页+锚点过滤 / 未知 kind 不认");
+        } catch (Throwable t) {
+            ok(stat, L, false, "v46 inline 用例异常：" + t);
+        }
+
+        // v46：usage 页 / inline 插槽认得；page 认不出的 inline 不算可用、不收集
+        ok(stat, L, Extensions.knownPage(Extensions.PAGE_USAGE)
+                        && Extensions.knownSlot(Extensions.SLOT_INLINE),
+                "v46 usage 页与 inline 插槽都算认得的");
+        try {
+            List<Extensions.Item> bad = Extensions.parse(
+                    "{\"extensions\":[{\"id\":\"x\",\"entry\":\"E\",\"slot\":\"inline\","
+                            + "\"page\":\"tomorrow\",\"place\":\"main.playtime\","
+                            + "\"kind\":\"button\"}]}");
+            ok(stat, L, bad.size() == 1 && !Extensions.usable(bad.get(0))
+                            && Extensions.forInline(bad, "tomorrow",
+                                    Extensions.ANCHOR_MAIN_PLAYTIME).isEmpty(),
+                    "v46 inline：page 认不出 ⇒ 不算可用、也不收集");
+        } catch (Throwable t) {
+            ok(stat, L, false, "v46 inline page 用例异常：" + t);
+        }
+
+        // v46：主界面「游戏时长」行 + inline 容器真的在布局里（少一个 @+id 是静默跳过）
+        try {
+            android.view.View main = android.view.LayoutInflater.from(ctx)
+                    .inflate(R.layout.activity_main, null);
+            ok(stat, L, main.findViewById(R.id.status_playtime_row) != null
+                            && main.findViewById(R.id.status_playtime) != null
+                            && main.findViewById(R.id.status_playtime_inline) != null,
+                    "v46 ★主界面布局：游戏时长行与 inline 容器都在");
+        } catch (Throwable t) {
+            ok(stat, L, false, "v46 主界面布局用例异常：" + t);
         }
 
         // PluginUiHost：在主线程造零件，断言文字 / 方向 / 子节点

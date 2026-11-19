@@ -66,6 +66,10 @@ public class MainActivity extends BaseActivity {
     private TextView mStatusSummary;
     /** v30：插件声明的累计游玩（没有插件声明 / 没有数据 ⇒ 整行 GONE） */
     private TextView mStatusPlaytime;
+    /** v46：游玩时长**这一行**（含行尾的 inline 小控件）——显隐看整行，不看 TextView。 */
+    private View mStatusPlaytimeRow;
+    /** v46：行尾的 inline 容器（插件声明的小按钮挂这里）。 */
+    private ViewGroup mStatusPlaytimeInline;
     private TextView mStatusDetail;
     private View mBtnContinue;
     private TextView mContinueText;
@@ -569,6 +573,8 @@ public class MainActivity extends BaseActivity {
         // 顶部状态卡：整卡可点，展开完整路径 —— 长路径不该一上来就糊满屏
         mStatusSummary = (TextView) root.findViewById(R.id.status_summary);
         mStatusPlaytime = (TextView) root.findViewById(R.id.status_playtime);
+        mStatusPlaytimeRow = root.findViewById(R.id.status_playtime_row);
+        mStatusPlaytimeInline = (ViewGroup) root.findViewById(R.id.status_playtime_inline);
         mStatusDetail = (TextView) root.findViewById(R.id.status_detail);
         Util.bindExpandableCard(root, R.id.status_box, R.id.status_detail, R.id.status_chevron);
 
@@ -753,15 +759,20 @@ public class MainActivity extends BaseActivity {
      * 措辞归宿主（同一个时长资源与存档行一致），插件只给毫秒。
      */
     private void bindPlaytime() {
-        if (mStatusPlaytime == null) return;
+        if (mStatusPlaytime == null || mStatusPlaytimeRow == null) return;
         long ms = PluginEntries.playtimeTotalMs(this);
         String text = ms > 0 ? MsavText.durationText(this, ms) : "";
         if (text.isEmpty()) {
-            mStatusPlaytime.setVisibility(View.GONE);
+            mStatusPlaytimeRow.setVisibility(View.GONE);
             return;
         }
         mStatusPlaytime.setText(Trans.get(this, R.string.main_playtime_fmt, text));
-        mStatusPlaytime.setVisibility(View.VISIBLE);
+        mStatusPlaytimeRow.setVisibility(View.VISIBLE);
+        // v46：行尾的 inline 小控件（插件声明的预设按钮，例如「统计」）
+        if (mStatusPlaytimeInline != null) {
+            PluginEntries.attachInline(this, Extensions.PAGE_MAIN,
+                    Extensions.ANCHOR_MAIN_PLAYTIME, mStatusPlaytimeInline);
+        }
     }
 
     /**

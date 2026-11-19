@@ -141,7 +141,7 @@ public final class PluginHost {
      * 在回调里已看不见这次启动，所以身份直接给）；`game-exit` 补 `exit` 四档
      * （`clean` / `crash` / `unclean` / `launch-failed`）。
      */
-    public static final int API = 45;
+    public static final int API = 46;
     /**
      * 还认的**最老**契约版本。
      *

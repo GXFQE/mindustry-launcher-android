@@ -76,6 +76,8 @@ final class Extensions {
     static final String PAGE_PATCHES = "patches";
     /** v40：资源统计页。 */
     static final String PAGE_RESOURCES = "resources";
+    /** v46：「使用统计」页（主界面「游戏时长」行尾的 inline 按钮进去）。 */
+    static final String PAGE_USAGE = "usage";
     /**
      * 第 193 轮（v9）：**段落插槽** —— 插件把一段界面直接画进宿主页里。
      *
@@ -90,6 +92,25 @@ final class Extensions {
      * 不该先跳一个空页；插件只要实现 {@code run(PluginApi)}，对话框 / SAF / 进度都落在原来的页上。</p>
      */
     static final String SLOT_ACTION = "action";
+
+    /**
+     * **v46**：行内插入 —— 在宿主**文本行的尾部**放一个预设小控件（按钮 / 徽标 / 短文字）。
+     *
+     * <p>与 {@link #SLOT_ACTION} 的区别：动作是"一行"，这个是"行内的一小块"；尺寸由宿主防呆，
+     * 插件只声明类型与文字，不能自带任意 View（用户 2026-11-19：「直接给个预设类型就行，
+     * 大小做过防呆限制就行，不用搞得很死」）。
+     *
+     * <p>`place` 直接写**锚点名**（如 {@link #ANCHOR_MAIN_PLAYTIME}），不是 actions/summary/detail。
+     */
+    static final String SLOT_INLINE = "inline";
+
+    /** v46：主界面摘要卡「游戏时长」行尾的锚点。 */
+    static final String ANCHOR_MAIN_PLAYTIME = "main.playtime";
+
+    /** v46：inline 认得的预设类型（别的值 ⇒ 不画）。 */
+    static final String INLINE_BUTTON = "button";
+    static final String INLINE_CHIP = "chip";
+    static final String INLINE_TEXT = "text";
 
     /**
      * **v40**：`place` = `"actions"` 的条目插到**宿主那一页的操作卡**里，而不是底部「插件」卡。
@@ -136,18 +157,25 @@ final class Extensions {
         final String event;
         /** v40：插入位置（`actions` = 宿主那一页的操作卡；空 = 原来的「插件」卡）。 */
         final String place;
+        /** v46：行内插入的预设类型（{@link #INLINE_BUTTON} / {@link #INLINE_CHIP} / {@link #INLINE_TEXT}；空 = 不是 inline）。 */
+        final String kind;
 
         Item(String id, String title, String subtitle, String entry, String slot, String page) {
-            this(id, title, subtitle, entry, slot, page, "", "");
+            this(id, title, subtitle, entry, slot, page, "", "", "");
         }
 
         Item(String id, String title, String subtitle, String entry, String slot, String page,
              String event) {
-            this(id, title, subtitle, entry, slot, page, event, "");
+            this(id, title, subtitle, entry, slot, page, event, "", "");
         }
 
         Item(String id, String title, String subtitle, String entry, String slot, String page,
              String event, String place) {
+            this(id, title, subtitle, entry, slot, page, event, place, "");
+        }
+
+        Item(String id, String title, String subtitle, String entry, String slot, String page,
+             String event, String place, String kind) {
             this.id = id;
             this.title = title;
             this.subtitle = subtitle;
@@ -156,6 +184,7 @@ final class Extensions {
             this.page = page;
             this.event = event == null ? "" : event;
             this.place = place == null ? "" : place;
+            this.kind = kind == null ? "" : kind;
         }
 
         /** 界面上那个名字：标题空就回落 id（与插件名同一策略：**不印空白**）。 */
@@ -188,12 +217,17 @@ final class Extensions {
                 String page = trim(o.optString("page", ""));   // 只有 content 插槽用得上
                 String event = trim(o.optString("event", ""));  // v23：事件扩展
                 String place = trim(o.optString("place", "")).toLowerCase(java.util.Locale.ROOT);
-                if (!PLACE_ACTIONS.equals(place) && !PLACE_SUMMARY.equals(place)
+                String kind = trim(o.optString("kind", "")).toLowerCase(java.util.Locale.ROOT);
+                // v46：inline 的 place 是锚点名（不是 actions/summary/detail），原样保留；
+                // 其余插槽认不出的 place 仍按老规矩清空（回落原行为）。
+                if (!SLOT_INLINE.equals(slot)
+                        && !PLACE_ACTIONS.equals(place) && !PLACE_SUMMARY.equals(place)
                         && !PLACE_DETAIL.equals(place)) {
                     place = "";                                 // 认不出的 place ⇒ 原行为
                 }
+                if (!SLOT_INLINE.equals(slot)) kind = "";       // kind 只对 inline 有意义
                 out.add(new Item(id, trim(o.optString("title", "")), trim(o.optString("subtitle", "")),
-                        entry, slot, page, event, place));
+                        entry, slot, page, event, place, kind));
             }
         } catch (Throwable t) {
             return new ArrayList<Item>();                       // 自述坏了 ⇒ 当"没有扩展"，别崩页面
@@ -261,7 +295,9 @@ final class Extensions {
                 //   说成「这一版还不支持」（第 229 轮：mods-health 插件第一次撞上）。
                 || SLOT_ANALYZER.equals(slot)
                 // v25：插件能往页面的筛选 / 排序里加自己的一项
-                || SLOT_FILTER.equals(slot) || SLOT_SORT.equals(slot);
+                || SLOT_FILTER.equals(slot) || SLOT_SORT.equals(slot)
+                // v46：行内插入（文本行尾的预设小控件）
+                || SLOT_INLINE.equals(slot);
     }
 
     /** 这一版认得的内容页 / 功能页（只有 content 插槽的条目用得上）。 */
@@ -274,7 +310,9 @@ final class Extensions {
                 || PAGE_MAP_DETAIL.equals(page) || PAGE_BLUEPRINT_DETAIL.equals(page)
                 // v40：三个新页面钩子（布局里有 plugin_section，BaseActivity 会挂）
                 || PAGE_VERSION.equals(page) || PAGE_PATCHES.equals(page)
-                || PAGE_RESOURCES.equals(page);
+                || PAGE_RESOURCES.equals(page)
+                // v46：「使用统计」页（主界面「游戏时长」行尾按钮进去）
+                || PAGE_USAGE.equals(page);
     }
 
     /**
@@ -301,10 +339,35 @@ final class Extensions {
         return forPlaced(all, page, PLACE_ACTIONS);
     }
 
+    /**
+     * **v46**：这一页某个锚点上该画哪些 inline 条目（纯函数，顺序 = 声明顺序）。
+     *
+     * <p>判据：插槽 == {@link #SLOT_INLINE} · page 逐字相等且是本版认得的 · place == 锚点名。
+     * 锚点本身是否有宿主容器由调用方判（没有容器就不挂）。
+     */
+    static List<Item> forInline(List<Item> all, String page, String anchor) {
+        List<Item> out = new ArrayList<Item>();
+        if (all == null || page == null || anchor == null || anchor.isEmpty()
+                || !knownPage(page)) return out;
+        for (Item it : all) {
+            if (!SLOT_INLINE.equals(it.slot)) continue;
+            if (!anchor.equals(it.place)) continue;
+            if (!page.equals(it.page)) continue;
+            out.add(it);
+        }
+        return out;
+    }
+
+    /** v46：inline 的预设类型白名单（别的值 ⇒ 不画）。 */
+    static boolean knownKind(String kind) {
+        return INLINE_BUTTON.equals(kind) || INLINE_CHIP.equals(kind) || INLINE_TEXT.equals(kind);
+    }
+
     /** 这一条现在**真的会被渲染**吗（唯一的"用得上"判据，报告 / 提示都走它）。 */
     static boolean usable(Item i) {
         if (i == null || !knownSlot(i.slot)) return false;
-        if (SLOT_CONTENT.equals(i.slot)) return knownPage(i.page);
+        // v46：inline 也绑页面（page 认不出 ⇒ 没有宿主行可挂）
+        if (SLOT_CONTENT.equals(i.slot) || SLOT_INLINE.equals(i.slot)) return knownPage(i.page);
         return true;
     }
 
