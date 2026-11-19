@@ -1,0 +1,14 @@
+自检不碰游玩账本的尺子（第 395 轮）
+====================================
+
+报告：evidence/round395/report-m3.txt
+
+===== 通过 2333 项，失败 0 项 =====
+21 个测试槽已清理（含其备份）
+✅ ★自检不碰用户游玩账本（usagestats ledger/total 前后一致：
+   2181:f9083a402c1ada0f3c3dfe8c9620a2c4dd3276e1923daaafd11d3be230700d50|
+   7:b923d2e1bbba69d8bfbe8f366a72c3ab5bf7be8b5f5c22132397332fc26ef546）
+
+真机前后 sha256（自检前 / 自检后相同）：
+ad514ba4fc561197f77f2608038cdd0e0b1a346a0034513c559cf5abb3fe0179  ledger.tsv
+b923d2e1bbba69d8bfbe8f366a72c3ab5bf7be8b5f5c22132397332fc26ef546  total.txt

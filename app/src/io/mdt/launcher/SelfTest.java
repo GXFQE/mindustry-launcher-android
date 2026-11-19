@@ -211,6 +211,7 @@ public final class SelfTest {
         L.add("");
 
         // 先清场：上一轮跑挂了也不能污染这一轮
+        String playFpBefore = playtimeFingerprint(ctx);
         try {
             for (String s : TEST_SLOTS) {
                 Backup.deleteSlotBackups(ctx, s);
@@ -416,6 +417,12 @@ public final class SelfTest {
         }
         L.add("");
         L.add(cleaned + " 个测试槽已清理（含其备份）");
+        // ★ 第 394 轮：用户问「自检到底为啥每次删我游戏记录」——立一份尺子：
+        //   自检只许碰 m3-* 测试槽，**不许改** usagestats 的游玩账本（ledger.tsv / total.txt）。
+        //   前后指纹必须逐字一致；不一致就判失败（真删了也能在报告里看见，不再靠事后发现）。
+        String playFpAfter = playtimeFingerprint(ctx);
+        ok(stat, L, playFpBefore.equals(playFpAfter),
+                "★自检不碰用户游玩账本（usagestats ledger/total 前后一致：" + playFpBefore + "）");
         L.add("用时 " + (System.currentTimeMillis() - t0) + " ms");
 
         // ★★ 汇总必须放在【最前】（F17c，需求原文：「**在开头显示下总体情况，出问题了再翻**」）。
@@ -6539,8 +6546,29 @@ public final class SelfTest {
     }
 
     /** 下载用例里的小工具：字节数组 → sha256（与 Patches/UpdateDownload 同一套判定）。 */
-    private static String sha256Hex(byte[] data) {
+    /**
+     * 用户游玩账本指纹：usagestats 插件数据目录里的 ledger.tsv + total.txt。
+     *
+     * <p>第 394 轮：自检只许碰 `m3-*` 测试槽，这份数据不是槽内容、也不在 TEST_SLOTS 里；
+     * 前后逐字比对，防止哪天真被某个清理分支误删。
+     */
+    private static String playtimeFingerprint(Context ctx) {
+        File d = new File(Paths.privateDir(ctx), "plugins/usagestats/data");
+        return fileFingerprint(new File(d, "ledger.tsv")) + "|"
+                + fileFingerprint(new File(d, "total.txt"));
+    }
+
+    private static String fileFingerprint(File f) {
         try {
+            if (f == null || !f.isFile()) return "-";
+            String s = Util.readText(f);
+            return s.length() + ":" + sha256Hex(s.getBytes("UTF-8"));
+        } catch (Throwable t) {
+            return "err";
+        }
+    }
+
+    private static String sha256Hex(byte[] data) {        try {
             java.security.MessageDigest md = java.security.MessageDigest.getInstance("SHA-256");
             byte[] d = md.digest(data);
             StringBuilder sb = new StringBuilder(d.length * 2);
