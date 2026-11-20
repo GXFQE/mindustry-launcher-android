@@ -152,7 +152,7 @@ public final class PluginHost {
      * 联机地址 `host:port` 带进游戏（宿主拼 `mindustry://`，游戏在 `ClientLoadEvent` 弹它自己的
      * 「要连接到 xxx 吗」确认框）。只接受 `host:port`，不收完整 URI。
      */
-    public static final int API = 49;
+    public static final int API = 50;
     /**
      * 还认的**最老**契约版本。
      *
@@ -1615,6 +1615,237 @@ public final class PluginHost {
                     failLaunch(cb, reason);
                 }
             });
+        }
+
+        // ---- v50（第 408 轮）：启动项（行）的写 -----------------------------
+        //
+        // 行身份 = (版本 key, 槽)；槽一律是 `Versions.slotFor(e)`（= `versions()` 的 extra.slot）。
+        // 这一组只写宿主 config（哪一行绑哪个槽 / 叫什么 / 排第几），不动槽里的文件；
+        // 唯一动盘的是 deleteRow 的"最后一行 + 导入版"分支（整个版本进中转站，与界面同一条路）。
+
+        @Override public void addLaunchItem(String versionKey, String slot, final Done done) {
+            postDone(done, addRowNow(versionKey, slot));
+        }
+
+        @Override public void setRowSlot(String versionKey, String slot, String newSlot,
+                                         final Done done) {
+            postDone(done, retargetRowNow(versionKey, slot, newSlot));
+        }
+
+        @Override public void setRowName(String versionKey, String slot, String name,
+                                         final Done done) {
+            postDone(done, renameRowNow(versionKey, slot, name));
+        }
+
+        @Override public void moveRow(String versionKey, String slot, int toIndex,
+                                      final Done done) {
+            postDone(done, moveRowNow(versionKey, slot, toIndex));
+        }
+
+        @Override public void deleteRow(String versionKey, String slot, final Deleted done) {
+            final Context c = getBaseContext();
+            final Activity a = activityOrNull();
+            final String key = versionKey == null ? "" : versionKey.trim();
+            final String rowSlot = slot == null ? "" : slot.trim();
+            // 门禁要用 Activity（与界面的 WriteGate.blockedInstance / blockedVersion 同一份）
+            if (a == null) { postDeleted(done, Result.fail("no-page"), null); return; }
+            if (key.isEmpty() || rowSlot.isEmpty()) {
+                postDeleted(done, Result.fail("invalid"), null);
+                return;
+            }
+            final Versions.Entry row;
+            try {
+                row = findRow(c, key, rowSlot);
+            } catch (Throwable t) {
+                postDeleted(done, Result.fail("io"), null);
+                return;
+            }
+            if (row == null) { postDeleted(done, Result.fail("not-found"), null); return; }
+            final int scope = VersionOps.deleteScope(Versions.rowCount(key), row.imported);
+            if (scope == VersionOps.DELETE_BLOCKED) {
+                // 最后一行 + 已装版：那份在系统里，宿主界面也不给删
+                postDeleted(done, Result.fail("installed"), null);
+                return;
+            }
+            if (scope == VersionOps.DELETE_ROW) {
+                if (WriteGate.blockedInstance(a, Versions.instanceKey(key, rowSlot))) {
+                    postDeleted(done, Result.fail("game-running"), null);
+                    return;
+                }
+                boolean ok = Config.get().removeBinding(key, rowSlot);
+                postDeleted(done, ok ? Result.ok() : Result.fail("not-found"),
+                        ok ? Deleted.ROW : null);
+                return;
+            }
+            // 最后一行 + 导入版：几十 MB 的跨分区搬运 ⇒ 后台线程（与界面那条路同一份实现）
+            if (WriteGate.blockedVersion(a, key)) {
+                postDeleted(done, Result.fail("game-running"), null);
+                return;
+            }
+            new Thread(new Runnable() {
+                @Override public void run() {
+                    Result r;
+                    try {
+                        Trash.Result tr = Importer.trashVersion(c, row);
+                        r = (tr != null && tr.ok) ? Result.ok() : Result.fail(trashReason(tr));
+                    } catch (Throwable t) {
+                        r = Result.fail("io");
+                    }
+                    postDeleted(done, r, r.ok ? Deleted.VERSION : null);
+                }
+            }, "plugin-row-delete").start();
+        }
+
+        /** v50：参数 / 配置类动作当场算完，回调切回主线程（契约：插件回调都在 UI 线程）。 */
+        private void postDone(final Done done, final Result r) {
+            postMain(new Runnable() {
+                @Override public void run() {
+                    if (r.ok) refreshMain();
+                    if (done == null) return;
+                    try { done.onDone(r); } catch (Throwable ignored) {
+                        // 插件自己的回调抛异常不该把宿主带崩
+                    }
+                }
+            });
+        }
+
+        /** v50：删行 / 删版本的结果（主线程）。 */
+        private void postDeleted(final Deleted done, final Result r, final String scope) {
+            postMain(new Runnable() {
+                @Override public void run() {
+                    if (r.ok) refreshMain();
+                    if (done == null) return;
+                    try { done.onDeleted(r, scope); } catch (Throwable ignored) { }
+                }
+            });
+        }
+
+        /**
+         * v50：config 写完主页未必会自己刷新 —— `Config.save()` 没有监听器，`MainActivity`
+         * 只在 `onResume` 里 reload + rescan。插件挂在主页上的 inline 动作就在同一页，
+         * 所以这里主动重建一次；插件在自己的整页里调时顶层 Activity 不是 MainActivity，
+         * 什么都不做（真回到主页时 onResume 照旧会 reload + rescan）。
+         */
+        private void refreshMain() {
+            Activity a = activityOrNull();
+            if (a instanceof MainActivity && !a.isFinishing() && !a.isDestroyed()) {
+                try {
+                    ((MainActivity) a).rescan();
+                } catch (Throwable t) {
+                    android.util.Log.w("MDTPlugin", "rescan after config write failed", t);
+                }
+            }
+        }
+
+        /** v50：按行身份找 `Versions.Entry`（slot 为 null / 空 = 这个版本的任意一行）。 */
+        private Versions.Entry findRow(Context c, String key, String slot) {
+            java.util.List<Versions.Entry> all = Versions.scanAll(c);
+            if (all == null) return null;
+            for (Versions.Entry e : all) {
+                if (e == null || !key.equals(e.key())) continue;
+                if (slot == null || slot.isEmpty() || slot.equals(Versions.slotFor(e))) return e;
+            }
+            return null;
+        }
+
+        /** v50：多加一行（已绑着同一个槽 ⇒ 幂等成功：目的就是"这一行在"）。 */
+        private Result addRowNow(String versionKey, String slot) {
+            Context c = getBaseContext();
+            String key = versionKey == null ? "" : versionKey.trim();
+            if (key.isEmpty()) return Result.fail("invalid");
+            String want = Data.sanitizeSlot(slot == null ? "" : slot);
+            if (want == null) return Result.fail("invalid");
+            try {
+                if (!Data.slotNames(c).contains(want)) return Result.fail("not-found");
+                if (findRow(c, key, null) == null) return Result.fail("not-found");
+                Config cfg = Config.get();
+                if (cfg.hasSlotBinding(key, want)) return Result.ok();
+                return cfg.addExtraSlot(key, want) ? Result.ok() : Result.fail("io");
+            } catch (Throwable t) {
+                return Result.fail("io");
+            }
+        }
+
+        /** v50：换这一行绑的槽（主行 / 附加行的分岔在 `Config.retargetRow` 里）。 */
+        private Result retargetRowNow(String versionKey, String slot, String newSlot) {
+            Context c = getBaseContext();
+            String key = versionKey == null ? "" : versionKey.trim();
+            String from = Data.sanitizeSlot(slot == null ? "" : slot);
+            String to = Data.sanitizeSlot(newSlot == null ? "" : newSlot);
+            if (key.isEmpty() || from == null || to == null) return Result.fail("invalid");
+            try {
+                if (!Data.slotNames(c).contains(to)) return Result.fail("not-found");
+                Versions.Entry row = findRow(c, key, from);
+                if (row == null) return Result.fail("not-found");
+                if (from.equals(to)) return Result.ok();
+                int r = Config.get().retargetRow(key, row.boundSlot, to);
+                if (r == Config.BIND_TARGET_TAKEN) return Result.fail("exists");
+                if (r == Config.BIND_NOT_FOUND) return Result.fail("not-found");
+                if (r == Config.BIND_BAD_ARG) return Result.fail("invalid");
+                return Result.ok();
+            } catch (Throwable t) {
+                return Result.fail("io");
+            }
+        }
+
+        /** v50：给这一项起名；空 = 恢复原名（与版本页「重命名」同一格存储）。 */
+        private Result renameRowNow(String versionKey, String slot, String name) {
+            Context c = getBaseContext();
+            String key = versionKey == null ? "" : versionKey.trim();
+            String rowSlot = slot == null ? "" : slot.trim();
+            if (key.isEmpty() || rowSlot.isEmpty()) return Result.fail("invalid");
+            String clean = name == null ? "" : name.trim();
+            if (clean.length() > 60) return Result.fail("invalid");
+            for (int i = 0; i < clean.length(); i++) {
+                char ch = clean.charAt(i);
+                if (ch < 0x20 || ch == 0x7f) return Result.fail("invalid");
+            }
+            try {
+                Versions.Entry row = findRow(c, key, rowSlot);
+                if (row == null) return Result.fail("not-found");
+                Config.get().setRowNameOf(key, row.boundSlot, clean);
+                return Result.ok();
+            } catch (Throwable t) {
+                return Result.fail("io");
+            }
+        }
+
+        /** v50：把这一行在主页列表里挪到第 toIndex 位（键用 `Versions.orderKey`，落 `main_order`）。 */
+        private Result moveRowNow(String versionKey, String slot, int toIndex) {
+            Context c = getBaseContext();
+            String key = versionKey == null ? "" : versionKey.trim();
+            String rowSlot = slot == null ? "" : slot.trim();
+            if (key.isEmpty() || rowSlot.isEmpty()) return Result.fail("invalid");
+            try {
+                java.util.List<Versions.Entry> rows =
+                        Versions.orderRows(Versions.scanAll(c), Config.get().mainOrder());
+                int idx = -1;
+                for (int i = 0; i < rows.size(); i++) {
+                    Versions.Entry e = rows.get(i);
+                    if (e != null && key.equals(e.key())
+                            && rowSlot.equals(Versions.slotFor(e))) { idx = i; break; }
+                }
+                if (idx < 0) return Result.fail("not-found");
+                if (toIndex < 0 || toIndex >= rows.size()) return Result.fail("invalid");
+                if (idx == toIndex) return Result.ok();
+                java.util.List<String> order = new java.util.ArrayList<String>();
+                for (Versions.Entry e : rows) order.add(Versions.orderKey(e));
+                Versions.moveOrder(order, idx, toIndex);
+                Config.get().setMainOrder(order);
+                return Result.ok();
+            } catch (Throwable t) {
+                return Result.fail("io");
+            }
+        }
+
+        /** v50：中转站的机器码 → 插件那套 Result 码（同一件事只翻一次）。 */
+        private static String trashReason(Trash.Result r) {
+            if (r == null) return "io";
+            if (r.errCode == Trash.Result.T_GAME_RUNNING) return "game-running";
+            if (r.errCode == Trash.Result.T_NO_KIND
+                    || r.errCode == Trash.Result.T_CURRENT_SLOT
+                    || r.errCode == Trash.Result.T_BAD_NAME) return "invalid";
+            return "io";
         }
 
         // ---- v15 ---------------------------------------------------------

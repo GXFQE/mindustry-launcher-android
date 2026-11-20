@@ -942,6 +942,20 @@ public final class Versions {
     }
 
     /**
+     * **第 408 轮（插件 v50）**：把 {@code order} 里第 {@code from} 项挪到第 {@code to} 项（原地改）。
+     *
+     * <p>纯函数（自检直接喂）：越界 / {@code from == to} ⇒ 什么都不做 —— 调用方不用自己防。
+     * 下标按**当前生效顺序**（{@link #orderRows} 出来的那份），不是扫描顺序。
+     */
+    public static void moveOrder(List<String> order, int from, int to) {
+        if (order == null) return;
+        int n = order.size();
+        if (from < 0 || to < 0 || from >= n || to >= n || from == to) return;
+        String k = order.remove(from);
+        order.add(to, k);
+    }
+
+    /**
      * 这个版本现在在列表里有**几行**（主行永远算一行，附加绑定各算一行）。
      *
      * <p>★ 删除的语义按它分岔（2026-10-25 用户定案）：还有别的行 ⇒ 只删这一行；

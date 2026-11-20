@@ -542,7 +542,11 @@ final class PluginData {
         if (ctx == null) return out;
         List<Versions.Entry> entries;
         try {
-            entries = Versions.scanAll(ctx);
+            // v50：返回顺序 = **主页看到的那份**（用户手工排的顺序），不是扫描顺序 ——
+            // 以前这里直接给 scanAll，插件看到的顺序与主页不一致（同一份列表两种顺序）。
+            Config cfg = Config.get();
+            cfg.load(ctx);                 // 幂等；插件页可能是本进程第一次碰 config
+            entries = Versions.orderRows(Versions.scanAll(ctx), cfg.mainOrder());
         } catch (Throwable t) {
             return out;
         }

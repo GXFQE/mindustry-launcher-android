@@ -5348,6 +5348,8 @@ public final class SelfTest {
         pluginV48(ctx, L, stat);
         // ★ v49：带着联机地址启动（第 396 轮）
         pluginV49(ctx, L, stat);
+        // ★ v50：启动项（行）的写（第 408 轮）
+        pluginV50(ctx, L, stat);
     }
 
     /**
@@ -5371,8 +5373,8 @@ public final class SelfTest {
     private static void pluginV43(android.content.Context ctx, List<String> L, int[] stat) {
         L.add("");
         L.add("【v43 · 插件下载 / 模组写 / 网络扩充（第 378 轮）】");
-        ok(stat, L, PluginHost.API == 49 && PluginApi.DOC_VERSION == 49,
-                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 49（v49 起）");
+        ok(stat, L, PluginHost.API == 50 && PluginApi.DOC_VERSION == 50,
+                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 50（v50 起）");
 
         boolean shape = true;
         try {
@@ -5870,8 +5872,8 @@ public final class SelfTest {
     private static void pluginV45(android.content.Context ctx, List<String> L, int[] stat) {
         L.add("");
         L.add("【v45 · 启动否决 + 身份（第 394 轮）】");
-        ok(stat, L, PluginHost.API == 49 && PluginApi.DOC_VERSION == 49,
-                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 49（v49 起）");
+        ok(stat, L, PluginHost.API == 50 && PluginApi.DOC_VERSION == 50,
+                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 50（v50 起）");
 
         boolean shape = true;
         try {
@@ -6009,8 +6011,8 @@ public final class SelfTest {
     private static void pluginV48(Context ctx, List<String> L, int[] stat) {
         L.add("");
         L.add("【v48 · 插件立刻启动实例（第 395 轮）】");
-        ok(stat, L, PluginHost.API == 49 && PluginApi.DOC_VERSION == 49,
-                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 49（v49 起）");
+        ok(stat, L, PluginHost.API == 50 && PluginApi.DOC_VERSION == 50,
+                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 50（v50 起）");
 
         boolean shape = true;
         try {
@@ -6067,8 +6069,8 @@ public final class SelfTest {
     private static void pluginV49(Context ctx, List<String> L, int[] stat) {
         L.add("");
         L.add("【v49 · 带着联机地址启动（第 396 轮）】");
-        ok(stat, L, PluginHost.API == 49 && PluginApi.DOC_VERSION == 49,
-                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 49（v49 起）");
+        ok(stat, L, PluginHost.API == 50 && PluginApi.DOC_VERSION == 50,
+                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 50（v50 起）");
 
         boolean shape = true;
         try {
@@ -6100,6 +6102,87 @@ public final class SelfTest {
         ok(stat, L, links,
                 "★ deepLinkFor：host:port → mindustry://…；空 / 带路径 / 带空白 / 带 @ / 超长 一律拒"
                         + "（非 mindustry 的 data 会被游戏当文件导入，所以不能放行）");
+    }
+
+    /**
+     * 第 408 轮（v50）：**启动项（行）的写** —— 加行 / 换槽 / 起名 / 挪位 / 删行。
+     *
+     * <p>这一组写的是宿主 config 里的"哪一行绑哪个槽、叫什么、排第几"，所以这里钉两样：
+     * 接口面（签名与常量逐字）＋ 行身份的分岔（主行 / 附加行别写串）。
+     * v51 才动槽目录与内容文件，那一组另起一段。
+     */
+    private static void pluginV50(Context ctx, List<String> L, int[] stat) {
+        L.add("");
+        L.add("【v50 · 启动项（行）的写：加行 / 换槽 / 起名 / 挪位 / 删行（第 408 轮）】");
+        ok(stat, L, PluginHost.API == 50 && PluginApi.DOC_VERSION == 50,
+                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 50（v50 起）");
+
+        boolean shape = true;
+        String miss = "";
+        try {
+            PluginApi.class.getMethod("addLaunchItem",
+                    String.class, String.class, PluginApi.Done.class);
+            PluginApi.class.getMethod("setRowSlot",
+                    String.class, String.class, String.class, PluginApi.Done.class);
+            PluginApi.class.getMethod("setRowName",
+                    String.class, String.class, String.class, PluginApi.Done.class);
+            PluginApi.class.getMethod("moveRow",
+                    String.class, String.class, int.class, PluginApi.Done.class);
+            PluginApi.class.getMethod("deleteRow",
+                    String.class, String.class, PluginApi.Deleted.class);
+        } catch (Throwable t) {
+            shape = false;
+            miss = String.valueOf(t);
+        }
+        ok(stat, L, shape && "row".equals(PluginApi.Deleted.ROW)
+                        && "version".equals(PluginApi.Deleted.VERSION),
+                "接口面：五个写方法 + Deleted(ROW/VERSION) 都在"
+                        + (shape ? "" : "（" + miss + "）"));
+
+        boolean del = true;
+        try {
+            java.lang.reflect.Method m = PluginApi.Deleted.class.getMethod("onDeleted",
+                    io.mdt.launcher.api.Result.class, String.class);
+            del = m.getReturnType() == Void.TYPE;
+        } catch (Throwable t) {
+            del = false;
+        }
+        ok(stat, L, del, "★ Deleted.onDeleted(Result, scope)：删行 / 删版本的结果只回一次");
+
+        // 行身份 = (版本 key, 槽)：主行 / 附加行的分岔只在 Config.retargetRow 一处
+        Config cfg = Config.get();
+        final String K = "selftest:v50-row";
+        cfg.clearBindings(K);
+        ok(stat, L, cfg.retargetRow(K, null, "v50-a") == Config.BIND_OK
+                        && "v50-a".equals(cfg.slotOf(K)),
+                "retargetRow：主行（从没显式分配过）⇒ 写成显式分配");
+        ok(stat, L, cfg.addExtraSlot(K, "v50-b")
+                        && cfg.retargetRow(K, "v50-b", "v50-c") == Config.BIND_OK
+                        && cfg.hasSlotBinding(K, "v50-c") && !cfg.hasSlotBinding(K, "v50-b"),
+                "retargetRow：附加行原地换槽（旧绑定摘掉）");
+        ok(stat, L, cfg.retargetRow(K, null, "v50-c") == Config.BIND_TARGET_TAKEN,
+                "★ retargetRow：主行换到已绑着的槽 ⇒ TARGET_TAKEN（不许两行绑同一个槽）");
+        ok(stat, L, cfg.removeBinding(K, "v50-a") && "v50-c".equals(cfg.slotOf(K)),
+                "removeBinding：删主行把第一条附加行提成主行（加行 / 删行的互逆）");
+        cfg.clearBindings(K);
+
+        // 手工顺序是纯函数：越界 / 原地都不许动
+        List<String> ord = new ArrayList<String>();
+        ord.add("a");
+        ord.add("b");
+        ord.add("c");
+        Versions.moveOrder(ord, 0, 2);
+        boolean m1 = ord.equals(java.util.Arrays.asList("b", "c", "a"));
+        Versions.moveOrder(ord, 1, 99);
+        Versions.moveOrder(ord, -1, 2);
+        Versions.moveOrder(ord, 2, 2);
+        boolean m2 = ord.equals(java.util.Arrays.asList("b", "c", "a"));
+        ok(stat, L, m1 && m2, "moveOrder：0→2 = [b,c,a]；越界 / 原地一律不动");
+
+        ok(stat, L, "k\u0000s".equals(Versions.instanceKey("k", "s"))
+                        && "k".equals(Versions.instanceVkey("k\u0000s"))
+                        && "s".equals(Versions.instanceSlot("k\u0000s")),
+                "行身份：instanceKey / instanceVkey / instanceSlot 三个函数互逆（门禁用同一套键）");
     }
 
     /**

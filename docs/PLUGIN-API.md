@@ -5,7 +5,7 @@
 
 ## 1. 版本与兼容（v20 冻结基线）
 
-- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..49**。
+- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..50**。
   （v20 是冻结基线；v21 = 游戏设置面；v22 = 后台任务 + 游戏事件；v23 = 探针；v24 = 分析器；
   v25 = 结论挂行 + 筛选/排序注入 + HJSON；v26 = 逐项判定；v27 = 详情页的门 + 槽级结论进摘要卡；
   v28 = 原版文案键；v29 = 游戏前后台事件；v30 = 探针知道版本 / 跨会话数据目录 + 摘要卡总时长；
@@ -84,6 +84,11 @@
   （宿主拼 `mindustry://`；游戏在 `ClientLoadEvent` 弹它自己的「要连接到 xxx 吗」确认框，
   用户还得点一下「连接」）；校验口径 = `Uri.getHost()` 非空（与游戏同一套），
   非 `host:port` 一律拒（否则游戏会把 data 当文件导入）。`API_MIN` 仍不动。
+  **v50 = 启动项（行）的写**：`addLaunchItem` / `setRowSlot` / `setRowName` / `moveRow` / `deleteRow`
+  —— 行身份就是 `versions()` 的 (`extra.key`, `extra.slot`)，加行 / 换槽 / 起名 / 挪位 / 删行。
+  只写宿主 config（哪一行绑哪个槽、叫什么、排第几），**不动槽里的文件**；唯一动盘的是 `deleteRow`
+  的"最后一行 + 导入版"（整个版本进中转站，与界面同一条路）。`versions()` 从此**按主页顺序**返回。
+  `API_MIN` 仍不动。
 - 插件 `api()` 报的是「我需要的最低宿主接口版本」。用不到的新能力**不要**报高 ——
   报高了只会在老宿主上被拒，换不来任何东西。
 - **不要用 try/catch 去兼容老宿主**：报什么版本就只会跑在什么版本上。`api()` 报 20，
@@ -171,7 +176,7 @@
 ## 3. 入口类约定
 
 ```java
-public static int api();                        // 必需：你需要的接口版本（当前 45；用不到新能力就报 20）
+public static int api();                        // 必需：你需要的接口版本（当前 50；用不到新能力就报 20）
 public static View createView(PluginApi api);   // content / section 用
 public static void run(PluginApi api);          // action 用（在原页跑，不换页）
 public static void unload();                    // 可选：收尾（也认 unload(Context)）
@@ -191,7 +196,7 @@ public static void unload();                    // 可选：收尾（也认 unlo
 
 | 方法 | 说明 |
 |---|---|
-| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 45） |
+| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 50） |
 | `context()` | 插件上下文（**只用来取资源 / 主题 / 建 View**） |
 | `page()` / `slot()` | 从哪一页来 / 当前槽名 |
 | `theme()` | 主题色与 dp/sp（别自己写死颜色，见 `PluginTheme`） |
@@ -840,7 +845,8 @@ String json = api.parseHjson(file);   // 标准 JSON 文本；失败/读不了 �
 > 别的槽的游戏不影响你写这个槽。读类方法一律放行。
 > ⚠️ **File 出口不受写门禁保护**：`slotDir()`/`savesDir()`/… 与 `ItemInfo.path` 给的路径
 > 可以直接写（本工程"无沙箱"是既定边界，见 `PluginApi` 头注释）。写门禁只拦
-> `writeItem`/`addItem`/`modsInstall`/`modsSetEnabled`/`writeGameSettings`/`trashItem` 这六个 API。
+> `writeItem`/`addItem`/`modsInstall`/`modsSetEnabled`/`writeGameSettings`/`trashItem` 这六个 API，
+> 以及 v50 的 `deleteRow`（按**行**判：那一行 / 那个版本有实例在跑就拒）。
 
 | 方法 | 说明 |
 |---|---|
@@ -865,6 +871,30 @@ String json = api.parseHjson(file);   // 标准 JSON 文本；失败/读不了 �
   游戏设置里的成对键（`-enabled` + `-failed`），与模组页的启停完全同一套。
 - 失败码：`not-found` / `invalid` / `exists` / `not-a-mod` / `game-running` / `unreadable` / `io`。
 - ⚠️ `File` 出口仍能绕过写门禁（见上），但**这两个 API 是推荐路径** —— 插件自己做判据必然与宿主漂。
+
+**v50 启动项（行）的写**（`addLaunchItem` / `setRowSlot` / `setRowName` / `moveRow` / `deleteRow`）：
+
+行身份 = `(versionKey, slot)`，就是 `versions()` 里每一条的 `extra["key"]` + `extra["slot"]`
+（附加绑定行给的是它自己绑的槽，不是主行那个）——**别自己拼 `instanceKey`**，那个是给门禁 / `instances()` 用的。
+
+| 方法 | 说明 |
+|---|---|
+| `addLaunchItem(versionKey, slot, Done)` | 给这个版本多加一行、绑到 `slot`；**幂等**（已经绑着同一个槽 ⇒ `ok`） |
+| `setRowSlot(versionKey, slot, newSlot, Done)` | 换这一行绑的槽（主行 / 附加行都认；`newSlot` 已被同一版本别的行绑着 ⇒ `exists`） |
+| `setRowName(versionKey, slot, name, Done)` | 给这一项起名；`name` 空 / null = 恢复原名；去首尾空白、≤60 字、不许控制字符 |
+| `moveRow(versionKey, slot, toIndex, Done)` | 在主页列表里挪到第 `toIndex` 位（`0` = 第一行；与手工拖拽同一份 `main_order`） |
+| `deleteRow(versionKey, slot, Deleted)` | 删这一行；回调带 `scope`：`Deleted.ROW` = 只删了这一行 / `Deleted.VERSION` = 删的是最后一行、整个导入版本进了中转站 |
+
+- `deleteRow` 的范围判据 = 宿主界面同一条（`VersionOps.deleteScope`）：
+  还有别的行 ⇒ 只删这一行（**纯 config，不丢任何文件**）；最后一行 + 导入版 ⇒ 整个版本进中转站；
+  最后一行 + 已装版 ⇒ `installed`（那份在系统里，宿主界面也不给删 —— 这是**正确结果**，别当失败重试）。
+- 失败码：`not-found`（版本 / 这一行 / 目标槽不存在）、`exists`（`setRowSlot` 目标已被绑）、
+  `invalid`（槽名 / 名字 / 下标非法）、`game-running`（这一行 / 这个版本有实例在跑）、
+  `installed`、`no-page`、`io`。
+- 只写 config：写完宿主会**主动重建一次主页**（插件挂在主页上的 inline 动作会立刻看到新行）。
+  在宿主界面以外的调用不需要自己刷新；回到主页时 `onResume` 仍会 reload + rescan。
+- 删除版本是几十 MB 的搬运，`deleteRow` 走后台线程，回调仍在 UI 线程。
+- **槽本身的新增 / 改名 / 删除、以及内容文件改名**：v50 都没有（槽的增删改仍在宿主界面；v51 另说）。
 
 ### 游戏设置（v21）
 
@@ -901,7 +931,7 @@ void writeGameSettings(String slot, Map<String, Object> changes, Done done); // 
 - `createView` / `run` 在 UI 线程；**不要**在里面读大文件。
 - `runBackground(label, body)` 的 `body` 在后台线程；**别碰 View**，要更新 UI 用 View 自己的 `post`。
 - 回调（`Choose` / `Confirm` / `Prompt` / `PickFile` / `PickContent` / `After` / `Done` / `Cancel`，
-  v39 起还有 `Fetch` / `Releases` / `Download` / `Imported` / `Conflicts`，v40 的 `Card`）
+  v39 起还有 `Fetch` / `Releases` / `Download` / `Imported` / `Conflicts`，v40 的 `Card`，v50 的 `Deleted`）
   **都在 UI 线程**回调（`showCard` 没有 Activity 时也会把 `onCard(-1)` 投回 UI 线程）。
 - `export` / `share` / `writeItem` / `patchImport` 传进去的 `InputStream` **由宿主关闭**；
   `pickFile` / `download` 给你的是文件，自己读。
@@ -930,6 +960,8 @@ public final String reason;  // 机器码；成功恒为 null，失败恒非空
 | `no-page` | 当下没有可用的界面 |
 | `io` | 读写失败 |
 | `invalid` | 参数不合法（null / 类型不对） |
+| `exists`（v35 起） | 目标已经存在（`addItem` 同名 / `setRowSlot` 目标槽已被这个版本绑着） |
+| `installed`（v50） | 删的是"最后一行 + 已装版"——那份版本在系统里，宿主界面也不给删 |
 | `unknown` | 宿主没给具体原因（兜底） |
 
 **v39 网络**（`fetchText` / `githubReleases` / `download`）：
@@ -1294,6 +1326,15 @@ v49（2026-11-19 第 396 轮）：**插件带着联机地址启动** —— `lau
 ★ 时机：只在**冷启动**时带（游戏在 `ClientLoadEvent` 处理，`ui` 已就绪）；`onNewIntent` 那条热路径不做。
 ★ 认知边界：游戏弹的是**它自己的**确认框，用户还要点一下「连接」—— 所以是"一键唤起 + 一次确认"，
 不是真正直连。`API_MIN` 仍不动（区间 20..49）。
+v50（2026-11-20 第 408 轮）：**启动项（行）的写** —— `addLaunchItem` / `setRowSlot` / `setRowName` /
+`moveRow` / `deleteRow`，行身份 = `versions()` 的 (`extra.key`, `extra.slot`)。
+★ 只认行身份、不认"版本"：同一个版本可以有多行（附加绑定），所以每个方法都要 `slot`；
+`versions()` 的输出顺序**从扫描顺序改成主页顺序**（`Versions.orderRows` + `main_order`）——
+插件看到的列表从此与用户看到的一致（此前两边顺序可能不同）。
+★ `deleteRow` 的范围判据与宿主界面同一份（`VersionOps.deleteScope`）：还有别的行 ⇒ 只删这一行
+（纯 config，不丢文件）；最后一行 + 导入版 ⇒ 整个版本进中转站；最后一行 + 已装版 ⇒ `installed`。
+★ 写完 config 宿主主动 `MainActivity.rescan()` 一次（`Config.save()` 没有监听器）—— 插件挂在
+主界面的 inline 动作能立刻看到新行。`API_MIN` 仍不动（区间 20..50）。
 
 **官方体检插件**：`plugins/mods-health`（第 229 轮，前身叫 `conflict`）。宿主原来的那行
 「查模组冲突」整块删掉，判据搬进插件的 `core/Conflicts.java` 与 `core/Gates.java`；

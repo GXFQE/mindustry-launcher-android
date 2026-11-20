@@ -59,7 +59,7 @@ public interface PluginApi {
      * <p>为什么要有这个常量：注释里的「当前 = N」运行期读不到，一个写 17、一个写 20 也没人发现；
      * 常量 + 断言才拦得住。</p>
      */
-    int DOC_VERSION = 49;
+    int DOC_VERSION = 50;
 
     // ══ 环境 ═══════════════════════════════════════════════════════════════
 
@@ -738,6 +738,92 @@ public interface PluginApi {
         void onState(String state, String reason);
     }
 
+    // ── v50（第 408 轮）：启动项（行）的写 ────────────────────────────────
+    //
+    // ★ 行身份 = **(版本 key, 槽)**，与 `versions()` 的 `extra.key` + `extra.slot` 完全同一对值
+    //   （槽 = 这一行**实际**绑的槽：主行是它的有效槽，附加行是它绑的那个槽）。
+    //   别拿 `slot()`（当前槽）或 `extra["bound"]` 当身份 —— 那是别的概念。
+    //
+    // 这一组只写宿主的**配置**（哪一行绑哪个槽 / 叫什么 / 排第几），不动任何槽里的文件；
+    // 唯一的例外是 `deleteRow`：最后一行 + 导入版走"整个版本进中转站"（与界面删除同一条路）。
+
+    /**
+     * **v50**：给一个已存在版本**再加一行**（把它绑到另一个槽 = 多一个启动项）。
+     *
+     * <p>与版本页「克隆」同一条路：**不复制任何文件** —— 游戏本体共用同一份 APK，
+     * 新的一行只是多了一个槽绑定（各自的存档 / 设置 / 模组）。
+     *
+     * <p>幂等：这个版本已经绑着该槽（包括它就是主行那一行）⇒ 直接成功，不会写出两行一样的。
+     *
+     * @param versionKey {@code versions()} 的 {@code extra.key}；不是已装 / 已导入的版本 ⇒ {@code not-found}
+     * @param slot       要绑的槽，必须**已存在**（{@code slots()} 里的名字）⇒ 否则 {@code not-found}；
+     *                   名字非法 ⇒ {@code invalid}
+     * @param done       主线程回调
+     *
+     * <p>⚠️ 宿主主页若正好在前台，会就地重建一次列表（与用户在版本页点「克隆」后的刷新同源）。
+     */
+    void addLaunchItem(String versionKey, String slot, Done done);
+
+    /**
+     * **v50**：把**这一行**换到另一个槽（只动这一行；同一个版本的另一行一个字不变）。
+     *
+     * <p>与版本页「换槽」同一条路：主行走"显式分配"、附加行走"原地替换" —— 这个分岔在宿主里
+     * 踩过坑（主行可能从没显式分配过槽），别让插件各自实现一遍。
+     *
+     * @param versionKey {@code versions()} 的 {@code extra.key}
+     * @param slot       这一行**现在**的槽（{@code extra.slot}）⇒ 不是一行 ⇒ {@code not-found}
+     * @param newSlot    目标槽，必须已存在 ⇒ 否则 {@code not-found}；名字非法 ⇒ {@code invalid}
+     * @param done       主线程回调；目标槽已经绑在这个版本上（会变成两行一样）⇒ {@code exists}
+     */
+    void setRowSlot(String versionKey, String slot, String newSlot, Done done);
+
+    /**
+     * **v50**：给**这一项**（启动项）起名 —— 只改宿主界面显示，不动 APK、不动游戏里的任何东西。
+     *
+     * <p>名字跟着"这一项"走：同一个版本的另一行有自己的名字（与版本页「重命名」同一格存储）。
+     *
+     * @param versionKey {@code versions()} 的 {@code extra.key}
+     * @param slot       这一行的槽（{@code extra.slot}）⇒ 不是一行 ⇒ {@code not-found}
+     * @param name       新名字；{@code null} / 空串 = **恢复原名**（回落 APK 自己的 label）。
+     *                   前后空白会去掉；含换行 / 控制字符或超过 60 个字 ⇒ {@code invalid}
+     * @param done       主线程回调
+     */
+    void setRowName(String versionKey, String slot, String name, Done done);
+
+    /**
+     * **v50**：把**这一行**在主页列表里挪到第 {@code toIndex} 位。
+     *
+     * <p>顺序就是用户长按拖动的那一份；v50 起 {@link #versions()} 也按这个顺序返回，两边一致。
+     *
+     * @param versionKey {@code versions()} 的 {@code extra.key}
+     * @param slot       这一行的槽（{@code extra.slot}）⇒ 不是一行 ⇒ {@code not-found}
+     * @param toIndex    目标下标（0 起，按**当前生效顺序**）；越界 ⇒ {@code invalid}；
+     *                   已经在那一位 ⇒ 成功且不写盘
+     * @param done       主线程回调
+     */
+    void moveRow(String versionKey, String slot, int toIndex, Done done);
+
+    /**
+     * **v50**：删掉**这一行**（或 —— 当它是这个版本**最后一**行、且该版本是导入包时 ——
+     * 把整个版本挪进中转站）。
+     *
+     * <p>范围由宿主的同一份判据决定，与界面删除完全一样：
+     * <ul>
+     *   <li>这个版本还有别的行 ⇒ 只删这一行（**纯配置**，不进中转站）；</li>
+     *   <li>最后一行 + **导入**版 ⇒ 整个版本（APK / entry / state）挪进**中转站**（能放回）；</li>
+     *   <li>最后一行 + **已装**版 ⇒ 拒绝 {@code installed}（那份在系统里，宿主界面也不给删）。</li>
+     * </ul>
+     *
+     * <p>门禁与界面同源：这一行的实例在跑 ⇒ {@code game-running}；删整个版本时按版本判。
+     * 删行只写配置（当场回）；删版本是几十 MB 的跨分区搬运 ⇒ 后台线程，回调回主线程。
+     *
+     * @param versionKey {@code versions()} 的 {@code extra.key}
+     * @param slot       这一行的槽（{@code extra.slot}）⇒ 不是一行 ⇒ {@code not-found}
+     * @param done       回调（主线程）；成功时 {@link Deleted#scope} = {@link Deleted#ROW} /
+     *                   {@link Deleted#VERSION}，失败时 scope = {@code null}
+     */
+    void deleteRow(String versionKey, String slot, Deleted done);
+
     /**
      * 让用户从**当前槽的某一类内容**里勾选，结果回调给插件。
      *
@@ -1107,6 +1193,25 @@ public interface PluginApi {
      * （空表 = 没冲突）；失败时为 null。
      */
     interface Conflicts { void onConflicts(Result result, List<String> names); }
+
+    /**
+     * **v50**：{@link #deleteRow} 的结果 —— 顺带告诉插件删掉的是**一行**还是**整个版本**。
+     *
+     * <p>两者的后续动作不一样：删一行只是列表少一项；删整个版本连 APK 都进了中转站，
+     * 插件要按 {@link #VERSION} 处理（例如把跟这个版本有关的记账一起收掉）。
+     */
+    interface Deleted {
+        /** 只删了**这一行**（纯配置；版本本身还在）。 */
+        String ROW = "row";
+        /** 整个版本进了中转站（最后一行 + 导入版）。 */
+        String VERSION = "version";
+
+        /**
+         * @param result 结果；失败时 {@code scope} = {@code null}
+         * @param scope  {@link #ROW} / {@link #VERSION}
+         */
+        void onDeleted(Result result, String scope);
+    }
 
     /** **v40**：{@link #showCard} 选了哪个按钮；{@code -1} = 没选（返回 / 点外面关掉）。 */
     interface Card { void onCard(int index); }

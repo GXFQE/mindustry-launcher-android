@@ -929,6 +929,27 @@ public final class Config {
     }
 
     /**
+     * **第 408 轮（插件 v50）**：把**这一行**换到 newSlot —— 主行 / 附加行的分岔收口在这一处。
+     *
+     * <p>★ 主行（{@code boundSlot == null}）一律走 {@link #setSlotOf}：它的实际槽可能**从来没显式
+     *   分配过**（一直用默认槽），拿 (key, 旧槽名) 去 {@link #replaceSlotBinding} 会返回"找不到"。
+     *   这个坑 {@link VersionOps#pickSlot} 的注释里记着 —— 插件接口别各自再踩一遍。
+     *
+     * @param boundSlot 这一行的 {@code Versions.Entry.boundSlot}（null / 空 = 主行）
+     * @return {@link #BIND_OK} / {@link #BIND_TARGET_TAKEN} / {@link #BIND_NOT_FOUND} / {@link #BIND_BAD_ARG}
+     */
+    public synchronized int retargetRow(String key, String boundSlot, String newSlot) {
+        if (key == null || key.isEmpty() || newSlot == null || newSlot.isEmpty()) return BIND_BAD_ARG;
+        if (boundSlot == null || boundSlot.isEmpty()) {
+            if (newSlot.equals(effectivePrimaryOf(key))) return BIND_OK;   // 就是它现在用的槽
+            if (extraSlotsOf(key).contains(newSlot)) return BIND_TARGET_TAKEN;
+            setSlotOf(key, newSlot);
+            return BIND_OK;
+        }
+        return replaceSlotBinding(key, boundSlot, newSlot);
+    }
+
+    /**
      * 去掉一个版本的**全部行状态**（删导入版本 / 自检清理）：主槽、附加槽、以及**每一项的名字**。
      *
      * <p>★ 名字也算"行状态"（2026-10-26）：版本没了还留着它的名字 ⇒ 下一次同文件名的导入会
