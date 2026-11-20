@@ -618,16 +618,14 @@ final class SlotOps {
      *   到用户真的彻底删掉那个容器时，{@link TrashActivity} 才会叫 GC 去收。
      */
     static void deleteSlot(final Activity a, final Data.Slot s, final Host h) {
-        if (s.active) {
-            alert(a, Trans.get(a, R.string.delete_current_slot_title),
-                    Trans.get(a, R.string.delete_current_slot_msg_fmt, s.name));
-            return;
-        }
-        // 2026-11-12（第 359 轮）：按**运行实例**判（以前只有"当前槽身份"这一道，
-        // 多开时另一个正在跑的槽会被直接搬走 —— 见 plan §12.3C）。
-        if (WriteGate.blockedSlot(a, s.name)) {
-            alert(a, Trans.get(a, R.string.game_busy_title),
-                    Trans.get(a, R.string.game_busy_msg_fmt, s.name));
+        // 门禁只有一份实现（Trash.checkSlotRemovable）：默认槽 / 实例在跑 / 还有启动项落着。
+        // ★ 放在弹确认框**之前** —— 让用户先读完"这些文件会挪走"再吃一个失败提示，是反过来的顺序。
+        Trash.Result check = Trash.checkSlotRemovable(a, s.name);
+        if (!check.ok) {
+            String title = check.errCode == Trash.Result.T_GAME_RUNNING
+                    ? Trans.get(a, R.string.game_busy_title)
+                    : Trans.get(a, R.string.delete_failed);
+            alert(a, title, TrashText.reason(a, check));
             return;
         }
         final List<Backup.Snapshot> snaps = Backup.list(a, s.name);
@@ -654,16 +652,11 @@ final class SlotOps {
                             alert(a, Trans.get(a, R.string.delete_failed),
                                     TrashText.reason(a, r));
                         } else {
-                            // ★ 两种受影响的行**分开说**：主分配是"回落到默认槽"（那一行还在），
-                            //   附加绑定是"那一行直接没了"（它存在的理由就是这个槽）。
-                            //   混成一句话（"N 个版本回落到默认槽"）会让用户去找一行根本没了的启动项。
-                            Config.Retarget rt = Config.get().retargetSlots(s.name, "");
-                            String tail = (rt.primary > 0
-                                    ? Trans.get(a, R.string.slot_deleted_fallback_fmt, rt.primary) : "")
-                                    + (rt.extras > 0
-                                    ? Trans.get(a, R.string.slot_deleted_extras_fmt, rt.extras) : "");
-                            Toast.makeText(a,
-                                    Trans.get(a, R.string.slot_deleted_fmt, s.name) + tail,
+                            // ★ 行绑定那一半已被门禁挡住（还有启动项就不许删），这里 retarget 只为清掉
+                            //   **按槽存**的三处记录（自动备份策略 / 默认槽 / 手工顺序里的附加行键）。
+                            //   以前这里还会 toast「回落 N / 消失 N」—— 那两种情况现在都进不来，删掉。
+                            Config.get().retargetSlots(s.name, "");
+                            Toast.makeText(a, Trans.get(a, R.string.slot_deleted_fmt, s.name),
                                     Toast.LENGTH_LONG).show();
                         }
                         h.onSlotChanged();

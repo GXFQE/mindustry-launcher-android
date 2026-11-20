@@ -214,6 +214,32 @@ final class Paths {
         Util.atomicWriteText(slotRecord(ctx), n);
     }
 
+    /**
+     * 把「上次启动的槽」这条记录**整个删掉**（主文件 + `.bak` + 残留的 `.tmp`）。
+     *
+     * <p>为什么是删而不是写 `default`：删掉之后 {@link #readSlotName} 与"新装完、从没启动过"
+     * 走的是**同一条路**（读不到 ⇒ 落回 {@link #SLOT_DEFAULT}）。写一个 `default` 进去则会
+     * 凭空造出一条"上次启动在 default"的记录 —— 那个槽可能根本不存在，读侧还要再判一次悬空。
+     *
+     * <p>谁调：删掉某个槽里**最后一个启动项**时（界面删除与插件 `deleteRow` 共用
+     * `VersionOps.forgetLastLaunch`）。此时指针本来就是"上一次启动"的记账，实例没了就没有意义了。
+     */
+    static void clearSlotName(Context ctx) {
+        File main = slotRecord(ctx);
+        File[] files = {
+                main,
+                slotRecordBackup(ctx),
+                new File(main.getParentFile(), main.getName() + ".tmp"),
+        };
+        for (File f : files) {
+            try {
+                if (f.exists() && !f.delete()) Log.w(TAG, "slot pointer not removed: " + f);
+            } catch (Throwable t) {
+                Log.w(TAG, "slot pointer removal failed: " + f + " (" + t + ")");
+            }
+        }
+    }
+
     private static String readSlotText(File f) {
         try {
             return Util.readText(f).trim();

@@ -409,6 +409,41 @@ final class VersionOps {
     // ── 删除 ──────────────────────────────────────────────────────────────
 
     /**
+     * 删掉一个启动项 / 一个版本之后，要跟着清掉的**启动记录**（界面删除与插件 `deleteRow` 共用这一份）。
+     *
+     * <p>用户 2026-11-20 定的口径：**实例都没了，就没有"下一次启动"** —— 所以游戏侧文件
+     * （`launchid.dat` / `crashes/` / `settings.bin`）一个都不动；要清的是宿主自己记的三样：
+     * <ol>
+     *   <li>`last_version`（「继续上次」；由 :game 进程写）—— 删掉的正是上次启动那一行时清；</li>
+     *   <li>当前槽指针（`mdt-slot.txt`）—— 那个槽已经没有任何启动项落着时清（读侧回到"新装完"那条路）；</li>
+     *   <li>`last_played[key]`（"上次启动时刻"，详情页用）—— 这个版本一行都不剩时清。</li>
+     * </ol>
+     *
+     * <p>⚠️ 调用顺序写死：**先把行删掉 / 先把版本挪走，再调这里**（下面按"删完之后"数行数）。
+     * ⚠️ `last_version` 可能是 :game 进程刚写的，主进程内存里那份是旧的 ⇒ 判之前先 reload；
+     * 这也是本方法里唯一一次读盘（config 只有 1~2 KB）。
+     */
+    static void forgetLastLaunch(Context c, String versionKey, String slot) {
+        if (c == null || versionKey == null || versionKey.isEmpty()) return;
+        Config cfg = Config.get();
+        cfg.reload(c);
+        boolean slotEmpty = true;
+        boolean versionEmpty = true;
+        for (Versions.Entry row : Versions.scanAll(c)) {
+            if (slot != null && slot.equals(Versions.slotFor(row))) slotEmpty = false;
+            if (versionKey.equals(row.key())) versionEmpty = false;
+        }
+        boolean ptrHere = slot != null && slot.equals(Data.currentSlot(c));
+        if (versionKey.equals(cfg.lastVersion()) && (versionEmpty || ptrHere)) {
+            cfg.clearLastVersion();
+        }
+        if (slotEmpty && ptrHere) {
+            Paths.clearSlotName(c);
+        }
+        if (versionEmpty) cfg.clearLastPlayed(versionKey);
+    }
+
+    /**
      * 删除（唯一入口）。范围由**行数**决定，不按来源分岔：
      * <ul>
      *   <li>还有别的项 ⇒ 只删这一项（确认框说清"其他项与存档都不动"）；</li>
@@ -444,6 +479,8 @@ final class VersionOps {
                                 Toast.makeText(a, R.string.binding_failed, Toast.LENGTH_LONG).show();
                                 return;
                             }
+                            // 2026-11-20：删掉的若是"继续上次"那一行，启动记录也一起清（别留着指向幽灵）
+                            forgetLastLaunch(a, e.key(), slot);
                             Toast.makeText(a, Trans.get(a, R.string.delete_row_done_fmt, slot),
                                     Toast.LENGTH_SHORT).show();
                             if (done != null) done.changed();
@@ -472,6 +509,8 @@ final class VersionOps {
 
     /** 本体是几十 MB 的跨分区搬运 ⇒ 后台线程 + 前台服务；回来再报结果 */
     private static void trashVersionAsync(final Activity a, final Versions.Entry e, final Done done) {
+        // 槽身份在**删之前**取（删完 config 里还留着这一行的绑定，但别指望它一定在）
+        final String slot = Versions.slotFor(e);
         Work.begin(a, R.string.delete_version_title);
         new Thread(new Runnable() {
             @Override public void run() {
@@ -484,6 +523,8 @@ final class VersionOps {
                             Toast.makeText(a, R.string.version_delete_failed, Toast.LENGTH_LONG).show();
                             return;
                         }
+                        // 2026-11-20：删掉的若是"继续上次"那一行 / 该槽最后一行，启动记录一起清
+                        forgetLastLaunch(a, e.key(), slot);
                         Toast.makeText(a, Trans.get(a, R.string.version_deleted_fmt, e.displayName(a)),
                                 Toast.LENGTH_LONG).show();
                         if (done != null) done.changed();

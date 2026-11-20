@@ -164,7 +164,6 @@
     <string name="binding_added_fmt">已加一个启动项：用槽「%1$s」</string>
     <string name="binding_taken_fmt">这个版本已经在用槽「%1$s」了</string>
     <string name="binding_failed">这一项没能改动（配置可能被别处改过）。</string>
-    <string name="slot_deleted_extras_fmt">（%1$d 个只绑了这个槽的启动项已移除）</string>
 
     <!--
       2026-10-25：版本页（一个版本的全部动作都在一页里）。
@@ -407,18 +406,17 @@
     <string name="slot_err_no_external">拿不到外部数据目录（可能没挂载）</string>
     <string name="slot_err_exists_fmt">槽「%1$s」已存在</string>
     <string name="slot_err_mkdir_fmt">创建目录失败：%1$s</string>
-    <string name="slot_err_rename_current_fmt">「%1$s」是当前槽（正在使用中），不能改名。\n请先用别的版本切到其它槽。</string>
+    <string name="slot_err_rename_pointer_fmt">槽名已改，但没能把「上次启动」指着新名字记下来（%1$s）。下次从新名字启动一次就正常了。</string>
     <string name="slot_err_missing_fmt">槽「%1$s」不存在</string>
     <string name="slot_err_target_current_fmt">目标名「%1$s」是当前槽，不能占用</string>
     <string name="slot_err_rename_failed_fmt">改名失败（%1$s → %2$s）</string>
+    <!-- 只留给「永久删除」那条路（deleteSlotForever 仍拒绝当前槽：不可逆的动作保留更严的门禁） -->
     <string name="slot_err_delete_current_fmt">「%1$s」是当前槽，正被游戏使用，不能删除。</string>
     <string name="slot_err_game_running_fmt">槽「%1$s」的游戏实例正在运行，现在改会被它覆盖 —— 请先退出那个游戏再改。</string>
     <string name="slot_err_game_running">这个槽的游戏实例正在运行 —— 请先退出那个游戏再操作。</string>
     <string name="version_err_game_running">这个版本的游戏实例正在运行 —— 请先退出那个游戏再操作。</string>
     <string name="slot_err_delete_partial_fmt">删除未完全成功（可能有文件被占用）：%1$s\n剩余 %2$d/%3$d 个文件</string>
 
-    <string name="delete_current_slot_title">不能删除当前槽</string>
-    <string name="delete_current_slot_msg_fmt">「%1$s」是当前槽，游戏正在用它。\n请先用别的槽启动一次，再回来删它。</string>
     <string name="delete_slot_confirm_title_fmt">删除槽「%1$s」？</string>
     <!-- ⚠️ 这里**不能**用 `**` 表示强调：弹窗是纯文本（AlertDialog.setMessage），
          `**` 会原样显示成星号。要加重语气只能靠措辞。全工程同此纪律。 -->
@@ -431,7 +429,6 @@
     <string name="delete_forever">永久删除</string>
     <string name="delete_failed">删除失败</string>
     <string name="slot_deleted_fmt">已把槽「%1$s」挪进中转站</string>
-    <string name="slot_deleted_fallback_fmt">（%1$d 个版本回落到默认槽）</string>
 
     <string name="backup_title_fmt">备份槽「%1$s」</string>
     <string name="backup_label_hint">备注，可留空</string>
@@ -1447,7 +1444,9 @@
     <string name="trash_reason_no_kind">这既不是地图、模组、存档，也不是整个槽，没有地方放回去</string>
     <string name="trash_reason_mkdir">建不了那个槽里的目录</string>
     <string name="trash_reason_delete_failed">删不掉，它还在中转站里</string>
-    <string name="trash_reason_current_slot">那个槽正在用着，先换到别的槽再试</string>
+    <string name="trash_reason_current_slot">那个槽正是当前槽，先换到别的槽再试</string>
+    <string name="trash_reason_in_use_fmt">还有 %1$d 个启动项落在槽「%2$s」上，先挪走或删掉它们。</string>
+    <string name="trash_reason_default_slot_fmt">「%1$s」是默认槽，先把默认槽改成别的槽。</string>
     <string name="trash_reason_bad_name">那个槽名不能用</string>
     <string name="trash_reason_unknown">原因不明</string>
     <!-- 第 309 轮：自更新（只做 APK 更新；文案随版本走） -->

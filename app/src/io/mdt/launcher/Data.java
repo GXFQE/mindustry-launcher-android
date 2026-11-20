@@ -458,27 +458,47 @@ public final class Data {
         return null;
     }
 
-    /** 改名。当前槽在占用中、或**这个槽的实例正在跑**，拒绝（先退出再改）。 */
+    /**
+     * 改名。**当前槽也可以改**（2026-11-20 第 409 轮）：当前槽只是"上次启动落在哪个槽"的指针，
+     * 目录改名之后把指针改成新名字即可 —— 不写指针的话读侧会因为 `slot-&lt;旧名&gt;` 不存在而
+     * 静默退回 default（第 177 轮「存档像没了」的同族事故）。
+     *
+     * <p>仍然拒绝：这个槽的实例正在跑（{@link WriteGate}）；目标名是**别的**槽的名字；
+     * 目标名恰好是当前槽名（那只发生在改的是另一槽时 —— 否则指针会指到一份从没启动过的数据）。
+     */
     public static String renameSlot(Context ctx, String name, String rawNewName) {
         String n = sanitizeSlot(rawNewName);
         if (n == null) {
             return Trans.get(ctx, R.string.slot_err_name_invalid);
         }
         if (n.equals(name)) return null;
-        if (name.equals(currentSlot(ctx))) {
-            return Trans.get(ctx, R.string.slot_err_rename_current_fmt, name);
-        }
         // 2026-11-12（第 359 轮）：按**运行实例**判（多开前置；见 WriteGate）
         if (WriteGate.blockedSlot(ctx, name)) {
             return Trans.get(ctx, R.string.slot_err_game_running_fmt, name);
         }
         File from = slotDir(ctx, name);
         if (from == null || !from.exists()) return Trans.get(ctx, R.string.slot_err_missing_fmt, name);
-        if (n.equals(currentSlot(ctx))) return Trans.get(ctx, R.string.slot_err_target_current_fmt, n);
+        // ★ 必须在 renameTo **之前**取：目录一挪走，读侧就按"目录不存在"把这个名字判成悬空，
+        //   currentSlot() 会直接退回 default —— 之后再也认不出"刚才改的是当前槽"。
+        boolean wasCurrent = name.equals(currentSlot(ctx));
+        if (n.equals(currentSlot(ctx)) && !wasCurrent) {
+            return Trans.get(ctx, R.string.slot_err_target_current_fmt, n);
+        }
         File to = slotDir(ctx, n);
         if (to.exists()) return Trans.get(ctx, R.string.slot_err_exists_fmt, n);
         if (!from.renameTo(to)) {
             return Trans.get(ctx, R.string.slot_err_rename_failed_fmt, from.getName(), to.getName());
+        }
+        if (wasCurrent) {
+            try {
+                Paths.writeSlotName(ctx, n);
+            } catch (Exception e) {
+                // 指针写不进去 ⇒ 回滚目录，宁可"什么都没发生"（否则指针说旧名、目录是新名，
+                // 读侧退回 default，用户看到的是"槽里的东西不见了"）
+                boolean rolled = to.renameTo(from);
+                Log.w(TAG, "slot pointer rewrite failed (rollback=" + rolled + "): " + e);
+                return Trans.get(ctx, R.string.slot_err_rename_pointer_fmt, name);
+            }
         }
         Log.i(TAG, "slot renamed: " + name + " -> " + n);
         return null;

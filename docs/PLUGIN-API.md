@@ -894,6 +894,9 @@ String json = api.parseHjson(file);   // 标准 JSON 文本；失败/读不了 �
 - 只写 config：写完宿主会**主动重建一次主页**（插件挂在主页上的 inline 动作会立刻看到新行）。
   在宿主界面以外的调用不需要自己刷新；回到主页时 `onResume` 仍会 reload + rescan。
 - 删除版本是几十 MB 的搬运，`deleteRow` 走后台线程，回调仍在 UI 线程。
+- 删完会顺手清「继续上次」的记录（与宿主界面同一条 `VersionOps.forgetLastLaunch`）：删的若是上次启动那一行
+  ⇒ `last_version` 清掉；该槽再没有别的行 ⇒ 连「上次启动的槽」指针一起清；该版本再没有行 ⇒ 清它的上次启动时刻。
+  这只动宿主自己的记录，**不碰**游戏侧 `launchid.dat` / `settings.bin` / 崩溃报告。
 - **槽本身的新增 / 改名 / 删除、以及内容文件改名**：v50 都没有（槽的增删改仍在宿主界面；v51 另说）。
 
 ### 游戏设置（v21）

@@ -176,7 +176,6 @@
     <string name="binding_added_fmt">Added a launch entry using slot \"%1$s\"</string>
     <string name="binding_taken_fmt">This version already uses slot \"%1$s\"</string>
     <string name="binding_failed">Could not change this entry (the config may have been changed elsewhere).</string>
-    <string name="slot_deleted_extras_fmt">(%1$d launch entries that only used this slot were removed)</string>
 
     <!--
       2026-10-25: the version page — every action that belongs to a version lives on one page.
@@ -415,18 +414,16 @@
     <string name="slot_err_no_external">Cannot reach the external data directory (it may not be mounted)</string>
     <string name="slot_err_exists_fmt">Slot \"%1$s\" already exists</string>
     <string name="slot_err_mkdir_fmt">Could not create the directory: %1$s</string>
-    <string name="slot_err_rename_current_fmt">\"%1$s\" is the current slot and is in use, so it cannot be renamed.\nPoint another version at a different slot first.</string>
     <string name="slot_err_missing_fmt">Slot \"%1$s\" does not exist</string>
     <string name="slot_err_target_current_fmt">The target name \"%1$s\" is the current slot and cannot be taken over</string>
     <string name="slot_err_rename_failed_fmt">Rename failed (%1$s → %2$s)</string>
+    <string name="slot_err_rename_pointer_fmt">Renamed, but could not point the \"last launch\" record at the new name (%1$s). Launch once from the new name to fix that.</string>
     <string name="slot_err_delete_current_fmt">\"%1$s\" is the current slot and the game is using it, so it cannot be deleted.</string>
     <string name="slot_err_game_running_fmt">Slot \"%1$s\" has a game instance running, so this change would be overwritten. Exit that game first.</string>
     <string name="slot_err_game_running">A game instance is running for this slot. Exit that game before doing that.</string>
     <string name="version_err_game_running">A game instance is running this version. Exit that game before doing that.</string>
     <string name="slot_err_delete_partial_fmt">Deletion did not fully succeed (some files may be in use): %1$s\n%2$d of %3$d files left</string>
 
-    <string name="delete_current_slot_title">Cannot delete the current slot</string>
-    <string name="delete_current_slot_msg_fmt">\"%1$s\" is the current slot and the game is using it.\nLaunch once with another slot, then come back and delete this one.</string>
     <string name="delete_slot_confirm_title_fmt">Delete slot \"%1$s\"?</string>
     <!-- ⚠️ 这里**不能**用 `**` 表示强调：弹窗是纯文本（AlertDialog.setMessage），
          `**` 会原样显示成星号。要加重语气只能靠措辞。全工程同此纪律。 -->
@@ -439,7 +436,6 @@
     <string name="delete_forever">Delete permanently</string>
     <string name="delete_failed">Delete failed</string>
     <string name="slot_deleted_fmt">Moved slot \"%1$s\" to the transfer station</string>
-    <string name="slot_deleted_fallback_fmt">(%1$d versions fell back to the default slot)</string>
 
     <string name="backup_title_fmt">Back up slot \"%1$s\"</string>
     <string name="backup_label_hint">Note, may be left empty</string>
@@ -1474,7 +1470,9 @@
     <string name="trash_reason_no_kind">This is not a map, mod, save or slot, so there is nowhere to put it back</string>
     <string name="trash_reason_mkdir">Could not create the folder inside that slot</string>
     <string name="trash_reason_delete_failed">Could not delete it; it is still in the transfer station</string>
-    <string name="trash_reason_current_slot">That slot is in use right now. Switch to another slot first.</string>
+    <string name="trash_reason_current_slot">That slot is the current one right now. Switch to another slot first.</string>
+    <string name="trash_reason_in_use_fmt">%1$d launch entries still use slot \"%2$s\". Move or delete them first.</string>
+    <string name="trash_reason_default_slot_fmt">\"%1$s\" is the default slot. Pick another default slot first.</string>
     <string name="trash_reason_bad_name">That slot name cannot be used</string>
     <string name="trash_reason_unknown">Unknown reason</string>
     <!--

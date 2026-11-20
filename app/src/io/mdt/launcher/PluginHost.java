@@ -1629,7 +1629,18 @@ public final class PluginHost {
 
         @Override public void setRowSlot(String versionKey, String slot, String newSlot,
                                          final Done done) {
-            postDone(done, retargetRowNow(versionKey, slot, newSlot));
+            Result r = retargetRowNow(versionKey, slot, newSlot);
+            // 2026-11-20：换了槽 ⇒ 旧身份 (key, 旧槽) 这一行就没了，与"删掉一行"是同一件事。
+            // 它正好是"继续上次"那一行时就该跟着清；原地不动（from == to）不算。
+            if (r.ok) {
+                String key = versionKey == null ? "" : versionKey.trim();
+                String from = Data.sanitizeSlot(slot == null ? "" : slot);
+                String to = Data.sanitizeSlot(newSlot == null ? "" : newSlot);
+                if (!key.isEmpty() && from != null && !from.equals(to)) {
+                    VersionOps.forgetLastLaunch(getBaseContext(), key, from);
+                }
+            }
+            postDone(done, r);
         }
 
         @Override public void setRowName(String versionKey, String slot, String name,
@@ -1673,6 +1684,8 @@ public final class PluginHost {
                     return;
                 }
                 boolean ok = Config.get().removeBinding(key, rowSlot);
+                // 2026-11-20：与界面同一条清账 —— 删掉的若是"继续上次"那一行，启动记录一起清
+                if (ok) VersionOps.forgetLastLaunch(c, key, rowSlot);
                 postDeleted(done, ok ? Result.ok() : Result.fail("not-found"),
                         ok ? Deleted.ROW : null);
                 return;
@@ -1691,6 +1704,8 @@ public final class PluginHost {
                     } catch (Throwable t) {
                         r = Result.fail("io");
                     }
+                    // 2026-11-20：删版本成功后清启动记录（读盘 + 重扫，放后台线程刚好）
+                    if (r.ok) VersionOps.forgetLastLaunch(c, key, rowSlot);
                     postDeleted(done, r, r.ok ? Deleted.VERSION : null);
                 }
             }, "plugin-row-delete").start();

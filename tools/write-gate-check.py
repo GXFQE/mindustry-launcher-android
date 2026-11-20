@@ -10,6 +10,10 @@ exercise *today*.  This build-time ruler pins the structural side:
 
   1. ENTRY TABLE: each listed write entry's method body must contain
      ``WriteGate.``.  A missing method also fails (the table went stale).
+     ★ 2026-11-20: an entry may instead call **one** shared helper listed in
+     ``GATE_HELPERS``; the helper itself must contain ``WriteGate.`` (one hop,
+     no chains).  This exists so the UI and the plugin API can share one gate
+     implementation instead of keeping two drifting copies.
   2. GLOBAL ``Data.gameAlive(`` budget is frozen: new callers must use
      ``WriteGate`` instead; ``gameAlive`` is only for migration / recovery /
      process-kill style global actions.
@@ -72,6 +76,12 @@ ENTRIES = [
 
 # Budget for `Data.gameAlive(` call sites in app/src (non-test).
 GLOBAL_GAMEALIVE_BUDGET = 9
+
+# helper method -> file that must hold a `WriteGate.` call inside it.
+# One hop only: an entry may call the helper; the helper asks the gate.
+GATE_HELPERS = {
+    "checkSlotRemovable": "Trash.java",
+}
 
 # Frozen `deleteTree(` count per file (only files that currently have it).
 # SelfTest is the ruler's own test data and is not frozen.
@@ -147,6 +157,19 @@ def count_needle(text, needle):
     return text.count(needle)
 
 
+def helper_gated(src, body):
+    """True when `body` calls a GATE_HELPERS helper whose body asks WriteGate."""
+    for helper, hfile in GATE_HELPERS.items():
+        if (helper + "(") not in body:
+            continue
+        htext = src.get(hfile)
+        if htext is None:
+            continue
+        if any("WriteGate." in hb for hb in find_methods(htext, helper)):
+            return True
+    return False
+
+
 def check_entries(src):
     errs = []
     for fn, method, _why in ENTRIES:
@@ -159,7 +182,7 @@ def check_entries(src):
             errs.append("entry method not found (stale table?): %s.%s"
                         % (fn, method))
             continue
-        if not any("WriteGate." in b for b in bodies):
+        if not any("WriteGate." in b or helper_gated(src, b) for b in bodies):
             errs.append("write entry has no WriteGate: %s.%s" % (fn, method))
     return errs
 
@@ -271,6 +294,39 @@ def selftest():
     e, _ = run_checks({"Other.java": "void f() { am.killBackgroundProcesses(p); }\n"})
     cases.append(("stray killBackgroundProcesses rejected",
                   any("killBackgroundProcesses( outside" in x for x in e)))
+
+    # 5b. an entry may delegate to a gated helper (one shared gate impl)
+    deleg_good = mk_src({
+        "Trash.java":
+            "    public static Result checkSlotRemovable(Context ctx, String s) {\n"
+            "        if (WriteGate.blockedSlot(ctx, s)) return fail();\n"
+            "        return ok();\n"
+            "    }\n",
+        "SlotOps.java":
+            "    static void deleteSlot(Activity a, Data.Slot s) {\n"
+            "        Trash.Result c = Trash.checkSlotRemovable(a, s.name);\n"
+            "    }\n",
+    })
+    e, _ = run_checks(deleg_good)
+    cases.append(("delegating entry accepted",
+                  not any("SlotOps.java.deleteSlot" in x and "no WriteGate" in x
+                          for x in e)))
+
+    # 5c. delegating to an UNGATED helper is still rejected (no free pass)
+    deleg_bad = mk_src({
+        "Trash.java":
+            "    public static Result checkSlotRemovable(Context ctx, String s) {\n"
+            "        return ok();\n"
+            "    }\n",
+        "SlotOps.java":
+            "    static void deleteSlot(Activity a, Data.Slot s) {\n"
+            "        Trash.Result c = Trash.checkSlotRemovable(a, s.name);\n"
+            "    }\n",
+    })
+    e, _ = run_checks(deleg_bad)
+    cases.append(("ungated helper rejected",
+                  any("SlotOps.java.deleteSlot" in x and "no WriteGate" in x
+                      for x in e)))
 
     # 6. clean input passes: every entry file/method is gated, Data owns the
     #    deletion surface and the single killBackgroundProcesses call.

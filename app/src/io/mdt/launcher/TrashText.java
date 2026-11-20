@@ -150,11 +150,16 @@ public final class TrashText {
             case Trash.Result.T_DELETE_FAILED:
                 return Trans.get(c, R.string.trash_reason_delete_failed);
             case Trash.Result.T_CURRENT_SLOT:
+                // 2026-11-20 起只剩"往当前槽里放回整槽"这一条路（删当前槽已放行，见 Trash.trashSlot）
                 return Trans.get(c, R.string.trash_reason_current_slot);
             case Trash.Result.T_BAD_NAME:
                 return Trans.get(c, R.string.trash_reason_bad_name);
             case Trash.Result.T_NOT_SCHEM:
                 return Trans.get(c, R.string.trash_reason_not_schem);
+            case Trash.Result.T_IN_USE:
+                return Trans.get(c, R.string.trash_reason_in_use_fmt, r.count, r.errS1);
+            case Trash.Result.T_DEFAULT_SLOT:
+                return Trans.get(c, R.string.trash_reason_default_slot_fmt, r.errS1);
             default:
                 return Trans.get(c, R.string.trash_reason_unknown);
         }

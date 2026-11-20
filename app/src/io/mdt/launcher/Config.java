@@ -496,6 +496,17 @@ public final class Config {
         save();
     }
 
+    /**
+     * 「继续上次」作废（删掉上次启动的那个实例之后调，见 `VersionOps.forgetLastLaunch`）。
+     * **把键整个删掉**：与"新装完从没启动过"同一个状态（空串也能让界面不出那一行，
+     * 但 config.json 里留一个 `"last_version": ""` 只是噪音 —— 同 {@link #setMainOrder} 的口径）。
+     */
+    public synchronized void clearLastVersion() {
+        if (!mRoot.has(K_LAST)) return;
+        mRoot.remove(K_LAST);
+        save();
+    }
+
     /** F23 之后：已经提示过的那一份崩溃报告（`<槽>|<文件名>`；空串 = 还没提示过任何一份） */
     public synchronized String crashAlerted() {
         return mRoot.optString(K_ALERT, "");
@@ -1088,6 +1099,10 @@ public final class Config {
         Retarget r = new Retarget();
         if (oldName == null || oldName.isEmpty()) return r;
         boolean drop = (newName == null || newName.isEmpty());
+        // 除了"行绑定"之外还有三处也记着槽名（默认槽 / 自动备份策略 / 主界面手工顺序的附加行键）。
+        // ★ 它们**不增加** r 的计数（那三个数说的是"行"），但只要动了就要落盘 ——
+        //   以前只看 r.total()，于是"改名之后自动备份策略静默回默认"这一类漂移在真机上很久才发现。
+        boolean dirty = false;
 
         // ① 主分配 { key: slot }
         JSONObject vs = mRoot.optJSONObject(K_VSLOTS);
@@ -1174,7 +1189,53 @@ public final class Config {
             }
         }
 
-        if (r.total() > 0) save();
+        // ③ 默认槽（设置页那一项）：改到新名字 / 删槽时清回"没设置"
+        //    ★ 默认槽**不允许被删**（Trash 侧有门禁），但这里仍要处理：删槽路径可能从更早的版本
+        //      留下一条指向已不存在槽的 `default_slot`，顺手清掉比留一个悬空值好。
+        if (oldName.equals(defaultSlot())) {
+            setDefaultSlot(drop ? "" : newName);
+        }
+
+        // ④ 自动备份策略：键就是槽名（`backup_policy.<槽>`）—— 不改的话改名后策略静默回默认
+        JSONObject bp = mRoot.optJSONObject(K_BACKUP);
+        if (bp != null && bp.has(oldName)) {
+            Object policy = bp.opt(oldName);
+            bp.remove(oldName);
+            try {
+                if (!drop) bp.put(newName, policy);
+            } catch (Exception e) {
+                Log.w(TAG, "retargetSlots(backup_policy) failed: " + e);
+            }
+            if (bp.length() == 0) mRoot.remove(K_BACKUP);   // 空对象不留（同 storeExtra）
+            else put(K_BACKUP, bp);
+            dirty = true;
+        }
+
+        // ⑤ 主界面手工顺序：附加行的行键 = `key + NUL + 槽名`（见 Versions.orderKey）
+        //    键里只有一个 NUL（版本键是包名 / `import:<文件名>`，都不含 NUL）⇒ 认最后一个 NUL 之后那段
+        JSONArray order = mRoot.optJSONArray(K_MAIN_ORDER);
+        if (order != null) {
+            JSONArray fixed = new JSONArray();
+            boolean changed = false;
+            for (int i = 0; i < order.length(); i++) {
+                String s = order.optString(i, "");
+                if (s.isEmpty()) continue;
+                int cut = s.lastIndexOf('\u0000');
+                if (cut > 0 && s.substring(cut + 1).equals(oldName)) {
+                    changed = true;
+                    if (!drop) fixed.put(s.substring(0, cut + 1) + newName);
+                } else {
+                    fixed.put(s);
+                }
+            }
+            if (changed) {
+                if (fixed.length() == 0) mRoot.remove(K_MAIN_ORDER);
+                else put(K_MAIN_ORDER, fixed);
+                dirty = true;
+            }
+        }
+
+        if (dirty || r.total() > 0) save();
         return r;
     }
 
@@ -1575,6 +1636,20 @@ public final class Config {
         if (key == null) return 0L;
         JSONObject all = mRoot.optJSONObject(K_PLAYED);
         return all == null ? 0L : all.optLong(key, 0L);
+    }
+
+    /**
+     * 清掉某个版本的"上次启动时刻"（那个版本的**所有启动项都没了**时调，见 `VersionOps.forgetLastLaunch`）。
+     * 只剩这一个版本的那一条记录时把 `last_played` 整个删掉（不留空对象 —— 同其它键的口径）。
+     */
+    public synchronized void clearLastPlayed(String key) {
+        if (key == null) return;
+        JSONObject all = mRoot.optJSONObject(K_PLAYED);
+        if (all == null || !all.has(key)) return;
+        all.remove(key);
+        if (all.length() == 0) mRoot.remove(K_PLAYED);
+        else put(K_PLAYED, all);
+        save();
     }
 
     // ── 主界面启动项的手工顺序（第 319 轮：长按最左图标拖动）─────────────────

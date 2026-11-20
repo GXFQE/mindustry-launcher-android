@@ -11675,13 +11675,13 @@ public final class SelfTest {
             String sExists = ctx.getString(R.string.slot_err_exists_fmt, "x");
             String sMissing = ctx.getString(R.string.slot_err_missing_fmt, "x");
             String sTarget = ctx.getString(R.string.slot_err_target_current_fmt, "x");
-            String sRenameCur = ctx.getString(R.string.slot_err_rename_current_fmt, "x");
+            String sRenamePtr = ctx.getString(R.string.slot_err_rename_pointer_fmt, "x");
             String sDelCur = ctx.getString(R.string.slot_err_delete_current_fmt, "x");
             String sMkdir = ctx.getString(R.string.slot_err_mkdir_fmt, "/p");
             String sRenameFail = ctx.getString(R.string.slot_err_rename_failed_fmt, "a", "b");
             String sPartial = ctx.getString(R.string.slot_err_delete_partial_fmt, "/p", 2, 7);
             ok(stat, L, sExists.contains("x") && sMissing.contains("x") && sTarget.contains("x")
-                            && sRenameCur.contains("x") && sDelCur.contains("x")
+                            && sRenamePtr.contains("x") && sDelCur.contains("x")
                             && sMkdir.contains("/p") && sRenameFail.contains("a")
                             && sRenameFail.contains("b") && sPartial.contains("/p")
                             && sPartial.contains("2") && sPartial.contains("7"),
@@ -13229,6 +13229,107 @@ public final class SelfTest {
                     Data.currentSlot(ctx), false);
             ok(stat, L, !r7.ok && r7.errCode == Trash.Result.T_CURRENT_SLOT,
                     "③ ★不许把整槽放到**正在用的**那个槽（那等于砸掉当前存档）");
+
+            // ── ④ 门禁（2026-11-20 用户定案）：默认槽不许删 / 还有启动项落着不许删 / 当前槽放行 ──
+            String defSlot = Config.get().defaultSlot();
+            if (defSlot == null || defSlot.isEmpty()) defSlot = Data.SLOT_DEFAULT;
+            Trash.Result gDef = Trash.checkSlotRemovable(ctx, defSlot);
+            ok(stat, L, !gDef.ok && gDef.errCode == Trash.Result.T_DEFAULT_SLOT,
+                    "④ ★默认槽不许删（没分配槽的启动项都落在它上面）⇒ 码 " + gDef.errCode);
+            boolean sawInUse = false;
+            for (Versions.Entry row : Versions.scanAll(ctx)) {
+                String rowSlot = Versions.slotFor(row);
+                if (rowSlot == null || rowSlot.equals(defSlot)) continue;
+                Trash.Result gUsed = Trash.checkSlotRemovable(ctx, rowSlot);
+                ok(stat, L, !gUsed.ok && gUsed.errCode == Trash.Result.T_IN_USE && gUsed.count > 0,
+                        "④ ★还有启动项落着的槽不许删（" + rowSlot + " 报出 " + gUsed.count + " 份）");
+                sawInUse = true;
+                break;
+            }
+            if (!sawInUse) L.add("  · ④ 跳过「还有启动项」：这台机器上所有启动项都落在默认槽");
+            List<Versions.Entry> fakeRows = new ArrayList<Versions.Entry>();
+            Versions.Entry f1 = new Versions.Entry();
+            f1.pkg = "selftest:rows";
+            f1.boundSlot = "st-x";
+            Versions.Entry f2 = new Versions.Entry();
+            f2.pkg = "selftest:rows";
+            f2.boundSlot = "st-y";
+            fakeRows.add(f1);
+            fakeRows.add(f2);
+            ok(stat, L, Versions.rowsInSlot(fakeRows, "st-x") == 1
+                            && Versions.rowsInSlot(fakeRows, "st-y") == 1
+                            && Versions.rowsInSlot(fakeRows, "st-none") == 0,
+                    "④ rowsInSlot 按 slotFor 数（附加行也算一份，未落着的不算）");
+
+            // ── ⑤ 改名当前槽：指针跟着走（当前槽不再拦改名）─────────────────────
+            String origPtr = Data.currentSlot(ctx);
+            String rnA = "st-rn-a";
+            String rnB = "st-rn-b";
+            Data.deleteTree(Data.slotDir(ctx, rnA));
+            Data.deleteTree(Data.slotDir(ctx, rnB));
+            String rnErr = Data.createSlot(ctx, rnA);
+            if (rnErr != null) {
+                L.add("  · ⑤ 跳过改名当前槽：建不了测试槽（" + rnErr + "）");
+            } else {
+                boolean wrote = true;
+                try {
+                    Paths.writeSlotName(ctx, rnA);
+                } catch (IOException e) {
+                    wrote = false;
+                }
+                String re = wrote ? Data.renameSlot(ctx, rnA, rnB) : "pointer write failed";
+                ok(stat, L, re == null && rnB.equals(Data.currentSlot(ctx))
+                                && Data.slotDir(ctx, rnB).isDirectory()
+                                && !Data.slotDir(ctx, rnA).exists(),
+                        "⑤ ★当前槽可以改名，指针自动跟到新名字" + (re == null ? "" : "（" + re + "）"));
+                // 还原现场：名字改回去 + 指针拨回原值（别把机器留在实验状态）
+                Data.renameSlot(ctx, rnB, rnA);
+                Data.deleteTree(Data.slotDir(ctx, rnA));
+                Data.deleteTree(Data.slotDir(ctx, rnB));
+                try {
+                    Paths.writeSlotName(ctx, origPtr);
+                } catch (IOException ignored) {
+                }
+            }
+
+            // ── ⑥ 槽改名 / 删槽时三处记录的迁移（default_slot / backup_policy / main_order）──
+            String mA = "st-mig-a";
+            String mB = "st-mig-b";
+            String migKey = "selftest:mig";
+            Config migCfg = Config.get();
+            String defBefore = migCfg.defaultSlot();
+            List<String> orderBefore = new ArrayList<String>(migCfg.mainOrder());
+            migCfg.setDefaultSlot(mA);
+            migCfg.setBackupPolicy(mA, true, 61, 999);
+            List<String> orderAfter = new ArrayList<String>(orderBefore);
+            orderAfter.add(migKey + "\u0000" + mA);
+            migCfg.setMainOrder(orderAfter);
+            migCfg.retargetSlots(mA, mB);
+            Config.BackupPolicy bNew = migCfg.backupPolicy(mB);
+            ok(stat, L, mB.equals(migCfg.defaultSlot())
+                            && bNew.minMinutes == 61 && bNew.maxBackups == 999
+                            && migCfg.backupPolicy(mA).maxBackups != 999
+                            && migCfg.mainOrder().contains(migKey + "\u0000" + mB)
+                            && !migCfg.mainOrder().contains(migKey + "\u0000" + mA),
+                    "⑥ ★改名时 default_slot / backup_policy / main_order 三处一起搬（以前三处全漏）");
+            migCfg.retargetSlots(mB, "");       // 删槽那条路：这三处记录全部清掉
+            ok(stat, L, migCfg.defaultSlot().isEmpty()
+                            && migCfg.backupPolicy(mB).maxBackups != 999
+                            && !migCfg.mainOrder().contains(migKey + "\u0000" + mB),
+                    "⑥ ★槽没了 ⇒ 三处记录不留残余（默认槽清空、备份策略消失、顺序表里的键被丢掉）");
+            migCfg.setDefaultSlot(defBefore);
+            migCfg.setMainOrder(orderBefore);
+
+            // ── ⑦ 删实例后的清账：last_version 指向一个已经没有行的版本 ⇒ 清掉 ──
+            //    界面删除与插件 `deleteRow` 共用 VersionOps.forgetLastLaunch 这一份实现，
+            //    这里钉住它最核心的那条（"继续上次"不会留在一个不存在的实例上）。
+            String lastBefore = migCfg.lastVersion();
+            String goneKey = "selftest:gone";
+            migCfg.setLastVersion(goneKey);
+            VersionOps.forgetLastLaunch(ctx, goneKey, "st-no-such-slot");
+            ok(stat, L, migCfg.lastVersion().isEmpty(),
+                    "⑦ ★删掉「继续上次」那一行 ⇒ last_version 被清掉（不指向一个没有行的实例）");
+            migCfg.setLastVersion(lastBefore);
 
             File decoy = Data.slotDir(ctx, SLOT_GONE);
             decoy.mkdirs();

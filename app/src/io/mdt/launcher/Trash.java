@@ -487,13 +487,23 @@ public final class Trash {
          *   混用会让用户以为中转站里躺着一张地图。
          */
         public static final int T_NOT_SCHEM = 13;
+        /**
+         * 那个槽还有**启动项落着**（`Versions.rowsInSlot` > 0）；`errS1` = 槽名，`count` = 行数。
+         *
+         * <p>2026-11-20（第 409 轮，用户定）：删槽的最大问题是**跟着的实例**，不是"当前槽"。
+         * 以前删槽会把那些行的主分配悄悄回落默认槽 / 附加行整行消失 —— 用户看不到"我的启动项没了"。
+         * 现在先拦下来，让用户自己把启动项删掉或换绑（消息里给行数）。
+         */
+        public static final int T_IN_USE = 14;
+        /** 那是**默认槽**（设置页那一项；没设置时 = `default`）：删了所有没分配槽的启动项就没去处。s1 = 槽名 */
+        public static final int T_DEFAULT_SLOT = 15;
 
         /** **所有**错误码（自检**遍历**它：`TrashText.reason` 的 switch 有 default 兜底，
          *  漏映射**不崩**、界面上只是静默退化成"原因不明" ⇒ 只有遍历才抓得住） */
         public static final int[] ALL_CODES = {
                 T_NOT_IN_TRASH, T_NO_TARGET, T_NAME_TAKEN, T_NOT_MAP, T_STASH_FAILED,
                 T_MOVE_FAILED, T_GAME_RUNNING, T_NO_KIND, T_MKDIR, T_DELETE_FAILED,
-                T_CURRENT_SLOT, T_BAD_NAME, T_NOT_SCHEM,
+                T_CURRENT_SLOT, T_BAD_NAME, T_NOT_SCHEM, T_IN_USE, T_DEFAULT_SLOT,
         };
 
         public boolean ok;
@@ -659,6 +669,40 @@ public final class Trash {
     // ── 整个槽：进站（容器）/ 出站 ────────────────────────────────────────
 
     /**
+     * 删槽前的**只读预检** —— 与 {@link #trashSlot} 用**同一份判据**（界面在弹确认框之前问一次，
+     * 免得用户先读完"这些文件会挪走"再吃一个失败提示）。
+     *
+     * <p>通过时返回 `ok=true`（`errCode` 仍是 T_NONE，**别**拿它当"有错"）；失败时码与
+     * trashSlot 完全一致，`TrashText.reason` 直接能用。
+     */
+    public static Result checkSlotRemovable(Context ctx, String slotName) {
+        Result r = new Result();
+        String name = slotName == null ? "" : slotName.trim();
+        if (name.isEmpty()) {
+            return r.fail(Result.T_NO_TARGET, "empty slot name", null);
+        }
+        // 默认槽：没分配槽的启动项都落在它上面（设置页「默认槽」；没设置时 = Data.SLOT_DEFAULT）
+        String def = Config.get().defaultSlot();
+        if (def == null || def.isEmpty()) def = Data.SLOT_DEFAULT;
+        if (name.equals(def)) {
+            return r.fail(Result.T_DEFAULT_SLOT, "default slot: " + name, name);
+        }
+        // 2026-11-12（第 359 轮）：按**运行实例**判（多开前置；见 WriteGate）
+        if (WriteGate.blockedSlot(ctx, name)) {
+            return r.fail(Result.T_GAME_RUNNING, "slot instance running: " + name, name);
+        }
+        // ★ 还有启动项落着 ⇒ 拒绝（用户 2026-11-20：「最大的问题在于跟着的实例」）。
+        //   判据用 Versions.slotFor（含"没绑定 ⇒ 落默认槽"的那一片），别用显式绑定数。
+        int rows = Versions.rowsInSlot(ctx, name);
+        if (rows > 0) {
+            r.count = rows;
+            return r.fail(Result.T_IN_USE, "slot still has " + rows + " row(s)", name);
+        }
+        r.ok = true;
+        return r;
+    }
+
+    /**
      * **把一个槽整个挪进中转站**（2026-10-05 第二批，把"删槽 = 硬删"这条也接上）。
      *
      * 容器布局（一个条目 = 这个槽的全部）：
@@ -679,22 +723,26 @@ public final class Trash {
      *   那些快照引用的对象池对象到那时才真的没人引用（`Backup.allReferencedShas` 会扫本站容器，
      *   所以**只要容器还在，对象就不会被回收** —— 这正是"能恢复"的前提）。
      *
+     * <p><b>2026-11-20（第 409 轮，用户定）三道门禁</b>，判据按"用户能不能看见后果"排：
+     *   · **当前槽放行**（以前拒绝）：当前槽只是"上次启动落在哪个槽"的指针，挪走目录之后
+     *     把指针清掉即可 —— 读侧没有指针 = 新装完的路（落回默认槽），不会"存档像没了"；
+     *   · **默认槽拒绝**（`T_DEFAULT_SLOT`）：它是没分配槽的启动项的落点，删了那些行就没去处；
+     *   · **还有启动项拒绝**（`T_IN_USE` + `count` = 行数）：删槽不能顺手把别人的启动项
+     *     悄悄回落或整行吞掉（用户原话：「最大的问题在于跟着的实例」）。
+     *
      * @param backupsRoot `&lt;hub&gt;/backups`（由调用方传：{@link Backup#rootDir}）。
      *                    这里刻意不 import Backup —— 那边反过来要扫本站容器，成环不好看（见 DIR_BACKUPS）
      */
     public static Result trashSlot(Context ctx, String slotName, File backupsRoot) {
+        Result check = checkSlotRemovable(ctx, slotName);
+        if (!check.ok) return check;
         Result r = new Result();
         String name = slotName == null ? "" : slotName.trim();
-        if (name.isEmpty()) {
-            return r.fail(Result.T_NO_TARGET, "empty slot name", null);
-        }
-        if (name.equals(Data.currentSlot(ctx))) {
-            return r.fail(Result.T_CURRENT_SLOT, "current slot: " + name, name);
-        }
-        // 2026-11-12（第 359 轮）：按**运行实例**判（以前只有"当前槽身份"这一道）
-        if (WriteGate.blockedSlot(ctx, name)) {
-            return r.fail(Result.T_GAME_RUNNING, "slot instance running: " + name, name);
-        }
+        // ★ 当前槽**放行**：它只是"上次启动落哪个槽"的指针，挪走目录后把指针清掉即可（见下面 r.ok 前）。
+        //   以前这里拒绝，理由是"读侧按目录存在校验、改名/删除会静默退回 default" —— 那是对**符号**
+        //   的担心，现在由"改名重写指针 / 删槽清指针"正面解决（用户 2026-11-20：删槽最大的问题是
+        //   跟着的实例，不是当前槽）。
+        boolean wasCurrent = name.equals(Data.currentSlot(ctx));
         File slotDir = Data.slotDir(ctx, name);
         if (slotDir == null || !slotDir.exists()) {
             return r.fail(Result.T_NO_TARGET, "no slot dir: " + slotDir, name);
@@ -730,6 +778,11 @@ public final class Trash {
             }
         }
         pruneIn(dir);
+        // 删掉的是"上次启动所在的那个槽" ⇒ 指针没有意义了，清掉（读侧没有指针 = 新装完那条路，
+        // 落回默认槽）。⚠️ 必须在目录**挪走之后**清：读侧按"slot-<名> 目录存在"校验，
+        // 目录还在时清指针不过是个非当前槽；先清后挪反而会短暂出现"指针指向将被挪走的目录"
+        // 这一瞬间 —— 反正删完都清，不如放在成功之后。
+        if (wasCurrent) Paths.clearSlotName(ctx);
         r.ok = true;
         r.dest = container;
         return r;

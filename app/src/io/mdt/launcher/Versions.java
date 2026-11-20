@@ -966,6 +966,28 @@ public final class Versions {
         return 1 + Config.get().extraSlotsOf(key).size();
     }
 
+    /**
+     * **纯函数**：这些行里有几行落在 {@code slot}（判据就是 {@link #slotFor} —— 显式绑定的算，
+     * 没绑定、回落到默认槽的也算）。
+     *
+     * <p>谁用：删槽的门禁（{@link Trash#trashSlot}）。★ 别用"显式绑定数"代替 —— 那会漏掉
+     * "没分配槽 ⇒ 落默认槽"的那一大片，默认槽还能靠另一道门禁拦住，别的槽就漏了。
+     */
+    public static int rowsInSlot(List<Entry> rows, String slot) {
+        if (rows == null || slot == null || slot.isEmpty()) return 0;
+        int n = 0;
+        for (Entry e : rows) {
+            if (slot.equals(slotFor(e))) n++;
+        }
+        return n;
+    }
+
+    /** {@link #rowsInSlot(List, String)} 的现扫版（删槽门禁用；扫一遍包表，代价与主页 rescan 同量级）。 */
+    public static int rowsInSlot(Context ctx, String slot) {
+        if (ctx == null || slot == null || slot.isEmpty()) return 0;
+        return rowsInSlot(scanAll(ctx), slot);
+    }
+
     /** 一个 APK 文件里声明的包名 + 发布版本名（不安装它）。 */
     static final class ArchiveMeta {
         final String pkg;
