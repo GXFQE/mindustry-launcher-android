@@ -53,6 +53,48 @@ final class ProbeLab {
     };
 
     /**
+     * **空壳基座实验**（2026-11-20）：触发文件 {@code hub/base-apk-lab.txt}，一行一个 APK 路径
+     * （`#` 开头当注释）。把 {@code plan.apk} 与 {@code plan.assetBase} 换成该 APK ——
+     * 用来验证「基座只有一个空壳、真正的游戏（dex / assets / native）全在补丁里」。
+     *
+     * <p>空壳里的假入口类只为让 {@code Injector.prewarm} 的 {@code loadClass} 过关；
+     * 补丁元素插在基座之前，运行期真正加载到的是补丁里的入口类。</p>
+     *
+     * <p>读一次即删；报告写 {@code hub/report-base-apk-lab.txt}。</p>
+     */
+    private static void decorateBaseApk(Context ctx, Injector.Plan plan) {
+        try {
+            File armed = new File(Data.hubDir(ctx), "base-apk-lab.txt");
+            if (!armed.isFile()) return;
+            String text = readText(armed);
+            armed.delete();
+            StringBuilder rep = new StringBuilder("== base apk lab（装填）==\n");
+            rep.append("before = ").append(plan.apk.getAbsolutePath())
+                    .append(" (").append(plan.apk.length()).append(" B)\n");
+            for (String line : text.split("\\r?\\n")) {
+                String p = line.trim();
+                if (p.isEmpty() || p.startsWith("#")) continue;
+                File f = new File(p);
+                if (!f.isFile()) {
+                    rep.append("missing = ").append(p).append('\n');
+                    continue;
+                }
+                plan.apk = f;
+                plan.assetBase = f;
+                rep.append("base = ").append(f.getAbsolutePath())
+                        .append(" (").append(f.length()).append(" B)\n");
+            }
+            writeText(new File(Data.hubDir(ctx), "report-base-apk-lab.txt"), rep.toString());
+        } catch (Throwable t) {
+            try {
+                writeText(new File(Data.hubDir(ctx), "report-base-apk-lab.txt"),
+                        "decorate FAILED: " + t + "\n");
+            } catch (Throwable ignored) {
+            }
+        }
+    }
+
+    /**
      * **整包补丁实验**（2026-11-20）：触发文件 {@code hub/apk-patch-lab.txt}，一行一个 APK 路径
      * （`#` 开头当注释）。读一次即删；装填结果写 {@code hub/report-apk-patch-lab.txt}。
      *
@@ -109,6 +151,8 @@ final class ProbeLab {
         sAssetLabApk = null;
         sAssetLabFiles.clear();
         sAssetLabNotes.setLength(0);
+        // 空壳基座实验（2026-11-20）：先换基座，再装补丁（补丁实验看到的 apk 也是空壳）
+        decorateBaseApk(ctx, plan);
         // v2 整包补丁实验（2026-11-20）：与 asset-lab 独立，可以同时开
         decorateApkPatch(ctx, plan);
         try {
