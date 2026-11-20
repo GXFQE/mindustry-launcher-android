@@ -105,13 +105,16 @@ public final class PatchesActivity extends BaseActivity {
         final boolean targetMatches;
         final int classCount;
         final int assetCount;
+        /** v2 整包：dex 份数 / native 条数（v1 为 1 / 0；不是整端不显示）。 */
+        final int dexCount;
+        final int libCount;
         final long dexBytes;
         final long assetsBytes;
         final long importedAt;
 
         Row(Patches.Record record, boolean enabled, int state, Patches.TargetFile target,
-            boolean targetMatches, int classCount, int assetCount, long dexBytes, long assetsBytes,
-            long importedAt) {
+            boolean targetMatches, int classCount, int assetCount, int dexCount, int libCount,
+            long dexBytes, long assetsBytes, long importedAt) {
             this.record = record;
             this.enabled = enabled;
             this.state = state;
@@ -119,6 +122,8 @@ public final class PatchesActivity extends BaseActivity {
             this.targetMatches = targetMatches;
             this.classCount = classCount;
             this.assetCount = assetCount;
+            this.dexCount = dexCount;
+            this.libCount = libCount;
             this.dexBytes = dexBytes;
             this.assetsBytes = assetsBytes;
             this.importedAt = importedAt;
@@ -232,7 +237,9 @@ public final class PatchesActivity extends BaseActivity {
                     File mf = new File(r.dir, PatchManifest.FILE);
                     long importedAt = mf.lastModified();
                     rows.add(new Row(r, on, state, show, match != null,
-                            classes, assets, dexBytes, assetsBytes, importedAt));
+                            classes, assets, show == null ? 0 : show.dexCount(),
+                            show == null ? 0 : show.libCount(),
+                            dexBytes, assetsBytes, importedAt));
                 }
                 List<Patches.Problem> problems = Patches.launchProblems(PatchesActivity.this);
                 // ★ 第 360 轮：崩溃后自动停用的结论也进同一张卡（用户可重新启用）
@@ -352,6 +359,11 @@ public final class PatchesActivity extends BaseActivity {
         }
         body.append('\n').append(Trans.get(this, R.string.patch_detail_content_fmt,
                 row.classCount, row.assetCount));
+        // 第 405 轮：整端才显示"几份 dex / 几个 native"（普通补丁恒为 1 / 0，写了是噪音）
+        if (m.isGame() && row.dexCount > 0) {
+            body.append('\n').append(Trans.get(this, R.string.patch_detail_game_build_fmt,
+                    row.dexCount, row.libCount));
+        }
         body.append('\n').append(Trans.get(this, R.string.patch_detail_size_fmt,
                 humanBytes(row.dexBytes + row.assetsBytes)));
         if (m.tool != null && !m.tool.isEmpty()) {

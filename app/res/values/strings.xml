@@ -2334,6 +2334,7 @@
     <string name="patch_detail_author_fmt">Author: %1$s</string>
     <string name="patch_detail_target_fmt">For: %1$s · APK %2$s</string>
     <string name="patch_detail_content_fmt">%1$d classes · %2$d asset files</string>
+    <string name="patch_detail_game_build_fmt">Full build: %1$d dex · %2$d native</string>
     <string name="patch_detail_size_fmt">Size: %1$s</string>
     <string name="patch_detail_tool_fmt">Tool: %1$s</string>
     <string name="patch_detail_imported_fmt">Imported: %1$s</string>

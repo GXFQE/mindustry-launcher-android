@@ -19023,6 +19023,11 @@ public final class SelfTest {
                 libsOk = false;
             }
             ok(stat, L, libsOk, "⑨ native 键 = abi/文件名（整包里的 lib/ 能被列出来）");
+            ok(stat, L, tfApk.dexCount() == 1 && tfApk.libCount() == 1,
+                    "⑨ 整包载体：dex 份数 / native 条数可数（补丁页详情第 405 轮起显示）");
+            String buildLine = Trans.get(ctx, R.string.patch_detail_game_build_fmt, 2, 8);
+            ok(stat, L, buildLine.contains("2") && buildLine.contains("8"),
+                    "⑨ 整端构成文案两个数都在（dex 份数 / native 条数）");
             Patches.enable(ctx, IKEY3, recApk, apkSha);
             Patches.Resolved rApk = Patches.resolve(ctx, fakeApk, IKEY3);
             ok(stat, L, rApk.loaded.size() == 1

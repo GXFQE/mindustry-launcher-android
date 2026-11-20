@@ -182,6 +182,30 @@ final class Patches {
         /** v2：整包 APK；v1：null。 */
         File apkFile() { return apk; }
 
+        /**
+         * 载体里有几份 dex（v2 = APK 的 `classes*.dex` 份数；v1 = 1）。
+         *
+         * <p>只给界面显示用，不参与注入：注入时整包交给 ART 展开。</p>
+         */
+        int dexCount() {
+            if (apk == null) return dex != null ? 1 : 0;
+            try {
+                return PatchPackage.dexNames(apk).size();
+            } catch (IOException e) {
+                return 0;
+            }
+        }
+
+        /** 载体带几个 native（v2 = APK 的 `lib/<abi>/*.so` 条数；v1 = 0）。 */
+        int libCount() {
+            if (apk == null) return 0;
+            try {
+                return PatchPackage.libKeys(apk).size();
+            } catch (IOException e) {
+                return 0;
+            }
+        }
+
         /** dex 文件（v2 返回整包 APK —— 注入走 `Injector.Patch.apk`，这里只给"载体"用）。 */
         File dexFile() { return apk != null ? apk : dex; }
 
