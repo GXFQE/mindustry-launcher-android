@@ -41,7 +41,7 @@ ENTRIES = [
     ("BatchIo.java", "importSync", "batch import (sync)"),
     ("BlueprintFiles.java", "importSchem", "blueprint import"),
     ("BlueprintFiles.java", "deleteToTrash", "blueprint delete"),
-    ("Data.java", "renameSlot", "slot rename"),
+    ("Data.java", "renameSlotCode", "slot rename"),
     ("Data.java", "deleteSlotForever", "slot delete"),
     ("Importer.java", "importApk0", "game package import"),
     ("Importer.java", "trashVersion", "game version delete"),
@@ -98,6 +98,7 @@ DELETION_BASELINE = {
     "Patches.java": 6,
     "Plugins.java": 2,
     "Recovery.java": 2,
+    "SlotOps.java": 1,
     "SlotWrite.java": 1,
     "Trash.java": 8,
 }

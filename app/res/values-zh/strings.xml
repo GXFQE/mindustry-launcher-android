@@ -410,6 +410,7 @@
     <string name="slot_err_missing_fmt">槽「%1$s」不存在</string>
     <string name="slot_err_target_current_fmt">目标名「%1$s」是当前槽，不能占用</string>
     <string name="slot_err_rename_failed_fmt">改名失败（%1$s → %2$s）</string>
+    <string name="slot_err_copy_failed_fmt">复制槽 %1$s 的数据失败</string>
     <!-- 只留给「永久删除」那条路（deleteSlotForever 仍拒绝当前槽：不可逆的动作保留更严的门禁） -->
     <string name="slot_err_delete_current_fmt">「%1$s」是当前槽，正被游戏使用，不能删除。</string>
     <string name="slot_err_game_running_fmt">槽「%1$s」的游戏实例正在运行，现在改会被它覆盖 —— 请先退出那个游戏再改。</string>

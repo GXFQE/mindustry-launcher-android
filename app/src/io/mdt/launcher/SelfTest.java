@@ -5350,6 +5350,8 @@ public final class SelfTest {
         pluginV49(ctx, L, stat);
         // ★ v50：启动项（行）的写（第 408 轮）
         pluginV50(ctx, L, stat);
+        // ★ v51：槽与内容文件（第 410 轮）
+        pluginV51(ctx, L, stat);
     }
 
     /**
@@ -5373,8 +5375,8 @@ public final class SelfTest {
     private static void pluginV43(android.content.Context ctx, List<String> L, int[] stat) {
         L.add("");
         L.add("【v43 · 插件下载 / 模组写 / 网络扩充（第 378 轮）】");
-        ok(stat, L, PluginHost.API == 50 && PluginApi.DOC_VERSION == 50,
-                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 50（v50 起）");
+        ok(stat, L, PluginHost.API == 51 && PluginApi.DOC_VERSION == 51,
+                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 51（v51 起）");
 
         boolean shape = true;
         try {
@@ -5872,8 +5874,8 @@ public final class SelfTest {
     private static void pluginV45(android.content.Context ctx, List<String> L, int[] stat) {
         L.add("");
         L.add("【v45 · 启动否决 + 身份（第 394 轮）】");
-        ok(stat, L, PluginHost.API == 50 && PluginApi.DOC_VERSION == 50,
-                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 50（v50 起）");
+        ok(stat, L, PluginHost.API == 51 && PluginApi.DOC_VERSION == 51,
+                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 51（v51 起）");
 
         boolean shape = true;
         try {
@@ -6011,8 +6013,8 @@ public final class SelfTest {
     private static void pluginV48(Context ctx, List<String> L, int[] stat) {
         L.add("");
         L.add("【v48 · 插件立刻启动实例（第 395 轮）】");
-        ok(stat, L, PluginHost.API == 50 && PluginApi.DOC_VERSION == 50,
-                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 50（v50 起）");
+        ok(stat, L, PluginHost.API == 51 && PluginApi.DOC_VERSION == 51,
+                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 51（v51 起）");
 
         boolean shape = true;
         try {
@@ -6069,8 +6071,8 @@ public final class SelfTest {
     private static void pluginV49(Context ctx, List<String> L, int[] stat) {
         L.add("");
         L.add("【v49 · 带着联机地址启动（第 396 轮）】");
-        ok(stat, L, PluginHost.API == 50 && PluginApi.DOC_VERSION == 50,
-                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 50（v50 起）");
+        ok(stat, L, PluginHost.API == 51 && PluginApi.DOC_VERSION == 51,
+                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 51（v51 起）");
 
         boolean shape = true;
         try {
@@ -6114,8 +6116,8 @@ public final class SelfTest {
     private static void pluginV50(Context ctx, List<String> L, int[] stat) {
         L.add("");
         L.add("【v50 · 启动项（行）的写：加行 / 换槽 / 起名 / 挪位 / 删行（第 408 轮）】");
-        ok(stat, L, PluginHost.API == 50 && PluginApi.DOC_VERSION == 50,
-                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 50（v50 起）");
+        ok(stat, L, PluginHost.API == 51 && PluginApi.DOC_VERSION == 51,
+                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 51（v51 起）");
 
         boolean shape = true;
         String miss = "";
@@ -6183,6 +6185,119 @@ public final class SelfTest {
                         && "k".equals(Versions.instanceVkey("k\u0000s"))
                         && "s".equals(Versions.instanceSlot("k\u0000s")),
                 "行身份：instanceKey / instanceVkey / instanceSlot 三个函数互逆（门禁用同一套键）");
+    }
+
+    /**
+     * 第 410 轮（v51）：**槽与内容文件** —— 建 / 改名 / 克隆 / 进中转站 / 改文件名。
+     *
+     * <p>这一组真的动盘，所以每条都断言"目标在不在、源还在不在"，全在一次性槽上做；
+     * 结尾把造出来的槽（含中转站容器）清掉，不给下一轮留垃圾。
+     */
+    private static void pluginV51(Context ctx, List<String> L, int[] stat) {
+        L.add("");
+        L.add("【v51 · 槽与内容文件：建 / 改名 / 克隆 / 进中转站 / 改文件名（第 410 轮）】");
+        ok(stat, L, PluginHost.API == 51 && PluginApi.DOC_VERSION == 51,
+                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 51");
+
+        boolean shape = true;
+        String miss = "";
+        try {
+            PluginApi.class.getMethod("newSlot", String.class, PluginApi.Done.class);
+            PluginApi.class.getMethod("renameSlot", String.class, String.class, PluginApi.Done.class);
+            PluginApi.class.getMethod("cloneSlotData", String.class, String.class,
+                    PluginApi.Done.class);
+            PluginApi.class.getMethod("trashSlot", String.class, PluginApi.Done.class);
+            PluginApi.class.getMethod("renameItem", ItemInfo.class, String.class,
+                    PluginApi.Done.class);
+        } catch (Throwable t) {
+            shape = false;
+            miss = String.valueOf(t);
+        }
+        ok(stat, L, shape,
+                "接口面：newSlot / renameSlot / cloneSlotData / trashSlot / renameItem 都在"
+                        + (shape ? "" : "（" + miss + "）"));
+
+        final String A = "st-v51-a";
+        final String B = "st-v51-b";
+        final String C = "st-v51-c";
+        for (String s : new String[]{A, B, C}) Data.deleteSlotForever(ctx, s);
+
+        int c1 = Data.createSlotCode(ctx, A);
+        int c2 = Data.createSlotCode(ctx, A);
+        int c3 = Data.createSlotCode(ctx, "../nope");
+        int c4 = Data.renameSlotCode(ctx, A, "../nope");
+        ok(stat, L, c1 == Data.SLOT_OK && c2 == Data.SLOT_EXISTS && c3 == Data.SLOT_BAD_NAME
+                        && c4 == Data.SLOT_BAD_NAME,
+                "newSlot 的码：新建 OK / 已存在 EXISTS / 名字非法 BAD_NAME（建与改名都拒改名漂移）");
+
+        // 源槽里放一份"存档"（renameItem 只看后缀；内容不需要是真档案）
+        boolean made = false;
+        try {
+            File demo = new File(Data.savesDirOf(ctx, A), "demo.msav");
+            write(demo, "hello".getBytes("UTF-8"));
+            made = demo.isFile();
+        } catch (IOException e) {
+            L.add("  · 写夹具失败：" + e);
+        }
+        ok(stat, L, made, "夹具：槽 A 的 saves/ 里放了一份 demo.msav");
+
+        int k1 = SlotOps.cloneCore(ctx, A, B);
+        int k2 = SlotOps.cloneCore(ctx, A, B);
+        File aDemo = new File(new File(Data.dirOf(ctx, A), "saves"), "demo.msav");
+        File bDemo = new File(new File(Data.dirOf(ctx, B), "saves"), "demo.msav");
+        ok(stat, L, k1 == Data.SLOT_OK && bDemo.isFile() && bDemo.length() == 5
+                        && aDemo.isFile() && k2 == Data.SLOT_EXISTS,
+                "cloneSlotData：整槽复制（含 saves 里的文件）/ 源一个字节没动 / 目标已存在 ⇒ EXISTS");
+
+        SlotOps.Renamed ren = SlotOps.renameCore(ctx, A, C);
+        ok(stat, L, ren.code == Data.SLOT_OK
+                        && Data.dirOf(ctx, C).isDirectory() && !Data.dirOf(ctx, A).exists(),
+                "renameSlot：目录改名（源没了 / 新名字在）");
+
+        File cDemo = new File(new File(Data.dirOf(ctx, C), "saves"), "demo.msav");
+        ItemInfo saveItem = new ItemInfo(ItemInfo.KIND_SAVES, "demo.msav", "",
+                cDemo.getAbsolutePath(), null, null, cDemo.length(), cDemo.lastModified(),
+                "slot", null, false, true, null);
+        io.mdt.launcher.api.Result r1 = SlotOps.renameItemNow(ctx, saveItem, "demo2");
+        File renamed = new File(cDemo.getParentFile(), "demo2.msav");
+        ok(stat, L, r1.ok && renamed.isFile() && !cDemo.exists(),
+                "renameItem：没带后缀 ⇒ 自动补 .msav，原文件已改名");
+
+        ItemInfo renamedItem = new ItemInfo(ItemInfo.KIND_SAVES, "demo2.msav", "",
+                renamed.getAbsolutePath(), null, null, renamed.length(), renamed.lastModified(),
+                "slot", null, false, true, null);
+        io.mdt.launcher.api.Result r2 = SlotOps.renameItemNow(ctx, renamedItem, "demo3.txt");
+        ok(stat, L, !r2.ok && "invalid".equals(r2.reason),
+                "renameItem：换后缀（.msav → .txt）⇒ invalid");
+
+        File other = new File(renamed.getParentFile(), "other.msav");
+        boolean otherOk = false;
+        try {
+            write(other, "zz".getBytes("UTF-8"));
+            otherOk = other.isFile();
+        } catch (IOException ignored) {
+        }
+        io.mdt.launcher.api.Result r3 = SlotOps.renameItemNow(ctx, renamedItem, "other");
+        ItemInfo modsItem = new ItemInfo(ItemInfo.KIND_MODS, "x", "",
+                renamed.getAbsolutePath(), null, null, renamed.length(), 0L,
+                "", null, false, true, null);
+        io.mdt.launcher.api.Result r4 = SlotOps.renameItemNow(ctx, modsItem, "y.msav");
+        ok(stat, L, otherOk && !r3.ok && "exists".equals(r3.reason)
+                        && !r4.ok && "invalid".equals(r4.reason),
+                "renameItem：目标已存在 ⇒ exists / 模组（名字不是文件名）⇒ invalid");
+
+        String def = Config.get().defaultSlot();
+        if (def == null || def.isEmpty()) def = Data.SLOT_DEFAULT;
+        Trash.Result tDef = SlotOps.trashCore(ctx, def);
+        Trash.Result tC = SlotOps.trashCore(ctx, C);
+        ok(stat, L, !tDef.ok && tDef.errCode == Trash.Result.T_DEFAULT_SLOT,
+                "trashSlot：默认槽不许删 ⇒ T_DEFAULT_SLOT");
+        ok(stat, L, tC.ok && !Data.dirOf(ctx, C).exists(),
+                "trashSlot：整槽进中转站（目录已挪走，能从中转站放回来）");
+
+        // 收尾：把造出来的槽与那个中转站容器清掉（容器是本轮的测试产物，不是用户数据）
+        Data.deleteSlotForever(ctx, B);
+        if (tC.dest != null) Data.deleteTree(tC.dest);
     }
 
     /**

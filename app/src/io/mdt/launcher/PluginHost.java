@@ -152,7 +152,7 @@ public final class PluginHost {
      * 联机地址 `host:port` 带进游戏（宿主拼 `mindustry://`，游戏在 `ClientLoadEvent` 弹它自己的
      * 「要连接到 xxx 吗」确认框）。只接受 `host:port`，不收完整 URI。
      */
-    public static final int API = 50;
+    public static final int API = 51;
     /**
      * 还认的**最老**契约版本。
      *
@@ -1861,6 +1861,84 @@ public final class PluginHost {
                     || r.errCode == Trash.Result.T_CURRENT_SLOT
                     || r.errCode == Trash.Result.T_BAD_NAME) return "invalid";
             return "io";
+        }
+
+        // ---- v51（第 410 轮）：槽与内容文件 ---------------------------------
+
+        @Override public void newSlot(String slot, final Done done) {
+            postDone(done, slotResult(Data.createSlotCode(getBaseContext(), slot)));
+        }
+
+        @Override public void renameSlot(String oldSlot, String newSlot, final Done done) {
+            int code = SlotOps.renameCore(getBaseContext(),
+                    oldSlot == null ? "" : oldSlot.trim(),
+                    newSlot == null ? "" : newSlot.trim()).code;
+            postDone(done, slotResult(code));
+        }
+
+        @Override public void cloneSlotData(String srcSlot, String dstSlot, final Done done) {
+            final Context c = getBaseContext();
+            final String src = srcSlot == null ? "" : srcSlot.trim();
+            final String dst = dstSlot == null ? "" : dstSlot.trim();
+            // 整槽可能几十 MB（模组 / 地图）⇒ 后台线程；回调仍由 postDone 切回主线程
+            new Thread(new Runnable() {
+                @Override public void run() {
+                    postDone(done, slotResult(SlotOps.cloneCore(c, src, dst)));
+                }
+            }, "plugin-slot-clone").start();
+        }
+
+        @Override public void trashSlot(String slot, final Done done) {
+            final Context c = getBaseContext();
+            final String name = slot == null ? "" : slot.trim();
+            // 跨分区搬目录（中转站）⇒ 后台线程
+            new Thread(new Runnable() {
+                @Override public void run() {
+                    Trash.Result r;
+                    try {
+                        r = SlotOps.trashCore(c, name);
+                    } catch (Throwable t) {
+                        r = null;
+                    }
+                    postDone(done, (r != null && r.ok) ? Result.ok() : Result.fail(trashSlotReason(r)));
+                }
+            }, "plugin-slot-trash").start();
+        }
+
+        @Override public void renameItem(ItemInfo item, String newName, final Done done) {
+            postDone(done, SlotOps.renameItemNow(getBaseContext(), item, newName));
+        }
+
+        /** Data.SLOT_* → 插件 reason（码表只有一份，见 {@link Data#createSlotCode}）。 */
+        private static Result slotResult(int code) {
+            switch (code) {
+                case Data.SLOT_OK:            return Result.ok();
+                case Data.SLOT_BAD_NAME:      return Result.fail("invalid");
+                case Data.SLOT_EXISTS:
+                case Data.SLOT_TARGET_CURRENT: return Result.fail("exists");
+                case Data.SLOT_MISSING:       return Result.fail("not-found");
+                case Data.SLOT_GAME_RUNNING:  return Result.fail("game-running");
+                case Data.SLOT_NO_EXTERNAL:
+                case Data.SLOT_MKDIR_FAILED:
+                case Data.SLOT_RENAME_FAILED:
+                case Data.SLOT_POINTER_FAILED:
+                case Data.SLOT_COPY_FAILED:   return Result.fail("io");
+                default:                      return Result.fail("io");
+            }
+        }
+
+        /** 中转站删槽的码 → 插件 reason（`in-use` / `default-slot` 是"用户能处理"的两种失败）。 */
+        private static String trashSlotReason(Trash.Result r) {
+            if (r == null) return "io";
+            switch (r.errCode) {
+                case Trash.Result.T_IN_USE:        return "in-use";
+                case Trash.Result.T_DEFAULT_SLOT:  return "default-slot";
+                case Trash.Result.T_GAME_RUNNING:  return "game-running";
+                case Trash.Result.T_NO_TARGET:
+                case Trash.Result.T_NOT_IN_TRASH:  return "not-found";
+                case Trash.Result.T_CURRENT_SLOT:  return "invalid";
+                default:                           return "io";
+            }
         }
 
         // ---- v15 ---------------------------------------------------------

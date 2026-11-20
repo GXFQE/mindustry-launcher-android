@@ -372,6 +372,23 @@ public final class Data {
     }
 
     /**
+     * 严格版 {@link #sanitizeSlot} —— 名字里**会被静默改写**的东西一律当不合法。
+     *
+     * `sanitizeSlot` 会把 `/` `\` 换成 `_`、剔掉控制字符（历史行为，界面输入框靠它"救一下"）；
+     * 但那等于替用户改名字。**需要"名字就是调用方说的那个名字"的入口（建槽 / 改名的结果码、
+     * 插件 API）用这一版** —— `null` ⇒ 调用方报「名字不合法」。只允许首尾空白被 trim。
+     *
+     * 第 410 轮加：自检拿 `"../nope"` 试 `createSlotCode` 时发现它被悄悄建成 `.._nope`
+     * （插件会以为新槽叫 `../nope`，`slots()` 里却查不到 —— 名字漂移）。
+     */
+    public static String sanitizeSlotStrict(String raw) {
+        String n = sanitizeSlot(raw);
+        if (n == null) return null;
+        String t = raw == null ? "" : raw.trim();
+        return n.equals(t) ? n : null;
+    }
+
+    /**
      * 磁盘上存在的槽名（按名字排序）。
      * ★ F0 后当前槽**也在这个列表里**（它的本体就是 `slot-<当前名>`）。
      *   调用方 {@link #allSlots} 会把"当前槽"排到最前并从本列表里跳过，不重复。
@@ -441,54 +458,105 @@ public final class Data {
 
     // ── 槽的增 / 改 / 删 ──────────────────────────────────────────────────
 
+    /**
+     * 槽操作的结果码。**判断只有一份实现**（下面的 `*Code`），界面拿码翻文案
+     * （{@link #slotErrText}），插件接口直接拿码翻成自己的 reason —— 别再各拼一套判断。
+     */
+    public static final int SLOT_OK = 0;
+    public static final int SLOT_BAD_NAME = 1;
+    public static final int SLOT_NO_EXTERNAL = 2;
+    public static final int SLOT_EXISTS = 3;
+    public static final int SLOT_MKDIR_FAILED = 4;
+    public static final int SLOT_MISSING = 5;
+    public static final int SLOT_GAME_RUNNING = 6;
+    public static final int SLOT_TARGET_CURRENT = 7;
+    public static final int SLOT_RENAME_FAILED = 8;
+    public static final int SLOT_POINTER_FAILED = 9;
+    public static final int SLOT_COPY_FAILED = 10;
+
+    /**
+     * 新建槽 —— 返回结果码。
+     * ★ 当前槽不算"新建"：它的本体就是 `slot-<当前名>`，由启动时按需 mkdirs；
+     *   这里**故意不 mkdirs**（F6 的教训：只读探测造出的空目录会被下一轮当成"有内容"）。
+     */
+    public static int createSlotCode(Context ctx, String rawName) {
+        String n = sanitizeSlotStrict(rawName);
+        if (n == null) return SLOT_BAD_NAME;
+        File d = slotDir(ctx, n);
+        if (d == null) return SLOT_NO_EXTERNAL;
+        if (n.equals(currentSlot(ctx))) return SLOT_OK;
+        if (d.exists()) return SLOT_EXISTS;
+        if (!d.mkdirs()) return SLOT_MKDIR_FAILED;
+        Log.i(TAG, "slot created: " + d);
+        return SLOT_OK;
+    }
+
     /** 失败返回错误文本，成功返回 null（文本走资源 —— 见 `slot_err_*`） */
     public static String createSlot(Context ctx, String rawName) {
+        int code = createSlotCode(ctx, rawName);
+        if (code == SLOT_OK) return null;
         String n = sanitizeSlot(rawName);
-        if (n == null) {
-            return Trans.get(ctx, R.string.slot_err_name_invalid);
+        return slotErrText(ctx, code, n == null ? rawName : n, null);
+    }
+
+    /** 结果码 → 用户可读文案（**唯一**的码表实现；插件不走这里，它要码不要字）。 */
+    public static String slotErrText(Context ctx, int code, String name, String newName) {
+        switch (code) {
+            case SLOT_BAD_NAME:
+                return Trans.get(ctx, R.string.slot_err_name_invalid);
+            case SLOT_NO_EXTERNAL:
+                return Trans.get(ctx, R.string.slot_err_no_external);
+            case SLOT_EXISTS:
+                return Trans.get(ctx, R.string.slot_err_exists_fmt, name);
+            case SLOT_MKDIR_FAILED: {
+                File d = slotDir(ctx, name);
+                return Trans.get(ctx, R.string.slot_err_mkdir_fmt,
+                        d == null ? name : d.getAbsolutePath());
+            }
+            case SLOT_MISSING:
+                return Trans.get(ctx, R.string.slot_err_missing_fmt, name);
+            case SLOT_GAME_RUNNING:
+                return Trans.get(ctx, R.string.slot_err_game_running_fmt, name);
+            case SLOT_TARGET_CURRENT:
+                return Trans.get(ctx, R.string.slot_err_target_current_fmt,
+                        newName == null ? name : newName);
+            case SLOT_RENAME_FAILED:
+                return Trans.get(ctx, R.string.slot_err_rename_failed_fmt,
+                        SLOT_PREFIX + name, SLOT_PREFIX + newName);
+            case SLOT_POINTER_FAILED:
+                return Trans.get(ctx, R.string.slot_err_rename_pointer_fmt, name);
+            case SLOT_COPY_FAILED:
+                return Trans.get(ctx, R.string.slot_err_copy_failed_fmt, name);
+            default:
+                return null;
         }
-        File d = slotDir(ctx, n);
-        if (d == null) return Trans.get(ctx, R.string.slot_err_no_external);
-        // 当前槽不算"新建"：它的本体就是 slot-<当前名>，由启动时按需 mkdirs。
-        // ⚠️ 这里**故意不 mkdirs** —— F6 的教训：只读探测造出的空目录会被下一轮当成"有内容"。
-        if (n.equals(currentSlot(ctx))) return null;
-        if (d.exists()) return Trans.get(ctx, R.string.slot_err_exists_fmt, n);
-        if (!d.mkdirs()) return Trans.get(ctx, R.string.slot_err_mkdir_fmt, d.getAbsolutePath());
-        Log.i(TAG, "slot created: " + d);
-        return null;
     }
 
     /**
-     * 改名。**当前槽也可以改**（2026-11-20 第 409 轮）：当前槽只是"上次启动落在哪个槽"的指针，
+     * 改名 —— 返回结果码（{@link #SLOT_OK} 起）。
+     *
+     * **当前槽也可以改**（2026-11-20 第 409 轮）：当前槽只是"上次启动落在哪个槽"的指针，
      * 目录改名之后把指针改成新名字即可 —— 不写指针的话读侧会因为 `slot-&lt;旧名&gt;` 不存在而
      * 静默退回 default（第 177 轮「存档像没了」的同族事故）。
      *
      * <p>仍然拒绝：这个槽的实例正在跑（{@link WriteGate}）；目标名是**别的**槽的名字；
      * 目标名恰好是当前槽名（那只发生在改的是另一槽时 —— 否则指针会指到一份从没启动过的数据）。
      */
-    public static String renameSlot(Context ctx, String name, String rawNewName) {
-        String n = sanitizeSlot(rawNewName);
-        if (n == null) {
-            return Trans.get(ctx, R.string.slot_err_name_invalid);
-        }
-        if (n.equals(name)) return null;
+    public static int renameSlotCode(Context ctx, String name, String rawNewName) {
+        String n = sanitizeSlotStrict(rawNewName);
+        if (n == null) return SLOT_BAD_NAME;
+        if (n.equals(name)) return SLOT_OK;
         // 2026-11-12（第 359 轮）：按**运行实例**判（多开前置；见 WriteGate）
-        if (WriteGate.blockedSlot(ctx, name)) {
-            return Trans.get(ctx, R.string.slot_err_game_running_fmt, name);
-        }
+        if (WriteGate.blockedSlot(ctx, name)) return SLOT_GAME_RUNNING;
         File from = slotDir(ctx, name);
-        if (from == null || !from.exists()) return Trans.get(ctx, R.string.slot_err_missing_fmt, name);
+        if (from == null || !from.exists()) return SLOT_MISSING;
         // ★ 必须在 renameTo **之前**取：目录一挪走，读侧就按"目录不存在"把这个名字判成悬空，
         //   currentSlot() 会直接退回 default —— 之后再也认不出"刚才改的是当前槽"。
         boolean wasCurrent = name.equals(currentSlot(ctx));
-        if (n.equals(currentSlot(ctx)) && !wasCurrent) {
-            return Trans.get(ctx, R.string.slot_err_target_current_fmt, n);
-        }
+        if (n.equals(currentSlot(ctx)) && !wasCurrent) return SLOT_TARGET_CURRENT;
         File to = slotDir(ctx, n);
-        if (to.exists()) return Trans.get(ctx, R.string.slot_err_exists_fmt, n);
-        if (!from.renameTo(to)) {
-            return Trans.get(ctx, R.string.slot_err_rename_failed_fmt, from.getName(), to.getName());
-        }
+        if (to.exists()) return SLOT_EXISTS;
+        if (!from.renameTo(to)) return SLOT_RENAME_FAILED;
         if (wasCurrent) {
             try {
                 Paths.writeSlotName(ctx, n);
@@ -497,11 +565,19 @@ public final class Data {
                 // 读侧退回 default，用户看到的是"槽里的东西不见了"）
                 boolean rolled = to.renameTo(from);
                 Log.w(TAG, "slot pointer rewrite failed (rollback=" + rolled + "): " + e);
-                return Trans.get(ctx, R.string.slot_err_rename_pointer_fmt, name);
+                return SLOT_POINTER_FAILED;
             }
         }
         Log.i(TAG, "slot renamed: " + name + " -> " + n);
-        return null;
+        return SLOT_OK;
+    }
+
+    /** 失败返回错误文本，成功返回 null（界面的那条路；插件要码，见 {@link #renameSlotCode}） */
+    public static String renameSlot(Context ctx, String name, String rawNewName) {
+        int code = renameSlotCode(ctx, name, rawNewName);
+        if (code == SLOT_OK) return null;
+        String n = sanitizeSlot(rawNewName);
+        return slotErrText(ctx, code, name, n == null ? rawNewName : n);
     }
 
     /**

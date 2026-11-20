@@ -16,6 +16,10 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import io.mdt.launcher.api.ItemInfo;
+import io.mdt.launcher.api.Result;
+
+import java.io.File;
 import java.util.List;
 
 /**
@@ -589,15 +593,17 @@ final class SlotOps {
                 .setPositiveButton(R.string.rename, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int w) {
                         String nv = input.getText().toString();
-                        String err = Data.renameSlot(a, s.name, nv);
-                        if (err != null) { alert(a, Trans.get(a, R.string.rename_failed), err); return; }
                         String clean = Data.sanitizeSlot(nv);
-                        if (clean != null) {
-                            Backup.renameSlotBackups(a, s.name, clean);
-                            // ★ 返回值是 Retarget（主分配 / 附加绑定分开计数）—— 附加绑定改名后，
-                            //   那个版本的另一行仍然指着新名字（一个版本可以绑多个槽，见 Config.K_VEXTRA）
-                            Config.Retarget r = Config.get().retargetSlots(s.name, clean);
-                            if (r.total() > 0) toast(a, Trans.get(a, R.string.renamed_slots_fmt, r.total()));
+                        Renamed r = renameCore(a, s.name, nv);
+                        if (r.code != Data.SLOT_OK) {
+                            alert(a, Trans.get(a, R.string.rename_failed),
+                                    Data.slotErrText(a, r.code, s.name, clean == null ? nv : clean));
+                            return;
+                        }
+                        // ★ 返回值是 Retarget（主分配 / 附加绑定分开计数）—— 附加绑定改名后，
+                        //   那个版本的另一行仍然指着新名字（一个版本可以绑多个槽，见 Config.K_VEXTRA）
+                        if (r.retarget != null && r.retarget.total() > 0) {
+                            toast(a, Trans.get(a, R.string.renamed_slots_fmt, r.retarget.total()));
                         }
                         h.onSlotChanged();
                     }
@@ -647,15 +653,11 @@ final class SlotOps {
                 //   真机验收时一眼就看出来了（这种自相矛盾比措辞难看严重得多）。
                 .setPositiveButton(R.string.delete_slot_confirm_btn, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int w) {
-                        Trash.Result r = Trash.trashSlot(a, s.name, Backup.rootDir(a));
+                        Trash.Result r = trashCore(a, s.name);
                         if (!r.ok) {
                             alert(a, Trans.get(a, R.string.delete_failed),
                                     TrashText.reason(a, r));
                         } else {
-                            // ★ 行绑定那一半已被门禁挡住（还有启动项就不许删），这里 retarget 只为清掉
-                            //   **按槽存**的三处记录（自动备份策略 / 默认槽 / 手工顺序里的附加行键）。
-                            //   以前这里还会 toast「回落 N / 消失 N」—— 那两种情况现在都进不来，删掉。
-                            Config.get().retargetSlots(s.name, "");
                             Toast.makeText(a, Trans.get(a, R.string.slot_deleted_fmt, s.name),
                                     Toast.LENGTH_LONG).show();
                         }
@@ -664,6 +666,114 @@ final class SlotOps {
                 })
                 .setNegativeButton(R.string.cancel, null)
                 .show();
+    }
+
+    // ── 复合动作（界面与插件接口共用一份） ────────────────────────────────
+
+    /** 改名的结果：`code == Data.SLOT_OK` 时 `retarget` 是本次迁移计数（可能为 null）。 */
+    static final class Renamed {
+        final int code;
+        final Config.Retarget retarget;
+
+        Renamed(int code, Config.Retarget retarget) {
+            this.code = code;
+            this.retarget = retarget;
+        }
+    }
+
+    /**
+     * 改槽：目录改名（含当前槽指针重写）+ 备份跟着搬 + 三处记录迁移。
+     * 界面与插件**都走这一个** —— 少一步就会出现"备份还在旧名字下"或"默认槽指着旧名字"。
+     */
+    static Renamed renameCore(Context c, String from, String rawTo) {
+        int code = Data.renameSlotCode(c, from, rawTo);
+        if (code != Data.SLOT_OK) return new Renamed(code, null);
+        String to = Data.sanitizeSlot(rawTo);
+        if (to == null) return new Renamed(Data.SLOT_BAD_NAME, null); // 到不了；防御
+        Backup.renameSlotBackups(c, from, to);
+        return new Renamed(Data.SLOT_OK, Config.get().retargetSlots(from, to));
+    }
+
+    /** 删槽到中转站 + 清掉按槽存的三处记录（界面的那条成功路径）。 */
+    static Trash.Result trashCore(Context c, String name) {
+        Trash.Result r = Trash.trashSlot(c, name, Backup.rootDir(c));
+        if (r.ok) Config.get().retargetSlots(name, "");
+        return r;
+    }
+
+    /**
+     * 克隆整槽（连同 `settings.bin`；备份树与缓存不搬、也不进 `Work` —— 进度归调用方）。
+     * 返回 {@link Data#SLOT_OK} 或 BAD_NAME / NO_EXTERNAL / MISSING / EXISTS / GAME_RUNNING / COPY_FAILED。
+     */
+    static int cloneCore(Context c, String from, String rawTo) {
+        final String to = Data.sanitizeSlot(rawTo);
+        if (to == null || to.equals(from)) return Data.SLOT_BAD_NAME;
+        File src = Data.slotDir(c, from);
+        if (src == null || !src.isDirectory()) return Data.SLOT_MISSING;
+        if (WriteGate.blockedSlot(c, from)) return Data.SLOT_GAME_RUNNING;
+        File dst = Data.slotDir(c, to);
+        if (dst == null) return Data.SLOT_NO_EXTERNAL;
+        if (dst.exists()) return Data.SLOT_EXISTS;
+        if (!Trash.copyTree(src, dst)) {
+            Data.deleteTree(dst);
+            return Data.SLOT_COPY_FAILED;
+        }
+        return Data.SLOT_OK;
+    }
+
+    /**
+     * v51：改一个**内容文件**的磁盘名（只动文件名，不改内容 / 内部元数据）。
+     *
+     * <p>只认槽里的真实文件：存档（{@code .msav}）、槽内地图（{@code .msav}）、蓝图（{@code .msch}）。
+     * 模组（显示名不是文件名）、游戏 APK / 模组包里的条目、目录 ⇒ {@code invalid}。
+     * 新名字没带后缀就补原后缀；后缀不同 ⇒ {@code invalid}（别把存档改成别的类型）。
+     */
+    static Result renameItemNow(Context c, ItemInfo item, String rawNew) {
+        if (item == null || item.path == null || item.directory) return Result.fail("invalid");
+        String kind = item.kind == null ? "" : item.kind;
+        final String expect;
+        if (ItemInfo.KIND_SAVES.equals(kind)) expect = ".msav";
+        else if (ItemInfo.KIND_MAPS.equals(kind)) expect = ".msav";
+        else if (ItemInfo.KIND_BLUEPRINTS.equals(kind)) expect = ".msch";
+        else return Result.fail("invalid");
+        // 游戏 APK / 模组包里的条目没有可改的真实文件（改的是磁盘名，不是容器条目名）
+        if (item.container != null && !item.container.isEmpty()) return Result.fail("invalid");
+        if (item.entry != null && !item.entry.isEmpty()) return Result.fail("invalid");
+        final File f = new File(item.path);
+        if (!f.isFile()) return Result.fail("invalid");
+        if (!f.getName().toLowerCase(java.util.Locale.ROOT).endsWith(expect)) {
+            return Result.fail("invalid");
+        }
+        String slot = null;
+        try {
+            final String path = f.getCanonicalPath();
+            for (String s : Data.slotNames(c)) {
+                File root = Data.dirOf(c, s);
+                if (root == null) continue;
+                if (path.startsWith(root.getCanonicalPath() + File.separator)) { slot = s; break; }
+            }
+        } catch (Throwable t) {
+            return Result.fail("io");
+        }
+        if (slot == null) return Result.fail("invalid");
+        if (WriteGate.blockedSlot(c, slot)) return Result.fail("game-running");
+        String name = rawNew == null ? "" : rawNew.trim();
+        if (name.isEmpty() || name.length() > 100) return Result.fail("invalid");
+        if (".".equals(name) || "..".equals(name)) return Result.fail("invalid");
+        if (name.indexOf('/') >= 0 || name.indexOf('\\') >= 0) return Result.fail("invalid");
+        for (int i = 0; i < name.length(); i++) {
+            char ch = name.charAt(i);
+            if (ch < 0x20 || ch == 0x7f) return Result.fail("invalid");
+        }
+        if (name.indexOf('.') < 0) {
+            name = name + expect;
+        } else if (!name.substring(name.lastIndexOf('.')).equalsIgnoreCase(expect)) {
+            return Result.fail("invalid");
+        }
+        File to = new File(f.getParentFile(), name);
+        if (to.exists()) return Result.fail("exists");
+        if (!f.renameTo(to)) return Result.fail("io");
+        return Result.ok();
     }
 
     // ── 选槽（放东西进哪个槽） ────────────────────────────────────────────

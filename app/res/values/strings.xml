@@ -417,6 +417,7 @@
     <string name="slot_err_missing_fmt">Slot \"%1$s\" does not exist</string>
     <string name="slot_err_target_current_fmt">The target name \"%1$s\" is the current slot and cannot be taken over</string>
     <string name="slot_err_rename_failed_fmt">Rename failed (%1$s → %2$s)</string>
+    <string name="slot_err_copy_failed_fmt">Could not copy the data of slot %1$s</string>
     <string name="slot_err_rename_pointer_fmt">Renamed, but could not point the \"last launch\" record at the new name (%1$s). Launch once from the new name to fix that.</string>
     <string name="slot_err_delete_current_fmt">\"%1$s\" is the current slot and the game is using it, so it cannot be deleted.</string>
     <string name="slot_err_game_running_fmt">Slot \"%1$s\" has a game instance running, so this change would be overwritten. Exit that game first.</string>

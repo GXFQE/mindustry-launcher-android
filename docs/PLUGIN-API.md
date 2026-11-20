@@ -5,7 +5,7 @@
 
 ## 1. 版本与兼容（v20 冻结基线）
 
-- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..50**。
+- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..51**。
   （v20 是冻结基线；v21 = 游戏设置面；v22 = 后台任务 + 游戏事件；v23 = 探针；v24 = 分析器；
   v25 = 结论挂行 + 筛选/排序注入 + HJSON；v26 = 逐项判定；v27 = 详情页的门 + 槽级结论进摘要卡；
   v28 = 原版文案键；v29 = 游戏前后台事件；v30 = 探针知道版本 / 跨会话数据目录 + 摘要卡总时长；
@@ -88,6 +88,11 @@
   —— 行身份就是 `versions()` 的 (`extra.key`, `extra.slot`)，加行 / 换槽 / 起名 / 挪位 / 删行。
   只写宿主 config（哪一行绑哪个槽、叫什么、排第几），**不动槽里的文件**；唯一动盘的是 `deleteRow`
   的"最后一行 + 导入版"（整个版本进中转站，与界面同一条路）。`versions()` 从此**按主页顺序**返回。
+  `API_MIN` 仍不动。
+  **v51 = 槽与内容文件**：`newSlot` / `renameSlot` / `cloneSlotData` / `trashSlot` / `renameItem`
+  —— 这一组**真的动盘**：建空槽、槽改名（含当前槽，指针一起改）、整槽克隆、整槽进中转站、
+  改槽内内容文件的磁盘名。槽改名会一次做完"目录 + 备份目录 + 默认槽 / 备份策略 / 手工顺序"；
+  删槽的门禁与界面同源（默认槽 `default-slot` / 还有启动项 `in-use` / 实例在跑 `game-running`）。
   `API_MIN` 仍不动。
 - 插件 `api()` 报的是「我需要的最低宿主接口版本」。用不到的新能力**不要**报高 ——
   报高了只会在老宿主上被拒，换不来任何东西。
@@ -176,7 +181,7 @@
 ## 3. 入口类约定
 
 ```java
-public static int api();                        // 必需：你需要的接口版本（当前 50；用不到新能力就报 20）
+public static int api();                        // 必需：你需要的接口版本（当前 51；用不到新能力就报 20）
 public static View createView(PluginApi api);   // content / section 用
 public static void run(PluginApi api);          // action 用（在原页跑，不换页）
 public static void unload();                    // 可选：收尾（也认 unload(Context)）
@@ -196,7 +201,7 @@ public static void unload();                    // 可选：收尾（也认 unlo
 
 | 方法 | 说明 |
 |---|---|
-| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 50） |
+| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 51） |
 | `context()` | 插件上下文（**只用来取资源 / 主题 / 建 View**） |
 | `page()` / `slot()` | 从哪一页来 / 当前槽名 |
 | `theme()` | 主题色与 dp/sp（别自己写死颜色，见 `PluginTheme`） |
@@ -899,6 +904,24 @@ String json = api.parseHjson(file);   // 标准 JSON 文本；失败/读不了 �
   这只动宿主自己的记录，**不碰**游戏侧 `launchid.dat` / `settings.bin` / 崩溃报告。
 - **槽本身的新增 / 改名 / 删除、以及内容文件改名**：v50 都没有（槽的增删改仍在宿主界面；v51 另说）。
 
+**v51 槽与内容文件**（`newSlot` / `renameSlot` / `cloneSlotData` / `trashSlot` / `renameItem`）：
+
+| 方法 | 说明 |
+|---|---|
+| `newSlot(slot, Done)` | 新建**空槽**；已存在 ⇒ `exists`（不"复用旧数据"） |
+| `renameSlot(oldSlot, newSlot, Done)` | 槽改名；**当前槽也能改**（指针一起改）；备份目录、默认槽、备份策略、手工顺序里的附加行键一起迁 |
+| `cloneSlotData(srcSlot, dstSlot, Done)` | 克隆整槽（含 `settings.bin`；备份树 / 缓存不搬）；后台线程，回调回主线程 |
+| `trashSlot(slot, Done)` | 槽挪进**中转站**（可恢复）；默认槽 ⇒ `default-slot`，还有启动项落着 ⇒ `in-use`，实例在跑 ⇒ `game-running` |
+| `renameItem(item, newName, Done)` | 改槽内内容文件的磁盘名（saves / 槽内地图 / blueprints）；模组 / 包内条目 / 换后缀 ⇒ `invalid` |
+
+- 失败码：`invalid` / `exists` / `not-found` / `game-running` / `in-use` / `default-slot` / `io`。
+- `trashSlot` **允许删当前槽**（成功后清「上次启动」指针）；删完宿主同时清掉按这个槽名存的记录
+  （自动备份策略 / 默认槽 / 手工顺序里的附加行键）。
+- `renameItem` 的新名字没带后缀 ⇒ 自动补原后缀；目标已存在 ⇒ `exists`；只动文件名，不改内容 / 内部元数据。
+- **名字不会被静默改写**：带 `/` `\`、控制字符、`shared`、`slot-` 前缀、`.`/`..`、超 40 字的槽名
+  ⇒ `invalid`（宿主界面那条老路也改成同一套判据 —— 以前会把 `/` 换成 `_` 悄悄建成另一个名字）。
+- 内容文件的删除仍走 v16 的 `trashItem`（进中转站）；v51 没有"复制 / 移动条目"的接口。
+
 ### 游戏设置（v21）
 
 `settings.bin` 的**解析结果**与**安全写**：键的含义归你，格式与安全归宿主。
@@ -963,8 +986,10 @@ public final String reason;  // 机器码；成功恒为 null，失败恒非空
 | `no-page` | 当下没有可用的界面 |
 | `io` | 读写失败 |
 | `invalid` | 参数不合法（null / 类型不对） |
-| `exists`（v35 起） | 目标已经存在（`addItem` 同名 / `setRowSlot` 目标槽已被这个版本绑着） |
+| `exists`（v35 起） | 目标已经存在（`addItem` 同名 / `setRowSlot` 目标槽已被这个版本绑着 / `newSlot` 槽已存在） |
 | `installed`（v50） | 删的是"最后一行 + 已装版"——那份版本在系统里，宿主界面也不给删 |
+| `in-use`（v51） | 这个槽还有启动项落着（`trashSlot`）——先把那几行换槽或删掉 |
+| `default-slot`（v51） | 默认槽不许删（`trashSlot`）——先把默认槽改成别的槽 |
 | `unknown` | 宿主没给具体原因（兜底） |
 
 **v39 网络**（`fetchText` / `githubReleases` / `download`）：
@@ -1338,6 +1363,13 @@ v50（2026-11-20 第 408 轮）：**启动项（行）的写** —— `addLaunch
 （纯 config，不丢文件）；最后一行 + 导入版 ⇒ 整个版本进中转站；最后一行 + 已装版 ⇒ `installed`。
 ★ 写完 config 宿主主动 `MainActivity.rescan()` 一次（`Config.save()` 没有监听器）—— 插件挂在
 主界面的 inline 动作能立刻看到新行。`API_MIN` 仍不动（区间 20..50）。
+v51（2026-11-20 第 410 轮）：**槽与内容文件** —— `newSlot` / `renameSlot` / `cloneSlotData` /
+`trashSlot` / `renameItem`。这一组真的动盘，宿主把"改目录 + 备份目录 + 默认槽 / 备份策略 /
+手工顺序的附加行键"收进一次动作（`SlotOps.renameCore`），界面与插件共用；删槽的门禁也共用
+`Trash.checkSlotRemovable`（默认槽 `default-slot` / 还有启动项 `in-use` / 实例在跑 `game-running`）。
+`renameItem` 只改磁盘文件名（saves / 槽内地图 / blueprints），换后缀 / 模组 / 包内条目一律 `invalid`。
+`Data.createSlot` / `Data.renameSlot` 内部抽成"结果码"（`SLOT_*`），界面翻文案、插件翻 reason ——
+判断只有一份。`API_MIN` 仍不动（区间 20..51）。
 
 **官方体检插件**：`plugins/mods-health`（第 229 轮，前身叫 `conflict`）。宿主原来的那行
 「查模组冲突」整块删掉，判据搬进插件的 `core/Conflicts.java` 与 `core/Gates.java`；

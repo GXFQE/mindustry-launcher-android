@@ -59,7 +59,7 @@ public interface PluginApi {
      * <p>为什么要有这个常量：注释里的「当前 = N」运行期读不到，一个写 17、一个写 20 也没人发现；
      * 常量 + 断言才拦得住。</p>
      */
-    int DOC_VERSION = 50;
+    int DOC_VERSION = 51;
 
     // ══ 环境 ═══════════════════════════════════════════════════════════════
 
@@ -823,6 +823,83 @@ public interface PluginApi {
      *                   {@link Deleted#VERSION}，失败时 scope = {@code null}
      */
     void deleteRow(String versionKey, String slot, Deleted done);
+
+    // ── v51（第 410 轮）：槽与内容文件 ────────────────────────────────────
+    //
+    // 槽 = 一份独立的数据根（存档 / 地图 / 蓝图 / 模组 / 游戏设置）。这一组**真的动盘**，
+    // 所以每条都说清"挪什么、不挪什么"。所有失败都通过 {@link Done} 回一个非空的 reason。
+
+    /**
+     * **v51**：新建一个**空槽**（只是把槽目录建出来，不写任何内容）。
+     *
+     * <p>已经存在 ⇒ {@code exists}：不"复用旧数据" —— 想让插件往一个可能已经有东西的槽里写，
+     * 应该先 {@link #slots()} 看一眼再决定，别把 {@code newSlot} 当"确保存在"。
+     *
+     * @param slot 槽名；1~40 字，不许 {@code shared} / {@code slot-} 前缀 / {@code .} / {@code ..}，
+     *             非法 ⇒ {@code invalid}；没有外部存储 / 建目录失败 ⇒ {@code io}
+     * @param done 主线程回调
+     */
+    void newSlot(String slot, Done done);
+
+    /**
+     * **v51**：给槽改名。**当前槽也能改**（它只是"上次启动落在哪个槽"的指针，宿主会把指针
+     * 改成新名字）。
+     *
+     * <p>跟着改的东西（宿主一次做完，插件不用管）：槽目录、这个槽的备份目录、以及配置里
+     * 按槽名存的记录（默认槽 / 自动备份策略 / 手工顺序里的附加行键）。
+     *
+     * @param oldSlot 现在的名字
+     * @param newSlot 新名字；与 {@code oldSlot} 相同 ⇒ 成功（幂等）
+     * @param done    主线程回调；源槽不存在 ⇒ {@code not-found}；目标已存在 ⇒ {@code exists}；
+     *                名字非法 ⇒ {@code invalid}；该槽有实例在跑 ⇒ {@code game-running}；
+     *                指针写不进去（宿主已回滚目录）⇒ {@code io}
+     */
+    void renameSlot(String oldSlot, String newSlot, Done done);
+
+    /**
+     * **v51**：把一个槽的**数据**克隆到另一个槽（整槽目录，含 {@code settings.bin}；
+     * 备份树与缓存不搬）。
+     *
+     * <p>只复制文件、不启动、也不碰任何"上次启动"记录。几十 MB 的复制在后台线程做，
+     * 回调回主线程 —— 想在界面上显示进度，由插件自己的卡片负责（宿主不弹进度条）。
+     *
+     * @param srcSlot 源槽（必须存在且是一个目录）
+     * @param dstSlot 目标槽（必须**不存在**；与源同名 ⇒ {@code invalid}）
+     * @param done    主线程回调；源不存在 ⇒ {@code not-found}；目标已存在 ⇒ {@code exists}；
+     *                源槽有实例在跑 ⇒ {@code game-running}；复制失败（已清掉半成品）⇒ {@code io}
+     */
+    void cloneSlotData(String srcSlot, String dstSlot, Done done);
+
+    /**
+     * **v51**：把槽挪进**中转站**（可恢复，不是永久删除 —— 与界面上的「删除槽」同一条路）。
+     *
+     * <p>门禁（与界面同源）：**默认槽**不许删 ⇒ {@code default-slot}；还有启动项落在它上面
+     * ⇒ {@code in-use}（先把那几行换槽或删掉）；这个槽有实例在跑 ⇒ {@code game-running}。
+     * 允许删**当前槽**：成功后宿主清掉"上次启动"指针（下次打开就是新装的读法）。
+     *
+     * <p>成功时宿主同时清掉按这个槽名存的记录（自动备份策略 / 默认槽 / 手工顺序里的附加行键）。
+     *
+     * @param slot 槽名；不存在 ⇒ {@code not-found}；不是可挪的槽 ⇒ {@code invalid}
+     * @param done 主线程回调
+     */
+    void trashSlot(String slot, Done done);
+
+    /**
+     * **v51**：改一个**内容文件**的磁盘文件名（只动名字，不改文件内容 / 内部元数据）。
+     *
+     * <p>只支持槽里的真实文件：{@link ItemInfo#KIND_SAVES}（{@code .msav}）、
+     * {@link ItemInfo#KIND_MAPS}（槽里的地图文件）、{@link ItemInfo#KIND_BLUEPRINTS}（{@code .msch}）。
+     * 模组（文件名不是显示名）、游戏自带 / 模组包里的条目、目录 ⇒ {@code invalid}。
+     *
+     * <p>新名字没带后缀 ⇒ 自动补上原后缀；后缀与原来不同 ⇒ {@code invalid}（别把存档改成别的类型）。
+     *
+     * @param item    要改的条目（来自 {@link #contents(String, String)} / {@link #picked()} 等；
+     *                只认 {@code path} 在某个槽目录里的那些）
+     * @param newName 新文件名（不带路径；含 {@code /} / {@code \} / 控制字符或空 ⇒ {@code invalid}）
+     * @param done    主线程回调；这个槽有实例在跑 ⇒ {@code game-running}；目标已存在 ⇒ {@code exists}；
+     *                改名失败 ⇒ {@code io}
+     */
+    void renameItem(ItemInfo item, String newName, Done done);
 
     /**
      * 让用户从**当前槽的某一类内容**里勾选，结果回调给插件。
