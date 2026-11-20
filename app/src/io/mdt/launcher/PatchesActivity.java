@@ -281,7 +281,11 @@ public final class PatchesActivity extends BaseActivity {
                             Trans.get(PatchesActivity.this, R.string.patch_detail_title_fmt,
                                     row.record.label(), row.record.version()));
                     ((TextView) item.findViewById(R.id.patch_item_sub)).setText(
-                            Trans.get(PatchesActivity.this, R.string.patch_row_sub_fmt,
+                            row.record.manifest.isGame()
+                            ? Trans.get(PatchesActivity.this, R.string.patch_row_sub_game_fmt,
+                                    row.targetMatches ? row.classCount : 0,
+                                    PatchText.state(PatchesActivity.this, row.state))
+                            : Trans.get(PatchesActivity.this, R.string.patch_row_sub_fmt,
                                     row.targetMatches ? row.classCount : 0,
                                     PatchText.state(PatchesActivity.this, row.state)));
                     item.setOnClickListener(new View.OnClickListener() {
@@ -333,6 +337,10 @@ public final class PatchesActivity extends BaseActivity {
         final PatchManifest m = rec.manifest;
         StringBuilder body = new StringBuilder();
         body.append(Trans.get(this, R.string.patch_detail_id_fmt, m.id));
+        // 第 403 轮：整端补丁（整份游戏本体）先说明它是什么，再说作者/目标/内容
+        if (m.isGame()) {
+            body.append('\n').append(Trans.get(this, R.string.patch_detail_game_note));
+        }
         if (m.author != null && !m.author.isEmpty()) {
             body.append('\n').append(Trans.get(this, R.string.patch_detail_author_fmt, m.author));
         }
@@ -383,15 +391,20 @@ public final class PatchesActivity extends BaseActivity {
 
     private void startEnable(final CardStack stack, final Row row) {
         // "这会替换游戏代码"只告知一次（全局看一次就够；每次启用都弹就是骚扰）
-        if (!Patches.warned(this)) {
+        // ★ 第 403 轮：整端补丁（整份本体）的告知**另记一笔**（patch_warned_game）——
+        //   它与普通补丁那句强度不同，不能被"以前看过小补丁的告知"吞掉。
+        final boolean game = row.record.manifest.isGame();
+        if (game ? !Patches.warnedGame(this) : !Patches.warned(this)) {
             stack.push(Trans.get(this, R.string.patch_warn_title),
-                    CardStack.text(this, Trans.get(this, R.string.patch_warn_body)),
+                    CardStack.text(this, Trans.get(this, game
+                            ? R.string.patch_warn_game_body : R.string.patch_warn_body)),
                     new CardStack.Btn(Trans.get(this, R.string.patch_cancel), new Runnable() {
                         @Override public void run() { stack.pop(); }
                     }),
                     new CardStack.Btn(Trans.get(this, R.string.patch_warn_ok), new Runnable() {
                         @Override public void run() {
-                            Patches.markWarned(PatchesActivity.this);
+                            if (game) Patches.markWarnedGame(PatchesActivity.this);
+                            else Patches.markWarned(PatchesActivity.this);
                             doEnable(stack, row);
                         }
                     }));

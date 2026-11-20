@@ -38,6 +38,8 @@ final class PatchText {
             PatchException.C_RECORD_GONE,
             PatchException.C_CONFLICT_LAUNCH,
             PatchException.C_CRASH_DISABLED,   // 崩溃后自动停用（第 360 轮）
+            PatchException.C_CRASH_DISABLED_GAME,   // 整端崩了 ⇒ 回退到官方本体（第 403 轮）
+            PatchException.C_GAME_LAYER,            // 整端独占（第 403 轮）
     };
 
     private PatchText() {}
@@ -75,6 +77,12 @@ final class PatchText {
         }
         if (PatchException.C_CRASH_DISABLED.equals(code)) {
             return Trans.get(c, R.string.patch_err_crash_disabled_fmt, d);
+        }
+        if (PatchException.C_CRASH_DISABLED_GAME.equals(code)) {
+            return Trans.get(c, R.string.patch_err_crash_disabled_game_fmt, d);
+        }
+        if (PatchException.C_GAME_LAYER.equals(code)) {
+            return Trans.get(c, R.string.patch_err_game_layer_fmt, d);
         }
         return Trans.get(c, R.string.patch_err_io_fmt, d);
     }

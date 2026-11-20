@@ -59,6 +59,16 @@ final class PatchException extends IOException {
      * 用户重新启用后这条结论会被清掉。
      */
     static final String C_CRASH_DISABLED = "crash_disabled";
+    /**
+     * 崩溃后被自动停用的是**整端**补丁（第 403 轮）⇒ 文案要说「回退到官方本体」：
+     * 普通补丁停用只是少一小块改动，整端停用等于换回官方包。
+     */
+    static final String C_CRASH_DISABLED_GAME = "crash_disabled_game";
+    /**
+     * 整端补丁（role=game）**独占**这个启动项：不能与别的补丁同时启用（第 403 轮）。
+     * detail = 对方的名字，让用户知道是跟谁冲突。
+     */
+    static final String C_GAME_LAYER = "game_layer";
 
     final String code;
     /** 给"人话模板"填空的定位信息（文件名 / 字段名 / 补丁名）；可为空串。 */

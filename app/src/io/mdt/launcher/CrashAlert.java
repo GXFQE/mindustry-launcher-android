@@ -297,7 +297,10 @@ public final class CrashAlert {
                 if (j.length() > 0) j.append(" / ");
                 j.append(x);
             }
-            msg = msg + "\n\n" + Trans.get(a, R.string.crash_patch_disabled_fmt, j.toString());
+            // ★ 第 403 轮：被停用的是整端补丁 ⇒ 说"回退到官方本体"（普通补丁只少一小块改动）
+            msg = msg + "\n\n" + Trans.get(a, Patches.crashDisabledWasGame(a, slot)
+                    ? R.string.crash_patch_disabled_game_fmt
+                    : R.string.crash_patch_disabled_fmt, j.toString());
         }
         android.app.AlertDialog.Builder b = new android.app.AlertDialog.Builder(a)
                 .setTitle(v != null && v.kind == CrashAnalysis.KIND_LAUNCHER

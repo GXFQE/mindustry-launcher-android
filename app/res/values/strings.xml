@@ -1936,6 +1936,7 @@
     <string name="crash_alert_title">The game crashed</string>
     <string name="crash_alert_toast_fmt">The game crashed: %1$s</string>
     <string name="crash_patch_disabled_fmt">The game crashed last launch with patch \"%1$s\" (now disabled). You can re-enable it on the patch page.</string>
+    <string name="crash_patch_disabled_game_fmt">Full build \"%1$s\" was disabled after the crash; the game falls back to the original APK.</string>
     <!-- Launcher's own report (crash_*_launcher.txt) lands in the same folder: do not call it "the game". -->
     <string name="crash_alert_title_launcher">The manager hit an error</string>
     <string name="crash_alert_toast_launcher_fmt">The manager hit an error: %1$s</string>
@@ -2270,6 +2271,8 @@
     <string name="version_type_official">Vanilla</string>
     <string name="version_type_modded">Modded</string>
     <string name="version_type_half">Half-modified</string>
+    <!-- Round 403: a whole game build used as a patch takes over the launch entry -->
+    <string name="version_type_full">Full build</string>
     <string name="version_name_title">Name this launch entry</string>
     <string name="version_name_msg">Only renames this launch entry (its list row, this page, and Continue). Other entries of the same version keep their own names, and the APK itself is untouched. Leave empty to restore the original name.</string>
     <string name="version_name_reset">Restore original</string>
@@ -2302,6 +2305,8 @@
     <string name="patch_page_title">Patches</string>
     <string name="patch_badge_fmt">Patch %1$d</string>
     <string name="subtitle_patch_fmt">Patch %1$d · %2$s</string>
+    <string name="patch_badge_game_fmt">Full build %1$s</string>
+    <string name="subtitle_patch_game_fmt">Full build %1$s · %2$s</string>
     <string name="patch_head_fmt">Game: %1$s</string>
     <string name="patch_head_sub_fmt">APK %1$s · %2$d imported</string>
     <!-- Round 353: patch enable state is per launch entry (instance) now -->
@@ -2318,12 +2323,14 @@
     <string name="patch_deleting">Deleting patch</string>
     <string name="patch_import_ok_fmt">Imported %1$s %2$s</string>
     <string name="patch_row_sub_fmt">%1$d classes · %2$s</string>
+    <string name="patch_row_sub_game_fmt">Full build · %1$d classes · %2$s</string>
     <string name="patch_state_on">enabled</string>
     <string name="patch_state_off">not enabled</string>
     <string name="patch_state_na">not for this APK</string>
     <string name="patch_state_broken">files missing</string>
     <string name="patch_detail_title_fmt">%1$s %2$s</string>
     <string name="patch_detail_id_fmt">ID: %1$s</string>
+    <string name="patch_detail_game_note">This is a whole game build: it replaces the game code, assets and native libraries, and takes over this launch entry.</string>
     <string name="patch_detail_author_fmt">Author: %1$s</string>
     <string name="patch_detail_target_fmt">For: %1$s · APK %2$s</string>
     <string name="patch_detail_content_fmt">%1$d classes · %2$d asset files</string>
@@ -2340,6 +2347,7 @@
     <string name="patch_disable_ok_fmt">Disabled %1$s</string>
     <string name="patch_warn_title">Enable patch?</string>
     <string name="patch_warn_body">A patch replaces game code and can make the game crash. Only enable packages you trust.</string>
+    <string name="patch_warn_game_body">This is a whole game build, not a small patch: it replaces the game code, assets and native libraries of this launch entry, and cannot be enabled together with other patches. Only enable builds you trust.</string>
     <string name="patch_warn_ok">Enable anyway</string>
     <string name="patch_delete_title">Delete patch?</string>
     <string name="patch_delete_body_fmt">Move %1$s to the trash station? (You can restore it from there.)</string>
@@ -2368,6 +2376,8 @@
     <string name="patch_err_in_use_fmt">This patch is still enabled here: %1$s. Disable it first.</string>
     <string name="patch_err_record_gone_fmt">Patch record no longer exists: %1$s</string>
     <string name="patch_err_crash_disabled_fmt">Crashed last launch with \"%1$s\", so it was disabled. Re-enable it on the patch page to try again.</string>
+    <string name="patch_err_crash_disabled_game_fmt">Crashed last launch with full build \"%1$s\"; it was disabled, so the game falls back to the original APK. Re-enable it on the patch page to try again.</string>
+    <string name="patch_err_game_layer_fmt">A full-build patch owns this launch entry; disable it or the other patch first: %1$s</string>
     <string name="patch_err_missing_fmt">Patch files are missing: %1$s</string>
     <string name="version_row_patch">Patches</string>
     <string name="version_row_patch_sub">Replace game code for this version</string>

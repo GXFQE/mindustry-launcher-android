@@ -3073,6 +3073,14 @@ public final class SelfTest {
                 Versions.typeFor(ctx, vanilla, 1));
         ok(stat, L, halfRow.contains("  半改端  ") && !halfRow.contains("  原端  "),
                 "★启用补丁的行名逐字换成半改端，不再叠原端：" + halfRow);
+        // ★ 第 403 轮：整份游戏本体当补丁 ⇒ 类型词「整端」（压过「半改端」）
+        ok(stat, L, "整端".equals(Versions.typeFor(ctx, vanilla, 1, "整份游戏"))
+                        && "半改端".equals(Versions.typeFor(ctx, vanilla, 1, null)),
+                "★第 403 轮 typeFor：有整端补丁 ⇒ 整端；没有整端才按补丁数");
+        String fullRow = vanilla.displayName(ctx, true, true,
+                Versions.typeFor(ctx, vanilla, 1, "整份游戏"));
+        ok(stat, L, fullRow.contains("  整端  ") && !fullRow.contains("  半改端  "),
+                "★整端的行名逐字换成「整端」：" + fullRow);
         // ★ 名字预算（2026-10-16 用户先自己试了长名字，再定下"名字可以省，类型和版本必须留"）：
         ok(stat, L, "我的整合包".equals(Versions.clipName("我的整合包", 20)),
                 "★短名字不动：" + Versions.clipName("我的整合包", 20));
@@ -12030,6 +12038,14 @@ public final class SelfTest {
                         && homeSub.contains(ctx.getString(R.string.patch_badge_fmt, 1))
                         && homeSub.contains(ctx.getString(R.string.row_based_on_fmt, "160.1")),
                 "★主页行副标题不显示 APK 名 / 大小（只留 导入 / 备份 / 补丁 / 基于）：" + homeSub);
+        // ★ 第 403 轮：有整端时写「整端 <名字>」，不再写「补丁 N 份」（两句话不能同时出现）
+        String gameSub = Versions.mainRowSubtitleLine(ctx, homeRow, 2, 1, "整份游戏");
+        ok(stat, L, gameSub.contains(ctx.getString(R.string.patch_badge_game_fmt, "整份游戏"))
+                        && !gameSub.contains(ctx.getString(R.string.patch_badge_fmt, 1)),
+                "★第 403 轮：有整端时主页副标题写「整端 <名字>」：" + gameSub);
+        String gamePageSub = Versions.subtitleLine(ctx, homeRow, 2, 1, "整份游戏");
+        ok(stat, L, gamePageSub.contains("整端 整份游戏") && gamePageSub.contains("official-159.apk"),
+                "★版本页副标题同样写整端名（仍带来源与大小）：" + gamePageSub);
         String pageSub = Versions.subtitleLine(ctx, homeRow, 2, 1);
         ok(stat, L, pageSub.contains("official-159.apk") && pageSub.contains("MB"),
                 "★版本页副标题仍带来源与大小（与主页故意不同）：" + pageSub);
@@ -19012,6 +19028,29 @@ public final class SelfTest {
             ok(stat, L, rApk.loaded.size() == 1
                             && rApk.loaded.get(0).target.apkFile() != null,
                     "⑨ 启动解析：整包补丁解析成 APK 载体（Injector 走整包注入）");
+            // ★ 第 403 轮：整端**独占**启动项 —— 两个方向都要判死，且点名对方
+            try {
+                Patches.enable(ctx, IKEY3, recA, apkSha);
+                ok(stat, L, false, "⑨ 整端已启用时再启用别的补丁应被拒（实际通过）");
+            } catch (PatchException pe) {
+                ok(stat, L, PatchException.C_GAME_LAYER.equals(pe.code)
+                                && pe.detail != null && pe.detail.contains(recApk.label()),
+                        "⑨ 整端独占：整端已启用 ⇒ 别的补丁被拒，且点名整端（"
+                                + pe.code + " / " + pe.detail + "）");
+            }
+            Patches.disable(ctx, IKEY3, recApk);
+            Patches.enable(ctx, IKEY3, recA, apkSha);
+            try {
+                Patches.enable(ctx, IKEY3, recApk, apkSha);
+                ok(stat, L, false, "⑨ 普通补丁在用时启用整端应被拒（实际通过）");
+            } catch (PatchException pe) {
+                ok(stat, L, PatchException.C_GAME_LAYER.equals(pe.code)
+                                && pe.detail != null && pe.detail.contains(recA.label()),
+                        "⑨ 反方向：普通补丁在用时整端被拒，且点名那个补丁（"
+                                + pe.code + " / " + pe.detail + "）");
+            }
+            Patches.disable(ctx, IKEY3, recA);
+            Patches.enable(ctx, IKEY3, recApk, apkSha);   // 恢复整端启用，供下面的解析断言
             // 普通补丁（role=patch）带 lib/ ⇒ 导入就拒（避免"半个 native"）
             File badLibs = new File(work, "apk-libs-patch.apk");
             String badLibsJson = apkJson.replace("\"role\":\"game\"", "\"role\":\"patch\"");
@@ -19577,6 +19616,14 @@ public final class SelfTest {
             ok(stat, L, !PatchText.reason(ctx, PatchException.C_CRASH_DISABLED, "自检补丁")
                             .contains(PatchException.C_CRASH_DISABLED),
                     "★新错误码有人话（界面上不出现英文码）");
+            // ★ 第 403 轮：整端崩了是另一句话（回退到官方本体），且普通补丁不能误用那句
+            ok(stat, L, !PatchText.reason(ctx, PatchException.C_CRASH_DISABLED_GAME, "整端自检")
+                            .contains(PatchException.C_CRASH_DISABLED_GAME)
+                            && !PatchText.reason(ctx, PatchException.C_GAME_LAYER, "别的补丁")
+                            .contains(PatchException.C_GAME_LAYER),
+                    "★第 403 轮两个新码也有人话（crash_disabled_game / game_layer）");
+            ok(stat, L, !Patches.crashDisabledWasGame(ctx, slot),
+                    "★普通补丁崩了不算整端（回退文案不能被误用）");
 
             ok(stat, L, Patches.noteGameCrash(ctx, slot).isEmpty(),
                     "★同一场崩溃只处置一次（启动记录已消费）");

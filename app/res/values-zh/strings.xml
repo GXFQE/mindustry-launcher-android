@@ -1880,6 +1880,7 @@
     <string name="crash_alert_title">游戏崩了</string>
     <string name="crash_alert_toast_fmt">游戏崩了：%1$s</string>
     <string name="crash_patch_disabled_fmt">上次启动带着补丁「%1$s」崩了，已自动停用；在补丁页可以重新启用。</string>
+    <string name="crash_patch_disabled_game_fmt">整端「%1$s」在这次崩溃后已自动停用，游戏会回退到官方本体。</string>
     <!-- 启动器自己的报告（crash_*_launcher.txt）落在同一个目录 ⇒ 别叫它"游戏崩了" -->
     <string name="crash_alert_title_launcher">管理器出错了</string>
     <string name="crash_alert_toast_launcher_fmt">管理器出错了：%1$s</string>
@@ -2227,6 +2228,8 @@
     <string name="version_type_official">原端</string>
     <string name="version_type_modded">改端</string>
     <string name="version_type_half">半改端</string>
+    <!-- 第 403 轮：整份游戏本体当补丁，独占启动项 -->
+    <string name="version_type_full">整端</string>
     <string name="version_name_title">给这个启动项命名</string>
     <string name="version_name_msg">只改这一项的名字（列表里这一行、这里、继续上次都用它），同一个版本的其他启动项不受影响，也不动 APK 本身。留空 = 恢复原名。</string>
     <string name="version_name_reset">恢复原名</string>
@@ -2258,6 +2261,8 @@
     <string name="patch_page_title">补丁</string>
     <string name="patch_badge_fmt">补丁 %1$d 份</string>
     <string name="subtitle_patch_fmt">补丁 %1$d 份 · %2$s</string>
+    <string name="patch_badge_game_fmt">整端 %1$s</string>
+    <string name="subtitle_patch_game_fmt">整端 %1$s · %2$s</string>
     <string name="patch_head_fmt">游戏：%1$s</string>
     <string name="patch_head_sub_fmt">APK %1$s · 已导入 %2$d 个</string>
     <!-- ★ 第 353 轮：补丁启用状态按**启动项（实例）**存，补丁页要说清是哪个实例 -->
@@ -2274,12 +2279,14 @@
     <string name="patch_deleting">正在删除补丁</string>
     <string name="patch_import_ok_fmt">已导入 %1$s %2$s</string>
     <string name="patch_row_sub_fmt">%1$d 个类 · %2$s</string>
+    <string name="patch_row_sub_game_fmt">整端 · %1$d 个类 · %2$s</string>
     <string name="patch_state_on">已启用</string>
     <string name="patch_state_off">未启用</string>
     <string name="patch_state_na">不适用这个 APK</string>
     <string name="patch_state_broken">文件缺失</string>
     <string name="patch_detail_title_fmt">%1$s %2$s</string>
     <string name="patch_detail_id_fmt">标识：%1$s</string>
+    <string name="patch_detail_game_note">这是一整份游戏本体：会替换游戏的代码、素材和 native，并独占这个启动项。</string>
     <string name="patch_detail_author_fmt">作者：%1$s</string>
     <string name="patch_detail_target_fmt">适用于：%1$s · APK %2$s</string>
     <string name="patch_detail_content_fmt">%1$d 个类 · 素材 %2$d 个</string>
@@ -2296,6 +2303,7 @@
     <string name="patch_disable_ok_fmt">已停用 %1$s</string>
     <string name="patch_warn_title">启用补丁？</string>
     <string name="patch_warn_body">补丁会替换游戏代码，可能让游戏崩溃。只启用你信任的补丁包。</string>
+    <string name="patch_warn_game_body">这是一整份游戏本体，不是小补丁：它会替换这个启动项的游戏代码、素材和 native，而且不能和其他补丁同时启用。只启用你信任的包。</string>
     <string name="patch_warn_ok">仍然启用</string>
     <string name="patch_delete_title">删除补丁？</string>
     <string name="patch_delete_body_fmt">把 %1$s 挪进中转站？（以后能从「中转站」放回来）</string>
@@ -2325,6 +2333,8 @@
     <string name="patch_err_record_gone_fmt">补丁记录不存在了：%1$s</string>
     <!-- ★ 第 360 轮：崩溃处理与 :game 注入失败同一套处置（带崩的补丁自动停用） -->
     <string name="patch_err_crash_disabled_fmt">上次启动带着「%1$s」崩了，已自动停用；确认没问题可以重新启用</string>
+    <string name="patch_err_crash_disabled_game_fmt">上次启动带着整端「%1$s」崩了，已自动停用；游戏会回退到官方本体，确认没问题可以重新启用</string>
+    <string name="patch_err_game_layer_fmt">整端补丁独占这个启动项，不能再启用别的补丁（或先停用它）：%1$s</string>
     <string name="patch_err_missing_fmt">补丁文件缺失：%1$s</string>
     <string name="version_row_patch">补丁</string>
     <string name="version_row_patch_sub">替换这个版本的游戏代码</string>

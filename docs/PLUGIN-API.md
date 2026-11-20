@@ -283,6 +283,9 @@ public static void unload();                    // 可选：收尾（也认 unlo
 - 其余失败码沿用补丁机制：`bad_zip` / `bad_json` / `schema` / `field` / `no_targets` / `bad_hash` /
   `bad_path` / `missing_entry` / `bad_dex` / `bad_assets`（只在导入时出现）/ `dup` / `too_big` /
   `io` / `record_gone` / `invalid`。
+- ★ **`game_layer`**（2026-11-20，第 403 轮）：整端补丁（`patches()` 的 `extra["role"] == "game"`）
+  **独占**这个启动项 —— 已有其他补丁时启用整端、或已有整端时启用其他补丁，两个方向都返回它；
+  提示里带冲突方的显示名。插件别自己判独占，照这个码行事即可（启动期 `resolve` 还会再拦一次）。
 - **启用只写记录，不碰正在跑的进程**：真正生效在下次启动；同一补丁在两个槽上各开各的（第 353 轮）。
 - 插件自己负责"动手前问用户"（想和宿主风格一致就用宿主的 `confirm` / `choose`）。
 - 这些方法都是异步：回调在 UI 线程；`patchImport` / `patchConflicts` 会读 dex，**别在主线程等结果**。

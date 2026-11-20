@@ -237,6 +237,8 @@ public final class Config {
     private static final String K_PATCH = "patch_enabled";
     /** 补丁：首次启用前那次"这会替换游戏代码"的告知是否已经看过。 */
     private static final String K_PATCH_WARN = "patch_warned";
+    /** 补丁：整端（整份本体）那次更强的告知是否已经看过 —— 与普通补丁分开记账（第 403 轮）。 */
+    private static final String K_PATCH_WARN_GAME = "patch_warned_game";
 
     /**
      * 自动备份的出厂默认，逐条对齐桌面版 config.py 的 PROFILE_DEFAULTS
@@ -1843,6 +1845,16 @@ public final class Config {
 
     public synchronized void setPatchWarned() {
         put(K_PATCH_WARN, true);
+        save();
+    }
+
+    /** 整端补丁的告知是否已看过（第 403 轮：与普通补丁分开记账，互不吞掉）。 */
+    public synchronized boolean patchWarnedGame() {
+        return boolOf(mRoot, K_PATCH_WARN_GAME, false, "patch_warned_game");
+    }
+
+    public synchronized void setPatchWarnedGame() {
+        put(K_PATCH_WARN_GAME, true);
         save();
     }
 

@@ -61,6 +61,12 @@ public class MainActivity extends BaseActivity {
      */
     private java.util.Map<String, Integer> mPatchCounts = java.util.Collections.emptyMap();
 
+    /**
+     * 每个启动项上的**整端补丁**名（第 403 轮）：有整端时类型词写「整端」、副标题写整端名。
+     * 与 {@link #mPatchCounts} 同一次扫描算好（不逐行扫补丁库）。
+     */
+    private java.util.Map<String, String> mGameLabels = java.util.Collections.emptyMap();
+
     // F3b：版本列表容器（LinearLayout，条目代码挂载）+ 空态
     private ViewGroup mListContainer;
     private TextView mEmpty;
@@ -749,6 +755,8 @@ public class MainActivity extends BaseActivity {
         // ★ 第 345 轮用户反馈：行上只写"原端/改端"看不出"这版其实打了补丁" ⇒ 副标题前缀 `补丁 N`。
         //   口径与补丁页「已启用 N 个」同一份（只数记录还在的引用，见 Patches.enabledCounts）。
         mPatchCounts = Patches.enabledCounts(this);
+        // ★ 第 403 轮：整端补丁（整份游戏本体当补丁）要改类型词与副标题 —— 与补丁数同一次扫描算好
+        mGameLabels = Patches.gameLabels(this);
         computeConflicts();
         rebuildList();
         if (mStatusSummary != null) {
@@ -881,7 +889,7 @@ public class MainActivity extends BaseActivity {
      * ★ 第 345 轮：带上这个版本 key 上启用的补丁数（>0 时加 `补丁 N`）。
      */
     private String rowSubtitle(Versions.Entry e, int backups) {
-        return Versions.mainRowSubtitleLine(this, e, backups, patchCountFor(e));
+        return Versions.mainRowSubtitleLine(this, e, backups, patchCountFor(e), gameLabelFor(e));
     }
 
     /** 把副标题写进行里：空串就 GONE（否则那行会挂一个空白的 13sp 行高）。 */
@@ -902,6 +910,16 @@ public class MainActivity extends BaseActivity {
         if (e == null || mPatchCounts == null || mPatchCounts.isEmpty()) return 0;
         Integer n = mPatchCounts.get(Versions.instanceKey(e.key(), Versions.slotFor(e)));
         return n == null ? 0 : n;
+    }
+
+    /**
+     * 这个启动项上的**整端补丁**名（第 403 轮；整份游戏本体当补丁）。
+     *
+     * <p>有整端时：类型词写「整端」、副标题写 `整端 <名字>`（不再写补丁份数）。
+     */
+    private String gameLabelFor(Versions.Entry e) {
+        if (e == null || mGameLabels == null || mGameLabels.isEmpty()) return null;
+        return mGameLabels.get(Versions.instanceKey(e.key(), Versions.slotFor(e)));
     }
 
     /** 把一行「版本」填上数据并接上交互（原 Adapter.getView 的逻辑，一字未改）。 */
@@ -1258,7 +1276,7 @@ public class MainActivity extends BaseActivity {
         // 名字超预算自己省略（类型 + 版本号在末尾，必须保住 —— 见 NAME_MAX_UNITS）
         // ★ 第 392 轮：这个启动项启用了补丁 ⇒ 类型词直接写「半改端」，不再「原端」+「补丁 N」叠着。
         String plain = e.displayName(this, true, true,
-                Versions.typeFor(this, e, patchCountFor(e)));
+                Versions.typeFor(this, e, patchCountFor(e), gameLabelFor(e)));
         // ★★ 2026-11-10 用户订正：**基座版本不再缀在标题里** ——
         //   「版本号被折叠的问题又出现了，算了，基于原版的版本号放下面那层吧」。
         //   它现在由副标题承担（`… · 基于 160.1`，见 Versions.subtitleLine）；

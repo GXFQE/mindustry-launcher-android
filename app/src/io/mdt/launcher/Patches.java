@@ -633,6 +633,18 @@ final class Patches {
             //   "与已启用的补丁冲突"，用户看到「与已启用的补丁冲突：它自己」。
             List<String> refs = Config.get().patchRefs(ikey);
             if (refs.contains(r.ref())) throw new PatchException(PatchException.C_ENABLED, "");
+            // ★ 第 403 轮：**整端独占**（role=game 替换的是整份游戏，与别的补丁叠着没有意义）。
+            //   判据放在 conflicts 之前：两条补丁即使类/素材不相交也不许并存。
+            List<Record> on = enabledRecords(ctx, ikey);
+            if (isGame(r)) {
+                if (!on.isEmpty()) throw new PatchException(PatchException.C_GAME_LAYER, labels(on));
+            } else {
+                for (Record other : on) {
+                    if (isGame(other)) {
+                        throw new PatchException(PatchException.C_GAME_LAYER, other.label());
+                    }
+                }
+            }
             List<String> names = conflicts(ctx, ikey, r, apkSha256);
             if (!names.isEmpty()) throw new PatchException(PatchException.C_CONFLICT, join(names));
             refs.add(r.ref());
@@ -758,6 +770,48 @@ final class Patches {
         return out;
     }
 
+    /**
+     * 这个启动项上启用的**整端补丁**显示名（没有返回 null）。
+     *
+     * <p>第 403 轮：整端补丁的存在要改变界面的说法 —— 类型词写「整端」（不是「半改端」）、
+     * 副标题写整端名（不是「补丁 N 份」）、崩溃文案说「回退到官方本体」。
+     */
+    static String gameLabel(Context ctx, String ikey) {
+        for (Record r : enabledRecords(ctx, ikey)) {
+            if (isGame(r)) return r.label();
+        }
+        return null;
+    }
+
+    /** 每个启动项上的整端补丁名（主界面列表一次算完；没有整端的不进 map）。 */
+    static Map<String, String> gameLabels(Context ctx) {
+        Map<String, Record> byRef = new HashMap<String, Record>();
+        for (Record r : scan(ctx)) byRef.put(r.ref(), r);
+        Map<String, String> out = new HashMap<String, String>();
+        for (String ikey : Config.get().patchRefVkeys()) {
+            for (String ref : Config.get().patchRefs(ikey)) {
+                Record r = byRef.get(ref);
+                if (isGame(r)) {
+                    out.put(ikey, r.label());
+                    break;
+                }
+            }
+        }
+        return out;
+    }
+
+    /** role=game（整份游戏本体当补丁）。 */
+    private static boolean isGame(Record r) {
+        return r != null && r.manifest != null && r.manifest.isGame();
+    }
+
+    /** 一串记录的显示名（给"整端独占"点名用）。 */
+    private static String labels(List<Record> rs) {
+        List<String> out = new ArrayList<String>();
+        for (Record r : rs) if (r != null) out.add(r.label());
+        return join(out);
+    }
+
     // ══ 启动解析 ════════════════════════════════════════════════════════════
 
     /** 这次启动要注入的一个补丁。 */
@@ -809,6 +863,7 @@ final class Patches {
         Set<String> usedClasses = new HashSet<String>();
         Set<String> usedAssets = new HashSet<String>();
         Set<String> usedIds = new HashSet<String>();
+        boolean gameSeen = false;      // 整端已加载 ⇒ 后面的普通补丁整条跳过（第 403 轮）
         for (String ref : refs) {
             Record r = findByRef(ctx, ref);
             if (r == null) {
@@ -822,6 +877,17 @@ final class Patches {
             }
             if (!t.exists()) {
                 res.problems.add(new Problem(PatchException.C_MISSING, r.label()));
+                continue;
+            }
+            // ★ 第 403 轮：整端独占 —— 与界面那道门同一判据（配置被手改也拦得住）：
+            //   整端只许单独加载；它已经加载了，后面的普通补丁整条跳过。
+            boolean game = isGame(r);
+            if (game && (!res.loaded.isEmpty() || gameSeen)) {
+                res.problems.add(new Problem(PatchException.C_GAME_LAYER, r.label()));
+                continue;
+            }
+            if (!game && gameSeen) {
+                res.problems.add(new Problem(PatchException.C_GAME_LAYER, r.label()));
                 continue;
             }
             List<String> cls;
@@ -847,6 +913,7 @@ final class Patches {
             usedClasses.addAll(cls);
             usedAssets.addAll(keys);
             res.loaded.add(new Loaded(r, t));
+            if (game) gameSeen = true;
         }
         return res;
     }
@@ -1179,7 +1246,11 @@ final class Patches {
         List<String[]> disabled = new ArrayList<String[]>();
         for (Launched l : info.patches) {
             if (l == null || l.ref.isEmpty() || !refs.remove(l.ref)) continue;
-            disabled.add(new String[]{l.ref, l.label});
+            // 第 403 轮：崩溃后被停用的是整端 ⇒ 文案要说"回退到官方本体"（码不同，人话不同）
+            Record rec = findByRef(ctx, l.ref);
+            String code = isGame(rec) ? PatchException.C_CRASH_DISABLED_GAME
+                    : PatchException.C_CRASH_DISABLED;
+            disabled.add(new String[]{l.ref, l.label, code});
         }
         if (disabled.isEmpty()) {               // 用户已经自己停用了 ⇒ 没有要处置的东西
             markLaunchHandled(ctx, info);
@@ -1244,7 +1315,7 @@ final class Patches {
         sb.append("# crash = ").append(crash).append('\n');
         sb.append(data);
         for (String[] d : disabled) {
-            sb.append(PatchException.C_CRASH_DISABLED).append('|')
+            sb.append(d.length > 2 ? d[2] : PatchException.C_CRASH_DISABLED).append('|')
               .append(d[1] == null ? "" : d[1]).append('|')
               .append(d[0] == null ? "" : d[0]).append('\n');
         }
@@ -1304,6 +1375,36 @@ final class Patches {
         if (f.isFile()) f.delete();
     }
 
+    /**
+     * 崩溃后被自动停用的那条是不是**整端**（崩溃弹窗据此说"已回退到官方本体"）。
+     *
+     * <p>第 403 轮：普通补丁被停用只是少一小块改动，整端被停用等于换回官方包 —— 两句话不能混。
+     */
+    static boolean crashDisabledWasGame(Context ctx, String slot) {
+        File f = crashReportFile(ctx);
+        if (!f.isFile()) return false;
+        try {
+            String want = slot == null ? "" : slot;
+            String curSlot = null;
+            for (String line : Util.readText(f).split("\\r?\\n")) {
+                if (line.startsWith("# slot = ")) {
+                    curSlot = line.substring("# slot = ".length()).trim();
+                } else if (line.isEmpty() || line.startsWith("#")) {
+                    continue;
+                } else {
+                    if (!want.isEmpty() && !want.equals(curSlot)) continue;
+                    String[] parts = line.split("\\|", 3);
+                    if (parts.length >= 2 && PatchException.C_CRASH_DISABLED_GAME.equals(parts[0])) {
+                        return true;
+                    }
+                }
+            }
+        } catch (Throwable t) {
+            Log.w(TAG, "read patch crash report failed: " + t);
+        }
+        return false;
+    }
+
     /** 用户重新启用一条补丁 ⇒ 把关于它的旧崩溃结论删掉（旧结论不该继续骂它）。 */
     static void clearCrashNoticeForRef(Context ctx, String ref) {
         if (ref == null || ref.isEmpty()) return;
@@ -1339,6 +1440,15 @@ final class Patches {
 
     static void markWarned(Context ctx) {
         Config.get().setPatchWarned();
+    }
+
+    /** 整端的告知（第 403 轮：与普通补丁分开记账 —— 两条话强度不同，不能互相吞掉）。 */
+    static boolean warnedGame(Context ctx) {
+        return Config.get().patchWarnedGame();
+    }
+
+    static void markWarnedGame(Context ctx) {
+        Config.get().setPatchWarnedGame();
     }
 
     // ══ 工具 ════════════════════════════════════════════════════════════════

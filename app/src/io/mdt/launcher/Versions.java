@@ -430,12 +430,25 @@ public final class Versions {
     public static final String OFFICIAL_PKG = "io.anuke.mindustry";
 
     /**
-     * 启动项的类型词：**启用了补丁 ⇒ 半改端**，否则按 APK 本身的原端 / 改端。
+     * 启动项的类型词：**启用了补丁 ⇒ 半改端 / 整端**，否则按 APK 本身的原端 / 改端。
      *
      * <p>第 392 轮统一说法：主界面、版本页、槽页游玩时长都用这一个词，别再出现
-     * 「原端」+「补丁 N」叠着写。
+     * 「原端」+「补丁 N」叠着写。第 403 轮加「整端」：整份本体当补丁时用 4 参重载。
      */
     public static String typeFor(Context ctx, Entry e, int patchCount) {
+        return typeFor(ctx, e, patchCount, null);
+    }
+
+    /**
+     * 同上，另认**整端**（第 403 轮：整份游戏本体当补丁）。
+     *
+     * <p>整端换掉的不是一小块代码，是整套游戏 ⇒ 类型词写「整端」而不是「半改端」；
+     * 没有整端时才回到"有补丁 = 半改端"。
+     *
+     * @param gameLabel 这个启动项上启用的整端补丁显示名；null / 空 = 没有整端
+     */
+    public static String typeFor(Context ctx, Entry e, int patchCount, String gameLabel) {
+        if (gameLabel != null && !gameLabel.isEmpty()) return Trans.get(ctx, R.string.version_type_full);
         if (patchCount > 0) return Trans.get(ctx, R.string.version_type_half);
         return e == null ? "" : e.typeWord(ctx);
     }
@@ -1111,6 +1124,12 @@ public final class Versions {
      *                改成数备份（`VersionOps.backupCountIn`，与槽页「看看有哪些备份…」同源）。
      */
     public static String subtitleLine(android.content.Context ctx, Entry e, int backups, int patches) {
+        return subtitleLine(ctx, e, backups, patches, null);
+    }
+
+    /** 同上，另认**整端**（第 403 轮）：有整端时写 `整端 <名字> · …`，不再写补丁份数。 */
+    public static String subtitleLine(android.content.Context ctx, Entry e, int backups, int patches,
+                                      String gameLabel) {
         String base;
         if (e == null) return "";
         String size = Util.formatSize(e.apkSize);
@@ -1124,6 +1143,10 @@ public final class Versions {
                     ? Trans.get(ctx, R.string.row_imported_sub_fmt,
                             e.importFile == null ? "" : e.importFile, size)
                     : Trans.get(ctx, R.string.row_sub_fmt, e.pkg, size);
+        }
+        if (gameLabel != null && !gameLabel.isEmpty()) {
+            return appendUpstream(ctx, e,
+                    Trans.get(ctx, R.string.subtitle_patch_game_fmt, gameLabel, base));
         }
         if (patches <= 0) return appendUpstream(ctx, e, base);
         return appendUpstream(ctx, e,
@@ -1149,12 +1172,22 @@ public final class Versions {
      */
     public static String mainRowSubtitleLine(android.content.Context ctx, Entry e,
                                              int backups, int patches) {
+        return mainRowSubtitleLine(ctx, e, backups, patches, null);
+    }
+
+    /** 同上，另认**整端**（第 403 轮）：整端写 `整端 <名字>`，不再写「补丁 N 份」。 */
+    public static String mainRowSubtitleLine(android.content.Context ctx, Entry e,
+                                             int backups, int patches, String gameLabel) {
         if (e == null) return "";
         StringBuilder sb = new StringBuilder();
         appendPart(sb, Trans.get(ctx, e.imported
                 ? R.string.row_imported_tag : R.string.row_installed_tag));
         if (backups > 0) appendPart(sb, Trans.get(ctx, R.string.row_backups_count_fmt, backups));
-        if (patches > 0) appendPart(sb, Trans.get(ctx, R.string.patch_badge_fmt, patches));
+        if (gameLabel != null && !gameLabel.isEmpty()) {
+            appendPart(sb, Trans.get(ctx, R.string.patch_badge_game_fmt, gameLabel));
+        } else if (patches > 0) {
+            appendPart(sb, Trans.get(ctx, R.string.patch_badge_fmt, patches));
+        }
         String up = e.upstreamNote();
         if (up != null && !up.isEmpty()) {
             appendPart(sb, Trans.get(ctx, R.string.row_based_on_fmt, up));

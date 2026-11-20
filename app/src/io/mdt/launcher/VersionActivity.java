@@ -196,15 +196,17 @@ public class VersionActivity extends BaseActivity {
         //   下面「补丁」行动作行复用这个数（不再重复算）。
         // ★ 第 353 轮：按**实例键**数（版本 key + 槽）—— 同一版本的两个启动项各开各的
         int patchCount = Patches.enabledCount(this, Versions.instanceKey(mKey, slot));
+        // ★ 第 403 轮：整端补丁（整份游戏本体当补丁）⇒ 类型词「整端」、副标题写整端名。
+        String gameLabel = Patches.gameLabel(this, Versions.instanceKey(mKey, slot));
         // ★ 第 392 轮：启用补丁时标题类型直接写「半改端」，与主界面 / 槽页统一。
         String name = found.displayName(this, true, false,
-                Versions.typeFor(this, found, patchCount));
+                Versions.typeFor(this, found, patchCount, gameLabel));
         setTitle(name);
         ((TextView) findViewById(R.id.version_title)).setText(name);
         // 副标题用**列表行那份紧凑文案**（来源 · 大小 · 备份 N 份）——
         // 别用 Entry.subtitle() 的长形态：它带整条 `/data/app/~~…/base.apk` 路径，真机上占三行。
         ((TextView) findViewById(R.id.version_sub)).setText(
-                Versions.subtitleLine(this, found, backups, patchCount));
+                Versions.subtitleLine(this, found, backups, patchCount, gameLabel));
         ((TextView) findViewById(R.id.version_slot)).setText(Trans.get(this,
                 R.string.version_page_slot_fmt, slot, backups));
 
