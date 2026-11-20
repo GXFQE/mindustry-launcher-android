@@ -201,9 +201,9 @@ yourself — even just a few lines — see **Translation file** below.
 
 This launcher builds on other people's work:
 
-- **[Mindustry](https://github.com/Anuke/Mindustry)** by Anuke — GPL-3.0. The manager loads the
+- **[Mindustry](https://github.com/Anuken/Mindustry)** by Anuke — GPL-3.0. The manager loads the
   official APK you provide; it does not bundle or redistribute the game.
-- **[arc](https://github.com/Anuke/Arc)** by Anuke — Apache-2.0. Reference for asset injection, ABI
+- **[arc](https://github.com/Anuken/Arc)** by Anuke — Apache-2.0. Reference for asset injection, ABI
   and FreeType behaviour. `Hjson.java` is a hand port of `arc.util.serialization.Jval` (the HJSON
   read branch and the plain writer only; the two upstream versions and the changes are documented
   in that file).

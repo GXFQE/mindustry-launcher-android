@@ -181,8 +181,8 @@
 
 这个启动器用到了这些开源项目：
 
-- **[Mindustry](https://github.com/Anuke/Mindustry)**（Anuke）—— GPL-3.0。启动器加载的是**你自备的官方 APK**，不打包、不再分发游戏本体。
-- **[arc](https://github.com/Anuke/Arc)**（Anuke）—— Apache-2.0。资产注入 / ABI / FreeType 的行为以它为准；`Hjson.java` 是 `arc.util.serialization.Jval` 的手工移植（只取 HJSON 读取与 plain 写出两段，两版正本与改动都记在该文件头部）。
+- **[Mindustry](https://github.com/Anuken/Mindustry)**（Anuke）—— GPL-3.0。启动器加载的是**你自备的官方 APK**，不打包、不再分发游戏本体。
+- **[arc](https://github.com/Anuken/Arc)**（Anuke）—— Apache-2.0。资产注入 / ABI / FreeType 的行为以它为准；`Hjson.java` 是 `arc.util.serialization.Jval` 的手工移植（只取 HJSON 读取与 plain 写出两段，两版正本与改动都记在该文件头部）。
 - **[libGDX](https://libgdx.com/)** —— Apache-2.0。arc 底下的图形层。
 - **[Material Design Icons](https://github.com/google/material-design-icons)**（Google）—— Apache-2.0。界面图标的 path 数据。
 - **[MindustryX](https://github.com/TinyLake/MindustryX)**（TinyLake 及贡献者）—— GPL-3.0。游戏的社区分支，本启动器支持它，也拿它当行为对照（没有打包它的代码）。
