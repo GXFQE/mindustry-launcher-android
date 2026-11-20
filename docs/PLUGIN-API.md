@@ -28,6 +28,8 @@
   补丁的匹配键仍是**目标 APK 的 sha256**，不是版本号区间。**
   ★ 2026-11-20（补丁 v2，F27.20）：`patches()` 的 `extra` 多一个 `role`（`patch` / `game`）——
   `game` = 整端补丁（APK 容器，可带 native；独占一个启动项）；`target.0.*` 的键名与语义不变。
+★ 2026-11-20（第 407 轮）：补丁包**只认 APK 容器**（根 `classes.dex` + 根 `patch.json`，schema 2）；
+旧 `.mdp`（schema 1 + `targets/`）已退役 —— `patchImport` 会给失败码 `legacy_format`。
   **v39 = 网络 / 补丁写 / 实例与备份**：`fetchText` / `githubReleases` / `download`（复用宿主更新基建：
   https-only、正文 512 KB / 下载 1 GB 上限、GitHub API 10 分钟缓存 + 每小时 40 次、
   走用户选的镜像线路、`.part` + sha256）；`patchEnable` / `patchDisable` / `patchImport` /

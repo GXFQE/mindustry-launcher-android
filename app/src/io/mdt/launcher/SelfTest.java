@@ -18598,15 +18598,13 @@ public final class SelfTest {
             PatchManifest back = PatchManifest.parse(good.toBytes());
             ok(stat, L, back.id.equals(good.id) && back.version.equals(good.version)
                             && back.targets.size() == 1
-                            && back.targets.get(0).apkSha256.equals(apkSha)
-                            && back.targets.get(0).hasAssets(),
-                    "② 清单写→读往返：id / version / target / assets 一致");
+                            && back.targets.get(0).apkSha256.equals(apkSha),
+                    "② 清单写→读往返：id / version / target 一致");
             // ★ B9：外部名字里的换行/控制字符必须在解析处清洗（它会进冲突文案与启动报告行格式）
             try {
-                PatchManifest dirty = PatchManifest.parse(("{\"schema\":1,\"id\":\"dirtyname\","
-                        + "\"name\":\"a\\nb|c\",\"version\":\"1\",\"targets\":[{\"apkSha256\":\""
-                        + apkSha + "\",\"dex\":\"targets/" + apkSha + "/patch.dex\"}]}")
-                        .getBytes("UTF-8"));
+                PatchManifest dirty = PatchManifest.parse(("{\"schema\":2,\"id\":\"dirtyname\","
+                        + "\"name\":\"a\\nb|c\",\"version\":\"1\",\"apkSha256\":\""
+                        + apkSha + "\"}").getBytes("UTF-8"));
                 ok(stat, L, "a b|c".equals(dirty.name),
                         "② name 里的换行被清洗成空格（实际 [" + dirty.name + "]）");
             } catch (Throwable t) {
@@ -18615,10 +18613,9 @@ public final class SelfTest {
             // ★ 第 372 轮评审：`note` 是唯一允许换行的清单字段 —— 换行要留，其它控制字符（NUL/Tab）
             //   不许原样进 extra（插件会把它上屏 / 写报告）。解析处清洗一次，所有下游都安全。
             try {
-                PatchManifest dirtyNote = PatchManifest.parse(("{\"schema\":1,\"id\":\"dirtynote\","
+                PatchManifest dirtyNote = PatchManifest.parse(("{\"schema\":2,\"id\":\"dirtynote\","
                         + "\"name\":\"N\",\"version\":\"1\",\"note\":\"line1\\u0001tab\\there\\nfine\","
-                        + "\"targets\":[{\"apkSha256\":\"" + apkSha + "\",\"dex\":\"targets/"
-                        + apkSha + "/patch.dex\"}]}").getBytes("UTF-8"));
+                        + "\"apkSha256\":\"" + apkSha + "\"}").getBytes("UTF-8"));
                 boolean noCtl = dirtyNote.note.indexOf('\u0001') < 0
                         && dirtyNote.note.indexOf('\t') < 0
                         && dirtyNote.note.indexOf('\u0000') < 0;
@@ -18629,34 +18626,32 @@ public final class SelfTest {
                 ok(stat, L, false, "② 带控制字符的 note 不该解析失败：" + t);
             }
 
-            String tgt = "{\"apkSha256\":\"%s\",\"gameVersion\":\"160.4\",\"dex\":\"%s\"%s}";
             String otherSha = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
             expectPatchCode(L, stat, "schema=3（未知版本）", PatchException.C_SCHEMA,
-                    ("{\"schema\":3,\"id\":\"x\",\"name\":\"X\",\"version\":\"1\",\"targets\":["
-                            + String.format(tgt, apkSha, "targets/" + apkSha + "/patch.dex", "")
-                            + "]}").getBytes("UTF-8"));
+                    ("{\"schema\":3,\"id\":\"x\",\"name\":\"X\",\"version\":\"1\","
+                            + "\"apkSha256\":\"" + apkSha + "\"}").getBytes("UTF-8"));
+            expectPatchCode(L, stat, "schema=1（旧 .mdp 已退役）", PatchException.C_SCHEMA,
+                    ("{\"schema\":1,\"id\":\"x\",\"name\":\"X\",\"version\":\"1\","
+                            + "\"targets\":[]}").getBytes("UTF-8"));
             expectPatchCode(L, stat, "哈希不是 64 hex", PatchException.C_BAD_HASH,
-                    ("{\"schema\":1,\"id\":\"x\",\"name\":\"X\",\"version\":\"1\",\"targets\":["
-                            + "{\"apkSha256\":\"zz\",\"dex\":\"targets/zz/patch.dex\"}]}").getBytes("UTF-8"));
-            expectPatchCode(L, stat, "dex 路径穿越", PatchException.C_BAD_PATH,
-                    ("{\"schema\":1,\"id\":\"x\",\"name\":\"X\",\"version\":\"1\",\"targets\":["
-                            + String.format(tgt, apkSha, "targets/" + apkSha + "/../evil.dex", "")
-                            + "]}").getBytes("UTF-8"));
-            expectPatchCode(L, stat, "dex 不在自己哈希的目录下", PatchException.C_BAD_PATH,
-                    ("{\"schema\":1,\"id\":\"x\",\"name\":\"X\",\"version\":\"1\",\"targets\":["
-                            + String.format(tgt, apkSha, "targets/" + otherSha + "/patch.dex", "")
-                            + "]}").getBytes("UTF-8"));
+                    ("{\"schema\":2,\"id\":\"x\",\"name\":\"X\",\"version\":\"1\","
+                            + "\"apkSha256\":\"zz\"}").getBytes("UTF-8"));
             expectPatchCode(L, stat, "缺 name", PatchException.C_FIELD,
-                    ("{\"schema\":1,\"id\":\"x\",\"version\":\"1\",\"targets\":["
-                            + String.format(tgt, apkSha, "targets/" + apkSha + "/patch.dex", "")
-                            + "]}").getBytes("UTF-8"));
-            expectPatchCode(L, stat, "targets 为空", PatchException.C_NO_TARGETS,
-                    "{\"schema\":1,\"id\":\"x\",\"name\":\"X\",\"version\":\"1\",\"targets\":[]}"
-                            .getBytes("UTF-8"));
-            expectPatchCode(L, stat, "targets 不是数组", PatchException.C_FIELD,
-                    "{\"schema\":1,\"id\":\"x\",\"name\":\"X\",\"version\":\"1\",\"targets\":1}"
-                            .getBytes("UTF-8"));
-            boolean safeOk = PatchManifest.safeRel("targets/abc/patch.dex")
+                    ("{\"schema\":2,\"id\":\"x\",\"version\":\"1\","
+                            + "\"apkSha256\":\"" + apkSha + "\"}").getBytes("UTF-8"));
+            expectPatchCode(L, stat, "targets 字段已退役", PatchException.C_FIELD,
+                    ("{\"schema\":2,\"id\":\"x\",\"name\":\"X\",\"version\":\"1\","
+                            + "\"apkSha256\":\"" + apkSha + "\",\"targets\":[]}").getBytes("UTF-8"));
+            try {
+                PatchManifest roleOdd = PatchManifest.parse(("{\"schema\":2,\"id\":\"x\",\"name\":\"X\","
+                        + "\"version\":\"1\",\"role\":\"weird\",\"apkSha256\":\""
+                        + apkSha + "\"}").getBytes("UTF-8"));
+                ok(stat, L, PatchManifest.ROLE_PATCH.equals(roleOdd.role),
+                        "② role 未知值按普通补丁（前向兼容，实际 " + roleOdd.role + "）");
+            } catch (Throwable t) {
+                ok(stat, L, false, "② role 未知值不该解析失败：" + t);
+            }
+            boolean safeOk = PatchManifest.safeRel("assets/abc/patch.txt")
                     && !PatchManifest.safeRel("/etc/passwd")
                     && !PatchManifest.safeRel("../x")
                     && !PatchManifest.safeRel("a/../b")
@@ -18677,8 +18672,8 @@ public final class SelfTest {
                             .startsWith(Paths.privateDir(ctx).getAbsolutePath()),
                     "③ A 的文件齐全，且落在内部存储 " + recA.dir.getName());
             Patches.TargetFile ta = recA.targets.get(0);
-            ok(stat, L, ta.dex.isFile() && !ta.dex.canWrite(),
-                    "③ A 的 dex 已复制并置为只读（ART 的硬要求）");
+            ok(stat, L, ta.apkFile().isFile() && !ta.apkFile().canWrite(),
+                    "③ A 的整包载体已复制并置为只读（ART 的硬要求）");
             ok(stat, L, ta.classes().contains("io.mdt.launcher.PatchProbe"),
                     "③ 从落盘记录里能重新解析出补丁类（冲突检测的判据来源）");
             ok(stat, L, ta.assetKeys().size() == 1
@@ -18883,13 +18878,13 @@ public final class SelfTest {
                     "⑤ 反方向：换一个 APK ⇒ 不加载，只报 no_match（不硬上）");
 
             // ── ⑥ 状态判据 / 文案 / 跳转 ──────────────────────────────────
-            File dDex = recD.targets.get(0).dex;
+            File dDex = recD.targets.get(0).apkFile();
             dDex.setWritable(true);
             dDex.delete();
             Patches.Record recD2 = Patches.find(ctx, dMan.id, dMan.version);
             ok(stat, L, recD2 != null && !recD2.filesOk
                             && PatchesActivity.stateOf(recD2, apkSha, true) == PatchesActivity.STATE_BROKEN,
-                    "⑥ dex 被外部删掉 ⇒ 记录仍在、状态 = 文件缺失（看得见也删得掉）");
+                    "⑥ 载体被外部删掉 ⇒ 记录仍在、状态 = 文件缺失（看得见也删得掉）");
             Patches.disable(ctx, IKEY, recD2);
             ok(stat, L, PatchesActivity.stateOf(recB, apkSha, false) == PatchesActivity.STATE_OFF
                             && PatchesActivity.stateOf(recA, apkSha, true) == PatchesActivity.STATE_ON
@@ -18916,59 +18911,58 @@ public final class SelfTest {
                             && "v_slot".equals(PatchesActivity.EXTRA_SLOT),
                     "⑥ 版本页 → 补丁页的 Intent：类 + 两个 extra（版本 key / 槽）都对");
 
-            // ── ⑦ 素材包规矩 + 导入负例 ────────────────────────────────────
-            boolean assetsRules;
-            try {
-                Patches.Shipped.assetKeysOf(byteFile(work, "root-level.zip",
-                        zipBytes(new String[]{"patch-lab/x.txt"}, new byte[][]{"x".getBytes("UTF-8")})));
-                assetsRules = false;
-            } catch (java.io.IOException e) {
-                assetsRules = true;
-            }
-            ok(stat, L, assetsRules, "⑦ 素材包条目不在 assets/ 下 ⇒ 拒绝");
-            boolean traversalZip;
-            try {
-                Patches.Shipped.assetKeysOf(byteFile(work, "traversal.zip",
-                        zipBytes(new String[]{"assets/../evil.txt"}, new byte[][]{"x".getBytes("UTF-8")})));
-                traversalZip = false;
-            } catch (java.io.IOException e) {
-                traversalZip = true;
-            }
-            ok(stat, L, traversalZip, "⑦ 素材包条目带 .. ⇒ 拒绝");
-
+            // ── ⑦ 导入负例（v2 整包：不安全路径 / 缺 dex / 坏 dex / schema / 旧格式）───
             File notZip = byteFile(work, "not.zip", "not a zip".getBytes("UTF-8"));
             expectImportCode(ctx, L, stat, "不是 zip", PatchException.C_BAD_ZIP, notZip);
-            File missingDex = new File(work, "missing.mdp");
+            File missingDex = new File(work, "missing.apk");
             zipBlobs(missingDex, java.util.Collections.singletonList(PatchManifest.FILE),
                     java.util.Collections.<byte[]>singletonList(
                             patchManifest(ID_PREFIX + "miss", apkSha, false, "缺 dex").toBytes()));
-            expectImportCode(ctx, L, stat, "清单声明的 dex 不在包里", PatchException.C_MISSING_ENTRY, missingDex);
-            File badDexPkg = patchPackage(work, "baddex.mdp",
+            expectImportCode(ctx, L, stat, "清单合法但整包没有 classes.dex",
+                    PatchException.C_MISSING_ENTRY, missingDex);
+            File badDexPkg = patchPackage(work, "baddex.apk",
                     patchManifest(ID_PREFIX + "x", apkSha, false, "坏 dex"), "not-a-dex".getBytes("UTF-8"), null);
             expectImportCode(ctx, L, stat, "dex 内容不是 dex", PatchException.C_BAD_DEX, badDexPkg);
-            File traversalPkg = new File(work, "traversal.mdp");
+            // ★ 实测（第 407 轮 zipprobe）：安卓的 ZipFile 一旦 getEntry 就会校验**全部**条目名，
+            //   遇到 `..` 直接抛「Invalid zip entry path」⇒ 这种包在平台层就打不开（bad_zip），
+            //   根本走不到我们的 safeRel。真正要靠我们判的是平台**能**打开的坏形状：
+            //   空段（a//b）与 `.` 段（a/./b）。
+            File traversalPkg = new File(work, "traversal.apk");
             zipBlobs(traversalPkg,
-                    java.util.Arrays.asList(PatchManifest.FILE,
-                            "targets/" + apkSha + "/patch.dex", "sub/../evil.txt"),
+                    java.util.Arrays.asList(PatchManifest.FILE, "classes.dex", "a//evil.txt"),
                     java.util.Arrays.asList(good.toBytes(), fixtureDex, "evil".getBytes("UTF-8")));
-            try {
-                Patches.importPackage(ctx, traversalPkg);
-                ok(stat, L, false, "⑦ zip 条目带 .. 应被拒（实际导入成功）");
-            } catch (PatchException e) {
-                // 理想是 bad_path（我们自己的判据）；平台 zip 读取器也可能先拒（= bad_zip）。
-                // 两条都算"拒绝"，但顺序不同 —— 消息里记下实际码，免得以后看不出是哪一道门挡的。
-                ok(stat, L, PatchException.C_BAD_PATH.equals(e.code)
-                                || PatchException.C_BAD_ZIP.equals(e.code),
-                        "⑦ zip 条目带 .. ⇒ 拒绝（实际 " + e.code + " / " + e.detail + "）");
-            }
-            File badSchemaPkg = new File(work, "schema.mdp");
+            expectImportCode(ctx, L, stat, "整包条目含空段（a//evil.txt）",
+                    PatchException.C_BAD_PATH, traversalPkg);
+            File traversalAsset = new File(work, "traversal-asset.apk");
+            zipBlobs(traversalAsset,
+                    java.util.Arrays.asList(PatchManifest.FILE, "classes.dex", "a/./evil.txt"),
+                    java.util.Arrays.asList(good.toBytes(), fixtureDex, "evil".getBytes("UTF-8")));
+            expectImportCode(ctx, L, stat, "整包条目含 . 段（a/./evil.txt）",
+                    PatchException.C_BAD_PATH, traversalAsset);
+            // 反方向：`..` 的包**确实**进不来（平台给的 bad_zip）——钉住这个行为，
+            // 免得以后有人以为「safeRel 管着它」。
+            File dotdotPkg = new File(work, "dotdot.apk");
+            zipBlobs(dotdotPkg,
+                    java.util.Arrays.asList(PatchManifest.FILE, "classes.dex", "sub/../evil.txt"),
+                    java.util.Arrays.asList(good.toBytes(), fixtureDex, "evil".getBytes("UTF-8")));
+            expectImportCode(ctx, L, stat, "带 .. 的包（平台直接拒）",
+                    PatchException.C_BAD_ZIP, dotdotPkg);
+            File badSchemaPkg = new File(work, "schema.apk");
             String badSchemaJson = "{\"schema\":3,\"id\":\"" + ID_PREFIX + "s\",\"name\":\"S\","
-                    + "\"version\":\"1\",\"targets\":[{\"apkSha256\":\"" + apkSha
-                    + "\",\"dex\":\"targets/" + apkSha + "/patch.dex\"}]}";
+                    + "\"version\":\"1\",\"apkSha256\":\"" + apkSha + "\"}";
             zipBlobs(badSchemaPkg,
-                    java.util.Arrays.asList(PatchManifest.FILE, "targets/" + apkSha + "/patch.dex"),
+                    java.util.Arrays.asList(PatchManifest.FILE, "classes.dex"),
                     java.util.Arrays.asList(badSchemaJson.getBytes("UTF-8"), fixtureDex));
             expectImportCode(ctx, L, stat, "schema=3 的包（未知版本）", PatchException.C_SCHEMA, badSchemaPkg);
+            // ★ 第 407 轮：旧 .mdp（schema 1 + targets/）已退役 ⇒ 导入处要明确说「已退役」
+            File legacyMdp = new File(work, "legacy.mdp");
+            String legacyJson = "{\"schema\":1,\"id\":\"" + ID_PREFIX + "old\",\"name\":\"OLD\","
+                    + "\"version\":\"1\",\"targets\":[{\"apkSha256\":\"" + apkSha
+                    + "\",\"dex\":\"targets/" + apkSha + "/patch.dex\"}]}";
+            zipBlobs(legacyMdp,
+                    java.util.Arrays.asList(PatchManifest.FILE, "targets/" + apkSha + "/patch.dex"),
+                    java.util.Arrays.asList(legacyJson.getBytes("UTF-8"), fixtureDex));
+            expectImportCode(ctx, L, stat, "旧 .mdp（schema 1）", PatchException.C_LEGACY, legacyMdp);
             // ★ B12：zip 里同名条目 ⇒ 清单/dex 取哪一个是实现细节 ⇒ 直接拒绝。
             //   夹具必须是**PC 上造的**（安卓的 ZipOutputStream 自己就拒绝同名条目，造不出来），
             //   所以它随 dev 包放在 assets-dev/patch-fixture/dup-entry.zip。
@@ -18979,12 +18973,16 @@ public final class SelfTest {
             } finally {
                 dupIn.close();
             }
-            File dupEntries = byteFile(work, "dupentries.mdp", dupBytes);
-            expectImportCode(ctx, L, stat, "zip 同名条目", PatchException.C_BAD_ZIP, dupEntries);
+            File dupEntries = byteFile(work, "dupentries.zip", dupBytes);
+            // ★ 实测（第 407 轮 zipprobe）：安卓的 ZipFile 打开同名条目时直接抛
+            //   ZipException「Duplicate entry name」⇒ 这一层的判据是**平台给的**，
+            //   我们能观察到的结果就是 C_BAD_ZIP（不要自己再写一遍检测）。
+            expectImportCode(ctx, L, stat, "同名条目（PC 造的夹具，平台就拒）",
+                    PatchException.C_BAD_ZIP, dupEntries);
             // ★ B2 根因链：checksum 被改坏的 dex 必须在导入阶段判死
             byte[] badSumPkgDex = fixtureDex.clone();
             badSumPkgDex[200] ^= 0xFF;
-            File badSumPkg = patchPackage(work, "badsum.mdp",
+            File badSumPkg = patchPackage(work, "badsum.apk",
                     patchManifest(ID_PREFIX + "cs", apkSha, false, "坏校验和"), badSumPkgDex, null);
             expectImportCode(ctx, L, stat, "dex checksum 不符", PatchException.C_BAD_DEX, badSumPkg);
             ok(stat, L, countPatchRecords(ctx, ID_PREFIX) == 4,
@@ -19003,7 +19001,7 @@ public final class SelfTest {
                     java.util.Arrays.asList(apkJson.getBytes("UTF-8"), fixtureDex,
                             "shared".getBytes("UTF-8"), new byte[]{1, 2, 3}));
             ok(stat, L, PatchPackage.isApkContainer(apkPkg)
-                            && !PatchPackage.isApkContainer(pkgA),
+                            && !PatchPackage.isApkContainer(legacyMdp),
                     "⑨ 整包识别：根上 classes.dex + patch.json ⇒ APK 容器；老 .mdp 不算");
             Patches.Record recApk = Patches.importPackage(ctx, apkPkg);
             Patches.TargetFile tfApk = recApk.targets.get(0);
@@ -19084,13 +19082,13 @@ public final class SelfTest {
             //   根因 = 补丁库在内部存储、中转站在外部 hub ⇒ 往返是跨文件系统复制，
             //   `Util.copyFile` 建出来的文件是 0600 可写，而 ART 拒载可写 dex。
             //   夹具里放一份**真 dex**，钉住"放回后必须重新落只读"。
-            write(new File(fakeVer, apkSha + ".dex"), fixtureDex);
+            write(new File(fakeVer, PatchPackage.APK), fixtureDex);
             File patchTrash = Trash.patchesDir(ctx);
             File stashed = new File(patchTrash, Trash.nameFor("", ID_PREFIX + "trash@1"));
             ok(stat, L, Trash.move(fakeVer, stashed) && stashed.isDirectory(),
                     "⑦ 删补丁 = 挪进中转站 patches-trash（不是直接删）");
             // 模拟跨文件系统复制的结果（真实路径上 renameTo 失败 ⇒ copyFile ⇒ 0600）
-            File stashedDex = new File(stashed, apkSha + ".dex");
+            File stashedDex = new File(stashed, PatchPackage.APK);
             stashedDex.setWritable(true);
             Trash.Item sti = Trash.parse(stashed);
             ok(stat, L, sti != null && sti.kind == Trash.Kind.PATCH
@@ -19099,13 +19097,13 @@ public final class SelfTest {
             Trash.Result rr = Trash.restorePatch(ctx, sti);
             ok(stat, L, rr.ok && fakeVer.isDirectory() && !stashed.exists(),
                     "⑦ 从「中转站」放回补丁库原位置（<id>/<version>）");
-            File restoredDex = new File(fakeVer, apkSha + ".dex");
+            File restoredDex = new File(fakeVer, PatchPackage.APK);
             ok(stat, L, restoredDex.isFile() && !restoredDex.canWrite(),
-                    "★★ 放回来的 dex 重新落成只读（第 381 轮：可写 dex 被 ART 拒 ⇒ 只报一行 bad_dex）");
+                    "★★ 放回来的整包载体重新落成只读（第 381 轮：可写 dex 被 ART 拒 ⇒ 只报一行 bad_dex）");
             // 直接钉 seal() 本身（不经过中转站，其它入口也走它）
             File sealDir = new File(work, "seal-" + System.currentTimeMillis());
             sealDir.mkdirs();
-            File sealDex = new File(sealDir, "x.dex");
+            File sealDex = new File(sealDir, "x.apk");
             write(sealDex, new byte[]{1, 2, 3});
             boolean sealTouched = Patches.seal(sealDir);
             ok(stat, L, sealTouched && sealDex.isFile() && !sealDex.canWrite(),
@@ -19254,7 +19252,7 @@ public final class SelfTest {
             if (refMiss != null) {
                 Patches.Record rMiss = Patches.findByRef(ctx, refMiss);
                 if (rMiss != null && !rMiss.targets.isEmpty()) {
-                    File dex = rMiss.targets.get(0).dex;
+                    File dex = rMiss.targets.get(0).apkFile();
                     dex.setWritable(true);
                     dexGone = dex.delete();
                 }
@@ -19669,34 +19667,43 @@ public final class SelfTest {
             Patches.importPackage(ctx, zip);
             ok(stat, L, false, "⑦ " + label + " 应被拒（实际导入成功）");
         } catch (PatchException e) {
-            ok(stat, L, want.equals(e.code), "⑦ " + label + " → " + want + "（实际 " + e.code + "）");
+            ok(stat, L, want.equals(e.code), "⑦ " + label + " → " + want + "（实际 " + e.code
+                    + (e.detail == null ? "" : " / " + e.detail) + "）");
         } catch (Throwable t) {
             ok(stat, L, false, "⑦ " + label + " 抛了非 PatchException：" + t);
         }
     }
 
-    /** 造一份只含一个 target 的清单（自检夹具；dex 路径 / 素材路径按格式拼好）。 */
+    /** 造一份只含一个 target 的**整包**清单（自检夹具；v2 = APK 容器，素材在容器里）。 */
     private static PatchManifest patchManifest(String id, String apkSha, boolean withAssets, String name) {
-        String dex = "targets/" + apkSha + "/patch.dex";
-        String assets = withAssets ? ("targets/" + apkSha + "/assets.zip") : "";
         List<PatchManifest.Target> ts = new ArrayList<PatchManifest.Target>();
-        ts.add(new PatchManifest.Target(apkSha, "160.4", dex, assets));
-        return new PatchManifest(id, name, "1.0", "", "", "selftest", ts);
+        ts.add(new PatchManifest.Target(apkSha, "160.4"));
+        return new PatchManifest(PatchManifest.SCHEMA_APK, id, name, "1.0", "", "", "selftest",
+                PatchManifest.ROLE_PATCH, apkSha, "160.4", ts);
     }
 
-    /** 按清单把 package 打成 zip（manifest 在根；dex / 素材用清单里写的相对路径）。 */
+    /** 按清单打成**整包 APK 容器**（manifest 在根 + classes.dex + 素材 zip 的条目原样展开）。 */
     private static File patchPackage(File dir, String fileName, PatchManifest m,
                                      byte[] dex, byte[] assets) throws java.io.IOException {
-        PatchManifest.Target t = m.targets.get(0);
         List<String> names = new ArrayList<String>();
         List<byte[]> blobs = new ArrayList<byte[]>();
         names.add(PatchManifest.FILE);
         blobs.add(m.toBytes());
-        names.add(t.dex);
+        names.add("classes.dex");
         blobs.add(dex);
-        if (t.hasAssets() && assets != null) {
-            names.add(t.assets);
-            blobs.add(assets);
+        if (assets != null) {
+            java.util.zip.ZipInputStream in = new java.util.zip.ZipInputStream(
+                    new java.io.ByteArrayInputStream(assets));
+            try {
+                java.util.zip.ZipEntry e;
+                while ((e = in.getNextEntry()) != null) {
+                    if (e.isDirectory()) continue;
+                    names.add(e.getName());
+                    blobs.add(readAll(in));
+                }
+            } finally {
+                in.close();
+            }
         }
         File f = new File(dir, fileName);
         zipBlobs(f, names, blobs);

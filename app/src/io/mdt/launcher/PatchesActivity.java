@@ -109,12 +109,11 @@ public final class PatchesActivity extends BaseActivity {
         final int dexCount;
         final int libCount;
         final long dexBytes;
-        final long assetsBytes;
         final long importedAt;
 
         Row(Patches.Record record, boolean enabled, int state, Patches.TargetFile target,
             boolean targetMatches, int classCount, int assetCount, int dexCount, int libCount,
-            long dexBytes, long assetsBytes, long importedAt) {
+            long dexBytes, long importedAt) {
             this.record = record;
             this.enabled = enabled;
             this.state = state;
@@ -125,7 +124,6 @@ public final class PatchesActivity extends BaseActivity {
             this.dexCount = dexCount;
             this.libCount = libCount;
             this.dexBytes = dexBytes;
-            this.assetsBytes = assetsBytes;
             this.importedAt = importedAt;
         }
     }
@@ -220,12 +218,10 @@ public final class PatchesActivity extends BaseActivity {
                     Patches.TargetFile show = match != null ? match
                             : (r.targets.isEmpty() ? null : r.targets.get(0));
                     int classes = 0, assets = 0;
-                    long dexBytes = 0, assetsBytes = 0;
+                    long apkBytes = 0;
                     if (show != null) {
-                        File dex = show.dexFile();
-                        File as = show.assetsFile();
-                        if (dex != null && dex.isFile()) dexBytes = dex.length();
-                        if (as != null && as.isFile()) assetsBytes = as.length();
+                        File carrier = show.apkFile();
+                        if (carrier != null && carrier.isFile()) apkBytes = carrier.length();
                         if (r.filesOk) {
                             try {
                                 classes = show.classCount();
@@ -239,7 +235,7 @@ public final class PatchesActivity extends BaseActivity {
                     rows.add(new Row(r, on, state, show, match != null,
                             classes, assets, show == null ? 0 : show.dexCount(),
                             show == null ? 0 : show.libCount(),
-                            dexBytes, assetsBytes, importedAt));
+                            apkBytes, importedAt));
                 }
                 List<Patches.Problem> problems = Patches.launchProblems(PatchesActivity.this);
                 // ★ 第 360 轮：崩溃后自动停用的结论也进同一张卡（用户可重新启用）
@@ -365,7 +361,7 @@ public final class PatchesActivity extends BaseActivity {
                     row.dexCount, row.libCount));
         }
         body.append('\n').append(Trans.get(this, R.string.patch_detail_size_fmt,
-                humanBytes(row.dexBytes + row.assetsBytes)));
+                humanBytes(row.dexBytes)));
         if (m.tool != null && !m.tool.isEmpty()) {
             body.append('\n').append(Trans.get(this, R.string.patch_detail_tool_fmt, m.tool));
         }

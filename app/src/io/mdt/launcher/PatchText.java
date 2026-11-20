@@ -19,6 +19,7 @@ final class PatchText {
             PatchException.C_BAD_ZIP,
             PatchException.C_BAD_JSON,
             PatchException.C_SCHEMA,
+            PatchException.C_LEGACY,           // 旧 .mdp 已退役（第 407 轮）
             PatchException.C_FIELD,
             PatchException.C_NO_TARGETS,
             PatchException.C_BAD_HASH,
@@ -55,6 +56,7 @@ final class PatchText {
         if (PatchException.C_BAD_ZIP.equals(code)) return Trans.get(c, R.string.patch_err_bad_zip);
         if (PatchException.C_BAD_JSON.equals(code)) return Trans.get(c, R.string.patch_err_json);
         if (PatchException.C_SCHEMA.equals(code)) return Trans.get(c, R.string.patch_err_schema_fmt, d);
+        if (PatchException.C_LEGACY.equals(code)) return Trans.get(c, R.string.patch_err_legacy_fmt, d);
         if (PatchException.C_FIELD.equals(code)) return Trans.get(c, R.string.patch_err_field_fmt, d);
         if (PatchException.C_NO_TARGETS.equals(code)) return Trans.get(c, R.string.patch_err_targets);
         if (PatchException.C_BAD_HASH.equals(code)) return Trans.get(c, R.string.patch_err_hash_fmt, d);

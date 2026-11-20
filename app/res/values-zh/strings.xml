@@ -2317,6 +2317,7 @@
     <string name="patch_err_bad_zip">不是有效的补丁包（zip）。</string>
     <string name="patch_err_json">包里的 patch.json 读不出来。</string>
     <string name="patch_err_schema_fmt">补丁格式版本不支持（schema=%1$s）。</string>
+    <string name="patch_err_legacy_fmt">旧 .mdp 补丁格式已退役，请重新打包成 APK 补丁：%1$s</string>
     <string name="patch_err_field_fmt">补丁清单字段无效：%1$s</string>
     <string name="patch_err_targets">补丁包没有声明任何适用版本。</string>
     <string name="patch_err_hash_fmt">APK 哈希无效：%1$s</string>

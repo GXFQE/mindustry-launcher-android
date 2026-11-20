@@ -16,8 +16,13 @@ final class PatchException extends IOException {
     static final String C_BAD_ZIP = "bad_zip";
     /** 包里没有 patch.json，或 JSON 解析失败。 */
     static final String C_BAD_JSON = "bad_json";
-    /** schema 不是 1（不猜未来格式）。 */
+    /** schema 不是 2（不猜未来格式，也不再认旧 .mdp 的 schema 1）。 */
     static final String C_SCHEMA = "schema";
+    /**
+     * 旧 .mdp（schema 1）格式**已退役**（第 407 轮）：用户拿老包来导入时要说「格式已退役」，
+     * 而不是笼统的「schema 不认识」——detail = 文件名。
+     */
+    static final String C_LEGACY = "legacy_format";
     /** 某个字段缺失 / 非法。 */
     static final String C_FIELD = "field";
     /** targets 数组为空。 */

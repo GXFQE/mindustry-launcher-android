@@ -8,7 +8,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Enumeration;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -190,12 +192,16 @@ final class PatchPackage {
             int assetCount = 0;
             long totalLib = 0;
             int libCount = 0;
+            Set<String> seen = new HashSet<String>();
             for (Enumeration<? extends ZipEntry> en = z.entries(); en.hasMoreElements(); ) {
                 ZipEntry e = en.nextElement();
                 if (e.isDirectory()) continue;
                 String n = e.getName();
+                // 安全路径与同名条目要对**全部**条目成立：`sub/../evil.txt` 这类既不进
+                // assets/ 也不进 lib/ 的条目，同样会让"清单/dex 取的是哪一个"变得不可预期。
+                if (!PatchManifest.safeRel(n)) throw new PatchException(PatchException.C_BAD_PATH, n);
+                if (!seen.add(n)) throw new PatchException(PatchException.C_BAD_ZIP, "duplicate entry: " + n);
                 if (n.startsWith("assets/")) {
-                    if (!PatchManifest.safeRel(n)) throw new PatchException(PatchException.C_BAD_PATH, n);
                     if (++assetCount > MAX_ASSET_ENTRIES) {
                         throw new PatchException(PatchException.C_TOO_BIG, "assets entries");
                     }

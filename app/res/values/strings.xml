@@ -2361,6 +2361,7 @@
     <string name="patch_err_bad_zip">Not a valid patch package (zip).</string>
     <string name="patch_err_json">The patch.json inside cannot be read.</string>
     <string name="patch_err_schema_fmt">Unsupported patch format (schema %1$s).</string>
+    <string name="patch_err_legacy_fmt">The old .mdp patch format is retired; rebuild this patch as an APK container: %1$s</string>
     <string name="patch_err_field_fmt">Invalid patch manifest field: %1$s</string>
     <string name="patch_err_targets">This package does not declare any game version.</string>
     <string name="patch_err_hash_fmt">Invalid APK hash: %1$s</string>

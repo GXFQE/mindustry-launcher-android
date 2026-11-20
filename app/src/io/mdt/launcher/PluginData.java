@@ -883,31 +883,23 @@ final class PluginData {
             String p = "target." + i + ".";
             ex.put(p + "sha256", spec.apkSha256);
             put(ex, p + "gameVersion", spec.gameVersion);
-            File dex = t.dexFile();
-            File as = t.assetsFile();
-            boolean dexOk = dex != null && dex.isFile() && dex.length() > 0;
-            boolean asOk = as != null && as.isFile();
-            long dexBytes = dexOk ? dex.length() : 0L;
-            long asBytes = asOk ? as.length() : 0L;
-            bytes += dexBytes + asBytes;
+            // 载体是一个整包 APK（dex / assets / native 都在里面）；"assetsBytes" 这个键
+            // 没有对应物了，但插件可能已在读它 ⇒ 保留键、恒为 0（不删别人的尺子）。
+            File carrier = t.apkFile();
+            boolean carrierOk = carrier != null && carrier.isFile() && carrier.length() > 0;
+            long dexBytes = carrierOk ? carrier.length() : 0L;
+            bytes += dexBytes;
             ex.put(p + "dexBytes", String.valueOf(dexBytes));
-            ex.put(p + "assetsBytes", String.valueOf(asBytes));
-            if (dexOk) {
+            ex.put(p + "assetsBytes", "0");
+            if (carrierOk) {
                 try {
                     ex.put(p + "classes", String.valueOf(t.classCount()));
                 } catch (Throwable ignored) {
                     // dex 坏了 / 读不出来 ⇒ 不放这个键（别当 0）
                 }
             }
-            if (t.apkFile() != null) {
-                // v2 整包补丁：素材就在 APK 的 assets/ 里（没有单独素材包可数 "0"）
-                try {
-                    ex.put(p + "assets", String.valueOf(t.assetKeys().size()));
-                } catch (Throwable ignored) {
-                }
-            } else if (!spec.hasAssets()) {
-                ex.put(p + "assets", "0");      // 没声明素材包 = **事实**，不是"读不出来"
-            } else if (asOk) {
+            // 素材就在 APK 的 assets/ 里（读不出来就不放这个键，别当 0）
+            if (carrierOk) {
                 try {
                     ex.put(p + "assets", String.valueOf(t.assetKeys().size()));
                 } catch (Throwable ignored) {

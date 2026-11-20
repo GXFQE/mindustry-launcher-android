@@ -870,7 +870,9 @@ final class DevTools {
                         sb.append("targets = ").append(r.targets.size()).append('\n');
                         for (Patches.TargetFile t : r.targets) {
                             sb.append("  target ").append(t.spec.apkSha256)
-                              .append(" assets=").append(t.spec.hasAssets()).append('\n');
+                              .append(" carrier=").append(t.apkFile() == null ? "MISSING"
+                                      : (t.apkFile().length() + " B"))
+                              .append(" assets=in-apk").append('\n');
                         }
                     } catch (PatchException e) {
                         sb.append("result= fail\n");
@@ -1004,7 +1006,7 @@ final class DevTools {
                               .append(carrier == null ? "MISSING" : carrier.length())
                               .append(" dexes=").append(t.dexCount())
                               .append(" classes=").append(cc)
-                              .append(" assets=").append(t.spec.hasAssets() ? "yes" : "in-apk")
+                              .append(" assets=in-apk")
                               .append('\n');
                         }
                     }

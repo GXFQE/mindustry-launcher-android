@@ -1,6 +1,5 @@
 package io.mdt.launcher;
 
-import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
@@ -13,21 +12,17 @@ import java.util.regex.Pattern;
 /**
  * 补丁清单 `patch.json` 的**解析 + 校验**。
  *
- * <h3>两种包（schema 1 = 旧 `.mdp`；schema 2 = 整包 APK）</h3>
+ * <h3>一种包（schema 2 = 整包 APK）</h3>
  *
  * <pre>
- * schema 1（旧）：my-patch.mdp (zip)
- *   ├── patch.json
- *   └── targets/&lt;apkSha256&gt;/patch.dex + assets.zip
- *
- * schema 2（2026-11-20，整包）：mdtx-1607.apk
+ * 补丁 = 一个 APK（根上多一份清单）：
  *   ├── patch.json                     ← 根上
  *   ├── classes.dex / classes2.dex…    ← 全部代码（多 dex）
  *   ├── lib/&lt;abi&gt;/*.so                ← 可选；仅 role=game
  *   └── assets/**                      ← 可选
  * </pre>
  *
- * <h3>schema 2 的清单</h3>
+ * <h3>清单</h3>
  * <pre>
  * { "schema": 2,
  *   "id": "mdtx-1607", "name": "MindustryX", "version": "B509",
@@ -37,28 +32,21 @@ import java.util.regex.Pattern;
  *   "author": "", "note": "", "tool": "" }
  * </pre>
  *
- * <p>schema 2 没有 `targets`：**一个包 = 一个基座**；要覆盖多个基座就出多个包（转换器是脚本）。
- * 这样与"补丁包就是一个 APK、根上多一份清单"的形状一致。</p>
+ * <p>没有 `targets`：**一个包 = 一个基座**；要覆盖多个基座就出多个包（转换器是脚本）。
+ * 旧 `.mdp`（schema 1 + `targets/`）已在第 407 轮退役：解析到 schema 1 一律
+ * {@link PatchException#C_LEGACY}。</p>
  *
  * <p>纯 JDK + `org.json` —— 不 import `android.*`，设备自检直接喂字节。</p>
  */
 final class PatchManifest {
 
-    /** 旧 `.mdp` 格式。 */
-    static final int SCHEMA_LEGACY = 1;
     /** 整包 APK 格式（2026-11-20）。 */
     static final int SCHEMA_APK = 2;
-    /** 当前写入用的版本（读侧同时认 1）。 */
+    /** 当前（也是唯一）支持的版本。 */
     static final int SCHEMA = SCHEMA_APK;
-
-    /** 一份 v1 清单里最多接受多少个 target（一个包带多版本，但不该带几十个）。 */
-    static final int MAX_TARGETS = 8;
 
     /** 包内清单文件名（必须在 zip 根上）。 */
     static final String FILE = "patch.json";
-
-    /** v1 target 目录前缀（v2 不再使用）。 */
-    static final String TARGETS = "targets/";
 
     static final String ROLE_PATCH = "patch";
     static final String ROLE_GAME = "game";
@@ -67,26 +55,16 @@ final class PatchManifest {
     private static final Pattern VERSION = Pattern.compile("[A-Za-z0-9][A-Za-z0-9._+-]{0,31}");
     private static final Pattern SHA = Pattern.compile("[0-9a-f]{64}");
 
-    /** 一个 target = 一份"针对特定 APK"的补丁产物（v2 只会有一个，字段由 APK 内容补全）。 */
+    /** 一个 target = 一份"针对特定 APK"的补丁产物（只有一个，字段由 APK 内容补全）。 */
     static final class Target {
         /** 目标 APK 的 sha256（64 位小写十六进制）—— 唯一匹配键。 */
         final String apkSha256;
         /** 给人看的游戏版本（如 `160.4`）；空串 = 清单没写，界面显示 APK 哈希前缀。 */
         final String gameVersion;
-        /** 包内 dex 相对路径（v1 用；v2 为空，dex 由 APK 根上的 `classes*.dex` 决定）。 */
-        final String dex;
-        /** 包内素材 zip 相对路径（v1 用；v2 为空，素材就在 APK 的 `assets/` 里）。 */
-        final String assets;
 
-        Target(String apkSha256, String gameVersion, String dex, String assets) {
+        Target(String apkSha256, String gameVersion) {
             this.apkSha256 = apkSha256;
             this.gameVersion = gameVersion == null ? "" : gameVersion;
-            this.dex = dex == null ? "" : dex;
-            this.assets = assets == null ? "" : assets;
-        }
-
-        boolean hasAssets() {
-            return !assets.isEmpty();
         }
     }
 
@@ -97,20 +75,14 @@ final class PatchManifest {
     final String author;
     final String note;
     final String tool;
-    /** v2：`patch` / `game`。v1 一律 `patch`。 */
+    /** `patch` / `game`。 */
     final String role;
-    /** v2：基座 APK 的 sha256；v1 为 null（在 targets 里）。 */
+    /** 基座 APK 的 sha256。 */
     final String apkSha256;
-    /** v2：给人看的基座版本；v1 为空（在 targets 里）。 */
+    /** 给人看的基座版本。 */
     final String gameVersion;
+    /** 恒为 1 条（保留列表形状：`Record` / 插件快照 / 界面都按 target 遍历）。 */
     final List<Target> targets;
-
-    /** v1 构造（自检夹具还用它）。 */
-    PatchManifest(String id, String name, String version, String author, String note,
-                  String tool, List<Target> targets) {
-        this(SCHEMA_LEGACY, id, name, version, author, note, tool,
-                ROLE_PATCH, null, "", targets);
-    }
 
     PatchManifest(int schema, String id, String name, String version, String author, String note,
                   String tool, String role, String apkSha256, String gameVersion,
@@ -148,35 +120,30 @@ final class PatchManifest {
         }
 
         int schema = o.optInt("schema", Integer.MIN_VALUE);
+        if (schema != SCHEMA_APK) {
+            // schema 1（旧 .mdp）已退役；未知版本同样拒绝（detail 里带上原值，导入处据此翻成"已退役"）
+            throw new PatchException(PatchException.C_SCHEMA, String.valueOf(o.opt("schema")));
+        }
         String[] h = head(o);       // id / name / version / author / note / tool
-
-        if (schema == SCHEMA_LEGACY) {
-            List<Target> targets = parseTargets(o);
-            return new PatchManifest(SCHEMA_LEGACY, h[0], h[1], h[2], h[3], h[4], h[5],
-                    ROLE_PATCH, null, "", targets);
+        if (o.has("targets")) {
+            // 整包格式没有 targets：一个包 = 一个基座
+            throw new PatchException(PatchException.C_FIELD, "targets");
         }
-        if (schema == SCHEMA_APK) {
-            if (o.has("targets")) {
-                // 整包格式没有 targets：一个包 = 一个基座
-                throw new PatchException(PatchException.C_FIELD, "targets");
-            }
-            String sha = o.optString("apkSha256", "").trim().toLowerCase(Locale.ROOT);
-            if (!SHA.matcher(sha).matches()) {
-                throw new PatchException(PatchException.C_BAD_HASH, o.optString("apkSha256", "apkSha256"));
-            }
-            String game = clean(o.optString("gameVersion", ""));
-            if (game.length() > 64) throw new PatchException(PatchException.C_FIELD, "gameVersion");
-            String role = o.optString("role", ROLE_PATCH).trim().toLowerCase(Locale.ROOT);
-            if (!ROLE_GAME.equals(role)) role = ROLE_PATCH;   // 未知值按普通补丁（前向兼容）
-            List<Target> one = new ArrayList<Target>(1);
-            one.add(new Target(sha, game, "", ""));
-            return new PatchManifest(SCHEMA_APK, h[0], h[1], h[2], h[3], h[4], h[5],
-                    role, sha, game, one);
+        String sha = o.optString("apkSha256", "").trim().toLowerCase(Locale.ROOT);
+        if (!SHA.matcher(sha).matches()) {
+            throw new PatchException(PatchException.C_BAD_HASH, o.optString("apkSha256", "apkSha256"));
         }
-        throw new PatchException(PatchException.C_SCHEMA, String.valueOf(o.opt("schema")));
+        String game = clean(o.optString("gameVersion", ""));
+        if (game.length() > 64) throw new PatchException(PatchException.C_FIELD, "gameVersion");
+        String role = o.optString("role", ROLE_PATCH).trim().toLowerCase(Locale.ROOT);
+        if (!ROLE_GAME.equals(role)) role = ROLE_PATCH;   // 未知值按普通补丁（前向兼容）
+        List<Target> one = new ArrayList<Target>(1);
+        one.add(new Target(sha, game));
+        return new PatchManifest(SCHEMA_APK, h[0], h[1], h[2], h[3], h[4], h[5],
+                role, sha, game, one);
     }
 
-    /** 公共头字段（两个 schema 一样）。返回 {id, name, version, author, note, tool}。 */
+    /** 公共头字段。返回 {id, name, version, author, note, tool}。 */
     private static String[] head(JSONObject o) throws PatchException {
         String id = o.optString("id", "").trim();
         if (!ID.matcher(id).matches()) throw new PatchException(PatchException.C_FIELD, "id");
@@ -196,54 +163,6 @@ final class PatchManifest {
         String tool = clean(o.optString("tool", ""));
         if (tool.length() > 64) throw new PatchException(PatchException.C_FIELD, "tool");
         return new String[]{id, name, version, author, note, tool};
-    }
-
-    /** v1：targets 数组（多版本）。 */
-    private static List<Target> parseTargets(JSONObject o) throws PatchException {
-        JSONArray arr = o.optJSONArray("targets");
-        if (arr == null) throw new PatchException(PatchException.C_FIELD, "targets");
-        if (arr.length() == 0) throw new PatchException(PatchException.C_NO_TARGETS, "");
-        if (arr.length() > MAX_TARGETS) throw new PatchException(PatchException.C_FIELD, "targets");
-
-        List<Target> targets = new ArrayList<Target>(arr.length());
-        for (int i = 0; i < arr.length(); i++) {
-            JSONObject t = arr.optJSONObject(i);
-            if (t == null) throw new PatchException(PatchException.C_FIELD, "targets[" + i + "]");
-            String sha = t.optString("apkSha256", "").trim().toLowerCase(Locale.ROOT);
-            if (!SHA.matcher(sha).matches()) {
-                throw new PatchException(PatchException.C_BAD_HASH,
-                        t.optString("apkSha256", "targets[" + i + "]"));
-            }
-            for (Target e : targets) {
-                if (e.apkSha256.equals(sha)) {
-                    // 同一份 APK 两个 target：静默取一个就是"随机行为"，直接拒绝
-                    throw new PatchException(PatchException.C_FIELD, "targets[" + i + "].apkSha256");
-                }
-            }
-            String game = clean(t.optString("gameVersion", ""));
-            if (game.length() > 64) throw new PatchException(PatchException.C_FIELD, "gameVersion");
-            String dex = t.optString("dex", "").trim();
-            checkTargetPath(dex, sha, ".dex");
-            String assets = t.optString("assets", "").trim();
-            if (!assets.isEmpty()) checkTargetPath(assets, sha, ".zip");
-            targets.add(new Target(sha, game, dex, assets));
-        }
-        return targets;
-    }
-
-    /** v1：dex / assets 必须是 `targets/&lt;自己的 sha&gt;/&lt;名字&gt;.dex|.zip` —— 单层文件名。 */
-    private static void checkTargetPath(String path, String sha, String suffix)
-            throws PatchException {
-        if (!safeRel(path)) throw new PatchException(PatchException.C_BAD_PATH, path);
-        String prefix = TARGETS + sha + "/";
-        if (!path.startsWith(prefix)) throw new PatchException(PatchException.C_BAD_PATH, path);
-        String rest = path.substring(prefix.length());
-        if (rest.isEmpty() || rest.indexOf('/') >= 0) {
-            throw new PatchException(PatchException.C_BAD_PATH, path);
-        }
-        if (!rest.endsWith(suffix) || rest.length() > 64) {
-            throw new PatchException(PatchException.C_BAD_PATH, path);
-        }
     }
 
     /**
@@ -314,22 +233,9 @@ final class PatchManifest {
             o.put("author", author);
             o.put("note", note);
             o.put("tool", tool);
-            if (schema == SCHEMA_APK) {
-                o.put("role", role);
-                o.put("apkSha256", apkSha256 == null ? "" : apkSha256);
-                o.put("gameVersion", gameVersion);
-            } else {
-                JSONArray arr = new JSONArray();
-                for (Target t : targets) {
-                    JSONObject j = new JSONObject();
-                    j.put("apkSha256", t.apkSha256);
-                    j.put("gameVersion", t.gameVersion);
-                    j.put("dex", t.dex);
-                    if (t.hasAssets()) j.put("assets", t.assets);
-                    arr.put(j);
-                }
-                o.put("targets", arr);
-            }
+            o.put("role", role);
+            o.put("apkSha256", apkSha256 == null ? "" : apkSha256);
+            o.put("gameVersion", gameVersion);
         } catch (JSONException e) {
             // org.json 的 put 只在 key 为 null 时抛；这里的 key 全是字面量 ⇒ 理论上到不了
             throw new IllegalStateException("manifest toJson failed", e);
@@ -341,7 +247,7 @@ final class PatchManifest {
         return toJson().toString().getBytes(java.nio.charset.Charset.forName("UTF-8"));
     }
 
-    /** 清单里 target 个数（界面副标题用；v2 恒为 1）。 */
+    /** 清单里 target 个数（界面副标题用；恒为 1）。 */
     int targetCount() {
         return targets.size();
     }

@@ -68,10 +68,8 @@ final class InjectionSources {
             if (crashAt > 0L && info.at > crashAt) return;      // 之后又启动过 ⇒ 不是这一局
             for (Patches.Launched l : info.patches) {
                 if (l == null || l.dex.isEmpty()) continue;
-                File carrier = new File(l.dex);
-                // v2：载体可能是整包 APK（多 dex）；v1：单 dex
-                Set<String> classes = carrier.getName().endsWith(".apk")
-                        ? classesOfApk(carrier) : classesOfDex(carrier);
+                // 载体是整包 APK（可能多 dex）
+                Set<String> classes = classesOfApk(new File(l.dex));
                 if (classes.isEmpty()) continue;
                 s.addPatch(l.label == null || l.label.isEmpty() ? l.ref : l.label, classes);
             }
@@ -95,18 +93,6 @@ final class InjectionSources {
             }
         } catch (Throwable t) {
             Log.w(TAG, "injection sources: plugin classes failed: " + t);
-        }
-    }
-
-    private static Set<String> classesOfDex(File dex) {
-        if (dex == null || !dex.isFile() || dex.length() <= 0 || dex.length() > MAX_DEX) {
-            return new LinkedHashSet<String>();
-        }
-        try {
-            return new LinkedHashSet<String>(PatchDex.classes(readAll(dex)));
-        } catch (Throwable t) {
-            Log.w(TAG, "injection sources: read dex failed: " + dex, t);
-            return new LinkedHashSet<String>();
         }
     }
 
