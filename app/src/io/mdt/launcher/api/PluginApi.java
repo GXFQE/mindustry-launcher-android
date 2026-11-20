@@ -59,7 +59,7 @@ public interface PluginApi {
      * <p>为什么要有这个常量：注释里的「当前 = N」运行期读不到，一个写 17、一个写 20 也没人发现；
      * 常量 + 断言才拦得住。</p>
      */
-    int DOC_VERSION = 51;
+    int DOC_VERSION = 52;
 
     // ══ 环境 ═══════════════════════════════════════════════════════════════
 
@@ -900,6 +900,61 @@ public interface PluginApi {
      *                改名失败 ⇒ {@code io}
      */
     void renameItem(ItemInfo item, String newName, Done done);
+
+    // ── v52（第 411 轮）：宿主设置只读 ────────────────────────────────────
+    //
+    // 只读、同步、不弹窗；两组分开 —— 一组是"设置页里用户能看到的项"，
+    // 另一组是"上次启动落在哪"（那是启动记录，不是用户设置）。
+
+    /**
+     * **v52**：宿主设置的**只读**快照（键 → 值；值保留真类型：{@code Integer} /
+     * {@code Boolean} / {@code String} / {@code Long}，备份那块是嵌套 Map）。
+     *
+     * <p>只给**设置页里用户能看到的项**（用户改得到的东西才给插件看）：
+     * <pre>
+     * theme_mode              int      深浅色（0 跟随系统 / 1 浅色 / 2 深色）
+     * orientation_mode        int      管理器界面方向（0 跟随系统 / 1 竖屏 / 2 横屏）
+     * app_language            String   BCP-47 语言；空串 = 跟随系统
+     * default_slot            String   **生效值**（没设过时是 "default"，不是空串）
+     * default_slot_configured boolean  用户是否显式设过默认槽（区分"设成 default"与"没设"）
+     * max_log_files           int      运行日志保留份数
+     * trash_keep              int      中转站普通条目保留份数
+     * trash_keep_slots        int      中转站整槽条目保留份数
+     * auto_clean_redundant    boolean  自动清理缓存开关
+     * crash_alert             boolean  崩溃提醒开关
+     * plugin_auto_update      boolean  插件自动更新开关
+     * update_mode             int      更新模式（0 关闭 / 1 稳定版 / 2 预览版）
+     * update_mirror           String   更新线路；空串 = 自动，{@code direct} = 直连，其余为自定义 https 前缀
+     * download_limit          long     下载限速（字节/秒；0 = 不限；插件不许改）
+     * backups                 Map      按槽名的自动备份策略：槽名 → {enabled:Boolean,
+     *                                  min_minutes:Integer, max_backups:Integer}
+     * </pre>
+     *
+     * <p>**不给的**：宿主内部记录（{@code version_slots} / {@code main_order} /
+     * {@code patch_enabled} / {@code imports} …）不是用户设置，而且会绕开 v50 的行写门禁 ——
+     * 改启动项用 {@link #addLaunchItem} 那一组。上次启动也不在这张表里，见 {@link #lastLaunch()}。
+     *
+     * <p>同步、无回调；读失败只返回读得到的那部分（不抛）。**只读**，没有对应的写接口。
+     */
+    Map<String, Object> launcherSettings();
+
+    /**
+     * **v52**：上次启动落在哪个版本 / 哪个槽（只读快照）。
+     *
+     * <p>返回的键：
+     * <ul>
+     *   <li>{@code has}：{@code Boolean}，有没有可用的"上次启动"记录（从没启动过 / 记录被清过
+     *       ⇒ false）；</li>
+     *   <li>{@code version}：{@code String}，版本 key（与 {@link #versions()} 的 {@code extra.key}
+     *       同源）；{@code has=false} 时不出现；</li>
+     *   <li>{@code slot}：{@code String}，上次启动所在槽；{@code has=false} 时不出现。</li>
+     * </ul>
+     *
+     * <p>它回答的是"上一次实际启动的是哪个实例"，**不是**用户设的默认槽（那个在
+     * {@link #launcherSettings()} 的 {@code default_slot}）。记录由宿主在启动时写、删实例时清；
+     * 插件**只读**（没有 useSlot 之类的写接口）。
+     */
+    Map<String, Object> lastLaunch();
 
     /**
      * 让用户从**当前槽的某一类内容**里勾选，结果回调给插件。

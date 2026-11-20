@@ -5,7 +5,7 @@
 
 ## 1. 版本与兼容（v20 冻结基线）
 
-- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..51**。
+- 宿主接受**区间**：插件 `api()` 落在 `[API_MIN, API]` 就加载。当前是 **20..52**。
   （v20 是冻结基线；v21 = 游戏设置面；v22 = 后台任务 + 游戏事件；v23 = 探针；v24 = 分析器；
   v25 = 结论挂行 + 筛选/排序注入 + HJSON；v26 = 逐项判定；v27 = 详情页的门 + 槽级结论进摘要卡；
   v28 = 原版文案键；v29 = 游戏前后台事件；v30 = 探针知道版本 / 跨会话数据目录 + 摘要卡总时长；
@@ -37,7 +37,8 @@
   **插件启停仍归宿主**）；`List<ItemInfo> instances()`（运行实例，含启动占位）+
   `List<ItemInfo> backups(slot)`（备份元信息）。另有一批 **`extra` 加键**（不抬版本的增量）：
   `versions()` 的 `instanceKey` / `bound` / `patchCount` / `backupCount`，`plugins()` 的
-  `updateState` / `updateVersion` / `updateNote`，`settings()` 的六个公开设置键。**
+  `updateState` / `updateVersion` / `updateNote`，`settings()` 快照的六个设置键（当时只在宿主内部；
+  v52 起由 `launcherSettings()` 正式给出）。**
   **v40 = 插入能力**：`showCard(title, body, buttons, cb)`（宿主卡片，最多 3 个按钮；回调只来一次，
   点按钮给下标、关掉给 -1）+ `openPage(page, slot)`（跳宿主页面；slot 空 = 当前槽）；`plugin.json`
   的扩展条目多一个可选 `"place": "actions"`（把动作插进宿主操作卡，四个内容页有锚点，别的页回落
@@ -54,7 +55,7 @@
   `fetchText(url, maxBytes, cb)`（上限由插件给，钳到 2 MB）、`fetchBytes(url, maxBytes, cb)`
   （图标等小块，256 KB）、`modsInstall(...)`（走宿主导入链：游戏判据 + 旧件进中转站）+
   `modsSetEnabled(...)`（转 `Mods.setEnabled`）；`GitHubRelease.Asset` 多 `browserUrl` / `sha256`；
-  `settings()` 多 `download_limit`。）
+  `settings()` 快照多 `download_limit`（v52 起 `launcherSettings()` 同样给）。）
   **v44 = `game-exit` 观测键 + 宿主版本需求**：`game-exit` 的 `data` 多
   `started` / `ended` / `activeMs` / `wallMs` / `key`（第 384 轮的宿主时钟；拿不到检查点就整组不给），
   以及 `patch` / `patchLabel` / `patchCount`（第 388 轮：这一局**实际注入的补丁**；没有补丁就不给这三个键）；
@@ -93,7 +94,11 @@
   —— 这一组**真的动盘**：建空槽、槽改名（含当前槽，指针一起改）、整槽克隆、整槽进中转站、
   改槽内内容文件的磁盘名。槽改名会一次做完"目录 + 备份目录 + 默认槽 / 备份策略 / 手工顺序"；
   删槽的门禁与界面同源（默认槽 `default-slot` / 还有启动项 `in-use` / 实例在跑 `game-running`）。
-  `API_MIN` 仍不动。
+  **v52 = 宿主设置的只读快照**：`launcherSettings()` 一次给出 15 个键（11 项设置页里能被改的
+  值 + `default_slot` 的生效值与"设没设过"+ `backups` 按槽嵌套）；`lastLaunch()` 单独回答
+  "上次实际启动的是哪个实例"（`has` / `version` / `slot`）。**只读、同步、没有失败码**；
+  内部记录（`version_slots` / `main_order` / `patch_enabled` / `imports` …）一律不给，
+  设置写接口本轮不做。`API_MIN` 仍不动。
 - 插件 `api()` 报的是「我需要的最低宿主接口版本」。用不到的新能力**不要**报高 ——
   报高了只会在老宿主上被拒，换不来任何东西。
 - **不要用 try/catch 去兼容老宿主**：报什么版本就只会跑在什么版本上。`api()` 报 20，
@@ -181,7 +186,7 @@
 ## 3. 入口类约定
 
 ```java
-public static int api();                        // 必需：你需要的接口版本（当前 51；用不到新能力就报 20）
+public static int api();                        // 必需：你需要的接口版本（当前 52；用不到新能力就报 20）
 public static View createView(PluginApi api);   // content / section 用
 public static void run(PluginApi api);          // action 用（在原页跑，不换页）
 public static void unload();                    // 可选：收尾（也认 unload(Context)）
@@ -201,7 +206,7 @@ public static void unload();                    // 可选：收尾（也认 unlo
 
 | 方法 | 说明 |
 |---|---|
-| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 51） |
+| `hostApi()` | 宿主支持的接口版本（判断能力用；当前 52） |
 | `context()` | 插件上下文（**只用来取资源 / 主题 / 建 View**） |
 | `page()` / `slot()` | 从哪一页来 / 当前槽名 |
 | `theme()` | 主题色与 dp/sp（别自己写死颜色，见 `PluginTheme`） |
@@ -227,6 +232,8 @@ public static void unload();                    // 可选：收尾（也认 unlo
 | `patches()` / `patches(versionKey, slot)`（v38） | 已导入的游戏补丁；给了启动项才判 `enabled` / `applies`，见下文 |
 | `instances()`（v39） | **正在跑**的游戏实例（含启动占位）—— `pid` / `vkey` / `slot` / `instanceKey` / `started` / `starting`；顺序 = 启动时间升序。⚠️ 读失败也返回空表（没有失败码）：空表只说明"这份快照里没有"，别当"一定没在跑"的硬证据 |
 | `backups(slot)`（v39） | 某个槽的**备份快照**元信息（`created` / `label` / `source` / `files` / `bytes` / `legacy`）；`slot` 空 = 这一页的槽；恢复 / 删除不给插件做。⚠️ 清单读不出来也返回空表（同上） |
+| `launcherSettings()`（v52） | 宿主设置的**只读快照**（15 键：设置页能被改的 11 项 + `default_slot` 两态 + `backups` 按槽嵌套）—— **同步、没有失败码**；内部记录一律不给，见下文「v52 宿主设置只读」 |
+| `lastLaunch()`（v52） | **上次实际启动的实例**：`has`（Boolean）/ `version`（版本 key）/ `slot`（宿主生效的槽名）；`has=false` 时另外两个键**不出现**。与"默认槽"无关 |
 | `usageDir()` | 插件数据目录（见第 9 节） |
 | `crashReportsDir()`（v22） | 当前槽的崩溃报告目录（只读；可能不存在） |
 
@@ -236,7 +243,7 @@ public static void unload();                    // 可选：收尾（也认 unlo
 |---|---|
 | `versions()` | `instanceKey`（= 宿主实例键 `版本key + NUL + 槽`，**别自己拼**）/ `bound`（`"true"` = 附加绑定行，不是主行）/ `patchCount`（这个启动项启用的补丁数；补丁库读不出来就**没有这个键**）/ `backupCount`（这个槽的备份份数；备份目录读不出来就**没有这个键**） |
 | `plugins()` | `updateState`（`ok` / `available` / `installed` / `confirm` / `failed`）/ `updateVersion` / `updateNote`（后两个可能是空串 = 更新记录里没写；**记录不存在 ⇒ 三个键都不出现**） |
-| `settings()` | `plugin_auto_update` / `crash_alert` / `trash_keep` / `trash_keep_slots` / `update_mode` / `update_mirror`（都是"设置页里能被改的项"；`update_mirror` 空串 = 自动，`direct` = 直连，预设或**用户自定义的 https 前缀**） |
+| `settings()`（内部快照） | **没有公开方法**（以前这张表写成"公开"是过期的）；这些值 v52 起由 `launcherSettings()` 给出：`plugin_auto_update` / `crash_alert` / `trash_keep` / `trash_keep_slots` / `update_mode` / `update_mirror`（`update_mirror` 空串 = 自动，`direct` = 直连，预设或**用户自定义的 https 前缀**） |
 
 ### 网络与下载（v39）
 
@@ -922,6 +929,46 @@ String json = api.parseHjson(file);   // 标准 JSON 文本；失败/读不了 �
   ⇒ `invalid`（宿主界面那条老路也改成同一套判据 —— 以前会把 `/` 换成 `_` 悄悄建成另一个名字）。
 - 内容文件的删除仍走 v16 的 `trashItem`（进中转站）；v51 没有"复制 / 移动条目"的接口。
 
+**v52 宿主设置只读**（`launcherSettings()` / `lastLaunch()`）：
+
+```java
+Map<String, Object> s = api.launcherSettings();
+int theme = ((Number) s.get("theme_mode")).intValue();
+Map<String, Object> backups = (Map<String, Object>) s.get("backups");
+```
+
+| 键 | 类型 | 说明 |
+|---|---|---|
+| `theme_mode` | Integer | 0 跟随系统 / 1 浅色 / 2 深色（`ThemeMode`） |
+| `orientation_mode` | Integer | 0 跟随系统 / 1 强制竖屏 / 2 强制横屏（`OrientationMode`） |
+| `app_language` | String | 空串 = 跟随系统；否则语言标签（与设置页 `app_languages` 名单同一套） |
+| `default_slot` | String | **生效值**（用户没设过 ⇒ 宿主兜底名 `default`），恒非空 |
+| `default_slot_configured` | Boolean | 用户有没有**显式**设过默认槽（false 时上面那个是兜底值） |
+| `max_log_files` | Integer | 日志保留份数 |
+| `trash_keep` / `trash_keep_slots` | Integer | 中转站保留份数（按文件 / 按整槽） |
+| `auto_clean_redundant` | Boolean | 自动清理冗余缓存 |
+| `crash_alert` | Boolean | 崩了主动提示 |
+| `plugin_auto_update` | Boolean | 插件自动更新 |
+| `update_mode` | Integer | 0 关 / 1 稳定 / 2 预览（`UpdateMode`） |
+| `update_mirror` | String | 空串 = 自动 / `direct` = 直连 / 预设或用户自定义 https 前缀 |
+| `download_limit` | Long | 字节/秒，0 = 不限（**全局用户设置**，插件不能覆盖） |
+| `backups` | Map（槽名 → Map） | 按槽：`enabled` Boolean / `min_minutes` Integer / `max_backups` Integer。槽名允许点号 ⇒ 用**嵌套 Map**，别拍平成 `backup.<槽>.x` |
+
+- **只读、同步、没有失败码**：配置读不出来就宁可给能读到的部分；值保留真类型（Integer / Long / Boolean / 嵌套 Map），别按字符串解析。
+- 内部记录一律不给（`version_slots` / `version_extra_slots` / `version_names` / `version_row_names` / `main_order` / `patch_enabled` / `imports` / `known_packages` / `config_version` / `last_version` / `tap_count` / `developer_mode` …）：它们不是"用户的设置"，而且给了就能绕开 v50 的行写门禁。
+- 键集是**契约**：加键算兼容（加法），减键 / 改名算破坏 —— 只有设置页里用户能看见、能改的项才会进来。
+
+`lastLaunch()`：
+
+| 键 | 类型 | 说明 |
+|---|---|---|
+| `has` | Boolean | 有没有"上次启动"记录 |
+| `version` | String | 上次启动的版本 key（= `versions()` 的 `extra.key`）；`has=false` 时**不出现** |
+| `slot` | String | 上次启动实例所在的槽（宿主**生效值**，不是原始指针字符串）；`has=false` 时不出现 |
+
+- 这是"上次**真的**启动过的那个实例"，不是默认槽。判"有没有可继续的"仍看 `versions()` 里有没有这个 (`extra.key`, `extra.slot`)。
+- 记录由宿主写：游戏启动成功后 `:game` 进程写 `last_version`；槽指针 = 最近一次启动实例所在的那个槽。
+
 ### 游戏设置（v21）
 
 `settings.bin` 的**解析结果**与**安全写**：键的含义归你，格式与安全归宿主。
@@ -1370,6 +1417,14 @@ v51（2026-11-20 第 410 轮）：**槽与内容文件** —— `newSlot` / `ren
 `renameItem` 只改磁盘文件名（saves / 槽内地图 / blueprints），换后缀 / 模组 / 包内条目一律 `invalid`。
 `Data.createSlot` / `Data.renameSlot` 内部抽成"结果码"（`SLOT_*`），界面翻文案、插件翻 reason ——
 判断只有一份。`API_MIN` 仍不动（区间 20..51）。
+v52（2026-11-20 第 411 轮）：**宿主设置的只读快照** —— `launcherSettings()`（15 键：设置页能被改的
+11 项 + `default_slot` 的生效值 / `default_slot_configured` + `backups` 按槽嵌套）与 `lastLaunch()`
+（上次实际启动的实例：`has` / `version` / `slot`）。
+★ 只读、同步、**没有失败码**；值保留真类型（Integer / Long / Boolean / 嵌套 Map），插件不用到处 parseInt。
+★ 键集按"用户能看到的设置"裁剪：`config_version`、`last_version` 与所有内部记录一律不给
+（它们会绕开 v50 的行写门禁）；"上次启动"单独走 `lastLaunch()`，不混进设置表。
+★ 文档里从 v39 起就写着、但 `PluginApi` 里根本没有的 `settings()`（第 239 行那张表的旧行）
+改成 `launcherSettings()` 的实际键表。`API_MIN` 仍不动（区间 20..52）。
 
 **官方体检插件**：`plugins/mods-health`（第 229 轮，前身叫 `conflict`）。宿主原来的那行
 「查模组冲突」整块删掉，判据搬进插件的 `core/Conflicts.java` 与 `core/Gates.java`；

@@ -399,6 +399,89 @@ final class PluginData {
         return Collections.unmodifiableMap(out);
     }
 
+    /**
+     * v52（第 411 轮）：宿主设置的**只读**快照 —— 值保留真类型，键集只含"设置页里用户能看到的项"。
+     *
+     * <p>与 {@link #settings} 的区别：那个是宿主内部用的字符串快照（含 {@code config_version} /
+     * {@code last_version} / {@code backup.<槽>.…} 扁平键），给自检和设置页自己看；这个是**插件接口**，
+     * 键集是公开约定 —— 少一个 / 多一个都会被自检钉住，而且**不给**内部记录
+     * （{@code version_slots} / {@code main_order} / {@code patch_enabled} …），它们不是用户设置，
+     * 还会绕开 v50 的行写门禁。
+     *
+     * <p>值类型：{@code Integer} / {@code Boolean} / {@code String} / {@code Long}；
+     * {@code backups} 是嵌套 Map（槽名 → {@code {enabled, min_minutes, max_backups}}）。
+     * 槽名允许点号 ⇒ 不能用 {@code backup.<槽>.enabled} 这种扁平键（会歧义）。
+     */
+    static Map<String, Object> launcherSettings(Context ctx) {
+        Map<String, Object> out = new LinkedHashMap<String, Object>();
+        if (ctx == null) return Collections.unmodifiableMap(out);
+        Config c = Config.get();
+        try {
+            c.reload(ctx);
+        } catch (Throwable ignored) {
+        }
+        out.put("theme_mode", c.themeMode());
+        out.put("orientation_mode", c.orientationMode());
+        out.put("app_language", safe(c.appLanguage()));
+        // ★ 生效值 + "设过没有"两个都给：空串在宿主读侧会回落 default，插件只看空串会误判成"没有默认槽"。
+        String configured = safe(c.defaultSlot());
+        out.put("default_slot", configured.isEmpty() ? Data.SLOT_DEFAULT : configured);
+        out.put("default_slot_configured", !configured.isEmpty());
+        out.put("max_log_files", c.maxLogFiles());
+        out.put("trash_keep", c.trashKeep());
+        out.put("trash_keep_slots", c.trashKeepSlots());
+        out.put("auto_clean_redundant", c.autoCleanRedundant());
+        out.put("crash_alert", c.crashAlertEnabled());
+        out.put("plugin_auto_update", c.pluginAutoUpdate());
+        out.put("update_mode", c.updateMode());
+        out.put("update_mirror", safe(c.updateMirror()));
+        out.put("download_limit", c.downloadLimit());
+        // 备份策略按槽走：槽名里允许点号，扁平键会歧义 ⇒ 嵌套 Map。
+        Map<String, Object> backups = new LinkedHashMap<String, Object>();
+        List<String> slots = new ArrayList<String>(Data.slotNames(ctx));
+        String cur = Data.currentSlot(ctx);
+        if (cur != null && !cur.isEmpty() && !slots.contains(cur)) slots.add(cur);
+        for (String s : slots) {
+            Config.BackupPolicy p = c.backupPolicy(s);
+            Map<String, Object> one = new LinkedHashMap<String, Object>();
+            one.put("enabled", p.enabled);
+            one.put("min_minutes", p.minMinutes);
+            one.put("max_backups", p.maxBackups);
+            backups.put(s, Collections.unmodifiableMap(one));
+        }
+        out.put("backups", Collections.unmodifiableMap(backups));
+        return Collections.unmodifiableMap(out);
+    }
+
+    /**
+     * v52（第 411 轮）：上次启动落在哪个版本 / 哪个槽（只读）。
+     *
+     * <p>两个记录分开读：{@code version} = {@link Config#lastVersion()}（由 {@code :game} 进程在
+     * 启动成功后写），{@code slot} = 当前槽指针（启动前写；宿主改名 / 删槽时机械维护）。
+     * 版本记录为空 ⇒ {@code has=false}，此时**不带**另外两个键（插件别拿空串当槽名去用）。
+     *
+     * <p>槽读的是宿主**生效值**（指针悬空会按 {@code Paths.acceptSlot} 规则回落）——
+     * 这里不返回"记录的原始字符串"，因为那个值对插件没有任何可用的意义。
+     */
+    static Map<String, Object> lastLaunch(Context ctx) {
+        Map<String, Object> out = new LinkedHashMap<String, Object>();
+        if (ctx == null) return Collections.unmodifiableMap(out);
+        Config c = Config.get();
+        try {
+            c.reload(ctx);
+        } catch (Throwable ignored) {
+        }
+        String version = safe(c.lastVersion());
+        if (version.isEmpty()) {
+            out.put("has", false);
+            return Collections.unmodifiableMap(out);
+        }
+        out.put("has", true);
+        out.put("version", version);
+        out.put("slot", Data.currentSlot(ctx));
+        return Collections.unmodifiableMap(out);
+    }
+
     static List<ItemInfo> logs(Context ctx) {
         List<ItemInfo> out = new ArrayList<ItemInfo>();
         if (ctx == null) return out;

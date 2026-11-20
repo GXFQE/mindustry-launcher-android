@@ -5352,6 +5352,8 @@ public final class SelfTest {
         pluginV50(ctx, L, stat);
         // ★ v51：槽与内容文件（第 410 轮）
         pluginV51(ctx, L, stat);
+        // ★ v52：宿主设置只读（第 411 轮）
+        pluginV52(ctx, L, stat);
     }
 
     /**
@@ -5375,8 +5377,8 @@ public final class SelfTest {
     private static void pluginV43(android.content.Context ctx, List<String> L, int[] stat) {
         L.add("");
         L.add("【v43 · 插件下载 / 模组写 / 网络扩充（第 378 轮）】");
-        ok(stat, L, PluginHost.API == 51 && PluginApi.DOC_VERSION == 51,
-                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 51（v51 起）");
+        ok(stat, L, PluginHost.API == 52 && PluginApi.DOC_VERSION == 52,
+                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 52（v52 起）");
 
         boolean shape = true;
         try {
@@ -5874,8 +5876,8 @@ public final class SelfTest {
     private static void pluginV45(android.content.Context ctx, List<String> L, int[] stat) {
         L.add("");
         L.add("【v45 · 启动否决 + 身份（第 394 轮）】");
-        ok(stat, L, PluginHost.API == 51 && PluginApi.DOC_VERSION == 51,
-                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 51（v51 起）");
+        ok(stat, L, PluginHost.API == 52 && PluginApi.DOC_VERSION == 52,
+                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 52（v52 起）");
 
         boolean shape = true;
         try {
@@ -6013,8 +6015,8 @@ public final class SelfTest {
     private static void pluginV48(Context ctx, List<String> L, int[] stat) {
         L.add("");
         L.add("【v48 · 插件立刻启动实例（第 395 轮）】");
-        ok(stat, L, PluginHost.API == 51 && PluginApi.DOC_VERSION == 51,
-                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 51（v51 起）");
+        ok(stat, L, PluginHost.API == 52 && PluginApi.DOC_VERSION == 52,
+                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 52（v52 起）");
 
         boolean shape = true;
         try {
@@ -6071,8 +6073,8 @@ public final class SelfTest {
     private static void pluginV49(Context ctx, List<String> L, int[] stat) {
         L.add("");
         L.add("【v49 · 带着联机地址启动（第 396 轮）】");
-        ok(stat, L, PluginHost.API == 51 && PluginApi.DOC_VERSION == 51,
-                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 51（v51 起）");
+        ok(stat, L, PluginHost.API == 52 && PluginApi.DOC_VERSION == 52,
+                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 52（v52 起）");
 
         boolean shape = true;
         try {
@@ -6116,8 +6118,8 @@ public final class SelfTest {
     private static void pluginV50(Context ctx, List<String> L, int[] stat) {
         L.add("");
         L.add("【v50 · 启动项（行）的写：加行 / 换槽 / 起名 / 挪位 / 删行（第 408 轮）】");
-        ok(stat, L, PluginHost.API == 51 && PluginApi.DOC_VERSION == 51,
-                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 51（v51 起）");
+        ok(stat, L, PluginHost.API == 52 && PluginApi.DOC_VERSION == 52,
+                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 52（v52 起）");
 
         boolean shape = true;
         String miss = "";
@@ -6196,8 +6198,8 @@ public final class SelfTest {
     private static void pluginV51(Context ctx, List<String> L, int[] stat) {
         L.add("");
         L.add("【v51 · 槽与内容文件：建 / 改名 / 克隆 / 进中转站 / 改文件名（第 410 轮）】");
-        ok(stat, L, PluginHost.API == 51 && PluginApi.DOC_VERSION == 51,
-                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 51");
+        ok(stat, L, PluginHost.API == 52 && PluginApi.DOC_VERSION == 52,
+                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 52");
 
         boolean shape = true;
         String miss = "";
@@ -6298,6 +6300,130 @@ public final class SelfTest {
         // 收尾：把造出来的槽与那个中转站容器清掉（容器是本轮的测试产物，不是用户数据）
         Data.deleteSlotForever(ctx, B);
         if (tC.dest != null) Data.deleteTree(tC.dest);
+    }
+
+    /**
+     * 第 411 轮（v52）：**宿主设置只读** —— 键集是公开约定，不是"包含就行"。
+     *
+     * <p>五半：
+     * <ol>
+     *   <li><b>接口面</b>：两个方法都是无参、返回 {@code Map}；</li>
+     *   <li><b>键集钉死</b>：恰好 15 个键（多一个 / 少一个 / 改名都失败），
+     *       且 {@code config_version} / {@code last_version} 这类内部量不在里面；</li>
+     *   <li><b>类型</b>：保留真类型（Integer / Long / Boolean / 嵌套 Map），插件不用到处 parseInt；</li>
+     *   <li><b>联动</b>：改设置页那一项 ⇒ 重读跟着变；{@code default_slot} 的"设没设过"两态；</li>
+     *   <li><b>{@code lastLaunch()}</b>：无记录只有 {@code has=false}；有记录给 version + slot。</li>
+     * </ol>
+     *
+     * <p>改过的配置项全部在结尾还原（自检不能把用户的设置留在实验值上）。
+     */
+    private static void pluginV52(Context ctx, List<String> L, int[] stat) {
+        L.add("");
+        L.add("【v52 · 宿主设置只读：launcherSettings / lastLaunch（第 411 轮）】");
+        ok(stat, L, PluginHost.API == 52 && PluginApi.DOC_VERSION == 52,
+                "版本：PluginHost.API 与 PluginApi.DOC_VERSION 都是 52（v52 起）");
+
+        boolean shape = true;
+        String miss = "";
+        try {
+            java.lang.reflect.Method ls = PluginApi.class.getMethod("launcherSettings");
+            java.lang.reflect.Method ll = PluginApi.class.getMethod("lastLaunch");
+            shape = ls.getReturnType() == Map.class && ls.getParameterTypes().length == 0
+                    && ll.getReturnType() == Map.class && ll.getParameterTypes().length == 0;
+        } catch (Throwable t) {
+            shape = false;
+            miss = String.valueOf(t);
+        }
+        ok(stat, L, shape, "接口面：launcherSettings() / lastLaunch() 都是无参、返回 Map"
+                + (shape ? "" : "（" + miss + "）"));
+
+        Config cfg = Config.get();
+        try {
+            cfg.reload(ctx);
+        } catch (Throwable ignored) {
+        }
+
+        // ① 键集钉死（不是 containsAll —— 多一个也算契约变了）
+        final String[] expect = {
+                "theme_mode", "orientation_mode", "app_language", "default_slot",
+                "default_slot_configured", "max_log_files", "trash_keep", "trash_keep_slots",
+                "auto_clean_redundant", "crash_alert", "plugin_auto_update", "update_mode",
+                "update_mirror", "download_limit", "backups"};
+        Map<String, Object> m = PluginData.launcherSettings(ctx);
+        java.util.Set<String> keys = new java.util.HashSet<String>(m.keySet());
+        java.util.Set<String> want = new java.util.HashSet<String>(
+                java.util.Arrays.asList(expect));
+        ok(stat, L, keys.equals(want),
+                "键集恰好 " + expect.length + " 个（多 / 少 / 改名都失败）");
+
+        // ② 内部记录一律不给（它们会绕开 v50 的行写门禁 / 是架构量不是用户设置）
+        ok(stat, L, !m.containsKey("version_slots") && !m.containsKey("version_extra_slots")
+                        && !m.containsKey("main_order") && !m.containsKey("patch_enabled")
+                        && !m.containsKey("imports") && !m.containsKey("config_version")
+                        && !m.containsKey("last_version"),
+                "内部记录不给：version_slots / main_order / patch_enabled / imports / "
+                        + "config_version / last_version");
+
+        // ③ 类型抽查 + 备份是嵌套 Map（槽名带点号时扁平键会歧义）
+        Object theme = m.get("theme_mode");
+        Object limit = m.get("download_limit");
+        Object alert = m.get("crash_alert");
+        Object backups = m.get("backups");
+        boolean typeOk = theme instanceof Integer && limit instanceof Long
+                && alert instanceof Boolean && backups instanceof Map;
+        String cur = Data.currentSlot(ctx);
+        boolean backupOk = false;
+        if (backups instanceof Map) {
+            Object one = ((Map<?, ?>) backups).get(cur);
+            if (one instanceof Map) {
+                Map<?, ?> bp = (Map<?, ?>) one;
+                backupOk = bp.size() == 3 && bp.get("enabled") instanceof Boolean
+                        && bp.get("min_minutes") instanceof Integer
+                        && bp.get("max_backups") instanceof Integer;
+            }
+        }
+        ok(stat, L, typeOk && backupOk,
+                "类型：theme_mode=Integer / download_limit=Long / crash_alert=Boolean；"
+                        + "backups 里当前槽是 {enabled, min_minutes, max_backups}");
+
+        // ④ 设置页写入 ⇒ 重读跟着变（尺子钉"用户能改的那一项"）
+        int oldLogs = cfg.maxLogFiles();
+        cfg.setMaxLogFiles(7);
+        Object logsAfter = PluginData.launcherSettings(ctx).get("max_log_files");
+        cfg.setMaxLogFiles(oldLogs);
+        ok(stat, L, Integer.valueOf(7).equals(logsAfter),
+                "与设置页联动：max_log_files 改成 7 ⇒ 快照里读到 7（已还原）");
+
+        // ⑤ default_slot 两态：生效值恒非空，configured 区分"设过"与"没设"
+        String oldDef = cfg.defaultSlot();
+        cfg.setDefaultSlot("");
+        Map<String, Object> m3 = PluginData.launcherSettings(ctx);
+        boolean unset = Data.SLOT_DEFAULT.equals(m3.get("default_slot"))
+                && Boolean.FALSE.equals(m3.get("default_slot_configured"));
+        cfg.setDefaultSlot("st-v52-def");
+        Map<String, Object> m4 = PluginData.launcherSettings(ctx);
+        boolean set = "st-v52-def".equals(m4.get("default_slot"))
+                && Boolean.TRUE.equals(m4.get("default_slot_configured"));
+        cfg.setDefaultSlot(oldDef == null ? "" : oldDef);
+        ok(stat, L, unset && set,
+                "default_slot：没设过 ⇒ 生效值 default + configured=false；"
+                        + "设过 ⇒ 新名 + configured=true（已还原）");
+
+        // ⑥ 上次启动：无记录只有 has=false；有记录给 version + slot
+        String oldLast = cfg.lastVersion();
+        cfg.clearLastVersion();
+        Map<String, Object> l0 = PluginData.lastLaunch(ctx);
+        boolean none = Boolean.FALSE.equals(l0.get("has")) && !l0.containsKey("version")
+                && !l0.containsKey("slot");
+        cfg.setLastVersion("selftest:v52");
+        Map<String, Object> l1 = PluginData.lastLaunch(ctx);
+        boolean some = Boolean.TRUE.equals(l1.get("has"))
+                && "selftest:v52".equals(l1.get("version"))
+                && cur.equals(l1.get("slot"));
+        if (oldLast == null || oldLast.isEmpty()) cfg.clearLastVersion();
+        else cfg.setLastVersion(oldLast);
+        ok(stat, L, none && some,
+                "lastLaunch：无记录 ⇒ 只有 has=false / 有记录 ⇒ version=上次的版本、slot=当前槽（已还原）");
     }
 
     /**

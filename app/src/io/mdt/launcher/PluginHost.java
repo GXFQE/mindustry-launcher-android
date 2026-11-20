@@ -152,7 +152,7 @@ public final class PluginHost {
      * 联机地址 `host:port` 带进游戏（宿主拼 `mindustry://`，游戏在 `ClientLoadEvent` 弹它自己的
      * 「要连接到 xxx 吗」确认框）。只接受 `host:port`，不收完整 URI。
      */
-    public static final int API = 51;
+    public static final int API = 52;
     /**
      * 还认的**最老**契约版本。
      *
@@ -1939,6 +1939,16 @@ public final class PluginHost {
                 case Trash.Result.T_CURRENT_SLOT:  return "invalid";
                 default:                           return "io";
             }
+        }
+
+        // ---- v52（第 411 轮）：宿主设置只读 ---------------------------------
+
+        @Override public Map<String, Object> launcherSettings() {
+            return PluginData.launcherSettings(getBaseContext());
+        }
+
+        @Override public Map<String, Object> lastLaunch() {
+            return PluginData.lastLaunch(getBaseContext());
         }
 
         // ---- v15 ---------------------------------------------------------
