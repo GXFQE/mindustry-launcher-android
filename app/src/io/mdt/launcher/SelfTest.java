@@ -18615,8 +18615,8 @@ public final class SelfTest {
 
             String tgt = "{\"apkSha256\":\"%s\",\"gameVersion\":\"160.4\",\"dex\":\"%s\"%s}";
             String otherSha = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-            expectPatchCode(L, stat, "schema=2", PatchException.C_SCHEMA,
-                    ("{\"schema\":2,\"id\":\"x\",\"name\":\"X\",\"version\":\"1\",\"targets\":["
+            expectPatchCode(L, stat, "schema=3（未知版本）", PatchException.C_SCHEMA,
+                    ("{\"schema\":3,\"id\":\"x\",\"name\":\"X\",\"version\":\"1\",\"targets\":["
                             + String.format(tgt, apkSha, "targets/" + apkSha + "/patch.dex", "")
                             + "]}").getBytes("UTF-8"));
             expectPatchCode(L, stat, "哈希不是 64 hex", PatchException.C_BAD_HASH,
@@ -18946,13 +18946,13 @@ public final class SelfTest {
                         "⑦ zip 条目带 .. ⇒ 拒绝（实际 " + e.code + " / " + e.detail + "）");
             }
             File badSchemaPkg = new File(work, "schema.mdp");
-            String badSchemaJson = "{\"schema\":2,\"id\":\"" + ID_PREFIX + "s\",\"name\":\"S\","
+            String badSchemaJson = "{\"schema\":3,\"id\":\"" + ID_PREFIX + "s\",\"name\":\"S\","
                     + "\"version\":\"1\",\"targets\":[{\"apkSha256\":\"" + apkSha
                     + "\",\"dex\":\"targets/" + apkSha + "/patch.dex\"}]}";
             zipBlobs(badSchemaPkg,
                     java.util.Arrays.asList(PatchManifest.FILE, "targets/" + apkSha + "/patch.dex"),
                     java.util.Arrays.asList(badSchemaJson.getBytes("UTF-8"), fixtureDex));
-            expectImportCode(ctx, L, stat, "schema=2 的包", PatchException.C_SCHEMA, badSchemaPkg);
+            expectImportCode(ctx, L, stat, "schema=3 的包（未知版本）", PatchException.C_SCHEMA, badSchemaPkg);
             // ★ B12：zip 里同名条目 ⇒ 清单/dex 取哪一个是实现细节 ⇒ 直接拒绝。
             //   夹具必须是**PC 上造的**（安卓的 ZipOutputStream 自己就拒绝同名条目，造不出来），
             //   所以它随 dev 包放在 assets-dev/patch-fixture/dup-entry.zip。
@@ -18973,6 +18973,62 @@ public final class SelfTest {
             expectImportCode(ctx, L, stat, "dex checksum 不符", PatchException.C_BAD_DEX, badSumPkg);
             ok(stat, L, countPatchRecords(ctx, ID_PREFIX) == 4,
                     "⑦ 所有失败导入都没留下半条记录（当前自检记录数 = 4）");
+
+            // ── ⑨ 整包补丁（APK 容器，2026-11-20）────────────────────────────
+            // 判据：根上 classes.dex + patch.json ⇒ 整包；dex/assets/native 全从 APK 里读。
+            final String IKEY3 = Versions.instanceKey(VKEY, "selftest-slot-3");
+            File apkPkg = new File(work, "apk-package.apk");
+            String apkJson = "{\"schema\":2,\"id\":\"" + ID_PREFIX + "apk\","
+                    + "\"name\":\"APK 整包补丁\",\"version\":\"1\",\"role\":\"game\","
+                    + "\"apkSha256\":\"" + apkSha + "\",\"gameVersion\":\"160.7\"}";
+            zipBlobs(apkPkg,
+                    java.util.Arrays.asList("patch.json", "classes.dex",
+                            "assets/patch-lab/shared.txt", "lib/arm64-v8a/libx.so"),
+                    java.util.Arrays.asList(apkJson.getBytes("UTF-8"), fixtureDex,
+                            "shared".getBytes("UTF-8"), new byte[]{1, 2, 3}));
+            ok(stat, L, PatchPackage.isApkContainer(apkPkg)
+                            && !PatchPackage.isApkContainer(pkgA),
+                    "⑨ 整包识别：根上 classes.dex + patch.json ⇒ APK 容器；老 .mdp 不算");
+            Patches.Record recApk = Patches.importPackage(ctx, apkPkg);
+            Patches.TargetFile tfApk = recApk.targets.get(0);
+            ok(stat, L, recApk.ref().equals(ID_PREFIX + "apk@1")
+                            && recApk.filesOk && tfApk.apkFile() != null
+                            && tfApk.apkFile().isFile() && !tfApk.apkFile().canWrite(),
+                    "⑨ 整包导入：ref / 文件齐全 / patch.apk 落在内部并只读");
+            ok(stat, L, tfApk.classes().contains("io.mdt.launcher.PatchProbe")
+                            && tfApk.assetKeys().size() == 1
+                            && tfApk.assetKeys().get(0).equals("patch-lab/shared.txt"),
+                    "⑨ 整包里的类与 assets 都能读出来（冲突检测的判据来源）");
+            boolean libsOk;
+            try {
+                java.util.List<String> lk = PatchPackage.libKeys(tfApk.apkFile());
+                libsOk = lk.size() == 1 && "arm64-v8a/libx.so".equals(lk.get(0));
+            } catch (java.io.IOException ioe) {
+                libsOk = false;
+            }
+            ok(stat, L, libsOk, "⑨ native 键 = abi/文件名（整包里的 lib/ 能被列出来）");
+            Patches.enable(ctx, IKEY3, recApk, apkSha);
+            Patches.Resolved rApk = Patches.resolve(ctx, fakeApk, IKEY3);
+            ok(stat, L, rApk.loaded.size() == 1
+                            && rApk.loaded.get(0).target.apkFile() != null,
+                    "⑨ 启动解析：整包补丁解析成 APK 载体（Injector 走整包注入）");
+            // 普通补丁（role=patch）带 lib/ ⇒ 导入就拒（避免"半个 native"）
+            File badLibs = new File(work, "apk-libs-patch.apk");
+            String badLibsJson = apkJson.replace("\"role\":\"game\"", "\"role\":\"patch\"");
+            zipBlobs(badLibs,
+                    java.util.Arrays.asList("patch.json", "classes.dex", "lib/arm64-v8a/libx.so"),
+                    java.util.Arrays.asList(badLibsJson.getBytes("UTF-8"), fixtureDex,
+                            new byte[]{1, 2, 3}));
+            expectImportCode(ctx, L, stat, "普通补丁带 lib/", PatchException.C_FIELD, badLibs);
+            Patches.disable(ctx, IKEY3, recApk);
+            Patches.deleteTree(recApk.dir);   // 用补丁库自己的删树（会先放开只读位）
+            File apkIdDir = recApk.dir.getParentFile();
+            if (apkIdDir != null && apkIdDir.isDirectory()) {
+                String[] left = apkIdDir.list();
+                if (left != null && left.length == 0) apkIdDir.delete();   // 空 id 目录顺手收掉
+            }
+            ok(stat, L, Patches.find(ctx, ID_PREFIX + "apk", "1") == null,
+                    "⑨ 清理：整包记录删掉后扫描不到（不影响后面的记录数断言）");
             // ★ 第 357 轮用户：「游戏补丁中转站保留个数按照哪个算的啊」—— 原来补丁删除根本不进
             //   中转站（唯一一个裸删的破坏性操作）。现在：删除 = 挪进 patches-trash，
             //   保留份数走整槽那一档（默认 3），能从「中转站」放回补丁库。

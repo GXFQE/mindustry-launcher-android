@@ -83,7 +83,9 @@ DELETION_BASELINE = {
     "Importer.java": 2,
     "MapFiles.java": 12,
     "Mods.java": 8,
-    "Patches.java": 4,
+    # 2026-11-20：补丁 v2 的整包导入多两个 deleteTree（临时目录的"先清 + finally 清"），
+    # 与 v1 导入同款；都是临时件，不触碰补丁库正式目录 ⇒ 复核后 4 → 6。
+    "Patches.java": 6,
     "Plugins.java": 2,
     "Recovery.java": 2,
     "SlotWrite.java": 1,

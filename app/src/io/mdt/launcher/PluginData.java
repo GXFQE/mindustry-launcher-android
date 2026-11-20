@@ -872,6 +872,7 @@ final class PluginData {
         put(ex, "note", m.note);
         put(ex, "tool", m.tool);
         ex.put("filesOk", String.valueOf(r.filesOk));
+        ex.put("role", r.manifest.isGame() ? "game" : "patch");
         ex.put("targetCount", String.valueOf(m.targets.size()));
         boolean hasSha = apkSha != null && !apkSha.isEmpty();
         boolean applies = false;
@@ -898,7 +899,13 @@ final class PluginData {
                     // dex 坏了 / 读不出来 ⇒ 不放这个键（别当 0）
                 }
             }
-            if (!spec.hasAssets()) {
+            if (t.apkFile() != null) {
+                // v2 整包补丁：素材就在 APK 的 assets/ 里（没有单独素材包可数 "0"）
+                try {
+                    ex.put(p + "assets", String.valueOf(t.assetKeys().size()));
+                } catch (Throwable ignored) {
+                }
+            } else if (!spec.hasAssets()) {
                 ex.put(p + "assets", "0");      // 没声明素材包 = **事实**，不是"读不出来"
             } else if (asOk) {
                 try {

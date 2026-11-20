@@ -53,9 +53,50 @@ final class ProbeLab {
     };
 
     /**
-     * 素材实验的**装填**阶段：在 {@code Injector.launch} 之前把增量资产包塞进 plan。
+     * **整包补丁实验**（2026-11-20）：触发文件 {@code hub/apk-patch-lab.txt}，一行一个 APK 路径
+     * （`#` 开头当注释）。读一次即删；装填结果写 {@code hub/report-apk-patch-lab.txt}。
      *
-     * <p>为什么必须早于 launch：{@code addAssetPath} 只对**之后**创建 / 之后补挂的
+     * <p>这条实验要回答的问题：一个**完整 APK**（比如 MDTX 的构建）直接当补丁，
+     * 整包注入（多 dex）/ 整包挂 assets / 从包里取 native 这三件事能不能一起成立。
+     * 注入与资产链的细节仍看 {@code hub/report-launch.txt}（Injector 写）。</p>
+     */
+    private static void decorateApkPatch(Context ctx, Injector.Plan plan) {
+        try {
+            File armed = new File(Data.hubDir(ctx), "apk-patch-lab.txt");
+            if (!armed.isFile()) return;
+            String text = readText(armed);
+            armed.delete();
+            StringBuilder rep = new StringBuilder("== apk patch lab（装填）==\n");
+            for (String line : text.split("\\r?\\n")) {
+                String p = line.trim();
+                if (p.isEmpty() || p.startsWith("#")) continue;
+                File f = new File(p);
+                if (!f.isFile()) {
+                    rep.append("missing = ").append(p).append('\n');
+                    continue;
+                }
+                Injector.Patch patch = new Injector.Patch();
+                patch.apk = f;
+                patch.label = f.getName();
+                patch.ref = "lab:" + f.getName();
+                plan.patches.add(patch);
+                rep.append("added = ").append(f.getAbsolutePath())
+                        .append(" (").append(f.length()).append(" B)\n");
+            }
+            writeText(new File(Data.hubDir(ctx), "report-apk-patch-lab.txt"), rep.toString());
+        } catch (Throwable t) {
+            try {
+                writeText(new File(Data.hubDir(ctx), "report-apk-patch-lab.txt"),
+                        "decorate FAILED: " + t + "\n");
+            } catch (Throwable ignored) {
+            }
+        }
+    }
+
+    /**
+     * 实验装填（launch 之前）：整包补丁（{@code apk-patch-lab.txt}）+ 素材增量包（{@code asset-lab.txt}）。
+     *
+     * <p>素材实验部分：{@code addAssetPath} 只对**之后**创建 / 之后补挂的
      * AssetManager 生效（游戏那个 activity 的链由 {@code LauncherApp.preCreated} 再挂一遍）；
      * 等 {@link #runIfArmed} 再挂就晚了 —— 那时游戏 activity 已经带着旧链建好了。
      *
@@ -68,6 +109,8 @@ final class ProbeLab {
         sAssetLabApk = null;
         sAssetLabFiles.clear();
         sAssetLabNotes.setLength(0);
+        // v2 整包补丁实验（2026-11-20）：与 asset-lab 独立，可以同时开
+        decorateApkPatch(ctx, plan);
         try {
             File armed = new File(Data.hubDir(ctx), "asset-lab.txt");
             if (!armed.isFile()) return;

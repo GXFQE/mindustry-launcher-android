@@ -126,37 +126,51 @@ final class Patches {
         }
     }
 
-    /** 一个 target 在本地盘上的文件（dex 必在；assets 可有可无）。类名列表惰性解析。 */
+    /** 一个 target 在本地盘上的文件（v1：dex 必在、assets 可有可无；v2：apk 在）。类名列表惰性解析。 */
     static final class TargetFile {
         final PatchManifest.Target spec;
         final File dex;
         final File assets;
+        /**
+         * v2 整包补丁：`patch.apk`（dex / assets / native 全在里面）。
+         * null = v1 的单 dex 载体（{@link #dex} + 可选 {@link #assets}）。
+         */
+        final File apk;
         private List<String> classes;
         private List<String> assetKeys;
         private String parseError;
 
         TargetFile(PatchManifest.Target spec, File dex, File assets) {
+            this(spec, dex, assets, null);
+        }
+
+        TargetFile(PatchManifest.Target spec, File dex, File assets, File apk) {
             this.spec = spec;
             this.dex = dex;
             this.assets = assets;
+            this.apk = apk;
         }
 
         boolean exists() {
-            return dex.isFile() && dex.length() > 0 && (assets == null || assets.isFile());
+            if (apk != null) return apk.isFile() && apk.length() > 0;
+            return dex != null && dex.isFile() && dex.length() > 0
+                    && (assets == null || assets.isFile());
         }
 
         /**
-         * 这个 dex 定义了**多少个类**（只读文件头的 `class_defs_size`，不解析字符串表）。
+         * 这个 target 定义了多少个类。
          *
-         * <p>给列表 / 详情卡出"内容量"用；冲突检测仍走 {@link #classes()}（那个真要类名）。
+         * <p>v2：整包 APK 里所有 `classes*.dex` 的 `class_defs_size` 之和（只读头，不解析字符串表）。
+         * v1：单 dex 的 `class_defs_size`。</p>
          */
         int classCount() throws IOException {
             if (classes != null) return classes.size();
             if (parseError != null) throw new IOException(parseError);
+            if (apk != null) return PatchPackage.classCount(apk);
             return PatchDex.classCount(readAll(dex, MAX_DEX));
         }
 
-        /** 素材包里改了几个 `assets` 路径（剥前缀后的键数；没有素材包 = 0）。 */
+        /** 素材包里改了几个 `assets` 路径（剥前缀后的键数；没有 = 0）。v2 直接数 APK 的 `assets/`。 */
         int assetCount() {
             try {
                 return assetKeys().size();
@@ -165,19 +179,26 @@ final class Patches {
             }
         }
 
-        /** dex 文件（详情卡读大小用；记录可能已经缺文件，所以只返回引用、不保证存在）。 */
-        File dexFile() { return dex; }
+        /** v2：整包 APK；v1：null。 */
+        File apkFile() { return apk; }
 
-        /** 素材包文件（没有素材包时返回 null）。 */
-        File assetsFile() { return assets; }
+        /** dex 文件（v2 返回整包 APK —— 注入走 `Injector.Patch.apk`，这里只给"载体"用）。 */
+        File dexFile() { return apk != null ? apk : dex; }
+
+        /** 素材包文件（v2 返回 null：素材在 APK 里，挂链时直接挂 APK）。 */
+        File assetsFile() { return apk != null ? null : assets; }
 
         /** dex 里定义的类（点分名）；读不出来抛 IOException（调用方翻成"补丁文件坏了"）。 */
         List<String> classes() throws IOException {
             if (classes != null) return classes;
             if (parseError != null) throw new IOException(parseError);
             try {
-                byte[] bytes = readAll(dex, MAX_DEX);
-                classes = PatchDex.classes(bytes);
+                if (apk != null) {
+                    classes = PatchPackage.classes(apk);
+                } else {
+                    byte[] bytes = readAll(dex, MAX_DEX);
+                    classes = PatchDex.classes(bytes);
+                }
                 if (classes.isEmpty()) throw new IOException("dex defines no classes");
                 return classes;
             } catch (IOException e) {
@@ -189,6 +210,10 @@ final class Patches {
         /** 素材包里改了哪些 assets 路径（**已剥掉 `assets/` 前缀**，与 AssetManager 里的键一致）。 */
         List<String> assetKeys() throws IOException {
             if (assetKeys != null) return assetKeys;
+            if (apk != null) {
+                assetKeys = PatchPackage.assetKeys(apk);
+                return assetKeys;
+            }
             if (assets == null) {
                 assetKeys = Collections.emptyList();
                 return assetKeys;
@@ -232,6 +257,7 @@ final class Patches {
             if (f == null || !f.isFile()) continue;
             String n = f.getName();
             boolean carrier = n.endsWith(".dex") || n.endsWith(".assets.zip")
+                    || n.endsWith(".apk")
                     || PatchManifest.FILE.equals(n);
             if (!carrier || !f.canWrite()) continue;
             if (f.setReadOnly()) touched = true;
@@ -300,10 +326,16 @@ final class Patches {
             return null;
         }
         List<TargetFile> files = new ArrayList<TargetFile>();
-        for (PatchManifest.Target t : m.targets) {
-            File dex = new File(dir, t.apkSha256 + ".dex");
-            File assets = t.hasAssets() ? new File(dir, t.apkSha256 + ".assets.zip") : null;
-            files.add(new TargetFile(t, dex, assets));
+        if (m.apkSha256 != null) {
+            // v2 整包补丁：一个 APK 就是全部载体（dex / assets / native 都在里面）
+            PatchManifest.Target t = new PatchManifest.Target(m.apkSha256, m.gameVersion, "", "");
+            files.add(new TargetFile(t, null, null, new File(dir, PatchPackage.APK)));
+        } else {
+            for (PatchManifest.Target t : m.targets) {
+                File dex = new File(dir, t.apkSha256 + ".dex");
+                File assets = t.hasAssets() ? new File(dir, t.apkSha256 + ".assets.zip") : null;
+                files.add(new TargetFile(t, dex, assets));
+            }
         }
         return new Record(m, dir, files);
     }
@@ -342,6 +374,10 @@ final class Patches {
     private static Record importPackage0(Context ctx, File zipFile) throws PatchException {
         if (zipFile == null || !zipFile.isFile()) {
             throw new PatchException(PatchException.C_IO, zipFile == null ? "" : zipFile.getName());
+        }
+        // v2 整包补丁（APK 根上有 classes.dex + patch.json）走另一条路；老 .mdp 保持原逻辑
+        if (PatchPackage.isApkContainer(zipFile)) {
+            return importApkContainer0(ctx, zipFile);
         }
         ZipFile zip;
         try {
@@ -441,6 +477,47 @@ final class Patches {
             throw new PatchException(PatchException.C_IO, e.getClass().getSimpleName());
         } finally {
             try { zip.close(); } catch (IOException ignored) { }
+            if (tmp != null) deleteTree(tmp);
+        }
+    }
+
+    /**
+     * 导入一个**整包补丁**（APK 容器，2026-11-20）：清单在 APK 根上，dex / assets / native 都在包里。
+     * 落成 `<id>/<ver>/patch.apk` + `patch.json`（都只读）。重 IO：调用方放后台线程。
+     */
+    private static Record importApkContainer0(Context ctx, File apkFile) throws PatchException {
+        PatchManifest m = PatchPackage.readManifest(apkFile);
+        PatchPackage.validate(apkFile);
+        File dest = recordDir(ctx, m.id, m.version);
+        if (dest.exists()) throw new PatchException(PatchException.C_DUP, m.id + " " + m.version);
+        File tmp = null;
+        try {
+            File root = storeDir(ctx);
+            tmp = new File(root, ".tmp-" + System.currentTimeMillis() + "-"
+                    + Integer.toHexString((int) (Math.random() * 0xFFFF)));
+            deleteTree(tmp);
+            if (!tmp.mkdirs()) throw new PatchException(PatchException.C_IO, "mkdir: " + tmp.getName());
+            byte[] mf = PatchPackage.readRoot(apkFile, PatchManifest.FILE, 64 * 1024);
+            writeBytes(new File(tmp, PatchManifest.FILE), mf);
+            Util.copyFile(apkFile, new File(tmp, PatchPackage.APK));
+            seal(tmp);
+            File parent = dest.getParentFile();
+            if (parent != null && !parent.isDirectory() && !parent.mkdirs()) {
+                throw new PatchException(PatchException.C_IO, "mkdir: " + parent.getName());
+            }
+            if (!tmp.renameTo(dest)) {
+                throw new PatchException(PatchException.C_IO, "rename: " + dest.getName());
+            }
+            tmp = null;   // 已就位
+            Record r = readRecord(dest);
+            if (r == null) throw new PatchException(PatchException.C_IO, dest.getName());
+            Log.i(TAG, "apk patch imported: " + r.ref() + " apk=" + new File(dest, PatchPackage.APK).length());
+            return r;
+        } catch (PatchException pe) {
+            throw pe;
+        } catch (IOException e) {
+            throw new PatchException(PatchException.C_IO, e.getClass().getSimpleName());
+        } finally {
             if (tmp != null) deleteTree(tmp);
         }
     }

@@ -50,7 +50,8 @@ SettingsBin.java = 59   # ★ 已码化：失败文案走 errCode+参数（Setti
 MsavMeta.java = 32   # ★ 已码化：8 条 error 走 errCode+参数（MsavText 映射）；这些句子只给报告/自检看
 Compat.java = 26   # 只进 report-devtool.txt / 崩溃报告（取证文本）
 ModsActivity.java = 26   # 全部在 `report()` 里（dev 落盘转储，只有 `MainActivity` 的 `dev_*` 口调它） —— 与 `MainActivity` 的 126 条同类；**它没有自己的用户可见文案**
-Injector.java = 41   # 用户可见的已搬完；剩的是启动管线报告（log.append）—— v49 加了一行「深链 = …」
+Injector.java = 46   # 用户可见的已搬完；剩的是启动管线报告（log.append）—— v49 加了一行「深链 = …」；
+                     # 2026-11-20 补丁 v2 加 5 行（整包载体 / 补丁 native 来源 / 跳过原因），只进 report-launch.txt
                      # ★ 2026-11-10（第 345 轮，补丁机制 v1）：23 → 32。新增的是「宿主 dex 条数 /
                      #   每条补丁注入到哪个下标 / 注入失败跳过」这几行 —— 与既有 23 条**同族**：
                      #   只进 `hub/report-launch.txt`（原始诊断层，运行日志页原样展示），

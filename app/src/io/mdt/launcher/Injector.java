@@ -226,6 +226,14 @@ public final class Injector {
      * 见 `ref/48`）；assets 是可选素材包，挂到资产链**最后**（后挂覆盖先挂）。
      */
     public static class Patch {
+        /**
+         * **整包补丁**（补丁机制 v2，2026-11-20）：一个 APK（或 APK 布局的 zip），
+         * 里面同时带 `classes*.dex` + `assets/**` + 可选的 `lib/<abi>/*.so`。
+         *
+         * <p>非 null 时优先于 {@link #dex}：注入整包（ART 原生多 dex）、资产链直接挂这个包、
+         * native 也优先从这里取。{@link #dex} / {@link #assets} 是 v1 的单 dex 载体，保留给旧夹具。</p>
+         */
+        public File apk;
         public File dex;
         /** 可选素材包（条目必须在 assets/ 下；null = 这个补丁没有素材） */
         public File assets;
@@ -501,26 +509,28 @@ public final class Injector {
         for (int i = 0; i < plan.patches.size(); i++) {
             Patch p = plan.patches.get(i);
             String label = labelOf(p, i);
-            if (p.dex == null || !p.dex.isFile() || p.dex.length() <= 0) {
+            // v2 整包补丁（APK）优先；否则走 v1 的单 dex 载体
+            File carrier = p.apk != null ? p.apk : p.dex;
+            if (carrier == null || !carrier.isFile() || carrier.length() <= 0) {
                 log.append("补丁[").append(i + 1).append("] ").append(label)
-                        .append(" 跳过：dex 不存在\n");
+                        .append(" 跳过：").append(p.apk != null ? "补丁包" : "dex").append("不存在\n");
                 plan.patchProblems.add(PatchException.C_MISSING + "|" + label);
                 continue;
             }
             // 🔴 第 381 轮：可写 dex 会被 ART 拒（`Writable dex file ... is not allowed`）——
             //   中转站往返是跨文件系统复制，会丢掉只读位（见 Patches#seal）。这里兜最后一道，
             //   否则用户只看到启动报告里一行 `bad_dex`，完全判不出是权限问题。
-            if (p.dex.canWrite()) {
-                boolean ro = p.dex.setReadOnly();
+            if (carrier.canWrite()) {
+                boolean ro = carrier.setReadOnly();
                 log.append("补丁[").append(i + 1).append("] ").append(label)
-                        .append(" 的 dex 原本可写 -> setReadOnly: ").append(ro).append('\n');
+                        .append(" 的载体原本可写 -> setReadOnly: ").append(ro).append('\n');
             }
             int at = patchInsertIndex(hostDex, inserted);
             try {
                 List<String> notes = new ArrayList<>();
                 int before = Reflect.dexElementCount(baseCl);
                 long t0 = System.nanoTime();
-                int after = Reflect.injectDex(baseCl, p.dex, opt, at, notes);
+                int after = Reflect.injectDex(baseCl, carrier, opt, at, notes);
                 long ms = (System.nanoTime() - t0) / 1000000L;
                 log.append("补丁[").append(i + 1).append("] ").append(label)
                         .append(" 注入 @").append(at).append(" elements ")
@@ -590,6 +600,9 @@ public final class Injector {
     private static void loadNatives(Context ctx, Plan plan, StringBuilder log) throws Exception {
         File apk = plan.apk;
         ZipFile zf = new ZipFile(apk);
+        // v2：已应用的整包补丁也可以带 native（`lib/<abi>/*.so`）—— 补丁优先、基座兜底。
+        List<ZipFile> patchZips = new ArrayList<ZipFile>();
+        List<Patch> patchList = new ArrayList<Patch>();
         int loaded = 0;
         try {
             // ★ ABI 不能写死 Build.SUPPORTED_ABIS[0]：只提供 armeabi-v7a 的包在 32 位进程里
@@ -603,23 +616,49 @@ public final class Injector {
             }
             log.append("选用 ABI = ").append(abi).append('\n');
             String tag = Natives.tagFor(plan.tag, apk);
-            File dir = Natives.dir(ctx, abi, tag);
-            log.append("native 目录 = ").append(dir.getAbsolutePath())
+            for (Patch p : plan.patches) {
+                if (p == null || !p.applied || p.apk == null || !p.apk.isFile()) continue;
+                try {
+                    patchZips.add(new ZipFile(p.apk));
+                    patchList.add(p);
+                } catch (Throwable t) {
+                    log.append("补丁 ").append(labelOf(p, patchList.size()))
+                            .append(" 的 native 载体打不开：").append(t).append('\n');
+                }
+            }
+            log.append("native 目录 = ").append(Natives.dir(ctx, abi, tag).getAbsolutePath())
                     .append("（版本 tag = ").append(tag).append("）\n");
 
             for (String name : NATIVE_LIBS) {
-                ZipEntry e = zf.getEntry("lib/" + abi + "/" + name);
+                // 先找补丁包（按注入顺序，先到先得），没有再回基座
+                ZipEntry e = null;
+                int from = -1;
+                for (int i = 0; i < patchZips.size(); i++) {
+                    e = patchZips.get(i).getEntry("lib/" + abi + "/" + name);
+                    if (e != null) { from = i; break; }
+                }
+                if (e == null) e = zf.getEntry("lib/" + abi + "/" + name);
                 if (e == null) {
                     log.append("APK 里没有 lib/").append(abi).append('/').append(name).append('\n');
                     continue;
                 }
-                File out = Natives.publish(ctx, abi, tag, name, zf.getInputStream(e));
+                // ★ 补丁自带的 native 用独立 tag：同版本不同 native 的构建不互相覆盖（第 382 轮的教训）
+                String useTag = from >= 0
+                        ? Natives.tagOf(tag + "+" + patchList.get(from).ref) : tag;
+                ZipFile src = from >= 0 ? patchZips.get(from) : zf;
+                File out = Natives.publish(ctx, abi, useTag, name, src.getInputStream(e));
                 System.load(out.getAbsolutePath());
                 loaded++;
                 log.append("System.load(").append(name).append(") OK  ")
-                        .append(out.length()).append(" B\n");
+                        .append(out.length()).append(" B");
+                if (from >= 0) log.append("  [补丁 ").append(patchList.get(from).label).append(']');
+                log.append('\n');
             }
         } finally {
+            for (ZipFile z : patchZips) {
+                try { z.close(); } catch (Throwable ignored) {
+                }
+            }
             zf.close();
         }
         // 🔴 计数必须是**本次 launch 的局部量**。原来用 static Set 累加、跨 launch 不清空：
@@ -733,7 +772,11 @@ public final class Injector {
         // 两个补丁改同一个素材在启用时就被拒绝了 ⇒ 这里的顺序不需要额外裁决。
         // ★ 只挂**真正注入成功**的补丁（applied）：注入失败还挂素材 = 半截补丁（B2）。
         for (Patch p : plan.patches) {
-            if (p.applied && p.assets != null && p.assets.isFile()) chain.add(p.assets);
+            if (!p.applied) continue;
+            // v2：整包补丁就把这个 APK 加进链（assets 与资源表都在里面）；
+            // v1：只挂素材增量包。
+            if (p.apk != null && p.apk.isFile()) chain.add(p.apk);
+            else if (p.assets != null && p.assets.isFile()) chain.add(p.assets);
         }
 
         android.content.res.AssetManager amApp = app.getAssets();

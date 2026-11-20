@@ -192,8 +192,13 @@ public class GameSlot extends BaseActivity {
         for (Patches.Loaded l : patchRes.loaded) {
             Injector.Patch p = new Injector.Patch();
             p.ref = l.record.ref();
-            p.dex = l.target.dex;
-            p.assets = l.target.assets;
+            // v2 整包补丁：载体是一个 APK（dex/assets/native 都在里面）；
+            // v1 单 dex 载体才填 dex/assets。
+            p.apk = l.target.apkFile();
+            if (p.apk == null) {
+                p.dex = l.target.dex;
+                p.assets = l.target.assets;
+            }
             p.label = l.record.label();
             plan.patches.add(p);
         }
@@ -216,9 +221,11 @@ public class GameSlot extends BaseActivity {
             java.util.List<Patches.Launched> applied = new java.util.ArrayList<Patches.Launched>();
             for (Injector.Patch ap : plan.patches) {
                 if (ap == null || !ap.applied) continue;
-                // ★ 第 361 轮：连**注入的那份 dex 路径**一起记 —— 崩溃归因要读它的 class_defs
-                applied.add(new Patches.Launched(ap.ref, ap.label,
-                        ap.dex == null ? "" : ap.dex.getAbsolutePath()));
+                // ★ 第 361 轮：连载体的路径一起记 —— 崩溃归因要读它的 class_defs；
+                //   v2 的载体是整包 APK（可能多 dex），由 InjectionSources 按扩展名分流。
+                String carrier = ap.apk != null ? ap.apk.getAbsolutePath()
+                        : (ap.dex == null ? "" : ap.dex.getAbsolutePath());
+                applied.add(new Patches.Launched(ap.ref, ap.label, carrier));
             }
             Patches.writeLaunchRecord(this, launchSlot, ikey, applied);
             reportPatches(ikey, patchRes, plan);

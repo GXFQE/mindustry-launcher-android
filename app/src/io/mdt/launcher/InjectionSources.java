@@ -68,7 +68,10 @@ final class InjectionSources {
             if (crashAt > 0L && info.at > crashAt) return;      // 之后又启动过 ⇒ 不是这一局
             for (Patches.Launched l : info.patches) {
                 if (l == null || l.dex.isEmpty()) continue;
-                Set<String> classes = classesOfDex(new File(l.dex));
+                File carrier = new File(l.dex);
+                // v2：载体可能是整包 APK（多 dex）；v1：单 dex
+                Set<String> classes = carrier.getName().endsWith(".apk")
+                        ? classesOfApk(carrier) : classesOfDex(carrier);
                 if (classes.isEmpty()) continue;
                 s.addPatch(l.label == null || l.label.isEmpty() ? l.ref : l.label, classes);
             }
