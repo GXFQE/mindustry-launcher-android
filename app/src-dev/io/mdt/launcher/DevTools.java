@@ -998,10 +998,13 @@ final class DevTools {
                         for (Patches.TargetFile t : r.targets) {
                             int cc = -1;
                             try { cc = t.classes().size(); } catch (Throwable ignored) { }
+                            File carrier = t.dexFile();
                             sb.append("    sha=").append(t.spec.apkSha256)
-                              .append(" dex=").append(t.dex.isFile() ? t.dex.length() : "MISSING")
+                              .append(" carrier=")
+                              .append(carrier == null ? "MISSING" : carrier.length())
+                              .append(" dexes=").append(t.dexCount())
                               .append(" classes=").append(cc)
-                              .append(" assets=").append(t.spec.hasAssets() ? "yes" : "no")
+                              .append(" assets=").append(t.spec.hasAssets() ? "yes" : "in-apk")
                               .append('\n');
                         }
                     }
