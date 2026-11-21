@@ -1300,7 +1300,8 @@
     <string name="step_start">启动游戏</string>
     <string name="launch_err_bad_package">游戏包不存在或不可读</string>
     <string name="launch_err_no_activity_fmt">无法从游戏包中解析出 %1$s\n该文件可能不是 Mindustry 系 APK，或已损坏。</string>
-    <string name="launch_err_no_abi_fmt">APK 里没有适配本机的 native 库（设备 %1$s）</string>
+    <string name="launch_err_no_abi_fmt">APK 和已启用的补丁里都没有适配本机的 native 库（设备 %1$s）</string>
+    <string name="launch_err_native_align_fmt">native 库 %1$s 只按 %2$d KB 对齐，本机需要 %3$d KB，系统会拒绝加载（来源：%4$s）</string>
     <string name="launch_err_no_native_loaded">没有任何 native 库被加载</string>
     <string name="launch_err_dex">游戏代码加载不了 —— 这个包可能不是原版包，或者已经损坏。</string>
     <string name="launch_err_native">图形库加载不了 —— 这个包可能和本机不兼容。</string>

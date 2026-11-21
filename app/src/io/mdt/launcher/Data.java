@@ -217,6 +217,21 @@ public final class Data {
     }
 
     /**
+     * 这次启动**会落到哪个槽名**（只算名字，不碰任何文件）。
+     *
+     * ★ 第 408 轮：{@link GameSlot} 要在 {@code prepareSlot} **之前**解析补丁（实例键 = 版本 + 槽），
+     *   而 prepareSlot 只把目标槽名规范化、不会改出别的名字 ⇒ 名字可以先按同一套规则算出来。
+     *   规则与 prepareSlot 的各分支一致：空 = 当前槽；shared 原样；不合法 = 当前槽。
+     */
+    public static String slotNameFor(Context ctx, String target) {
+        String cur = currentSlot(ctx);
+        if (target == null || target.isEmpty()) return cur;
+        if (SLOT_SHARED.equals(target)) return SLOT_SHARED;
+        String safe = sanitizeSlot(target);
+        return safe == null ? cur : safe;
+    }
+
+    /**
      * 记下当前槽。★ 唯一写在 {@link Paths#writeSlotName}（原子写 + `.bak` + 目录先建）——
      * 第 177 轮（杀后台 P0）把它从 `FileWriter` 直写改过去：真机把半截 `te`
      * 当成合法槽名之后，界面看起来像"存档全没了"。

@@ -605,17 +605,8 @@ public final class Injector {
         List<Patch> patchList = new ArrayList<Patch>();
         int loaded = 0;
         try {
-            // ★ ABI 不能写死 Build.SUPPORTED_ABIS[0]：只提供 armeabi-v7a 的包在 32 位进程里
-            //   照样能跑，写死 [0] 会找不到库。按**进程**优先级找第一个交集，且**与 Compat
-            //   的判据同一实现**（Compat.pickAbi）——否则会出现"探测说能跑、加载就失败"。
-            String abi = Compat.pickAbi(zf);
-            if (abi == null) {
-                log.append("APK 里没有任何匹配本机 ABI 的 native 目录\n");
-                throw new IllegalStateException(Trans.get(ctx, R.string.launch_err_no_abi_fmt,
-                        Compat.join(Compat.deviceAbis())));
-            }
-            log.append("选用 ABI = ").append(abi).append('\n');
-            String tag = Natives.tagFor(plan.tag, apk);
+            // 补丁的 native 载体先打开 —— 第 408 轮起 ABI 要按「基座 ∪ 补丁」算，
+            // 所以不能等 ABI 选完再开（原来就是那个顺序，导致补丁的 ABI 永远不参与）。
             for (Patch p : plan.patches) {
                 if (p == null || !p.applied || p.apk == null || !p.apk.isFile()) continue;
                 try {
@@ -626,6 +617,22 @@ public final class Injector {
                             .append(" 的 native 载体打不开：").append(t).append('\n');
                 }
             }
+            // ★ ABI 不能写死 Build.SUPPORTED_ABIS[0]：只提供 armeabi-v7a 的包在 32 位进程里
+            //   照样能跑，写死 [0] 会找不到库。按**进程**优先级找第一个交集，且**与 Compat
+            //   的判据同一实现**（Compat.pickAbi）——否则会出现"探测说能跑、加载就失败"。
+            // ★ 第 408 轮：整端补丁自带 native 时，基座自己没交集也能跑 ⇒ 并集里挑。
+            List<ZipFile> abiSources = new ArrayList<ZipFile>();
+            abiSources.add(zf);
+            abiSources.addAll(patchZips);
+            String abi = Compat.pickAbi(abiSources);
+            if (abi == null) {
+                log.append("基座与补丁里都没有匹配本机 ABI 的 native 目录\n");
+                throw new IllegalStateException(Trans.get(ctx, R.string.launch_err_no_abi_fmt,
+                        Compat.join(Compat.deviceAbis())));
+            }
+            log.append("选用 ABI = ").append(abi)
+                    .append("（基座 ∪ ").append(patchZips.size()).append(" 个补丁）\n");
+            String tag = Natives.tagFor(plan.tag, apk);
             log.append("native 目录 = ").append(Natives.dir(ctx, abi, tag).getAbsolutePath())
                     .append("（版本 tag = ").append(tag).append("）\n");
 
@@ -642,15 +649,29 @@ public final class Injector {
                     log.append("APK 里没有 lib/").append(abi).append('/').append(name).append('\n');
                     continue;
                 }
+                ZipFile src = from >= 0 ? patchZips.get(from) : zf;
+                String fromLabel = from >= 0 ? ("补丁 " + patchList.get(from).label) : "基座";
+                // ★ 第 408 轮：页对齐必须验**真正要加载的那条 so**。以前只验基座那条，
+                //   而整端补丁优先用自己的 native ⇒ 验的和用的不是同一个文件（16 KB 页设备上
+                //   会在 System.load 才炸，Android 15 上表现为"游戏一启动就崩"）。
+                long align = Compat.maxAlignOf(src, e);
+                long page = Compat.pageSize();
+                if (Compat.alignBlocks(align, page)) {
+                    log.append("native 对齐不合格：").append(name).append("  ")
+                            .append(align / 1024).append(" KB < 页 ").append(page / 1024)
+                            .append(" KB（").append(fromLabel).append("）\n");
+                    throw new IllegalStateException(Trans.get(ctx, R.string.launch_err_native_align_fmt,
+                            name, align / 1024, page / 1024, fromLabel));
+                }
                 // ★ 补丁自带的 native 用独立 tag：同版本不同 native 的构建不互相覆盖（第 382 轮的教训）
                 String useTag = from >= 0
                         ? Natives.tagOf(tag + "+" + patchList.get(from).ref) : tag;
-                ZipFile src = from >= 0 ? patchZips.get(from) : zf;
                 File out = Natives.publish(ctx, abi, useTag, name, src.getInputStream(e));
                 System.load(out.getAbsolutePath());
                 loaded++;
                 log.append("System.load(").append(name).append(") OK  ")
-                        .append(out.length()).append(" B");
+                        .append(out.length()).append(" B  align=")
+                        .append(align == 0 ? "?" : (align / 1024) + "K");
                 if (from >= 0) log.append("  [补丁 ").append(patchList.get(from).label).append(']');
                 log.append('\n');
             }

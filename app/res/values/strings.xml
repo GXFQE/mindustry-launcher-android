@@ -1325,7 +1325,8 @@
     <string name="step_start">starting the game</string>
     <string name="launch_err_bad_package">the game package is missing or unreadable</string>
     <string name="launch_err_no_activity_fmt">could not find %1$s in the game package\nthe file may not be a Mindustry-family APK, or it may be damaged</string>
-    <string name="launch_err_no_abi_fmt">the APK has no native libraries for this device (%1$s)</string>
+    <string name="launch_err_no_abi_fmt">neither the APK nor its enabled patches have native libraries for this device (%1$s)</string>
+    <string name="launch_err_native_align_fmt">native library %1$s is only %2$d KB aligned, but this device needs %3$d KB; the system would refuse to load it (from %4$s)</string>
     <string name="launch_err_no_native_loaded">no native library was loaded</string>
     <string name="launch_err_dex">could not load the game code — this package may not be an official build, or it may be damaged</string>
     <string name="launch_err_native">could not load the graphics library — this package may not work on this device</string>

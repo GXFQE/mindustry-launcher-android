@@ -1722,7 +1722,10 @@ public class MainActivity extends BaseActivity {
                 //   ② 系统侧变过（页大小 4 KB ↔ 16 KB 不同设备的槽数据迁移、OTA）。
                 //   ⚠️ 复检不过就**不启动** —— 否则用户白等一次 :game 拉起，只看到一个看不懂的错。
                 Compat.Probe cp = compatProbeOf(a, e);
-                if (cp != null && !cp.runnable()) {
+                // ★ 第 408 轮：这里只拦"基座根本不是游戏包"（没有入口类）。ABI / 页对齐要看
+                //   「基座 ∪ 已启用补丁」才知道（整端补丁可以自带 native），把决定权交给
+                //   :game 的 Injector.loadNatives —— 它会对**真正要加载的那条 so** 判。
+                if (cp != null && !cp.hasEntry) {
                     final String msg = e.displayName(a) + "\n\n" + Compat.rejectReason(a, cp);
                     a.runOnUiThread(new Runnable() {
                         @Override public void run() {

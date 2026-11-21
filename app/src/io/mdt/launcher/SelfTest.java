@@ -3842,6 +3842,53 @@ public final class SelfTest {
         p.hasEntry = false;
         ok(stat, L, !p.runnable(), "缺入口类 ⇒ 不可进管线（哪怕库和页对齐都合格）");
 
+        // ⑥b ★★ 第 408 轮：整端补丁能自带 native ⇒ ABI / 页对齐不能只看基座。
+        //     probe 只回答"基座是不是游戏包"，ABI 由启动时「基座 ∪ 已应用补丁」并集判。
+        Compat.Probe q = new Compat.Probe();
+        q.hasEntry = true;
+        q.coreLib = "libarc.so";
+        q.abi = null;
+        q.maxAlign = 4096;
+        q.pageSize = 16384;
+        ok(stat, L, q.runnable(), "基座没有可用 ABI 也算可进管线（ABI 等补丁）");
+        ok(stat, L, q.abiDeferred(), "abiDeferred：ABI 尚未定");
+        ok(stat, L, Compat.alignBlocks(4096, 16384), "4 KB 对齐 / 16 KB 页 ⇒ 拦");
+        ok(stat, L, !Compat.alignBlocks(16384, 16384), "16 KB / 16 KB ⇒ 放行");
+        ok(stat, L, !Compat.alignBlocks(0, 16384), "读不到对齐 ⇒ 放行（保守）");
+        ok(stat, L, !Compat.alignBlocks(4096, 0), "读不到页大小 ⇒ 放行（保守）");
+
+        // ⑥c 并集选 ABI + 对齐验"真正要加载的那条"（单个 zip 不认识的 ABI，补丁里有）
+        File abiDir = new File(ctx.getCacheDir(), "selftest-compat-abis");
+        Data.deleteTree(abiDir);
+        abiDir.mkdirs();
+        String abi0 = Compat.deviceAbis()[0];
+        try {
+            File zbF = byteFile(abiDir, "base.zip",
+                    zipBytes(new String[]{"classes.dex"}, new byte[][]{{1, 2, 3}}));
+            File zpF = byteFile(abiDir, "patch.apk",
+                    zipBytes(new String[]{"lib/" + abi0 + "/libarc.so"},
+                            new byte[][]{fakeElf64(16384)}));
+            java.util.zip.ZipFile zb = new java.util.zip.ZipFile(zbF);
+            java.util.zip.ZipFile zp = new java.util.zip.ZipFile(zpF);
+            try {
+                ok(stat, L, Compat.pickAbi(zb) == null, "只看基座：没有本机 ABI");
+                ok(stat, L, abi0.equals(Compat.pickAbi(java.util.Arrays.asList(zb, zp))),
+                        "基座 ∪ 补丁：选中设备 ABI " + abi0);
+                java.util.zip.ZipEntry so = zp.getEntry("lib/" + abi0 + "/libarc.so");
+                ok(stat, L, Compat.maxAlignOf(zp, so) == 16384,
+                        "补丁的 so 对齐读得到 16384（" + Compat.maxAlignOf(zp, so) + "）");
+                ok(stat, L, Compat.maxAlignOf(zb, null) == 0, "基座没有 so ⇒ 0（不拦）");
+            } finally {
+                zb.close();
+                zp.close();
+            }
+        } catch (Exception e) {
+            stat[1]++;
+            L.add("❌ ABI 并集 / 对齐夹具异常：" + e);
+        } finally {
+            Data.deleteTree(abiDir);
+        }
+
         // ⑦ 字节搜索的边界（针比干草长时不能越界）
         ok(stat, L, Compat.contains("abcdef".getBytes(), "cde".getBytes()), "字节搜索：命中");
         ok(stat, L, !Compat.contains("abcdef".getBytes(), "xyz".getBytes()), "字节搜索：不命中");

@@ -139,7 +139,14 @@ public class GameSlot extends BaseActivity {
         final Map<String, String> vmap = mapOf(vinfo);
 
         // ② 存档槽：必须在游戏起来之前定下来
-        boolean legacy = needsLegacySlot(target, it);
+        // ★ 第 408 轮：整端补丁可以换掉游戏本体（代码 / native），"支不支持属性注入"必须按
+        //   **生效的那份 dex** 判，而不是基座。解析补丁要实例键（版本 + 槽），槽名在
+        //   prepareSlot 之后才落定 —— 但 prepareSlot 只把目标槽名规范化、不会改出别的名字
+        //   （见 Data.slotNameFor 与 prepareSlot 的各分支），所以先用规范化后的名字解析一次。
+        final String provSlot = Data.slotNameFor(this, slot);
+        final String provKey = Versions.instanceKey(vkey, provSlot);
+        Patches.Resolved patchRes = Patches.resolve(this, target, provKey);
+        boolean legacy = needsLegacySlot(target, it, patchRes);
         String rep = Data.prepareSlot(this, slot, legacy);
         if (!legacy) {
             File dir = Data.dataRoot(this);
@@ -159,6 +166,12 @@ public class GameSlot extends BaseActivity {
         //   （`slot` extra 可能为空 / 远古包会临时改道）：`currentSlot` 才是这一局真正落地的槽。
         final String launchSlot = Data.currentSlot(this);
         final String ikey = Versions.instanceKey(vkey, launchSlot);
+        if (!ikey.equals(provKey)) {
+            // 极端情况：prepareSlot 没认下目标槽（名字不合法 / 外部目录不可用）⇒ 用真正落地的
+            // 实例键再解析一次，别把补丁算到别的实例头上。
+            patchRes = Patches.resolve(this, target, ikey);
+            android.util.Log.w("MDTLauncher", "patch resolve: 实例键 " + provKey + " → " + ikey);
+        }
         mVkey = vkey;
         mLaunchSlot = launchSlot;
 
@@ -188,7 +201,7 @@ public class GameSlot extends BaseActivity {
         // ★ 2026-11-17（第 389 轮）：这里必须把补丁引用带进 Injector.Patch ——
         //   启动记录/崩溃归因/游玩时长的补丁身份都读 `ap.ref`；漏了的话注入明明成功，
         //   `report-patch-launch.json` 里 patches 却是空的（第 388 轮的补丁统计就这么全落成本体）。
-        Patches.Resolved patchRes = Patches.resolve(this, target, ikey);
+        // ★ 第 408 轮：patchRes 已在 ② 之前解析过（legacy 决策要用），这里直接用。
         for (Patches.Loaded l : patchRes.loaded) {
             Injector.Patch p = new Injector.Patch();
             p.ref = l.record.ref();
@@ -266,15 +279,34 @@ public class GameSlot extends BaseActivity {
      * 该包要不要走**改名交换**（= 它不支持 F0 的属性注入）。
      *
      * 判据来源（唯一性很关键，别在两处各判一次）：
-     *   · 有 {@link #EXTRA_LEGACY_SWAP} ⇒ 用入口页那次探测的结果（免重复读 dex）；
-     *   · 没有 ⇒ 自己探一次（dev：经 MainActivity 的 dev extra 进来，`GameSlot` 已 `exported=false`）。
+     *   · **整端补丁定义了入口类** ⇒ 按补丁的 dex 判（它才是真正跑起来的游戏本体，第 408 轮）；
+     *   · 否则有 {@link #EXTRA_LEGACY_SWAP} ⇒ 用入口页那次探测的结果（免重复读 dex）；
+     *   · 都没有 ⇒ 自己探基座一次。
      *
      * ★★ **探不出来时一律按"要改名交换"处理** —— 这个方向的错**只是慢**（不并行），
      *   反方向的错是**游戏写 files/ 而 HUB 去 slot-<名> 找** ⇒ 用户的存档"看起来没了"。
      *   （后者其实也能自愈：下一次启动的 {@link Data#reclaimLegacy} 会发现 files/ 里有数据
      *   并把本体声明回 files/。但那要等到下一局，用户这一局已经吓一跳了。）
      */
-    private boolean needsLegacySlot(File apk, Intent it) {
+    private boolean needsLegacySlot(File apk, Intent it, Patches.Resolved res) {
+        // ① 整端补丁（注入后排在基座之前 ⇒ 它的同名类先被解析到）—— 判它自己支不支持属性
+        if (res != null) {
+            for (Patches.Loaded l : res.loaded) {
+                File carrier = l.target == null ? null : l.target.apkFile();
+                if (carrier == null || !carrier.isFile()) continue;
+                try {
+                    if (PatchPackage.classes(carrier).contains(Injector.GAME_ACTIVITY)) {
+                        boolean prop = Compat.probe(carrier).hasProp;
+                        android.util.Log.i("MDTLauncher", "slot-mode: 整端补丁 " + l.record.label()
+                                + " 定义入口类 ⇒ 属性注入=" + prop);
+                        return !prop;
+                    }
+                } catch (Throwable t) {
+                    android.util.Log.w("MDTLauncher", "整端补丁探测失败，继续看基座: " + t);
+                }
+            }
+        }
+        // ② 基座
         if (it != null && it.hasExtra(EXTRA_LEGACY_SWAP)) {
             return it.getBooleanExtra(EXTRA_LEGACY_SWAP, false);
         }

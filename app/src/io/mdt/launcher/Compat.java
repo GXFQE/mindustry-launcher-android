@@ -85,9 +85,20 @@ public final class Compat {
         /** 取证用：读了几个 dex */
         public int dexCount;
 
-        /** 能不能进管线（① ② ③ ④ 全过） */
+        /**
+         * 能不能进管线（① ② 全过）—— 只判"基座自己是不是一份游戏包"。
+         *
+         * ★ ③ ABI 与 ④ 页对齐**不在这里判**：整端补丁可以自带 native，真正加载哪条 so
+         *   要到启动时把「基座 ∪ 已应用补丁」并起来才知道（第 408 轮）。这里只把探测到的
+         *   ABI / 对齐当**信息**记下来（{@link #abiDeferred()} / {@link #alignOk()}）。
+         */
         public boolean runnable() {
-            return hasEntry && abi != null && coreLib != null && alignOk();
+            return hasEntry && coreLib != null;
+        }
+
+        /** 基座自己跟本机没有 ABI 交集 ⇒ 能不能跑取决于补丁里有没有（启动时判，第 408 轮）。 */
+        public boolean abiDeferred() {
+            return runnable() && abi == null;
         }
 
         /**
@@ -96,8 +107,7 @@ public final class Compat {
          *    保守取向，见类注释。
          */
         public boolean alignOk() {
-            if (maxAlign == 0 || pageSize == 0) return true;
-            return maxAlign >= pageSize;
+            return !alignBlocks(maxAlign, pageSize);
         }
 
         /** ★ 属性注入不可用 ⇒ 该版本必须回退到**改名交换**（F0 落地后据此分流） */
@@ -113,7 +123,7 @@ public final class Compat {
                     + " align=" + (maxAlign == 0 ? "?" : (maxAlign / 1024) + "K")
                     + "/page=" + (pageSize == 0 ? "?" : (pageSize / 1024) + "K")
                     + " prop=" + (hasProp ? "Y" : "N")
-                    + " → " + (runnable() ? "可用" : "拒绝")
+                    + " → " + (runnable() ? (abi == null ? "基座可用（ABI 待补丁）" : "可用") : "拒绝")
                     + (needsRename() ? "（回退改名交换）" : "");
         }
     }
@@ -230,14 +240,53 @@ public final class Compat {
      *   否则"探测说能跑、加载就失败"。
      */
     public static String pickAbi(ZipFile zf) {
+        return pickAbiFrom(abisOf(zf));
+    }
+
+    /**
+     * 在「基座 ∪ 已应用补丁」里挑一个本机能用的 ABI（第 408 轮）。
+     * ★ 整端补丁可以自带 native：基座自己没交集时，补丁里可能正好有本机要的那套。
+     */
+    public static String pickAbi(List<ZipFile> zips) {
+        TreeSet<String> all = new TreeSet<String>();
+        if (zips != null) {
+            for (ZipFile z : zips) {
+                if (z != null) all.addAll(abisOf(z));
+            }
+        }
+        return pickAbiFrom(all);
+    }
+
+    /** 一个 zip 里出现过的 ABI 目录（只认 `lib/<abi>/<file>` 这一层）。 */
+    static TreeSet<String> abisOf(ZipFile zf) {
         TreeSet<String> abis = new TreeSet<String>();
+        if (zf == null) return abis;
         for (Enumeration<? extends ZipEntry> en = zf.entries(); en.hasMoreElements(); ) {
             String n = en.nextElement().getName();
             if (!n.startsWith("lib/")) continue;
             int s = n.indexOf('/', 4);
             if (s > 4 && n.indexOf('/', s + 1) < 0) abis.add(n.substring(4, s));
         }
-        return pickAbiFrom(abis);
+        return abis;
+    }
+
+    /** 读 zip 里某个 so 的 ELF 对齐 —— 只有**真正要加载的那条**才算数（第 408 轮）。 */
+    public static long maxAlignOf(ZipFile zf, ZipEntry e) {
+        if (zf == null || e == null) return 0;
+        return elfMaxAlign(readUpTo(zf, e, ELF_PROBE_BYTES));
+    }
+
+    /** 这个 APK 的 dex 是否支持属性注入（整端补丁定义入口类时用它判断，见 GameSlot）。 */
+    public static boolean hasProp(File apk) throws IOException {
+        return probe(apk).hasProp;
+    }
+
+    /**
+     * 页对齐判据的**唯一实现**：只有"读到了对齐、也拿到了页大小、且确实小"才拦。
+     * 0 表示不知道（非 ELF / 读不到 / 拿不到页大小）⇒ 放行（保守取向，别误伤能跑的包）。
+     */
+    public static boolean alignBlocks(long maxAlign, long pageSize) {
+        return maxAlign > 0 && pageSize > 0 && maxAlign < pageSize;
     }
 
     /** 从已收集的 ABI 集合里按**进程**优先级挑一个 */
