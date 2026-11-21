@@ -96,6 +96,7 @@ final class DevTools {
                 || intent.hasExtra("dev_cas_stats")
                 || intent.hasExtra("dev_cas_gc")
                 || intent.hasExtra("dev_cas_migrate")
+        || intent.hasExtra("dev_casbench")
                 || intent.hasExtra("dev_compat")
                 || intent.hasExtra("dev_backup_restore")
                 || intent.hasExtra("dev_logs_export")
@@ -440,6 +441,10 @@ final class DevTools {
         }
         if (intent.hasExtra("dev_cas_migrate")) {
             devCasReport(false, true);
+            return;
+        }
+        if (intent.hasExtra("dev_casbench")) {
+            devCasBench();
             return;
         }
 
@@ -1205,6 +1210,27 @@ final class DevTools {
                 reportDev(sb.toString(), "dev_cas");
             }
         }, "dev-cas").start();
+    }
+
+
+    /**
+     * 第 412 轮探针：**CAS 存游戏本体的效果与速率**（`--es dev_casbench 1`）。
+     *
+     * <p>只测不建：读现有 `app_hub/import/*.apk`，池用内部存储的临时目录，跑完删净。
+     * 输出走 {@link #reportDev}（`hub/report-devtool.txt`），不进任何产品路径。
+     */
+    private void devCasBench() {
+        new Thread(new Runnable() {
+            @Override public void run() {
+                StringBuilder sb = new StringBuilder();
+                try {
+                    CasBench.run(a, sb);
+                } catch (Throwable t) {
+                    sb.append("FAILED: ").append(t).append('\n');
+                }
+                reportDev(sb.toString(), "dev_casbench");
+            }
+        }, "dev-casbench").start();
     }
 
 
