@@ -1308,6 +1308,9 @@
     <string name="game_cannot_start">Cannot start</string>
     <string name="game_pkg_missing_fmt">Cannot find the game package to start. It may have been uninstalled or deleted.</string>
     <string name="step_prepare">prepare</string>
+    <string name="legacy_slot_busy">A game is still running. Quit it before switching this launch item to another save slot.</string>
+    <string name="legacy_slot_ownerless_fmt">The shared files/ folder holds older data with no recorded owner. Launch the current slot %1$s once to claim it, then switch.</string>
+    <string name="legacy_slot_move_failed_fmt">Could not move the save folders (nothing was deleted). Check free space and try again.</string>
     <string name="step_unknown">unknown</string>
     <!--
       ══ 启动管线各步 + 失败原因（P3）══════════════════════════════════════

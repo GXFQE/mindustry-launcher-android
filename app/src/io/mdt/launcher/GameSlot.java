@@ -147,7 +147,15 @@ public class GameSlot extends BaseActivity {
         final String provKey = Versions.instanceKey(vkey, provSlot);
         Patches.Resolved patchRes = Patches.resolve(this, target, provKey);
         boolean legacy = needsLegacySlot(target, it, patchRes);
-        String rep = Data.prepareSlot(this, slot, legacy);
+        // ★ 第 412 轮：远古包（build ≤ 146）的槽交接可能**拒绝**启动 ——
+        //   files/ 里有无主数据、或游戏还在跑时，宁可停下说清楚，也不猜/不抢。
+        String rep;
+        try {
+            rep = Data.prepareSlot(this, slot, legacy);
+        } catch (Data.SlotRefused e) {
+            fail(Trans.get(GameSlot.this, R.string.step_prepare), slotRefusedText(e), null);
+            return;
+        }
         if (!legacy) {
             File dir = Data.dataRoot(this);
             if (dir == null) {
@@ -288,6 +296,20 @@ public class GameSlot extends BaseActivity {
      *   （后者其实也能自愈：下一次启动的 {@link Data#reclaimLegacy} 会发现 files/ 里有数据
      *   并把本体声明回 files/。但那要等到下一局，用户这一局已经吓一跳了。）
      */
+    /**
+     * 远古包槽交接被拒 ⇒ 启动失败弹窗里那句话（文案只在 strings 里）。
+     */
+    private String slotRefusedText(Data.SlotRefused e) {
+        if ("legacy_busy".equals(e.code)) {
+            return Trans.get(this, R.string.legacy_slot_busy);
+        }
+        if ("legacy_ownerless".equals(e.code)) {
+            return Trans.get(this, R.string.legacy_slot_ownerless_fmt,
+                    e.arg == null ? Data.currentSlot(this) : e.arg);
+        }
+        return Trans.get(this, R.string.legacy_slot_move_failed_fmt);
+    }
+
     private boolean needsLegacySlot(File apk, Intent it, Patches.Resolved res) {
         // ① 整端补丁（注入后排在基座之前 ⇒ 它的同名类先被解析到）—— 判它自己支不支持属性
         if (res != null) {

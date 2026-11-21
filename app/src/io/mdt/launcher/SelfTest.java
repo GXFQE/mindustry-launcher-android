@@ -4074,6 +4074,23 @@ public final class SelfTest {
                         != (Data.legacyClaim(null, false, "a") == null),
                 "元断言：legacyClaim 对「files/ 有没有内容」敏感（不是恒返回同一个）");
 
+        // ⑤b 第 412 轮：交接决策表（纯函数）—— 这五条就是"什么时候敢搬、什么时候必须停"的全部规则
+        ok(stat, L, Data.legacyPlan(true, "a", "a", "a", true) == Data.LEGACY_PLAN_BUSY,
+                "游戏在跑 ⇒ 不搬（BUSY）");
+        ok(stat, L, Data.legacyPlan(false, null, "a", "a", false) == Data.LEGACY_PLAN_NONE,
+                "files/ 空且无标记 ⇒ 正常搬入（NONE）");
+        ok(stat, L, Data.legacyPlan(true, "a", "a", "a", false) == Data.LEGACY_PLAN_KEEP,
+                "files/ 属于目标槽 ⇒ 沿用（KEEP）");
+        ok(stat, L, Data.legacyPlan(true, "a", "b", "b", false) == Data.LEGACY_PLAN_SWAP,
+                "files/ 属于别的槽 ⇒ 交接（SWAP）");
+        ok(stat, L, Data.legacyPlan(true, null, "a", "a", false) == Data.LEGACY_PLAN_ADOPT,
+                "无标记 + 目标是当前槽 ⇒ 认领（ADOPT）");
+        ok(stat, L, Data.legacyPlan(true, null, "a", "b", false) == Data.LEGACY_PLAN_OWNERLESS,
+                "无标记 + 目标不是当前槽 ⇒ 拒绝（OWNERLESS，不猜这份数据是谁的）");
+        ok(stat, L, !Data.legacyPlanName(Data.LEGACY_PLAN_SWAP)
+                        .equals(Data.legacyPlanName(Data.LEGACY_PLAN_KEEP)),
+                "元断言：交接与沿用**说法不同**（报告里能看出走的是哪条路）");
+
         // ⑥ ★★ 核心不变式（对**任意布局**都成立的等价式，四条一起判）：
         //      「`dirOf(某槽)` 指向 `files/`」 ⟺ 「该槽是 shared，或它就是 legacyClaim 认下的本体」
         //    两边任一实现写错，这里立刻红。这才是"存档不会看起来没了"的防线：

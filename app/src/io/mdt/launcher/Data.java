@@ -718,6 +718,31 @@ public final class Data {
     }
 
     /**
+     * 有没有**别的**游戏实例在跑（排除本进程）。
+     *
+     * <p>★ 第 412 轮：`prepareSlot` 是在 `:game` 进程里执行的 ⇒ 用 {@link #gameAlive}
+     * 会看到**自己**，于是"游戏还在跑"永远成立、远古包换槽永远被自己拦下
+     * （真机第一次验证就撞上了）。全局动作（迁移 / 回收 / 杀进程）仍用
+     * {@link #gameAlive}，只有"准备这一局"用本方法。
+     */
+    static boolean gameAliveExceptSelf(Context ctx) {
+        try {
+            ActivityManager am =
+                    (ActivityManager) ctx.getSystemService(Context.ACTIVITY_SERVICE);
+            if (am == null) return false;
+            List<ActivityManager.RunningAppProcessInfo> ps = am.getRunningAppProcesses();
+            if (ps == null) return false;
+            String pkg = ctx.getPackageName();
+            int self = android.os.Process.myPid();
+            for (ActivityManager.RunningAppProcessInfo p : ps) {
+                if (p != null && p.pid != self && isGameProcessName(pkg, p.processName)) return true;
+            }
+        } catch (Throwable ignored) {
+        }
+        return false;
+    }
+
+    /**
      * 这个进程名是不是**游戏实例进程**：`包名:game`，或 `包名:game` + 纯数字（`:game0/:game1`）。
      *
      * <p>为什么现在就把 `:gameN` 认下来：多开方案 §4 计划把实例进程改成 `:game0/:game1`，
@@ -1062,12 +1087,6 @@ public final class Data {
           .append('\n');
         if (blank) target = cur;
 
-        // ① 先回到统一布局：把"借住 files/ 的本体"收回 slot-<名>。
-        //    任何模式都要先做 —— 否则下面的路径判断全都建立在错的起点上。
-        //    幂等；已是统一布局时返回 null。
-        String re = reclaimLegacy(ctx);
-        if (re != null) sb.append("① ").append(re);
-
         if (SLOT_SHARED.equals(target)) {
             rememberSlot(ctx, SLOT_SHARED);
             sb.append("shared 模式：不隔离，游戏写它自己的默认根 files/\n");
@@ -1080,7 +1099,10 @@ public final class Data {
         }
 
         if (!legacy) {
-            // ② 真隔离：只需要认下槽名。目录由调用方 mkdirs 后写进系统属性。
+            // ② 真隔离：先把可能借住 files/ 的远古包本体收回自己的槽（游戏没在跑才敢动），
+            //    再只认下槽名。目录由调用方 mkdirs 后写进系统属性。
+            String re = reclaimLegacy(ctx);
+            if (re != null) sb.append("① ").append(re);
             rememberSlot(ctx, safe);
             sb.append("② 槽记为 ").append(safe).append("；游戏数据根 = ")
               .append(slotDir(ctx, safe)).append("（不搬动任何文件）\n");
@@ -1088,73 +1110,127 @@ public final class Data {
         }
 
         // ②' 远古包：本体必须躺进 files/（该版本只会看游戏的默认根）
-        return legacyLendToFiles(ctx, sb, safe);
+        return legacyExchange(ctx, sb, safe, cur);
     }
 
     /**
-     * 把槽 `safe` 的本体改名到 `files/`（远古包专用）。
-     * ⚠️ 前置：{@link #reclaimLegacy} 刚跑过 ⇒ `files/` 应当是**空壳**。
-     *   万一不是（历史残留），先把整个空壳**整体归档**到 `<hub>/files-shell/`，
-     *   而不是逐个删 —— 见 {@link #stashShell}。
+     * 远古包（build ≤ 146）的槽交接：`files/` 是游戏唯一认的数据根，同一时刻只允许一个槽
+     * "住"在里面。**绝不允许"两边都有内容"时静默共用** —— 这是第 412 轮修掉的串档口子：
+     *
+     *   · files/ 属于目标槽 ⇒ 沿用（目标槽目录里若还留着旧数据，先归档到 hub/legacy-backup/）；
+     *   · files/ 属于别的槽   ⇒ 把它整个收回到那个槽（槽目录里的旧数据先归档），
+     *                          再把目标槽的目录搬进 files/；
+     *   · files/ 有数据但没登记归属 ⇒ 只有"目标槽 == 当前槽"才认领，否则拒绝启动（不猜）；
+     *   · 游戏进程还活着 ⇒ 拒绝（正在写的目录绝不能搬）。
+     *
+     * 失败策略：**任何一步失败都不删除数据**，能回退就回退，然后拒绝启动并把原因说清。
      */
-    private static String legacyLendToFiles(Context ctx, StringBuilder sb, String safe) {
+    private static String legacyExchange(Context ctx, StringBuilder sb, String safe, String cur) {
         File ext = Paths.externalRoot(ctx);
-        File tgt = slotDir(ctx, safe);
-        if (ext == null || tgt == null) {
-            sb.append("拿不到外部根 / 槽目录 ⇒ 不改动\n");
-            return sb.toString();
-        }
-        long t0 = System.currentTimeMillis();
-        boolean had = tgt.exists();
+        if (ext == null) throw new SlotRefused("legacy_io", null);
+        boolean extHas = !contentRootsOf(ext).isEmpty();
+        String owner = legacyOwner(ctx);
+        int plan = legacyPlan(extHas, owner, cur, safe, gameAliveExceptSelf(ctx));
+        sb.append("① 计划 = ").append(legacyPlanName(plan))
+          .append("（files/ ").append(extHas ? "有数据" : "空")
+          .append("；登记归属 = ").append(owner == null ? "无" : owner).append("）\n");
+        if (plan == LEGACY_PLAN_BUSY) throw new SlotRefused("legacy_busy", null);
+        if (plan == LEGACY_PLAN_OWNERLESS) throw new SlotRefused("legacy_ownerless", cur);
 
-        // ★ files/ 必须为空才能被 rename 覆盖；且有内容时**绝不**把它当成"可以牺牲"的东西。
-        List<File> extContent = contentRootsOf(ext);
-        if (!extContent.isEmpty()) {
-            // 这不该发生（reclaim 刚跑过）。发生了说明"有个更老的布局"，
-            // ⇒ 最安全的是**什么都不动**，并把本体声明为 files/（它确实在那儿）。
-            rememberSlot(ctx, safe);
+        long t0 = System.currentTimeMillis();
+        if (plan == LEGACY_PLAN_ADOPT || plan == LEGACY_PLAN_KEEP) {
+            sb.append(archiveIfDirty(ctx, slotDir(ctx, safe), safe));
             writeLegacyOwner(ctx, safe);
-            sb.append("⚠ files/ 里有 ").append(extContent.size())
-              .append(" 项数据 ⇒ 不搬动；本槽本体就地取用 files/\n");
+            rememberSlot(ctx, safe);
+            if (!ext.exists()) ext.mkdirs();
+            sb.append("② 远古包：files/ 沿用（归属 ").append(safe).append("）；耗时 ")
+              .append(System.currentTimeMillis() - t0).append(" ms\n");
             return sb.toString();
         }
+
+        if (plan == LEGACY_PLAN_SWAP) {
+            Move parked = parkTo(ctx, owner);
+            sb.append(parked.text);
+            if (!parked.ok) throw new SlotRefused("legacy_move", null);
+        }
+
+        // NONE / SWAP 之后：files/ 应该已经不存在（或者只剩空壳）⇒ 把目标槽搬进来
         if (ext.exists()) {
             File[] kids = ext.listFiles();
-            if (kids != null && kids.length > 0) {
-                if (!stashShell(ctx, ext, "files-shell")) {
-                    // 清不掉空壳 ⇒ 只能放弃隔离。**不改任何东西**：游戏仍写 files/，
-                    // 本槽本体留在 slot-<安全名>（数据完好，只是这局看不到它）—— 报告里说清。
-                    sb.append("⚠ 清不掉 files/ 里的历史残留 ⇒ 本次不做隔离。\n")
-                      .append("  本槽数据完好地留在 ").append(tgt.getName())
-                      .append("（该远古版本这局将看不到它）\n");
-                    rememberSlot(ctx, safe);
-                    return sb.toString();
+            if (kids != null && kids.length > 0 && !stashShell(ctx, ext, "files-shell")) {
+                throw new SlotRefused("legacy_move", null);
+            }
+            if (ext.exists() && !deleteTree(ext)) throw new SlotRefused("legacy_move", null);
+        }
+        File tgt = slotDir(ctx, safe);
+        if (tgt != null && !contentRootsOf(tgt).isEmpty()) {
+            if (!tgt.renameTo(ext)) {
+                // 回退：把刚收回 slot-<owner> 的那份放回 files/，回到这一局之前的状态
+                if (plan == LEGACY_PLAN_SWAP) {
+                    File ownerDir = slotDir(ctx, owner);
+                    if (ownerDir != null) ownerDir.renameTo(ext);
                 }
-                sb.append("  （files/ 的非内容残留已归档到 hub/files-shell/）\n");
+                throw new SlotRefused("legacy_move", null);
             }
-            // 现在应为空；删掉这个空目录好让下面的 rename 能落地
-            if (!deleteTree(ext)) {
-                sb.append("⚠ files/ 删不掉 ⇒ 本次不做隔离（同上）\n");
-                rememberSlot(ctx, safe);
-                return sb.toString();
-            }
+            sb.append("② 远古包：本体 = files/（由 ").append(tgt.getName()).append(" 搬入）\n");
+        } else {
+            if (!ext.exists()) ext.mkdirs();
+            sb.append("② 远古包：本体 = files/（该槽还没有数据，空目录）\n");
         }
-        if (had && !tgt.renameTo(ext)) {
-            // 极端情况：rename 失败（被占用？）。回到"不改任何东西"，
-            // 但**必须**把标记写成 safe —— 否则 dirOf 会指向 slot-<safe>，
-            // 而游戏写的是 files/，用户的存档就"看起来"没了。
-            rememberSlot(ctx, safe);
-            writeLegacyOwner(ctx, safe);
-            sb.append("⚠ rename ").append(tgt.getName())
-              .append(" → files/ 失败 ⇒ 未做任何删除；标记本体就在 files/\n");
-            return sb.toString();
-        }
-        rememberSlot(ctx, safe);
         writeLegacyOwner(ctx, safe);
-        sb.append("② 远古包模式：本体 = files/（")
-          .append(had ? "由 " + tgt.getName() + " 改名而来" : "该槽首次使用，空目录")
-          .append("）；耗时 ").append(System.currentTimeMillis() - t0).append(" ms\n");
+        rememberSlot(ctx, safe);
+        sb.append("   耗时 ").append(System.currentTimeMillis() - t0).append(" ms\n");
         return sb.toString();
+    }
+
+    /** 槽目录里若还留着"本不该有的旧数据"，归档到 hub/legacy-backup/（返回给报告的说明）。 */
+    private static String archiveIfDirty(Context ctx, File dir, String slot) {
+        if (dir == null) return "";
+        if (contentRootsOf(dir).isEmpty()) {
+            if (dir.exists() && !stashShell(ctx, dir, "legacy-shell-" + slot)) {
+                return "   （空壳 " + dir.getName() + " 挪不动，不影响数据）\n";
+            }
+            return "";
+        }
+        File bak = archiveDir(ctx, dir, slot);
+        if (bak == null) return "⚠ " + dir.getName() + " 里的旧数据归档失败\n";
+        return "   （" + dir.getName() + " 里的旧数据已归档到 " + bak.getName() + "）\n";
+    }
+
+    /**
+     * 把 `files/` 收回给 `owner` 槽（先把它槽目录里挡路的旧数据归档，保证 rename 能落地）。
+     * 返回结果对象；失败时 `ok=false`，且**已经还原到调用前能还原的状态**。
+     */
+    private static Move parkTo(Context ctx, String owner) {
+        File ext = Paths.externalRoot(ctx);
+        File slot = slotDir(ctx, owner);
+        if (ext == null || slot == null) return new Move(false, "⚠ 拿不到目录 ⇒ 无法收回\n");
+        File backup = null;
+        if (!contentRootsOf(slot).isEmpty()) {
+            backup = archiveDir(ctx, slot, owner);
+            if (backup == null) {
+                return new Move(false, "⚠ " + slot.getName() + " 里的旧数据归档失败 ⇒ 不收回\n");
+            }
+        } else if (slot.exists() && !stashShell(ctx, slot, "legacy-shell-" + owner)) {
+            return new Move(false, "⚠ 旧空壳 " + slot.getName() + " 挪不动 ⇒ 不收回\n");
+        }
+        if (!ext.renameTo(slot)) {
+            if (backup != null) backup.renameTo(slot);   // 还原归档
+            return new Move(false, "⚠ files/ → " + slot.getName() + " 改名失败 ⇒ 保持现状\n");
+        }
+        if (!ext.exists()) ext.mkdirs();
+        return new Move(true, "② 已收回 → " + slot.getName()
+                + (backup == null ? "" : "（槽里的旧数据已归档到 " + backup.getName() + "）") + "\n");
+    }
+
+    /** 归档目录（同盘 rename，不复制）；返回落点，失败 null。 */
+    private static File archiveDir(Context ctx, File src, String slot) {
+        File hub = hubDir(ctx);
+        if (hub == null) return null;
+        File dir = new File(hub, "legacy-backup");
+        if (!dir.exists() && !dir.mkdirs()) return null;
+        File dst = new File(dir, slot + "-" + System.currentTimeMillis());
+        return src.renameTo(dst) ? dst : null;
     }
 
     /**
@@ -1218,61 +1294,85 @@ public final class Data {
      *     · {@link LauncherApp#onCreate} 主进程：**必须**自己判 `!gameAlive`，
      *       因为主进程可能在 `:game` 还活着时被系统重新拉起。
      */
+    // ── 远古包交接：决策表 + 拒绝原因 ──────────────────────────────────────
+
+    public static final int LEGACY_PLAN_NONE = 0;      // files/ 空、无主：把目标槽搬进来（若有）
+    public static final int LEGACY_PLAN_KEEP = 1;      // files/ 就是目标槽的：原样用
+    public static final int LEGACY_PLAN_ADOPT = 2;     // files/ 有数据但没登记归属、目标==当前槽：认领
+    public static final int LEGACY_PLAN_SWAP = 3;      // files/ 属于别的槽：收回，再把目标槽搬进来
+    public static final int LEGACY_PLAN_BUSY = 4;      // 游戏在跑：不动
+    public static final int LEGACY_PLAN_OWNERLESS = 5; // files/ 有数据、无主、目标又不是当前槽：不猜
+
+    /**
+     * 远古包槽交接的**纯决策**（自检直接钉这张表；执行在 {@link #legacyExchange}）。
+     * 只看四个事实：files/ 有没有内容、登记归属、当前槽、目标槽；外加"游戏在不在跑"。
+     */
+    static int legacyPlan(boolean extHas, String owner, String current, String target,
+                          boolean gameAlive) {
+        if (gameAlive) return LEGACY_PLAN_BUSY;
+        if (!extHas) return LEGACY_PLAN_NONE;
+        if (owner == null) {
+            return target.equals(current) ? LEGACY_PLAN_ADOPT : LEGACY_PLAN_OWNERLESS;
+        }
+        return owner.equals(target) ? LEGACY_PLAN_KEEP : LEGACY_PLAN_SWAP;
+    }
+
+    static String legacyPlanName(int plan) {
+        switch (plan) {
+            case LEGACY_PLAN_KEEP: return "沿用";
+            case LEGACY_PLAN_ADOPT: return "认领";
+            case LEGACY_PLAN_SWAP: return "交接";
+            case LEGACY_PLAN_BUSY: return "游戏在跑";
+            case LEGACY_PLAN_OWNERLESS: return "无主数据";
+            default: return "空";
+        }
+    }
+
+    /** 远古包槽交接被拒绝（调用方据此拒绝启动并给用户一句话）。 */
+    public static final class SlotRefused extends RuntimeException {
+        public final String code;
+        public final String arg;
+
+        SlotRefused(String code, String arg) {
+            super(code);
+            this.code = code;
+            this.arg = arg;
+        }
+    }
+
+    /** {@link #parkTo} 的结果：`ok` 决定要不要中止，`text` 进报告（不拿文案当判据）。 */
+    static final class Move {
+        final boolean ok;
+        final String text;
+
+        Move(boolean ok, String text) {
+            this.ok = ok;
+            this.text = text;
+        }
+    }
+
+    /**
+     * **把"本体借住 files/"的布局收回到统一布局** —— 幂等；已经是统一布局时返回 null。
+     *
+     * 与 {@link #legacyExchange} 共用 {@link #parkTo}：游戏在跑时不动；无法安全收回时
+     * **一个字节都不删**，只把原因写进报告返回。归属判定仍走 {@link #legacyClaim}。
+     */
     public static String reclaimLegacy(Context ctx) {
         File ext = Paths.externalRoot(ctx);
         if (ext == null) return null;
+        if (gameAlive(ctx)) return null;               // 正在写的目录不能搬
         String marker = legacyOwner(ctx);
-        boolean extHasContent = !contentRootsOf(ext).isEmpty();
-
-        // ★ 决策交给纯函数（同时也是自检的被试，见 SelfTest#dataDirModel）——
-        //   执行（改名）与判定分开，判定才能在自检里被单独证伪。
-        String owner = legacyClaim(marker, extHasContent, currentSlot(ctx));
-        if (owner == null) return null;   // 已是统一布局（或 shared：files/ 本就是它的根）
-
-        File slot = slotDir(ctx, owner);
-        if (slot == null) return "拿不到槽目录 ⇒ 保持 files/ 不动\n";
-
-        if (!extHasContent) {
-            // files/ 里没有数据 ⇒ 本体要么已经在槽里（标记过期），要么两边都空。
-            if (slot.exists()) {
-                writeLegacyOwner(ctx, null);
-                return "标记已过期（本体就在 " + slot.getName() + "）⇒ 清标记\n";
-            }
-            if (ext.exists() && !ext.renameTo(slot)) {
-                writeLegacyOwner(ctx, owner);
-                return "⚠ 空的 files/ 收不回 " + slot.getName() + " ⇒ 保持现状\n";
-            }
+        boolean extHas = !contentRootsOf(ext).isEmpty();
+        String owner = legacyClaim(marker, extHas, currentSlot(ctx));
+        if (owner == null) return null;                // 已是统一布局（或 shared）
+        if (!extHas) {
             writeLegacyOwner(ctx, null);
-            if (!ext.exists()) ext.mkdirs();
-            return "空的槽目录已归位 → " + slot.getName() + "（files/ 留空）\n";
+            return "标记已过期（本体就在 " + owner + "）⇒ 清标记\n";
         }
-
-        // files/ 里有真数据 ⇒ 它就是本体（老布局 或 远古包刚写过的）
-        //
-        // 🔴 判据是"槽那边**有没有内容**"，不是"目录在不在" —— F6 同一类坑：
-        //   `slot-<当前槽>` 常常只是个**空壳**（只读探测走 `savesDirOf` 的 `mkdirs`
-        //   造出来的，或老布局留下的空目录）。若按 `exists()` 判成"两边都有东西"，
-        //   就会永久拒绝迁移 ⇒ **F0 的隔离对当前槽永远不生效**，而现象只是
-        //   "看起来跟改造前一模一样"（不会有任何报错）。
-        if (!contentRootsOf(slot).isEmpty()) {
-            // 两边都**真有内容**：不合并、不删除，把本体声明为 files/（它确实在那儿）
-            writeLegacyOwner(ctx, owner);
-            return "⚠ " + slot.getName() + " 和 files/ 里都有内容 ⇒ 不敢自动合并，继续用 files/\n";
-        }
-        if (slot.exists() && !stashShell(ctx, slot, "slot-shell-" + owner)) {
-            // 槽侧空壳挪不动（还好只是空壳）⇒ 放弃本次迁移，绝不硬删
-            writeLegacyOwner(ctx, owner);
-            return "⚠ 槽侧空壳 " + slot.getName() + " 挪不动 ⇒ 保持现状（本体继续用 files/）\n";
-        }
-        if (!ext.renameTo(slot)) {
-            writeLegacyOwner(ctx, owner);
-            return "⚠ files/ → " + slot.getName() + " 改名失败 ⇒ 保持现状（本体继续用 files/）\n";
-        }
+        Move moved = parkTo(ctx, owner);
+        if (!moved.ok) return moved.text;
         writeLegacyOwner(ctx, null);
-        // ★ files/ 必须**存在且为空**：游戏会往这里写自己的标记，而"目录不存在"
-        //   会让它认为从没搬过、重新把内部 files/ 复制一遍（见 Paths 头注释）。
-        if (!ext.exists()) ext.mkdirs();
-        return "已收回 → " + slot.getName() + "（files/ 留空）\n";
+        return moved.text;
     }
 
     // ── 树统计 / 删除 ─────────────────────────────────────────────────────

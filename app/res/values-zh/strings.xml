@@ -1286,6 +1286,9 @@
     <string name="game_cannot_start">无法启动</string>
     <string name="game_pkg_missing_fmt">找不到要启动的游戏包 —— 它可能已经被卸载或删掉了。</string>
     <string name="step_prepare">准备</string>
+    <string name="legacy_slot_busy">还有一局游戏在跑：先退出游戏，再把这个启动项换到别的存档槽。</string>
+    <string name="legacy_slot_ownerless_fmt">files/ 里有一份没有登记归属的旧数据：先启动当前槽「%1$s」把它认领，再切到别的槽。</string>
+    <string name="legacy_slot_move_failed_fmt">整理存档目录失败（没有删除任何数据）；请检查存储空间后重试。</string>
     <string name="step_unknown">未知</string>
     <!--
       ══ 启动管线各步 + 失败原因（P3）══════════════════════════════════════
