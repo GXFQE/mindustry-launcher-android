@@ -135,6 +135,9 @@ final class Recovery {
                     j.append(x);
                 }
                 sb.append("patch auto-disabled after crash: ").append(j).append('\n');
+                // ★ 第 414 轮：崩溃当场那次弹窗可能还没有「已自动停用」这句（:game 没收尸 ⇒ 安全阀被挡）；
+                //   现在真停了就得说一声，否则用户以为"崩了但什么都没变"。
+                CrashAlert.toastPatchDisabled(ctx, Data.currentSlot(ctx), pd);
             }
         } catch (Throwable t) {
             Log.w(TAG, "recovery: patch crash handling failed", t);

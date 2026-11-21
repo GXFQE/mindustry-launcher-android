@@ -233,6 +233,9 @@ public class GameSlot extends BaseActivity {
             android.util.Log.w("MDTLauncher", "cache epoch failed", t);
         }
         try {
+            // ★ 第 414 轮：拉起游戏之前先落一道"启动护栏"——整端补丁在 onCreate 就炸时，
+            //   游戏自己来不及写 `launchid.dat`，回到界面要靠这道护栏才知道"这次没走完"。
+            CrashAlert.markLaunched(this, launchSlot);
             Injector.Timing t = Injector.launch(this, plan);
             // ★ 第 360 轮（用户：「在包含游戏补丁的情况下游戏崩溃处理方式和 game 进程注入保持一致」）：
             //   记下这一局**真的注入了谁** —— 崩溃处理要靠它判断"崩的那一局带了哪个补丁"。

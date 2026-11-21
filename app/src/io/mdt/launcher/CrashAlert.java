@@ -92,6 +92,74 @@ public final class CrashAlert {
         return best;
     }
 
+    // ── 启动护栏（第 414 轮） ──────────────────────────────────────────────
+    //
+    // 游戏的 `launchid.dat` 要等它自己初始化后才写 —— 整端补丁把入口类换掉、在 onCreate
+    // 就炸时，那个标记根本来不及出现，于是"回到界面补一次"这条路整条哑掉（第 413 轮演练
+    // 实测：安全阀生效、界面上一句话都没有）。
+    //
+    // ⇒ 启动器在拉起游戏**之前**自己写一份 `hub/launch-guard.txt`（毫秒 + 槽名）。
+    //   判据：当前槽的 crashes/ 里有**比这个毫秒更新**的报告 ⇒ 这次启动没走完。
+    //   它不替代 launchid.dat（那条路照旧），只是把"游戏来不及写标记"的缺口补上。
+
+    /** 启动护栏文件（外部 hub，跟着数据根走、不随槽切换而丢）。 */
+    static File guardFile(Context ctx) {
+        return new File(Data.hubDir(ctx), "launch-guard.txt");
+    }
+
+    /** 每次拉起游戏之前写一次（在 `:game` 进程里调）。 */
+    static void markLaunched(Context ctx, String slot) {
+        try {
+            Util.atomicWriteText(guardFile(ctx),
+                    System.currentTimeMillis() + "\n" + (slot == null ? "" : slot) + "\n");
+        } catch (Throwable ignored) {
+            // 护栏写不进去不该挡启动
+        }
+    }
+
+    /** 纯判据：护栏记录的启动时刻（只认当前槽；没有 / 不是这个槽 ⇒ 0）。 */
+    static long launchedAt(Context ctx, String slot) {
+        try {
+            File f = guardFile(ctx);
+            if (f == null || !f.isFile()) return 0;
+            String s = Util.readText(f);
+            String[] lines = s.split("\n");
+            if (lines.length < 2) return 0;
+            String gslot = lines[1] == null ? "" : lines[1].trim();
+            if (slot == null || !slot.equals(gslot)) return 0;
+            return Long.parseLong(lines[0].trim());
+        } catch (Throwable ignored) {
+            return 0;
+        }
+    }
+
+    /** 纯判据：目录里有没有**比 `atMs` 更新**的报告（看名字里的毫秒，不看 mtime）。 */
+    static boolean crashedSince(File dir, long atMs) {
+        if (atMs <= 0) return false;
+        File[] fs = (dir != null && dir.isDirectory()) ? dir.listFiles() : null;
+        if (fs == null) return false;
+        for (File f : fs) {
+            if (f == null || !f.isFile()) continue;
+            long ms = reportMs(f.getName());
+            if (ms > atMs) return true;
+        }
+        return false;
+    }
+
+    /** 报告文件名里的毫秒（`crash_<毫秒>.txt` / `crash_<毫秒>_launcher.txt`）；不是这个形状 ⇒ 0。 */
+    static long reportMs(String name) {
+        if (name == null || !name.startsWith("crash_")) return 0;
+        int i = "crash_".length();
+        int j = i;
+        while (j < name.length() && Character.isDigit(name.charAt(j))) j++;
+        if (j == i) return 0;
+        try {
+            return Long.parseLong(name.substring(i, j));
+        } catch (Throwable ignored) {
+            return 0;
+        }
+    }
+
     // ── 前台挂钩（BaseActivity 调） ───────────────────────────────────────
 
     static void activityResumed(Activity a) {
@@ -161,7 +229,8 @@ public final class CrashAlert {
 
     /**
      * 回到界面时补一次（进程被杀过 / 用户自己切回来）。
-     * 判据 = 游戏写的 {@code launchid.dat}（"上次启动没跑完"）**且**最新报告不是已提示过的那份。
+     * 判据 = 槽里有游戏写的 {@code launchid.dat}（"上次启动没跑完"）**或**
+     * 第 414 轮的启动护栏（护栏之后出现过崩溃报告） **且** 最新报告不是已提示过的那份。
      * ⚠️ 必须在 UI 线程调（`MainActivity.onResume`）—— 它可能要弹对话框。
      */
     static void catchUp(Activity a) {
@@ -173,9 +242,14 @@ public final class CrashAlert {
         String slot = Data.currentSlot(a);
         File root = Data.dirOf(a, slot);
         if (root == null) return;
-        File lid = new File(root, "launchid.dat");
-        if (!lid.isFile()) return;                       // 上次是正常退出的 ⇒ 不该烦用户
         File dir = crashesDir(a, slot);
+        // ★ 第 414 轮：游戏自己的 `launchid.dat` 要等它初始化完才写 —— 整端补丁在 onCreate
+        //   就炸时那份标记根本来不及出现（第 413 轮演练：安全阀生效、界面上一句话都没有）。
+        //   ⇒ 没标记时再看护栏：当前槽的 crashes/ 里有没有**比这次启动更新**的报告。
+        if (!new File(root, "launchid.dat").isFile()) {
+            long at = launchedAt(a, slot);
+            if (!crashedSince(dir, at)) return;          // 上次是正常退出的 ⇒ 不该烦用户
+        }
         String name = newestName(dir);
         if (name.isEmpty()) return;
         String key = slot + "|" + name;
@@ -277,6 +351,42 @@ public final class CrashAlert {
         }, "crash-alert-dialog").start();
     }
 
+    /**
+     * 「这一局带过补丁、崩后已自动停用」那一句（对话框与浮层**共用**，别写两遍）。
+     * ★ 第 403 轮：被停用的是整端补丁 ⇒ 说"回退到官方本体"（普通补丁只少一小块改动）。
+     */
+    private static String disabledSentence(Context a, String slot, java.util.List<String> pd) {
+        StringBuilder j = new StringBuilder();
+        for (String x : pd) {
+            if (j.length() > 0) j.append(" / ");
+            j.append(x);
+        }
+        return Trans.get(a, Patches.crashDisabledWasGame(a, slot)
+                ? R.string.crash_patch_disabled_game_fmt
+                : R.string.crash_patch_disabled_fmt, j.toString());
+    }
+
+    /**
+     * 第 414 轮：**稍稍才处置**的那条路（{@link Recovery} 在下次启动里才发现"上一局带补丁崩了"）。
+     *
+     * <p>为什么需要它：崩溃当时的监视循环里 {@link Patches#noteGameCrash} 可能被
+     * {@code WriteGate.blockedInstance} 挡住（`:game` 还没收尸）⇒ 那一刻弹的窗**没有**
+     * 「已自动停用」那句；等到 Recovery 真正停用时，同一份报告已认领过，不会再弹窗。
+     * 用户就会以为"崩了但什么都没变"。这里补一句系统浮层（游戏在前台也看得见）。
+     */
+    static void toastPatchDisabled(final Context ctx, String slot, final java.util.List<String> pd) {
+        if (ctx == null || pd == null || pd.isEmpty() || !Config.get().crashAlertEnabled()) return;
+        final String text = disabledSentence(ctx, slot, pd);
+        new Handler(Looper.getMainLooper()).post(new Runnable() {
+            @Override public void run() {
+                try {
+                    Toast.makeText(ctx, text, Toast.LENGTH_LONG).show();
+                } catch (Throwable ignored) {
+                }
+            }
+        });
+    }
+
     /** 结论对话框：正文 = {@link CrashAnalysis#text}（**唯一来源**），按钮 =「看运行日志」/「知道了」 */
     private static void showDialog(final Activity a, CrashAnalysis.Verdict v, final String slot) {
         if (a == null || Util.dead(a)) return;
@@ -292,15 +402,7 @@ public final class CrashAlert {
         // ★ 第 360 轮：这一局带过补丁崩了 ⇒ 说清已经自动停用（与 :game 注入失败同一套处置）
         java.util.List<String> pd = Patches.crashDisabledLabels(a, slot);
         if (pd != null && !pd.isEmpty()) {
-            StringBuilder j = new StringBuilder();
-            for (String x : pd) {
-                if (j.length() > 0) j.append(" / ");
-                j.append(x);
-            }
-            // ★ 第 403 轮：被停用的是整端补丁 ⇒ 说"回退到官方本体"（普通补丁只少一小块改动）
-            msg = msg + "\n\n" + Trans.get(a, Patches.crashDisabledWasGame(a, slot)
-                    ? R.string.crash_patch_disabled_game_fmt
-                    : R.string.crash_patch_disabled_fmt, j.toString());
+            msg = msg + "\n\n" + disabledSentence(a, slot, pd);
         }
         android.app.AlertDialog.Builder b = new android.app.AlertDialog.Builder(a)
                 .setTitle(v != null && v.kind == CrashAnalysis.KIND_LAUNCHER

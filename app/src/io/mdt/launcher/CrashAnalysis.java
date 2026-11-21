@@ -110,6 +110,12 @@ final class CrashAnalysis {
     static final String LAYER_DEX = "L3";
 
     /**
+     * 兜底报告的语言无关标记（{@link Crash#writeGameFacing} 写在头部；见 {@link Report#fallback}）。
+     * ★ 判据不许用会被翻译的文案 —— 中文备注只给人看，机器只认这一行。
+     */
+    static final String FALLBACK_MARK = "!mdt-fallback=game-v1";
+
+    /**
      * **点名门槛**：针的权重 ≥ 它才算"点名"，否则只当"弱线索"。
      *
      * 权重规则（{@link #weightOfClass} / {@link #weightOfMember}）只有一条思想：
@@ -157,6 +163,12 @@ final class CrashAnalysis {
         String emptyReason = "";
         /** 首行是管理器自己的报告头（`MDT 管理器 —— 崩溃报告`；判据只看首行**以 `MDT` 开头**，不看中文） */
         boolean launcherOwn;
+        /**
+         * 管理器**在 :game 进程里兜底**写的报告（备注行含「来源：启动器兜底」）。
+         * 它虽然也是管理器落盘的（首行以 `MDT` 开头），但**崩的是游戏进程** ⇒
+         * 不许按 {@link #KIND_LAUNCHER} 处理，否则会跟用户说「管理器自己崩了」。
+         */
+        boolean fallback;
 
         String firstLine = "";
         String version = "";
@@ -370,6 +382,9 @@ final class CrashAnalysis {
         String[] lines = text.replace("\r\n", "\n").replace('\r', '\n').split("\n", -1);
         r.firstLine = lines.length == 0 ? "" : lines[0].trim();
         r.launcherOwn = r.firstLine.startsWith("MDT");
+        // ★ 第 414 轮：:game 里的兜底报告也带管理器头，但它说的是游戏崩了（见 Report#fallback）。
+        //   判据 = 报告里那行**语言无关**的标记（不许用会被翻译的文案当判据）。
+        r.fallback = text.indexOf(FALLBACK_MARK) >= 0;
 
         // ── 头部：一路读到第一个异常行为止 ──
         int i = 0;
@@ -764,7 +779,7 @@ final class CrashAnalysis {
             return v;
         }
         v.cause = r.cause;      // 「非模组」的可判原因：所有分支都带上（只有 KIND_NONE 会用它）
-        if (r.launcherOwn) {
+        if (r.launcherOwn && !r.fallback) {
             v.kind = KIND_LAUNCHER;
             return v;
         }

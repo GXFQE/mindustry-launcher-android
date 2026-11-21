@@ -9734,6 +9734,33 @@ public final class SelfTest {
                     "★★原子闸门的判据：**同一份报告只认领一次**（已提示过的那份再认领 ⇒ false）；"
                             + "换了另一份 / 空手 ⇒ 认领；null 与空串不许认领");
             Config.get().setCrashAlerted(oldAlert);
+            // ★ 第 414 轮：启动护栏 —— 整端补丁在 onCreate 就炸时，游戏自己的 `launchid.dat`
+            //   根本来不及写，"回到界面补一次"需要另一个判据（启动器拉起游戏前落的那道）。
+            write(new File(ad, "crash_5000.txt"), "e".getBytes("UTF-8"));
+            ok(stat, L, CrashAlert.crashedSince(ad, 4000L) && !CrashAlert.crashedSince(ad, 6000L),
+                    "★启动护栏：只有**比启动时刻新**的报告才算这次没走完（旧报告不许再报）");
+            ok(stat, L, CrashAlert.reportMs("crash_12345.txt") == 12345L
+                            && CrashAlert.reportMs("crash_12345_launcher.txt") == 12345L
+                            && CrashAlert.reportMs("crash_x.txt") == 0
+                            && CrashAlert.reportMs(null) == 0,
+                    "★报告名里的毫秒解析（游戏那份与 _launcher 那份都认；怪名字 ⇒ 0）");
+            File guard = CrashAlert.guardFile(ctx);
+            String oldGuard = "";
+            try {
+                if (guard != null && guard.isFile()) oldGuard = Util.readText(guard);
+            } catch (Throwable ignored) {
+            }
+            CrashAlert.markLaunched(ctx, "selftest-guard");
+            ok(stat, L, CrashAlert.launchedAt(ctx, "selftest-guard") > 0
+                            && CrashAlert.launchedAt(ctx, "别的槽") == 0,
+                    "★启动护栏只认自己的槽（换槽后旧护栏不算数）");
+            try {
+                if (!oldGuard.isEmpty()) Util.atomicWriteText(guard, oldGuard);
+                else if (guard != null) guard.delete();
+            } catch (Throwable ignored) {
+            }
+            ok(stat, L, !CrashAlert.crashedSince(null, 123L) && !CrashAlert.crashedSince(ad, 0),
+                    "★没护栏（at=0）/ 目录不存在 ⇒ 不报（监视与回界面两条路都要容错）");
             ok(stat, L, ctx.getString(R.string.crash_alert_title).length() > 0
                             && ctx.getString(R.string.crash_alert_open).length() > 0,
                     "★提示用的两条文案在：「" + ctx.getString(R.string.crash_alert_title)
@@ -20146,6 +20173,13 @@ public final class SelfTest {
             }
             ok(stat, L, gft.contains("启动器兜底"),
                     "★兜底报告里写明来源（游戏转储尚未初始化），维护者不用猜");
+            // ★ 第 414 轮：兜底报告虽然也是管理器写头，但崩的是游戏进程 ⇒ 不许判成「管理器自己崩了」
+            CrashAnalysis.Report fbRep = CrashAnalysis.parse(gft);
+            ok(stat, L, fbRep.launcherOwn && fbRep.fallback,
+                    "★兜底报告认得出：首行是管理器头，但带「来源：启动器兜底」");
+            CrashAnalysis.Verdict fbV = CrashAnalysis.judge(fbRep, null, null, null);
+            ok(stat, L, fbV != null && fbV.kind != CrashAnalysis.KIND_LAUNCHER,
+                    "★★兜底报告不按「管理器自己崩了」讲（标题与正文都按游戏崩溃走）");
             if (gf != null) gf.delete();
 
             Patches.clearCrashNoticeForRef(ctx, ref);

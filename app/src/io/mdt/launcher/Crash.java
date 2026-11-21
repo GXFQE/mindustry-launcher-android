@@ -178,7 +178,11 @@ final class Crash {
             w.write("版本：" + versionOf(ctx) + "\n");
             w.write("当前槽：" + safeCurrentSlot(ctx) + "\n");
             w.write("数据根：" + safeDataRoot(ctx) + "\n");
-            if (note != null && !note.isEmpty()) w.write("备注：" + note + "\n");
+            if (note != null && !note.isEmpty()) {
+                w.write("备注：" + note + "\n");
+                // ★ 第 414 轮：给机器看的语言无关标记（判据不许用会被翻译的文案）
+                w.write("!mdt-fallback=game-v1\n");
+            }
             w.write("\n");
             // 异常原文 + 完整栈（这才是要留的东西）
             w.write(String.valueOf(e));
