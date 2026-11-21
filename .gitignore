@@ -55,6 +55,9 @@ __pycache__/
 *.log
 .idea/
 .vscode/
+# arc 的音乐缓存：桌面版游戏若 cwd 落在仓库里会写出 16 个 <曲名>__<字节数>.ogg
+# （2026-11-21 真发生过；机制与判据见 .dsh/memory/ref/46 §J，删掉即可，可再生）
+cache/
 
 # 保留：app/（源码 + 资源 + AndroidManifest）、build.sh、README.md /
 #       FLOWS.md / BACKLOG.md（三份文档）、spike/（实验记录）、
