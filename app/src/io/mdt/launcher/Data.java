@@ -735,11 +735,62 @@ public final class Data {
             String pkg = ctx.getPackageName();
             int self = android.os.Process.myPid();
             for (ActivityManager.RunningAppProcessInfo p : ps) {
-                if (p != null && p.pid != self && isGameProcessName(pkg, p.processName)) return true;
+                if (p != null && p.pid != self && isGameProcessName(pkg, p.processName)
+                        && alivePid(p.pid)) return true;
             }
         } catch (Throwable ignored) {
         }
         return false;
+    }
+
+    /**
+     * 这个 pid 还活着吗（`/proc/<pid>` 存在）。
+     *
+     * <p>★ 第 412 轮真机坑：上一局的 `:game` 刚被 force-stop，`getRunningAppProcesses()`
+     * 里可能还留着它 ⇒ 只看进程名会把"正在退场的自己人"当成"另一局在跑"，远古包换槽
+     * 被误拒（界面只留一句"还有一局游戏在跑"）。判活以 /proc 为准。
+     */
+    private static boolean alivePid(int pid) {
+        if (pid <= 0) return false;
+        try {
+            return new File("/proc/" + pid).exists();
+        } catch (Throwable t) {
+            return true; // 拿不准时按"活着"处理（宁可拒绝，不猜）
+        }
+    }
+
+    /**
+     * 诊断：远古包换槽被"游戏在跑"拦下时，把进程清单落到 `<hub>/report-slot-busy.txt`。
+     *
+     * <p>只在 debuggable 包里写：产品包拒绝启动时不该顺手多一个报告文件。
+     */    private static void dumpBusy(Context ctx, String owner, String cur, String target) {
+        try {
+            int flags = ctx.getApplicationInfo().flags;
+            if ((flags & android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) == 0) return;
+            File hub = hubDir(ctx);
+            if (hub == null) return;
+            StringBuilder sb = new StringBuilder();
+            sb.append("self=").append(android.os.Process.myPid()).append('\n');
+            sb.append("cur=").append(cur == null ? "" : cur)
+              .append(" target=").append(target == null ? "" : target)
+              .append(" owner=").append(owner == null ? "" : owner).append('\n');
+            ActivityManager am =
+                    (ActivityManager) ctx.getSystemService(Context.ACTIVITY_SERVICE);
+            List<ActivityManager.RunningAppProcessInfo> ps = am == null ? null : am.getRunningAppProcesses();
+            String pkg = ctx.getPackageName();
+            if (ps == null) {
+                sb.append("ps=null\n");
+            } else {
+                for (ActivityManager.RunningAppProcessInfo p : ps) {
+                    if (p == null) continue;
+                    if (isGameProcessName(pkg, p.processName) || pkg.equals(p.processName)) {
+                        sb.append("proc=").append(p.processName).append('#').append(p.pid).append('\n');
+                    }
+                }
+            }
+            Util.atomicWriteText(new File(hub, "report-slot-busy.txt"), sb.toString());
+        } catch (Throwable ignored) {
+        }
     }
 
     /**
@@ -1134,7 +1185,10 @@ public final class Data {
         sb.append("① 计划 = ").append(legacyPlanName(plan))
           .append("（files/ ").append(extHas ? "有数据" : "空")
           .append("；登记归属 = ").append(owner == null ? "无" : owner).append("）\n");
-        if (plan == LEGACY_PLAN_BUSY) throw new SlotRefused("legacy_busy", null);
+        if (plan == LEGACY_PLAN_BUSY) {
+            dumpBusy(ctx, owner, cur, safe);
+            throw new SlotRefused("legacy_busy", null);
+        }
         if (plan == LEGACY_PLAN_OWNERLESS) throw new SlotRefused("legacy_ownerless", cur);
 
         long t0 = System.currentTimeMillis();
