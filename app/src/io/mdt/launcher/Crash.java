@@ -53,6 +53,40 @@ final class Crash {
     }
 
     /**
+     * 装在 `:game` 进程（{@link GameSlot} 槽准备完、拉起游戏之前）。
+     *
+     * <p>⚠️ 与 {@link #installIfMainProcess} 那条「只在主进程装、别抢游戏的转储」不矛盾：
+     * 这里兜的是**游戏自己的崩溃转储还没初始化**的那一小段 —— 整端补丁的入口类在
+     * `onCreate` 就炸时正是这种情况，游戏一个字节都还没写。游戏启动过程中会把默认
+     * 处理器换成它自己的，我们这个只在前面顶一会儿。
+     *
+     * <p>报告用**游戏那份命名**（`crash_<毫秒>.txt`）：只有这种才会被
+     * {@link Patches#noteGameCrash} 认成"这一局崩了"，从而自动停用补丁。
+     */
+    static void installForGame(final Context ctx) {
+        final Thread.UncaughtExceptionHandler def = Thread.getDefaultUncaughtExceptionHandler();
+        Thread.setDefaultUncaughtExceptionHandler(new Thread.UncaughtExceptionHandler() {
+            @Override public void uncaughtException(Thread t, Throwable e) {
+                try {
+                    writeGameFacing(ctx, t, e);
+                } catch (Throwable ignored) {
+                    // 崩溃路径上绝不二次抛出
+                }
+                if (def != null) def.uncaughtException(t, e);
+            }
+        });
+    }
+
+    /** `:game` 启动期的兜底报告：与 {@link #write} 同目录同格式，但用游戏那份文件名。 */
+    static File writeGameFacing(Context ctx, Thread t, Throwable e) {
+        File dir = crashDir(ctx);
+        if (dir == null) return null;
+        File out = new File(dir, "crash_" + System.currentTimeMillis() + ".txt");
+        return dump(ctx, out, t, e,
+                "来源：启动器兜底（:game 启动期，游戏自己的崩溃转储尚未初始化）") ? out : null;
+    }
+
+    /**
      * 写一份崩溃报告。返回落点；写不出去返回 null（调用方不必处理 —— 现场只有尽力而为）。
      * ⚠️ 报告内容是**给维护者的**（异常栈原文），所以不受"少术语"那条纪律约束；
      *   之所以落进日志页能看见的目录，是为了让用户按提示"把崩溃报告导出来"时真的有东西可导。
@@ -124,6 +158,11 @@ final class Crash {
 
     /** 真正落盘：原子写（先 .tmp 再改名），失败返回 false */
     private static boolean dump(Context ctx, File out, Thread t, Throwable e) {
+        return dump(ctx, out, t, e, null);
+    }
+
+    /** 同上；{@code note} 非空时在头部多写一行来源说明（兜底报告用）。 */
+    private static boolean dump(Context ctx, File out, Thread t, Throwable e, String note) {
         File tmp = new File(out.getParentFile(), out.getName() + ".tmp");
         Writer w = null;
         try {
@@ -139,6 +178,7 @@ final class Crash {
             w.write("版本：" + versionOf(ctx) + "\n");
             w.write("当前槽：" + safeCurrentSlot(ctx) + "\n");
             w.write("数据根：" + safeDataRoot(ctx) + "\n");
+            if (note != null && !note.isEmpty()) w.write("备注：" + note + "\n");
             w.write("\n");
             // 异常原文 + 完整栈（这才是要留的东西）
             w.write(String.valueOf(e));

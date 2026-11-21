@@ -75,7 +75,7 @@ MapStatsMods.java = 10  # 内容表 / 语料诊断 / bundle 旁证条数（「�
                         # ——依据，有意保留；8 → 11 是 2026-10-08 加"bundle 声明过的方块名 N 条"
                         # （蓝图缺件误报的**真修**旁证，见 REF §77.5④）：新加的这 2~3 条同样是
                         # **维护者可见的依据行**，不是给用户的界面文案。
-Crash.java = 6   # 只进 crashes/*.txt（崩溃转储）
+Crash.java = 8   # 只进 crashes/*.txt（崩溃转储；第 412 轮 +2：兜底报告的来源说明）
 GameSlot.java = 6   # 启动时 `Data.prepareSlot` 的落盘/日志报告（`rep`）
 LauncherApp.java = 1   # `Log.i` 里的 F0 迁移报告 —— 只进日志
 CacheEpoch.java = 4   # ★ 2026-11-15（第 382 轮，阶段 0.2）：只进 `hub/report-cache.txt` 与 logcat ——

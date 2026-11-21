@@ -20131,6 +20131,23 @@ public final class SelfTest {
             ok(stat, L, Patches.noteGameCrash(ctx, slot).isEmpty(),
                     "★同一场崩溃只处置一次（启动记录已消费）");
 
+            // ★ 第 412 轮：:game 启动期兜底 —— 游戏自己的转储还没初始化时，由启动器写一份
+            //   **游戏命名**的报告；否则整端补丁在 onCreate 就炸时一个字节都不会留。
+            File gf = Crash.writeGameFacing(ctx, Thread.currentThread(),
+                    new RuntimeException("selftest fallback drill"));
+            ok(stat, L, gf != null && gf.isFile()
+                            && gf.getName().matches("^crash_\\d{13}\\.txt$")
+                            && !gf.getName().contains("_launcher"),
+                    "★★第 412 轮：`:game` 启动期兜底报告用游戏那份命名（noteGameCrash 才认）");
+            String gft = "";
+            try {
+                if (gf != null) gft = Util.readText(gf);
+            } catch (Throwable ignored) {
+            }
+            ok(stat, L, gft.contains("启动器兜底"),
+                    "★兜底报告里写明来源（游戏转储尚未初始化），维护者不用猜");
+            if (gf != null) gf.delete();
+
             Patches.clearCrashNoticeForRef(ctx, ref);
             ok(stat, L, Patches.crashProblems(ctx).isEmpty(),
                     "★用户重新启用后旧结论被清掉（旧结论不该继续骂它）");

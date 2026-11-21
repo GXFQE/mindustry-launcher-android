@@ -167,6 +167,9 @@ public class GameSlot extends BaseActivity {
             }
         }
         android.util.Log.i("MDTLauncher", "slot prepare:\n" + rep);
+        // ★ 第 412 轮：游戏自己的崩溃转储还没初始化前，兜住 :game 启动期的未捕获异常
+        //   （整端补丁的入口类在 onCreate 就炸时，游戏不会写下任何 crash_*.txt）。
+        Crash.installForGame(this);
         mStatus.setText(Trans.get(GameSlot.this, R.string.game_starting_fmt, shown, Data.currentSlot(this)));
 
         // ★★ 第 353 轮（用户：「游戏补丁的启用状态应该绑定实例吧」）：补丁按**启动项（实例）**解析，

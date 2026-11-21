@@ -58,6 +58,36 @@ public class LauncherApp extends Application {
         //   ⚠️ 反过来，若这里**不做**，那个窗口期还有个后果：打开存档页 → `savesDirOf`
         //      的 `mkdirs` 会造出一个空的 `slot-<当前槽>/`，而 reclaimLegacy 的
         //      "槽侧空壳"分支会把它归档走（现在已按**内容**而非 `exists()` 判，不会卡住迁移）。
+        // ★★ 第 412 轮：下面这段（F0 迁移 + Recovery）**只允许主进程做** —— Application.onCreate
+        //   每个进程都会跑（`:game` / `:probe` 也是），而 Recovery 会写 `config.json`
+        //   （崩溃后自动停用补丁）：两个进程各持一份 Config 内存副本，谁后写谁赢 ⇒
+        //   真机复现过「report-patch-crash.txt 记了已停用、config 里却还启用着」的复活。
+        //   全局记账只留给主进程；`:game` 侧本来就有 prepareSlot 自己那份兜底。
+        if (Util.isMainProcess(this)) startupRecovery();
+        Config.get().load(this);
+        // 第 378 轮：把用户的下载限速交给全局额度（0 = 不限）。改设置时由设置页再调一次。
+        Bandwidth.set(Config.get().downloadLimit());
+        // ★ 第 383 轮（用户：「不如把所有缓存类的东西都合并给一个自动清理的开关」）：
+        //   一个开关管三样（游戏 cache / 分享 cache / 旧版本重复文件）。**每 24h 最多一次**、
+        //   只在主进程且游戏没在跑时；自己起后台线程，不阻塞启动。
+        //   手动「存储占用 → 清理」不受这个间隔限制。
+        try {
+            Cleanup.autoCleanInBackground(this);
+        } catch (Throwable t) {
+            Log.w(TAG, "auto cleanup scheduling failed: " + t);
+        }
+        Log.i(TAG, "app up, privateDir=" + Paths.privateDir(this)
+                + " pid=" + android.os.Process.myPid());
+    }
+
+    /**
+     * F0 迁移 + 启动自愈：**只允许主进程调用**。
+     *
+     * <p>⚠️ 别把它挪回 `onCreate` 的公共路径：`:probe` 里 `Data.gameAlive` 也是 false，
+     * 它一旦跟着跑就会和主进程各写一份 `config.json` —— 补丁"崩溃后自动停用"会被
+     * 另一个进程的旧副本盖回去（第 412 轮真机复现）。
+     */
+    private void startupRecovery() {
         if (!Data.gameAlive(this)) {
             String r = Data.reclaimLegacy(this);
             if (r != null) Log.i(TAG, "F0 一次性迁移：\n" + r);
@@ -79,19 +109,5 @@ public class LauncherApp extends Application {
                 Log.w(TAG, "startup slot heal failed: " + t);
             }
         }
-        Config.get().load(this);
-        // 第 378 轮：把用户的下载限速交给全局额度（0 = 不限）。改设置时由设置页再调一次。
-        Bandwidth.set(Config.get().downloadLimit());
-        // ★ 第 383 轮（用户：「不如把所有缓存类的东西都合并给一个自动清理的开关」）：
-        //   一个开关管三样（游戏 cache / 分享 cache / 旧版本重复文件）。**每 24h 最多一次**、
-        //   只在主进程且游戏没在跑时；自己起后台线程，不阻塞启动。
-        //   手动「存储占用 → 清理」不受这个间隔限制。
-        try {
-            Cleanup.autoCleanInBackground(this);
-        } catch (Throwable t) {
-            Log.w(TAG, "auto cleanup scheduling failed: " + t);
-        }
-        Log.i(TAG, "app up, privateDir=" + Paths.privateDir(this)
-                + " pid=" + android.os.Process.myPid());
     }
 }
