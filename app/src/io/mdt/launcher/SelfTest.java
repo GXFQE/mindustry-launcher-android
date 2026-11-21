@@ -3911,8 +3911,19 @@ public final class SelfTest {
             ok(stat, L, picked32 == null,
                     "64 位进程：只提供 armeabi-v7a 的包选不出 ABI（实得 " + picked32 + "）");
         } else {
-            ok(stat, L, "armeabi-v7a".equals(picked32),
-                    "32 位进程：选得动 armeabi-v7a（实得 " + picked32 + "）");
+            // ★ 32 位**不等于**支持 ARM：x86 32 位镜像的 abilist 只有 x86（没有 armeabi-v7a 翻译层）
+            //   ⇒ 这里按"本进程到底支不支持 armeabi-v7a"分两种判据，别把环境差异当成 ABI 逻辑错。
+            boolean arm32 = false;
+            for (String a : Compat.deviceAbis()) {
+                if ("armeabi-v7a".equals(a) || "armeabi".equals(a)) arm32 = true;
+            }
+            if (arm32) {
+                ok(stat, L, "armeabi-v7a".equals(picked32),
+                        "32 位进程：选得动 armeabi-v7a（实得 " + picked32 + "）");
+            } else {
+                ok(stat, L, picked32 == null,
+                        "32 位 x86 进程：只提供 armeabi-v7a 的包选不出 ABI（实得 " + picked32 + "）");
+            }
         }
         String[] own = Compat.deviceAbis();
         java.util.TreeSet<String> ownSet = new java.util.TreeSet<>(java.util.Arrays.asList(own));
@@ -19428,14 +19439,14 @@ public final class SelfTest {
                     java.util.Arrays.asList(good.toBytes(), fixtureDex, "evil".getBytes("UTF-8")));
             expectImportCode(ctx, L, stat, "整包条目含 . 段（a/./evil.txt）",
                     PatchException.C_BAD_PATH, traversalAsset);
-            // 反方向：`..` 的包**确实**进不来（平台给的 bad_zip）——钉住这个行为，
-            // 免得以后有人以为「safeRel 管着它」。
+            // 反方向：`..` 的包**确实**进不来。平台行为随 API 版本不同：
+            // Android 11+ 在 getEntry 时直接拒（bad_zip）；Android 10 能读出来，落到 safeRel（bad_path）。
             File dotdotPkg = new File(work, "dotdot.apk");
             zipBlobs(dotdotPkg,
                     java.util.Arrays.asList(PatchManifest.FILE, "classes.dex", "sub/../evil.txt"),
                     java.util.Arrays.asList(good.toBytes(), fixtureDex, "evil".getBytes("UTF-8")));
-            expectImportCode(ctx, L, stat, "带 .. 的包（平台直接拒）",
-                    PatchException.C_BAD_ZIP, dotdotPkg);
+            expectImportCode(ctx, L, stat, "带 .. 的包（平台/ safeRel 拒）", dotdotPkg,
+                    PatchException.C_BAD_ZIP, PatchException.C_BAD_PATH);
             File badSchemaPkg = new File(work, "schema.apk");
             String badSchemaJson = "{\"schema\":3,\"id\":\"" + ID_PREFIX + "s\",\"name\":\"S\","
                     + "\"version\":\"1\",\"apkSha256\":\"" + apkSha + "\"}";
@@ -20152,12 +20163,26 @@ public final class SelfTest {
     /** 导入负例的统一断言：期望抛**特定的码**。 */
     private static void expectImportCode(Context ctx, List<String> L, int[] stat,
                                          String label, String want, File zip) {
+        expectImportCode(ctx, L, stat, label, zip, want);
+    }
+
+    /**
+     * 同 {@link #expectImportCode(Context, List, int[], String, String, File)}，但允许两种期望码。
+     *
+     * <p>2026-11-21（32 位模拟器上发现）：条目名带 `..` 的包，平台行为**随 API 版本不同** ——
+     * Android 11+ 在 `getEntry` 时直接抛 `ZipException`（我们报 bad_zip）；Android 10（API 29）
+     * 能读出来 ⇒ 落到我们自己的 `safeRel` 判 `bad_path`。两者都是"进不来"，测试钉行为而不是钉平台。
+     */
+    private static void expectImportCode(Context ctx, List<String> L, int[] stat,
+                                         String label, File zip, String... wants) {
         try {
             Patches.importPackage(ctx, zip);
             ok(stat, L, false, "⑦ " + label + " 应被拒（实际导入成功）");
         } catch (PatchException e) {
-            ok(stat, L, want.equals(e.code), "⑦ " + label + " → " + want + "（实际 " + e.code
-                    + (e.detail == null ? "" : " / " + e.detail) + "）");
+            boolean hit = false;
+            for (String w : wants) if (w.equals(e.code)) hit = true;
+            ok(stat, L, hit, "⑦ " + label + " → " + java.util.Arrays.toString(wants)
+                    + "（实际 " + e.code + (e.detail == null ? "" : " / " + e.detail) + "）");
         } catch (Throwable t) {
             ok(stat, L, false, "⑦ " + label + " 抛了非 PatchException：" + t);
         }
