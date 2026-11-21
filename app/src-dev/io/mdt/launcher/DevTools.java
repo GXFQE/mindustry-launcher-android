@@ -97,6 +97,12 @@ final class DevTools {
                 || intent.hasExtra("dev_cas_gc")
                 || intent.hasExtra("dev_cas_migrate")
         || intent.hasExtra("dev_casbench")
+                // 第 415 轮：按条目 CAS（对象池）的 ingest / 物化 / ART 验收探针
+                || intent.hasExtra("dev_casentry")
+                // 目录 / symlink 能否当资产源（old 4.4b 的两个探针）
+                || intent.hasExtra("dev_casentry_dir")
+                || intent.hasExtra("dev_casentry_clean")
+                || intent.hasExtra("dev_poolspike")
                 || intent.hasExtra("dev_compat")
                 || intent.hasExtra("dev_backup_restore")
                 || intent.hasExtra("dev_logs_export")
@@ -445,6 +451,28 @@ final class DevTools {
         }
         if (intent.hasExtra("dev_casbench")) {
             devCasBench();
+            return;
+        }
+        // 第 415 轮：按条目 CAS —— 逐条目 ingest / 物化 / ART 验收 / 7 包全量。
+        // 用法：`--es dev_casentry 1`（保留池，便于外部 du 复核）
+        //       `--es dev_casentry_clean 1`（只清掉上次留下的池）
+        if (intent.hasExtra("dev_casentry_clean")) {
+            devCasEntryClean();
+            return;
+        }
+        if (intent.hasExtra("dev_casentry")) {
+            devCasEntry(true);
+            return;
+        }
+        // 目录 / symlink 能不能当资产源（旧计划 4.4b 一直挂着的两个探针）
+        if (intent.hasExtra("dev_casentry_dir")) {
+            devCasEntryDir();
+            return;
+        }
+        // 同名 AndroidFi 替换 + 对象池：只用池造 classloader，APK 藏起来后真读资产。
+        // 用法：`--es dev_poolspike 1`（需先把 override.dex 推到 app_hub/poolspike/）
+        if (intent.hasExtra("dev_poolspike")) {
+            devPoolSpike();
             return;
         }
 
@@ -1231,6 +1259,101 @@ final class DevTools {
                 reportDev(sb.toString(), "dev_casbench");
             }
         }, "dev-casbench").start();
+    }
+
+
+    /**
+     * 第 415 轮探针：**按条目 CAS**（对象池）的 ingest / 物化 / ART 验收（`--es dev_casentry 1`）。
+     *
+     * <p>只测不建：读现有 `app_hub/import/*.apk`，池用内部存储的临时目录
+     * `app_hub/casentry/`，跑完保留（便于外部 `du` 复核块开销），不复用任何产品路径。
+     * 输出走 {@link #reportDev}（`hub/report-devtool.txt`）。
+     */
+    private void devCasEntry(final boolean keep) {
+        new Thread(new Runnable() {
+            @Override public void run() {
+                StringBuilder sb = new StringBuilder();
+                try {
+                    CasEntryBench.run(a, sb, keep);
+                } catch (Throwable t) {
+                    sb.append("FAILED: ").append(t).append('\n');
+                }
+                reportDev(sb.toString(), "dev_casentry");
+            }
+        }, "dev-casentry").start();
+    }
+
+    /** 清掉 {@link #devCasEntry} 留下的池（对象是只读的，先 setWritable 再删） */
+    private void devCasEntryClean() {
+        new Thread(new Runnable() {
+            @Override public void run() {
+                StringBuilder sb = new StringBuilder();
+                try {
+                    File base = new File(Paths.privateDir(a), "casentry");
+                    long before = 0;
+                    try { before = new File(base, "objects").exists()
+                            ? dirBytes(new File(base, "objects")) : 0; } catch (Throwable ignored) { }
+                    boolean had = base.exists();
+                    CasEntryBench.deleteTree(base);
+                    sb.append("dev_casentry_clean：").append(had ? "删了 " + before + " B" : "本来就没有")
+                      .append(base.exists() ? "（仍有残留！）" : "（已净）").append('\n');
+                } catch (Throwable t) {
+                    sb.append("FAILED: ").append(t).append('\n');
+                }
+                reportDev(sb.toString(), "dev_casentry_clean");
+            }
+        }, "dev-casentry-clean").start();
+    }
+
+    private static long dirBytes(File f) {
+        if (f == null || !f.exists()) return 0;
+        if (f.isFile()) return f.length();
+        long n = 0;
+        File[] fs = f.listFiles();
+        if (fs != null) for (File c : fs) n += dirBytes(c);
+        return n;
+    }
+
+    /**
+     * 目录 / symlink 能不能当资产源（`--es dev_casentry_dir 1`）。
+     *
+     * <p>这是「能不能不物化」的分水岭：若 `addAssetPath` 吃目录，对象池本身就能直接喂 ART，
+     * 那 83 MB 物化包和版本少时的倒亏都不存在了。旧计划 4.4b 登记了这两个探针但一直没测。
+     */
+    private void devCasEntryDir() {
+        new Thread(new Runnable() {
+            @Override public void run() {
+                StringBuilder sb = new StringBuilder();
+                try {
+                    CasEntryBench.dirRedirect(a, sb);
+                } catch (Throwable t) {
+                    sb.append("FAILED: ").append(t).append('\n');
+                }
+                reportDev(sb.toString(), "dev_casentry_dir");
+            }
+        }, "dev-casentry-dir").start();
+    }
+
+    /**
+     * 同名 AndroidFi 替换 + 对象池（`--es dev_poolspike 1`）。
+     *
+     * <p>这是「能不能完全不物化」的最后一道验证：把 APK 藏起来后，只用对象池 +
+     * override.dex 造 classloader，看资产是否还能逐字节读出来。
+     * 前提：override.dex 已放在 `app_hub/poolspike/override.dex`。
+     */
+    private void devPoolSpike() {
+        new Thread(new Runnable() {
+            @Override public void run() {
+                StringBuilder sb = new StringBuilder();
+                sb.append("== dev_poolspike ==\n");
+                try {
+                    PoolSpike.run(a, sb);
+                } catch (Throwable t) {
+                    sb.append("FAILED: ").append(t).append('\n');
+                }
+                reportDev(sb.toString(), "dev_poolspike");
+            }
+        }, "dev-poolspike").start();
     }
 
 

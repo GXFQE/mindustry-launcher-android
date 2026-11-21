@@ -66,3 +66,6 @@ cache/
 
 # ── 改源码时留的工序备份（*.bak / *.bak2 / *.emptied.bak …）——不提交 ────────
 *.bak*
+
+# ─── poolspike 构建产物（javac + d8 重建，见 tools/poolspike/README.md）─────────
+tools/poolspike/out/
