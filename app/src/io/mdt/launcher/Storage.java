@@ -274,30 +274,33 @@ final class Storage {
                     Util.formatSize(r.trashTotalBytes))).append('\n');
         }
 
-        // ① 启动器自身 —— ★ 第 140 轮新开的一节：内部 app_hub 从来没有露过面，
-        //   而"导入的游戏包"是真机上最大的一块（用户看到总数从 18 MB 变成 200 MB 才知道）。
-        sb.append('\n').append(Trans.get(c, R.string.storage_sec_app)).append('\n');
-        boolean appAny = false;
+        // ① 游戏包 —— 原包 / 共用文件 / 解出的运行库，这三项都是“游戏包”带来的。
+        //   挂在“管理器自身”下面会读成“管理器自己有 6 个版本”（用户 2026-11-23 指出）。
+        StringBuilder game = new StringBuilder();
         if (r.importCount > 0 || r.importBytes > 0) {
-            sb.append(Trans.get(c, R.string.storage_app_import_fmt, r.importCount,
+            game.append(Trans.get(c, R.string.storage_app_import_fmt, r.importCount,
                     Util.formatSize(r.importBytes))).append('\n');
-            appAny = true;
         }
-        // 游戏包共用文件（开了去重才有）—— 术语纪律：第一层只说"共用文件"，不出现 CAS/对象池
+        // 共用文件（开了去重才有）—— 术语纪律：第一层只说“共用文件”，不出现 CAS/对象池
         if (r.gamePoolBytes > 0 && r.gamePoolVersions > 0) {
             int gpct = r.gamePoolRaw > r.gamePoolBytes && r.gamePoolRaw > 0
                     ? (int) Math.round((r.gamePoolRaw - r.gamePoolBytes) * 100d / r.gamePoolRaw) : 0;
-            sb.append(Trans.get(c, R.string.storage_app_gamepool_fmt, r.gamePoolVersions,
+            game.append(Trans.get(c, R.string.storage_app_gamepool_fmt, r.gamePoolVersions,
                     Util.formatSize(r.gamePoolBytes),
                     Util.formatSize(Math.max(r.gamePoolRaw, r.gamePoolBytes)),
                     Trans.get(c, R.string.storage_pct_fmt, gpct))).append('\n');
-            appAny = true;
         }
         if (r.nativesBytes > 0) {
-            sb.append(Trans.get(c, R.string.storage_app_natives_fmt,
+            game.append(Trans.get(c, R.string.storage_app_natives_fmt,
                     Util.formatSize(r.nativesBytes))).append('\n');
-            appAny = true;
         }
+        if (game.length() > 0) {
+            sb.append('\n').append(Trans.get(c, R.string.storage_sec_game)).append('\n').append(game);
+        }
+
+        // ② 管理器自身 —— 插件 / 补丁 / 缓存 / 其它
+        sb.append('\n').append(Trans.get(c, R.string.storage_sec_app)).append('\n');
+        boolean appAny = false;
         if (r.pluginCount > 0 || r.pluginsBytes > 0) {
             sb.append(Trans.get(c, R.string.storage_app_plugins_fmt, r.pluginCount,
                     Util.formatSize(r.pluginsBytes))).append('\n');

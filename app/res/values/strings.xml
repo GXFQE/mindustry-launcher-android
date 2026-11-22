@@ -1413,6 +1413,7 @@
     <string name="storage_total_fmt">These add up to %1$s</string>
     <string name="storage_total_split_fmt">Data %1$s · cache %2$s</string>
     <string name="storage_total_trash_fmt">Also: the trash station holds %1$s</string>
+    <string name="storage_sec_game">Game packages</string>
     <string name="storage_sec_app">The manager itself</string>
     <string name="storage_app_import_fmt">Imported game packages: %1$d · %2$s</string>
     <string name="storage_app_patches_fmt">Game patches: %1$d · %2$s</string>
