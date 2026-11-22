@@ -72,6 +72,8 @@ final class Storage {
          */
         public long gamePoolBytes;
         public int gamePoolVersions;
+        /** 这些版本各自的原始包大小之和（“不共用的话要占多少”） */
+        public long gamePoolRaw;
         /**
          * 其中：游戏补丁（`app_hub/patches/<id>/<version>/`，含 dex / 素材 / 清单）。
          *
@@ -169,17 +171,18 @@ final class Storage {
         File priv = Paths.privateDir(ctx);
         r.internalBytes = Data.sizeTree(priv);
         File imp = new File(priv, "import");
-        r.importBytes = Data.sizeTree(imp);
+        // ★ 2026-11-23：「导入的游戏包」只算**包本身**，不算目录里别的东西 ——
+        //   开了游戏包去重之后原包被删、`import/oat/` 里还留着 ART 的 odex/vdex，
+        //   整目录量出来会变成「0 个游戏包 · 60.6 MB」这种自相矛盾的数字。
+        r.importBytes = apkBytes(imp);
         r.importCount = countApk(imp);
         r.nativesBytes = Data.sizeTree(new File(priv, "natives"));
-        // 游戏包共用文件：只量不建（这页是只读的），版本数数清单
+        // 游戏包共用文件：只量不建（这页是只读的）。版本数与"原始大小"都从清单拿 ——
+        // 那样这一行才能和备份一样说清「占多少 / 不共用的话要多少 / 省了多少」。
         r.gamePoolBytes = Data.sizeTree(new File(priv, "pkgs/objects"));
-        File pm = new File(priv, "pkgs/manifests");
-        File[] pml = pm.isDirectory() ? pm.listFiles() : null;
-        if (pml != null) {
-            for (File f : pml) {
-                if (f != null && f.isFile() && f.getName().endsWith(".json")) r.gamePoolVersions++;
-            }
+        for (PkgManifest m : PkgIngest.all(ctx)) {
+            r.gamePoolVersions++;
+            r.gamePoolRaw += m.size;
         }
         File pl = Plugins.dirNoCreate(ctx);      // ⚠️ 不创建：只读一眼不该多出目录
         r.pluginsBytes = Data.sizeTree(pl);
@@ -215,8 +218,25 @@ final class Storage {
      * 数一数目录里有多少个 `*.apk`（递归 —— 插件是 `plugins/&lt;id&gt;/&lt;ver&gt;.apk` 两层）。
      * ★ 只数 `.apk`：同一个目录下还躺着 `.part` 残留与别的杂项，按"文件数"报会虚高。
      */
-    private static int countApk(File dir) {
+    /** 只累加 `*.apk`（含拷到一半的 `*.apk.part`）的字节数；目录里的 oat/profile 不算。 */
+    private static long apkBytes(File dir) {
         if (dir == null || !dir.isDirectory()) return 0;
+        File[] fs = dir.listFiles();
+        if (fs == null) return 0;
+        long n = 0;
+        for (File f : fs) {
+            if (f == null) continue;
+            if (f.isDirectory()) {
+                n += apkBytes(f);
+            } else {
+                String name = f.getName().toLowerCase(java.util.Locale.US);
+                if (name.endsWith(".apk") || name.endsWith(".apk.part")) n += f.length();
+            }
+        }
+        return n;
+    }
+
+    private static int countApk(File dir) {        if (dir == null || !dir.isDirectory()) return 0;
         File[] fs = dir.listFiles();
         if (fs == null) return 0;
         int n = 0;
@@ -270,8 +290,12 @@ final class Storage {
         }
         // 游戏包共用文件（开了去重才有）—— 术语纪律：第一层只说"共用文件"，不出现 CAS/对象池
         if (r.gamePoolBytes > 0 && r.gamePoolVersions > 0) {
+            int gpct = r.gamePoolRaw > r.gamePoolBytes && r.gamePoolRaw > 0
+                    ? (int) Math.round((r.gamePoolRaw - r.gamePoolBytes) * 100d / r.gamePoolRaw) : 0;
             sb.append(Trans.get(c, R.string.storage_app_gamepool_fmt, r.gamePoolVersions,
-                    Util.formatSize(r.gamePoolBytes))).append('\n');
+                    Util.formatSize(r.gamePoolBytes),
+                    Util.formatSize(Math.max(r.gamePoolRaw, r.gamePoolBytes)),
+                    Trans.get(c, R.string.storage_pct_fmt, gpct))).append('\n');
             appAny = true;
         }
         if (r.pluginCount > 0 || r.pluginsBytes > 0) {

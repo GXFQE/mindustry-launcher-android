@@ -115,6 +115,8 @@ public final class PkgAdmin {
         long[] st = Pkgs.get(ctx).stats();
         r.poolObjects = (int) st[0];
         r.poolBytes = st[1];
+        // 删完包顺手清掉 oat/profile 残留（否则存储页会出现"0 个游戏包 · 60.6 MB"）
+        sweepImportLeftovers(ctx);
         r.ms = System.currentTimeMillis() - t0;
         Log.i(TAG, "cas enable: " + r.describe());
         return r;
@@ -194,8 +196,72 @@ public final class PkgAdmin {
             for (PkgManifest.Entry e : m.entries) live.add(e.sha);
         }
         long freed = Pkgs.get(ctx).gc(live);
+        // 顺带清 import/ 里的 oat/profile 残留（APK 已删的那些）
+        freed += sweepImportLeftovers(ctx);
         Log.i(TAG, "cas gc: live=" + live.size() + " freed=" + freed + " B");
         return freed;
+    }
+
+    /**
+     * 清 `import/` 里跟着 APK 一起该走的残留：ART 编译出来的 `oat/<abi>/<名字>.{odex,vdex}`、
+     * 以及 `<名字>.apk.cur.prof` 这类松散的 profile 文件。
+     *
+     * <p>为什么需要：删掉 APK 之后这些不会自己消失（真机上量到过 62 MB），
+     * 而存储占用页只数 `.apk` ⇒ 会显示「0 个游戏包 · 60.6 MB」这种自相矛盾的数字。
+     * 判据很保守：**只删「对应的 .apk 已经不在」的那些**，正在导入的 `.part` 一律跳过。</p>
+     *
+     * @return 释放的字节数（只用于日志）
+     */
+    static long sweepImportLeftovers(Context ctx) {
+        File dir = Importer.importDir(ctx);
+        if (dir == null || !dir.isDirectory()) return 0;
+        long freed = 0;
+        // ① oat/<abi>/<stem>.{odex,vdex}
+        File oat = new File(dir, "oat");
+        File[] abis = oat.isDirectory() ? oat.listFiles() : null;
+        if (abis != null) {
+            for (File abi : abis) {
+                if (abi == null || !abi.isDirectory()) continue;
+                File[] fs = abi.listFiles();
+                if (fs == null) continue;
+                for (File f : fs) {
+                    if (f == null || !f.isFile()) continue;
+                    String stem = stemOf(f.getName());
+                    if (stem == null) continue;
+                    if (new File(dir, stem + ".apk").isFile()) continue;
+                    long len = f.length();
+                    if (f.delete()) freed += len;
+                    else Log.w(TAG, "cas sweep: cannot delete " + f);
+                }
+                File[] left = abi.listFiles();
+                if (left != null && left.length == 0) abi.delete();
+            }
+        }
+        // ② 松散文件：<名字>.apk.cur.prof 之类（绝不碰 .part，那是正在拷的包）
+        File[] loose = dir.listFiles();
+        if (loose != null) {
+            for (File f : loose) {
+                if (f == null || !f.isFile()) continue;
+                String n = f.getName();
+                if (n.endsWith(".part")) continue;
+                int i = n.indexOf(".apk.");
+                if (i <= 0) continue;
+                String apk = n.substring(0, i + 4);
+                if (new File(dir, apk).isFile()) continue;
+                long len = f.length();
+                if (f.delete()) freed += len;
+                else Log.w(TAG, "cas sweep: cannot delete " + f);
+            }
+        }
+        if (freed > 0) Log.i(TAG, "cas sweep: freed " + freed + " B of stale import leftovers");
+        return freed;
+    }
+
+    /** `v1607.odex` → `v1607`；不是 odex/vdex 返回 null。 */
+    private static String stemOf(String name) {
+        if (name.endsWith(".odex")) return name.substring(0, name.length() - 5);
+        if (name.endsWith(".vdex")) return name.substring(0, name.length() - 5);
+        return null;
     }
 
     /** 池子现在省了多少：所有清单对应 APK 的大小之和 − 池子实际占用。 */

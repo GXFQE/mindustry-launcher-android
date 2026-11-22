@@ -1391,7 +1391,7 @@
     <!-- ★ 第 354 轮：补丁也占地方，而且用户会拿各节加总对账 -->
     <string name="storage_app_patches_fmt">游戏补丁：%1$d 个 · %2$s</string>
     <string name="storage_app_natives_fmt">从游戏包里解出的运行库：%1$s</string>
-    <string name="storage_app_gamepool_fmt">游戏包共用文件：%1$d 个版本共用 %2$s</string>
+    <string name="storage_app_gamepool_fmt">%1$d 个版本 · 占 %2$s · 不共用文件的话要 %3$s（省了 %4$s）</string>
     <string name="storage_app_plugins_fmt">插件：%1$d 个 · %2$s</string>
     <string name="storage_app_cache_fmt">缓存（临时文件）：%1$s</string>
     <string name="storage_app_tmp_fmt">临时文件（导出、导入中转）：%1$s</string>
