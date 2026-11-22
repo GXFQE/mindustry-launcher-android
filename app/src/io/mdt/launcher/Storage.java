@@ -160,7 +160,10 @@ final class Storage {
             }
         }
         File hub = Data.hubDir(ctx);
-        r.hubBytes = Data.sizeTree(hub);
+        // ★ 预览图（地图/蓝图缩略图）是**可再生缓存**，跟系统 cache 同类 ⇒ 单列进 cacheBytes，
+        //   并从 hub 里减掉：它住在 hub 里，不减的话 total 会把这一块算两遍。
+        long previewsBytes = Data.sizeTree(new File(hub, "previews"));
+        r.hubBytes = Math.max(0L, Data.sizeTree(hub) - previewsBytes);
 
         // ── 内部存储（★ 第 140 轮补上；导入的游戏包 = 真机上最大的一块）──────────
         File priv = Paths.privateDir(ctx);
@@ -189,8 +192,10 @@ final class Storage {
         } catch (Throwable ignored) {
             r.patchCount = 0;
         }
-        // 两个缓存目录一起算（游戏解出来的音乐 / 模组贴图 + 系统给动态加载的包生成的 dex 产物）
-        r.cacheBytes = Data.sizeTree(ctx.getCacheDir()) + Data.sizeTree(ctx.getCodeCacheDir());
+        // 两个缓存目录 + 预览图一起算（游戏解出来的音乐 / 模组贴图 + 系统给动态加载的包生成的
+        // dex 产物 + 地图/蓝图缩略图）。预览图那部分已从 hubBytes 里减掉，见上面。
+        r.cacheBytes = Data.sizeTree(ctx.getCacheDir()) + Data.sizeTree(ctx.getCodeCacheDir())
+                + previewsBytes;
         // ★ 第 382 轮（阶段 0.5）：HUB 临时件（app_hub/tmp）单独计量 —— 不跟外部 hub 重复算，
         //   也不加进 total（它本来就在 internalBytes 里）。
         r.tmpBytes = HubTmp.sizeNoFollow(HubTmp.rootNoCreate(ctx));
