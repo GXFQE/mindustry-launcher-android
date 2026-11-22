@@ -105,6 +105,7 @@ final class DevTools {
                 || intent.hasExtra("dev_poolspike")
                 || intent.hasExtra("dev_cas_ingest")
                 || intent.hasExtra("dev_cas_info")
+                || intent.hasExtra("dev_pkggc")
                 || intent.hasExtra("dev_start")
                 || intent.hasExtra("dev_compat")
                 || intent.hasExtra("dev_backup_restore")
@@ -493,6 +494,10 @@ final class DevTools {
         }
         if (intent.hasExtra("dev_cas_info")) {
             devCasInfo(intent.getBooleanExtra("cas_off", false));
+            return;
+        }
+        if (intent.hasExtra("dev_pkggc")) {
+            devPkgGc();
             return;
         }
 
@@ -1429,6 +1434,24 @@ final class DevTools {
                     .append("  arc=").append(m.arc == null ? "-" : m.arc.reason).append('\n');
         }
         reportDev(sb.toString(), "dev_cas_info");
+    }
+
+    /** 手动跑一次游戏包池的孤儿回收（`--es dev_pkggc 1`），报告回收前后与释放量。 */
+    private void devPkgGc() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("== dev_pkggc ==\n");
+        long[] before = Pkgs.get(a).stats();
+        sb.append("before = ").append(before[0]).append(" obj / ").append(before[1]).append(" B\n");
+        int live = 0;
+        for (PkgManifest m : PkgIngest.all(a)) {
+            live += m.entries.size();
+        }
+        sb.append("live entries = ").append(live).append('\n');
+        long freed = PkgAdmin.collect(a);
+        long[] after = Pkgs.get(a).stats();
+        sb.append("freed = ").append(freed).append(" B\n");
+        sb.append("after = ").append(after[0]).append(" obj / ").append(after[1]).append(" B\n");
+        reportDev(sb.toString(), "dev_pkggc");
     }
 
     /**

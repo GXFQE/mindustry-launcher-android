@@ -76,6 +76,26 @@ public class LauncherApp extends Application {
         } catch (Throwable t) {
             Log.w(TAG, "auto cleanup scheduling failed: " + t);
         }
+        // 2026-11-22：游戏包去重的孤儿回收。引用集 = 全部版本的清单，起一次就够
+        // （启动不再物化任何包，运行期不产生临时件）。只在主进程、游戏没在跑时做，
+        // 后台线程、失败静默 —— 它一项都不能拖慢冷启动。
+        if (Config.get().casGameEnabled() && Util.isMainProcess(this)) {
+            try {
+                new Thread(new Runnable() {
+                    @Override public void run() {
+                        try {
+                            if (!WriteGate.blockedSlotOrGlobal(LauncherApp.this, null)) {
+                                PkgAdmin.collect(LauncherApp.this);
+                            }
+                        } catch (Throwable t) {
+                            Log.w(TAG, "pkg gc failed: " + t);
+                        }
+                    }
+                }, "pkg-gc").start();
+            } catch (Throwable t) {
+                Log.w(TAG, "pkg gc scheduling failed: " + t);
+            }
+        }
         Log.i(TAG, "app up, privateDir=" + Paths.privateDir(this)
                 + " pid=" + android.os.Process.myPid());
     }

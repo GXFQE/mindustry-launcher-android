@@ -1416,6 +1416,7 @@
     <string name="storage_app_import_fmt">Imported game packages: %1$d · %2$s</string>
     <string name="storage_app_patches_fmt">Game patches: %1$d · %2$s</string>
     <string name="storage_app_natives_fmt">Native libraries unpacked from them: %1$s</string>
+    <string name="storage_app_gamepool_fmt">Shared game files: %1$d versions share %2$s</string>
     <string name="storage_app_plugins_fmt">Plugins: %1$d · %2$s</string>
     <string name="storage_app_cache_fmt">Cache (temporary files): %1$s</string>
     <string name="storage_app_tmp_fmt">Temp files (exports, imports): %1$s</string>

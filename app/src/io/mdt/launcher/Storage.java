@@ -65,6 +65,14 @@ final class Storage {
         public long pluginsBytes;
         public int pluginCount;
         /**
+         * 其中：**游戏包共用文件**（`app_hub/pkgs/objects`，开了「游戏包去重」才有）。
+         *
+         * <p>它住内部存储、包含在 {@link #internalBytes} 里，所以既要从「其它」里减掉，
+         * 也不许再加进 total。版本数不从目录数推，而是数清单（一个版本 = 一份清单）。</p>
+         */
+        public long gamePoolBytes;
+        public int gamePoolVersions;
+        /**
          * 其中：游戏补丁（`app_hub/patches/<id>/<version>/`，含 dex / 素材 / 清单）。
          *
          * <p>★ 第 354 轮用户：「游戏补丁似乎也没统计」—— 之前它混在「其它」里，
@@ -161,6 +169,15 @@ final class Storage {
         r.importBytes = Data.sizeTree(imp);
         r.importCount = countApk(imp);
         r.nativesBytes = Data.sizeTree(new File(priv, "natives"));
+        // 游戏包共用文件：只量不建（这页是只读的），版本数数清单
+        r.gamePoolBytes = Data.sizeTree(new File(priv, "pkgs/objects"));
+        File pm = new File(priv, "pkgs/manifests");
+        File[] pml = pm.isDirectory() ? pm.listFiles() : null;
+        if (pml != null) {
+            for (File f : pml) {
+                if (f != null && f.isFile() && f.getName().endsWith(".json")) r.gamePoolVersions++;
+            }
+        }
         File pl = Plugins.dirNoCreate(ctx);      // ⚠️ 不创建：只读一眼不该多出目录
         r.pluginsBytes = Data.sizeTree(pl);
         r.pluginCount = countApk(pl);
@@ -183,7 +200,8 @@ final class Storage {
         // ⚠️ 用减法算，所以要**夹到 0**：份额取自别处的口径（池 / 中转站），
         //    万一将来有个东西两边都算，负数会在界面上变成一句莫名其妙的"-3 MB"。
         long covered = (r.pool == null ? 0L : r.pool.actual + r.pool.legacyBytes) + r.trashTotalBytes
-                + r.importBytes + r.nativesBytes + r.pluginsBytes + r.patchBytes + r.tmpBytes;
+                + r.importBytes + r.nativesBytes + r.pluginsBytes + r.patchBytes + r.tmpBytes
+                + r.gamePoolBytes;
         r.otherBytes = Math.max(0L, r.hubBytes + r.internalBytes - covered);
         return r;
     }
@@ -243,6 +261,12 @@ final class Storage {
         if (r.nativesBytes > 0) {
             sb.append(Trans.get(c, R.string.storage_app_natives_fmt,
                     Util.formatSize(r.nativesBytes))).append('\n');
+            appAny = true;
+        }
+        // 游戏包共用文件（开了去重才有）—— 术语纪律：第一层只说"共用文件"，不出现 CAS/对象池
+        if (r.gamePoolBytes > 0 && r.gamePoolVersions > 0) {
+            sb.append(Trans.get(c, R.string.storage_app_gamepool_fmt, r.gamePoolVersions,
+                    Util.formatSize(r.gamePoolBytes))).append('\n');
             appAny = true;
         }
         if (r.pluginCount > 0 || r.pluginsBytes > 0) {
