@@ -58,15 +58,23 @@ final class CacheClean {
         return gameCache(ctx, null, null, null);
     }
 
+    /** 自动语义（预览图只删过期的）——自检与旧调用点用这个。 */
+    static Result gameCache(Context ctx, File cacheDir, File codeCacheDir,
+                            Boolean otherRunning) {
+        return gameCache(ctx, cacheDir, codeCacheDir, otherRunning, false);
+    }
+
     /**
      * 可注入版本（自检用）。
      *
      * @param cacheDir     null = {@code ctx.getCacheDir()}
      * @param codeCacheDir null = {@code ctx.getCodeCacheDir()}
      * @param otherRunning null = 现查（运行实例 **或** 启动占位，见 {@link #anyGameStarting}）
+     * @param manual       true = 用户**手动**点的清理 ⇒ 预览图不留期限、整棵清掉；
+     *                     false = 自动清理 ⇒ 只删过期的（{@link #PREVIEW_KEEP_DAYS} 天）
      */
     static Result gameCache(Context ctx, File cacheDir, File codeCacheDir,
-                            Boolean otherRunning) {
+                            Boolean otherRunning, boolean manual) {
         Result r = new Result();
         if (otherRunning == null) otherRunning = Boolean.valueOf(anyGameStarting(ctx));
         if (otherRunning.booleanValue()) {
@@ -76,7 +84,7 @@ final class CacheClean {
         }
         r.ok = clean(cacheDir == null ? ctx.getCacheDir() : cacheDir, r);
         r.ok = clean(codeCacheDir == null ? ctx.getCodeCacheDir() : codeCacheDir, r) && r.ok;
-        r.ok = previews(ctx, r) && r.ok;
+        r.ok = previews(ctx, r, manual) && r.ok;
         Log.i(TAG, "cache clean: " + r.brief());
         return r;
     }
@@ -85,18 +93,22 @@ final class CacheClean {
     static final int PREVIEW_KEEP_DAYS = 30;
 
     /**
-     * 剪 `hub/previews/`：**只删过期的**，不是整棵清。
+     * 剪 `hub/previews/`。
      *
-     * <p>为什么不整棵删：这些图是用户点开地图列表才用得上的，删光之后第一次进列表要重算
-     * （大图上要等一会儿）。按天数留一批，既压住体积又不让常用图陪葬。</p>
+     * <p>**自动清理只删过期的**（{@link #PREVIEW_KEEP_DAYS} 天）：这些图是用户点开地图列表才用得上的，
+     * 删光之后第一次进列表要重算（大图上要等一会儿）。按天数留一批，既压住体积又不让常用图陪葬。</p>
+     *
+     * <p>**手动清理整棵清**（用户 2026-11-23：「那是自动清理时限，我都点清理了应该都清掉吧」）：
+     * 点了清理就是明确要求腾空间，留 30 天窗口只会让人觉得"清了等于没清"。</p>
      *
      * <p>不碰：`.v&lt;N&gt;` 标记文件（`MapLoad` 用它判断"这个画法版本已经清过一次"）；
      * 当前画法版本目录里的**新**图。旧画法版本的整棵目录由 `MapLoad.purgeOld` 负责，这里不管。</p>
      */
-    private static boolean previews(Context ctx, Result r) {
+    private static boolean previews(Context ctx, Result r, boolean manual) {
         File root = new File(Data.hubDir(ctx), "previews");
         if (!root.isDirectory()) return true;
-        long cut = System.currentTimeMillis() - PREVIEW_KEEP_DAYS * 24L * 60L * 60L * 1000L;
+        long cut = manual ? Long.MAX_VALUE
+                : System.currentTimeMillis() - PREVIEW_KEEP_DAYS * 24L * 60L * 60L * 1000L;
         return prune(root, cut, r);
     }
 
@@ -124,7 +136,18 @@ final class CacheClean {
             }
         }
         File[] left = dir.listFiles();
-        return ok && (left == null || left.length == 0);
+        // 判"是否已空"时**忽略 `.v<N>` 标记**：它本来就该留着（MapLoad 用它记画法版本），
+        // 把它算成"没清干净"会让手动清完整棵之后还报"部分清理"（2026-11-23 实测踩到）。
+        boolean anyLeft = false;
+        if (left != null) {
+            for (File f : left) {
+                if (f != null && !f.getName().startsWith(".")) {
+                    anyLeft = true;
+                    break;
+                }
+            }
+        }
+        return ok && !anyLeft;
     }
 
     /**

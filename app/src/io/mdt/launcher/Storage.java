@@ -263,7 +263,8 @@ final class Storage {
         //   合计那一个数对不上任何一栏 ⇒ 这里也把两个数摊开写。
         //   数据 = 合计 − 缓存（外部 hub + 内部 app_hub + 各槽），与系统「数据」同一口径。
         long cache = Math.max(0L, r.cacheBytes);
-        if (cache > 0) {
+        // 不到 1 KB 就当没有：显示“缓存 1 B”只会让人以为清理没生效
+        if (cache > 1024) {
             sb.append(Trans.get(c, R.string.storage_total_split_fmt,
                     Util.formatSize(Math.max(0L, r.totalBytes() - cache)),
                     Util.formatSize(cache))).append('\n');
@@ -311,7 +312,7 @@ final class Storage {
                     Util.formatSize(r.patchBytes))).append('\n');
             appAny = true;
         }
-        if (r.cacheBytes > 0) {
+        if (r.cacheBytes > 1024) {
             sb.append(Trans.get(c, R.string.storage_app_cache_fmt,
                     Util.formatSize(r.cacheBytes))).append('\n');
             appAny = true;

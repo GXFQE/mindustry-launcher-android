@@ -115,7 +115,8 @@ final class Cleanup {
     static Result runAt(Context ctx, File cacheDir, File codeCacheDir, Boolean gameRunning,
                         File shareDir, DupClean dup, long shareCutoff) {
         Result r = new Result();
-        r.cache = CacheClean.gameCache(ctx, cacheDir, codeCacheDir, gameRunning);
+        r.cache = CacheClean.gameCache(ctx, cacheDir, codeCacheDir, gameRunning,
+                shareCutoff == Long.MAX_VALUE);
         if (r.cache == null || !r.cache.ok) r.ok = false;
 
         File sd = shareDir == null ? ShareProvider.dirOf(ctx) : shareDir;
