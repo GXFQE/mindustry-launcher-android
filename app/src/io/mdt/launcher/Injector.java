@@ -313,8 +313,15 @@ public final class Injector {
         //    这里兜一道：只动我们自己的私有副本（`/data/app` 下的本来就不可写，canWrite=false）。
         if (plan.apk.canWrite()) ensureDexReadOnly(plan.apk, log);
 
+        // ★ 按条目 CAS（附录 E）：这个版本若有清单且 ABI 判定通过，dex / native / 资产全从对象池取。
+        //   任一条不成立就 cas = null，后面每一步都退回「用 APK」的老路。
+        PkgManifest cas = PkgLauncher.lookup(app, plan.tag);
+        if (cas != null) {
+            log.append("pkg cas  = ").append(PkgLauncher.describe(app, cas)).append('\n');
+        }
+
         // ⓪ 预热
-        if (!prewarm(app, plan.apk, log)) {
+        if (!prewarm(app, plan.apk, cas, log)) {
             t.mark("prewarm");
             report(app, log);
             throw new LaunchError(Trans.get(activity, R.string.step_prewarm),
@@ -338,7 +345,7 @@ public final class Injector {
         }
         log.append("宿主 dex elements = ").append(hostDex).append('\n');
         try {
-            injectDex(app, baseCl, plan.apk, log);
+            injectDex(app, baseCl, plan.apk, cas, log);
             injectPatches(app, baseCl, plan, hostDex, log);
         } catch (Throwable e) {
             t.mark("dexInject");
@@ -431,11 +438,12 @@ public final class Injector {
      * 但规律是确定的：第一次产出的 element 是"死"的（句柄有、类表空），紧接着
      * 再建一个 DexClassLoader 立刻就能解析。已安装的 APK 因安装期已 dexopt 不受影响。
      */
-    private static boolean prewarm(Context ctx, File apk, StringBuilder log) {
-        // dev spike：池就绪时 dexPath 只由「覆盖 dex + 池里的 dex」组成（不含 APK）；
-        // 产品版 ProbeLab 恒返回 apk 路径，行为不变。
-        String dexPath = ProbeLab.dexPath(ctx, apk);
-        if (!dexPath.equals(apk.getAbsolutePath())) log.append("dev spike: dexPath = ").append(dexPath).append('\n');
+    private static boolean prewarm(Context ctx, File apk, PkgManifest cas, StringBuilder log) {
+        // 有清单 ⇒ dexPath 只由「覆盖 dex + 池里的 dex」组成（不含 APK）；
+        // 否则照旧用 APK（dev 探针 ProbeLab 可能再叠一层实验路径）。
+        String dexPath = cas != null ? PkgLauncher.dexPath(ctx, cas) : ProbeLab.dexPath(ctx, apk);
+        if (dexPath == null) dexPath = apk.getAbsolutePath();
+        if (!dexPath.equals(apk.getAbsolutePath())) log.append("dexPath  = ").append(dexPath).append('\n');
         for (int attempt = 1; attempt <= 3; attempt++) {
             try {
                 DexClassLoader d = new DexClassLoader(dexPath,
@@ -458,17 +466,20 @@ public final class Injector {
      * ★ optimizedDirectory 必须用 getCodeCacheDir() **本身**，不能用它的子目录 ——
      *   探针实测：用子目录时私有副本的 dex 首次拿不到类，用本身正常（受控变量对照）。
      */
-    private static void injectDex(Context ctx, ClassLoader baseCl, File apk, StringBuilder log)
-            throws Exception {
+    private static void injectDex(Context ctx, ClassLoader baseCl, File apk, PkgManifest cas,
+                                  StringBuilder log) throws Exception {
         File opt = ctx.getCodeCacheDir();
         if (!opt.exists()) opt.mkdirs();
-        String dexPath = ProbeLab.dexPath(ctx, apk);
+        String dexPath = cas != null ? PkgLauncher.dexPath(ctx, cas) : ProbeLab.dexPath(ctx, apk);
+        if (dexPath == null) dexPath = apk.getAbsolutePath();
         DexClassLoader extra = new DexClassLoader(dexPath,
                 opt.getAbsolutePath(), null, baseCl.getParent());
         int total = Reflect.appendDexElements(baseCl, extra);
         log.append("dexElements 合并后 = ").append(total).append('\n');
-        // dev spike：池映射必须在游戏第一次 internal 读取之前灌进去
-        ProbeLab.afterInject(ctx, baseCl);
+        // 池映射必须在游戏第一次 internal 读取之前灌进去：
+        // 有清单走产品路径（PkgLauncher.attach），否则走 dev 探针（ProbeLab，release 是空壳）。
+        if (cas != null) PkgLauncher.attach(ctx, baseCl, cas);
+        else ProbeLab.afterInject(ctx, baseCl);
         // 验证挪到 injectPatches 的末尾：补丁要在这句之前插好，否则 if (补丁替换了入口类)
         // 这里会先把原版加载掉 —— 之后再 prepend 就换不掉了（S0 的「已加载过就换不掉」）。
     }
@@ -605,6 +616,12 @@ public final class Injector {
      *   旧实现是"所有版本共用一个固定路径、先删后写" ⇒ 两个版本互相覆盖（plan §12.23）。
      */
     private static void loadNatives(Context ctx, Plan plan, StringBuilder log) throws Exception {
+        // 有清单 ⇒ .so 直接从池取（不打开 APK）。
+        PkgManifest cas = PkgLauncher.lookup(ctx, plan.tag);
+        if (cas != null) {
+            loadNativesFromManifest(ctx, plan, cas, log);
+            return;
+        }
         // dev spike（零 APK 实验）：池就绪时 .so 直接从对象池取，完全不打开 APK。
         if (ProbeLab.poolReady(ctx)) {
             loadNativesFromPool(ctx, plan, log);
@@ -735,6 +752,40 @@ public final class Injector {
         if (loaded == 0) throw new IllegalStateException(Trans.get(ctx, R.string.launch_err_no_native_loaded));
     }
 
+    /**
+     * 按清单从对象池取 `lib/&lt;abi&gt;/*.so`（附录 E 的产品路径），发布到 `natives/<abi>/<tag>/`
+     * 再 `System.load`。
+     *
+     * <p>与 {@link #loadNativesFromPool} 的区别：ABI 与条目都从清单里查，不再依赖 dev 探针的
+     * manifest.tsv。故意不做 APK 那条 zipalign 对齐校验 —— .so 是从池里拷成独立文件的，
+     * 吃的是 ELF 自己的 `p_align`。</p>
+     */
+    private static void loadNativesFromManifest(Context ctx, Plan plan, PkgManifest m,
+                                                StringBuilder log) throws Exception {
+        String abi = PkgLauncher.pickAbi(m);
+        if (abi == null) {
+            log.append("pkg: manifest has no lib/<abi> entry\n");
+            throw new IllegalStateException(Trans.get(ctx, R.string.launch_err_no_abi_fmt,
+                    Compat.join(Compat.deviceAbis())));
+        }
+        String tag = Natives.tagFor(plan.tag, plan.apk);
+        log.append("pkg natives  abi=").append(abi).append("  tag=").append(tag).append('\n');
+        int loaded = 0;
+        for (String name : NATIVE_LIBS) {
+            File src = PkgLauncher.nativeFile(ctx, m, abi, name);
+            if (src == null || !src.isFile()) {
+                log.append("pkg missing lib/").append(abi).append('/').append(name).append('\n');
+                continue;
+            }
+            File out = Natives.publish(ctx, abi, tag, name, new java.io.FileInputStream(src));
+            System.load(out.getAbsolutePath());
+            loaded++;
+            log.append("System.load(").append(name).append(") OK  ")
+                    .append(out.length()).append(" B  [pkg]").append('\n');
+        }
+        if (loaded == 0) throw new IllegalStateException(Trans.get(ctx, R.string.launch_err_no_native_loaded));
+    }
+
     // ── ③ 置 loaded 标志 ──────────────────────────────────────────────────
 
     /**
@@ -828,6 +879,11 @@ public final class Injector {
      */
     private static void mountAssets(Context app, Activity activity, Plan plan, StringBuilder log)
             throws Exception {
+        // 按条目 CAS：资产由同名 AndroidFi 直接读对象池，不再往 AssetManager 挂 APK。
+        if (PkgLauncher.lookup(app, plan.tag) != null) {
+            log.append("pkg: skip addAssetPath (pool assets)\n");
+            return;
+        }
         // dev P0 实验（2026-11-22）：池就绪时不挂 APK，资产全靠同名 AndroidFi 覆盖读池。
         // 产品版 ProbeLab 永远返回 false ⇒ 这里一行都不会走到。
         if (ProbeLab.skipAssetMount(app)) {

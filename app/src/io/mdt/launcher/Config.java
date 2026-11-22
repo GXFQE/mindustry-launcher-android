@@ -204,6 +204,9 @@ public final class Config {
      */
     private static final String K_PLUGIN_UPDATE = "plugin_update";
 
+    /** 游戏包去重（按条目 CAS）：默认关，见 {@link #DEF_CAS_GAME}。 */
+    private static final String K_CAS_GAME = "cas_game";
+
     /**
      * 第 378 轮：**下载限速**（字节/秒；0 = 不限）。
      *
@@ -291,6 +294,9 @@ public final class Config {
      * 一行一件事（不要因为关掉启动器自更新就悄悄停掉插件更新）。
      */
     public static final boolean DEF_PLUGIN_UPDATE = true;
+
+    /** 游戏包去重默认关：开启会把 import/*.apk 收进对象池并删掉原包，属于不可无感回退的选项。 */
+    public static final boolean DEF_CAS_GAME = false;
 
     private static volatile Config sInstance;
 
@@ -564,6 +570,20 @@ public final class Config {
         Log.w(TAG, "config key '" + K_PLUGIN_UPDATE + "' is not a boolean (" + v
                 + "), falling back to default " + DEF_PLUGIN_UPDATE);
         return DEF_PLUGIN_UPDATE;
+    }
+
+    /** 游戏包去重（CAS）总开关：默认关。 */
+    public synchronized boolean casGameEnabled() {
+        if (!mRoot.has(K_CAS_GAME)) return DEF_CAS_GAME;
+        Object v = mRoot.opt(K_CAS_GAME);
+        if (v instanceof Boolean) return ((Boolean) v).booleanValue();
+        Log.w(TAG, "config key '" + K_CAS_GAME + "' is not a boolean (" + v + "), falling back to default " + DEF_CAS_GAME);
+        return DEF_CAS_GAME;
+    }
+
+    public synchronized void setCasGameEnabled(boolean on) {
+        put(K_CAS_GAME, Boolean.valueOf(on));
+        save();
     }
 
     public synchronized void setPluginAutoUpdate(boolean on) {

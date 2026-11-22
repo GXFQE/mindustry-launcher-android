@@ -200,6 +200,26 @@ public final class Importer {
         }
         Log.i(TAG, "import prewarm ok: " + c.getName() + " from " + tmp.getName());
 
+        // ★ 按条目 CAS（附录 E）：开关打开时先把这个包收进对象池并写清单。
+        //   放在 rename **之前**、用 `.part` 做源：清单落盘失败 ⇒ 这次导入还没生效，
+        //   直接抛出去（`.part` 会被 cleanup），不会留下「config 指着一个没有清单的版本」。
+        //   这一步不删原包 —— 删包是迁移动作，等版本列表能完全从清单读出来之后再做。
+        if (Config.get().casGameEnabled()) {
+            try {
+                PkgIngest.Stats st = new PkgIngest.Stats();
+                PkgManifest m = PkgIngest.ingest(ctx, tmp, "import:" + base,
+                        stripExt(displayName), version, Util.md5(tmp), st);
+                Log.i(TAG, "import cas: " + st);
+                if (m == null || !m.arc.eligible) {
+                    Log.w(TAG, "import cas: arc not eligible — falling back to the APK at launch");
+                }
+            } catch (Throwable t) {
+                cleanup(tmp);
+                Log.w(TAG, "import cas failed: " + t);
+                throw new IOException(Trans.get(ctx, R.string.imp_err_bad_zip), t);
+            }
+        }
+
         // rename 只需要目录写权限，只读文件本身不影响；
         // 顺带覆盖掉同名的旧副本（Linux 语义 = 原子替换）。
         if (!tmp.renameTo(file)) {

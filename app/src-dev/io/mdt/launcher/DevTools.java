@@ -103,6 +103,8 @@ final class DevTools {
                 || intent.hasExtra("dev_casentry_dir")
                 || intent.hasExtra("dev_casentry_clean")
                 || intent.hasExtra("dev_poolspike")
+                || intent.hasExtra("dev_cas_ingest")
+                || intent.hasExtra("dev_cas_info")
                 || intent.hasExtra("dev_start")
                 || intent.hasExtra("dev_compat")
                 || intent.hasExtra("dev_backup_restore")
@@ -480,6 +482,17 @@ final class DevTools {
         // 用法：`--es dev_start v1607.apk`（也接受 `import:v1607.apk` 全 key）
         if (intent.hasExtra("dev_start")) {
             devStart(intent.getStringExtra("dev_start"));
+            return;
+        }
+        // 按条目 CAS（P1）：把 import/ 下的包收进对象池并写清单。
+        // 用法：`--es dev_cas_ingest 1`（全部）或 `--es dev_cas_ingest v1607.apk`（单个）；
+        //       `--es dev_cas_ingest 1 --es cas_on 0` 只入库不开开关。
+        if (intent.hasExtra("dev_cas_ingest")) {
+            devCasIngest(intent.getStringExtra("dev_cas_ingest"), intent.getStringExtra("cas_on"));
+            return;
+        }
+        if (intent.hasExtra("dev_cas_info")) {
+            devCasInfo(intent.getBooleanExtra("cas_off", false));
             return;
         }
 
@@ -1339,6 +1352,83 @@ final class DevTools {
                 reportDev(sb.toString(), "dev_casentry_dir");
             }
         }, "dev-casentry-dir").start();
+    }
+
+    /**
+     * 按条目 CAS（P1）：把 `import/` 下的包收进对象池并写清单。
+     *
+     * <p>用法：`--es dev_cas_ingest 1`（全部）或 `--es dev_cas_ingest v1607.apk`；
+     * 默认会把开关打开（`--es cas_on 0` 只入库不开）。</p>
+     */
+    private void devCasIngest(final String which, final String casOn) {
+        new Thread(new Runnable() {
+            @Override public void run() {
+                StringBuilder sb = new StringBuilder();
+                sb.append("== dev_cas_ingest ==\n");
+                try {
+                    boolean on = casOn == null || !"0".equals(casOn.trim());
+                    if (on) {
+                        Config.get().setCasGameEnabled(true);
+                    }
+                    sb.append("cas_game = ").append(Config.get().casGameEnabled()).append('\n');
+                    File ov = OverrideDex.ensure(a);
+                    sb.append("override.dex = ").append(ov == null ? "(missing)" : ov.length() + " B")
+                            .append('\n');
+                    if (ov == null) {
+                        sb.append("FAILED: override.dex 不在 assets 里\n");
+                        reportDev(sb.toString(), "dev_cas_ingest");
+                        return;
+                    }
+                    File dir = Importer.importDir(a);
+                    File[] apks = dir.listFiles();
+                    if (apks == null) apks = new File[0];
+                    int done = 0;
+                    for (File f : apks) {
+                        if (f == null || !f.isFile() || !f.getName().endsWith(".apk")) continue;
+                        if (which != null && !"1".equals(which.trim())
+                                && !f.getName().equals(which.trim())) continue;
+                        PkgIngest.Stats st = new PkgIngest.Stats();
+                        try {
+                            PkgManifest m = PkgIngest.ingest(a, f, "import:" + f.getName(),
+                                    f.getName().replace(".apk", ""), null, Util.md5(f), st);
+                            sb.append("- ").append(f.getName()).append(": ").append(st)
+                                    .append('\n');
+                            if (m != null) sb.append("  manifest -> ").append(m.describe()).append('\n');
+                            done++;
+                        } catch (Throwable t) {
+                            sb.append("- ").append(f.getName()).append(": FAILED ").append(t).append('\n');
+                        }
+                    }
+                    long[] pool = Pkgs.get(a).stats();
+                    sb.append("pool: ").append(pool[0]).append(" obj / ")
+                            .append(String.format(java.util.Locale.US, "%.1f MB", pool[1] / 1048576.0)).append('\n');
+                    sb.append("done: ").append(done).append(" package(s)\n");
+                } catch (Throwable t) {
+                    sb.append("FAILED: ").append(t).append('\n');
+                }
+                reportDev(sb.toString(), "dev_cas_ingest");
+            }
+        }, "dev-cas-ingest").start();
+    }
+
+    /** 看清单与池的状态，可选把开关关掉（`--ez cas_off true`）。 */
+    private void devCasInfo(boolean casOff) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("== dev_cas_info ==\n");
+        if (casOff) {
+            Config.get().setCasGameEnabled(false);
+        }
+        sb.append("cas_game = ").append(Config.get().casGameEnabled()).append('\n');
+        File ov = OverrideDex.ensure(a);
+        sb.append("override.dex = ").append(ov == null ? "(missing)" : ov.length() + " B").append('\n');
+        long[] pool = Pkgs.get(a).stats();
+        sb.append("pool = ").append(pool[0]).append(" obj / ")
+                .append(String.format(java.util.Locale.US, "%.1f MB", pool[1] / 1048576.0)).append('\n');
+        for (PkgManifest m : PkgIngest.all(a)) {
+            sb.append("- ").append(m.vkey).append("  ").append(m.describe())
+                    .append("  arc=").append(m.arc == null ? "-" : m.arc.reason).append('\n');
+        }
+        reportDev(sb.toString(), "dev_cas_info");
     }
 
     /**

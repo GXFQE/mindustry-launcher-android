@@ -1391,6 +1391,22 @@
     -->
     <string name="set_storage_title">Storage used</string>
     <string name="set_storage_sub">View what backups save and where the space goes</string>
+    <string name="set_cas_title">Deduplicate game packages</string>
+    <string name="set_cas_sub_on">On — versions share identical files</string>
+    <string name="set_cas_sub_off">Off — each version keeps its own APK</string>
+    <string name="set_cas_sub_none">No imported versions yet</string>
+    <string name="cas_on_confirm_title">Turn on deduplication?</string>
+    <string name="cas_on_confirm_body">Imported versions will be stored as shared files, so identical parts are kept once. This takes a moment and uses the same space for the first version.</string>
+    <string name="cas_off_confirm_title">Turn off deduplication?</string>
+    <string name="cas_off_confirm_body">Each version will be rebuilt back into its own APK file, then the shared files are removed. This can need roughly as much free space as the packages themselves.</string>
+    <string name="cas_busy">A game is running — close it first.</string>
+    <string name="cas_saved_fmt">Saved %1$s across %2$d versions</string>
+    <string name="cas_working">Working…</string>
+    <string name="cas_on_go">Turn on deduplication</string>
+    <string name="cas_off_go">Turn off and free the space</string>
+    <string name="cas_failed_fmt">Could not finish: %1$s</string>
+    <string name="cas_space_title">Not enough space</string>
+    <string name="cas_space_body">Turn this off with less free space than the packages need? Free it, then close the game and try again.</string>
     <string name="storage_loading">Counting…</string>
     <string name="storage_failed">Could not measure storage — go back and open this again.</string>
     <string name="storage_total_fmt">These add up to %1$s</string>

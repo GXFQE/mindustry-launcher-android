@@ -156,6 +156,20 @@
                     android:layout_marginStart="62dp"
                     android:background="@color/divider" />
 
+                <!-- 游戏包去重（CAS）：默认关；开着才有副作用（删原包/换装载方式），
+                     所以放在存储占用正下方，先看占用再决定。 -->
+                <include
+                    android:id="@+id/row_cas_game"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="62dp"
+                    android:background="@color/divider" />
+
                 <!-- F20 / 第 383 轮：自动清理缓存（开关）。用户 2026-11-15 要求放在
                      「存储占用」下面：先看占用，再决定要不要自动清。 -->
                 <include

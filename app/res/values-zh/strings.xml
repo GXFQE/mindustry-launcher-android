@@ -1363,6 +1363,22 @@
     -->
     <string name="set_storage_title">存储占用</string>
     <string name="set_storage_sub">查看备份省了多少、各类数据各占多少</string>
+    <string name="set_cas_title">游戏包去重</string>
+    <string name="set_cas_sub_on">已开启 —— 版本之间共用的文件只存一份</string>
+    <string name="set_cas_sub_off">已关闭 —— 每个版本各自保留完整安装包</string>
+    <string name="set_cas_sub_none">还没有导入的版本</string>
+    <string name="cas_on_confirm_title">开启游戏包去重？</string>
+    <string name="cas_on_confirm_body">导入的版本会改成共用文件存放，相同的内容只留一份。这一步要花一点时间，第一个版本占的空间和原来差不多。</string>
+    <string name="cas_off_confirm_title">关闭游戏包去重？</string>
+    <string name="cas_off_confirm_body">会按记录把每个版本重新拼回独立的安装包，然后删掉共用文件。需要预留大约相当于这些安装包大小的空间。</string>
+    <string name="cas_busy">游戏正在运行 —— 先把它关掉。</string>
+    <string name="cas_saved_fmt">%2$d 个版本共省下 %1$s</string>
+    <string name="cas_working">处理中…</string>
+    <string name="cas_on_go">开启去重</string>
+    <string name="cas_off_go">关闭并释放空间</string>
+    <string name="cas_failed_fmt">没能完成：%1$s</string>
+    <string name="cas_space_title">空间不够</string>
+    <string name="cas_space_body">关掉它需要能放下这些安装包的空间。先腾出空间，关掉游戏再试。</string>
     <string name="storage_loading">正在统计…</string>
     <string name="storage_failed">统计失败 —— 返回上一页再进一次试试。</string>
     <string name="storage_total_fmt">这些数据合计占 %1$s</string>

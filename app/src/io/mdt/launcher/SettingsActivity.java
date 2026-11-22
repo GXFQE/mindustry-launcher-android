@@ -83,6 +83,7 @@ public class SettingsActivity extends BaseActivity {
     private TextView mTrashSub;
     /** F20：自动清理缓存那一行的副标题（已开 / 已关） */
     private TextView mAutoCleanSub;
+    private TextView mCasSub;
     /** 用户语言包那一行的副标题（当前状态） */
     private TextView mLangPackSub;
     /** 第 309 轮：检查更新的副标题（当前版本号，动态）。 */
@@ -204,6 +205,15 @@ public class SettingsActivity extends BaseActivity {
                         showStorage();
                     }
                 });
+
+        // ★ 2026-11-22：游戏包去重（CAS）——**默认关**，开了才改变存放方式（删原包）。
+        //   位置按「先看占用，再决定要不要开」，紧挨存储占用。动作走后台线程 + 确认框，
+        //   因为它会真的搬文件（开启 = 逐包入库；关闭 = 按清单拼回 APK 再删池）。
+        View rowCas = Util.bindActionValue(root, R.id.row_cas_game, R.drawable.ic_storage,
+                R.string.set_cas_title, new Runnable() {
+                    @Override public void run() { promptCasGame(); }
+                });
+        mCasSub = (TextView) rowCas.findViewById(R.id.act_sub);
 
         // F20（2026-10-03 用户：「我们是不是应该给一些功能加上开关」）：
         // ★ 全工程**唯一一个"静默删文件"**的动作就是它，所以只给它加了开关。
@@ -331,8 +341,20 @@ public class SettingsActivity extends BaseActivity {
             mTrashSub.setText(Trans.get(SettingsActivity.this, R.string.set_trash_sub_fmt,
                     Config.get().trashKeep(), Config.get().trashKeepSlots()));
         }
-        if (mAutoCleanSub != null) {
-            // ★ 走 Trans（别 setText(resId)）：用户语言包要能改这一条。
+        if (mCasSub != null) {
+            // ★ 三种说法：没开关 / 开着 / 关着。「开着」不报省了多少 —— 现在还没删原包，
+            //   报了就是假数字（真省下来要等删包那一步）。
+            int res;
+            if (!Config.get().casGameEnabled()) {
+                res = R.string.set_cas_sub_off;
+            } else if (PkgAdmin.versionCount(this) == 0) {
+                res = R.string.set_cas_sub_none;
+            } else {
+                res = R.string.set_cas_sub_on;
+            }
+            mCasSub.setText(Trans.get(SettingsActivity.this, res));
+        }
+        if (mAutoCleanSub != null) {            // ★ 走 Trans（别 setText(resId)）：用户语言包要能改这一条。
             mAutoCleanSub.setText(Trans.get(SettingsActivity.this,
                     Config.get().autoCleanRedundant() ? R.string.set_autoclean_on
                             : R.string.set_autoclean_off));
@@ -421,6 +443,91 @@ public class SettingsActivity extends BaseActivity {
                         })
                 .setNegativeButton(R.string.close, null)
                 .show();
+    }
+
+    /**
+     * 2026-11-22：游戏包去重（CAS）的开关。**默认关**。
+     *
+     * <p>开启 = 把 `import/` 里现有包全部收进对象池（启动改走池）；
+     * 关闭 = 丢清单 + 丢池子，回到「每个版本各自一个 APK」。</p>
+     *
+     * <p>⚠️ 现在开启**不会删原始 APK**：界面里还有几处（地图/蓝图缩略图）直接读 APK，
+     * 删早了那些页面会空。所以副标题只说「共用文件只存一份」，不吹省了多少 ——
+     * 真正的省要到删包那一步，见 {@link PkgAdmin} 的类注释。</p>
+     */
+    private void promptCasGame() {
+        // 池子是全局资源 ⇒ 按「有没有实例在跑」拦（走 WriteGate，别直接调 Data.gameAlive：
+        // 那个全局判据有调用点预算，只留给迁移/回收/杀进程）。
+        if (WriteGate.blockedSlotOrGlobal(this, null)) {
+            Toast.makeText(this, R.string.cas_busy, Toast.LENGTH_LONG).show();
+            return;
+        }
+        final boolean on = Config.get().casGameEnabled();
+        new AlertDialog.Builder(this)
+                .setTitle(on ? R.string.cas_off_confirm_title : R.string.cas_on_confirm_title)
+                .setMessage(Trans.get(this, on ? R.string.cas_off_confirm_body
+                                                : R.string.cas_on_confirm_body))
+                .setPositiveButton(on ? R.string.cas_off_go : R.string.cas_on_go,
+                        new DialogInterface.OnClickListener() {
+                            @Override public void onClick(DialogInterface d, int w) {
+                                applyCasGame(!on);
+                            }
+                        })
+                .setNegativeButton(R.string.close, null)
+                .show();
+    }
+
+    /** 真正干活：后台跑，弹一张不可取消的进度卡，回来刷新副标题。 */
+    private void applyCasGame(final boolean on) {
+        final AlertDialog prog = new AlertDialog.Builder(this)
+                .setMessage(Trans.get(this, R.string.cas_working))
+                .setCancelable(false)
+                .show();
+        new Thread(new Runnable() {
+            @Override public void run() {
+                String err = null;
+                long saved = 0;
+                int n = 0;
+                try {
+                    if (on) {
+                        PkgAdmin.Result r = PkgAdmin.enable(SettingsActivity.this);
+                        if (r.error != null) {
+                            err = r.error;
+                        } else {
+                            Config.get().setCasGameEnabled(true);
+                        }
+                        android.util.Log.i("MDTLauncher", "cas enable: " + r.describe());
+                    } else {
+                        long freed = PkgAdmin.disable(SettingsActivity.this);
+                        android.util.Log.i("MDTLauncher", "cas disable: freed " + freed + " B");
+                    }
+                    n = PkgAdmin.versionCount(SettingsActivity.this);
+                    saved = PkgAdmin.savedBytes(SettingsActivity.this);
+                } catch (Throwable t) {
+                    err = String.valueOf(t.getMessage());
+                    android.util.Log.w("MDTLauncher", "cas toggle failed", t);
+                }
+                final String ferr = err;
+                final long fsaved = saved;
+                final int fn = n;
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        if (!Util.dead(SettingsActivity.this) && prog.isShowing()) prog.dismiss();
+                        String msg;
+                        if (ferr != null) {
+                            msg = Trans.get(SettingsActivity.this, R.string.cas_failed_fmt, ferr);
+                        } else if (on) {
+                            msg = Trans.get(SettingsActivity.this, R.string.cas_saved_fmt,
+                                    PkgAdmin.fmt(fsaved), fn);
+                        } else {
+                            msg = Trans.get(SettingsActivity.this, R.string.set_cas_sub_off);
+                        }
+                        Toast.makeText(SettingsActivity.this, msg, Toast.LENGTH_LONG).show();
+                        fillValues();
+                    }
+                });
+            }
+        }).start();
     }
 
     /**

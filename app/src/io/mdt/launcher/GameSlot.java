@@ -146,7 +146,7 @@ public class GameSlot extends BaseActivity {
         final String provSlot = Data.slotNameFor(this, slot);
         final String provKey = Versions.instanceKey(vkey, provSlot);
         Patches.Resolved patchRes = Patches.resolve(this, target, provKey);
-        boolean legacy = needsLegacySlot(target, it, patchRes);
+        boolean legacy = needsLegacySlot(target, vkey, it, patchRes);
         // ★ 第 412 轮：远古包（build ≤ 146）的槽交接可能**拒绝**启动 ——
         //   files/ 里有无主数据、或游戏还在跑时，宁可停下说清楚，也不猜/不抢。
         String rep;
@@ -316,7 +316,7 @@ public class GameSlot extends BaseActivity {
         return Trans.get(this, R.string.legacy_slot_move_failed_fmt);
     }
 
-    private boolean needsLegacySlot(File apk, Intent it, Patches.Resolved res) {
+    private boolean needsLegacySlot(File apk, String versionKey, Intent it, Patches.Resolved res) {
         // ① 整端补丁（注入后排在基座之前 ⇒ 它的同名类先被解析到）—— 判它自己支不支持属性
         if (res != null) {
             for (Patches.Loaded l : res.loaded) {
@@ -337,6 +337,13 @@ public class GameSlot extends BaseActivity {
         // ② 基座
         if (it != null && it.hasExtra(EXTRA_LEGACY_SWAP)) {
             return it.getBooleanExtra(EXTRA_LEGACY_SWAP, false);
+        }
+        // ②' CAS 版本：入过池的版本，远古包判定在入库时就落进清单了。
+        //     APK 可能已经删了，这里不能再靠 Probe 现探（探不到会被当成远古包 ⇒ 搬空槽）。
+        PkgManifest cas = PkgManifest.read(PkgManifest.fileOf(this, versionKey));
+        if (cas != null) {
+            android.util.Log.i("MDTLauncher", "slot-mode: cas manifest legacy=" + cas.legacy);
+            return cas.legacy;
         }
         try {
             return Compat.probe(apk).needsRename();
