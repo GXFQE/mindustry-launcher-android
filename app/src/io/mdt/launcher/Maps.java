@@ -292,15 +292,15 @@ public final class Maps {
      */
     static void scanContainer(Context ctx, File container, String prefix, int from, String sourceLabel,
                               List<Item> out) {
-        if (container == null || !container.isFile()) return;
-        ZipFile zf = null;
+        if (container == null) return;
+        // ★ 2026-11-22（P2）：游戏自带地图住在版本 APK 里，原包删了也要列得出来
+        //   （Pkg 走清单 + 池；模组 zip 仍走同一入口，行为不变）
+        Pkg pkg = null;
         try {
-            zf = new ZipFile(container);
-            Enumeration<? extends ZipEntry> en = zf.entries();
-            while (en.hasMoreElements()) {
-                ZipEntry ze = en.nextElement();
-                if (ze.isDirectory()) continue;
-                String n = ze.getName();
+            pkg = Pkg.open(ctx, container);
+            if (pkg == null) return;
+            for (Pkg.Entry ze : pkg.entries()) {
+                String n = ze.name();
                 if (!n.toLowerCase(Locale.ROOT).endsWith(".msav")) continue;
                 // 前缀匹配：要么以 prefix 开头，要么路径里出现过 "/" + prefix（模组可能整个套一层目录）
                 String p = prefix;
@@ -312,7 +312,7 @@ public final class Maps {
                 it.container = container;
                 it.entry = n;
                 it.where = container.getName() + "!/" + n;
-                it.bytes = ze.getSize();
+                it.bytes = ze.size();
                 it.meta = metaOf(it);                     // ★ 只读第一块 ⇒ 不解压整份
                 if (it.meta != null && !it.meta.ok) it.error = it.meta.error;
                 out.add(it);
@@ -320,12 +320,7 @@ public final class Maps {
         } catch (Throwable t) {
             // 容器打不开（不是 zip / 被占用）：**不抛**，只是这一组为空
         } finally {
-            if (zf != null) {
-                try {
-                    zf.close();
-                } catch (Throwable ignored) {
-                }
-            }
+            if (pkg != null) pkg.close();
         }
     }
 
@@ -454,13 +449,15 @@ public final class Maps {
         if (it == null) return null;
         if (it.file != null) return MsavMeta.read(it.file);
         if (it.container == null || it.entry == null) return null;
-        ZipFile zf = null;
+        Pkg pkg = null;
         InputStream in = null;
         try {
-            zf = new ZipFile(it.container);
-            ZipEntry e = zf.getEntry(it.entry);
+            // ★ 2026-11-22（P2）：游戏自带地图的元数据也要能在原包删掉后读出来
+            pkg = Pkg.open(it.container);
+            if (pkg == null) return null;
+            Pkg.Entry e = pkg.entry(it.entry);
             if (e == null) return null;
-            in = new BufferedInputStream(zf.getInputStream(e), 8192);
+            in = new BufferedInputStream(e.open(), 8192);
             return MsavMeta.read(in);
         } catch (Throwable t) {
             return null;
@@ -471,12 +468,7 @@ public final class Maps {
                 } catch (Throwable ignored) {
                 }
             }
-            if (zf != null) {
-                try {
-                    zf.close();
-                } catch (Throwable ignored) {
-                }
-            }
+            if (pkg != null) pkg.close();
         }
     }
 }

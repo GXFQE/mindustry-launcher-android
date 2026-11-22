@@ -14521,7 +14521,7 @@ public final class SelfTest {
                 zos.close();
             }
 
-            GameAssets.Catalog c = GameAssets.scan(apk);
+            GameAssets.Catalog c = GameAssets.scan(ctx, apk);
             ok(stat, L, c.entries == 13,
                     "★只数 assets/：13 条（classes.dex / lib 不算）—— 实际 " + c.entries);
             ok(stat, L, c.groups.size() == 12,

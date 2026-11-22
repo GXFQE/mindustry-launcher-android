@@ -80,23 +80,20 @@ public final class BundleNames implements MapStats.Names {
         this.wallNameFmt = wallNameFmt == null ? "%1$s" : wallNameFmt;
         MapStats.BundleLang w = want == null ? new MapStats.BundleLang("", "") : want;
         int nz = 0, nb = 0;
-        ZipFile zf = null;
+        Pkg pkg = null;
         try {
-            if (apk != null && apk.isFile()) {
-                zf = new ZipFile(apk);
-                nz = loadBestLocale(zf, w, locale);
-                nb = load(zf, "assets/bundles/bundle.properties", base);
+            // ★ 2026-11-22（P2）：不再直接开 ZipFile —— 原包删掉之后这一页仍要能读
+            //   （Pkg 自己决定走 zip 还是走清单 + 池）
+            if (apk != null) pkg = Pkg.open(apk);
+            if (pkg != null) {
+                nz = loadBestLocale(pkg, w, locale);
+                nb = load(pkg, "assets/bundles/bundle.properties", base);
             }
         } catch (Throwable t) {
             noLocaleBundle = true;
             note = "译文读不出来，显示内部名";
         } finally {
-            if (zf != null) {
-                try {
-                    zf.close();
-                } catch (Throwable ignored) {
-                }
-            }
+            if (pkg != null) pkg.close();
         }
         if (nz == 0) noLocaleBundle = true;
         int ml = 0, mb = 0;
@@ -137,14 +134,13 @@ public final class BundleNames implements MapStats.Names {
      * ⚠️ 同一门语言可能同时有 `bundle_zh_CN` 与 `bundle_zh_TW`：两份都读会互相覆盖
      *   ⇒ 只取分数最高的一份。
      */
-    private static int loadBestLocale(ZipFile zf, MapStats.BundleLang want,
+    private static int loadBestLocale(Pkg pkg, MapStats.BundleLang want,
                                       Map<String, String> into) {
         if (want.lang.isEmpty()) return 0;
         String best = null;
         int bestRank = 0;
-        java.util.Enumeration<? extends ZipEntry> en = zf.entries();
-        while (en.hasMoreElements()) {
-            String n = en.nextElement().getName();
+        for (Pkg.Entry e : pkg.entries()) {
+            String n = e.name();
             int r = MapStats.bundleRank(n, want);
             if (r < 10) continue;
             int slash = n.lastIndexOf('/');
@@ -158,16 +154,16 @@ public final class BundleNames implements MapStats.Names {
                 best = n;
             }
         }
-        return best == null ? 0 : load(zf, best, into);
+        return best == null ? 0 : load(pkg, best, into);
     }
 
-    /** 从 APK 里读一个 bundle 文件到目标层；返回读到几条（0 = 没有这个文件） */
-    private static int load(ZipFile zf, String entry, Map<String, String> into) {
+    /** 从包里读一个 bundle 文件到目标层；返回读到几条（0 = 没有这个文件） */
+    private static int load(Pkg pkg, String entry, Map<String, String> into) {
         InputStream in = null;
         try {
-            ZipEntry e = zf.getEntry(entry);
+            Pkg.Entry e = pkg.entry(entry);
             if (e == null) return 0;
-            in = zf.getInputStream(e);
+            in = e.open();
             Reader r = new InputStreamReader(in, StandardCharsets.UTF_8);
             Properties p = new Properties();
             p.load(r);

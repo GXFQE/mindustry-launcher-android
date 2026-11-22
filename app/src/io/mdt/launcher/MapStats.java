@@ -778,7 +778,7 @@ public final class MapStats {
      *   ⇒ 游戏运行时那些名字是有的，我们只读标准目录就会显示成 `Ore Tungsten`。
      *   ⚠️ 这条是"用户说游戏里有翻译、我们这里没有"的直接原因。
      */
-    private static void readZipBundles(ZipFile zf, MapStats.Pack p, MapStats.Bundles out,
+    private static void readZipBundles(Pkg pkg, MapStats.Pack p, MapStats.Bundles out,
                                        BundleLang want) {
         List<String> base = new ArrayList<>();
         // 目录 → 该目录里分数最高的那份语言包
@@ -789,9 +789,8 @@ public final class MapStats {
         //     各一份、后者有 2754 条原版内容名（见本方法上面的长注释）。
         Map<String, String> bestInDir = new java.util.LinkedHashMap<>();
         Map<String, Integer> rankInDir = new java.util.HashMap<>();
-        Enumeration<? extends ZipEntry> en = zf.entries();
-        while (en.hasMoreElements()) {
-            String n = en.nextElement().getName();
+        for (Pkg.Entry pe : pkg.entries()) {
+            String n = pe.name();
             if (!inBundleDir(n)) continue;           // 父目录必须是 bundles / *-bundles
             int r = bundleRank(n, want);
             if (r == 2) {
@@ -812,8 +811,8 @@ public final class MapStats {
         Collections.sort(base);
         List<String> loc = new ArrayList<>(bestInDir.values());
         Collections.sort(loc);             // 顺序固定（后读的覆盖先读的）
-        loadAll(zf, base, out.base, p);
-        loadAll(zf, loc, out.locale, p);
+        loadAll(pkg, base, out.base, p);
+        loadAll(pkg, loc, out.locale, p);
     }
 
     /** 目录形态：在包根下找一层 `*bundles/` 目录 */
@@ -849,10 +848,11 @@ public final class MapStats {
         return slash <= 0 ? "" : path.substring(0, slash);
     }
 
-    private static void loadAll(ZipFile zf, List<String> names, Map<String, String> into, Pack p) {
+    private static void loadAll(Pkg pkg, List<String> names, Map<String, String> into, Pack p) {
         for (String n : names) {
             try {
-                p.bundleKeys += loadBundle(into, zf.getInputStream(zf.getEntry(n)), 1);
+                Pkg.Entry e = pkg.entry(n);
+                if (e != null) p.bundleKeys += loadBundle(into, e.open(), 1);
             } catch (Throwable ignored) {
             }
         }
@@ -908,15 +908,13 @@ public final class MapStats {
             try {
                 if (p.dir != null && p.dir.isDirectory()) {
                     readDirBundles(p.dir, p, out, w);
-                } else if (p.pkg != null && p.pkg.isFile()) {
-                    ZipFile zf = new ZipFile(p.pkg);
+                } else if (p.pkg != null) {
+                    // ★ 2026-11-22（P2）：原包删掉之后也要读得出名字（Pkg 走清单 + 池）
+                    Pkg pkg = Pkg.open(p.pkg);
                     try {
-                        readZipBundles(zf, p, out, w);
+                        if (pkg != null) readZipBundles(pkg, p, out, w);
                     } finally {
-                        try {
-                            zf.close();
-                        } catch (Throwable ignored) {
-                        }
+                        if (pkg != null) pkg.close();
                     }
                 }
             } catch (Throwable ignored) {

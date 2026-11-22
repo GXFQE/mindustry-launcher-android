@@ -43,7 +43,25 @@ final class BaseBundles {
         } catch (Throwable ignored) {
         }
         if (apk == null || apk.trim().isEmpty()) return Collections.emptySet();
-        return keysOf(new File(apk.trim()));
+        return keysOf(ctx, new File(apk.trim()));
+    }
+
+    /**
+     * 有 {@code Context} 的版本：走 {@link Pkg} 虚拟包 —— 开了共用文件、原包删掉之后
+     * 这一页仍然能读出 bundle 键集（真机验过）。
+     */
+    static Set<String> keysOf(Context ctx, File apk) {
+        if (apk == null) return Collections.emptySet();
+        final String path = apk.getAbsolutePath();
+        final long mtime = apk.lastModified();
+        synchronized (BaseBundles.class) {
+            if (path.equals(cPath) && mtime == cMtime) return cKeys;
+            Set<String> out = load(ctx, apk);
+            cPath = path;
+            cMtime = mtime;
+            cKeys = out;
+            return out;
+        }
     }
 
     /**
@@ -63,6 +81,27 @@ final class BaseBundles {
             cMtime = mtime;
             cKeys = out;
             return out;
+        }
+    }
+
+    /** 虚拟包版：原包在就读 zip，原包删了就读池（{@link Pkg} 自己分流） */
+    private static Set<String> load(Context ctx, File apk) {
+        Pkg pkg = null;
+        try {
+            pkg = Pkg.open(ctx, apk);
+            if (pkg == null) return Collections.emptySet();
+            byte[] raw = pkg.bytes("assets/bundles/bundle.properties");
+            if (raw == null) return Collections.emptySet();
+            Properties p = new Properties();
+            // ★ 必须 UTF-8：Properties.load(InputStream) 是 ISO-8859-1（与 BundleNames 同一个坑）
+            p.load(new InputStreamReader(new java.io.ByteArrayInputStream(raw),
+                    StandardCharsets.UTF_8));
+            return Collections.unmodifiableSet(
+                    new LinkedHashSet<String>(p.stringPropertyNames()));
+        } catch (Throwable t) {
+            return Collections.emptySet();
+        } finally {
+            if (pkg != null) pkg.close();
         }
     }
 

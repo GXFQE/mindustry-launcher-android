@@ -106,14 +106,15 @@ public final class MapLoad {
         int[] cached = PALETTES.get(key);
         if (cached != null) return cached.length == 0 ? null : cached;
         int[] pal = null;
-        ZipFile zf = null;
+        Pkg pkg = null;
         InputStream in = null;
         try {
-            zf = new ZipFile(new File(key));
-            ZipEntry e = zf.getEntry("assets/sprites/block_colors.png");
-            if (e == null) e = zf.getEntry("sprites/block_colors.png");
+            // ★ 2026-11-22（P2）：原包删了也要出配色（Pkg 走清单 + 池）
+            pkg = Pkg.open(ctx, key);
+            Pkg.Entry e = pkg == null ? null : pkg.entry("assets/sprites/block_colors.png");
+            if (e == null && pkg != null) e = pkg.entry("sprites/block_colors.png");
             if (e != null) {
-                in = new BufferedInputStream(zf.getInputStream(e), 8192);
+                in = new BufferedInputStream(e.open(), 8192);
                 Bitmap bmp = BitmapFactory.decodeStream(in);
                 if (bmp != null) {
                     pal = new int[bmp.getWidth()];
@@ -132,12 +133,7 @@ public final class MapLoad {
                 } catch (Throwable ignored) {
                 }
             }
-            if (zf != null) {
-                try {
-                    zf.close();
-                } catch (Throwable ignored) {
-                }
-            }
+            if (pkg != null) pkg.close();
         }
         PALETTES.put(key, pal == null ? new int[0] : pal);
         return pal;
@@ -311,13 +307,15 @@ public final class MapLoad {
         if (it == null) return null;
         if (it.file != null) return MsavTiles.read(it.file, preferPreview);
         if (it.container == null || it.entry == null) return null;
-        ZipFile zf = null;
+        Pkg pkg = null;
         InputStream in = null;
         try {
-            zf = new ZipFile(it.container);
-            ZipEntry e = zf.getEntry(it.entry);
+            // ★ 2026-11-22（P2）：游戏自带地图的整图也要能在原包删掉后读出来
+            pkg = Pkg.open(it.container);
+            if (pkg == null) return null;
+            Pkg.Entry e = pkg.entry(it.entry);
             if (e == null) return null;
-            in = new java.io.BufferedInputStream(zf.getInputStream(e), 1 << 16);
+            in = new java.io.BufferedInputStream(e.open(), 1 << 16);
             return MsavTiles.read(in, preferPreview);
         } catch (Throwable t) {
             return null;
@@ -328,12 +326,7 @@ public final class MapLoad {
                 } catch (Throwable ignored) {
                 }
             }
-            if (zf != null) {
-                try {
-                    zf.close();
-                } catch (Throwable ignored) {
-                }
-            }
+            if (pkg != null) pkg.close();
         }
     }
 }

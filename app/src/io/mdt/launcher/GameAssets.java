@@ -11,6 +11,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import android.content.Context;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 
@@ -133,25 +134,23 @@ public final class GameAssets {
      * @throws IOException 包不存在 / 不是 zip / 打不开 —— 调用方把它变成「读不了这个包」，
      *                     **不猜**、也不拿别的包顶替。
      */
-    public static Catalog scan(File apk) throws IOException {
-        if (apk == null || !apk.isFile()) throw new IOException("apk not found");
-        ZipFile zf = new ZipFile(apk);
+    public static Catalog scan(Context ctx, File apk) throws IOException {
+        if (apk == null) throw new IOException("apk not found");
+        // ★ 2026-11-22（P2）：原包删了也要能列资源（Pkg 走清单 + 池；包内压缩后大小在此模式下不可知，
+        //   按原始大小计，只影响界面上的「原始/压缩」对比，不影响导出字节）
+        Pkg pkg = Pkg.open(ctx, apk);
+        if (pkg == null) throw new IOException("apk not found");
         try {
             // 同名的重复条目只留第一条：ZipFile.getEntry 本来就只认一条，
             // 这里若把重名都列出来，导出 zip 会在 putNextEntry 时炸（且不容易看出为什么）。
             Map<String, Entry> byName = new LinkedHashMap<String, Entry>();
-            Enumeration<? extends ZipEntry> en = zf.entries();
-            while (en.hasMoreElements()) {
-                ZipEntry ze = en.nextElement();
-                if (ze == null || ze.isDirectory()) continue;
-                String n = ze.getName();
+            for (Pkg.Entry pe : pkg.entries()) {
+                String n = pe.name();
                 if (n == null || !n.startsWith("assets/")) continue;
                 if (byName.containsKey(n)) continue;
-                long size = ze.getSize();
+                long size = pe.size();
                 if (size < 0) size = 0;
-                long packed = ze.getCompressedSize();
-                if (packed < 0) packed = 0;
-                byName.put(n, new Entry(n, size, packed));
+                byName.put(n, new Entry(n, size, size));
             }
             List<Entry> all = new ArrayList<Entry>(byName.values());
             Collections.sort(all, new Comparator<Entry>() {
@@ -165,7 +164,7 @@ public final class GameAssets {
             return new Catalog(apk, groups, all.size(), bytes);
         } finally {
             try {
-                zf.close();
+                pkg.close();
             } catch (Throwable ignored) {
             }
         }

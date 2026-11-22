@@ -81,15 +81,17 @@ public final class MschSheet implements MschSprite.Sheet {
     }
 
     private static MschSheet build(Context ctx, File apk, String slot) {
-        ZipFile zf = null;
+        Pkg pkg = null;
         InputStream in = null;
         try {
-            if (apk == null || !apk.isFile()) return null;
-            zf = new ZipFile(apk);
-            ZipEntry e = zf.getEntry("assets/sprites/sprites.aatls");
-            if (e == null) e = zf.getEntry("sprites/sprites.aatls");
+            if (apk == null) return null;
+            // ★ 2026-11-22（P2）：原包删了也要能出图集（Pkg 走清单 + 池）
+            pkg = Pkg.open(ctx, apk);
+            if (pkg == null) return null;
+            Pkg.Entry e = pkg.entry("assets/sprites/sprites.aatls");
+            if (e == null) e = pkg.entry("sprites/sprites.aatls");
             if (e == null) return null;
-            in = zf.getInputStream(e);
+            in = e.open();
             Map<String, MschAtlas.Region> regions = MschAtlas.read(in);
             if (regions == null || regions.isEmpty()) return null;
             // 模组侧：扫本槽 `mods/`（读不出来就是空的，不影响原版贴图）
@@ -111,12 +113,7 @@ public final class MschSheet implements MschSprite.Sheet {
                 } catch (Throwable ignored) {
                 }
             }
-            if (zf != null) {
-                try {
-                    zf.close();
-                } catch (Throwable ignored) {
-                }
-            }
+            if (pkg != null) pkg.close();
         }
     }
 
@@ -256,15 +253,16 @@ public final class MschSheet implements MschSprite.Sheet {
             if (!dir.isDirectory() && !dir.mkdirs() && !dir.isDirectory()) return null;
             File out = new File(dir, page);
             if (out.isFile() && out.length() > 0) return out;
-            ZipFile zf = new ZipFile(apk);
+            Pkg pkg = Pkg.open(apk);
+            if (pkg == null) return null;
             InputStream in = null;
             FileOutputStream fos = null;
             File part = new File(dir, page + ".part");
             try {
-                ZipEntry e = zf.getEntry("assets/sprites/" + page);
-                if (e == null) e = zf.getEntry("sprites/" + page);
+                Pkg.Entry e = pkg.entry("assets/sprites/" + page);
+                if (e == null) e = pkg.entry("sprites/" + page);
                 if (e == null) return null;
-                in = new java.io.BufferedInputStream(zf.getInputStream(e), 1 << 16);
+                in = new java.io.BufferedInputStream(e.open(), 1 << 16);
                 fos = new FileOutputStream(part);
                 byte[] buf = new byte[1 << 16];
                 int n;
@@ -290,7 +288,7 @@ public final class MschSheet implements MschSprite.Sheet {
                     } catch (Throwable ignored) {
                     }
                 }
-                zf.close();
+                if (pkg != null) pkg.close();
             }
         } catch (Throwable t) {
             return null;

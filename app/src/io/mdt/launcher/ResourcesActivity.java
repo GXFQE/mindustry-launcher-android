@@ -179,7 +179,7 @@ public final class ResourcesActivity extends BaseActivity {
                 GameAssets.Catalog c = null;
                 boolean ok = false;
                 try {
-                    c = GameAssets.scan(apk);
+                    c = GameAssets.scan(ResourcesActivity.this, apk);
                     ok = true;
                 } catch (Throwable t) {
                     Log.w(TAG, "game assets scan failed: " + apk, t);

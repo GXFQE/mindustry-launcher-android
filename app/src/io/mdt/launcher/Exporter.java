@@ -194,20 +194,22 @@ public final class Exporter {
      */
     static long copyEntry(Context ctx, File container, String entry, OutputStream out)
             throws IOException {
-        if (container == null || !container.isFile()) {
+        if (container == null) {
             throw new IOException(Trans.get(ctx, R.string.exp_err_pkg_missing_fmt, String.valueOf(container)));
         }
         if (entry == null || entry.trim().isEmpty()) {
             throw new IOException(Trans.get(ctx, R.string.exp_err_no_entry));
         }
-        java.util.zip.ZipFile zf = null;
+        // ★ 2026-11-22（P2）：原包删了也要导得出条目（Pkg 走清单 + 池）
+        Pkg pkg = null;
         InputStream in = null;
         long n = 0;
         try {
-            zf = new java.util.zip.ZipFile(container);
-            java.util.zip.ZipEntry ze = zf.getEntry(entry);
+            pkg = Pkg.open(ctx, container);
+            if (pkg == null) throw new IOException(Trans.get(ctx, R.string.exp_err_pkg_missing_fmt, String.valueOf(container)));
+            Pkg.Entry ze = pkg.entry(entry);
             if (ze == null) throw new IOException(Trans.get(ctx, R.string.exp_err_entry_missing_fmt, entry));
-            in = zf.getInputStream(ze);
+            in = ze.open();
             byte[] buf = new byte[BUF];
             int r;
             while ((r = in.read(buf)) > 0) {
@@ -216,12 +218,7 @@ public final class Exporter {
             }
         } finally {
             closeQuietly(in);
-            if (zf != null) {
-                try {
-                    zf.close();
-                } catch (Throwable ignored) {
-                }
-            }
+            if (pkg != null) pkg.close();
         }
         return n;
     }
@@ -269,17 +266,20 @@ public final class Exporter {
     static Result zipEntriesTo(Context ctx, OutputStream raw, File container,
                                List<String> entries, Result r, Step step) throws IOException {
         if (r == null) r = new Result();
-        if (container == null || !container.isFile()) {
+        if (container == null) {
             throw new IOException(Trans.get(ctx, R.string.exp_err_pkg_missing_fmt,
                     String.valueOf(container)));
         }
         if (entries == null || entries.isEmpty()) {
             throw new IOException(Trans.get(ctx, R.string.exp_err_no_src));
         }
-        java.util.zip.ZipFile zf = null;
+        // ★ 2026-11-22（P2）：同上，容器可以是已被去重删掉的原包（走清单 + 池）
+        Pkg pkg = null;
         ZipOutputStream zos = null;
         try {
-            zf = new java.util.zip.ZipFile(container);
+            pkg = Pkg.open(ctx, container);
+            if (pkg == null) throw new IOException(Trans.get(ctx, R.string.exp_err_pkg_missing_fmt,
+                    String.valueOf(container)));
             zos = new ZipOutputStream(new BufferedOutputStream(raw, BUF));
             zos.setLevel(Deflater.BEST_SPEED);
             int seen = 0;
@@ -290,20 +290,20 @@ public final class Exporter {
                     if (step != null) step.onStep(seen, total);
                     continue;
                 }
-                java.util.zip.ZipEntry ze = zf.getEntry(name);
-                if (ze == null || ze.isDirectory()) {
+                Pkg.Entry ze = pkg.entry(name);
+                if (ze == null) {
                     r.skipped++;
                     if (step != null) step.onStep(seen, total);
                     continue;
                 }
                 ZipEntry out = new ZipEntry(name);
-                long t = ze.getTime();
+                long t = ze.time();
                 // 同 addTree：1980 之前 / 2107 之后的时间会让 setTime 抛 IllegalArgumentException
                 if (t >= 315532800000L && t <= 4354819199000L) out.setTime(t);
                 zos.putNextEntry(out);
                 InputStream in = null;
                 try {
-                    in = zf.getInputStream(ze);
+                    in = ze.open();
                     byte[] buf = new byte[BUF];
                     int n;
                     while ((n = in.read(buf)) > 0) {
@@ -320,18 +320,11 @@ public final class Exporter {
             if (r.files == 0) throw new IOException(Trans.get(ctx, R.string.exp_err_no_src));
         } finally {
             // 必须关（中央目录在 close 时写）；★ 第 369 轮起不许吞：close 失败 = 坏包。
-            // zos 可能还没建起来（ZipFile 构造就抛了）⇒ 别让 NPE 盖掉原始异常。
             if (zos != null) zos.close();
-            if (zf != null) {
-                try {
-                    zf.close();
-                } catch (Throwable ignored) {
-                }
-            }
+            if (pkg != null) pkg.close();
         }
         return r;
     }
-
     // ── 批量导出（多份 → 一个 zip；第 127 轮） ───────────────────────────────
 
     /**

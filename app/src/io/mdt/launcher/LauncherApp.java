@@ -34,6 +34,10 @@ public class LauncherApp extends Application {
         //   下面那几件事（迁移/回收）本身也可能抛，装晚了就白装。内部自己判"是不是主进程"，
         //   所以在 :game 进程里是空操作（那边是游戏的进程，有自己的崩溃转储）。
         Crash.installIfMainProcess(this);
+        // ★ 2026-11-22（P2）：界面那几个「从游戏包里读小文件」的地方（bundle / 配色图 /
+        //   地图图标）签名里没有 Context，靠这里存一份 app context 判断该不该走共用文件池。
+        //   **只存 application context**，不会漏 Activity。
+        Pkg.initApp(this);
         // ★★ 2026-10-05：**游戏 activity 一创建就把资产链补挂上**。
         //   起因：`arc` 用的是游戏自己那个 activity 的 AssetManager，而它由 `startActivity`
         //   之后系统创建 —— 坑位挂链时它还不存在。这台 ROM 上 `app.getAssets() != activity.getAssets()`，
