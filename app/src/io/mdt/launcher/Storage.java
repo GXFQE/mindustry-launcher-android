@@ -283,11 +283,6 @@ final class Storage {
                     Util.formatSize(r.importBytes))).append('\n');
             appAny = true;
         }
-        if (r.nativesBytes > 0) {
-            sb.append(Trans.get(c, R.string.storage_app_natives_fmt,
-                    Util.formatSize(r.nativesBytes))).append('\n');
-            appAny = true;
-        }
         // 游戏包共用文件（开了去重才有）—— 术语纪律：第一层只说"共用文件"，不出现 CAS/对象池
         if (r.gamePoolBytes > 0 && r.gamePoolVersions > 0) {
             int gpct = r.gamePoolRaw > r.gamePoolBytes && r.gamePoolRaw > 0
@@ -296,6 +291,11 @@ final class Storage {
                     Util.formatSize(r.gamePoolBytes),
                     Util.formatSize(Math.max(r.gamePoolRaw, r.gamePoolBytes)),
                     Trans.get(c, R.string.storage_pct_fmt, gpct))).append('\n');
+            appAny = true;
+        }
+        if (r.nativesBytes > 0) {
+            sb.append(Trans.get(c, R.string.storage_app_natives_fmt,
+                    Util.formatSize(r.nativesBytes))).append('\n');
             appAny = true;
         }
         if (r.pluginCount > 0 || r.pluginsBytes > 0) {
