@@ -312,6 +312,13 @@ public final class Check {
                         && Heat.level(90_000L, new int[]{1, 2, 3, 4}) == 2,
                 "heat: 自定义档位阈值按分钟生效（1/2/3/4 分钟）");
 
+        boolean boundsOk = true;
+        for (Heat.Grain g : Heat.Grain.values()) {
+            int[] b = Heat.defaultBounds(g);
+            if (b == null || b.length != 4 || b[3] > Heat.grainMaxMin(g)) boundsOk = false;
+        }
+        fail += ok(boundsOk, "heat: 默认档位都不超过一格（时档 1 小时不能配 120 分钟）");
+
         Heat.Grid gh2 = Heat.grid(one, now, sh, Heat.Grain.HOUR,
                 at(sh, 2026, 11, 18, 10, 0), at(sh, 2026, 11, 18, 23, 0) - 1L);
         fail += ok(gh2.rows == 1 && "2026-11-18 00".equals(gh2.cellKey[0]),

@@ -48,4 +48,5 @@
     <string name="us_levels_hint">Lower bounds of levels 2 / 3 / 4 / 5; blank = default.</string>
     <string name="us_apply">Apply</string>
     <string name="us_levels_bad">Levels must be increasing numbers.</string>
+    <string name="us_levels_over">Levels cannot exceed one cell (%1$d min), or the top level is unreachable.</string>
 </resources>

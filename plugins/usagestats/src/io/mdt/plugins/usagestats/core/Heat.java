@@ -111,12 +111,20 @@ public final class Heat {
         return 12;
     }
 
-    /** 默认档位阈值（分钟，4 个：第 2 / 3 / 4 / 5 档的下界）。 */
+    /** 默认档位阈值（分钟，4 个：第 2 / 3 / 4 / 5 档的下界）。**都不超过一格的长度**。 */
     public static int[] defaultBounds(Grain g) {
-        if (g == Grain.HOUR) return new int[]{10, 30, 60, 120};
+        if (g == Grain.HOUR) return new int[]{10, 20, 40, 55};
         if (g == Grain.DAY) return new int[]{30, 60, 120, 240};
         if (g == Grain.WEEK) return new int[]{60, 180, 420, 840};
         return new int[]{120, 360, 900, 1800};
+    }
+
+    /** 一格最多多少分钟（自定义阈值不能超过它，否则最高档永远到不了）。 */
+    public static int grainMaxMin(Grain g) {
+        if (g == Grain.HOUR) return 60;
+        if (g == Grain.DAY) return 24 * 60;
+        if (g == Grain.WEEK) return 7 * 24 * 60;
+        return 31 * 24 * 60;   // 最长月份
     }
 
     /**

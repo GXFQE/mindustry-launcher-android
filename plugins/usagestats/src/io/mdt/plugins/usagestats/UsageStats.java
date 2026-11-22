@@ -449,6 +449,12 @@ public final class UsageStats {
                             Toast.LENGTH_SHORT).show();
                     return;
                 }
+                int max = Heat.grainMaxMin(g);
+                if (b[3] > max) {
+                    Toast.makeText(c, c.getString(R.string.us_levels_over, max),
+                            Toast.LENGTH_SHORT).show();
+                    return;
+                }
                 saveBounds(api, g, b);
                 rebuild[0].run();
             }
