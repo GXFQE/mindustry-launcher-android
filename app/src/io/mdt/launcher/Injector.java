@@ -762,28 +762,76 @@ public final class Injector {
      */
     private static void loadNativesFromManifest(Context ctx, Plan plan, PkgManifest m,
                                                 StringBuilder log) throws Exception {
-        String abi = PkgLauncher.pickAbi(m);
-        if (abi == null) {
-            log.append("pkg: manifest has no lib/<abi> entry\n");
-            throw new IllegalStateException(Trans.get(ctx, R.string.launch_err_no_abi_fmt,
-                    Compat.join(Compat.deviceAbis())));
-        }
-        String tag = Natives.tagFor(plan.tag, plan.apk);
-        log.append("pkg natives  abi=").append(abi).append("  tag=").append(tag).append('\n');
-        int loaded = 0;
-        for (String name : NATIVE_LIBS) {
-            File src = PkgLauncher.nativeFile(ctx, m, abi, name);
-            if (src == null || !src.isFile()) {
-                log.append("pkg missing lib/").append(abi).append('/').append(name).append('\n');
-                continue;
+        // ★ 补丁自带的 native 也要装：v2 整端补丁会把 arc 的 .so 一起换掉，只装池里那份
+        //   = 跑的是「新 dex + 旧 so」，两边对不上就崩（和资产那条是同一个坑）。
+        //   顺序与 APK 那条一致：补丁优先、基座（池）兜底。
+        List<ZipFile> patchZips = new ArrayList<ZipFile>();
+        List<Patch> patchList = new ArrayList<Patch>();
+        try {
+            for (Patch p : plan.patches) {
+                if (p == null || !p.applied || p.apk == null || !p.apk.isFile()) continue;
+                try {
+                    patchZips.add(new ZipFile(p.apk));
+                    patchList.add(p);
+                } catch (Throwable t) {
+                    log.append("patch ").append(labelOf(p, patchList.size()))
+                            .append(" native carrier unreadable: ").append(t).append('\n');
+                }
             }
-            File out = Natives.publish(ctx, abi, tag, name, new java.io.FileInputStream(src));
-            System.load(out.getAbsolutePath());
-            loaded++;
-            log.append("System.load(").append(name).append(") OK  ")
-                    .append(out.length()).append(" B  [pkg]").append('\n');
+            String abi = PkgLauncher.pickAbi(m);
+            if (abi == null && !patchZips.isEmpty()) abi = Compat.pickAbi(patchZips);
+            if (abi == null) {
+                log.append("pkg: manifest has no lib/<abi> entry\n");
+                throw new IllegalStateException(Trans.get(ctx, R.string.launch_err_no_abi_fmt,
+                        Compat.join(Compat.deviceAbis())));
+            }
+            String tag = Natives.tagFor(plan.tag, plan.apk);
+            log.append("pkg natives  abi=").append(abi).append("  tag=").append(tag)
+                    .append(" (+").append(patchZips.size()).append(" patches)\n");
+            int loaded = 0;
+            for (String name : NATIVE_LIBS) {
+                ZipEntry e = null;
+                int from = -1;
+                for (int i = 0; i < patchZips.size(); i++) {
+                    e = patchZips.get(i).getEntry("lib/" + abi + "/" + name);
+                    if (e != null) {
+                        from = i;
+                        break;
+                    }
+                }
+                if (from >= 0) {
+                    String useTag = Natives.tagOf(tag + "+" + patchList.get(from).ref);
+                    File out = Natives.publish(ctx, abi, useTag, name,
+                            patchZips.get(from).getInputStream(e));
+                    System.load(out.getAbsolutePath());
+                    loaded++;
+                    log.append("System.load(").append(name).append(") OK  ")
+                            .append(out.length()).append(" B  [patch ")
+                            .append(patchList.get(from).label).append(']').append('\n');
+                    continue;
+                }
+                File src = PkgLauncher.nativeFile(ctx, m, abi, name);
+                if (src == null || !src.isFile()) {
+                    log.append("pkg missing lib/").append(abi).append('/').append(name).append('\n');
+                    continue;
+                }
+                File out = Natives.publish(ctx, abi, tag, name, new java.io.FileInputStream(src));
+                System.load(out.getAbsolutePath());
+                loaded++;
+                log.append("System.load(").append(name).append(") OK  ")
+                        .append(out.length()).append(" B  [pkg]").append('\n');
+            }
+            if (loaded == 0) {
+                throw new IllegalStateException(Trans.get(ctx, R.string.launch_err_no_native_loaded));
+            }
+        } finally {
+            for (ZipFile z : patchZips) {
+                try {
+                    z.close();
+                } catch (Throwable ignored) {
+                }
+            }
         }
-        if (loaded == 0) throw new IllegalStateException(Trans.get(ctx, R.string.launch_err_no_native_loaded));
     }
 
     // ── ③ 置 loaded 标志 ──────────────────────────────────────────────────
@@ -879,20 +927,23 @@ public final class Injector {
      */
     private static void mountAssets(Context app, Activity activity, Plan plan, StringBuilder log)
             throws Exception {
-        // 按条目 CAS：资产由同名 AndroidFi 直接读对象池，不再往 AssetManager 挂 APK。
-        if (PkgLauncher.lookup(app, plan.tag) != null) {
-            log.append("pkg: skip addAssetPath (pool assets)\n");
-            return;
-        }
-        // dev P0 实验（2026-11-22）：池就绪时不挂 APK，资产全靠同名 AndroidFi 覆盖读池。
-        // 产品版 ProbeLab 永远返回 false ⇒ 这里一行都不会走到。
-        if (ProbeLab.skipAssetMount(app)) {
+        // 按条目 CAS：游戏本体的资产由同名 AndroidFi 直接读对象池，不再往 AssetManager 挂游戏 APK。
+        // ★ 但**补丁 / 增量的素材包仍必须挂**：补丁自带的新素材（如 MindustryX 的 `assets/labels`）
+        //   不在基础包清单里、池里查不到，只能回落到 AssetManager；不挂就是
+        //   `FileNotFoundException: labels`（2026-11-22 真机，补丁一进 UI 初始化就崩）。
+        PkgManifest cas = PkgLauncher.lookup(app, plan.tag);
+        if (cas == null && ProbeLab.skipAssetMount(app)) {
+            // dev P0 实验（2026-11-22）：池就绪时不挂 APK，资产全靠同名 AndroidFi 覆盖读池。
+            // 产品版 ProbeLab 永远返回 false ⇒ 这里一行都不会走到。
             log.append("dev spike: skip addAssetPath (pool-only assets)\n");
             return;
         }
-        File base = (plan.assetBase != null && plan.assetBase.exists()) ? plan.assetBase : plan.apk;
         List<File> chain = new ArrayList<>();
-        chain.add(base);
+        if (cas == null) {
+            File base = (plan.assetBase != null && plan.assetBase.exists())
+                    ? plan.assetBase : plan.apk;
+            chain.add(base);
+        }
         for (File d : plan.assetDeltas) {
             if (d != null && d.exists()) chain.add(d);
         }
@@ -911,7 +962,12 @@ public final class Injector {
         android.content.res.AssetManager amAct = activity.getAssets();
         boolean same = amApp == amAct;
         sChain = chain;                       // ★ 留给后建的 activity 补挂（见 sChain 的注释）
-        log.append("资产链 = ");
+        if (chain.isEmpty()) {
+            // 池模式且这一局没有补丁：AssetManager 不需要挂任何东西，资产全走 AndroidFi → 池。
+            log.append("pkg: skip addAssetPath (pool assets, no patch chain)\n");
+            return;
+        }
+        log.append(cas != null ? "pkg patch asset chain = " : "asset chain = ");
         for (File f : chain) log.append(f.getName()).append(' ');
         log.append("\n两份 AssetManager 同源 = ").append(same).append('\n');
 
