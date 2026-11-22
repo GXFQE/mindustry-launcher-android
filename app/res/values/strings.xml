@@ -1396,11 +1396,12 @@
     <string name="set_cas_sub_off">Off — each version keeps its own APK</string>
     <string name="set_cas_sub_none">No imported versions yet</string>
     <string name="cas_on_confirm_title">Turn on deduplication?</string>
-    <string name="cas_on_confirm_body">Imported versions will be stored as shared files, so identical parts are kept once. This takes a moment and uses the same space for the first version.</string>
+    <string name="cas_on_confirm_body">Imported versions will be stored as shared files, so identical parts are kept once. The original APK of each version is then removed (the game still starts from the shared files). Takes a moment.</string>
     <string name="cas_off_confirm_title">Turn off deduplication?</string>
-    <string name="cas_off_confirm_body">Each version will be rebuilt back into its own APK file, then the shared files are removed. This can need roughly as much free space as the packages themselves.</string>
+    <string name="cas_off_confirm_body">Each version will be rebuilt back into its own APK file, then the shared files are removed. Needs roughly as much free space as the packages themselves. The rebuilt APK is not byte-identical to the original (no signature, files stored uncompressed) but plays fine.</string>
     <string name="cas_busy">A game is running — close it first.</string>
-    <string name="cas_saved_fmt">Saved %1$s across %2$d versions</string>
+    <string name="cas_saved_fmt">Saved %1$s across %2$d versions; originals folded into shared files</string>
+    <string name="cas_rebuild_failed">Some version could not be rebuilt into an APK, so nothing was removed. The shared files are still intact ? try again.</string>
     <string name="cas_working">Working…</string>
     <string name="cas_on_go">Turn on deduplication</string>
     <string name="cas_off_go">Turn off and free the space</string>

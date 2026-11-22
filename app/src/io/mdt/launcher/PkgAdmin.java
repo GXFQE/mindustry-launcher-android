@@ -20,10 +20,10 @@ import java.util.Set;
  * 也必须在后台线程跑（{@code PkgIngest} 一个 78 MB 包的入库就是几百毫秒）。
  * UI 只负责确认与提示，见 {@code SettingsActivity.promptCasGame}。</p>
  *
- * <p>⚠️ 现阶段的边界（P1）：**开启时不会删掉 import 目录里的原始 APK** ——
- * 启动链路上还有几处（界面读地图/蓝图缩略图那 8 个点位）仍直接读 APK，
- * 删包之后那些页面会拿不到数据（P2 的虚拟包层才堵这个口子）。所以此刻
- * 开启只意味着「启动改走池」，省空间要等删包那一步。</p>
+ * <p>⚠️ 边界（P1 时的记录，P3 起已变）：当时**开启不删原包**，因为界面还有几处直接读 APK；
+ * P2 的虚拟包层（{@link Pkg}）把那些点位堵上之后，P3 改成「入库成功后删掉原包」——
+ * 包体本来就在池子里，关掉开关时由 {@link PkgRestore} 拼回来（字节不保证与原件一致，
+ * 但能启动、能导出）。删之前一定先确认清单可用，否则等于把用户的包弄丢。</p>
  */
 public final class PkgAdmin {
     private static final String TAG = "MDTLauncher";
@@ -32,7 +32,11 @@ public final class PkgAdmin {
         public int files;
         public int ingested;
         public int skipped;
+        /** 入库后成功删掉的原始 APK 个数（P3 起 > 0） */
+        public int deleted;
         public long bytes;
+        /** 删原包实际回收的字节（= 被删 APK 大小之和） */
+        public long reclaimed;
         public long poolBytes;
         public int poolObjects;
         public long ms;
@@ -40,7 +44,8 @@ public final class PkgAdmin {
 
         public String describe() {
             return "files=" + files + " ingested=" + ingested + " skipped=" + skipped
-                    + " bytes=" + bytes + " pool=" + poolObjects + " (" + fmt(poolBytes) + ")"
+                    + " deleted=" + deleted + " bytes=" + bytes + " reclaimed=" + reclaimed
+                    + " pool=" + poolObjects + " (" + fmt(poolBytes) + ")"
                     + " in " + ms + " ms";
         }
     }
@@ -86,9 +91,22 @@ public final class PkgAdmin {
                 String label = entry == null ? stripExt(name) : entry.optString("label", stripExt(name));
                 String version = entry == null ? null : entry.optString("version", null);
                 PkgIngest.Stats st = new PkgIngest.Stats();
-                PkgIngest.ingest(ctx, apk, vkey, label, version, md5, st);
+                PkgManifest m = PkgIngest.ingest(ctx, apk, vkey, label, version, md5, st);
                 r.ingested++;
                 r.bytes += apk.length();
+                // ★ P3：入库成功才删原包 —— 判据是「清单写出来了 + 池里条目齐全」，
+                //   只要有一条不成立就不删（宁可这次不省空间，也不能把包弄丢）。
+                if (m != null && m.arc != null && m.arc.eligible && PkgRestore.complete(ctx, m)
+                        && Config.get().casGameEnabled()) {
+                    long len = apk.length();
+                    apk.setWritable(true);
+                    if (apk.delete()) {
+                        r.deleted++;
+                        r.reclaimed += len;
+                    } else {
+                        Log.w(TAG, "cas enable: cannot delete " + apk);
+                    }
+                }
             } catch (Throwable t) {
                 Log.w(TAG, "cas enable: ingest failed for " + name + ": " + t);
                 r.error = String.valueOf(t.getMessage());
@@ -103,13 +121,30 @@ public final class PkgAdmin {
     }
 
     /**
-     * 关闭：关掉开关 → 删清单 → 删对象。
+     * 关闭：**先把每个版本拼回 APK**，全部成功之后才关开关、删清单、删对象。
      *
-     * <p>顺序不能反：先让 {@link PkgLauncher#lookup} 开始返回 null，再动文件 ——
-     * 否则删到一半正好有新一轮启动读到半死的池子。**只动池子，不碰 `import/`**
-     * （原始 APK 是用户的东西，删不删走「删版本」那条路，有中转站可放回）。</p>
+     * <p>顺序：① 拼回（失败就整体中止，池子一个字节不动 —— 否则包就真没了）
+     * ② `Config.setCasGameEnabled(false)` 让 {@link PkgLauncher#lookup} 开始返回 null
+     * ③ 删清单 ④ 删对象。</p>
+     *
+     * <p>⚠️ 拼回来的 APK 不是原件（不保签名、全 STORED、带 4 字节对齐填充），
+     * 但能启动、能被导出；{@code apkSha256} 会变，见 {@link PkgRestore}。</p>
+     *
+     * @return 释放的字节数；**-1 表示有包没拼回来、已中止**（池子保留原样）
      */
     public static long disable(Context ctx) {
+        // ① 先把池里的东西拼回 import/ —— 少了这步，关掉开关等于把包删了
+        java.util.List<PkgManifest> all = PkgIngest.all(ctx);
+        for (PkgManifest m : all) {
+            File apk = new File(Importer.importDir(ctx), m.file);
+            if (apk.isFile() && apk.length() >= 1024) continue;   // 原件还在 ⇒ 不用拼
+            File back = PkgRestore.rebuild(ctx, m);
+            if (back == null) {
+                Log.w(TAG, "cas disable: rebuild failed for " + m.file + ", keep pool");
+                return -1L;
+            }
+        }
+        // ② 关开关
         Config.get().setCasGameEnabled(false);
         long freed = 0;
         File mdir = PkgManifest.dir(ctx);

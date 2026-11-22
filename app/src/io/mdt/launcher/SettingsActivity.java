@@ -448,12 +448,11 @@ public class SettingsActivity extends BaseActivity {
     /**
      * 2026-11-22：游戏包去重（CAS）的开关。**默认关**。
      *
-     * <p>开启 = 把 `import/` 里现有包全部收进对象池（启动改走池）；
-     * 关闭 = 丢清单 + 丢池子，回到「每个版本各自一个 APK」。</p>
+     * <p>开启 = 把 `import/` 里现有包全部收进对象池，**成功后删掉原始 APK**（P3）；
+     * 关闭 = 先把每个版本从池里拼回 APK（{@link PkgRestore}），全成功才丢清单 + 丢池子。</p>
      *
-     * <p>⚠️ 现在开启**不会删原始 APK**：界面里还有几处（地图/蓝图缩略图）直接读 APK，
-     * 删早了那些页面会空。所以副标题只说「共用文件只存一份」，不吹省了多少 ——
-     * 真正的省要到删包那一步，见 {@link PkgAdmin} 的类注释。</p>
+     * <p>⚠️ 拼回来的 APK 与原件不是逐字节相同（不保签名、全 STORED），但能启动、能导出；
+     * 每次开着去重启动都走池，删除原件不会影响玩。</p>
      */
     private void promptCasGame() {
         // 池子是全局资源 ⇒ 按「有没有实例在跑」拦（走 WriteGate，别直接调 Data.gameAlive：
@@ -490,15 +489,20 @@ public class SettingsActivity extends BaseActivity {
                 int n = 0;
                 try {
                     if (on) {
+                        // ★ P3：**先进池模式再收包** —— enable 成功后会删掉原始 APK，
+                        //   这期间万一有实例启动，也得只走池（否则删到一半读到半个包）。
+                        Config.get().setCasGameEnabled(true);
                         PkgAdmin.Result r = PkgAdmin.enable(SettingsActivity.this);
                         if (r.error != null) {
                             err = r.error;
-                        } else {
-                            Config.get().setCasGameEnabled(true);
                         }
                         android.util.Log.i("MDTLauncher", "cas enable: " + r.describe());
                     } else {
                         long freed = PkgAdmin.disable(SettingsActivity.this);
+                        if (freed < 0) {
+                            // 有包没拼回来：池子原样保留，开关也还没动 —— 告诉用户重试
+                            err = Trans.get(SettingsActivity.this, R.string.cas_rebuild_failed);
+                        }
                         android.util.Log.i("MDTLauncher", "cas disable: freed " + freed + " B");
                     }
                     n = PkgAdmin.versionCount(SettingsActivity.this);

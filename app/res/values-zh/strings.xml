@@ -1368,11 +1368,12 @@
     <string name="set_cas_sub_off">已关闭 —— 每个版本各自保留完整安装包</string>
     <string name="set_cas_sub_none">还没有导入的版本</string>
     <string name="cas_on_confirm_title">开启游戏包去重？</string>
-    <string name="cas_on_confirm_body">导入的版本会改成共用文件存放，相同的内容只留一份。这一步要花一点时间，第一个版本占的空间和原来差不多。</string>
+    <string name="cas_on_confirm_body">导入的版本会改成共用文件存放，相同的内容只留一份，然后删掉每个版本的原始安装包（玩的时候从共用文件读）。这一步要花一点时间。</string>
     <string name="cas_off_confirm_title">关闭游戏包去重？</string>
-    <string name="cas_off_confirm_body">会按记录把每个版本重新拼回独立的安装包，然后删掉共用文件。需要预留大约相当于这些安装包大小的空间。</string>
+    <string name="cas_off_confirm_body">会按记录把每个版本重新拼回独立的安装包，然后删掉共用文件。需要预留大约相当于这些安装包大小的空间。拼回来的包和原件不是逐字节相同（不带签名、条目不压缩），但能正常玩。</string>
     <string name="cas_busy">游戏正在运行 —— 先把它关掉。</string>
-    <string name="cas_saved_fmt">%2$d 个版本共省下 %1$s</string>
+    <string name="cas_saved_fmt">%2$d 个版本共省下 %1$s（原包已收进共用文件）</string>
+    <string name="cas_rebuild_failed">有个版本没法拼回安装包，这次什么都没删；共用文件还在，可以稍后重试。</string>
     <string name="cas_working">处理中…</string>
     <string name="cas_on_go">开启去重</string>
     <string name="cas_off_go">关闭并释放空间</string>

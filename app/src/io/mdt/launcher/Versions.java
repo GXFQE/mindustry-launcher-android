@@ -1288,7 +1288,14 @@ public final class Versions {
             String fn = o.optString("file", "");
             if (fn.isEmpty()) continue;
             File f = new File(dir, fn);
-            if (!f.exists()) continue; // 缺失：跳过，不自动清配置
+            // ★ P3（2026-11-22）：开了「游戏包去重」之后原始 APK 会被删，包体在对象池里。
+            //   文件不在但清单可用 ⇒ 这个版本照样算"有"，大小取清单里记的原始包大小
+            //   （界面别显示 0 B，那会让人以为包坏了）。清单也没有才真的跳过。
+            PkgManifest cm = null;
+            if (!f.exists()) {
+                cm = PkgIngest.manifest(ctx, "import:" + fn);
+                if (cm == null || cm.arc == null || !cm.arc.eligible) continue;
+            }
             Entry e = new Entry();
             e.imported = true;
             e.importFile = fn;
@@ -1296,7 +1303,7 @@ public final class Versions {
             e.label = o.optString("label", fn);
             e.versionName = o.optString("version", "?");
             e.apkPath = f.getAbsolutePath();
-            e.apkSize = f.length();
+            e.apkSize = cm != null ? cm.size : f.length();
             e.md5 = o.optString("md5", "");
             e.realPkg = o.optString("pkg", "");   // 导入时若记过真包名就直接用（老记录没有 ⇒ 扫描时补读）
             out.add(e);

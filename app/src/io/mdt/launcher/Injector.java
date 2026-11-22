@@ -293,11 +293,19 @@ public final class Injector {
      * 失败时抛 LaunchError，调用方按 step 展示；已做的注入不回滚（进程随后会被抛弃）。
      */
     public static Timing launch(Activity activity, Plan plan) throws LaunchError {
-        if (plan == null || plan.apk == null || !plan.apk.exists()) {
+        if (plan == null || plan.apk == null) {
             throw new LaunchError(Trans.get(activity, R.string.step_prepare),
                     Trans.get(activity, R.string.launch_err_bad_package), null);
         }
         Context app = activity.getApplicationContext();
+        // ★ P3（2026-11-22）：开了「游戏包去重」之后，`import/` 里的原始 APK 会被删掉 ——
+        //   文件不在不算错，只要这个版本有可用清单（池里有全套条目）就能启动。
+        //   没开 CAS / 没清单 / ABI 不适配 ⇒ 仍然要求 APK 在（老路一字节不改）。
+        PkgManifest casEarly = PkgLauncher.lookup(app, plan.tag);
+        if (!plan.apk.exists() && casEarly == null) {
+            throw new LaunchError(Trans.get(activity, R.string.step_prepare),
+                    Trans.get(activity, R.string.launch_err_bad_package), null);
+        }
         ClassLoader baseCl = activity.getClassLoader();
         Timing t = new Timing();
         StringBuilder log = new StringBuilder();
@@ -311,11 +319,11 @@ public final class Injector {
         //    导入时 Importer 已经置过只读；但"中转站放回来 / 手工拷 / 旧版本导入"这些路径可能留下
         //    可写文件 —— 真机实测（2026-10-25）：`official-159.apk` 是 0600，一启动就三次 SecurityException。
         //    这里兜一道：只动我们自己的私有副本（`/data/app` 下的本来就不可写，canWrite=false）。
-        if (plan.apk.canWrite()) ensureDexReadOnly(plan.apk, log);
+        if (plan.apk.exists() && plan.apk.canWrite()) ensureDexReadOnly(plan.apk, log);
 
         // ★ 按条目 CAS（附录 E）：这个版本若有清单且 ABI 判定通过，dex / native / 资产全从对象池取。
         //   任一条不成立就 cas = null，后面每一步都退回「用 APK」的老路。
-        PkgManifest cas = PkgLauncher.lookup(app, plan.tag);
+        PkgManifest cas = casEarly;
         if (cas != null) {
             log.append("pkg cas  = ").append(PkgLauncher.describe(app, cas)).append('\n');
         }
