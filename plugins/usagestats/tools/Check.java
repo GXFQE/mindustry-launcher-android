@@ -275,15 +275,20 @@ public final class Check {
                 "sessions: clean 控制字符 -> 空格，仍是一行");
 
         // ── 热力图（第 400 轮）：范围 × 粒度 / 对齐 / 裁剪 / 上限 ─────────────────
-        fail += ok(Heat.level(Heat.Grain.DAY, 0) == 0
-                        && Heat.level(Heat.Grain.DAY, 1) == 1
-                        && Heat.level(Heat.Grain.DAY, 30 * 60_000L) == 2
+        fail += ok(Heat.level(Heat.Grain.DAY, 30 * 60_000L) == 2
                         && Heat.level(Heat.Grain.DAY, 60 * 60_000L) == 3
                         && Heat.level(Heat.Grain.DAY, 2 * 60 * 60_000L) == 4
-                        && Heat.level(Heat.Grain.DAY, 4 * 60 * 60_000L) == 5
-                        && Heat.level(Heat.Grain.HOUR, 10 * 60_000L) == 2
-                        && Heat.level(Heat.Grain.WEEK, 3 * 60 * 60_000L) == 3,
-                "heat: 档位按粒度分（日 / 时 / 周各一套阈值）");
+                        && Heat.level(Heat.Grain.DAY, 4 * 60 * 60_000L) == 5,
+                "heat: 日档阈值 30m / 1h / 2h / 4h");
+        fail += ok(Heat.level(Heat.Grain.HOUR, 10 * 60_000L) == 2
+                        && Heat.level(Heat.Grain.HOUR, 59 * 60_000L) == 5,
+                "heat: 时档阈值 10 / 20 / 40 / 55 分钟");
+        fail += ok(Heat.level(Heat.Grain.WEEK, 4 * 60 * 60_000L) == 2
+                        && Heat.level(Heat.Grain.WEEK, 8 * 60 * 60_000L) == 3
+                        && Heat.level(Heat.Grain.WEEK, 30 * 60 * 60_000L) == 5,
+                "heat: 周档阈值 3.5h / 7h / 14h / 28h");        fail += ok(Heat.level(Heat.Grain.MONTH, 16 * 60 * 60_000L) == 2
+                        && Heat.level(Heat.Grain.MONTH, 121 * 60 * 60_000L) == 5,
+                "heat: 月档阈值 15h / 30h / 60h / 120h");
 
         long now = at(sh, 2026, 11, 19, 12, 0);   // 周四
         Sessions.Entry e1 = new Sessions.Entry(at(sh, 2026, 11, 18, 10, 0),
@@ -318,6 +323,15 @@ public final class Check {
             if (b == null || b.length != 4 || b[3] > Heat.grainMaxMin(g)) boundsOk = false;
         }
         fail += ok(boundsOk, "heat: 默认档位都不超过一格（时档 1 小时不能配 120 分钟）");
+
+        int[] day = Heat.defaultBounds(Heat.Grain.DAY);
+        int[] week = Heat.defaultBounds(Heat.Grain.WEEK);
+        int[] month = Heat.defaultBounds(Heat.Grain.MONTH);
+        boolean ratio = true;
+        for (int i = 0; i < 4; i++) {
+            if (week[i] != day[i] * 7 || month[i] != day[i] * 30) ratio = false;
+        }
+        fail += ok(ratio, "heat: 默认档位同一口径（周 = 日 × 7、月 = 日 × 30）");
 
         Heat.Grid gh2 = Heat.grid(one, now, sh, Heat.Grain.HOUR,
                 at(sh, 2026, 11, 18, 10, 0), at(sh, 2026, 11, 18, 23, 0) - 1L);

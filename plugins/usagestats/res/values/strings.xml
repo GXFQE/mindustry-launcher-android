@@ -44,9 +44,13 @@
         <item>Sun</item>
     </string-array>
     <string name="us_panel_too_small">Range is shorter than one cell. Widen the range or pick a finer grain.</string>
-    <string name="us_levels_title">Color levels (min)</string>
+    <string name="us_levels_title">Color levels</string>
     <string name="us_levels_hint">Lower bounds of levels 2 / 3 / 4 / 5; blank = default.</string>
+    <string name="us_unit_min">min</string>
+    <string name="us_unit_hour">h</string>
+    <string name="us_span_hour">%1$d h</string>
+    <string name="us_span_day">%1$d d</string>
     <string name="us_apply">Apply</string>
     <string name="us_levels_bad">Levels must be increasing numbers.</string>
-    <string name="us_levels_over">Levels cannot exceed one cell (%1$d min), or the top level is unreachable.</string>
+    <string name="us_levels_over">Levels cannot exceed one cell (%1$s), or the top level is unreachable.</string>
 </resources>

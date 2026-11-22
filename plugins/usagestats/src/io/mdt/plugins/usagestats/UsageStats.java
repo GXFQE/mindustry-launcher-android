@@ -393,6 +393,26 @@ public final class UsageStats {
         return R.string.us_grain_month;
     }
 
+    /** 档位编辑的单位：时 / 日用分钟，周 / 月用小时（一个月按分钟计没法读）。 */
+    private static int unitMin(Heat.Grain g) {
+        return g == Heat.Grain.HOUR || g == Heat.Grain.DAY ? 1 : 60;
+    }
+
+    /** 分钟数按单位显示：小时整数就不带小数（3.5 小时这种也照实显示）。 */
+    private static String fmtBound(int mins, int unitMin) {
+        if (unitMin == 1) return String.valueOf(mins);
+        if (mins % 60 == 0) return String.valueOf(mins / 60);
+        return String.format(java.util.Locale.US, "%.1f", mins / 60f);
+    }
+
+    /** 一格有多长（提示用）：「1 小时」/「24 小时」/「7 天」/「31 天」。 */
+    private static String spanText(Context c, Heat.Grain g) {
+        if (g == Heat.Grain.HOUR) return c.getString(R.string.us_span_hour, 1);
+        if (g == Heat.Grain.DAY) return c.getString(R.string.us_span_hour, 24);
+        if (g == Heat.Grain.WEEK) return c.getString(R.string.us_span_day, 7);
+        return c.getString(R.string.us_span_day, 31);
+    }
+
     /**
      * 颜色档位编辑（用户 2026-11-19：「多少的定义应该也可以自定义吧」）。
      * 4 个分钟输入 = 第 2 / 3 / 4 / 5 档的下界；留空 = 默认；按粒度存 `data/levels.txt`。
@@ -402,10 +422,12 @@ public final class UsageStats {
                                      int[] bounds, final Runnable[] rebuild) {
         LinearLayout box = new LinearLayout(c);
         box.setOrientation(LinearLayout.VERTICAL);
+        final int unitMin = unitMin(g);
         TextView t = new TextView(c);
         t.setTextSize(12f);
         t.setTextColor(th.textMuted);
-        t.setText(c.getString(R.string.us_levels_title) + " · " + c.getString(gnameRes(g)));
+        t.setText(c.getString(R.string.us_levels_title) + " · " + c.getString(gnameRes(g))
+                + "（" + c.getString(unitMin == 1 ? R.string.us_unit_min : R.string.us_unit_hour) + "）");
         box.addView(t);
 
         final LinearLayout row = new LinearLayout(c);
@@ -416,9 +438,12 @@ public final class UsageStats {
             android.widget.EditText e = new android.widget.EditText(c);
             e.setTextSize(12f);
             e.setTextColor(th.text);
-            e.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
+            e.setInputType(unitMin == 1
+                    ? android.text.InputType.TYPE_CLASS_NUMBER
+                    : android.text.InputType.TYPE_CLASS_NUMBER
+                            | android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);
             e.setSingleLine(true);
-            e.setText(String.valueOf(bounds[i]));
+            e.setText(fmtBound(bounds[i], unitMin));
             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(0,
                     LinearLayout.LayoutParams.WRAP_CONTENT, 1f);
             lp.rightMargin = th.dp(6);
@@ -438,7 +463,7 @@ public final class UsageStats {
                         continue;
                     }
                     try {
-                        b[i] = Integer.parseInt(s);
+                        b[i] = (int) Math.round(Double.parseDouble(s) * unitMin);
                     } catch (Throwable t2) {
                         b[i] = -1;
                     }
@@ -451,7 +476,7 @@ public final class UsageStats {
                 }
                 int max = Heat.grainMaxMin(g);
                 if (b[3] > max) {
-                    Toast.makeText(c, c.getString(R.string.us_levels_over, max),
+                    Toast.makeText(c, c.getString(R.string.us_levels_over, spanText(c, g)),
                             Toast.LENGTH_SHORT).show();
                     return;
                 }

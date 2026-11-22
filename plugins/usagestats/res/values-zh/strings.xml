@@ -44,9 +44,13 @@
         <item>日</item>
     </string-array>
     <string name="us_panel_too_small">范围比所选颗粒还短。请扩大范围，或换更细的颗粒。</string>
-    <string name="us_levels_title">颜色档位（分钟）</string>
+    <string name="us_levels_title">颜色档位</string>
     <string name="us_levels_hint">第 2 / 3 / 4 / 5 档的下界；留空 = 默认。</string>
+    <string name="us_unit_min">分钟</string>
+    <string name="us_unit_hour">小时</string>
+    <string name="us_span_hour">%1$d 小时</string>
+    <string name="us_span_day">%1$d 天</string>
     <string name="us_apply">应用</string>
     <string name="us_levels_bad">档位必须是递增的数字。</string>
-    <string name="us_levels_over">档位不能超过一格（%1$d 分钟），否则最高档永远到不了。</string>
+    <string name="us_levels_over">档位不能超过一格（%1$s），否则最高档永远到不了。</string>
 </resources>
