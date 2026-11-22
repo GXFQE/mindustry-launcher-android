@@ -167,6 +167,22 @@ public final class Config {
     private static final String K_UPDATE_MODE = "update_mode";
 
     /**
+     * 第 415 轮：**游戏本体签名校验模式**（三档，见 {@link SigMode}）。
+     *
+     * <p>缺键 = 出厂默认（{@link SigMode#DEFAULT} = 询问）；坏了 / 越界退默认并 WARNING
+     * 点名键名 —— 与 {@link #updateMode()} 同一族纪律。
+     */
+    private static final String K_SIG_MODE = "sig_check_mode";
+
+    /**
+     * 第 415 轮：**用户自己导入的受信任证书**（数组，元素 `{"fp":"<64位hex>","label":"..."}`）。
+     *
+     * <p>内置两条（官方 / MindustryX）在 {@link SigTrust} 里写死，不落这个键 ——
+     * 这样"误删内置"在结构上就不可能。坏条目由读侧跳过，不在写侧重建整棵树。
+     */
+    private static final String K_SIG_TRUST = "sig_trust";
+
+    /**
      * 第 336 轮：**更新线路**（下载启动器 APK 时先试哪个镜像）。
      *
      * <p>取值：空串 = 自动（四个预设 → 直连）；{@code "direct"} = 只走直连；
@@ -580,6 +596,55 @@ public final class Config {
 
     public synchronized void setUpdateMode(int m) {
         put(K_UPDATE_MODE, Integer.valueOf(UpdateMode.valid(m) ? m : UpdateMode.DEFAULT));
+        save();
+    }
+
+    /**
+     * 第 415 轮：**游戏本体签名校验模式**（{@link SigMode#LOG} / {@link SigMode#ASK} /
+     * {@link SigMode#REJECT}）。
+     *
+     * <p>坏值 / 越界一律退 {@link SigMode#DEFAULT} 并 WARNING 点名键名（与 {@link #updateMode()}
+     * 同一族纪律）。键不存在时**静默**退默认（这是新键，老配置当然没有）。
+     */
+    public synchronized int sigMode() {
+        Object v = mRoot.opt(K_SIG_MODE);
+        if (v instanceof Integer) {
+            int m = ((Integer) v).intValue();
+            if (SigMode.valid(m)) return m;
+            Log.w(TAG, "config key '" + K_SIG_MODE + "' has unknown value " + m
+                    + ", falling back to default " + SigMode.DEFAULT);
+            return SigMode.DEFAULT;
+        }
+        if (v != null) {
+            Log.w(TAG, "config key '" + K_SIG_MODE + "' is not an int (" + v
+                    + "), falling back to default " + SigMode.DEFAULT);
+        }
+        return SigMode.DEFAULT;
+    }
+
+    public synchronized void setSigMode(int m) {
+        put(K_SIG_MODE, Integer.valueOf(SigMode.valid(m) ? m : SigMode.DEFAULT));
+        save();
+    }
+
+    /**
+     * 第 415 轮：用户导入的受信任证书（见 {@link #K_SIG_TRUST}）。
+     *
+     * <p>返回的是**树里那一份**（读侧只读、写侧由 {@link SigTrust#add}/{@link #setSigTrust}
+     * 整份替换）—— 与 {@code imports} 那族一致，不额外拷贝。
+     * 不是数组 / 坏值 ⇒ 当空表并 WARNING（绝不因为一个键坏掉就重建整棵树）。
+     */
+    public synchronized JSONArray sigTrust() {
+        Object v = mRoot.opt(K_SIG_TRUST);
+        if (v instanceof JSONArray) return (JSONArray) v;
+        if (v != null) {
+            Log.w(TAG, "config key '" + K_SIG_TRUST + "' is not a list (" + v + "), ignoring");
+        }
+        return new JSONArray();
+    }
+
+    public synchronized void setSigTrust(JSONArray list) {
+        put(K_SIG_TRUST, list == null ? new JSONArray() : list);
         save();
     }
 

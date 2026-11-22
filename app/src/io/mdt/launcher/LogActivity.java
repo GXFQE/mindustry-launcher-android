@@ -39,7 +39,8 @@ import java.util.Locale;
  *     游戏侧：<数据根>/last_log.txt（截断覆盖 + 每行 flush ⇒ 崩了也在盘上）
  *             <数据根>/crashes/crash_<毫秒>.txt
  *     启动器侧：<HUB 外部>/report-launch.txt（六步管线耗时）/ report-autobackup.txt /
- *               report-settings.txt / report-health.txt / report-m3.txt / report-devtool.txt
+ *               report-settings.txt / report-health.txt / report-m3.txt / report-devtool.txt /
+ *               report-import.txt（第 415 轮：游戏本体导入签名判定）
  *
  *   在此之前这些文件**只有 adb 取得出来** —— 对普通用户等于不存在。
  *   本页就是它们的唯一出口。
@@ -112,6 +113,7 @@ public class LogActivity extends BaseActivity {
             "report-health.txt",
             "report-m3.txt",
             "report-devtool.txt",
+            "report-import.txt",
     };
     private static final int[] HUB_LABELS = {
             R.string.log_hub_launch,
@@ -120,6 +122,7 @@ public class LogActivity extends BaseActivity {
             R.string.log_hub_health,
             R.string.log_hub_m3,
             R.string.log_hub_devtool,
+            R.string.log_hub_import,
     };
 
     // ── 视图 ──────────────────────────────────────────────────────────────

@@ -121,6 +121,17 @@
     <string name="import_failed">导入失败</string>
 
     <!--
+      第 415 轮：游戏本体签名校验。
+      询问卡三个按钮都是短动作词（按钮文案一长就竖排，见 REF §29 第 28 条），
+      正文只说「这个包 vs 受信任列表」和后果。
+    -->
+    <string name="imp_sig_title">签名不在受信任列表里</string>
+    <string name="imp_sig_body_fmt">这个包的签名不在受信任列表里。\n\n这个包：%1$s\n受信任：内置 %2$d 个 · 自定义 %3$d 个\n\n信得过它就把签名记下来，以后不再问。</string>
+    <string name="imp_sig_allow">仍要导入</string>
+    <string name="imp_sig_trust">信任并导入</string>
+    <string name="imp_sig_reject_fmt">这个包的签名不在受信任列表里，已拒绝导入。\n\n包签名：%1$s\n\n可以在「设置 → 信任的证书」里加上它，或者把签名校验改成「询问后导入」。</string>
+
+    <!--
       F18：兼容性拒绝。四条对应四项**硬**判据（见 Compat.java），按能力判、不按版本号。
       写法纪律：要让用户知道**下一步能做什么**（换哪个版本），不能只说"不行"。
     -->
@@ -1586,6 +1597,32 @@
     <string name="settings_section_download">下载</string>
     <string name="settings_section_version">版本与更新</string>
 
+    <!-- 第 415 轮：安全分区 —— 游戏包签名校验 + 信任的证书 -->
+    <string name="settings_section_security">安全</string>
+    <string name="set_sig_check_title">游戏包签名校验</string>
+    <string name="set_sig_check_pick_title">签名校验</string>
+    <string name="set_sig_check_sub_fmt">当前：%1$s</string>
+    <string name="sig_mode_log">只记日志</string>
+    <string name="sig_mode_ask">询问后导入</string>
+    <string name="sig_mode_reject">不符就拒绝</string>
+    <string name="set_sig_trust_title">信任的证书</string>
+    <string name="set_sig_trust_sub_fmt">内置 %1$d 个 · 自定义 %2$d 个</string>
+    <string name="sig_trust_title">信任的证书</string>
+    <string name="sig_trust_intro">用这些证书签名的包导入时不再询问。内置两条不能删。</string>
+    <string name="sig_trust_official">Mindustry（原版）</string>
+    <string name="sig_trust_mdtx">MindustryX</string>
+    <string name="sig_trust_builtin">内置</string>
+    <string name="sig_trust_none">还没有自定义证书</string>
+    <string name="sig_trust_add">导入证书文件</string>
+    <string name="sig_trust_picker">选择证书文件</string>
+    <string name="sig_trust_tap_remove">点一下移除</string>
+    <string name="sig_trust_remove_title">移除这张证书？</string>
+    <string name="sig_trust_remove_yes">移除</string>
+    <string name="sig_trust_added_toast">已添加 %1$s</string>
+    <string name="sig_trust_removed_toast">已移除</string>
+    <string name="sig_trust_dup">这张证书已经在受信任列表里</string>
+    <string name="sig_trust_bad_cert">不是证书文件（支持 PEM / DER）</string>
+
     <string name="set_crash_alert_title">崩溃提示</string>
     <string name="set_crash_alert_on">当前：开 · 报告仍保存</string>
     <string name="set_crash_alert_off">当前：关 · 报告仍保存</string>
@@ -1730,6 +1767,7 @@
     <string name="log_hub_health">体检</string>
     <string name="log_hub_m3">自检报告</string>
     <string name="log_hub_devtool">调试记录</string>
+    <string name="log_hub_import">APK 导入</string>
 
     <!-- F20：一键导出「全部日志」成一个文件（需求原文：「加一个一键导出所以日志的功能」） -->
     <string name="log_export">导出全部日志</string>

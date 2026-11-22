@@ -204,6 +204,45 @@
                     android:layout_height="wrap_content" />
             </LinearLayout>
 
+            <!-- ══ 安全 ══════════════════════════════════════════════════ -->
+            <TextView
+                android:id="@+id/settings_section_security"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:paddingTop="18dp"
+                android:paddingBottom="6dp"
+                android:textColor="@color/fg_muted"
+                android:textSize="12sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/card_bg"
+                android:orientation="vertical">
+
+                <!-- 第 415 轮：游戏包签名校验（只记日志 / 询问后导入（默认）/ 不符就拒绝）。 -->
+                <include
+                    android:id="@+id/row_sig_check"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="62dp"
+                    android:background="@color/divider" />
+
+                <!-- 第 415 轮：信任的证书（内置 原版 / MindustryX + 用户自己导入的证书）。 -->
+                <include
+                    android:id="@+id/row_sig_trust"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
             <!-- ══ 下载 ══════════════════════════════════════════════════ -->
             <TextView
                 android:id="@+id/settings_section_download"

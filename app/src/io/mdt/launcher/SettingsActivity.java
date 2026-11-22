@@ -4,8 +4,12 @@ import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.database.Cursor;
+import android.net.Uri;
 import android.os.Bundle;
+import android.provider.OpenableColumns;
 import android.text.InputType;
+import android.util.TypedValue;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.EditText;
@@ -13,12 +17,12 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 import org.json.JSONObject;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.List;
-import android.net.Uri;
 
 /**
  * 全局设置（F3）。
@@ -55,10 +59,12 @@ public class SettingsActivity extends BaseActivity {
 
     private static final int LOG_MIN = 1;
     private static final int LOG_MAX = 999;
-    /** 用户语言包的文件选择请求码（本页唯一一个 `startActivityForResult`） */
+    /** 用户语言包的文件选择请求码 */
     private static final int REQ_LANG_PACK = 62;
     /** 导出翻译模板的"存到哪"请求码 */
     private static final int REQ_LANG_TPL = 63;
+    /** 第 415 轮：导入信任证书的请求码 */
+    private static final int REQ_SIG_CERT = 64;
     /** 模板先落这里，用户选完落点再整份写过去（取消就删掉） */
     private File sTemplateTmp;
     private int sTemplateCount;
@@ -89,6 +95,13 @@ public class SettingsActivity extends BaseActivity {
     private TextView mDownloadLimitSub;
     /** 第 338 轮：插件自动更新的副标题（已开启 / 已关闭）。 */
     private TextView mPluginUpdateSub;
+    /** 第 415 轮：游戏包签名校验的副标题（当前：<三档之一>）。 */
+    private TextView mSigSub;
+    /** 第 415 轮：信任的证书的副标题（内置 2 个 · 自定义 N 个）。 */
+    private TextView mTrustSub;
+    /** 第 415 轮：信任列表卡片与它的正文容器（导入证书后就地重建，不另开一张卡）。 */
+    private CardStack mTrustCard;
+    private LinearLayout mTrustBody;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -164,6 +177,20 @@ public class SettingsActivity extends BaseActivity {
                     @Override public void run() { promptTrashKeep(); }
                 });
         mTrashSub = (TextView) rowTrash.findViewById(R.id.act_sub);
+
+        // 第 415 轮：安全 —— 游戏包签名校验（三档单选）+ 信任的证书（内置 原版 / MindustryX，
+        // 外加用户自己导入的证书）。两行都在本页就地改变量，不做"点开是另一个页面"。
+        View rowSig = Util.bindActionValue(root, R.id.row_sig_check, R.drawable.ic_verify,
+                R.string.set_sig_check_title, new Runnable() {
+                    @Override public void run() { pickSigMode(); }
+                });
+        mSigSub = (TextView) rowSig.findViewById(R.id.act_sub);
+
+        View rowTrust = Util.bindActionValue(root, R.id.row_sig_trust, R.drawable.ic_verify,
+                R.string.set_sig_trust_title, new Runnable() {
+                    @Override public void run() { showSigTrust(); }
+                });
+        mTrustSub = (TextView) rowTrust.findViewById(R.id.act_sub);
 
         // F7：运行日志入口 —— ★ 2026-10-08（第 123 轮）**搬去主界面的工具卡**了
         //   （用户点单：「中转站和运行日志不应该放在设置里」）。本页从此只放"能被改的项"，
@@ -257,6 +284,8 @@ public class SettingsActivity extends BaseActivity {
         Trans.bind(root, R.id.settings_section_appearance, R.string.settings_section_appearance);
         Trans.bind(root, R.id.settings_section_startup, R.string.settings_section_startup);
         Trans.bind(root, R.id.settings_section_alerts, R.string.settings_section_alerts);
+        // 第 415 轮：安全（游戏包签名校验 / 信任的证书）
+        Trans.bind(root, R.id.settings_section_security, R.string.settings_section_security);
         // 第 378 轮：下载单列（更新线路 / 下载限速）—— 不再往"版本与更新"那张卡下面堆。
         Trans.bind(root, R.id.settings_section_download, R.string.settings_section_download);
         Trans.bind(root, R.id.settings_section_version, R.string.settings_section_version);
@@ -354,6 +383,16 @@ public class SettingsActivity extends BaseActivity {
                     Config.get().pluginAutoUpdate() ? R.string.plugin_update_auto_on
                                                     : R.string.plugin_update_auto_off));
         }
+        if (mSigSub != null) {
+            // 副标题 = 当前模式，统一带「当前：」。
+            mSigSub.setText(Trans.get(SettingsActivity.this,
+                    R.string.set_sig_check_sub_fmt,
+                    getString(SigMode.labelRes(SigMode.of(this)))));
+        }
+        if (mTrustSub != null) {
+            mTrustSub.setText(Trans.get(SettingsActivity.this,
+                    R.string.set_sig_trust_sub_fmt, 2, SigTrust.customCount(this)));
+        }
     }
 
     /**
@@ -447,6 +486,201 @@ public class SettingsActivity extends BaseActivity {
                 });
             }
         }, "storage-stats").start();
+    }
+
+    // ── 第 415 轮：信任的证书 ─────────────────────────────────────────────
+
+    /**
+     * 信任列表卡片：内置两条（原版 / MindustryX，不可删）+ 用户导入的证书 + 「导入证书文件」。
+     *
+     * <p>为什么不单开一个页面：设置页纪律只放「能被改的项」，不做「点开是另一个页面」的行
+     * （见类注释与 SelfTest.pageSkeleton）。导入完成后就地在同一张卡里重建正文，不换窗。</p>
+     */
+    private void showSigTrust() {
+        final CardStack card = new CardStack(this);
+        mTrustCard = card;
+        mTrustBody = new LinearLayout(this);
+        mTrustBody.setOrientation(LinearLayout.VERTICAL);
+        renderSigTrust();
+        card.root(Trans.get(this, R.string.sig_trust_title),
+                CardStack.wrap(this, mTrustBody),
+                new CardStack.Btn(Trans.get(this, R.string.close), new Runnable() {
+                    @Override public void run() { card.dismiss(); }
+                }));
+        card.show();
+    }
+
+    private void renderSigTrust() {
+        final LinearLayout body = mTrustBody;
+        if (body == null) return;
+        body.removeAllViews();
+        body.addView(trustText(Trans.get(this, R.string.sig_trust_intro), R.color.fg_muted));
+        body.addView(trustRow(Trans.get(this, R.string.sig_trust_official),
+                Trans.get(this, R.string.sig_trust_builtin) + " · " + PluginTrust.shortFp(SigTrust.OFFICIAL_FP),
+                null));
+        body.addView(trustRow(Trans.get(this, R.string.sig_trust_mdtx),
+                Trans.get(this, R.string.sig_trust_builtin) + " · " + PluginTrust.shortFp(SigTrust.MDTX_FP),
+                null));
+        List<String[]> customs = SigTrust.custom(this);
+        if (customs.isEmpty()) {
+            body.addView(trustText(Trans.get(this, R.string.sig_trust_none), R.color.fg_muted));
+        } else {
+            for (String[] e : customs) {
+                final String fp = e[0];
+                String label = e.length > 1 && e[1] != null && !e[1].isEmpty() ? e[1] : fp;
+                body.addView(trustRow(label,
+                        PluginTrust.shortFp(fp) + " · " + Trans.get(this, R.string.sig_trust_tap_remove),
+                        new View.OnClickListener() {
+                            @Override public void onClick(View v) { confirmRemoveCert(fp, label); }
+                        }));
+            }
+        }
+        body.addView(trustRow(Trans.get(this, R.string.sig_trust_add), null,
+                new View.OnClickListener() {
+                    @Override public void onClick(View v) { openCertPicker(); }
+                }));
+        if (mTrustCard != null && mTrustCard.isShowing()) mTrustCard.remeasure();
+    }
+
+    /** 一行「标题 +（可选）副标题」；给 onClick 才可点（可点行带系统涟漪）。 */
+    private View trustRow(CharSequence title, CharSequence sub, View.OnClickListener onClick) {
+        LinearLayout row = new LinearLayout(this);
+        row.setOrientation(LinearLayout.VERTICAL);
+        int pad = Math.round(getResources().getDisplayMetrics().density * 12);
+        row.setPadding(pad, pad, pad, pad);
+        TextView t = new TextView(this);
+        t.setText(title);
+        t.setTextSize(15);
+        t.setTextColor(getResources().getColor(R.color.fg));
+        row.addView(t);
+        if (sub != null) {
+            TextView s = new TextView(this);
+            s.setText(sub);
+            s.setTextSize(12);
+            s.setTextColor(getResources().getColor(R.color.fg_muted));
+            row.addView(s);
+        }
+        if (onClick != null) {
+            row.setOnClickListener(onClick);
+            TypedValue tv = new TypedValue();
+            if (getTheme().resolveAttribute(android.R.attr.selectableItemBackground, tv, true)) {
+                row.setBackgroundResource(tv.resourceId);
+            }
+        }
+        return row;
+    }
+
+    private TextView trustText(String text, int colorRes) {
+        TextView v = new TextView(this);
+        v.setText(text);
+        v.setTextSize(12);
+        v.setTextColor(getResources().getColor(colorRes));
+        int pad = Math.round(getResources().getDisplayMetrics().density * 12);
+        v.setPadding(pad, pad, pad, pad);
+        v.setLineSpacing(getResources().getDisplayMetrics().density * 4, 1f);
+        return v;
+    }
+
+    private void confirmRemoveCert(final String fp, final String label) {
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.sig_trust_remove_title)
+                // 点名是哪一张（只给短指纹，多张证书时用户分不出来）
+                .setMessage(label + "\n" + PluginTrust.shortFp(fp))
+                // 破坏性动作放 neutral（最左），不坐正按钮（REF §29 第 28 条）。
+                .setNeutralButton(R.string.sig_trust_remove_yes, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int w) {
+                        SigTrust.remove(SettingsActivity.this, fp);
+                        renderSigTrust();
+                        fillValues();
+                        Toast.makeText(SettingsActivity.this, R.string.sig_trust_removed_toast,
+                                Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    private void openCertPicker() {
+        Intent i = new Intent(Intent.ACTION_OPEN_DOCUMENT);
+        i.addCategory(Intent.CATEGORY_OPENABLE);
+        i.setType("*/*");     // ⚠️ 通配：各家文件管理器对 .pem / .crt 报的 MIME 不一致
+        startActivityForResult(
+                Intent.createChooser(i, Trans.get(this, R.string.sig_trust_picker)),
+                REQ_SIG_CERT);
+    }
+
+    /** 选回来的证书：解析出指纹（DER 字节的 SHA-256）再加进受信任列表。 */
+    private void importCert(final Uri uri) {
+        final String label = certLabel(uri);
+        new Thread(new Runnable() {
+            @Override public void run() {
+                final String fp;
+                try {
+                    fp = SigTrust.fingerprintOfCert(readCapped(SettingsActivity.this, uri));
+                } catch (final Throwable e) {
+                    android.util.Log.w("MDTLauncher", "cert parse failed: " + e);
+                    runOnUiThread(new Runnable() {
+                        @Override public void run() {
+                            if (Util.dead(SettingsActivity.this)) return;
+                            Toast.makeText(SettingsActivity.this, R.string.sig_trust_bad_cert,
+                                    Toast.LENGTH_LONG).show();
+                        }
+                    });
+                    return;
+                }
+                final boolean added = SigTrust.add(SettingsActivity.this, fp, label);
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        if (Util.dead(SettingsActivity.this)) return;
+                        Toast.makeText(SettingsActivity.this,
+                                added ? Trans.get(SettingsActivity.this,
+                                        R.string.sig_trust_added_toast, label)
+                                      : Trans.get(SettingsActivity.this, R.string.sig_trust_dup),
+                                Toast.LENGTH_LONG).show();
+                        if (added) renderSigTrust();
+                        fillValues();
+                    }
+                });
+            }
+        }, "cert-import").start();
+    }
+
+    /** 把用户选的文件整份读出来（上限见 {@link SigTrust#MAX_CERT_BYTES}）。 */
+    private static byte[] readCapped(Activity a, Uri uri) throws IOException {
+        InputStream in = a.getContentResolver().openInputStream(uri);
+        if (in == null) throw new IOException("cannot open " + uri);
+        try {
+            ByteArrayOutputStream out = new ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            int n, total = 0;
+            while ((n = in.read(buf)) > 0) {
+                total += n;
+                if (total > SigTrust.MAX_CERT_BYTES) throw new IOException("cert file too large");
+                out.write(buf, 0, n);
+            }
+            return out.toByteArray();
+        } finally {
+            in.close();
+        }
+    }
+
+    private String certLabel(Uri uri) {
+        String name = null;
+        Cursor c = null;
+        try {
+            c = getContentResolver().query(uri,
+                    new String[]{OpenableColumns.DISPLAY_NAME}, null, null, null);
+            if (c != null && c.moveToFirst()) name = c.getString(0);
+        } catch (Throwable ignored) {
+            // 拿不到名字就退回落路径名 —— 不值得弹窗
+        } finally {
+            if (c != null) c.close();
+        }
+        if (name == null || name.isEmpty()) name = uri.getLastPathSegment();
+        if (name == null) name = "cert";
+        int dot = name.lastIndexOf('.');
+        if (dot > 0) name = name.substring(0, dot);
+        return name.length() > 60 ? name.substring(0, 60) : name;
     }
 
     /**
@@ -554,6 +788,34 @@ public class SettingsActivity extends BaseActivity {
                     @Override public void onClick(DialogInterface d, int w) {
                         d.dismiss();
                         UpdateMode.set(SettingsActivity.this, modes[w]);
+                        fillValues();
+                    }
+                })
+                .setNegativeButton(R.string.cancel, null)
+                .show();
+    }
+
+    /**
+     * 第 415 轮：**游戏包签名校验**（三档单选）—— 只记日志 / 询问后导入（默认）/ 不符就拒绝。
+     *
+     * <p>为什么是三档而不是三个开关：判据与 {@link UpdateMode} 同一条 —— 三种处置互斥且有序，
+     * 一个三选一最难说出自相矛盾的话。
+     */
+    private void pickSigMode() {
+        final int[] modes = SigMode.ALL;
+        String[] names = new String[modes.length];
+        final int cur = SigMode.of(this);
+        int checked = -1;
+        for (int i = 0; i < modes.length; i++) {
+            names[i] = getString(SigMode.labelRes(modes[i]));
+            if (modes[i] == cur) checked = i;
+        }
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.set_sig_check_pick_title)
+                .setSingleChoiceItems(names, checked, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int w) {
+                        d.dismiss();
+                        SigMode.set(SettingsActivity.this, modes[w]);
                         fillValues();
                     }
                 })
@@ -915,6 +1177,11 @@ public class SettingsActivity extends BaseActivity {
                     if (!p.isEmpty()) new File(p).delete();
                 }
             }
+            return;
+        }
+        if (requestCode == REQ_SIG_CERT) {
+            if (resultCode != RESULT_OK || data == null || data.getData() == null) return;
+            importCert(data.getData());
             return;
         }
         if (requestCode != REQ_LANG_PACK) return;

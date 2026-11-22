@@ -34,6 +34,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 /**
  * 主界面（主进程 = UI 进程；游戏退出带走的是 :game 进程，这里不受影响）。
@@ -1446,14 +1448,109 @@ public class MainActivity extends BaseActivity {
     void startImport(final Uri uri, final String name) {
         // ★ 第 268 轮：进度与失败都在同一张卡片里（原来 ProgressDialog + 失败 AlertDialog = 两次换窗）
         final CardStack stack = new CardStack(this);
-        stack.replace(Trans.get(this, R.string.import_progress_title),
-                name + Trans.get(this, R.string.import_progress_suffix));
+        final String progressTitle = Trans.get(this, R.string.import_progress_title);
+        final String progressBody = name + Trans.get(this, R.string.import_progress_suffix);
+        stack.replace(progressTitle, progressBody);
+
+        // ★ 第 415 轮：签名询问。后台线程在 Importer 里回调这里 ⇒ 把进度卡换成询问卡、
+        //   等用户点完再把卡换回进度。⚠️ 只在这张卡上换页，不另开窗（§84：同窗换页）。
+        final CountDownLatch latch = new CountDownLatch(1);
+        final int[] answer = {Importer.Ask.CANCEL};
+        final boolean[] answered = {false};
+        stack.setOnDismiss(new Runnable() {
+            @Override public void run() {
+                // 返回键 / 点窗外关掉 = 取消（answered 为真时说明用户已经点过按钮）
+                if (!answered[0]) {
+                    answered[0] = true;
+                    answer[0] = Importer.Ask.CANCEL;
+                    latch.countDown();
+                }
+            }
+        });
+        final Importer.Ask ask = new Importer.Ask() {
+            @Override public int ask(Context ctx, final String displayName, final String fp) {
+                if (Util.dead(MainActivity.this)) return Importer.Ask.CANCEL;
+                runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        if (Util.dead(MainActivity.this)) { latch.countDown(); return; }
+                        CardStack.Btn cancel = new CardStack.Btn(
+                                Trans.get(MainActivity.this, R.string.cancel),
+                                new Runnable() {
+                                    @Override public void run() {
+                                        if (answered[0]) return;
+                                        answered[0] = true;
+                                        answer[0] = Importer.Ask.CANCEL;
+                                        // ★ 计数放在改卡之前：`dismiss()` 会回调 setOnDismiss，
+                                        //   那时 answered 已为真，不会重复 countDown（幂等）
+                                        latch.countDown();
+                                        stack.dismiss();
+                                    }
+                                });
+                        CardStack.Btn allow = new CardStack.Btn(
+                                Trans.get(MainActivity.this, R.string.imp_sig_allow),
+                                new Runnable() {
+                                    @Override public void run() {
+                                        if (answered[0]) return;
+                                        answered[0] = true;
+                                        answer[0] = Importer.Ask.IMPORT;
+                                        latch.countDown();
+                                        stack.replace(progressTitle, progressBody);
+                                    }
+                                });
+                        CharSequence title = Trans.get(MainActivity.this, R.string.imp_sig_title);
+                        CharSequence body = Trans.get(MainActivity.this, R.string.imp_sig_body_fmt,
+                                PluginTrust.shortFp(fp),
+                                Integer.valueOf(2),
+                                Integer.valueOf(SigTrust.customCount(MainActivity.this)));
+                        if (fp == null) {
+                            // 连签名都读不出来的包：没有可记的指纹，「信任」按了也没意义
+                            stack.replace(title, body, cancel, allow);
+                        } else {
+                            CardStack.Btn trust = new CardStack.Btn(
+                                    Trans.get(MainActivity.this, R.string.imp_sig_trust),
+                                    new Runnable() {
+                                        @Override public void run() {
+                                            if (answered[0]) return;
+                                            answered[0] = true;
+                                            answer[0] = Importer.Ask.TRUST;
+                                            latch.countDown();
+                                            stack.replace(progressTitle, progressBody);
+                                        }
+                                    });
+                            stack.replace(title, body, cancel, allow, trust);
+                        }
+                    }
+                });
+                long deadline = System.currentTimeMillis() + 10 * 60 * 1000L;
+                while (true) {
+                    try {
+                        // ★ 用 latch 本身当同步点（`answer` 由 UI 线程写、这里读）：
+                        //   `await` 返回 true 才保证看得到按钮写入的值
+                        if (latch.await(250, TimeUnit.MILLISECONDS)) break;
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                        return Importer.Ask.CANCEL;
+                    }
+                    if (Util.dead(MainActivity.this)) return Importer.Ask.CANCEL;
+                    if (System.currentTimeMillis() > deadline) {
+                        // 用户把界面放着不管十分钟 ⇒ 当取消（不把 .part 永久挂在那里）
+                        return Importer.Ask.CANCEL;
+                    }
+                }
+                return answer[0];
+            }
+        };
+
         new Thread() {
             @Override public void run() {
                 String err = null;
+                boolean canceled = false;
                 org.json.JSONObject entry = null;
                 try {
-                    entry = Importer.importApk(MainActivity.this, uri, name);
+                    entry = Importer.importApk(MainActivity.this, uri, name, ask);
+                } catch (Importer.Canceled c) {
+                    // 用户自己取消：不是失败，别弹「导入失败」
+                    canceled = true;
                 } catch (Exception e) {
                     // ★ 2026-10-15：原来是 `getMessage()`，消息为空时退回 `String.valueOf(e)`
                     //   ⇒ 弹窗正文会出现 `java.io.IOException: …` 甚至只有类名。
@@ -1463,10 +1560,14 @@ public class MainActivity extends BaseActivity {
                     android.util.Log.w("MDTLauncher", "import failed: " + err, e);
                 }
                 final String ferr = err;
+                final boolean fcanceled = canceled;
                 final org.json.JSONObject fentry = entry;
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
-                        if (ferr == null) {
+                        if (fcanceled) {
+                            if (Util.dead(MainActivity.this)) return;
+                            stack.dismiss();
+                        } else if (ferr == null) {
                             // ⚠️ version 字段是 Importer 从 APK 里读出来的**原文**
                             //    （形如 8-official-159.7）—— 这里只有裸 JSONObject，
                             //    拿不到 Entry，所以必须走 Versions.displayVersionOf()。

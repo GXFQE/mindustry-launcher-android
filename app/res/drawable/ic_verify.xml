@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  第 415 轮：游戏包签名校验 / 信任的证书两行共用的图标。
+  一个**实心盾牌**的单 path（没有 keyhole、没有对勾）—— 同一条 path 里再挖洞时，
+  fillType 的绕向一错洞就被涂回去；单块形状最稳。
+  约定同 ic_add：fillColor 走 @color/icon_tint，行图标由 row_action 的 ImageView 染成 accent。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@color/icon_tint"
+        android:pathData="M12,1L3,5v6c0,5.55 3.84,10.74 9,12c5.16,-1.26 9,-6.45 9,-12V5L12,1z" />
+</vector>

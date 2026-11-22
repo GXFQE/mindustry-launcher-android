@@ -39,6 +39,30 @@ public final class Importer {
 
     private Importer() {}
 
+    /**
+     * 签名询问的**三态**回答（第 415 轮）。
+     *
+     * <p>为什么不是 boolean：用户面对一个没见过的签名有三条同样合理的路 ——
+     * 取消（不导入）、只这一次放行、记住这个签名。做成 boolean 就只剩两条，
+     * 而"记住"这件事恰恰是 {@link SigTrust} 存在的理由。
+     */
+    public interface Ask {
+        int CANCEL = -1;
+        int IMPORT = 0;
+        int TRUST = 1;
+
+        /**
+         * 在**后台线程**里调用；实现负责把进度卡换成询问卡、等用户点完再返回。
+         * 实现必须自己保证 Activity 死掉 / 超时 ⇒ 返回 {@link #CANCEL}。
+         */
+        int ask(Context ctx, String displayName, String fingerprint);
+    }
+
+    /** 用户在签名询问卡上选了「取消」—— 不是错误，UI 不该弹失败卡。 */
+    public static final class Canceled extends IOException {
+        Canceled() { super("import canceled"); }
+    }
+
     public static File importDir(Context ctx) {
         File d = new File(Paths.privateDir(ctx), "import");
         if (!d.exists()) d.mkdirs();
@@ -46,17 +70,17 @@ public final class Importer {
     }
 
     /** 拷贝 + 校验 + 预热预检 + 登记。失败抛 IOException（.part 副本已清理）。 */
-    public static JSONObject importApk(Context ctx, Uri uri, String displayName) throws IOException {
+    public static JSONObject importApk(Context ctx, Uri uri, String displayName, Ask ask) throws IOException {
         // ★ 第 177 轮：78 MB 的拷贝 + 校验 + 预热都在这一段里，给它一个前台身份
         Work.begin(ctx, R.string.work_import_apk);
         try {
-            return importApk0(ctx, uri, displayName);
+            return importApk0(ctx, uri, displayName, ask);
         } finally {
             Work.end(ctx);
         }
     }
 
-    private static JSONObject importApk0(Context ctx, Uri uri, String displayName) throws IOException {
+    private static JSONObject importApk0(Context ctx, Uri uri, String displayName, Ask ask) throws IOException {
         File dir = importDir(ctx);
         String base = sanitizeName(displayName);
         if (base.isEmpty()) base = "import-" + System.currentTimeMillis() + ".apk";
@@ -126,6 +150,43 @@ public final class Importer {
             cleanup(tmp);
             throw new IOException(Trans.get(ctx, R.string.imp_err_bad_zip));
         }
+
+        // ★ 第 415 轮：**游戏本体签名校验**（用户：「或许默认原版和MDTX，也允许自己导入证书？」）。
+        //   ⚠️ 位置在 Compat 通过之后、setReadOnly / 预热**之前**：
+        //   到这里包已经确认"能跑"，但它的 dex 还一行都没执行过（预热会真的加载入口类）——
+        //   用户没点头之前，不跑别人的代码。
+        String fp = null;
+        try {
+            fp = PluginTrust.apkFingerprint(ctx, tmp);
+        } catch (Throwable t) {
+            // 读不出签名 ⇒ 当"不受信任"（PluginTrust 的既有纪律），而不是当故障
+            Log.w(TAG, "import signature read failed: " + t);
+        }
+        int mode = SigMode.of(ctx);
+        int source = SigTrust.sourceOf(ctx, fp);
+        int decision = SigTrust.decide(mode, source);
+        String action;
+        if (decision == SigTrust.BLOCK) {
+            SigTrust.record(ctx, mode, displayName, fp, source, "reject");
+            cleanup(tmp);
+            throw new IOException(Trans.get(ctx, R.string.imp_sig_reject_fmt, PluginTrust.shortFp(fp)));
+        } else if (decision == SigTrust.NEED_ASK) {
+            int answer = ask == null ? Ask.CANCEL : ask.ask(ctx, displayName, fp);
+            if (answer == Ask.CANCEL) {
+                SigTrust.record(ctx, mode, displayName, fp, source, "ask-cancel");
+                cleanup(tmp);
+                throw new Canceled();
+            }
+            if (answer == Ask.TRUST && fp != null && SigTrust.add(ctx, fp, stripExt(displayName))) {
+                source = SigTrust.SOURCE_CUSTOM;
+                action = "ask-trust";
+            } else {
+                action = "ask-import";
+            }
+        } else {
+            action = source == SigTrust.SOURCE_NONE ? "log" : "import";
+        }
+        SigTrust.record(ctx, mode, displayName, fp, source, action);
 
         // ★ dex 载体必须只读
         tmp.setReadOnly();

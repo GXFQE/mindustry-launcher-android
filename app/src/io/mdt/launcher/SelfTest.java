@@ -396,6 +396,8 @@ public final class SelfTest {
             downloadResume(ctx, L, stat);
             // ★ 第 338 轮：插件更新（清单解析 / 内容哈希比对 / 状态表）—— 纯逻辑
             pluginUpdates(ctx, L, stat);
+            // ★ 第 415 轮：游戏包签名校验（三档真值表 / 指纹口径 / 受信任来源）—— 纯函数
+            signatureCheck(ctx, L, stat);
             // ★ 第 345 轮：补丁机制 v1（dex 类名解析 / 清单校验 / 导入 / 冲突 / 启动解析）
             patches(ctx, L, stat);
             // ★ 篡改对象池的用例放**最后**：它会在池里留下一个内容坏掉的对象，
@@ -3560,8 +3562,9 @@ public final class SelfTest {
 
             // ★ 第一条正路：**页面上真读一遍**再拼（readAll 是 static，dev 口也走它）
             LogActivity.Snap live = LogActivity.readAll(ctx);
-            ok(stat, L, !live.dataRootMissing && live.hub.length == 6,
-                    "readAll 能独立跑通（hub 六份都在册，dataRoot 可用）");
+            // ★ 第 415 轮：第 7 份报告 = `report-import.txt`（APK 导入签名记录）
+            ok(stat, L, !live.dataRootMissing && live.hub.length == 7,
+                    "readAll 能独立跑通（hub 七份都在册，dataRoot 可用）");
         } catch (Throwable t) {
             ok(stat, L, false, "日志导出用例异常：" + t);
         } finally {
@@ -14841,6 +14844,24 @@ public final class SelfTest {
         } catch (Throwable t) {
             ok(stat, L, false, "设置页末行检查自身异常：" + t);
         }
+        // ★ 第 415 轮：安全卡两行（签名校验 / 信任的证书）。
+        //   少一个 `@+id` ⇒ findViewById 返回 null、Util.bindActionValue 静默跳过，
+        //   编译 / 门禁全绿而界面上只是少了一行 —— 与上面「入口搬家」同一类坑。
+        try {
+            android.view.View v = inf.inflate(R.layout.activity_settings, null);
+            android.view.View sig = v.findViewById(R.id.row_sig_check);
+            android.view.View trust = v.findViewById(R.id.row_sig_trust);
+            boolean sameCard = sig != null && trust != null
+                    && sig.getParent() != null && sig.getParent() == trust.getParent();
+            ok(stat, L, sameCard, "★设置页：签名校验 / 信任的证书两行在同一张卡里");
+            android.view.View sec = v.findViewById(R.id.settings_section_security);
+            ok(stat, L, sec != null, "★设置页：安全分区标题在布局里");
+            ok(stat, L, ctx.getString(R.string.set_sig_check_title).length() > 0
+                            && ctx.getString(R.string.set_sig_trust_title).length() > 0,
+                    "★设置页：安全两行的标题资源都非空");
+        } catch (Throwable t) {
+            ok(stat, L, false, "设置页安全卡检查自身异常：" + t);
+        }
         // ★ 2026-10-27（第 275 轮）：设置页新增「屏幕方向」（用户：「我觉得需要加个页面强制横屏
         //   和强制竖屏」——真机自动旋转关着，想看一眼横屏效果只能去系统设置里开自动旋转）。
         //   两件事都要钉，而且都属于"错了也不报错"的那一类：
@@ -21744,6 +21765,88 @@ public final class SelfTest {
             ok(stat, L, ver != null && ver.length() == 8 && b[2].startsWith(ver),
                     "内置版本键必须是 sha256 前 8 位（" + b[0] + "）");
         }
+    }
+
+    // ── 第 415 轮：游戏包签名校验（三档 + 受信任表）─────────────────────
+
+    /**
+     * 签名的**判定层**（纯函数）：三档真值表 / 指纹口径 / 内置来源 / 证书负例。
+     *
+     * <p>★ 这里**不碰真实 Config**（不写 `sig_trust`）：自检不能留下一条"用户自定义证书"，
+     * 否则下一次真机导入会被这条测试数据悄悄放过。</p>
+     */
+    private static void signatureCheck(Context ctx, List<String> L, int[] stat) {
+        L.add("");
+        L.add("【签名校验（第 415 轮）】");
+
+        // 三档：值互不相同、默认是询问、越界值不吃
+        ok(stat, L, SigMode.LOG != SigMode.ASK && SigMode.ASK != SigMode.REJECT
+                        && SigMode.LOG != SigMode.REJECT,
+                "三档的值互不相同");
+        ok(stat, L, SigMode.DEFAULT == SigMode.ASK, "出厂默认 = 询问后导入");
+        ok(stat, L, SigMode.valid(SigMode.LOG) && SigMode.valid(SigMode.ASK)
+                        && SigMode.valid(SigMode.REJECT) && !SigMode.valid(-1) && !SigMode.valid(3),
+                "valid() 只认三档，越界拒绝");
+
+        // 三档文案必须互不相同（防"三条都返回同一句"）
+        String l0 = Trans.get(ctx, SigMode.labelRes(SigMode.LOG));
+        String l1 = Trans.get(ctx, SigMode.labelRes(SigMode.ASK));
+        String l2 = Trans.get(ctx, SigMode.labelRes(SigMode.REJECT));
+        ok(stat, L, !l0.equals(l1) && !l1.equals(l2) && !l0.equals(l2),
+                "三档文案互不相同（元断言：不能三条返回同一句）");
+        ok(stat, L, SigMode.labelRes(99) == R.string.sig_mode_ask,
+                "★未知值走默认（ask）文案");
+
+        // 指纹口径
+        ok(stat, L, SigTrust.isFingerprint(SigTrust.OFFICIAL_FP)
+                        && SigTrust.isFingerprint(SigTrust.MDTX_FP),
+                "内置两条指纹都是 64 位 hex");
+        ok(stat, L, !SigTrust.isFingerprint("abc") && !SigTrust.isFingerprint(null)
+                        && !SigTrust.isFingerprint(SigTrust.OFFICIAL_FP.substring(1) + "z"),
+                "★长度不对 / 非 hex / null 都不算指纹");
+        ok(stat, L, SigTrust.OFFICIAL_FP.equals(
+                        SigTrust.normalize(SigTrust.OFFICIAL_FP.toUpperCase(java.util.Locale.US))),
+                "指纹大小写归一（大写输入 = 小写存储）");
+
+        // 来源：内置命中 / 翻转一位不命中
+        ok(stat, L, SigTrust.sourceOf(ctx, SigTrust.OFFICIAL_FP) == SigTrust.SOURCE_OFFICIAL
+                        && SigTrust.sourceOf(ctx, SigTrust.MDTX_FP) == SigTrust.SOURCE_MDTX,
+                "内置两条分别认成 official / MDTX");
+        String flipped = (SigTrust.OFFICIAL_FP.charAt(0) == '0' ? "1" : "0")
+                + SigTrust.OFFICIAL_FP.substring(1);
+        ok(stat, L, SigTrust.sourceOf(ctx, flipped) == SigTrust.SOURCE_NONE
+                        && SigTrust.sourceOf(ctx, null) == SigTrust.SOURCE_NONE,
+                "不在列表里 / 根本没有指纹 ⇒ SOURCE_NONE");
+
+        // 判定真值表：三档 × 不受信任，以及"受信任三档都直接过"
+        ok(stat, L, SigTrust.decide(SigMode.LOG, SigTrust.SOURCE_NONE) == SigTrust.PASS
+                        && SigTrust.decide(SigMode.ASK, SigTrust.SOURCE_NONE) == SigTrust.NEED_ASK
+                        && SigTrust.decide(SigMode.REJECT, SigTrust.SOURCE_NONE) == SigTrust.BLOCK,
+                "三档 × 不受信任：日志放行 / 询问 / 拒绝");
+        ok(stat, L, SigTrust.decide(SigMode.LOG, SigTrust.SOURCE_OFFICIAL) == SigTrust.PASS
+                        && SigTrust.decide(SigMode.ASK, SigTrust.SOURCE_MDTX) == SigTrust.PASS
+                        && SigTrust.decide(SigMode.REJECT, SigTrust.SOURCE_CUSTOM) == SigTrust.PASS,
+                "★受信任签名三档都直接过（REJECT 也不拦）");
+        ok(stat, L, SigTrust.PASS != SigTrust.NEED_ASK && SigTrust.NEED_ASK != SigTrust.BLOCK
+                        && SigTrust.PASS != SigTrust.BLOCK,
+                "三个判定值互不相同");
+
+        // 证书解析负例：空 / 一段随便的文本都不能变成"受信任指纹"
+        boolean emptyThrew = false;
+        try {
+            SigTrust.fingerprintOfCert(new byte[0]);
+        } catch (Throwable t) {
+            emptyThrew = true;
+        }
+        ok(stat, L, emptyThrew, "★空文件不是证书（抛错，不返回一个假指纹）");
+        boolean junkThrew = false;
+        try {
+            SigTrust.fingerprintOfCert("not a certificate".getBytes(
+                    java.nio.charset.StandardCharsets.US_ASCII));
+        } catch (Throwable t) {
+            junkThrew = true;
+        }
+        ok(stat, L, junkThrew, "★一段随便的文本不是证书");
     }
 
     // ── 第 336 轮：更新线路（预设 / 严格解析 / 启动清扫）─────────────────
