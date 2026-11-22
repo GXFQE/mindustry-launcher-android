@@ -1103,21 +1103,20 @@ final class Patches {
      * 崩溃处理沿用**注入失败那一套处置** —— 出问题的补丁不再加载，并把结论落到用户看得见的地方。
      *
      * <p>具体：上一局真的注入过补丁、之后槽里出现**比那次启动更新**的**游戏**崩溃报告
-     * （`crash_<毫秒>.txt`；`_launcher` 后缀是启动器自己崩的，不算）⇒ 把这些补丁在这个实例上
-     * **自动停用**（从 config 的启用列表里摘掉），并写 {@link #CRASH_REPORT}；
-     * 补丁页的「上次启动」卡会列出来，用户可随时重新启用（重新启用会清掉这条旧结论）。
+     * （`crash_<毫秒>.txt`；`_launcher` 后缀是启动器自己崩的，不算）⇒ 把这些补丁记成
+     * **崩溃嫌疑人**并写 {@link #CRASH_REPORT}；补丁页的「上次启动」卡会列出来。
      *
-     * <p>为什么是"停用"而不是"跳过一次"：注入失败的补丁**每次启动都会跳过**（文件坏了就坏）；
-     * 崩溃没有"坏文件"这种持久判据，跳过一次 ⇒ 下次照样崩、再跳一次，会变成隔一次崩一次的循环。
-     * 停用 + 明说 + 可重新启用，与 {@link Plugins} 的安全阀（崩溃后自动停用、用户可再打开）同一语义。
+     * <p>★ 2026-11-22 用户定调：「就算补丁崩了也不至于没法到设置里关，不要自动关」
+     * ⇒ **不再改启用列表**。管理器是独立进程，游戏崩了照样能进来关补丁；
+     * 自动停用反而会让"启动器自己没装好"（如 CAS 缺补丁素材）的责任落到补丁头上。
      *
      * <p>判据只认**真正的崩溃报告**（与插件安全阀同一条）：「没走完」不算
-     * （用户按重启 / 系统回收很常见，一次就停用太容易误伤）。
+     * （用户按重启 / 系统回收很常见，一次就记太容易误伤）。
      *
-     * <p>幂等：处置成功后删掉启动记录 ⇒ 同一场崩溃不会处置第二次。
+     * <p>幂等：处置成功后标记启动记录 ⇒ 同一场崩溃不会记第二次。
      *
      * @param slot 槽名；null / 空 ⇒ 用启动记录里那个槽
-     * @return 被自动停用的补丁显示名（没做事返回空表）
+     * @return 崩溃嫌疑人的显示名（没做事返回空表）
      */
     static synchronized List<String> noteGameCrash(Context ctx, String slot) {
         List<String> out = new ArrayList<String>();
@@ -1142,24 +1141,23 @@ final class Patches {
         if (crash == null) return out;          // 崩溃报告还没落盘：记录留着，下次再判
         if (WriteGate.blockedInstance(ctx, ikey)) return out;   // 进程还在/没来得及收尸 ⇒ 下次再判
         List<String> refs = Config.get().patchRefs(ikey);
-        List<String[]> disabled = new ArrayList<String[]>();
+        List<String[]> suspects = new ArrayList<String[]>();
         for (Launched l : info.patches) {
-            if (l == null || l.ref.isEmpty() || !refs.remove(l.ref)) continue;
-            // 第 403 轮：崩溃后被停用的是整端 ⇒ 文案要说"回退到官方本体"（码不同，人话不同）
-            Record rec = findByRef(ctx, l.ref);
-            String code = isGame(rec) ? PatchException.C_CRASH_DISABLED_GAME
-                    : PatchException.C_CRASH_DISABLED;
-            disabled.add(new String[]{l.ref, l.label, code});
+            if (l == null || l.ref.isEmpty() || !refs.contains(l.ref)) continue;
+            // 第 403 轮：整端补丁崩了要提示"可以回退到官方本体"；码统一成 crash_suspect（旧码仍可读）
+            suspects.add(new String[]{l.ref, l.label, PatchException.C_CRASH_SUSPECT});
         }
-        if (disabled.isEmpty()) {               // 用户已经自己停用了 ⇒ 没有要处置的东西
+        if (suspects.isEmpty()) {               // 用户已经自己停用了 ⇒ 没有要处置的东西
             markLaunchHandled(ctx, info);
             return out;
         }
-        Config.get().setPatchRefs(ikey, refs);
-        appendCrashReport(ctx, recSlot, ikey, crash, disabled);
-        for (String[] d : disabled) {
+        // ★ 2026-11-22 用户：「就算补丁崩了也不至于没法到设置里关，不要自动关」
+        //   ⇒ 只**记录**这一局带着谁崩的，**不动启用列表**。管理器是独立进程，
+        //     游戏崩了照样能进来；关不关由用户在补丁页自己决定。
+        appendCrashReport(ctx, recSlot, ikey, crash, suspects);
+        for (String[] d : suspects) {
             out.add(d[1] == null || d[1].isEmpty() ? d[0] : d[1]);
-            Log.i(TAG, "patch disabled after game crash: " + d[0] + " for " + ikey);
+            Log.i(TAG, "patch suspect after game crash: " + d[0] + " for " + ikey);
         }
         // ★ 第 361 轮：**保留**记录（标记 handled）—— 崩溃归因要读 dex 反查"崩在补丁的类里"
         markLaunchHandled(ctx, info);

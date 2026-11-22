@@ -20160,12 +20160,12 @@ public final class SelfTest {
             writeTmp(crashes, "crash_" + (System.currentTimeMillis() + 2000) + ".txt", "x");
             List<String> dis = Patches.noteGameCrash(ctx, slot);
             ok(stat, L, dis.size() == 1 && "自检补丁".equals(dis.get(0))
-                            && !Config.get().patchRefs(ikey).contains(ref),
-                    "★★带补丁崩了 ⇒ 与 :game 注入失败同一套处置：自动停用 + 报出来");
+                            && Config.get().patchRefs(ikey).contains(ref),
+                    "★★带补丁崩了 ⇒ 只记崩溃嫌疑人，**不禁用**（2026-11-22 用户：崩了也要能进管理器自己关）");
             ok(stat, L, Patches.crashProblems(ctx).size() >= 1,
                     "★补丁页的「上次启动」卡能读到这条结论（不是只写日志）");
-            ok(stat, L, !PatchText.reason(ctx, PatchException.C_CRASH_DISABLED, "自检补丁")
-                            .contains(PatchException.C_CRASH_DISABLED),
+            ok(stat, L, !PatchText.reason(ctx, PatchException.C_CRASH_SUSPECT, "自检补丁")
+                            .contains(PatchException.C_CRASH_SUSPECT),
                     "★新错误码有人话（界面上不出现英文码）");
             // ★ 第 403 轮：整端崩了是另一句话（回退到官方本体），且普通补丁不能误用那句
             ok(stat, L, !PatchText.reason(ctx, PatchException.C_CRASH_DISABLED_GAME, "整端自检")

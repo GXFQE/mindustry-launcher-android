@@ -124,8 +124,8 @@ final class Recovery {
             Log.w(TAG, "recovery: launchid auto-clear failed", t);
         }
 
-        // 3e) 崩溃处理（第 360 轮）：上一局带补丁崩了 ⇒ 与 :game 注入失败同一套处置
-        //     （自动停用 + 写进补丁页的「上次启动」卡；用户可重新启用）
+        // 3e) 崩溃处理（第 360 轮；2026-11-22 改语义）：上一局带补丁崩了 ⇒ 只**记录嫌疑人**
+        //     并写进补丁页的「上次启动」卡，**不自动停用**（用户自己决定关不关）。
         try {
             List<String> pd = Patches.noteGameCrash(ctx, null);
             if (!pd.isEmpty()) {
@@ -134,9 +134,9 @@ final class Recovery {
                     if (j.length() > 0) j.append(", ");
                     j.append(x);
                 }
-                sb.append("patch auto-disabled after crash: ").append(j).append('\n');
-                // ★ 第 414 轮：崩溃当场那次弹窗可能还没有「已自动停用」这句（:game 没收尸 ⇒ 安全阀被挡）；
-                //   现在真停了就得说一声，否则用户以为"崩了但什么都没变"。
+                sb.append("patch suspects after crash: ").append(j).append('\n');
+                // 崩溃当场那次弹窗可能还没这句话（:game 没收尸 ⇒ 被挡）；这里补一句浮层，
+                // 让用户知道"上次是带着谁崩的、要关得自己去关"。
                 CrashAlert.toastPatchDisabled(ctx, Data.currentSlot(ctx), pd);
             }
         } catch (Throwable t) {

@@ -1995,6 +1995,8 @@
     <string name="crash_alert_toast_fmt">The game crashed: %1$s</string>
     <string name="crash_patch_disabled_fmt">The game crashed last launch with patch \"%1$s\" (now disabled). You can re-enable it on the patch page.</string>
     <string name="crash_patch_disabled_game_fmt">Full build \"%1$s\" was disabled after the crash; the game falls back to the original APK.</string>
+    <string name="crash_patch_suspect_fmt">The game crashed last launch with patch \"%1$s\". It stays enabled — turn it off on the patch page if it keeps crashing.</string>
+    <string name="patch_err_crash_suspect_fmt">Crashed last launch with \"%1$s\"; still enabled. Turn it off on the patch page if it keeps crashing.</string>
     <!-- Launcher's own report (crash_*_launcher.txt) lands in the same folder: do not call it "the game". -->
     <string name="crash_alert_title_launcher">The manager hit an error</string>
     <string name="crash_alert_toast_launcher_fmt">The manager hit an error: %1$s</string>

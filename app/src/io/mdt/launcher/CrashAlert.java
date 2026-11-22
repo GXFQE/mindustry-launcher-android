@@ -352,8 +352,10 @@ public final class CrashAlert {
     }
 
     /**
-     * 「这一局带过补丁、崩后已自动停用」那一句（对话框与浮层**共用**，别写两遍）。
-     * ★ 第 403 轮：被停用的是整端补丁 ⇒ 说"回退到官方本体"（普通补丁只少一小块改动）。
+     * 「这一局带过补丁、崩了」那一句（对话框与浮层**共用**，别写两遍）。
+     *
+     * <p>★ 2026-11-22：补丁**不再自动停用**（用户定的：崩了也能进管理器自己关），
+     * 所以这句从「已自动停用」改成「它还在启用中，一直崩就自己关」。</p>
      */
     private static String disabledSentence(Context a, String slot, java.util.List<String> pd) {
         StringBuilder j = new StringBuilder();
@@ -361,9 +363,7 @@ public final class CrashAlert {
             if (j.length() > 0) j.append(" / ");
             j.append(x);
         }
-        return Trans.get(a, Patches.crashDisabledWasGame(a, slot)
-                ? R.string.crash_patch_disabled_game_fmt
-                : R.string.crash_patch_disabled_fmt, j.toString());
+        return Trans.get(a, R.string.crash_patch_suspect_fmt, j.toString());
     }
 
     /**

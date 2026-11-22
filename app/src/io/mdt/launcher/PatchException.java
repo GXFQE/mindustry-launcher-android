@@ -65,6 +65,11 @@ final class PatchException extends IOException {
      */
     static final String C_CRASH_DISABLED = "crash_disabled";
     /**
+     * 上次启动带着这个补丁、游戏崩了 ⇒ **崩溃嫌疑人**（2026-11-22 起只记录，不再自动停用）。
+     * 用户要自己去补丁页关；关掉/重新启用后这条结论会被清掉。
+     */
+    static final String C_CRASH_SUSPECT = "crash_suspect";
+    /**
      * 崩溃后被自动停用的是**整端**补丁（第 403 轮）⇒ 文案要说「回退到官方本体」：
      * 普通补丁停用只是少一小块改动，整端停用等于换回官方包。
      */

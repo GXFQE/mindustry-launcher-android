@@ -77,6 +77,9 @@ final class PatchText {
         if (PatchException.C_CONFLICT_LAUNCH.equals(code)) {
             return Trans.get(c, R.string.patch_err_conflict_fmt, d);
         }
+        if (PatchException.C_CRASH_SUSPECT.equals(code)) {
+            return Trans.get(c, R.string.patch_err_crash_suspect_fmt, d);
+        }
         if (PatchException.C_CRASH_DISABLED.equals(code)) {
             return Trans.get(c, R.string.patch_err_crash_disabled_fmt, d);
         }

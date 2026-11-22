@@ -1940,6 +1940,8 @@
     <string name="crash_alert_toast_fmt">游戏崩了：%1$s</string>
     <string name="crash_patch_disabled_fmt">上次启动带着补丁「%1$s」崩了，已自动停用；在补丁页可以重新启用。</string>
     <string name="crash_patch_disabled_game_fmt">整端「%1$s」在这次崩溃后已自动停用，游戏会回退到官方本体。</string>
+    <string name="crash_patch_suspect_fmt">上次启动带着补丁「%1$s」崩了。它仍在启用中——如果一直崩，去补丁页把它关掉。</string>
+    <string name="patch_err_crash_suspect_fmt">上次启动带着「%1$s」崩了；仍然启用中，一直崩就去补丁页关掉它。</string>
     <!-- 启动器自己的报告（crash_*_launcher.txt）落在同一个目录 ⇒ 别叫它"游戏崩了" -->
     <string name="crash_alert_title_launcher">管理器出错了</string>
     <string name="crash_alert_toast_launcher_fmt">管理器出错了：%1$s</string>
