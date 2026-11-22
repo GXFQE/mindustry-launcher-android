@@ -69,3 +69,4 @@ cache/
 
 # ─── poolspike 构建产物（javac + d8 重建，见 tools/poolspike/README.md）─────────
 tools/poolspike/out/
+shot-*.png
