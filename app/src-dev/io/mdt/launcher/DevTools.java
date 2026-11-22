@@ -103,6 +103,7 @@ final class DevTools {
                 || intent.hasExtra("dev_casentry_dir")
                 || intent.hasExtra("dev_casentry_clean")
                 || intent.hasExtra("dev_poolspike")
+                || intent.hasExtra("dev_start")
                 || intent.hasExtra("dev_compat")
                 || intent.hasExtra("dev_backup_restore")
                 || intent.hasExtra("dev_logs_export")
@@ -473,6 +474,12 @@ final class DevTools {
         // 用法：`--es dev_poolspike 1`（需先把 override.dex 推到 app_hub/poolspike/）
         if (intent.hasExtra("dev_poolspike")) {
             devPoolSpike();
+            return;
+        }
+        // 直接从 adb 起一个版本（GameSlot 不 exported，adb 点不进去）
+        // 用法：`--es dev_start v1607.apk`（也接受 `import:v1607.apk` 全 key）
+        if (intent.hasExtra("dev_start")) {
+            devStart(intent.getStringExtra("dev_start"));
             return;
         }
 
@@ -1342,18 +1349,62 @@ final class DevTools {
      * 前提：override.dex 已放在 `app_hub/poolspike/override.dex`。
      */
     private void devPoolSpike() {
+        String apkName = a.getIntent().getStringExtra("poolspike_apk");
+        if (apkName == null || apkName.isEmpty()) apkName = "v160.apk";
+        final String name = apkName;
         new Thread(new Runnable() {
             @Override public void run() {
                 StringBuilder sb = new StringBuilder();
                 sb.append("== dev_poolspike ==\n");
                 try {
-                    PoolSpike.run(a, sb);
+                    PoolSpike.run(a, sb, name);
                 } catch (Throwable t) {
                     sb.append("FAILED: ").append(t).append('\n');
                 }
                 reportDev(sb.toString(), "dev_poolspike");
             }
         }, "dev-poolspike").start();
+    }
+
+
+    /**
+     * 从 adb 直接起一个版本（`GameSlot` 不 exported，adb 起不来）：
+     * `--es dev_start v1607.apk`，也接受 `import:v1607.apk` 全 key。
+     */
+    private void devStart(String key) {
+        String k = key == null ? "" : key.trim();
+        if (k.isEmpty()) {
+            reportDev("dev_start: 缺版本 key", "dev_start");
+            return;
+        }
+        if (k.indexOf(':') < 0) k = "import:" + k;
+        Versions.Entry hit = null;
+        try {
+            for (Versions.Entry e : Versions.scanAll(a)) {
+                if (k.equals(e.key())) {
+                    hit = e;
+                    break;
+                }
+            }
+        } catch (Throwable t) {
+            reportDev("dev_start 扫描失败: " + t, "dev_start");
+            return;
+        }
+        if (hit == null) {
+            StringBuilder sb = new StringBuilder("dev_start: 找不到 ").append(k).append("\n可选：\n");
+            try {
+                for (Versions.Entry e : Versions.scanAll(a)) sb.append("  ").append(e.key()).append('\n');
+            } catch (Throwable ignored) {
+            }
+            reportDev(sb.toString(), "dev_start");
+            return;
+        }
+        final Versions.Entry e = hit;
+        a.runOnUiThread(new Runnable() {
+            @Override public void run() {
+                MainActivity.startVersion(a, e, null, null, null);
+            }
+        });
     }
 
 

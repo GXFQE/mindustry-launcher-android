@@ -432,9 +432,13 @@ public final class Injector {
      * 再建一个 DexClassLoader 立刻就能解析。已安装的 APK 因安装期已 dexopt 不受影响。
      */
     private static boolean prewarm(Context ctx, File apk, StringBuilder log) {
+        // dev spike：池就绪时 dexPath 只由「覆盖 dex + 池里的 dex」组成（不含 APK）；
+        // 产品版 ProbeLab 恒返回 apk 路径，行为不变。
+        String dexPath = ProbeLab.dexPath(ctx, apk);
+        if (!dexPath.equals(apk.getAbsolutePath())) log.append("dev spike: dexPath = ").append(dexPath).append('\n');
         for (int attempt = 1; attempt <= 3; attempt++) {
             try {
-                DexClassLoader d = new DexClassLoader(apk.getAbsolutePath(),
+                DexClassLoader d = new DexClassLoader(dexPath,
                         ctx.getCodeCacheDir().getAbsolutePath(), null,
                         Injector.class.getClassLoader().getParent());
                 d.loadClass(GAME_ACTIVITY);
@@ -458,10 +462,13 @@ public final class Injector {
             throws Exception {
         File opt = ctx.getCodeCacheDir();
         if (!opt.exists()) opt.mkdirs();
-        DexClassLoader extra = new DexClassLoader(apk.getAbsolutePath(),
+        String dexPath = ProbeLab.dexPath(ctx, apk);
+        DexClassLoader extra = new DexClassLoader(dexPath,
                 opt.getAbsolutePath(), null, baseCl.getParent());
         int total = Reflect.appendDexElements(baseCl, extra);
         log.append("dexElements 合并后 = ").append(total).append('\n');
+        // dev spike：池映射必须在游戏第一次 internal 读取之前灌进去
+        ProbeLab.afterInject(ctx, baseCl);
         // 验证挪到 injectPatches 的末尾：补丁要在这句之前插好，否则 if (补丁替换了入口类)
         // 这里会先把原版加载掉 —— 之后再 prepend 就换不掉了（S0 的「已加载过就换不掉」）。
     }
@@ -598,6 +605,11 @@ public final class Injector {
      *   旧实现是"所有版本共用一个固定路径、先删后写" ⇒ 两个版本互相覆盖（plan §12.23）。
      */
     private static void loadNatives(Context ctx, Plan plan, StringBuilder log) throws Exception {
+        // dev spike（零 APK 实验）：池就绪时 .so 直接从对象池取，完全不打开 APK。
+        if (ProbeLab.poolReady(ctx)) {
+            loadNativesFromPool(ctx, plan, log);
+            return;
+        }
         File apk = plan.apk;
         ZipFile zf = new ZipFile(apk);
         // v2：已应用的整包补丁也可以带 native（`lib/<abi>/*.so`）—— 补丁优先、基座兜底。
@@ -687,6 +699,39 @@ public final class Injector {
         //   进程仍在）⇒ 第二次启动一个 native 缺失的包时这个判断**不会抛**，
         //   于是一路走到 startActivity，最后崩在游戏内部（等价的库从未加载），
         //   用户完全无从判断原因 —— 这是"静默出错"的最坏形态。
+        if (loaded == 0) throw new IllegalStateException(Trans.get(ctx, R.string.launch_err_no_native_loaded));
+    }
+
+    /**
+     * dev spike（零 APK 实验）：从对象池取 `lib/&lt;abi&gt;/*.so` 发布到 `natives/` 再 `System.load`。
+     *
+     * <p>**不做 APK 里那条 zipalign 对齐校验**：那条校验针对「直接从 zip 里 mmap 加载」的场景，
+     * 这里是把 .so 原样拷成独立文件再 `System.load`，吃的是 ELF 自己的 `p_align`（池里字节不变）。</p>
+     */
+    private static void loadNativesFromPool(Context ctx, Plan plan, StringBuilder log) throws Exception {
+        String abi = ProbeLab.nativeAbi(ctx);
+        if (abi == null) {
+            log.append("dev spike: pool has no lib/<abi> entry\n");
+            throw new IllegalStateException(Trans.get(ctx, R.string.launch_err_no_abi_fmt,
+                    Compat.join(Compat.deviceAbis())));
+        }
+        String tag = Natives.tagFor(plan.tag, plan.apk);
+        log.append("dev spike: natives from pool  abi=").append(abi)
+                .append("  tag=").append(tag).append('\n');
+        int loaded = 0;
+        for (String name : NATIVE_LIBS) {
+            File src = ProbeLab.nativeFile(ctx, abi, name);
+            if (src == null || !src.isFile()) {
+                log.append("pool missing lib/").append(abi).append('/').append(name).append('\n');
+                continue;
+            }
+            File out = Natives.publish(ctx, abi, tag, name, new java.io.FileInputStream(src));
+            System.load(out.getAbsolutePath());
+            loaded++;
+            log.append("System.load(").append(name).append(") OK  ")
+                    .append(out.length()).append(" B  [pool]");
+            log.append('\n');
+        }
         if (loaded == 0) throw new IllegalStateException(Trans.get(ctx, R.string.launch_err_no_native_loaded));
     }
 
@@ -783,6 +828,12 @@ public final class Injector {
      */
     private static void mountAssets(Context app, Activity activity, Plan plan, StringBuilder log)
             throws Exception {
+        // dev P0 实验（2026-11-22）：池就绪时不挂 APK，资产全靠同名 AndroidFi 覆盖读池。
+        // 产品版 ProbeLab 永远返回 false ⇒ 这里一行都不会走到。
+        if (ProbeLab.skipAssetMount(app)) {
+            log.append("dev spike: skip addAssetPath (pool-only assets)\n");
+            return;
+        }
         File base = (plan.assetBase != null && plan.assetBase.exists()) ? plan.assetBase : plan.apk;
         List<File> chain = new ArrayList<>();
         chain.add(base);

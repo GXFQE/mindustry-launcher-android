@@ -3,6 +3,7 @@ package arc.backend.android;
 import android.content.res.AssetFileDescriptor;
 import android.content.res.AssetManager;
 import android.os.ParcelFileDescriptor;
+import android.util.Log;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -30,6 +31,10 @@ import arc.files.Fi;
  */
 public class AndroidFi extends Fi {
 
+    private static final String TAG = "MDT-PoolFi";
+    private static int hits;
+    private static int misses;
+
     private static Map<String, String> pool = new HashMap<String, String>();
     private static Map<String, List<String>> kids = new HashMap<String, List<String>>();
     private static boolean inited;
@@ -55,6 +60,12 @@ public class AndroidFi extends Fi {
         pool = p;
         kids = k;
         inited = true;
+        Log.i(TAG, "init pool=" + p.size() + " dirs=" + k.size() + " loader=" + AndroidFi.class.getClassLoader());
+    }
+
+    /** 读池的账（spike 用；游戏跑一会儿之后由探针打出来）。 */
+    public static String stats() {
+        return "hits=" + hits + " misses=" + misses + " pool=" + pool.size();
     }
 
     public static int poolSize() {
@@ -98,7 +109,10 @@ public class AndroidFi extends Fi {
     }
 
     private boolean internal() {
-        return type == FileType.internal;
+        // ★ classpath 也要走池：游戏把 `vfxshaders/*` 这类文件放在 APK **根目录**，
+        //   原实现靠 `Fi.read()` 里的 classloader 资源查找（APK 在 dexPath 里才找得到）。
+        //   不挂 APK 之后那条路断了，所以把 classpath 和 internal 一起当成"池里读"。
+        return type == FileType.internal || type == FileType.classpath;
     }
 
     /** 逻辑路径在池里的对象文件；不是 internal 或没命中就是 null。 */
@@ -113,10 +127,24 @@ public class AndroidFi extends Fi {
         return new Fi(f);
     }
 
+    private void note(String what, boolean hit) {
+        if (hit) {
+            hits++;
+            if (hits <= 60) Log.i(TAG, what + " HIT " + path());
+        } else {
+            misses++;
+            if (misses <= 40) Log.w(TAG, what + " MISS " + path() + " -> fallback assets");
+        }
+    }
+
     @Override
     public InputStream read() {
         File o = obj();
-        if (o != null) return plain(o).read();
+        if (o != null) {
+            note("read", true);
+            return plain(o).read();
+        }
+        if (internal()) note("read", false);
         if (internal() && assets != null) {
             try {
                 return assets.open(path());
@@ -132,6 +160,7 @@ public class AndroidFi extends Fi {
         File o = obj();
         if (o != null) return o.length();
         if (internal() && assets != null) {
+            note("len", false);
             try {
                 AssetFileDescriptor afd = assets.openFd(path());
                 try {
@@ -154,6 +183,7 @@ public class AndroidFi extends Fi {
         }
         if (internal() && assets != null) {
             String p = path();
+            note("exists", false);
             try {
                 InputStream in = assets.open(p);
                 in.close();
@@ -220,6 +250,7 @@ public class AndroidFi extends Fi {
     public AssetFileDescriptor getAssetFileDescriptor() {
         File o = obj();
         if (o != null) {
+            note("afd", true);
             try {
                 ParcelFileDescriptor pfd = ParcelFileDescriptor.open(o, ParcelFileDescriptor.MODE_READ_ONLY);
                 return new AssetFileDescriptor(pfd, 0, o.length());
@@ -228,6 +259,7 @@ public class AndroidFi extends Fi {
             }
         }
         if (internal() && assets != null) {
+            note("afd", false);
             try {
                 return assets.openFd(path());
             } catch (IOException e) {
@@ -240,7 +272,11 @@ public class AndroidFi extends Fi {
     @Override
     public ByteBuffer map(FileChannel.MapMode mode) {
         File o = obj();
-        if (o != null) return plain(o).map(mode);
+        if (o != null) {
+            note("map", true);
+            return plain(o).map(mode);
+        }
+        if (internal()) note("map", false);
         return super.map(mode);
     }
 

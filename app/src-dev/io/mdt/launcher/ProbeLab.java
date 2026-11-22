@@ -39,6 +39,136 @@ final class ProbeLab {
         if (sAssetLab) runAssetLab(ctx);
     }
 
+    // ── 本体 CAS spike：同名 AndroidFi 覆盖（2026-11-22）─────────────────────
+
+    private static final String SPIKE_DIR = "poolspike";
+
+    /**
+     * 池已就绪（`override.dex` + `manifest.tsv` 都在）时，返回要**前置**进 dexPath 的文件；
+     * 否则 null（= 走原来的单 APK 路径，产品行为不变）。
+     */
+    static String dexPrepend(Context ctx) {
+        File dir = new File(Paths.privateDir(ctx), SPIKE_DIR);
+        File ov = new File(dir, "override.dex");
+        File man = new File(dir, "manifest.tsv");
+        return ov.isFile() && man.isFile() && man.length() > 0 ? ov.getAbsolutePath() : null;
+    }
+
+    /**
+     * P0 实验（2026-11-22）：**不把 APK 挂进 AssetManager**，资产只走同名类覆盖读池。
+     * 池就绪才生效；否则 false（产品行为不变）。
+     */
+    static boolean skipAssetMount(Context ctx) {
+        return dexPrepend(ctx) != null;
+    }
+
+    /** 池就绪（`override.dex` + `manifest.tsv` 都在）。 */
+    static boolean poolReady(Context ctx) {
+        return dexPrepend(ctx) != null;
+    }
+
+    /**
+     * 零 APK 实验：dexPath = 覆盖 dex + 池里的 dex 对象（`d` 行），**不含 APK**。
+     * 池没就绪时返回 APK 自己的路径（= 原行为）。
+     */
+    static String dexPath(Context ctx, File apk) {
+        if (!poolReady(ctx)) return apk.getAbsolutePath();
+        StringBuilder b = new StringBuilder(dexPrepend(ctx));
+        for (String obj : manifestObjects(ctx, 'd')) b.append(File.pathSeparator).append(obj);
+        return b.toString();
+    }
+
+    /** 池里第一个「本机 ABI 且有全部 native」的 abi；没有返回 null。 */
+    static String nativeAbi(Context ctx) {
+        if (!poolReady(ctx)) return null;
+        java.util.Set<String> abis = new java.util.LinkedHashSet<String>();
+        for (String p : manifestNames(ctx, 'l')) {
+            // lib/<abi>/<name>
+            int a = p.indexOf('/');
+            int b = p.indexOf('/', a + 1);
+            if (a > 0 && b > a) abis.add(p.substring(a + 1, b));
+        }
+        for (String d : Compat.deviceAbis()) if (abis.contains(d)) return d;
+        return abis.isEmpty() ? null : abis.iterator().next();
+    }
+
+    /** 池里 `lib/&lt;abi&gt;/&lt;name&gt;` 对应的对象文件；没有返回 null。 */
+    static File nativeFile(Context ctx, String abi, String name) {
+        if (!poolReady(ctx)) return null;
+        String want = "lib/" + abi + "/" + name;
+        java.util.List<String> names = manifestNames(ctx, 'l');
+        java.util.List<String> objs = manifestObjects(ctx, 'l');
+        for (int i = 0; i < names.size() && i < objs.size(); i++) {
+            if (want.equals(names.get(i))) return new File(objs.get(i));
+        }
+        return null;
+    }
+
+    /** manifest 里某类（`a` 资产 / `d` dex / `l` native）的**逻辑名**，按行序。 */
+    private static java.util.List<String> manifestNames(Context ctx, char kind) {
+        java.util.List<String> out = new java.util.ArrayList<String>();
+        for (String[] row : manifestRows(ctx)) if (row[0].charAt(0) == kind) out.add(row[1]);
+        return out;
+    }
+
+    /** manifest 里某类条目的**对象文件路径**（由 sha 推），按行序。 */
+    private static java.util.List<String> manifestObjects(Context ctx, char kind) {
+        java.util.List<String> out = new java.util.ArrayList<String>();
+        File objects = new File(new File(Paths.privateDir(ctx), SPIKE_DIR), "objects");
+        for (String[] row : manifestRows(ctx)) {
+            if (row[0].charAt(0) != kind) continue;
+            String sha = row[2];
+            out.add(new File(new File(objects, sha.substring(0, 2)), sha.substring(2)).getAbsolutePath());
+        }
+        return out;
+    }
+
+    /** 读 manifest.tsv → 每行 `{kind, name, sha, size}`；格式坏的行跳过。 */
+    private static java.util.List<String[]> manifestRows(Context ctx) {
+        java.util.List<String[]> out = new java.util.ArrayList<String[]>();
+        File man = new File(new File(Paths.privateDir(ctx), SPIKE_DIR), "manifest.tsv");
+        if (!man.isFile()) return out;
+        try {
+            java.io.BufferedReader r = new java.io.BufferedReader(
+                    new java.io.InputStreamReader(new FileInputStream(man), "UTF-8"));
+            try {
+                String line;
+                while ((line = r.readLine()) != null) {
+                    String[] f = line.split("\t");
+                    if (f.length >= 4 && f[0].length() == 1 && f[2].length() == 64) out.add(f);
+                }
+            } finally {
+                r.close();
+            }
+        } catch (Throwable e) {
+            Log.w("MDTLauncher", "manifest read failed", e);
+        }
+        return out;
+    }
+
+    /**
+     * dex 注入之后灌池映射 —— 必须早于游戏第一次 internal 读取（否则那一跳会回落 assets）。
+     * 覆盖类是**游戏自己的** `arc.backend.android.AndroidFi`（同名，靠 dexPath 顺序顶掉）。
+     */
+    static void afterInject(Context ctx, ClassLoader baseCl) {
+        if (!poolReady(ctx)) return;
+        try {
+            File objects = new File(new File(Paths.privateDir(ctx), SPIKE_DIR), "objects");
+            java.util.Map<String, String> pool = new java.util.HashMap<String, String>();
+            for (String[] row : manifestRows(ctx)) {
+                char k = row[0].charAt(0);
+                if (k != 'a' && k != 'r') continue;      // 资产 + APK 根文件（classpath）
+                String sha = row[2];
+                pool.put(row[1], new File(new File(objects, sha.substring(0, 2)), sha.substring(2)).getAbsolutePath());
+            }
+            Class<?> af = Class.forName("arc.backend.android.AndroidFi", true, baseCl);
+            af.getMethod("init", java.util.Map.class).invoke(null, pool);
+            Log.i("MDTLauncher", "poolspike: init pool=" + pool.size() + " cls=" + af.getClassLoader());
+        } catch (Throwable e) {
+            Log.w("MDTLauncher", "poolspike attach failed", e);
+        }
+    }
+
     // ── 素材（资源补丁）实验 · 2026-11-05 ────────────────────────────────
 
     private static boolean sAssetLab;

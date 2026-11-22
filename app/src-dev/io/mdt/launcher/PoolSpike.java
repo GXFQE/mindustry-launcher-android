@@ -29,12 +29,17 @@ final class PoolSpike {
     private static final String APK_NAME = "v160.apk";
 
     static void run(Context ctx, StringBuilder sb) {
+        run(ctx, sb, APK_NAME);
+    }
+
+    static void run(Context ctx, StringBuilder sb, String apkName) {
         long t0 = System.nanoTime();
         File base = new File(Paths.privateDir(ctx), "poolspike");
         File objects = new File(base, "objects");
         File tmp = new File(base, "tmp");
         File override = new File(base, "override.dex");
-        File apk = new File(Importer.importDir(ctx), APK_NAME);
+        File manifest = new File(base, "manifest.tsv");
+        File apk = new File(Importer.importDir(ctx), apkName);
         java.lang.reflect.Field coreFilesField = null;
         Object coreFilesOld = null;
 
@@ -58,9 +63,12 @@ final class PoolSpike {
             // ---- 1. ingest ----
             Map<String, String> pool = new HashMap<String, String>();
             List<String> dexObjs = new ArrayList<String>();
+            StringBuilder man = new StringBuilder();
             byte[] cursorOrig = null, sparseOrig = null;
             String classesSha = null;
             int entries = 0;
+            int libs = 0;
+            int roots = 0;
             long bytes = 0;
             long ti = System.nanoTime();
             ZipFile zf = new ZipFile(apk);
@@ -70,7 +78,7 @@ final class PoolSpike {
                     ZipEntry ze = en.nextElement();
                     if (ze.isDirectory()) continue;
                     String name = ze.getName();
-                    if (name.startsWith("lib/") || name.startsWith("META-INF/")) continue;
+                    if (name.startsWith("META-INF/")) continue;
                     byte[] data = readAll(zf.getInputStream(ze));
                     String sha = sha256(data);
                     File obj = objectPath(objects, sha);
@@ -84,7 +92,20 @@ final class PoolSpike {
                         }
                         obj.setReadOnly();
                     }
-                    if (name.startsWith("assets/")) pool.put(name.substring(7), obj.getAbsolutePath());
+                    if (name.startsWith("assets/")) {
+                        String key = name.substring(7);
+                        pool.put(key, obj.getAbsolutePath());
+                        man.append("a\t").append(key).append('\t').append(sha).append('\t').append(data.length).append('\n');
+                    } else if (name.startsWith("lib/")) {
+                        man.append("l\t").append(name).append('\t').append(sha).append('\t').append(data.length).append('\n');
+                        libs++;
+                    } else if (name.equals("classes.dex") || name.matches("classes\\d+\\.dex")) {
+                        man.append("d\t").append(name).append('\t').append(sha).append('\t').append(data.length).append('\n');
+                    } else {
+                        // APK 根目录的普通文件（`vfxshaders/*` 等）—— classpath 类型从这里读
+                        man.append("r\t").append(name).append('\t').append(sha).append('\t').append(data.length).append('\n');
+                        roots++;
+                    }
                     if (name.equals("classes.dex")) {
                         dexObjs.add(obj.getAbsolutePath());
                         classesSha = sha;
@@ -101,11 +122,16 @@ final class PoolSpike {
             }
             sb.append("① ingest ").append(entries).append(" 条目 / ").append(fmt(bytes))
                     .append("，池 ").append(pool.size()).append(" 路径，dex 对象 ").append(dexObjs.size())
+                    .append("，lib 对象 ").append(libs)
+                    .append("，根文件 ").append(roots)
                     .append("，耗时 ").append(ms(ti)).append("ms\n");
+            writeAll(manifest, man.toString().getBytes("UTF-8"));
+            int manLines = man.length() == 0 ? 0 : man.toString().split("\n").length;
+            sb.append("   manifest.tsv = ").append(manifest.length()).append("B / ").append(manLines).append(" 行\n");
             sb.append("   classes.dex sha=").append(classesSha == null ? "?" : classesSha.substring(0, 16)).append("...\n");
 
             // ---- 2. 把 APK 藏起来（证明不依赖它）----
-            File hidden = new File(apk.getParentFile(), APK_NAME + ".hidden");
+            File hidden = new File(apk.getParentFile(), apk.getName() + ".hidden");
             boolean renamed = apk.renameTo(hidden);
             sb.append("② APK 改名 ").append(renamed ? "OK" : "失败").append(" -> ").append(hidden.getName()).append('\n');
             try {
