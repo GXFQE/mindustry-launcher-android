@@ -133,7 +133,7 @@ final class PluginEntries {
             String ver = Plugins.stateGet(active, id);
             if (ver == null || ver.isEmpty()) continue;
             File apk = Plugins.apkOf(ctx, id, ver);
-            List<Extensions.Item> items = Extensions.forPage(Extensions.of(apk), page);
+            List<Extensions.Item> items = Extensions.forPage(Extensions.of(ctx, apk), page);
             if (items.isEmpty()) continue;
             String name = Plugins.displayNameOf(ctx, id);
             for (Extensions.Item it : items) out.add(new Entry(id, ver, name, it));
@@ -150,7 +150,7 @@ final class PluginEntries {
             String ver = Plugins.stateGet(active, id);
             if (ver == null || ver.isEmpty()) continue;
             File apk = Plugins.apkOf(ctx, id, ver);
-            List<Extensions.Item> items = Extensions.forAction(Extensions.of(apk), page);
+            List<Extensions.Item> items = Extensions.forAction(Extensions.of(ctx, apk), page);
             if (items.isEmpty()) continue;
             String name = Plugins.displayNameOf(ctx, id);
             for (Extensions.Item it : items) out.add(new Entry(id, ver, name, it));
@@ -198,7 +198,7 @@ final class PluginEntries {
             String ver = Plugins.stateGet(active, id);
             if (ver == null || ver.isEmpty()) continue;
             File apk = Plugins.apkOf(ctx, id, ver);
-            List<Extensions.Item> items = Extensions.forSection(Extensions.of(apk), page);
+            List<Extensions.Item> items = Extensions.forSection(Extensions.of(ctx, apk), page);
             if (items.isEmpty()) continue;
             String name = Plugins.displayNameOf(ctx, id);
             for (Extensions.Item it : items) out.add(new Entry(id, ver, name, it));
@@ -662,7 +662,7 @@ final class PluginEntries {
             String ver = Plugins.stateGet(active, id);
             if (ver == null || ver.isEmpty()) continue;
             File apk = Plugins.apkOf(ctx, id, ver);
-            List<Extensions.Item> items = Extensions.forPlaced(Extensions.of(apk), page, place);
+            List<Extensions.Item> items = Extensions.forPlaced(Extensions.of(ctx, apk), page, place);
             if (items.isEmpty()) continue;
             String name = Plugins.displayNameOf(ctx, id);
             for (Extensions.Item it : items) out.add(new Entry(id, ver, name, it));
@@ -869,7 +869,7 @@ final class PluginEntries {
             String ver = Plugins.stateGet(active, id);
             if (ver == null || ver.isEmpty()) continue;
             File apk = Plugins.apkOf(ctx, id, ver);
-            List<Extensions.Item> items = Extensions.forInline(Extensions.of(apk), page, anchor);
+            List<Extensions.Item> items = Extensions.forInline(Extensions.of(ctx, apk), page, anchor);
             if (items.isEmpty()) continue;
             String name = Plugins.displayNameOf(ctx, id);
             for (Extensions.Item it : items) out.add(new Entry(id, ver, name, it));

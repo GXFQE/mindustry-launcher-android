@@ -1,5 +1,7 @@
 package io.mdt.launcher;
 
+import android.content.Context;
+
 import org.json.JSONArray;
 import org.json.JSONObject;
 
@@ -205,6 +207,20 @@ final class Extensions {
      * 见类注释：坏条目只坑自己、整个坏了返回空表。
      */
     static List<Item> parse(String jsonText) {
+        return parse(jsonText, null);
+    }
+
+    /**
+     * 同上，但按界面语言取标题 —— 可选键 {@code title_<语言>} / {@code subtitle_<语言>}
+     * （例如 {@code title_en}），没有就落回 {@code title} / {@code subtitle}。
+     *
+     * <p>★ 2026-11-23（用户：「使用时长插件缺翻译」）：插件自述里的名字原来只有一种语言，
+     *   「游玩时长」「统计」在英文界面里仍是中文。这里只多认两个可选键，**不改既有格式** ——
+     *   老自述（只有 {@code title}）行为完全不变。</p>
+     *
+     * @param lang 语言码（{@link Content#lang}，例如 {@code zh} / {@code en}）；null = 只读基础键
+     */
+    static List<Item> parse(String jsonText, String lang) {
         List<Item> out = new ArrayList<Item>();
         if (jsonText == null || jsonText.trim().isEmpty()) return out;
         try {
@@ -231,7 +247,7 @@ final class Extensions {
                     place = "";                                 // 认不出的 place ⇒ 原行为
                 }
                 if (!SLOT_INLINE.equals(slot)) kind = "";       // kind 只对 inline 有意义
-                out.add(new Item(id, trim(o.optString("title", "")), trim(o.optString("subtitle", "")),
+                out.add(new Item(id, txt(o, "title", lang), txt(o, "subtitle", lang),
                         entry, slot, page, event, place, kind));
             }
         } catch (Throwable t) {
@@ -240,9 +256,32 @@ final class Extensions {
         return out;
     }
 
+    /**
+     * 取一项文案：先看 {@code <key>_<lang>}，空就落回 {@code <key>}。
+     *
+     * <p>两处都 trim：自述里的多余空白照旧被吃掉（与原地实现一致）。</p>
+     */
+    private static String txt(JSONObject o, String key, String lang) {
+        if (lang != null && !lang.isEmpty()) {
+            String alt = trim(o.optString(key + "_" + lang, ""));
+            if (!alt.isEmpty()) return alt;
+        }
+        return trim(o.optString(key, ""));
+    }
+
     /** 读某个插件 APK 里的声明（没这个文件 / 没这一节 ⇒ 空表，**不是错误**）。 */
     static List<Item> of(File apk) {
         return parse(PluginMeta.zipText(apk, ASSET));
+    }
+
+    /**
+     * 同上，但标题按**界面当前语言**取（{@code title_en} / {@code title_zh} 这类可选键）。
+     *
+     * <p>★ 2026-11-23：界面渲染路径都走这个重载；{@link #of(File)} 留给"只要结构、不看语言"
+     *  的地方（自检、数据导出），行为与以前逐字相同。</p>
+     */
+    static List<Item> of(Context c, File apk) {
+        return parse(PluginMeta.zipText(apk, ASSET), c == null ? null : Content.lang(c));
     }
 
     /** 只要某个插槽的条目（**纯函数**）。 */

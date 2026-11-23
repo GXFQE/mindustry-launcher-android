@@ -49,29 +49,29 @@ final class UpdateLineUi {
     }
 
     private static void intro(final Activity a, final Runnable changed) {
-        String body = Trans.get(a, R.string.update_line_intro)
+        final String body = Trans.get(a, R.string.update_line_intro)
                 + "\n\n" + Trans.get(a, R.string.set_update_line_sub_fmt,
                 label(a, Config.get().updateMirror()));
-        CardStack card = CardStack.show(null, a,
+        // ★ 第 418 轮（用户「更新线路部分动画存在问题」）：按钮必须跟正文**同一次渲染**。
+        //   旧写法是 show() 先画一页没有按钮的，紧跟着 bindIntroButtons() 又 replace 一次
+        //   ⇒ 同一帧里按钮从无到有，看着就是"闪一下"。
+        //   card 还没返回，所以用一格 holder 让按钮闭包拿到它（都是点击后才读）。
+        final CardStack[] ref = new CardStack[1];
+        ref[0] = CardStack.show(null, a,
                 Trans.get(a, R.string.set_update_line_title),
-                CardStack.text(a, body));
-        bindIntroButtons(a, card, changed);
-    }
-
-    private static void bindIntroButtons(final Activity a, final CardStack card,
-                                         final Runnable changed) {
-        if (card == null || !card.isShowing()) return;
-        card.replace(Trans.get(a, R.string.set_update_line_title),
-                Trans.get(a, R.string.update_line_intro)
-                        + "\n\n" + Trans.get(a, R.string.set_update_line_sub_fmt,
-                        label(a, Config.get().updateMirror())),
+                CardStack.text(a, body),
                 new CardStack.Btn(Trans.get(a, R.string.update_line_test), new Runnable() {
-                    @Override public void run() { startTest(a, card, changed); }
+                    @Override public void run() { startTest(a, ref[0], changed); }
                 }),
                 new CardStack.Btn(Trans.get(a, R.string.update_line_pick), new Runnable() {
-                    @Override public void run() { pickLine(a, card, changed); }
+                    @Override public void run() { pickLine(a, ref[0], changed); }
                 }),
-                closeBtn(a, card));
+                new CardStack.Btn(Trans.get(a, R.string.close), new Runnable() {
+                    @Override public void run() {
+                        CardStack c = ref[0];
+                        if (c != null && c.isShowing()) c.dismiss();
+                    }
+                }));
     }
 
     private static void startTest(final Activity a, final CardStack card,

@@ -162,7 +162,9 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
      */
     private final PluginPicks.Sink mPluginSink = new PluginPicks.Sink() {
         @Override public void onPluginFilter(String key, java.util.Set<String> ids) {
-            mPluginFilters.put(key, ids);
+            // ★ 第 418 轮：ids == null = 这一维不筛（空勾）⇒ 移出表，别留个"筛选中"的空壳
+            if (ids == null) mPluginFilters.remove(key);
+            else mPluginFilters.put(key, ids);
             rebuildList();
         }
 
@@ -953,17 +955,7 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
                     blamed.add(s.toLowerCase(java.util.Locale.ROOT));
                 }
                 // ★ 那次崩溃的**后果还在不在**：有模组带着它留下的记录（= 还被关着）
-                final boolean anyFailedNow;
-                {
-                    boolean any = false;
-                    for (Mods.Info mm : mScan.mods) {
-                        if (mm != null && mm.failed) {
-                            any = true;
-                            break;
-                        }
-                    }
-                    anyFailedNow = any;
-                }
+                final boolean anyFailedNow = ModsText.anyFailed(mScan.mods);
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
                         if (Util.dead(ModsActivity.this) || !slot.equals(mSlot)) return;
@@ -1025,13 +1017,7 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
         // ★ 「上次启动没跑完 ⇒ 游戏把全部模组都标成失败」是**全槽级**的事实，只在这里说一次
         //   （理由见 `mods_warn_failed` / isBlamed 的注释：逐行显示会冤枉无关模组）
         if (mFailNote != null) {
-            boolean anyFailed = false;
-            for (Mods.Info m : mScan.mods) {
-                if (m != null && m.failed) {
-                    anyFailed = true;
-                    break;
-                }
-            }
+            boolean anyFailed = ModsText.anyFailed(mScan.mods);
             // ★★ 2026-10-08 修（用户真机：「明明游戏禁用了所有模组但依旧显示会加载」/
             //    「就是目前这个状态，但下次启动是不加载的」）：
             //    **判据搬进 `ModsText.cardNote`**（纯函数、自检逐格钉住），而且
@@ -1062,11 +1048,20 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
             mCopySub.setText(Trans.get(ModsActivity.this, R.string.mods_act_copy_sub_fmt, mSlot));
         }
         if (mDetail != null) {
+            // ★ 2026-11-23（第 418 轮，用户「整槽跳过却说正常启动」）：
+            //   「上次启动」这一节原来只有两态（`launchid.dat` 在 = 没跑完 / 不在 = 正常跑完）。
+            //   而 `-failed` 是**上一次崩溃留下的记录**，`launchid.dat` 是**这一次**的启动标记 ——
+            //   崩溃→整槽跳过→下一次正常进游戏之后，两态判据都会说「上次启动正常跑完了」，
+            //   可模组还全被关着 ⇒ 用户看到的就是"明明跳过了却说正常"。
+            //   ⇒ 第三种状态必须单独说（与摘要卡 `ModsText.cardNote` 同一套机制）。
+            final boolean anyFailed = ModsText.anyFailed(mScan.mods);
+            final int launchRes = mScan.launchIdExists ? R.string.mods_crash_yes
+                    : (anyFailed ? R.string.mods_crash_no_but_failed : R.string.mods_crash_no);
             StringBuilder sb = new StringBuilder();
             sb.append(Trans.get(ModsActivity.this, R.string.mods_detail_fmt,
                     mScan.modsDirPath(),
                     mScan.settingsNote,
-                    getString(mScan.launchIdExists ? R.string.mods_crash_yes : R.string.mods_crash_no)));
+                    Trans.get(ModsActivity.this, launchRes)));
             if (!mTarget.any()) {
                 sb.append("\n\n").append(Trans.get(ModsActivity.this, R.string.mods_detail_no_target));
             } else {

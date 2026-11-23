@@ -390,6 +390,43 @@ public final class Trash {
             return a.path.getName().compareTo(b.path.getName());
         }
     };
+    /** 名字升序（不吃大小写；并列时按完整文件名 —— 与 `ListQuery` 的兜底同一口径）。 */
+    private static final Comparator<Item> BY_NAME_ASC = new Comparator<Item>() {
+        @Override public int compare(Item a, Item b) {
+            String x = a.name == null ? "" : a.name;
+            String y = b.name == null ? "" : b.name;
+            int c = x.compareToIgnoreCase(y);
+            if (c != 0) return c;
+            return a.path.getName().compareTo(b.path.getName());
+        }
+    };
+    /** 体积大 → 小（并列时名字升序，别让"一样大"的几项每次都换位置）。 */
+    private static final Comparator<Item> BY_SIZE_DESC = new Comparator<Item>() {
+        @Override public int compare(Item a, Item b) {
+            if (a.bytes != b.bytes) return a.bytes > b.bytes ? -1 : 1;
+            return BY_NAME_ASC.compare(a, b);
+        }
+    };
+
+    /** 中转站列表的排序方式（**纯显示层**：只影响 {@link #sorted}，不动盘上任何东西）。 */
+    public static final int SORT_TIME = 0;   // 挪进来的时间，新 → 旧（默认，与原来的行为一致）
+    public static final int SORT_NAME = 1;   // 名字升序
+    public static final int SORT_SIZE = 2;   // 体积，大 → 小
+
+    /**
+     * 按用户选的排序方式重排（★ 返回**新表**，入参一个字节都不动）。
+     *
+     * <p>★ 2026-11-23（第 418 轮，用户「中转站缺排序」）：原来顺序写死在
+     * {@link #listAll} 里（时间倒序），用户没有任何可选。三档与地图 / 蓝图 / 存档三页同名同序
+     * （名称 / 大小），"时间"这一档只有中转站有（别的页没有"挪进来的时间"这个概念）。
+     */
+    public static List<Item> sorted(List<Item> in, int sort) {
+        List<Item> out = new ArrayList<>(in == null ? Collections.<Item>emptyList() : in);
+        Comparator<Item> cmp = sort == SORT_NAME ? BY_NAME_ASC
+                : sort == SORT_SIZE ? BY_SIZE_DESC : BY_TIME_DESC;
+        Collections.sort(out, cmp);
+        return out;
+    }
 
     /** 某个中转站目录里的一项项（★ 跳过 `.nomedia` / `.part` 这类非用户数据，口径与备份一致） */
     public static List<Item> list(File dir) {

@@ -93,6 +93,23 @@ public class SlotsActivity extends BaseActivity {
     private TextView mSummary;
     private TextView mDetail;
 
+    /**
+     * ★ 2026-11-23（第 418 轮，用户「游戏崩溃以后**以及**提示正在运行」）：
+     * 本页的「运行中 / 没在跑」原来只在 `onResume` 取一次 ⇒ 人站在这一页时游戏崩掉，
+     * 摘要**不会自己变**（页内没有轮询，也没有崩溃回调可用 —— `GameSlot` 里写明退出没有可靠回调）。
+     * 这里补一条 1.5 s 的轻量轮询，**只重刷状态卡那一行**（不重建列表、不扫盘、不写任何文件）。
+     */
+    private static final long ALIVE_POLL_MS = 1500;
+    private final android.os.Handler mAliveHandler =
+            new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable mAliveTick = new Runnable() {
+        @Override public void run() {
+            if (isFinishing()) return;
+            refreshSummary();
+            mAliveHandler.postDelayed(this, ALIVE_POLL_MS);
+        }
+    };
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -108,6 +125,16 @@ public class SlotsActivity extends BaseActivity {
         // ★ 第 383 轮：数据根残留 / 缓存不再在进本页时清（见 Cleanup.autoCleanInBackground）。
         Data.reloadLegacyOwner();
         refresh();
+        // ★ 运行态自己会变（见 mAliveTick 的注释）：回到前台就开始轻量轮询
+        mAliveHandler.removeCallbacks(mAliveTick);
+        mAliveHandler.postDelayed(mAliveTick, ALIVE_POLL_MS);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        // 轮询只在看得见的时候跑（离开这一页就停，别在后台空转）
+        mAliveHandler.removeCallbacks(mAliveTick);
     }
 
     // ── UI ────────────────────────────────────────────────────────────────
@@ -148,13 +175,26 @@ public class SlotsActivity extends BaseActivity {
     private void refresh() {
         mSlots = Data.allSlots(this);
         rebuildList();
-        if (mSummary != null) {
-            File root = Data.dataRoot(this);
-            mSummary.setText(Trans.get(SlotsActivity.this, R.string.saves_summary_fmt,
-                    mSlots.size(),
-                    Data.currentSlot(this),
-                    getString(Data.gameAlive(this) ? R.string.game_running
-                                                   : R.string.game_not_running)));
+        refreshSummary();
+    }
+
+    /**
+     * 状态卡那两行。
+     *
+     * ★ 单独抽出来是为了给 {@link #mAliveTick} 复用：**运行态会自己变**（游戏崩溃 / 退出），
+     *   而这一页原来只在 `onResume` 取一次 ⇒ 人站在这里看着游戏崩了，摘要还写着「运行中 ⚠」。
+     * ★ 只在真的变了才 `setText`：同样的字符串重设也会触发布局，1.5 s 一次太浪费。
+     */
+    private void refreshSummary() {
+        if (mSummary == null) return;
+        File root = Data.dataRoot(this);
+        CharSequence text = Trans.get(SlotsActivity.this, R.string.saves_summary_fmt,
+                mSlots == null ? 0 : mSlots.size(),
+                Data.currentSlot(this),
+                Trans.get(SlotsActivity.this, Data.gameAlive(this) ? R.string.game_running
+                                                                  : R.string.game_not_running));
+        if (!text.equals(mSummary.getText())) mSummary.setText(text);
+        if (mDetail != null) {
             mDetail.setText(Trans.get(SlotsActivity.this, R.string.saves_detail_fmt,
                     root == null ? "?" : root.getAbsolutePath(),
                     Backup.rootDir(this).getAbsolutePath()));

@@ -83,6 +83,14 @@ public final class CardStack {
     private Runnable onDismiss;
     /** 	extPage() 建的那个 TextView（updateText 用）。 */
     private TextView lastText;
+    /**
+     * 正在跑的正文高度动画（第 418 轮）。
+     *
+     * <p>★ 为什么要存它：用户「更新线路部分动画存在问题」—— 换页时 `setBodyHeight` 可能在
+     *  170ms 内被连续调用两次（先缩到"检测中"、再涨到结果），两个 animator 同时往 `lp.height`
+     *  里写 ⇒ 高度在两个目标之间来回抖。开新动画前先把这个 cancel 掉。</p>
+     */
+    private android.animation.ValueAnimator mHeightAnim;
     /** 正文槽的高度上限（屏高减去卡片上下留白 + 标题 + 按钮 + 边距，留够余量）。 */
     private final int maxBody;
 
@@ -246,6 +254,26 @@ public final class CardStack {
         render(p, false);
     }
 
+    /**
+     * 「结束页」：把整摞压成**这一页**（历史清空）—— 系统返回键从此 = 关窗，不再是"退回上一屏"。
+     *
+     * <p>★ 2026-11-23（用户：「复制设置结束不应当可返回（再复制就失败）」）：结束页原来是
+     *   {@link #push} 上去的，返回键会 pop 回上一页；而上一页的闭包里攥着**已经算好的 plan**
+     *   （或已经执行完的动作），再点一次只会得到 noop / 第二次失败。</p>
+     *
+     * <p>判据：这一屏之后**没有下一步**才用它（结果 / 失败 / 无事可做）；还要继续操作的用 {@link #push}。</p>
+     */
+    public void finish(CharSequence title, CharSequence message, Btn... buttons) {
+        Page p = new Page();
+        p.title = title;
+        p.body = textPage(dlg.getContext(), message);
+        for (Btn b : buttons) if (b != null) p.buttons.add(b);
+        pages.clear();
+        pages.add(p);
+        render(p, false);
+        if (!dlg.isShowing()) dlg.show();
+    }
+
     /** 只改这一页的正文（进度数字这种高频刷新）—— 不换页、不播动画。 */
     public void updateText(CharSequence message) {
         if (lastText == null) return;
@@ -367,6 +395,10 @@ public final class CardStack {
             bodyView.addView(p.body);
             setBodyHeight(h, false);
             setButtons(p);
+            // ★ 第 418 轮：硬切页也把按钮栏拨回不透明 —— 上一步可能是带淡入的动画页，
+            //   它留下的 alpha 会跟着新按钮一起继承（按钮半透明地"幽灵出现"）。
+            buttonBar.animate().cancel();
+            buttonBar.setAlpha(1f);
             return;
         }
         titleView.animate().alpha(0f).setDuration(70).withEndAction(new Runnable() {
@@ -392,6 +424,11 @@ public final class CardStack {
         }
         setBodyHeight(h, true);
         setButtons(p);
+        // ★ 第 418 轮（用户「更新线路部分动画存在问题」）：`setButtons` 是**立即生效**的，
+        //   而正文要淡入 150ms ⇒ 换页时看着像"按钮先到、正文后到"。让按钮栏跟正文一起淡入。
+        buttonBar.animate().cancel();
+        buttonBar.setAlpha(0f);
+        buttonBar.animate().alpha(1f).setDuration(150).start();
         bodyView.postDelayed(new Runnable() {
             @Override public void run() {
                 for (int i = bodyView.getChildCount() - 1; i >= 0; i--) {
@@ -542,6 +579,11 @@ public final class CardStack {
     }
 
     private void setBodyHeight(final int target, boolean animate) {
+        // ★ 第 418 轮：先把上一次没跑完的高度动画停掉（见 mHeightAnim 的说明）。
+        if (mHeightAnim != null) {
+            mHeightAnim.cancel();
+            mHeightAnim = null;
+        }
         final ViewGroup.LayoutParams lp = bodyView.getLayoutParams();
         int start = bodyView.getHeight();
         if (!animate || start <= 0 || start == target) {
@@ -560,6 +602,7 @@ public final class CardStack {
                 applyPageHeight(h);
             }
         });
+        mHeightAnim = v;
         v.start();
     }
 

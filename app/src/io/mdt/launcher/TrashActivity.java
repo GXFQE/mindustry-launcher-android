@@ -58,6 +58,10 @@ public class TrashActivity extends BaseActivity {
     private List<Trash.Item> mAll;
     /** 「按类型筛选」那一行的副标题（显示当前选了哪一类） */
     private TextView mFilterSub;
+    /** 「排序」那一行的副标题（第 418 轮：显示当前档位） */
+    private TextView mSortSub;
+    /** 当前排序方式（{@link Trash#SORT_TIME} / {@code SORT_NAME} / {@code SORT_SIZE}）；纯显示层 */
+    private int mSort = Trash.SORT_TIME;
     /** 当前分类；null = 全部 */
     private Trash.Kind mKind;
 
@@ -90,6 +94,14 @@ public class TrashActivity extends BaseActivity {
                     @Override public void run() { pickFilter(); }
                 });
         mFilterSub = (TextView) rowFilter.findViewById(R.id.act_sub);
+
+        // ★ 2026-11-23（第 418 轮，用户「中转站缺排序」）：形态与上面那行"筛选"完全一致
+        //   （动作卡一行 + 单选弹窗 + 副标题显当前档位），不另造控件。
+        View rowSort = Util.bindActionValue(root, R.id.row_trash_sort, R.drawable.ic_sort,
+                R.string.trash_sort_title, new Runnable() {
+                    @Override public void run() { pickSort(); }
+                });
+        mSortSub = (TextView) rowSort.findViewById(R.id.act_sub);
 
         mRowClick = new MsavListAdapter.RowClick() {
             @Override public void onRow(int pos) {
@@ -153,6 +165,8 @@ public class TrashActivity extends BaseActivity {
                 bytes += it.bytes;
             }
         }
+        // ★ 第 418 轮：顺序交给 Trash.sorted（纯函数、三档；并列的兜底也在那边）
+        shown = Trash.sorted(shown, mSort);
         mItems = shown;
 
         String[] titles = new String[shown.size()];
@@ -180,6 +194,46 @@ public class TrashActivity extends BaseActivity {
             mFilterSub.setText(Trans.get(TrashActivity.this, R.string.trash_filter_item_fmt,
                     TrashText.kindLabel(TrashActivity.this, mKind), shown.size()));
         }
+        if (mSortSub != null) mSortSub.setText(sortLabel());
+    }
+
+    /** 当前排序档位的人话（三档与地图 / 蓝图 / 存档同词，"时间"只有中转站有）。 */
+    private CharSequence sortLabel() {
+        int res = mSort == Trash.SORT_NAME ? R.string.mods_filter_sort_name
+                : mSort == Trash.SORT_SIZE ? R.string.mods_filter_sort_size
+                : R.string.trash_sort_time;
+        return Trans.get(TrashActivity.this, res);
+    }
+
+    /**
+     * 选排序（第 418 轮用户「中转站缺排序」）。
+     *
+     * <p>与「筛选」同一形态：{@code setSingleChoiceItems} 单选、选中即关窗重排，
+     * **不配正文**（HONOR 上 `setMessage` + 列表同现会让列表整块不渲染，`docs/flows/20` §20.5）。
+     * 排序只是重排 `mAll` 的显示副本（{@link Trash#sorted}），**一个文件都不碰**。
+     */
+    private void pickSort() {
+        final int[] opts = { Trash.SORT_TIME, Trash.SORT_NAME, Trash.SORT_SIZE };
+        final CharSequence[] labels = new CharSequence[opts.length];
+        int checked = 0;
+        for (int i = 0; i < opts.length; i++) {
+            labels[i] = Trans.get(TrashActivity.this, opts[i] == Trash.SORT_NAME
+                    ? R.string.mods_filter_sort_name
+                    : opts[i] == Trash.SORT_SIZE ? R.string.mods_filter_sort_size
+                    : R.string.trash_sort_time);
+            if (opts[i] == mSort) checked = i;
+        }
+        new AlertDialog.Builder(TrashActivity.this)
+                .setTitle(R.string.trash_sort_title)
+                .setSingleChoiceItems(labels, checked, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int which) {
+                        mSort = opts[which];
+                        d.dismiss();
+                        render();
+                    }
+                })
+                .setPositiveButton(R.string.cancel, null)
+                .show();
     }
 
     /**
@@ -225,7 +279,7 @@ public class TrashActivity extends BaseActivity {
                                 render();
                             }
                         })
-                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.cancel, null)
                 .show();
     }
 

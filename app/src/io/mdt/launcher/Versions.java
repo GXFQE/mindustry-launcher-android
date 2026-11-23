@@ -327,6 +327,18 @@ public final class Versions {
                 ArchiveMeta meta = readArchiveMeta(ctx, e.apkPath);
                 if (e.realPkg == null || e.realPkg.isEmpty()) e.realPkg = meta.pkg;
                 e.archiveVersion = meta.versionName;
+                // ★ 第 418 轮：CAS 开着时导入包可能**已经被删掉**（内容全在池里）——
+                //   那时读不到 APK 清单，版本号就退回清单里记下的那份，否则界面只能显示
+                //   version.properties 里的基座号（用户 2026-11-10 反馈过"b509 不是改端版本号"）。
+                if (e.archiveVersion == null || e.archiveVersion.trim().isEmpty()) {
+                    String fn = e.apkPath == null ? null : new File(e.apkPath).getName();
+                    if (fn != null && !fn.isEmpty()) {
+                        PkgManifest pm = PkgIngest.manifest(ctx, "import:" + fn);
+                        if (pm != null && pm.version != null && !pm.version.trim().isEmpty()) {
+                            e.archiveVersion = pm.version.trim();
+                        }
+                    }
+                }
             }
         }
     }

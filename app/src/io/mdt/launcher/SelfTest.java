@@ -13315,6 +13315,45 @@ public final class SelfTest {
             ok(stat, L, !d.parsed && "不是时间戳的图.msav".equals(d.name),
                     "① ★元断言：认不出的名字 parsed=false，但**原名原样保留**（得到「" + d.name + "」）");
 
+            // ── ①' 排序三档（第 418 轮：用户「中转站缺排序」）────────────────
+            // 三份夹具：名字 / 体积 / 时间**各不相同**（否则哪一档看着都"对"）。
+            File sOld = new File(trash, "20260101-000000-aaa.msav");
+            File sMid = new File(trash, "20260102-000000-bbb.msav");
+            File sNew = new File(trash, "20260103-000000-ccc.msav");
+            write(sOld, new byte[10]);
+            write(sMid, new byte[30]);
+            write(sNew, new byte[20]);
+            java.util.List<Trash.Item> rawItems = new java.util.ArrayList<Trash.Item>();
+            rawItems.add(Trash.parse(sOld));
+            rawItems.add(Trash.parse(sMid));
+            rawItems.add(Trash.parse(sNew));
+            java.util.List<Trash.Item> byTime = Trash.sorted(rawItems, Trash.SORT_TIME);
+            ok(stat, L, "ccc.msav".equals(byTime.get(0).name)
+                            && "bbb.msav".equals(byTime.get(1).name)
+                            && "aaa.msav".equals(byTime.get(2).name),
+                    "①' 排序 · 时间：新的在前（" + byTime.get(0).name + " / " + byTime.get(1).name
+                            + " / " + byTime.get(2).name + "）");
+            java.util.List<Trash.Item> byName = Trash.sorted(rawItems, Trash.SORT_NAME);
+            ok(stat, L, "aaa.msav".equals(byName.get(0).name)
+                            && "bbb.msav".equals(byName.get(1).name)
+                            && "ccc.msav".equals(byName.get(2).name),
+                    "①' 排序 · 名称：升序（" + byName.get(0).name + " / " + byName.get(1).name
+                            + " / " + byName.get(2).name + "）");
+            java.util.List<Trash.Item> bySize = Trash.sorted(rawItems, Trash.SORT_SIZE);
+            ok(stat, L, "bbb.msav".equals(bySize.get(0).name)
+                            && bySize.get(0).bytes == 30
+                            && "ccc.msav".equals(bySize.get(1).name)
+                            && bySize.get(1).bytes == 20,
+                    "①' 排序 · 大小：大的在前（" + bySize.get(0).name + " " + bySize.get(0).bytes
+                            + " B / " + bySize.get(1).name + " " + bySize.get(1).bytes + " B）");
+            ok(stat, L, rawItems.get(0).name.equals("aaa.msav")
+                            && rawItems.get(1).name.equals("bbb.msav")
+                            && rawItems.get(2).name.equals("ccc.msav"),
+                    "①' ★元断言：排序不改编入参（传进去那张表原样不动）");
+            sOld.delete();
+            sMid.delete();
+            sNew.delete();
+
             // ── ② 放回去：过解析器 + 逐字节一致 ───────────────────────────
             File srcMap = tinyMsav(new File(root, "夹具.msav"), "夹具图", 32, 32, 1, false);
             final byte[] mapBytes = java.nio.file.Files.readAllBytes(srcMap.toPath());
@@ -20204,8 +20243,17 @@ public final class SelfTest {
             if (gf != null) gf.delete();
 
             Patches.clearCrashNoticeForRef(ctx, ref);
-            ok(stat, L, Patches.crashProblems(ctx).isEmpty(),
-                    "★用户重新启用后旧结论被清掉（旧结论不该继续骂它）");
+            // ★ 判据只能落在**这一条**上：设备上可能本来就有用户真实补丁的崩溃记录
+            //   （crashProblems 是全局文件、不按 ikey 过滤），拿"全局为空"当判据会冤枉自检。
+            boolean stillMine = false;
+            for (Patches.Problem pr : Patches.crashProblems(ctx)) {
+                if (pr != null && pr.detail != null && pr.detail.contains("自检补丁")) {
+                    stillMine = true;
+                    break;
+                }
+            }
+            ok(stat, L, !stillMine,
+                    "★用户重新启用后旧结论被清掉（旧结论不该继续骂它；别人的记录不归本断言管）");
         } catch (Throwable t) {
             ok(stat, L, false, "⑯ 崩溃处理组异常：" + t);
         } finally {

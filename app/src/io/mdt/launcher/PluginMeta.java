@@ -108,7 +108,23 @@ final class PluginMeta {
         } catch (Throwable ignored) {
         }
         return new Info(trim(m.get(K_ENTRY)), trim(m.get(K_NAME)), trim(m.get(K_VERSION)),
-                trim(m.get(K_AUTHOR)), trim(m.get(K_DESC)));
+                trim(m.get(K_AUTHOR)), pick(m, K_DESC, ctx == null ? null : Content.lang(ctx)));
+    }
+
+    /**
+     * 取一条描述：先看 {@code <键>_<语言>}（例如 {@code description_zh}），空就落回原键。
+     *
+     * <p>★ 2026-11-23（用户「使用时长插件缺翻译」）：插件页上那句描述原来只有英文，
+     *   `title` / `description` 这类自述字段没有语言维度。这里加的是**可选**键，
+     *   老自述（只写 {@code description}）行为逐字不变。</p>
+     */
+    private static String pick(Map<String, String> m, String key, String lang) {
+        if (m == null) return null;
+        if (lang != null && !lang.isEmpty()) {
+            String alt = trim(m.get(key + "_" + lang));
+            if (alt != null && !alt.isEmpty()) return alt;
+        }
+        return trim(m.get(key));
     }
 
     /** 只要入口类名（注入路径上最常用的那一个）。 */

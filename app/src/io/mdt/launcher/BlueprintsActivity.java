@@ -115,7 +115,9 @@ public class BlueprintsActivity extends BaseActivity {
     /** 插件筛选 / 排序算完那一下（四个列表页各一份，形状相同）：结果缓存下来再重画。 */
     private final PluginPicks.Sink mPluginSink = new PluginPicks.Sink() {
         @Override public void onPluginFilter(String key, java.util.Set<String> ids) {
-            mPluginFilters.put(key, ids);
+            // ★ 第 418 轮：ids == null = 这一维不筛（空勾）⇒ 移出表，别留个"筛选中"的空壳
+            if (ids == null) mPluginFilters.remove(key);
+            else mPluginFilters.put(key, ids);
             rebuildList();
         }
 

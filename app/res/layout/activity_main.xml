@@ -64,7 +64,7 @@
             android:paddingStart="@dimen/page_pad"
             android:paddingEnd="@dimen/page_pad"
             android:paddingTop="12dp"
-            android:paddingBottom="14dp">
+            android:paddingBottom="@dimen/card_gap">
 
             <!-- 状态摘要卡：整卡可点，展开/收起详情 -->
             <LinearLayout
@@ -301,7 +301,12 @@
             </LinearLayout>
 
             <!-- 第 160 轮：插件动作区（没有条目整块 GONE） -->
-            <include layout="@layout/plugin_section" />
+            <!-- 2026-11-23（第 418 轮）：卡间距统一 = card_gap。插件区自己带 8dp 的上下外边距
+                 （其它页也是这套），这里**在 include 上覆盖**成 10dp / 0dp：上面与工具卡隔
+                 card_gap，下面留给顶部区的 paddingBottom（也是 card_gap）⇒ 与"卡与卡之间"一致。 -->
+            <include layout="@layout/plugin_section"
+                android:layout_marginTop="@dimen/card_gap"
+                android:layout_marginBottom="0dp" />
         </LinearLayout>
 
         <!-- ── 版本列表容器（条目由 MainActivity.rebuildList() 全展开挂载） ── -->

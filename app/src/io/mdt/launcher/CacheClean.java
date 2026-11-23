@@ -109,28 +109,35 @@ final class CacheClean {
         if (!root.isDirectory()) return true;
         long cut = manual ? Long.MAX_VALUE
                 : System.currentTimeMillis() - PREVIEW_KEEP_DAYS * 24L * 60L * 60L * 1000L;
-        return prune(root, cut, r);
+        // ★ 判"成功"只认**删不掉的件**，不认"还剩东西"：自动清理按设计留新图，
+        //   把"没有全空"当失败会让每次自动清理都报「部分清理」（2026-11-23 自检抓到）。
+        boolean[] failed = new boolean[1];
+        prune(root, cut, r, failed);
+        return !failed[0];
     }
 
-    /** 递归剪：文件按 mtime 判，剪空的目录也走（只对自己删空的目录动手） */
-    private static boolean prune(File dir, long cut, Result r) {
+    /** 递归剪：文件按 mtime 判，剪空的目录也走（只对自己删空的目录动手）。返回"这棵子树空了"。 */
+    private static boolean prune(File dir, long cut, Result r, boolean[] failed) {
         File[] fs = dir.listFiles();
         if (fs == null) return false;
-        boolean ok = true;
         for (File f : fs) {
             if (f == null) continue;
             if (f.getName().startsWith(".")) continue;   // .v<N> 标记
             if (f.isDirectory()) {
-                boolean empty = prune(f, cut, r);
-                if (empty && f.delete()) r.entries++;
-                else if (!empty) ok = false;
+                // 目录本身不表态：自动清理**只删过期的**，留下的新图是正常结果，
+                // 不许把它算成"没清干净"（否则每次自动清理都对着一张新预览报失败）。
+                boolean empty = prune(f, cut, r, failed);
+                if (empty) {
+                    if (f.delete()) r.entries++;
+                    else failed[0] = true;
+                }
             } else if (f.lastModified() < cut) {
                 long len = HubTmp.sizeNoFollow(f);
                 if (HubTmp.deleteNoFollow(f)) {
                     r.entries++;
                     r.bytes += len;
                 } else {
-                    ok = false;
+                    failed[0] = true;
                     Log.w(TAG, "cache clean: cannot delete " + f);
                 }
             }
@@ -147,7 +154,7 @@ final class CacheClean {
                 }
             }
         }
-        return ok && !anyLeft;
+        return !anyLeft;
     }
 
     /**

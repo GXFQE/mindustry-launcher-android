@@ -73,7 +73,7 @@ final class PluginViews {
                 String ver = Plugins.stateGet(active, id);
                 File apk = Plugins.apkOf(ctx, id, ver);
                 if (apk == null || !apk.isFile()) continue;
-                for (Extensions.Item it : Extensions.forSlot(Extensions.of(apk), slot)) {
+                for (Extensions.Item it : Extensions.forSlot(Extensions.of(ctx, apk), slot)) {
                     if (page.equals(it.page)) out.add(new View(id, ver, it));
                 }
             }

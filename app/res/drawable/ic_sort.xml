@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 第 418 轮：中转站「排序」行。Material "sort"（三条从长到短的横线）的标准 path，
+     与其它行图标同一套颜色（@color/icon_tint，ImageView 上还有 accent 的 tint）。 -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@color/icon_tint"
+        android:pathData="M3,18h6v-2H3v2zM3,6v2h18V6H3zM3,13h12v-2H3v2z" />
+</vector>

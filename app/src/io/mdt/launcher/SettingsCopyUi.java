@@ -9,6 +9,12 @@ import android.widget.Toast;
  *
  * <p>三档沿用 {@link SlotWrite}（更新 / 补齐 / 覆盖），但**文案是设置版**：
  * 整槽导入那句说的是“文件”，这里说的是“键”，不能直接套。
+ *
+ * <p>★ 2026-11-23（用户：「复制设置结束不应当可返回（再复制就失败）」）：
+ *   所有"结束"屏（成功 / 失败 / 无事可做）一律用 {@link CardStack#finish} ——
+ *   它把整摞压成一页，返回键就是关窗。以前用 `pushMessage` 会留一个「返回」，
+ *   退回的是**预览页**，那一页的闭包里攥着已经算好的 {@link SettingsCopy.Plan}：
+ *   再点一次「复制设置」时 `SettingsCopy.apply` 发现 `changed == 0` ⇒ 判成失败（真机现象）。</p>
  */
 final class SettingsCopyUi {
 
@@ -56,29 +62,20 @@ final class SettingsCopyUi {
         try {
             plan = SettingsCopy.plan(a, source, target.name, mode);
         } catch (Throwable t) {
-            stack.pushMessage(Trans.get(a, R.string.settings_copy_failed_title),
-                    Trans.get(a, R.string.settings_copy_failed_fmt, msg(t)),
-                    Trans.get(a, R.string.close), new Runnable() {
-                        @Override public void run() { stack.dismiss(); }
-                    });
+            finish(stack, a, R.string.settings_copy_failed_title,
+                    Trans.get(a, R.string.settings_copy_failed_fmt, msg(t)));
             return;
         }
 
         if (plan.versionConflict) {
-            stack.pushMessage(Trans.get(a, R.string.settings_copy_failed_title),
-                    Trans.get(a, R.string.settings_copy_version_mismatch),
-                    Trans.get(a, R.string.close), new Runnable() {
-                        @Override public void run() { stack.dismiss(); }
-                    });
+            finish(stack, a, R.string.settings_copy_failed_title,
+                    Trans.get(a, R.string.settings_copy_version_mismatch));
             return;
         }
 
         if (plan.empty()) {
-            stack.pushMessage(Trans.get(a, R.string.settings_copy_preview_title),
-                    Trans.get(a, R.string.settings_copy_no_changes),
-                    Trans.get(a, R.string.close), new Runnable() {
-                        @Override public void run() { stack.dismiss(); }
-                    });
+            finish(stack, a, R.string.settings_copy_preview_title,
+                    Trans.get(a, R.string.settings_copy_no_changes));
             return;
         }
 
@@ -112,31 +109,34 @@ final class SettingsCopyUi {
         try {
             r = SettingsCopy.apply(a, target.name, plan);
         } catch (Throwable t) {
-            r = null;
-            stack.pushMessage(Trans.get(a, R.string.settings_copy_failed_title),
-                    Trans.get(a, R.string.settings_copy_failed_fmt, msg(t)),
-                    Trans.get(a, R.string.close), new Runnable() {
-                        @Override public void run() { stack.dismiss(); }
-                    });
+            finish(stack, a, R.string.settings_copy_failed_title,
+                    Trans.get(a, R.string.settings_copy_failed_fmt, msg(t)));
             return;
         }
-        if (r == null || !r.ok || !r.verified) {
+        // ★ noop 是**合法结果**（这次没有键需要改），而 `SettingsBin` 只在**真写盘**时才置
+        //   `verified`（见 SettingsBin 写后校验那一段）⇒ 判据必须排除 noop，
+        //   否则"再确认一次"会被判成失败，而且原因取不到（弹一张空白正文的卡）。
+        if (r == null || !r.ok || (!r.noop && !r.verified)) {
             String why = (r == null || r.error == null || r.error.isEmpty()) ? "" : r.error;
-            stack.pushMessage(Trans.get(a, R.string.settings_copy_failed_title),
-                    Trans.get(a, R.string.settings_copy_failed_fmt, why),
-                    Trans.get(a, R.string.close), new Runnable() {
-                        @Override public void run() { stack.dismiss(); }
-                    });
+            if (why.isEmpty()) why = Trans.get(a, R.string.settings_copy_failed_noreason);
+            finish(stack, a, R.string.settings_copy_failed_title,
+                    Trans.get(a, R.string.settings_copy_failed_fmt, why));
             return;
         }
         if (host != null) host.onSlotChanged();
         String body = r.noop
-                ? a.getString(R.string.settings_copy_no_changes)
+                ? Trans.get(a, R.string.settings_copy_no_changes)
                 : Trans.get(a, R.string.settings_copy_done_fmt, plan.writeCount, plan.deleteCount);
-        stack.pushMessage(Trans.get(a, R.string.settings_copy_done_title), body,
-                Trans.get(a, R.string.close), new Runnable() {
+        finish(stack, a, R.string.settings_copy_done_title, body);
+    }
+
+    /** 结束屏：一页 + 只有一个「关闭」（{@link CardStack#finish} 已清空历史，返回键也是关窗）。 */
+    private static void finish(final CardStack stack, final Activity a,
+                               int titleRes, CharSequence body) {
+        stack.finish(Trans.get(a, titleRes), body,
+                new CardStack.Btn(Trans.get(a, R.string.close), new Runnable() {
                     @Override public void run() { stack.dismiss(); }
-                });
+                }));
     }
 
     private static String msg(Throwable t) {

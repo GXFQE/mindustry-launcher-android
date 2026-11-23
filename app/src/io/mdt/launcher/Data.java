@@ -700,6 +700,11 @@ public final class Data {
      *
      * <p>判据 = 进程名是 `包名:game` **或** `包名:gameN`（多开方案 §4 的命名；
      * 这样换进程名时不会静默 fail-open —— 见 plan §12.6 第 1 条）。
+     *
+     * <p>★ 2026-11-23（第 418 轮，用户「游戏崩溃以后以及提示正在运行」）：光看进程名不够 ——
+     * 游戏刚崩掉时 `getRunningAppProcesses()` 里会留着它（第 412 轮真机踩过同一现象），
+     * 于是主界面 / 槽页都说「运行中 ⚠」、启动被自己拦下。**判活以 `/proc/&lt;pid&gt;` 为准**
+     * （{@link #alivePid}，与 {@link #gameAliveExceptSelf} 同一套），拿不准时仍按"活着"处理。
      */
     public static boolean gameAlive(Context ctx) {
         try {
@@ -710,7 +715,7 @@ public final class Data {
             if (ps == null) return false;
             String pkg = ctx.getPackageName();
             for (ActivityManager.RunningAppProcessInfo p : ps) {
-                if (p != null && isGameProcessName(pkg, p.processName)) return true;
+                if (p != null && isGameProcessName(pkg, p.processName) && alivePid(p.pid)) return true;
             }
         } catch (Throwable ignored) {
         }

@@ -207,6 +207,10 @@ public final class PatchesActivity extends BaseActivity {
                     } catch (Throwable t) {
                         Log.w(TAG, "patch apk hash failed: " + apk, t);
                     }
+                } else {
+                    // ★ 第 418 轮：CAS 删包后 apkPath 指向一个不存在的文件；
+                    //   哈希改从版本清单读，否则整页补丁都会判成「不适用」。
+                    sha = PkgManifest.apkShaOf(PatchesActivity.this, key);
                 }
                 List<Patches.Record> records = Patches.scan(PatchesActivity.this);
                 List<String> enabled = Patches.enabledRefs(PatchesActivity.this, ikey);
@@ -237,9 +241,11 @@ public final class PatchesActivity extends BaseActivity {
                             show == null ? 0 : show.libCount(),
                             apkBytes, importedAt));
                 }
-                List<Patches.Problem> problems = Patches.launchProblems(PatchesActivity.this);
+                // ★ 第 418 轮：两报告都是全局一份 ⇒ 按当前实例键 / 槽过滤，别把别的实例的问题
+                //   挂到这一页上（用户看到的就是"提示重复"）。
+                List<Patches.Problem> problems = Patches.launchProblems(PatchesActivity.this, ikey);
                 // ★ 第 360 轮：崩溃后自动停用的结论也进同一张卡（用户可重新启用）
-                problems.addAll(Patches.crashProblems(PatchesActivity.this));
+                problems.addAll(Patches.crashProblems(PatchesActivity.this, slot, ikey));
                 ui(gen, entry, sha, rows, problems);
             }
         }, "patches-load").start();

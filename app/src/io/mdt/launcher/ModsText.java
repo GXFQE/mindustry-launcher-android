@@ -155,6 +155,24 @@ final class ModsText {
     }
 
     /**
+     * ★ 「有模组带着游戏写的失败记录」—— **全槽级**判据，只有这一处实现。
+     *
+     * <p>三处都在用它：摘要卡那句（{@link #cardNote} 的入参）、崩溃残余判定
+     * （{@link #crashStillLive} 的入参）、详情页「上次启动」那一节。
+     *
+     * <p>⚠️ 它说的是「游戏把整槽标成加载失败」，**不是**「下次启动会跳过」——
+     * 后者看 `launchid.dat` + 游戏里那个跳过开关（{@link Mods.Scan#skipModLoading}）。
+     * 两件事只差一次游戏启动就会分开，**别互相替代**（2026-10-08 就是在这里写错过）。
+     */
+    static boolean anyFailed(java.util.List<Mods.Info> mods) {
+        if (mods == null) return false;
+        for (Mods.Info m : mods) {
+            if (m != null && m.failed) return true;
+        }
+        return false;
+    }
+
+    /**
      * ★★ 摘要卡那一句该显示**哪一句**（0 = 不显示）。判据全在**机制**上，与界面无关
      * （2026-10-08 用户真机：「**明明游戏禁用了所有模组但依旧显示会加载**」/「**就是目前这个状态，
      * 但下次启动是不加载的**」）。

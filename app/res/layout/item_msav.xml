@@ -11,6 +11,10 @@
   ★ 2026-10-27 用户「横向宽度」→ 选「让行更宽」：左右各 10dp 的容器 padding **拿掉**
      ⇒ 行卡片宽 +20dp、文字列宽 +20dp；上下 4dp 留着当行间距。
      列表本身还在卡片 65px 的内衬里，所以不会贴到屏幕边。
+     ⚠️ 上面那句判断**已不成立**（列表容器当时没有横向内衬，行是贴屏的）——
+     2026-11-23 用户反馈「每个条目比上面两个按钮宽」⇒ 改回**由列表容器统一给内衬**
+     （四页 `*_list` 各补 `paddingStart/End=14dp`，与页内动作卡的 `marginStart/End=14dp` 精确对齐；
+     模组页 `mod_container` 一直是 `@dimen/page_pad`）。所以行卡这里**仍然不写外边距**。
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"

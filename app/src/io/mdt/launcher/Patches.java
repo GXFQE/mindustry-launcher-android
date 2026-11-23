@@ -752,12 +752,20 @@ final class Patches {
     static Resolved resolve(Context ctx, File apk, String ikey) {
         Resolved res = new Resolved();
         List<String> refs = Config.get().patchRefs(ikey);
-        if (refs.isEmpty() || apk == null || !apk.isFile()) return res;
-        try {
-            res.apkSha = sha256Of(apk);
-        } catch (IOException e) {
-            res.problems.add(new Problem(PatchException.C_IO, apk.getName()));
-            return res;
+        if (refs.isEmpty()) return res;
+        // ★ 第 418 轮：CAS 模式下原始 APK 已经被删（内容全在池里）⇒ 哈希从版本清单里读。
+        //   以前这里 "文件不在" 直接返回空 Resolved（apkSha 也留空），于是所有补丁都落到
+        //   C_NO_MATCH（界面上就是一片"不适用"），连带着"启动看起来正常、补丁一个没进"。
+        if (apk != null && apk.isFile()) {
+            try {
+                res.apkSha = sha256Of(apk);
+            } catch (IOException e) {
+                res.problems.add(new Problem(PatchException.C_IO, apk.getName()));
+                return res;
+            }
+        } else {
+            res.apkSha = PkgManifest.apkShaOf(ctx, apk == null ? null : "import:" + apk.getName());
+            if (res.apkSha.isEmpty()) return res;   // 连清单都没有：照旧"判不出"，不冤枉补丁
         }
         Set<String> usedClasses = new HashSet<String>();
         Set<String> usedAssets = new HashSet<String>();
@@ -847,11 +855,26 @@ final class Patches {
 
     /** 读回上次启动的问题（主进程界面用）；没有报告/空报告返回空表。 */
     static List<Problem> launchProblems(Context ctx) {
+        return launchProblems(ctx, null);
+    }
+
+    /**
+     * 只读**属于这个实例**的启动问题。
+     *
+     * <p>★ 第 418 轮（用户：「补丁页面失败提示重复」）：报告是全局一份，头里有 `# ikey =`，
+     * 以前不看这个头 ⇒ 上一个实例 / 别的版本的失败会出现在当前实例的补丁页上，
+     * 看着就像同一件事说了好几遍。`ikey` 为空（null）⇒ 不过滤（dev 口 / 插件数据口要全局视角）。
+     */
+    static List<Problem> launchProblems(Context ctx, String ikey) {
         List<Problem> out = new ArrayList<Problem>();
         File f = new File(Data.hubDir(ctx), REPORT);
         if (!f.isFile()) return out;
         try {
             String text = Util.readText(f);
+            String owner = head(text, "ikey");
+            if (ikey != null && !ikey.isEmpty() && !owner.isEmpty() && !owner.equals(oneLine(ikey))) {
+                return out;
+            }
             for (String line : text.split("\\r?\\n")) {
                 if (line.isEmpty() || line.startsWith("#")) continue;
                 int bar = line.indexOf('|');
@@ -1195,12 +1218,14 @@ final class Patches {
     private static void appendCrashReport(Context ctx, String slot, String ikey,
                                           String crash, List<String[]> disabled) {
         StringBuilder data = new StringBuilder();
+        Set<String> have = new HashSet<String>();
         try {
             File f = crashReportFile(ctx);
             if (f.isFile()) {
                 for (String line : Util.readText(f).split("\\r?\\n")) {
                     if (line.isEmpty() || line.startsWith("#")) continue;
                     data.append(line).append('\n');
+                    have.add(line);
                 }
             }
         } catch (Throwable ignored) {
@@ -1212,9 +1237,12 @@ final class Patches {
         sb.append("# crash = ").append(crash).append('\n');
         sb.append(data);
         for (String[] d : disabled) {
-            sb.append(d.length > 2 ? d[2] : PatchException.C_CRASH_DISABLED).append('|')
-              .append(d[1] == null ? "" : d[1]).append('|')
-              .append(d[0] == null ? "" : d[0]).append('\n');
+            // ★ 第 418 轮：同一个补丁崩两次时以前会追加出一模一样的两行 —— 只写没记过的那条。
+            String line = (d.length > 2 ? d[2] : PatchException.C_CRASH_DISABLED) + '|'
+                    + (d[1] == null ? "" : d[1]) + '|'
+                    + (d[0] == null ? "" : d[0]);
+            if (!have.add(line)) continue;
+            sb.append(line).append('\n');
         }
         try {
             Util.atomicWriteText(crashReportFile(ctx), sb.toString());
@@ -1225,20 +1253,73 @@ final class Patches {
 
     /** 补丁页「上次启动」卡里"崩溃被自动停用"的那几条（没有返回空表）。 */
     static List<Problem> crashProblems(Context ctx) {
+        return crashProblems(ctx, null, null);
+    }
+
+    /**
+     * 只读**属于这个实例**的崩溃处置记录（`slot`/`ikey` 为空 = 不过滤）。
+     *
+     * <p>★ 第 418 轮：`report-patch-crash.txt` 也是全局一份，头里写着 slot / ikey；
+     * 以前整份读，A 槽的崩溃嫌疑会挂到 B 槽的补丁页上（“重复提示”的第二个来源）。
+     * 顺带按行去重（同一个补丁被记两遍）并丢掉已无写入方的旧 `crash_disabled`
+     * —— 它与新的 `crash_suspect` 摆在一起是自相矛盾的（「已自动停用」+「仍然启用中」）。
+     */
+    static List<Problem> crashProblems(Context ctx, String slot, String ikey) {
         List<Problem> out = new ArrayList<Problem>();
         File f = crashReportFile(ctx);
         if (!f.isFile()) return out;
         try {
-            for (String line : Util.readText(f).split("\\r?\\n")) {
+            String text = Util.readText(f);
+            String ownerSlot = head(text, "slot");
+            String ownerKey = head(text, "ikey");
+            if (slot != null && !slot.isEmpty() && !ownerSlot.isEmpty() && !ownerSlot.equals(oneLine(slot))) {
+                return out;
+            }
+            if (ikey != null && !ikey.isEmpty() && !ownerKey.isEmpty() && !ownerKey.equals(oneLine(ikey))) {
+                return out;
+            }
+            Set<String> seen = new HashSet<String>();
+            List<Problem> disabled = new ArrayList<Problem>();
+            for (String line : text.split("\\r?\\n")) {
                 if (line.isEmpty() || line.startsWith("#")) continue;
                 String[] parts = line.split("\\|", 3);
                 if (parts.length < 2) continue;
-                out.add(new Problem(parts[0], parts[1]));
+                String key = parts[0] + "|" + parts[1];
+                if (!seen.add(key)) continue;   // 同一件事只留一条
+                Problem p = new Problem(parts[0], parts[1]);
+                if (PatchException.C_CRASH_DISABLED.equals(p.code)
+                        || PatchException.C_CRASH_DISABLED_GAME.equals(p.code)) {
+                    disabled.add(p);
+                } else {
+                    out.add(p);
+                }
+            }
+            // 新记录（crash_suspect）点名过的补丁，旧的「已自动停用」不再显示
+            for (Problem d : disabled) {
+                boolean superseded = false;
+                for (Problem p : out) {
+                    if (p.detail.equals(d.detail)) { superseded = true; break; }
+                }
+                if (!superseded) out.add(d);
             }
         } catch (Throwable t) {
             Log.w(TAG, "read patch crash report failed: " + t);
         }
         return out;
+    }
+
+    /** 报告头里的 `# k = v`（v 按写入侧同一套清洗过）；没有返回空串。 */
+    private static String head(String text, String k) {
+        for (String line : text.split("\\r?\\n")) {
+            String s = line.trim();
+            if (!s.startsWith("#")) continue;
+            s = s.substring(1).trim();
+            int eq = s.indexOf('=');
+            if (eq < 0) continue;
+            if (!s.substring(0, eq).trim().equals(k)) continue;
+            return s.substring(eq + 1).trim();
+        }
+        return "";
     }
 
     /** 该槽有没有"崩溃后自动停用"的结论（崩溃弹窗补一句用）；返回补丁显示名。 */

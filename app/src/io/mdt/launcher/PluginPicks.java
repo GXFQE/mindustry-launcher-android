@@ -101,7 +101,12 @@ final class PluginPicks {
 
     /** 结果回给页面的那一边（在 UI 线程调用）。{@code key} = 选中的那一条 `pluginId/itemId`。 */
     interface Sink {
-        /** 插件筛选通过的条目身份（空集 = 一条都不通过）。 */
+        /**
+         * 插件筛选通过的条目身份。
+         *
+         * <p>{@code ids == null} = **这一维不筛**（用户在多选卡里一个都没勾，第 418 轮）；
+         * 空集 = 一条都不通过（插件真的筛掉了全部）。两者不是一回事，页面要分开处理。</p>
+         */
         void onPluginFilter(String key, Set<String> ids);
 
         /** 插件给的顺序（同一份清单的身份；空 = 插件没给顺序）。 */
@@ -317,8 +322,11 @@ final class PluginPicks {
                                  final String[] opts, final PluginViews.Session s,
                                  final List<ItemInfo> items, final boolean sort,
                                  final String key, final Sink sink) {
+        // ★ 第 418 轮（用户：「不应该阻止空筛选」）：这里以前传 false ⇒ 一个都不勾就弹
+        //   「还没有勾选任何一份」并**什么都不做**。空勾的含义是"这一维不筛"（见 BatchIo.pickFilter
+        //   的 Javadoc，其余三个列表页都传 true），计算那一步按"不筛"收尾。
         BatchIo.pickFilter(a, 0, title, opts, new boolean[opts.length],
-                R.string.list_filter_ok_fmt, false, new BatchIo.OnPick() {
+                R.string.list_filter_ok_fmt, true, new BatchIo.OnPick() {
                     @Override public void onPick(java.util.List<Integer> idx, CardStack card) {
                         if (card != null) card.dismiss();
                         int[] which = new int[idx == null ? 0 : idx.size()];
@@ -329,7 +337,8 @@ final class PluginPicks {
                         for (int i : which) {
                             if (i >= 0 && i < opts.length) names.add(opts[i]);
                         }
-                        CHOSEN.put(page + "/" + key, ListQuery.joinFmt(names,
+                        if (names.isEmpty()) CHOSEN.remove(page + "/" + key);
+                        else CHOSEN.put(page + "/" + key, ListQuery.joinFmt(names,
                                 Trans.get(a, R.string.list_filter_pair_fmt)));
                         compute(a, s, items, which, sort, key, sink);
                     }
@@ -346,10 +355,15 @@ final class PluginPicks {
             @Override public void run() {
                 final Set<String> keep = new LinkedHashSet<String>();
                 final List<String> order = new ArrayList<String>();
+                // ★ 第 418 轮：多选卡里一个都没勾 = "这一维不筛"，不是"插件把全部筛掉"。
+                //   这种情况下别去问插件（`choose(空)` 的契约是"一条都不通过"）。
+                final boolean noFilter = !sort && which != null && which.length == 0;
                 try {
-                    if (which != null) s.choose(which);
-                    if (sort) order.addAll(s.sorted());
-                    else keep.addAll(s.accepted());
+                    if (!noFilter) {
+                        if (which != null) s.choose(which);
+                        if (sort) order.addAll(s.sorted());
+                        else keep.addAll(s.accepted());
+                    }
                 } catch (Throwable ignored) {
                     // 插件坏了 ⇒ 当没选（排序 = 原顺序；筛选 = 空集，页面会显示"筛完一条不剩"）
                 } finally {
@@ -362,6 +376,7 @@ final class PluginPicks {
                         } catch (Throwable ignored) { }
                         if (Util.dead(a)) return;
                         if (sort) sink.onPluginSort(key, order);
+                        else if (noFilter) sink.onPluginFilter(key, null);
                         else sink.onPluginFilter(key, keep);
                     }
                 });

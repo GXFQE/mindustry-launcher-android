@@ -126,16 +126,20 @@ public class GameSlot extends BaseActivity {
             target = Versions.apkOfPackage(this, pkg);
             label = pkg;
         }
-        if (target == null || !target.exists()) {
+        final String shown = (label == null ? (target == null ? "" : target.getName()) : label);
+        // v30：这一局的版本 key（与 Versions.Entry.key() 同一套：已装 = 包名，导入 = import:文件名）
+        // ★ 不另加 extra：这两条分支本来就把"是哪个版本"带齐了，再从 intent 塞一份只会多一个漂移源。
+        final String vkey = (pkg != null && !pkg.isEmpty())
+                ? pkg.trim() : (target == null ? null : "import:" + target.getName());
+        // ★ 第 418 轮：CAS 模式下导入 APK 已经被删掉（内容全在池里，见 PkgAdmin.enable）——
+        //   存在性判据要和 Injector.launch 里那条放宽同源：清单还在、能走 CAS，就放行。
+        //   （以前只放宽了 Injector，这里先 fail 掉 ⇒ :game 进程一进来就死，"任何游戏无法启动"。）
+        final boolean casReady = vkey != null && PkgLauncher.lookup(this, vkey) != null;
+        if (target == null || (!target.exists() && !casReady)) {
             fail(Trans.get(GameSlot.this, R.string.step_prepare),
                     Trans.get(GameSlot.this, R.string.game_pkg_missing_fmt), null);
             return;
         }
-        final String shown = (label == null ? target.getName() : label);
-        // v30：这一局的版本 key（与 Versions.Entry.key() 同一套：已装 = 包名，导入 = import:文件名）
-        // ★ 不另加 extra：这两条分支本来就把"是哪个版本"带齐了，再从 intent 塞一份只会多一个漂移源。
-        final String vkey = (pkg != null && !pkg.isEmpty())
-                ? pkg.trim() : "import:" + target.getName();
         final Map<String, String> vmap = mapOf(vinfo);
 
         // ② 存档槽：必须在游戏起来之前定下来

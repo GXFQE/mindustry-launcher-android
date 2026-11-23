@@ -191,6 +191,22 @@ public final class PkgManifest {
         f.delete();
     }
 
+    /**
+     * 读池里记着的「原始 APK 的 sha256」。
+     *
+     * <p>★ 第 418 轮：CAS 模式下原始 APK 已经被删（内容全在池里），可补丁的适用判据
+     * （{@code PatchManifest} 的 target sha256）仍然要这个哈希。入库时
+     * {@code PkgIngest} 就把 {@link #apkSha256} 写进清单了 ⇒ 这里直接读，别再拿
+     * "文件不在" 当成 "没有哈希"，否则界面上一整页补丁都会变成"不适用"。
+     *
+     * @return 小写哈希；没有清单 / 旧清单没这个字段 ⇒ 空串（调用方按"判不出"处理）
+     */
+    public static String apkShaOf(Context ctx, String vkey) {
+        PkgManifest m = read(fileOf(ctx, vkey));
+        if (m == null || m.apkSha256 == null) return "";
+        return m.apkSha256.trim().toLowerCase(Locale.ROOT);
+    }
+
     // ── 查询辅助 ──────────────────────────────────────────────────────
 
     public Entry entry(String path) {

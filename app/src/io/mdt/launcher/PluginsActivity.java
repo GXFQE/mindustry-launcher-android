@@ -1309,7 +1309,7 @@ public class PluginsActivity extends BaseActivity {
      * 真正的加载推迟到用户点它的那一刻（那条路本来就有 try/catch 兜底）。
      */
     private void bindExtensions(View card, final String id, final String ver) {
-        List<Extensions.Item> all = Extensions.of(Plugins.apkOf(this, id, ver));
+        List<Extensions.Item> all = Extensions.of(this, Plugins.apkOf(this, id, ver));
         List<Extensions.Item> items = Extensions.forSlot(all, Extensions.SLOT_PLUGINS);
         LinearLayout box = (LinearLayout) card.findViewById(R.id.plugin_exts);
         // ★ 声明了入口、但这一版一个都用不上 ⇒ 在卡里说一句。原来这里什么都不显示，用户会以为

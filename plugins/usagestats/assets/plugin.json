@@ -5,6 +5,7 @@
   "api": 47,
   "author": "mdt",
   "description": "foreground play time (host clock -> game-exit event; the plugin writes its own ledger) + range/grain heatmap panel",
+  "description_zh": "前台游玩时长（宿主时钟 → 退出事件；账本由插件自己写）+ 区间 / 粒度热力图面板",
   "update": "https://github.com/GXFQE/mindustry-launcher-android/releases/download/plugins-latest/usagestats.json",
   "playtimeTotal": "total.txt",
   "access": [],
@@ -12,6 +13,7 @@
     {
       "id": "playtime-slot",
       "title": "游玩时长",
+      "title_en": "Playtime",
       "entry": "io.mdt.plugins.usagestats.UsageStats",
       "slot": "section",
       "page": "slot"
@@ -24,6 +26,7 @@
     {
       "id": "playtime-panel",
       "title": "统计",
+      "title_en": "Stats",
       "entry": "io.mdt.plugins.usagestats.UsageStats",
       "slot": "inline",
       "place": "main.playtime",

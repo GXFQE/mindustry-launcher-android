@@ -51,6 +51,11 @@ import java.util.List;
  * ★ 第 174 轮（用户「设置真的应该分个类」）：按**用途**分成三张卡 ——
  *   外观与语言 / 启动与存储 / 通知与日志；新增项放对应卡，别再往一张卡里堆。
  *   分区标题是 12sp 灰字，文字由 {@link Trans} 写入，不在 XML 写 android:text。
+ *
+ * ★ 2026-11-23（用户「所有设置把关闭放最右侧」）：本页所有弹窗的**关窗按钮坐最右**。
+ *   Android 的 `AlertDialog` 按钮从右往左是 positive → negative → neutral ⇒ 关窗 / 取消
+ *   一律用 `setPositiveButton`；带动作的按钮（开关、保存、装上）退到 negative，破坏性的再往左（neutral）。
+ *   与 {@link CardStack} 的关窗位置（最后一个按钮 = 最右）对齐；别再写出"关闭在最左边"。
  */
 public class SettingsActivity extends BaseActivity {
 
@@ -433,7 +438,8 @@ public class SettingsActivity extends BaseActivity {
         new AlertDialog.Builder(this)
                 .setTitle(R.string.set_autoclean_title)
                 .setMessage(Trans.get(this, R.string.set_autoclean_why))
-                .setPositiveButton(on ? R.string.set_autoclean_disable
+                .setPositiveButton(R.string.close, null)
+                .setNegativeButton(on ? R.string.set_autoclean_disable
                                       : R.string.set_autoclean_enable,
                         new DialogInterface.OnClickListener() {
                             @Override public void onClick(DialogInterface d, int w) {
@@ -441,7 +447,6 @@ public class SettingsActivity extends BaseActivity {
                                 fillValues();
                             }
                         })
-                .setNegativeButton(R.string.close, null)
                 .show();
     }
 
@@ -466,13 +471,13 @@ public class SettingsActivity extends BaseActivity {
                 .setTitle(on ? R.string.cas_off_confirm_title : R.string.cas_on_confirm_title)
                 .setMessage(Trans.get(this, on ? R.string.cas_off_confirm_body
                                                 : R.string.cas_on_confirm_body))
-                .setPositiveButton(on ? R.string.cas_off_go : R.string.cas_on_go,
+                .setPositiveButton(R.string.close, null)
+                .setNegativeButton(on ? R.string.cas_off_go : R.string.cas_on_go,
                         new DialogInterface.OnClickListener() {
                             @Override public void onClick(DialogInterface d, int w) {
                                 applyCasGame(!on);
                             }
                         })
-                .setNegativeButton(R.string.close, null)
                 .show();
     }
 
@@ -707,7 +712,7 @@ public class SettingsActivity extends BaseActivity {
                                 Toast.LENGTH_SHORT).show();
                     }
                 })
-                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.cancel, null)
                 .show();
     }
 
@@ -902,7 +907,7 @@ public class SettingsActivity extends BaseActivity {
                         fillValues();
                     }
                 })
-                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.cancel, null)
                 .show();
     }
 
@@ -930,7 +935,7 @@ public class SettingsActivity extends BaseActivity {
                         fillValues();
                     }
                 })
-                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.cancel, null)
                 .show();
     }
 
@@ -955,7 +960,7 @@ public class SettingsActivity extends BaseActivity {
                                 fillValues();
                             }
                         })
-                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.cancel, null)
                 .show();
     }
 
@@ -977,7 +982,7 @@ public class SettingsActivity extends BaseActivity {
                         recreate();
                     }
                 })
-                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.cancel, null)
                 .show();
     }
 
@@ -1010,7 +1015,7 @@ public class SettingsActivity extends BaseActivity {
                 .setTitle(R.string.set_download_limit_pick_title)
                 .setMessage(R.string.set_download_limit_msg)
                 .setView(box)
-                .setPositiveButton(R.string.policy_save, new DialogInterface.OnClickListener() {
+                .setNegativeButton(R.string.policy_save, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int w) {
                         long kb;
                         try {
@@ -1029,7 +1034,7 @@ public class SettingsActivity extends BaseActivity {
                         fillValues();
                     }
                 })
-                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.cancel, null)
                 .show();
     }
 
@@ -1050,7 +1055,7 @@ public class SettingsActivity extends BaseActivity {
                         recreate();
                     }
                 })
-                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.cancel, null)
                 .show();
     }
 
@@ -1080,19 +1085,19 @@ public class SettingsActivity extends BaseActivity {
             new AlertDialog.Builder(this)
                     .setTitle(Trans.get(SettingsActivity.this, R.string.lang_dialog_title))
                     .setMessage(Trans.get(SettingsActivity.this, R.string.lang_dialog_none_msg))
-                    .setPositiveButton(Trans.get(SettingsActivity.this, R.string.lang_pack_pick),
-                            new DialogInterface.OnClickListener() {
-                                @Override public void onClick(DialogInterface d, int w) {
-                                    openLangPackPicker();
-                                }
-                            })
+                    .setPositiveButton(Trans.get(SettingsActivity.this, R.string.cancel), null)
                     .setNeutralButton(Trans.get(SettingsActivity.this, R.string.lang_tpl_export),
                             new DialogInterface.OnClickListener() {
                                 @Override public void onClick(DialogInterface d, int w) {
                                     exportLangTemplate();
                                 }
                             })
-                    .setNegativeButton(Trans.get(SettingsActivity.this, R.string.cancel), null)
+                    .setNegativeButton(Trans.get(SettingsActivity.this, R.string.lang_pack_pick),
+                            new DialogInterface.OnClickListener() {
+                                @Override public void onClick(DialogInterface d, int w) {
+                                    openLangPackPicker();
+                                }
+                            })
                     .show();
             return;
         }
@@ -1364,13 +1369,13 @@ public class SettingsActivity extends BaseActivity {
         new AlertDialog.Builder(this)
                 .setTitle(Trans.get(SettingsActivity.this, R.string.lang_dialog_title))
                 .setMessage(msg)
-                .setPositiveButton(Trans.get(SettingsActivity.this, R.string.lang_pack_ok),
+                .setNegativeButton(Trans.get(SettingsActivity.this, R.string.lang_pack_ok),
                         new DialogInterface.OnClickListener() {
                             @Override public void onClick(DialogInterface d, int w) {
                                 installLangPack(tmp);
                             }
                         })
-                .setNegativeButton(Trans.get(SettingsActivity.this, R.string.cancel),
+                .setPositiveButton(Trans.get(SettingsActivity.this, R.string.cancel),
                         new DialogInterface.OnClickListener() {
                             @Override public void onClick(DialogInterface d, int w) {
                                 HubTmp.drop(SettingsActivity.this, tmp);
@@ -1471,7 +1476,7 @@ public class SettingsActivity extends BaseActivity {
                         recreate();
                     }
                 })
-                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.cancel, null)
                 .show();
     }
 
@@ -1500,7 +1505,7 @@ public class SettingsActivity extends BaseActivity {
                         fillValues();
                     }
                 })
-                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.cancel, null)
                 .show();
     }
 
@@ -1524,7 +1529,7 @@ public class SettingsActivity extends BaseActivity {
                                 fillValues();
                             }
                         })
-                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.cancel, null)
                 .show();
     }
 
@@ -1574,7 +1579,7 @@ public class SettingsActivity extends BaseActivity {
         new AlertDialog.Builder(this)
                 .setTitle(R.string.set_trash_dialog_title)
                 .setView(box)
-                .setPositiveButton(R.string.policy_save, new DialogInterface.OnClickListener() {
+                .setNegativeButton(R.string.policy_save, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int w) {
                         int n;
                         int s;
@@ -1595,7 +1600,7 @@ public class SettingsActivity extends BaseActivity {
                         fillValues();
                     }
                 })
-                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.cancel, null)
                 .show();
     }
 
@@ -1612,7 +1617,7 @@ public class SettingsActivity extends BaseActivity {
         new AlertDialog.Builder(this)
                 .setTitle(R.string.set_logs_dialog_title)
                 .setView(box)
-                .setPositiveButton(R.string.policy_save, new DialogInterface.OnClickListener() {
+                .setNegativeButton(R.string.policy_save, new DialogInterface.OnClickListener() {
                     @Override public void onClick(DialogInterface d, int w) {
                         int n;
                         try {
@@ -1629,7 +1634,7 @@ public class SettingsActivity extends BaseActivity {
                         fillValues();
                     }
                 })
-                .setNegativeButton(R.string.cancel, null)
+                .setPositiveButton(R.string.cancel, null)
                 .show();
     }
 

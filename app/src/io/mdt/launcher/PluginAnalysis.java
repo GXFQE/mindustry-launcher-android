@@ -43,7 +43,7 @@ final class PluginAnalysis {
                 File apk = Plugins.apkOf(ctx, id, ver);
                 if (apk == null || !apk.isFile()) continue;
                 for (Extensions.Item it : Extensions.forSlot(
-                        Extensions.of(apk), Extensions.SLOT_ANALYZER)) {
+                        Extensions.of(ctx, apk), Extensions.SLOT_ANALYZER)) {
                     if (page.equals(it.page)) out.add(it);
                 }
             }
@@ -85,7 +85,7 @@ final class PluginAnalysis {
                 File apk = Plugins.apkOf(ctx, id, ver);
                 if (apk == null || !apk.isFile()) continue;
                 for (Extensions.Item it : Extensions.forSlot(
-                        Extensions.of(apk), Extensions.SLOT_ANALYZER)) {
+                        Extensions.of(ctx, apk), Extensions.SLOT_ANALYZER)) {
                     if (!page.equals(it.page)) continue;
                     runOne(ctx, apk, it, page, slot, selected, item, items, out, verdicts, gates);
                 }
