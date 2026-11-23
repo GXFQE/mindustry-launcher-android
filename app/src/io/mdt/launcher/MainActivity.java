@@ -1927,6 +1927,9 @@ public class MainActivity extends BaseActivity {
                         // 放行：收起进度卡片再拉起游戏（不在这里清 sLaunching：这一局还在跑，
                         // 回到任意界面时由 BaseActivity.onResume 统一清 —— 见 sLaunching 的注释）
                         stack.dismiss();
+                        // ★ 第 420 轮：先记下"这一局想启动" —— 进程要是在写任何报告之前就死了
+                        //   （原生崩溃 / 被系统回收），回来时只有这条能证明"点过启动"。
+                        LaunchFailNotice.noteAttempt(a, e.key(), slot);
                         // ★ 第 366 轮：**启动占位** —— 补上「startActivity → :game publish」之间
                         //   门禁看不见的窗口（:game 要等 prepareSlot 之后才能 publish，
                         //   而那时它已经在读这个槽的资产了）。

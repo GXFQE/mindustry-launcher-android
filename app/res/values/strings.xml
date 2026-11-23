@@ -1318,6 +1318,8 @@
     <string name="game_step_stuck_fmt">Failed at: %1$s\n\n%2$s</string>
     <string name="game_report_hint">\n\nA detailed record was written to the runtime log (Home → Runtime log).</string>
     <string name="game_cannot_start">Cannot start</string>
+    <string name="game_launch_died_title">Game did not start</string>
+    <string name="game_launch_died_msg">The game process never reached the main menu after launch, and no failure record was written.\n\nIt may have crashed natively or been killed by the system — try again; if it keeps happening, check the crash stack in the runtime log.</string>
     <string name="game_pkg_missing_fmt">Cannot find the game package to start. It may have been uninstalled or deleted.</string>
     <string name="step_prepare">prepare</string>
     <string name="legacy_slot_busy">A game is still running. Quit it before switching this launch item to another save slot.</string>

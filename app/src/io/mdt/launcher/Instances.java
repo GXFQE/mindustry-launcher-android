@@ -213,6 +213,19 @@ final class Instances {
         };
     }
 
+    /**
+     * 只算**已经 publish 过的真实实例**（不含启动占位），按 pid 判活。
+     *
+     * <p>与 {@link #live} 的区别就是"占位算不算"：占位只证明"有人点过启动"，
+     * 不证明 `:game` 已经把自己登记上来。回界面判断「这一局到底起来了没有」
+     * 必须用这个 —— 否则占位会把"死掉了"判成"还在起"（第 420 轮）。
+     */
+    static List<Running> published(final Context ctx) {
+        List<Running> test = sTestSnapshot;
+        if (test != null) return test;
+        return scan(dir(ctx), liveAdapter(ctx));
+    }
+
     private static void sortByStart(List<Running> out) {
         Collections.sort(out, new Comparator<Running>() {
             @Override public int compare(Running a, Running b) {

@@ -1296,6 +1296,8 @@
     <string name="game_step_stuck_fmt">出错的环节：%1$s\n\n%2$s</string>
     <string name="game_report_hint">\n\n详细记录已写进运行日志（主界面 → 运行日志）。</string>
     <string name="game_cannot_start">无法启动</string>
+    <string name="game_launch_died_title">游戏没起来</string>
+    <string name="game_launch_died_msg">点了启动之后，游戏进程没能进入主界面，也没留下失败记录。\n\n可能是原生崩溃或被系统回收 —— 可以再试一次；反复这样就看运行日志里的崩溃堆栈。</string>
     <string name="game_pkg_missing_fmt">找不到要启动的游戏包 —— 它可能已经被卸载或删掉了。</string>
     <string name="step_prepare">准备</string>
     <string name="legacy_slot_busy">还有一局游戏在跑：先退出游戏，再把这个启动项换到别的存档槽。</string>

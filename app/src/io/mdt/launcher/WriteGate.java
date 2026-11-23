@@ -68,6 +68,19 @@ final class WriteGate {
     }
 
     /**
+     * 有没有**已经登记上来**的实例还活着（{@link Instances#published}，不含启动占位）。
+     *
+     * <p>只给"回界面补一句提示"这类**读**判断用（{@link LaunchFailNotice}）：
+     * - 不用 {@link Data#gameAlive}：那是进程表判据，全局预算冻结（第 420 轮踩到
+     *   `write-gate check` 10 > 9），而且它不区分"进程刚起还没登记"；
+     * - 不用 {@link Instances#live}：占位会把"点了启动但进程没登记就死了"判成"还在起"
+     *   （占位要等 sweep 才清），这正是要报的那一类。
+     */
+    static boolean anyPublished(Context ctx) {
+        return !Instances.published(ctx).isEmpty();
+    }
+
+    /**
      * **目录 / 文件所属槽**有实例在跑吗 —— core 写函数只拿到 `File`（`maps/` / `saves/` /
      * `mods/` / 槽根）时的便利重载（2026-11-12 第 362 轮，§12.7 第 3 步）。
      * 反查不出槽时退回 {@link #blockedSlotOrGlobal} 的保守方向。

@@ -6093,6 +6093,46 @@ public final class SelfTest {
                         && LaunchFailNotice.claims("", k1) && !LaunchFailNotice.claims(k1, k1)
                         && !LaunchFailNotice.claims("x", null) && !LaunchFailNotice.claims("x", ""),
                 "★ 启动失败提示：同一局只提示一次（槽+时刻去重，空键不提示）");
+        //   ★ 多键版：两种来源（失败记录 / 点击记录）共用一份记账，不能互相覆盖
+        java.util.List<String> handledMany = new java.util.ArrayList<String>();
+        handledMany.add("default|100");
+        handledMany.add("attempt|default|200");
+        ok(stat, L, !LaunchFailNotice.claims(handledMany, "default|100")
+                        && !LaunchFailNotice.claims(handledMany, "attempt|default|200")
+                        && LaunchFailNotice.claims(handledMany, "default|300")
+                        && !LaunchFailNotice.claims(handledMany, "")
+                        && LaunchFailNotice.claims((java.util.List<String>) null, "default|400"),
+                "★ 记账是多键的：失败记录与点击记录互不覆盖（否则同一张卡每次回界面都重弹）");
+
+        // ── 第 420 轮：进程"什么都没写"就没了 —— 判据必须能算出 false ──
+        //   ① 全部条件都满足（刚点、没有登记着的实例、没有新报告、没有失败记录）⇒ true
+        long attemptAt = nowT - 20_000L;
+        ok(stat, L, LaunchFailNotice.diedBeforeStart(attemptAt, nowT, false, 0L, 0L),
+                "启动没起来：点过 + 没有已登记实例 + 没有报告 ⇒ 判「这一局没了」");
+        //   ② 还有已登记的实例活着（正在起 / 别的实例在跑）⇒ 不判
+        ok(stat, L, !LaunchFailNotice.diedBeforeStart(attemptAt, nowT, true, 0L, 0L),
+                "★ 反向：还有已登记实例 ⇒ 不补报（别抢在启动完成之前下结论）");
+        //   ③ 注入跑完了（report-launch.txt 比点击新）⇒ 不判（进没进主界面不归这里管）
+        ok(stat, L, !LaunchFailNotice.diedBeforeStart(attemptAt, nowT, false, nowT, 0L),
+                "★ 反向：report-launch.txt 已经更新 ⇒ 不判（那说明注入跑完了）");
+        //   ④ 有失败记录 ⇒ 交给带 step/msg 的那条路，别重复报"什么都没写"
+        ok(stat, L, !LaunchFailNotice.diedBeforeStart(attemptAt, nowT, false, 0L, nowT),
+                "★ 反向：已有失败记录 ⇒ 不按点击补报（同一局只说一次）");
+        //   ⑤ 点击太老（超过 3 分钟）⇒ 不判（用户可能早就在写别的了）
+        ok(stat, L, !LaunchFailNotice.diedBeforeStart(
+                        nowT - LaunchFailNotice.ATTEMPT_FRESH_MS - 1000L, nowT, false, 0L, 0L),
+                "★ 反向：点击记录超过 3 分钟 ⇒ 不补报（只补刚刚那局）");
+        //   ⑥ 太新（`:game` 可能还在占位阶段、没 publish）⇒ 不判，等复查（第 420 轮踩过 write-gate）
+        ok(stat, L, !LaunchFailNotice.diedBeforeStart(
+                        nowT - 3000L, nowT, false, 0L, 0L),
+                "★ 反向：点击只过了 3 秒 ⇒ 不判（占位阶段与「死了」不可区分，等 12 秒复查）");
+        //   ⑦ 窗口是独立的：失败 15 分钟 ≠ 点击 3 分钟（别把两个窗口写成同一个常量）
+        ok(stat, L, LaunchFailNotice.ATTEMPT_FRESH_MS < LaunchFailNotice.FRESH_MS
+                        && LaunchFailNotice.ATTEMPT_MIN_MS > 0
+                        && LaunchFailNotice.ATTEMPT_MIN_MS < LaunchFailNotice.ATTEMPT_FRESH_MS
+                        && LaunchFailNotice.fresh(nowT - 60_000L, nowT, LaunchFailNotice.ATTEMPT_FRESH_MS)
+                        && !LaunchFailNotice.fresh(nowT - 4L * 60_000L, nowT, LaunchFailNotice.ATTEMPT_FRESH_MS),
+                "★ 点击记录的窗口（3 分钟）与失败记录（15 分钟）分开：别共用一个常量");
     }
 
     /**
