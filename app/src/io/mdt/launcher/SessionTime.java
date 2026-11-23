@@ -39,6 +39,16 @@ final class SessionTime {
     /** 检查点后缀（与 `instances/` 里的 `*.json` 区分开）。 */
     static final String EXT = ".time";
 
+    /**
+     * 原子写的半成品（`<name>.tmp`）多久算「没人要了」（第 422 轮）。
+     *
+     * <p>{@code Util.atomicWriteText} 是「先写 `.tmp`、再 rename」：进程在两者之间被杀就留下一个
+     * `.time.tmp` / `r-….json.tmp`，而原来的清扫只认 `*.time` ⇒ 它会永远躺着。
+     * 这里按**年龄**判，不按 pid —— 写 `.tmp` 的可能正是 `:game` 进程，扫它的登记表也看不见这个中间文件；
+     * 10 分钟足够任何一次写入跑完（检查点最多几 KB）。</p>
+     */
+    static final long TMP_STALE_MS = 10 * 60 * 1000L;
+
     /** 一个检查点（不可变）。 */
     static final class Summary {
         final File file;
@@ -170,6 +180,17 @@ final class SessionTime {
 
     /** 目录级实现（自检喂临时目录 + 假存活表）。 */
     static int sweepOrphansIn(File dir, List<Config.Session> sessions, Instances.Live probe) {
+        return sweepOrphansIn(dir, sessions, probe, System.currentTimeMillis());
+    }
+
+    /**
+     * 目录级实现 + 固定「现在」（自检喂固定时刻，断言才不吃系统时钟）。
+     *
+     * <p>第 422 轮起同一个清扫也回收**原子写留下的半成品**：`instances/` 与 `instances/reserved/`
+     * 里超过 {@link #TMP_STALE_MS} 的 `*.tmp`（判据见该字段的说明）。</p>
+     */
+    static int sweepOrphansIn(File dir, List<Config.Session> sessions, Instances.Live probe,
+                              long now) {
         if (dir == null || probe == null) return 0;
         Set<String> pending = new HashSet<String>();
         if (sessions != null) {
@@ -179,7 +200,7 @@ final class SessionTime {
         }
         File[] fs = dir.listFiles();
         if (fs == null) return 0;
-        int n = 0;
+        int n = sweepTmpIn(dir, now);
         for (File f : fs) {
             if (f == null || !f.isFile() || !f.getName().endsWith(EXT)) continue;
             Summary one = summaryOf(f, readJson(f));
@@ -189,6 +210,24 @@ final class SessionTime {
             }
             if (pending.contains(one.slot)) continue;   // 有账 ⇒ 留给 settle
             if (probe.alive(one.pid, one.proc)) continue;  // 进程还活着 ⇒ 别动
+            if (f.delete()) n++;
+        }
+        n += sweepTmpIn(Instances.reservedDir(dir), now);   // 启动占位那一层也要收
+        return n;
+    }
+
+    /**
+     * 清掉太久没人动的 `*.tmp`（原子写的半成品）。返回删了几个。
+     * 只按年龄判：刚写的可能另一个进程正在 rename，碰它会把一次写入变成"目标消失"。
+     */
+    private static int sweepTmpIn(File d, long now) {
+        if (d == null) return 0;
+        File[] fs = d.listFiles();
+        if (fs == null) return 0;
+        int n = 0;
+        for (File f : fs) {
+            if (f == null || !f.isFile() || !f.getName().endsWith(".tmp")) continue;
+            if (now - f.lastModified() < TMP_STALE_MS) continue;
             if (f.delete()) n++;
         }
         return n;

@@ -277,7 +277,16 @@ final class Instances {
     // ── 启动占位（第 366 轮，主进程 startActivity 之前的"即将被占"） ─────────
 
     static File reservedDir(Context ctx) {
-        return new File(dir(ctx), RESERVED);
+        return reservedDir(dir(ctx));
+    }
+
+    /**
+     * 目录级实现（第 422 轮：`SessionTime` 的清扫也要扫占位目录里被写坏的 `.tmp`）。
+     *
+     * <p>别把 `RESERVED` 抄第二遍 —— 目录名只有这一个来源。</p>
+     */
+    static File reservedDir(File base) {
+        return base == null ? null : new File(base, RESERVED);
     }
 
     /**

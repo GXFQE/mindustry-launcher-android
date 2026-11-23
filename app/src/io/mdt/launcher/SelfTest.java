@@ -21033,6 +21033,7 @@ public final class SelfTest {
             File tmpDir = new File(ctx.getCacheDir(), "selftest-clock");
             boolean sweepOk;
             boolean scanOk;
+            boolean tmpOk;
             int swept = -1;
             int sweptKeep = -1;
             int sweptLive = -1;
@@ -21074,9 +21075,27 @@ public final class SelfTest {
                 Util.atomicWriteText(probe, "{}");
                 Instances.scan(tmpDir, dead);
                 scanOk = probe.isFile();
+
+                // ⑦ 原子写的半成品（第 422 轮）：老的 .tmp 收掉、刚写的留着
+                File staleTmp = new File(tmpDir, (now - 20_000L) + "-7001.time.tmp");
+                File freshTmp = new File(tmpDir, (now - 1_000L) + "-7002.time.tmp");
+                Util.atomicWriteText(staleTmp, "{\"slot\":\"x\"}");
+                Util.atomicWriteText(freshTmp, "{\"slot\":\"x\"}");
+                staleTmp.setLastModified(now - 11 * 60_000L);
+                File resDir = Instances.reservedDir(tmpDir);
+                if (!resDir.isDirectory() && !resDir.mkdirs()) {
+                    throw new java.io.IOException("mkdirs " + resDir);
+                }
+                File staleRes = new File(resDir, "r-1-1.json.tmp");
+                Util.atomicWriteText(staleRes, "{}");
+                staleRes.setLastModified(now - 11 * 60_000L);
+                SessionTime.sweepOrphansIn(tmpDir,
+                        java.util.Collections.<Config.Session>emptyList(), dead, now);
+                tmpOk = !staleTmp.exists() && freshTmp.isFile() && !staleRes.exists();
             } catch (Throwable t) {
                 sweepOk = false;
                 scanOk = false;
+                tmpOk = false;
             } finally {
                 File[] fs = tmpDir.listFiles();
                 if (fs != null) {
@@ -21091,6 +21110,9 @@ public final class SelfTest {
                             + " sweptKeep=" + sweptKeep + " keep=" + keepPresent
                             + " sweptLive=" + sweptLive + " live=" + livePresent + "）");
             ok(stat, L, scanOk, "⑥ Instances.scan 只处理 *.json：.time 不会被登记表扫描删掉");
+            ok(stat, L, tmpOk,
+                    "⑦ 原子写的半成品按年龄收：超过 10 分钟的 *.time.tmp / reserved/*.json.tmp 删掉，"
+                            + "刚写的留着（不按 pid 判 —— 写它的可能正是 :game）");
         } catch (Throwable t) {
             ok(stat, L, false, "宿主时钟自检异常：" + t);
         } finally {
