@@ -514,6 +514,11 @@ public class MainActivity extends BaseActivity {
         //   ⚠️ 都放在 rescan/AutoBackup 之后：提示是"锦上添花"，不许挡住主界面自己的刷新。
         CrashAlert.start(this);
         CrashAlert.catchUp(this);
+        // ★ 第 419 轮：「这一局没起来」也要回界面时补一次 —— 进度卡在 startActivity 前就收了，
+        //   而 :game 的失败弹窗常常落在没有前台窗口的进程里（用户只看到"点了没反应"）。
+        //   判据是 :game 写的 report-launch-failed.txt（不许删，插件 exit 判据还要用）；
+        //   这里只多写一份"提示过"的标记 ⇒ 同一局只提示一次，旧的只记账不打扰。
+        LaunchFailNotice.catchUp(this);
         // ★ 列表重建之后再把滚动位置放回去（版本页 / 游戏回来都走这里）。
         restoreScroll();
         // ★ 第 309 轮：启动时静默检查更新（24 h 去重在本进程内也去重一次）。

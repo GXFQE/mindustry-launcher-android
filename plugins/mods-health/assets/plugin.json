@@ -12,7 +12,9 @@
     {
       "id": "mods-analyzer",
       "title": "模组体检",
+      "title_en": "Mod checkup",
       "subtitle": "冲突 / 结构 / 上次日志",
+      "subtitle_en": "Conflicts / structure / last log",
       "entry": "io.mdt.plugins.mods.ModsHealth",
       "slot": "analyzer",
       "page": "mods"
@@ -20,6 +22,7 @@
     {
       "id": "conflict-filter",
       "title": "有冲突的模组",
+      "title_en": "Mods with conflicts",
       "entry": "io.mdt.plugins.mods.ModsHealth",
       "slot": "filter",
       "page": "mods"
@@ -27,6 +30,7 @@
     {
       "id": "risk-sort",
       "title": "按冲突风险",
+      "title_en": "By conflict risk",
       "entry": "io.mdt.plugins.mods.ModsHealth",
       "slot": "sort",
       "page": "mods"

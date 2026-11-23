@@ -436,7 +436,7 @@ public class GameSlot extends BaseActivity {
         // ★ v45：落一条"这局没起来"的持久记录 —— 主进程判 `game-exit` 的 `launch-failed` 档用。
         //   为什么不能只看"实例没登记过"：:game 可能 publish 成功之后才失败，那时主进程
         //   已经见过它活着，仅凭观测分不出"起来过又挂了"和"根本没起来"。
-        recordLaunchFailed(step);
+        recordLaunchFailed(step, msg);
         // 2026-11-17：时钟停表 —— 失败弹窗可能被用户晾着，不停的话 lastSeen 会一直涨，
         // 下一轮结算会把"看弹窗的时间"算成玩了多久。
         if (mClock != null) {
@@ -471,8 +471,11 @@ public class GameSlot extends BaseActivity {
      *
      * <p>⚠️ 单文件只留最后一条：多开下两个槽同时失败，后写的会盖掉前一个 —— 那个槽会
      * 降级成 `unclean`（"拿不准就不说"）。这是刻意的取舍，不为此引入并发写协议。
+     *
+     * <p>第 419 轮追加 {@code msg=} 行：主界面回前台时要用它对用户说
+     * "在哪一步、为什么"（{@link LaunchFailNotice}）。旧读者只认前三行，多一行不影响。
      */
-    private void recordLaunchFailed(String step) {
+    private void recordLaunchFailed(String step, String msg) {
         try {
             File hub = Data.hubDir(this);
             if (hub == null) return;
@@ -480,6 +483,9 @@ public class GameSlot extends BaseActivity {
             sb.append("slot=").append(mLaunchSlot == null ? "" : mLaunchSlot).append('\n');
             sb.append("at=").append(System.currentTimeMillis()).append('\n');
             sb.append("step=").append(step == null ? "" : step).append('\n');
+            // 单行 + 去换行：这份文件是"一行一个键"的格式，值里有换行会把它读坏
+            String why = msg == null ? "" : msg.replace('\r', ' ').replace('\n', ' ').trim();
+            sb.append("msg=").append(why).append('\n');
             Util.atomicWriteText(new File(hub, "report-launch-failed.txt"), sb.toString());
         } catch (Throwable t) {
             android.util.Log.w("MDTLauncher", "record launch failed: " + t);

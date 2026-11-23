@@ -12,7 +12,9 @@
     {
       "id": "mapstats-maps",
       "title": "导出统计…",
+      "title_en": "Export stats…",
       "subtitle": "选一张或多张；详细 / 简洁，直接保存或分享",
+      "subtitle_en": "Pick one or more maps; detailed or concise, save or share",
       "entry": "io.mdt.plugins.mapstats.MapStatsPage",
       "slot": "action",
       "page": "maps"
@@ -20,7 +22,9 @@
     {
       "id": "mapstats-section",
       "title": "资源统计",
+      "title_en": "Resource stats",
       "subtitle": "统计这张地图的矿物 / 可采地板 / 可建造区域",
+      "subtitle_en": "Ores / mineable floors / buildable area of this map",
       "entry": "io.mdt.plugins.mapstats.MapStatsPage",
       "slot": "section",
       "page": "map-detail"
@@ -28,6 +32,7 @@
     {
       "id": "mapstats-sort-reach",
       "title": "按可采资源（多的在前）",
+      "title_en": "By mineable resources (most first)",
       "entry": "io.mdt.plugins.mapstats.SortReach",
       "slot": "sort",
       "page": "maps"
@@ -35,6 +40,7 @@
     {
       "id": "mapstats-sort-build",
       "title": "按能建格数（多的在前）",
+      "title_en": "By buildable tiles (most first)",
       "entry": "io.mdt.plugins.mapstats.SortBuild",
       "slot": "sort",
       "page": "maps"
@@ -42,6 +48,7 @@
     {
       "id": "mapstats-sort-cores",
       "title": "按可建核心数（多的在前）",
+      "title_en": "By buildable cores (most first)",
       "entry": "io.mdt.plugins.mapstats.SortCores",
       "slot": "sort",
       "page": "maps"
@@ -49,6 +56,7 @@
     {
       "id": "mapstats-sort-ore",
       "title": "按某矿含量（多的在前）…",
+      "title_en": "By one ore's amount (most first)…",
       "entry": "io.mdt.plugins.mapstats.SortOre",
       "slot": "sort",
       "page": "maps"
@@ -56,6 +64,7 @@
     {
       "id": "mapstats-filter-core",
       "title": "只看有核心区的图",
+      "title_en": "Only maps with a core zone",
       "entry": "io.mdt.plugins.mapstats.FilterCore",
       "slot": "filter",
       "page": "maps"
@@ -63,6 +72,7 @@
     {
       "id": "mapstats-filter-ore",
       "title": "只看含某矿的图…",
+      "title_en": "Only maps containing one ore…",
       "entry": "io.mdt.plugins.mapstats.FilterOre",
       "slot": "filter",
       "page": "maps"

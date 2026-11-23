@@ -6078,6 +6078,21 @@ public final class SelfTest {
         ok(stat, L, PluginEvents.EXIT_POLL_MS > 0 && PluginEvents.EXIT_POLL_MS <= 30_000L
                         && PluginEvents.LAUNCH_GRACE_MS >= 60_000L,
                 "轮询间隔 ≤ 30 秒、启动宽限 ≥ 60 秒（别误报「没起来」）");
+
+        // ── 第 419 轮：「这一局没起来」回界面补一次的纯判据 ──
+        //   fresh：只补报刚刚那局（未来的时刻 = 时钟被往回拨，也算新）；没有时刻不报。
+        long nowT = System.currentTimeMillis();
+        ok(stat, L, LaunchFailNotice.fresh(nowT - 1000, nowT)
+                        && LaunchFailNotice.fresh(nowT + 1000, nowT)
+                        && !LaunchFailNotice.fresh(nowT - LaunchFailNotice.FRESH_MS - 1000, nowT)
+                        && !LaunchFailNotice.fresh(0L, nowT),
+                "启动失败提示：只补报 15 分钟内那局（更老的只记账、不翻旧账）");
+        //   claims：同一条记录（槽+时刻）只提示一次；换了那一局才再来。
+        String k1 = LaunchFailNotice.keyOf("default", 1234L);
+        ok(stat, L, "default|1234".equals(k1) && "|1234".equals(LaunchFailNotice.keyOf(null, 1234L))
+                        && LaunchFailNotice.claims("", k1) && !LaunchFailNotice.claims(k1, k1)
+                        && !LaunchFailNotice.claims("x", null) && !LaunchFailNotice.claims("x", ""),
+                "★ 启动失败提示：同一局只提示一次（槽+时刻去重，空键不提示）");
     }
 
     /**
