@@ -6133,6 +6133,69 @@ public final class SelfTest {
                         && LaunchFailNotice.fresh(nowT - 60_000L, nowT, LaunchFailNotice.ATTEMPT_FRESH_MS)
                         && !LaunchFailNotice.fresh(nowT - 4L * 60_000L, nowT, LaunchFailNotice.ATTEMPT_FRESH_MS),
                 "★ 点击记录的窗口（3 分钟）与失败记录（15 分钟）分开：别共用一个常量");
+
+        // ── 第 421 轮：补丁认「原件身份」——重拼包换字节也不许把补丁判成"不适用" ──
+        //   背景：PkgRestore 拼回来的包与原件不是同一份字节（全 STORED、丢 META-INF/），
+        //   而 patch.json 认的是原件字节 ⇒ "关一次去重再开"会让整组补丁落 C_NO_MATCH。
+        //   判据只有一条：**优先用 originSha256，没有才退回盘上字节的哈希**。
+        PkgManifest pmNoOrigin = new PkgManifest();
+        pmNoOrigin.apkSha256 = "AA";
+        PkgManifest pmOrigin = new PkgManifest();
+        pmOrigin.apkSha256 = "bb";
+        pmOrigin.originSha256 = "  CC  ";
+        PkgManifest pmEmpty = new PkgManifest();
+        ok(stat, L, "aa".equals(PkgManifest.patchSha(pmNoOrigin))
+                        && "cc".equals(PkgManifest.patchSha(pmOrigin))
+                        && "".equals(PkgManifest.patchSha(pmEmpty))
+                        && "".equals(PkgManifest.patchSha((PkgManifest) null)),
+                "★ 补丁身份：有原件哈希就用原件（小写化），没有才用盘上字节；都没有 ⇒ 判不出");
+        ok(stat, L, "cc".equals(PkgRestore.originFor(pmOrigin))
+                        && "aa".equals(PkgRestore.originFor(pmNoOrigin))
+                        && "".equals(PkgRestore.originFor(pmEmpty)),
+                "★ 写旁证时取的也是同一个值（origin 优先，否则 apkSha；都没有不写）");
+
+        //   清单读写要把 originSha256 带上（旧清单没有这个字段 ⇒ null，不能当成 ""）
+        File pmf = new File(ctx.getCacheDir(), "selftest-manifest-" + System.nanoTime() + ".json");
+        boolean pmRound;
+        try {
+            pmOrigin.vkey = "selftest:pkg";
+            pmOrigin.file = "selftest.apk";
+            pmOrigin.entries.add(new PkgManifest.Entry("classes.dex", "00", 1, 0, 0));
+            pmOrigin.write(pmf);
+            PkgManifest back = PkgManifest.read(pmf);
+            pmRound = back != null && "  CC  ".equals(back.originSha256)
+                    && "cc".equals(PkgManifest.patchSha(back));
+        } catch (Throwable t) {
+            pmRound = false;
+        } finally {
+            pmf.delete();
+        }
+        ok(stat, L, pmRound, "★ 清单里存得下 originSha256（重拼前写的身份，下一轮入库要带回来）");
+
+        //   旁证文件本身：一行 64 位十六进制；大写要小写化，长度/字符不对一律当"没有"
+        File sideApk = new File(ctx.getCacheDir(), "selftest-origin-" + System.nanoTime() + ".apk");
+        File side = new File(sideApk.getParentFile(), sideApk.getName() + ".origin");
+        String hex = "0123456789abcdef";
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 64; i++) sb.append(hex.charAt(i % 16));
+        String good = sb.toString();
+        boolean sideOk;
+        try {
+            Util.atomicWriteText(side, good.toUpperCase(java.util.Locale.ROOT) + "\n");
+            String read = PkgIngest.originOf(sideApk);
+            Util.atomicWriteText(side, good.substring(0, 63) + "\n");
+            String shortOne = PkgIngest.originOf(sideApk);
+            Util.atomicWriteText(side, good.substring(0, 63) + "z\n");
+            String badChar = PkgIngest.originOf(sideApk);
+            sideOk = good.equals(read) && shortOne.isEmpty() && badChar.isEmpty();
+        } catch (Throwable t) {
+            sideOk = false;
+        } finally {
+            side.delete();
+            sideApk.delete();
+        }
+        ok(stat, L, sideOk && PkgIngest.originOf(sideApk).isEmpty(),
+                "★ 旁证解析：64 位十六进制（大写小写化）才算；长度/字符不对、文件不在 ⇒ 空串");
     }
 
     /**

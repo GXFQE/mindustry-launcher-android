@@ -204,13 +204,14 @@ public final class Importer {
         //   放在 rename **之前**、用 `.part` 做源：清单落盘失败 ⇒ 这次导入还没生效，
         //   直接抛出去（`.part` 会被 cleanup），不会留下「config 指着一个没有清单的版本」。
         //   这一步不删原包 —— 删包是迁移动作，等版本列表能完全从清单读出来之后再做。
+        PkgManifest casManifest = null;
         if (Config.get().casGameEnabled()) {
             try {
                 PkgIngest.Stats st = new PkgIngest.Stats();
-                PkgManifest m = PkgIngest.ingest(ctx, tmp, "import:" + base,
+                casManifest = PkgIngest.ingest(ctx, tmp, "import:" + base,
                         stripExt(displayName), version, Util.md5(tmp), st);
                 Log.i(TAG, "import cas: " + st);
-                if (m == null || !m.arc.eligible) {
+                if (casManifest == null || casManifest.arc == null || !casManifest.arc.eligible) {
                     Log.w(TAG, "import cas: arc not eligible — falling back to the APK at launch");
                 }
             } catch (Throwable t) {
@@ -245,6 +246,18 @@ public final class Importer {
             }
             file.setReadOnly();
             if (old.exists()) { old.setWritable(true); old.delete(); }
+        }
+
+        // ★ 第 421 轮：清单里记的是源 `.part` 名（入库发生在 rename 之前，见上面的注释）。
+        //   改名成功后把 file 改回正式名 —— 否则关掉去重时 PkgRestore 会拼出一个 `.part`
+        //   名字的包，而 `.part` 在启动恢复里是被当"没拷完"清掉的。
+        if (casManifest != null && !file.getName().equals(casManifest.file)) {
+            casManifest.file = file.getName();
+            try {
+                casManifest.write(PkgManifest.fileOf(ctx, "import:" + base));
+            } catch (IOException we) {
+                Log.w(TAG, "import cas: cannot fix manifest file name: " + we);
+            }
         }
 
         JSONObject e = new JSONObject();

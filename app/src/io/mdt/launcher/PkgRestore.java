@@ -128,11 +128,43 @@ final class PkgRestore {
             }
             Log.i(TAG, "pkg restore: " + m.file + " entries=" + done + " size=" + dst.length()
                     + " B in " + (System.currentTimeMillis() - t0) + " ms");
+            // 第 421 轮：把「这份包的原件是谁」写在包旁边。重拼改变了字节（全 STORED、
+            //   丢 META-INF/），而补丁包认的是原件字节 —— 没有这条旁证，「关一次去重再开」
+            //   就会把所有补丁判成「不适用这个 APK」。下一次 PkgIngest 会把它读回清单。
+            writeOrigin(dst, originFor(m));
             return dst;
         } catch (Throwable t) {
             Log.w(TAG, "pkg restore failed for " + m.file + ": " + t);
             part.delete();
             return null;
+        }
+    }
+
+    /**
+     * 「这份包的原件哈希」（第 421 轮）：清单里记过 origin 就用 origin，否则用 apkSha256。
+     *
+     * <p>为什么要挑：一个包可能被「关去重 → 开去重」折腾过好几轮，每一轮的 apkSha256
+     * 都不同，但 origin 始终是最早那份原件的哈希 —— 补丁只认它。</p>
+     */
+    static String originFor(PkgManifest m) {
+        if (m == null) return "";
+        if (m.originSha256 != null && !m.originSha256.trim().isEmpty()) {
+            return m.originSha256.trim().toLowerCase(java.util.Locale.ROOT);
+        }
+        if (m.apkSha256 != null && !m.apkSha256.trim().isEmpty()) {
+            return m.apkSha256.trim().toLowerCase(java.util.Locale.ROOT);
+        }
+        return "";
+    }
+
+    /** 写 `<dst>.origin` 旁证。失败只记日志：旁证丢了顶多让补丁判不出来，不能让重建失败。 */
+    private static void writeOrigin(File dst, String sha) {
+        if (dst == null || sha == null || sha.isEmpty()) return;
+        File side = new File(dst.getParentFile(), dst.getName() + ".origin");
+        try {
+            Util.atomicWriteText(side, sha + "\n");
+        } catch (Throwable t) {
+            Log.w(TAG, "pkg restore: cannot write origin sidecar " + side + ": " + t);
         }
     }
 

@@ -201,16 +201,16 @@ public final class PatchesActivity extends BaseActivity {
                 }
                 File apk = entry.apkPath == null ? null : new File(entry.apkPath);
                 String sha = "";
-                if (apk != null && apk.isFile()) {
+                // ★ 第 421 轮：与 Patches.resolve 同一口径 —— 清单里若有「原件哈希」就用它。
+                //   CAS 关掉时盘上那份是 PkgRestore 拼回来的（字节与原件不同），拿它去匹配
+                //   补丁会整页「不适用」；originSha256 记的才是原件。
+                sha = PkgManifest.patchShaOf(PatchesActivity.this, key);
+                if (sha.isEmpty() && apk != null && apk.isFile()) {
                     try {
                         sha = Patches.sha256Of(apk);
                     } catch (Throwable t) {
                         Log.w(TAG, "patch apk hash failed: " + apk, t);
                     }
-                } else {
-                    // ★ 第 418 轮：CAS 删包后 apkPath 指向一个不存在的文件；
-                    //   哈希改从版本清单读，否则整页补丁都会判成「不适用」。
-                    sha = PkgManifest.apkShaOf(PatchesActivity.this, key);
                 }
                 List<Patches.Record> records = Patches.scan(PatchesActivity.this);
                 List<String> enabled = Patches.enabledRefs(PatchesActivity.this, ikey);

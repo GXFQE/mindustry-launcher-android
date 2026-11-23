@@ -115,6 +115,9 @@ public final class PkgIngest {
         } catch (IOException e) {
             m.apkSha256 = null;
         }
+        // 第 421 轮：这份 APK 若是 PkgRestore 拼回来的，旁边有 `<file>.origin` 旁证（原件哈希）。
+        //   补丁包认的是原件字节，没有这一步「关一次去重再开」就会把补丁全部变成「不适用」。
+        m.originSha256 = originOf(apk);
 
         ArcAbi.Result r = ArcAbi.probe(ctx, apk, override);
         m.arc = new PkgManifest.Arc(r.fingerprint, r.eligible, r.reason);
@@ -147,6 +150,33 @@ public final class PkgIngest {
     /** 读清单；没有就返回 null。 */
     public static PkgManifest manifest(Context ctx, String vkey) {
         return PkgManifest.read(PkgManifest.fileOf(ctx, vkey));
+    }
+
+    /**
+     * 读 `import/&lt;file&gt;.origin` 旁证：一行 64 位十六进制 = 这份 APK **原件**的 sha256。
+     *
+     * <p>第 421 轮：{@link PkgRestore#rebuild} 拼回来的包与原件不是同一份字节（全 STORED、
+     * 丢 `META-INF/`），而补丁包认的是原件字节 ⇒ 重建后必须把「原件是谁」记在包旁边，
+     * 下次入库（{@link #ingest}）再读回 {@link PkgManifest#originSha256}。</p>
+     *
+     * @return 小写哈希；没有旁证 / 读不出来 / 不是 64 位十六进制 ⇒ 空串（按"没重拼过"处理）
+     */
+    static String originOf(File apk) {
+        if (apk == null) return "";
+        File side = new File(apk.getParentFile(), apk.getName() + ".origin");
+        if (!side.isFile()) return "";
+        try {
+            String t = Util.readText(side).trim().toLowerCase(Locale.ROOT);
+            if (t.length() != 64) return "";
+            for (int i = 0; i < 64; i++) {
+                char c = t.charAt(i);
+                boolean hex = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f');
+                if (!hex) return "";
+            }
+            return t;
+        } catch (IOException e) {
+            return "";
+        }
     }
 
     /** 全部清单（GC 的引用集就从这里来）。 */

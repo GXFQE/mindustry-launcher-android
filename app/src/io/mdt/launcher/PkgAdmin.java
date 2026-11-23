@@ -103,6 +103,9 @@ public final class PkgAdmin {
                     if (apk.delete()) {
                         r.deleted++;
                         r.reclaimed += len;
+                        // 第 421 轮：原件哈希已经进了清单，旁证文件可以一起清掉
+                        //   （留着也只是给 sweep 当残留）
+                        new File(apk.getParentFile(), apk.getName() + ".origin").delete();
                     } else {
                         Log.w(TAG, "cas enable: cannot delete " + apk);
                     }

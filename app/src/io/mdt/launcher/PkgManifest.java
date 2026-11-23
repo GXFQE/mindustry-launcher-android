@@ -72,6 +72,21 @@ public final class PkgManifest {
     public String md5;
     public String apkSha256;
     /**
+     * 「这份包的**原件**字节」的 sha256（第 421 轮）。
+     *
+     * <p>为什么需要它：`PkgRestore.rebuild` 从池子里拼回来的 APK 与原件**不是同一份字节**
+     * （全部 STORED、丢掉 `META-INF/`，见 {@link PkgRestore} 的类注释）⇒ 重拼一次
+     * {@link #apkSha256} 就变一次。而补丁包（`patch.json`）认的是「APK 整份字节的 sha256」，
+     * 于是「关一次去重 → 再开」就把所有补丁变成「不适用这个 APK」——
+     * 用户看到的现象就是「加了 CAS 以后补丁全炸了」。</p>
+     *
+     * <p>所以：{@link #apkSha256} 记盘上这份文件的真实哈希（拼回、校验用），
+     * 本字段记它**本来是哪份包**（补丁认人用）；重拼前 {@link PkgRestore} 会把旧值写进
+     * `import/<file>.origin` 旁证，下次入库时 {@link PkgIngest} 再带回来。
+     * 没有重拼过的版本本字段为 null（此时原件就是 {@link #apkSha256}）。</p>
+     */
+    public String originSha256;
+    /**
      * 这个版本是不是「远古包」（build ≤ 146，只认游戏默认根 `files/`，不认
      * `mindustry.data.dir` 属性）。**入库时就判好**——删掉 APK 之后
      * `Compat.probe(apk)` 已经无从下手，而 `GameSlot.needsLegacySlot` 一旦探不到
@@ -112,6 +127,7 @@ public final class PkgManifest {
             m.added = o.optLong("added", 0);
             m.md5 = o.optString("md5", null);
             m.apkSha256 = o.optString("apkSha256", null);
+            m.originSha256 = o.optString("originSha256", null);
             m.legacy = o.optBoolean("legacy", false);
             JSONObject a = o.optJSONObject("arc");
             if (a != null) {
@@ -150,6 +166,7 @@ public final class PkgManifest {
             o.put("added", added);
             o.put("md5", md5);
             o.put("apkSha256", apkSha256);
+            o.put("originSha256", originSha256);
             o.put("legacy", legacy);
             JSONObject a = new JSONObject();
             a.put("fingerprint", arc == null ? null : arc.fingerprint);
@@ -205,6 +222,29 @@ public final class PkgManifest {
         PkgManifest m = read(fileOf(ctx, vkey));
         if (m == null || m.apkSha256 == null) return "";
         return m.apkSha256.trim().toLowerCase(Locale.ROOT);
+    }
+
+    /**
+     * 「补丁该拿哪个哈希去认这个包」（第 421 轮）：有原件哈希就用原件，否则用盘上字节的哈希。
+     *
+     * <p>纯函数，给 {@link Patches} / {@code PatchesActivity} / 自检共用一份口径 ——
+     * 三处各写一遍必然漂（补丁注入用一份、页面判「适用」用另一份，就会出现
+     * 「页面说能用、启动时没注入」）。</p>
+     */
+    public static String patchSha(PkgManifest m) {
+        if (m == null) return "";
+        if (m.originSha256 != null && !m.originSha256.trim().isEmpty()) {
+            return m.originSha256.trim().toLowerCase(Locale.ROOT);
+        }
+        if (m.apkSha256 != null && !m.apkSha256.trim().isEmpty()) {
+            return m.apkSha256.trim().toLowerCase(Locale.ROOT);
+        }
+        return "";
+    }
+
+    /** {@link #patchSha} 的「按 vkey 读清单」版本。 */
+    public static String patchShaOf(Context ctx, String vkey) {
+        return patchSha(read(fileOf(ctx, vkey)));
     }
 
     // ── 查询辅助 ──────────────────────────────────────────────────────

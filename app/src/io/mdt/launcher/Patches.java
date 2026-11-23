@@ -756,7 +756,13 @@ final class Patches {
         // ★ 第 418 轮：CAS 模式下原始 APK 已经被删（内容全在池里）⇒ 哈希从版本清单里读。
         //   以前这里 "文件不在" 直接返回空 Resolved（apkSha 也留空），于是所有补丁都落到
         //   C_NO_MATCH（界面上就是一片"不适用"），连带着"启动看起来正常、补丁一个没进"。
-        if (apk != null && apk.isFile()) {
+        // ★ 第 421 轮：**清单里的"原件哈希"优先**。关掉去重时 PkgRestore 拼回来的包与原件
+        //   不是同一份字节（全 STORED、丢 META-INF/），拿盘上文件的 sha 去匹配补丁必然落空 ——
+        //   那正是用户看到的"加了 CAS 以后补丁全炸"。
+        String fromManifest = apk == null ? "" : PkgManifest.patchShaOf(ctx, "import:" + apk.getName());
+        if (!fromManifest.isEmpty()) {
+            res.apkSha = fromManifest;
+        } else if (apk != null && apk.isFile()) {
             try {
                 res.apkSha = sha256Of(apk);
             } catch (IOException e) {
@@ -764,8 +770,7 @@ final class Patches {
                 return res;
             }
         } else {
-            res.apkSha = PkgManifest.apkShaOf(ctx, apk == null ? null : "import:" + apk.getName());
-            if (res.apkSha.isEmpty()) return res;   // 连清单都没有：照旧"判不出"，不冤枉补丁
+            return res;   // 连清单都没有：照旧"判不出"，不冤枉补丁
         }
         Set<String> usedClasses = new HashSet<String>();
         Set<String> usedAssets = new HashSet<String>();
