@@ -77,6 +77,20 @@ public final class SlotWrite {
      *                     因为"清了一半再写"会让用户拿到一个既不是旧槽也不是新槽的东西
      */
     public static List<String> wipeSlot(Context ctx, File root) throws IOException {
+        return wipeSlot(ctx, root, false);
+    }
+
+    /**
+     * 同上，但可以选择把 {@link Data#contentRootsOf} **看不见的空壳**也一起抹掉（第 425 轮，槽归档用）。
+     *
+     * <p>{@code contentRootsOf} 把「空目录 / 零字节文件 / 点开头」排除在"槽内容"之外 ——
+     * 那是**备份 / 导出**该有的口径，对归档就有症状：归档一个没有模组的槽，空 `mods/`
+     * 目录会留在原地，界面上看着像"还有东西"（2026-11-24 用户专门提过）。
+     *
+     * <p>⚠️ 只有归档传 {@code true}：快照恢复 / 整槽导入要保留"清空 = 删内容"的老语义，
+     *   否则恢复中途失败时连 `.archived` 标记都会被先删掉。
+     */
+    public static List<String> wipeSlot(Context ctx, File root, boolean dropShells) throws IOException {
         List<String> gone = new ArrayList<>();
         if (root == null) return gone;
         // 2026-11-12（第 362 轮，plan §12.7 第 3 步）：清空是**最重的写** —— 门禁放这里，
@@ -85,7 +99,18 @@ public final class SlotWrite {
             throw new IOException(Trans.get(ctx, R.string.slot_err_game_running));
         }
         if (!root.isDirectory()) return gone;
-        for (File f : Data.contentRootsOf(root)) {
+        // 要删的清单：槽内容 +（可选）排除清单之外的所有残留（空壳 / 零字节 / 点开头）
+        List<File> targets = new ArrayList<>(Data.contentRootsOf(root));
+        if (dropShells) {
+            File[] kids = root.listFiles();
+            if (kids != null) {
+                for (File f : kids) {
+                    if (Data.slotExcluded(f.getName()) || targets.contains(f)) continue;
+                    targets.add(f);
+                }
+            }
+        }
+        for (File f : targets) {
             if (!Data.deleteTree(f)) {
                 throw new IOException(Trans.get(ctx, R.string.slotwrite_err_wipe_failed_fmt,
                         f.getAbsolutePath()));

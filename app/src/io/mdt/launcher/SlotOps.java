@@ -936,7 +936,9 @@ final class SlotOps {
                         throw new java.io.IOException("archive snapshot failed: " + s.name);
                     }
                     try {
-                        SlotWrite.wipeSlot(a, s.dir);
+                        // ★ 第 425 轮：归档要连空壳一起抹掉（空 mods/ 之类；contentRootsOf 对备份正确、
+                        //   对归档会留下"看着还有东西"的空目录）—— 用户 2026-11-24 专门提过这条
+                        SlotWrite.wipeSlot(a, s.dir, true);
                     } catch (Throwable t) {
                         // **没清成**才允许删快照；清成了之后它就是这个槽的唯一副本（见 plan §4）
                         try { Backup.delete(a, snap); } catch (Throwable ignored) { }

@@ -1194,7 +1194,12 @@ public class MainActivity extends BaseActivity {
         mDragY = -1f;
         mDragScrollDir = 0;
         mDragHandler.removeCallbacks(mDragScrollTask);
-        row.setAlpha(1f);
+        // ★ 第 425 轮：原来这里无条件 setAlpha(1f) ⇒ 归档行被拖一下就不再变灰
+        //   （用户 2026-11-24：「为什么我拖一下后启动项就不变灰了」）。按行身份恢复。
+        Object dragTag = row.getTag();
+        boolean dragArchived = dragTag instanceof Versions.Entry
+                && SlotArchive.isArchived(this, Versions.slotFor((Versions.Entry) dragTag));
+        row.setAlpha(dragArchived ? 0.55f : 1f);
         if (commit && commitRowOrder()) {
             Toast.makeText(this, Trans.get(this, R.string.main_order_saved), Toast.LENGTH_SHORT).show();
         }

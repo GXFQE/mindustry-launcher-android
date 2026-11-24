@@ -274,9 +274,17 @@ public class SlotActivity extends BaseActivity {
         setMenuTitle(menu, R.id.action_slot_copy_settings, R.string.slot_op_copy_settings);
         setMenuTitle(menu, R.id.action_slot_delete, R.string.slot_op_delete);
         // ★ 第 425 轮：归档 / 解除归档。
-        //   · 已归档 ⇒ 标题变「解除归档」，其余"动内容"的项留一个可见但点不动（改名 / 克隆 / 删除照旧可用）
+        //   · 已归档 ⇒ 标题变「解除归档」，且把「重命名 / 克隆 / 复制设置」收起 ——
+        //     槽本体已经清空，克隆一个空壳、从没有设置的槽里复制设置都没有意义
+        //     （用户 2026-11-24：「克隆一个归档的槽干啥」「这个就只要归档」）。
+        //     删除仍留着：用户要能把归档过的槽彻底丢掉。
         //   · 未归档 ⇒ 标题「归档」；默认槽（设置页那项）与"游戏在跑"时这一项**灰掉**
         //     （用户 2026-11-24：「默认不能归档」；灰掉的原因是点下去才知道，所以下面给 Info 文案兜底）
+        for (int hide : new int[]{R.id.action_slot_rename, R.id.action_slot_clone,
+                R.id.action_slot_copy_settings}) {
+            android.view.MenuItem hit = menu.findItem(hide);
+            if (hit != null) hit.setVisible(!mArchived);
+        }
         android.view.MenuItem arc = menu.findItem(R.id.action_slot_archive);
         if (arc != null) {
             arc.setTitle(Trans.get(SlotActivity.this, mArchived
@@ -304,6 +312,11 @@ public class SlotActivity extends BaseActivity {
         // 槽可能已经不在（别处删了 / 改了名）⇒ 与点行时同一条判据
         final Data.Slot s = findSlot();
         if (s == null) { gone(); return true; }
+        // ★ 第 425 轮：归档槽上这几项已经收起（见 onCreateOptionsMenu）—— 兜一道，防菜单缓存
+        if (mArchived && (id == R.id.action_slot_rename || id == R.id.action_slot_clone
+                || id == R.id.action_slot_copy_settings)) {
+            return true;
+        }
         if (id == R.id.action_slot_rename) SlotOps.renameSlot(this, s, mHost);
         else if (id == R.id.action_slot_clone) SlotOps.cloneSlot(this, s, mHost);
         else if (id == R.id.action_slot_copy_settings) {

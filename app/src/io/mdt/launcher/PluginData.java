@@ -679,7 +679,12 @@ final class PluginData {
         if (ctx == null || apk == null) return null;
         try {
             String path = apk.getAbsolutePath();
-            for (Versions.Entry e : Versions.scanAll(ctx)) {
+            // ★ 2026-11-24（第 425 轮）：同一个 APK 可以有多行（主项 + 附加槽），
+            //   原来按 scanAll 原始顺序取第一条 ⇒ 与 `versions()`（主页顺序）拿到的"这一份"
+            //   可能不是同一行（自检里 ikey 对不上就是这么来的）。这里用同一份排序口径。
+            Config cfg = Config.get();
+            cfg.load(ctx);
+            for (Versions.Entry e : Versions.orderRows(Versions.scanAll(ctx), cfg.mainOrder())) {
                 if (e == null || e.apkPath == null || !path.equals(e.apkPath)) continue;
                 return versionItem(ctx, e.key(), Versions.slotFor(e));
             }

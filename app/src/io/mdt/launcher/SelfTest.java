@@ -5822,7 +5822,9 @@ public final class SelfTest {
                         if (Integer.parseInt(pc) != (n == null ? 0 : n.intValue())) countsOk = false;
                     }
                     if (bc != null) {
-                        int want = Backup.list(ctx, slot).size();
+                        // ★ 2026-11-24（第 425 轮）：插件与宿主都取 `Backup.normal`（归档快照不计入 N 份），
+                        //   断言也要用同一口径 —— 拿 `Backup.list` 比会把归档快照算成一份，必红。
+                        int want = Backup.normal(ctx, slot).size();
                         if (Integer.parseInt(bc) != want) countsOk = false;
                     }
                 }
@@ -6776,7 +6778,17 @@ public final class SelfTest {
                         && pr != null && pr.size() == 1
                         && ikey.equals(pr.get(0).extra.get("instanceKey"));
                 ok(stat, L, itemOk,
-                        "v40 ★版本页 / 资源页的 selectedItem · pageItems 能拿到这一份（评审 B2/M4）");
+                        "v40 ★版本页 / 资源页的 selectedItem · pageItems 能拿到这一份（评审 B2/M4）"
+                                + (itemOk ? "" : "〔one=" + (one != null) + " byApk=" + (byApk != null)
+                                + " pv=" + (pv == null ? "null" : pv.size())
+                                + " pr=" + (pr == null ? "null" : pr.size())
+                                + " k=" + k + " sl=" + sl
+                                + " ikey=" + ikey
+                                + " one.ikey=" + (one == null ? "-" : one.extra.get("instanceKey"))
+                                + " byApk.ikey=" + (byApk == null ? "-" : byApk.extra.get("instanceKey"))
+                                + " pv0=" + (pv == null || pv.isEmpty() ? "-" : pv.get(0).extra.get("instanceKey"))
+                                + " pr0=" + (pr == null || pr.isEmpty() ? "-" : pr.get(0).extra.get("instanceKey"))
+                                + " one.key=" + (one == null ? "-" : one.extra.get("key")) + "〕"));
             }
         } catch (Throwable t) {
             ok(stat, L, false, "v40 版本页 item 用例异常：" + t);
