@@ -51,6 +51,23 @@ final class UpdateMode {
         return m == PREVIEW;
     }
 
+    /**
+     * 一次检查该走哪个通道（第 424 轮用户「关闭自动检查更新，手动检查到底是稳定还是稳定和测试」）。
+     *
+     * <p>★ 为什么「关」档的手动检查要连预览版一起看：1.0 之前每个版本都是 prerelease
+     * （`v0.7.0-preview` / `v1.0.0-rc1` …），而 `GitHubReleases.pick(list,false)` 只认
+     * 非 prerelease ⇒ 「关」和「只查稳定版」两档的手动检查会**永远**返回「已是最新版本」。
+     * 用户主动点了「检查更新」，不该被自己设的"关"字吃掉预览版。
+     *
+     * <p>★ 为什么「只查稳定版」不跟着放宽：那是用户**明确选过**的通道承诺 ——
+     * 手动时它看不到预览版是这一档的定义，不是缺陷；要放宽就改设置，别偷偷改。
+     *
+     * @param manual 用户主动点的（true）还是启动时静默跑的（false）
+     */
+    static boolean previewForCheck(int m, boolean manual) {
+        return usesPreview(m) || (manual && m == OFF);
+    }
+
     static boolean valid(int m) {
         return m == OFF || m == STABLE || m == PREVIEW;
     }

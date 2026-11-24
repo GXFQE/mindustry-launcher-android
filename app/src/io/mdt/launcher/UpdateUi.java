@@ -125,7 +125,10 @@ final class UpdateUi {
 
         new Thread(new Runnable() {
             @Override public void run() {
-                final boolean preview = UpdateMode.usesPreview(UpdateMode.of(a));
+                // ★ 第 424 轮：通道不能只看模式 —— 「关」档的手动检查要连预览版一起看
+                //   （1.0 之前全是 prerelease，只认稳定等于永远「已是最新」）。
+                //   「只查稳定版」照旧只认稳定（那是用户选过的承诺）。判据见 UpdateMode.previewForCheck。
+                final boolean preview = UpdateMode.previewForCheck(UpdateMode.of(a), manual);
                 final String[] err = new String[1];
                 UpdateManifest m = loadLatest(preview, err);
                 if (m == null) {

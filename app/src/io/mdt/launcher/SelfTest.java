@@ -21901,6 +21901,29 @@ public final class SelfTest {
         ok(stat, L, bare.ok() && !UpdateUi.foundBody(ctx, bare).isEmpty()
                         && UpdateUi.foundBody(ctx, bare).contains(installed),
                 "★元断言：清单只有 versionCode 时正文也不为空（旧实现会只剩空串）");
+
+        // ── 第 424 轮：手动 / 静默 × 三档的**通道**判据 ────────────────
+        // 用户：「关闭自动检查更新，手动检查到底是稳定还是稳定和测试」。
+        // 现状是「关」和「只查稳定版」都只认非 prerelease ⇒ 1.0 前一个都挑不出来。
+        ok(stat, L, UpdateMode.previewForCheck(UpdateMode.OFF, true),
+                "★「关」档的手动检查连预览版一起看（否则 1.0 前永远「已是最新」）");
+        ok(stat, L, !UpdateMode.previewForCheck(UpdateMode.OFF, false),
+                "「关」档的静默通道不走预览（它本来也不联网：autoChecks=false）");
+        ok(stat, L, !UpdateMode.previewForCheck(UpdateMode.STABLE, true)
+                        && !UpdateMode.previewForCheck(UpdateMode.STABLE, false),
+                "★「只查稳定版」手动时也仍然只查稳定（用户选过的承诺，不许偷偷放宽）");
+        ok(stat, L, UpdateMode.previewForCheck(UpdateMode.PREVIEW, true)
+                        && UpdateMode.previewForCheck(UpdateMode.PREVIEW, false),
+                "「稳定版和预览版」两路都走预览通道");
+
+        // 元断言：把机制本身钉住 —— 全是 prerelease 时「只认稳定」挑不出来。
+        java.util.List<GitHubReleases.Release> onlyPre =
+                new java.util.ArrayList<GitHubReleases.Release>();
+        onlyPre.add(new GitHubReleases.Release("v1.0.0-rc1", true, "2026-10-30"));
+        ok(stat, L, GitHubReleases.pick(onlyPre, false) == null
+                        && GitHubReleases.pick(onlyPre, true) != null,
+                "★元断言：全是 prerelease 时「只认稳定」挑不出任何一条 —— 这就是「关」档手动检查"
+                        + "永远「已是最新」的机制");
     }
 
     // ── 第 338 轮：插件自动更新（清单 / 哈希比对 / 状态表 / 内置在线升级登记）──────
