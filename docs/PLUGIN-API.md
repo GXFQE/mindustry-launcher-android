@@ -94,7 +94,7 @@
   —— 这一组**真的动盘**：建空槽、槽改名（含当前槽，指针一起改）、整槽克隆、整槽进中转站、
   改槽内内容文件的磁盘名。槽改名会一次做完"目录 + 备份目录 + 默认槽 / 备份策略 / 手工顺序"；
   删槽的门禁与界面同源（默认槽 `default-slot` / 还有启动项 `in-use` / 实例在跑 `game-running`）。
-  **v52 = 宿主设置的只读快照**：`launcherSettings()` 一次给出 15 个键（11 项设置页里能被改的
+  **v52 = 宿主设置的只读快照**：`launcherSettings()` 一次给出 17 个键（13 项设置页里能被改的
   值 + `default_slot` 的生效值与"设没设过"+ `backups` 按槽嵌套）；`lastLaunch()` 单独回答
   "上次实际启动的是哪个实例"（`has` / `version` / `slot`）。**只读、同步、没有失败码**；
   内部记录（`version_slots` / `main_order` / `patch_enabled` / `imports` …）一律不给，
@@ -232,7 +232,7 @@ public static void unload();                    // 可选：收尾（也认 unlo
 | `patches()` / `patches(versionKey, slot)`（v38） | 已导入的游戏补丁；给了启动项才判 `enabled` / `applies`，见下文 |
 | `instances()`（v39） | **正在跑**的游戏实例（含启动占位）—— `pid` / `vkey` / `slot` / `instanceKey` / `started` / `starting`；顺序 = 启动时间升序。⚠️ 读失败也返回空表（没有失败码）：空表只说明"这份快照里没有"，别当"一定没在跑"的硬证据 |
 | `backups(slot)`（v39） | 某个槽的**备份快照**元信息（`created` / `label` / `source` / `files` / `bytes` / `legacy`）；`slot` 空 = 这一页的槽；恢复 / 删除不给插件做。⚠️ 清单读不出来也返回空表（同上） |
-| `launcherSettings()`（v52） | 宿主设置的**只读快照**（15 键：设置页能被改的 11 项 + `default_slot` 两态 + `backups` 按槽嵌套）—— **同步、没有失败码**；内部记录一律不给，见下文「v52 宿主设置只读」 |
+| `launcherSettings()`（v52） | 宿主设置的**只读快照**（17 键：设置页能被改的 13 项 + `default_slot` 两态 + `backups` 按槽嵌套）—— **同步、没有失败码**；内部记录一律不给，见下文「v52 宿主设置只读」 |
 | `lastLaunch()`（v52） | **上次实际启动的实例**：`has`（Boolean）/ `version`（版本 key）/ `slot`（宿主生效的槽名）；`has=false` 时另外两个键**不出现**。与"默认槽"无关 |
 | `usageDir()` | 插件数据目录（见第 9 节） |
 | `crashReportsDir()`（v22） | 当前槽的崩溃报告目录（只读；可能不存在） |
@@ -243,7 +243,7 @@ public static void unload();                    // 可选：收尾（也认 unlo
 |---|---|
 | `versions()` | `instanceKey`（= 宿主实例键 `版本key + NUL + 槽`，**别自己拼**）/ `bound`（`"true"` = 附加绑定行，不是主行）/ `patchCount`（这个启动项启用的补丁数；补丁库读不出来就**没有这个键**）/ `backupCount`（这个槽的备份份数；备份目录读不出来就**没有这个键**） |
 | `plugins()` | `updateState`（`ok` / `available` / `installed` / `confirm` / `failed`）/ `updateVersion` / `updateNote`（后两个可能是空串 = 更新记录里没写；**记录不存在 ⇒ 三个键都不出现**） |
-| `settings()`（内部快照） | **没有公开方法**（以前这张表写成"公开"是过期的）；这些值 v52 起由 `launcherSettings()` 给出：`plugin_auto_update` / `crash_alert` / `trash_keep` / `trash_keep_slots` / `update_mode` / `update_mirror`（`update_mirror` 空串 = 自动，`direct` = 直连，预设或**用户自定义的 https 前缀**） |
+| `settings()`（内部快照） | **没有公开方法**（以前这张表写成"公开"是过期的）；这些值 v52 起由 `launcherSettings()` 给出：`plugin_auto_update` / `crash_alert` / `trash_keep` / `trash_keep_slots` / `trash_keep_days` / `hub_tmp_cap_mb` / `update_mode` / `update_mirror`（`update_mirror` 空串 = 自动，`direct` = 直连，预设或**用户自定义的 https 前缀**） |
 
 ### 网络与下载（v39）
 
@@ -945,7 +945,8 @@ Map<String, Object> backups = (Map<String, Object>) s.get("backups");
 | `default_slot` | String | **生效值**（用户没设过 ⇒ 宿主兜底名 `default`），恒非空 |
 | `default_slot_configured` | Boolean | 用户有没有**显式**设过默认槽（false 时上面那个是兜底值） |
 | `max_log_files` | Integer | 日志保留份数 |
-| `trash_keep` / `trash_keep_slots` | Integer | 中转站保留份数（按文件 / 按整槽） |
+| `trash_keep` / `trash_keep_slots` / `trash_keep_days` | Integer | 中转站保留份数（按文件 / 按整槽）与保留天数（超期的从最旧清掉，最新一份始终留着） |
+| `hub_tmp_cap_mb` | Integer | 临时文件（`app_hub/tmp` 各命名空间下**散落文件**）的体积上限，单位 MB，最小 1 |
 | `auto_clean_redundant` | Boolean | 自动清理冗余缓存 |
 | `crash_alert` | Boolean | 崩了主动提示 |
 | `plugin_auto_update` | Boolean | 插件自动更新 |
@@ -1420,6 +1421,8 @@ v51（2026-11-20 第 410 轮）：**槽与内容文件** —— `newSlot` / `ren
 v52（2026-11-20 第 411 轮）：**宿主设置的只读快照** —— `launcherSettings()`（15 键：设置页能被改的
 11 项 + `default_slot` 的生效值 / `default_slot_configured` + `backups` 按槽嵌套）与 `lastLaunch()`
 （上次实际启动的实例：`has` / `version` / `slot`）。
+★ 第 426 轮加两键（同样是设置页里能被改的项，属**加法**、不改 `API_MIN` 区间）：`trash_keep_days`
+（中转站保留天数）与 `hub_tmp_cap_mb`（临时文件散落文件的体积上限，MB）⇒ 现在是 **17 键**。
 ★ 只读、同步、**没有失败码**；值保留真类型（Integer / Long / Boolean / 嵌套 Map），插件不用到处 parseInt。
 ★ 键集按"用户能看到的设置"裁剪：`config_version`、`last_version` 与所有内部记录一律不给
 （它们会绕开 v50 的行写门禁）；"上次启动"单独走 `lastLaunch()`，不混进设置表。

@@ -148,6 +148,22 @@ public final class Config {
     private static final String K_TRASH_KEEP = "trash_keep";
     private static final String K_TRASH_KEEP_SLOTS = "trash_keep_slots";
     /**
+     * 第 426 轮：中转站**保留天数**（数量之外的第二道判据）。
+     *
+     * <p>用户 2026-11-24：「中转站按照数量+时间」—— 只按份数留，半年不碰的中转站会攒一屋子
+     * 早就不要的旧副本（份数上限 999 时尤其明显）。超期的从最旧删，但**永远留最新 1 份**
+     * （否则刚挪进去的东西会被"时间到了"立刻清掉）。默认 30 天。
+     */
+    private static final String K_TRASH_KEEP_DAYS = "trash_keep_days";
+    /**
+     * 第 426 轮：临时文件（`app_hub/tmp` 各命名空间根下的**散落文件**）体积上限，单位 MB。
+     *
+     * <p>用户 2026-11-24：「临时文件按照大小+时间」—— 时间是既有的 TTL（{@code HubTmp.ttlMs}），
+     * 这里补体积那道闸：分享缓存 / 插件导出的散文件会在两次清扫之间堆到几百 MB。
+     * 0 **不允许**（用户：「不让设成0MB的啊，这不放下就清理了」），最小 1 MB。
+     */
+    private static final String K_HUB_TMP_CAP_MB = "hub_tmp_cap_mb";
+    /**
      * F23 之后：**已经提示过**的那一份崩溃报告（`&lt;槽&gt;|&lt;文件名&gt;`）—— 同一份只提示一次。
      *
      * <p>★ 为什么要有它："崩了马上弹窗"有两条路（进程活着时立刻 Toast / 回到界面时补弹），
@@ -271,6 +287,10 @@ public final class Config {
     /** 中转站保留份数的出厂默认（普通条目 / 整个槽）—— 与 Trash.KEEP / KEEP_SLOTS 对齐。 */
     public static final int DEF_TRASH_KEEP = 20;
     public static final int DEF_TRASH_KEEP_SLOTS = 3;
+    /** 第 426 轮：中转站保留天数的出厂默认（数量之外的第二道判据）。 */
+    public static final int DEF_TRASH_KEEP_DAYS = 30;
+    /** 第 426 轮：临时文件散落件的体积上限默认（MB；0 不允许，最小 1）。 */
+    public static final int DEF_HUB_TMP_CAP_MB = 64;
     /**
      * ★ F20：自动清理所有**缓存类数据**的出厂默认 = **开**（游戏 cache / 分享 cache /
      * 旧版本重复文件；第 383 轮起从"只清数据根残留"扩大到一个开关管全部）。
@@ -1418,6 +1438,36 @@ public final class Config {
 
     public synchronized void setTrashKeepSlots(int v) {
         put(K_TRASH_KEEP_SLOTS, Math.max(1, Math.min(999, v)));
+        save();
+    }
+
+    /**
+     * 第 426 轮：中转站保留天数（默认 30；1..3650）。
+     *
+     * <p>与份数是**两道独立判据**：超过天数就删（{@link Trash#prune} 里先按时间、再按份数），
+     * 但永远留最新 1 份。
+     */
+    public synchronized int trashKeepDays() {
+        return intKey(K_TRASH_KEEP_DAYS, DEF_TRASH_KEEP_DAYS, 1, 3650);
+    }
+
+    public synchronized void setTrashKeepDays(int v) {
+        put(K_TRASH_KEEP_DAYS, Math.max(1, Math.min(3650, v)));
+        save();
+    }
+
+    /**
+     * 第 426 轮：临时文件散落件的体积上限（MB；默认 64；1..10240）。
+     *
+     * <p>★ 读写都按 MB，落盘也是 MB（不像 {@link #downloadLimit()} 存字节）——
+     * 用户填的就是"多少 MB"，存字节省得来回除、还容易在自检里写出 1024 的余数。
+     */
+    public synchronized int hubTmpCapMb() {
+        return intKey(K_HUB_TMP_CAP_MB, DEF_HUB_TMP_CAP_MB, 1, 10240);
+    }
+
+    public synchronized void setHubTmpCapMb(int v) {
+        put(K_HUB_TMP_CAP_MB, Math.max(1, Math.min(10240, v)));
         save();
     }
 

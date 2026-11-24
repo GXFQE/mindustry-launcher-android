@@ -529,6 +529,12 @@ public class MainActivity extends BaseActivity {
         //   ⚠️ 它**不跟着**启动器的「更新模式」走：那是两个开关（见 Config.DEF_PLUGIN_UPDATE）。
         //   有插件被自动更新 / 需要确认时会给一条 Toast；其余情况（没声明地址 / 没网）完全安静。
         PluginUpdates.checkDue(this);
+        // ★ 第 426 轮：回到界面也补一次存储上限巡检（每小时最多一次，内部判 stamp）。
+        //   冷启动那个检查点在 LauncherApp.onCreate；这里覆盖"长期不退出"的用法。
+        try {
+            StorageGuard.autoInBackground(this);
+        } catch (Throwable ignored) {
+        }
         // ★ 第 386 轮：接口版本不够导致的回退 / 停用**不许静默** —— 每进程主动说一次；
         //   插件页还有一张持久的警告卡（去那里看具体是谁、要多少、退到了哪一版）。
         if (!sApiToastShown) {

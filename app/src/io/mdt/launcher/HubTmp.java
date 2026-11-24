@@ -8,7 +8,9 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * HUB 临时件的**唯一落点**：`app_hub/tmp/`（阶段 0.1，2026-11-15 第 382 轮）。
@@ -80,8 +82,11 @@ final class HubTmp {
     /** 主人不在了也要等这么久才删（刚建的目录可能还没写 owner） */
     static final long GRACE_MS = 30L * 1000L;
 
-    /** 总量上限：超过就按最旧的无主会话清（1.5 GB ≈ 三个整槽导出） */
-    static final long CAP_BYTES = 1536L * 1024L * 1024L;
+    /**
+     * 体积修剪时"刚放下"的宽限（1 h）：分享包 / 插件导出可能正被别的 App 借出去读，
+     * 刚写完就删会让对方拿到一个空文件。
+     */
+    private static final long TRIM_GRACE_MS = 60L * 60L * 1000L;
 
     private HubTmp() {}
 
@@ -246,9 +251,14 @@ final class HubTmp {
         }
     }
 
-    /** 正式入口：真实时间 / 真实 pid / 上限 1.5 GB */
+    /** 正式入口：真实时间 / 真实 pid / 上限读设置（默认 64 MB，见 {@link Config#hubTmpCapMb()}） */
     static Swept sweep(Context ctx) {
-        return sweep(ctx, System.currentTimeMillis(), null, CAP_BYTES);
+        return sweep(ctx, System.currentTimeMillis(), null, capBytes());
+    }
+
+    /** 体积上限（字节）。设置里存 MB，**最小 1 MB**（用户：「不让设成 0MB 的」）。 */
+    static long capBytes() {
+        return Math.max(1, Config.get().hubTmpCapMb()) * 1024L * 1024L;
     }
 
     /**
@@ -305,44 +315,90 @@ final class HubTmp {
             }
         }
 
-        // 总量上限：只清**无主**会话，最旧优先
-        if (capBytes > 0) trimToCap(ctx, now, live, capBytes, out);
+        // 总量上限：只清**散落文件**，最旧优先（会话目录由 owner.pid 那套自己收）
+        if (capBytes > 0) trimToCap(ctx, now, capBytes, out);
         return out;
     }
 
-    private static void trimToCap(Context ctx, long now, final PidAlive live, long capBytes,
-                                   Swept out) {        File root = rootNoCreate(ctx);
+    /**
+     * 体积上限：只清**各命名空间根下的散落文件**（`share` / `plugin-export` / `export` …），
+     * 会话目录由 owner.pid 那套自己收，活进程的一个字节都不动。
+     *
+     * <p>★ 为什么口径是散文件（第 426 轮，用户：「导出和分享不一样」）：拖到几百 MB 的正是
+     * 分享缓存与插件导出这些平铺件；会话目录有主、有 TTL，冷启动也会收。
+     *
+     * <p>保护：`.part`（正在写）、符号链接、1 h 内放下的、每个命名空间留最新 1 份
+     * （该命名空间只剩一份时不再护着，否则上限永远不生效）。
+     */
+    private static void trimToCap(Context ctx, long now, long capBytes, Swept out) {
+        File root = rootNoCreate(ctx);
         long total = sizeNoFollow(root);
         if (total <= capBytes) return;
-        List<File> cand = new ArrayList<>();
-        File[] nsDirs = root.listFiles();
-        if (nsDirs == null) return;
-        for (File nsDir : nsDirs) {
-            if (nsDir == null || isLink(nsDir) || !nsDir.isDirectory()) continue;
-            File[] items = nsDir.listFiles();
-            if (items == null) continue;
-            for (File it : items) {
-                if (it == null || isLink(it) || !it.isDirectory()) continue;
-                int pid = ownerPid(it);
-                if (pid > 0 && (pid == Process.myPid() || live.alive(pid))) continue;
-                cand.add(it);
-            }
-        }
-        Collections.sort(cand, new Comparator<File>() {
-            @Override public int compare(File a, File b) {
-                return Long.compare(age(a, now), age(b, now));
-            }
-        });
-        for (int i = 0; i < cand.size() && total > capBytes; i++) {
-            File it = cand.get(i);                       // 最旧的在前，先删最旧的
-            long len = sizeNoFollow(it);
+        List<File> droppable = capCandidates(root, now);
+        for (int i = 0; i < droppable.size() && total > capBytes; i++) {
+            File it = droppable.get(i);                       // 最旧的在前
+            long len = it.length();
             if (deleteNoFollow(it)) {
-                out.dirs++;
+                out.files++;
                 out.bytes += len;
                 total -= len;
             }
         }
     }
+
+    /**
+     * 体积修剪的**候选列表**（最旧 → 新）—— 拆成纯函数，自检可以直接喂夹具
+     * （真 tmp 根里可能有用户正在用的分享缓存，自检不能拿它当实验场）。
+     *
+     * <p>规则：每个命名空间（`tmp/<ns>/`）根下的**散落文件**，排除 `.part`（正在写）、
+     * 符号链接、1 小时内放下的（可能正被别的 App 借出去读）；组里不止一份时留**最新 1 份**
+     * （只剩一份时它是唯一一件，再护着上限就永远不生效）。
+     *
+     * <p>⚠️ "留最新 1 份"必须按**整组**算：先收全组、排序、再剔除最后一个。若一开始就按宽限
+     * 过滤，组里只剩一件旧件时 `size()==1` ⇒ 一个都不删，上限永远不生效（2026-11-24 真机踩到）。
+     */
+    static List<File> capCandidates(File root, long now) {
+        List<File> droppable = new ArrayList<>();
+        if (root == null || !root.isDirectory()) return droppable;
+        Map<String, List<File>> byNs = new LinkedHashMap<>();
+        File[] nsDirs = root.listFiles();
+        if (nsDirs == null) return droppable;
+        for (File nsDir : nsDirs) {
+            if (nsDir == null || isLink(nsDir) || !nsDir.isDirectory()) continue;
+            File[] items = nsDir.listFiles();
+            if (items == null) continue;
+            for (File it : items) {
+                if (it == null || isLink(it) || !it.isFile()) continue;
+                if (it.getName().endsWith(".part")) continue;         // 正在写
+                List<File> g = byNs.get(nsDir.getName());
+                if (g == null) {
+                    g = new ArrayList<>();
+                    byNs.put(nsDir.getName(), g);
+                }
+                g.add(it);
+            }
+        }
+        for (List<File> g : byNs.values()) {
+            Collections.sort(g, BY_AGE_ASC);
+            // 每个 ns 留最新 1 份 —— **只在组里不止一份时**：刚分享出去的那份不能因为"最旧"被删；
+            // 但组里就剩一件时它也是唯一一件，再护着上限就永远不生效（第 426 轮自检 ④d 钉的这条）。
+            int guard = g.size() >= 2 ? 1 : 0;
+            for (int i = 0; i < g.size() - guard; i++) {
+                File f = g.get(i);
+                if (age(f, now) <= TRIM_GRACE_MS) continue;   // 刚放下：可能正被借出读
+                droppable.add(f);
+            }
+        }
+        Collections.sort(droppable, BY_AGE_ASC);
+        return droppable;
+    }
+
+    /** 体积修剪的排序：越旧越前（散文件按修改时间；目录名里的时刻对平铺件没意义） */
+    private static final Comparator<File> BY_AGE_ASC = new Comparator<File>() {
+        @Override public int compare(File a, File b) {
+            return Long.compare(a.lastModified(), b.lastModified());
+        }
+    };
 
     // ── 小工具 ────────────────────────────────────────────────────────────
 

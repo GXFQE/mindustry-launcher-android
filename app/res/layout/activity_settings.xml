@@ -143,6 +143,20 @@
                     android:layout_marginStart="62dp"
                     android:background="@color/divider" />
 
+                <!-- 第 426 轮：临时文件体积上限（只算散落文件；隔壁那行管中转站，两行合起来
+                     就是「数量/大小 + 时间」两道保留策略）。 -->
+                <include
+                    android:id="@+id/row_tmp_cap"
+                    layout="@layout/row_action"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="62dp"
+                    android:background="@color/divider" />
+
                 <!-- 游戏包去重（CAS）：默认关；开着才有副作用（删原包 / 换装载方式）。
                      放在「存储占用」上面：两者讲的都是"盘上占多少"，先开关去重、再看占用；
                      下两行（存储占用 → 自动清理）是用户 2026-11-15 定死的顺序，不许插东西。 -->

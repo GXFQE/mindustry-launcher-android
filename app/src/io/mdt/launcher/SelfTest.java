@@ -6547,6 +6547,7 @@ public final class SelfTest {
         final String[] expect = {
                 "theme_mode", "orientation_mode", "app_language", "default_slot",
                 "default_slot_configured", "max_log_files", "trash_keep", "trash_keep_slots",
+                "trash_keep_days", "hub_tmp_cap_mb",
                 "auto_clean_redundant", "crash_alert", "plugin_auto_update", "update_mode",
                 "update_mirror", "download_limit", "backups"};
         Map<String, Object> m = PluginData.launcherSettings(ctx);
@@ -6569,8 +6570,11 @@ public final class SelfTest {
         Object limit = m.get("download_limit");
         Object alert = m.get("crash_alert");
         Object backups = m.get("backups");
+        Object keepDays = m.get("trash_keep_days");
+        Object tmpCap = m.get("hub_tmp_cap_mb");
         boolean typeOk = theme instanceof Integer && limit instanceof Long
-                && alert instanceof Boolean && backups instanceof Map;
+                && alert instanceof Boolean && backups instanceof Map
+                && keepDays instanceof Integer && tmpCap instanceof Integer;
         String cur = Data.currentSlot(ctx);
         boolean backupOk = false;
         if (backups instanceof Map) {
@@ -6584,6 +6588,7 @@ public final class SelfTest {
         }
         ok(stat, L, typeOk && backupOk,
                 "类型：theme_mode=Integer / download_limit=Long / crash_alert=Boolean；"
+                        + "trash_keep_days、hub_tmp_cap_mb 都是 Integer；"
                         + "backups 里当前槽是 {enabled, min_minutes, max_backups}");
 
         // ④ 设置页写入 ⇒ 重读跟着变（尺子钉"用户能改的那一项"）
@@ -6593,6 +6598,19 @@ public final class SelfTest {
         cfg.setMaxLogFiles(oldLogs);
         ok(stat, L, Integer.valueOf(7).equals(logsAfter),
                 "与设置页联动：max_log_files 改成 7 ⇒ 快照里读到 7（已还原）");
+
+        // ④b 第 426 轮新增两键：写进去 ⇒ 快照跟着变（证明不是硬编码常量）
+        int oldDays = cfg.trashKeepDays();
+        int oldCap = cfg.hubTmpCapMb();
+        cfg.setTrashKeepDays(7);
+        cfg.setHubTmpCapMb(9);
+        Map<String, Object> mDays = PluginData.launcherSettings(ctx);
+        boolean newOk = Integer.valueOf(7).equals(mDays.get("trash_keep_days"))
+                && Integer.valueOf(9).equals(mDays.get("hub_tmp_cap_mb"));
+        cfg.setTrashKeepDays(oldDays);
+        cfg.setHubTmpCapMb(oldCap);
+        ok(stat, L, newOk,
+                "与设置页联动：trash_keep_days=7 / hub_tmp_cap_mb=9 ⇒ 快照读到新值（已还原）");
 
         // ⑤ default_slot 两态：生效值恒非空，configured 区分"设过"与"没设"
         String oldDef = cfg.defaultSlot();
@@ -13657,6 +13675,35 @@ public final class SelfTest {
             ok(stat, L, lm && removed == 1 && !unparsed.exists() && older.isFile(),
                     "⑤ ★修剪按**真实时间**：2020 那份（名字以 a 开头、字典序最大）先被删，2026 那份留下");
 
+            // ── ⑤b 第 426 轮：数量之外再按**时间**收（用户：数量+时间）──────────
+            File pd = new File(root, "prune-days");
+            pd.mkdirs();
+            File dOld1 = new File(pd, "old1.msav");
+            File dOld2 = new File(pd, "old2.msav");
+            File dNew = new File(pd, "new.msav");
+            write(dOld1, "1".getBytes("UTF-8"));
+            write(dOld2, "2".getBytes("UTF-8"));
+            write(dNew, "3".getBytes("UTF-8"));
+            long ago = System.currentTimeMillis() - 40L * 24L * 3600L * 1000L;
+            dOld1.setLastModified(ago);
+            dOld2.setLastModified(ago - 1000L);
+            int rmDays = Trash.prune(pd, 10, 30);
+            ok(stat, L, rmDays == 2 && !dOld1.exists() && !dOld2.exists() && dNew.isFile(),
+                    "⑤b ★数量 + 时间：份数远没到上限（10），但两份超 30 天的照样清掉，新的留着");
+
+            // ── ⑤c 全部超期：保底留最新 1 份（"刚挪进来的"不能因为戳早就被清）────
+            File pe = new File(root, "prune-floor");
+            pe.mkdirs();
+            File allOld1 = new File(pe, "a.msav");
+            File allOld2 = new File(pe, "b.msav");
+            write(allOld1, "a".getBytes("UTF-8"));
+            write(allOld2, "b".getBytes("UTF-8"));
+            allOld1.setLastModified(ago);
+            allOld2.setLastModified(ago - 5000L);
+            int rmFloor = Trash.prune(pe, 3, 30);
+            ok(stat, L, rmFloor == 1 && !allOld2.exists() && allOld1.isFile(),
+                    "⑤c ★保底：全部超期也只删到剩最新 1 份（时间闸永远留最新那份）");
+
             // ── ⑥ 清空 / 码映射 / 文案实拼 ────────────────────────────────
             final int n0 = Trash.list(trash).size();
             Trash.Result r9 = Trash.empty(trash);
@@ -15118,6 +15165,29 @@ public final class SelfTest {
             }
         } catch (Throwable t) {
             ok(stat, L, false, "设置页末行检查自身异常：" + t);
+        }
+        // ★ 第 426 轮（用户 2026-11-24）：中转站「保留天数」/ 临时文件「体积上限」两行。
+        //   与上面「入口搬家」同一类坑：少一个 `@+id` ⇒ findViewById 返回 null、绑定静默跳过，
+        //   编译和门禁全绿而界面上只是少了一行。
+        try {
+            android.view.View v = inf.inflate(R.layout.activity_settings, null);
+            android.view.View keep = v.findViewById(R.id.row_trash_keep);
+            android.view.View tmpCap = v.findViewById(R.id.row_tmp_cap);
+            android.view.View storage = v.findViewById(R.id.row_storage);
+            boolean rows = keep != null && tmpCap != null && storage != null
+                    && keep.getParent() != null && keep.getParent() == tmpCap.getParent()
+                    && tmpCap.getParent() == storage.getParent();
+            boolean above = false;
+            if (rows) {
+                android.view.ViewGroup card = (android.view.ViewGroup) storage.getParent();
+                above = card.indexOfChild(keep) < card.indexOfChild(tmpCap)
+                        && card.indexOfChild(tmpCap) < card.indexOfChild(storage);
+            }
+            ok(stat, L, rows && above,
+                    "★设置页（第 426 轮）：保留份数 / 临时文件上限两行同在启动与存储卡，"
+                            + "且都排在存储占用上面");
+        } catch (Throwable t) {
+            ok(stat, L, false, "设置页第 426 轮两行检查自身异常：" + t);
         }
         // ★ 第 415 轮：安全卡两行（签名校验 / 信任的证书）。
         //   少一个 `@+id` ⇒ findViewById 返回 null、Util.bindActionValue 静默跳过，
@@ -21472,6 +21542,78 @@ public final class SelfTest {
             HubTmp.drop(ctx, batch);
         }
         ok(stat, L, swept, "④ 清扫：死 pid / 无主旧件清掉；活 pid / 新件一个不动");
+
+        // ④b 第 426 轮：体积上限（用户：大小+时间）——
+        //   口径 = 各命名空间根下的**散落文件**；.part / 1 小时宽限 / 会话目录都不参与。
+        //   ★ 这里只传「刚好没超」的上限：断言的是"不该动的东西一个没动"，
+        //     避免自检把用户真在用的分享缓存清掉（实删那半条放在真机验证里做）。
+        File capNs = HubTmp.dir(ctx, "selftest-cap");
+        boolean capKeep;
+        try {
+            File capFresh = writeTmp(capNs, "share-new.zip", "A");
+            File capOldTmp = writeTmp(capNs, "share-old.zip", "B");
+            // 40 分钟：既在 TTL（1 小时）里不被时间闸删，又在 cap 的 1 小时宽限里不参与
+            capOldTmp.setLastModified(now - 40L * 60_000L);
+            File capPart = writeTmp(capNs, "half.part", "C");
+            capPart.setLastModified(now - 40L * 60_000L);
+            long total = HubTmp.sizeNoFollow(root);
+            HubTmp.sweep(ctx, now, new HubTmp.PidAlive() {
+                @Override public boolean alive(int pid) {
+                    return true;
+                }
+            }, total + 1L);
+            capKeep = capFresh.isFile() && capOldTmp.isFile() && capPart.isFile();
+        } catch (Throwable t) {
+            capKeep = false;
+        } finally {
+            Data.deleteTree(capNs);
+        }
+        ok(stat, L, capKeep, "④b 体积上限：没超上限时散落文件一个不动"
+                + "（40 分钟前的旧件与 .part 都还在：宽限期 + 不参与的口径）");
+
+        // ④c 上限值真的读设置（不是写死的 1.5 GB），填 0 被夹到最小 1 MB
+        int oldCapMb = Config.get().hubTmpCapMb();
+        boolean capCfg;
+        try {
+            Config.get().setHubTmpCapMb(9);
+            boolean nine = HubTmp.capBytes() == 9L * 1024L * 1024L;
+            Config.get().setHubTmpCapMb(0);
+            capCfg = nine && Config.get().hubTmpCapMb() >= 1;
+        } catch (Throwable t) {
+            capCfg = false;
+        } finally {
+            Config.get().setHubTmpCapMb(oldCapMb);
+        }
+        ok(stat, L, capCfg, "④c 上限读设置（9 MB ⇒ 9×1024×1024 字节），填 0 被夹成 ≥ 1 MB");
+
+        // ④d 候选算法（纯函数，喂临时目录 —— 不碰真 tmp 根里用户在用的分享缓存）：
+        //    ★ 尺子钉的是"组里只剩一件旧件时也得进候选"：一开始就按宽限过滤会让 size()==1
+        //      ⇒ 一个都不删、上限永远不生效（2026-11-24 真机踩到的那条）。
+        File tree = new File(cache, "selftest-captree");
+        boolean cand;
+        try {
+            File shareDir = new File(tree, "share");
+            File exportDir = new File(tree, "export");
+            shareDir.mkdirs();
+            exportDir.mkdirs();
+            File sOld = writeTmp(shareDir, "s-old.bin", "1234567890");
+            File sNew = writeTmp(shareDir, "s-new.bin", "1234567890");
+            File sPart = writeTmp(shareDir, "s-half.part", "1234567890");
+            File eOnlyOld = writeTmp(exportDir, "e-only.bin", "1234567890");
+            sOld.setLastModified(now - 2L * 3600_000L);
+            eOnlyOld.setLastModified(now - 2L * 3600_000L);
+            sPart.setLastModified(now - 2L * 3600_000L);
+            sNew.setLastModified(now);
+            List<File> cand2 = HubTmp.capCandidates(tree, now);
+            cand = cand2.size() == 2 && cand2.contains(sOld) && cand2.contains(eOnlyOld)
+                    && !cand2.contains(sNew) && !cand2.contains(sPart);
+        } catch (Throwable t) {
+            cand = false;
+        } finally {
+            Data.deleteTree(tree);
+        }
+        ok(stat, L, cand,
+                "④d 上限候选：每组留最新 1 份、组里只有旧件时照样进候选、.part 与 1 小时内不进");
 
         // ⑤ 不跟随符号链接：链接删掉、它指向的东西一个字节没动
         File target = new File(cache, "selftest-tmp-target");

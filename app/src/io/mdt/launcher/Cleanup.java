@@ -190,6 +190,11 @@ final class Cleanup {
      * 没记录 / 读不出来 / 时间戳在未来（用户改过系统时间）一律算"该清了"。
      */
     static boolean autoDue(File stamp, long now) {
+        return autoDue(stamp, now, AUTO_INTERVAL_MS);
+    }
+
+    /** 同上，但间隔由调用方给（{@link StorageGuard} 用每小时，本类用 24 h）。 */
+    static boolean autoDue(File stamp, long now, long intervalMs) {
         long last = 0L;
         try {
             if (stamp != null && stamp.isFile()) {
@@ -200,7 +205,7 @@ final class Cleanup {
         }
         if (last <= 0L) return true;
         if (last > now + 60_000L) return true;      // 时钟回拨：别把"未来"当成刚清过
-        return now - last >= AUTO_INTERVAL_MS;
+        return now - last >= intervalMs;
     }
 
     /** 记下这次自动清理的时刻（写失败只记日志：下次还会再试，方向安全）。 */

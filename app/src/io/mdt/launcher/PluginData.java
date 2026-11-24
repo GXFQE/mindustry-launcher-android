@@ -430,6 +430,10 @@ final class PluginData {
         out.put("max_log_files", c.maxLogFiles());
         out.put("trash_keep", c.trashKeep());
         out.put("trash_keep_slots", c.trashKeepSlots());
+        // 第 426 轮：中转站保留天数（数量之外的第二道判据）
+        out.put("trash_keep_days", c.trashKeepDays());
+        // 第 426 轮：临时文件散落件的体积上限（MB；0 不允许，最小 1）
+        out.put("hub_tmp_cap_mb", c.hubTmpCapMb());
         out.put("auto_clean_redundant", c.autoCleanRedundant());
         out.put("crash_alert", c.crashAlertEnabled());
         out.put("plugin_auto_update", c.pluginAutoUpdate());

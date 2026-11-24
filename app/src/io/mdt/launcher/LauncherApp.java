@@ -80,6 +80,14 @@ public class LauncherApp extends Application {
         } catch (Throwable t) {
             Log.w(TAG, "auto cleanup scheduling failed: " + t);
         }
+        // ★ 第 426 轮（用户：「中转站按照数量+时间，临时文件按照大小+时间」）：
+        //   执行用户自己设的保留上限。每小时最多一次，冷启动 / 回界面各有一个检查点。
+        //   与上面那个 24h 的自动清理开关**相互独立**（那是可关的清理，这里是设置本身生效）。
+        try {
+            StorageGuard.autoInBackground(this);
+        } catch (Throwable t) {
+            Log.w(TAG, "storage guard scheduling failed: " + t);
+        }
         // 2026-11-22：游戏包去重的孤儿回收。引用集 = 全部版本的清单，起一次就够
         // （启动不再物化任何包，运行期不产生临时件）。只在主进程、游戏没在跑时做，
         // 后台线程、失败静默 —— 它一项都不能拖慢冷启动。

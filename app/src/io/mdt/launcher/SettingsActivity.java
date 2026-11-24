@@ -87,6 +87,8 @@ public class SettingsActivity extends BaseActivity {
     private TextView mCrashSub;
     /** 第 173 轮：中转站保留份数那一行的副标题（普通 / 整槽） */
     private TextView mTrashSub;
+    /** 第 426 轮：临时文件体积上限那一行的副标题（当前 MB） */
+    private TextView mTmpCapSub;
     /** F20：自动清理缓存那一行的副标题（已开 / 已关） */
     private TextView mAutoCleanSub;
     private TextView mCasSub;
@@ -184,6 +186,13 @@ public class SettingsActivity extends BaseActivity {
                     @Override public void run() { promptTrashKeep(); }
                 });
         mTrashSub = (TextView) rowTrash.findViewById(R.id.act_sub);
+
+        // 第 426 轮：临时文件（散落文件）体积上限 —— 与中转站保留策略相邻，都是"超了就丢旧的"。
+        View rowTmpCap = Util.bindActionValue(root, R.id.row_tmp_cap, R.drawable.ic_trash,
+                R.string.set_tmp_cap_title, new Runnable() {
+                    @Override public void run() { promptTmpCap(); }
+                });
+        mTmpCapSub = (TextView) rowTmpCap.findViewById(R.id.act_sub);
 
         // 第 415 轮：安全 —— 游戏包签名校验（三档单选）+ 信任的证书（内置 原版 / MindustryX，
         // 外加用户自己导入的证书）。两行都在本页就地改变量，不做"点开是另一个页面"。
@@ -345,7 +354,12 @@ public class SettingsActivity extends BaseActivity {
         }
         if (mTrashSub != null) {
             mTrashSub.setText(Trans.get(SettingsActivity.this, R.string.set_trash_sub_fmt,
-                    Config.get().trashKeep(), Config.get().trashKeepSlots()));
+                    Config.get().trashKeep(), Config.get().trashKeepSlots(),
+                    Config.get().trashKeepDays()));
+        }
+        if (mTmpCapSub != null) {
+            mTmpCapSub.setText(Trans.get(SettingsActivity.this, R.string.set_tmp_cap_sub_fmt,
+                    Config.get().hubTmpCapMb()));
         }
         if (mCasSub != null) {
             // ★ 三种说法：没开关 / 开着 / 关着。「开着」不报省了多少 —— 现在还没删原包，
@@ -1543,6 +1557,9 @@ public class SettingsActivity extends BaseActivity {
      * <p>为什么用两个输入框而不是一个：一个槽可能几十 MB，普通条目是 KB 级；
      * 合成一个数字就只能在"小文件留太少"和"大槽占太多"之间二选一。
      * 默认值来自 {@link Config#DEF_TRASH_KEEP} / {@link Config#DEF_TRASH_KEEP_SLOTS}。
+     *
+     * <p>第 426 轮加了第三个输入：**保留天数**（用户：「中转站按照数量+时间」）。
+     * 数量之外再按时间收一道，超期的从最旧删，但永远留最新 1 份。
      */
     private void promptTrashKeep() {
         final EditText items = new EditText(this);
@@ -1556,6 +1573,12 @@ public class SettingsActivity extends BaseActivity {
         slots.setSingleLine(true);
         slots.setHint(R.string.set_trash_slots_hint);
         slots.setText(String.valueOf(Config.get().trashKeepSlots()));
+
+        final EditText days = new EditText(this);
+        days.setInputType(InputType.TYPE_CLASS_NUMBER);
+        days.setSingleLine(true);
+        days.setHint(R.string.set_trash_days_hint);
+        days.setText(String.valueOf(Config.get().trashKeepDays()));
 
         LinearLayout box = new LinearLayout(this);
         box.setOrientation(LinearLayout.VERTICAL);
@@ -1580,6 +1603,15 @@ public class SettingsActivity extends BaseActivity {
         box.addView(slots, new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
 
+        TextView daysLabel = new TextView(this);
+        daysLabel.setText(Trans.get(SettingsActivity.this, R.string.set_trash_days_label));
+        daysLabel.setTextSize(13);
+        daysLabel.setTextColor(getResources().getColor(R.color.fg_muted, getTheme()));
+        daysLabel.setPadding(0, dp(10), 0, dp(4));
+        box.addView(daysLabel);
+        box.addView(days, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
         new AlertDialog.Builder(this)
                 .setTitle(R.string.set_trash_dialog_title)
                 .setView(box)
@@ -1587,20 +1619,81 @@ public class SettingsActivity extends BaseActivity {
                     @Override public void onClick(DialogInterface d, int w) {
                         int n;
                         int s;
+                        int dd;
                         try {
                             n = Integer.parseInt(items.getText().toString().trim());
                             s = Integer.parseInt(slots.getText().toString().trim());
+                            dd = Integer.parseInt(days.getText().toString().trim());
                         } catch (NumberFormatException e) {
                             n = -1;
                             s = -1;
+                            dd = -1;
                         }
                         if (n < 1 || n > 999 || s < 1 || s > 999) {
                             Toast.makeText(SettingsActivity.this, R.string.set_trash_bad,
                                     Toast.LENGTH_SHORT).show();
                             return;
                         }
+                        if (dd < 1 || dd > 3650) {
+                            Toast.makeText(SettingsActivity.this, R.string.set_trash_days_bad,
+                                    Toast.LENGTH_SHORT).show();
+                            return;
+                        }
                         Config.get().setTrashKeep(n);
                         Config.get().setTrashKeepSlots(s);
+                        Config.get().setTrashKeepDays(dd);
+                        fillValues();
+                    }
+                })
+                .setPositiveButton(R.string.cancel, null)
+                .show();
+    }
+
+    /**
+     * 第 426 轮：临时文件体积上限（MB）—— 只管 `app_hub/tmp/<命名空间>/` 根下的**散落文件**
+     * （分享缓存 / 插件导出），会话目录由 owner.pid 那套自己收。
+     *
+     * <p>★ 为什么最小 1 MB（用户 2026-11-24：「不让设成 0MB 的啊，这不放下就清理了」）：
+     * 0 会让刚写出来的分享包立刻被删。
+     */
+    private void promptTmpCap() {
+        final EditText input = new EditText(this);
+        input.setInputType(InputType.TYPE_CLASS_NUMBER);
+        input.setSingleLine(true);
+        input.setHint(R.string.set_tmp_cap_hint);
+        input.setText(String.valueOf(Config.get().hubTmpCapMb()));
+
+        LinearLayout box = new LinearLayout(this);
+        box.setOrientation(LinearLayout.VERTICAL);
+        box.setPadding(dp(20), 0, dp(20), 0);
+
+        TextView label = new TextView(this);
+        label.setText(Trans.get(SettingsActivity.this, R.string.set_tmp_cap_label));
+        label.setTextSize(13);
+        label.setTextColor(getResources().getColor(R.color.fg_muted, getTheme()));
+        label.setLineSpacing(dp(2), 1f);
+        label.setPadding(0, 0, 0, dp(4));
+        box.addView(label);
+        box.addView(input, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        new AlertDialog.Builder(this)
+                .setTitle(R.string.set_tmp_cap_dialog_title)
+                .setView(box)
+                .setNegativeButton(R.string.policy_save, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int w) {
+                        int mb;
+                        try {
+                            mb = Integer.parseInt(input.getText().toString().trim());
+                        } catch (NumberFormatException e) {
+                            mb = -1;
+                        }
+                        if (mb < 1 || mb > 10240) {
+                            Toast.makeText(SettingsActivity.this, R.string.set_tmp_cap_bad,
+                                    Toast.LENGTH_SHORT).show();
+                            return;
+                        }
+                        Config.get().setHubTmpCapMb(mb);
                         fillValues();
                     }
                 })

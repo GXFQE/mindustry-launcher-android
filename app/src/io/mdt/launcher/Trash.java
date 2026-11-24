@@ -323,9 +323,34 @@ public final class Trash {
         return (k == Kind.SLOT || k == Kind.VERSION || k == Kind.PATCH) ? keepSlots() : keep();
     }
 
-    /** 按**目录自己的类型**修剪（`maps-trash` 用普通份数、`slots-trash` 用整槽份数） */
+    /**
+     * 按**目录自己的类型**修剪（`maps-trash` 用普通份数、`slots-trash` 用整槽份数）。
+     *
+     * <p>第 426 轮起同时应用**保留天数**（{@link Config#trashKeepDays()}，默认 30）——
+     * 13 处写入路径都走这里，所以设置一改下一次挪东西进去就生效。
+     */
     public static int pruneIn(File dir) {
-        return prune(dir, keepFor(kindIn(dir, "", false)));
+        return prune(dir, keepFor(kindIn(dir, "", false)), Config.get().trashKeepDays());
+    }
+
+    /**
+     * 全部 8 个目录按"数量 + 时间"修剪一遍（第 426 轮）。
+     *
+     * <p>★ 为什么不能只靠写入路径：用户半年不往中转站挪东西，30 天前那一屋子旧副本
+     * 就永远不会过期。这一份给 {@link StorageGuard} 的每小时巡检用。
+     *
+     * @return 这次一共删了几份
+     */
+    public static int trimAll(Context ctx) {
+        int n = 0;
+        for (File d : allDirs(ctx)) {
+            try {
+                n += pruneIn(d);
+            } catch (Throwable t) {
+                android.util.Log.w("MDTLauncher", "trash trim failed: " + d.getName(), t);
+            }
+        }
+        return n;
     }
 
     /** 解析一项（**永远返回一个 Item**：认不出名字也照样能列出来、能彻底删除） */
@@ -470,16 +495,48 @@ public final class Trash {
     /**
      * 只保留最近 `keep` 项（**唯一实现** —— {@link MapFiles} / {@link Mods} 原来各有一份逐字相同的复制品）。
      *
+     * <p>第 426 轮起多了**时间**这道判据（用户：「中转站按照数量+时间」）：超过
+     * {@code Config.trashKeepDays()} 天的从最旧删。这个两参版本保持"只看份数"的旧语义
+     * （{@code days = 0}），给自检与需要精确控制的调用方用；生产路径走 {@link #pruneIn}。
+     *
      * ★ 排序用解析出来的时间戳（而不是文件名字典序）：v1/v2 两种名字混在一个目录里时，
      *   字典序在同一秒内会把它们交错，而"删最旧的"必须按**真实时间**。
      */
     public static int prune(File dir, int keep) {
+        return prune(dir, keep, 0);
+    }
+
+    /**
+     * 数量 + 时间两道闸（时间闸 `days <= 0` = 不按时间删）。
+     *
+     * <p>🔴 **时间闸永远留最新 1 份**：用户把份数调到 1 时，刚挪进来的那份不能因为
+     * "戳比现在还早"就被清掉 —— 中转站的意义就是"刚删掉的东西还找得回来"。
+     */
+    public static int prune(File dir, int keep, int days) {
         List<Item> all = list(dir);
-        if (all.size() <= keep) return 0;
+        if (all.isEmpty()) return 0;
         Collections.sort(all, BY_TIME_ASC);
+        boolean[] dead = new boolean[all.size()];
+        // ① 时间闸：升序扫到"第一份没超期"就停（后面的只会更新）
+        if (days > 0) {
+            long cut = System.currentTimeMillis() - days * 24L * 60L * 60L * 1000L;
+            for (int i = 0; i < all.size() - 1; i++) {   // 最后一份（最新）不因时间删
+                if (all.get(i).sortKey() >= cut) break;
+                dead[i] = true;
+            }
+        }
+        // ② 份数闸：只从"还活着"的里标记最旧的
+        int alive = 0;
+        for (boolean d : dead) if (!d) alive++;
+        for (int i = 0; i < all.size() && alive > keep; i++) {
+            if (dead[i]) continue;
+            dead[i] = true;
+            alive--;
+        }
+        // ③ 两道闸的结果合起来**只在这一处**删（写门禁冻结的是删除面，别为多一道闸多一处 deleteTree）
         int removed = 0;
-        for (int i = 0; i < all.size() - keep; i++) {
-            if (Data.deleteTree(all.get(i).path)) removed++;
+        for (int i = 0; i < all.size(); i++) {
+            if (dead[i] && Data.deleteTree(all.get(i).path)) removed++;
         }
         return removed;
     }
