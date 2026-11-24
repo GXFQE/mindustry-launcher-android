@@ -667,13 +667,16 @@ final class SlotIo {
      *   不是槽目录 —— 归档后槽本体已经清空，照老路导出会得到一个空包，
      *   而空槽导出又是被 `export_slot_empty_fmt` 拦着的（白让用户点两次）。
      */
-    static void exportArchive(final CardStack parent, final Activity a, final Data.Slot s) {
+    static void exportArchive(final Activity a, final Data.Slot s) {
         if (Backup.archiveOf(a, s.name) == null) {
             toast(a, Trans.get(a, R.string.slot_err_archived_missing));
             return;
         }
         final CardStack[] ref = new CardStack[1];
-        ref[0] = CardStack.show(parent, a, Trans.get(a, R.string.slot_archive_export),
+        // ⚠️ 第一个参数必须是 null：`CardStack.show(stack, ...)` 对非 null 的 stack 走 `push()`，
+        //   而 `push` 在"还没 show 过的卡片"上只往 pages 里加页、从不 `dlg.show()` ⇒ 界面毫无反应
+        //   （2026-11-24 用户：「导出归档备份点不了啊」）。空卡要用 `show(null, ...)` 或 `replace(...)`。
+        ref[0] = CardStack.show(null, a, Trans.get(a, R.string.slot_archive_export),
                 CardStack.text(a, Trans.get(a, R.string.slot_archive_export_sub)),
                 new CardStack.Btn(Trans.get(a, R.string.cancel), new Runnable() {
                     @Override public void run() { ref[0].dismiss(); }

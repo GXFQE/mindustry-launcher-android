@@ -437,7 +437,9 @@
 
     <!-- ── Slot archive (2026-11-24) ─────────────────────────────────── -->
     <string name="slot_archive">Archive</string>
+    <string name="slot_archive_menu">Archive this slot…</string>
     <string name="slot_archive_un">Unarchive</string>
+    <string name="slot_archive_un_menu">Unarchive this slot…</string>
     <string name="slot_archive_badge">Archived</string>
     <string name="slot_archive_meta">Archived — contents live in the archive backup</string>
     <string name="slot_archive_label">Archive</string>

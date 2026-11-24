@@ -431,7 +431,9 @@
     <!-- ── 槽归档（2026-11-24）───────────────────────────────────────── -->
     <!-- 判据只有一份：SlotArchive.isArchived。文案里说的「等于没玩过」是用户原话。 -->
     <string name="slot_archive">归档</string>
+    <string name="slot_archive_menu">归档此槽…</string>
     <string name="slot_archive_un">解除归档</string>
+    <string name="slot_archive_un_menu">解除归档此槽…</string>
     <string name="slot_archive_badge">已归档</string>
     <string name="slot_archive_meta">已归档 · 内容都在归档备份里</string>
     <string name="slot_archive_label">归档</string>

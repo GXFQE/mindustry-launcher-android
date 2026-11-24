@@ -124,7 +124,7 @@ public class SlotActivity extends BaseActivity {
                         if (SlotArchive.isArchived(SlotActivity.this, mSlot)) {
                             Data.Slot s = findSlot();
                             if (s == null) { gone(); return; }
-                            SlotIo.exportArchive(new CardStack(SlotActivity.this), SlotActivity.this, s);
+                            SlotIo.exportArchive(SlotActivity.this, s);
                             return;
                         }
                         // ★ 第 265 轮：三选一 → 导出/分享确认原来是两层窗（每换一次 dim 就重播）。
@@ -288,7 +288,7 @@ public class SlotActivity extends BaseActivity {
         android.view.MenuItem arc = menu.findItem(R.id.action_slot_archive);
         if (arc != null) {
             arc.setTitle(Trans.get(SlotActivity.this, mArchived
-                    ? R.string.slot_archive_un : R.string.slot_archive));
+                    ? R.string.slot_archive_un_menu : R.string.slot_archive_menu));
             String why = mArchived ? null : SlotArchive.denyReason(this, mSlot);
             arc.setEnabled(mArchived || why == null);
             arc.setVisible(mArchived || why == null);
