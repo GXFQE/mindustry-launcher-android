@@ -399,6 +399,9 @@ public class SlotActivity extends BaseActivity {
         // ★ 第 425 轮：归档槽的表现 —— 信息卡补一句（槽本体已空、内容都在归档备份里），
         //   六行灰掉，整槽导出行换成「导出归档备份」。判据只认 `SlotArchive` 那一处。
         mArchived = SlotArchive.isArchived(this, mSlot);
+        // 老归档（第 425 轮之前）清空时没删 cache/ tmp/ —— 进槽页顺手抹掉，免得存储占用页
+        // 还把它算成「各槽内容」（2026-11-24 用户：「为什么存储占用里面还有啊」）。
+        if (mArchived) SlotArchive.dropRegenerable(this, mSlot);
         if (mArchived) {
             sb.append('\n').append(Trans.get(SlotActivity.this, R.string.slot_archived_rows));
             if (mInfo != null) mInfo.setText(sb.toString());

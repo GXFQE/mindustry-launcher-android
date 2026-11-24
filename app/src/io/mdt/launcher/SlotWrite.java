@@ -105,7 +105,14 @@ public final class SlotWrite {
             File[] kids = root.listFiles();
             if (kids != null) {
                 for (File f : kids) {
-                    if (Data.slotExcluded(f.getName()) || targets.contains(f)) continue;
+                    if (targets.contains(f)) continue;
+                    String n = f.getName();
+                    // 2026-11-24（第 425 轮）：归档 = 槽本体不要了 ⇒ `cache/` `tmp/` 这两种**可再生产物**
+                    // 也一起抹掉。它们虽在 SLOT_EXCLUDE 里（备份 / 导出不该带），但 `sizeTree` 会照实
+                    // 算进「各槽内容」，归档后界面上还显示「7 个文件 · 326 KB」—— 用户问过两次
+                    // 「为什么存储占用里面还有」。其余排除项（config.json 等）保持不动。
+                    boolean regenerable = "cache".equals(n) || "tmp".equals(n);
+                    if (Data.slotExcluded(n) && !regenerable) continue;
                     targets.add(f);
                 }
             }

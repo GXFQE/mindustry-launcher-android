@@ -338,6 +338,13 @@ final class Storage {
         } else {
             for (Data.Slot s : r.slots) {
                 if (s == null) continue;
+                // 第 425 轮：归档槽的"内容"其实在备份池里（归档快照），槽目录只剩标记 ——
+                // 再印「1 个文件 · 0 B」会让用户以为归档没生效（2026-11-24：「为什么存储占用
+                // 里面还有啊」）⇒ 单独说清它已归档、东西在备份里，体积仍算在备份那一节。
+                if (SlotArchive.isArchived(c, s.name)) {
+                    sb.append(Trans.get(c, R.string.storage_slot_archived_fmt, s.name)).append('\n');
+                    continue;
+                }
                 sb.append(Trans.get(c, R.string.storage_slot_line_fmt, s.name, s.files,
                         Util.formatSize(s.bytes))).append('\n');
             }

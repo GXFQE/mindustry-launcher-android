@@ -13460,6 +13460,35 @@ public final class SelfTest {
                     G + " 目录不在 ⇒ 不误判成归档");
             ok(stat, L, SlotArchive.clear(ctx, slot), G + " 标记删得掉");
             ok(stat, L, !SlotArchive.isArchived(ctx, slot), G + " 删了标记 ⇒ 回到未归档");
+            // ⑧.1 归档清空要连 cache/ tmp/（可再生产物）一起抹 —— 第 425 轮追加：用户问
+            //      「为什么存储占用里面还有啊」，根因就是 sizeTree 把这两个目录算进「各槽内容」。
+            File cacheDir = new File(dir, "cache");
+            File tmpSub = new File(dir, "tmp");
+            cacheDir.mkdirs();
+            tmpSub.mkdirs();
+            Util.atomicWriteText(new File(cacheDir, "previews.bin"), "xx");
+            Util.atomicWriteText(new File(tmpSub, "export.tmp"), "yy");
+            boolean wiped = false;
+            try {
+                SlotWrite.wipeSlot(ctx, dir, true);
+                wiped = true;
+            } catch (Throwable ignored) {
+            }
+            ok(stat, L, wiped && !cacheDir.exists() && !tmpSub.exists() && !saves.exists(),
+                    G + " 归档清空连 cache/ tmp/ 与实际内容一起抹");
+            // ⑧.2 两参 wipeSlot（快照恢复 / 整槽导入走的就是它）**不许**动 cache/ tmp/ ——
+            //      否则"恢复中途失败"会把缓存也一起带走；两种语义必须分得开。
+            cacheDir.mkdirs();
+            tmpSub.mkdirs();
+            Util.atomicWriteText(new File(cacheDir, "keep.bin"), "z");
+            boolean wiped2 = false;
+            try {
+                SlotWrite.wipeSlot(ctx, dir);
+                wiped2 = true;
+            } catch (Throwable ignored) {
+            }
+            ok(stat, L, wiped2 && cacheDir.isDirectory() && tmpSub.isDirectory(),
+                    G + " ★两参 wipeSlot 保留 cache/ tmp/（别把归档语义借给恢复 / 导入）");
         } catch (Throwable t) {
             ok(stat, L, false, G + " 自身异常：" + t);
         } finally {

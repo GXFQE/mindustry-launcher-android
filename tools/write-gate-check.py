@@ -98,6 +98,9 @@ DELETION_BASELINE = {
     "Patches.java": 6,
     "Plugins.java": 2,
     "Recovery.java": 2,
+    # 2026-11-24（第 425 轮）：归档槽进槽页时清掉 `cache/` `tmp/` 可再生产物（老归档在
+    # 归档时没删，sizeTree 会把它算进「各槽内容」）—— 只碰这两个目录，不是内容。
+    "SlotArchive.java": 1,
     "SlotOps.java": 1,
     "SlotWrite.java": 1,
     "Trash.java": 8,

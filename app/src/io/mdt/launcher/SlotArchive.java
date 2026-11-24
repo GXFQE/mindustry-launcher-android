@@ -73,6 +73,25 @@ final class SlotArchive {
         return o == null ? 0L : o.optLong("at", 0L);
     }
 
+    /**
+     * 抹掉归档槽里**可再生产物**（`cache/`、`tmp/`）。
+     *
+     * <p>归档清空走的是 {@link SlotWrite#wipeSlot(Context, File, boolean)}：第 425 轮之后
+     * 它会连这两个目录一起删。但**在那之前归档的槽**（第 425 轮前就归档过的）里还留着它们，
+     * `Data.slotInfo` 的 `sizeTree` 会照实算进「各槽内容」—— 2026-11-24 用户在存储占用页
+     * 看到归档槽还占「7 个文件 · 326 KB」就是这么来的。进槽页时顺手抹一次，幂等。</p>
+     */
+    static void dropRegenerable(Context ctx, String slot) {
+        File dir = Paths.slotDir(ctx, slot);
+        if (dir == null || !dir.isDirectory()) return;
+        for (String n : new String[]{"cache", "tmp"}) {
+            File f = new File(dir, n);
+            if (f.exists() && !Data.deleteTree(f)) {
+                Log.w("MDTLauncher", "archived slot: cannot drop " + f.getAbsolutePath());
+            }
+        }
+    }
+
     /** 写标记。目录不存在 ⇒ 返回 false（不是「归档成功」）。 */
     static boolean write(Context ctx, String slot, String snapshotDir) {
         File f = markerOf(ctx, slot);

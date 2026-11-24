@@ -1433,6 +1433,7 @@
     <string name="storage_sec_slots">各槽内容</string>
     <string name="storage_no_slots">还没有槽。</string>
     <string name="storage_slot_line_fmt">槽「%1$s」：%2$d 个文件 · %3$s</string>
+<string name="storage_slot_archived_fmt">槽「%1$s」：已归档（内容都在备份里）</string>
     <string name="storage_sec_backup">备份</string>
     <string name="storage_backup_none">还没有备份。</string>
     <string name="storage_backup_fmt">%1$d 份备份 · 占 %2$s · 不共用内容的话要 %3$s（省了 %4$s）</string>
