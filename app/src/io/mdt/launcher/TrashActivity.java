@@ -4,6 +4,7 @@ import android.app.AlertDialog;
 import android.content.DialogInterface;
 import android.os.Bundle;
 import android.view.View;
+import android.widget.EditText;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -64,6 +65,9 @@ public class TrashActivity extends BaseActivity {
     private int mSort = Trash.SORT_TIME;
     /** 当前分类；null = 全部 */
     private Trash.Kind mKind;
+    /** 搜索框与关键词（第 423 轮，用户：「我觉得需要给中转站也加上搜索」）；空 = 不筛 */
+    private EditText mSearch;
+    private String mQuery = "";
 
     @Override protected void onCreate(Bundle b) {
         super.onCreate(b);
@@ -102,6 +106,17 @@ public class TrashActivity extends BaseActivity {
                     @Override public void run() { pickSort(); }
                 });
         mSortSub = (TextView) rowSort.findViewById(R.id.act_sub);
+
+        // ★ 第 423 轮（用户「我觉得需要给中转站也加上搜索」）：与地图 / 模组 / 蓝图 / 存档
+        //   同一个形状 —— 纯前端过滤（`mAll` 是底稿，搜索只改显示），提示语走 `Trans.bind`。
+        mSearch = (EditText) root.findViewById(R.id.trash_search);
+        Util.bindSearch(mSearch, mQuery, new Runnable() {
+            @Override public void run() {
+                mQuery = mSearch == null ? "" : mSearch.getText().toString();
+                render();
+            }
+        });
+        Trans.bind(root, R.id.trash_search, R.string.trash_search_hint);
 
         mRowClick = new MsavListAdapter.RowClick() {
             @Override public void onRow(int pos) {
@@ -159,8 +174,9 @@ public class TrashActivity extends BaseActivity {
         List<Trash.Item> all = (mAll == null) ? new java.util.ArrayList<Trash.Item>() : mAll;
         List<Trash.Item> shown = new java.util.ArrayList<Trash.Item>();
         long bytes = 0;
+        final boolean searching = !mQuery.trim().isEmpty();
         for (Trash.Item it : all) {
-            if (mKind == null || it.kind == mKind) {
+            if ((mKind == null || it.kind == mKind) && TrashText.matches(it, mQuery)) {
                 shown.add(it);
                 bytes += it.bytes;
             }
@@ -186,8 +202,11 @@ public class TrashActivity extends BaseActivity {
             boolean empty = shown.isEmpty();
             mEmpty.setVisibility(empty ? View.VISIBLE : View.GONE);
             if (empty) {
+                // 三种空要分开说：站里本来就没东西 / 搜索没命中（清框就能回来）/ 这一类空
                 mEmpty.setText(Trans.get(TrashActivity.this,
-                        all.isEmpty() ? R.string.trash_empty : R.string.trash_filter_empty));
+                        all.isEmpty() ? R.string.trash_empty
+                                : searching ? R.string.trash_search_empty
+                                : R.string.trash_filter_empty));
             }
         }
         if (mFilterSub != null) {

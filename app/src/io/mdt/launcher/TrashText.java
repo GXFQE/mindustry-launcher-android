@@ -85,6 +85,22 @@ public final class TrashText {
     }
 
     /**
+     * 搜索命中判定（第 423 轮，用户：「我觉得需要给中转站也加上搜索」）。
+     *
+     * <p>标题 / 原名 / 盘上文件名**任一**包含关键词即算命中；空关键词 ⇒ 全部命中（= 不筛）。
+     * 为什么连盘上文件名也比：旧格式剥不出原名（`parsed=false`），而用户记得的往往是
+     * 磁盘上那一串（带时间戳与槽名）。大小写不敏感，中文没有大小写、`toLowerCase` 不影响。</p>
+     */
+    public static boolean matches(Trash.Item it, String query) {
+        if (it == null) return false;
+        String q = query == null ? "" : query.trim().toLowerCase(java.util.Locale.ROOT);
+        if (q.isEmpty()) return true;
+        if (title(it).toLowerCase(java.util.Locale.ROOT).contains(q)) return true;
+        if (it.name != null && it.name.toLowerCase(java.util.Locale.ROOT).contains(q)) return true;
+        return it.path != null && it.path.getName().toLowerCase(java.util.Locale.ROOT).contains(q);
+    }
+
+    /**
      * 一行摘要（列表副标题 + 动作弹窗正文的第一行）：
      * `地图 · 来自槽「default」 · 586 KB · 10-04 15:30`。
      *

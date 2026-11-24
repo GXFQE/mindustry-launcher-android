@@ -13472,6 +13472,22 @@ public final class SelfTest {
             sMid.delete();
             sNew.delete();
 
+            // ── ①'' 搜索（第 423 轮，用户「中转站也加上搜索」）────────────────
+            // 判据全在 `TrashText.matches` 这个纯函数里：标题 / 原名 / 盘上文件名任一命中，
+            // 空词 = 不筛；`null` 项一律不着（列表里不该有 null，但纯函数得能扛住）。
+            Trash.Item sea = new Trash.Item();
+            sea.name = "我的地图.msav";
+            sea.kind = Trash.Kind.MAP;
+            sea.path = new File(trash, "1750000000000_我的地图.msav");
+            ok(stat, L, TrashText.matches(sea, "")
+                            && TrashText.matches(sea, "   ")
+                            && TrashText.matches(sea, "地图")
+                            && TrashText.matches(sea, "MSAV")
+                            && TrashText.matches(sea, "1750")
+                            && !TrashText.matches(sea, "zzz")
+                            && !TrashText.matches(null, "地图"),
+                    "①'' 搜索：标题 / 原名 / 盘上文件名任一命中，空词 = 不筛，null 项不着");
+
             // ── ② 放回去：过解析器 + 逐字节一致 ───────────────────────────
             File srcMap = tinyMsav(new File(root, "夹具.msav"), "夹具图", 32, 32, 1, false);
             final byte[] mapBytes = java.nio.file.Files.readAllBytes(srcMap.toPath());

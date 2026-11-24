@@ -86,6 +86,25 @@
         android:layout_marginTop="8dp"
         android:layout_marginBottom="8dp" />
 
+    <!--
+      搜索框（第 423 轮，用户：「我觉得需要给中转站也加上搜索」）。
+      与地图 / 模组 / 蓝图 / 存档四页同一个形状：就在列表正上方，纯前端过滤。
+      ⚠️ 提示语在 Java 里绑（`Trans.bind`）：布局够不到用户语言包。
+    -->
+    <EditText
+        android:id="@+id/trash_search"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/page_pad"
+        android:layout_marginEnd="@dimen/page_pad"
+        android:layout_marginTop="2dp"
+        android:inputType="text"
+        android:maxLength="60"
+        android:singleLine="true"
+        android:textColor="@color/fg"
+        android:textColorHint="@color/fg_muted"
+        android:textSize="15sp" />
+
     <TextView
         android:id="@+id/trash_empty"
         android:layout_width="match_parent"
