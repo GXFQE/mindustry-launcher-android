@@ -86,7 +86,8 @@ final class VersionOps {
     static int backupCountIn(Context c, String slot) {
         if (c == null || slot == null || slot.isEmpty()) return 0;
         try {
-            List<Backup.Snapshot> list = Backup.list(c, slot);
+            // ★ 2026-11-24：归档快照不计入「N 份备份」（用户：归档备份不计入备份数量）
+            List<Backup.Snapshot> list = Backup.normal(c, slot);
             return list == null ? 0 : list.size();
         } catch (Throwable t) {
             return 0;
@@ -111,6 +112,8 @@ final class VersionOps {
         final String cur = Versions.slotFor(e);
         final int curIndex;
         for (Data.Slot s : all) {
+            // ★ 2026-11-24：归档槽（槽本体已清空）不能当换槽 / 克隆的目标
+            if (SlotArchive.isArchived(a, s.name)) continue;
             if (includeCurrent && s.name.equals(cur)) out.add(s);
             else if (!Config.get().hasSlotBinding(e.key(), s.name)) out.add(s);
         }

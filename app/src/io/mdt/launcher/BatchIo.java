@@ -1237,6 +1237,11 @@ final class BatchIo {
 
     /** 界面那条路：多选 + 一次性同名确认 + 报告（四个页面各一句） */
     static void runImport(Activity a, String slot, List<Doc> docs, int kind, Runnable onDone) {
+        // ★ 第 425 轮：归档槽拒收写入（本体已清空，写进去的东西不会进归档快照）
+        if (SlotArchive.isArchived(a, slot)) {
+            toast(a, Trans.get(a, R.string.slot_archived_rows));
+            return;
+        }
         Kind k = kindOf(a, slot, kind);
         runImport(a, k.dir, docs, k.exts, k.rootMarkers, k.namer, k.imp, slot, slot, kind, onDone);
     }
@@ -1253,6 +1258,11 @@ final class BatchIo {
         // 单份导入实现本身也会判（`MapFiles.importMap` 等），这里先给一份**能读懂的报告**。
         if (WriteGate.blockedSlot(ctx, slot)) {
             rep.failed.add(line(ctx, slot, Trans.get(ctx, R.string.slot_err_game_running)));
+            return rep;
+        }
+        // ★ 第 425 轮：归档槽与"游戏在跑"同一个处理 —— 给一句能读懂的原因，不写
+        if (SlotArchive.isArchived(ctx, slot)) {
+            rep.failed.add(line(ctx, slot, Trans.get(ctx, R.string.slot_archived_rows)));
             return rep;
         }
         File work = workDir(ctx);
@@ -2265,6 +2275,11 @@ final class BatchIo {
         }
         if (WriteGate.blockedSlot(a, slot)) {
             toast(a, Trans.get(a, R.string.slot_err_game_running));
+            return;
+        }
+        // ★ 第 425 轮：归档槽不接收任何导入（四类都不写）
+        if (SlotArchive.isArchived(a, slot)) {
+            toast(a, Trans.get(a, R.string.slot_archived_rows));
             return;
         }
         final CardStack stack = new CardStack(a);

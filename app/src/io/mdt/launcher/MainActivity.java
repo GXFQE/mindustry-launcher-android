@@ -993,6 +993,15 @@ public class MainActivity extends BaseActivity {
             conflict.setVisibility(View.GONE);
         }
 
+        // ★ 第 425 轮：绑在归档槽上的实例 —— 行变灰、点行不启动、明说为什么。
+        //   管理按钮与长按仍然可用（用户要从那里换槽，否则这一行就永远废着）。
+        final boolean archivedRow = SlotArchive.isArchived(this, Versions.slotFor(e));
+        v.setAlpha(archivedRow ? 0.55f : 1f);
+        if (archivedRow) {
+            conflict.setVisibility(View.VISIBLE);
+            conflict.setText(Trans.get(MainActivity.this, R.string.slot_archived_row_sub));
+        }
+
         // 可见入口 = 「管理」按钮（2026-10-25）：点它和长按整行都进**同一个**版本页。
         // ★ 形状是用户定的：原来这里是"直接换槽"的快捷弹窗，用户 2026-10-24 说
         //   「槽操作和长按后的版本操作有点乱」⇒ 把所有版本级动作收进一个二级页面
@@ -1007,7 +1016,16 @@ public class MainActivity extends BaseActivity {
         // 现在直接挂在行根上（行根变 clickable 后，按下状态会自动播给内部不可点击的子视图，
         // 卡片背景 card_bg_press 的按下高亮照旧生效）。
         v.setOnClickListener(new View.OnClickListener() {
-            @Override public void onClick(View x) { startVersion(MainActivity.this, e, mConflict.get(Versions.rowKey(e)), null, null); }
+            @Override public void onClick(View x) {
+                // ★ 第 425 轮：归档槽的行点了不启动 —— 给一句"为什么"，别让人以为点了没反应
+                if (SlotArchive.isArchived(MainActivity.this, Versions.slotFor(e))) {
+                    android.widget.Toast.makeText(MainActivity.this,
+                            Trans.get(MainActivity.this, R.string.slot_archived_launch_msg),
+                            android.widget.Toast.LENGTH_LONG).show();
+                    return;
+                }
+                startVersion(MainActivity.this, e, mConflict.get(Versions.rowKey(e)), null, null);
+            }
         });
         v.setOnLongClickListener(new View.OnLongClickListener() {
             @Override public boolean onLongClick(View x) { openVersion(e); return true; }
@@ -1400,6 +1418,13 @@ public class MainActivity extends BaseActivity {
             mBtnContinue.setVisibility(View.GONE);
             return;
         }
+        // ★ 第 425 轮：当前槽已归档 ⇒ 这个快捷入口直接不出现。
+        //   归档槽"等于没玩过"，挂一个点了只会弹"要先解除归档"的按钮是纯噪音；
+        //   用户要解除归档会去槽页（那里有唯一入口）。
+        if (SlotArchive.isArchived(this, Versions.slotFor(e))) {
+            mBtnContinue.setVisibility(View.GONE);
+            return;
+        }
         mBtnContinue.setVisibility(View.VISIBLE);
         // ★ 2026-10-16 用户：「继续上次不要显示那个类型」—— 这行是纯文本按钮，没有列表行那种
         //   弱化层次，类型词在这里只是把"叫什么、哪一版"往后挤（见 Entry#displayName(ctx, boolean)）。
@@ -1662,12 +1687,45 @@ public class MainActivity extends BaseActivity {
             return;
         }
         recordStartTrace(a, e, share);
+        // ★ 2026-11-24（第 425 轮）：归档槽「等于没玩过」—— 绑它的实例一律不许启动。
+        //   这是**第一层**门（界面能弹卡）；权威那道在 GameSlot.handle（覆盖 dev / 插件入口）。
+        final String launchSlot = Versions.slotFor(e);
+        if (SlotArchive.isArchived(a, launchSlot)) {
+            promptArchived(a, e, launchSlot, cb);
+            return;
+        }
         // ★ 第 367 轮（plan §12.17）：起新局前**先确认**（不再静默杀掉正在跑的游戏）。
         if (Data.gameAlive(a)) {
             promptSwitchRunning(a, e, share, hostPort, cb);
             return;
         }
         proceedStart(a, e, share, hostPort, cb);
+    }
+
+    /** 「这个槽已归档」提示（第 425 轮）。去解除归档 ⇒ 打开那个槽的槽页。 */
+    private static void promptArchived(final Activity a, final Versions.Entry e,
+                                       final String slot, final LaunchCb cb) {
+        final CardStack[] ref = new CardStack[1];
+        ref[0] = CardStack.show(null, a, Trans.get(a, R.string.slot_archived_launch_title),
+                CardStack.text(a, Trans.get(a, R.string.slot_archived_launch_msg)),
+                new CardStack.Btn(Trans.get(a, R.string.slot_archived_go_unarchive), new Runnable() {
+                    @Override public void run() {
+                        ref[0].dismiss();
+                        if (cb != null) cb.state(PluginApi.Launch.CANCELLED, "archived");
+                        try {
+                            a.startActivity(new Intent(a, SlotActivity.class)
+                                    .putExtra(SlotActivity.EXTRA_SLOT, slot));
+                        } catch (Throwable t) {
+                            android.util.Log.w("MDTLauncher", "open slot page failed: " + t);
+                        }
+                    }
+                }),
+                new CardStack.Btn(Trans.get(a, R.string.cancel), new Runnable() {
+                    @Override public void run() {
+                        ref[0].dismiss();
+                        if (cb != null) cb.state(PluginApi.Launch.CANCELLED, "archived");
+                    }
+                }));
     }
 
     /** 「会先退出正在运行的游戏」确认（第 367 轮）。取消 ⇒ 回调 cancelled。 */

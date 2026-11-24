@@ -816,7 +816,23 @@ final class SlotOps {
     /** 带卡片版：回调拿到真正承载这一页的那张卡，调用方可以继续 push 下一页。 */
     static void pickSlot(final CardStack parent, final Activity a, int titleRes, final String prefer,
                          final SlotPick2 cb) {
-        final List<Data.Slot> slots = Data.allSlots(a);
+        pickSlot(parent, a, titleRes, prefer, false, cb);
+    }
+
+    /**
+     * ★ 第 425 轮：可选「把归档槽从候选里藏起来」。
+     *
+     * <p>复制设置要用这条：归档槽的 `settings.bin` 已经在归档快照里、槽本体是空的，
+     * 让它出现在源槽候选里只会选中一个"什么都没得复制"的槽（用户 m02991：「设置都没了」）。</p>
+     */
+    static void pickSlot(final CardStack parent, final Activity a, int titleRes, final String prefer,
+                         boolean hideArchived, final SlotPick2 cb) {
+        List<Data.Slot> slots = new java.util.ArrayList<Data.Slot>();
+        for (Data.Slot s : Data.allSlots(a)) {
+            if (s == null) continue;
+            if (hideArchived && SlotArchive.isArchived(a, s.name)) continue;
+            slots.add(s);
+        }
         if (slots.isEmpty()) return;
         final String[] names = new String[slots.size()];
         for (int i = 0; i < slots.size(); i++) {
@@ -870,6 +886,159 @@ final class SlotOps {
                 .setMessage(msg)
                 .setPositiveButton(R.string.close, null)
                 .show();
+    }
+
+    // ── ★ 第 425 轮：归档 / 解除归档 ────────────────────────────────────────────
+
+    /**
+     * 归档一个槽（用户 2026-11-24 的思路）：先存一份**归档备份**，再清空槽，最后打标记。
+     *
+     * <p>顺序 = 快照 → 清空 → 标记，**先有退路再动刀**：
+     * 清空失败时把刚建的快照删掉、槽保持原样；标记写失败时快照**不删**（内容已经清空了，
+     * 那份快照是唯一副本 —— 删了就真丢了）。</p>
+     *
+     * <p>★ 为什么归档快照不计入备份数量：它承担的是"这个槽被清空之后唯一的内容副本"，
+     * 归 `max_backups` 修剪会把它裁掉 —— 那不是"老备份被新备份挤掉"，是数据丢失。
+     * 判据落在 `Backup.normal`（`AutoBackup.trim` 与所有"N 份"显示都走它）。</p>
+     */
+    static void archiveSlot(final Activity a, final Data.Slot s, final Host h) {
+        String why = SlotArchive.denyReason(a, s.name);
+        if (why != null) {
+            alert(a, Trans.get(a, R.string.slot_archive), SlotArchive.denyText(a, why));
+            return;
+        }
+        new AlertDialog.Builder(a)
+                .setTitle(Trans.get(a, R.string.slot_archive))
+                .setMessage(Trans.get(a, R.string.slot_archive_why))
+                .setPositiveButton(R.string.cancel, null)
+                .setNegativeButton(R.string.slot_archive_go, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int w) {
+                        doArchive(a, s, h);
+                    }
+                })
+                .show();
+    }
+
+    private static void doArchive(final Activity a, final Data.Slot s, final Host h) {
+        final AlertDialog prog = new AlertDialog.Builder(a)
+                .setTitle(Trans.get(a, R.string.slot_archive))
+                .setMessage(Trans.get(a, R.string.slot_archive_working))
+                .setCancelable(false)
+                .show();
+        new Thread(new Runnable() {
+            @Override public void run() {
+                String err = null;
+                Backup.Snapshot snap = null;
+                try {
+                    snap = Backup.create(a, s.name,
+                            Trans.get(a, R.string.slot_archive_label), Backup.KIND_ARCHIVE);
+                    if (snap == null || snap.dir == null) {
+                        throw new java.io.IOException("archive snapshot failed: " + s.name);
+                    }
+                    try {
+                        SlotWrite.wipeSlot(a, s.dir);
+                    } catch (Throwable t) {
+                        // **没清成**才允许删快照；清成了之后它就是这个槽的唯一副本（见 plan §4）
+                        try { Backup.delete(a, snap); } catch (Throwable ignored) { }
+                        throw t;
+                    }
+                    if (!SlotArchive.write(a, s.name, snap.dir.getName())) {
+                        throw new java.io.IOException("archive marker not written: " + s.name);
+                    }
+                } catch (Throwable t) {
+                    err = Util.ioReason(a, t);
+                    android.util.Log.w("MDTLauncher", "archive slot failed: " + s.name, t);
+                }
+                final String fe = err;
+                a.runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        prog.dismiss();
+                        if (fe != null) {
+                            alert(a, Trans.get(a, R.string.slot_archive), fe);
+                            return;
+                        }
+                        Toast.makeText(a, Trans.get(a, R.string.slot_archive_done_fmt, s.name),
+                                Toast.LENGTH_LONG).show();
+                        h.onSlotChanged();
+                    }
+                });
+            }
+        }, "slot-archive").start();
+    }
+
+    /** 解除归档：把归档快照**整份放回来** → 删快照 → 删标记（用户 m02988「解除以后就删了吧」）。 */
+    static void unarchiveSlot(final Activity a, final Data.Slot s, final Host h) {
+        if (!SlotArchive.isArchived(a, s.name)) {
+            alert(a, Trans.get(a, R.string.slot_archive_un), Trans.get(a, R.string.slot_err_not_archived));
+            return;
+        }
+        final Backup.Snapshot ss = Backup.archiveOf(a, s.name);
+        if (ss == null) {
+            // 快照被手动删了：只能提供一个"只解除标记"的出口（槽本来就是空的）
+            new AlertDialog.Builder(a)
+                    .setTitle(Trans.get(a, R.string.slot_archive_un))
+                    .setMessage(Trans.get(a, R.string.slot_unarchive_no_snapshot))
+                    .setPositiveButton(R.string.cancel, null)
+                    .setNegativeButton(R.string.slot_unarchive_clear_go, new DialogInterface.OnClickListener() {
+                        @Override public void onClick(DialogInterface d, int w) {
+                            SlotArchive.clear(a, s.name);
+                            Toast.makeText(a, Trans.get(a, R.string.slot_unarchive_done),
+                                    Toast.LENGTH_LONG).show();
+                            h.onSlotChanged();
+                        }
+                    })
+                    .show();
+            return;
+        }
+        new AlertDialog.Builder(a)
+                .setTitle(Trans.get(a, R.string.slot_archive_un))
+                .setMessage(Trans.get(a, R.string.slot_unarchive_why))
+                .setPositiveButton(R.string.cancel, null)
+                .setNegativeButton(R.string.slot_archive_un, new DialogInterface.OnClickListener() {
+                    @Override public void onClick(DialogInterface d, int w) {
+                        doUnarchive(a, s, ss, h);
+                    }
+                })
+                .show();
+    }
+
+    private static void doUnarchive(final Activity a, final Data.Slot s,
+                                    final Backup.Snapshot ss, final Host h) {
+        final AlertDialog prog = new AlertDialog.Builder(a)
+                .setTitle(Trans.get(a, R.string.slot_archive_un))
+                .setMessage(Trans.get(a, R.string.slot_unarchive_working))
+                .setCancelable(false)
+                .show();
+        new Thread(new Runnable() {
+            @Override public void run() {
+                String err = null;
+                try {
+                    // 槽是空的，REPLACE 与"放回来"语义最贴；WriteGate 仍由 restore 自己把着
+                    Backup.RestoreResult r = Backup.restore(a, s.name, ss, SlotWrite.REPLACE);
+                    if (r == null || !r.ok) {
+                        throw new java.io.IOException(r == null ? "restore failed" : r.report);
+                    }
+                    Backup.delete(a, ss);        // 恢复成功才删快照
+                    SlotArchive.clear(a, s.name);
+                } catch (Throwable t) {
+                    err = Util.ioReason(a, t);
+                    android.util.Log.w("MDTLauncher", "unarchive slot failed: " + s.name, t);
+                }
+                final String fe = err;
+                a.runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        prog.dismiss();
+                        if (fe != null) {
+                            alert(a, Trans.get(a, R.string.slot_archive_un), fe);
+                            return;
+                        }
+                        Toast.makeText(a, Trans.get(a, R.string.slot_unarchive_done),
+                                Toast.LENGTH_LONG).show();
+                        h.onSlotChanged();
+                    }
+                });
+            }
+        }, "slot-unarchive").start();
     }
 
     private static void toast(Activity a, String s) {

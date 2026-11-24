@@ -335,6 +335,8 @@ public final class SelfTest {
             trashMore(ctx, L, stat);
             // ★ ㊵ 整槽写入的三个模式（更新 / 补齐 / 覆盖）+ 槽操作前的自动备份
             slotModes(ctx, L, stat);
+            // ★ 第 425 轮：槽归档 —— 标记读写 / 拒绝原因码表 / 归档快照不计入「N 份」
+            slotArchive(ctx, L, stat);
             // ★ ㊶ 「存档视为地图」：区间改写（两面判据）+ 落位 + 区 1..n 不变 + 码映射
             // ★ 2026-10-06（第 115 轮第五批）：把"系统异常 ⇒ 白话"的翻译钉死
             ioReason(ctx, L, stat);
@@ -13397,6 +13399,65 @@ public final class SelfTest {
      *   （唯一一处例外是结尾那次"打扫 ⑰ 留下的残留"，它按"来源槽以 m3- 开头"这个判据删，
      *   且那个判据本身先在临时目录里验过分辨力）。
      */
+    /**
+     * ★ 第 425 轮：槽归档的纯判据 —— 标记读写 / 拒绝原因码表 / 归档快照不计入「N 份」。
+     *
+     * <p>一条一次性槽（`m3-arch`）造两份快照：普通 + 归档。重点断言
+     * <b>`Backup.normal` 与 `Backup.archives` 必须把两份分开</b> —— 这是「归档不计入备份数量」
+     * 的唯一判据（修剪 / 界面计数 / 插件都走它）；两边返回同一份的话那句话就是假的。</p>
+     */
+    private static void slotArchive(Context ctx, List<String> L, int[] stat) {
+        final String G = "⑧ 槽归档";
+        final String slot = "m3-arch";
+        File dir = Paths.slotDir(ctx, slot);
+        Backup.Snapshot sNorm = null, sArch = null;
+        try {
+            Data.deleteTree(dir);
+            if (!dir.mkdirs()) {
+                ok(stat, L, false, G + " 建一次性槽目录失败：" + dir);
+                return;
+            }
+            ok(stat, L, !SlotArchive.isArchived(ctx, slot), G + " 新槽默认不算归档");
+            ok(stat, L, SlotArchive.DENY_MISSING.equals(SlotArchive.denyReason(ctx, "m3-no-such-slot")),
+                    G + " 目录不在 ⇒ missing（码表只此一处）");
+            File saves = new File(dir, "saves");
+            if (!saves.mkdirs() && !saves.isDirectory()) {
+                ok(stat, L, false, G + " 建 saves 失败");
+                return;
+            }
+            Util.atomicWriteText(new File(saves, "a.msav"), "0123456789");
+            sNorm = Backup.create(ctx, slot, "normal");
+            sArch = Backup.create(ctx, slot, "archive", Backup.KIND_ARCHIVE);
+            ok(stat, L, sNorm != null && sArch != null, G + " 普通 / 归档两种快照都建得出来");
+            ok(stat, L, Backup.normal(ctx, slot).size() == 1,
+                    G + " ★「N 份」只算普通快照（normal=1）");
+            ok(stat, L, Backup.archives(ctx, slot).size() == 1,
+                    G + " 归档快照单独归类（archives=1）");
+            Backup.Snapshot a0 = Backup.archiveOf(ctx, slot);
+            ok(stat, L, a0 != null && a0.kind == Backup.KIND_ARCHIVE,
+                    G + " archiveOf 给的就是归档那份（kind=" + (a0 == null ? "?" : String.valueOf(a0.kind)) + "）");
+            ok(stat, L, SlotArchive.write(ctx, slot, sArch.dir.getName()), G + " 标记写得进去");
+            ok(stat, L, SlotArchive.isArchived(ctx, slot), G + " 标记在 ⇒ 算归档");
+            ok(stat, L, sArch.dir.getName().equals(SlotArchive.snapshotOf(ctx, slot)),
+                    G + " 标记里记着快照目录名");
+            ok(stat, L, SlotArchive.archivedAt(ctx, slot) > 0, G + " 标记里记着时刻");
+            ok(stat, L, SlotArchive.DENY_ARCHIVED.equals(SlotArchive.denyReason(ctx, slot)),
+                    G + " 已归档 ⇒ 拒绝再归档");
+            ok(stat, L, SlotArchive.pluginBlocked(ctx, slot), G + " 插件侧同一个门");
+            ok(stat, L, !SlotArchive.isArchived(ctx, "m3-no-such-slot"),
+                    G + " 目录不在 ⇒ 不误判成归档");
+            ok(stat, L, SlotArchive.clear(ctx, slot), G + " 标记删得掉");
+            ok(stat, L, !SlotArchive.isArchived(ctx, slot), G + " 删了标记 ⇒ 回到未归档");
+        } catch (Throwable t) {
+            ok(stat, L, false, G + " 自身异常：" + t);
+        } finally {
+            try { if (sNorm != null) Backup.delete(ctx, sNorm); } catch (Throwable ignored) { }
+            try { if (sArch != null) Backup.delete(ctx, sArch); } catch (Throwable ignored) { }
+            Data.deleteTree(dir);
+        }
+        L.add("");
+    }
+
     private static void trashStation(Context ctx, List<String> L, int[] stat) {
         L.add("── ㊳ 中转站（列表 / 放回去 / 彻底删除 / 清空 / 修剪）──");
         File root = new File(Paths.privateDir(ctx), "selftest-trash");
@@ -15972,12 +16033,13 @@ public final class SelfTest {
                 new android.view.View(ctx));
         pm158.getMenuInflater().inflate(R.menu.slot, pm158.getMenu());
         android.view.Menu m158 = pm158.getMenu();
-        ok(stat, L, m158.size() == 4
+        ok(stat, L, m158.size() == 5
                         && m158.findItem(R.id.action_slot_rename) != null
                         && m158.findItem(R.id.action_slot_clone) != null
                         && m158.findItem(R.id.action_slot_copy_settings) != null
-                        && m158.findItem(R.id.action_slot_delete) != null,
-                "★★槽页顶栏 ⋮ = 重命名 / 克隆 / 复制设置 / 删除四件（" + m158.size() + " 项）");
+                        && m158.findItem(R.id.action_slot_delete) != null
+                        && m158.findItem(R.id.action_slot_archive) != null,
+                "★★槽页顶栏 ⋮ = 重命名 / 克隆 / 复制设置 / 删除 + 归档（" + m158.size() + " 项）");
 
         // ── 7.3c：全黑名单 + 三档（纯计划；不碰真实 settings.bin）────────────────
         LinkedHashMap<String, Object> sm = new LinkedHashMap<>();

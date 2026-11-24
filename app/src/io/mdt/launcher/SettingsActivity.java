@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -1486,7 +1487,10 @@ public class SettingsActivity extends BaseActivity {
      *    否则列表项一个都不渲染（F3b 实测，见 SlotsActivity.slotOps 的注释）。
      */
     private void pickDefaultSlot() {
-        final List<Data.Slot> slots = Data.allSlots(this);
+        final List<Data.Slot> all = Data.allSlots(this);
+        // ★ 2026-11-24：归档槽不能当默认槽（它已经"等于没玩过"，新版本落进去也没法启动）
+        final List<Data.Slot> slots = new ArrayList<>();
+        for (Data.Slot s : all) if (!SlotArchive.isArchived(this, s.name)) slots.add(s);
         if (slots.isEmpty()) return;
         final String[] names = new String[slots.size()];
         String cur = Config.get().defaultSlot();

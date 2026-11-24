@@ -562,7 +562,15 @@ public final class PluginHost {
         // ---- PluginApi（v5 只读数据面）-------------------------------------
 
         @Override public List<SlotInfo> slots() {
-            return PluginData.slots(getBaseContext());
+            // ★ 第 425 轮：归档槽不列给插件（它们等于没玩过；列出来插件会去读/写一个空槽）
+            List<SlotInfo> all = PluginData.slots(getBaseContext());
+            List<SlotInfo> out = new java.util.ArrayList<SlotInfo>();
+            for (SlotInfo si : all) {
+                if (si == null) continue;
+                if (SlotArchive.isArchived(getBaseContext(), si.name)) continue;
+                out.add(si);
+            }
+            return out;
         }
 
         @Override public List<ItemInfo> contents(String slot, String kind) {
@@ -601,15 +609,28 @@ public final class PluginHost {
             return PluginData.open(item);
         }
 
-        @Override public File slotDir() { return Data.dirOf(getBaseContext(), slot); }
+        /**
+         * ★ 第 425 轮：归档槽的原始目录一律不给 —— 这是一个**读写都拦**的口子。
+         *
+         * <p>归档槽本体已被清空、内容只在归档快照里；把空目录（甚至即将被重建的目录）交给插件，
+         * 插件写进去的东西既不会被备份、也不会随解除归档回来，等于凭空消失。
+         * 按接口约定用 `IllegalStateException`，让插件自己在 `catch` 里兜住、而不是拿到 null 去 NPE。</p>
+         */
+        private void requireNotArchived() {
+            if (SlotArchive.isArchived(getBaseContext(), slot)) {
+                throw new IllegalStateException("slot archived: " + slot);
+            }
+        }
 
-        @Override public File savesDir() { return new File(slotDir(), "saves"); }
+        @Override public File slotDir() { requireNotArchived(); return Data.dirOf(getBaseContext(), slot); }
 
-        @Override public File modsDir() { return new File(slotDir(), "mods"); }
+        @Override public File savesDir() { requireNotArchived(); return new File(slotDir(), "saves"); }
 
-        @Override public File mapsDir() { return new File(slotDir(), "maps"); }
+        @Override public File modsDir() { requireNotArchived(); return new File(slotDir(), "mods"); }
 
-        @Override public File blueprintsDir() { return new File(slotDir(), "schematics"); }
+        @Override public File mapsDir() { requireNotArchived(); return new File(slotDir(), "maps"); }
+
+        @Override public File blueprintsDir() { requireNotArchived(); return new File(slotDir(), "schematics"); }
 
         @Override public void toast(final String message) {
             final Context c = getBaseContext();
@@ -2114,6 +2135,9 @@ public final class PluginHost {
         private String resolveSlot(String raw) {
             String s = (raw == null || raw.isEmpty()) ? slot : raw;
             if (s == null || s.isEmpty()) return null;
+            // ★ 第 425 轮：归档槽"等于没玩过"——插件按名字要它时给 not-found，
+            //   别让插件往一个已被清空的槽里写（写进去的东西会和快照对不上）
+            if (SlotArchive.isArchived(getBaseContext(), s)) return null;
             if (s.equals(slot)) return s;
             if (Data.sanitizeSlot(s) == null) return null;
             for (String n : Data.slotNames(getBaseContext())) {

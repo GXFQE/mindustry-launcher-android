@@ -456,7 +456,17 @@ public final class Data {
     public static Slot slotInfo(Context ctx, String name) {
         boolean active = name.equals(currentSlot(ctx));
         File d = dirOf(ctx, name);
-        return new Slot(name, d, active, countTree(d), sizeTree(d));
+        int files = countTree(d);
+        long bytes = sizeTree(d);
+        // ★ 第 425 轮：归档标记（`.archived`）不是槽内容 —— 它是我们自己的状态文件。
+        //   不剔掉的话界面会出现「1 个文件 · 49 B」与同一张卡上「这些内容都在归档备份里」
+        //   自相矛盾（一条说还有东西、一条说都挪走了）。
+        File mark = SlotArchive.markerOf(ctx, name);
+        if (mark.isFile()) {
+            files = Math.max(0, files - 1);
+            bytes = Math.max(0L, bytes - mark.length());
+        }
+        return new Slot(name, d, active, files, bytes);
     }
 
     /** 全部槽：当前槽排第一，其余按名字排序 */

@@ -219,19 +219,28 @@ public class SlotsActivity extends BaseActivity {
             final Data.Slot s = mSlots.get(i);
             View v = inf.inflate(R.layout.item_slot, mListContainer, false);
             // 布局里那些静态文案已搬到 Java（见 Trans）：布局够不到用户语言包
-            Trans.bind(v, R.id.slot_badge, R.string.slot_current_badge);
+            boolean archived = SlotArchive.isArchived(this, s.name);
+            Trans.bind(v, R.id.slot_badge, archived ? R.string.slot_archive_badge : R.string.slot_current_badge);
             ((TextView) v.findViewById(R.id.slot_name)).setText(s.name);
-            // ★ 第 351 轮用户：「存档与备份那里，写多少个模组/地图/存档/蓝图更合适」——
-            //   统计段不再报"N 个文件 · 大小"，改报这四类内容的份数（判据见 `Data.contentCounts`）。
-            int[] cc = Data.contentCounts(Data.dirOf(this, s.name));
-            String meta = Trans.get(SlotsActivity.this, R.string.slot_entry_counts_fmt,
-                    cc[0], cc[1], cc[2], cc[3]);
-            Config.BackupPolicy bp = Config.get().backupPolicy(s.name);
-            meta += bp.enabled
-                    ? Trans.get(SlotsActivity.this, R.string.policy_summary_fmt, bp.minMinutes, bp.maxBackups)
-                    : Trans.get(SlotsActivity.this, R.string.policy_off_suffix);
-            ((TextView) v.findViewById(R.id.slot_meta)).setText(meta);
-            v.findViewById(R.id.slot_badge).setVisibility(s.active ? View.VISIBLE : View.GONE);
+            // ★ 第 425 轮：归档槽不报"四类份数 + 备份策略"——它现在是空的，
+            //   报「0 / 0 / 0 / 0」会让人以为内容丢了；直接说内容在哪儿。
+            if (archived) {
+                ((TextView) v.findViewById(R.id.slot_meta)).setText(
+                        Trans.get(SlotsActivity.this, R.string.slot_archive_meta));
+                v.findViewById(R.id.slot_badge).setVisibility(View.VISIBLE);
+            } else {
+                // ★ 第 351 轮用户：「存档与备份那里，写多少个模组/地图/存档/蓝图更合适」——
+                //   统计段不再报"N 个文件 · 大小"，改报这四类内容的份数（判据见 `Data.contentCounts`）。
+                int[] cc = Data.contentCounts(Data.dirOf(this, s.name));
+                String meta = Trans.get(SlotsActivity.this, R.string.slot_entry_counts_fmt,
+                        cc[0], cc[1], cc[2], cc[3]);
+                Config.BackupPolicy bp = Config.get().backupPolicy(s.name);
+                meta += bp.enabled
+                        ? Trans.get(SlotsActivity.this, R.string.policy_summary_fmt, bp.minMinutes, bp.maxBackups)
+                        : Trans.get(SlotsActivity.this, R.string.policy_off_suffix);
+                ((TextView) v.findViewById(R.id.slot_meta)).setText(meta);
+                v.findViewById(R.id.slot_badge).setVisibility(s.active ? View.VISIBLE : View.GONE);
+            }
             // 整行点击 = 槽操作菜单（原先是 ListView 的 onItemClick）
             v.setOnClickListener(new View.OnClickListener() {
                 @Override public void onClick(View x) { Intent _it = new Intent(SlotsActivity.this, SlotActivity.class);

@@ -162,6 +162,13 @@ final class AutoBackup {
                 continue;
             }
             if (stillRunning(act, s.slot, gameAlive, registryEmpty)) continue;
+            // ★ 2026-11-24（第 425 轮）：归档槽不结算 —— 它已经被清空了，这时再造一份
+            //   普通备份只会得到"空槽的快照"，还会占掉备份名额。账照样清掉（别每次重判）。
+            if (SlotArchive.isArchived(act, s.slot)) {
+                Config.get().sessionClear(s.slot);
+                SessionTime.deleteSlot(act, s.slot);
+                continue;
+            }
             settleOne(act, s);
         }
     }
@@ -292,10 +299,15 @@ final class AutoBackup {
     /** 最近一次快照的逻辑总量 */
     private static long sLastLogical = 0L;
 
-    /** 超过上限就从最旧的开始删（Backup.list 是新的在前）。 */
+    /**
+     * 超过上限就从最旧的开始删（{@link Backup#list} 是新的在前）。
+     *
+     * <p>★ 归档快照**不占名额**：用户要的是"归档备份不计入备份数量"，
+     *   所以这里只数普通备份（{@link Backup#normal}）。
+     */
     private static void trim(Context ctx, String slot) {
         int max = Config.get().backupPolicy(slot).maxBackups;
-        List<Backup.Snapshot> list = Backup.list(ctx, slot);
+        List<Backup.Snapshot> list = Backup.normal(ctx, slot);
         for (int i = max; i < list.size(); i++) {
             String err = Backup.delete(ctx, list.get(i));
             if (err != null) android.util.Log.w("MDTLauncher", "trim backup failed: " + err);

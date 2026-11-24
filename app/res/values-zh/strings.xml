@@ -427,6 +427,35 @@
     <string name="slot_err_delete_current_fmt">「%1$s」是当前槽，正被游戏使用，不能删除。</string>
     <string name="slot_err_game_running_fmt">槽「%1$s」的游戏实例正在运行，现在改会被它覆盖 —— 请先退出那个游戏再改。</string>
     <string name="slot_err_game_running">这个槽的游戏实例正在运行 —— 请先退出那个游戏再操作。</string>
+
+    <!-- ── 槽归档（2026-11-24）───────────────────────────────────────── -->
+    <!-- 判据只有一份：SlotArchive.isArchived。文案里说的「等于没玩过」是用户原话。 -->
+    <string name="slot_archive">归档</string>
+    <string name="slot_archive_un">解除归档</string>
+    <string name="slot_archive_badge">已归档</string>
+    <string name="slot_archive_meta">已归档 · 内容都在归档备份里</string>
+    <string name="slot_archive_label">归档</string>
+    <string name="slot_archive_why">会先存一份「归档备份」，再把这个槽清空：\n\n它的模组、存档、地图、蓝图、游戏设置都会进那份备份并从这里消失；绑这个槽的实例将不能启动。\n\n解除归档之后原样回来。这份备份不计入备份数量。</string>
+    <string name="slot_archive_go">归档并清空</string>
+    <string name="slot_archive_working">正在归档…</string>
+    <string name="slot_unarchive_working">正在解除归档…</string>
+    <string name="slot_unarchive_why">会把归档备份里的内容放回来，然后删掉那份归档备份。之后这个槽就能正常启动、导入和导出。</string>
+    <string name="slot_archive_done_fmt">已归档：%1$s</string>
+    <string name="slot_archived_rows">这些内容都在归档备份里 —— 解除归档之后才能查看和修改。</string>
+    <string name="slot_archived_row_sub">这个实例绑的槽已归档，解除归档之后才能启动</string>
+    <string name="slot_unarchive_done">已解除归档：内容已经回来了。</string>
+    <string name="slot_unarchive_no_snapshot">找不到那份归档备份（可能被手动删了）。可以只解除标记 —— 这个槽目前是空的。</string>
+    <string name="slot_unarchive_clear_go">只解除标记</string>
+    <string name="slot_archived_launch_title">这个槽已归档</string>
+    <string name="slot_archived_launch_msg">归档之后它「等于没玩过」—— 要先解除归档才能启动。</string>
+    <string name="slot_archived_go_unarchive">去解除归档</string>
+    <string name="slot_archive_export">导出归档备份</string>
+    <string name="slot_archive_export_sub">导出归档那一刻的内容；结构与整槽导出一致</string>
+    <string name="slot_copy_src_archived">这个槽已归档，没有设置可以复制</string>
+    <string name="slot_err_default_slot">默认槽不能归档 —— 先在设置里换一个默认槽。</string>
+    <string name="slot_err_already_archived">这个槽已经归档了。</string>
+    <string name="slot_err_not_archived">这个槽没有归档。</string>
+    <string name="slot_err_archived_missing">这个槽不存在（可能已经被删了）。</string>
     <string name="version_err_game_running">这个版本的游戏实例正在运行 —— 请先退出那个游戏再操作。</string>
     <string name="slot_err_delete_partial_fmt">删除未完全成功（可能有文件被占用）：%1$s\n剩余 %2$d/%3$d 个文件</string>
 

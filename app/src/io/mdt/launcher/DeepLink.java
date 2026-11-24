@@ -190,7 +190,11 @@ final class DeepLink {
      */
     private static void open(final Activity a, final int kind, final BatchIo.Doc doc,
                              final String detail) {
-        final List<Data.Slot> all = Data.allSlots(a);
+        // ★ 第 425 轮：归档槽不能当落点（它本体已清空，导入进去的东西不会进快照、解除归档时对不上）
+        final List<Data.Slot> all = new java.util.ArrayList<Data.Slot>();
+        for (Data.Slot s : Data.allSlots(a)) {
+            if (s != null && !SlotArchive.isArchived(a, s.name)) all.add(s);
+        }
         if (!shouldAsk(all)) {
             // 0 个槽（理论上不会有）⇒ 回落到当前槽；1 个 ⇒ 就是它
             afterSlot(a, kind, doc, all.isEmpty() ? Data.currentSlot(a) : all.get(0).name, detail);

@@ -58,6 +58,8 @@ final class SlotIo {
     private static final int EXPORT_SLOT = 2;
     /** ★ 第 141 轮：**分享用**整槽包（与 {@link #EXPORT_SLOT} 同一个包 + 剥身份信息） */
     private static final int EXPORT_SHARE = 3;
+    /** ★ 第 425 轮：**归档快照**导出（槽本体已被清空，导的是池里那份快照） */
+    private static final int EXPORT_ARCHIVE = 4;
 
     // ── 第 177 轮（杀后台 P0）：SAF 待办的磁盘日志名 ───────────────────────
     // 静态字段只活到进程死为止；这三份是同一件事的"磁盘那半"。
@@ -188,6 +190,13 @@ final class SlotIo {
                 } else {
                     doExportShare(a, uri, slot,
                             roots == null ? Data.contentRoots(a, slot) : roots, plan);
+                }
+            } else if (kind == EXPORT_ARCHIVE) {
+                // ★ 第 425 轮：槽本体已清空 ⇒ 导的是归档快照（从 CAS 对象流进 zip）
+                if (slot == null) {
+                    Toast.makeText(a, R.string.pending_lost, Toast.LENGTH_LONG).show();
+                } else {
+                    doExportArchive(a, uri, slot);
                 }
             }
             return true;
@@ -647,6 +656,79 @@ final class SlotIo {
                                 Trans.get(a, R.string.chooser_export)), REQ_EXPORT);
                     }
                 }));
+    }
+
+    // ── ★ 第 425 轮：导出归档备份（槽已归档时那一行的替代动作） ────────────────
+
+    /**
+     * 归档槽上的「导出归档备份」。
+     *
+     * <p>★ 与 {@link #exportSlot} 的差别只有一个：内容来源是**归档快照**（池里的对象），
+     *   不是槽目录 —— 归档后槽本体已经清空，照老路导出会得到一个空包，
+     *   而空槽导出又是被 `export_slot_empty_fmt` 拦着的（白让用户点两次）。
+     */
+    static void exportArchive(final CardStack parent, final Activity a, final Data.Slot s) {
+        if (Backup.archiveOf(a, s.name) == null) {
+            toast(a, Trans.get(a, R.string.slot_err_archived_missing));
+            return;
+        }
+        final CardStack[] ref = new CardStack[1];
+        ref[0] = CardStack.show(parent, a, Trans.get(a, R.string.slot_archive_export),
+                CardStack.text(a, Trans.get(a, R.string.slot_archive_export_sub)),
+                new CardStack.Btn(Trans.get(a, R.string.cancel), new Runnable() {
+                    @Override public void run() { ref[0].dismiss(); }
+                }),
+                new CardStack.Btn(Trans.get(a, R.string.export_ok), new Runnable() {
+                    @Override public void run() {
+                        ref[0].dismiss();
+                        sExportKind = EXPORT_ARCHIVE;
+                        sExportSlot = s.name;
+                        sExportRoots = null;
+                        sExportSrc = null;
+                        sSharePlan = null;
+                        Pending.put(a, PEND_EXPORT, exportJson(EXPORT_ARCHIVE, s.name, null));
+                        a.startActivityForResult(Intent.createChooser(
+                                Exporter.createDoc(suggestZipName(s.name, "archive"), "application/zip"),
+                                Trans.get(a, R.string.chooser_export)), REQ_EXPORT);
+                    }
+                }));
+    }
+
+    private static void doExportArchive(final Activity a, final Uri uri, final String slot) {
+        final Backup.Snapshot ss = Backup.archiveOf(a, slot);
+        if (ss == null) {
+            alert(a, Trans.get(a, R.string.export_failed),
+                    Trans.get(a, R.string.slot_err_archived_missing));
+            return;
+        }
+        final CardStack stack = new CardStack(a);
+        stack.replace(Trans.get(a, R.string.export_progress_title),
+                Trans.get(a, R.string.export_progress_msg_fmt, slot));
+        new Thread(new Runnable() {
+            @Override public void run() {
+                String err = null;
+                Exporter.Result r = null;
+                try {
+                    r = Backup.zipSnapshot(a, uri, ss);
+                } catch (Throwable e) {
+                    err = Util.ioReason(a, e);
+                    android.util.Log.w("MDTLauncher", "export archive failed", e);
+                }
+                final String fe = err;
+                final Exporter.Result fr = r;
+                a.runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        if (fe != null) {
+                            stack.replace(Trans.get(a, R.string.export_failed), fe, closeBtn(a, stack));
+                            return;
+                        }
+                        stack.dismiss();
+                        toast(a, Trans.get(a, R.string.export_slot_done_fmt,
+                                fr.files, Util.formatSize(fr.outBytes)));
+                    }
+                });
+            }
+        }, "export-archive").start();
     }
 
     // ── ★ 第 141 轮：分享用整槽包（脱敏导出） ─────────────────────────────────
@@ -1234,9 +1316,24 @@ final class SlotIo {
      *  ★ F15b：与 .msav 同理，原先的"存档页入口"（先选槽再选包）已移除。 */
     static void importSlot(Activity a, final Data.Slot s) {
         if (blockedByGame(a, s)) return;
+        if (blockedByArchive(a, s)) return;
         sZipSlot = s.name;
         Pending.put(a, PEND_ZIP, slotJson(s.name));        // 第 177 轮：磁盘那半
         pickZipFile(a);
+    }
+
+    /**
+     * ★ 第 425 轮：归档槽拒收写入（整槽导入 / 深链整包 / 分享落地都从这儿过）。
+     *
+     * <p>为什么单列一道：归档槽的"内容"只在归档快照里，本体是空的。
+     * 这时候往里导入一个整槽包，写进去的东西**不会进那份快照**、解除归档一恢复就被覆盖/丢弃 ——
+     * 用户会以为"导入成功了"，其实东西没进任何账本。所以宁可当场拒、让他先解除归档。</p>
+     */
+    private static boolean blockedByArchive(Activity a, Data.Slot s) {
+        if (s == null) return true;
+        if (!SlotArchive.isArchived(a, s.name)) return false;
+        toast(a, Trans.get(a, R.string.slot_archived_rows));
+        return true;
     }
 
     /** 挑 zip（两条入口共用；目标槽必须已经写进 sZipSlot） */
@@ -1275,6 +1372,7 @@ final class SlotIo {
             return;
         }
         if (blockedByGame(a, s)) return;
+        if (blockedByArchive(a, s)) return;
         readZipThenConfirm(a, doc.uri, doc.name, s.name, h);
     }
 

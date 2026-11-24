@@ -434,6 +434,34 @@
     <string name="slot_err_delete_current_fmt">\"%1$s\" is the current slot and the game is using it, so it cannot be deleted.</string>
     <string name="slot_err_game_running_fmt">Slot \"%1$s\" has a game instance running, so this change would be overwritten. Exit that game first.</string>
     <string name="slot_err_game_running">A game instance is running for this slot. Exit that game before doing that.</string>
+
+    <!-- ── Slot archive (2026-11-24) ─────────────────────────────────── -->
+    <string name="slot_archive">Archive</string>
+    <string name="slot_archive_un">Unarchive</string>
+    <string name="slot_archive_badge">Archived</string>
+    <string name="slot_archive_meta">Archived — contents live in the archive backup</string>
+    <string name="slot_archive_label">Archive</string>
+    <string name="slot_archive_why">This saves an \"archive backup\" first, then clears the slot:\n\nIts mods, saves, maps, blueprints and game settings all go into that backup and disappear from here. Instances bound to this slot will not be able to start.\n\nUnarchiving brings everything back. This backup does not count towards the backup limit.</string>
+    <string name="slot_archive_go">Archive and clear</string>
+    <string name="slot_archive_working">Archiving…</string>
+    <string name="slot_unarchive_working">Unarchiving…</string>
+    <string name="slot_unarchive_why">This puts the contents of the archive backup back, then deletes that backup. The slot then works normally again for launching, importing and exporting.</string>
+    <string name="slot_archive_done_fmt">Archived: %1$s</string>
+    <string name="slot_archived_rows">All of this is inside the archive backup — unarchive to view or change it.</string>
+    <string name="slot_archived_row_sub">This instance is bound to an archived slot; unarchive it before starting</string>
+    <string name="slot_unarchive_done">Unarchived: the contents are back.</string>
+    <string name="slot_unarchive_no_snapshot">The archive backup cannot be found (it may have been deleted). You can just clear the marker — this slot is currently empty.</string>
+    <string name="slot_unarchive_clear_go">Clear the marker only</string>
+    <string name="slot_archived_launch_title">This slot is archived</string>
+    <string name="slot_archived_launch_msg">After archiving it counts as never played — unarchive it before starting.</string>
+    <string name="slot_archived_go_unarchive">Unarchive it</string>
+    <string name="slot_archive_export">Export archive backup</string>
+    <string name="slot_archive_export_sub">Exports what was there at archive time; same layout as a whole-slot export</string>
+    <string name="slot_copy_src_archived">This slot is archived and has no settings to copy</string>
+    <string name="slot_err_default_slot">The default slot cannot be archived — pick another default slot in Settings first.</string>
+    <string name="slot_err_already_archived">This slot is already archived.</string>
+    <string name="slot_err_not_archived">This slot is not archived.</string>
+    <string name="slot_err_archived_missing">This slot does not exist (it may have been deleted).</string>
     <string name="version_err_game_running">A game instance is running this version. Exit that game before doing that.</string>
     <string name="slot_err_delete_partial_fmt">Deletion did not fully succeed (some files may be in use): %1$s\n%2$d of %3$d files left</string>
 

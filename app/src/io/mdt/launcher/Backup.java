@@ -1,6 +1,7 @@
 package io.mdt.launcher;
 
 import android.content.Context;
+import android.net.Uri;
 import android.util.Log;
 import java.io.File;
 import java.io.FileInputStream;
@@ -102,6 +103,11 @@ public final class Backup {
     /** 旧格式的快照内容子目录 */
     private static final String LEGACY_FILES = "files";
 
+    /** 普通备份 */
+    public static final int KIND_NORMAL = 0;
+    /** 槽归档时留下的那一份（不计入备份数量、每槽至多一份） */
+    public static final int KIND_ARCHIVE = 1;
+
     private Backup() {}
 
     // ── 目录 ──────────────────────────────────────────────────────────────
@@ -138,6 +144,15 @@ public final class Backup {
         public long bytes;
         public String label = "";
         public String source = "";
+
+        /**
+         * {@link #KIND_NORMAL} / {@link #KIND_ARCHIVE}。
+         *
+         * <p>★ 判据只在清单头 `kind=` 里：老快照没有这个键 ⇒ 读回来就是普通备份（向后兼容）。
+         *   归档快照**不计入备份数量**（{@link AutoBackup} 的修剪与 {@code backupCountIn}
+         *   都按这个字段过滤），并且每槽至多一份。
+         */
+        public int kind = KIND_NORMAL;
 
         /** 1 = 旧格式（`files/` 全量拷贝，md5）；2 = CAS（对象池，sha256） */
         public int version = 2;
@@ -193,15 +208,25 @@ public final class Backup {
      * @param label 用户可读备注，可为空
      */
     public static Snapshot create(Context ctx, String slot, String label) throws IOException {
+        return create(ctx, slot, label, KIND_NORMAL);
+    }
+
+    /**
+     * 同上，但可以指定 {@link #KIND_ARCHIVE}。
+     *
+     * <p>★ 归档那份快照与普通备份**同一套对象池 / 清单**，唯一的区别是清单头的 `kind=`
+     *   —— 于是"恢复"这条老路完全不用改（`restore` 只看文件表）。
+     */
+    public static Snapshot create(Context ctx, String slot, String label, int kind) throws IOException {
         Work.begin(ctx, R.string.work_backup);       // 第 177 轮：100 MB 级的长操作
         try {
-            return create0(ctx, slot, label);
+            return create0(ctx, slot, label, kind);
         } finally {
             Work.end(ctx);
         }
     }
 
-    private static Snapshot create0(Context ctx, String slot, String label) throws IOException {
+    private static Snapshot create0(Context ctx, String slot, String label, int kind) throws IOException {
         // ★ 第 367 轮（读语义定案，plan §12.17）：**读一律放行** —— 创建备份是"读整槽 + 写 hub"，
         //   按不变式②不该拒。以前这里按运行实例拒（`backup_err_game_running`），多开下
         //   还会把"别的槽在跑"也算进来。现在只由界面提示"快照可能包含写了一半的文件"，
@@ -229,6 +254,7 @@ public final class Backup {
         ss.created = now;
         ss.label = (label == null ? "" : label.replace('\n', ' ').trim());
         ss.source = src.getAbsolutePath();
+        ss.kind = kind;
 
         Cas pool = cas(ctx);
         List<Entry> entries = new ArrayList<>();
@@ -299,6 +325,59 @@ public final class Backup {
             }
         });
         return out;
+    }
+
+    /**
+     * 只要普通备份（归档快照不算「备份数量」）。
+     *
+     * <p>★ 这个判据只有这一份：修剪（{@link AutoBackup}）、清单显示、行上的「N 份」
+     *   全部走它，别在各处自己写 {@code if (ss.kind == ...)}。
+     */
+    public static List<Snapshot> normal(Context ctx, String slot) {
+        List<Snapshot> out = new ArrayList<>();
+        for (Snapshot s : list(ctx, slot)) if (s.kind != KIND_ARCHIVE) out.add(s);
+        return out;
+    }
+
+    /** 只要归档快照（每槽至多一份；万一有多份，新的在前） */
+    public static List<Snapshot> archives(Context ctx, String slot) {
+        List<Snapshot> out = new ArrayList<>();
+        for (Snapshot s : list(ctx, slot)) if (s.kind == KIND_ARCHIVE) out.add(s);
+        return out;
+    }
+
+    /** 这个槽的归档快照；没有 ⇒ {@code null} */
+    public static Snapshot archiveOf(Context ctx, String slot) {
+        List<Snapshot> a = archives(ctx, slot);
+        return a.isEmpty() ? null : a.get(0);
+    }
+
+    /**
+     * 把一份快照按**原相对路径**打成 zip（第 425 轮「导出归档备份」）。
+     *
+     * <p>★ 直接从 CAS 对象流进 zip，**不落临时目录**、也不走 {@link #restore}
+     *   （后者要目标目录、还会写盘；导出一份空槽的归档没必要造一遍中间态）。
+     *   条目名 = 清单里的 `rel`（相对槽根），所以导出来的包与「整槽导出」同构，
+     *   可以直接再用「整槽导入」放回去。
+     *
+     * <p>⚠️ 清单里的对象一个都不许缺：缺了就是池子被误清 —— 宁可报错，也别导出半份。
+     */
+    public static Exporter.Result zipSnapshot(Context ctx, Uri uri, Snapshot ss) throws IOException {
+        if (ss == null || ss.dir == null) {
+            throw new IOException(Trans.get(ctx, R.string.backup_err_snapshot_missing));
+        }
+        List<Entry> entries = readEntries(ctx, new File(ss.dir, MANIFEST));
+        if (entries.isEmpty()) throw new IOException(Trans.get(ctx, R.string.exp_err_no_src));
+        Cas cas = cas(ctx);
+        List<Exporter.Src> srcs = new ArrayList<>();
+        for (Entry e : entries) {
+            File obj = cas.objectPath(e.hash);
+            if (obj == null || !obj.isFile()) {
+                throw new IOException("missing cas object: " + e.hash + " (" + e.rel + ")");
+            }
+            srcs.add(Exporter.Src.ofFile(obj, e.rel));
+        }
+        return Exporter.zipSources(ctx, uri, srcs);
     }
 
     /**
@@ -1009,6 +1088,7 @@ public final class Backup {
         sb.append("source=").append(ss.source).append('\n');
         sb.append("count=").append(ss.count).append('\n');
         sb.append("bytes=").append(ss.bytes).append('\n');
+        sb.append("kind=").append(ss.kind).append('\n');
         sb.append(SEP).append('\n');
         for (Entry e : entries) {
             sb.append(e.hash).append('\t').append(e.size).append('\t').append(e.rel).append('\n');
@@ -1041,6 +1121,7 @@ public final class Backup {
                 else if ("source".equals(k)) ss.source = v;
                 else if ("count".equals(k)) ss.count = (int) parseLong(v);
                 else if ("bytes".equals(k)) ss.bytes = parseLong(v);
+                else if ("kind".equals(k)) ss.kind = (int) parseLong(v);
             }
             if (ss.created == 0) {
                 // 兜底：老快照没有 created 就拿目录名当时间

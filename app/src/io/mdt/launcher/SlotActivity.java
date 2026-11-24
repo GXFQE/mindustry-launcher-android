@@ -62,9 +62,11 @@ public class SlotActivity extends BaseActivity {
                                 .putExtra(ModsActivity.EXTRA_SLOT, mSlot));   // 槽已定 ⇒ 不再问槽
                     }
                 });
+        mModsRow = modsRow;
         mModsSub = (TextView) modsRow.findViewById(R.id.act_sub);
         mModsSub.setText(Trans.get(SlotActivity.this, R.string.slot_page_mods_sub));
         oneLineSub(mModsSub);
+        mSavesRow = (View) root.findViewById(R.id.row_slot_saves);
         mSavesSub = (TextView) root.findViewById(R.id.row_slot_saves).findViewById(R.id.act_sub);
         // ★ 2026-10-06（第 115 轮第六批）：本行改成**开子页面**（与模组 / 地图 / 蓝图同一条）。
         //   原来是**弹窗菜单**（看每份存档… / 导出存档… / 导入存档…），用户：
@@ -87,6 +89,7 @@ public class SlotActivity extends BaseActivity {
                     }
                 });
         mMapsSub = (TextView) mapsRow.findViewById(R.id.act_sub);
+        mMapsRow = mapsRow;
         mMapsSub.setText(Trans.get(SlotActivity.this, R.string.slot_page_maps_sub));
         oneLineSub(mMapsSub);
         // ★ F22（第 109 轮）：蓝图 —— 与地图同一条路子（开子页面，不弹窗）。
@@ -99,6 +102,7 @@ public class SlotActivity extends BaseActivity {
                     }
                 });
         mBpSub = (TextView) bpRow.findViewById(R.id.act_sub);
+        mBpRow = bpRow;
         mBpSub.setText(Trans.get(SlotActivity.this, R.string.slot_page_blueprints_sub));
         oneLineSub(mBpSub);
         // ★★ 「备份与恢复」**就地弹窗**（不再跳存档页）—— 实现搬到 SlotOps，两个页面共用一份。
@@ -110,10 +114,19 @@ public class SlotActivity extends BaseActivity {
                         promptSlotOps();
                     }
                 });
+        mOpsRow = root.findViewById(R.id.row_slot_ops);
         // ★ 整槽导入导出**也就地**（SlotIo）—— 四条 SAF 链路现在都从本页发起
         Util.bindAction(root, R.id.row_slot_export, R.drawable.ic_zip,
                 R.string.slot_page_export, R.string.slot_page_export_sub, new Runnable() {
                     @Override public void run() {
+                        // ★ 第 425 轮：归档槽上这一行改成「导出归档备份」——
+                        //   槽本体已经清空，走原来的整槽导出只会得到一个空包（还会被"空槽"那句拦下来）。
+                        if (SlotArchive.isArchived(SlotActivity.this, mSlot)) {
+                            Data.Slot s = findSlot();
+                            if (s == null) { gone(); return; }
+                            SlotIo.exportArchive(new CardStack(SlotActivity.this), SlotActivity.this, s);
+                            return;
+                        }
                         // ★ 第 265 轮：三选一 → 导出/分享确认原来是两层窗（每换一次 dim 就重播）。
                         //   现在同一张卡：菜单是根页，后面的确认页都往里 push。
                         final CardStack stack = new CardStack(SlotActivity.this);
@@ -145,6 +158,7 @@ public class SlotActivity extends BaseActivity {
                         stack.show();
                     }
                 });
+        mExportRow = root.findViewById(R.id.row_slot_export);
 
         // F9 深链（第 379/380 轮）：外部递进来的包 —— 两种，全走**与本页菜单同一条**流程：
         //   · **整槽包**（判据 = `settings.bin`，见 `BatchIo.Probe#slotState`）⇒ 读包 → 确认框
@@ -259,6 +273,18 @@ public class SlotActivity extends BaseActivity {
         setMenuTitle(menu, R.id.action_slot_clone, R.string.slot_op_clone);
         setMenuTitle(menu, R.id.action_slot_copy_settings, R.string.slot_op_copy_settings);
         setMenuTitle(menu, R.id.action_slot_delete, R.string.slot_op_delete);
+        // ★ 第 425 轮：归档 / 解除归档。
+        //   · 已归档 ⇒ 标题变「解除归档」，其余"动内容"的项留一个可见但点不动（改名 / 克隆 / 删除照旧可用）
+        //   · 未归档 ⇒ 标题「归档」；默认槽（设置页那项）与"游戏在跑"时这一项**灰掉**
+        //     （用户 2026-11-24：「默认不能归档」；灰掉的原因是点下去才知道，所以下面给 Info 文案兜底）
+        android.view.MenuItem arc = menu.findItem(R.id.action_slot_archive);
+        if (arc != null) {
+            arc.setTitle(Trans.get(SlotActivity.this, mArchived
+                    ? R.string.slot_archive_un : R.string.slot_archive));
+            String why = mArchived ? null : SlotArchive.denyReason(this, mSlot);
+            arc.setEnabled(mArchived || why == null);
+            arc.setVisible(mArchived || why == null);
+        }
         return true;
     }
 
@@ -271,7 +297,8 @@ public class SlotActivity extends BaseActivity {
     public boolean onOptionsItemSelected(android.view.MenuItem item) {
         int id = item.getItemId();
         if (id != R.id.action_slot_rename && id != R.id.action_slot_clone
-                && id != R.id.action_slot_copy_settings && id != R.id.action_slot_delete) {
+                && id != R.id.action_slot_copy_settings && id != R.id.action_slot_delete
+                && id != R.id.action_slot_archive) {
             return super.onOptionsItemSelected(item);
         }
         // 槽可能已经不在（别处删了 / 改了名）⇒ 与点行时同一条判据
@@ -279,8 +306,18 @@ public class SlotActivity extends BaseActivity {
         if (s == null) { gone(); return true; }
         if (id == R.id.action_slot_rename) SlotOps.renameSlot(this, s, mHost);
         else if (id == R.id.action_slot_clone) SlotOps.cloneSlot(this, s, mHost);
-        else if (id == R.id.action_slot_copy_settings) SettingsCopyUi.open(this, s, mHost);
-        else SlotOps.deleteSlot(this, s, mHost);
+        else if (id == R.id.action_slot_copy_settings) {
+            // ★ 第 425 轮：归档槽没有设置可复制（settings.bin 在归档快照里）
+            if (SlotArchive.isArchived(this, s.name)) {
+                android.widget.Toast.makeText(this, Trans.get(this, R.string.slot_copy_src_archived),
+                        android.widget.Toast.LENGTH_LONG).show();
+                return true;
+            }
+            SettingsCopyUi.open(this, s, mHost);
+        } else if (id == R.id.action_slot_archive) {
+            if (mArchived) SlotOps.unarchiveSlot(this, s, mHost);
+            else SlotOps.archiveSlot(this, s, mHost);
+        } else SlotOps.deleteSlot(this, s, mHost);
         return true;
     }
 
@@ -294,6 +331,14 @@ public class SlotActivity extends BaseActivity {
     private TextView mModsSub;
     /** 存档 / 地图 / 蓝图三行的副标题（同样后台填） */
     private TextView mSavesSub, mMapsSub, mBpSub;
+    /**
+     * ★ 第 425 轮：归档时要**变灰**的六行（模组 / 存档 / 地图 / 蓝图 / 备份与恢复 / 整槽导出）。
+     * 归档之后槽本体是空的，这些入口点进去只会看到"什么都没有" —— 索性灰掉，
+     * 只留 ⋮ 的「解除归档 / 删除」与「导出归档备份」。
+     */
+    private View mModsRow, mSavesRow, mMapsRow, mBpRow, mOpsRow, mExportRow;
+    /** 本页认的那个槽当前是不是归档状态（菜单项与灰化都看它） */
+    private boolean mArchived;
     /**
      * 上一轮扫出来的「读不出来的存档」份数 —— 副标题与存档行的菜单项**共用这一个数**。
      * ★ 存在的意义是**别在点击时重新扫盘**：槽里几百份存档，扫一遍要百来毫秒，
@@ -337,6 +382,30 @@ public class SlotActivity extends BaseActivity {
                               : Trans.get(SlotActivity.this, R.string.slot_page_info_other_nogame));
         }
         if (mInfo != null) mInfo.setText(sb.toString());
+
+        // ★ 第 425 轮：归档槽的表现 —— 信息卡补一句（槽本体已空、内容都在归档备份里），
+        //   六行灰掉，整槽导出行换成「导出归档备份」。判据只认 `SlotArchive` 那一处。
+        mArchived = SlotArchive.isArchived(this, mSlot);
+        if (mArchived) {
+            sb.append('\n').append(Trans.get(SlotActivity.this, R.string.slot_archived_rows));
+            if (mInfo != null) mInfo.setText(sb.toString());
+        }
+        greyRow(mModsRow, mArchived);
+        greyRow(mSavesRow, mArchived);
+        greyRow(mMapsRow, mArchived);
+        greyRow(mBpRow, mArchived);
+        greyRow(mOpsRow, mArchived);
+        // 整槽导出**不灰**：归档时它是「导出归档备份」，是这个状态下仅剩的两个入口之一。
+        if (mExportRow != null) {
+            TextView title = (TextView) mExportRow.findViewById(R.id.act_title);
+            TextView sub = (TextView) mExportRow.findViewById(R.id.act_sub);
+            if (title != null) title.setText(Trans.get(SlotActivity.this, mArchived
+                    ? R.string.slot_archive_export : R.string.slot_page_export));
+            if (sub != null) sub.setText(Trans.get(SlotActivity.this, mArchived
+                    ? R.string.slot_archive_export_sub : R.string.slot_page_export_sub));
+        }
+        // 菜单项（归档 / 解除归档）随状态变 ⇒ 让系统重建一次
+        invalidateOptionsMenu();
         // 三段的条数/摘要都在**后台**算好再写（扫模组要读包、扫地图要开 APK，别放 UI 线程）
         new Thread(new Runnable() {
             @Override public void run() {
@@ -401,6 +470,19 @@ public class SlotActivity extends BaseActivity {
                 }
             }
         }, "slot-counts").start();
+    }
+
+    /**
+     * 归档状态下把一行「变灰、点不动」。
+     *
+     * <p>★ 用 `setEnabled(false)` + 半透明，而不是 `setVisibility(GONE)`：
+     *   用户要能看见这几件事**存在过**、只是现在不能动（以及为什么不能动 —— 信息卡那句）；
+     *   整行消失会让人以为"这个版本没这些功能"。
+     */
+    private static void greyRow(View row, boolean grey) {
+        if (row == null) return;
+        row.setEnabled(!grey);
+        row.setAlpha(grey ? 0.4f : 1f);
     }
 
     /**

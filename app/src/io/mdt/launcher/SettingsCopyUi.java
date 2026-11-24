@@ -22,13 +22,22 @@ final class SettingsCopyUi {
 
     static void open(final Activity a, final Data.Slot target, final SlotOps.Host host) {
         if (a == null || target == null) return;
+        // ★ 第 425 轮：归档槽是空的 —— 目标槽没有设置可写、源槽没有设置可读（settings.bin 在快照里）
+        if (SlotArchive.isArchived(a, target.name)) {
+            toast(a, R.string.slot_err_already_archived);
+            return;
+        }
         // 2026-11-12（第 359 轮）：这一步只是**读两个槽的 settings.bin**（不变式②：读一律放行），
         // 写门禁挪到真正落盘的 doCopy（按目标槽判，见 WriteGate）。
-        SlotOps.pickSlot(null, a, R.string.settings_copy_pick_source, target.name,
+        SlotOps.pickSlot(null, a, R.string.settings_copy_pick_source, target.name, true,
                 new SlotOps.SlotPick2() {
                     @Override public void onPicked(CardStack stack, String source) {
                         if (source == null || source.equals(target.name)) {
                             toast(a, R.string.settings_copy_same_slot);
+                            return;
+                        }
+                        if (SlotArchive.isArchived(a, source)) {
+                            toast(a, R.string.slot_copy_src_archived);
                             return;
                         }
                         showMode(stack, a, target, source, host);

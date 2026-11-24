@@ -37,4 +37,15 @@
         android:id="@+id/action_slot_delete"
         android:showAsAction="never"
         android:title="@string/slot_op_delete" />
+
+    <!--
+      ★ 第 425 轮：归档 / 解除归档。**加在最后** —— 前四项的相对次序不动，
+        免得用户与老断言"第几项是什么"的记忆失效。
+      ⚠️ 标题（归档 / 解除归档）由 SlotActivity 按标记现改；当前槽恰好是
+        设置页的默认槽时这一项**不出现**（默认槽不能归档）。
+    -->
+    <item
+        android:id="@+id/action_slot_archive"
+        android:showAsAction="never"
+        android:title="@string/slot_archive" />
 </menu>

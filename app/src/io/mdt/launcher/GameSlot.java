@@ -148,6 +148,13 @@ public class GameSlot extends BaseActivity {
         //   prepareSlot 之后才落定 —— 但 prepareSlot 只把目标槽名规范化、不会改出别的名字
         //   （见 Data.slotNameFor 与 prepareSlot 的各分支），所以先用规范化后的名字解析一次。
         final String provSlot = Data.slotNameFor(this, slot);
+        // ★ 2026-11-24（第 425 轮）：归档槽的**权威**门 —— 主界面那道只是好说话的那层，
+        //   dev 口 / 插件 / 深链都可能绕过它，真正不许起局的是这里（槽本体已被清空）。
+        if (SlotArchive.isArchived(this, provSlot)) {
+            fail(Trans.get(this, R.string.step_prepare),
+                    Trans.get(this, R.string.slot_archived_launch_msg), null);
+            return;
+        }
         final String provKey = Versions.instanceKey(vkey, provSlot);
         Patches.Resolved patchRes = Patches.resolve(this, target, provKey);
         boolean legacy = needsLegacySlot(target, vkey, it, patchRes);
