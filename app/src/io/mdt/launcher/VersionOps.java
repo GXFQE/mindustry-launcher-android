@@ -40,6 +40,15 @@ final class VersionOps {
     /** 选了一个槽（可能是刚新建的） */
     interface SlotPick { void onPicked(String slot); }
 
+    /**
+     * 换槽**成功**之后把新槽名回给调用方（第 425 轮追加）。
+     *
+     * <p>起因：版本页的"换槽"原来一律走 {@link Done#changed()} ⇒ 直接 `finish()` 回主界面。
+     * 用户 2026-11-24 问「到底为什么换槽会返回到主页啊」—— 这一页的身份就是 (key, 槽)，
+     * 换完把 mSlot 改成新槽再 {@code refresh()} 就能留在原地看结果，不必回去重进。</p>
+     */
+    interface SlotMoved { void moved(String slot); }
+
     private VersionOps() {}
 
     // ── 删除的范围（**唯一判据**）─────────────────────────────────────────
@@ -208,6 +217,15 @@ final class VersionOps {
      *   （写成显式分配），附加行才走替换。这个分岔在真机前抓过一次，别合并回去。
      */
     static void pickSlot(final Activity a, final Versions.Entry e, final Done done) {
+        pickSlot(a, e, done, null);
+    }
+
+    /**
+     * 同上，但换槽成功后额外把新槽名交给 {@code moved}（版本页用它留在原地刷新，
+     * 而不是 `finish()` 回主界面）。{@code done} 与 {@code moved} 可以只给一个。
+     */
+    static void pickSlot(final Activity a, final Versions.Entry e, final Done done,
+                         final SlotMoved moved) {
         final String cur = Versions.slotFor(e);
         slotList(a, e, true, Trans.get(a, R.string.slot_pick_title_fmt, e.displayName(a, false)),
                 new SlotPick() {
@@ -232,6 +250,7 @@ final class VersionOps {
                         }
                         Toast.makeText(a, Trans.get(a, R.string.slot_set_fmt, want),
                                 Toast.LENGTH_SHORT).show();
+                        if (moved != null) moved.moved(want);
                         if (done != null) done.changed();
                     }
                 });

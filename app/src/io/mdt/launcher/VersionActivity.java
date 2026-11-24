@@ -96,7 +96,17 @@ public class VersionActivity extends BaseActivity {
                 R.string.version_row_slot, R.string.version_row_slot_sub,
                 new Runnable() {
                     @Override public void run() {
-                        if (mEntry != null) VersionOps.pickSlot(VersionActivity.this, mEntry, done);
+                        if (mEntry == null) return;
+                        // ★ 第 425 轮：换完**留在这一页**（用户 2026-11-24：「到底为什么换槽会返回到
+                        //   主页啊」）。这一页的身份是 (key, 槽) ⇒ 把 mSlot 改成新槽再 refresh 就行。
+                        //   克隆 / 删除仍然 finish()：它们改的是"列表里有哪些项"。
+                        VersionOps.pickSlot(VersionActivity.this, mEntry, null,
+                                new VersionOps.SlotMoved() {
+                                    @Override public void moved(String slot) {
+                                        mSlot = slot;
+                                        refresh();
+                                    }
+                                });
                     }
                 });
         // ★ 第 320 轮：**进这一行的槽**（用户：「在实例管理页面加一个进入当前槽的管理页面的机制」）。
