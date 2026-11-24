@@ -223,6 +223,26 @@ final class HubTmp {
         return n;
     }
 
+    /**
+     * 体积上限的**分母**：只算参与修剪的命名空间（`share` 不参与）。
+     *
+     * <p>⚠️ 不能直接用 {@link #sizeNoFollow}(root)：分享缓存那份大文件不参与清理、却算进总量
+     * ⇒ 目标永远达不到，每次清扫都把别的命名空间删光（"分享一下 = 清空缓存"）。
+     * 用户 2026-11-24 指出的正是这个。
+     */
+    static long capOwnedBytes(File root) {
+        if (root == null || !root.isDirectory()) return 0;
+        File[] list = root.listFiles();
+        if (list == null) return 0;
+        long total = 0;
+        for (File f : list) {
+            if (f == null || isLink(f) || !f.isDirectory()) continue;  // 只算可清的那些命名空间目录
+            if (NS_SHARE.equals(f.getName())) continue;
+            total += sizeNoFollow(f);
+        }
+        return total;
+    }
+
     // ── 清扫 ──────────────────────────────────────────────────────────────
 
     /** pid 存活判据（可注入，自检用） */
@@ -321,18 +341,22 @@ final class HubTmp {
     }
 
     /**
-     * 体积上限：只清**各命名空间根下的散落文件**（`share` / `plugin-export` / `export` …），
+     * 体积上限：只清**各命名空间根下的散落文件**（`plugin-export` / `export` …），
      * 会话目录由 owner.pid 那套自己收，活进程的一个字节都不动。
      *
      * <p>★ 为什么口径是散文件（第 426 轮，用户：「导出和分享不一样」）：拖到几百 MB 的正是
-     * 分享缓存与插件导出这些平铺件；会话目录有主、有 TTL，冷启动也会收。
+     * 插件导出这些平铺件；会话目录有主、有 TTL，冷启动也会收。
+     *
+     * <p>★ 分享缓存（`share`）**不参与**：一份分享包本身就可能大于上限，按体积清等于
+     * 「刚分享完就盯上它」（用户 2026-11-24：「分享缓存还是算了，这东西太大了一个就容易超」）。
+     * 它只按 {@link #ttlMs} 的 24 h 走。
      *
      * <p>保护：`.part`（正在写）、符号链接、1 h 内放下的、每个命名空间留最新 1 份
      * （该命名空间只剩一份时不再护着，否则上限永远不生效）。
      */
     private static void trimToCap(Context ctx, long now, long capBytes, Swept out) {
         File root = rootNoCreate(ctx);
-        long total = sizeNoFollow(root);
+        long total = capOwnedBytes(root);        // share 不算分母，否则永远清不到目标
         if (total <= capBytes) return;
         List<File> droppable = capCandidates(root, now);
         for (int i = 0; i < droppable.size() && total > capBytes; i++) {
@@ -354,6 +378,9 @@ final class HubTmp {
      * 符号链接、1 小时内放下的（可能正被别的 App 借出去读）；组里不止一份时留**最新 1 份**
      * （只剩一份时它是唯一一件，再护着上限就永远不生效）。
      *
+     * <p>★ 分享缓存（`share`）整目录跳过 —— 一份分享包就可能超过上限，按体积清它没有意义
+     * （用户 2026-11-24：「分享缓存还是算了，这东西太大了一个就容易超」）。
+     *
      * <p>⚠️ "留最新 1 份"必须按**整组**算：先收全组、排序、再剔除最后一个。若一开始就按宽限
      * 过滤，组里只剩一件旧件时 `size()==1` ⇒ 一个都不删，上限永远不生效（2026-11-24 真机踩到）。
      */
@@ -365,6 +392,7 @@ final class HubTmp {
         if (nsDirs == null) return droppable;
         for (File nsDir : nsDirs) {
             if (nsDir == null || isLink(nsDir) || !nsDir.isDirectory()) continue;
+            if (NS_SHARE.equals(nsDir.getName())) continue;   // 分享缓存只按 TTL 走，见 trimToCap 的说明
             File[] items = nsDir.listFiles();
             if (items == null) continue;
             for (File it : items) {

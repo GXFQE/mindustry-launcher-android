@@ -1655,7 +1655,7 @@
     <string name="set_tmp_cap_title">临时文件上限</string>
     <string name="set_tmp_cap_sub_fmt">当前：%1$d MB</string>
     <string name="set_tmp_cap_dialog_title">临时文件上限（1 ~ 10240 MB）</string>
-    <string name="set_tmp_cap_label">MB · 只算临时根目录下的散落文件（分享缓存、插件导出）。正在用的会话和每类里最新的那份不动。</string>
+    <string name="set_tmp_cap_label">MB · 只算临时根目录下的散落文件（插件导出等）。正在用的会话和每类里最新的那份不动。分享缓存不按体积算。</string>
     <string name="set_tmp_cap_hint">64</string>
     <string name="set_tmp_cap_bad">只能填 1 ~ 10240 的整数</string>
 

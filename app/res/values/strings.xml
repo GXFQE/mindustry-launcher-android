@@ -1709,7 +1709,7 @@
     <string name="set_tmp_cap_title">Temp file limit</string>
     <string name="set_tmp_cap_sub_fmt">Current: %1$d MB</string>
     <string name="set_tmp_cap_dialog_title">Temp file limit (1 ~ 10240 MB)</string>
-    <string name="set_tmp_cap_label">MB · loose files under the temp root (share cache, plugin exports). Running sessions and the newest file in each area are kept.</string>
+    <string name="set_tmp_cap_label">MB · loose files under the temp root (plugin exports etc.). Running sessions and the newest file in each area are kept. Share cache is not counted.</string>
     <string name="set_tmp_cap_hint">64</string>
     <string name="set_tmp_cap_bad">Enter an integer from 1 to 10240</string>
 

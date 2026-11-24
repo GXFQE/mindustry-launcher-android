@@ -21589,31 +21589,42 @@ public final class SelfTest {
         // ④d 候选算法（纯函数，喂临时目录 —— 不碰真 tmp 根里用户在用的分享缓存）：
         //    ★ 尺子钉的是"组里只剩一件旧件时也得进候选"：一开始就按宽限过滤会让 size()==1
         //      ⇒ 一个都不删、上限永远不生效（2026-11-24 真机踩到的那条）。
+        //    ★ 分享缓存（share）整目录不参与（用户 2026-11-24：一份分享包就可能超上限）。
         File tree = new File(cache, "selftest-captree");
         boolean cand;
         try {
             File shareDir = new File(tree, "share");
             File exportDir = new File(tree, "export");
+            File plugDir = new File(tree, "plugin-export");
             shareDir.mkdirs();
             exportDir.mkdirs();
+            plugDir.mkdirs();
             File sOld = writeTmp(shareDir, "s-old.bin", "1234567890");
             File sNew = writeTmp(shareDir, "s-new.bin", "1234567890");
             File sPart = writeTmp(shareDir, "s-half.part", "1234567890");
-            File eOnlyOld = writeTmp(exportDir, "e-only.bin", "1234567890");
+            File eOld = writeTmp(exportDir, "e-old.bin", "1234567890");
+            File eNew = writeTmp(exportDir, "e-new.bin", "1234567890");
+            File pOnlyOld = writeTmp(plugDir, "p-only.bin", "1234567890");
             sOld.setLastModified(now - 2L * 3600_000L);
-            eOnlyOld.setLastModified(now - 2L * 3600_000L);
             sPart.setLastModified(now - 2L * 3600_000L);
             sNew.setLastModified(now);
+            eOld.setLastModified(now - 2L * 3600_000L);
+            eNew.setLastModified(now);
+            pOnlyOld.setLastModified(now - 2L * 3600_000L);
             List<File> cand2 = HubTmp.capCandidates(tree, now);
-            cand = cand2.size() == 2 && cand2.contains(sOld) && cand2.contains(eOnlyOld)
-                    && !cand2.contains(sNew) && !cand2.contains(sPart);
+            // 分母也只算参与修剪的命名空间：share 里三份一共 30 B 不许算进来
+            long owned = HubTmp.capOwnedBytes(tree);
+            cand = cand2.size() == 2 && cand2.contains(eOld) && cand2.contains(pOnlyOld)
+                    && !cand2.contains(eNew) && !cand2.contains(sOld)
+                    && !cand2.contains(sNew) && !cand2.contains(sPart)
+                    && owned == 30L;
         } catch (Throwable t) {
             cand = false;
         } finally {
             Data.deleteTree(tree);
         }
         ok(stat, L, cand,
-                "④d 上限候选：每组留最新 1 份、组里只有旧件时照样进候选、.part 与 1 小时内不进");
+                "④d 上限候选：每组留最新 1 份、组里只有旧件时照样进候选、.part 与 1 小时内不进、分享缓存不参与（连分母都不算）");
 
         // ⑤ 不跟随符号链接：链接删掉、它指向的东西一个字节没动
         File target = new File(cache, "selftest-tmp-target");
