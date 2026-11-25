@@ -1075,6 +1075,7 @@
     <string name="imp_err_open_failed">could not read the selected file</string>
     <string name="imp_err_too_small_fmt">the file is too small (%1$d B) to be a game APK</string>
     <string name="imp_err_no_dex">not a valid APK (classes.dex is missing)</string>
+    <string name="imp_err_is_patch">this is a patch package, not a game APK — import it from the Patches page of that version</string>
     <string name="imp_err_bad_zip">not a valid zip/APK</string>
     <string name="imp_err_no_entry_fmt">could not resolve the game entry class %1$s\n(this may not be a Mindustry-family APK)</string>
     <string name="imp_err_rename_fmt">could not rename the file into place: %1$s</string>

@@ -127,6 +127,11 @@ public final class Importer {
         try {
             ZipFile zip = new ZipFile(tmp);
             try {
+                // ★ 第 427 轮：补丁包也是 APK（v2 起整端容器，自带 classes.dex 与 native），
+                //   走「添加游戏」必然一路走到兼容性探测才被拒，报的是"包里没有适配本机的库"——
+                //   用户看着像游戏坏了。先认根上的 `patch.json`，直接说清楚该去哪导入。
+                if (zip.getEntry("patch.json") != null)
+                    throw new IOException(Trans.get(ctx, R.string.imp_err_is_patch));
                 if (zip.getEntry("classes.dex") == null)
                     throw new IOException(Trans.get(ctx, R.string.imp_err_no_dex));
                 version = readVersion(zip);

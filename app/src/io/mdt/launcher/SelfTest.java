@@ -6200,6 +6200,29 @@ public final class SelfTest {
         }
         ok(stat, L, sideOk && PkgIngest.originOf(sideApk).isEmpty(),
                 "★ 旁证解析：64 位十六进制（大写小写化）才算；长度/字符不对、文件不在 ⇒ 空串");
+
+        //   第 427 轮：清单被删了、旁证还在 ⇒ 仍要判得出原件哈希。
+        //   真机上的成因（2026-11-25）：PkgAdmin.disable 重建完 APK 就把池子连同清单一起清掉，
+        //   只留 PkgRestore 写的 `.origin` ⇒ 补丁页从「7217 个类 · 已启用」变成
+        //   「0 个类 · 不适用这个 APK」。
+        File impDir = Importer.importDir(ctx);
+        String sideOnly = "selftest-sideonly-" + System.nanoTime() + ".apk";
+        File sideOnlyF = new File(impDir, sideOnly + ".origin");
+        boolean shaFallback;
+        try {
+            Util.atomicWriteText(sideOnlyF, good + "\n");
+            String fromSide = PkgManifest.patchShaOf(ctx, "import:" + sideOnly);
+            sideOnlyF.delete();
+            String noSide = PkgManifest.patchShaOf(ctx, "import:" + sideOnly);
+            shaFallback = good.equals(fromSide) && noSide.isEmpty()
+                    && "".equals(PkgManifest.patchShaOf(ctx, "not-import:" + sideOnly));
+        } catch (Throwable t) {
+            shaFallback = false;
+        } finally {
+            sideOnlyF.delete();
+        }
+        ok(stat, L, shaFallback,
+                "★ 清单没了也要判得出：patchShaOf 回退 `import/<file>.origin` 旁证；非导入键不猜");
     }
 
     /**

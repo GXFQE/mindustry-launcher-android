@@ -914,6 +914,7 @@
     <string name="imp_err_open_failed">无法读取所选文件</string>
     <string name="imp_err_too_small_fmt">文件过小（%1$d B），不是游戏 APK</string>
     <string name="imp_err_no_dex">不是有效的 APK（缺 classes.dex）</string>
+    <string name="imp_err_is_patch">这是补丁包，不是游戏 APK —— 到那个版本的「补丁」页里导入</string>
     <string name="imp_err_bad_zip">不是有效的 zip/APK</string>
     <string name="imp_err_no_entry_fmt">解析不出游戏入口类 %1$s\n（可能不是 Mindustry 系 APK）</string>
     <string name="imp_err_rename_fmt">落盘改名失败：%1$s</string>

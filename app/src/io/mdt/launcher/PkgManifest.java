@@ -242,9 +242,30 @@ public final class PkgManifest {
         return "";
     }
 
-    /** {@link #patchSha} 的「按 vkey 读清单」版本。 */
+    /**
+     * {@link #patchSha} 的「按 vkey 读清单」版本。
+     *
+     * <p>★ 第 427 轮：清单可能已经不在了、而旁证还在。{@link PkgAdmin#disable} 重建完 APK
+     * 就把池子连同清单一起清掉，只剩 {@link PkgRestore} 写在 {@code import/<file>.origin}
+     * 的原件哈希。这时候只认清单，补丁就整页变成「不适用这个 APK」——2026-11-25 真机复现：
+     * 关一次去重再打开补丁页，{@code 7217 个类 · 已启用} 直接变成 {@code 0 个类 · 不适用}。
+     * ⇒ 清单读不出来时回退到旁证（与 {@link PkgIngest#originOf} 同一套校验），两边都没有才给空串。</p>
+     */
     public static String patchShaOf(Context ctx, String vkey) {
-        return patchSha(read(fileOf(ctx, vkey)));
+        String fromManifest = patchSha(read(fileOf(ctx, vkey)));
+        if (!fromManifest.isEmpty()) return fromManifest;
+        String file = importNameOf(vkey);
+        if (file == null) return "";
+        return PkgIngest.originOf(new File(Importer.importDir(ctx), file));
+    }
+
+    /** `import:&lt;file&gt;` → `&lt;file&gt;`；其它键（安装版升级上来的、旧格式）⇒ null。 */
+    public static String importNameOf(String vkey) {
+        if (vkey == null) return null;
+        final String prefix = "import:";
+        if (!vkey.startsWith(prefix)) return null;
+        String name = vkey.substring(prefix.length()).trim();
+        return name.isEmpty() ? null : name;
     }
 
     // ── 查询辅助 ──────────────────────────────────────────────────────
