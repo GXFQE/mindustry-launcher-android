@@ -50,7 +50,7 @@ SettingsBin.java = 59   # ★ 已码化：失败文案走 errCode+参数（Setti
 MsavMeta.java = 32   # ★ 已码化：8 条 error 走 errCode+参数（MsavText 映射）；这些句子只给报告/自检看
 Compat.java = 27   # 只进 report-devtool.txt / 崩溃报告（取证文本）
 ModsActivity.java = 26   # 全部在 `report()` 里（dev 落盘转储，只有 `MainActivity` 的 `dev_*` 口调它） —— 与 `MainActivity` 的 126 条同类；**它没有自己的用户可见文案**
-Injector.java = 51   # 用户可见的已搬完；剩的是启动管线报告（log.append）—— v49 加了一行「深链 = …」；
+Injector.java = 54   # 用户可见的已搬完；剩的是启动管线报告（log.append）—— v49 加了一行「深链 = …」；★ 2026-11-25 第 428 轮 51 → 54：池模式探针措辞（`probe(app) = n/a（池模式…）` 与 `applyChainTo` 的探针加注），仍只进 report-launch.txt / report-assets.txt；
                      # 2026-11-20 补丁 v2 加 5 行（整包载体 / 补丁 native 来源 / 跳过原因），只进 report-launch.txt
                      # ★ 2026-11-10（第 345 轮，补丁机制 v1）：23 → 32。新增的是「宿主 dex 条数 /
                      #   每条补丁注入到哪个下标 / 注入失败跳过」这几行 —— 与既有 23 条**同族**：
@@ -83,6 +83,8 @@ CacheEpoch.java = 4   # ★ 2026-11-15（第 382 轮，阶段 0.2）：只进 `h
                       #   （清缓存这件事还没有设置页入口，0.4 才有）。
 MsavPatches.java = 1   # ★ 纯 Java 解析器守卫（`IllegalArgumentException`），只经异常链向上
 Util.java = 1   # ★ 通用 IO 原语诊断；调用方（`MapFiles`）自己先建目录 ⇒ 此路径实际不可达
+PkgLauncher.java = 1   # ★ 2026-11-25（第 428 轮）：池探针缺失标记「⚠ 映射不完整」——只进 report-launch.txt
+                       #   （启动报告，运行日志页原样展示），界面一个字都不读；与 Injector 那几条同族。
 Msch.java = 46   # ★ 2026-10-05 新增（蓝图解析）：**全部是 `error`/`Bad` 的中文诊断**（给落盘报告与自检看）；
                  #   界面一律走 `errCode` + `MschText`（那个文件 **0 条**中文，已核）。
                  #   🔴 核心刻意不碰 Android（要在 PC 上拿游戏自己的读取器当判据）⇒ 只能这样分 —— 与 `MsavMeta` 同族。

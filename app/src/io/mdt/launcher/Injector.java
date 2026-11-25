@@ -83,19 +83,31 @@ public final class Injector {
     private static final java.util.IdentityHashMap<android.content.res.AssetManager, Boolean> sPatched =
             new java.util.IdentityHashMap<>();
 
+    /**
+     * 这一局是不是「池模式」（CAS 清单在、基础资产走 AndroidFi 池）。
+     *
+     * <p>只用于给探针结论加注：池模式下 `AssetManager` 里没有基础资产，
+     * `probeAsset` 读 `cursors/cursor.png` 必然 FAIL，别让人把它当故障。</p>
+     */
+    private static volatile boolean sPoolAssets;
+
     /** 给**任何一个**后建的 activity 的 AssetManager 补挂资产链（LauncherApp 在 preCreated 里调） */
     static void applyChainTo(Activity a) {
         List<File> chain = sChain;
         if (chain == null || chain.isEmpty() || a == null) return;
         StringBuilder sb = new StringBuilder();
         sb.append("资产链补挂 ").append(a.getClass().getName()).append('\n');
+        String poolNote = sPoolAssets
+                ? "（池模式：基础资产不在 AssetManager 里，这里只验证补丁素材挂上了；"
+                        + "资产判据看 report-launch 的 probe(pool)）"
+                : "";
         try {
             android.content.res.AssetManager am = a.getAssets();
             boolean known;
             synchronized (sPatched) {
                 known = sPatched.containsKey(am);
             }
-            sb.append("  probe-before = ").append(probeAsset(am)).append('\n');
+            sb.append("  probe-before = ").append(probeAsset(am)).append(poolNote).append('\n');
             if (known) {
                 sb.append("  （这份实例已经补挂过，跳过）\n");
             } else {
@@ -108,7 +120,7 @@ public final class Injector {
                     sPatched.put(am, Boolean.TRUE);
                 }
             }
-            sb.append("  probe-after  = ").append(probeAsset(am)).append('\n');
+            sb.append("  probe-after  = ").append(probeAsset(am)).append(poolNote).append('\n');
         } catch (Throwable t) {
             sb.append("  FAILED: ").append(t).append('\n');
         }
@@ -486,7 +498,8 @@ public final class Injector {
         log.append("dexElements 合并后 = ").append(total).append('\n');
         // 池映射必须在游戏第一次 internal 读取之前灌进去：
         // 有清单走产品路径（PkgLauncher.attach），否则走 dev 探针（ProbeLab，release 是空壳）。
-        if (cas != null) PkgLauncher.attach(ctx, baseCl, cas);
+        // attach 的那行要进启动报告 —— 池模式下这是唯一能回答"资产读不读得到"的判据。
+        if (cas != null) log.append(PkgLauncher.attach(ctx, baseCl, cas)).append('\n');
         else ProbeLab.afterInject(ctx, baseCl);
         // 验证挪到 injectPatches 的末尾：补丁要在这句之前插好，否则 if (补丁替换了入口类)
         // 这里会先把原版加载掉 —— 之后再 prepend 就换不掉了（S0 的「已加载过就换不掉」）。
@@ -940,6 +953,7 @@ public final class Injector {
         //   不在基础包清单里、池里查不到，只能回落到 AssetManager；不挂就是
         //   `FileNotFoundException: labels`（2026-11-22 真机，补丁一进 UI 初始化就崩）。
         PkgManifest cas = PkgLauncher.lookup(app, plan.tag);
+        sPoolAssets = cas != null;
         if (cas == null && ProbeLab.skipAssetMount(app)) {
             // dev P0 实验（2026-11-22）：池就绪时不挂 APK，资产全靠同名 AndroidFi 覆盖读池。
             // 产品版 ProbeLab 永远返回 false ⇒ 这里一行都不会走到。
@@ -972,7 +986,9 @@ public final class Injector {
         sChain = chain;                       // ★ 留给后建的 activity 补挂（见 sChain 的注释）
         if (chain.isEmpty()) {
             // 池模式且这一局没有补丁：AssetManager 不需要挂任何东西，资产全走 AndroidFi → 池。
-            log.append("pkg: skip addAssetPath (pool assets, no patch chain)\n");
+            // ★ 报告里把"不需要挂"与"挂不上"分开写（2026-11-25）：这一模式下 probe(app) 必然
+            //   FAIL，真正该看的是 injectDex 那行 `pkg: AndroidFi pool=… probe(pool) = …`。
+            log.append("pkg: assets = pool via AndroidFi (no AssetManager chain)\n");
             return;
         }
         log.append(cas != null ? "pkg patch asset chain = " : "asset chain = ");
@@ -992,8 +1008,17 @@ public final class Injector {
         }
         // ★ 这两份挂完之后**各自探一次**：探针能直接回答"这个实例到底读不读得到游戏资产"，
         //   而不是等游戏崩了再猜（M2 那条 `list("")` 误判就是缺这么一个探针）。
-        log.append("  probe(app) = ").append(probeAsset(amApp)).append('\n');
-        if (!same) log.append("  probe(act) = ").append(probeAsset(amAct)).append('\n');
+        // ★ 池模式下基础资产不在 AssetManager 里（挂进来的只有补丁素材包），此时 probeAsset
+        //   必然 FAIL —— 那不是故障，是问错了对象；池那条判据在 `probe(pool)`。
+        String probeNote = cas != null
+                ? "n/a（池模式：基础资产走 AndroidFi 池，这里只挂了补丁素材包）"
+                : null;
+        log.append("  probe(app) = ")
+                .append(probeNote != null ? probeNote : probeAsset(amApp)).append('\n');
+        if (!same) {
+            log.append("  probe(act) = ")
+                    .append(probeNote != null ? probeNote : probeAsset(amAct)).append('\n');
+        }
     }
 
     // ── ⑤ 启动游戏 ────────────────────────────────────────────────────────
