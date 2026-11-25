@@ -6223,6 +6223,27 @@ public final class SelfTest {
         }
         ok(stat, L, shaFallback,
                 "★ 清单没了也要判得出：patchShaOf 回退 `import/<file>.origin` 旁证；非导入键不猜");
+
+        //   第 429 轮：同名导入不许互相覆盖 —— 名字被占了就往后挪。
+        //   成因：版本身份是 `import:<文件名>`，同名包直接 rename 覆盖 ⇒ 旧版本被静默换成另一份游戏。
+        String stem = "selftest-name-" + System.nanoTime();
+        File nm1 = new File(impDir, stem + ".apk");
+        File nm2 = new File(impDir, stem + " (2).apk");
+        boolean nameOk;
+        try {
+            nameOk = (stem + ".apk").equals(Importer.nextFreeName(impDir, stem + ".apk"));
+            Util.atomicWriteText(nm1, "x");
+            nameOk = nameOk && (stem + " (2).apk").equals(Importer.nextFreeName(impDir, stem + ".apk"));
+            Util.atomicWriteText(nm2, "x");
+            nameOk = nameOk && (stem + " (3).apk").equals(Importer.nextFreeName(impDir, stem + ".apk"));
+        } catch (Throwable t) {
+            nameOk = false;
+        } finally {
+            nm1.delete();
+            nm2.delete();
+        }
+        ok(stat, L, nameOk,
+                "★ 同名导入不覆盖：名字被占用就往后挪（foo.apk → foo (2).apk → foo (3).apk）");
     }
 
     /**

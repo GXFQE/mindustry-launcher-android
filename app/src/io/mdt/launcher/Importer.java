@@ -69,6 +69,29 @@ public final class Importer {
         return d;
     }
 
+    /**
+     * ★ 第 429 轮：同名导入**不互相覆盖** —— 给被占用的名字找一个空位。
+     *
+     * <p>`foo.apk` 已存在且内容不同 ⇒ `foo (2).apk`、`foo (3).apk` …
+     * 判"内容是否相同"由调用方用 md5 判（同一个文件重复导入仍然走原来的原子替换，
+     * 否则每导一次就会多一行同名版本）。
+     */
+    public static String nextFreeName(File dir, String want) {
+        if (!new File(dir, want).exists()) return want;
+        String stem = want;
+        String ext = "";
+        int dot = want.lastIndexOf('.');
+        if (dot > 0) {
+            stem = want.substring(0, dot);
+            ext = want.substring(dot);
+        }
+        for (int i = 2; i < 1000; i++) {
+            String c = stem + " (" + i + ")" + ext;
+            if (!new File(dir, c).exists()) return c;
+        }
+        return stem + "-" + System.currentTimeMillis() + ext;
+    }
+
     /** 拷贝 + 校验 + 预热预检 + 登记。失败抛 IOException（.part 副本已清理）。 */
     public static JSONObject importApk(Context ctx, Uri uri, String displayName, Ask ask) throws IOException {
         // ★ 第 177 轮：78 MB 的拷贝 + 校验 + 预热都在这一段里，给它一个前台身份
@@ -205,6 +228,52 @@ public final class Importer {
         }
         Log.i(TAG, "import prewarm ok: " + c.getName() + " from " + tmp.getName());
 
+        // ★ 第 429 轮：**同名不同内容不许互相覆盖**。
+        //   版本身份是 `import:<文件名>`，旧实现直接 rename 覆盖 ⇒ 旧版本被静默换成另一份游戏，
+        //   而它的槽数据、存档、补丁绑定还全指着旧内容（用户看到的是"导了两个 Mindustry.apk，
+        //   怎么只剩一个"）。判据用 md5：同一个文件重复导入仍然走替换（否则每导一次多一行同名版本），
+        //   只有内容不同才另起名字。
+        String md5Tmp = Util.md5(tmp);
+        File clash = new File(dir, base);
+        boolean taken = false;
+        boolean same = false;
+        if (clash.isFile()) {
+            taken = true;
+            same = Util.md5(clash).equals(md5Tmp);
+        } else {
+            // CAS 开了之后原包已经被删（内容在池里）⇒ 名字被占用的证据只剩清单
+            PkgManifest prev = PkgManifest.read(PkgManifest.fileOf(ctx, "import:" + base));
+            String sha = prev == null ? "" : PkgManifest.patchSha(prev);
+            if (!sha.isEmpty()) {
+                taken = true;
+                try {
+                    same = sha.equalsIgnoreCase(Pkgs.sha256Of(tmp));
+                } catch (IOException e) {
+                    same = false;      // 读不出来就按"内容不同"处理：宁可多一行，也不要静默覆盖
+                }
+            }
+        }
+        if (taken && !same) {
+            String free = nextFreeName(dir, base);
+            File moved = new File(dir, free + ".part");
+            if (moved.exists()) { moved.setWritable(true); moved.delete(); }
+            if (!tmp.renameTo(moved)) {
+                cleanup(tmp);
+                throw new IOException(Trans.get(ctx, R.string.imp_err_rename_fmt, tmp.getName()));
+            }
+            Log.i(TAG, "import clash: " + base + " -> " + free);
+            base = free;
+            tmp = moved;
+            file = new File(dir, base);
+            old = new File(dir, base + ".old");
+            if (WriteGate.blockedVersion(ctx, "import:" + base)) {
+                cleanup(tmp);
+                throw new IOException(Trans.get(ctx, R.string.version_err_game_running));
+            }
+        }
+        // 显示名跟着最终文件名走：否则两行都叫「Mindustry」，用户分不出哪个是哪个
+        String label = stripExt(base);
+
         // ★ 按条目 CAS（附录 E）：开关打开时先把这个包收进对象池并写清单。
         //   放在 rename **之前**、用 `.part` 做源：清单落盘失败 ⇒ 这次导入还没生效，
         //   直接抛出去（`.part` 会被 cleanup），不会留下「config 指着一个没有清单的版本」。
@@ -214,7 +283,7 @@ public final class Importer {
             try {
                 PkgIngest.Stats st = new PkgIngest.Stats();
                 casManifest = PkgIngest.ingest(ctx, tmp, "import:" + base,
-                        stripExt(displayName), version, Util.md5(tmp), st);
+                        label, version, md5Tmp, st);
                 Log.i(TAG, "import cas: " + st);
                 if (casManifest == null || casManifest.arc == null || !casManifest.arc.eligible) {
                     Log.w(TAG, "import cas: arc not eligible — falling back to the APK at launch");
@@ -268,10 +337,10 @@ public final class Importer {
         JSONObject e = new JSONObject();
         try {
             e.put("file", base);
-            e.put("label", stripExt(displayName));
+            e.put("label", label);
             e.put("version", version);
             e.put("size", bytes);
-            e.put("md5", Util.md5(file));
+            e.put("md5", md5Tmp);
             e.put("added", System.currentTimeMillis());
         } catch (Exception je) {
             Log.w(TAG, "import entry build failed: " + je);
