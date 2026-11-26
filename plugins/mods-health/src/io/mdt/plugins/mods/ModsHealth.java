@@ -97,11 +97,14 @@ public final class ModsHealth {
         final int n = orphans.size();
         // 不在卡里再写一遍标题：宿主已经用**插件声明的标题**（plugin.json 的 `title`）画了一行
         // 小标题（真机截图 2026-11-26：「失效开关」连着出现两次）⇒ 同一件事只说一次。
-        card.addView(api.ui().text(c.getString(R.string.cf_orphan_clean_note), true));
+        // ★ 说明写成**这一行的副标题**，不另起一段（用户 2026-11-26：「这个行间距啊」）：
+        //   别的动作行都是「标题 + 副标题」，另起一段时那段的行距和下面那行的间距都不归页面管，
+        //   视觉上就是两块东西硬贴在一起；并进一行之后间距由 row_action 统一给。
         // 用**行**不用实底大按钮（用户 2026-11-26：「雷霆大按钮啊」）：这一页别的动作都是行，
         // 一整条 accent 实底在这张两行的小卡里太抢眼。
         final android.view.View btn = api.ui().row(
-                c.getString(R.string.cf_orphan_clean_btn_fmt, n), null);
+                c.getString(R.string.cf_orphan_clean_btn_fmt, n),
+                c.getString(R.string.cf_orphan_clean_note));
         btn.setOnClickListener(new android.view.View.OnClickListener() {
             @Override public void onClick(android.view.View view) {
                 api.confirm(c.getString(R.string.cf_orphan_clean_confirm_title_fmt, n),
