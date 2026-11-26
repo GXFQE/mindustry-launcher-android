@@ -95,6 +95,9 @@ public final class ModsHealth {
         if (!(v instanceof android.view.ViewGroup)) return v;
         final android.view.ViewGroup card = (android.view.ViewGroup) v;
         final int n = orphans.size();
+        // ★ 点名字（第 433 轮，用户「清掉这 2 个开关，『这』指的啥」）：光说"这些开关 / 这几个键"
+        //   没有指代对象 —— 必须把**模组名**说出来（"LogicSugar 的 2 个开关"）。
+        final String who = namesText(c, Conflicts.orphanMods(orphans));
         // 不在卡里再写一遍标题：宿主已经用**插件声明的标题**（plugin.json 的 `title`）画了一行
         // 小标题（真机截图 2026-11-26：「失效开关」连着出现两次）⇒ 同一件事只说一次。
         // ★ 说明写成**这一行的副标题**，不另起一段（用户 2026-11-26：「这个行间距啊」）：
@@ -104,11 +107,11 @@ public final class ModsHealth {
         // 一整条 accent 实底在这张两行的小卡里太抢眼。
         final android.view.View btn = api.ui().row(
                 c.getString(R.string.cf_orphan_clean_btn_fmt, n),
-                c.getString(R.string.cf_orphan_clean_note));
+                c.getString(R.string.cf_orphan_clean_note_fmt, who));
         btn.setOnClickListener(new android.view.View.OnClickListener() {
             @Override public void onClick(android.view.View view) {
                 api.confirm(c.getString(R.string.cf_orphan_clean_confirm_title_fmt, n),
-                        c.getString(R.string.cf_orphan_clean_confirm_msg),
+                        c.getString(R.string.cf_orphan_clean_confirm_msg_fmt, who),
                         c.getString(R.string.cf_orphan_clean_ok),
                         new PluginApi.Confirm() {
                             @Override public void onConfirm(boolean ok) {
@@ -135,6 +138,31 @@ public final class ModsHealth {
         card.addView(btn);
         return card;
     }
+
+    /**
+     * 把模组名拼成一句话用的「谁」（第 433 轮）。
+     *
+     * <p>为什么要它：用户 2026-11-26 问「清掉这 2 个开关，『这』指的啥」——
+     * 标题里不许出现**没有指代对象**的"这"，得点名字。但名字多了副标题会被撑爆，
+     * 所以超过 {@link #NAME_CAP} 个就只报个数（"等 N 个模组"），细节留给日志。
+     */
+    static String namesText(android.content.Context c, List<String> names) {
+        if (c == null || names == null || names.isEmpty()) return "";
+        StringBuilder sb = new StringBuilder();
+        String sep = c.getString(R.string.cf_orphan_clean_sep);
+        int shown = Math.min(names.size(), NAME_CAP);
+        for (int i = 0; i < shown; i++) {
+            if (i > 0) sb.append(sep);
+            sb.append(names.get(i));
+        }
+        if (names.size() > shown) {
+            sb.append(sep).append(c.getString(R.string.cf_orphan_clean_more_fmt, names.size() - shown));
+        }
+        return sb.toString();
+    }
+
+    /** {@link #namesText} 最多点几个名字（再多就报个数）。 */
+    private static final int NAME_CAP = 3;
 
     /**
      * 这个槽 {@code settings} 里的孤儿键（判据在 {@link Conflicts#orphanKeys}，这里只取事实）。

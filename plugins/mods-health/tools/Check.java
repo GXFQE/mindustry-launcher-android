@@ -174,6 +174,21 @@ public final class Check {
         withBlank.add("mod-gone-enabled"); withBlank.add(""); withBlank.add(null);
         check(Conflicts.orphanChanges(withBlank).size() == 1,
                 "孤儿开关清理：空白键跳过（不许把空键写进 settings.bin）");
+        // ── v41（第 433 轮）：孤儿键 ⇒ 模组名 —— 标题里不许出现没有指代对象的"这" ──────────
+        java.util.List<String> modsOf = Conflicts.orphanMods(orphans);
+        check(modsOf.size() == 1 && "gone".equals(modsOf.get(0)),
+                "孤儿开关点名：三个同模组的键 ⇒ 一个名字（实际 " + modsOf.size() + "）");
+        java.util.List<String> twoMods = java.util.Arrays.asList(
+                "mod-gone-enabled", "mod-alpha-enabled", "mod-gone-failed");
+        check(Conflicts.orphanMods(twoMods).size() == 2,
+                "孤儿开关点名：两个模组的键 ⇒ 两个名字（同一个模组不许重复）");
+        check(Conflicts.orphanMods(null).isEmpty()
+                && Conflicts.orphanMods(new java.util.ArrayList<String>()).isEmpty(),
+                "孤儿开关点名：null / 空表 ⇒ 空（调方拼句子时不许出现 null）");
+        check(Conflicts.orphanMods(java.util.Arrays.asList("modcrashdisable", "other")).isEmpty(),
+                "★反向：全局键 / 不是 mod- 前缀的键不许被当成模组名");
+        check(Conflicts.orphanMods(orphans).size() <= orphans.size(),
+                "孤儿开关点名：名字数不许超过键数（去重不是去没了）");
 
         check(rB.issues.isEmpty(),
                 "★反向：读不出说明文件的包不许报版本门槛（它连 internalName 都没有）");

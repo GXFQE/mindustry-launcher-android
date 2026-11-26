@@ -66,10 +66,12 @@
 
     <!-- v41 (round 432): the "stale switches" card — a finding cannot carry a button, so draw one -->
     <!-- NOTE: no in-card heading — the host already renders plugin.json's `title` (was doubled once) -->
-    <string name="cf_orphan_clean_note">stale switches: the mods behind them are gone from this slot; cleaning them up leaves every other setting alone (a backup is taken first).</string>
-    <string name="cf_orphan_clean_btn_fmt">Clean up these %1$d switches</string>
-    <string name="cf_orphan_clean_confirm_title_fmt">Clean up these %1$d switches?</string>
-    <string name="cf_orphan_clean_confirm_msg">only the switches for mods that no longer exist are removed; nothing else changes.</string>
+    <string name="cf_orphan_clean_note_fmt">stale switches: %1$s — gone from this slot, so the game will never read these keys again; cleaning them up leaves every other setting alone (a backup is taken first).</string>
+    <string name="cf_orphan_clean_btn_fmt">Clean up %1$d switches of deleted mods</string>
+    <string name="cf_orphan_clean_confirm_title_fmt">Clean up %1$d switches of deleted mods?</string>
+    <string name="cf_orphan_clean_confirm_msg_fmt">only the keys pointing at %1$s are removed; nothing else changes.</string>
+    <string name="cf_orphan_clean_sep">, </string>
+    <string name="cf_orphan_clean_more_fmt">and %1$d more</string>
     <string name="cf_orphan_clean_ok">Clean up</string>
     <string name="cf_orphan_clean_toast_fmt">cleaned up %1$d switches</string>
     <string name="cf_orphan_clean_fail_running">could not clean up: the game in this slot is running — close it and try again.</string>

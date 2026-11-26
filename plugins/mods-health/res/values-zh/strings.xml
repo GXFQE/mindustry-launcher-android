@@ -66,10 +66,12 @@
 
     <!-- v41（第 432 轮）：「失效开关」那张卡 —— 结论带不了按钮，所以自己画一张，点了把那些键删掉 -->
     <!-- ⚠️ 卡里**不写标题**：宿主已经用 plugin.json 的 title 画了小标题（重复过一次，2026-11-26 真机） -->
-    <string name="cf_orphan_clean_note">失效开关：这些键指向的模组已经不在这个槽里了；清掉不动别的设置（写之前会先备份）。</string>
-    <string name="cf_orphan_clean_btn_fmt">清掉这 %1$d 个开关</string>
-    <string name="cf_orphan_clean_confirm_title_fmt">清掉这 %1$d 个开关？</string>
-    <string name="cf_orphan_clean_confirm_msg">只删掉指向已不存在的模组的那几个键，别的设置不动。</string>
+    <string name="cf_orphan_clean_note_fmt">失效开关：%1$s已经不在这个槽里了，游戏不会再读这些键；清掉不动别的设置（写之前会先备份）。</string>
+    <string name="cf_orphan_clean_btn_fmt">清掉 %1$d 个已删模组的开关</string>
+    <string name="cf_orphan_clean_confirm_title_fmt">清掉 %1$d 个已删模组的开关？</string>
+    <string name="cf_orphan_clean_confirm_msg_fmt">只删掉指向 %1$s 的那几个键，别的设置不动。</string>
+    <string name="cf_orphan_clean_sep">、</string>
+    <string name="cf_orphan_clean_more_fmt">等 %1$d 个模组</string>
     <string name="cf_orphan_clean_ok">清掉</string>
     <string name="cf_orphan_clean_toast_fmt">已清掉 %1$d 个开关</string>
     <string name="cf_orphan_clean_fail_running">没清掉：这个槽的游戏正在运行，先退出游戏再试。</string>

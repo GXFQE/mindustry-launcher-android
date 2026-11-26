@@ -161,6 +161,32 @@ public final class Conflicts {
     }
 
     /**
+     * 第 433 轮：从键名剥出**模组名**（去重、保序、按出现顺序）——
+     * 用户 2026-11-26 问「清掉这 2 个开关，『这』指的啥」，光有数量答不了这个问题。
+     *
+     * <p>剥法与 {@link #orphanKeys} 同一条判据（前缀 `mod-`、后缀 {@code -enabled/-failed/-repo}），
+     * 所以两个函数必须**同时改**；名字按键里存的原样（游戏写键时已小写化，模组没了也找不回原大小写）。
+     *
+     * @param keys 键（一般就是 {@link #orphanKeys} 的结果；可为 null）
+     * @return 模组名，去重保序；没有任何可剥的键 ⇒ 空表
+     */
+    public static List<String> orphanMods(List<String> keys) {
+        List<String> out = new ArrayList<String>();
+        if (keys == null) return out;
+        String[] suffixes = {"-enabled", "-failed", "-repo"};
+        for (String k : keys) {
+            if (k == null || !k.startsWith("mod-")) continue;
+            for (String suf : suffixes) {
+                if (k.length() <= ("mod-" + suf).length() || !k.endsWith(suf)) continue;
+                String nm = k.substring(4, k.length() - suf.length()).trim();
+                if (!nm.isEmpty() && !out.contains(nm)) out.add(nm);
+                break;
+            }
+        }
+        return out;
+    }
+
+    /**
      * 游戏自己的版本比较（`Mods.isAtLeast` 的**逐行照抄**，第 229 轮 P3b 搬进来）。
      *
      * <p>`build.revision` 形态（`"159.7"`）比到小版本；纯整数形态比 build；
