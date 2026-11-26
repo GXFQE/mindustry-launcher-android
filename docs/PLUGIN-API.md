@@ -146,6 +146,12 @@
 | `section` | 宿主页面里的一块 | 直接画进宿主页（`createView`，`api.page()` 知道在哪） |
 | `action` | 某一页的动作区（一行） | **不换页**，直接调 `run(PluginApi)` |
 
+★ **`section` 的 `title` 写成 `"-"` ⇒ 宿主不画那一行小标题**（第 432 轮，2026-11-26）：
+宿主平时会在段落上面写一行 12sp 灰字，用 `title` 当名字。插件既然自己画了卡、把内容
+（标题 + 副标题）都摆在卡里了，那行小标签就只是把话再说一遍、还白占一行高度 ——
+写 `"-"` 就让它整行 `GONE`。只在**插件自己给了 View**时生效（没有 View 时外框就是那张卡，
+标题是它唯一的头，不能消失），多段同页时本来也只会显示通用「插件」。
+
 `page` 取值：`main` / `slots` / `slot` / `saves` / `maps` / `mods` / `blueprints` / `map-detail` / `blueprint-detail` / `settings` / `logs` / `trash` / **v40** `version` / `patches` / `resources`。
 
 ⚠️ 三类插槽现在**所有页面都挂齐了**（2026-10-24 第 226 轮统一；v40 起带 `place: "actions"` 的

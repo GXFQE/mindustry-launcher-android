@@ -221,6 +221,14 @@ final class PluginEntries {
     }
 
     /**
+     * 段落名字写成这个记号 ⇒ 宿主**不画**那一行小标题（插件把自己的标题画进卡里）。
+     *
+     * <p>只有"插件自己给了 View"（外框已让出）时认它；见 {@code attachPage} 里的说明与
+     * `docs/PLUGIN-API.md` 的 `title` 一节。第 432 轮（2026-11-26）。
+     */
+    static final String NO_SECTION_HEADING = "-";
+
+    /**
      * 把 `plugin_section` 的外框**还原成卡片**（背景 + 上下 6dp，与 `plugin_section.xml` 一致）。
      *
      * <p>★ 为什么需要它：`attachPage` 在"插件自己有 View"时会把外框让给插件
@@ -451,8 +459,17 @@ final class PluginEntries {
                 // 就还是通用「插件」（否则卡里明明有两件事，标题却只报一件）
                 String heading = (rows.isEmpty() && acts.isEmpty())
                         ? sectionHeading(sections) : null;
-                title.setText(heading == null
-                        ? Trans.get(a, R.string.plugin_section_title) : heading);
+                // ★★ 2026-11-26（第 432 轮）：段落名字写成 {@code -} ⇒ **这一块不画小标题**。
+                //   用户看真机：「那个失效开关字很小而且上面间距过大，建议把标题合并到正文中」——
+                //   插件既然自己画了卡（外框已让出），那行 12sp 的小标签就只是重复一遍卡里的意思，
+                //   还平白多出一行高度。只在"有插件 View"时认这个记号：没有 View 时外框就是卡，
+                //   标题是这张卡唯一的头（而且 ④ 的分析器还会改它），不能凭空消失。
+                boolean silent = hasSectionView && NO_SECTION_HEADING.equals(heading);
+                title.setVisibility(silent ? View.GONE : View.VISIBLE);
+                if (!silent) {
+                    title.setText(heading == null
+                            ? Trans.get(a, R.string.plugin_section_title) : heading);
+                }
             }
             section.setVisibility(View.VISIBLE);
         }

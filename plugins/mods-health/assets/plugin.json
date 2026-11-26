@@ -37,8 +37,8 @@
     },
     {
       "id": "orphan-clean",
-      "title": "失效开关",
-      "title_en": "Stale switches",
+      "title": "-",
+      "title_en": "-",
       "entry": "io.mdt.plugins.mods.ModsHealth",
       "slot": "section",
       "page": "mods"

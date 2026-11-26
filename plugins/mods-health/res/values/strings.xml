@@ -66,7 +66,7 @@
 
     <!-- v41 (round 432): the "stale switches" card — a finding cannot carry a button, so draw one -->
     <!-- NOTE: no in-card heading — the host already renders plugin.json's `title` (was doubled once) -->
-    <string name="cf_orphan_clean_note">the mods behind these switches are gone from this slot; cleaning them up leaves every other setting alone (a backup is taken first).</string>
+    <string name="cf_orphan_clean_note">stale switches: the mods behind them are gone from this slot; cleaning them up leaves every other setting alone (a backup is taken first).</string>
     <string name="cf_orphan_clean_btn_fmt">Clean up these %1$d switches</string>
     <string name="cf_orphan_clean_confirm_title_fmt">Clean up these %1$d switches?</string>
     <string name="cf_orphan_clean_confirm_msg">only the switches for mods that no longer exist are removed; nothing else changes.</string>
