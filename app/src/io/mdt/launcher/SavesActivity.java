@@ -468,16 +468,18 @@ public class SavesActivity extends BaseActivity {
                                                             }
                                                         });
                                                 refresh();
-                                                if (rep.failed == 0) {
-                                                    Toast.makeText(SavesActivity.this,
-                                                            Trans.get(SavesActivity.this,
-                                                                    R.string.batch_del_done_fmt, rep.moved),
-                                                            Toast.LENGTH_LONG).show();
+                                                //  ★ 2026-11-26 真机 bug：确认卡点完**不关** ⇒ 用户再点一次时那批
+                                                //    文件早就不在了（记进 skipped），而结果只报 moved ⇒
+                                                //    「那 1 份会被挪走」+「已把 0 份」互相打脸。
+                                                String outcome = BatchIo.deleteOutcome(SavesActivity.this, rep);
+                                                if (rep.failed > 0) {
+                                                    alert(Trans.get(SavesActivity.this, R.string.batch_del_row), outcome);
                                                 } else {
-                                                    alert(Trans.get(SavesActivity.this, R.string.batch_del_row),
-                                                            Trans.get(SavesActivity.this, R.string.batch_del_done_fmt, rep.moved)
-                                                                    + "\n"
-                                                                    + Trans.get(SavesActivity.this, R.string.batch_del_none_fmt, rep.failed));
+                                                    card.dismiss();
+                                                    if (!outcome.isEmpty()) {
+                                                        Toast.makeText(SavesActivity.this, outcome,
+                                                                Toast.LENGTH_LONG).show();
+                                                    }
                                                 }
                                     }
                                 }));

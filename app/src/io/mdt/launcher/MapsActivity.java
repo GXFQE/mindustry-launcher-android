@@ -821,16 +821,18 @@ public class MapsActivity extends BaseActivity {
                                                             }
                                                         });
                                                 refreshList();   // 图上没了 ⇒ 重新清点（不重建页面）
-                                                if (rep.failed == 0) {
-                                                    Toast.makeText(MapsActivity.this,
-                                                            Trans.get(MapsActivity.this,
-                                                                    R.string.batch_del_done_fmt, rep.moved),
-                                                            Toast.LENGTH_LONG).show();
+                                                //  ★ 2026-11-26 真机 bug：确认卡点完**不关** ⇒ 用户再点一次时
+                                                //    那批文件早就不在了（记进 skipped），而结果只报 moved
+                                                //    ⇒「那 1 份会被挪走」+「已把 0 份」互相打脸。
+                                                String outcome = BatchIo.deleteOutcome(MapsActivity.this, rep);
+                                                if (rep.failed > 0) {
+                                                    alert(Trans.get(MapsActivity.this, R.string.batch_del_row), outcome);
                                                 } else {
-                                                    alert(Trans.get(MapsActivity.this, R.string.batch_del_row),
-                                                            Trans.get(MapsActivity.this, R.string.batch_del_done_fmt, rep.moved)
-                                                                    + "\n"
-                                                                    + Trans.get(MapsActivity.this, R.string.batch_del_none_fmt, rep.failed));
+                                                    card.dismiss();
+                                                    if (!outcome.isEmpty()) {
+                                                        Toast.makeText(MapsActivity.this, outcome,
+                                                                Toast.LENGTH_LONG).show();
+                                                    }
                                                 }
                                     }
                                 }));

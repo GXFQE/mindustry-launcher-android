@@ -504,16 +504,20 @@ public class ModsActivity extends BaseActivity implements PluginEntries.Findings
                                                             }
                                                         }, true);
                                                 rescan();
-                                                if (rep.failed == 0) {
-                                                    Toast.makeText(ModsActivity.this,
-                                                            Trans.get(ModsActivity.this,
-                                                                    R.string.batch_del_done_fmt, rep.moved),
-                                                            Toast.LENGTH_LONG).show();
+                                                //  ★ 2026-11-26 真机 bug（用户：「你看手机现在状态，什么bug」）：
+                                                //    确认卡点完**不关** ⇒ 用户以为没反应、再点一次时那批文件
+                                                //    早就挪走了（⇒ skipped），而结果只报 moved ⇒ 屏上
+                                                //    「这 1 份会被挪进中转站」+「已把 0 份挪进中转站」互相打脸。
+                                                //    现在：成功就关卡走人，有事才留在卡里说清楚。
+                                                String outcome = BatchIo.deleteOutcome(ModsActivity.this, rep);
+                                                if (rep.failed > 0) {
+                                                    alert(Trans.get(ModsActivity.this, R.string.batch_del_row), outcome);
                                                 } else {
-                                                    alert(Trans.get(ModsActivity.this, R.string.batch_del_row),
-                                                            Trans.get(ModsActivity.this, R.string.batch_del_done_fmt, rep.moved)
-                                                                    + "\n"
-                                                                    + Trans.get(ModsActivity.this, R.string.batch_del_none_fmt, rep.failed));
+                                                    card.dismiss();
+                                                    if (!outcome.isEmpty()) {
+                                                        Toast.makeText(ModsActivity.this, outcome,
+                                                                Toast.LENGTH_LONG).show();
+                                                    }
                                                 }
                                     }
                                 }));

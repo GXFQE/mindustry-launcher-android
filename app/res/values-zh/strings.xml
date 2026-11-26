@@ -2325,6 +2325,9 @@
     <string name="batch_del_ok">挪进去</string>
     <string name="batch_del_done_fmt">已把 %1$d 份挪进中转站</string>
     <string name="batch_del_none_fmt">有 %1$d 份没挪动（还在原来的地方）</string>
+    <!-- 运行期 skipped：勾选之后那一份已经不在原处了（不是"住在模组包里/子目录里"那一类，那个是 batch_del_skipped_fmt）。
+         ★ 2026-11-26：只能说状态、不许说成"已把 0 份挪进中转站"（真机 bug，见 BatchIo.deleteOutcome）。 -->
+    <string name="batch_del_gone_fmt">有 %1$d 份已经不在了（可能刚被挪走或删掉）</string>
     <string name="batch_import_pct_fmt">正在导入 %1$d / %2$d 份</string>
     <string name="batch_export_pct_fmt">正在打包 %1$d / %2$d 份</string>
     <string name="batch_del_row">删除…</string>

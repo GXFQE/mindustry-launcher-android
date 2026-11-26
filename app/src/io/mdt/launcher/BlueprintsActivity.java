@@ -908,16 +908,19 @@ public class BlueprintsActivity extends BaseActivity {
                                                             }
                                                         });
                                                 scan();      // 少了几份 ⇒ 重新清点
-                                                if (rep.failed == 0) {
-                                                    Toast.makeText(BlueprintsActivity.this,
-                                                            Trans.get(BlueprintsActivity.this,
-                                                                    R.string.batch_del_done_fmt, rep.moved),
-                                                            Toast.LENGTH_LONG).show();
+                                                //  ★ 2026-11-26 真机 bug：确认卡点完**不关** ⇒ 用户以为没反应、
+                                                //    再点一次时那批文件早就不在了（记进 skipped），而结果只报
+                                                //    moved ⇒ 屏上「那 1 份会被挪走」+「已把 0 份」互相打脸。
+                                                //    现在：成功就关卡走人，有事才留在卡里说清楚。
+                                                String outcome = BatchIo.deleteOutcome(BlueprintsActivity.this, rep);
+                                                if (rep.failed > 0) {
+                                                    alert(Trans.get(BlueprintsActivity.this, R.string.batch_del_row), outcome);
                                                 } else {
-                                                    alert(Trans.get(BlueprintsActivity.this, R.string.batch_del_row),
-                                                            Trans.get(BlueprintsActivity.this, R.string.batch_del_done_fmt, rep.moved)
-                                                                    + "\n"
-                                                                    + Trans.get(BlueprintsActivity.this, R.string.batch_del_none_fmt, rep.failed));
+                                                    card.dismiss();
+                                                    if (!outcome.isEmpty()) {
+                                                        Toast.makeText(BlueprintsActivity.this, outcome,
+                                                                Toast.LENGTH_LONG).show();
+                                                    }
                                                 }
                                     }
                                 }));

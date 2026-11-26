@@ -2538,6 +2538,38 @@ final class BatchIo {
         return r;
     }
 
+    /**
+     * 一次批量删除的**结果那句话**（四页共用这一处判据，别各写一份）。
+     *
+     * <p>🔴 2026-11-26 真机抓出来的 bug：确认卡点完**不关**，用户以为没反应就再点一次 ——
+     * 那一批文件早就挪走了，`deletableItem` 判 false ⇒ 全部记进 {@link DelReport#skipped}，
+     * 而结果只报 `moved` ⇒ 屏上出现「要删除这 1 份吗」+「已把 0 份挪进中转站」**两句互相打脸**。
+     * （logcat 里两秒内 15 行 `Package has already queued 5 toasts`。）</p>
+     *
+     * <p>规则：</p>
+     * <ul>
+     *   <li>`moved == 0` 时**不报**「已把 0 份」—— 零信息，还会跟确认页那句对撞；</li>
+     *   <li>`skipped` 在**运行期**只有一个含义：「这一份已经不在原处了」。确认之前数的
+     *       `cant`（住在模组包里 / 子目录里）是另一回事，见各页的 `batch_del_skipped_fmt`；</li>
+     *   <li>`failed` 与 `skipped` 各占一行，**一个都不许并进别的数里**；</li>
+     *   <li>一个数都没有（勾的列表为空）⇒ **空串**，调用方别弹空提示。</li>
+     * </ul>
+     */
+    static String deleteOutcome(Context ctx, DelReport r) {
+        if (ctx == null || r == null) return "";
+        StringBuilder sb = new StringBuilder();
+        if (r.moved > 0) sb.append(ctx.getString(R.string.batch_del_done_fmt, r.moved));
+        if (r.failed > 0) {
+            if (sb.length() > 0) sb.append('\n');
+            sb.append(ctx.getString(R.string.batch_del_none_fmt, r.failed));
+        }
+        if (r.skipped > 0) {
+            if (sb.length() > 0) sb.append('\n');
+            sb.append(ctx.getString(R.string.batch_del_gone_fmt, r.skipped));
+        }
+        return sb.toString();
+    }
+
     // ══ 小工具 ═════════════════════════════════════════════════════════════
 
     private static void closeQuietly(java.io.Closeable c) {

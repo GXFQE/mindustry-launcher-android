@@ -18561,6 +18561,38 @@ public final class SelfTest {
             ok(stat, L, drNull.moved == 0 && drNull.failed == 0 && drNull.skipped == 0
                             && BatchIo.deleteAll(ctx, picked, kindDir, delTrash, null).moved == 0,
                     "★元断言：`null` 列表 / `null` 删除器都不抛（三个数都是 0）");
+            //  ★★ 元断言（**真机抓出来的 bug**，2026-11-26 用户报「你看手机现在状态，什么bug」）：
+            //     确认卡点完**不关** ⇒ 用户以为没反应、再点一次「挪进去」，而那一批文件早就挪走了
+            //     （⇒ 进 `skipped`），结果句却只报 `moved` ⇒ 屏上同时出现「这 1 份会被挪进中转站」
+            //     与「已把 0 份挪进中转站」**两句互相打脸**的话（logcat 里两秒 15 行 toast 排队）。
+            //     判据（纯函数 `BatchIo.deleteOutcome`，四页共用一处）：**零的那一路不许进句子**；
+            //     句子行数 == 非零出口的个数；首行不许以换行开头。
+            BatchIo.DelReport oMoved = new BatchIo.DelReport();
+            oMoved.moved = 2;
+            BatchIo.DelReport oGone = new BatchIo.DelReport();
+            oGone.skipped = 1;
+            BatchIo.DelReport oMix = new BatchIo.DelReport();
+            oMix.moved = 1;
+            oMix.failed = 1;
+            oMix.skipped = 2;
+            String sMoved = BatchIo.deleteOutcome(ctx, oMoved);
+            String sGone = BatchIo.deleteOutcome(ctx, oGone);
+            String sMix = BatchIo.deleteOutcome(ctx, oMix);
+            ok(stat, L, sMoved.split("\n").length == 1 && sMoved.contains("2"),
+                    "★批量删除的结果句：只挪走 ⇒ 一句、带那个份数（" + sMoved + "）");
+            ok(stat, L, !sGone.isEmpty() && !sGone.equals(ctx.getString(R.string.batch_del_done_fmt, 0))
+                            && !sGone.contains("0") && sGone.contains("1")
+                            && sGone.split("\n").length == 1,
+                    "★★元断言：那一批**早就不在了**时说的是「已经不在了」（" + sGone
+                            + "），**不许**出现「已把 0 份」");
+            ok(stat, L, sMix.split("\n").length == 3 && !sMix.startsWith("\n")
+                            && sMix.contains("1") && sMix.contains("2"),
+                    "★★元断言：三个出口都进句子 ⇒ 三行、一个数都不许丢（"
+                            + sMix.replace('\n', '丨') + "）");
+            ok(stat, L, BatchIo.deleteOutcome(ctx, new BatchIo.DelReport()).isEmpty()
+                            && BatchIo.deleteOutcome(ctx, null).isEmpty()
+                            && BatchIo.deleteOutcome(null, oMix).isEmpty(),
+                    "★元断言：一个数都没有（或 ctx 为 null）⇒ **空串**，调用方别弹空提示");
             //  ★★ 元断言（**真机抓出来的 bug**）：勾选对话框的正按钮那句词**由调用方给** ——
             //     删除那条路原来复用了写死的「导出（N 份）」⇒ 用户勾完准备删、按钮却写着"导出"。
             //     判据 = 两句词必须**不同**，且都要带份数（不然按钮就成了不会变的一句空话）。
