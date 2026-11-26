@@ -32,9 +32,10 @@ import io.mdt.plugins.mods.core.Gates;
 public final class ModsHealth {
 
     /** v24 的 analyzer + v25 的 `Finding.anchor` / 筛选排序 + v26 的 `state()` + v27 的门与摘要卡
-     *  + v28 的原版文案键（覆盖检测要判断"改的是不是原版那句"）。 */
+     *  + v28 的原版文案键（覆盖检测要判断"改的是不是原版那句"）
+     *  + **v41 的 `ui()`**（第 432 轮：「失效开关」那张卡要自己画一个按钮）。 */
     public static int api() {
-        return 28;
+        return 41;
     }
 
     private static final Object LOCK = new Object();
@@ -62,6 +63,97 @@ public final class ModsHealth {
             api.log("mods-health: analyze failed: " + t);
             return Collections.emptyList();
         }
+    }
+
+    /**
+     * **v41（第 432 轮）**：模组页「插件」卡里的「失效开关」小卡。
+     *
+     * <p>为什么要有：这条结论原来只有一行字，用户问「这东西咋清理，没给按钮」——
+     * 宿主把 {@link Finding} 画成文本，结论本身带不了动作。⇒ 这里自己画：一句说明 +
+     * 一个按钮，点了把那些键从 `settings.bin` 删掉（宿主那套写自带备份 / 读回 / 失败还原），
+     * 写成功后宿主会让这一页重扫 ⇒ 这张卡和上面那条警告一起消失。
+     *
+     * <p>没有孤儿键 ⇒ 返回 {@code null}（宿主据此把整块 {@code GONE}，不留空卡）。
+     */
+    public static android.view.View createView(final PluginApi api) {
+        if (api == null) return null;
+        final Context c = api.context();
+        if (c == null) return null;
+        final List<String> orphans;
+        try {
+            orphans = orphanKeys(api);
+        } catch (Throwable t) {
+            return null;
+        }
+        if (orphans.isEmpty()) return null;
+        android.view.View v;
+        try {
+            v = api.ui().card();
+        } catch (Throwable t) {
+            return null;                    // 宿主太旧（没有 v41 的 ui()）⇒ 不画；结论那条照样在
+        }
+        if (!(v instanceof android.view.ViewGroup)) return v;
+        final android.view.ViewGroup card = (android.view.ViewGroup) v;
+        final int n = orphans.size();
+        // 不在卡里再写一遍标题：宿主已经用**插件声明的标题**（plugin.json 的 `title`）画了一行
+        // 小标题（真机截图 2026-11-26：「失效开关」连着出现两次）⇒ 同一件事只说一次。
+        card.addView(api.ui().text(c.getString(R.string.cf_orphan_clean_note), true));
+        // 用**行**不用实底大按钮（用户 2026-11-26：「雷霆大按钮啊」）：这一页别的动作都是行，
+        // 一整条 accent 实底在这张两行的小卡里太抢眼。
+        final android.view.View btn = api.ui().row(
+                c.getString(R.string.cf_orphan_clean_btn_fmt, n), null);
+        btn.setOnClickListener(new android.view.View.OnClickListener() {
+            @Override public void onClick(android.view.View view) {
+                api.confirm(c.getString(R.string.cf_orphan_clean_confirm_title_fmt, n),
+                        c.getString(R.string.cf_orphan_clean_confirm_msg),
+                        c.getString(R.string.cf_orphan_clean_ok),
+                        new PluginApi.Confirm() {
+                            @Override public void onConfirm(boolean ok) {
+                                if (!ok) return;
+                                api.writeGameSettings(Conflicts.orphanChanges(orphans),
+                                        new PluginApi.Done() {
+                                            @Override public void onDone(io.mdt.launcher.api.Result r) {
+                                                if (r != null && r.ok) {
+                                                    api.toast(c.getString(
+                                                            R.string.cf_orphan_clean_toast_fmt, n));
+                                                } else {
+                                                    String why = r == null ? "" : r.reason;
+                                                    api.toast(c.getString(
+                                                            "game-running".equals(why)
+                                                                    ? R.string.cf_orphan_clean_fail_running
+                                                                    : R.string.cf_orphan_clean_fail));
+                                                }
+                                            }
+                                        });
+                            }
+                        });
+            }
+        });
+        card.addView(btn);
+        return card;
+    }
+
+    /**
+     * 这个槽 {@code settings} 里的孤儿键（判据在 {@link Conflicts#orphanKeys}，这里只取事实）。
+     *
+     * <p>取事实的两处都容错：读不到设置 / 读不到模组清单 ⇒ 当"没有"（宁可不说，也别乱删键）。
+     */
+    static List<String> orphanKeys(PluginApi api) {
+        List<String> keys = new ArrayList<String>();
+        try {
+            java.util.Map<String, Object> gs = api.gameSettings();
+            if (gs != null) for (String k : gs.keySet()) keys.add(k);
+        } catch (Throwable ignored) {
+        }
+        List<String> names = new ArrayList<String>();
+        try {
+            for (ItemInfo it : api.contents(ItemInfo.KIND_MODS)) {
+                String nm = extra(it, "internalName");
+                if (!nm.isEmpty()) names.add(nm);
+            }
+        } catch (Throwable ignored) {
+        }
+        return Conflicts.orphanKeys(keys, names);
     }
 
     /**
@@ -475,16 +567,10 @@ public final class ModsHealth {
 
         // v27：**孤儿开关**（槽级）—— settings 里还有 `mod-<名字>-enabled`，模组已经不在槽里了。
         // 判据在 core（`Conflicts.orphanKeys`，PC 自检盯着）；这里只负责取事实 + 拼文案。
+        // 第 432 轮：取事实那半段抽成 `orphanKeys(api)`（「失效开关」那张卡也用它），
+        // 清理动作在 `createView` 里 —— 结论本身是文本，带不了按钮。
         try {
-            java.util.List<String> keys = new ArrayList<String>();
-            java.util.Map<String, Object> gs = api.gameSettings();
-            if (gs != null) for (String k : gs.keySet()) keys.add(k);
-            java.util.List<String> names = new ArrayList<String>();
-            for (ItemInfo it : api.contents(ItemInfo.KIND_MODS)) {
-                String nm = extra(it, "internalName");
-                if (!nm.isEmpty()) names.add(nm);
-            }
-            java.util.List<String> orphans = Conflicts.orphanKeys(keys, names);
+            java.util.List<String> orphans = orphanKeys(api);
             if (!orphans.isEmpty()) {
                 out.add(new Finding(c.getString(R.string.cf_orphan_title_fmt, orphans.size()),
                         c.getString(R.string.cf_orphan_detail), Finding.WARN));

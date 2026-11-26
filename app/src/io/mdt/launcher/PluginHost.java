@@ -2125,10 +2125,30 @@ public final class PluginHost {
                     new android.os.Handler(android.os.Looper.getMainLooper()).post(new Runnable() {
                         @Override public void run() {
                             if (done != null) done.onDone(r);
+                            // ★ 第 432 轮：写成功 ⇒ 让当前页重扫一次。
+                            //   否则插件卡里说"已清掉 2 个"，页面上那条旧结论还挂着 —— 同一件事
+                            //   两个说法（§85.16.1 那类自相矛盾）。插件不该自己知道这件事。
+                            if (r != null && r.ok) notifySettingsWrote();
                         }
                     });
                 }
             }, "mdt-plugin-settings").start();
+        }
+
+        /**
+         * 插件改完 `settings.bin` 之后叫一声当前页（{@link PluginEntries.PluginWriteSink}）。
+         *
+         * <p>为什么放在宿主：插件只该说"我要删这几个键"，重画页面是宿主的活；写在插件里的话
+         * 每个插件都得记一遍。取不到（页面不是那个实现 / 已经不在前台）就什么都不做。
+         */
+        private void notifySettingsWrote() {
+            try {
+                Context base = getBaseContext();
+                if (base instanceof PluginEntries.PluginWriteSink) {
+                    ((PluginEntries.PluginWriteSink) base).onPluginWroteSettings();
+                }
+            } catch (Throwable ignored) {
+            }
         }
 
         /** `null` / 空 = 当前槽；只接受真实存在的槽名，防插件拿 `../` 之类去拼路径。 */

@@ -159,6 +159,21 @@ public final class Check {
         check(Conflicts.orphanKeys(null, liveNames).isEmpty()
                 && Conflicts.orphanKeys(allKeys, null).size() == 5,
                 "孤儿开关：空输入不许抛；槽里一个模组都没有时全都是孤儿");
+        // ── v41（第 432 轮）：清理动作的改动表 —— 每个键 → null（宿主语义 = 删键）──
+        java.util.Map<String, Object> changes = Conflicts.orphanChanges(orphans);
+        check(changes.size() == 3, "孤儿开关清理：三个残留键 ⇒ 三条改动（实际 " + changes.size() + "）");
+        boolean allNull = true;
+        for (String k : changes.keySet()) if (changes.get(k) != null) allNull = false;
+        check(allNull, "★孤儿开关清理：每条改动都必须是 null（宿主只认 null = 删键，别的值会写成设置值）");
+        check(changes.containsKey("mod-gone-enabled") && changes.containsKey("mod-gone-failed")
+                && changes.containsKey("mod-gone-repo"), "孤儿开关清理：三种后缀都要进改动表");
+        check(Conflicts.orphanChanges(null).isEmpty()
+                && Conflicts.orphanChanges(new java.util.ArrayList<String>()).isEmpty(),
+                "孤儿开关清理：空/null ⇒ 空表（空表不许发起写：宿主会回 invalid）");
+        java.util.List<String> withBlank = new java.util.ArrayList<String>();
+        withBlank.add("mod-gone-enabled"); withBlank.add(""); withBlank.add(null);
+        check(Conflicts.orphanChanges(withBlank).size() == 1,
+                "孤儿开关清理：空白键跳过（不许把空键写进 settings.bin）");
 
         check(rB.issues.isEmpty(),
                 "★反向：读不出说明文件的包不许报版本门槛（它连 internalName 都没有）");

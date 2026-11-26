@@ -9,6 +9,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Locale;
@@ -137,6 +138,24 @@ public final class Conflicts {
                 if (!nm.isEmpty() && !have.contains(nm)) out.add(k);
                 break;
             }
+        }
+        return out;
+    }
+
+    /**
+     * 第 432 轮：把孤儿键翻成**宿主 `writeGameSettings` 的改动表** —— 每个键 → {@code null}。
+     *
+     * <p>为什么是 null：宿主那边 `SettingsBin.applyValues` 的语义就是「值为 null = 删掉这个键」
+     * （见其注释），插件不该自己动 `settings.bin`（备份 / 读回 / 失败还原都在宿主那一层）。
+     *
+     * <p>空表 ⇒ 没东西可删，调用方不该发起写（宿主对空改动表返回 `invalid`）。
+     */
+    public static Map<String, Object> orphanChanges(List<String> keys) {
+        Map<String, Object> out = new LinkedHashMap<String, Object>();
+        if (keys == null) return out;
+        for (String k : keys) {
+            if (k == null || k.trim().isEmpty()) continue;
+            out.put(k, null);
         }
         return out;
     }

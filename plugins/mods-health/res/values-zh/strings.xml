@@ -64,6 +64,17 @@
     <string name="cf_orphan_title_fmt">设置里有 %1$d 个开关指向已经不在的模组</string>
     <string name="cf_orphan_detail">那些模组已经从槽里删了，游戏不会再看它们。</string>
 
+    <!-- v41（第 432 轮）：「失效开关」那张卡 —— 结论带不了按钮，所以自己画一张，点了把那些键删掉 -->
+    <!-- ⚠️ 卡里**不写标题**：宿主已经用 plugin.json 的 title 画了小标题（重复过一次，2026-11-26 真机） -->
+    <string name="cf_orphan_clean_note">这些键指向的模组已经不在这个槽里了；清掉不动别的设置（写之前会先备份）。</string>
+    <string name="cf_orphan_clean_btn_fmt">清掉这 %1$d 个开关</string>
+    <string name="cf_orphan_clean_confirm_title_fmt">清掉这 %1$d 个开关？</string>
+    <string name="cf_orphan_clean_confirm_msg">只删掉指向已不存在的模组的那几个键，别的设置不动。</string>
+    <string name="cf_orphan_clean_ok">清掉</string>
+    <string name="cf_orphan_clean_toast_fmt">已清掉 %1$d 个开关</string>
+    <string name="cf_orphan_clean_fail_running">没清掉：这个槽的游戏正在运行，先退出游戏再试。</string>
+    <string name="cf_orphan_clean_fail">没清掉：设置文件写不进去，稍后再试。</string>
+
     <!-- v27：整槽跳过（槽级，显示在摘要卡） -->
     <string name="cf_slot_skip_title">上次启动没跑完，下次会整槽跳过模组</string>
     <string name="cf_slot_skip_detail">游戏会认为这个槽的模组把它弄崩了，开机时把它们全部关掉。</string>

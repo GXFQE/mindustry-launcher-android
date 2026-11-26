@@ -45,7 +45,21 @@ import java.util.Map;
  *  · 不改 `settings.bin`（启停要写它，而那有三条硬约束：改前备份 / 原子写 / 写后自检，
  *    见 {@link SettingsBin} 的类注释）—— **等这一阶段验收过、定案再做**。
  */
-public class ModsActivity extends BaseActivity implements PluginEntries.FindingsSink {
+public class ModsActivity extends BaseActivity
+        implements PluginEntries.FindingsSink, PluginEntries.PluginWriteSink {
+
+    /**
+     * 第 432 轮：插件（mods-health 的「失效开关」卡）删掉几个键之后，让这一页重扫。
+     *
+     * <p>不这么做就会出现「已清掉 2 个」与上面那条「设置里有 2 个开关…」同屏并存。
+     * 重扫而不是 `finish()` 重开：页面身份没变，重画即可（AGENTS.md A43）。
+     */
+    @Override public void onPluginWroteSettings() {
+        try {
+            rescan();
+        } catch (Throwable ignored) {
+        }
+    }
 
     /** v24（第 226 轮）：本页的插件挂载点（content / action / section 统一由 BaseActivity 挂）。 */
     @Override protected String pluginPageId() { return Extensions.PAGE_MODS; }

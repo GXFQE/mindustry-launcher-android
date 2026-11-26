@@ -220,6 +220,24 @@ final class PluginEntries {
         return t == null || t.trim().isEmpty() ? null : t.trim();
     }
 
+    /**
+     * 把 `plugin_section` 的外框**还原成卡片**（背景 + 上下 6dp，与 `plugin_section.xml` 一致）。
+     *
+     * <p>★ 为什么需要它：`attachPage` 在"插件自己有 View"时会把外框让给插件
+     * （`setBackground(null)` + padding 0，第 335 轮免得卡片套卡片）。而 {@code showFindings}
+     * 用 `section.getBackground() != null` 判"外框还是不是那张卡" —— 这个判断读的是**上一次渲染
+     * 留下的状态**，所以每一次渲染都必须显式给出它，不能只在"有插件 View"时改一次。
+     */
+    private static void restoreFrame(Activity a, View section) {
+        try {
+            section.setBackgroundResource(R.drawable.card_bg);
+            int v = dp(a, 6);
+            section.setPadding(0, v, 0, v);
+        } catch (Throwable ignored) {
+            // 一份坏的 drawable 不该把宿主页弄白
+        }
+    }
+
     // ---- v30：主界面摘要卡的「累计游玩」 ---------------------------------------
 
     /** 100 年（毫秒）—— 脏文件不许把界面写成天文数字。 */
@@ -328,6 +346,19 @@ final class PluginEntries {
     }
 
     /**
+     * 第 432 轮：页面想知道「插件刚把 `settings.bin` 改了」——好在**主线程**重扫一次。
+     *
+     * <p>为什么必须在宿主这一层：插件（比如 mods-health 的「失效开关」卡）自己删掉几个键之后，
+     * 页面上那条旧结论还挂在它头上 —— 同一屏两个说法（"已清掉 2 个" + "设置里有 2 个开关…"），
+     * 正是 §85.16.1 那类只有"同屏两条信息是否自相矛盾"才能抓到的错。
+     * ⇒ 写成功由 {@link PluginHost} 统一通知，插件不必知道这件事。
+     */
+    interface PluginWriteSink {
+        /** 插件写 `settings.bin` 成功了；实现方该重新取数并重画（别 finish 重开页面）。 */
+        void onPluginWroteSettings();
+    }
+
+    /**
      * 通用页面的「插件」卡：**三种插入一次挂齐**（v24 第 226 轮统一）。
      *
      * <ul>
@@ -381,6 +412,13 @@ final class PluginEntries {
 
         boolean any = (body != null && body.getChildCount() > 0) || box.getChildCount() > 0;
         if (!any) {
+            // 🔴 2026-11-26（第 432 轮）：**先复位外框再 GONE**。
+            //   上一次渲染若有插件段落，这里已经被 `setBackground(null)` + padding 0（把外框让给插件）。
+            //   只 GONE 不复位 ⇒ ④ 的 showFindings 用 `section.getBackground() != null` 判
+            //   "外框还是不是那张卡"，会误判成"外框已让出"，于是不设标题、把上一次留下的标题文本
+            //   （真机上是「失效开关」）连同自己在 body 里补的一张卡一起显出来 ——
+            //   用户看到的就是"空标题 + 下面一张没头没尾的卡"。
+            restoreFrame(a, section);
             section.setVisibility(View.GONE);
         } else {
             // ★★ 第 335 轮（用户：「资源统计页面…怎么有个一半的框」）：**别把卡片套进卡片**。
@@ -402,6 +440,10 @@ final class PluginEntries {
                         ((LinearLayout.LayoutParams) lp).topMargin = dp(a, 8);
                     }
                 }
+            } else {
+                // 反过来也要复位：上一轮是插件段落、这一轮不是（插件被关掉 / 没有孤儿键了），
+                // 外框得还回来，否则这一段就没有卡底了（同上，第 432 轮）。
+                restoreFrame(a, section);
             }
             TextView title = (TextView) section.findViewById(R.id.plugin_section_title);
             if (title != null) {

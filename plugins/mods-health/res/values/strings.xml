@@ -64,6 +64,17 @@
     <string name="cf_orphan_title_fmt">settings still hold %1$d switches for mods that are gone</string>
     <string name="cf_orphan_detail">those mods were removed from this slot; the game will never look at them again.</string>
 
+    <!-- v41 (round 432): the "stale switches" card — a finding cannot carry a button, so draw one -->
+    <!-- NOTE: no in-card heading — the host already renders plugin.json's `title` (was doubled once) -->
+    <string name="cf_orphan_clean_note">the mods behind these switches are gone from this slot; cleaning them up leaves every other setting alone (a backup is taken first).</string>
+    <string name="cf_orphan_clean_btn_fmt">Clean up these %1$d switches</string>
+    <string name="cf_orphan_clean_confirm_title_fmt">Clean up these %1$d switches?</string>
+    <string name="cf_orphan_clean_confirm_msg">only the switches for mods that no longer exist are removed; nothing else changes.</string>
+    <string name="cf_orphan_clean_ok">Clean up</string>
+    <string name="cf_orphan_clean_toast_fmt">cleaned up %1$d switches</string>
+    <string name="cf_orphan_clean_fail_running">could not clean up: the game in this slot is running — close it and try again.</string>
+    <string name="cf_orphan_clean_fail">could not clean up: the settings file could not be written, try again later.</string>
+
     <!-- v27: whole slot skipped (slot level, shown on the summary card) -->
     <string name="cf_slot_skip_title">last launch did not finish, so the next one will skip every mod here</string>
     <string name="cf_slot_skip_detail">the game believes these mods crashed it, and will turn them all off on startup.</string>

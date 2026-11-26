@@ -1,7 +1,7 @@
 {
   "entry": "io.mdt.plugins.mods.ModsHealth",
   "name": "mods-health",
-  "version": "2",
+  "version": "3",
   "author": "mdt",
   "description": "mod health check (bundles / structure / dependencies / versions / game log)",
   "update": "https://github.com/GXFQE/mindustry-launcher-android/releases/download/plugins-latest/mods-health.json",
@@ -33,6 +33,14 @@
       "title_en": "By conflict risk",
       "entry": "io.mdt.plugins.mods.ModsHealth",
       "slot": "sort",
+      "page": "mods"
+    },
+    {
+      "id": "orphan-clean",
+      "title": "失效开关",
+      "title_en": "Stale switches",
+      "entry": "io.mdt.plugins.mods.ModsHealth",
+      "slot": "section",
       "page": "mods"
     }
   ]
