@@ -18654,6 +18654,16 @@ public final class SelfTest {
                         && DeepLink.kindFor("x.bin", "text/plain", textHead) == DeepLink.UNKNOWN
                         && DeepLink.kindFor("x.bin", null, textHead) == DeepLink.UNKNOWN,
                 "① mime 兜底：`application/x-msav`（官方声明过的那个）⇒ 地图；什么都不是 ⇒ 认不出");
+        // ★ 第 431 轮（用户：「修复后缀名是 jar 的模组不能从深联导入」）：content:// 那条路
+        //   **常常没有文件名**（DocumentsUI 给的是 `…/document/msf%3A1234`）⇒ 后缀认不出，只剩 mime。
+        //   ⚠️ 这两条 mime 与清单里收的那两条必须是同一对，否则「判据认了、系统却不给我们」。
+        ok(stat, L,
+                DeepLink.kindFor("document", "application/java-archive", null) == BatchIo.KIND_MODS
+                        && DeepLink.kindFor("document", "application/x-java-archive", null)
+                           == BatchIo.KIND_MODS
+                        && DeepLink.kindFor("document", "APPLICATION/JAVA-ARCHIVE", null)
+                           == BatchIo.KIND_MODS,
+                "★★ 没有文件名的 content://：靠 mime 认出 `.jar` ⇒ 模组页（大小写不敏感）");
         ok(stat, L, DeepLink.UNKNOWN != DeepLink.PROBE,
                 "★ 元断言：两种「不知道」不是一回事 —— 认不出（说那句话）vs 得读内容（去读一遍），"
                         + "挤成同一个值就会对着 zip 说「认不出这个文件」");
@@ -18963,23 +18973,28 @@ public final class SelfTest {
         // ── ⑤ 安装后的清单门禁（aapt2 不检查 filter；这条是唯一能发现的尺子）──
         ok(stat, L, listed(ctx, view("file:///sdcard/x.msav", "*/*"))
                         && listed(ctx, view("file:///sdcard/x.msch", "*/*"))
-                        && listed(ctx, view("file:///sdcard/x.zip", "*/*")),
-                "★★ 系统真的把我们当成 `.msav` / `.msch` / `.zip` 的候选"
+                        && listed(ctx, view("file:///sdcard/x.zip", "*/*"))
+                        && listed(ctx, view("file:///sdcard/a-mod.jar", "*/*")),
+                "★★ 系统真的把我们当成 `.msav` / `.msch` / `.zip` / `.jar`（第 431 轮补的）的候选"
                         + "（`queryIntentActivities` 问的是**装在这台机器上**的那份清单）");
         ok(stat, L, "io.mdt.launcher.MainActivity".equals(
                         resolvesTo(ctx, view("file:///sdcard/x.msav", "*/*"))),
                 "★ 接住它的就是我们自己的主入口（不是某个内容页 / 别的 Activity）");
         ok(stat, L, !listed(ctx, view("file:///sdcard/x.txt", "*/*"))
                         && !listed(ctx, view("file:///sdcard/xmsav", "*/*"))
-                        && !listed(ctx, view("file:///sdcard/xXmsav", "*/*")),
-                "★★ 反方向：`.txt` / `xmsav` / `xXmsav` 都**不**在候选里 —— 后两条正是"
-                        + "`pathPattern` 那个反斜杠的尺子（写成 `.*.msav` 时它们会被匹配上，"
+                        && !listed(ctx, view("file:///sdcard/xXmsav", "*/*"))
+                        && !listed(ctx, view("file:///sdcard/xjar", "*/*"))
+                        && !listed(ctx, view("file:///sdcard/xXjar", "*/*")),
+                "★★ 反方向：`.txt` / `xmsav` / `xXmsav` / `xjar` / `xXjar` 都**不**在候选里 —— 后四条正是"
+                        + "`pathPattern` 那个反斜杠的尺子（写成 `.*.msav` / `.*.jar` 时它们会被匹配上，"
                         + "而 aapt2 / 编译器**一声不响**）");
         ok(stat, L, listed(ctx, view("content://x/y", "application/octet-stream"))
                         && listed(ctx, view("content://x/y", "application/x-msav"))
                         && listed(ctx, view("content://x/y", "application/zip"))
+                        && listed(ctx, view("content://x/y", "application/java-archive"))
                         && !listed(ctx, view("content://x/y", "text/plain")),
-                "★★ content:// 那一条按 mime 认（官方原样 octet-stream / x-msav，我们加了 zip）；"
+                "★★ content:// 那一条按 mime 认（官方原样 octet-stream / x-msav，我们加了 zip /"
+                        + " java-archive —— `.jar` 在这条路上没有可认的文件名）；"
                         + "`text/plain` 不认（别把所有文件都抢过来）");
         ok(stat, L, !listedByGame(ctx, view("file:///sdcard/x.msav", "*/*")),
                 "★★ 游戏那个 Activity（`mindustry.android.AndroidLauncher`）**一个 filter 都没有**"

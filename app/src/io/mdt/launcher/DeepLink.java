@@ -142,7 +142,8 @@ final class DeepLink {
      *   <li>`.jar`：一个模组包（模组页自己还会再判一次是不是整包）；</li>
      *   <li>其余看头 4 字节：`PK..` ⇒ 压缩包 · `msch` ⇒ 蓝图 · zlib / gzip ⇒ 地图或存档
      *       （**同一个容器，分不开** ⇒ 按地图页处理，那页自己会认出"这其实是存档"）；</li>
-     *   <li>最后看 mime（`application/x-msav` 是官方声明过的那个）。</li>
+     *   <li>最后看 mime（`application/x-msav` 是官方声明过的那个；`application/java-archive`
+     *       是第 431 轮补的 —— content:// 那条路没有文件名，`.jar` 只剩 mime 可认）。</li>
      * </ol>
      * ⚠️ 第 ④ 条对**无后缀**的下载文件才是决定性的："download" 这种名字在浏览器里很常见。
      */
@@ -157,6 +158,11 @@ final class DeepLink {
         if (isZlibHead(head) || isGzipHead(head)) return BatchIo.KIND_MAPS;
         String m = mime == null ? "" : mime.trim().toLowerCase(Locale.ROOT);
         if (m.contains("msav")) return BatchIo.KIND_MAPS;
+        // ★ 第 431 轮：content:// 那条路常常**没有文件名**（DocumentsUI 给的是
+        //   `…/document/msf%3A1234`，展示名有时也拿不到）⇒ 后缀判不出来，只剩 mime。
+        //   判据与清单里收的那两条 mime 一致；`.jar` 在内容层再分"单个模组 / 整包"
+        //   （`BatchIo.modsBatchWanted`），这里只说"它是模组那一类"。
+        if (m.contains("java-archive")) return BatchIo.KIND_MODS;
         return UNKNOWN;
     }
 

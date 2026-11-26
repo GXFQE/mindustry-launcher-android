@@ -256,7 +256,12 @@
 
             <!--
               ★★ F9 深链（第 128 轮）：浏览器 / 文件管理器 / 任何 App 点一个
-                 `.msav` 地图 · `.msch` 蓝图 · 整包 zip ⇒ 系统把文件直接交给我们。
+                 `.msav` 地图 · `.msch` 蓝图 · 整包 zip · `.jar` 模组 ⇒ 系统把文件直接交给我们。
+                 ★ 第 431 轮（用户：「修复后缀名是 jar 的模组不能从深联导入」）：`.jar` 原来
+                 **两组 filter 都没写** ⇒ 系统压根不把我们列成候选（点 .jar 只能在"打开方式"
+                 里看到别的 App）。判据层 `DeepLink.kindFor` 第 154 行本来就认 `.jar`
+                 （`BatchIo.isArchiveName`），`ModsActivity.importDocs` 也会先探"单个模组还是整包"
+                 ⇒ 缺的只有清单这一层。
 
               🔴 **为什么挂在这里，而不是照抄官方挂在游戏那个 Activity 上**
                  （`mindustry.android.AndroidLauncher`，官方 APK 的 filter 就在那一节）：
@@ -285,6 +290,10 @@
                 <data android:scheme="content" android:mimeType="application/octet-stream"/>
                 <data android:scheme="content" android:mimeType="application/x-msav"/>
                 <data android:scheme="content" android:mimeType="application/zip"/>
+                <!-- ★ 第 431 轮：`.jar` 的 mime（系统按后缀查 MimeTypeMap 得到的就是它；
+                     少数老 App 给 `x-java-archive`，一起收下） -->
+                <data android:scheme="content" android:mimeType="application/java-archive"/>
+                <data android:scheme="content" android:mimeType="application/x-java-archive"/>
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.VIEW"/>
@@ -294,6 +303,9 @@
                 <data android:pathPattern=".*\\.msav"/>
                 <data android:pathPattern=".*\\.msch"/>
                 <data android:pathPattern=".*\\.zip"/>
+                <!-- ★ 第 431 轮：`\\` 是两个字符（aapt2 会把 `\.` 当转义吃掉 ⇒ 编译成 `.*.jar`，
+                     那样子串 `xjar` 也会被匹配上。门禁见自检的 `xjar` / `xXjar` 反方向） -->
+                <data android:pathPattern=".*\\.jar"/>
             </intent-filter>
         </activity>
 
