@@ -13498,6 +13498,10 @@ public final class SelfTest {
         Backup.Snapshot sNorm = null, sArch = null;
         try {
             Data.deleteTree(dir);
+            // ★ 第 436 轮：备份在 `<hub>/backups/<槽>`，不在槽目录里 —— 只删槽目录的话，
+            //   上一轮留下的两份快照会让「normal=1 / archives=1」从第二轮起必然失败
+            //   （自检要能反复跑：发版验证会在同一台机上跑很多轮）。
+            Data.deleteTree(Backup.slotDir(ctx, slot));
             if (!dir.mkdirs()) {
                 ok(stat, L, false, G + " 建一次性槽目录失败：" + dir);
                 return;
@@ -18768,6 +18772,16 @@ public final class SelfTest {
                         && DeepLink.kindFor("document", "APPLICATION/JAVA-ARCHIVE", null)
                            == BatchIo.KIND_MODS,
                 "★★ 没有文件名的 content://：靠 mime 认出 `.jar` ⇒ 模组页（大小写不敏感）");
+        // ★ 第 436 轮：`.apk` 游戏本体（`.apk` 也是 zip ⇒ 后缀必须排在容器判据之前）
+        ok(stat, L, DeepLink.kindFor("Mindustry.apk", null, zipHead) == DeepLink.KIND_GAME
+                        && DeepLink.kindFor("v146.APK", null, null) == DeepLink.KIND_GAME
+                        && DeepLink.kindFor("document", "application/vnd.android.package-archive", null)
+                           == DeepLink.KIND_GAME
+                        && DeepLink.kindFor("document", "APPLICATION/VND.ANDROID.PACKAGE-ARCHIVE", null)
+                           == DeepLink.KIND_GAME,
+                "★★ `.apk` ⇒ 游戏本体（交给宿主那条「添加游戏」）；没有文件名的 content:// 靠 mime 认出");
+        ok(stat, L, DeepLink.kindFor("一整包.zip", null, zipHead) == DeepLink.PROBE,
+                "★ 元断言：同是 `PK` 头，`.apk` 与 `.zip` 走两条路 —— 后缀判在魔数之前（顺序反了就全成压缩包）");
         ok(stat, L, DeepLink.UNKNOWN != DeepLink.PROBE,
                 "★ 元断言：两种「不知道」不是一回事 —— 认不出（说那句话）vs 得读内容（去读一遍），"
                         + "挤成同一个值就会对着 zip 说「认不出这个文件」");
@@ -19078,8 +19092,9 @@ public final class SelfTest {
         ok(stat, L, listed(ctx, view("file:///sdcard/x.msav", "*/*"))
                         && listed(ctx, view("file:///sdcard/x.msch", "*/*"))
                         && listed(ctx, view("file:///sdcard/x.zip", "*/*"))
-                        && listed(ctx, view("file:///sdcard/a-mod.jar", "*/*")),
-                "★★ 系统真的把我们当成 `.msav` / `.msch` / `.zip` / `.jar`（第 431 轮补的）的候选"
+                        && listed(ctx, view("file:///sdcard/a-mod.jar", "*/*"))
+                        && listed(ctx, view("file:///sdcard/a-game.apk", "*/*")),
+                "★★ 系统真的把我们当成 `.msav` / `.msch` / `.zip` / `.jar` / `.apk` 的候选"
                         + "（`queryIntentActivities` 问的是**装在这台机器上**的那份清单）");
         ok(stat, L, "io.mdt.launcher.MainActivity".equals(
                         resolvesTo(ctx, view("file:///sdcard/x.msav", "*/*"))),
@@ -19088,17 +19103,20 @@ public final class SelfTest {
                         && !listed(ctx, view("file:///sdcard/xmsav", "*/*"))
                         && !listed(ctx, view("file:///sdcard/xXmsav", "*/*"))
                         && !listed(ctx, view("file:///sdcard/xjar", "*/*"))
-                        && !listed(ctx, view("file:///sdcard/xXjar", "*/*")),
-                "★★ 反方向：`.txt` / `xmsav` / `xXmsav` / `xjar` / `xXjar` 都**不**在候选里 —— 后四条正是"
-                        + "`pathPattern` 那个反斜杠的尺子（写成 `.*.msav` / `.*.jar` 时它们会被匹配上，"
+                        && !listed(ctx, view("file:///sdcard/xXjar", "*/*"))
+                        && !listed(ctx, view("file:///sdcard/xapk", "*/*"))
+                        && !listed(ctx, view("file:///sdcard/xXapk", "*/*")),
+                "★★ 反方向：`.txt` / `xmsav` / `xXmsav` / `xjar` / `xXjar` / `xapk` / `xXapk` 都**不**在候选里"
+                        + " —— 后六条正是 `pathPattern` 那个反斜杠的尺子（写成 `.*.msav` 时它们会被匹配上，"
                         + "而 aapt2 / 编译器**一声不响**）");
         ok(stat, L, listed(ctx, view("content://x/y", "application/octet-stream"))
                         && listed(ctx, view("content://x/y", "application/x-msav"))
                         && listed(ctx, view("content://x/y", "application/zip"))
                         && listed(ctx, view("content://x/y", "application/java-archive"))
+                        && listed(ctx, view("content://x/y", "application/vnd.android.package-archive"))
                         && !listed(ctx, view("content://x/y", "text/plain")),
                 "★★ content:// 那一条按 mime 认（官方原样 octet-stream / x-msav，我们加了 zip /"
-                        + " java-archive —— `.jar` 在这条路上没有可认的文件名）；"
+                        + " java-archive / package-archive —— 这两类在这条路上没有可认的文件名）；"
                         + "`text/plain` 不认（别把所有文件都抢过来）");
         ok(stat, L, !listedByGame(ctx, view("file:///sdcard/x.msav", "*/*")),
                 "★★ 游戏那个 Activity（`mindustry.android.AndroidLauncher`）**一个 filter 都没有**"
@@ -19116,8 +19134,9 @@ public final class SelfTest {
                         && !t1.contains("%") && !t2.contains("%") && !t3.contains("%")
                         && !t4.contains("%") && !t5.contains("%"),
                 "★ 五句深链文案都能实拼、且没有残留占位符（这几条都没参数）");
-        ok(stat, L, t2.contains(".msav") && t2.contains(".msch") && t2.contains("zip"),
-                "★ 「认不出」那句要说清**支持什么**（含 .msav / .msch / zip）");
+        ok(stat, L, t2.contains(".msav") && t2.contains(".msch") && t2.contains("zip")
+                        && t2.contains(".apk"),
+                "★ 「认不出」那句要说清**支持什么**（含 .msav / .msch / .apk / zip）");
         // ★ 第 380 轮：**导入前确认卡**那几条（带参，必须真拼一遍才知道参数对得上）
         String c1 = Trans.get(ctx, R.string.deeplink_confirm_title);
         String c2 = Trans.get(ctx, R.string.deeplink_confirm_file_fmt, "a.zip");
@@ -19129,6 +19148,10 @@ public final class SelfTest {
                         && !c2.contains("%") && !c3.contains("%")
                         && !c4.contains("%") && !c5.contains("%"),
                 "★ 确认卡那几条格式串**按真参数实拼**（文件 / 槽 / 混合包三个数 / 单一类的份数）");
+        // ★ 第 436 轮：游戏本体那句（`.apk` 走「添加游戏」，确认卡上要说清认成了什么）
+        String game = DeepLink.detailOf(ctx, DeepLink.KIND_GAME, null);
+        ok(stat, L, game != null && game.contains("游戏本体") && !game.contains("%"),
+                "★ `.apk` 的「识别为…」实拼得出来（实际：" + game + "）");
         L.add("");
     }
 

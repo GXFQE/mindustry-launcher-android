@@ -1487,6 +1487,14 @@ public class MainActivity extends BaseActivity {
     }
 
     void startImport(final Uri uri, final String name) {
+        startImport(uri, name, null);
+    }
+
+    /**
+     * @param slotToBind 深链里选好的槽（第 436 轮）；导入成功后把这个版本落到它上面。
+     *                   普通导入传 {@code null}（按默认槽走）。
+     */
+    void startImport(final Uri uri, final String name, final String slotToBind) {
         // ★ 第 268 轮：进度与失败都在同一张卡片里（原来 ProgressDialog + 失败 AlertDialog = 两次换窗）
         final CardStack stack = new CardStack(this);
         final String progressTitle = Trans.get(this, R.string.import_progress_title);
@@ -1616,6 +1624,12 @@ public class MainActivity extends BaseActivity {
                             //    Toast 报「8-official-159.7」、而同一秒列表行报「159.7」，
                             //    同一个版本两种叫法（用户：「导入的这个版本号也处理下」）。
                             stack.dismiss();
+                            // ★ 第 436 轮：深链选的槽在**导入成功之后**才落库（key = import:<最终文件名>）
+                            //   —— 失败 / 取消时不留一条指向不存在数据的绑定。
+                            if (slotToBind != null && !slotToBind.isEmpty()) {
+                                String file = fentry.optString("file");
+                                if (!file.isEmpty()) Config.get().setSlotOf("import:" + file, slotToBind);
+                            }
                             Toast.makeText(MainActivity.this,
                                     Trans.get(MainActivity.this, R.string.import_done_fmt,
                                             fentry.optString("label"),

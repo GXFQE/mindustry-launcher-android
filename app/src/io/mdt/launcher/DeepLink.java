@@ -62,6 +62,11 @@ final class DeepLink {
     static final int PROBE = -2;
     /** {@link #kindFor} 的返回值：认不出 */
     static final int UNKNOWN = -1;
+    /**
+     * ★ 第 436 轮：`.apk` 游戏本体 —— 不走内容页，交给宿主那条「添加游戏」
+     * （它本来就有进度卡 / 签名询问 / 兼容性探测），选好的槽在导入成功后落到这一行上。
+     */
+    static final int KIND_GAME = -3;
 
     private DeepLink() {
     }
@@ -136,6 +141,7 @@ final class DeepLink {
      *
      * <p>判据顺序（**后缀 → 内容 → mime**，越靠前越可信）：
      * <ol>
+     *   <li>`.apk`：游戏本体（`.apk` 也是 zip ⇒ 排在容器判据之前）；</li>
      *   <li>`.msch` / `.msav`：后缀就是答案；</li>
      *   <li>`.zip`：**必须探内容** —— 它可能是整包（模组 / 地图 / 存档 / 蓝图），
      *       也可能是"一个模组包"本身；</li>
@@ -149,6 +155,11 @@ final class DeepLink {
      */
     static int kindFor(String name, String mime, byte[] head) {
         String n = name == null ? "" : name.trim().toLowerCase(Locale.ROOT);
+        String m = mime == null ? "" : mime.trim().toLowerCase(Locale.ROOT);
+        // ★ 第 436 轮：游戏本体（`.apk` 也是 zip ⇒ 必须排在下面那几个容器判据之前）。
+        //   content:// 这条路上常常没有文件名，只剩 mime —— 与清单里收的那条一致。
+        if (n.endsWith(".apk")) return KIND_GAME;
+        if (m.contains("vnd.android.package-archive")) return KIND_GAME;
         if (n.endsWith(".msch")) return BatchIo.KIND_BLUEPRINTS;
         if (n.endsWith(".msav")) return BatchIo.KIND_MAPS;
         if (BatchIo.isZipName(n)) return PROBE;
@@ -156,7 +167,6 @@ final class DeepLink {
         if (isMschHead(head)) return BatchIo.KIND_BLUEPRINTS;
         if (isZipHead(head)) return PROBE;
         if (isZlibHead(head) || isGzipHead(head)) return BatchIo.KIND_MAPS;
-        String m = mime == null ? "" : mime.trim().toLowerCase(Locale.ROOT);
         if (m.contains("msav")) return BatchIo.KIND_MAPS;
         // ★ 第 431 轮：content:// 那条路常常**没有文件名**（DocumentsUI 给的是
         //   `…/document/msf%3A1234`，展示名有时也拿不到）⇒ 后缀判不出来，只剩 mime。
@@ -225,6 +235,7 @@ final class DeepLink {
      * @param s 压缩包那一路的摘要；后缀那一路传 `null`（那就按"1 份"说）
      */
     static String detailOf(Context a, int kind, BatchIo.Summary s) {
+        if (kind == KIND_GAME) return Trans.get(a, R.string.deeplink_confirm_game);  // 也是负数，必须排在下面那条之前
         if (kind == BatchIo.KIND_SLOT) return null;       // 整槽包：槽页自己那张确认框更细
         if (kind == BatchIo.KIND_SLOT_AMBIGUOUS || kind < 0) return null;
         final int one = 1;
@@ -308,6 +319,12 @@ final class DeepLink {
     }
 
     private static void route(Activity a, int kind, BatchIo.Doc doc, String slot) {
+        // ★ 第 436 轮：游戏本体不是"进某一页"，而是宿主自己那条「添加游戏」
+        //   （进度卡 / 签名询问 / 兼容性探测都在那儿）；选好的槽由它导入成功后落库。
+        if (kind == KIND_GAME) {
+            if (a instanceof MainActivity) ((MainActivity) a).startImport(doc.uri, doc.name, slot);
+            return;
+        }
         a.startActivity(openIntent(a, kind, doc, slot));
     }
 

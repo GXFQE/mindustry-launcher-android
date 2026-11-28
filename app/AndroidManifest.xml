@@ -294,6 +294,8 @@
                      少数老 App 给 `x-java-archive`，一起收下） -->
                 <data android:scheme="content" android:mimeType="application/java-archive"/>
                 <data android:scheme="content" android:mimeType="application/x-java-archive"/>
+                <!-- ★ 第 436 轮：`.apk` 游戏本体（走「添加游戏」那条导入，选好的槽在成功后落库） -->
+                <data android:scheme="content" android:mimeType="application/vnd.android.package-archive"/>
             </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.VIEW"/>
@@ -306,6 +308,8 @@
                 <!-- ★ 第 431 轮：`\\` 是两个字符（aapt2 会把 `\.` 当转义吃掉 ⇒ 编译成 `.*.jar`，
                      那样子串 `xjar` 也会被匹配上。门禁见自检的 `xjar` / `xXjar` 反方向） -->
                 <data android:pathPattern=".*\\.jar"/>
+                <!-- ★ 第 436 轮：`.apk`（同样写两个反斜杠；反方向尺子是 `xapk` / `xXapk`） -->
+                <data android:pathPattern=".*\\.apk"/>
             </intent-filter>
         </activity>
 
