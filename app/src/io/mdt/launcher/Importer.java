@@ -354,6 +354,8 @@ public final class Importer {
 
     /** 中转站里一个"版本"目录里的三件东西 */
     static final String V_APK = "base.apk";
+    /** 原件哈希旁证（`import/<file>.origin` 的站内副本，放回来时归位）。 */
+    static final String V_ORIGIN = "origin.txt";
     static final String V_ENTRY = "entry.json";
     static final String V_STATE = "state.json";
 
@@ -377,7 +379,18 @@ public final class Importer {
             return Trash.fail(Trash.Result.T_GAME_RUNNING, "game is running", e.importFile);
         }
         File src = new File(importDir(ctx), e.importFile);
-        if (!src.isFile()) return Trash.fail(Trash.Result.T_NOT_IN_TRASH, "missing: " + src, e.importFile);
+        if (!src.isFile()) {
+            // 第 438 轮：CAS 开过一次之后原包会被收进对象池（`PkgAdmin.enable` 的设计行为），
+            // 盘上只剩清单 ⇒ 以前这里直接 `T_NOT_IN_TRASH`，等于**CAS 用过的版本删不掉**。
+            // 现在先按清单从池里把本体拼回来（STORED、只读，与 PkgRestore 同一条路），再照常挪走。
+            PkgManifest m = PkgManifest.read(PkgManifest.fileOf(ctx, e.key()));
+            File back = PkgRestore.rebuild(ctx, m);
+            if (back == null || !back.isFile()) {
+                Log.w(TAG, "trash version: no apk and cannot rebuild from pool: " + e.importFile);
+                return Trash.fail(Trash.Result.T_NOT_IN_TRASH, "missing: " + src, e.importFile);
+            }
+            src = back;
+        }
         // ★ 标签只用**名字**（`displayLabel`），不要带"类型 + 版本号"的完整显示名：
         //   那串里有 `  ` 分隔、还会随版本号变化，进目录名既难看又容易在解析时踩到分隔符。
         File dir = new File(Trash.versionsDir(ctx), Trash.nameFor(e.displayLabel(), e.importFile));
@@ -388,6 +401,14 @@ public final class Importer {
         if (!Trash.move(src, apk)) {
             Data.deleteTree(dir);
             return Trash.fail(Trash.Result.T_MOVE_FAILED, "move failed: " + src, e.importFile);
+        }
+        // 第 438 轮：原件哈希的旁证跟着版本进站。CAS 拼回来的包字节与原件不同（STORED、去 META-INF），
+        // 只靠清单/旁证才知道「它原来是哪份 APK」；放回来时要一起回去，否则补丁又对不上。
+        File origin = new File(importDir(ctx), e.importFile + ".origin");
+        if (origin.isFile() && !Trash.move(origin, new File(dir, V_ORIGIN))) {
+            // 留在 import 目录里会污染以后同名的包（`patchShaOf` 会把它当成那一份的原件哈希）
+            Log.w(TAG, "version origin move failed, dropped: " + origin);
+            origin.delete();
         }
         // 先写登记与状态，再清 config —— 顺序反了就会在两步之间被杀成"登记没了、东西还在站里"
         String key = e.key();
@@ -415,6 +436,10 @@ public final class Importer {
         }
         writeJson(new File(dir, V_STATE), state);
         Config.get().removeImport(e.importFile);
+        // 第 438 轮：清单跟着版本一起删。只挪本体、清 config 会留下 `import_<名>.apk.json`
+        // 幽灵记录（2026-11-28 真机连删两个测试版本各留一条），之后 `patchShaOf` /
+        // `Pkg.open` 还会拿着一个不存在的版本名去猜。
+        PkgManifest.drop(ctx, key);
         // ★ 2026-10-25 用户：「游戏本体保留个数按照整个槽算」⇒ `keepFor(VERSION)` 走整槽那一套（默认 3），
         //   而且**必须在这里真的执行**：别的种类都是在各自的删除动作里顺手 prune，这里以前漏了 ⇒
         //   站里的旧版本会无限堆积（每个几十 MB，比什么都伤）。
@@ -453,6 +478,12 @@ public final class Importer {
         File dest = new File(importDir(ctx), file);
         if (dest.exists()) return Trash.fail(Trash.Result.T_NAME_TAKEN, "exists: " + dest, file);
         if (!Trash.move(apk, dest)) return Trash.fail(Trash.Result.T_MOVE_FAILED, "move back failed", file);
+        // 第 438 轮：旁证一起放回来（删版本时它跟着进了站），否则这个版本的补丁会重新"不适用"。
+        File originBack = new File(dir, V_ORIGIN);
+        if (originBack.isFile() && !Trash.move(originBack, new File(importDir(ctx), file + ".origin"))) {
+            Log.w(TAG, "version origin restore failed, dropped: " + originBack);
+            originBack.delete();
+        }
         Config.get().addImport(entry);
         String key = "import:" + file;
         org.json.JSONObject state = readJson(new File(dir, V_STATE));

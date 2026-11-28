@@ -6244,6 +6244,27 @@ public final class SelfTest {
         }
         ok(stat, L, nameOk,
                 "★ 同名导入不覆盖：名字被占用就往后挪（foo.apk → foo (2).apk → foo (3).apk）");
+
+        //   第 438 轮：删版本要把清单一起删 —— 只挪本体、清 config 会留下
+        //   `import_<名>.apk.json` 幽灵记录（2026-11-28 真机连删两个测试版本各留一条）。
+        //   `.part` 是原子写的中途件，一起收。
+        String dropKey = "import:selftest-drop-" + System.nanoTime() + ".apk";
+        File dropA = PkgManifest.fileOf(ctx, dropKey);
+        File dropB = new File(dropA.getParentFile(), dropA.getName() + ".part");
+        boolean dropOk;
+        try {
+            Util.atomicWriteText(dropA, "{}");
+            Util.atomicWriteText(dropB, "{}");
+            PkgManifest.drop(ctx, dropKey);
+            dropOk = !dropA.exists() && !dropB.exists();
+        } catch (Throwable t) {
+            dropOk = false;
+        } finally {
+            dropA.delete();
+            dropB.delete();
+        }
+        ok(stat, L, dropOk,
+                "★ 删版本要清清单：PkgManifest.drop 连 `.json` 与 `.json.part` 一起收");
     }
 
     /**

@@ -1,6 +1,7 @@
 package io.mdt.launcher;
 
 import android.content.Context;
+import android.util.Log;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -26,6 +27,7 @@ import java.util.Locale;
  * 但每个条目的内容、CRC 和时间戳都能对上。</p>
  */
 public final class PkgManifest {
+    private static final String TAG = "MDTLauncher";
     public static final int FORMAT = 1;
 
     /** 一条条目。 */
@@ -257,6 +259,20 @@ public final class PkgManifest {
         String file = importNameOf(vkey);
         if (file == null) return "";
         return PkgIngest.originOf(new File(Importer.importDir(ctx), file));
+    }
+
+    /**
+     * 第 438 轮：删版本时把清单一起删掉。
+     *
+     * <p>删版本只挪本体、清 config，清单会留下来 ⇒ {@code import_<名>.apk.json} 变成幽灵记录
+     * （2026-11-28 真机连删两个测试版本各留过一条）。残留会让 {@link #patchShaOf} /
+     * {@link Pkg#open} 读到一个已经不存在的版本名。{@code .part} 是原子写的中途件，一起收。</p>
+     */
+    static void drop(Context ctx, String vkey) {
+        File f = fileOf(ctx, vkey);
+        File part = new File(f.getParentFile(), f.getName() + ".part");
+        if (part.isFile()) part.delete();
+        if (f.isFile() && !f.delete()) Log.w(TAG, "manifest delete failed: " + f);
     }
 
     /** `import:&lt;file&gt;` → `&lt;file&gt;`；其它键（安装版升级上来的、旧格式）⇒ null。 */
