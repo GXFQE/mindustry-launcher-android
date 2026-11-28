@@ -1228,10 +1228,13 @@ public final class SelfTest {
             write(setFile, keepBytes);
 
             // ── ⑥ 真实 settings.bin（只读；设备上还没有就跳过）────────────────
+            //   ⚠️ 自检自己会往一次性槽里写"假 settings.bin"（几字节文本）；只认能解析的，
+            //      否则扫到假的就 EOF，整段用例中断（旧写法在干净设备上必炸）。
             File real = null;
             for (Data.Slot s0 : Data.allSlots(ctx)) {
                 File cand = new File(s0.dir, "settings.bin");
                 if (cand.isFile() && cand.length() > 0) {
+                    if (SettingsBin.readSafe(cand, null) == null) continue;
                     real = cand;
                     break;
                 }
@@ -1434,7 +1437,8 @@ public final class SelfTest {
                             + "\u8bbe\u5907\u578b\u53f7\u90fd\u6362\u6210\u4e86\u5360\u4f4d\u7b26");
             ok(stat, L, h1.contains(slot == null ? "" : slot) && !h1.contains(CrashScrub.P_DEVICE),
                     "\u2463 \u53cd\u65b9\u5411\uff1a**\u539f\u4ef6**\u90a3\u4e00\u6863\u7684\u8868\u5934\u7167\u65e7\u5e26\u69fd\u540d\u4e0e\u771f\u673a\u578b");
-            ok(stat, L, bothHave(h1, h2, "arm64") && bothHave(h1, h2, "API")
+            // ABI 只能是本机那个（硬编码 "arm64" 在 x86_64 模拟器上必败，而这条要验的是"ABI 还在"）
+            ok(stat, L, bothHave(h1, h2, android.os.Build.SUPPORTED_ABIS[0]) && bothHave(h1, h2, "API")
                             && bothHave(h1, h2, Compat.pageSize() + " B"),
                     "\u2463 \u2605ABI / API / \u9875\u5927\u5c0f\u5728**\u4e24\u6863\u91cc\u90fd\u5728**"
                             + "\uff08\u5b83\u4eec\u662f\u6392\u969c\u5224\u636e\uff0c\u4e0d\u80fd\u8ddf\u7740\u654f\u611f\u4fe1\u606f\u4e00\u8d77\u88ab\u62b9\uff09");
@@ -8736,6 +8740,8 @@ public final class SelfTest {
             for (Data.Slot s0 : Data.allSlots(ctx)) {
                 File cand = new File(s0.dir, "settings.bin");
                 if (cand.isFile() && cand.length() > 0) {
+                    // 自检自己写的假 settings.bin 也要跳过（只认真的能解析的）
+                    if (SettingsBin.readSafe(cand, null) == null) continue;
                     real = cand;
                     break;
                 }
