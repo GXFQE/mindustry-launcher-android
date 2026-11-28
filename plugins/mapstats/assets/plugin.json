@@ -2,6 +2,7 @@
   "entry": "io.mdt.plugins.mapstats.MapStatsPage",
   "name": "mapstats",
   "version": "6",
+  "api": 33,
   "author": "mdt",
   "description": "map resource statistics (ores / walls / floors / buildable / core zone)",
   "update": "https://github.com/GXFQE/mindustry-launcher-android/releases/download/plugins-latest/mapstats.json",

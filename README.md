@@ -9,11 +9,12 @@ second one and it overwrites the first. There is a single set of saves too, so s
 pushes the old progress aside. This manager gives every version its own **save slot**: several
 versions installed side by side, each with separate **saves / maps / blueprints / mods**.
 
-> ⚠️ **Release candidate (1.0.0-rc1) — the feature set is frozen.** The APK is on
+> ⚠️ **Release candidate (1.0.0-rc2).** The APK is on
 > [Releases](https://github.com/GXFQE/mindustry-launcher-android/releases) (the one marked
 > Pre-release); you can also build it yourself — see [Building](docs/DEVELOPING.md#构建)
-> *(in Chinese for now)*. "Candidate" means no new features go in: only fixes, until a full RC
-> cycle passes with no blocking bugs — **until then it is not a stable release.**
+> *(in Chinese for now)*. It is still a candidate: 1.0 ships after a full RC cycle with no blocking
+> bugs — **until then it is not a stable release.** (rc1 was fixes only; rc2 is the checkpoint after
+> a round of additions, and that "no blocking bug" cycle is counted from here.)
 >
 > The feature list below describes the **current source code**; the RC APK can lag a little behind it.
 
@@ -56,7 +57,10 @@ point the game at that directory when it starts.
    - tap that version to launch. **Continue** goes straight back to the version you launched last.
 
 Files from other apps come in too: opening a `.msav` / `.msch` / slot or mod zip from a file manager
-or a chat hands it to the manager — with more than one slot it asks where to import.
+or a chat hands it to the manager — with more than one slot it asks where to import. It also accepts
+**game APKs** (asks which slot, imports it and binds it to that slot) and **patch packages** (finds
+the installed version the patch is built for and opens its **Patches** page; if no version matches,
+the package is still imported and the page says why it cannot be enabled yet).
 
 The interface **follows your system language**: 简体中文 on a phone set to Chinese, English otherwise
 (English and Simplified Chinese are the only translations so far). **Settings → Language** (the gear at
@@ -78,6 +82,14 @@ yourself — even just a few lines — see **Translation file** below.
 - Details: source, size, checksum, raw version name, ABI, build number, save count
 - Version page → **Assets**: export the game package resources by type (sprites / sounds / music / maps / text / fonts and more); only the checked types go into the zip
 - Two versions sharing a slot get a warning that their saves will overwrite each other
+- **Game packages can share their files**: with deduplication on, files several versions have in
+  common are stored once (two builds that would take 136 MB take 121.8 MB); turn it off and every
+  package is rebuilt from the shared pool
+- **A slot you no longer play can be archived**: its contents move into an archive backup and are
+  cleared from the working area; unarchive to bring them back. Archive backups are not counted with
+  ordinary ones, and can be exported on their own
+- **Signature check on import**: log only / ask first / refuse — trusted certificates for the
+  official Mindustry and MindustryX builds are built in, and you can add your own
 - **Packages that will not run are refused** — checked at import and again before launch
 - **Continue** resumes the row you launched last (when one version has several slots, it comes back to the slot it used)
 - The **?** at the top right (and the one next to the summary row) opens a short glossary: version,
@@ -148,6 +160,9 @@ yourself — even just a few lines — see **Translation file** below.
 - Per version: version page -> **Patches** to enable / disable; two patches that replace the same class or the same asset cannot be enabled together
 - If a patch cannot be applied, the launch still proceeds and the Patches page says which one failed and why; a broken patch is skipped, not fatal
 - Patches are **matched by the APK sha256**, never by version number - a patch built for 160 will not be applied to 160.4
+- A patch package can also be a **whole game APK** (its `patch.json` says `"role": "game"`): it
+  replaces that launch entry's code, assets and native libraries instead of adding to them, and owns
+  the entry — it cannot be combined with ordinary patches there
 
 ### Transfer station
 - Deleted things land here instead of disappearing
@@ -163,7 +178,10 @@ yourself — even just a few lines — see **Translation file** below.
 - **Check for updates**: downloads and installs its own update; **Auto-check** picks what it accepts
   (off / stable only / stable and preview), **Update line** picks the mirror and can speed-test it.
   Builds up to 0.7.0 have no updater, so that one step is still manual
-- Settings: default slot, crash alerts, crash reports to keep, trash retention, automatic cleanup, storage used
+- Settings: default slot, crash alerts, crash reports to keep, trash retention (by count and days),
+  automatic cleanup, temporary-file cap, download speed limit, storage used
+- **Storage used** is broken down: game packages (and what deduplication saves), extracted native
+  libraries, the manager itself (plug-ins / cache / previews / reports) and each slot
 - About page: version / credits / data locations / GitHub repository, issues, GPL-3.0
 
 ## What is not there yet

@@ -2,6 +2,7 @@
   "entry": "io.mdt.plugins.mods.ModsHealth",
   "name": "mods-health",
   "version": "3",
+  "api": 41,
   "author": "mdt",
   "description": "mod health check (bundles / structure / dependencies / versions / game log)",
   "update": "https://github.com/GXFQE/mindustry-launcher-android/releases/download/plugins-latest/mods-health.json",
