@@ -2299,6 +2299,15 @@
     <string name="deeplink_confirm_blueprints_fmt">识别为：蓝图，共 %1$d 份</string>
     <string name="deeplink_confirm_mixed_fmt">识别为：混合包（模组 %1$d · 蓝图 %2$d · 地图/存档 %3$d）</string>
     <string name="deeplink_confirm_game">识别为：游戏本体（一个 Mindustry 版本包）</string>
+    <!-- 第 437 轮：深链认出补丁包（v2 容器也是 APK ⇒ 只能开箱才分得开） -->
+    <string name="deeplink_confirm_patch_fmt">识别为：补丁包（%1$s）</string>
+    <string name="deeplink_patch_target_fmt">目标：%1$s</string>
+    <string name="deeplink_patch_hits_fmt">本机有 %1$d 个版本对得上</string>
+    <string name="deeplink_patch_none_fmt">本机没有匹配的游戏版本（目标 %1$s）。仍然可以导入，但启用时会被拒绝。</string>
+    <string name="deeplink_patch_pick_title">打开哪个版本的补丁页？</string>
+    <string name="deeplink_patch_import_anyway">仍然导入</string>
+    <string name="deeplink_patch_done_title">补丁已导入</string>
+    <string name="deeplink_patch_done">已导入。先把对应的游戏版本导进来，再到那个版本的「补丁」页里启用。</string>
     <string name="deeplink_confirm_ok">导入</string>
     <string name="deeplink_open_failed">读不到这个文件：可能已经不在了，或者本应用没有读取它的权限（新版安卓下「下载」这类公共目录里的文件本应用读不了，用文件管理器「分享 / 打开方式」发过来才行）。</string>
 

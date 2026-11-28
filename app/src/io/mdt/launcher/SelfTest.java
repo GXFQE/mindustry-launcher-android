@@ -19152,6 +19152,25 @@ public final class SelfTest {
         String game = DeepLink.detailOf(ctx, DeepLink.KIND_GAME, null);
         ok(stat, L, game != null && game.contains("游戏本体") && !game.contains("%"),
                 "★ `.apk` 的「识别为…」实拼得出来（实际：" + game + "）");
+        // ★ 第 437 轮：补丁包的那两句（名字 / 目标）—— 没名字只写版本，没 gameVersion 退 sha 前 8 位
+        String sha1607 = "a298a773aa780ecd366d1da6b46bcfe77df11d3ae0603ce6d82fc8e46e7fa570";
+        PatchManifest pm = new PatchManifest(2, "mdtx-1607", "", "2026.10.10.B509", "", "", "",
+                "patch", sha1607, "160.7",
+                java.util.Collections.singletonList(new PatchManifest.Target(sha1607, "160.7")));
+        ok(stat, L, "2026.10.10.B509".equals(DeepLink.patchLabel(pm))
+                        && "160.7".equals(DeepLink.patchTarget(pm)),
+                "★ 补丁包没有名字 ⇒ 只写版本；目标写 gameVersion");
+        PatchManifest pm2 = new PatchManifest(2, "p2", "MindustryX", "B509", "", "", "",
+                "patch", sha1607, "",
+                java.util.Collections.singletonList(new PatchManifest.Target(sha1607, "")));
+        ok(stat, L, "MindustryX B509".equals(DeepLink.patchLabel(pm2))
+                        && "a298a773".equals(DeepLink.patchTarget(pm2)),
+                "★ 有名字就带上；没有 gameVersion 时目标退 sha256 前 8 位");
+        // ★ 第 437 轮：进补丁页要带对两个 extra（版本 key + 槽；写错键编译器不响）
+        android.content.Intent pi = PatchesActivity.intent(ctx, "import:Mindustry.apk", "s2");
+        ok(stat, L, "import:Mindustry.apk".equals(pi.getStringExtra(PatchesActivity.EXTRA_KEY))
+                        && "s2".equals(pi.getStringExtra(PatchesActivity.EXTRA_SLOT)),
+                "★ 深链进补丁页带的是「版本 key + 槽」两个 extra");
         L.add("");
     }
 

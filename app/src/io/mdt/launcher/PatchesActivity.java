@@ -652,4 +652,12 @@ public final class PatchesActivity extends BaseActivity {
         return new Intent(c, PatchesActivity.class)
                 .putExtra(PatchesActivity.EXTRA_KEY, vkey == null ? "" : vkey);
     }
+
+    /**
+     * ★ 第 437 轮：深链认出补丁包之后要落到**那个版本的补丁页**上 —— 顺手把槽也带过去，
+     * 页头的「启动项：槽「…」」才和用户平时看到的一致（不带 ⇒ 页面按当前槽算，可能不是他刚选的那个）。
+     */
+    static Intent intent(Context c, String vkey, String slot) {
+        return intent(c, vkey).putExtra(EXTRA_SLOT, slot == null ? "" : slot);
+    }
 }

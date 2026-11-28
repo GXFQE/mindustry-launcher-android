@@ -109,6 +109,11 @@ final class Pkg implements Closeable {
             if (!Config.get().casGameEnabled()) return null;
             String name = apk.getName();
             if (name == null || name.isEmpty()) return null;
+            // ★ 第 437 轮：只在「导入目录里的这一份」上按名字回落。
+            //   别处的同名文件（自检夹具、临时拷贝）不是那个版本。
+            java.io.File parent = apk.getAbsoluteFile().getParentFile();
+            java.io.File dir = Importer.importDir(ctx).getAbsoluteFile();
+            if (parent == null || !parent.equals(dir)) return null;
             PkgManifest m = PkgManifest.read(PkgManifest.fileOf(ctx, "import:" + name));
             return m != null && m.arc != null && m.arc.eligible ? m : null;
         } catch (Throwable t) {

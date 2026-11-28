@@ -5,8 +5,10 @@ import android.app.AlertDialog;
 import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
+import java.io.File;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 
@@ -101,6 +103,13 @@ final class DeepLink {
             alert(a, doc.name, R.string.deeplink_unrecognized);
             return true;
         }
+        // ★ 第 437 轮（用户：「补丁为啥不能自动识别」）：`.apk` 先开箱看一眼再决定走哪条路。
+        //   补丁 v2 容器就是一份 APK（根上 patch.json + classes.dex），后缀 / mime 与游戏本体一样，
+        //   只有打开 zip 才分得开 ⇒ 拷进 app_hub/tmp 看一眼（判据见 PatchPackage.isApkContainer）。
+        if (kind == KIND_GAME) {
+            preflightApk(a, doc);
+            return true;
+        }
         if (kind != PROBE) {
             // ★ 第 380 轮（用户「导入前对识别情况给个确认」）：后缀就已经定类的这几种，
             //   也让用户先看一眼"我们认成什么、导到哪个槽"。
@@ -134,6 +143,234 @@ final class DeepLink {
             }
         }, "deeplink-probe").start();
         return true;
+    }
+
+    // ══ 补丁包识别（第 437 轮）════════════════════════════════════════════════
+
+    /**
+     * `.apk` 的**开箱预检**：是补丁包 ⇒ 转补丁那条路；不是 ⇒ 当游戏本体、临时件立刻删。
+     *
+     * <p>为什么必须落盘：content:// 只能顺流读，而"是不是补丁包"要读 zip 中央目录。
+     * 代价 = 一次拷贝（几 MB ~ 80 MB），所以放后台 + 一张「正在识别…」的卡。
+     */
+    private static void preflightApk(final Activity a, final BatchIo.Doc doc) {
+        final CardStack stack = new CardStack(a);
+        stack.replace(Trans.get(a, R.string.deeplink_reading), doc.name);
+        new Thread(new Runnable() {
+            @Override public void run() {
+                File tmp = null;
+                PatchManifest m = null;
+                List<Hit> hits = null;
+                String err = null;
+                try {
+                    tmp = new File(HubTmp.session(a, HubTmp.NS_PATCH), "deeplink.apk");
+                    InputStream in = a.getContentResolver().openInputStream(doc.uri);
+                    if (in == null) throw new java.io.IOException("no stream");
+                    try {
+                        Util.copyStream(in, tmp);
+                    } finally {
+                        try { in.close(); } catch (Throwable ignored) { }
+                    }
+                    if (PatchPackage.isApkContainer(tmp)) {
+                        m = PatchPackage.readManifest(tmp);
+                        hits = matchVersions(a, m);
+                    }
+                } catch (Throwable t) {
+                    err = Util.ioReason(a, t, Trans.get(a, R.string.deeplink_open_failed));
+                }
+                final File ftmp = tmp;
+                final PatchManifest fm = m;
+                final List<Hit> fh = hits;
+                final String fe = err;
+                a.runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        stack.dismiss();
+                        if (Util.dead(a)) { HubTmp.drop(a, ftmp); return; }
+                        if (fe != null) {
+                            HubTmp.drop(a, ftmp);
+                            card(a, Trans.get(a, R.string.deeplink_open_failed), fe);
+                        } else if (fm != null) {
+                            confirmPatch(a, doc, ftmp, fm, fh);
+                        } else {
+                            HubTmp.drop(a, ftmp);      // 游戏本体：临时件没用，删掉再走原路
+                            open(a, KIND_GAME, doc, detailOf(a, KIND_GAME, null));
+                        }
+                    }
+                });
+            }
+        }, "deeplink-apk").start();
+    }
+
+    /** 本机的一个候选版本（补丁包点名的目标 APK 就在它身上）。 */
+    static final class Hit {
+        final String key;
+        final String name;
+        final String slot;
+
+        Hit(String key, String name, String slot) {
+            this.key = key == null ? "" : key;
+            this.name = name == null ? "" : name;
+            this.slot = slot == null ? "" : slot;
+        }
+    }
+
+    /**
+     * 在**本机已有版本**里找补丁包点名的那些 APK（按 sha256）。
+     *
+     * <p>两个来源都要看：CAS 开着时 APK 已删，原件哈希在清单的 `originSha256` 里
+     * （{@link PkgManifest#patchShaOf}，第 427 轮）；盘上还有文件就现算。
+     * 只在后台线程调（要读几十 MB）。
+     */
+    static List<Hit> matchVersions(Context ctx, PatchManifest m) {
+        List<Hit> out = new ArrayList<>();
+        if (m == null) return out;
+        HashSet<String> want = new HashSet<>();
+        for (PatchManifest.Target t : m.targets) {
+            if (t != null && t.apkSha256 != null && !t.apkSha256.isEmpty()) {
+                want.add(t.apkSha256.toLowerCase(Locale.ROOT));
+            }
+        }
+        if (want.isEmpty()) return out;
+        List<Versions.Entry> rows;
+        try {
+            rows = Versions.scanAll(ctx);
+        } catch (Throwable t) {
+            return out;
+        }
+        HashSet<String> seen = new HashSet<>();
+        for (Versions.Entry e : rows) {
+            if (e == null) continue;
+            String key = e.key();
+            if (key == null || key.isEmpty() || !seen.add(key)) continue;
+            File apk = e.imported
+                    ? new File(Importer.importDir(ctx), e.importFile == null ? "" : e.importFile)
+                    : (e.apkPath == null ? null : new File(e.apkPath));
+            String sha = "";
+            try {
+                if (e.imported) sha = PkgManifest.patchShaOf(ctx, key);   // CAS：清单里的原件哈希
+                if ((sha == null || sha.isEmpty()) && apk != null && apk.isFile()) {
+                    sha = Pkgs.sha256Of(apk);
+                }
+            } catch (Throwable ignored) {
+                // 读不出来就当"对不上"（与 patchShaOf 的语义一致：判不出不冤枉）
+            }
+            if (sha != null && want.contains(sha.toLowerCase(Locale.ROOT))) {
+                out.add(new Hit(key, e.displayName(ctx), Versions.slotFor(e)));
+            }
+        }
+        return out;
+    }
+
+    /** 「识别为」那半句里的名字（`name version`；名字空 ⇒ 只写版本）。纯函数。 */
+    static String patchLabel(PatchManifest m) {
+        if (m == null) return "";
+        String n = m.name == null ? "" : m.name.trim();
+        String v = m.version == null ? "" : m.version.trim();
+        if (n.isEmpty()) return v;
+        return v.isEmpty() ? n : n + " " + v;
+    }
+
+    /** 目标版本给人看的那串（`gameVersion`；空 ⇒ APK sha256 前 8 位）。纯函数。 */
+    static String patchTarget(PatchManifest m) {
+        if (m == null) return "";
+        if (m.gameVersion != null && !m.gameVersion.trim().isEmpty()) return m.gameVersion.trim();
+        String s = m.apkSha256 == null ? "" : m.apkSha256;
+        return s.length() > 8 ? s.substring(0, 8) : s;
+    }
+
+    /** 补丁包的确认卡：文件 / 识别为 / 目标 / 对得上几个版本；按钮「取消」「导入」。 */
+    private static void confirmPatch(final Activity a, final BatchIo.Doc doc, final File tmp,
+                                     final PatchManifest m, final List<Hit> hits) {
+        final List<Hit> hs = hits == null ? new ArrayList<Hit>() : hits;
+        String body = Trans.get(a, R.string.deeplink_confirm_file_fmt, doc.name) + "\n"
+                + Trans.get(a, R.string.deeplink_confirm_patch_fmt, patchLabel(m)) + "\n"
+                + Trans.get(a, R.string.deeplink_patch_target_fmt, patchTarget(m)) + "\n"
+                + (hs.isEmpty()
+                ? Trans.get(a, R.string.deeplink_patch_none_fmt, patchTarget(m))
+                : Trans.get(a, R.string.deeplink_patch_hits_fmt, hs.size()));
+        final CardStack[] ref = new CardStack[1];
+        ref[0] = CardStack.show(null, a, Trans.get(a, R.string.deeplink_confirm_title),
+                CardStack.text(a, body),
+                new CardStack.Btn(Trans.get(a, R.string.cancel), new Runnable() {
+                    @Override public void run() {
+                        ref[0].dismiss();
+                        HubTmp.drop(a, tmp);
+                    }
+                }),
+                new CardStack.Btn(Trans.get(a, hs.isEmpty()
+                        ? R.string.deeplink_patch_import_anyway : R.string.deeplink_confirm_ok),
+                        new Runnable() {
+                            @Override public void run() {
+                                ref[0].dismiss();
+                                if (hs.size() > 1) askVersion(a, tmp, hs);
+                                else importPatch(a, tmp, hs.isEmpty() ? null : hs.get(0));
+                            }
+                        }));
+    }
+
+    /** 多个版本对得上时问一句进哪一页（形状与选槽那屏一致）。 */
+    private static void askVersion(final Activity a, final File tmp, final List<Hit> hits) {
+        final String[] labels = new String[hits.size()];
+        for (int i = 0; i < hits.size(); i++) labels[i] = hits.get(i).name;
+        final CardStack[] ref = new CardStack[1];
+        ref[0] = CardStack.show(null, a, Trans.get(a, R.string.deeplink_patch_pick_title),
+                CardStack.list(a, labels, new CardStack.ItemClick() {
+                    @Override public void onClick(int w) {
+                        if (w < 0 || w >= hits.size()) return;
+                        ref[0].dismiss();
+                        importPatch(a, tmp, hits.get(w));
+                    }
+                }),
+                new CardStack.Btn(Trans.get(a, R.string.cancel), new Runnable() {
+                    @Override public void run() {
+                        ref[0].dismiss();
+                        HubTmp.drop(a, tmp);
+                    }
+                }));
+    }
+
+    /** 真导入（后台）；成功后进那个版本的补丁页，没有匹配版本就只报一句「已导入」。 */
+    private static void importPatch(final Activity a, final File tmp, final Hit hit) {
+        final CardStack stack = new CardStack(a);
+        stack.replace(Trans.get(a, R.string.patch_importing), tmp == null ? "" : tmp.getName());
+        new Thread(new Runnable() {
+            @Override public void run() {
+                String err = null;
+                try {
+                    Patches.importPackage(a, tmp);
+                } catch (PatchException e) {
+                    err = PatchText.reason(a, e);
+                } catch (Throwable t) {
+                    err = Util.ioReason(a, t, Trans.get(a, R.string.patch_import_failed));
+                } finally {
+                    HubTmp.drop(a, tmp);
+                }
+                final String fe = err;
+                a.runOnUiThread(new Runnable() {
+                    @Override public void run() {
+                        stack.dismiss();
+                        if (Util.dead(a)) return;
+                        if (fe != null) {
+                            card(a, Trans.get(a, R.string.patch_import_failed), fe);
+                        } else if (hit == null) {
+                            card(a, Trans.get(a, R.string.deeplink_patch_done_title),
+                                    Trans.get(a, R.string.deeplink_patch_done));
+                        } else {
+                            a.startActivity(PatchesActivity.intent(a, hit.key, hit.slot));
+                        }
+                    }
+                });
+            }
+        }, "deeplink-patch").start();
+    }
+
+    /** 一张只有「关闭」的卡（出错 / 一句话都走这儿）。 */
+    private static void card(Activity a, String title, String body) {
+        final CardStack[] ref = new CardStack[1];
+        ref[0] = CardStack.show(null, a, title, CardStack.text(a, body),
+                new CardStack.Btn(Trans.get(a, R.string.patch_close), new Runnable() {
+                    @Override public void run() { ref[0].dismiss(); }
+                }));
     }
 
     /**

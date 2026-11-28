@@ -2337,6 +2337,15 @@
     <string name="deeplink_confirm_blueprints_fmt">Recognized: blueprints, %1$d item(s)</string>
     <string name="deeplink_confirm_mixed_fmt">Recognized: mixed bundle (mods %1$d · blueprints %2$d · maps/saves %3$d)</string>
     <string name="deeplink_confirm_game">Recognized: a game build (one Mindustry APK)</string>
+    <!-- 第 437 轮：深链认出补丁包（v2 容器也是 APK ⇒ 只能开箱才分得开） -->
+    <string name="deeplink_confirm_patch_fmt">Recognized: a patch package (%1$s)</string>
+    <string name="deeplink_patch_target_fmt">Target: %1$s</string>
+    <string name="deeplink_patch_hits_fmt">%1$d version(s) on this device match</string>
+    <string name="deeplink_patch_none_fmt">No matching game build on this device (target %1$s). You can still import it, but enabling will be refused.</string>
+    <string name="deeplink_patch_pick_title">Which version should open?</string>
+    <string name="deeplink_patch_import_anyway">Import anyway</string>
+    <string name="deeplink_patch_done_title">Patch imported</string>
+    <string name="deeplink_patch_done">Imported. Import the matching game build first, then enable it on that version patch page.</string>
     <string name="deeplink_confirm_ok">Import</string>
     <string name="deeplink_open_failed">Cannot read this file. It may be gone, or this app has no permission to read it (files in shared folders such as Download are not readable by this app on newer Android versions - share them through a file manager instead).</string>
 
