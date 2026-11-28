@@ -59,6 +59,7 @@
     </LinearLayout>
 
     <ImageView
+        android:id="@+id/act_chevron"
         android:layout_width="@dimen/row_chevron"
         android:layout_height="@dimen/row_chevron"
         android:layout_marginStart="8dp"

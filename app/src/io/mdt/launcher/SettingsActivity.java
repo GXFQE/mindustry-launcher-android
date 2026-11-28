@@ -8,10 +8,11 @@ import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.OpenableColumns;
-import android.text.InputType;
 import android.util.TypedValue;
+import android.view.KeyEvent;
 import android.view.View;
-import android.view.ViewGroup;
+import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -77,33 +78,24 @@ public class SettingsActivity extends BaseActivity {
     /** 第 177 轮（杀后台 P0）：模板待办的磁盘表示（进程被杀后靠它恢复） */
     private static final String PEND_TPL = "settings.langtpl";
 
+    /** 深浅色 / 屏幕方向 / 更新模式的候选（下标与下拉项一一对应）。 */
+    private static final int[] THEMES = {ThemeMode.SYSTEM, ThemeMode.LIGHT, ThemeMode.DARK};
+    private static final int[] ORIENTS = {OrientationMode.SYSTEM, OrientationMode.PORTRAIT,
+            OrientationMode.LANDSCAPE};
+
+    private View mRoot;
     private TextView mThemeSub;
     private TextView mLangSub;
     /** 第 275 轮：屏幕方向那一行的副标题（当前：跟随系统 / 强制竖屏 / 强制横屏） */
     private TextView mOrientSub;
     private TextView mSlotSub;
-    private TextView mLogsSub;
-    /** 第 174 轮：崩溃提示开关那一行的副标题（已开启 / 已关闭） */
-    private TextView mCrashSub;
-    /** 第 173 轮：中转站保留份数那一行的副标题（普通 / 整槽） */
-    private TextView mTrashSub;
-    /** 第 426 轮：临时文件体积上限那一行的副标题（当前 MB） */
-    private TextView mTmpCapSub;
-    /** F20：自动清理缓存那一行的副标题（已开 / 已关） */
-    private TextView mAutoCleanSub;
     private TextView mCasSub;
-    /** 用户语言包那一行的副标题（当前状态） */
-    private TextView mLangPackSub;
     /** 第 309 轮：检查更新的副标题（当前版本号，动态）。 */
     private TextView mUpdateSub;
     /** 第 313 轮：更新模式（三档）的副标题 —— 它同时回答"要不要自动查"和"查哪个通道"。 */
     private TextView mUpdateModeSub;
     /** 第 336 轮：更新线路（自动 / 直连 / 四个镜像）的副标题。 */
     private TextView mUpdateLineSub;
-    /** 第 378 轮：下载限速（不限 / 256 KB/s …）的副标题。 */
-    private TextView mDownloadLimitSub;
-    /** 第 338 轮：插件自动更新的副标题（已开启 / 已关闭）。 */
-    private TextView mPluginUpdateSub;
     /** 第 415 轮：游戏包签名校验的副标题（当前：<三档之一>）。 */
     private TextView mSigSub;
     /** 第 415 轮：信任的证书的副标题（内置 2 个 · 自定义 N 个）。 */
@@ -111,6 +103,18 @@ public class SettingsActivity extends BaseActivity {
     /** 第 415 轮：信任列表卡片与它的正文容器（导入证书后就地重建，不另开一张卡）。 */
     private CardStack mTrustCard;
     private LinearLayout mTrustBody;
+
+    /** 四个开关行：只用来显示状态，点击一律走整行（开关自己不接收点击）。 */
+    private android.widget.Switch mCasSwitch;
+    private android.widget.Switch mCrashSwitch;
+    private android.widget.Switch mAutoCleanSwitch;
+    private android.widget.Switch mPluginSwitch;
+    /** CAS 正在跑（进度卡挂着）—— 防连点，也防收尾前被回读改写。 */
+    private boolean mCasBusy;
+    /** CAS 确认框挂着 —— 期间再点行不重复开窗。 */
+    private boolean mCasConfirming;
+    /** 六个行内输入框的提交动作（onPause 兜底提交一遍）。 */
+    private final List<Runnable> mInputCommits = new ArrayList<>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -125,82 +129,135 @@ public class SettingsActivity extends BaseActivity {
         fillValues();
     }
 
+    @Override
+    protected void onPause() {
+        // 兜底提交：输入框还聚焦着用户就按了返回 / 切到别的页面时，失焦回调不一定来。
+        for (Runnable r : mInputCommits) r.run();
+        super.onPause();
+    }
+
     // ── UI ────────────────────────────────────────────────────────────────
 
     private void buildUi() {
-        View root = getLayoutInflater().inflate(R.layout.activity_settings, null);
+        mRoot = getLayoutInflater().inflate(R.layout.activity_settings, null);
+        View root = mRoot;
 
         // F15：深浅色。放在最上面 —— 纯外观项，也是用户最常回来改的那一项。
-        View rowTheme = Util.bindActionValue(root, R.id.row_theme, R.drawable.ic_theme,
-                R.string.set_theme_title, new Runnable() {
-                    @Override public void run() { pickTheme(); }
+        Util.bindDropdownRow(root, R.id.row_theme, R.drawable.ic_theme,
+                R.string.set_theme_title, new Util.DropdownSource() {
+                    @Override public Util.DropdownSpec get() { return themeSpec(); }
+                }, new Util.OnPick() {
+                    @Override public void onPick(int index) {
+                        Config.get().setThemeMode(THEMES[index]);
+                        recreate();
+                    }
                 });
-        mThemeSub = (TextView) rowTheme.findViewById(R.id.act_sub);
+        mThemeSub = subOf(root, R.id.row_theme);
 
         // P2：界面语言。与深浅色相邻 —— 两者都在 BaseActivity 的同一个 Configuration 上生效。
-        View rowLang = Util.bindActionValue(root, R.id.row_language, R.drawable.ic_language,
-                R.string.set_lang_title, new Runnable() {
-                    @Override public void run() { pickLanguage(); }
+        // ★ 2026-11-27：末项「翻译文件…」并进同一个下拉 —— 同一件事不再分两行。
+        Util.bindDropdownRow(root, R.id.row_language, R.drawable.ic_language,
+                R.string.set_lang_title, new Util.DropdownSource() {
+                    @Override public Util.DropdownSpec get() { return langSpec(); }
+                }, new Util.OnPick() {
+                    @Override public void onPick(int index) {
+                        String[] tags = LocaleMode.tags(SettingsActivity.this);
+                        if (index >= tags.length) { pickLangPack(); return; }
+                        Config.get().setAppLanguage("system".equals(tags[index])
+                                ? LocaleMode.SYSTEM : tags[index]);
+                        recreate();
+                    }
                 });
-        mLangSub = (TextView) rowLang.findViewById(R.id.act_sub);
-
-        // 用户语言包（lang.properties）：紧挨「语言」—— 两者都是"界面文字从哪来"。
-        View rowLangPack = Util.bindActionValue(root, R.id.row_lang_pack, R.drawable.ic_language,
-                R.string.lang_row_title, new Runnable() {
-                    @Override public void run() { pickLangPack(); }
-                });
-        mLangPackSub = (TextView) rowLangPack.findViewById(R.id.act_sub);
+        mLangSub = subOf(root, R.id.row_language);
 
         // 第 275 轮：屏幕方向（跟随系统 / 强制竖屏 / 强制横屏）。放在外观卡末尾 ——
         // 它和深浅色、语言一样是"界面长什么样"的一类；只管管理器自己的页面（游戏不受影响）。
-        View rowOrient = Util.bindActionValue(root, R.id.row_orientation, R.drawable.ic_orientation,
-                R.string.set_orientation_title, new Runnable() {
-                    @Override public void run() { pickOrientation(); }
+        Util.bindDropdownRow(root, R.id.row_orientation, R.drawable.ic_orientation,
+                R.string.set_orientation_title, new Util.DropdownSource() {
+                    @Override public Util.DropdownSpec get() { return orientSpec(); }
+                }, new Util.OnPick() {
+                    @Override public void onPick(int index) {
+                        Config.get().setOrientationMode(ORIENTS[index]);
+                        recreate();
+                    }
                 });
-        mOrientSub = (TextView) rowOrient.findViewById(R.id.act_sub);
+        mOrientSub = subOf(root, R.id.row_orientation);
 
-        View rowSlot = Util.bindActionValue(root, R.id.row_def_slot, R.drawable.ic_folder,
-                R.string.set_slot_title, new Runnable() {
-                    @Override public void run() { pickDefaultSlot(); }
+        Util.bindDropdownRow(root, R.id.row_def_slot, R.drawable.ic_folder,
+                R.string.set_slot_title, new Util.DropdownSource() {
+                    @Override public Util.DropdownSpec get() { return slotSpec(); }
+                }, new Util.OnPick() {
+                    @Override public void onPick(int index) {
+                        List<Data.Slot> slots = liveSlots();
+                        if (index < 0 || index >= slots.size()) return;
+                        Config.get().setDefaultSlot(slots.get(index).name);
+                        fillValues();
+                    }
                 });
-        mSlotSub = (TextView) rowSlot.findViewById(R.id.act_sub);
+        mSlotSub = subOf(root, R.id.row_def_slot);
 
-        // 第 174 轮：崩溃提示总开关。放在日志份数上面 —— 两项都属于「通知与日志」，
+        // 第 174 轮：崩溃提示总开关（开关行）。放在日志份数上面 —— 两项都属于「通知与日志」，
         // 一个管"要不要主动说"，一个管"留几份报告"。
-        View rowCrash = Util.bindActionValue(root, R.id.row_crash_alert, R.drawable.ic_terminal,
-                R.string.set_crash_alert_title, new Runnable() {
-                    @Override public void run() { promptCrashAlert(); }
+        mCrashSwitch = Util.bindSwitchRow(root, R.id.row_crash_alert, R.drawable.ic_terminal,
+                R.string.set_crash_alert_title, new View.OnClickListener() {
+                    @Override public void onClick(View v) {
+                        boolean target = !Config.get().crashAlertEnabled();
+                        Config.get().setCrashAlertEnabled(target);
+                        mCrashSwitch.setChecked(target);
+                    }
                 });
-        mCrashSub = (TextView) rowCrash.findViewById(R.id.act_sub);
+        setSub(root, R.id.row_crash_alert, R.string.set_crash_alert_why);
 
-        View rowLogs = Util.bindActionValue(root, R.id.row_logs, R.drawable.ic_log,
-                R.string.set_logs_title, new Runnable() {
-                    @Override public void run() { promptLogs(); }
-                });
-        mLogsSub = (TextView) rowLogs.findViewById(R.id.act_sub);
+        bindNumberRow(root, R.id.row_logs, R.drawable.ic_log, R.string.set_logs_title,
+                R.string.set_logs_why, new IntGetter() {
+                    @Override public int get() { return Config.get().maxLogFiles(); }
+                }, new IntSetter() {
+                    @Override public void set(int v) { Config.get().setMaxLogFiles(v); }
+                }, LOG_MIN, LOG_MAX, R.string.set_logs_bad);
 
-        // 第 173 轮：中转站保留份数（普通条目 / 整个槽分开）—— 与日志份数相邻，
-        // 两项都是"保留多少份、超出丢最旧"的保留策略。
-        View rowTrash = Util.bindActionValue(root, R.id.row_trash_keep, R.drawable.ic_trash,
-                R.string.set_trash_title, new Runnable() {
-                    @Override public void run() { promptTrashKeep(); }
-                });
-        mTrashSub = (TextView) rowTrash.findViewById(R.id.act_sub);
+        // 第 173 轮：中转站保留策略。2026-11-27 拆成三行（普通条目 / 整槽·版本 / 保留天数）——
+        // 三个数塞一个弹窗里最难改的是"第二个数"。
+        bindNumberRow(root, R.id.row_trash_items, R.drawable.ic_trash,
+                R.string.set_trash_items_title, R.string.set_trash_items_why, new IntGetter() {
+                    @Override public int get() { return Config.get().trashKeep(); }
+                }, new IntSetter() {
+                    @Override public void set(int v) { Config.get().setTrashKeep(v); }
+                }, 1, 999, R.string.set_trash_bad);
+
+        bindNumberRow(root, R.id.row_trash_slots, R.drawable.ic_trash,
+                R.string.set_trash_slots_title, R.string.set_trash_slots_why, new IntGetter() {
+                    @Override public int get() { return Config.get().trashKeepSlots(); }
+                }, new IntSetter() {
+                    @Override public void set(int v) { Config.get().setTrashKeepSlots(v); }
+                }, 1, 999, R.string.set_trash_bad);
+
+        bindNumberRow(root, R.id.row_trash_days, R.drawable.ic_trash,
+                R.string.set_trash_days_title, R.string.set_trash_days_why, new IntGetter() {
+                    @Override public int get() { return Config.get().trashKeepDays(); }
+                }, new IntSetter() {
+                    @Override public void set(int v) { Config.get().setTrashKeepDays(v); }
+                }, 1, 3650, R.string.set_trash_days_bad);
 
         // 第 426 轮：临时文件（散落文件）体积上限 —— 与中转站保留策略相邻，都是"超了就丢旧的"。
-        View rowTmpCap = Util.bindActionValue(root, R.id.row_tmp_cap, R.drawable.ic_trash,
-                R.string.set_tmp_cap_title, new Runnable() {
-                    @Override public void run() { promptTmpCap(); }
-                });
-        mTmpCapSub = (TextView) rowTmpCap.findViewById(R.id.act_sub);
+        bindNumberRow(root, R.id.row_tmp_cap, R.drawable.ic_trash,
+                R.string.set_tmp_cap_title, R.string.set_tmp_cap_why, new IntGetter() {
+                    @Override public int get() { return Config.get().hubTmpCapMb(); }
+                }, new IntSetter() {
+                    @Override public void set(int v) { Config.get().setHubTmpCapMb(v); }
+                }, 1, 10240, R.string.set_tmp_cap_bad);
 
         // 第 415 轮：安全 —— 游戏包签名校验（三档单选）+ 信任的证书（内置 原版 / MindustryX，
         // 外加用户自己导入的证书）。两行都在本页就地改变量，不做"点开是另一个页面"。
-        View rowSig = Util.bindActionValue(root, R.id.row_sig_check, R.drawable.ic_verify,
-                R.string.set_sig_check_title, new Runnable() {
-                    @Override public void run() { pickSigMode(); }
+        Util.bindDropdownRow(root, R.id.row_sig_check, R.drawable.ic_verify,
+                R.string.set_sig_check_title, new Util.DropdownSource() {
+                    @Override public Util.DropdownSpec get() { return sigSpec(); }
+                }, new Util.OnPick() {
+                    @Override public void onPick(int index) {
+                        SigMode.set(SettingsActivity.this, SigMode.ALL[index]);
+                        fillValues();
+                    }
                 });
-        mSigSub = (TextView) rowSig.findViewById(R.id.act_sub);
+        mSigSub = subOf(root, R.id.row_sig_check);
 
         View rowTrust = Util.bindActionValue(root, R.id.row_sig_trust, R.drawable.ic_verify,
                 R.string.set_sig_trust_title, new Runnable() {
@@ -222,13 +279,13 @@ public class SettingsActivity extends BaseActivity {
                 });
 
         // ★ 2026-11-22：游戏包去重（CAS）——**默认关**，开了才改变存放方式（删原包）。
-        //   位置按「先看占用，再决定要不要开」，紧挨存储占用。动作走后台线程 + 确认框，
-        //   因为它会真的搬文件（开启 = 逐包入库；关闭 = 按清单拼回 APK 再删池）。
-        View rowCas = Util.bindActionValue(root, R.id.row_cas_game, R.drawable.ic_storage,
-                R.string.set_cas_title, new Runnable() {
-                    @Override public void run() { promptCasGame(); }
+        //   2026-11-27 从「启动与存储」换到「实验性功能」卡（它动的是游戏包本体）。
+        //   ★ 开关先翻、再弹确认；取消 / 返回就从 Config 回读翻回去（回弹）。
+        mCasSwitch = Util.bindSwitchRow(root, R.id.row_cas_game, R.drawable.ic_storage,
+                R.string.set_cas_title, new View.OnClickListener() {
+                    @Override public void onClick(View v) { onCasToggled(); }
                 });
-        mCasSub = (TextView) rowCas.findViewById(R.id.act_sub);
+        mCasSub = subOf(root, R.id.row_cas_game);
 
         // F20（2026-10-03 用户：「我们是不是应该给一些功能加上开关」）：
         // ★ 全工程**唯一一个"静默删文件"**的动作就是它，所以只给它加了开关。
@@ -236,11 +293,15 @@ public class SettingsActivity extends BaseActivity {
         //   调度在 Cleanup.autoCleanInBackground（冷启动、游戏没在跑、每 24h 最多一次）。
         //   手动清理并进「存储占用 → 清理」，这一行只留自动开关（动作跟着数字走）。
         //   ★ 用户 2026-11-15：这一行**放在「存储占用」下面**（先看占用，再决定要不要自动清）。
-        View rowClean = Util.bindActionValue(root, R.id.row_auto_clean, R.drawable.ic_health,
-                R.string.set_autoclean_title, new Runnable() {
-                    @Override public void run() { promptAutoClean(); }
+        mAutoCleanSwitch = Util.bindSwitchRow(root, R.id.row_auto_clean, R.drawable.ic_health,
+                R.string.set_autoclean_title, new View.OnClickListener() {
+                    @Override public void onClick(View v) {
+                        boolean target = !Config.get().autoCleanRedundant();
+                        Config.get().setAutoCleanRedundant(target);
+                        mAutoCleanSwitch.setChecked(target);
+                    }
                 });
-        mAutoCleanSub = (TextView) rowClean.findViewById(R.id.act_sub);
+        setSub(root, R.id.row_auto_clean, R.string.set_autoclean_row_why);
 
         // 中转站（2026-10-05 第 102 轮）—— ★ 2026-10-08（第 123 轮）**搬去主界面的工具卡**了
         //   （用户点单）。它仍然不属于任何一个槽（所以没进槽页），只是不再住"设置"里。
@@ -259,11 +320,18 @@ public class SettingsActivity extends BaseActivity {
 
         // 第 313 轮：**更新模式**（三档合并）。它同时回答两个问题：
         //   "要不要自动查" 与 "查哪个通道" —— 三选一，天然不会出现自相矛盾的组合。
-        View rowMode = Util.bindActionValue(root, R.id.row_update_mode, R.drawable.ic_download,
-                R.string.set_update_mode_title, new Runnable() {
-                    @Override public void run() { pickUpdateMode(); }
+        // 第 313 轮：**更新模式**（三档合并）。它同时回答两个问题：
+        //   "要不要自动查" 与 "查哪个通道" —— 三选一，天然不会出现自相矛盾的组合。
+        Util.bindDropdownRow(root, R.id.row_update_mode, R.drawable.ic_download,
+                R.string.set_update_mode_title, new Util.DropdownSource() {
+                    @Override public Util.DropdownSpec get() { return updateModeSpec(); }
+                }, new Util.OnPick() {
+                    @Override public void onPick(int index) {
+                        UpdateMode.set(SettingsActivity.this, UpdateMode.ALL[index]);
+                        fillValues();
+                    }
                 });
-        mUpdateModeSub = (TextView) rowMode.findViewById(R.id.act_sub);
+        mUpdateModeSub = subOf(root, R.id.row_update_mode);
 
         // 第 336 轮：更新线路（自动 / 直连 / 四个预设）。点进去是「测速 / 选一条 / 关闭」卡；
         // 正常下载不测速，只有点「测速」才在后台跑。
@@ -278,19 +346,34 @@ public class SettingsActivity extends BaseActivity {
         mUpdateLineSub = (TextView) rowLine.findViewById(R.id.act_sub);
 
         // 第 378 轮：下载限速（全局一份，0 = 不限）。放在「更新线路」下面 —— 两者都管"下载怎么走"。
-        View rowLimit = Util.bindActionValue(root, R.id.row_download_limit, R.drawable.ic_download,
-                R.string.set_download_limit_title, new Runnable() {
-                    @Override public void run() { pickDownloadLimit(); }
-                });
-        mDownloadLimitSub = (TextView) rowLimit.findViewById(R.id.act_sub);
+        bindNumberRow(root, R.id.row_download_limit, R.drawable.ic_download,
+                R.string.set_download_limit_title, R.string.set_download_limit_why,
+                new IntGetter() {
+                    @Override public int get() {
+                        long cur = Config.get().downloadLimit();
+                        if (cur <= 0) return 0;
+                        return (int) Math.max(1, (cur + DownloadLimit.KB / 2) / DownloadLimit.KB);
+                    }
+                }, new IntSetter() {
+                    @Override public void set(int v) {
+                        long bps = v * DownloadLimit.KB;
+                        Config.get().setDownloadLimit(bps);
+                        Bandwidth.set(bps);
+                    }
+                }, 0, (int) (DownloadLimit.MAX / DownloadLimit.KB), R.string.set_download_limit_bad);
 
         // 第 338 轮：**插件自动更新**（开关）。它与上一行「更新模式」是两件事 ——
-        //   那个管启动器自己，这个管插件；点一下切换，副标题报"现在是什么"。
-        View rowPluginUp = Util.bindActionValue(root, R.id.row_plugin_update,
-                R.drawable.ic_plugins_bar, R.string.plugin_update_auto_title, new Runnable() {
-                    @Override public void run() { promptPluginUpdate(); }
+        //   那个管启动器自己，这个管插件。
+        mPluginSwitch = Util.bindSwitchRow(root, R.id.row_plugin_update,
+                R.drawable.ic_plugins_bar, R.string.plugin_update_auto_title,
+                new View.OnClickListener() {
+                    @Override public void onClick(View v) {
+                        boolean target = !Config.get().pluginAutoUpdate();
+                        Config.get().setPluginAutoUpdate(target);
+                        mPluginSwitch.setChecked(target);
+                        fillValues();
+                    }
                 });
-        mPluginUpdateSub = (TextView) rowPluginUp.findViewById(R.id.act_sub);
 
         // 第 175 轮：「关于」搬成独立二级页（版本 / 包名 / 数据路径 / 开源地址 / 许可证）。
         // 页面只读；入口是设置页底部单独一行（不混进三类设置）。
@@ -314,6 +397,11 @@ public class SettingsActivity extends BaseActivity {
         // 第 378 轮：下载单列（更新线路 / 下载限速）—— 不再往"版本与更新"那张卡下面堆。
         Trans.bind(root, R.id.settings_section_download, R.string.settings_section_download);
         Trans.bind(root, R.id.settings_section_version, R.string.settings_section_version);
+        // 2026-11-27：实验性功能（CAS；后面的存档守护也归这张卡）。
+        Trans.bind(root, R.id.settings_section_experimental,
+                R.string.settings_section_experimental);
+        Trans.bind(root, R.id.settings_section_experimental_hint,
+                R.string.settings_section_experimental_hint);
 
     }
 
@@ -336,68 +424,66 @@ public class SettingsActivity extends BaseActivity {
         if (mLangSub != null) {
             // ★ 语言名用它自己的语言写（English / 简体中文）—— 所以这里传的是**当前上下文的
             //   Resources**，但取的数组是 translatable="false" 的，任何语言下都是同一份。
+            // ★ 2026-11-27：翻译包状态并进这一句（同一件事只说一次）。
             CharSequence cur = LocaleMode.label(this, LocaleMode.of(this));
-            mLangSub.setText(Trans.get(SettingsActivity.this, R.string.set_lang_sub_fmt, cur));
+            StringBuilder s = new StringBuilder(String.valueOf(Trans.get(SettingsActivity.this,
+                    R.string.set_lang_sub_fmt, cur)));
+            Trans.Pack p = Trans.installed(this) ? Trans.pack(this) : null;
+            if (p == null) {
+                s.append(" · ").append(Trans.get(this, R.string.lang_pack_none_short));
+            } else {
+                s.append(" · ").append(Trans.get(this, R.string.lang_pack_sum_fmt, p.used()));
+                if (!p.ok()) {
+                    s.append(" · ").append(Trans.get(this, R.string.lang_row_rejected_fmt,
+                            p.rejected.size()));
+                }
+                if (!p.unknown.isEmpty()) {
+                    s.append(" · ").append(Trans.get(this, R.string.lang_row_unknown_fmt,
+                            p.unknown.size()));
+                }
+            }
+            mLangSub.setText(s);
         }
         if (mSlotSub != null) {
             String s = Config.get().defaultSlot();
             mSlotSub.setText(Trans.get(SettingsActivity.this, R.string.set_slot_sub_fmt,
                     s.isEmpty() ? Data.SLOT_DEFAULT : s));
         }
-        if (mLogsSub != null) {
-            mLogsSub.setText(Trans.get(SettingsActivity.this, R.string.set_logs_sub_fmt, Config.get().maxLogFiles()));
-        }
-        if (mCrashSub != null) {
-            mCrashSub.setText(Trans.get(SettingsActivity.this,
-                    Config.get().crashAlertEnabled() ? R.string.set_crash_alert_on
-                            : R.string.set_crash_alert_off));
-        }
-        if (mTrashSub != null) {
-            mTrashSub.setText(Trans.get(SettingsActivity.this, R.string.set_trash_sub_fmt,
-                    Config.get().trashKeep(), Config.get().trashKeepSlots(),
-                    Config.get().trashKeepDays()));
-        }
-        if (mTmpCapSub != null) {
-            mTmpCapSub.setText(Trans.get(SettingsActivity.this, R.string.set_tmp_cap_sub_fmt,
-                    Config.get().hubTmpCapMb()));
-        }
-        if (mCasSub != null) {
-            // ★ 三种说法：没开关 / 开着 / 关着。「开着」不报省了多少 —— 现在还没删原包，
-            //   报了就是假数字（真省下来要等删包那一步）。
+        if (mCasSwitch != null) {
+            boolean on = Config.get().casGameEnabled();
+            mCasSwitch.setChecked(on);
+            // 三种说法：开着 / 没版本可去重 / 关着。「开着」不报省了多少 —— 现在还没删原包，
+            // 报了就是假数字（真省下来要等删包那一步）。
             int res;
-            if (!Config.get().casGameEnabled()) {
-                res = R.string.set_cas_sub_off;
+            if (!on) {
+                res = R.string.set_cas_why_off;
             } else if (PkgAdmin.versionCount(this) == 0) {
-                res = R.string.set_cas_sub_none;
+                res = R.string.set_cas_why_none;
             } else {
-                res = R.string.set_cas_sub_on;
+                res = R.string.set_cas_why_on;
             }
-            mCasSub.setText(Trans.get(SettingsActivity.this, res));
+            if (mCasSub != null) mCasSub.setText(Trans.get(SettingsActivity.this, res));
         }
-        if (mAutoCleanSub != null) {            // ★ 走 Trans（别 setText(resId)）：用户语言包要能改这一条。
-            mAutoCleanSub.setText(Trans.get(SettingsActivity.this,
-                    Config.get().autoCleanRedundant() ? R.string.set_autoclean_on
-                            : R.string.set_autoclean_off));
+        if (mCrashSwitch != null) {
+            mCrashSwitch.setChecked(Config.get().crashAlertEnabled());
         }
-        if (mLangPackSub != null) {
-            Trans.Pack p = Trans.installed(SettingsActivity.this)
-                    ? Trans.pack(SettingsActivity.this) : null;
-            if (p == null) {
-                mLangPackSub.setText(Trans.get(SettingsActivity.this, R.string.lang_row_none));
-            } else {
-                // ★ 第 383 轮：统一「当前：<值> · <补充>」；别再用全角空格拼统计。
-                String s = Trans.get(SettingsActivity.this, R.string.lang_row_used_fmt, p.used());
-                if (!p.ok()) {
-                    s += " · " + Trans.get(SettingsActivity.this, R.string.lang_row_rejected_fmt,
-                            p.rejected.size());
-                }
-                if (!p.unknown.isEmpty()) {
-                    s += " · " + Trans.get(SettingsActivity.this, R.string.lang_row_unknown_fmt,
-                            p.unknown.size());
-                }
-                mLangPackSub.setText(s);
-            }
+        if (mAutoCleanSwitch != null) {
+            mAutoCleanSwitch.setChecked(Config.get().autoCleanRedundant());
         }
+        if (mPluginSwitch != null) {
+            boolean on = Config.get().pluginAutoUpdate();
+            mPluginSwitch.setChecked(on);
+            setSub(mRoot, R.id.row_plugin_update,
+                    on ? R.string.plugin_update_auto_why_on
+                       : R.string.plugin_update_auto_why_off);
+        }
+        // ★ 输入框：聚焦中的那个不覆盖（用户可能正打到一半，回读会把光标清掉）。
+        setInput(R.id.row_logs, Config.get().maxLogFiles());
+        setInput(R.id.row_tmp_cap, Config.get().hubTmpCapMb());
+        setInput(R.id.row_trash_items, Config.get().trashKeep());
+        setInput(R.id.row_trash_slots, Config.get().trashKeepSlots());
+        setInput(R.id.row_trash_days, Config.get().trashKeepDays());
+        setInput(R.id.row_download_limit, kbOf(Config.get().downloadLimit()));
         if (mUpdateSub != null) {
             // 副标题只说"现在是什么版本"—— 不报"有没有新版"（那要在启动时才发现，
             // 而这一行是"点下去查"，不是"结论位"）。
@@ -415,16 +501,6 @@ public class SettingsActivity extends BaseActivity {
                     R.string.set_update_line_sub_fmt,
                     UpdateLineUi.label(this, Config.get().updateMirror())));
         }
-        if (mDownloadLimitSub != null) {
-            mDownloadLimitSub.setText(Trans.get(SettingsActivity.this,
-                    R.string.set_download_limit_sub_fmt,
-                    DownloadLimit.label(this, Config.get().downloadLimit())));
-        }
-        if (mPluginUpdateSub != null) {
-            mPluginUpdateSub.setText(Trans.get(SettingsActivity.this,
-                    Config.get().pluginAutoUpdate() ? R.string.plugin_update_auto_on
-                                                    : R.string.plugin_update_auto_off));
-        }
         if (mSigSub != null) {
             // 副标题 = 当前模式，统一带「当前：」。
             mSigSub.setText(Trans.get(SettingsActivity.this,
@@ -437,32 +513,212 @@ public class SettingsActivity extends BaseActivity {
         }
     }
 
+    // ── 行内控件的公共件（2026-11-27：开关 / 下拉 / 数字输入）──────────────────
+
+    private TextView subOf(View root, int rowId) {
+        View row = root.findViewById(rowId);
+        return row == null ? null : (TextView) row.findViewById(R.id.act_sub);
+    }
+
+    private void setSub(View root, int rowId, int textRes) {
+        TextView sub = subOf(root, rowId);
+        if (sub != null) sub.setText(Trans.get(this, textRes));
+    }
+
+    private Util.DropdownSpec themeSpec() {
+        CharSequence[] labels = new CharSequence[THEMES.length];
+        int cur = Config.get().themeMode();
+        int checked = 0;
+        for (int i = 0; i < THEMES.length; i++) {
+            labels[i] = Trans.get(this, ThemeMode.labelRes(THEMES[i]));
+            if (THEMES[i] == cur) checked = i;
+        }
+        return new Util.DropdownSpec(labels, checked);
+    }
+
+    private Util.DropdownSpec orientSpec() {
+        CharSequence[] labels = new CharSequence[ORIENTS.length];
+        int cur = OrientationMode.of(this);
+        int checked = 0;
+        for (int i = 0; i < ORIENTS.length; i++) {
+            labels[i] = Trans.get(this, OrientationMode.labelRes(ORIENTS[i]));
+            if (ORIENTS[i] == cur) checked = i;
+        }
+        return new Util.DropdownSpec(labels, checked);
+    }
+
+    private Util.DropdownSpec sigSpec() {
+        CharSequence[] labels = new CharSequence[SigMode.ALL.length];
+        int cur = SigMode.of(this);
+        int checked = 0;
+        for (int i = 0; i < SigMode.ALL.length; i++) {
+            labels[i] = Trans.get(this, SigMode.labelRes(SigMode.ALL[i]));
+            if (SigMode.ALL[i] == cur) checked = i;
+        }
+        return new Util.DropdownSpec(labels, checked);
+    }
+
+    private Util.DropdownSpec updateModeSpec() {
+        CharSequence[] labels = new CharSequence[UpdateMode.ALL.length];
+        int cur = UpdateMode.of(this);
+        int checked = 0;
+        for (int i = 0; i < UpdateMode.ALL.length; i++) {
+            labels[i] = Trans.get(this, UpdateMode.labelRes(UpdateMode.ALL[i]));
+            if (UpdateMode.ALL[i] == cur) checked = i;
+        }
+        return new Util.DropdownSpec(labels, checked);
+    }
+
+    /** 可选槽：归档的不算（它们只是备份，不该被选成"新发现的版本默认进这个槽"）。 */
+    private List<Data.Slot> liveSlots() {
+        List<Data.Slot> out = new ArrayList<Data.Slot>();
+        List<Data.Slot> all = Data.allSlots(this);
+        if (all != null) {
+            for (Data.Slot s : all) {
+                if (!SlotArchive.isArchived(this, s.name)) out.add(s);
+            }
+        }
+        return out;
+    }
+
+    private Util.DropdownSpec slotSpec() {
+        List<Data.Slot> slots = liveSlots();
+        String cur = Config.get().defaultSlot();
+        CharSequence[] labels = new CharSequence[slots.size()];
+        int checked = 0;
+        for (int i = 0; i < slots.size(); i++) {
+            Data.Slot s = slots.get(i);
+            labels[i] = s.active ? s.name + Trans.get(this, R.string.slot_current_suffix) : s.name;
+            if (s.name.equals(cur)) checked = i;
+        }
+        return new Util.DropdownSpec(labels, checked);
+    }
+
+    /** 语言下拉：三个语言 + 末项「翻译文件…」（末项只分岔，不改语言）。 */
+    private Util.DropdownSpec langSpec() {
+        String[] tags = LocaleMode.tags(this);
+        String cur = LocaleMode.of(this);
+        CharSequence[] labels = new CharSequence[tags.length + 1];
+        int checked = 0;
+        for (int i = 0; i < tags.length; i++) {
+            boolean sys = "system".equals(tags[i]);
+            labels[i] = sys ? Trans.get(this, R.string.lang_system) : LocaleMode.label(this, tags[i]);
+            if (sys ? LocaleMode.SYSTEM.equals(cur) : tags[i].equals(cur)) checked = i;
+        }
+        labels[tags.length] = packItemLabel(this);
+        return new Util.DropdownSpec(labels, checked);
+    }
+
+    static String packItemLabel(android.content.Context c) {
+        Trans.Pack p = Trans.installed(c) ? Trans.pack(c) : null;
+        return p == null
+                ? String.valueOf(Trans.get(c, R.string.set_lang_pack_item))
+                : String.valueOf(Trans.get(c, R.string.set_lang_pack_item_fmt, p.used()));
+    }
+
+    private interface IntGetter { int get(); }
+
+    private interface IntSetter { void set(int v); }
+
     /**
-     * F20：「自动清理缓存」这一行（第 383 轮；一个开关管三样）。
-     *
-     * <p>它只控制**自动清理**：{@link Cleanup#autoCleanInBackground} 在主进程冷启动、
-     * 游戏没在跑、距上次 ≥ 24h 时清游戏缓存 / 分享缓存（超过 1h 的）/ 旧版本重复文件。
-     * 手动清理已经并进「存储占用 → 清理」（见 {@link Cleanup}），这里不再放
-     * 「立即清理一次」—— 动作跟着数字走，设置页只留策略。</p>
-     *
-     * <p>★ 为什么不像别处那样放一个开关控件：本页所有行都是"点一下弹选择"的样式
-     *   （深浅色 / 默认槽 / 日志份数都这样），中间插一个 Switch 会让这一页看起来像两套交互。</p>
+     * 数字设置行：行上直接放输入框，三处提交（失焦 / 键盘完成 / onPause 兜底），且幂等 ——
+     * 值没变就不写盘。空串 = 放弃修改（回读还原，不弹 Toast）。
      */
-    private void promptAutoClean() {
-        final boolean on = Config.get().autoCleanRedundant();
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.set_autoclean_title)
-                .setMessage(Trans.get(this, R.string.set_autoclean_why))
-                .setPositiveButton(R.string.close, null)
-                .setNegativeButton(on ? R.string.set_autoclean_disable
-                                      : R.string.set_autoclean_enable,
-                        new DialogInterface.OnClickListener() {
-                            @Override public void onClick(DialogInterface d, int w) {
-                                Config.get().setAutoCleanRedundant(!on);
-                                fillValues();
-                            }
-                        })
-                .show();
+    private void bindNumberRow(View root, final int rowId, int iconRes, int titleRes,
+                               int subRes, final IntGetter getter, final IntSetter setter,
+                               final int min, final int max, final int badRes) {
+        final View row = Util.bindActionValue(root, rowId, iconRes, titleRes, new Runnable() {
+            @Override public void run() { focusInput(rowId); }
+        });
+        TextView sub = (TextView) row.findViewById(R.id.act_sub);
+        if (sub != null) sub.setText(Trans.get(this, subRes));
+        final EditText in = (EditText) row.findViewById(R.id.act_input);
+        if (in == null) return;
+        in.setText(String.valueOf(getter.get()));
+        final Runnable commit = new Runnable() {
+            @Override public void run() { commitNumber(in, min, max, getter, setter, badRes); }
+        };
+        in.setOnFocusChangeListener(new View.OnFocusChangeListener() {
+            @Override public void onFocusChange(View v, boolean has) {
+                if (!has) commit.run();
+            }
+        });
+        in.setOnEditorActionListener(new TextView.OnEditorActionListener() {
+            @Override public boolean onEditorAction(TextView v, int actionId, KeyEvent e) {
+                if (actionId == EditorInfo.IME_ACTION_DONE
+                        || (e != null && e.getKeyCode() == KeyEvent.KEYCODE_ENTER)) {
+                    commit.run();
+                    InputMethodManager imm =
+                            (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+                    if (imm != null) imm.hideSoftInputFromWindow(in.getWindowToken(), 0);
+                    in.clearFocus();
+                    return true;
+                }
+                return false;
+            }
+        });
+        mInputCommits.add(commit);
+    }
+
+    private void focusInput(int rowId) {
+        final EditText in = inputOf(rowId);
+        if (in == null) return;
+        in.requestFocus();
+        in.setSelection(in.getText().length());
+        InputMethodManager imm = (InputMethodManager) getSystemService(INPUT_METHOD_SERVICE);
+        if (imm != null) imm.showSoftInput(in, InputMethodManager.SHOW_IMPLICIT);
+        if (!(mRoot instanceof android.widget.ScrollView)) return;
+        // 键盘是另一个窗口：用"可见显示区"量它挡住了多少，只在真被挡住时补最小滚动。
+        in.postDelayed(new Runnable() {
+            @Override public void run() {
+                if (!in.isFocused()) return;
+                android.graphics.Rect frame = new android.graphics.Rect();
+                getWindow().getDecorView().getWindowVisibleDisplayFrame(frame);
+                int[] loc = new int[2];
+                in.getLocationOnScreen(loc);
+                int overlap = loc[1] + in.getHeight() - (frame.bottom - dp(12));
+                if (overlap > 0) ((android.widget.ScrollView) mRoot).smoothScrollBy(0, overlap);
+            }
+        }, 450);
+    }
+
+    private EditText inputOf(int rowId) {
+        if (mRoot == null) return null;
+        View row = mRoot.findViewById(rowId);
+        return row == null ? null : (EditText) row.findViewById(R.id.act_input);
+    }
+
+    private void setInput(int rowId, int v) {
+        EditText in = inputOf(rowId);
+        if (in != null && !in.hasFocus()) in.setText(String.valueOf(v));
+    }
+
+    private static int kbOf(long bps) {
+        if (bps <= 0) return 0;
+        return (int) Math.max(1, (bps + DownloadLimit.KB / 2) / DownloadLimit.KB);
+    }
+
+    private void commitNumber(EditText in, int min, int max, IntGetter getter, IntSetter setter,
+                              int badRes) {
+        if (in == null) return;
+        String raw = in.getText().toString().trim();
+        if (raw.isEmpty()) {                 // 空 = 放弃修改，不弹错
+            in.setText(String.valueOf(getter.get()));
+            return;
+        }
+        int v;
+        try {
+            v = Integer.parseInt(raw);
+        } catch (NumberFormatException e) {
+            v = Integer.MIN_VALUE;
+        }
+        if (v < min || v > max) {
+            Toast.makeText(this, badRes, Toast.LENGTH_SHORT).show();
+            in.setText(String.valueOf(getter.get()));
+            return;
+        }
+        if (v != getter.get()) setter.set(v);
+        in.setText(String.valueOf(v));
     }
 
     /**
@@ -473,26 +729,42 @@ public class SettingsActivity extends BaseActivity {
      *
      * <p>⚠️ 拼回来的 APK 与原件不是逐字节相同（不保签名、全 STORED），但能启动、能导出；
      * 每次开着去重启动都走池，删除原件不会影响玩。</p>
+     *
+     * <p>★ 2026-11-27：这一行改成开关（用户在 plan 里定的「回弹 + 确认」）—— 手指点下去开关
+     * 立刻翻到目标态，但真正的动作只在确认之后；取消 / 返回 / 点窗外 ⇒ 从 Config 回读翻回去。
+     * 开关表示的是**配置值**，不是"操作做完了"（开启失败时配置仍是 true，开关停在开）。</p>
      */
-    private void promptCasGame() {
+    private void onCasToggled() {
+        if (mCasBusy || mCasConfirming) return;      // 防连点（弹窗还开着 / 正在跑）
         // 池子是全局资源 ⇒ 按「有没有实例在跑」拦（走 WriteGate，别直接调 Data.gameAlive：
-        // 那个全局判据有调用点预算，只留给迁移/回收/杀进程）。
+        // 那个全局判据有调用点预算，只留给迁移/回收/杀进程）。拦到就不翻开关 —— 反正做不成。
         if (WriteGate.blockedSlotOrGlobal(this, null)) {
             Toast.makeText(this, R.string.cas_busy, Toast.LENGTH_LONG).show();
             return;
         }
-        final boolean on = Config.get().casGameEnabled();
+        final boolean target = !Config.get().casGameEnabled();
+        mCasSwitch.setChecked(target);               // 先翻（反馈）+ 取消时回弹
+        mCasConfirming = true;
         new AlertDialog.Builder(this)
-                .setTitle(on ? R.string.cas_off_confirm_title : R.string.cas_on_confirm_title)
-                .setMessage(Trans.get(this, on ? R.string.cas_off_confirm_body
-                                                : R.string.cas_on_confirm_body))
-                .setPositiveButton(R.string.close, null)
-                .setNegativeButton(on ? R.string.cas_off_go : R.string.cas_on_go,
+                .setTitle(target ? R.string.cas_on_confirm_title : R.string.cas_off_confirm_title)
+                .setMessage(Trans.get(this, target ? R.string.cas_on_confirm_body
+                                                   : R.string.cas_off_confirm_body))
+                .setPositiveButton(R.string.cancel, null)
+                .setNegativeButton(target ? R.string.cas_on_go : R.string.cas_off_go,
                         new DialogInterface.OnClickListener() {
                             @Override public void onClick(DialogInterface d, int w) {
-                                applyCasGame(!on);
+                                mCasBusy = true;
+                                mCasSwitch.setEnabled(false);
+                                applyCasGame(target);
                             }
                         })
+                .setOnDismissListener(new DialogInterface.OnDismissListener() {
+                    @Override public void onDismiss(DialogInterface d) {
+                        mCasConfirming = false;
+                        // 取消的那条路：开关回读到配置值（别停在没生效的位置）。
+                        if (!mCasBusy) fillValues();
+                    }
+                })
                 .show();
     }
 
@@ -537,6 +809,9 @@ public class SettingsActivity extends BaseActivity {
                 runOnUiThread(new Runnable() {
                     @Override public void run() {
                         if (!Util.dead(SettingsActivity.this) && prog.isShowing()) prog.dismiss();
+                        // 收尾：开关重新可用 + 按配置回读（失败时别把开关停在"已生效"的样子）。
+                        mCasBusy = false;
+                        if (mCasSwitch != null) mCasSwitch.setEnabled(true);
                         String msg;
                         if (ferr != null) {
                             msg = Trans.get(SettingsActivity.this, R.string.cas_failed_fmt, ferr);
@@ -879,200 +1154,6 @@ public class SettingsActivity extends BaseActivity {
 
     // ── 设置项 ────────────────────────────────────────────────────────────
 
-    /**
-     * F15：深浅色。三选一（跟随系统 / 浅色 / 深色），改完**立即生效**。
-     *
-     * ★ 生效方式见 {@link ThemeMode}：把 uiMode 的 night 位改掉再包一层 Context，
-     *   所以 `values-night/` 那一整套颜色会自动顶上，不需要第二套布局。
-     *
-     * ★ 本页必须**自己** `recreate()`：
-     *   改动就发生在当前 Activity 里，`onResume` 不会因为"配置变了"而重跑，
-     *   不重建的话界面上什么都不变（用户会以为没生效，然后再点一次）。
-     *   其它页面（主界面 / 存档页 / 日志页）从本页返回时会走
-     *   {@link BaseActivity#onResume} 的自查，不需要在这里通知它们。
-     *
-     * ⚠️ 单选列表只能配 `setTitle`，**不能**配 `setMessage`（两者并存列表项不渲染，
-     *    见 {@link SlotsActivity#slotOps} 的注释）；先 `dismiss()` 再重建，
-     *    免得对话框的窗口在 Activity 被销毁后还挂着。
-     */
-    /**
-     * 第 313 轮：**更新模式**（三档单选）—— 把原来两个开关合并成一个。
-     *
-     * <p>为什么合并：见 {@link UpdateMode} 的类注释。一句话 —— 那两个维度天然有序，
-     * 三选一比两个独立开关更难出现自相矛盾的组合。
-     *
-     * <p>⚠️ 单选列表只能配 `setTitle`、**不能**配 `setMessage`（两者并存列表项不渲染，
-     * 见 {@link SlotsActivity#slotOps}）。
-     */
-    private void pickUpdateMode() {
-        final int[] modes = UpdateMode.ALL;
-        String[] names = new String[modes.length];
-        final int cur = UpdateMode.of(this);
-        int checked = -1;
-        for (int i = 0; i < modes.length; i++) {
-            names[i] = getString(UpdateMode.labelRes(modes[i]));
-            if (modes[i] == cur) checked = i;
-        }
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.set_update_mode_title)
-                .setSingleChoiceItems(names, checked, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) {
-                        d.dismiss();
-                        UpdateMode.set(SettingsActivity.this, modes[w]);
-                        fillValues();
-                    }
-                })
-                .setPositiveButton(R.string.cancel, null)
-                .show();
-    }
-
-    /**
-     * 第 415 轮：**游戏包签名校验**（三档单选）—— 只记日志 / 询问后导入（默认）/ 不符就拒绝。
-     *
-     * <p>为什么是三档而不是三个开关：判据与 {@link UpdateMode} 同一条 —— 三种处置互斥且有序，
-     * 一个三选一最难说出自相矛盾的话。
-     */
-    private void pickSigMode() {
-        final int[] modes = SigMode.ALL;
-        String[] names = new String[modes.length];
-        final int cur = SigMode.of(this);
-        int checked = -1;
-        for (int i = 0; i < modes.length; i++) {
-            names[i] = getString(SigMode.labelRes(modes[i]));
-            if (modes[i] == cur) checked = i;
-        }
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.set_sig_check_pick_title)
-                .setSingleChoiceItems(names, checked, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) {
-                        d.dismiss();
-                        SigMode.set(SettingsActivity.this, modes[w]);
-                        fillValues();
-                    }
-                })
-                .setPositiveButton(R.string.cancel, null)
-                .show();
-    }
-
-    /**
-     * 第 338 轮：「插件自动更新」开关。
-     *
-     * <p>★ 2026-11-15（用户）：「崩溃提示两个选项弹窗、插件自动更新却不弹」——本页统一
-     * 「点一下弹选择」，它只有开 / 关也要弹，不再单独造一个"点一下就翻"的例外。
-     * 选项与崩溃提示同款单选；副标题跟着 {@link #fillValues()} 刷新。
-     */
-    private void promptPluginUpdate() {
-        final boolean on = Config.get().pluginAutoUpdate();
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.plugin_update_auto_title)
-                .setSingleChoiceItems(new String[]{
-                                Trans.get(SettingsActivity.this, R.string.plugin_update_auto_enable),
-                                Trans.get(SettingsActivity.this, R.string.plugin_update_auto_disable)},
-                        on ? 0 : 1, new DialogInterface.OnClickListener() {
-                            @Override public void onClick(DialogInterface d, int w) {
-                                d.dismiss();
-                                Config.get().setPluginAutoUpdate(w == 0);
-                                fillValues();
-                            }
-                        })
-                .setPositiveButton(R.string.cancel, null)
-                .show();
-    }
-
-    private void pickTheme() {
-        final int[] modes = {ThemeMode.SYSTEM, ThemeMode.LIGHT, ThemeMode.DARK};
-        String[] names = new String[modes.length];
-        final int cur = Config.get().themeMode();
-        int checked = -1;
-        for (int i = 0; i < modes.length; i++) {
-            names[i] = getString(ThemeMode.labelRes(modes[i]));
-            if (modes[i] == cur) checked = i;
-        }
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.set_theme_pick_title)
-                .setSingleChoiceItems(names, checked, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) {
-                        d.dismiss();
-                        Config.get().setThemeMode(modes[w]);
-                        recreate();
-                    }
-                })
-                .setPositiveButton(R.string.cancel, null)
-                .show();
-    }
-
-    /**
-     * 第 275 轮：屏幕方向（用户：「我觉得需要加个页面强制横屏和强制竖屏」——
-     * 真机自动旋转关着，想看一眼横屏效果只能去系统设置里开自动旋转）。
-     *
-     * <p>★ 与深浅色 / 语言同一套交互：**选完立刻生效**（`recreate()`），没有"保存"。
-     * 新实例在 `BaseActivity.onCreate` 里把方向 `setRequestedOrientation` 下去。
-     * ★ 只作用于管理器自己的页面（`GameSlot` 除外），游戏那一页仍按它自己的清单。
-     */
-    /**
-     * 第 378 轮：下载限速（用户自己填，单位 KB/s；0 = 不限）。
-     *
-     * <p>为什么不做档位：不同网络差得远（热点 / 5G / 家里宽带），固定档位总有人选不到合适的；
-     * 一个数字框 + 上限防呆更直接。改完立刻交给 {@link Bandwidth}，正在跑的下载下一片就按新额度。
-     */
-    private void pickDownloadLimit() {
-        final EditText input = new EditText(this);
-        input.setInputType(InputType.TYPE_CLASS_NUMBER);
-        input.setHint(R.string.set_download_limit_hint);
-        long cur = Config.get().downloadLimit();
-        input.setText(String.valueOf(cur <= 0 ? 0 : Math.max(1L, (cur + DownloadLimit.KB / 2) / DownloadLimit.KB)));
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(20), 0, dp(20), 0);
-        box.addView(input, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.set_download_limit_pick_title)
-                .setMessage(R.string.set_download_limit_msg)
-                .setView(box)
-                .setNegativeButton(R.string.policy_save, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) {
-                        long kb;
-                        try {
-                            kb = Long.parseLong(input.getText().toString().trim());
-                        } catch (NumberFormatException e) {
-                            kb = -1L;
-                        }
-                        if (kb < 0L || kb > DownloadLimit.MAX / DownloadLimit.KB) {
-                            Toast.makeText(SettingsActivity.this, R.string.set_download_limit_bad,
-                                    Toast.LENGTH_SHORT).show();
-                            return;
-                        }
-                        long bps = kb * DownloadLimit.KB;
-                        Config.get().setDownloadLimit(bps);
-                        Bandwidth.set(bps);
-                        fillValues();
-                    }
-                })
-                .setPositiveButton(R.string.cancel, null)
-                .show();
-    }
-
-    private void pickOrientation() {        final int[] modes = {OrientationMode.SYSTEM, OrientationMode.PORTRAIT, OrientationMode.LANDSCAPE};
-        String[] names = new String[modes.length];
-        final int cur = OrientationMode.of(this);
-        int checked = -1;
-        for (int i = 0; i < modes.length; i++) {
-            names[i] = getString(OrientationMode.labelRes(modes[i]));
-            if (modes[i] == cur) checked = i;
-        }
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.set_orientation_pick_title)
-                .setSingleChoiceItems(names, checked, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) {
-                        d.dismiss();
-                        Config.get().setOrientationMode(modes[w]);
-                        recreate();
-                    }
-                })
-                .setPositiveButton(R.string.cancel, null)
-                .show();
-    }
 
     // ── 用户语言包（lang.properties）────────────────────────────────────────
 
@@ -1452,288 +1533,6 @@ public class SettingsActivity extends BaseActivity {
         recreate();
     }
 
-    /**
-     * P2：界面语言。列表第一项是「跟随系统」，其余是**应用真正带了的那些语言**
-     * （名单 = `R.array.app_languages`，由构建期门禁 `RES-10` 保证与 `values-*` 一一对应）。
-     *
-     * ★ 语言名用**它自己的语言**写（English / 简体中文）—— 语言选择器的通行做法：
-     *   用户在一个看不懂的界面里，唯一能认出来的就是母语自己的写法。
-     *
-     * ★ 与 {@link #pickTheme()} 同一套：
-     *   · 改完必须**自己 `recreate()`** —— 改动就发生在当前页，`onResume` 不会重跑，
-     *     不重建的话界面上什么都不变（用户会以为没生效，然后再点一次）；
-     *   · 单选列表只能配 `setTitle`、**不能**配 `setMessage`（两者并存列表项不渲染）；
-     *   · 先 `dismiss()` 再重建，免得对话框的窗口在 Activity 被销毁后还挂着。
-     *
-     * ⚠️ 这里**只写 config.json**，绝不调 `Locale.setDefault()` —— 理由见 {@link LocaleMode}
-     *   类注释里那条红线（`:game` 进程与游戏同进程，动了它会把游戏的语言也带偏）。
-     */
-    private void pickLanguage() {
-        final String[] tags = LocaleMode.tags(this);
-        String[] names = new String[tags.length];
-        final String cur = LocaleMode.of(this);
-        int checked = -1;
-        for (int i = 0; i < tags.length; i++) {
-            names[i] = ("system".equals(tags[i]) ? Trans.get(SettingsActivity.this, R.string.lang_system)
-                                                 : String.valueOf(LocaleMode.label(this, tags[i])));
-            // 「跟随系统」在资源里存的是字面量 "system"，与 LocaleMode.SYSTEM（空串）是两回事
-            boolean isCur = "system".equals(tags[i]) ? LocaleMode.SYSTEM.equals(cur)
-                                                     : tags[i].equals(cur);
-            if (isCur) checked = i;
-        }
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.set_lang_pick_title)
-                .setSingleChoiceItems(names, checked, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) {
-                        d.dismiss();
-                        Config.get().setAppLanguage("system".equals(tags[w])
-                                ? LocaleMode.SYSTEM : tags[w]);
-                        recreate();
-                    }
-                })
-                .setPositiveButton(R.string.cancel, null)
-                .show();
-    }
-
-    /**
-     * 默认槽 = 新发现的版本自动落到哪个槽（此前是硬编码 default）。
-     * ⚠️ 单选列表必须用 setSingleChoiceItems 配 setTitle —— 不能配 setMessage，
-     *    否则列表项一个都不渲染（F3b 实测，见 SlotsActivity.slotOps 的注释）。
-     */
-    private void pickDefaultSlot() {
-        final List<Data.Slot> all = Data.allSlots(this);
-        // ★ 2026-11-24：归档槽不能当默认槽（它已经"等于没玩过"，新版本落进去也没法启动）
-        final List<Data.Slot> slots = new ArrayList<>();
-        for (Data.Slot s : all) if (!SlotArchive.isArchived(this, s.name)) slots.add(s);
-        if (slots.isEmpty()) return;
-        final String[] names = new String[slots.size()];
-        String cur = Config.get().defaultSlot();
-        int checked = -1;
-        for (int i = 0; i < slots.size(); i++) {
-            Data.Slot s = slots.get(i);
-            names[i] = s.name + (s.active ? Trans.get(SettingsActivity.this, R.string.slot_current_suffix) : "");
-            if (s.name.equals(cur)) checked = i;
-        }
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.set_slot_pick_title)
-                .setSingleChoiceItems(names, checked, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) {
-                        Config.get().setDefaultSlot(slots.get(w).name);
-                        d.dismiss();
-                        fillValues();
-                    }
-                })
-                .setPositiveButton(R.string.cancel, null)
-                .show();
-    }
-
-    /**
-     * 第 174 轮：崩溃提示开关（默认开）。
-     *
-     * <p>关掉只影响 {@link CrashAlert} 的 Toast / 弹窗；报告仍然照常落盘、照常进崩溃分析。
-     * 选项用单选列表（与深浅色同款），不另造 Switch —— 本页所有行都是"点一下弹选择"。
-     */
-    private void promptCrashAlert() {
-        final boolean on = Config.get().crashAlertEnabled();
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.set_crash_alert_pick_title)
-                .setSingleChoiceItems(new String[]{
-                                Trans.get(SettingsActivity.this, R.string.set_crash_alert_enable),
-                                Trans.get(SettingsActivity.this, R.string.set_crash_alert_disable)},
-                        on ? 0 : 1, new DialogInterface.OnClickListener() {
-                            @Override public void onClick(DialogInterface d, int w) {
-                                d.dismiss();
-                                Config.get().setCrashAlertEnabled(w == 0);
-                                fillValues();
-                            }
-                        })
-                .setPositiveButton(R.string.cancel, null)
-                .show();
-    }
-
-    /**
-     * 第 173 轮：中转站保留份数 —— 普通条目与整个槽分开填。
-     *
-     * <p>为什么用两个输入框而不是一个：一个槽可能几十 MB，普通条目是 KB 级；
-     * 合成一个数字就只能在"小文件留太少"和"大槽占太多"之间二选一。
-     * 默认值来自 {@link Config#DEF_TRASH_KEEP} / {@link Config#DEF_TRASH_KEEP_SLOTS}。
-     *
-     * <p>第 426 轮加了第三个输入：**保留天数**（用户：「中转站按照数量+时间」）。
-     * 数量之外再按时间收一道，超期的从最旧删，但永远留最新 1 份。
-     */
-    private void promptTrashKeep() {
-        final EditText items = new EditText(this);
-        items.setInputType(InputType.TYPE_CLASS_NUMBER);
-        items.setSingleLine(true);
-        items.setHint(R.string.set_trash_hint);
-        items.setText(String.valueOf(Config.get().trashKeep()));
-
-        final EditText slots = new EditText(this);
-        slots.setInputType(InputType.TYPE_CLASS_NUMBER);
-        slots.setSingleLine(true);
-        slots.setHint(R.string.set_trash_slots_hint);
-        slots.setText(String.valueOf(Config.get().trashKeepSlots()));
-
-        final EditText days = new EditText(this);
-        days.setInputType(InputType.TYPE_CLASS_NUMBER);
-        days.setSingleLine(true);
-        days.setHint(R.string.set_trash_days_hint);
-        days.setText(String.valueOf(Config.get().trashKeepDays()));
-
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(20), 0, dp(20), 0);
-
-        TextView itemsLabel = new TextView(this);
-        itemsLabel.setText(Trans.get(SettingsActivity.this, R.string.set_trash_items_label));
-        itemsLabel.setTextSize(13);
-        itemsLabel.setTextColor(getResources().getColor(R.color.fg_muted, getTheme()));
-        itemsLabel.setLineSpacing(dp(2), 1f);
-        itemsLabel.setPadding(0, 0, 0, dp(4));
-        box.addView(itemsLabel);
-        box.addView(items, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-
-        TextView slotsLabel = new TextView(this);
-        slotsLabel.setText(Trans.get(SettingsActivity.this, R.string.set_trash_slots_label));
-        slotsLabel.setTextSize(13);
-        slotsLabel.setTextColor(getResources().getColor(R.color.fg_muted, getTheme()));
-        slotsLabel.setPadding(0, dp(10), 0, dp(4));
-        box.addView(slotsLabel);
-        box.addView(slots, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-
-        TextView daysLabel = new TextView(this);
-        daysLabel.setText(Trans.get(SettingsActivity.this, R.string.set_trash_days_label));
-        daysLabel.setTextSize(13);
-        daysLabel.setTextColor(getResources().getColor(R.color.fg_muted, getTheme()));
-        daysLabel.setPadding(0, dp(10), 0, dp(4));
-        box.addView(daysLabel);
-        box.addView(days, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.set_trash_dialog_title)
-                .setView(box)
-                .setNegativeButton(R.string.policy_save, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) {
-                        int n;
-                        int s;
-                        int dd;
-                        try {
-                            n = Integer.parseInt(items.getText().toString().trim());
-                            s = Integer.parseInt(slots.getText().toString().trim());
-                            dd = Integer.parseInt(days.getText().toString().trim());
-                        } catch (NumberFormatException e) {
-                            n = -1;
-                            s = -1;
-                            dd = -1;
-                        }
-                        if (n < 1 || n > 999 || s < 1 || s > 999) {
-                            Toast.makeText(SettingsActivity.this, R.string.set_trash_bad,
-                                    Toast.LENGTH_SHORT).show();
-                            return;
-                        }
-                        if (dd < 1 || dd > 3650) {
-                            Toast.makeText(SettingsActivity.this, R.string.set_trash_days_bad,
-                                    Toast.LENGTH_SHORT).show();
-                            return;
-                        }
-                        Config.get().setTrashKeep(n);
-                        Config.get().setTrashKeepSlots(s);
-                        Config.get().setTrashKeepDays(dd);
-                        fillValues();
-                    }
-                })
-                .setPositiveButton(R.string.cancel, null)
-                .show();
-    }
-
-    /**
-     * 第 426 轮：临时文件体积上限（MB）—— 只管 `app_hub/tmp/<命名空间>/` 根下的**散落文件**
-     * （分享缓存 / 插件导出），会话目录由 owner.pid 那套自己收。
-     *
-     * <p>★ 为什么最小 1 MB（用户 2026-11-24：「不让设成 0MB 的啊，这不放下就清理了」）：
-     * 0 会让刚写出来的分享包立刻被删。
-     */
-    private void promptTmpCap() {
-        final EditText input = new EditText(this);
-        input.setInputType(InputType.TYPE_CLASS_NUMBER);
-        input.setSingleLine(true);
-        input.setHint(R.string.set_tmp_cap_hint);
-        input.setText(String.valueOf(Config.get().hubTmpCapMb()));
-
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(20), 0, dp(20), 0);
-
-        TextView label = new TextView(this);
-        label.setText(Trans.get(SettingsActivity.this, R.string.set_tmp_cap_label));
-        label.setTextSize(13);
-        label.setTextColor(getResources().getColor(R.color.fg_muted, getTheme()));
-        label.setLineSpacing(dp(2), 1f);
-        label.setPadding(0, 0, 0, dp(4));
-        box.addView(label);
-        box.addView(input, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.set_tmp_cap_dialog_title)
-                .setView(box)
-                .setNegativeButton(R.string.policy_save, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) {
-                        int mb;
-                        try {
-                            mb = Integer.parseInt(input.getText().toString().trim());
-                        } catch (NumberFormatException e) {
-                            mb = -1;
-                        }
-                        if (mb < 1 || mb > 10240) {
-                            Toast.makeText(SettingsActivity.this, R.string.set_tmp_cap_bad,
-                                    Toast.LENGTH_SHORT).show();
-                            return;
-                        }
-                        Config.get().setHubTmpCapMb(mb);
-                        fillValues();
-                    }
-                })
-                .setPositiveButton(R.string.cancel, null)
-                .show();
-    }
-
-    private void promptLogs() {
-        final EditText input = new EditText(this);
-        input.setInputType(InputType.TYPE_CLASS_NUMBER);
-        input.setHint(R.string.set_logs_hint);
-        input.setText(String.valueOf(Config.get().maxLogFiles()));
-        LinearLayout box = new LinearLayout(this);
-        box.setOrientation(LinearLayout.VERTICAL);
-        box.setPadding(dp(20), 0, dp(20), 0);
-        box.addView(input, new LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
-        new AlertDialog.Builder(this)
-                .setTitle(R.string.set_logs_dialog_title)
-                .setView(box)
-                .setNegativeButton(R.string.policy_save, new DialogInterface.OnClickListener() {
-                    @Override public void onClick(DialogInterface d, int w) {
-                        int n;
-                        try {
-                            n = Integer.parseInt(input.getText().toString().trim());
-                        } catch (NumberFormatException e) {
-                            n = -1;
-                        }
-                        if (n < LOG_MIN || n > LOG_MAX) {
-                            Toast.makeText(SettingsActivity.this, R.string.set_logs_bad,
-                                    Toast.LENGTH_SHORT).show();
-                            return;
-                        }
-                        Config.get().setMaxLogFiles(n);
-                        fillValues();
-                    }
-                })
-                .setPositiveButton(R.string.cancel, null)
-                .show();
-    }
 
     private int dp(int v) {
         return Math.round(v * getResources().getDisplayMetrics().density);

@@ -2459,4 +2459,31 @@
     <string name="version_row_patch">补丁</string>
     <string name="version_row_patch_sub">替换这个版本的游戏代码</string>
     <string name="version_row_patch_sub_fmt">已启用 %1$d 个</string>
+
+    <!-- ══ 2026-11-27 设置页改造：开关 / 下拉 / 行内输入 ══
+       ★ 副标题四种口径（见 SettingsActivity#fillValues 的注释）：
+         下拉「当前：<值>」· 开关只写解释（状态由开关自己表达）· 输入只写单位/超出怎么办 · 导航说"能做什么"。
+       ⚠️ 旧的 set_autoclean_why / set_cas_sub_on|off|none / set_crash_alert_on|off /
+          set_logs_sub_fmt / set_tmp_cap_sub_fmt / set_trash_sub_fmt / set_download_limit_sub_fmt /
+          lang_row_none / lang_row_used_fmt 都已随正式版发出去过 ⇒ **留作死键不删**。 -->
+    <string name="settings_section_experimental">实验性功能</string>
+    <string name="settings_section_experimental_hint">还在验证，可能改动或撤回</string>
+    <string name="set_trash_items_title">中转站 · 普通条目</string>
+    <string name="set_trash_items_why">超出后先删最旧的</string>
+    <string name="set_trash_slots_title">中转站 · 整槽 / 版本</string>
+    <string name="set_trash_slots_why">整槽备份、版本备份各留几份</string>
+    <string name="set_trash_days_title">中转站 · 保留天数</string>
+    <string name="set_trash_days_why">超期自动删</string>
+    <string name="set_lang_pack_item">翻译文件…</string>
+    <string name="set_lang_pack_item_fmt">翻译文件…（已用 %1$d 条）</string>
+    <string name="lang_pack_sum_fmt">翻译包已用 %1$d 条</string>
+    <string name="lang_pack_none_short">未装翻译包</string>
+    <string name="set_crash_alert_why">崩溃时主动提示 · 报告仍保存</string>
+    <string name="set_autoclean_row_why">冷启动时清一次 · 每 24 小时最多</string>
+    <string name="set_cas_why_on">版本之间共用的文件只存一份</string>
+    <string name="set_cas_why_off">每个版本各自保留完整安装包</string>
+    <string name="set_cas_why_none">还没有导入的版本</string>
+    <string name="set_logs_why">超出后丢最旧的</string>
+    <string name="set_tmp_cap_why">单位 MB · 超出的临时文件会被清</string>
+    <string name="set_download_limit_why">单位 KB/s · 0 = 不限</string>
 </resources>

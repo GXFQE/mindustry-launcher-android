@@ -26,4 +26,6 @@
     <dimen name="row_icon">22dp</dimen>
     <dimen name="row_icon_box">34dp</dimen>
     <dimen name="row_chevron">18dp</dimen>
+    <!-- 行内数字输入框的宽度：六个数字都放得下（102400 六位） -->
+    <dimen name="row_input_width">88dp</dimen>
 </resources>

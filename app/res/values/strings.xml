@@ -2500,4 +2500,32 @@
     <string name="version_row_patch">Patches</string>
     <string name="version_row_patch_sub">Replace game code for this version</string>
     <string name="version_row_patch_sub_fmt">Enabled: %1$d</string>
+
+    <!-- ══ 2026-11-27 设置页改造：开关 / 下拉 / 行内输入 ══
+       ★ 副标题四种口径（见 SettingsActivity#fillValues 的注释）：
+         下拉「当前：<值>」· 开关只写解释（状态由开关自己表达）· 输入只写单位/超出怎么办 · 导航说"能做什么"。
+       ⚠️ 旧的 set_autoclean_why / set_cas_sub_on|off|none / set_crash_alert_on|off /
+          set_logs_sub_fmt / set_tmp_cap_sub_fmt / set_trash_sub_fmt / set_download_limit_sub_fmt /
+          lang_row_none / lang_row_used_fmt 都已随正式版发出去过 ⇒ **留作死键不删**
+          （用户语言包里那些译文还要认得出来）。 -->
+    <string name="settings_section_experimental">Experimental</string>
+    <string name="settings_section_experimental_hint">Still being tested; may change or be removed</string>
+    <string name="set_trash_items_title">Trash · items</string>
+    <string name="set_trash_items_why">Oldest ones go first</string>
+    <string name="set_trash_slots_title">Trash · whole slots</string>
+    <string name="set_trash_slots_why">Slot backups and version backups each keep a few</string>
+    <string name="set_trash_days_title">Trash · days kept</string>
+    <string name="set_trash_days_why">Older than this is deleted</string>
+    <string name="set_lang_pack_item">Translation file…</string>
+    <string name="set_lang_pack_item_fmt">Translation file… (%1$d entries used)</string>
+    <string name="lang_pack_sum_fmt">%1$d entries from the file</string>
+    <string name="lang_pack_none_short">no translation file</string>
+    <string name="set_crash_alert_why">Tell me when the game crashes · reports still saved</string>
+    <string name="set_autoclean_row_why">Once at startup · at most every 24 hours</string>
+    <string name="set_cas_why_on">Versions share identical files</string>
+    <string name="set_cas_why_off">Every version keeps its own APK</string>
+    <string name="set_cas_why_none">No imported versions yet</string>
+    <string name="set_logs_why">Oldest ones are discarded</string>
+    <string name="set_tmp_cap_why">MB · bigger temp files are cleaned up</string>
+    <string name="set_download_limit_why">KB/s · 0 = unlimited</string>
 </resources>

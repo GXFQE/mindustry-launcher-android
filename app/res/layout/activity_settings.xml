@@ -72,18 +72,6 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
 
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="62dp"
-                    android:background="@color/divider" />
-
-                <include
-                    android:id="@+id/row_lang_pack"
-                    layout="@layout/row_action"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content" />
-
                 <!-- 第 275 轮：屏幕方向（跟随系统 / 强制竖屏 / 强制横屏）。
                      放在外观卡末尾 —— 它和深浅色、语言一样是"界面长什么样"的一类；
                      只作用于管理器自己的页面（游戏那一页仍按它自己的清单）。 -->
@@ -130,10 +118,11 @@
                     android:layout_marginStart="62dp"
                     android:background="@color/divider" />
 
-                <!-- 第 173 轮：中转站保留份数（普通条目 / 整个槽分开）。 -->
+                <!-- 第 173 轮：中转站保留份数。2026-11-27 拆成三行（普通条目 / 整槽·版本 /
+                     保留天数）—— 三个数塞一个弹窗里最难改的是"第二个数"。 -->
                 <include
-                    android:id="@+id/row_trash_keep"
-                    layout="@layout/row_action"
+                    android:id="@+id/row_trash_items"
+                    layout="@layout/row_input"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
 
@@ -143,26 +132,35 @@
                     android:layout_marginStart="62dp"
                     android:background="@color/divider" />
 
-                <!-- 第 426 轮：临时文件体积上限（只算散落文件；隔壁那行管中转站，两行合起来
+                <include
+                    android:id="@+id/row_trash_slots"
+                    layout="@layout/row_input"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="62dp"
+                    android:background="@color/divider" />
+
+                <include
+                    android:id="@+id/row_trash_days"
+                    layout="@layout/row_input"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:layout_marginStart="62dp"
+                    android:background="@color/divider" />
+
+                <!-- 第 426 轮：临时文件体积上限（只算散落文件；旁边三行管中转站，合起来
                      就是「数量/大小 + 时间」两道保留策略）。 -->
                 <include
                     android:id="@+id/row_tmp_cap"
-                    layout="@layout/row_action"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content" />
-
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="1dp"
-                    android:layout_marginStart="62dp"
-                    android:background="@color/divider" />
-
-                <!-- 游戏包去重（CAS）：默认关；开着才有副作用（删原包 / 换装载方式）。
-                     放在「存储占用」上面：两者讲的都是"盘上占多少"，先开关去重、再看占用；
-                     下两行（存储占用 → 自动清理）是用户 2026-11-15 定死的顺序，不许插东西。 -->
-                <include
-                    android:id="@+id/row_cas_game"
-                    layout="@layout/row_action"
+                    layout="@layout/row_input"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
 
@@ -190,7 +188,7 @@
                      且与存储占用只隔一条分割线 —— 自检钉着这两条（别在它后面再加行）。 -->
                 <include
                     android:id="@+id/row_auto_clean"
-                    layout="@layout/row_action"
+                    layout="@layout/row_switch"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
             </LinearLayout>
@@ -216,7 +214,7 @@
                 <!-- 第 174 轮：崩溃提示总开关（默认开；关掉不影响报告落盘/分析）。 -->
                 <include
                     android:id="@+id/row_crash_alert"
-                    layout="@layout/row_action"
+                    layout="@layout/row_switch"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
 
@@ -229,7 +227,7 @@
                 <!-- F7：日志保留份数（设置值，不是页面入口）。 -->
                 <include
                     android:id="@+id/row_logs"
-                    layout="@layout/row_action"
+                    layout="@layout/row_input"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
             </LinearLayout>
@@ -307,7 +305,48 @@
                 <!-- 第 378 轮：下载限速（0 = 不限）。 -->
                 <include
                     android:id="@+id/row_download_limit"
-                    layout="@layout/row_action"
+                    layout="@layout/row_input"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
+            <!-- ══ 实验性功能 ══════════════════════════════════════════════ -->
+            <!--
+              2026-11-27：还在验证的东西单独放一张卡（分组按"靠不靠谱"，不按主题）。
+              卡级提示只在这里写一次，不在每行副标题里重复；只有一行 ⇒ 不加行间分割线。
+            -->
+            <TextView
+                android:id="@+id/settings_section_experimental"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:paddingTop="18dp"
+                android:textColor="@color/fg_muted"
+                android:textSize="12sp" />
+
+            <TextView
+                android:id="@+id/settings_section_experimental_hint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingStart="4dp"
+                android:paddingEnd="4dp"
+                android:paddingTop="2dp"
+                android:paddingBottom="6dp"
+                android:textColor="@color/fg_muted"
+                android:textSize="12sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/card_bg"
+                android:orientation="vertical">
+
+                <!-- 游戏包去重（CAS）：默认关；开着才有副作用（删原包 / 换装载方式）。
+                     2026-11-27 从「启动与存储」换到这里 —— 它动的是游戏包本体，与存档守护同类。 -->
+                <include
+                    android:id="@+id/row_cas_game"
+                    layout="@layout/row_switch"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
             </LinearLayout>
@@ -380,7 +419,7 @@
                 -->
                 <include
                     android:id="@+id/row_plugin_update"
-                    layout="@layout/row_action"
+                    layout="@layout/row_switch"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
 

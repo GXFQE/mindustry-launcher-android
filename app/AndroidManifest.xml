@@ -355,6 +355,7 @@
             android:exported="false"
             android:theme="@style/AppTheme"
             android:label="@string/settings_title"
+            android:windowSoftInputMode="adjustResize"
             android:parentActivityName=".MainActivity"/>
 
         <!--

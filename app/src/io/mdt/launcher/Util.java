@@ -197,6 +197,108 @@ public final class Util {
     }
 
     /**
+     * 设置页：绑定一个「开关行」（layout/row_switch.xml）。
+     *
+     * <p>返回行里的 {@link android.widget.Switch}，调用方拿它显示当前状态。
+     *
+     * <p>★ **不挂 OnCheckedChangeListener**：开关自己是不可点的（整行点一下切换），
+     *   提交只走行点击 ⇒ 代码里 {@code setChecked(...)} 永远不会写盘、也不会误触发
+     *   "用户改了一下"。
+     */
+    public static android.widget.Switch bindSwitchRow(android.view.View root, int rowId,
+                                                      int iconRes, int titleRes,
+                                                      final android.view.View.OnClickListener onClick) {
+        android.view.View row = root.findViewById(rowId);
+        ((android.widget.ImageView) row.findViewById(R.id.act_icon)).setImageResource(iconRes);
+        ((android.widget.TextView) row.findViewById(R.id.act_title))
+                .setText(Trans.get(root.getContext(), titleRes));
+        row.setOnClickListener(onClick);
+        return (android.widget.Switch) row.findViewById(R.id.act_switch);
+    }
+
+    /** 设置页下拉行的候选：{@code labels} 与 {@code checked}（-1 = 没有选中项）。 */
+    public static final class DropdownSpec {
+        public final CharSequence[] labels;
+        public final int checked;
+
+        public DropdownSpec(CharSequence[] labels, int checked) {
+            this.labels = labels == null ? new CharSequence[0] : labels;
+            this.checked = checked;
+        }
+    }
+
+    /** 每次点开下拉时现算候选（语言包名字会跟着"装没装"变）。 */
+    public interface DropdownSource { DropdownSpec get(); }
+
+    public interface OnPick { void onPick(int index); }
+
+    /**
+     * 设置页：绑定一个「下拉行」（layout/row_action.xml）。
+     *
+     * <p>点行 ⇒ 在行下面弹一个无标题、无取消按钮的列表 ⇒ 点一项就回调（先关列表再回调）。
+     *
+     * <p>★ 用 {@link android.widget.ListPopupWindow} 而不是 {@code Spinner}：
+     *   Spinner 在**初次布局**时就会回调一次 {@code onItemSelected}，主题 / 语言 / 方向
+     *   这几行会因此误 {@code recreate()}。ListPopupWindow 只在真的点开时才有动作。
+     * <p>★ 候选为空（比如一个槽都没有）时**不弹** —— 弹个空框比没反应更让人困惑。
+     */
+    public static void bindDropdownRow(final android.view.View root, int rowId,
+                                       int iconRes, int titleRes,
+                                       final DropdownSource src, final OnPick onPick) {
+        final android.view.View row = root.findViewById(rowId);
+        ((android.widget.ImageView) row.findViewById(R.id.act_icon)).setImageResource(iconRes);
+        ((android.widget.TextView) row.findViewById(R.id.act_title))
+                .setText(Trans.get(root.getContext(), titleRes));
+        final android.widget.ImageView chevron =
+                (android.widget.ImageView) row.findViewById(R.id.act_chevron);
+        // 原位选值 ⇒ 箭头朝下（与"点开是另一页"的 `>` 区分开；开关行则根本没有箭头）。
+        if (chevron != null) chevron.setRotation(90f);
+        row.setOnClickListener(new android.view.View.OnClickListener() {
+            @Override public void onClick(android.view.View v) {
+                DropdownSpec spec = src == null ? null : src.get();
+                if (spec == null || spec.labels.length == 0) return;
+                showDropdown(row.getContext(), row, spec, onPick);
+            }
+        });
+    }
+
+    /** 行下拉的实现体（只有一个 call site，单独抽出来只为一处能读完）。 */
+    private static void showDropdown(final android.content.Context c, final android.view.View anchor,
+                                     final DropdownSpec spec, final OnPick onPick) {
+        final android.widget.ListPopupWindow pop = new android.widget.ListPopupWindow(c);
+        pop.setAnchorView(anchor);
+        pop.setModal(true);
+        pop.setInputMethodMode(android.widget.ListPopupWindow.INPUT_METHOD_NOT_NEEDED);
+        int w = anchor.getWidth();
+        if (w > 0) pop.setWidth(w);
+        pop.setBackgroundDrawable(c.getDrawable(R.drawable.popup_bg));
+        final int accent = c.getResources().getColor(R.color.accent, c.getTheme());
+        final int normal = c.getResources().getColor(R.color.fg, c.getTheme());
+        pop.setAdapter(new android.widget.BaseAdapter() {
+            @Override public int getCount() { return spec.labels.length; }
+            @Override public Object getItem(int position) { return spec.labels[position]; }
+            @Override public long getItemId(int position) { return position; }
+            @Override public android.view.View getView(int position, android.view.View convertView,
+                                                       android.view.ViewGroup parent) {
+                android.widget.TextView tv = (android.widget.TextView) android.view.LayoutInflater
+                        .from(c).inflate(R.layout.item_dropdown, parent, false);
+                tv.setText(spec.labels[position]);
+                tv.setTextColor(position == spec.checked ? accent : normal);
+                return tv;
+            }
+        });
+        pop.setOnItemClickListener(new android.widget.AdapterView.OnItemClickListener() {
+            @Override public void onItemClick(android.widget.AdapterView<?> p, android.view.View v,
+                                              int position, long id) {
+                // ★ 先关再回调：回调里很可能要 recreate()，popup 挂着会跟着旧窗口一起漏。
+                pop.dismiss();
+                if (onPick != null) onPick.onPick(position);
+            }
+        });
+        pop.show();
+    }
+
+    /**
      * ★★ 这个 Activity 是不是已经"死了"（正在退出 **或** 已被销毁）。
      *
      * 用途只有一个：**后台任务完成 → `runOnUiThread` 里弹窗/更新 View 之前**先判它，

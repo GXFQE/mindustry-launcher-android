@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  设置页下拉列表的一项。
+  ★ 必须用 android:id="@android:id/text1"：ArrayAdapter 只认这个 id（复用系统行布局时的那一套）。
+  ★ 不用 simple_list_item_1：它按主题取字色，夜间主题下会黑字黑底。
+-->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@android:id/text1"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:paddingStart="16dp"
+    android:paddingEnd="16dp"
+    android:paddingTop="13dp"
+    android:paddingBottom="13dp"
+    android:textSize="15sp"
+    android:textColor="@color/fg"
+    android:singleLine="true"
+    android:ellipsize="end"
+    android:background="?android:attr/selectableItemBackground" />

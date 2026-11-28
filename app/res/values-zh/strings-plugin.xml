@@ -166,4 +166,7 @@
     <string name="plugin_update_auto_off">当前：关 · 只在手动检查时</string>
     <string name="plugin_update_auto_enable">开启（每天查一次）</string>
     <string name="plugin_update_auto_disable">关闭（只有我点才查）</string>
+    <!-- 2026-11-27 设置页改造：这两行改成了开关，副标题只写解释（状态由开关自己表达）。 -->
+    <string name="plugin_update_auto_why_on">后台每天查一次</string>
+    <string name="plugin_update_auto_why_off">只在手动检查时查</string>
 </resources>

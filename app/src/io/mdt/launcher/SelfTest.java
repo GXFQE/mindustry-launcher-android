@@ -10352,6 +10352,17 @@ public final class SelfTest {
         return fs == null ? 0 : fs.length;
     }
 
+    /** 递归数一棵布局树里带某个 id 的子 View 个数（设置页按控件类型钉行数用）。 */
+    private static int countById(android.view.View v, int id) {
+        if (v == null) return 0;
+        int n = v.getId() == id ? 1 : 0;
+        if (v instanceof android.view.ViewGroup) {
+            android.view.ViewGroup g = (android.view.ViewGroup) v;
+            for (int i = 0; i < g.getChildCount(); i++) n += countById(g.getChildAt(i), id);
+        }
+        return n;
+    }
+
     // ══ ⑰ F13 第三阶段：模组包导入 / 跨槽复制 ══════════════════════════════
 
     private static void modsPack(Context ctx, List<String> L, int[] stat) {
@@ -15211,27 +15222,35 @@ public final class SelfTest {
             ok(stat, L, false, "设置页末行检查自身异常：" + t);
         }
         // ★ 第 426 轮（用户 2026-11-24）：中转站「保留天数」/ 临时文件「体积上限」两行。
+        //   2026-11-27 设置页改造把中转站拆成三行（普通条目 / 整槽 · 版本 / 保留天数）。
         //   与上面「入口搬家」同一类坑：少一个 `@+id` ⇒ findViewById 返回 null、绑定静默跳过，
         //   编译和门禁全绿而界面上只是少了一行。
         try {
             android.view.View v = inf.inflate(R.layout.activity_settings, null);
-            android.view.View keep = v.findViewById(R.id.row_trash_keep);
+            android.view.View items = v.findViewById(R.id.row_trash_items);
+            android.view.View slots = v.findViewById(R.id.row_trash_slots);
+            android.view.View days = v.findViewById(R.id.row_trash_days);
             android.view.View tmpCap = v.findViewById(R.id.row_tmp_cap);
             android.view.View storage = v.findViewById(R.id.row_storage);
-            boolean rows = keep != null && tmpCap != null && storage != null
-                    && keep.getParent() != null && keep.getParent() == tmpCap.getParent()
+            boolean rows = items != null && slots != null && days != null
+                    && tmpCap != null && storage != null
+                    && items.getParent() != null && items.getParent() == slots.getParent()
+                    && slots.getParent() == days.getParent()
+                    && days.getParent() == tmpCap.getParent()
                     && tmpCap.getParent() == storage.getParent();
-            boolean above = false;
+            boolean ordered = false;
             if (rows) {
                 android.view.ViewGroup card = (android.view.ViewGroup) storage.getParent();
-                above = card.indexOfChild(keep) < card.indexOfChild(tmpCap)
+                ordered = card.indexOfChild(items) < card.indexOfChild(slots)
+                        && card.indexOfChild(slots) < card.indexOfChild(days)
+                        && card.indexOfChild(days) < card.indexOfChild(tmpCap)
                         && card.indexOfChild(tmpCap) < card.indexOfChild(storage);
             }
-            ok(stat, L, rows && above,
-                    "★设置页（第 426 轮）：保留份数 / 临时文件上限两行同在启动与存储卡，"
-                            + "且都排在存储占用上面");
+            ok(stat, L, rows && ordered,
+                    "★设置页：中转站三行（普通条目 / 整槽 · 版本 / 保留天数）与临时文件上限"
+                            + "同在启动与存储卡，且都排在存储占用上面");
         } catch (Throwable t) {
-            ok(stat, L, false, "设置页第 426 轮两行检查自身异常：" + t);
+            ok(stat, L, false, "设置页启动与存储卡顺序检查自身异常：" + t);
         }
         // ★ 第 415 轮：安全卡两行（签名校验 / 信任的证书）。
         //   少一个 `@+id` ⇒ findViewById 返回 null、Util.bindActionValue 静默跳过，
@@ -15269,8 +15288,8 @@ public final class SelfTest {
             }
             ok(stat, L, row != null && row.findViewById(R.id.act_title) != null,
                     "★设置页有「屏幕方向」那一行（外观卡末尾）");
-            ok(stat, L, rows == 4,
-                    "★外观卡是四行（深浅色 / 语言 / 翻译文件 / 屏幕方向）—— 实得 " + rows);
+            ok(stat, L, rows == 3,
+                    "★外观卡是三行（深浅色 / 语言 / 屏幕方向；翻译文件已并进语言下拉）—— 实得 " + rows);
         } catch (Throwable t) {
             ok(stat, L, false, "屏幕方向那一行检查自身异常：" + t);
         }
@@ -15286,8 +15305,8 @@ public final class SelfTest {
                 for (int i = 0; i < card.getChildCount(); i++) {
                     if (card.getChildAt(i).findViewById(R.id.act_title) != null) rows++;
                 }
-                ok(stat, L, rows == 3,
-                        "★元断言：摘掉「屏幕方向」后外观卡只剩 3 行（实得 " + rows + "）");
+                ok(stat, L, rows == 2,
+                        "★元断言：摘掉「屏幕方向」后外观卡只剩 2 行（实得 " + rows + "）");
             } else {
                 ok(stat, L, false, "★元断言：外观卡找不到（row_orientation 不在树里）");
             }
@@ -15342,6 +15361,91 @@ public final class SelfTest {
                     "★自检收尾把方向恢复成进这一段之前的值（不污染用户的选择）：" + before);
         } catch (Throwable t) {
             ok(stat, L, false, "方向 Config 往返自身异常：" + t);
+        }
+        // ★ 2026-11-27 设置页改造（用户：「部分设置改成下拉栏和开关而不是弹窗」）：
+        //   行布局换错也属于"错了不报错"——该行里没有 act_switch / act_input 时，
+        //   bindSwitchRow / bindNumberRow 的 findViewById 拿不到控件，
+        //   编译与门禁全绿，界面上只是那一行少了控件。这里数"布局里各类型控件的个数"。
+        try {
+            android.view.View v = inf.inflate(R.layout.activity_settings, null);
+            int switches = countById(v, R.id.act_switch);
+            int inputs = countById(v, R.id.act_input);
+            ok(stat, L, switches == 4,
+                    "★设置页四个开关（崩溃提示 / 自动清理 / 游戏包去重 / 插件自动更新）—— 实得 " + switches);
+            ok(stat, L, inputs == 6,
+                    "★设置页六个行内输入（中转站 ×3 / 临时上限 / 日志份数 / 下载限速）—— 实得 " + inputs);
+            //    下拉行共用的 row_action 都带箭头；这里钉"这六行确实各自带箭头"，
+            //    比数总数稳（以后再加导航行不会误报）。
+            int[] dropdowns = {R.id.row_theme, R.id.row_language, R.id.row_orientation,
+                    R.id.row_def_slot, R.id.row_sig_check, R.id.row_update_mode};
+            int withChevron = 0;
+            for (int id : dropdowns) {
+                android.view.View row = v.findViewById(id);
+                if (row != null && row.findViewById(R.id.act_chevron) != null) withChevron++;
+            }
+            ok(stat, L, withChevron == dropdowns.length,
+                    "★设置页六个下拉（深浅色 / 语言 / 屏幕方向 / 默认槽 / 签名校验 / 更新模式）"
+                            + "各自带箭头 —— 实得 " + withChevron);
+            //    元断言：摘掉一个开关行 ⇒ 计数必须变 3（证明数的是树里的控件、不是恒 4）
+            android.view.View cas = v.findViewById(R.id.row_cas_game);
+            android.view.ViewGroup casCard = cas == null ? null : (android.view.ViewGroup) cas.getParent();
+            if (casCard != null) {
+                casCard.removeView(cas);
+                ok(stat, L, countById(v, R.id.act_switch) == 3,
+                        "★元断言：摘掉游戏包去重那一行后开关只剩 3 个");
+            } else {
+                ok(stat, L, false, "★元断言：实验性功能卡找不到（row_cas_game 不在树里）");
+            }
+        } catch (Throwable t) {
+            ok(stat, L, false, "设置页控件类型计数检查自身异常：" + t);
+        }
+        // ★ 同一批：CAS 搬到「实验性功能」卡（用户 2026-11-28：「CAS放实验性功能」）。
+        //   搬卡时 include 与分割线要一起挪，只挪 include ⇒ 旧卡末尾留一条多余分割线。
+        try {
+            android.view.View v = inf.inflate(R.layout.activity_settings, null);
+            android.view.View cas = v.findViewById(R.id.row_cas_game);
+            android.view.View storage = v.findViewById(R.id.row_storage);
+            boolean moved = cas != null && storage != null && cas.getParent() != null
+                    && cas.getParent() != storage.getParent();
+            ok(stat, L, moved, "★设置页：游戏包去重不在启动与存储卡里（已搬到实验性功能）");
+            android.view.View sec = v.findViewById(R.id.settings_section_experimental);
+            android.view.View hint = v.findViewById(R.id.settings_section_experimental_hint);
+            ok(stat, L, sec != null && hint != null,
+                    "★设置页：实验性功能的分区标题与小字都在布局里");
+            ok(stat, L, ctx.getString(R.string.settings_section_experimental).length() > 0
+                            && ctx.getString(R.string.settings_section_experimental_hint).length() > 0,
+                    "★设置页：实验性功能的两条文案资源都非空");
+            if (moved) {
+                android.view.ViewGroup card = (android.view.ViewGroup) cas.getParent();
+                ok(stat, L, card.getChildCount() == 1,
+                        "★实验性功能卡只有一行，卡内不该有行间分割线（实得子 View " + card.getChildCount() + " 个）");
+            }
+        } catch (Throwable t) {
+            ok(stat, L, false, "设置页实验性功能卡检查自身异常：" + t);
+        }
+        // ★ 同一批：开关行的副标题只写解释（状态由开关自己表达）——写成「当前：开」就与开关重复。
+        try {
+            int[] whys = {R.string.set_crash_alert_why, R.string.set_autoclean_row_why,
+                    R.string.set_cas_why_on, R.string.set_cas_why_off, R.string.set_cas_why_none,
+                    R.string.plugin_update_auto_why_on, R.string.plugin_update_auto_why_off};
+            boolean clean = true;
+            for (int id : whys) {
+                String s = ctx.getString(id);
+                if (s.contains("当前") || s.contains("Current")) clean = false;
+            }
+            ok(stat, L, clean, "★开关行的副标题不含「当前：」/「Current:」（状态由开关自己表达）");
+        } catch (Throwable t) {
+            ok(stat, L, false, "开关副标题检查自身异常：" + t);
+        }
+        // ★ 同一批：语言下拉的末项是「翻译文件…」（只用来分岔，不是语言）——候选数比语言多一个。
+        try {
+            int n = LocaleMode.tags(ctx).length;
+            ok(stat, L, n >= 1, "★语言候选至少一个（" + n + "）");
+            String item = SettingsActivity.packItemLabel(ctx);
+            ok(stat, L, item != null && item.length() > 0,
+                    "★语言下拉末项「翻译文件…」文案非空：" + item);
+        } catch (Throwable t) {
+            ok(stat, L, false, "语言下拉末项检查自身异常：" + t);
         }
         // ★ 第 320 轮：实例管理页（版本页）新增「管理这个槽」—— 从这里进**这一行的槽**的槽页。
         //   用户原话：「在实例管理页面加一个进入当前槽的管理页面的机制」。

@@ -182,4 +182,7 @@
     <string name="plugin_update_auto_off">Current: Off · only on manual check</string>
     <string name="plugin_update_auto_enable">Turn on (check once a day)</string>
     <string name="plugin_update_auto_disable">Turn off (only when I check)</string>
+    <!-- 2026-11-27 设置页改造：这两行改成了开关，副标题只写解释（状态由开关自己表达）。 -->
+    <string name="plugin_update_auto_why_on">Checked once a day in the background</string>
+    <string name="plugin_update_auto_why_off">Only when you check manually</string>
 </resources>
